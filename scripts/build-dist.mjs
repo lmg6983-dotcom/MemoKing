@@ -24,6 +24,7 @@ const runSmoke = !process.argv.includes('--no-smoke');
 const builderPkg = join(BUILD, 'node_modules', 'electron-builder', 'package.json');
 if (!existsSync(builderPkg) || JSON.parse(readFileSync(builderPkg, 'utf8')).version !== BUILDER_VERSION) {
   console.log(`설치: electron-builder@${BUILDER_VERSION} → ${BUILD}`);
+  mkdirSync(BUILD, { recursive: true }); // 처음 빌드하는 컴퓨터에는 폴더가 없다
   execSync(`npm install --no-audit --no-fund electron-builder@${BUILDER_VERSION}`, { cwd: BUILD, stdio: 'inherit' });
 }
 
@@ -68,6 +69,7 @@ const config = {
   asarUnpack: ['scripts/clipboard-helper.ps1', 'scripts/popup-watch.ps1'], // PowerShell 이 읽어야 하므로 asar 밖에
   npmRebuild: false,
   nodeGypRebuild: false,
+  publish: null, // 자동 업데이트·배포 안 함 (없으면 배포 대상을 찾다가 멈출 수 있다)
   win: {
     target: [{ target: 'nsis', arch: ['x64'] }],
     icon: 'assets/icons/memoking.ico',
