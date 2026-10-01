@@ -4,7 +4,8 @@
 //            v0.17.1 — 창이 작아도 스탬프가 카드(요약)와 겹치지 않음 · 카카오톡 알림은 설정 없이 늘 · 선택한 내용 자동 영역 캡처
 //            v0.17.2 — 화면 밖까지 선택하면 스크롤하며 캡처해 이어 붙이기 · 표 머리글 강조는 고를 때만, 열 너비·행 높이 끌기 · Ctrl+휠 본문 확대
 //            v0.17.3 — 표 막대(행·열 추가·지우기·셀 병합·자동 조정) · 붙여넣은 표 열 너비·정렬 자동 · 칸 안 줄바꿈 유지
-//            v0.17.4 — H1·H2 버튼 대신 스타일 고르기 · 좁은 메모 창에서도 표 막대 버튼이 모두 보임
+//            v0.17.4 — H1·H2 버튼 대신 스타일 고르기 · 좁은 메모 창에서도 표 막대 버튼이 모두 보임 · 목록 Ctrl+휠 확대
+//                      · 선택 영역 자동 캡처 고침(UI 자동화 어셈블리 경로) · 팝업 알림 글자를 접근성(MSAA)·자식 창에서도
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
@@ -505,6 +506,23 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     check('H1·H2 버튼 대신 "스타일": 지금 줄 스타일 표시(제목 1), 고르는 목록(본문·제목 1·2·3·인용·코드 블록, 지금 것 ✓), 제목 2를 고르면 바뀜',
       noH && label0 === '제목 1' && menu === '본문,제목 1✓,제목 2,제목 3,인용,코드 블록' && after.h2 && after.label === '제목 2' && after.menuHidden, JSON.stringify({ noH, label0, menu, after }));
     tw.close();
+    // 10) v0.17.4: 메모 목록에서도 Ctrl+마우스 휠 → 카드만 확대·축소 (창 전체 확대는 아님), 배율 기억
+    const lw = getList();
+    const lBox = lw.getContentBounds();
+    const title0 = await lj(`document.querySelector('#cards .card-title').getBoundingClientRect().height`);
+    for (let i = 0; i < 2; i++) {
+      lw.webContents.sendInputEvent({ type: 'mouseWheel', x: Math.round(lBox.width / 2), y: Math.round(lBox.height / 2), deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
+      await wait(150);
+    }
+    await wait(300);
+    const lz = await lj(`({ zoom: Number(document.getElementById('cards').style.zoom || 1), title: document.querySelector('#cards .card-title').getBoundingClientRect().height, badge: document.querySelector('.zoom-badge')?.textContent ?? '', saved: localStorage.getItem('memoking.listZoom') })`);
+    check('메모 목록 Ctrl+휠 → 카드 글자가 배율만큼 커지거나 작아지고(창 전체 확대는 아님), 배율을 기억',
+      lz.zoom !== 1 && Math.abs(lz.title / title0 - lz.zoom) < 0.08 && lw.webContents.getZoomFactor() === 1 && /메모 \d+%/.test(lz.badge) && Number(lz.saved) === lz.zoom, JSON.stringify({ lz, title0 }));
+    await lj(`document.querySelector('.zoom-badge button').click()`);
+    // 팝업 알림을 어떤 방법으로 읽었는지 남김 (UI 자동화로 읽은 김대리 알림 = uia)
+    const viaUia = history.list({ query: '김대리' }).find((e) => e.source === 'popup')?.via;
+    check('팝업 알림 항목에 읽은 방법이 남음 (글자를 그대로 읽으면 uia·msaa·win32, 그림 글자 인식이면 ocr)', ['uia', 'msaa', 'win32'].includes(viaUia), String(viaUia));
+
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {

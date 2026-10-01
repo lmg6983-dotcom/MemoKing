@@ -146,7 +146,14 @@ public static class MkWin {
 # 좌표는 실제 화면 픽셀 (스레드를 모니터별 DPI 인식으로 두고 읽는다). 응답 없는 앱에 묶이지 않게 시간 제한.
 function Initialize-SelApi {
   if ($script:selApiLoaded) { return }
-  Add-Type -ReferencedAssemblies UIAutomationClient, UIAutomationTypes, WindowsBase -TypeDefinition @'
+  # UI 자동화·WindowsBase 는 .NET 기본 폴더가 아니라 WPF 폴더에 있어 이름만으로는 컴파일러가 찾지 못한다 → 불러온 뒤 실제 파일 경로로
+  Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, WindowsBase
+  $refs = @(
+    [System.Windows.Automation.AutomationElement].Assembly.Location,
+    [System.Windows.Automation.AutomationElementIdentifiers].Assembly.Location,
+    [System.Windows.Rect].Assembly.Location
+  )
+  Add-Type -ReferencedAssemblies $refs -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -343,9 +350,103 @@ public static class MkSel {
   $script:selApiLoaded = $true
 }
 
+# 마지막으로 끈(드래그) 시작·끝 점 — UI 자동화로 선택 위치를 읽을 수 없는 앱(카카오톡 등)에서 강조색을 찾을 자리
+# 왼쪽 단추를 누른 채 8px 넘게 움직였다 뗀 것만. 좌표는 실제 화면 픽셀. 위치만 기억하고 다른 것은 하지 않는다.
+function Initialize-DragApi {
+  if ($script:dragApiLoaded) { return }
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class MkDrag {
+  delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+  [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+  [StructLayout(LayoutKind.Sequential)] struct MSLLHOOKSTRUCT { public POINT pt; public uint mouseData, flags, time; public IntPtr extra; }
+  [StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam, lParam; public uint time; public POINT pt; }
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+  [DllImport("user32.dll")] static extern IntPtr SetWindowsHookEx(int id, LowLevelMouseProc fn, IntPtr mod, uint thread);
+  [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr h, int code, IntPtr w, IntPtr l);
+  [DllImport("user32.dll")] static extern int GetMessage(out MSG msg, IntPtr hwnd, uint min, uint max);
+  [DllImport("kernel32.dll")] static extern IntPtr GetModuleHandle(string name);
+  [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT p);
+  [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h, uint flags);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr ctx);
+
+  static LowLevelMouseProc proc = Hook; // 훅이 쓰는 동안 사라지지 않게
+  static IntPtr hook = IntPtr.Zero;
+  static bool down; static int downX, downY; static IntPtr downWin;
+  public static int X0, Y0, X1, Y1;
+  public static long Hwnd;
+  public static DateTime At = DateTime.MinValue;
+
+  public static void Start() {
+    if (hook != IntPtr.Zero) return;
+    var t = new System.Threading.Thread(() => {
+      try { SetThreadDpiAwarenessContext(new IntPtr(-4)); } catch { }
+      hook = SetWindowsHookEx(14, proc, GetModuleHandle(null), 0); // WH_MOUSE_LL
+      MSG m;
+      while (GetMessage(out m, IntPtr.Zero, 0, 0) > 0) { }
+    });
+    t.IsBackground = true;
+    t.Start();
+  }
+
+  static IntPtr Hook(int code, IntPtr w, IntPtr l) {
+    try {
+      if (code >= 0) {
+        int msg = w.ToInt32();
+        if (msg == 0x201 || msg == 0x202) {
+          var s = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(l, typeof(MSLLHOOKSTRUCT));
+          if (msg == 0x201) { down = true; downX = s.pt.X; downY = s.pt.Y; downWin = GetAncestor(WindowFromPoint(s.pt), 2); }
+          else if (down) {
+            down = false;
+            if (Math.Abs(s.pt.X - downX) + Math.Abs(s.pt.Y - downY) > 8) {
+              X0 = downX; Y0 = downY; X1 = s.pt.X; Y1 = s.pt.Y; Hwnd = downWin.ToInt64(); At = DateTime.UtcNow;
+            }
+          }
+        }
+      }
+    } catch { }
+    return CallNextHookEx(hook, code, w, l);
+  }
+
+  public static bool SameAsForeground() { return GetAncestor(GetForegroundWindow(), 2).ToInt64() == Hwnd; }
+  public static int[] ForegroundRect() {
+    IntPtr old = IntPtr.Zero;
+    try { old = SetThreadDpiAwarenessContext(new IntPtr(-4)); } catch { }
+    try { RECT r; return GetWindowRect(GetForegroundWindow(), out r) ? new[] { r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top } : null; }
+    finally { if (old != IntPtr.Zero) { try { SetThreadDpiAwarenessContext(old); } catch { } } }
+  }
+}
+'@
+  $script:dragApiLoaded = $true
+}
+
+function Get-LastDrag {
+  Initialize-DragApi
+  if ([MkDrag]::At -eq [DateTime]::MinValue) { return '{"found":false}' }
+  $out = @{
+    found = $true
+    x0 = [MkDrag]::X0; y0 = [MkDrag]::Y0; x1 = [MkDrag]::X1; y1 = [MkDrag]::Y1
+    ageMs = [Math]::Round(([DateTime]::UtcNow - [MkDrag]::At).TotalMilliseconds)
+    sameWindow = [MkDrag]::SameAsForeground()
+  }
+  $wr = [MkDrag]::ForegroundRect()
+  if ($wr) { $out.window = @{ x = $wr[0]; y = $wr[1]; width = $wr[2]; height = $wr[3] } }
+  $fg = [MkWin]::GetForegroundWindow()
+  $out.title = [MkWin]::Title($fg)
+  $procId = [uint32]0
+  [void][MkWin]::GetWindowThreadProcessId($fg, [ref]$procId)
+  $out.process = ''
+  try { $out.process = (Get-Process -Id $procId -ErrorAction Stop).ProcessName } catch { }
+  return ($out | ConvertTo-Json -Compress)
+}
+
 function Get-SelectionRect {
   Initialize-SelApi
-  $r = [MkSel]::Find(1500)
+  $r = [MkSel]::Find(2500) # 처음 물을 때 앱(브라우저 등)이 접근성 정보를 만드느라 늦을 수 있다
   if ($r.Error) { return (@{ found = $false; error = $r.Error } | ConvertTo-Json -Compress) }
   $out = @{ found = $r.Found; more = $r.More }
   if ($r.Found) {
@@ -459,10 +560,12 @@ switch ($Action) {
   #   capture<TAB><폴더 경로 base64(UTF-8)>[<TAB>nocopy]  ->  JSON 한 줄
   #   selrect  ->  {"found":true,"more"(화면 밖까지 선택),"x","y","width","height","view"(화면 픽셀),"window","process"} 또는 {"found":false}
   #   selscroll<TAB>start|next|restore  ->  {"ok","atEnd","moved","view","sel"}  (스크롤 캡처)
+  #   lastdrag  ->  {"found","x0","y0","x1","y1"(화면 픽셀),"ageMs","sameWindow","window","title","process"}  (마지막으로 끈 곳)
   'serve' {
     try { [Console]::OutputEncoding = $utf8 } catch { }
     Initialize-WinApi
     try { Initialize-SelApi } catch { } # 미리 컴파일해 두어 처음 누를 때 늦지 않게 (실패하면 selrect 가 오류로 답함)
+    try { Initialize-DragApi; [MkDrag]::Start() } catch { } # 마지막 드래그 위치 기억 (UI 자동화를 쓰지 않는 앱용)
     [Console]::Out.WriteLine('{"ready":true}')
     [Console]::Out.Flush()
     while ($null -ne ($line = [Console]::In.ReadLine())) {
@@ -475,6 +578,8 @@ switch ($Action) {
           $out = Invoke-Capture $dir ($mode -eq 'nocopy') $only
         } elseif ($parts[0] -eq 'selrect') {
           $out = Get-SelectionRect
+        } elseif ($parts[0] -eq 'lastdrag') {
+          $out = Get-LastDrag
         } elseif ($parts[0] -eq 'selscroll') {
           $out = Invoke-SelScroll $parts[1]
         } elseif ($parts[0] -eq 'ping') {

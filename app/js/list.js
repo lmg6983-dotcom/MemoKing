@@ -8,6 +8,7 @@ import { setupHistoryTab } from './list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
+import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
@@ -646,6 +647,59 @@ function applyDensity() {
   set('--row-h', d.fill ? 'minmax(min-content, 1fr)' : 'auto');
   el.cards.classList.toggle('fill', d.fill);
 }
+// ---------- 메모 카드 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 메모 창과 같은 단계, 이 PC 에 기억 ----------
+// 카드 목록만 확대한다 (위 막대·탭·검색은 그대로). 크게 하면 한 화면에 들어가는 카드가 줄어 모양(넉넉·보통·촘촘)도 따라 바뀐다.
+const LIST_ZOOM_KEY = 'memoking.listZoom';
+let listZoom = 1;
+try {
+  listZoom = clampZoom(localStorage.getItem(LIST_ZOOM_KEY) ?? 1);
+} catch {
+  // 저장소를 못 써도 100% 로
+}
+const listZoomBadge = document.createElement('div');
+listZoomBadge.className = 'zoom-badge';
+listZoomBadge.setAttribute('role', 'status');
+const listZoomText = document.createElement('span');
+const listZoomReset = document.createElement('button');
+listZoomReset.type = 'button';
+listZoomReset.textContent = '원래대로';
+listZoomReset.addEventListener('click', () => setListZoom(1));
+listZoomBadge.append(listZoomText, listZoomReset);
+document.body.append(listZoomBadge);
+let listZoomTimer = 0;
+function setListZoom(z, { show = true } = {}) {
+  listZoom = clampZoom(z);
+  el.cards.style.zoom = listZoom === 1 ? '' : String(listZoom);
+  document.body.dataset.listZoom = String(listZoom);
+  try {
+    if (listZoom === 1) localStorage.removeItem(LIST_ZOOM_KEY);
+    else localStorage.setItem(LIST_ZOOM_KEY, String(listZoom));
+  } catch {
+    // 기억 못 해도 지금 창에서는 그대로
+  }
+  if (!densityFrame) densityFrame = requestAnimationFrame(applyDensity);
+  if (!show) return;
+  listZoomText.textContent = `메모 ${zoomLabel(listZoom)}`;
+  listZoomReset.hidden = listZoom === 1;
+  listZoomBadge.classList.add('show');
+  clearTimeout(listZoomTimer);
+  listZoomTimer = setTimeout(() => listZoomBadge.classList.remove('show'), 1600);
+}
+setListZoom(listZoom, { show: false });
+window.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault(); // 창 전체(Chromium) 확대는 막는다
+  if (e.deltaY) setListZoom(stepZoom(listZoom, e.deltaY < 0 ? 1 : -1));
+}, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || (e.shiftKey && e.code !== 'Equal')) return;
+  if (e.target.closest?.('input, textarea, [contenteditable="true"]') && e.code !== 'Equal' && e.code !== 'Minus') return;
+  if (e.code === 'Equal' || e.code === 'NumpadAdd') setListZoom(stepZoom(listZoom, 1));
+  else if (e.code === 'Minus' || e.code === 'NumpadSubtract') setListZoom(stepZoom(listZoom, -1));
+  else return;
+  e.preventDefault();
+});
+
 // 크기가 바뀌면 다음 화면에서 한 번만 (모양을 바꾸며 생기는 크기 변화가 다시 불러들이지 않게)
 new ResizeObserver(() => {
   if (!densityFrame) densityFrame = requestAnimationFrame(applyDensity);

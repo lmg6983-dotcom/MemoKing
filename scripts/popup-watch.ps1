@@ -2,15 +2,19 @@
 # Some apps (e.g. KakaoTalk PC) show their own small popup windows instead of Windows notifications,
 # so those never reach the Action Center database. This helper watches for such popups and reads them:
 #   1) UI Automation text of the popup window
-#   2) if none, captures the window (PrintWindow) and reads it with the OCR built into Windows (Windows.Media.Ocr)
-# One JSON line per new popup text on stdout: {"process","pid","hwnd","windowTitle","lines":[...],"via":"uia|ocr","image":"<png>"}
+#   2) if none, MSAA (IAccessible name / value / description) of the window and its children
+#   3) if none, text of the child windows (WM_GETTEXT)
+#   4) if none, captures the window (PrintWindow) and reads it with the OCR built into Windows (Windows.Media.Ocr)
+# One JSON line per new popup text on stdout: {"process","pid","hwnd","windowTitle","lines":[...],"via":"uia|msaa|win32|ocr","image":"<png>"}
+# -Log <file>: one JSON line per popup with what each method found (to see how an app's popup can be read)
 # Requires Windows PowerShell 5.1 (WinRT OCR):  powershell.exe -STA -NoProfile -ExecutionPolicy Bypass -File popup-watch.ps1 -Processes KakaoTalk -Dir <tmp>
 param(
   [string]$Processes = 'KakaoTalk',   # process names without .exe, comma separated
   [int]$OnlyPid = 0,                  # self-test: watch only this process id (names ignored)
   [Parameter(Mandatory = $true)][string]$Dir,
   [int]$IntervalMs = 700,
-  [switch]$ForceOcr
+  [switch]$ForceOcr,
+  [string]$Log = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,6 +82,111 @@ public static class MkPopup {
   }
 }
 '@
+
+# ---------- 글자 그대로 읽기: MSAA(접근성) · 자식 창 글자 ----------
+Add-Type -AssemblyName Accessibility
+Add-Type -ReferencedAssemblies ([Accessibility.IAccessible].Assembly.Location) -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+using Accessibility;
+
+public static class MkText {
+  [DllImport("oleacc.dll")] static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint id, ref Guid iid, [MarshalAs(UnmanagedType.IUnknown)] out object obj);
+  [DllImport("oleacc.dll")] static extern int AccessibleChildren(IAccessible acc, int start, int count, [Out] object[] children, out int obtained);
+  public delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumProc cb, IntPtr l);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, StringBuilder l, uint flags, uint timeout, out IntPtr result);
+
+  static void Add(List<string> list, Func<string> f) {
+    try { var s = f(); if (!string.IsNullOrWhiteSpace(s)) list.Add(s.Trim()); } catch { }
+  }
+
+  // 창(과 그 안)의 접근성 이름·값·설명
+  public static string[] Msaa(long hwnd) {
+    var list = new List<string>();
+    try {
+      Guid iid = new Guid("618736E0-3C3D-11CF-810C-00AA00389B71"); // IID_IAccessible
+      object o;
+      if (AccessibleObjectFromWindow(new IntPtr(hwnd), 0xFFFFFFFC, ref iid, out o) == 0 && o is IAccessible) Walk((IAccessible)o, list, 0); // OBJID_CLIENT
+    } catch { }
+    return list.ToArray();
+  }
+
+  static void Walk(IAccessible acc, List<string> list, int depth) {
+    if (depth > 6 || list.Count > 120) return;
+    Add(list, () => acc.get_accName(0));
+    Add(list, () => acc.get_accValue(0));
+    Add(list, () => acc.get_accDescription(0));
+    int n = 0;
+    try { n = acc.accChildCount; } catch { }
+    if (n <= 0) return;
+    n = Math.Min(n, 80);
+    var kids = new object[n];
+    int got;
+    try { if (AccessibleChildren(acc, 0, n, kids, out got) != 0) return; } catch { return; }
+    for (int i = 0; i < got; i++) {
+      var child = kids[i] as IAccessible;
+      if (child != null) { Walk(child, list, depth + 1); continue; }
+      if (kids[i] is int) {
+        object id = kids[i];
+        Add(list, () => acc.get_accName(id));
+        Add(list, () => acc.get_accValue(id));
+      }
+    }
+  }
+
+  // 자식 창들의 글자 (WM_GETTEXT, 응답 없으면 건너뜀)
+  public static string[] Win32(long hwnd) {
+    var list = new List<string>();
+    EnumChildWindows(new IntPtr(hwnd), (h, l) => {
+      var sb = new StringBuilder(2048);
+      IntPtr r;
+      if (SendMessageTimeout(h, 0x000D, new IntPtr(sb.Capacity), sb, 0x0002, 200, out r) != IntPtr.Zero && sb.Length > 0) list.Add(sb.ToString().Trim());
+      return list.Count < 80;
+    }, IntPtr.Zero);
+    return list.ToArray();
+  }
+
+  // 진단용: 창과 자식 창들의 종류(class)
+  public static string[] Classes(long hwnd) {
+    var list = new List<string>();
+    var sb = new StringBuilder(256);
+    GetClassName(new IntPtr(hwnd), sb, 256);
+    list.Add(sb.ToString());
+    EnumChildWindows(new IntPtr(hwnd), (h, l) => {
+      var c = new StringBuilder(256);
+      GetClassName(h, c, 256);
+      list.Add(c.ToString());
+      return list.Count < 40;
+    }, IntPtr.Zero);
+    return list.ToArray();
+  }
+}
+'@
+
+# 읽은 조각들 정리: 공백 하나로, 같은 것은 한 번, 창 제목과 같은 것은 빼고, 다른 조각들을 통째로 담은 덩어리도 뺀다
+function Select-Fragments([string[]]$items, [string]$title) {
+  $seen = @{}
+  $out = New-Object System.Collections.Generic.List[string]
+  foreach ($raw in $items) {
+    $name = ($raw -replace '\s+', ' ').Trim()
+    if (-not $name -or $name -eq $title -or $seen.ContainsKey($name)) { continue }
+    $seen[$name] = $true
+    $out.Add($name)
+  }
+  @($out | Where-Object { $n = $_; -not ($out | Where-Object { $_ -ne $n -and $n.Contains($_) -and $_.Length -ge 2 }) })
+}
+
+function Write-PopupLog($entry) {
+  if (-not $Log) { return }
+  try {
+    if ((Test-Path $Log) -and (Get-Item $Log).Length -gt 300KB) { Clear-Content $Log }
+    [IO.File]::AppendAllText($Log, (($entry | ConvertTo-Json -Compress -Depth 4) + "`n"), (New-Object System.Text.UTF8Encoding $false))
+  } catch { }
+}
 
 # ---------- WinRT 글자 인식 (한국어) ----------
 $null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRuntime]
@@ -160,10 +269,20 @@ while ($true) {
           if ($s.stable -ne 1) { continue }                                # 모양이 그대로면 한 번만 읽는다
           $png = Join-Path $Dir ("popup-{0}-{1}.png" -f $w.Hwnd, [DateTime]::Now.Ticks)
           $bmp.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
-          $via = 'uia'
+          # 글자를 그대로 읽을 수 있는 방법부터: UI 자동화 → 접근성(MSAA) → 자식 창 글자 → 마지막에 그림 글자 인식
+          $found = [ordered]@{ uia = @(); msaa = @(); win32 = @() }
+          $via = ''
           $lines = @()
-          if (-not $ForceOcr) { $lines = @(Read-Uia $w.Hwnd $w.Title) }
+          if (-not $ForceOcr) {
+            $found.uia = @(Read-Uia $w.Hwnd $w.Title)
+            if ($found.uia.Count) { $via = 'uia'; $lines = $found.uia }
+            $found.msaa = @(Select-Fragments ([MkText]::Msaa($w.Hwnd)) $w.Title)
+            if (-not $lines.Count -and $found.msaa.Count) { $via = 'msaa'; $lines = $found.msaa }
+            $found.win32 = @(Select-Fragments ([MkText]::Win32($w.Hwnd)) $w.Title)
+            if (-not $lines.Count -and $found.win32.Count) { $via = 'win32'; $lines = $found.win32 }
+          }
           if (-not $lines.Count) { $via = 'ocr'; $lines = @(Read-Ocr $png) }
+          Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); classes = @([MkText]::Classes($w.Hwnd)); title = $w.Title; size = "$($w.W)x$($w.H)"; uia = $found.uia; msaa = $found.msaa; win32 = $found.win32; via = $via; lines = $lines })
           $key = ($lines -join "`n")
           if (-not $key -or $key -eq $s.sent) { Remove-Item $png -ErrorAction SilentlyContinue; continue }
           $s.sent = $key

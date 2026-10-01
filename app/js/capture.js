@@ -12,8 +12,9 @@ let done = false;
 let auto = false;
 const AUTO_MS = 650; // 테두리가 자리 잡고 반짝인 뒤 캡처
 
-api.on('capture:image', ({ src, auto: rect }) => {
+api.on('capture:image', ({ src, auto: rect, hint }) => {
   auto = Boolean(rect);
+  if (hint && !rect) $('hint').textContent = `${hint} · 취소는 Esc`; // 선택한 곳을 찾지 못해 직접 고르는 까닭
   if (auto) document.body.classList.add('auto', 'selecting');
   $('shot').onload = () => {
     document.documentElement.dataset.ready = 'true';

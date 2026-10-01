@@ -736,3 +736,40 @@ body.is-dragging .card:hover { transform: none; }
 
 /* 카드의 미리보기 사진: 위아래·좌우가 잘리지 않게 사진 전체를 (남는 자리는 옅은 바탕) */
 .card-thumb { object-fit: contain; object-position: center; background: color-mix(in srgb, var(--note-fg) 7%, transparent); }
+
+/* 팝업 알림을 그림 글자 인식으로 읽은 경우 (v0.17.4) */
+.noti-via { padding: 0 5px; border-radius: 4px; background: var(--fill-hover); font-size: 10.5px; font-weight: 600; }
+
+/* 메모 카드 확대·축소 안내 (Ctrl+휠, v0.17.4) — 메모 창과 같은 모양 */
+.zoom-badge {
+  position: fixed;
+  right: 14px;
+  bottom: 16px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--brand-black);
+  color: var(--on-black);
+  font: 600 12px/22px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+  pointer-events: none;
+}
+.zoom-badge.show { opacity: 1; transform: none; pointer-events: auto; }
+.zoom-badge button {
+  height: 22px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.zoom-badge button:hover { background: rgba(255, 255, 255, 0.28); }
