@@ -636,13 +636,14 @@ function applyDensity() {
   const width = el.cards.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const height = el.cards.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   if (width <= 0 || height <= 0) return;
-  const d = chooseDensity({ width, height }, el.cards.children.length, visibleForZoom(listZoom));
+  const d = chooseDensity({ width, height }, el.cards.children.length, visibleForZoom(listZoom), { zoom: listZoom });
   const set = (name, value) => {
     if (el.cards.style.getPropertyValue(name) !== value) el.cards.style.setProperty(name, value);
   };
   if (el.cards.dataset.density !== d.mode) el.cards.dataset.density = d.mode;
   set('--cols', String(d.cols));
   set('--preview-lines', String(Math.max(1, d.previewLines)));
+  set('--preview-lines-full', String(Math.max(1, d.fullLines)));
   set('--thumb-h', `${d.thumbHeight}px`);
   // 메모가 적으면 목록 높이를 같은 높이로 나눠 채운다
   // 남는 몇 px 까지 똑같이 나누되, 카드 내용보다 낮아지지는 않게 (창이 작으면 목록이 스크롤 — 카드가 넘쳐 틈의 스탬프와 겹치지 않게)
@@ -669,8 +670,10 @@ listZoomReset.addEventListener('click', () => setListZoom(1));
 listZoomBadge.append(listZoomText, listZoomReset);
 document.body.append(listZoomBadge);
 let listZoomTimer = 0;
+// 175% 넘게는 확대하지 않는다 — 카드가 한 장만 보이는 배율이라 더 키우면 글자만 커지고 보이는 내용은 오히려 준다
+const LIST_ZOOM_MAX = 1.75;
 function setListZoom(z, { show = true } = {}) {
-  listZoom = clampZoom(z);
+  listZoom = Math.min(LIST_ZOOM_MAX, clampZoom(z));
   el.cards.style.zoom = listZoom === 1 ? '' : String(listZoom);
   // 제목 글자는 확대해도 100% 크기(줄 높이 22px)보다 커지지 않게 — 확대 배율만큼 되돌려 줄인다 (축소할 때는 함께 작아짐)
   el.cards.style.setProperty('--title-cap', String(listZoom > 1 ? 1 / listZoom : 1));

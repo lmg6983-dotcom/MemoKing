@@ -18,7 +18,7 @@ export function clampZoom(v) {
 // 목록 확대 배율 → 한 화면에 보일 메모 수 (100% = 8개). 확대하면 적게(카드마다 내용을 더), 축소하면 많이
 export function visibleForZoom(z) {
   // 글자도 배율만큼 커지므로 카드 한 장의 높이(글자 기준)가 늘려면 배율보다 빠르게 줄여야 한다 → 배율의 세제곱
-  return Math.min(40, Math.max(2, Math.round(8 / clampZoom(z) ** 3)));
+  return Math.min(40, Math.max(1, Math.round(8 / clampZoom(z) ** 3)));
 }
 
 export const zoomLabel = (z) => `${Math.round(z * 100)}%`;

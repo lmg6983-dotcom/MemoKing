@@ -35,6 +35,6 @@ test('배율 이름', () => {
 
 test('목록 배율 → 한 화면에 보일 메모 수: 확대하면 적게, 축소하면 많이', () => {
   assert.equal(visibleForZoom(1), 8);
-  assert.ok(visibleForZoom(1.25) < 8 && visibleForZoom(1.5) < visibleForZoom(1.25) && visibleForZoom(3) >= 2);
+  assert.ok(visibleForZoom(1.25) < 8 && visibleForZoom(1.5) < visibleForZoom(1.25) && visibleForZoom(3) >= 1);
   assert.ok(visibleForZoom(0.8) > 8 && visibleForZoom(0.5) > visibleForZoom(0.8) && visibleForZoom(0.5) <= 40);
 });

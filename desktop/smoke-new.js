@@ -8,6 +8,7 @@
 //                      · 팝업 알림 글자를 접근성(MSAA)·자식 창에서도
 //            v0.17.6 — 선택 영역 자동 캡처·스크롤 캡처 삭제 · 목록 확대할수록 카드 수는 줄고 카드 안 내용은 늘게
 //            v0.17.7 — 목록 확대해도 카드 제목은 22px 넘게 커지지 않음
+//            v0.17.8 — 목록 확대할수록 카드 안 요약 줄이 더 많이 (사진은 같은 크기, 최대 175%)
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
@@ -466,7 +467,7 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     const titleOk = lz.zoom > 1 ? Math.abs(lz.title - title0) <= 1 && lz.title <= 22.5 : Math.abs(lz.title / title0 - lz.zoom) < 0.08;
     check('메모 목록 Ctrl+휠 → 카드만 확대·축소(창 전체 확대는 아님), 제목은 22px 넘게 커지지 않음, 배율을 기억',
       lz.zoom !== 1 && titleOk && lw.webContents.getZoomFactor() === 1 && /메모 \d+%/.test(lz.badge) && Number(lz.saved) === lz.zoom, JSON.stringify({ lz, title0 }));
-    check('목록 확대하면 한 화면의 카드 수는 줄고 카드 안 내용(요약 줄)은 같거나 늘며, 축소하면 반대',
+    check('목록 확대하면 한 화면의 카드 수는 줄고 카드 안 내용(요약 줄)은 같거나 늘며, 축소하면 반대 (사진은 같은 크기)',
       bigger ? zAfter.full <= zBefore.full && zAfter.lines >= zBefore.lines : zAfter.full >= zBefore.full && zAfter.lines <= zBefore.lines, JSON.stringify({ zoom: lz.zoom, zBefore, zAfter }));
     await lj(`document.querySelector('.zoom-badge button').click()`);
     // 팝업 알림을 어떤 방법으로 읽었는지 남김 (UI 자동화로 읽은 김대리 알림 = uia)

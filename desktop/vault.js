@@ -206,7 +206,7 @@ export class Vault extends EventEmitter {
       id: entry.id,
       file: entry.file,
       title: extractTitle(entry.body),
-      preview: extractPreview(entry.body),
+      preview: extractPreview(entry.body, 1200), // 목록을 확대하면 카드에 요약을 여러 줄 보여 주므로 넉넉히
       color: entry.meta.color,
       pinned: entry.meta.pinned,
       created: entry.meta.created,
