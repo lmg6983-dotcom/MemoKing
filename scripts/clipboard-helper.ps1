@@ -1,5 +1,6 @@
 ﻿# Windows clipboard helper for MemoKing.
 #   - Quick memo hotkey (Ctrl+Alt+C): capture / serve  -> copies the selection in the foreground app and dumps the clipboard
+#   - Area capture (Ctrl+Alt+C twice): serve 'selrect' -> screen rectangle of the drag-selected content (UI Automation)
 #   - Clipboard smoke test (npm run smoke:clipboard): text / html / image / files / backup / restore
 # Puts the same formats real apps put on the clipboard:
 #   text  - Notepad          (Unicode text)
@@ -141,6 +142,103 @@ public static class MkWin {
   $script:winApiLoaded = $true
 }
 
+# 앞 창에서 드래그로 선택한 내용(글·글 속 그림)의 화면 사각형 — UI 자동화 TextPattern 의 선택 범위
+# 좌표는 실제 화면 픽셀 (스레드를 모니터별 DPI 인식으로 두고 읽는다). 응답 없는 앱에 묶이지 않게 시간 제한.
+function Initialize-SelApi {
+  if ($script:selApiLoaded) { return }
+  Add-Type -ReferencedAssemblies UIAutomationClient, UIAutomationTypes, WindowsBase -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using System.Windows.Automation;
+using System.Windows.Automation.Text;
+
+public static class MkSel {
+  [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr ctx);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+
+  public class Result { public bool Found; public double X, Y, W, H; public uint Pid; public long Hwnd; public string Error; }
+
+  public static Result Find(int timeoutMs) {
+    var task = Task.Run(() => FindNow());
+    if (!task.Wait(timeoutMs)) return new Result { Error = "timeout" };
+    return task.Result;
+  }
+
+  class Box {
+    public double L = double.MaxValue, T = double.MaxValue, R = double.MinValue, B = double.MinValue;
+    public bool Any;
+    public void Add(System.Windows.Rect rc) {
+      if (rc.IsEmpty || double.IsInfinity(rc.X) || double.IsNaN(rc.X) || rc.Width < 1 || rc.Height < 1) return;
+      L = Math.Min(L, rc.Left); T = Math.Min(T, rc.Top); R = Math.Max(R, rc.Right); B = Math.Max(B, rc.Bottom); Any = true;
+    }
+  }
+
+  static Result FindNow() {
+    IntPtr old = IntPtr.Zero;
+    try { old = SetThreadDpiAwarenessContext(new IntPtr(-4)); } catch { } // PER_MONITOR_AWARE_V2 (Windows 10 1607+)
+    try {
+      IntPtr fg = GetForegroundWindow();
+      uint pid; GetWindowThreadProcessId(fg, out pid);
+      var res = new Result { Pid = pid, Hwnd = fg.ToInt64() };
+      var el = AutomationElement.FocusedElement;
+      if (el == null || el.Current.ProcessId != (int)pid) return res;
+      var box = new Box();
+      var walker = TreeWalker.RawViewWalker;
+      // 포커스가 문서 안의 작은 요소일 수 있어 TextPattern 이 있는 조상까지 올라가며 찾는다
+      for (int depth = 0; el != null && depth < 12 && !box.Any; depth++) {
+        object pat;
+        if (el.TryGetCurrentPattern(TextPattern.Pattern, out pat)) {
+          foreach (TextPatternRange range in ((TextPattern)pat).GetSelection()) {
+            string text = range.GetText(256) ?? "";
+            AutomationElement[] kids = new AutomationElement[0];
+            try { kids = range.GetChildren(); } catch { }
+            if (text.Trim().Length == 0 && kids.Length == 0) continue; // 커서만 있음
+            foreach (var rc in range.GetBoundingRectangles()) box.Add(rc);
+            foreach (var k in kids) {
+              try { if (!k.Current.IsOffscreen) box.Add(k.Current.BoundingRectangle); } catch { }
+            }
+          }
+        }
+        if (!box.Any) el = walker.GetParent(el);
+      }
+      if (!box.Any) return res;
+      RECT wr;
+      if (GetWindowRect(fg, out wr)) {
+        box.L = Math.Max(box.L, wr.Left); box.T = Math.Max(box.T, wr.Top);
+        box.R = Math.Min(box.R, wr.Right); box.B = Math.Min(box.B, wr.Bottom);
+      }
+      if (box.R - box.L < 4 || box.B - box.T < 4) return res;
+      res.Found = true; res.X = box.L; res.Y = box.T; res.W = box.R - box.L; res.H = box.B - box.T;
+      return res;
+    } catch (Exception e) {
+      return new Result { Error = e.Message };
+    } finally {
+      if (old != IntPtr.Zero) { try { SetThreadDpiAwarenessContext(old); } catch { } }
+    }
+  }
+}
+'@
+  $script:selApiLoaded = $true
+}
+
+function Get-SelectionRect {
+  Initialize-SelApi
+  $r = [MkSel]::Find(1500)
+  if ($r.Error) { return (@{ found = $false; error = $r.Error } | ConvertTo-Json -Compress) }
+  $out = @{ found = $r.Found }
+  if ($r.Found) {
+    $out.x = [Math]::Round($r.X); $out.y = [Math]::Round($r.Y); $out.width = [Math]::Round($r.W); $out.height = [Math]::Round($r.H)
+    $out.window = [MkWin]::Title([IntPtr]$r.Hwnd)
+    $out.process = ''
+    try { $out.process = (Get-Process -Id $r.Pid -ErrorAction Stop).ProcessName } catch { }
+  }
+  return ($out | ConvertTo-Json -Compress)
+}
+
 function Invoke-Capture([string]$dir, [bool]$noCopy, [uint32]$onlyPid = 0) {
   Initialize-WinApi
   $hwnd = [MkWin]::GetForegroundWindow()
@@ -223,9 +321,11 @@ switch ($Action) {
   }
   # 상주 모드: 앱이 켜질 때 한 번 띄워 두고 한 줄씩 명령을 받는다 (매번 PowerShell 을 띄우는 지연 없음)
   #   capture<TAB><폴더 경로 base64(UTF-8)>[<TAB>nocopy]  ->  JSON 한 줄
+  #   selrect  ->  {"found":true,"x","y","width","height"(화면 픽셀),"window","process"} 또는 {"found":false}
   'serve' {
     try { [Console]::OutputEncoding = $utf8 } catch { }
     Initialize-WinApi
+    try { Initialize-SelApi } catch { } # 미리 컴파일해 두어 처음 누를 때 늦지 않게 (실패하면 selrect 가 오류로 답함)
     [Console]::Out.WriteLine('{"ready":true}')
     [Console]::Out.Flush()
     while ($null -ne ($line = [Console]::In.ReadLine())) {
@@ -236,6 +336,8 @@ switch ($Action) {
           $mode = if ($parts.Length -gt 2) { $parts[2] } else { '' }
           $only = if ($mode -like 'only:*') { [uint32]$mode.Substring(5) } else { 0 }
           $out = Invoke-Capture $dir ($mode -eq 'nocopy') $only
+        } elseif ($parts[0] -eq 'selrect') {
+          $out = Get-SelectionRect
         } elseif ($parts[0] -eq 'ping') {
           $out = '{"pong":true}'
         } else {

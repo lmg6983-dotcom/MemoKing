@@ -383,8 +383,6 @@ async function loadSettings() {
   auto.disabled = !s.autoStart.available;
   $('auto-start-note').textContent = s.autoStart.available ? '작업 표시줄 알림 영역에서 조용히 시작해요' : '설치한 메모킹에서 쓸 수 있어요';
   $('history-enabled').checked = s.historyEnabled;
-  $('popup-watch').checked = s.popupWatch;
-  $('popup-watch').disabled = !s.historyEnabled;
   showQuickMemo(s.quickMemo);
   $('trash-days').value = String(s.trashDays);
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
@@ -399,12 +397,8 @@ $('quick-memo').addEventListener('change', async (e) => showQuickMemo(await api.
 $('auto-start').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setAutoStart(e.target.checked);
 });
-$('popup-watch').addEventListener('change', async (e) => {
-  e.target.checked = await api.history.setPopupWatch(e.target.checked);
-});
 $('history-enabled').addEventListener('change', async (e) => {
   e.target.checked = await api.history.setEnabled(e.target.checked);
-  $('popup-watch').disabled = !e.target.checked;
   historyTab.refresh();
 });
 
@@ -648,7 +642,8 @@ function applyDensity() {
   set('--preview-lines', String(Math.max(1, d.previewLines)));
   set('--thumb-h', `${d.thumbHeight}px`);
   // 메모가 적으면 목록 높이를 같은 높이로 나눠 채운다
-  set('--row-h', d.fill ? 'minmax(0, 1fr)' : 'auto'); // 남는 몇 px 까지 똑같이 나눈다
+  // 남는 몇 px 까지 똑같이 나누되, 카드 내용보다 낮아지지는 않게 (창이 작으면 목록이 스크롤 — 카드가 넘쳐 틈의 스탬프와 겹치지 않게)
+  set('--row-h', d.fill ? 'minmax(min-content, 1fr)' : 'auto');
   el.cards.classList.toggle('fill', d.fill);
 }
 // 크기가 바뀌면 다음 화면에서 한 번만 (모양을 바꾸며 생기는 크기 변화가 다시 불러들이지 않게)

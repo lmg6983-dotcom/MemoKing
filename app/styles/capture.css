@@ -37,3 +37,37 @@ body.selecting .dim { display: none; }
   transition: opacity 0.15s ease-out;
 }
 body.selecting .hint { opacity: 0; }
+
+/* 자동(드래그로 선택한 내용): 테두리가 바깥에서 조여 들며 자리 잡고 → 안쪽이 하얗게 반짝 */
+body.auto { cursor: default; }
+.sel.auto {
+  outline-width: 3px;
+  animation: mk-sel-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.sel.auto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+}
+.sel.auto.flash { animation: mk-sel-blink 0.36s ease-out both; }
+.sel.auto.flash::after { animation: mk-flash 0.36s ease-out both; }
+.sel.auto .size { display: none; }
+@keyframes mk-sel-in {
+  from { outline-offset: 14px; outline-color: transparent; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0); }
+  to { outline-offset: 0; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.42); }
+}
+@keyframes mk-sel-blink {
+  0%, 100% { outline-color: var(--brand-yellow); }
+  40% { outline-color: #ffffff; }
+}
+@keyframes mk-flash {
+  0% { opacity: 0; }
+  25% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sel.auto, .sel.auto.flash, .sel.auto.flash::after { animation-duration: 0.01s; }
+}

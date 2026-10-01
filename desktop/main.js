@@ -19,6 +19,7 @@ import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
 import { popupToEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
+import { selectionCaptureRect } from '../app/js/core/selection-rect.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -70,7 +71,6 @@ const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 let settings = {
   vaultPath: null, openNotes: [], noteBounds: {}, onTop: {}, listBounds: null, migratedV1: false,
   historyEnabled: false, // 알림 보관함 (다른 앱 알림을 읽으므로 사용자가 켤 때만)
-  popupWatch: false, // 팝업 알림도 모으기 (카카오톡 등 Windows 알림 센터를 쓰지 않는 앱의 알림 창을 읽음)
   autoStartSet: false, // 설치판 첫 실행 때 자동 실행을 한 번 켜 두었는지
   quickMemo: true, // Ctrl+Alt+C 빠른 메모
   tutorialDone: false, // 처음 실행 튜토리얼을 마쳤거나 건너뛰었는지
@@ -1357,18 +1357,12 @@ function addPopupToHistory(p) {
 }
 
 function syncPopupWatch() {
-  const on = settings.historyEnabled && settings.popupWatch && !SMOKE;
+  // 따로 켜는 설정 없이, 알림 모아두기가 켜져 있으면 늘 (카카오톡 등의 알림 창도 함께 모은다)
+  const on = settings.historyEnabled && !SMOKE;
   if (on) {
     popupWatcher ??= createPopupWatcher();
     popupWatcher.start();
   } else popupWatcher?.stop();
-}
-
-function setPopupWatch(on) {
-  settings.popupWatch = Boolean(on);
-  saveSettings();
-  syncPopupWatch();
-  return settings.popupWatch;
 }
 
 function setHistoryEnabled(on) {
@@ -1428,7 +1422,6 @@ function appSettings() {
     trashCount: vault?.trashList().length ?? 0,
     autoStart: { available: autoStartAvailable(), enabled: getAutoStart() },
     historyEnabled: settings.historyEnabled,
-    popupWatch: settings.popupWatch,
     quickMemo: { enabled: settings.quickMemo, registered: globalShortcut.isRegistered(QUICK_MEMO_KEY), key: 'Ctrl+Alt+C' },
     version: app.getVersion(),
   };
@@ -1517,13 +1510,46 @@ function openCaptureMemo(capture, point, message) {
 // ---------- 영역 캡처 (Ctrl+Alt+C 두 번) ----------
 // Electron 의 desktopCapturer(Chromium) 로 모니터마다 원래 해상도 화면을 찍고, 그 위에 전체 화면 오버레이를 띄워
 // 끌어서 고른 사각형만 잘라 → 클립보드에 그림으로 복사 + 새 메모. 자동 점검은 오버레이를 숨긴 채 쓴다.
-let areaCapture = null; // { wins, shots: Map(webContents id → { image, display }), point }
+// 앞 창에 드래그로 선택한 글·그림이 있으면 고르지 않고 그 내용이 다 들어가는 사각형으로 바로 (테두리·반짝·찰칵).
+let areaCapture = null; // { wins, shots: Map(webContents id → { image, display }), point, auto }
 const smokeClipboard = [];
 
-async function startAreaCapture({ show = !SMOKE } = {}) {
+// 앞 창에서 드래그로 선택한 내용의 화면 사각형(DIP) — 없거나 못 읽으면 null
+async function findSelectionRect() {
+  if (process.platform !== 'win32') return null;
+  try {
+    const r = await captureHelper.request('selrect', 2500);
+    if (!r?.found) return null;
+    // 도우미는 실제 화면 픽셀로 준다 → 화면 DIP
+    const dip = screen.screenToDipRect(null, { x: r.x, y: r.y, width: r.width, height: r.height });
+    return { ...dip, window: r.window ?? '', process: r.process ?? '' };
+  } catch (err) {
+    console.warn('선택한 내용 위치를 읽지 못했어요', err.message);
+    return null;
+  }
+}
+
+// Ctrl+Alt+C 두 번: 선택한 내용이 있으면 그 영역을 자동으로, 없으면 끌어서 고르기
+async function captureSelectionOrArea() {
+  if (areaCapture || !vault) return startAreaCapture();
+  const sel = await findSelectionRect();
+  return startAreaCapture(sel ? { auto: sel } : {});
+}
+
+/** @param {{ show?: boolean, auto?: { x: number, y: number, width: number, height: number, window?: string, process?: string } | null }} options */
+async function startAreaCapture({ show = !SMOKE, auto = null } = {}) {
   if (areaCapture || !vault) return false;
-  areaCapture = { wins: [], shots: new Map(), point: screen.getCursorScreenPoint() };
-  const displays = screen.getAllDisplays();
+  areaCapture = { wins: [], shots: new Map(), point: screen.getCursorScreenPoint(), auto: null };
+  let displays = screen.getAllDisplays();
+  if (auto) {
+    // 선택한 내용이 있는 모니터 하나만 (모니터 밖은 잘라 낸 사각형)
+    const display = screen.getDisplayMatching({ x: Math.round(auto.x), y: Math.round(auto.y), width: Math.round(auto.width), height: Math.round(auto.height) });
+    const rect = selectionCaptureRect(auto, display.bounds);
+    if (rect) {
+      displays = [display];
+      areaCapture.auto = { rect, window: auto.window ?? '', process: auto.process ?? '' };
+    }
+  }
   let sources = [];
   try {
     const size = {
@@ -1565,8 +1591,11 @@ async function startAreaCapture({ show = !SMOKE } = {}) {
     win.webContents.once('did-finish-load', () => {
       if (!areaCapture || win.isDestroyed()) return;
       // 보여 주기만 하는 그림은 JPEG 로 가볍게 (자르기는 원본 그대로)
-      win.webContents.send('capture:image', { src: `data:image/jpeg;base64,${src.thumbnail.toJPEG(92).toString('base64')}` });
-      if (show) {
+      win.webContents.send('capture:image', { src: `data:image/jpeg;base64,${src.thumbnail.toJPEG(92).toString('base64')}`, auto: areaCapture.auto?.rect ?? null });
+      if (show && areaCapture.auto) {
+        win.showInactive(); // 자동: 고를 것이 없으니 보여 주기만 (쓰던 앱의 포커스는 그대로)
+        win.moveTop();
+      } else if (show) {
         win.show();
         win.moveTop();
         win.focus();
@@ -1623,25 +1652,27 @@ function finishAreaCapture(senderId, rect) {
   fs.writeFileSync(tmp, png);
   copyImageToClipboard(tmp);
   const src = vault.saveAttachment(png, 'png');
+  const auto = c.auto;
+  const heading = auto ? '선택한 내용 캡처' : '화면 캡처';
   const capture = {
-    heading: '화면 캡처',
+    heading,
     html: null,
     text: null,
-    items: [{ kind: 'image', src, alt: '화면 캡처' }],
+    items: [{ kind: 'image', src, alt: heading }],
     skipped: [],
-    source: { window: '화면 캡처', process: '', url: null, time: new Date().toISOString(), copied: false },
+    source: { window: auto?.window || '화면 캡처', process: auto?.process ?? '', url: null, time: new Date().toISOString(), copied: false },
   };
   return openCaptureMemo(capture, c.point, {
-    title: '화면을 캡처해 메모를 만들었어요',
+    title: auto ? '선택한 내용을 캡처해 메모를 만들었어요' : '화면을 캡처해 메모를 만들었어요',
     body: `${crop.width} × ${crop.height} 그림을 클립보드에도 복사했어요 · 누르면 메모로 가요`,
   });
 }
 
-// Ctrl+Alt+C: 한 번 = 빠른 메모, 0.35초 안에 두 번 = 영역 캡처
+// Ctrl+Alt+C: 한 번 = 빠른 메모, 0.35초 안에 두 번 = 영역 캡처 (선택한 내용이 있으면 그 영역을 자동으로)
 const onQuickMemoKey = createDoublePress({
   ms: 350,
   onSingle: () => quickMemo(),
-  onDouble: () => startAreaCapture(),
+  onDouble: () => captureSelectionOrArea(),
 });
 
 // ---------- IPC ----------
@@ -1723,7 +1754,6 @@ function registerIpc() {
   });
   ipcMain.handle('trash:delete', (_e, name) => vault?.deleteTrash(String(name ?? '')) ?? false);
   ipcMain.handle('trash:empty', () => vault?.emptyTrash() ?? { memos: 0, files: 0 });
-  ipcMain.handle('history:set-popup-watch', (_e, on) => setPopupWatch(on));
   ipcMain.handle('app:set-trash-days', (_e, days) => {
     const d = Number(days);
     if (TRASH_DAYS.includes(d)) {
@@ -2075,7 +2105,7 @@ app.whenReady().then(async () => {
       alarms, smokeToasts, getHistory: () => history, appSettings, quickMemo, registerQuickMemoKey,
       getCapturePoint: () => lastCapturePoint, smokeOpened, smokeConfirmAnswers,
       getStacks: () => stacks, trackWindowDrag, endWindowDrag, stackInto, getTabTear: () => tabTear, getSettings: () => settings, stickers, reloadSettings: loadSettings, installMark,
-      startAreaCapture, getAreaCapture: () => areaCapture, smokeClipboard, onQuickMemoKey,
+      startAreaCapture, getAreaCapture: () => areaCapture, smokeClipboard, onQuickMemoKey, findSelectionRect, captureHelper,
       createPopupWatcher, getHistory: () => history, smokePdf, getPdfWin: () => pdfWin, openPdfWindow,
       startTutorial, getTutorial: () => tutorial,
       captureToMemo, smokeToastsList: smokeToasts, getTitleBarOverlay: () => titleBarOverlay(),

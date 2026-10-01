@@ -1,6 +1,7 @@
 // 바뀐 기능만 확인하는 짧은 점검 (npm run smoke:new) — 전체 점검(npm run smoke)은 요청할 때만.
 // 버전마다 아래 "이번 버전" 부분을 새 기능에 맞게 바꾼다. 임시 폴더(%TEMP%\memoking-smoke)만 쓴다.
 // 이번 버전: v0.17.0 — 팝업 알림 모으기(UI 자동화·글자 인식) · 메모를 PDF로 · 고친 때 스탬프는 카드 사이 틈에
+//            v0.17.1 — 창이 작아도 스탬프가 카드(요약)와 겹치지 않음 · 카카오톡 알림은 설정 없이 늘 · 선택한 내용 자동 영역 캡처
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
@@ -63,7 +64,13 @@ function pdfText(buf) {
   return { fonts, chars };
 }
 
-export async function runSmoke({ noteWins, getVault, createListWindow, getList, createPopupWatcher, getHistory, smokePdf, getPdfWin }) {
+// PNG 파일의 가로·세로 (IHDR)
+function pngSize(file) {
+  const b = fs.readFileSync(file);
+  return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+}
+
+export async function runSmoke({ noteWins, getVault, createListWindow, getList, createPopupWatcher, getHistory, smokePdf, getPdfWin, startAreaCapture, getAreaCapture, findSelectionRect, smokeToastsList, smokeClipboard }) {
   const checks = [];
   const errors = [];
   const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
@@ -147,17 +154,15 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     })()`);
     check('카드 버튼 묶음: PDF·압정·지우기 버튼이 같은 크기', btnSizes.length === 3 && btnSizes.every((b) => b[1] === btnSizes[0][1] && b[2] === btnSizes[0][2]), JSON.stringify(btnSizes));
 
-    // 2) 팝업 알림 지켜보기 (설정)
+    // 2) 팝업 알림 지켜보기 — 따로 켜는 설정 없이 알림 모아두기와 함께 늘
     await lj(`document.getElementById('settings-btn').click()`);
     await wait(200);
-    const pw0 = await lj(`document.getElementById('popup-watch').disabled`);
     await lj(`document.getElementById('history-enabled').click()`);
-    await until(() => lj(`document.getElementById('history-enabled').checked && !document.getElementById('popup-watch').disabled`), '알림 모으기 켬');
-    await lj(`document.getElementById('popup-watch').click()`);
-    await until(() => lj(`document.getElementById('popup-watch').checked`), '팝업 켬');
+    await until(() => lj(`document.getElementById('history-enabled').checked`), '알림 모으기 켬');
+    const noSwitch = await lj(`!document.getElementById('popup-watch') && /카카오톡/.test(document.getElementById('history-enabled').closest('label').textContent)`);
     await capture(getList(), 'smoke-new-settings-popup.png');
     await lj(`document.getElementById('settings-dialog').close()`);
-    check('설정: 알림 모아두기를 켜야 "카카오톡 알림도 모으기"를 켤 수 있음', pw0);
+    check('설정: "카카오톡 알림도 모으기" 스위치 없이, 알림 모아두기 설명에 카카오톡도 함께 모은다고', noSwitch);
 
     // 가짜 알림 창을 이 점검 앱이 띄우고, 이 앱의 창만 지켜본다
     watcher = createPopupWatcher({ onlyPid: process.pid, processes: [], dir: path.join(SMOKE_DIR, 'popups') });
@@ -262,6 +267,63 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
       v.destroy();
     }
 
+    // 4) v0.17.1: 목록 창을 가장 작게 줄여도 고친 때 스탬프가 카드(요약)와 겹치지 않음 — 메모가 8개 이하라 칸을 나눠 채울 때
+    for (let i = 0; i < 5; i++) {
+      const m = vault.create();
+      vault.save(m, `# 겹침 점검 ${i + 1}\n\n요약 글이 여러 줄로 길게 이어지는 메모예요. 창을 작게 줄였을 때 스탬프가 이 글 위에 겹치지 않는지 봐요. 한 줄 더 이어지는 글이에요.`);
+    }
+    await until(() => lj(`document.querySelectorAll('#cards .card').length >= 7`), '카드 7개', 10000);
+    const overlapAt = async (w, h) => {
+      getList().setSize(w, h);
+      await wait(600);
+      return lj(`(() => {
+        const cards = [...document.querySelectorAll('#cards .card')].map((c) => c.getBoundingClientRect());
+        const hits = [];
+        for (const s of document.querySelectorAll('#cards .card-stamp')) {
+          const r = s.getBoundingClientRect();
+          cards.forEach((c, i) => { if (r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top) hits.push([s.textContent, i]); });
+        }
+        const ul = document.getElementById('cards');
+        return { hits, density: ul.dataset.density, scroll: ul.scrollHeight > ul.clientHeight };
+      })()`);
+    };
+    const small = await overlapAt(300, 380); // 목록 창의 가장 작은 크기
+    await capture(getList(), 'smoke-new-stamps-small.png');
+    const mid = await overlapAt(340, 520);
+    check('목록 창을 가장 작게(300×380) 줄여도 스탬프가 카드·요약과 겹치지 않음 (대신 목록이 스크롤)', small.hits.length === 0 && mid.hits.length === 0, JSON.stringify({ small, mid }));
+    getList().setSize(400, 680);
+
+    // 5) v0.17.1: 드래그로 선택한 내용 → 그 영역을 자동으로 캡처 (테두리·반짝·찰칵 뒤 새 메모)
+    const sample = new BrowserWindow({ width: 640, height: 420, x: 120, y: 120, show: true, title: '선택 캡처 점검', webPreferences: { sandbox: true } });
+    await sample.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><title>선택 캡처 점검</title><body style="margin:0;padding:40px;font:18px/1.6 'Malgun Gothic';background:#fff">
+      <p>선택하지 않은 첫 문단이에요.</p><p id="pick">이 문단을 드래그로 선택했어요. 선택한 글이 모두 캡처에 들어가야 해요. 두 번째 줄까지 이어지는 긴 문장이에요.</p><p>선택하지 않은 마지막 문단이에요.</p></body>`)}`);
+    sample.focus();
+    await wait(400);
+    const pick = await js(sample, `(() => { const el = document.getElementById('pick'); const r = document.createRange(); r.selectNodeContents(el);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); const b = el.getBoundingClientRect(); return { x: b.left, y: b.top, width: b.width, height: b.height }; })()`);
+    const cb = sample.getContentBounds();
+    const expected = { x: cb.x + pick.x, y: cb.y + pick.y, width: pick.width, height: pick.height };
+    // (가) UI 자동화로 앞 창의 선택 위치 읽기 (실제 Windows · 점검 앱 자신의 창)
+    const selFound = await findSelectionRect();
+    const near = selFound && Math.abs(selFound.x - expected.x) < 16 && Math.abs(selFound.y - expected.y) < 16
+      && Math.abs(selFound.x + selFound.width - (expected.x + expected.width)) < 16 && Math.abs(selFound.y + selFound.height - (expected.y + expected.height)) < 16;
+    check('Ctrl+Alt+C 두 번: 앞 창에서 드래그로 선택한 글의 화면 위치를 UI 자동화로 읽음', near, JSON.stringify({ found: selFound, expected }));
+    // (나) 그 사각형으로 자동 캡처 → 오버레이에 테두리·반짝 → 클립보드·새 메모 (UI 자동화 결과와 상관없이 정해진 사각형으로)
+    const toasts0 = smokeToastsList.length;
+    const clips0 = smokeClipboard.length;
+    await startAreaCapture({ show: false, auto: { ...expected, window: '선택 캡처 점검', process: 'electron' } });
+    const overlay = getAreaCapture()?.wins[0];
+    const autoLook = overlay ? await until(() => js(overlay, `document.body.classList.contains('auto') && document.getElementById('sel').classList.contains('auto') && !document.getElementById('sel').hidden && document.getElementById('hint').textContent`), '자동 테두리', 8000).catch(() => null) : null;
+    const flashed = overlay ? await until(() => !overlay.isDestroyed() && js(overlay, `document.getElementById('sel').classList.contains('flash')`), '반짝', 4000).catch(() => false) : false;
+    const t = await until(() => smokeToastsList.slice(toasts0).find((x) => /선택한 내용을 캡처/.test(x.title)), '자동 캡처 메모', 10000).catch(() => null);
+    const clip = smokeClipboard[clips0];
+    const size = clip && fs.existsSync(clip) ? pngSize(clip) : null;
+    const scale = screen.getDisplayMatching(expected).scaleFactor;
+    const wantW = Math.round((expected.width + 16) * scale);
+    const wantH = Math.round((expected.height + 16) * scale);
+    check('선택한 내용 자동 캡처: 고르지 않고 테두리 → 반짝 뒤 바로 캡처, "선택한 내용을 캡처해 메모를 만들었어요"', autoLook && flashed && t, JSON.stringify({ autoLook, flashed, toast: t?.title }));
+    check('자동 캡처 그림 = 선택한 내용 + 둘레 여백 8px (원래 해상도)', size && Math.abs(size.width - wantW) <= 3 * scale && Math.abs(size.height - wantH) <= 3 * scale, JSON.stringify({ size, want: [wantW, wantH] }));
+    sample.destroy();
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {

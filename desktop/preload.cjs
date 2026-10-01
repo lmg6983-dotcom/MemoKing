@@ -47,7 +47,6 @@ contextBridge.exposeInMainWorld('memoking', {
   history: {
     list: invoke('history:list'),
     setEnabled: invoke('history:set-enabled'),
-    setPopupWatch: invoke('history:set-popup-watch'),
     remove: invoke('history:remove'),
     clear: invoke('history:clear'),
     toMemo: invoke('history:to-memo'),
