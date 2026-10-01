@@ -3,6 +3,7 @@
 // 이번 버전: v0.17.0 — 팝업 알림 모으기(UI 자동화·글자 인식) · 메모를 PDF로 · 고친 때 스탬프는 카드 사이 틈에
 //            v0.17.1 — 창이 작아도 스탬프가 카드(요약)와 겹치지 않음 · 카카오톡 알림은 설정 없이 늘 · 선택한 내용 자동 영역 캡처
 //            v0.17.2 — 화면 밖까지 선택하면 스크롤하며 캡처해 이어 붙이기 · 표 머리글 강조는 고를 때만, 열 너비·행 높이 끌기 · Ctrl+휠 본문 확대
+//            v0.17.3 — 표 막대(행·열 추가·지우기·셀 병합·자동 조정) · 붙여넣은 표 열 너비·정렬 자동 · 칸 안 줄바꿈 유지
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
@@ -388,13 +389,28 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     await tj(`(() => { document.querySelector('.mk-doc').focus(); const td = document.querySelector('.mk-doc td'); const r = document.createRange(); r.setStart(td.querySelector('p')?.firstChild ?? td, 1); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
     await wait(200);
     await until(() => tj(`!document.getElementById('table-bar').hidden`), '표 막대');
-    await tj(`document.querySelector('[data-table="accent"]').click()`);
+    const barLabels = await tj(`[...document.querySelectorAll('#table-bar button')].map((b) => b.textContent.trim())`);
+    check('표 막대: 행 추가 · 열 추가 · 행 지우기 · 열 지우기 · 셀 병합 · 자동 조정', JSON.stringify(barLabels) === JSON.stringify(['행 추가', '열 추가', '행 지우기', '열 지우기', '셀 병합', '자동 조정']), JSON.stringify(barLabels));
+    // 셀 병합: 둘째 열의 본문 두 칸을 끌어서 고른 뒤 "셀 병합"
+    const mergeFrom = await tj(`(() => { const rows = document.querySelectorAll('.mk-doc tr'); const a = rows[1].children[2].getBoundingClientRect(); const b = rows[2].children[2].getBoundingClientRect(); return { x: a.left + 12, y: a.top + 10, dy: b.top - a.top }; })()`);
+    send('mouseMove', mergeFrom.x, mergeFrom.y);
+    await wait(60);
+    send('mouseDown', mergeFrom.x, mergeFrom.y);
+    for (let i = 1; i <= 5; i++) {
+      send('mouseMove', mergeFrom.x, mergeFrom.y + (mergeFrom.dy * i) / 5);
+      await wait(40);
+    }
+    send('mouseUp', mergeFrom.x, mergeFrom.y + mergeFrom.dy);
+    await wait(250);
+    await tj(`document.querySelector('[data-table="merge"]').click()`);
     await wait(900); // 머리말 저장 (0.4초 모아서)
     const t1 = await look();
+    const mergedCells = await tj(`[...document.querySelectorAll('.mk-doc td[rowspan="2"]')].map((c) => c.textContent)`);
     const savedTables = vault.get(tableMemo)?.tables;
-    check('표: 첫 열 오른쪽 테두리를 끌면 넓어지고, 둘째 행 아래 테두리를 끌면 높아지고, "머리글 강조"를 켜면 머리글 바탕이 칠해짐',
-      t1.cols[0] >= t0.cols[0] + 50 && t1.rows[1] >= t0.rows[1] + 30 && !/rgba\(0, 0, 0, 0\)/.test(t1.thBg), JSON.stringify({ t0, t1 }));
-    check('표 크기·머리글 강조는 메모 머리말(tables)에 저장', savedTables?.[0]?.cols?.length === 3 && savedTables[0].rows?.[1] > 0 && savedTables[0].accent === true, JSON.stringify(savedTables));
+    check('표: 첫 열 오른쪽 테두리를 끌면 넓어지고, 둘째 행 아래 테두리를 끌면 높아지고, 머리글은 바탕을 칠하지 않음',
+      t1.cols[0] >= t0.cols[0] + 50 && t1.rows[1] >= t0.rows[1] + 30 && /rgba\(0, 0, 0, 0\)|transparent/.test(t1.thBg), JSON.stringify({ t0, t1 }));
+    check('셀 병합: 고른 두 칸이 한 칸(행 2개)으로, 글은 줄바꿈으로 이어짐', mergedCells.length === 1 && /첫째\s*둘째/.test(mergedCells[0]), JSON.stringify(mergedCells));
+    check('표 크기·병합은 메모 머리말(tables)에 저장', savedTables?.[0]?.cols?.length === 3 && savedTables[0].rows?.[1] > 0 && JSON.stringify(savedTables[0].merges) === '[[1,2,2,1]]', JSON.stringify(savedTables));
     await capture(tw, 'smoke-new-table-sized.png');
     tw.close();
     await until(() => !noteWins.get(tableMemo), '표 메모 닫힘');
@@ -403,9 +419,42 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     await ready(tw);
     await wait(300);
     const t2 = await look();
-    check('표 메모를 닫았다 다시 열어도 열 너비·행 높이·머리글 강조가 그대로', Math.abs(t2.cols[0] - t1.cols[0]) <= 2 && Math.abs(t2.rows[1] - t1.rows[1]) <= 2 && t2.thBg === t1.thBg, JSON.stringify({ t1, t2 }));
-    const mdAfter = vault.get(tableMemo)?.body ?? '';
-    check('표 본문(마크다운)은 그대로 (크기는 머리말에만)', /\| 예산 \| 김대리 \| 첫째 \|/.test(mdAfter.replace(/ +/g, ' ')), mdAfter);
+    const merged2 = await js(tw, `document.querySelectorAll('.mk-doc td[rowspan="2"]').length`);
+    check('표 메모를 닫았다 다시 열어도 열 너비·행 높이·병합이 그대로', Math.abs(t2.cols[0] - t1.cols[0]) <= 2 && Math.abs(t2.rows[1] - t1.rows[1]) <= 2 && merged2 === 1, JSON.stringify({ t1, t2, merged2 }));
+    const mdAfter = (vault.get(tableMemo)?.body ?? '').replace(/ +/g, ' ');
+    check('표 본문(마크다운)에는 병합을 푼 표 (내용은 첫 칸, 크기·병합은 머리말에만)', /\| 예산 \| 김대리 \| 첫째<br>둘째 \|/.test(mdAfter) && /\| 일정 \| 박과장 \| \|/.test(mdAfter), mdAfter);
+
+    // 7-2) 엑셀·시트에서 붙여넣은 표: 내용·본문 폭에 맞춰 열 너비·정렬 자동 (번호·날짜는 좁게, 긴 설명 열에 공간, 칸 안 줄바꿈 유지)
+    const pasteMemo = vault.create();
+    vault.save(pasteMemo, '# 붙여넣기 점검\n\n여기에 붙여요\n');
+    await lj(`window.memoking.memo.open(${JSON.stringify(pasteMemo)})`);
+    const pw3 = await until(() => noteWins.get(pasteMemo), '붙여넣기 메모 창');
+    await ready(pw3);
+    const longText = '분기별 예산 집행 현황을 정리하고 다음 분기 계획에 반영할 항목을 검토하는 긴 설명입니다. 담당 부서와 협의가 필요합니다.';
+    const excelHtml = `<html><body><!--StartFragment--><table><tr><td>번호</td><td>날짜</td><td>금액</td><td>설명</td><td>담당</td></tr><tr><td>1</td><td>2026-10-01</td><td>1,250,000</td><td>${longText}</td><td>김대리</td></tr><tr><td>2</td><td>2026-10-02</td><td>320,000</td><td>첫 줄 메모<br style="mso-data-placement:same-cell">둘째 줄 메모</td><td>박과장</td></tr><tr><td>3</td><td>2026-10-03</td><td>45,000</td><td>짧은 설명</td><td>이주임</td></tr></table><!--EndFragment--></body></html>`;
+    const pasted = await js(pw3, `(async () => {
+      const doc = document.querySelector('.mk-doc'); doc.focus();
+      const p = doc.querySelector('p:last-of-type'); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r);
+      await new Promise((ok) => setTimeout(ok, 100));
+      const dt = new DataTransfer(); dt.setData('text/html', ${JSON.stringify(excelHtml)}); dt.setData('text/plain', 'x');
+      doc.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+      await new Promise((ok) => setTimeout(ok, 400));
+      const cs = getComputedStyle(doc);
+      return {
+        cols: [...document.querySelectorAll('.mk-doc tr:first-child > *')].map((c) => Math.round(c.getBoundingClientRect().width)),
+        table: Math.round(document.querySelector('.mk-doc table').getBoundingClientRect().width),
+        body: doc.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+        align: [...document.querySelectorAll('.mk-doc tr:nth-child(2) > *')].map((c) => c.style.textAlign || 'left'),
+        breaks: document.querySelectorAll('.mk-doc td br[data-type="html"]').length,
+        status: document.getElementById('status').textContent,
+      };
+    })()`);
+    check('붙여넣은 표: 본문 폭 안에 맞춤, 번호 열이 가장 좁고 설명 열이 가장 넓음, 정렬(번호·날짜 가운데·금액 오른쪽·글 왼쪽), 칸 안 줄바꿈 유지',
+      pasted.table <= pasted.body + 2 && pasted.cols[0] === Math.min(...pasted.cols) && pasted.cols[3] === Math.max(...pasted.cols)
+        && JSON.stringify(pasted.align) === JSON.stringify(['center', 'center', 'right', 'left', 'left']) && pasted.breaks === 1 && /정리했어요/.test(pasted.status),
+      JSON.stringify(pasted));
+    await capture(pw3, 'smoke-new-table-pasted.png');
+    pw3.close();
 
     // 8) v0.17.2: 메모 안에서 Ctrl+마우스 휠 → 본문만 확대·축소 (창 전체 확대는 아님), 배율은 메모마다 기억
     const docBox = await tj(`(() => { const r = document.querySelector('.mk-doc').getBoundingClientRect(); return { x: r.left + 40, y: r.top + 30, h: document.querySelector('.mk-doc h1').getBoundingClientRect().height }; })()`);

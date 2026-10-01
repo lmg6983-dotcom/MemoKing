@@ -26,3 +26,8 @@ test('같은 모양인지 (기본 값 차이는 무시)', () => {
   assert.equal(sameTables([{ cols: [100] }], [{ cols: [101] }]), false);
   assert.equal(sameTables([], [{}]), true);
 });
+
+test('병합한 칸 [행, 열, 행 수, 열 수] — 맞지 않는 값은 뺀다', () => {
+  assert.deepEqual(normalizeTable({ merges: [[1, 0, 2, 1], [0, 1, 1, 2], [0, 0, 1, 1], [-1, 0, 2, 2], 'x', [1, 2]] }), { merges: [[1, 0, 2, 1], [0, 1, 1, 2]] });
+  assert.deepEqual(normalizeTables([{}, { merges: [[0, 0, 1, 1]] }]), []);
+});

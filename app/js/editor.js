@@ -3,11 +3,12 @@ import {
   Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx,
   commonmark, imageSchema, linkSchema, toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand,
   wrapInHeadingCommand, turnIntoTextCommand, wrapInBulletListCommand, wrapInOrderedListCommand,
-  wrapInBlockquoteCommand, createCodeBlockCommand, insertHrCommand, liftListItemCommand,
+  wrapInBlockquoteCommand, createCodeBlockCommand, insertHrCommand, liftListItemCommand, htmlSchema,
   gfm, toggleStrikethroughCommand, history, listener, listenerCtx, clipboard, trailing, upload, uploadConfig,
   callCommand, getMarkdown, replaceAll, insert, $view, $prose, $markSchema, $nodeSchema, $remark, Plugin, PluginKey, TextSelection,
   toggleMark, Decoration, DecorationSet, insertTableCommand, tableSchema,
   addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, columnResizing,
+  splitCell, CellSelection, TableMap,
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
@@ -17,9 +18,10 @@ import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
 import { vaultUrl, mediaKind, baseName } from './media.js';
 import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from './core/link-preview.js';
 import { extOf, fileKind } from './core/file-kinds.js';
-import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv } from './core/tables.js';
+import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
+import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
-import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent } from './table-extras.js';
+import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells } from './table-extras.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
 // 모두 마크다운 이미지 문법 ![설명](attachments/파일) 로 저장하고, 확장자로 구분해 보여준다.
@@ -507,8 +509,8 @@ function cellInlineHtml(cell, boldClasses) {
     if (node.nodeType !== 1) return;
     const tag = node.tagName;
     if (tag === 'STYLE' || tag === 'SCRIPT') return;
-    // 마크다운 표의 셀은 한 줄이라 셀 안 줄바꿈은 띄어쓰기로
-    if (tag === 'BR') return out.push(' ');
+    // 셀 안의 의도적인 줄바꿈(엑셀 Alt+Enter·시트의 줄바꿈)은 <br> 로 지킨다
+    if (tag === 'BR' || (tag === 'SPAN' && node.dataset.type === 'html' && isBreakHtml(node.dataset.value))) return out.push(CELL_BREAK_HTML);
     const block = /^(P|DIV|LI|H[1-6])$/.test(tag);
     if (block && out.length) out.push(' ');
     const keep = CELL_INLINE.has(tag) && tag !== 'SPAN' && tag !== 'BR';
@@ -528,14 +530,119 @@ function cellInlineHtml(cell, boldClasses) {
   const bold = /font-weight:\s*(bold|[6-9]00)/i.test(style) || [...cell.classList].some((c) => boldClasses.has(c)) || cell.tagName === 'TH';
   const italic = /font-style:\s*italic/i.test(style);
   cell.childNodes.forEach(walk);
-  let html = out.join('').replace(/\s+/g, ' ').trim();
+  let html = out.join('').replace(/\s+/g, ' ').trim()
+    .replace(/(?:\s*<span data-type="html" data-value="&lt;br&gt;"><\/span>\s*)+$/, '') // 끝의 빈 줄바꿈은 뺀다
+    .replace(/^(?:\s*<span data-type="html" data-value="&lt;br&gt;"><\/span>\s*)+/, '');
   if (!html) return '';
   // 머리글은 원래 굵게 보이므로 굵게를 따로 두지 않는다 (첫 줄)
   if (italic) html = `<i>${html}</i>`;
   return { html, bold };
 }
 
+// 표 하나의 열 너비·정렬을 내용에 맞춘다 (병합한 칸은 첫 칸의 열에 내용이 있는 것으로 본다)
+function fitTable(tr, node, pos, { available, measure }) {
+  const map = TableMap.get(node);
+  const grid = Array.from({ length: map.height }, () => Array(map.width).fill(''));
+  const seen = new Set();
+  for (const rel of map.map) {
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    const r = map.findCell(rel);
+    grid[r.top][r.left] = (node.nodeAt(rel)?.attrs.colspan ?? 1) > 1 ? '' : cellText(node.nodeAt(rel));
+  }
+  const fit = autoFitTable(grid, { available, measure });
+  for (const rel of seen) {
+    const cell = node.nodeAt(rel);
+    const r = map.findCell(rel);
+    tr.setNodeMarkup(tr.mapping.map(pos + 1 + rel), null, { ...cell.attrs, colwidth: fit.widths.slice(r.left, r.right), alignment: fit.align[r.left] });
+  }
+  return fit;
+}
+
+// 칸 안의 문단이 여럿이면(칸을 합친 뒤) 한 문단으로 — 마크다운 표 칸은 한 줄이라 문단 사이는 <br>
+function oneLineCell(cell) {
+  if (cell.childCount <= 1) return cell.content;
+  const schema = cell.type.schema;
+  const br = schema.nodes.html.create({ value: '<br>' });
+  const inline = [];
+  cell.forEach((block, _o, i) => {
+    if (i > 0 && block.content.size) inline.push(br);
+    block.content.forEach((n) => inline.push(n));
+  });
+  return schema.nodes.paragraph.create(null, inline);
+}
+
+// 병합한 칸이 있는 표 → 병합을 푼 표 (마크다운으로 쓰기 위해). 병합·여러 문단 칸이 없으면 그대로.
+function unmergedTable(node) {
+  const map = TableMap.get(node);
+  let merged = false;
+  node.descendants((n) => {
+    if ((n.attrs.colspan ?? 1) > 1 || (n.attrs.rowspan ?? 1) > 1 || (/^table_(cell|header)$/.test(n.type.name) && n.childCount > 1)) merged = true;
+    return !merged;
+  });
+  if (!merged) return node;
+  const rows = [];
+  for (let r = 0; r < map.height; r++) {
+    const rowNode = node.child(r);
+    const cells = [];
+    for (let c = 0; c < map.width; c++) {
+      const rel = map.map[r * map.width + c];
+      const cell = node.nodeAt(rel);
+      const at = map.findCell(rel);
+      const cellType = rowNode.firstChild?.type ?? cell.type;
+      if (at.top === r && at.left === c) cells.push(cellType.create({ ...cell.attrs, colspan: 1, rowspan: 1, colwidth: null }, oneLineCell(cell)));
+      else cells.push(cellType.createAndFill({ ...cell.attrs, colspan: 1, rowspan: 1, colwidth: null }));
+    }
+    rows.push(rowNode.type.create(rowNode.attrs, cells));
+  }
+  return node.type.create(node.attrs, rows);
+}
+
+const isBreakHtml = (value) => /^<br\s*\/?>$/i.test(String(value ?? '').trim());
+
+// 표 칸의 글 (칸 안 줄바꿈·문단은 "\n")
+function cellText(cell) {
+  const lines = [];
+  cell.forEach((block) => {
+    let line = '';
+    block.descendants((n) => {
+      if (n.isText) line += n.text;
+      else if (n.type.name === 'hardbreak' || n.type.name === 'hard_break' || (n.type.name === 'html' && isBreakHtml(n.attrs.value))) line += '\n';
+      return true;
+    });
+    lines.push(line);
+  });
+  return lines.join('\n');
+}
+
+// 표가 쓸 수 있는 본문 폭 (편집 영역 안쪽 여백·표 테두리·여유 몇 px 를 뺀다)
+function tableBodyWidth(view) {
+  const cs = getComputedStyle(view.dom);
+  return Math.max(200, Math.floor(view.dom.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4));
+}
+
+// 표 칸 글자 너비 재기 (편집기 글꼴, 표는 본문의 0.95배, 머리글은 굵게)
+function tableMeasure(view) {
+  const cs = getComputedStyle(view.dom);
+  const size = parseFloat(cs.fontSize) * 0.95;
+  const ctx = document.createElement('canvas').getContext('2d');
+  const cache = new Map();
+  return (text, bold) => {
+    const key = `${bold ? 1 : 0}${text}`;
+    if (!cache.has(key)) {
+      ctx.font = `${bold ? 700 : 400} ${size}px ${cs.fontFamily}`;
+      cache.set(key, Math.ceil(ctx.measureText(text).width));
+    }
+    return cache.get(key);
+  };
+}
+
+// 붙여넣은 표마다 따로 살펴볼 이유(병합된 칸·표 안의 표·그림·수식) — 붙인 뒤 열 너비를 자동으로 맞출 때 쓴다
+let pastedTableReviews = [];
+let pastedTablesAt = 0; // 표가 든 내용을 붙여넣은 시각 (Milkdown 붙여넣기는 "paste" 표시 없이 문서를 바꾸므로 이것으로 안다)
+
 function normalizePastedTables(html) {
+  pastedTableReviews = [];
   if (!/<t[rdh][\s>]/i.test(html)) return html;
   const doc = new window.DOMParser().parseFromString(wrapOrphanRows(html), 'text/html');
   // 엑셀은 굵게를 <style> 의 class(.xl65 { font-weight:700 })로 준다
@@ -546,6 +653,7 @@ function normalizePastedTables(html) {
   let changed = false;
   for (const table of [...doc.querySelectorAll('table')]) {
     if (table.parentElement?.closest('table')) continue; // 표 안의 표는 바깥 표에서 글자로
+    const review = tableReviewReasons(table);
     const rows = [...table.rows].map((tr) => [...tr.cells].map((cell) => {
       const inner = cellInlineHtml(cell, boldClasses);
       return {
@@ -568,12 +676,14 @@ function normalizePastedTables(html) {
       changed = true;
       continue;
     }
+    pastedTableReviews.push(review);
     const clean = gridToHtml(grid.map((row, r) => (r === 0 ? row.map((v) => v.replace(/^<b>([\s\S]*)<\/b>$/, '$1')) : row)), { cellHtml: true });
     const holder = doc.createElement('div');
     holder.innerHTML = clean;
     table.replaceWith(...holder.childNodes);
     changed = true;
   }
+  if (pastedTableReviews.length) pastedTablesAt = Date.now();
   if (!changed) return html;
   doc.querySelectorAll('style, colgroup, col, meta, google-sheets-html-origin > style').forEach((n) => n.remove());
   return doc.body.innerHTML;
@@ -799,10 +909,17 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }));
 
   // 표 안 Tab: 다음 셀로, 마지막 셀이면 행을 더해 그 첫 셀로 (Shift+Tab 은 Milkdown 표 기능이 이전 셀로)
+  // 표 안 Shift+Enter: 칸 안에서 줄바꿈 (마크다운에는 <br>)
   const tableTab = $prose(() => new Plugin({
     key: new PluginKey('memoking-table-tab'),
     props: {
       handleKeyDown(v, event) {
+        if (event.key === 'Enter' && event.shiftKey && !event.ctrlKey && !event.altKey && isInTable(v.state)) {
+          const type = v.state.schema.nodes.html;
+          if (!type) return false;
+          v.dispatch(v.state.tr.replaceSelectionWith(type.create({ value: '<br>' })).scrollIntoView());
+          return true;
+        }
         if (event.key !== 'Tab' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || !isInTable(v.state)) return false;
         if (goToNextCell(1)(v.state, v.dispatch)) return true;
         if (addRowAfter(v.state, v.dispatch)) goToNextCell(1)(v.state, v.dispatch);
@@ -823,6 +940,63 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   const tableExtras = $prose(() => extras.plugin);
   // 열 너비: 칸 오른쪽 테두리를 끌기 (prosemirror-tables — Milkdown gfm 묶음에는 빠져 있어 따로 켠다)
   const tableResize = $prose(() => columnResizing({ cellMinWidth: 24 }));
+
+  // 붙여넣은 표(엑셀·구글 시트 등): 내용·본문 폭에 맞춰 열 너비·정렬을 자동으로 (core/table-autofit.js)
+  // 병합된 칸·표 안의 표·그림·수식이 있던 표는 자동으로 맞추지 않고 확인해 달라고 알린다.
+  let fitView = null;
+  const tableAutoFit = $prose(() => new Plugin({
+    key: new PluginKey('memoking-table-autofit'),
+    view: (v) => {
+      fitView = v;
+      return { destroy: () => (fitView = null) };
+    },
+    appendTransaction(trs, _old, state) {
+      if (readOnly || !fitView || !pastedTablesAt || Date.now() - pastedTablesAt > 3000) return null;
+      if (!trs.some((tr) => tr.docChanged)) return null;
+      // 바뀐 범위 (모든 트랜잭션 뒤 문서 기준)
+      let from = Infinity;
+      let to = -Infinity;
+      trs.forEach((tr, t) => tr.mapping.maps.forEach((map, i) => map.forEach((_a, _b, start, end) => {
+        let a = tr.mapping.slice(i + 1).map(start, -1);
+        let b = tr.mapping.slice(i + 1).map(end, 1);
+        for (const later of trs.slice(t + 1)) {
+          a = later.mapping.map(a, -1);
+          b = later.mapping.map(b, 1);
+        }
+        from = Math.min(from, a);
+        to = Math.max(to, b);
+      })));
+      if (!(to > from)) return null;
+      // 그 범위 안의, 아직 너비가 없는 표 = 방금 붙여넣은 표
+      const tables = [];
+      state.doc.nodesBetween(from, to, (node, pos) => {
+        if (node.type.name !== 'table') return true;
+        if (!node.firstChild?.firstChild?.attrs.colwidth) tables.push({ node, pos });
+        return false;
+      });
+      if (!tables.length) return null;
+      const reviews = pastedTableReviews;
+      pastedTableReviews = [];
+      pastedTablesAt = 0;
+      const tr = state.tr;
+      const measure = tableMeasure(fitView);
+      const available = tableBodyWidth(fitView);
+      let fitted = 0;
+      const skipped = new Set();
+      tables.forEach(({ node, pos }, i) => {
+        const reasons = reviews[i] ?? [];
+        if (reasons.length) {
+          reasons.forEach((r) => skipped.add(r));
+          return;
+        }
+        fitTable(tr, node, pos, { available, measure });
+        fitted++;
+      });
+      if (skipped.size) onNotice?.(`붙여넣은 표에 ${[...skipped].join('·')}이 있어 열 너비를 자동으로 맞추지 않았어요. 표를 확인해 주세요`);
+      else if (fitted) onNotice?.('붙여넣은 표의 열 너비·정렬을 내용에 맞춰 정리했어요');
+      return tr.docChanged ? tr : null;
+    },
+  }));
 
   const media = $view(imageSchema.node, () => (node) => mediaView(node));
   const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
@@ -870,7 +1044,24 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       }));
       // Milkdown 7.22.2 버그 우회: 제목 없는 이미지 ![a](b) 의 title 을 null 로 넘겨 불러오기가 실패한다.
       // 마크다운 표는 머리글 행만 있어도 된다 (Milkdown 기본은 "머리글 행 + 행 1개 이상")
-      ctx.update(tableSchema.key, (factory) => (c) => ({ ...factory(c), content: 'table_header_row table_row*' }));
+      ctx.update(tableSchema.key, (factory) => (c) => {
+        const schema = factory(c);
+        return {
+          ...schema,
+          content: 'table_header_row table_row*',
+          // 마크다운 표에는 병합이 없다 → 병합을 푼 표(내용은 첫 칸, 나머지는 빈 칸)로 쓴다. 병합은 머리말(tables)에
+          toMarkdown: { ...schema.toMarkdown, runner: (state, node) => schema.toMarkdown.runner(state, unmergedTable(node)) },
+        };
+      });
+      // 표 칸 안의 줄바꿈은 마크다운에 <br> (html 노드)로 저장된다 → 글자 "<br>" 대신 실제 줄바꿈으로 보이게
+      ctx.update(htmlSchema.key, (factory) => (c) => {
+        const schema = factory(c);
+        return {
+          ...schema,
+          toDOM: (node) => (isBreakHtml(node.attrs.value) ? ['br', { 'data-type': 'html', 'data-value': node.attrs.value }] : schema.toDOM(node)),
+          parseDOM: [{ tag: 'br[data-type="html"]', getAttrs: (dom) => ({ value: dom.dataset.value || '<br>' }) }, ...(schema.parseDOM ?? [])],
+        };
+      });
       ctx.update(imageSchema.key, (factory) => (c) => {
         const schema = factory(c);
         return {
@@ -911,6 +1102,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(commonmark)
     .use(gfm)
     .use(tableTab)
+    .use(tableAutoFit)
     .use(tableResize) // 읽기 전용(PDF)에서도 열 너비가 보이게 (끌기는 편집할 때만)
     .use(tableExtras)
     .use(tagSuggest) // 자동완성 목록이 떠 있을 때 Enter·↑↓ 를 먼저 받는다
@@ -937,6 +1129,16 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   applyTables(view(), tables);
   extras.setLoading(false);
   const call = (command, payload) => editor.action(callCommand(command.key, payload));
+
+  // 셀 병합: 여러 칸을 골랐으면 합치고, 병합한 칸 안이면 풀기
+  function mergeOrSplit(v) {
+    if (v.state.selection instanceof CellSelection && v.state.selection.ranges.length > 1) {
+      const result = mergeSelectedCells(v.state, v.dispatch);
+      if (result !== true) onNotice?.(result, true);
+      return;
+    }
+    if (!splitCell(v.state, v.dispatch)) onNotice?.('합칠 칸들을 끌어서 골라 주세요 (병합한 칸 안에서 누르면 병합을 풀어요)');
+  }
 
   function parentOfType(names) {
     const { $from } = view().state.selection;
@@ -1054,6 +1256,27 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         if (isInTable(v.state)) (name === 'accent' ? toggleAccent : resetTableSize)(v);
         return v.focus();
       }
+      if (name === 'merge') {
+        mergeOrSplit(v);
+        return v.focus();
+      }
+      if (name === 'autoFit') {
+        const table = parentOfType(['table']);
+        if (table) {
+          const tr = v.state.tr;
+          fitTable(tr, table.node, table.pos, { available: tableBodyWidth(v), measure: tableMeasure(v) });
+          // 끌어서 바꾼 행 높이도 내용에 맞춤으로
+          const marks = [];
+          let p = table.pos + 1;
+          table.node.forEach((row) => {
+            marks.push({ kind: 'row', pos: p, value: 0 });
+            p += row.nodeSize;
+          });
+          v.dispatch(tr.setMeta(tableExtrasKey, { set: marks }));
+          onNotice?.('표의 열 너비·정렬을 내용에 맞춰 정리했어요');
+        }
+        return v.focus();
+      }
       const cmd = { addRow: addRowAfter, addCol: addColumnAfter, delRow: deleteRow, delCol: deleteColumn, delTable: deleteTable }[name];
       if (!cmd || !isInTable(v.state)) return v.focus();
       const tablePos = parentOfType(['table'])?.pos;
@@ -1164,7 +1387,16 @@ function activeFormats(state) {
     const node = $from.node(d);
     if (node.type.name === 'table_header_row') active.tableHeader = true;
     if (node.type.name === 'table') {
-      active.table = { rows: node.childCount, cols: node.firstChild?.childCount ?? 0, header: Boolean(active.tableHeader), accent: isAccent(state, { node, pos: $from.before(d) }) };
+      const cellNode = $from.node(Math.min($from.depth, d + 2));
+      const multi = state.selection instanceof CellSelection && state.selection.ranges.length > 1;
+      active.table = {
+        rows: node.childCount,
+        cols: node.firstChild?.childCount ?? 0,
+        header: Boolean(active.tableHeader),
+        accent: isAccent(state, { node, pos: $from.before(d) }),
+        canMerge: multi,
+        merged: !multi && ((cellNode?.attrs.colspan ?? 1) > 1 || (cellNode?.attrs.rowspan ?? 1) > 1),
+      };
       break;
     }
   }

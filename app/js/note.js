@@ -671,18 +671,27 @@ function showTableBar(table) {
   if (!table) return;
   const delRow = tableBar.querySelector('[data-table="delRow"]');
   const delCol = tableBar.querySelector('[data-table="delCol"]');
-  // 머리글 아래 행은 마지막 하나까지 지울 수 있다 (머리글 행만 남은 1행 표도 된다)
-  delRow.disabled = table.header;
-  delRow.title = table.header ? '머리글 행은 지울 수 없어요. 표를 없애려면 표 지우기를 눌러 주세요' : '이 행 지우기';
-  const accent = tableBar.querySelector('[data-table="accent"]');
-  accent.setAttribute('aria-pressed', String(Boolean(table.accent)));
-  delCol.disabled = table.cols <= 1;
-  delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 표를 없애려면 표 지우기를 눌러 주세요' : '이 열 지우기';
+  // 머리글 아래 행은 마지막 하나까지 지울 수 있다 (머리글 행만 남은 1행 표도 된다).
+  // 머리글 행만 남았을 때 머리글에서 누르면, 열이 하나뿐일 때 누르면 표 전체를 지운다 (표 막대에 "표 지우기"가 따로 없음)
+  const lastRow = table.header && table.rows <= 1;
+  delRow.disabled = table.header && !lastRow;
+  delRow.textContent = lastRow ? '표 지우기' : '행 지우기';
+  delRow.title = lastRow ? '머리글 행만 남았어요. 누르면 표를 지워요' : table.header ? '머리글 행은 지울 수 없어요 (아래 행을 다 지운 뒤 누르면 표를 지워요)' : '이 행 지우기';
+  // 셀 병합: 여러 칸을 골랐으면 "셀 병합", 병합한 칸 안이면 "병합 풀기"
+  const merge = tableBar.querySelector('[data-table="merge"]');
+  merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
+  merge.disabled = !table.canMerge && !table.merged;
+  merge.title = table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요';
+  delCol.textContent = table.cols <= 1 ? '표 지우기' : '열 지우기';
+  delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 지워요' : '이 열 지우기';
 }
 tableBar.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서가 표 안에 남게
 tableBar.addEventListener('click', (e) => {
   const b = e.target.closest('[data-table]');
-  if (b && !b.disabled) editor.tableCommand(b.dataset.table);
+  if (!b || b.disabled) return;
+  // 마지막 남은 머리글 행·열을 지우면 표 전체를 지운다
+  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.textContent === '표 지우기';
+  editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
 });
 
 function showActive(active) {

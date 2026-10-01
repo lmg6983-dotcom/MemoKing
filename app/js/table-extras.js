@@ -3,8 +3,9 @@
 //            한 열을 처음 바꾸면 나머지 열도 지금 너비로 고정해 표가 정한 대로 보이게 한다.
 //   행 높이: 칸 아래 테두리를 끌기 (두 번 누르면 내용에 맞춤) → 행 표시(decoration)의 높이.
 //   머리글 강조: 표 표시(decoration)의 class.
+//   셀 병합: 칸의 colspan·rowspan. 마크다운 표에는 병합이 없어 본문에는 풀어 둔 표(내용은 첫 칸)로 저장하고, 병합은 머리말에.
 // 셋 다 마크다운 표에는 적을 곳이 없어 메모 머리말(tables)에 표 순서대로 저장한다 (core/table-sizes.js).
-import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
+import { Plugin, PluginKey, Decoration, DecorationSet, TableMap, CellSelection, TextSelection, selectedRect } from '../vendor/milkdown.js';
 import { normalizeTables, sameTables, ROW_MIN, ROW_MAX } from './core/table-sizes.js';
 
 export const tableExtrasKey = new PluginKey('memoking-table-extras');
@@ -43,10 +44,116 @@ export function collectTables(state) {
     });
     if (rows.some((h) => h > 0)) t.rows = rows;
     if (decoAt(set, pos, pos + node.nodeSize, 'mkAccent').length) t.accent = true;
+    const merges = tableMerges(node);
+    if (merges.length) t.merges = merges;
     out.push(t);
     return false;
   });
   return normalizeTables(out);
+}
+
+// 표의 병합한 칸들: [행, 열, 행 수, 열 수]
+export function tableMerges(node) {
+  const map = TableMap.get(node);
+  const out = [];
+  const seen = new Set();
+  for (const pos of map.map) {
+    if (seen.has(pos)) continue;
+    seen.add(pos);
+    const cell = node.nodeAt(pos);
+    const rs = cell?.attrs.rowspan ?? 1;
+    const cs = cell?.attrs.colspan ?? 1;
+    if (rs > 1 || cs > 1) {
+      const r = map.findCell(pos);
+      out.push([r.top, r.left, rs, cs]);
+    }
+  }
+  return out;
+}
+
+// n 번째 표
+function nthTable(doc, n) {
+  let i = 0;
+  let found = null;
+  doc.descendants((node, pos) => {
+    if (found) return false;
+    if (node.type.name !== 'table') return true;
+    if (i++ === n) found = { node, pos };
+    return false;
+  });
+  return found;
+}
+
+// 머리글 행과 본문 행을 걸치는 병합은 하지 않는다 (마크다운 표의 머리글은 한 줄)
+export function mergeAllowed(top, rowspan) {
+  return top === 0 ? rowspan === 1 : true;
+}
+
+/**
+ * 고른 칸들(CellSelection)을 하나로 합친다. Milkdown 의 표 칸은 문단 하나만 담으므로
+ * (prosemirror-tables 의 mergeCells 는 문단을 여러 개 이어 붙여 표가 깨진다) 칸들의 글을 한 문단으로, 사이는 줄바꿈(<br>).
+ * 머리글 행과 본문 행을 걸치거나, 이미 합친 칸을 일부만 고르면 하지 않는다.
+ * @returns {boolean|string} true = 합침, 문자열 = 못 합친 이유
+ */
+export function mergeSelectedCells(state, dispatch) {
+  if (!(state.selection instanceof CellSelection)) return '합칠 칸들을 끌어서 골라 주세요';
+  const rect = selectedRect(state);
+  const { map, tableStart, table } = rect;
+  if (rect.right - rect.left < 1 || rect.bottom - rect.top < 1 || (rect.right - rect.left === 1 && rect.bottom - rect.top === 1)) return '두 칸 이상 골라 주세요';
+  if (!mergeAllowed(rect.top, rect.bottom - rect.top)) return '머리글 행과 아래 행은 합칠 수 없어요';
+  const cells = [];
+  const seen = new Set();
+  for (let r = rect.top; r < rect.bottom; r++) {
+    for (let c = rect.left; c < rect.right; c++) {
+      const pos = map.map[r * map.width + c];
+      if (seen.has(pos)) continue;
+      seen.add(pos);
+      const at = map.findCell(pos);
+      if (at.left < rect.left || at.right > rect.right || at.top < rect.top || at.bottom > rect.bottom) return '이미 합친 칸은 통째로 골라 주세요';
+      cells.push({ pos, node: table.nodeAt(pos), at });
+    }
+  }
+  if (!dispatch) return true;
+  const schema = state.schema;
+  const br = schema.nodes.html.create({ value: '<br>' });
+  const inline = [];
+  for (const { node } of cells) {
+    const parts = [];
+    node.forEach((block) => block.content.forEach((n) => parts.push(n)));
+    if (!parts.length) continue;
+    if (inline.length) inline.push(br);
+    inline.push(...parts);
+  }
+  // 합친 칸의 열 너비 = 맨 윗줄 칸들의 너비 (모두 있을 때만)
+  const widths = [];
+  for (const { node, at } of cells.filter((x) => x.at.top === rect.top)) {
+    for (let i = 0; i < at.right - at.left; i++) widths.push(node.attrs.colwidth?.[i] ?? 0);
+  }
+  const origin = cells[0];
+  const tr = state.tr;
+  for (const { pos, node } of [...cells.slice(1)].sort((a, b) => b.pos - a.pos)) tr.delete(tableStart + pos, tableStart + pos + node.nodeSize);
+  const merged = origin.node.type.create(
+    { ...origin.node.attrs, colspan: rect.right - rect.left, rowspan: rect.bottom - rect.top, colwidth: widths.every((w) => w > 0) ? widths : null },
+    schema.nodes.paragraph.create(null, inline),
+  );
+  tr.replaceWith(tableStart + origin.pos, tableStart + origin.pos + origin.node.nodeSize, merged);
+  tr.setSelection(CellSelection.create(tr.doc, tableStart + origin.pos));
+  dispatch(tr);
+  return true;
+}
+
+// 병합 한 칸 (applyTables·불러오기)
+function applyMerge(view, tableIndex, [r, c, rs, cs]) {
+  const t = nthTable(view.state.doc, tableIndex);
+  if (!t || !mergeAllowed(r, rs)) return;
+  const map = TableMap.get(t.node);
+  if (r + rs > map.height || c + cs > map.width) return;
+  const start = t.pos + 1;
+  const anchor = start + map.map[r * map.width + c];
+  const head = start + map.map[(r + rs - 1) * map.width + (c + cs - 1)];
+  const sel = view.state.tr.setSelection(CellSelection.create(view.state.doc, anchor, head));
+  view.dispatch(sel.setMeta('addToHistory', false));
+  mergeSelectedCells(view.state, (tr) => view.dispatch(tr.setMeta('addToHistory', false)));
 }
 
 // 머리말의 모양을 문서의 표에 입힌다 (열 수가 다른 표는 너비를 건너뛴다 — 파일을 밖에서 고친 경우)
@@ -78,6 +185,15 @@ export function applyTables(view, tables) {
   tr.setMeta(tableExtrasKey, { set: marks, load: true });
   tr.setMeta('addToHistory', false);
   view.dispatch(tr);
+  // 병합은 너비를 입힌 뒤에 (병합한 칸이 너비를 합쳐 갖는다)
+  const anyMerge = list.some((t) => t.merges?.length);
+  if (!anyMerge) return;
+  const keep = view.state.selection.from;
+  list.forEach((t, i) => {
+    for (const m of [...(t.merges ?? [])].sort((a, b) => b[0] - a[0] || b[1] - a[1])) applyMerge(view, i, m);
+  });
+  const doc = view.state.doc;
+  view.dispatch(view.state.tr.setSelection(TextSelection.near(doc.resolve(Math.min(keep, doc.content.size)))).setMeta('addToHistory', false));
 }
 
 function setMarks(set, doc, marks) {

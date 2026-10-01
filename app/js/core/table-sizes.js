@@ -4,6 +4,7 @@
 //     - cols: [120, 0, 200]   열 너비 px (0 = 내용에 맞춤)
 //       rows: [0, 48]          행 높이 px (0 = 내용에 맞춤), 첫 행이 머리글
 //       accent: true           머리글 행 바탕을 칠함 (없으면 머리글도 다른 칸과 같은 바탕)
+//       merges: [[1, 0, 2, 1]] 병합한 칸 [행, 열, 행 수, 열 수] (마크다운 표에는 병합이 없어 본문에는 풀어 둔 표, 내용은 첫 칸에)
 
 export const COL_MIN = 24;
 export const COL_MAX = 2000;
@@ -28,10 +29,16 @@ export function normalizeTable(raw) {
   if (cols) t.cols = cols;
   if (rows) t.rows = rows;
   if (raw.accent === true) t.accent = true;
+  if (Array.isArray(raw.merges)) {
+    const merges = raw.merges.slice(0, 500)
+      .map((m) => (Array.isArray(m) ? m.slice(0, 4).map((v) => Math.floor(Number(v))) : null))
+      .filter((m) => m && m.length === 4 && m.every(Number.isFinite) && m[0] >= 0 && m[1] >= 0 && m[2] >= 1 && m[3] >= 1 && (m[2] > 1 || m[3] > 1) && m[2] <= 1000 && m[3] <= 100);
+    if (merges.length) t.merges = merges;
+  }
   return t;
 }
 
-const isPlain = (t) => !t.cols && !t.rows && !t.accent;
+const isPlain = (t) => !t.cols && !t.rows && !t.accent && !t.merges;
 
 // 머리말 값 → 표 목록. 모든 표가 기본 모양이면 [] (머리말에 쓰지 않음). 끝의 기본 모양 표는 뺀다.
 export function normalizeTables(raw) {

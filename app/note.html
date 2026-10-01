@@ -136,17 +136,15 @@
   </aside>
 
   <!-- 서식 도구막대: 창 폭에 들어가지 않는 버튼은 끝의 » 더보기 안으로 옮겨진다 (note.js layoutToolbar) -->
-  <!-- 표 안에 커서가 있을 때만: 행·열 추가·지우기, 머리글 강조, 크기 원래대로 -->
+  <!-- 표 안에 커서가 있을 때만: 행 추가 · 열 추가 · 행 지우기 · 열 지우기 · 셀 병합 · 자동 조정 -->
   <div id="table-bar" class="table-bar" role="toolbar" aria-label="표" hidden>
     <button type="button" data-table="addRow" title="아래에 행 추가 (마지막 셀에서 Tab)">행 추가</button>
     <button type="button" data-table="addCol" title="오른쪽에 열 추가">열 추가</button>
-    <span class="table-bar-sep"></span>
-    <button type="button" data-table="accent" aria-pressed="false" title="머리글 행 바탕을 칠하기·없애기">머리글 강조</button>
-    <button type="button" data-table="resetSize" title="끌어서 바꾼 열 너비·행 높이를 원래대로 (칸 오른쪽·아래 테두리를 끌면 크기 조절)">크기 원래대로</button>
-    <span class="table-bar-sep"></span>
     <button type="button" data-table="delRow">행 지우기</button>
     <button type="button" data-table="delCol">열 지우기</button>
-    <button type="button" data-table="delTable" class="danger">표 지우기</button>
+    <span class="table-bar-sep"></span>
+    <button type="button" data-table="merge" title="끌어서 고른 칸들을 하나로 합치기">셀 병합</button>
+    <button type="button" data-table="autoFit" title="내용·본문 폭에 맞춰 열 너비·정렬을 자동으로 (번호·날짜는 좁게, 긴 설명 열에 공간). 칸 오른쪽·아래 테두리를 끌면 직접 조절">자동 조정</button>
   </div>
   <footer class="format-bar" id="format-bar" role="toolbar" aria-label="서식">
     <div class="format-items" id="format-items">
