@@ -2,6 +2,7 @@
 // 버전마다 아래 "이번 버전" 부분을 새 기능에 맞게 바꾼다. 임시 폴더(%TEMP%\memoking-smoke)만 쓴다.
 // 이번 버전: v0.17.0 — 팝업 알림 모으기(UI 자동화·글자 인식) · 메모를 PDF로 · 고친 때 스탬프는 카드 사이 틈에
 //            v0.17.1 — 창이 작아도 스탬프가 카드(요약)와 겹치지 않음 · 카카오톡 알림은 설정 없이 늘 · 선택한 내용 자동 영역 캡처
+//            v0.17.2 — 화면 밖까지 선택하면 스크롤하며 캡처해 이어 붙이기 · 표 머리글 강조는 고를 때만, 열 너비·행 높이 끌기 · Ctrl+휠 본문 확대
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
@@ -70,7 +71,7 @@ function pngSize(file) {
   return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
 }
 
-export async function runSmoke({ noteWins, getVault, createListWindow, getList, createPopupWatcher, getHistory, smokePdf, getPdfWin, startAreaCapture, getAreaCapture, findSelectionRect, smokeToastsList, smokeClipboard }) {
+export async function runSmoke({ noteWins, getVault, createListWindow, getList, createPopupWatcher, getHistory, smokePdf, getPdfWin, startAreaCapture, getAreaCapture, findSelectionRect, smokeToastsList, smokeClipboard, scrollingCapture }) {
   const checks = [];
   const errors = [];
   const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
@@ -324,6 +325,107 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     check('선택한 내용 자동 캡처: 고르지 않고 테두리 → 반짝 뒤 바로 캡처, "선택한 내용을 캡처해 메모를 만들었어요"', autoLook && flashed && t, JSON.stringify({ autoLook, flashed, toast: t?.title }));
     check('자동 캡처 그림 = 선택한 내용 + 둘레 여백 8px (원래 해상도)', size && Math.abs(size.width - wantW) <= 3 * scale && Math.abs(size.height - wantH) <= 3 * scale, JSON.stringify({ size, want: [wantW, wantH] }));
     sample.destroy();
+
+    // 6) v0.17.2: 화면 밖까지 이어지는 선택 → 스크롤하며 여러 장 찍어 이어 붙이기
+    const longWin = new BrowserWindow({ width: 560, height: 420, x: 140, y: 100, show: true, title: '스크롤 캡처 점검', webPreferences: { sandbox: true } });
+    const paras = Array.from({ length: 40 }, (_, i) => `<p id="p${i}">${i + 1}번째 문단이에요. 스크롤 캡처로 이어 붙인 그림에 이 문단이 빠짐없이 들어가야 해요.</p>`).join('');
+    await longWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><title>스크롤 캡처 점검</title><body style="margin:0;padding:24px 32px;font:17px/1.7 'Malgun Gothic';background:#fff">${paras}</body>`)}`);
+    longWin.focus();
+    await wait(400);
+    const span = await js(longWin, `(() => { const a = document.getElementById('p3'), b = document.getElementById('p30'); const r = document.createRange(); r.setStartBefore(a.firstChild); r.setEndAfter(b.firstChild);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); window.scrollTo(0, 0);
+      return { top: a.getBoundingClientRect().top + scrollY, bottom: b.getBoundingClientRect().bottom + scrollY, view: innerHeight }; })()`);
+    const longSel = await findSelectionRect();
+    check('화면 밖(아래)까지 이어진 선택을 알아챔 (보이는 영역도)', longSel?.more && longSel.viewPx?.height > 100, JSON.stringify(longSel));
+    const tScroll = smokeToastsList.length;
+    const cScroll = smokeClipboard.length;
+    if (longSel?.more) await scrollingCapture(longSel);
+    const scrollToast = smokeToastsList.slice(tScroll).find((x) => /선택한 내용을 캡처/.test(x.title));
+    const scrollClip = smokeClipboard[cScroll];
+    const scrollSize = scrollClip && fs.existsSync(scrollClip) ? pngSize(scrollClip) : null;
+    const lScale = screen.getDisplayMatching(longWin.getBounds()).scaleFactor;
+    const wantScrollH = Math.round((span.bottom - span.top + 16) * lScale);
+    const scrolledBack = await js(longWin, 'scrollY');
+    check('스크롤하며 여러 장을 찍어 이어 붙임 → 선택한 4~31번째 문단이 모두 든 한 장 (+여백), "N장을 이어 붙인"', scrollToast && /장을 이어 붙인/.test(scrollToast.body) && scrollSize && Math.abs(scrollSize.height - wantScrollH) <= 30 * lScale && scrollSize.height > span.view * lScale * 1.5,
+      JSON.stringify({ toast: scrollToast?.body, size: scrollSize, want: wantScrollH, view: span.view }));
+    check('스크롤 캡처가 끝나면 원래 스크롤 자리로 (맨 위)', scrolledBack < 5, String(scrolledBack));
+    if (scrollClip && fs.existsSync(scrollClip)) fs.copyFileSync(scrollClip, path.join(OUT, 'smoke-new-scroll-capture.png'));
+    longWin.destroy();
+
+    // 7) v0.17.2: 표 — 머리글 바탕은 "머리글 강조"를 켰을 때만, 열 너비·행 높이를 끌어서 바꾸고 다시 열어도 그대로
+    const tableMemo = vault.create();
+    vault.save(tableMemo, '# 표 크기 점검\n\n| 항목 | 담당 | 메모 |\n| --- | --- | --- |\n| 예산 | 김대리 | 첫째 |\n| 일정 | 박과장 | 둘째 |\n');
+    await lj(`window.memoking.memo.open(${JSON.stringify(tableMemo)})`);
+    let tw = await until(() => noteWins.get(tableMemo), '표 메모 창');
+    await ready(tw);
+    tw.focus();
+    const tj = (code) => js(tw, code);
+    const send = (type, x, y) => tw.webContents.sendInputEvent({ type, x: Math.round(x), y: Math.round(y), button: 'left', clickCount: 1 });
+    async function dragBy(x, y, dx, dy) {
+      send('mouseMove', x - 12, y - 12);
+      await wait(60);
+      send('mouseMove', x, y);
+      await wait(120);
+      send('mouseDown', x, y);
+      for (let i = 1; i <= 6; i++) {
+        send('mouseMove', x + (dx * i) / 6, y + (dy * i) / 6);
+        await wait(40);
+      }
+      send('mouseUp', x + dx, y + dy);
+      await wait(300);
+    }
+    const look = () => tj(`(() => ({
+      cols: [...document.querySelectorAll('.mk-doc tr:first-child > *')].map((c) => Math.round(c.getBoundingClientRect().width)),
+      rows: [...document.querySelectorAll('.mk-doc tr')].map((r) => Math.round(r.getBoundingClientRect().height)),
+      thBg: getComputedStyle(document.querySelector('.mk-doc th')).backgroundColor,
+    }))()`);
+    const t0 = await look();
+    check('표 머리글 행은 기본으로 다른 칸과 같은 바탕 (색을 따로 칠하지 않음)', /rgba\(0, 0, 0, 0\)|transparent/.test(t0.thBg), t0.thBg);
+    const colEdge = await tj(`(() => { const r = document.querySelector('.mk-doc th').getBoundingClientRect(); return { x: r.right - 1, y: r.top + r.height / 2 }; })()`);
+    await dragBy(colEdge.x, colEdge.y, 70, 0);
+    const rowEdge = await tj(`(() => { const r = document.querySelectorAll('.mk-doc tr')[1].children[1].getBoundingClientRect(); return { x: r.left + 20, y: r.bottom - 2 }; })()`);
+    await dragBy(rowEdge.x, rowEdge.y, 0, 40);
+    await tj(`(() => { document.querySelector('.mk-doc').focus(); const td = document.querySelector('.mk-doc td'); const r = document.createRange(); r.setStart(td.querySelector('p')?.firstChild ?? td, 1); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
+    await wait(200);
+    await until(() => tj(`!document.getElementById('table-bar').hidden`), '표 막대');
+    await tj(`document.querySelector('[data-table="accent"]').click()`);
+    await wait(900); // 머리말 저장 (0.4초 모아서)
+    const t1 = await look();
+    const savedTables = vault.get(tableMemo)?.tables;
+    check('표: 첫 열 오른쪽 테두리를 끌면 넓어지고, 둘째 행 아래 테두리를 끌면 높아지고, "머리글 강조"를 켜면 머리글 바탕이 칠해짐',
+      t1.cols[0] >= t0.cols[0] + 50 && t1.rows[1] >= t0.rows[1] + 30 && !/rgba\(0, 0, 0, 0\)/.test(t1.thBg), JSON.stringify({ t0, t1 }));
+    check('표 크기·머리글 강조는 메모 머리말(tables)에 저장', savedTables?.[0]?.cols?.length === 3 && savedTables[0].rows?.[1] > 0 && savedTables[0].accent === true, JSON.stringify(savedTables));
+    await capture(tw, 'smoke-new-table-sized.png');
+    tw.close();
+    await until(() => !noteWins.get(tableMemo), '표 메모 닫힘');
+    await lj(`window.memoking.memo.open(${JSON.stringify(tableMemo)})`);
+    tw = await until(() => noteWins.get(tableMemo), '표 메모 다시 열기');
+    await ready(tw);
+    await wait(300);
+    const t2 = await look();
+    check('표 메모를 닫았다 다시 열어도 열 너비·행 높이·머리글 강조가 그대로', Math.abs(t2.cols[0] - t1.cols[0]) <= 2 && Math.abs(t2.rows[1] - t1.rows[1]) <= 2 && t2.thBg === t1.thBg, JSON.stringify({ t1, t2 }));
+    const mdAfter = vault.get(tableMemo)?.body ?? '';
+    check('표 본문(마크다운)은 그대로 (크기는 머리말에만)', /\| 예산 \| 김대리 \| 첫째 \|/.test(mdAfter.replace(/ +/g, ' ')), mdAfter);
+
+    // 8) v0.17.2: 메모 안에서 Ctrl+마우스 휠 → 본문만 확대·축소 (창 전체 확대는 아님), 배율은 메모마다 기억
+    const docBox = await tj(`(() => { const r = document.querySelector('.mk-doc').getBoundingClientRect(); return { x: r.left + 40, y: r.top + 30, h: document.querySelector('.mk-doc h1').getBoundingClientRect().height }; })()`);
+    for (let i = 0; i < 2; i++) {
+      tw.webContents.sendInputEvent({ type: 'mouseWheel', x: docBox.x, y: docBox.y, deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
+      await wait(150);
+    }
+    const z1 = await tj(`({ zoom: Number(getComputedStyle(document.getElementById('editor')).getPropertyValue('--note-zoom')), h: document.querySelector('.mk-doc h1').getBoundingClientRect().height, bar: document.querySelector('.bar').getBoundingClientRect().height, badge: document.querySelector('.zoom-badge')?.textContent })`);
+    const pageZoom = tw.webContents.getZoomFactor();
+    check('Ctrl+휠 두 칸 → 본문 글·표가 함께 확대(또는 축소)되고 위 막대 크기는 그대로, 창 전체(Chromium) 확대는 안 됨',
+      z1.zoom && z1.zoom !== 1 && Math.abs(z1.h / docBox.h - z1.zoom) < 0.08 && pageZoom === 1 && /확대 \d+%/.test(z1.badge ?? ''), JSON.stringify({ z1, docH: docBox.h, pageZoom }));
+    tw.close();
+    await until(() => !noteWins.get(tableMemo), '닫힘');
+    await lj(`window.memoking.memo.open(${JSON.stringify(tableMemo)})`);
+    tw = await until(() => noteWins.get(tableMemo), '다시 열기');
+    await ready(tw);
+    const z2 = await js(tw, `Number(getComputedStyle(document.getElementById('editor')).getPropertyValue('--note-zoom'))`);
+    check('메모를 다시 열어도 그 메모의 확대 배율 그대로', z2 === z1.zoom, JSON.stringify({ z1: z1.zoom, z2 }));
+    await js(tw, `document.querySelector('.zoom-badge button').click()`).catch(() => {});
+    tw.close();
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {

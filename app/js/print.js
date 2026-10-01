@@ -57,6 +57,7 @@ if (memo) {
   document.title = memo.title;
   await createNoteEditor(root, {
     markdown: memo.body,
+    tables: memo.tables ?? [], // 표 열 너비·행 높이·머리글 강조도 PDF 에 그대로
     readOnly: true,
     onChange: () => {},
     fetchPreview: (url) => api.links.preview(url),

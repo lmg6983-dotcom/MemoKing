@@ -20,6 +20,7 @@ import { PopupWatcher } from './popup-watch.js';
 import { popupToEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
 import { selectionCaptureRect } from '../app/js/core/selection-rect.js';
+import { stitchFrames } from '../app/js/core/stitch.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -1520,20 +1521,22 @@ async function findSelectionRect() {
   try {
     const r = await captureHelper.request('selrect', 2500);
     if (!r?.found) return null;
-    // 도우미는 실제 화면 픽셀로 준다 → 화면 DIP
-    const dip = screen.screenToDipRect(null, { x: r.x, y: r.y, width: r.width, height: r.height });
-    return { ...dip, window: r.window ?? '', process: r.process ?? '' };
+    // 도우미는 실제 화면 픽셀로 준다 → 화면 DIP (보이는 영역은 스크롤 캡처용으로 픽셀 그대로도)
+    const dip = r.width > 0 ? screen.screenToDipRect(null, { x: r.x, y: r.y, width: r.width, height: r.height }) : { x: 0, y: 0, width: 0, height: 0 };
+    const viewPx = r.view?.width > 0 ? r.view : null;
+    return { ...dip, more: Boolean(r.more && viewPx), viewPx, window: r.window ?? '', process: r.process ?? '' };
   } catch (err) {
     console.warn('선택한 내용 위치를 읽지 못했어요', err.message);
     return null;
   }
 }
 
-// Ctrl+Alt+C 두 번: 선택한 내용이 있으면 그 영역을 자동으로, 없으면 끌어서 고르기
+// Ctrl+Alt+C 두 번: 선택한 내용이 있으면 그 영역을 자동으로 (화면 밖까지 이어지면 스크롤하며), 없으면 끌어서 고르기
 async function captureSelectionOrArea() {
-  if (areaCapture || !vault) return startAreaCapture();
+  if (areaCapture || scrollCapture || !vault) return startAreaCapture();
   const sel = await findSelectionRect();
-  return startAreaCapture(sel ? { auto: sel } : {});
+  if (sel?.more) return scrollingCapture(sel);
+  return startAreaCapture(sel?.width > 0 ? { auto: sel } : {});
 }
 
 /** @param {{ show?: boolean, auto?: { x: number, y: number, width: number, height: number, window?: string, process?: string } | null }} options */
@@ -1647,12 +1650,15 @@ function finishAreaCapture(senderId, rect) {
   crop.width = Math.min(crop.width, iw - crop.x);
   crop.height = Math.min(crop.height, ih - crop.y);
   if (crop.width < 2 || crop.height < 2) return null;
-  const png = shot.image.crop(crop).toPNG();
+  return captureImageToMemo(shot.image.crop(crop).toPNG(), crop, { auto: c.auto, point: c.point });
+}
+
+// 캡처한 그림 → 클립보드 + 새 메모 (영역 캡처·선택한 내용 자동 캡처·스크롤 캡처가 함께 씀)
+function captureImageToMemo(png, size, { auto = null, point, scrolled = 0 }) {
   const tmp = path.join(os.tmpdir(), `memoking-area-${Date.now()}.png`);
   fs.writeFileSync(tmp, png);
   copyImageToClipboard(tmp);
   const src = vault.saveAttachment(png, 'png');
-  const auto = c.auto;
   const heading = auto ? '선택한 내용 캡처' : '화면 캡처';
   const capture = {
     heading,
@@ -1662,10 +1668,124 @@ function finishAreaCapture(senderId, rect) {
     skipped: [],
     source: { window: auto?.window || '화면 캡처', process: auto?.process ?? '', url: null, time: new Date().toISOString(), copied: false },
   };
-  return openCaptureMemo(capture, c.point, {
+  return openCaptureMemo(capture, point, {
     title: auto ? '선택한 내용을 캡처해 메모를 만들었어요' : '화면을 캡처해 메모를 만들었어요',
-    body: `${crop.width} × ${crop.height} 그림을 클립보드에도 복사했어요 · 누르면 메모로 가요`,
+    body: `${scrolled > 1 ? `스크롤하며 ${scrolled}장을 이어 붙인 ` : ''}${size.width} × ${size.height} 그림을 클립보드에도 복사했어요 · 누르면 메모로 가요`,
   });
+}
+
+// ---------- 스크롤 캡처: 선택한 내용이 화면 밖(위·아래)까지 이어질 때 ----------
+// 도우미(UI 자동화)가 선택 첫 줄을 맨 위로 스크롤 → 보이는 영역을 찍고 → 보이는 마지막 줄을 맨 위로 스크롤 → … 선택 끝이
+// 보일 때까지. 찍은 장들을 겹치는 줄로 맞춰 이어 붙이고(core/stitch.js) 선택한 내용이 모두 들어가게 잘라 메모로.
+// 캡처하는 동안 영역 바깥에 노랑 테두리·진행 안내(캡처 그림에는 들어가지 않음), 끝나면 반짝·찰칵. 끝나면 원래 스크롤 자리로.
+const SCROLL_MAX_FRAMES = 40;
+const SCROLL_MAX_HEIGHT = 30000; // 이어 붙인 그림의 최대 높이 (px)
+let scrollCapture = null;
+
+// 실제 화면 픽셀 사각형 → 그 모니터의 화면을 찍어 잘라 낸 그림 (원래 해상도, BGRA)
+async function grabScreenRect(rect) {
+  const dip = screen.screenToDipRect(null, rect);
+  const display = screen.getDisplayMatching({ x: Math.round(dip.x), y: Math.round(dip.y), width: Math.max(1, Math.round(dip.width)), height: Math.max(1, Math.round(dip.height)) });
+  const displays = screen.getAllDisplays();
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: {
+      width: Math.max(...displays.map((d) => Math.round(d.bounds.width * d.scaleFactor))),
+      height: Math.max(...displays.map((d) => Math.round(d.bounds.height * d.scaleFactor))),
+    },
+  });
+  const src = sources.find((x) => String(x.display_id) === String(display.id)) ?? (displays.length === 1 ? sources[0] : null);
+  if (!src || src.thumbnail.isEmpty()) return null;
+  const { width: iw, height: ih } = src.thumbnail.getSize();
+  const rx = iw / display.bounds.width;
+  const ry = ih / display.bounds.height;
+  const crop = { x: Math.max(0, Math.round((dip.x - display.bounds.x) * rx)), y: Math.max(0, Math.round((dip.y - display.bounds.y) * ry)) };
+  crop.width = Math.min(iw - crop.x, Math.round(dip.width * rx));
+  crop.height = Math.min(ih - crop.y, Math.round(dip.height * ry));
+  if (crop.width < 8 || crop.height < 8) return null;
+  const part = src.thumbnail.crop(crop);
+  const size = part.getSize();
+  // 그림 픽셀 / 실제 화면 픽셀 (보통 1)
+  return { width: size.width, height: size.height, data: part.toBitmap(), k: rx / display.scaleFactor };
+}
+
+// 캡처 영역(실제 화면 픽셀) 바깥에 테두리·안내 창
+function openScrollFrame(view) {
+  const v = screen.screenToDipRect(null, view);
+  const display = screen.getDisplayMatching({ x: Math.round(v.x), y: Math.round(v.y), width: Math.max(1, Math.round(v.width)), height: Math.max(1, Math.round(v.height)) });
+  const PAD = 6;
+  const PILL = 34;
+  const top = v.y - PAD - PILL >= display.bounds.y;
+  const win = new BrowserWindow({
+    x: Math.round(v.x - PAD), y: Math.round(v.y - PAD - (top ? PILL : 0)),
+    width: Math.round(v.width + PAD * 2), height: Math.round(v.height + PAD * 2 + PILL),
+    frame: false, transparent: true, show: false, resizable: false, movable: false, minimizable: false, maximizable: false,
+    fullscreenable: false, focusable: false, skipTaskbar: true, hasShadow: false, enableLargerThanScreen: true,
+    webPreferences,
+  });
+  guardWindow(win);
+  win.setIgnoreMouseEvents(true);
+  win.setContentProtection(true); // 화면 캡처에서 빠지게 (테두리는 어차피 캡처 영역 밖)
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.webContents.once('did-finish-load', () => !win.isDestroyed() && !SMOKE && win.showInactive());
+  win.loadFile(path.join(APP_DIR, 'scroll-frame.html'), { query: { pill: top ? 'top' : 'bottom' } });
+  return win;
+}
+const frameCall = (win, code) => (win && !win.isDestroyed() ? win.webContents.executeJavaScript(`window.mkScroll?.${code}`).catch(() => {}) : Promise.resolve());
+
+/** @param {{ view: object, window?: string, process?: string }} sel findSelectionRect 결과 (more = 화면 밖까지 선택) */
+async function scrollingCapture(sel) {
+  if (areaCapture || scrollCapture || !vault) return null;
+  scrollCapture = { point: screen.getCursorScreenPoint(), frames: 0 };
+  const frameWin = openScrollFrame(sel.viewPx);
+  const frames = [];
+  let first = null;
+  try {
+    let step = await captureHelper.request('selscroll\tstart', 8000);
+    for (let i = 0; i < SCROLL_MAX_FRAMES && step?.ok && step.view; i++) {
+      const shot = await grabScreenRect(step.view);
+      if (!shot) break;
+      first ??= shot;
+      if (shot.width !== first.width) break; // 보이는 영역의 너비가 바뀌면 (가로 스크롤 막대 등) 거기까지
+      const k = shot.k;
+      frames.push({
+        width: shot.width,
+        height: shot.height,
+        data: shot.data,
+        moved: i ? Math.round(step.moved * k) : 0,
+        sel: step.sel ? { x: (step.sel.x - step.view.x) * k, y: (step.sel.y - step.view.y) * k, width: step.sel.width * k, height: step.sel.height * k } : null,
+      });
+      scrollCapture.frames = frames.length;
+      frameCall(frameWin, `count(${frames.length})`);
+      if (step.atEnd || frames.reduce((h, f) => h + (f.moved || f.height), 0) > SCROLL_MAX_HEIGHT) break;
+      const next = await captureHelper.request('selscroll\tnext', 8000);
+      if (!next?.ok || !(next.moved > 0)) break; // 더 스크롤되지 않으면 거기까지
+      step = next;
+    }
+  } catch (err) {
+    console.error('스크롤 캡처 실패', err);
+  } finally {
+    await captureHelper.request('selscroll\trestore', 6000).catch(() => {});
+  }
+  try {
+    if (!frames.length) {
+      notice('스크롤 캡처를 하지 못했어요', '이 앱에서는 스크롤하며 찍을 수 없어요. Ctrl+Alt+C를 두 번 눌러 영역을 직접 골라 주세요.');
+      return null;
+    }
+    await frameCall(frameWin, 'stitching()');
+    const out = stitchFrames(frames, { pad: 8 });
+    const image = nativeImage.createFromBitmap(Buffer.from(out.data.buffer, out.data.byteOffset, out.data.byteLength), { width: out.width, height: out.height });
+    await frameCall(frameWin, 'flash()');
+    await new Promise((r) => setTimeout(r, 450));
+    return captureImageToMemo(image.toPNG(), out, { auto: { window: sel.window ?? '', process: sel.process ?? '' }, point: scrollCapture.point, scrolled: frames.length });
+  } catch (err) {
+    console.error('스크롤 캡처 이어 붙이기 실패', err);
+    notice('스크롤 캡처를 하지 못했어요', '잠시 뒤 다시 해 주세요.');
+    return null;
+  } finally {
+    if (!frameWin.isDestroyed()) frameWin.destroy();
+    scrollCapture = null;
+  }
 }
 
 // Ctrl+Alt+C: 한 번 = 빠른 메모, 0.35초 안에 두 번 = 영역 캡처 (선택한 내용이 있으면 그 영역을 자동으로)
@@ -1811,7 +1931,7 @@ function registerIpc() {
   ipcMain.handle('pdf:open', (_e, id) => openPdfWindow(String(id)));
   ipcMain.handle('pdf:memo', (_e, id) => {
     const m = vault?.get(String(id));
-    return m ? { title: m.title, body: m.body, color: m.color, created: m.created, updated: m.updated } : null;
+    return m ? { title: m.title, body: m.body, color: m.color, tables: m.tables, created: m.created, updated: m.updated } : null;
   });
   ipcMain.handle('pdf:save', (event, id, options) => savePdf(String(id), options ?? {}, BrowserWindow.fromWebContents(event.sender)));
   ipcMain.handle('memo:links', (_e, id) => vault?.links(id) ?? { links: [], backlinks: [], suggestions: [] });
@@ -2105,7 +2225,7 @@ app.whenReady().then(async () => {
       alarms, smokeToasts, getHistory: () => history, appSettings, quickMemo, registerQuickMemoKey,
       getCapturePoint: () => lastCapturePoint, smokeOpened, smokeConfirmAnswers,
       getStacks: () => stacks, trackWindowDrag, endWindowDrag, stackInto, getTabTear: () => tabTear, getSettings: () => settings, stickers, reloadSettings: loadSettings, installMark,
-      startAreaCapture, getAreaCapture: () => areaCapture, smokeClipboard, onQuickMemoKey, findSelectionRect, captureHelper,
+      startAreaCapture, getAreaCapture: () => areaCapture, smokeClipboard, onQuickMemoKey, findSelectionRect, captureHelper, scrollingCapture, getScrollCapture: () => scrollCapture,
       createPopupWatcher, getHistory: () => history, smokePdf, getPdfWin: () => pdfWin, openPdfWindow,
       startTutorial, getTutorial: () => tutorial,
       captureToMemo, smokeToastsList: smokeToasts, getTitleBarOverlay: () => titleBarOverlay(),

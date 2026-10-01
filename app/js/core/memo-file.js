@@ -4,13 +4,14 @@ import { parse as parseYaml, stringify as stringifyYaml } from '../../vendor/yam
 import { tableLineText } from './tables.js';
 import { toLocalIso } from './time.js';
 import { normalizeReminder, serializeReminder } from './reminders.js';
+import { normalizeTables } from './table-sizes.js';
 
 export const COLORS = ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal'];
 export const DEFAULT_COLOR = 'yellow';
 export const UNTITLED = '제목 없음';
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders'];
+const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders', 'tables'];
 const AUDIO_EXT = /\.(weba|ogg|oga|opus|mp3|m4a|aac|wav|flac)$/i;
 const VIDEO_EXT = /\.(mp4|m4v|mov|ogv|mkv)$/i;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
@@ -48,6 +49,7 @@ export function normalizeMeta(data) {
     pinned: data.pinned === true,
     links: Array.isArray(data.links) ? [...new Set(data.links.filter((v) => typeof v === 'string' && v))] : [],
     reminders: Array.isArray(data.reminders) ? data.reminders.map((r) => normalizeReminder(r)).filter(Boolean) : [],
+    tables: normalizeTables(data.tables), // 표 열 너비·행 높이·머리글 강조 (표 순서대로)
     extra,
   };
 }
@@ -64,6 +66,8 @@ export function serializeMemoFile(meta, body) {
   if (meta.pinned) data.pinned = true;
   if (meta.links?.length) data.links = meta.links;
   if (meta.reminders?.length) data.reminders = meta.reminders.map(serializeReminder);
+  const tables = normalizeTables(meta.tables);
+  if (tables.length) data.tables = tables;
   Object.assign(data, meta.extra);
   const yaml = stringifyYaml(data, { lineWidth: 0 }).trimEnd();
   const text = body.replace(/\r\n/g, '\n').replace(/\s+$/, '');

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <title>스크롤 캡처</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/capture.css">
+  <script type="module" src="js/scroll-frame.js"></script>
+</head>
+<body class="scroll-frame">
+  <!-- 스크롤 캡처 중: 캡처하는 영역 바깥에 노랑 테두리와 진행 안내 (캡처한 그림에는 들어가지 않는다) -->
+  <div id="ring" class="ring"><div id="flash" class="ring-flash"></div></div>
+  <div id="pill" class="pill" role="status">스크롤하며 캡처하는 중</div>
+</body>
+</html>

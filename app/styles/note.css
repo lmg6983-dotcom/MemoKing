@@ -762,7 +762,9 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
   vertical-align: top;
   text-align: left;
 }
-.mk-doc th { background: var(--note-hover); font-weight: 700; }
+.mk-doc th { font-weight: 700; }
+/* 머리글 행 바탕은 표 막대의 "머리글 강조"를 켰을 때만 (v0.17.2) */
+.mk-doc .mk-head-accent th { background: var(--note-hover); }
 .mk-doc th > p, .mk-doc td > p { margin: 0; }
 /* 여러 칸을 고르면 (드래그) 칸마다 옅은 노랑 */
 .mk-doc .selectedCell::after {
@@ -890,3 +892,47 @@ body.stacked { --tabs-h: 0px; --tabs-w: 30px; padding-left: var(--tabs-w); }
 .stack-tab[data-color][aria-selected="true"] { background: var(--note-bg); }
 .stack-tab { flex: none; min-height: 0; }
 .stack-tab .stack-title { flex: none; overflow: visible; text-overflow: clip; white-space: nowrap; line-height: 1; letter-spacing: 0.02em; }
+
+/* ---------- v0.17.2: Ctrl+마우스 휠로 본문 확대·축소 (웹 브라우저처럼 글·사진·표가 함께) ---------- */
+#editor > * { zoom: var(--note-zoom, 1); } /* 본문 요소에도 .editor class 가 붙으므로 id 로 (두 번 확대되지 않게) */
+.zoom-badge {
+  position: fixed;
+  right: 14px;
+  bottom: 54px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--brand-black);
+  color: var(--on-black);
+  font: 600 12px/22px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+  pointer-events: none;
+}
+.zoom-badge.show { opacity: 1; transform: none; pointer-events: auto; }
+.zoom-badge button {
+  height: 22px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.zoom-badge button:hover { background: rgba(255, 255, 255, 0.28); }
+
+/* ---------- v0.17.2: 표 열 너비·행 높이를 자유롭게 ---------- */
+/* 열 너비를 정한 표는 끈 대로 (좁게도 넓게도) — 너비를 안 정한 표는 지금처럼 내용에 맞춤 */
+.mk-doc .mk-sized table, .mk-doc table.mk-sized { table-layout: fixed; min-width: 0; }
+.mk-doc .mk-sized :is(th, td) { min-width: 0; overflow-wrap: anywhere; }
+/* 행 높이: 칸 아래 테두리를 끌기 */
+.mk-doc.row-resize-cursor, body.mk-row-resizing, body.mk-row-resizing * { cursor: row-resize !important; }
+body.mk-row-resizing { user-select: none; }
+.table-bar button[aria-pressed="true"] { background: var(--note-hover); color: var(--note-text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 30%, transparent); }

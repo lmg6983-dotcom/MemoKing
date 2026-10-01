@@ -71,3 +71,42 @@ body.auto { cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .sel.auto, .sel.auto.flash, .sel.auto.flash::after { animation-duration: 0.01s; }
 }
+
+/* ---------- 스크롤 캡처 테두리 창 (v0.17.2): 창 = 캡처 영역 + 둘레 6px + 안내 자리 34px ---------- */
+html:has(body.scroll-frame), body.scroll-frame { background: transparent; cursor: default; }
+body.scroll-frame .ring {
+  position: fixed;
+  left: 3px;
+  right: 3px;
+  border: 3px solid var(--brand-yellow);
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  animation: mk-ring-pulse 1.2s ease-in-out infinite;
+  overflow: hidden;
+}
+body.pill-top .ring { top: 37px; bottom: 3px; }
+body.pill-bottom .ring { top: 3px; bottom: 37px; }
+body.scroll-frame .pill {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--brand-black);
+  color: var(--on-black);
+  font: 600 13px/20px var(--font-sans);
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+body.pill-top .pill { top: 3px; }
+body.pill-bottom .pill { bottom: 3px; }
+.ring-flash { position: absolute; inset: 0; background: #ffffff; opacity: 0; }
+.ring.flash { animation: none; border-color: #ffffff; }
+.ring.flash .ring-flash { animation: mk-flash 0.4s ease-out both; }
+@keyframes mk-ring-pulse {
+  0%, 100% { border-color: var(--brand-yellow); }
+  50% { border-color: color-mix(in srgb, var(--brand-yellow) 55%, #ffffff); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.scroll-frame .ring { animation: none; }
+}

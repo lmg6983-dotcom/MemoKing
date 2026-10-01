@@ -7,7 +7,7 @@ import {
   gfm, toggleStrikethroughCommand, history, listener, listenerCtx, clipboard, trailing, upload, uploadConfig,
   callCommand, getMarkdown, replaceAll, insert, $view, $prose, $markSchema, $nodeSchema, $remark, Plugin, PluginKey, TextSelection,
   toggleMark, Decoration, DecorationSet, insertTableCommand, tableSchema,
-  addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell,
+  addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, columnResizing,
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
@@ -19,6 +19,7 @@ import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from '.
 import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv } from './core/tables.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
+import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent } from './table-extras.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
 // 모두 마크다운 이미지 문법 ![설명](attachments/파일) 로 저장하고, 확장자로 구분해 보여준다.
@@ -591,7 +592,7 @@ function normalizePastedTables(html) {
  *   fetchPreview: 링크 카드에 보여줄 제목·설명·사진 (메인 프로세스가 메모 폴더에 모아 둔 것)
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, readOnly = false }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false }) {
   let ready = false;
   let editor = null;
   const view = () => editor.ctx.get(editorViewCtx);
@@ -810,6 +811,19 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
   }));
 
+  // 표 열 너비·행 높이·머리글 강조 (메모 머리말에 저장)
+  let currentTables = tables;
+  const extras = createTableExtras({
+    readOnly,
+    onChange: (next) => {
+      currentTables = next;
+      onTables?.(next);
+    },
+  });
+  const tableExtras = $prose(() => extras.plugin);
+  // 열 너비: 칸 오른쪽 테두리를 끌기 (prosemirror-tables — Milkdown gfm 묶음에는 빠져 있어 따로 켠다)
+  const tableResize = $prose(() => columnResizing({ cellMinWidth: 24 }));
+
   const media = $view(imageSchema.node, () => (node) => mediaView(node));
   const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
   const taskToggle = $prose(() => new Plugin({
@@ -897,6 +911,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(commonmark)
     .use(gfm)
     .use(tableTab)
+    .use(tableResize) // 읽기 전용(PDF)에서도 열 너비가 보이게 (끌기는 편집할 때만)
+    .use(tableExtras)
     .use(tagSuggest) // 자동완성 목록이 떠 있을 때 Enter·↑↓ 를 먼저 받는다
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(inlineHtmlMarks)
@@ -918,6 +934,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .create();
 
   ready = true;
+  applyTables(view(), tables);
+  extras.setLoading(false);
   const call = (command, payload) => editor.action(callCommand(command.key, payload));
 
   function parentOfType(names) {
@@ -1032,6 +1050,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
     tableCommand(name) {
       const v = view();
+      if (name === 'accent' || name === 'resetSize') {
+        if (isInTable(v.state)) (name === 'accent' ? toggleAccent : resetTableSize)(v);
+        return v.focus();
+      }
       const cmd = { addRow: addRowAfter, addCol: addColumnAfter, delRow: deleteRow, delCol: deleteColumn, delTable: deleteTable }[name];
       if (!cmd || !isInTable(v.state)) return v.focus();
       const tablePos = parentOfType(['table'])?.pos;
@@ -1054,7 +1076,14 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const end = Date.now() + timeout;
       while ((pendingChecks > 0 || localizing.size > 0) && Date.now() < end) await new Promise((r) => setTimeout(r, 50));
     },
-    setMarkdown: (md) => editor.action(replaceAll(md)),
+    // 본문을 통째로 바꾸면 표 모양은 지금 저장된 것으로 다시 입힌다 (바꾸는 동안은 저장하지 않음)
+    setMarkdown(md, nextTables = currentTables) {
+      extras.setLoading(true);
+      editor.action(replaceAll(md));
+      applyTables(view(), nextTables);
+      currentTables = nextTables;
+      extras.setLoading(false);
+    },
     // 빠른 메모(Ctrl+Alt+C)로 받은 내용 채우기 --------------------------------
     focusEnd() {
       const v = view();
@@ -1135,7 +1164,7 @@ function activeFormats(state) {
     const node = $from.node(d);
     if (node.type.name === 'table_header_row') active.tableHeader = true;
     if (node.type.name === 'table') {
-      active.table = { rows: node.childCount, cols: node.firstChild?.childCount ?? 0, header: Boolean(active.tableHeader) };
+      active.table = { rows: node.childCount, cols: node.firstChild?.childCount ?? 0, header: Boolean(active.tableHeader), accent: isAccent(state, { node, pos: $from.before(d) }) };
       break;
     }
   }

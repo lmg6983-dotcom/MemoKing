@@ -9,6 +9,7 @@ import { setupReminderPanel } from './reminder-panel.js';
 import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
 import { setupCoach } from './coach.js';
+import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 
 const SAVE_DELAY = 600;
 const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
@@ -123,7 +124,7 @@ window.addEventListener('beforeunload', () => {
 // ---------- 다른 곳(다른 PC, 다른 앱)에서 바뀐 경우 ----------
 
 function applyExternal(next) {
-  editor.setMarkdown(next.body);
+  editor.setMarkdown(next.body, next.tables ?? []);
   current = saved = editor.getMarkdown();
   el.banner.hidden = true;
   pendingExternal = null;
@@ -644,6 +645,23 @@ document.addEventListener('mousedown', (e) => {
   if (!el.morePanel.hidden && !el.morePanel.contains(e.target) && !el.moreBtn.contains(e.target) && !el.palette.contains(e.target)) closeMore();
 });
 
+// 표 열 너비·행 높이·머리글 강조 → 메모 머리말 (끄는 동안 여러 번 바뀌어도 한 번에)
+let tablesTimer = 0;
+let pendingTables = null;
+function saveTables(tables) {
+  pendingTables = tables;
+  clearTimeout(tablesTimer);
+  tablesTimer = setTimeout(flushTables, 400);
+}
+function flushTables() {
+  clearTimeout(tablesTimer);
+  if (!pendingTables) return;
+  const t = pendingTables;
+  pendingTables = null;
+  api.memo.set(id, { tables: t }).catch(() => setStatus('표 크기를 저장하지 못했어요', true));
+}
+window.addEventListener('beforeunload', flushTables);
+
 // 표 막대: 표 안에 커서가 있을 때만. 머리글 행과 마지막 남은 열은 지울 수 없으므로 막는다.
 const tableBar = $('table-bar');
 function showTableBar(table) {
@@ -656,6 +674,8 @@ function showTableBar(table) {
   // 머리글 아래 행은 마지막 하나까지 지울 수 있다 (머리글 행만 남은 1행 표도 된다)
   delRow.disabled = table.header;
   delRow.title = table.header ? '머리글 행은 지울 수 없어요. 표를 없애려면 표 지우기를 눌러 주세요' : '이 행 지우기';
+  const accent = tableBar.querySelector('[data-table="accent"]');
+  accent.setAttribute('aria-pressed', String(Boolean(table.accent)));
   delCol.disabled = table.cols <= 1;
   delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 표를 없애려면 표 지우기를 눌러 주세요' : '이 열 지우기';
 }
@@ -736,6 +756,65 @@ window.addEventListener('keydown', (e) => {
   else if (name === 'reminders') reminderPanel?.toggle();
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
+}, true);
+
+// ---------- 본문 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 웹 브라우저처럼 글·사진·표가 함께 ----------
+// 배율은 메모마다 이 PC 에 기억한다. 위 막대·서식 막대는 그대로.
+const ZOOM_KEY = `memoking.zoom.${id}`;
+let zoom = 1;
+try {
+  zoom = clampZoom(localStorage.getItem(ZOOM_KEY) ?? 1);
+} catch {
+  // 저장소를 못 써도 100% 로
+}
+const zoomBadge = document.createElement('div');
+zoomBadge.className = 'zoom-badge';
+zoomBadge.setAttribute('role', 'status');
+const zoomText = document.createElement('span');
+const zoomReset = document.createElement('button');
+zoomReset.type = 'button';
+zoomReset.textContent = '원래대로';
+zoomReset.addEventListener('click', () => setZoom(1));
+zoomBadge.append(zoomText, zoomReset);
+document.body.append(zoomBadge);
+let zoomTimer = 0;
+
+function setZoom(z, { show = true } = {}) {
+  const scroller = el.editorRoot;
+  // 보던 곳이 그대로 보이게: 스크롤 위치를 배율에 맞춰 옮긴다
+  const ratio = scroller.scrollHeight > scroller.clientHeight ? scroller.scrollTop / (scroller.scrollHeight - scroller.clientHeight) : 0;
+  zoom = clampZoom(z);
+  el.editorRoot.style.setProperty('--note-zoom', String(zoom));
+  document.body.dataset.zoom = String(zoom);
+  scroller.scrollTop = ratio * Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  try {
+    if (zoom === 1) localStorage.removeItem(ZOOM_KEY);
+    else localStorage.setItem(ZOOM_KEY, String(zoom));
+  } catch {
+    // 기억 못 해도 지금 창에서는 그대로
+  }
+  if (!show) return;
+  zoomText.textContent = `확대 ${zoomLabel(zoom)}`;
+  zoomReset.hidden = zoom === 1;
+  zoomBadge.classList.add('show');
+  clearTimeout(zoomTimer);
+  zoomTimer = setTimeout(() => zoomBadge.classList.remove('show'), 1600);
+}
+setZoom(zoom, { show: false });
+
+// Ctrl+휠: 위로 굴리면 크게, 아래로 굴리면 작게 (창 전체가 아니라 본문만 — Chromium 의 페이지 확대는 막는다)
+window.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  if (e.deltaY) setZoom(stepZoom(zoom, e.deltaY < 0 ? 1 : -1));
+}, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey && e.code !== 'Equal') return;
+  if (e.code === 'Equal' || e.code === 'NumpadAdd') setZoom(stepZoom(zoom, 1));
+  else if (e.code === 'Minus' || e.code === 'NumpadSubtract') setZoom(stepZoom(zoom, -1));
+  else return;
+  e.preventDefault();
+  e.stopPropagation();
 }, true);
 
 async function closeWindow() {
@@ -919,6 +998,7 @@ if (!memo) {
   current = saved = memo.body;
   editor = await createNoteEditor(el.editorRoot, {
     markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus,
+    tables: memo.tables ?? [], onTables: saveTables,
     fetchPreview: (url) => api.links.preview(url),
     openLink: (url) => api.links.open(url),
     getTags: () => api.tags.list(),

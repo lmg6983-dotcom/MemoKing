@@ -160,12 +160,29 @@ public static class MkSel {
   [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
   [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
 
-  public class Result { public bool Found; public double X, Y, W, H; public uint Pid; public long Hwnd; public string Error; }
+  // 선택 위치 (+ 화면 밖까지 이어지는지, 보이는 영역)
+  public class Result { public bool Found, More; public double X, Y, W, H, VX, VY, VW, VH; public uint Pid; public long Hwnd; public string Error; }
+  // 스크롤 한 번의 결과: 보이는 영역, 그 안의 선택 부분, 스크롤한 거리, 선택 끝이 보이는지
+  public class Step { public bool Ok, AtEnd, HasSel; public double Moved, SX, SY, SW, SH, VX, VY, VW, VH; public string Error; }
 
-  public static Result Find(int timeoutMs) {
-    var task = Task.Run(() => FindNow());
-    if (!task.Wait(timeoutMs)) return new Result { Error = "timeout" };
-    return task.Result;
+  // 스크롤 캡처 동안 기억해 두는 것 (selrect 가 정하고 selscroll 이 쓴다)
+  static TextPattern sPat; static TextPatternRange sSel; static AutomationElement sEl; static IntPtr sHwnd;
+  static ScrollPattern sScroll; static double sH = -1, sV = -1;
+
+  // 응답 없는 앱에 묶이지 않게 시간 제한 + 모니터별 DPI 인식 스레드에서 (좌표 = 실제 화면 픽셀)
+  static T Run<T>(Func<T> f, int timeoutMs, Func<string, T> fail) {
+    var task = Task.Run(() => {
+      IntPtr old = IntPtr.Zero;
+      try { old = SetThreadDpiAwarenessContext(new IntPtr(-4)); } catch { } // PER_MONITOR_AWARE_V2 (Windows 10 1607+)
+      try { return f(); }
+      finally { if (old != IntPtr.Zero) { try { SetThreadDpiAwarenessContext(old); } catch { } } }
+    });
+    try {
+      if (!task.Wait(timeoutMs)) return fail("timeout");
+      return task.Result;
+    } catch (AggregateException e) {
+      return fail(e.InnerException != null ? e.InnerException.Message : e.Message);
+    }
   }
 
   class Box {
@@ -175,50 +192,151 @@ public static class MkSel {
       if (rc.IsEmpty || double.IsInfinity(rc.X) || double.IsNaN(rc.X) || rc.Width < 1 || rc.Height < 1) return;
       L = Math.Min(L, rc.Left); T = Math.Min(T, rc.Top); R = Math.Max(R, rc.Right); B = Math.Max(B, rc.Bottom); Any = true;
     }
+    public void Clip(double l, double t, double r, double b) { L = Math.Max(L, l); T = Math.Max(T, t); R = Math.Min(R, r); B = Math.Min(B, b); }
+    public bool Valid { get { return Any && R - L >= 4 && B - T >= 4; } }
   }
 
+  static void AddRange(Box box, TextPatternRange range) {
+    foreach (var rc in range.GetBoundingRectangles()) box.Add(rc);
+    try { foreach (var k in range.GetChildren()) { if (!k.Current.IsOffscreen) box.Add(k.Current.BoundingRectangle); } } catch { }
+  }
+
+  // 보이는 영역 = 글이 있는 요소의 사각형 ∩ 창
+  static Box ViewBox() {
+    var v = new Box();
+    v.Add(sEl.Current.BoundingRectangle);
+    RECT wr;
+    if (GetWindowRect(sHwnd, out wr)) v.Clip(wr.Left, wr.Top, wr.Right, wr.Bottom);
+    return v;
+  }
+
+  public static Result Find(int timeoutMs) { return Run(() => FindNow(), timeoutMs, e => new Result { Error = e }); }
+
   static Result FindNow() {
-    IntPtr old = IntPtr.Zero;
-    try { old = SetThreadDpiAwarenessContext(new IntPtr(-4)); } catch { } // PER_MONITOR_AWARE_V2 (Windows 10 1607+)
-    try {
-      IntPtr fg = GetForegroundWindow();
-      uint pid; GetWindowThreadProcessId(fg, out pid);
-      var res = new Result { Pid = pid, Hwnd = fg.ToInt64() };
-      var el = AutomationElement.FocusedElement;
-      if (el == null || el.Current.ProcessId != (int)pid) return res;
-      var box = new Box();
-      var walker = TreeWalker.RawViewWalker;
-      // 포커스가 문서 안의 작은 요소일 수 있어 TextPattern 이 있는 조상까지 올라가며 찾는다
-      for (int depth = 0; el != null && depth < 12 && !box.Any; depth++) {
-        object pat;
-        if (el.TryGetCurrentPattern(TextPattern.Pattern, out pat)) {
-          foreach (TextPatternRange range in ((TextPattern)pat).GetSelection()) {
-            string text = range.GetText(256) ?? "";
-            AutomationElement[] kids = new AutomationElement[0];
-            try { kids = range.GetChildren(); } catch { }
-            if (text.Trim().Length == 0 && kids.Length == 0) continue; // 커서만 있음
-            foreach (var rc in range.GetBoundingRectangles()) box.Add(rc);
-            foreach (var k in kids) {
-              try { if (!k.Current.IsOffscreen) box.Add(k.Current.BoundingRectangle); } catch { }
-            }
-          }
+    sPat = null; sSel = null; sEl = null; sScroll = null; sH = sV = -1;
+    IntPtr fg = GetForegroundWindow();
+    uint pid; GetWindowThreadProcessId(fg, out pid);
+    var res = new Result { Pid = pid, Hwnd = fg.ToInt64() };
+    var el = AutomationElement.FocusedElement;
+    if (el == null || el.Current.ProcessId != (int)pid) return res;
+    var box = new Box();
+    var walker = TreeWalker.RawViewWalker;
+    // 포커스가 문서 안의 작은 요소일 수 있어 TextPattern 이 있는 조상까지 올라가며 찾는다
+    for (int depth = 0; el != null && depth < 12 && !box.Any; depth++) {
+      object pat;
+      if (el.TryGetCurrentPattern(TextPattern.Pattern, out pat)) {
+        var tp = (TextPattern)pat;
+        TextPatternRange first = null, last = null;
+        foreach (TextPatternRange range in tp.GetSelection()) {
+          string text = range.GetText(256) ?? "";
+          AutomationElement[] kids = new AutomationElement[0];
+          try { kids = range.GetChildren(); } catch { }
+          if (text.Trim().Length == 0 && kids.Length == 0) continue; // 커서만 있음
+          AddRange(box, range);
+          if (first == null) first = range;
+          last = range;
         }
-        if (!box.Any) el = walker.GetParent(el);
+        if (first != null) {
+          sPat = tp; sEl = el; sHwnd = fg;
+          sSel = first.Clone();
+          if (last != first) sSel.MoveEndpointByRange(TextPatternRangeEndpoint.End, last, TextPatternRangeEndpoint.End);
+          // 선택이 보이는 곳 밖(위·아래)까지 이어지는지
+          try {
+            var vis = tp.GetVisibleRanges();
+            if (vis.Length > 0) {
+              res.More = sSel.CompareEndpoints(TextPatternRangeEndpoint.Start, vis[0], TextPatternRangeEndpoint.Start) < 0
+                || sSel.CompareEndpoints(TextPatternRangeEndpoint.End, vis[vis.Length - 1], TextPatternRangeEndpoint.End) > 0;
+            }
+          } catch { }
+        }
       }
-      if (!box.Any) return res;
-      RECT wr;
-      if (GetWindowRect(fg, out wr)) {
-        box.L = Math.Max(box.L, wr.Left); box.T = Math.Max(box.T, wr.Top);
-        box.R = Math.Min(box.R, wr.Right); box.B = Math.Min(box.B, wr.Bottom);
-      }
-      if (box.R - box.L < 4 || box.B - box.T < 4) return res;
-      res.Found = true; res.X = box.L; res.Y = box.T; res.W = box.R - box.L; res.H = box.B - box.T;
-      return res;
-    } catch (Exception e) {
-      return new Result { Error = e.Message };
-    } finally {
-      if (old != IntPtr.Zero) { try { SetThreadDpiAwarenessContext(old); } catch { } }
+      if (!box.Any) el = walker.GetParent(el);
     }
+    if (!box.Any) return res;
+    RECT wr;
+    if (GetWindowRect(fg, out wr)) box.Clip(wr.Left, wr.Top, wr.Right, wr.Bottom);
+    if (!box.Valid && !res.More) return res;
+    var view = ViewBox();
+    if (view.Valid) { res.VX = view.L; res.VY = view.T; res.VW = view.R - view.L; res.VH = view.B - view.T; }
+    else res.More = false;
+    if (box.Valid) { res.X = box.L; res.Y = box.T; res.W = box.R - box.L; res.H = box.B - box.T; }
+    res.Found = box.Valid || res.More;
+    if (res.More) {
+      // 끝나면 원래 스크롤 위치로 되돌리려고 기억해 둔다
+      for (var s = sEl; s != null && sScroll == null; s = walker.GetParent(s)) {
+        object sp;
+        if (s.TryGetCurrentPattern(ScrollPattern.Pattern, out sp) && ((ScrollPattern)sp).Current.VerticallyScrollable) sScroll = (ScrollPattern)sp;
+      }
+      if (sScroll != null) { sH = sScroll.Current.HorizontalScrollPercent; sV = sScroll.Current.VerticalScrollPercent; }
+    }
+    return res;
+  }
+
+  static double Top(TextPatternRange r) {
+    var rects = r.GetBoundingRectangles();
+    return rects.Length > 0 ? rects[0].Top : double.NaN;
+  }
+
+  static Step Snap(double moved) {
+    var st = new Step { Ok = true, Moved = moved };
+    var view = ViewBox();
+    if (!view.Valid) return new Step { Error = "no view" };
+    st.VX = view.L; st.VY = view.T; st.VW = view.R - view.L; st.VH = view.B - view.T;
+    var box = new Box();
+    AddRange(box, sSel);
+    box.Clip(view.L, view.T, view.R, view.B);
+    if (box.Valid) { st.HasSel = true; st.SX = box.L; st.SY = box.T; st.SW = box.R - box.L; st.SH = box.B - box.T; }
+    var vis = sPat.GetVisibleRanges();
+    st.AtEnd = vis.Length == 0 || sSel.CompareEndpoints(TextPatternRangeEndpoint.End, vis[vis.Length - 1], TextPatternRangeEndpoint.End) <= 0;
+    return st;
+  }
+
+  // 선택 첫 줄을 보이는 곳 맨 위로
+  public static Step Start(int timeoutMs) {
+    return Run(() => {
+      if (sSel == null) return new Step { Error = "no selection" };
+      var r = sSel.Clone();
+      r.MoveEndpointByRange(TextPatternRangeEndpoint.End, r, TextPatternRangeEndpoint.Start);
+      r.ExpandToEnclosingUnit(TextUnit.Line);
+      r.ScrollIntoView(true);
+      System.Threading.Thread.Sleep(350); // 다시 그릴 시간
+      return Snap(0);
+    }, timeoutMs, e => new Step { Error = e });
+  }
+
+  // 지금 보이는 마지막 줄을 맨 위로 (그 줄만큼 겹치게) — 스크롤한 거리는 그 줄이 움직인 거리
+  public static Step Next(int timeoutMs) {
+    return Run(() => {
+      if (sSel == null) return new Step { Error = "no selection" };
+      var vis = sPat.GetVisibleRanges();
+      if (vis.Length == 0) return new Step { Error = "no visible range" };
+      var r = vis[vis.Length - 1].Clone();
+      r.MoveEndpointByRange(TextPatternRangeEndpoint.Start, r, TextPatternRangeEndpoint.End);
+      r.ExpandToEnclosingUnit(TextUnit.Line);
+      double before = Top(r);
+      r.ScrollIntoView(true);
+      System.Threading.Thread.Sleep(350);
+      double after = Top(r);
+      return Snap(double.IsNaN(before) || double.IsNaN(after) ? 0 : before - after);
+    }, timeoutMs, e => new Step { Error = e });
+  }
+
+  // 원래 스크롤 위치로 (못 하면 선택 첫 줄이 보이게)
+  public static Step Restore(int timeoutMs) {
+    return Run(() => {
+      try {
+        if (sScroll != null && sV >= 0) {
+          sScroll.SetScrollPercent(sScroll.Current.HorizontallyScrollable ? sH : ScrollPattern.NoScroll, sV);
+        } else if (sSel != null) {
+          var r = sSel.Clone();
+          r.MoveEndpointByRange(TextPatternRangeEndpoint.End, r, TextPatternRangeEndpoint.Start);
+          r.ScrollIntoView(true);
+        }
+      } finally {
+        sPat = null; sSel = null; sEl = null; sScroll = null;
+      }
+      return new Step { Ok = true };
+    }, timeoutMs, e => new Step { Error = e });
   }
 }
 '@
@@ -229,13 +347,31 @@ function Get-SelectionRect {
   Initialize-SelApi
   $r = [MkSel]::Find(1500)
   if ($r.Error) { return (@{ found = $false; error = $r.Error } | ConvertTo-Json -Compress) }
-  $out = @{ found = $r.Found }
+  $out = @{ found = $r.Found; more = $r.More }
   if ($r.Found) {
     $out.x = [Math]::Round($r.X); $out.y = [Math]::Round($r.Y); $out.width = [Math]::Round($r.W); $out.height = [Math]::Round($r.H)
+    $out.view = @{ x = [Math]::Round($r.VX); y = [Math]::Round($r.VY); width = [Math]::Round($r.VW); height = [Math]::Round($r.VH) }
     $out.window = [MkWin]::Title([IntPtr]$r.Hwnd)
     $out.process = ''
     try { $out.process = (Get-Process -Id $r.Pid -ErrorAction Stop).ProcessName } catch { }
   }
+  return ($out | ConvertTo-Json -Compress)
+}
+
+# 선택 범위를 따라 스크롤: start(선택 첫 줄을 맨 위로) · next(보이는 마지막 줄을 맨 위로) · restore(원래 자리로)
+function Invoke-SelScroll([string]$mode) {
+  Initialize-SelApi
+  $st = switch ($mode) {
+    'start' { [MkSel]::Start(4000) }
+    'next' { [MkSel]::Next(4000) }
+    'restore' { [MkSel]::Restore(3000) }
+    default { $null }
+  }
+  if (-not $st) { return '{"ok":false,"error":"unknown mode"}' }
+  if ($st.Error) { return (@{ ok = $false; error = $st.Error } | ConvertTo-Json -Compress) }
+  $out = @{ ok = $true; atEnd = $st.AtEnd; moved = [Math]::Round($st.Moved) }
+  if ($st.VW -gt 0) { $out.view = @{ x = [Math]::Round($st.VX); y = [Math]::Round($st.VY); width = [Math]::Round($st.VW); height = [Math]::Round($st.VH) } }
+  if ($st.HasSel) { $out.sel = @{ x = [Math]::Round($st.SX); y = [Math]::Round($st.SY); width = [Math]::Round($st.SW); height = [Math]::Round($st.SH) } }
   return ($out | ConvertTo-Json -Compress)
 }
 
@@ -321,7 +457,8 @@ switch ($Action) {
   }
   # 상주 모드: 앱이 켜질 때 한 번 띄워 두고 한 줄씩 명령을 받는다 (매번 PowerShell 을 띄우는 지연 없음)
   #   capture<TAB><폴더 경로 base64(UTF-8)>[<TAB>nocopy]  ->  JSON 한 줄
-  #   selrect  ->  {"found":true,"x","y","width","height"(화면 픽셀),"window","process"} 또는 {"found":false}
+  #   selrect  ->  {"found":true,"more"(화면 밖까지 선택),"x","y","width","height","view"(화면 픽셀),"window","process"} 또는 {"found":false}
+  #   selscroll<TAB>start|next|restore  ->  {"ok","atEnd","moved","view","sel"}  (스크롤 캡처)
   'serve' {
     try { [Console]::OutputEncoding = $utf8 } catch { }
     Initialize-WinApi
@@ -338,6 +475,8 @@ switch ($Action) {
           $out = Invoke-Capture $dir ($mode -eq 'nocopy') $only
         } elseif ($parts[0] -eq 'selrect') {
           $out = Get-SelectionRect
+        } elseif ($parts[0] -eq 'selscroll') {
+          $out = Invoke-SelScroll $parts[1]
         } elseif ($parts[0] -eq 'ping') {
           $out = '{"pong":true}'
         } else {

@@ -26,4 +26,4 @@ export { callCommand, getMarkdown, replaceAll, insert, $view, $prose, $markSchem
 export { Plugin, PluginKey, TextSelection, NodeSelection } from '@milkdown/kit/prose/state';
 export { toggleMark } from '@milkdown/kit/prose/commands';
 export { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
-export { addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, selectedRect } from '@milkdown/kit/prose/tables';
+export { addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, selectedRect, columnResizing } from '@milkdown/kit/prose/tables';
