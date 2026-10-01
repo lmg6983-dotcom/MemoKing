@@ -1,14 +1,14 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
 import { injectIcons, icon } from './icons.js';
 import { formatStamp } from './core/format.js';
-import { chooseDensity } from './core/list-density.js';
+import { chooseDensity, levelDensity } from './core/list-density.js';
 import { vaultUrl } from './media.js';
 import { setupRemindersTab } from './list-reminders.js';
 import { setupHistoryTab } from './list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
-import { stepZoom, clampZoom, zoomLabel, visibleForZoom } from './core/zoom.js';
+import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -636,7 +636,11 @@ function applyDensity() {
   const width = el.cards.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const height = el.cards.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   if (width <= 0 || height <= 0) return;
-  const d = chooseDensity({ width, height }, el.cards.children.length, visibleForZoom(listZoom), { zoom: listZoom, line: previewLine() });
+  // 100% 모양은 화면 크기로 고른다 (축소 중이면 목록 자체가 작아져 있어 잰 크기 × 배율 = 화면 크기),
+  // 확대·축소 단계는 그 모양에서 요약 줄·사진·열을 더하고 뺀다 (levelDensity)
+  const count = el.cards.children.length;
+  const s = listZoom < 1 ? listZoom : 1;
+  const d = levelDensity(chooseDensity({ width: width * s, height: height * s }, count), listZoom, { width, count });
   const set = (name, value) => {
     if (el.cards.style.getPropertyValue(name) !== value) el.cards.style.setProperty(name, value);
   };
@@ -650,9 +654,9 @@ function applyDensity() {
   set('--row-h', d.fill ? 'minmax(min-content, 1fr)' : 'auto');
   el.cards.classList.toggle('fill', d.fill);
 }
-// ---------- 메모 카드 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 메모 창과 같은 단계, 이 PC 에 기억 ----------
-// 카드 목록만 확대한다 (위 막대·탭·검색은 그대로). 크게 하면 글자가 커지고 한 화면의 카드 수는 줄면서 카드마다 보이는 내용
-// (요약 줄 수·사진)은 늘고, 작게 하면 반대로 — 배율에 맞춰 한 화면에 보일 메모 수를 바꾼다 (visibleForZoom).
+// ---------- 메모 카드 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) = 얼마나 자세히 보기, 이 PC 에 기억 ----------
+// 확대: 글자·여백·버튼은 100% 크기 그대로, 카드마다 요약 줄을 더하고 150%부터 사진·태그 줄을 덧붙인다 (카드가 길어져 한 화면의
+//       카드 수는 준다). 축소: 카드 목록 전체가 작아지고(CSS zoom) 요약 줄을 줄이며 열을 늘린다. 단계는 core/list-density.js 의 levelDensity.
 const LIST_ZOOM_KEY = 'memoking.listZoom';
 try {
   listZoom = clampZoom(localStorage.getItem(LIST_ZOOM_KEY) ?? 1);
@@ -670,18 +674,12 @@ listZoomReset.addEventListener('click', () => setListZoom(1));
 listZoomBadge.append(listZoomText, listZoomReset);
 document.body.append(listZoomBadge);
 let listZoomTimer = 0;
-// 175% 넘게는 확대하지 않는다 — 카드가 한 장만 보이는 배율이라 더 키우면 글자만 커지고 보이는 내용은 오히려 준다
+// 자세히 보기 단계는 175% 까지 (core/list-density.js 의 MORE)
 const LIST_ZOOM_MAX = 1.75;
-const MAX_FONT_PX = 22; // 카드 글자 크기 상한 (화면 px)
-// 요약 한 줄 높이 (확대된 단위): 요약은 제목처럼 확대해도 100% 크기 → 줄 높이 21÷배율 (축소하면 함께 작아짐)
-const previewLine = () => 21 * Math.min(1, 1 / listZoom);
 function setListZoom(z, { show = true } = {}) {
   listZoom = Math.min(LIST_ZOOM_MAX, clampZoom(z));
-  el.cards.style.zoom = listZoom === 1 ? '' : String(listZoom);
-  // 제목·요약·스탬프·버튼 묶음은 확대해도 100% 크기 그대로 — 확대 배율만큼 되돌려 줄인다 (축소할 때는 함께 작아짐)
-  el.cards.style.setProperty('--title-cap', String(listZoom > 1 ? 1 / listZoom : 1));
-  // 카드 안 모든 글자는 확대해도 화면에서 22px 를 넘지 않게 (확대된 단위로 22÷배율)
-  el.cards.style.setProperty('--font-cap', `${(MAX_FONT_PX / listZoom).toFixed(3)}px`);
+  // 축소할 때만 목록 전체를 작게 (확대할 때 글자·여백·버튼·사진은 100% 크기 그대로)
+  el.cards.style.zoom = listZoom < 1 ? String(listZoom) : '';
   document.body.dataset.listZoom = String(listZoom);
   try {
     if (listZoom === 1) localStorage.removeItem(LIST_ZOOM_KEY);

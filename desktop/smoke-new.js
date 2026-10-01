@@ -11,8 +11,9 @@
 //            v0.17.8 — 목록 확대할수록 카드 안 요약 줄이 더 많이 (사진은 같은 크기, 최대 175%)
 //            v0.17.9 — 목록 확대해도 카드 안 모든 글자는 화면 22px 이하 · 마우스를 올리면 뜨는 버튼 묶음은 100% 크기
 //            v0.17.10 — 요약·스탬프·버튼 묶음도 제목을 따라 (확대해도 100% 크기, 축소하면 함께 작아짐)
+//            v0.17.11 — 목록 확대·축소 = 얼마나 자세히 보기 단계 (역행 없음) · 메모 글 복사에 \ 가 섞이지 않음
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
-import { app, BrowserWindow, screen } from 'electron';
+import { app, BrowserWindow, clipboard, screen } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -203,6 +204,17 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     await until(() => lj(`document.querySelectorAll('#history-rows .noti-shot').length >= 2`), '보관함 그림').catch(() => {});
     const rows = await lj(`[...document.querySelectorAll('#history-rows .noti')].filter((r) => r.querySelector('.noti-shot')).length`);
     check('보관함에서 팝업 알림은 알림 창 그림과 함께 보임', rows >= 2, String(rows));
+    const textFirst = await lj(`(() => {
+      const r = document.querySelector('#history-rows .noti.has-text');
+      if (!r) return null;
+      const shown = () => getComputedStyle(r.querySelector('.noti-shot')).display !== 'none';
+      const before = shown();
+      r.click();
+      const after = shown();
+      r.click();
+      return !before && after;
+    })()`);
+    check('글을 읽은 팝업 알림은 글이 먼저 — 알림 창 그림은 눌러 펼쳤을 때만 (v0.17.11)', textFirst === true, String(textFirst));
     await capture(getList(), 'smoke-new-popup-history.png');
     await lj(`document.querySelector('.tabs [data-tab="memos"]').click()`);
 
@@ -448,45 +460,73 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     const after = await js(tw, `({ h2: !!document.querySelector('.mk-doc h2'), label: document.querySelector('[data-action="style"] .style-name').textContent, menuHidden: document.getElementById('style-menu').hidden })`);
     check('H1·H2 버튼 대신 "스타일": 지금 줄 스타일 표시(제목 1), 고르는 목록(본문·제목 1·2·3·인용·코드 블록, 지금 것 ✓), 제목 2를 고르면 바뀜',
       noH && label0 === '제목 1' && menu === '본문,제목 1✓,제목 2,제목 3,인용,코드 블록' && after.h2 && after.label === '제목 2' && after.menuHidden, JSON.stringify({ noH, label0, menu, after }));
-    tw.close();
-    // 10) v0.17.4: 메모 목록에서도 Ctrl+마우스 휠 → 카드만 확대·축소 (창 전체 확대는 아님), 배율 기억
-    const lw = getList();
-    const lBox = lw.getContentBounds();
-    const title0 = await lj(`document.querySelector('#cards .card-title').getBoundingClientRect().height`);
-    const shown = () => lj(`(() => { const u = document.getElementById('cards').getBoundingClientRect(); const cards = [...document.querySelectorAll('#cards .card')];
-      return { full: cards.filter((c) => { const r = c.getBoundingClientRect(); return r.top >= u.top - 1 && r.bottom <= u.bottom + 1; }).length,
-        lines: document.getElementById('cards').dataset.density === 'compact' ? 0 : Number(getComputedStyle(document.getElementById('cards')).getPropertyValue('--preview-lines')) }; })()`);
-    const zBefore = await shown();
-    const btnW = () => lj(`(() => { const b = document.querySelector('#cards .card-actions button'); return b ? b.getBoundingClientRect().width : 0; })()`);
-    const btn0 = await btnW();
-    // 제목·요약·스탬프의 화면 글자 크기 (확대 배율을 곱한 값)
-    const shownFonts = () => lj(`(() => { const z = Number(document.getElementById('cards').style.zoom) || 1;
-      const f = (s) => { const e = document.querySelector('#cards ' + s); return e ? parseFloat(getComputedStyle(e).fontSize) * z : 0; };
-      return { title: f('.card-title'), preview: f('.card-preview'), stamp: f('.card-stamp') }; })()`);
-    const f0 = await shownFonts();
-    for (let i = 0; i < 2; i++) {
-      lw.webContents.sendInputEvent({ type: 'mouseWheel', x: Math.round(lBox.width / 2), y: Math.round(lBox.height / 2), deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
-      await wait(150);
-    }
+    // v0.17.11: 메모 글을 복사해 다른 곳(메모장 등)에 붙이면 마크다운의 \ 이스케이프 없이 보이는 글 그대로
+    const clipBefore = clipboard.readText();
+    await js(tw, `(() => { const h = document.querySelector('.mk-doc h2'); const r = document.createRange(); r.selectNodeContents(h); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand('insertText', false, ' 5*3=15 [괄호] file_name #태그 1. 번호'); })()`);
+    await wait(200);
+    tw.webContents.selectAll();
     await wait(300);
-    const lz = await lj(`({ zoom: Number(document.getElementById('cards').style.zoom || 1), title: document.querySelector('#cards .card-title').getBoundingClientRect().height, badge: document.querySelector('.zoom-badge')?.textContent ?? '', saved: localStorage.getItem('memoking.listZoom') })`);
-    const zAfter = await shown();
-    const btn1 = await btnW();
-    // 카드 안 글자의 화면 크기 (확대 배율을 곱한 값)
-    const fontsMax = await lj(`(() => { const z = Number(document.getElementById('cards').style.zoom) || 1;
-      return Math.max(...['.card-title', '.card-preview', '.card-stamp', '.card-tag', '.card-meta'].flatMap((s) => [...document.querySelectorAll('#cards ' + s)].map((e) => parseFloat(getComputedStyle(e).fontSize) * z))); })()`);
-    const f1 = await shownFonts();
-    // 확대: 제목·요약·스탬프·버튼은 100% 크기 그대로 / 축소: 배율만큼 함께 작아짐 (모양이 촘촘↔보통으로 바뀌면 제목은 14.5↔15px)
-    const k = Math.min(1, lz.zoom);
-    const follows = Math.abs(f1.preview - f0.preview * k) <= 0.6 && Math.abs(f1.stamp - f0.stamp * k) <= 0.6 && Math.abs(f1.title - f0.title * k) <= 0.8 && Math.abs(btn1 - btn0 * k) <= 1.5;
-    check('요약·스탬프·버튼 묶음은 제목을 따라: 확대해도 100% 크기, 축소하면 함께 작아짐 (카드 안 글자는 모두 22px 이하)', follows && fontsMax <= 22.05, JSON.stringify({ zoom: lz.zoom, f0, f1, btn0, btn1, fontsMax }));
-    const bigger = lz.zoom > 1;
-    // 제목은 확대해도 100% 크기(22px)보다 커지지 않고, 축소하면 함께 작아진다
-    const titleOk = lz.zoom > 1 ? Math.abs(lz.title - title0) <= 1 && lz.title <= 22.5 : Math.abs(lz.title / title0 - lz.zoom) < 0.08;
-    check('메모 목록 Ctrl+휠 → 카드만 확대·축소(창 전체 확대는 아님), 제목은 22px 넘게 커지지 않음, 배율을 기억',
-      lz.zoom !== 1 && titleOk && lw.webContents.getZoomFactor() === 1 && /메모 \d+%/.test(lz.badge) && Number(lz.saved) === lz.zoom, JSON.stringify({ lz, title0 }));
-    check('목록 확대하면 한 화면의 카드 수는 줄고 카드 안 내용(요약 줄)은 같거나 늘며, 축소하면 반대 (사진은 같은 크기)',
-      bigger ? zAfter.full <= zBefore.full && zAfter.lines >= zBefore.lines : zAfter.full >= zBefore.full && zAfter.lines <= zBefore.lines, JSON.stringify({ zoom: lz.zoom, zBefore, zAfter }));
+    tw.webContents.copy();
+    await wait(300);
+    const copied = clipboard.readText();
+    clipboard.writeText(clipBefore);
+    check('메모 글 복사 → 일반 글자에 \\ 가 섞이지 않음 (5*3=15 [괄호] file_name 그대로, 표는 칸 사이 탭)',
+      copied.includes('5*3=15 [괄호] file_name #태그 1. 번호') && !copied.includes('\\') && /\t/.test(copied), JSON.stringify(copied.slice(0, 300)));
+    tw.close();
+    // 10) 메모 목록 Ctrl+마우스 휠 = 얼마나 자세히 보기 (v0.17.11): 단계를 오르내리며 확인
+    //     확대할수록 한 화면의 카드 수는 줄고 요약 줄·사진은 늘기만 (역행 없음), 글자·버튼은 확대해도 100% 크기·축소하면 함께 작아짐
+    const lw = getList();
+    lw.setSize(420, 720);
+    await wait(400);
+    const lBox = lw.getContentBounds();
+    const sample = () => lj(`(() => {
+      const ul = document.getElementById('cards');
+      const z = Number(ul.style.zoom) || 1; // 축소할 때만 목록 전체를 작게
+      const u = ul.getBoundingClientRect();
+      const cards = [...ul.querySelectorAll('.card')];
+      const lines = (c) => { const pv = c.querySelector('.card-preview'); if (!pv || !pv.offsetParent) return 0; return Math.round(pv.clientHeight / parseFloat(getComputedStyle(pv).lineHeight)); };
+      const photo = cards.find((c) => c.querySelector('.card-thumb'));
+      const plain = cards.find((c) => !c.querySelector('.card-thumb'));
+      const thumb = photo?.querySelector('.card-thumb');
+      const fs = (sel) => { const e = ul.querySelector(sel); return e ? parseFloat(getComputedStyle(e).fontSize) * z : 0; };
+      const btn = ul.querySelector('.card-actions button');
+      return {
+        zoom: Number(document.body.dataset.listZoom || 1),
+        full: cards.filter((c) => { const r = c.getBoundingClientRect(); return r.top >= u.top - 1 && r.bottom <= u.bottom + 1; }).length,
+        photoLines: photo ? lines(photo) : 0, plainLines: plain ? lines(plain) : 0,
+        thumb: thumb && thumb.offsetParent ? Math.round(thumb.getBoundingClientRect().height) : 0,
+        title: fs('.card-title'), preview: fs('.card-preview'), stamp: fs('.card-stamp'), btn: btn ? btn.getBoundingClientRect().width : 0,
+        fontsMax: Math.max(...['.card-title', '.card-preview', '.card-stamp', '.card-tag', '.card-meta'].flatMap((s) => [...ul.querySelectorAll(s)].map((e) => parseFloat(getComputedStyle(e).fontSize) * z))),
+        badge: document.querySelector('.zoom-badge')?.textContent ?? '', saved: localStorage.getItem('memoking.listZoom'),
+      };
+    })()`);
+    const wheel = async (dy) => {
+      lw.webContents.sendInputEvent({ type: 'mouseWheel', x: Math.round(lBox.width / 2), y: Math.round(lBox.height / 2), deltaX: 0, deltaY: dy, wheelTicksY: dy > 0 ? 1 : -1, canScroll: true, modifiers: ['control'] });
+      await wait(300);
+    };
+    const seen = new Map();
+    const keep = (x) => seen.set(x.zoom, x);
+    keep(await sample());
+    for (let i = 0; i < 4; i++) keep((await wheel(120), await sample()));
+    for (let i = 0; i < 8; i++) keep((await wheel(-120), await sample()));
+    const levels = [...seen.values()].sort((a, b) => a.zoom - b.zoom);
+    const at100 = seen.get(1);
+    const bad = [];
+    levels.forEach((x, idx) => {
+      const prev = levels[idx - 1];
+      if (prev && !(x.full <= prev.full && x.photoLines >= prev.photoLines && x.plainLines >= prev.plainLines && x.thumb >= prev.thumb)) bad.push(['역행', prev.zoom, x.zoom]);
+      const k = Math.min(1, x.zoom);
+      if (at100 && !(Math.abs(x.preview - at100.preview * k) <= 0.6 && Math.abs(x.stamp - at100.stamp * k) <= 0.6 && Math.abs(x.title - at100.title * k) <= 0.8 && Math.abs(x.btn - at100.btn * k) <= 1.5)) bad.push(['크기', x.zoom]);
+      if (x.fontsMax > 22.05 || (x.thumb && Math.abs(x.thumb - 120) > 2)) bad.push(['상한', x.zoom]);
+    });
+    const top = levels.at(-1);
+    const bottom = levels[0];
+    check('목록 확대·축소(75%~175%): 단계를 올릴수록 카드 수는 줄고 요약 줄·사진은 늘기만 함 (역행 없음)', levels.length >= 7 && top.zoom >= 1.5 && bottom.zoom <= 0.8 && top.photoLines > (at100?.photoLines ?? 0) && !bad.some((b) => b[0] === '역행'),
+      JSON.stringify({ bad, levels: levels.map((x) => [x.zoom, x.full, x.photoLines, x.plainLines, x.thumb]) }));
+    check('목록 확대해도 글자·버튼은 100% 크기 그대로(사진 120px, 글자 22px 이하), 축소하면 함께 작아짐, 창 전체 확대는 아님', !bad.some((b) => b[0] !== '역행') && lw.webContents.getZoomFactor() === 1,
+      JSON.stringify({ bad, levels: levels.map((x) => [x.zoom, x.title, x.preview, x.stamp, x.btn]) }));
+    const last = await sample();
+    check('목록 배율 안내·기억', /메모 \d+%/.test(last.badge) && Number(last.saved || 1) === last.zoom, JSON.stringify(last));
     await lj(`document.querySelector('.zoom-badge button').click()`);
     // 팝업 알림을 어떤 방법으로 읽었는지 남김 (UI 자동화로 읽은 김대리 알림 = uia)
     const viaUia = history.list({ query: '김대리' }).find((e) => e.source === 'popup')?.via;

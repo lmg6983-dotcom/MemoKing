@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stepZoom, clampZoom, zoomLabel, visibleForZoom, ZOOM_STEPS } from '../app/js/core/zoom.js';
+import { stepZoom, clampZoom, zoomLabel, ZOOM_STEPS } from '../app/js/core/zoom.js';
 
 test('한 단계씩 크게·작게 (브라우저와 같은 단계)', () => {
   assert.equal(stepZoom(1, 1), 1.1);
@@ -31,10 +31,4 @@ test('배율 이름', () => {
   assert.equal(zoomLabel(1), '100%');
   assert.equal(zoomLabel(0.67), '67%');
   assert.equal(zoomLabel(1.25), '125%');
-});
-
-test('목록 배율 → 한 화면에 보일 메모 수: 확대하면 적게, 축소하면 많이', () => {
-  assert.equal(visibleForZoom(1), 8);
-  assert.ok(visibleForZoom(1.25) < 8 && visibleForZoom(1.5) < visibleForZoom(1.25) && visibleForZoom(3) >= 1);
-  assert.ok(visibleForZoom(0.8) > 8 && visibleForZoom(0.5) > visibleForZoom(0.8) && visibleForZoom(0.5) <= 40);
 });

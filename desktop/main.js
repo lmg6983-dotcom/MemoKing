@@ -17,7 +17,7 @@ import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
-import { popupToEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
+import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
@@ -1322,7 +1322,7 @@ function initHistory() {
 }
 
 // ---------- 팝업 알림 (Windows 알림 센터를 쓰지 않는 앱) ----------
-// 지켜볼 앱이 작은 맨 위 창(알림 창)을 띄우면 도우미가 UI 자동화 → 안 되면 Windows 글자 인식으로 읽어 보내 준다.
+// 지켜볼 앱이 작은 맨 위 창(알림 창)을 띄우면 도우미가 글자를 그대로 읽거나(UI 자동화 등) Windows 글자 인식으로 읽어 보내 준다.
 let popupWatcher = null;
 const recentPopups = [];
 
@@ -1342,7 +1342,11 @@ function createPopupWatcher(options = {}) {
 function addPopupToHistory(p) {
   try {
     const app = popupAppName(p.process);
-    const entry = popupToEntry(p.lines, { appName: app });
+    // 카카오톡 알림 창을 글자 인식으로 읽었으면 줄의 자리로 방 이름·보낸 사람·메시지를 나눈다
+    const byLayout = p.process === 'KakaoTalk' && p.via === 'ocr' && Array.isArray(p.boxes)
+      ? kakaoEntry(p.boxes, { width: p.size?.w, height: p.size?.h, appName: app })
+      : null;
+    const entry = byLayout ?? popupToEntry(p.lines, { appName: app });
     if (!entry || !history) return;
     const now = Date.now();
     while (recentPopups.length && now - recentPopups[0].at > 5 * 60 * 1000) recentPopups.shift();

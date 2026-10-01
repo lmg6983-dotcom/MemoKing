@@ -97,6 +97,8 @@ export function setupHistoryTab({ api, els, confirm }) {
     }
     if (e.body) text.append(body);
     if (e.image && e.source === 'popup') {
+      // 글을 읽었으면 글이 먼저 — 알림 창 그림은 눌러 펼쳤을 때만 (글을 못 읽은 알림은 그림을 늘 보인다)
+      if (e.body) div.classList.add('has-text');
       const shot = document.createElement('img');
       shot.className = 'noti-shot';
       shot.src = `memoking://history/${encodeURIComponent(e.image)}`;

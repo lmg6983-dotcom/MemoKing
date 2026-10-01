@@ -211,35 +211,30 @@ function setMarks(set, doc, marks) {
 }
 
 // 열 너비가 일부만 정해진 표: 나머지 열도 지금 보이는 너비로 정한다 (표가 끈 대로 정확히 보이게)
+// 열 단위로 본다 — 합친 칸(colspan)은 colwidth 에 열마다 너비를 갖고, 행마다 칸 순서와 열 번호가 다를 수 있다.
 function fillColumnWidths(view) {
   const { state } = view;
   const tr = state.tr;
   state.doc.descendants((node, pos) => {
     if (node.type.name !== 'table') return true;
-    const first = node.firstChild;
-    if (!first) return false;
-    const widths = [];
-    let any = false;
-    let missing = false;
-    let c = pos + 2;
-    first.forEach((cell) => {
-      const w = cell.attrs.colwidth?.[0];
-      if (w) any = true;
-      else missing = true;
-      const dom = view.nodeDOM(c);
-      widths.push(w || Math.round(dom?.offsetWidth ?? 0));
-      c += cell.nodeSize;
-    });
-    if (!any || !missing || widths.some((w) => !w)) return false;
-    let p = pos + 1;
-    node.forEach((row) => {
-      let cp = p + 1;
-      row.forEach((cell, _o, ci) => {
-        if (!cell.attrs.colwidth?.[0] && widths[ci]) tr.setNodeMarkup(cp, null, { ...cell.attrs, colwidth: [widths[ci]] });
-        cp += cell.nodeSize;
-      });
-      p += row.nodeSize;
-    });
+    const map = TableMap.get(node);
+    const cells = [...new Set(map.map)].map((rel) => ({ rel, cell: node.nodeAt(rel), at: map.findCell(rel) }));
+    const widths = Array(map.width).fill(0);
+    for (const { cell, at } of cells) {
+      for (let c = at.left; c < at.right; c++) widths[c] ||= cell.attrs.colwidth?.[c - at.left] || 0;
+    }
+    if (!widths.some((w) => w > 0) || widths.every((w) => w > 0)) return false;
+    // 정해지지 않은 열은 그 열 하나만 차지하는 칸의 지금 너비로
+    for (let c = 0; c < map.width; c++) {
+      if (widths[c]) continue;
+      const one = cells.find(({ at }) => at.left === c && at.right === c + 1);
+      widths[c] = Math.round(one ? view.nodeDOM(pos + 1 + one.rel)?.offsetWidth ?? 0 : 0);
+    }
+    if (widths.some((w) => !w)) return false;
+    for (const { rel, cell, at } of cells) {
+      const want = widths.slice(at.left, at.right);
+      if (JSON.stringify(cell.attrs.colwidth ?? null) !== JSON.stringify(want)) tr.setNodeMarkup(pos + 1 + rel, null, { ...cell.attrs, colwidth: want });
+    }
     return false;
   });
   if (tr.docChanged) {
@@ -253,7 +248,7 @@ function sizedDecos(doc) {
   const out = [];
   doc.descendants((node, pos) => {
     if (node.type.name !== 'table') return true;
-    if (node.firstChild && [...Array(node.firstChild.childCount).keys()].some((i) => node.firstChild.child(i).attrs.colwidth?.[0])) {
+    if (node.firstChild && [...Array(node.firstChild.childCount).keys()].some((i) => node.firstChild.child(i).attrs.colwidth?.some((w) => w > 0))) {
       out.push(Decoration.node(pos, pos + node.nodeSize, { class: 'mk-sized' }));
     }
     return false;

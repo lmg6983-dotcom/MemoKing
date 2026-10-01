@@ -4,8 +4,12 @@
 #   1) UI Automation text of the popup window
 #   2) if none, MSAA (IAccessible name / value / description) of the window and its children
 #   3) if none, text of the child windows (WM_GETTEXT)
-#   4) if none, captures the window (PrintWindow) and reads it with the OCR built into Windows (Windows.Media.Ocr)
-# One JSON line per new popup text on stdout: {"process","pid","hwnd","windowTitle","lines":[...],"via":"uia|msaa|win32|ocr","image":"<png>"}
+#   4) captures the window (PrintWindow) and reads it with the OCR built into Windows (Windows.Media.Ocr).
+#      OCR always runs; text from 1)~3) is used only when it covers what OCR sees (some apps expose only junk names).
+#      For OCR the capture is made opaque (layered/GDI windows leave alpha at 0 and OCR then sees an empty canvas)
+#      and enlarged (small UI text reads much better), and each line keeps its place (x, y, w, h in 100%-scale px).
+# One JSON line per new popup text on stdout:
+#   {"process","pid","hwnd","windowTitle","lines":[...],"via":"uia|msaa|win32|ocr","image":"<png>","boxes":[{text,x,y,w,h}],"size":{w,h}}
 # -Log <file>: one JSON line per popup with what each method found (to see how an app's popup can be read)
 # Requires Windows PowerShell 5.1 (WinRT OCR):  powershell.exe -STA -NoProfile -ExecutionPolicy Bypass -File popup-watch.ps1 -Processes KakaoTalk -Dir <tmp>
 param(
@@ -39,9 +43,25 @@ public static class MkPopup {
   [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int index);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowTextW(IntPtr hWnd, StringBuilder s, int max);
   [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
+  [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+  [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] static extern bool IsProcessDPIAware();
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
 
-  public class Win { public long Hwnd; public uint Pid; public int X, Y, W, H; public string Title; }
+  public class Win { public long Hwnd; public uint Pid; public int X, Y, W, H; public string Title; public double Scale = 1; }
+
+  // 화면 배율이 100% 가 아니어도 창 크기·그림을 실제 픽셀로 (배율을 모르는 프로세스는 줄어든 크기를 받아 그림이 잘린다)
+  public static bool DpiAware;
+  public static void Init() {
+    try { DpiAware = SetProcessDpiAwarenessContext(new IntPtr(-4)); } catch { } // PER_MONITOR_AWARE_V2 (Windows 10 1703+)
+    if (!DpiAware) { try { SetProcessDPIAware(); } catch { } }
+    try { DpiAware = IsProcessDPIAware(); } catch { DpiAware = false; }
+  }
+  static double ScaleOf(IntPtr h) {
+    if (!DpiAware) return 1;
+    try { uint dpi = GetDpiForWindow(h); return dpi >= 96 ? dpi / 96.0 : 1; } catch { return 1; }
+  }
 
   // 작은 맨 위(또는 도구) 창 = 알림 창 후보
   public static List<Win> Candidates(uint[] pids) {
@@ -55,9 +75,11 @@ public static class MkPopup {
       if (!topmost && !tool) return true;
       RECT r; GetWindowRect(h, out r);
       int w = r.Right - r.Left, hh = r.Bottom - r.Top;
-      if (w < 120 || w > 720 || hh < 40 || hh > 480) return true;
+      double scale = ScaleOf(h);
+      double lw = w / scale, lh = hh / scale; // 100% 배율 크기로 거른다
+      if (lw < 120 || lw > 720 || lh < 40 || lh > 480) return true;
       var sb = new StringBuilder(256); GetWindowTextW(h, sb, 256);
-      list.Add(new Win { Hwnd = h.ToInt64(), Pid = pid, X = r.Left, Y = r.Top, W = w, H = hh, Title = sb.ToString() });
+      list.Add(new Win { Hwnd = h.ToInt64(), Pid = pid, X = r.Left, Y = r.Top, W = w, H = hh, Title = sb.ToString(), Scale = scale });
       return true;
     }, IntPtr.Zero);
     return list;
@@ -68,11 +90,41 @@ public static class MkPopup {
     var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
     using (var g = Graphics.FromImage(bmp)) {
       IntPtr hdc = g.GetHdc();
-      bool ok = PrintWindow(new IntPtr(hwnd), hdc, 2);
+      bool ok = PrintWindow(new IntPtr(hwnd), hdc, 2) || PrintWindow(new IntPtr(hwnd), hdc, 0); // PW_RENDERFULLCONTENT, 안 되면 기본
       g.ReleaseHdc(hdc);
       if (!ok) { bmp.Dispose(); return null; }
     }
     return bmp;
+  }
+
+  // 글자 인식용 그림: 알파를 무시해 불투명하게 (GDI 로 그린 글자는 알파가 0 이라 그대로면 빈 그림으로 보인다)
+  // 그리고 factor 배로 키운다 (작은 글자는 키우면 훨씬 잘 읽힌다)
+  public static Bitmap OcrImage(Bitmap src, double factor) {
+    var opaque = new Bitmap(src.Width, src.Height, PixelFormat.Format32bppArgb);
+    var rect = new Rectangle(0, 0, src.Width, src.Height);
+    var from = src.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+    var to = opaque.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+    try {
+      int bytes = Math.Abs(from.Stride) * src.Height;
+      var buf = new byte[bytes];
+      Marshal.Copy(from.Scan0, buf, 0, bytes);
+      for (int i = 3; i < bytes; i += 4) buf[i] = 255;
+      Marshal.Copy(buf, 0, to.Scan0, bytes);
+    } finally { src.UnlockBits(from); opaque.UnlockBits(to); }
+    if (factor <= 1.01) return opaque;
+    int w = (int)Math.Round(src.Width * factor), h = (int)Math.Round(src.Height * factor);
+    var big = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+    using (var g = Graphics.FromImage(big)) {
+      g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+      g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+      g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+      using (var attrs = new ImageAttributes()) {
+        attrs.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY); // 가장자리 번짐 없이
+        g.DrawImage(opaque, new Rectangle(0, 0, w, h), 0, 0, opaque.Width, opaque.Height, GraphicsUnit.Pixel, attrs);
+      }
+    }
+    opaque.Dispose();
+    return big;
   }
   public static string Fingerprint(Bitmap b) {
     long sum = 0; int n = 0;
@@ -82,6 +134,8 @@ public static class MkPopup {
   }
 }
 '@
+
+[MkPopup]::Init()
 
 # ---------- 글자 그대로 읽기: MSAA(접근성) · 자식 창 글자 ----------
 Add-Type -AssemblyName Accessibility
@@ -201,8 +255,11 @@ function Await($op, [Type]$type) {
 }
 $ocr = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new('ko'))
 if (-not $ocr) { $ocr = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
+# 한국어 글자 인식이 없으면(Windows 언어 설정 > 한국어 > 광학 문자 인식) 한글을 못 읽는다 — 기록에 남겨 둔다
+Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); ocrLanguage = $(if ($ocr) { $ocr.RecognizerLanguage.LanguageTag } else { '' }); dpiAware = [MkPopup]::DpiAware })
 
-function Read-Ocr([string]$png) {
+# 그림 파일 글자 인식 → 줄마다 { text, x, y, w, h } (unit = 그림 px 가 100% 배율 화면 px 의 몇 배인지)
+function Read-Ocr([string]$png, [double]$unit = 1) {
   if (-not $ocr) { return @() }
   $file = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($png)) ([Windows.Storage.StorageFile])
   $stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
@@ -210,22 +267,43 @@ function Read-Ocr([string]$png) {
     $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
     $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
     $result = Await ($ocr.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
-    # 한글 OCR 은 글자마다 띄어 주므로 단어 사이 간격으로 다시 붙인다
-    $lines = foreach ($line in $result.Lines) {
+    foreach ($line in $result.Lines) {
+      # 한글 OCR 은 글자마다 띄어 주므로 단어 사이 간격으로 다시 붙인다
       $text = ''
       $prev = $null
+      $x0 = [double]::MaxValue; $y0 = [double]::MaxValue; $x1 = 0.0; $y1 = 0.0
       foreach ($w in $line.Words) {
+        $r = $w.BoundingRect
         if ($prev) {
-          $gap = $w.BoundingRect.X - ($prev.BoundingRect.X + $prev.BoundingRect.Width)
-          if ($gap -gt ($prev.BoundingRect.Height * 0.35)) { $text += ' ' }
+          $gap = $r.X - ($prev.X + $prev.Width)
+          if ($gap -gt ($prev.Height * 0.35)) { $text += ' ' }
         }
         $text += $w.Text
-        $prev = $w
+        $prev = $r
+        $x0 = [Math]::Min($x0, $r.X); $y0 = [Math]::Min($y0, $r.Y)
+        $x1 = [Math]::Max($x1, $r.X + $r.Width); $y1 = [Math]::Max($y1, $r.Y + $r.Height)
       }
-      $text.Trim()
+      $text = $text.Trim()
+      if ($text) {
+        [ordered]@{ text = $text; x = [Math]::Round($x0 / $unit, 1); y = [Math]::Round($y0 / $unit, 1); w = [Math]::Round(($x1 - $x0) / $unit, 1); h = [Math]::Round(($y1 - $y0) / $unit, 1) }
+      }
     }
-    @($lines | Where-Object { $_ })
   } finally { $stream.Dispose() }
+}
+
+# 바로 읽은 글이 화면의 글(글자 인식 결과)을 얼마나 담고 있는지 (0~1). 공백·기호는 빼고 글자끼리 견준다.
+# 앱에 따라 UI 자동화·접근성으로는 "Pane" 같은 엉뚱한 이름만 나오므로, 글자 수가 아니라 같은 글자인지를 본다.
+function Get-Letters([string[]]$lines, [string]$title) {
+  @($lines | Where-Object { $_ -and $_.Trim() -ne $title } | ForEach-Object { ($_ -replace '[^\p{L}\p{N}]', '').ToCharArray() })
+}
+function Measure-Cover([string[]]$direct, [string[]]$ocrLines, [string]$title) {
+  $want = Get-Letters $ocrLines $title
+  if ($want.Count -lt 2) { return $(if ((Get-Letters $direct $title).Count -ge 2) { 1.0 } else { 0.0 }) }   # 화면에서 글을 못 읽었으면 바로 읽은 글을 믿는다
+  $have = @{}
+  foreach ($c in (Get-Letters $direct $title)) { $k = [string]$c; $have[$k] = 1 + [int]$have[$k] }
+  $hit = 0
+  foreach ($c in $want) { $k = [string]$c; if ([int]$have[$k] -gt 0) { $have[$k]--; $hit++ } }
+  $hit / $want.Count
 }
 
 function Read-Uia([long]$hwnd, [string]$title) {
@@ -269,25 +347,44 @@ while ($true) {
           if ($s.stable -ne 1) { continue }                                # 모양이 그대로면 한 번만 읽는다
           $png = Join-Path $Dir ("popup-{0}-{1}.png" -f $w.Hwnd, [DateTime]::Now.Ticks)
           $bmp.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
-          # 글자를 그대로 읽을 수 있는 방법부터: UI 자동화 → 접근성(MSAA) → 자식 창 글자 → 마지막에 그림 글자 인식
+          # 1) 글자를 그대로 읽을 수 있는 방법: UI 자동화 → 접근성(MSAA) → 자식 창 글자
           $found = [ordered]@{ uia = @(); msaa = @(); win32 = @() }
-          $via = ''
-          $lines = @()
+          $direct = @(); $directVia = ''
           if (-not $ForceOcr) {
             $found.uia = @(Read-Uia $w.Hwnd $w.Title)
-            if ($found.uia.Count) { $via = 'uia'; $lines = $found.uia }
+            if ($found.uia.Count) { $directVia = 'uia'; $direct = $found.uia }
             $found.msaa = @(Select-Fragments ([MkText]::Msaa($w.Hwnd)) $w.Title)
-            if (-not $lines.Count -and $found.msaa.Count) { $via = 'msaa'; $lines = $found.msaa }
+            if (-not $direct.Count -and $found.msaa.Count) { $directVia = 'msaa'; $direct = $found.msaa }
             $found.win32 = @(Select-Fragments ([MkText]::Win32($w.Hwnd)) $w.Title)
-            if (-not $lines.Count -and $found.win32.Count) { $via = 'win32'; $lines = $found.win32 }
+            if (-not $direct.Count -and $found.win32.Count) { $directVia = 'win32'; $direct = $found.win32 }
           }
-          if (-not $lines.Count) { $via = 'ocr'; $lines = @(Read-Ocr $png) }
-          Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); classes = @([MkText]::Classes($w.Hwnd)); title = $w.Title; size = "$($w.W)x$($w.H)"; uia = $found.uia; msaa = $found.msaa; win32 = $found.win32; via = $via; lines = $lines })
+          # 2) 그림 글자 인식 — 늘 함께 (100% 배율 기준 3배 크기로 키워서)
+          $boxes = @()
+          if ($ocr) {
+            $factor = [Math]::Max(1.0, 3.0 / $w.Scale)
+            $factor = [Math]::Min($factor, ([Windows.Media.Ocr.OcrEngine]::MaxImageDimension - 1) / [Math]::Max($w.W, $w.H))
+            $big = [MkPopup]::OcrImage($bmp, $factor)
+            $ocrPng = "$png.ocr.png"
+            try {
+              $big.Save($ocrPng, [System.Drawing.Imaging.ImageFormat]::Png)
+              $boxes = @(Read-Ocr $ocrPng ($factor * $w.Scale))
+            } catch { Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); ocrError = $_.Exception.Message }) }
+            finally { $big.Dispose(); Remove-Item $ocrPng -ErrorAction SilentlyContinue }
+          }
+          $ocrLines = @($boxes | ForEach-Object { $_.text })
+          # 바로 읽은 글이 화면의 글(글자 인식)을 거의 다 담고 있으면 그것을 (틀린 글자가 없다), 아니면 글자 인식 결과를
+          $cover = Measure-Cover $direct $ocrLines $w.Title
+          if ($direct.Count -and $cover -ge 0.6) { $via = $directVia; $lines = $direct }
+          else { $via = 'ocr'; $lines = $ocrLines }
+          $size = [ordered]@{ w = [Math]::Round($w.W / $w.Scale); h = [Math]::Round($w.H / $w.Scale) }
+          Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); classes = @([MkText]::Classes($w.Hwnd)); title = $w.Title; size = "$($size.w)x$($size.h)"; scale = $w.Scale; uia = $found.uia; msaa = $found.msaa; win32 = $found.win32; ocr = $boxes; cover = [Math]::Round($cover, 2); via = $via; lines = $lines })
           $key = ($lines -join "`n")
           if (-not $key -or $key -eq $s.sent) { Remove-Item $png -ErrorAction SilentlyContinue; continue }
           $s.sent = $key
           $proc = (Get-Process -Id $w.Pid -ErrorAction SilentlyContinue).ProcessName
-          [Console]::Out.WriteLine((@{ process = $proc; pid = $w.Pid; hwnd = $w.Hwnd; windowTitle = $w.Title; lines = $lines; via = $via; image = $png } | ConvertTo-Json -Compress))
+          $msg = [ordered]@{ process = $proc; pid = $w.Pid; hwnd = $w.Hwnd; windowTitle = $w.Title; lines = @($lines); via = $via; image = $png; size = $size }
+          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes) }
+          [Console]::Out.WriteLine(($msg | ConvertTo-Json -Compress -Depth 4))
           [Console]::Out.Flush()
         } finally { $bmp.Dispose() }
       }
