@@ -12,6 +12,7 @@
 //            v0.17.9 — 목록 확대해도 카드 안 모든 글자는 화면 22px 이하 · 마우스를 올리면 뜨는 버튼 묶음은 100% 크기
 //            v0.17.10 — 요약·스탬프·버튼 묶음도 제목을 따라 (확대해도 100% 크기, 축소하면 함께 작아짐)
 //            v0.17.11 — 목록 확대·축소 = 얼마나 자세히 보기 단계 (역행 없음) · 메모 글 복사에 \ 가 섞이지 않음
+//            v0.17.12 — 카카오톡 등 알림 창 그림 글자를 한글에 강한 tesseract.js(한글 best)로 읽음 (숨은 OCR 창, memoking://ocr)
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, clipboard, screen } from 'electron';
 import fs from 'node:fs';
@@ -190,7 +191,7 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     check('팝업 알림(글자) → UI 자동화로 읽어 보관함에 (보낸 사람·내용·알림 창 그림)', e1 && e1.body === '회의 자료 보냈어요' && e1.source === 'popup' && e1.image, JSON.stringify(e1));
     const p2 = popup(['박과장', '내일 회의 시간 바꿔요'], { canvas: true });
     const e2 = await found('박과장');
-    check('팝업 알림(그림 글자) → Windows 글자 인식(한국어)으로 읽어 보관함에', e2 && /내일\s*회의\s*시간\s*바꿔요/.test(e2.body), JSON.stringify(e2));
+    check('팝업 알림(그림 글자) → 한글 OCR(tesseract.js 한글 best, 숨은 OCR 창)로 읽어 보관함에', e2 && /내일\s*회의\s*시간\s*바꿔요/.test(e2.body), JSON.stringify(e2));
     // 같은 창에 새 메시지 → 다시 읽음, 그대로면 한 번만
     const before = history.list({ query: '김대리' }).length;
     await wait(2500);

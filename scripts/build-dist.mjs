@@ -66,7 +66,8 @@ const config = {
   directories: { output: OUT },
   files: ['**/*'],
   asar: true,
-  asarUnpack: ['scripts/clipboard-helper.ps1', 'scripts/popup-watch.ps1'], // PowerShell 이 읽어야 하므로 asar 밖에
+  // PowerShell 이 읽어야 하는 도우미와, 숨은 OCR 창이 워커·wasm 으로 불러오는 tesseract 파일은 asar 밖에 둔다
+  asarUnpack: ['scripts/clipboard-helper.ps1', 'scripts/popup-watch.ps1', 'app/vendor/tesseract/**'],
   npmRebuild: false,
   nodeGypRebuild: false,
   publish: null, // 자동 업데이트·배포 안 함 (없으면 배포 대상을 찾다가 멈출 수 있다)

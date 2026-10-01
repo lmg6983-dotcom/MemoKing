@@ -358,19 +358,23 @@ while ($true) {
             $found.win32 = @(Select-Fragments ([MkText]::Win32($w.Hwnd)) $w.Title)
             if (-not $direct.Count -and $found.win32.Count) { $directVia = 'win32'; $direct = $found.win32 }
           }
-          # 2) 그림 글자 인식 — 늘 함께 (100% 배율 기준 3배 크기로 키워서)
+          # 2) 글자 인식용으로 알림 창 그림을 불투명하게·100% 기준 3배로 키워 따로 저장한다 (최대 변 2200px 까지).
+          #    이 그림은 메모킹(Node)이 한글에 강한 tesseract.js 로 다시 읽는 데 쓴다. Windows 기본 OCR 은 보조로만.
           $boxes = @()
-          if ($ocr) {
-            $factor = [Math]::Max(1.0, 3.0 / $w.Scale)
-            $factor = [Math]::Min($factor, ([Windows.Media.Ocr.OcrEngine]::MaxImageDimension - 1) / [Math]::Max($w.W, $w.H))
+          $ocrPng = ''
+          $ocrUnit = 1.0
+          $factor = [Math]::Max(1.0, [Math]::Min(3.0 / $w.Scale, 2200.0 / [Math]::Max($w.W, $w.H)))
+          try {
             $big = [MkPopup]::OcrImage($bmp, $factor)
             $ocrPng = "$png.ocr.png"
-            try {
-              $big.Save($ocrPng, [System.Drawing.Imaging.ImageFormat]::Png)
-              $boxes = @(Read-Ocr $ocrPng ($factor * $w.Scale))
-            } catch { Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); ocrError = $_.Exception.Message }) }
-            finally { $big.Dispose(); Remove-Item $ocrPng -ErrorAction SilentlyContinue }
-          }
+            $big.Save($ocrPng, [System.Drawing.Imaging.ImageFormat]::Png)
+            $ocrUnit = $factor * $w.Scale
+            $big.Dispose()
+            if ($ocr) {
+              $capped = [Math]::Min($factor, ([Windows.Media.Ocr.OcrEngine]::MaxImageDimension - 1) / [Math]::Max($w.W, $w.H))
+              if ([Math]::Abs($capped - $factor) -lt 0.01) { $boxes = @(Read-Ocr $ocrPng $ocrUnit) }
+            }
+          } catch { Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); ocrError = $_.Exception.Message }) }
           $ocrLines = @($boxes | ForEach-Object { $_.text })
           # 바로 읽은 글이 화면의 글(글자 인식)을 거의 다 담고 있으면 그것을 (틀린 글자가 없다), 아니면 글자 인식 결과를
           $cover = Measure-Cover $direct $ocrLines $w.Title
@@ -379,11 +383,14 @@ while ($true) {
           $size = [ordered]@{ w = [Math]::Round($w.W / $w.Scale); h = [Math]::Round($w.H / $w.Scale) }
           Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); classes = @([MkText]::Classes($w.Hwnd)); title = $w.Title; size = "$($size.w)x$($size.h)"; scale = $w.Scale; uia = $found.uia; msaa = $found.msaa; win32 = $found.win32; ocr = $boxes; cover = [Math]::Round($cover, 2); via = $via; lines = $lines })
           $key = ($lines -join "`n")
-          if (-not $key -or $key -eq $s.sent) { Remove-Item $png -ErrorAction SilentlyContinue; continue }
-          $s.sent = $key
+          # via 가 'ocr' 이면 Node 가 ocrImage 를 한글 OCR 로 다시 읽으므로, 바로 읽은 글만으로 중복 판단하지 않는다
+          $dedupeKey = $(if ($via -eq 'ocr') { "ocr:$($w.Hwnd):$fp" } else { $key })
+          if ((-not $key -and $via -ne 'ocr') -or $dedupeKey -eq $s.sent) { Remove-Item $png, $ocrPng -ErrorAction SilentlyContinue; continue }
+          $s.sent = $dedupeKey
           $proc = (Get-Process -Id $w.Pid -ErrorAction SilentlyContinue).ProcessName
           $msg = [ordered]@{ process = $proc; pid = $w.Pid; hwnd = $w.Hwnd; windowTitle = $w.Title; lines = @($lines); via = $via; image = $png; size = $size }
-          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes) }
+          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes); $msg['ocrImage'] = $ocrPng; $msg['ocrUnit'] = [Math]::Round($ocrUnit, 4) }
+          else { Remove-Item $ocrPng -ErrorAction SilentlyContinue }
           [Console]::Out.WriteLine(($msg | ConvertTo-Json -Compress -Depth 4))
           [Console]::Out.Flush()
         } finally { $bmp.Dispose() }

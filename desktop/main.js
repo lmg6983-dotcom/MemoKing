@@ -34,6 +34,7 @@ const LOGIN_ARGS = ['--hidden'];
 const APP_ID = 'com.memoking.desktop';
 const APP_DIR = path.join(import.meta.dirname, '..', 'app');
 const PRELOAD = path.join(import.meta.dirname, 'preload.cjs');
+const OCR_PRELOAD = path.join(import.meta.dirname, 'ocr-preload.cjs');
 const ASSETS_DIR = path.join(import.meta.dirname, '..', 'assets');
 // 창·작업표시줄·알림 영역 아이콘 (npm run icons 로 생성, 16~256px 9개 크기)
 const APP_ICON = path.join(ASSETS_DIR, 'icons', 'memoking.ico');
@@ -1334,14 +1335,75 @@ function createPopupWatcher(options = {}) {
     processes: Object.keys(POPUP_APPS),
     ...options,
   });
-  watcher.on('popup', addPopupToHistory);
+  watcher.on('popup', (p) => addPopupToHistory(p).catch((err) => console.warn('[팝업 알림]', err.message)));
   watcher.on('error', (err) => console.warn('[팝업 알림]', err.message));
   return watcher;
 }
 
-function addPopupToHistory(p) {
+// ---------- 숨은 OCR 창 (tesseract.js 한글) — 알림 창 그림을 Windows 기본 OCR 대신 한글에 강한 모델로 읽는다 ----------
+// memoking://ocr 오리진에서 로드되어 워커·wasm·언어파일을 같은 오리진에서 불러온다. 처음 쓸 때 한 번만 띄운다.
+let ocrWin = null;
+let ocrReady = null;
+const ocrPending = new Map(); // id -> {resolve, timer}
+let ocrSeq = 0;
+
+function ensureOcrWindow() {
+  if (ocrReady) return ocrReady;
+  ocrReady = new Promise((resolve, reject) => {
+    try {
+      ocrWin = new BrowserWindow({
+        show: false,
+        skipTaskbar: true,
+        webPreferences: { preload: OCR_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
+      });
+      ipcMain.once('ocr:ready', () => resolve(ocrWin));
+      ocrWin.webContents.on('render-process-gone', () => { ocrWin = null; ocrReady = null; });
+      ocrWin.on('closed', () => { ocrWin = null; ocrReady = null; });
+      ocrWin.loadURL('memoking://ocr/ocr.html').catch(reject);
+      setTimeout(() => reject(new Error('OCR 창 준비 시간 초과')), 20000);
+    } catch (err) {
+      ocrReady = null;
+      reject(err);
+    }
+  }).catch((err) => { ocrReady = null; throw err; });
+  return ocrReady;
+}
+
+ipcMain.on('ocr:result', (_e, data) => {
+  const job = ocrPending.get(data?.id);
+  if (!job) return;
+  ocrPending.delete(data.id);
+  clearTimeout(job.timer);
+  job.resolve(data);
+});
+
+// 그림 파일을 한글 OCR → 줄마다 { text, x, y, w, h } (좌표는 100% 배율 px). 안 되면 throw.
+async function runOcr(imagePath, unit) {
+  await ensureOcrWindow();
+  const dataUrl = `data:image/png;base64,${fs.readFileSync(imagePath).toString('base64')}`;
+  const id = ++ocrSeq;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { ocrPending.delete(id); reject(new Error('OCR 시간 초과')); }, 30000);
+    ocrPending.set(id, { resolve, timer });
+    ocrWin.webContents.send('ocr:request', { id, dataUrl, unit: unit || 1 });
+  }).then((data) => {
+    if (data.error) throw new Error(data.error);
+    return data;
+  });
+}
+
+async function addPopupToHistory(p) {
   try {
     const app = popupAppName(p.process);
+    // Windows 기본 OCR 대신 한글에 강한 tesseract.js 로 다시 읽는다 (그대로 읽은 글이 없을 때 = via 'ocr', 3배 확대 그림이 있을 때)
+    if (p.via === 'ocr' && p.ocrImage && fs.existsSync(p.ocrImage)) {
+      try {
+        const r = await runOcr(p.ocrImage, p.ocrUnit);
+        if (r.boxes?.length) { p.boxes = r.boxes; p.lines = r.lines; }
+      } catch (err) {
+        console.warn('[한글 OCR]', err.message); // 실패하면 아래에서 PowerShell 이 보낸 Windows OCR 결과를 그대로 쓴다
+      }
+    }
     // 카카오톡 알림 창을 글자 인식으로 읽었으면 줄의 자리로 방 이름·보낸 사람·메시지를 나눈다
     const byLayout = p.process === 'KakaoTalk' && p.via === 'ocr' && Array.isArray(p.boxes)
       ? kakaoEntry(p.boxes, { width: p.size?.w, height: p.size?.h, appName: app })
@@ -1357,6 +1419,7 @@ function addPopupToHistory(p) {
     history.add({ source: 'popup', appId: p.process, app, ...entry, image, via: p.via ?? '' });
   } finally {
     if (p.image) fs.rm(p.image, { force: true }, () => {});
+    if (p.ocrImage) fs.rm(p.ocrImage, { force: true }, () => {});
   }
 }
 
@@ -1366,7 +1429,10 @@ function syncPopupWatch() {
   if (on) {
     popupWatcher ??= createPopupWatcher();
     popupWatcher.start();
-  } else popupWatcher?.stop();
+  } else {
+    popupWatcher?.stop();
+    if (ocrWin && !ocrWin.isDestroyed()) ocrWin.close(); // 알림 모으기를 끄면 OCR 창도 닫는다
+  }
 }
 
 function setHistoryEnabled(on) {
@@ -1941,6 +2007,13 @@ function registerVaultProtocol() {
   protocol.handle('memoking', (request) => {
     const url = new URL(request.url);
     const rel = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+    // memoking://ocr/<경로> = 숨은 OCR 창이 쓰는 앱 파일 (ocr.html·tesseract vendor). 같은 오리진이라 워커·wasm 을 그대로 불러온다.
+    if (url.host === 'ocr') {
+      const safe = path.normalize(rel).replace(/^(\.\.(\/|\\|$))+/, '');
+      const file = path.join(APP_DIR, safe);
+      if (file.startsWith(APP_DIR) && fs.existsSync(file)) return net.fetch(pathToFileURL(file).href, { headers: request.headers });
+      return new Response('not found', { status: 404 });
+    }
     const file = url.host === 'vault' ? vault?.resolve(rel) : url.host === 'history' ? history?.resolveImage(rel) : null;
     if (!file || !fs.existsSync(file)) return new Response('not found', { status: 404 });
     return net.fetch(pathToFileURL(file).href, { headers: request.headers });
