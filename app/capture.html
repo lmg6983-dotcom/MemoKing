@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <title>화면 영역 캡처</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/capture.css">
+  <script type="module" src="js/capture.js"></script>
+</head>
+<body>
+  <!-- 찍어 둔 화면 위에서 끌어 사각형을 고른다. 고른 곳만 밝게 -->
+  <img id="shot" class="shot" alt="" draggable="false">
+  <div id="dim" class="dim"></div>
+  <div id="sel" class="sel" hidden><span id="size" class="size"></span></div>
+  <div id="hint" class="hint" role="status">끌어서 캡처할 영역을 고르세요 · 취소는 Esc</div>
+</body>
+</html>

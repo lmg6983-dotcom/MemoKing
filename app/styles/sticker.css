@@ -1,0 +1,36 @@
+/* 늘 위에 두기 왕관 스티커 — 투명 창 안에 그린다 (창 밖으로 반쯤 나오게 하려고 따로 띄운 창) */
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+.crown {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 1.5px 1.5px rgba(0, 0, 0, 0.28));
+}
+.crown[hidden] { display: none; }
+/* 마우스는 왕관 모양(흰 가장자리 포함) 위에서만 */
+.crown { pointer-events: none; }
+.hit { pointer-events: visiblePainted; cursor: pointer; }
+/* 왕관에 마우스를 올리면 떼어질 듯 살짝 들린다 */
+.crown { transition: transform 0.15s ease-out, filter 0.15s ease-out; transform-origin: 30% 80%; }
+.crown.hover { transform: translateY(-2px) rotate(-4deg); filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.32)); }
+.edge { fill: rgba(255, 255, 255, 0.9); stroke: rgba(255, 255, 255, 0.9); stroke-width: 5; stroke-linejoin: round; }
+.body { fill: rgba(255, 204, 0, 0.78); stroke: rgba(17, 17, 17, 0.35); stroke-width: 1; stroke-linejoin: round; }
+.shine { fill: url(#shine); }
+.glint { stroke: rgba(255, 255, 255, 0.85); stroke-width: 1.8; stroke-linecap: round; fill: none; }
+
+/* 켤 때: 위에서 내려와 눌러 붙음 / 끌 때: 들리며 사라짐 */
+.crown.sticking { animation: crown-stick 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.3); transform-origin: 50% 70%; }
+.crown.peeling { animation: crown-peel 0.2s ease-in forwards; transform-origin: 30% 80%; }
+@keyframes crown-stick {
+  0% { opacity: 0; transform: translateY(-12px) rotate(-14deg) scale(1.2); }
+  60% { opacity: 1; }
+  100% { transform: none; }
+}
+@keyframes crown-peel {
+  to { opacity: 0; transform: translateY(-10px) rotate(10deg) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .crown.sticking, .crown.peeling { animation: none; }
+  .crown { transition: none; }
+}

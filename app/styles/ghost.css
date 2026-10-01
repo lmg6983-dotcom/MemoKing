@@ -1,0 +1,76 @@
+/* 끌어다 놓기 미리보기 창 — 창 자체는 투명하고, 안쪽 여백(24px)에 그림자가 들어간다 */
+html, body {
+  height: 100%;
+  background: transparent !important;
+  overflow: hidden;
+  user-select: none;
+}
+body { padding: 24px; }
+
+.ghost {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--note-bg);
+  color: var(--note-fg);
+  outline: 2px dashed var(--text-strong);
+  outline-offset: -2px;
+  box-shadow: var(--shadow-pop);
+  opacity: 0;
+  transform: scale(0.88) rotate(-1.5deg);
+  transform-origin: 48px 18px; /* 커서가 잡은 지점을 기준으로 커진다 */
+  transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.12s ease-out;
+}
+.ghost[data-color="charcoal"] { outline-color: var(--brand-yellow); }
+
+.ghost.visible { opacity: 0.93; transform: none; }
+/* 놓는 순간: 테두리가 실선으로 바뀌며 자리를 잡는다 */
+.ghost.dropped { opacity: 1; outline-style: solid; transform: none; transition-duration: 0.08s; }
+
+.ghost-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  flex: none;
+  padding: 0 12px;
+  background: var(--note-bar);
+}
+.ghost-bar span { width: 14px; height: 4px; border-radius: 2px; background: currentColor; opacity: 0.2; }
+
+.ghost-body { flex: 1; min-height: 0; padding: 10px 16px; overflow: hidden; }
+.ghost-title { font-size: 1.3em; font-weight: 800; line-height: 1.3; letter-spacing: -0.01em; }
+.ghost-preview {
+  display: -webkit-box;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.65;
+  opacity: 0.8;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+}
+
+.ghost-label {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--brand-black);
+  color: var(--on-black);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.ghost[data-color="charcoal"] .ghost-label { background: var(--brand-yellow); color: var(--on-brand); }
+
+/* 다른 메모 위: 탭으로 합쳐질 때는 작고 흐리게 */
+.ghost.stacking { opacity: 0.55; transform: scale(0.8); outline-color: var(--brand-yellow); outline-style: solid; }
+.ghost.stacking .ghost-label { background: var(--brand-yellow); color: var(--on-brand); }

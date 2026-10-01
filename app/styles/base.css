@@ -1,0 +1,261 @@
+/* 모든 창이 함께 쓰는 기본 스타일 — 값은 메모킹 디자인 시스템(노랑·검정) 토큰 */
+@font-face {
+  font-family: "Pretendard Variable";
+  src: url("../vendor/fonts/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  /* 브랜드 */
+  --brand-yellow: #ffcc00;
+  --brand-yellow-hover: #f2c000;
+  --brand-yellow-soft: #fff6cc;
+  --brand-black: #111111;
+  --on-brand: #111111;
+  --on-black: #ffffff;
+
+  /* 바탕 · 글씨 */
+  --surface-0: #f6f5f1;
+  --surface-1: #ffffff;
+  --surface-2: #ffffff;
+  --line: #e8e6df;
+  --fill-hover: rgba(17, 17, 17, 0.06);
+  --fill-tab: rgba(17, 17, 17, 0.05);
+  --text-strong: #111111;
+  --text-muted: #6b6860;
+  --text-faint: #8f8c83;
+  --danger: #d93036;
+  --on-danger: #ffffff;
+  --focus-ring: #111111;
+
+  --shadow-card: 0 1px 2px rgba(17, 17, 17, 0.06), 0 2px 8px rgba(17, 17, 17, 0.04);
+  --shadow-pop: 0 12px 32px rgba(17, 17, 17, 0.16);
+
+  --font-sans: "Pretendard Variable", Pretendard, "Malgun Gothic", system-ui, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* 예전 이름 — 각 화면 CSS 가 쓰는 짧은 이름을 토큰에 잇는다 */
+  --bg: var(--surface-0);
+  --surface: var(--surface-1);
+  --border: var(--line);
+  --text: var(--text-strong);
+  --muted: var(--text-muted);
+  --hover: var(--fill-hover);
+  --accent: var(--brand-yellow);
+  --accent-strong: var(--brand-yellow-hover);
+  --accent-text: var(--on-brand);
+  --shadow: var(--shadow-pop);
+
+  /* 스티커 메모 7색: 바탕 / 윗막대 / 목록에서 보이는 색 칩 */
+  --yellow-bg: #fff4b8; --yellow-bar: #ffe680; --yellow-chip: #ffcc00;
+  --green-bg: #ddf5df; --green-bar: #bfebc3; --green-chip: #4cb35a;
+  --pink-bg: #ffe0ec; --pink-bar: #ffc4da; --pink-chip: #ec5a93;
+  --purple-bg: #ede3ff; --purple-bar: #d9c7ff; --purple-chip: #8f5ce6;
+  --blue-bg: #ddeeff; --blue-bar: #c2e0ff; --blue-chip: #3d8ee6;
+  --gray-bg: #f1f0ec; --gray-bar: #e2e0da; --gray-chip: #9a978f;
+  --charcoal-bg: #1c1c1b; --charcoal-bar: #111111; --charcoal-chip: #111111;
+  --note-text-default: #1f1f1c;
+  --note-black-text: #f5f4ef;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand-yellow-hover: #ffd633;
+    --brand-yellow-soft: #3a3100;
+    --surface-0: #0e0e0d;
+    --surface-1: #1a1a18;
+    --surface-2: #252522;
+    --line: #2e2d29;
+    --fill-hover: rgba(255, 255, 255, 0.08);
+    --fill-tab: rgba(255, 255, 255, 0.06);
+    --text-strong: #f5f4ef;
+    --text-muted: #a3a098;
+    --text-faint: #77746c;
+    --danger: #ff6b70;
+    --on-danger: #1a0506;
+    --focus-ring: #ffcc00;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.6);
+
+    --yellow-bg: #3a3317; --yellow-bar: #4a401a;
+    --green-bg: #1e3322; --green-bar: #26402b; --green-chip: #5cc46a;
+    --pink-bg: #3d2230; --pink-bar: #4c2a3b; --pink-chip: #f07aa8;
+    --purple-bg: #2c2440; --purple-bar: #372d50; --purple-chip: #a980f0;
+    --blue-bg: #1c2d42; --blue-bar: #233852; --blue-chip: #62a6f0;
+    --gray-bg: #262624; --gray-bar: #31302d; --gray-chip: #8a877f;
+    --charcoal-bg: #141413; --charcoal-bar: #0a0a0a; --charcoal-chip: #f5f4ef;
+    --note-text-default: #f5f4ef;
+    color-scheme: dark;
+  }
+}
+
+/* 메모 안의 강조(체크 표시·선택 막대·링크 밑줄)는 어느 색이든 브랜드 노랑 */
+[data-color] { --note-accent: var(--brand-yellow); --note-fg: var(--note-text-default); }
+[data-color="yellow"] { --note-bg: var(--yellow-bg); --note-bar: var(--yellow-bar); --note-chip: var(--yellow-chip); }
+[data-color="green"] { --note-bg: var(--green-bg); --note-bar: var(--green-bar); --note-chip: var(--green-chip); }
+[data-color="pink"] { --note-bg: var(--pink-bg); --note-bar: var(--pink-bar); --note-chip: var(--pink-chip); }
+[data-color="purple"] { --note-bg: var(--purple-bg); --note-bar: var(--purple-bar); --note-chip: var(--purple-chip); }
+[data-color="blue"] { --note-bg: var(--blue-bg); --note-bar: var(--blue-bar); --note-chip: var(--blue-chip); }
+[data-color="gray"] { --note-bg: var(--gray-bg); --note-bar: var(--gray-bar); --note-chip: var(--gray-chip); }
+[data-color="charcoal"] { --note-bg: var(--charcoal-bg); --note-bar: var(--charcoal-bar); --note-chip: var(--charcoal-chip); --note-fg: var(--note-black-text); }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, textarea, select { font: inherit; color: inherit; }
+svg { width: 20px; height: 20px; flex: none; }
+/* 아이콘 묶음: SVG 에는 hidden 속성이 적용되지 않으므로 크기 0 으로 숨긴다 */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+::placeholder { color: var(--text-faint); }
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease-out;
+}
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.icon-btn.primary { background: var(--brand-yellow); color: var(--on-brand); }
+.icon-btn.primary:hover { background: var(--brand-yellow-hover); }
+.icon-btn.danger:hover { color: var(--danger); }
+
+/* 버튼: 기본(흰 바탕) · primary(노랑, 한 화면에 하나) · strong(검정) · danger */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, transform 0.1s ease-out;
+}
+.btn:hover { background: var(--fill-hover); }
+.btn:active { transform: scale(0.98); }
+.btn.primary { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
+.btn.primary:hover { background: var(--brand-yellow-hover); }
+.btn.strong { background: var(--brand-black); color: var(--on-black); box-shadow: none; }
+.btn.strong:hover { background: #2a2a28; }
+/* 다크 모드에서는 검정 바탕 위라 강조 버튼을 밝게 뒤집는다 */
+@media (prefers-color-scheme: dark) {
+  .btn.strong { background: var(--text-strong); color: var(--surface-0); }
+  .btn.strong:hover { background: #ffffff; }
+}
+.btn.danger { background: var(--danger); color: var(--on-danger); box-shadow: none; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.dialog {
+  width: min(380px, calc(100vw - 32px));
+  padding: 24px 24px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+}
+.dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+.dialog h2 { margin: 0 0 12px; font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
+.dialog p { margin: 0 0 16px; line-height: 1.6; white-space: pre-line; }
+.dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+.path-box {
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, ::backdrop { animation: none !important; transition: none !important; }
+}
+
+/* ---------- 튜토리얼 말풍선 (v0.12.0) ---------- */
+.coach-spot {
+  position: fixed;
+  z-index: 900;
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  pointer-events: none; /* 비춘 버튼을 실제로 눌러 볼 수 있게 */
+  transition: left 0.2s ease-out, top 0.2s ease-out, width 0.2s ease-out, height 0.2s ease-out;
+}
+.coach-spot.center { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); }
+.coach-bubble {
+  position: fixed;
+  z-index: 901;
+  width: min(300px, calc(100vw - 24px));
+  padding: 16px 16px 12px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-pop);
+  font-family: var(--font-sans);
+  animation: coach-in 0.15s ease-out;
+}
+@keyframes coach-in { from { opacity: 0; transform: scale(0.96); } }
+.coach-count { font-size: 11px; font-weight: 700; color: var(--text-muted); }
+.coach-bubble h3 { margin: 2px 0 6px; font-size: 17px; line-height: 24px; font-weight: 800; letter-spacing: -0.015em; }
+.coach-bubble p { margin: 0 0 12px; font-size: 13.5px; line-height: 21px; color: var(--text-strong); }
+.coach-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.coach-try {
+  margin-right: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--brand-yellow-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.coach-skip { padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.coach-skip:hover { background: var(--fill-hover); color: var(--text-strong); }
+.coach-next { height: 34px; padding: 0 14px; font-size: 13px; }
+
+/* ---------- 움직임 (v0.16.1) — 짧고 조용하게. 움직임 줄이기는 위 규칙이 모두 멈춘다 ---------- */
+/* 아이콘 버튼·버튼: 누르면 살짝 눌림 */
+.icon-btn { transition: background-color 0.15s ease-out, color 0.15s ease-out, transform 0.1s ease-out; }
+.icon-btn:active { transform: scale(0.92); }
+
+/* 대화 상자: 살짝 커지며 나타나고, 흐려지며 닫힌다. 뒤 막도 서서히 */
+.dialog {
+  transition: opacity 0.18s ease-out, transform 0.18s ease-out, overlay 0.18s allow-discrete, display 0.18s allow-discrete;
+}
+.dialog:not([open]) { opacity: 0; }
+.dialog[open] { opacity: 1; transform: none; }
+@starting-style { .dialog[open] { opacity: 0; transform: scale(0.96) translateY(4px); } }
+.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0.18s allow-discrete, display 0.18s allow-discrete; }
+@starting-style { .dialog[open]::backdrop { background-color: rgba(0, 0, 0, 0); } }
+
+@keyframes mk-pop-in { from { opacity: 0; transform: scale(0.95); } }
+@keyframes mk-slide-in-right { from { opacity: 0; transform: translateX(16px); } }
+@keyframes mk-rise-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes mk-drop-in { from { opacity: 0; transform: translateY(-6px); } }

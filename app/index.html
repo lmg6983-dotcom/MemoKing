@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' memoking: data: blob: https:; media-src 'self' memoking: blob:">
+  <title>메모킹</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/list.css">
+  <script type="module" src="js/list.js"></script>
+</head>
+<body>
+  <header class="titlebar">
+    <img class="brand-icon" src="assets/mark-64.png" alt="" draggable="false">
+    <span class="brand">메모킹</span>
+    <button id="list-top-btn" class="icon-btn titlebar-btn crown-btn" title="왕관 스티커를 붙여 목록을 다른 창보다 늘 위에 두기" aria-label="목록을 다른 창보다 늘 위에 두기" aria-pressed="false"><svg><use href="#i-crown-line"/></svg></button>
+  </header>
+
+  <section id="setup" class="setup" hidden>
+    <img class="setup-logo" src="assets/mark-256.png" alt="메모킹" draggable="false">
+    <h1>반가워요, 메모킹이에요</h1>
+    <h2 class="setup-sub">메모를 어디에 보관할까요?</h2>
+    <p>메모 하나가 이 폴더에 <b>파일 하나</b>로 보관돼요.<br>
+      Google Drive 폴더를 고르면 다른 PC에서도 같은 메모를 볼 수 있어요.</p>
+    <div class="path-box" id="suggested-path"></div>
+    <div class="setup-actions">
+      <button id="use-suggested" class="btn primary">이 폴더에 보관하기</button>
+      <button id="choose-folder" class="btn">다른 폴더 고르기</button>
+    </div>
+    <p id="setup-error" class="setup-error" hidden></p>
+  </section>
+
+  <section id="main" class="main" hidden>
+    <div class="toolbar">
+      <button id="new-btn" class="icon-btn primary" title="새 메모 (Ctrl+N)" aria-label="새 메모"><svg><use href="#i-plus"/></svg></button>
+      <label class="search">
+        <svg class="search-icon"><use href="#i-search"/></svg>
+        <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
+      </label>
+      <button id="filter-btn" class="icon-btn filter-btn" title="필터 (색·담긴 것)" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
+      <button id="settings-btn" class="icon-btn" title="설정" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="보기">
+      <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
+      <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-bell"/></svg>알림 예약 <span class="tab-count" id="count-reminders"></span></button>
+      <button role="tab" data-tab="history" aria-selected="false"><svg><use href="#i-inbox"/></svg>알림 보관함</button>
+    </nav>
+
+    <!-- 메모 -->
+    <div class="view" id="view-memos" role="tabpanel">
+      <!-- 필터: 태그 줄(늘 보임) + 색·담긴 것(필터 버튼) -->
+      <div id="filter-panel" class="filter-panel" hidden>
+        <div class="filter-group"><span class="filter-label">색</span><div id="color-filter" class="color-filter" role="group" aria-label="색으로 거르기"></div></div>
+        <div class="filter-group"><span class="filter-label">담긴 것</span><div id="kind-filter" class="chip-row" role="group" aria-label="담긴 것으로 거르기"></div></div>
+      </div>
+      <div id="tag-strip" class="tag-strip" role="group" aria-label="태그로 거르기" hidden></div>
+      <div id="filter-summary" class="filter-summary" hidden>
+        <span id="filter-summary-text"></span>
+        <button id="filter-clear" class="link-btn">모두 지우기</button>
+      </div>
+      <ul id="cards" class="cards" aria-label="메모 목록"></ul>
+      <p id="empty" class="empty" hidden></p>
+    </div>
+
+    <!-- 알림 예약: 모든 메모의 알림을 한 번에 -->
+    <div class="view" id="view-reminders" role="tabpanel" hidden>
+      <div id="reminder-groups" class="rows"></div>
+      <p id="reminders-empty" class="empty" hidden>예약한 알림이 없어요.
+        메모 창 위쪽 종 모양 버튼(Ctrl+Shift+A)으로 추가할 수 있어요.</p>
+    </div>
+
+    <!-- 알림 보관함: 알림 센터에서 사라진 Windows 알림 기록 -->
+    <div class="view" id="view-history" role="tabpanel" hidden>
+      <div id="history-consent" class="consent" hidden>
+        <svg class="consent-icon"><use href="#i-inbox"/></svg>
+        <h3>알림 보관함</h3>
+        <p>알림 센터에서 사라진 알림도 여기에 모아둘게요.</p>
+        <ul>
+          <li>다른 앱(메신저·메일 등) 알림의 <b>제목과 내용</b>을 읽어서 보관해요.</li>
+          <li>보관한 알림은 <b>이 PC에만</b> 남고, 메모 폴더에는 올라가지 않아요.</li>
+          <li>언제든 끌 수 있고, 하나씩 또는 한 번에 지울 수 있어요.</li>
+        </ul>
+        <button id="history-enable" class="btn strong">보관 시작하기</button>
+      </div>
+      <div id="history-body" hidden>
+        <div class="history-bar">
+          <select id="history-app" aria-label="앱으로 거르기"></select>
+          <span class="grow"></span>
+          <button id="history-clear" class="link-btn danger">모두 지우기</button>
+        </div>
+        <div id="history-rows" class="rows"></div>
+        <p id="history-empty" class="empty" hidden></p>
+      </div>
+    </div>
+    <div id="drag-hint" class="drag-hint" role="status" aria-live="polite"></div>
+    <footer class="status">
+      <span id="count"></span>
+    </footer>
+  </section>
+
+  <dialog id="settings-dialog" class="dialog">
+    <h2>설정</h2>
+    <p class="label">메모 폴더</p>
+    <div class="path-box" id="vault-path"></div>
+    <div class="dialog-actions left">
+      <button id="reveal-vault" class="btn">폴더 열기</button>
+      <button id="change-vault" class="btn">폴더 바꾸기</button>
+    </div>
+    <p class="label">편의 기능</p>
+    <label class="setting-row">
+      <input type="checkbox" id="auto-start" class="switch">
+      <span>PC를 켜면 메모킹도 함께 켜기 <small id="auto-start-note"></small></span>
+    </label>
+    <label class="setting-row">
+      <input type="checkbox" id="quick-memo" class="switch">
+      <span>빠른 메모 <kbd>Ctrl+Alt+C</kbd> <small id="quick-memo-note">어디서든 고른 내용을 바로 메모로 만들어요. 두 번 누르면 화면 영역 캡처</small></span>
+    </label>
+    <label class="setting-row">
+      <input type="checkbox" id="history-enabled" class="switch">
+      <span>Windows 알림 모아두기 <small>알림 보관함 탭에서 볼 수 있어요</small></span>
+    </label>
+    <label class="setting-row sub-row">
+      <input type="checkbox" id="popup-watch" class="switch">
+      <span>카카오톡 알림도 모으기 <small>Windows 알림 센터를 쓰지 않는 앱이 띄우는 알림 창을 읽어서 모아요</small></span>
+    </label>
+    <p class="label">지운 메모</p>
+    <div class="dialog-actions left">
+      <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
+    </div>
+    <label class="setting-row select-row">
+      <span>오래된 메모 자동 영구 삭제 <small>휴지통에 이 기간보다 오래 있던 메모를 지워요</small></span>
+      <select id="trash-days" aria-label="자동 영구 삭제 기간">
+        <option value="7">7일 뒤</option>
+        <option value="30">30일 뒤</option>
+        <option value="90">90일 뒤</option>
+        <option value="365">1년 뒤</option>
+        <option value="0">하지 않음</option>
+      </select>
+    </label>
+    <p class="label">도움말</p>
+    <div class="dialog-actions left">
+      <button id="tutorial-btn" class="btn">사용법 둘러보기</button>
+    </div>
+    <p class="version" id="version"></p>
+    <p class="copyright">© 2026 메모킹 · 만든 사람 lmg6983@gmail.com</p>
+    <form method="dialog" class="dialog-actions">
+      <button class="btn primary">닫기</button>
+    </form>
+  </dialog>
+
+  <!-- 휴지통: 지운 메모 되살리기·영구 삭제 -->
+  <dialog id="trash-dialog" class="dialog trash-dialog">
+    <h2>휴지통</h2>
+    <p class="trash-note" id="trash-note"></p>
+    <ul id="trash-list" class="trash-list" aria-label="지운 메모"></ul>
+    <p id="trash-empty" class="empty trash-empty" hidden>휴지통이 비어 있어요.</p>
+    <div class="dialog-actions">
+      <button id="trash-clear" class="btn danger">휴지통 비우기</button>
+      <span class="grow"></span>
+      <button id="trash-close" class="btn primary">닫기</button>
+    </div>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="dialog">
+    <form method="dialog">
+      <p id="confirm-message"></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn">취소</button>
+        <button value="ok" class="btn danger" id="confirm-ok">지우기</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <title>늘 위에 두기 — 누르면 떼어져요</title>
+  <link rel="stylesheet" href="styles/sticker.css">
+  <script type="module" src="js/sticker.js"></script>
+</head>
+<body>
+  <!-- 늘 위에 두기 표시: 창 위 가장자리에 반쯤 걸쳐 붙은 반투명 왕관 스티커 (메모킹 로고의 왕관) -->
+  <svg id="crown" class="crown" viewBox="0 0 64 52" aria-hidden="true">
+    <defs>
+      <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+        <stop offset="0.45" stop-color="#ffffff" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <g class="hit" transform="rotate(-7 32 26)">
+      <!-- 오려 낸 스티커의 흰 가장자리 -->
+      <g class="edge">
+        <path d="M14 19 L22 30 L32 13 L42 30 L50 19 L48 39 L16 39 Z"/>
+        <circle cx="14" cy="17" r="4.2"/><circle cx="32" cy="11" r="4.2"/><circle cx="50" cy="17" r="4.2"/>
+        <rect x="15" y="40" width="34" height="7" rx="3.5"/>
+      </g>
+      <!-- 반투명 노랑 왕관 -->
+      <g class="body">
+        <path d="M14 19 L22 30 L32 13 L42 30 L50 19 L48 39 L16 39 Z"/>
+        <circle cx="14" cy="17" r="4.2"/><circle cx="32" cy="11" r="4.2"/><circle cx="50" cy="17" r="4.2"/>
+        <rect x="15" y="40" width="34" height="7" rx="3.5"/>
+      </g>
+      <!-- 은은한 광택 -->
+      <path class="shine" d="M14 19 L22 30 L32 13 L42 30 L50 19 L48 39 L16 39 Z"/>
+      <path class="glint" d="M19 24 L22 29"/>
+    </g>
+  </svg>
+</body>
+</html>

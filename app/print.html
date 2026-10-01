@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko" class="print-page">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' memoking: data: blob: https: http:; media-src 'self' memoking: blob:">
+  <title>PDF</title>
+  <link rel="stylesheet" href="vendor/prosemirror.css">
+  <link rel="stylesheet" href="vendor/plyr.css">
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/note.css">
+  <link rel="stylesheet" href="styles/print.css">
+  <script type="module" src="js/print.js"></script>
+</head>
+<body data-color="yellow">
+  <!-- 메모 한 장을 PDF 로 (print=1) · PDF 만들기 창의 미리보기(첫 쪽) -->
+  <main id="editor" class="editor print-doc"></main>
+  <footer id="print-date" class="print-date" hidden></footer>
+</body>
+</html>

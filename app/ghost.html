@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <title>메모 미리보기</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/ghost.css">
+  <script type="module" src="js/ghost.js"></script>
+</head>
+<body>
+  <!-- 목록에서 카드를 끌 때 커서를 따라다니는 "여기에 열립니다" 미리보기 -->
+  <div id="ghost" class="ghost" data-color="yellow">
+    <div class="ghost-bar"><span></span><span></span><span></span></div>
+    <div class="ghost-body">
+      <div id="ghost-title" class="ghost-title"></div>
+      <div id="ghost-preview" class="ghost-preview"></div>
+    </div>
+    <div id="ghost-label" class="ghost-label">놓으면 여기에 열려요</div>
+  </div>
+</body>
+</html>

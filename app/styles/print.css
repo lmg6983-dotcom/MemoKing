@@ -1,0 +1,56 @@
+/* 메모를 PDF 쪽으로 — 늘 밝은 색으로 (다크 모드여도 종이는 흰색) */
+html.print-page {
+  color-scheme: light;
+  --surface-0: #ffffff; --surface-1: #ffffff; --surface-2: #ffffff; --line: #e8e6df;
+  --text-strong: #111111; --text-muted: #6b6860; --fill-hover: rgba(17, 17, 17, 0.06);
+  --yellow-bg: #fff4b8; --yellow-bar: #ffe680;
+  --green-bg: #ddf5df; --green-bar: #bfebc3;
+  --pink-bg: #ffe0ec; --pink-bar: #ffc4da;
+  --purple-bg: #ede3ff; --purple-bar: #d9c7ff;
+  --blue-bg: #ddeeff; --blue-bar: #c2e0ff;
+  --gray-bg: #f1f0ec; --gray-bar: #e2e0da;
+  --charcoal-bg: #1c1c1b; --charcoal-bar: #111111;
+  --note-text-default: #1f1f1c;
+  background: var(--page-bg, #ffffff) !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+html.print-page, html.print-page body { height: auto; overflow: visible; }
+html.print-page body {
+  display: block;
+  margin: 0;
+  background: transparent !important;
+  --note-text: #1f1f1c;
+  --note-muted: rgba(17, 17, 17, 0.64);
+  --note-hover: rgba(17, 17, 17, 0.07);
+  color: var(--note-text);
+}
+/* 메모 색 바탕: 쪽 전체 (여백 포함) */
+html.print-page.with-bg body[data-color="charcoal"] { --note-text: #f5f4ef; --note-muted: rgba(255, 255, 255, 0.64); --note-hover: rgba(255, 255, 255, 0.1); }
+
+.print-doc { overflow: visible; padding: 0; cursor: default; }
+.print-doc .mk-doc { min-height: 0; font-size: 11pt; line-height: 1.65; }
+/* 소리·동영상은 플레이어 대신 이름만 */
+.print-doc .plyr { display: none; }
+.print-doc .mk-media { display: block; padding: 6px 10px; border-radius: 8px; background: var(--note-hover); }
+.print-doc .mk-media-label::before { content: "▶ "; }
+.print-doc .mk-link-card .lc-remove { display: none; }
+.print-doc img, .print-doc table, .print-doc .mk-link-card { break-inside: avoid; }
+.print-date { margin-top: 18px; font-size: 9pt; color: var(--note-muted); text-align: right; }
+
+/* 미리보기(PDF 만들기 창): 첫 쪽만 실제 크기 쪽 모양으로 */
+html.preview { background: transparent; }
+html.preview body {
+  box-sizing: border-box;
+  width: var(--page-w);
+  height: var(--page-h);
+  padding: var(--page-m);
+  overflow: hidden;
+  background: var(--page-bg, #ffffff) !important;
+}
+
+/* PDF 여백: 쪽마다 위아래 빈 칸 + 좌우 안쪽 여백 */
+.page-table { width: 100%; border-collapse: collapse; border-spacing: 0; }
+.page-table > thead > tr > td, .page-table > tfoot > tr > td { height: var(--page-m); padding: 0; }
+.page-table .page-cell { padding: 0 var(--page-m); vertical-align: top; }
+.page-table > * > tr > td { border: 0 !important; background: none !important; } /* 바깥 여백 표만 (메모 안의 표는 그대로) */
