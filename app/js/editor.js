@@ -1211,6 +1211,33 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     setColor(markName, current ? null : color);
   }
 
+  // 스타일 고르기 (도구막대 "스타일"): 이 줄을 그 스타일로 — 이미 그 스타일이면 그대로 (H1·H2 버튼처럼 켜고 끄지 않음)
+  function setStyle(name) {
+    const v = view();
+    const active = activeFormats(v.state);
+    const inQuote = () => {
+      const { $from, $to } = view().state.selection;
+      return $from.blockRange($to, (n) => n.type.name === 'blockquote');
+    };
+    if (name === 'quote') {
+      if (parentOfType(['heading', 'code_block'])) call(turnIntoTextCommand); // 인용은 본문 글을 감싼다
+      if (!active.quote) call(wrapInBlockquoteCommand);
+      return;
+    }
+    // 인용 밖으로 (인용이 아닌 스타일을 고르면)
+    const range = inQuote();
+    if (range) view().dispatch(view().state.tr.lift(range, range.depth - 1));
+    if (name === 'paragraph') {
+      if (parentOfType(['heading', 'code_block'])) call(turnIntoTextCommand);
+    } else if (/^h[1-3]$/.test(name)) {
+      const level = Number(name[1]);
+      const heading = parentOfType(['heading']);
+      if (!heading || heading.node.attrs.level !== level) call(wrapInHeadingCommand, level);
+    } else if (name === 'codeBlock') {
+      if (!parentOfType(['code_block'])) call(createCodeBlockCommand);
+    }
+  }
+
   const commands = {
     bold: () => call(toggleStrongCommand),
     italic: () => call(toggleEmphasisCommand),
@@ -1235,6 +1262,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   return {
     run(name) {
       commands[name]?.();
+      view().focus();
+    },
+    setStyle(name) {
+      setStyle(name);
       view().focus();
     },
     setTextColor(color) {
@@ -1377,6 +1408,7 @@ function activeFormats(state) {
     const node = $from.node(d);
     const name = node.type.name;
     if (name === 'heading') active[`h${node.attrs.level}`] = true;
+    if (name === 'code_block') active.codeBlock = true;
     if (name === 'blockquote') active.quote = true;
     if (name === 'list_item' && node.attrs.checked != null && active.task === undefined) active.task = true;
     if (name === 'bullet_list' && !active.task && !active.ordered) active.bullet ??= true;

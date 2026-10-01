@@ -615,7 +615,55 @@ el.moreBtn.addEventListener('click', () => {
   if (open) placePopover(el.morePanel, el.moreBtn);
 });
 
+// ---------- 스타일 고르기 (H1·H2 버튼 대신): 본문 · 제목 1·2·3 · 인용 · 코드 블록 ----------
+const styleMenu = $('style-menu');
+const STYLE_NAMES = { paragraph: '본문', h1: '제목 1', h2: '제목 2', h3: '제목 3', quote: '인용', codeBlock: '코드 블록' };
+let currentStyle = 'paragraph';
+
+function closeStyleMenu() {
+  styleMenu.hidden = true;
+  for (const b of document.querySelectorAll('[data-action="style"]')) b.setAttribute('aria-expanded', 'false');
+}
+function openStyleMenu(anchor) {
+  closePalette();
+  for (const b of styleMenu.querySelectorAll('[data-style]')) b.setAttribute('aria-selected', String(b.dataset.style === currentStyle));
+  styleMenu.hidden = false;
+  for (const b of document.querySelectorAll('[data-action="style"]')) b.setAttribute('aria-expanded', 'true');
+  placePopover(styleMenu, anchor);
+}
+// 지금 줄의 스타일 (코드 블록 > 제목 > 인용 > 본문)
+function styleOf(active) {
+  if (active.codeBlock) return 'codeBlock';
+  for (const h of ['h1', 'h2', 'h3']) if (active[h]) return h;
+  return active.quote ? 'quote' : 'paragraph';
+}
+function showStyle(active) {
+  currentStyle = styleOf(active);
+  for (const b of document.querySelectorAll('[data-action="style"]')) {
+    b.querySelector('.style-name').textContent = STYLE_NAMES[currentStyle];
+    b.classList.toggle('active', currentStyle !== 'paragraph');
+  }
+  if (!styleMenu.hidden) for (const b of styleMenu.querySelectorAll('[data-style]')) b.setAttribute('aria-selected', String(b.dataset.style === currentStyle));
+}
+styleMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서 유지
+styleMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-style]');
+  if (!b) return;
+  editor.setStyle(b.dataset.style);
+  closeStyleMenu();
+  closeMore();
+});
+styleMenu.addEventListener('keydown', (e) => {
+  const items = [...styleMenu.querySelectorAll('[data-style]')];
+  const i = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+  }
+});
+
 const actions = {
+  style: (btn) => (styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
   file: () => el.fileInput.click(),
   table: () => editor.insertTable(),
   color: (btn) => (paletteKind === 'color' ? closePalette() : openPalette('color', btn)),
@@ -642,7 +690,8 @@ for (const container of [el.formatBar, el.morePanel]) {
 // 도구막대·팝업 밖을 누르면 팝업을 닫는다
 document.addEventListener('mousedown', (e) => {
   if (!el.palette.hidden && !el.palette.contains(e.target) && !e.target.closest?.('[data-action="color"],[data-action="highlight"]')) closePalette();
-  if (!el.morePanel.hidden && !el.morePanel.contains(e.target) && !el.moreBtn.contains(e.target) && !el.palette.contains(e.target)) closeMore();
+  if (!el.morePanel.hidden && !el.morePanel.contains(e.target) && !el.moreBtn.contains(e.target) && !el.palette.contains(e.target) && !styleMenu.contains(e.target)) closeMore();
+  if (!styleMenu.hidden && !styleMenu.contains(e.target) && !e.target.closest?.('[data-action="style"]')) closeStyleMenu();
 });
 
 // 표 열 너비·행 높이·머리글 강조 → 메모 머리말 (끄는 동안 여러 번 바뀌어도 한 번에)
@@ -696,6 +745,7 @@ tableBar.addEventListener('click', (e) => {
 
 function showActive(active) {
   showTableBar(active.table);
+  showStyle(active);
   for (const btn of document.querySelectorAll('[data-cmd]')) {
     btn.classList.toggle('active', Boolean(active[btn.dataset.cmd]));
   }
@@ -733,7 +783,8 @@ const SHORTCUTS = {
 window.addEventListener('keydown', (e) => {
   if (!editor || el.confirm.open) return;
   if (e.key === 'Escape') {
-    if (!el.palette.hidden) closePalette();
+    if (!styleMenu.hidden) closeStyleMenu();
+    else if (!el.palette.hidden) closePalette();
     else if (!el.morePanel.hidden) closeMore();
     else if (!el.menu.hidden) closeMenu();
     else if (!el.linksPanel.hidden) toggleLinks(false);

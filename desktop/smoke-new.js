@@ -4,6 +4,7 @@
 //            v0.17.1 — 창이 작아도 스탬프가 카드(요약)와 겹치지 않음 · 카카오톡 알림은 설정 없이 늘 · 선택한 내용 자동 영역 캡처
 //            v0.17.2 — 화면 밖까지 선택하면 스크롤하며 캡처해 이어 붙이기 · 표 머리글 강조는 고를 때만, 열 너비·행 높이 끌기 · Ctrl+휠 본문 확대
 //            v0.17.3 — 표 막대(행·열 추가·지우기·셀 병합·자동 조정) · 붙여넣은 표 열 너비·정렬 자동 · 칸 안 줄바꿈 유지
+//            v0.17.4 — H1·H2 버튼 대신 스타일 고르기 · 좁은 메모 창에서도 표 막대 버튼이 모두 보임
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
@@ -474,6 +475,35 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     const z2 = await js(tw, `Number(getComputedStyle(document.getElementById('editor')).getPropertyValue('--note-zoom'))`);
     check('메모를 다시 열어도 그 메모의 확대 배율 그대로', z2 === z1.zoom, JSON.stringify({ z1: z1.zoom, z2 }));
     await js(tw, `document.querySelector('.zoom-badge button').click()`).catch(() => {});
+    tw.close();
+
+    // 9) v0.17.4: 좁은 메모 창에서도 표 막대 버튼 6개가 모두 보임 · H1·H2 버튼 대신 스타일 고르기
+    await until(() => !noteWins.get(tableMemo), '닫힘');
+    await lj(`window.memoking.memo.open(${JSON.stringify(tableMemo)})`);
+    tw = await until(() => noteWins.get(tableMemo), '다시 열기');
+    await ready(tw);
+    tw.setSize(260, 520);
+    await wait(400);
+    await js(tw, `(() => { document.querySelector('.mk-doc').focus(); const td = document.querySelector('.mk-doc td'); const r = document.createRange(); r.setStart(td.querySelector('p')?.firstChild ?? td, 1); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
+    await until(() => js(tw, `!document.getElementById('table-bar').hidden`), '표 막대');
+    const narrowBar = await js(tw, `(() => { const bar = document.getElementById('table-bar').getBoundingClientRect(); return [...document.querySelectorAll('#table-bar button')].map((x) => { const r = x.getBoundingClientRect(); return { t: x.textContent, ok: r.width > 0 && r.left >= bar.left - 1 && r.right <= bar.right + 1 && r.bottom <= bar.bottom + 1 }; }); })()`);
+    await capture(tw, 'smoke-new-table-bar-narrow.png');
+    check('좁은 메모 창(260px)에서도 표 막대 버튼 6개가 가려지지 않고 모두 보임 (여러 줄)', narrowBar.length === 6 && narrowBar.every((x) => x.ok), JSON.stringify(narrowBar));
+    tw.setSize(420, 560);
+    await wait(300);
+    const noH = await js(tw, `document.querySelectorAll('[data-cmd="h1"], [data-cmd="h2"]').length === 0 && !!document.querySelector('[data-action="style"]')`);
+    await js(tw, `(() => { const h = document.querySelector('.mk-doc h1'); const r = document.createRange(); r.setStart(h.firstChild, 1); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
+    await wait(200);
+    const label0 = await js(tw, `document.querySelector('[data-action="style"] .style-name').textContent`);
+    await js(tw, `document.querySelector('[data-action="style"]').click()`);
+    await wait(150);
+    const menu = await js(tw, `!document.getElementById('style-menu').hidden && [...document.querySelectorAll('#style-menu [data-style]')].map((b) => b.querySelector('.style-sample').textContent + (b.getAttribute('aria-selected') === 'true' ? '✓' : '')).join(',')`);
+    await capture(tw, 'smoke-new-style-menu.png');
+    await js(tw, `document.querySelector('#style-menu [data-style="h2"]').click()`);
+    await wait(200);
+    const after = await js(tw, `({ h2: !!document.querySelector('.mk-doc h2'), label: document.querySelector('[data-action="style"] .style-name').textContent, menuHidden: document.getElementById('style-menu').hidden })`);
+    check('H1·H2 버튼 대신 "스타일": 지금 줄 스타일 표시(제목 1), 고르는 목록(본문·제목 1·2·3·인용·코드 블록, 지금 것 ✓), 제목 2를 고르면 바뀜',
+      noH && label0 === '제목 1' && menu === '본문,제목 1✓,제목 2,제목 3,인용,코드 블록' && after.h2 && after.label === '제목 2' && after.menuHidden, JSON.stringify({ noH, label0, menu, after }));
     tw.close();
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
