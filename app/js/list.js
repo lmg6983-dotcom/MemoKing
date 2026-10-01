@@ -636,7 +636,7 @@ function applyDensity() {
   const width = el.cards.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const height = el.cards.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   if (width <= 0 || height <= 0) return;
-  const d = chooseDensity({ width, height }, el.cards.children.length, visibleForZoom(listZoom), { zoom: listZoom });
+  const d = chooseDensity({ width, height }, el.cards.children.length, visibleForZoom(listZoom), { zoom: listZoom, line: previewLine() });
   const set = (name, value) => {
     if (el.cards.style.getPropertyValue(name) !== value) el.cards.style.setProperty(name, value);
   };
@@ -672,11 +672,19 @@ document.body.append(listZoomBadge);
 let listZoomTimer = 0;
 // 175% 넘게는 확대하지 않는다 — 카드가 한 장만 보이는 배율이라 더 키우면 글자만 커지고 보이는 내용은 오히려 준다
 const LIST_ZOOM_MAX = 1.75;
+const MAX_FONT_PX = 22; // 카드 글자 크기 상한 (화면 px)
+const PREVIEW_FONT = 13.5; // list.css 의 요약 글자 크기 · 줄 높이 21
+// 요약 한 줄 높이 (확대된 단위): 글자가 상한에 걸리면 줄 높이도 함께 줄어든다
+const previewLine = () => (Math.min(PREVIEW_FONT, MAX_FONT_PX / listZoom) * 21) / PREVIEW_FONT;
 function setListZoom(z, { show = true } = {}) {
   listZoom = Math.min(LIST_ZOOM_MAX, clampZoom(z));
   el.cards.style.zoom = listZoom === 1 ? '' : String(listZoom);
   // 제목 글자는 확대해도 100% 크기(줄 높이 22px)보다 커지지 않게 — 확대 배율만큼 되돌려 줄인다 (축소할 때는 함께 작아짐)
   el.cards.style.setProperty('--title-cap', String(listZoom > 1 ? 1 / listZoom : 1));
+  // 카드 안 모든 글자는 확대해도 화면에서 22px 를 넘지 않게 (확대된 단위로 22÷배율)
+  el.cards.style.setProperty('--font-cap', `${(MAX_FONT_PX / listZoom).toFixed(3)}px`);
+  // 마우스를 올리면 뜨는 버튼 묶음(PDF·압정·지우기)은 확대·축소와 상관없이 100% 크기 그대로
+  el.cards.style.setProperty('--unzoom', String(1 / listZoom));
   document.body.dataset.listZoom = String(listZoom);
   try {
     if (listZoom === 1) localStorage.removeItem(LIST_ZOOM_KEY);

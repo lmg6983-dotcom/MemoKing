@@ -779,3 +779,15 @@ body.is-dragging .card:hover { transform: none; }
 .cards[data-density="compact"] .card-title { font-size: calc(14.5px * var(--title-cap, 1)); }
 /* 사진이 없는 넉넉한 카드는 사진 자리까지 요약 글로 (v0.17.8) */
 .cards[data-density="roomy"] .card:not(:has(.card-thumb)) .card-preview { -webkit-line-clamp: var(--preview-lines-full, var(--preview-lines, 3)); }
+
+/* 목록 확대(Ctrl+휠)해도 카드 안 모든 글자는 화면에서 22px 를 넘지 않게 (v0.17.9) — list.js 가 --font-cap = 22px÷배율 */
+.card-preview { font-size: min(13.5px, var(--font-cap, 13.5px)); line-height: calc(min(13.5px, var(--font-cap, 13.5px)) * 21 / 13.5); }
+.card-tag { font-size: min(12px, var(--font-cap, 12px)); }
+.card-meta { font-size: min(11px, var(--font-cap, 11px)); }
+.card-stamp { font-size: min(10.5px, var(--font-cap, 10.5px)); }
+.card-title { font-size: min(calc(15px * var(--title-cap, 1)), var(--font-cap, 15px)); }
+.cards[data-density="compact"] .card-title { font-size: min(calc(14.5px * var(--title-cap, 1)), var(--font-cap, 14.5px)); }
+/* 마우스를 올리면 뜨는 버튼 묶음은 목록 확대·축소와 상관없이 100% 크기 (v0.17.9) — --unzoom = 1÷배율 */
+.card-actions { zoom: var(--unzoom, 1); }
+.cards li:hover .card-head { padding-right: calc(88px * var(--unzoom, 1)); }
+.cards[data-density="compact"] li:hover .card-head { padding-right: 0; }
