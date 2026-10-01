@@ -72,7 +72,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'quick', win: 'list', target: [],
     title: '어디서든 Ctrl+Alt+C',
-    text: '웹·문서·탐색기 어디서든 글이나 파일을 고르고 Ctrl+Alt+C를 누르면 바로 메모가 돼요. 빠르게 두 번 누르면 화면을 끌어서 캡처하고, 드래그로 선택해 둔 내용이 있으면 그 영역을 바로 캡처해요.',
+    text: '웹·문서·탐색기 어디서든 글이나 파일을 고르고 Ctrl+Alt+C를 누르면 바로 메모가 돼요. 빠르게 두 번 누르면 화면을 끌어서 캡처해요.',
     next: '다음',
   },
   {

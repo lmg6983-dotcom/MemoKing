@@ -8,7 +8,9 @@ import { setupHistoryTab } from './list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
-import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
+import { stepZoom, clampZoom, zoomLabel, visibleForZoom } from './core/zoom.js';
+
+let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
@@ -634,7 +636,7 @@ function applyDensity() {
   const width = el.cards.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const height = el.cards.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   if (width <= 0 || height <= 0) return;
-  const d = chooseDensity({ width, height }, el.cards.children.length);
+  const d = chooseDensity({ width, height }, el.cards.children.length, visibleForZoom(listZoom));
   const set = (name, value) => {
     if (el.cards.style.getPropertyValue(name) !== value) el.cards.style.setProperty(name, value);
   };
@@ -648,9 +650,9 @@ function applyDensity() {
   el.cards.classList.toggle('fill', d.fill);
 }
 // ---------- 메모 카드 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 메모 창과 같은 단계, 이 PC 에 기억 ----------
-// 카드 목록만 확대한다 (위 막대·탭·검색은 그대로). 크게 하면 한 화면에 들어가는 카드가 줄어 모양(넉넉·보통·촘촘)도 따라 바뀐다.
+// 카드 목록만 확대한다 (위 막대·탭·검색은 그대로). 크게 하면 글자가 커지고 한 화면의 카드 수는 줄면서 카드마다 보이는 내용
+// (요약 줄 수·사진)은 늘고, 작게 하면 반대로 — 배율에 맞춰 한 화면에 보일 메모 수를 바꾼다 (visibleForZoom).
 const LIST_ZOOM_KEY = 'memoking.listZoom';
-let listZoom = 1;
 try {
   listZoom = clampZoom(localStorage.getItem(LIST_ZOOM_KEY) ?? 1);
 } catch {

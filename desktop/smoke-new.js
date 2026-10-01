@@ -1,11 +1,12 @@
 // 바뀐 기능만 확인하는 짧은 점검 (npm run smoke:new) — 전체 점검(npm run smoke)은 요청할 때만.
 // 버전마다 아래 "이번 버전" 부분을 새 기능에 맞게 바꾼다. 임시 폴더(%TEMP%\memoking-smoke)만 쓴다.
 // 이번 버전: v0.17.0 — 팝업 알림 모으기(UI 자동화·글자 인식) · 메모를 PDF로 · 고친 때 스탬프는 카드 사이 틈에
-//            v0.17.1 — 창이 작아도 스탬프가 카드(요약)와 겹치지 않음 · 카카오톡 알림은 설정 없이 늘 · 선택한 내용 자동 영역 캡처
-//            v0.17.2 — 화면 밖까지 선택하면 스크롤하며 캡처해 이어 붙이기 · 표 머리글 강조는 고를 때만, 열 너비·행 높이 끌기 · Ctrl+휠 본문 확대
+//            v0.17.1 — 창이 작아도 스탬프가 카드(요약)와 겹치지 않음 · 카카오톡 알림은 설정 없이 늘
+//            v0.17.2 — 표 머리글 강조는 고를 때만, 열 너비·행 높이 끌기 · Ctrl+휠 본문 확대
 //            v0.17.3 — 표 막대(행·열 추가·지우기·셀 병합·자동 조정) · 붙여넣은 표 열 너비·정렬 자동 · 칸 안 줄바꿈 유지
 //            v0.17.4 — H1·H2 버튼 대신 스타일 고르기 · 좁은 메모 창에서도 표 막대 버튼이 모두 보임 · 목록 Ctrl+휠 확대
-//                      · 선택 영역 자동 캡처 고침(UI 자동화 어셈블리 경로) · 팝업 알림 글자를 접근성(MSAA)·자식 창에서도
+//                      · 팝업 알림 글자를 접근성(MSAA)·자식 창에서도
+//            v0.17.6 — 선택 영역 자동 캡처·스크롤 캡처 삭제 · 목록 확대할수록 카드 수는 줄고 카드 안 내용은 늘게
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
@@ -68,13 +69,8 @@ function pdfText(buf) {
   return { fonts, chars };
 }
 
-// PNG 파일의 가로·세로 (IHDR)
-function pngSize(file) {
-  const b = fs.readFileSync(file);
-  return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
-}
 
-export async function runSmoke({ noteWins, getVault, createListWindow, getList, createPopupWatcher, getHistory, smokePdf, getPdfWin, startAreaCapture, getAreaCapture, findSelectionRect, smokeToastsList, smokeClipboard, scrollingCapture }) {
+export async function runSmoke({ noteWins, getVault, createListWindow, getList, createPopupWatcher, getHistory, smokePdf, getPdfWin }) {
   const checks = [];
   const errors = [];
   const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
@@ -297,63 +293,6 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     check('목록 창을 가장 작게(300×380) 줄여도 스탬프가 카드·요약과 겹치지 않음 (대신 목록이 스크롤)', small.hits.length === 0 && mid.hits.length === 0, JSON.stringify({ small, mid }));
     getList().setSize(400, 680);
 
-    // 5) v0.17.1: 드래그로 선택한 내용 → 그 영역을 자동으로 캡처 (테두리·반짝·찰칵 뒤 새 메모)
-    const sample = new BrowserWindow({ width: 640, height: 420, x: 120, y: 120, show: true, title: '선택 캡처 점검', webPreferences: { sandbox: true } });
-    await sample.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><title>선택 캡처 점검</title><body style="margin:0;padding:40px;font:18px/1.6 'Malgun Gothic';background:#fff">
-      <p>선택하지 않은 첫 문단이에요.</p><p id="pick">이 문단을 드래그로 선택했어요. 선택한 글이 모두 캡처에 들어가야 해요. 두 번째 줄까지 이어지는 긴 문장이에요.</p><p>선택하지 않은 마지막 문단이에요.</p></body>`)}`);
-    sample.focus();
-    await wait(400);
-    const pick = await js(sample, `(() => { const el = document.getElementById('pick'); const r = document.createRange(); r.selectNodeContents(el);
-      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); const b = el.getBoundingClientRect(); return { x: b.left, y: b.top, width: b.width, height: b.height }; })()`);
-    const cb = sample.getContentBounds();
-    const expected = { x: cb.x + pick.x, y: cb.y + pick.y, width: pick.width, height: pick.height };
-    // (가) UI 자동화로 앞 창의 선택 위치 읽기 (실제 Windows · 점검 앱 자신의 창)
-    const selFound = await findSelectionRect();
-    const near = selFound && Math.abs(selFound.x - expected.x) < 16 && Math.abs(selFound.y - expected.y) < 16
-      && Math.abs(selFound.x + selFound.width - (expected.x + expected.width)) < 16 && Math.abs(selFound.y + selFound.height - (expected.y + expected.height)) < 16;
-    check('Ctrl+Alt+C 두 번: 앞 창에서 드래그로 선택한 글의 화면 위치를 UI 자동화로 읽음', near, JSON.stringify({ found: selFound, expected }));
-    // (나) 그 사각형으로 자동 캡처 → 오버레이에 테두리·반짝 → 클립보드·새 메모 (UI 자동화 결과와 상관없이 정해진 사각형으로)
-    const toasts0 = smokeToastsList.length;
-    const clips0 = smokeClipboard.length;
-    await startAreaCapture({ show: false, auto: { ...expected, window: '선택 캡처 점검', process: 'electron' } });
-    const overlay = getAreaCapture()?.wins[0];
-    const autoLook = overlay ? await until(() => js(overlay, `document.body.classList.contains('auto') && document.getElementById('sel').classList.contains('auto') && !document.getElementById('sel').hidden && document.getElementById('hint').textContent`), '자동 테두리', 8000).catch(() => null) : null;
-    const flashed = overlay ? await until(() => !overlay.isDestroyed() && js(overlay, `document.getElementById('sel').classList.contains('flash')`), '반짝', 4000).catch(() => false) : false;
-    const t = await until(() => smokeToastsList.slice(toasts0).find((x) => /선택한 내용을 캡처/.test(x.title)), '자동 캡처 메모', 10000).catch(() => null);
-    const clip = smokeClipboard[clips0];
-    const size = clip && fs.existsSync(clip) ? pngSize(clip) : null;
-    const scale = screen.getDisplayMatching(expected).scaleFactor;
-    const wantW = Math.round((expected.width + 16) * scale);
-    const wantH = Math.round((expected.height + 16) * scale);
-    check('선택한 내용 자동 캡처: 고르지 않고 테두리 → 반짝 뒤 바로 캡처, "선택한 내용을 캡처해 메모를 만들었어요"', autoLook && flashed && t, JSON.stringify({ autoLook, flashed, toast: t?.title }));
-    check('자동 캡처 그림 = 선택한 내용 + 둘레 여백 8px (원래 해상도)', size && Math.abs(size.width - wantW) <= 3 * scale && Math.abs(size.height - wantH) <= 3 * scale, JSON.stringify({ size, want: [wantW, wantH] }));
-    sample.destroy();
-
-    // 6) v0.17.2: 화면 밖까지 이어지는 선택 → 스크롤하며 여러 장 찍어 이어 붙이기
-    const longWin = new BrowserWindow({ width: 560, height: 420, x: 140, y: 100, show: true, title: '스크롤 캡처 점검', webPreferences: { sandbox: true } });
-    const paras = Array.from({ length: 40 }, (_, i) => `<p id="p${i}">${i + 1}번째 문단이에요. 스크롤 캡처로 이어 붙인 그림에 이 문단이 빠짐없이 들어가야 해요.</p>`).join('');
-    await longWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><title>스크롤 캡처 점검</title><body style="margin:0;padding:24px 32px;font:17px/1.7 'Malgun Gothic';background:#fff">${paras}</body>`)}`);
-    longWin.focus();
-    await wait(400);
-    const span = await js(longWin, `(() => { const a = document.getElementById('p3'), b = document.getElementById('p30'); const r = document.createRange(); r.setStartBefore(a.firstChild); r.setEndAfter(b.firstChild);
-      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); window.scrollTo(0, 0);
-      return { top: a.getBoundingClientRect().top + scrollY, bottom: b.getBoundingClientRect().bottom + scrollY, view: innerHeight }; })()`);
-    const longSel = await findSelectionRect();
-    check('화면 밖(아래)까지 이어진 선택을 알아챔 (보이는 영역도)', longSel?.more && longSel.viewPx?.height > 100, JSON.stringify(longSel));
-    const tScroll = smokeToastsList.length;
-    const cScroll = smokeClipboard.length;
-    if (longSel?.more) await scrollingCapture(longSel);
-    const scrollToast = smokeToastsList.slice(tScroll).find((x) => /선택한 내용을 캡처/.test(x.title));
-    const scrollClip = smokeClipboard[cScroll];
-    const scrollSize = scrollClip && fs.existsSync(scrollClip) ? pngSize(scrollClip) : null;
-    const lScale = screen.getDisplayMatching(longWin.getBounds()).scaleFactor;
-    const wantScrollH = Math.round((span.bottom - span.top + 16) * lScale);
-    const scrolledBack = await js(longWin, 'scrollY');
-    check('스크롤하며 여러 장을 찍어 이어 붙임 → 선택한 4~31번째 문단이 모두 든 한 장 (+여백), "N장을 이어 붙인"', scrollToast && /장을 이어 붙인/.test(scrollToast.body) && scrollSize && Math.abs(scrollSize.height - wantScrollH) <= 30 * lScale && scrollSize.height > span.view * lScale * 1.5,
-      JSON.stringify({ toast: scrollToast?.body, size: scrollSize, want: wantScrollH, view: span.view }));
-    check('스크롤 캡처가 끝나면 원래 스크롤 자리로 (맨 위)', scrolledBack < 5, String(scrolledBack));
-    if (scrollClip && fs.existsSync(scrollClip)) fs.copyFileSync(scrollClip, path.join(OUT, 'smoke-new-scroll-capture.png'));
-    longWin.destroy();
 
     // 7) v0.17.2: 표 — 머리글 바탕은 "머리글 강조"를 켰을 때만, 열 너비·행 높이를 끌어서 바꾸고 다시 열어도 그대로
     const tableMemo = vault.create();
@@ -510,14 +449,22 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     const lw = getList();
     const lBox = lw.getContentBounds();
     const title0 = await lj(`document.querySelector('#cards .card-title').getBoundingClientRect().height`);
+    const shown = () => lj(`(() => { const u = document.getElementById('cards').getBoundingClientRect(); const cards = [...document.querySelectorAll('#cards .card')];
+      return { full: cards.filter((c) => { const r = c.getBoundingClientRect(); return r.top >= u.top - 1 && r.bottom <= u.bottom + 1; }).length,
+        lines: document.getElementById('cards').dataset.density === 'compact' ? 0 : Number(getComputedStyle(document.getElementById('cards')).getPropertyValue('--preview-lines')) }; })()`);
+    const zBefore = await shown();
     for (let i = 0; i < 2; i++) {
       lw.webContents.sendInputEvent({ type: 'mouseWheel', x: Math.round(lBox.width / 2), y: Math.round(lBox.height / 2), deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
       await wait(150);
     }
     await wait(300);
     const lz = await lj(`({ zoom: Number(document.getElementById('cards').style.zoom || 1), title: document.querySelector('#cards .card-title').getBoundingClientRect().height, badge: document.querySelector('.zoom-badge')?.textContent ?? '', saved: localStorage.getItem('memoking.listZoom') })`);
+    const zAfter = await shown();
+    const bigger = lz.zoom > 1;
     check('메모 목록 Ctrl+휠 → 카드 글자가 배율만큼 커지거나 작아지고(창 전체 확대는 아님), 배율을 기억',
       lz.zoom !== 1 && Math.abs(lz.title / title0 - lz.zoom) < 0.08 && lw.webContents.getZoomFactor() === 1 && /메모 \d+%/.test(lz.badge) && Number(lz.saved) === lz.zoom, JSON.stringify({ lz, title0 }));
+    check('목록 확대하면 한 화면의 카드 수는 줄고 카드 안 내용(요약 줄)은 같거나 늘며, 축소하면 반대',
+      bigger ? zAfter.full <= zBefore.full && zAfter.lines >= zBefore.lines : zAfter.full >= zBefore.full && zAfter.lines <= zBefore.lines, JSON.stringify({ zoom: lz.zoom, zBefore, zAfter }));
     await lj(`document.querySelector('.zoom-badge button').click()`);
     // 팝업 알림을 어떤 방법으로 읽었는지 남김 (UI 자동화로 읽은 김대리 알림 = uia)
     const viaUia = history.list({ query: '김대리' }).find((e) => e.source === 'popup')?.via;

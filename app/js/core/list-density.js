@@ -18,13 +18,15 @@ const THUMB_MIN = 48;
 /**
  * @param {{ width: number, height: number }} area 카드 목록의 안쪽 크기(px, 여백 뺀)
  * @param {number} count 보여 줄 메모 수
+ * @param {number} minVisible 한 화면에 보일 메모 수 (목록 확대·축소: 확대하면 적게 → 카드마다 내용을 더, 축소하면 많이)
  * @returns {{ mode: 'roomy'|'preview'|'compact', cols: number, previewLines: number, thumbHeight: number, perCard: number, fill: boolean }}
  */
-export function chooseDensity({ width, height }, count = MIN_VISIBLE) {
+export function chooseDensity({ width, height }, count = MIN_VISIBLE, minVisible = MIN_VISIBLE) {
+  const visible = Math.max(1, Math.round(minVisible) || 1);
   const n = Math.max(1, Math.round(count) || 1);
   const cols = Math.min(width >= 980 ? 3 : width >= 640 ? 2 : 1, n); // 메모가 열보다 적으면 열을 줄인다
-  const fill = n <= MIN_VISIBLE;
-  const rows = Math.ceil((fill ? n : MIN_VISIBLE) / cols);
+  const fill = n <= visible;
+  const rows = Math.ceil((fill ? n : visible) / cols);
   const perCard = Math.floor((height - GAP * (rows - 1)) / rows);
   const thumbMax = fill ? 260 : 140;
   if (perCard >= BASE + 2 * LINE + THUMB_GAP + THUMB_MIN) {

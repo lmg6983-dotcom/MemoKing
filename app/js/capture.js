@@ -1,44 +1,18 @@
 // 영역 캡처 오버레이 — 메인 프로세스가 찍어 준 화면 위에서 끌어 사각형을 고른다.
 // 좌표는 이 모니터 기준 화면 좌표(창 = 모니터 전체). 자르기는 메인이 원래 해상도로 한다.
-// 자동(드래그로 선택한 내용이 있을 때): 고르지 않고 그 사각형에 테두리 → 반짝 + 찰칵 → 바로 캡처.
-import { shutter } from './shutter.js';
-
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
 const sel = $('sel');
 const size = $('size');
 let start = null;
 let done = false;
-let auto = false;
-const AUTO_MS = 650; // 테두리가 자리 잡고 반짝인 뒤 캡처
 
-api.on('capture:image', ({ src, auto: rect, hint }) => {
-  auto = Boolean(rect);
-  if (hint && !rect) $('hint').textContent = `${hint} · 취소는 Esc`; // 선택한 곳을 찾지 못해 직접 고르는 까닭
-  if (auto) document.body.classList.add('auto', 'selecting');
+api.on('capture:image', ({ src }) => {
   $('shot').onload = () => {
     document.documentElement.dataset.ready = 'true';
-    if (rect) autoCapture(rect);
   };
   $('shot').src = src;
 });
-
-function autoCapture(rect) {
-  $('hint').textContent = '선택한 내용을 캡처해요';
-  draw(rect);
-  sel.classList.add('auto');
-  // 테두리가 자리 잡으면 반짝 + 찰칵
-  setTimeout(() => {
-    if (done) return;
-    sel.classList.add('flash');
-    shutter();
-  }, 260);
-  setTimeout(() => {
-    if (done) return;
-    done = true;
-    api.capture.done(rect);
-  }, AUTO_MS);
-}
 
 function rectOf(e) {
   const x = Math.min(start.x, e.clientX);
@@ -60,14 +34,14 @@ function cancel() {
 }
 
 window.addEventListener('mousedown', (e) => {
-  if (done || auto) return;
+  if (done) return;
   if (e.button !== 0) return cancel(); // 오른쪽 클릭 = 취소
   start = { x: e.clientX, y: e.clientY };
   document.body.classList.add('selecting');
   draw({ x: start.x, y: start.y, width: 0, height: 0 });
 });
 window.addEventListener('mousemove', (e) => {
-  if (start && !done && !auto) draw(rectOf(e));
+  if (start && !done) draw(rectOf(e));
 });
 window.addEventListener('mouseup', (e) => {
   if (!start || done) return;
