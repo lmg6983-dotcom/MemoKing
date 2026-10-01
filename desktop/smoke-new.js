@@ -6,6 +6,7 @@ import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 const SMOKE_DIR = path.join(os.tmpdir(), 'memoking-smoke');
 const VAULT = path.join(SMOKE_DIR, 'vault');
@@ -28,6 +29,38 @@ function popupHtml(lines, { canvas = false } = {}) {
       </script>`
     : `<div style="font:700 16px 'Malgun Gothic';padding:12px 14px 2px">${lines[0]}</div><div style="font:15px 'Malgun Gothic';padding:0 14px">${lines[1]}</div>`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><title></title><body style="margin:0;background:#fff">${body}</body>`)}`;
+}
+
+// PDF 의 글자 확인: 들어 있는 글꼴 이름, 글자 표(ToUnicode)로 고를 수 있는 글자들
+// (글꼴 정보·글자 표가 압축된 스트림에 있을 수 있어 풀어서 함께 본다. 가변 글꼴(Pretendard)은 Type3 글자 모양으로 들어가 /FontFile 이 없을 수 있다)
+function pdfText(buf) {
+  const raw = buf.toString('latin1');
+  const parts = [raw];
+  for (const m of raw.matchAll(/(?<!end)stream\r?\n/g)) {
+    const from = m.index + m[0].length;
+    const to = raw.indexOf('endstream', from);
+    if (to < 0) continue;
+    try {
+      parts.push(zlib.inflateSync(buf.subarray(from, to)).toString('latin1'));
+    } catch {
+      // 압축되지 않았거나 그림 등
+    }
+  }
+  const all = parts.join('\n');
+  const fonts = [...all.matchAll(/\/(?:BaseFont|FontName)\s*\/([^\s/<>\[\]()]+)/g)].map((m) => m[1].replace(/^[A-Z]{6}\+/, ''));
+  const chars = new Set();
+  const hex = (h) => parseInt(h, 16);
+  const unit = (h) => String.fromCodePoint(...(h.match(/.{4}/g) ?? []).map(hex));
+  for (const [, body] of all.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) {
+    for (const [, , dst] of body.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g)) chars.add(unit(dst));
+  }
+  for (const [, body] of all.matchAll(/beginbfrange([\s\S]*?)endbfrange/g)) {
+    for (const [, lo, hi, dst, list] of body.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*(?:<([0-9a-fA-F]+)>|\[([^\]]*)\])/g)) {
+      if (list) for (const [, d] of list.matchAll(/<([0-9a-fA-F]+)>/g)) chars.add(unit(d));
+      else for (let i = 0; i <= hex(hi) - hex(lo); i++) chars.add(String.fromCodePoint(hex(dst) + i));
+    }
+  }
+  return { fonts, chars };
 }
 
 export async function runSmoke({ noteWins, getVault, createListWindow, getList, createPopupWatcher, getHistory, smokePdf, getPdfWin }) {
@@ -193,6 +226,11 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     const mm = (pt) => (Number(pt) * 25.4) / 72;
     const previewPages = Number(/(\d+)쪽$/.exec(s2)?.[1]);
     check('PDF 파일: 쪽 크기 160 × 90mm, 여러 쪽 — 미리보기의 쪽 수와 실제 PDF 쪽 수가 같음', box && Math.abs(mm(box[1]) - 160) < 1 && Math.abs(mm(box[2]) - 90) < 1 && pages >= 2 && previewPages === pages, JSON.stringify({ box: box?.slice(1), pages, previewPages }));
+    // 글자: 한글 글꼴이 PDF 에 들어 있고, 그림이 아니라 고를 수 있는 글자(글자 표에 제목·본문·표의 한글이 모두 있음)
+    const text = fs.existsSync(file) ? pdfText(fs.readFileSync(file)) : { fonts: [], chars: new Set() };
+    const want = [...'분기회의록참석김대리박과장항목담당예산일정논의한내용'];
+    const missing = want.filter((c) => !text.chars.has(c));
+    check('PDF 글자: 한글 글꼴(Pretendard)로, 제목·본문·표의 한글을 글자로 고를 수 있음', text.fonts.some((f) => /pretendard/i.test(f)) && missing.length === 0, JSON.stringify({ fonts: [...new Set(text.fonts)], missing: missing.join('') }));
     const closed = await until(() => !getPdfWin(), '저장 뒤 창 닫힘').then(() => true).catch(() => false);
     check('저장하면 "N쪽 PDF로 저장했어요" 뒤 창이 닫힘', closed);
     // A4 로도 (메모 창 메뉴에서)
