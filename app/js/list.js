@@ -672,6 +672,8 @@ let listZoomTimer = 0;
 function setListZoom(z, { show = true } = {}) {
   listZoom = clampZoom(z);
   el.cards.style.zoom = listZoom === 1 ? '' : String(listZoom);
+  // 제목 글자는 확대해도 100% 크기(줄 높이 22px)보다 커지지 않게 — 확대 배율만큼 되돌려 줄인다 (축소할 때는 함께 작아짐)
+  el.cards.style.setProperty('--title-cap', String(listZoom > 1 ? 1 / listZoom : 1));
   document.body.dataset.listZoom = String(listZoom);
   try {
     if (listZoom === 1) localStorage.removeItem(LIST_ZOOM_KEY);

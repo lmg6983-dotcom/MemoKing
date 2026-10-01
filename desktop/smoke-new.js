@@ -7,6 +7,7 @@
 //            v0.17.4 — H1·H2 버튼 대신 스타일 고르기 · 좁은 메모 창에서도 표 막대 버튼이 모두 보임 · 목록 Ctrl+휠 확대
 //                      · 팝업 알림 글자를 접근성(MSAA)·자식 창에서도
 //            v0.17.6 — 선택 영역 자동 캡처·스크롤 캡처 삭제 · 목록 확대할수록 카드 수는 줄고 카드 안 내용은 늘게
+//            v0.17.7 — 목록 확대해도 카드 제목은 22px 넘게 커지지 않음
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
@@ -461,8 +462,10 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     const lz = await lj(`({ zoom: Number(document.getElementById('cards').style.zoom || 1), title: document.querySelector('#cards .card-title').getBoundingClientRect().height, badge: document.querySelector('.zoom-badge')?.textContent ?? '', saved: localStorage.getItem('memoking.listZoom') })`);
     const zAfter = await shown();
     const bigger = lz.zoom > 1;
-    check('메모 목록 Ctrl+휠 → 카드 글자가 배율만큼 커지거나 작아지고(창 전체 확대는 아님), 배율을 기억',
-      lz.zoom !== 1 && Math.abs(lz.title / title0 - lz.zoom) < 0.08 && lw.webContents.getZoomFactor() === 1 && /메모 \d+%/.test(lz.badge) && Number(lz.saved) === lz.zoom, JSON.stringify({ lz, title0 }));
+    // 제목은 확대해도 100% 크기(22px)보다 커지지 않고, 축소하면 함께 작아진다
+    const titleOk = lz.zoom > 1 ? Math.abs(lz.title - title0) <= 1 && lz.title <= 22.5 : Math.abs(lz.title / title0 - lz.zoom) < 0.08;
+    check('메모 목록 Ctrl+휠 → 카드만 확대·축소(창 전체 확대는 아님), 제목은 22px 넘게 커지지 않음, 배율을 기억',
+      lz.zoom !== 1 && titleOk && lw.webContents.getZoomFactor() === 1 && /메모 \d+%/.test(lz.badge) && Number(lz.saved) === lz.zoom, JSON.stringify({ lz, title0 }));
     check('목록 확대하면 한 화면의 카드 수는 줄고 카드 안 내용(요약 줄)은 같거나 늘며, 축소하면 반대',
       bigger ? zAfter.full <= zBefore.full && zAfter.lines >= zBefore.lines : zAfter.full >= zBefore.full && zAfter.lines <= zBefore.lines, JSON.stringify({ zoom: lz.zoom, zBefore, zAfter }));
     await lj(`document.querySelector('.zoom-badge button').click()`);
