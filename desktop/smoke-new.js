@@ -10,6 +10,7 @@
 //            v0.17.7 — 목록 확대해도 카드 제목은 22px 넘게 커지지 않음
 //            v0.17.8 — 목록 확대할수록 카드 안 요약 줄이 더 많이 (사진은 같은 크기, 최대 175%)
 //            v0.17.9 — 목록 확대해도 카드 안 모든 글자는 화면 22px 이하 · 마우스를 올리면 뜨는 버튼 묶음은 100% 크기
+//            v0.17.10 — 요약·스탬프·버튼 묶음도 제목을 따라 (확대해도 100% 크기, 축소하면 함께 작아짐)
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
@@ -458,6 +459,11 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     const zBefore = await shown();
     const btnW = () => lj(`(() => { const b = document.querySelector('#cards .card-actions button'); return b ? b.getBoundingClientRect().width : 0; })()`);
     const btn0 = await btnW();
+    // 제목·요약·스탬프의 화면 글자 크기 (확대 배율을 곱한 값)
+    const shownFonts = () => lj(`(() => { const z = Number(document.getElementById('cards').style.zoom) || 1;
+      const f = (s) => { const e = document.querySelector('#cards ' + s); return e ? parseFloat(getComputedStyle(e).fontSize) * z : 0; };
+      return { title: f('.card-title'), preview: f('.card-preview'), stamp: f('.card-stamp') }; })()`);
+    const f0 = await shownFonts();
     for (let i = 0; i < 2; i++) {
       lw.webContents.sendInputEvent({ type: 'mouseWheel', x: Math.round(lBox.width / 2), y: Math.round(lBox.height / 2), deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
       await wait(150);
@@ -469,7 +475,11 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     // 카드 안 글자의 화면 크기 (확대 배율을 곱한 값)
     const fontsMax = await lj(`(() => { const z = Number(document.getElementById('cards').style.zoom) || 1;
       return Math.max(...['.card-title', '.card-preview', '.card-stamp', '.card-tag', '.card-meta'].flatMap((s) => [...document.querySelectorAll('#cards ' + s)].map((e) => parseFloat(getComputedStyle(e).fontSize) * z))); })()`);
-    check('목록을 확대해도 카드 안 모든 글자는 화면 22px 이하, 마우스를 올리면 뜨는 버튼 묶음은 100% 크기 그대로', fontsMax <= 22.05 && Math.abs(btn1 - btn0) <= 1, JSON.stringify({ zoom: lz.zoom, fontsMax, btn0, btn1 }));
+    const f1 = await shownFonts();
+    // 확대: 제목·요약·스탬프·버튼은 100% 크기 그대로 / 축소: 배율만큼 함께 작아짐 (모양이 촘촘↔보통으로 바뀌면 제목은 14.5↔15px)
+    const k = Math.min(1, lz.zoom);
+    const follows = Math.abs(f1.preview - f0.preview * k) <= 0.6 && Math.abs(f1.stamp - f0.stamp * k) <= 0.6 && Math.abs(f1.title - f0.title * k) <= 0.8 && Math.abs(btn1 - btn0 * k) <= 1.5;
+    check('요약·스탬프·버튼 묶음은 제목을 따라: 확대해도 100% 크기, 축소하면 함께 작아짐 (카드 안 글자는 모두 22px 이하)', follows && fontsMax <= 22.05, JSON.stringify({ zoom: lz.zoom, f0, f1, btn0, btn1, fontsMax }));
     const bigger = lz.zoom > 1;
     // 제목은 확대해도 100% 크기(22px)보다 커지지 않고, 축소하면 함께 작아진다
     const titleOk = lz.zoom > 1 ? Math.abs(lz.title - title0) <= 1 && lz.title <= 22.5 : Math.abs(lz.title / title0 - lz.zoom) < 0.08;
