@@ -921,7 +921,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     key: new PluginKey('memoking-paste'),
     props: {
       // 복사·끌기: 서식 없는 곳에 붙일 "일반 글자"는 마크다운(\ 이스케이프가 섞임)이 아니라 읽는 글로 (Milkdown 클립보드보다 먼저)
-      clipboardTextSerializer: (slice) => plainTextOf(slice.content),
+      clipboardTextSerializer: (slice) => plainTextOf(slice.content, { openStart: slice.openStart, openEnd: slice.openEnd }),
       transformPastedHTML: (html) => revealLazyImages(normalizePastedTables(html)),
       handlePaste(v, event) {
         const data = event.clipboardData;

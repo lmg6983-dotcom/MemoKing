@@ -983,61 +983,56 @@ body.mk-row-resizing { user-select: none; }
 .table-bar { flex-wrap: wrap; row-gap: 2px; overflow-x: visible; }
 .table-bar button { flex: none; }
 
-/* ---------- v0.17.13: 목록·체크리스트 항목 끌어서 순서 바꾸기 ---------- */
+/* ---------- v0.17.14: 목록·체크리스트 항목 — 글자를 잠깐 누르고 끌어서 순서 바꾸기 ---------- */
 .mk-doc li { position: relative; }
-.mk-drag-handle {
-  position: absolute;
-  left: calc(-1.35em - 16px);
-  top: 0.18em;
-  width: 12px;
-  height: 1.3em;
-  border-radius: 3px;
-  cursor: grab;
-  opacity: 0;
-  transition: opacity 0.12s;
-  user-select: none;
-  /* 점 여섯 개 (⠿) */
-  background: radial-gradient(circle, var(--note-muted) 1.2px, transparent 1.4px) 0 0 / 6px 6px;
-  background-position: 0 2px;
+.mk-doc .mk-sorting > li { transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* 들어 올린 항목: 그림자 + 살짝 크게, 바뀔 자리로 미끄러진다 */
+.mk-doc li.mk-lift {
+  z-index: 3;
+  border-radius: 6px;
+  background: var(--note-bg);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18), 0 0 0 1.5px var(--note-accent, #ffcd00);
+  cursor: grabbing;
 }
-.mk-doc li:hover:not(:has(li:hover)) > .mk-drag-handle { opacity: 0.75; }
-.mk-drag-handle:hover { opacity: 1 !important; background-color: var(--note-hover); }
+.mk-doc li.mk-lift > p { animation: mk-lift-in 0.18s ease-out both; }
+@keyframes mk-lift-in { from { transform: scale(1); } 50% { transform: scale(1.03); } to { transform: scale(1.015); } }
+/* 맞바꿀 항목 */
+.mk-doc li.mk-swap-target { border-radius: 6px; outline: 2px dashed var(--note-accent, #ffcd00); outline-offset: 1px; background: var(--note-hover); }
 .mk-list-dragging, .mk-list-dragging * { cursor: grabbing !important; user-select: none !important; }
-.mk-drag-source { opacity: 0.45; }
-.mk-drop-line { position: fixed; z-index: 50; height: 2px; border-radius: 2px; background: var(--note-accent, #ffcd00); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); pointer-events: none; }
+.mk-list-dragging ::selection { background: transparent !important; } /* 끄는 동안 글자 선택 표시는 숨김 */
+.mk-drop-line { position: fixed; z-index: 50; height: 3px; border-radius: 2px; background: var(--note-accent, #ffcd00); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); pointer-events: none; }
 .mk-drop-line[hidden] { display: none; }
 
 /* 체크 폭죽 (canvas-confetti) */
 .mk-confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 60; pointer-events: none; }
 
-/* 모든 체크리스트를 끝내면 CLEAR 도장 */
+/* 모든 체크리스트를 끝내면 CLEAR 도장 — 메모 본문 정중앙에 반투명 (글을 가리지 않게, 눌리지 않음) */
 .clear-stamp {
   position: fixed;
-  right: 18px;
   z-index: 5;
-  padding: 3px 12px 2px;
-  border: 3px double #e5484d;
-  border-radius: 8px;
+  padding: 6px 22px 4px;
+  border: 5px double #e5484d;
+  border-radius: 14px;
   color: #e5484d;
-  font-size: 22px;
+  font-size: 46px;
   font-weight: 900;
-  letter-spacing: 0.12em;
-  line-height: 1.2;
-  transform: rotate(-12deg);
-  opacity: 0.82;
+  letter-spacing: 0.14em;
+  line-height: 1.15;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  opacity: 0.26;
   pointer-events: none;
-  mix-blend-mode: multiply;
+  white-space: nowrap;
 }
-body[data-color="charcoal"] .clear-stamp { mix-blend-mode: normal; color: #ff8b8f; border-color: #ff8b8f; }
+body[data-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.32; }
 .clear-stamp[hidden] { display: none; }
-.clear-stamp.stamp-in { animation: clear-stamp-in 0.42s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.clear-stamp.stamp-in { animation: clear-stamp-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 @keyframes clear-stamp-in {
-  0% { transform: rotate(-12deg) scale(2.4); opacity: 0; }
-  60% { transform: rotate(-12deg) scale(0.92); opacity: 0.9; }
-  100% { transform: rotate(-12deg) scale(1); opacity: 0.82; }
+  0% { transform: translate(-50%, -50%) rotate(-14deg) scale(2.4); opacity: 0; }
+  60% { transform: translate(-50%, -50%) rotate(-14deg) scale(0.94); opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) rotate(-14deg) scale(1); opacity: 0.26; }
 }
 @media (prefers-reduced-motion: reduce) {
   .clear-stamp.stamp-in { animation: none; }
-  .mk-drag-handle { transition: none; }
+  .mk-doc .mk-sorting > li, .mk-doc li.mk-lift > p { transition: none; animation: none; }
 }
-@media print { .mk-drag-handle, .clear-stamp { display: none !important; } }
+@media print { .clear-stamp { display: none !important; } }

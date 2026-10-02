@@ -938,8 +938,11 @@ clearStamp.setAttribute('role', 'status');
 clearStamp.setAttribute('aria-label', '체크리스트를 모두 끝냈어요');
 clearStamp.hidden = true;
 document.body.append(clearStamp);
+// 메모 본문(편집 영역)의 정중앙
 const placeClearStamp = () => {
-  clearStamp.style.top = `${Math.round(el.editorRoot.getBoundingClientRect().top + 10)}px`;
+  const r = el.editorRoot.getBoundingClientRect();
+  clearStamp.style.left = `${Math.round(r.left + r.width / 2)}px`;
+  clearStamp.style.top = `${Math.round(r.top + r.height / 2)}px`;
 };
 new ResizeObserver(() => {
   if (!clearStamp.hidden) placeClearStamp();

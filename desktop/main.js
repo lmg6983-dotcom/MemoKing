@@ -20,6 +20,8 @@ import { PopupWatcher } from './popup-watch.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
 import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY } from '../app/js/core/magic-modules.js';
+import { searchMemos } from '../app/js/core/memo-search.js';
+import { FileIndex } from './file-index.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -80,6 +82,7 @@ let settings = {
   listOnTop: false, // 목록 창도 다른 창보다 늘 위에
   fitTables: true, // 표가 메모 본문보다 넓으면 메모를 줄여 맞추고, 더 못 줄이면 창을 넓힌다
   magic: undefined, // 매직키 (Ctrl+Alt+Space): { enabled, modules } — normalizeMagicSettings 로 정리
+  magicPos: null, // 매직키 창을 끌어 옮긴 자리 { x, y }
 };
 let settingsTimer = null;
 
@@ -1499,6 +1502,7 @@ function appSettings() {
     quickMemo: { enabled: settings.quickMemo, registered: globalShortcut.isRegistered(QUICK_MEMO_KEY), key: 'Ctrl+Alt+C' },
     fitTables: settings.fitTables !== false,
     magic: normalizeMagicSettings(settings.magic),
+    magicIndex: fileIndex?.status() ?? null, // 파일 검색 목록: 개수·만든 때
     version: app.getVersion(),
   };
 }
@@ -1540,6 +1544,13 @@ function createMagicWindow() {
   win.setAlwaysOnTop(true, 'screen-saver');
   win.loadFile(path.join(APP_DIR, 'magic.html'));
   win.on('blur', () => win.hide()); // 밖을 누르면 닫힌다
+  // 끌어 옮긴 자리는 기억해 다음에도 그 자리에
+  win.on('moved', () => {
+    if (!win.isVisible()) return;
+    const [x, y] = win.getPosition();
+    settings.magicPos = { x, y };
+    saveSettings();
+  });
   win.on('closed', () => { if (magicWin === win) magicWin = null; });
   return win;
 }
@@ -1547,14 +1558,46 @@ function createMagicWindow() {
 function showMagic() {
   if (!vault) { createListWindow(); return; } // 메모 폴더가 아직 없으면 목록부터
   magicWin ??= createMagicWindow();
-  const point = screen.getCursorScreenPoint();
-  const area = screen.getDisplayNearestPoint(point).workArea;
-  const [w, h] = magicWin.getSize();
-  magicWin.setPosition(Math.round(area.x + (area.width - w) / 2), Math.round(area.y + area.height * 0.22));
+  const [w] = magicWin.getSize();
+  const saved = settings.magicPos;
+  // 끌어 옮긴 자리가 지금 화면 안이면 그 자리, 아니면 마우스가 있는 화면 위쪽 가운데
+  const onScreen = saved && screen.getAllDisplays().some((d) => {
+    const a = d.workArea;
+    return saved.x >= a.x - 40 && saved.x + 80 <= a.x + a.width && saved.y >= a.y - 10 && saved.y + 40 <= a.y + a.height;
+  });
+  if (onScreen) magicWin.setPosition(Math.round(saved.x), Math.round(saved.y));
+  else {
+    const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+    magicWin.setPosition(Math.round(area.x + (area.width - w) / 2), Math.round(area.y + area.height * 0.22));
+  }
   magicWin.show();
   magicWin.focus();
   magicWin.webContents.send('magic:show');
+  fileIndex?.touch(); // 오래됐으면 파일 목록을 뒤에서 새로
 }
+
+// 파일 검색 모듈이 켜져 있으면 파일 이름 목록을 만들어 두고 주기적으로 새로 고친다
+let fileIndex = null;
+function syncFileIndex() {
+  const on = !SMOKE && activeModules(settings.magic).some((m) => m.id === 'files');
+  if (on) {
+    fileIndex ??= new FileIndex({ cacheFile: path.join(app.getPath('userData'), 'file-index.json') });
+    fileIndex.start();
+  } else fileIndex?.stop();
+}
+
+// 파일 아이콘 (확장자마다 한 번, 프로그램·바로 가기·폴더는 그 파일 것)
+const iconCache = new Map();
+async function fileIcon(p, isDir) {
+  const ext = path.extname(p).toLowerCase();
+  const key = isDir ? 'dir' : /^\.(exe|lnk|url|ico|appref-ms)$/.test(ext) ? p : ext || 'none';
+  if (!iconCache.has(key)) {
+    iconCache.set(key, app.getFileIcon(p, { size: 'normal' }).then((img) => img.toDataURL()).catch(() => ''));
+    if (iconCache.size > 800) iconCache.delete(iconCache.keys().next().value);
+  }
+  return iconCache.get(key);
+}
+let lastFileResults = new Set(); // 매직키 창이 열 수 있는 파일 = 방금 찾아 보여 준 것만
 
 function registerMagicKey() {
   globalShortcut.unregister(MAGIC_KEY);
@@ -1568,6 +1611,7 @@ function setMagicSettings(next) {
   settings.magic = normalizeMagicSettings(next);
   saveSettings();
   registerMagicKey();
+  syncFileIndex();
   if (!settings.magic.enabled && magicWin && !magicWin.isDestroyed()) magicWin.hide();
   return settings.magic;
 }
@@ -1844,6 +1888,42 @@ function registerIpc() {
   ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings(next));
   ipcMain.handle('magic:modules', () => activeModules(settings.magic));
   ipcMain.on('magic:close', () => { if (magicWin && !magicWin.isDestroyed()) magicWin.hide(); });
+  // 입력하는 대로: 메모(제목·내용)와 파일(이름)을 찾는다
+  ipcMain.handle('magic:search', async (_e, query) => {
+    const mods = new Set(activeModules(settings.magic).map((m) => m.id));
+    const q = String(query ?? '').slice(0, 200);
+    const notes = mods.has('notes') && vault ? searchMemos(vault.searchable(), q, 5) : [];
+    let files = [];
+    if (mods.has('files') && fileIndex && q.trim().length >= 1) {
+      files = fileIndex.search(q, 7);
+      lastFileResults = new Set(files.map((f) => f.path));
+      files = await Promise.all(files.map(async (f) => ({ ...f, icon: await fileIcon(f.path, f.isDir) })));
+    }
+    return { notes, files, index: fileIndex?.status() ?? null };
+  });
+  ipcMain.handle('magic:open-memo', (_e, id) => {
+    if (!vault?.get(String(id))) return false;
+    magicWin?.hide();
+    revealNote(String(id));
+    return true;
+  });
+  ipcMain.handle('magic:open-file', async (_e, { path: p, reveal } = {}) => {
+    if (!lastFileResults.has(p) || !fs.existsSync(p)) return false; // 방금 보여 준 결과만
+    magicWin?.hide();
+    if (reveal) shell.showItemInFolder(p);
+    else {
+      const err = await shell.openPath(p);
+      if (err) notice('열지 못했어요', err);
+    }
+    return true;
+  });
+  // 결과 목록 높이에 맞춰 창 높이를 바꾼다 (위치는 그대로)
+  ipcMain.on('magic:resize', (_e, h) => {
+    if (!magicWin || magicWin.isDestroyed()) return;
+    const height = Math.max(120, Math.min(640, Math.round(Number(h) || 0)));
+    const [w, cur] = magicWin.getSize();
+    if (cur !== height) magicWin.setSize(w, height);
+  });
   ipcMain.handle('magic:run', (_e, payload) => {
     const mods = activeModules(settings.magic);
     if (!vault || payload?.module !== 'memo' || !mods.some((m) => m.id === 'memo')) return { ok: false };
@@ -2259,6 +2339,7 @@ app.whenReady().then(async () => {
   alarms.start(); // 날짜·시간·반복·타이머 알림 (놓친 것 포함)
   registerQuickMemoKey(); // Ctrl+Alt+C 빠른 메모
   registerMagicKey(); // Ctrl+Alt+Space 매직키
+  syncFileIndex(); // 매직키 파일 검색 목록
   updateTrayMenu();
   // 튜토리얼을 마치기 전에 껐다 켰으면 다시 (자동 실행으로 조용히 켜질 때는 제외)
   if (vault && !settings.tutorialDone && !HIDDEN_START) startTutorial();

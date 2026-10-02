@@ -2,6 +2,7 @@
 // Milkdown 은 여기에 마크다운 원문을 넣어 \* · 1\. · \[ 같은 이스케이프(\)가 섞여 붙는다. 사람이 읽는 글로 바꾼다:
 //   문단·제목은 한 줄씩, 칸 안 줄바꿈은 줄바꿈, 목록은 "• " · "1. " · "☐ "/"☑ ", 표는 칸 사이 탭(엑셀에 붙이면 칸이 나뉨),
 //   링크 카드는 주소, 사진·소리·동영상은 빼고, 가로줄은 "———".
+//   목록 항목을 일부만 끌어 골라 복사하면 체크 네모·글머리 없이 글만.
 // 서식 있는 곳(워드·메모킹)에는 함께 들어가는 HTML 이 쓰인다.
 
 const isBreak = (node) => node.type.name === 'hardbreak' || node.type.name === 'hard_break'
@@ -19,11 +20,24 @@ function inlineText(node, breakAs = '\n') {
   return s;
 }
 
+// 고른 범위가 목록 항목의 중간에서 시작하거나 끝나는가 (slice 의 열린 가장자리에 항목이 있는가)
+function cutsIntoItem(fragment, open, side) {
+  let node = side === 'start' ? fragment.firstChild : fragment.lastChild;
+  for (let d = 0; d < open && node; d++) {
+    if (node.type.name === 'list_item') return true;
+    node = side === 'start' ? node.firstChild : node.lastChild;
+  }
+  return false;
+}
+
 /**
  * @param {import('prosemirror-model').Fragment} fragment 복사한 조각(slice.content)
+ * @param {{ openStart?: number, openEnd?: number }} [open] slice 의 열린 깊이 — 목록 항목을 일부만 골랐으면
+ *   체크 네모(☐/☑)·글머리(• 1.) 없이 글만 (Ctrl+A 처럼 통째로 복사할 때만 목록 모양을 붙인다)
  * @returns {string}
  */
-export function plainTextOf(fragment) {
+export function plainTextOf(fragment, { openStart = 0, openEnd = 0 } = {}) {
+  const partial = cutsIntoItem(fragment, openStart, 'start') || cutsIntoItem(fragment, openEnd, 'end');
   const lines = [];
   let run = ''; // 문단 일부만 고른 경우처럼 글이 맨 바깥에 바로 있을 때
   const flush = () => {
@@ -45,11 +59,11 @@ export function plainTextOf(fragment) {
       let n = Number(node.attrs.order ?? 1) || 1;
       node.forEach((item) => {
         const checked = item.attrs?.checked;
-        const mark = checked === true ? '☑ ' : checked === false ? '☐ ' : name === 'ordered_list' ? `${n}. ` : '• ';
+        const mark = partial ? '' : checked === true ? '☑ ' : checked === false ? '☐ ' : name === 'ordered_list' ? `${n}. ` : '• ';
         n++;
         let first = true;
         item.forEach((child) => {
-          if (child.type.name === 'bullet_list' || child.type.name === 'ordered_list') block(child, `${indent}  `);
+          if (child.type.name === 'bullet_list' || child.type.name === 'ordered_list') block(child, partial ? indent : `${indent}  `);
           else {
             block(child, first ? indent + mark : indent + ' '.repeat(mark.length));
             first = false;

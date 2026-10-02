@@ -399,6 +399,7 @@ async function loadSettings() {
   $('auto-start-note').textContent = s.autoStart.available ? '작업 표시줄 알림 영역에서 조용히 시작해요' : '설치한 메모킹에서 쓸 수 있어요';
   $('history-enabled').checked = s.historyEnabled;
   $('fit-tables').checked = s.fitTables !== false;
+  magicIndex = s.magicIndex ?? null;
   showMagic(s.magic);
   showQuickMemo(s.quickMemo);
   $('trash-days').value = String(s.trashDays);
@@ -420,6 +421,8 @@ $('fit-tables').addEventListener('change', async (e) => {
 
 // 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)
 let magicState = { enabled: true, modules: {} };
+let magicIndex = null; // 파일 검색 목록 상태 { count, builtAt, building }
+const indexNote = (st) => (!st ? '' : st.building && !st.count ? ' · 파일 목록을 만드는 중…' : st.count ? ` · 파일 ${st.count.toLocaleString('ko-KR')}개${st.building ? ' (새로 고치는 중)' : ''}` : '');
 function renderMagicModules() {
   const list = $('magic-modules-list');
   list.replaceChildren(...MAGIC_MODULES.map((m) => {
@@ -435,7 +438,15 @@ function renderMagicModules() {
       renderMagicModules();
     });
     const text = document.createElement('span');
-    text.innerHTML = `${m.name}${m.ready ? '' : ' <em>(준비 중)</em>'} <small>${m.description}</small>`;
+    text.append(m.name);
+    if (!m.ready) {
+      const em = document.createElement('em');
+      em.textContent = ' (준비 중)';
+      text.append(em);
+    }
+    const small = document.createElement('small');
+    small.textContent = m.description + (m.id === 'files' && cb.checked ? indexNote(magicIndex) : '');
+    text.append(' ', small);
     row.append(cb, text);
     return row;
   }));

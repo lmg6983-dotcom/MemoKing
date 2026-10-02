@@ -14,6 +14,7 @@
 //            v0.17.11 — 목록 확대·축소 = 얼마나 자세히 보기 단계 (역행 없음) · 메모 글 복사에 \ 가 섞이지 않음
 //            v0.17.12 — 카카오톡 등 알림 창 그림 글자를 한글에 강한 tesseract.js(한글 best)로 읽음 (숨은 OCR 창, memoking://ocr)
 //            v0.17.13 — 체크리스트 여러 줄 적용·항목 끌어 옮기기·체크 폭죽·모두 끝내면 CLEAR 도장 · 표 넘치면 메모 줄여 맞추기 · 매직키(Ctrl+Alt+Space)
+//            v0.17.14 — 글자를 잠깐 눌러 끌기(가운데=맞바꿈, 사이=끼움, 미리 보기) · CLEAR 도장 정중앙 반투명 · 매직키 창 옮기기·메모/파일 검색 · 체크리스트 일부 복사에 네모 없음
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, clipboard, screen } from 'electron';
 import fs from 'node:fs';
@@ -544,9 +545,21 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     await js(cw, `(() => { const d = document.querySelector('.mk-doc'); d.focus(); const r = document.createRange(); r.selectNodeContents(d); getSelection().removeAllRanges(); getSelection().addRange(r); document.querySelector('[data-cmd="task"]').click(); })()`);
     await wait(200);
     const boxes = await js(cw, `document.querySelectorAll('.mk-doc li[data-item-type="task"]').length`);
-    const handles = await js(cw, `document.querySelectorAll('.mk-doc .mk-drag-handle').length`);
     check('체크리스트를 여러 줄 선택에 적용하면 줄마다 체크 네모 (맨 위 하나만 X)', boxes === 3, `boxes=${boxes}`);
-    check('목록·체크리스트 항목마다 끌어 옮기는 손잡이', handles === 3, `handles=${handles}`);
+    // v0.17.14: 첫째 글자를 잠깐 누른 뒤 셋째 가운데로 끌면 미리 보기(바뀔 자리) → 놓으면 맞바뀜
+    const pts = await js(cw, `[...document.querySelectorAll('.mk-doc li > p')].map((p) => { const r = p.getBoundingClientRect(); return { x: Math.round(r.left + 20), y: Math.round(r.top + r.height / 2) }; })`);
+    cw.webContents.sendInputEvent({ type: 'mouseDown', x: pts[0].x, y: pts[0].y, button: 'left', clickCount: 1 });
+    await wait(400);
+    for (let i = 1; i <= 6; i++) {
+      cw.webContents.sendInputEvent({ type: 'mouseMove', x: pts[0].x, y: Math.round(pts[0].y + ((pts[2].y - pts[0].y) * i) / 6), button: 'left' });
+      await wait(40);
+    }
+    await wait(250);
+    const preview = await js(cw, `({ lift: !!document.querySelector('li.mk-lift'), swap: document.querySelector('li.mk-swap-target')?.textContent ?? '' })`);
+    cw.webContents.sendInputEvent({ type: 'mouseUp', x: pts[0].x, y: pts[2].y, button: 'left', clickCount: 1 });
+    await wait(300);
+    const order = await js(cw, `[...document.querySelectorAll('.mk-doc li')].map((li) => li.textContent.trim()).join(',')`);
+    check('글자를 잠깐 눌러 끌기: 다른 줄 가운데에 놓으면 맞바뀌고, 놓기 전에 미리 보임', preview.lift && /대파/.test(preview.swap) && order === '대파,계란,우유', JSON.stringify({ preview, order }));
     // 세 네모를 모두 체크 → 폭죽 + CLEAR 도장
     await js(cw, `(async () => { for (const li of document.querySelectorAll('.mk-doc li[data-item-type="task"]')) { const r = li.getBoundingClientRect(); li.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: r.left - 6, clientY: r.top + 6 })); await new Promise((res) => setTimeout(res, 60)); } })()`);
     await wait(400);
@@ -565,8 +578,8 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     // 매직키 설정: 메모 모듈 켜짐 + 준비 중 모듈은 끌 수 없음
     await lj(`document.getElementById('settings-btn').click()`);
     await wait(300);
-    const magicRows = await lj(`(() => { const rows = [...document.querySelectorAll('.magic-mod')]; return { enabled: document.getElementById('magic-enabled').checked, memo: rows[0]?.querySelector('input').checked, soon: rows.slice(1).every((r) => r.querySelector('input').disabled && /준비 중/.test(r.textContent)), count: rows.length }; })()`);
-    check('매직키 설정: 메모 모듈 켜짐, 나머지(계산기·Everything·OPMS)는 준비 중으로 끌 수 없음', magicRows.enabled && magicRows.memo && magicRows.soon && magicRows.count === 4, JSON.stringify(magicRows));
+    const magicRows = await lj(`(() => { const rows = [...document.querySelectorAll('.magic-mod')]; return { enabled: document.getElementById('magic-enabled').checked, on: rows.slice(0, 3).every((r) => r.querySelector('input').checked && !r.querySelector('input').disabled), soon: rows.slice(3).every((r) => r.querySelector('input').disabled && /준비 중/.test(r.textContent)), count: rows.length }; })()`);
+    check('매직키 설정: 메모 만들기·메모 검색·파일 검색 켜짐, 계산기·OPMS 는 준비 중으로 끌 수 없음', magicRows.enabled && magicRows.on && magicRows.soon && magicRows.count === 5, JSON.stringify(magicRows));
     await lj(`document.getElementById('settings').close()`);
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

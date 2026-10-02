@@ -1,5 +1,5 @@
-/* 매직키 (Ctrl+Alt+Space) — 어디서든 빠르게 입력하는 작은 창 (맥OS Spotlight 처럼) */
-html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+/* 매직키 (Ctrl+Alt+Space) — 어디서든 빠르게 입력·찾는 작은 창 (맥OS Spotlight 처럼) */
+html, body { margin: 0; background: transparent; overflow: hidden; }
 body { font-family: var(--font, "Pretendard", system-ui, sans-serif); }
 .magic {
   margin: 8px;
@@ -7,10 +7,12 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); }
   background: var(--surface, #fff);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.06);
   overflow: hidden;
-  -webkit-app-region: drag;
+  -webkit-app-region: drag; /* 테두리·빈 곳을 끌면 창이 옮겨진다 */
 }
-.magic-top { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px 8px; }
-.magic-icon { font-size: 20px; line-height: 1.5; color: var(--brand-yellow, #ffcd00); -webkit-text-stroke: 0.4px rgba(0,0,0,0.25); }
+.magic-grip { display: flex; justify-content: center; padding: 6px 0 0; cursor: grab; }
+.magic-grip span { width: 38px; height: 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.16); }
+.magic-top { display: flex; align-items: flex-start; gap: 10px; padding: 6px 16px 10px; }
+.magic-icon { font-size: 20px; line-height: 1.5; color: var(--brand-yellow, #ffcd00); -webkit-text-stroke: 0.4px rgba(0, 0, 0, 0.25); }
 .magic-input {
   -webkit-app-region: no-drag;
   flex: 1;
@@ -21,17 +23,35 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); }
   color: var(--text, #111);
   font-size: 19px;
   line-height: 1.5;
-  max-height: 40vh;
+  max-height: 30vh;
   font-family: inherit;
 }
-.magic-input::placeholder { color: var(--muted, #8a8a8a); font-size: 16px; }
-.magic-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 14px 12px; }
-.magic-modules { display: flex; gap: 6px; flex-wrap: wrap; -webkit-app-region: no-drag; }
-.magic-chip { padding: 2px 9px; border-radius: 999px; background: var(--fill, #f1f1f1); color: var(--muted, #777); font-size: 11.5px; font-weight: 600; }
-.magic-chip.on { background: var(--brand-yellow-soft, #fff3c4); color: var(--text, #111); }
-.magic-hint { color: var(--muted, #9a9a9a); font-size: 11.5px; white-space: nowrap; }
+.magic-input::placeholder { color: var(--muted, #8a8a8a); font-size: 17px; }
+
+.magic-results { -webkit-app-region: no-drag; list-style: none; margin: 0; padding: 0 8px; max-height: 420px; overflow-y: auto; }
+.magic-results:empty { display: none; }
+.magic-section { padding: 8px 10px 3px; color: var(--muted, #8a8a8a); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+.magic-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; cursor: pointer; min-width: 0; }
+.magic-row[aria-selected="true"] { background: var(--brand-yellow-soft, #fff3c4); }
+.magic-row .ico { flex: none; width: 22px; height: 22px; display: grid; place-items: center; font-size: 15px; }
+.magic-row .ico img { width: 20px; height: 20px; }
+.magic-row .dot { width: 12px; height: 12px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18); }
+.magic-row .txt { min-width: 0; flex: 1; }
+.magic-row .t { font-size: 14px; color: var(--text, #111); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.magic-row .s { font-size: 11.5px; color: var(--muted, #808080); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.magic-row .tag { flex: none; padding: 1px 7px; border-radius: 99px; background: var(--fill, #f1f1f1); color: var(--muted, #777); font-size: 10.5px; font-weight: 600; }
+.magic-row .key { flex: none; color: var(--muted, #999); font-size: 11px; }
+.magic-row b { font-weight: 800; background: rgba(255, 205, 0, 0.35); border-radius: 2px; }
+.magic-note { padding: 6px 10px 8px; color: var(--muted, #8a8a8a); font-size: 12px; }
+
+.magic-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px 10px; }
+.magic-modules { display: flex; gap: 6px; flex-wrap: wrap; }
+.magic-chip { padding: 2px 9px; border-radius: 999px; background: var(--brand-yellow-soft, #fff3c4); color: var(--text, #111); font-size: 11px; font-weight: 600; }
+.magic-hint { color: var(--muted, #9a9a9a); font-size: 11px; white-space: nowrap; }
 @media (prefers-color-scheme: dark) {
-  .magic { background: #2a2a2e; box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08); }
-  .magic-input { color: #f3f3f3; }
-  .magic-chip { background: #3a3a40; }
+  .magic { background: #2a2a2e; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08); }
+  .magic-input, .magic-row .t { color: #f3f3f3; }
+  .magic-grip span { background: rgba(255, 255, 255, 0.22); }
+  .magic-row[aria-selected="true"] { background: rgba(255, 205, 0, 0.2); }
+  .magic-chip { background: #3a3a40; color: #eee; }
 }

@@ -232,6 +232,13 @@ export class Vault extends EventEmitter {
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0));
   }
 
+  // 매직키 메모 검색용: 메모마다 제목·본문 글
+  searchable() {
+    return [...this.entries.values()]
+      .filter((e) => e.file)
+      .map((e) => ({ id: e.id, title: extractTitle(e.body), text: plainLines(e.body).join('\n'), updated: e.meta.updated, color: e.meta.color }));
+  }
+
   search(query, excludeId = null) {
     const q = query.trim().toLowerCase();
     return this.list().filter((m) => {

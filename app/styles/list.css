@@ -783,24 +783,23 @@ body.is-dragging .card:hover { transform: none; }
 .card { position: relative; }
 .card-clear {
   position: absolute;
-  right: 14px;
-  bottom: 10px;
-  padding: 1px 7px 0;
-  border: 2.5px double #e5484d;
-  border-radius: 6px;
+  left: 50%;
+  top: 50%;
+  padding: 2px 12px 1px;
+  border: 3.5px double #e5484d;
+  border-radius: 9px;
   color: #e5484d;
-  font-size: 13px;
+  font-size: 22px;
   font-weight: 900;
-  letter-spacing: 0.12em;
-  line-height: 1.25;
-  transform: rotate(-10deg);
-  opacity: 0.8;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  opacity: 0.28;
   pointer-events: none;
-  mix-blend-mode: multiply;
 }
-.card[data-color="charcoal"] .card-clear { mix-blend-mode: normal; color: #ff8b8f; border-color: #ff8b8f; }
-.cards[data-density="compact"] .card-clear { bottom: auto; top: 50%; right: 18%; transform: translateY(-50%) rotate(-10deg); font-size: 11px; }
-li:hover > .card .card-clear { opacity: 0.35; } /* 마우스를 올리면 뜨는 버튼 묶음이 잘 보이게 */
+.card[data-color="charcoal"] .card-clear { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.34; }
+.cards[data-density="compact"] .card-clear { font-size: 14px; padding: 0 8px; border-width: 2.5px; }
 
 /* ---------- v0.17.13: 매직키 설정 ---------- */
 .setting-sub { margin: 0 0 8px; padding: 2px 0 0 34px; }

@@ -1,10 +1,16 @@
 // 목록·체크리스트 항목 순서 바꾸기 (편집기 플러그인)
-//   - 항목에 마우스를 올리면 왼쪽에 손잡이(⠿)가 보이고, 끌어서 다른 항목 위·아래에 놓으면 그 자리로 옮겨진다
-//     (하위 항목은 함께 움직이고, 다른 목록으로도 옮길 수 있다. 놓을 자리에는 가로줄로 표시)
-//   - 키보드: Alt+↑ / Alt+↓ 로 지금 항목을 한 칸 위·아래로
-import { Plugin, PluginKey, Decoration, DecorationSet, TextSelection } from '../vendor/milkdown.js';
+//   - 항목의 글자를 잠깐(0.25초) 누르고 있으면 항목이 들어 올려지고, 그대로 끌면 순서를 바꾼다
+//     (바로 끌면 지금처럼 글자 선택 — 여러 줄을 골라 체크리스트로 바꾸는 일과 겹치지 않게)
+//   - 다른 항목의 가운데에 놓으면 두 항목이 서로 맞바뀌고, 위·아래 가장자리(줄과 줄 사이)에 놓으면 그 사이에 끼워진다
+//   - 놓기 전에 바뀔 모습을 미리 보여 준다 (같은 목록은 항목들이 바뀔 자리로 미끄러지고, 다른 목록은 가로줄·테두리)
+//   - 하위 항목은 함께 움직인다. Esc 로 취소. 키보드: Alt+↑ / Alt+↓ 로 한 칸 위·아래로
+import { Plugin, PluginKey, TextSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
+import { previewOrder, dropAt } from './core/list-order.js';
 
 export const listDragKey = new PluginKey('memoking-list-drag');
+
+export const HOLD_MS = 250; // 이만큼 누르고 있으면 들어 올림
+const MOVE_TOLERANCE = 5; // 그 전에 이만큼 움직이면 글자 선택으로 본다
 
 const isItem = (node) => node?.type.name === 'list_item';
 
@@ -26,6 +32,18 @@ export function moveItemTr(state, src, target) {
   const at = tr.mapping.map(target);
   tr.insert(at, node);
   tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(at + 2, tr.doc.content.size))));
+  return tr.scrollIntoView();
+}
+
+// 두 항목을 서로 맞바꾸는 트랜잭션 (한쪽이 다른 쪽 안에 있으면 null). 커서는 끌었던 항목(src)으로
+export function swapItemsTr(state, src, other) {
+  const [a, b] = src < other ? [src, other] : [other, src];
+  const A = state.doc.nodeAt(a);
+  const B = state.doc.nodeAt(b);
+  if (!isItem(A) || !isItem(B) || a === b || a + A.nodeSize > b) return null;
+  const tr = state.tr.replaceWith(b, b + B.nodeSize, A).replaceWith(a, a + A.nodeSize, B);
+  const srcAt = src === a ? b + B.nodeSize - A.nodeSize : a; // 끌었던 항목의 새 자리
+  tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(srcAt + 2, tr.doc.content.size))));
   return tr.scrollIntoView();
 }
 
@@ -57,24 +75,6 @@ export function moveItemBy(state, dispatch, dir) {
   return true;
 }
 
-function handleWidget() {
-  const h = document.createElement('span');
-  h.className = 'mk-drag-handle';
-  h.contentEditable = 'false';
-  h.title = '끌어서 순서 바꾸기 (Alt+↑ / Alt+↓)';
-  h.setAttribute('aria-hidden', 'true');
-  return h;
-}
-
-function handleDecos(doc) {
-  const decos = [];
-  doc.descendants((node, pos) => {
-    if (isItem(node)) decos.push(Decoration.widget(pos + 1, handleWidget, { side: -1, key: 'mk-drag', ignoreSelection: true }));
-    return true;
-  });
-  return DecorationSet.create(doc, decos);
-}
-
 // 목록 항목 li 의 문서 위치
 function itemPosOf(view, li) {
   let pos;
@@ -94,101 +94,235 @@ function scrollerOf(el) {
     const oy = getComputedStyle(s).overflowY;
     if ((oy === 'auto' || oy === 'scroll') && s.scrollHeight > s.clientHeight) return s;
   }
-  return null;
+  return document.scrollingElement;
 }
+
+const directItems = (list) => [...list.children].filter((c) => c.tagName === 'LI');
 
 /** @param {{ readOnly?: boolean }} options */
 export function createListDrag({ readOnly = false } = {}) {
-  let drag = null;
+  let press = null; // 누르고 기다리는 중 { li, x, y, timer }
+  let drag = null; // 들어 올린 뒤
+
+  const scrollTop = () => drag?.scroller?.scrollTop ?? 0;
+
+  function cancelPress() {
+    if (!press) return;
+    clearTimeout(press.timer);
+    window.removeEventListener('mousemove', press.move, true);
+    window.removeEventListener('mouseup', press.up, true);
+    press = null;
+  }
+
+  // 미리 보기는 데코레이션으로 (편집기가 관리하는 DOM 의 class·style 을 직접 바꾸면 편집기가 되돌린다)
+  // specs: [{ pos, cls?, style? }] — pos 는 항목(또는 목록) 노드의 시작
+  function decorate(view, specs) {
+    const { doc } = view.state;
+    const decos = [];
+    for (const { pos, cls, style } of specs) {
+      const node = doc.nodeAt(pos);
+      if (!node) continue;
+      const attrs = {};
+      if (cls) attrs.class = cls;
+      if (style) attrs.style = style;
+      decos.push(Decoration.node(pos, pos + node.nodeSize, attrs));
+    }
+    view.dispatch(view.state.tr.setMeta(listDragKey, DecorationSet.create(doc, decos)));
+  }
+
+  function clearPreview(view) {
+    if (!drag) return;
+    drag.line.hidden = true;
+    decorate(view, []);
+  }
 
   function finish(view, commit) {
     if (!drag) return;
     const d = drag;
+    clearPreview(view);
     drag = null;
     window.removeEventListener('mousemove', d.move, true);
     window.removeEventListener('mouseup', d.up, true);
     window.removeEventListener('keydown', d.key, true);
+    window.removeEventListener('selectstart', d.block, true);
     clearInterval(d.timer);
     d.line.remove();
-    d.srcEl?.classList.remove('mk-drag-source');
     document.body.classList.remove('mk-list-dragging');
-    if (!commit || d.target == null) return;
-    const tr = moveItemTr(view.state, d.src, d.target);
+    const { state } = view;
+    if (!commit || !d.drop) {
+      // 끄는 동안 늘어난 글자 선택은 버리고 커서를 그 항목에
+      view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(Math.min(d.srcPos + 2, state.doc.content.size)))));
+      view.focus();
+      return;
+    }
+    let tr = null;
+    if (d.drop.cross) {
+      tr = d.drop.kind === 'swap' ? swapItemsTr(state, d.srcPos, d.drop.pos) : moveItemTr(state, d.srcPos, d.drop.pos);
+    } else if (d.drop.kind === 'swap') {
+      tr = swapItemsTr(state, d.srcPos, d.positions[d.drop.index]);
+    } else {
+      const i = d.drop.index;
+      const target = i < d.positions.length ? d.positions[i] : d.positions.at(-1) + state.doc.nodeAt(d.positions.at(-1)).nodeSize;
+      tr = moveItemTr(state, d.srcPos, target);
+    }
     if (tr) view.dispatch(tr);
     view.focus();
   }
 
-  function start(view, event, handle) {
-    const srcEl = handle.closest('li');
-    const src = srcEl && itemPosOf(view, srcEl);
-    if (src == null) return false;
-    event.preventDefault();
+  // 같은 목록: 항목들을 바뀔 자리로 옮겨 보여 준다 (원래 자리 기준으로 계산 — 미리 보기가 다시 판정에 끼지 않게)
+  function previewSame(view, drop, extra = []) {
+    const { tops, slots, s, scale, positions, listPos } = drag;
+    const order = previewOrder(positions.length, s, drop);
+    const specs = [{ pos: listPos, cls: 'mk-sorting' }];
+    let y = tops[0];
+    order.forEach((i) => {
+      const dy = y - tops[i];
+      const cls = [i === s ? 'mk-lift' : '', drop?.kind === 'swap' && i === drop.index && i !== s ? 'mk-swap-target' : ''].filter(Boolean).join(' ');
+      specs.push({ pos: positions[i], cls, style: dy ? `transform: translateY(${(dy / scale).toFixed(1)}px)` : '' });
+      y += slots[i];
+    });
+    decorate(view, [...specs, ...extra]);
+  }
+
+  function place(view, x, y) {
+    const d = drag;
+    d.drop = null;
+    d.line.hidden = true;
+    const cy = y + scrollTop(); // 스크롤과 상관없는 세로 위치
+    const inList = x >= d.box.left - 40 && x <= d.box.right + 40 && cy >= d.tops[0] - 6 && cy <= d.bottom + 6;
+    if (inList) {
+      let k = d.tops.findIndex((t, i) => cy < t + d.slots[i]);
+      if (k < 0) k = d.tops.length - 1;
+      const frac = Math.min(1, Math.max(0, (cy - d.tops[k]) / Math.max(1, d.heights[k])));
+      const drop = dropAt(k, frac);
+      const same = drop.kind === 'swap' ? drop.index === d.s : drop.index === d.s || drop.index === d.s + 1;
+      d.drop = same ? null : drop;
+      previewSame(view, d.drop);
+      return;
+    }
+    // 다른 목록: 그 항목 위에 가로줄(끼우기) 또는 테두리(맞바꾸기)
+    const hit = document.elementFromPoint(x, y)?.closest?.('li');
+    if (!hit || !view.dom.contains(hit) || d.src.contains(hit) || hit.contains(d.src)) {
+      previewSame(view, null);
+      return;
+    }
+    const pos = itemPosOf(view, hit);
+    if (pos == null) {
+      previewSame(view, null);
+      return;
+    }
+    const node = view.state.doc.nodeAt(pos);
+    const first = hit.querySelector(':scope > p')?.getBoundingClientRect() ?? hit.getBoundingClientRect();
+    const drop = dropAt(0, (y - first.top) / Math.max(1, first.height));
+    if (drop.kind === 'swap') {
+      d.drop = { cross: true, kind: 'swap', pos };
+      previewSame(view, null, [{ pos, cls: 'mk-swap-target' }]);
+      return;
+    }
+    const before = drop.index === 0;
+    d.drop = { cross: true, kind: 'insert', pos: before ? pos : pos + node.nodeSize };
+    previewSame(view, null);
+    const r = hit.getBoundingClientRect();
+    d.line.hidden = false;
+    d.line.style.left = `${r.left}px`;
+    d.line.style.width = `${Math.max(40, r.width)}px`;
+    d.line.style.top = `${(before ? r.top : r.bottom) - 1}px`;
+  }
+
+  function lift(view, li, x, y) {
+    const srcPos = itemPosOf(view, li);
+    const list = li.parentElement;
+    if (srcPos == null || !list) return;
+    const scroller = scrollerOf(view.dom);
+    const items = directItems(list);
+    const st = scroller?.scrollTop ?? 0;
+    const rects = items.map((it) => it.getBoundingClientRect());
+    const tops = rects.map((r) => r.top + st);
+    const heights = rects.map((r) => r.height);
+    const gap = items.length > 1 ? Math.max(0, tops[1] - (tops[0] + heights[0])) : 0;
+    const slots = tops.map((t, i) => (i < tops.length - 1 ? tops[i + 1] - t : heights[i] + gap));
+    const scale = li.offsetHeight ? rects[items.indexOf(li)].height / li.offsetHeight : 1; // 본문 확대·축소 배율
     const line = document.createElement('div');
     line.className = 'mk-drop-line';
     line.hidden = true;
     document.body.append(line);
-    const scroller = scrollerOf(view.dom);
-    drag = { src, srcEl, line, target: null, y: event.clientY, timer: 0 };
-    srcEl.classList.add('mk-drag-source');
-    document.body.classList.add('mk-list-dragging');
-
-    const place = (x, y) => {
-      drag.target = null;
-      line.hidden = true;
-      const hit = document.elementFromPoint(x, y);
-      const li = hit?.closest?.('li');
-      if (!li || !view.dom.contains(li) || srcEl.contains(li)) return;
-      const pos = itemPosOf(view, li);
-      if (pos == null) return;
-      const node = view.state.doc.nodeAt(pos);
-      const r = li.getBoundingClientRect();
-      // 하위 목록이 있는 항목은 첫 줄의 가운데를 기준으로 (그 아래는 "뒤에")
-      const first = li.querySelector(':scope > p')?.getBoundingClientRect() ?? r;
-      const before = y < first.top + first.height / 2;
-      drag.target = before ? pos : pos + node.nodeSize;
-      line.hidden = false;
-      line.style.left = `${r.left}px`;
-      line.style.width = `${Math.max(40, r.width)}px`;
-      line.style.top = `${(before ? r.top : r.bottom) - 1}px`;
+    getSelection()?.removeAllRanges(); // 누르는 동안 시작된 글자 선택은 버린다
+    const $src = view.state.doc.resolve(srcPos);
+    drag = {
+      view, src: li, srcPos, listPos: $src.before(), positions: items.map((it) => itemPosOf(view, it)), s: items.indexOf(li),
+      tops, heights, slots, bottom: tops.at(-1) + heights.at(-1), box: list.getBoundingClientRect(), scale, scroller, line,
+      drop: null, crossEl: null, x, y, timer: 0,
     };
+    document.body.classList.add('mk-list-dragging');
+    previewSame(view, null); // 들어 올린 모습
+    drag.block = (e) => e.preventDefault();
     drag.move = (e) => {
       if (!drag) return;
+      e.preventDefault();
+      e.stopPropagation(); // 편집기의 글자 선택 늘리기를 막는다
       drag.x = e.clientX;
       drag.y = e.clientY;
-      place(e.clientX, e.clientY);
+      place(view, e.clientX, e.clientY);
     };
     drag.up = (e) => {
-      if (drag) place(e.clientX, e.clientY);
+      e.preventDefault();
+      e.stopPropagation();
       finish(view, true);
     };
     drag.key = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         finish(view, false);
       }
     };
     // 위·아래 끝 가까이에서는 저절로 스크롤
     drag.timer = setInterval(() => {
       if (!drag || !scroller) return;
-      const r = scroller.getBoundingClientRect();
-      const edge = 28;
-      const dy = drag.y < r.top + edge ? -12 : drag.y > r.bottom - edge ? 12 : 0;
+      const r = scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : scroller.getBoundingClientRect();
+      const dy = drag.y < r.top + 28 ? -12 : drag.y > r.bottom - 28 ? 12 : 0;
       if (dy) {
         scroller.scrollTop += dy;
-        if (drag.x != null) place(drag.x, drag.y);
+        place(view, drag.x, drag.y);
       }
     }, 30);
     window.addEventListener('mousemove', drag.move, true);
     window.addEventListener('mouseup', drag.up, true);
     window.addEventListener('keydown', drag.key, true);
-    return true;
+    window.addEventListener('selectstart', drag.block, true);
+  }
+
+  function startPress(view, event) {
+    const target = event.target instanceof Element ? event.target : null;
+    const li = target?.closest('li');
+    if (!li || !view.dom.contains(li)) return;
+    // 체크 네모(항목 왼쪽 바깥)·링크·그림·버튼은 제외
+    if (event.clientX < li.getBoundingClientRect().left) return;
+    if (target.closest('a, img, video, audio, button, input, .mk-link-card, .mk-file')) return;
+    cancelPress();
+    press = { li, x: event.clientX, y: event.clientY };
+    press.move = (e) => {
+      if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > MOVE_TOLERANCE) cancelPress(); // 바로 끌기 = 글자 선택
+      else {
+        press.x2 = e.clientX;
+        press.y2 = e.clientY;
+      }
+    };
+    press.up = () => cancelPress();
+    press.timer = setTimeout(() => {
+      const p = press;
+      cancelPress();
+      if (p?.li.isConnected) lift(view, p.li, p.x2 ?? p.x, p.y2 ?? p.y);
+    }, HOLD_MS);
+    window.addEventListener('mousemove', press.move, true);
+    window.addEventListener('mouseup', press.up, true);
   }
 
   return new Plugin({
     key: listDragKey,
     state: {
-      init: (_c, state) => (readOnly ? DecorationSet.empty : handleDecos(state.doc)),
-      apply: (tr, old) => (readOnly ? old : tr.docChanged ? handleDecos(tr.doc) : old),
+      init: () => DecorationSet.empty,
+      apply: (tr, old) => tr.getMeta(listDragKey) ?? (tr.docChanged ? DecorationSet.empty : old),
     },
     props: {
       decorations: (state) => listDragKey.getState(state),
@@ -199,13 +333,21 @@ export function createListDrag({ readOnly = false } = {}) {
       },
       handleDOMEvents: readOnly ? {} : {
         mousedown(view, event) {
-          if (event.button !== 0) return false;
-          const handle = event.target instanceof Element ? event.target.closest('.mk-drag-handle') : null;
-          if (!handle || !view.dom.contains(handle)) return false;
-          return start(view, event, handle);
+          if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && event.detail === 1) startPress(view, event);
+          return false; // 편집기는 지금처럼 (커서 놓기·글자 선택)
+        },
+        dragstart(_view, event) {
+          if (!drag) return false;
+          event.preventDefault(); // 들어 올린 동안 브라우저 끌어 놓기는 막는다
+          return true;
         },
       },
     },
-    view: (view) => ({ destroy: () => finish(view, false) }),
+    view: (view) => ({
+      destroy: () => {
+        cancelPress();
+        finish(view, false);
+      },
+    }),
   });
 }

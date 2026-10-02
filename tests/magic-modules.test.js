@@ -2,17 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MAGIC_MODULES, normalizeMagicSettings, activeModules, memoBodyFromText } from '../app/js/core/magic-modules.js';
 
-test('매직키 설정: 기본은 켜짐 · 메모 모듈만 켜짐, 준비 중 모듈은 늘 꺼짐', () => {
+test('매직키 설정: 기본은 켜짐 · 메모 만들기·메모 검색·파일 검색 켜짐, 준비 중 모듈은 늘 꺼짐', () => {
   const s = normalizeMagicSettings(undefined);
   assert.equal(s.enabled, true);
-  assert.deepEqual(s.modules, { memo: true, calc: false, everything: false, opms: false });
-  const forced = normalizeMagicSettings({ enabled: false, modules: { memo: false, calc: true, opms: true, unknown: true } });
-  assert.deepEqual(forced, { enabled: false, modules: { memo: false, calc: false, everything: false, opms: false } });
+  assert.deepEqual(s.modules, { memo: true, notes: true, files: true, calc: false, opms: false });
+  const forced = normalizeMagicSettings({ enabled: false, modules: { memo: false, files: false, calc: true, opms: true, everything: true } });
+  assert.deepEqual(forced, { enabled: false, modules: { memo: false, notes: true, files: false, calc: false, opms: false } });
 });
 
 test('매직키: 켜진 모듈만, 매직키를 끄면 없음', () => {
-  assert.deepEqual(activeModules({}).map((m) => m.id), ['memo']);
-  assert.deepEqual(activeModules({ modules: { memo: false } }), []);
+  assert.deepEqual(activeModules({}).map((m) => m.id), ['memo', 'notes', 'files']);
+  assert.deepEqual(activeModules({ modules: { memo: false, notes: false, files: false } }), []);
   assert.deepEqual(activeModules({ enabled: false }), []);
   assert.ok(MAGIC_MODULES.every((m) => m.id && m.name && m.description));
 });
