@@ -19,7 +19,7 @@ import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
-import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY } from '../app/js/core/magic-modules.js';
+import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { FileIndex } from './file-index.js';
 import { createDoublePress } from './double-press.js';
@@ -1886,20 +1886,41 @@ function registerIpc() {
     return settings.fitTables;
   });
   ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings(next));
-  ipcMain.handle('magic:modules', () => activeModules(settings.magic));
+  // 매직키 창 아래 캡슐: 쓸 수 있는 모듈 모두와 켜짐 여부 (누르면 켜고 끔)
+  const magicModuleList = () => {
+    const m = normalizeMagicSettings(settings.magic);
+    return MAGIC_MODULES.filter((x) => x.ready).map(({ id, name, description }) => ({ id, name, description, on: m.enabled && m.modules[id] }));
+  };
+  ipcMain.handle('magic:modules', () => magicModuleList());
+  ipcMain.handle('magic:toggle-module', (_e, id) => {
+    const m = normalizeMagicSettings(settings.magic);
+    if (!(id in m.modules)) return magicModuleList();
+    setMagicSettings({ ...m, modules: { ...m.modules, [id]: !m.modules[id] } });
+    return magicModuleList();
+  });
   ipcMain.on('magic:close', () => { if (magicWin && !magicWin.isDestroyed()) magicWin.hide(); });
   // 입력하는 대로: 메모(제목·내용)와 파일(이름)을 찾는다
   ipcMain.handle('magic:search', async (_e, query) => {
     const mods = new Set(activeModules(settings.magic).map((m) => m.id));
     const q = String(query ?? '').slice(0, 200);
-    const notes = mods.has('notes') && vault ? searchMemos(vault.searchable(), q, 5) : [];
-    let files = [];
-    if (mods.has('files') && fileIndex && q.trim().length >= 1) {
-      files = fileIndex.search(q, 7);
-      lastFileResults = new Set(files.map((f) => f.path));
-      files = await Promise.all(files.map(async (f) => ({ ...f, icon: await fileIcon(f.path, f.isDir) })));
+    // 아무것도 안 썼으면 최근 메모 몇 개 (바로 열 수 있게)
+    if (!q.trim()) {
+      const recent = mods.has('notes') && vault ? vault.list().slice(0, 4).map((m) => ({ id: m.id, title: m.title, snippet: (m.preview ?? '').split('\n')[0], color: m.color, updated: m.updated })) : [];
+      return { notes: recent, recent: true, folders: [], files: [], index: fileIndex?.status() ?? null };
     }
-    return { notes, files, index: fileIndex?.status() ?? null };
+    const updatedOf = new Map((vault?.list() ?? []).map((m) => [m.id, m.updated]));
+    const notes = mods.has('notes') && vault ? searchMemos(vault.searchable(), q, 5).map((n) => ({ ...n, updated: updatedOf.get(n.id) })) : [];
+    let folders = [];
+    let files = [];
+    if (mods.has('files') && fileIndex) {
+      ({ folders, files } = fileIndex.searchSplit(q, { folders: 3, files: 6 }));
+      lastFileResults = new Set([...folders, ...files].map((f) => f.path));
+      const home = os.homedir();
+      const shown = (p) => (p.toLowerCase().startsWith(home.toLowerCase()) ? `~${p.slice(home.length)}` : p);
+      const withIcon = (list) => Promise.all(list.map(async (f) => ({ ...f, where: shown(path.dirname(f.path)), icon: await fileIcon(f.path, f.isDir) })));
+      [folders, files] = await Promise.all([withIcon(folders), withIcon(files)]);
+    }
+    return { notes, folders, files, index: fileIndex?.status() ?? null };
   });
   ipcMain.handle('magic:open-memo', (_e, id) => {
     if (!vault?.get(String(id))) return false;

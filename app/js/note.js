@@ -930,6 +930,35 @@ window.addEventListener('keydown', (e) => {
   e.stopPropagation();
 }, true);
 
+// ---------- 아래 서식 도구막대: 메모 창이 활성일 때나 마우스가 창 아래쪽에 있을 때만 (미끄러져 올라옴, v0.17.16) ----------
+let barHover = false;
+let barTimer = 0;
+const barHeight = () => el.formatBar.offsetHeight || 38;
+const popoverOpen = () => !el.palette.hidden || !el.morePanel.hidden || !document.getElementById('style-menu').hidden;
+function updateBar() {
+  clearTimeout(barTimer);
+  document.body.style.setProperty('--bar-h', `${barHeight()}px`);
+  document.body.classList.toggle('bar-hidden', !(document.hasFocus() || barHover || popoverOpen()));
+}
+const hideBarSoon = () => {
+  clearTimeout(barTimer);
+  barTimer = setTimeout(updateBar, 400); // 지나가기만 할 때 깜빡이지 않게
+};
+window.addEventListener('focus', updateBar);
+window.addEventListener('blur', hideBarSoon);
+document.addEventListener('mousemove', (e) => {
+  const near = e.clientY >= window.innerHeight - (barHeight() + 22);
+  if (near === barHover) return;
+  barHover = near;
+  if (near) updateBar();
+  else hideBarSoon();
+});
+document.documentElement.addEventListener('mouseleave', () => {
+  barHover = false;
+  hideBarSoon();
+});
+updateBar();
+
 // ---------- CLEAR 도장: 체크리스트를 모두 끝내면 (v0.17.13) ----------
 const clearStamp = document.createElement('div');
 clearStamp.className = 'clear-stamp';

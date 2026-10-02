@@ -36,6 +36,10 @@ test('파일 검색: 이름 목록을 만들고 철자가 조금 달라도 찾�
   const r2 = idx.search('회의록').map((x) => x.name);
   assert.equal(r2[0], '회의록');
   assert.deepEqual(idx.search(''), []);
+  // 폴더는 따로: '여행' → 폴더 칸에 '제주 여행'
+  const split = idx.searchSplit('여행');
+  assert.deepEqual(split.folders.map((r) => r.name), ['제주 여행']);
+  assert.ok(split.files.every((r) => !r.isDir));
 });
 
 test('파일 검색: 저장한 목록을 불러와 바로 찾는다', async () => {

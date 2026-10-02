@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('magic', {
   modules: () => ipcRenderer.invoke('magic:modules'),
+  toggleModule: (id) => ipcRenderer.invoke('magic:toggle-module', id),
   run: (payload) => ipcRenderer.invoke('magic:run', payload),
   search: (query) => ipcRenderer.invoke('magic:search', query),
   openMemo: (id) => ipcRenderer.invoke('magic:open-memo', id),

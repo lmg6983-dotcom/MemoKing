@@ -1,5 +1,6 @@
 // 목록·체크리스트 항목 순서 바꾸기 (편집기 플러그인)
-//   - 항목의 글자를 잠깐(0.25초) 누르고 있으면 항목이 들어 올려지고, 그대로 끌면 순서를 바꾼다
+//   - 항목에 마우스를 올리면 옮길 수 있다는 흐린 점선 테두리, 글자를 꾹(0.3초) 누르면 테두리가 점점 진해지다가
+//     들어 올려지고, 그대로 끌면 순서를 바꾼다
 //     (바로 끌면 지금처럼 글자 선택 — 여러 줄을 골라 체크리스트로 바꾸는 일과 겹치지 않게)
 //   - 다른 항목의 가운데에 놓으면 두 항목이 서로 맞바뀌고, 위·아래 가장자리(줄과 줄 사이)에 놓으면 그 사이에 끼워진다
 //   - 놓기 전에 바뀔 모습을 미리 보여 준다 (같은 목록은 항목들이 바뀔 자리로 미끄러지고, 다른 목록은 가로줄·테두리)
@@ -9,7 +10,7 @@ import { previewOrder, dropAt } from './core/list-order.js';
 
 export const listDragKey = new PluginKey('memoking-list-drag');
 
-export const HOLD_MS = 250; // 이만큼 누르고 있으면 들어 올림
+export const HOLD_MS = 300; // 이만큼 누르고 있으면 들어 올림 (그동안 테두리가 점점 진해진다)
 const MOVE_TOLERANCE = 5; // 그 전에 이만큼 움직이면 글자 선택으로 본다
 
 const isItem = (node) => node?.type.name === 'list_item';
@@ -106,12 +107,16 @@ export function createListDrag({ readOnly = false } = {}) {
 
   const scrollTop = () => drag?.scroller?.scrollTop ?? 0;
 
-  function cancelPress() {
+  // keepMark: 들어 올리기로 넘어갈 때는 누름 표시를 지우지 않는다 (곧 들어 올린 모습으로 바뀜)
+  function cancelPress({ keepMark = false } = {}) {
     if (!press) return;
-    clearTimeout(press.timer);
-    window.removeEventListener('mousemove', press.move, true);
-    window.removeEventListener('mouseup', press.up, true);
+    const p = press;
     press = null;
+    clearTimeout(p.timer);
+    clearTimeout(p.markTimer);
+    window.removeEventListener('mousemove', p.move, true);
+    window.removeEventListener('mouseup', p.up, true);
+    if (p.marked && !keepMark && !drag && p.view && !p.view.isDestroyed) decorate(p.view, []);
   }
 
   // 미리 보기는 데코레이션으로 (편집기가 관리하는 DOM 의 class·style 을 직접 바꾸면 편집기가 되돌린다)
@@ -300,7 +305,14 @@ export function createListDrag({ readOnly = false } = {}) {
     if (event.clientX < li.getBoundingClientRect().left) return;
     if (target.closest('a, img, video, audio, button, input, .mk-link-card, .mk-file')) return;
     cancelPress();
-    press = { li, x: event.clientX, y: event.clientY };
+    press = { li, view, x: event.clientX, y: event.clientY };
+    // 잠깐 뒤(그냥 누르는 클릭에는 깜빡이지 않게)부터 테두리가 점점 진해진다 → 다 진해지면 들어 올림
+    press.markTimer = setTimeout(() => {
+      const pos = press && itemPosOf(view, li);
+      if (pos == null) return;
+      press.marked = true;
+      decorate(view, [{ pos, cls: 'mk-pressing' }]);
+    }, 70);
     press.move = (e) => {
       if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > MOVE_TOLERANCE) cancelPress(); // 바로 끌기 = 글자 선택
       else {
@@ -311,7 +323,7 @@ export function createListDrag({ readOnly = false } = {}) {
     press.up = () => cancelPress();
     press.timer = setTimeout(() => {
       const p = press;
-      cancelPress();
+      cancelPress({ keepMark: true });
       if (p?.li.isConnected) lift(view, p.li, p.x2 ?? p.x, p.y2 ?? p.y);
     }, HOLD_MS);
     window.addEventListener('mousemove', press.move, true);

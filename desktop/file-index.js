@@ -188,6 +188,15 @@ export class FileIndex {
    * 이름으로 찾기 (철자가 조금 달라도, 띄어 쓴 낱말은 모두 들어간 것). 프로그램 바로 가기·얕은 곳을 조금 앞으로
    * @returns {{ name: string, path: string, isDir: boolean, app: boolean }[]}
    */
+  /**
+   * 이름으로 찾기 — 폴더와 파일(프로그램 포함)을 따로 몇 개씩 (폴더가 파일들에 묻혀 안 보이는 일이 없게)
+   * @returns {{ folders: object[], files: object[] }}
+   */
+  searchSplit(query, { folders = 3, files = 6 } = {}) {
+    const all = this.search(query, (folders + files) * 4);
+    return { folders: all.filter((r) => r.isDir).slice(0, folders), files: all.filter((r) => !r.isDir).slice(0, files) };
+  }
+
   search(query, limit = 8) {
     const q = String(query ?? '').trim();
     if (!q || !this.snapshot) return [];
