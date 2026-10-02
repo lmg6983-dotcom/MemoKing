@@ -13,6 +13,7 @@
 //            v0.17.10 — 요약·스탬프·버튼 묶음도 제목을 따라 (확대해도 100% 크기, 축소하면 함께 작아짐)
 //            v0.17.11 — 목록 확대·축소 = 얼마나 자세히 보기 단계 (역행 없음) · 메모 글 복사에 \ 가 섞이지 않음
 //            v0.17.12 — 카카오톡 등 알림 창 그림 글자를 한글에 강한 tesseract.js(한글 best)로 읽음 (숨은 OCR 창, memoking://ocr)
+//            v0.17.13 — 체크리스트 여러 줄 적용·항목 끌어 옮기기·체크 폭죽·모두 끝내면 CLEAR 도장 · 표 넘치면 메모 줄여 맞추기 · 매직키(Ctrl+Alt+Space)
 // (팝업은 점검 앱 자신이 띄운 가짜 알림 창만 지켜본다 — 사용자의 카카오톡 등은 건드리지 않음)
 import { app, BrowserWindow, clipboard, screen } from 'electron';
 import fs from 'node:fs';
@@ -532,6 +533,41 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     // 팝업 알림을 어떤 방법으로 읽었는지 남김 (UI 자동화로 읽은 김대리 알림 = uia)
     const viaUia = history.list({ query: '김대리' }).find((e) => e.source === 'popup')?.via;
     check('팝업 알림 항목에 읽은 방법이 남음 (글자를 그대로 읽으면 uia·msaa·win32, 그림 글자 인식이면 ocr)', ['uia', 'msaa', 'win32'].includes(viaUia), String(viaUia));
+
+    // 11) v0.17.13: 체크리스트(여러 줄·끌어 옮기기·폭죽·CLEAR) · 매직키 설정
+    const vref = getVault();
+    const clearId = vref.import({ body: '# 장보기\n\n우유\n계란\n대파\n' });
+    await lj(`window.memoking.memo.open(${JSON.stringify(clearId)})`);
+    const cw = await until(() => noteWins.get(clearId), '체크 메모 창');
+    await ready(cw);
+    // 본문 전체 선택 후 체크리스트 버튼 → 세 줄 모두 체크 네모
+    await js(cw, `(() => { const d = document.querySelector('.mk-doc'); d.focus(); const r = document.createRange(); r.selectNodeContents(d); getSelection().removeAllRanges(); getSelection().addRange(r); document.querySelector('[data-cmd="task"]').click(); })()`);
+    await wait(200);
+    const boxes = await js(cw, `document.querySelectorAll('.mk-doc li[data-item-type="task"]').length`);
+    const handles = await js(cw, `document.querySelectorAll('.mk-doc .mk-drag-handle').length`);
+    check('체크리스트를 여러 줄 선택에 적용하면 줄마다 체크 네모 (맨 위 하나만 X)', boxes === 3, `boxes=${boxes}`);
+    check('목록·체크리스트 항목마다 끌어 옮기는 손잡이', handles === 3, `handles=${handles}`);
+    // 세 네모를 모두 체크 → 폭죽 + CLEAR 도장
+    await js(cw, `(async () => { for (const li of document.querySelectorAll('.mk-doc li[data-item-type="task"]')) { const r = li.getBoundingClientRect(); li.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: r.left - 6, clientY: r.top + 6 })); await new Promise((res) => setTimeout(res, 60)); } })()`);
+    await wait(400);
+    const cleared = await js(cw, `(() => { const s = document.querySelector('.clear-stamp'); const c = document.querySelector('canvas.mk-confetti'); let painted = 0; if (c) { const d = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) painted++; } return { stamp: s && !s.hidden, painted, md: window.getSelection && null }; })()`);
+    check('체크리스트를 모두 끝내면 메모에 CLEAR 도장 + 체크 폭죽', cleared.stamp === true && cleared.painted > 50, JSON.stringify(cleared));
+    await capture(cw, 'smoke-new-checklist-clear.png');
+    cw.webContents.executeJavaScript('window.memoking.memo.saveSync && null');
+    await wait(300);
+    cw.close();
+    // 목록 카드에도 CLEAR 도장
+    await until(() => !noteWins.get(clearId), '체크 메모 닫힘').catch(() => {});
+    await lj(`window.memoking.memos.list()`); // 저장 반영
+    await wait(300);
+    const cardClear = await lj(`(() => { const card = document.querySelector('.cards .card[data-id="${clearId}"]'); return card ? !!card.querySelector('.card-clear') : 'no-card'; })()`);
+    check('체크리스트를 모두 끝낸 메모는 목록 카드에도 CLEAR 도장', cardClear === true, String(cardClear));
+    // 매직키 설정: 메모 모듈 켜짐 + 준비 중 모듈은 끌 수 없음
+    await lj(`document.getElementById('settings-btn').click()`);
+    await wait(300);
+    const magicRows = await lj(`(() => { const rows = [...document.querySelectorAll('.magic-mod')]; return { enabled: document.getElementById('magic-enabled').checked, memo: rows[0]?.querySelector('input').checked, soon: rows.slice(1).every((r) => r.querySelector('input').disabled && /준비 중/.test(r.textContent)), count: rows.length }; })()`);
+    check('매직키 설정: 메모 모듈 켜짐, 나머지(계산기·Everything·OPMS)는 준비 중으로 끌 수 없음', magicRows.enabled && magicRows.memo && magicRows.soon && magicRows.count === 4, JSON.stringify(magicRows));
+    await lj(`document.getElementById('settings').close()`);
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;

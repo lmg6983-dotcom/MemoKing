@@ -11,6 +11,7 @@ import {
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { normalizeTables } from '../app/js/core/table-sizes.js';
+import { taskProgress } from '../app/js/core/tasks.js';
 
 export const APP_DIR = '_memoking';
 export const ATTACH_DIR = 'attachments';
@@ -220,6 +221,7 @@ export class Vault extends EventEmitter {
       hasFile: has('file'),
       reminderCount: entry.meta.reminders.filter((r) => r.enabled).length,
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
+      tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
     };
   }
 

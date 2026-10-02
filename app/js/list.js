@@ -8,6 +8,8 @@ import { setupHistoryTab } from './list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
+import { isAllClear } from './core/tasks.js';
+import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
@@ -281,6 +283,16 @@ function renderCard(memo) {
   // 태그·표시가 있을 때만 아랫줄 (없으면 한 줄 아낌)
   if (tags.childElementCount || meta.childElementCount) card.append(foot);
 
+  // 체크리스트를 모두 끝낸 메모: CLEAR 도장 (v0.17.13)
+  if (isAllClear(memo.tasks)) {
+    const clear = document.createElement('span');
+    clear.className = 'card-clear';
+    clear.textContent = 'CLEAR';
+    clear.setAttribute('aria-label', `체크리스트 ${memo.tasks.total}개를 모두 끝냈어요`);
+    card.classList.add('all-clear');
+    card.append(clear);
+  }
+
   const del = document.createElement('button');
   del.className = 'icon-btn danger card-delete';
   del.title = '지우기';
@@ -386,6 +398,8 @@ async function loadSettings() {
   auto.disabled = !s.autoStart.available;
   $('auto-start-note').textContent = s.autoStart.available ? '작업 표시줄 알림 영역에서 조용히 시작해요' : '설치한 메모킹에서 쓸 수 있어요';
   $('history-enabled').checked = s.historyEnabled;
+  $('fit-tables').checked = s.fitTables !== false;
+  showMagic(s.magic);
   showQuickMemo(s.quickMemo);
   $('trash-days').value = String(s.trashDays);
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
@@ -399,6 +413,42 @@ function showQuickMemo(q) {
 $('quick-memo').addEventListener('change', async (e) => showQuickMemo(await api.settings.setQuickMemo(e.target.checked)));
 $('auto-start').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setAutoStart(e.target.checked);
+});
+$('fit-tables').addEventListener('change', async (e) => {
+  e.target.checked = await api.settings.setFitTables(e.target.checked);
+});
+
+// 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)
+let magicState = { enabled: true, modules: {} };
+function renderMagicModules() {
+  const list = $('magic-modules-list');
+  list.replaceChildren(...MAGIC_MODULES.map((m) => {
+    const row = document.createElement('label');
+    row.className = `magic-mod${m.ready ? '' : ' soon'}`;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'switch';
+    cb.checked = m.ready && magicState.modules[m.id] !== false && !!magicState.modules[m.id];
+    cb.disabled = !m.ready || !magicState.enabled;
+    cb.addEventListener('change', async () => {
+      magicState = await api.settings.setMagic({ enabled: magicState.enabled, modules: { ...magicState.modules, [m.id]: cb.checked } });
+      renderMagicModules();
+    });
+    const text = document.createElement('span');
+    text.innerHTML = `${m.name}${m.ready ? '' : ' <em>(준비 중)</em>'} <small>${m.description}</small>`;
+    row.append(cb, text);
+    return row;
+  }));
+}
+function showMagic(magic) {
+  magicState = magic ?? { enabled: true, modules: {} };
+  $('magic-enabled').checked = magicState.enabled;
+  $('magic-modules-row').hidden = !magicState.enabled;
+  renderMagicModules();
+}
+$('magic-enabled').addEventListener('change', async (e) => {
+  magicState = await api.settings.setMagic({ enabled: e.target.checked, modules: magicState.modules });
+  showMagic(magicState);
 });
 $('history-enabled').addEventListener('change', async (e) => {
   e.target.checked = await api.history.setEnabled(e.target.checked);

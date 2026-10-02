@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <title>매직키</title>
+  <link rel="stylesheet" href="styles/base.css" />
+  <link rel="stylesheet" href="styles/magic.css" />
+</head>
+<body>
+  <div id="magic" class="magic">
+    <div class="magic-top">
+      <span class="magic-icon" aria-hidden="true">✦</span>
+      <textarea id="magic-input" class="magic-input" rows="1" placeholder="메모를 입력하고 Enter … (Ctrl+Enter = 저장하고 열기, Esc 닫기)" autofocus></textarea>
+    </div>
+    <div class="magic-foot">
+      <div id="magic-modules" class="magic-modules"></div>
+      <div id="magic-hint" class="magic-hint">Enter 저장 · Ctrl+Enter 저장하고 열기</div>
+    </div>
+  </div>
+  <script type="module" src="js/magic.js"></script>
+</body>
+</html>

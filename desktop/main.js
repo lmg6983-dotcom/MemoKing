@@ -19,6 +19,7 @@ import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
+import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY } from '../app/js/core/magic-modules.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -35,6 +36,7 @@ const APP_ID = 'com.memoking.desktop';
 const APP_DIR = path.join(import.meta.dirname, '..', 'app');
 const PRELOAD = path.join(import.meta.dirname, 'preload.cjs');
 const OCR_PRELOAD = path.join(import.meta.dirname, 'ocr-preload.cjs');
+const MAGIC_PRELOAD = path.join(import.meta.dirname, 'magic-preload.cjs');
 const ASSETS_DIR = path.join(import.meta.dirname, '..', 'assets');
 // 창·작업표시줄·알림 영역 아이콘 (npm run icons 로 생성, 16~256px 9개 크기)
 const APP_ICON = path.join(ASSETS_DIR, 'icons', 'memoking.ico');
@@ -76,6 +78,8 @@ let settings = {
   tutorialDone: false, // 처음 실행 튜토리얼을 마쳤거나 건너뛰었는지
   trashDays: 30, // 휴지통에 이 날짜보다 오래 있던 메모를 저절로 영구 삭제 (0 = 하지 않음)
   listOnTop: false, // 목록 창도 다른 창보다 늘 위에
+  fitTables: true, // 표가 메모 본문보다 넓으면 메모를 줄여 맞추고, 더 못 줄이면 창을 넓힌다
+  magic: undefined, // 매직키 (Ctrl+Alt+Space): { enabled, modules } — normalizeMagicSettings 로 정리
 };
 let settingsTimer = null;
 
@@ -1493,6 +1497,8 @@ function appSettings() {
     autoStart: { available: autoStartAvailable(), enabled: getAutoStart() },
     historyEnabled: settings.historyEnabled,
     quickMemo: { enabled: settings.quickMemo, registered: globalShortcut.isRegistered(QUICK_MEMO_KEY), key: 'Ctrl+Alt+C' },
+    fitTables: settings.fitTables !== false,
+    magic: normalizeMagicSettings(settings.magic),
     version: app.getVersion(),
   };
 }
@@ -1511,6 +1517,59 @@ function registerQuickMemoKey() {
   if (!ok) console.warn('Ctrl+Alt+C 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다');
   else captureHelper.start(); // 미리 띄워 두어 누르자마자 동작하게
   return ok;
+}
+
+// ---------- 매직키 (Ctrl+Alt+Space) — 어디서든 빠르게 입력하는 작은 창 (기본: 메모 만들기) ----------
+let magicWin = null;
+
+function createMagicWindow() {
+  const win = new BrowserWindow({
+    width: 600,
+    height: 190,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    ...windowIcon,
+    webPreferences: { preload: MAGIC_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.loadFile(path.join(APP_DIR, 'magic.html'));
+  win.on('blur', () => win.hide()); // 밖을 누르면 닫힌다
+  win.on('closed', () => { if (magicWin === win) magicWin = null; });
+  return win;
+}
+
+function showMagic() {
+  if (!vault) { createListWindow(); return; } // 메모 폴더가 아직 없으면 목록부터
+  magicWin ??= createMagicWindow();
+  const point = screen.getCursorScreenPoint();
+  const area = screen.getDisplayNearestPoint(point).workArea;
+  const [w, h] = magicWin.getSize();
+  magicWin.setPosition(Math.round(area.x + (area.width - w) / 2), Math.round(area.y + area.height * 0.22));
+  magicWin.show();
+  magicWin.focus();
+  magicWin.webContents.send('magic:show');
+}
+
+function registerMagicKey() {
+  globalShortcut.unregister(MAGIC_KEY);
+  if (!normalizeMagicSettings(settings.magic).enabled) return false;
+  const ok = globalShortcut.register(MAGIC_KEY, () => showMagic());
+  if (!ok) console.warn('Ctrl+Alt+Space 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다');
+  return ok;
+}
+
+function setMagicSettings(next) {
+  settings.magic = normalizeMagicSettings(next);
+  saveSettings();
+  registerMagicKey();
+  if (!settings.magic.enabled && magicWin && !magicWin.isDestroyed()) magicWin.hide();
+  return settings.magic;
 }
 
 function setQuickMemo(on) {
@@ -1777,6 +1836,40 @@ function registerIpc() {
   ipcMain.handle('app:settings', () => appSettings());
   ipcMain.handle('app:set-auto-start', (_e, on) => setAutoStart(on));
   ipcMain.handle('app:set-quick-memo', (_e, on) => setQuickMemo(on));
+  ipcMain.handle('app:set-fit-tables', (_e, on) => {
+    settings.fitTables = Boolean(on);
+    saveSettings();
+    return settings.fitTables;
+  });
+  ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings(next));
+  ipcMain.handle('magic:modules', () => activeModules(settings.magic));
+  ipcMain.on('magic:close', () => { if (magicWin && !magicWin.isDestroyed()) magicWin.hide(); });
+  ipcMain.handle('magic:run', (_e, payload) => {
+    const mods = activeModules(settings.magic);
+    if (!vault || payload?.module !== 'memo' || !mods.some((m) => m.id === 'memo')) return { ok: false };
+    const body = memoBodyFromText(payload.text);
+    if (!body) return { ok: false };
+    const id = vault.import({ body });
+    if (payload.open) openNote(id);
+    else notice('메모를 만들었어요', body.split('\n')[0].slice(0, 40));
+    return { ok: true, id };
+  });
+  // 표가 넘칠 때: 메모 창을 더 넓게 (요청한 본문 폭이 들어가도록, 화면 안에서). 반환: 실제로 넓힌 본문 폭(px)
+  ipcMain.handle('win:grow-width', (event, extra) => {
+    const win = senderWindow(event);
+    const add = Math.ceil(Number(extra) || 0);
+    if (!win || add <= 0) return 0;
+    const [w, h] = win.getSize();
+    const [x, y] = win.getPosition();
+    const area = screen.getDisplayMatching({ x, y, width: w, height: h }).workArea;
+    const maxW = area.width - 24;
+    const want = Math.min(maxW, w + add);
+    if (want <= w) return 0;
+    let nx = x;
+    if (x + want > area.x + area.width) nx = Math.max(area.x, area.x + area.width - want); // 화면 밖으로 나가면 왼쪽으로
+    win.setBounds({ x: nx, y, width: want, height: h });
+    return want - w;
+  });
   // 휴지통: 되살리기·영구 삭제·비우기, 자동 영구 삭제 기간
   ipcMain.handle('trash:list', () => vault?.trashList() ?? []);
   ipcMain.handle('trash:restore', (_e, name) => {
@@ -2165,6 +2258,7 @@ app.whenReady().then(async () => {
   alarms.startup(); // "실행할 때" 알림
   alarms.start(); // 날짜·시간·반복·타이머 알림 (놓친 것 포함)
   registerQuickMemoKey(); // Ctrl+Alt+C 빠른 메모
+  registerMagicKey(); // Ctrl+Alt+Space 매직키
   updateTrayMenu();
   // 튜토리얼을 마치기 전에 껐다 켰으면 다시 (자동 실행으로 조용히 켜질 때는 제외)
   if (vault && !settings.tutorialDone && !HIDDEN_START) startTutorial();

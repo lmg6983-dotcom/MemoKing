@@ -982,3 +982,62 @@ body.mk-row-resizing { user-select: none; }
 /* ---------- v0.17.4: 표 막대는 좁은 창에서도 버튼이 가려지지 않게 여러 줄로 ---------- */
 .table-bar { flex-wrap: wrap; row-gap: 2px; overflow-x: visible; }
 .table-bar button { flex: none; }
+
+/* ---------- v0.17.13: 목록·체크리스트 항목 끌어서 순서 바꾸기 ---------- */
+.mk-doc li { position: relative; }
+.mk-drag-handle {
+  position: absolute;
+  left: calc(-1.35em - 16px);
+  top: 0.18em;
+  width: 12px;
+  height: 1.3em;
+  border-radius: 3px;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s;
+  user-select: none;
+  /* 점 여섯 개 (⠿) */
+  background: radial-gradient(circle, var(--note-muted) 1.2px, transparent 1.4px) 0 0 / 6px 6px;
+  background-position: 0 2px;
+}
+.mk-doc li:hover:not(:has(li:hover)) > .mk-drag-handle { opacity: 0.75; }
+.mk-drag-handle:hover { opacity: 1 !important; background-color: var(--note-hover); }
+.mk-list-dragging, .mk-list-dragging * { cursor: grabbing !important; user-select: none !important; }
+.mk-drag-source { opacity: 0.45; }
+.mk-drop-line { position: fixed; z-index: 50; height: 2px; border-radius: 2px; background: var(--note-accent, #ffcd00); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); pointer-events: none; }
+.mk-drop-line[hidden] { display: none; }
+
+/* 체크 폭죽 (canvas-confetti) */
+.mk-confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 60; pointer-events: none; }
+
+/* 모든 체크리스트를 끝내면 CLEAR 도장 */
+.clear-stamp {
+  position: fixed;
+  right: 18px;
+  z-index: 5;
+  padding: 3px 12px 2px;
+  border: 3px double #e5484d;
+  border-radius: 8px;
+  color: #e5484d;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  transform: rotate(-12deg);
+  opacity: 0.82;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+body[data-color="charcoal"] .clear-stamp { mix-blend-mode: normal; color: #ff8b8f; border-color: #ff8b8f; }
+.clear-stamp[hidden] { display: none; }
+.clear-stamp.stamp-in { animation: clear-stamp-in 0.42s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+@keyframes clear-stamp-in {
+  0% { transform: rotate(-12deg) scale(2.4); opacity: 0; }
+  60% { transform: rotate(-12deg) scale(0.92); opacity: 0.9; }
+  100% { transform: rotate(-12deg) scale(1); opacity: 0.82; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clear-stamp.stamp-in { animation: none; }
+  .mk-drag-handle { transition: none; }
+}
+@media print { .mk-drag-handle, .clear-stamp { display: none !important; } }

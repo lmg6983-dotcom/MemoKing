@@ -862,6 +862,59 @@ function setZoom(z, { show = true } = {}) {
 }
 setZoom(zoom, { show: false });
 
+// ---------- 표가 넘치면 메모를 줄여 맞추고, 더 못 줄이면 창을 넓힌다 (v0.17.13, 설정으로 끄고 켬) ----------
+// 열 너비를 줄이지 않고(사용자 요청) 본문 배율(--note-zoom)을 낮춰 표 가로가 잘리지 않게 한다.
+// 측정은 화면 px 로 (표는 배율이 걸린 .mk-doc 안, 편집 영역은 배율이 없음).
+let fitTables = true;
+let fitTimer = 0;
+let growing = false;
+const MIN_ZOOM = 0.5;
+
+function widestTableWidth() {
+  let w = 0;
+  for (const t of el.editorRoot.querySelectorAll('.mk-doc table')) w = Math.max(w, t.getBoundingClientRect().width);
+  return w;
+}
+function availWidth() {
+  const cs = getComputedStyle(el.editorRoot);
+  return el.editorRoot.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+}
+
+async function fitWide() {
+  if (!fitTables || growing) return;
+  const avail = availWidth();
+  const widest = widestTableWidth();
+  if (widest <= 1 || avail <= 1) return;
+  if (widest <= avail + 1) return; // 이미 들어온다
+  // 지금 배율에서 표가 avail 에 들어갈 배율. 더 키우지는 않는다 (줄이기만)
+  const target = clampZoom(Math.max(MIN_ZOOM, (zoom * avail) / widest));
+  if (target < zoom - 0.001) {
+    setZoom(target);
+    await new Promise((r) => requestAnimationFrame(r));
+  }
+  // 최소 배율에서도 넘치면 창을 넓힌다 (화면 안에서)
+  const stillWidest = widestTableWidth();
+  if (stillWidest > availWidth() + 1 && zoom <= MIN_ZOOM + 0.001) {
+    growing = true;
+    try {
+      const grown = await api.win.growWidth(Math.ceil(stillWidest - availWidth()) + 8);
+      if (grown > 0) {
+        await new Promise((r) => requestAnimationFrame(r));
+        // 창을 넓혀 공간이 생겼으면 배율을 다시 올려 본다
+        const avail2 = availWidth();
+        const widest2 = widestTableWidth();
+        if (widest2 > 1) setZoom(Math.min(1, clampZoom((zoom * avail2) / widest2)));
+      }
+    } finally {
+      growing = false;
+    }
+  }
+}
+const scheduleFit = () => {
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(fitWide, 250);
+};
+
 // Ctrl+휠: 위로 굴리면 크게, 아래로 굴리면 작게 (창 전체가 아니라 본문만 — Chromium 의 페이지 확대는 막는다)
 window.addEventListener('wheel', (e) => {
   if (!e.ctrlKey) return;
@@ -876,6 +929,39 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault();
   e.stopPropagation();
 }, true);
+
+// ---------- CLEAR 도장: 체크리스트를 모두 끝내면 (v0.17.13) ----------
+const clearStamp = document.createElement('div');
+clearStamp.className = 'clear-stamp';
+clearStamp.textContent = 'CLEAR';
+clearStamp.setAttribute('role', 'status');
+clearStamp.setAttribute('aria-label', '체크리스트를 모두 끝냈어요');
+clearStamp.hidden = true;
+document.body.append(clearStamp);
+const placeClearStamp = () => {
+  clearStamp.style.top = `${Math.round(el.editorRoot.getBoundingClientRect().top + 10)}px`;
+};
+new ResizeObserver(() => {
+  if (!clearStamp.hidden) placeClearStamp();
+}).observe(el.editorRoot);
+
+// 편집기가 알려 주는 체크리스트 진행 → 도장 (처음 열 때는 그냥 찍혀 있고, 방금 끝냈을 때만 "쿵")
+function showTasks({ total, done }, { initial = false } = {}) {
+  const clear = total > 0 && done === total;
+  const was = !clearStamp.hidden;
+  clearStamp.hidden = !clear;
+  document.body.dataset.tasks = total ? `${done}/${total}` : '';
+  if (!clear) {
+    clearStamp.classList.remove('stamp-in');
+    return;
+  }
+  placeClearStamp();
+  if (!was && !initial) {
+    clearStamp.classList.remove('stamp-in');
+    void clearStamp.offsetWidth; // 애니메이션 다시
+    clearStamp.classList.add('stamp-in');
+  }
+}
 
 async function closeWindow() {
   await flush();
@@ -1063,6 +1149,7 @@ if (!memo) {
     openLink: (url) => api.links.open(url),
     getTags: () => api.tags.list(),
     onEmpty: showPlaceholder,
+    onTasks: showTasks,
   });
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();
@@ -1077,5 +1164,13 @@ if (!memo) {
   if (memo.alarm) showAlarm(memo.alarm);
   editor.focus();
   if (memo.capture) await applyCapture(memo.capture);
+  // 표가 넘치면 메모를 줄여 맞추기 (설정) — 열 때 한 번, 그리고 본문이 바뀔 때(표 붙여넣기·넣기)
+  try {
+    fitTables = (await api.settings.get())?.fitTables !== false;
+  } catch {
+    // 설정을 못 읽으면 기본(켜짐)
+  }
+  new MutationObserver(scheduleFit).observe(el.editorRoot, { childList: true, subtree: true, characterData: true });
+  scheduleFit();
   document.documentElement.dataset.ready = 'true';
 }

@@ -23,6 +23,8 @@ import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells } from './table-extras.js';
+import { createListDrag } from './list-drag.js';
+import { create as createConfetti } from '../vendor/confetti.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
 // 모두 마크다운 이미지 문법 ![설명](attachments/파일) 로 저장하고, 확장자로 구분해 보여준다.
@@ -152,6 +154,42 @@ const inlineHtmlMarks = $remark('memoking-inline-html-marks', () => remarkInline
 
 // ---------- 체크리스트 ----------
 
+// 체크를 하면 체크 네모 자리에서 작은 폭죽 (canvas-confetti, 동작 줄이기 설정이면 생략)
+let confettiFire = null;
+function celebrateAt(clientX, clientY) {
+  try {
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
+    if (!confettiFire) {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'mk-confetti';
+      document.body.append(canvas);
+      confettiFire = createConfetti(canvas, { resize: true, useWorker: false, disableForReducedMotion: true });
+    }
+    confettiFire({
+      particleCount: 28,
+      spread: 360, // 체크 네모를 중심으로 사방으로 (위 모서리 가까이에서도 화면 밖으로 날아가지 않게)
+      startVelocity: 11,
+      gravity: 0.7,
+      decay: 0.92,
+      ticks: 80,
+      scalar: 0.7,
+      origin: { x: clientX / window.innerWidth, y: clientY / window.innerHeight },
+      colors: ['#ffcd00', '#ff7a59', '#4fc3f7', '#7ed957', '#c18cff'],
+      shapes: ['circle', 'square'],
+    });
+  } catch {
+    // 폭죽은 꾸밈이라 안 되어도 그만
+  }
+}
+
+// 체크 네모의 화면 좌표 (ProseMirror 가 체크 뒤 li 를 다시 그려 참조가 끊기므로 누르기 전에 잰다)
+function checkboxPoint(li) {
+  const r = li.getBoundingClientRect();
+  const fs = parseFloat(getComputedStyle(li).fontSize) || 14;
+  const scale = li.offsetWidth ? r.width / li.offsetWidth : 1;
+  return { x: r.left - fs * 0.9 * scale, y: r.top + fs * 0.8 * scale };
+}
+
 // 체크리스트 네모를 누르면 체크/해제
 function toggleTaskOnClick(view, event) {
   const li = event.target instanceof Element ? event.target.closest('li[data-item-type="task"]') : null;
@@ -160,12 +198,29 @@ function toggleTaskOnClick(view, event) {
   for (let d = $pos.depth; d > 0; d--) {
     const node = $pos.node(d);
     if (node.type.name === 'list_item') {
-      view.dispatch(view.state.tr.setNodeMarkup($pos.before(d), undefined, { ...node.attrs, checked: !node.attrs.checked }));
+      const checked = !node.attrs.checked;
+      const point = checked ? checkboxPoint(li) : null; // 다시 그리기 전에 미리 잰다
+      view.dispatch(view.state.tr.setNodeMarkup($pos.before(d), undefined, { ...node.attrs, checked }));
       event.preventDefault();
+      if (point) celebrateAt(point.x, point.y);
       return true;
     }
   }
   return false;
+}
+
+// 문서의 체크리스트 진행 (CLEAR 도장)
+function taskCounts(doc) {
+  let total = 0;
+  let done = 0;
+  doc.descendants((node) => {
+    if (node.type.name === 'list_item' && node.attrs.checked != null) {
+      total++;
+      if (node.attrs.checked) done++;
+    }
+    return true;
+  });
+  return { total, done };
 }
 
 // ---------- 링크 미리보기 카드 ----------
@@ -703,7 +758,7 @@ function normalizePastedTables(html) {
  *   fetchPreview: 링크 카드에 보여줄 제목·설명·사진 (메인 프로세스가 메모 폴더에 모아 둔 것)
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false }) {
   let ready = false;
   let editor = null;
   const view = () => editor.ctx.get(editorViewCtx);
@@ -1003,6 +1058,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
 
   const media = $view(imageSchema.node, () => (node) => mediaView(node));
   const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
+  const listDrag = $prose(() => createListDrag({ readOnly }));
   const taskToggle = $prose(() => new Plugin({
     key: new PluginKey('memoking-task-toggle'),
     props: { handleDOMEvents: { mousedown: toggleTaskOnClick } },
@@ -1021,10 +1077,14 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     // 내용이 바뀌는 즉시(글자 하나) 알린다 — 저장용 마크다운은 조금 늦게 갱신되므로 안내 문구는 이것을 따른다
     view: (v) => {
       onEmpty?.(isEmptyDoc(v.state.doc));
+      onTasks?.(taskCounts(v.state.doc), { initial: true });
       return {
         update: (view, prev) => {
           onState?.(activeFormats(view.state));
-          if (!prev.doc.eq(view.state.doc)) onEmpty?.(isEmptyDoc(view.state.doc));
+          if (!prev.doc.eq(view.state.doc)) {
+            onEmpty?.(isEmptyDoc(view.state.doc));
+            onTasks?.(taskCounts(view.state.doc), { initial: false });
+          }
         },
       };
     },
@@ -1124,6 +1184,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(media)
     .use(cardView)
     .use(taskToggle)
+    .use(listDrag)
     .use(tagHighlight)
     .use(stateWatcher)
     .create();
@@ -1157,37 +1218,106 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     else call(wrapInHeadingCommand, level);
   }
 
+  // 선택한 범위(커서만 있으면 그 줄)의 목록 항목들
+  function itemsInSelection() {
+    const { state } = view();
+    const { from, to } = state.selection;
+    const items = [];
+    state.doc.nodesBetween(from, to, (node, pos) => {
+      if (node.type.name === 'list_item') items.push({ node, pos });
+    });
+    return items;
+  }
+
+  // 목록·체크리스트로 바꾸기 전에: 한 문단 안에서 줄바꿈(Shift+Enter·붙여넣은 여러 줄)으로 나뉜 줄들을 문단으로 나눈다
+  // → 줄마다 항목 하나 (그렇지 않으면 여러 줄이 항목 하나가 되어 맨 위에만 체크가 달린다)
+  function splitLinesInSelection() {
+    const v = view();
+    const { state } = v;
+    const { from, to } = state.selection;
+    const breaks = [];
+    state.doc.nodesBetween(from, to, (node, pos, parent) => {
+      if (node.type.name === 'code_block') return false;
+      if (parent?.type.name !== 'paragraph') return true;
+      if (node.type.name === 'hardbreak' || node.type.name === 'hard_break' || (node.type.name === 'html' && isBreakHtml(node.attrs.value))) breaks.push({ pos, size: node.nodeSize });
+      else if (node.isText) {
+        for (let i = node.text.indexOf('\n'); i >= 0; i = node.text.indexOf('\n', i + 1)) breaks.push({ pos: pos + i, size: 1 });
+      }
+      return true;
+    });
+    if (!breaks.length) return;
+    const tr = state.tr;
+    for (const b of breaks.sort((a, c) => c.pos - a.pos)) {
+      tr.delete(b.pos, b.pos + b.size);
+      tr.split(b.pos);
+    }
+    v.dispatch(tr);
+  }
+
+  // 고른 줄(문단)마다 항목 하나인 목록으로 감싼다 — Milkdown 의 감싸기(wrapIn)는 고른 문단을 모두 항목 하나에 넣어
+  // 체크 네모가 맨 위 하나만 생긴다. 제목·표 등 문단이 아닌 것이 섞이면 false (Milkdown 기본 동작으로)
+  function wrapLinesInList(typeName) {
+    const v = view();
+    const { state } = v;
+    const { $from, $to } = state.selection;
+    const range = $from.blockRange($to);
+    const listType = state.schema.nodes[typeName];
+    const itemType = state.schema.nodes.list_item;
+    if (!range || !listType || !itemType) return false;
+    const items = [];
+    for (let i = range.startIndex; i < range.endIndex; i++) {
+      const block = range.parent.child(i);
+      if (block.type.name !== 'paragraph') return false;
+      items.push(itemType.create({ listType: typeName === 'ordered_list' ? 'ordered' : 'bullet' }, block));
+    }
+    if (!items.length) return false;
+    const list = listType.create(null, items);
+    const tr = state.tr.replaceWith(range.start, range.end, list);
+    tr.setSelection(TextSelection.between(tr.doc.resolve(range.start + 1), tr.doc.resolve(range.start + list.nodeSize - 1)));
+    v.dispatch(tr.scrollIntoView());
+    return true;
+  }
+
+  // 선택한 항목 모두의 체크 상태 (null = 체크리스트 아님, false/true = 체크리스트)
+  function setCheckedInSelection(checked) {
+    const v = view();
+    const tr = v.state.tr;
+    for (const { node, pos } of itemsInSelection()) {
+      if (node.attrs.checked !== checked) tr.setNodeMarkup(pos, undefined, { ...node.attrs, checked });
+    }
+    if (tr.docChanged) v.dispatch(tr);
+  }
+
   function toggleList(type) {
     const list = parentOfType(['bullet_list', 'ordered_list']);
-    const item = parentOfType(['list_item']);
-    const isTask = item && item.node.attrs.checked != null;
-    if (list && list.node.type.name === type && !isTask) {
+    const items = itemsInSelection();
+    const anyTask = items.some((i) => i.node.attrs.checked != null);
+    if (list && list.node.type.name === type && !anyTask) {
       call(liftListItemCommand);
       return;
     }
-    if (!list) call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
-    else if (list.node.type.name !== type) {
+    if (!list) {
+      splitLinesInSelection();
+      if (!wrapLinesInList(type)) call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
+    } else if (list.node.type.name !== type) {
       call(liftListItemCommand);
       call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
     }
-    setChecked(null);
-  }
-
-  function setChecked(checked) {
-    const item = parentOfType(['list_item']);
-    if (!item || item.node.attrs.checked === checked) return;
-    const v = view();
-    v.dispatch(v.state.tr.setNodeMarkup(item.pos, undefined, { ...item.node.attrs, checked }));
+    setCheckedInSelection(null);
   }
 
   function toggleTask() {
-    const item = parentOfType(['list_item']);
-    if (item && item.node.attrs.checked != null) {
+    const items = itemsInSelection();
+    // 고른 항목이 모두 체크리스트면 체크리스트를 푼다
+    if (items.length && items.every((i) => i.node.attrs.checked != null)) {
       call(liftListItemCommand);
       return;
     }
-    if (!item) call(wrapInBulletListCommand);
-    setChecked(false);
+    if (!parentOfType(['list_item'])) {
+      splitLinesInSelection();
+      if (!wrapLinesInList('bullet_list')) call(wrapInBulletListCommand);
+    }
+    setCheckedInSelection(false); // 고른 줄마다 체크 네모
   }
 
   // 글자 색·하이라이트: 색을 주면 그 색으로 바꾸고, null 이면 지운다.
