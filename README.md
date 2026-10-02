@@ -122,6 +122,7 @@ backups/    단계별 zip 스냅샷 (git 제외)
 <!-- HISTORY:START -->
 | 태그 | 날짜 | 단계 | 내용 |
 |---|---|---|---|
+| `v0.17.12-feedback` | 2026-10-02 | 3. 피드백 | 개선 6가지: 1) 표가 넘치면 메모를 줄여 맞추고 한계면 창 넓히기(옵션) 2) 체크리스트를 여러 줄에 적용할 때 맨 위 하나만 체크되던 것 3) 목록·체크리스트 항목을 끌어서 순서 바꾸기 4) 체크 완료 시 작은 폭죽 5) 체크리스트를 모두 끝내면 메모·목록에 CLEAR 도장 6) 어디서든 Ctrl+Alt+Space 로 빠르게 입력하는 매직키(기본 메모, 모듈식, 설정에서 끄고 켜기 — 계산기·Everything·OPMS 는 추후). 1~6 은 오픈소스 활용 가능 |
 | `v0.17.12` | 2026-10-01 | 2. 생성 | 카카오톡 등 알림 창 그림 글자를 한글에 강한 tesseract.js(한글 best, tessdata_best 정수화)로 읽어 정확도 향상 — Windows 기본 OCR보다 받침·작은 글자를 잘 읽음. 순수 WASM이라 네이티브 모듈 없이 app/vendor/tesseract 에 포함(코어 2종+한글 언어 2.2MB), 숨은 OCR 창을 memoking://ocr 오리진으로 띄워 워커·wasm·언어파일을 같은 오리진에서 로드. 인터넷·외부 서비스 없이 이 PC 안에서만. PowerShell 은 알림 창을 불투명·3배(최대 변 2200px)로 키운 그림을 ocrImage·ocrUnit 으로 넘기고 Node 가 한글 OCR → 줄 단위 글·위치 → kakaoEntry. 바로 읽은 글(UIA/MSAA) 우선, OCR 실패 시 Windows OCR 폴백. 메모리 접근·DB 복호화 방식은 쓰지 않음. 단위 48. Windows 점검(smoke:new) 아직 안 돌림 |
 | `v0.17.12-plan` | 2026-10-01 | 1. 계획 | 알림 창 그림 글자를 Windows 기본 OCR 대신 한글에 강한 tesseract.js(tessdata_best 한글, 정수화 2.2MB)로 읽기. 순수 WASM이라 네이티브 모듈 없이 app/vendor/tesseract 에 넣고(밀크다운처럼), 숨은 창을 memoking://ocr 오리진으로 띄워 워커·wasm·언어파일을 같은 오리진에서 불러옴. PowerShell 은 알림 창을 불투명·3배로 키운 그림만 넘기고(ocrImage·ocrUnit), Node 가 그 그림을 한글 OCR → 줄 단위 글·위치 → 카카오톡은 kakaoEntry 로 방·보낸사람·메시지 분리. 그대로 읽은 글(UIA/MSAA)이 있으면 그걸 우선, OCR 실패하면 Windows OCR 로 폴백 |
 | `v0.17.11-feedback` | 2026-10-01 | 3. 피드백 | 카카오톡 알림 OCR 정확도가 너무 낮음 — 한글에 강한 모델을 쓰자(메모리 접근·DB 복호화 방식은 쓰지 않기로, 이용약관·계정정지·법적 위험 때문). PaddleOCR 한글이 1순위였으나 공식 모델 호스트가 이 환경에서 모두 막혀 받지 못함 → 받아서 검증 가능한 차선책으로 |
