@@ -126,9 +126,17 @@ body[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-ho
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* 스크롤 막대 자리를 늘 비워 둔다: 아래 도구막대가 오르내리거나 내용이 창 높이를 살짝 넘나들 때
+     막대가 생겼다 사라지며 글 폭이 바뀌어 줄바꿈이 달라지는 일이 없게 (v0.17.19) */
   padding: 10px 16px 16px;
   cursor: text;
 }
+/* 본문 요소(.mk-doc)에도 .editor class 가 붙으므로 바깥 스크롤 상자는 id 로 */
+#editor { scrollbar-gutter: stable; padding-right: 8px; }
+#editor::-webkit-scrollbar { width: 8px; }
+#editor::-webkit-scrollbar-track { background: transparent; }
+#editor::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 4px; background: color-mix(in srgb, var(--note-text) 22%, transparent) padding-box; }
+#editor::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--note-text) 38%, transparent); }
 .mk-doc {
   min-height: 100%;
   outline: none;

@@ -932,11 +932,9 @@ window.addEventListener('keydown', (e) => {
 
 // ---------- 아래 서식 도구막대: 메모 창이 활성일 때나 마우스가 창 아래쪽에 있을 때만 (미끄러져 올라옴, v0.17.16) ----------
 let barHover = false;
-let barTimer = 0;
 const barHeight = () => el.formatBar.offsetHeight || 38;
 const popoverOpen = () => !el.palette.hidden || !el.morePanel.hidden || !document.getElementById('style-menu').hidden;
 function updateBar() {
-  clearTimeout(barTimer);
   document.body.style.setProperty('--bar-h', `${barHeight()}px`);
   const coaching = document.body.classList.contains('coaching'); // 튜토리얼 말풍선이 도구막대를 가리킬 수 있게
   document.body.classList.toggle('bar-hidden', !(document.hasFocus() || barHover || popoverOpen() || coaching));
@@ -949,22 +947,17 @@ new MutationObserver(() => {
     updateBar();
   }
 }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
-const hideBarSoon = () => {
-  clearTimeout(barTimer);
-  barTimer = setTimeout(updateBar, 400); // 지나가기만 할 때 깜빡이지 않게
-};
 window.addEventListener('focus', updateBar);
-window.addEventListener('blur', hideBarSoon);
+window.addEventListener('blur', updateBar); // 창을 떠나거나 마우스가 아래쪽을 벗어나면 바로 내려간다 (v0.17.19)
 document.addEventListener('mousemove', (e) => {
   const near = e.clientY >= window.innerHeight - (barHeight() + 22);
   if (near === barHover) return;
   barHover = near;
-  if (near) updateBar();
-  else hideBarSoon();
+  updateBar();
 });
 document.documentElement.addEventListener('mouseleave', () => {
   barHover = false;
-  hideBarSoon();
+  updateBar();
 });
 updateBar();
 
