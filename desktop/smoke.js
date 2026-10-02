@@ -962,19 +962,24 @@ export async function runSmoke({
       await js(tutWin(), `document.querySelector('.mk-doc').focus()`);
       await type(tutWin(), '튜토리얼 메모');
       const formatStep = await waitStep(tutWin, 'format');
-      check('글을 쓰면 → 저절로 다음 단계', formatStep);
+      const barShown = formatStep && (await js(tutWin(), `!document.body.classList.contains('bar-hidden')`));
+      check('글을 쓰면 → 저절로 다음 단계 (튜토리얼 동안 서식 도구막대는 보임)', formatStep && barShown);
+      await coachNext(tutWin());
+      await waitStep(tutWin, 'lists');
       await coachNext(tutWin());
       await waitStep(tutWin, 'tag');
       await type(tutWin(), ' #할일 ');
-      const barStep = await waitStep(tutWin, 'bar');
-      check('#태그를 쓰면 → 저절로 다음 단계', barStep);
+      const crownStep = await waitStep(tutWin, 'crown');
+      check('#태그를 쓰면 → 저절로 다음 단계', crownStep);
+      await coachNext(tutWin());
+      await waitStep(tutWin, 'bar');
       await capture(tutWin(), 'smoke-tutorial-note.png');
       await coachNext(tutWin());
       await waitStep(tutWin, 'close');
       await js(tutWin(), `document.getElementById('close-btn').click()`);
       const cardsStep = await waitStep(getList, 'cards');
       check('메모를 닫으면 → 목록 창으로 돌아와 다음 단계', cardsStep && !noteWins.has(tutMemo) && vault.get(tutMemo)?.title.startsWith('튜토리얼 메모'), JSON.stringify({ cardsStep, open: noteWins.has(tutMemo), title: vault.get(tutMemo)?.title }));
-      for (const id of ['filters', 'tabs', 'quick', 'done']) {
+      for (const id of ['filters', 'tabs', 'quick', 'magic', 'settings', 'done']) {
         await coachNext(getList());
         await waitStep(getList, id);
       }

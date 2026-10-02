@@ -25,7 +25,13 @@ export const TUTORIAL_STEPS = [
   {
     id: 'format', win: 'note', target: ['#format-bar'],
     title: '글자를 꾸밀 수 있어요',
-    text: '글자를 고른 뒤 굵게·밑줄·색·형광펜을 눌러 보세요. 클립 버튼으로 사진·파일을, 표 버튼으로 표를 넣을 수 있어요.',
+    text: '아래 도구막대는 메모를 쓰는 동안이나 마우스를 창 아래쪽에 가져가면 올라와요. 글자를 고른 뒤 굵게·색·형광펜을 누르고, 스타일에서 제목·인용·코드 블록을 골라요. 클립으로 사진·파일, 표 버튼으로 표를 넣어요.',
+    next: '다음',
+  },
+  {
+    id: 'lists', win: 'note', target: ['[data-cmd="task"]', '#format-bar'],
+    title: '체크리스트와 목록',
+    text: '여러 줄을 고르고 체크리스트 버튼을 누르면 줄마다 네모가 생겨요. 체크하면 축하 폭죽, 모두 끝내면 CLEAR 도장이 찍혀요. 항목을 꾹 누르면 들려서 끌어 옮길 수 있어요 — 다른 항목 위에 놓으면 맞바꾸고, 사이에 놓으면 끼워 넣어요.',
     next: '다음',
   },
   {
@@ -66,7 +72,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'tabs', win: 'list', target: ['.tabs'],
     title: '알림도 한곳에서',
-    text: '알림 예약 탭에서는 모든 메모의 알림을, 알림 보관함에서는 지나간 Windows 알림을 볼 수 있어요.',
+    text: '알림 예약 탭에서는 모든 메모의 알림을, 알림 보관함에서는 지나간 Windows 알림을 볼 수 있어요. 카카오톡 알림도 사진이 아니라 글자로 모아 둬요.',
     next: '다음',
   },
   {
@@ -76,9 +82,15 @@ export const TUTORIAL_STEPS = [
     next: '다음',
   },
   {
+    id: 'magic', win: 'list', target: [],
+    title: '매직키 Ctrl+Alt+Space',
+    text: '어디서든 Ctrl+Alt+Space를 누르면 검색 창이 떠요. 메모·폴더·파일을 이름 몇 글자로 바로 찾고, 찾는 게 없으면 Enter로 적은 말이 곧바로 메모가 돼요. 아래 캡슐을 누르면 그 기능을 켜고 꺼요.',
+    next: '다음',
+  },
+  {
     id: 'settings', win: 'list', target: ['#settings-btn'],
     title: '설정',
-    text: '지운 메모 되살리기(휴지통), Windows 알림 모아두기, 사용법 다시 보기는 설정에 있어요. 목록 창도 왕관을 눌러 늘 위에 둘 수 있어요.',
+    text: '지운 메모 되살리기(휴지통), Windows 알림 모아두기, 표가 넘치면 메모를 줄여 맞추기, 매직키 켜기·기능 고르기, 사용법 다시 보기는 설정에 있어요. 목록 창도 왕관을 눌러 늘 위에 둘 수 있어요.',
     next: '다음',
   },
   {

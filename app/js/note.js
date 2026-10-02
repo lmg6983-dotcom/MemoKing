@@ -938,8 +938,17 @@ const popoverOpen = () => !el.palette.hidden || !el.morePanel.hidden || !documen
 function updateBar() {
   clearTimeout(barTimer);
   document.body.style.setProperty('--bar-h', `${barHeight()}px`);
-  document.body.classList.toggle('bar-hidden', !(document.hasFocus() || barHover || popoverOpen()));
+  const coaching = document.body.classList.contains('coaching'); // 튜토리얼 말풍선이 도구막대를 가리킬 수 있게
+  document.body.classList.toggle('bar-hidden', !(document.hasFocus() || barHover || popoverOpen() || coaching));
 }
+let wasCoaching = false;
+new MutationObserver(() => {
+  const now = document.body.classList.contains('coaching');
+  if (now !== wasCoaching) {
+    wasCoaching = now;
+    updateBar();
+  }
+}).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 const hideBarSoon = () => {
   clearTimeout(barTimer);
   barTimer = setTimeout(updateBar, 400); // 지나가기만 할 때 깜빡이지 않게
