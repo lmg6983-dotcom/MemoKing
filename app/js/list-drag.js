@@ -141,9 +141,24 @@ export function createListDrag({ readOnly = false } = {}) {
     decorate(view, []);
   }
 
+  // 놓은 뒤: 옮겨진 항목이 잠깐 반짝여 어디로 갔는지 보여 준다
+  function flashMoved(view) {
+    const { $from } = view.state.selection;
+    for (let d = $from.depth; d > 0; d--) {
+      if (!isItem($from.node(d))) continue;
+      const pos = $from.before(d);
+      decorate(view, [{ pos, cls: 'mk-dropped' }]);
+      setTimeout(() => {
+        if (!drag && !press && !view.isDestroyed && listDragKey.getState(view.state)?.find().length) decorate(view, []);
+      }, 700);
+      return;
+    }
+  }
+
   function finish(view, commit) {
     if (!drag) return;
     const d = drag;
+    cancelAnimationFrame(d.raf);
     clearPreview(view);
     drag = null;
     window.removeEventListener('mousemove', d.move, true);
@@ -152,6 +167,7 @@ export function createListDrag({ readOnly = false } = {}) {
     window.removeEventListener('selectstart', d.block, true);
     clearInterval(d.timer);
     d.line.remove();
+    d.badge.remove();
     document.body.classList.remove('mk-list-dragging');
     const { state } = view;
     if (!commit || !d.drop) {
@@ -170,68 +186,102 @@ export function createListDrag({ readOnly = false } = {}) {
       const target = i < d.positions.length ? d.positions[i] : d.positions.at(-1) + state.doc.nodeAt(d.positions.at(-1)).nodeSize;
       tr = moveItemTr(state, d.srcPos, target);
     }
-    if (tr) view.dispatch(tr);
+    if (tr) {
+      view.dispatch(tr);
+      flashMoved(view);
+    }
     view.focus();
   }
 
-  // 같은 목록: 항목들을 바뀔 자리로 옮겨 보여 준다 (원래 자리 기준으로 계산 — 미리 보기가 다시 판정에 끼지 않게)
-  function previewSame(view, drop, extra = []) {
-    const { tops, slots, s, scale, positions, listPos } = drag;
+  // 미리 보기: 끄는 항목은 커서를 그대로 따라오고, 같은 목록의 다른 항목들은 놓았을 때의 자리로 미끄러져
+  // 들어갈 틈을 연다 (원래 자리 기준으로 계산 — 미리 보기가 다시 판정에 끼지 않게)
+  // free: 다른 목록으로 가는 중이면 커서를 그대로 따라가고, 같은 목록 안에서는 목록의 맨 위·맨 아래에서 멈춘다
+  // (커서가 목록 밖으로 멀리 가도 항목은 맨 끝 자리에 머물러 "맨 끝으로" 가 보이게, 본문 밖으로 잘리지도 않게)
+  function previewSame(view, drop, extra = [], { free = false } = {}) {
+    const { tops, slots, s, scale, positions, listPos, heights } = drag;
     const order = previewOrder(positions.length, s, drop);
     const specs = [{ pos: listPos, cls: 'mk-sorting' }];
+    let follow = drag.y + scrollTop() - drag.startY; // 끄는 항목이 커서를 따라간 거리
+    if (!free) follow = Math.min(drag.bottom - heights[s] + 6, Math.max(tops[0] - 6, tops[s] + follow)) - tops[s];
     let y = tops[0];
     order.forEach((i) => {
-      const dy = y - tops[i];
-      const cls = [i === s ? 'mk-lift' : '', drop?.kind === 'swap' && i === drop.index && i !== s ? 'mk-swap-target' : ''].filter(Boolean).join(' ');
-      specs.push({ pos: positions[i], cls, style: dy ? `transform: translateY(${(dy / scale).toFixed(1)}px)` : '' });
+      if (i === s) {
+        specs.push({ pos: positions[i], cls: 'mk-lift', style: `transform: translateY(${(follow / scale).toFixed(1)}px)` });
+      } else {
+        const dy = y - tops[i];
+        const cls = drop?.kind === 'swap' && i === drop.index ? 'mk-swap-target' : '';
+        specs.push({ pos: positions[i], cls, style: dy ? `transform: translateY(${(dy / scale).toFixed(1)}px)` : '' });
+      }
       y += slots[i];
     });
     decorate(view, [...specs, ...extra]);
+  }
+
+  // 커서 옆 안내: 지금 놓으면 무엇이 되는지
+  function showBadge(kind) {
+    const b = drag.badge;
+    b.dataset.kind = kind ?? '';
+    b.textContent = kind === 'swap' ? '⇅ 맞바꾸기' : kind === 'insert' ? '↳ 여기에 넣기' : '';
+    b.hidden = !kind;
+    b.style.left = `${drag.x + 16}px`;
+    b.style.top = `${drag.y + 14}px`;
   }
 
   function place(view, x, y) {
     const d = drag;
     d.drop = null;
     d.line.hidden = true;
-    const cy = y + scrollTop(); // 스크롤과 상관없는 세로 위치
-    const inList = x >= d.box.left - 40 && x <= d.box.right + 40 && cy >= d.tops[0] - 6 && cy <= d.bottom + 6;
-    if (inList) {
-      let k = d.tops.findIndex((t, i) => cy < t + d.slots[i]);
-      if (k < 0) k = d.tops.length - 1;
-      const frac = Math.min(1, Math.max(0, (cy - d.tops[k]) / Math.max(1, d.heights[k])));
-      const drop = dropAt(k, frac);
-      const same = drop.kind === 'swap' ? drop.index === d.s : drop.index === d.s || drop.index === d.s + 1;
-      d.drop = same ? null : drop;
-      previewSame(view, d.drop);
-      return;
-    }
-    // 다른 목록: 그 항목 위에 가로줄(끼우기) 또는 테두리(맞바꾸기)
+    // 1) 다른 목록(하위 목록 포함)의 항목 위면 그쪽으로 — 끄는 항목은 마우스를 통과시켜 그 아래가 잡힌다
     const hit = document.elementFromPoint(x, y)?.closest?.('li');
-    if (!hit || !view.dom.contains(hit) || d.src.contains(hit) || hit.contains(d.src)) {
-      previewSame(view, null);
-      return;
+    const other = hit && view.dom.contains(hit) && hit.parentElement !== d.list && !d.src.contains(hit) && !hit.contains(d.src) ? hit : null;
+    if (other) {
+      const pos = itemPosOf(view, other);
+      if (pos != null) {
+        const node = view.state.doc.nodeAt(pos);
+        const first = other.querySelector(':scope > p')?.getBoundingClientRect() ?? other.getBoundingClientRect();
+        const drop = dropAt(0, (y - first.top) / Math.max(1, first.height));
+        if (drop.kind === 'swap') {
+          d.drop = { cross: true, kind: 'swap', pos };
+          previewSame(view, null, [{ pos, cls: 'mk-swap-target' }], { free: true });
+        } else {
+          const before = drop.index === 0;
+          d.drop = { cross: true, kind: 'insert', pos: before ? pos : pos + node.nodeSize };
+          previewSame(view, null, [], { free: true });
+          const r = other.getBoundingClientRect();
+          d.line.hidden = false;
+          d.line.style.left = `${r.left}px`;
+          d.line.style.width = `${Math.max(40, r.width)}px`;
+          d.line.style.top = `${(before ? r.top : r.bottom) - 1}px`;
+        }
+        showBadge(d.drop.kind);
+        return;
+      }
     }
-    const pos = itemPosOf(view, hit);
-    if (pos == null) {
-      previewSame(view, null);
-      return;
+    // 2) 같은 목록: 목록 위·아래로 벗어나도 맨 앞·맨 끝으로 (멀리 옮겨도 미리 보기가 끊기지 않게)
+    const cy = y + scrollTop(); // 스크롤과 상관없는 세로 위치
+    const n = d.tops.length;
+    let drop;
+    if (cy < d.tops[0]) drop = { kind: 'insert', index: 0 };
+    else if (cy > d.bottom) drop = { kind: 'insert', index: n };
+    else {
+      let k = d.tops.findIndex((t, i) => cy < t + d.slots[i]);
+      if (k < 0) k = n - 1;
+      drop = dropAt(k, Math.min(1, Math.max(0, (cy - d.tops[k]) / Math.max(1, d.heights[k]))));
     }
-    const node = view.state.doc.nodeAt(pos);
-    const first = hit.querySelector(':scope > p')?.getBoundingClientRect() ?? hit.getBoundingClientRect();
-    const drop = dropAt(0, (y - first.top) / Math.max(1, first.height));
-    if (drop.kind === 'swap') {
-      d.drop = { cross: true, kind: 'swap', pos };
-      previewSame(view, null, [{ pos, cls: 'mk-swap-target' }]);
-      return;
-    }
-    const before = drop.index === 0;
-    d.drop = { cross: true, kind: 'insert', pos: before ? pos : pos + node.nodeSize };
-    previewSame(view, null);
-    const r = hit.getBoundingClientRect();
-    d.line.hidden = false;
-    d.line.style.left = `${r.left}px`;
-    d.line.style.width = `${Math.max(40, r.width)}px`;
-    d.line.style.top = `${(before ? r.top : r.bottom) - 1}px`;
+    const same = drop.kind === 'swap' ? drop.index === d.s : drop.index === d.s || drop.index === d.s + 1;
+    d.drop = same ? null : drop;
+    previewSame(view, d.drop);
+    showBadge(d.drop?.kind);
+  }
+
+  // 마우스가 움직이면 다음 화면 그리기 때 한 번만 (빠르게 끌어도 매끄럽게)
+  function schedulePlace(view) {
+    if (!drag || drag.raf) return;
+    drag.raf = requestAnimationFrame(() => {
+      if (!drag) return;
+      drag.raf = 0;
+      place(view, drag.x, drag.y);
+    });
   }
 
   function lift(view, li, x, y) {
@@ -250,13 +300,16 @@ export function createListDrag({ readOnly = false } = {}) {
     const line = document.createElement('div');
     line.className = 'mk-drop-line';
     line.hidden = true;
-    document.body.append(line);
+    const badge = document.createElement('div');
+    badge.className = 'mk-drag-badge';
+    badge.hidden = true;
+    document.body.append(line, badge);
     getSelection()?.removeAllRanges(); // 누르는 동안 시작된 글자 선택은 버린다
     const $src = view.state.doc.resolve(srcPos);
     drag = {
-      view, src: li, srcPos, listPos: $src.before(), positions: items.map((it) => itemPosOf(view, it)), s: items.indexOf(li),
-      tops, heights, slots, bottom: tops.at(-1) + heights.at(-1), box: list.getBoundingClientRect(), scale, scroller, line,
-      drop: null, crossEl: null, x, y, timer: 0,
+      view, src: li, srcPos, list, listPos: $src.before(), positions: items.map((it) => itemPosOf(view, it)), s: items.indexOf(li),
+      tops, heights, slots, bottom: tops.at(-1) + heights.at(-1), scale, scroller, line, badge,
+      drop: null, x, y, startY: y + st, timer: 0, raf: 0,
     };
     document.body.classList.add('mk-list-dragging');
     previewSame(view, null); // 들어 올린 모습
@@ -267,11 +320,16 @@ export function createListDrag({ readOnly = false } = {}) {
       e.stopPropagation(); // 편집기의 글자 선택 늘리기를 막는다
       drag.x = e.clientX;
       drag.y = e.clientY;
-      place(view, e.clientX, e.clientY);
+      schedulePlace(view);
     };
     drag.up = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (drag) {
+        drag.x = e.clientX;
+        drag.y = e.clientY;
+        place(view, e.clientX, e.clientY); // 놓은 자리로 마지막 판정
+      }
       finish(view, true);
     };
     drag.key = (e) => {
@@ -281,11 +339,14 @@ export function createListDrag({ readOnly = false } = {}) {
         finish(view, false);
       }
     };
-    // 위·아래 끝 가까이에서는 저절로 스크롤
+    // 위·아래 끝 가까이에서는 저절로 스크롤 (가까울수록 빠르게)
     drag.timer = setInterval(() => {
       if (!drag || !scroller) return;
       const r = scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : scroller.getBoundingClientRect();
-      const dy = drag.y < r.top + 28 ? -12 : drag.y > r.bottom - 28 ? 12 : 0;
+      const edge = 40;
+      const up = r.top + edge - drag.y;
+      const down = drag.y - (r.bottom - edge);
+      const dy = up > 0 ? -Math.ceil(up / 3) : down > 0 ? Math.ceil(down / 3) : 0;
       if (dy) {
         scroller.scrollTop += dy;
         place(view, drag.x, drag.y);
