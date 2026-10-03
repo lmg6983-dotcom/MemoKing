@@ -1,18 +1,21 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
-// 화면은 데스크탑과 함께 쓰는 웹 코어(../app)와 안드로이드 화면(../web)을 앱 안에 묶어 넣는다.
-//   assets/www/app/  ← 저장소의 app/ (편집기·메모 파일 형식·인덱서 등 공용 코드)
-//   assets/www/m/    ← android/web/ (휴대폰 화면)
 // local.properties(저장소에 올리지 않음) → 환경 변수 순으로 찾는다
 fun secret(key: String, env: String): String {
-    val props = java.util.Properties()
-    rootDir.resolve("local.properties").takeIf { it.exists() }?.inputStream()?.use(props::load)
+    val props = Properties()
+    val file = rootDir.resolve("local.properties")
+    if (file.exists()) file.inputStream().use { props.load(it) }
     return (props.getProperty("memoking.$key") ?: System.getenv(env) ?: "").trim().replace("\"", "")
 }
 
+// 화면은 데스크탑과 함께 쓰는 웹 코어(../app)와 안드로이드 화면(../web)을 앱 안에 묶어 넣는다.
+//   assets/www/app/  ← 저장소의 app/ (편집기·메모 파일 형식·인덱서 등 공용 코드)
+//   assets/www/m/    ← android/web/ (휴대폰 화면)
 val webOut = layout.buildDirectory.dir("generated/web")
 val syncWeb by tasks.registering(Sync::class) {
     from(rootDir.resolve("../app")) { into("www/app") }
