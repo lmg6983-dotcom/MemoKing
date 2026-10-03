@@ -109,7 +109,7 @@ class DriveApi(private val ctx: Context) : Remote {
     private fun get(url: String) = request("GET", url, handle = ::json)
 
     /** 구글 계정 이메일 */
-    fun about(): String = get("$API/about?fields=user(emailAddress)").optJSONObject("user")?.optString("emailAddress") ?: ""
+    fun about(): String = get("$API/about?fields=user").optJSONObject("user")?.optString("emailAddress") ?: ""
 
     private fun query(q: String, orderBy: String? = null): List<JSONObject> {
         val out = ArrayList<JSONObject>()

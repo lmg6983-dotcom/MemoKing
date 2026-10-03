@@ -213,9 +213,9 @@ export function renderStatus(s = drive.status()) {
     $('drive-title').textContent = `내 드라이브 › ${s.folderName || '메모 폴더'}`;
     $('drive-sub').textContent = !s.connected
       ? '로그인이 끊겼어요. 연결하기를 눌러 다시 로그인해 주세요'
-      : st.state === 'syncing' ? `${s.email} · 동기화하는 중…`
+      : st.state === 'syncing' ? [s.email, '동기화하는 중…'].filter(Boolean).join(' · ')
       : st.state === 'error' ? st.error
-      : `${s.email} · ${st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'}`;
+      : [s.email, st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'].filter(Boolean).join(' · ');
   } else {
     $('drive-title').textContent = s.connected ? '폴더를 아직 고르지 않았어요' : '연결 안 됨';
     $('drive-sub').textContent = s.connected ? s.email : 'PC 메모킹과 같은 메모를 쓰려면 연결하세요';

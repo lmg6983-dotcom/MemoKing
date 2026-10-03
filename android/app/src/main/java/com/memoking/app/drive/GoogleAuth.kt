@@ -71,6 +71,17 @@ object GoogleAuth {
     }
     fun email(ctx: Context): String = prefs(ctx).getString(KEY_EMAIL, "") ?: ""
 
+    /** 계정 이메일을 아직 모르면 Drive 에 물어 둔다 (로그인 직후 못 받았을 때) */
+    fun ensureEmail(ctx: Context) {
+        if (email(ctx).isNotEmpty() || !connected(ctx)) return
+        try {
+            val email = DriveApi(ctx).about()
+            if (email.isNotEmpty()) prefs(ctx).edit().putString(KEY_EMAIL, email).apply()
+        } catch (e: Exception) {
+            android.util.Log.w("MemoKing", "구글 계정 이메일을 받지 못했어요", e)
+        }
+    }
+
     fun signOut(ctx: Context) {
         val refresh = prefs(ctx).getString(KEY_REFRESH, null)
         val token = accessToken

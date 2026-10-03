@@ -95,6 +95,7 @@ object DriveSync {
             return Status("error", status.lastSync, message).also(::publish)
         }
         saveState(file, state)
+        GoogleAuth.ensureEmail(ctx)
         return Status("idle", System.currentTimeMillis(), "", result.localChanged, result.conflicts).also(::publish)
     }
 
@@ -115,8 +116,9 @@ object DriveSync {
         Vaults.prefs(ctx).edit().putString(KEY_FOLDER_NAME, name).apply()
         if (importFrom != null) copyAll(importFrom, FileStorage(mirror, ""))
         Vaults.use(ctx, PREFIX + folderId)
+        val status = syncBlocking(ctx)
         schedule(ctx)
-        return syncBlocking(ctx)
+        return status
     }
 
     // 예전 메모 폴더의 파일을 새 폴더로 (같은 이름이 이미 있으면 두기)
@@ -149,7 +151,12 @@ object DriveSync {
             .setPeriodic(15 * 60 * 1000L)
             .setPersisted(true)
             .build()
-        js.schedule(job)
+        // 배경 동기화를 못 걸어도(권한·제조사 제한) 화면이 보이는 동안의 동기화는 그대로 되게
+        try {
+            js.schedule(job)
+        } catch (e: Exception) {
+            android.util.Log.w("MemoKing", "배경 동기화를 예약하지 못했어요", e)
+        }
     }
 
     fun cancelSchedule(ctx: Context) {

@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 앱이 꺼져 있을 때 인터넷이 될 때만 동기화 (JobScheduler 의 네트워크 조건) -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- 예약 알림 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
