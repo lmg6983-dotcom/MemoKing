@@ -259,6 +259,11 @@ try {
   await page.waitForTimeout(300);
   await page.fill('#search', '');
   await page.waitForTimeout(300);
+  await page.locator('.noti').nth(0).tap();
+  await page.locator('.noti').nth(1).tap();
+  check('보관함: 펼친 알림은 하나만', (await page.locator('.noti.expanded').count()) === 1);
+  await page.locator('.noti').nth(1).tap(); // 다시 누르면 접힘
+  check('보관함: 다시 누르면 접힘', (await page.locator('.noti.expanded').count()) === 0);
   // 이 앱 알림 그만 모으기 (카카오톡, 이미 모은 2개도 지우기)
   await page.locator('.noti', { hasText: '카카오톡' }).first().tap();
   await page.locator('.noti.expanded [aria-label="카카오톡 알림 그만 모으기"]').tap();

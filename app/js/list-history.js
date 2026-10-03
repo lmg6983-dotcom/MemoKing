@@ -114,7 +114,12 @@ export function setupHistoryTab({ api, els, confirm }) {
     // 누르면 내용 펼치기 / 메모킹 알림은 그 메모 열기
     div.addEventListener('click', () => {
       if (e.memoId) api.memo.open(e.memoId);
-      else div.classList.toggle('expanded');
+      else {
+        // 펼친 알림은 하나만: 다른 알림을 누르면 앞의 것은 접는다
+        const open = !div.classList.contains('expanded');
+        for (const other of els.rows.querySelectorAll('.noti.expanded')) other.classList.remove('expanded');
+        div.classList.toggle('expanded', open);
+      }
     });
     return div;
   }
