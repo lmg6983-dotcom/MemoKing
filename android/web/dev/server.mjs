@@ -157,6 +157,17 @@ const sync = {
     fakeHistory.entries = fakeHistory.entries.filter((e) => e.id !== id);
     return true;
   },
+  historyBlock: (appId, app, removeExisting) => {
+    fakeHistory.blocked[appId] = app;
+    if (!removeExisting) return 0;
+    const before = fakeHistory.entries.length;
+    fakeHistory.entries = fakeHistory.entries.filter((e) => e.appId !== appId || e.source === 'memoking');
+    return before - fakeHistory.entries.length;
+  },
+  historyUnblock: (appId) => {
+    delete fakeHistory.blocked[appId];
+    return null;
+  },
   historyClear: () => {
     fakeHistory.entries = [];
     return null;
@@ -186,7 +197,7 @@ const fakeDrive = {
   folders: { root: [{ id: 'f-memo', name: '메모킹' }, { id: 'f-work', name: '업무' }, { id: 'f-photo', name: '사진' }], 'f-work': [{ id: 'f-work-2026', name: '2026' }] },
 };
 const driveInfo = () => ({ ...fakeDrive, configured: true, builtIn: false, nativeAvailable: !process.env.NO_PLAY_SERVICES, browserConfigured: fakeDrive.configured, folders: undefined });
-const fakeHistory = { enabled: false, granted: false, entries: [] };
+const fakeHistory = { enabled: false, granted: false, blocked: {}, entries: [] };
 let pendingIntent = null;
 let scheduled = [];
 let pickQueue = []; // 점검용: 다음 pickFiles 가 돌려줄 파일들 [{ name, mime, base64 }]
@@ -350,6 +361,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (p.startsWith('/vault/')) return serveFile(res, vaultPath(p.slice('/vault/'.length)), req);
+    // 알림 보관함 앱 아이콘 (앱은 앱 아이콘을 저장해 두지만 미리보기에는 없으므로 메모킹 아이콘으로)
+    if (p.startsWith('/history/')) return serveFile(res, path.resolve(here, '../../../assets/icons/icon-256.png'), req);
     if (p.startsWith('/app/')) return serveFile(res, inside(appRoot, p.slice('/app/'.length)), req);
     if (p === '/m/index.html' || p === '/m/' || p === '/') {
       // 앱 대신 window.MemoKingNative 를 흉내 내는 스크립트를 먼저 넣는다

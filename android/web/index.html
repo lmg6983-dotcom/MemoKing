@@ -105,6 +105,7 @@
         <div class="history-bar">
           <select id="history-app" aria-label="앱으로 거르기"></select>
           <span class="grow"></span>
+          <button id="history-apps" class="link-btn">모을 앱</button>
           <button id="history-clear" class="link-btn danger">모두 지우기</button>
         </div>
         <div id="history-rows" class="rows"></div>
@@ -368,6 +369,9 @@
       <input type="checkbox" id="history-enabled" class="switch">
       <span>다른 앱 알림 모아두기 <small id="history-note"></small></span>
     </label>
+    <div class="sheet-actions">
+      <button id="history-apps-2" class="btn">알림 모을 앱 고르기 <span id="blocked-count" class="trash-count"></span></button>
+    </div>
 
     <p class="label">지운 메모</p>
     <div class="sheet-actions">
@@ -385,6 +389,15 @@
     </label>
     <p class="version" id="version"></p>
     <p class="copyright">© 2026 메모킹 · 만든 사람 lmg6983@gmail.com</p>
+  </section>
+
+  <!-- 알림 보관함: 앱마다 모을지 고르기 -->
+  <section id="apps-sheet" class="sheet apps-sheet" role="dialog" aria-label="알림 모을 앱" hidden>
+    <div class="sheet-grip"></div>
+    <h2 class="sheet-title">알림 모을 앱</h2>
+    <p class="hint">끈 앱의 알림은 앞으로 보관함에 모으지 않아요. 언제든 다시 켤 수 있어요.</p>
+    <ul id="apps-list" class="apps-list"></ul>
+    <p id="apps-empty" class="empty small" hidden>아직 알림이 온 앱이 없어요</p>
   </section>
 
   <!-- 휴지통 -->

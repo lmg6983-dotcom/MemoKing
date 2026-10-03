@@ -47,6 +47,8 @@ export const history = {
   setEnabled: sync('historySetEnabled'),
   remove: sync('historyRemove'),
   clear: sync('historyClear'),
+  block: sync('historyBlock'),
+  unblock: sync('historyUnblock'),
 };
 
 // Google Drive 동기화 (DriveSync.kt)

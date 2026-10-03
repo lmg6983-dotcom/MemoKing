@@ -30,6 +30,7 @@ class NotiService : NotificationListenerService() {
 object NotiStore {
     private const val MAX = 3000
     private const val KEY_ENABLED = "historyEnabled"
+    private const val KEY_BLOCKED = "historyBlocked" // 모으지 않을 앱: { 패키지: 앱 이름 }
     private const val REPEAT_MS = 10 * 60 * 1000L // 같은 알림이 다시 올라오면(갱신) 한 번만
     private val lock = Any()
     private var cache: JSONArray? = null
@@ -42,6 +43,40 @@ object NotiStore {
 
     fun enabled(ctx: Context) = Vaults.prefs(ctx).getBoolean(KEY_ENABLED, false)
     fun setEnabled(ctx: Context, on: Boolean) = Vaults.prefs(ctx).edit().putBoolean(KEY_ENABLED, on).apply()
+
+    // ---------- 모으지 않을 앱 ----------
+
+    fun blocked(ctx: Context): JSONObject = try {
+        JSONObject(Vaults.prefs(ctx).getString(KEY_BLOCKED, "{}") ?: "{}")
+    } catch (e: Exception) {
+        JSONObject()
+    }
+
+    private fun isBlocked(ctx: Context, pkg: String) = blocked(ctx).has(pkg)
+
+    /** 이 앱 알림을 더 모으지 않는다. removeExisting 이면 이미 모은 것도 지운다. 지운 개수 */
+    fun block(ctx: Context, pkg: String, app: String, removeExisting: Boolean): Int {
+        val map = blocked(ctx).put(pkg, app)
+        Vaults.prefs(ctx).edit().putString(KEY_BLOCKED, map.toString()).apply()
+        if (!removeExisting) return 0
+        return synchronized(lock) {
+            val list = load(ctx)
+            val next = JSONArray()
+            var removed = 0
+            for (i in 0 until list.length()) {
+                val e = list.getJSONObject(i)
+                if (e.optString("appId") == pkg && e.optString("source") != "memoking") removed++ else next.put(e)
+            }
+            if (removed > 0) save(ctx, next)
+            removed
+        }
+    }
+
+    fun unblock(ctx: Context, pkg: String) {
+        val map = blocked(ctx)
+        map.remove(pkg)
+        Vaults.prefs(ctx).edit().putString(KEY_BLOCKED, map.toString()).apply()
+    }
 
     /** 안드로이드 설정에서 "알림 접근"을 허용했는가 */
     fun granted(ctx: Context): Boolean {
@@ -116,6 +151,7 @@ object NotiStore {
 
     fun fromNotification(ctx: Context, sbn: StatusBarNotification): JSONObject? {
         if (sbn.packageName == ctx.packageName) return null // 메모킹 알림은 addOwn 으로
+        if (isBlocked(ctx, sbn.packageName)) return null // 사용자가 그만 모으기로 한 앱
         val n = sbn.notification
         // 계속 떠 있는 알림(음악·다운로드·통화 중), 묶음 머리 알림은 빼고
         if (sbn.isOngoing || n.flags and Notification.FLAG_FOREGROUND_SERVICE != 0 || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return null

@@ -258,6 +258,24 @@ try {
   await back();
   await page.waitForTimeout(300);
   await page.fill('#search', '');
+  await page.waitForTimeout(300);
+  // 이 앱 알림 그만 모으기 (카카오톡, 이미 모은 2개도 지우기)
+  await page.locator('.noti', { hasText: '카카오톡' }).first().tap();
+  await page.locator('.noti.expanded [aria-label="카카오톡 알림 그만 모으기"]').tap();
+  await page.click('#confirm-ok'); // 그만 모으기
+  await page.waitForTimeout(250);
+  await page.click('#confirm-ok'); // 이미 모은 것도 지우기
+  await page.waitForTimeout(300);
+  check('보관함: 앱 차단 + 이미 모은 것 지움', (await page.locator('.noti', { hasText: '카카오톡' }).count()) === 0);
+  await page.tap('#history-apps');
+  await page.waitForTimeout(250);
+  await shot('08-history-apps');
+  const kakao = page.locator('.app-row', { hasText: '카카오톡' });
+  check('모을 앱: 끈 앱이 꺼진 채로 보임', (await kakao.count()) === 1 && !(await kakao.locator('.switch').isChecked()));
+  await kakao.locator('.switch').click();
+  await page.waitForTimeout(200);
+  check('모을 앱: 다시 켜기', (await devLog()).log !== undefined && Object.keys((await (await fetch(`${base}/native/sync`, { method: 'POST', body: JSON.stringify({ method: 'historyAll', args: [] }) })).json()).v.blocked).length === 0);
+  await back();
   await back(); // 보관함 탭 → 메모 탭
   await page.waitForTimeout(200);
 

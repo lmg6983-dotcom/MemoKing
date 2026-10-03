@@ -214,8 +214,18 @@ class Bridge(private val activity: MainActivity) {
     /** { enabled, granted, entries: [...] } — 거르기·검색은 화면이 한다 */
     @JavascriptInterface
     fun historyAll(): String = reply {
-        JSONObject().put("enabled", NotiStore.enabled(ctx)).put("granted", NotiStore.granted(ctx)).put("entries", NotiStore.all(ctx))
+        JSONObject().put("enabled", NotiStore.enabled(ctx)).put("granted", NotiStore.granted(ctx))
+            .put("blocked", NotiStore.blocked(ctx)).put("entries", NotiStore.all(ctx))
     }
+
+    /** 이 앱 알림을 더 모으지 않기 (removeExisting: 이미 모은 것도 지우기) → 지운 개수 */
+    @JavascriptInterface
+    fun historyBlock(appId: String, app: String, removeExisting: Boolean): String = reply {
+        NotiStore.block(ctx, appId, app, removeExisting)
+    }
+
+    @JavascriptInterface
+    fun historyUnblock(appId: String): String = reply { NotiStore.unblock(ctx, appId) }
 
     @JavascriptInterface
     fun historySetEnabled(on: Boolean): String = reply {

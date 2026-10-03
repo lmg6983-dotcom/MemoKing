@@ -107,6 +107,8 @@ export function setupHistoryTab({ api, els, confirm }) {
       actionButton('copy', '복사', () => api.copyText([e.title, e.body].filter(Boolean).join('\n'))),
       actionButton('trash', '지우기', () => api.history.remove(e.id)),
     );
+    // 이 앱 알림 그만 모으기 (안드로이드)
+    if (api.history.block && e.source !== 'memoking') actions.append(actionButton('block', `${e.app} 알림 그만 모으기`, () => api.history.block(e)));
 
     div.append(avatar(e), text, actions);
     // 누르면 내용 펼치기 / 메모킹 알림은 그 메모 열기

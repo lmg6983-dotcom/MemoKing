@@ -58,6 +58,11 @@ app.api = {
       history.clear();
       list.refreshHistory();
     },
+    // 이 앱 알림 그만 모으기 (보관함의 알림을 펼친 곳)
+    block: async (e) => {
+      await blockApp(e.appId, e.app);
+      list.refreshHistory();
+    },
     toMemo: async (id) => {
       const e = history.all().entries.find((x) => x.id === id);
       if (!e || !app.vault) return null;
@@ -82,9 +87,84 @@ async function enableHistory(on) {
   return granted;
 }
 
+// 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
+async function blockApp(appId, appName) {
+  if (!(await confirmDialog(`${appName} 알림을 앞으로 모으지 않을까요?\n설정 › 알림 모을 앱 고르기에서 다시 켤 수 있어요.`, '그만 모으기'))) return false;
+  const count = history.all().entries.filter((x) => x.appId === appId && x.source !== 'memoking').length;
+  const remove = count > 0 && await confirmDialog(`이미 모은 ${appName} 알림 ${count}개도 지울까요?`, '지우기');
+  const removed = history.block(appId, appName, remove);
+  toast(removed ? `${appName} 알림을 그만 모으고 ${removed}개를 지웠어요` : `${appName} 알림을 앞으로 모으지 않아요`);
+  return true;
+}
+
+// 알림 모을 앱 고르기: 지금까지 알림이 온 앱 + 끈 앱, 앱마다 스위치
+function renderApps() {
+  const { entries, blocked } = history.all();
+  const apps = new Map();
+  for (const e of entries) {
+    if (e.source === 'memoking') continue;
+    const a = apps.get(e.appId) ?? { appId: e.appId, app: e.app, image: e.image, count: 0 };
+    a.count++;
+    apps.set(e.appId, a);
+  }
+  for (const [appId, app] of Object.entries(blocked ?? {})) if (!apps.has(appId)) apps.set(appId, { appId, app, image: `${appId}.png`, count: 0 });
+  const rows = [...apps.values()].sort((a, b) => b.count - a.count || a.app.localeCompare(b.app, 'ko'));
+  $('apps-empty').hidden = rows.length > 0;
+  $('apps-list').replaceChildren(...rows.map((a) => {
+    const off = Boolean(blocked?.[a.appId]);
+    const li = document.createElement('li');
+    li.className = `app-row${off ? ' off' : ''}`;
+    const img = document.createElement('img');
+    img.className = 'avatar';
+    img.alt = '';
+    img.src = `${window.memoking.historyBase}${encodeURIComponent(a.image ?? `${a.appId}.png`)}`;
+    img.onerror = () => {
+      const letter = document.createElement('span');
+      letter.className = 'avatar letter';
+      letter.textContent = (a.app || '?').charAt(0).toUpperCase();
+      let h = 0;
+      for (const ch of a.app) h = (h * 31 + ch.codePointAt(0)) % 360;
+      letter.style.background = `hsl(${h} 55% 50%)`;
+      img.replaceWith(letter);
+    };
+    const name = document.createElement('span');
+    name.className = 'app-name';
+    const b = document.createElement('b');
+    b.textContent = a.app;
+    const small = document.createElement('small');
+    small.textContent = off ? '모으지 않아요' : `알림 ${a.count}개 보관 중`;
+    name.append(b, small);
+    const sw = document.createElement('input');
+    sw.type = 'checkbox';
+    sw.className = 'switch';
+    sw.checked = !off;
+    sw.setAttribute('aria-label', `${a.app} 알림 모으기`);
+    sw.addEventListener('change', async () => {
+      if (sw.checked) {
+        history.unblock(a.appId);
+        toast(`${a.app} 알림을 다시 모아요`);
+      } else if (!(await blockApp(a.appId, a.app))) sw.checked = true;
+      renderApps();
+      refreshHistoryRow();
+      list.refreshHistory();
+    });
+    li.append(img, name, sw);
+    return li;
+  }));
+}
+
+function openAppsSheet() {
+  renderApps();
+  openSheet($('apps-sheet'));
+}
+$('history-apps').addEventListener('click', openAppsSheet);
+$('history-apps-2').addEventListener('click', openAppsSheet);
+
 function refreshHistoryRow() {
   const { enabled, granted } = history.all();
   $('history-enabled').checked = enabled && granted;
+  const blockedCount = Object.keys(history.all().blocked ?? {}).length;
+  $('blocked-count').textContent = blockedCount ? `${blockedCount}개 끔` : '';
   $('history-note').textContent = enabled && !granted
     ? '안드로이드 설정에서 "알림 접근"을 허용해야 모을 수 있어요'
     : '다른 앱 알림을 이 휴대폰에만 모아 둬요 (알림 보관함 탭)';
