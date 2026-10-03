@@ -409,6 +409,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .note-screen .format-bar .sep { height: 22px; margin: 0 4px; }
 .note-screen .format-bar button:hover { background: none; }
 .note-screen .format-bar button:active { background: var(--note-hover); }
+.note-screen .format-bar button.active { background: color-mix(in srgb, var(--note-text) 14%, transparent); color: var(--note-text); }
 .done-btn { margin-left: auto; }
 .note-screen:not(.keyboard) .done-btn { display: none; }
 .note-screen .table-bar { overflow-x: auto; }
