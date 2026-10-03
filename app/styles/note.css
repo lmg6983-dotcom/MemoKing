@@ -126,9 +126,17 @@ body[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-ho
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* 스크롤 막대 자리를 늘 비워 둔다: 아래 도구막대가 오르내리거나 내용이 창 높이를 살짝 넘나들 때
+     막대가 생겼다 사라지며 글 폭이 바뀌어 줄바꿈이 달라지는 일이 없게 (v0.17.19) */
   padding: 10px 16px 16px;
   cursor: text;
 }
+/* 본문 요소(.mk-doc)에도 .editor class 가 붙으므로 바깥 스크롤 상자는 id 로 */
+#editor { scrollbar-gutter: stable; padding-right: 8px; }
+#editor::-webkit-scrollbar { width: 8px; }
+#editor::-webkit-scrollbar-track { background: transparent; }
+#editor::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 4px; background: color-mix(in srgb, var(--note-text) 22%, transparent) padding-box; }
+#editor::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--note-text) 38%, transparent); }
 .mk-doc {
   min-height: 100%;
   outline: none;
@@ -762,7 +770,9 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
   vertical-align: top;
   text-align: left;
 }
-.mk-doc th { background: var(--note-hover); font-weight: 700; }
+.mk-doc th { font-weight: 700; }
+/* 머리글 행 바탕은 표 막대의 "머리글 강조"를 켰을 때만 (v0.17.2) */
+.mk-doc .mk-head-accent th { background: var(--note-hover); }
 .mk-doc th > p, .mk-doc td > p { margin: 0; }
 /* 여러 칸을 고르면 (드래그) 칸마다 옅은 노랑 */
 .mk-doc .selectedCell::after {
@@ -890,3 +900,195 @@ body.stacked { --tabs-h: 0px; --tabs-w: 30px; padding-left: var(--tabs-w); }
 .stack-tab[data-color][aria-selected="true"] { background: var(--note-bg); }
 .stack-tab { flex: none; min-height: 0; }
 .stack-tab .stack-title { flex: none; overflow: visible; text-overflow: clip; white-space: nowrap; line-height: 1; letter-spacing: 0.02em; }
+
+/* ---------- v0.17.2: Ctrl+마우스 휠로 본문 확대·축소 (웹 브라우저처럼 글·사진·표가 함께) ---------- */
+#editor > * { zoom: var(--note-zoom, 1); } /* 본문 요소에도 .editor class 가 붙으므로 id 로 (두 번 확대되지 않게) */
+.zoom-badge {
+  position: fixed;
+  right: 14px;
+  bottom: 54px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--brand-black);
+  color: var(--on-black);
+  font: 600 12px/22px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+  pointer-events: none;
+}
+.zoom-badge.show { opacity: 1; transform: none; pointer-events: auto; }
+.zoom-badge button {
+  height: 22px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.zoom-badge button:hover { background: rgba(255, 255, 255, 0.28); }
+
+/* ---------- v0.17.2: 표 열 너비·행 높이를 자유롭게 ---------- */
+/* 열 너비를 정한 표는 끈 대로 (좁게도 넓게도) — 너비를 안 정한 표는 지금처럼 내용에 맞춤 */
+.mk-doc .mk-sized table, .mk-doc table.mk-sized { table-layout: fixed; min-width: 0; }
+.mk-doc .mk-sized :is(th, td) { min-width: 0; overflow-wrap: anywhere; }
+/* 행 높이: 칸 아래 테두리를 끌기 */
+.mk-doc.row-resize-cursor, body.mk-row-resizing, body.mk-row-resizing * { cursor: row-resize !important; }
+body.mk-row-resizing { user-select: none; }
+.table-bar button[aria-pressed="true"] { background: var(--note-hover); color: var(--note-text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 30%, transparent); }
+
+/* ---------- v0.17.4: 스타일 고르기 (H1·H2 버튼 대신) ---------- */
+.format-bar .style-btn, .more-panel .style-btn { width: auto; min-width: 64px; padding: 0 8px 0 9px; gap: 6px; display: inline-flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 700; }
+.style-btn .style-name { white-space: nowrap; }
+.style-caret { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor; opacity: 0.6; }
+.style-btn[aria-expanded="true"] .style-caret { transform: rotate(180deg); }
+.style-menu { width: 196px; display: flex; flex-direction: column; gap: 1px; }
+.style-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+  padding: 4px 10px 4px 26px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+.style-menu button:hover, .style-menu button:focus-visible { background: var(--fill-hover); }
+.style-menu button[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-70%) rotate(-45deg);
+}
+.style-menu kbd { font: 500 11px/1 var(--font-sans); color: var(--muted); }
+.style-sample { line-height: 1.25; white-space: nowrap; }
+.s-paragraph { font-size: 14px; }
+.s-h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+.s-h2 { font-size: 17px; font-weight: 750; }
+.s-h3 { font-size: 15px; font-weight: 700; }
+.s-quote { padding-left: 8px; border-left: 3px solid var(--brand-yellow); color: var(--muted); font-size: 14px; }
+.s-code { padding: 1px 6px; border-radius: 4px; background: var(--fill-hover); font: 13px ui-monospace, Consolas, monospace; }
+
+/* ---------- v0.17.4: 표 막대는 좁은 창에서도 버튼이 가려지지 않게 여러 줄로 ---------- */
+.table-bar { flex-wrap: wrap; row-gap: 2px; overflow-x: visible; }
+.table-bar button { flex: none; }
+
+/* ---------- v0.17.14: 목록·체크리스트 항목 — 글자를 잠깐 누르고 끌어서 순서 바꾸기 ---------- */
+.mk-doc li { position: relative; }
+.mk-doc .mk-sorting > li { transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* 옮길 수 있다는 표시: 마우스를 올린 항목(가장 안쪽)에 흐린 점선 테두리 — 체크 네모·글머리까지 감싼다.
+   꾹 누르면(.mk-pressing) 누르는 동안 테두리가 점점 진해지고, 들어 올리면(.mk-lift) 진한 실선. 색은 메모 글자 색 기준(어느 메모 색에서도 보이게) */
+.mk-doc li::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: calc(-1.35em - 7px);
+  right: -6px;
+  border: 1.5px dashed transparent;
+  border-radius: 7px;
+  pointer-events: none;
+  transition: border-color 0.15s ease-out;
+}
+.mk-doc li:hover:not(:has(li:hover))::after { border-color: color-mix(in srgb, var(--note-text) 24%, transparent); }
+.mk-doc li.mk-pressing::after {
+  border-style: solid !important;
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--note-text) 75%, transparent) !important;
+  transition: border-color 0.23s linear;
+}
+.mk-doc[contenteditable="false"] li::after, .mk-list-dragging .mk-doc li:not(.mk-lift):not(.mk-swap-target)::after { border-color: transparent; }
+/* 들어 올린 항목: 진한 실선 테두리 + 그림자, 바뀔 자리로 미끄러진다 */
+.mk-doc li.mk-lift {
+  z-index: 5;
+  border-radius: 6px;
+  background: var(--note-bg);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  cursor: grabbing;
+  pointer-events: none; /* 커서를 따라오는 동안 아래 항목이 잡히게 */
+  transition: none !important; /* 커서를 지연 없이 따라온다 (나머지 항목만 미끄러짐) */
+}
+.mk-doc li.mk-lift::after { border: 2px solid var(--note-text) !important; }
+.mk-doc li.mk-lift > p { animation: mk-lift-in 0.18s ease-out both; }
+@keyframes mk-lift-in { from { transform: scale(1); } 50% { transform: scale(1.03); } to { transform: scale(1.015); } }
+/* 맞바꿀 항목 */
+.mk-doc li.mk-swap-target { border-radius: 6px; background: var(--note-hover); }
+.mk-doc li.mk-swap-target::after { border: 2px dashed color-mix(in srgb, var(--note-text) 60%, transparent) !important; }
+.mk-list-dragging, .mk-list-dragging * { cursor: grabbing !important; user-select: none !important; }
+.mk-list-dragging ::selection { background: transparent !important; } /* 끄는 동안 글자 선택 표시는 숨김 */
+.mk-drop-line { position: fixed; z-index: 50; height: 3px; border-radius: 2px; background: var(--note-accent, #ffcd00); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); pointer-events: none; }
+.mk-drop-line[hidden] { display: none; }
+
+/* 체크 폭죽 (canvas-confetti) */
+.mk-confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 60; pointer-events: none; }
+
+/* 모든 체크리스트를 끝내면 CLEAR 도장 — 메모 본문 정중앙에 반투명 (글을 가리지 않게, 눌리지 않음) */
+.clear-stamp {
+  position: fixed;
+  z-index: 5;
+  padding: 6px 22px 4px;
+  border: 5px double #e5484d;
+  border-radius: 14px;
+  color: #e5484d;
+  font-size: 46px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1.15;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  opacity: 0.26;
+  pointer-events: none;
+  white-space: nowrap;
+}
+body[data-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.32; }
+.clear-stamp[hidden] { display: none; }
+.clear-stamp.stamp-in { animation: clear-stamp-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+@keyframes clear-stamp-in {
+  0% { transform: translate(-50%, -50%) rotate(-14deg) scale(2.4); opacity: 0; }
+  60% { transform: translate(-50%, -50%) rotate(-14deg) scale(0.94); opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) rotate(-14deg) scale(1); opacity: 0.26; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clear-stamp.stamp-in { animation: none; }
+  .mk-doc .mk-sorting > li, .mk-doc li.mk-lift > p { transition: none; animation: none; }
+}
+@media print { .clear-stamp { display: none !important; } }
+
+/* ---------- v0.17.16: 아래 서식 도구막대 — 메모 창이 활성이거나 마우스가 아래쪽에 있을 때만 미끄러져 올라온다 ---------- */
+.format-bar { position: relative; z-index: 2; background: var(--note-bg); transition: margin-bottom 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease-out; }
+body.bar-hidden .format-bar { margin-bottom: calc(-1 * var(--bar-h, 38px)); opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .format-bar { transition: none; } }
+
+/* ---------- v0.17.17: 끌기 — 커서 옆 안내 · 놓은 항목 반짝 ---------- */
+.mk-drag-badge {
+  position: fixed; z-index: 60; pointer-events: none;
+  padding: 3px 9px; border-radius: 99px;
+  background: #111; color: #fff; font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  animation: mk-badge-in 0.12s ease-out;
+}
+.mk-drag-badge[data-kind="swap"] { background: #7a4dff; }
+.mk-drag-badge[data-kind="insert"] { background: #111; }
+.mk-drag-badge[hidden] { display: none; }
+@keyframes mk-badge-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.mk-doc li.mk-dropped { border-radius: 6px; animation: mk-dropped 0.7s ease-out; }
+@keyframes mk-dropped { 0% { background: color-mix(in srgb, var(--note-text) 16%, transparent); } 100% { background: transparent; } }
+.mk-doc li.mk-swap-target::after { border-color: #7a4dff !important; }
+@media (prefers-reduced-motion: reduce) { .mk-drag-badge, .mk-doc li.mk-dropped { animation: none; } }

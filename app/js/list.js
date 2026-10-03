@@ -1,13 +1,18 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
 import { injectIcons, icon } from './icons.js';
 import { formatStamp } from './core/format.js';
-import { chooseDensity } from './core/list-density.js';
+import { chooseDensity, levelDensity } from './core/list-density.js';
 import { vaultUrl } from './media.js';
 import { setupRemindersTab } from './list-reminders.js';
 import { setupHistoryTab } from './list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
+import { isAllClear } from './core/tasks.js';
+import { MAGIC_MODULES } from './core/magic-modules.js';
+import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
+
+let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
@@ -278,6 +283,16 @@ function renderCard(memo) {
   // 태그·표시가 있을 때만 아랫줄 (없으면 한 줄 아낌)
   if (tags.childElementCount || meta.childElementCount) card.append(foot);
 
+  // 체크리스트를 모두 끝낸 메모: CLEAR 도장 (v0.17.13)
+  if (isAllClear(memo.tasks)) {
+    const clear = document.createElement('span');
+    clear.className = 'card-clear';
+    clear.textContent = 'CLEAR';
+    clear.setAttribute('aria-label', `체크리스트 ${memo.tasks.total}개를 모두 끝냈어요`);
+    card.classList.add('all-clear');
+    card.append(clear);
+  }
+
   const del = document.createElement('button');
   del.className = 'icon-btn danger card-delete';
   del.title = '지우기';
@@ -383,8 +398,9 @@ async function loadSettings() {
   auto.disabled = !s.autoStart.available;
   $('auto-start-note').textContent = s.autoStart.available ? '작업 표시줄 알림 영역에서 조용히 시작해요' : '설치한 메모킹에서 쓸 수 있어요';
   $('history-enabled').checked = s.historyEnabled;
-  $('popup-watch').checked = s.popupWatch;
-  $('popup-watch').disabled = !s.historyEnabled;
+  $('fit-tables').checked = s.fitTables !== false;
+  magicIndex = s.magicIndex ?? null;
+  showMagic(s.magic);
   showQuickMemo(s.quickMemo);
   $('trash-days').value = String(s.trashDays);
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
@@ -399,12 +415,54 @@ $('quick-memo').addEventListener('change', async (e) => showQuickMemo(await api.
 $('auto-start').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setAutoStart(e.target.checked);
 });
-$('popup-watch').addEventListener('change', async (e) => {
-  e.target.checked = await api.history.setPopupWatch(e.target.checked);
+$('fit-tables').addEventListener('change', async (e) => {
+  e.target.checked = await api.settings.setFitTables(e.target.checked);
+});
+
+// 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)
+let magicState = { enabled: true, modules: {} };
+let magicIndex = null; // 파일 검색 목록 상태 { count, builtAt, building }
+const indexNote = (st) => (!st ? '' : st.building && !st.count ? ' · 파일 목록을 만드는 중…' : st.count ? ` · 파일 ${st.count.toLocaleString('ko-KR')}개${st.building ? ' (새로 고치는 중)' : ''}` : '');
+function renderMagicModules() {
+  const list = $('magic-modules-list');
+  list.replaceChildren(...MAGIC_MODULES.map((m) => {
+    const row = document.createElement('label');
+    row.className = `magic-mod${m.ready ? '' : ' soon'}`;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'switch';
+    cb.checked = m.ready && magicState.modules[m.id] !== false && !!magicState.modules[m.id];
+    cb.disabled = !m.ready || !magicState.enabled;
+    cb.addEventListener('change', async () => {
+      magicState = await api.settings.setMagic({ enabled: magicState.enabled, modules: { ...magicState.modules, [m.id]: cb.checked } });
+      renderMagicModules();
+    });
+    const text = document.createElement('span');
+    text.append(m.name);
+    if (!m.ready) {
+      const em = document.createElement('em');
+      em.textContent = ' (준비 중)';
+      text.append(em);
+    }
+    const small = document.createElement('small');
+    small.textContent = m.description + (m.id === 'files' && cb.checked ? indexNote(magicIndex) : '');
+    text.append(' ', small);
+    row.append(cb, text);
+    return row;
+  }));
+}
+function showMagic(magic) {
+  magicState = magic ?? { enabled: true, modules: {} };
+  $('magic-enabled').checked = magicState.enabled;
+  $('magic-modules-row').hidden = !magicState.enabled;
+  renderMagicModules();
+}
+$('magic-enabled').addEventListener('change', async (e) => {
+  magicState = await api.settings.setMagic({ enabled: e.target.checked, modules: magicState.modules });
+  showMagic(magicState);
 });
 $('history-enabled').addEventListener('change', async (e) => {
   e.target.checked = await api.history.setEnabled(e.target.checked);
-  $('popup-watch').disabled = !e.target.checked;
   historyTab.refresh();
 });
 
@@ -639,18 +697,80 @@ function applyDensity() {
   const width = el.cards.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const height = el.cards.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   if (width <= 0 || height <= 0) return;
-  const d = chooseDensity({ width, height }, el.cards.children.length);
+  // 100% 모양은 화면 크기로 고른다 (축소 중이면 목록 자체가 작아져 있어 잰 크기 × 배율 = 화면 크기),
+  // 확대·축소 단계는 그 모양에서 요약 줄·사진·열을 더하고 뺀다 (levelDensity)
+  const count = el.cards.children.length;
+  const s = listZoom < 1 ? listZoom : 1;
+  const d = levelDensity(chooseDensity({ width: width * s, height: height * s }, count), listZoom, { width, count });
   const set = (name, value) => {
     if (el.cards.style.getPropertyValue(name) !== value) el.cards.style.setProperty(name, value);
   };
   if (el.cards.dataset.density !== d.mode) el.cards.dataset.density = d.mode;
   set('--cols', String(d.cols));
   set('--preview-lines', String(Math.max(1, d.previewLines)));
+  set('--preview-lines-full', String(Math.max(1, d.fullLines)));
   set('--thumb-h', `${d.thumbHeight}px`);
   // 메모가 적으면 목록 높이를 같은 높이로 나눠 채운다
-  set('--row-h', d.fill ? 'minmax(0, 1fr)' : 'auto'); // 남는 몇 px 까지 똑같이 나눈다
+  // 남는 몇 px 까지 똑같이 나누되, 카드 내용보다 낮아지지는 않게 (창이 작으면 목록이 스크롤 — 카드가 넘쳐 틈의 스탬프와 겹치지 않게)
+  set('--row-h', d.fill ? 'minmax(min-content, 1fr)' : 'auto');
   el.cards.classList.toggle('fill', d.fill);
 }
+// ---------- 메모 카드 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) = 얼마나 자세히 보기, 이 PC 에 기억 ----------
+// 확대: 글자·여백·버튼은 100% 크기 그대로, 카드마다 요약 줄을 더하고 150%부터 사진·태그 줄을 덧붙인다 (카드가 길어져 한 화면의
+//       카드 수는 준다). 축소: 카드 목록 전체가 작아지고(CSS zoom) 요약 줄을 줄이며 열을 늘린다. 단계는 core/list-density.js 의 levelDensity.
+const LIST_ZOOM_KEY = 'memoking.listZoom';
+try {
+  listZoom = clampZoom(localStorage.getItem(LIST_ZOOM_KEY) ?? 1);
+} catch {
+  // 저장소를 못 써도 100% 로
+}
+const listZoomBadge = document.createElement('div');
+listZoomBadge.className = 'zoom-badge';
+listZoomBadge.setAttribute('role', 'status');
+const listZoomText = document.createElement('span');
+const listZoomReset = document.createElement('button');
+listZoomReset.type = 'button';
+listZoomReset.textContent = '원래대로';
+listZoomReset.addEventListener('click', () => setListZoom(1));
+listZoomBadge.append(listZoomText, listZoomReset);
+document.body.append(listZoomBadge);
+let listZoomTimer = 0;
+// 자세히 보기 단계는 175% 까지 (core/list-density.js 의 MORE)
+const LIST_ZOOM_MAX = 1.75;
+function setListZoom(z, { show = true } = {}) {
+  listZoom = Math.min(LIST_ZOOM_MAX, clampZoom(z));
+  // 축소할 때만 목록 전체를 작게 (확대할 때 글자·여백·버튼·사진은 100% 크기 그대로)
+  el.cards.style.zoom = listZoom < 1 ? String(listZoom) : '';
+  document.body.dataset.listZoom = String(listZoom);
+  try {
+    if (listZoom === 1) localStorage.removeItem(LIST_ZOOM_KEY);
+    else localStorage.setItem(LIST_ZOOM_KEY, String(listZoom));
+  } catch {
+    // 기억 못 해도 지금 창에서는 그대로
+  }
+  if (!densityFrame) densityFrame = requestAnimationFrame(applyDensity);
+  if (!show) return;
+  listZoomText.textContent = `메모 ${zoomLabel(listZoom)}`;
+  listZoomReset.hidden = listZoom === 1;
+  listZoomBadge.classList.add('show');
+  clearTimeout(listZoomTimer);
+  listZoomTimer = setTimeout(() => listZoomBadge.classList.remove('show'), 1600);
+}
+setListZoom(listZoom, { show: false });
+window.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault(); // 창 전체(Chromium) 확대는 막는다
+  if (e.deltaY) setListZoom(stepZoom(listZoom, e.deltaY < 0 ? 1 : -1));
+}, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || (e.shiftKey && e.code !== 'Equal')) return;
+  if (e.target.closest?.('input, textarea, [contenteditable="true"]') && e.code !== 'Equal' && e.code !== 'Minus') return;
+  if (e.code === 'Equal' || e.code === 'NumpadAdd') setListZoom(stepZoom(listZoom, 1));
+  else if (e.code === 'Minus' || e.code === 'NumpadSubtract') setListZoom(stepZoom(listZoom, -1));
+  else return;
+  e.preventDefault();
+});
+
 // 크기가 바뀌면 다음 화면에서 한 번만 (모양을 바꾸며 생기는 크기 변화가 다시 불러들이지 않게)
 new ResizeObserver(() => {
   if (!densityFrame) densityFrame = requestAnimationFrame(applyDensity);

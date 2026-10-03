@@ -58,10 +58,14 @@ export function pageSize(o) {
 }
 
 // 비율 고정으로 한 변을 바꿨을 때 다른 변 (직접 입력)
+// 다른 변이 범위(50~1200mm)를 넘으면 바꾼 변을 줄이거나 늘려 비율을 지킨다
 export function keepRatio(changed, value, { width, height }) {
-  const v = clampMm(value);
-  if (changed === 'width') return { width: v, height: clampMm((v * height) / width) };
-  return { width: clampMm((v * width) / height), height: v };
+  const r = changed === 'width' ? height / width : width / height; // 다른 변 = 바꾼 변 × r
+  let v = clampMm(value);
+  if (v * r > MAX_MM) v = clampMm(MAX_MM / r);
+  if (v * r < MIN_MM) v = clampMm(MIN_MM / r);
+  const other = clampMm(v * r);
+  return changed === 'width' ? { width: v, height: other } : { width: other, height: v };
 }
 
 // 화면 미리보기용: mm → CSS px (96dpi)

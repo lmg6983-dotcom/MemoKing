@@ -17,8 +17,11 @@ import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
-import { popupToEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
+import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
+import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
+import { searchMemos } from '../app/js/core/memo-search.js';
+import { FileIndex } from './file-index.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -34,6 +37,8 @@ const LOGIN_ARGS = ['--hidden'];
 const APP_ID = 'com.memoking.desktop';
 const APP_DIR = path.join(import.meta.dirname, '..', 'app');
 const PRELOAD = path.join(import.meta.dirname, 'preload.cjs');
+const OCR_PRELOAD = path.join(import.meta.dirname, 'ocr-preload.cjs');
+const MAGIC_PRELOAD = path.join(import.meta.dirname, 'magic-preload.cjs');
 const ASSETS_DIR = path.join(import.meta.dirname, '..', 'assets');
 // 창·작업표시줄·알림 영역 아이콘 (npm run icons 로 생성, 16~256px 9개 크기)
 const APP_ICON = path.join(ASSETS_DIR, 'icons', 'memoking.ico');
@@ -70,12 +75,14 @@ const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 let settings = {
   vaultPath: null, openNotes: [], noteBounds: {}, onTop: {}, listBounds: null, migratedV1: false,
   historyEnabled: false, // 알림 보관함 (다른 앱 알림을 읽으므로 사용자가 켤 때만)
-  popupWatch: false, // 팝업 알림도 모으기 (카카오톡 등 Windows 알림 센터를 쓰지 않는 앱의 알림 창을 읽음)
   autoStartSet: false, // 설치판 첫 실행 때 자동 실행을 한 번 켜 두었는지
   quickMemo: true, // Ctrl+Alt+C 빠른 메모
   tutorialDone: false, // 처음 실행 튜토리얼을 마쳤거나 건너뛰었는지
   trashDays: 30, // 휴지통에 이 날짜보다 오래 있던 메모를 저절로 영구 삭제 (0 = 하지 않음)
   listOnTop: false, // 목록 창도 다른 창보다 늘 위에
+  fitTables: true, // 표가 메모 본문보다 넓으면 메모를 줄여 맞추고, 더 못 줄이면 창을 넓힌다
+  magic: undefined, // 매직키 (Ctrl+Alt+Space): { enabled, modules } — normalizeMagicSettings 로 정리
+  magicPos: null, // 매직키 창을 끌어 옮긴 자리 { x, y }
 };
 let settingsTimer = null;
 
@@ -1323,7 +1330,7 @@ function initHistory() {
 }
 
 // ---------- 팝업 알림 (Windows 알림 센터를 쓰지 않는 앱) ----------
-// 지켜볼 앱이 작은 맨 위 창(알림 창)을 띄우면 도우미가 UI 자동화 → 안 되면 Windows 글자 인식으로 읽어 보내 준다.
+// 지켜볼 앱이 작은 맨 위 창(알림 창)을 띄우면 도우미가 글자를 그대로 읽거나(UI 자동화 등) Windows 글자 인식으로 읽어 보내 준다.
 let popupWatcher = null;
 const recentPopups = [];
 
@@ -1331,18 +1338,84 @@ function createPopupWatcher(options = {}) {
   const watcher = new PopupWatcher({
     script: POPUP_HELPER,
     dir: path.join(os.tmpdir(), 'memoking-popups'),
+    log: path.join(app.getPath('userData'), 'popup-debug.log'),
     processes: Object.keys(POPUP_APPS),
     ...options,
   });
-  watcher.on('popup', addPopupToHistory);
+  watcher.on('popup', (p) => addPopupToHistory(p).catch((err) => console.warn('[팝업 알림]', err.message)));
   watcher.on('error', (err) => console.warn('[팝업 알림]', err.message));
   return watcher;
 }
 
-function addPopupToHistory(p) {
+// ---------- 숨은 OCR 창 (tesseract.js 한글) — 알림 창 그림을 Windows 기본 OCR 대신 한글에 강한 모델로 읽는다 ----------
+// memoking://ocr 오리진에서 로드되어 워커·wasm·언어파일을 같은 오리진에서 불러온다. 처음 쓸 때 한 번만 띄운다.
+let ocrWin = null;
+let ocrReady = null;
+const ocrPending = new Map(); // id -> {resolve, timer}
+let ocrSeq = 0;
+
+function ensureOcrWindow() {
+  if (ocrReady) return ocrReady;
+  ocrReady = new Promise((resolve, reject) => {
+    try {
+      ocrWin = new BrowserWindow({
+        show: false,
+        skipTaskbar: true,
+        webPreferences: { preload: OCR_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
+      });
+      ipcMain.once('ocr:ready', () => resolve(ocrWin));
+      ocrWin.webContents.on('render-process-gone', () => { ocrWin = null; ocrReady = null; });
+      ocrWin.on('closed', () => { ocrWin = null; ocrReady = null; });
+      ocrWin.loadURL('memoking://ocr/ocr.html').catch(reject);
+      setTimeout(() => reject(new Error('OCR 창 준비 시간 초과')), 20000);
+    } catch (err) {
+      ocrReady = null;
+      reject(err);
+    }
+  }).catch((err) => { ocrReady = null; throw err; });
+  return ocrReady;
+}
+
+ipcMain.on('ocr:result', (_e, data) => {
+  const job = ocrPending.get(data?.id);
+  if (!job) return;
+  ocrPending.delete(data.id);
+  clearTimeout(job.timer);
+  job.resolve(data);
+});
+
+// 그림 파일을 한글 OCR → 줄마다 { text, x, y, w, h } (좌표는 100% 배율 px). 안 되면 throw.
+async function runOcr(imagePath, unit) {
+  await ensureOcrWindow();
+  const dataUrl = `data:image/png;base64,${fs.readFileSync(imagePath).toString('base64')}`;
+  const id = ++ocrSeq;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { ocrPending.delete(id); reject(new Error('OCR 시간 초과')); }, 30000);
+    ocrPending.set(id, { resolve, timer });
+    ocrWin.webContents.send('ocr:request', { id, dataUrl, unit: unit || 1 });
+  }).then((data) => {
+    if (data.error) throw new Error(data.error);
+    return data;
+  });
+}
+
+async function addPopupToHistory(p) {
   try {
     const app = popupAppName(p.process);
-    const entry = popupToEntry(p.lines, { appName: app });
+    // Windows 기본 OCR 대신 한글에 강한 tesseract.js 로 다시 읽는다 (그대로 읽은 글이 없을 때 = via 'ocr', 3배 확대 그림이 있을 때)
+    if (p.via === 'ocr' && p.ocrImage && fs.existsSync(p.ocrImage)) {
+      try {
+        const r = await runOcr(p.ocrImage, p.ocrUnit);
+        if (r.boxes?.length) { p.boxes = r.boxes; p.lines = r.lines; }
+      } catch (err) {
+        console.warn('[한글 OCR]', err.message); // 실패하면 아래에서 PowerShell 이 보낸 Windows OCR 결과를 그대로 쓴다
+      }
+    }
+    // 카카오톡 알림 창을 글자 인식으로 읽었으면 줄의 자리로 방 이름·보낸 사람·메시지를 나눈다
+    const byLayout = p.process === 'KakaoTalk' && p.via === 'ocr' && Array.isArray(p.boxes)
+      ? kakaoEntry(p.boxes, { width: p.size?.w, height: p.size?.h, appName: app })
+      : null;
+    const entry = byLayout ?? popupToEntry(p.lines, { appName: app });
     if (!entry || !history) return;
     const now = Date.now();
     while (recentPopups.length && now - recentPopups[0].at > 5 * 60 * 1000) recentPopups.shift();
@@ -1350,25 +1423,23 @@ function addPopupToHistory(p) {
     recentPopups.push({ app, ...entry, at: now });
     // 알림 창 그림도 함께 (보관함에서 그대로 보이게)
     const image = p.image ? history.keepImage(p.image) : null;
-    history.add({ source: 'popup', appId: p.process, app, ...entry, image });
+    history.add({ source: 'popup', appId: p.process, app, ...entry, image, via: p.via ?? '' });
   } finally {
     if (p.image) fs.rm(p.image, { force: true }, () => {});
+    if (p.ocrImage) fs.rm(p.ocrImage, { force: true }, () => {});
   }
 }
 
 function syncPopupWatch() {
-  const on = settings.historyEnabled && settings.popupWatch && !SMOKE;
+  // 따로 켜는 설정 없이, 알림 모아두기가 켜져 있으면 늘 (카카오톡 등의 알림 창도 함께 모은다)
+  const on = settings.historyEnabled && !SMOKE;
   if (on) {
     popupWatcher ??= createPopupWatcher();
     popupWatcher.start();
-  } else popupWatcher?.stop();
-}
-
-function setPopupWatch(on) {
-  settings.popupWatch = Boolean(on);
-  saveSettings();
-  syncPopupWatch();
-  return settings.popupWatch;
+  } else {
+    popupWatcher?.stop();
+    if (ocrWin && !ocrWin.isDestroyed()) ocrWin.close(); // 알림 모으기를 끄면 OCR 창도 닫는다
+  }
 }
 
 function setHistoryEnabled(on) {
@@ -1428,8 +1499,10 @@ function appSettings() {
     trashCount: vault?.trashList().length ?? 0,
     autoStart: { available: autoStartAvailable(), enabled: getAutoStart() },
     historyEnabled: settings.historyEnabled,
-    popupWatch: settings.popupWatch,
     quickMemo: { enabled: settings.quickMemo, registered: globalShortcut.isRegistered(QUICK_MEMO_KEY), key: 'Ctrl+Alt+C' },
+    fitTables: settings.fitTables !== false,
+    magic: normalizeMagicSettings(settings.magic),
+    magicIndex: fileIndex?.status() ?? null, // 파일 검색 목록: 개수·만든 때
     version: app.getVersion(),
   };
 }
@@ -1448,6 +1521,99 @@ function registerQuickMemoKey() {
   if (!ok) console.warn('Ctrl+Alt+C 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다');
   else captureHelper.start(); // 미리 띄워 두어 누르자마자 동작하게
   return ok;
+}
+
+// ---------- 매직키 (Ctrl+Alt+Space) — 어디서든 빠르게 입력하는 작은 창 (기본: 메모 만들기) ----------
+let magicWin = null;
+
+function createMagicWindow() {
+  const win = new BrowserWindow({
+    width: 600,
+    height: 190,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    ...windowIcon,
+    webPreferences: { preload: MAGIC_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.loadFile(path.join(APP_DIR, 'magic.html'));
+  win.on('blur', () => win.hide()); // 밖을 누르면 닫힌다
+  // 끌어 옮긴 자리는 기억해 다음에도 그 자리에
+  win.on('moved', () => {
+    if (!win.isVisible()) return;
+    const [x, y] = win.getPosition();
+    settings.magicPos = { x, y };
+    saveSettings();
+  });
+  win.on('closed', () => { if (magicWin === win) magicWin = null; });
+  return win;
+}
+
+function showMagic() {
+  if (!vault) { createListWindow(); return; } // 메모 폴더가 아직 없으면 목록부터
+  magicWin ??= createMagicWindow();
+  const [w] = magicWin.getSize();
+  const saved = settings.magicPos;
+  // 끌어 옮긴 자리가 지금 화면 안이면 그 자리, 아니면 마우스가 있는 화면 위쪽 가운데
+  const onScreen = saved && screen.getAllDisplays().some((d) => {
+    const a = d.workArea;
+    return saved.x >= a.x - 40 && saved.x + 80 <= a.x + a.width && saved.y >= a.y - 10 && saved.y + 40 <= a.y + a.height;
+  });
+  if (onScreen) magicWin.setPosition(Math.round(saved.x), Math.round(saved.y));
+  else {
+    const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+    magicWin.setPosition(Math.round(area.x + (area.width - w) / 2), Math.round(area.y + area.height * 0.22));
+  }
+  magicWin.show();
+  magicWin.focus();
+  magicWin.webContents.send('magic:show');
+  fileIndex?.touch(); // 오래됐으면 파일 목록을 뒤에서 새로
+}
+
+// 파일 검색 모듈이 켜져 있으면 파일 이름 목록을 만들어 두고 주기적으로 새로 고친다
+let fileIndex = null;
+function syncFileIndex() {
+  const on = !SMOKE && activeModules(settings.magic).some((m) => m.id === 'files');
+  if (on) {
+    fileIndex ??= new FileIndex({ cacheFile: path.join(app.getPath('userData'), 'file-index.json') });
+    fileIndex.start();
+  } else fileIndex?.stop();
+}
+
+// 파일 아이콘 (확장자마다 한 번, 프로그램·바로 가기·폴더는 그 파일 것)
+const iconCache = new Map();
+async function fileIcon(p, isDir) {
+  const ext = path.extname(p).toLowerCase();
+  const key = isDir ? 'dir' : /^\.(exe|lnk|url|ico|appref-ms)$/.test(ext) ? p : ext || 'none';
+  if (!iconCache.has(key)) {
+    iconCache.set(key, app.getFileIcon(p, { size: 'normal' }).then((img) => img.toDataURL()).catch(() => ''));
+    if (iconCache.size > 800) iconCache.delete(iconCache.keys().next().value);
+  }
+  return iconCache.get(key);
+}
+let lastFileResults = new Set(); // 매직키 창이 열 수 있는 파일 = 방금 찾아 보여 준 것만
+
+function registerMagicKey() {
+  globalShortcut.unregister(MAGIC_KEY);
+  if (!normalizeMagicSettings(settings.magic).enabled) return false;
+  const ok = globalShortcut.register(MAGIC_KEY, () => showMagic());
+  if (!ok) console.warn('Ctrl+Alt+Space 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다');
+  return ok;
+}
+
+function setMagicSettings(next) {
+  settings.magic = normalizeMagicSettings(next);
+  saveSettings();
+  registerMagicKey();
+  syncFileIndex();
+  if (!settings.magic.enabled && magicWin && !magicWin.isDestroyed()) magicWin.hide();
+  return settings.magic;
 }
 
 function setQuickMemo(on) {
@@ -1714,6 +1880,97 @@ function registerIpc() {
   ipcMain.handle('app:settings', () => appSettings());
   ipcMain.handle('app:set-auto-start', (_e, on) => setAutoStart(on));
   ipcMain.handle('app:set-quick-memo', (_e, on) => setQuickMemo(on));
+  ipcMain.handle('app:set-fit-tables', (_e, on) => {
+    settings.fitTables = Boolean(on);
+    saveSettings();
+    return settings.fitTables;
+  });
+  ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings(next));
+  // 매직키 창 아래 캡슐: 쓸 수 있는 모듈 모두와 켜짐 여부 (누르면 켜고 끔)
+  const magicModuleList = () => {
+    const m = normalizeMagicSettings(settings.magic);
+    return MAGIC_MODULES.filter((x) => x.ready).map(({ id, name, description }) => ({ id, name, description, on: m.enabled && m.modules[id] }));
+  };
+  ipcMain.handle('magic:modules', () => magicModuleList());
+  ipcMain.handle('magic:toggle-module', (_e, id) => {
+    const m = normalizeMagicSettings(settings.magic);
+    if (!(id in m.modules)) return magicModuleList();
+    setMagicSettings({ ...m, modules: { ...m.modules, [id]: !m.modules[id] } });
+    return magicModuleList();
+  });
+  ipcMain.on('magic:close', () => { if (magicWin && !magicWin.isDestroyed()) magicWin.hide(); });
+  // 입력하는 대로: 메모(제목·내용)와 파일(이름)을 찾는다
+  ipcMain.handle('magic:search', async (_e, query) => {
+    const mods = new Set(activeModules(settings.magic).map((m) => m.id));
+    const q = String(query ?? '').slice(0, 200);
+    // 아무것도 안 썼으면 최근 메모 몇 개 (바로 열 수 있게)
+    if (!q.trim()) {
+      const recent = mods.has('notes') && vault ? vault.list().slice(0, 4).map((m) => ({ id: m.id, title: m.title, snippet: (m.preview ?? '').split('\n')[0], color: m.color, updated: m.updated })) : [];
+      return { notes: recent, recent: true, folders: [], files: [], index: fileIndex?.status() ?? null };
+    }
+    const updatedOf = new Map((vault?.list() ?? []).map((m) => [m.id, m.updated]));
+    const notes = mods.has('notes') && vault ? searchMemos(vault.searchable(), q, 5).map((n) => ({ ...n, updated: updatedOf.get(n.id) })) : [];
+    let folders = [];
+    let files = [];
+    if (mods.has('files') && fileIndex) {
+      ({ folders, files } = fileIndex.searchSplit(q, { folders: 3, files: 6 }));
+      lastFileResults = new Set([...folders, ...files].map((f) => f.path));
+      const home = os.homedir();
+      const shown = (p) => (p.toLowerCase().startsWith(home.toLowerCase()) ? `~${p.slice(home.length)}` : p);
+      const withIcon = (list) => Promise.all(list.map(async (f) => ({ ...f, where: shown(path.dirname(f.path)), icon: await fileIcon(f.path, f.isDir) })));
+      [folders, files] = await Promise.all([withIcon(folders), withIcon(files)]);
+    }
+    return { notes, folders, files, index: fileIndex?.status() ?? null };
+  });
+  ipcMain.handle('magic:open-memo', (_e, id) => {
+    if (!vault?.get(String(id))) return false;
+    magicWin?.hide();
+    revealNote(String(id));
+    return true;
+  });
+  ipcMain.handle('magic:open-file', async (_e, { path: p, reveal } = {}) => {
+    if (!lastFileResults.has(p) || !fs.existsSync(p)) return false; // 방금 보여 준 결과만
+    magicWin?.hide();
+    if (reveal) shell.showItemInFolder(p);
+    else {
+      const err = await shell.openPath(p);
+      if (err) notice('열지 못했어요', err);
+    }
+    return true;
+  });
+  // 결과 목록 높이에 맞춰 창 높이를 바꾼다 (위치는 그대로)
+  ipcMain.on('magic:resize', (_e, h) => {
+    if (!magicWin || magicWin.isDestroyed()) return;
+    const height = Math.max(120, Math.min(640, Math.round(Number(h) || 0)));
+    const [w, cur] = magicWin.getSize();
+    if (cur !== height) magicWin.setSize(w, height);
+  });
+  ipcMain.handle('magic:run', (_e, payload) => {
+    const mods = activeModules(settings.magic);
+    if (!vault || payload?.module !== 'memo' || !mods.some((m) => m.id === 'memo')) return { ok: false };
+    const body = memoBodyFromText(payload.text);
+    if (!body) return { ok: false };
+    const id = vault.import({ body });
+    if (payload.open) openNote(id);
+    else notice('메모를 만들었어요', body.split('\n')[0].slice(0, 40));
+    return { ok: true, id };
+  });
+  // 표가 넘칠 때: 메모 창을 더 넓게 (요청한 본문 폭이 들어가도록, 화면 안에서). 반환: 실제로 넓힌 본문 폭(px)
+  ipcMain.handle('win:grow-width', (event, extra) => {
+    const win = senderWindow(event);
+    const add = Math.ceil(Number(extra) || 0);
+    if (!win || add <= 0) return 0;
+    const [w, h] = win.getSize();
+    const [x, y] = win.getPosition();
+    const area = screen.getDisplayMatching({ x, y, width: w, height: h }).workArea;
+    const maxW = area.width - 24;
+    const want = Math.min(maxW, w + add);
+    if (want <= w) return 0;
+    let nx = x;
+    if (x + want > area.x + area.width) nx = Math.max(area.x, area.x + area.width - want); // 화면 밖으로 나가면 왼쪽으로
+    win.setBounds({ x: nx, y, width: want, height: h });
+    return want - w;
+  });
   // 휴지통: 되살리기·영구 삭제·비우기, 자동 영구 삭제 기간
   ipcMain.handle('trash:list', () => vault?.trashList() ?? []);
   ipcMain.handle('trash:restore', (_e, name) => {
@@ -1723,7 +1980,6 @@ function registerIpc() {
   });
   ipcMain.handle('trash:delete', (_e, name) => vault?.deleteTrash(String(name ?? '')) ?? false);
   ipcMain.handle('trash:empty', () => vault?.emptyTrash() ?? { memos: 0, files: 0 });
-  ipcMain.handle('history:set-popup-watch', (_e, on) => setPopupWatch(on));
   ipcMain.handle('app:set-trash-days', (_e, days) => {
     const d = Number(days);
     if (TRASH_DAYS.includes(d)) {
@@ -1781,7 +2037,7 @@ function registerIpc() {
   ipcMain.handle('pdf:open', (_e, id) => openPdfWindow(String(id)));
   ipcMain.handle('pdf:memo', (_e, id) => {
     const m = vault?.get(String(id));
-    return m ? { title: m.title, body: m.body, color: m.color, created: m.created, updated: m.updated } : null;
+    return m ? { title: m.title, body: m.body, color: m.color, tables: m.tables, created: m.created, updated: m.updated } : null;
   });
   ipcMain.handle('pdf:save', (event, id, options) => savePdf(String(id), options ?? {}, BrowserWindow.fromWebContents(event.sender)));
   ipcMain.handle('memo:links', (_e, id) => vault?.links(id) ?? { links: [], backlinks: [], suggestions: [] });
@@ -1945,6 +2201,13 @@ function registerVaultProtocol() {
   protocol.handle('memoking', (request) => {
     const url = new URL(request.url);
     const rel = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+    // memoking://ocr/<경로> = 숨은 OCR 창이 쓰는 앱 파일 (ocr.html·tesseract vendor). 같은 오리진이라 워커·wasm 을 그대로 불러온다.
+    if (url.host === 'ocr') {
+      const safe = path.normalize(rel).replace(/^(\.\.(\/|\\|$))+/, '');
+      const file = path.join(APP_DIR, safe);
+      if (file.startsWith(APP_DIR) && fs.existsSync(file)) return net.fetch(pathToFileURL(file).href, { headers: request.headers });
+      return new Response('not found', { status: 404 });
+    }
     const file = url.host === 'vault' ? vault?.resolve(rel) : url.host === 'history' ? history?.resolveImage(rel) : null;
     if (!file || !fs.existsSync(file)) return new Response('not found', { status: 404 });
     return net.fetch(pathToFileURL(file).href, { headers: request.headers });
@@ -2096,6 +2359,8 @@ app.whenReady().then(async () => {
   alarms.startup(); // "실행할 때" 알림
   alarms.start(); // 날짜·시간·반복·타이머 알림 (놓친 것 포함)
   registerQuickMemoKey(); // Ctrl+Alt+C 빠른 메모
+  registerMagicKey(); // Ctrl+Alt+Space 매직키
+  syncFileIndex(); // 매직키 파일 검색 목록
   updateTrayMenu();
   // 튜토리얼을 마치기 전에 껐다 켰으면 다시 (자동 실행으로 조용히 켜질 때는 제외)
   if (vault && !settings.tutorialDone && !HIDDEN_START) startTutorial();

@@ -711,6 +711,7 @@ body.is-dragging .card:hover { transform: none; }
 /* 팝업 알림을 찍은 그림: 글 아래에 (펼치면 크게) */
 .noti-shot { display: block; max-width: 100%; max-height: 72px; margin-top: 6px; border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px var(--line); object-fit: contain; object-position: left top; }
 .noti.expanded .noti-shot { max-height: 240px; }
+.noti.has-text:not(.expanded) .noti-shot { display: none; }
 
 /* ---------- v0.17.0: 고친 때 스탬프는 카드 사이 틈에 (카드 안에서 자리를 차지하지 않게) ---------- */
 .cards { row-gap: 20px; padding-bottom: 22px; }
@@ -736,3 +737,76 @@ body.is-dragging .card:hover { transform: none; }
 
 /* 카드의 미리보기 사진: 위아래·좌우가 잘리지 않게 사진 전체를 (남는 자리는 옅은 바탕) */
 .card-thumb { object-fit: contain; object-position: center; background: color-mix(in srgb, var(--note-fg) 7%, transparent); }
+
+/* 팝업 알림을 그림 글자 인식으로 읽은 경우 (v0.17.4) */
+.noti-via { padding: 0 5px; border-radius: 4px; background: var(--fill-hover); font-size: 10.5px; font-weight: 600; }
+
+/* 메모 카드 확대·축소 안내 (Ctrl+휠, v0.17.4) — 메모 창과 같은 모양 */
+.zoom-badge {
+  position: fixed;
+  right: 14px;
+  bottom: 16px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--brand-black);
+  color: var(--on-black);
+  font: 600 12px/22px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+  pointer-events: none;
+}
+.zoom-badge.show { opacity: 1; transform: none; pointer-events: auto; }
+.zoom-badge button {
+  height: 22px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.zoom-badge button:hover { background: rgba(255, 255, 255, 0.28); }
+
+/* 사진이 없는 넉넉한 카드는 사진 자리까지 요약 글로 (v0.17.8) */
+.cards[data-density="roomy"] .card:not(:has(.card-thumb)) .card-preview { -webkit-line-clamp: var(--preview-lines-full, var(--preview-lines, 3)); }
+
+
+/* ---------- v0.17.13: 체크리스트를 모두 끝낸 메모 카드의 CLEAR 도장 ---------- */
+.card { position: relative; }
+.card-clear {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  padding: 2px 12px 1px;
+  border: 3.5px double #e5484d;
+  border-radius: 9px;
+  color: #e5484d;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  opacity: 0.28;
+  pointer-events: none;
+}
+.card[data-color="charcoal"] .card-clear { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.34; }
+.cards[data-density="compact"] .card-clear { font-size: 14px; padding: 0 8px; border-width: 2.5px; }
+
+/* ---------- v0.17.13: 매직키 설정 ---------- */
+.setting-sub { margin: 0 0 8px; padding: 2px 0 0 34px; }
+.label.sub { margin: 4px 0; font-size: 12px; opacity: 0.8; }
+.magic-settings-modules { display: flex; flex-direction: column; gap: 8px; }
+.magic-mod { display: flex; align-items: flex-start; gap: 10px; }
+.magic-mod > span { font-size: 13px; line-height: 1.35; }
+.magic-mod small { display: block; color: var(--muted); font-size: 11.5px; }
+.magic-mod em { color: var(--muted); font-style: normal; }
+.magic-mod.soon > span { opacity: 0.6; }

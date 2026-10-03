@@ -87,8 +87,18 @@ export function setupHistoryTab({ api, els, confirm }) {
     body.className = 'noti-body';
     body.textContent = e.body;
     text.append(meta, title);
+    // 알림 창 그림에서 글자 인식으로 읽은 글은 틀릴 수 있다고 알려 준다 (글자를 그대로 읽은 경우는 표시 없음)
+    if (e.source === 'popup' && e.via === 'ocr') {
+      const tag = document.createElement('span');
+      tag.className = 'noti-via';
+      tag.textContent = '글자 인식';
+      tag.title = '알림 창에서 글자를 그대로 읽을 수 없어 그림에서 글자를 인식했어요. 틀린 글자가 있을 수 있어요';
+      meta.append(' · ', tag);
+    }
     if (e.body) text.append(body);
     if (e.image && e.source === 'popup') {
+      // 글을 읽었으면 글이 먼저 — 알림 창 그림은 눌러 펼쳤을 때만 (글을 못 읽은 알림은 그림을 늘 보인다)
+      if (e.body) div.classList.add('has-text');
       const shot = document.createElement('img');
       shot.className = 'noti-shot';
       shot.src = `memoking://history/${encodeURIComponent(e.image)}`;
