@@ -206,6 +206,7 @@ class MainActivity : Activity() {
         visible = this
         if (pageReady) emit("app", "resume")
         DriveSync.listener = { status -> runOnUiThread { if (pageReady) emit("sync", status.json()) } }
+        NotiStore.listener = { runOnUiThread { if (pageReady) emit("history", null) } }
         root.removeCallbacks(syncTick)
         root.post(syncTick)
     }
@@ -504,6 +505,24 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         val id = waiting.remove(requestCode) ?: return
         bridge.resolve(id) { grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED }
+    }
+
+    /** 안드로이드 설정의 "알림 접근" 화면 (메모킹을 켜도록) */
+    fun openNotificationAccess(id: Int) {
+        bridge.resolve(id) {
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                    .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, android.content.ComponentName(this, NotiService::class.java).flattenToString())
+            } else {
+                Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            }
+            try {
+                startActivity(intent)
+            } catch (e: ActivityNotFoundException) {
+                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }
+            true
+        }
     }
 
     fun openExactAlarmSettings(id: Int) {

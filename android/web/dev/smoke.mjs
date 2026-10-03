@@ -164,6 +164,16 @@ try {
   await page.keyboard.type('# 휴대폰 첫 메모');
   await page.keyboard.press('Enter');
   await page.keyboard.type('장보기 #생활');
+  // 제목·점 목록·번호 목록·체크리스트는 한 줄에 하나만 (버튼도 하나만 눌려 보임)
+  const lineStyle = () => page.$$eval('#format-bar [data-cmd].active', (bs) => bs.map((b) => b.dataset.cmd).filter((c) => ['h1', 'h2', 'bullet', 'ordered', 'task'].includes(c)).join(','));
+  const steps = [['bullet', 'bullet'], ['ordered', 'ordered'], ['task', 'task'], ['h1', 'h1'], ['ordered', 'ordered'], ['h2', 'h2'], ['task', 'task'], ['task', '']];
+  let exclusive = true;
+  for (const [cmd, want] of steps) {
+    await page.click(`#format-bar [data-cmd="${cmd}"]`);
+    await page.waitForTimeout(120);
+    if ((await lineStyle()) !== want) exclusive = false;
+  }
+  check('서식: 제목·목록·체크리스트 버튼은 하나만 눌림', exclusive);
   await page.waitForTimeout(800);
   await back();
   await page.waitForTimeout(300);
@@ -228,6 +238,28 @@ try {
   const index = JSON.parse(read('_memoking/index.json'));
   check('LLM 인덱스: 모든 메모', index.memos.length === fs.readdirSync(vault).filter((f) => f.endsWith('.md')).length);
   check('LLM 인덱스: 안내서', fs.existsSync(path.join(vault, '_memoking/README.md')));
+
+  // 알림 보관함: 탭 → 보관 시작하기 → (설정에서 알림 접근 허용) → 모은 알림
+  await page.tap('[data-tab="history"]');
+  check('보관함: 처음엔 안내', await page.isVisible('#history-consent'));
+  await page.tap('#history-enable');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(300);
+  check('보관함: 모은 알림 4개', (await page.locator('.noti').count()) === 4);
+  await page.fill('#search', '회의');
+  await page.waitForTimeout(300);
+  check('보관함: 검색', (await page.locator('.noti').count()) === 1);
+  await page.locator('.noti').first().tap();
+  await shot('07-history');
+  await page.locator('.noti.expanded [aria-label="메모로 만들기"]').tap();
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  check('보관함: 알림으로 메모 만들기', fs.readdirSync(vault).some((f) => f.startsWith('회의 일정 안내')));
+  await back();
+  await page.waitForTimeout(300);
+  await page.fill('#search', '');
+  await back(); // 보관함 탭 → 메모 탭
+  await page.waitForTimeout(200);
 
   // Google Drive 연결 (미리보기 서버의 가짜 Drive): 설정 › 연결하기 › (휴대폰 구글 계정) › 폴더 › 지금 메모 함께 올리기
   const count = await page.locator('.card').count();

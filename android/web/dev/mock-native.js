@@ -11,6 +11,7 @@
   const methods = [
     'info', 'useInternalVault', 'scan', 'list', 'stat', 'readText', 'writeText', 'writeBase64', 'mkdirs', 'move', 'remove',
     'commitTemp', 'readTempText', 'dropTemp', 'copyText', 'setChrome', 'takeIntent', 'ready', 'scheduleAlarms', 'wasFired', 'notify',
+    'historyAll', 'historySetEnabled', 'historyRemove', 'historyClear',
     'driveStatus', 'driveSetClient', 'driveDisconnect', 'driveCancelLogin', 'driveSyncSoon',
   ];
   const native = {};

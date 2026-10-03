@@ -134,6 +134,7 @@ object Notifier {
             .setContentIntent(content)
             .setAutoCancel(true)
             .build()
+        NotiStore.addOwn(ctx, title.ifEmpty { "메모킹" }, label.ifEmpty { text }, memoId)
         try {
             ctx.getSystemService(NotificationManager::class.java)!!.notify(key.hashCode(), notification)
         } catch (e: SecurityException) {

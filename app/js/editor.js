@@ -928,13 +928,43 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return null;
   }
 
+  // 제목 · 점 목록 · 번호 목록 · 체크리스트는 한 줄에 하나만 (서로 바꾸면 앞의 것은 풀린다)
+
+  // 목록 밖으로 (겹친 목록이면 바깥까지)
+  function leaveLists() {
+    for (let i = 0; i < 8 && parentOfType(['list_item']); i++) {
+      const before = view().state.doc;
+      call(liftListItemCommand);
+      if (view().state.doc === before) break; // 더 풀 수 없음
+    }
+  }
+
+  function leaveHeading() {
+    if (parentOfType(['heading'])) call(turnIntoTextCommand);
+  }
+
+  // 지금 줄이 든 목록의 종류만 바꾼다 (들여쓴 구조는 그대로)
+  function setListType(list, type) {
+    const v = view();
+    const target = v.state.schema.nodes[type];
+    if (!target || list.node.type === target) return;
+    const attrs = { spread: list.node.attrs.spread };
+    if (type === 'ordered_list') attrs.order = 1;
+    v.dispatch(v.state.tr.setNodeMarkup(list.pos, target, attrs));
+  }
+
   function toggleHeading(level) {
     const heading = parentOfType(['heading']);
-    if (heading && heading.node.attrs.level === level) call(turnIntoTextCommand);
-    else call(wrapInHeadingCommand, level);
+    if (heading && heading.node.attrs.level === level) {
+      call(turnIntoTextCommand);
+      return;
+    }
+    leaveLists();
+    call(wrapInHeadingCommand, level);
   }
 
   function toggleList(type) {
+    leaveHeading();
     const list = parentOfType(['bullet_list', 'ordered_list']);
     const item = parentOfType(['list_item']);
     const isTask = item && item.node.attrs.checked != null;
@@ -943,10 +973,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       return;
     }
     if (!list) call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
-    else if (list.node.type.name !== type) {
-      call(liftListItemCommand);
-      call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
-    }
+    else setListType(list, type);
     setChecked(null);
   }
 
@@ -963,7 +990,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       call(liftListItemCommand);
       return;
     }
-    if (!item) call(wrapInBulletListCommand);
+    leaveHeading();
+    const list = parentOfType(['bullet_list', 'ordered_list']);
+    if (!list) call(wrapInBulletListCommand);
+    else setListType(list, 'bullet_list'); // 체크리스트는 번호 없이
     setChecked(false);
   }
 
@@ -1122,16 +1152,20 @@ function activeFormats(state) {
     color: findMark(marks.mk_color)?.attrs.color ?? null,
     highlight: findMark(marks.mk_highlight)?.attrs.color ?? null,
   };
-  for (let d = $from.depth; d > 0; d--) {
-    const node = $from.node(d);
-    const name = node.type.name;
-    if (name === 'heading') active[`h${node.attrs.level}`] = true;
-    if (name === 'blockquote') active.quote = true;
-    if (name === 'list_item' && node.attrs.checked != null && active.task === undefined) active.task = true;
-    if (name === 'bullet_list' && !active.task && !active.ordered) active.bullet ??= true;
-    if (name === 'ordered_list' && !active.bullet) active.ordered ??= true;
+  // 줄 모양은 하나만: 이 줄이 제목이면 제목, 아니면 가장 가까운 목록 항목 하나로 정한다
+  // (바깥 목록의 종류까지 켜면 여러 버튼이 함께 눌려 보인다)
+  if ($from.parent.type.name === 'heading') active[`h${$from.parent.attrs.level}`] = true;
+  else {
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name !== 'list_item') continue;
+      const list = $from.node(d - 1).type.name;
+      if ($from.node(d).attrs.checked != null) active.task = true;
+      else if (list === 'ordered_list') active.ordered = true;
+      else if (list === 'bullet_list') active.bullet = true;
+      break;
+    }
   }
-  if (active.task) active.bullet = false;
+  for (let d = $from.depth; d > 0; d--) if ($from.node(d).type.name === 'blockquote') active.quote = true;
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d);
     if (node.type.name === 'table_header_row') active.tableHeader = true;

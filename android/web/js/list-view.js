@@ -3,10 +3,11 @@ import { icon } from '../../app/js/icons.js';
 import { formatStamp } from '../../app/js/core/format.js';
 import { vaultUrl } from '../../app/js/media.js';
 import { setupRemindersTab } from '../../app/js/list-reminders.js';
+import { setupHistoryTab } from '../../app/js/list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../../app/js/core/tags.js';
 import { COLORS } from '../../app/js/core/memo-file.js';
 import { app, COLOR_NAMES } from './state.js';
-import { matchChrome } from './ui.js';
+import { matchChrome, confirmDialog } from './ui.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -36,6 +37,7 @@ const state = {
 };
 
 let remindersTab = null;
+let historyTab = null;
 
 // ---------- 카드 ----------
 
@@ -233,6 +235,7 @@ function toggleFilterPanel(force) {
 let searchTimer = null;
 function runSearch() {
   if (state.tab === 'reminders') return remindersTab?.setQuery(el.search.value);
+  if (state.tab === 'history') return historyTab?.setQuery(el.search.value);
   state.query = el.search.value.trim();
   const { text, tags } = parseQuery(state.query);
   state.queryTags = tags;
@@ -254,8 +257,10 @@ function setTab(tab) {
   for (const b of document.querySelectorAll('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   $('view-memos').hidden = tab !== 'memos';
   $('view-reminders').hidden = tab !== 'reminders';
+  $('view-history').hidden = tab !== 'history';
   el.filterBtn.hidden = tab !== 'memos';
-  el.search.placeholder = tab === 'memos' ? '메모 검색 · #태그' : '알림 검색';
+  el.search.placeholder = { memos: '메모 검색 · #태그', reminders: '알림 검색', history: '보관한 알림 검색' }[tab];
+  $('fab').hidden = tab === 'history';
   if (tab === 'reminders') remindersTab.refresh();
   runSearch();
 }
@@ -313,6 +318,24 @@ export function setup() {
     countEl: $('count-reminders'),
   });
   $('fab').addEventListener('click', () => app.newMemo());
+  historyTab = setupHistoryTab({
+    api: app.api,
+    els: {
+      consent: $('history-consent'),
+      body: $('history-body'),
+      enable: $('history-enable'),
+      app: $('history-app'),
+      clear: $('history-clear'),
+      rows: $('history-rows'),
+      empty: $('history-empty'),
+    },
+    confirm: confirmDialog,
+  });
+}
+
+/** 알림 보관함 탭이 보이면 다시 그린다 (새 알림·설정에서 돌아옴) */
+export function refreshHistory() {
+  if (state.tab === 'history') historyTab?.refresh();
 }
 
 export function refresh() {

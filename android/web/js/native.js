@@ -41,6 +41,14 @@ export const native = {
   notify: (item) => unwrap(raw.notify(JSON.stringify(item))),
 };
 
+// 알림 보관함 (NotiService.kt)
+export const history = {
+  all: sync('historyAll'),
+  setEnabled: sync('historySetEnabled'),
+  remove: sync('historyRemove'),
+  clear: sync('historyClear'),
+};
+
 // Google Drive 동기화 (DriveSync.kt)
 export const drive = {
   status: sync('driveStatus'),

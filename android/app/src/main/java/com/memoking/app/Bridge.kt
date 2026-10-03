@@ -209,6 +209,26 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun driveSyncSoon(): String = reply { DriveSync.request(ctx, 0) }
 
+    // ---------- 알림 보관함 ----------
+
+    /** { enabled, granted, entries: [...] } — 거르기·검색은 화면이 한다 */
+    @JavascriptInterface
+    fun historyAll(): String = reply {
+        JSONObject().put("enabled", NotiStore.enabled(ctx)).put("granted", NotiStore.granted(ctx)).put("entries", NotiStore.all(ctx))
+    }
+
+    @JavascriptInterface
+    fun historySetEnabled(on: Boolean): String = reply {
+        NotiStore.setEnabled(ctx, on)
+        NotiStore.granted(ctx)
+    }
+
+    @JavascriptInterface
+    fun historyRemove(id: String): String = reply { NotiStore.remove(ctx, id) }
+
+    @JavascriptInterface
+    fun historyClear(): String = reply { NotiStore.clear(ctx) }
+
     // ---------- 오래 걸리는 일 ----------
 
     @JavascriptInterface
@@ -224,6 +244,7 @@ class Bridge(private val activity: MainActivity) {
             "print" -> activity.runOnUiThread { activity.printPage(id, a.optString("title", "메모")) }
             "notifyPermission" -> activity.runOnUiThread { activity.requestNotifyPermission(id) }
             "exactAlarmSettings" -> activity.runOnUiThread { activity.openExactAlarmSettings(id) }
+            "historyPermission" -> activity.runOnUiThread { activity.openNotificationAccess(id) }
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
             // 기본: 휴대폰 구글 계정 그대로 (계정 고르기·허용). browser=true 면 브라우저 로그인(예비)
             "driveLogin" -> if (!a.optBoolean("browser") && NativeAuth.available(ctx)) {

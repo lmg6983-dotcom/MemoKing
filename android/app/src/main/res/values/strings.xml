@@ -6,4 +6,5 @@
     <string name="shortcut_new_long">새 메모 쓰기</string>
     <string name="channel_reminders">예약 알림</string>
     <string name="channel_reminders_desc">메모에 예약한 알림이 울려요</string>
+    <string name="history_label">메모킹 알림 보관함</string>
 </resources>

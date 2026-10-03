@@ -44,6 +44,7 @@ class WebServer(private val context: Context) {
             when {
                 path.startsWith("/app/") || path.startsWith("/m/") -> asset("www$path")
                 path.startsWith("/vault/") -> vault(Uri.decode(path.removePrefix("/vault/")), request.requestHeaders)
+                path.startsWith("/history/") -> historyIcon(Uri.decode(path.removePrefix("/history/")))
                 else -> notFound()
             }
         } catch (e: Exception) {
@@ -94,6 +95,13 @@ class WebServer(private val context: Context) {
         head["Content-Range"] = "bytes $start-$end/$size"
         head["Content-Length"] = (end - start + 1).toString()
         return WebResourceResponse(type, null, 206, "Partial Content", head, Limited(stream, end - start + 1))
+    }
+
+    // 알림 보관함의 앱 아이콘
+    private fun historyIcon(name: String): WebResourceResponse {
+        val file = java.io.File(NotiStore.iconDir(context), java.io.File(name).name)
+        if (!file.isFile) return notFound()
+        return WebResourceResponse("image/png", null, 200, "OK", headers("image/png"), file.inputStream())
     }
 
     private fun notFound() = WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers("text/plain"), ByteArrayInputStream(ByteArray(0)))

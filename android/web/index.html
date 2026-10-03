@@ -65,6 +65,7 @@
     <nav class="tabs" role="tablist" aria-label="보기">
       <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
       <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-bell"/></svg>알림 예약 <span class="tab-count" id="count-reminders"></span></button>
+      <button role="tab" data-tab="history" aria-selected="false"><svg><use href="#i-inbox"/></svg>보관함</button>
     </nav>
 
     <div class="view" id="view-memos" role="tabpanel">
@@ -84,6 +85,31 @@
     <div class="view" id="view-reminders" role="tabpanel" hidden>
       <div id="reminder-groups" class="rows"></div>
       <p id="reminders-empty" class="empty" hidden>예약한 알림이 없어요.<br>메모를 열고 위쪽 종 버튼으로 추가할 수 있어요.</p>
+    </div>
+
+    <!-- 알림 보관함: 휴대폰에 온 다른 앱 알림 (app/js/list-history.js 가 그림) -->
+    <div class="view" id="view-history" role="tabpanel" hidden>
+      <div id="history-consent" class="consent" hidden>
+        <svg class="consent-icon"><use href="#i-inbox"/></svg>
+        <h3>알림 보관함</h3>
+        <p>알림을 지웠거나 놓쳤어도 여기서 다시 볼 수 있게 모아둘게요.</p>
+        <ul>
+          <li>다른 앱(메신저·메일 등) 알림의 <b>제목과 내용</b>을 읽어서 보관해요.</li>
+          <li>안드로이드 설정에서 <b>알림 접근</b>을 허용해야 해요 (눌러서 메모킹을 켜고 돌아오면 돼요).</li>
+          <li>보관한 알림은 <b>이 휴대폰에만</b> 남고, 메모 폴더나 PC로는 가지 않아요.</li>
+          <li>언제든 끌 수 있고, 하나씩 또는 한 번에 지울 수 있어요.</li>
+        </ul>
+        <button id="history-enable" class="btn strong">보관 시작하기</button>
+      </div>
+      <div id="history-body" hidden>
+        <div class="history-bar">
+          <select id="history-app" aria-label="앱으로 거르기"></select>
+          <span class="grow"></span>
+          <button id="history-clear" class="link-btn danger">모두 지우기</button>
+        </div>
+        <div id="history-rows" class="rows"></div>
+        <p id="history-empty" class="empty" hidden></p>
+      </div>
     </div>
 
     <button id="fab" class="fab" aria-label="새 메모"><svg><use href="#i-plus"/></svg></button>
@@ -337,6 +363,11 @@
       <span>예약 알림 <small id="notify-note"></small></span>
       <button id="notify-btn" class="btn small">알림 허용하기</button>
     </div>
+
+    <label class="setting-row">
+      <input type="checkbox" id="history-enabled" class="switch">
+      <span>다른 앱 알림 모아두기 <small id="history-note"></small></span>
+    </label>
 
     <p class="label">지운 메모</p>
     <div class="sheet-actions">

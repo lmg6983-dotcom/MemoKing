@@ -2,6 +2,8 @@
 import { icon } from './icons.js';
 
 const pad = (v) => String(v).padStart(2, '0');
+// 알림 그림 주소 (안드로이드는 window.memoking.historyBase 로 자기 주소를 알려 준다)
+const historyUrl = (name) => `${globalThis.memoking?.historyBase ?? 'memoking://history/'}${encodeURIComponent(name)}`;
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
 
 function dayLabel(d, now = new Date()) {
@@ -35,7 +37,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     if (e.image && e.source !== 'popup') {
       const img = document.createElement('img');
       img.className = 'avatar';
-      img.src = `memoking://history/${encodeURIComponent(e.image)}`;
+      img.src = historyUrl(e.image);
       img.alt = '';
       img.onerror = () => img.replaceWith(letter(e));
       return img;
@@ -91,7 +93,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     if (e.image && e.source === 'popup') {
       const shot = document.createElement('img');
       shot.className = 'noti-shot';
-      shot.src = `memoking://history/${encodeURIComponent(e.image)}`;
+      shot.src = historyUrl(e.image);
       shot.alt = `${e.app} 알림 창`;
       shot.loading = 'lazy';
       shot.onerror = () => shot.remove();

@@ -3,7 +3,8 @@ import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
 import { extractTitle, isBlankBody, plainText, COLORS } from '../../app/js/core/memo-file.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
-import { native, call, on, setBackHandler, drive } from './native.js';
+import { native, call, on, setBackHandler, drive, history } from './native.js';
+import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
 import { LinkPreviews } from './web-fetch.js';
@@ -17,7 +18,7 @@ import * as note from './note-view.js';
 const $ = (x) => document.getElementById(x);
 
 // 공용 코드(app/js/media.js)가 첨부 주소를 만들 때 쓴다
-window.memoking = { platform: 'android', vaultBase: `${location.origin}/vault/` };
+window.memoking = { platform: 'android', vaultBase: `${location.origin}/vault/`, historyBase: `${location.origin}/history/` };
 
 injectIcons();
 injectMobileIcons();
@@ -30,7 +31,64 @@ app.api = {
     all: async () => app.vault?.allReminders() ?? [],
   },
   memo: { open: (id) => app.openMemo(id) },
+  copyText: async (text) => {
+    native.copyText(text);
+    toast('복사했어요');
+  },
+  // 알림 보관함 (app/js/list-history.js 가 씀) — 거르기·검색은 여기서
+  history: {
+    list: async ({ query = '', app: appName = '' } = {}) => {
+      const { enabled, granted, entries } = history.all();
+      const counts = new Map();
+      for (const e of entries) counts.set(e.app, (counts.get(e.app) ?? 0) + 1);
+      const shown = entries.filter((e) => (!appName || e.app === appName) && matchesQuery(e, query));
+      return {
+        enabled: enabled && granted,
+        total: entries.length,
+        apps: [...counts].sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count })),
+        entries: shown.slice(0, 500),
+      };
+    },
+    setEnabled: async (on) => enableHistory(on),
+    remove: async (id) => {
+      history.remove(id);
+      list.refreshHistory();
+    },
+    clear: async () => {
+      history.clear();
+      list.refreshHistory();
+    },
+    toMemo: async (id) => {
+      const e = history.all().entries.find((x) => x.id === id);
+      if (!e || !app.vault) return null;
+      const when = new Date(e.time).toLocaleString('ko-KR');
+      const memoId = app.vault.import({ body: `# ${e.title || e.app}\n\n${e.body ? `${e.body}\n\n` : ''}> ${e.app} 알림 · ${when}` });
+      await app.openMemo(memoId);
+      toast('알림으로 메모를 만들었어요');
+      return memoId;
+    },
+  },
 };
+
+// 알림 모아두기 켜기: 안드로이드 설정의 "알림 접근" 을 허용해야 한다 (켜고 돌아오면 바로 시작)
+async function enableHistory(on) {
+  const granted = history.setEnabled(on);
+  if (on && !granted) {
+    toast('설정에서 "메모킹 알림 보관함"을 켜고 돌아와 주세요');
+    await call('historyPermission').catch(() => {});
+  }
+  list.refreshHistory();
+  refreshHistoryRow();
+  return granted;
+}
+
+function refreshHistoryRow() {
+  const { enabled, granted } = history.all();
+  $('history-enabled').checked = enabled && granted;
+  $('history-note').textContent = enabled && !granted
+    ? '안드로이드 설정에서 "알림 접근"을 허용해야 모을 수 있어요'
+    : '다른 앱 알림을 이 휴대폰에만 모아 둬요 (알림 보관함 탭)';
+}
 
 let notifyAsked = false;
 app.setReminders = (memoId, next) => {
@@ -228,10 +286,12 @@ function openSettings() {
   const n = app.vault?.trashList().length ?? 0;
   $('trash-count').textContent = n ? String(n) : '';
   refreshNotifyRow();
+  refreshHistoryRow();
   renderDrive();
   openSheet($('settings-sheet'));
 }
 $('settings-btn').addEventListener('click', openSettings);
+$('history-enabled').addEventListener('change', () => enableHistory($('history-enabled').checked));
 $('trash-days').addEventListener('change', () => {
   try {
     localStorage.setItem(TRASH_DAYS_KEY, $('trash-days').value);
@@ -468,6 +528,7 @@ function openVault() {
 // ---------- 앱의 소식 ----------
 
 on('intent', handleIntent);
+on('history', () => list.refreshHistory());
 // Google Drive 동기화 소식: 내려받은 게 있으면 메모 폴더를 바로 다시 읽는다
 on('sync', (st) => {
   renderDrive();
@@ -495,6 +556,7 @@ on('app', (state) => {
   } else if (state === 'resume' && app.vault) {
     app.vault.scan();
     renderDrive();
+    list.refreshHistory(); // "알림 접근" 을 켜고 돌아왔을 때
     app.vault.resume();
     alarms.start();
   }

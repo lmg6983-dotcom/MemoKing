@@ -148,6 +148,19 @@ const sync = {
     return null;
   },
   wasFired: () => false,
+  historyAll: () => fakeHistory,
+  historySetEnabled: (on) => {
+    fakeHistory.enabled = on;
+    return fakeHistory.granted;
+  },
+  historyRemove: (id) => {
+    fakeHistory.entries = fakeHistory.entries.filter((e) => e.id !== id);
+    return true;
+  },
+  historyClear: () => {
+    fakeHistory.entries = [];
+    return null;
+  },
   driveStatus: () => driveInfo(),
   driveSetClient: (id, secret) => {
     fakeDrive.configured = Boolean(id && secret);
@@ -173,6 +186,7 @@ const fakeDrive = {
   folders: { root: [{ id: 'f-memo', name: '메모킹' }, { id: 'f-work', name: '업무' }, { id: 'f-photo', name: '사진' }], 'f-work': [{ id: 'f-work-2026', name: '2026' }] },
 };
 const driveInfo = () => ({ ...fakeDrive, configured: true, builtIn: false, nativeAvailable: !process.env.NO_PLAY_SERVICES, browserConfigured: fakeDrive.configured, folders: undefined });
+const fakeHistory = { enabled: false, granted: false, entries: [] };
 let pendingIntent = null;
 let scheduled = [];
 let pickQueue = []; // 점검용: 다음 pickFiles 가 돌려줄 파일들 [{ name, mime, base64 }]
@@ -213,6 +227,19 @@ const calls = {
     return true;
   },
   notifyPermission: async () => true,
+  // "알림 접근" 설정 화면 흉내: 허용하고 돌아온 것으로 + 알림 몇 개
+  historyPermission: async () => {
+    fakeHistory.granted = true;
+    const now = Date.now();
+    const at = (min) => new Date(now - min * 60000).toISOString();
+    fakeHistory.entries = [
+      { id: 'n1', source: 'android', appId: 'com.kakao.talk', app: '카카오톡', title: '엄마', body: '저녁 먹고 들어와?', time: at(3), image: null, memoId: null },
+      { id: 'n2', source: 'android', appId: 'com.google.android.gm', app: 'Gmail', title: '회의 일정 안내', body: '다음 주 화요일 오후 2시에 회의가 있습니다.\n장소: 3층 회의실', time: at(40), image: null, memoId: null },
+      { id: 'n3', source: 'memoking', appId: 'com.memoking.app', app: '메모킹', title: '약 먹기', body: '알림 · 오늘 12:30', time: at(90), image: null, memoId: '00000000-0000-4000-8000-000000000003' },
+      { id: 'n4', source: 'android', appId: 'com.kakao.talk', app: '카카오톡', title: '팀방 · 김대리', body: '자료 공유드립니다', time: at(60 * 26), image: null, memoId: null },
+    ];
+    return true;
+  },
   driveLogin: async () => {
     await new Promise((r) => setTimeout(r, 300));
     Object.assign(fakeDrive, { connected: true, email: 'me@gmail.com' });
