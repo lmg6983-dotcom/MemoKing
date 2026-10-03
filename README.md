@@ -14,9 +14,10 @@ Windows 스티커 메모처럼 쓰는 메모 앱. 메모는 **지정한 폴더(�
 
 ## 안드로이드
 
-휴대폰 앱은 [`android/`](android/README.md) 에 있습니다. PC 와 같은 메모 폴더 형식(메모 파일·머리말·첨부·휴지통·LLM 인덱스)을 그대로 읽고 쓰므로, 동기화 앱(FolderSync·Autosync·Syncthing 등)으로 PC 메모 폴더와 맞춘 휴대폰 폴더를 고르면 같은 메모를 씁니다.
+휴대폰 앱은 [`android/`](android/README.md) 에 있습니다. PC 와 같은 메모 폴더 형식(메모 파일·머리말·첨부·휴지통·LLM 인덱스)을 그대로 쓰고, **Google Drive 에 직접 연결해 PC 메모킹과 같은 메모를 동기화**합니다 (PC 쪽은 Google Drive for desktop 이 그대로 맞춰 주므로 바꿀 것이 없음).
 
 - 설치: GitHub **Actions › Android APK** 실행 결과의 **memoking-android** (APK) 를 휴대폰에 설치
+- Google Drive 동기화 준비(처음 한 번): [android/DRIVE-SETUP.md](android/DRIVE-SETUP.md)
 - 목록·검색·태그·필터, PC 와 같은 편집기, 사진·파일 넣기, 다른 앱에서 공유하기 → 새 메모, 예약 알림(앱이 꺼져 있어도 울림), 메모 연결, 휴지통, PDF 저장
 - 자세한 내용: [android/README.md](android/README.md)
 

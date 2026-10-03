@@ -3,7 +3,8 @@ import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
 import { extractTitle, isBlankBody, plainText, COLORS } from '../../app/js/core/memo-file.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
-import { native, call, on, setBackHandler } from './native.js';
+import { native, call, on, setBackHandler, drive } from './native.js';
+import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
 import { LinkPreviews } from './web-fetch.js';
 import { createAlarms } from './alarms.js';
@@ -220,11 +221,14 @@ function openSettings() {
   const info = native.info();
   $('vault-path').textContent = info.vault?.label || '(없음)';
   $('use-internal-2').hidden = Boolean(info.vault?.internal);
+  $('change-vault').textContent = info.vault?.drive ? '휴대폰 폴더 고르기' : '폴더 바꾸기';
+  $('vault-hint').hidden = Boolean(info.vault?.drive);
   $('trash-days').value = String(trashDays());
   $('version').textContent = `메모킹 안드로이드 ${info.version}`;
   const n = app.vault?.trashList().length ?? 0;
   $('trash-count').textContent = n ? String(n) : '';
   refreshNotifyRow();
+  renderDrive();
   openSheet($('settings-sheet'));
 }
 $('settings-btn').addEventListener('click', openSettings);
@@ -248,6 +252,19 @@ async function chooseFolder() {
   openVault();
   return '';
 }
+
+// Google Drive 연결 (처음 화면 · 설정)
+$('choose-drive').addEventListener('click', () => startConnect(() => openVault()));
+$('drive-connect').addEventListener('click', () => startConnect(() => openVault()));
+$('drive-sync-now').addEventListener('click', () => syncNow());
+$('sync-btn').addEventListener('click', () => syncNow());
+$('drive-disconnect').addEventListener('click', async () => {
+  const ok = await confirmDialog('Google Drive 연결을 끊을까요?\n휴대폰에 받아 둔 메모는 그대로 볼 수 있지만, 다시 연결할 때까지 PC와 맞추지 않아요.', '연결 끊기');
+  if (!ok) return;
+  drive.disconnect();
+  renderDrive();
+  toast('Google Drive 연결을 끊었어요');
+});
 
 $('choose-folder').addEventListener('click', async () => {
   const error = await chooseFolder();
@@ -417,6 +434,7 @@ function openVault() {
     return;
   }
   app.vault = vault;
+  app.vaultInfo = native.info().vault;
   app.previews ??= new LinkPreviews();
   app.previews.reset();
   vault.on('changed', (detail) => {
@@ -436,6 +454,8 @@ function openVault() {
   }
   alarms.start();
   alarms.schedule();
+  renderDrive();
+  if (app.vaultInfo?.drive) drive.syncSoon();
   if (pendingIntent) {
     const p = pendingIntent;
     pendingIntent = null;
@@ -448,6 +468,12 @@ function openVault() {
 // ---------- 앱의 소식 ----------
 
 on('intent', handleIntent);
+// Google Drive 동기화 소식: 내려받은 게 있으면 메모 폴더를 바로 다시 읽는다
+on('sync', (st) => {
+  renderDrive();
+  if (st.changed) app.vault?.scan();
+  if (st.conflicts?.length) toast(`PC와 휴대폰에서 함께 고친 메모 ${st.conflicts.length}개는 "(휴대폰 충돌 …)" 사본으로 남겼어요`);
+});
 on('alarm', () => alarms.tick());
 on('keyboard', ({ open }) => {
   nativeKeyboard = true;
@@ -468,6 +494,7 @@ on('app', (state) => {
     alarms.stop();
   } else if (state === 'resume' && app.vault) {
     app.vault.scan();
+    renderDrive();
     app.vault.resume();
     alarms.start();
   }

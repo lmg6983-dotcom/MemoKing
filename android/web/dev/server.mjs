@@ -45,7 +45,7 @@ const sync = {
   info: () => ({
     version: '0.1.0-dev',
     sdk: 35,
-    vault: vaultRoot ? { internal: false, label: vaultRoot, ok: true } : null,
+    vault: vaultRoot ? { internal: false, drive: fakeDrive.active, label: fakeDrive.active ? `Google Drive › ${fakeDrive.folderName}` : vaultRoot, ok: true } : null,
     exactAlarms: true,
   }),
   useInternalVault: () => {
@@ -148,12 +148,31 @@ const sync = {
     return null;
   },
   wasFired: () => false,
+  driveStatus: () => driveInfo(),
+  driveSetClient: (id, secret) => {
+    fakeDrive.configured = Boolean(id && secret);
+    return driveInfo();
+  },
+  driveDisconnect: () => {
+    Object.assign(fakeDrive, { connected: false, email: '' });
+    fakeDrive.status = { ...fakeDrive.status, state: 'off' };
+    return driveInfo();
+  },
+  driveCancelLogin: () => null,
+  driveSyncSoon: () => null,
   notify: (json) => {
     log.push({ notify: JSON.parse(json) });
     return true;
   },
 };
 
+// 가짜 Google Drive (화면 점검용) — 진짜 동기화는 앱(DriveSync.kt)이 한다
+const fakeDrive = {
+  configured: false, connected: false, email: '', active: false, folderId: '', folderName: '',
+  status: { state: 'off', lastSync: 0, error: '', changed: false, conflicts: [] },
+  folders: { root: [{ id: 'f-memo', name: '메모킹' }, { id: 'f-work', name: '업무' }, { id: 'f-photo', name: '사진' }], 'f-work': [{ id: 'f-work-2026', name: '2026' }] },
+};
+const driveInfo = () => ({ ...fakeDrive, builtIn: false, folders: undefined });
 let pendingIntent = null;
 let scheduled = [];
 let pickQueue = []; // 점검용: 다음 pickFiles 가 돌려줄 파일들 [{ name, mime, base64 }]
@@ -194,6 +213,31 @@ const calls = {
     return true;
   },
   notifyPermission: async () => true,
+  driveLogin: async () => {
+    await new Promise((r) => setTimeout(r, 300));
+    Object.assign(fakeDrive, { connected: true, email: 'me@gmail.com' });
+    return { email: fakeDrive.email };
+  },
+  driveFolders: async ({ parent }) => fakeDrive.folders[parent] ?? [],
+  driveCreateFolder: async ({ parent, name }) => {
+    const f = { id: `f-${randomUUID().slice(0, 6)}`, name };
+    (fakeDrive.folders[parent] ??= []).push(f);
+    return f;
+  },
+  driveUse: async ({ folderId, name, import: importLocal }) => {
+    const dir = path.join(os.tmpdir(), `memoking-dev-drive-${folderId}`);
+    fs.mkdirSync(dir, { recursive: true });
+    if (importLocal && vaultRoot) fs.cpSync(vaultRoot, dir, { recursive: true, force: false, errorOnExist: false });
+    vaultRoot = dir;
+    Object.assign(fakeDrive, { active: true, folderId, folderName: name });
+    fakeDrive.status = { state: 'idle', lastSync: Date.now(), error: '', changed: false, conflicts: [] };
+    log.push({ driveUse: { folderId, name, importLocal } });
+    return { vault: { internal: false, drive: true, label: `Google Drive › ${name}`, ok: true }, status: fakeDrive.status };
+  },
+  driveSync: async () => {
+    fakeDrive.status = { ...fakeDrive.status, state: 'idle', lastSync: Date.now() };
+    return fakeDrive.status;
+  },
   exactAlarmSettings: async () => true,
   http: async ({ url, accept = '*/*', limit = 5 * 1024 * 1024, save = false }) => {
     const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) MemoKing-dev' }, redirect: 'follow' });

@@ -3,6 +3,7 @@ package com.memoking.app
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.memoking.app.drive.DriveSync
 import java.io.File
 
 /** 지금 쓰는 메모 폴더를 기억한다: "internal"(이 휴대폰에만) 또는 사용자가 고른 폴더(SAF 주소) */
@@ -30,6 +31,8 @@ object Vaults {
 
     private fun open(ctx: Context, spec: String): Storage? {
         if (spec == INTERNAL) return FileStorage(internalRoot(ctx), "이 휴대폰 안 (메모킹 앱)")
+        // Google Drive 폴더: 휴대폰 쪽 사본(앱 안)을 메모 폴더로 쓰고, DriveSync 가 Drive 와 맞춘다
+        if (spec.startsWith(DriveSync.PREFIX)) return DriveSync.storage(ctx, spec.removePrefix(DriveSync.PREFIX))
         val uri = Uri.parse(spec)
         // 권한을 잃었으면(폴더를 지웠거나 앱 데이터를 옮김) 다시 골라야 한다
         val granted = ctx.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission && it.isWritePermission }
@@ -42,8 +45,9 @@ object Vaults {
         val old = spec(ctx)
         prefs(ctx).edit().putString(KEY, spec).apply()
         cached = spec to storage
+        if (!spec.startsWith(DriveSync.PREFIX)) DriveSync.cancelSchedule(ctx)
         // 예전에 고른 폴더의 권한은 돌려준다 (앱이 붙잡을 수 있는 폴더 수에 한도가 있음)
-        if (old != null && old != spec && old != INTERNAL) {
+        if (old != null && old != spec && old != INTERNAL && !old.startsWith(DriveSync.PREFIX)) {
             try {
                 ctx.contentResolver.releasePersistableUriPermission(
                     Uri.parse(old), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,

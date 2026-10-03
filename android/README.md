@@ -10,23 +10,26 @@ PC 메모킹과 **같은 메모 폴더 형식**을 그대로 쓰는 휴대폰 �
 2. 휴대폰으로 APK를 옮겨 열면 설치됩니다. 처음에는 "출처를 알 수 없는 앱 설치"를 허용해야 해요.
 3. 직접 빌드하려면 아래 [개발](#개발) 참고.
 
-> 지금 APK는 디버그 서명입니다. Play 스토어에 올리거나 업데이트 설치를 오래 이어 가려면 릴리스 서명 키를 만들어 `app/build.gradle.kts` 에 `signingConfigs` 를 추가하세요.
+> APK는 저장소에 고정한 디버그 키로 서명돼서, 새로 빌드한 APK를 지우지 않고 업데이트로 설치할 수 있어요. (0.1.0 을 설치했었다면 서명이 달라 한 번은 지우고 설치해야 해요.) Play 스토어에 올릴 때는 릴리스 서명 키를 따로 만드세요.
 
 ## 처음 실행: 메모 폴더 고르기
 
 | 고르는 것 | 설명 |
 |---|---|
-| **폴더 고르기** | 휴대폰 저장공간의 아무 폴더(예: `Documents/메모킹`). PC와 같은 메모를 쓰려면 이걸로 |
-| **이 휴대폰에만 보관하기** | 앱 안 저장공간. 바로 시작하고, 나중에 설정 › 폴더 바꾸기 |
+| **Google Drive와 동기화** (추천) | PC 메모킹이 쓰는 Google Drive 폴더(`내 드라이브 › 메모킹`)와 앱이 직접 맞춥니다. 다른 앱 필요 없음 |
+| **휴대폰 폴더 고르기** | 휴대폰 저장공간의 아무 폴더 (Syncthing 같은 다른 동기화 앱과 함께 쓸 때) |
+| **이 휴대폰에만 보관하기** | 앱 안 저장공간. 바로 시작하고, 나중에 설정에서 바꿀 수 있어요 |
 
-### PC와 같은 메모 쓰기 (동기화)
+### PC와 같은 메모 쓰기 — Google Drive 동기화
 
-PC 메모킹은 Google Drive 같은 폴더에 메모를 보관합니다. 안드로이드의 Google Drive 앱은 폴더를 휴대폰에 내려 두지 않으므로, 동기화 앱으로 그 폴더를 휴대폰의 폴더와 맞춘 뒤 메모킹에서 그 폴더를 고르세요.
+PC 메모킹은 **Google Drive for desktop** 이 동기화하는 폴더(`G:\내 드라이브\메모킹`)에 메모를 보관합니다. 휴대폰 메모킹은 같은 구글 계정으로 로그인해 그 Drive 폴더와 직접 동기화합니다. PC 쪽은 바꿀 것이 없어요.
 
-- **Autosync for Google Drive** / **FolderSync** — Google Drive 의 `메모킹` 폴더 ↔ 휴대폰 `Documents/메모킹` 양방향 동기화
-- **Syncthing** — PC와 휴대폰을 직접 동기화 (클라우드 없이)
+처음 한 번 내 Google Cloud 프로젝트에 OAuth 클라이언트를 만들어야 합니다 → **[DRIVE-SETUP.md](DRIVE-SETUP.md)** (10분 정도)
 
-메모킹은 4초마다(화면이 켜져 있을 때) 폴더를 살펴 다른 기기에서 바뀐 메모를 반영합니다. 열어 둔 메모가 바뀌면 바로 불러오고, 쓰는 중이었다면 "바뀐 내용 보기 / 지금 내용 두기" 를 물어봅니다.
+- 언제 맞추나: 앱을 열 때 · 메모를 고친 뒤 몇 초 · 화면을 보는 동안 1분마다 · 앱이 꺼져 있을 때 15분쯤마다(인터넷이 될 때) · 목록 위 ☁ 버튼으로 바로
+- PC와 휴대폰에서 같은 메모를 함께 고치면 PC 쪽을 남기고 휴대폰 쪽은 `(휴대폰 충돌 …)` 사본으로 남깁니다 (글을 잃지 않음)
+- 휴대폰에서 받아 둔 메모는 인터넷이 없어도 보고 고칠 수 있고, 연결되면 맞춥니다
+- 열어 둔 메모가 PC에서 바뀌면 바로 불러오고, 쓰는 중이었다면 "바뀐 내용 보기 / 지금 내용 두기" 를 물어봅니다
 
 ## 기능
 
@@ -58,6 +61,11 @@ android/
     VaultFileProvider.kt 앱 안 폴더의 첨부를 다른 앱이 열 수 있게
     Alarms.kt            예약 알림을 시스템 알람에 맡기기 · 알림 띄우기 · 재부팅 뒤 다시 걸기
     Http.kt              링크 미리보기·인터넷 사진 받기
+    drive/GoogleAuth.kt  구글 로그인 (휴대폰 브라우저 + 127.0.0.1 로 돌아오기, PKCE) · 토큰
+    drive/DriveApi.kt    Google Drive REST API v3
+    drive/SyncEngine.kt  동기화 규칙 (지난번 모습과 비교해 올리기·내려받기·지우기·충돌 사본) — 단위 테스트 있음
+    drive/DriveSync.kt   언제 맞출지, 앱이 꺼져 있을 때 시스템 작업
+  app/src/test/          동기화 엔진 단위 테스트 (가짜 Drive)
   web/                   휴대폰 화면 (앱에 assets/www/m 으로 들어감)
     index.html           처음 설정 · 목록 · 메모 · 시트들
     js/app.js            시작, 화면 바꾸기, 설정·휴지통, 공유받기, 알림
@@ -66,6 +74,7 @@ android/
     js/note-view.js      메모 화면 (app/js/note.js 의 휴대폰판)
     js/alarms.js         예약 알림 실행기 (desktop/alarms.js + 시스템 알람 맡기기)
     js/web-fetch.js      링크 미리보기 (desktop/link-previews.js 와 같은 저장 위치)
+    js/drive.js          Google Drive 연결 화면 · 동기화 상태
     dev/                 PC 브라우저 미리보기 서버·자동 점검 (APK 에는 안 들어감)
 ```
 
@@ -73,12 +82,13 @@ android/
 
 ## 개발
 
-필요한 것: JDK 17, Android SDK (Android Studio 를 설치하면 함께 생김)
+필요한 것: JDK 17, Android SDK (Android Studio 를 설치하면 함께 생김). Google Drive 로그인 설정을 APK 에 넣으려면 `android/local.properties` 에 `memoking.googleClientId=…` / `memoking.googleClientSecret=…`
 
 | 명령 (저장소 맨 위에서) | 설명 |
 |---|---|
 | `cd android && ./gradlew assembleDebug` | APK 만들기 → `android/app/build/outputs/apk/debug/app-debug.apk` |
 | `cd android && ./gradlew installDebug` | 연결한 휴대폰에 바로 설치 |
+| `cd android && ./gradlew testDebugUnitTest` | 동기화 엔진 단위 테스트 |
 | `npm run android:preview` | 휴대폰 화면을 PC 브라우저에서 미리보기 (`http://localhost:8790/m/index.html`, 크롬 개발자 도구의 휴대폰 보기로). 메모 폴더를 주려면 `npm run android:preview -- <폴더>` |
 | `npm run android:smoke` | 미리보기 서버를 띄워 휴대폰 크기로 사용자처럼 조작하고, 메모 폴더에 쓰인 파일을 확인 (30개 항목, 캡처는 `out/android/`, Playwright 필요) |
 

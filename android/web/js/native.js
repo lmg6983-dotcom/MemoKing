@@ -41,6 +41,15 @@ export const native = {
   notify: (item) => unwrap(raw.notify(JSON.stringify(item))),
 };
 
+// Google Drive 동기화 (DriveSync.kt)
+export const drive = {
+  status: sync('driveStatus'),
+  setClient: sync('driveSetClient'),
+  disconnect: sync('driveDisconnect'),
+  cancelLogin: sync('driveCancelLogin'),
+  syncSoon: sync('driveSyncSoon'),
+};
+
 const pending = new Map();
 let seq = 0;
 

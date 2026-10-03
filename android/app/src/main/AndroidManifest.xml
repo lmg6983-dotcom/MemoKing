@@ -45,6 +45,13 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- 구글 로그인을 마치고 브라우저에서 "메모킹으로 돌아가기" -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="memoking" android:host="auth" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -55,6 +62,12 @@
             android:authorities="com.memoking.app.files"
             android:exported="false"
             android:grantUriPermissions="true" />
+
+        <!-- Google Drive 동기화 (앱이 꺼져 있을 때) -->
+        <service
+            android:name=".drive.SyncJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <receiver
             android:name=".AlarmReceiver"

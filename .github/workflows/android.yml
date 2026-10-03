@@ -32,8 +32,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: APK 빌드 (디버그 서명 — 휴대폰에 바로 설치 가능)
-        run: ./gradlew --no-daemon assembleDebug
+      - name: 동기화 엔진 테스트 + APK 빌드 (디버그 서명 — 휴대폰에 바로 설치 가능)
+        # 저장소 설정 › Secrets 에 넣어 두면 Google Drive 로그인 설정이 APK 에 들어간다 (android/DRIVE-SETUP.md)
+        env:
+          MEMOKING_GOOGLE_CLIENT_ID: ${{ secrets.MEMOKING_GOOGLE_CLIENT_ID }}
+          MEMOKING_GOOGLE_CLIENT_SECRET: ${{ secrets.MEMOKING_GOOGLE_CLIENT_SECRET }}
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:

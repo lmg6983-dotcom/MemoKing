@@ -229,6 +229,28 @@ try {
   check('LLM 인덱스: 모든 메모', index.memos.length === fs.readdirSync(vault).filter((f) => f.endsWith('.md')).length);
   check('LLM 인덱스: 안내서', fs.existsSync(path.join(vault, '_memoking/README.md')));
 
+  // Google Drive 연결 (미리보기 서버의 가짜 Drive): 설정 › 연결하기 › 클라이언트 › 로그인 › 폴더 › 지금 메모 함께 올리기
+  const count = await page.locator('.card').count();
+  await page.tap('#settings-btn');
+  await page.tap('#drive-connect');
+  await page.fill('#client-id', 'test-123.apps.googleusercontent.com');
+  await page.fill('#client-secret', 'GOCSPX-test');
+  await page.tap('#client-save');
+  await page.tap('#drive-login');
+  await page.waitForSelector('.folder-item.suggest');
+  check('Drive: 로그인 뒤 폴더 목록 (메모킹이 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹'));
+  check('Drive: 내 드라이브 맨 위는 고를 수 없음', await page.isDisabled('#folder-use'));
+  await page.tap('.folder-item.suggest');
+  await page.waitForTimeout(200);
+  check('Drive: 지금 메모 함께 올리기 보임', await page.isVisible('#import-row'));
+  await page.tap('#folder-use');
+  await page.waitForTimeout(1000);
+  await shot('06-drive');
+  const used = (await devLog()).log.find((l) => l.driveUse)?.driveUse;
+  check('Drive: 폴더 연결 (지금 메모 함께)', used?.name === '메모킹' && used?.importLocal === true);
+  check('Drive: 연결 뒤 메모 그대로 보임', (await page.locator('.card').count()) === count);
+  check('Drive: 목록 위 동기화 버튼', await page.isVisible('#sync-btn'));
+
   // 다크 모드
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.waitForTimeout(200);

@@ -5,6 +5,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.util.Base64
 import android.webkit.JavascriptInterface
+import com.memoking.app.drive.DriveApi
+import com.memoking.app.drive.DriveSync
+import com.memoking.app.drive.GoogleAuth
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -41,6 +44,7 @@ class Bridge(private val activity: MainActivity) {
         val storage = Vaults.current(ctx)
         return JSONObject()
             .put("internal", spec == Vaults.INTERNAL)
+            .put("drive", spec.startsWith(DriveSync.PREFIX))
             .put("label", storage?.label ?: "")
             .put("ok", storage != null)
     }
@@ -90,25 +94,31 @@ class Bridge(private val activity: MainActivity) {
         if (storage.stat(rel)?.dir != false) null else storage.openRead(rel).use { it.readBytes().toString(Charsets.UTF_8) }
     }
 
+    // 메모 폴더를 고쳤으면 잠시 뒤 Google Drive 와 맞춘다 (Drive 폴더를 쓸 때만)
+    private fun <T> changed(value: T): T {
+        DriveSync.request(ctx, 3000)
+        return value
+    }
+
     @JavascriptInterface
     fun writeText(rel: String, text: String): String = reply {
-        storage().write(rel) { it.write(text.toByteArray(Charsets.UTF_8)) }.json()
+        changed(storage().write(rel) { it.write(text.toByteArray(Charsets.UTF_8)) }.json())
     }
 
     @JavascriptInterface
     fun writeBase64(rel: String, data: String): String = reply {
         val bytes = Base64.decode(data, Base64.DEFAULT)
-        storage().write(rel) { it.write(bytes) }.json()
+        changed(storage().write(rel) { it.write(bytes) }.json())
     }
 
     @JavascriptInterface
     fun mkdirs(rel: String): String = reply { storage().mkdirs(rel) }
 
     @JavascriptInterface
-    fun move(from: String, to: String): String = reply { storage().move(from, to) }
+    fun move(from: String, to: String): String = reply { changed(storage().move(from, to)) }
 
     @JavascriptInterface
-    fun remove(rel: String): String = reply { storage().delete(rel) }
+    fun remove(rel: String): String = reply { changed(storage().delete(rel)) }
 
     // ---------- 임시 파일 (공유받은 파일·고른 파일·인터넷에서 받은 것) ----------
 
@@ -117,7 +127,7 @@ class Bridge(private val activity: MainActivity) {
         val file = Temp.file(ctx, id) ?: throw IllegalArgumentException("임시 파일이 없어요")
         val entry = file.inputStream().use { input -> storage().write(rel) { input.copyTo(it) } }
         file.delete()
-        entry.json()
+        changed(entry.json())
     }
 
     @JavascriptInterface
@@ -162,6 +172,40 @@ class Bridge(private val activity: MainActivity) {
         true
     }
 
+    // ---------- Google Drive 동기화 ----------
+
+    fun driveInfo(): JSONObject = JSONObject()
+        .put("configured", GoogleAuth.configured(ctx))
+        .put("builtIn", GoogleAuth.builtIn())
+        .put("connected", GoogleAuth.connected(ctx))
+        .put("email", GoogleAuth.email(ctx))
+        .put("active", DriveSync.active(ctx))
+        .put("folderId", DriveSync.folderId(ctx) ?: "")
+        .put("folderName", DriveSync.folderName(ctx))
+        .put("status", DriveSync.status.json())
+
+    @JavascriptInterface
+    fun driveStatus(): String = reply { driveInfo() }
+
+    /** OAuth 클라이언트 ID·보안 비밀 붙여 넣기 (빌드에 넣지 않았을 때) */
+    @JavascriptInterface
+    fun driveSetClient(id: String, secret: String): String = reply {
+        GoogleAuth.setClient(ctx, id, secret)
+        driveInfo()
+    }
+
+    @JavascriptInterface
+    fun driveDisconnect(): String = reply {
+        DriveSync.disconnect(ctx)
+        driveInfo()
+    }
+
+    @JavascriptInterface
+    fun driveCancelLogin(): String = reply { GoogleAuth.cancelLogin() }
+
+    @JavascriptInterface
+    fun driveSyncSoon(): String = reply { DriveSync.request(ctx, 0) }
+
     // ---------- 오래 걸리는 일 ----------
 
     @JavascriptInterface
@@ -178,6 +222,33 @@ class Bridge(private val activity: MainActivity) {
             "notifyPermission" -> activity.runOnUiThread { activity.requestNotifyPermission(id) }
             "exactAlarmSettings" -> activity.runOnUiThread { activity.openExactAlarmSettings(id) }
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
+            "driveLogin" -> pool.execute {
+                resolve(id) {
+                    val email = GoogleAuth.login(ctx) { url -> activity.runOnUiThread { activity.openBrowser(url) } }
+                    activity.runOnUiThread { activity.bringToFront() }
+                    JSONObject().put("email", email)
+                }
+            }
+            "driveFolders" -> pool.execute {
+                resolve(id) {
+                    val parent = a.optString("parent", "root").ifEmpty { "root" }
+                    JSONArray(DriveApi(ctx).folders(parent).map { JSONObject().put("id", it.id).put("name", it.name) })
+                }
+            }
+            "driveCreateFolder" -> pool.execute {
+                resolve(id) {
+                    val f = DriveApi(ctx).createFolder(a.optString("parent", "root").ifEmpty { "root" }, a.getString("name"))
+                    JSONObject().put("id", f.id).put("name", f.name)
+                }
+            }
+            "driveUse" -> pool.execute {
+                resolve(id) {
+                    val from = if (a.optBoolean("import")) Vaults.current(ctx)?.takeIf { !DriveSync.active(ctx) } else null
+                    val status = DriveSync.use(ctx, a.getString("folderId"), a.getString("name"), from)
+                    JSONObject().put("vault", vaultInfo()).put("status", status.json())
+                }
+            }
+            "driveSync" -> pool.execute { resolve(id) { DriveSync.syncBlocking(ctx).json() } }
             else -> resolve(id) { throw IllegalArgumentException("알 수 없는 기능: $method") }
         }
     }

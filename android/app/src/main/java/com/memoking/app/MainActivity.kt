@@ -26,6 +26,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.window.OnBackInvokedDispatcher
+import com.memoking.app.drive.DriveSync
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.Executors
@@ -189,16 +190,43 @@ class MainActivity : Activity() {
         runOnUiThread { if (pageReady) emit("alarm", item) }
     }
 
+    // 화면이 보이는 동안 1분마다 Google Drive 와 맞추기
+    private val syncTick = object : Runnable {
+        override fun run() {
+            DriveSync.request(this@MainActivity)
+            root.postDelayed(this, 60_000)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         visible = this
         if (pageReady) emit("app", "resume")
+        DriveSync.listener = { status -> runOnUiThread { if (pageReady) emit("sync", status.json()) } }
+        root.removeCallbacks(syncTick)
+        root.post(syncTick)
     }
 
     override fun onPause() {
         if (pageReady) emit("app", "pause") // 쓰던 메모를 바로 저장
         if (visible === this) visible = null
+        root.removeCallbacks(syncTick)
+        DriveSync.request(this, 1500) // 방금 고친 것을 바로 올린다
+        DriveSync.schedule(this)
         super.onPause()
+    }
+
+    fun openBrowser(url: String) {
+        launchView(Uri.parse(url))
+    }
+
+    /** 브라우저에서 로그인을 마쳤을 때 앱을 앞으로 (안 되면 사용자가 "메모킹으로 돌아가기" 를 누른다) */
+    fun bringToFront() {
+        try {
+            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        } catch (e: Exception) {
+            // 백그라운드에서 화면 띄우기가 막힘
+        }
     }
 
     override fun onDestroy() {
