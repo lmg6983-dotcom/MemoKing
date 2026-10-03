@@ -47,7 +47,6 @@ contextBridge.exposeInMainWorld('memoking', {
   history: {
     list: invoke('history:list'),
     setEnabled: invoke('history:set-enabled'),
-    setPopupWatch: invoke('history:set-popup-watch'),
     remove: invoke('history:remove'),
     clear: invoke('history:clear'),
     toMemo: invoke('history:to-memo'),
@@ -72,6 +71,8 @@ contextBridge.exposeInMainWorld('memoking', {
     get: invoke('app:settings'),
     setAutoStart: invoke('app:set-auto-start'),
     setQuickMemo: invoke('app:set-quick-memo'),
+    setFitTables: invoke('app:set-fit-tables'),
+    setMagic: invoke('app:set-magic'),
     setTrashDays: invoke('app:set-trash-days'),
   },
   // 휴지통 (지운 메모)
@@ -142,6 +143,7 @@ contextBridge.exposeInMainWorld('memoking', {
     listOnTop: invoke('list:on-top'),
     toggleTop: invoke('win:toggle-top'),
     showList: invoke('list:show'),
+    growWidth: invoke('win:grow-width'),
   },
   on(event, callback) {
     if (!EVENTS.includes(event)) throw new Error(`알 수 없는 이벤트: ${event}`);

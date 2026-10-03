@@ -1,6 +1,9 @@
 // 표 — 엑셀·구글 시트에서 붙여넣은 표를 마크다운 표로 옮기기 좋은 모양으로 정리한다 (순수 함수, 단위 테스트 대상)
 // 마크다운 표는 셀 병합이 없고 첫 행이 머리글이므로: 병합된 셀은 풀어 빈 셀로, 첫 행은 머리글(<th>)로.
 
+// 칸 안의 의도적인 줄바꿈: 마크다운 표 칸에는 <br> 로 저장 (편집기에서는 html 노드 → 줄바꿈으로 보임)
+export const CELL_BREAK_HTML = '<span data-type="html" data-value="&lt;br&gt;"></span>';
+
 const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /**
@@ -47,8 +50,8 @@ export function cellsToGrid(rows) {
 /** 격자 → 붙여넣기용 HTML 표 (첫 행은 머리글, 행이 하나면 머리글만). cellHtml 이 true 면 셀 내용은 이미 HTML. */
 export function gridToHtml(grid, { cellHtml = false } = {}) {
   if (!grid.length || !grid[0].length) return '';
-  // 마크다운 표의 셀은 한 줄 — 셀 안 줄바꿈은 띄어쓰기로
-  const cell = (v) => (cellHtml ? v : escapeHtml(v).replace(/\s*\n\s*/g, ' '));
+  // 마크다운 표의 셀은 한 줄 — 셀 안 줄바꿈(엑셀의 Alt+Enter)은 <br> 로 지킨다
+  const cell = (v) => (cellHtml ? v : escapeHtml(String(v).trim()).replace(/[ \t]*\n[ \t]*/g, CELL_BREAK_HTML));
   const [head, ...body] = grid;
   // 머리글 행만 있는 1행 표도 된다
   const tbody = body.length ? `<tbody>${body.map((row) => `<tr>${row.map((v) => `<td>${cell(v)}</td>`).join('')}</tr>`).join('')}</tbody>` : '';

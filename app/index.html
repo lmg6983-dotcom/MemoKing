@@ -130,14 +130,22 @@
     </label>
     <label class="setting-row">
       <input type="checkbox" id="history-enabled" class="switch">
-      <span>Windows 알림 모아두기 <small>알림 보관함 탭에서 볼 수 있어요</small></span>
-    </label>
-    <label class="setting-row sub-row">
-      <input type="checkbox" id="popup-watch" class="switch">
-      <span>카카오톡 알림도 모으기 <small>Windows 알림 센터를 쓰지 않는 앱이 띄우는 알림 창을 읽어서 모아요</small></span>
+      <span>Windows 알림 모아두기 <small>카카오톡 알림 창도 함께 모아요 · 알림 보관함 탭에서 볼 수 있어요</small></span>
     </label>
     <div class="dialog-actions left sub-actions">
       <button id="history-apps-btn" class="btn">알림 모을 앱 고르기 <span id="blocked-count" class="trash-count"></span></button>
+    </div>
+    <label class="setting-row">
+      <input type="checkbox" id="fit-tables" class="switch">
+      <span>표가 넘치면 메모를 줄여 맞추기 <small>표가 메모 폭보다 넓으면 글자를 줄여 표가 잘리지 않게 해요. 더 못 줄이면 메모 창을 넓혀요</small></span>
+    </label>
+    <label class="setting-row">
+      <input type="checkbox" id="magic-enabled" class="switch">
+      <span>매직키 <kbd>Ctrl+Alt+Space</kbd> <small>어디서든 작은 입력창을 띄워 바로 메모로 만들어요 (맥OS Spotlight 처럼)</small></span>
+    </label>
+    <div id="magic-modules-row" class="setting-sub" hidden>
+      <p class="label sub">매직키 기능</p>
+      <div id="magic-modules-list" class="magic-settings-modules"></div>
     </div>
     <p class="label">지운 메모</p>
     <div class="dialog-actions left">

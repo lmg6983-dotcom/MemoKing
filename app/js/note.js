@@ -9,6 +9,7 @@ import { setupReminderPanel } from './reminder-panel.js';
 import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
 import { setupCoach } from './coach.js';
+import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 
 const SAVE_DELAY = 600;
 const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
@@ -123,7 +124,7 @@ window.addEventListener('beforeunload', () => {
 // ---------- 다른 곳(다른 PC, 다른 앱)에서 바뀐 경우 ----------
 
 function applyExternal(next) {
-  editor.setMarkdown(next.body);
+  editor.setMarkdown(next.body, next.tables ?? []);
   current = saved = editor.getMarkdown();
   el.banner.hidden = true;
   pendingExternal = null;
@@ -614,7 +615,55 @@ el.moreBtn.addEventListener('click', () => {
   if (open) placePopover(el.morePanel, el.moreBtn);
 });
 
+// ---------- 스타일 고르기 (H1·H2 버튼 대신): 본문 · 제목 1·2·3 · 인용 · 코드 블록 ----------
+const styleMenu = $('style-menu');
+const STYLE_NAMES = { paragraph: '본문', h1: '제목 1', h2: '제목 2', h3: '제목 3', quote: '인용', codeBlock: '코드 블록' };
+let currentStyle = 'paragraph';
+
+function closeStyleMenu() {
+  styleMenu.hidden = true;
+  for (const b of document.querySelectorAll('[data-action="style"]')) b.setAttribute('aria-expanded', 'false');
+}
+function openStyleMenu(anchor) {
+  closePalette();
+  for (const b of styleMenu.querySelectorAll('[data-style]')) b.setAttribute('aria-selected', String(b.dataset.style === currentStyle));
+  styleMenu.hidden = false;
+  for (const b of document.querySelectorAll('[data-action="style"]')) b.setAttribute('aria-expanded', 'true');
+  placePopover(styleMenu, anchor);
+}
+// 지금 줄의 스타일 (코드 블록 > 제목 > 인용 > 본문)
+function styleOf(active) {
+  if (active.codeBlock) return 'codeBlock';
+  for (const h of ['h1', 'h2', 'h3']) if (active[h]) return h;
+  return active.quote ? 'quote' : 'paragraph';
+}
+function showStyle(active) {
+  currentStyle = styleOf(active);
+  for (const b of document.querySelectorAll('[data-action="style"]')) {
+    b.querySelector('.style-name').textContent = STYLE_NAMES[currentStyle];
+    b.classList.toggle('active', currentStyle !== 'paragraph');
+  }
+  if (!styleMenu.hidden) for (const b of styleMenu.querySelectorAll('[data-style]')) b.setAttribute('aria-selected', String(b.dataset.style === currentStyle));
+}
+styleMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서 유지
+styleMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-style]');
+  if (!b) return;
+  editor.setStyle(b.dataset.style);
+  closeStyleMenu();
+  closeMore();
+});
+styleMenu.addEventListener('keydown', (e) => {
+  const items = [...styleMenu.querySelectorAll('[data-style]')];
+  const i = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+  }
+});
+
 const actions = {
+  style: (btn) => (styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
   file: () => el.fileInput.click(),
   table: () => editor.insertTable(),
   color: (btn) => (paletteKind === 'color' ? closePalette() : openPalette('color', btn)),
@@ -641,8 +690,26 @@ for (const container of [el.formatBar, el.morePanel]) {
 // 도구막대·팝업 밖을 누르면 팝업을 닫는다
 document.addEventListener('mousedown', (e) => {
   if (!el.palette.hidden && !el.palette.contains(e.target) && !e.target.closest?.('[data-action="color"],[data-action="highlight"]')) closePalette();
-  if (!el.morePanel.hidden && !el.morePanel.contains(e.target) && !el.moreBtn.contains(e.target) && !el.palette.contains(e.target)) closeMore();
+  if (!el.morePanel.hidden && !el.morePanel.contains(e.target) && !el.moreBtn.contains(e.target) && !el.palette.contains(e.target) && !styleMenu.contains(e.target)) closeMore();
+  if (!styleMenu.hidden && !styleMenu.contains(e.target) && !e.target.closest?.('[data-action="style"]')) closeStyleMenu();
 });
+
+// 표 열 너비·행 높이·머리글 강조 → 메모 머리말 (끄는 동안 여러 번 바뀌어도 한 번에)
+let tablesTimer = 0;
+let pendingTables = null;
+function saveTables(tables) {
+  pendingTables = tables;
+  clearTimeout(tablesTimer);
+  tablesTimer = setTimeout(flushTables, 400);
+}
+function flushTables() {
+  clearTimeout(tablesTimer);
+  if (!pendingTables) return;
+  const t = pendingTables;
+  pendingTables = null;
+  api.memo.set(id, { tables: t }).catch(() => setStatus('표 크기를 저장하지 못했어요', true));
+}
+window.addEventListener('beforeunload', flushTables);
 
 // 표 막대: 표 안에 커서가 있을 때만. 머리글 행과 마지막 남은 열은 지울 수 없으므로 막는다.
 const tableBar = $('table-bar');
@@ -653,20 +720,32 @@ function showTableBar(table) {
   if (!table) return;
   const delRow = tableBar.querySelector('[data-table="delRow"]');
   const delCol = tableBar.querySelector('[data-table="delCol"]');
-  // 머리글 아래 행은 마지막 하나까지 지울 수 있다 (머리글 행만 남은 1행 표도 된다)
-  delRow.disabled = table.header;
-  delRow.title = table.header ? '머리글 행은 지울 수 없어요. 표를 없애려면 표 지우기를 눌러 주세요' : '이 행 지우기';
-  delCol.disabled = table.cols <= 1;
-  delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 표를 없애려면 표 지우기를 눌러 주세요' : '이 열 지우기';
+  // 머리글 아래 행은 마지막 하나까지 지울 수 있다 (머리글 행만 남은 1행 표도 된다).
+  // 머리글 행만 남았을 때 머리글에서 누르면, 열이 하나뿐일 때 누르면 표 전체를 지운다 (표 막대에 "표 지우기"가 따로 없음)
+  const lastRow = table.header && table.rows <= 1;
+  delRow.disabled = table.header && !lastRow;
+  delRow.textContent = lastRow ? '표 지우기' : '행 지우기';
+  delRow.title = lastRow ? '머리글 행만 남았어요. 누르면 표를 지워요' : table.header ? '머리글 행은 지울 수 없어요 (아래 행을 다 지운 뒤 누르면 표를 지워요)' : '이 행 지우기';
+  // 셀 병합: 여러 칸을 골랐으면 "셀 병합", 병합한 칸 안이면 "병합 풀기"
+  const merge = tableBar.querySelector('[data-table="merge"]');
+  merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
+  merge.disabled = !table.canMerge && !table.merged;
+  merge.title = table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요';
+  delCol.textContent = table.cols <= 1 ? '표 지우기' : '열 지우기';
+  delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 지워요' : '이 열 지우기';
 }
 tableBar.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서가 표 안에 남게
 tableBar.addEventListener('click', (e) => {
   const b = e.target.closest('[data-table]');
-  if (b && !b.disabled) editor.tableCommand(b.dataset.table);
+  if (!b || b.disabled) return;
+  // 마지막 남은 머리글 행·열을 지우면 표 전체를 지운다
+  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.textContent === '표 지우기';
+  editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
 });
 
 function showActive(active) {
   showTableBar(active.table);
+  showStyle(active);
   for (const btn of document.querySelectorAll('[data-cmd]')) {
     btn.classList.toggle('active', Boolean(active[btn.dataset.cmd]));
   }
@@ -704,7 +783,8 @@ const SHORTCUTS = {
 window.addEventListener('keydown', (e) => {
   if (!editor || el.confirm.open) return;
   if (e.key === 'Escape') {
-    if (!el.palette.hidden) closePalette();
+    if (!styleMenu.hidden) closeStyleMenu();
+    else if (!el.palette.hidden) closePalette();
     else if (!el.morePanel.hidden) closeMore();
     else if (!el.menu.hidden) closeMenu();
     else if (!el.linksPanel.hidden) toggleLinks(false);
@@ -737,6 +817,185 @@ window.addEventListener('keydown', (e) => {
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
 }, true);
+
+// ---------- 본문 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 웹 브라우저처럼 글·사진·표가 함께 ----------
+// 배율은 메모마다 이 PC 에 기억한다. 위 막대·서식 막대는 그대로.
+const ZOOM_KEY = `memoking.zoom.${id}`;
+let zoom = 1;
+try {
+  zoom = clampZoom(localStorage.getItem(ZOOM_KEY) ?? 1);
+} catch {
+  // 저장소를 못 써도 100% 로
+}
+const zoomBadge = document.createElement('div');
+zoomBadge.className = 'zoom-badge';
+zoomBadge.setAttribute('role', 'status');
+const zoomText = document.createElement('span');
+const zoomReset = document.createElement('button');
+zoomReset.type = 'button';
+zoomReset.textContent = '원래대로';
+zoomReset.addEventListener('click', () => setZoom(1));
+zoomBadge.append(zoomText, zoomReset);
+document.body.append(zoomBadge);
+let zoomTimer = 0;
+
+function setZoom(z, { show = true } = {}) {
+  const scroller = el.editorRoot;
+  // 보던 곳이 그대로 보이게: 스크롤 위치를 배율에 맞춰 옮긴다
+  const ratio = scroller.scrollHeight > scroller.clientHeight ? scroller.scrollTop / (scroller.scrollHeight - scroller.clientHeight) : 0;
+  zoom = clampZoom(z);
+  el.editorRoot.style.setProperty('--note-zoom', String(zoom));
+  document.body.dataset.zoom = String(zoom);
+  scroller.scrollTop = ratio * Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  try {
+    if (zoom === 1) localStorage.removeItem(ZOOM_KEY);
+    else localStorage.setItem(ZOOM_KEY, String(zoom));
+  } catch {
+    // 기억 못 해도 지금 창에서는 그대로
+  }
+  if (!show) return;
+  zoomText.textContent = `확대 ${zoomLabel(zoom)}`;
+  zoomReset.hidden = zoom === 1;
+  zoomBadge.classList.add('show');
+  clearTimeout(zoomTimer);
+  zoomTimer = setTimeout(() => zoomBadge.classList.remove('show'), 1600);
+}
+setZoom(zoom, { show: false });
+
+// ---------- 표가 넘치면 메모를 줄여 맞추고, 더 못 줄이면 창을 넓힌다 (v0.17.13, 설정으로 끄고 켬) ----------
+// 열 너비를 줄이지 않고(사용자 요청) 본문 배율(--note-zoom)을 낮춰 표 가로가 잘리지 않게 한다.
+// 측정은 화면 px 로 (표는 배율이 걸린 .mk-doc 안, 편집 영역은 배율이 없음).
+let fitTables = true;
+let fitTimer = 0;
+let growing = false;
+const MIN_ZOOM = 0.5;
+
+function widestTableWidth() {
+  let w = 0;
+  for (const t of el.editorRoot.querySelectorAll('.mk-doc table')) w = Math.max(w, t.getBoundingClientRect().width);
+  return w;
+}
+function availWidth() {
+  const cs = getComputedStyle(el.editorRoot);
+  return el.editorRoot.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+}
+
+async function fitWide() {
+  if (!fitTables || growing) return;
+  const avail = availWidth();
+  const widest = widestTableWidth();
+  if (widest <= 1 || avail <= 1) return;
+  if (widest <= avail + 1) return; // 이미 들어온다
+  // 지금 배율에서 표가 avail 에 들어갈 배율. 더 키우지는 않는다 (줄이기만)
+  const target = clampZoom(Math.max(MIN_ZOOM, (zoom * avail) / widest));
+  if (target < zoom - 0.001) {
+    setZoom(target);
+    await new Promise((r) => requestAnimationFrame(r));
+  }
+  // 최소 배율에서도 넘치면 창을 넓힌다 (화면 안에서)
+  const stillWidest = widestTableWidth();
+  if (stillWidest > availWidth() + 1 && zoom <= MIN_ZOOM + 0.001) {
+    growing = true;
+    try {
+      const grown = await api.win.growWidth(Math.ceil(stillWidest - availWidth()) + 8);
+      if (grown > 0) {
+        await new Promise((r) => requestAnimationFrame(r));
+        // 창을 넓혀 공간이 생겼으면 배율을 다시 올려 본다
+        const avail2 = availWidth();
+        const widest2 = widestTableWidth();
+        if (widest2 > 1) setZoom(Math.min(1, clampZoom((zoom * avail2) / widest2)));
+      }
+    } finally {
+      growing = false;
+    }
+  }
+}
+const scheduleFit = () => {
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(fitWide, 250);
+};
+
+// Ctrl+휠: 위로 굴리면 크게, 아래로 굴리면 작게 (창 전체가 아니라 본문만 — Chromium 의 페이지 확대는 막는다)
+window.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  if (e.deltaY) setZoom(stepZoom(zoom, e.deltaY < 0 ? 1 : -1));
+}, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey && e.code !== 'Equal') return;
+  if (e.code === 'Equal' || e.code === 'NumpadAdd') setZoom(stepZoom(zoom, 1));
+  else if (e.code === 'Minus' || e.code === 'NumpadSubtract') setZoom(stepZoom(zoom, -1));
+  else return;
+  e.preventDefault();
+  e.stopPropagation();
+}, true);
+
+// ---------- 아래 서식 도구막대: 메모 창이 활성일 때나 마우스가 창 아래쪽에 있을 때만 (미끄러져 올라옴, v0.17.16) ----------
+let barHover = false;
+const barHeight = () => el.formatBar.offsetHeight || 38;
+const popoverOpen = () => !el.palette.hidden || !el.morePanel.hidden || !document.getElementById('style-menu').hidden;
+function updateBar() {
+  document.body.style.setProperty('--bar-h', `${barHeight()}px`);
+  const coaching = document.body.classList.contains('coaching'); // 튜토리얼 말풍선이 도구막대를 가리킬 수 있게
+  document.body.classList.toggle('bar-hidden', !(document.hasFocus() || barHover || popoverOpen() || coaching));
+}
+let wasCoaching = false;
+new MutationObserver(() => {
+  const now = document.body.classList.contains('coaching');
+  if (now !== wasCoaching) {
+    wasCoaching = now;
+    updateBar();
+  }
+}).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+window.addEventListener('focus', updateBar);
+window.addEventListener('blur', updateBar); // 창을 떠나거나 마우스가 아래쪽을 벗어나면 바로 내려간다 (v0.17.19)
+document.addEventListener('mousemove', (e) => {
+  const near = e.clientY >= window.innerHeight - (barHeight() + 22);
+  if (near === barHover) return;
+  barHover = near;
+  updateBar();
+});
+document.documentElement.addEventListener('mouseleave', () => {
+  barHover = false;
+  updateBar();
+});
+updateBar();
+
+// ---------- CLEAR 도장: 체크리스트를 모두 끝내면 (v0.17.13) ----------
+const clearStamp = document.createElement('div');
+clearStamp.className = 'clear-stamp';
+clearStamp.textContent = 'CLEAR';
+clearStamp.setAttribute('role', 'status');
+clearStamp.setAttribute('aria-label', '체크리스트를 모두 끝냈어요');
+clearStamp.hidden = true;
+document.body.append(clearStamp);
+// 메모 본문(편집 영역)의 정중앙
+const placeClearStamp = () => {
+  const r = el.editorRoot.getBoundingClientRect();
+  clearStamp.style.left = `${Math.round(r.left + r.width / 2)}px`;
+  clearStamp.style.top = `${Math.round(r.top + r.height / 2)}px`;
+};
+new ResizeObserver(() => {
+  if (!clearStamp.hidden) placeClearStamp();
+}).observe(el.editorRoot);
+
+// 편집기가 알려 주는 체크리스트 진행 → 도장 (처음 열 때는 그냥 찍혀 있고, 방금 끝냈을 때만 "쿵")
+function showTasks({ total, done }, { initial = false } = {}) {
+  const clear = total > 0 && done === total;
+  const was = !clearStamp.hidden;
+  clearStamp.hidden = !clear;
+  document.body.dataset.tasks = total ? `${done}/${total}` : '';
+  if (!clear) {
+    clearStamp.classList.remove('stamp-in');
+    return;
+  }
+  placeClearStamp();
+  if (!was && !initial) {
+    clearStamp.classList.remove('stamp-in');
+    void clearStamp.offsetWidth; // 애니메이션 다시
+    clearStamp.classList.add('stamp-in');
+  }
+}
 
 async function closeWindow() {
   await flush();
@@ -919,10 +1178,12 @@ if (!memo) {
   current = saved = memo.body;
   editor = await createNoteEditor(el.editorRoot, {
     markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus,
+    tables: memo.tables ?? [], onTables: saveTables,
     fetchPreview: (url) => api.links.preview(url),
     openLink: (url) => api.links.open(url),
     getTags: () => api.tags.list(),
     onEmpty: showPlaceholder,
+    onTasks: showTasks,
   });
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();
@@ -937,5 +1198,13 @@ if (!memo) {
   if (memo.alarm) showAlarm(memo.alarm);
   editor.focus();
   if (memo.capture) await applyCapture(memo.capture);
+  // 표가 넘치면 메모를 줄여 맞추기 (설정) — 열 때 한 번, 그리고 본문이 바뀔 때(표 붙여넣기·넣기)
+  try {
+    fitTables = (await api.settings.get())?.fitTables !== false;
+  } catch {
+    // 설정을 못 읽으면 기본(켜짐)
+  }
+  new MutationObserver(scheduleFit).observe(el.editorRoot, { childList: true, subtree: true, characterData: true });
+  scheduleFit();
   document.documentElement.dataset.ready = 'true';
 }

@@ -3,11 +3,12 @@ import {
   Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx,
   commonmark, imageSchema, linkSchema, toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand,
   wrapInHeadingCommand, turnIntoTextCommand, wrapInBulletListCommand, wrapInOrderedListCommand,
-  wrapInBlockquoteCommand, createCodeBlockCommand, insertHrCommand, liftListItemCommand,
+  wrapInBlockquoteCommand, createCodeBlockCommand, insertHrCommand, liftListItemCommand, htmlSchema,
   gfm, toggleStrikethroughCommand, history, listener, listenerCtx, clipboard, trailing, upload, uploadConfig,
   callCommand, getMarkdown, replaceAll, insert, $view, $prose, $markSchema, $nodeSchema, $remark, Plugin, PluginKey, TextSelection,
   toggleMark, Decoration, DecorationSet, insertTableCommand, tableSchema,
-  addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell,
+  addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, columnResizing,
+  splitCell, CellSelection, TableMap,
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
@@ -17,8 +18,13 @@ import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
 import { vaultUrl, mediaKind, baseName } from './media.js';
 import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from './core/link-preview.js';
 import { extOf, fileKind } from './core/file-kinds.js';
-import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv } from './core/tables.js';
+import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
+import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
+import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
+import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells } from './table-extras.js';
+import { createListDrag } from './list-drag.js';
+import { create as createConfetti } from '../vendor/confetti.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
 // 모두 마크다운 이미지 문법 ![설명](attachments/파일) 로 저장하고, 확장자로 구분해 보여준다.
@@ -148,6 +154,42 @@ const inlineHtmlMarks = $remark('memoking-inline-html-marks', () => remarkInline
 
 // ---------- 체크리스트 ----------
 
+// 체크를 하면 체크 네모 자리에서 작은 폭죽 (canvas-confetti, 동작 줄이기 설정이면 생략)
+let confettiFire = null;
+function celebrateAt(clientX, clientY) {
+  try {
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
+    if (!confettiFire) {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'mk-confetti';
+      document.body.append(canvas);
+      confettiFire = createConfetti(canvas, { resize: true, useWorker: false, disableForReducedMotion: true });
+    }
+    confettiFire({
+      particleCount: 28,
+      spread: 360, // 체크 네모를 중심으로 사방으로 (위 모서리 가까이에서도 화면 밖으로 날아가지 않게)
+      startVelocity: 11,
+      gravity: 0.7,
+      decay: 0.92,
+      ticks: 80,
+      scalar: 0.7,
+      origin: { x: clientX / window.innerWidth, y: clientY / window.innerHeight },
+      colors: ['#ffcd00', '#ff7a59', '#4fc3f7', '#7ed957', '#c18cff'],
+      shapes: ['circle', 'square'],
+    });
+  } catch {
+    // 폭죽은 꾸밈이라 안 되어도 그만
+  }
+}
+
+// 체크 네모의 화면 좌표 (ProseMirror 가 체크 뒤 li 를 다시 그려 참조가 끊기므로 누르기 전에 잰다)
+function checkboxPoint(li) {
+  const r = li.getBoundingClientRect();
+  const fs = parseFloat(getComputedStyle(li).fontSize) || 14;
+  const scale = li.offsetWidth ? r.width / li.offsetWidth : 1;
+  return { x: r.left - fs * 0.9 * scale, y: r.top + fs * 0.8 * scale };
+}
+
 // 체크리스트 네모를 누르면 체크/해제
 function toggleTaskOnClick(view, event) {
   const li = event.target instanceof Element ? event.target.closest('li[data-item-type="task"]') : null;
@@ -156,12 +198,29 @@ function toggleTaskOnClick(view, event) {
   for (let d = $pos.depth; d > 0; d--) {
     const node = $pos.node(d);
     if (node.type.name === 'list_item') {
-      view.dispatch(view.state.tr.setNodeMarkup($pos.before(d), undefined, { ...node.attrs, checked: !node.attrs.checked }));
+      const checked = !node.attrs.checked;
+      const point = checked ? checkboxPoint(li) : null; // 다시 그리기 전에 미리 잰다
+      view.dispatch(view.state.tr.setNodeMarkup($pos.before(d), undefined, { ...node.attrs, checked }));
       event.preventDefault();
+      if (point) celebrateAt(point.x, point.y);
       return true;
     }
   }
   return false;
+}
+
+// 문서의 체크리스트 진행 (CLEAR 도장)
+function taskCounts(doc) {
+  let total = 0;
+  let done = 0;
+  doc.descendants((node) => {
+    if (node.type.name === 'list_item' && node.attrs.checked != null) {
+      total++;
+      if (node.attrs.checked) done++;
+    }
+    return true;
+  });
+  return { total, done };
 }
 
 // ---------- 링크 미리보기 카드 ----------
@@ -506,8 +565,8 @@ function cellInlineHtml(cell, boldClasses) {
     if (node.nodeType !== 1) return;
     const tag = node.tagName;
     if (tag === 'STYLE' || tag === 'SCRIPT') return;
-    // 마크다운 표의 셀은 한 줄이라 셀 안 줄바꿈은 띄어쓰기로
-    if (tag === 'BR') return out.push(' ');
+    // 셀 안의 의도적인 줄바꿈(엑셀 Alt+Enter·시트의 줄바꿈)은 <br> 로 지킨다
+    if (tag === 'BR' || (tag === 'SPAN' && node.dataset.type === 'html' && isBreakHtml(node.dataset.value))) return out.push(CELL_BREAK_HTML);
     const block = /^(P|DIV|LI|H[1-6])$/.test(tag);
     if (block && out.length) out.push(' ');
     const keep = CELL_INLINE.has(tag) && tag !== 'SPAN' && tag !== 'BR';
@@ -527,14 +586,119 @@ function cellInlineHtml(cell, boldClasses) {
   const bold = /font-weight:\s*(bold|[6-9]00)/i.test(style) || [...cell.classList].some((c) => boldClasses.has(c)) || cell.tagName === 'TH';
   const italic = /font-style:\s*italic/i.test(style);
   cell.childNodes.forEach(walk);
-  let html = out.join('').replace(/\s+/g, ' ').trim();
+  let html = out.join('').replace(/\s+/g, ' ').trim()
+    .replace(/(?:\s*<span data-type="html" data-value="&lt;br&gt;"><\/span>\s*)+$/, '') // 끝의 빈 줄바꿈은 뺀다
+    .replace(/^(?:\s*<span data-type="html" data-value="&lt;br&gt;"><\/span>\s*)+/, '');
   if (!html) return '';
   // 머리글은 원래 굵게 보이므로 굵게를 따로 두지 않는다 (첫 줄)
   if (italic) html = `<i>${html}</i>`;
   return { html, bold };
 }
 
+// 표 하나의 열 너비·정렬을 내용에 맞춘다 (병합한 칸은 첫 칸의 열에 내용이 있는 것으로 본다)
+function fitTable(tr, node, pos, { available, measure }) {
+  const map = TableMap.get(node);
+  const grid = Array.from({ length: map.height }, () => Array(map.width).fill(''));
+  const seen = new Set();
+  for (const rel of map.map) {
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    const r = map.findCell(rel);
+    grid[r.top][r.left] = (node.nodeAt(rel)?.attrs.colspan ?? 1) > 1 ? '' : cellText(node.nodeAt(rel));
+  }
+  const fit = autoFitTable(grid, { available, measure });
+  for (const rel of seen) {
+    const cell = node.nodeAt(rel);
+    const r = map.findCell(rel);
+    tr.setNodeMarkup(tr.mapping.map(pos + 1 + rel), null, { ...cell.attrs, colwidth: fit.widths.slice(r.left, r.right), alignment: fit.align[r.left] });
+  }
+  return fit;
+}
+
+// 칸 안의 문단이 여럿이면(칸을 합친 뒤) 한 문단으로 — 마크다운 표 칸은 한 줄이라 문단 사이는 <br>
+function oneLineCell(cell) {
+  if (cell.childCount <= 1) return cell.content;
+  const schema = cell.type.schema;
+  const br = schema.nodes.html.create({ value: '<br>' });
+  const inline = [];
+  cell.forEach((block, _o, i) => {
+    if (i > 0 && block.content.size) inline.push(br);
+    block.content.forEach((n) => inline.push(n));
+  });
+  return schema.nodes.paragraph.create(null, inline);
+}
+
+// 병합한 칸이 있는 표 → 병합을 푼 표 (마크다운으로 쓰기 위해). 병합·여러 문단 칸이 없으면 그대로.
+function unmergedTable(node) {
+  const map = TableMap.get(node);
+  let merged = false;
+  node.descendants((n) => {
+    if ((n.attrs.colspan ?? 1) > 1 || (n.attrs.rowspan ?? 1) > 1 || (/^table_(cell|header)$/.test(n.type.name) && n.childCount > 1)) merged = true;
+    return !merged;
+  });
+  if (!merged) return node;
+  const rows = [];
+  for (let r = 0; r < map.height; r++) {
+    const rowNode = node.child(r);
+    const cells = [];
+    for (let c = 0; c < map.width; c++) {
+      const rel = map.map[r * map.width + c];
+      const cell = node.nodeAt(rel);
+      const at = map.findCell(rel);
+      const cellType = rowNode.firstChild?.type ?? cell.type;
+      if (at.top === r && at.left === c) cells.push(cellType.create({ ...cell.attrs, colspan: 1, rowspan: 1, colwidth: null }, oneLineCell(cell)));
+      else cells.push(cellType.createAndFill({ ...cell.attrs, colspan: 1, rowspan: 1, colwidth: null }));
+    }
+    rows.push(rowNode.type.create(rowNode.attrs, cells));
+  }
+  return node.type.create(node.attrs, rows);
+}
+
+const isBreakHtml = (value) => /^<br\s*\/?>$/i.test(String(value ?? '').trim());
+
+// 표 칸의 글 (칸 안 줄바꿈·문단은 "\n")
+function cellText(cell) {
+  const lines = [];
+  cell.forEach((block) => {
+    let line = '';
+    block.descendants((n) => {
+      if (n.isText) line += n.text;
+      else if (n.type.name === 'hardbreak' || n.type.name === 'hard_break' || (n.type.name === 'html' && isBreakHtml(n.attrs.value))) line += '\n';
+      return true;
+    });
+    lines.push(line);
+  });
+  return lines.join('\n');
+}
+
+// 표가 쓸 수 있는 본문 폭 (편집 영역 안쪽 여백·표 테두리·여유 몇 px 를 뺀다)
+function tableBodyWidth(view) {
+  const cs = getComputedStyle(view.dom);
+  return Math.max(200, Math.floor(view.dom.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4));
+}
+
+// 표 칸 글자 너비 재기 (편집기 글꼴, 표는 본문의 0.95배, 머리글은 굵게)
+function tableMeasure(view) {
+  const cs = getComputedStyle(view.dom);
+  const size = parseFloat(cs.fontSize) * 0.95;
+  const ctx = document.createElement('canvas').getContext('2d');
+  const cache = new Map();
+  return (text, bold) => {
+    const key = `${bold ? 1 : 0}${text}`;
+    if (!cache.has(key)) {
+      ctx.font = `${bold ? 700 : 400} ${size}px ${cs.fontFamily}`;
+      cache.set(key, Math.ceil(ctx.measureText(text).width));
+    }
+    return cache.get(key);
+  };
+}
+
+// 붙여넣은 표마다 따로 살펴볼 이유(병합된 칸·표 안의 표·그림·수식) — 붙인 뒤 열 너비를 자동으로 맞출 때 쓴다
+let pastedTableReviews = [];
+let pastedTablesAt = 0; // 표가 든 내용을 붙여넣은 시각 (Milkdown 붙여넣기는 "paste" 표시 없이 문서를 바꾸므로 이것으로 안다)
+
 function normalizePastedTables(html) {
+  pastedTableReviews = [];
   if (!/<t[rdh][\s>]/i.test(html)) return html;
   const doc = new window.DOMParser().parseFromString(wrapOrphanRows(html), 'text/html');
   // 엑셀은 굵게를 <style> 의 class(.xl65 { font-weight:700 })로 준다
@@ -545,6 +709,7 @@ function normalizePastedTables(html) {
   let changed = false;
   for (const table of [...doc.querySelectorAll('table')]) {
     if (table.parentElement?.closest('table')) continue; // 표 안의 표는 바깥 표에서 글자로
+    const review = tableReviewReasons(table);
     const rows = [...table.rows].map((tr) => [...tr.cells].map((cell) => {
       const inner = cellInlineHtml(cell, boldClasses);
       return {
@@ -567,12 +732,14 @@ function normalizePastedTables(html) {
       changed = true;
       continue;
     }
+    pastedTableReviews.push(review);
     const clean = gridToHtml(grid.map((row, r) => (r === 0 ? row.map((v) => v.replace(/^<b>([\s\S]*)<\/b>$/, '$1')) : row)), { cellHtml: true });
     const holder = doc.createElement('div');
     holder.innerHTML = clean;
     table.replaceWith(...holder.childNodes);
     changed = true;
   }
+  if (pastedTableReviews.length) pastedTablesAt = Date.now();
   if (!changed) return html;
   doc.querySelectorAll('style, colgroup, col, meta, google-sheets-html-origin > style').forEach((n) => n.remove());
   return doc.body.innerHTML;
@@ -591,7 +758,7 @@ function normalizePastedTables(html) {
  *   fetchPreview: 링크 카드에 보여줄 제목·설명·사진 (메인 프로세스가 메모 폴더에 모아 둔 것)
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, readOnly = false }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false }) {
   let ready = false;
   let editor = null;
   const view = () => editor.ctx.get(editorViewCtx);
@@ -753,6 +920,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   const pastePlugin = $prose(() => new Plugin({
     key: new PluginKey('memoking-paste'),
     props: {
+      // 복사·끌기: 서식 없는 곳에 붙일 "일반 글자"는 마크다운(\ 이스케이프가 섞임)이 아니라 읽는 글로 (Milkdown 클립보드보다 먼저)
+      clipboardTextSerializer: (slice) => plainTextOf(slice.content, { openStart: slice.openStart, openEnd: slice.openEnd }),
       transformPastedHTML: (html) => revealLazyImages(normalizePastedTables(html)),
       handlePaste(v, event) {
         const data = event.clipboardData;
@@ -798,10 +967,17 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }));
 
   // 표 안 Tab: 다음 셀로, 마지막 셀이면 행을 더해 그 첫 셀로 (Shift+Tab 은 Milkdown 표 기능이 이전 셀로)
+  // 표 안 Shift+Enter: 칸 안에서 줄바꿈 (마크다운에는 <br>)
   const tableTab = $prose(() => new Plugin({
     key: new PluginKey('memoking-table-tab'),
     props: {
       handleKeyDown(v, event) {
+        if (event.key === 'Enter' && event.shiftKey && !event.ctrlKey && !event.altKey && isInTable(v.state)) {
+          const type = v.state.schema.nodes.html;
+          if (!type) return false;
+          v.dispatch(v.state.tr.replaceSelectionWith(type.create({ value: '<br>' })).scrollIntoView());
+          return true;
+        }
         if (event.key !== 'Tab' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || !isInTable(v.state)) return false;
         if (goToNextCell(1)(v.state, v.dispatch)) return true;
         if (addRowAfter(v.state, v.dispatch)) goToNextCell(1)(v.state, v.dispatch);
@@ -810,8 +986,79 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
   }));
 
+  // 표 열 너비·행 높이·머리글 강조 (메모 머리말에 저장)
+  let currentTables = tables;
+  const extras = createTableExtras({
+    readOnly,
+    onChange: (next) => {
+      currentTables = next;
+      onTables?.(next);
+    },
+  });
+  const tableExtras = $prose(() => extras.plugin);
+  // 열 너비: 칸 오른쪽 테두리를 끌기 (prosemirror-tables — Milkdown gfm 묶음에는 빠져 있어 따로 켠다)
+  const tableResize = $prose(() => columnResizing({ cellMinWidth: 24 }));
+
+  // 붙여넣은 표(엑셀·구글 시트 등): 내용·본문 폭에 맞춰 열 너비·정렬을 자동으로 (core/table-autofit.js)
+  // 병합된 칸·표 안의 표·그림·수식이 있던 표는 자동으로 맞추지 않고 확인해 달라고 알린다.
+  let fitView = null;
+  const tableAutoFit = $prose(() => new Plugin({
+    key: new PluginKey('memoking-table-autofit'),
+    view: (v) => {
+      fitView = v;
+      return { destroy: () => (fitView = null) };
+    },
+    appendTransaction(trs, _old, state) {
+      if (readOnly || !fitView || !pastedTablesAt || Date.now() - pastedTablesAt > 3000) return null;
+      if (!trs.some((tr) => tr.docChanged)) return null;
+      // 바뀐 범위 (모든 트랜잭션 뒤 문서 기준)
+      let from = Infinity;
+      let to = -Infinity;
+      trs.forEach((tr, t) => tr.mapping.maps.forEach((map, i) => map.forEach((_a, _b, start, end) => {
+        let a = tr.mapping.slice(i + 1).map(start, -1);
+        let b = tr.mapping.slice(i + 1).map(end, 1);
+        for (const later of trs.slice(t + 1)) {
+          a = later.mapping.map(a, -1);
+          b = later.mapping.map(b, 1);
+        }
+        from = Math.min(from, a);
+        to = Math.max(to, b);
+      })));
+      if (!(to > from)) return null;
+      // 그 범위 안의, 아직 너비가 없는 표 = 방금 붙여넣은 표
+      const tables = [];
+      state.doc.nodesBetween(from, to, (node, pos) => {
+        if (node.type.name !== 'table') return true;
+        if (!node.firstChild?.firstChild?.attrs.colwidth) tables.push({ node, pos });
+        return false;
+      });
+      if (!tables.length) return null;
+      const reviews = pastedTableReviews;
+      pastedTableReviews = [];
+      pastedTablesAt = 0;
+      const tr = state.tr;
+      const measure = tableMeasure(fitView);
+      const available = tableBodyWidth(fitView);
+      let fitted = 0;
+      const skipped = new Set();
+      tables.forEach(({ node, pos }, i) => {
+        const reasons = reviews[i] ?? [];
+        if (reasons.length) {
+          reasons.forEach((r) => skipped.add(r));
+          return;
+        }
+        fitTable(tr, node, pos, { available, measure });
+        fitted++;
+      });
+      if (skipped.size) onNotice?.(`붙여넣은 표에 ${[...skipped].join('·')}이 있어 열 너비를 자동으로 맞추지 않았어요. 표를 확인해 주세요`);
+      else if (fitted) onNotice?.('붙여넣은 표의 열 너비·정렬을 내용에 맞춰 정리했어요');
+      return tr.docChanged ? tr : null;
+    },
+  }));
+
   const media = $view(imageSchema.node, () => (node) => mediaView(node));
   const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
+  const listDrag = $prose(() => createListDrag({ readOnly }));
   const taskToggle = $prose(() => new Plugin({
     key: new PluginKey('memoking-task-toggle'),
     props: { handleDOMEvents: { mousedown: toggleTaskOnClick } },
@@ -830,10 +1077,14 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     // 내용이 바뀌는 즉시(글자 하나) 알린다 — 저장용 마크다운은 조금 늦게 갱신되므로 안내 문구는 이것을 따른다
     view: (v) => {
       onEmpty?.(isEmptyDoc(v.state.doc));
+      onTasks?.(taskCounts(v.state.doc), { initial: true });
       return {
         update: (view, prev) => {
           onState?.(activeFormats(view.state));
-          if (!prev.doc.eq(view.state.doc)) onEmpty?.(isEmptyDoc(view.state.doc));
+          if (!prev.doc.eq(view.state.doc)) {
+            onEmpty?.(isEmptyDoc(view.state.doc));
+            onTasks?.(taskCounts(view.state.doc), { initial: false });
+          }
         },
       };
     },
@@ -856,7 +1107,24 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       }));
       // Milkdown 7.22.2 버그 우회: 제목 없는 이미지 ![a](b) 의 title 을 null 로 넘겨 불러오기가 실패한다.
       // 마크다운 표는 머리글 행만 있어도 된다 (Milkdown 기본은 "머리글 행 + 행 1개 이상")
-      ctx.update(tableSchema.key, (factory) => (c) => ({ ...factory(c), content: 'table_header_row table_row*' }));
+      ctx.update(tableSchema.key, (factory) => (c) => {
+        const schema = factory(c);
+        return {
+          ...schema,
+          content: 'table_header_row table_row*',
+          // 마크다운 표에는 병합이 없다 → 병합을 푼 표(내용은 첫 칸, 나머지는 빈 칸)로 쓴다. 병합은 머리말(tables)에
+          toMarkdown: { ...schema.toMarkdown, runner: (state, node) => schema.toMarkdown.runner(state, unmergedTable(node)) },
+        };
+      });
+      // 표 칸 안의 줄바꿈은 마크다운에 <br> (html 노드)로 저장된다 → 글자 "<br>" 대신 실제 줄바꿈으로 보이게
+      ctx.update(htmlSchema.key, (factory) => (c) => {
+        const schema = factory(c);
+        return {
+          ...schema,
+          toDOM: (node) => (isBreakHtml(node.attrs.value) ? ['br', { 'data-type': 'html', 'data-value': node.attrs.value }] : schema.toDOM(node)),
+          parseDOM: [{ tag: 'br[data-type="html"]', getAttrs: (dom) => ({ value: dom.dataset.value || '<br>' }) }, ...(schema.parseDOM ?? [])],
+        };
+      });
       ctx.update(imageSchema.key, (factory) => (c) => {
         const schema = factory(c);
         return {
@@ -897,6 +1165,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(commonmark)
     .use(gfm)
     .use(tableTab)
+    .use(tableAutoFit)
+    .use(tableResize) // 읽기 전용(PDF)에서도 열 너비가 보이게 (끌기는 편집할 때만)
+    .use(tableExtras)
     .use(tagSuggest) // 자동완성 목록이 떠 있을 때 Enter·↑↓ 를 먼저 받는다
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(inlineHtmlMarks)
@@ -913,12 +1184,25 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(media)
     .use(cardView)
     .use(taskToggle)
+    .use(listDrag)
     .use(tagHighlight)
     .use(stateWatcher)
     .create();
 
   ready = true;
+  applyTables(view(), tables);
+  extras.setLoading(false);
   const call = (command, payload) => editor.action(callCommand(command.key, payload));
+
+  // 셀 병합: 여러 칸을 골랐으면 합치고, 병합한 칸 안이면 풀기
+  function mergeOrSplit(v) {
+    if (v.state.selection instanceof CellSelection && v.state.selection.ranges.length > 1) {
+      const result = mergeSelectedCells(v.state, v.dispatch);
+      if (result !== true) onNotice?.(result, true);
+      return;
+    }
+    if (!splitCell(v.state, v.dispatch)) onNotice?.('합칠 칸들을 끌어서 골라 주세요 (병합한 칸 안에서 누르면 병합을 풀어요)');
+  }
 
   function parentOfType(names) {
     const { $from } = view().state.selection;
@@ -963,38 +1247,111 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     call(wrapInHeadingCommand, level);
   }
 
+  // 선택한 범위(커서만 있으면 그 줄)의 목록 항목들
+  function itemsInSelection() {
+    const { state } = view();
+    const { from, to } = state.selection;
+    const items = [];
+    state.doc.nodesBetween(from, to, (node, pos) => {
+      if (node.type.name === 'list_item') items.push({ node, pos });
+    });
+    return items;
+  }
+
+  // 목록·체크리스트로 바꾸기 전에: 한 문단 안에서 줄바꿈(Shift+Enter·붙여넣은 여러 줄)으로 나뉜 줄들을 문단으로 나눈다
+  // → 줄마다 항목 하나 (그렇지 않으면 여러 줄이 항목 하나가 되어 맨 위에만 체크가 달린다)
+  function splitLinesInSelection() {
+    const v = view();
+    const { state } = v;
+    const { from, to } = state.selection;
+    const breaks = [];
+    state.doc.nodesBetween(from, to, (node, pos, parent) => {
+      if (node.type.name === 'code_block') return false;
+      if (parent?.type.name !== 'paragraph') return true;
+      if (node.type.name === 'hardbreak' || node.type.name === 'hard_break' || (node.type.name === 'html' && isBreakHtml(node.attrs.value))) breaks.push({ pos, size: node.nodeSize });
+      else if (node.isText) {
+        for (let i = node.text.indexOf('\n'); i >= 0; i = node.text.indexOf('\n', i + 1)) breaks.push({ pos: pos + i, size: 1 });
+      }
+      return true;
+    });
+    if (!breaks.length) return;
+    const tr = state.tr;
+    for (const b of breaks.sort((a, c) => c.pos - a.pos)) {
+      tr.delete(b.pos, b.pos + b.size);
+      tr.split(b.pos);
+    }
+    v.dispatch(tr);
+  }
+
+  // 고른 줄(문단)마다 항목 하나인 목록으로 감싼다 — Milkdown 의 감싸기(wrapIn)는 고른 문단을 모두 항목 하나에 넣어
+  // 체크 네모가 맨 위 하나만 생긴다. 제목·표 등 문단이 아닌 것이 섞이면 false (Milkdown 기본 동작으로)
+  function wrapLinesInList(typeName) {
+    const v = view();
+    const { state } = v;
+    const { $from, $to } = state.selection;
+    const range = $from.blockRange($to);
+    const listType = state.schema.nodes[typeName];
+    const itemType = state.schema.nodes.list_item;
+    if (!range || !listType || !itemType) return false;
+    const items = [];
+    for (let i = range.startIndex; i < range.endIndex; i++) {
+      const block = range.parent.child(i);
+      if (block.type.name !== 'paragraph') return false;
+      items.push(itemType.create({ listType: typeName === 'ordered_list' ? 'ordered' : 'bullet' }, block));
+    }
+    if (!items.length) return false;
+    const list = listType.create(null, items);
+    const tr = state.tr.replaceWith(range.start, range.end, list);
+    tr.setSelection(TextSelection.between(tr.doc.resolve(range.start + 1), tr.doc.resolve(range.start + list.nodeSize - 1)));
+    v.dispatch(tr.scrollIntoView());
+    return true;
+  }
+
+  // 선택한 항목 모두의 체크 상태 (null = 체크리스트 아님, false/true = 체크리스트)
+  function setCheckedInSelection(checked) {
+    const v = view();
+    const tr = v.state.tr;
+    for (const { node, pos } of itemsInSelection()) {
+      if (node.attrs.checked !== checked) tr.setNodeMarkup(pos, undefined, { ...node.attrs, checked });
+    }
+    if (tr.docChanged) v.dispatch(tr);
+  }
+
   function toggleList(type) {
     leaveHeading();
     const list = parentOfType(['bullet_list', 'ordered_list']);
-    const item = parentOfType(['list_item']);
-    const isTask = item && item.node.attrs.checked != null;
-    if (list && list.node.type.name === type && !isTask) {
+    const items = itemsInSelection();
+    const anyTask = items.some((i) => i.node.attrs.checked != null);
+    if (list && list.node.type.name === type && !anyTask) {
       call(liftListItemCommand);
       return;
     }
-    if (!list) call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
-    else setListType(list, type);
-    setChecked(null);
-  }
-
-  function setChecked(checked) {
-    const item = parentOfType(['list_item']);
-    if (!item || item.node.attrs.checked === checked) return;
-    const v = view();
-    v.dispatch(v.state.tr.setNodeMarkup(item.pos, undefined, { ...item.node.attrs, checked }));
+    if (!list) {
+      splitLinesInSelection();
+      if (!wrapLinesInList(type)) call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
+    } else if (list.node.type.name !== type) {
+      call(liftListItemCommand);
+      call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
+    }
+    setCheckedInSelection(null);
   }
 
   function toggleTask() {
-    const item = parentOfType(['list_item']);
-    if (item && item.node.attrs.checked != null) {
+    const items = itemsInSelection();
+    // 고른 항목이 모두 체크리스트면 체크리스트를 푼다
+    if (items.length && items.every((i) => i.node.attrs.checked != null)) {
       call(liftListItemCommand);
       return;
     }
     leaveHeading();
-    const list = parentOfType(['bullet_list', 'ordered_list']);
-    if (!list) call(wrapInBulletListCommand);
-    else setListType(list, 'bullet_list'); // 체크리스트는 번호 없이
-    setChecked(false);
+    if (!parentOfType(['list_item'])) {
+      splitLinesInSelection();
+      if (!wrapLinesInList('bullet_list')) call(wrapInBulletListCommand);
+    } else {
+      const ordered = parentOfType(['ordered_list']);
+      if (ordered) setListType(ordered, 'bullet_list'); // 체크리스트는 번호 없이
+    }
+    setCheckedInSelection(false); // 고른 줄마다 체크 네모
   }
 
   // 글자 색·하이라이트: 색을 주면 그 색으로 바꾸고, null 이면 지운다.
@@ -1019,6 +1376,33 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const active = activeFormats(view().state);
     const current = markName === 'mk_color' ? active.color : active.highlight;
     setColor(markName, current ? null : color);
+  }
+
+  // 스타일 고르기 (도구막대 "스타일"): 이 줄을 그 스타일로 — 이미 그 스타일이면 그대로 (H1·H2 버튼처럼 켜고 끄지 않음)
+  function setStyle(name) {
+    const v = view();
+    const active = activeFormats(v.state);
+    const inQuote = () => {
+      const { $from, $to } = view().state.selection;
+      return $from.blockRange($to, (n) => n.type.name === 'blockquote');
+    };
+    if (name === 'quote') {
+      if (parentOfType(['heading', 'code_block'])) call(turnIntoTextCommand); // 인용은 본문 글을 감싼다
+      if (!active.quote) call(wrapInBlockquoteCommand);
+      return;
+    }
+    // 인용 밖으로 (인용이 아닌 스타일을 고르면)
+    const range = inQuote();
+    if (range) view().dispatch(view().state.tr.lift(range, range.depth - 1));
+    if (name === 'paragraph') {
+      if (parentOfType(['heading', 'code_block'])) call(turnIntoTextCommand);
+    } else if (/^h[1-3]$/.test(name)) {
+      const level = Number(name[1]);
+      const heading = parentOfType(['heading']);
+      if (!heading || heading.node.attrs.level !== level) call(wrapInHeadingCommand, level);
+    } else if (name === 'codeBlock') {
+      if (!parentOfType(['code_block'])) call(createCodeBlockCommand);
+    }
   }
 
   const commands = {
@@ -1047,6 +1431,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       commands[name]?.();
       view().focus();
     },
+    setStyle(name) {
+      setStyle(name);
+      view().focus();
+    },
     setTextColor(color) {
       setColor('mk_color', color);
       view().focus();
@@ -1062,6 +1450,31 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
     tableCommand(name) {
       const v = view();
+      if (name === 'accent' || name === 'resetSize') {
+        if (isInTable(v.state)) (name === 'accent' ? toggleAccent : resetTableSize)(v);
+        return v.focus();
+      }
+      if (name === 'merge') {
+        mergeOrSplit(v);
+        return v.focus();
+      }
+      if (name === 'autoFit') {
+        const table = parentOfType(['table']);
+        if (table) {
+          const tr = v.state.tr;
+          fitTable(tr, table.node, table.pos, { available: tableBodyWidth(v), measure: tableMeasure(v) });
+          // 끌어서 바꾼 행 높이도 내용에 맞춤으로
+          const marks = [];
+          let p = table.pos + 1;
+          table.node.forEach((row) => {
+            marks.push({ kind: 'row', pos: p, value: 0 });
+            p += row.nodeSize;
+          });
+          v.dispatch(tr.setMeta(tableExtrasKey, { set: marks }));
+          onNotice?.('표의 열 너비·정렬을 내용에 맞춰 정리했어요');
+        }
+        return v.focus();
+      }
       const cmd = { addRow: addRowAfter, addCol: addColumnAfter, delRow: deleteRow, delCol: deleteColumn, delTable: deleteTable }[name];
       if (!cmd || !isInTable(v.state)) return v.focus();
       const tablePos = parentOfType(['table'])?.pos;
@@ -1084,7 +1497,14 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const end = Date.now() + timeout;
       while ((pendingChecks > 0 || localizing.size > 0) && Date.now() < end) await new Promise((r) => setTimeout(r, 50));
     },
-    setMarkdown: (md) => editor.action(replaceAll(md)),
+    // 본문을 통째로 바꾸면 표 모양은 지금 저장된 것으로 다시 입힌다 (바꾸는 동안은 저장하지 않음)
+    setMarkdown(md, nextTables = currentTables) {
+      extras.setLoading(true);
+      editor.action(replaceAll(md));
+      applyTables(view(), nextTables);
+      currentTables = nextTables;
+      extras.setLoading(false);
+    },
     // 빠른 메모(Ctrl+Alt+C)로 받은 내용 채우기 --------------------------------
     focusEnd() {
       const v = view();
@@ -1152,25 +1572,31 @@ function activeFormats(state) {
     color: findMark(marks.mk_color)?.attrs.color ?? null,
     highlight: findMark(marks.mk_highlight)?.attrs.color ?? null,
   };
-  // 줄 모양은 하나만: 이 줄이 제목이면 제목, 아니면 가장 가까운 목록 항목 하나로 정한다
-  // (바깥 목록의 종류까지 켜면 여러 버튼이 함께 눌려 보인다)
-  if ($from.parent.type.name === 'heading') active[`h${$from.parent.attrs.level}`] = true;
-  else {
-    for (let d = $from.depth; d > 0; d--) {
-      if ($from.node(d).type.name !== 'list_item') continue;
-      const list = $from.node(d - 1).type.name;
-      if ($from.node(d).attrs.checked != null) active.task = true;
-      else if (list === 'ordered_list') active.ordered = true;
-      else if (list === 'bullet_list') active.bullet = true;
-      break;
-    }
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d);
+    const name = node.type.name;
+    if (name === 'heading') active[`h${node.attrs.level}`] = true;
+    if (name === 'code_block') active.codeBlock = true;
+    if (name === 'blockquote') active.quote = true;
+    if (name === 'list_item' && node.attrs.checked != null && active.task === undefined) active.task = true;
+    if (name === 'bullet_list' && !active.task && !active.ordered) active.bullet ??= true;
+    if (name === 'ordered_list' && !active.task && !active.bullet) active.ordered ??= true;
   }
   for (let d = $from.depth; d > 0; d--) if ($from.node(d).type.name === 'blockquote') active.quote = true;
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d);
     if (node.type.name === 'table_header_row') active.tableHeader = true;
     if (node.type.name === 'table') {
-      active.table = { rows: node.childCount, cols: node.firstChild?.childCount ?? 0, header: Boolean(active.tableHeader) };
+      const cellNode = $from.node(Math.min($from.depth, d + 2));
+      const multi = state.selection instanceof CellSelection && state.selection.ranges.length > 1;
+      active.table = {
+        rows: node.childCount,
+        cols: node.firstChild?.childCount ?? 0,
+        header: Boolean(active.tableHeader),
+        accent: isAccent(state, { node, pos: $from.before(d) }),
+        canMerge: multi,
+        merged: !multi && ((cellNode?.attrs.colspan ?? 1) > 1 || (cellNode?.attrs.rowspan ?? 1) > 1),
+      };
       break;
     }
   }

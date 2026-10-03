@@ -1,0 +1,37 @@
+// 매직키 (Ctrl+Alt+Space) — 어디서든 빠르게 입력하는 창. 여러 기능 모듈로 이루어지고, 설정에서 모듈마다 끄고 켠다.
+// (순수 함수, 단위 테스트 대상) 모듈을 더할 때는 여기에 한 줄 + magic.js 의 처리기(HANDLERS)에 한 개.
+
+export const MAGIC_KEY = 'Ctrl+Alt+Space';
+
+// ready: 지금 쓸 수 있는가 (false = 준비 중, 설정에서 켤 수 없음)
+export const MAGIC_MODULES = [
+  { id: 'memo', name: '메모 만들기', description: '입력한 글을 새 메모로 바로 저장해요 (Enter 저장 · Ctrl+Enter 저장하고 열기)', ready: true, defaultOn: true },
+  { id: 'notes', name: '메모 검색', description: '입력하는 대로 메모의 제목·내용에서 찾아 바로 열어요', ready: true, defaultOn: true },
+  { id: 'files', name: '파일 검색', description: 'PC 의 파일·폴더·프로그램 이름을 바로 찾아 열어요. 따로 설치할 것 없이 메모킹이 이름 목록을 만들어 두어요 (이 PC 안에서만, 내용은 읽지 않음)', ready: true, defaultOn: true },
+  { id: 'calc', name: '계산기', description: '수식을 입력하면 바로 계산해요', ready: false, defaultOn: false },
+  { id: 'opms', name: 'OPMS 검색', description: '회사 OPMS 시스템을 바로 검색해요', ready: false, defaultOn: false },
+];
+
+/**
+ * 저장된 설정 → 쓸 수 있는 설정. 모르는 모듈은 버리고, 준비 중인 모듈은 늘 꺼 둔다.
+ * @param {any} raw
+ * @returns {{ enabled: boolean, modules: Record<string, boolean> }}
+ */
+export function normalizeMagicSettings(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const saved = src.modules && typeof src.modules === 'object' ? src.modules : {};
+  const modules = {};
+  for (const m of MAGIC_MODULES) modules[m.id] = m.ready ? (typeof saved[m.id] === 'boolean' ? saved[m.id] : m.defaultOn) : false;
+  return { enabled: typeof src.enabled === 'boolean' ? src.enabled : true, modules };
+}
+
+// 켜져 있고 쓸 수 있는 모듈들 (표시 순서대로)
+export const activeModules = (settings) => {
+  const s = normalizeMagicSettings(settings);
+  return s.enabled ? MAGIC_MODULES.filter((m) => m.ready && s.modules[m.id]) : [];
+};
+
+// 매직키 입력 → 메모 본문. 앞뒤 빈 줄은 빼고, 줄바꿈은 그대로 (첫 줄이 메모 제목이 된다)
+export function memoBodyFromText(text) {
+  return String(text ?? '').replace(/\r\n/g, '\n').replace(/^\s*\n+/, '').replace(/\s+$/, '');
+}

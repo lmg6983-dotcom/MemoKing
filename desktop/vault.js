@@ -10,6 +10,8 @@ import {
 } from '../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
+import { normalizeTables } from '../app/js/core/table-sizes.js';
+import { taskProgress } from '../app/js/core/tasks.js';
 
 export const APP_DIR = '_memoking';
 export const ATTACH_DIR = 'attachments';
@@ -205,7 +207,7 @@ export class Vault extends EventEmitter {
       id: entry.id,
       file: entry.file,
       title: extractTitle(entry.body),
-      preview: extractPreview(entry.body),
+      preview: extractPreview(entry.body, 1200), // 목록을 확대하면 카드에 요약을 여러 줄 보여 주므로 넉넉히
       color: entry.meta.color,
       pinned: entry.meta.pinned,
       created: entry.meta.created,
@@ -219,6 +221,7 @@ export class Vault extends EventEmitter {
       hasFile: has('file'),
       reminderCount: entry.meta.reminders.filter((r) => r.enabled).length,
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
+      tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
     };
   }
 
@@ -227,6 +230,13 @@ export class Vault extends EventEmitter {
       .filter((e) => e.file)
       .map((e) => this.summary(e))
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0));
+  }
+
+  // 매직키 메모 검색용: 메모마다 제목·본문 글
+  searchable() {
+    return [...this.entries.values()]
+      .filter((e) => e.file)
+      .map((e) => ({ id: e.id, title: extractTitle(e.body), text: plainLines(e.body).join('\n'), updated: e.meta.updated, color: e.meta.color }));
   }
 
   search(query, excludeId = null) {
@@ -251,6 +261,7 @@ export class Vault extends EventEmitter {
       pinned: entry.meta.pinned,
       links: entry.meta.links,
       reminders: entry.meta.reminders,
+      tables: entry.meta.tables ?? [],
       created: entry.meta.created,
       updated: entry.meta.updated,
     };
@@ -393,6 +404,7 @@ export class Vault extends EventEmitter {
     if (!entry) return null;
     if (patch.color && COLORS.includes(patch.color)) entry.meta.color = patch.color;
     if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
+    if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
     if (entry.file) this.write(entry);
     this.changed([id]);
     return this.get(id);

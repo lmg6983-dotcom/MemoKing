@@ -37,3 +37,66 @@ export function popupToEntry(lines, { appName = '' } = {}) {
 export function isRepeat(recent, entry, now = Date.now(), windowMs = 2 * 60 * 1000) {
   return recent.some((r) => r.app === entry.app && r.title === entry.title && r.body === entry.body && now - r.at < windowMs);
 }
+
+// ---------- 카카오톡 PC 알림 창: 글자 인식 결과를 자리로 나누기 ----------
+// 알림 창 모양 (위에서부터, 단위 = 100% 배율 화면 px):
+//   맨 위 줄  채팅방 이름 (오른쪽 위에는 알림 끄기 종·닫기 단추 — 글자 인식이 '0'·'x' 로 잘못 읽는다)
+//   둘째 줄   보낸 사람 (1:1 대화면 채팅방 이름과 같다)
+//   그 아래   메시지 (KAKAO_BODY_Y 부터. 이모티콘·사진이면 없다)
+// 참고: AIoish/ALTONG_client PR #18 (카카오톡 알림 창을 Windows 글자 인식으로 읽는 방식)
+export const KAKAO_BODY_Y = 58;
+const ICON_ZONE = { x: 0.7, y: 0.35 }; // 폭의 70% 오른쪽 · 높이의 35% 위 = 종·닫기 단추 자리
+const CONTROL = /^(닫기|x|close|답장|reply|전송|보기|확인)$/i;
+
+// 글자로 쓸 수 있는 조각인가 (기호만·단추 글자·잘못 읽은 한 글자는 빼고, 'ㅋㅋ'·'ㅠ' 같은 자모만의 메시지는 남긴다)
+function usable(text) {
+  if (!/[\p{L}\p{N}]/u.test(text)) return false;
+  if (/^[0-9ox]$/i.test(text)) return false;
+  const t = text.replace(/\s+/g, '').toLowerCase();
+  return !CONTROL.test(t) && !t.includes('메시지입력') && !t.includes('아이콘표시');
+}
+
+/**
+ * 글자 인식 결과(줄마다 글과 자리) → { title, body }
+ * @param {{ text: string, x: number, y: number, w?: number, h?: number }[]} boxes 알림 창 왼쪽 위 기준 (100% 배율 px)
+ * @param {{ width?: number, height?: number, appName?: string }} [size] 알림 창 크기 (100% 배율 px)
+ * @returns {{ title: string, body: string } | null}
+ */
+export function kakaoEntry(boxes, { width = 0, height = 0, appName = '' } = {}) {
+  const items = [];
+  for (const b of [].concat(boxes ?? [])) {
+    const text = String(b?.text ?? '').replace(/\s+/g, ' ').trim();
+    const x = Number(b?.x) || 0;
+    const y = Number(b?.y) || 0;
+    const h = Math.max(1, Number(b?.h) || 14);
+    if (!text || !usable(text) || NOISE.some((re) => re.test(text)) || text === appName) continue;
+    if (width && height && x > width * ICON_ZONE.x && y < height * ICON_ZONE.y) continue;
+    items.push({ text, x, y, h });
+  }
+  if (!items.length) return null;
+  // 같은 높이(세로 가운데가 글자 높이의 절반 안)에 있는 조각은 한 줄로, 왼쪽부터
+  items.sort((a, b) => a.y - b.y);
+  const rows = [];
+  for (const it of items) {
+    const row = rows.find((r) => Math.abs((r.y + r.h / 2) - (it.y + it.h / 2)) < Math.min(r.h, it.h) / 2);
+    if (row) row.parts.push(it);
+    else rows.push({ y: it.y, h: it.h, parts: [it] });
+  }
+  const lines = rows.map((r) => ({ y: r.y, text: r.parts.sort((a, b) => a.x - b.x).map((p) => p.text).join(' ') }));
+
+  let room;
+  let sender;
+  let body;
+  if (lines.length === 1) {
+    [room, sender, body] = [lines[0].text, lines[0].text, []];
+  } else if (lines[1].y >= KAKAO_BODY_Y || lines[0].text === lines[1].text) {
+    // 윗줄 하나 + 메시지 (1:1 대화에서 보낸 사람 줄이 따로 없거나 같은 글로 두 번 읽힌 경우)
+    const rest = lines.slice(1).map((l) => l.text);
+    if (rest[0] === lines[0].text) rest.shift();
+    [room, sender, body] = [lines[0].text, lines[0].text, rest];
+  } else {
+    [room, sender, body] = [lines[0].text, lines[1].text, lines.slice(2).map((l) => l.text)];
+  }
+  const title = room && room !== sender ? `${sender} (${room})` : sender;
+  return { title: title.slice(0, 200), body: body.join('\n').slice(0, 2000) };
+}

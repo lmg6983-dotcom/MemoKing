@@ -70,6 +70,7 @@ export class NotificationHistory extends EventEmitter {
       time: entry.time ?? new Date().toISOString(),
       image: entry.image ?? null,
       memoId: entry.memoId ?? null,
+      ...(entry.via ? { via: entry.via } : {}), // 팝업 알림을 읽은 방법: uia·msaa·win32(글자 그대로) / ocr(그림 글자 인식)
     };
     if (this.blocked.has(item.appId) && item.source !== 'memoking') return null;
     if (this.state.entries.some((e) => e.id === item.id)) return null;

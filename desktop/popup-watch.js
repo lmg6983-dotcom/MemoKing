@@ -6,11 +6,12 @@ import { EventEmitter } from 'node:events';
 
 export class PopupWatcher extends EventEmitter {
   /**
-   * @param {{ script: string, dir: string, processes?: string[], onlyPid?: number, forceOcr?: boolean }} options
+   * @param {{ script: string, dir: string, processes?: string[], onlyPid?: number, forceOcr?: boolean, log?: string }} options
+   *   log: 알림 창마다 어떤 방법으로 무엇을 읽었는지 적는 파일 (앱의 알림 창을 어떻게 읽을 수 있는지 보려고)
    */
-  constructor({ script, dir, processes = ['KakaoTalk'], onlyPid = 0, forceOcr = false }) {
+  constructor({ script, dir, processes = ['KakaoTalk'], onlyPid = 0, forceOcr = false, log = '' }) {
     super();
-    Object.assign(this, { script, dir, processes, onlyPid, forceOcr });
+    Object.assign(this, { script, dir, processes, onlyPid, forceOcr, log });
     this.proc = null;
     this.stopping = false;
     this.restartTimer = null;
@@ -28,6 +29,7 @@ export class PopupWatcher extends EventEmitter {
       '-Dir', this.dir, '-Processes', this.processes.join(',')];
     if (this.onlyPid) args.push('-OnlyPid', String(this.onlyPid));
     if (this.forceOcr) args.push('-ForceOcr');
+    if (this.log) args.push('-Log', this.log);
     const proc = spawn('powershell.exe', args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     this.proc = proc;
     readline.createInterface({ input: proc.stdout }).on('line', (line) => {

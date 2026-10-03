@@ -136,14 +136,15 @@
   </aside>
 
   <!-- 서식 도구막대: 창 폭에 들어가지 않는 버튼은 끝의 » 더보기 안으로 옮겨진다 (note.js layoutToolbar) -->
-  <!-- 표 안에 커서가 있을 때만: 행·열 추가·지우기 -->
+  <!-- 표 안에 커서가 있을 때만: 행 추가 · 열 추가 · 행 지우기 · 열 지우기 · 셀 병합 · 자동 조정 -->
   <div id="table-bar" class="table-bar" role="toolbar" aria-label="표" hidden>
     <button type="button" data-table="addRow" title="아래에 행 추가 (마지막 셀에서 Tab)">행 추가</button>
     <button type="button" data-table="addCol" title="오른쪽에 열 추가">열 추가</button>
-    <span class="table-bar-sep"></span>
     <button type="button" data-table="delRow">행 지우기</button>
     <button type="button" data-table="delCol">열 지우기</button>
-    <button type="button" data-table="delTable" class="danger">표 지우기</button>
+    <span class="table-bar-sep"></span>
+    <button type="button" data-table="merge" title="끌어서 고른 칸들을 하나로 합치기">셀 병합</button>
+    <button type="button" data-table="autoFit" title="내용·본문 폭에 맞춰 열 너비·정렬을 자동으로 (번호·날짜는 좁게, 긴 설명 열에 공간). 칸 오른쪽·아래 테두리를 끌면 직접 조절">자동 조정</button>
   </div>
   <footer class="format-bar" id="format-bar" role="toolbar" aria-label="서식">
     <div class="format-items" id="format-items">
@@ -162,18 +163,25 @@
       <button data-action="file" title="파일 넣기 (Ctrl+Shift+I) · 사진·소리·동영상·문서"><svg><use href="#i-clip"/></svg></button>
       <button data-action="table" title="표 넣기"><svg><use href="#i-table"/></svg></button>
       <span class="sep"></span>
-      <button data-cmd="h1" title="제목 1 (Ctrl+1)">H1</button>
-      <button data-cmd="h2" title="제목 2 (Ctrl+2)">H2</button>
+      <button data-action="style" class="style-btn" title="스타일 (본문·제목·인용·코드 블록)" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
       <span class="sep"></span>
       <button data-cmd="bullet" title="점 목록 (Ctrl+Shift+8)"><svg><use href="#i-bullet"/></svg></button>
       <button data-cmd="ordered" title="번호 목록 (Ctrl+Shift+7)"><svg><use href="#i-ordered"/></svg></button>
       <button data-cmd="task" title="체크리스트 (Ctrl+Shift+9)"><svg><use href="#i-task"/></svg></button>
-      <button data-cmd="quote" title="인용 (Ctrl+Shift+B)"><svg><use href="#i-quote"/></svg></button>
     </div>
     <button id="more-btn" class="more-btn" title="서식 더보기" aria-label="서식 더보기" aria-haspopup="true" hidden><svg><use href="#i-chevrons"/></svg></button>
   </footer>
 
   <div id="more-panel" class="pop more-panel" role="toolbar" aria-label="서식 더보기" hidden></div>
+  <!-- 스타일 고르기: 그 스타일 모양 그대로 미리 보임, 지금 줄의 스타일에 표시 -->
+  <div id="style-menu" class="pop style-menu" role="listbox" aria-label="스타일" hidden>
+    <button type="button" role="option" data-style="paragraph"><span class="style-sample s-paragraph">본문</span><kbd>Ctrl+0</kbd></button>
+    <button type="button" role="option" data-style="h1"><span class="style-sample s-h1">제목 1</span><kbd>Ctrl+1</kbd></button>
+    <button type="button" role="option" data-style="h2"><span class="style-sample s-h2">제목 2</span><kbd>Ctrl+2</kbd></button>
+    <button type="button" role="option" data-style="h3"><span class="style-sample s-h3">제목 3</span><kbd>Ctrl+3</kbd></button>
+    <button type="button" role="option" data-style="quote"><span class="style-sample s-quote">인용</span><kbd>Ctrl+Shift+B</kbd></button>
+    <button type="button" role="option" data-style="codeBlock"><span class="style-sample s-code">코드 블록</span><kbd></kbd></button>
+  </div>
   <div id="palette" class="pop palette" role="menu" hidden>
     <div class="palette-title" id="palette-title"></div>
     <div class="palette-swatches" id="palette-swatches"></div>
