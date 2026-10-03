@@ -172,7 +172,7 @@ const fakeDrive = {
   status: { state: 'off', lastSync: 0, error: '', changed: false, conflicts: [] },
   folders: { root: [{ id: 'f-memo', name: '메모킹' }, { id: 'f-work', name: '업무' }, { id: 'f-photo', name: '사진' }], 'f-work': [{ id: 'f-work-2026', name: '2026' }] },
 };
-const driveInfo = () => ({ ...fakeDrive, builtIn: false, folders: undefined });
+const driveInfo = () => ({ ...fakeDrive, configured: true, builtIn: false, nativeAvailable: !process.env.NO_PLAY_SERVICES, browserConfigured: fakeDrive.configured, folders: undefined });
 let pendingIntent = null;
 let scheduled = [];
 let pickQueue = []; // 점검용: 다음 pickFiles 가 돌려줄 파일들 [{ name, mime, base64 }]

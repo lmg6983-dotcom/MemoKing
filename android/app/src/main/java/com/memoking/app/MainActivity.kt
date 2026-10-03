@@ -27,6 +27,8 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.window.OnBackInvokedDispatcher
 import com.memoking.app.drive.DriveSync
+import com.memoking.app.drive.GoogleAuth
+import com.memoking.app.drive.NativeAuth
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.Executors
@@ -42,6 +44,7 @@ class MainActivity : Activity() {
         private const val REQ_FOLDER = 1
         private const val REQ_FILES = 2
         private const val REQ_NOTIFY = 3
+        private const val REQ_AUTH = 4
 
         /** 지금 앞에 보이는 화면 (알림이 울렸을 때 바로 알리기 위해) */
         @Volatile
@@ -216,6 +219,34 @@ class MainActivity : Activity() {
         super.onPause()
     }
 
+    /** 휴대폰에 로그인된 구글 계정으로 Drive 권한 받기 — 계정 고르기·허용 화면만 */
+    fun loginWithPhoneAccount(id: Int) {
+        waiting[REQ_AUTH]?.let { old -> bridge.resolve(old) { throw GoogleAuth.AuthError("로그인을 취소했어요") } }
+        waiting[REQ_AUTH] = id
+        NativeAuth.begin(
+            this,
+            startForResult = { sender ->
+                try {
+                    @Suppress("DEPRECATION")
+                    startIntentSenderForResult(sender, REQ_AUTH, null, 0, 0, 0)
+                } catch (e: Exception) {
+                    waiting.remove(REQ_AUTH)
+                    bridge.resolve(id) { throw GoogleAuth.AuthError(NativeAuth.describe(e)) }
+                }
+            },
+            onToken = { token -> finishPhoneLogin(token) },
+            onError = { message ->
+                waiting.remove(REQ_AUTH)
+                bridge.resolve(id) { throw GoogleAuth.AuthError(message) }
+            },
+        )
+    }
+
+    private fun finishPhoneLogin(token: String) {
+        val id = waiting.remove(REQ_AUTH) ?: return
+        io.execute { bridge.resolve(id) { JSONObject().put("email", GoogleAuth.completeNative(this, token)) } }
+    }
+
     fun openBrowser(url: String) {
         launchView(Uri.parse(url))
     }
@@ -367,6 +398,18 @@ class MainActivity : Activity() {
     @Deprecated("Activity Result API 대신 단순한 방식을 쓴다 (androidx 없이)")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_AUTH) {
+            val token = try {
+                if (resultCode != RESULT_OK) throw GoogleAuth.AuthError("로그인을 취소했어요")
+                NativeAuth.finish(this, data)
+            } catch (e: Exception) {
+                val id = waiting.remove(REQ_AUTH) ?: return
+                bridge.resolve(id) { throw GoogleAuth.AuthError(if (e is GoogleAuth.AuthError) e.message ?: "" else NativeAuth.describe(e)) }
+                return
+            }
+            finishPhoneLogin(token)
+            return
+        }
         val id = waiting.remove(requestCode) ?: return
         if (resultCode != RESULT_OK || data == null) {
             bridge.resolve(id) { null }

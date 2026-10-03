@@ -19,10 +19,11 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 
 /**
- * 구글 로그인 (Google Drive 권한). Play 서비스 없이 휴대폰 브라우저로 로그인하고,
- * 앱 안 작은 서버(127.0.0.1)로 결과를 받는다 — "데스크톱 앱" 유형 OAuth 클라이언트 + PKCE.
- *
- * OAuth 클라이언트 ID·보안 비밀은 빌드할 때 넣거나(BuildConfig) 앱 설정에서 붙여 넣는다.
+ * 구글 로그인 (Google Drive 권한). 두 가지 방법:
+ *   기본: 휴대폰에 로그인된 구글 계정 그대로 (Play 서비스, NativeAuth) — 계정 고르고 "허용"만
+ *   예비: 휴대폰 브라우저로 로그인하고 앱 안 작은 서버(127.0.0.1)로 결과를 받기
+ *         ("데스크톱 앱" 유형 OAuth 클라이언트 + PKCE, Play 서비스가 없는 휴대폰용). 클라이언트 ID 는
+ *         빌드할 때 넣거나(BuildConfig) 앱 설정에서 붙여 넣는다.
  */
 object GoogleAuth {
     private const val SCOPE = "https://www.googleapis.com/auth/drive"
@@ -32,6 +33,7 @@ object GoogleAuth {
     private const val KEY_SECRET = "googleClientSecret"
     private const val KEY_REFRESH = "googleRefreshToken"
     private const val KEY_EMAIL = "googleEmail"
+    private const val KEY_NATIVE = "googleNative"
     private const val LOGIN_TIMEOUT = 5 * 60 * 1000
 
     class AuthError(message: String) : IOException(message)
@@ -44,20 +46,38 @@ object GoogleAuth {
 
     fun clientId(ctx: Context): String = prefs(ctx).getString(KEY_ID, null)?.takeIf { it.isNotBlank() } ?: BuildConfig.GOOGLE_CLIENT_ID
     fun clientSecret(ctx: Context): String = prefs(ctx).getString(KEY_SECRET, null)?.takeIf { it.isNotBlank() } ?: BuildConfig.GOOGLE_CLIENT_SECRET
-    fun configured(ctx: Context) = clientId(ctx).isNotBlank()
+    fun configured(ctx: Context) = NativeAuth.available(ctx) || clientId(ctx).isNotBlank()
+    fun native(ctx: Context) = prefs(ctx).getBoolean(KEY_NATIVE, false)
     fun builtIn() = BuildConfig.GOOGLE_CLIENT_ID.isNotBlank()
 
     fun setClient(ctx: Context, id: String, secret: String) {
         prefs(ctx).edit().putString(KEY_ID, id.trim()).putString(KEY_SECRET, secret.trim()).apply()
     }
 
-    fun connected(ctx: Context) = prefs(ctx).getString(KEY_REFRESH, null) != null
+    fun connected(ctx: Context) = native(ctx) || prefs(ctx).getString(KEY_REFRESH, null) != null
+
+    /** 휴대폰 구글 계정으로 허용받은 뒤 (NativeAuth) — 계정 이메일을 돌려준다 */
+    fun completeNative(ctx: Context, token: String): String {
+        prefs(ctx).edit().putBoolean(KEY_NATIVE, true).remove(KEY_REFRESH).apply()
+        accessToken = token
+        expiresAt = System.currentTimeMillis() + 45 * 60 * 1000
+        val email = try {
+            DriveApi(ctx).about()
+        } catch (e: Exception) {
+            ""
+        }
+        prefs(ctx).edit().putString(KEY_EMAIL, email).apply()
+        return email
+    }
     fun email(ctx: Context): String = prefs(ctx).getString(KEY_EMAIL, "") ?: ""
 
     fun signOut(ctx: Context) {
         val refresh = prefs(ctx).getString(KEY_REFRESH, null)
-        prefs(ctx).edit().remove(KEY_REFRESH).remove(KEY_EMAIL).apply()
+        val token = accessToken
+        val wasNative = native(ctx)
+        prefs(ctx).edit().remove(KEY_REFRESH).remove(KEY_EMAIL).remove(KEY_NATIVE).apply()
         accessToken = null
+        if (wasNative && token != null) Thread { NativeAuth.clear(ctx, token) }.start()
         expiresAt = 0
         // 구글 쪽 권한도 돌려준다 (실패해도 괜찮음)
         if (refresh != null) Thread {
@@ -143,7 +163,7 @@ object GoogleAuth {
         val refresh = token.optString("refresh_token").ifEmpty { throw AuthError("구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 시도해 주세요") }
         accessToken = token.getString("access_token")
         expiresAt = System.currentTimeMillis() + token.optLong("expires_in", 3600) * 1000
-        prefs(ctx).edit().putString(KEY_REFRESH, refresh).apply()
+        prefs(ctx).edit().putString(KEY_REFRESH, refresh).putBoolean(KEY_NATIVE, false).apply()
         val email = try {
             DriveApi(ctx).about()
         } catch (e: Exception) {
@@ -171,6 +191,11 @@ a{display:inline-block;margin-top:20px;padding:14px 28px;border-radius:14px;back
     @Synchronized
     fun token(ctx: Context): String {
         accessToken?.let { if (System.currentTimeMillis() < expiresAt - 60_000) return it }
+        if (native(ctx)) {
+            accessToken = NativeAuth.token(ctx)
+            expiresAt = System.currentTimeMillis() + 45 * 60 * 1000
+            return accessToken!!
+        }
         val refresh = prefs(ctx).getString(KEY_REFRESH, null) ?: throw AuthError("Google Drive에 로그인해 주세요")
         val token = try {
             post(TOKEN_URL, mapOf("refresh_token" to refresh, "client_id" to clientId(ctx), "client_secret" to clientSecret(ctx), "grant_type" to "refresh_token"))
@@ -184,8 +209,10 @@ a{display:inline-block;margin-top:20px;padding:14px 28px;border-radius:14px;back
         return accessToken!!
     }
 
-    fun invalidate() {
+    fun invalidate(ctx: Context) {
+        val token = accessToken
         accessToken = null
+        if (token != null && native(ctx)) NativeAuth.clear(ctx, token)
     }
 
     private fun post(url: String, form: Map<String, String>): JSONObject {

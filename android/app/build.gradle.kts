@@ -34,8 +34,8 @@ android {
         applicationId = "com.memoking.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
 
         // Google Drive 동기화용 OAuth 클라이언트 ("데스크톱 앱" 유형). 비워 두면 앱 설정에서 붙여 넣는다.
         // 넣는 곳: android/local.properties 의 memoking.googleClientId / memoking.googleClientSecret,
@@ -76,6 +76,9 @@ android {
 }
 
 dependencies {
+    // 휴대폰에 로그인된 구글 계정으로 Drive 권한 받기 (계정 고르기·허용만)
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
+
     // 동기화 엔진 단위 테스트 (PC 에서 JVM 으로)
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303") // 안드로이드 org.json 대신 진짜 구현

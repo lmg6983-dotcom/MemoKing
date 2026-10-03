@@ -271,7 +271,7 @@
     <h2 class="sheet-title">Google Drive 연결</h2>
 
     <div class="drive-step" data-step="client" hidden>
-      <p class="hint">처음 한 번, 내 Google Cloud 프로젝트에서 만든 <b>OAuth 클라이언트 ID</b>(유형: 데스크톱 앱)를 넣어 주세요.
+      <p class="hint">이 휴대폰에는 구글 계정 연결(Google Play 서비스)을 쓸 수 없어서, 브라우저로 로그인해요. 내 Google Cloud 프로젝트에서 만든 <b>OAuth 클라이언트 ID</b>(유형: 데스크톱 앱)를 넣어 주세요.
         만드는 방법은 <a href="https://github.com/lmg6983-dotcom/MemoKing/blob/main/android/DRIVE-SETUP.md" id="drive-guide">안내서</a>에 있어요 (10분 정도).</p>
       <label class="field"><span>클라이언트 ID</span><input id="client-id" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="….apps.googleusercontent.com"></label>
       <label class="field"><span>클라이언트 보안 비밀번호</span><input id="client-secret" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="GOCSPX-…"></label>
@@ -279,11 +279,10 @@
     </div>
 
     <div class="drive-step" data-step="login" hidden>
-      <p class="hint">PC 메모킹이 쓰는 것과 <b>같은 구글 계정</b>으로 로그인해 주세요. 브라우저가 열리고, 허용한 뒤 "메모킹으로 돌아가기"를 누르면 돼요.</p>
-      <p class="hint small">"Google에서 확인하지 않은 앱" 화면이 나오면 <b>고급 › 메모킹(으)로 이동</b>을 눌러요 (내가 만든 OAuth 클라이언트라서 나오는 안내예요).</p>
-      <button id="drive-login" class="btn primary wide"><svg><use href="#i-google"/></svg>Google 계정으로 로그인</button>
-      <div id="login-wait" class="wait" hidden><span class="spinner"></span><span>브라우저에서 로그인을 기다리고 있어요</span><button id="login-cancel" class="link-btn">그만두기</button></div>
-      <button id="client-edit" class="link-btn">OAuth 클라이언트 바꾸기</button>
+      <p class="hint">휴대폰에 로그인된 <b>구글 계정</b>(Google Drive 앱에서 쓰는 계정)으로 연결해요. PC 메모킹과 같은 계정을 고르고 <b>허용</b>만 누르면 돼요.</p>
+      <button id="drive-login" class="btn primary wide"><svg><use href="#i-google"/></svg>구글 계정으로 연결</button>
+      <div id="login-wait" class="wait" hidden><span class="spinner"></span><span id="login-wait-text">구글 계정을 확인하고 있어요</span><button id="login-cancel" class="link-btn" hidden>그만두기</button></div>
+      <button id="client-edit" class="link-btn">다른 방법: 브라우저로 로그인</button>
     </div>
 
     <div class="drive-step" data-step="folder" hidden>

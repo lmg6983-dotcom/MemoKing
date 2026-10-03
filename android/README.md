@@ -22,9 +22,9 @@ PC 메모킹과 **같은 메모 폴더 형식**을 그대로 쓰는 휴대폰 �
 
 ### PC와 같은 메모 쓰기 — Google Drive 동기화
 
-PC 메모킹은 **Google Drive for desktop** 이 동기화하는 폴더(`G:\내 드라이브\메모킹`)에 메모를 보관합니다. 휴대폰 메모킹은 같은 구글 계정으로 로그인해 그 Drive 폴더와 직접 동기화합니다. PC 쪽은 바꿀 것이 없어요.
+PC 메모킹은 **Google Drive for desktop** 이 동기화하는 폴더(`G:\내 드라이브\메모킹`)에 메모를 보관합니다. 휴대폰 메모킹은 **휴대폰에 로그인된 구글 계정**(Google Drive 앱에서 쓰는 계정)으로 그 Drive 폴더와 직접 동기화합니다. 사용자는 계정을 고르고 **허용**, 폴더 **메모킹** 을 고르면 끝이에요. PC 쪽은 바꿀 것이 없어요.
 
-처음 한 번 내 Google Cloud 프로젝트에 OAuth 클라이언트를 만들어야 합니다 → **[DRIVE-SETUP.md](DRIVE-SETUP.md)** (10분 정도)
+앱 주인(개발자)이 Google Cloud 에 앱을 처음 한 번 등록해야 합니다 (5분, 붙여 넣을 값 없음) → **[DRIVE-SETUP.md](DRIVE-SETUP.md)**
 
 - 언제 맞추나: 앱을 열 때 · 메모를 고친 뒤 몇 초 · 화면을 보는 동안 1분마다 · 앱이 꺼져 있을 때 15분쯤마다(인터넷이 될 때) · 목록 위 ☁ 버튼으로 바로
 - PC와 휴대폰에서 같은 메모를 함께 고치면 PC 쪽을 남기고 휴대폰 쪽은 `(휴대폰 충돌 …)` 사본으로 남깁니다 (글을 잃지 않음)
@@ -61,7 +61,8 @@ android/
     VaultFileProvider.kt 앱 안 폴더의 첨부를 다른 앱이 열 수 있게
     Alarms.kt            예약 알림을 시스템 알람에 맡기기 · 알림 띄우기 · 재부팅 뒤 다시 걸기
     Http.kt              링크 미리보기·인터넷 사진 받기
-    drive/GoogleAuth.kt  구글 로그인 (휴대폰 브라우저 + 127.0.0.1 로 돌아오기, PKCE) · 토큰
+    drive/NativeAuth.kt  휴대폰 구글 계정으로 Drive 권한 (Google Play 서비스: 계정 고르기·허용)
+    drive/GoogleAuth.kt  토큰 관리 · 예비 로그인 (휴대폰 브라우저 + 127.0.0.1 로 돌아오기, PKCE)
     drive/DriveApi.kt    Google Drive REST API v3
     drive/SyncEngine.kt  동기화 규칙 (지난번 모습과 비교해 올리기·내려받기·지우기·충돌 사본) — 단위 테스트 있음
     drive/DriveSync.kt   언제 맞출지, 앱이 꺼져 있을 때 시스템 작업

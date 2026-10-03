@@ -22,12 +22,15 @@ export function startConnect(done) {
   const s = drive.status();
   openSheet(sheet, {
     onClose: () => {
-      if (loggingIn) drive.cancelLogin();
+      if (loggingIn && browserLogin) drive.cancelLogin();
     },
   });
-  if (!s.configured) showStep('client');
-  else if (!s.connected) showStep('login');
-  else openFolders();
+  if (s.connected) openFolders();
+  else if (s.nativeAvailable) {
+    // 휴대폰 구글 계정: 바로 계정 고르기·허용 화면으로
+    showStep('login');
+    login(false);
+  } else showStep(s.configured ? 'login' : 'client');
 }
 
 // ---------- ① OAuth 클라이언트 ----------
@@ -45,24 +48,31 @@ $('client-save').addEventListener('click', () => {
   }
   drive.setClient(id, secret);
   showStep('login');
+  login(true);
 });
 $('client-edit').addEventListener('click', () => {
-  const s = drive.status();
-  $('client-id').value = '';
-  $('client-secret').value = '';
-  $('client-id').placeholder = s.builtIn ? '(앱에 들어 있는 것을 쓰는 중)' : '….apps.googleusercontent.com';
-  showStep('client');
+  // 예비: 브라우저 로그인 (클라이언트 ID 가 있어야 함)
+  if (drive.status().browserConfigured) login(true);
+  else {
+    $('client-id').value = '';
+    $('client-secret').value = '';
+    showStep('client');
+  }
 });
 
 // ---------- ② 로그인 ----------
 
-$('drive-login').addEventListener('click', async () => {
+let browserLogin = false;
+async function login(browser) {
+  browserLogin = browser;
   loggingIn = true;
   $('drive-login').disabled = true;
   $('login-wait').hidden = false;
+  $('login-cancel').hidden = !browser;
+  $('login-wait-text').textContent = browser ? '브라우저에서 로그인을 기다리고 있어요' : '구글 계정을 확인하고 있어요';
   try {
-    const { email } = await call('driveLogin');
-    toast(email ? `${email} 계정으로 로그인했어요` : '로그인했어요');
+    const { email } = await call('driveLogin', { browser });
+    toast(email ? `${email} 계정으로 연결했어요` : '구글 계정으로 연결했어요');
     openFolders();
   } catch (err) {
     if (!sheet.hidden) toast(err.message, true);
@@ -71,7 +81,8 @@ $('drive-login').addEventListener('click', async () => {
     $('drive-login').disabled = false;
     $('login-wait').hidden = true;
   }
-});
+}
+$('drive-login').addEventListener('click', () => login(!drive.status().nativeAvailable));
 $('login-cancel').addEventListener('click', () => drive.cancelLogin());
 
 // ---------- ③ 폴더 고르기 ----------

@@ -77,7 +77,7 @@ class DriveApi(private val ctx: Context) : Remote {
                 if (code in 200..299) return handle(conn)
                 val err = conn.errorStream?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
                 if (code == 401 && attempt == 0) {
-                    GoogleAuth.invalidate()
+                    GoogleAuth.invalidate(ctx)
                 } else if ((code == 429 || code >= 500 || (code == 403 && "rateLimit" in err)) && attempt < 3) {
                     Thread.sleep(1000L shl attempt)
                 } else {

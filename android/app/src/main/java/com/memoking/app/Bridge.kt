@@ -8,6 +8,7 @@ import android.webkit.JavascriptInterface
 import com.memoking.app.drive.DriveApi
 import com.memoking.app.drive.DriveSync
 import com.memoking.app.drive.GoogleAuth
+import com.memoking.app.drive.NativeAuth
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -177,6 +178,8 @@ class Bridge(private val activity: MainActivity) {
     fun driveInfo(): JSONObject = JSONObject()
         .put("configured", GoogleAuth.configured(ctx))
         .put("builtIn", GoogleAuth.builtIn())
+        .put("nativeAvailable", NativeAuth.available(ctx))
+        .put("browserConfigured", GoogleAuth.clientId(ctx).isNotBlank())
         .put("connected", GoogleAuth.connected(ctx))
         .put("email", GoogleAuth.email(ctx))
         .put("active", DriveSync.active(ctx))
@@ -222,7 +225,10 @@ class Bridge(private val activity: MainActivity) {
             "notifyPermission" -> activity.runOnUiThread { activity.requestNotifyPermission(id) }
             "exactAlarmSettings" -> activity.runOnUiThread { activity.openExactAlarmSettings(id) }
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
-            "driveLogin" -> pool.execute {
+            // 기본: 휴대폰 구글 계정 그대로 (계정 고르기·허용). browser=true 면 브라우저 로그인(예비)
+            "driveLogin" -> if (!a.optBoolean("browser") && NativeAuth.available(ctx)) {
+                activity.runOnUiThread { activity.loginWithPhoneAccount(id) }
+            } else pool.execute {
                 resolve(id) {
                     val email = GoogleAuth.login(ctx) { url -> activity.runOnUiThread { activity.openBrowser(url) } }
                     activity.runOnUiThread { activity.bringToFront() }
