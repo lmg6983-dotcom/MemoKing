@@ -6,7 +6,7 @@ const EVENTS = [
   'memos:changed', 'memo:external', 'memo:removed', 'memo:meta', 'memo:links-changed', 'vault:indexed', 'vault:opened',
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
-  'stack:state', 'stack:hover', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
+  'stack:state', 'stack:hover', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -51,6 +51,22 @@ contextBridge.exposeInMainWorld('memoking', {
     remove: invoke('history:remove'),
     clear: invoke('history:clear'),
     toMemo: invoke('history:to-memo'),
+    // 앱마다 모으지 않기
+    apps: invoke('history:apps'),
+    blockApp: invoke('history:block'),
+    unblockApp: invoke('history:unblock'),
+  },
+  // Google Drive 직접 동기화 (Google Drive 데스크탑 앱 없이)
+  drive: {
+    status: invoke('drive:status'),
+    setClient: invoke('drive:set-client'),
+    login: invoke('drive:login'),
+    cancelLogin: invoke('drive:cancel-login'),
+    folders: invoke('drive:folders'),
+    createFolder: invoke('drive:create-folder'),
+    use: invoke('drive:use'),
+    sync: invoke('drive:sync'),
+    disconnect: invoke('drive:disconnect'),
   },
   settings: {
     get: invoke('app:settings'),

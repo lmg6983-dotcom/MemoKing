@@ -27,6 +27,8 @@
       <button id="use-suggested" class="btn primary">이 폴더에 보관하기</button>
       <button id="choose-folder" class="btn">다른 폴더 고르기</button>
     </div>
+    <p class="setup-or">Google Drive 데스크탑 앱이 없어도 돼요</p>
+    <button id="setup-drive" class="btn drive-start"><svg><use href="#i-cloud"/></svg>Google 계정으로 로그인해서 동기화하기</button>
     <p id="setup-error" class="setup-error" hidden></p>
   </section>
 
@@ -107,6 +109,16 @@
       <button id="reveal-vault" class="btn">폴더 열기</button>
       <button id="change-vault" class="btn">폴더 바꾸기</button>
     </div>
+    <p class="label">Google Drive 동기화 <small>앱 설치 없이 구글 로그인만으로</small></p>
+    <div class="drive-box" id="drive-box">
+      <svg class="drive-box-icon"><use href="#i-cloud"/></svg>
+      <div class="drive-box-text"><b id="drive-title"></b><small id="drive-sub"></small></div>
+    </div>
+    <div class="dialog-actions left">
+      <button id="drive-connect" class="btn">연결하기</button>
+      <button id="drive-sync-now" class="btn">지금 동기화</button>
+      <button id="drive-disconnect" class="btn">연결 끊기</button>
+    </div>
     <p class="label">편의 기능</p>
     <label class="setting-row">
       <input type="checkbox" id="auto-start" class="switch">
@@ -124,6 +136,9 @@
       <input type="checkbox" id="popup-watch" class="switch">
       <span>카카오톡 알림도 모으기 <small>Windows 알림 센터를 쓰지 않는 앱이 띄우는 알림 창을 읽어서 모아요</small></span>
     </label>
+    <div class="dialog-actions left sub-actions">
+      <button id="history-apps-btn" class="btn">알림 모을 앱 고르기 <span id="blocked-count" class="trash-count"></span></button>
+    </div>
     <p class="label">지운 메모</p>
     <div class="dialog-actions left">
       <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
@@ -150,6 +165,60 @@
   </dialog>
 
   <!-- 휴지통: 지운 메모 되살리기·영구 삭제 -->
+  <!-- Google Drive 연결: ① OAuth 클라이언트 ② 로그인 ③ 폴더 고르기 -->
+  <dialog id="drive-dialog" class="dialog drive-dialog">
+    <h2>Google Drive 연결</h2>
+    <div class="drive-step" data-step="client" hidden>
+      <p class="hint">처음 한 번, 메모킹 Google Cloud 프로젝트의 <b>OAuth 클라이언트 ID</b>(유형: <b>데스크톱 앱</b>)를 넣어 주세요. 만드는 방법은 메모킹 폴더의 <b>android/DRIVE-SETUP.md</b> 에 있어요.</p>
+      <label class="field"><span>클라이언트 ID</span><input id="client-id" type="text" autocomplete="off" spellcheck="false" placeholder="….apps.googleusercontent.com"></label>
+      <label class="field"><span>클라이언트 보안 비밀번호</span><input id="client-secret" type="text" autocomplete="off" spellcheck="false" placeholder="GOCSPX-…"></label>
+      <div class="dialog-actions">
+        <button class="btn" data-close>취소</button>
+        <button id="client-save" class="btn primary">저장하고 로그인</button>
+      </div>
+    </div>
+    <div class="drive-step" data-step="login" hidden>
+      <p class="hint">기본 브라우저가 열리면 <b>휴대폰 메모킹과 같은 구글 계정</b>으로 로그인하고 <b>허용</b>을 눌러 주세요. 끝나면 이 창으로 돌아와요.</p>
+      <div class="wait"><span class="spinner"></span><span>브라우저에서 로그인을 기다리고 있어요</span></div>
+      <div class="dialog-actions">
+        <button id="client-edit" class="link-btn">OAuth 클라이언트 바꾸기</button>
+        <span class="grow"></span>
+        <button id="login-cancel" class="btn">그만두기</button>
+      </div>
+    </div>
+    <div class="drive-step" data-step="folder" hidden>
+      <p class="hint">메모를 보관할 Drive 폴더를 골라요. 휴대폰 메모킹이 쓰는 폴더(보통 <b>내 드라이브 › 메모킹</b>)를 고르면 같은 메모를 써요.</p>
+      <p class="drive-account" id="drive-account"></p>
+      <nav class="crumbs" id="crumbs" aria-label="폴더 위치"></nav>
+      <ul class="folder-list" id="folder-list"></ul>
+      <div class="new-folder" id="new-folder-row" hidden>
+        <input id="new-folder-name" type="text" autocomplete="off" spellcheck="false" placeholder="새 폴더 이름">
+        <button id="new-folder-ok" class="btn">만들기</button>
+      </div>
+      <p class="hint small" id="folder-local"></p>
+      <div class="dialog-actions">
+        <button id="folder-new" class="btn">새 폴더</button>
+        <span class="grow"></span>
+        <button class="btn" data-close>취소</button>
+        <button id="folder-use" class="btn primary"></button>
+      </div>
+    </div>
+    <div class="drive-step" data-step="syncing" hidden>
+      <div class="wait big"><span class="spinner"></span><span>Google Drive와 메모를 맞추고 있어요…<br><small>메모가 많으면 조금 걸려요</small></span></div>
+    </div>
+  </dialog>
+
+  <!-- 알림 보관함: 앱마다 모을지 고르기 -->
+  <dialog id="apps-dialog" class="dialog apps-dialog">
+    <h2>알림 모을 앱</h2>
+    <p class="trash-note">끈 앱의 알림은 앞으로 알림 보관함에 모으지 않아요. 언제든 다시 켤 수 있어요.</p>
+    <ul id="apps-list" class="apps-list" aria-label="알림을 보낸 앱"></ul>
+    <p id="apps-empty" class="empty" hidden>아직 알림이 온 앱이 없어요.</p>
+    <form method="dialog" class="dialog-actions">
+      <button class="btn primary">닫기</button>
+    </form>
+  </dialog>
+
   <dialog id="trash-dialog" class="dialog trash-dialog">
     <h2>휴지통</h2>
     <p class="trash-note" id="trash-note"></p>

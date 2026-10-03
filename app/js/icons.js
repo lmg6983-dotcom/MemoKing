@@ -40,6 +40,9 @@ const ICONS = {
   tabs: `<path d="M3.5 9.5V18a1.5 1.5 0 001.5 1.5h14a1.5 1.5 0 001.5-1.5V9.5M3.5 9.5V6A1.5 1.5 0 015 4.5h4.5l1.5 5M3.5 9.5h17M11 9.5l1.2-3.5H18a1.5 1.5 0 011.5 1.5v2" ${stroke}/>`,
   table: `<rect x="3.5" y="4.5" width="17" height="15" rx="2" ${stroke}/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10" ${stroke}/>`,
   pdf: `<path d="M14 3.5H7a2 2 0 00-2 2v13a2 2 0 002 2h10a2 2 0 002-2V8.5l-5-5z" ${stroke}/><path d="M14 3.5v5h5" ${stroke}/><path d="M12 11v6M9.5 14.5L12 17l2.5-2.5" ${stroke}/>`,
+  // 앱 알림 그만 모으기
+  block: `<circle cx="12" cy="12" r="8.5" ${stroke}/><path d="M6 6l12 12" ${stroke}/>`,
+  cloud: `<path d="M7 18.5h10.5a4 4 0 00.6-7.95A6 6 0 006.6 9.1 4.75 4.75 0 007 18.5z" ${stroke}/>`,
   folder: `<path d="M3.5 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2h-13a2 2 0 01-2-2V7z" ${stroke}/>`,
   // 다른 창보다 늘 위에 두기: 창 + 위 화살표 (압정은 "목록 맨 위에 고정" 에만 쓴다)
   ontop: `<rect x="3.5" y="4.5" width="17" height="15" rx="2" ${stroke}/><path d="M3.5 8.5h17" ${stroke}/><path d="M12 17v-5.5M9.2 14l2.8-2.8 2.8 2.8" ${stroke} stroke-width="2"/>`,

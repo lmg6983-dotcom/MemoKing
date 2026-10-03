@@ -15,3 +15,6 @@ android/local.properties
 android/.idea/
 android/.kotlin/
 *.iml
+
+# PC 메모킹 Google 로그인용 OAuth 클라이언트 (설정에서 붙여 넣거나 이 파일로)
+desktop/google-client.json

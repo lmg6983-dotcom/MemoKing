@@ -8,6 +8,7 @@ import { setupHistoryTab } from './list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
+import { setupDrivePanel } from './drive-panel.js';
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
@@ -46,6 +47,7 @@ const state = {
   filter: { tags: [], colors: [], kinds: [] },
 };
 let searchTimer = null;
+let drivePanel = null; // Google Drive 직접 동기화 (설정 · 처음 화면)
 
 // ---------- 화면 전환 ----------
 
@@ -371,6 +373,7 @@ el.chooseFolder.addEventListener('click', async () => applyInfo(await api.vault.
 el.newBtn.addEventListener('click', () => api.memo.create());
 el.settingsBtn.addEventListener('click', async () => {
   await loadSettings();
+  drivePanel?.refresh();
   el.settings.showModal();
 });
 
@@ -385,6 +388,7 @@ async function loadSettings() {
   $('history-enabled').checked = s.historyEnabled;
   $('popup-watch').checked = s.popupWatch;
   $('popup-watch').disabled = !s.historyEnabled;
+  showBlockedCount();
   showQuickMemo(s.quickMemo);
   $('trash-days').value = String(s.trashDays);
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
@@ -416,8 +420,65 @@ let activeTab = 'memos';
 const remindersTab = setupRemindersTab({
   api, container: $('reminder-groups'), empty: $('reminders-empty'), countEl: $('count-reminders'),
 });
+// 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
+async function blockHistoryApp(appId, appName) {
+  if (!(await confirmDialog(`${appName} 알림을 앞으로 모으지 않을까요?\n설정 › 알림 모을 앱 고르기에서 다시 켤 수 있어요.`, '그만 모으기'))) return false;
+  const apps = await api.history.apps();
+  const count = apps.find((a) => a.appId === appId)?.count ?? 0;
+  const remove = count > 0 && await confirmDialog(`이미 모은 ${appName} 알림 ${count}개도 지울까요?`, '지우기');
+  await api.history.blockApp(appId, appName, remove);
+  historyTab.refresh();
+  return true;
+}
+
+// 알림 모을 앱 고르기
+async function renderApps() {
+  const apps = (await api.history.apps()).sort((a, b) => b.count - a.count || a.app.localeCompare(b.app, 'ko'));
+  $('apps-empty').hidden = apps.length > 0;
+  $('apps-list').replaceChildren(...apps.map((a) => {
+    const li = document.createElement('li');
+    li.className = `app-row${a.blocked ? ' off' : ''}`;
+    const letter = document.createElement('span');
+    letter.className = 'avatar letter';
+    letter.textContent = (a.app || '?').trim().charAt(0).toUpperCase();
+    let h = 0;
+    for (const ch of a.app) h = (h * 31 + ch.codePointAt(0)) % 360;
+    letter.style.background = `hsl(${h} 55% 50%)`;
+    const name = document.createElement('span');
+    name.className = 'app-name';
+    const b = document.createElement('b');
+    b.textContent = a.app;
+    const small = document.createElement('small');
+    small.textContent = a.blocked ? '모으지 않아요' : `알림 ${a.count}개 보관 중`;
+    name.append(b, small);
+    const sw = document.createElement('input');
+    sw.type = 'checkbox';
+    sw.className = 'switch';
+    sw.checked = !a.blocked;
+    sw.setAttribute('aria-label', `${a.app} 알림 모으기`);
+    sw.addEventListener('change', async () => {
+      if (sw.checked) await api.history.unblockApp(a.appId);
+      else if (!(await blockHistoryApp(a.appId, a.app))) sw.checked = true;
+      renderApps();
+      showBlockedCount();
+      historyTab.refresh();
+    });
+    li.append(letter, name, sw);
+    return li;
+  }));
+}
+async function showBlockedCount() {
+  const n = (await api.history.apps()).filter((a) => a.blocked).length;
+  $('blocked-count').textContent = n ? `${n}개 끔` : '';
+}
+$('history-apps-btn').addEventListener('click', async () => {
+  await renderApps();
+  $('apps-dialog').showModal();
+});
+
 const historyTab = setupHistoryTab({
-  api,
+  // 보관함의 알림을 펼친 곳의 "이 앱 알림 그만 모으기"
+  api: { ...api, history: { ...api.history, block: (e) => blockHistoryApp(e.appId, e.app) } },
   confirm: confirmDialog,
   els: {
     consent: $('history-consent'), body: $('history-body'), enable: $('history-enable'),
@@ -784,6 +845,7 @@ $('tutorial-btn').addEventListener('click', () => {
   api.tutorial.start();
 });
 applyInfo(await api.info());
+if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog });
 await refresh();
 $('count-memos').textContent = String(state.memos.length);
 await remindersTab.refresh();

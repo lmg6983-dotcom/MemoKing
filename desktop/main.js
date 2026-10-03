@@ -1,7 +1,7 @@
 // Electron 메인 프로세스 — 목록 창·스티커 창 관리, 설정, 메모 폴더(볼트) 연결.
 import {
   app, BrowserWindow, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, net, Notification,
-  powerMonitor, protocol, screen, session, shell, Tray,
+  powerMonitor, protocol, safeStorage, screen, session, shell, Tray,
 } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,6 +11,9 @@ import { Vault } from './vault.js';
 import { isInside, dropBounds, tweenBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 import { createAlarmRunner } from './alarms.js';
 import { NotificationHistory } from './notification-history.js';
+import { GoogleAuth } from './drive/google-auth.js';
+import { DriveApi } from './drive/drive-api.js';
+import { DriveSync, insideDriveForDesktop } from './drive/drive-sync.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
 import { LinkPreviews } from './link-previews.js';
 import { isProgramFile } from '../app/js/core/file-kinds.js';
@@ -76,6 +79,8 @@ let settings = {
   tutorialDone: false, // 처음 실행 튜토리얼을 마쳤거나 건너뛰었는지
   trashDays: 30, // 휴지통에 이 날짜보다 오래 있던 메모를 저절로 영구 삭제 (0 = 하지 않음)
   listOnTop: false, // 목록 창도 다른 창보다 늘 위에
+  historyBlocked: {}, // 알림 보관함에 모으지 않을 앱 { 앱 id: 앱 이름 }
+  drive: null, // Google Drive 직접 동기화: { folderId, folderName } (메모 폴더를 이 Drive 폴더와 맞춘다)
 };
 let settingsTimer = null;
 
@@ -138,6 +143,7 @@ function openVault(dir) {
     const next = new Vault(dir);
     next.on('changed', ({ external, removed }) => {
       pushList();
+      driveSync?.request(3000); // 고친 것을 잠시 뒤 Google Drive 로
       for (const id of external) sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) sendToNote(id, 'memo:removed');
     });
@@ -151,6 +157,7 @@ function openVault(dir) {
     migrateV1();
     loadStacks();
     purgeTrash();
+    configureDrive();
   } catch (err) {
     console.error('메모 폴더 열기 실패', err);
     vaultError = '메모 폴더를 열지 못했어요. 폴더가 있는지, Google Drive가 연결돼 있는지 확인해 주세요.';
@@ -1318,6 +1325,7 @@ function initHistory() {
   });
   history.on('changed', () => listWin?.webContents.send('history:changed'));
   history.on('error', (err) => console.warn('[알림 보관함]', err.message));
+  history.setBlocked(Object.keys(settings.historyBlocked ?? {}));
   if (settings.historyEnabled) history.start();
   syncPopupWatch();
 }
@@ -1381,6 +1389,32 @@ function setHistoryEnabled(on) {
   return settings.historyEnabled;
 }
 
+// 앱마다 모으지 않기: { 앱 id: 앱 이름 }
+function blockHistoryApp(appId, appName, removeExisting) {
+  if (!appId || !history) return 0;
+  settings.historyBlocked = { ...(settings.historyBlocked ?? {}), [appId]: appName || appId };
+  saveSettings();
+  history.setBlocked(Object.keys(settings.historyBlocked));
+  return removeExisting ? history.removeApp(appId) : 0;
+}
+
+function unblockHistoryApp(appId) {
+  const next = { ...(settings.historyBlocked ?? {}) };
+  delete next[appId];
+  settings.historyBlocked = next;
+  saveSettings();
+  history?.setBlocked(Object.keys(next));
+  history?.emit('changed');
+}
+
+// 모을 앱 고르기: 알림이 온 앱 + 끈 앱
+function historyApps() {
+  const blocked = settings.historyBlocked ?? {};
+  const apps = new Map((history?.appList() ?? []).map((a) => [a.appId, { ...a, blocked: Boolean(blocked[a.appId]) }]));
+  for (const [appId, app] of Object.entries(blocked)) if (!apps.has(appId)) apps.set(appId, { appId, app, count: 0, blocked: true });
+  return [...apps.values()];
+}
+
 // 보관한 알림을 메모로 만든다
 function historyToMemo(entryId) {
   const e = history?.get(entryId);
@@ -1390,6 +1424,66 @@ function historyToMemo(entryId) {
   const id = vault.import({ body });
   openNote(id);
   return id;
+}
+
+// ---------- Google Drive 직접 동기화 (Google Drive 데스크탑 앱 없이) ----------
+// 메모 폴더(이 PC)를 고른 Drive 폴더와 맞춘다. 휴대폰 메모킹과 같은 규칙(desktop/drive/sync-engine.js).
+
+let driveAuth = null;
+let driveApi = null;
+let driveSync = null;
+
+function initDrive() {
+  driveAuth = new GoogleAuth({
+    file: path.join(app.getPath('userData'), 'google-auth.json'),
+    bundledClient: path.join(import.meta.dirname, 'google-client.json'),
+    fetch: (...args) => net.fetch(...args),
+    openExternal: (url) => shell.openExternal(url),
+    safeStorage,
+  });
+  driveApi = new DriveApi({ auth: driveAuth, fetch: (...args) => net.fetch(...args) });
+  driveSync = new DriveSync({ api: driveApi, auth: driveAuth, stateDir: path.join(app.getPath('userData'), 'drive') });
+  driveSync.on('status', (st) => {
+    if (st.changed) vault?.scan(); // 내려받은 메모를 바로 목록·열린 창에
+    listWin?.webContents.send('drive:status', driveInfo());
+  });
+  configureDrive();
+}
+
+function configureDrive() {
+  if (!driveSync) return;
+  const d = settings.drive;
+  driveSync.configure(d?.folderId && vault ? { folderId: d.folderId, folderName: d.folderName, root: vault.root } : null);
+  driveSync.request(2000);
+}
+
+function driveInfo() {
+  return {
+    configured: driveAuth?.configured ?? false,
+    connected: driveAuth?.connected ?? false,
+    email: driveAuth?.email ?? '',
+    active: Boolean(settings.drive?.folderId) && (driveSync?.active ?? false),
+    folderId: settings.drive?.folderId ?? '',
+    folderName: settings.drive?.folderName ?? '',
+    root: vault?.root ?? '',
+    insideDriveApp: insideDriveForDesktop(vault?.root),
+    status: driveSync?.status ?? { state: 'off' },
+  };
+}
+
+// 이 Drive 폴더와 맞추기 시작. 지금 메모 폴더가 Google Drive 데스크탑 앱 폴더(G:\내 드라이브…) 안이면
+// 두 번 동기화가 되지 않게 이 PC 의 문서\메모킹 으로 옮겨 맞춘다 (첫 동기화 때 Drive 의 메모를 모두 받음).
+async function useDriveFolder(folderId, folderName) {
+  let root = vault?.root;
+  if (!root || insideDriveForDesktop(root)) root = path.join(app.getPath('documents'), '메모킹');
+  settings.drive = { folderId, folderName };
+  saveSettings();
+  if (root !== vault?.root) {
+    for (const win of noteWins.values()) win.close();
+    openVault(root); // → configureDrive
+  } else configureDrive();
+  const status = await driveSync.run();
+  return { info: vaultInfo(), status, drive: driveInfo() };
 }
 
 // ---------- Windows 시작 시 자동 실행 ----------
@@ -1708,6 +1802,41 @@ function registerIpc() {
   ipcMain.handle('history:remove', (_e, id) => history?.remove(id) ?? false);
   ipcMain.handle('history:clear', () => history?.clear());
   ipcMain.handle('history:to-memo', (_e, id) => historyToMemo(id));
+  ipcMain.handle('history:apps', () => historyApps());
+  // Google Drive 직접 동기화
+  ipcMain.handle('drive:status', () => driveInfo());
+  ipcMain.handle('drive:set-client', (_e, id, secret) => {
+    driveAuth.setClient(id, secret);
+    return driveInfo();
+  });
+  ipcMain.handle('drive:login', async () => {
+    await driveAuth.login();
+    const email = await driveApi.about().catch(() => '');
+    if (email) driveAuth.setEmail(email);
+    if (listWin) {
+      if (listWin.isMinimized()) listWin.restore();
+      listWin.show();
+      listWin.focus();
+    }
+    return { email };
+  });
+  ipcMain.handle('drive:cancel-login', () => driveAuth.cancelLogin());
+  ipcMain.handle('drive:folders', async (_e, parent) => (await driveApi.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name })));
+  ipcMain.handle('drive:create-folder', async (_e, parent, name) => {
+    const f = await driveApi.createFolder(String(parent || 'root'), String(name));
+    return { id: f.id, name: f.name };
+  });
+  ipcMain.handle('drive:use', (_e, folderId, name) => useDriveFolder(String(folderId), String(name)));
+  ipcMain.handle('drive:sync', () => driveSync.run());
+  ipcMain.handle('drive:disconnect', () => {
+    driveAuth.signOut();
+    settings.drive = null;
+    saveSettings();
+    configureDrive();
+    return driveInfo();
+  });
+  ipcMain.handle('history:block', (_e, appId, app, removeExisting) => blockHistoryApp(String(appId ?? ''), String(app ?? ''), Boolean(removeExisting)));
+  ipcMain.handle('history:unblock', (_e, appId) => unblockHistoryApp(String(appId ?? '')));
   ipcMain.handle('clipboard:write-text', (_e, text) => clipboard.writeText(String(text ?? '')));
 
   // 설정 (자동 실행)
@@ -2053,7 +2182,10 @@ app.whenReady().then(async () => {
   });
 
   // 절전에서 깨어나면 그 사이 알림을 바로 확인
-  powerMonitor.on('resume', () => alarms.tick());
+  powerMonitor.on('resume', () => {
+    alarms.tick();
+    driveSync?.request(3000);
+  });
   powerMonitor.on('unlock-screen', () => alarms.tick());
 
   if (SMOKE) {
@@ -2085,6 +2217,7 @@ app.whenReady().then(async () => {
 
   loadSettings();
   initHistory();
+  initDrive();
   // 설치판 첫 실행: 자동 실행을 기본으로 켜 둔다 (설정·트레이 메뉴에서 끌 수 있음)
   if (autoStartAvailable() && !settings.autoStartSet) setAutoStart(true);
   if (settings.vaultPath) openVault(settings.vaultPath);
