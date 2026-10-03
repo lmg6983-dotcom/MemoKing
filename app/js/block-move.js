@@ -1,8 +1,12 @@
 // 그림·소리·동영상·파일·링크 카드 같은 "내용" 줄 옮기기 (편집기 플러그인, 데스크탑·휴대폰 함께)
-//   - 내용을 누르면(고르면) 그 줄 오른쪽 위에 작은 막대: ↑ 위로 · ⠿ 끌어 옮기기 · ↓ 아래로
-//   - ↑·↓ 는 위·아래 줄과 자리를 맞바꾼다 (한 줄씩). 키보드: Alt+↑ / Alt+↓
-//   - ⠿ 를 끌면 목록 끌기와 같은 규칙: 다른 줄의 가운데에 놓으면 맞바꾸기, 줄과 줄 사이에 놓으면 끼우기 (놓기 전 미리 보기, Esc 취소)
-//   - 마우스와 터치(포인터 이벤트) 모두. 줄 = 같은 상자(본문·인용·목록 항목) 안의 블록 하나
+// 따로 손잡이·버튼 없이 내용 자체를 잡아 옮긴다 (목록·체크리스트 끌기와 같은 감각)
+//   - 마우스: 내용을 누른 채 끌면 바로 들어 올려진다 (그냥 누르면 지금처럼 고르기·열기)
+//   - 터치: 꾹(0.4초) 누르면 테두리가 진해지다 "톡" 들어 올려지고, 손가락을 떼지 않고 끈다 (그냥 밀면 스크롤)
+//   - 끄는 줄은 손을 따라오고, 다른 줄들은 놓으면 될 자리로 미끄러져 틈을 연다.
+//     다른 줄의 가운데 = 맞바꾸기, 줄과 줄 사이 = 끼우기 (손 옆에 ⇅ 맞바꾸기 / ↳ 여기에 넣기). Esc 취소
+//   - 키보드: 내용을 고른 채 Alt+↑ / Alt+↓ 로 한 줄씩
+//   - 처음 한 번, 내용을 고르면 옮기는 방법을 작은 안내로 알려 준다
+//   - 줄 = 같은 상자(본문·인용·목록 항목) 안의 블록 하나
 import { Plugin, PluginKey, TextSelection, NodeSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
 
@@ -56,11 +60,45 @@ export function contentBlockAt(state) {
   }
   if (depth == null || depth < 1) return null;
   const pos = depth > $from.depth ? sel.from : $from.before(depth);
-  const $pos = state.doc.resolve(pos);
-  if (NO_MOVE_PARENTS.test($pos.parent.type.name)) return null;
-  const node = state.doc.nodeAt(pos);
+  return blockInfo(state.doc, pos, inner);
+}
+
+function blockInfo(doc, pos, inner) {
+  const node = doc.nodeAt(pos);
   if (!node) return null;
-  return { pos, node, depth, start: $pos.start(), index: $pos.index(), count: $pos.parent.childCount, inner };
+  const $pos = doc.resolve(pos);
+  if (NO_MOVE_PARENTS.test($pos.parent.type.name)) return null;
+  return { pos, node, depth: $pos.depth + 1, start: $pos.start(), index: $pos.index(), count: $pos.parent.childCount, inner };
+}
+
+const GRAB_TARGET = 'img.mk-image, .mk-media, .mk-link-card, [data-link-card], a';
+const NO_GRAB = '.plyr__controls, .plyr__control, button, input, select, textarea, [contenteditable="true"] [contenteditable="true"]';
+
+/** 화면에서 누른 곳(target)이 옮길 수 있는 내용 줄이면 그 줄 */
+export function blockFromTarget(view, target) {
+  const t = target instanceof Element ? target : target?.parentElement;
+  const host = t?.closest(GRAB_TARGET);
+  if (!host || !view.dom.contains(host) || t.closest(NO_GRAB)) return null;
+  let pos;
+  try {
+    pos = view.posAtDOM(host, 0);
+  } catch {
+    return null;
+  }
+  const { doc } = view.state;
+  for (const p of [pos, pos - 1]) {
+    if (p >= 0 && doc.nodeAt(p)?.type.name === 'mk_link_card') return blockInfo(doc, p, { kind: 'node', offset: -1 });
+  }
+  const $p = doc.resolve(Math.min(pos, doc.content.size));
+  for (let d = $p.depth; d > 0; d--) {
+    const n = $p.node(d);
+    if (n.type.name === 'mk_link_card') return blockInfo(doc, $p.before(d), { kind: 'node', offset: -1 });
+    if (n.type.name !== 'paragraph') continue;
+    if (!isContentParagraph(n)) return null;
+    const isImage = doc.nodeAt(pos)?.type.name === 'image';
+    return blockInfo(doc, $p.before(d), isImage ? { kind: 'node', offset: pos - $p.start(d) } : { kind: 'text', offset: 0 });
+  }
+  return null;
 }
 
 // 상자 안의 줄 순서를 order(원래 번호들)로 바꾸고, 옮긴 줄(src)을 다시 고른다
@@ -99,19 +137,19 @@ export function moveBlockBy(state, dispatch, dir) {
   return true;
 }
 
-function el(tag, className, attrs = {}) {
-  const e = document.createElement(tag);
-  e.className = className;
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-  return e;
-}
-
-const ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const GRIP = '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></g></svg>';
+// 마우스·터치 이벤트 이름과 좌표를 하나로 (list-drag.js 와 같은 기준)
+const INPUT = {
+  mouse: { move: 'mousemove', up: 'mouseup', cancel: null, hold: 0, tolerance: 4 },
+  touch: { move: 'touchmove', up: 'touchend', cancel: 'touchcancel', hold: 400, tolerance: 10 },
+};
+const pointOf = (e) => e.touches?.[0] ?? e.changedTouches?.[0] ?? e;
+const LISTEN = { capture: true, passive: false };
+const HINT_KEY = 'memoking.hint.blockMove';
+const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
 
 /** @param {{ readOnly?: boolean }} options */
 export function createBlockMove({ readOnly = false } = {}) {
+  let mover = null;
   return new Plugin({
     key: blockMoveKey,
     state: {
@@ -123,179 +161,183 @@ export function createBlockMove({ readOnly = false } = {}) {
       handleKeyDown(view, event) {
         if (readOnly || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
         if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false;
-        return moveBlockBy(view.state, view.dispatch, event.key === 'ArrowUp' ? -1 : 1);
+        const moved = moveBlockBy(view.state, view.dispatch, event.key === 'ArrowUp' ? -1 : 1);
+        if (moved) mover?.flash();
+        return moved;
+      },
+      handleDOMEvents: readOnly ? {} : {
+        mousedown(view, event) {
+          if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) mover?.press(event, 'mouse');
+          return false; // 그냥 누르면 지금처럼 (고르기·열기)
+        },
+        touchstart(view, event) {
+          if (event.touches.length === 1) mover?.press(event, 'touch');
+          else mover?.cancelPress();
+          return false; // 그냥 누르면 고르기, 밀면 스크롤
+        },
+        dragstart(_view, event) {
+          if (!mover?.busy()) return false;
+          event.preventDefault(); // 브라우저 그림 끌어 놓기 대신 줄 옮기기
+          return true;
+        },
       },
     },
-    view: (view) => (readOnly ? {} : new MoveBar(view)),
+    view: (view) => {
+      if (readOnly) return {};
+      mover = new Mover(view);
+      return mover;
+    },
   });
 }
 
-class MoveBar {
+class Mover {
   constructor(view) {
     this.view = view;
-    this.block = null;
+    this.pressing = null;
     this.drag = null;
-    this.bar = el('div', 'mk-move-bar', { role: 'toolbar', 'aria-label': '이 줄 옮기기' });
-    this.up = el('button', 'mk-move-btn', { type: 'button', title: '위 줄과 바꾸기 (Alt+↑)', 'aria-label': '위로' });
-    this.grip = el('button', 'mk-move-btn mk-move-grip', { type: 'button', title: '끌어서 옮기기 — 다른 줄 가운데는 맞바꾸기, 줄 사이는 끼우기', 'aria-label': '끌어서 옮기기' });
-    this.down = el('button', 'mk-move-btn', { type: 'button', title: '아래 줄과 바꾸기 (Alt+↓)', 'aria-label': '아래로' });
-    this.up.innerHTML = ARROW_UP;
-    this.grip.innerHTML = GRIP;
-    this.down.innerHTML = ARROW_DOWN;
-    this.bar.append(this.up, this.grip, this.down);
-    this.bar.hidden = true;
-    document.body.append(this.bar);
-    // 막대를 눌러도 편집기의 선택(고른 그림)이 그대로 남게
-    this.bar.addEventListener('mousedown', (e) => e.preventDefault());
-    this.up.addEventListener('click', () => this.step(-1));
-    this.down.addEventListener('click', () => this.step(1));
-    this.grip.addEventListener('pointerdown', (e) => this.lift(e));
-    this.grip.addEventListener('click', (e) => e.preventDefault());
-    this.reposition = () => this.place();
-    window.addEventListener('scroll', this.reposition, true);
-    window.addEventListener('resize', this.reposition);
-    this.update(view);
+    this.hint = null;
+    this.lastBlock = null;
   }
 
-  step(dir) {
+  busy() {
+    return Boolean(this.pressing || this.drag);
+  }
+
+  // ---------- 누르기 → 들어 올리기 ----------
+
+  press(event, kind) {
     const { view } = this;
-    if (moveBlockBy(view.state, view.dispatch, dir)) {
-      this.flash();
-      if (!view.hasFocus()) view.focus();
-    }
-  }
-
-  // 옮긴 줄이 잠깐 반짝여 어디로 갔는지 보여 준다
-  flash() {
-    const { view } = this;
-    const block = contentBlockAt(view.state);
-    if (!block) return;
-    this.decorate([{ pos: block.pos, cls: 'mk-block-dropped' }]);
-    clearTimeout(this.flashTimer);
-    this.flashTimer = setTimeout(() => {
-      if (!this.drag && !view.isDestroyed) this.decorate([]);
-    }, 700);
-  }
-
-  decorate(specs) {
-    const { view } = this;
-    const { doc } = view.state;
-    const decos = [];
-    for (const { pos, cls, style } of specs) {
-      const node = doc.nodeAt(pos);
-      if (!node) continue;
-      const attrs = {};
-      if (cls) attrs.class = cls;
-      if (style) attrs.style = style;
-      decos.push(Decoration.node(pos, pos + node.nodeSize, attrs));
-    }
-    view.dispatch(view.state.tr.setMeta(blockMoveKey, DecorationSet.create(doc, decos)).setMeta('addToHistory', false));
-  }
-
-  update(view) {
-    this.view = view;
     if (this.drag) return;
-    this.block = view.editable ? contentBlockAt(view.state) : null;
-    this.bar.hidden = !this.block;
-    if (!this.block) return;
-    this.up.disabled = this.block.index === 0;
-    this.down.disabled = this.block.index >= this.block.count - 1;
-    this.grip.disabled = this.block.count < 2;
-    this.place();
-  }
-
-  place() {
-    if (!this.block || this.bar.hidden || this.drag) return;
-    const dom = this.view.nodeDOM(this.block.pos);
-    if (!(dom instanceof Element) || !dom.isConnected) {
-      this.bar.hidden = true;
-      return;
+    const block = blockFromTarget(view, event.target);
+    if (!block || block.count < 2) return;
+    this.cancelPress();
+    const io = INPUT[kind];
+    const pt = pointOf(event);
+    const p = { block, kind, x: pt.clientX, y: pt.clientY, x2: pt.clientX, y2: pt.clientY };
+    this.pressing = p;
+    p.move = (e) => {
+      const q = pointOf(e);
+      p.x2 = q.clientX;
+      p.y2 = q.clientY;
+      const far = Math.hypot(q.clientX - p.x, q.clientY - p.y) > io.tolerance;
+      if (!far) return;
+      if (kind === 'mouse') {
+        // 마우스는 누른 채 움직이면 바로 들어 올림 (글자 고르기와 겹치지 않는 내용이므로)
+        e.preventDefault();
+        this.cancelPress({ keepMark: true });
+        this.lift(p);
+      } else this.cancelPress(); // 터치는 꾹 누르기 전에 밀면 스크롤
+    };
+    p.up = () => this.cancelPress();
+    window.addEventListener(io.move, p.move, LISTEN);
+    window.addEventListener(io.up, p.up, LISTEN);
+    if (io.cancel) window.addEventListener(io.cancel, p.up, LISTEN);
+    if (kind === 'touch') {
+      // 누르고 있는 동안 테두리가 점점 진해지고, 다 되면 들어 올림
+      p.markTimer = setTimeout(() => {
+        if (this.pressing !== p) return;
+        p.marked = true;
+        this.decorate([{ pos: block.pos, cls: 'mk-block-pressing' }]);
+      }, 80);
+      p.timer = setTimeout(() => {
+        if (this.pressing !== p) return;
+        this.cancelPress({ keepMark: true });
+        this.lift(p);
+      }, io.hold);
     }
-    const r = dom.getBoundingClientRect();
-    const box = this.view.dom.getBoundingClientRect();
-    const w = this.bar.offsetWidth || 110;
-    const h = this.bar.offsetHeight || 36;
-    // 줄의 오른쪽 위 안쪽 (본문 밖으로 나가지 않게)
-    const left = Math.max(box.left + 4, Math.min(r.right, box.right) - w - 4);
-    const top = Math.max(4, Math.min(window.innerHeight - h - 4, r.top + 6));
-    this.bar.style.left = `${Math.round(left)}px`;
-    this.bar.style.top = `${Math.round(top)}px`;
   }
 
-  // ---------- ⠿ 끌어 옮기기 (포인터: 마우스·터치) ----------
+  cancelPress({ keepMark = false } = {}) {
+    const p = this.pressing;
+    if (!p) return;
+    this.pressing = null;
+    clearTimeout(p.timer);
+    clearTimeout(p.markTimer);
+    const io = INPUT[p.kind];
+    window.removeEventListener(io.move, p.move, LISTEN);
+    window.removeEventListener(io.up, p.up, LISTEN);
+    if (io.cancel) window.removeEventListener(io.cancel, p.up, LISTEN);
+    if (p.marked && !keepMark && !this.view.isDestroyed) this.decorate([]);
+  }
 
-  lift(e) {
+  lift(p) {
     const { view } = this;
-    const block = contentBlockAt(view.state);
-    if (!block || block.count < 2 || (e.button ?? 0) !== 0) return;
-    e.preventDefault();
+    // 누른 사이 문서가 바뀌었을 수 있으니 같은 자리의 줄을 다시 찾는다
+    const block = blockInfo(view.state.doc, p.block.pos, p.block.inner);
+    if (!block || block.count < 2) return;
     const parent = view.state.doc.resolve(block.pos).parent;
     const positions = [];
-    let p = block.start;
+    let q = block.start;
     parent.forEach((c) => {
-      positions.push(p);
-      p += c.nodeSize;
+      positions.push(q);
+      q += c.nodeSize;
     });
-    const doms = positions.map((q) => view.nodeDOM(q));
+    const doms = positions.map((x) => view.nodeDOM(x));
     if (doms.some((d) => !(d instanceof Element))) return;
+    getSelection()?.removeAllRanges();
     const scroller = scrollerOf(view.dom);
     const st = scroller?.scrollTop ?? 0;
     const rects = doms.map((d) => d.getBoundingClientRect());
     const tops = rects.map((r) => r.top + st);
     const heights = rects.map((r) => r.height);
     const slots = tops.map((t, i) => (i < tops.length - 1 ? tops[i + 1] - t : heights[i]));
-    const scale = doms[block.index].offsetHeight ? heights[block.index] / doms[block.index].offsetHeight : 1;
-    const badge = el('div', 'mk-drag-badge');
+    const src = doms[block.index];
+    const scale = src.offsetHeight ? heights[block.index] / src.offsetHeight : 1;
+    const badge = document.createElement('div');
+    badge.className = 'mk-drag-badge';
     badge.hidden = true;
     document.body.append(badge);
-    this.drag = {
-      block, positions, tops, heights, slots, scale, scroller, badge, drop: null,
-      x: e.clientX, y: e.clientY, startY: e.clientY + st, pointer: e.pointerId, pointerType: e.pointerType, raf: 0, timer: 0,
+    this.hideHint();
+    const d = {
+      block, positions, tops, heights, slots, scale, scroller, badge, drop: null, kind: p.kind,
+      x: p.x2, y: p.y2, startY: p.y + st, raf: 0, timer: 0,
     };
-    try {
-      this.grip.setPointerCapture(e.pointerId);
-    } catch {
-      // 캡처가 안 되어도 창 전체에서 받는다
-    }
-    this.bar.classList.add('dragging');
+    this.drag = d;
     document.body.classList.add('mk-block-dragging');
-    if (e.pointerType === 'touch') navigator.vibrate?.(15);
-    this.preview();
-    this.onMove = (ev) => {
-      if (!this.drag || ev.pointerId !== this.drag.pointer) return;
-      ev.preventDefault();
-      this.drag.x = ev.clientX;
-      this.drag.y = ev.clientY;
-      if (!this.drag.raf) {
-        this.drag.raf = requestAnimationFrame(() => {
-          if (!this.drag) return;
-          this.drag.raf = 0;
-          this.judge();
+    if (p.kind === 'touch') navigator.vibrate?.(15);
+    this.judge();
+
+    const io = INPUT[p.kind];
+    d.move = (e) => {
+      if (!this.drag) return;
+      e.preventDefault(); // 터치: 스크롤 대신 끌기
+      e.stopPropagation(); // 편집기의 글자 고르기 늘리기를 막는다
+      const pt = pointOf(e);
+      d.x = pt.clientX;
+      d.y = pt.clientY;
+      if (!d.raf) {
+        d.raf = requestAnimationFrame(() => {
+          d.raf = 0;
+          if (this.drag === d) this.judge();
         });
       }
     };
-    this.onUp = (ev) => {
-      if (!this.drag || ev.pointerId !== this.drag.pointer) return;
-      ev.preventDefault();
-      this.drag.x = ev.clientX;
-      this.drag.y = ev.clientY;
+    d.up = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const pt = pointOf(e);
+      d.x = pt.clientX;
+      d.y = pt.clientY;
       this.judge();
-      this.finish(ev.type === 'pointerup');
+      this.finish(true);
     };
-    this.onKey = (ev) => {
-      if (ev.key !== 'Escape') return;
-      ev.preventDefault();
-      ev.stopPropagation();
+    d.cancel = () => this.finish(false);
+    d.key = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
       this.finish(false);
     };
-    window.addEventListener('pointermove', this.onMove, { capture: true, passive: false });
-    window.addEventListener('pointerup', this.onUp, true);
-    window.addEventListener('pointercancel', this.onUp, true);
-    window.addEventListener('keydown', this.onKey, true);
+    d.stop = (e) => e.preventDefault();
+    window.addEventListener(io.move, d.move, LISTEN);
+    window.addEventListener(io.up, d.up, LISTEN);
+    if (io.cancel) window.addEventListener(io.cancel, d.cancel, LISTEN);
+    window.addEventListener('keydown', d.key, true);
+    window.addEventListener('selectstart', d.stop, true);
+    window.addEventListener('contextmenu', d.stop, true);
     // 위·아래 끝 가까이에서는 저절로 스크롤 (가까울수록 빠르게)
-    this.drag.timer = setInterval(() => {
-      const d = this.drag;
-      if (!d?.scroller) return;
+    d.timer = setInterval(() => {
+      if (this.drag !== d || !d.scroller) return;
       const r = d.scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : d.scroller.getBoundingClientRect();
       const edge = 48;
       const upBy = r.top + edge - d.y;
@@ -307,6 +349,8 @@ class MoveBar {
       }
     }, 30);
   }
+
+  // ---------- 끄는 동안: 어디에 놓일지 판정 · 미리 보기 ----------
 
   judge() {
     const d = this.drag;
@@ -330,10 +374,10 @@ class MoveBar {
     b.textContent = d.drop?.kind === 'swap' ? '⇅ 맞바꾸기' : d.drop?.kind === 'insert' ? '↳ 여기에 넣기' : '';
     b.hidden = !d.drop;
     b.style.left = `${Math.min(window.innerWidth - 120, d.x + 16)}px`;
-    b.style.top = `${d.y + (d.pointerType === 'touch' ? -44 : 14)}px`;
+    b.style.top = `${d.y + (d.kind === 'touch' ? -44 : 14)}px`; // 터치: 손가락에 가리지 않게 위로
   }
 
-  // 끄는 줄은 손가락·마우스를 따라오고, 다른 줄들은 놓았을 때의 자리로 미끄러진다
+  // 끄는 줄은 손을 따라오고, 다른 줄들은 놓았을 때의 자리로 미끄러진다
   preview() {
     const d = this.drag;
     const { tops, slots, positions, heights, scale } = d;
@@ -341,7 +385,7 @@ class MoveBar {
     const order = previewOrder(positions.length, s, d.drop);
     const bottom = tops.at(-1) + heights.at(-1);
     let follow = d.y + (d.scroller?.scrollTop ?? 0) - d.startY;
-    follow = Math.min(bottom - heights[s] + 6, Math.max(tops[0] - 6, tops[s] + follow)) - tops[s];
+    follow = Math.min(bottom - heights[s] + 8, Math.max(tops[0] - 8, tops[s] + follow)) - tops[s];
     const specs = [];
     let y = tops[0];
     order.forEach((i) => {
@@ -362,34 +406,115 @@ class MoveBar {
     if (!d) return;
     cancelAnimationFrame(d.raf);
     clearInterval(d.timer);
-    window.removeEventListener('pointermove', this.onMove, { capture: true, passive: false });
-    window.removeEventListener('pointerup', this.onUp, true);
-    window.removeEventListener('pointercancel', this.onUp, true);
-    window.removeEventListener('keydown', this.onKey, true);
+    const io = INPUT[d.kind];
+    window.removeEventListener(io.move, d.move, LISTEN);
+    window.removeEventListener(io.up, d.up, LISTEN);
+    if (io.cancel) window.removeEventListener(io.cancel, d.cancel, LISTEN);
+    window.removeEventListener('keydown', d.key, true);
+    window.removeEventListener('selectstart', d.stop, true);
+    window.removeEventListener('contextmenu', d.stop, true);
     d.badge.remove();
-    this.bar.classList.remove('dragging');
     document.body.classList.remove('mk-block-dragging');
     this.drag = null;
+    // 끈 뒤 따라오는 클릭(파일 열기·링크 열기)은 먹는다
+    const swallow = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener('click', swallow, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener('click', swallow, true), 400);
     const { view } = this;
     if (view.isDestroyed) return;
     this.decorate([]);
     if (commit && d.drop) {
-      const block = contentBlockAt(view.state) ?? d.block;
+      const block = blockInfo(view.state.doc, d.block.pos, d.block.inner) ?? d.block;
       const tr = reorderTr(view.state, block, previewOrder(d.positions.length, d.block.index, d.drop));
       if (tr) {
         view.dispatch(tr);
         this.flash();
       }
     }
-    this.update(view);
+  }
+
+  // 옮긴 줄이 잠깐 반짝여 어디로 갔는지 보여 준다
+  flash() {
+    const { view } = this;
+    const block = contentBlockAt(view.state);
+    if (!block) return;
+    this.decorate([{ pos: block.pos, cls: 'mk-block-dropped' }]);
+    clearTimeout(this.flashTimer);
+    this.flashTimer = setTimeout(() => {
+      if (!this.drag && !this.pressing && !view.isDestroyed) this.decorate([]);
+    }, 700);
+  }
+
+  decorate(specs) {
+    const { view } = this;
+    const { doc } = view.state;
+    const decos = [];
+    for (const { pos, cls, style } of specs) {
+      const node = doc.nodeAt(pos);
+      if (!node) continue;
+      const attrs = {};
+      if (cls) attrs.class = cls;
+      if (style) attrs.style = style;
+      decos.push(Decoration.node(pos, pos + node.nodeSize, attrs));
+    }
+    view.dispatch(view.state.tr.setMeta(blockMoveKey, DecorationSet.create(doc, decos)).setMeta('addToHistory', false));
+  }
+
+  // ---------- 처음 한 번: 내용을 고르면 옮기는 방법 안내 ----------
+
+  update(view) {
+    this.view = view;
+    if (this.drag || this.pressing) return;
+    const block = view.editable ? contentBlockAt(view.state) : null;
+    const key = block ? `${block.pos}` : null;
+    if (key === this.lastBlock) return;
+    this.lastBlock = key;
+    if (!block || block.count < 2) return this.hideHint();
+    let seen = false;
+    try {
+      seen = localStorage.getItem(HINT_KEY) === '1';
+    } catch {
+      seen = true;
+    }
+    if (seen) return;
+    const dom = view.nodeDOM(block.pos);
+    if (!(dom instanceof Element)) return;
+    try {
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+      // 다음에 또 보여도 괜찮다
+    }
+    this.hideHint();
+    const hint = document.createElement('div');
+    hint.className = 'mk-move-hint';
+    hint.setAttribute('role', 'status');
+    hint.textContent = coarse() ? '꾹 눌러 끌면 다른 줄로 옮겨요' : '끌어서 다른 줄로 옮길 수 있어요 · Alt+↑↓';
+    document.body.append(hint);
+    const r = dom.getBoundingClientRect();
+    const w = hint.offsetWidth;
+    hint.style.left = `${Math.round(Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)))}px`;
+    // 내용이 넉넉하면 그 위 아래쪽에 얹고(다른 글을 가리지 않게), 작으면 바로 아래에
+    const h = hint.offsetHeight;
+    const top = r.height > h * 3 ? r.bottom - h - 12 : r.bottom + 8;
+    hint.style.top = `${Math.round(Math.max(8, Math.min(window.innerHeight - h - 8, top)))}px`;
+    this.hint = hint;
+    this.hintTimer = setTimeout(() => this.hideHint(), 3600);
+  }
+
+  hideHint() {
+    clearTimeout(this.hintTimer);
+    this.hint?.remove();
+    this.hint = null;
   }
 
   destroy() {
+    this.cancelPress();
     if (this.drag) this.finish(false);
     clearTimeout(this.flashTimer);
-    window.removeEventListener('scroll', this.reposition, true);
-    window.removeEventListener('resize', this.reposition);
-    this.bar.remove();
+    this.hideHint();
   }
 }
 

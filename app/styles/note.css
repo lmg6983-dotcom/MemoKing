@@ -1090,42 +1090,48 @@ body.bar-hidden .format-bar { margin-bottom: calc(-1 * var(--bar-h, 38px)); opac
 .mk-doc li.mk-swap-target::after { border-color: #7a4dff !important; }
 @media (prefers-reduced-motion: reduce) { .mk-drag-badge, .mk-doc li.mk-dropped { animation: none; } }
 
-/* ---------- 그림·소리·동영상·파일·링크 카드 줄 옮기기 (block-move.js) ---------- */
-.mk-move-bar {
-  position: fixed; z-index: 40;
-  display: flex; align-items: center; gap: 2px;
-  padding: 3px;
-  border-radius: 10px;
-  background: #111; color: #fff;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
-  animation: mk-badge-in 0.12s ease-out;
+/* ---------- 그림·소리·동영상·파일·링크 카드 줄 옮기기 (block-move.js) — 내용 자체를 잡아 끈다 ---------- */
+/* 마우스를 올리면 "잡을 수 있다" (손 모양 + 흐린 점선), 끄는 동안 "잡고 있다" */
+@media (hover: hover) {
+  .mk-doc[contenteditable="true"] img.mk-image { cursor: grab; }
+  .mk-doc[contenteditable="true"] img.mk-image:hover,
+  .mk-doc[contenteditable="true"] .mk-link-card:hover {
+    outline: 1.5px dashed color-mix(in srgb, var(--note-text) 35%, transparent); outline-offset: 3px;
+  }
 }
-.mk-move-bar[hidden] { display: none; }
-.mk-move-btn {
-  display: grid; place-items: center;
-  width: 30px; height: 30px; padding: 0;
-  border: 0; border-radius: 7px;
-  background: transparent; color: inherit; cursor: pointer;
-}
-.mk-move-btn svg { width: 17px; height: 17px; }
-.mk-move-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
-.mk-move-btn:disabled { opacity: 0.32; cursor: default; }
-.mk-move-grip { cursor: grab; touch-action: none; }
-.mk-move-bar.dragging { opacity: 0; pointer-events: none; }
+.mk-doc img.mk-image, .mk-doc .mk-media, .mk-doc .mk-link-card { -webkit-touch-callout: none; -webkit-user-drag: none; }
 body.mk-block-dragging, body.mk-block-dragging * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
-.mk-doc > .mk-block-sorting, .mk-doc .mk-block-sorting { transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
+body.mk-block-dragging .mk-doc img.mk-image:hover, body.mk-block-dragging .mk-doc .mk-link-card:hover { outline: none; }
+/* 터치: 꾹 누르는 동안 테두리가 점점 진해진다 */
+.mk-doc .mk-block-pressing { border-radius: 8px; animation: mk-block-press 0.32s ease-in forwards; }
+@keyframes mk-block-press {
+  from { box-shadow: 0 0 0 2px color-mix(in srgb, var(--note-text) 10%, transparent); transform: scale(1); }
+  to { box-shadow: 0 0 0 2px color-mix(in srgb, var(--note-text) 70%, transparent); transform: scale(0.985); }
+}
+.mk-doc .mk-block-sorting { transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .mk-doc .mk-block-lift {
   position: relative; z-index: 3;
   border-radius: 8px;
-  outline: 2px solid var(--note-text); outline-offset: 2px;
   background: var(--note-bg);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24), 0 0 0 4px var(--note-bg), 0 0 0 6px var(--note-text);
+  opacity: 0.96;
+  width: fit-content; max-width: 100%; /* 들어 올린 틀은 내용 크기에 맞게 (높이는 그대로라 다른 줄 자리 계산은 같다) */
 }
-.mk-doc .mk-block-swap-target { border-radius: 8px; outline: 2px dashed #7a4dff; outline-offset: 2px; }
+p.mk-block-lift:has(> .mk-file), p.mk-block-lift:has(> a) { padding-right: 2px; }
+body.mk-block-dragging .mk-doc .ProseMirror-selectednode { outline: none; }
+.mk-doc .mk-block-lift > * { animation: mk-lift-in 0.18s ease-out both; }
+.mk-doc .mk-block-swap-target { border-radius: 8px; outline: 2px dashed #7a4dff; outline-offset: 2px; background: color-mix(in srgb, #7a4dff 8%, transparent); }
 .mk-doc .mk-block-dropped { border-radius: 8px; animation: mk-dropped 0.7s ease-out; }
-@media (pointer: coarse) {
-  .mk-move-btn { width: 40px; height: 40px; }
-  .mk-move-btn svg { width: 20px; height: 20px; }
+/* 처음 한 번 옮기는 방법 안내 */
+.mk-move-hint {
+  position: fixed; z-index: 60; pointer-events: none;
+  padding: 6px 12px; border-radius: 99px;
+  background: #111; color: #fff; font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  animation: mk-hint 3.6s ease-out forwards;
 }
-@media (prefers-reduced-motion: reduce) { .mk-doc .mk-block-sorting { transition: none; } }
-@media print { .mk-move-bar { display: none !important; } }
+@keyframes mk-hint { 0% { opacity: 0; transform: translateY(4px); } 6%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .mk-doc .mk-block-sorting, .mk-doc .mk-block-lift > *, .mk-doc .mk-block-pressing { transition: none; animation: none; }
+}
+@media print { .mk-move-hint { display: none !important; } }

@@ -252,31 +252,52 @@ try {
   check('목록: 다 끝낸 메모 카드에 CLEAR 도장', (await page.locator('.card[data-id="00000000-0000-4000-8000-000000000001"] .card-clear').count()) === 1);
   await shot('05c-list-clear');
 
-  // 그림을 누르면 줄 옮기기 막대 → 아래로 (글 줄과 자리 바꿈)
+  // 그림·파일 줄 옮기기: 버튼 없이 내용 자체를 꾹 눌러 끈다
   await page.tap('.card[data-id="00000000-0000-4000-8000-000000000002"]');
   await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
   await page.waitForTimeout(400);
   await page.locator('.mk-doc img.mk-image').first().tap();
   await page.waitForTimeout(200);
-  check('그림 줄 옮기기: 그림을 누르면 막대', await page.isVisible('.mk-move-bar'));
-  await shot('06-move-bar');
-  await page.tap('.mk-move-bar [aria-label="아래로"]');
+  check('그림 줄 옮기기: 처음 한 번 옮기는 방법 안내', (await page.textContent('.mk-move-hint').catch(() => '')).includes('꾹 눌러'));
+  await shot('06-move-hint');
+  check('그림 줄 옮기기: 따로 버튼·손잡이 없음', (await page.locator('.mk-move-bar, .mk-move-grip').count()) === 0);
+  const img = await page.locator('.mk-doc img.mk-image').first().boundingBox();
+  const textLine = await page.locator('.mk-doc p', { hasText: '새 아이콘 시안' }).boundingBox();
+  // 꾹 누르기 전에 밀면 스크롤 (옮기지 않음)
+  await touch('touchStart', img.x + 60, img.y + 60);
+  await touch('touchMove', img.x + 60, img.y + 120);
+  await page.waitForTimeout(500);
+  check('그림 줄 옮기기: 그냥 밀면 들어 올리지 않음', (await page.locator('.mk-block-lift').count()) === 0);
+  await touch('touchEnd', 0, 0);
+  // 꾹 눌러 들어 올려 아래 글 줄 가운데로 → 맞바꾸기
+  await touch('touchStart', img.x + 60, img.y + 60);
+  await page.waitForTimeout(200);
+  check('그림 줄 옮기기: 누르는 동안 테두리', (await page.locator('.mk-block-pressing').count()) === 1);
+  await page.waitForTimeout(350);
+  check('그림 줄 옮기기: 꾹 누르면 들어 올림', (await page.locator('.mk-block-lift').count()) === 1);
+  const to = textLine.y + textLine.height / 2;
+  for (let i = 1; i <= 8; i++) await touch('touchMove', img.x + 60, img.y + 60 + ((to - img.y - 60) * i) / 8);
+  await page.waitForTimeout(120);
+  check('그림 줄 옮기기: 맞바꾸기 안내', (await page.textContent('.mk-drag-badge')).includes('맞바꾸기'));
+  await shot('06b-move-drag');
+  await touch('touchEnd', 0, 0);
   await page.waitForTimeout(900);
   let logo = read('로고 사진.md');
-  check('그림 줄 옮기기: 아래 줄과 맞바꿈', logo.indexOf('새 아이콘 시안') < logo.indexOf('![로고]'), logo);
-  check('그림 줄 옮기기: 옮긴 뒤에도 그림이 골라져 있음', await page.isVisible('.mk-move-bar'));
-  // ⠿ 를 끌어 맨 위(제목 줄 가운데)로 → 제목과 맞바꿈 대신 위로 끼우기 확인
-  const grip = await page.locator('.mk-move-bar .mk-move-grip').boundingBox();
-  const h1 = await page.locator('.mk-doc h1').boundingBox();
-  await touch('touchStart', grip.x + grip.width / 2, grip.y + grip.height / 2);
-  for (let i = 1; i <= 8; i++) await touch('touchMove', grip.x + grip.width / 2, grip.y + grip.height / 2 + ((h1.y + h1.height + 4 - grip.y - grip.height / 2) * i) / 8);
-  await page.waitForTimeout(100);
-  await shot('06b-move-drag');
+  check('그림 줄 옮기기: 글 줄과 맞바꿈', logo.indexOf('새 아이콘 시안') < logo.indexOf('![로고]'), logo);
+  // 다시 꾹 눌러 제목과 글 줄 사이로 → 끼우기
+  const img2 = await page.locator('.mk-doc img.mk-image').first().boundingBox();
+  const text2 = await page.locator('.mk-doc p', { hasText: '새 아이콘 시안' }).boundingBox();
+  await touch('touchStart', img2.x + 60, img2.y + 60);
+  await page.waitForTimeout(550);
+  const to2 = text2.y + 3;
+  for (let i = 1; i <= 8; i++) await touch('touchMove', img2.x + 60, img2.y + 60 + ((to2 - img2.y - 60) * i) / 8);
+  await page.waitForTimeout(120);
+  check('그림 줄 옮기기: 끼우기 안내', (await page.textContent('.mk-drag-badge')).includes('넣기'));
   await touch('touchEnd', 0, 0);
   await page.waitForTimeout(900);
   logo = read('로고 사진.md');
   const order = ['# 로고 사진', '![로고]', '새 아이콘 시안'].map((t) => logo.indexOf(t));
-  check('그림 줄 옮기기: ⠿ 끌어서 제목 바로 아래로', order[0] < order[1] && order[1] < order[2], logo);
+  check('그림 줄 옮기기: 제목 바로 아래로 끼움', order[0] < order[1] && order[1] < order[2], logo);
   await back();
   await page.waitForTimeout(300);
 
