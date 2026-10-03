@@ -1068,8 +1068,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       if (text) data.setData('text/plain', text);
       view().dom.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
     },
-    insertItems(items) {
-      if (items.length) insertBlocks(view().state.doc.content.size, items);
+    // atCursor: 커서 자리에 (안드로이드에서 앱이 저장해 둔 파일을 넣을 때). 기본은 문서 끝
+    insertItems(items, { atCursor = false } = {}) {
+      if (items.length) insertBlocks(atCursor ? view().state.selection.from : view().state.doc.content.size, items);
     },
     // 문서를 통째로 다시 쓰지 않고 끝에 끼워 넣는다 (받는 중인 사진의 주소 교체와 엇갈리지 않게)
     appendMarkdown(md) {

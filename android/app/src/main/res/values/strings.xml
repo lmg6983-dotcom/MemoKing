@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">메모킹</string>
+    <string name="share_label">메모킹에 메모하기</string>
+    <string name="shortcut_new">새 메모</string>
+    <string name="shortcut_new_long">새 메모 쓰기</string>
+    <string name="channel_reminders">예약 알림</string>
+    <string name="channel_reminders_desc">메모에 예약한 알림이 울려요</string>
+</resources>

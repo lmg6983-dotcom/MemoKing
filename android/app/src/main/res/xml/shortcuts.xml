@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 앱 아이콘을 길게 누르면 나오는 바로가기 -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="new_memo"
+        android:shortcutLongLabel="@string/shortcut_new_long"
+        android:shortcutShortLabel="@string/shortcut_new">
+        <intent
+            android:action="com.memoking.app.NEW_MEMO"
+            android:targetClass="com.memoking.app.MainActivity"
+            android:targetPackage="com.memoking.app" />
+    </shortcut>
+</shortcuts>

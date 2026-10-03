@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 알림 막대의 작은 아이콘: 메모킹 왕관 (app/js/icons.js 의 crown 과 같은 모양) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,7l4.5,4L12,4l4.5,7L21,7l-2,12H5L3,7z" />
+</vector>

@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' blob:; font-src 'self'">
+  <meta name="color-scheme" content="light dark">
+  <title>메모킹</title>
+  <link rel="stylesheet" href="../app/vendor/prosemirror.css">
+  <link rel="stylesheet" href="../app/vendor/plyr.css">
+  <link rel="stylesheet" href="../app/styles/base.css">
+  <link rel="stylesheet" href="../app/styles/note.css">
+  <link rel="stylesheet" href="styles/mobile.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <!-- ========== 처음: 메모 폴더 고르기 ========== -->
+  <section id="setup" class="screen setup" hidden>
+    <img class="setup-logo" src="../app/assets/mark-256.png" alt="메모킹" draggable="false">
+    <h1>반가워요, 메모킹이에요</h1>
+    <h2 class="setup-sub">메모를 어디에 보관할까요?</h2>
+    <p>메모 하나가 폴더 안의 <b>파일 하나</b>로 보관돼요.</p>
+    <div class="setup-choices">
+      <button id="choose-folder" class="choice">
+        <svg><use href="#i-folder"/></svg>
+        <span><b>폴더 고르기</b><small>PC 메모킹과 같은 메모를 쓰려면 이걸 골라요. 동기화 앱이 맞춰 주는 폴더를 고르면 돼요</small></span>
+      </button>
+      <button id="use-internal" class="choice">
+        <svg><use href="#i-phone"/></svg>
+        <span><b>이 휴대폰에만 보관하기</b><small>바로 시작해요. 나중에 설정에서 폴더를 바꿀 수 있어요</small></span>
+      </button>
+    </div>
+    <details class="setup-help">
+      <summary>PC와 같은 메모를 쓰려면?</summary>
+      <p>PC 메모킹은 Google Drive 같은 폴더에 메모를 보관해요. 휴대폰에서는
+        <b>FolderSync</b>·<b>Autosync for Google Drive</b>·<b>Syncthing</b> 같은 동기화 앱으로 그 폴더를 휴대폰의 폴더와 맞춘 뒤,
+        여기서 그 폴더를 고르면 돼요.</p>
+    </details>
+    <p id="setup-error" class="setup-error" hidden></p>
+  </section>
+
+  <!-- ========== 메모 목록 ========== -->
+  <section id="list-screen" class="screen list-screen" hidden>
+    <header class="top">
+      <img class="brand-icon" src="../app/assets/mark-64.png" alt="" draggable="false">
+      <span class="brand">메모킹</span>
+      <span class="grow"></span>
+      <button id="layout-btn" class="icon-btn" aria-label="카드 모양 바꾸기"><svg><use href="#i-rows"/></svg></button>
+      <button id="settings-btn" class="icon-btn" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
+    </header>
+
+    <div class="searchbar">
+      <label class="search">
+        <svg class="search-icon"><use href="#i-search"/></svg>
+        <input id="search" type="search" placeholder="메모 검색 · #태그" aria-label="메모 검색" autocomplete="off" enterkeyhint="search">
+      </label>
+      <button id="filter-btn" class="icon-btn filter-btn" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="보기">
+      <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
+      <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-bell"/></svg>알림 예약 <span class="tab-count" id="count-reminders"></span></button>
+    </nav>
+
+    <div class="view" id="view-memos" role="tabpanel">
+      <div id="filter-panel" class="filter-panel" hidden>
+        <div class="filter-group"><span class="filter-label">색</span><div id="color-filter" class="color-filter" role="group" aria-label="색으로 거르기"></div></div>
+        <div class="filter-group"><span class="filter-label">담긴 것</span><div id="kind-filter" class="chip-row" role="group" aria-label="담긴 것으로 거르기"></div></div>
+      </div>
+      <div id="tag-strip" class="tag-strip" role="group" aria-label="태그로 거르기" hidden></div>
+      <div id="filter-summary" class="filter-summary" hidden>
+        <span id="filter-summary-text"></span>
+        <button id="filter-clear" class="link-btn">모두 지우기</button>
+      </div>
+      <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
+      <p id="empty" class="empty" hidden></p>
+    </div>
+
+    <div class="view" id="view-reminders" role="tabpanel" hidden>
+      <div id="reminder-groups" class="rows"></div>
+      <p id="reminders-empty" class="empty" hidden>예약한 알림이 없어요.<br>메모를 열고 위쪽 종 버튼으로 추가할 수 있어요.</p>
+    </div>
+
+    <button id="fab" class="fab" aria-label="새 메모"><svg><use href="#i-plus"/></svg></button>
+  </section>
+
+  <!-- ========== 메모 ========== -->
+  <section id="note-screen" class="screen note-screen" data-color="yellow" hidden>
+    <header class="bar">
+      <button id="back-btn" class="icon-btn" aria-label="목록으로 · 자동으로 저장돼요"><svg><use href="#i-back"/></svg></button>
+      <span id="status" class="status" role="status"></span>
+      <button id="bell-btn" class="icon-btn count-btn bell-btn" aria-label="예약 알림">
+        <svg><use href="#i-bell"/></svg><span id="bell-count" class="count"></span>
+      </button>
+      <button id="links-btn" class="icon-btn links-btn" aria-label="메모 연결">
+        <svg><use href="#i-link"/></svg><span id="links-count" class="count"></span>
+      </button>
+      <button id="menu-btn" class="icon-btn" aria-label="메뉴" aria-haspopup="true"><svg><use href="#i-more"/></svg></button>
+    </header>
+
+    <div id="banner" class="banner" hidden>
+      <span id="banner-text"></span>
+      <button id="banner-load" class="banner-btn primary">바뀐 내용 보기</button>
+      <button id="banner-keep" class="banner-btn">지금 내용 두기</button>
+    </div>
+
+    <div id="alarm-banner" class="banner alarm-banner" role="alert" hidden>
+      <svg><use href="#i-bell"/></svg>
+      <span id="alarm-text"></span>
+      <button id="alarm-ok" class="banner-btn primary">확인했어요</button>
+    </div>
+
+    <main id="editor" class="editor"></main>
+
+    <div id="table-bar" class="table-bar" role="toolbar" aria-label="표" hidden>
+      <button type="button" data-table="addRow">행 추가</button>
+      <button type="button" data-table="addCol">열 추가</button>
+      <span class="table-bar-sep"></span>
+      <button type="button" data-table="delRow">행 지우기</button>
+      <button type="button" data-table="delCol">열 지우기</button>
+      <button type="button" data-table="delTable" class="danger">표 지우기</button>
+    </div>
+    <!-- 서식 도구막대: 휴대폰에서는 옆으로 밀어서 더 보기 -->
+    <footer class="format-bar" id="format-bar" role="toolbar" aria-label="서식">
+      <div class="format-items" id="format-items">
+        <button data-action="file" aria-label="사진·파일 넣기"><svg><use href="#i-clip"/></svg></button>
+        <button data-action="camera" aria-label="사진 넣기"><svg><use href="#i-image"/></svg></button>
+        <span class="sep"></span>
+        <button data-cmd="task" aria-label="체크리스트"><svg><use href="#i-task"/></svg></button>
+        <button data-cmd="bullet" aria-label="점 목록"><svg><use href="#i-bullet"/></svg></button>
+        <button data-cmd="ordered" aria-label="번호 목록"><svg><use href="#i-ordered"/></svg></button>
+        <span class="sep"></span>
+        <button data-cmd="bold" aria-label="굵게"><b>B</b></button>
+        <button data-cmd="italic" aria-label="기울임"><i>I</i></button>
+        <button data-cmd="underline" aria-label="밑줄"><u>U</u></button>
+        <button data-cmd="strike" aria-label="취소선"><s>S</s></button>
+        <button data-action="color" class="swatch-btn" aria-label="글자 색" aria-haspopup="true">
+          <span class="glyph">A</span><span class="swatch-bar" data-bar="color"></span>
+        </button>
+        <button data-action="highlight" class="swatch-btn" aria-label="형광펜" aria-haspopup="true">
+          <svg><use href="#i-highlighter"/></svg><span class="swatch-bar" data-bar="highlight"></span>
+        </button>
+        <span class="sep"></span>
+        <button data-cmd="h1" aria-label="제목 1">H1</button>
+        <button data-cmd="h2" aria-label="제목 2">H2</button>
+        <button data-cmd="quote" aria-label="인용"><svg><use href="#i-quote"/></svg></button>
+        <button data-action="table" aria-label="표 넣기"><svg><use href="#i-table"/></svg></button>
+        <button data-action="tag" aria-label="태그 넣기"><svg><use href="#i-tag"/></svg></button>
+        <span class="sep"></span>
+        <button data-action="undo" aria-label="되돌리기"><svg><use href="#i-undo"/></svg></button>
+        <button data-action="redo" aria-label="다시 하기"><svg><use href="#i-redo"/></svg></button>
+        <button data-action="done" class="done-btn" aria-label="키보드 닫기"><svg><use href="#i-keyboard-down"/></svg></button>
+      </div>
+    </footer>
+
+    <div id="palette" class="pop palette" role="menu" hidden>
+      <div class="palette-title" id="palette-title"></div>
+      <div class="palette-swatches" id="palette-swatches"></div>
+      <button class="palette-clear" id="palette-clear" type="button">색 지우기</button>
+    </div>
+  </section>
+
+  <!-- ========== 아래에서 올라오는 시트 ========== -->
+  <div id="scrim" class="scrim" hidden></div>
+
+  <!-- 메모 메뉴 (메모 화면 ⋮ · 목록 카드를 길게 누르기) -->
+  <section id="memo-sheet" class="sheet" role="dialog" aria-labelledby="memo-sheet-title" hidden>
+    <div class="sheet-grip"></div>
+    <h3 id="memo-sheet-title" class="sheet-title"></h3>
+    <div class="swatches" id="swatches" role="radiogroup" aria-label="메모 색"></div>
+    <button class="menu-item" data-memo-action="open"><svg><use href="#i-note"/></svg><span>열기</span></button>
+    <button class="menu-item" data-memo-action="pin"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
+    <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>다른 앱으로 보내기</span></button>
+    <button class="menu-item" data-memo-action="copy"><svg><use href="#i-copy"/></svg><span>글 복사하기</span></button>
+    <button class="menu-item" data-memo-action="print"><svg><use href="#i-pdf"/></svg><span>PDF로 저장 · 인쇄</span></button>
+    <button class="menu-item danger" data-memo-action="delete"><svg><use href="#i-trash"/></svg><span>메모 지우기</span></button>
+  </section>
+
+  <!-- 예약 알림 (app/js/reminder-panel.js 가 다루는 요소들 — 데스크탑 note.html 과 같은 id) -->
+  <aside id="reminder-panel" class="sheet links-panel reminder-panel" hidden>
+    <div class="sheet-grip"></div>
+    <header class="links-head">
+      <b>알림 예약</b>
+      <button id="reminder-close" class="icon-btn" aria-label="알림 예약 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <ul id="reminder-list" class="reminder-list"></ul>
+
+    <form id="reminder-form" class="reminder-form">
+      <h4>새 알림</h4>
+      <div class="seg" id="rem-kind" role="radiogroup" aria-label="알림 종류">
+        <button type="button" data-kind="timer" aria-checked="true">타이머</button>
+        <button type="button" data-kind="at" aria-checked="false">날짜·시간</button>
+        <button type="button" data-kind="repeat" aria-checked="false">반복</button>
+        <button type="button" data-kind="startup" aria-checked="false">켤 때</button>
+      </div>
+
+      <div class="rem-pane" data-pane="timer">
+        <div class="chips" id="timer-presets">
+          <button type="button" data-min="5">5분</button>
+          <button type="button" data-min="10" aria-pressed="true">10분</button>
+          <button type="button" data-min="30">30분</button>
+          <button type="button" data-min="60">1시간</button>
+          <button type="button" data-min="180">3시간</button>
+        </div>
+        <label class="rem-row">직접 <input type="number" id="timer-min" min="1" max="10080" value="10" inputmode="numeric"> 분 뒤</label>
+      </div>
+
+      <div class="rem-pane" data-pane="at" hidden>
+        <label class="rem-row"><input type="datetime-local" id="at-input"></label>
+      </div>
+
+      <div class="rem-pane" data-pane="repeat" hidden>
+        <label class="rem-row">
+          <select id="rep-every">
+            <option value="day">매일</option>
+            <option value="week">매주</option>
+            <option value="month">매월</option>
+            <option value="year">매년</option>
+          </select>
+          <span id="rep-date" class="rem-inline">
+            <span id="rep-month-wrap"><input type="number" id="rep-month" min="1" max="12" value="1" inputmode="numeric"> 월</span>
+            <span id="rep-day-wrap"><input type="number" id="rep-day" min="1" max="31" value="1" inputmode="numeric"> 일</span>
+          </span>
+          <input type="time" id="rep-time" value="09:00">
+        </label>
+        <div class="chips weekdays" id="rep-weekdays" hidden>
+          <button type="button" data-wd="1">월</button><button type="button" data-wd="2">화</button><button type="button" data-wd="3">수</button>
+          <button type="button" data-wd="4">목</button><button type="button" data-wd="5">금</button><button type="button" data-wd="6">토</button>
+          <button type="button" data-wd="0">일</button>
+        </div>
+      </div>
+
+      <div class="rem-pane" data-pane="startup" hidden>
+        <label class="rem-radio"><input type="radio" name="startup" value="every" checked> 메모킹을 켤 때마다</label>
+        <label class="rem-radio"><input type="radio" name="startup" value="daily"> 하루에 한 번, 처음 켤 때</label>
+        <label class="rem-radio"><input type="radio" name="startup" value="once"> 다음에 켤 때 한 번만</label>
+      </div>
+
+      <div class="rem-action" role="radiogroup" aria-label="알림 방식">
+        <label class="rem-radio"><input type="radio" name="action" value="notify" checked> 알림만 보내기 <small>알림 막대에 떠요</small></label>
+        <label class="rem-radio"><input type="radio" name="action" value="open"> 메모 띄우기 <small>메모킹이 열려 있으면 메모가 바로 열려요</small></label>
+      </div>
+      <button type="submit" class="btn primary rem-submit">알림 추가하기</button>
+    </form>
+  </aside>
+
+  <aside id="links-panel" class="sheet links-panel" hidden>
+    <div class="sheet-grip"></div>
+    <header class="links-head">
+      <b>메모 연결</b>
+      <button id="links-close" class="icon-btn" aria-label="메모 연결 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <input id="link-search" class="link-search" type="search" placeholder="연결할 메모 찾기" autocomplete="off">
+    <ul id="link-results" class="link-list"></ul>
+    <h4>연결한 메모</h4>
+    <ul id="links-out" class="link-list"></ul>
+    <h4>이 메모를 연결한 곳</h4>
+    <ul id="links-in" class="link-list"></ul>
+    <h4>비슷한 메모 <small>내용이 닮은 메모를 골랐어요</small></h4>
+    <ul id="links-suggest" class="link-list"></ul>
+  </aside>
+
+  <!-- 설정 -->
+  <section id="settings-sheet" class="sheet settings-sheet" role="dialog" aria-label="설정" hidden>
+    <div class="sheet-grip"></div>
+    <h2 class="sheet-title">설정</h2>
+    <p class="label">메모 폴더</p>
+    <div class="path-box" id="vault-path"></div>
+    <div class="sheet-actions">
+      <button id="change-vault" class="btn">폴더 바꾸기</button>
+      <button id="use-internal-2" class="btn">이 휴대폰에만 보관</button>
+    </div>
+    <p class="hint">PC와 같은 메모를 쓰려면 동기화 앱(FolderSync·Autosync·Syncthing 등)으로 PC 메모 폴더와 맞춘 휴대폰 폴더를 고르세요.</p>
+
+    <p class="label">알림</p>
+    <div class="setting-row" id="notify-row">
+      <span>예약 알림 <small id="notify-note"></small></span>
+      <button id="notify-btn" class="btn small">알림 허용하기</button>
+    </div>
+
+    <p class="label">지운 메모</p>
+    <div class="sheet-actions">
+      <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
+    </div>
+    <label class="setting-row select-row">
+      <span>오래된 메모 자동 영구 삭제 <small>휴지통에 이 기간보다 오래 있던 메모를 지워요</small></span>
+      <select id="trash-days" aria-label="자동 영구 삭제 기간">
+        <option value="7">7일 뒤</option>
+        <option value="30">30일 뒤</option>
+        <option value="90">90일 뒤</option>
+        <option value="365">1년 뒤</option>
+        <option value="0">하지 않음</option>
+      </select>
+    </label>
+    <p class="version" id="version"></p>
+    <p class="copyright">© 2026 메모킹 · 만든 사람 lmg6983@gmail.com</p>
+  </section>
+
+  <!-- 휴지통 -->
+  <section id="trash-sheet" class="sheet trash-sheet" role="dialog" aria-label="휴지통" hidden>
+    <div class="sheet-grip"></div>
+    <h2 class="sheet-title">휴지통</h2>
+    <p class="trash-note" id="trash-note"></p>
+    <ul id="trash-list" class="trash-list" aria-label="지운 메모"></ul>
+    <p id="trash-empty" class="empty trash-empty" hidden>휴지통이 비어 있어요.</p>
+    <div class="sheet-actions">
+      <button id="trash-clear" class="btn danger">휴지통 비우기</button>
+    </div>
+  </section>
+
+  <dialog id="confirm-dialog" class="dialog">
+    <form method="dialog">
+      <p id="confirm-message"></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn">취소</button>
+        <button value="ok" class="btn danger" id="confirm-ok">지우기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

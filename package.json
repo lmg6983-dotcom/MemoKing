@@ -2,7 +2,7 @@
   "name": "memoking",
   "productName": "MemoKing",
   "version": "0.16.5",
-  "description": "메모킹 — 폴더 기반 스티커 메모 앱 (데스크탑 · 안드로이드 예정)",
+  "description": "메모킹 — 폴더 기반 스티커 메모 앱 (데스크탑 · 안드로이드)",
   "type": "module",
   "main": "desktop/main.js",
   "private": true,
@@ -16,7 +16,9 @@
     "vendor": "node scripts/build-vendor.mjs",
     "icons": "node scripts/build-icons.mjs",
     "dist": "node scripts/build-dist.mjs",
-    "stage": "node scripts/stage.mjs"
+    "stage": "node scripts/stage.mjs",
+    "android:preview": "node android/web/dev/server.mjs",
+    "android:smoke": "node android/web/dev/smoke.mjs"
   },
   "author": {
     "name": "lmg6983",

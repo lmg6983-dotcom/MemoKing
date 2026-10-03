@@ -2,7 +2,7 @@
 
 <img src="assets/icons/icon-256.png" alt="메모킹 아이콘" width="96">
 
-Windows 스티커 메모처럼 쓰는 메모 앱. 메모는 **지정한 폴더(예: Google Drive)의 마크다운 파일**로 저장되어 어디서든 동기화되고, LLM 에이전트가 읽기 좋은 **JSON 인덱스**가 자동으로 만들어집니다. 윈도우 데스크탑용으로 시작해 안드로이드로 확장할 예정입니다.
+Windows 스티커 메모처럼 쓰는 메모 앱. 메모는 **지정한 폴더(예: Google Drive)의 마크다운 파일**로 저장되어 어디서든 동기화되고, LLM 에이전트가 읽기 좋은 **JSON 인덱스**가 자동으로 만들어집니다. 윈도우 데스크탑과 **안드로이드**에서 같은 메모 폴더를 함께 씁니다.
 
 ## 설치 (배포판)
 
@@ -11,6 +11,14 @@ Windows 스티커 메모처럼 쓰는 메모 앱. 메모는 **지정한 폴더(�
 - 바탕화면·시작 메뉴에 **메모킹** 바로가기가 생기고, **Windows 시작 시 자동으로 알림 영역에서 실행**됩니다 (설정·트레이 메뉴에서 끌 수 있음)
 - 코드 서명 인증서가 없어서 처음 실행 때 Windows SmartScreen 경고가 뜰 수 있습니다 → **추가 정보 › 실행**
 - 지우기: Windows 설정 › 앱 › 메모킹 제거 (메모는 메모 폴더에 그대로 남음)
+
+## 안드로이드
+
+휴대폰 앱은 [`android/`](android/README.md) 에 있습니다. PC 와 같은 메모 폴더 형식(메모 파일·머리말·첨부·휴지통·LLM 인덱스)을 그대로 읽고 쓰므로, 동기화 앱(FolderSync·Autosync·Syncthing 등)으로 PC 메모 폴더와 맞춘 휴대폰 폴더를 고르면 같은 메모를 씁니다.
+
+- 설치: GitHub **Actions › Android APK** 실행 결과의 **memoking-android** (APK) 를 휴대폰에 설치
+- 목록·검색·태그·필터, PC 와 같은 편집기, 사진·파일 넣기, 다른 앱에서 공유하기 → 새 메모, 예약 알림(앱이 꺼져 있어도 울림), 메모 연결, 휴지통, PDF 저장
+- 자세한 내용: [android/README.md](android/README.md)
 
 ## 개발용 실행
 
@@ -87,6 +95,9 @@ Windows 스티커 메모처럼 쓰는 메모 앱. 메모는 **지정한 폴더(�
 | `npm run vendor` | 오픈소스 라이브러리(Milkdown, yaml, Plyr)를 `app/vendor/` 로 다시 묶기 |
 | `npm run icons` | 아이콘 시안(`assets/source/`)에서 ico·png 아이콘 다시 만들기 (ImageMagick 필요) |
 | `npm run stage -- <plan\|build\|feedback> <버전> "<요약>"` | 단계 기록 (버전·히스토리·커밋·태그·백업) |
+| `npm run android:preview` | 안드로이드 휴대폰 화면을 PC 브라우저에서 미리보기 (`http://localhost:8790/m/index.html`) |
+| `npm run android:smoke` | 안드로이드 화면 자동 점검 (휴대폰 크기 크로미움, Playwright 필요) |
+| `cd android && ./gradlew assembleDebug` | 안드로이드 APK 만들기 (JDK 17 · Android SDK) |
 
 사람이 직접 확인해야 하는 테스트 목록: [docs/MANUAL-TESTS.md](docs/MANUAL-TESTS.md)
 
@@ -100,6 +111,7 @@ app/        공용 웹 코어 (데스크탑·안드로이드 공통 UI)
   vendor/   묶어 넣은 오픈소스 (npm run vendor 로 생성)
   assets/   화면용 로고 이미지
 desktop/    Electron 셸 (창·알림 영역 관리, 메모 폴더 읽기·쓰기·감시)
+android/    안드로이드 앱 (Kotlin 셸 + 휴대폰 화면 web/, 공용 웹 코어 app/ 를 그대로 묶음)
 assets/     아이콘 원본 시안(source/)과 생성된 아이콘(icons/)
 tests/      단위 테스트
 scripts/    실행기, 라이브러리 묶기, 단계 기록·백업

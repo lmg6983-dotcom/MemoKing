@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 화면은 모두 WebView 가 그리므로 액션바 없이, 바탕은 디자인 시스템의 surface-0 -->
+    <style name="Theme.MemoKing" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/surface_0</item>
+        <item name="android:statusBarColor">@color/surface_0</item>
+        <item name="android:navigationBarColor">@color/surface_0</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:colorAccent">@color/brand_yellow</item>
+    </style>
+    <color name="surface_0">#F6F5F1</color>
+    <color name="brand_yellow">#FFCC00</color>
+</resources>

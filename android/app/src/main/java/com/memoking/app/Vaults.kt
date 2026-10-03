@@ -1,0 +1,57 @@
+package com.memoking.app
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import java.io.File
+
+/** 지금 쓰는 메모 폴더를 기억한다: "internal"(이 휴대폰에만) 또는 사용자가 고른 폴더(SAF 주소) */
+object Vaults {
+    const val INTERNAL = "internal"
+    private const val PREFS = "memoking"
+    private const val KEY = "vault"
+
+    private var cached: Pair<String, Storage>? = null
+
+    fun internalRoot(ctx: Context) = File(ctx.filesDir, "메모킹")
+
+    fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    fun spec(ctx: Context): String? = prefs(ctx).getString(KEY, null)
+
+    @Synchronized
+    fun current(ctx: Context): Storage? {
+        val spec = spec(ctx) ?: return null
+        cached?.let { (s, storage) -> if (s == spec) return storage }
+        val storage = open(ctx, spec) ?: return null
+        cached = spec to storage
+        return storage
+    }
+
+    private fun open(ctx: Context, spec: String): Storage? {
+        if (spec == INTERNAL) return FileStorage(internalRoot(ctx), "이 휴대폰 안 (메모킹 앱)")
+        val uri = Uri.parse(spec)
+        // 권한을 잃었으면(폴더를 지웠거나 앱 데이터를 옮김) 다시 골라야 한다
+        val granted = ctx.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission && it.isWritePermission }
+        return if (granted) SafStorage(ctx, uri) else null
+    }
+
+    @Synchronized
+    fun use(ctx: Context, spec: String): Storage? {
+        val storage = open(ctx, spec) ?: return null
+        val old = spec(ctx)
+        prefs(ctx).edit().putString(KEY, spec).apply()
+        cached = spec to storage
+        // 예전에 고른 폴더의 권한은 돌려준다 (앱이 붙잡을 수 있는 폴더 수에 한도가 있음)
+        if (old != null && old != spec && old != INTERNAL) {
+            try {
+                ctx.contentResolver.releasePersistableUriPermission(
+                    Uri.parse(old), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            } catch (e: SecurityException) {
+                // 이미 없음
+            }
+        }
+        return storage
+    }
+}

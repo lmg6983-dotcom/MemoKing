@@ -1,5 +1,6 @@
 // 메모 폴더 안의 첨부 파일을 화면에 보여주기 위한 주소 변환.
 // 파일에는 "attachments/a.png" 처럼 상대 경로로 저장하고, 화면에서만 memoking:// 주소로 바꾼다.
+// (안드로이드는 window.memoking.vaultBase 로 자기 주소를 알려 준다)
 
 export function vaultUrl(src) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(src)) return src; // http:, data:, blob: 는 그대로
@@ -9,7 +10,8 @@ export function vaultUrl(src) {
   } catch {
     // 이미 디코딩된 경로
   }
-  return `memoking://vault/${decoded.split('/').map(encodeURIComponent).join('/')}`;
+  const base = globalThis.memoking?.vaultBase ?? 'memoking://vault/';
+  return `${base}${decoded.split('/').map(encodeURIComponent).join('/')}`;
 }
 
 const MIME_EXT = {
