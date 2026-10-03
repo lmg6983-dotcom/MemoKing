@@ -7,6 +7,7 @@ import { setupHistoryTab } from '../../app/js/list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../../app/js/core/tags.js';
 import { COLORS } from '../../app/js/core/memo-file.js';
 import { app, COLOR_NAMES } from './state.js';
+import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog } from './ui.js';
 
 const $ = (x) => document.getElementById(x);
@@ -82,6 +83,16 @@ function renderCard(memo) {
     img.draggable = false;
     img.onerror = () => img.remove();
     card.append(img);
+  }
+
+  // 체크리스트를 모두 끝낸 메모: CLEAR 도장 (데스크탑과 같은 모양)
+  if (isAllClear(memo.tasks)) {
+    const clear = document.createElement('span');
+    clear.className = 'card-clear';
+    clear.textContent = 'CLEAR';
+    clear.setAttribute('aria-label', `체크리스트 ${memo.tasks.total}개를 모두 끝냈어요`);
+    card.classList.add('all-clear');
+    card.append(clear);
   }
 
   const foot = document.createElement('div');

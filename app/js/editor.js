@@ -24,6 +24,7 @@ import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells } from './table-extras.js';
 import { createListDrag } from './list-drag.js';
+import { createBlockMove } from './block-move.js';
 import { create as createConfetti } from '../vendor/confetti.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
@@ -1059,6 +1060,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   const media = $view(imageSchema.node, () => (node) => mediaView(node));
   const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
   const listDrag = $prose(() => createListDrag({ readOnly }));
+  const blockMove = $prose(() => createBlockMove({ readOnly }));
   const taskToggle = $prose(() => new Plugin({
     key: new PluginKey('memoking-task-toggle'),
     props: { handleDOMEvents: { mousedown: toggleTaskOnClick } },
@@ -1185,6 +1187,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(cardView)
     .use(taskToggle)
     .use(listDrag)
+    .use(blockMove)
     .use(tagHighlight)
     .use(stateWatcher)
     .create();

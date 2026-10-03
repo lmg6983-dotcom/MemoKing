@@ -1089,3 +1089,43 @@ body.bar-hidden .format-bar { margin-bottom: calc(-1 * var(--bar-h, 38px)); opac
 @keyframes mk-dropped { 0% { background: color-mix(in srgb, var(--note-text) 16%, transparent); } 100% { background: transparent; } }
 .mk-doc li.mk-swap-target::after { border-color: #7a4dff !important; }
 @media (prefers-reduced-motion: reduce) { .mk-drag-badge, .mk-doc li.mk-dropped { animation: none; } }
+
+/* ---------- 그림·소리·동영상·파일·링크 카드 줄 옮기기 (block-move.js) ---------- */
+.mk-move-bar {
+  position: fixed; z-index: 40;
+  display: flex; align-items: center; gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #111; color: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  animation: mk-badge-in 0.12s ease-out;
+}
+.mk-move-bar[hidden] { display: none; }
+.mk-move-btn {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: 7px;
+  background: transparent; color: inherit; cursor: pointer;
+}
+.mk-move-btn svg { width: 17px; height: 17px; }
+.mk-move-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.mk-move-btn:disabled { opacity: 0.32; cursor: default; }
+.mk-move-grip { cursor: grab; touch-action: none; }
+.mk-move-bar.dragging { opacity: 0; pointer-events: none; }
+body.mk-block-dragging, body.mk-block-dragging * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+.mk-doc > .mk-block-sorting, .mk-doc .mk-block-sorting { transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.mk-doc .mk-block-lift {
+  position: relative; z-index: 3;
+  border-radius: 8px;
+  outline: 2px solid var(--note-text); outline-offset: 2px;
+  background: var(--note-bg);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+.mk-doc .mk-block-swap-target { border-radius: 8px; outline: 2px dashed #7a4dff; outline-offset: 2px; }
+.mk-doc .mk-block-dropped { border-radius: 8px; animation: mk-dropped 0.7s ease-out; }
+@media (pointer: coarse) {
+  .mk-move-btn { width: 40px; height: 40px; }
+  .mk-move-btn svg { width: 20px; height: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .mk-doc .mk-block-sorting { transition: none; } }
+@media print { .mk-move-bar { display: none !important; } }

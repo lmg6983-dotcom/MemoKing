@@ -237,6 +237,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   text-align: left;
   transition: transform 0.12s ease-out;
   -webkit-touch-callout: none;
+  position: relative;
 }
 .card:active { transform: scale(0.98); }
 .cards[data-layout="rows"] .card { min-height: 0; }
@@ -621,3 +622,25 @@ h2.sheet-title { font-size: 20px; }
   .note-screen .editor { overflow: visible; padding: 0; }
   .mk-link-card .lc-remove { display: none; }
 }
+
+/* 체크리스트를 모두 끝낸 메모 카드의 CLEAR 도장 (데스크탑 list.css 와 같은 모양) */
+.card-clear {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  padding: 1px 10px 0;
+  border: 3px double #e5484d;
+  border-radius: 8px;
+  color: #e5484d;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  opacity: 0.3;
+  pointer-events: none;
+}
+.card[data-color="charcoal"] .card-clear { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.36; }
+body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.32; }
+#note-screen .clear-stamp { font-size: 38px; }

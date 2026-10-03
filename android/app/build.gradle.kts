@@ -18,7 +18,11 @@ fun secret(key: String, env: String): String {
 //   assets/www/m/    ← android/web/ (휴대폰 화면)
 val webOut = layout.buildDirectory.dir("generated/web")
 val syncWeb by tasks.registering(Sync::class) {
-    from(rootDir.resolve("../app")) { into("www/app") }
+    from(rootDir.resolve("../app")) {
+        into("www/app")
+        // 데스크탑에서만 쓰는 것 (글자 인식 OCR 15MB · 매직키 검색) 은 APK 에 넣지 않는다
+        exclude("vendor/tesseract/**", "vendor/fuzzysort.js", "ocr.html", "magic.html", "js/ocr.js", "js/magic*.js", "styles/magic.css")
+    }
     from(rootDir.resolve("web")) {
         into("www/m")
         exclude("dev/**")
@@ -34,8 +38,8 @@ android {
         applicationId = "com.memoking.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.4.3"
+        versionCode = 8
+        versionName = "0.5.0"
 
         // Google Drive 동기화용 OAuth 클라이언트 ("데스크톱 앱" 유형). 비워 두면 앱 설정에서 붙여 넣는다.
         // 넣는 곳: android/local.properties 의 memoking.googleClientId / memoking.googleClientSecret,

@@ -7,6 +7,8 @@ import {
 } from '../../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { extractTags } from '../../app/js/core/tags.js';
+import { normalizeTables } from '../../app/js/core/table-sizes.js';
+import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
 
 export const APP_DIR = '_memoking';
@@ -177,6 +179,7 @@ export class Vault extends EventTarget {
       hasFile: has('file'),
       reminderCount: entry.meta.reminders.filter((r) => r.enabled).length,
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
+      tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
     };
   }
 
@@ -209,6 +212,7 @@ export class Vault extends EventTarget {
       pinned: entry.meta.pinned,
       links: entry.meta.links,
       reminders: entry.meta.reminders,
+      tables: entry.meta.tables ?? [],
       created: entry.meta.created,
       updated: entry.meta.updated,
     };
@@ -349,6 +353,7 @@ export class Vault extends EventTarget {
     if (!entry) return null;
     if (patch.color && COLORS.includes(patch.color)) entry.meta.color = patch.color;
     if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
+    if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
     if (entry.file) this.write(entry);
     this.changed([id]);
     return this.get(id);

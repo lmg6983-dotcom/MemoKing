@@ -5,6 +5,7 @@
 //   - 다른 항목의 가운데에 놓으면 두 항목이 서로 맞바뀌고, 위·아래 가장자리(줄과 줄 사이)에 놓으면 그 사이에 끼워진다
 //   - 놓기 전에 바뀔 모습을 미리 보여 준다 (같은 목록은 항목들이 바뀔 자리로 미끄러지고, 다른 목록은 가로줄·테두리)
 //   - 하위 항목은 함께 움직인다. Esc 로 취소. 키보드: Alt+↑ / Alt+↓ 로 한 칸 위·아래로
+//   - 휴대폰(터치): 글자를 꾹(0.4초) 누르면 들어 올려지고, 손가락을 떼지 않고 끌면 같은 규칙으로 옮긴다
 import { Plugin, PluginKey, TextSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
 
@@ -12,6 +13,16 @@ export const listDragKey = new PluginKey('memoking-list-drag');
 
 export const HOLD_MS = 300; // 이만큼 누르고 있으면 들어 올림 (그동안 테두리가 점점 진해진다)
 const MOVE_TOLERANCE = 5; // 그 전에 이만큼 움직이면 글자 선택으로 본다
+export const TOUCH_HOLD_MS = 400; // 터치: 휴대폰의 글자 고르기(약 0.5초)보다 조금 먼저
+const TOUCH_TOLERANCE = 10; // 손가락은 조금 흔들린다
+
+// 마우스와 터치의 이벤트 이름·좌표를 하나로
+const INPUT = {
+  mouse: { move: 'mousemove', up: 'mouseup', cancel: null, hold: HOLD_MS, tolerance: MOVE_TOLERANCE },
+  touch: { move: 'touchmove', up: 'touchend', cancel: 'touchcancel', hold: TOUCH_HOLD_MS, tolerance: TOUCH_TOLERANCE },
+};
+const pointOf = (e) => e.touches?.[0] ?? e.changedTouches?.[0] ?? e;
+const LISTEN = { capture: true, passive: false }; // 터치로 끄는 동안 화면이 스크롤되지 않게 preventDefault 할 수 있어야 한다
 
 const isItem = (node) => node?.type.name === 'list_item';
 
@@ -114,8 +125,10 @@ export function createListDrag({ readOnly = false } = {}) {
     press = null;
     clearTimeout(p.timer);
     clearTimeout(p.markTimer);
-    window.removeEventListener('mousemove', p.move, true);
-    window.removeEventListener('mouseup', p.up, true);
+    const io = INPUT[p.kind];
+    window.removeEventListener(io.move, p.move, LISTEN);
+    window.removeEventListener(io.up, p.up, LISTEN);
+    if (io.cancel) window.removeEventListener(io.cancel, p.up, LISTEN);
     if (p.marked && !keepMark && !drag && p.view && !p.view.isDestroyed) decorate(p.view, []);
   }
 
@@ -161,10 +174,13 @@ export function createListDrag({ readOnly = false } = {}) {
     cancelAnimationFrame(d.raf);
     clearPreview(view);
     drag = null;
-    window.removeEventListener('mousemove', d.move, true);
-    window.removeEventListener('mouseup', d.up, true);
+    const io = INPUT[d.kind];
+    window.removeEventListener(io.move, d.move, LISTEN);
+    window.removeEventListener(io.up, d.up, LISTEN);
+    if (io.cancel) window.removeEventListener(io.cancel, d.cancel, LISTEN);
     window.removeEventListener('keydown', d.key, true);
     window.removeEventListener('selectstart', d.block, true);
+    window.removeEventListener('contextmenu', d.block, true);
     clearInterval(d.timer);
     d.line.remove();
     d.badge.remove();
@@ -223,8 +239,8 @@ export function createListDrag({ readOnly = false } = {}) {
     b.dataset.kind = kind ?? '';
     b.textContent = kind === 'swap' ? '⇅ 맞바꾸기' : kind === 'insert' ? '↳ 여기에 넣기' : '';
     b.hidden = !kind;
-    b.style.left = `${drag.x + 16}px`;
-    b.style.top = `${drag.y + 14}px`;
+    b.style.left = `${Math.min(window.innerWidth - 120, drag.x + 16)}px`;
+    b.style.top = `${drag.y + (drag.kind === 'touch' ? -44 : 14)}px`; // 터치: 손가락에 가리지 않게 위로
   }
 
   function place(view, x, y) {
@@ -284,7 +300,7 @@ export function createListDrag({ readOnly = false } = {}) {
     });
   }
 
-  function lift(view, li, x, y) {
+  function lift(view, li, x, y, kind = 'mouse') {
     const srcPos = itemPosOf(view, li);
     const list = li.parentElement;
     if (srcPos == null || !list) return;
@@ -309,29 +325,33 @@ export function createListDrag({ readOnly = false } = {}) {
     drag = {
       view, src: li, srcPos, list, listPos: $src.before(), positions: items.map((it) => itemPosOf(view, it)), s: items.indexOf(li),
       tops, heights, slots, bottom: tops.at(-1) + heights.at(-1), scale, scroller, line, badge,
-      drop: null, x, y, startY: y + st, timer: 0, raf: 0,
+      drop: null, x, y, startY: y + st, timer: 0, raf: 0, kind,
     };
+    if (kind === 'touch') navigator.vibrate?.(15); // 들어 올렸다는 느낌
     document.body.classList.add('mk-list-dragging');
     previewSame(view, null); // 들어 올린 모습
     drag.block = (e) => e.preventDefault();
     drag.move = (e) => {
       if (!drag) return;
-      e.preventDefault();
+      e.preventDefault(); // (터치) 화면 스크롤 대신 끌기
       e.stopPropagation(); // 편집기의 글자 선택 늘리기를 막는다
-      drag.x = e.clientX;
-      drag.y = e.clientY;
+      const p = pointOf(e);
+      drag.x = p.clientX;
+      drag.y = p.clientY;
       schedulePlace(view);
     };
     drag.up = (e) => {
       e.preventDefault();
       e.stopPropagation();
       if (drag) {
-        drag.x = e.clientX;
-        drag.y = e.clientY;
-        place(view, e.clientX, e.clientY); // 놓은 자리로 마지막 판정
+        const p = pointOf(e);
+        drag.x = p.clientX;
+        drag.y = p.clientY;
+        place(view, p.clientX, p.clientY); // 놓은 자리로 마지막 판정
       }
       finish(view, true);
     };
+    drag.cancel = () => finish(view, false);
     drag.key = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -352,21 +372,26 @@ export function createListDrag({ readOnly = false } = {}) {
         place(view, drag.x, drag.y);
       }
     }, 30);
-    window.addEventListener('mousemove', drag.move, true);
-    window.addEventListener('mouseup', drag.up, true);
+    const io = INPUT[kind];
+    window.addEventListener(io.move, drag.move, LISTEN);
+    window.addEventListener(io.up, drag.up, LISTEN);
+    if (io.cancel) window.addEventListener(io.cancel, drag.cancel, LISTEN);
     window.addEventListener('keydown', drag.key, true);
     window.addEventListener('selectstart', drag.block, true);
+    window.addEventListener('contextmenu', drag.block, true); // (터치) 꾹 누르기 메뉴가 뜨지 않게
   }
 
-  function startPress(view, event) {
-    const target = event.target instanceof Element ? event.target : null;
+  function startPress(view, event, kind = 'mouse') {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement ?? null;
     const li = target?.closest('li');
     if (!li || !view.dom.contains(li)) return;
+    const pt = pointOf(event);
     // 체크 네모(항목 왼쪽 바깥)·링크·그림·버튼은 제외
-    if (event.clientX < li.getBoundingClientRect().left) return;
+    if (pt.clientX < li.getBoundingClientRect().left) return;
     if (target.closest('a, img, video, audio, button, input, .mk-link-card, .mk-file')) return;
     cancelPress();
-    press = { li, view, x: event.clientX, y: event.clientY };
+    const io = INPUT[kind];
+    press = { li, view, kind, x: pt.clientX, y: pt.clientY };
     // 잠깐 뒤(그냥 누르는 클릭에는 깜빡이지 않게)부터 테두리가 점점 진해진다 → 다 진해지면 들어 올림
     press.markTimer = setTimeout(() => {
       const pos = press && itemPosOf(view, li);
@@ -375,20 +400,22 @@ export function createListDrag({ readOnly = false } = {}) {
       decorate(view, [{ pos, cls: 'mk-pressing' }]);
     }, 70);
     press.move = (e) => {
-      if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > MOVE_TOLERANCE) cancelPress(); // 바로 끌기 = 글자 선택
+      const p = pointOf(e);
+      if (Math.hypot(p.clientX - press.x, p.clientY - press.y) > io.tolerance) cancelPress(); // 바로 끌기 = 글자 선택 (터치는 스크롤)
       else {
-        press.x2 = e.clientX;
-        press.y2 = e.clientY;
+        press.x2 = p.clientX;
+        press.y2 = p.clientY;
       }
     };
     press.up = () => cancelPress();
     press.timer = setTimeout(() => {
       const p = press;
       cancelPress({ keepMark: true });
-      if (p?.li.isConnected) lift(view, p.li, p.x2 ?? p.x, p.y2 ?? p.y);
-    }, HOLD_MS);
-    window.addEventListener('mousemove', press.move, true);
-    window.addEventListener('mouseup', press.up, true);
+      if (p?.li.isConnected) lift(view, p.li, p.x2 ?? p.x, p.y2 ?? p.y, kind);
+    }, io.hold);
+    window.addEventListener(io.move, press.move, LISTEN);
+    window.addEventListener(io.up, press.up, LISTEN);
+    if (io.cancel) window.addEventListener(io.cancel, press.up, LISTEN);
   }
 
   return new Plugin({
@@ -408,6 +435,11 @@ export function createListDrag({ readOnly = false } = {}) {
         mousedown(view, event) {
           if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && event.detail === 1) startPress(view, event);
           return false; // 편집기는 지금처럼 (커서 놓기·글자 선택)
+        },
+        touchstart(view, event) {
+          if (event.touches.length === 1) startPress(view, event, 'touch');
+          else cancelPress();
+          return false; // 그냥 누르면 지금처럼 커서, 밀면 스크롤
         },
         dragstart(_view, event) {
           if (!drag) return false;

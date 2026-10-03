@@ -209,7 +209,77 @@ try {
   check('파일 넣기: 파일 칩 링크', /\n\[보고서\.pdf\]\(attachments\/[^)]+\.pdf\)\n?$/.test(withFile), withFile);
   await back();
 
-  // 길게 눌러 지우기 → 휴지통 → 되살리기
+  // 데스크탑과 같은 편집 기능: 체크리스트 끝내면 CLEAR 도장 · 꾹 눌러 끌어 줄 바꾸기 · 그림 줄 옮기기
+  const cdp = await ctx.newCDPSession(page);
+  const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  await page.tap('.card[data-id="00000000-0000-4000-8000-000000000001"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.waitForTimeout(300);
+  check('체크리스트: 아직 남았으면 도장 없음', await page.isHidden('#note-screen .clear-stamp'));
+  const todo = await page.locator('.mk-doc li[data-checked="false"]').first().boundingBox();
+  await page.touchscreen.tap(todo.x - 10, todo.y + 10);
+  await page.waitForTimeout(900);
+  check('체크리스트: 체크하면 저장', /- \[x\] 안드로이드 버전 테스트/.test(read('회의 메모.md')), read('회의 메모.md'));
+  check('체크리스트: 모두 끝내면 CLEAR 도장', await page.isVisible('#note-screen .clear-stamp'));
+  await shot('05-clear');
+  // 둘째 항목을 꾹 눌러 첫째 항목 가운데로 → 맞바꾸기
+  const items = page.locator('.mk-doc li[data-item-type="task"]');
+  const a = await items.nth(0).boundingBox();
+  const b = await items.nth(1).boundingBox();
+  await touch('touchStart', b.x + 40, b.y + b.height / 2);
+  await page.waitForTimeout(550);
+  check('줄 바꾸기: 꾹 누르면 들어 올림', (await page.locator('.mk-doc li.mk-lift').count()) === 1);
+  for (let i = 1; i <= 6; i++) await touch('touchMove', b.x + 40, b.y + b.height / 2 - ((b.y - a.y) * i) / 6);
+  await page.waitForTimeout(100);
+  await shot('05b-drag');
+  await touch('touchEnd', 0, 0);
+  await page.waitForTimeout(900);
+  const body = read('회의 메모.md');
+  check('줄 바꾸기: 손가락으로 끌어 맞바꿈', body.indexOf('안드로이드 버전 테스트') < body.indexOf('디자인 시안 확인'), body);
+  // 두 손가락으로 벌리면 본문 확대
+  const pinchTo = async (pts) => cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pts });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 150, y: 600, id: 1 }, { x: 240, y: 600, id: 2 }] });
+  for (let i = 1; i <= 5; i++) await pinchTo([{ x: 150 - i * 15, y: 600, id: 1 }, { x: 240 + i * 15, y: 600, id: 2 }]);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  const z = await page.evaluate(() => Number(document.getElementById('editor').style.getPropertyValue('--note-zoom')));
+  check('두 손가락 확대: 본문 배율', z > 1.3, String(z));
+  await page.evaluate(() => {
+    localStorage.removeItem('memoking.noteZoom');
+    document.getElementById('editor').style.setProperty('--note-zoom', '1');
+  });
+  await back();
+  await page.waitForTimeout(300);
+  check('목록: 다 끝낸 메모 카드에 CLEAR 도장', (await page.locator('.card[data-id="00000000-0000-4000-8000-000000000001"] .card-clear').count()) === 1);
+  await shot('05c-list-clear');
+
+  // 그림을 누르면 줄 옮기기 막대 → 아래로 (글 줄과 자리 바꿈)
+  await page.tap('.card[data-id="00000000-0000-4000-8000-000000000002"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.waitForTimeout(400);
+  await page.locator('.mk-doc img.mk-image').first().tap();
+  await page.waitForTimeout(200);
+  check('그림 줄 옮기기: 그림을 누르면 막대', await page.isVisible('.mk-move-bar'));
+  await shot('06-move-bar');
+  await page.tap('.mk-move-bar [aria-label="아래로"]');
+  await page.waitForTimeout(900);
+  let logo = read('로고 사진.md');
+  check('그림 줄 옮기기: 아래 줄과 맞바꿈', logo.indexOf('새 아이콘 시안') < logo.indexOf('![로고]'), logo);
+  check('그림 줄 옮기기: 옮긴 뒤에도 그림이 골라져 있음', await page.isVisible('.mk-move-bar'));
+  // ⠿ 를 끌어 맨 위(제목 줄 가운데)로 → 제목과 맞바꿈 대신 위로 끼우기 확인
+  const grip = await page.locator('.mk-move-bar .mk-move-grip').boundingBox();
+  const h1 = await page.locator('.mk-doc h1').boundingBox();
+  await touch('touchStart', grip.x + grip.width / 2, grip.y + grip.height / 2);
+  for (let i = 1; i <= 8; i++) await touch('touchMove', grip.x + grip.width / 2, grip.y + grip.height / 2 + ((h1.y + h1.height + 4 - grip.y - grip.height / 2) * i) / 8);
+  await page.waitForTimeout(100);
+  await shot('06b-move-drag');
+  await touch('touchEnd', 0, 0);
+  await page.waitForTimeout(900);
+  logo = read('로고 사진.md');
+  const order = ['# 로고 사진', '![로고]', '새 아이콘 시안'].map((t) => logo.indexOf(t));
+  check('그림 줄 옮기기: ⠿ 끌어서 제목 바로 아래로', order[0] < order[1] && order[1] < order[2], logo);
+  await back();
+  await page.waitForTimeout(300);
+
   await page.dispatchEvent('.card[data-id="00000000-0000-4000-8000-000000000002"]', 'contextmenu');
   await page.tap('[data-memo-action="delete"]');
   await page.click('#confirm-ok');

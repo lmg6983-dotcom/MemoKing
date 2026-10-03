@@ -7,6 +7,7 @@ import { fileExtension, mediaKind, baseName } from '../../app/js/media.js';
 import { isDataImage, decodeDataImage } from '../../app/js/core/remote-images.js';
 import { setupReminderPanel } from '../../app/js/reminder-panel.js';
 import { collectTags } from '../../app/js/core/tags.js';
+import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
 import { app, reduceMotion } from './state.js';
 import { call } from './native.js';
 import { fetchRemoteImage } from './web-fetch.js';
@@ -107,7 +108,7 @@ export function flush() {
 // ---------- 다른 기기(PC)에서 바뀐 경우 ----------
 
 function applyExternal(next) {
-  editor.setMarkdown(next.body);
+  editor.setMarkdown(next.body, next.tables ?? []);
   current = saved = editor.getMarkdown();
   el.banner.hidden = true;
   pendingExternal = null;
@@ -475,6 +476,10 @@ function showTableBar(table) {
   if (!table) return;
   el.tableBar.querySelector('[data-table="delRow"]').disabled = table.header;
   el.tableBar.querySelector('[data-table="delCol"]').disabled = table.cols <= 1;
+  // 셀 병합: 여러 칸을 골랐으면 "셀 병합", 병합한 칸 안이면 "병합 풀기"
+  const merge = el.tableBar.querySelector('[data-table="merge"]');
+  merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
+  merge.disabled = !table.canMerge && !table.merged;
 }
 el.tableBar.addEventListener('mousedown', (e) => e.preventDefault());
 el.tableBar.addEventListener('click', (e) => {
@@ -565,6 +570,9 @@ export async function openNote(memoId, options = {}) {
       openLink: (url) => call('openUrl', { url }),
       getTags: async () => collectTags(app.vault.list()),
       onEmpty: showPlaceholder,
+      onTasks: showTasks,
+      tables: memo.tables ?? [],
+      onTables: saveTables,
     });
     // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 (열기만 해도 저장되는 일 방지)
     current = saved = editor.getMarkdown();
@@ -586,6 +594,8 @@ export async function openNote(memoId, options = {}) {
 export function closeNote({ quiet = false } = {}) {
   if (!id) return;
   flush();
+  flushTables();
+  clearStamp.hidden = true;
   const closing = id;
   closePalette();
   for (const panel of [el.linksPanel, $('reminder-panel')]) if (!panel.hidden) closeSheet(panel);
@@ -615,6 +625,8 @@ export function closeNote({ quiet = false } = {}) {
 /** 이 메모를 지우기 (메뉴) — 지운 메모는 저장하지 않는다 */
 export function discardAndClose() {
   saved = current;
+  pendingTables = null;
+  clearStamp.hidden = true;
   clearTimeout(saveTimer);
   editor?.destroy();
   editor = null;
@@ -623,6 +635,96 @@ export function discardAndClose() {
   el.screen.hidden = true;
   delete document.body.dataset.noteColor;
 }
+
+// ---------- 표 열 너비·행 높이·머리글 강조·병합 → 메모 머리말 (데스크탑과 같음) ----------
+let tablesTimer = 0;
+let pendingTables = null;
+function saveTables(tables) {
+  pendingTables = { id, tables };
+  clearTimeout(tablesTimer);
+  tablesTimer = setTimeout(flushTables, 400);
+}
+function flushTables() {
+  clearTimeout(tablesTimer);
+  if (!pendingTables) return;
+  const p = pendingTables;
+  pendingTables = null;
+  try {
+    app.vault.setMeta(p.id, { tables: p.tables });
+  } catch {
+    setStatus('표 크기를 저장하지 못했어요', true);
+  }
+}
+
+// ---------- CLEAR 도장: 체크리스트를 모두 끝내면 (데스크탑 v0.17.13 과 같음) ----------
+const clearStamp = document.createElement('div');
+clearStamp.className = 'clear-stamp';
+clearStamp.textContent = 'CLEAR';
+clearStamp.setAttribute('role', 'status');
+clearStamp.setAttribute('aria-label', '체크리스트를 모두 끝냈어요');
+clearStamp.hidden = true;
+el.screen.append(clearStamp);
+const placeClearStamp = () => {
+  const r = el.editorRoot.getBoundingClientRect();
+  clearStamp.style.left = `${Math.round(r.left + r.width / 2)}px`;
+  clearStamp.style.top = `${Math.round(r.top + r.height / 2)}px`;
+};
+new ResizeObserver(() => {
+  if (!clearStamp.hidden) placeClearStamp();
+}).observe(el.editorRoot);
+
+// 처음 열 때는 그냥 찍혀 있고, 방금 끝냈을 때만 "쿵"
+function showTasks({ total, done }, { initial = false } = {}) {
+  const clear = total > 0 && done === total;
+  const was = !clearStamp.hidden;
+  clearStamp.hidden = !clear;
+  if (!clear) {
+    clearStamp.classList.remove('stamp-in');
+    return;
+  }
+  placeClearStamp();
+  if (!was && !initial) {
+    clearStamp.classList.remove('stamp-in');
+    void clearStamp.offsetWidth;
+    clearStamp.classList.add('stamp-in');
+    navigator.vibrate?.(30);
+  }
+}
+
+// ---------- 두 손가락으로 본문 확대·축소 (데스크탑 Ctrl+휠과 같은 배율, 모든 메모에 기억) ----------
+const ZOOM_KEY = 'memoking.noteZoom';
+let zoom = 1;
+try {
+  zoom = clampZoom(localStorage.getItem(ZOOM_KEY) ?? 1);
+} catch {
+  // 기억 못 해도 100%
+}
+const applyZoom = () => el.editorRoot.style.setProperty('--note-zoom', String(zoom));
+applyZoom();
+let pinch = null;
+const spread = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+el.editorRoot.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) pinch = { d: Math.max(1, spread(e.touches)), z: zoom };
+}, { passive: true });
+el.editorRoot.addEventListener('touchmove', (e) => {
+  if (!pinch || e.touches.length !== 2) return;
+  e.preventDefault();
+  const next = Math.round(clampZoom(pinch.z * (spread(e.touches) / pinch.d)) * 20) / 20;
+  if (next === zoom) return;
+  zoom = next;
+  applyZoom();
+  setStatus(`확대 ${zoomLabel(zoom)}`);
+}, { passive: false });
+el.editorRoot.addEventListener('touchend', (e) => {
+  if (!pinch || e.touches.length >= 2) return;
+  pinch = null;
+  try {
+    if (zoom === 1) localStorage.removeItem(ZOOM_KEY);
+    else localStorage.setItem(ZOOM_KEY, String(zoom));
+  } catch {
+    // 이번에만
+  }
+});
 
 export function editorMarkdown() {
   if (editor) current = editor.getMarkdown();
