@@ -273,6 +273,7 @@ try {
   await page.locator('.mk-doc img.mk-image').first().tap();
   await page.waitForTimeout(200);
   check('그림 줄 옮기기: 처음 한 번 옮기는 방법 안내', (await page.textContent('.mk-move-hint').catch(() => '')).includes('꾹 눌러'));
+  check('그림 누르기: 키보드를 올리지 않음', (await page.getAttribute('.mk-doc', 'inputmode')) === 'none');
   await shot('06-move-hint');
   check('그림 줄 옮기기: 따로 버튼·손잡이 없음', (await page.locator('.mk-move-bar, .mk-move-grip').count()) === 0);
   const img = await page.locator('.mk-doc img.mk-image').first().boundingBox();
@@ -289,6 +290,7 @@ try {
   check('그림 줄 옮기기: 누르는 동안 테두리', (await page.locator('.mk-block-pressing').count()) === 1);
   await page.waitForTimeout(350);
   check('그림 줄 옮기기: 꾹 누르면 들어 올림', (await page.locator('.mk-block-lift').count()) === 1);
+  check('그림 끌기: 키보드를 올리지 않음', (await page.getAttribute('.mk-doc', 'inputmode')) === 'none');
   const to = textLine.y + textLine.height / 2;
   for (let i = 1; i <= 8; i++) await touch('touchMove', img.x + 60, img.y + 60 + ((to - img.y - 60) * i) / 8);
   await page.waitForTimeout(120);
@@ -312,6 +314,8 @@ try {
   logo = read('로고 사진.md');
   const order = ['# 로고 사진', '![로고]', '새 아이콘 시안'].map((t) => logo.indexOf(t));
   check('그림 줄 옮기기: 제목 바로 아래로 끼움', order[0] < order[1] && order[1] < order[2], logo);
+  await page.locator('.mk-doc p', { hasText: '새 아이콘 시안' }).tap();
+  check('글자를 누르면 다시 키보드', (await page.getAttribute('.mk-doc', 'inputmode')) === null);
   await back();
   await page.waitForTimeout(300);
 

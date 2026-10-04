@@ -147,6 +147,27 @@ const LISTEN = { capture: true, passive: false };
 const HINT_KEY = 'memoking.hint.blockMove';
 const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
 
+// 휴대폰: 그림·소리·동영상·파일·링크 카드를 누르거나 끌 때는 키보드를 올리지 않는다 (끄는 데 방해되지 않게).
+// 편집기에 inputmode="none" 을 잠깐 달아 두고, 글자를 다시 누르면 떼어 평소처럼 키보드가 올라오게 한다.
+const NO_KEYBOARD_TARGET = 'img, .mk-media, .mk-link-card, .mk-file, a[href], .mk-math, .mk-math-block';
+function keyboardFor(view, target) {
+  if (!coarse()) return;
+  const el = target instanceof Element ? target : target?.parentElement;
+  const onContent = Boolean(el?.closest(NO_KEYBOARD_TARGET)) && view.dom.contains(el);
+  const dom = view.dom;
+  if (onContent) {
+    if (dom.getAttribute('inputmode') !== 'none') {
+      dom.setAttribute('inputmode', 'none');
+      dom.dataset.mkNoKeyboard = '1';
+    }
+  } else if (dom.dataset.mkNoKeyboard) {
+    // 글자를 누름: 키보드를 다시 쓸 수 있게 (이미 초점이 있으면 한 번 놓아 새로 누른 것처럼 키보드가 뜨게)
+    dom.removeAttribute('inputmode');
+    delete dom.dataset.mkNoKeyboard;
+    if (view.hasFocus()) dom.blur();
+  }
+}
+
 /** @param {{ readOnly?: boolean }} options */
 export function createBlockMove({ readOnly = false } = {}) {
   let mover = null;
@@ -171,6 +192,7 @@ export function createBlockMove({ readOnly = false } = {}) {
           return false; // 그냥 누르면 지금처럼 (고르기·열기)
         },
         touchstart(view, event) {
+          keyboardFor(view, event.target);
           if (event.touches.length === 1) mover?.press(event, 'touch');
           else mover?.cancelPress();
           return false; // 그냥 누르면 고르기, 밀면 스크롤
