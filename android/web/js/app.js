@@ -7,6 +7,7 @@ import { shareText } from '../../app/js/core/share-text.js';
 import { importText, isTextDocument, stripFrontMatter } from '../../app/js/core/markdown-import.js';
 import { mediaKind } from '../../app/js/media.js';
 import { vocabularyFrom, fixTranscript } from '../../app/js/core/transcript-fix.js';
+import { voiceCardMarkdown, attachTranscript } from '../../app/js/core/voice-card.js';
 import { native, call, on, setBackHandler, drive, history, fs } from './native.js';
 import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
@@ -457,7 +458,6 @@ shareSheet.addEventListener('click', async (e) => {
 
 // ---------- 녹음을 메모에 넣기 (녹음을 끝냈을 때 · 앱이 꺼져 있는 동안 끝난 녹음) ----------
 
-const escapeText = (t) => importText(t).markdown;
 
 // 받아쓰기 말모음: 이 메모 폴더의 태그·제목에 자주 나온 낱말 (힌트로 넘기고, 받아쓴 글을 고칠 때 쓴다)
 let vocabCache = { at: 0, list: [] };
@@ -482,14 +482,14 @@ app.deliverRecording = async (r) => {
   const [item] = note.tempsToItems([{ temp: r.temp, name: r.name || 'recording.m4a', mime: r.mime || 'audio/mp4' }]);
   item.alt = alt;
   const transcript = polish(String(r.transcript ?? '').trim());
-  const textMd = transcript ? escapeText(transcript) : '';
+  // 소리와 받아쓴 글을 한 칸(음성 카드)에 — 문장마다 줄, 말한 사람이 바뀌면 이름표
+  const card = voiceCardMarkdown(item, transcript);
   let memoId = r.memoId;
   if (note.currentId() === memoId) {
-    note.insertRecording(item, textMd, `음성 메모 · ${whenLabel(r.startedAt)}`);
+    note.insertRecording(card, `음성 메모 · ${whenLabel(r.startedAt)}`);
   } else {
     const memo = memoId && app.vault.get(memoId);
-    const media = `![${alt}](${item.src})`;
-    const parts = [media, textMd].filter(Boolean).join('\n\n');
+    const parts = card;
     const heading = `# 음성 메모 · ${whenLabel(r.startedAt)}`;
     if (memo && !isBlankBody(memo.body)) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
     else if (memo) app.vault.save(memoId, `${heading}\n\n${parts}\n`);
@@ -566,7 +566,41 @@ function refreshSttRow(progress) {
     : busy ? `받는 중 ${progress ?? st.progress ?? 0}%` : `처음 한 번 받아요 (${st.modelSize ?? '약 87MB'}, Wi-Fi 추천)`;
   $('stt-model-btn').textContent = st.model === 'ready' ? '지우기' : busy ? '받는 중' : '받기';
   $('stt-model-btn').disabled = busy;
+  refreshSpeakerRow();
 }
+
+// 말한 사람 나누기: Vosk 말한 사람 모델(약 13MB)을 받으면 받아쓴 글에 "화자 1·2" 이름표
+function refreshSpeakerRow(progress) {
+  const st = recorder.sttStatus();
+  const vosk = recorder.sttEngine() === 'vosk';
+  $('spk-row').hidden = !vosk || st.model !== 'ready';
+  const busy = progress != null || st.speaker === 'downloading';
+  const ready = st.speaker === 'ready';
+  $('spk-note').textContent = busy
+    ? `받는 중 ${progress ?? 0}%`
+    : ready
+      ? st.speakerOn ? '켜짐 · 말한 사람이 바뀌면 "화자 2:" 처럼 표시해요' : '꺼짐 · 눌러서 다시 켜기'
+      : `목소리 특징으로 회의 참석자를 나눠요 (${st.speakerSize ?? '약 13MB'}, 인터넷 없이)`;
+  $('spk-btn').textContent = busy ? '받는 중' : ready ? (st.speakerOn ? '끄기' : '켜기') : '받기';
+  $('spk-btn').disabled = busy;
+}
+$('spk-btn').addEventListener('click', async () => {
+  const st = recorder.sttStatus();
+  try {
+    if (st.speaker === 'ready') await call('speakerModel', { on: !st.speakerOn });
+    else {
+      refreshSpeakerRow(0);
+      await call('speakerModel', {});
+      toast('말한 사람 나누기를 켰어요. 다음 녹음부터 사람별로 나눠 적어요');
+    }
+  } catch (err) {
+    toast(err.message || '말한 사람 모델을 받지 못했어요. 인터넷 연결을 확인해 주세요', true);
+  }
+  refreshSpeakerRow();
+});
+on('speakerModel', ({ progress }) => {
+  if (!$('settings-sheet').hidden) refreshSpeakerRow(progress < 100 ? progress : undefined);
+});
 $('stt-engine').addEventListener('change', () => {
   recorder.setSttEngine($('stt-engine').value);
   refreshSttRow();
@@ -787,11 +821,14 @@ async function transcribeInto(memoId, items) {
         toast('받아쓸 말소리를 찾지 못했어요');
         continue;
       }
-      const md = importText(text).markdown;
-      if (note.currentId() === memoId) note.appendText(md);
-      else {
+      // 그 소리 줄에 붙여 음성 카드로 (소리 줄을 못 찾으면 메모 끝에)
+      if (note.currentId() === memoId) {
+        if (!note.attachTranscript(item.src, text)) note.appendText(importText(text).markdown);
+      } else {
         const memo = app.vault.get(memoId);
-        if (memo) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${md}\n`);
+        const next = memo && attachTranscript(memo.body, item.src, text);
+        if (next) app.vault.save(memoId, next);
+        else if (memo) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${importText(text).markdown}\n`);
       }
       toast('받아쓴 글을 메모에 넣었어요');
     } catch (err) {

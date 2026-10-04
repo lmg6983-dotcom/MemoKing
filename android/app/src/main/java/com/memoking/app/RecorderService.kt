@@ -215,7 +215,7 @@ class RecorderService : Service() {
         private var running = false
         private var thread: Thread? = null
         private var samples = 0L // 녹음한(멈춘 동안 빼고) 표본 수
-        private val parts = ArrayList<String>()
+        private val parts = ArrayList<Transcript.Line>()
         @Volatile
         private var partial = ""
         var onChange: (() -> Unit)? = null
@@ -224,7 +224,7 @@ class RecorderService : Service() {
         fun elapsedMs(): Long = samples * 1000 / Stt.SAMPLE_RATE
 
         fun text(): String = synchronized(parts) { Transcript.join(parts) }
-        fun lastText(): String = synchronized(parts) { parts.lastOrNull() ?: partial }
+        fun lastText(): String = synchronized(parts) { parts.lastOrNull()?.text ?: partial }
 
         fun status(): JSONObject = JSONObject()
             .put("active", true).put("paused", paused).put("memoId", memoId)
@@ -251,7 +251,7 @@ class RecorderService : Service() {
             }
             val encoder = AacEncoder(file, Stt.SAMPLE_RATE)
             val transcriber = if (stt) try {
-                Stt.create(ctx, engine, { final, part -> onText(final, part) }, terms)
+                Stt.create(ctx, engine, { final, part, spk -> onText(final, part, spk) }, terms)
             } catch (e: Exception) {
                 android.util.Log.w("MemoKing", "받아쓰기를 시작하지 못했어요", e)
                 sttError = true
@@ -294,15 +294,15 @@ class RecorderService : Service() {
                     } catch (e: Exception) {
                         ""
                     }
-                    if (tail.isNotBlank()) synchronized(parts) { parts.add(tail) }
+                    if (tail.isNotBlank()) synchronized(parts) { parts.add(Transcript.Line(tail)) }
                     transcriber?.close()
                 }
             }, "memoking-recorder")
             thread!!.start()
         }
 
-        private fun onText(final: String?, part: String?) {
-            if (!final.isNullOrBlank()) synchronized(parts) { parts.add(final) }
+        private fun onText(final: String?, part: String?, speaker: Int) {
+            if (!final.isNullOrBlank()) synchronized(parts) { parts.add(Transcript.Line(final, speaker)) }
             partial = part ?: ""
             RecorderService.listener?.invoke(JSONObject().put("type", "status").put("status", status()))
             if (!final.isNullOrBlank()) onChange?.invoke()

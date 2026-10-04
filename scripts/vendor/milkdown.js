@@ -1,5 +1,5 @@
 // app/vendor/milkdown.js 로 묶일 Milkdown 기능 목록 (npm run vendor)
-export { Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx } from '@milkdown/kit/core';
+export { Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx, parserCtx } from '@milkdown/kit/core';
 export {
   commonmark,
   imageSchema,

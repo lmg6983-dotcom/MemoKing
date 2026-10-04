@@ -317,6 +317,20 @@ class Bridge(private val activity: MainActivity) {
                     Stt.status(ctx)
                 }
             }
+            // 말한 사람 모델(Vosk, 약 13MB) 받기·지우기·켜고 끄기
+            "speakerModel" -> pool.execute {
+                resolve(id) {
+                    when {
+                        a.optBoolean("delete") -> SpeakerModels.delete(ctx)
+                        a.has("on") -> SpeakerModels.setOn(ctx, a.optBoolean("on"))
+                        else -> {
+                            SpeakerModels.download(ctx) { p -> activity.runOnUiThread { activity.emit("speakerModel", JSONObject().put("progress", p)) } }
+                            SpeakerModels.setOn(ctx, true)
+                        }
+                    }
+                    Stt.status(ctx)
+                }
+            }
             // 보내기: 그림(base64) 같은 파일 · PDF
             "shareFile" -> pool.execute {
                 val file = shareFile(a.optString("name", "메모"))

@@ -102,7 +102,7 @@ const errors = [];
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'ko-KR' });
   const page = await ctx.newPage();
-  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('pageerror', (e) => { errors.push(e.message); if (process.env.MK_DUMP) console.log('PAGEERROR', e.stack); });
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   const shot = (name) => page.screenshot({ path: path.join(outDir, `${name}.png`) });
   const back = () => page.evaluate(() => window.__mk.back());
@@ -513,6 +513,7 @@ try {
   await page.waitForTimeout(400);
   f = fileWith('오늘 회의를 시작하겠습니다');
   check('음성 메모: 소리 파일 + 받아쓴 글', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 음성 메모'), f && read(f));
+  check('음성 카드: 소리와 받아쓴 글이 한 칸(인용), 문장마다 줄 · 화자 이름표', f && /^> !\[녹음/m.test(read(f)) && read(f).includes('>\n> **화자 2:** 다음 주 출시 일정을 정리했어요.\n>\n> 표로 공유할게요.'), f && read(f));
 
   // 소리·표·수식·글 문단도 자유롭게 옮기기 (소리는 이름 줄 ⠿, 글 문단·표는 왼쪽 손잡이 ⠿)
   fs.writeFileSync(path.join(vault, 'attachments/move-test.m4a'), Buffer.from('fake'));
@@ -553,6 +554,26 @@ try {
   await back();
   await page.waitForTimeout(300);
 
+  // 조용한 다듬기: 쓰던 줄을 떠나면 겹친 띄어쓰기·부호 앞 띄어쓰기, 갈라진 같은 목록은 하나로
+  write('다듬기.md', '---\nid: 00000000-0000-4000-8000-0000000000bb\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 다듬기\n\n- 사과\n- 배\n\n* 감\n* 귤\n\n둘째 문단\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000bb"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.waitForTimeout(300);
+  check('다듬기: 갈라진 같은 목록은 한 목록으로', (await page.locator('.mk-doc ul').count()) === 1 && (await page.locator('.mk-doc ul > li').count()) === 4);
+  await page.locator('.mk-doc p', { hasText: '둘째 문단' }).tap();
+  await page.keyboard.press('End');
+  await page.keyboard.type('  끝이에요  정말 .');
+  await page.waitForTimeout(200);
+  check('다듬기: 쓰는 줄은 그대로', (await page.locator('.mk-doc p', { hasText: '둘째 문단' }).textContent()).includes('끝이에요  정말 .'));
+  await page.locator('.mk-doc h1').tap();
+  await page.waitForTimeout(900);
+  const tidied = read('다듬기.md');
+  check('다듬기: 줄을 떠나면 띄어쓰기 정리', tidied.includes('둘째 문단 끝이에요 정말.') && /- 사과\n- 배\n- 감\n- 귤/.test(tidied), tidied);
+  await back();
+  await page.waitForTimeout(300);
+
   // 다른 앱에서 받은 마크다운 글은 서식대로
   await post('/dev/intent', { type: 'share', text: '## 회의록\n- 첫째\n- 둘째\n\n**결론**: 진행', app: '메모장', files: [] });
   await page.evaluate(() => window.__mk.emit('intent', null));
@@ -572,6 +593,18 @@ try {
   await page.waitForTimeout(1800);
   f = fileWith('받아쓴 글이에요');
   check('소리 파일 받기: 소리 + 받아쓴 글', f && /\.m4a\)/.test(read(f)), f && read(f));
+  check('소리 파일 받기: 받아쓴 글은 그 소리의 음성 카드 안에', f && /^> !\[[^\]]*\]\([^)]+\.m4a\)\n>\n> /m.test(read(f)), f && read(f));
+  await page.waitForSelector('.mk-voice .mk-voice-toggle');
+  check('음성 카드: 한 칸으로 보임 (소리 + 글 + 접기 막대)', (await page.locator('.mk-voice .mk-media').count()) === 1 && (await page.locator('.mk-voice .mk-voice-line').count()) >= 1);
+  await page.tap('.mk-voice-toggle');
+  await page.waitForTimeout(300);
+  check('음성 카드: 접으면 글이 숨고 첫 문장 미리 보기', (await page.locator('.mk-voice.folded').count()) === 1 && !(await page.locator('.mk-voice .mk-voice-line').first().isVisible()) && (await page.locator('.mk-voice-peek').textContent()).length > 0);
+  await shot('16-voice-card-folded');
+  await page.tap('.mk-voice-toggle');
+  await page.waitForTimeout(300);
+  check('음성 카드: 다시 펴기', (await page.locator('.mk-voice.folded').count()) === 0);
+  await shot('16-voice-card');
+  if (process.env.MK_DUMP) console.log(await page.evaluate(() => { const v = document.querySelector('.mk-voice'); const p = v.querySelector('.mk-voice-body > p'); return p.outerHTML.replace(/<svg[\s\S]*?<\/svg>/g, '') + '\n' + [...p.querySelectorAll('*')].slice(0, 8).map((e) => e.tagName + '.' + e.className + ' ' + e.getBoundingClientRect().height).join('\n'); }));
   await back();
   await page.waitForTimeout(300);
 

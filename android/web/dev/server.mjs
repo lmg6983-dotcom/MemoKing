@@ -203,7 +203,7 @@ const sync = {
     fakeDone = fakeDone.filter((r) => r.id !== id);
     return true;
   },
-  sttStatus: () => ({ engine: 'vosk', model: 'ready', system: true }),
+  sttStatus: () => ({ engine: 'vosk', model: 'ready', system: true, speaker: 'ready', speakerOn: true, speakerSize: '약 13MB' }),
 };
 
 
@@ -312,14 +312,14 @@ const calls = {
     const r = fakeRec;
     fakeRec = null;
     const file = makeTemp('recording.m4a', 'audio/mp4', Buffer.from('fake-m4a'));
-    const result = { id: randomUUID(), memoId: r.memoId, ...file, durationMs: Date.now() - r.at, startedAt: r.at, transcript: r.stt ? '오늘 회의를 시작하겠습니다\n\n다음 주 출시 일정을 정리했어요' : '' };
+    const result = { id: randomUUID(), memoId: r.memoId, ...file, durationMs: Date.now() - r.at, startedAt: r.at, transcript: r.stt ? '화자 1: 오늘 회의를 시작하겠습니다.\n화자 2: 다음 주 출시 일정을 정리했어요.\n표로 공유할게요.' : '' };
     fakeDone.push(result);
     log.push({ recordStop: result.id });
     return result;
   },
   transcribe: async ({ rel }) => {
     log.push({ transcribe: rel });
-    return { text: '받아쓴 글이에요' };
+    return { text: '받아쓴 글이에요.\n두 번째 문장이에요.' };
   },
   shareFile: async (a) => {
     log.push({ shareFile: { name: a.name, mime: a.mime, bytes: Math.round((a.base64?.length ?? 0) * 0.75) } });
@@ -330,6 +330,7 @@ const calls = {
     return true;
   },
   sttModel: async () => ({ model: 'ready' }),
+  speakerModel: async () => ({ model: 'ready', speaker: 'ready', speakerOn: true }),
   http: async ({ url, accept = '*/*', limit = 5 * 1024 * 1024, save = false }) => {
     const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) MemoKing-dev' }, redirect: 'follow' });
     const type = (res.headers.get('content-type') ?? '').toLowerCase();

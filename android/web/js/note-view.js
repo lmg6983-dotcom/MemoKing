@@ -1001,11 +1001,17 @@ export function appendText(md) {
   flush();
 }
 
-/** 녹음 결과: 소리 파일 줄 + 받아쓴 글을 메모 끝에. 빈 메모면 제목 줄부터 */
-export function insertRecording(item, textMd, heading) {
+/** 녹음 결과: 음성 카드(소리 + 받아쓴 글)를 메모 끝에. 빈 메모면 제목 줄부터 */
+export function insertRecording(cardMd, heading) {
   if (!editor) return;
   if (!editorMarkdown().trim() && heading) editor.setMarkdown(`# ${heading}\n`);
-  editor.insertItems([item]);
-  if (textMd) editor.appendMarkdown(textMd);
+  editor.appendMarkdown(cardMd);
   flush();
+}
+
+/** 받아쓴 글을 그 소리 줄에 붙여 음성 카드로 */
+export function attachTranscript(src, text) {
+  if (!editor?.attachTranscript(src, text)) return false;
+  flush();
+  return true;
 }

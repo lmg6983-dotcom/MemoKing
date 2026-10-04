@@ -1,6 +1,6 @@
 // 서식 편집기 (Milkdown) — 화면에는 서식이 적용된 모습, 저장은 마크다운.
 import {
-  Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx,
+  Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx, parserCtx,
   commonmark, imageSchema, linkSchema, toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand,
   wrapInHeadingCommand, turnIntoTextCommand, wrapInBulletListCommand, wrapInOrderedListCommand,
   wrapInBlockquoteCommand, createCodeBlockCommand, insertHrCommand, liftListItemCommand, htmlSchema,
@@ -25,6 +25,9 @@ import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells } from './table-extras.js';
 import { createListDrag } from './list-drag.js';
 import { createBlockMove } from './block-move.js';
+import { createVoiceCards, isVoiceCard } from './voice-card-view.js';
+import { createTidy } from './tidy.js';
+import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
 import { create as createConfetti } from '../vendor/confetti.js';
 import { mathPlugins, insertMathBlock } from './math.js';
 import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
@@ -1077,6 +1080,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
   const listDrag = $prose(() => createListDrag({ readOnly }));
   const blockMove = $prose(() => createBlockMove({ readOnly }));
+  const voiceCards = $prose(() => createVoiceCards());
+  const tidy = $prose(() => createTidy({ readOnly }));
   const taskToggle = $prose(() => new Plugin({
     key: new PluginKey('memoking-task-toggle'),
     props: { handleDOMEvents: { mousedown: toggleTaskOnClick } },
@@ -1205,6 +1210,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(taskToggle)
     .use(listDrag)
     .use(blockMove)
+    .use(voiceCards)
+    .use(tidy)
     .use(tagHighlight)
     .use(stateWatcher)
     .create();
@@ -1582,6 +1589,38 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       v.dispatch(v.state.tr.setSelection(TextSelection.near(v.state.doc.resolve(v.state.doc.content.size), -1)));
       editor.action(insert(md));
     },
+    // 이 소리 파일 줄에 받아쓴 글을 붙여 음성 카드로 (이미 카드면 끝에 이어서). 소리 줄이 없으면 false
+    attachTranscript(src, transcript) {
+      const v = view();
+      const { doc } = v.state;
+      let found = null;
+      doc.descendants((node, pos) => {
+        if (found) return false;
+        if (node.type.name === 'image' && node.attrs.src === src) found = { node, pos };
+        return true;
+      });
+      if (!found) return false;
+      const parse = (md) => editor.action((ctx) => ctx.get(parserCtx)(md));
+      const $p = doc.resolve(found.pos);
+      const card = $p.depth >= 2 && isVoiceCard($p.node($p.depth - 1)) ? $p.depth - 1 : null;
+      const tr = v.state.tr;
+      if (card != null) {
+        const lines = transcriptLines(transcript);
+        if (!lines.length) return true;
+        tr.insert($p.after(card) - 1, parse(lines.join('\n\n')).content);
+      } else {
+        const para = $p.node($p.depth);
+        const alone = para.childCount === 1 || para.textContent.trim() === '';
+        const cardDoc = parse(voiceCardMarkdown({ alt: found.node.attrs.alt, src }, transcript));
+        if (alone) tr.replaceWith($p.before(), $p.after(), cardDoc.content);
+        else {
+          tr.insert($p.after(), cardDoc.content);
+          tr.delete(found.pos, found.pos + found.node.nodeSize);
+        }
+      }
+      v.dispatch(tr.scrollIntoView());
+      return true;
+    },
     // 커서 자리에 파일들을 넣는다.
     async insertFiles(files) {
       const pos = view().state.selection.from;
@@ -1635,12 +1674,12 @@ function activeFormats(state) {
     const name = node.type.name;
     if (name === 'heading') active[`h${node.attrs.level}`] = true;
     if (name === 'code_block') active.codeBlock = true;
-    if (name === 'blockquote') active.quote = true;
+    if (name === 'blockquote' && !isVoiceCard(node)) active.quote = true;
     if (name === 'list_item' && node.attrs.checked != null && active.task === undefined) active.task = true;
     if (name === 'bullet_list' && !active.task && !active.ordered) active.bullet ??= true;
     if (name === 'ordered_list' && !active.task && !active.bullet) active.ordered ??= true;
   }
-  for (let d = $from.depth; d > 0; d--) if ($from.node(d).type.name === 'blockquote') active.quote = true;
+  for (let d = $from.depth; d > 0; d--) if ($from.node(d).type.name === 'blockquote' && !isVoiceCard($from.node(d))) active.quote = true;
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d);
     if (node.type.name === 'table_header_row') active.tableHeader = true;

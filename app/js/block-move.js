@@ -13,6 +13,7 @@
 import { holdKeyboard, keyboardFor, edgeScroll } from './keyboard-guard.js';
 import { Plugin, PluginKey, TextSelection, NodeSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
+import { isVoiceCard } from './voice-card-view.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
 
@@ -63,6 +64,8 @@ export function contentBlockAt(state) {
     inner = { kind: 'text', offset: sel.from - $from.start() };
   }
   if (depth == null || depth < 1) return null;
+  // 음성 카드 안의 소리 줄 → 카드 통째로 (받아쓴 글도 함께)
+  if (depth >= 2 && isVoiceCard($from.node(depth - 1))) return blockInfo(state.doc, $from.before(depth - 1), { kind: 'text', offset: 1 + (inner.offset < 0 ? 0 : inner.offset) });
   const pos = depth > $from.depth ? sel.from : $from.before(depth);
   return blockInfo(state.doc, pos, inner);
 }
@@ -101,6 +104,7 @@ export function blockFromTarget(view, target) {
     if (n.type.name === 'mk_link_card') return blockInfo(doc, $p.before(d), { kind: 'node', offset: -1 });
     if (n.type.name !== 'paragraph') continue;
     if (!isContentParagraph(n)) return null;
+    if (d >= 2 && isVoiceCard($p.node(d - 1))) return blockInfo(doc, $p.before(d - 1), { kind: 'text', offset: 1 });
     const isImage = doc.nodeAt(pos)?.type.name === 'image';
     return blockInfo(doc, $p.before(d), isImage ? { kind: 'node', offset: pos - $p.start(d) } : { kind: 'text', offset: 0 });
   }

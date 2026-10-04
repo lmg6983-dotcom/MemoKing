@@ -67,7 +67,10 @@ export function fixTranscript(text, vocab = []) {
   const out = String(text ?? '')
     .replace(/[ \t]+/g, ' ')
     .split('\n')
-    .map((line) => line.split(' ').map((w) => (w ? correctWord(w, vocab, known) ?? w : w)).join(' '))
+    .map((line) => {
+      const label = line.match(/^\s*화자\s*\d+\s*:\s*/)?.[0] ?? ''; // 말한 사람 이름표는 그대로
+      return label + line.slice(label.length).split(' ').map((w) => (w ? correctWord(w, vocab, known) ?? w : w)).join(' ');
+    })
     .join('\n');
   return out
     .replace(/ +([.,?!])/g, '$1') // 부호 앞 띄어쓰기

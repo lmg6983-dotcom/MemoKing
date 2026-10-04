@@ -19,6 +19,7 @@ import org.vosk.LibVosk
 import org.vosk.LogLevel
 import org.vosk.Model
 import org.vosk.Recognizer
+import org.vosk.SpeakerModel
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -41,8 +42,11 @@ interface Transcriber {
     fun close()
 }
 
-/** 받아쓴 글 조각: final = 한 문장이 끝남, partial = 말하는 중(바뀔 수 있음) */
-typealias SttListener = (final: String?, partial: String?) -> Unit
+/**
+ * 받아쓴 글 조각: final = 한 문장이 끝남, partial = 말하는 중(바뀔 수 있음)
+ * speaker = 말한 사람 번호(1, 2, …), 모르면 0 — Vosk 말한 사람 모델을 받았을 때만
+ */
+typealias SttListener = (final: String?, partial: String?, speaker: Int) -> Unit
 
 object Stt {
     const val SAMPLE_RATE = 16000
@@ -64,7 +68,7 @@ object Stt {
      */
     fun create(ctx: Context, engine: String, listener: SttListener, terms: List<String> = emptyList()): Transcriber {
         val inner = if (engine == ENGINE_SYSTEM && Build.VERSION.SDK_INT >= 33) SystemTranscriber(ctx, listener, terms)
-        else VoskTranscriber(VoskModels.load(ctx), listener)
+        else VoskTranscriber(VoskModels.load(ctx), if (SpeakerModels.on(ctx)) SpeakerModels.load(ctx) else null, listener)
         return Conditioned(inner)
     }
 
@@ -85,20 +89,38 @@ object Stt {
         .put("progress", VoskModels.progress)
         .put("modelSize", VoskModels.SIZE_LABEL)
         .put("system", systemAvailable(ctx))
+        .put("speaker", if (SpeakerModels.ready(ctx)) "ready" else if (SpeakerModels.progress >= 0) "downloading" else "missing")
+        .put("speakerOn", SpeakerModels.on(ctx))
+        .put("speakerSize", SpeakerModels.SIZE_LABEL)
 }
 
 // ---------- Vosk (오픈소스, 인터넷 없이) ----------
 
-class VoskTranscriber(model: Model, private val listener: SttListener) : Transcriber {
-    private val rec = Recognizer(model, Stt.SAMPLE_RATE.toFloat())
+class VoskTranscriber(model: Model, spk: SpeakerModel?, private val listener: SttListener) : Transcriber {
+    private val rec = (if (spk != null) Recognizer(model, Stt.SAMPLE_RATE.toFloat(), spk) else Recognizer(model, Stt.SAMPLE_RATE.toFloat())).also {
+        // 문장 끝을 조금 빨리 끊는다(0.6초 쉬면 한 문장) — 문장마다 줄을 바꾸고, 말한 사람이 바뀌는 자리를 놓치지 않게
+        try {
+            it.setEndpointerDelays(5.0f, 0.6f, 20.0f)
+        } catch (e: Throwable) {
+            // 옛 라이브러리
+        }
+    }
+    private val speakers = SpeakerTracker()
     private var lastPartial = ""
     private var partialAt = 0L
 
+    private fun emit(json: String) {
+        val o = JSONObject(json)
+        val text = o.optString("text").trim()
+        lastPartial = ""
+        if (text.isEmpty()) return
+        val vec = o.optJSONArray("spk")?.let { a -> FloatArray(a.length()) { a.optDouble(it).toFloat() } }
+        listener(text, "", speakers.assign(vec, o.optInt("spk_frames", 0)))
+    }
+
     override fun feed(pcm: ByteArray, len: Int) {
         if (rec.acceptWaveForm(pcm, len)) {
-            val text = JSONObject(rec.result).optString("text").trim()
-            lastPartial = ""
-            if (text.isNotEmpty()) listener(text, "")
+            emit(rec.result)
         } else {
             val now = System.currentTimeMillis()
             if (now - partialAt < 300) return // 말하는 중 글은 0.3초마다만
@@ -106,55 +128,100 @@ class VoskTranscriber(model: Model, private val listener: SttListener) : Transcr
             val partial = JSONObject(rec.partialResult).optString("partial").trim()
             if (partial != lastPartial) {
                 lastPartial = partial
-                listener(null, partial)
+                listener(null, partial, 0)
             }
         }
     }
 
-    override fun finish(): String = try {
-        JSONObject(rec.finalResult).optString("text").trim()
-    } catch (e: Exception) {
-        ""
+    override fun finish(): String {
+        try {
+            emit(rec.finalResult)
+        } catch (e: Exception) {
+            // 남은 소리 없음
+        }
+        return ""
     }
 
     override fun close() = rec.close()
 }
 
-/** Vosk 한국어 모델: 앱 안 저장 공간(files/stt/)에 한 번 받아 두고 쓴다 */
-object VoskModels {
-    const val NAME = "vosk-model-small-ko-0.22"
-    const val URL_ZIP = "https://alphacephei.com/vosk/models/$NAME.zip"
-    const val SIZE_LABEL = "약 87MB"
+/**
+ * 말한 사람 나누기 (가볍게): Vosk 말한 사람 모델이 문장마다 주는 목소리 특징(x-vector, 128개 수)을
+ * 지금까지의 사람별 평균과 견줘(코사인 유사도) 가장 닮은 사람으로, 아무와도 안 닮으면 새 사람으로.
+ * 아주 짧은 말("네", "음")은 특징이 흔들리므로 바로 앞 사람으로 둔다.
+ */
+class SpeakerTracker(private val threshold: Float = 0.45f, private val maxSpeakers: Int = 6, private val minFrames: Int = 80) {
+    private val centroids = ArrayList<FloatArray>()
+    private val counts = ArrayList<Int>()
+    private var last = 0
+
+    /** @return 말한 사람 번호(1부터), 특징이 없으면 0 */
+    fun assign(vec: FloatArray?, frames: Int): Int {
+        if (vec == null || vec.isEmpty()) return 0
+        if (frames in 1 until minFrames && last > 0) return last
+        val v = unit(vec)
+        var best = -1
+        var bestSim = -2f
+        for (i in centroids.indices) {
+            val s = dot(v, centroids[i])
+            if (s > bestSim) {
+                bestSim = s
+                best = i
+            }
+        }
+        if (best < 0 || (bestSim < threshold && centroids.size < maxSpeakers)) {
+            centroids.add(v)
+            counts.add(1)
+            last = centroids.size
+            return last
+        }
+        // 사람별 평균을 조금씩 다듬기
+        val n = counts[best]
+        val c = centroids[best]
+        for (i in c.indices) c[i] = (c[i] * n + v[i]) / (n + 1)
+        centroids[best] = unit(c)
+        counts[best] = minOf(n + 1, 50)
+        last = best + 1
+        return last
+    }
+
+    private fun unit(x: FloatArray): FloatArray {
+        var s = 0.0
+        for (f in x) s += f * f
+        val n = kotlin.math.sqrt(s).toFloat().takeIf { it > 0f } ?: 1f
+        return FloatArray(x.size) { x[it] / n }
+    }
+
+    private fun dot(a: FloatArray, b: FloatArray): Float {
+        var s = 0f
+        for (i in 0 until minOf(a.size, b.size)) s += a[i] * b[i]
+        return s
+    }
+}
+
+/** Vosk 모델 하나: 앱 안 저장 공간(files/stt/)에 한 번 받아 두고 쓴다 */
+open class VoskPack(val name: String, val sizeLabel: String) {
+    private val urlZip = "https://alphacephei.com/vosk/models/$name.zip"
 
     /** 받는 중이면 0~100, 아니면 -1 */
     @Volatile
     var progress = -1
         private set
 
-    private var model: Model? = null
-
     private fun root(ctx: Context) = File(ctx.filesDir, "stt")
-    fun dir(ctx: Context) = File(root(ctx), NAME)
+    fun dir(ctx: Context) = File(root(ctx), name)
     fun ready(ctx: Context) = File(dir(ctx), ".ok").isFile
-
-    @Synchronized
-    fun load(ctx: Context): Model {
-        model?.let { return it }
-        if (!ready(ctx)) throw IllegalStateException("받아쓰기 모델이 없어요")
-        LibVosk.setLogLevel(LogLevel.WARNINGS)
-        return Model(dir(ctx).absolutePath).also { model = it }
-    }
 
     /** 모델 받기 (zip 을 받아 풀기). 오래 걸리므로 백그라운드 스레드에서 */
     @Synchronized
     fun download(ctx: Context, onProgress: (Int) -> Unit) {
         if (ready(ctx)) return
         val root = root(ctx).apply { mkdirs() }
-        val zip = File(root, "$NAME.zip.part")
-        val unpack = File(root, "$NAME.part")
+        val zip = File(root, "$name.zip.part")
+        val unpack = File(root, "$name.part")
         progress = 0
         try {
-            var conn = URL(URL_ZIP).openConnection() as HttpURLConnection
+            var conn = URL(urlZip).openConnection() as HttpURLConnection
             for (i in 0 until 5) { // https → 다른 주소로 넘겨주기(리다이렉트) 따라가기
                 conn.instanceFollowRedirects = true
                 conn.connectTimeout = 20_000
@@ -163,7 +230,7 @@ object VoskModels {
                 if (code in 300..399) {
                     val next = conn.getHeaderField("Location") ?: break
                     conn.disconnect()
-                    conn = URL(URL(URL_ZIP), next).openConnection() as HttpURLConnection
+                    conn = URL(URL(urlZip), next).openConnection() as HttpURLConnection
                     continue
                 }
                 if (code != 200) throw IOException("모델을 받지 못했어요 (HTTP $code)")
@@ -190,7 +257,7 @@ object VoskModels {
                 }
             }
             conn.disconnect()
-            // 풀기: zip 안의 "vosk-model-small-ko-0.22/..." → files/stt/vosk-model-small-ko-0.22/...
+            // 풀기: zip 안의 "<모델 이름>/..." → files/stt/<모델 이름>/...
             unpack.deleteRecursively()
             unpack.mkdirs()
             ZipInputStream(zip.inputStream().buffered()).use { zin ->
@@ -207,7 +274,7 @@ object VoskModels {
                     }
                 }
             }
-            File(unpack, ".ok").writeText(NAME)
+            File(unpack, ".ok").writeText(name)
             dir(ctx).deleteRecursively()
             if (!unpack.renameTo(dir(ctx))) throw IOException("모델을 풀지 못했어요")
             progress = 100
@@ -219,11 +286,57 @@ object VoskModels {
         }
     }
 
+    protected open fun unload() {}
+
     @Synchronized
     fun delete(ctx: Context) {
+        unload()
+        dir(ctx).deleteRecursively()
+    }
+}
+
+/** Vosk 한국어 받아쓰기 모델 (약 87MB) */
+object VoskModels : VoskPack("vosk-model-small-ko-0.22", "약 87MB") {
+    const val SIZE_LABEL = "약 87MB"
+    private var model: Model? = null
+
+    @Synchronized
+    fun load(ctx: Context): Model {
+        model?.let { return it }
+        if (!ready(ctx)) throw IllegalStateException("받아쓰기 모델이 없어요")
+        LibVosk.setLogLevel(LogLevel.WARNINGS)
+        return Model(dir(ctx).absolutePath).also { model = it }
+    }
+
+    override fun unload() {
         model?.close()
         model = null
-        dir(ctx).deleteRecursively()
+    }
+}
+
+/** Vosk 말한 사람 모델 (약 13MB, 모든 언어) — 받아 두고 켜면 받아쓴 글을 말한 사람별로 나눈다 */
+object SpeakerModels : VoskPack("vosk-model-spk-0.4", "약 13MB") {
+    const val SIZE_LABEL = "약 13MB"
+    private var model: SpeakerModel? = null
+    private const val PREFS = "memoking.stt"
+
+    fun on(ctx: Context) = ready(ctx) && ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("speakers", true)
+    fun setOn(ctx: Context, on: Boolean) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("speakers", on).apply()
+
+    @Synchronized
+    fun load(ctx: Context): SpeakerModel? {
+        model?.let { return it }
+        return try {
+            SpeakerModel(dir(ctx).absolutePath).also { model = it }
+        } catch (e: Throwable) {
+            android.util.Log.w("MemoKing", "말한 사람 모델을 열지 못했어요", e)
+            null
+        }
+    }
+
+    override fun unload() {
+        model?.close()
+        model = null
     }
 }
 
@@ -258,11 +371,11 @@ class SystemTranscriber(private val ctx: Context, private val listener: SttListe
         sr.setRecognitionListener(object : RecognitionListener {
             override fun onSegmentResults(segmentResults: Bundle) {
                 val text = segmentResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
-                if (text.isNotEmpty()) listener(text, "")
+                if (text.isNotEmpty()) listener(text, "", 0)
             }
             override fun onPartialResults(partialResults: Bundle) {
                 val text = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
-                listener(null, text)
+                listener(null, text, 0)
             }
             override fun onResults(results: Bundle) {
                 onSegmentResults(results)
@@ -405,12 +518,12 @@ class SpeechConditioner(rate: Int) {
 object FileTranscriber {
     /** 파일을 16kHz 모노로 풀어 받아쓴다. onProgress: 0~100 */
     fun run(ctx: Context, file: File, engine: String, terms: List<String> = emptyList(), onProgress: (Int) -> Unit): String {
-        val parts = ArrayList<String>()
-        val stt = Stt.create(ctx, engine, { final, _ -> if (!final.isNullOrBlank()) synchronized(parts) { parts.add(final) } }, terms)
+        val parts = ArrayList<Transcript.Line>()
+        val stt = Stt.create(ctx, engine, { final, _, spk -> if (!final.isNullOrBlank()) synchronized(parts) { parts.add(Transcript.Line(final, spk)) } }, terms)
         try {
             AudioDecoder.decode16k(file, onProgress) { pcm -> stt.feed(pcm, pcm.size) }
             val tail = stt.finish()
-            if (tail.isNotBlank()) synchronized(parts) { parts.add(tail) }
+            if (tail.isNotBlank()) synchronized(parts) { parts.add(Transcript.Line(tail, 0)) }
             onProgress(100)
         } finally {
             stt.close()
@@ -531,8 +644,13 @@ class Resampler(private val inRate: Int, private val channels: Int) {
     }
 }
 
-/** 받아쓴 조각들을 읽기 좋은 글로: 조각 끝에 문장부호(Vosk 는 안 붙여 준다), 조각 사이는 띄어쓰기, 몇 조각마다 문단 */
+/**
+ * 받아쓴 조각들을 읽기 좋은 글로: 조각(한 문장)마다 줄을 바꾸고, 끝에 문장부호(Vosk 는 안 붙여 준다).
+ * 말한 사람이 둘 이상이면 사람이 바뀌는 줄 앞에 "화자 2: " (같은 사람이 이어 말하면 줄만 바꿈)
+ */
 object Transcript {
+    data class Line(val text: String, val speaker: Int = 0)
+
     // 묻는 말로 끝나면 ?, 맺는 말로 끝나면 . (이미 부호가 있으면 그대로)
     private val QUESTION = Regex("(까|까요|나요|가요|는지|는지요|냐|래요|대요|할래|했니|하니|있니|없니|어때|어때요)$")
     private val STATEMENT = Regex("(다|요|죠|네|군|자|세요|니다|지|야|어|아|해|래)$")
@@ -547,12 +665,21 @@ object Transcript {
         }
     }
 
-    fun join(parts: List<String>, perParagraph: Int = 4): String {
+    fun join(parts: List<Line>): String {
+        val lines = parts.filter { it.text.isNotBlank() }
+        val many = lines.map { it.speaker }.filter { it > 0 }.distinct().size >= 2
         val sb = StringBuilder()
-        parts.filter { it.isNotBlank() }.forEachIndexed { i, p ->
-            if (i > 0) sb.append(if (i % perParagraph == 0) "\n\n" else " ")
-            sb.append(punctuate(p))
+        var who = -1
+        for (l in lines) {
+            if (sb.isNotEmpty()) sb.append('\n')
+            // 모르는(0) 조각은 앞사람으로
+            val spk = if (l.speaker > 0) l.speaker else who
+            if (many && spk > 0 && spk != who) sb.append("화자 ").append(spk).append(": ")
+            if (spk > 0) who = spk
+            sb.append(punctuate(l.text))
         }
         return sb.toString()
     }
+
+    fun joinText(parts: List<String>) = join(parts.map { Line(it) })
 }
