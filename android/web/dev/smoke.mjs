@@ -514,6 +514,45 @@ try {
   f = fileWith('오늘 회의를 시작하겠습니다');
   check('음성 메모: 소리 파일 + 받아쓴 글', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 음성 메모'), f && read(f));
 
+  // 소리·표·수식·글 문단도 자유롭게 옮기기 (소리는 이름 줄 ⠿, 글 문단·표는 왼쪽 손잡이 ⠿)
+  fs.writeFileSync(path.join(vault, 'attachments/move-test.m4a'), Buffer.from('fake'));
+  write('옮기기.md', '---\nid: 00000000-0000-4000-8000-0000000000aa\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 옮기기\n\n첫 문단\n\n![녹음 테스트](attachments/move-test.m4a)\n\n| 가 | 나 |\n| --- | --- |\n| 1 | 2 |\n\n끝 문단\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000aa"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .mk-media-label');
+  await page.waitForTimeout(400);
+  const orderOf = (...keys) => { const t = read('옮기기.md'); return keys.map((k) => t.indexOf(k)); };
+  const lab = await page.locator('.mk-media-label').boundingBox();
+  const first = await page.locator('.mk-doc p', { hasText: '첫 문단' }).boundingBox();
+  await touch('touchStart', lab.x + 40, lab.y + lab.height / 2);
+  await page.waitForTimeout(550);
+  check('소리 옮기기: 이름 줄을 꾹 누르면 들어 올림', (await page.locator('.mk-block-lift').count()) === 1);
+  for (let i = 1; i <= 6; i++) await touch('touchMove', lab.x + 40, lab.y - ((lab.y - first.y) * i) / 6);
+  await page.waitForTimeout(100);
+  await touch('touchEnd', 0, 0);
+  await page.waitForTimeout(900);
+  let ord = orderOf('녹음 테스트', '첫 문단');
+  check('소리 옮기기: 다른 줄과 맞바꿈', ord[0] > 0 && ord[0] < ord[1], read('옮기기.md'));
+  // 손잡이: 표가 든 줄을 눌러 커서를 두면 왼쪽에 ⠿, 잡고 끝 문단 아래로
+  await page.locator('.mk-doc td', { hasText: '1' }).first().tap();
+  await page.waitForTimeout(300);
+  check('손잡이: 커서가 있는 줄 왼쪽에 ⠿', await page.isVisible('.mk-grip'));
+  await shot('15-grip');
+  const g = await page.locator('.mk-grip').boundingBox();
+  const last = await page.locator('.mk-doc p', { hasText: '끝 문단' }).boundingBox();
+  await touch('touchStart', g.x + g.width / 2, g.y + g.height / 2);
+  await page.waitForTimeout(120);
+  check('손잡이: 잡으면 바로 들어 올림 · 키보드 막기', (await page.locator('.mk-block-lift').count()) === 1 && (await page.getAttribute('.mk-doc', 'inputmode')) === 'none');
+  for (let i = 1; i <= 8; i++) await touch('touchMove', g.x + 10, g.y + ((last.y + last.height + 4 - g.y) * i) / 8);
+  await page.waitForTimeout(100);
+  await touch('touchEnd', 0, 0);
+  await page.waitForTimeout(900);
+  ord = orderOf('끝 문단', '| 가 |');
+  check('손잡이: 표를 통째로 끝 문단 아래로', ord[0] > 0 && ord[0] < ord[1], read('옮기기.md'));
+  await back();
+  await page.waitForTimeout(300);
+
   // 정확하게 다시 받아쓰기 · 말한 사람 구분: 메모 메뉴 › 모델 받기 → 녹음 바로 아래에 화자 1·2
   const voiceCard = page.locator('.card', { hasText: '음성 메모' }).first();
   await voiceCard.dispatchEvent('contextmenu');

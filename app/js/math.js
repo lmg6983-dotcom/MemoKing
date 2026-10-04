@@ -216,7 +216,8 @@ function mathView(node, view, getPos, readOnly) {
     },
     selectNode: () => dom.classList.add('selected'),
     deselectNode: () => dom.classList.remove('selected'),
-    stopEvent: (e) => ['mousedown', 'click', 'pointerdown', 'touchstart'].includes(e.type) && !readOnly,
+    // 누르기·끌기는 편집기로 보내 줄 옮기기가 받게 (그냥 누르면 click 으로 고치기 창)
+    stopEvent: (e) => e.type === 'click' && !readOnly,
     ignoreMutation: () => true,
   };
 }

@@ -1202,3 +1202,23 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 /* ---------- v0.18.1: 큰 그림·동영상·링크 카드는 들어 올리면 작은 썸네일로 (놓을 자리 주변 글이 보이게) ---------- */
 .mk-doc .mk-block-thumb { border-radius: 14px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), 0 0 0 6px var(--note-bg), 0 0 0 10px var(--note-text); }
 .mk-doc .mk-block-thumb > * { animation: none; }
+
+/* ---------- v0.18.1: 줄 손잡이 ⠿ — 글 문단·제목·표·코드·인용·목록 묶음도 잡고 끌어 옮기기 ---------- */
+.mk-grip {
+  position: fixed; z-index: 20;
+  display: grid; place-items: center;
+  padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--note-muted, #888);
+  font-size: 15px; line-height: 1; letter-spacing: 0;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  opacity: 0.55; transition: opacity 0.12s, background-color 0.12s;
+}
+.mk-grip:hover, .mk-grip:active { opacity: 1; background: var(--note-hover, rgba(0, 0, 0, 0.07)); }
+.mk-grip[hidden] { display: none; }
+body.mk-block-dragging .mk-grip, body.mk-list-dragging .mk-grip { display: none; }
+@media print { .mk-grip { display: none !important; } }
+/* 소리·동영상: 위의 이름 줄이 잡는 곳 (⠿) */
+.mk-media .mk-media-label { display: flex; align-items: center; gap: 4px; padding: 3px 6px 2px; cursor: grab; touch-action: none; -webkit-touch-callout: none; }
+.mk-media .mk-media-label::before { content: "⠿"; font-size: 13px; opacity: 0.7; }
+.mk-doc[contenteditable="false"] .mk-media .mk-media-label { cursor: default; }
+.mk-doc[contenteditable="false"] .mk-media .mk-media-label::before { content: none; }

@@ -75,12 +75,12 @@ function mediaView(node) {
     const dom = document.createElement('span');
     dom.className = `mk-media mk-${kind}`;
     dom.contentEditable = 'false';
-    if (alt) {
-      const label = document.createElement('span');
-      label.className = 'mk-media-label';
-      label.textContent = alt;
-      dom.append(label);
-    }
+    // 이름 줄 = 잡는 곳 (⠿): 꾹 눌러(휴대폰)·끌어(PC) 이 줄을 옮긴다 — 플레이어 단추는 재생용
+    const label = document.createElement('span');
+    label.className = 'mk-media-label';
+    label.title = '잡고 끌어서 옮기기';
+    label.textContent = alt || baseName(String(src).split('/').pop() ?? '') || (kind === 'video' ? '동영상' : '소리');
+    dom.append(label);
     const el = document.createElement(kind);
     el.preload = 'metadata';
     el.src = vaultUrl(src);
@@ -89,7 +89,13 @@ function mediaView(node) {
     const player = new Plyr(el, playerOptions(kind));
     return {
       dom,
-      stopEvent: () => true, // 플레이어 조작이 편집기로 새지 않게
+      // 플레이어 조작은 편집기로 새지 않게. 이름 줄(그리고 동영상 화면)은 편집기로 보내 줄 옮기기가 받게
+      stopEvent: (e) => {
+        const t = e.target instanceof Element ? e.target : null;
+        if (t?.closest('.mk-media-label')) return false;
+        if (kind === 'video' && t && !t.closest('.plyr__controls, .plyr__control, button, input')) return false;
+        return true;
+      },
       ignoreMutation: () => true,
       destroy: () => player.destroy(),
     };
