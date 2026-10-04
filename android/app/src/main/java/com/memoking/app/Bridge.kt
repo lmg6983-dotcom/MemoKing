@@ -290,7 +290,7 @@ class Bridge(private val activity: MainActivity) {
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
             "micPermission" -> activity.runOnUiThread { activity.requestMicPermission(id) }
             "recordStart" -> activity.runOnUiThread {
-                resolve(id) { RecorderService.start(activity, a.getString("memoId"), a.optBoolean("stt", true), a.optString("engine", Stt.ENGINE_VOSK)) }
+                resolve(id) { RecorderService.start(activity, a.getString("memoId"), a.optBoolean("stt", true), a.optString("engine", Stt.ENGINE_VOSK), terms(a)) }
             }
             "recordStop" -> pool.execute { resolve(id) { RecorderService.stop(ctx) } }
             // 소리 파일 받아쓰기: 메모 폴더의 파일(rel) 또는 임시 파일(temp)
@@ -300,7 +300,7 @@ class Bridge(private val activity: MainActivity) {
                     Stt.unavailableReason(ctx, engine)?.let { throw IllegalStateException(it) }
                     val (file, temporary) = audioFile(a)
                     try {
-                        val text = FileTranscriber.run(ctx, file, engine) { p ->
+                        val text = FileTranscriber.run(ctx, file, engine, terms(a)) { p ->
                             activity.runOnUiThread { activity.emit("transcribe", JSONObject().put("progress", p)) }
                         }
                         JSONObject().put("text", text)
@@ -362,6 +362,9 @@ class Bridge(private val activity: MainActivity) {
             else -> resolve(id) { throw IllegalArgumentException("알 수 없는 기능: $method") }
         }
     }
+
+    /** 받아쓰기 힌트 낱말 (화면이 메모 폴더의 태그·자주 쓰는 말에서 골라 준다) */
+    private fun terms(a: JSONObject): List<String> = a.optJSONArray("terms")?.let { arr -> List(arr.length()) { arr.optString(it) }.filter { it.isNotBlank() } } ?: emptyList()
 
     /** 받아쓸 소리 파일 → (파일, 다 쓰면 지울지). 메모 폴더(SAF 일 수도)는 임시 파일로 복사해 읽는다 */
     private fun audioFile(a: JSONObject): Pair<File, Boolean> {

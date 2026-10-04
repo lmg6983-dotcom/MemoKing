@@ -6,6 +6,7 @@ import { loneUrl } from '../../app/js/core/link-preview.js';
 import { shareText } from '../../app/js/core/share-text.js';
 import { importText, isTextDocument, stripFrontMatter } from '../../app/js/core/markdown-import.js';
 import { mediaKind } from '../../app/js/media.js';
+import { vocabularyFrom, fixTranscript } from '../../app/js/core/transcript-fix.js';
 import { native, call, on, setBackHandler, drive, history, fs } from './native.js';
 import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
@@ -458,6 +459,16 @@ shareSheet.addEventListener('click', async (e) => {
 
 const escapeText = (t) => importText(t).markdown;
 
+// 받아쓰기 말모음: 이 메모 폴더의 태그·제목에 자주 나온 낱말 (힌트로 넘기고, 받아쓴 글을 고칠 때 쓴다)
+let vocabCache = { at: 0, list: [] };
+function sttVocab() {
+  if (!app.vault) return [];
+  if (Date.now() - vocabCache.at > 60_000) vocabCache = { at: Date.now(), list: vocabularyFrom(app.vault.bodies()) };
+  return vocabCache.list;
+}
+app.sttTerms = () => sttVocab().map((t) => t.term);
+const polish = (text) => fixTranscript(text, sttVocab());
+
 function whenLabel(ms) {
   const d = new Date(ms || Date.now());
   const h = d.getHours();
@@ -470,7 +481,7 @@ app.deliverRecording = async (r) => {
   const alt = `녹음 ${whenLabel(r.startedAt)} · ${duration}`;
   const [item] = note.tempsToItems([{ temp: r.temp, name: r.name || 'recording.m4a', mime: r.mime || 'audio/mp4' }]);
   item.alt = alt;
-  const transcript = String(r.transcript ?? '').trim();
+  const transcript = polish(String(r.transcript ?? '').trim());
   const textMd = transcript ? escapeText(transcript) : '';
   let memoId = r.memoId;
   if (note.currentId() === memoId) {
@@ -770,8 +781,8 @@ async function transcribeInto(memoId, items) {
   for (const item of items) {
     try {
       toast(`"${item.alt}" 를 받아쓰고 있어요…`);
-      const res = await call('transcribe', { rel: item.src, engine: recorder.sttEngine() });
-      const text = String(res?.text ?? '').trim();
+      const res = await call('transcribe', { rel: item.src, engine: recorder.sttEngine(), terms: app.sttTerms() });
+      const text = polish(String(res?.text ?? '').trim());
       if (!text) {
         toast('받아쓸 말소리를 찾지 못했어요');
         continue;

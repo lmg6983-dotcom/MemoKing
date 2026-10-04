@@ -55,11 +55,11 @@ class RecorderService : Service() {
         fun hasMic(ctx: Context) = ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
         /** 녹음 시작 → { stt: 받아쓰는지, reason: 못 받아쓰는 이유 } */
-        fun start(ctx: Context, memoId: String, stt: Boolean, engine: String): JSONObject {
+        fun start(ctx: Context, memoId: String, stt: Boolean, engine: String, terms: List<String> = emptyList()): JSONObject {
             if (session != null) throw IllegalStateException("이미 녹음하고 있어요")
             if (!hasMic(ctx)) throw IllegalStateException("마이크 권한이 없어요")
             val reason = if (stt) Stt.unavailableReason(ctx, engine) else null
-            val s = Session(ctx.applicationContext, memoId, stt && reason == null, engine, wantedStt = stt)
+            val s = Session(ctx.applicationContext, memoId, stt && reason == null, engine, wantedStt = stt, terms = terms)
             session = s
             val intent = Intent(ctx, RecorderService::class.java).setAction(ACTION_START)
             try {
@@ -203,6 +203,7 @@ class RecorderService : Service() {
         val stt: Boolean,
         private val engine: String,
         private val wantedStt: Boolean,
+        private val terms: List<String> = emptyList(),
     ) {
         val id: String = UUID.randomUUID().toString()
         val startedAt = System.currentTimeMillis()
@@ -237,14 +238,20 @@ class RecorderService : Service() {
         fun begin() {
             val min = AudioRecord.getMinBufferSize(Stt.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
             val size = maxOf(min, Stt.SAMPLE_RATE / 5 * 2) // 0.2초
-            val rec = AudioRecord(MediaRecorder.AudioSource.MIC, Stt.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, size * 2)
+            // 받아쓰기에 맞춘 마이크(VOICE_RECOGNITION: 기기의 소리 꾸밈 없이 고른 소리) — 안 되는 기기는 보통 마이크로
+            fun open(source: Int) = AudioRecord(source, Stt.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, size * 2)
+            var rec = open(if (stt) MediaRecorder.AudioSource.VOICE_RECOGNITION else MediaRecorder.AudioSource.MIC)
+            if (rec.state != AudioRecord.STATE_INITIALIZED) {
+                rec.release()
+                rec = open(MediaRecorder.AudioSource.MIC)
+            }
             if (rec.state != AudioRecord.STATE_INITIALIZED) {
                 rec.release()
                 throw IllegalStateException("마이크를 열지 못했어요")
             }
             val encoder = AacEncoder(file, Stt.SAMPLE_RATE)
             val transcriber = if (stt) try {
-                Stt.create(ctx, engine) { final, part -> onText(final, part) }
+                Stt.create(ctx, engine, { final, part -> onText(final, part) }, terms)
             } catch (e: Exception) {
                 android.util.Log.w("MemoKing", "받아쓰기를 시작하지 못했어요", e)
                 sttError = true

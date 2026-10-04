@@ -58,9 +58,27 @@ object Stt {
         else -> if (VoskModels.ready(ctx)) null else "받아쓰기 모델을 아직 받지 않았어요 (설정 › 녹음 › 한국어 받아쓰기 모델)"
     }
 
-    fun create(ctx: Context, engine: String, listener: SttListener): Transcriber =
-        if (engine == ENGINE_SYSTEM && Build.VERSION.SDK_INT >= 33) SystemTranscriber(ctx, listener)
+    /**
+     * @param terms 이 메모 폴더에서 자주 쓰는 낱말(태그·제목 등) — 휴대폰 음성 인식에 "이런 말이 나올 수 있어요" 힌트로
+     * 받아쓰기 엔진에 넘기기 전에 소리를 다듬는다 (SpeechConditioner: 낮은 웅웅 소리 빼기 · 작은 목소리 키우기)
+     */
+    fun create(ctx: Context, engine: String, listener: SttListener, terms: List<String> = emptyList()): Transcriber {
+        val inner = if (engine == ENGINE_SYSTEM && Build.VERSION.SDK_INT >= 33) SystemTranscriber(ctx, listener, terms)
         else VoskTranscriber(VoskModels.load(ctx), listener)
+        return Conditioned(inner)
+    }
+
+    /** 받아쓰기용으로만 다듬은 소리를 넘긴다 (녹음 파일은 원래 소리 그대로) */
+    private class Conditioned(private val inner: Transcriber) : Transcriber {
+        private val conditioner = SpeechConditioner(SAMPLE_RATE)
+        override fun feed(pcm: ByteArray, len: Int) {
+            val copy = pcm.copyOf(len)
+            conditioner.process(copy, len)
+            inner.feed(copy, len)
+        }
+        override fun finish() = inner.finish()
+        override fun close() = inner.close()
+    }
 
     fun status(ctx: Context): JSONObject = JSONObject()
         .put("model", if (VoskModels.ready(ctx)) "ready" else if (VoskModels.progress >= 0) "downloading" else "missing")
@@ -210,22 +228,31 @@ object VoskModels {
 }
 
 // ---------- 휴대폰 음성 인식 (안드로이드 13+, 녹음한 소리를 파이프로 넘긴다) ----------
+//   - 자주 쓰는 낱말을 힌트로 (EXTRA_BIASING_STRINGS) — 사람 이름·회사·제품 이름 같은 말을 더 잘 알아듣게
+//   - 문장부호·띄어쓰기 다듬기 (EXTRA_ENABLE_FORMATTING, 정확도 우선)
+//   - 인식기가 오류로 멈추면(네트워크가 잠깐 끊김 등) 새 파이프로 다시 시작 — 긴 회의에서 받아쓰기가 끊기지 않게
 
-class SystemTranscriber(private val ctx: Context, private val listener: SttListener) : Transcriber {
+class SystemTranscriber(private val ctx: Context, private val listener: SttListener, private val terms: List<String> = emptyList()) : Transcriber {
     private val main = Handler(Looper.getMainLooper())
-    private val pipe = ParcelFileDescriptor.createPipe()
-    private val out = ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])
+    @Volatile
+    private var out: java.io.OutputStream? = null
+    private var readEnd: ParcelFileDescriptor? = null
     private var recognizer: SpeechRecognizer? = null
     private val ended = CountDownLatch(1)
     @Volatile
-    private var failed = false
+    private var finishing = false
+    @Volatile
+    private var dead = false
+    private var restarts = 0
 
     init {
         main.post { begin() }
     }
 
     private fun begin() {
-        if (Build.VERSION.SDK_INT < 33) return
+        if (Build.VERSION.SDK_INT < 33 || finishing) return
+        val pipe = ParcelFileDescriptor.createPipe()
+        readEnd = pipe[0]
         val sr = SpeechRecognizer.createSpeechRecognizer(ctx)
         recognizer = sr
         sr.setRecognitionListener(object : RecognitionListener {
@@ -239,15 +266,19 @@ class SystemTranscriber(private val ctx: Context, private val listener: SttListe
             }
             override fun onResults(results: Bundle) {
                 onSegmentResults(results)
-                ended.countDown()
+                if (finishing) ended.countDown() else restart()
             }
             override fun onEndOfSegmentedSession() {
-                ended.countDown()
+                if (finishing) ended.countDown() else restart()
             }
             override fun onError(error: Int) {
-                failed = true
-                ended.countDown()
                 android.util.Log.w("MemoKing", "음성 인식 오류 $error")
+                val fatal = error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED || error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ||
+                    error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS || error == SpeechRecognizer.ERROR_CLIENT
+                if (finishing || fatal || restarts >= 30) {
+                    dead = !finishing
+                    ended.countDown()
+                } else restart()
             }
             override fun onReadyForSpeech(params: Bundle?) {}
             override fun onBeginningOfSpeech() {}
@@ -265,21 +296,45 @@ class SystemTranscriber(private val ctx: Context, private val listener: SttListe
             .putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
             .putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, Stt.SAMPLE_RATE)
             .putExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION, RecognizerIntent.EXTRA_AUDIO_SOURCE)
+            .putExtra(RecognizerIntent.EXTRA_ENABLE_FORMATTING, RecognizerIntent.FORMATTING_OPTIMIZE_QUALITY)
+        if (terms.isNotEmpty()) intent.putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, ArrayList(terms.take(100)))
+        out = ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])
         sr.startListening(intent)
     }
 
-    override fun feed(pcm: ByteArray, len: Int) {
-        if (failed) return
+    /** 멈춘 인식기를 버리고 새로 (그동안 들어오는 소리는 새 파이프로) */
+    private fun restart() {
+        restarts++
+        val oldOut = out
+        out = null
         try {
-            out.write(pcm, 0, len)
+            oldOut?.close()
         } catch (e: IOException) {
-            failed = true
+            // 이미 닫힘
+        }
+        recognizer?.destroy()
+        recognizer = null
+        try {
+            readEnd?.close()
+        } catch (e: IOException) {
+            // 무시
+        }
+        main.postDelayed({ begin() }, 300)
+    }
+
+    override fun feed(pcm: ByteArray, len: Int) {
+        if (dead || finishing) return
+        try {
+            out?.write(pcm, 0, len)
+        } catch (e: IOException) {
+            // 인식기가 다시 시작하는 사이 — 그 조각은 버린다
         }
     }
 
     override fun finish(): String {
+        finishing = true
         try {
-            out.close() // 소리가 끝났다고 알린다 → 남은 글을 보내고 끝남
+            out?.close() // 소리가 끝났다고 알린다 → 남은 글을 보내고 끝남
         } catch (e: IOException) {
             // 이미 닫힘
         }
@@ -288,14 +343,59 @@ class SystemTranscriber(private val ctx: Context, private val listener: SttListe
     }
 
     override fun close() {
+        finishing = true
         main.post {
             recognizer?.destroy()
             recognizer = null
+            try {
+                readEnd?.close()
+            } catch (e: IOException) {
+                // 무시
+            }
         }
-        try {
-            pipe[0].close()
-        } catch (e: IOException) {
-            // 무시
+    }
+}
+
+/**
+ * 받아쓰기 전에 소리를 가볍게 다듬는다 (연산 몇 개, 지연 없음)
+ *   1) 고역 통과(약 100Hz 아래 빼기): 에어컨·책상 울림 같은 낮은 웅웅 소리가 말소리로 잘못 들리지 않게
+ *   2) 자동 크기 맞춤: 멀리서 작게 말한 사람(회의 맞은편)도 들리게 키우되, 조용할 때(배경 소음)는 키우지 않는다
+ *   3) 너무 큰 소리는 부드럽게 눌러 찌그러지지 않게
+ */
+class SpeechConditioner(rate: Int) {
+    private val alpha = (1.0 / (1.0 + 2 * Math.PI * 100.0 / rate)).toFloat() // 고역 통과 계수
+    private var prevIn = 0f
+    private var prevOut = 0f
+    private var level = 0.02f // 지금 말소리 크기 (느리게 따라감)
+    private var noise = 0.005f // 배경 소음 크기 (아주 느리게 따라감)
+    private var gain = 1f
+    private val target = 0.12f // 맞추려는 말소리 크기 (-18dBFS 쯤)
+
+    fun process(pcm: ByteArray, len: Int) {
+        val n = len / 2
+        if (n == 0) return
+        val buf = java.nio.ByteBuffer.wrap(pcm, 0, n * 2).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        val x = FloatArray(n)
+        var sum = 0.0
+        for (i in 0 until n) {
+            val v = buf.getShort(i * 2) / 32768f
+            val y = alpha * (prevOut + v - prevIn)
+            prevIn = v
+            prevOut = y
+            x[i] = y
+            sum += y * y
+        }
+        val rms = kotlin.math.sqrt(sum / n).toFloat()
+        // 배경 소음은 조용한 쪽으로 빨리, 큰 쪽으로는 아주 느리게
+        noise = if (rms < noise) noise * 0.9f + rms * 0.1f else noise * 0.999f + rms * 0.001f
+        val speaking = rms > noise * 2.5f && rms > 0.004f
+        if (speaking) level = level * 0.9f + rms * 0.1f
+        val want = if (speaking) (target / level.coerceAtLeast(1e-4f)).coerceIn(1f, 8f) else 1f.coerceAtLeast(gain * 0.98f).coerceAtMost(gain)
+        gain += (want - gain) * 0.2f
+        for (i in 0 until n) {
+            var y = x[i] * gain
+            if (y > 0.8f) y = 0.8f + (y - 0.8f) * 0.2f else if (y < -0.8f) y = -0.8f + (y + 0.8f) * 0.2f // 부드럽게 누르기
+            buf.putShort(i * 2, (y.coerceIn(-1f, 1f) * 32767f).toInt().toShort())
         }
     }
 }
@@ -304,9 +404,9 @@ class SystemTranscriber(private val ctx: Context, private val listener: SttListe
 
 object FileTranscriber {
     /** 파일을 16kHz 모노로 풀어 받아쓴다. onProgress: 0~100 */
-    fun run(ctx: Context, file: File, engine: String, onProgress: (Int) -> Unit): String {
+    fun run(ctx: Context, file: File, engine: String, terms: List<String> = emptyList(), onProgress: (Int) -> Unit): String {
         val parts = ArrayList<String>()
-        val stt = Stt.create(ctx, engine) { final, _ -> if (!final.isNullOrBlank()) synchronized(parts) { parts.add(final) } }
+        val stt = Stt.create(ctx, engine, { final, _ -> if (!final.isNullOrBlank()) synchronized(parts) { parts.add(final) } }, terms)
         try {
             AudioDecoder.decode16k(file, onProgress) { pcm -> stt.feed(pcm, pcm.size) }
             val tail = stt.finish()
@@ -431,13 +531,27 @@ class Resampler(private val inRate: Int, private val channels: Int) {
     }
 }
 
-/** 받아쓴 조각들을 읽기 좋은 글로: 조각 사이는 띄어쓰기, 몇 조각마다 문단 */
+/** 받아쓴 조각들을 읽기 좋은 글로: 조각 끝에 문장부호(Vosk 는 안 붙여 준다), 조각 사이는 띄어쓰기, 몇 조각마다 문단 */
 object Transcript {
+    // 묻는 말로 끝나면 ?, 맺는 말로 끝나면 . (이미 부호가 있으면 그대로)
+    private val QUESTION = Regex("(까|까요|나요|가요|는지|는지요|냐|래요|대요|할래|했니|하니|있니|없니|어때|어때요)$")
+    private val STATEMENT = Regex("(다|요|죠|네|군|자|세요|니다|지|야|어|아|해|래)$")
+
+    fun punctuate(part: String): String {
+        val t = part.trim()
+        if (t.isEmpty() || t.last() in ".?!,…~") return t
+        return when {
+            QUESTION.containsMatchIn(t) -> "$t?"
+            STATEMENT.containsMatchIn(t) -> "$t."
+            else -> t
+        }
+    }
+
     fun join(parts: List<String>, perParagraph: Int = 4): String {
         val sb = StringBuilder()
         parts.filter { it.isNotBlank() }.forEachIndexed { i, p ->
             if (i > 0) sb.append(if (i % perParagraph == 0) "\n\n" else " ")
-            sb.append(p.trim())
+            sb.append(punctuate(p))
         }
         return sb.toString()
     }

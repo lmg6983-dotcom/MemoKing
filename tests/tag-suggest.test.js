@@ -41,3 +41,33 @@ test('태그 붙이기: 끝에 태그 줄', () => {
   assert.equal(appendTags('# 제목\n\n본문\n', ['회의', '업무']), '# 제목\n\n본문\n\n#회의 #업무\n');
   assert.equal(appendTags('# 제목\n\n#회의\n', ['업무']), '# 제목\n\n#회의 #업무\n');
 });
+
+test('기존 태그와 정합성: 대소문자·같은 뜻·회의록↔회의·오타는 기존 태그로', async () => {
+  const { matchExisting } = await import('../app/js/core/tag-suggest.js');
+  const existing = [{ name: 'MemoKing', count: 3 }, { name: '회의', count: 5 }, { name: '장보기', count: 2 }, { name: '프로젝트', count: 2 }];
+  assert.equal(matchExisting('memoking', existing).name, 'MemoKing');
+  assert.equal(matchExisting('미팅', existing).name, '회의');
+  assert.equal(matchExisting('회의록', existing).name, '회의');
+  assert.equal(matchExisting('쇼핑', existing).name, '장보기');
+  assert.equal(matchExisting('프로잭트', existing).name, '프로젝트');
+  assert.equal(matchExisting('여행', existing), null);
+});
+
+test('태그 추천: 같은 뜻의 말이 나오면 새 태그 대신 기존 태그', () => {
+  const got = suggestTagsFor('# 거래처 미팅\n\n다음 분기 계획 미팅 메모', memos);
+  const hit = got.find((t) => t.name === '회의');
+  assert.ok(hit);
+  assert.equal(hit.existing, true);
+  assert.ok(!got.some((t) => t.name === '미팅'));
+});
+
+test('태그 추천: 함께 다는 태그', () => {
+  const ms = [
+    { id: '1', body: '# 가\n\n견적 정리 #고객 #계약' },
+    { id: '2', body: '# 나\n\n발주 요청 #고객 #계약' },
+    { id: '3', body: '# 다\n\n방문 일정 #고객 #계약' },
+  ];
+  const got = suggestTagsFor('# 새 고객 응대\n\n고객 문의 응대 내역 기록', ms);
+  assert.equal(got[0].name, '고객');
+  assert.ok(got.some((t) => t.name === '계약'));
+});

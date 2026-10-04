@@ -186,7 +186,7 @@ export async function start(memoId) {
       toast('녹음하려면 마이크를 허용해 주세요 (휴대폰 설정 › 앱 › 메모킹 › 권한)', true);
       return;
     }
-    const res = await call('recordStart', { memoId, stt: sttOn(), engine: sttEngine() });
+    const res = await call('recordStart', { memoId, stt: sttOn(), engine: sttEngine(), terms: app.sttTerms?.() ?? [] });
     setStatus({ active: true, paused: false, memoId, elapsedMs: 0, stt: Boolean(res?.stt), text: '', partial: '' });
     navigator.vibrate?.(20);
     if (sttOn() && !res?.stt) {

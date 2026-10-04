@@ -363,6 +363,8 @@ function renderTagBar() {
   el.tagChips.replaceChildren(...list.map((t) => {
     const b = tagChip(t.name, { add: true, onClick: () => addTags([t.name]) });
     if (t.sure) b.classList.add('sure');
+    if (!t.existing) b.classList.add('new');
+    if (t.why) b.title = t.why;
     return b;
   }));
   if (list.length > 1) {
