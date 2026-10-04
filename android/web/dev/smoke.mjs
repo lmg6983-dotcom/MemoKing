@@ -243,6 +243,14 @@ try {
   await touch('touchStart', b.x + 40, b.y + b.height / 2);
   await page.waitForTimeout(550);
   check('줄 바꾸기: 꾹 누르면 들어 올림', (await page.locator('.mk-doc li.mk-lift').count()) === 1);
+  check('줄 바꾸기: 옮기는 동안 키보드 막기', (await page.getAttribute('.mk-doc', 'inputmode')) === 'none' && !(await page.evaluate(() => document.querySelector('.mk-doc').contains(document.activeElement))));
+  const scrollBefore = await page.evaluate(() => document.getElementById('editor').scrollTop);
+  // 손가락이 편집 영역 아래 끝 밖(도구막대 쪽)으로 멀리 나가도 맨 아래로 휙 가지 않는다
+  await touch('touchMove', b.x + 40, 840);
+  await page.waitForTimeout(300);
+  const scrollAfter = await page.evaluate(() => document.getElementById('editor').scrollTop);
+  check('줄 바꾸기: 아래 끝 밖으로 나가도 자동 스크롤 속도 상한', scrollAfter - scrollBefore <= 14 * 12, String(scrollAfter - scrollBefore));
+  await touch('touchMove', b.x + 40, b.y + b.height / 2);
   for (let i = 1; i <= 6; i++) await touch('touchMove', b.x + 40, b.y + b.height / 2 - ((b.y - a.y) * i) / 6);
   await page.waitForTimeout(100);
   await shot('05b-drag');

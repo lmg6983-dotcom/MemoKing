@@ -7,6 +7,7 @@
 //   - 키보드: 내용을 고른 채 Alt+↑ / Alt+↓ 로 한 줄씩
 //   - 처음 한 번, 내용을 고르면 옮기는 방법을 작은 안내로 알려 준다
 //   - 줄 = 같은 상자(본문·인용·목록 항목) 안의 블록 하나
+import { holdKeyboard, keyboardFor, edgeScroll } from './keyboard-guard.js';
 import { Plugin, PluginKey, TextSelection, NodeSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
 
@@ -147,27 +148,6 @@ const LISTEN = { capture: true, passive: false };
 const HINT_KEY = 'memoking.hint.blockMove';
 const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
 
-// 휴대폰: 그림·소리·동영상·파일·링크 카드를 누르거나 끌 때는 키보드를 올리지 않는다 (끄는 데 방해되지 않게).
-// 편집기에 inputmode="none" 을 잠깐 달아 두고, 글자를 다시 누르면 떼어 평소처럼 키보드가 올라오게 한다.
-const NO_KEYBOARD_TARGET = 'img, .mk-media, .mk-link-card, .mk-file, a[href], .mk-math, .mk-math-block';
-function keyboardFor(view, target) {
-  if (!coarse()) return;
-  const el = target instanceof Element ? target : target?.parentElement;
-  const onContent = Boolean(el?.closest(NO_KEYBOARD_TARGET)) && view.dom.contains(el);
-  const dom = view.dom;
-  if (onContent) {
-    if (dom.getAttribute('inputmode') !== 'none') {
-      dom.setAttribute('inputmode', 'none');
-      dom.dataset.mkNoKeyboard = '1';
-    }
-  } else if (dom.dataset.mkNoKeyboard) {
-    // 글자를 누름: 키보드를 다시 쓸 수 있게 (이미 초점이 있으면 한 번 놓아 새로 누른 것처럼 키보드가 뜨게)
-    dom.removeAttribute('inputmode');
-    delete dom.dataset.mkNoKeyboard;
-    if (view.hasFocus()) dom.blur();
-  }
-}
-
 /** @param {{ readOnly?: boolean }} options */
 export function createBlockMove({ readOnly = false } = {}) {
   let mover = null;
@@ -283,6 +263,7 @@ class Mover {
   }
 
   lift(p) {
+    holdKeyboard(this.view); // 옮기는 동안 키보드는 절대 뜨지 않게
     const { view } = this;
     // 누른 사이 문서가 바뀌었을 수 있으니 같은 자리의 줄을 다시 찾는다
     const block = blockInfo(view.state.doc, p.block.pos, p.block.inner);
@@ -361,10 +342,7 @@ class Mover {
     d.timer = setInterval(() => {
       if (this.drag !== d || !d.scroller) return;
       const r = d.scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : d.scroller.getBoundingClientRect();
-      const edge = 48;
-      const upBy = r.top + edge - d.y;
-      const downBy = d.y - (r.bottom - edge);
-      const dy = upBy > 0 ? -Math.ceil(upBy / 3) : downBy > 0 ? Math.ceil(downBy / 3) : 0;
+      const dy = edgeScroll(d.y, r.top, r.bottom, 48);
       if (dy) {
         d.scroller.scrollTop += dy;
         this.judge();

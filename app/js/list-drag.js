@@ -11,6 +11,7 @@
 //   - 커서가 있는 항목에 흐린 점선 테두리 (Enter 로 새 항목을 만들면 따라간다)
 import { Plugin, PluginKey, TextSelection, Decoration, DecorationSet, sinkListItem, liftListItem } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
+import { holdKeyboard, edgeScroll } from './keyboard-guard.js';
 
 export const listDragKey = new PluginKey('memoking-list-drag');
 
@@ -357,6 +358,7 @@ export function createListDrag({ readOnly = false } = {}) {
     const srcPos = itemPosOf(view, li);
     const list = li.parentElement;
     if (srcPos == null || !list) return;
+    if (kind === 'touch') holdKeyboard(view); // 옮기는 동안 키보드는 절대 뜨지 않게 (떠 있으면 내림)
     const scroller = scrollerOf(view.dom);
     const items = directItems(list);
     const st = scroller?.scrollTop ?? 0;
@@ -416,10 +418,7 @@ export function createListDrag({ readOnly = false } = {}) {
     drag.timer = setInterval(() => {
       if (!drag || !scroller) return;
       const r = scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : scroller.getBoundingClientRect();
-      const edge = 40;
-      const up = r.top + edge - drag.y;
-      const down = drag.y - (r.bottom - edge);
-      const dy = up > 0 ? -Math.ceil(up / 3) : down > 0 ? Math.ceil(down / 3) : 0;
+      const dy = edgeScroll(drag.y, r.top, r.bottom, 40);
       if (dy) {
         scroller.scrollTop += dy;
         place(view, drag.x, drag.y);
@@ -440,6 +439,7 @@ export function createListDrag({ readOnly = false } = {}) {
     const pos = itemPosOf(view, li);
     if (pos == null) return;
     event.preventDefault();
+    holdKeyboard(view);
     const badge = document.createElement('div');
     badge.className = 'mk-drag-badge';
     badge.hidden = true;
