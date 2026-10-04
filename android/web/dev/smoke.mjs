@@ -299,6 +299,9 @@ try {
   await page.waitForTimeout(350);
   check('그림 줄 옮기기: 꾹 누르면 들어 올림', (await page.locator('.mk-block-lift').count()) === 1);
   check('그림 끌기: 키보드를 올리지 않음', (await page.getAttribute('.mk-doc', 'inputmode')) === 'none');
+  const thumb = await page.locator('.mk-doc .mk-block-lift').boundingBox();
+  check('그림 끌기: 작은 썸네일로 손가락 위에 (주변 글이 보이게)', (await page.locator('.mk-block-thumb').count()) === 1 && thumb.height < 130 && thumb.y + thumb.height <= img.y + 60, JSON.stringify(thumb));
+  await shot('06c-thumb');
   const to = textLine.y + textLine.height / 2;
   for (let i = 1; i <= 8; i++) await touch('touchMove', img.x + 60, img.y + 60 + ((to - img.y - 60) * i) / 8);
   await page.waitForTimeout(120);

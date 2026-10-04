@@ -1198,3 +1198,7 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-math-actions button.primary { background: var(--brand-yellow, #ffcd00); color: var(--on-brand, #111); }
 .s-math { font: italic 15px "Times New Roman", serif; }
 @media print { .mk-math-editor { display: none !important; } .mk-doc .mk-math-block { background: none; } }
+
+/* ---------- v0.18.1: 큰 그림·동영상·링크 카드는 들어 올리면 작은 썸네일로 (놓을 자리 주변 글이 보이게) ---------- */
+.mk-doc .mk-block-thumb { border-radius: 14px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), 0 0 0 6px var(--note-bg), 0 0 0 10px var(--note-text); }
+.mk-doc .mk-block-thumb > * { animation: none; }

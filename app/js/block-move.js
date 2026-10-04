@@ -146,6 +146,8 @@ const INPUT = {
 const pointOf = (e) => e.touches?.[0] ?? e.changedTouches?.[0] ?? e;
 const LISTEN = { capture: true, passive: false };
 const HINT_KEY = 'memoking.hint.blockMove';
+const THUMB_MIN = 90; // 이보다 높은 내용은 들어 올릴 때 썸네일로 줄인다 (px)
+const THUMB_H = 84; // 썸네일 높이 (px)
 const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
 
 /** @param {{ readOnly?: boolean }} options */
@@ -291,9 +293,14 @@ class Mover {
     badge.hidden = true;
     document.body.append(badge);
     this.hideHint();
+    // 큰 내용(그림·동영상·링크 카드)은 들어 올린 동안 작은 썸네일로 줄여 손가락 위에 띄운다 — 놓을 자리 주변 글이 가리지 않게
+    const h = heights[block.index];
+    const shrink = h > THUMB_MIN ? Math.max(0.22, Math.min(0.7, THUMB_H / h)) : 1;
+    const grabX = p.x - rects[block.index].left; // 누른 자리 (내용 안, 화면 px) — 여기를 중심으로 줄인다
+    const grabY = p.y - rects[block.index].top;
     const d = {
       block, positions, tops, heights, slots, scale, scroller, badge, drop: null, kind: p.kind,
-      x: p.x2, y: p.y2, startY: p.y + st, raf: 0, timer: 0,
+      x: p.x2, y: p.y2, startY: p.y + st, raf: 0, timer: 0, shrink, grabX, grabY,
     };
     this.drag = d;
     document.body.classList.add('mk-block-dragging');
@@ -373,8 +380,9 @@ class Mover {
     b.dataset.kind = d.drop?.kind ?? '';
     b.textContent = d.drop?.kind === 'swap' ? '⇅ 맞바꾸기' : d.drop?.kind === 'insert' ? '↳ 여기에 넣기' : '';
     b.hidden = !d.drop;
-    b.style.left = `${Math.min(window.innerWidth - 120, d.x + 16)}px`;
-    b.style.top = `${d.y + (d.kind === 'touch' ? -44 : 14)}px`; // 터치: 손가락에 가리지 않게 위로
+    // 터치: 썸네일은 손가락 위, 안내는 손가락 오른쪽 (둘 다 가리지 않게)
+    b.style.left = `${Math.min(window.innerWidth - 120, d.x + (d.kind === 'touch' ? 28 : 16))}px`;
+    b.style.top = `${d.y + (d.kind === 'touch' ? -12 : 14)}px`;
   }
 
   // 끄는 줄은 손을 따라오고, 다른 줄들은 놓았을 때의 자리로 미끄러진다
@@ -390,7 +398,15 @@ class Mover {
     let y = tops[0];
     order.forEach((i) => {
       if (i === s) {
-        specs.push({ pos: positions[i], cls: 'mk-block-lift', style: `transform: translateY(${(follow / scale).toFixed(1)}px)` });
+        let style = `transform: translateY(${(follow / scale).toFixed(1)}px)`;
+        if (d.shrink < 1) {
+          // 누른 자리를 중심으로 줄이고, 손가락에 가리지 않게 썸네일 아래 끝이 손가락보다 위에 오도록 올린다
+          const k = d.shrink;
+          const up = d.kind === 'touch' ? (heights[s] - d.grabY) * k + 18 : 0;
+          style = `transform-origin: ${(d.grabX / scale).toFixed(1)}px ${(d.grabY / scale).toFixed(1)}px; `
+            + `transform: translateY(${((follow - up) / scale).toFixed(1)}px) scale(${k.toFixed(3)}); opacity: 0.88`;
+        }
+        specs.push({ pos: positions[i], cls: `mk-block-lift${d.shrink < 1 ? ' mk-block-thumb' : ''}`, style });
       } else {
         const dy = y - tops[i];
         const cls = ['mk-block-sorting', d.drop?.kind === 'swap' && i === d.drop.index ? 'mk-block-swap-target' : ''].filter(Boolean).join(' ');
