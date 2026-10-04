@@ -128,6 +128,13 @@ try {
   await page.fill('#search', '아이콘');
   await page.waitForTimeout(250);
   check('검색: 본문 글자', (await page.locator('.card').count()) === 1);
+  await page.fill('#search', '없는말쯤');
+  await page.waitForTimeout(250);
+  check('빈 결과: 안내와 풀기 단추', await page.isVisible('#empty .btn.primary'));
+  await page.tap('#empty .btn.primary');
+  await page.waitForTimeout(250);
+  check('빈 결과: 풀면 다시 모두', (await page.locator('.card').count()) === 4 && (await page.inputValue('#search')) === '');
+  check('카드: 사람이 말하듯 시각 · 미리 보기에 태그 반복 없음', !(await page.locator('.card[data-id="00000000-0000-4000-8000-000000000001"] .card-preview').textContent()).includes('#업무'));
   await back();
 
   // 메모 열고 고치기
@@ -338,6 +345,13 @@ try {
   check('지우기: 휴지통으로', !fs.existsSync(path.join(vault, '로고 사진.md')) && fs.readdirSync(path.join(vault, '_memoking/trash')).some((f) => f.startsWith('로고 사진 (')));
   check('지우기: 그 메모만 쓰던 첨부도 휴지통으로', fs.existsSync(path.join(vault, '_memoking/trash/attachments/20261001-090000-ab12.png')));
   await page.tap('#settings-btn');
+  await page.locator('#stt-engine').scrollIntoViewIfNeeded();
+  await page.tap('#stt-engine [data-value="system"]');
+  await page.waitForTimeout(400);
+  check('설정: 받아쓰기 엔진은 미끄러지는 고르기 칸', (await page.getAttribute('#stt-engine [data-value="system"]', 'aria-checked')) === 'true' && (await page.evaluate(() => Math.round(new DOMMatrix(getComputedStyle(document.querySelector('#stt-engine > .seg-thumb')).transform).m41) === document.querySelector('#stt-engine [data-value="system"]').offsetLeft)));
+  await shot('17-settings-stt');
+  await page.tap('#stt-engine [data-value="vosk"]');
+  await page.waitForTimeout(300);
   await page.tap('#trash-btn');
   await page.waitForTimeout(200);
   await shot('04-trash');
@@ -361,7 +375,11 @@ try {
   check('LLM 인덱스: 안내서', fs.existsSync(path.join(vault, '_memoking/README.md')));
 
   // 알림 보관함: 탭 → 보관 시작하기 → (설정에서 알림 접근 허용) → 모은 알림
+  const thumbAt = () => page.evaluate(() => { const t = document.querySelector('.tabs > .seg-thumb'); const b = document.querySelector('.tabs [aria-selected="true"]'); return t && b && Math.round(new DOMMatrix(getComputedStyle(t).transform).m41) === b.offsetLeft ? b.dataset.tab : null; });
+  check('탭: 선택 표시가 있는 칸에', (await thumbAt()) === 'memos');
   await page.tap('[data-tab="history"]');
+  await page.waitForTimeout(400);
+  check('탭: 고르면 선택 표시가 그 칸으로 미끄러짐', (await thumbAt()) === 'history');
   check('보관함: 처음엔 안내', await page.isVisible('#history-consent'));
   await page.tap('#history-enable');
   await page.waitForTimeout(300);
@@ -506,6 +524,8 @@ try {
   await page.waitForSelector('#rec-panel:not([hidden])');
   check('음성 메모: 바로 녹음 시작', (await devLog()).log.some((l) => l.recordStart));
   await page.waitForTimeout(1200);
+  for (const lv of [0.2, 0.9, 0.6, 0.8, 0.3, 0.7, 0.5]) await page.evaluate((level) => window.__mk.emit('record', { type: 'level', level }), lv);
+  check('녹음: 소리 크기 막대가 움직임', (await page.evaluate(() => getComputedStyle(document.querySelector('#rec-wave i:last-child')).getPropertyValue('--lv'))).trim() === '0.50');
   await shot('11-recording');
   await page.tap('#rec-stop');
   await page.waitForTimeout(1200);
@@ -515,7 +535,7 @@ try {
   check('음성 메모: 소리 파일 + 받아쓴 글', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 음성 메모'), f && read(f));
   check('음성 카드: 소리와 받아쓴 글이 한 칸(인용), 문장마다 줄 · 화자 이름표', f && /^> !\[녹음/m.test(read(f)) && read(f).includes('>\n> **화자 2:** 다음 주 출시 일정을 정리했어요.\n>\n> 표로 공유할게요.'), f && read(f));
 
-  // 소리·표·수식·글 문단도 자유롭게 옮기기 (소리는 이름 줄 ⠿, 글 문단·표는 왼쪽 손잡이 ⠿)
+  // 소리·표·수식·글 문단도 자유롭게 옮기기 (모두 꾹 눌러 들어 올리기)
   fs.writeFileSync(path.join(vault, 'attachments/move-test.m4a'), Buffer.from('fake'));
   write('옮기기.md', '---\nid: 00000000-0000-4000-8000-0000000000aa\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 옮기기\n\n첫 문단\n\n![녹음 테스트](attachments/move-test.m4a)\n\n| 가 | 나 |\n| --- | --- |\n| 1 | 2 |\n\n끝 문단\n');
   await page.evaluate(() => window.__mk.emit('app', 'resume'));
@@ -535,22 +555,22 @@ try {
   await page.waitForTimeout(900);
   let ord = orderOf('녹음 테스트', '첫 문단');
   check('소리 옮기기: 다른 줄과 맞바꿈', ord[0] > 0 && ord[0] < ord[1], read('옮기기.md'));
-  // 손잡이: 표가 든 줄을 눌러 커서를 두면 왼쪽에 ⠿, 잡고 끝 문단 아래로
-  await page.locator('.mk-doc td', { hasText: '1' }).first().tap();
-  await page.waitForTimeout(300);
-  check('손잡이: 커서가 있는 줄 왼쪽에 ⠿', await page.isVisible('.mk-grip'));
-  await shot('15-grip');
-  const g = await page.locator('.mk-grip').boundingBox();
+  // 표·글 문단도 목록 항목과 같은 방식: 꾹 누르면 들어 올림 (손잡이 없음)
+  check('옮기기: 따로 손잡이(⠿) 없음', (await page.locator('.mk-grip').count()) === 0);
+  const cell = await page.locator('.mk-doc td', { hasText: '1' }).first().boundingBox();
   const last = await page.locator('.mk-doc p', { hasText: '끝 문단' }).boundingBox();
-  await touch('touchStart', g.x + g.width / 2, g.y + g.height / 2);
-  await page.waitForTimeout(120);
-  check('손잡이: 잡으면 바로 들어 올림 · 키보드 막기', (await page.locator('.mk-block-lift').count()) === 1 && (await page.getAttribute('.mk-doc', 'inputmode')) === 'none');
-  for (let i = 1; i <= 8; i++) await touch('touchMove', g.x + 10, g.y + ((last.y + last.height + 4 - g.y) * i) / 8);
+  await touch('touchStart', cell.x + cell.width / 2, cell.y + cell.height / 2);
+  await page.waitForTimeout(150);
+  check('표 옮기기: 짧게 누르면 아직 안 들어 올림', (await page.locator('.mk-block-lift').count()) === 0);
+  await page.waitForTimeout(400);
+  check('표 옮기기: 꾹 누르면 들어 올림 · 키보드 막기', (await page.locator('.mk-block-lift').count()) === 1 && (await page.getAttribute('.mk-doc', 'inputmode')) === 'none');
+  await shot('15-hold-move');
+  for (let i = 1; i <= 8; i++) await touch('touchMove', cell.x + 10, cell.y + ((last.y + last.height + 4 - cell.y) * i) / 8);
   await page.waitForTimeout(100);
   await touch('touchEnd', 0, 0);
   await page.waitForTimeout(900);
   ord = orderOf('끝 문단', '| 가 |');
-  check('손잡이: 표를 통째로 끝 문단 아래로', ord[0] > 0 && ord[0] < ord[1], read('옮기기.md'));
+  check('표 옮기기: 통째로 끝 문단 아래로', ord[0] > 0 && ord[0] < ord[1], read('옮기기.md'));
   await back();
   await page.waitForTimeout(300);
 

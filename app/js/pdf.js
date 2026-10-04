@@ -1,5 +1,6 @@
 // PDF 만들기 창 — 크기·비율·방향·여백을 고르면 미리보기가 바로 바뀌고, 저장하면 메인 프로세스가 PDF 를 만든다.
 import { PAPERS, RATIOS, MARGINS, pageSize, keepRatio, ratioLabel, mmToPx } from './core/pdf-page.js';
+import { attachSliders } from './seg-slider.js';
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
@@ -180,3 +181,5 @@ const memo = await api.pdf.memo(id);
 $('heading').textContent = memo ? `"${memo.title}" PDF로 저장` : 'PDF로 저장';
 render();
 document.documentElement.dataset.ready = 'true';
+
+attachSliders(document, '.seg'); // 고르기 칸: 선택 표시가 미끄러진다

@@ -24,3 +24,22 @@ export function formatStamp(value) {
   if (Number.isNaN(d.getTime())) return '';
   return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+// 목록 카드: 사람이 말하듯 — 방금 · 5분 전 · 오후 3:20 · 어제 오후 3:20 · 화요일 · 10월 2일 · 25.10.02
+export function friendlyTime(value, now = Date.now()) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const diff = now - d.getTime();
+  if (diff >= -60_000 && diff < 60_000) return '방금';
+  if (diff > 0 && diff < 3_600_000) return `${Math.floor(diff / 60_000)}분 전`;
+  const n = new Date(now);
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((day(n) - day(d)) / 86_400_000);
+  const h = d.getHours();
+  const clock = `${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${pad(d.getMinutes())}`;
+  if (days === 0) return clock;
+  if (days === 1) return `어제 ${clock}`;
+  if (days > 1 && days < 7) return `${'일월화수목금토'[d.getDay()]}요일`;
+  if (d.getFullYear() === n.getFullYear()) return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+}

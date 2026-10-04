@@ -79,7 +79,7 @@
         <button id="filter-clear" class="link-btn">모두 지우기</button>
       </div>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
-      <p id="empty" class="empty" hidden></p>
+      <div id="empty" class="empty" hidden></div>
     </div>
 
     <div class="view" id="view-reminders" role="tabpanel" hidden>
@@ -175,6 +175,7 @@
         <span class="rec-dot" aria-hidden="true"></span>
         <b id="rec-time" class="rec-time">00:00</b>
         <span id="rec-state" class="rec-state">녹음 중</span>
+        <span id="rec-wave" class="rec-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
         <span class="grow"></span>
         <button id="rec-pause" class="rec-btn" aria-label="잠시 멈춤"><svg><use href="#i-pause"/></svg></button>
         <button id="rec-stop" class="rec-btn stop"><svg><use href="#i-stop"/></svg><span>끝내기</span></button>
@@ -458,13 +459,14 @@
       <input type="checkbox" id="rec-stt" class="switch" checked>
       <span>녹음할 때 받아쓰기 <small id="rec-stt-note">말하는 대로 글로 옮겨요 · 화면을 꺼도 계속 녹음해요</small></span>
     </label>
-    <label class="setting-row select-row">
-      <span>받아쓰기 엔진 <small id="stt-engine-note">Vosk 는 오픈소스라 인터넷 없이 휴대폰 안에서만 받아써요 (회의 내용이 밖으로 나가지 않아요)</small></span>
-      <select id="stt-engine" aria-label="받아쓰기 엔진">
-        <option value="vosk">Vosk (오픈소스 · 오프라인)</option>
-        <option value="system">휴대폰 음성 인식 (더 정확)</option>
-      </select>
-    </label>
+    <div class="setting-row select-row stt-engine-row">
+      <span>받아쓰기 엔진 <small id="stt-engine-note">Vosk 는 오픈소스라 인터넷 없이 휴대폰 안에서만 받아써요 (회의 내용이 밖으로 나가지 않아요)</small>
+        <span class="seg wide" id="stt-engine" role="radiogroup" aria-label="받아쓰기 엔진">
+          <button type="button" role="radio" data-value="vosk" aria-checked="true">Vosk · 오프라인</button>
+          <button type="button" role="radio" data-value="system" aria-checked="false">휴대폰 음성 인식</button>
+        </span>
+      </span>
+    </div>
     <div class="setting-row" id="stt-model-row">
       <span>한국어 받아쓰기 모델 <small id="stt-model-note"></small></span>
       <button id="stt-model-btn" class="btn small">받기</button>

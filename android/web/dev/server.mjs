@@ -47,6 +47,7 @@ const sync = {
     sdk: 35,
     vault: vaultRoot ? { internal: false, drive: fakeDrive.active, label: fakeDrive.active ? `Google Drive › ${fakeDrive.folderName}` : vaultRoot, ok: true } : null,
     exactAlarms: true,
+    record: { system: true },
   }),
   useInternalVault: () => {
     vaultRoot = path.join(os.tmpdir(), 'memoking-dev-internal');

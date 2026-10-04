@@ -21,6 +21,7 @@ import * as recorder from './recorder.js';
 import { renderMemoImage } from './share-image.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
+import { attachSliders } from '../../app/js/seg-slider.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -28,6 +29,7 @@ const $ = (x) => document.getElementById(x);
 window.memoking = { platform: 'android', vaultBase: `${location.origin}/vault/`, historyBase: `${location.origin}/history/` };
 
 injectIcons();
+attachSliders(); // 탭·고르기 칸: 선택 표시가 미끄러진다
 injectMobileIcons();
 
 // ---------- 데스크탑 모양의 API (reminder-panel.js · list-reminders.js 가 씀) ----------
@@ -547,8 +549,8 @@ function openSettings() {
   $('auto-tags').checked = note.autoTagsOn();
   $('rec-stt').checked = recorder.sttOn();
   $('rec-stt-note').textContent = '말하는 대로 글로 옮겨요 · 화면을 꺼도 계속 녹음해요';
-  $('stt-engine').value = recorder.sttEngine();
-  $('stt-engine').querySelector('[value="system"]').disabled = !info.record?.system;
+  markEngine(recorder.sttEngine());
+  $('stt-engine').querySelector('[data-value="system"]').disabled = !info.record?.system;
   refreshSttRow();
   openSheet($('settings-sheet'));
 }
@@ -601,8 +603,14 @@ $('spk-btn').addEventListener('click', async () => {
 on('speakerModel', ({ progress }) => {
   if (!$('settings-sheet').hidden) refreshSpeakerRow(progress < 100 ? progress : undefined);
 });
-$('stt-engine').addEventListener('change', () => {
-  recorder.setSttEngine($('stt-engine').value);
+function markEngine(engine) {
+  for (const b of $('stt-engine').querySelectorAll('[data-value]')) b.setAttribute('aria-checked', String(b.dataset.value === engine));
+}
+$('stt-engine').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-value]');
+  if (!b || b.disabled) return;
+  markEngine(b.dataset.value);
+  recorder.setSttEngine(b.dataset.value);
   refreshSttRow();
 });
 $('stt-model-btn').addEventListener('click', async () => {

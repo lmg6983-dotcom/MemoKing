@@ -111,11 +111,11 @@ function render() {
   const text = status.text || '';
   el.text.hidden = !status.stt && !text;
   el.text.replaceChildren();
-  if (text) el.text.append(text);
+  if (text) renderLines(el.text, text);
   if (status.partial) {
     const span = document.createElement('span');
     span.className = 'rec-partial';
-    span.textContent = `${text ? ' ' : ''}${status.partial}`;
+    span.textContent = `${text ? '\n' : ''}${status.partial}`;
     el.text.append(span);
   }
   if (!text && !status.partial) {
@@ -125,6 +125,29 @@ function render() {
     el.text.append(span);
   }
   el.text.scrollTop = el.text.scrollHeight;
+}
+
+// 소리 크기 막대: 새 크기가 오른쪽에서 들어와 왼쪽으로 흘러간다 (말하면 출렁)
+const levels = Array(7).fill(0);
+function showLevel(level) {
+  levels.shift();
+  levels.push(status.paused ? 0 : level);
+  const bars = $('rec-wave')?.children ?? [];
+  for (let i = 0; i < bars.length; i++) bars[i].style.setProperty('--lv', levels[i].toFixed(2));
+}
+
+// 받아쓴 글: 줄마다, "화자 N:" 은 색 이름표로
+function renderLines(box, text) {
+  for (const [i, line] of text.split('\n').entries()) {
+    if (i) box.append('\n');
+    const m = line.match(/^화자\s*(\d+)\s*:\s*/);
+    if (m) {
+      const chip = document.createElement('span');
+      chip.className = `rec-spk mk-spk-${(Number(m[1]) - 1) % 6}`;
+      chip.textContent = `화자 ${m[1]}`;
+      box.append(chip, line.slice(m[0].length));
+    } else box.append(line);
+  }
 }
 
 function svg(name) {
@@ -242,6 +265,10 @@ on('record', (ev) => {
   if (ev.type === 'done') {
     setStatus({ active: false, paused: false, partial: '' });
     if (ev.result) app.deliverRecording(ev.result).then(() => record.ack(ev.result.id)).catch(() => {});
+    return;
+  }
+  if (ev.type === 'level') {
+    showLevel(ev.level ?? 0);
     return;
   }
   if (ev.type === 'error') {

@@ -7,12 +7,14 @@
 //   - 키보드: 내용을 고른 채 Alt+↑ / Alt+↓ 로 한 줄씩
 //   - 처음 한 번, 내용을 고르면 옮기는 방법을 작은 안내로 알려 준다
 //   - 줄 = 같은 상자(본문·인용·목록 항목) 안의 블록 하나
-//   - 소리·동영상은 위의 이름 줄(⠿), 수식 블록·가로줄은 그대로 잡는다
-//   - 글 문단·제목·표·코드 블록·인용·목록 묶음은 줄 왼쪽의 ⠿ 손잡이로 (휴대폰: 커서가 있는 줄, PC: 마우스를 올린 줄)
+//   - 소리·동영상은 위의 이름 줄, 수식 블록·가로줄은 그대로 잡는다
+//   - 글 문단·제목·표·코드 블록·인용·음성 카드는 목록 항목과 같은 방식: 글자를 꾹(마우스 0.3초·터치 0.4초) 누르면
+//     테두리가 점점 진해지다 들어 올려진다 (그 전에 움직이면 지금처럼 글자 고르기·스크롤). 목록 항목은 list-drag.js
 //     PC 는 어느 줄에서든 Alt+↑ / Alt+↓
 import { holdKeyboard, keyboardFor, edgeScroll } from './keyboard-guard.js';
 import { Plugin, PluginKey, TextSelection, NodeSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
+import { HOLD_MS, TOUCH_HOLD_MS } from './list-drag.js';
 import { isVoiceCard } from './voice-card-view.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
@@ -109,6 +111,17 @@ export function blockFromTarget(view, target) {
     return blockInfo(doc, $p.before(d), isImage ? { kind: 'node', offset: pos - $p.start(d) } : { kind: 'text', offset: 0 });
   }
   return null;
+}
+
+// 꾹 눌러 옮길 글 줄: 누른 자리가 든 맨 바깥 줄 (목록 항목은 list-drag.js 가, 단추·체크 상자·음성 카드 막대는 그대로)
+const NO_TEXT_GRAB = 'li, button, input, select, textarea, label, a, .mk-voice-bar, .plyr, .mk-tag, [data-tag]';
+export function textBlockFromTarget(view, event) {
+  const t = event.target instanceof Element ? event.target : event.target?.parentElement;
+  if (!t || !view.dom.contains(t) || t === view.dom || t.closest(NO_TEXT_GRAB)) return null;
+  const pt = pointOf(event);
+  const hit = view.posAtCoords({ left: pt.clientX, top: pt.clientY });
+  if (!hit) return null;
+  return topBlockAt(view.state.doc, hit.inside >= 0 ? hit.inside : hit.pos, null);
 }
 
 // 상자 안의 줄 순서를 order(원래 번호들)로 바꾸고, 옮긴 줄(src)을 다시 고른다
@@ -228,94 +241,6 @@ class Mover {
     this.drag = null;
     this.hint = null;
     this.lastBlock = null;
-    this.setupGrip();
-  }
-
-  // ---------- 손잡이 ⠿: 글 문단·제목·표·코드·인용·목록 묶음도 통째로 옮기기 ----------
-  // 휴대폰은 커서가 있는 줄 왼쪽에, PC 는 마우스를 올린 줄 왼쪽에. 잡고 끌면 그 줄이 들어 올려진다.
-
-  setupGrip() {
-    const grip = document.createElement('button');
-    grip.type = 'button';
-    grip.className = 'mk-grip';
-    grip.hidden = true;
-    grip.tabIndex = -1;
-    grip.setAttribute('aria-label', '이 줄을 잡고 끌어서 옮기기');
-    grip.title = '잡고 끌어서 옮기기 (Alt+↑↓)';
-    grip.textContent = '⠿';
-    document.body.append(grip);
-    this.grip = grip;
-    this.gripPos = null;
-    const start = (e, kind) => {
-      e.preventDefault(); // 키보드·글자 고르기·스크롤 대신
-      e.stopPropagation();
-      const { doc } = this.view.state;
-      const block = this.gripPos == null || !doc.nodeAt(this.gripPos) ? null : blockInfo(doc, this.gripPos, innerFor(doc.nodeAt(this.gripPos), 0));
-      if (!block || block.count < 2) return;
-      const pt = pointOf(e);
-      this.cancelPress();
-      grip.hidden = true;
-      this.lift({ block, kind, x: pt.clientX, y: pt.clientY, x2: pt.clientX, y2: pt.clientY });
-    };
-    grip.addEventListener('mousedown', (e) => e.button === 0 && start(e, 'mouse'));
-    grip.addEventListener('touchstart', (e) => e.touches.length === 1 && start(e, 'touch'), { passive: false });
-    grip.addEventListener('mouseenter', () => clearTimeout(this.gripTimer));
-    grip.addEventListener('mouseleave', () => this.hideGripSoon());
-    // PC: 마우스를 올린 줄
-    this.onHover = (e) => {
-      if (this.drag || coarse()) return;
-      const hit = this.view.posAtCoords({ left: e.clientX, top: e.clientY });
-      const block = hit && topBlockAt(this.view.state.doc, hit.pos);
-      if (block) this.showGrip(block);
-    };
-    this.onLeave = () => this.hideGripSoon();
-    this.view.dom.addEventListener('mousemove', this.onHover);
-    this.view.dom.addEventListener('mouseleave', this.onLeave);
-    // 스크롤하면 손잡이도 따라가게
-    this.onScroll = () => {
-      if (!grip.hidden && this.gripPos != null) this.placeGrip();
-    };
-    window.addEventListener('scroll', this.onScroll, true);
-    window.addEventListener('resize', this.onScroll);
-  }
-
-  showGrip(block) {
-    if (!this.view.editable || this.drag || !block || block.count < 2) return this.hideGrip();
-    clearTimeout(this.gripTimer);
-    this.gripPos = block.pos;
-    this.placeGrip();
-  }
-
-  placeGrip() {
-    const dom = this.view.nodeDOM(this.gripPos);
-    if (!(dom instanceof Element) || !dom.isConnected) return this.hideGrip();
-    const r = dom.getBoundingClientRect();
-    const box = this.view.dom.getBoundingClientRect();
-    // 화면에서 벗어난 줄이면 숨김
-    if (r.bottom < box.top - 4 || r.top > Math.min(window.innerHeight, box.bottom) || r.height === 0) {
-      this.grip.hidden = true;
-      return;
-    }
-    // 휴대폰은 본문 왼쪽 여백(20px) 안에 들어가게 좁고 길게 (손가락으로 잡기 좋게 높이는 넉넉히)
-    const w = coarse() ? 20 : 20;
-    const h = coarse() ? 34 : 24;
-    const line = Math.min(r.height, coarse() ? 30 : 26); // 첫 줄 높이 가운데에
-    this.grip.style.width = `${w}px`;
-    this.grip.style.height = `${h}px`;
-    this.grip.style.left = `${Math.max(0, Math.round(r.left - w - (coarse() ? 0 : 3)))}px`;
-    this.grip.style.top = `${Math.round(r.top + line / 2 - h / 2)}px`;
-    this.grip.hidden = false;
-  }
-
-  hideGrip() {
-    clearTimeout(this.gripTimer);
-    this.grip.hidden = true;
-    this.gripPos = null;
-  }
-
-  hideGripSoon() {
-    clearTimeout(this.gripTimer);
-    this.gripTimer = setTimeout(() => this.hideGrip(), 400);
   }
 
   busy() {
@@ -327,12 +252,15 @@ class Mover {
   press(event, kind) {
     const { view } = this;
     if (this.drag) return;
-    const block = blockFromTarget(view, event.target);
+    let block = blockFromTarget(view, event.target);
+    // 내용 줄이 아니면 글 줄(문단·제목·표·코드·인용·음성 카드): 꾹 눌러야 들어 올린다
+    const text = !block;
+    if (text) block = textBlockFromTarget(view, event);
     if (!block || block.count < 2) return;
     this.cancelPress();
     const io = INPUT[kind];
     const pt = pointOf(event);
-    const p = { block, kind, x: pt.clientX, y: pt.clientY, x2: pt.clientX, y2: pt.clientY };
+    const p = { block, kind, text, x: pt.clientX, y: pt.clientY, x2: pt.clientX, y2: pt.clientY };
     this.pressing = p;
     p.move = (e) => {
       const q = pointOf(e);
@@ -340,7 +268,7 @@ class Mover {
       p.y2 = q.clientY;
       const far = Math.hypot(q.clientX - p.x, q.clientY - p.y) > io.tolerance;
       if (!far) return;
-      if (kind === 'mouse') {
+      if (kind === 'mouse' && !p.text) {
         // 마우스는 누른 채 움직이면 바로 들어 올림 (글자 고르기와 겹치지 않는 내용이므로)
         e.preventDefault();
         this.cancelPress({ keepMark: true });
@@ -351,7 +279,7 @@ class Mover {
     window.addEventListener(io.move, p.move, LISTEN);
     window.addEventListener(io.up, p.up, LISTEN);
     if (io.cancel) window.addEventListener(io.cancel, p.up, LISTEN);
-    if (kind === 'touch') {
+    if (kind === 'touch' || text) {
       // 누르고 있는 동안 테두리가 점점 진해지고, 다 되면 들어 올림
       p.markTimer = setTimeout(() => {
         if (this.pressing !== p) return;
@@ -361,8 +289,9 @@ class Mover {
       p.timer = setTimeout(() => {
         if (this.pressing !== p) return;
         this.cancelPress({ keepMark: true });
+        navigator.vibrate?.(12);
         this.lift(p);
-      }, io.hold);
+      }, text ? (kind === 'touch' ? TOUCH_HOLD_MS : HOLD_MS) : io.hold);
     }
   }
 
@@ -599,12 +528,6 @@ class Mover {
   update(view, prev) {
     this.view = view;
     if (this.drag || this.pressing) return;
-    // 휴대폰: 커서가 있는 줄에 손잡이 (글을 쓰는 중에도 바로 옮길 수 있게)
-    if (coarse()) {
-      if (view.hasFocus() && view.editable) this.showGrip(topBlockAt(view.state.doc, view.state.selection.from));
-      else this.hideGrip();
-    } else if (this.gripPos != null && prev && !prev.doc.eq(view.state.doc)) this.hideGrip(); // 글이 바뀌면 다시 올릴 때까지
-    else if (this.gripPos != null) this.placeGrip();
     const block = view.editable ? contentBlockAt(view.state) : null;
     const key = block ? `${block.pos}` : null;
     if (key === this.lastBlock) return;
@@ -651,13 +574,7 @@ class Mover {
     this.cancelPress();
     if (this.drag) this.finish(false);
     clearTimeout(this.flashTimer);
-    clearTimeout(this.gripTimer);
     this.hideHint();
-    this.grip.remove();
-    this.view.dom.removeEventListener('mousemove', this.onHover);
-    this.view.dom.removeEventListener('mouseleave', this.onLeave);
-    window.removeEventListener('scroll', this.onScroll, true);
-    window.removeEventListener('resize', this.onScroll);
   }
 }
 

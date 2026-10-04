@@ -1,6 +1,6 @@
 // 메모 목록 화면 — 카드(실제 메모 색) · 검색 · 태그 줄 · 필터 · 알림 예약 탭
 import { icon } from '../../app/js/icons.js';
-import { formatStamp } from '../../app/js/core/format.js';
+import { formatStamp, friendlyTime } from '../../app/js/core/format.js';
 import { vaultUrl } from '../../app/js/media.js';
 import { setupRemindersTab } from '../../app/js/list-reminders.js';
 import { setupHistoryTab } from '../../app/js/list-history.js';
@@ -71,8 +71,10 @@ function renderCard(memo) {
   if (memo.preview) {
     const preview = document.createElement('div');
     preview.className = 'card-preview';
-    preview.textContent = memo.preview;
-    card.append(preview);
+    // 태그는 아래 줄에 따로 보이므로 미리 보기 글에서는 뺀다
+    const tagSet = new Set((memo.tags ?? []).map((t) => t.toLocaleLowerCase('ko')));
+    preview.textContent = memo.preview.replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
+    if (preview.textContent) card.append(preview);
   }
   if (memo.thumb) {
     const img = document.createElement('img');
@@ -109,7 +111,8 @@ function renderCard(memo) {
   if (memo.linkCount) meta.append(badge('link', memo.linkCount));
   const time = document.createElement('span');
   time.className = 'card-time';
-  time.textContent = formatStamp(memo.updated);
+  time.textContent = friendlyTime(memo.updated);
+  time.title = formatStamp(memo.updated);
   meta.append(time);
   foot.append(tags, meta);
   card.append(foot);
@@ -144,6 +147,39 @@ new ResizeObserver(() => {
   if (!el.screen.hidden && columnsFor(el.cards.clientWidth) !== lastCols) render();
 }).observe(el.cards);
 
+// 빈 목록: 그림 + 다음에 할 일 단추 (검색·필터로 비었으면 풀기, 메모가 없으면 첫 메모 만들기)
+function renderEmpty(narrowed) {
+  const art = document.createElement('span');
+  art.className = 'empty-art';
+  art.textContent = narrowed ? '🔍' : '📝';
+  const text = document.createElement('span');
+  text.textContent = narrowed
+    ? state.query ? `"${state.query}" 이(가) 든 메모가 없어요.` : '조건에 맞는 메모가 없어요.'
+    : '아직 메모가 없어요.\n떠오른 생각을 바로 적거나 말로 남겨 보세요.';
+  const actions = document.createElement('span');
+  actions.className = 'empty-actions';
+  const button = (label, run, primary = false) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = primary ? 'btn primary' : 'btn';
+    b.textContent = label;
+    b.addEventListener('click', run);
+    actions.append(b);
+  };
+  if (narrowed) {
+    button('검색·필터 풀기', () => {
+      state.filter = { tags: [], colors: [], kinds: [] };
+      el.search.value = '';
+      el.search.dispatchEvent(new Event('input', { bubbles: true }));
+      render();
+    }, true);
+  } else {
+    button('글 메모', () => app.newMemo(), true);
+    button('🎙 음성 메모', () => app.newMemo({ voice: true }));
+  }
+  el.empty.replaceChildren(art, text, actions);
+}
+
 function filterCount() {
   return state.filter.tags.length + state.filter.colors.length + state.filter.kinds.length;
 }
@@ -153,9 +189,7 @@ export function render() {
   const memos = filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
   layoutCards(memos);
   el.empty.hidden = memos.length > 0;
-  el.empty.textContent = narrowed
-    ? '조건에 맞는 메모가 없어요.'
-    : '아직 메모가 없어요.\n오른쪽 아래 + 버튼으로 첫 메모를 만들어 보세요.';
+  if (!memos.length) renderEmpty(narrowed);
   $('count-memos').textContent = state.memos.length ? String(state.memos.length) : '';
   renderFilters();
 }
@@ -365,10 +399,29 @@ try {
   // 기본
 }
 applyLayout(layout);
+// 카드들이 새 자리로 미끄러져 간다 (FLIP: 옛 자리 → 새 자리) — 모양이 바뀐 것을 눈으로 따라갈 수 있게
+function glideCards(change) {
+  const before = new Map([...el.cards.querySelectorAll('.card')].map((c) => [c.dataset.id, c.getBoundingClientRect()]));
+  change();
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const c of el.cards.querySelectorAll('.card')) {
+    const a = before.get(c.dataset.id);
+    if (!a) continue;
+    const b = c.getBoundingClientRect();
+    const dx = a.left - b.left;
+    const dy = a.top - b.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' });
+  }
+}
+
 el.layoutBtn.addEventListener('click', () => {
   layout = layout === 'rows' ? 'grid' : 'rows';
-  applyLayout(layout);
-  render();
+  el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.3, 1.4, 0.5, 1)' });
+  glideCards(() => {
+    applyLayout(layout);
+    render();
+  });
   try {
     localStorage.setItem('memoking.layout', layout);
   } catch {

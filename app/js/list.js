@@ -12,6 +12,7 @@ import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
+import { attachSlider } from './seg-slider.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -573,22 +574,13 @@ const historyTab = setupHistoryTab({
   },
 });
 
-const tabIndicator = document.createElement('span');
-tabIndicator.className = 'tab-indicator';
-document.querySelector('.tabs')?.prepend(tabIndicator);
-function moveTabIndicator() {
-  const sel = document.querySelector('.tabs [aria-selected="true"]');
-  if (!sel || !sel.offsetWidth) return;
-  tabIndicator.style.width = `${sel.offsetWidth}px`;
-  tabIndicator.style.transform = `translateX(${sel.offsetLeft}px)`;
-}
-new ResizeObserver(moveTabIndicator).observe(document.querySelector('.tabs'));
+// 탭의 흰 선택 표시가 다음 탭으로 미끄러진다 (seg-slider.js — 휴대폰·다른 고르기 칸과 같은 움직임)
+attachSlider(document.querySelector('.tabs'), { className: 'tab-indicator' });
 
 function showTab(tab) {
   if (!TAB_PLACEHOLDER[tab]) return;
   activeTab = tab;
   for (const b of document.querySelectorAll('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
-  moveTabIndicator();
   for (const name of Object.keys(TAB_PLACEHOLDER)) $(`view-${name}`).hidden = name !== tab;
   document.body.dataset.tab = tab;
   el.search.placeholder = TAB_PLACEHOLDER[tab];

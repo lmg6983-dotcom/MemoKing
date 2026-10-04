@@ -674,21 +674,8 @@ body.is-dragging .card:hover { transform: none; }
 .cards li:hover .card-actions, .card-actions:focus-within { transform: none; }
 .cards[data-density="compact"] li:hover .card-actions { transform: translateY(-50%); }
 
-/* 탭: 흰 선택 표시가 다음 탭으로 미끄러진다 */
-.tabs { position: relative; }
-.tabs button { position: relative; z-index: 1; transition: color 0.15s ease-out; }
-.tabs button[aria-selected="true"] { background: none; box-shadow: none; }
-.tab-indicator {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 0;
-  width: 0;
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
+/* 탭: 흰 선택 표시가 다음 탭으로 미끄러진다 (움직임은 base.css 의 .mk-slider) */
+.tabs > .tab-indicator { background: var(--surface); }
 .filter-panel { overflow: hidden; }
 
 /* 칩·색 점: 누르면 살짝 눌림 */

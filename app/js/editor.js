@@ -78,7 +78,7 @@ function mediaView(node) {
     const dom = document.createElement('span');
     dom.className = `mk-media mk-${kind}`;
     dom.contentEditable = 'false';
-    // 이름 줄 = 잡는 곳 (⠿): 꾹 눌러(휴대폰)·끌어(PC) 이 줄을 옮긴다 — 플레이어 단추는 재생용
+    // 이름 줄 = 잡는 곳: 꾹 눌러(휴대폰)·끌어(PC) 이 줄을 옮긴다 — 플레이어 단추는 재생용
     const label = document.createElement('span');
     label.className = 'mk-media-label';
     label.title = '잡고 끌어서 옮기기';

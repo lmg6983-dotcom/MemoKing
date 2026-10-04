@@ -268,6 +268,7 @@ class RecorderService : Service() {
                         if (n <= 0) continue
                         if (paused) continue // 멈춘 동안의 소리는 버린다
                         encoder.feed(buf, n)
+                        emitLevel(buf, n)
                         try {
                             transcriber?.feed(buf, n)
                         } catch (e: Exception) {
@@ -299,6 +300,26 @@ class RecorderService : Service() {
                 }
             }, "memoking-recorder")
             thread!!.start()
+        }
+
+        private var levelAt = 0L
+
+        /** 소리 크기(0~1)를 화면에 — 마이크가 듣고 있는지 보이게 (0.1초마다만) */
+        private fun emitLevel(buf: ByteArray, n: Int) {
+            val now = System.currentTimeMillis()
+            if (now - levelAt < 100) return
+            levelAt = now
+            var sum = 0.0
+            var i = 0
+            while (i + 1 < n) {
+                val v = ((buf[i].toInt() and 0xff) or (buf[i + 1].toInt() shl 8)).toShort() / 32768.0
+                sum += v * v
+                i += 2
+            }
+            val rms = kotlin.math.sqrt(sum / maxOf(1, n / 2))
+            // dB 로 바꿔 -60dB → 0, 0dB → 1
+            val level = ((20 * kotlin.math.log10(rms.coerceAtLeast(1e-6)) + 60) / 60).coerceIn(0.0, 1.0)
+            RecorderService.listener?.invoke(JSONObject().put("type", "level").put("level", Math.round(level * 100) / 100.0))
         }
 
         private fun onText(final: String?, part: String?, speaker: Int) {

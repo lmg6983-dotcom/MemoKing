@@ -259,3 +259,22 @@ svg { width: 20px; height: 20px; flex: none; }
 @keyframes mk-slide-in-right { from { opacity: 0; transform: translateX(16px); } }
 @keyframes mk-rise-in { from { opacity: 0; transform: translateY(6px); } }
 @keyframes mk-drop-in { from { opacity: 0; transform: translateY(-6px); } }
+
+/* 여럿 중 하나 고르기: 선택 표시(흰 칸)가 다음 칸으로 미끄러진다 (seg-slider.js) */
+.mk-slider { position: relative; isolation: isolate; }
+.mk-slider > button { position: relative; z-index: 1; transition: color 0.18s ease-out; }
+.mk-slider > button:active { transform: scale(0.96); }
+.mk-slider > [aria-selected="true"], .mk-slider > [aria-checked="true"] { background: none !important; box-shadow: none !important; }
+.seg-thumb, .mk-slider > .tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.28s cubic-bezier(0.3, 1.3, 0.5, 1), width 0.28s cubic-bezier(0.3, 1.3, 0.5, 1), height 0.2s ease-out, opacity 0.15s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .seg-thumb, .mk-slider > .tab-indicator { transition: none; }
+}

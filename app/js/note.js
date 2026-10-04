@@ -10,6 +10,7 @@ import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
 import { setupCoach } from './coach.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
+import { attachSliders } from './seg-slider.js';
 
 const SAVE_DELAY = 600;
 const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
@@ -1205,3 +1206,5 @@ if (!memo) {
   scheduleFit();
   document.documentElement.dataset.ready = 'true';
 }
+
+attachSliders(document, '.seg'); // 알림 종류 고르기: 선택 표시가 미끄러진다

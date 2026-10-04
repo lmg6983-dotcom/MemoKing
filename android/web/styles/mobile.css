@@ -14,6 +14,8 @@ html, body {
 body {
   display: block;
   font-size: 15px;
+  word-break: keep-all; /* 한글은 낱말 단위로 줄바꿈 ("옮겼/어요" 처럼 끊기지 않게) */
+  overflow-wrap: anywhere;
   background: var(--bg);
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
@@ -283,6 +285,11 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .cards .item { animation: mk-pop-in 0.16s ease-out both; }
 
 .empty { margin: 48px 24px; text-align: center; line-height: 1.7; color: var(--muted); white-space: pre-line; }
+#empty:not([hidden]) { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: mk-pop-in 0.25s ease-out both; }
+.empty-art { font-size: 44px; line-height: 1; animation: empty-bob 2.6s ease-in-out infinite; }
+.empty-actions { display: flex; gap: 8px; margin-top: 6px; }
+@keyframes empty-bob { 50% { transform: translateY(-5px) rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .empty-art { animation: none; } }
 
 /* 새 메모 버튼 (오른쪽 아래, 엄지 자리) */
 .fab {
@@ -348,10 +355,16 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   border-radius: 50%;
   background: var(--surface-1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  transition: transform 0.15s ease-out;
+  transition: transform 0.28s cubic-bezier(0.3, 1.4, 0.5, 1), width 0.15s ease-out, background-color 0.15s;
 }
 .switch:checked { background: var(--brand-yellow); }
 .switch:checked::after { transform: translateX(16px); background: var(--brand-black); }
+/* 누르는 동안 손잡이가 살짝 늘어난다 (움직일 쪽으로) — 켜고 끄는 스위치라는 것이 손에 느껴지게 */
+.switch:active::after { width: 22px; }
+.switch:checked:active::after { transform: translateX(12px); }
+.seg.wide { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; margin: 6px 0 0; }
+.seg.wide button { height: 36px; font-size: 13px; }
+.seg button:disabled { opacity: 0.4; }
 
 /* ========== 메모 ========== */
 .note-screen {
@@ -680,6 +693,10 @@ body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #f
 .rec-panel.paused .rec-dot { animation: none; background: var(--note-muted); box-shadow: none; }
 .rec-time { font-size: 17px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 .rec-state { font-size: 12.5px; color: var(--note-muted); }
+.rec-wave { display: inline-flex; align-items: center; gap: 3px; height: 22px; margin-left: 2px; }
+.rec-wave i { display: block; width: 3px; height: 22px; border-radius: 2px; background: #e5484d; transform: scaleY(calc(0.12 + var(--lv, 0) * 0.88)); transition: transform 0.12s ease-out; }
+.rec-panel.paused .rec-wave i { background: var(--note-muted); transform: scaleY(0.12); }
+.rec-spk { display: inline-block; margin-right: 4px; padding: 0 7px; border-radius: 999px; font-size: 0.8em; font-weight: 700; line-height: 1.6; color: #fff; background: var(--spk, #2f6fdf); }
 .rec-btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; min-width: 38px; padding: 0 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font-weight: 700; font-size: 14px; }
 .rec-btn svg { width: 18px; height: 18px; }
 .rec-btn.stop { background: #e5484d; color: #fff; }
@@ -775,7 +792,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #f
 .btn.primary { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
 
 /* ---------- 잠깐 알림 + 되돌리기 ---------- */
-.toast { display: flex; align-items: center; gap: 12px; }
+.toast { display: flex; align-items: center; gap: 12px; word-break: keep-all; overflow-wrap: anywhere; }
 .toast[hidden] { display: none; }
 .toast-action { flex: none; margin: -6px -8px -6px 0; padding: 8px 10px; border: 0; border-radius: 10px; background: none; color: var(--brand-yellow); font-weight: 800; font-size: 14px; }
 .toast-action[hidden] { display: none; }
@@ -815,6 +832,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #f
 .note-screen.trashing { animation: note-trash 0.26s cubic-bezier(0.5, 0, 0.75, 0) forwards; transform-origin: 85% 100%; }
 @keyframes note-trash { to { opacity: 0; transform: translateY(30%) scale(0.35) rotate(-6deg); border-radius: 40px; } }
 @media (prefers-reduced-motion: reduce) {
+  .rec-wave i { transition: none; }
   .fab-sat, .fab-menu.closing .fab-sat, .cards .item.removing, .cards .item.removing .card, .note-screen.trashing, .rec-dot { animation: none; }
 }
 

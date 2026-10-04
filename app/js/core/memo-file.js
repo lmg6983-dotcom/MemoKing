@@ -137,8 +137,14 @@ export function extractTitle(body) {
 }
 
 // 제목(첫 줄)을 뺀 나머지로 만든 미리보기
+//   카드에서 읽기 좋게: 공유하기로 붙은 "출처: …" 줄은 빼고, 수식 표시($)는 걷어낸다
 export function extractPreview(body, maxLength = 160) {
-  return plainLines(body).slice(1).join(' ').slice(0, maxLength);
+  return plainLines(body)
+    .slice(1)
+    .filter((l) => !/^출처\s*[:：]/.test(l))
+    .join(' ')
+    .replace(/\${1,2}([^$]+?)\${1,2}/g, '$1')
+    .slice(0, maxLength);
 }
 
 export function extractHeadings(body) {
