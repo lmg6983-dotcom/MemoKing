@@ -15,8 +15,6 @@ export const app = {
   filterByTag: (_name) => {},
   deliverRecording: async (_result) => {},
   closeFabMenu: () => false,
-  flushNote: () => {},
-  insertTranscript: async (_result) => 0,
 };
 
 export const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };

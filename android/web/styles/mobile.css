@@ -894,22 +894,3 @@ body.two-pane .toast { left: calc(var(--list-w) + (100vw - var(--list-w)) / 2); 
   .rec-text { max-height: 14vh; }
   .searchbar { padding-bottom: 4px; }
 }
-
-/* ---------- 정확하게 다시 받아쓰기 · 말한 사람 구분 ---------- */
-.pro-audio { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; }
-.pro-audio[hidden] { display: none; }
-.pro-models { margin: 0 0 8px; padding: 0; list-style: none; border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px var(--line); }
-.pro-model { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 12px; }
-.pro-model + .pro-model { border-top: 1px solid var(--line); }
-.pro-model > span { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.pro-model b { font-size: 14.5px; }
-.pro-model small { font-size: 12.5px; color: var(--muted); }
-.pro-model.ready small { color: var(--text-strong); }
-.pro-model.ready small::before { content: "✓ "; }
-.pro-progress { margin: 6px 0 10px; }
-.pro-progress[hidden] { display: none; }
-.pro-bar { height: 8px; border-radius: 99px; background: var(--fill-tab, var(--line)); overflow: hidden; }
-.pro-bar span { display: block; height: 100%; width: 0; border-radius: inherit; background: #7a4dff; transition: width 0.4s ease-out; }
-.pro-progress-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--muted); }
-.pro-progress-row span { flex: 1; }
-.sheet .label small { font-weight: 500; color: var(--text-faint); }

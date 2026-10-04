@@ -41,11 +41,6 @@ PC 메모킹은 **Google Drive for desktop** 이 동기화하는 폴더(`G:\내 
 - **녹음 · 받아쓰기** — 메모 화면 도구막대의 🎙 또는 + › 음성 메모. **화면을 끄거나 다른 앱을 써도 계속 녹음**(알림에 시간·잠시 멈춤·끝내기)하고, 말하는 대로 **글로 받아써** 녹음 칸에 바로 보여요. 끝내면 소리 파일(.m4a)과 받아쓴 글이 그 메모에 들어가요 (알림에서 끝내 앱이 꺼져 있어도 다음에 열 때 들어감). 고객 미팅·회의 기록용
   - 받아쓰기 엔진(설정 › 태그 · 녹음): **Vosk**(오픈소스 [alphacep/vosk-api](https://github.com/alphacep/vosk-api), Apache-2.0 — 인터넷 없이 휴대폰 안에서만, 회의 내용이 밖으로 나가지 않음, 모든 안드로이드 버전, 한국어 모델 약 87MB 를 처음 한 번 받음) · **휴대폰 음성 인식**(보통 Google, 더 정확, 안드로이드 13+)
   - 모델이 없을 때 녹음하면 녹음은 그대로 하고, 모델을 받은 뒤 녹음 파일로 받아써요
-- **정확하게 다시 받아쓰기 · 말한 사람 구분** — 녹음이 든 메모의 메뉴 › **정확하게 다시 받아쓰기 · 말한 사람 구분**. 오픈소스 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)(Apache-2.0)로 휴대폰 안에서만:
-  - 받아쓰기: **Whisper small**(OpenAI, MIT) — 녹음하는 동안의 받아쓰기보다 더 정확. 녹음을 조용한 곳에서 28초 이하 조각으로 나눠 받아씀
-  - 말한 사람 구분: **pyannote segmentation 3.0**(MIT) + **3D-Speaker ERes2Net**(Apache-2.0) 목소리 특징으로 나눠 `**화자 1** (00:00) …` · `**화자 2** (00:15) …` 처럼 (사람 수를 알면 고르면 더 정확, 기본은 저절로)
-  - 결과는 그 녹음 줄 **바로 아래**에. 1시간 회의도 **화면을 끄거나 앱을 닫아도 끝까지**(알림에 진행률·그만두기), 녹음 길이만큼(또는 조금 더) 걸림
-  - 모델은 처음 한 번 받음 (Whisper 약 375MB · 말한 사람 구분 약 45MB, 메뉴에서 지우기). 설정 › **녹음을 끝내면 정확하게 다시 받아쓰기** 를 켜면 녹음을 끝낼 때마다 저절로
 - **소리 파일 받기** — 다른 앱(녹음기·카톡 등)에서 m4a·mp3 등을 공유하거나 "다른 앱으로 열기 › 메모킹" 하면 메모가 되고, 그때마다 **받아쓰기**를 켤지 고를 수 있어요 (지난번 선택이 기본)
 - **메모 편집** — PC와 같은 편집기(Milkdown): 굵게·기울임·밑줄·취소선·글자 색·형광펜·목록·체크리스트·표·태그 자동완성·링크 미리보기 카드·**수식**. 서식 막대는 키보드 바로 위에(📎 파일 · 🎙 녹음 · **스타일**(본문·제목 1~3·인용·코드 블록·수식, PC 와 같음) · 목록 · 글자 서식 · 표), 옆으로 밀어 더 보기. **되돌리기·다시 하기는 위 막대에 늘** (누를 것이 없으면 흐리게)
 - **수식** — `$x^2$` 처럼 치거나 스타일 › 수식. KaTeX 로 그리고, 누르면 고치기 창(쓰는 대로 미리 보기). 파일에는 `$$x^2$$` (돈 표시 `$5` 는 그대로)
@@ -88,10 +83,6 @@ android/
     Http.kt              링크 미리보기·인터넷 사진 받기
     RecorderService.kt   녹음 (포그라운드 서비스 · AudioRecord → AAC .m4a · 끝난 녹음 보관)
     Stt.kt               받아쓰기: Vosk(오픈소스, 오프라인) · 휴대폰 음성 인식 · 소리 파일 받아쓰기 · 모델 받기
-    Pro.kt               정확하게 다시 받아쓰기·말한 사람 구분: 모델 받기 · 조각 나누기 · 포그라운드 서비스(ProService) · 결과 보관
-  app/src/sherpa/java/   sherpa-onnx 를 부르는 곳 (ProEngine) — 빌드 전에 받은 라이브러리가 있을 때만
-  app/src/nosherpa/java/ 라이브러리 없이 빌드할 때 (그 기능만 빠짐)
-  scripts/fetch-sherpa-onnx.sh  sherpa-onnx 안드로이드 라이브러리(AAR) 받기 (CI 가 실행, 저장소에는 넣지 않음)
   app/src/main/java/android/print/PdfPrint.kt  인쇄 화면 없이 메모를 PDF 파일로
     drive/NativeAuth.kt  휴대폰 구글 계정으로 Drive 권한 (Google Play 서비스: 계정 고르기·허용)
     drive/GoogleAuth.kt  토큰 관리 · 예비 로그인 (휴대폰 브라우저 + 127.0.0.1 로 돌아오기, PKCE)
@@ -106,7 +97,6 @@ android/
     js/list-view.js      목록 화면
     js/note-view.js      메모 화면 (app/js/note.js 의 휴대폰판) · 추천 태그 · 연결
     js/recorder.js       녹음 화면 (시간·받아쓴 글·멈춤·끝내기)
-    js/pro.js            정확하게 다시 받아쓰기·말한 사람 구분 화면
     js/share-image.js    메모를 그림(PNG)으로 (html-to-image)
     js/alarms.js         예약 알림 실행기 (desktop/alarms.js + 시스템 알람 맡기기)
     js/web-fetch.js      링크 미리보기 (desktop/link-previews.js 와 같은 저장 위치)
@@ -122,7 +112,6 @@ android/
 
 | 명령 (저장소 맨 위에서) | 설명 |
 |---|---|
-| `cd android && ./scripts/fetch-sherpa-onnx.sh` | 정확하게 다시 받아쓰기·말한 사람 구분용 sherpa-onnx 라이브러리 받기 (gh 필요, 한 번만 — 없으면 그 기능만 빠진 채 빌드) |
 | `cd android && ./gradlew assembleDebug` | APK 만들기 → `android/app/build/outputs/apk/debug/app-debug.apk` |
 | `cd android && ./gradlew installDebug` | 연결한 휴대폰에 바로 설치 |
 | `cd android && ./gradlew testDebugUnitTest` | 동기화 엔진 단위 테스트 |

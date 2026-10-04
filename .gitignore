@@ -19,5 +19,3 @@ android/.kotlin/
 # PC 메모킹 Google 로그인용 OAuth 클라이언트 (설정에서 붙여 넣거나 이 파일로)
 desktop/google-client.json
 
-# sherpa-onnx 안드로이드 라이브러리 (android/scripts/fetch-sherpa-onnx.sh 가 받음)
-android/app/libs/

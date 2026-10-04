@@ -61,12 +61,6 @@ class MainActivity : Activity() {
     private val io = Executors.newSingleThreadExecutor()
 
     private var pageReady = false
-    private val proReceiver = object : android.content.BroadcastReceiver() {
-        override fun onReceive(context: android.content.Context, intent: Intent) {
-            val ev = intent.getStringExtra("event") ?: return
-            if (pageReady) emit("pro", JSONObject(ev))
-        }
-    }
     private var pendingIntent: JSONObject? = null
     private val waiting = HashMap<Int, Int>() // 요청 코드 → 화면의 call id
 
@@ -113,10 +107,6 @@ class MainActivity : Activity() {
         setupBack()
         // 녹음 서비스의 소식(시간·받아쓴 글·끝남)을 화면으로
         RecorderService.listener = { ev -> runOnUiThread { if (pageReady) emit("record", ev) } }
-        // 받아쓰기 프로세스(:pro)의 소식(진행·끝남)은 방송으로 온다
-        val filter = android.content.IntentFilter(ProService.ACTION_EVENT)
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(proReceiver, filter, RECEIVER_NOT_EXPORTED)
-        else registerReceiver(proReceiver, filter)
         web.loadUrl(WebServer.START)
         if (savedInstanceState == null) handleIntent(intent)
     }
@@ -279,11 +269,6 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         if (visible === this) visible = null
         RecorderService.listener = null
-        try {
-            unregisterReceiver(proReceiver)
-        } catch (e: IllegalArgumentException) {
-            // 이미 풀림
-        }
         web.destroy()
         super.onDestroy()
     }

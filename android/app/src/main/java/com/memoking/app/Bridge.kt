@@ -271,21 +271,6 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun sttStatus(): String = reply { Stt.status(ctx) }
 
-    // ---------- 정확하게 다시 받아쓰기 · 말한 사람 구분 (Pro.kt) ----------
-
-    @JavascriptInterface
-    fun proStatus(): String = reply { ProModels.status(ctx) }
-
-    @JavascriptInterface
-    fun proCancel(): String = reply { ProService.cancel(ctx) }
-
-    /** 끝난 받아쓰기 결과 (아직 메모에 넣지 않은 것) */
-    @JavascriptInterface
-    fun proTakeDone(): String = reply { if (ProService.current(ctx) == null) JobStore.all(ctx) else JSONArray() }
-
-    @JavascriptInterface
-    fun proAck(id: String): String = reply { JobStore.ack(ctx, id) }
-
     // ---------- 오래 걸리는 일 ----------
 
     @JavascriptInterface
@@ -330,33 +315,6 @@ class Bridge(private val activity: MainActivity) {
                     if (a.optBoolean("delete")) VoskModels.delete(ctx)
                     else VoskModels.download(ctx) { p -> activity.runOnUiThread { activity.emit("sttModel", JSONObject().put("progress", p)) } }
                     Stt.status(ctx)
-                }
-            }
-            // 정확하게 다시 받아쓰기용 모델 받기·지우기: { keys: ["whisper","diarize"] } | { delete: "whisper" }
-            "proModels" -> pool.execute {
-                resolve(id) {
-                    val del = a.optString("delete")
-                    if (del.isNotEmpty()) ProModels.delete(ctx, del)
-                    else {
-                        val keys = a.optJSONArray("keys")?.let { arr -> List(arr.length()) { arr.getString(it) } } ?: listOf("whisper", "diarize")
-                        ProModels.download(ctx, keys) { key, p -> activity.runOnUiThread { activity.emit("proModel", JSONObject().put("key", key).put("progress", p)) } }
-                    }
-                    ProModels.status(ctx)
-                }
-            }
-            // 메모 폴더의 녹음(rel)을 정확하게 다시 받아쓰기 → { jobId } (결과는 on('pro') 의 done · proTakeDone)
-            "retranscribe" -> pool.execute {
-                resolve(id) {
-                    val rel = a.getString("rel")
-                    val audio = File(ProService.jobsDir(ctx), "${java.util.UUID.randomUUID()}.audio")
-                    storage().openRead(rel).use { input -> audio.outputStream().use { input.copyTo(it) } }
-                    val jobId = try {
-                        ProService.start(activity, a.optString("memoId"), rel, audio, a.optBoolean("diarize", true), a.optInt("speakers", 0))
-                    } catch (e: Exception) {
-                        audio.delete()
-                        throw e
-                    }
-                    JSONObject().put("jobId", jobId)
                 }
             }
             // 보내기: 그림(base64) 같은 파일 · PDF

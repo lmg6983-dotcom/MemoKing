@@ -204,23 +204,9 @@ const sync = {
     return true;
   },
   sttStatus: () => ({ engine: 'vosk', model: 'ready', system: true }),
-  // 정확하게 다시 받아쓰기 (가짜): 모델 받기 → 받아쓰기는 바로 끝난 것으로
-  proStatus: () => ({
-    available: true,
-    busy: null,
-    whisper: { state: fakePro.whisper, progress: -1, label: '정확한 받아쓰기 (Whisper small)', size: '약 375MB' },
-    diarize: { state: fakePro.diarize, progress: -1, label: '말한 사람 구분 (pyannote + 3D-Speaker)', size: '약 45MB' },
-  }),
-  proCancel: () => null,
-  proTakeDone: () => fakeProDone,
-  proAck: (id) => {
-    fakeProDone = fakeProDone.filter((r) => r.id !== id);
-    return true;
-  },
 };
 
-const fakePro = { whisper: 'missing', diarize: 'missing' };
-let fakeProDone = [];
+
 
 let fakeRec = null;
 let fakeDone = [];
@@ -344,23 +330,6 @@ const calls = {
     return true;
   },
   sttModel: async () => ({ model: 'ready' }),
-  proModels: async ({ keys = [] }) => {
-    for (const k of keys) fakePro[k] = 'ready';
-    log.push({ proModels: keys });
-    return sync.proStatus();
-  },
-  retranscribe: async ({ memoId, rel, diarize, speakers }) => {
-    log.push({ retranscribe: { memoId, rel, diarize, speakers } });
-    const id = randomUUID();
-    fakeProDone.push({
-      ok: true, id, memoId, rel, engine: 'whisper-small', diarize, speakers: diarize ? 2 : 0, durationSec: 20,
-      segments: [
-        { start: 0, end: 4, speaker: diarize ? 1 : -1, text: '오늘 회의를 시작하겠습니다' },
-        { start: 5, end: 9, speaker: diarize ? 0 : -1, text: '네 일정부터 보죠' },
-      ],
-    });
-    return { jobId: id };
-  },
   http: async ({ url, accept = '*/*', limit = 5 * 1024 * 1024, save = false }) => {
     const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) MemoKing-dev' }, redirect: 'follow' });
     const type = (res.headers.get('content-type') ?? '').toLowerCase();
