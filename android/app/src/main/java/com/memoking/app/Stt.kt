@@ -303,13 +303,25 @@ class SystemTranscriber(private val ctx: Context, private val listener: SttListe
 // ---------- 소리 파일 받아쓰기 (다른 앱에서 받은 m4a·mp3 등) ----------
 
 object FileTranscriber {
-    /**
-     * 파일을 풀어(MediaExtractor + MediaCodec) 16kHz 모노로 바꿔 받아쓴다.
-     * onProgress: 0~100
-     */
+    /** 파일을 16kHz 모노로 풀어 받아쓴다. onProgress: 0~100 */
     fun run(ctx: Context, file: File, engine: String, onProgress: (Int) -> Unit): String {
         val parts = ArrayList<String>()
         val stt = Stt.create(ctx, engine) { final, _ -> if (!final.isNullOrBlank()) synchronized(parts) { parts.add(final) } }
+        try {
+            AudioDecoder.decode16k(file, onProgress) { pcm -> stt.feed(pcm, pcm.size) }
+            val tail = stt.finish()
+            if (tail.isNotBlank()) synchronized(parts) { parts.add(tail) }
+            onProgress(100)
+        } finally {
+            stt.close()
+        }
+        return synchronized(parts) { Transcript.join(parts) }
+    }
+}
+
+/** 소리 파일(m4a·mp3·wav 등)을 풀어(MediaExtractor + MediaCodec) 16kHz 모노 16비트 PCM 조각으로 */
+object AudioDecoder {
+    fun decode16k(file: File, onProgress: (Int) -> Unit = {}, sink: (ByteArray) -> Unit) {
         val extractor = MediaExtractor()
         try {
             extractor.setDataSource(file.absolutePath)
@@ -322,62 +334,56 @@ object FileTranscriber {
             val codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
             codec.configure(format, null, null, 0)
             codec.start()
-            var rate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-            var channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-            var resampler = Resampler(rate, channels)
+            var resampler = Resampler(format.getInteger(MediaFormat.KEY_SAMPLE_RATE), format.getInteger(MediaFormat.KEY_CHANNEL_COUNT))
             val info = MediaCodec.BufferInfo()
             var inputDone = false
             var lastProgress = -1
-            while (true) {
-                if (!inputDone) {
-                    val i = codec.dequeueInputBuffer(10_000)
-                    if (i >= 0) {
-                        val buf = codec.getInputBuffer(i)!!
-                        val n = extractor.readSampleData(buf, 0)
-                        if (n < 0) {
-                            codec.queueInputBuffer(i, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            inputDone = true
-                        } else {
-                            codec.queueInputBuffer(i, 0, n, extractor.sampleTime, 0)
-                            extractor.advance()
-                        }
-                    }
-                }
-                val o = codec.dequeueOutputBuffer(info, 10_000)
-                if (o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                    rate = codec.outputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-                    channels = codec.outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-                    resampler = Resampler(rate, channels)
-                } else if (o >= 0) {
-                    if (info.size > 0) {
-                        val buf = codec.getOutputBuffer(o)!!
-                        val bytes = ByteArray(info.size)
-                        buf.position(info.offset)
-                        buf.get(bytes)
-                        val pcm = resampler.process(bytes)
-                        if (pcm.isNotEmpty()) stt.feed(pcm, pcm.size)
-                        if (durationUs > 0) {
-                            val p = (info.presentationTimeUs * 100 / durationUs).toInt().coerceIn(0, 99)
-                            if (p != lastProgress) {
-                                lastProgress = p
-                                onProgress(p)
+            try {
+                while (true) {
+                    if (!inputDone) {
+                        val i = codec.dequeueInputBuffer(10_000)
+                        if (i >= 0) {
+                            val buf = codec.getInputBuffer(i)!!
+                            val n = extractor.readSampleData(buf, 0)
+                            if (n < 0) {
+                                codec.queueInputBuffer(i, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                                inputDone = true
+                            } else {
+                                codec.queueInputBuffer(i, 0, n, extractor.sampleTime, 0)
+                                extractor.advance()
                             }
                         }
                     }
-                    codec.releaseOutputBuffer(o, false)
-                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
+                    val o = codec.dequeueOutputBuffer(info, 10_000)
+                    if (o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                        resampler = Resampler(codec.outputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE), codec.outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT))
+                    } else if (o >= 0) {
+                        if (info.size > 0) {
+                            val buf = codec.getOutputBuffer(o)!!
+                            val bytes = ByteArray(info.size)
+                            buf.position(info.offset)
+                            buf.get(bytes)
+                            val pcm = resampler.process(bytes)
+                            if (pcm.isNotEmpty()) sink(pcm)
+                            if (durationUs > 0) {
+                                val p = (info.presentationTimeUs * 100 / durationUs).toInt().coerceIn(0, 99)
+                                if (p != lastProgress) {
+                                    lastProgress = p
+                                    onProgress(p)
+                                }
+                            }
+                        }
+                        codec.releaseOutputBuffer(o, false)
+                        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
+                    }
                 }
+            } finally {
+                codec.stop()
+                codec.release()
             }
-            codec.stop()
-            codec.release()
-            val tail = stt.finish()
-            if (tail.isNotBlank()) synchronized(parts) { parts.add(tail) }
-            onProgress(100)
         } finally {
             extractor.release()
-            stt.close()
         }
-        return synchronized(parts) { Transcript.join(parts) }
     }
 }
 

@@ -13,6 +13,10 @@ fun secret(key: String, env: String): String {
     return (props.getProperty("memoking.$key") ?: System.getenv(env) ?: "").trim().replace("\"", "")
 }
 
+// 정확하게 다시 받아쓰기·말한 사람 구분: 오픈소스 sherpa-onnx (k2-fsa/sherpa-onnx, Apache-2.0) 안드로이드 라이브러리.
+// 저장소에 넣지 않고 빌드 전에 받는다 (android/scripts/fetch-sherpa-onnx.sh — CI 가 실행). 없으면 그 기능만 빠진 채로 빌드된다.
+val sherpaAar: File = file("libs/sherpa-onnx.aar")
+
 // 화면은 데스크탑과 함께 쓰는 웹 코어(../app)와 안드로이드 화면(../web)을 앱 안에 묶어 넣는다.
 //   assets/www/app/  ← 저장소의 app/ (편집기·메모 파일 형식·인덱서 등 공용 코드)
 //   assets/www/m/    ← android/web/ (휴대폰 화면)
@@ -38,8 +42,8 @@ android {
         applicationId = "com.memoking.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.6.0"
+        versionCode = 11
+        versionName = "0.7.0"
 
         // 받아쓰기(Vosk) 네이티브 라이브러리: 실제 휴대폰용만 (APK 크기)
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
@@ -69,6 +73,7 @@ android {
     }
 
     sourceSets["main"].assets.srcDir(webOut.get().asFile)
+    sourceSets["main"].java.srcDir(if (sherpaAar.exists()) "src/sherpa/java" else "src/nosherpa/java")
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -88,6 +93,11 @@ dependencies {
 
     // 받아쓰기: 오픈소스 음성 인식 Vosk (alphacep/vosk-api, Apache-2.0) — 인터넷 없이 휴대폰 안에서 한국어를 글로
     implementation("com.alphacephei:vosk-android:0.3.75")
+
+    // 정확하게 다시 받아쓰기(Whisper)·말한 사람 구분(pyannote + 3D-Speaker) — sherpa-onnx
+    if (sherpaAar.exists()) implementation(files(sherpaAar))
+    // 모델 압축 파일(.tar.bz2) 풀기 (Apache-2.0)
+    implementation("org.apache.commons:commons-compress:1.27.1")
 
     // 동기화 엔진 단위 테스트 (PC 에서 JVM 으로)
     testImplementation("junit:junit:4.13.2")

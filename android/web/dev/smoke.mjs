@@ -499,6 +499,24 @@ try {
   f = fileWith('오늘 회의를 시작하겠습니다');
   check('음성 메모: 소리 파일 + 받아쓴 글', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 음성 메모'), f && read(f));
 
+  // 정확하게 다시 받아쓰기 · 말한 사람 구분: 메모 메뉴 › 모델 받기 → 녹음 바로 아래에 화자 1·2
+  const voiceCard = page.locator('.card', { hasText: '음성 메모' }).first();
+  await voiceCard.dispatchEvent('contextmenu');
+  await page.waitForTimeout(200);
+  check('다시 받아쓰기: 녹음이 든 메모 메뉴에 보임', await page.isVisible('[data-memo-action="retranscribe"]'));
+  await page.tap('[data-memo-action="retranscribe"]');
+  await page.waitForSelector('#pro-sheet:not([hidden])');
+  check('다시 받아쓰기: 필요한 모델 두 개 · 모델 받고 시작', (await page.locator('.pro-model').count()) === 2 && (await page.textContent('#pro-start')).includes('모델 받고'));
+  await shot('14-pro-sheet');
+  await page.tap('#pro-start');
+  await page.waitForTimeout(3800);
+  const vf = fileWith('오늘 회의를 시작하겠습니다');
+  const vtext = vf ? read(vf) : '';
+  check('다시 받아쓰기: 모델 받기', (await devLog()).log.some((l) => l.proModels?.includes('diarize')));
+  check('다시 받아쓰기: 녹음 바로 아래에 화자 1·2', /\.m4a\)\n\n\*\*정확하게 다시 받아쓴 글\*\* · Whisper · 말한 사람 2명\n\n\*\*화자 1\*\* \(00:00\) 오늘 회의를 시작하겠습니다\n\n\*\*화자 2\*\* \(00:05\) 네 일정부터 보죠/.test(vtext), vtext);
+  await back();
+  await page.waitForTimeout(300);
+
   // 다른 앱에서 받은 마크다운 글은 서식대로
   await post('/dev/intent', { type: 'share', text: '## 회의록\n- 첫째\n- 둘째\n\n**결론**: 진행', app: '메모장', files: [] });
   await page.evaluate(() => window.__mk.emit('intent', null));

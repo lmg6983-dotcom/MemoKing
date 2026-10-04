@@ -245,6 +245,7 @@
     <button class="menu-item" data-memo-action="open"><svg><use href="#i-note"/></svg><span>열기</span></button>
     <button class="menu-item" data-memo-action="pin"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
     <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>보내기 · 글 · 그림 · PDF</span></button>
+    <button class="menu-item" data-memo-action="retranscribe" hidden><svg><use href="#i-mic"/></svg><span>정확하게 다시 받아쓰기 · 말한 사람 구분</span></button>
     <button class="menu-item" data-memo-action="copy"><svg><use href="#i-copy"/></svg><span>글 복사하기</span></button>
     <button class="menu-item" data-memo-action="print"><svg><use href="#i-pdf"/></svg><span>PDF로 저장 · 인쇄</span></button>
     <button class="menu-item danger" data-memo-action="delete"><svg><use href="#i-trash"/></svg><span>메모 지우기</span></button>
@@ -351,6 +352,35 @@
       <button class="share-choice" data-share="pdf"><svg><use href="#i-pdf"/></svg><b>PDF</b><small>문서로 (글자 고르기 가능)</small></button>
     </div>
     <p id="share-busy" class="wait" hidden><span class="spinner"></span><span id="share-busy-text">만들고 있어요</span></p>
+  </section>
+
+  <!-- 정확하게 다시 받아쓰기 (Whisper) · 말한 사람 구분 (pyannote + 3D-Speaker) — sherpa-onnx, 휴대폰 안에서 -->
+  <section id="pro-sheet" class="sheet pro-sheet" role="dialog" aria-labelledby="pro-sheet-title" hidden>
+    <div class="sheet-grip"></div>
+    <h3 id="pro-sheet-title" class="sheet-title">정확하게 다시 받아쓰기</h3>
+    <p class="hint">오픈소스 <b>Whisper</b> 로 녹음을 한 번 더, 더 정확하게 받아써요. 인터넷 없이 휴대폰 안에서만 하고, 화면을 꺼도 끝까지 해요. 녹음 길이만큼(또는 조금 더) 걸려요. 결과는 녹음 바로 아래에 들어가요.</p>
+    <div id="pro-audio" class="pro-audio" role="radiogroup" aria-label="받아쓸 녹음"></div>
+    <label class="setting-row">
+      <input type="checkbox" id="pro-diarize" class="switch" checked>
+      <span>말한 사람 구분 <small>목소리로 나눠 "화자 1 · 화자 2" 처럼 적어요 (회의·미팅)</small></span>
+    </label>
+    <label class="setting-row select-row" id="pro-speakers-row">
+      <span>말한 사람 수 <small>알면 고르세요. 더 정확해져요</small></span>
+      <select id="pro-speakers" aria-label="말한 사람 수">
+        <option value="0">저절로</option>
+        <option value="2">2명</option><option value="3">3명</option><option value="4">4명</option><option value="5">5명</option><option value="6">6명</option>
+      </select>
+    </label>
+    <p class="label">필요한 모델 <small>(처음 한 번만 받아요 · Wi-Fi 추천)</small></p>
+    <ul id="pro-models" class="pro-models"></ul>
+    <div id="pro-progress" class="pro-progress" hidden>
+      <div class="pro-bar"><span id="pro-bar-fill"></span></div>
+      <div class="pro-progress-row"><span id="pro-progress-text"></span><button id="pro-cancel" class="link-btn danger">그만두기</button></div>
+    </div>
+    <p id="pro-unavailable" class="hint" hidden>이 빌드에는 정확한 받아쓰기가 들어 있지 않아요. 최신 APK 를 설치해 주세요.</p>
+    <div class="sheet-actions">
+      <button id="pro-start" class="btn primary">받아쓰기 시작</button>
+    </div>
   </section>
 
   <!-- 다른 앱에서 받은 소리 파일: 받아쓸지 그때마다 고르기 -->
@@ -464,6 +494,10 @@
         <option value="vosk">Vosk (오픈소스 · 오프라인)</option>
         <option value="system">휴대폰 음성 인식 (더 정확)</option>
       </select>
+    </label>
+    <label class="setting-row">
+      <input type="checkbox" id="auto-pro" class="switch">
+      <span>녹음을 끝내면 정확하게 다시 받아쓰기 <small>Whisper 로 한 번 더 받아쓰고 말한 사람을 나눠요 (모델을 받아 두었을 때)</small></span>
     </label>
     <div class="setting-row" id="stt-model-row">
       <span>한국어 받아쓰기 모델 <small id="stt-model-note"></small></span>

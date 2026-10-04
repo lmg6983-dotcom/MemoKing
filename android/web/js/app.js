@@ -16,6 +16,8 @@ import { injectMobileIcons } from './m-icons.js';
 import { app, COLOR_NAMES } from './state.js';
 import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
+import * as pro from './pro.js';
+import { formatTranscript, insertAfterMedia } from '../../app/js/core/transcript-format.js';
 import { renderMemoImage } from './share-image.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
@@ -288,6 +290,7 @@ app.memoMenu = (id) => {
   for (const s of swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   memoSheet.querySelector('[data-memo-action="open"]').hidden = inNote;
   memoSheet.querySelector('[data-memo-action="print"]').hidden = !inNote;
+  memoSheet.querySelector('[data-memo-action="retranscribe"]').hidden = !pro.hasAudio(body);
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
   pin.querySelector('span').textContent = memo.pinned ? '목록 맨 위 고정 풀기' : '목록 맨 위에 고정';
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
@@ -328,6 +331,11 @@ memoSheet.addEventListener('click', async (e) => {
     case 'share':
       closeSheet(memoSheet);
       openShare(id);
+      break;
+    case 'retranscribe':
+      closeSheet(memoSheet);
+      note.flush();
+      pro.open(id, body);
       break;
     case 'copy':
       closeSheet(memoSheet);
@@ -486,6 +494,11 @@ app.deliverRecording = async (r) => {
     list.refresh();
   }
   toast(transcript ? `녹음 ${duration}과 받아쓴 글을 메모에 넣었어요` : `녹음 ${duration}을 메모에 넣었어요`);
+  // 설정 "녹음을 끝내면 정확하게 다시 받아쓰기": 모델을 받아 두었으면 바로 (화면을 꺼도 끝까지)
+  if (pro.autoOn() && pro.ready(true)) {
+    pro.start({ memoId, rel: item.src, diarize: true, speakers: 0 }).catch((err) => toast(err.message, true));
+    return;
+  }
   // 녹음 중에는 못 받아썼으면(모델이 없었음) 이제 녹음 파일로
   if (r.sttPending && recorder.sttOn()) {
     if (recorder.sttReady()) transcribeInto(memoId, [item]);
@@ -496,6 +509,24 @@ app.deliverRecording = async (r) => {
       });
     }
   }
+};
+
+// ---------- 정확하게 다시 받아쓴 글을 그 녹음 바로 아래에 ----------
+
+app.flushNote = () => note.flush();
+app.insertTranscript = async (result) => {
+  const md = formatTranscript(result);
+  if (!md || !app.vault) return 0;
+  if (note.currentId() === result.memoId) {
+    note.flush();
+    note.replaceBody(insertAfterMedia(note.editorMarkdown(), result.rel, md));
+  } else {
+    const memo = app.vault.get(result.memoId);
+    if (memo) app.vault.save(result.memoId, insertAfterMedia(memo.body, result.rel, md));
+    else app.vault.import({ body: `# 다시 받아쓴 녹음\n\n${md}\n` });
+    list.refresh();
+  }
+  return result.segments?.length ?? 0;
 };
 
 // ---------- 설정 ----------
@@ -537,6 +568,7 @@ function openSettings() {
   $('rec-stt').checked = recorder.sttOn();
   $('rec-stt-note').textContent = '말하는 대로 글로 옮겨요 · 화면을 꺼도 계속 녹음해요';
   $('stt-engine').value = recorder.sttEngine();
+  $('auto-pro').checked = pro.autoOn();
   $('stt-engine').querySelector('[value="system"]').disabled = !info.record?.system;
   refreshSttRow();
   openSheet($('settings-sheet'));
@@ -556,6 +588,10 @@ function refreshSttRow(progress) {
   $('stt-model-btn').textContent = st.model === 'ready' ? '지우기' : busy ? '받는 중' : '받기';
   $('stt-model-btn').disabled = busy;
 }
+$('auto-pro').addEventListener('change', async () => {
+  pro.setAuto($('auto-pro').checked);
+  if ($('auto-pro').checked && !pro.ready(true)) toast('메모 메뉴 › 정확하게 다시 받아쓰기에서 모델을 한 번 받아 두면 저절로 해요');
+});
 $('stt-engine').addEventListener('change', () => {
   recorder.setSttEngine($('stt-engine').value);
   refreshSttRow();
@@ -959,6 +995,7 @@ function openVault() {
   renderDrive();
   if (app.vaultInfo?.drive) drive.syncSoon();
   recorder.resume(); // 녹음이 도는 중인지, 꺼져 있는 동안 끝난 녹음이 있는지
+  pro.resume(); // 다시 받아쓰기가 끝났으면 넣기
   if (pendingIntent) {
     const p = pendingIntent;
     pendingIntent = null;
@@ -1002,6 +1039,7 @@ on('app', (state) => {
     list.refreshHistory(); // "알림 접근" 을 켜고 돌아왔을 때
     app.vault.resume();
     recorder.resume();
+    pro.resume();
     alarms.start();
   }
 });

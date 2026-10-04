@@ -35,20 +35,32 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # 받아쓰기 다시 하기·말한 사람 구분 (sherpa-onnx, Apache-2.0) 안드로이드 라이브러리 받기 + 쓰는 API 확인용 목록
+      # 정확하게 다시 받아쓰기·말한 사람 구분 (sherpa-onnx, Apache-2.0) 안드로이드 라이브러리 받기 (저장소에는 넣지 않음)
       - name: sherpa-onnx 받기
         env:
           GH_TOKEN: ${{ github.token }}
+          SHERPA_ONNX_VERSION: v1.13.8
         run: |
           ./scripts/fetch-sherpa-onnx.sh
-          cd app/libs && rm -rf x && mkdir x && cd x && unzip -q ../sherpa-onnx.aar
-          echo "--- AAR"; find . -maxdepth 3 | sort | head -80
-          if [ -f classes.jar ]; then
-            echo "--- 클래스"; unzip -l classes.jar | grep -o 'com/k2fsa/[^ ]*\.class' | sort
-            mkdir c && cd c && unzip -q ../classes.jar && cd ..
-            for f in $(find c/com/k2fsa -name '*.class' | grep -Ev '\$' | grep -E 'Offline|Feature|Speaker|Vad|Silero|Whisper|Diariz|Clustering' | sort); do javap -cp c "$(echo "${f#c/}" | sed 's/\.class$//; s#/#.#g')"; done
-          fi
-          cd .. && rm -rf x
+          unzip -l app/libs/sherpa-onnx.aar | grep -E 'classes.jar|\.so$'
+
+      # 휴대폰이 처음 한 번 받는 모델 주소가 살아 있는지 (실패해도 빌드는 계속 — 앱은 다음 주소로 넘어간다)
+      - name: 받아쓰기 모델 주소 확인
+        continue-on-error: true
+        run: |
+          for u in \
+            https://alphacephei.com/vosk/models/vosk-model-small-ko-0.22.zip \
+            https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/main/small-encoder.int8.onnx \
+            https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/main/small-decoder.int8.onnx \
+            https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/main/small-tokens.txt \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2 \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 \
+            https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_small.onnx; do
+            code=$(curl -sIL -o /dev/null -w '%{http_code}' "$u"); len=$(curl -sIL "$u" | grep -i '^content-length' | tail -1 | tr -d '\r' | awk '{print $2}')
+            echo "$code ${len:-?} $u"
+          done
 
       - name: 동기화 엔진 테스트 + APK 빌드 (디버그 서명 — 휴대폰에 바로 설치 가능)
         # 저장소 설정 › Secrets 에 넣어 두면 Google Drive 로그인 설정이 APK 에 들어간다 (android/DRIVE-SETUP.md)

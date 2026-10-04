@@ -9,9 +9,10 @@ mkdir -p app/libs
 out=app/libs/sherpa-onnx.aar
 version="${SHERPA_ONNX_VERSION:-}"
 if [ -z "$version" ]; then
-  version=$(gh api 'repos/k2-fsa/sherpa-onnx/releases?per_page=30' --jq '[.[] | select(any(.assets[]; .name | endswith(".aar")))][0].tag_name')
+  version=$(gh api 'repos/k2-fsa/sherpa-onnx/releases?per_page=30' --jq '[.[] | select(any(.assets[]; .name | test("^sherpa-onnx-[0-9.]+\\.aar$")))][0].tag_name')
 fi
-url=$(gh api "repos/k2-fsa/sherpa-onnx/releases/tags/$version" --jq '[.assets[] | select(.name | endswith(".aar")) | .browser_download_url][0]')
+# 일반판 sherpa-onnx-<버전>.aar (-rknn 등 특정 칩용은 빼고)
+url=$(gh api "repos/k2-fsa/sherpa-onnx/releases/tags/$version" --jq '[.assets[] | select(.name | test("^sherpa-onnx-[0-9.]+\\.aar$")) | .browser_download_url][0]')
 echo "sherpa-onnx $version ← $url"
 curl -fsSL --retry 3 -o "$out" "$url"
 echo "$version" > app/libs/sherpa-onnx.version

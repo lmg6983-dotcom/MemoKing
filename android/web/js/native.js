@@ -61,6 +61,14 @@ export const record = {
   ack: sync('recordAck'), // 메모에 넣었으니 지워도 됨
 };
 
+// 정확하게 다시 받아쓰기 · 말한 사람 구분 (Pro.kt) — 시작은 call('retranscribe'), 모델은 call('proModels')
+export const pro = {
+  status: sync('proStatus'),
+  cancel: sync('proCancel'),
+  takeDone: sync('proTakeDone'),
+  ack: sync('proAck'),
+};
+
 // Google Drive 동기화 (DriveSync.kt)
 export const drive = {
   status: sync('driveStatus'),

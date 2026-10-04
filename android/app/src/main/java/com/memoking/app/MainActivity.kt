@@ -107,6 +107,7 @@ class MainActivity : Activity() {
         setupBack()
         // 녹음 서비스의 소식(시간·받아쓴 글·끝남)을 화면으로
         RecorderService.listener = { ev -> runOnUiThread { if (pageReady) emit("record", ev) } }
+        ProService.listener = { ev -> runOnUiThread { if (pageReady) emit("pro", ev) } }
         web.loadUrl(WebServer.START)
         if (savedInstanceState == null) handleIntent(intent)
     }
@@ -269,6 +270,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         if (visible === this) visible = null
         RecorderService.listener = null
+        ProService.listener = null
         web.destroy()
         super.onDestroy()
     }
