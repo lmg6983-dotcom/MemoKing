@@ -6,12 +6,14 @@ import { TEXT_COLORS, HIGHLIGHT_COLORS } from '../../app/js/core/html-marks.js';
 import { fileExtension, mediaKind, baseName } from '../../app/js/media.js';
 import { isDataImage, decodeDataImage } from '../../app/js/core/remote-images.js';
 import { setupReminderPanel } from '../../app/js/reminder-panel.js';
-import { collectTags } from '../../app/js/core/tags.js';
+import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
+import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
 import { app, reduceMotion } from './state.js';
 import { call } from './native.js';
 import { fetchRemoteImage } from './web-fetch.js';
-import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome } from './ui.js';
+import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
+import * as recorder from './recorder.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -34,6 +36,14 @@ const el = {
   formatBar: $('format-bar'),
   palette: $('palette'),
   tableBar: $('table-bar'),
+  styleMenu: $('style-menu'),
+  undoBtn: $('undo-btn'),
+  redoBtn: $('redo-btn'),
+  tagBar: $('tag-suggest-bar'),
+  tagChips: $('tag-suggest-chips'),
+  linksTags: $('links-tags'),
+  linksTagsEmpty: $('links-tags-empty'),
+  linksTagSuggest: $('links-tag-suggest'),
 };
 
 let editor = null;
@@ -65,6 +75,7 @@ function isDirty() {
 function onChange(md) {
   current = md;
   if (current === saved) return;
+  if (!el.tagBar.hidden || !extractTags(md).length) scheduleTagBar();
   setStatus('');
   clearTimeout(saveTimer);
   saveTimer = setTimeout(flush, SAVE_DELAY);
@@ -158,7 +169,7 @@ function applyMeta(next) {
   memo = { ...memo, ...next };
   el.screen.dataset.color = memo.color;
   document.body.dataset.noteColor = memo.color;
-  matchChrome(el.bar);
+  if (!isTwoPane()) matchChrome(el.bar); // 넓은 화면은 목록과 메모가 함께 보이므로 위 막대는 목록 색
 }
 
 // ---------- 알림으로 열렸을 때 ----------
@@ -226,16 +237,185 @@ function setLink(targetId, on) {
   refreshLinks();
 }
 
+// 태그로 이어진 메모: 이 메모의 태그마다 같은 태그를 단 메모 (최근 고친 순, 태그마다 6개까지)
+function tagGroups() {
+  const tags = extractTags(editorMarkdown());
+  if (!tags.length) return [];
+  const all = app.vault.list().filter((m) => m.id !== id);
+  return tags.map((name) => ({ name, memos: all.filter((m) => (m.tags ?? []).some((t) => sameTag(t, name))) }));
+}
+
+function relatedCount() {
+  const { links, backlinks } = app.vault.links(id);
+  const ids = new Set([...links, ...backlinks].map((m) => m.id));
+  for (const g of tagGroups()) for (const m of g.memos) ids.add(m.id);
+  return ids.size;
+}
+
+function tagChip(name, { count, add = false, onClick } = {}) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `tag-chip${add ? ' add' : ''}`;
+  b.append(add ? `+ #${name}` : `#${name}`);
+  if (count != null) {
+    const small = document.createElement('small');
+    small.textContent = String(count);
+    b.append(small);
+  }
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+function renderTagGroups() {
+  const groups = tagGroups();
+  el.linksTagsEmpty.hidden = groups.length > 0;
+  el.linksTags.replaceChildren(...groups.map((g) => {
+    const box = document.createElement('div');
+    box.className = 'link-tag-group';
+    const head = document.createElement('div');
+    head.className = 'link-tag-head';
+    head.append(tagChip(g.name, { count: g.memos.length, onClick: () => app.filterByTag(g.name) }));
+    const more = document.createElement('span');
+    more.className = 'link-tag-hint';
+    more.textContent = g.memos.length ? '누르면 목록에서 모아 보기' : '아직 이 태그를 단 다른 메모가 없어요';
+    head.append(more);
+    const ul = document.createElement('ul');
+    ul.className = 'link-list';
+    ul.append(...g.memos.slice(0, 6).map((m) => linkItem(m)));
+    box.append(head, ul);
+    return box;
+  }));
+  // 태그가 없으면 추천 태그를 여기서도 달 수 있게
+  const suggestions = groups.length ? [] : currentSuggestions();
+  el.linksTagSuggest.replaceChildren(...suggestions.map((t) => tagChip(t.name, { add: true, onClick: () => addTags([t.name]) })));
+}
+
 function refreshLinks() {
   if (!id) return;
   const { links, backlinks, suggestions } = app.vault.links(id);
-  const total = new Set([...links, ...backlinks].map((m) => m.id)).size;
+  const total = relatedCount();
   el.linksCount.textContent = total ? String(total) : '';
   el.linksBtn.classList.toggle('has-links', total > 0);
   if (el.linksPanel.hidden) return;
+  renderTagGroups();
+  const mine = new Set(extractTags(editorMarkdown()).map((t) => t.toLocaleLowerCase('ko')));
   el.linksOut.replaceChildren(...links.map((m) => linkItem(m, { onRemove: () => setLink(m.id, false) })));
+  $('links-in-title').hidden = backlinks.length === 0;
   el.linksIn.replaceChildren(...backlinks.map((m) => linkItem(m)));
-  el.linksSuggest.replaceChildren(...suggestions.map((m) => linkItem(m, { onAdd: () => setLink(m.id, true), score: m.score })));
+  $('links-suggest-title').hidden = suggestions.length === 0;
+  el.linksSuggest.replaceChildren(...suggestions.map((m) => {
+    const li = linkItem(m, { onAdd: () => setLink(m.id, true), score: m.score });
+    // 닮은 메모의 태그 중 이 메모에 없는 것: 함께 달면 태그로도 이어진다
+    const theirs = (app.vault.list().find((x) => x.id === m.id)?.tags ?? []).filter((t) => !mine.has(t.toLocaleLowerCase('ko'))).slice(0, 3);
+    if (theirs.length) {
+      const row = document.createElement('div');
+      row.className = 'link-borrow';
+      row.append(...theirs.map((t) => tagChip(t, { add: true, onClick: () => addTags([t]) })));
+      li.append(row);
+    }
+    return li;
+  }));
+}
+
+// ---------- 추천 태그 (태그가 없는 메모) ----------
+
+const AUTO_TAGS_KEY = 'memoking.autoTags';
+export const autoTagsOn = () => {
+  try {
+    return localStorage.getItem(AUTO_TAGS_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+};
+export function setAutoTags(on) {
+  try {
+    localStorage.setItem(AUTO_TAGS_KEY, on ? 'on' : 'off');
+  } catch {
+    // 이번에만
+  }
+}
+
+let suggestCache = { body: null, list: [] };
+let suggestTimer = 0;
+const dismissed = new Set(); // 이번에 닫은 메모 (다시 열 때까지 추천 막대를 숨김)
+
+function suggestionsFor(body, memoId = id) {
+  if (!app.vault || extractTags(body).length) return [];
+  if (suggestCache.body === body) return suggestCache.list;
+  let list = [];
+  try {
+    list = suggestTagsFor(body, app.vault.bodies(), { excludeId: memoId });
+  } catch (err) {
+    console.warn('태그 추천 실패', err);
+  }
+  suggestCache = { body, list };
+  return list;
+}
+const currentSuggestions = () => (id ? suggestionsFor(editorMarkdown()) : []);
+
+function renderTagBar() {
+  if (!id || !editor || dismissed.has(id)) {
+    el.tagBar.hidden = true;
+    return;
+  }
+  const list = currentSuggestions();
+  el.tagBar.hidden = list.length === 0;
+  el.tagChips.replaceChildren(...list.map((t) => {
+    const b = tagChip(t.name, { add: true, onClick: () => addTags([t.name]) });
+    if (t.sure) b.classList.add('sure');
+    return b;
+  }));
+  if (list.length > 1) {
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'link-btn';
+    all.textContent = '모두 달기';
+    all.addEventListener('click', () => addTags(list.map((t) => t.name)));
+    el.tagChips.append(all);
+  }
+}
+function scheduleTagBar() {
+  clearTimeout(suggestTimer);
+  suggestTimer = setTimeout(renderTagBar, 1500); // 쓰는 동안은 기다렸다가
+}
+el.tagBar.addEventListener('mousedown', (e) => e.preventDefault()); // 키보드 유지
+$('tag-suggest-close').addEventListener('click', () => {
+  if (id) dismissed.add(id);
+  el.tagBar.hidden = true;
+});
+
+/** 본문 끝 줄에 태그를 단다 */
+function addTags(names) {
+  if (!editor || !names.length) return;
+  editor.appendMarkdown(names.map((n) => `#${n}`).join(' '));
+  flush();
+  toast(`${names.map((n) => `#${n}`).join(' ')} 태그를 달았어요`);
+  el.tagBar.hidden = true;
+  setTimeout(() => {
+    renderTagBar();
+    refreshLinks();
+  }, 50);
+}
+
+/** 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정, 되돌리기 가능) */
+function autoTag(memoId, body) {
+  if (!autoTagsOn() || dismissed.has(memoId) || extractTags(body).length) return;
+  const sure = suggestionsFor(body, memoId).filter((t) => t.sure).slice(0, 2);
+  if (!sure.length) return;
+  const next = appendTags(body, sure.map((t) => t.name));
+  try {
+    app.vault.save(memoId, next);
+  } catch {
+    return;
+  }
+  toast(`태그 ${sure.map((t) => `#${t.name}`).join(' ')} 를 달았어요`, false, {
+    label: '되돌리기',
+    run: () => {
+      app.vault.save(memoId, body);
+      dismissed.add(memoId);
+      toast('태그를 떼었어요');
+    },
+  });
 }
 
 let linkSearchTimer = null;
@@ -438,17 +618,43 @@ function pressKey(key, shift = false) {
   pm?.dispatchEvent(new KeyboardEvent('keydown', { key, code: `Key${key.toUpperCase()}`, ctrlKey: true, shiftKey: shift, bubbles: true, cancelable: true }));
 }
 
+// ---------- 스타일 고르기 (데스크탑과 같음): 본문 · 제목 1·2·3 · 인용 · 코드 블록 · 수식 ----------
+const STYLE_NAMES = { paragraph: '본문', h1: '제목 1', h2: '제목 2', h3: '제목 3', quote: '인용', codeBlock: '코드 블록' };
+let currentStyle = 'paragraph';
+const styleOf = (active) => {
+  if (active.codeBlock) return 'codeBlock';
+  for (const h of ['h1', 'h2', 'h3']) if (active[h]) return h;
+  return active.quote ? 'quote' : 'paragraph';
+};
+function openStyleMenu(anchor) {
+  closePalette();
+  for (const b of el.styleMenu.querySelectorAll('[data-style]')) b.setAttribute('aria-selected', String(b.dataset.style === currentStyle));
+  el.styleMenu.hidden = false;
+  anchor.setAttribute('aria-expanded', 'true');
+  const rect = anchor.getBoundingClientRect();
+  const width = el.styleMenu.offsetWidth;
+  el.styleMenu.style.left = `${Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8)}px`;
+  el.styleMenu.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 8)}px`;
+}
+export function closeStyleMenu() {
+  if (el.styleMenu.hidden) return false;
+  el.styleMenu.hidden = true;
+  for (const b of document.querySelectorAll('[data-action="style"]')) b.setAttribute('aria-expanded', 'false');
+  return true;
+}
+el.styleMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서(키보드) 유지
+el.styleMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-style]');
+  if (!b || !editor) return;
+  editor.setStyle(b.dataset.style);
+  closeStyleMenu();
+});
+
 const actions = {
   file: () => pickAndInsert('*/*'),
-  camera: () => pickAndInsert('image/*'),
+  record: () => recorder.toggle(),
   table: () => editor.insertTable(),
-  tag: () => {
-    editor.focus();
-    document.execCommand('insertText', false, '#');
-  },
-  undo: () => pressKey('z'),
-  redo: () => pressKey('z', true),
-  done: () => document.activeElement?.blur(),
+  style: (btn) => (el.styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
   color: (btn) => (paletteKind === 'color' ? closePalette() : openPalette('color', btn)),
   highlight: (btn) => (paletteKind === 'highlight' ? closePalette() : openPalette('highlight', btn)),
 };
@@ -459,15 +665,29 @@ el.formatBar.addEventListener('click', (e) => {
   if (!btn || !editor) return;
   if (btn.dataset.cmd) {
     closePalette();
+    closeStyleMenu();
     editor.run(btn.dataset.cmd);
   } else if (btn.dataset.action) {
     if (!['color', 'highlight'].includes(btn.dataset.action)) closePalette();
+    if (btn.dataset.action !== 'style') closeStyleMenu();
     actions[btn.dataset.action]?.(btn);
   }
 });
 document.addEventListener('pointerdown', (e) => {
   if (!el.palette.hidden && !el.palette.contains(e.target) && !e.target.closest?.('[data-action="color"],[data-action="highlight"]')) closePalette();
+  if (!el.styleMenu.hidden && !el.styleMenu.contains(e.target) && !e.target.closest?.('[data-action="style"]')) closeStyleMenu();
 });
+
+// 되돌리기·다시 하기: 자주 쓰므로 위 막대에 늘 (누를 것이 없으면 흐리게)
+for (const [btn, shift] of [[el.undoBtn, false], [el.redoBtn, true]]) {
+  btn.addEventListener('mousedown', (e) => e.preventDefault()); // 키보드를 내리지 않는다
+  btn.addEventListener('click', () => {
+    if (!editor) return;
+    const typing = el.editorRoot.contains(document.activeElement);
+    pressKey('z', shift);
+    if (!typing) document.activeElement?.blur();
+  });
+}
 
 // 표 막대: 표 안에 커서가 있을 때만
 function showTableBar(table) {
@@ -489,6 +709,13 @@ el.tableBar.addEventListener('click', (e) => {
 
 function showActive(active) {
   showTableBar(active.table);
+  currentStyle = styleOf(active);
+  for (const b of document.querySelectorAll('[data-action="style"]')) {
+    b.querySelector('.style-name').textContent = STYLE_NAMES[currentStyle];
+    b.classList.toggle('active', currentStyle !== 'paragraph');
+  }
+  el.undoBtn.disabled = !active.canUndo;
+  el.redoBtn.disabled = !active.canRedo;
   for (const btn of el.formatBar.querySelectorAll('[data-cmd]')) btn.classList.toggle('active', Boolean(active[btn.dataset.cmd]));
   for (const kind of ['color', 'highlight']) {
     for (const btn of el.formatBar.querySelectorAll(`[data-action="${kind}"]`)) btn.classList.toggle('active', Boolean(active[kind]));
@@ -578,10 +805,15 @@ export async function openNote(memoId, options = {}) {
     current = saved = editor.getMarkdown();
     reminderPanel.set(memo.reminders);
     refreshLinks();
+    el.undoBtn.disabled = true;
+    el.redoBtn.disabled = true;
+    renderTagBar();
+    recorder.attach(memoId);
     if (options.alarm) showAlarm(options.alarm);
     if (options.highlight) highlight();
     if (options.capture) await options.capture(editor);
-    if (options.fresh && !options.capture) editor.focus();
+    if (options.record) recorder.start(memoId);
+    else if (options.fresh && !options.capture) editor.focus();
   })();
   try {
     await opening;
@@ -597,7 +829,12 @@ export function closeNote({ quiet = false } = {}) {
   flushTables();
   clearStamp.hidden = true;
   const closing = id;
+  const body = current;
   closePalette();
+  closeStyleMenu();
+  clearTimeout(suggestTimer);
+  el.tagBar.hidden = true;
+  recorder.detach();
   for (const panel of [el.linksPanel, $('reminder-panel')]) if (!panel.hidden) closeSheet(panel);
   editor?.destroy();
   editor = null;
@@ -610,6 +847,7 @@ export function closeNote({ quiet = false } = {}) {
   } catch (err) {
     console.error(err);
   }
+  if (app.vault.get(closing)) autoTag(closing, body);
   document.activeElement?.blur();
   if (quiet || reduceMotion()) {
     el.screen.hidden = true;
@@ -625,6 +863,9 @@ export function closeNote({ quiet = false } = {}) {
 /** 이 메모를 지우기 (메뉴) — 지운 메모는 저장하지 않는다 */
 export function discardAndClose() {
   saved = current;
+  el.tagBar.hidden = true;
+  closeStyleMenu();
+  recorder.detach();
   pendingTables = null;
   clearStamp.hidden = true;
   clearTimeout(saveTimer);
@@ -732,3 +973,28 @@ export function editorMarkdown() {
 }
 
 paintSwatchBars();
+
+export const getEditor = () => editor;
+
+/** 붙여넣은 사진 받기 등 편집기 일이 끝날 때까지 (그림·PDF 로 보내기 전에) */
+export async function settled() {
+  if (opening) await opening;
+  await editor?.imagesSettled(8000);
+  await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 60)));
+}
+
+/** 받아쓴 글 등을 메모 끝에 (서식대로) */
+export function appendText(md) {
+  if (!editor || !md) return;
+  editor.appendMarkdown(md);
+  flush();
+}
+
+/** 녹음 결과: 소리 파일 줄 + 받아쓴 글을 메모 끝에. 빈 메모면 제목 줄부터 */
+export function insertRecording(item, textMd, heading) {
+  if (!editor) return;
+  if (!editorMarkdown().trim() && heading) editor.setMarkdown(`# ${heading}\n`);
+  editor.insertItems([item]);
+  if (textMd) editor.appendMarkdown(textMd);
+  flush();
+}

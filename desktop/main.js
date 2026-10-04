@@ -2158,9 +2158,12 @@ function registerIpc() {
   ipcMain.handle('memo:remove', (_e, id) => {
     removeFromStack(id, 'none'); // 스택이면 옆 탭이 보이게
     const win = noteWins.get(id);
+    const title = vault?.get?.(id)?.title ?? '';
     const ok = vault?.trash(id) ?? false;
     win?.destroy();
-    return ok;
+    // 묻지 않고 지우므로 목록 창에 "되돌리기" (메모 창에서 지워도)
+    if (typeof ok === 'string') listWin?.webContents.send('memo:trashed', { name: ok, title });
+    return Boolean(ok);
   });
   // 메모를 PDF 로
   ipcMain.handle('pdf:open', (_e, id) => openPdfWindow(String(id)));

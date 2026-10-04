@@ -219,14 +219,11 @@ $('show-list').addEventListener('click', () => {
 });
 $('delete-btn').addEventListener('click', async () => {
   closeMenu();
-  if (!isBlankBody(current)) {
-    $('confirm-message').textContent = `"${extractTitle(current)}" 메모를 지울까요?\n지운 메모는 메모 폴더 안 휴지통에 보관돼요.`;
-    el.confirm.returnValue = '';
-    el.confirm.showModal();
-    const ok = await new Promise((resolve) => el.confirm.addEventListener('close', () => resolve(el.confirm.returnValue === 'ok'), { once: true }));
-    if (!ok) return;
-  }
+  // 묻지 않고 바로 휴지통으로 (목록 창에 되돌리기) — 창이 휴지통으로 빨려 들어가듯 사라진다
   saved = current; // 삭제하는 메모는 저장하지 않는다
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    await document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {});
+  }
   await api.memo.remove(id);
 });
 

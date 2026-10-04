@@ -8,7 +8,7 @@ import {
   callCommand, getMarkdown, replaceAll, insert, $view, $prose, $markSchema, $nodeSchema, $remark, Plugin, PluginKey, TextSelection,
   toggleMark, Decoration, DecorationSet, insertTableCommand, tableSchema,
   addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, columnResizing,
-  splitCell, CellSelection, TableMap,
+  splitCell, CellSelection, TableMap, undoDepth, redoDepth,
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
@@ -26,6 +26,8 @@ import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent,
 import { createListDrag } from './list-drag.js';
 import { createBlockMove } from './block-move.js';
 import { create as createConfetti } from '../vendor/confetti.js';
+import { mathPlugins, insertMathBlock } from './math.js';
+import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
 // 모두 마크다운 이미지 문법 ![설명](attachments/파일) 로 저장하고, 확장자로 구분해 보여준다.
@@ -937,6 +939,14 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
             return true;
           }
         }
+        // 마크다운 원문을 글자로만 감싼 HTML(메신저·메모 앱 복사 등)이면 HTML 대신 마크다운으로 그린다
+        const plain = data?.getData('text/plain') ?? '';
+        if (!files.length && html && looksLikeMarkdown(plain) && !/<(h[1-6]|ul|ol|li|table|pre|blockquote|img|strong|b|em|a)[\s>]/i.test(html)
+          && !v.state.selection.$from.parent.type.spec.code && editor) {
+          event.preventDefault();
+          editor.action(insert(normalizeMath(plain.replace(/\r\n?/g, '\n'))));
+          return true;
+        }
         const url = files.length ? null : loneUrl(data?.getData('text/plain'));
         const linkTitle = url ? pastedLinkTitle(html, url) : null;
         if (url && linkTitle !== null && !v.state.selection.$from.parent.type.spec.code) {
@@ -1175,6 +1185,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(inlineHtmlMarks)
     .use(linkCards)
     .use(linkCardSchema)
+    .use(mathPlugins({ readOnly }))
     .use(underlineMark)
     .use(colorMark)
     .use(highlightMark)
@@ -1228,16 +1239,6 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
 
   function leaveHeading() {
     if (parentOfType(['heading'])) call(turnIntoTextCommand);
-  }
-
-  // 지금 줄이 든 목록의 종류만 바꾼다 (들여쓴 구조는 그대로)
-  function setListType(list, type) {
-    const v = view();
-    const target = v.state.schema.nodes[type];
-    if (!target || list.node.type === target) return;
-    const attrs = { spread: list.node.attrs.spread };
-    if (type === 'ordered_list') attrs.order = 1;
-    v.dispatch(v.state.tr.setNodeMarkup(list.pos, target, attrs));
   }
 
   function toggleHeading(level) {
@@ -1320,6 +1321,30 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     if (tr.docChanged) v.dispatch(tr);
   }
 
+  // 이어진 목록 하나(지금 줄이 든 단계)를 통째로 다른 목록으로 — 한 줄씩 바꾸지 않아도 되게
+  //   checked: null = 체크리스트 풀기, 'task' = 체크리스트로(이미 체크한 항목은 그대로)
+  function convertList(list, typeName, checked) {
+    const v = view();
+    const target = v.state.schema.nodes[typeName];
+    if (!target) return;
+    const tr = v.state.tr;
+    if (list.node.type !== target) {
+      const attrs = { ...list.node.attrs };
+      if (typeName === 'ordered_list') attrs.order = list.node.attrs.order ?? 1;
+      tr.setNodeMarkup(list.pos, target, attrs);
+    }
+    let pos = list.pos + 1;
+    list.node.forEach((item) => {
+      if (item.type.name === 'list_item') {
+        const next = { ...item.attrs, listType: typeName === 'ordered_list' ? 'ordered' : 'bullet' };
+        next.checked = checked === 'task' ? (item.attrs.checked ?? false) : null;
+        if (next.checked !== item.attrs.checked || next.listType !== item.attrs.listType) tr.setNodeMarkup(pos, undefined, next);
+      }
+      pos += item.nodeSize;
+    });
+    if (tr.docChanged) v.dispatch(tr);
+  }
+
   function toggleList(type) {
     leaveHeading();
     const list = parentOfType(['bullet_list', 'ordered_list']);
@@ -1332,11 +1357,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     if (!list) {
       splitLinesInSelection();
       if (!wrapLinesInList(type)) call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
-    } else if (list.node.type.name !== type) {
-      call(liftListItemCommand);
-      call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
+      setCheckedInSelection(null);
+      return;
     }
-    setCheckedInSelection(null);
+    convertList(list, type, null);
   }
 
   function toggleTask() {
@@ -1347,14 +1371,14 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       return;
     }
     leaveHeading();
-    if (!parentOfType(['list_item'])) {
+    const list = parentOfType(['bullet_list', 'ordered_list']);
+    if (!list) {
       splitLinesInSelection();
       if (!wrapLinesInList('bullet_list')) call(wrapInBulletListCommand);
-    } else {
-      const ordered = parentOfType(['ordered_list']);
-      if (ordered) setListType(ordered, 'bullet_list'); // 체크리스트는 번호 없이
+      setCheckedInSelection(false); // 고른 줄마다 체크 네모
+      return;
     }
-    setCheckedInSelection(false); // 고른 줄마다 체크 네모
+    convertList(list, 'bullet_list', 'task'); // 체크리스트는 번호 없이, 이어진 목록 전체를
   }
 
   // 글자 색·하이라이트: 색을 주면 그 색으로 바꾸고, null 이면 지운다.
@@ -1389,6 +1413,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const { $from, $to } = view().state.selection;
       return $from.blockRange($to, (n) => n.type.name === 'blockquote');
     };
+    if (name === 'math') {
+      insertMathBlock(v);
+      return;
+    }
     if (name === 'quote') {
       if (parentOfType(['heading', 'code_block'])) call(turnIntoTextCommand); // 인용은 본문 글을 감싼다
       if (!active.quote) call(wrapInBlockquoteCommand);
@@ -1402,7 +1430,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     } else if (/^h[1-3]$/.test(name)) {
       const level = Number(name[1]);
       const heading = parentOfType(['heading']);
-      if (!heading || heading.node.attrs.level !== level) call(wrapInHeadingCommand, level);
+      if (!heading || heading.node.attrs.level !== level) {
+        leaveLists(); // 제목은 목록 밖 한 줄 (제목·목록은 한 줄에 하나만)
+        call(wrapInHeadingCommand, level);
+      }
     } else if (name === 'codeBlock') {
       if (!parentOfType(['code_block'])) call(createCodeBlockCommand);
     }
@@ -1495,6 +1526,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     toggleTextColor: (color) => toggleColor('mk_color', color),
     toggleHighlight: (color) => toggleColor('mk_highlight', color),
     getMarkdown: () => unescapeTags(trimTrailingBreaks(editor.action(getMarkdown()))),
+    // 보이는 그대로의 글 (목록은 • 1. ☐/☑, 표는 탭) — 다른 앱으로 보내기
+    plainText: () => plainTextOf(view().state.doc.content),
+    // 지금 보이는 본문 DOM (그림·PDF 로 보내기)
+    dom: () => view().dom,
     // 붙여넣은 인터넷 사진 받기가 모두 끝날 때까지 (최대 timeout)
     async imagesSettled(timeout = 25_000) {
       const end = Date.now() + timeout;
@@ -1525,6 +1560,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     insertItems(items, { atCursor = false } = {}) {
       if (items.length) insertBlocks(atCursor ? view().state.selection.from : view().state.doc.content.size, items);
     },
+    // 마크다운을 커서 자리에 서식대로 넣는다 (공유받은 마크다운 글·녹음 받아쓰기)
+    insertMarkdown(md) {
+      if (md) editor.action(insert(md));
+    },
     // 문서를 통째로 다시 쓰지 않고 끝에 끼워 넣는다 (받는 중인 사진의 주소 교체와 엇갈리지 않게)
     appendMarkdown(md) {
       const v = view();
@@ -1553,6 +1592,14 @@ function isEmptyDoc(doc) {
   return doc.childCount === 1 && doc.firstChild.type.name === 'paragraph' && doc.firstChild.content.size === 0;
 }
 
+const safeDepth = (fn, state) => {
+  try {
+    return fn(state);
+  } catch {
+    return 1; // 기록 기능이 없으면 늘 누를 수 있게
+  }
+};
+
 // 도구막대 버튼을 눌린 상태로 보여주기 위한 현재 서식
 function activeFormats(state) {
   const { $from, from, to, empty } = state.selection;
@@ -1574,6 +1621,8 @@ function activeFormats(state) {
     code: Boolean(findMark(marks.inlineCode)),
     color: findMark(marks.mk_color)?.attrs.color ?? null,
     highlight: findMark(marks.mk_highlight)?.attrs.color ?? null,
+    canUndo: safeDepth(undoDepth, state) > 0,
+    canRedo: safeDepth(redoDepth, state) > 0,
   };
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d);

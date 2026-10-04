@@ -200,6 +200,15 @@ export class Vault extends EventTarget {
     });
   }
 
+  /** 태그 추천용: 파일이 있는 메모의 본문 (최근 고친 순, 많으면 앞의 limit 개) */
+  bodies(limit = 400) {
+    return [...this.entries.values()]
+      .filter((e) => e.file)
+      .sort((a, b) => (Date.parse(b.meta.updated) || 0) - (Date.parse(a.meta.updated) || 0))
+      .slice(0, limit)
+      .map((e) => ({ id: e.id, body: e.body }));
+  }
+
   get(id) {
     const entry = this.entries.get(id);
     if (!entry) return null;
@@ -378,8 +387,10 @@ export class Vault extends EventTarget {
     const entry = this.entries.get(id);
     if (!entry) return false;
     this.entries.delete(id);
+    let trashed = null;
     if (entry.file && fs.stat(entry.file)) {
       const dest = `${TRASH_DIR}/${stripMd(baseName(entry.file))} (${stamp()}).md`;
+      trashed = baseName(dest);
       if (!fs.move(entry.file, dest)) {
         this.entries.set(id, entry);
         throw new Error('메모를 휴지통으로 옮기지 못했어요');
@@ -388,7 +399,7 @@ export class Vault extends EventTarget {
     this.orphans.delete(id);
     this.trashAttachments(extractAttachments(entry.body));
     this.changed([id]);
-    return true;
+    return trashed ?? true; // 휴지통 파일 이름 (되돌리기에 씀)
   }
 
   flushOrphans() {

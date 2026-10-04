@@ -644,3 +644,253 @@ h2.sheet-title { font-size: 20px; }
 .card[data-color="charcoal"] .card-clear { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.36; }
 body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.32; }
 #note-screen .clear-stamp { font-size: 38px; }
+
+/* =====================================================================
+   0.6.0 — 위 막대 되돌리기·다시 하기, 도구막대 정리(스타일 고르기), 녹음, 추천 태그,
+   연결(태그로 이어진 메모), 보내기(글·그림·PDF), 바로 지우기, + 위성 버튼, 넓은 화면(폴더블·태블릿)
+   ===================================================================== */
+
+/* ---------- 메모 위 막대: 되돌리기·다시 하기 (누를 것이 없으면 흐리게) ---------- */
+.note-screen .bar .icon-btn:disabled { opacity: 0.32; }
+.note-screen .bar #undo-btn, .note-screen .bar #redo-btn { width: 40px; }
+.note-screen .bar #undo-btn svg, .note-screen .bar #redo-btn svg { width: 21px; height: 21px; }
+
+/* ---------- 서식 도구막대: 스타일 고르기 (H1·H2 대신) ---------- */
+.note-screen .format-bar .style-btn { min-width: 74px; padding: 0 10px 0 12px; gap: 8px; font-size: 14px; font-weight: 700; }
+.note-screen .format-bar .style-btn .style-caret { border-top-width: 6px; }
+.note-screen .format-bar .style-btn.active { background: color-mix(in srgb, var(--note-text) 10%, transparent); }
+.note-screen .style-menu { width: 220px; padding: 6px; z-index: 30; }
+.note-screen .style-menu button { min-height: 46px; padding-left: 30px; }
+.note-screen .style-menu kbd { font-size: 12px; }
+.note-screen .format-bar [data-action="record"].active { color: #fff; background: #e5484d; }
+.note-screen .format-bar [data-action="record"].active svg { animation: rec-blink 1.2s ease-in-out infinite; }
+
+/* ---------- 녹음 중 ---------- */
+.rec-panel {
+  flex: none;
+  margin: 0 10px 6px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--note-bg) 70%, var(--note-text) 8%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
+  animation: sheet-up 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.rec-head { display: flex; align-items: center; gap: 8px; }
+.rec-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #e5484d; box-shadow: 0 0 0 4px rgba(229, 72, 77, 0.2); animation: rec-blink 1.2s ease-in-out infinite; }
+.rec-panel.paused .rec-dot { animation: none; background: var(--note-muted); box-shadow: none; }
+.rec-time { font-size: 17px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.rec-state { font-size: 12.5px; color: var(--note-muted); }
+.rec-btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; min-width: 38px; padding: 0 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font-weight: 700; font-size: 14px; }
+.rec-btn svg { width: 18px; height: 18px; }
+.rec-btn.stop { background: #e5484d; color: #fff; }
+.rec-btn:active { transform: scale(0.96); }
+.rec-text { max-height: 22vh; margin-top: 8px; overflow-y: auto; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rec-text[hidden] { display: none; }
+.rec-partial { color: var(--note-muted); }
+.rec-hint { color: var(--note-muted); font-size: 13px; }
+@keyframes rec-blink { 50% { opacity: 0.35; } }
+/* 목록 화면: 녹음 중 알약 (+ 버튼 위) */
+.rec-pill {
+  position: absolute;
+  right: 20px;
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 40px; padding: 0 14px;
+  border: 0; border-radius: 999px;
+  background: #e5484d; color: #fff;
+  font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 18px rgba(229, 72, 77, 0.35);
+}
+.rec-pill .rec-dot { background: #fff; box-shadow: none; }
+.rec-pill[hidden] { display: none; }
+
+/* ---------- 추천 태그 (태그 없는 메모) ---------- */
+.tag-suggest-bar {
+  display: flex; align-items: center; gap: 8px;
+  flex: none;
+  padding: 4px 4px 4px 14px;
+  border-top: 1px solid color-mix(in srgb, var(--note-text) 8%, transparent);
+  animation: mk-drop-in 0.18s ease-out;
+}
+.tag-suggest-bar[hidden] { display: none; }
+.tsb-label { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 12.5px; font-weight: 700; color: var(--note-muted); }
+.tsb-label svg { width: 15px; height: 15px; }
+.tsb-chips { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.tsb-chips::-webkit-scrollbar { display: none; }
+.tag-suggest-bar .tag-chip { height: 30px; background: color-mix(in srgb, var(--note-text) 7%, transparent); box-shadow: none; color: var(--note-text); }
+.tag-suggest-bar .tag-chip.sure { box-shadow: inset 0 0 0 1.5px var(--note-text); }
+.tag-suggest-bar .link-btn { flex: none; color: var(--note-text); }
+.tag-suggest-bar .icon-btn { width: 36px; height: 36px; flex: none; }
+.tag-chip.add { border-style: dashed; }
+
+/* ---------- 연결: 태그로 이어진 메모 ---------- */
+.link-tag-groups { display: flex; flex-direction: column; gap: 10px; margin-bottom: 6px; }
+.link-tag-group { padding: 8px; border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line); }
+.link-tag-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.link-tag-hint { font-size: 12px; color: var(--muted); }
+.link-tag-group .link-list { margin: 0; }
+.link-tag-suggest { margin: 4px 0 8px; }
+.link-tag-suggest:empty { display: none; }
+.link-borrow { display: flex; gap: 6px; width: 100%; padding: 0 0 6px 30px; }
+.link-borrow .tag-chip { height: 28px; font-size: 12.5px; }
+.links-panel .link-item { flex-wrap: wrap; }
+.links-panel h4[hidden], #links-in-title[hidden] { display: none; }
+
+/* ---------- 보내기 (글 · 그림 · PDF) ---------- */
+.share-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 4px 0 8px; }
+.share-choice {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 16px 8px 14px;
+  border: 0; border-radius: var(--radius-lg);
+  background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text); text-align: center;
+}
+.share-choice svg { width: 30px; height: 30px; color: var(--text-strong); }
+.share-choice b { font-size: 15.5px; }
+.share-choice small { font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+.share-choice:active { transform: scale(0.97); background: var(--hover); }
+.share-choice:disabled { opacity: 0.5; }
+/* 그림으로 찍을 종이 (화면 밖) */
+.share-paper {
+  padding: 36px 40px 22px;
+  background: var(--note-bg);
+  color: var(--note-fg);
+  --note-text: var(--note-fg);
+  --note-muted: rgba(17, 17, 17, 0.64);
+  --note-hover: rgba(17, 17, 17, 0.07);
+}
+.share-paper[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.1); }
+.share-paper .mk-doc { font-size: 17px; line-height: 1.7; outline: none; }
+.share-paper .mk-doc li::after { display: none; }
+.share-media { display: inline-block; margin: 4px 0; padding: 4px 10px; border-radius: 8px; background: var(--note-hover); font-size: 14px; font-weight: 600; }
+.share-foot { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--note-hover); font-size: 12px; color: var(--note-muted); text-align: right; }
+
+/* ---------- 받은 소리 파일 ---------- */
+.import-files { margin: 0 0 8px; padding: 0; list-style: none; }
+.import-files li { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px; border-bottom: 1px solid var(--line); font-size: 15px; overflow-wrap: anywhere; }
+.import-files svg { width: 20px; height: 20px; flex: none; color: var(--muted); }
+.import-files small { margin-left: auto; font-size: 12px; color: var(--muted); }
+.btn.primary { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
+
+/* ---------- 잠깐 알림 + 되돌리기 ---------- */
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast[hidden] { display: none; }
+.toast-action { flex: none; margin: -6px -8px -6px 0; padding: 8px 10px; border: 0; border-radius: 10px; background: none; color: var(--brand-yellow); font-weight: 800; font-size: 14px; }
+.toast-action[hidden] { display: none; }
+@media (prefers-color-scheme: dark) { .toast-action { color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--brand-yellow); text-underline-offset: 3px; } }
+
+/* ---------- + 위성 버튼 ---------- */
+.fab { z-index: 21; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.fab svg { transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.fab.open { background: var(--brand-black); color: var(--on-black); }
+.fab.open svg { transform: rotate(45deg); }
+@media (prefers-color-scheme: dark) { .fab.open { background: var(--surface-2); color: var(--text-strong); } }
+.fab-scrim { position: absolute; inset: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); animation: fade-in 0.15s ease-out; }
+.fab-scrim[hidden], .fab-menu[hidden] { display: none; }
+.fab-menu { position: absolute; right: 20px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 21; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+.fab-sat { display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none; color: var(--text-strong); animation: sat-out 0.26s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.fab-sat:nth-child(1) { animation-delay: 0.03s; }
+.fab-menu.closing .fab-sat { animation: sat-in 0.14s ease-in both; }
+.fab-sat-label { padding: 6px 12px; border-radius: 10px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14.5px; }
+.fab-sat-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-right: 4px; border-radius: 18px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.2); }
+.fab-sat[data-new="voice"] .fab-sat-btn { background: #e5484d; color: #fff; }
+.fab-sat-btn svg { width: 24px; height: 24px; }
+.fab-sat:active .fab-sat-btn { transform: scale(0.94); }
+@keyframes sat-out { from { opacity: 0; transform: translate(18px, 34px) scale(0.5); } }
+@keyframes sat-in { to { opacity: 0; transform: translate(18px, 34px) scale(0.5); } }
+
+/* ---------- 바로 지우기: 카드는 밀려 접히고, 메모 화면은 휴지통으로 ---------- */
+.cards .item.removing { overflow: hidden; animation: card-remove 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.cards .item.removing .card { animation: card-fly 0.24s ease-in forwards; }
+@keyframes card-remove { 60% { height: var(--h, auto); opacity: 0.4; } to { height: 0; margin-top: -10px; opacity: 0; } }
+@keyframes card-fly { to { transform: translateX(var(--fly, 110%)) rotate(6deg); opacity: 0; } }
+.card.swiping { transition: none; z-index: 2; }
+.card.swipe-ready { box-shadow: 0 0 0 2px #e5484d, var(--shadow-card); }
+.card.swipe-ready::before {
+  content: "지우기"; position: absolute; top: 10px; right: 10px;
+  padding: 2px 8px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 11.5px; font-weight: 800;
+}
+.note-screen.trashing { animation: note-trash 0.26s cubic-bezier(0.5, 0, 0.75, 0) forwards; transform-origin: 85% 100%; }
+@keyframes note-trash { to { opacity: 0; transform: translateY(30%) scale(0.35) rotate(-6deg); border-radius: 40px; } }
+@media (prefers-reduced-motion: reduce) {
+  .fab-sat, .fab-menu.closing .fab-sat, .cards .item.removing, .cards .item.removing .card, .note-screen.trashing, .rec-dot { animation: none; }
+}
+
+/* 인쇄·PDF: 메모 내용만 */
+@media print {
+  .rec-panel, .tag-suggest-bar, .style-menu, .fab, .fab-menu, .fab-scrim, .rec-pill, .pane-empty, .mk-math-editor { display: none !important; }
+  body.two-pane .note-screen { left: 0 !important; }
+}
+
+/* =====================================================================
+   넓은 화면: 펼친 폴더블(갤럭시 Z 폴드 안쪽 화면) · 태블릿(갤럭시 탭) — 목록과 메모를 나란히
+   ===================================================================== */
+.pane-empty { display: none; }
+body.two-pane {
+  --list-w: clamp(320px, 40vw, 420px);
+}
+body.two-pane .list-screen { right: auto; width: var(--list-w); border-right: 1px solid var(--line); }
+body.two-pane .note-screen { left: var(--list-w); }
+body.two-pane .note-screen.entering { animation: pane-in 0.18s ease-out; }
+body.two-pane .note-screen.leaving { animation: pane-out 0.14s ease-in forwards; }
+@keyframes pane-in { from { opacity: 0; transform: translateX(16px); } }
+@keyframes pane-out { to { opacity: 0; } }
+body.two-pane .pane-empty:not([hidden]) {
+  position: fixed; top: 0; bottom: 0; left: var(--list-w); right: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: var(--surface-1);
+  color: var(--muted); text-align: center; line-height: 1.6;
+}
+.pane-empty img { width: 72px; height: 72px; opacity: 0.5; filter: grayscale(0.4); }
+/* 메모 본문은 읽기 좋은 폭으로 가운데 */
+body.two-pane .note-screen .editor { padding-left: max(28px, calc((100% - 760px) / 2)); padding-right: max(28px, calc((100% - 760px) / 2)); }
+body.two-pane .note-screen .format-items { justify-content: safe center; } /* 넘치면 왼쪽부터 (가운데 정렬로 잘리지 않게) */
+.search { min-width: 0; }
+.search input { width: 100%; }
+/* 목록 카드 고른 표시 */
+body.two-pane .card.current { box-shadow: 0 0 0 2.5px var(--text-strong), var(--shadow-card); }
+/* 시트는 아래 가득이 아니라 가운데 카드처럼 */
+body.two-pane .sheet, body.two-pane .sheet.links-panel {
+  left: 50%; right: auto; bottom: 24px;
+  width: min(560px, calc(100vw - 48px)); max-height: min(86%, 760px);
+  border-radius: 22px;
+  transform: translateX(-50%);
+  animation: sheet-pop 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes sheet-pop { from { opacity: 0; transform: translate(-50%, 24px); } }
+body.two-pane .sheet .sheet-grip { display: none; }
+body.two-pane .fab-menu, body.two-pane .fab, body.two-pane .rec-pill { right: 20px; }
+body.two-pane .toast { left: calc(var(--list-w) + (100vw - var(--list-w)) / 2); }
+
+/* 태블릿 가로처럼 아주 넓은 화면: 목록을 넓혀 카드 열을 늘린다 */
+@media (min-width: 1100px) {
+  body.two-pane { --list-w: clamp(420px, 36vw, 560px); }
+  .note-screen .mk-doc { font-size: 17.5px; }
+}
+
+/* 폴더블을 반쯤 접어 세운 자세(책처럼 세로 접힘): 접히는 선을 사이에 두고 왼쪽 목록 · 오른쪽 메모 */
+@media (horizontal-viewport-segments: 2) {
+  body.two-pane { --list-w: env(viewport-segment-width 0 0, 50vw); }
+  body.two-pane .note-screen, body.two-pane .pane-empty:not([hidden]) { left: env(viewport-segment-left 1 0, 50vw); }
+}
+/* 노트북처럼 가로로 반쯤 접은 자세(플렉스 모드): 위 화면에 본문, 아래 화면에 도구막대·키보드 */
+@media (vertical-viewport-segments: 2) {
+  .note-screen .editor { max-height: env(viewport-segment-height 0 0, 50vh); }
+}
+
+/* 작은 화면 (Z 플립 바깥 화면 · 접은 폴드 바깥 화면 등) */
+@media (max-width: 360px) {
+  :root { --tap: 40px; }
+  .note-screen .editor { padding: 6px 14px 32px; }
+  .note-screen .format-bar button { min-width: 38px; height: 40px; }
+  .tabs button { font-size: 12.5px; }
+  .tabs button svg { display: none; }
+  .brand { font-size: 18px; }
+  .share-choice small { display: none; }
+}
+/* 가로로 눕힌 휴대폰 (높이가 낮음): 막대를 얇게 */
+@media (max-height: 460px) and (orientation: landscape) {
+  :root { --top-h: 46px; }
+  .rec-text { max-height: 14vh; }
+  .searchbar { padding-bottom: 4px; }
+}

@@ -6,7 +6,10 @@
 //   - 놓기 전에 바뀔 모습을 미리 보여 준다 (같은 목록은 항목들이 바뀔 자리로 미끄러지고, 다른 목록은 가로줄·테두리)
 //   - 하위 항목은 함께 움직인다. Esc 로 취소. 키보드: Alt+↑ / Alt+↓ 로 한 칸 위·아래로
 //   - 휴대폰(터치): 글자를 꾹(0.4초) 누르면 들어 올려지고, 손가락을 떼지 않고 끌면 같은 규칙으로 옮긴다
-import { Plugin, PluginKey, TextSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
+//   - 하위·상위 항목: 항목을 오른쪽으로 밀면 바로 위 항목의 하위로, 왼쪽으로 밀면 한 단계 위로 (터치는 그냥 옆으로 밀기,
+//     마우스는 꾹 눌러 들어 올린 채 옆으로) — 체크리스트·점 목록·번호 목록 모두
+//   - 커서가 있는 항목에 흐린 점선 테두리 (Enter 로 새 항목을 만들면 따라간다)
+import { Plugin, PluginKey, TextSelection, Decoration, DecorationSet, sinkListItem, liftListItem } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
 
 export const listDragKey = new PluginKey('memoking-list-drag');
@@ -25,6 +28,42 @@ const pointOf = (e) => e.touches?.[0] ?? e.changedTouches?.[0] ?? e;
 const LISTEN = { capture: true, passive: false }; // 터치로 끄는 동안 화면이 스크롤되지 않게 preventDefault 할 수 있어야 한다
 
 const isItem = (node) => node?.type.name === 'list_item';
+
+export const SWIPE_DISTANCE = 48; // 이만큼 옆으로 밀면 하위·상위로
+const SWIPE_START = 12; // 이만큼 옆으로 먼저 움직이면 (세로보다 확실히) 밀기로 본다
+
+// 항목(pos) 을 한 단계 들여쓰기(dir>0, 바로 위 항목의 하위로) · 내어쓰기(dir<0). 맨 바깥 항목은 목록 밖으로 빼지 않는다.
+// 바꿀 수 없으면 false
+export function shiftItem(view, pos, dir) {
+  const { state } = view;
+  const node = state.doc.nodeAt(pos);
+  if (!isItem(node)) return false;
+  const $pos = state.doc.resolve(pos);
+  if (dir > 0 && $pos.index() === 0) return false; // 위에 항목이 없으면 하위로 갈 곳이 없다
+  if (dir < 0 && !isItem($pos.node($pos.depth - 1))) return false; // 이미 맨 바깥
+  const type = state.schema.nodes.list_item;
+  const sel = state.tr.setSelection(TextSelection.near(state.doc.resolve(Math.min(pos + 2, state.doc.content.size))));
+  const next = state.apply(sel);
+  let tr = null;
+  const capture = (t) => (tr = t);
+  if (!(dir > 0 ? sinkListItem(type) : liftListItem(type))(next, capture) || !tr) return false;
+  // 하위 목록의 종류는 위 항목의 목록을 따른다 (체크리스트 안이면 체크 네모도 유지)
+  view.dispatch(sel);
+  view.dispatch(tr.scrollIntoView());
+  return true;
+}
+
+// 커서가 있는 가장 안쪽 항목에 테두리 표시 (끄는 중이 아닐 때)
+function caretDecoration(state) {
+  const { $from } = state.selection;
+  for (let d = $from.depth; d > 0; d--) {
+    if (isItem($from.node(d))) {
+      const pos = $from.before(d);
+      return DecorationSet.create(state.doc, [Decoration.node(pos, pos + $from.node(d).nodeSize, { class: 'mk-caret-item' })]);
+    }
+  }
+  return DecorationSet.empty;
+}
 
 // pos 에서 시작하는 항목을 target(다른 항목의 앞·뒤 자리)으로 옮기는 트랜잭션. 옮길 수 없으면 null.
 export function moveItemTr(state, src, target) {
@@ -186,6 +225,11 @@ export function createListDrag({ readOnly = false } = {}) {
     d.badge.remove();
     document.body.classList.remove('mk-list-dragging');
     const { state } = view;
+    if (commit && !d.drop && d.shift) {
+      if (shiftItem(view, d.srcPos, d.shift)) flashMoved(view);
+      view.focus();
+      return;
+    }
     if (!commit || !d.drop) {
       // 끄는 동안 늘어난 글자 선택은 버리고 커서를 그 항목에
       view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(Math.min(d.srcPos + 2, state.doc.content.size)))));
@@ -213,7 +257,7 @@ export function createListDrag({ readOnly = false } = {}) {
   // 들어갈 틈을 연다 (원래 자리 기준으로 계산 — 미리 보기가 다시 판정에 끼지 않게)
   // free: 다른 목록으로 가는 중이면 커서를 그대로 따라가고, 같은 목록 안에서는 목록의 맨 위·맨 아래에서 멈춘다
   // (커서가 목록 밖으로 멀리 가도 항목은 맨 끝 자리에 머물러 "맨 끝으로" 가 보이게, 본문 밖으로 잘리지도 않게)
-  function previewSame(view, drop, extra = [], { free = false } = {}) {
+  function previewSame(view, drop, extra = [], { free = false, dx = 0 } = {}) {
     const { tops, slots, s, scale, positions, listPos, heights } = drag;
     const order = previewOrder(positions.length, s, drop);
     const specs = [{ pos: listPos, cls: 'mk-sorting' }];
@@ -222,7 +266,8 @@ export function createListDrag({ readOnly = false } = {}) {
     let y = tops[0];
     order.forEach((i) => {
       if (i === s) {
-        specs.push({ pos: positions[i], cls: 'mk-lift', style: `transform: translateY(${(follow / scale).toFixed(1)}px)` });
+        const sx = Math.max(-56, Math.min(56, dx * 0.7)) / scale;
+        specs.push({ pos: positions[i], cls: 'mk-lift', style: `transform: translate(${sx.toFixed(1)}px, ${(follow / scale).toFixed(1)}px)` });
       } else {
         const dy = y - tops[i];
         const cls = drop?.kind === 'swap' && i === drop.index ? 'mk-swap-target' : '';
@@ -234,10 +279,11 @@ export function createListDrag({ readOnly = false } = {}) {
   }
 
   // 커서 옆 안내: 지금 놓으면 무엇이 되는지
+  const BADGES = { swap: '⇅ 맞바꾸기', insert: '↳ 여기에 넣기', indent: '→ 하위 항목으로', outdent: '← 상위 항목으로', blocked: '더 옮길 수 없어요' };
   function showBadge(kind) {
     const b = drag.badge;
     b.dataset.kind = kind ?? '';
-    b.textContent = kind === 'swap' ? '⇅ 맞바꾸기' : kind === 'insert' ? '↳ 여기에 넣기' : '';
+    b.textContent = BADGES[kind] ?? '';
     b.hidden = !kind;
     b.style.left = `${Math.min(window.innerWidth - 120, drag.x + 16)}px`;
     b.style.top = `${drag.y + (drag.kind === 'touch' ? -44 : 14)}px`; // 터치: 손가락에 가리지 않게 위로
@@ -246,6 +292,7 @@ export function createListDrag({ readOnly = false } = {}) {
   function place(view, x, y) {
     const d = drag;
     d.drop = null;
+    d.shift = 0;
     d.line.hidden = true;
     // 1) 다른 목록(하위 목록 포함)의 항목 위면 그쪽으로 — 끄는 항목은 마우스를 통과시켜 그 아래가 잡힌다
     const hit = document.elementFromPoint(x, y)?.closest?.('li');
@@ -286,9 +333,15 @@ export function createListDrag({ readOnly = false } = {}) {
     }
     const same = drop.kind === 'swap' ? drop.index === d.s : drop.index === d.s || drop.index === d.s + 1;
     d.drop = same ? null : drop;
-    previewSame(view, d.drop);
-    showBadge(d.drop?.kind);
+    // 제자리에서 옆으로 밀면 하위·상위로 (세로로는 같은 자리, 가로로 충분히)
+    const dx = x - d.startX;
+    d.shift = 0;
+    if (!d.drop && Math.abs(dx) >= SWIPE_DISTANCE) d.shift = dx > 0 ? 1 : -1;
+    previewSame(view, d.drop, [], { dx: d.drop ? 0 : dx });
+    showBadge(d.shift ? (canShift(view, d.srcPos, d.shift) ? (d.shift > 0 ? 'indent' : 'outdent') : 'blocked') : d.drop?.kind);
   }
+
+  const canShift = (view, pos, dir) => canSwipe(view, pos, dir);
 
   // 마우스가 움직이면 다음 화면 그리기 때 한 번만 (빠르게 끌어도 매끄럽게)
   function schedulePlace(view) {
@@ -325,7 +378,7 @@ export function createListDrag({ readOnly = false } = {}) {
     drag = {
       view, src: li, srcPos, list, listPos: $src.before(), positions: items.map((it) => itemPosOf(view, it)), s: items.indexOf(li),
       tops, heights, slots, bottom: tops.at(-1) + heights.at(-1), scale, scroller, line, badge,
-      drop: null, x, y, startY: y + st, timer: 0, raf: 0, kind,
+      drop: null, shift: 0, x, y, startX: x, startY: y + st, timer: 0, raf: 0, kind,
     };
     if (kind === 'touch') navigator.vibrate?.(15); // 들어 올렸다는 느낌
     document.body.classList.add('mk-list-dragging');
@@ -381,6 +434,73 @@ export function createListDrag({ readOnly = false } = {}) {
     window.addEventListener('contextmenu', drag.block, true); // (터치) 꾹 누르기 메뉴가 뜨지 않게
   }
 
+  // 손가락으로 항목을 옆으로 밀기: 따라 움직이다가 SWIPE_DISTANCE 를 넘기고 떼면 하위(→)·상위(←)로
+  let swipe = null;
+  function startSwipe(view, li, x0, y0, event) {
+    const pos = itemPosOf(view, li);
+    if (pos == null) return;
+    event.preventDefault();
+    const badge = document.createElement('div');
+    badge.className = 'mk-drag-badge';
+    badge.hidden = true;
+    document.body.append(badge);
+    const scale = li.offsetWidth ? li.getBoundingClientRect().width / li.offsetWidth : 1;
+    swipe = { view, pos, x0, y0, dx: 0, badge, scale };
+    const show = () => {
+      const { dx } = swipe;
+      const dir = Math.abs(dx) >= SWIPE_DISTANCE ? Math.sign(dx) : 0;
+      const ok = dir && canSwipe(view, pos, dir);
+      const shown = Math.max(-72, Math.min(72, dx * 0.75)) / scale;
+      decorate(view, [{ pos, cls: `mk-swiping${ok ? ' mk-swipe-ready' : ''}`, style: `transform: translateX(${shown.toFixed(1)}px)` }]);
+      badge.dataset.kind = dir ? (ok ? (dir > 0 ? 'indent' : 'outdent') : 'blocked') : '';
+      badge.textContent = dir ? (ok ? (dir > 0 ? '→ 하위 항목으로' : '← 상위 항목으로') : '더 옮길 수 없어요') : dx > 0 ? '→ 밀면 하위로' : '← 밀면 상위로';
+      badge.hidden = false;
+      badge.style.left = `${Math.min(window.innerWidth - 130, Math.max(8, x0 + dx - 50))}px`;
+      badge.style.top = `${y0 - 48}px`;
+    };
+    const move = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      swipe.dx = pointOf(e).clientX - x0;
+      show();
+    };
+    const end = (e, commit = true) => {
+      window.removeEventListener('touchmove', move, LISTEN);
+      window.removeEventListener('touchend', up, LISTEN);
+      window.removeEventListener('touchcancel', cancel, LISTEN);
+      badge.remove();
+      const { dx } = swipe;
+      swipe = null;
+      if (view.isDestroyed) return;
+      const dir = Math.abs(dx) >= SWIPE_DISTANCE ? Math.sign(dx) : 0;
+      if (commit && dir && shiftItem(view, pos, dir)) {
+        navigator.vibrate?.(12);
+        flashMoved(view);
+        return;
+      }
+      // 제자리로 미끄러져 돌아감
+      decorate(view, [{ pos, cls: 'mk-swipe-back', style: 'transform: translateX(0)' }]);
+      setTimeout(() => {
+        if (!drag && !press && !swipe && !view.isDestroyed) decorate(view, []);
+      }, 200);
+    };
+    const up = (e) => {
+      e.preventDefault();
+      end(e, true);
+    };
+    const cancel = (e) => end(e, false);
+    window.addEventListener('touchmove', move, LISTEN);
+    window.addEventListener('touchend', up, LISTEN);
+    window.addEventListener('touchcancel', cancel, LISTEN);
+    swipe.dx = pointOf(event).clientX - x0;
+    show();
+  }
+
+  function canSwipe(view, pos, dir) {
+    const $pos = view.state.doc.resolve(pos);
+    return dir > 0 ? $pos.index() > 0 : isItem($pos.node($pos.depth - 1));
+  }
+
   function startPress(view, event, kind = 'mouse') {
     const target = event.target instanceof Element ? event.target : event.target?.parentElement ?? null;
     const li = target?.closest('li');
@@ -401,7 +521,16 @@ export function createListDrag({ readOnly = false } = {}) {
     }, 70);
     press.move = (e) => {
       const p = pointOf(e);
-      if (Math.hypot(p.clientX - press.x, p.clientY - press.y) > io.tolerance) cancelPress(); // 바로 끌기 = 글자 선택 (터치는 스크롤)
+      const dx = p.clientX - press.x;
+      const dy = p.clientY - press.y;
+      // (터치) 옆으로 먼저 밀면 하위·상위로 옮기기
+      if (kind === 'touch' && Math.abs(dx) > SWIPE_START && Math.abs(dx) > Math.abs(dy) * 1.6) {
+        const { li: item, x: x0, y: y0 } = press;
+        cancelPress();
+        startSwipe(view, item, x0, y0, e);
+        return;
+      }
+      if (Math.hypot(dx, dy) > io.tolerance) cancelPress(); // 바로 끌기 = 글자 선택 (터치는 스크롤)
       else {
         press.x2 = p.clientX;
         press.y2 = p.clientY;
@@ -425,7 +554,10 @@ export function createListDrag({ readOnly = false } = {}) {
       apply: (tr, old) => tr.getMeta(listDragKey) ?? (tr.docChanged ? DecorationSet.empty : old),
     },
     props: {
-      decorations: (state) => listDragKey.getState(state),
+      decorations: (state) => {
+        const set = listDragKey.getState(state);
+        return set.find().length || drag || readOnly ? set : caretDecoration(state);
+      },
       handleKeyDown(view, event) {
         if (readOnly || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
         if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false;
@@ -448,11 +580,22 @@ export function createListDrag({ readOnly = false } = {}) {
         },
       },
     },
-    view: (view) => ({
-      destroy: () => {
-        cancelPress();
-        finish(view, false);
-      },
-    }),
+    view: (view) => {
+      // 치는 동안은 마우스를 올린 항목 테두리를 숨기고 커서 항목만 (마우스를 움직이면 다시)
+      const typing = (e) => {
+        if (view.dom.contains(e.target) && !e.ctrlKey && !e.metaKey) document.body.classList.add('mk-typing');
+      };
+      const moved = () => document.body.classList.remove('mk-typing');
+      window.addEventListener('keydown', typing, true);
+      window.addEventListener('mousemove', moved, { passive: true });
+      return {
+        destroy: () => {
+          window.removeEventListener('keydown', typing, true);
+          window.removeEventListener('mousemove', moved);
+          cancelPress();
+          finish(view, false);
+        },
+      };
+    },
   });
 }

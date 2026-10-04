@@ -374,14 +374,43 @@ function confirmDialog(message, okLabel = '지우기') {
 async function deleteMemo(id) {
   const memo = state.memos.find((m) => m.id === id);
   if (!memo) return;
-  const ok = await confirmDialog(`"${memo.title}" 메모를 지울까요?\n지운 메모는 메모 폴더 안 휴지통에 보관돼요.`);
-  if (!ok) return;
+  // 묻지 않고 바로 휴지통으로 — 카드가 옆으로 밀려 접히며 사라지고, 아래에 "되돌리기"
   const li = el.cards.querySelector(`.card[data-id="${id}"]`)?.closest('li');
   if (li && !reduceMotion()) {
-    await li.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(0.96)' }], { duration: 160, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {});
+    await li.animate([
+      { opacity: 1, transform: 'none' },
+      { opacity: 0, transform: 'translateX(40px) rotate(2deg) scale(0.94)' },
+    ], { duration: 200, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' }).finished.catch(() => {});
   }
   await api.memo.remove(id);
 }
+
+// 지운 뒤 잠깐 "되돌리기" (메모 창에서 지워도 여기에)
+let undoTimer = 0;
+function showUndo({ name, title }) {
+  let bar = $('undo-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'undo-bar';
+    bar.className = 'undo-bar';
+    bar.setAttribute('role', 'status');
+    document.body.append(bar);
+  }
+  const text = document.createElement('span');
+  text.textContent = `"${title || '메모'}" 를 휴지통으로 옮겼어요`;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '되돌리기';
+  btn.addEventListener('click', async () => {
+    bar.hidden = true;
+    await api.trash.restore(name);
+  });
+  bar.replaceChildren(text, btn);
+  bar.hidden = false;
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => (bar.hidden = true), 6000);
+}
+api.on('memo:trashed', showUndo);
 
 el.useSuggested.addEventListener('click', async () => applyInfo(await api.vault.use(state.info.suggestedPath)));
 el.chooseFolder.addEventListener('click', async () => applyInfo(await api.vault.choose()));

@@ -20,6 +20,12 @@ import java.io.FileNotFoundException
 class VaultFileProvider : ContentProvider() {
     companion object {
         const val AUTHORITY = "com.memoking.app.files"
+        /** 보내기용 파일(그림·PDF): cache/share/ → content://com.memoking.app.files/~share/<이름> */
+        const val SHARE_DIR = "share"
+        private const val SHARE_PREFIX = "~share"
+
+        fun shareUriFor(name: String): Uri = Uri.Builder().scheme("content").authority(AUTHORITY)
+            .encodedPath("/$SHARE_PREFIX/" + Uri.encode(name)).build()
 
         fun uriFor(rel: String): Uri = Uri.Builder().scheme("content").authority(AUTHORITY)
             .encodedPath("/" + Storage.clean(rel).split('/').joinToString("/") { Uri.encode(it) })
@@ -32,6 +38,12 @@ class VaultFileProvider : ContentProvider() {
 
     private fun fileFor(uri: Uri): File {
         val ctx: Context = context ?: throw FileNotFoundException()
+        if (uri.pathSegments.firstOrNull() == SHARE_PREFIX && uri.pathSegments.size == 2) {
+            val dir = File(ctx.cacheDir, SHARE_DIR).canonicalFile
+            val file = File(dir, uri.pathSegments[1]).canonicalFile
+            if (file.parentFile != dir) throw FileNotFoundException()
+            return file
+        }
         val root = Vaults.internalRoot(ctx).canonicalFile
         val rel = Storage.clean(uri.pathSegments.joinToString("/"))
         val file = File(root, rel).canonicalFile

@@ -1,7 +1,7 @@
 // 앱(Kotlin)과 주고받기 — window.MemoKingNative (android/app/.../Bridge.kt)
 //   바로 답하는 함수: {"v": 값} | {"err": "이유"} 글자 → 값 또는 예외
 //   오래 걸리는 일: call(이름, 인자) → Promise (앱이 __mk.resolve 로 알려 줌)
-//   앱이 보내는 소식: on('intent' | 'alarm' | 'app' | 'keyboard', fn)
+//   앱이 보내는 소식: on('intent' | 'alarm' | 'app' | 'keyboard' | 'record' | 'transcribe', fn)
 
 const raw = window.MemoKingNative;
 if (!raw) throw new Error('메모킹 앱 안에서 열어 주세요 (MemoKingNative 없음)');
@@ -39,6 +39,7 @@ export const native = {
   scheduleAlarms: (items) => unwrap(raw.scheduleAlarms(JSON.stringify(items))),
   wasFired: sync('wasFired'),
   notify: (item) => unwrap(raw.notify(JSON.stringify(item))),
+  sttStatus: sync('sttStatus'), // 받아쓰기 모델·엔진 상태
 };
 
 // 알림 보관함 (NotiService.kt)
@@ -49,6 +50,15 @@ export const history = {
   clear: sync('historyClear'),
   block: sync('historyBlock'),
   unblock: sync('historyUnblock'),
+};
+
+// 녹음 · 받아쓰기 (RecorderService.kt) — 시작·끝내기는 call('recordStart' | 'recordStop')
+export const record = {
+  status: sync('recordStatus'),
+  pause: sync('recordPause'),
+  resume: sync('recordResume'),
+  takeDone: sync('recordTakeDone'), // 앱이 꺼져 있는 동안 끝난 녹음들
+  ack: sync('recordAck'), // 메모에 넣었으니 지워도 됨
 };
 
 // Google Drive 동기화 (DriveSync.kt)

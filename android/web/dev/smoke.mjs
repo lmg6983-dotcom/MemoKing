@@ -27,6 +27,8 @@ try {
 
 // ---------- 시험용 메모 폴더 (데스크탑 메모킹이 만든 것과 같은 모양) ----------
 
+// 지난 점검이 남긴 가짜 Drive 폴더는 지우고 시작 (남아 있으면 메모 수가 달라진다)
+for (const d of fs.readdirSync(os.tmpdir())) if (d.startsWith('memoking-dev-drive-')) fs.rmSync(path.join(os.tmpdir(), d), { recursive: true, force: true });
 const vault = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-android-smoke-'));
 fs.mkdirSync(path.join(vault, 'attachments'));
 fs.copyFileSync(path.join(repo, 'assets/icons/icon-256.png'), path.join(vault, 'attachments/20261001-090000-ab12.png'));
@@ -158,20 +160,31 @@ try {
   await page.waitForTimeout(250); // 닫히는 움직임
   check('뒤로 가기: 메모 → 목록', await page.isHidden('#note-screen'));
 
-  // 새 메모 → 제목이 파일 이름
+  // 새 메모 → 제목이 파일 이름 (+ 를 누르면 위성 버튼: 음성 메모 · 글 메모)
   await page.tap('#fab');
+  await page.waitForTimeout(250);
+  check('+ 위성 버튼: 음성 메모 · 글 메모', await page.isVisible('[data-new="voice"]') && await page.isVisible('[data-new="text"]'));
+  await shot('02b-fab');
+  await page.tap('[data-new="text"]');
   await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
   await page.keyboard.type('# 휴대폰 첫 메모');
   await page.keyboard.press('Enter');
   await page.keyboard.type('장보기 #생활');
   // 제목·점 목록·번호 목록·체크리스트는 한 줄에 하나만 (버튼도 하나만 눌려 보임)
-  const lineStyle = () => page.$$eval('#format-bar [data-cmd].active', (bs) => bs.map((b) => b.dataset.cmd).filter((c) => ['h1', 'h2', 'bullet', 'ordered', 'task'].includes(c)).join(','));
-  const steps = [['bullet', 'bullet'], ['ordered', 'ordered'], ['task', 'task'], ['h1', 'h1'], ['ordered', 'ordered'], ['h2', 'h2'], ['task', 'task'], ['task', '']];
+  const lineStyle = () => page.$$eval('#format-bar [data-cmd].active', (bs) => bs.map((b) => b.dataset.cmd).filter((c) => ['bullet', 'ordered', 'task'].includes(c)).join(','));
+  const styleName = () => page.textContent('#format-bar .style-name');
+  const pickStyle = async (name) => {
+    await page.click('#format-bar [data-action="style"]');
+    await page.click(`#style-menu [data-style="${name}"]`);
+  };
+  const steps = [['bullet', 'bullet'], ['ordered', 'ordered'], ['task', 'task'], ['h1', ''], ['ordered', 'ordered'], ['h2', ''], ['task', 'task'], ['task', '']];
   let exclusive = true;
   for (const [cmd, want] of steps) {
-    await page.click(`#format-bar [data-cmd="${cmd}"]`);
+    if (/^h\d$/.test(cmd)) await pickStyle(cmd);
+    else await page.click(`#format-bar [data-cmd="${cmd}"]`);
     await page.waitForTimeout(120);
     if ((await lineStyle()) !== want) exclusive = false;
+    if (/^h\d$/.test(cmd) && (await styleName()) !== `제목 ${cmd[1]}`) exclusive = false;
   }
   check('서식: 제목·목록·체크리스트 버튼은 하나만 눌림', exclusive);
   await page.waitForTimeout(800);
@@ -183,6 +196,7 @@ try {
   // 빈 새 메모는 파일을 만들지 않음
   const before = fs.readdirSync(vault).length;
   await page.tap('#fab');
+  await page.tap('[data-new="text"]');
   await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
   await back();
   await page.waitForTimeout(300);
@@ -303,8 +317,9 @@ try {
 
   await page.dispatchEvent('.card[data-id="00000000-0000-4000-8000-000000000002"]', 'contextmenu');
   await page.tap('[data-memo-action="delete"]');
-  await page.click('#confirm-ok');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
+  check('지우기: 묻지 않음', !(await page.evaluate(() => document.getElementById('confirm-dialog').open)));
+  check('지우기: 되돌리기 버튼', await page.isVisible('#toast-action'));
   check('지우기: 휴지통으로', !fs.existsSync(path.join(vault, '로고 사진.md')) && fs.readdirSync(path.join(vault, '_memoking/trash')).some((f) => f.startsWith('로고 사진 (')));
   check('지우기: 그 메모만 쓰던 첨부도 휴지통으로', fs.existsSync(path.join(vault, '_memoking/trash/attachments/20261001-090000-ab12.png')));
   await page.tap('#settings-btn');
@@ -374,6 +389,152 @@ try {
   await back();
   await back(); // 보관함 탭 → 메모 탭
   await page.waitForTimeout(200);
+
+  // ---------- 0.6.0 ----------
+  const newText = async () => {
+    await page.tap('#fab');
+    await page.tap('[data-new="text"]');
+    await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  };
+  const fileWith = (text) => fs.readdirSync(vault).find((f) => f.endsWith('.md') && read(f).includes(text));
+  check('도구막대: H1·H2·태그·키보드·사진 버튼 없음', (await page.locator('#format-bar [data-cmd="h1"], #format-bar [data-cmd="h2"], #format-bar [data-action="tag"], #format-bar [data-action="done"], #format-bar [data-action="camera"]').count()) === 0);
+  check('위 막대: 되돌리기·다시 하기', (await page.locator('#note-screen .bar #undo-btn, #note-screen .bar #redo-btn').count()) === 2);
+
+  // 이어진 목록 하나를 바꾸면 통째로
+  await newText();
+  await page.keyboard.type('# 목록 바꾸기');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('- 사과');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('배');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('감');
+  await page.click('#format-bar [data-cmd="ordered"]');
+  await page.waitForTimeout(900);
+  let f = fileWith('목록 바꾸기');
+  check('목록: 한 줄만 바꿔도 이어진 목록 전체가 번호 목록으로', f && /1\. 사과\n2\. 배\n3\. 감/.test(read(f)), f && read(f));
+  await page.click('#format-bar [data-cmd="task"]');
+  await page.waitForTimeout(900);
+  check('목록: 체크리스트로도 통째로', /- \[ \] 사과\n- \[ \] 배\n- \[ \] 감/.test(read(f)), read(f));
+  // 오른쪽으로 밀면 하위 항목
+  const third = await page.locator('.mk-doc li').nth(2).boundingBox();
+  await touch('touchStart', third.x + 30, third.y + third.height / 2);
+  for (let i = 1; i <= 8; i++) await touch('touchMove', third.x + 30 + i * 12, third.y + third.height / 2);
+  await page.waitForTimeout(80);
+  check('밀기: 하위로 안내', (await page.textContent('.mk-drag-badge').catch(() => '')).includes('하위'));
+  await shot('07-swipe');
+  await touch('touchEnd', 0, 0);
+  await page.waitForTimeout(900);
+  check('밀기: 오른쪽 → 하위 항목', /- \[ \] 배\n\s+- \[ \] 감/.test(read(f)), read(f));
+  const sub = await page.locator('.mk-doc li li').first().boundingBox();
+  await touch('touchStart', sub.x + 30, sub.y + sub.height / 2);
+  for (let i = 1; i <= 8; i++) await touch('touchMove', sub.x + 30 - i * 12, sub.y + sub.height / 2);
+  await touch('touchEnd', 0, 0);
+  await page.waitForTimeout(900);
+  check('밀기: 왼쪽 → 상위 항목', /- \[ \] 배\n- \[ \] 감/.test(read(f)), read(f));
+  // 커서 항목 테두리 (Enter 로 새 항목에 따라감)
+  check('목록: 커서 항목 표시', (await page.locator('.mk-doc li.mk-caret-item').count()) === 1);
+
+  // 수식
+  await page.locator('.mk-doc > p').last().click();
+  await page.keyboard.type('넓이 $\\pi r^2$ 끝');
+  await page.waitForTimeout(1500);
+  check('수식: $..$ 치면 수식으로 그려짐', (await page.locator('.mk-doc .mk-math .katex').count()) === 1);
+  check('수식: 파일에는 $$..$$', read(f).includes('$$\\pi r^2$$'), read(f));
+  await shot('08-math');
+
+  // 보내기: 글은 목록 모양 그대로
+  await page.tap('#menu-btn');
+  await page.tap('[data-memo-action="share"]');
+  await page.tap('[data-share="text"]');
+  await page.waitForTimeout(300);
+  const sent = (await devLog()).log.filter((l) => l.share).at(-1)?.share?.text ?? '';
+  check('보내기 글: 체크 네모 그대로', sent.includes('☐ 사과') && sent.includes('☐ 감'), sent);
+  await page.tap('#menu-btn');
+  await page.tap('[data-memo-action="share"]');
+  await page.tap('[data-share="image"]');
+  await page.waitForTimeout(2500);
+  const png2 = (await devLog()).log.filter((l) => l.shareFile).at(-1)?.shareFile;
+  check("보내기 그림: PNG", png2?.mime === "image/png" && png2.bytes > 5000, JSON.stringify(png2));
+  await page.tap('#menu-btn');
+  await page.tap('[data-memo-action="share"]');
+  await page.tap('[data-share="pdf"]');
+  await page.waitForTimeout(500);
+  check('보내기 PDF', (await devLog()).log.some((l) => l.sharePdf));
+  await back();
+  await page.waitForTimeout(300);
+
+  // 추천 태그: 태그 없는 메모에 쓰는 태그(#업무) 이름이 나오면
+  await newText();
+  await page.keyboard.type('# 다음 주 업무 정리');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('업무 일정과 출시 계획을 정리해요');
+  await page.waitForTimeout(2200);
+  check('추천 태그: #업무', (await page.locator('#tag-suggest-chips .tag-chip', { hasText: '업무' }).count()) === 1);
+  await shot('09-tag-suggest');
+  await page.tap('#links-btn');
+  await page.waitForTimeout(200);
+  check('연결: 태그 없으면 추천 태그로 이어 주기', (await page.locator('#links-tag-suggest .tag-chip').count()) > 0);
+  await page.locator('#links-tag-suggest .tag-chip', { hasText: '업무' }).tap();
+  await page.waitForTimeout(400);
+  check('연결: 태그로 이어진 메모', (await page.locator('#links-tags .link-item').count()) >= 1);
+  await shot('10-links');
+  await back();
+  await page.waitForTimeout(900);
+  check('추천 태그: 누르면 본문에 #업무', read(fileWith('다음 주 업무 정리')).includes('#업무'));
+  await back();
+  await page.waitForTimeout(300);
+
+  // 음성 메모: + › 음성 메모 → 바로 녹음, 끝내면 소리 파일 + 받아쓴 글
+  await page.tap('#fab');
+  await page.tap('[data-new="voice"]');
+  await page.waitForSelector('#rec-panel:not([hidden])');
+  check('음성 메모: 바로 녹음 시작', (await devLog()).log.some((l) => l.recordStart));
+  await page.waitForTimeout(1200);
+  await shot('11-recording');
+  await page.tap('#rec-stop');
+  await page.waitForTimeout(1200);
+  await back();
+  await page.waitForTimeout(400);
+  f = fileWith('오늘 회의를 시작하겠습니다');
+  check('음성 메모: 소리 파일 + 받아쓴 글', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 음성 메모'), f && read(f));
+
+  // 다른 앱에서 받은 마크다운 글은 서식대로
+  await post('/dev/intent', { type: 'share', text: '## 회의록\n- 첫째\n- 둘째\n\n**결론**: 진행', app: '메모장', files: [] });
+  await page.evaluate(() => window.__mk.emit('intent', null));
+  await page.waitForTimeout(1200);
+  f = fileWith('회의록');
+  check('공유하기: 마크다운은 서식대로', f && /## 회의록\n\n- 첫째\n- 둘째/.test(read(f)) && read(f).includes('**결론**'), f && read(f));
+  await back();
+  await page.waitForTimeout(300);
+
+  // 다른 앱에서 받은 소리 파일: 받아쓸지 묻는다
+  await post('/dev/intent', { type: 'share', text: '', app: '녹음기', files: [{ name: '미팅.m4a', mime: 'audio/mp4', base64: Buffer.from('fake').toString('base64') }] });
+  await page.evaluate(() => window.__mk.emit('intent', null));
+  await page.waitForSelector('#import-sheet:not([hidden])');
+  check('소리 파일 받기: 받아쓰기 체크', await page.isChecked('#import-stt'));
+  await shot('12-import-audio');
+  await page.tap('#import-ok');
+  await page.waitForTimeout(1800);
+  f = fileWith('받아쓴 글이에요');
+  check('소리 파일 받기: 소리 + 받아쓴 글', f && /\.m4a\)/.test(read(f)), f && read(f));
+  await back();
+  await page.waitForTimeout(300);
+
+  // 넓은 화면(펼친 폴더블·태블릿): 목록과 메모를 나란히
+  await page.setViewportSize({ width: 884, height: 1000 });
+  await page.waitForTimeout(300);
+  check('넓은 화면: 메모 고르기 안내', await page.isVisible('#pane-empty'));
+  await page.locator('.card').first().tap();
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.waitForTimeout(300);
+  const lb = await page.locator('#list-screen').boundingBox();
+  const nb = await page.locator('#note-screen').boundingBox();
+  check('넓은 화면: 목록과 메모 나란히', lb && nb && lb.width < 500 && nb.x >= lb.width - 1 && await page.isVisible('#list-screen'), JSON.stringify({ lb, nb }));
+  await shot('13-two-pane');
+  await back();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(300);
 
   // Google Drive 연결 (미리보기 서버의 가짜 Drive): 설정 › 연결하기 › (휴대폰 구글 계정) › 폴더 › 지금 메모 함께 올리기
   const count = await page.locator('.card').count();

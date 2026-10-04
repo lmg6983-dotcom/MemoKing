@@ -188,7 +188,29 @@ const sync = {
     log.push({ notify: JSON.parse(json) });
     return true;
   },
+  // 녹음 (가짜): 시작하면 시간이 가고, 끝내면 작은 소리 파일 + 받아쓴 글
+  recordStatus: () => recordState(),
+  recordPause: () => {
+    if (fakeRec) fakeRec.paused = true;
+    return recordState();
+  },
+  recordResume: () => {
+    if (fakeRec) fakeRec.paused = false;
+    return recordState();
+  },
+  recordTakeDone: () => fakeDone,
+  recordAck: (id) => {
+    fakeDone = fakeDone.filter((r) => r.id !== id);
+    return true;
+  },
+  sttStatus: () => ({ engine: 'vosk', model: 'ready', system: true }),
 };
+
+let fakeRec = null;
+let fakeDone = [];
+const recordState = () => (fakeRec
+  ? { active: true, paused: Boolean(fakeRec.paused), memoId: fakeRec.memoId, elapsedMs: Date.now() - fakeRec.at, stt: fakeRec.stt, text: fakeRec.stt ? '오늘 회의를 시작하겠습니다' : '', partial: '' }
+  : { active: false, paused: false, memoId: null, elapsedMs: 0, stt: false, text: '', partial: '' });
 
 // 가짜 Google Drive (화면 점검용) — 진짜 동기화는 앱(DriveSync.kt)이 한다
 const fakeDrive = {
@@ -277,6 +299,35 @@ const calls = {
     return fakeDrive.status;
   },
   exactAlarmSettings: async () => true,
+  micPermission: async () => true,
+  recordStart: async ({ memoId, stt }) => {
+    fakeRec = { memoId, stt, at: Date.now() };
+    log.push({ recordStart: { memoId, stt } });
+    return { stt, reason: '' };
+  },
+  recordStop: async () => {
+    if (!fakeRec) return null;
+    const r = fakeRec;
+    fakeRec = null;
+    const file = makeTemp('recording.m4a', 'audio/mp4', Buffer.from('fake-m4a'));
+    const result = { id: randomUUID(), memoId: r.memoId, ...file, durationMs: Date.now() - r.at, startedAt: r.at, transcript: r.stt ? '오늘 회의를 시작하겠습니다\n\n다음 주 출시 일정을 정리했어요' : '' };
+    fakeDone.push(result);
+    log.push({ recordStop: result.id });
+    return result;
+  },
+  transcribe: async ({ rel }) => {
+    log.push({ transcribe: rel });
+    return { text: '받아쓴 글이에요' };
+  },
+  shareFile: async (a) => {
+    log.push({ shareFile: { name: a.name, mime: a.mime, bytes: Math.round((a.base64?.length ?? 0) * 0.75) } });
+    return true;
+  },
+  sharePdf: async (a) => {
+    log.push({ sharePdf: a });
+    return true;
+  },
+  sttModel: async () => ({ model: 'ready' }),
   http: async ({ url, accept = '*/*', limit = 5 * 1024 * 1024, save = false }) => {
     const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) MemoKing-dev' }, redirect: 'follow' });
     const type = (res.headers.get('content-type') ?? '').toLowerCase();

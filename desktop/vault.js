@@ -429,11 +429,13 @@ export class Vault extends EventEmitter {
     const entry = this.entries.get(id);
     if (!entry) return false;
     this.entries.delete(id);
+    let trashed = null;
     if (entry.file) {
       const base = path.posix.basename(entry.file, '.md');
       const dest = path.join(this.trashDir, `${base} (${stamp()}).md`);
       try {
         fs.renameSync(this.abs(entry.file), dest);
+        trashed = path.basename(dest);
       } catch (err) {
         if (err.code !== 'ENOENT') {
           this.entries.set(id, entry);
@@ -444,7 +446,7 @@ export class Vault extends EventEmitter {
     this.orphans.delete(id);
     this.trashAttachments(extractAttachments(entry.body));
     this.changed([id]);
-    return true;
+    return trashed ?? true; // 휴지통 파일 이름 (되돌리기에 씀)
   }
 
   // 밖에서 없어진 메모가 그동안 돌아오지 않았으면(이름만 바뀐 경우는 같은 id 로 돌아옴) 첨부를 치운다

@@ -29,3 +29,7 @@ export { Plugin, PluginKey, TextSelection, NodeSelection } from '@milkdown/kit/p
 export { toggleMark } from '@milkdown/kit/prose/commands';
 export { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 export { addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, selectedRect, columnResizing, mergeCells, splitCell, CellSelection, TableMap } from '@milkdown/kit/prose/tables';
+export { sinkListItem, liftListItem } from '@milkdown/kit/prose/schema-list';
+export { InputRule, inputRules } from '@milkdown/kit/prose/inputrules';
+export { default as remarkMath } from 'remark-math';
+export { undoDepth, redoDepth } from '@milkdown/kit/prose/history';

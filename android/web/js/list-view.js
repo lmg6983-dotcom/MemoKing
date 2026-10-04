@@ -286,6 +286,63 @@ el.cards.addEventListener('click', (e) => {
   const card = e.target.closest('.card');
   if (card) app.openMemo(card.dataset.id);
 });
+// 카드를 옆으로 밀어 지우기 (여러 개를 빨리 지울 때) — 묻지 않고 휴지통으로, 되돌리기 가능
+let swipe = null;
+el.cards.addEventListener('touchstart', (e) => {
+  const card = e.target.closest('.card');
+  if (!card || e.touches.length !== 1) return;
+  swipe = { card, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, active: false };
+}, { passive: true });
+el.cards.addEventListener('touchmove', (e) => {
+  if (!swipe) return;
+  const t = e.touches[0];
+  const dx = t.clientX - swipe.x;
+  const dy = t.clientY - swipe.y;
+  if (!swipe.active) {
+    if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+      swipe = null; // 세로 = 스크롤
+      return;
+    }
+    if (Math.abs(dx) < 14) return;
+    swipe.active = true;
+    swipe.card.classList.add('swiping');
+  }
+  e.preventDefault();
+  swipe.dx = dx;
+  const w = swipe.card.offsetWidth || 1;
+  const ready = Math.abs(dx) > w * 0.38;
+  swipe.card.style.transform = `translateX(${dx}px) rotate(${dx / w * 4}deg)`;
+  swipe.card.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / w * 0.7));
+  swipe.card.classList.toggle('swipe-ready', ready);
+}, { passive: false });
+function endSwipe() {
+  if (!swipe) return;
+  const { card, dx, active } = swipe;
+  swipe = null;
+  if (!active) return;
+  card.classList.remove('swiping', 'swipe-ready');
+  const w = card.offsetWidth || 1;
+  if (Math.abs(dx) > w * 0.38) {
+    card.style.transition = 'transform 0.18s ease-in, opacity 0.18s ease-in';
+    card.style.transform = `translateX(${Math.sign(dx) * w * 1.3}px) rotate(${Math.sign(dx) * 8}deg)`;
+    card.style.opacity = '0';
+    card.dataset.swiped = '1';
+    setTimeout(() => app.deleteMemo(card.dataset.id), 120);
+    return;
+  }
+  card.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s';
+  card.style.transform = '';
+  card.style.opacity = '';
+  setTimeout(() => (card.style.transition = ''), 220);
+}
+el.cards.addEventListener('touchend', endSwipe);
+el.cards.addEventListener('touchcancel', endSwipe);
+// 밀어서 지운 카드는 눌린 것으로 치지 않는다
+el.cards.addEventListener('click', (e) => {
+  const card = e.target.closest('.card');
+  if (card?.dataset.swiped || card?.classList.contains('swiping')) e.stopImmediatePropagation();
+}, true);
+
 // 길게 누르면 메뉴 (고정·색·보내기·지우기)
 el.cards.addEventListener('contextmenu', (e) => {
   const card = e.target.closest('.card');
@@ -328,7 +385,6 @@ export function setup() {
     empty: $('reminders-empty'),
     countEl: $('count-reminders'),
   });
-  $('fab').addEventListener('click', () => app.newMemo());
   historyTab = setupHistoryTab({
     api: app.api,
     els: {
@@ -342,6 +398,30 @@ export function setup() {
     },
     confirm: confirmDialog,
   });
+}
+
+/** 태그 하나로 거르기 (연결 패널의 태그를 눌렀을 때) */
+export function filterTag(name) {
+  if (state.tab !== 'memos') setTab('memos');
+  state.filter = { tags: [name], colors: [], kinds: [] };
+  el.search.value = '';
+  state.query = '';
+  state.queryTags = [];
+  state.results = null;
+  render();
+  $('view-memos').scrollTop = 0;
+}
+
+/** 지우는 카드가 옆으로 밀려 접히며 사라진다 */
+export async function animateRemove(id, { dir = 1 } = {}) {
+  const card = el.cards.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+  const item = card?.closest('.item');
+  if (!item) return;
+  item.style.height = `${item.offsetHeight}px`;
+  item.style.setProperty('--fly', `${dir * 110}%`);
+  void item.offsetHeight;
+  item.classList.add('removing');
+  await new Promise((r) => setTimeout(r, 280));
 }
 
 /** 알림 보관함 탭이 보이면 다시 그린다 (새 알림·설정에서 돌아옴) */

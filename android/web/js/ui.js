@@ -91,17 +91,43 @@ document.addEventListener('touchend', () => {
 // ---------- 잠깐 알림 ----------
 
 let toastTimer = null;
-export function toast(text, isError = false) {
+/**
+ * @param {string} text
+ * @param {boolean} [isError]
+ * @param {{ label: string, run: () => void }} [action] 오른쪽 버튼 (예: 되돌리기) — 있으면 조금 더 오래 보인다
+ */
+export function toast(text, isError = false, action = null) {
   const el = $('toast');
-  el.textContent = text;
+  $('toast-text').textContent = text;
+  const btn = $('toast-action');
+  btn.hidden = !action;
+  btn.textContent = action?.label ?? '';
+  btn.onclick = action ? () => {
+    el.hidden = true;
+    action.run();
+  } : null;
   el.classList.toggle('error', isError);
+  el.classList.toggle('has-action', Boolean(action));
   el.hidden = false;
   el.style.animation = 'none';
   void el.offsetWidth;
   el.style.animation = '';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), isError ? 4500 : 2600);
+  toastTimer = setTimeout(() => (el.hidden = true), action ? 5000 : isError ? 4500 : 2600);
 }
+
+// ---------- 넓은 화면 (펼친 폴더블 · 태블릿): 목록과 메모를 나란히 ----------
+
+const wide = window.matchMedia('(min-width: 640px) and (min-height: 460px)');
+export const isTwoPane = () => wide.matches;
+function applyPane() {
+  document.body.classList.toggle('two-pane', wide.matches);
+}
+applyPane();
+wide.addEventListener('change', () => {
+  applyPane();
+  window.dispatchEvent(new Event('memoking:pane'));
+});
 
 // ---------- 확인 ----------
 

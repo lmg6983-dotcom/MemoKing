@@ -113,7 +113,19 @@
       </div>
     </div>
 
-    <button id="fab" class="fab" aria-label="새 메모"><svg><use href="#i-plus"/></svg></button>
+    <!-- 새 메모: + 를 누르면 위로 위성 버튼 두 개 (음성 메모 · 글 메모) -->
+    <div id="fab-scrim" class="fab-scrim" hidden></div>
+    <div id="fab-menu" class="fab-menu" role="menu" aria-label="새 메모 종류" hidden>
+      <button class="fab-sat" data-new="voice" role="menuitem"><span class="fab-sat-label">음성 메모</span><span class="fab-sat-btn"><svg><use href="#i-mic"/></svg></span></button>
+      <button class="fab-sat" data-new="text" role="menuitem"><span class="fab-sat-label">글 메모</span><span class="fab-sat-btn"><svg><use href="#i-pen"/></svg></span></button>
+    </div>
+    <button id="fab" class="fab" aria-label="새 메모" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
+  </section>
+
+  <!-- 넓은 화면(펼친 폴더블·태블릿): 메모를 아직 고르지 않았을 때 오른쪽 -->
+  <section id="pane-empty" class="pane-empty" aria-hidden="true" hidden>
+    <img src="../app/assets/mark-256.png" alt="" draggable="false">
+    <p>왼쪽에서 메모를 고르거나<br>+ 로 새 메모를 만들어 보세요</p>
   </section>
 
   <!-- ========== 메모 ========== -->
@@ -121,6 +133,8 @@
     <header class="bar">
       <button id="back-btn" class="icon-btn" aria-label="목록으로 · 자동으로 저장돼요"><svg><use href="#i-back"/></svg></button>
       <span id="status" class="status" role="status"></span>
+      <button id="undo-btn" class="icon-btn" aria-label="되돌리기"><svg><use href="#i-undo"/></svg></button>
+      <button id="redo-btn" class="icon-btn" aria-label="다시 하기"><svg><use href="#i-redo"/></svg></button>
       <button id="bell-btn" class="icon-btn count-btn bell-btn" aria-label="예약 알림">
         <svg><use href="#i-bell"/></svg><span id="bell-count" class="count"></span>
       </button>
@@ -155,11 +169,33 @@
       <button type="button" data-table="merge">셀 병합</button>
       <button type="button" data-table="autoFit">자동 조정</button>
     </div>
-    <!-- 서식 도구막대: 휴대폰에서는 옆으로 밀어서 더 보기 -->
+    <!-- 녹음 중: 시간·받아쓰기가 보이고, 멈추면 소리 파일과 받아쓴 글이 메모에 들어간다 -->
+    <div id="rec-panel" class="rec-panel" role="region" aria-label="녹음" hidden>
+      <div class="rec-head">
+        <span class="rec-dot" aria-hidden="true"></span>
+        <b id="rec-time" class="rec-time">00:00</b>
+        <span id="rec-state" class="rec-state">녹음 중</span>
+        <span class="grow"></span>
+        <button id="rec-pause" class="rec-btn" aria-label="잠시 멈춤"><svg><use href="#i-pause"/></svg></button>
+        <button id="rec-stop" class="rec-btn stop"><svg><use href="#i-stop"/></svg><span>끝내기</span></button>
+      </div>
+      <div id="rec-text" class="rec-text" aria-live="polite"></div>
+    </div>
+
+    <!-- 태그 없는 메모: 추천 태그 (누르면 달기) -->
+    <div id="tag-suggest-bar" class="tag-suggest-bar" role="group" aria-label="추천 태그" hidden>
+      <span class="tsb-label"><svg><use href="#i-tag"/></svg>추천</span>
+      <div id="tag-suggest-chips" class="tsb-chips"></div>
+      <button id="tag-suggest-close" class="icon-btn" aria-label="추천 태그 닫기"><svg><use href="#i-close"/></svg></button>
+    </div>
+
+    <!-- 서식 도구막대: 휴대폰에서는 옆으로 밀어서 더 보기 (되돌리기·다시 하기는 위 막대에) -->
     <footer class="format-bar" id="format-bar" role="toolbar" aria-label="서식">
       <div class="format-items" id="format-items">
-        <button data-action="file" aria-label="사진·파일 넣기"><svg><use href="#i-clip"/></svg></button>
-        <button data-action="camera" aria-label="사진 넣기"><svg><use href="#i-image"/></svg></button>
+        <button data-action="file" aria-label="파일 넣기 · 사진·소리·동영상·문서"><svg><use href="#i-clip"/></svg></button>
+        <button data-action="record" aria-label="녹음 · 받아쓰기"><svg><use href="#i-mic"/></svg></button>
+        <span class="sep"></span>
+        <button data-action="style" class="style-btn" aria-label="스타일" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
         <span class="sep"></span>
         <button data-cmd="task" aria-label="체크리스트"><svg><use href="#i-task"/></svg></button>
         <button data-cmd="bullet" aria-label="점 목록"><svg><use href="#i-bullet"/></svg></button>
@@ -176,17 +212,20 @@
           <svg><use href="#i-highlighter"/></svg><span class="swatch-bar" data-bar="highlight"></span>
         </button>
         <span class="sep"></span>
-        <button data-cmd="h1" aria-label="제목 1">H1</button>
-        <button data-cmd="h2" aria-label="제목 2">H2</button>
-        <button data-cmd="quote" aria-label="인용"><svg><use href="#i-quote"/></svg></button>
         <button data-action="table" aria-label="표 넣기"><svg><use href="#i-table"/></svg></button>
-        <button data-action="tag" aria-label="태그 넣기"><svg><use href="#i-tag"/></svg></button>
-        <span class="sep"></span>
-        <button data-action="undo" aria-label="되돌리기"><svg><use href="#i-undo"/></svg></button>
-        <button data-action="redo" aria-label="다시 하기"><svg><use href="#i-redo"/></svg></button>
-        <button data-action="done" class="done-btn" aria-label="키보드 닫기"><svg><use href="#i-keyboard-down"/></svg></button>
       </div>
     </footer>
+
+    <!-- 스타일 고르기 (데스크탑과 같음): 그 모양 그대로 미리 보며, 지금 줄의 스타일에 ✓ -->
+    <div id="style-menu" class="pop style-menu" role="listbox" aria-label="스타일" hidden>
+      <button type="button" role="option" data-style="paragraph"><span class="style-sample s-paragraph">본문</span></button>
+      <button type="button" role="option" data-style="h1"><span class="style-sample s-h1">제목 1</span></button>
+      <button type="button" role="option" data-style="h2"><span class="style-sample s-h2">제목 2</span></button>
+      <button type="button" role="option" data-style="h3"><span class="style-sample s-h3">제목 3</span></button>
+      <button type="button" role="option" data-style="quote"><span class="style-sample s-quote">인용</span></button>
+      <button type="button" role="option" data-style="codeBlock"><span class="style-sample s-code">코드 블록</span></button>
+      <button type="button" role="option" data-style="math"><span class="style-sample s-math">∑ 수식</span><kbd>$x$</kbd></button>
+    </div>
 
     <div id="palette" class="pop palette" role="menu" hidden>
       <div class="palette-title" id="palette-title"></div>
@@ -205,7 +244,7 @@
     <div class="swatches" id="swatches" role="radiogroup" aria-label="메모 색"></div>
     <button class="menu-item" data-memo-action="open"><svg><use href="#i-note"/></svg><span>열기</span></button>
     <button class="menu-item" data-memo-action="pin"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
-    <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>다른 앱으로 보내기</span></button>
+    <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>보내기 · 글 · 그림 · PDF</span></button>
     <button class="menu-item" data-memo-action="copy"><svg><use href="#i-copy"/></svg><span>글 복사하기</span></button>
     <button class="menu-item" data-memo-action="print"><svg><use href="#i-pdf"/></svg><span>PDF로 저장 · 인쇄</span></button>
     <button class="menu-item danger" data-memo-action="delete"><svg><use href="#i-trash"/></svg><span>메모 지우기</span></button>
@@ -279,21 +318,55 @@
     </form>
   </aside>
 
+  <!-- 연결: 태그로 이어진 메모(저절로) + 직접 연결 + 역연결 + 닮은 메모(연결하기·태그 함께 달기) -->
   <aside id="links-panel" class="sheet links-panel" hidden>
     <div class="sheet-grip"></div>
     <header class="links-head">
-      <b>메모 연결</b>
-      <button id="links-close" class="icon-btn" aria-label="메모 연결 닫기"><svg><use href="#i-close"/></svg></button>
+      <b>연결</b>
+      <button id="links-close" class="icon-btn" aria-label="연결 닫기"><svg><use href="#i-close"/></svg></button>
     </header>
-    <input id="link-search" class="link-search" type="search" placeholder="연결할 메모 찾기" autocomplete="off">
+    <section id="links-tags-section">
+      <h4>태그로 이어진 메모 <small>같은 태그를 단 메모예요</small></h4>
+      <div id="links-tags" class="link-tag-groups"></div>
+      <p id="links-tags-empty" class="hint small" hidden>이 메모에 태그가 없어요. 아래 추천 태그를 달면 같은 태그의 메모와 저절로 이어져요.</p>
+      <div id="links-tag-suggest" class="chip-row link-tag-suggest"></div>
+    </section>
+    <input id="link-search" class="link-search" type="search" placeholder="직접 연결할 메모 찾기" autocomplete="off">
     <ul id="link-results" class="link-list"></ul>
-    <h4>연결한 메모</h4>
+    <h4>직접 연결한 메모</h4>
     <ul id="links-out" class="link-list"></ul>
-    <h4>이 메모를 연결한 곳</h4>
+    <h4 id="links-in-title">이 메모를 연결한 곳</h4>
     <ul id="links-in" class="link-list"></ul>
-    <h4>비슷한 메모 <small>내용이 닮은 메모를 골랐어요</small></h4>
+    <h4 id="links-suggest-title">비슷한 메모 <small>내용이 닮은 메모예요 · 연결하거나 그 메모의 태그를 함께 달 수 있어요</small></h4>
     <ul id="links-suggest" class="link-list"></ul>
   </aside>
+
+  <!-- 다른 앱으로 보내기: 글 · 그림 · PDF -->
+  <section id="share-sheet" class="sheet share-sheet" role="dialog" aria-labelledby="share-sheet-title" hidden>
+    <div class="sheet-grip"></div>
+    <h3 id="share-sheet-title" class="sheet-title">보내기</h3>
+    <div class="share-choices">
+      <button class="share-choice" data-share="text"><svg><use href="#i-text"/></svg><b>글</b><small>목록·체크리스트 모양 그대로</small></button>
+      <button class="share-choice" data-share="image"><svg><use href="#i-image"/></svg><b>그림</b><small>메모 모양 그대로 한 장</small></button>
+      <button class="share-choice" data-share="pdf"><svg><use href="#i-pdf"/></svg><b>PDF</b><small>문서로 (글자 고르기 가능)</small></button>
+    </div>
+    <p id="share-busy" class="wait" hidden><span class="spinner"></span><span id="share-busy-text">만들고 있어요</span></p>
+  </section>
+
+  <!-- 다른 앱에서 받은 소리 파일: 받아쓸지 그때마다 고르기 -->
+  <section id="import-sheet" class="sheet import-sheet" role="dialog" aria-labelledby="import-sheet-title" hidden>
+    <div class="sheet-grip"></div>
+    <h3 id="import-sheet-title" class="sheet-title">음성 파일로 메모 만들기</h3>
+    <ul id="import-files" class="import-files"></ul>
+    <label class="setting-row">
+      <input type="checkbox" id="import-stt" class="switch" checked>
+      <span>글자로 받아쓰기 <small id="import-stt-note">소리 내용을 글로 옮겨 메모에 함께 넣어요 (휴대폰의 음성 인식, 길면 시간이 걸려요)</small></span>
+    </label>
+    <div class="sheet-actions">
+      <button id="import-cancel" class="btn">그만두기</button>
+      <button id="import-ok" class="btn primary">메모 만들기</button>
+    </div>
+  </section>
 
   <!-- Google Drive 연결: ① 로그인 설정 ② 로그인 ③ 폴더 고르기 -->
   <section id="drive-sheet" class="sheet drive-sheet" role="dialog" aria-label="Google Drive 연결" hidden>
@@ -376,6 +449,27 @@
       <button id="history-apps-2" class="btn">알림 모을 앱 고르기 <span id="blocked-count" class="trash-count"></span></button>
     </div>
 
+    <p class="label">태그 · 녹음</p>
+    <label class="setting-row">
+      <input type="checkbox" id="auto-tags" class="switch" checked>
+      <span>태그 없는 메모에 추천 태그 달기 <small>메모를 닫을 때 확실한 태그만 저절로 달아요 (되돌리기 가능)</small></span>
+    </label>
+    <label class="setting-row">
+      <input type="checkbox" id="rec-stt" class="switch" checked>
+      <span>녹음할 때 받아쓰기 <small id="rec-stt-note">말하는 대로 글로 옮겨요 · 화면을 꺼도 계속 녹음해요</small></span>
+    </label>
+    <label class="setting-row select-row">
+      <span>받아쓰기 엔진 <small id="stt-engine-note">Vosk 는 오픈소스라 인터넷 없이 휴대폰 안에서만 받아써요 (회의 내용이 밖으로 나가지 않아요)</small></span>
+      <select id="stt-engine" aria-label="받아쓰기 엔진">
+        <option value="vosk">Vosk (오픈소스 · 오프라인)</option>
+        <option value="system">휴대폰 음성 인식 (더 정확)</option>
+      </select>
+    </label>
+    <div class="setting-row" id="stt-model-row">
+      <span>한국어 받아쓰기 모델 <small id="stt-model-note"></small></span>
+      <button id="stt-model-btn" class="btn small">받기</button>
+    </div>
+
     <p class="label">지운 메모</p>
     <div class="sheet-actions">
       <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
@@ -425,6 +519,6 @@
     </form>
   </dialog>
 
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden><span id="toast-text"></span><button id="toast-action" class="toast-action" hidden></button></div>
 </body>
 </html>

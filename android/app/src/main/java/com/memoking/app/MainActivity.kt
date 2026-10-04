@@ -10,6 +10,8 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.print.PdfPrint
+import android.print.PrintAttributes
 import android.print.PrintManager
 import android.provider.MediaStore
 import android.provider.OpenableColumns
@@ -45,6 +47,7 @@ class MainActivity : Activity() {
         private const val REQ_FILES = 2
         private const val REQ_NOTIFY = 3
         private const val REQ_AUTH = 4
+        private const val REQ_MIC = 5
 
         /** 지금 앞에 보이는 화면 (알림이 울렸을 때 바로 알리기 위해) */
         @Volatile
@@ -102,6 +105,8 @@ class MainActivity : Activity() {
             }
         }
         setupBack()
+        // 녹음 서비스의 소식(시간·받아쓴 글·끝남)을 화면으로
+        RecorderService.listener = { ev -> runOnUiThread { if (pageReady) emit("record", ev) } }
         web.loadUrl(WebServer.START)
         if (savedInstanceState == null) handleIntent(intent)
     }
@@ -263,6 +268,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         if (visible === this) visible = null
+        RecorderService.listener = null
         web.destroy()
         super.onDestroy()
     }
@@ -301,6 +307,15 @@ class MainActivity : Activity() {
                     .put("label", intent.getStringExtra("label") ?: ""),
             )
             ACTION_NEW_MEMO -> deliver(JSONObject().put("type", "new"))
+            // 다른 앱의 "다른 앱으로 열기"(소리 파일·마크다운·글 파일) → 공유하기와 같게 새 메모
+            Intent.ACTION_VIEW -> {
+                val uri = intent.data ?: return
+                if (uri.scheme == "memoking") return
+                val app = sourceApp()
+                io.execute {
+                    deliver(JSONObject().put("type", "share").put("text", "").put("app", app).put("files", copyToTemp(listOf(uri))))
+                }
+            }
             Intent.ACTION_PROCESS_TEXT -> {
                 val text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString() ?: return
                 deliver(JSONObject().put("type", "share").put("text", text).put("app", sourceApp()).put("files", JSONArray()))
@@ -501,9 +516,62 @@ class MainActivity : Activity() {
         requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFY)
     }
 
+    /** 녹음: 마이크 권한 (안드로이드 13+ 은 녹음 알림이 보이도록 알림 권한도 함께) */
+    fun requestMicPermission(id: Int) {
+        if (RecorderService.hasMic(this)) {
+            bridge.resolve(id) { true }
+            return
+        }
+        waiting[REQ_MIC]?.let { old -> bridge.resolve(old) { false } }
+        waiting[REQ_MIC] = id
+        val perms = mutableListOf(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            perms.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        requestPermissions(perms.toTypedArray(), REQ_MIC)
+    }
+
+    /** 앱 캐시의 파일(그림·PDF)을 다른 앱으로 보내기 */
+    fun shareFile(id: Int, file: java.io.File, mime: String, title: String) {
+        bridge.resolve(id) {
+            val uri = VaultFileProvider.shareUriFor(file.name)
+            val intent = Intent(Intent.ACTION_SEND).setType(mime)
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .putExtra(Intent.EXTRA_SUBJECT, title)
+                .putExtra(Intent.EXTRA_TITLE, title)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.clipData = android.content.ClipData.newRawUri(title, uri)
+            startActivity(Intent.createChooser(intent, title.ifEmpty { null }).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+            true
+        }
+    }
+
+    /** 지금 보이는 메모를 PDF 파일로 만들어(인쇄 화면 없이) 보내기 — 글자를 고를 수 있는 PDF */
+    fun sharePdf(id: Int, file: java.io.File, title: String) {
+        val attrs = PrintAttributes.Builder()
+            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+            .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
+            .setMinMargins(PrintAttributes.Margins(720, 720, 720, 720)) // 1.27cm (1/1000 인치 단위)
+            .build()
+        try {
+            PdfPrint(attrs).write(web.createPrintDocumentAdapter(file.name), file) { error ->
+                runOnUiThread {
+                    if (error != null) bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요: ${error.message}") }
+                    else shareFile(id, file, "application/pdf", title)
+                }
+            }
+        } catch (e: Throwable) {
+            bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요: ${e.message}") }
+        }
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         val id = waiting.remove(requestCode) ?: return
+        if (requestCode == REQ_MIC) {
+            bridge.resolve(id) { RecorderService.hasMic(this) }
+            return
+        }
         bridge.resolve(id) { grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED }
     }
 

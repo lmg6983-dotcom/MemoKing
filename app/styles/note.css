@@ -1135,3 +1135,66 @@ body.mk-block-dragging .mk-doc .ProseMirror-selectednode { outline: none; }
   .mk-doc .mk-block-sorting, .mk-doc .mk-block-lift > *, .mk-doc .mk-block-pressing { transition: none; animation: none; }
 }
 @media print { .mk-move-hint { display: none !important; } }
+
+/* ---------- v0.18.0: 목록 끌기 — 떠오른 그림자·바탕을 점선 테두리와 같은 틀(::after)에 (체크 네모·글머리까지 함께) ---------- */
+.mk-doc li.mk-lift, .mk-doc li.mk-swap-target, .mk-doc li.mk-dropped, .mk-doc li.mk-swiping { background: none; box-shadow: none; }
+.mk-doc li.mk-lift::after {
+  z-index: -1; /* li 가 z-index 로 쌓임 맥락을 만들어 글자 바로 뒤에 깔린다 */
+  background: var(--note-bg);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.mk-doc li.mk-swap-target { z-index: 1; }
+.mk-doc li.mk-swap-target::after { z-index: -1; background: var(--note-hover); }
+.mk-doc li.mk-dropped { z-index: 1; animation: none; }
+.mk-doc li.mk-dropped::after { z-index: -1; animation: mk-dropped 0.7s ease-out; }
+/* 커서가 있는 항목에 흐린 점선 — Enter 로 새 항목을 만들면 테두리도 새 항목으로 따라간다.
+   마우스를 올린 항목 테두리는 마우스를 움직일 때만 (치는 동안 남아 있던 자리에 머물지 않게) */
+.mk-doc.ProseMirror-focused li.mk-caret-item::after { border-color: color-mix(in srgb, var(--note-text) 24%, transparent); }
+body.mk-typing .mk-doc li:hover:not(:has(li:hover))::after { border-color: transparent; }
+body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-color: color-mix(in srgb, var(--note-text) 24%, transparent); }
+@media (hover: none) {
+  /* 터치는 누른 자리에 :hover 가 남으므로 쓰지 않고 커서 항목만 */
+  .mk-doc li:hover:not(:has(li:hover))::after { border-color: transparent; }
+  .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-color: color-mix(in srgb, var(--note-text) 24%, transparent); }
+}
+/* 옆으로 밀어 하위·상위로: 미는 동안 따라 움직이고, 넘으면 테두리가 진해진다 */
+.mk-doc li.mk-swiping { z-index: 2; transition: none !important; }
+.mk-doc li.mk-swiping::after { border-style: solid; border-color: color-mix(in srgb, var(--note-text) 35%, transparent) !important; }
+.mk-doc li.mk-swipe-ready::after { border-width: 2px; border-color: #7a4dff !important; }
+.mk-doc li.mk-swipe-back { transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) !important; }
+.mk-drag-badge[data-kind="indent"], .mk-drag-badge[data-kind="outdent"] { background: #7a4dff; }
+.mk-drag-badge[data-kind="blocked"] { background: #666; }
+
+/* ---------- v0.18.0: 수식 (KaTeX) — 누르면 아래에 고치기 창 ---------- */
+.mk-doc .mk-math { padding: 0 2px; border-radius: 4px; cursor: pointer; }
+.mk-doc .mk-math-block { display: block; margin: 0.5em 0; padding: 8px 10px; border-radius: 8px; overflow-x: auto; text-align: center; cursor: pointer; background: color-mix(in srgb, var(--note-text) 4%, transparent); }
+.mk-doc .mk-math:hover, .mk-doc .mk-math-block:hover { background: var(--note-hover); }
+.mk-doc .mk-math.selected, .mk-doc .mk-math-block.selected { outline: 2px solid var(--note-accent); outline-offset: 1px; }
+.mk-doc .mk-math.empty, .mk-doc .mk-math-block.empty { color: var(--note-muted); font-size: 0.9em; font-style: italic; }
+.mk-doc .katex { font-size: 1.08em; }
+.mk-doc .mk-math-block .katex-display { margin: 0; }
+.mk-doc[contenteditable="false"] .mk-math, .mk-doc[contenteditable="false"] .mk-math-block { cursor: default; }
+.mk-math-editor {
+  position: fixed; z-index: 70;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--surface-2, #fff); color: var(--text, #111);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), inset 0 0 0 1px var(--line, rgba(0, 0, 0, 0.1));
+  animation: mk-drop-in 0.14s ease-out;
+}
+.mk-math-editor textarea {
+  width: 100%; resize: vertical; min-height: 36px;
+  padding: 8px 10px; border: 1px solid var(--line, #ddd); border-radius: 8px;
+  background: var(--surface-1, #fff); color: inherit;
+  font: 14px/1.5 ui-monospace, Consolas, monospace;
+}
+.mk-math-editor textarea:focus { outline: 2px solid var(--text-strong, #111); outline-offset: -1px; }
+.mk-math-preview { min-height: 28px; max-height: 40vh; overflow: auto; padding: 4px 2px; text-align: center; }
+.mk-math-preview.empty { color: var(--muted, #777); font-size: 13px; }
+.mk-math-actions { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted, #777); }
+.mk-math-actions span { flex: 1; }
+.mk-math-actions button { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--fill-hover, #eee); color: inherit; font-weight: 700; }
+.mk-math-actions button.primary { background: var(--brand-yellow, #ffcd00); color: var(--on-brand, #111); }
+.s-math { font: italic 15px "Times New Roman", serif; }
+@media print { .mk-math-editor { display: none !important; } .mk-doc .mk-math-block { background: none; } }

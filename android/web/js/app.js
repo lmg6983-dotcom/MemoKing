@@ -1,9 +1,12 @@
 // 메모킹 안드로이드 — 시작, 화면 바꾸기, 설정·휴지통, 다른 앱에서 받은 것, 예약 알림
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
-import { extractTitle, isBlankBody, plainText, COLORS } from '../../app/js/core/memo-file.js';
+import { extractTitle, isBlankBody, COLORS } from '../../app/js/core/memo-file.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
-import { native, call, on, setBackHandler, drive, history } from './native.js';
+import { shareText } from '../../app/js/core/share-text.js';
+import { importText, isTextDocument, stripFrontMatter } from '../../app/js/core/markdown-import.js';
+import { mediaKind } from '../../app/js/media.js';
+import { native, call, on, setBackHandler, drive, history, fs } from './native.js';
 import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
@@ -11,7 +14,9 @@ import { LinkPreviews } from './web-fetch.js';
 import { createAlarms } from './alarms.js';
 import { injectMobileIcons } from './m-icons.js';
 import { app, COLOR_NAMES } from './state.js';
-import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, matchChrome } from './ui.js';
+import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, matchChrome, isTwoPane } from './ui.js';
+import * as recorder from './recorder.js';
+import { renderMemoImage } from './share-image.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
 
@@ -214,6 +219,26 @@ app.showList = () => {
   note.closeNote();
   list.refresh();
   list.show();
+  syncPane();
+};
+
+// 넓은 화면: 메모를 고르지 않았으면 오른쪽에 안내
+function syncPane() {
+  $('pane-empty').hidden = !isTwoPane() || note.isOpen() || $('list-screen').hidden;
+}
+window.addEventListener('memoking:pane', () => {
+  syncPane();
+  if (note.isOpen() && !isTwoPane()) matchChrome(document.querySelector('#note-screen .bar'));
+  else if (!$('list-screen').hidden) matchChrome($('list-screen'));
+});
+
+// 태그를 눌러 그 태그의 메모 모아 보기 (연결 패널 · 추천 태그)
+app.filterByTag = (name) => {
+  closeAllSheets();
+  if (!isTwoPane()) note.closeNote();
+  list.filterTag(name);
+  list.show();
+  syncPane();
 };
 
 app.openMemo = async (id, options = {}) => {
@@ -221,9 +246,10 @@ app.openMemo = async (id, options = {}) => {
   closeAllSheets();
   $('list-screen').hidden = false; // 메모 뒤에 목록이 있어야 닫을 때 바로 보인다
   await note.openNote(id, options);
+  syncPane();
 };
 
-app.newMemo = async ({ color } = {}) => {
+app.newMemo = async ({ color, voice = false } = {}) => {
   if (!app.vault) return null;
   let pick = color;
   if (!pick) {
@@ -234,7 +260,7 @@ app.newMemo = async ({ color } = {}) => {
     }
   }
   const id = app.vault.create({ color: pick });
-  await app.openMemo(id, { fresh: true });
+  await app.openMemo(id, { fresh: true, record: Boolean(voice) });
   return id;
 };
 
@@ -301,7 +327,7 @@ memoSheet.addEventListener('click', async (e) => {
       break;
     case 'share':
       closeSheet(memoSheet);
-      call('share', { title, text: plainText(body) }).catch((err) => toast(err.message, true));
+      openShare(id);
       break;
     case 'copy':
       closeSheet(memoSheet);
@@ -313,25 +339,164 @@ memoSheet.addEventListener('click', async (e) => {
       note.flush();
       call('print', { title }).catch((err) => toast(err.message, true));
       break;
-    case 'delete': {
+    case 'delete':
       closeSheet(memoSheet);
-      if (!isBlankBody(body)) {
-        const ok = await confirmDialog(`"${title}" 메모를 지울까요?\n지운 메모는 메모 폴더 안 휴지통에 보관돼요.`);
-        if (!ok) return;
-      }
-      if (note.currentId() === id) note.discardAndClose();
-      try {
-        app.vault.trash(id);
-        toast('메모를 휴지통으로 옮겼어요');
-      } catch (err) {
-        toast(err.message, true);
-      }
-      app.showList();
+      deleteMemo(id);
       break;
-    }
     default:
   }
 });
+
+// ---------- 지우기: 묻지 않고 바로 휴지통으로 (애니메이션 + 되돌리기) ----------
+
+const titleOf = (body) => (isBlankBody(body) ? '새 메모' : extractTitle(body));
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** 메모를 지운다. 열려 있으면 메모 화면이 휴지통으로 빨려 들어가듯, 목록이면 카드가 접히며 사라진다 */
+async function deleteMemo(id) {
+  if (!app.vault?.get(id)) return;
+  const inNote = note.currentId() === id;
+  const body = inNote ? note.editorMarkdown() : app.vault.get(id)?.body ?? '';
+  const motion = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (inNote) {
+    note.flush();
+    if (motion) {
+      $('note-screen').classList.add('trashing');
+      await wait(260);
+    }
+    note.discardAndClose();
+    $('note-screen').classList.remove('trashing');
+  } else if (motion) await list.animateRemove(id);
+  navigator.vibrate?.(10);
+  let name;
+  try {
+    name = app.vault.trash(id);
+  } catch (err) {
+    toast(err.message, true);
+    list.refresh();
+    return;
+  }
+  if (inNote) app.showList();
+  else list.refresh();
+  if (isBlankBody(body) || typeof name !== 'string') {
+    toast('메모를 지웠어요');
+    return;
+  }
+  toast(`"${titleOf(body)}" 를 휴지통으로 옮겼어요`, false, {
+    label: '되돌리기',
+    run: () => {
+      const restored = app.vault.restoreTrash(name);
+      list.refresh();
+      toast(restored ? '메모를 되살렸어요' : '되살리지 못했어요', !restored);
+    },
+  });
+}
+app.deleteMemo = deleteMemo;
+
+// ---------- 보내기: 글(목록 모양 그대로) · 그림 · PDF ----------
+
+let shareFor = null;
+const shareSheet = $('share-sheet');
+function openShare(id) {
+  shareFor = id;
+  const memo = app.vault.get(id);
+  const body = note.currentId() === id ? note.editorMarkdown() : memo?.body ?? '';
+  $('share-sheet-title').textContent = `"${titleOf(body)}" 보내기`;
+  $('share-busy').hidden = true;
+  for (const b of shareSheet.querySelectorAll('[data-share]')) b.disabled = false;
+  openSheet(shareSheet);
+}
+
+const fileName = (title, ext) => `${title.replace(/[\\/:*?"<>|#]+/g, ' ').trim().slice(0, 60) || '메모'}.${ext}`;
+
+shareSheet.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-share]');
+  if (!b || !shareFor) return;
+  const id = shareFor;
+  const kind = b.dataset.share;
+  const body = note.currentId() === id ? note.editorMarkdown() : app.vault.get(id)?.body ?? '';
+  const title = titleOf(body);
+  if (kind === 'text') {
+    closeSheet(shareSheet);
+    call('share', { title, text: shareText(body) }).catch((err) => toast(err.message, true));
+    return;
+  }
+  // 그림·PDF 는 메모 화면에 그려진 모습으로 만든다 (닫혀 있으면 연다)
+  for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = true;
+  $('share-busy').hidden = false;
+  $('share-busy-text').textContent = kind === 'image' ? '그림을 만들고 있어요' : 'PDF를 만들고 있어요';
+  try {
+    if (note.currentId() !== id) {
+      closeSheet(shareSheet);
+      await app.openMemo(id);
+      openSheet(shareSheet);
+    }
+    note.flush();
+    await note.settled();
+    if (kind === 'image') {
+      const base64 = await renderMemoImage(note.getEditor(), { color: app.vault.get(id)?.color });
+      await call('shareFile', { base64, name: fileName(title, 'png'), mime: 'image/png', title });
+    } else {
+      try {
+        await call('sharePdf', { title, name: fileName(title, 'pdf') });
+      } catch (err) {
+        console.warn('PDF 파일을 바로 만들지 못해 인쇄 화면으로', err);
+        await call('print', { title });
+      }
+    }
+    closeSheet(shareSheet);
+  } catch (err) {
+    console.error(err);
+    toast(err.message || '보내지 못했어요', true);
+  } finally {
+    $('share-busy').hidden = true;
+    for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = false;
+  }
+});
+
+// ---------- 녹음을 메모에 넣기 (녹음을 끝냈을 때 · 앱이 꺼져 있는 동안 끝난 녹음) ----------
+
+const escapeText = (t) => importText(t).markdown;
+
+function whenLabel(ms) {
+  const d = new Date(ms || Date.now());
+  const h = d.getHours();
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+app.deliverRecording = async (r) => {
+  if (!app.vault || !r?.temp) return;
+  const duration = recorder.formatDuration(r.durationMs ?? 0);
+  const alt = `녹음 ${whenLabel(r.startedAt)} · ${duration}`;
+  const [item] = note.tempsToItems([{ temp: r.temp, name: r.name || 'recording.m4a', mime: r.mime || 'audio/mp4' }]);
+  item.alt = alt;
+  const transcript = String(r.transcript ?? '').trim();
+  const textMd = transcript ? escapeText(transcript) : '';
+  let memoId = r.memoId;
+  if (note.currentId() === memoId) {
+    note.insertRecording(item, textMd, `음성 메모 · ${whenLabel(r.startedAt)}`);
+  } else {
+    const memo = memoId && app.vault.get(memoId);
+    const media = `![${alt}](${item.src})`;
+    const parts = [media, textMd].filter(Boolean).join('\n\n');
+    const heading = `# 음성 메모 · ${whenLabel(r.startedAt)}`;
+    if (memo && !isBlankBody(memo.body)) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
+    else if (memo) app.vault.save(memoId, `${heading}\n\n${parts}\n`);
+    else memoId = app.vault.import({ body: `${heading}\n\n${parts}\n` });
+    list.refresh();
+  }
+  toast(transcript ? `녹음 ${duration}과 받아쓴 글을 메모에 넣었어요` : `녹음 ${duration}을 메모에 넣었어요`);
+  // 녹음 중에는 못 받아썼으면(모델이 없었음) 이제 녹음 파일로
+  if (r.sttPending && recorder.sttOn()) {
+    if (recorder.sttReady()) transcribeInto(memoId, [item]);
+    else if (recorder.sttEngine() === 'vosk') {
+      toast('받아쓰기 모델을 받으면 이 녹음을 글로 옮길게요', false, {
+        label: '모델 받기',
+        run: () => recorder.downloadModel().then(() => transcribeInto(memoId, [item])).catch(() => {}),
+      });
+    }
+  }
+};
 
 // ---------- 설정 ----------
 
@@ -368,8 +533,48 @@ function openSettings() {
   refreshNotifyRow();
   refreshHistoryRow();
   renderDrive();
+  $('auto-tags').checked = note.autoTagsOn();
+  $('rec-stt').checked = recorder.sttOn();
+  $('rec-stt-note').textContent = '말하는 대로 글로 옮겨요 · 화면을 꺼도 계속 녹음해요';
+  $('stt-engine').value = recorder.sttEngine();
+  $('stt-engine').querySelector('[value="system"]').disabled = !info.record?.system;
+  refreshSttRow();
   openSheet($('settings-sheet'));
 }
+
+function refreshSttRow(progress) {
+  const st = recorder.sttStatus();
+  const vosk = recorder.sttEngine() === 'vosk';
+  $('stt-model-row').hidden = !vosk;
+  $('stt-engine-note').textContent = vosk
+    ? 'Vosk 는 오픈소스라 인터넷 없이 휴대폰 안에서만 받아써요 (회의 내용이 밖으로 나가지 않아요)'
+    : '휴대폰에 들어 있는 음성 인식(보통 Google)으로 받아써요. 더 정확하지만 휴대폰에 따라 인터넷을 쓸 수 있어요';
+  const busy = progress != null || st.model === 'downloading';
+  $('stt-model-note').textContent = st.model === 'ready'
+    ? '받아 둠 · 인터넷 없이 받아써요'
+    : busy ? `받는 중 ${progress ?? st.progress ?? 0}%` : `처음 한 번 받아요 (${st.modelSize ?? '약 82MB'}, Wi-Fi 추천)`;
+  $('stt-model-btn').textContent = st.model === 'ready' ? '지우기' : busy ? '받는 중' : '받기';
+  $('stt-model-btn').disabled = busy;
+}
+$('stt-engine').addEventListener('change', () => {
+  recorder.setSttEngine($('stt-engine').value);
+  refreshSttRow();
+});
+$('stt-model-btn').addEventListener('click', async () => {
+  if (recorder.sttStatus().model === 'ready') {
+    if (!(await confirmDialog('받아쓰기 모델을 지울까요?\n다시 받아쓰려면 다시 받아야 해요.', '지우기'))) return;
+    await call('sttModel', { delete: true }).catch((err) => toast(err.message, true));
+    refreshSttRow();
+    return;
+  }
+  refreshSttRow(0);
+  recorder.downloadModel().catch(() => {}).finally(() => refreshSttRow());
+});
+on('sttModel', ({ progress }) => {
+  if (!$('settings-sheet').hidden) refreshSttRow(progress < 100 ? progress : undefined);
+});
+$('auto-tags').addEventListener('change', () => note.setAutoTags($('auto-tags').checked));
+$('rec-stt').addEventListener('change', () => recorder.setStt($('rec-stt').checked));
 $('settings-btn').addEventListener('click', openSettings);
 $('history-enabled').addEventListener('change', () => enableHistory($('history-enabled').checked));
 $('trash-days').addEventListener('change', () => {
@@ -509,30 +714,155 @@ function sourceLine(appName) {
   return `> 출처: ${esc(appName || '공유하기')} · ${when}`;
 }
 
+// 받은 소리 파일: 받아쓸지 그때마다 묻는다 (지난번 고른 것이 기본)
+const IMPORT_STT_KEY = 'memoking.importStt';
+function askAudioImport(files) {
+  const sheet = $('import-sheet');
+  $('import-files').replaceChildren(...files.map((f) => {
+    const li = document.createElement('li');
+    li.append(icon('audio'), f.name || '소리 파일');
+    if (f.size) {
+      const small = document.createElement('small');
+      small.textContent = f.size > 1048576 ? `${(f.size / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(f.size / 1024))}KB`;
+      li.append(small);
+    }
+    return li;
+  }));
+  const canStt = true; // Vosk 는 모든 안드로이드 버전 (모델이 없으면 받은 뒤)
+  let last = true;
+  try {
+    last = localStorage.getItem(IMPORT_STT_KEY) !== 'off';
+  } catch {
+    // 기본은 받아쓰기
+  }
+  $('import-stt').checked = canStt && last;
+  $('import-stt').disabled = !canStt;
+  $('import-stt-note').textContent = recorder.sttReady()
+    ? '소리 내용을 글로 옮겨 메모에 함께 넣어요 (길면 시간이 걸려요)'
+    : `소리 내용을 글로 옮겨요 · 받아쓰기 모델(${recorder.sttStatus().modelSize ?? '약 82MB'})을 먼저 한 번 받아요`;
+  $('import-sheet-title').textContent = files.length > 1 ? `음성 파일 ${files.length}개로 메모 만들기` : '음성 파일로 메모 만들기';
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      $('import-ok').onclick = null;
+      $('import-cancel').onclick = null;
+      closeSheet(sheet);
+      resolve(value);
+    };
+    $('import-ok').onclick = () => {
+      const stt = $('import-stt').checked;
+      try {
+        localStorage.setItem(IMPORT_STT_KEY, stt ? 'on' : 'off');
+      } catch {
+        // 이번에만
+      }
+      finish({ stt });
+    };
+    $('import-cancel').onclick = () => finish(null);
+    openSheet(sheet, { onClose: () => finish(null) });
+  });
+}
+
+// 메모 폴더의 소리 파일을 받아써서 그 메모 끝에 넣는다 (오래 걸리므로 메모를 만든 뒤 따로)
+async function transcribeInto(memoId, items) {
+  for (const item of items) {
+    try {
+      toast(`"${item.alt}" 를 받아쓰고 있어요…`);
+      const res = await call('transcribe', { rel: item.src, engine: recorder.sttEngine() });
+      const text = String(res?.text ?? '').trim();
+      if (!text) {
+        toast('받아쓸 말소리를 찾지 못했어요');
+        continue;
+      }
+      const md = importText(text).markdown;
+      if (note.currentId() === memoId) note.appendText(md);
+      else {
+        const memo = app.vault.get(memoId);
+        if (memo) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${md}\n`);
+      }
+      toast('받아쓴 글을 메모에 넣었어요');
+    } catch (err) {
+      toast(err.message || '받아쓰지 못했어요', true);
+    }
+  }
+}
+
 // 공유하기로 받은 글·주소·파일로 새 메모 (PC 의 빠른 메모와 같은 모양: 제목 → 글 → 파일 → 출처)
+//   마크다운 글·.md 파일은 서식대로, 소리 파일은 받아쓸지 묻는다
 async function memoFromShare(payload) {
   const text = String(payload.text ?? '').trim();
   const subject = String(payload.subject ?? '').trim();
-  const files = payload.files ?? [];
+  let files = payload.files ?? [];
   if (!text && !files.length) return;
+  const docs = files.filter((f) => isTextDocument(f.name, f.mime));
+  const audio = files.filter((f) => !docs.includes(f) && mediaKind({ name: f.name || '', type: f.mime || '' }) === 'audio');
+  let stt = false;
+  if (audio.length) {
+    const answer = await askAudioImport(audio);
+    if (!answer) {
+      for (const f of files) {
+        try {
+          fs.dropTemp(f.temp);
+        } catch {
+          // 임시 파일은 하루 뒤 치워진다
+        }
+      }
+      return;
+    }
+    stt = answer.stt;
+  }
+  // .md · .txt 는 첨부가 아니라 글로
+  const docTexts = [];
+  for (const f of docs) {
+    try {
+      docTexts.push(stripFrontMatter(fs.readTempText(f.temp) ?? ''));
+      fs.dropTemp(f.temp);
+    } catch {
+      docTexts.push('');
+    }
+  }
+  files = files.filter((f) => !docs.includes(f));
   const id = app.vault.create({});
+  let audioItems = [];
   await app.openMemo(id, {
     capture: async (editor) => {
       const url = loneUrl(text);
-      if (subject && !text.includes(subject) && !url) editor.setMarkdown(`# ${esc(subject)}\n`);
-      else if (!text && files.length) editor.setMarkdown(`# ${esc(files.length === 1 ? files[0].name : `파일 ${files.length}개`)}\n`);
+      const docHasTitle = docTexts.some((t) => /^#\s/.test(t));
+      if (subject && !text.includes(subject) && !url && !docHasTitle) editor.setMarkdown(`# ${esc(subject)}\n`);
+      else if (!text && !docTexts.length && files.length) {
+        const name = audio.length === files.length ? `음성 메모 · ${whenLabel(Date.now())}` : files.length === 1 ? files[0].name : `파일 ${files.length}개`;
+        editor.setMarkdown(`# ${esc(name)}\n`);
+      }
       editor.focusEnd();
-      // 공유받은 글은 줄마다 문단으로 (마크다운에서 줄 하나 바꿈은 같은 문단으로 붙어 버린다)
-      if (text) editor.pasteData({ text: url ?? text.replace(/\r\n?/g, '\n').replace(/([^\n])\n(?!\n)/g, '$1\n\n') });
-      if (files.length) editor.insertItems(note.tempsToItems(files));
+      // 주소 하나는 링크 카드, 마크다운 글은 서식대로, 그냥 글은 줄마다 문단으로
+      if (text) editor.pasteData({ text: url ?? importText(text).markdown });
+      for (const t of docTexts) if (t) editor.pasteData({ text: importText(t).markdown });
+      if (files.length) {
+        const items = note.tempsToItems(files);
+        audioItems = items.filter((it) => it.kind === 'audio');
+        editor.insertItems(items);
+      }
       await new Promise((r) => setTimeout(r, 30));
       editor.appendMarkdown(sourceLine(payload.app));
       await editor.imagesSettled();
       note.flush();
       document.activeElement?.blur(); // 키보드는 올리지 않는다 (이어 쓰려면 누르기)
-      toast('공유받은 내용으로 메모를 만들었어요');
+      toast(audio.length ? '음성 파일로 메모를 만들었어요' : docTexts.length ? '마크다운 문서로 메모를 만들었어요' : '공유받은 내용으로 메모를 만들었어요');
     },
   });
+  if (stt && audioItems.length) {
+    if (!recorder.sttReady() && recorder.sttEngine() === 'vosk') {
+      try {
+        toast('받아쓰기 모델을 받고 있어요…');
+        await recorder.downloadModel();
+      } catch {
+        return;
+      }
+    }
+    transcribeInto(id, audioItems);
+  }
 }
 
 async function handleIntent() {
@@ -555,6 +885,38 @@ async function handleIntent() {
   }
 }
 let pendingIntent = null;
+
+// ---------- 새 메모: + 를 누르면 위성 버튼 (음성 메모 · 글 메모) ----------
+
+const fab = $('fab');
+const fabMenu = $('fab-menu');
+function setFabMenu(open) {
+  if (open === !fabMenu.hidden) return false;
+  fab.setAttribute('aria-expanded', String(open));
+  fab.classList.toggle('open', open);
+  $('fab-scrim').hidden = !open;
+  if (open) {
+    fabMenu.hidden = false;
+    fabMenu.classList.remove('closing');
+    navigator.vibrate?.(8);
+  } else {
+    fabMenu.classList.add('closing');
+    setTimeout(() => {
+      if (fab.getAttribute('aria-expanded') === 'false') fabMenu.hidden = true;
+      fabMenu.classList.remove('closing');
+    }, 160);
+  }
+  return true;
+}
+app.closeFabMenu = () => setFabMenu(false);
+fab.addEventListener('click', () => setFabMenu(fabMenu.hidden));
+$('fab-scrim').addEventListener('click', () => setFabMenu(false));
+fabMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-new]');
+  if (!b) return;
+  setFabMenu(false);
+  app.newMemo({ voice: b.dataset.new === 'voice' });
+});
 
 // ---------- 메모 폴더 열기 ----------
 
@@ -596,6 +958,7 @@ function openVault() {
   alarms.schedule();
   renderDrive();
   if (app.vaultInfo?.drive) drive.syncSoon();
+  recorder.resume(); // 녹음이 도는 중인지, 꺼져 있는 동안 끝난 녹음이 있는지
   if (pendingIntent) {
     const p = pendingIntent;
     pendingIntent = null;
@@ -638,6 +1001,7 @@ on('app', (state) => {
     renderDrive();
     list.refreshHistory(); // "알림 접근" 을 켜고 돌아왔을 때
     app.vault.resume();
+    recorder.resume();
     alarms.start();
   }
 });
@@ -649,6 +1013,8 @@ document.addEventListener('visibilitychange', () => {
 setBackHandler(() => {
   if (closeConfirm()) return true;
   if (note.closePalette()) return true;
+  if (note.closeStyleMenu()) return true;
+  if (setFabMenu(false)) return true;
   if (sheetOpen()) return closeTopSheet();
   if (note.isOpen()) {
     app.showList();

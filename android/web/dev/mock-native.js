@@ -13,6 +13,7 @@
     'commitTemp', 'readTempText', 'dropTemp', 'copyText', 'setChrome', 'takeIntent', 'ready', 'scheduleAlarms', 'wasFired', 'notify',
     'historyAll', 'historySetEnabled', 'historyRemove', 'historyClear', 'historyBlock', 'historyUnblock',
     'driveStatus', 'driveSetClient', 'driveDisconnect', 'driveCancelLogin', 'driveSyncSoon',
+    'recordStatus', 'recordPause', 'recordResume', 'recordTakeDone', 'recordAck', 'sttStatus',
   ];
   const native = {};
   for (const m of methods) native[m] = (...args) => syncCall(m, args);

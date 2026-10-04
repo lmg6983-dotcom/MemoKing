@@ -11,6 +11,10 @@ export const app = {
   showList: () => {},
   memoMenu: (_id) => {},
   setReminders: (_id, _list) => null,
+  deleteMemo: async (_id) => {},
+  filterByTag: (_name) => {},
+  deliverRecording: async (_result) => {},
+  closeFabMenu: () => false,
 };
 
 export const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
