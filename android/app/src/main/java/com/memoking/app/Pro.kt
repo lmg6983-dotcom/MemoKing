@@ -51,14 +51,15 @@ object ProModels {
 
     /** 모델 하나 = 파일 몇 개. 파일마다 받을 곳을 차례로 (앞이 안 되면 다음) — tar 는 압축 파일 안의 그 파일 */
     class Source(val url: String, val inTar: String? = null)
-    class ModelFile(val name: String, val sources: List<Source>)
+    /** minBytes: 이보다 작으면 받다가 끊긴 것 (손상) */
+    class ModelFile(val name: String, val sources: List<Source>, val minBytes: Long = 1)
     class Model(val key: String, val label: String, val sizeLabel: String, val files: List<ModelFile>)
 
     private val whisperTar = "$GH/asr-models/sherpa-onnx-whisper-small.tar.bz2"
     val WHISPER = Model(
         "whisper", "정확한 받아쓰기 (Whisper small)", "약 375MB",
-        listOf("small-encoder.int8.onnx", "small-decoder.int8.onnx", "small-tokens.txt").map { f ->
-            ModelFile(f, listOf(Source("$HF/sherpa-onnx-whisper-small/resolve/main/$f"), Source(whisperTar, "sherpa-onnx-whisper-small/$f")))
+        listOf("small-encoder.int8.onnx" to 100_000_000L, "small-decoder.int8.onnx" to 250_000_000L, "small-tokens.txt" to 500_000L).map { (f, min) ->
+            ModelFile(f, listOf(Source("$HF/sherpa-onnx-whisper-small/resolve/main/$f"), Source(whisperTar, "sherpa-onnx-whisper-small/$f")), min)
         },
     )
     val DIARIZE = Model(
@@ -70,6 +71,7 @@ object ProModels {
                     Source("$GH/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2", "sherpa-onnx-pyannote-segmentation-3-0/model.onnx"),
                     Source("$HF/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx"),
                 ),
+                5_000_000L,
             ),
             ModelFile(
                 "embedding.onnx",
@@ -77,6 +79,7 @@ object ProModels {
                     Source("$GH/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx"),
                     Source("$GH/speaker-recongition-models/nemo_en_titanet_small.onnx"),
                 ),
+                30_000_000L,
             ),
         ),
     )
@@ -88,6 +91,16 @@ object ProModels {
     fun file(ctx: Context, m: Model, name: String) = File(dir(ctx, m), name)
     fun ready(ctx: Context, m: Model) = File(dir(ctx, m), ".ok").isFile
 
+    /** 받아 둔 파일이 온전한가 (크기) — 아니면 표시를 지워 다시 받게 한다 */
+    fun verify(ctx: Context, m: Model): Boolean {
+        val ok = m.files.all { file(ctx, m, it.name).let { f -> f.isFile && f.length() >= it.minBytes } }
+        if (!ok) {
+            File(dir(ctx, m), ".ok").delete()
+            m.files.forEach { f -> file(ctx, m, f.name).takeIf { it.isFile && it.length() < f.minBytes }?.delete() }
+        }
+        return ok
+    }
+
     fun status(ctx: Context): JSONObject {
         val o = JSONObject().put("available", ProEngine.AVAILABLE)
         for (m in ALL) {
@@ -97,7 +110,7 @@ object ProModels {
                     .put("progress", progress[m.key] ?: -1).put("label", m.label).put("size", m.sizeLabel),
             )
         }
-        return o.put("busy", ProService.current?.status() ?: JSONObject.NULL)
+        return o.put("busy", ProService.current(ctx) ?: JSONObject.NULL)
     }
 
     /** 모델 받기 (백그라운드 스레드). onProgress(모델 키, 0~100) */
@@ -109,11 +122,12 @@ object ProModels {
                 try {
                     m.files.forEachIndexed { i, f ->
                         val target = File(dir, f.name)
-                        if (target.isFile && target.length() > 0) return@forEachIndexed
+                        if (target.isFile && target.length() >= f.minBytes) return@forEachIndexed
+                        target.delete()
                         var last: Exception? = null
                         for (src in f.sources) {
                             try {
-                                fetch(ctx, src, target) { p ->
+                                fetch(ctx, src, target, f.minBytes) { p ->
                                     val total = (i * 100 + p) / m.files.size
                                     progress[m.key] = total
                                     onProgress(m.key, total)
@@ -140,7 +154,7 @@ object ProModels {
         ALL.firstOrNull { it.key == key }?.let { dir(ctx, it).deleteRecursively() }
     }
 
-    private fun fetch(ctx: Context, src: Source, target: File, onProgress: (Int) -> Unit) {
+    private fun fetch(ctx: Context, src: Source, target: File, minBytes: Long, onProgress: (Int) -> Unit) {
         val part = File(target.parentFile, "${target.name}.part")
         val conn = URL(src.url).openConnection() as HttpURLConnection
         conn.instanceFollowRedirects = true
@@ -188,6 +202,10 @@ object ProModels {
         } finally {
             conn.disconnect()
         }
+        if (part.length() < minBytes) {
+            part.delete()
+            throw IOException("받다가 끊겼어요 (${part.length()}바이트)")
+        }
         if (!part.renameTo(target)) throw IOException("모델 파일을 저장하지 못했어요")
     }
 }
@@ -198,7 +216,7 @@ object ProPipeline {
     private const val RATE = Stt.SAMPLE_RATE
     private const val MAX_CHUNK = 28f // Whisper 는 30초까지 한 번에
     private const val MIN_CHUNK = 16f
-    private const val WHOLE_LIMIT_SEC = 75 * 60 // 이보다 길면 30분씩 나눠 말한 사람을 구분
+    private const val WHOLE_LIMIT_SEC = 40 * 60 // 이보다 길면 20분씩 나눠 말한 사람을 구분 (메모리)
 
     // 조용한 곳에서 Whisper 가 지어내는 흔한 문장
     private val HALLUCINATIONS = Regex("^\\s*(시청해\\s?주셔서 감사합니다|구독과 좋아요|MBC 뉴스|감사합니다)[.!\\s]*$")
@@ -209,8 +227,8 @@ object ProPipeline {
      */
     fun run(ctx: Context, audio: File, work: File, diarize: Boolean, speakers: Int, cancelled: () -> Boolean, onStage: (String, Int) -> Unit): JSONObject {
         if (!ProEngine.AVAILABLE) throw IllegalStateException("이 빌드에는 정확한 받아쓰기가 들어 있지 않아요")
-        if (!ProModels.ready(ctx, ProModels.WHISPER)) throw IllegalStateException("정확한 받아쓰기 모델을 먼저 받아 주세요")
-        if (diarize && !ProModels.ready(ctx, ProModels.DIARIZE)) throw IllegalStateException("말한 사람 구분 모델을 먼저 받아 주세요")
+        if (!ProModels.ready(ctx, ProModels.WHISPER) || !ProModels.verify(ctx, ProModels.WHISPER)) throw IllegalStateException("정확한 받아쓰기 모델이 없거나 손상됐어요. 다시 받아 주세요")
+        if (diarize && (!ProModels.ready(ctx, ProModels.DIARIZE) || !ProModels.verify(ctx, ProModels.DIARIZE))) throw IllegalStateException("말한 사람 구분 모델이 없거나 손상됐어요. 다시 받아 주세요")
         // 1) 16kHz 모노 PCM 파일로 풀기 (긴 회의도 메모리에 다 올리지 않게)
         val pcm = File(work, "audio.pcm")
         pcm.outputStream().buffered(1 shl 20).use { out ->
@@ -220,11 +238,13 @@ object ProPipeline {
         if (total < RATE / 2) throw IllegalArgumentException("소리가 너무 짧아요")
         RandomAccessFile(pcm, "r").use { raf ->
             // 2) 말한 사람 구간
+            if (diarize) onStage("load", 0)
             val segs: List<Seg> = if (diarize) diarizeAll(ctx, raf, total, speakers, cancelled) { onStage("diarize", it) } else listOf(Seg(0f, total.toFloat() / RATE, -1))
             if (cancelled()) throw InterruptedException()
             // 3) 받아쓸 조각 (28초 이하, 조용한 곳에서 자름)
             val chunks = chunk(raf, total, segs)
             // 4) Whisper
+            onStage("load", 0)
             val rec = ProEngine.whisper(
                 ProModels.file(ctx, ProModels.WHISPER, "small-encoder.int8.onnx").absolutePath,
                 ProModels.file(ctx, ProModels.WHISPER, "small-decoder.int8.onnx").absolutePath,
@@ -280,10 +300,10 @@ object ProPipeline {
             return out
         }
         val list = try {
-            window(if (total > WHOLE_LIMIT_SEC.toLong() * RATE) 30 * 60 else WHOLE_LIMIT_SEC)
+            window(if (total > WHOLE_LIMIT_SEC.toLong() * RATE) 20 * 60 else WHOLE_LIMIT_SEC)
         } catch (e: OutOfMemoryError) {
             System.gc()
-            window(15 * 60)
+            window(10 * 60)
         }
         onProgress(100)
         return list.sortedBy { it.start }
@@ -300,7 +320,11 @@ object ProPipeline {
             } else merged.add(s)
         }
         val out = ArrayList<Seg>()
-        for (s in merged) {
+        val endSec = total.toFloat() / RATE
+        for (raw in merged) {
+            // 말한 사람 구간이 소리 끝을 살짝 넘을 수 있다
+            val s = Seg(raw.start.coerceIn(0f, endSec), raw.end.coerceIn(0f, endSec), raw.speaker)
+            if (s.end - s.start < 0.3f) continue
             var start = s.start
             while (s.end - start > MAX_CHUNK) {
                 val cut = quietest(raf, total, start + MIN_CHUNK, start + MAX_CHUNK)
@@ -333,14 +357,24 @@ object ProPipeline {
         return (a + best + frame / 2).toFloat() / RATE
     }
 
-    /** PCM 파일에서 [from, to) 표본을 -1~1 로 */
+    /** PCM 파일에서 [from, to) 표본을 -1~1 로 (파일 끝을 넘지 않게, 1MB 씩 읽어 메모리를 두 배로 쓰지 않게) */
     fun read(raf: RandomAccessFile, from: Long, to: Long): FloatArray {
-        val n = (to - from).coerceAtLeast(0).toInt()
-        val bytes = ByteArray(n * 2)
-        raf.seek(from * 2)
-        raf.readFully(bytes, 0, bytes.size)
-        val shorts = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-        return FloatArray(n) { shorts.get(it) / 32768f }
+        val total = raf.length() / 2
+        val a = from.coerceIn(0, total)
+        val b = to.coerceIn(a, total)
+        val n = (b - a).toInt()
+        val out = FloatArray(n)
+        raf.seek(a * 2)
+        val buf = ByteArray(1 shl 20)
+        var i = 0
+        while (i < n) {
+            val want = minOf(buf.size, (n - i) * 2)
+            raf.readFully(buf, 0, want)
+            val shorts = ByteBuffer.wrap(buf, 0, want).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+            for (k in 0 until want / 2) out[i + k] = shorts.get(k) / 32768f
+            i += want / 2
+        }
+        return out
     }
 
     private fun rms(s: FloatArray): Float {
@@ -351,101 +385,210 @@ object ProPipeline {
     }
 }
 
-// ---------- 백그라운드에서 끝까지 (포그라운드 서비스) ----------
+// ---------- 백그라운드에서 끝까지 (포그라운드 서비스, 따로 된 프로세스 ":pro") ----------
+// 받아쓰기 엔진(C++)이 메모리 부족 등으로 멈춰도 앱은 꺼지지 않도록 다른 프로세스에서 돌린다.
+// 두 프로세스는 파일(files/jobs/)과 방송(PRO_EVENT)으로 주고받는다:
+//   current.json = 지금 하는 일(단계·진행·심장 박동 시각), done.json = 끝난 결과(JobStore)
+// 일하던 프로세스가 갑자기 죽으면(심장 박동이 끊기면) 앱 쪽이 알아채고, 안드로이드가 남긴 종료 이유를 결과에 적는다.
 
 class ProService : Service() {
     companion object {
         const val CHANNEL = "transcribe"
         private const val NOTIFY_ID = 7401
+        private const val ACTION_RUN = "com.memoking.app.PRO_RUN"
         private const val ACTION_CANCEL = "com.memoking.app.PRO_CANCEL"
-
-        @Volatile
-        var current: Job? = null
-            private set
-
-        @Volatile
-        var listener: ((JSONObject) -> Unit)? = null
-
-        /** 일 시작 → 일 id. 소리 파일은 일 폴더로 복사해 둔 것 */
-        fun start(ctx: Context, memoId: String, rel: String, audio: File, diarize: Boolean, speakers: Int): String {
-            if (current != null) throw IllegalStateException("다른 받아쓰기를 하고 있어요. 끝난 뒤 다시 해 주세요")
-            val job = Job(ctx.applicationContext, memoId, rel, audio, diarize, speakers)
-            current = job
-            ctx.startForegroundService(Intent(ctx, ProService::class.java))
-            return job.id
-        }
-
-        fun cancel() {
-            current?.cancelled = true
-        }
+        const val ACTION_EVENT = "com.memoking.app.PRO_EVENT"
+        private const val STALE_MS = 25_000L // 이만큼 심장 박동이 없으면 멈춘 것으로
 
         fun jobsDir(ctx: Context) = File(ctx.filesDir, "jobs").apply { mkdirs() }
+        private fun currentFile(ctx: Context) = File(jobsDir(ctx), "current.json")
+
+        /** 지금 하는 일 (없거나 멈췄으면 null). 멈춘 일은 실패 결과로 정리한다 — 앱 프로세스에서 부른다 */
+        @Synchronized
+        fun current(ctx: Context): JSONObject? {
+            val f = currentFile(ctx)
+            val cur = try {
+                if (f.isFile) JSONObject(f.readText()) else null
+            } catch (e: Exception) {
+                null
+            } ?: return null
+            val beat = cur.optLong("heartbeat")
+            if (System.currentTimeMillis() - beat < STALE_MS) return cur
+            // 일하던 프로세스가 죽었다
+            f.delete()
+            File(jobsDir(ctx), cur.optString("id")).deleteRecursively()
+            File(cur.optString("audio")).delete()
+            val stage = when (cur.optString("stage")) {
+                "decode" -> "소리 파일 읽는 중"
+                "load" -> "모델 불러오는 중"
+                "diarize" -> "말한 사람 나누는 중"
+                else -> "받아쓰는 중"
+            }
+            JobStore.add(
+                ctx,
+                JSONObject().put("ok", false).put("id", cur.optString("id")).put("memoId", cur.optString("memoId")).put("rel", cur.optString("rel"))
+                    .put("message", "받아쓰기 엔진이 멈췄어요 ($stage ${cur.optInt("progress")}%). ${exitReason(ctx, cur.optLong("startedAt"))}"),
+            )
+            return null
+        }
+
+        /** 안드로이드가 남긴 ":pro" 프로세스 종료 이유 (안드로이드 11+) */
+        private fun exitReason(ctx: Context, since: Long): String {
+            if (Build.VERSION.SDK_INT < 30) return ""
+            return try {
+                val am = ctx.getSystemService(android.app.ActivityManager::class.java)!!
+                val info = am.getHistoricalProcessExitReasons(ctx.packageName, 0, 10)
+                    .firstOrNull { it.processName.endsWith(":pro") && it.timestamp >= since - 5_000 } ?: return ""
+                val why = when (info.reason) {
+                    android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "휴대폰 메모리가 모자랐어요. 다른 앱을 닫거나 '말한 사람 구분'을 끄고 해 보세요"
+                    android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "엔진 내부 오류"
+                    android.app.ApplicationExitInfo.REASON_CRASH -> "앱 오류"
+                    android.app.ApplicationExitInfo.REASON_EXIT_SELF -> "엔진이 스스로 멈춤 (모델 파일 문제일 수 있어요 — 모델을 지우고 다시 받아 보세요)"
+                    android.app.ApplicationExitInfo.REASON_SIGNALED -> "시스템이 멈춤"
+                    android.app.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "자원을 너무 많이 씀"
+                    else -> "이유 ${info.reason}"
+                }
+                val detail = info.description?.take(160)?.let { " · $it" } ?: ""
+                "원인: $why$detail"
+            } catch (e: Exception) {
+                ""
+            }
+        }
+
+        /** 일 시작 → 일 id (앱 프로세스에서). 소리 파일은 일 폴더로 복사해 둔 것 */
+        fun start(ctx: Context, memoId: String, rel: String, audio: File, diarize: Boolean, speakers: Int): String {
+            if (current(ctx) != null) throw IllegalStateException("다른 받아쓰기를 하고 있어요. 끝난 뒤 다시 해 주세요")
+            val id = UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+            // 시작 표시를 먼저 적어 둔다 (서비스가 뜨기 전에 다시 눌러도 겹치지 않게)
+            currentFile(ctx).writeText(
+                JSONObject().put("id", id).put("memoId", memoId).put("rel", rel).put("audio", audio.absolutePath)
+                    .put("stage", "decode").put("progress", 0).put("diarize", diarize).put("startedAt", now).put("heartbeat", now).toString(),
+            )
+            val intent = Intent(ctx, ProService::class.java).setAction(ACTION_RUN)
+                .putExtra("id", id).putExtra("memoId", memoId).putExtra("rel", rel).putExtra("audio", audio.absolutePath)
+                .putExtra("diarize", diarize).putExtra("speakers", speakers)
+            try {
+                ctx.startForegroundService(intent)
+            } catch (e: Exception) {
+                currentFile(ctx).delete()
+                throw IllegalStateException("받아쓰기를 시작하지 못했어요: ${e.message}")
+            }
+            return id
+        }
+
+        fun cancel(ctx: Context) {
+            ctx.startService(Intent(ctx, ProService::class.java).setAction(ACTION_CANCEL))
+        }
     }
 
-    class Job(val ctx: Context, val memoId: String, val rel: String, val audio: File, val diarize: Boolean, val speakers: Int) {
-        val id: String = UUID.randomUUID().toString()
-        @Volatile var cancelled = false
-        @Volatile var stage = "decode"
-        @Volatile var progress = 0
-        fun status(): JSONObject = JSONObject().put("id", id).put("memoId", memoId).put("rel", rel).put("stage", stage).put("progress", progress).put("diarize", diarize)
-    }
-
+    @Volatile
+    private var cancelled = false
+    @Volatile
+    private var running = false
     private var wake: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_CANCEL) {
-            cancel()
-            return START_NOT_STICKY
-        }
-        val job = current ?: run {
-            stopSelf()
+            cancelled = true
+            if (!running) stopSelf()
             return START_NOT_STICKY
         }
         ensureChannel()
+        val job = JSONObject()
+            .put("id", intent?.getStringExtra("id") ?: "").put("memoId", intent?.getStringExtra("memoId") ?: "")
+            .put("rel", intent?.getStringExtra("rel") ?: "").put("audio", intent?.getStringExtra("audio") ?: "")
+            .put("diarize", intent?.getBooleanExtra("diarize", true) ?: true).put("speakers", intent?.getIntExtra("speakers", 0) ?: 0)
+            .put("stage", "decode").put("progress", 0).put("startedAt", System.currentTimeMillis())
+        // startForegroundService 다음에는 무슨 일이 있어도 startForeground 를 불러야 한다 (안 그러면 시스템이 앱을 끈다)
         val n = notification(job)
-        when {
-            Build.VERSION.SDK_INT >= 35 -> startForeground(NOTIFY_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
-            Build.VERSION.SDK_INT >= 30 -> startForeground(NOTIFY_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-            else -> startForeground(NOTIFY_ID, n)
+        try {
+            when {
+                Build.VERSION.SDK_INT >= 35 -> startForeground(NOTIFY_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+                Build.VERSION.SDK_INT >= 30 -> startForeground(NOTIFY_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                else -> startForeground(NOTIFY_ID, n)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MemoKing", "받아쓰기 알림을 띄우지 못했어요", e)
+            finishJob(job, JSONObject().put("ok", false).put("message", "받아쓰기를 시작하지 못했어요: ${e.message}"))
+            return START_NOT_STICKY
         }
+        if (running || intent?.action != ACTION_RUN || job.optString("id").isEmpty()) {
+            if (!running) stopSelf()
+            return START_NOT_STICKY
+        }
+        running = true
         wake = getSystemService(PowerManager::class.java)!!.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MemoKing:transcribe").apply { acquire(5 * 60 * 60 * 1000L) }
         Thread({ work(job) }, "memoking-pro").start()
         return START_NOT_STICKY
     }
 
-    private fun work(job: Job) {
-        val dir = File(jobsDir(this), job.id).apply { mkdirs() }
+    private fun writeCurrent(job: JSONObject) {
+        job.put("heartbeat", System.currentTimeMillis()).put("pid", android.os.Process.myPid())
+        try {
+            currentFile(this).writeText(job.toString())
+        } catch (e: Exception) {
+            // 다음 박동에
+        }
+    }
+
+    private fun send(ev: JSONObject) {
+        sendBroadcast(Intent(ACTION_EVENT).setPackage(packageName).putExtra("event", ev.toString()))
+    }
+
+    private fun work(job: JSONObject) {
+        val id = job.getString("id")
+        val dir = File(jobsDir(this), id).apply { mkdirs() }
+        writeCurrent(job)
+        // 심장 박동: 오래 걸리는 한 조각(모델 불러오기 등) 동안에도 살아 있음을 알린다
+        val beat = Thread {
+            try {
+                while (true) {
+                    Thread.sleep(5_000)
+                    writeCurrent(job)
+                }
+            } catch (e: InterruptedException) {
+                // 끝
+            }
+        }.apply { isDaemon = true; start() }
         var lastNotify = 0L
         val result: JSONObject = try {
-            val r = ProPipeline.run(this, job.audio, dir, job.diarize, job.speakers, { job.cancelled }) { stage, p ->
-                job.stage = stage
-                job.progress = p
+            ProPipeline.run(this, File(job.getString("audio")), dir, job.getBoolean("diarize"), job.getInt("speakers"), { cancelled }) { stage, p ->
+                job.put("stage", stage).put("progress", p)
                 val now = System.currentTimeMillis()
                 if (now - lastNotify > 1500) {
                     lastNotify = now
-                    listener?.invoke(JSONObject().put("type", "progress").put("status", job.status()))
+                    writeCurrent(job)
+                    send(JSONObject().put("type", "progress").put("status", job))
                     try {
                         getSystemService(NotificationManager::class.java)!!.notify(NOTIFY_ID, notification(job))
                     } catch (e: SecurityException) {
                         // 알림 권한 없음
                     }
                 }
-            }
-            r.put("ok", true)
+            }.put("ok", true)
         } catch (e: InterruptedException) {
             JSONObject().put("ok", false).put("cancelled", true).put("message", "받아쓰기를 그만뒀어요")
+        } catch (e: OutOfMemoryError) {
+            JSONObject().put("ok", false).put("message", "휴대폰 메모리가 모자랐어요. 다른 앱을 닫거나 '말한 사람 구분'을 끄고 해 보세요")
         } catch (e: Throwable) {
             android.util.Log.e("MemoKing", "다시 받아쓰기 실패", e)
             JSONObject().put("ok", false).put("message", e.message ?: e.javaClass.simpleName)
         }
-        result.put("id", job.id).put("memoId", job.memoId).put("rel", job.rel)
+        beat.interrupt()
         dir.deleteRecursively()
-        job.audio.delete()
+        finishJob(job, result)
+    }
+
+    private fun finishJob(job: JSONObject, result: JSONObject) {
+        result.put("id", job.optString("id")).put("memoId", job.optString("memoId")).put("rel", job.optString("rel"))
+        File(job.optString("audio")).takeIf { it.path.isNotEmpty() }?.delete()
         JobStore.add(this, result)
-        current = null
-        listener?.invoke(JSONObject().put("type", "done").put("result", result))
+        currentFile(this).delete()
+        send(JSONObject().put("type", "done").put("result", result))
+        running = false
         wake?.let { if (it.isHeld) it.release() }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -460,25 +603,28 @@ class ProService : Service() {
         })
     }
 
-    private fun notification(job: Job): Notification {
+    private fun notification(job: JSONObject): Notification {
+        val memoId = job.optString("memoId")
         val open = Intent(this, MainActivity::class.java)
             .setAction(MainActivity.ACTION_OPEN_MEMO)
-            .setData(Uri.parse("memoking://memo/" + Uri.encode(job.memoId) + "?pro=1"))
-            .putExtra("memoId", job.memoId)
+            .setData(Uri.parse("memoking://memo/" + Uri.encode(memoId) + "?pro=1"))
+            .putExtra("memoId", memoId)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val content = PendingIntent.getActivity(this, 7402, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val cancel = PendingIntent.getService(this, 7403, Intent(this, ProService::class.java).setAction(ACTION_CANCEL), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val stageLabel = when (job.stage) {
+        val stageLabel = when (job.optString("stage")) {
             "decode" -> "소리 파일 읽는 중"
+            "load" -> "모델 불러오는 중"
             "diarize" -> "말한 사람 나누는 중"
             else -> "받아쓰는 중"
         }
+        val progress = job.optInt("progress")
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_crown)
             .setColor(0xFF7A4DFF.toInt())
             .setContentTitle("정확하게 다시 받아쓰기 · $stageLabel")
-            .setContentText("${job.progress}% · 화면을 꺼도 계속해요")
-            .setProgress(100, job.progress, false)
+            .setContentText("$progress% · 화면을 꺼도 계속해요")
+            .setProgress(100, progress, job.optString("stage") == "load")
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(content)
@@ -492,27 +638,35 @@ class ProService : Service() {
     }
 }
 
-/** 끝난 받아쓰기 결과 (화면이 메모에 넣으면 지움) */
+/** 끝난 받아쓰기 결과 (화면이 메모에 넣으면 지움) — 두 프로세스가 함께 쓰므로 파일 잠금 */
 object JobStore {
     private fun list(ctx: Context) = File(ProService.jobsDir(ctx), "done.json")
 
-    @Synchronized
-    fun all(ctx: Context): JSONArray = try {
+    private fun <T> locked(ctx: Context, block: () -> T): T {
+        RandomAccessFile(File(ProService.jobsDir(ctx), "done.lock"), "rw").use { raf ->
+            raf.channel.lock().use { return block() }
+        }
+    }
+
+    private fun read(ctx: Context): JSONArray = try {
         JSONArray(list(ctx).takeIf { it.isFile }?.readText() ?: "[]")
     } catch (e: Exception) {
         JSONArray()
     }
 
     @Synchronized
-    fun add(ctx: Context, result: JSONObject) {
-        val arr = all(ctx)
+    fun all(ctx: Context): JSONArray = locked(ctx) { read(ctx) }
+
+    @Synchronized
+    fun add(ctx: Context, result: JSONObject) = locked(ctx) {
+        val arr = read(ctx)
         arr.put(result)
         list(ctx).writeText(arr.toString())
     }
 
     @Synchronized
-    fun ack(ctx: Context, id: String) {
-        val arr = all(ctx)
+    fun ack(ctx: Context, id: String) = locked(ctx) {
+        val arr = read(ctx)
         val keep = JSONArray()
         for (i in 0 until arr.length()) if (arr.getJSONObject(i).optString("id") != id) keep.put(arr.getJSONObject(i))
         list(ctx).writeText(keep.toString())

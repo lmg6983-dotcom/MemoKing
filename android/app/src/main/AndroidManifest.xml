@@ -108,9 +108,10 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
-        <!-- 정확하게 다시 받아쓰기 · 말한 사람 구분 (Pro.kt) -->
+        <!-- 정확하게 다시 받아쓰기 · 말한 사람 구분 (Pro.kt) — 받아쓰기 엔진이 멈춰도 앱이 꺼지지 않게 따로 된 프로세스에서 -->
         <service
             android:name=".ProService"
+            android:process=":pro"
             android:exported="false"
             android:foregroundServiceType="dataSync|mediaProcessing" />
 

@@ -43,7 +43,7 @@ export const hasAudio = (body) => audioSources(body).length > 0;
 
 // ---------- 시트 ----------
 
-const STAGES = { decode: '소리 파일 읽는 중', diarize: '말한 사람 나누는 중', transcribe: '받아쓰는 중' };
+const STAGES = { decode: '소리 파일 읽는 중', load: '모델 불러오는 중', diarize: '말한 사람 나누는 중', transcribe: '받아쓰는 중' };
 
 function renderModels(st, live = {}) {
   const diarize = $('pro-diarize').checked;
@@ -184,7 +184,7 @@ async function deliver(result) {
     if (result.ok) {
       const n = await app.insertTranscript(result);
       toast(n ? `정확하게 다시 받아쓴 글을 녹음 아래에 넣었어요${result.speakers ? ` (말한 사람 ${result.speakers}명)` : ''}` : '받아쓸 말소리를 찾지 못했어요');
-    } else if (!result.cancelled) toast(`다시 받아쓰지 못했어요: ${result.message ?? ''}`, true);
+    } else if (!result.cancelled) toast(`다시 받아쓰지 못했어요 — ${result.message ?? ''}`, true, { label: '확인', run: () => {} }); // 이유를 읽을 수 있게 조금 더 오래
     else toast('받아쓰기를 그만뒀어요');
     pro.ack(result.id);
   } catch (err) {

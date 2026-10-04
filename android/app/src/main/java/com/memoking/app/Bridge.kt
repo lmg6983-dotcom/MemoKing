@@ -277,11 +277,11 @@ class Bridge(private val activity: MainActivity) {
     fun proStatus(): String = reply { ProModels.status(ctx) }
 
     @JavascriptInterface
-    fun proCancel(): String = reply { ProService.cancel() }
+    fun proCancel(): String = reply { ProService.cancel(ctx) }
 
     /** 끝난 받아쓰기 결과 (아직 메모에 넣지 않은 것) */
     @JavascriptInterface
-    fun proTakeDone(): String = reply { if (ProService.current == null) JobStore.all(ctx) else JSONArray() }
+    fun proTakeDone(): String = reply { if (ProService.current(ctx) == null) JobStore.all(ctx) else JSONArray() }
 
     @JavascriptInterface
     fun proAck(id: String): String = reply { JobStore.ack(ctx, id) }

@@ -16,7 +16,7 @@ import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractorConfig
 object ProEngine {
     const val AVAILABLE = true
 
-    private val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+    private val threads = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 4)
 
     /** 말한 사람 구분: 구간(초)과 사람 번호. speakers = 0 이면 사람 수를 저절로 */
     fun diarize(segmentation: String, embedding: String, samples: FloatArray, speakers: Int, onProgress: (Int) -> Unit): List<Seg> {
@@ -50,7 +50,7 @@ object ProEngine {
                 whisper = OfflineWhisperModelConfig(encoder = encoder, decoder = decoder, language = "ko", task = "transcribe"),
                 tokens = tokens,
                 numThreads = threads,
-                modelType = "whisper",
+                // modelType 은 비워 둔다 — sherpa-onnx 가 whisper 설정을 보고 알아서 고른다
             ),
             decodingMethod = "greedy_search",
         )
