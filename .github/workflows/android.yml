@@ -35,6 +35,21 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # 받아쓰기 다시 하기·말한 사람 구분 (sherpa-onnx, Apache-2.0) 안드로이드 라이브러리 받기 + 쓰는 API 확인용 목록
+      - name: sherpa-onnx 받기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/fetch-sherpa-onnx.sh
+          cd app/libs && rm -rf x && mkdir x && cd x && unzip -q ../sherpa-onnx.aar
+          echo "--- AAR"; find . -maxdepth 3 | sort | head -80
+          if [ -f classes.jar ]; then
+            echo "--- 클래스"; unzip -l classes.jar | grep -o 'com/k2fsa/[^ ]*\.class' | sort
+            mkdir c && cd c && unzip -q ../classes.jar && cd ..
+            for f in $(find c/com/k2fsa -name '*.class' | grep -Ev '\$' | grep -E 'Offline|Feature|Speaker|Vad|Silero|Whisper|Diariz|Clustering' | sort); do javap -cp c "$(echo "${f#c/}" | sed 's/\.class$//; s#/#.#g')"; done
+          fi
+          cd .. && rm -rf x
+
       - name: 동기화 엔진 테스트 + APK 빌드 (디버그 서명 — 휴대폰에 바로 설치 가능)
         # 저장소 설정 › Secrets 에 넣어 두면 Google Drive 로그인 설정이 APK 에 들어간다 (android/DRIVE-SETUP.md)
         env:
