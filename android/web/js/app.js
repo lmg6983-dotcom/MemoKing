@@ -584,7 +584,7 @@ function refreshSttRow(progress) {
   const busy = progress != null || st.model === 'downloading';
   $('stt-model-note').textContent = st.model === 'ready'
     ? '받아 둠 · 인터넷 없이 받아써요'
-    : busy ? `받는 중 ${progress ?? st.progress ?? 0}%` : `처음 한 번 받아요 (${st.modelSize ?? '약 82MB'}, Wi-Fi 추천)`;
+    : busy ? `받는 중 ${progress ?? st.progress ?? 0}%` : `처음 한 번 받아요 (${st.modelSize ?? '약 87MB'}, Wi-Fi 추천)`;
   $('stt-model-btn').textContent = st.model === 'ready' ? '지우기' : busy ? '받는 중' : '받기';
   $('stt-model-btn').disabled = busy;
 }
@@ -775,7 +775,7 @@ function askAudioImport(files) {
   $('import-stt').disabled = !canStt;
   $('import-stt-note').textContent = recorder.sttReady()
     ? '소리 내용을 글로 옮겨 메모에 함께 넣어요 (길면 시간이 걸려요)'
-    : `소리 내용을 글로 옮겨요 · 받아쓰기 모델(${recorder.sttStatus().modelSize ?? '약 82MB'})을 먼저 한 번 받아요`;
+    : `소리 내용을 글로 옮겨요 · 받아쓰기 모델(${recorder.sttStatus().modelSize ?? '약 87MB'})을 먼저 한 번 받아요`;
   $('import-sheet-title').textContent = files.length > 1 ? `음성 파일 ${files.length}개로 메모 만들기` : '음성 파일로 메모 만들기';
   return new Promise((resolve) => {
     let done = false;

@@ -30,7 +30,7 @@ import java.util.zip.ZipInputStream
 /**
  * 받아쓰기(STT) — 녹음하는 소리(16kHz 모노 PCM)를 그대로 받아 글로 옮긴다.
  *
- *  - "vosk"   : 오픈소스 Vosk (alphacep/vosk-api, Apache-2.0) + 한국어 모델(vosk-model-small-ko, 약 82MB, 처음 한 번 받음).
+ *  - "vosk"   : 오픈소스 Vosk (alphacep/vosk-api, Apache-2.0) + 한국어 모델(vosk-model-small-ko, 약 87MB, 처음 한 번 받음).
  *               인터넷 없이 휴대폰 안에서만 돌아서 회의 내용이 밖으로 나가지 않는다. 모든 안드로이드 버전.
  *  - "system" : 휴대폰의 음성 인식(보통 Google). 더 정확하지만 안드로이드 13 이상, 녹음한 소리를 직접 넘기는 방식.
  */
@@ -106,7 +106,7 @@ class VoskTranscriber(model: Model, private val listener: SttListener) : Transcr
 object VoskModels {
     const val NAME = "vosk-model-small-ko-0.22"
     const val URL_ZIP = "https://alphacephei.com/vosk/models/$NAME.zip"
-    const val SIZE_LABEL = "약 82MB"
+    const val SIZE_LABEL = "약 87MB"
 
     /** 받는 중이면 0~100, 아니면 -1 */
     @Volatile

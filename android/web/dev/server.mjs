@@ -208,7 +208,7 @@ const sync = {
   proStatus: () => ({
     available: true,
     busy: null,
-    whisper: { state: fakePro.whisper, progress: -1, label: '정확한 받아쓰기 (Whisper small)', size: '약 360MB' },
+    whisper: { state: fakePro.whisper, progress: -1, label: '정확한 받아쓰기 (Whisper small)', size: '약 375MB' },
     diarize: { state: fakePro.diarize, progress: -1, label: '말한 사람 구분 (pyannote + 3D-Speaker)', size: '약 45MB' },
   }),
   proCancel: () => null,

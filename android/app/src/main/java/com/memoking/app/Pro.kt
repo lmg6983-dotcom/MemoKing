@@ -56,7 +56,7 @@ object ProModels {
 
     private val whisperTar = "$GH/asr-models/sherpa-onnx-whisper-small.tar.bz2"
     val WHISPER = Model(
-        "whisper", "정확한 받아쓰기 (Whisper small)", "약 360MB",
+        "whisper", "정확한 받아쓰기 (Whisper small)", "약 375MB",
         listOf("small-encoder.int8.onnx", "small-decoder.int8.onnx", "small-tokens.txt").map { f ->
             ModelFile(f, listOf(Source("$HF/sherpa-onnx-whisper-small/resolve/main/$f"), Source(whisperTar, "sherpa-onnx-whisper-small/$f")))
         },

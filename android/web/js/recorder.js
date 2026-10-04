@@ -60,7 +60,7 @@ export function sttStatus() {
 export const sttReady = () => (sttEngine() === 'system' ? Boolean(sttStatus().system) : sttStatus().model === 'ready');
 
 let downloading = null;
-/** Vosk 한국어 모델 받기 (약 82MB, 한 번만) — 진행은 on('sttModel') */
+/** Vosk 한국어 모델 받기 (약 87MB, 한 번만) — 진행은 on('sttModel') */
 export function downloadModel() {
   downloading ??= call('sttModel', {})
     .then((st) => {
@@ -192,7 +192,7 @@ export async function start(memoId) {
     if (sttOn() && !res?.stt) {
       // 모델이 없으면 녹음은 그대로 하면서 받아 두고, 끝내면 녹음 파일로 받아쓴다
       if (sttEngine() === 'vosk' && sttStatus().model !== 'ready') {
-        toast(`받아쓰기 모델(${sttStatus().modelSize ?? '약 82MB'})이 필요해요. 녹음은 계속돼요`, false, { label: '지금 받기', run: () => downloadModel().catch(() => {}) });
+        toast(`받아쓰기 모델(${sttStatus().modelSize ?? '약 87MB'})이 필요해요. 녹음은 계속돼요`, false, { label: '지금 받기', run: () => downloadModel().catch(() => {}) });
       } else toast(res?.reason || '받아쓰기를 할 수 없어 녹음만 해요');
     }
     document.activeElement?.blur();
