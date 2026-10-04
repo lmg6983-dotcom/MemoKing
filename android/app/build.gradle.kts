@@ -42,8 +42,8 @@ android {
         applicationId = "com.memoking.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.7.0"
+        versionCode = 12
+        versionName = "0.7.1"
 
         // 받아쓰기(Vosk) 네이티브 라이브러리: 실제 휴대폰용만 (APK 크기)
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
