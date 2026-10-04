@@ -24,7 +24,7 @@ import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells } from './table-extras.js';
 import { createListDrag } from './list-drag.js';
-import { createBlockMove } from './block-move.js';
+import { createBlockMove, createContentLines } from './block-move.js';
 import { createVoiceCards, isVoiceCard } from './voice-card-view.js';
 import { createTidy } from './tidy.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
@@ -1081,6 +1081,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   const listDrag = $prose(() => createListDrag({ readOnly }));
   const blockMove = $prose(() => createBlockMove({ readOnly }));
   const voiceCards = $prose(() => createVoiceCards());
+  const contentLines = $prose(() => createContentLines());
   const tidy = $prose(() => createTidy({ readOnly }));
   const taskToggle = $prose(() => new Plugin({
     key: new PluginKey('memoking-task-toggle'),
@@ -1211,6 +1212,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(listDrag)
     .use(blockMove)
     .use(voiceCards)
+    .use(contentLines)
     .use(tidy)
     .use(tagHighlight)
     .use(stateWatcher)

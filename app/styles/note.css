@@ -1286,3 +1286,12 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 @media (prefers-reduced-motion: reduce) {
   .mk-voice-chev, .mk-voice.mk-voice-anim .mk-voice-body > :not(:first-child) { transition: none; animation: none; }
 }
+
+/* 그림만 든 줄: 칸이 그림만 감싸게 (줄 높이·보이지 않는 줄바꿈 여백 없애기) — block-move.js 의 mk-image-line */
+.mk-doc p.mk-image-line { width: fit-content; max-width: 100%; margin: 6px 0; line-height: 0; font-size: 0; }
+.mk-doc p.mk-image-line > br, .mk-doc p.mk-image-line > img.ProseMirror-separator { display: none; }
+.mk-doc p.mk-image-line .mk-image { margin: 0; vertical-align: top; }
+.mk-doc p.mk-image-line .mk-media { margin: 0; line-height: normal; font-size: 13px; }
+.mk-doc p.mk-image-line > .mk-image + .mk-image, .mk-doc p.mk-image-line > .mk-media + .mk-media { margin-top: 6px; }
+.mk-doc .mk-voice-body > p.mk-image-line { margin: 0; }
+.mk-doc p.mk-image-line:has(.mk-media) { width: auto; }

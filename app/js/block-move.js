@@ -585,3 +585,25 @@ function scrollerOf(node) {
   }
   return document.scrollingElement;
 }
+
+// 그림만 든 줄: 줄 높이·보이지 않는 줄바꿈이 만든 여백을 없애 칸(누를 때 테두리)이 그림만 감싸게
+const imageOnly = (node) => isContentParagraph(node) && node.content.content.every((c) => c.type.name === 'image' || INLINE_CONTENT.has(c.type.name));
+export function createContentLines() {
+  let cache = { doc: null, set: DecorationSet.empty };
+  return new Plugin({
+    key: new PluginKey('memoking-content-lines'),
+    props: {
+      decorations(state) {
+        if (cache.doc === state.doc) return cache.set;
+        const decos = [];
+        state.doc.descendants((node, pos) => {
+          if (node.type.name !== 'paragraph') return true;
+          if (imageOnly(node)) decos.push(Decoration.node(pos, pos + node.nodeSize, { class: 'mk-image-line' }));
+          return false;
+        });
+        cache = { doc: state.doc, set: DecorationSet.create(state.doc, decos) };
+        return cache.set;
+      },
+    },
+  });
+}

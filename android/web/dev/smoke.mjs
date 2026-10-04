@@ -574,6 +574,26 @@ try {
   await back();
   await page.waitForTimeout(300);
 
+  // 그림과 그림 사이: 칸이 그림만 감싼다 (보이지 않는 줄바꿈 여백 없음)
+  fs.copyFileSync(path.join(repo, 'assets/icons/icon-256.png'), path.join(vault, 'attachments/two-a.png'));
+  fs.copyFileSync(path.join(repo, 'assets/icons/icon-256.png'), path.join(vault, 'attachments/two-b.png'));
+  write('그림 둘.md', '---\nid: 00000000-0000-4000-8000-0000000000cc\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 그림 둘\n\n![a](attachments/two-a.png)\n\n![b](attachments/two-b.png)\n\n끝\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000cc"]');
+  await page.waitForSelector('#note-screen:not([hidden]) img.mk-image');
+  await page.waitForTimeout(500);
+  const fit = await page.evaluate(() => [...document.querySelectorAll('.mk-doc p.mk-image-line')].map((p) => Math.round(p.getBoundingClientRect().height - p.querySelector('img.mk-image').getBoundingClientRect().height)));
+  check('그림 줄: 칸이 그림만 감쌈 (여백 없음)', fit.length === 2 && fit.every((d) => Math.abs(d) <= 1), JSON.stringify(fit));
+  const ib = await page.locator('img.mk-image').first().boundingBox();
+  await touch('touchStart', ib.x + 40, ib.y + 40);
+  await page.waitForTimeout(250);
+  await shot('18-image-press');
+  await touch('touchEnd', 0, 0);
+  await page.waitForTimeout(300);
+  await back();
+  await page.waitForTimeout(300);
+
   // 조용한 다듬기: 쓰던 줄을 떠나면 겹친 띄어쓰기·부호 앞 띄어쓰기, 갈라진 같은 목록은 하나로
   write('다듬기.md', '---\nid: 00000000-0000-4000-8000-0000000000bb\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 다듬기\n\n- 사과\n- 배\n\n* 감\n* 귤\n\n둘째 문단\n');
   await page.evaluate(() => window.__mk.emit('app', 'resume'));
