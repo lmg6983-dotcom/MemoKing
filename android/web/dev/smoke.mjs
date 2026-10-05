@@ -978,6 +978,51 @@ try {
     await page.waitForTimeout(300);
   }
 
+  // 목록 항목: 꾹 눌렀다 놓으면 × (2.5초), 더 오래 누르면 목록 전체를 옮긴다
+  {
+    const id = '00000000-0000-4000-8000-0000000000af';
+    write('목록 지우기.md', `---\nid: ${id}\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: yellow\n---\n# 목록 지우기\n\n위 문단\n\n- 사과\n- 배\n- 감\n\n아래 문단\n\n끝 문단\n`);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForTimeout(400);
+    await page.tap(`.card[data-id="${id}"]`);
+    await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror li');
+    await page.waitForTimeout(800);
+    const { parseMemoFile } = await import('../../../app/js/core/memo-file.js');
+    const body = () => parseMemoFile(read('목록 지우기.md')).body;
+    const liBox = (t) => page.locator('.mk-doc li', { hasText: t }).first().boundingBox();
+    let b = await liBox('배');
+    await touch('touchStart', b.x + 30, b.y + b.height / 2);
+    await page.waitForTimeout(500);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(300);
+    const shown = (await page.locator('.mk-delete-btn').count()) === 1 && (await page.locator('.mk-doc li.mk-del-target').count()) === 1;
+    await page.waitForTimeout(2000);
+    const still = (await page.locator('.mk-delete-btn:not(.fading)').count()) === 1;
+    await page.waitForTimeout(700);
+    check('목록 항목: 꾹 눌렀다 놓으면 × (2.5초 뒤 사라짐)', shown && still && (await page.locator('.mk-delete-btn').count()) === 0);
+    b = await liBox('배');
+    await touch('touchStart', b.x + 30, b.y + b.height / 2);
+    await page.waitForTimeout(500);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(300);
+    const x = await page.locator('.mk-delete-btn').boundingBox();
+    await touch('touchStart', x.x + 15, x.y + 15);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(1500);
+    check('목록 항목: × 를 누르면 그 항목만 지움', /- 사과\n- 감\n/.test(body()) && !body().includes('배'), body());
+    b = await liBox('사과');
+    await touch('touchStart', b.x + 30, b.y + b.height / 2);
+    await page.waitForTimeout(1300);
+    const whole = await page.evaluate(() => document.body.classList.contains('mk-block-dragging') && document.querySelector('.mk-block-lift')?.tagName === 'UL');
+    for (let i = 1; i <= 10; i++) { await touch('touchMove', b.x + 30, b.y + b.height / 2 + i * 30); await page.waitForTimeout(40); }
+    await page.waitForTimeout(150);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(1500);
+    check('목록: 항목을 더 오래 누르면 목록 전체를 들어 올려 옮김', whole && /끝 문단\n\n- 사과\n- 감/.test(body()), body());
+    await back();
+    await page.waitForTimeout(300);
+  }
+
   // 넓은 화면(펼친 폴더블·태블릿): 목록과 메모를 나란히
   await page.setViewportSize({ width: 884, height: 1000 });
   await page.waitForTimeout(300);

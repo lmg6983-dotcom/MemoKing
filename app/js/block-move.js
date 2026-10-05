@@ -18,6 +18,7 @@ import { HOLD_MS, TOUCH_HOLD_MS } from './list-drag.js';
 import { isVoiceCard } from './voice-card-view.js';
 import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
+import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
 
@@ -289,6 +290,23 @@ class Mover {
       this.press(e, 'touch');
     };
     view.dom.addEventListener('touchstart', this.onScrubTouch, { capture: true, passive: true });
+    // 목록 항목을 더 오래 누르면 list-drag.js 가 목록 전체(맨 바깥 줄)를 여기에 넘긴다
+    this.onLiftRequest = (e) => {
+      const { pos, x, y, kind } = e.detail ?? {};
+      e.detail.ok = this.liftAt(pos, x, y, kind);
+    };
+    view.dom.addEventListener('mk-lift-block', this.onLiftRequest);
+  }
+
+  /** 그 자리의 맨 바깥 줄을 바로 들어 올린다 (누르고 있는 손가락·마우스 그대로 이어서 끈다) */
+  liftAt(pos, x, y, kind) {
+    if (this.drag || pos == null) return false;
+    const block = topBlockAt(this.view.state.doc, pos, null);
+    if (!block || block.count < 2) return false;
+    this.cancelPress();
+    this.hideDelete(true);
+    this.lift({ block, kind, text: true, x, y, x2: x, y2: y });
+    return Boolean(this.drag);
   }
 
   busy() {
@@ -576,60 +594,18 @@ class Mover {
     }
   }
 
-  // ---------- 지우기 단추: 꾹 눌렀다 놓은 내용의 오른쪽 위 (2초 뒤·다른 것을 고르면 사라짐) ----------
+  // ---------- 지우기 단추: 꾹 눌렀다 놓은 내용의 오른쪽 위 (delete-button.js) ----------
 
   showDelete(block) {
-    this.hideDelete(true);
     const { view } = this;
     const dom = view.nodeDOM(block.pos);
     if (!(dom instanceof Element)) return;
-    const target = dom.querySelector('img.mk-image, .mk-media, .mk-link-card') && isContentParagraph(block.node) ? dom.querySelector('img.mk-image, .mk-media, .mk-link-card') : dom;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'mk-delete-btn';
-    btn.setAttribute('aria-label', '이 내용 지우기');
-    btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-    document.body.append(btn);
-    const place = () => {
-      const r = target.getBoundingClientRect();
-      btn.style.left = `${Math.round(Math.min(window.innerWidth - 40, r.right - 30))}px`;
-      btn.style.top = `${Math.round(Math.max(4, r.top - 10))}px`;
-    };
-    place();
-    target.classList.add('mk-delete-target');
-    const del = { btn, pos: block.pos, node: block.node, state: view.state, place, target };
-    this.del = del;
-    const remove = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const node = view.state.doc.nodeAt(del.pos);
-      if (!node || node !== del.node) return this.hideDelete();
-      navigator.vibrate?.(15);
-      target.classList.add('mk-deleting');
-      btn.remove();
-      setTimeout(() => {
-        if (view.isDestroyed) return;
-        const now = view.state.doc.nodeAt(del.pos);
-        if (now === del.node) view.dispatch(view.state.tr.delete(del.pos, del.pos + now.nodeSize).scrollIntoView());
-        this.hideDelete(true);
-      }, 180);
-    };
-    btn.addEventListener('mousedown', remove);
-    btn.addEventListener('touchstart', remove, { passive: false });
-    window.addEventListener('scroll', place, true);
-    del.timer = setTimeout(() => this.hideDelete(), 2000);
+    const media = isContentParagraph(block.node) ? dom.querySelector('img.mk-image, .mk-media, .mk-link-card') : null;
+    showDeleteButton(view, { pos: block.pos, node: block.node, target: media ?? dom });
   }
 
   hideDelete(now = false) {
-    const del = this.del;
-    if (!del) return;
-    this.del = null;
-    clearTimeout(del.timer);
-    window.removeEventListener('scroll', del.place, true);
-    del.target.classList.remove('mk-delete-target');
-    if (now) return del.btn.remove();
-    del.btn.classList.add('fading');
-    setTimeout(() => del.btn.remove(), 260);
+    hideDeleteButton(now);
   }
 
   // 옮긴 줄이 잠깐 반짝여 어디로 갔는지 보여 준다
@@ -663,7 +639,7 @@ class Mover {
 
   update(view, prev) {
     this.view = view;
-    if (this.del && (view.state.doc !== this.del.state.doc || !view.state.selection.eq(this.del.state.selection))) this.hideDelete();
+    hideDeleteIfChanged(view);
     if (this.drag || this.pressing) return;
     const block = view.editable ? contentBlockAt(view.state) : null;
     const key = block ? `${block.pos}` : null;
@@ -709,6 +685,7 @@ class Mover {
 
   destroy() {
     this.view.dom.removeEventListener('touchstart', this.onScrubTouch, true);
+    this.view.dom.removeEventListener('mk-lift-block', this.onLiftRequest);
     this.cancelPress();
     if (this.drag) this.finish(false);
     clearTimeout(this.flashTimer);

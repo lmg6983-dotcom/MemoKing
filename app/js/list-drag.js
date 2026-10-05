@@ -15,6 +15,7 @@ import { previewOrder, dropAt } from './core/list-order.js';
 import { holdKeyboard, edgeScroll } from './keyboard-guard.js';
 import { HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
+import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
 
 export const listDragKey = new PluginKey('memoking-list-drag');
 
@@ -34,6 +35,9 @@ const LISTEN = { capture: true, passive: false }; // 터치로 끄는 동안 화
 const isItem = (node) => node?.type.name === 'list_item';
 
 export const SWIPE_DISTANCE = 48; // 이만큼 옆으로 밀면 하위·상위로
+// 들어 올린 항목을 움직이지 않고 더 누르고 있으면 목록 전체를 옮긴다 (GATHER_MS 부터 목록 테두리가 차오름)
+export const WHOLE_LIST_MS = 650;
+const GATHER_MS = 200;
 const SWIPE_START = 12; // 이만큼 옆으로 먼저 움직이면 (세로보다 확실히) 밀기로 본다
 
 // 항목(pos) 을 한 단계 들여쓰기(dir>0, 바로 위 항목의 하위로) · 내어쓰기(dir<0). 맨 바깥 항목은 목록 밖으로 빼지 않는다.
@@ -224,10 +228,47 @@ export function createListDrag({ readOnly = false } = {}) {
     }
   }
 
-  function finish(view, commit) {
+  // 목록 항목 지우기 단추 — 항목 하나뿐인 목록이면 목록째로
+  function showItemDelete(view, pos) {
+    const node = view.state.doc.nodeAt(pos);
+    const li = view.nodeDOM(pos);
+    if (!node || !isItem(node) || !(li instanceof Element)) return;
+    const mark = (on) => {
+      if (on) return decorate(view, [{ pos, cls: 'mk-del-target' }]);
+      // 사라질 때는 편집기 갱신 중일 수 있어 한 박자 뒤에
+      setTimeout(() => {
+        if (!drag && !press && !view.isDestroyed && listDragKey.getState(view.state)?.find().length) decorate(view, []);
+      }, 0);
+    };
+    showDeleteButton(view, {
+      pos, node, target: li, label: '이 항목 지우기', mark,
+      remove: (v, at, item) => {
+        const $at = v.state.doc.resolve(at);
+        const list = $at.parent;
+        const tr = list.childCount === 1 ? v.state.tr.delete($at.before(), $at.after()) : v.state.tr.delete(at, at + item.nodeSize);
+        v.dispatch(tr.scrollIntoView());
+      },
+    });
+  }
+
+  // 들어 올린 항목 대신 목록 전체(맨 바깥 줄)를 들어 올린다 — 손가락은 그대로, 옮기기는 block-move.js 가
+  function liftWholeList(view) {
+    const d = drag;
+    if (!d || d.moved || d.wholePos == null) return;
+    const { x, y, kind, wholePos } = d;
+    finish(view, false, { quiet: true });
+    const detail = { pos: wholePos + 1, x, y, kind, ok: false };
+    view.dom.dispatchEvent(new CustomEvent('mk-lift-block', { detail }));
+    if (!detail.ok && !view.isDestroyed) decorate(view, []);
+  }
+
+  function finish(view, commit, { quiet = false } = {}) {
     if (!drag) return;
     const d = drag;
     cancelAnimationFrame(d.raf);
+    clearTimeout(d.gatherTimer);
+    clearTimeout(d.wholeTimer);
+    const stillAt = Math.hypot(d.x - d.startX, d.y + (d.scroller?.scrollTop ?? 0) - d.startY) < 14;
     clearPreview(view);
     drag = null;
     const io = INPUT[d.kind];
@@ -240,6 +281,7 @@ export function createListDrag({ readOnly = false } = {}) {
     clearInterval(d.timer);
     d.frames.destroy();
     document.body.classList.remove('mk-list-dragging');
+    if (quiet) return; // 목록 전체 옮기기로 넘김 (block-move.js 가 이어서)
     const { state } = view;
     if (commit && !d.drop && d.shift) {
       if (shiftItem(view, d.srcPos, d.shift)) flashMoved(view);
@@ -250,6 +292,8 @@ export function createListDrag({ readOnly = false } = {}) {
       // 끄는 동안 늘어난 글자 선택은 버리고 커서를 그 항목에
       view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(Math.min(d.srcPos + 2, state.doc.content.size)))));
       view.focus();
+      // (터치) 꾹 눌러 들어 올렸다가 그 자리에 놓으면: 사진·소리처럼 오른쪽 위에 지우기 단추
+      if (commit && !d.shift && stillAt && d.kind === 'touch') showItemDelete(view, d.srcPos);
       return;
     }
     let tr = null;
@@ -280,6 +324,7 @@ export function createListDrag({ readOnly = false } = {}) {
     const st = scrollTop();
     const order = previewOrder(positions.length, s, drop);
     const specs = [{ pos: listPos, cls: 'mk-sorting' }];
+    if (drag.gathering) specs.push({ pos: drag.wholePos, cls: 'mk-list-gather' }); // 곧 목록 전체를 들어 올림
     let follow = drag.y + st - drag.startY; // 끄는 항목이 커서를 따라간 거리
     if (!free) follow = Math.min(drag.bottom - heights[s] + 6, Math.max(tops[0] - 6, tops[s] + follow)) - tops[s];
     let y = tops[0];
@@ -416,6 +461,19 @@ export function createListDrag({ readOnly = false } = {}) {
       fx: items.map((it, i) => xExtent(it, rects[i])), lastKey: '', lastCy: null, lastDrop: null, buzzKey: '',
       drop: null, shift: 0, x, y, startX: x, startY: y + st, timer: 0, raf: 0, kind,
     };
+    // 더 누르고 있으면 목록 전체: 맨 바깥 줄이 목록이고 옮길 다른 줄이 있을 때만
+    const top = view.state.doc.resolve(srcPos);
+    const wholePos = top.depth >= 1 ? top.before(1) : null;
+    const whole = wholePos != null ? view.state.doc.nodeAt(wholePos) : null;
+    if (whole && /list/.test(whole.type.name) && view.state.doc.childCount >= 2) {
+      drag.wholePos = wholePos;
+      drag.gatherTimer = setTimeout(() => {
+        if (!drag || drag.moved) return;
+        drag.gathering = true;
+        previewSame(view, null);
+      }, GATHER_MS);
+      drag.wholeTimer = setTimeout(() => liftWholeList(view), WHOLE_LIST_MS);
+    }
     if (kind === 'touch') navigator.vibrate?.(15); // 들어 올렸다는 느낌
     document.body.classList.add('mk-list-dragging');
     previewSame(view, null); // 들어 올린 모습
@@ -427,6 +485,13 @@ export function createListDrag({ readOnly = false } = {}) {
       const p = pointOf(e);
       drag.x = p.clientX;
       drag.y = p.clientY;
+      // 움직이기 시작하면 이 항목만 옮긴다 (목록 전체로 넘어가지 않음)
+      if (!drag.moved && Math.hypot(drag.x - drag.startX, drag.y + scrollTop() - drag.startY) > INPUT[drag.kind].tolerance) {
+        drag.moved = true;
+        clearTimeout(drag.gatherTimer);
+        clearTimeout(drag.wholeTimer);
+        drag.gathering = false;
+      }
       schedulePlace(view);
     };
     drag.up = (e) => {
@@ -546,6 +611,7 @@ export function createListDrag({ readOnly = false } = {}) {
     if (pt.clientX < li.getBoundingClientRect().left) return;
     if (target.closest('a, img, video, audio, button, input, .mk-link-card, .mk-file')) return;
     cancelPress();
+    hideDeleteButton(true);
     const io = INPUT[kind];
     press = { li, view, kind, x: pt.clientX, y: pt.clientY };
     // 잠깐 뒤(그냥 누르는 클릭에는 깜빡이지 않게)부터 테두리가 점점 진해진다 → 다 진해지면 들어 올림
@@ -625,6 +691,7 @@ export function createListDrag({ readOnly = false } = {}) {
       window.addEventListener('keydown', typing, true);
       window.addEventListener('mousemove', moved, { passive: true });
       return {
+        update: (v) => hideDeleteIfChanged(v),
         destroy: () => {
           window.removeEventListener('keydown', typing, true);
           window.removeEventListener('mousemove', moved);

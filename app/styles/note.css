@@ -1293,7 +1293,7 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-doc .mk-voice-body > p.mk-image-line { margin: 0; }
 .mk-doc p.mk-image-line:has(.mk-media) { width: auto; }
 
-/* 꾹 눌렀다 놓은 내용의 지우기 단추 (오른쪽 위, 2초 뒤 사라짐) — block-move.js
+/* 꾹 눌렀다 놓은 내용·목록 항목의 지우기 단추 (오른쪽 위, 2.5초 뒤 사라짐) — delete-button.js
    메모킹 브랜드: 검정 단추 + 노란 테두리, 가는 × (다른 위 막대 단추들과 같은 선 굵기) */
 .mk-delete-btn {
   position: fixed;
@@ -1400,3 +1400,12 @@ body.mk-block-compact .mk-doc :is(p, h1, h2, h3, h4, h5, h6).mk-block-compact-it
 body.mk-block-compact .mk-doc .mk-block-compact-item img.mk-image { width: auto; height: auto; max-height: 88px; max-width: 220px; border-radius: 8px; }
 body.mk-block-compact .mk-doc p.mk-image-line.mk-block-compact-item { -webkit-mask-image: none; mask-image: none; }
 body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height: 92px; }
+
+/* 목록 항목: 꾹 눌렀다 놓으면 지우기 단추의 대상 (delete-button.js) · 더 누르고 있으면 목록 전체 테두리가 차오름 (list-drag.js) */
+.mk-doc li.mk-del-target::after { border: 2px solid color-mix(in srgb, var(--note-text) 55%, transparent) !important; }
+.mk-doc .mk-list-gather { border-radius: 10px; animation: mk-list-gather 0.45s ease-in forwards; }
+@keyframes mk-list-gather {
+  from { box-shadow: 0 0 0 4px color-mix(in srgb, var(--note-text) 0%, transparent); }
+  to { box-shadow: 0 0 0 4px color-mix(in srgb, var(--note-text) 55%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .mk-doc .mk-list-gather { animation: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--note-text) 55%, transparent); } }
