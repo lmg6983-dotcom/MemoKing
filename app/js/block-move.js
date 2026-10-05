@@ -520,7 +520,7 @@ class Mover {
     btn.type = 'button';
     btn.className = 'mk-delete-btn';
     btn.setAttribute('aria-label', '이 내용 지우기');
-    btn.textContent = '×';
+    btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
     document.body.append(btn);
     const place = () => {
       const r = target.getBoundingClientRect();

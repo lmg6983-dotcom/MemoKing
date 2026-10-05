@@ -934,9 +934,11 @@ function showTasks({ total, done }, { initial = false } = {}) {
   }
 }
 
-// ---------- 두 손가락으로 본문 확대·축소: 페이지째 (지도·PDF 처럼) ----------
-//   글자·그림·표가 모두 같은 비율로 커지고 작아진다 — 줄은 100% 일 때 그대로 두고(다시 맞추지 않음), 화면보다 넓어지면
-//   옆으로 밀어서 본다. 두 손가락 가운데를 중심으로 커지고, 배율은 모든 메모에 기억 (데스크탑 Ctrl+휠과 같은 단계)
+// ---------- 두 손가락으로 본문 확대·축소: 매직 줌 ----------
+//   100% 보다 크게: 페이지째 (지도·PDF 처럼) — 글자·그림·표가 같은 비율로 커지고, 줄은 100% 일 때 그대로 둔 채
+//                   화면보다 넓어지면 옆으로 밀어서 본다 (자세히 들여다보기)
+//   100% 보다 작게: 글자 크기 줄이기 — 줄이 화면 폭에 다시 맞춰져 한 화면에 더 많이 (한눈에 훑어보기, 옆으로 밀 일 없음)
+//   두 손가락 가운데를 중심으로, 배율은 모든 메모에 기억 (데스크탑 Ctrl+휠과 같은 단계)
 const ZOOM_KEY = 'memoking.noteZoom';
 let zoom = 1;
 try {
@@ -956,15 +958,18 @@ function applyZoom(focus) {
   root.style.setProperty('--note-base-w', `${base}px`);
   root.style.setProperty('--note-zoom', String(zoom));
   // 폭은 확대되는 요소(편집기 바로 아래 틀) 자신에게 — 저절로 맞는 폭은 확대해도 화면 폭에 맞춰져 버리므로
-  for (const child of root.children) child.style.width = `${base}px`;
+  //   작게(100% 아래)는 폭을 비워 두어 줄이 화면 폭에 다시 맞춰지게
+  for (const child of root.children) child.style.width = zoom > 1 ? `${base}px` : '';
   root.classList.toggle('zoomed', zoom > 1);
+  root.classList.toggle('zoomed-out', zoom < 1);
   // 두 손가락 가운데(focus)의 내용이 그 자리에 머물게 스크롤을 맞춘다
   if (focus && before !== zoom) {
     const r = root.getBoundingClientRect();
     const fx = focus.x - r.left;
     const fy = focus.y - r.top;
     const k = zoom / before;
-    root.scrollLeft = (root.scrollLeft + fx) * k - fx;
+    if (zoom > 1) root.scrollLeft = (root.scrollLeft + fx) * k - fx;
+    else root.scrollLeft = 0;
     root.scrollTop = (root.scrollTop + fy) * k - fy;
   }
 }
@@ -984,7 +989,7 @@ el.editorRoot.addEventListener('touchmove', (e) => {
   if (next === zoom) return;
   zoom = next;
   applyZoom(middle(e.touches));
-  setStatus(`확대 ${zoomLabel(zoom)}`);
+  setStatus(zoom >= 1 ? `매직 줌 · 확대 ${zoomLabel(zoom)}` : `매직 줌 · 글자 ${zoomLabel(zoom)}`);
 }, { passive: false });
 el.editorRoot.addEventListener('touchend', (e) => {
   if (!pinch || e.touches.length >= 2) return;

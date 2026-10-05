@@ -880,10 +880,10 @@ body.is-dragging .card:hover { transform: none; }
   line-height: 1.2;
   white-space: nowrap;
   transform: translate(-50%, -50%) rotate(-12deg);
-  opacity: 0.28;
+  opacity: 0.55;
   pointer-events: none;
 }
-.card[data-color="charcoal"] .card-clear { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.34; }
+.card[data-color="charcoal"] .card-clear { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.62; }
 .cards[data-density="compact"] .card-clear { font-size: 14px; padding: 0 8px; border-width: 2.5px; }
 
 /* ---------- v0.17.13: 매직키 설정 ---------- */

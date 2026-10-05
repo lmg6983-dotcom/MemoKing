@@ -655,11 +655,11 @@ h2.sheet-title { font-size: 20px; }
   line-height: 1.2;
   white-space: nowrap;
   transform: translate(-50%, -50%) rotate(-12deg);
-  opacity: 0.3;
+  opacity: 0.55;
   pointer-events: none;
 }
-.card[data-color="charcoal"] .card-clear { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.36; }
-body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.32; }
+.card[data-color="charcoal"] .card-clear { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.62; }
+body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.58; }
 #note-screen .clear-stamp { font-size: 38px; }
 
 /* =====================================================================

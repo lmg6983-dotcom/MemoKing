@@ -285,6 +285,23 @@ try {
   await page.waitForTimeout(150);
   const back1 = await page.evaluate(() => ({ z: document.getElementById('editor').style.getPropertyValue('--note-zoom'), saved: localStorage.getItem('memoking.noteZoom') }));
   check('두 손가락 오므리기: 다시 100%', back1.z === '1' && back1.saved == null, JSON.stringify(back1));
+  // 매직 줌: 100% 아래로 오므리면 글자 크기만 줄고 줄이 화면 폭에 다시 맞춰진다 (옆으로 밀 일 없음)
+  const h1Before = await page.evaluate(() => document.querySelector('.mk-doc h1').getBoundingClientRect().height);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 90, y: 600, id: 1 }, { x: 290, y: 600, id: 2 }] });
+  for (let i = 1; i <= 6; i++) await pinchTo([{ x: 90 + i * 5, y: 600, id: 1 }, { x: 290 - i * 5, y: 600, id: 2 }]);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForTimeout(200);
+  const out = await page.evaluate(() => { const ed = document.getElementById('editor'); const box = ed.firstElementChild; return { z: Number(ed.style.getPropertyValue('--note-zoom')), wide: ed.scrollWidth > ed.clientWidth + 2, visW: box.getBoundingClientRect().width, cw: ed.clientWidth, h1: document.querySelector('.mk-doc h1').getBoundingClientRect().height, status: document.querySelector('#note-status, .note-status')?.textContent ?? '' }; });
+  check('매직 줌: 100% 아래는 글자만 작게 · 줄은 화면 폭에 다시 맞춤', out.z < 1 && !out.wide && out.visW > out.cw * 0.85 && out.h1 < h1Before, JSON.stringify({ ...out, h1Before }));
+  await shot('05e-magic-zoom-out');
+  {
+    const zz = out.z;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 140, y: 600, id: 1 }, { x: 240, y: 600, id: 2 }] });
+    for (let i = 1; i <= 6; i++) { const h = 50 + ((50 / zz - 50) * i) / 6; await pinchTo([{ x: 190 - h, y: 600, id: 1 }, { x: 190 + h, y: 600, id: 2 }]); }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForTimeout(150);
+  }
+  check('매직 줌: 다시 벌려 100%', (await page.evaluate(() => document.getElementById('editor').style.getPropertyValue('--note-zoom'))) === '1');
   await back();
   await page.waitForTimeout(300);
   check('목록: 다 끝낸 메모 카드에 CLEAR 도장', (await page.locator('.card[data-id="00000000-0000-4000-8000-000000000001"] .card-clear').count()) === 1);
@@ -622,10 +639,10 @@ try {
   {
     const size = () => page.evaluate(() => ({ img: document.querySelector('img.mk-image').getBoundingClientRect().width, text: document.querySelector('.mk-doc h1').getBoundingClientRect().height }));
     const a = await size();
-    await page.evaluate(() => { const ed = document.getElementById('editor'); ed.style.setProperty('--note-zoom', '1.5'); ed.classList.add('zoomed'); });
+    await page.evaluate(() => { const ed = document.getElementById('editor'); ed.style.setProperty('--note-zoom', '1.5'); ed.classList.add('zoomed'); ed.firstElementChild.style.width = ed.style.getPropertyValue('--note-base-w'); });
     await page.waitForTimeout(200);
     const b = await size();
-    await page.evaluate(() => { const ed = document.getElementById('editor'); ed.style.setProperty('--note-zoom', '1'); ed.classList.remove('zoomed'); });
+    await page.evaluate(() => { const ed = document.getElementById('editor'); ed.style.setProperty('--note-zoom', '1'); ed.classList.remove('zoomed'); ed.firstElementChild.style.width = ''; });
     check('페이지째 확대: 그림도 글자와 같은 비율로', Math.abs(b.img / a.img - 1.5) < 0.05 && Math.abs(b.text / a.text - 1.5) < 0.08, JSON.stringify({ a, b }));
   }
   const ib = await page.locator('img.mk-image').first().boundingBox();
