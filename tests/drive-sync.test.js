@@ -212,3 +212,31 @@ test('Drive 에서 한꺼번에 사라지면 멈추고 이 PC 파일은 그대�
   await assert.rejects(sync(), SafetyStop);
   assert.equal(lt('많은/1.md'), 'x1');
 });
+
+test('PC 메모 폴더 옮기기: Google Drive 앱 폴더의 메모·첨부를 문서\\메모킹 으로 복사 (원래 폴더는 그대로, 있는 파일은 두기)', async () => {
+  const { copyVault } = await import('../desktop/drive/drive-sync.js');
+  const from = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-from-'));
+  const to = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-to-'));
+  fs.mkdirSync(path.join(from, 'attachments'));
+  fs.mkdirSync(path.join(from, '업무'));
+  fs.mkdirSync(path.join(from, '.hidden'));
+  fs.writeFileSync(path.join(from, '회의.md'), '# 회의');
+  fs.writeFileSync(path.join(from, '업무', '보고.md'), '# 보고');
+  fs.writeFileSync(path.join(from, 'attachments', 'a.png'), 'png');
+  fs.writeFileSync(path.join(from, '.hidden', 'x.md'), 'x');
+  fs.writeFileSync(path.join(from, '~$임시.md'), 'tmp');
+  const old = new Date('2026-01-02T03:04:05Z');
+  fs.utimesSync(path.join(from, '회의.md'), old, old);
+  fs.writeFileSync(path.join(to, '보존.md'), '# 이미 있던 것');
+  fs.mkdirSync(path.join(to, '업무'));
+  fs.writeFileSync(path.join(to, '업무', '보고.md'), '# 새쪽 것');
+  const n = copyVault(from, to);
+  assert.equal(n, 2);
+  assert.equal(fs.readFileSync(path.join(to, '회의.md'), 'utf8'), '# 회의');
+  assert.equal(fs.readFileSync(path.join(to, 'attachments', 'a.png'), 'utf8'), 'png');
+  assert.equal(fs.readFileSync(path.join(to, '업무', '보고.md'), 'utf8'), '# 새쪽 것');
+  assert.ok(!fs.existsSync(path.join(to, '.hidden')) && !fs.existsSync(path.join(to, '~$임시.md')));
+  assert.equal(fs.statSync(path.join(to, '회의.md')).mtimeMs, old.getTime()); // 고친 시각 그대로
+  assert.ok(fs.existsSync(path.join(from, '회의.md'))); // 원래 폴더는 그대로
+  assert.equal(copyVault(from, from), 0);
+});

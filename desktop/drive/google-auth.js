@@ -9,7 +9,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 
-const SCOPE = 'https://www.googleapis.com/auth/drive';
+// 메모킹이 만든(또는 사용자가 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님).
+// PC 메모킹과 휴대폰 메모킹은 같은 Google Cloud 프로젝트의 클라이언트라 서로 만든 메모를 본다
+export const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const LOGIN_TIMEOUT = 5 * 60 * 1000;
@@ -30,6 +32,20 @@ export class GoogleAuth {
     this.openExternal = openExternal;
     this.safeStorage = safeStorage;
     this.data = this.load();
+    // 예전(Drive 전체 권한)으로 로그인해 둔 것: 다시 연결하게 하고, 구글 쪽 예전 권한은 돌려준다
+    this.scopeUpgraded = false;
+    if (this.data.refreshToken && this.data.scope !== SCOPE) {
+      const old = this.data.refreshToken;
+      delete this.data.refreshToken;
+      delete this.data.email;
+      this.scopeUpgraded = true;
+      try {
+        this.save();
+      } catch {
+        // 다음에
+      }
+      this.post('https://oauth2.googleapis.com/revoke', { token: old }).catch(() => {});
+    }
     this.accessToken = null;
     this.expiresAt = 0;
     this.pending = null; // 기다리는 로그인 서버
@@ -152,6 +168,8 @@ export class GoogleAuth {
     });
     if (!token.refresh_token) throw new AuthError('구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 시도해 주세요');
     this.data.refreshToken = token.refresh_token;
+    this.data.scope = SCOPE;
+    this.scopeUpgraded = false;
     this.accessToken = token.access_token;
     this.expiresAt = Date.now() + (token.expires_in ?? 3600) * 1000;
     this.save();

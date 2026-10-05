@@ -26,7 +26,8 @@ import java.security.SecureRandom
  *         빌드할 때 넣거나(BuildConfig) 앱 설정에서 붙여 넣는다.
  */
 object GoogleAuth {
-    private const val SCOPE = "https://www.googleapis.com/auth/drive"
+    // 메모킹이 만든(또는 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님)
+    const val SCOPE = "https://www.googleapis.com/auth/drive.file"
     private const val AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
     private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
     private const val KEY_ID = "googleClientId"
@@ -34,6 +35,8 @@ object GoogleAuth {
     private const val KEY_REFRESH = "googleRefreshToken"
     private const val KEY_EMAIL = "googleEmail"
     private const val KEY_NATIVE = "googleNative"
+    private const val KEY_SCOPE = "googleScope"
+    private const val KEY_RECONNECT = "googleReconnect"
     private const val LOGIN_TIMEOUT = 5 * 60 * 1000
 
     class AuthError(message: String) : IOException(message)
@@ -56,9 +59,22 @@ object GoogleAuth {
 
     fun connected(ctx: Context) = native(ctx) || prefs(ctx).getString(KEY_REFRESH, null) != null
 
+    /** 연결 방식이 바뀌어 다시 연결해야 하는가 (예전 Drive 전체 권한 연결을 끊은 뒤) */
+    fun reconnectNeeded(ctx: Context) = prefs(ctx).getBoolean(KEY_RECONNECT, false)
+
+    /**
+     * 앱을 켤 때 한 번: 예전(Drive 전체 권한)으로 연결해 둔 것이면 끊고 다시 연결하게 한다.
+     * 메모 폴더(휴대폰 안 사본)는 그대로라 메모는 계속 보인다 — 다시 연결해 새 폴더를 고르면 그리로 옮겨 맞춘다
+     */
+    fun upgradeScope(ctx: Context) {
+        if (!connected(ctx) || prefs(ctx).getString(KEY_SCOPE, null) == SCOPE) return
+        signOut(ctx)
+        prefs(ctx).edit().putBoolean(KEY_RECONNECT, true).apply()
+    }
+
     /** 휴대폰 구글 계정으로 허용받은 뒤 (NativeAuth) — 계정 이메일을 돌려준다 */
     fun completeNative(ctx: Context, token: String): String {
-        prefs(ctx).edit().putBoolean(KEY_NATIVE, true).remove(KEY_REFRESH).apply()
+        prefs(ctx).edit().putBoolean(KEY_NATIVE, true).remove(KEY_REFRESH).putString(KEY_SCOPE, SCOPE).remove(KEY_RECONNECT).apply()
         accessToken = token
         expiresAt = System.currentTimeMillis() + 45 * 60 * 1000
         val email = try {
@@ -174,7 +190,7 @@ object GoogleAuth {
         val refresh = token.optString("refresh_token").ifEmpty { throw AuthError("구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 시도해 주세요") }
         accessToken = token.getString("access_token")
         expiresAt = System.currentTimeMillis() + token.optLong("expires_in", 3600) * 1000
-        prefs(ctx).edit().putString(KEY_REFRESH, refresh).putBoolean(KEY_NATIVE, false).apply()
+        prefs(ctx).edit().putString(KEY_REFRESH, refresh).putBoolean(KEY_NATIVE, false).putString(KEY_SCOPE, SCOPE).remove(KEY_RECONNECT).apply()
         val email = try {
             DriveApi(ctx).about()
         } catch (e: Exception) {

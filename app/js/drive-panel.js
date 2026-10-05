@@ -3,6 +3,8 @@
 import { formatStamp } from './core/format.js';
 
 const $ = (id) => document.getElementById(id);
+// 메모킹이 Drive 에 만드는 폴더 이름 (예전 "메모킹" 폴더는 Google Drive 데스크탑 앱이 만든 것이라 메모킹이 볼 수 없다)
+export const SYNC_FOLDER = '메모킹 동기화';
 
 // Electron 이 붙이는 "Error invoking remote method 'drive:login': AuthError: …" 를 걷어낸다
 export const cleanError = (err) => String(err?.message ?? err ?? '')
@@ -30,7 +32,10 @@ export function setupDrivePanel({ api, onVault, confirm }) {
     box.classList.toggle('error', on && st.state === 'error');
     let title = '연결 안 됨';
     let sub = 'Google 계정으로 로그인하면 휴대폰 메모킹과 같은 메모를 써요';
-    if (info.connected && !info.active) {
+    if (info.reconnect && !info.connected) {
+      title = '다시 연결해 주세요';
+      sub = 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC 에 그대로 있어요';
+    } else if (info.connected && !info.active) {
       title = `${info.email || 'Google 계정'} 로그인됨`;
       sub = '맞출 Drive 폴더를 아직 고르지 않았어요';
     } else if (on) {
@@ -95,9 +100,10 @@ export function setupDrivePanel({ api, onVault, confirm }) {
   async function openFolders() {
     step('folder');
     $('drive-account').textContent = info.email ? `${info.email} 의 Drive` : '';
-    $('folder-local').textContent = info.insideDriveApp || !info.root
-      ? `이 PC 에서는 ${info.insideDriveApp ? 'Google Drive 앱 폴더 대신 ' : ''}"문서\\메모킹" 폴더에 메모를 두고 맞춰요.`
-      : `이 PC 의 메모 폴더: ${info.root}`;
+    $('folder-local').textContent = info.insideDriveApp
+      ? `지금 메모 폴더(${info.root})의 메모를 "문서\\메모킹" 으로 복사해서 맞춰요. 원래 폴더는 그대로 둬요.`
+      : !info.root ? '이 PC 에서는 "문서\\메모킹" 폴더에 메모를 두고 맞춰요.'
+      : `이 PC 의 메모 폴더: ${info.root} (처음 맞출 때 이 메모들을 새 폴더로 올려요)`;
     path = [{ id: 'root', name: '내 드라이브' }];
     await showFolder();
   }
@@ -132,7 +138,9 @@ export function setupDrivePanel({ api, onVault, confirm }) {
     if (path.at(-1) !== cur) return; // 그새 다른 폴더로 감
     list.replaceChildren();
     if (!folders.length) {
-      list.append(Object.assign(document.createElement('li'), { className: 'empty', textContent: '안에 폴더가 없어요' }));
+      const top = cur.id === 'root';
+      list.append(Object.assign(document.createElement('li'), { className: 'empty', textContent: top ? '메모킹이 만든 폴더가 아직 없어요 — 새 폴더를 만들어 주세요' : '안에 폴더가 없어요' }));
+      if (top) newFolder();
     }
     for (const f of folders) {
       const li = document.createElement('li');
@@ -153,7 +161,7 @@ export function setupDrivePanel({ api, onVault, confirm }) {
     const row = $('new-folder-row');
     const input = $('new-folder-name');
     row.hidden = false;
-    input.value = path.length === 1 ? '메모킹' : '';
+    input.value = path.length === 1 ? SYNC_FOLDER : '';
     input.focus();
     input.select();
   }

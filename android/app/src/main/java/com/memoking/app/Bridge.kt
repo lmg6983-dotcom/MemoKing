@@ -184,6 +184,7 @@ class Bridge(private val activity: MainActivity) {
         .put("nativeAvailable", NativeAuth.available(ctx))
         .put("browserConfigured", GoogleAuth.clientId(ctx).isNotBlank())
         .put("connected", GoogleAuth.connected(ctx))
+        .put("reconnect", GoogleAuth.reconnectNeeded(ctx))
         .put("email", GoogleAuth.email(ctx))
         .put("active", DriveSync.active(ctx))
         .put("folderId", DriveSync.folderId(ctx) ?: "")
@@ -367,7 +368,9 @@ class Bridge(private val activity: MainActivity) {
             }
             "driveUse" -> pool.execute {
                 resolve(id) {
-                    val from = if (a.optBoolean("import")) Vaults.current(ctx)?.takeIf { !DriveSync.active(ctx) } else null
+                    // 지금까지의 메모(휴대폰 폴더, 또는 예전 Drive 폴더의 휴대폰 사본)를 새 폴더로 함께 옮긴다
+                    val target = a.getString("folderId")
+                    val from = if (a.optBoolean("import")) Vaults.current(ctx)?.takeIf { DriveSync.folderId(ctx) != target } else null
                     val status = DriveSync.use(ctx, a.getString("folderId"), a.getString("name"), from)
                     JSONObject().put("vault", vaultInfo()).put("status", status.json())
                 }

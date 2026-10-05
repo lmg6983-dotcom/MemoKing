@@ -166,6 +166,7 @@ object DriveSync {
 
 class SyncJobService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
+        GoogleAuth.upgradeScope(this)
         if (!DriveSync.active(this) || !GoogleAuth.connected(this)) return false
         Thread {
             val status = DriveSync.syncBlocking(this)

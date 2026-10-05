@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
  * 등록돼 있어야 권한을 준다. 개발자가 한 번만 등록하면 된다 (android/DRIVE-SETUP.md).
  */
 object NativeAuth {
-    private const val SCOPE = "https://www.googleapis.com/auth/drive"
+    private const val SCOPE = GoogleAuth.SCOPE
 
     private fun request(): AuthorizationRequest =
         AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(SCOPE))).build()

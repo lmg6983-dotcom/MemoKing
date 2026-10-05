@@ -6,7 +6,8 @@ import { icon } from '../../app/js/icons.js';
 
 const $ = (x) => document.getElementById(x);
 const sheet = $('drive-sheet');
-const SUGGEST = '메모킹';
+// 메모킹이 Drive 에 만드는 폴더 (PC 와 같은 이름 — app/js/drive-panel.js SYNC_FOLDER)
+const SUGGEST = '메모킹 동기화';
 
 let path = [{ id: 'root', name: '내 드라이브' }];
 let onConnected = () => {};
@@ -92,9 +93,10 @@ function openFolders() {
   showStep('folder');
   const s = drive.status();
   $('drive-account').textContent = s.email ? `${s.email} 의 Google Drive` : '';
-  const count = app.vault && !app.vaultInfo?.drive ? app.vault.list().length : 0;
+  // 지금까지의 메모(휴대폰 폴더 또는 예전 Drive 폴더의 휴대폰 사본)를 새 폴더로 함께
+  const count = app.vault ? app.vault.list().length : 0;
   $('import-row').hidden = count === 0;
-  $('import-note').textContent = `메모 ${count}개 · 같은 이름이 있으면 사본으로 올려요`;
+  $('import-note').textContent = `메모 ${count}개 · 같은 이름이 이미 있으면 그쪽을 둬요`;
   loadFolders();
 }
 
@@ -118,7 +120,7 @@ async function loadFolders() {
   if (seq !== loadSeq) return;
   // PC 메모킹 폴더(이름 "메모킹")를 맨 위에
   folders.sort((a, b) => Number(b.name === SUGGEST) - Number(a.name === SUGGEST));
-  $('folder-empty').hidden = folders.length > 0;
+  $('folder-empty').hidden = folders.length > 0 || here.id !== 'root';
   $('folder-list').replaceChildren(...folders.map((f) => {
     const li = document.createElement('li');
     const b = document.createElement('button');
@@ -219,6 +221,10 @@ export function renderStatus(s = drive.status()) {
   } else {
     $('drive-title').textContent = s.connected ? '폴더를 선택하세요' : '연결 안 됨';
     $('drive-sub').textContent = s.connected ? s.email : 'PC와 같은 메모를 함께 써요';
+  }
+  if (s.reconnect && !s.connected) {
+    $('drive-title').textContent = '다시 연결해 주세요';
+    $('drive-sub').textContent = 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 휴대폰에 그대로 있어요';
   }
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;

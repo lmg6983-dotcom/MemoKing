@@ -68,6 +68,7 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.memoking.app.drive.GoogleAuth.upgradeScope(this) // 예전 Drive 전체 권한 연결이면 다시 연결하게
         root = FrameLayout(this)
         web = WebView(this)
         root.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))

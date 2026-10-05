@@ -4,7 +4,7 @@
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
-import { SyncEngine } from './sync-engine.js';
+import { SyncEngine, skipName, skipPath } from './sync-engine.js';
 
 const INTERVAL = 60_000;
 
@@ -124,4 +124,37 @@ export class DriveSync extends EventEmitter {
 // Google Drive 데스크탑 앱이 맞추는 폴더(G:\내 드라이브 …) 안이면, 앱으로 또 맞추면 두 번 동기화가 된다
 export function insideDriveForDesktop(dir) {
   return /(^|[\\/])(내 드라이브|My Drive|Google Drive|공유 드라이브|Shared drives)([\\/]|$)/i.test(String(dir ?? ''));
+}
+
+/**
+ * 메모 폴더를 다른 곳으로 옮겨 맞출 때 (Google Drive 데스크탑 앱 폴더 → 문서\메모킹): 원래 폴더의 메모·첨부를 복사한다.
+ * 원래 폴더는 그대로 두고, 새 폴더에 같은 이름이 이미 있으면 건드리지 않는다 (동기화 기록·임시 파일은 빼고).
+ * @returns {number} 복사한 파일 수
+ */
+export function copyVault(from, to) {
+  let copied = 0;
+  const walk = (rel) => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(path.join(from, rel), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (skipName(e.name)) continue;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(r);
+      else if (e.isFile() && !skipPath(r)) {
+        const dest = path.join(to, r);
+        if (fs.existsSync(dest)) continue;
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(path.join(from, r), dest);
+        const st = fs.statSync(path.join(from, r));
+        fs.utimesSync(dest, st.atime, st.mtime); // 고친 시각을 그대로 (목록 순서·충돌 판정이 바뀌지 않게)
+        copied++;
+      }
+    }
+  };
+  if (path.resolve(from) !== path.resolve(to)) walk('');
+  return copied;
 }

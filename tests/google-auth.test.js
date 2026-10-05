@@ -99,3 +99,23 @@ test('Drive 올리기: resumable 시작 → 주소로 내용 보내기, 401 이�
   assert.equal(calls[1].headers['X-Upload-Content-Length'], '3');
   assert.equal(calls[2].method, 'PUT');
 });
+
+test('권한: 메모킹이 만든 파일만(drive.file) 요청하고, 예전 Drive 전체 권한 연결은 끊어 다시 연결하게', async () => {
+  const { auth, dir, opened } = setup();
+  auth.setClient('id-1.apps.googleusercontent.com', 'GOCSPX-s');
+  await auth.login();
+  assert.equal(opened().searchParams.get('scope'), 'https://www.googleapis.com/auth/drive.file');
+  const file = path.join(dir, 'google-auth.json');
+  // 같은 범위로 저장된 연결은 그대로
+  assert.equal(new GoogleAuth({ file, openExternal: () => {}, fetch: async () => new Response('{}') }).connected, true);
+  // 예전 버전이 저장한 연결 (범위 표시 없음) → 끊고, 구글 쪽 권한은 돌려준다
+  fs.writeFileSync(file, JSON.stringify({ plain: { clientId: 'id-1.apps.googleusercontent.com', refreshToken: 'OLD', email: 'a@b.com' } }));
+  const revoked = [];
+  const old = new GoogleAuth({ file, openExternal: () => {}, fetch: async (url, init) => { revoked.push([url, String(init.body)]); return new Response('{}'); } });
+  assert.equal(old.connected, false);
+  assert.equal(old.scopeUpgraded, true);
+  assert.equal(old.client().id, 'id-1.apps.googleusercontent.com'); // 연결 정보는 남김
+  await new Promise((r) => setTimeout(r, 10));
+  assert.ok(revoked.some(([url, body]) => url.includes('/revoke') && body.includes('OLD')));
+  assert.equal(new GoogleAuth({ file, openExternal: () => {} }).scopeUpgraded, false); // 한 번만
+});

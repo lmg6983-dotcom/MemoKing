@@ -13,7 +13,7 @@ import { createAlarmRunner } from './alarms.js';
 import { NotificationHistory } from './notification-history.js';
 import { GoogleAuth } from './drive/google-auth.js';
 import { DriveApi } from './drive/drive-api.js';
-import { DriveSync, insideDriveForDesktop } from './drive/drive-sync.js';
+import { DriveSync, insideDriveForDesktop, copyVault } from './drive/drive-sync.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
 import { LinkPreviews } from './link-previews.js';
 import { isProgramFile } from '../app/js/core/file-kinds.js';
@@ -1521,6 +1521,11 @@ function initDrive() {
     if (st.changed) vault?.scan(); // 내려받은 메모를 바로 목록·열린 창에
     listWin?.webContents.send('drive:status', driveInfo());
   });
+  // 예전(Drive 전체 권한) 연결이었으면: 고른 Drive 폴더도 잊고 다시 연결하게 (메모는 이 PC 에 그대로)
+  if (driveAuth.scopeUpgraded && settings.drive) {
+    settings.drive = null;
+    saveSettings();
+  }
   configureDrive();
 }
 
@@ -1541,21 +1546,32 @@ function driveInfo() {
     folderName: settings.drive?.folderName ?? '',
     root: vault?.root ?? '',
     insideDriveApp: insideDriveForDesktop(vault?.root),
+    reconnect: driveAuth?.scopeUpgraded ?? false, // 연결 방식이 바뀌어 다시 연결해야 함
     status: driveSync?.status ?? { state: 'off' },
   };
 }
 
 // 이 Drive 폴더와 맞추기 시작. 지금 메모 폴더가 Google Drive 데스크탑 앱 폴더(G:\내 드라이브…) 안이면
-// 두 번 동기화가 되지 않게 이 PC 의 문서\메모킹 으로 옮겨 맞춘다 (첫 동기화 때 Drive 의 메모를 모두 받음).
+// 두 번 동기화가 되지 않게 이 PC 의 문서\메모킹 으로 옮겨 맞춘다 — 메모킹은 자기가 만든 Drive 파일만 보므로
+// (drive.file) Drive 앱이 올린 메모를 내려받을 수 없다: 원래 폴더의 메모를 먼저 복사해 두고, 첫 동기화 때 새 Drive 폴더로 올린다.
 async function useDriveFolder(folderId, folderName) {
   let root = vault?.root;
   if (!root || insideDriveForDesktop(root)) root = path.join(app.getPath('documents'), '메모킹');
+  const moving = root !== vault?.root;
+  if (moving) {
+    // 열린 메모 창이 닫히며 남은 글을 원래 폴더에 저장한 뒤 복사한다
+    const wins = [...noteWins.values()].filter((w) => !w.isDestroyed());
+    await Promise.all(wins.map((w) => new Promise((resolve) => {
+      w.once('closed', resolve);
+      setTimeout(resolve, 3000); // 닫히지 않는 창이 있어도 멈추지 않게
+      w.close();
+    })));
+    if (vault?.root) copyVault(vault.root, root);
+  }
   settings.drive = { folderId, folderName };
   saveSettings();
-  if (root !== vault?.root) {
-    for (const win of noteWins.values()) win.close();
-    openVault(root); // → configureDrive
-  } else configureDrive();
+  if (moving) openVault(root); // → configureDrive
+  else configureDrive();
   const status = await driveSync.run();
   return { info: vaultInfo(), status, drive: driveInfo() };
 }
