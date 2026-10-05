@@ -22,6 +22,7 @@ import { renderMemoImage } from './share-image.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
+import { printHtml } from './print-html.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -442,7 +443,8 @@ shareSheet.addEventListener('click', async (e) => {
       await call('shareFile', { base64, name: fileName(title, 'png'), mime: 'image/png', title });
     } else {
       try {
-        await call('sharePdf', { title, name: fileName(title, 'pdf') });
+        const html = printHtml(note.getEditor().dom(), { title, color: app.vault.get(id)?.color });
+        await call('sharePdf', { title, name: fileName(title, 'pdf'), html });
       } catch (err) {
         console.warn('PDF 파일을 바로 만들지 못해 인쇄 화면으로', err);
         await call('print', { title });

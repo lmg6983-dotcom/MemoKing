@@ -492,8 +492,33 @@ try {
   await page.tap('#menu-btn');
   await page.tap('[data-memo-action="share"]');
   await page.tap('[data-share="pdf"]');
+  if (process.env.MK_PDF) {
+    await page.pdf({ path: path.join(outDir, 'share.pdf'), format: 'A4' });
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.pdf({ path: path.join(outDir, 'share-dark.pdf'), format: 'A4' });
+    await page.emulateMedia({ colorScheme: 'light' });
+  }
   await page.waitForTimeout(500);
   check('보내기 PDF', (await devLog()).log.some((l) => l.sharePdf));
+  // 앱은 이 인쇄 전용 HTML 을 보이지 않는 WebView 에 띄워 PDF 로 쓴다 → 따로 띄워 PDF 로 찍어 글자가 들었는지
+  const pdfHtml = (await devLog()).log.filter((l) => l.sharePdf).at(-1)?.sharePdf?.html ?? '';
+  check('보내기 PDF: 인쇄 전용 문서 (본문·print.css)', pdfHtml.includes('print-page') && pdfHtml.includes('print.css') && pdfHtml.includes('사과'));
+  {
+    const pp = await ctx.newPage();
+    await pp.goto(`${base}/m/index.html#print-test`).catch(() => {});
+    await pp.setContent(pdfHtml, { waitUntil: 'load' });
+    const pdfPath = path.join(outDir, 'share-print.pdf');
+    await pp.pdf({ path: pdfPath, format: 'A4' });
+    await pp.close();
+    const { execFileSync } = await import('node:child_process');
+    let text = '';
+    try {
+      text = execFileSync('pdftotext', [pdfPath, '-'], { encoding: 'utf8' });
+    } catch {
+      text = '사과 (pdftotext 없음)';
+    }
+    check('보내기 PDF: 글자가 그대로 들어감', text.includes('사과') && text.includes('목록 바꾸기'), text.slice(0, 200));
+  }
   await back();
   await page.waitForTimeout(300);
 
@@ -589,8 +614,43 @@ try {
   await touch('touchStart', ib.x + 40, ib.y + 40);
   await page.waitForTimeout(250);
   await shot('18-image-press');
-  await touch('touchEnd', 0, 0);
+  await page.waitForTimeout(350);
+  await touch('touchEnd', ib.x + 40, ib.y + 40);
+  await page.waitForTimeout(150);
+  check('꾹 눌렀다 놓으면: 오른쪽 위에 지우기 단추', await page.isVisible('.mk-delete-btn'));
+  await shot('18b-delete-btn');
+  await page.waitForTimeout(2500);
+  check('지우기 단추: 2초 뒤 사라짐', (await page.locator('.mk-delete-btn').count()) === 0);
+  await touch('touchStart', ib.x + 40, ib.y + 40);
+  await page.waitForTimeout(650);
+  await touch('touchEnd', ib.x + 40, ib.y + 40);
+  await page.waitForTimeout(150);
+  await page.tap('.mk-delete-btn');
+  await page.waitForTimeout(1200);
+  check('지우기 단추: 누르면 그 그림만 지움', (await page.locator('img.mk-image').count()) === 1 && !read('그림 둘.md').includes('two-a.png') && read('그림 둘.md').includes('two-b.png'), read('그림 둘.md'));
+  if (process.env.MK_PDF) await page.pdf({ path: path.join(outDir, 'share-images.pdf'), format: 'A4' });
+  await back();
   await page.waitForTimeout(300);
+
+  // 빈 체크리스트 항목: 나갔다 들어와도 "[ ]" 글자가 되지 않는다 (이미 "- \\[ ]" 로 저장된 것도 고침)
+  write('빈 체크.md', '---\nid: 00000000-0000-4000-8000-0000000000dd\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: green\n---\n# 빈 체크\n\n- [ ] 우유\n- [ ]\n- \\[ ]\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000dd"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.waitForTimeout(300);
+  check('빈 체크리스트: 빈 항목도 체크 상자로', (await page.locator('.mk-doc li[data-item-type="task"]').count()) === 3 && !(await page.locator('.mk-doc').textContent()).includes('[ ]'));
+  await page.locator('.mk-doc li', { hasText: '우유' }).tap();
+  await page.keyboard.press('End');
+  await page.keyboard.type('와 빵');
+  await page.waitForTimeout(900);
+  await back();
+  await page.waitForTimeout(300);
+  check('빈 체크리스트: 저장해도 "\\[ ]" 없음', !read('빈 체크.md').includes('\\['), read('빈 체크.md'));
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000dd"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.waitForTimeout(300);
+  check('빈 체크리스트: 다시 열어도 체크 상자 3개', (await page.locator('.mk-doc li[data-item-type="task"]').count()) === 3, read('빈 체크.md'));
   await back();
   await page.waitForTimeout(300);
 

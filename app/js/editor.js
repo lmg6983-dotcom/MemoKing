@@ -13,6 +13,7 @@ import {
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
 import { mediaKindOf, trimTrailingBreaks } from './core/memo-file.js';
+import { remarkEmptyTasks } from './core/empty-tasks.js';
 import { remarkInlineHtmlMarks, stringifyHandlers, safeColor, DEFAULT_HIGHLIGHT } from './core/html-marks.js';
 import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
 import { vaultUrl, mediaKind, baseName } from './media.js';
@@ -60,11 +61,11 @@ function playerOptions(kind) {
     blankVideo: '',
     i18n: PLYR_I18N,
     speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
-    settings: ['speed'],
+    settings: kind === 'video' ? ['speed'] : [], // 소리는 설정(재생 속도) 단추 없이 — 막대를 넓게
     // 스티커 창은 좁으므로 음량 막대는 빼고 음소거 버튼만 (시간 표시가 줄바꿈되지 않게)
     controls: kind === 'video'
       ? ['play-large', 'play', 'progress', 'current-time', 'mute', 'settings', 'fullscreen']
-      : ['play', 'progress', 'current-time', 'duration', 'mute', 'settings'],
+      : ['play', 'progress', 'current-time', 'duration', 'mute'],
     keyboard: { focused: true, global: false },
     tooltips: { controls: true, seek: true },
   };
@@ -267,6 +268,7 @@ const linkCardSchema = $nodeSchema('mk_link_card', () => ({
   },
 }));
 const linkCards = $remark('memoking-link-cards', () => remarkLinkCards);
+const emptyTasks = $remark('memoking-empty-tasks', () => remarkEmptyTasks);
 
 // 같은 주소의 카드가 여러 번 그려져도 한 번만 묻는다
 const previewRequests = new Map();
@@ -1196,6 +1198,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(inlineHtmlMarks)
     .use(linkCards)
+    .use(emptyTasks)
     .use(linkCardSchema)
     .use(mathPlugins({ readOnly }))
     .use(underlineMark)

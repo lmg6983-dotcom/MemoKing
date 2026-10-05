@@ -342,7 +342,7 @@ class Bridge(private val activity: MainActivity) {
                 }
                 activity.runOnUiThread { activity.shareFile(id, file, a.optString("mime", "application/octet-stream"), a.optString("title")) }
             }
-            "sharePdf" -> activity.runOnUiThread { activity.sharePdf(id, shareFile(a.optString("name", "메모.pdf")), a.optString("title", "메모")) }
+            "sharePdf" -> activity.runOnUiThread { activity.sharePdf(id, shareFile(a.optString("name", "메모.pdf")), a.optString("title", "메모"), a.optString("html").ifBlank { null }) }
             // 기본: 휴대폰 구글 계정 그대로 (계정 고르기·허용). browser=true 면 브라우저 로그인(예비)
             "driveLogin" -> if (!a.optBoolean("browser") && NativeAuth.available(ctx)) {
                 activity.runOnUiThread { activity.loginWithPhoneAccount(id) }

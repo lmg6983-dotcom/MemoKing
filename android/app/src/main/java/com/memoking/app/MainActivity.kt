@@ -547,22 +547,67 @@ class MainActivity : Activity() {
     }
 
     /** 지금 보이는 메모를 PDF 파일로 만들어(인쇄 화면 없이) 보내기 — 글자를 고를 수 있는 PDF */
-    fun sharePdf(id: Int, file: java.io.File, title: String) {
+    /** 지금 인쇄용 WebView (끝날 때까지 붙잡아 둔다 — 버려지면 PDF 가 중간에 끊긴다) */
+    private var printWeb: WebView? = null
+
+    /**
+     * 메모를 PDF 파일로 보내기.
+     *   html 이 있으면(화면이 만든 인쇄 전용 문서) 보이지 않는 WebView 에 띄워 그것을 쓴다 — 앱 화면 틀(고정 높이·안쪽
+     *   스크롤·열린 시트)이 끼지 않아 쪽이 비지 않는다. 없으면 예전처럼 지금 화면을 인쇄.
+     */
+    fun sharePdf(id: Int, file: java.io.File, title: String, html: String? = null) {
         val attrs = PrintAttributes.Builder()
             .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
             .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
             .setMinMargins(PrintAttributes.Margins(720, 720, 720, 720)) // 1.27cm (1/1000 인치 단위)
             .build()
-        try {
-            PdfPrint(attrs).write(web.createPrintDocumentAdapter(file.name), file) { error ->
-                runOnUiThread {
-                    if (error != null) bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요: ${error.message}") }
-                    else shareFile(id, file, "application/pdf", title)
+        val write = { view: WebView, cleanup: () -> Unit ->
+            try {
+                PdfPrint(attrs).write(view.createPrintDocumentAdapter(file.name), file) { error ->
+                    runOnUiThread {
+                        cleanup()
+                        if (error != null) bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요: ${error.message}") }
+                        else if (file.length() < 200) bridge.resolve(id) { throw IllegalStateException("PDF가 비어 있어요") }
+                        else shareFile(id, file, "application/pdf", title)
+                    }
                 }
+            } catch (e: Throwable) {
+                cleanup()
+                bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요: ${e.message}") }
             }
-        } catch (e: Throwable) {
-            bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요: ${e.message}") }
         }
+        if (html.isNullOrBlank()) {
+            write(web) {}
+            return
+        }
+        printWeb?.destroy()
+        val pw = WebView(this)
+        printWeb = pw
+        pw.settings.apply {
+            javaScriptEnabled = false // 그려 둔 그대로만
+            allowFileAccess = false
+            allowContentAccess = false
+            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            blockNetworkImage = false
+        }
+        // 보이지 않아도 쪽 나누기가 되도록 A4 폭쯤으로 배치
+        pw.layout(0, 0, 1240, 1754)
+        var started = false
+        pw.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? = server.handle(request)
+            override fun onPageFinished(view: WebView, url: String?) {
+                if (started) return
+                started = true
+                // 그림·글꼴이 다 그려지도록 조금 기다렸다가
+                view.postDelayed({
+                    write(view) {
+                        if (printWeb === view) printWeb = null
+                        view.postDelayed({ view.destroy() }, 500)
+                    }
+                }, 700)
+            }
+        }
+        pw.loadDataWithBaseURL(WebServer.START, html, "text/html", "utf-8", null)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

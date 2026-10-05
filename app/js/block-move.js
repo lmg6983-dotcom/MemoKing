@@ -113,6 +113,11 @@ export function blockFromTarget(view, target) {
   return null;
 }
 
+/** 지우기 단추를 띄울 "내용" 줄: 그림·소리·파일 줄, 링크 카드·수식·가로줄, 음성 카드 */
+export function isContentBlock(node) {
+  return Boolean(node) && (isContentParagraph(node) || node.type.name === 'mk_link_card' || (node.isBlock && node.isAtom) || isVoiceCard(node));
+}
+
 // 꾹 눌러 옮길 글 줄: 누른 자리가 든 맨 바깥 줄 (목록 항목은 list-drag.js 가, 단추·체크 상자·음성 카드 막대는 그대로)
 const NO_TEXT_GRAB = 'li, button, input, select, textarea, label, a, .mk-voice-bar, .plyr, .mk-tag, [data-tag]';
 export function textBlockFromTarget(view, event) {
@@ -252,6 +257,7 @@ class Mover {
   press(event, kind) {
     const { view } = this;
     if (this.drag) return;
+    this.hideDelete();
     let block = blockFromTarget(view, event.target);
     // 내용 줄이 아니면 글 줄(문단·제목·표·코드·인용·음성 카드): 꾹 눌러야 들어 올린다
     const text = !block;
@@ -344,7 +350,7 @@ class Mover {
     const grabY = p.y - rects[block.index].top;
     const d = {
       block, positions, tops, heights, slots, scale, scroller, badge, drop: null, kind: p.kind,
-      x: p.x2, y: p.y2, startY: p.y + st, raf: 0, timer: 0, shrink, grabX, grabY,
+      x: p.x2, y: p.y2, x0: p.x2, y0: p.y2, startY: p.y + st, raf: 0, timer: 0, shrink, grabX, grabY,
     };
     this.drag = d;
     document.body.classList.add('mk-block-dragging');
@@ -486,6 +492,12 @@ class Mover {
     const { view } = this;
     if (view.isDestroyed) return;
     this.decorate([]);
+    // 꾹 눌러 들어 올렸다가 그 자리에 놓으면(옮기지 않음): 내용이면 오른쪽 위에 지우기 단추
+    if (commit && !d.drop && Math.hypot(d.x - d.x0, d.y - d.y0) < 14) {
+      const block = blockInfo(view.state.doc, d.block.pos, d.block.inner);
+      if (block && isContentBlock(block.node)) this.showDelete(block);
+      return;
+    }
     if (commit && d.drop) {
       const block = blockInfo(view.state.doc, d.block.pos, d.block.inner) ?? d.block;
       const tr = reorderTr(view.state, block, previewOrder(d.positions.length, d.block.index, d.drop));
@@ -494,6 +506,62 @@ class Mover {
         this.flash();
       }
     }
+  }
+
+  // ---------- 지우기 단추: 꾹 눌렀다 놓은 내용의 오른쪽 위 (2초 뒤·다른 것을 고르면 사라짐) ----------
+
+  showDelete(block) {
+    this.hideDelete(true);
+    const { view } = this;
+    const dom = view.nodeDOM(block.pos);
+    if (!(dom instanceof Element)) return;
+    const target = dom.querySelector('img.mk-image, .mk-media, .mk-link-card') && isContentParagraph(block.node) ? dom.querySelector('img.mk-image, .mk-media, .mk-link-card') : dom;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mk-delete-btn';
+    btn.setAttribute('aria-label', '이 내용 지우기');
+    btn.textContent = '×';
+    document.body.append(btn);
+    const place = () => {
+      const r = target.getBoundingClientRect();
+      btn.style.left = `${Math.round(Math.min(window.innerWidth - 40, r.right - 30))}px`;
+      btn.style.top = `${Math.round(Math.max(4, r.top - 10))}px`;
+    };
+    place();
+    target.classList.add('mk-delete-target');
+    const del = { btn, pos: block.pos, node: block.node, state: view.state, place, target };
+    this.del = del;
+    const remove = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const node = view.state.doc.nodeAt(del.pos);
+      if (!node || node !== del.node) return this.hideDelete();
+      navigator.vibrate?.(15);
+      target.classList.add('mk-deleting');
+      btn.remove();
+      setTimeout(() => {
+        if (view.isDestroyed) return;
+        const now = view.state.doc.nodeAt(del.pos);
+        if (now === del.node) view.dispatch(view.state.tr.delete(del.pos, del.pos + now.nodeSize).scrollIntoView());
+        this.hideDelete(true);
+      }, 180);
+    };
+    btn.addEventListener('mousedown', remove);
+    btn.addEventListener('touchstart', remove, { passive: false });
+    window.addEventListener('scroll', place, true);
+    del.timer = setTimeout(() => this.hideDelete(), 2000);
+  }
+
+  hideDelete(now = false) {
+    const del = this.del;
+    if (!del) return;
+    this.del = null;
+    clearTimeout(del.timer);
+    window.removeEventListener('scroll', del.place, true);
+    del.target.classList.remove('mk-delete-target');
+    if (now) return del.btn.remove();
+    del.btn.classList.add('fading');
+    setTimeout(() => del.btn.remove(), 260);
   }
 
   // 옮긴 줄이 잠깐 반짝여 어디로 갔는지 보여 준다
@@ -527,6 +595,7 @@ class Mover {
 
   update(view, prev) {
     this.view = view;
+    if (this.del && (view.state.doc !== this.del.state.doc || !view.state.selection.eq(this.del.state.selection))) this.hideDelete();
     if (this.drag || this.pressing) return;
     const block = view.editable ? contentBlockAt(view.state) : null;
     const key = block ? `${block.pos}` : null;
@@ -575,6 +644,7 @@ class Mover {
     if (this.drag) this.finish(false);
     clearTimeout(this.flashTimer);
     this.hideHint();
+    this.hideDelete(true);
   }
 }
 

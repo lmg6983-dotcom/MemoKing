@@ -1295,3 +1295,31 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-doc p.mk-image-line > .mk-image + .mk-image, .mk-doc p.mk-image-line > .mk-media + .mk-media { margin-top: 6px; }
 .mk-doc .mk-voice-body > p.mk-image-line { margin: 0; }
 .mk-doc p.mk-image-line:has(.mk-media) { width: auto; }
+
+/* 꾹 눌렀다 놓은 내용의 지우기 단추 (오른쪽 위, 2초 뒤 사라짐) — block-move.js */
+.mk-delete-btn {
+  position: fixed;
+  z-index: 70;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #e5484d;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 34px;
+  text-align: center;
+  box-shadow: 0 3px 10px rgba(229, 72, 77, 0.4), 0 0 0 2px #fff;
+  cursor: pointer;
+  animation: mk-del-in 0.22s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  -webkit-tap-highlight-color: transparent;
+}
+.mk-delete-btn:active { transform: scale(0.9); }
+.mk-delete-btn.fading { opacity: 0; transform: scale(0.7); transition: opacity 0.25s ease-out, transform 0.25s ease-out; pointer-events: none; }
+@keyframes mk-del-in { from { opacity: 0; transform: scale(0.4); } }
+.mk-deleting { transition: opacity 0.18s ease-in, transform 0.18s ease-in; opacity: 0; transform: scale(0.92); }
+@media (prefers-reduced-motion: reduce) { .mk-delete-btn { animation: none; } }
+@media print { .mk-delete-btn { display: none !important; } }
+.mk-delete-target { outline: 2px solid color-mix(in srgb, #e5484d 55%, transparent); outline-offset: 3px; border-radius: 6px; transition: outline-color 0.25s; }
