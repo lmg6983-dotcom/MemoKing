@@ -112,7 +112,7 @@ export function flush() {
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
-    setStatus('저장하지 못했어요. 메모 폴더가 연결돼 있는지 확인해 주세요.', true);
+    setStatus('저장하지 못했어요. 저장 위치를 확인해 주세요', true);
   }
 }
 
@@ -130,7 +130,7 @@ function applyExternal(next) {
 export function onVaultChanged({ ids, external, removed }) {
   if (!id || !editor) return;
   if (removed.includes(id)) {
-    el.bannerText.textContent = '메모 폴더에서 이 메모가 사라졌어요. 계속 쓰면 다시 저장할게요.';
+    el.bannerText.textContent = '이 메모가 저장 위치에서 사라졌어요. 계속 쓰면 다시 저장돼요.';
     el.bannerLoad.hidden = true;
     el.banner.hidden = false;
     return;
@@ -141,7 +141,7 @@ export function onVaultChanged({ ids, external, removed }) {
     if (!isDirty()) applyExternal(next);
     else {
       pendingExternal = next;
-      el.bannerText.textContent = '다른 곳에서 이 메모를 고쳤어요.';
+      el.bannerText.textContent = '다른 기기에서 이 메모가 바뀌었어요.';
       el.bannerLoad.hidden = false;
       el.banner.hidden = false;
     }
@@ -277,7 +277,7 @@ function renderTagGroups() {
     head.append(tagChip(g.name, { count: g.memos.length, onClick: () => app.filterByTag(g.name) }));
     const more = document.createElement('span');
     more.className = 'link-tag-hint';
-    more.textContent = g.memos.length ? '누르면 목록에서 모아 보기' : '아직 이 태그를 단 다른 메모가 없어요';
+    more.textContent = g.memos.length ? '목록에서 모아 보기' : '같은 태그의 다른 메모가 없어요';
     head.append(more);
     const ul = document.createElement('ul');
     ul.className = 'link-list';
@@ -410,12 +410,12 @@ function autoTag(memoId, body) {
   } catch {
     return;
   }
-  toast(`태그 ${sure.map((t) => `#${t.name}`).join(' ')} 를 달았어요`, false, {
+  toast(`${sure.map((t) => `#${t.name}`).join(' ')} 태그를 달았어요`, false, {
     label: '되돌리기',
     run: () => {
       app.vault.save(memoId, body);
       dismissed.add(memoId);
-      toast('태그를 떼었어요');
+      toast('태그를 뺐어요');
     },
   });
 }
@@ -481,16 +481,16 @@ async function pickAndInsert(accept) {
   }
   if (!files?.length || !editor) return;
   try {
-    setStatus(`파일 ${files.length}개를 메모 폴더에 넣고 있어요`);
+    setStatus(`파일 ${files.length}개 추가 중…`);
     const items = tempsToItems(files);
     // 쓰던 자리가 있으면 그 자리에, 아니면(키보드를 내리고 버튼만 누름) 메모 끝에
     const typing = el.editorRoot.contains(document.activeElement);
     editor.insertItems(items, { atCursor: typing });
     flush();
-    setStatus(`파일 ${items.length}개를 넣었어요`);
+    setStatus(`파일 ${items.length}개를 추가했어요`);
   } catch (err) {
     console.error(err);
-    setStatus('파일을 넣지 못했어요. 다시 시도해 주세요.', true);
+    setStatus('파일을 추가하지 못했어요. 다시 시도해 주세요', true);
   }
 }
 
@@ -769,7 +769,7 @@ export async function openNote(memoId, options = {}) {
   if (id) closeNote({ quiet: true });
   const next = app.vault.get(memoId);
   if (!next) {
-    toast('메모를 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요.', true);
+    toast('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
     return;
   }
   opening = (async () => {

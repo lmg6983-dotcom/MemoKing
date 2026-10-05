@@ -66,7 +66,7 @@ class RecorderService : Service() {
                 ctx.startForegroundService(intent)
             } catch (e: Exception) {
                 session = null
-                throw IllegalStateException("녹음을 시작하지 못했어요: ${e.message}")
+                throw IllegalStateException("녹음을 시작하지 못했어요. 다른 앱이 마이크를 쓰고 있는지 확인해 주세요")
             }
             return JSONObject().put("stt", s.stt).put("reason", reason ?: "")
         }
@@ -183,13 +183,13 @@ class RecorderService : Service() {
         val b = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_crown)
             .setColor(0xFFE5484D.toInt())
-            .setContentTitle(if (s.paused) "녹음 잠시 멈춤" else if (s.stt) "녹음 · 받아쓰는 중" else "녹음 중")
-            .setContentText(s.lastText().ifEmpty { "메모킹 · 눌러서 메모 열기" })
+            .setContentTitle(if (s.paused) "녹음 일시 정지" else if (s.stt) "녹음·받아쓰는 중" else "녹음 중")
+            .setContentText(s.lastText().ifEmpty { "눌러서 메모 열기" })
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setContentIntent(content)
-            .addAction(if (s.paused) action(ACTION_RESUME, "이어서", 7303) else action(ACTION_PAUSE, "잠시 멈춤", 7304))
+            .addAction(if (s.paused) action(ACTION_RESUME, "이어서", 7303) else action(ACTION_PAUSE, "일시 정지", 7304))
             .addAction(action(ACTION_STOP, "끝내기", 7305))
         if (!s.paused) b.setUsesChronometer(true).setWhen(System.currentTimeMillis() - s.elapsedMs()).setShowWhen(true)
         if (Build.VERSION.SDK_INT >= 31) b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)

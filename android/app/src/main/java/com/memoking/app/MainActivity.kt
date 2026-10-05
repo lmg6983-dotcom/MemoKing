@@ -439,7 +439,7 @@ class MainActivity : Activity() {
                         contentResolver.takePersistableUriPermission(
                             uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                         )
-                        Vaults.use(this, uri.toString()) ?: throw IllegalStateException("이 폴더는 쓸 수 없어요. 다른 폴더를 골라 주세요")
+                        Vaults.use(this, uri.toString()) ?: throw IllegalStateException("이 폴더는 쓸 수 없어요. 다른 폴더를 선택해 주세요")
                         bridge.vaultInfo()
                     }
                 }
@@ -456,7 +456,7 @@ class MainActivity : Activity() {
 
     fun openVaultFile(id: Int, rel: String) {
         bridge.resolve(id) {
-            val storage = Vaults.current(this) ?: throw IllegalStateException("메모 폴더가 연결돼 있지 않아요")
+            val storage = Vaults.current(this) ?: throw IllegalStateException("저장 위치가 설정되지 않았어요")
             val uri = storage.shareUri(rel) ?: return@resolve "이 휴대폰의 메모 폴더에 파일이 아직 없어요"
             val intent = Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, VaultFileProvider.mimeOf(rel))
@@ -566,14 +566,14 @@ class MainActivity : Activity() {
                 PdfPrint(attrs).write(view.createPrintDocumentAdapter(file.name), file) { error ->
                     runOnUiThread {
                         cleanup()
-                        if (error != null) bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요: ${error.message}") }
-                        else if (file.length() < 200) bridge.resolve(id) { throw IllegalStateException("PDF가 비어 있어요") }
+                        if (error != null) bridge.resolve(id) { android.util.Log.w("MemoKing", "PDF", error); throw IllegalStateException("PDF를 만들지 못했어요. 다시 시도해 주세요") }
+                        else if (file.length() < 200) bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요. 다시 시도해 주세요") }
                         else shareFile(id, file, "application/pdf", title)
                     }
                 }
             } catch (e: Throwable) {
                 cleanup()
-                bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요: ${e.message}") }
+                bridge.resolve(id) { android.util.Log.w("MemoKing", "PDF", e); throw IllegalStateException("PDF를 만들지 못했어요. 다시 시도해 주세요") }
             }
         }
         if (html.isNullOrBlank()) {

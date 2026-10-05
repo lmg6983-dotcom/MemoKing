@@ -89,7 +89,7 @@ app.api = {
 async function enableHistory(on) {
   const granted = history.setEnabled(on);
   if (on && !granted) {
-    toast('설정에서 "메모킹 알림 보관함"을 켜고 돌아와 주세요');
+    toast('설정에서 "메모킹" 알림 접근을 켜 주세요');
     await call('historyPermission').catch(() => {});
   }
   list.refreshHistory();
@@ -99,11 +99,11 @@ async function enableHistory(on) {
 
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockApp(appId, appName) {
-  if (!(await confirmDialog(`${appName} 알림을 앞으로 모으지 않을까요?\n설정 › 알림 모을 앱 고르기에서 다시 켤 수 있어요.`, '그만 모으기'))) return false;
+  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n설정 › 모을 앱 선택에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const count = history.all().entries.filter((x) => x.appId === appId && x.source !== 'memoking').length;
-  const remove = count > 0 && await confirmDialog(`이미 모은 ${appName} 알림 ${count}개도 지울까요?`, '지우기');
+  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제');
   const removed = history.block(appId, appName, remove);
-  toast(removed ? `${appName} 알림을 그만 모으고 ${removed}개를 지웠어요` : `${appName} 알림을 앞으로 모으지 않아요`);
+  toast(removed ? `${appName} 알림 보관을 멈추고 ${removed}개를 삭제했어요` : `${appName} 알림을 더 이상 보관하지 않아요`);
   return true;
 }
 
@@ -142,7 +142,7 @@ function renderApps() {
     const b = document.createElement('b');
     b.textContent = a.app;
     const small = document.createElement('small');
-    small.textContent = off ? '모으지 않아요' : `알림 ${a.count}개 보관 중`;
+    small.textContent = off ? '보관 안 함' : `알림 ${a.count}개 보관 중`;
     name.append(b, small);
     const sw = document.createElement('input');
     sw.type = 'checkbox';
@@ -152,7 +152,7 @@ function renderApps() {
     sw.addEventListener('change', async () => {
       if (sw.checked) {
         history.unblock(a.appId);
-        toast(`${a.app} 알림을 다시 모아요`);
+        toast(`${a.app} 알림을 다시 보관해요`);
       } else if (!(await blockApp(a.appId, a.app))) sw.checked = true;
       renderApps();
       refreshHistoryRow();
@@ -174,10 +174,10 @@ function refreshHistoryRow() {
   const { enabled, granted } = history.all();
   $('history-enabled').checked = enabled && granted;
   const blockedCount = Object.keys(history.all().blocked ?? {}).length;
-  $('blocked-count').textContent = blockedCount ? `${blockedCount}개 끔` : '';
+  $('blocked-count').textContent = blockedCount ? `${blockedCount}개 꺼짐` : '';
   $('history-note').textContent = enabled && !granted
-    ? '안드로이드 설정에서 "알림 접근"을 허용해야 모을 수 있어요'
-    : '다른 앱 알림을 이 휴대폰에만 모아 둬요 (알림 보관함 탭)';
+    ? '휴대폰 설정에서 "알림 접근"을 허용해 주세요'
+    : '보관함 탭에 모아요 · 이 휴대폰에만 저장'
 }
 
 let notifyAsked = false;
@@ -294,7 +294,7 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="open"]').hidden = inNote;
   memoSheet.querySelector('[data-memo-action="print"]').hidden = !inNote;
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
-  pin.querySelector('span').textContent = memo.pinned ? '목록 맨 위 고정 풀기' : '목록 맨 위에 고정';
+  pin.querySelector('span').textContent = memo.pinned ? '고정 해제' : '맨 위에 고정';
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -328,7 +328,7 @@ memoSheet.addEventListener('click', async (e) => {
       note.flush();
       app.vault.setMeta(id, { pinned: !memo.pinned });
       closeSheet(memoSheet);
-      toast(memo.pinned ? '고정을 풀었어요' : '목록 맨 위에 고정했어요');
+      toast(memo.pinned ? '고정을 해제했어요' : '맨 위에 고정했어요');
       break;
     case 'share':
       closeSheet(memoSheet);
@@ -337,7 +337,7 @@ memoSheet.addEventListener('click', async (e) => {
     case 'copy':
       closeSheet(memoSheet);
       native.copyText(body);
-      toast('글을 복사했어요 (마크다운)');
+      toast('텍스트를 복사했어요');
       break;
     case 'print':
       closeSheet(memoSheet);
@@ -384,15 +384,15 @@ async function deleteMemo(id) {
   if (inNote) app.showList();
   else list.refresh();
   if (isBlankBody(body) || typeof name !== 'string') {
-    toast('메모를 지웠어요');
+    toast('메모를 삭제했어요');
     return;
   }
-  toast(`"${titleOf(body)}" 를 휴지통으로 옮겼어요`, false, {
+  toast('휴지통으로 옮겼어요', false, {
     label: '되돌리기',
     run: () => {
       const restored = app.vault.restoreTrash(name);
       list.refresh();
-      toast(restored ? '메모를 되살렸어요' : '되살리지 못했어요', !restored);
+      toast(restored ? '메모를 복원했어요' : '복원하지 못했어요', !restored);
     },
   });
 }
@@ -406,7 +406,7 @@ function openShare(id) {
   shareFor = id;
   const memo = app.vault.get(id);
   const body = note.currentId() === id ? note.editorMarkdown() : memo?.body ?? '';
-  $('share-sheet-title').textContent = `"${titleOf(body)}" 보내기`;
+  $('share-sheet-title').textContent = '공유';
   $('share-busy').hidden = true;
   for (const b of shareSheet.querySelectorAll('[data-share]')) b.disabled = false;
   openSheet(shareSheet);
@@ -429,7 +429,7 @@ shareSheet.addEventListener('click', async (e) => {
   // 그림·PDF 는 메모 화면에 그려진 모습으로 만든다 (닫혀 있으면 연다)
   for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = true;
   $('share-busy').hidden = false;
-  $('share-busy-text').textContent = kind === 'image' ? '그림을 만들고 있어요' : 'PDF를 만들고 있어요';
+  $('share-busy-text').textContent = kind === 'image' ? '이미지를 만드는 중…' : 'PDF를 만드는 중…';
   try {
     if (note.currentId() !== id) {
       closeSheet(shareSheet);
@@ -453,7 +453,7 @@ shareSheet.addEventListener('click', async (e) => {
     closeSheet(shareSheet);
   } catch (err) {
     console.error(err);
-    toast(err.message || '보내지 못했어요', true);
+    toast(err.message || '공유하지 못했어요', true);
   } finally {
     $('share-busy').hidden = true;
     for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = false;
@@ -500,13 +500,13 @@ app.deliverRecording = async (r) => {
     else memoId = app.vault.import({ body: `${heading}\n\n${parts}\n` });
     list.refresh();
   }
-  toast(transcript ? `녹음 ${duration}과 받아쓴 글을 메모에 넣었어요` : `녹음 ${duration}을 메모에 넣었어요`);
+  toast(transcript ? `녹음(${duration})과 받아쓴 내용을 저장했어요` : `녹음(${duration})을 저장했어요`);
   // 녹음 중에는 못 받아썼으면(모델이 없었음) 이제 녹음 파일로
   if (r.sttPending && recorder.sttOn()) {
     if (recorder.sttReady()) transcribeInto(memoId, [item]);
     else if (recorder.sttEngine() === 'vosk') {
-      toast('받아쓰기 모델을 받으면 이 녹음을 글로 옮길게요', false, {
-        label: '모델 받기',
+      toast('받아쓰기 데이터를 다운로드하면 이 녹음을 텍스트로 옮겨요', false, {
+        label: '다운로드',
         run: () => recorder.downloadModel().then(() => transcribeInto(memoId, [item])).catch(() => {}),
       });
     }
@@ -529,9 +529,9 @@ function refreshNotifyRow() {
   const info = native.info();
   const exact = info.exactAlarms;
   $('notify-note').textContent = exact
-    ? '알림이 꺼져 있으면 버튼을 눌러 허용해 주세요'
-    : '정확한 시각에 울리려면 "알람 및 리마인더" 권한이 필요해요';
-  $('notify-btn').textContent = exact ? '알림 허용하기' : '권한 설정 열기';
+    ? '알림이 오지 않으면 허용해 주세요'
+    : '정확한 시각에 받으려면 "알람 및 리마인더" 권한이 필요해요';
+  $('notify-btn').textContent = exact ? '허용' : '설정 열기';
   $('notify-btn').onclick = () => (exact ? call('notifyPermission').then((ok) => toast(ok ? '알림을 허용했어요' : '휴대폰 설정에서 메모킹 알림을 켜 주세요', !ok)) : call('exactAlarmSettings'));
 }
 
@@ -539,10 +539,10 @@ function openSettings() {
   const info = native.info();
   $('vault-path').textContent = info.vault?.label || '(없음)';
   $('use-internal-2').hidden = Boolean(info.vault?.internal);
-  $('change-vault').textContent = info.vault?.drive ? '휴대폰 폴더 고르기' : '폴더 바꾸기';
+  $('change-vault').textContent = info.vault?.drive ? '휴대폰 폴더 선택' : '위치 변경';
   $('vault-hint').hidden = Boolean(info.vault?.drive);
   $('trash-days').value = String(trashDays());
-  $('version').textContent = `메모킹 안드로이드 ${info.version}`;
+  $('version').textContent = `메모킹 ${info.version}`;
   const n = app.vault?.trashList().length ?? 0;
   $('trash-count').textContent = n ? String(n) : '';
   refreshNotifyRow();
@@ -550,7 +550,7 @@ function openSettings() {
   renderDrive();
   $('auto-tags').checked = note.autoTagsOn();
   $('rec-stt').checked = recorder.sttOn();
-  $('rec-stt-note').textContent = '말하는 대로 글로 옮겨요 · 화면을 꺼도 계속 녹음해요';
+  $('rec-stt-note').textContent = '말하는 내용을 바로 텍스트로 적어요';
   markEngine(recorder.sttEngine());
   $('stt-engine').querySelector('[data-value="system"]').disabled = !info.record?.system;
   refreshSttRow();
@@ -562,13 +562,13 @@ function refreshSttRow(progress) {
   const vosk = recorder.sttEngine() === 'vosk';
   $('stt-model-row').hidden = !vosk;
   $('stt-engine-note').textContent = vosk
-    ? 'Vosk 는 오픈소스라 인터넷 없이 휴대폰 안에서만 받아써요 (회의 내용이 밖으로 나가지 않아요)'
-    : '휴대폰에 들어 있는 음성 인식(보통 Google)으로 받아써요. 더 정확하지만 휴대폰에 따라 인터넷을 쓸 수 있어요';
+    ? '인터넷 없이 휴대폰 안에서만 처리해요. 녹음 내용이 밖으로 나가지 않아요'
+    : '휴대폰의 음성 인식으로 더 정확하게 받아써요. 인터넷을 쓸 수 있어요';
   const busy = progress != null || st.model === 'downloading';
   $('stt-model-note').textContent = st.model === 'ready'
-    ? '받아 둠 · 인터넷 없이 받아써요'
-    : busy ? `받는 중 ${progress ?? st.progress ?? 0}%` : `처음 한 번 받아요 (${st.modelSize ?? '약 87MB'}, Wi-Fi 추천)`;
-  $('stt-model-btn').textContent = st.model === 'ready' ? '지우기' : busy ? '받는 중' : '받기';
+    ? '설치됨'
+    : busy ? `다운로드 중 ${progress ?? st.progress ?? 0}%` : `처음 한 번 필요해요 · ${(st.modelSize ?? '약 87MB').replace('약 ', '')} · Wi-Fi 권장`;
+  $('stt-model-btn').textContent = st.model === 'ready' ? '삭제' : busy ? '다운로드 중' : '다운로드';
   $('stt-model-btn').disabled = busy;
   refreshSpeakerRow();
 }
@@ -581,11 +581,11 @@ function refreshSpeakerRow(progress) {
   const busy = progress != null || st.speaker === 'downloading';
   const ready = st.speaker === 'ready';
   $('spk-note').textContent = busy
-    ? `받는 중 ${progress ?? 0}%`
+    ? `다운로드 중 ${progress ?? 0}%`
     : ready
-      ? st.speakerOn ? '켜짐 · 말한 사람이 바뀌면 "화자 2:" 처럼 표시해요' : '꺼짐 · 눌러서 다시 켜기'
-      : `목소리 특징으로 회의 참석자를 나눠요 (${st.speakerSize ?? '약 13MB'}, 인터넷 없이)`;
-  $('spk-btn').textContent = busy ? '받는 중' : ready ? (st.speakerOn ? '끄기' : '켜기') : '받기';
+      ? st.speakerOn ? '사용 중 · 말하는 사람마다 "화자 1·2"로 표시해요' : '사용 안 함'
+      : `목소리로 참석자를 구분해 "화자 1·2"로 표시해요 · ${(st.speakerSize ?? '약 13MB').replace('약 ', '')}`;
+  $('spk-btn').textContent = busy ? '다운로드 중' : ready ? (st.speakerOn ? '끄기' : '켜기') : '다운로드';
   $('spk-btn').disabled = busy;
 }
 $('spk-btn').addEventListener('click', async () => {
@@ -595,10 +595,10 @@ $('spk-btn').addEventListener('click', async () => {
     else {
       refreshSpeakerRow(0);
       await call('speakerModel', {});
-      toast('말한 사람 나누기를 켰어요. 다음 녹음부터 사람별로 나눠 적어요');
+      toast('화자 구분을 켰어요. 다음 녹음부터 적용돼요');
     }
   } catch (err) {
-    toast(err.message || '말한 사람 모델을 받지 못했어요. 인터넷 연결을 확인해 주세요', true);
+    toast(err.message || '다운로드하지 못했어요. 인터넷 연결을 확인해 주세요', true);
   }
   refreshSpeakerRow();
 });
@@ -617,7 +617,7 @@ $('stt-engine').addEventListener('click', (e) => {
 });
 $('stt-model-btn').addEventListener('click', async () => {
   if (recorder.sttStatus().model === 'ready') {
-    if (!(await confirmDialog('받아쓰기 모델을 지울까요?\n다시 받아쓰려면 다시 받아야 해요.', '지우기'))) return;
+    if (!(await confirmDialog('받아쓰기 데이터를 삭제할까요?\n받아쓰기를 다시 쓰려면 다운로드해야 해요.', '삭제'))) return;
     await call('sttModel', { delete: true }).catch((err) => toast(err.message, true));
     refreshSttRow();
     return;
@@ -678,15 +678,15 @@ $('change-vault').addEventListener('click', async () => {
   note.flush();
   const error = await chooseFolder();
   if (error) toast(error, true);
-  else if (error === '') toast('메모 폴더를 바꿨어요');
+  else if (error === '') toast('저장 위치를 바꿨어요');
 });
 $('use-internal-2').addEventListener('click', async () => {
-  const ok = await confirmDialog('메모 폴더를 이 휴대폰 안으로 바꿀까요?\n지금 폴더의 메모는 그대로 남아요.', '바꾸기');
+  const ok = await confirmDialog('이 휴대폰에만 저장할까요?\n기존 폴더의 메모는 그대로 남아요.', '바꾸기');
   if (!ok) return;
   note.flush();
   native.useInternalVault();
   openVault();
-  toast('이 휴대폰 안 폴더로 바꿨어요');
+  toast('이 휴대폰에 저장해요');
 });
 
 // ---------- 휴지통 ----------
@@ -717,12 +717,12 @@ function renderTrash() {
     text.append(title, sub);
     const restore = document.createElement('button');
     restore.className = 'btn';
-    restore.textContent = '되살리기';
+    restore.textContent = '복원';
     restore.addEventListener('click', () => {
       const id = app.vault.restoreTrash(t.name);
       renderTrash();
       list.refresh();
-      toast(id ? '메모를 되살렸어요' : '되살리지 못했어요', !id);
+      toast(id ? '메모를 복원했어요' : '복원하지 못했어요', !id);
     });
     const del = document.createElement('button');
     del.className = 'icon-btn danger';
@@ -824,11 +824,11 @@ function askAudioImport(files) {
 async function transcribeInto(memoId, items) {
   for (const item of items) {
     try {
-      toast(`"${item.alt}" 를 받아쓰고 있어요…`);
+      toast('받아쓰는 중…');
       const res = await call('transcribe', { rel: item.src, engine: recorder.sttEngine(), terms: app.sttTerms() });
       const text = polish(String(res?.text ?? '').trim());
       if (!text) {
-        toast('받아쓸 말소리를 찾지 못했어요');
+        toast('인식된 말소리가 없어요');
         continue;
       }
       // 그 소리 줄에 붙여 음성 카드로 (소리 줄을 못 찾으면 메모 끝에)
@@ -840,7 +840,7 @@ async function transcribeInto(memoId, items) {
         if (next) app.vault.save(memoId, next);
         else if (memo) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${importText(text).markdown}\n`);
       }
-      toast('받아쓴 글을 메모에 넣었어요');
+      toast('받아쓴 내용을 추가했어요');
     } catch (err) {
       toast(err.message || '받아쓰지 못했어요', true);
     }
@@ -907,13 +907,13 @@ async function memoFromShare(payload) {
       await editor.imagesSettled();
       note.flush();
       document.activeElement?.blur(); // 키보드는 올리지 않는다 (이어 쓰려면 누르기)
-      toast(audio.length ? '음성 파일로 메모를 만들었어요' : docTexts.length ? '마크다운 문서로 메모를 만들었어요' : '공유받은 내용으로 메모를 만들었어요');
+      toast('메모를 만들었어요');
     },
   });
   if (stt && audioItems.length) {
     if (!recorder.sttReady() && recorder.sttEngine() === 'vosk') {
       try {
-        toast('받아쓰기 모델을 받고 있어요…');
+        toast('받아쓰기 데이터를 다운로드하는 중…');
         await recorder.downloadModel();
       } catch {
         return;
@@ -1034,7 +1034,7 @@ on('history', () => list.refreshHistory());
 on('sync', (st) => {
   renderDrive();
   if (st.changed) app.vault?.scan();
-  if (st.conflicts?.length) toast(`PC와 휴대폰에서 함께 고친 메모 ${st.conflicts.length}개는 "(휴대폰 충돌 …)" 사본으로 남겼어요`);
+  if (st.conflicts?.length) toast(`두 기기에서 동시에 고친 메모 ${st.conflicts.length}개는 사본으로 남겼어요`);
 });
 on('alarm', () => alarms.tick());
 on('keyboard', ({ open }) => {

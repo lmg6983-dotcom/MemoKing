@@ -58,8 +58,8 @@ object Stt {
 
     /** 이 엔진으로 지금 받아쓸 수 있는가 — 안 되면 이유 */
     fun unavailableReason(ctx: Context, engine: String): String? = when (engine) {
-        ENGINE_SYSTEM -> if (systemAvailable(ctx)) null else "이 휴대폰에서는 휴대폰 음성 인식으로 받아쓸 수 없어요 (안드로이드 13 이상)"
-        else -> if (VoskModels.ready(ctx)) null else "받아쓰기 모델을 아직 받지 않았어요 (설정 › 녹음 › 한국어 받아쓰기 모델)"
+        ENGINE_SYSTEM -> if (systemAvailable(ctx)) null else "이 휴대폰은 '정확도 우선' 받아쓰기를 지원하지 않아요 (Android 13 이상)"
+        else -> if (VoskModels.ready(ctx)) null else "받아쓰기 데이터를 먼저 다운로드해 주세요 (설정 › 받아쓰기 데이터)"
     }
 
     /**
@@ -233,7 +233,7 @@ open class VoskPack(val name: String, val sizeLabel: String) {
                     conn = URL(URL(urlZip), next).openConnection() as HttpURLConnection
                     continue
                 }
-                if (code != 200) throw IOException("모델을 받지 못했어요 (HTTP $code)")
+                if (code != 200) throw IOException("다운로드하지 못했어요. 잠시 후 다시 시도해 주세요")
                 break
             }
             val total = conn.contentLengthLong
@@ -276,7 +276,7 @@ open class VoskPack(val name: String, val sizeLabel: String) {
             }
             File(unpack, ".ok").writeText(name)
             dir(ctx).deleteRecursively()
-            if (!unpack.renameTo(dir(ctx))) throw IOException("모델을 풀지 못했어요")
+            if (!unpack.renameTo(dir(ctx))) throw IOException("설치하지 못했어요. 저장 공간을 확인해 주세요")
             progress = 100
             onProgress(100)
         } finally {
@@ -303,7 +303,7 @@ object VoskModels : VoskPack("vosk-model-small-ko-0.22", "약 87MB") {
     @Synchronized
     fun load(ctx: Context): Model {
         model?.let { return it }
-        if (!ready(ctx)) throw IllegalStateException("받아쓰기 모델이 없어요")
+        if (!ready(ctx)) throw IllegalStateException("받아쓰기 데이터가 없어요")
         LibVosk.setLogLevel(LogLevel.WARNINGS)
         return Model(dir(ctx).absolutePath).also { model = it }
     }
@@ -540,7 +540,7 @@ object AudioDecoder {
             extractor.setDataSource(file.absolutePath)
             val track = (0 until extractor.trackCount).firstOrNull {
                 extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
-            } ?: throw IllegalArgumentException("소리가 들어 있지 않은 파일이에요")
+            } ?: throw IllegalArgumentException("음성이 없는 파일이에요")
             extractor.selectTrack(track)
             val format = extractor.getTrackFormat(track)
             val durationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else 0L

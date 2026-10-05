@@ -64,11 +64,11 @@ let downloading = null;
 export function downloadModel() {
   downloading ??= call('sttModel', {})
     .then((st) => {
-      toast('받아쓰기 모델을 받았어요. 이제 인터넷 없이 받아써요');
+      toast('받아쓰기 데이터를 설치했어요');
       return st;
     })
     .catch((err) => {
-      toast(err.message || '모델을 받지 못했어요. 인터넷 연결을 확인해 주세요', true);
+      toast(err.message || '다운로드하지 못했어요. 인터넷 연결을 확인해 주세요', true);
       throw err;
     })
     .finally(() => (downloading = null));
@@ -99,15 +99,15 @@ function render() {
   document.getElementById('note-screen').classList.toggle('recording', Boolean(status.active && attached === status.memoId));
   for (const b of document.querySelectorAll('[data-action="record"]')) {
     b.classList.toggle('active', Boolean(status.active && attached === status.memoId));
-    b.setAttribute('aria-label', status.active ? '녹음 끝내기' : '녹음 · 받아쓰기');
+    b.setAttribute('aria-label', status.active ? '녹음 끝내기' : '녹음');
   }
   renderPill();
   if (!show) return;
   el.time.textContent = formatDuration(elapsed());
-  el.state.textContent = status.paused ? '잠시 멈춤' : status.stt ? '녹음 · 받아쓰는 중' : '녹음 중';
+  el.state.textContent = status.paused ? '일시 정지' : status.stt ? '녹음·받아쓰는 중' : '녹음 중';
   el.panel.classList.toggle('paused', status.paused);
   el.pause.replaceChildren(svg(status.paused ? 'play' : 'pause'));
-  el.pause.setAttribute('aria-label', status.paused ? '이어서 녹음' : '잠시 멈춤');
+  el.pause.setAttribute('aria-label', status.paused ? '이어서 녹음' : '일시 정지');
   const text = status.text || '';
   el.text.hidden = !status.stt && !text;
   el.text.replaceChildren();
@@ -121,7 +121,7 @@ function render() {
   if (!text && !status.partial) {
     const span = document.createElement('span');
     span.className = 'rec-hint';
-    span.textContent = status.stt ? '말하면 여기에 글로 나타나요' : '받아쓰기 없이 녹음만 해요';
+    span.textContent = status.stt ? '말하면 여기에 텍스트로 나타나요' : '녹음만 하고 있어요';
     el.text.append(span);
   }
   el.text.scrollTop = el.text.scrollHeight;
@@ -201,12 +201,12 @@ export function detach() {
 export async function start(memoId) {
   if (!memoId) return;
   if (status.active) {
-    if (status.memoId !== memoId) toast('다른 메모에서 녹음하고 있어요. 그 녹음을 먼저 끝내 주세요', true);
+    if (status.memoId !== memoId) toast('다른 메모에서 녹음 중이에요. 먼저 끝내 주세요', true);
     return;
   }
   try {
     if (!(await call('micPermission'))) {
-      toast('녹음하려면 마이크를 허용해 주세요 (휴대폰 설정 › 앱 › 메모킹 › 권한)', true);
+      toast('녹음하려면 마이크 권한을 허용해 주세요', true);
       return;
     }
     const res = await call('recordStart', { memoId, stt: sttOn(), engine: sttEngine(), terms: app.sttTerms?.() ?? [] });
@@ -215,8 +215,8 @@ export async function start(memoId) {
     if (sttOn() && !res?.stt) {
       // 모델이 없으면 녹음은 그대로 하면서 받아 두고, 끝내면 녹음 파일로 받아쓴다
       if (sttEngine() === 'vosk' && sttStatus().model !== 'ready') {
-        toast(`받아쓰기 모델(${sttStatus().modelSize ?? '약 87MB'})이 필요해요. 녹음은 계속돼요`, false, { label: '지금 받기', run: () => downloadModel().catch(() => {}) });
-      } else toast(res?.reason || '받아쓰기를 할 수 없어 녹음만 해요');
+        toast('받아쓰기 데이터가 필요해요. 녹음은 계속돼요', false, { label: '다운로드', run: () => downloadModel().catch(() => {}) });
+      } else toast(res?.reason || '받아쓰기를 쓸 수 없어 녹음만 해요');
     }
     document.activeElement?.blur();
   } catch (err) {

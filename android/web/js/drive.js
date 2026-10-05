@@ -39,11 +39,11 @@ $('client-save').addEventListener('click', () => {
   const id = $('client-id').value.trim();
   const secret = $('client-secret').value.trim();
   if (!/\.apps\.googleusercontent\.com$/.test(id)) {
-    toast('클라이언트 ID는 ".apps.googleusercontent.com" 으로 끝나요', true);
+    toast('연결 ID를 다시 확인해 주세요 (".apps.googleusercontent.com"으로 끝나요)', true);
     return;
   }
   if (!secret) {
-    toast('클라이언트 보안 비밀번호를 넣어 주세요', true);
+    toast('연결 비밀번호를 넣어 주세요', true);
     return;
   }
   drive.setClient(id, secret);
@@ -69,7 +69,7 @@ async function login(browser) {
   $('drive-login').disabled = true;
   $('login-wait').hidden = false;
   $('login-cancel').hidden = !browser;
-  $('login-wait-text').textContent = browser ? '브라우저에서 로그인을 기다리고 있어요' : '구글 계정을 확인하고 있어요';
+  $('login-wait-text').textContent = browser ? '브라우저에서 로그인해 주세요…' : '구글 계정을 확인하는 중…';
   try {
     const { email } = await call('driveLogin', { browser });
     toast(email ? `${email} 계정으로 연결했어요` : '구글 계정으로 연결했어요');
@@ -94,7 +94,7 @@ function openFolders() {
   $('drive-account').textContent = s.email ? `${s.email} 의 Google Drive` : '';
   const count = app.vault && !app.vaultInfo?.drive ? app.vault.list().length : 0;
   $('import-row').hidden = count === 0;
-  $('import-note').textContent = `메모 ${count}개 — 같은 이름의 메모가 이미 있으면 Drive 것을 남기고 휴대폰 것은 사본으로 둬요`;
+  $('import-note').textContent = `메모 ${count}개 · 같은 이름이 있으면 사본으로 올려요`;
   loadFolders();
 }
 
@@ -107,7 +107,7 @@ async function loadFolders() {
   $('folder-empty').hidden = true;
   const use = $('folder-use');
   use.disabled = here.id === 'root';
-  use.textContent = here.id === 'root' ? '폴더를 골라 주세요' : `"${here.name}" 폴더 쓰기`;
+  use.textContent = here.id === 'root' ? '폴더를 선택하세요' : `"${here.name}" 폴더 사용`;
   let folders;
   try {
     folders = await call('driveFolders', { parent: here.id });
@@ -128,7 +128,7 @@ async function loadFolders() {
     b.append(icon('folder'), name);
     if (f.name === SUGGEST && here.id === 'root') {
       const tag = document.createElement('small');
-      tag.textContent = 'PC 메모 폴더';
+      tag.textContent = 'PC 메모';
       b.append(tag);
     }
     b.append(icon('chevron'));
@@ -178,7 +178,7 @@ $('folder-use').addEventListener('click', async () => {
     closeSheet(sheet);
     onConnected();
     if (status.state === 'error') toast(status.error, true);
-    else toast(`Google Drive "${here.name}" 폴더와 동기화했어요`);
+    else toast(`"${here.name}" 폴더와 동기화했어요`);
   } catch (err) {
     toast(err.message, true);
     showStep('folder');
@@ -217,12 +217,12 @@ export function renderStatus(s = drive.status()) {
       : st.state === 'error' ? st.error
       : [s.email, st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'].filter(Boolean).join(' · ');
   } else {
-    $('drive-title').textContent = s.connected ? '폴더를 아직 고르지 않았어요' : '연결 안 됨';
-    $('drive-sub').textContent = s.connected ? s.email : 'PC 메모킹과 같은 메모를 쓰려면 연결하세요';
+    $('drive-title').textContent = s.connected ? '폴더를 선택하세요' : '연결 안 됨';
+    $('drive-sub').textContent = s.connected ? s.email : 'PC와 같은 메모를 함께 써요';
   }
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;
-  $('drive-connect').textContent = s.active && s.connected ? '폴더 바꾸기' : '연결하기';
+  $('drive-connect').textContent = s.active && s.connected ? '폴더 변경' : '연결하기';
 }
 
 export async function syncNow() {
@@ -230,7 +230,7 @@ export async function syncNow() {
   try {
     const st = await call('driveSync');
     if (st.state === 'error') toast(st.error, true);
-    else toast('Google Drive와 맞췄어요');
+    else toast('동기화했어요');
   } catch (err) {
     toast(err.message, true);
   }

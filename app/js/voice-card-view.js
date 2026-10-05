@@ -109,7 +109,7 @@ function voiceView(node) {
     dom.classList.toggle('folded', folded && lines > 0);
     dom.classList.toggle('has-text', lines > 0);
     const who = speakers >= 2 ? ` · 화자 ${speakers}명` : '';
-    label.textContent = folded ? `받아쓴 글 ${lines}줄${who}` : `받아쓴 글 접기${who ? ` (${lines}줄${who})` : ''}`;
+    label.textContent = folded ? `받아쓰기 ${lines}줄${who}` : `접기${who}`;
     peek.textContent = folded && first ? first : '';
     toggle.setAttribute('aria-expanded', String(!folded));
   }
