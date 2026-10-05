@@ -345,6 +345,7 @@ try {
   for (let i = 1; i <= 8; i++) await touch('touchMove', img.x + 60, img.y + 60 + ((to - img.y - 60) * i) / 8);
   await page.waitForTimeout(120);
   check('그림 줄 옮기기: 맞바꾸기 안내', (await page.textContent('.mk-drag-badge')).includes('맞바꾸기'));
+  check('그림 줄 옮기기: 맞바꿀 줄에 점선 테두리', (await page.locator('.mk-block-swap-target').count()) === 1 && await page.isHidden('.mk-drop-slot'));
   await shot('06b-move-drag');
   await touch('touchEnd', 0, 0);
   await page.waitForTimeout(900);
@@ -359,6 +360,11 @@ try {
   for (let i = 1; i <= 8; i++) await touch('touchMove', img2.x + 60, img2.y + 60 + ((to2 - img2.y - 60) * i) / 8);
   await page.waitForTimeout(120);
   check('그림 줄 옮기기: 끼우기 안내', (await page.textContent('.mk-drag-badge')).includes('넣기'));
+  {
+    const slotBox = await page.locator('.mk-drop-slot').boundingBox();
+    check('그림 줄 옮기기: 끼울 자리에 점선 칸 (그림 크기만큼)', Boolean(slotBox) && slotBox.height > 60, JSON.stringify(slotBox));
+    await shot('06d-drop-slot');
+  }
   await touch('touchEnd', 0, 0);
   await page.waitForTimeout(900);
   logo = read('로고 사진.md');

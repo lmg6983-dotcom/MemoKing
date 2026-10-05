@@ -348,7 +348,13 @@ class Mover {
     const shrink = h > THUMB_MIN ? Math.max(0.22, Math.min(0.7, THUMB_H / h)) : 1;
     const grabX = p.x - rects[block.index].left; // 누른 자리 (내용 안, 화면 px) — 여기를 중심으로 줄인다
     const grabY = p.y - rects[block.index].top;
+    // 놓을 자리 미리 보기: 손을 놓기 전에 옮겨질 자리에 점선 테두리 칸
+    const slot = document.createElement('div');
+    slot.className = 'mk-drop-slot';
+    slot.hidden = true;
+    document.body.append(slot);
     const d = {
+      slot, left: rects[block.index].left, width: rects[block.index].width,
       block, positions, tops, heights, slots, scale, scroller, badge, drop: null, kind: p.kind,
       x: p.x2, y: p.y2, x0: p.x2, y0: p.y2, startY: p.y + st, raf: 0, timer: 0, shrink, grabX, grabY,
     };
@@ -448,6 +454,17 @@ class Mover {
     let y = tops[0];
     order.forEach((i) => {
       if (i === s) {
+        // 끼울 자리(다른 줄들이 비켜 연 틈)에 점선 칸 — 맞바꾸기는 그 줄 자체에 점선(mk-block-swap-target)
+        const sl = d.slot;
+        sl.hidden = d.drop?.kind !== 'insert';
+        if (!sl.hidden) {
+          const st = d.scroller?.scrollTop ?? 0;
+          sl.style.left = `${Math.round(d.left - 4)}px`;
+          sl.style.width = `${Math.round(d.width + 8)}px`;
+          sl.style.top = `${Math.round(y - st - 3)}px`;
+          sl.style.height = `${Math.round(heights[s] + 6)}px`;
+          sl.dataset.kind = d.drop.kind;
+        }
         let style = `transform: translateY(${(follow / scale).toFixed(1)}px)`;
         if (d.shrink < 1) {
           // 누른 자리를 중심으로 줄이고, 손가락에 가리지 않게 썸네일 아래 끝이 손가락보다 위에 오도록 올린다
@@ -480,6 +497,7 @@ class Mover {
     window.removeEventListener('selectstart', d.stop, true);
     window.removeEventListener('contextmenu', d.stop, true);
     d.badge.remove();
+    d.slot.remove();
     document.body.classList.remove('mk-block-dragging');
     this.drag = null;
     // 끈 뒤 따라오는 클릭(파일 열기·링크 열기)은 먹는다

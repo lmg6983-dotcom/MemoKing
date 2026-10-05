@@ -1340,3 +1340,20 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .tag-suggest-bar .icon-btn { flex: none; width: 26px; height: 26px; }
 .tag-suggest-bar .icon-btn svg { width: 14px; height: 14px; }
 @media print { .tag-suggest-bar { display: none !important; } }
+
+/* 놓을 자리 미리 보기: 끄는 동안, 손을 놓으면 옮겨질 자리에 점선 칸 (block-move.js) */
+.mk-drop-slot {
+  position: fixed;
+  z-index: 55;
+  box-sizing: border-box;
+  border: 2px dashed color-mix(in srgb, var(--note-text, #111) 55%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand-yellow, #ffcc00) 16%, transparent);
+  pointer-events: none;
+  transition: top 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: mk-slot-in 0.18s ease-out, mk-slot-breathe 1.4s ease-in-out 0.18s infinite;
+}
+.mk-drop-slot[hidden] { display: none; }
+@keyframes mk-slot-in { from { opacity: 0; transform: scale(0.96); } }
+@keyframes mk-slot-breathe { 50% { border-color: color-mix(in srgb, var(--note-text, #111) 30%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .mk-drop-slot { animation: none; transition: none; } }
