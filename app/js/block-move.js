@@ -194,6 +194,24 @@ const HINT_KEY = 'memoking.hint.blockMove';
 const COMPACT_H = 64; // 옮기는 동안 줄마다 이 높이까지만 보인다 (px) — note.css 의 .mk-block-compact-item 과 같게
 const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
 
+// ---------- 손가락 입력 보정 (터치) ----------
+// 줄의 높이와 상관없이 손가락을 약 STEP_PX 만큼 움직이면 한 칸 — 큰 내용 앞뒤로도 조금만 움직이면 되게.
+// 끄는 내용은 손가락보다 앞서 움직여 손가락에 가리지 않는다. 마우스는 그대로(1배)
+const STEP_PX = 40;
+export function dragGain(kind, slots) {
+  if (kind !== 'touch' || !slots.length) return 1;
+  const sorted = [...slots].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  return Math.min(2.2, Math.max(1, median / STEP_PX));
+}
+// 보정한 손가락 높이(화면 좌표): 들어 올린 자리에서 움직인 만큼 × 배율 (+ 접혀서 생긴 차이), 화면 밖으로는 안 나가게
+function virtualY(d) {
+  const y = d.y0 + (d.y - d.y0) * d.gain + d.bias;
+  const r = !d.scroller || d.scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : d.scroller.getBoundingClientRect();
+  return Math.min(r.bottom - 2, Math.max(r.top + 2, y));
+}
+const HYSTERESIS_PX = 10; // 판정이 바뀐 뒤 이만큼은 더 움직여야 다시 바뀐다 (경계에서 깜빡이지 않게)
+
 /** @param {{ readOnly?: boolean }} options */
 export function createBlockMove({ readOnly = false } = {}) {
   let mover = null;
@@ -369,11 +387,13 @@ class Mover {
     document.body.append(slot);
     const d = {
       slot, left: rects[block.index].left, width: rects[block.index].width, compactCls, bias, ratio,
+      gain: dragGain(p.kind, slots), lastKey: '', lastCy: null,
       block, positions, tops, heights, slots, scale, scroller, badge, drop: null, kind: p.kind,
       x: p.x2, y: p.y2, x0: p.x2, y0: p.y2, raf: 0, timer: 0, shrink, grabX, grabY,
     };
     this.drag = d;
     document.body.classList.add('mk-block-dragging');
+    document.body.dataset.dragGain = d.gain.toFixed(2); // 점검용 · 보정 배율
     if (p.kind === 'touch') navigator.vibrate?.(15);
     this.judge();
 
@@ -419,7 +439,7 @@ class Mover {
     d.timer = setInterval(() => {
       if (this.drag !== d || !d.scroller) return;
       const r = d.scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : d.scroller.getBoundingClientRect();
-      const dy = edgeScroll(d.y, r.top, r.bottom, 48);
+      const dy = edgeScroll(virtualY(d), r.top, r.bottom, 48); // 끄는 내용(보정한 자리)이 가장자리에 닿으면
       if (dy) {
         d.scroller.scrollTop += dy;
         this.judge();
@@ -432,7 +452,7 @@ class Mover {
   judge() {
     const d = this.drag;
     if (!d) return;
-    const cy = d.y + d.bias + (d.scroller?.scrollTop ?? 0);
+    const cy = virtualY(d) + (d.scroller?.scrollTop ?? 0);
     const n = d.tops.length;
     const s = d.block.index;
     let drop;
@@ -444,7 +464,16 @@ class Mover {
       drop = dropAt(k, Math.min(1, Math.max(0, (cy - d.tops[k]) / Math.max(1, d.heights[k]))));
     }
     const same = drop.kind === 'swap' ? drop.index === s : drop.index === s || drop.index === s + 1;
-    d.drop = same ? null : drop;
+    const next = same ? null : drop;
+    const key = next ? `${next.kind}:${next.index}` : '';
+    if (key !== d.lastKey) {
+      // 경계 근처의 작은 떨림으로는 바꾸지 않는다
+      if (d.lastCy != null && Math.abs(cy - d.lastCy) < HYSTERESIS_PX) return this.preview();
+      d.lastKey = key;
+      d.lastCy = cy;
+      d.drop = next;
+      if (d.kind === 'touch' && next) navigator.vibrate?.(6); // 놓을 자리가 바뀔 때 톡
+    } else d.lastCy = d.lastCy ?? cy;
     this.preview();
     const b = d.badge;
     b.dataset.kind = d.drop?.kind ?? '';
@@ -469,7 +498,7 @@ class Mover {
     const s = d.block.index;
     const order = previewOrder(positions.length, s, d.drop);
     const bottom = tops.at(-1) + heights.at(-1);
-    let follow = d.y + d.bias + (d.scroller?.scrollTop ?? 0) - (tops[s] + d.ratio * heights[s]);
+    let follow = virtualY(d) + (d.scroller?.scrollTop ?? 0) - (tops[s] + d.ratio * heights[s]);
     follow = Math.min(bottom - heights[s] + 8, Math.max(tops[0] - 8, tops[s] + follow)) - tops[s];
     const specs = [];
     let y = tops[0];
@@ -520,6 +549,7 @@ class Mover {
     d.badge.remove();
     d.slot.remove();
     document.body.classList.remove('mk-block-dragging', 'mk-block-compact');
+    delete document.body.dataset.dragGain;
     this.drag = null;
     // 끈 뒤 따라오는 클릭(파일 열기·링크 열기)은 먹는다
     const swallow = (e) => {

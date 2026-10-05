@@ -345,10 +345,16 @@ try {
   await shot('06c-compact');
   const ratio1 = 60 / img.height;
   const dy1 = textBox.y + textBox.height / 2 - (liftBox.y + ratio1 * liftBox.height);
-  check('옮기는 동안 접기: 옆 줄까지 손가락 이동이 짧음', Math.abs(dy1) < 110, String(dy1));
-  for (let i = 1; i <= 8; i++) await touch('touchMove', img.x + 60, img.y + 60 + (dy1 * i) / 8);
+  const gain1 = Number(await page.evaluate(() => document.body.dataset.dragGain));
+  check('손가락 입력 보정: 줄 높이와 상관없이 짧게 움직여도 옆 줄까지 (배율 1~2.2)', gain1 >= 1 && gain1 <= 2.2 && Math.abs(dy1 / gain1) < 70, JSON.stringify({ dy1, gain1 }));
+  for (let i = 1; i <= 8; i++) await touch('touchMove', img.x + 60, img.y + 60 + (dy1 / gain1 * i) / 8);
   await page.waitForTimeout(120);
   check('그림 줄 옮기기: 맞바꾸기 안내', (await page.textContent('.mk-drag-badge')).includes('맞바꾸기'));
+  {
+    const bb = await page.locator('.mk-drag-badge').boundingBox();
+    const fy = img.y + 60 + dy1 / gain1;
+    check('안내 캡슐이 손가락에 가리지 않음 (손가락보다 위)', bb && bb.y + bb.height < fy - 20, JSON.stringify({ bb, fy }));
+  }
   check('그림 줄 옮기기: 맞바꿀 줄에 점선 테두리', (await page.locator('.mk-block-swap-target').count()) === 1 && await page.isHidden('.mk-drop-slot'));
   await shot('06b-move-drag');
   await touch('touchEnd', 0, 0);
@@ -364,7 +370,8 @@ try {
     const lb2 = await page.locator('.mk-doc .mk-block-lift').boundingBox();
     const tb2 = await page.locator('.mk-doc p', { hasText: '새 아이콘 시안' }).boundingBox();
     const dy2 = tb2.y + 3 - (lb2.y + (60 / img2.height) * lb2.height);
-    for (let i = 1; i <= 8; i++) await touch('touchMove', img2.x + 60, img2.y + 60 + (dy2 * i) / 8);
+    const gain2 = Number(await page.evaluate(() => document.body.dataset.dragGain));
+    for (let i = 1; i <= 8; i++) await touch('touchMove', img2.x + 60, img2.y + 60 + (dy2 / gain2 * i) / 8);
   }
   await page.waitForTimeout(120);
   check('그림 줄 옮기기: 끼우기 안내', (await page.textContent('.mk-drag-badge')).includes('넣기'));
@@ -715,6 +722,32 @@ try {
   await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
   await page.waitForTimeout(300);
   check('빈 체크리스트: 다시 열어도 체크 상자 3개', (await page.locator('.mk-doc li[data-item-type="task"]').count()) === 3, read('빈 체크.md'));
+  await back();
+  await page.waitForTimeout(300);
+
+  // 큰 사진이 여럿 있어도: 손가락을 조금(약 3칸 × 40px)만 움직이면 세 칸 아래로
+  for (const n of ['p1', 'p2', 'p3', 'p4', 'p5']) fs.copyFileSync(path.join(repo, 'assets/icons/icon-256.png'), path.join(vault, `attachments/${n}.png`));
+  write('사진 다섯.md', '---\nid: 00000000-0000-4000-8000-0000000000ee\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 사진 다섯\n\n![p1](attachments/p1.png)\n\n![p2](attachments/p2.png)\n\n![p3](attachments/p3.png)\n\n![p4](attachments/p4.png)\n\n![p5](attachments/p5.png)\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000ee"]');
+  await page.waitForSelector('#note-screen:not([hidden]) img.mk-image');
+  await page.waitForTimeout(500);
+  {
+    const p1 = await page.locator('img.mk-image').first().boundingBox();
+    const fx = p1.x + 60;
+    const fy = p1.y + 60;
+    await touch('touchStart', fx, fy);
+    await page.waitForTimeout(600);
+    for (let i = 1; i <= 10; i++) await touch('touchMove', fx, fy + (135 * i) / 10);
+    await page.waitForTimeout(150);
+    await shot('20-many-photos-drag');
+    await touch('touchEnd', fx, fy + 135);
+    await page.waitForTimeout(900);
+    const t = read('사진 다섯.md');
+    const at = ['p1', 'p2', 'p3', 'p4', 'p5'].map((n) => t.indexOf(`(attachments/${n}.png)`));
+    check('손가락 입력 보정: 큰 사진 5장 사이에서 손가락 135px 로 세 칸 이상 아래로', at[0] > at[3], t.split('---').pop());
+  }
   await back();
   await page.waitForTimeout(300);
 
