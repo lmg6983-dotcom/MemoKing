@@ -3,7 +3,7 @@
 //   - 마우스: 내용을 누른 채 끌면 바로 들어 올려진다 (그냥 누르면 지금처럼 고르기·열기)
 //   - 터치: 꾹(0.4초) 누르면 테두리가 진해지다 "톡" 들어 올려지고, 손가락을 떼지 않고 끈다 (그냥 밀면 스크롤)
 //   - 끄는 줄은 손을 따라오고, 다른 줄들은 놓으면 될 자리로 미끄러져 틈을 연다.
-//     다른 줄의 가운데 = 맞바꾸기, 줄과 줄 사이 = 끼우기 (손 옆에 ⇅ 맞바꾸기 / ↳ 여기에 넣기). Esc 취소
+//     다른 줄의 가운데 = 맞바꾸기, 줄과 줄 사이 = 끼우기 (그 틀 오른쪽에 ⇅ 맞바꾸기 / ↳ 여기에 넣기 — drag-frames.js). Esc 취소
 //   - 키보드: 내용을 고른 채 Alt+↑ / Alt+↓ 로 한 줄씩
 //   - 처음 한 번, 내용을 고르면 옮기는 방법을 작은 안내로 알려 준다
 //   - 줄 = 같은 상자(본문·인용·목록 항목) 안의 블록 하나
@@ -16,6 +16,8 @@ import { Plugin, PluginKey, TextSelection, NodeSelection, Decoration, Decoration
 import { previewOrder, dropAt } from './core/list-order.js';
 import { HOLD_MS, TOUCH_HOLD_MS } from './list-drag.js';
 import { isVoiceCard } from './voice-card-view.js';
+import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
+import { DragFrames } from './drag-frames.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
 
@@ -191,26 +193,19 @@ const INPUT = {
 const pointOf = (e) => e.touches?.[0] ?? e.changedTouches?.[0] ?? e;
 const LISTEN = { capture: true, passive: false };
 const HINT_KEY = 'memoking.hint.blockMove';
-const COMPACT_H = 64; // 옮기는 동안 줄마다 이 높이까지만 보인다 (px) — note.css 의 .mk-block-compact-item 과 같게
+const COMPACT_H = 96; // 옮기는 동안 줄마다 이 높이까지만 보인다 (px) — note.css 의 .mk-block-compact-item 과 같게
 const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
 
-// ---------- 손가락 입력 보정 (터치) ----------
-// 줄의 높이와 상관없이 손가락을 약 STEP_PX 만큼 움직이면 한 칸 — 큰 내용 앞뒤로도 조금만 움직이면 되게.
-// 끄는 내용은 손가락보다 앞서 움직여 손가락에 가리지 않는다. 마우스는 그대로(1배)
-const STEP_PX = 40;
-export function dragGain(kind, slots) {
-  if (kind !== 'touch' || !slots.length) return 1;
-  const sorted = [...slots].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)];
-  return Math.min(2.2, Math.max(1, median / STEP_PX));
-}
-// 보정한 손가락 높이(화면 좌표): 들어 올린 자리에서 움직인 만큼 × 배율 (+ 접혀서 생긴 차이), 화면 밖으로는 안 나가게
+// 끄는 내용이 갈 높이(화면 좌표): 터치는 지나가는 칸마다 보정 (core/drag-geometry.js — 어느 칸이든 손가락 약 40px),
+// 마우스는 그대로. 스크롤된 만큼은 1배로 더하고, 화면 밖으로는 안 나가게
 function virtualY(d) {
-  const y = d.y0 + (d.y - d.y0) * d.gain + d.bias;
+  const st = d.scroller?.scrollTop ?? 0;
+  const base = d.c0 + (st - d.st0);
+  const D = d.y - d.y0;
+  const cy = d.kind === 'touch' ? warpDrag(base, D, d.tops, d.slots) : base + D;
   const r = !d.scroller || d.scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : d.scroller.getBoundingClientRect();
-  return Math.min(r.bottom - 2, Math.max(r.top + 2, y));
+  return Math.min(r.bottom - 2, Math.max(r.top + 2, cy - st));
 }
-const HYSTERESIS_PX = 10; // 판정이 바뀐 뒤 이만큼은 더 움직여야 다시 바뀐다 (경계에서 깜빡이지 않게)
 
 /** @param {{ readOnly?: boolean }} options */
 export function createBlockMove({ readOnly = false } = {}) {
@@ -364,32 +359,22 @@ class Mover {
     }
     const st = scroller?.scrollTop ?? 0;
     const rects = doms.map((d) => d.getBoundingClientRect());
-    // 스크롤로 다 맞추지 못했으면(맨 위 등) 손가락과 접힌 줄 사이의 차이를 기억해, 손가락이 움직인 만큼만 옮긴다
-    const bias = rects[block.index].top + ratio * rects[block.index].height - p.y;
     const tops = rects.map((r) => r.top + st);
     const heights = rects.map((r) => r.height);
     const slots = tops.map((t, i) => (i < tops.length - 1 ? tops[i + 1] - t : heights[i]));
     const src = doms[block.index];
     const scale = src.offsetHeight ? heights[block.index] / src.offsetHeight : 1;
-    const badge = document.createElement('div');
-    badge.className = 'mk-drag-badge';
-    badge.hidden = true;
-    document.body.append(badge);
     this.hideHint();
-    // 큰 내용(그림·동영상·링크 카드)은 들어 올린 동안 작은 썸네일로 줄여 손가락 위에 띄운다 — 놓을 자리 주변 글이 가리지 않게
-    const shrink = 1; // 접어서 옮기므로 썸네일로 따로 줄이지 않는다
-    const grabX = p.x - rects[block.index].left; // 누른 자리 (내용 안, 화면 px) — 여기를 중심으로 줄인다
-    const grabY = p.y - rects[block.index].top;
-    // 놓을 자리 미리 보기: 손을 놓기 전에 옮겨질 자리에 점선 테두리 칸
-    const slot = document.createElement('div');
-    slot.className = 'mk-drop-slot';
-    slot.hidden = true;
-    document.body.append(slot);
+    // 틀(들어 올린 것 · 맞바꿀 상대 · 넣을 자리)과 안내 캡슐은 화면 위 한 겹에 — 틀은 줄마다 내용 크기에 맞춘다
+    // (사진 줄은 사진에, 글 줄은 글 폭에 — note.css 가 접는 동안 글 줄을 글 폭만큼만 차지하게 한다)
+    const frames = new DragFrames(view.dom);
     const d = {
-      slot, left: rects[block.index].left, width: rects[block.index].width, compactCls, bias, ratio,
-      gain: dragGain(p.kind, slots), lastKey: '', lastCy: null,
-      block, positions, tops, heights, slots, scale, scroller, badge, drop: null, kind: p.kind,
-      x: p.x2, y: p.y2, x0: p.x2, y0: p.y2, raf: 0, timer: 0, shrink, grabX, grabY,
+      frames, lefts: rects.map((r) => r.left), widths: rects.map((r) => r.width), compactCls, ratio,
+      // 끄는 시작점 = 접힌 줄에서 누른 자리 (스크롤로 손가락 아래에 다 맞추지 못했어도(맨 위 등) 손가락이 움직인 만큼만 옮긴다)
+      c0: tops[block.index] + ratio * heights[block.index], st0: st,
+      gain: p.kind === 'touch' ? slotGain(slots[block.index]) : 1, lastKey: '', lastCy: null,
+      block, positions, tops, heights, slots, scale, scroller, drop: null, kind: p.kind,
+      x: p.x2, y: p.y2, x0: p.x2, y0: p.y2, raf: 0, timer: 0,
     };
     this.drag = d;
     document.body.classList.add('mk-block-dragging');
@@ -475,63 +460,43 @@ class Mover {
       if (d.kind === 'touch' && next) navigator.vibrate?.(6); // 놓을 자리가 바뀔 때 톡
     } else d.lastCy = d.lastCy ?? cy;
     this.preview();
-    const b = d.badge;
-    b.dataset.kind = d.drop?.kind ?? '';
-    b.textContent = d.drop?.kind === 'swap' ? '⇅ 맞바꾸기' : d.drop?.kind === 'insert' ? '↳ 여기에 넣기' : '';
-    b.hidden = !d.drop;
-    // 터치: 안내는 손가락이 가리지 않는 곳 — 손가락보다 위, 화면의 반대쪽으로
-    if (d.kind === 'touch') {
-      const bw = b.offsetWidth || 110;
-      const x = d.x < window.innerWidth / 2 ? d.x + 44 : d.x - 44 - bw;
-      b.style.left = `${Math.round(Math.max(8, Math.min(window.innerWidth - bw - 8, x)))}px`;
-      b.style.top = `${Math.round(Math.max(8, d.y - 76))}px`;
-    } else {
-      b.style.left = `${Math.min(window.innerWidth - 120, d.x + 16)}px`;
-      b.style.top = `${d.y + 14}px`;
-    }
   }
 
-  // 끄는 줄은 손을 따라오고, 다른 줄들은 놓았을 때의 자리로 미끄러진다
+  // 끄는 줄은 손을 따라오고, 다른 줄들은 놓았을 때의 자리로 미끄러진다. 틀·안내 캡슐도 함께
   preview() {
     const d = this.drag;
-    const { tops, slots, positions, heights, scale } = d;
+    const { tops, slots, positions, heights, scale, lefts, widths, frames } = d;
     const s = d.block.index;
+    const st = d.scroller?.scrollTop ?? 0;
     const order = previewOrder(positions.length, s, d.drop);
     const bottom = tops.at(-1) + heights.at(-1);
-    let follow = virtualY(d) + (d.scroller?.scrollTop ?? 0) - (tops[s] + d.ratio * heights[s]);
+    let follow = virtualY(d) + st - (tops[s] + d.ratio * heights[s]);
     follow = Math.min(bottom - heights[s] + 8, Math.max(tops[0] - 8, tops[s] + follow)) - tops[s];
+    const box = (i, top) => ({ left: lefts[i], top: top - st, width: widths[i], height: heights[i] });
     const specs = [];
     let y = tops[0];
+    let slot = null;
+    let target = null;
     order.forEach((i) => {
       if (i === s) {
-        // 끼울 자리(다른 줄들이 비켜 연 틈)에 점선 칸 — 맞바꾸기는 그 줄 자체에 점선(mk-block-swap-target)
-        const sl = d.slot;
-        sl.hidden = d.drop?.kind !== 'insert';
-        if (!sl.hidden) {
-          const st = d.scroller?.scrollTop ?? 0;
-          sl.style.left = `${Math.round(d.left - 4)}px`;
-          sl.style.width = `${Math.round(d.width + 8)}px`;
-          sl.style.top = `${Math.round(y - st - 3)}px`;
-          sl.style.height = `${Math.round(heights[s] + 6)}px`;
-          sl.dataset.kind = d.drop.kind;
-        }
-        let style = `transform: translateY(${(follow / scale).toFixed(1)}px)`;
-        if (d.shrink < 1) {
-          // 누른 자리를 중심으로 줄이고, 손가락에 가리지 않게 썸네일 아래 끝이 손가락보다 위에 오도록 올린다
-          const k = d.shrink;
-          const up = d.kind === 'touch' ? (heights[s] - d.grabY) * k + 18 : 0;
-          style = `transform-origin: ${(d.grabX / scale).toFixed(1)}px ${(d.grabY / scale).toFixed(1)}px; `
-            + `transform: translateY(${((follow - up) / scale).toFixed(1)}px) scale(${k.toFixed(3)}); opacity: 0.88`;
-        }
-        specs.push({ pos: positions[i], cls: `mk-block-lift ${d.compactCls(i)}${d.shrink < 1 ? ' mk-block-thumb' : ''}`, style });
+        // 놓으면 갈 자리(다른 줄들이 비켜 연 틈)에 점선 칸 — 맞바꾸기면 맞바꿀 줄에도 보라 점선 틀
+        if (d.drop) slot = box(s, y);
+        specs.push({ pos: positions[i], cls: `mk-block-lift ${d.compactCls(i)}`, style: `transform: translateY(${(follow / scale).toFixed(1)}px)` });
       } else {
         const dy = y - tops[i];
-        const cls = ['mk-block-sorting', d.compactCls(i), d.drop?.kind === 'swap' && i === d.drop.index ? 'mk-block-swap-target' : ''].filter(Boolean).join(' ');
+        const swap = d.drop?.kind === 'swap' && i === d.drop.index;
+        if (swap) target = box(i, y);
+        const cls = ['mk-block-sorting', d.compactCls(i), swap ? 'mk-block-swap-target' : ''].filter(Boolean).join(' ');
         specs.push({ pos: positions[i], cls, style: dy ? `transform: translateY(${(dy / scale).toFixed(1)}px)` : '' });
       }
       y += slots[i];
     });
     this.decorate(specs);
+    frames.set('lift', box(s, tops[s] + follow));
+    frames.set('target', target);
+    frames.set('slot', slot);
+    const kind = d.drop?.kind ?? null;
+    frames.label(kind, kind === 'swap' ? '⇅ 맞바꾸기' : kind === 'insert' ? '↳ 여기에 넣기' : '', { x: d.x, y: d.y }, d.kind);
   }
 
   finish(commit) {
@@ -546,8 +511,7 @@ class Mover {
     window.removeEventListener('keydown', d.key, true);
     window.removeEventListener('selectstart', d.stop, true);
     window.removeEventListener('contextmenu', d.stop, true);
-    d.badge.remove();
-    d.slot.remove();
+    d.frames.destroy();
     document.body.classList.remove('mk-block-dragging', 'mk-block-compact');
     delete document.body.dataset.dragGain;
     this.drag = null;

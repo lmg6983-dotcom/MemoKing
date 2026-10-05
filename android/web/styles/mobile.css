@@ -919,16 +919,13 @@ body.two-pane .toast { left: calc(var(--list-w) + (100vw - var(--list-w)) / 2); 
   .searchbar { padding-bottom: 4px; }
 }
 
-/* ---------- 메모 도구막대: 콘텐츠 추가(+) · 스타일 · 목록 · 글자 서식 ---------- */
+/* ---------- 메모 도구막대: 콘텐츠 추가(+) · 스타일 · 목록 · 글자 서식 ----------
+   + 도 다른 서식 버튼과 같은 모양 (바탕 없이 글자 색 아이콘). 위성 단추가 펼쳐진 동안만 켜진 서식처럼 옅은 바탕 */
 .note-screen #format-bar button.add-btn {
   flex: none;
   position: relative;
-  width: 40px;
-  min-width: 40px;
-  border-radius: 12px;
-  background: var(--brand-black);
-  color: var(--on-black);
 }
+.note-screen #format-bar button.add-btn.open { background: color-mix(in srgb, var(--note-text) 14%, transparent); color: var(--note-text); }
 .note-screen #format-bar button.add-btn svg { width: 20px; height: 20px; transition: transform 0.24s cubic-bezier(0.3, 1.4, 0.5, 1); }
 .note-screen #format-bar button.add-btn.open svg { transform: rotate(45deg); } /* + → × */
 .note-screen #format-bar button.add-btn.recording::after {
@@ -940,7 +937,7 @@ body.two-pane .toast { left: calc(var(--list-w) + (100vw - var(--list-w)) / 2); 
   height: 8px;
   border-radius: 50%;
   background: #e5484d;
-  box-shadow: 0 0 0 2px var(--brand-black);
+  box-shadow: 0 0 0 2px var(--note-bar);
   animation: rec-blink 1.2s ease-in-out infinite;
 }
 .add-menu {
@@ -973,7 +970,7 @@ body.two-pane .toast { left: calc(var(--list-w) + (100vw - var(--list-w)) / 2); 
 @media print { .add-menu { display: none !important; } }
 
 /* ---------- 도구막대: 어두운 모드에서만 메모킹 브랜드 모양 (짙은 알약 막대 · 켜진 서식은 노랑 · + 는 노랑 원) ----------
-   밝은 모드는 예전처럼 메모 색 막대 그대로 (위의 .format-bar · .add-btn 규칙) */
+   밝은 모드는 예전처럼 메모 색 막대 그대로, + 도 다른 버튼과 같은 모양 (위의 .format-bar · .add-btn 규칙) */
 @media (prefers-color-scheme: dark) {
   .note-screen #format-bar {
     --tb-bg: #242422;

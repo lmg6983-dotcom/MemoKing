@@ -266,6 +266,17 @@ try {
   await touch('touchMove', b.x + 40, b.y + b.height / 2);
   for (let i = 1; i <= 6; i++) await touch('touchMove', b.x + 40, b.y + b.height / 2 - ((b.y - a.y) * i) / 6);
   await page.waitForTimeout(100);
+  {
+    // 목록도 그림·글 줄과 같은 틀: 놓을 자리에 점선 칸(노란 선 아님), 안내 캡슐은 맞바꿀 항목 틀의 오른쪽
+    const st = await page.evaluate(() => {
+      const box = (el) => el && el.getBoundingClientRect();
+      const t = box(document.querySelector('.mk-doc li.mk-swap-target'));
+      const b = document.querySelector('.mk-drag-badge:not([hidden])');
+      const bb = box(b);
+      return { slot: Boolean(document.querySelector('.mk-drop-slot:not([hidden])')), line: document.querySelectorAll('.mk-drop-line').length, side: b?.dataset.side, right: t && bb ? bb.left + bb.width / 2 > t.left + t.width / 2 : false };
+    });
+    check('목록 옮기기: 그림 줄과 같은 틀 (놓을 자리 점선 칸 · 캡슐은 틀 오른쪽)', st.slot && st.line === 0 && st.right && Boolean(st.side), JSON.stringify(st));
+  }
   await shot('05b-drag');
   await touch('touchEnd', 0, 0);
   await page.waitForTimeout(900);
@@ -340,22 +351,50 @@ try {
   check('그림 끌기: 키보드를 올리지 않음', (await page.getAttribute('.mk-doc', 'inputmode')) === 'none');
   // 옮기는 동안은 모든 줄이 짧게 접힌다 → 한 칸 옮기는 데 손가락을 조금만
   const liftBox = await page.locator('.mk-doc .mk-block-lift').boundingBox();
-  const textBox = await page.locator('.mk-doc p', { hasText: '새 아이콘 시안' }).boundingBox();
-  check('옮기는 동안 접기: 들어 올린 그림도 짧게 (64px 이하)', liftBox.height <= 66 && (await page.locator('.mk-block-compact-item').count()) >= 2, JSON.stringify(liftBox));
+  check('옮기는 동안 접기: 들어 올린 그림도 짧게 (96px 이하)', liftBox.height <= 98 && (await page.locator('.mk-block-compact-item').count()) >= 2, JSON.stringify(liftBox));
+  {
+    // 사진과 틀이 딱 맞는다: 접힌 사진 = 줄 상자, 틀은 사진에서 4px 띄워 2px 선 (사방 6px)
+    const fit = await page.evaluate(() => {
+      const img = document.querySelector('.mk-block-lift img.mk-image').getBoundingClientRect();
+      const line = document.querySelector('.mk-block-lift').getBoundingClientRect();
+      const f = document.querySelector('.mk-drag-frame.lift').getBoundingClientRect();
+      return { img: [img.width, img.height], line: [line.width, line.height], d: [img.left - f.left, f.right - img.right, img.top - f.top, f.bottom - img.bottom].map((v) => Math.round(v)) };
+    });
+    check('사진 틀: 사진에 딱 맞음 (사진 = 줄 상자 · 사방 6px)', Math.abs(fit.img[0] - fit.line[0]) <= 3 && fit.img[1] >= 80 && fit.d.every((v) => v >= 4 && v <= 8), JSON.stringify(fit));
+  }
   await shot('06c-compact');
-  const ratio1 = 60 / img.height;
-  const dy1 = textBox.y + textBox.height / 2 - (liftBox.y + ratio1 * liftBox.height);
+  // 손가락을 조금씩 움직여, 안내가 바뀌는 데 든 거리를 잰다 (보정: 어느 줄이든 약 40px 에 한 칸)
+  const badgeText = () => page.evaluate(() => document.querySelector('.mk-drag-badge:not([hidden])')?.textContent ?? '');
+  const creep = async (x, y0, dir, want, max = 120) => {
+    for (let d = 4; d <= max; d += 4) {
+      await touch('touchMove', x, y0 + dir * d);
+      await page.waitForTimeout(40);
+      if ((await badgeText()).includes(want)) return d;
+    }
+    return 0;
+  };
+  const f1 = await creep(img.x + 60, img.y + 60, 1, '맞바꾸기');
   const gain1 = Number(await page.evaluate(() => document.body.dataset.dragGain));
-  check('손가락 입력 보정: 줄 높이와 상관없이 짧게 움직여도 옆 줄까지 (배율 1~2.2)', gain1 >= 1 && gain1 <= 2.2 && Math.abs(dy1 / gain1) < 70, JSON.stringify({ dy1, gain1 }));
-  for (let i = 1; i <= 8; i++) await touch('touchMove', img.x + 60, img.y + 60 + (dy1 / gain1 * i) / 8);
-  await page.waitForTimeout(120);
+  check('손가락 입력 보정: 큰 사진 줄도 손가락 조금(60px 안)이면 옆 줄과 맞바꾸기', f1 > 0 && f1 <= 60 && gain1 > 1, JSON.stringify({ f1, gain1 }));
+  await page.waitForTimeout(250);
   check('그림 줄 옮기기: 맞바꾸기 안내', (await page.textContent('.mk-drag-badge')).includes('맞바꾸기'));
   {
-    const bb = await page.locator('.mk-drag-badge').boundingBox();
-    const fy = img.y + 60 + dy1 / gain1;
-    check('안내 캡슐이 손가락에 가리지 않음 (손가락보다 위)', bb && bb.y + bb.height < fy - 20, JSON.stringify({ bb, fy }));
+    // 안내 캡슐: 맞바꿀 줄 틀의 오른쪽에 붙고, 손가락에 가리지 않는다
+    const fx = img.x + 60;
+    const fy = img.y + 60 + f1;
+    const st = await page.evaluate(() => {
+      const b = document.querySelector('.mk-drag-badge:not([hidden])');
+      const t = document.querySelector('.mk-drag-frame.target:not([hidden])');
+      const bb = b.getBoundingClientRect();
+      const tb = t?.getBoundingClientRect();
+      return { side: b.dataset.side, bb: [bb.left, bb.top, bb.right, bb.bottom], tb: tb && [tb.left, tb.top, tb.right, tb.bottom] };
+    });
+    const [l, t, r, btm] = st.bb;
+    const right = st.tb && (st.side === 'right' ? l >= st.tb[2] && t < st.tb[3] && btm > st.tb[1] : st.side === 'corner' && r <= st.tb[2] + 1 && Math.abs((t + btm) / 2 - st.tb[1]) < 4);
+    const covered = fx > l - 20 && fx < r + 20 && fy > t - 20 && fy < btm + 30;
+    check('안내 캡슐: 맞바꿀 틀 오른쪽에 · 손가락에 가리지 않음', right && !covered, JSON.stringify({ ...st, fx, fy }));
   }
-  check('그림 줄 옮기기: 맞바꿀 줄에 점선 테두리', (await page.locator('.mk-block-swap-target').count()) === 1 && await page.isHidden('.mk-drop-slot'));
+  check('그림 줄 옮기기: 맞바꿀 줄에 보라 점선 틀 · 놓으면 갈 자리에 점선 칸', (await page.locator('.mk-block-swap-target').count()) === 1 && await page.isVisible('.mk-drag-frame.target') && await page.isVisible('.mk-drop-slot'));
   await shot('06b-move-drag');
   await touch('touchEnd', 0, 0);
   await page.waitForTimeout(900);
@@ -367,13 +406,10 @@ try {
   await touch('touchStart', img2.x + 60, img2.y + 60);
   await page.waitForTimeout(550);
   {
-    const lb2 = await page.locator('.mk-doc .mk-block-lift').boundingBox();
-    const tb2 = await page.locator('.mk-doc p', { hasText: '새 아이콘 시안' }).boundingBox();
-    const dy2 = tb2.y + 3 - (lb2.y + (60 / img2.height) * lb2.height);
-    const gain2 = Number(await page.evaluate(() => document.body.dataset.dragGain));
-    for (let i = 1; i <= 8; i++) await touch('touchMove', img2.x + 60, img2.y + 60 + (dy2 / gain2 * i) / 8);
+    const f2 = await creep(img2.x + 60, img2.y + 60, -1, '넣기');
+    check('손가락 입력 보정: 위로도 조금(70px 안)이면 두 줄 위 사이에', f2 > 0 && f2 <= 70, String(f2));
   }
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(250);
   check('그림 줄 옮기기: 끼우기 안내', (await page.textContent('.mk-drag-badge')).includes('넣기'));
   {
     const slotBox = await page.locator('.mk-drop-slot').boundingBox();
