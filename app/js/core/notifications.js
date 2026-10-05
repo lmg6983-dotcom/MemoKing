@@ -10,7 +10,7 @@ function decodeXml(text) {
   return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
     if (e[0] === '#') {
       const code = e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+      return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : m; // 틀린 번호(&#99999999;)에 멈추지 않게
     }
     return ENTITIES[e.toLowerCase()] ?? m;
   });

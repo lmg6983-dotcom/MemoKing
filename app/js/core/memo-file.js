@@ -254,9 +254,11 @@ export function titleToFileName(title) {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^[.\s]+|[.\s]+$/g, '')
+    .replace(/^(~\$\s*)+/, '') // ~$ 로 시작하는 파일은 오피스 임시 파일로 보고 목록에서 빼므로
     .slice(0, 60)
     .trim();
   if (!name) name = UNTITLED;
-  if (RESERVED.test(name)) name += '_';
+  // 윈도우는 점 뒤가 있어도(con.txt) 장치 이름으로 본다 → 만들 수 없는 파일
+  if (RESERVED.test(name.split('.')[0].trim())) name = name.replace(/^([^.]*?)(\s*)(?=\.|$)/, '$1_$2');
   return name;
 }

@@ -329,8 +329,15 @@ class RecorderService : Service() {
             if (!final.isNullOrBlank()) onChange?.invoke()
         }
 
-        /** 녹음을 끝내고 결과를 RecordStore 에 남긴다 */
+        private var finished: JSONObject? = null
+
+        /**
+         * 녹음을 끝내고 결과를 RecordStore 에 남긴다. 앱의 끝내기와 알림의 끝내기가 겹쳐도 한 번만 마무리하고
+         * 늦게 온 쪽은 같은 결과를 받는다 (끝난 녹음이 두 번 남지 않게)
+         */
+        @Synchronized
         fun stop(): JSONObject {
+            finished?.let { return it }
             running = false
             thread?.join(15_000)
             val result = JSONObject()
@@ -346,6 +353,7 @@ class RecorderService : Service() {
                 // 받아쓰기를 원했지만 녹음 중에는 못 했으면, 화면이 모델을 받은 뒤 파일로 다시 받아쓸 수 있다
                 .put("sttPending", wantedStt && (!stt || sttError))
             RecordStore.add(ctx, result)
+            finished = result
             return result
         }
     }

@@ -394,12 +394,13 @@ export async function runSmoke({
     const panelShown = await js(reopened.win, `(() => { const p = document.getElementById('more-panel'); const r = p.getBoundingClientRect(); return !p.hidden && r.left >= 0 && r.right <= innerWidth; })()`);
     await capture(reopened.win, 'smoke-toolbar-narrow.png');
     await key(reopened.win, 'Escape');
-    check('좁은 창: 넘친 버튼은 » 더보기로 (14개 모두 접근 가능 — v0.13.0 표 버튼 포함)',
-      narrow.fits && narrow.moreShown && narrow.inPanel > 0 && narrow.inBar + narrow.inPanel === 14 && panelShown, JSON.stringify({ ...narrow, panelShown }));
+    // 서식 버튼 12개 (v0.17.4 H1·H2 → 스타일 고르기, v0.17.15 인용 버튼 → 스타일 고르기)
+    check('좁은 창: 넘친 버튼은 » 더보기로 (12개 모두 접근 가능 — 표 버튼 포함)',
+      narrow.fits && narrow.moreShown && narrow.inPanel > 0 && narrow.inBar + narrow.inPanel === 12 && panelShown, JSON.stringify({ ...narrow, panelShown }));
     reopened.win.setSize(760, 520);
     await wait(500);
     const wide = await toolbar();
-    check('넓은 창: 모든 버튼이 막대에 (더보기 없음)', wide.fits && !wide.moreShown && wide.inBar === 14, JSON.stringify(wide));
+    check('넓은 창: 모든 버튼이 막대에 (더보기 없음)', wide.fits && !wide.moreShown && wide.inBar === 12, JSON.stringify(wide));
     await capture(reopened.win, 'smoke-toolbar-wide.png');
     reopened.win.setBounds(wideBounds);
     await wait(300);
@@ -530,7 +531,7 @@ export async function runSmoke({
     await wait(300);
     const menu = labels();
     check('트레이 아이콘·메뉴 (목록 열기, 새 메모, 최근 메모, 종료)',
-      getTray() && !getTray().isDestroyed() && ['메모 목록 열기', '새 메모', '메모킹 끄기'].every((l) => menu.includes(l)) && menu.includes('장보기 목록'),
+      getTray() && !getTray().isDestroyed() && ['메모 목록 열기', '새 메모', '메모킹 종료'].every((l) => menu.includes(l)) && menu.includes('장보기 목록'),
       menu.join(' | '));
 
     list.close();
@@ -1103,7 +1104,7 @@ export async function runSmoke({
     check('메모킹 알림도 보관함에 기록', history.list().filter((e) => e.source === 'memoking').length >= 3);
     await listJs(`document.querySelector('[data-tab="history"]').click()`);
     await wait(300);
-    await listJs(`document.getElementById('history-disable').click()`); // "보관 켜기"
+    await listJs(`document.getElementById('history-enable').click()`); // 설명·동의 화면의 "보관 시작하기"
     const collected = await until(() => history.list().filter((e) => e.source === 'windows').length === 2, '알림 수집').catch(() => false);
     await wait(400);
     const shown = await listJs(`[...document.querySelectorAll('#history-rows .noti-title')].map((t) => t.textContent)`);
@@ -1146,7 +1147,7 @@ export async function runSmoke({
     // 17) 빠른 메모 단축키 등록 확인 — 점검 중 사용자의 Ctrl+Alt+C 를 붙잡지 않도록 바로 해제
     const registered = registerQuickMemoKey();
     // 설치된 메모킹이 켜져 있으면 그쪽이 단축키를 쓰고 있으므로 등록 확인은 건너뛴다
-    const otherRunning = !registered && execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    const otherRunning = !registered && process.platform === 'win32' && execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
       "Get-CimInstance Win32_Process -Filter \"Name='MemoKing.exe'\" | ForEach-Object { $_.ExecutablePath }"], { encoding: 'utf8' })
       .split(/\r?\n/).map((p) => p.trim().toLowerCase()).filter(Boolean)
       .some((p) => p !== process.execPath.toLowerCase());

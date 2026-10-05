@@ -2377,7 +2377,8 @@ let trayMenuTemplate = [];
 const shorten = (text, max = 28) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 function createTray() {
-  tray = new Tray(APP_ICON);
+  // .ico 는 Windows 에서만 읽힌다 (다른 곳에서는 PNG)
+  tray = new Tray(process.platform === 'win32' ? APP_ICON : APP_ICON_PNG);
   tray.setToolTip('메모킹 · 누르면 메모 목록이 열려요');
   tray.on('click', () => createListWindow());
   tray.on('double-click', () => createListWindow());
@@ -2463,7 +2464,11 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionCheckHandler(() => false);
   registerVaultProtocol();
   registerIpc();
-  createTray();
+  try {
+    createTray();
+  } catch (err) {
+    console.error('알림 영역 아이콘을 만들지 못했어요', err); // 아이콘이 없어도 메모 창·알림은 그대로 뜨게
+  }
   nativeTheme.on('updated', () => {
     listWin?.setTitleBarOverlay(titleBarOverlay());
     for (const [id, win] of noteWins) win.setBackgroundColor(noteBg(vault?.get(id)?.color));

@@ -268,7 +268,8 @@ on('record', (ev) => {
   if (!ev) return;
   if (ev.type === 'done') {
     setStatus({ active: false, paused: false, partial: '' });
-    if (ev.result) app.deliverRecording(ev.result).then(() => record.ack(ev.result.id)).catch(() => {});
+    // 앱에서 끝내는 중이면 그쪽(stop)이 같은 결과를 넣는다
+    if (ev.result && !stopping) app.deliverRecording(ev.result).then(() => record.ack(ev.result.id)).catch(() => {});
     return;
   }
   if (ev.type === 'level') {

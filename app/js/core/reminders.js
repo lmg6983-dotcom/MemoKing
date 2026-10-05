@@ -50,7 +50,7 @@ export function normalizeReminder(raw, now = new Date()) {
     const every = EVERY.includes(src.every) ? src.every : 'day';
     const repeat = { every, time: parseTime(src.time).text };
     if (every === 'week') {
-      const days = Array.isArray(src.weekdays) ? src.weekdays.map(Number).filter((d) => d >= 0 && d <= 6) : [];
+      const days = Array.isArray(src.weekdays) ? src.weekdays.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [];
       repeat.weekdays = [...new Set(days.length ? days : [validDate(r.created).getDay()])].sort((a, b) => a - b);
     }
     if (every === 'month' || every === 'year') repeat.day = Math.min(31, Math.max(1, Number(src.day) || 1));
@@ -176,8 +176,8 @@ export function describeReminder(r, now = new Date()) {
       const { every, time, weekdays, day, month } = r.repeat;
       if (every === 'day') return `매일 ${time}`;
       if (every === 'week') {
-        const names = weekdays.length === 7 ? '매일' : weekdays.map((w) => WEEKDAY[w]).join('·');
-        return `매주 ${names} ${time}`;
+        if (weekdays.length === 7) return `매일 ${time}`; // "매주 매일" 이 아니라
+        return `매주 ${weekdays.map((w) => WEEKDAY[w]).join('·')} ${time}`;
       }
       if (every === 'month') return `매월 ${day}일 ${time}`;
       return `매년 ${month}월 ${day}일 ${time}`;
