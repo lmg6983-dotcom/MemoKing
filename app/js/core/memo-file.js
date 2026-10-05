@@ -85,6 +85,9 @@ export { toLocalIso };
 
 // ---------- 본문 분석 ----------
 
+/** 마크다운 자동 링크 <https://…> · <mailto:…> · <이름@주소> */
+export const AUTOLINK = /<((?:https?|ftp|mailto):[^\s<>]+|[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)>/gi;
+
 // 한 줄의 마크다운 기호를 걷어내 사람이 읽는 글자만 남긴다.
 function stripInline(line) {
   return line
@@ -93,6 +96,7 @@ function stripInline(line) {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<br\s*\/?>/gi, ' ')
+    .replace(AUTOLINK, '$1') // 맨주소·이메일은 <https://…> 로 저장된다 — 태그로 보고 지우지 않게 주소를 남긴다
     .replace(/<\/?[a-z][^>]*>/gi, '') // <u>, <mark>, <span style=…> 같은 서식 태그는 글자만 남긴다
     .replace(/(\*\*|__|~~)(.+?)\1/g, '$2')
     .replace(/(^|[^\\*_])[*_](?=\S)(.+?)(?<=\S)[*_]/g, '$1$2')

@@ -71,3 +71,14 @@ test('태그 추천: 함께 다는 태그', () => {
   assert.equal(got[0].name, '고객');
   assert.ok(got.some((t) => t.name === '계약'));
 });
+
+test('태그 추천: 뜻이 넓은 흔한 말로는 다른 태그를 확실하다고 하지 않는다 (저절로 엉뚱하게 달리지 않게)', () => {
+  const ms = [
+    { id: '1', body: '# 오늘\n\n산책하고 일찍 잤다 #일기' },
+    { id: '2', body: '# 앱\n\n버그 고치기 #개발' },
+    { id: '3', body: '# 주간\n\n월요일 회의 #일정' },
+    { id: '4', body: '# 분기\n\n실적 정리 #보고서' },
+  ];
+  const got = suggestTagsFor('# 가게 정산\n\n하루 매출 정리하고 할인 코드 계획 세우기, 영화를 보고 쉬기', ms);
+  for (const name of ['일기', '개발', '일정', '보고서']) assert.ok(!got.some((t) => t.name === name && t.sure), `${name}: ${JSON.stringify(got)}`);
+});

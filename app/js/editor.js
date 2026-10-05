@@ -1120,10 +1120,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .config((ctx) => {
       ctx.set(rootCtx, root);
       ctx.set(defaultValueCtx, markdown);
-      // 목록 기호는 "-" (Obsidian·GitHub 와 같은 관례), 밑줄·색·하이라이트는 HTML 태그로 저장
+      // 목록 기호는 "-" (Obsidian·GitHub 와 같은 관례), 가로줄은 손으로 치는 "---", 밑줄·색·하이라이트는 HTML 태그로 저장
       ctx.update(remarkStringifyOptionsCtx, (prev) => ({
         ...prev,
         bullet: '-',
+        rule: '-',
         handlers: { ...prev.handlers, ...stringifyHandlers },
       }));
       ctx.update(editorViewOptionsCtx, (prev) => ({

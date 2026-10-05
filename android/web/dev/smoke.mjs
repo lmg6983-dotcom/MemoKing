@@ -864,6 +864,37 @@ try {
   await back();
   await page.waitForTimeout(300);
 
+  // 왕복: 까다로운 서식(굵게·밑줄·색·목록·체크·표·수식·코드·링크·맨주소·그림·줄바꿈·이스케이프·태그)의 메모를
+  // 열기만 하면 파일이 그대로, 끝에 글자 하나를 쳐서 저장하면 읽는 글이 한 줄도 사라지거나 바뀌지 않는다
+  {
+    const { plainLines, parseMemoFile } = await import('../../../app/js/core/memo-file.js');
+    const sample = fs.readFileSync(path.join(here, 'roundtrip-sample.md'), 'utf8');
+    fs.copyFileSync(path.join(repo, 'assets/icons/icon-256.png'), path.join(vault, 'attachments/a.png'));
+    const fileText = `---\nid: 00000000-0000-4000-8000-0000000000ab\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: yellow\n---\n${sample}`;
+    write('왕 테스트.md', fileText);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForTimeout(400);
+    await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000ab"]');
+    await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+    await page.waitForTimeout(1000);
+    check('왕복: 열기만 하면 파일 그대로', read('왕 테스트.md') === fileText);
+    await page.locator('.mk-doc p', { hasText: '끝 문단' }).tap();
+    await page.keyboard.press('End');
+    await page.keyboard.type('!');
+    await page.locator('.mk-doc h1').first().tap();
+    await page.waitForTimeout(1200);
+    const saved = read('왕 테스트.md');
+    const want = plainLines(sample.replace('말줄임 ..', '말줄임 ..!'));
+    const got = plainLines(parseMemoFile(saved).body);
+    const lost = want.filter((l) => !got.includes(l));
+    const added = got.filter((l) => !want.includes(l));
+    check('왕복: 저장해도 읽는 글이 그대로 (사라지거나 바뀐 줄 없음)', !lost.length && !added.length, JSON.stringify({ lost, added }));
+    const missing = ['- [ ] 할 일', '- [x] 끝낸 일', '| 사과 |', '$x^2 + y^2$', '$$\n\\int_0^1 x\\,dx\n$$', 'const a = 1; // 코드 # 태그 아님', '<u>밑줄</u>', '<span style="color: #e5484d">빨강</span>', '\n---\n', '![그림](attachments/a.png)'].filter((t) => !saved.includes(t));
+    check('왕복: 서식·구조도 그대로 (체크·표·수식·코드·색·가로줄)', !missing.length, JSON.stringify(missing) + '\n' + saved);
+    await back();
+    await page.waitForTimeout(300);
+  }
+
   // 넓은 화면(펼친 폴더블·태블릿): 목록과 메모를 나란히
   await page.setViewportSize({ width: 884, height: 1000 });
   await page.waitForTimeout(300);

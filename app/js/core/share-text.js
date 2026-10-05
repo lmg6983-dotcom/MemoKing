@@ -4,6 +4,7 @@
 //   편집기 없이(목록 화면에서 보낼 때도) 파일의 마크다운만으로 만든다. 일부 글을 골라 복사할 때(clipboard-text.js)와는 따로.
 
 import { CARD_TITLE } from './link-preview.js';
+import { AUTOLINK } from './memo-file.js';
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|heic|avif)$/i;
 const AUDIO_EXT = /\.(m4a|mp3|wav|ogg|oga|aac|flac|opus|weba|3gp|amr)$/i;
@@ -27,6 +28,7 @@ export function inlineToText(line) {
       return text && text !== href ? `${text} (${href})` : href;
     })
     .replace(/<br\s*\/?>/gi, '\n')
+    .replace(AUTOLINK, (_m, url) => url.replace(/^mailto:/i, '')) // 맨주소·이메일 <…> 는 괄호 없이
     .replace(/<\/?(u|mark|span|b|i|strong|em|s|del|sub|sup|small|kbd)\b[^>]*>/gi, '')
     .replace(/\$\$([^$]+)\$\$/g, '$$$1$$')
     .replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2')
