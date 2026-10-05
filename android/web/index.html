@@ -195,12 +195,7 @@
         <!-- 콘텐츠 추가: 누르면 위로 사진·파일·음성 녹음·표·수식 (평소엔 이 단추 하나) -->
         <button data-action="add" id="add-btn" class="add-btn" aria-label="콘텐츠 추가" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
         <span class="sep"></span>
-        <button data-action="style" class="style-btn" aria-label="스타일" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
-        <span class="sep"></span>
-        <button data-cmd="task" aria-label="체크리스트"><svg><use href="#i-task"/></svg></button>
-        <button data-cmd="bullet" aria-label="점 목록"><svg><use href="#i-bullet"/></svg></button>
-        <button data-cmd="ordered" aria-label="번호 목록"><svg><use href="#i-ordered"/></svg></button>
-        <span class="sep"></span>
+        <!-- 자주 쓰는 순서: 글자 서식 → 목록 → 스타일 -->
         <button data-cmd="bold" aria-label="굵게"><b>B</b></button>
         <button data-cmd="italic" aria-label="기울임"><i>I</i></button>
         <button data-cmd="underline" aria-label="밑줄"><u>U</u></button>
@@ -211,6 +206,12 @@
         <button data-action="highlight" class="swatch-btn" aria-label="형광펜" aria-haspopup="true">
           <svg><use href="#i-highlighter"/></svg><span class="swatch-bar" data-bar="highlight"></span>
         </button>
+        <span class="sep"></span>
+        <button data-cmd="task" aria-label="체크리스트"><svg><use href="#i-task"/></svg></button>
+        <button data-cmd="bullet" aria-label="점 목록"><svg><use href="#i-bullet"/></svg></button>
+        <button data-cmd="ordered" aria-label="번호 목록"><svg><use href="#i-ordered"/></svg></button>
+        <span class="sep"></span>
+        <button data-action="style" class="style-btn" aria-label="스타일" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
       </div>
     </footer>
 

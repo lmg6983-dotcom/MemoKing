@@ -971,3 +971,33 @@ body.two-pane .toast { left: calc(var(--list-w) + (100vw - var(--list-w)) / 2); 
   .add-sat, .add-menu.closing .add-sat, .note-screen #format-bar button.add-btn svg { animation: none; transition: none; }
 }
 @media print { .add-menu { display: none !important; } }
+
+/* ---------- 도구막대 브랜드 모양 (메모킹 검정·노랑) ----------
+   키보드 위에 뜬 검정 알약 막대 · 흰 아이콘 · 누른(켜진) 서식은 노랑 · + 는 노랑 원 */
+.note-screen #format-bar {
+  --tb-bg: var(--brand-black, #111);
+  --tb-fg: rgba(255, 255, 255, 0.88);
+  --tb-on: var(--brand-yellow, #ffcc00);
+  margin: 0 8px calc(6px + env(safe-area-inset-bottom));
+  padding: 4px;
+  border-radius: 20px;
+  background: var(--tb-bg);
+  color: var(--tb-fg);
+  box-shadow: 0 6px 20px rgba(17, 17, 17, 0.22);
+}
+@media (prefers-color-scheme: dark) {
+  .note-screen #format-bar { --tb-bg: #242422; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 20px rgba(0, 0, 0, 0.4); }
+}
+.note-screen #format-bar button { min-width: 40px; height: 40px; border-radius: 14px; color: var(--tb-fg); }
+.note-screen #format-bar button svg { width: 20px; height: 20px; }
+.note-screen #format-bar button :is(b, i, u, s) { font-size: 16.5px; }
+.note-screen #format-bar button:active { background: rgba(255, 255, 255, 0.12); }
+.note-screen #format-bar button.active { background: var(--tb-on); color: var(--brand-black, #111); }
+.note-screen #format-bar .sep { width: 1px; height: 20px; margin: 0 4px; background: rgba(255, 255, 255, 0.16); }
+.note-screen #format-bar .style-btn { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.note-screen #format-bar .style-btn.active { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.note-screen #format-bar .style-btn .style-caret { border-top-color: currentColor; }
+.note-screen #format-bar .swatch-btn .glyph { color: inherit; }
+.note-screen #format-bar button.add-btn { background: var(--tb-on); color: var(--brand-black, #111); border-radius: 50%; width: 40px; min-width: 40px; }
+.note-screen #format-bar button.add-btn.open { background: #fff; }
+.note-screen #format-bar button.add-btn.recording::after { box-shadow: 0 0 0 2px var(--tb-on); }
