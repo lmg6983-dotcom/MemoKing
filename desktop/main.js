@@ -2150,6 +2150,15 @@ function registerIpc() {
     noteWins.get(id)?.setTitle(summary.title);
     return summary;
   });
+  // 쓰는 중에 다른 기기에서도 고친 메모: 들어온 내용을 사본 메모로 따로 남긴다 (열어 둔 동안은 한 사본만 고쳐 쓴다)
+  ipcMain.handle('memo:keep-copy', (_e, sourceId, body, copyId) => {
+    if (!vault || typeof body !== 'string') return null;
+    if (copyId && vault.get(copyId)) {
+      vault.save(copyId, body);
+      return copyId;
+    }
+    return vault.import({ body, color: vault.get(sourceId)?.color });
+  });
   ipcMain.on('memo:save-sync', (event, id, body) => {
     try {
       if (typeof body === 'string' && vault) vault.save(id, body);

@@ -6,7 +6,7 @@ import { EventEmitter } from 'node:events';
 import { randomUUID, randomBytes } from 'node:crypto';
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
-  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS,
+  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS, conflictCopyBody, sameBody,
 } from '../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
@@ -348,15 +348,18 @@ export class Vault extends EventEmitter {
       this.entries.set(id, entry);
     }
     if (entry.body === body && entry.file) return this.summary(entry);
+    const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
     entry.body = body;
     entry.meta.updated = toLocalIso();
     if (!entry.file && isBlankBody(body)) return this.summary(entry);
-    this.write(entry);
+    this.write(entry, known);
     this.changed([id]);
     return this.summary(entry);
   }
 
-  write(entry) {
+  // known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것을 넘긴다)
+  write(entry, known = entry.body) {
+    if (entry.file) this.keepChangedOnDisk(entry, known);
     if (!entry.file) entry.file = this.uniqueFile(titleToFileName(extractTitle(entry.body)));
     const file = this.abs(entry.file);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -366,6 +369,21 @@ export class Vault extends EventEmitter {
     entry.mtimeMs = stat.mtimeMs;
     entry.size = stat.size;
     entry.idSaved = true;
+  }
+
+  // 마지막으로 읽은(쓴) 뒤 다른 기기(동기화)가 이 파일을 바꿨는데 아직 알아채기 전에 덮어쓰려 할 때: 그쪽 내용을 먼저
+  // 사본 메모로 남긴다 ("제목 (다른 기기 …)") — 자동 저장이 들어온 내용을 몰래 지우지 않게
+  keepChangedOnDisk(entry, known) {
+    let theirs;
+    try {
+      const st = fs.statSync(this.abs(entry.file));
+      if (st.mtimeMs === entry.mtimeMs && st.size === entry.size) return;
+      theirs = parseMemoFile(fs.readFileSync(this.abs(entry.file), 'utf8')).body;
+    } catch {
+      return; // 파일이 없어졌으면 그냥 다시 쓴다
+    }
+    if (sameBody(theirs, known) || sameBody(theirs, entry.body) || isBlankBody(theirs)) return;
+    this.import({ body: conflictCopyBody(theirs), color: entry.meta.color });
   }
 
   // 같은 폴더에서 겹치지 않는 파일명: "제목.md", "제목 (2).md", ...

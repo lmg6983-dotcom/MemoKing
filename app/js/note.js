@@ -1,7 +1,7 @@
 // 스티커 메모 창 — 메모 1개 = 창 1개 = 파일 1개.
 import { injectIcons, icon } from './icons.js';
 import { createNoteEditor } from './editor.js';
-import { COLORS, extractTitle, isBlankBody } from './core/memo-file.js';
+import { COLORS, extractTitle, isBlankBody, conflictCopyBody, sameBody } from './core/memo-file.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from './core/html-marks.js';
 import { fileExtension } from './media.js';
 import { isDataImage, decodeDataImage } from './core/remote-images.js';
@@ -190,23 +190,56 @@ function applyExternal(next) {
   setStatus('바뀐 내용을 불러왔어요');
 }
 
-api.on('memo:external', (next) => {
+let conflictCopy = null; // 쓰는 중에 다른 기기에서도 고쳐 들어온 내용을 따로 남긴 사본 메모 (창이 열린 동안 한 사본만)
+
+function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
+  el.bannerText.textContent = text;
+  $('banner-load').hidden = !load;
+  if (load) $('banner-load').textContent = load;
+  $('banner-keep').textContent = keep;
+  el.banner.hidden = false;
+}
+
+api.on('memo:external', async (next) => {
   if (!next) return;
-  if (!isDirty()) applyExternal(next);
-  else {
-    pendingExternal = next;
-    el.bannerText.textContent = '다른 기기에서 이 메모가 바뀌었어요.';
-    el.banner.hidden = false;
+  if (sameBody(next.body, current)) {
+    saved = current; // 지금 쓰는 글과 같은 내용 — 할 일 없음
+    return;
   }
+  if (!isDirty()) return applyExternal(next);
+  // 쓰는 중에 다른 기기에서도 고쳤을 때: 지금 쓰는 글은 이 메모에 그대로 저장하고, 들어온 내용은 사본 메모로 따로
+  // (고르기 전에 자동 저장이 들어온 내용을 덮어써 사라지는 일이 없게 — 휴대폰과 같게). 사본을 못 만들면 예전처럼 고르게
+  let copied = isBlankBody(next.body);
+  if (!copied) {
+    try {
+      conflictCopy = await api.memo.keepCopy(id, conflictCopyBody(next.body), conflictCopy);
+      copied = Boolean(conflictCopy);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  if (!copied) {
+    pendingExternal = next;
+    showBanner('다른 기기에서 이 메모가 바뀌었어요.', { load: '바뀐 내용 보기', keep: '지금 내용 두기' });
+    return;
+  }
+  pendingExternal = null;
+  await flush();
+  showBanner(conflictCopy ? '다른 기기에서도 이 메모를 고쳤어요. 그쪽 내용은 따로 저장해 뒀어요.' : '다른 기기에서도 이 메모를 고쳤어요.', { load: conflictCopy ? '그쪽 내용 보기' : null, keep: '확인' });
 });
 api.on('memo:removed', () => {
-  el.bannerText.textContent = '이 메모가 메모 폴더에서 사라졌어요. 계속 쓰면 다시 저장돼요.';
-  $('banner-load').hidden = true;
-  el.banner.hidden = false;
+  showBanner('이 메모가 메모 폴더에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
 });
-$('banner-load').addEventListener('click', () => pendingExternal && applyExternal(pendingExternal));
+$('banner-load').addEventListener('click', () => {
+  if (pendingExternal) return applyExternal(pendingExternal);
+  if (conflictCopy) {
+    el.banner.hidden = true;
+    api.memo.open(conflictCopy);
+  }
+});
 $('banner-keep').addEventListener('click', () => {
   el.banner.hidden = true;
+  if (!pendingExternal) return; // 사본으로 따로 남긴 뒤라 고를 것이 없다
   pendingExternal = null;
   saved = '';
   flush(); // 내 내용으로 덮어쓴다

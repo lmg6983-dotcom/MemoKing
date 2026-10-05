@@ -108,7 +108,7 @@ function render() {
   renderPill();
   if (!show) return;
   el.time.textContent = formatDuration(elapsed());
-  el.state.textContent = status.paused ? '일시 정지' : status.stt ? '녹음·받아쓰는 중' : '녹음 중';
+  el.state.textContent = status.paused ? '일시 정지' : status.stt ? '받아쓰는 중' : '녹음 중'; // 짧게 (빨간 점·시간이 녹음 중임을 알린다)
   el.panel.classList.toggle('paused', status.paused);
   el.pause.replaceChildren(svg(status.paused ? 'play' : 'pause'));
   el.pause.setAttribute('aria-label', status.paused ? '이어서 녹음' : '일시 정지');

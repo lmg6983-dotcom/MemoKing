@@ -695,13 +695,14 @@ body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #f
 .rec-head { display: flex; align-items: center; gap: 8px; }
 .rec-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #e5484d; box-shadow: 0 0 0 4px rgba(229, 72, 77, 0.2); animation: rec-blink 1.2s ease-in-out infinite; }
 .rec-panel.paused .rec-dot { animation: none; background: var(--note-muted); box-shadow: none; }
-.rec-time { font-size: 17px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
-.rec-state { font-size: 12.5px; color: var(--note-muted); }
-.rec-wave { display: inline-flex; align-items: center; gap: 3px; height: 22px; margin-left: 2px; }
+/* 좁은 화면에서도 한 줄: 시간·단추는 줄지 않고 줄바꿈도 없이, 모자라면 상태 글자만 말줄임 */
+.rec-time { flex: none; white-space: nowrap; font-size: 17px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.rec-state { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--note-muted); }
+.rec-wave { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 22px; margin-left: 2px; }
 .rec-wave i { display: block; width: 3px; height: 22px; border-radius: 2px; background: #e5484d; transform: scaleY(calc(0.12 + var(--lv, 0) * 0.88)); transition: transform 0.12s ease-out; }
 .rec-panel.paused .rec-wave i { background: var(--note-muted); transform: scaleY(0.12); }
 .rec-spk { display: inline-block; margin-right: 4px; padding: 0 7px; border-radius: 999px; font-size: 0.8em; font-weight: 700; line-height: 1.6; color: #fff; background: var(--spk, #2f6fdf); }
-.rec-btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; min-width: 38px; padding: 0 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font-weight: 700; font-size: 14px; }
+.rec-btn { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 38px; min-width: 38px; padding: 0 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font-weight: 700; font-size: 14px; }
 .rec-btn svg { width: 18px; height: 18px; }
 .rec-btn.stop { background: #e5484d; color: #fff; }
 .rec-btn:active { transform: scale(0.96); }

@@ -478,13 +478,18 @@ export function createListDrag({ readOnly = false } = {}) {
     // 안내 캡슐은 옮기기와 같은 자리 — 항목 틀의 오른쪽 (손가락에 가리면 비킨다)
     const frames = new DragFrames(view.dom);
     const home = frameOfLi(li);
+    // 테두리는 항목과 함께 밀리다가 본문 칸 끝에 닿으면 거기서 멈춘다 (화면 밖으로 잘려 나가지 않게)
+    const clip = (view.dom.closest('.editor') ?? view.dom).getBoundingClientRect();
     swipe = { view, pos, x0, y0, dx: 0, frames, scale };
     const show = () => {
       const { dx } = swipe;
       const dir = Math.abs(dx) >= SWIPE_DISTANCE ? Math.sign(dx) : 0;
       const ok = dir && canSwipe(view, pos, dir);
       const shown = Math.max(-72, Math.min(72, dx * 0.75));
-      decorate(view, [{ pos, cls: `mk-swiping${ok ? ' mk-swipe-ready' : ''}`, style: `transform: translateX(${(shown / scale).toFixed(1)}px)` }]);
+      const cutR = Math.max(0, home.left + home.width + shown - (clip.right - 2));
+      const cutL = Math.max(0, clip.left + 2 - (home.left + shown));
+      const style = `transform: translateX(${(shown / scale).toFixed(1)}px); --swipe-cut-r: ${(cutR / scale).toFixed(1)}px; --swipe-cut-l: ${(cutL / scale).toFixed(1)}px`;
+      decorate(view, [{ pos, cls: `mk-swiping${ok ? ' mk-swipe-ready' : ''}`, style }]);
       frames.set('lift', { ...home, left: home.left + shown }, { outer: true, draw: false });
       const kind = dir ? (ok ? (dir > 0 ? 'indent' : 'outdent') : 'blocked') : 'swipe';
       frames.label(kind, dir ? (ok ? (dir > 0 ? '→ 하위 항목으로' : '← 상위 항목으로') : '더 옮길 수 없어요') : dx > 0 ? '→ 밀면 하위로' : '← 밀면 상위로', { x: x0 + dx, y: y0 }, 'touch');

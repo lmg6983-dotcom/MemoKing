@@ -15,6 +15,7 @@ import { fetchRemoteImage } from './web-fetch.js';
 import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
 import { autoTagsFor } from '../../app/js/core/auto-tags.js';
+import { conflictCopyBody, isBlankBody, sameBody } from '../../app/js/core/memo-file.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -55,6 +56,7 @@ let current = '';   // 편집기의 최신 마크다운
 let saved = '';     // 마지막으로 저장한 마크다운
 let saveTimer = null;
 let pendingExternal = null;
+let conflictCopy = null; // 쓰는 중에 다른 기기에서도 고쳐 들어온 내용을 따로 남긴 사본 메모 (여는 동안 한 사본만 고쳐 쓴다)
 let opening = null;
 
 export const currentId = () => id;
@@ -105,6 +107,7 @@ el.editorRoot.addEventListener('beforeinput', (e) => {
 export function flush() {
   clearTimeout(saveTimer);
   saveTimer = null;
+  flushTables(); // 표 너비·높이도 (앱을 내릴 때 함께)
   if (!id || !isDirty()) return;
   const body = current;
   try {
@@ -131,21 +134,15 @@ function applyExternal(next) {
 export function onVaultChanged({ ids, external, removed }) {
   if (!id || !editor) return;
   if (removed.includes(id)) {
-    el.bannerText.textContent = '이 메모가 저장 위치에서 사라졌어요. 계속 쓰면 다시 저장돼요.';
-    el.bannerLoad.hidden = true;
-    el.banner.hidden = false;
+    showBanner('이 메모가 저장 위치에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
     return;
   }
   if (external.includes(id)) {
     const next = app.vault.get(id);
     if (!next) return;
-    if (!isDirty()) applyExternal(next);
-    else {
-      pendingExternal = next;
-      el.bannerText.textContent = '다른 기기에서 이 메모가 바뀌었어요.';
-      el.bannerLoad.hidden = false;
-      el.banner.hidden = false;
-    }
+    if (sameBody(next.body, current)) saved = current; // 지금 쓰는 글과 같은 내용 — 할 일 없음
+    else if (!isDirty()) applyExternal(next);
+    else keepTheirsAsCopy(next);
   }
   if (ids.includes(id)) {
     const next = app.vault.get(id);
@@ -156,9 +153,47 @@ export function onVaultChanged({ ids, external, removed }) {
     refreshLinks();
   }
 }
-el.bannerLoad.addEventListener('click', () => pendingExternal && applyExternal(pendingExternal));
+// 쓰는 중에 다른 기기에서도 이 메모를 고쳤을 때: 지금 쓰는 글은 이 메모에 그대로 저장하고, 들어온 내용은 사본 메모로
+// 따로 남긴다 (고르기 전에 자동 저장이 들어온 내용을 덮어써 사라지는 일이 없게). 사본을 못 만들면 예전처럼 고르게
+function keepTheirsAsCopy(next) {
+  let copied = isBlankBody(next.body); // 다른 기기에서 비웠다면 남길 것이 없다
+  if (!copied) {
+    try {
+      const body = conflictCopyBody(next.body);
+      if (conflictCopy && app.vault.get(conflictCopy)) app.vault.save(conflictCopy, body);
+      else conflictCopy = app.vault.import({ body, color: next.color });
+      copied = true;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  if (!copied) {
+    pendingExternal = next;
+    showBanner('다른 기기에서 이 메모가 바뀌었어요.', { load: '바뀐 내용 보기', keep: '지금 내용 두기' });
+    return;
+  }
+  flush(); // 들어온 내용으로 바뀐 파일을 지금 쓰는 글로
+  showBanner(conflictCopy ? '다른 기기에서도 이 메모를 고쳤어요. 그쪽 내용은 따로 저장해 뒀어요.' : '다른 기기에서도 이 메모를 고쳤어요.', { load: conflictCopy ? '그쪽 내용 보기' : null, keep: '확인' });
+}
+
+function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
+  el.bannerText.textContent = text;
+  el.bannerLoad.hidden = !load;
+  if (load) el.bannerLoad.textContent = load;
+  $('banner-keep').textContent = keep;
+  el.banner.hidden = false;
+}
+
+el.bannerLoad.addEventListener('click', () => {
+  if (pendingExternal) return applyExternal(pendingExternal);
+  if (conflictCopy && app.vault.get(conflictCopy)) {
+    el.banner.hidden = true;
+    app.openMemo(conflictCopy);
+  }
+});
 $('banner-keep').addEventListener('click', () => {
   el.banner.hidden = true;
+  if (!pendingExternal) return; // 사본으로 따로 남긴 뒤라 고를 것이 없다
   pendingExternal = null;
   saved = '';
   flush(); // 내 내용으로 덮어쓴다
@@ -301,9 +336,10 @@ function refreshLinks() {
   renderTagGroups();
   const mine = new Set(extractTags(editorMarkdown()).map((t) => t.toLocaleLowerCase('ko')));
   el.linksOut.replaceChildren(...links.map((m) => linkItem(m, { onRemove: () => setLink(m.id, false) })));
-  $('links-in-title').hidden = backlinks.length === 0;
+  // 이 메모를 연결한 메모·비슷한 메모는 있을 때만 (제목만 숨기면 빈 목록의 "아직 없어요"가 하나 더 보였다)
+  $('links-in-title').hidden = el.linksIn.hidden = backlinks.length === 0;
   el.linksIn.replaceChildren(...backlinks.map((m) => linkItem(m)));
-  $('links-suggest-title').hidden = suggestions.length === 0;
+  $('links-suggest-title').hidden = el.linksSuggest.hidden = suggestions.length === 0;
   el.linksSuggest.replaceChildren(...suggestions.map((m) => {
     const li = linkItem(m, { onAdd: () => setLink(m.id, true), score: m.score });
     // 닮은 메모의 태그 중 이 메모에 없는 것: 함께 달면 태그로도 이어진다
@@ -821,6 +857,8 @@ export async function openNote(memoId, options = {}) {
   opening = (async () => {
     id = memoId;
     memo = next;
+    pendingExternal = null;
+    conflictCopy = null;
     applyMeta(memo);
     el.banner.hidden = true;
     $('alarm-banner').hidden = true;
@@ -834,6 +872,7 @@ export async function openNote(memoId, options = {}) {
     current = saved = memo.body;
     el.editorRoot.replaceChildren();
     el.editorRoot.scrollTop = 0;
+    $('format-items').scrollLeft = 0; // 도구막대는 늘 처음(+ · 굵게)부터 — 지난 메모에서 옆으로 밀어 둔 채로 열리지 않게
     editor = await createNoteEditor(el.editorRoot, {
       markdown: memo.body,
       onChange,

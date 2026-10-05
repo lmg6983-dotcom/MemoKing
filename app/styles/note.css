@@ -1157,7 +1157,10 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 }
 /* 옆으로 밀어 하위·상위로: 미는 동안 따라 움직이고, 넘으면 테두리가 진해진다 */
 .mk-doc li.mk-swiping { z-index: 2; transition: none !important; }
-.mk-doc li.mk-swiping::after { border-style: solid; border-color: color-mix(in srgb, var(--note-text) 35%, transparent) !important; }
+.mk-doc li.mk-swiping::after {
+  border-style: solid; border-color: color-mix(in srgb, var(--note-text) 35%, transparent) !important;
+  left: calc(-1.35em - 7px + var(--swipe-cut-l, 0px)); right: calc(-6px + var(--swipe-cut-r, 0px)); /* 본문 칸 끝에서 멈춤 (list-drag.js) */
+}
 .mk-doc li.mk-swipe-ready::after { border-width: 2px; border-color: #7a4dff !important; }
 .mk-doc li.mk-swipe-back { transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) !important; }
 .mk-drag-badge[data-kind="indent"], .mk-drag-badge[data-kind="outdent"] { background: #7a4dff; color: #fff; }

@@ -456,6 +456,19 @@ try {
   write('약 먹기.md', read('약 먹기.md').replace('점심 먹고 30분 뒤', 'PC에서 고친 내용'));
   await page.waitForTimeout(4800);
   check('동기화: 열린 메모에 PC 변경 반영', (await page.textContent('#editor')).includes('PC에서 고친 내용'));
+  // 쓰는 중에 PC 에서도 고침 (자동 저장보다 먼저 파일이 바뀜): 내 글은 이 메모에, PC 쪽 내용은 사본 메모로 — 둘 다 남는다
+  await page.locator('.mk-doc p', { hasText: 'PC에서 고친 내용' }).tap();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' 휴대폰 글');
+  write('약 먹기.md', read('약 먹기.md').replace('PC에서 고친 내용', 'PC에서 또 고친 내용'));
+  await page.waitForTimeout(1500);
+  {
+    const copyName = fs.readdirSync(vault).find((f) => f.endsWith('.md') && f.includes('다른 기기'));
+    const copyText = copyName ? read(copyName) : '';
+    check('동시 수정: 내 글은 이 메모에 저장', read('약 먹기.md').includes('휴대폰 글'), read('약 먹기.md'));
+    check('동시 수정: PC 에서 고친 내용은 "(다른 기기 …)" 사본 메모로', copyText.includes('PC에서 또 고친 내용') && /^# 약 먹기 \(다른 기기 /m.test(copyText), `${copyName}\n${copyText}`);
+    if (copyName) fs.rmSync(path.join(vault, copyName)); // 뒤 점검(메모 수)에 끼지 않게
+  }
   await back();
 
   // LLM 인덱스
@@ -813,6 +826,7 @@ try {
   await page.waitForTimeout(1500);
   f = fileWith('출처: 스크린샷');
   check('화면 캡처: #캡처 태그를 저절로', f && /#캡처/.test(read(f)), f && read(f));
+  check('화면 캡처: 제목은 파일 이름 대신 "화면 캡처 · 날짜"', f && /^# 화면 캡처 · \d+월 \d+일/m.test(read(f)) && !read(f).includes('# Screenshot'), f && read(f));
   await back();
   await page.waitForTimeout(300);
 

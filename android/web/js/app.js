@@ -891,10 +891,7 @@ async function memoFromShare(payload) {
       const url = loneUrl(text);
       const docHasTitle = docTexts.some((t) => /^#\s/.test(t));
       if (subject && !text.includes(subject) && !url && !docHasTitle) editor.setMarkdown(`# ${esc(subject)}\n`);
-      else if (!text && !docTexts.length && files.length) {
-        const name = audio.length === files.length ? `음성 메모 · ${whenLabel(Date.now())}` : files.length === 1 ? files[0].name : `파일 ${files.length}개`;
-        editor.setMarkdown(`# ${esc(name)}\n`);
-      }
+      else if (!text && !docTexts.length && files.length) editor.setMarkdown(`# ${esc(sharedFilesTitle(files, audio.length, payload.app))}\n`);
       editor.focusEnd();
       // 주소 하나는 링크 카드, 마크다운 글은 서식대로, 그냥 글은 줄마다 문단으로
       if (text) editor.pasteData({ text: url ?? importText(text).markdown });
@@ -927,6 +924,20 @@ async function memoFromShare(payload) {
     }
     transcribeInto(id, audioItems);
   }
+}
+
+// 글 없이 파일만 받았을 때의 제목: 파일 이름(Screenshot_2026….png) 대신 사람이 읽는 이름 — 음성 메모와 같은 모양
+//   화면 캡처 · 10월 5일 오전 8:34 / 사진 3장 · … / 음성 메모 · … / 파일 하나는 그 이름 (보고서.pdf)
+const SCREENSHOT = /screen ?shot|screencap|스크린샷|화면 ?캡처|캡처/i;
+function sharedFilesTitle(files, audioCount, fromApp = '') {
+  const when = whenLabel(Date.now());
+  if (audioCount === files.length) return `음성 메모 · ${when}`;
+  const images = files.filter((f) => mediaKind({ name: f.name || '', type: f.mime || '' }) === 'image');
+  if (images.length === files.length) {
+    if (files.some((f) => SCREENSHOT.test(f.name || '')) || SCREENSHOT.test(fromApp)) return `화면 캡처 · ${when}`;
+    return files.length === 1 ? `사진 · ${when}` : `사진 ${files.length}장 · ${when}`;
+  }
+  return files.length === 1 ? files[0].name : `파일 ${files.length}개 · ${when}`;
 }
 
 async function handleIntent() {

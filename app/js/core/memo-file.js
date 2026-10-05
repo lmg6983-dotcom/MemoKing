@@ -213,6 +213,32 @@ export function isBlankBody(body) {
   return plainLines(body).length === 0 && extractAttachments(body).length === 0;
 }
 
+// ---------- 같은 메모를 두 기기에서 동시에 고쳤을 때 ----------
+// 열어 둔 메모에 아직 저장하지 않은 글이 있는데 다른 기기(동기화)에서 바뀐 내용이 들어오면, 지금 쓰는 글은 그대로 두고
+// 들어온 내용은 사본 메모로 남긴다 — 아무것도 잃지 않게 (Drive 동기화의 "(PC 충돌 …)" 사본과 같은 생각)
+//   사본 제목: "회의 메모 (다른 기기 10월 5일 08:34)"
+
+/** 같은 본문인가 — 파일에 쓸 때 줄바꿈(\r\n)·끝 공백을 맞추므로 그만큼은 같은 것으로 본다 */
+export function sameBody(a, b) {
+  const norm = (v) => String(v ?? '').replace(/\r\n/g, '\n').replace(/\s+$/, '');
+  return norm(a) === norm(b);
+}
+
+export function conflictLabel(date = new Date()) {
+  const pad = (v) => String(v).padStart(2, '0');
+  return `다른 기기 ${date.getMonth() + 1}월 ${date.getDate()}일 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** 사본 본문: 첫 줄(제목)에 "(다른 기기 …)" 를 붙인다. 제목 줄이 없으면 제목 줄을 만든다 */
+export function conflictCopyBody(body, label = conflictLabel()) {
+  const text = String(body ?? '').replace(/\r\n/g, '\n');
+  const lines = text.split('\n');
+  const i = lines.findIndex((l) => l.trim());
+  if (i >= 0 && /^\s{0,3}#{1,6}\s+\S/.test(lines[i])) lines[i] = `${lines[i].trimEnd()} (${label})`;
+  else lines.splice(Math.max(0, i), 0, `# ${extractTitle(text)} (${label})`, '');
+  return lines.join('\n');
+}
+
 // ---------- 파일명 ----------
 
 const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
