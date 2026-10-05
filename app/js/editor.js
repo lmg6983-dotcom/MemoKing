@@ -25,7 +25,7 @@ import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt } from './table-extras.js';
 import { createListDrag } from './list-drag.js';
-import { createBlockMove, createContentLines } from './block-move.js';
+import { createBlockMove, createContentLines, MEDIA_SCRUB } from './block-move.js';
 import { createVoiceCards, isVoiceCard } from './voice-card-view.js';
 import { createTidy } from './tidy.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
@@ -71,6 +71,9 @@ function playerOptions(kind) {
   };
 }
 
+// 플레이어에서 누르면 그 기능이 되는 곳 (재생 막대·단추). 그중 MEDIA_SCRUB(설정 메뉴)은 꾹 눌러도 옮기지 않음
+const MEDIA_CONTROL = `${MEDIA_SCRUB}, .plyr__progress, input, [role="slider"], .plyr__control, button`;
+
 function mediaView(node) {
   const { src, alt, title } = node.attrs;
   const kind = mediaKindOf(src, alt);
@@ -93,11 +96,12 @@ function mediaView(node) {
     const player = new Plyr(el, playerOptions(kind));
     return {
       dom,
-      // 플레이어 조작은 편집기로 새지 않게. 이름 줄(그리고 동영상 화면)은 편집기로 보내 줄 옮기기가 받게
+      // 상자 어디를 꾹 눌러도 줄을 옮긴다 (이름 줄·시간·빈 곳·동영상 화면은 편집기로).
+      // 재생 단추·재생 막대는 짧게 누르거나 밀면 그 기능, 꾹 누르면 옮기기 — 손가락이 닿는 순간만 편집기도 받는다
       stopEvent: (e) => {
         const t = e.target instanceof Element ? e.target : null;
-        if (t?.closest('.mk-media-label')) return false;
-        if (kind === 'video' && t && !t.closest('.plyr__controls, .plyr__control, button, input')) return false;
+        if (!t || !t.closest(MEDIA_CONTROL)) return false;
+        if (e.type === 'touchstart' && !t.closest(MEDIA_SCRUB)) return false;
         return true;
       },
       ignoreMutation: () => true,

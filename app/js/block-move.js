@@ -82,14 +82,22 @@ function blockInfo(doc, pos, inner) {
   return { pos, node, depth: $pos.depth + 1, start: $pos.start(), index: $pos.index(), count: $pos.parent.childCount, inner };
 }
 
+// 소리·동영상 플레이어에서 꾹 눌러도 옮기지 않는 곳 (설정 메뉴). 재생 막대는 밀면 감기, 꾹 누르면 옮기기 —
+// 누르는 사이 감긴 재생 위치는 들어 올릴 때 되돌린다
+export const MEDIA_SCRUB = '.plyr__menu__container';
 const GRAB_TARGET = 'img.mk-image, .mk-media, .mk-link-card, [data-link-card], a, .mk-math-block, hr';
 const NO_GRAB = '.plyr__controls, .plyr__control, button, input, select, textarea, [contenteditable="true"] [contenteditable="true"]';
 
 /** 화면에서 누른 곳(target)이 옮길 수 있는 내용 줄이면 그 줄 */
 export function blockFromTarget(view, target) {
   const t = target instanceof Element ? target : target?.parentElement;
+  // 음성 카드의 접기 막대: 카드째로
+  const bar = t?.closest('.mk-voice-bar');
+  if (bar && view.dom.contains(bar)) return voiceCardOf(view, bar.closest('.mk-voice'));
   const host = t?.closest(GRAB_TARGET);
-  if (!host || !view.dom.contains(host) || t.closest(NO_GRAB)) return null;
+  if (!host || !view.dom.contains(host)) return null;
+  // 소리·동영상 상자 안은 재생 막대(끌어서 감기)만 빼고 어디든 (단추는 짧게 누르면 단추 — editor.js mediaView)
+  if (host.classList.contains('mk-media') ? t.closest(MEDIA_SCRUB) : t.closest(NO_GRAB)) return null;
   let pos;
   try {
     pos = view.posAtDOM(host, 0);
@@ -113,6 +121,21 @@ export function blockFromTarget(view, target) {
     return blockInfo(doc, $p.before(d), isImage ? { kind: 'node', offset: pos - $p.start(d) } : { kind: 'text', offset: 0 });
   }
   return null;
+}
+
+// 화면의 음성 카드 상자 → 그 카드 줄
+function voiceCardOf(view, dom) {
+  if (!dom) return null;
+  let found = null;
+  view.state.doc.descendants((node, pos) => {
+    if (found != null) return false;
+    if (node.type.name === 'blockquote' && view.nodeDOM(pos) === dom) {
+      found = pos;
+      return false;
+    }
+    return node.isBlock && !node.isTextblock;
+  });
+  return found == null ? null : blockInfo(view.state.doc, found, { kind: 'text', offset: 1 });
 }
 
 /** 지우기 단추를 띄울 "내용" 줄: 그림·소리·파일 줄, 링크 카드·수식·가로줄, 음성 카드 */
@@ -258,6 +281,14 @@ class Mover {
     this.drag = null;
     this.hint = null;
     this.lastBlock = null;
+    // 재생 막대는 플레이어(RangeTouch)가 손가락이 닿는 순간 기본 동작을 막아 편집기에는 오지 않는다 —
+    // 그 전에(잡는 단계) 직접 받아 꾹 누르기를 잰다
+    this.onScrubTouch = (e) => {
+      if (e.touches.length !== 1 || !(e.target instanceof Element) || !e.target.closest('.mk-media input, .mk-media .plyr__progress')) return;
+      keyboardFor(view, e.target);
+      this.press(e, 'touch');
+    };
+    view.dom.addEventListener('touchstart', this.onScrubTouch, { capture: true, passive: true });
   }
 
   busy() {
@@ -279,6 +310,8 @@ class Mover {
     const io = INPUT[kind];
     const pt = pointOf(event);
     const p = { block, kind, text, x: pt.clientX, y: pt.clientY, x2: pt.clientX, y2: pt.clientY };
+    const media = event.target instanceof Element ? event.target.closest('.mk-media')?.querySelector('audio, video') : null;
+    if (media) p.media = { el: media, time: media.currentTime };
     this.pressing = p;
     p.move = (e) => {
       const q = pointOf(e);
@@ -308,6 +341,8 @@ class Mover {
         if (this.pressing !== p) return;
         this.cancelPress({ keepMark: true });
         navigator.vibrate?.(12);
+        if (p.media && p.media.el.currentTime !== p.media.time) p.media.el.currentTime = p.media.time; // 재생 막대를 눌러 감긴 것 되돌리기
+        if (document.activeElement instanceof HTMLInputElement) document.activeElement.blur();
         this.lift(p);
       }, text ? (kind === 'touch' ? TOUCH_HOLD_MS : HOLD_MS) : io.hold);
     }
@@ -673,6 +708,7 @@ class Mover {
   }
 
   destroy() {
+    this.view.dom.removeEventListener('touchstart', this.onScrubTouch, true);
     this.cancelPress();
     if (this.drag) this.finish(false);
     clearTimeout(this.flashTimer);

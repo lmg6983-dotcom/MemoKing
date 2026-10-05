@@ -682,6 +682,23 @@ try {
   await page.waitForTimeout(900);
   let ord = orderOf('녹음 테스트', '첫 문단');
   check('소리 옮기기: 다른 줄과 맞바꿈', ord[0] > 0 && ord[0] < ord[1], read('옮기기.md'));
+  // 소리 상자 어디든(재생 막대·시간·단추·빈 곳) 꾹 누르면 들어 올림 — 놓기만 하면 제자리
+  {
+    const missed = [];
+    for (const sel of ['.mk-audio input[type=range]', '.mk-audio .plyr__time', '.mk-audio .plyr__control[data-plyr="play"]', '.mk-audio']) {
+      const b = await page.locator(sel).first().boundingBox();
+      if (!b) { missed.push(`${sel}(없음)`); continue; }
+      const x = b.x + b.width / 2, y = sel === '.mk-audio' ? b.y + b.height - 3 : b.y + b.height / 2;
+      await touch('touchStart', x, y);
+      await page.waitForTimeout(550);
+      if ((await page.locator('.mk-block-lift').count()) !== 1) missed.push(sel);
+      await touch('touchEnd', 0, 0);
+      await page.waitForTimeout(700);
+      await page.evaluate(() => document.querySelector('.mk-delete-btn')?.remove());
+    }
+    check('소리 옮기기: 상자 어디를 꾹 눌러도 들어 올림 (재생 막대·시간·단추·빈 곳)', !missed.length, missed.join(', '));
+    check('소리 옮기기: 꾹 눌렀다 놓기만 하면 순서 그대로', JSON.stringify(orderOf('녹음 테스트', '첫 문단')) === JSON.stringify(ord), read('옮기기.md'));
+  }
   // 표·글 문단도 목록 항목과 같은 방식: 꾹 누르면 들어 올림 (손잡이 없음)
   check('옮기기: 따로 손잡이(⠿) 없음', (await page.locator('.mk-grip').count()) === 0);
   const cell = await page.locator('.mk-doc td', { hasText: '1' }).first().boundingBox();
@@ -859,6 +876,17 @@ try {
   await page.tap('.mk-voice-toggle');
   await page.waitForTimeout(300);
   check('음성 카드: 다시 펴기', (await page.locator('.mk-voice.folded').count()) === 0);
+  {
+    // 접기 막대도 꾹 누르면 카드째로 들어 올림 (놓아도 접히지 않음)
+    const b = await page.locator('.mk-voice-toggle').boundingBox();
+    await touch('touchStart', b.x + b.width / 2, b.y + b.height / 2);
+    await page.waitForTimeout(550);
+    const up = (await page.locator('.mk-block-lift').count()) === 1;
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(700);
+    check('음성 카드: 접기 막대를 꾹 누르면 카드째로 들어 올림 (놓아도 접히지 않음)', up && (await page.locator('.mk-voice.folded').count()) === 0);
+    await page.evaluate(() => document.querySelector('.mk-delete-btn')?.remove());
+  }
   await shot('16-voice-card');
   if (process.env.MK_DUMP) console.log(await page.evaluate(() => { const v = document.querySelector('.mk-voice'); const p = v.querySelector('.mk-voice-body > p'); return p.outerHTML.replace(/<svg[\s\S]*?<\/svg>/g, '') + '\n' + [...p.querySelectorAll('*')].slice(0, 8).map((e) => e.tagName + '.' + e.className + ' ' + e.getBoundingClientRect().height).join('\n'); }));
   await back();

@@ -4,7 +4,7 @@
 //   - 글자를 다시 누르면 떼어 평소처럼 키보드가 올라온다
 // 마우스(PC)에는 아무 일도 하지 않는다.
 const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
-const NO_KEYBOARD_TARGET = 'img, .mk-media, .mk-link-card, .mk-file, a[href], .mk-math, .mk-math-block';
+const NO_KEYBOARD_TARGET = 'img, .mk-media, .mk-link-card, .mk-file, a[href], .mk-math, .mk-math-block, .mk-voice-bar';
 
 /** 옮기기 시작: 키보드를 막고, 떠 있으면 내린다 */
 export function holdKeyboard(view, { hide = true } = {}) {

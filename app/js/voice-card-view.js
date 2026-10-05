@@ -121,9 +121,8 @@ function voiceView(node) {
     setTimeout(() => dom.classList.remove('mk-voice-anim'), 260);
     render();
   }
-  // 누르는 동안 커서·키보드가 움직이지 않게
+  // 누르는 동안 커서·키보드가 움직이지 않게 (손가락이 닿는 것은 편집기도 받아, 꾹 누르면 카드를 옮긴다)
   toggle.addEventListener('mousedown', (e) => e.preventDefault());
-  toggle.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
   toggle.addEventListener('click', (e) => {
     e.preventDefault();
     navigator.vibrate?.(8);
@@ -141,7 +140,7 @@ function voiceView(node) {
       render();
       return true;
     },
-    stopEvent: (e) => e.target instanceof Node && bar.contains(e.target),
+    stopEvent: (e) => e.type !== 'touchstart' && e.target instanceof Node && bar.contains(e.target),
     ignoreMutation: (m) => bar.contains(m.target) || m.target === dom,
   };
 }
