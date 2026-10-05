@@ -412,6 +412,12 @@ function openShare(id) {
   openSheet(shareSheet);
 }
 
+const PDF_WAIT_MS = 30_000; // 앱 쪽은 15초 안에 못 만들면 인쇄 화면으로 넘어간다
+const withTimeout = (promise, ms, message) => {
+  let timer;
+  return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); })]).finally(() => clearTimeout(timer));
+};
+
 const fileName = (title, ext) => `${title.replace(/[\\/:*?"<>|#]+/g, ' ').trim().slice(0, 60) || '메모'}.${ext}`;
 
 shareSheet.addEventListener('click', async (e) => {
@@ -442,13 +448,9 @@ shareSheet.addEventListener('click', async (e) => {
       const base64 = await renderMemoImage(note.getEditor(), { color: app.vault.get(id)?.color });
       await call('shareFile', { base64, name: fileName(title, 'png'), mime: 'image/png', title });
     } else {
-      try {
-        const html = printHtml(note.getEditor().dom(), { title, color: app.vault.get(id)?.color });
-        await call('sharePdf', { title, name: fileName(title, 'pdf'), html });
-      } catch (err) {
-        console.warn('PDF 파일을 바로 만들지 못해 인쇄 화면으로', err);
-        await call('print', { title });
-      }
+      // 앱이 PDF 를 바로 만들지 못하면 스스로 인쇄 화면("PDF로 저장")을 연다. 그래도 답이 없으면 계속 기다리지 않는다
+      const html = printHtml(note.getEditor().dom(), { title, color: app.vault.get(id)?.color });
+      await withTimeout(call('sharePdf', { title, name: fileName(title, 'pdf'), html }), PDF_WAIT_MS, 'PDF를 만들지 못했어요. 잠시 뒤 다시 해 주세요');
     }
     closeSheet(shareSheet);
   } catch (err) {

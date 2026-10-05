@@ -48,6 +48,7 @@ class MainActivity : Activity() {
         private const val REQ_NOTIFY = 3
         private const val REQ_AUTH = 4
         private const val REQ_MIC = 5
+        private const val PDF_TIMEOUT_MS = 15_000L // PDF 만들기를 이만큼 기다리고, 넘으면 인쇄 화면으로
 
         /** 지금 앞에 보이는 화면 (알림이 울렸을 때 바로 알리기 위해) */
         @Volatile
@@ -269,6 +270,9 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         if (visible === this) visible = null
         RecorderService.listener = null
+        main.removeCallbacksAndMessages(null)
+        printWeb?.destroy()
+        printWeb = null
         web.destroy()
         super.onDestroy()
     }
@@ -546,41 +550,32 @@ class MainActivity : Activity() {
         }
     }
 
-    /** 지금 보이는 메모를 PDF 파일로 만들어(인쇄 화면 없이) 보내기 — 글자를 고를 수 있는 PDF */
     /** 지금 인쇄용 WebView (끝날 때까지 붙잡아 둔다 — 버려지면 PDF 가 중간에 끊긴다) */
     private var printWeb: WebView? = null
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pdfJob = 0
+
+    private fun pdfAttributes() = PrintAttributes.Builder()
+        .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+        .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
+        .setMinMargins(PrintAttributes.Margins(720, 720, 720, 720)) // 1.27cm (1/1000 인치 단위)
+        .build()
+
+    // 인쇄용 WebView 치우기. 주의: 창에 붙지 않은 View 의 postDelayed 는 붙을 때까지 미뤄져 끝내 돌지 않으므로 Handler 로
+    //   (아직 PDF 를 쓰는 중일 수 있으면 later — 한참 뒤에 없앤다)
+    private fun dropPrintWeb(view: WebView, later: Boolean = false) {
+        if (printWeb === view) printWeb = null
+        root.removeView(view)
+        main.postDelayed({ view.destroy() }, if (later) 60_000L else 500L)
+    }
 
     /**
-     * 메모를 PDF 파일로 보내기.
-     *   html 이 있으면(화면이 만든 인쇄 전용 문서) 보이지 않는 WebView 에 띄워 그것을 쓴다 — 앱 화면 틀(고정 높이·안쪽
-     *   스크롤·열린 시트)이 끼지 않아 쪽이 비지 않는다. 없으면 예전처럼 지금 화면을 인쇄.
+     * 인쇄 전용 문서를 띄운 WebView 를 만들어, 그림·글꼴까지 다 그려지면 ready 로 넘긴다.
+     *   메인 화면 뒤(같은 창)에 붙여 둔다 — 창에 붙지 않은 WebView 는 휴대폰에 따라 그리기를 미뤄 PDF 가 끝나지 않을 수 있다.
+     *   메인 화면이 덮고 있어 보이지 않는다.
      */
-    fun sharePdf(id: Int, file: java.io.File, title: String, html: String? = null) {
-        val attrs = PrintAttributes.Builder()
-            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-            .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
-            .setMinMargins(PrintAttributes.Margins(720, 720, 720, 720)) // 1.27cm (1/1000 인치 단위)
-            .build()
-        val write = { view: WebView, cleanup: () -> Unit ->
-            try {
-                PdfPrint(attrs).write(view.createPrintDocumentAdapter(file.name), file) { error ->
-                    runOnUiThread {
-                        cleanup()
-                        if (error != null) bridge.resolve(id) { android.util.Log.w("MemoKing", "PDF", error); throw IllegalStateException("PDF를 만들지 못했어요. 다시 시도해 주세요") }
-                        else if (file.length() < 200) bridge.resolve(id) { throw IllegalStateException("PDF를 만들지 못했어요. 다시 시도해 주세요") }
-                        else shareFile(id, file, "application/pdf", title)
-                    }
-                }
-            } catch (e: Throwable) {
-                cleanup()
-                bridge.resolve(id) { android.util.Log.w("MemoKing", "PDF", e); throw IllegalStateException("PDF를 만들지 못했어요. 다시 시도해 주세요") }
-            }
-        }
-        if (html.isNullOrBlank()) {
-            write(web) {}
-            return
-        }
-        printWeb?.destroy()
+    private fun loadPrintWeb(html: String, ready: (WebView) -> Unit) {
+        printWeb?.let { dropPrintWeb(it) }
         val pw = WebView(this)
         printWeb = pw
         pw.settings.apply {
@@ -590,24 +585,79 @@ class MainActivity : Activity() {
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             blockNetworkImage = false
         }
-        // 보이지 않아도 쪽 나누기가 되도록 A4 폭쯤으로 배치
-        pw.layout(0, 0, 1240, 1754)
+        root.addView(pw, 0, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         var started = false
         pw.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? = server.handle(request)
             override fun onPageFinished(view: WebView, url: String?) {
                 if (started) return
                 started = true
-                // 그림·글꼴이 다 그려지도록 조금 기다렸다가
-                view.postDelayed({
-                    write(view) {
-                        if (printWeb === view) printWeb = null
-                        view.postDelayed({ view.destroy() }, 500)
-                    }
-                }, 700)
+                // 그림·글꼴이 다 그려지도록 조금 기다렸다가 (창에 붙지 않은 View 의 postDelayed 는 돌지 않으므로 Handler 로)
+                main.postDelayed({ if (printWeb === view) ready(view) }, 700)
             }
         }
         pw.loadDataWithBaseURL(WebServer.START, html, "text/html", "utf-8", null)
+    }
+
+    /**
+     * 메모를 PDF 파일로 보내기 (인쇄 화면 없이, 글자를 고를 수 있는 PDF).
+     *   html 이 있으면(화면이 만든 인쇄 전용 문서) 따로 띄운 WebView 로 — 앱 화면 틀(고정 높이·안쪽 스크롤·열린 시트)이
+     *   끼지 않아 쪽이 비지 않는다. 없으면 예전처럼 지금 화면.
+     *   PDF_TIMEOUT_MS 안에 끝나지 않으면(일부 휴대폰의 WebView) 계속 기다리게 두지 않고 인쇄 화면("PDF로 저장")으로 —
+     *   결과 "print"
+     */
+    fun sharePdf(id: Int, file: java.io.File, title: String, html: String? = null) {
+        val job = ++pdfJob
+        var settled = false
+        fun settle(block: () -> Unit) {
+            if (settled || job != pdfJob) return
+            settled = true
+            block()
+        }
+        val timeout = Runnable {
+            settle {
+                android.util.Log.w("MemoKing", "PDF: 시간 안에 끝나지 않아 인쇄 화면으로")
+                printWeb?.let { dropPrintWeb(it, later = true) }
+                openPrintDialog(id, title, html)
+            }
+        }
+        main.postDelayed(timeout, PDF_TIMEOUT_MS)
+        val write = { view: WebView ->
+            try {
+                PdfPrint(pdfAttributes()).write(view.createPrintDocumentAdapter(file.name), file) { error ->
+                    runOnUiThread {
+                        settle {
+                            main.removeCallbacks(timeout)
+                            if (view !== web) dropPrintWeb(view)
+                            if (error != null || file.length() < 200) {
+                                if (error != null) android.util.Log.w("MemoKing", "PDF", error)
+                                openPrintDialog(id, title, html) // 바로 못 만들면 인쇄 화면으로 (거기서 PDF로 저장)
+                            } else shareFile(id, file, "application/pdf", title)
+                        }
+                    }
+                }
+            } catch (e: Throwable) {
+                android.util.Log.w("MemoKing", "PDF", e)
+                settle {
+                    main.removeCallbacks(timeout)
+                    if (view !== web) dropPrintWeb(view)
+                    openPrintDialog(id, title, html)
+                }
+            }
+        }
+        if (html.isNullOrBlank()) write(web) else loadPrintWeb(html) { write(it) }
+    }
+
+    /** 안드로이드 인쇄 화면 (프린터 · "PDF로 저장") — 인쇄 전용 문서가 있으면 그것을, 없으면 지금 화면 */
+    private fun openPrintDialog(id: Int, title: String, html: String?) {
+        val show = { view: WebView ->
+            bridge.resolve(id) {
+                getSystemService(PrintManager::class.java)!!.print(title, view.createPrintDocumentAdapter(title), pdfAttributes())
+                "print"
+            }
+        }
+        // 인쇄 화면이 쓰는 동안 WebView 를 붙잡아 둔다 (다음 PDF 때나 화면이 닫힐 때 치운다)
+        if (html.isNullOrBlank()) show(web) else loadPrintWeb(html) { show(it) }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
