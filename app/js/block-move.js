@@ -191,8 +191,7 @@ const INPUT = {
 const pointOf = (e) => e.touches?.[0] ?? e.changedTouches?.[0] ?? e;
 const LISTEN = { capture: true, passive: false };
 const HINT_KEY = 'memoking.hint.blockMove';
-const THUMB_MIN = 90; // 이보다 높은 내용은 들어 올릴 때 썸네일로 줄인다 (px)
-const THUMB_H = 84; // 썸네일 높이 (px)
+const COMPACT_H = 64; // 옮기는 동안 줄마다 이 높이까지만 보인다 (px) — note.css 의 .mk-block-compact-item 과 같게
 const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
 
 /** @param {{ readOnly?: boolean }} options */
@@ -327,12 +326,28 @@ class Mover {
       positions.push(q);
       q += c.nodeSize;
     });
-    const doms = positions.map((x) => view.nodeDOM(x));
+    let doms = positions.map((x) => view.nodeDOM(x));
     if (doms.some((d) => !(d instanceof Element))) return;
     getSelection()?.removeAllRanges();
     const scroller = scrollerOf(view.dom);
+    // 옮기는 동안은 모든 줄을 짧게 접는다 (그림은 작은 썸네일, 긴 글·표는 첫 부분만) — 앞뒤 내용이 커도
+    // 한 칸 옮기는 데 손가락을 조금만 움직이면 되게. 놓으면 원래 크기로
+    const before = doms.map((el) => el.getBoundingClientRect().height);
+    const srcBefore = doms[block.index].getBoundingClientRect();
+    const ratio = srcBefore.height ? Math.min(1, Math.max(0, (p.y - srcBefore.top) / srcBefore.height)) : 0.5;
+    const compactCls = (i) => `mk-block-compact-item${before[i] > COMPACT_H ? ' mk-block-clipped' : ''}`;
+    document.body.classList.add('mk-block-compact');
+    this.decorate(positions.map((pos, i) => ({ pos, cls: `${i === block.index ? 'mk-block-lift' : 'mk-block-sorting'} ${compactCls(i)}` })));
+    doms = positions.map((x) => view.nodeDOM(x));
+    // 접힌 뒤에도 들어 올린 줄이 손가락 아래에 있게 스크롤을 맞춘다
+    if (scroller) {
+      const r = doms[block.index].getBoundingClientRect();
+      scroller.scrollTop += r.top - (p.y - ratio * r.height);
+    }
     const st = scroller?.scrollTop ?? 0;
     const rects = doms.map((d) => d.getBoundingClientRect());
+    // 스크롤로 다 맞추지 못했으면(맨 위 등) 손가락과 접힌 줄 사이의 차이를 기억해, 손가락이 움직인 만큼만 옮긴다
+    const bias = rects[block.index].top + ratio * rects[block.index].height - p.y;
     const tops = rects.map((r) => r.top + st);
     const heights = rects.map((r) => r.height);
     const slots = tops.map((t, i) => (i < tops.length - 1 ? tops[i + 1] - t : heights[i]));
@@ -344,8 +359,7 @@ class Mover {
     document.body.append(badge);
     this.hideHint();
     // 큰 내용(그림·동영상·링크 카드)은 들어 올린 동안 작은 썸네일로 줄여 손가락 위에 띄운다 — 놓을 자리 주변 글이 가리지 않게
-    const h = heights[block.index];
-    const shrink = h > THUMB_MIN ? Math.max(0.22, Math.min(0.7, THUMB_H / h)) : 1;
+    const shrink = 1; // 접어서 옮기므로 썸네일로 따로 줄이지 않는다
     const grabX = p.x - rects[block.index].left; // 누른 자리 (내용 안, 화면 px) — 여기를 중심으로 줄인다
     const grabY = p.y - rects[block.index].top;
     // 놓을 자리 미리 보기: 손을 놓기 전에 옮겨질 자리에 점선 테두리 칸
@@ -354,9 +368,9 @@ class Mover {
     slot.hidden = true;
     document.body.append(slot);
     const d = {
-      slot, left: rects[block.index].left, width: rects[block.index].width,
+      slot, left: rects[block.index].left, width: rects[block.index].width, compactCls, bias, ratio,
       block, positions, tops, heights, slots, scale, scroller, badge, drop: null, kind: p.kind,
-      x: p.x2, y: p.y2, x0: p.x2, y0: p.y2, startY: p.y + st, raf: 0, timer: 0, shrink, grabX, grabY,
+      x: p.x2, y: p.y2, x0: p.x2, y0: p.y2, raf: 0, timer: 0, shrink, grabX, grabY,
     };
     this.drag = d;
     document.body.classList.add('mk-block-dragging');
@@ -418,7 +432,7 @@ class Mover {
   judge() {
     const d = this.drag;
     if (!d) return;
-    const cy = d.y + (d.scroller?.scrollTop ?? 0);
+    const cy = d.y + d.bias + (d.scroller?.scrollTop ?? 0);
     const n = d.tops.length;
     const s = d.block.index;
     let drop;
@@ -436,9 +450,16 @@ class Mover {
     b.dataset.kind = d.drop?.kind ?? '';
     b.textContent = d.drop?.kind === 'swap' ? '⇅ 맞바꾸기' : d.drop?.kind === 'insert' ? '↳ 여기에 넣기' : '';
     b.hidden = !d.drop;
-    // 터치: 썸네일은 손가락 위, 안내는 손가락 오른쪽 (둘 다 가리지 않게)
-    b.style.left = `${Math.min(window.innerWidth - 120, d.x + (d.kind === 'touch' ? 28 : 16))}px`;
-    b.style.top = `${d.y + (d.kind === 'touch' ? -12 : 14)}px`;
+    // 터치: 안내는 손가락이 가리지 않는 곳 — 손가락보다 위, 화면의 반대쪽으로
+    if (d.kind === 'touch') {
+      const bw = b.offsetWidth || 110;
+      const x = d.x < window.innerWidth / 2 ? d.x + 44 : d.x - 44 - bw;
+      b.style.left = `${Math.round(Math.max(8, Math.min(window.innerWidth - bw - 8, x)))}px`;
+      b.style.top = `${Math.round(Math.max(8, d.y - 76))}px`;
+    } else {
+      b.style.left = `${Math.min(window.innerWidth - 120, d.x + 16)}px`;
+      b.style.top = `${d.y + 14}px`;
+    }
   }
 
   // 끄는 줄은 손을 따라오고, 다른 줄들은 놓았을 때의 자리로 미끄러진다
@@ -448,7 +469,7 @@ class Mover {
     const s = d.block.index;
     const order = previewOrder(positions.length, s, d.drop);
     const bottom = tops.at(-1) + heights.at(-1);
-    let follow = d.y + (d.scroller?.scrollTop ?? 0) - d.startY;
+    let follow = d.y + d.bias + (d.scroller?.scrollTop ?? 0) - (tops[s] + d.ratio * heights[s]);
     follow = Math.min(bottom - heights[s] + 8, Math.max(tops[0] - 8, tops[s] + follow)) - tops[s];
     const specs = [];
     let y = tops[0];
@@ -473,10 +494,10 @@ class Mover {
           style = `transform-origin: ${(d.grabX / scale).toFixed(1)}px ${(d.grabY / scale).toFixed(1)}px; `
             + `transform: translateY(${((follow - up) / scale).toFixed(1)}px) scale(${k.toFixed(3)}); opacity: 0.88`;
         }
-        specs.push({ pos: positions[i], cls: `mk-block-lift${d.shrink < 1 ? ' mk-block-thumb' : ''}`, style });
+        specs.push({ pos: positions[i], cls: `mk-block-lift ${d.compactCls(i)}${d.shrink < 1 ? ' mk-block-thumb' : ''}`, style });
       } else {
         const dy = y - tops[i];
-        const cls = ['mk-block-sorting', d.drop?.kind === 'swap' && i === d.drop.index ? 'mk-block-swap-target' : ''].filter(Boolean).join(' ');
+        const cls = ['mk-block-sorting', d.compactCls(i), d.drop?.kind === 'swap' && i === d.drop.index ? 'mk-block-swap-target' : ''].filter(Boolean).join(' ');
         specs.push({ pos: positions[i], cls, style: dy ? `transform: translateY(${(dy / scale).toFixed(1)}px)` : '' });
       }
       y += slots[i];
@@ -498,7 +519,7 @@ class Mover {
     window.removeEventListener('contextmenu', d.stop, true);
     d.badge.remove();
     d.slot.remove();
-    document.body.classList.remove('mk-block-dragging');
+    document.body.classList.remove('mk-block-dragging', 'mk-block-compact');
     this.drag = null;
     // 끈 뒤 따라오는 클릭(파일 열기·링크 열기)은 먹는다
     const swallow = (e) => {

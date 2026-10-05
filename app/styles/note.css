@@ -1357,3 +1357,11 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 @keyframes mk-slot-in { from { opacity: 0; transform: scale(0.96); } }
 @keyframes mk-slot-breathe { 50% { border-color: color-mix(in srgb, var(--note-text, #111) 30%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .mk-drop-slot { animation: none; transition: none; } }
+
+/* 옮기는 동안 접기 (block-move.js 의 COMPACT_H = 64px): 줄마다 짧게 — 그림은 작은 썸네일, 긴 글·표·음성 카드는
+   첫 부분만 (아래가 흐려짐). 한 칸 옮기는 데 손가락을 조금만 움직이면 되게. 놓으면 원래대로 */
+body.mk-block-compact .mk-doc .mk-block-compact-item { max-height: 64px; overflow: hidden; box-sizing: border-box; }
+body.mk-block-compact .mk-doc .mk-block-compact-item.mk-block-clipped { -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
+body.mk-block-compact .mk-doc .mk-block-compact-item img.mk-image { max-height: 56px; width: auto; max-width: 45%; border-radius: 8px; }
+body.mk-block-compact .mk-doc p.mk-image-line.mk-block-compact-item { -webkit-mask-image: none; mask-image: none; }
+body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height: 60px; }
