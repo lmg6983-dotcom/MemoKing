@@ -162,7 +162,7 @@ $('form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const s = size();
   $('save').disabled = true;
-  $('status').textContent = 'PDF를 만들고 있어요';
+  $('status').textContent = 'PDF를 만드는 중…';
   $('status').classList.remove('error');
   const r = await api.pdf.save(id, { width: s.width, height: s.height, margin: MARGINS[opt.margin], bg: opt.bg, date: opt.date, open: opt.open }).catch(() => null);
   $('save').disabled = false;
@@ -172,7 +172,7 @@ $('form').addEventListener('submit', async (e) => {
   } else if (r?.cancelled) {
     $('status').textContent = '';
   } else {
-    $('status').textContent = 'PDF를 만들지 못했어요. 저장할 곳을 바꿔 다시 시도해 주세요.';
+    $('status').textContent = 'PDF를 만들지 못했어요. 다른 위치에 저장해 보세요';
     $('status').classList.add('error');
   }
 });

@@ -352,7 +352,7 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
     await wait(200);
     await until(() => tj(`!document.getElementById('table-bar').hidden`), '표 막대');
     const barLabels = await tj(`[...document.querySelectorAll('#table-bar button')].map((b) => b.textContent.trim())`);
-    check('표 막대: 행 추가 · 열 추가 · 행 지우기 · 열 지우기 · 셀 병합 · 자동 조정', JSON.stringify(barLabels) === JSON.stringify(['행 추가', '열 추가', '행 지우기', '열 지우기', '셀 병합', '자동 조정']), JSON.stringify(barLabels));
+    check('표 막대: 행 추가 · 열 추가 · 행 삭제 · 열 삭제 · 셀 병합 · 자동 조정', JSON.stringify(barLabels) === JSON.stringify(['행 추가', '열 추가', '행 삭제', '열 삭제', '셀 병합', '자동 조정']), JSON.stringify(barLabels));
     // 셀 병합: 둘째 열의 본문 두 칸을 끌어서 고른 뒤 "셀 병합"
     const mergeFrom = await tj(`(() => { const rows = document.querySelectorAll('.mk-doc tr'); const a = rows[1].children[2].getBoundingClientRect(); const b = rows[2].children[2].getBoundingClientRect(); return { x: a.left + 12, y: a.top + 10, dy: b.top - a.top }; })()`);
     send('mouseMove', mergeFrom.x, mergeFrom.y);

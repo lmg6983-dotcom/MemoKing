@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('memoking', {
     setAutoStart: invoke('app:set-auto-start'),
     setQuickMemo: invoke('app:set-quick-memo'),
     setFitTables: invoke('app:set-fit-tables'),
+    setAutoTags: invoke('app:set-auto-tags'),
     setMagic: invoke('app:set-magic'),
     setTrashDays: invoke('app:set-trash-days'),
   },

@@ -43,7 +43,7 @@ export function setupDrivePanel({ api, onVault, confirm }) {
     }
     $('drive-title').textContent = title;
     $('drive-sub').textContent = sub;
-    $('drive-connect').textContent = on ? 'Drive 폴더 바꾸기' : '연결하기';
+    $('drive-connect').textContent = on ? '폴더 변경' : '연결하기';
     $('drive-sync-now').hidden = !on;
     $('drive-sync-now').disabled = st.state === 'syncing';
     $('drive-disconnect').hidden = !info.connected;
@@ -118,7 +118,7 @@ export function setupDrivePanel({ api, onVault, confirm }) {
     });
     const use = $('folder-use');
     use.disabled = cur.id === 'root';
-    use.textContent = cur.id === 'root' ? '폴더를 골라 주세요' : `"${cur.name}" 폴더 쓰기`;
+    use.textContent = cur.id === 'root' ? '폴더를 선택하세요' : `"${cur.name}" 폴더 사용`;
     const list = $('folder-list');
     list.innerHTML = '<li class="loading">불러오는 중…</li>';
     let folders;
@@ -203,7 +203,7 @@ export function setupDrivePanel({ api, onVault, confirm }) {
     }
   });
   $('drive-disconnect').addEventListener('click', async () => {
-    if (!(await confirm('Google Drive 연결을 끊을까요?\n이 PC 의 메모는 그대로 남고, 더 이상 휴대폰과 맞추지 않아요.', '연결 끊기'))) return;
+    if (!(await confirm('Google Drive 연결을 끊을까요?\n이 PC의 메모는 그대로 남고, 휴대폰과 더 이상 동기화하지 않아요.', '연결 끊기'))) return;
     render(await api.drive.disconnect());
   });
   $('client-save').addEventListener('click', async () => {

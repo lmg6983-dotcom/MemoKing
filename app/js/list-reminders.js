@@ -64,7 +64,7 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
 
     const del = document.createElement('button');
     del.className = 'icon-btn';
-    del.title = '알림 지우기';
+    del.title = '알림 삭제';
     del.setAttribute('aria-label', `${item.title} 알림 지우기`);
     del.append(icon('trash'));
     del.addEventListener('click', () => update(item, (list) => list.filter((x) => x.id !== r.id)));

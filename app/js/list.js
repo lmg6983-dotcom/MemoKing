@@ -66,7 +66,7 @@ function applyInfo(info) {
   el.setupError.hidden = !info.vaultError;
   el.setupError.textContent = info.vaultError ?? '';
   el.vaultPath.textContent = info.vaultPath ?? '';
-  el.version.textContent = `메모킹 v${info.version}`;
+  el.version.textContent = `메모킹 ${info.version}`;
 }
 
 // ---------- 목록 ----------
@@ -323,7 +323,7 @@ function renderCard(memo) {
 
   const del = document.createElement('button');
   del.className = 'icon-btn danger card-delete';
-  del.title = '지우기';
+  del.title = '삭제';
   del.setAttribute('aria-label', `${memo.title} 지우기`);
   del.dataset.delete = memo.id;
   del.append(icon('trash'));
@@ -331,7 +331,7 @@ function renderCard(memo) {
   // 목록 맨 위에 고정 (압정)
   const pin = document.createElement('button');
   pin.className = `icon-btn card-pin${memo.pinned ? ' on' : ''}`;
-  pin.title = memo.pinned ? '목록 맨 위 고정 풀기' : '목록 맨 위에 고정';
+  pin.title = memo.pinned ? '고정 해제' : '맨 위에 고정';
   pin.setAttribute('aria-label', `${memo.title} ${pin.title}`);
   pin.setAttribute('aria-pressed', String(Boolean(memo.pinned)));
   pin.dataset.pin = memo.id;
@@ -386,7 +386,7 @@ async function runSearch() {
 
 // ---------- 동작 ----------
 
-function confirmDialog(message, okLabel = '지우기') {
+function confirmDialog(message, okLabel = '삭제') {
   el.confirmMessage.textContent = message;
   $('confirm-ok').textContent = okLabel;
   el.confirm.returnValue = '';
@@ -423,7 +423,7 @@ function showUndo({ name, title }) {
     document.body.append(bar);
   }
   const text = document.createElement('span');
-  text.textContent = `"${title || '메모'}" 를 휴지통으로 옮겼어요`;
+  text.textContent = '휴지통으로 옮겼어요';
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = '되돌리기';
@@ -454,10 +454,11 @@ async function loadSettings() {
   const auto = $('auto-start');
   auto.checked = s.autoStart.enabled;
   auto.disabled = !s.autoStart.available;
-  $('auto-start-note').textContent = s.autoStart.available ? '작업 표시줄 알림 영역에서 조용히 시작해요' : '설치한 메모킹에서 쓸 수 있어요';
+  $('auto-start-note').textContent = s.autoStart.available ? '알림 영역에서 조용히 시작해요' : '설치한 메모킹에서 쓸 수 있어요';
   $('history-enabled').checked = s.historyEnabled;
   showBlockedCount();
   $('fit-tables').checked = s.fitTables !== false;
+  $('auto-tags').checked = s.autoTags !== false;
   magicIndex = s.magicIndex ?? null;
   showMagic(s.magic);
   showQuickMemo(s.quickMemo);
@@ -476,6 +477,9 @@ $('auto-start').addEventListener('change', async (e) => {
 });
 $('fit-tables').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setFitTables(e.target.checked);
+});
+$('auto-tags').addEventListener('change', async (e) => {
+  e.target.checked = await api.settings.setAutoTags(e.target.checked);
 });
 
 // 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)
@@ -535,10 +539,10 @@ const remindersTab = setupRemindersTab({
 });
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockHistoryApp(appId, appName) {
-  if (!(await confirmDialog(`${appName} 알림을 앞으로 모으지 않을까요?\n설정 › 알림 모을 앱 고르기에서 다시 켤 수 있어요.`, '그만 모으기'))) return false;
+  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n설정 › 모을 앱 선택에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const apps = await api.history.apps();
   const count = apps.find((a) => a.appId === appId)?.count ?? 0;
-  const remove = count > 0 && await confirmDialog(`이미 모은 ${appName} 알림 ${count}개도 지울까요?`, '지우기');
+  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제');
   await api.history.blockApp(appId, appName, remove);
   historyTab.refresh();
   return true;
@@ -562,7 +566,7 @@ async function renderApps() {
     const b = document.createElement('b');
     b.textContent = a.app;
     const small = document.createElement('small');
-    small.textContent = a.blocked ? '모으지 않아요' : `알림 ${a.count}개 보관 중`;
+    small.textContent = a.blocked ? '보관 안 함' : `알림 ${a.count}개 보관 중`;
     name.append(b, small);
     const sw = document.createElement('input');
     sw.type = 'checkbox';
@@ -582,7 +586,7 @@ async function renderApps() {
 }
 async function showBlockedCount() {
   const n = (await api.history.apps()).filter((a) => a.blocked).length;
-  $('blocked-count').textContent = n ? `${n}개 끔` : '';
+  $('blocked-count').textContent = n ? `${n}개 꺼짐` : '';
 }
 $('history-apps-btn').addEventListener('click', async () => {
   await renderApps();
@@ -957,7 +961,7 @@ async function renderTrash() {
     const restore = document.createElement('button');
     restore.className = 'btn trash-restore';
     restore.dataset.restore = t.name;
-    restore.textContent = '되살리기';
+    restore.textContent = '복원';
     const remove = document.createElement('button');
     remove.className = 'icon-btn danger trash-remove';
     remove.dataset.remove = t.name;
@@ -988,7 +992,7 @@ trashEl.list.addEventListener('click', async (e) => {
   const remove = e.target.closest('[data-remove]');
   if (!remove) return;
   const title = remove.closest('.trash-row').querySelector('.trash-title').textContent;
-  if (await confirmDialog(`"${title}" 메모를 영구 삭제할까요?\n영구 삭제한 메모는 되돌릴 수 없어요.`, '영구 삭제')) {
+  if (await confirmDialog(`"${title}" 메모를 영구 삭제할까요?\n되돌릴 수 없어요.`, '영구 삭제')) {
     await api.trash.remove(remove.dataset.remove);
     renderTrash();
   }

@@ -28,15 +28,15 @@
       <svg><use href="#i-link"/></svg><span id="links-count" class="count"></span>
     </button>
     <button id="menu-btn" class="icon-btn" title="메뉴" aria-label="메뉴" aria-haspopup="true"><svg><use href="#i-more"/></svg></button>
-    <button id="close-btn" class="icon-btn" title="닫기 · 자동으로 저장돼요 (Ctrl+W)" aria-label="닫기"><svg><use href="#i-close"/></svg></button>
+    <button id="close-btn" class="icon-btn" title="닫기 (Ctrl+W) · 자동 저장" aria-label="닫기"><svg><use href="#i-close"/></svg></button>
   </header>
 
   <div id="menu" class="menu" role="menu" hidden>
     <div class="swatches" id="swatches"></div>
-    <button class="menu-item" id="pin-toggle" role="menuitem"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
+    <button class="menu-item" id="pin-toggle" role="menuitem"><svg><use href="#i-pin"/></svg><span>맨 위에 고정</span></button>
     <button class="menu-item" id="show-list" role="menuitem"><svg><use href="#i-list"/></svg><span>메모 목록 열기</span></button>
     <button class="menu-item" id="pdf-btn" role="menuitem"><svg><use href="#i-pdf"/></svg><span>PDF로 저장</span></button>
-    <button class="menu-item danger" id="delete-btn" role="menuitem"><svg><use href="#i-trash"/></svg><span>메모 지우기</span></button>
+    <button class="menu-item danger" id="delete-btn" role="menuitem"><svg><use href="#i-trash"/></svg><span>삭제</span></button>
   </div>
 
   <div id="banner" class="banner" hidden>
@@ -74,7 +74,7 @@
         <button type="button" data-kind="timer" aria-checked="true">타이머</button>
         <button type="button" data-kind="at" aria-checked="false">날짜·시간</button>
         <button type="button" data-kind="repeat" aria-checked="false">반복</button>
-        <button type="button" data-kind="startup" aria-checked="false">켤 때</button>
+        <button type="button" data-kind="startup" aria-checked="false">앱 열 때</button>
       </div>
 
       <div class="rem-pane" data-pane="timer">
@@ -85,7 +85,7 @@
           <button type="button" data-min="60">1시간</button>
           <button type="button" data-min="180">3시간</button>
         </div>
-        <label class="rem-row">직접 <input type="number" id="timer-min" min="1" max="10080" value="10"> 분 뒤</label>
+        <label class="rem-row">직접 입력 <input type="number" id="timer-min" min="1" max="10080" value="10"> 분 후</label>
       </div>
 
       <div class="rem-pane" data-pane="at" hidden>
@@ -114,16 +114,16 @@
       </div>
 
       <div class="rem-pane" data-pane="startup" hidden>
-        <label class="rem-radio"><input type="radio" name="startup" value="every" checked> 메모킹을 켤 때마다</label>
-        <label class="rem-radio"><input type="radio" name="startup" value="daily"> 하루에 한 번, 처음 켤 때</label>
-        <label class="rem-radio"><input type="radio" name="startup" value="once"> 다음에 켤 때 한 번만</label>
+        <label class="rem-radio"><input type="radio" name="startup" value="every" checked> 열 때마다</label>
+        <label class="rem-radio"><input type="radio" name="startup" value="daily"> 하루 한 번 (처음 열 때)</label>
+        <label class="rem-radio"><input type="radio" name="startup" value="once"> 다음에 열 때 한 번만</label>
       </div>
 
       <div class="rem-action" role="radiogroup" aria-label="알림 방식">
-        <label class="rem-radio"><input type="radio" name="action" value="notify" checked> 알림만 보내기 <small>화면 오른쪽 아래에 떠요</small></label>
-        <label class="rem-radio"><input type="radio" name="action" value="open"> 메모 띄우기 <small>메모 창이 앞으로 나와요</small></label>
+        <label class="rem-radio"><input type="radio" name="action" value="notify" checked> 알림으로 받기</label>
+        <label class="rem-radio"><input type="radio" name="action" value="open"> 메모 바로 열기</label>
       </div>
-      <button type="submit" class="btn primary rem-submit">알림 추가하기</button>
+      <button type="submit" class="btn primary rem-submit">알림 추가</button>
     </form>
   </aside>
 
@@ -132,13 +132,13 @@
       <b>메모 연결</b>
       <button id="links-close" class="icon-btn" aria-label="메모 연결 닫기"><svg><use href="#i-close"/></svg></button>
     </header>
-    <input id="link-search" class="link-search" type="search" placeholder="연결할 메모 찾기" autocomplete="off">
+    <input id="link-search" class="link-search" type="search" placeholder="연결할 메모 검색" autocomplete="off">
     <ul id="link-results" class="link-list"></ul>
     <h4>연결한 메모</h4>
     <ul id="links-out" class="link-list"></ul>
-    <h4>이 메모를 연결한 곳</h4>
+    <h4>이 메모를 연결한 메모</h4>
     <ul id="links-in" class="link-list"></ul>
-    <h4>비슷한 메모 <small>내용이 닮은 메모를 골랐어요</small></h4>
+    <h4>비슷한 메모</h4>
     <ul id="links-suggest" class="link-list"></ul>
   </aside>
 
@@ -147,8 +147,8 @@
   <div id="table-bar" class="table-bar" role="toolbar" aria-label="표" hidden>
     <button type="button" data-table="addRow" title="아래에 행 추가 (마지막 셀에서 Tab)">행 추가</button>
     <button type="button" data-table="addCol" title="오른쪽에 열 추가">열 추가</button>
-    <button type="button" data-table="delRow">행 지우기</button>
-    <button type="button" data-table="delCol">열 지우기</button>
+    <button type="button" data-table="delRow">행 삭제</button>
+    <button type="button" data-table="delCol">열 삭제</button>
     <span class="table-bar-sep"></span>
     <button type="button" data-table="merge" title="끌어서 고른 칸들을 하나로 합치기">셀 병합</button>
     <button type="button" data-table="autoFit" title="내용·본문 폭에 맞춰 열 너비·정렬을 자동으로 (번호·날짜는 좁게, 긴 설명 열에 공간). 칸 오른쪽·아래 테두리를 끌면 직접 조절">자동 조정</button>
@@ -167,7 +167,7 @@
         <svg><use href="#i-highlighter"/></svg><span class="swatch-bar" data-bar="highlight"></span>
       </button>
       <span class="sep"></span>
-      <button data-action="file" title="파일 넣기 (Ctrl+Shift+I) · 사진·소리·동영상·문서"><svg><use href="#i-clip"/></svg></button>
+      <button data-action="file" title="첨부 (Ctrl+Shift+I)"><svg><use href="#i-clip"/></svg></button>
       <button data-action="table" title="표 넣기"><svg><use href="#i-table"/></svg></button>
       <span class="sep"></span>
       <button data-action="style" class="style-btn" title="스타일 (본문·제목·인용·코드 블록)" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
@@ -203,7 +203,7 @@
       <p id="confirm-message"></p>
       <div class="dialog-actions">
         <button value="cancel" class="btn">취소</button>
-        <button value="ok" class="btn danger" id="confirm-ok">지우기</button>
+        <button value="ok" class="btn danger" id="confirm-ok">삭제</button>
       </div>
     </form>
   </dialog>

@@ -88,6 +88,7 @@ let settings = {
   historyBlocked: {}, // 알림 보관함에 모으지 않을 앱 { 앱 id: 앱 이름 }
   drive: null, // Google Drive 직접 동기화: { folderId, folderName } (메모 폴더를 이 Drive 폴더와 맞춘다)
   fitTables: true, // 표가 메모 본문보다 넓으면 메모를 줄여 맞추고, 더 못 줄이면 창을 넓힌다
+  autoTags: true, // 태그 없는 메모를 닫을 때 확실한 추천 태그를 저절로 (휴대폰과 같음)
   magic: undefined, // 매직키 (Ctrl+Alt+Space): { enabled, modules } — normalizeMagicSettings 로 정리
   magicPos: null, // 매직키 창을 끌어 옮긴 자리 { x, y }
 };
@@ -1203,9 +1204,9 @@ async function openVaultFile(file, win) {
       : (await dialog.showMessageBox(win ?? undefined, {
         type: 'warning',
         title: '메모킹',
-        message: `"${name}" 은(는) 프로그램 파일이에요. 실행할까요?`,
-        detail: '메모 폴더는 다른 PC와 함께 쓰는 곳이에요. 직접 넣은 파일이 맞는지 확인해 주세요.',
-        buttons: ['실행하기', '취소'],
+        message: `"${name}"은(는) 프로그램 파일이에요. 실행할까요?`,
+        detail: '다른 기기와 함께 쓰는 폴더예요. 직접 넣은 파일이 맞는지 확인해 주세요.',
+        buttons: ['실행', '취소'],
         defaultId: 1,
         cancelId: 1,
         noLink: true,
@@ -1597,6 +1598,7 @@ function appSettings() {
     historyEnabled: settings.historyEnabled,
     quickMemo: { enabled: settings.quickMemo, registered: globalShortcut.isRegistered(QUICK_MEMO_KEY), key: 'Ctrl+Alt+C' },
     fitTables: settings.fitTables !== false,
+    autoTags: settings.autoTags !== false,
     magic: normalizeMagicSettings(settings.magic),
     magicIndex: fileIndex?.status() ?? null, // 파일 검색 목록: 개수·만든 때
     version: app.getVersion(),
@@ -1759,7 +1761,7 @@ function captureToMemo(dir, info, point) {
   const where = captureWhere(capture.source);
   return openCaptureMemo(capture, point, {
     title: '메모를 만들었어요',
-    body: `${captureTitle(capture)}${where ? `\n${where}에서 가져왔어요` : ''} · 누르면 메모로 가요`,
+    body: `${captureTitle(capture)}${where ? `\n${where}에서 가져왔어요` : ''} · 눌러서 열기`,
   });
 }
 
@@ -1894,8 +1896,8 @@ function finishAreaCapture(senderId, rect) {
     source: { window: '화면 캡처', process: '', url: null, time: new Date().toISOString(), copied: false },
   };
   return openCaptureMemo(capture, c.point, {
-    title: '화면을 캡처해 메모를 만들었어요',
-    body: `${crop.width} × ${crop.height} 그림을 클립보드에도 복사했어요 · 누르면 메모로 가요`,
+    title: '화면 캡처로 메모를 만들었어요',
+    body: `${crop.width} × ${crop.height} 이미지를 클립보드에도 복사했어요 · 눌러서 열기`,
   });
 }
 
@@ -1931,7 +1933,7 @@ function registerIpc() {
   });
   ipcMain.handle('vault:choose', async (event) => {
     const result = await dialog.showOpenDialog(senderWindow(event), {
-      title: '메모를 보관할 폴더 고르기',
+      title: '메모를 저장할 폴더 선택',
       defaultPath: vault?.root ?? suggestedVaultPath(),
       properties: ['openDirectory', 'createDirectory'],
     });
@@ -2019,6 +2021,11 @@ function registerIpc() {
     settings.fitTables = Boolean(on);
     saveSettings();
     return settings.fitTables;
+  });
+  ipcMain.handle('app:set-auto-tags', (_e, on) => {
+    settings.autoTags = Boolean(on);
+    saveSettings();
+    return settings.autoTags;
   });
   ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings(next));
   // 매직키 창 아래 캡슐: 쓸 수 있는 모듈 모두와 켜짐 여부 (누르면 켜고 끔)
@@ -2261,7 +2268,7 @@ function registerIpc() {
   ipcMain.handle('stack:menu', (event, id) => {
     Menu.buildFromTemplate([
       { label: '따로 떼어 보기', click: () => removeFromStack(String(id), 'detach') },
-      { label: '스택에서 빼기', click: () => removeFromStack(String(id), 'close') },
+      { label: '탭 닫기', click: () => removeFromStack(String(id), 'close') },
     ]).popup({ window: senderWindow(event) });
   });
   ipcMain.handle('win:minimize', (event) => senderWindow(event)?.minimize());
@@ -2374,21 +2381,21 @@ function updateTrayMenu() {
   trayMenuTemplate = [
     { label: '메모 목록 열기', click: () => createListWindow() },
     { label: '새 메모', enabled: Boolean(vault), click: () => createNote({}) },
-    { label: '화면 영역을 캡처해 메모 만들기', enabled: Boolean(vault), click: () => startAreaCapture() },
+    { label: '화면 캡처로 새 메모', enabled: Boolean(vault), click: () => startAreaCapture() },
     { label: '복사해 둔 내용으로 새 메모', enabled: Boolean(vault), click: () => quickMemo({ copy: false }) },
     { type: 'separator' },
     { label: '최근 메모', enabled: false },
     ...(recent.length
       ? recent.map((m) => ({ label: `   ${shorten(m.title)}`, click: () => openNote(m.id) }))
-      : [{ label: '   아직 없어요', enabled: false }]),
+      : [{ label: '   없음', enabled: false }]),
     { type: 'separator' },
-    { label: '예약한 알림 보기', click: () => createListWindow('reminders') },
+    { label: '알림 예약', click: () => createListWindow('reminders') },
     { label: '알림 보관함', click: () => createListWindow('history') },
     { label: '열린 메모 모두 앞으로', enabled: noteWins.size > 0, click: showAllNotes },
     { label: '메모 폴더 열기', enabled: Boolean(vault), click: () => shell.openPath(vault.root) },
     { type: 'separator' },
     {
-      label: '빠른 메모 Ctrl+Alt+C (두 번 누르면 화면 영역 캡처)',
+      label: '빠른 메모 Ctrl+Alt+C (두 번: 화면 캡처)',
       type: 'checkbox',
       checked: settings.quickMemo && globalShortcut.isRegistered(QUICK_MEMO_KEY),
       click: (item) => setQuickMemo(item.checked),
@@ -2401,8 +2408,8 @@ function updateTrayMenu() {
       click: (item) => setAutoStart(item.checked),
     },
     { type: 'separator' },
-    { label: '사용법 둘러보기', enabled: Boolean(vault), click: startTutorial },
-    { label: '메모킹 끄기', click: quitApp },
+    { label: '사용법 보기', enabled: Boolean(vault), click: startTutorial },
+    { label: '메모킹 종료', click: quitApp },
   ];
   tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate));
 }

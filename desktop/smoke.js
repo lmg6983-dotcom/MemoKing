@@ -1128,7 +1128,7 @@ export async function runSmoke({
     const notiMd = readMemo(memoFromNoti.id);
     check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림 · /.test(notiMd));
     await closeNote(memoFromNoti.id);
-    await listJs(`document.querySelector('#history-rows .noti [aria-label="지우기"]').click()`);
+    await listJs(`document.querySelector('#history-rows .noti [aria-label="삭제"]').click()`);
     await wait(300);
     check('보관한 알림 지우기', history.list({ query: '회의' }).length === 0);
     await listJs(`(() => { const s = document.getElementById('search'); s.value = ''; s.dispatchEvent(new Event('input')); })()`);

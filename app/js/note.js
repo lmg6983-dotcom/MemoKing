@@ -167,7 +167,7 @@ async function flush() {
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
-    setStatus('저장하지 못했어요. 메모 폴더가 연결돼 있는지 확인해 주세요.', true);
+    setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
   }
 }
 
@@ -195,12 +195,12 @@ api.on('memo:external', (next) => {
   if (!isDirty()) applyExternal(next);
   else {
     pendingExternal = next;
-    el.bannerText.textContent = '다른 곳에서 이 메모를 고쳤어요.';
+    el.bannerText.textContent = '다른 기기에서 이 메모가 바뀌었어요.';
     el.banner.hidden = false;
   }
 });
 api.on('memo:removed', () => {
-  el.bannerText.textContent = '메모 폴더에서 이 메모가 사라졌어요. 계속 쓰면 다시 저장할게요.';
+  el.bannerText.textContent = '이 메모가 메모 폴더에서 사라졌어요. 계속 쓰면 다시 저장돼요.';
   $('banner-load').hidden = true;
   el.banner.hidden = false;
 });
@@ -219,7 +219,7 @@ function applyMeta(next) {
   document.body.dataset.color = memo.color;
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
-  el.pinToggle.querySelector('span').textContent = memo.pinned ? '목록 맨 위 고정 풀기' : '목록 맨 위에 고정';
+  el.pinToggle.querySelector('span').textContent = memo.pinned ? '고정 해제' : '맨 위에 고정';
 }
 
 for (const color of COLORS) {
@@ -427,7 +427,7 @@ async function applyCapture(c) {
   editor.focusEnd();
   // 웹 사진을 받는 중에 저장하면 주소 교체와 엇갈릴 수 있어, 받기가 끝난 뒤 한 번에 저장
   if (c.html) {
-    setStatus('사진을 메모 폴더에 받고 있어요');
+    setStatus('사진을 저장하는 중…');
     await editor.imagesSettled();
   }
   // 태그를 저절로: 화면 캡처는 #캡처, 웹에서 가져온 것은 링크, 그 밖은 공유 (+ 내용에 맞는 기존 태그)
@@ -468,7 +468,7 @@ async function insertFiles(files) {
     await editor.insertFiles(files);
   } catch (err) {
     console.error(err);
-    setStatus('파일을 넣지 못했어요. 다시 시도해 주세요.', true);
+    setStatus('파일을 추가하지 못했어요. 다시 시도해 주세요', true);
   }
 }
 
@@ -790,22 +790,22 @@ function showTableBar(table) {
   // 머리글 행만 남았을 때 머리글에서 누르면, 열이 하나뿐일 때 누르면 표 전체를 지운다 (표 막대에 "표 지우기"가 따로 없음)
   const lastRow = table.header && table.rows <= 1;
   delRow.disabled = table.header && !lastRow;
-  delRow.textContent = lastRow ? '표 지우기' : '행 지우기';
-  delRow.title = lastRow ? '머리글 행만 남았어요. 누르면 표를 지워요' : table.header ? '머리글 행은 지울 수 없어요 (아래 행을 다 지운 뒤 누르면 표를 지워요)' : '이 행 지우기';
+  delRow.textContent = lastRow ? '표 삭제' : '행 삭제';
+  delRow.title = lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : '이 행 지우기';
   // 셀 병합: 여러 칸을 골랐으면 "셀 병합", 병합한 칸 안이면 "병합 풀기"
   const merge = tableBar.querySelector('[data-table="merge"]');
   merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
   merge.disabled = !table.canMerge && !table.merged;
   merge.title = table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요';
-  delCol.textContent = table.cols <= 1 ? '표 지우기' : '열 지우기';
-  delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 지워요' : '이 열 지우기';
+  delCol.textContent = table.cols <= 1 ? '표 삭제' : '열 삭제';
+  delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제';
 }
 tableBar.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서가 표 안에 남게
 tableBar.addEventListener('click', (e) => {
   const b = e.target.closest('[data-table]');
   if (!b || b.disabled) return;
   // 마지막 남은 머리글 행·열을 지우면 표 전체를 지운다
-  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.textContent === '표 지우기';
+  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.textContent === '표 삭제';
   editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
 });
 
@@ -1076,7 +1076,24 @@ function showTasks({ total, done }, { initial = false } = {}) {
   }
 }
 
+// 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)
+async function autoTagOnClose() {
+  if (!editor || tagDismissed) return;
+  try {
+    const s = await api.settings.get();
+    if (s?.autoTags === false) return;
+    const body = editor.getMarkdown();
+    if (isBlankBody(body) || extractTags(body).length) return;
+    const list = (await api.tags.suggest?.(body, id)) ?? [];
+    const sure = list.filter((t) => t.sure && t.existing).slice(0, 2);
+    if (sure.length) editor.appendMarkdown(sure.map((t) => `#${t.name}`).join(' '));
+  } catch {
+    // 태그를 못 달아도 닫기는 그대로
+  }
+}
+
 async function closeWindow() {
+  await autoTagOnClose();
   await flush();
   api.win.close();
 }
@@ -1084,6 +1101,7 @@ async function closeWindow() {
 // Ctrl+W: 스택이면 보이는 탭만 닫는다 (탭의 × 와 같음). 스택이 아니면 창을 닫는다.
 async function closeTabOrWindow() {
   if (tabsEl.hidden) return closeWindow();
+  await autoTagOnClose();
   await flush();
   api.stack.remove(id);
 }
@@ -1129,7 +1147,7 @@ function renderStack(state) {
     const close = document.createElement('button');
     close.className = 'stack-close';
     close.type = 'button';
-    close.title = '스택에서 빼기';
+    close.title = '탭 닫기';
     close.setAttribute('aria-label', `${m.title} 스택에서 빼기`);
     close.dataset.closeTab = m.id;
     close.append(icon('close'));
@@ -1248,7 +1266,7 @@ paintSwatchBars();
 coach = setupCoach(api);
 memo = await api.memo.get(id);
 if (!memo) {
-  setStatus('메모를 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요.', true);
+  setStatus('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
 } else {
   applyMeta(memo);
   applyTop(memo.onTop === true);

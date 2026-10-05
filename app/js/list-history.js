@@ -115,7 +115,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     actions.append(
       actionButton('note', '메모로 만들기', () => api.history.toMemo(e.id)),
       actionButton('copy', '복사', () => api.copyText([e.title, e.body].filter(Boolean).join('\n'))),
-      actionButton('trash', '지우기', () => api.history.remove(e.id)),
+      actionButton('trash', '삭제', () => api.history.remove(e.id)),
     );
     // 이 앱 알림 그만 모으기 (안드로이드)
     if (api.history.block && e.source !== 'memoking') actions.append(actionButton('block', `${e.app} 알림 그만 모으기`, () => api.history.block(e)));
@@ -172,7 +172,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     refresh();
   });
   els.clear.addEventListener('click', async () => {
-    if (await confirm(`보관한 알림 ${data.total}개를 모두 지울까요?\n지운 알림은 되돌릴 수 없어요.`, '모두 지우기')) api.history.clear();
+    if (await confirm(`보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`, '모두 삭제')) api.history.clear();
   });
   els.app.addEventListener('change', () => {
     app = els.app.value;
