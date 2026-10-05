@@ -889,8 +889,63 @@ try {
     const lost = want.filter((l) => !got.includes(l));
     const added = got.filter((l) => !want.includes(l));
     check('왕복: 저장해도 읽는 글이 그대로 (사라지거나 바뀐 줄 없음)', !lost.length && !added.length, JSON.stringify({ lost, added }));
-    const missing = ['- [ ] 할 일', '- [x] 끝낸 일', '| 사과 |', '$x^2 + y^2$', '$$\n\\int_0^1 x\\,dx\n$$', 'const a = 1; // 코드 # 태그 아님', '<u>밑줄</u>', '<span style="color: #e5484d">빨강</span>', '\n---\n', '![그림](attachments/a.png)'].filter((t) => !saved.includes(t));
+    const missing = ['- [ ] 할 일', '- [x] 끝낸 일', '| 사과 |', '$x^2 + y^2$', '$$\n\\int_0^1 x\\,dx\n$$', 'const a = 1; // 코드 # 태그 아님', '<u>밑줄</u>', '<span style="color: #e5484d">빨강</span>', '언어\n\n---\n\n이메일', '![그림](attachments/a.png)'].filter((t) => !saved.includes(t));
     check('왕복: 서식·구조도 그대로 (체크·표·수식·코드·색·가로줄)', !missing.length, JSON.stringify(missing) + '\n' + saved);
+    await back();
+    await page.waitForTimeout(300);
+  }
+
+  // 표 칸 안에서: 사진·표·수식 넣기와 붙여넣기가 표를 쪼개거나 옆 칸을 덮어쓰지 않는다
+  {
+    const id = '00000000-0000-4000-8000-0000000000ad';
+    const table = '| 품목 | 가격 |\n| --- | --- |\n| 사과 | 1000 |';
+    write('표 칸 테스트.md', `---\nid: ${id}\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: yellow\n---\n# 표 칸 테스트\n\n${table}\n\n끝\n`);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForTimeout(400);
+    await page.tap(`.card[data-id="${id}"]`);
+    await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+    await page.waitForTimeout(800);
+    const intoCell = async (text) => {
+      await page.locator('.mk-doc td', { hasText: text }).first().tap();
+      await page.keyboard.press('End');
+      await page.waitForTimeout(200);
+    };
+    const { parseMemoFile } = await import('../../../app/js/core/memo-file.js');
+    const body = () => parseMemoFile(read('표 칸 테스트.md')).body;
+    const paste = (text, html = '') => page.evaluate(([t, h]) => {
+      const d = new DataTransfer();
+      d.setData('text/plain', t);
+      if (h) d.setData('text/html', h);
+      document.querySelector('#note-screen .ProseMirror').dispatchEvent(new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true }));
+    }, [text, html]);
+    const settle = async () => {
+      await page.locator('.mk-doc h1').first().tap();
+      await page.waitForTimeout(1200);
+    };
+    await fetch(`${base}/dev/pick`, { method: 'POST', body: JSON.stringify([{ name: '칸.png', mime: 'image/png', base64: fs.readFileSync(path.join(repo, 'assets/icons/icon-256.png')).toString('base64') }]) });
+    await intoCell('사과');
+    await page.tap('#add-btn');
+    await page.waitForTimeout(250);
+    await page.tap('.add-sat[data-add="photo"]');
+    await settle();
+    check('표 칸: 사진은 표 바로 아래에 (표 그대로)', /\| 사과 \| 1000 \|\n\n!\[칸\]\(attachments\//.test(body()), body());
+    await intoCell('사과');
+    await page.tap('#add-btn');
+    await page.waitForTimeout(250);
+    await page.tap('.add-sat[data-add="math"]');
+    await page.waitForTimeout(400);
+    await page.keyboard.type('x^2');
+    await page.keyboard.press('Enter');
+    await settle();
+    check('표 칸: 수식은 표 바로 아래에 (표 그대로)', /\| 사과 \| 1000 \|\n\n\$\$\nx\^2\n\$\$/.test(body()), body());
+    await intoCell('사과');
+    await paste('첫 줄\n둘째 줄');
+    await settle();
+    check('표 칸: 여러 줄 붙여넣기는 그 칸 안 줄바꿈으로', /\| 사과첫 줄<br>둘째 줄 \| 1000 \|/.test(body()), body());
+    await intoCell('1000');
+    await paste('가\t나\n다\t라');
+    await settle();
+    check('표 칸: 엑셀 칸 붙여넣기는 칸마다 (모자라면 늘림)', /\| 사과첫 줄<br>둘째 줄 \| 가\s+\| 나\s+\|\n\|\s+\| 다\s+\| 라\s+\|/.test(body()), body());
     await back();
     await page.waitForTimeout(300);
   }

@@ -8,7 +8,7 @@ import {
   callCommand, getMarkdown, replaceAll, insert, $view, $prose, $markSchema, $nodeSchema, $remark, Plugin, PluginKey, TextSelection,
   toggleMark, Decoration, DecorationSet, insertTableCommand, tableSchema,
   addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, columnResizing,
-  splitCell, CellSelection, TableMap, undoDepth, redoDepth,
+  splitCell, CellSelection, TableMap, selectedRect, undoDepth, redoDepth,
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
@@ -23,7 +23,7 @@ import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } fr
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
-import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells } from './table-extras.js';
+import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt } from './table-extras.js';
 import { createListDrag } from './list-drag.js';
 import { createBlockMove, createContentLines } from './block-move.js';
 import { createVoiceCards, isVoiceCard } from './voice-card-view.js';
@@ -791,9 +791,15 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     });
     const $pos = v.state.doc.resolve(Math.min(pos, v.state.doc.content.size));
     const size = paragraphs.reduce((sum, p) => sum + p.nodeSize, 0);
+    // 표 칸에는 글 한 줄만 들어간다 — 칸 안이면 표 바로 아래에 (표가 둘로 쪼개지지 않게)
+    let depth = $pos.depth;
+    while (depth > 1 && !$pos.node(depth - 1).canReplaceWith($pos.index(depth - 1) + 1, $pos.index(depth - 1) + 1, schema.nodes.paragraph)) depth--;
     let tr = v.state.tr;
     let end;
-    if ($pos.depth > 0 && $pos.parent.isTextblock && $pos.parent.content.size === 0) {
+    if (depth < $pos.depth) {
+      tr = tr.insert($pos.after(depth), paragraphs);
+      end = $pos.after(depth) + size;
+    } else if ($pos.depth > 0 && $pos.parent.isTextblock && $pos.parent.content.size === 0) {
       tr = tr.replaceWith($pos.before(), $pos.after(), paragraphs);
       end = $pos.before() + size;
     } else if ($pos.depth > 0 && $pos.parent.isTextblock) {
@@ -930,6 +936,179 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     tr = tr.removeStoredMark(link); // 이어서 치는 글자는 링크가 아니게
     v.dispatch(tr.scrollIntoView());
   }
+
+  // ---------- 표 칸 안에 붙여넣기 ----------
+  // 칸에는 글 한 줄(문단 하나)만 들어간다. 그대로 붙이면 줄마다 옆 칸을 덮어쓰거나(표 기능이 줄을 칸으로 읽음),
+  // 표가 둘로 쪼개지거나, 표를 늘리다 멈춰 아무것도 붙지 않는다. 그래서 칸 안에서는 직접:
+  //   표(엑셀·시트의 칸, 탭으로 나뉜 글) → 지금 칸부터 오른쪽·아래로 칸마다 글을 채운다 (모자라면 표를 늘림, 칸 모양은 그대로)
+  //   여러 줄·여러 문단 → 줄마다 칸 안 줄바꿈(<br>)으로 이어 지금 칸에
+  // 칸 여러 개를 골라 두고 붙이면(CellSelection) 표 기능에 맡긴다.
+
+  const cellBreak = (schema) => schema.nodes.html.create({ value: '<br>' });
+
+  // 블록들 → 칸 한 줄에 들어갈 글 노드들 (줄 사이는 <br>)
+  function inlineLines(schema, fragment) {
+    const inline = [];
+    const line = (nodes) => {
+      if (!nodes.length) return;
+      if (inline.length) inline.push(cellBreak(schema));
+      inline.push(...nodes);
+    };
+    fragment.descendants((node) => {
+      if (node.type.name === 'math_block') {
+        if (node.attrs.value) line([schema.nodes.math_inline.create({ value: node.attrs.value })]);
+        return false;
+      }
+      if (node.type.name === 'mk_link_card') {
+        line([schema.text(node.attrs.title || node.attrs.href, [schema.marks.link.create({ href: node.attrs.href })])]);
+        return false;
+      }
+      if (!node.isTextblock) return true;
+      if (node.type.spec.code) {
+        for (const t of node.textContent.split('\n')) line(t ? [schema.text(t)] : []);
+      } else {
+        const nodes = [];
+        node.forEach((c) => nodes.push(c));
+        line(nodes);
+      }
+      return false;
+    });
+    return inline;
+  }
+
+  const textLines = (schema, text) => {
+    const out = [];
+    String(text ?? '').trim().split(/[ \t]*\n[ \t]*/).forEach((t, i) => {
+      if (i && out.length) out.push(cellBreak(schema));
+      if (t) out.push(schema.text(t));
+    });
+    return out;
+  };
+
+  // 붙일 것이 표 조각뿐이면 칸 글 격자 [행][열] = 글 노드들 (아니면 null — 표 앞뒤에 다른 글이 있으면 모두 한 칸에 이어 붙인다)
+  function sliceGrid(schema, slice) {
+    const rows = [];
+    let loose = null; // 행 없이 칸만 (편집기 안에서 칸을 복사한 경우)
+    if (!slice?.content.childCount) return null;
+    for (let i = 0; i < slice.content.childCount; i++) if (!slice.content.child(i).type.spec.tableRole) return null;
+    slice.content.descendants((node) => {
+      const role = node.type.spec.tableRole;
+      if (role === 'row') {
+        const row = [];
+        node.forEach((cell) => row.push(inlineLines(schema, cell.content)));
+        rows.push(row);
+        return false;
+      }
+      if (role === 'cell' || role === 'header_cell') {
+        (loose ??= []).push(inlineLines(schema, node.content));
+        return false;
+      }
+      return true;
+    });
+    if (rows.length) return rows;
+    return loose ? [loose] : null;
+  }
+
+  // 지금 칸부터 grid 크기만큼 들어가게 표를 늘린다 (오른쪽에 열, 아래에 행)
+  function growTableFor(tr, rect, rows, cols) {
+    const { map, table, tableStart } = rect;
+    const addRows = rect.top + rows - map.height;
+    const addCols = rect.left + cols - map.width;
+    const { schema } = tr.doc.type;
+    // 새 칸의 정렬은 그 열의 머리글을 따른다 (새 열은 정렬 없음 — 파일에 :- 같은 표시가 새로 생기지 않게)
+    const head = table.firstChild;
+    const alignOf = (c) => (c < map.width ? head?.maybeChild(c)?.attrs.alignment ?? null : null);
+    if (addCols > 0) {
+      table.forEach((row, offset) => {
+        const type = row.type.name === 'table_header_row' ? schema.nodes.table_header : schema.nodes.table_cell;
+        tr.insert(tr.mapping.map(tableStart + offset + row.nodeSize - 1), Array.from({ length: addCols }, () => type.createAndFill({ alignment: null })));
+      });
+    }
+    if (addRows > 0) {
+      const width = Math.max(map.width, rect.left + cols);
+      const newRows = Array.from({ length: addRows }, () => schema.nodes.table_row.create(null, Array.from({ length: width }, (_, c) => schema.nodes.table_cell.createAndFill({ alignment: alignOf(c) }))));
+      tr.insert(tr.mapping.map(tableStart + table.content.size), newRows);
+    }
+  }
+
+  // 칸마다 글을 바꿔 넣는다 (머리글·정렬·너비 같은 칸 모양은 그대로). 채운 칸들을 골라 둔다
+  function fillCells(v, grid) {
+    const rect = selectedRect(v.state);
+    const rows = grid.length;
+    const cols = Math.max(...grid.map((r) => r.length));
+    const tr = v.state.tr;
+    growTableFor(tr, rect, rows, cols);
+    // 늘린 뒤의 표 기준 자리 (그 뒤에 바꾼 칸들만큼 옮겨 읽는다)
+    const table = tr.doc.nodeAt(rect.tableStart - 1);
+    const map = TableMap.get(table);
+    const mapFrom = tr.mapping.maps.length;
+    const posOf = (rel) => tr.mapping.slice(mapFrom).map(rect.tableStart + rel);
+    const done = new Set();
+    let first = null;
+    let last = null;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const row = rect.top + r;
+        const col = rect.left + c;
+        const rel = map.map[row * map.width + col];
+        if (done.has(rel)) continue; // 합친 칸은 한 번만
+        done.add(rel);
+        const at = map.findCell(rel);
+        if (at.top !== row || at.left !== col) continue; // 합친 칸의 첫 칸이 아니면 그대로
+        const cell = tr.doc.nodeAt(posOf(rel));
+        const para = cell?.firstChild;
+        if (!para?.isTextblock) continue;
+        const from = posOf(rel) + 2; // 칸 · 문단 여는 자리 다음
+        tr.replaceWith(from, from + para.content.size, grid[r][c] ?? []);
+        first ??= rel;
+        last = rel;
+      }
+    }
+    if (first == null) return false;
+    if (first === last) {
+      tr.setSelection(TextSelection.create(tr.doc, posOf(last) + tr.doc.nodeAt(posOf(last)).nodeSize - 2)); // 그 칸 글 끝
+    } else {
+      tr.setSelection(CellSelection.create(tr.doc, posOf(first), posOf(last)));
+    }
+    v.dispatch(tr.scrollIntoView());
+    return true;
+  }
+
+  // 여러 줄·여러 문단을 지금 칸에 (줄 사이 <br>)
+  function pasteLines(v, slice) {
+    const first = slice?.content.firstChild;
+    if (!first || first.isInline || (slice.content.childCount === 1 && first.type.name === 'paragraph')) return false; // 한 줄은 평소대로
+    const inline = inlineLines(v.state.schema, slice.content);
+    if (!inline.length) return false;
+    const tr = v.state.tr.deleteSelection();
+    const pos = tr.selection.from;
+    tr.insert(pos, inline);
+    tr.setSelection(TextSelection.create(tr.doc, pos + inline.reduce((sum, n) => sum + n.nodeSize, 0)));
+    v.dispatch(tr.scrollIntoView());
+    return true;
+  }
+
+  // 표 기능(gfm)의 붙여넣기보다 먼저 받아야 해서 따로 (아래 .use 순서)
+  const cellPaste = $prose(() => new Plugin({
+    key: new PluginKey('memoking-cell-paste'),
+    props: {
+      handlePaste(v, event, slice) {
+        const data = event.clipboardData;
+        if (readOnly || !data || data.files.length || !isInTable(v.state) || v.state.selection instanceof CellSelection) return false;
+        if (v.state.selection.$from.parent.type.spec.code) return false;
+        const { schema } = v.state;
+        const html = data.getData('text/html');
+        // 엑셀·시트의 글자만(탭으로 나뉜 글) 복사한 경우: 줄 → 행, 탭 → 열
+        const tsv = html ? null : parseTsv(data.getData('text/plain'));
+        // 진짜 표(HTML 에 표가 있음)일 때만 칸으로 — 그냥 여러 줄도 붙이는 자리(칸)에 맞춰 칸들로 읽히므로
+        const grid = tsv ? tsv.map((row) => row.map((t) => textLines(schema, t))) : /<t(able|r|d|h)[\s>]/i.test(html) ? sliceGrid(schema, slice) : null;
+        pastedTablesAt = 0; // 있던 표의 열 너비·정렬을 붙여넣은 표처럼 저절로 맞추지 않게
+        const handled = grid?.length ? fillCells(v, grid) : pasteLines(v, slice);
+        if (handled) event.preventDefault();
+        return handled;
+      },
+    },
+  }));
 
   const pastePlugin = $prose(() => new Plugin({
     key: new PluginKey('memoking-paste'),
@@ -1190,6 +1369,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       }));
     })
     .use(commonmark)
+    .use(cellPaste) // 표 칸에 여러 줄 붙이기 — 표 기능보다 먼저
     .use(gfm)
     .use(tableTab)
     .use(tableAutoFit)
@@ -1498,6 +1678,16 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
     // 표 ----------------------------------------------------------
     insertTable() {
+      // 표 안에서 누르면 그 표 바로 아래 빈 줄에 (표 안에 표는 마크다운에 없어 표가 둘로 쪼개진다)
+      const v = view();
+      const outer = tableAt(v.state);
+      if (outer) {
+        const after = outer.pos + outer.node.nodeSize;
+        const next = v.state.doc.resolve(after).nodeAfter;
+        let tr = v.state.tr;
+        if (!(next?.type.name === 'paragraph' && next.content.size === 0)) tr = tr.insert(after, v.state.schema.nodes.paragraph.create());
+        v.dispatch(tr.setSelection(TextSelection.create(tr.doc, after + 1)));
+      }
       call(insertTableCommand, { row: 3, col: 3 });
       view().focus();
     },

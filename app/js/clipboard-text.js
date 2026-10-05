@@ -73,16 +73,22 @@ export function plainTextOf(fragment, { openStart = 0, openEnd = 0 } = {}) {
       });
       return;
     }
-    if (name === 'table') {
-      node.forEach((row) => {
-        const cells = [];
-        row.forEach((cell) => {
-          const parts = [];
-          cell.forEach((b) => parts.push(inlineText(b, ' ')));
-          cells.push(parts.join(' ').replace(/\t/g, ' ').trim());
-        });
-        lines.push(indent + cells.join('\t'));
+    // 표 · 칸 몇 개만 고른 것(행들): 행마다 한 줄, 칸 사이는 탭
+    const row = (r) => {
+      const cells = [];
+      r.forEach((cell) => {
+        const parts = [];
+        cell.forEach((b) => parts.push(inlineText(b, ' ')));
+        cells.push(parts.join(' ').replace(/\t/g, ' ').trim());
       });
+      lines.push(indent + cells.join('\t'));
+    };
+    if (name === 'table') {
+      node.forEach(row);
+      return;
+    }
+    if (name === 'table_row' || name === 'table_header_row') {
+      row(node);
       return;
     }
     if (name === 'hr') {

@@ -244,6 +244,7 @@ export const mathInputRules = $prose(() => inputRules({
       const type = state.schema.nodes.math_block;
       const $start = state.doc.resolve(start);
       if (!type || $start.parent.type.name !== 'paragraph' || $start.parent.content.size !== end - start) return null;
+      if (!blockFits($start, $start.depth, type, true)) return null; // 표 칸 안은 그대로 글자로 (표가 둘로 쪼개지지 않게)
       return state.tr.replaceRangeWith($start.before(), $start.after(), type.create({ value: '' }));
     }),
   ],
@@ -254,6 +255,13 @@ export function mathPlugins({ readOnly = false } = {}) {
   return [mathRemark, mathInlineSchema, mathBlockSchema, mathInlineView(readOnly), mathBlockView(readOnly), mathInputRules].flat();
 }
 
+// depth 의 줄 자리(replace: 그 줄 대신, 아니면 그 줄 바로 뒤)에 수식 블록이 들어갈 수 있나 — 표 칸에는 글 줄만 들어간다
+function blockFits($pos, depth, type, replace) {
+  const parent = $pos.node(depth - 1);
+  const index = $pos.index(depth - 1);
+  return replace ? parent.canReplaceWith(index, index + 1, type) : parent.canReplaceWith(index + 1, index + 1, type);
+}
+
 /** 빈 수식 블록을 넣고 바로 고치기 창을 연다 (도구막대 · 스타일 메뉴) */
 export function insertMathBlock(view) {
   const type = view.state.schema.nodes.math_block;
@@ -262,17 +270,20 @@ export function insertMathBlock(view) {
   const node = type.create({ value: '' });
   let tr;
   let pos;
-  if ($from.parent.type.name === 'paragraph' && $from.parent.content.size === 0 && $from.depth > 0) {
+  if ($from.parent.type.name === 'paragraph' && $from.parent.content.size === 0 && $from.depth > 0 && blockFits($from, $from.depth, type, true)) {
     pos = $from.before();
     tr = view.state.tr.replaceWith(pos, $from.after(), node);
   } else {
-    pos = $from.depth > 0 ? $from.after() : $from.pos;
+    // 지금 줄 뒤, 그 자리에 못 들어가면(표 칸 안) 들어갈 수 있는 바깥 블록 뒤 (표 바로 아래)
+    let depth = $from.depth;
+    while (depth > 1 && !blockFits($from, depth, type, false)) depth--;
+    pos = depth > 0 ? $from.after(depth) : $from.pos;
     tr = view.state.tr.insert(pos, node);
   }
   view.dispatch(tr.scrollIntoView());
   requestAnimationFrame(() => {
     const dom = view.nodeDOM(pos);
     const at = view.state.doc.nodeAt(pos);
-    if (dom && at) openEditor(view, () => pos, at, dom);
+    if (dom && at?.type === type) openEditor(view, () => pos, at, dom);
   });
 }
