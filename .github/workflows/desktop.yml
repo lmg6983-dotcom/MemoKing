@@ -1,0 +1,56 @@
+# PC 설치 파일(Windows) 만들기 — 데스크탑(desktop/)이나 공용 웹 코어(app/)가 바뀌면 자동으로 빌드하고,
+# 만든 설치 파일을 GitHub 릴리스 "desktop" 에 늘 최신으로 올린다. Actions 탭에서 손으로도 돌릴 수 있다.
+#   https://github.com/<저장소>/releases/download/desktop/MemoKing-Setup.exe
+name: Desktop Setup
+
+on:
+  push:
+    paths:
+      - 'desktop/**'
+      - 'app/**'
+      - 'assets/**'
+      - 'scripts/build-dist.mjs'
+      - 'package.json'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write # 릴리스에 설치 파일 올리기
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 단위 테스트
+        run: npm test
+
+      - name: 설치 파일 빌드 (npm run dist — 자동 점검은 화면이 없는 빌드 서버라 건너뜀)
+        run: node scripts/build-dist.mjs --no-smoke
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: memoking-desktop
+          path: dist/*.exe
+          if-no-files-found: error
+
+      - name: 최신 설치 파일을 릴리스에 올리기
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          cp "dist/MemoKing-Setup-${version}.exe" MemoKing-Setup.exe
+          notes="메모킹 PC 최신 설치 파일 v${version} (${GITHUB_REF_NAME} · ${GITHUB_SHA::7}). MemoKing-Setup.exe 를 받아 실행하세요."
+          if gh release view desktop >/dev/null 2>&1; then
+            gh release upload desktop MemoKing-Setup.exe --clobber
+            gh release edit desktop --notes "$notes"
+          else
+            gh release create desktop MemoKing-Setup.exe --title "메모킹 PC (최신)" --notes "$notes" --prerelease --target "$GITHUB_SHA"
+          fi
