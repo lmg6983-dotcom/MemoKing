@@ -66,8 +66,66 @@ function isDirty() {
   return current !== saved;
 }
 
+// ---------- 추천 태그 (휴대폰과 같음): 태그 없는 메모에 이 폴더의 태그 중 맞는 것을 아래 막대에 ----------
+const tagBar = $('tag-suggest-bar');
+let tagTimer = 0;
+let tagDismissed = false;
+let tagSeq = 0;
+function scheduleTagBar() {
+  clearTimeout(tagTimer);
+  tagTimer = setTimeout(renderTagBar, 1500); // 쓰는 동안은 기다렸다가
+}
+async function renderTagBar() {
+  if (!tagBar || !editor || tagDismissed) return;
+  const body = editor.getMarkdown();
+  if (extractTags(body).length) {
+    tagBar.hidden = true;
+    return;
+  }
+  const seq = ++tagSeq;
+  let list = [];
+  try {
+    list = (await api.tags.suggest?.(body, id)) ?? [];
+  } catch {
+    list = [];
+  }
+  if (seq !== tagSeq) return;
+  const chips = $('tag-suggest-chips');
+  chips.replaceChildren(...list.map((t) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `tag-chip${t.sure ? ' sure' : ''}${t.existing ? '' : ' new'}`;
+    b.textContent = `+ #${t.name}`;
+    if (t.why) b.title = t.why;
+    b.addEventListener('click', () => addTags([t.name]));
+    return b;
+  }));
+  if (list.length > 1) {
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'link-btn';
+    all.textContent = '모두 달기';
+    all.addEventListener('click', () => addTags(list.map((t) => t.name)));
+    chips.append(all);
+  }
+  tagBar.hidden = list.length === 0;
+}
+function addTags(names) {
+  if (!editor || !names.length) return;
+  editor.appendMarkdown(names.map((n) => `#${n}`).join(' '));
+  flush();
+  setStatus(`${names.map((n) => `#${n}`).join(' ')} 태그를 달았어요`);
+  tagBar.hidden = true;
+}
+tagBar?.addEventListener('mousedown', (e) => e.preventDefault()); // 커서 유지
+$('tag-suggest-close')?.addEventListener('click', () => {
+  tagDismissed = true;
+  tagBar.hidden = true;
+});
+
 function onChange(md) {
   current = md;
+  scheduleTagBar();
   // 튜토리얼 따라 하기: 글을 쓰면 · 태그를 붙이면 다음 단계로
   const advance = coach?.step?.advance;
   if (advance === 'typed' && !isBlankBody(md)) api.tutorial.event('typed');
@@ -372,9 +430,19 @@ async function applyCapture(c) {
     setStatus('사진을 메모 폴더에 받고 있어요');
     await editor.imagesSettled();
   }
+  // 태그를 저절로: 화면 캡처는 #캡처, 웹에서 가져온 것은 링크, 그 밖은 공유 (+ 내용에 맞는 기존 태그)
+  const source = c.source.window === '화면 캡처' ? 'capture' : c.source.url ? 'link' : 'share';
+  let tags = [];
+  try {
+    tags = (await api.tags.auto?.(editor.getMarkdown(), source, id)) ?? [];
+  } catch {
+    tags = [];
+  }
+  if (tags.length) editor.appendMarkdown(tags.map((t) => `#${t}`).join(' '));
   await flush();
   const skipped = c.skipped.length ? ` · 폴더 ${c.skipped.length}개는 넣을 수 없어서 뺐어요` : '';
-  setStatus(c.source.copied ? `고른 내용으로 메모를 만들었어요${skipped}` : `복사해 둔 내용으로 메모를 만들었어요${skipped}`);
+  const tagged = tags.length ? ` · ${tags.map((t) => `#${t}`).join(' ')}` : '';
+  setStatus(c.source.copied ? `고른 내용으로 메모를 만들었어요${tagged}${skipped}` : `복사해 둔 내용으로 메모를 만들었어요${tagged}${skipped}`);
 }
 
 // ---------- 파일 넣기 ----------
@@ -837,12 +905,25 @@ zoomBadge.append(zoomText, zoomReset);
 document.body.append(zoomBadge);
 let zoomTimer = 0;
 
+// 매직 줌 (휴대폰과 같음): 100% 보다 크게는 페이지째 — 100% 의 폭으로 배치한 채 크게, 넓어지면 옆으로 밀어 보기.
+// 100% 보다 작게는 글자 크기만 줄여 줄이 창 폭에 다시 맞춰진다 (넓은 표를 맞추는 축소도 이쪽)
+function applyMagicZoom() {
+  const root = el.editorRoot;
+  const cs = getComputedStyle(root);
+  const base = Math.max(200, root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+  root.style.setProperty('--note-zoom', String(zoom));
+  root.classList.toggle('zoomed', zoom > 1);
+  // 폭은 확대되는 요소 자신에게 (저절로 맞는 폭은 확대해도 창 폭에 맞춰져 버리므로)
+  for (const child of root.children) child.style.width = zoom > 1 ? `${base}px` : '';
+}
+new ResizeObserver(() => applyMagicZoom()).observe(el.editorRoot);
+
 function setZoom(z, { show = true } = {}) {
   const scroller = el.editorRoot;
   // 보던 곳이 그대로 보이게: 스크롤 위치를 배율에 맞춰 옮긴다
   const ratio = scroller.scrollHeight > scroller.clientHeight ? scroller.scrollTop / (scroller.scrollHeight - scroller.clientHeight) : 0;
   zoom = clampZoom(z);
-  el.editorRoot.style.setProperty('--note-zoom', String(zoom));
+  applyMagicZoom();
   document.body.dataset.zoom = String(zoom);
   scroller.scrollTop = ratio * Math.max(0, scroller.scrollHeight - scroller.clientHeight);
   try {
@@ -852,7 +933,7 @@ function setZoom(z, { show = true } = {}) {
     // 기억 못 해도 지금 창에서는 그대로
   }
   if (!show) return;
-  zoomText.textContent = `확대 ${zoomLabel(zoom)}`;
+  zoomText.textContent = zoom >= 1 ? `매직 줌 · 확대 ${zoomLabel(zoom)}` : `매직 줌 · 글자 ${zoomLabel(zoom)}`;
   zoomReset.hidden = zoom === 1;
   zoomBadge.classList.add('show');
   clearTimeout(zoomTimer);
@@ -1186,6 +1267,7 @@ if (!memo) {
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();
   refreshLinks();
+  scheduleTagBar();
   reminderPanel = setupReminderPanel({
     api,
     memoId: id,

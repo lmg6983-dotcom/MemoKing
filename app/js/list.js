@@ -1,6 +1,6 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
 import { injectIcons, icon } from './icons.js';
-import { formatStamp } from './core/format.js';
+import { friendlyTime } from './core/format.js';
 import { chooseDensity, levelDensity } from './core/list-density.js';
 import { vaultUrl } from './media.js';
 import { setupRemindersTab } from './list-reminders.js';
@@ -87,9 +87,7 @@ function render() {
   applyDensity();
   animateCards(before);
   el.empty.hidden = memos.length > 0;
-  el.empty.textContent = narrowed
-    ? '조건에 맞는 메모가 없어요.'
-    : '아직 메모가 없어요.\n+ 버튼(Ctrl+N)으로 첫 메모를 만들어 보세요.';
+  if (!memos.length) renderEmpty(narrowed);
   el.count.textContent = narrowed ? `메모 ${state.memos.length}개 중 ${memos.length}개` : `메모 ${state.memos.length}개`;
   renderFilters();
 }
@@ -225,6 +223,31 @@ $('filter-clear').addEventListener('click', () => {
   render();
 });
 
+// 빈 목록: 그림 + 다음에 할 일 단추 (휴대폰과 같음) — 검색·필터로 비었으면 풀기, 메모가 없으면 새 메모
+function renderEmpty(narrowed) {
+  const art = document.createElement('span');
+  art.className = 'empty-art';
+  art.textContent = narrowed ? '🔍' : '📝';
+  const text = document.createElement('span');
+  text.textContent = narrowed
+    ? state.query ? `"${state.query}" 이(가) 든 메모가 없어요.` : '조건에 맞는 메모가 없어요.'
+    : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn primary';
+  b.textContent = narrowed ? '검색·필터 풀기' : '새 메모 (Ctrl+N)';
+  b.addEventListener('click', () => {
+    if (!narrowed) return api.memo.create();
+    state.filter = { tags: [], colors: [], kinds: [] };
+    el.search.value = '';
+    runSearch();
+  });
+  const actions = document.createElement('span');
+  actions.className = 'empty-actions';
+  actions.append(b);
+  el.empty.replaceChildren(art, text, actions);
+}
+
 function renderCard(memo) {
   const li = document.createElement('li');
   const card = document.createElement('button');
@@ -247,8 +270,10 @@ function renderCard(memo) {
   if (memo.preview) {
     const preview = document.createElement('div');
     preview.className = 'card-preview';
-    preview.textContent = memo.preview;
-    card.append(preview);
+    // 태그는 카드 아래 줄에 따로 보이므로 미리 보기 글에서는 뺀다 (휴대폰과 같음)
+    const tagSet = new Set((memo.tags ?? []).map((t) => t.toLocaleLowerCase('ko')));
+    preview.textContent = memo.preview.replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
+    if (preview.textContent) card.append(preview);
   }
   if (memo.thumb) {
     const img = document.createElement('img');
@@ -327,7 +352,7 @@ function renderCard(memo) {
   // 마지막으로 고친 때: 카드 밖, 카드와 카드 사이 틈에 작게
   const stamp = document.createElement('span');
   stamp.className = 'card-stamp';
-  stamp.textContent = formatStamp(memo.updated);
+  stamp.textContent = friendlyTime(memo.updated);
   stamp.title = `마지막으로 고친 때 ${new Date(memo.updated).toLocaleString('ko-KR')}`;
 
   li.append(card, stamp, actions);

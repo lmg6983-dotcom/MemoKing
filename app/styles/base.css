@@ -115,6 +115,8 @@ html, body {
   font-family: var(--font-sans);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  word-break: keep-all; /* 한글은 낱말 단위로 줄바꿈 (휴대폰과 같음) */
+  overflow-wrap: anywhere;
 }
 
 button, input, textarea, select { font: inherit; color: inherit; }

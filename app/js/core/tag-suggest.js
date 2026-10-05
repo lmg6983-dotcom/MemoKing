@@ -37,6 +37,10 @@ const SYNONYMS = [
   ['고객', '클라이언트', 'client', 'customer'],
   ['계약', '계약서', 'contract'],
   ['보고', '보고서', 'report'],
+  ['캡처', '캡쳐', '스크린샷', '화면캡처', 'screenshot', 'capture'],
+  ['링크', '웹', '북마크', 'link', 'url', 'web'],
+  ['음성', '녹음', 'voice', '음성메모', '보이스'],
+  ['공유', '받은글', '스크랩', 'share', 'clip'],
 ];
 const SYN = new Map();
 SYNONYMS.forEach((group, i) => group.forEach((w) => SYN.set(normalizeTag(w), i)));

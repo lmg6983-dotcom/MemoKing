@@ -14,6 +14,7 @@ import { call } from './native.js';
 import { fetchRemoteImage } from './web-fetch.js';
 import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
+import { autoTagsFor } from '../../app/js/core/auto-tags.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -652,9 +653,51 @@ el.styleMenu.addEventListener('click', (e) => {
   closeStyleMenu();
 });
 
-const actions = {
+// ---------- 콘텐츠 추가 (+): 사진 · 파일 · 음성 녹음 · 표 · 수식 위성 단추 ----------
+const addMenu = $('add-menu');
+const addBtn = $('add-btn');
+let addCloseTimer = 0;
+function openAddMenu() {
+  closePalette();
+  closeStyleMenu();
+  clearTimeout(addCloseTimer);
+  addMenu.classList.remove('closing');
+  addMenu.hidden = false;
+  const r = addBtn.getBoundingClientRect();
+  addMenu.style.left = `${Math.max(8, Math.round(r.left))}px`;
+  addMenu.style.bottom = `${Math.round(window.innerHeight - r.top + 12)}px`;
+  addBtn.classList.add('open');
+  addBtn.setAttribute('aria-expanded', 'true');
+  navigator.vibrate?.(8);
+}
+export function closeAddMenu() {
+  if (addMenu.hidden || addMenu.classList.contains('closing')) return false;
+  addBtn.classList.remove('open');
+  addBtn.setAttribute('aria-expanded', 'false');
+  addMenu.classList.add('closing');
+  addCloseTimer = setTimeout(() => {
+    addMenu.hidden = true;
+    addMenu.classList.remove('closing');
+  }, 160);
+  return true;
+}
+const ADD = {
+  photo: () => pickAndInsert('image/*'),
   file: () => pickAndInsert('*/*'),
   record: () => recorder.toggle(),
+  table: () => editor.insertTable(),
+  math: () => editor.setStyle('math'),
+};
+addMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서(키보드) 유지
+addMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-add]');
+  if (!b || !editor) return;
+  closeAddMenu();
+  ADD[b.dataset.add]?.();
+});
+
+const actions = {
+  add: () => (addMenu.hidden || addMenu.classList.contains('closing') ? openAddMenu() : closeAddMenu()),
   table: () => editor.insertTable(),
   style: (btn) => (el.styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
   color: (btn) => (paletteKind === 'color' ? closePalette() : openPalette('color', btn)),
@@ -668,16 +711,19 @@ el.formatBar.addEventListener('click', (e) => {
   if (btn.dataset.cmd) {
     closePalette();
     closeStyleMenu();
+    closeAddMenu();
     editor.run(btn.dataset.cmd);
   } else if (btn.dataset.action) {
     if (!['color', 'highlight'].includes(btn.dataset.action)) closePalette();
     if (btn.dataset.action !== 'style') closeStyleMenu();
+    if (btn.dataset.action !== 'add') closeAddMenu();
     actions[btn.dataset.action]?.(btn);
   }
 });
 document.addEventListener('pointerdown', (e) => {
   if (!el.palette.hidden && !el.palette.contains(e.target) && !e.target.closest?.('[data-action="color"],[data-action="highlight"]')) closePalette();
   if (!el.styleMenu.hidden && !el.styleMenu.contains(e.target) && !e.target.closest?.('[data-action="style"]')) closeStyleMenu();
+  if (!addMenu.hidden && !addMenu.contains(e.target) && !e.target.closest?.('[data-action="add"]')) closeAddMenu();
 });
 
 // 되돌리기·다시 하기: 자주 쓰므로 위 막대에 늘 (누를 것이 없으면 흐리게)
@@ -1045,6 +1091,14 @@ export function insertRecording(cardMd, heading) {
   if (!editorMarkdown().trim() && heading) editor.setMarkdown(`# ${heading}\n`);
   editor.appendMarkdown(cardMd);
   flush();
+}
+
+/** 밖에서 들어온 메모(캡처·공유)에 태그를 저절로: 내용에 맞는 기존 태그 + 들어온 곳 태그 → 단 태그 이름들 */
+export function autoTagIncoming(source) {
+  if (!editor || !id || !app.vault) return [];
+  const tags = autoTagsFor(editorMarkdown(), app.vault.bodies(), { source, excludeId: id });
+  if (tags.length) editor.appendMarkdown(tags.map((t) => `#${t}`).join(' '));
+  return tags;
 }
 
 /** 받아쓴 글을 그 소리 줄에 붙여 음성 카드로 */

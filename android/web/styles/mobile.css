@@ -918,3 +918,56 @@ body.two-pane .toast { left: calc(var(--list-w) + (100vw - var(--list-w)) / 2); 
   .rec-text { max-height: 14vh; }
   .searchbar { padding-bottom: 4px; }
 }
+
+/* ---------- 메모 도구막대: 콘텐츠 추가(+) · 스타일 · 목록 · 글자 서식 ---------- */
+.note-screen #format-bar button.add-btn {
+  flex: none;
+  position: relative;
+  width: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  background: var(--brand-black);
+  color: var(--on-black);
+}
+.note-screen #format-bar button.add-btn svg { width: 20px; height: 20px; transition: transform 0.24s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.note-screen #format-bar button.add-btn.open svg { transform: rotate(45deg); } /* + → × */
+.note-screen #format-bar button.add-btn.recording::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e5484d;
+  box-shadow: 0 0 0 2px var(--brand-black);
+  animation: rec-blink 1.2s ease-in-out infinite;
+}
+.add-menu {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column-reverse; /* 첫 단추(음성 녹음)가 + 바로 위 */
+  align-items: flex-start;
+  gap: 10px;
+}
+.add-menu[hidden] { display: none; }
+.add-sat { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: var(--text-strong); animation: add-sat-out 0.26s cubic-bezier(0.2, 1.3, 0.4, 1) both; -webkit-tap-highlight-color: transparent; }
+.add-sat:nth-child(1) { animation-delay: 0s; }
+.add-sat:nth-child(2) { animation-delay: 0.03s; }
+.add-sat:nth-child(3) { animation-delay: 0.06s; }
+.add-sat:nth-child(4) { animation-delay: 0.09s; }
+.add-sat:nth-child(5) { animation-delay: 0.12s; }
+.add-menu.closing .add-sat { animation: add-sat-in 0.14s ease-in both; animation-delay: 0s; }
+.add-sat-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 16px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.18), inset 0 0 0 1px var(--line); }
+.add-sat-btn svg { width: 22px; height: 22px; }
+.add-sat-btn.rec { background: #e5484d; color: #fff; box-shadow: 0 6px 16px rgba(229, 72, 77, 0.35); }
+.add-sat.active .add-sat-btn.rec { animation: rec-blink 1.2s ease-in-out infinite; }
+.add-sat-label { padding: 5px 11px; border-radius: 10px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14px; white-space: nowrap; }
+.add-sat:active .add-sat-btn { transform: scale(0.92); }
+@keyframes add-sat-out { from { opacity: 0; transform: translate(-6px, 30px) scale(0.5); } }
+@keyframes add-sat-in { to { opacity: 0; transform: translate(-6px, 30px) scale(0.5); } }
+@media (prefers-reduced-motion: reduce) {
+  .add-sat, .add-menu.closing .add-sat, .note-screen #format-bar button.add-btn svg { animation: none; transition: none; }
+}
+@media print { .add-menu { display: none !important; } }

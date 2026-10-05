@@ -913,3 +913,10 @@ body.is-dragging .card:hover { transform: none; }
 .undo-bar span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .undo-bar button { flex: none; padding: 6px 10px; border: 0; border-radius: 8px; background: none; color: var(--brand-yellow, #ffcd00); font-weight: 800; cursor: pointer; }
 .undo-bar button:hover { background: rgba(255, 255, 255, 0.08); }
+
+/* 빈 목록: 그림 + 다음에 할 일 단추 (휴대폰과 같음) */
+#empty:not([hidden]) { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; animation: mk-pop-in 0.25s ease-out both; }
+.empty-art { font-size: 40px; line-height: 1; animation: empty-bob 2.6s ease-in-out infinite; }
+.empty-actions { display: flex; gap: 8px; margin-top: 4px; }
+@keyframes empty-bob { 50% { transform: translateY(-5px) rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .empty-art { animation: none; } }

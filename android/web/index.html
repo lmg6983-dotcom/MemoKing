@@ -192,8 +192,8 @@
     <!-- 서식 도구막대: 휴대폰에서는 옆으로 밀어서 더 보기 (되돌리기·다시 하기는 위 막대에) -->
     <footer class="format-bar" id="format-bar" role="toolbar" aria-label="서식">
       <div class="format-items" id="format-items">
-        <button data-action="file" aria-label="첨부"><svg><use href="#i-clip"/></svg></button>
-        <button data-action="record" aria-label="녹음"><svg><use href="#i-mic"/></svg></button>
+        <!-- 콘텐츠 추가: 누르면 위로 사진·파일·음성 녹음·표·수식 (평소엔 이 단추 하나) -->
+        <button data-action="add" id="add-btn" class="add-btn" aria-label="콘텐츠 추가" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
         <span class="sep"></span>
         <button data-action="style" class="style-btn" aria-label="스타일" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
         <span class="sep"></span>
@@ -211,10 +211,17 @@
         <button data-action="highlight" class="swatch-btn" aria-label="형광펜" aria-haspopup="true">
           <svg><use href="#i-highlighter"/></svg><span class="swatch-bar" data-bar="highlight"></span>
         </button>
-        <span class="sep"></span>
-        <button data-action="table" aria-label="표 넣기"><svg><use href="#i-table"/></svg></button>
       </div>
     </footer>
+
+    <!-- 콘텐츠 추가 위성 단추 (+ 위로 펼쳐짐) -->
+    <div id="add-menu" class="add-menu" role="menu" aria-label="콘텐츠 추가" hidden>
+      <button class="add-sat" data-add="record" data-action="record" role="menuitem"><span class="add-sat-btn rec"><svg><use href="#i-mic"/></svg></span><span class="add-sat-label">음성 녹음</span></button>
+      <button class="add-sat" data-add="photo" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-photo"/></svg></span><span class="add-sat-label">사진</span></button>
+      <button class="add-sat" data-add="file" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-clip"/></svg></span><span class="add-sat-label">파일</span></button>
+      <button class="add-sat" data-add="table" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-table"/></svg></span><span class="add-sat-label">표</span></button>
+      <button class="add-sat" data-add="math" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-sigma"/></svg></span><span class="add-sat-label">수식</span></button>
+    </div>
 
     <!-- 스타일 고르기 (데스크탑과 같음): 그 모양 그대로 미리 보며, 지금 줄의 스타일에 ✓ -->
     <div id="style-menu" class="pop style-menu" role="listbox" aria-label="스타일" hidden>
@@ -224,7 +231,6 @@
       <button type="button" role="option" data-style="h3"><span class="style-sample s-h3">제목 3</span></button>
       <button type="button" role="option" data-style="quote"><span class="style-sample s-quote">인용</span></button>
       <button type="button" role="option" data-style="codeBlock"><span class="style-sample s-code">코드 블록</span></button>
-      <button type="button" role="option" data-style="math"><span class="style-sample s-math">∑ 수식</span><kbd>$x$</kbd></button>
     </div>
 
     <div id="palette" class="pop palette" role="menu" hidden>

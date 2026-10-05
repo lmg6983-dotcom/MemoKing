@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   tags: {
     list: invoke('tags:list'),
+    auto: invoke('tags:auto'),
+    suggest: invoke('tags:suggest'),
   },
   memo: {
     open: invoke('memo:open'),

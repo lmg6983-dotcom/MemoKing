@@ -905,9 +905,13 @@ async function memoFromShare(payload) {
       await new Promise((r) => setTimeout(r, 30));
       editor.appendMarkdown(sourceLine(payload.app));
       await editor.imagesSettled();
+      // 태그를 저절로: 그림만 받았으면 화면 캡처, 주소 하나면 링크, 소리면 음성, 그 밖은 공유
+      const onlyImages = !text && !docTexts.length && files.length > 0 && files.every((f) => mediaKind({ name: f.name || '', type: f.mime || '' }) === 'image');
+      const source = onlyImages ? 'capture' : url ? 'link' : audio.length ? 'audio' : 'share';
+      const tags = note.autoTagIncoming(source);
       note.flush();
       document.activeElement?.blur(); // 키보드는 올리지 않는다 (이어 쓰려면 누르기)
-      toast('메모를 만들었어요');
+      toast(tags.length ? `메모를 만들었어요 · ${tags.map((t) => `#${t}`).join(' ')}` : '메모를 만들었어요');
     },
   });
   if (stt && audioItems.length) {
@@ -1072,6 +1076,7 @@ setBackHandler(() => {
   if (closeConfirm()) return true;
   if (note.closePalette()) return true;
   if (note.closeStyleMenu()) return true;
+  if (note.closeAddMenu()) return true;
   if (setFabMenu(false)) return true;
   if (sheetOpen()) return closeTopSheet();
   if (note.isOpen()) {

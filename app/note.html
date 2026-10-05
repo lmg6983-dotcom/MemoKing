@@ -53,6 +53,13 @@
 
   <main id="editor" class="editor"></main>
 
+  <!-- 태그 없는 메모: 추천 태그 (누르면 달기) — 휴대폰과 같음 -->
+  <div id="tag-suggest-bar" class="tag-suggest-bar" role="group" aria-label="추천 태그" hidden>
+    <span class="tsb-label"><svg><use href="#i-tag"/></svg>추천</span>
+    <div id="tag-suggest-chips" class="tsb-chips"></div>
+    <button id="tag-suggest-close" class="icon-btn" title="닫기" aria-label="추천 태그 닫기"><svg><use href="#i-close"/></svg></button>
+  </div>
+
   <!-- 예약 알림 패널 -->
   <aside id="reminder-panel" class="links-panel reminder-panel" hidden>
     <header class="links-head">

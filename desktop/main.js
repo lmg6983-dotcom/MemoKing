@@ -18,6 +18,8 @@ import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, 
 import { LinkPreviews } from './link-previews.js';
 import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
+import { autoTagsFor } from '../app/js/core/auto-tags.js';
+import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
@@ -1945,6 +1947,10 @@ function registerIpc() {
   ipcMain.handle('memos:list', () => listMemos());
   // 지금까지 쓴 태그 (많이 쓴 순) — 메모 창의 # 자동완성
   ipcMain.handle('tags:list', () => collectTags(vault?.list() ?? []));
+  // 밖에서 들어온 메모(화면 캡처·빠른 메모)에 저절로 달 태그 — 내용에 맞는 기존 태그 + 들어온 곳 태그
+  // 태그 없는 메모의 추천 태그 (휴대폰과 같은 알고리즘 — 이미 쓰는 태그와 정합성 있게)
+  ipcMain.handle('tags:suggest', (_e, body, id) => suggestTagsFor(String(body ?? ''), vault?.bodies() ?? [], { excludeId: id }));
+  ipcMain.handle('tags:auto', (_e, body, source, id) => autoTagsFor(String(body ?? ''), vault?.bodies() ?? [], { source, excludeId: id }));
   ipcMain.handle('memos:search', (_e, query, excludeId) => withOpenFlag(vault?.search(String(query ?? ''), excludeId) ?? []));
 
   // 예약 알림: 메모 하나의 알림 목록을 통째로 저장 (추가·삭제·켜기/끄기)

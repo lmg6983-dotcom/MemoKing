@@ -16,6 +16,8 @@ const ICONS = {
   pen: `<path d="M4 20h4L19 9a2.83 2.83 0 00-4-4L4 16v4z" ${stroke}/><path d="M13.5 6.5l4 4" ${stroke}/>`,
   pause: '<rect x="7" y="5" width="3.6" height="14" rx="1.2" fill="currentColor"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.2" fill="currentColor"/>',
   play: '<path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z" fill="currentColor"/>',
+  sigma: `<path d="M18 5H6l6.5 7L6 19h12" ${stroke} stroke-width="2"/>`,
+  photo: `<rect x="3.5" y="5" width="17" height="14" rx="2.5" ${stroke}/><circle cx="9" cy="10" r="1.6" ${stroke}/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4" ${stroke}/>`,
   stop: '<rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/>',
   text: `<path d="M5 6h14M5 10.5h14M5 15h9M5 19.5h6" ${stroke}/>`,
   'keyboard-down': `<rect x="3" y="3.5" width="18" height="11" rx="2" ${stroke}/><path d="M7 7.5h.01M10.5 7.5h.01M14 7.5h.01M17.5 7.5h.01M8 11h8" ${stroke}/><path d="M9 18l3 3 3-3" ${stroke}/>`,

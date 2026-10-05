@@ -97,10 +97,14 @@ function render() {
   const show = status.active && attached && attached === status.memoId;
   el.panel.hidden = !show;
   document.getElementById('note-screen').classList.toggle('recording', Boolean(status.active && attached === status.memoId));
+  const here = Boolean(status.active && attached === status.memoId);
   for (const b of document.querySelectorAll('[data-action="record"]')) {
-    b.classList.toggle('active', Boolean(status.active && attached === status.memoId));
+    b.classList.toggle('active', here);
     b.setAttribute('aria-label', status.active ? '녹음 끝내기' : '녹음');
+    const label = b.querySelector('.add-sat-label');
+    if (label) label.textContent = here ? '녹음 끝내기' : '음성 녹음';
   }
+  document.getElementById('add-btn')?.classList.toggle('recording', here); // + 단추에 녹음 중 빨간 점
   renderPill();
   if (!show) return;
   el.time.textContent = formatDuration(elapsed());

@@ -221,11 +221,17 @@ try {
   check('공유하기: 줄마다 문단', /좋은 문장\n\n둘째 줄/.test(sharedText), sharedText);
   check('공유하기: 사진을 첨부로', /!\[photo\]\(attachments\/\d{8}-\d{6}-[0-9a-f]{4}\.png\)/.test(sharedText));
   check('공유하기: 출처 한 줄', /> 출처: Chrome · /.test(sharedText));
+  check('공유하기: 태그를 저절로 (내용 태그가 없으면 #공유)', /#공유(\s|$)/.test(sharedText), sharedText);
 
   // 파일 넣기 (키보드를 내린 상태 → 메모 끝에)
   await post('/dev/pick', [{ name: '보고서.pdf', mime: 'application/pdf', base64: Buffer.from('%PDF-1.4').toString('base64') }]);
-  await page.tap('[data-action="file"]');
+  await page.tap('#add-btn');
+  await page.waitForTimeout(350);
+  check('도구막대: + 를 누르면 위성 단추 5개 (음성 녹음·사진·파일·표·수식)', (await page.locator('#add-menu:not([hidden]) .add-sat').count()) === 5);
+  await shot('19-add-menu');
+  await page.tap('[data-add="file"]');
   await page.waitForTimeout(800);
+  check('도구막대: 고르면 위성 단추가 접힘', await page.isHidden('#add-menu'));
   const withFile = read(shared);
   check('파일 넣기: 파일 칩 링크', /\n\[보고서\.pdf\]\(attachments\/[^)]+\.pdf\)\n?$/.test(withFile), withFile);
   await back();
@@ -663,6 +669,15 @@ try {
   await page.tap('.mk-delete-btn');
   await page.waitForTimeout(1200);
   check('지우기 단추: 누르면 그 그림만 지움', (await page.locator('img.mk-image').count()) === 1 && !read('그림 둘.md').includes('two-a.png') && read('그림 둘.md').includes('two-b.png'), read('그림 둘.md'));
+  // + › 표: 커서 자리에 표
+  await page.locator('.mk-doc p', { hasText: '끝' }).tap();
+  await page.waitForTimeout(150);
+  await page.tap('#add-btn');
+  await page.waitForTimeout(300);
+  await page.tap('[data-add="table"]');
+  await page.waitForTimeout(400);
+  check('도구막대: + › 표', (await page.locator('.mk-doc table').count()) === 1);
+  check('도구막대: 평소엔 + 하나 (첨부·녹음·표 단추 없음)', (await page.locator('#format-bar [data-action="file"], #format-bar [data-action="record"], #format-bar [data-action="table"]').count()) === 0);
   if (process.env.MK_PDF) await page.pdf({ path: path.join(outDir, 'share-images.pdf'), format: 'A4' });
   await back();
   await page.waitForTimeout(300);
@@ -706,6 +721,15 @@ try {
   await page.waitForTimeout(900);
   const tidied = read('다듬기.md');
   check('다듬기: 줄을 떠나면 띄어쓰기 정리', tidied.includes('둘째 문단 끝이에요 정말.') && /- 사과\n- 배\n- 감\n- 귤/.test(tidied), tidied);
+  await back();
+  await page.waitForTimeout(300);
+
+  // 화면 캡처(그림만 공유): #캡처 태그를 저절로
+  await post('/dev/intent', { type: 'share', text: '', app: '스크린샷', files: [{ name: 'Screenshot_20261005.png', mime: 'image/png', base64: fs.readFileSync(path.join(repo, 'assets/icons/icon-256.png')).toString('base64') }] });
+  await page.evaluate(() => window.__mk.emit('intent', null));
+  await page.waitForTimeout(1500);
+  f = fileWith('출처: 스크린샷');
+  check('화면 캡처: #캡처 태그를 저절로', f && /#캡처/.test(read(f)), f && read(f));
   await back();
   await page.waitForTimeout(300);
 
