@@ -995,7 +995,7 @@ try {
     await page.waitForTimeout(500);
     await touch('touchEnd', 0, 0);
     await page.waitForTimeout(300);
-    const shown = (await page.locator('.mk-delete-btn').count()) === 1 && (await page.locator('.mk-doc li.mk-del-target').count()) === 1;
+    const shown = (await page.locator('.mk-delete-btn').count()) === 1 && (await page.locator('.mk-doc li.mk-delete-target').count()) === 1;
     await page.waitForTimeout(2000);
     const still = (await page.locator('.mk-delete-btn:not(.fading)').count()) === 1;
     await page.waitForTimeout(700);
@@ -1019,6 +1019,22 @@ try {
     await touch('touchEnd', 0, 0);
     await page.waitForTimeout(1500);
     check('목록: 항목을 더 오래 누르면 목록 전체를 들어 올려 옮김', whole && /끝 문단\n\n- 사과\n- 감/.test(body()), body());
+    // 목록 전체를 들어 올렸다 그 자리에 놓으면 목록 전체 × (흰 바탕 빨간 ×) → 누르면 목록째로 지움
+    b = await liBox('감');
+    await touch('touchStart', b.x + 30, b.y + b.height / 2);
+    await page.waitForTimeout(1300);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(400);
+    const lab = await page.locator('.mk-delete-btn').getAttribute('aria-label').catch(() => null);
+    const look = await page.evaluate(() => { const e = document.querySelector('.mk-delete-btn'); if (!e) return null; const c = getComputedStyle(e); return { w: Math.round(e.getBoundingClientRect().width), bg: c.backgroundColor, color: c.color }; });
+    check('목록 전체: 놓으면 목록 전체 × (흰 바탕·빨간 ×·작게)', lab === '이 목록 지우기' && look?.bg === 'rgb(255, 255, 255)' && look?.color === 'rgb(229, 72, 77)' && look.w <= 26 && (await page.locator('.mk-doc ul.mk-delete-target').count()) === 1, JSON.stringify({ lab, look }));
+    const xb = await page.locator('.mk-delete-btn').boundingBox();
+    await touch('touchStart', xb.x + 12, xb.y + 12);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(150);
+    const fading = await page.evaluate(() => document.querySelector('.mk-doc ul.mk-deleting') != null);
+    await page.waitForTimeout(1500);
+    check('목록 전체: × 를 누르면 사라지는 모습 뒤 목록째로 지움', fading && !/- 사과|- 감/.test(body()) && body().includes('끝 문단'), body());
     await back();
     await page.waitForTimeout(300);
   }

@@ -228,27 +228,20 @@ export function createListDrag({ readOnly = false } = {}) {
     }
   }
 
-  // 목록 항목 지우기 단추 — 항목 하나뿐인 목록이면 목록째로
+  // 목록 항목 지우기 단추 — 항목 하나뿐인 목록이면 목록째로 (지워지는 모습도 목록째로)
   function showItemDelete(view, pos) {
-    const node = view.state.doc.nodeAt(pos);
+    const item = view.state.doc.nodeAt(pos);
     const li = view.nodeDOM(pos);
-    if (!node || !isItem(node) || !(li instanceof Element)) return;
-    const mark = (on) => {
-      if (on) return decorate(view, [{ pos, cls: 'mk-del-target' }]);
-      // 사라질 때는 편집기 갱신 중일 수 있어 한 박자 뒤에
-      setTimeout(() => {
-        if (!drag && !press && !view.isDestroyed && listDragKey.getState(view.state)?.find().length) decorate(view, []);
-      }, 0);
+    if (!item || !isItem(item) || !(li instanceof Element)) return;
+    const $pos = view.state.doc.resolve(pos);
+    const only = $pos.parent.childCount === 1;
+    const at = only ? $pos.before() : pos;
+    const node = only ? $pos.parent : item;
+    const deco = (spec) => {
+      if (spec) decorate(view, [{ pos: at, ...spec }]);
+      else if (!drag && !press && listDragKey.getState(view.state)?.find().length) decorate(view, []);
     };
-    showDeleteButton(view, {
-      pos, node, target: li, label: '이 항목 지우기', mark,
-      remove: (v, at, item) => {
-        const $at = v.state.doc.resolve(at);
-        const list = $at.parent;
-        const tr = list.childCount === 1 ? v.state.tr.delete($at.before(), $at.after()) : v.state.tr.delete(at, at + item.nodeSize);
-        v.dispatch(tr.scrollIntoView());
-      },
-    });
+    showDeleteButton(view, { pos: at, node, target: li, label: only ? '이 목록 지우기' : '이 항목 지우기', deco });
   }
 
   // 들어 올린 항목 대신 목록 전체(맨 바깥 줄)를 들어 올린다 — 손가락은 그대로, 옮기기는 block-move.js 가

@@ -306,6 +306,7 @@ class Mover {
     this.cancelPress();
     this.hideDelete(true);
     this.lift({ block, kind, text: true, x, y, x2: x, y2: y });
+    if (this.drag) this.drag.whole = true;
     return Boolean(this.drag);
   }
 
@@ -581,7 +582,8 @@ class Mover {
     // 꾹 눌러 들어 올렸다가 그 자리에 놓으면(옮기지 않음): 내용이면 오른쪽 위에 지우기 단추
     if (commit && !d.drop && Math.hypot(d.x - d.x0, d.y - d.y0) < 14) {
       const block = blockInfo(view.state.doc, d.block.pos, d.block.inner);
-      if (block && isContentBlock(block.node)) this.showDelete(block);
+      // 목록 전체를 들어 올렸다 놓은 경우도 (목록 항목을 더 오래 눌러 넘어온 것)
+      if (block && (isContentBlock(block.node) || (d.whole && /list/.test(block.node.type.name)))) this.showDelete(block);
       return;
     }
     if (commit && d.drop) {
@@ -601,7 +603,12 @@ class Mover {
     const dom = view.nodeDOM(block.pos);
     if (!(dom instanceof Element)) return;
     const media = isContentParagraph(block.node) ? dom.querySelector('img.mk-image, .mk-media, .mk-link-card') : null;
-    showDeleteButton(view, { pos: block.pos, node: block.node, target: media ?? dom });
+    const deco = (spec) => {
+      if (spec) this.decorate([{ pos: block.pos, ...spec }]);
+      else if (!this.drag && !this.pressing) this.decorate([]);
+    };
+    const list = /list/.test(block.node.type.name);
+    showDeleteButton(view, { pos: block.pos, node: block.node, target: media ?? dom, markTarget: Boolean(media), deco, label: list ? '이 목록 지우기' : '이 내용 지우기' });
   }
 
   hideDelete(now = false) {

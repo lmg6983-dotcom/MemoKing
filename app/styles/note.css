@@ -1293,33 +1293,59 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-doc .mk-voice-body > p.mk-image-line { margin: 0; }
 .mk-doc p.mk-image-line:has(.mk-media) { width: auto; }
 
-/* 꾹 눌렀다 놓은 내용·목록 항목의 지우기 단추 (오른쪽 위, 2.5초 뒤 사라짐) — delete-button.js
-   메모킹 브랜드: 검정 단추 + 노란 테두리, 가는 × (다른 위 막대 단추들과 같은 선 굵기) */
+/* 꾹 눌렀다 놓은 내용·목록의 지우기 단추 (오른쪽 위, 2.5초 뒤 흐려지며 사라짐) — delete-button.js
+   흰 동그라미에 빨간 × (작게, 어느 메모 색 위에서도 또렷하게 얇은 테두리·그림자) */
 .mk-delete-btn {
   position: fixed;
   z-index: 70;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 50%;
-  background: var(--brand-black, #111);
-  color: #fff;
-  box-shadow: 0 0 0 2px var(--brand-yellow, #ffcc00), 0 4px 12px rgba(0, 0, 0, 0.22);
+  background: #fff;
+  color: #e5484d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  animation: mk-del-in 0.24s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  animation: mk-del-in 0.22s cubic-bezier(0.3, 1.4, 0.5, 1) both;
   -webkit-tap-highlight-color: transparent;
 }
-.mk-delete-btn svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; fill: none; }
+/* 손가락이 닿는 범위는 넉넉하게 (보이는 단추는 작아도) */
+.mk-delete-btn::before { content: ""; position: absolute; inset: -10px; border-radius: 50%; }
+.mk-delete-btn svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; fill: none; }
 .mk-delete-btn:active { transform: scale(0.88); }
-.mk-delete-btn.fading { opacity: 0; transform: scale(0.75); transition: opacity 0.25s ease-out, transform 0.25s ease-out; pointer-events: none; }
-@keyframes mk-del-in { from { opacity: 0; transform: scale(0.5) rotate(-45deg); } }
-.mk-deleting { transition: opacity 0.18s ease-in, transform 0.18s ease-in; opacity: 0; transform: scale(0.94); }
-@media (prefers-reduced-motion: reduce) { .mk-delete-btn { animation: none; } }
+.mk-delete-btn.fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
+.mk-delete-btn.pressed { animation: mk-del-pressed 0.18s ease-in forwards; pointer-events: none; }
+@keyframes mk-del-in { from { opacity: 0; transform: scale(0.4) rotate(-60deg); } }
+@keyframes mk-del-fade { to { opacity: 0; transform: scale(0.6); } }
+@keyframes mk-del-pressed { 40% { transform: scale(0.8); background: #e5484d; color: #fff; } to { opacity: 0; transform: scale(0.5); background: #e5484d; color: #fff; } }
+/* 지울 대상: 옅은 붉은 테두리 */
+.mk-delete-target { outline: 1.5px solid rgba(229, 72, 77, 0.55); outline-offset: 3px; border-radius: 8px; }
+.mk-doc li.mk-delete-target { outline: none; }
+.mk-doc li.mk-delete-target::after { border: 1.5px solid rgba(229, 72, 77, 0.6) !important; }
+/* 지워질 때: 붉게 비쳤다가 작아지며 흐려지고(0.2초) → 그 자리가 접히며 아래 줄이 올라온다(0.2초) */
+.mk-doc .mk-deleting {
+  overflow: hidden;
+  transform-origin: center left;
+  animation: mk-delete-out 0.2s ease-in forwards;
+  transition: height 0.2s cubic-bezier(0.4, 0, 0.2, 1), margin 0.2s cubic-bezier(0.4, 0, 0.2, 1), padding 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+.mk-doc .mk-deleting::after { border-color: transparent !important; }
+.mk-doc .mk-collapsing { margin-top: 0 !important; margin-bottom: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+@keyframes mk-delete-out {
+  0% { opacity: 1; transform: scale(1); background-color: rgba(229, 72, 77, 0); }
+  35% { opacity: 1; transform: scale(1.01); background-color: rgba(229, 72, 77, 0.16); }
+  100% { opacity: 0; transform: scale(0.82); background-color: rgba(229, 72, 77, 0.1); filter: blur(1.5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mk-delete-btn, .mk-delete-btn.fading, .mk-delete-btn.pressed { animation: none; }
+  .mk-delete-btn.fading, .mk-delete-btn.pressed { opacity: 0; }
+  .mk-doc .mk-deleting { animation: none; opacity: 0; transition: none; }
+}
 @media print { .mk-delete-btn { display: none !important; } }
-.mk-delete-target { outline: 1.5px solid color-mix(in srgb, var(--note-text, #111) 55%, transparent); outline-offset: 3px; border-radius: 8px; }
 
 /* 추천 태그 막대 (태그 없는 메모, 본문 아래) — PC. 휴대폰은 mobile.css 가 크기를 덮어쓴다 */
 .tag-suggest-bar { display: flex; align-items: center; gap: 6px; flex: none; padding: 3px 4px 3px 10px; border-top: 1px solid color-mix(in srgb, var(--note-text) 8%, transparent); animation: mk-pop-in 0.18s ease-out; }
@@ -1401,8 +1427,7 @@ body.mk-block-compact .mk-doc .mk-block-compact-item img.mk-image { width: auto;
 body.mk-block-compact .mk-doc p.mk-image-line.mk-block-compact-item { -webkit-mask-image: none; mask-image: none; }
 body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height: 92px; }
 
-/* 목록 항목: 꾹 눌렀다 놓으면 지우기 단추의 대상 (delete-button.js) · 더 누르고 있으면 목록 전체 테두리가 차오름 (list-drag.js) */
-.mk-doc li.mk-del-target::after { border: 2px solid color-mix(in srgb, var(--note-text) 55%, transparent) !important; }
+/* 목록 항목을 더 누르고 있으면 목록 전체 테두리가 차오름 (list-drag.js) */
 .mk-doc .mk-list-gather { border-radius: 10px; animation: mk-list-gather 0.45s ease-in forwards; }
 @keyframes mk-list-gather {
   from { box-shadow: 0 0 0 4px color-mix(in srgb, var(--note-text) 0%, transparent); }
