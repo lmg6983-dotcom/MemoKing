@@ -400,9 +400,13 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 
 .note-screen .editor {
   padding: 8px 20px 40px;
+  overflow-x: auto; /* 페이지째 확대했을 때 옆으로 밀어 보기 */
   -webkit-overflow-scrolling: touch;
 }
 .note-screen .mk-doc { font-size: 16.5px; line-height: 1.7; }
+/* 페이지째 확대: 100% 의 폭으로 배치한 채 그대로 크게 (글자·그림·표 같은 비율) — note-view.js 의 --note-base-w */
+.note-screen #editor > * { box-sizing: border-box; margin-left: auto; margin-right: auto; } /* 폭은 note-view.js 가 직접 */
+.note-screen #editor:not(.zoomed) { overflow-x: hidden; }
 .note-screen .mk-doc li[data-item-type="task"]::before { transform: scale(1.15); transform-origin: left center; }
 
 /* 서식 도구막대: 키보드 바로 위. 버튼이 많으면 옆으로 밀어서 */

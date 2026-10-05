@@ -934,7 +934,9 @@ function showTasks({ total, done }, { initial = false } = {}) {
   }
 }
 
-// ---------- 두 손가락으로 본문 확대·축소 (데스크탑 Ctrl+휠과 같은 배율, 모든 메모에 기억) ----------
+// ---------- 두 손가락으로 본문 확대·축소: 페이지째 (지도·PDF 처럼) ----------
+//   글자·그림·표가 모두 같은 비율로 커지고 작아진다 — 줄은 100% 일 때 그대로 두고(다시 맞추지 않음), 화면보다 넓어지면
+//   옆으로 밀어서 본다. 두 손가락 가운데를 중심으로 커지고, 배율은 모든 메모에 기억 (데스크탑 Ctrl+휠과 같은 단계)
 const ZOOM_KEY = 'memoking.noteZoom';
 let zoom = 1;
 try {
@@ -942,10 +944,36 @@ try {
 } catch {
   // 기억 못 해도 100%
 }
-const applyZoom = () => el.editorRoot.style.setProperty('--note-zoom', String(zoom));
+// 100% 일 때의 본문 폭 (확대해도 이 폭으로 배치한 채 크게 그린다)
+function baseWidth() {
+  const cs = getComputedStyle(el.editorRoot);
+  return Math.max(200, el.editorRoot.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+}
+function applyZoom(focus) {
+  const root = el.editorRoot;
+  const before = Number(root.style.getPropertyValue('--note-zoom')) || 1;
+  const base = baseWidth();
+  root.style.setProperty('--note-base-w', `${base}px`);
+  root.style.setProperty('--note-zoom', String(zoom));
+  // 폭은 확대되는 요소(편집기 바로 아래 틀) 자신에게 — 저절로 맞는 폭은 확대해도 화면 폭에 맞춰져 버리므로
+  for (const child of root.children) child.style.width = `${base}px`;
+  root.classList.toggle('zoomed', zoom > 1);
+  // 두 손가락 가운데(focus)의 내용이 그 자리에 머물게 스크롤을 맞춘다
+  if (focus && before !== zoom) {
+    const r = root.getBoundingClientRect();
+    const fx = focus.x - r.left;
+    const fy = focus.y - r.top;
+    const k = zoom / before;
+    root.scrollLeft = (root.scrollLeft + fx) * k - fx;
+    root.scrollTop = (root.scrollTop + fy) * k - fy;
+  }
+}
 applyZoom();
+new ResizeObserver(() => applyZoom()).observe(el.editorRoot);
+new MutationObserver(() => applyZoom()).observe(el.editorRoot, { childList: true }); // 새 메모를 열면 그 본문에도
 let pinch = null;
 const spread = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+const middle = (t) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
 el.editorRoot.addEventListener('touchstart', (e) => {
   if (e.touches.length === 2) pinch = { d: Math.max(1, spread(e.touches)), z: zoom };
 }, { passive: true });
@@ -955,12 +983,17 @@ el.editorRoot.addEventListener('touchmove', (e) => {
   const next = Math.round(clampZoom(pinch.z * (spread(e.touches) / pinch.d)) * 20) / 20;
   if (next === zoom) return;
   zoom = next;
-  applyZoom();
+  applyZoom(middle(e.touches));
   setStatus(`확대 ${zoomLabel(zoom)}`);
 }, { passive: false });
 el.editorRoot.addEventListener('touchend', (e) => {
   if (!pinch || e.touches.length >= 2) return;
   pinch = null;
+  // 100% 가까이면 딱 100% 로 (가로로 조금 밀리는 일 없게)
+  if (Math.abs(zoom - 1) < 0.08) {
+    zoom = 1;
+    applyZoom();
+  }
   try {
     if (zoom === 1) localStorage.removeItem(ZOOM_KEY);
     else localStorage.setItem(ZOOM_KEY, String(zoom));
