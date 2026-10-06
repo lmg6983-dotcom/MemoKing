@@ -110,14 +110,15 @@ body[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-ho
   align-items: center;
   gap: 6px;
   padding: 8px 10px 8px 12px;
-  background: var(--brand-black);
-  color: var(--on-black);
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
+  box-shadow: inset 0 -1px 0 var(--bubble-line);
   font-size: 12.5px;
 }
 .banner span { flex: 1; min-width: 120px; }
-.banner svg { color: var(--brand-yellow); }
-.banner-btn { height: 26px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: rgba(255, 255, 255, 0.14); color: var(--on-black); cursor: pointer; font-size: 12px; font-weight: 600; }
-.banner-btn:hover { background: rgba(255, 255, 255, 0.24); }
+.banner svg { color: var(--bubble-fg); }
+.banner-btn { height: 26px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: var(--fill-tab); color: var(--bubble-fg); box-shadow: inset 0 0 0 1px var(--bubble-line); cursor: pointer; font-size: 12px; font-weight: 600; }
+.banner-btn:hover { background: var(--fill-hover); }
 .banner-btn.primary { background: var(--brand-yellow); color: var(--on-brand); }
 
 /* ---------- 편집기 ---------- */
@@ -334,14 +335,14 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
   max-width: calc(100vw - 12px);
   padding: 6px 10px;
   border-radius: var(--radius-sm);
-  background: var(--brand-black);
-  color: var(--on-black);
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--bubble-shadow);
   pointer-events: none;
 }
 
@@ -743,11 +744,11 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
 .stack-drop span {
   padding: 8px 16px;
   border-radius: 999px;
-  background: var(--brand-black);
-  color: var(--on-black);
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
   font-size: 13px;
   font-weight: 700;
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--bubble-shadow);
 }
 
 /* ---------- 표 (v0.13.0) ---------- */
@@ -913,11 +914,11 @@ body.stacked { --tabs-h: 0px; --tabs-w: 30px; padding-left: var(--tabs-w); }
   gap: 8px;
   padding: 4px 6px 4px 12px;
   border-radius: 999px;
-  background: var(--brand-black);
-  color: var(--on-black);
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
   font: 600 12px/22px var(--font-sans);
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--bubble-shadow);
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 0.15s ease-out, transform 0.15s ease-out;
@@ -929,12 +930,13 @@ body.stacked { --tabs-h: 0px; --tabs-w: 30px; padding-left: var(--tabs-w); }
   padding: 0 9px;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--fill-tab);
+  box-shadow: inset 0 0 0 1px var(--bubble-line);
   color: inherit;
   font: inherit;
   cursor: pointer;
 }
-.zoom-badge button:hover { background: rgba(255, 255, 255, 0.28); }
+.zoom-badge button:hover { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
 
 /* ---------- v0.17.2: 표 열 너비·행 높이를 자유롭게 ---------- */
 /* 열 너비를 정한 표는 끈 대로 (좁게도 넓게도) — 너비를 안 정한 표는 지금처럼 내용에 맞춤 */
@@ -1078,8 +1080,8 @@ body.bar-hidden .format-bar { margin-bottom: calc(-1 * var(--bar-h, 38px)); opac
 .mk-drag-badge {
   position: fixed; z-index: 60; pointer-events: none;
   padding: 3px 9px; border-radius: 99px;
-  background: var(--note-text, #111); color: var(--note-bg, #fff); font-size: 11.5px; font-weight: 700; white-space: nowrap; /* 메모 글자 색 — 어두운 메모에선 밝게 */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  background: var(--bubble-bg); color: var(--bubble-fg); font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  box-shadow: var(--bubble-shadow);
   animation: mk-badge-in 0.12s ease-out;
 }
 .mk-drag-badge[data-kind="swap"] { background: #7a4dff; color: #fff; }
@@ -1126,8 +1128,8 @@ body.mk-block-dragging .mk-doc .ProseMirror-selectednode { outline: none; }
 .mk-move-hint {
   position: fixed; z-index: 60; pointer-events: none;
   padding: 6px 12px; border-radius: 99px;
-  background: #111; color: #fff; font-size: 12.5px; font-weight: 600; white-space: nowrap;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  background: var(--bubble-bg); color: var(--bubble-fg); font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  box-shadow: var(--bubble-shadow);
   animation: mk-hint 3.6s ease-out forwards;
 }
 @keyframes mk-hint { 0% { opacity: 0; transform: translateY(4px); } 6%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }

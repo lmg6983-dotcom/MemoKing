@@ -612,12 +612,12 @@ h2.sheet-title { font-size: 20px; }
   max-width: calc(100vw - 32px);
   padding: 12px 18px;
   border-radius: 14px;
-  background: var(--brand-black);
-  color: var(--on-black);
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.45;
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--bubble-shadow);
   transform: translateX(-50%);
   animation: toast-in 0.2s ease-out;
 }
