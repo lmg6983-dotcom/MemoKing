@@ -26,7 +26,8 @@ test('직접 해 보기: 단계 시작 때보다 늘었을 때만', () => {
   assert.equal(tutorialDone('formatted', base, tutorialCounts('제목\n\n<mark>글</mark>', [])), true);
   assert.equal(tutorialDone('formatted', base, base), false);
   assert.equal(tutorialDone('styled', base, tutorialCounts('제목\n\n## 글', [])), true);
-  assert.equal(tutorialDone('styled', tutorialCounts('# 제목', []), tutorialCounts('# 제목\n', [])), false, '첫 줄 제목은 세지 않음');
+  assert.equal(tutorialDone('styled', tutorialCounts('제목', []), tutorialCounts('## 제목', [])), true, '첫 줄을 제목으로 바꿔도 셈');
+  assert.equal(tutorialDone('styled', tutorialCounts('# 제목', []), tutorialCounts('# 제목\n', [])), false, '처음부터 있던 제목은 세지 않음');
   assert.equal(tutorialDone('tasked', base, tutorialCounts('제목\n\n- [ ] 글', [])), true);
   assert.equal(tutorialDone('tagged', base, tutorialCounts('제목 #할일', ['할일'])), true);
   assert.equal(tutorialDone('typed', tutorialCounts('', []), tutorialCounts('안녕', [])), true);

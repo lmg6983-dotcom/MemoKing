@@ -340,7 +340,7 @@ function defaultNoteBounds(size = DEFAULT_NOTE_SIZE) {
 
 // inactive: 하던 작업의 키보드 포커스를 뺏지 않고 연다 (빠른 메모)
 // 스택에 든 메모면 그 스택 창에서 이 메모의 탭을 보여 준다.
-function openNote(id, { inactive = false, record = false, ink = false } = {}) {
+function openNote(id, { inactive = false, record = false, ink = false, big = false } = {}) {
   if (stacks?.stackOf(id)) return showTab(id, { inactive });
   const existing = noteWins.get(id);
   if (existing) {
@@ -352,17 +352,17 @@ function openNote(id, { inactive = false, record = false, ink = false } = {}) {
     }
     return existing;
   }
-  return createNoteWindow(id, { inactive, record, ink });
+  return createNoteWindow(id, { inactive, record, ink, big });
 }
 
 // show: false 면 숨긴 채로 만들어 둔다 (스택의 다른 탭 — 누르면 바로 보이도록)
-function createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false, ink = false } = {}) {
+function createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false, ink = false, big = false } = {}) {
   const memo = vault?.get(id);
   if (!memo) return null;
 
   const saved = settings.noteBounds[id];
   const win = new BrowserWindow({
-    ...(bounds ?? (onScreen(saved) ? saved : defaultNoteBounds(ink ? { width: 560, height: 640 } : DEFAULT_NOTE_SIZE))),
+    ...(bounds ?? (onScreen(saved) ? saved : defaultNoteBounds(ink || big ? { width: 560, height: 640 } : DEFAULT_NOTE_SIZE))),
     minWidth: 240,
     minHeight: 200,
     frame: false,
@@ -1172,9 +1172,10 @@ function createNote(options) {
   // record: 열리자마자 녹음을 시작하는 음성 메모 (목록 + › 음성 메모)
   const { record = false, ink = false, ...rest } = options ?? {};
   const id = vault.create(rest);
-  openNote(id, { record: Boolean(record), ink: Boolean(ink) });
-  // 튜토리얼 "첫 메모 만들기" 단계
-  if (tutorial.active && TUTORIAL_STEPS[tutorial.index]?.advance === 'memo-created') {
+  // 튜토리얼 "첫 메모 만들기" 단계: 말풍선과 함께 해 볼 수 있게 넓은 창으로
+  const forTutorial = tutorial.active && TUTORIAL_STEPS[tutorial.index]?.advance === 'memo-created';
+  openNote(id, { record: Boolean(record), ink: Boolean(ink), big: forTutorial });
+  if (forTutorial) {
     tutorial.memoId = id;
     tutorialEvent('memo-created');
   }
@@ -2688,7 +2689,7 @@ app.whenReady().then(async () => {
   if (SMOKE) {
     // 점검 모듈을 불러오지 못하면 멈춰 기다리지 말고 바로 실패로 끝낸다
     // --new: 이번에 바뀐 기능만 확인하는 짧은 점검 (smoke-new.js)
-    const { prepareSmoke, runSmoke } = await import(process.argv.includes('--new') ? './smoke-new.js' : './smoke.js').catch((err) => {
+    const { prepareSmoke, runSmoke } = await import(process.argv.includes('--tutorial') ? './smoke-tutorial.js' : process.argv.includes('--new') ? './smoke-new.js' : './smoke.js').catch((err) => {
       console.error('✖ 점검 모듈 오류', err);
       app.exit(1);
       return {};

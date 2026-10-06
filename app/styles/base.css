@@ -275,12 +275,32 @@ svg { width: 20px; height: 20px; flex: none; }
 .coach-skip:hover { background: var(--fill-hover); color: var(--text-strong); }
 .coach-next { height: 34px; padding: 0 14px; font-size: 13px; }
 .coach-next.coach-later { height: 32px; font-size: 12.5px; color: var(--text-muted); }
-/* 직접 해 보는 단계: 비춘 곳이 두근두근 */
+/* 직접 해 보는 단계: 비춘 곳이 두근두근 · 둘레는 아주 옅게만 (글자를 고르고 메뉴를 보며 해 볼 수 있게) */
 .coach-spot.pulse { animation: coach-pulse 1.4s ease-in-out infinite; }
 @keyframes coach-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px rgba(0, 0, 0, 0.4); }
-  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--brand-yellow) 55%, transparent), 0 0 0 9999px rgba(0, 0, 0, 0.4); }
+  0%, 100% { box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px rgba(0, 0, 0, 0.12); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--brand-yellow) 55%, transparent), 0 0 0 9999px rgba(0, 0, 0, 0.12); }
 }
+/* 접기 단추 · 접힌 알약 (직접 해 보는 동안 가리지 않게) */
+.coach-fold {
+  display: grid; place-items: center; flex: none; width: 26px; height: 26px; margin: -4px -6px -4px 0; padding: 0;
+  border: 0; border-radius: 8px; background: none; color: var(--text-muted); cursor: pointer;
+}
+.coach-fold::before { content: ""; width: 8px; height: 8px; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-2px) rotate(45deg); transition: transform 0.15s; }
+.coach-fold:hover { background: var(--fill-hover); color: var(--text-strong); }
+.coach-bubble.mini {
+  width: auto; max-width: min(340px, calc(100vw - 24px)); padding: 7px 10px 7px 7px; border-radius: 16px; cursor: pointer;
+  box-shadow: var(--shadow-pop), 0 0 0 2px var(--brand-yellow);
+}
+.coach-bubble.mini :is(h3, p, .coach-shot, .coach-actions, .coach-praise, .coach-progress, .coach-count) { display: none; }
+.coach-bubble.mini .coach-head { margin: 0; gap: 8px; }
+.coach-bubble.mini .coach-emoji { width: 30px; height: 30px; font-size: 17px; border-radius: 10px; animation: none; }
+.coach-bubble.mini .coach-try { order: 0; margin: 0; padding: 0; background: none; box-shadow: none; animation: none; font-size: 12.5px; }
+.coach-bubble.mini { display: flex; align-items: center; gap: 8px; }
+.coach-bubble.mini .coach-head { order: 0; }
+.coach-bubble.mini .coach-try { order: 1; flex: 1; min-width: 0; }
+.coach-bubble.mini .coach-head .coach-fold { display: none; } /* 접힌 알약은 눌러서 펼친다 */
+.coach-bubble[hidden] { display: none !important; }
 /* 손 메모 그리기·주석·녹음 중에는 말풍선을 잠시 숨긴다 (그리기를 가리지 않게) — 끝나면 다음 단계로 */
 body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .coach-bubble) { visibility: hidden; }
 

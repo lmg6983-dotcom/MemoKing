@@ -2,6 +2,7 @@
 //   PC(TUTORIAL_STEPS)와 휴대폰(MOBILE_TUTORIAL_STEPS)이 같은 말풍선(coach.js)을 쓴다.
 //   win: 말풍선을 띄울 화면 ('list' 목록 · 'note' 튜토리얼 중 만든 메모)
 //   target: 비출 요소(앞에서부터 보이는 것 하나, 없으면 가운데 카드)
+//   keep: 말풍선이 가리면 안 되는 곳 (직접 해 볼 본문 글 · 열리는 메뉴) — 말풍선은 이것들을 가장 덜 가리는 자리로
 //   emoji: 말풍선 머리의 그림 글자 · image: 실제 화면 사진 (app/assets/tutorial/)
 //   advance: 사용자가 이걸 하면 다음 단계로 (직접 해 보기) — 해 내면 "잘했어요" 칭찬과 함께 넘어간다
 //   try: 직접 해 보기 안내 (👉 로 보인다)
@@ -19,35 +20,35 @@ export const TUTORIAL_STEPS = [
     next: '시작할게요 🚀', skip: '나중에 볼게요',
   },
   {
-    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden])', '#fab'], advance: 'memo-created', emoji: '✨',
+    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden])', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]'], advance: 'memo-created', emoji: '✨',
     title: '첫 메모를 만들어 볼까요?',
     text: '오른쪽 아래 노란 + 를 누르면 🎙️ 음성 · ✍️ 손 · ✏️ 글 메모가 펼쳐져요.',
     try: '+ 를 누르고 "글 메모"를 골라 보세요',
   },
   // ---------- 쓰기 (메모 창) ----------
   {
-    id: 'write', win: 'note', target: ['#editor'], advance: 'typed', emoji: '✍️',
+    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], advance: 'typed', emoji: '✍️',
     title: '떠오르는 생각을 적어 보세요',
     text: '첫 줄은 메모 제목이 되고, 적는 대로 저절로 저장돼요. 💾 저장 단추는 없어요!',
     try: '아무 말이나 한 줄 적어 보세요',
     next: '다음',
   },
   {
-    id: 'format', win: 'note', target: ['#format-bar'], advance: 'formatted', emoji: '🎨',
+    id: 'format', win: 'note', target: ['#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], advance: 'formatted', emoji: '🎨',
     title: '글자를 꾸며 볼까요',
     text: '글자를 고르고 아래 도구막대의 굵게(B) · 글자 색(A) · 형광펜을 눌러요.',
     try: '방금 쓴 글자를 끌어서 고르고 B 를 눌러 보세요',
     next: LATER,
   },
   {
-    id: 'style', win: 'note', target: ['.format-bar .style-btn', '#format-bar'], advance: 'styled', emoji: '🔠',
+    id: 'style', win: 'note', target: ['.format-bar .style-btn', '#format-bar'], keep: ['.ProseMirror > *', '#style-menu:not([hidden])'], advance: 'styled', emoji: '🔠',
     title: '제목·인용으로 바꾸기',
     text: '"본문" 단추를 누르면 그 줄이 제목 · 인용 · 코드 모양으로 바뀌어요.',
     try: '"본문"을 누르고 "제목 2"를 골라 보세요',
     next: LATER,
   },
   {
-    id: 'lists', win: 'note', target: ['[data-cmd="task"]', '#format-bar'], advance: 'tasked', emoji: '✅',
+    id: 'lists', win: 'note', target: ['[data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *'], advance: 'tasked', emoji: '✅',
     image: 'clear.jpg',
     title: '할 일 목록 만들기',
     text: '체크리스트 단추를 누르면 줄 앞에 네모 칸이 생겨요. 모두 끝내면 CLEAR 도장이 쾅! 🎊',
@@ -55,14 +56,14 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['#editor'], emoji: '🖐️', image: 'move.jpg',
+    id: 'move', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], emoji: '🖐️', image: 'move.jpg',
     title: '줄을 옮기고 싶을 때',
     text: '줄을 꾹 누르면 살짝 들려요. 끌어서 원하는 자리에 놓으면 끝! 키보드로는 Alt+↑↓ 예요.',
     next: '다음',
   },
   // ---------- + 로 넣기 ----------
   {
-    id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], advance: 'add-opened', emoji: '➕',
+    id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     image: 'add.jpg',
     title: '+ 로 더 많은 것 넣기',
     text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 주석 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
@@ -70,7 +71,7 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], advance: 'ink-done', emoji: '✍️',
+    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'ink-done', emoji: '✍️',
     image: 'ink.jpg',
     title: '손으로 그리기',
     text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기, 잘못 그리면 ↩️ 되돌리기.',
@@ -78,7 +79,7 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], advance: 'annotate-done', emoji: '🖍️',
+    id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '.ProseMirror > *'], advance: 'annotate-done', emoji: '🖍️',
     image: 'annotate.jpg',
     title: '글 위에 바로 그리기',
     text: '"주석"은 글자 위에 밑줄이나 동그라미를 그리는 기능이에요. 글의 자리는 그대로예요.',
@@ -86,13 +87,13 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'voice', win: 'note', target: ['#add-btn', '#format-bar'], emoji: '🎙️', image: 'voice.jpg',
+    id: 'voice', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], emoji: '🎙️', image: 'voice.jpg',
     title: '말로 메모하기',
     text: '"음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. (Ctrl+Shift+R)',
     next: '다음',
   },
   {
-    id: 'tag', win: 'note', target: ['#editor'], advance: 'tagged', emoji: '🏷️',
+    id: 'tag', win: 'note', target: ['.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror > *', '.tag-suggest', '.tag-suggest-bar:not([hidden])'], advance: 'tagged', emoji: '🏷️',
     title: '#으로 태그 달기',
     text: '같은 태그가 붙은 메모끼리 모아 볼 수 있어요. #을 치면 전에 쓴 태그도 골라 쓸 수 있어요.',
     try: '#할일 처럼 적어 보세요',
@@ -132,20 +133,20 @@ export const TUTORIAL_STEPS = [
   },
   // ---------- 목록 ----------
   {
-    id: 'cards', win: 'list', target: ['#cards'], emoji: '🃏',
+    id: 'cards', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
     title: '메모는 모두 여기에',
     text: '방금 쓴 메모가 카드로 보여요. 카드를 누르면 다시 열리고, 목록 밖으로 끌어다 놓으면 그 자리에 열려요.',
     next: '다음',
   },
   {
-    id: 'layout', win: 'list', target: ['#layout-btn'], advance: 'layout-changed', emoji: '🔲',
+    id: 'layout', win: 'list', target: ['#layout-btn'], keep: ['#cards'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
     text: '카드를 바둑판처럼 볼지, 한 줄씩 볼지 고를 수 있어요.',
     try: '이 단추를 눌러 보세요',
     next: LATER,
   },
   {
-    id: 'filters', win: 'list', target: ['#tag-strip:not([hidden])', '#filter-btn'], advance: 'tag-filtered', emoji: '🔎',
+    id: 'filters', win: 'list', target: ['#tag-strip:not([hidden])', '#filter-btn'], keep: ['#tag-strip:not([hidden]) .tag-chip'], advance: 'tag-filtered', emoji: '🔎',
     title: '원하는 메모만 보기',
     text: '태그를 누르면 그 태그가 붙은 메모만 보여요. 깔때기 단추로 색이나 사진으로도 골라요.',
     try: '방금 만든 #태그를 눌러 보세요',
@@ -199,27 +200,27 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: '시작할게요 🚀', skip: '나중에 볼게요',
   },
   {
-    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], advance: 'memo-created', emoji: '✨',
+    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]'], advance: 'memo-created', emoji: '✨',
     title: '첫 메모를 만들어 볼까요?',
     text: '노란 + 를 누르면 🎙️ 음성 · ✍️ 손 · ✏️ 글 메모가 펼쳐져요.',
     try: '+ 를 누르고 "글 메모"를 골라 보세요',
   },
   {
-    id: 'write', win: 'note', target: ['#editor'], advance: 'typed', emoji: '✍️',
+    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], advance: 'typed', emoji: '✍️',
     title: '떠오르는 생각을 적어 보세요',
     text: '첫 줄은 메모 제목이 되고, 적는 대로 저절로 저장돼요. 💾 저장 단추는 없어요!',
     try: '아무 말이나 한 줄 적어 보세요',
     next: '다음',
   },
   {
-    id: 'format', win: 'note', target: ['#format-bar'], advance: 'formatted', emoji: '🎨',
+    id: 'format', win: 'note', target: ['#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], advance: 'formatted', emoji: '🎨',
     title: '글자를 꾸며 볼까요',
     text: '글자를 고르고 아래 도구막대의 B · A · 형광펜을 눌러요.',
     try: '글자를 꾹 눌러 고르고 B 를 눌러 보세요',
     next: LATER,
   },
   {
-    id: 'lists', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], advance: 'tasked', emoji: '✅',
+    id: 'lists', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *'], advance: 'tasked', emoji: '✅',
     image: 'clear.jpg',
     title: '할 일 목록 만들기',
     text: '체크리스트 단추를 누르면 네모 칸이 생겨요. 모두 끝내면 CLEAR 도장이 쾅! 🎊',
@@ -227,13 +228,13 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['#editor'], emoji: '🖐️', image: 'move.jpg',
+    id: 'move', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], emoji: '🖐️', image: 'move.jpg',
     title: '꾹 눌러 옮기기',
     text: '줄이나 사진을 꾹 누르면 살짝 들려요. 그대로 끌어서 원하는 자리에 놓으면 끝!',
     next: '다음',
   },
   {
-    id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], advance: 'add-opened', emoji: '➕',
+    id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     image: 'add.jpg',
     title: '+ 로 더 많은 것 넣기',
     text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 주석 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
@@ -241,7 +242,7 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], advance: 'ink-done', emoji: '✍️',
+    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'ink-done', emoji: '✍️',
     image: 'ink.jpg',
     title: '손으로 그리기',
     text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기, 두 손가락으로 화면을 넘겨요.',
@@ -249,7 +250,7 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], advance: 'annotate-done', emoji: '🖍️',
+    id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '.ProseMirror > *'], advance: 'annotate-done', emoji: '🖍️',
     image: 'annotate.jpg',
     title: '글 위에 바로 그리기',
     text: '"주석"은 글자 위에 밑줄이나 동그라미를 그리는 기능이에요. 글의 자리는 그대로예요.',
@@ -257,13 +258,13 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'voice', win: 'note', target: ['#add-btn', '#format-bar'], emoji: '🎙️', image: 'voice.jpg',
+    id: 'voice', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], emoji: '🎙️', image: 'voice.jpg',
     title: '말로 메모하기',
     text: '"음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
     next: '다음',
   },
   {
-    id: 'tag', win: 'note', target: ['#editor'], advance: 'tagged', emoji: '🏷️',
+    id: 'tag', win: 'note', target: ['.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror > *', '.tag-suggest', '.tag-suggest-bar:not([hidden])'], advance: 'tagged', emoji: '🏷️',
     title: '#으로 태그 달기',
     text: '같은 태그가 붙은 메모끼리 모아 볼 수 있어요. 아래에 추천 태그도 떠요.',
     try: '#할일 처럼 적어 보세요',
@@ -288,20 +289,20 @@ export const MOBILE_TUTORIAL_STEPS = [
     try: '왼쪽 위 ← 를 눌러 보세요',
   },
   {
-    id: 'cards', win: 'list', target: ['#cards'], emoji: '🃏',
+    id: 'cards', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
     title: '메모는 모두 여기에',
     text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유·색·지우기)가 떠요. 길게 누른 채 끌면 순서를 바꿔요.',
     next: '다음',
   },
   {
-    id: 'layout', win: 'list', target: ['#layout-btn'], advance: 'layout-changed', emoji: '🔲',
+    id: 'layout', win: 'list', target: ['#layout-btn'], keep: ['#cards'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
     text: '카드를 두 줄로 볼지, 한 줄씩 볼지 고를 수 있어요.',
     try: '이 단추를 눌러 보세요',
     next: LATER,
   },
   {
-    id: 'filters', win: 'list', target: ['#tag-strip:not([hidden])'], advance: 'tag-filtered', emoji: '🔎',
+    id: 'filters', win: 'list', target: ['#tag-strip:not([hidden])'], keep: ['#tag-strip:not([hidden]) .tag-chip'], advance: 'tag-filtered', emoji: '🔎',
     title: '원하는 메모만 보기',
     text: '태그를 누르면 그 태그가 붙은 메모만 보여요. 한 번 더 누르면 다시 모두 보여요.',
     try: '방금 만든 #태그를 눌러 보세요',
@@ -353,12 +354,10 @@ export function advanceTutorial(index, event, steps = TUTORIAL_STEPS) {
  */
 export function tutorialCounts(md, tags = []) {
   const text = String(md ?? '');
-  const lines = text.split('\n');
-  const body = lines.slice(1).join('\n'); // 첫 줄(제목)은 빼고
   return {
     text: text.replace(/\s/g, '').length,
     marks: (text.match(/\*\*[^*\n]+\*\*|(?<![*\w])\*[^*\s][^*\n]*\*|<mark\b|<u>|<span style="[^"]*color|==[^=\n]+==/g) ?? []).length,
-    blocks: (body.match(/^(#{1,6} |> )/gm) ?? []).length,
+    blocks: (text.match(/^(#{1,6} |> )/gm) ?? []).length, // 첫 줄을 제목으로 바꿔도 셈 (단계 시작 때와 견주므로)
     tasks: (text.match(/^\s*[-*+] \[[ xX]\]/gm) ?? []).length,
     tags: tags.length,
   };
