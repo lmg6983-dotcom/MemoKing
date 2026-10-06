@@ -630,10 +630,13 @@ function removeFromStack(id, mode = 'close') {
 }
 
 // 커서 아래에 있는, 합칠 수 있는 다른 메모 창 (자기 스택 제외)
+// 손 메모·주석을 그리는 창 (v0.22.0): 그 창을 끌어도 탭으로 합치지 않고, 다른 메모가 그 창으로 합쳐 들어오지도 않는다
+const inkingWins = new WeakSet();
+
 function stackTargetAt(point, excludeId) {
   const own = stacks?.stackOf(excludeId)?.memos ?? [excludeId];
   for (const [mid, w] of noteWins) {
-    if (own.includes(mid) || w.isDestroyed() || !w.isVisible() || w.isMinimized()) continue;
+    if (own.includes(mid) || w.isDestroyed() || !w.isVisible() || w.isMinimized() || inkingWins.has(w)) continue;
     if (isInside(point, w.getBounds())) return mid;
   }
   return null;
@@ -670,6 +673,8 @@ function clearStackTarget(state) {
 let windowDrag = null; // { id, target, armed, timer }
 
 function trackWindowDrag(id, point = screen.getCursorScreenPoint()) {
+  const w = noteWins.get(id);
+  if (w && inkingWins.has(w)) return; // 그리는 중: 창은 옮겨지지만 합치기는 없음
   if (windowDrag?.id !== id) {
     clearStackTarget(windowDrag);
     windowDrag = { id, target: null, armed: false, timer: null };
@@ -2477,6 +2482,16 @@ function registerIpc() {
     titleBarDim = level === 'dialog' || level === 'coach' ? level : false;
     listWin.setTitleBarOverlay(titleBarOverlay());
   });
+  ipcMain.handle('win:inking', (event, on) => {
+    const win = senderWindow(event);
+    if (!win) return;
+    if (!on) return void inkingWins.delete(win);
+    inkingWins.add(win);
+    if (windowDrag && noteWins.get(windowDrag.id) === win) {
+      clearStackTarget(windowDrag);
+      windowDrag = null;
+    }
+  });
   ipcMain.handle('win:toggle-top', (event, id) => {
     const win = senderWindow(event);
     return win ? setNoteOnTop(String(id), !win.isAlwaysOnTop()) : false;
@@ -2687,7 +2702,7 @@ app.whenReady().then(async () => {
       getTray: () => tray, getTrayMenu: () => trayMenuTemplate,
       alarms, smokeToasts, getHistory: () => history, appSettings, quickMemo, registerQuickMemoKey,
       getCapturePoint: () => lastCapturePoint, smokeOpened, smokeConfirmAnswers,
-      getStacks: () => stacks, trackWindowDrag, endWindowDrag, stackInto, getTabTear: () => tabTear, getSettings: () => settings, stickers, reloadSettings: loadSettings, installMark,
+      getStacks: () => stacks, isInking: (id) => inkingWins.has(noteWins.get(id)), trackWindowDrag, endWindowDrag, stackInto, getTabTear: () => tabTear, getSettings: () => settings, stickers, reloadSettings: loadSettings, installMark,
       startAreaCapture, getAreaCapture: () => areaCapture, smokeClipboard, onQuickMemoKey,
       createPopupWatcher, getHistory: () => history, smokePdf, getPdfWin: () => pdfWin, openPdfWindow,
       startTutorial, getTutorial: () => tutorial,

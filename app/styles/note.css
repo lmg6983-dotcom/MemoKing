@@ -1491,55 +1491,134 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-sheet.closing { animation: ink-out 0.16s ease-in forwards; }
 @keyframes ink-in { from { opacity: 0; transform: translateY(14px); } }
 @keyframes ink-out { to { opacity: 0; transform: translateY(14px); } }
-.ink-head { display: flex; align-items: center; gap: 10px; flex: none; padding: 8px 10px; border-bottom: 1px solid color-mix(in srgb, var(--note-text) 10%, transparent); }
-.ink-title { font-size: 15px; }
-.ink-hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--note-muted); text-align: center; }
-.ink-head-btn { flex: none; height: 32px; padding: 0 14px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font: inherit; font-weight: 700; font-size: 13.5px; cursor: pointer; }
-.ink-head-btn.primary { background: var(--brand-black, #111); color: var(--on-black, #fff); }
-.ink-head-btn:disabled { opacity: 0.5; }
+/* 그리는 칸은 창을 끌지 않는다 (PC: 창 끌기 영역은 위에 덮은 것과 상관없이 먼저 잡혀서, 위쪽에서 그리면 창이 움직이고 다른 메모와 합쳐졌다)
+   대신 머리 줄을 끌어 창을 옮긴다 (그리는 동안은 합치기 없이 — main.js win:inking) */
+.ink-sheet { -webkit-app-region: no-drag; }
+.ink-head {
+  display: flex; align-items: center; gap: 10px; flex: none; min-height: 48px; padding: 6px 8px 6px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--note-text) 9%, transparent);
+  -webkit-app-region: drag; user-select: none; -webkit-user-select: none;
+}
+.ink-head button { -webkit-app-region: no-drag; }
+.ink-title { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 15px; }
+.ink-title svg { width: 18px; height: 18px; }
+.ink-hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--note-muted); transition: color 0.15s; }
+.ink-hint.warn { color: #d9480f; font-weight: 600; }
+/* 완료: 하나뿐인 큰 단추 (취소 없음 — 닫으면 저장) */
+.ink-done {
+  display: inline-flex; align-items: center; gap: 5px; flex: none; height: 34px; padding: 0 14px 0 11px;
+  border: 0; border-radius: 999px; background: var(--brand-black, #111); color: var(--on-black, #fff);
+  font: inherit; font-weight: 800; font-size: 13.5px; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); transition: transform 0.12s ease-out, box-shadow 0.12s;
+}
+.ink-done svg { width: 17px; height: 17px; }
+.ink-done:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.26); }
+.ink-done:active { transform: scale(0.94); }
+.ink-done:disabled { opacity: 0.6; }
+[data-color="charcoal"] .ink-done { background: var(--brand-yellow); color: var(--on-brand, #111); }
 .ink-scroll { position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .ink-page { position: relative; }
 .ink-canvas { display: block; touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.ink-canvas.has-cursor, .mk-annot.drawing.has-cursor { cursor: none; }
 .ink-sheet[data-bg="white"] .ink-page { background: #ffffff; }
 .ink-sheet[data-bg="black"] .ink-page { background: #111111; }
 /* 투명 바탕: 메모 바탕 위에 옅은 모눈 (그린 그림에는 들어가지 않음) */
 .ink-sheet[data-bg="none"] .ink-page { background-image: radial-gradient(color-mix(in srgb, var(--note-text) 16%, transparent) 1px, transparent 1.2px); background-size: 24px 24px; }
+.ink-sheet[data-bg="black"] { --ink-cursor-ring: rgba(255, 255, 255, 0.85); }
 .ink-live { pointer-events: none; }
-.ink-eraser-ring { fill: none; stroke: color-mix(in srgb, var(--note-text) 55%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; pointer-events: none; }
-.ink-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-  padding: 6px 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  border-top: 1px solid color-mix(in srgb, var(--note-text) 10%, transparent);
-  background: var(--note-bg);
+/* 붓 미리 보기 (마우스·펜): 지금 색·굵기의 점, 지우개는 점선 고리 */
+.ink-cursor { fill: var(--c, #1f1f1c); fill-opacity: 0.55; stroke: var(--ink-cursor-ring, rgba(255, 255, 255, 0.9)); stroke-width: 1; pointer-events: none; }
+.ink-cursor.erase { fill: color-mix(in srgb, var(--note-text) 6%, transparent); fill-opacity: 1; stroke: color-mix(in srgb, var(--note-text) 60%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.ink-sheet[data-bg="black"] .ink-cursor.erase { stroke: rgba(255, 255, 255, 0.7); }
+/* 처음 안내 */
+.ink-empty {
+  position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px;
+  color: var(--note-muted); text-align: center; pointer-events: none; transition: opacity 0.25s, transform 0.25s;
 }
-.ink-toolbar::-webkit-scrollbar { display: none; }
-.ink-group { display: flex; align-items: center; gap: 2px; flex: none; padding: 0 4px; }
+.ink-empty svg { width: 46px; height: 46px; opacity: 0.45; animation: ink-wiggle 2.4s ease-in-out infinite; }
+.ink-empty b { display: block; font-size: 15px; color: var(--note-text); opacity: 0.7; }
+.ink-empty span { display: block; margin-top: 3px; font-size: 12.5px; }
+.ink-empty.gone { opacity: 0; transform: scale(0.96); }
+.ink-sheet[data-bg="black"] .ink-empty { color: rgba(255, 255, 255, 0.55); }
+.ink-sheet[data-bg="black"] .ink-empty b { color: #fff; }
+.ink-sheet[data-bg="white"] .ink-empty { color: #6b6b66; }
+.ink-sheet[data-bg="white"] .ink-empty b { color: #1f1f1c; }
+@keyframes ink-wiggle { 50% { transform: translateX(4px) rotate(-4deg); } }
+
+/* ---------- 떠 있는 도구 막대 (dock) ---------- */
+.ink-dock {
+  position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 3; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 2px; max-width: calc(100% - 16px); padding: 5px;
+  border-radius: 18px; background: var(--note-bg); color: var(--note-text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 11%, transparent);
+  -webkit-app-region: no-drag; user-select: none; -webkit-user-select: none;
+  animation: ink-dock-in 0.24s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+@keyframes ink-dock-in { from { opacity: 0; transform: translate(-50%, 16px) scale(0.96); } }
+.ink-group { display: flex; align-items: center; gap: 2px; flex: none; padding: 0 3px; }
 .ink-group + .ink-group { border-left: 1px solid color-mix(in srgb, var(--note-text) 12%, transparent); }
 .ink-group[hidden] { display: none; }
-.ink-btn { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--note-text); cursor: pointer; }
-.ink-btn svg { width: 19px; height: 19px; }
+.ink-btn {
+  position: relative; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 12px;
+  background: none; color: var(--note-text); cursor: pointer; transition: background 0.12s, transform 0.12s ease-out;
+}
+.ink-btn svg { width: 20px; height: 20px; }
 .ink-btn:hover { background: color-mix(in srgb, var(--note-text) 8%, transparent); }
-.ink-btn[aria-pressed="true"] { background: var(--brand-black, #111); color: var(--on-black, #fff); }
-.ink-btn:disabled { opacity: 0.35; cursor: default; background: none; }
-.ink-color { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.45); cursor: pointer; flex: none; margin: 0 1px; }
-.ink-color[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--note-bg), 0 0 0 4px var(--note-text); }
-.ink-size { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; }
+.ink-btn:active { transform: scale(0.9); }
+.ink-btn:disabled { opacity: 0.3; cursor: default; background: none; transform: none; }
+/* 고른 도구: 진하게 + 위로 살짝 (한 번 더 누르면 색·굵기) */
+.ink-tool[aria-pressed="true"] { background: var(--brand-black, #111); color: var(--on-black, #fff); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
+[data-color="charcoal"] .ink-tool[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand, #111); }
+.ink-tool-color { position: absolute; left: 9px; right: 9px; bottom: 4px; height: 3px; border-radius: 2px; background: var(--c); box-shadow: 0 0 0 1px rgba(128, 128, 128, 0.35); }
+.ink-tool[aria-pressed="true"] .ink-tool-color { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4); }
+.ink-style-dot { display: block; width: var(--d, 10px); height: var(--d, 10px); border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--note-bg), 0 0 0 3.5px color-mix(in srgb, var(--note-text) 30%, transparent); transition: width 0.15s, height 0.15s; }
+.ink-style[data-tool="eraser"] .ink-style-dot { background: none; box-shadow: none; border: 1.6px dashed color-mix(in srgb, var(--note-text) 70%, transparent); }
+.ink-style[aria-expanded="true"], .ink-bg-btn[aria-expanded="true"] { background: color-mix(in srgb, var(--note-text) 12%, transparent); }
+.ink-bg-swatch { display: block; width: 20px; height: 20px; border-radius: 6px; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--note-text) 45%, transparent); background-image: repeating-conic-gradient(color-mix(in srgb, var(--note-text) 14%, transparent) 0 25%, transparent 0 50%); background-size: 8px 8px; }
+.ink-bg-btn[data-bg="white"] .ink-bg-swatch { background: #fff; }
+.ink-bg-btn[data-bg="black"] .ink-bg-swatch { background: #111; }
+.ink-dock .ink-done { margin-left: 4px; height: 36px; }
+
+/* 위로 여는 작은 판 */
+.ink-pop {
+  position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%);
+  display: grid; gap: 10px; width: max-content; max-width: min(340px, calc(100vw - 24px)); padding: 12px;
+  border-radius: 16px; background: var(--note-bg); color: var(--note-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 11%, transparent);
+}
+.ink-pop[hidden] { display: none; }
+.ink-pop.in { animation: ink-pop-in 0.18s cubic-bezier(0.2, 1.3, 0.4, 1); }
+@keyframes ink-pop-in { from { opacity: 0; transform: translate(-50%, 8px) scale(0.94); } }
+.ink-pop-title { margin-bottom: 6px; font-size: 11.5px; font-weight: 700; color: var(--note-muted); }
+.ink-pop-items { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ink-pop-hint { font-size: 11.5px; color: var(--note-muted); max-width: 260px; }
+.ink-color { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.45); cursor: pointer; flex: none; transition: transform 0.12s ease-out; }
+.ink-color:hover { transform: scale(1.1); }
+.ink-color[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--note-bg), 0 0 0 4px var(--note-text); transform: scale(1.05); }
+.ink-size { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 5%, transparent); cursor: pointer; }
 .ink-size span { display: block; border-radius: 50%; background: var(--note-text); }
-.ink-size[aria-pressed="true"] { background: color-mix(in srgb, var(--note-text) 13%, transparent); }
-.ink-bg { height: 28px; padding: 0 9px; border: 0; border-radius: 8px; background: none; color: var(--note-text); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.ink-bg[aria-checked="true"] { background: var(--brand-black, #111); color: var(--on-black, #fff); }
+.ink-size[aria-pressed="true"] { background: color-mix(in srgb, var(--note-text) 15%, transparent); box-shadow: inset 0 0 0 2px var(--note-text); }
+.ink-bg { display: grid; justify-items: center; gap: 5px; width: 66px; padding: 7px 4px 6px; border: 0; border-radius: 12px; background: none; color: var(--note-text); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ink-bg:hover { background: color-mix(in srgb, var(--note-text) 7%, transparent); }
+.ink-bg[aria-checked="true"] { background: color-mix(in srgb, var(--note-text) 13%, transparent); box-shadow: inset 0 0 0 2px var(--note-text); }
+.ink-bg-preview { display: block; width: 40px; height: 30px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.5); background-image: repeating-conic-gradient(color-mix(in srgb, var(--note-text) 14%, transparent) 0 25%, transparent 0 50%); background-size: 10px 10px; }
+.ink-bg-white .ink-bg-preview { background: #fff; }
+.ink-bg-black .ink-bg-preview { background: #111; }
+.ink-clear { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: color-mix(in srgb, #e5484d 12%, transparent); color: #d63a3f; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ink-clear svg { width: 16px; height: 16px; }
+.ink-clear:disabled { opacity: 0.4; cursor: default; }
 @media (pointer: coarse) {
   .ink-btn { width: 42px; height: 42px; }
-  .ink-color { width: 30px; height: 30px; }
-  .ink-size { width: 36px; height: 36px; }
-  .ink-head-btn { height: 38px; }
+  .ink-done { height: 40px; }
+  .ink-dock .ink-done { height: 42px; }
+  .ink-color { width: 36px; height: 36px; }
+  .ink-size { width: 46px; height: 46px; }
 }
-@media (prefers-reduced-motion: reduce) { .ink-sheet, .ink-sheet.closing { animation: none; } }
+@media (max-width: 360px) {
+  .ink-btn { width: 36px; height: 38px; }
+  .ink-group { padding: 0 1px; }
+}
+@media (prefers-reduced-motion: reduce) { .ink-sheet, .ink-sheet.closing, .ink-dock, .ink-pop.in, .ink-empty svg, .mk-annot-caption { animation: none; } }
 
 /* 메모 안의 손 메모 한 칸: 그린 만큼의 크기 (넓으면 본문 폭에 맞춤), 누르면(PC 는 두 번) 이어 그리기 */
 .mk-doc .mk-ink { display: inline-block; position: relative; max-width: 100%; vertical-align: top; border-radius: 12px; line-height: 0; }
@@ -1588,17 +1667,23 @@ body.recording .format-bar button.add-btn::after {
 .mk-annot.drawing { pointer-events: auto; touch-action: none; cursor: crosshair; }
 body.annotating .mk-doc { user-select: none; -webkit-user-select: none; }
 body.annotating .format-bar, body.annotating .table-bar, body.annotating .tag-suggest-bar { display: none !important; }
-.mk-annot-bar {
-  position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 60;
-  display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px;
-  border-radius: 14px; background: var(--note-bg); color: var(--note-text);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
-  animation: ink-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+/* 주석 막대: 떠 있는 도구 막대 + 잠깐 보이는 안내 · 본문 둘레 점선 = 지금 주석 모드 */
+.mk-annot-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; height: 0; color: var(--note-text); -webkit-app-region: no-drag; }
+.mk-annot-bar .ink-dock { position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); }
+.mk-annot-caption {
+  position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  padding: 6px 12px; border-radius: 999px; background: var(--brand-black, #111); color: var(--on-black, #fff);
+  font-size: 12.5px; font-weight: 700; white-space: nowrap; pointer-events: none;
+  animation: mk-annot-caption 3.2s ease-in-out forwards;
 }
-.mk-annot-bar .ink-toolbar { flex: 1; min-width: 0; padding: 0; border: 0; background: none; }
-.mk-annot-label { flex: none; font-weight: 800; font-size: 13px; }
+.mk-annot-bar.quiet .mk-annot-caption { opacity: 0; transition: opacity 0.2s; animation: none; }
+@keyframes mk-annot-caption { 0% { opacity: 0; transform: translate(-50%, 8px); } 10%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+@media (pointer: coarse) { .mk-annot-caption { bottom: calc(84px + env(safe-area-inset-bottom)); } }
+.mk-annot-scroller { outline: 2px dashed color-mix(in srgb, var(--note-text) 28%, transparent); outline-offset: -5px; }
 @media print { .mk-annot-bar { display: none !important; } }
 /* 주석 층은 확대되는 본문과 따로 — 화면 좌표로 스스로 맞춘다 (두 번 확대되지 않게) */
 #editor > .mk-annot { zoom: 1; margin: 0; }
 /* 그리기 화면·주석 막대는 메모 색을 그대로 (data-color) — 글자 색도 그 색에서 */
 .ink-sheet[data-color], .mk-annot-bar[data-color] { --note-text: var(--note-fg); --note-muted: color-mix(in srgb, var(--note-fg) 64%, transparent); }
+/* 주석 모드에서는 글 되돌리기 단추를 숨긴다 (그림 되돌리기는 아래 도구 막대에 — 둘이 헷갈리지 않게) */
+body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }

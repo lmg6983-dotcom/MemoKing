@@ -1080,14 +1080,25 @@ try {
     await page.waitForTimeout(250);
     await page.tap('.add-sat[data-add="ink"]');
     await page.waitForSelector('.ink-sheet');
-    const sheet = await page.evaluate(() => ({ tools: document.querySelectorAll('.ink-sheet .ink-tools .ink-btn').length, bgs: document.querySelectorAll('.ink-sheet .ink-bg').length }));
+    const sheet = await page.evaluate(() => {
+      const dock = document.querySelector('.ink-sheet .ink-dock').getBoundingClientRect();
+      return { tools: document.querySelectorAll('.ink-sheet .ink-tools .ink-btn').length, bg: !!document.querySelector('.ink-sheet .ink-bg-btn'), head: [...document.querySelectorAll('.ink-head button')].map((b) => b.textContent.trim()).join(), fits: dock.left >= 0 && dock.right <= innerWidth, empty: !!document.querySelector('.ink-empty:not(.gone)') };
+    });
     await draw(wave(60, 260));
     await draw(wave(80, 340, 120));
     await page.waitForTimeout(150);
     await shot('20-ink-editor');
     const live = await page.locator('.ink-sheet .ink-strokes path').count();
-    check('손 메모: + › 손 메모 → 그리기 화면 (펜·형광펜·지우개 · 바탕 3가지) · 그린 획이 보임', sheet.tools === 3 && sheet.bgs === 3 && live === 2, JSON.stringify({ sheet, live }));
-    await page.tap('.ink-sheet .ink-head-btn.primary');
+    check('손 메모: + › 손 메모 → 그리기 화면 (취소 없이 완료 하나 · 떠 있는 도구 막대가 화면 안에 · 처음 안내) · 그린 획이 보임', sheet.tools === 3 && sheet.bg && sheet.head === '완료' && sheet.fits && sheet.empty && live === 2, JSON.stringify({ sheet, live }));
+    // 형광펜을 고르고 한 번 더 누르면 색·굵기 판 (형광 색 4가지)
+    await page.tap('.ink-sheet .ink-tool-highlighter');
+    await page.tap('.ink-sheet .ink-tool-highlighter');
+    const hlPop = await page.evaluate(() => !document.querySelector('.ink-sheet .ink-pop').hidden && document.querySelectorAll('.ink-sheet .ink-pop .ink-color').length);
+    await shot('20b-ink-pop');
+    await page.tap('.ink-sheet .ink-tool-pen');
+    const penBack = await page.evaluate(() => document.querySelectorAll('.ink-sheet .ink-pop .ink-color').length);
+    check('고른 도구를 한 번 더 누르면 색·굵기 판 · 판이 열린 채 도구를 바꾸면 그 도구의 색으로', hlPop === 4 && penBack === 7, JSON.stringify({ hlPop, penBack }));
+    await page.tap('.ink-sheet .ink-done');
     await page.waitForSelector('.mk-doc .mk-ink img');
     const body1 = await waitFile((b) => /!\[손 메모\]/.test(b));
     const svgRel = body1.match(/!\[손 메모\]\((attachments\/[^)]+\.svg)\)/)?.[1];
@@ -1104,13 +1115,15 @@ try {
     await page.waitForSelector('.ink-sheet');
     await page.waitForTimeout(200);
     const again = await page.locator('.ink-sheet .ink-strokes path').count();
-    await page.tap('.ink-sheet .ink-bg[data-bg="white"]');
+    await page.tap('.ink-sheet .ink-bg-btn');
+    await page.tap('.ink-sheet .ink-pop .ink-bg[data-bg="white"]');
     await draw(wave(70, 300, 100));
-    await page.tap('.ink-sheet .ink-head-btn.primary');
+    const popGone = await page.evaluate(() => document.querySelector('.ink-sheet .ink-pop').hidden);
+    await page.keyboard.press('Escape'); // 취소가 없다: Esc(뒤로 가기)도 저장하고 닫기
     const body2 = await waitFile((b) => /!\[손 메모 · 흰 바탕\]/.test(b));
     const svgRel2 = body2.match(/!\[손 메모 · 흰 바탕\]\((attachments\/[^)]+\.svg)\)/)?.[1];
     const svg2 = svgRel2 ? read(svgRel2) : '';
-    check('이어 그리기: 그린 획을 그대로 열고, 더 그리고 흰 바탕으로 저장', again === 2 && svgRel2 && svgRel2 !== svgRel && (svg2.match(/<path /g) ?? []).length === 3 && /<rect [^>]*#ffffff/.test(svg2), JSON.stringify({ again, svgRel2, body2 }));
+    check('이어 그리기: 그린 획을 그대로 열고, 바탕 판에서 흰 바탕 · 그리기 시작하면 판이 닫힘 · Esc 도 저장', popGone && again === 2 && svgRel2 && svgRel2 !== svgRel && (svg2.match(/<path /g) ?? []).length === 3 && /<rect [^>]*#ffffff/.test(svg2), JSON.stringify({ again, svgRel2, body2 }));
     // 주석: 글 위에 그리기 (칸을 차지하지 않음)
     const docH = await page.evaluate(() => document.querySelector('.ProseMirror').getBoundingClientRect().height);
     await page.tap('#add-btn');
@@ -1122,7 +1135,9 @@ try {
     await draw([[p.x, p.y], [p.x + 60, p.y + 4], [p.x + 120, p.y - 2], [p.x + 180, p.y + 3]]);
     await page.waitForTimeout(150);
     await shot('22-annotate');
-    await page.tap('.mk-annot-bar .ink-head-btn.primary');
+    const annBar = await page.evaluate(() => { const r = document.querySelector('.mk-annot-bar .ink-dock').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && !!document.querySelector('.mk-annot-scroller'); });
+    check('주석 모드: 도구 막대(완료 포함)가 화면 안에 · 본문 둘레 점선', annBar);
+    await page.tap('.mk-annot-bar .ink-done');
     const body3 = await waitFile((b) => /^ink: /m.test(b));
     const inkRel = body3.match(/^ink: (attachments\/\S+\.json)$/m)?.[1];
     const ann = inkRel ? JSON.parse(read(inkRel)) : null;

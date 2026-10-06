@@ -708,7 +708,7 @@ function openAddMenu() {
   addBtn.setAttribute('aria-expanded', 'true');
   navigator.vibrate?.(8);
 }
-/** 뒤로 가기: 손 메모 그리기 화면(한 번 더 누르면 버림) → 주석 모드 순으로 닫는다 */
+/** 뒤로 가기: 손 메모 그리기 화면 → 주석 모드 순으로 저장하고 닫는다 (취소는 없다) */
 export function closeInk() {
   if (document.querySelector('.ink-sheet:not(.closing)')) {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

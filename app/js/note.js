@@ -1433,6 +1433,10 @@ api.on('stack:state', renderStack);
 api.on('stack:hover', (on) => {
   $('stack-drop').hidden = !on;
 });
+// 손 메모·주석을 그리는 동안: 창을 끌어도 다른 메모와 합치지 않게 (ink-editor.js inkMode)
+window.addEventListener('memoking:inking', (e) => {
+  api.win.inking?.(e.detail)?.catch?.(() => {});
+});
 // 다른 탭으로 바뀌어 숨겨질 때 바로 저장
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && editor) flush();

@@ -23,7 +23,7 @@ export function prepareSmoke(userData) {
   fs.writeFileSync(path.join(userData, 'settings.json'), JSON.stringify({ vaultPath: VAULT, tutorialDone: true }));
 }
 
-export async function runSmoke({ noteWins, getVault, createListWindow, getList }) {
+export async function runSmoke({ noteWins, getVault, createListWindow, getList, getStacks, isInking, trackWindowDrag, endWindowDrag }) {
   const checks = [];
   const errors = [];
   const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
@@ -224,7 +224,44 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList }
       const drawn = await ij(`document.querySelectorAll('.ink-sheet .ink-strokes path').length`);
       await capture(ink.win, 'smoke-new-ink-editor.png');
       check('목록 + › 손 메모 → 넓은 메모 창에 그리기 화면 · 마우스로 그린 획', sheetOpen && size[0] >= 540 && drawn === 2, JSON.stringify({ sheetOpen, size, drawn }));
-      await ij(`document.querySelector('.ink-sheet .ink-head-btn.primary').click()`);
+      // v0.22.0: 취소 없음 · 완료 하나 · 떠 있는 도구 막대 · 그리는 칸은 창을 끌지 않음 (머리 줄만 끌기)
+      const ui = await ij(`(() => {
+        const q = (s) => document.querySelector(s);
+        const region = (s) => getComputedStyle(q(s)).webkitAppRegion ?? getComputedStyle(q(s)).getPropertyValue('-webkit-app-region');
+        return { buttons: [...document.querySelectorAll('.ink-head button')].map((b) => b.textContent.trim()).join(), sheet: region('.ink-sheet'), head: region('.ink-head'), done: region('.ink-head .ink-done'), dock: !!q('.ink-sheet .ink-dock'), empty: q('.ink-empty').classList.contains('gone') };
+      })()`);
+      check('그리기 화면: 취소 없이 완료 하나 · 그리는 칸 no-drag · 머리 줄로 창 옮기기 · 떠 있는 도구 막대 · 그리면 안내 사라짐', ui.buttons === '완료' && ui.sheet === 'no-drag' && ui.head === 'drag' && ui.done === 'no-drag' && ui.dock && ui.empty, JSON.stringify(ui));
+      // 그리는 동안 창을 끌어 다른 메모 위에 머물러도 합치지 않고, 다른 메모도 이 창으로 합쳐 들어오지 않는다
+      const center = (w) => {
+        const b = w.getBounds();
+        return { x: b.x + Math.round(b.width / 2), y: b.y + Math.round(b.height / 2) };
+      };
+      const otherId = vault.create();
+      vault.save(otherId, '# 옆 메모');
+      await lj(`window.memoking.memo.open(${JSON.stringify(otherId)})`);
+      const other = await until(() => noteWins.get(otherId), '옆 메모 창');
+      await ready(other);
+      const inkingNow = await until(() => isInking(ink.id), '그리기 표시', 3000).catch(() => false);
+      trackWindowDrag(ink.id, center(other));
+      await wait(400);
+      const hoverOnOther = await js(other, `!document.getElementById('stack-drop').hidden`);
+      endWindowDrag(ink.id);
+      trackWindowDrag(otherId, center(ink.win));
+      await wait(400);
+      endWindowDrag(otherId);
+      await wait(300);
+      check('그리는 중에는 창을 끌어 머물러도 탭으로 합쳐지지 않음 (양쪽 모두)', inkingNow && !hoverOnOther && !getStacks().stackOf(ink.id) && !getStacks().stackOf(otherId), JSON.stringify({ inkingNow, hoverOnOther }));
+      other.close();
+      ink.win.focus();
+      // 색·굵기 작은 판: 고른 도구를 한 번 더 누르면 열리고, Esc 는 판부터 닫는다 (그리기 화면은 그대로)
+      await ij(`document.querySelector('.ink-sheet .ink-tool-pen').click()`);
+      const popOpen = await ij(`!document.querySelector('.ink-sheet .ink-pop').hidden && document.querySelectorAll('.ink-sheet .ink-pop .ink-color').length`);
+      await capture(ink.win, 'smoke-new-ink-pop.png');
+      ink.win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+      await wait(100);
+      const popClosed = await ij(`document.querySelector('.ink-sheet .ink-pop').hidden && !!document.querySelector('.ink-sheet:not(.closing)')`);
+      check('펜을 한 번 더 누르면 색·굵기 판 · Esc 는 판만 닫음', popOpen === 7 && popClosed, JSON.stringify({ popOpen, popClosed }));
+      await ij(`document.querySelector('.ink-sheet .ink-done').click()`);
       const inkBody = await until(() => {
         const m = vault.get(ink.id);
         return m && /!\[손 메모\]\(attachments\/[^)]+\.svg\)/.test(m.body) && m.body;
@@ -237,16 +274,17 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList }
       // 두 번 누르면 이어 그리기 → 검은 바탕으로 한 획 더
       await ij(`document.querySelector('.mk-ink img').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
       const reopened = await until(() => ij(`document.querySelectorAll('.ink-sheet .ink-strokes path').length`), '이어 그리기', 6000).catch(() => 0);
-      await ij(`document.querySelector('.ink-sheet .ink-bg[data-bg="black"]').click()`);
-      await ij(`document.querySelector('.ink-sheet .ink-color[style*="#ffffff"]')?.click()`);
+      await ij(`document.querySelector('.ink-sheet .ink-bg-btn').click()`);
+      await ij(`document.querySelector('.ink-sheet .ink-pop .ink-bg[data-bg="black"]').click()`);
+      await capture(ink.win, 'smoke-new-ink-bg.png');
       await stroke(wave(60, 300, 120));
-      await ij(`document.querySelector('.ink-sheet .ink-head-btn.primary').click()`);
+      await ij(`document.querySelector('.ink-sheet .ink-done').click()`);
       const inkBody2 = await until(() => {
         const m = vault.get(ink.id);
         return m && /!\[손 메모 · 검은 바탕\]/.test(m.body) && m.body;
       }, '이어 그린 손 메모', 8000).catch(() => null);
       const svg2 = inkBody2 ? fs.readFileSync(path.join(VAULT, inkBody2.match(/\((attachments\/[^)]+\.svg)\)/)[1]), 'utf8') : '';
-      check('두 번 누르면 이어 그리기 (그린 획 그대로) → 검은 바탕·흰 펜으로 저장', reopened === 2 && (svg2.match(/<path /g) ?? []).length === 3 && /#111111/.test(svg2) && /fill="#ffffff"/.test(svg2), JSON.stringify({ reopened, inkBody2 }));
+      check('두 번 누르면 이어 그리기 (그린 획 그대로) → 검은 바탕: 이미 그린 검은 획도 흰색으로 · 흰 펜으로 저장', reopened === 2 && (svg2.match(/<path /g) ?? []).length === 3 && /#111111/.test(svg2) && (svg2.match(/fill="#ffffff"/g) ?? []).length === 3, JSON.stringify({ reopened, inkBody2 }));
       // 주석: Ctrl+Shift+E → 글 위에 그리기 → Esc 로 끝내면 머리말 ink:
       await ij(`(() => { const v = document.querySelector('.ProseMirror'); v.focus(); })()`);
       ink.win.webContents.insertText('');
@@ -264,6 +302,7 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList }
       const ann = annBody ? JSON.parse(fs.readFileSync(path.join(VAULT, annBody.ink), 'utf8')) : null;
       const raw = annBody ? fs.readFileSync(path.join(VAULT, annBody.file), 'utf8') : '';
       check('주석: Ctrl+Shift+E → 글 위에 그리고 Esc → 머리말 ink: 파일 (제목 문단에 붙음) · 보이는 층에 남음', annotOn && ann?.strokes?.length === 1 && ann.strokes[0].anchor?.b === 0 && /^ink: attachments\//m.test(raw) && (await ij(`document.querySelectorAll('.mk-annot path').length`)) === 1, JSON.stringify({ annotOn, ann: ann?.strokes?.[0]?.anchor, raw: raw.slice(0, 200) }));
+      check('주석을 끝내면 합치기 다시 됨', !isInking(ink.id));
       ink.win.close();
       await until(() => !noteWins.get(ink.id), '손 메모 창 닫힘').catch(() => {});
       // 다시 열면 주석이 그대로 보인다

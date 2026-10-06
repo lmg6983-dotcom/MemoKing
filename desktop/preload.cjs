@@ -160,6 +160,7 @@ contextBridge.exposeInMainWorld('memoking', {
     toggleListTop: invoke('list:toggle-top'),
     listOnTop: invoke('list:on-top'),
     toggleTop: invoke('win:toggle-top'),
+    inking: invoke('win:inking'),
     showList: invoke('list:show'),
     growWidth: invoke('win:grow-width'),
   },

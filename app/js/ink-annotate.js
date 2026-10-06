@@ -1,11 +1,12 @@
 // 주석으로서 손 메모 (PC·휴대폰 함께) — 메모 글 위에 겹쳐 그린다. 칸을 차지하지 않는다
 //   - 평소: 글 위에 그린 획이 보이기만 (누르면 글을 고친다)
-//   - 주석 모드(+ › 주석, PC 는 Ctrl+Shift+E): 위에 그리기 · 아래 도구 막대(펜·형광펜·지우개·색·굵기·되돌리기) · 완료
+//   - 주석 모드(+ › 주석, PC 는 Ctrl+Shift+E): 위에 그리기 · 아래에 떠 있는 도구 막대(펜·형광펜·지우개·색·굵기·되돌리기 · 완료)
+//     완료 · Esc · 뒤로 가기 = 저장하고 끝내기 (취소는 없다 — 되돌리기·모두 지우기로)
 //   - 획은 그 아래 문단을 따라간다 (core/ink.js anchorStroke·placeStroke): 글이 늘어 문단이 밀려도, 창 폭이 바뀌어도 같은 자리
 //   - 저장: 완료할 때 JSON 파일 하나 → 메모 머리말 ink: (자료가 없으면 머리말에서 뺀다)
 import { getStroke } from '../vendor/perfect-freehand.js';
 import { anchorStroke, placeStroke, normalizeInk, strokePath } from './core/ink.js';
-import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys } from './ink-editor.js';
+import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys, inkMode } from './ink-editor.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 
@@ -114,7 +115,7 @@ export function setupAnnotation(o) {
     if (e.key === 'Escape' || ((e.ctrlKey || e.metaKey) && e.key === 'Enter')) {
       e.preventDefault();
       e.stopPropagation();
-      exit();
+      if (e.key !== 'Escape' || !toolbar?.closePopover()) exit(); // Esc 는 먼저 열린 작은 판부터
       return;
     }
     if (inkKeys(e, {
@@ -154,6 +155,10 @@ export function setupAnnotation(o) {
         if (opts.undoable) afterChange();
       },
       scroller: o.scroller,
+      onDrawStart: () => {
+        toolbar?.closePopover();
+        bar?.classList.add('quiet');
+      },
     });
     bar = document.createElement('div');
     bar.className = 'mk-annot-bar';
@@ -164,19 +169,23 @@ export function setupAnnotation(o) {
       onRedo: () => hist.redo() && afterChange(),
       canUndo: hist.canUndo,
       canRedo: hist.canRedo,
+      onClear: () => {
+        hist.set([], { undoable: true });
+        afterChange();
+      },
+      canClear: () => hist.get().length > 0,
+      done: { label: '완료', run: () => exit() },
     });
-    const label = document.createElement('span');
-    label.className = 'mk-annot-label';
-    label.textContent = '주석';
-    const done = document.createElement('button');
-    done.type = 'button';
-    done.className = 'ink-head-btn primary';
-    done.textContent = '완료';
-    done.addEventListener('click', () => exit());
-    bar.append(label, toolbar.el, done);
+    // 잠깐 보이는 안내: 무엇을 하는 중인지 (그리기 시작하면 사라짐)
+    const caption = document.createElement('div');
+    caption.className = 'mk-annot-caption';
+    caption.textContent = '글 위에 주석을 그려요 · 글은 그대로예요';
+    bar.append(caption, toolbar.el);
     document.body.append(bar);
     document.body.classList.add('annotating');
+    o.scroller.classList.add('mk-annot-scroller');
     document.addEventListener('keydown', onKey, true);
+    inkMode(true);
     o.onMode?.(true);
     layout();
   }
@@ -185,6 +194,7 @@ export function setupAnnotation(o) {
     if (!on) return;
     on = false;
     document.removeEventListener('keydown', onKey, true);
+    toolbar?.closePopover();
     const changed = hist.changed();
     anchored = hist.get();
     hist = null;
@@ -196,6 +206,8 @@ export function setupAnnotation(o) {
     bar = null;
     toolbar = null;
     document.body.classList.remove('annotating');
+    o.scroller.classList.remove('mk-annot-scroller');
+    inkMode(false);
     o.onMode?.(false);
     layout();
     if (!changed) return;
