@@ -89,6 +89,9 @@ function event(name) {
   send();
 }
 
+/** 지금 단계가 이 일을 직접 해 보기로 기다리는지 (태블릿의 목록 단추가 튜토리얼 동안 메모를 닫게) */
+export const tutorialWaitsFor = (name) => state.active && STEPS[state.index]?.advance === name;
+
 /** 직접 해 보기: 지금 단계가 이 일을 기다리면 다음으로 */
 export function tutEvent(name) {
   if (state.active && STEPS[state.index]?.advance === name) event(name);

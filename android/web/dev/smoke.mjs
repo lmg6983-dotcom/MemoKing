@@ -1273,7 +1273,7 @@ try {
     await page.tap('.coach-bubble .coach-next');
     const newMemo = await stepIs('new-memo');
     const trying = await page.evaluate(() => !!document.querySelector('.coach-try') && document.querySelector('.coach-spot').classList.contains('pulse'));
-    check('튜토리얼: 설정 › 사용법 둘러보기 → 이모지·진행 막대 · 직접 해 보기 단계는 두근두근 + 👉 안내', welcome && head.emoji === '👋' && head.bar && newMemo && trying, JSON.stringify({ welcome, head, newMemo, trying }));
+    check('튜토리얼: 설정 › 사용법 둘러보기 → 이모지·진행 막대 · 직접 해 보기 단계는 누를 곳만 노란 테두리 + 해 보기 안내 (손가락 이모지 없음)', welcome && head.emoji === '👑' && head.bar && newMemo && trying, JSON.stringify({ welcome, head, newMemo, trying }));
     await page.tap('#fab');
     await page.waitForTimeout(300);
     await page.tap('#fab-menu [data-new="text"]');

@@ -2,12 +2,13 @@ import { flipFrom, haptic, reduceMotion, replayClass } from './dom.js';
 // 튜토리얼 말풍선 — 비출 요소 둘레만 밝게 두고 나머지를 어둡게, 옆에 안내 말풍선. (PC·휴대폰 함께)
 // 화면은 그대로 눌러지므로(따라 하기) 비춘 버튼을 실제로 눌러 볼 수 있다.
 //   - 머리: 단계 이모지 · 진행 막대 · 몇 번째인지
-//   - 직접 해 보기 단계: 비춘 곳이 두근두근 + "👉 이렇게 해 보세요" — 해 내면 다음 말풍선에 "🎉 잘했어요!" 와 꽃가루
+//   - 직접 해 보기 단계: 눌러야 할 곳 하나만 노란 테두리로 비춘다 + "이렇게 해 보세요" — 해 내면 다음 말풍선에 "🎉 잘했어요!" 와 꽃가루
+//   - 안내만 하는 단계는 아무것도 비추지 않는다 (눌러야 할 곳으로 헷갈리지 않게) — 말풍선만 그 근처에
 //   - 실제 화면 사진(app/assets/tutorial/): 누르면 크게
 //   - 말풍선은 비춘 곳 · 직접 해 볼 곳(step.keep)을 가장 덜 가리는 자리에, 해 보기 시작하면 작은 알약으로 접힘
 // 단계 진행은 PC 는 메인 프로세스, 휴대폰은 tutorial.js 가 맡고(core/tutorial.js), 여기서는 보여 주고 버튼만 전한다.
 
-const PRAISE = ['🎉 잘했어요!', '👏 완벽해요!', '✨ 멋져요!', '🙌 좋아요!', '💯 바로 그거예요!'];
+const PRAISE = ['🎉 잘했어요!', '🌟 완벽해요!', '✨ 멋져요!', '🥳 좋아요!', '💯 바로 그거예요!'];
 const shotUrl = (name) => new URL(`../assets/tutorial/${name}`, import.meta.url).href;
 
 /** @param {{ onStep?: (step: object|null) => void }} [o] onStep: 단계가 바뀔 때 (직접 해 보기 판정의 시작점) */
@@ -59,15 +60,19 @@ export function setupCoach(api, o = {}) {
     const pad = 6;
     let r = null;
     const prevSpot = spot.hidden ? null : spot.getBoundingClientRect();
+    // 노란 테두리는 직접 눌러 볼 곳에만 — 안내만 하는 단계는 비추지 않고 말풍선만 그 곁에 둔다 (강조가 여럿이면 헷갈림)
+    spot.hidden = Boolean(target) && !step.advance;
     if (target) {
       const t = target.getBoundingClientRect();
       r = {
         left: Math.max(2, t.left - pad), top: Math.max(2, t.top - pad),
         right: Math.min(vw - 2, t.right + pad), bottom: Math.min(vh - 2, t.bottom + pad),
       };
-      Object.assign(spot.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.right - r.left}px`, height: `${r.bottom - r.top}px` });
-      spot.classList.remove('center');
-      flipFrom(spot, prevSpot);
+      if (!spot.hidden) {
+        Object.assign(spot.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.right - r.left}px`, height: `${r.bottom - r.top}px` });
+        spot.classList.remove('center');
+        flipFrom(spot, prevSpot);
+      }
     } else {
       // 비출 곳이 없으면 화면 전체를 어둡게 하고 가운데에 말풍선
       Object.assign(spot.style, { left: `${vw / 2}px`, top: `${vh / 2}px`, width: '0px', height: '0px' });
@@ -231,7 +236,7 @@ export function setupCoach(api, o = {}) {
       img.addEventListener('load', place);
       parts.push(img);
     }
-    if (step.advance) parts.push(el('div', 'coach-try', `👉 ${step.try ?? '직접 해 보세요'}`));
+    if (step.advance) parts.push(el('div', 'coach-try', step.try ?? '직접 해 보세요'));
     // 접힌 알약에서도 이 단계만 건너뛸 수 있게 (펼치지 않아도)
     if (step.advance && step.next) parts.push(button('건너뛰기', 'coach-mini-skip', 'next'));
     const actions = el('div', 'coach-actions');
@@ -248,7 +253,6 @@ export function setupCoach(api, o = {}) {
     }
     bubble.classList.toggle('trying', Boolean(step.advance));
     spot.classList.toggle('pulse', Boolean(step.advance));
-    spot.hidden = false;
     bubble.hidden = false;
     document.body.classList.add('coaching');
     if (step.praise) confetti();

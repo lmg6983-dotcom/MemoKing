@@ -5,7 +5,7 @@
 //   keep: 말풍선이 가리면 안 되는 곳 (직접 해 볼 본문 글 · 열리는 메뉴) — 말풍선은 이것들을 가장 덜 가리는 자리로
 //   emoji: 말풍선 머리의 그림 글자 · image: 실제 화면 사진 (app/assets/tutorial/)
 //   advance: 사용자가 이걸 하면 다음 단계로 (직접 해 보기) — 해 내면 "잘했어요" 칭찬과 함께 넘어간다
-//   try: 직접 해 보기 안내 (👉 로 보인다)
+//   try: 직접 해 보기 안내 (말풍선 안의 '직접 해 보기' 칸)
 //   sample: 이 단계가 뜨면 메모 끝에 예시 목록(TUTORIAL_SAMPLE)을 저절로 넣는다 (옮겨 볼 줄이 있게)
 //   next: "다음" 버튼 글자. advance 와 함께 있으면 "다음에 해 볼게요" 처럼 이 단계만 건너뛰기
 //         (없으면 직접 해 봐야 넘어감 — 튜토리얼 끝내기는 언제나 있음)
@@ -24,20 +24,20 @@ export function hasTutorialSample(md) {
 export const TUTORIAL_STEPS = [
   // ---------- 시작 (목록 창) ----------
   {
-    id: 'welcome', win: 'list', target: [], emoji: '👋',
+    id: 'welcome', win: 'list', target: [], emoji: '👑',
     title: '반가워요! 메모킹이에요',
     text: '하나씩 직접 눌러 보면서 배워 볼게요. 3분이면 끝나요. 언제든 그만둘 수 있어요.',
     next: '시작할게요 🚀', skip: '나중에 볼게요',
   },
   {
-    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden])', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]'], advance: 'memo-created', emoji: '✨',
+    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]'], advance: 'memo-created', emoji: '✨',
     title: '첫 메모를 만들어 볼까요?',
-    text: '오른쪽 아래 노란 + 를 누르면 🎙️ 음성 · ✍️ 손 · ✏️ 글 메모가 펼쳐져요.',
+    text: '오른쪽 아래 노란 + 를 누르면 🎙️ 음성 · 🎨 손 · ✏️ 글 메모가 펼쳐져요.',
     try: '+ 를 누르고 "글 메모"를 골라 보세요',
   },
   // ---------- 쓰기 (메모 창) ----------
   {
-    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], advance: 'typed', emoji: '✍️',
+    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], advance: 'typed', emoji: '📝',
     title: '떠오르는 생각을 적어 보세요',
     text: '첫 줄은 메모 제목이 되고, 적는 대로 저절로 저장돼요. 💾 저장 단추는 없어요!',
     try: '아무 말이나 한 줄 적어 보세요',
@@ -59,7 +59,7 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['.ProseMirror > ul:last-of-type', '.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], sample: true, emoji: '🖐️', image: 'move.jpg',
+    id: 'move', win: 'note', target: ['.ProseMirror > ul:last-of-type', '.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], sample: true, emoji: '↕️', image: 'move.jpg',
     title: '줄을 옮기고 싶을 때',
     text: '연습하라고 장보기 목록을 넣어 뒀어요. 줄을 꾹 누르면 살짝 들려요. 끌어서 원하는 자리에 놓으면 끝! 키보드로는 Alt+↑↓ 예요.',
     next: '다음',
@@ -74,7 +74,7 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'ink-done', emoji: '✍️',
+    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'ink-done', emoji: '🎨',
     image: 'ink.jpg',
     title: '손으로 그리기',
     text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기, 잘못 그리면 ↩️ 되돌리기.',
@@ -129,7 +129,7 @@ export const TUTORIAL_STEPS = [
     next: '다음',
   },
   {
-    id: 'close', win: 'note', target: ['#close-btn'], advance: 'note-closed', emoji: '👋',
+    id: 'close', win: 'note', target: ['#close-btn'], advance: 'note-closed', emoji: '↩️',
     title: '다 적었으면 닫아 볼까요',
     text: '적은 내용은 이미 저장되어 있으니 걱정하지 않아도 돼요.',
     try: '오른쪽 위 × 를 눌러 닫아 보세요',
@@ -197,7 +197,7 @@ export const TUTORIAL_STEPS = [
 // 휴대폰: 같은 말풍선, 휴대폰 화면에 맞춘 단계 (목록 화면 ↔ 메모 화면)
 export const MOBILE_TUTORIAL_STEPS = [
   {
-    id: 'welcome', win: 'list', target: [], emoji: '👋',
+    id: 'welcome', win: 'list', target: [], emoji: '👑',
     title: '반가워요! 메모킹이에요',
     text: '직접 눌러 보며 2분이면 배워요. 언제든 그만둘 수 있어요.',
     next: '시작할게요 🚀', skip: '나중에 볼게요',
@@ -205,12 +205,12 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]', '#fab'], advance: 'memo-created', emoji: '✨',
     title: '첫 메모를 만들어 볼까요?',
-    text: '노란 + 를 누르면 🎙️ 음성 · ✍️ 손 · ✏️ 글 메모가 펼쳐져요.',
+    text: '노란 + 를 누르면 🎙️ 음성 · 🎨 손 · ✏️ 글 메모가 펼쳐져요.',
     try: '+ 를 누르고 "글 메모"를 골라 보세요',
   },
   // 글 쓰는 단계: 쓰는 줄과 그 아래(write) · 도구막대는 비워 두고, 다 쓰고 손을 멈추면 넘어간다 (치는 도중엔 그대로)
   {
-    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], write: true, advance: 'typed', emoji: '✍️',
+    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], write: true, advance: 'typed', emoji: '📝',
     title: '떠오르는 생각을 적어 보세요',
     text: '첫 줄은 제목이 되고, 적는 대로 저절로 저장돼요.',
     try: '한 줄 적어 보세요 — 다 쓰고 손을 떼면 다음으로',
@@ -225,7 +225,7 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['.ProseMirror > ul:last-of-type', '.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], sample: true, emoji: '🖐️', image: 'm-move.jpg',
+    id: 'move', win: 'note', target: ['.ProseMirror > ul:last-of-type', '.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], sample: true, emoji: '↕️', image: 'm-move.jpg',
     title: '꾹 눌러 옮기기',
     text: '연습하라고 장보기 목록을 넣어 뒀어요. 줄이나 사진·표를 꾹 누르면 살짝 들려요. 그대로 끌어서 원하는 자리에 놓으면 끝!',
     next: '다음',
@@ -238,7 +238,7 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'ink-done', emoji: '✍️',
+    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'ink-done', emoji: '🎨',
     title: '손으로 그리기',
     text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기를 골라요.',
     try: '"손 메모"를 눌러 쓱 그리고 ✓ 완료',
@@ -271,10 +271,10 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: '다음',
   },
   {
-    id: 'back', win: 'note', target: ['#back-btn'], advance: 'note-closed', emoji: '👈',
+    id: 'back', win: 'note', target: ['#back-btn'], advance: 'note-closed', emoji: '↩️',
     title: '목록으로 돌아가요',
     text: '적은 내용은 이미 저장되어 있어요. 휴대폰의 뒤로 가기를 눌러도 돼요.',
-    try: '왼쪽 위 ← 를 눌러 보세요',
+    try: '왼쪽 위 단추를 눌러 보세요',
   },
   {
     id: 'cards', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
