@@ -832,7 +832,7 @@ export function setKeyboard(open) {
 
 // ---------- 위쪽 버튼 ----------
 
-$('back-btn').addEventListener('click', () => app.showList());
+$('back-btn').addEventListener('click', () => app.noteBack());
 $('menu-btn').addEventListener('click', () => {
   flush();
   app.memoMenu(id);

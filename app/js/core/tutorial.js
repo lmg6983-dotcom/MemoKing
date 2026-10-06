@@ -291,7 +291,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'cards', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
     title: '메모는 모두 여기에',
-    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유·색·지우기)가 떠요. 길게 누른 채 끌면 순서를 바꿔요.',
+    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유·색·지우기)가 떠요. 왼쪽으로 밀면 지우기 — 태블릿에서는 오른쪽으로 밀면 지금 메모 옆에 나란히 열려요.',
     next: '다음',
   },
   {

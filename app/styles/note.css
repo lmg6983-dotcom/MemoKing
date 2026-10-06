@@ -1729,3 +1729,5 @@ body.annotating .format-bar, body.annotating .table-bar, body.annotating .tag-su
 .ink-sheet[data-color], .mk-annot-bar[data-color] { --note-text: var(--note-fg); --note-muted: color-mix(in srgb, var(--note-fg) 64%, transparent); }
 /* 주석 모드에서는 글 되돌리기 단추를 숨긴다 (그림 되돌리기는 아래 도구 막대에 — 둘이 헷갈리지 않게) */
 body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
+/* 보기만 하는 편집기(옆 메모·PDF)에는 이어 그리기 단추 없음 */
+.mk-doc[contenteditable="false"] .mk-ink-edit { display: none; }

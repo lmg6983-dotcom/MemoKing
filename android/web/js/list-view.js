@@ -8,7 +8,7 @@ import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../
 import { COLORS } from '../../app/js/core/memo-file.js';
 import { app, COLOR_NAMES } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
-import { matchChrome, confirmDialog } from './ui.js';
+import { matchChrome, confirmDialog, isTwoPane } from './ui.js';
 import { tutEvent } from './tutorial.js';
 
 const $ = (x) => document.getElementById(x);
@@ -348,6 +348,17 @@ el.cards.addEventListener('touchmove', (e) => {
   e.preventDefault();
   swipe.dx = dx;
   const w = swipe.card.offsetWidth || 1;
+  // 태블릿: 오른쪽으로 밀면 열기(지금 메모가 있으면 옆에) — 카드는 목록 안에서만 살짝 따라온다 · 지우기는 왼쪽으로만
+  const open = isTwoPane() && dx > 0;
+  swipe.card.classList.toggle('swipe-open', open);
+  if (open) {
+    const pull = Math.min(dx, w * 0.32) + Math.max(0, dx - w * 0.32) * 0.15;
+    swipe.card.dataset.openLabel = app.isNoteOpen?.() ? '옆에 열기 ▸' : '열기 ▸';
+    swipe.card.style.transform = `translateX(${pull}px)`;
+    swipe.card.style.opacity = '';
+    swipe.card.classList.toggle('swipe-ready', dx > w * 0.28);
+    return;
+  }
   const ready = Math.abs(dx) > w * 0.38;
   swipe.card.style.transform = `translateX(${dx}px) rotate(${dx / w * 4}deg)`;
   swipe.card.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / w * 0.7));
@@ -358,8 +369,21 @@ function endSwipe() {
   const { card, dx, active } = swipe;
   swipe = null;
   if (!active) return;
-  card.classList.remove('swiping', 'swipe-ready');
+  const opening = card.classList.contains('swipe-open');
+  card.classList.remove('swiping', 'swipe-ready', 'swipe-open');
   const w = card.offsetWidth || 1;
+  if (opening) {
+    card.style.transition = 'transform 0.22s cubic-bezier(0.2, 1.3, 0.4, 1)';
+    card.style.transform = '';
+    setTimeout(() => (card.style.transition = ''), 240);
+    if (dx > w * 0.28) {
+      card.dataset.swiped = '1';
+      setTimeout(() => delete card.dataset.swiped, 400);
+      navigator.vibrate?.(8);
+      app.openBeside(card.dataset.id);
+    }
+    return;
+  }
   if (Math.abs(dx) > w * 0.38) {
     card.style.transition = 'transform 0.18s ease-in, opacity 0.18s ease-in';
     card.style.transform = `translateX(${Math.sign(dx) * w * 1.3}px) rotate(${Math.sign(dx) * 8}deg)`;

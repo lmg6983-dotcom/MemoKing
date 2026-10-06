@@ -115,7 +115,7 @@ function inkView(node, view, getPos) {
   const open = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (typeof getPos === 'function') inkEditHandler?.(view, getPos());
+    if (typeof getPos === 'function' && view.editable) inkEditHandler?.(view, getPos());
   };
   edit.addEventListener('mousedown', (e) => e.preventDefault());
   edit.addEventListener('click', open);
@@ -834,7 +834,7 @@ function normalizePastedTables(html) {
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
 export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment }) {
-  inkReader = readAttachment ?? null; // 그림 칸(inkView)이 만들어지기 전에
+  if (readAttachment) inkReader = readAttachment; // 그림 칸(inkView)이 만들어지기 전에
   let ready = false;
   let editor = null;
   const view = () => editor.ctx.get(editorViewCtx);
@@ -842,9 +842,33 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   // 넣은 파일은 각자 한 줄(문단)을 차지한다.
   // 빈 줄이면 그 줄을 바꾸고, 글이 있는 줄이면 그 줄 바로 아래에 넣는다.
   // item: { kind: 'image'|'audio'|'video', src, alt } 또는 { kind: 'file', src, name } (파일 칩 = 링크)
+  // 음성 카드(받아쓴 글) 안에는 글자만 — 손 메모·사진·파일·표·수식 같은 칸은 카드 바로 아래로
+  function voiceCardDepth($pos) {
+    for (let d = $pos.depth; d > 0; d--) if (isVoiceCard($pos.node(d))) return d;
+    return 0;
+  }
+  function afterVoiceCard(state, pos) {
+    const $p = state.doc.resolve(Math.min(pos, state.doc.content.size));
+    const d = voiceCardDepth($p);
+    return d ? $p.after(d) : pos;
+  }
+  /** 커서가 음성 카드 안이면 카드 바로 아래 빈 줄로 (없으면 만든다) */
+  function leaveVoiceCard() {
+    const v = view();
+    const { $from } = v.state.selection;
+    const d = voiceCardDepth($from);
+    if (!d) return;
+    const after = $from.after(d);
+    const next = v.state.doc.resolve(after).nodeAfter;
+    let tr = v.state.tr;
+    if (!(next?.type.name === 'paragraph' && next.content.size === 0)) tr = tr.insert(after, v.state.schema.nodes.paragraph.create());
+    v.dispatch(tr.setSelection(TextSelection.create(tr.doc, after + 1)));
+  }
+
   function insertBlocks(pos, items) {
     const v = view();
     const { schema } = v.state;
+    pos = afterVoiceCard(v.state, pos);
     const paragraphs = items.map((item) => {
       if (item.kind === 'file') {
         return schema.nodes.paragraph.create(null, schema.text(item.name, [schema.marks.link.create({ href: item.src })]));
@@ -933,7 +957,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       onClose: () => v.focus(),
     });
   }
-  inkEditHandler = (v, pos) => editInk(v, pos);
+  if (!readOnly) inkEditHandler = (v, pos) => editInk(v, pos); // 보기만 하는 편집기(PDF·옆 메모)는 이어 그리기 없음
 
   async function filesToItems(files) {
     const items = [];
@@ -1732,7 +1756,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       return $from.blockRange($to, (n) => n.type.name === 'blockquote');
     };
     if (name === 'math') {
-      insertMathBlock(v);
+      leaveVoiceCard();
+      insertMathBlock(view());
       return;
     }
     if (name === 'quote') {
@@ -1797,6 +1822,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
     // 표 ----------------------------------------------------------
     insertTable() {
+      leaveVoiceCard();
       // 표 안에서 누르면 그 표 바로 아래 빈 줄에 (표 안에 표는 마크다운에 없어 표가 둘로 쪼개진다)
       const v = view();
       const outer = tableAt(v.state);

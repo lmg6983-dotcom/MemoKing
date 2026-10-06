@@ -128,6 +128,19 @@
     <p>왼쪽에서 메모를 고르거나<br>+ 로 새 메모를 만들어 보세요</p>
   </section>
 
+  <!-- 태블릿 나란히 보기: 옆 메모(보기만, 누르면 고치기) · 끌 때 안내 -->
+  <section id="peek-screen" class="screen note-screen peek-screen" data-color="yellow" aria-label="옆 메모 (누르면 고치기)" hidden>
+    <header class="bar peek-bar">
+      <b class="peek-title"></b>
+      <span class="peek-hint">✏️ 눌러서 고치기</span>
+    </header>
+    <main id="peek-editor" class="editor peek-editor"></main>
+  </section>
+  <div id="pane-edge-left" class="pane-edge left" hidden><span>↩ 목록으로</span></div>
+  <div id="pane-edge-right" class="pane-edge right" hidden><span>🗑 지우기</span></div>
+  <div id="pane-badge" class="pane-badge" hidden></div>
+  <div id="pane-slot" class="pane-slot" hidden><span>놓으면 제자리</span></div>
+
   <!-- ========== 메모 ========== -->
   <section id="note-screen" class="screen note-screen" data-color="yellow" hidden>
     <header class="bar">

@@ -1051,14 +1051,20 @@ try {
   // 넓은 화면(펼친 폴더블·태블릿): 목록과 메모를 나란히
   await page.setViewportSize({ width: 884, height: 1000 });
   await page.waitForTimeout(300);
-  check('넓은 화면: 메모 고르기 안내', await page.isVisible('#pane-empty'));
+  check('넓은 화면: 메모가 없으면 목록이 화면 가득', (await page.locator('#list-screen').boundingBox()).width > 860);
   await page.locator('.card').first().tap();
   await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(400);
+  const full = await page.locator('#note-screen').boundingBox();
+  check('넓은 화면: 메모를 열면 목록은 숨고 메모가 가득', full.x === 0 && full.width > 860 && !(await page.isVisible('#list-screen')), JSON.stringify(full));
+  await page.tap('#back-btn'); // ≡ 목록 옆에
+  await page.waitForTimeout(400);
   const lb = await page.locator('#list-screen').boundingBox();
   const nb = await page.locator('#note-screen').boundingBox();
-  check('넓은 화면: 목록과 메모 나란히', lb && nb && lb.width < 500 && nb.x >= lb.width - 1 && await page.isVisible('#list-screen'), JSON.stringify({ lb, nb }));
+  check('넓은 화면: ≡ → 목록과 메모 나란히', lb && nb && lb.width < 500 && nb.x >= lb.width - 1 && await page.isVisible('#list-screen'), JSON.stringify({ lb, nb }));
   await shot('13-two-pane');
+  await back(); // 태블릿 뒤로: 옆에 꺼낸 목록 숨기기 → 메모 닫기
+  await page.waitForTimeout(200);
   await back();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(300);

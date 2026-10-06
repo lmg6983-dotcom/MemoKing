@@ -22,6 +22,7 @@ import { renderMemoImage } from './share-image.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent } from './tutorial.js';
+import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml } from './print-html.js';
 
@@ -222,15 +223,25 @@ function showSetup(error = '') {
 
 app.showList = () => {
   closeAllSheets();
+  panes.closePane('peek');
   note.closeNote();
   list.refresh();
   list.show();
   syncPane();
 };
+// 메모 위 막대의 ← (휴대폰: 목록으로) · ≡ (태블릿: 목록을 옆에 꺼내기·넣기)
+app.noteBack = () => {
+  if (isTwoPane()) panes.toggleList();
+  else app.showList();
+};
+// 목록 카드를 오른쪽으로 밀기 (태블릿): 지금 메모 옆에 열기
+app.openBeside = (id) => panes.openBeside(id);
+app.isNoteOpen = () => note.isOpen();
 
 // 넓은 화면: 메모를 고르지 않았으면 오른쪽에 안내
 function syncPane() {
-  $('pane-empty').hidden = !isTwoPane() || note.isOpen() || $('list-screen').hidden;
+  $('pane-empty').hidden = true; // v0.14.0: 메모가 없으면 목록이 화면 가득 (빈 오른쪽 안내는 쓰지 않음)
+  panes.sync();
 }
 window.addEventListener('memoking:pane', () => {
   syncPane();
@@ -250,6 +261,9 @@ app.filterByTag = (name) => {
 app.openMemo = async (id, options = {}) => {
   if (!app.vault) return;
   closeAllSheets();
+  // 태블릿: 옆 메모를 고르면 그쪽을 고치는 칸으로 · 새로 열면 목록은 숨기고 메모를 가득
+  if (!options.beside && isTwoPane() && id === panes.peekId()) return panes.activatePeek();
+  if (!options.beside && isTwoPane()) panes.hideListForMemo();
   $('list-screen').hidden = false; // 메모 뒤에 목록이 있어야 닫을 때 바로 보인다
   await note.openNote(id, options);
   syncPane();
@@ -1019,6 +1033,7 @@ function openVault() {
   app.previews.reset();
   vault.on('changed', (detail) => {
     note.onVaultChanged(detail);
+    panes.peekChanged(detail?.ids);
     clearTimeout(changeTimer);
     changeTimer = setTimeout(() => list.refresh(), 60);
     alarms.scheduleSoon();
@@ -1097,6 +1112,7 @@ setBackHandler(() => {
   if (note.closeAddMenu()) return true;
   if (setFabMenu(false)) return true;
   if (sheetOpen()) return closeTopSheet();
+  if (panes.back()) return true; // 태블릿: 옆에 꺼낸 목록 → 옆 메모 순으로 닫기
   if (note.isOpen()) {
     app.showList();
     return true;
@@ -1108,6 +1124,7 @@ setBackHandler(() => {
 // ---------- 시작 ----------
 
 list.setup();
+panes.setupPanes({ note, openMemo: (id, o) => app.openMemo(id, o), deleteMemo: (id) => deleteMemo(id), showList: () => app.showList() });
 setupTutorial({ screen: () => (note.isOpen() ? 'note' : 'list'), markdown: () => (note.isOpen() ? note.editorMarkdown() : '') });
 const info = native.info();
 if (info.vault?.ok) openVault();
