@@ -300,6 +300,22 @@ svg { width: 20px; height: 20px; flex: none; }
 .coach-bubble.mini .coach-head { order: 0; }
 .coach-bubble.mini .coach-try { order: 1; flex: 1; min-width: 0; }
 .coach-bubble.mini .coach-head .coach-fold { display: none; } /* 접힌 알약은 눌러서 펼친다 */
+.coach-mini-skip { display: none; }
+.coach-bubble.mini .coach-mini-skip {
+  display: block; flex: none; order: 2; margin: 0 0 0 4px; padding: 5px 9px; border: 0; border-radius: 10px;
+  background: var(--fill-tab); color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+/* 휴대폰: 말풍선을 작게 (화면을 덜 가리게), 키보드가 올라와 화면이 낮으면 사진은 빼고 */
+@media (max-width: 560px) {
+  .coach-bubble { width: min(340px, calc(100vw - 20px)); padding: 12px 14px 10px; }
+  .coach-head { margin-bottom: 6px; }
+  .coach-emoji { width: 32px; height: 32px; font-size: 18px; border-radius: 10px; }
+  .coach-bubble h3 { margin: 0 0 4px; font-size: 15.5px; line-height: 21px; }
+  .coach-bubble p { margin: 0 0 8px; font-size: 13px; line-height: 19px; }
+  .coach-try { margin: 0 0 8px; padding: 7px 10px; font-size: 12.5px; line-height: 18px; }
+  .coach-shot { height: 128px; max-height: none; object-fit: cover; object-position: center; }
+}
+@media (max-height: 620px) and (max-width: 560px) { .coach-shot { display: none; } }
 /* 손 메모 그리기·주석·녹음 중에는 말풍선을 잠시 숨긴다 (그리기를 가리지 않게) — 끝나면 다음 단계로 */
 body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .coach-bubble) { visibility: hidden; }
 

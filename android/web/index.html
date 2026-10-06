@@ -552,6 +552,8 @@
     </form>
   </dialog>
 
+  <!-- 오래 걸리는 일(받아쓰기 데이터 다운로드)의 진행: 끝날 때까지 위에 떠 있다 -->
+  <div id="progress-pill" class="progress-pill" role="status" aria-live="polite" hidden><span id="progress-text"></span><span class="progress-track"><i id="progress-bar"></i></span></div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden><span id="toast-text"></span><button id="toast-action" class="toast-action" hidden></button></div>
 </body>
 </html>

@@ -220,6 +220,7 @@ open class VoskPack(val name: String, val sizeLabel: String) {
         val zip = File(root, "$name.zip.part")
         val unpack = File(root, "$name.part")
         progress = 0
+        onProgress(0) // 누르자마자 "다운로드 중 0%" 가 보이게
         try {
             var conn = URL(urlZip).openConnection() as HttpURLConnection
             for (i in 0 until 5) { // https → 다른 주소로 넘겨주기(리다이렉트) 따라가기
@@ -260,7 +261,25 @@ open class VoskPack(val name: String, val sizeLabel: String) {
             // 풀기: zip 안의 "<모델 이름>/..." → files/stt/<모델 이름>/...
             unpack.deleteRecursively()
             unpack.mkdirs()
-            ZipInputStream(zip.inputStream().buffered()).use { zin ->
+            // 푸는 동안도 90~99% 로 (읽은 zip 크기 기준) — 설치 중에도 멈춘 것처럼 보이지 않게
+            val zipSize = zip.length().coerceAtLeast(1)
+            val counted = object : java.io.FilterInputStream(zip.inputStream()) {
+                var read = 0L
+                var last = 90
+                private fun count(n: Int) {
+                    if (n <= 0) return
+                    read += n
+                    val p = 90 + (read * 9 / zipSize).toInt().coerceAtMost(9)
+                    if (p != last) {
+                        last = p
+                        progress = p
+                        onProgress(p)
+                    }
+                }
+                override fun read(): Int = super.read().also { if (it >= 0) count(1) }
+                override fun read(b: ByteArray, off: Int, len: Int): Int = super.read(b, off, len).also { count(it) }
+            }
+            ZipInputStream(counted.buffered()).use { zin ->
                 while (true) {
                     val e = zin.nextEntry ?: break
                     val rel = e.name.substringAfter('/', "")

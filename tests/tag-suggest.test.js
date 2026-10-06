@@ -82,3 +82,11 @@ test('태그 추천: 뜻이 넓은 흔한 말로는 다른 태그를 확실하�
   const got = suggestTagsFor('# 가게 정산\n\n하루 매출 정리하고 할인 코드 계획 세우기, 영화를 보고 쉬기', ms);
   for (const name of ['일기', '개발', '일정', '보고서']) assert.ok(!got.some((t) => t.name === name && t.sure), `${name}: ${JSON.stringify(got)}`);
 });
+
+test('unescapeTags: 줄 맨 앞 띄어쓰기를 버리고 태그를 살린다 (" #할일" → "#할일")', async () => {
+  const { unescapeTags } = await import('../app/js/core/tags.js');
+  assert.equal(unescapeTags('&#x20;\\#할일'), '#할일');
+  assert.equal(unescapeTags('- [ ] &#x20;\\#장보기'), '- [ ] #장보기');
+  assert.equal(unescapeTags('> &#x20;글'), '> 글');
+  assert.equal(unescapeTags('가운데 &#x20; 그대로'), '가운데 &#x20; 그대로');
+});

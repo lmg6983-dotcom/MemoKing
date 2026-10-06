@@ -49,6 +49,7 @@ export function setupCoach(api, o = {}) {
   };
   const overlap = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
   let placedAt = null;
+  let autoMini = false; // 이 단계에서 자리가 없어 저절로 접었음 (한 번만 — 사람이 펼치면 그대로 둔다)
 
   function place() {
     if (!step) return;
@@ -79,6 +80,12 @@ export function setupCoach(api, o = {}) {
     if (!r && !step.keep?.length) best = { left: (vw - bw) / 2, top: (vh - bh) / 2 };
     else {
       const avoid = visibleRects(step.keep);
+      // 글 쓰는 단계: 쓰고 있는 줄과 그 아래 몇 줄은 비워 둔다 (치는 글자가 말풍선 밑으로 들어가지 않게)
+      if (step.write) {
+        const room = writeRoom();
+        if (room) avoid.push(room, room); // 다른 것보다 두 배로 피한다
+        avoid.push(...visibleRects(['#note-screen > .bar', '#format-bar'])); // 쓰면서 누를 위·아래 막대도
+      }
       const candidates = [];
       if (r) {
         candidates.push(
@@ -93,6 +100,8 @@ export function setupCoach(api, o = {}) {
         );
       } else candidates.push({ left: (vw - bw) / 2, top: (vh - bh) / 2 });
       candidates.push({ left: vw - bw - m, top: m }, { left: m, top: m }, { left: vw - bw - m, top: vh - bh - m }, { left: m, top: vh - bh - m });
+      // 휴대폰처럼 좁은 화면: 가운데 줄을 위아래로 훑어 가장 덜 가리는 높이 (키보드가 올라와 화면이 낮아도)
+      if (vw < 560) for (let y = m; y <= vh - bh - m; y += 12) candidates.push({ left: (vw - bw) / 2, top: y });
       const score = (c) => {
         const box = { left: c.left, top: c.top, right: c.left + bw, bottom: c.top + bh };
         let sum = r ? overlap(box, r) * 4 : 0; // 눌러야 할 곳은 절대 가리지 않게
@@ -100,13 +109,21 @@ export function setupCoach(api, o = {}) {
         return sum;
       };
       let bestScore = Infinity;
+      let bestCover = 0;
       // 화면 안으로 당긴 자리끼리 견준다 (가리는 넓이가 같으면 비춘 곳 가까운 자리 먼저)
       for (const [i, c] of candidates.map((c) => ({ left: clampX(c.left), top: clampY(c.top) })).entries()) {
-        const s = score(c) + i;
-        if (s < bestScore) {
-          bestScore = s;
+        const cover = score(c);
+        if (cover + i < bestScore) {
+          bestScore = cover + i;
+          bestCover = cover;
           best = c;
         }
+      }
+      // 어디에 두어도 해 볼 곳을 꽤 가리면(키보드가 올라온 채 메뉴가 펼쳐진 휴대폰 등) 처음부터 작은 알약으로
+      const keepArea = avoid.reduce((sum, k) => sum + (k.right - k.left) * (k.bottom - k.top), 0) + (r ? (r.right - r.left) * (r.bottom - r.top) * 4 : 0);
+      if (step.advance && !bubble.classList.contains('mini') && !autoMini && keepArea && bestCover > keepArea * 0.08) {
+        autoMini = true;
+        return setMini(true);
       }
       // 지금 자리가 거의 같은 정도면 그대로 (말풍선이 이리저리 뛰지 않게)
       if (placedAt) {
@@ -117,6 +134,22 @@ export function setupCoach(api, o = {}) {
     placedAt = best;
     bubble.style.left = `${Math.max(m, best.left)}px`;
     bubble.style.top = `${Math.max(m, best.top)}px`;
+  }
+
+  // 쓰고 있는 자리: 글자 커서(없으면 본문 마지막 줄)부터 아래로 몇 줄 — 화면 폭 전체
+  function writeRoom() {
+    const doc = document.querySelector('.ProseMirror');
+    if (!doc || !doc.getClientRects().length) return null;
+    let line = null;
+    const sel = getSelection();
+    if (sel?.rangeCount && doc.contains(sel.anchorNode)) {
+      const rs = sel.getRangeAt(0).getClientRects();
+      const rr = rs.length ? rs[rs.length - 1] : sel.anchorNode.nodeType === 1 ? sel.anchorNode.getBoundingClientRect() : sel.anchorNode.parentElement?.getBoundingClientRect();
+      if (rr && rr.height) line = rr;
+    }
+    line ??= doc.lastElementChild?.getBoundingClientRect();
+    if (!line) return null;
+    return { left: 0, right: window.innerWidth, top: line.top - 6, bottom: line.bottom + 96 };
   }
 
   // 직접 해 보는 동안: 말풍선을 작은 알약으로 접어 둔다 (밖을 누르거나 글을 치면 저절로, 누르면 다시 펼침)
@@ -132,6 +165,12 @@ export function setupCoach(api, o = {}) {
   document.addEventListener('keydown', (e) => {
     if (step?.advance && !bubble.hidden && !bubble.contains(e.target) && !e.ctrlKey && !e.metaKey && e.key.length === 1) setMini(true);
   }, true);
+  // 휴대폰 키보드는 keydown 에 글자를 알려 주지 않으므로(Unidentified) 글이 들어올 때·한글 조합을 시작할 때도
+  for (const type of ['beforeinput', 'compositionstart']) {
+    document.addEventListener(type, (e) => {
+      if (step?.advance && !bubble.hidden && !bubble.contains(e.target)) setMini(true);
+    }, true);
+  }
 
   function button(label, className, action) {
     const b = document.createElement('button');
@@ -190,6 +229,8 @@ export function setupCoach(api, o = {}) {
       parts.push(img);
     }
     if (step.advance) parts.push(el('div', 'coach-try', `👉 ${step.try ?? '직접 해 보세요'}`));
+    // 접힌 알약에서도 이 단계만 건너뛸 수 있게 (펼치지 않아도)
+    if (step.advance && step.next) parts.push(button('건너뛰기', 'coach-mini-skip', 'next'));
     const actions = el('div', 'coach-actions');
     actions.append(button(step.skip ?? '튜토리얼 그만하기', 'coach-skip', 'skip'));
     // 직접 해 보는 단계의 "다음"은 이 단계만 건너뛰기 (옅은 단추) — 안내만 하는 단계는 노란 다음
@@ -198,7 +239,10 @@ export function setupCoach(api, o = {}) {
     bubble.replaceChildren(...parts);
     bubble.dataset.step = step.id;
     bubble.classList.remove('wide', 'mini');
-    if (step.id !== prevId) placedAt = null;
+    if (step.id !== prevId) {
+      placedAt = null;
+      autoMini = false;
+    }
     bubble.classList.toggle('trying', Boolean(step.advance));
     spot.classList.toggle('pulse', Boolean(step.advance));
     spot.hidden = false;

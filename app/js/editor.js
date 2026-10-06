@@ -30,6 +30,7 @@ import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt } from './table-extras.js';
 import { createListDrag } from './list-drag.js';
 import { createBlockMove, createContentLines, MEDIA_SCRUB } from './block-move.js';
+import { createTapList } from './tap-list.js';
 import { createVoiceCards, isVoiceCard, voiceAudioOf } from './voice-card-view.js';
 import { createTidy } from './tidy.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
@@ -833,7 +834,7 @@ function normalizePastedTables(html) {
  *   fetchPreview: 링크 카드에 보여줄 제목·설명·사진 (메인 프로세스가 메모 폴더에 모아 둔 것)
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false }) {
   if (readAttachment) inkReader = readAttachment; // 그림 칸(inkView)이 만들어지기 전에
   let ready = false;
   let editor = null;
@@ -1404,6 +1405,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
   const listDrag = $prose(() => createListDrag({ readOnly }));
   const blockMove = $prose(() => createBlockMove({ readOnly }));
+  // 휴대폰: 목록 아래 빈 줄을 누르면 목록이 이어진다 (보기만 할 때는 없음)
+  const tapList = $prose(() => (tapContinuesList && !readOnly ? createTapList() : new Plugin({})));
   const voiceCards = $prose(() => createVoiceCards());
   const contentLines = $prose(() => createContentLines());
   const tidy = $prose(() => createTidy({ readOnly }));
@@ -1538,6 +1541,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(taskToggle)
     .use(listDrag)
     .use(blockMove)
+    .use(tapList)
     .use(voiceCards)
     .use(contentLines)
     .use(tidy)

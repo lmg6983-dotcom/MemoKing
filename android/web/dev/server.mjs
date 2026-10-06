@@ -204,12 +204,14 @@ const sync = {
     fakeDone = fakeDone.filter((r) => r.id !== id);
     return true;
   },
-  sttStatus: () => ({ engine: 'vosk', model: 'ready', system: true, speaker: 'ready', speakerOn: true, speakerSize: '약 13MB' }),
+  sttStatus: () => ({ engine: 'vosk', model: fakeModel.state, modelSize: '약 87MB', system: true, speaker: 'ready', speakerOn: true, speakerSize: '약 13MB' }),
 };
 
 
 
 let fakeRec = null;
+// 받아쓰기 데이터: 점검 도구가 /dev/model 로 "없음"을 만들고, 받기를 끝내거나 실패시킨다
+const fakeModel = { state: 'ready', settle: null };
 let fakeDone = [];
 const recordState = () => (fakeRec
   ? { active: true, paused: Boolean(fakeRec.paused), memoId: fakeRec.memoId, elapsedMs: Date.now() - fakeRec.at, stt: fakeRec.stt, text: fakeRec.stt ? '오늘 회의를 시작하겠습니다' : '', partial: '' }
@@ -317,7 +319,7 @@ const calls = {
   recordStart: async ({ memoId, stt }) => {
     fakeRec = { memoId, stt, at: Date.now() };
     log.push({ recordStart: { memoId, stt } });
-    return { stt, reason: '' };
+    return { stt: stt && fakeModel.state === 'ready', reason: '' };
   },
   recordStop: async () => {
     if (!fakeRec) return null;
@@ -341,7 +343,19 @@ const calls = {
     log.push({ sharePdf: a });
     return true;
   },
-  sttModel: async () => ({ model: 'ready' }),
+  sttModel: async () => {
+    if (fakeModel.state === 'ready') return { model: 'ready' };
+    fakeModel.state = 'downloading';
+    log.push({ sttModel: 'start' });
+    const ok = await new Promise((resolve) => (fakeModel.settle = resolve));
+    fakeModel.settle = null;
+    if (!ok) {
+      fakeModel.state = 'missing';
+      throw new Error('다운로드하지 못했어요. 인터넷 연결을 확인해 주세요');
+    }
+    fakeModel.state = 'ready';
+    return { model: 'ready' };
+  },
   speakerModel: async () => ({ model: 'ready', speaker: 'ready', speakerOn: true }),
   http: async ({ url, accept = '*/*', limit = 5 * 1024 * 1024, save = false }) => {
     const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) MemoKing-dev' }, redirect: 'follow' });
@@ -419,6 +433,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && p === '/dev/pick') {
       pickQueue = JSON.parse(await readBody(req));
+      res.writeHead(200).end('{}');
+      return;
+    }
+    if (req.method === 'POST' && p === '/dev/model') {
+      const { state } = JSON.parse(await readBody(req)); // missing · finish · fail
+      if (state === 'missing') fakeModel.state = 'missing';
+      else fakeModel.settle?.(state === 'finish');
       res.writeHead(200).end('{}');
       return;
     }

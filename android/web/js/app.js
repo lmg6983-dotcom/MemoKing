@@ -522,7 +522,7 @@ app.deliverRecording = async (r) => {
     else if (recorder.sttEngine() === 'vosk') {
       toast('받아쓰기 데이터를 다운로드하면 이 녹음을 텍스트로 옮겨요', false, {
         label: '다운로드',
-        run: () => recorder.downloadModel().then(() => transcribeInto(memoId, [item])).catch(() => {}),
+        run: () => recorder.downloadModel(() => transcribeInto(memoId, [item])).catch(() => {}),
       });
     }
   }
@@ -934,8 +934,7 @@ async function memoFromShare(payload) {
   if (stt && audioItems.length) {
     if (!recorder.sttReady() && recorder.sttEngine() === 'vosk') {
       try {
-        toast('받아쓰기 데이터를 다운로드하는 중…');
-        await recorder.downloadModel();
+        await recorder.downloadModel(); // 진행은 화면 위 알약에
       } catch {
         return;
       }

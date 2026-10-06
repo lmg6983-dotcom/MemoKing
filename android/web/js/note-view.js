@@ -876,6 +876,7 @@ export async function openNote(memoId, options = {}) {
       tables: memo.tables ?? [],
       onTables: saveTables,
       readAttachment: async (src) => (await fetch(vaultUrl(src))).text(),
+      tapContinuesList: true, // 목록 아래 줄을 눌러 줄을 바꾸는 사람도 목록이 이어지게
     });
     // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 (열기만 해도 저장되는 일 방지)
     current = saved = editor.getMarkdown();

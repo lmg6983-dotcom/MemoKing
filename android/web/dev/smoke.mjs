@@ -671,6 +671,39 @@ try {
   check('음성 메모: 소리 파일 + 받아쓴 글', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 음성 메모'), f && read(f));
   check('음성 카드: 소리와 받아쓴 글이 한 칸(인용), 문장마다 줄 · 화자 이름표', f && /^> !\[녹음/m.test(read(f)) && read(f).includes('>\n> **화자 2:** 다음 주 출시 일정을 정리했어요.\n>\n> 표로 공유할게요.'), f && read(f));
 
+  // 받아쓰기 데이터가 아직 없는 사람의 첫 녹음: 다운로드를 누르면 끝날 때까지 진행이 보인다 (전에는 아무 반응 없어 보임)
+  await post('/dev/model', { state: 'missing' });
+  await page.tap('#fab');
+  await page.tap('[data-new="voice"]');
+  await page.waitForSelector('#rec-panel:not([hidden])');
+  await page.waitForTimeout(300);
+  check('첫 녹음(데이터 없음): 녹음은 하면서 다운로드 단추 알림', await page.isVisible('#toast-action') && (await page.textContent('#toast-text')).includes('받아쓰기 데이터'));
+  await page.tap('#toast-action');
+  await page.waitForTimeout(200);
+  const pill = async () => ((await page.isVisible('#progress-pill')) ? (await page.textContent('#progress-text')) : '');
+  check('다운로드: 누르자마자 진행 알약 (0%)', (await pill()).includes('다운로드 중 0%') && (await devLog()).log.some((l) => l.sttModel === 'start'), await pill());
+  await page.evaluate(() => window.__mk.emit('sttModel', { progress: 45 }));
+  await page.waitForTimeout(100);
+  const bar = await page.evaluate(() => document.getElementById('progress-bar').style.width);
+  check('다운로드: 몇 % 인지 글자·막대로', (await pill()).includes('50%') && bar === '45%', `${await pill()} ${bar}`);
+  await page.evaluate(() => window.__mk.emit('sttModel', { progress: 95 }));
+  await page.waitForTimeout(100);
+  check('다운로드: 다 받고 풀 때는 "설치하는 중"', (await pill()).includes('설치하는 중'), await pill());
+  await shot('11b-model-download');
+  await post('/dev/model', { state: 'fail' });
+  await page.waitForTimeout(400);
+  check('다운로드 실패: 알약은 닫히고 다시 시도 단추', !(await page.isVisible('#progress-pill')) && (await page.textContent('#toast-action')) === '다시 시도', await page.textContent('#toast-text'));
+  await page.tap('#toast-action');
+  await page.waitForTimeout(200);
+  check('다시 시도: 다시 진행 알약', (await pill()).includes('다운로드 중'));
+  await post('/dev/model', { state: 'finish' });
+  await page.waitForTimeout(400);
+  check('설치 끝: 알약 닫히고 "설치했어요"', !(await page.isVisible('#progress-pill')) && (await page.textContent('#toast-text')).includes('설치했어요'));
+  await page.tap('#rec-stop');
+  await page.waitForTimeout(1200);
+  await back();
+  await page.waitForTimeout(400);
+
   // 소리·표·수식·글 문단도 자유롭게 옮기기 (모두 꾹 눌러 들어 올리기)
   fs.writeFileSync(path.join(vault, 'attachments/move-test.m4a'), Buffer.from('fake'));
   write('옮기기.md', '---\nid: 00000000-0000-4000-8000-0000000000aa\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 옮기기\n\n첫 문단\n\n![녹음 테스트](attachments/move-test.m4a)\n\n| 가 | 나 |\n| --- | --- |\n| 1 | 2 |\n\n끝 문단\n');
@@ -775,6 +808,41 @@ try {
   check('도구막대: + › 표', (await page.locator('.mk-doc table').count()) === 1);
   check('도구막대: 평소엔 + 하나 (첨부·녹음·표 단추 없음)', (await page.locator('#format-bar [data-action="file"], #format-bar [data-action="record"], #format-bar [data-action="table"]').count()) === 0);
   if (process.env.MK_PDF) await page.pdf({ path: path.join(outDir, 'share-images.pdf'), format: 'A4' });
+  await back();
+  await page.waitForTimeout(300);
+
+  // 키패드 줄바꿈 대신 쓰던 줄 아랫줄을 손가락으로 눌러 줄을 바꾸는 사람: 목록이 이어진다
+  write('아랫줄.md', '---\nid: 00000000-0000-4000-8000-0000000000de\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: yellow\n---\n# 장보기\n\n위 줄\n\n- [ ] 우유\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000de"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.waitForTimeout(300);
+  // 체크리스트 마지막 줄 아래 빈 곳을 손가락으로 누른다
+  const tapBelow = async (sel) => {
+    const box = await page.locator(sel).last().boundingBox();
+    await page.touchscreen.tap(box.x + 40, box.y + box.height + 14);
+    await page.waitForTimeout(150);
+  };
+  const lastTask = '.mk-doc ul li[data-item-type="task"]';
+  await tapBelow(lastTask);
+  const madeTask = await page.evaluate(() => {
+    const li = getSelection().anchorNode?.parentElement?.closest('li');
+    return !!li && li.dataset.itemType === 'task' && li.textContent === '';
+  });
+  check('아랫줄 누르기: 체크리스트 아래 빈 줄 → 새 체크 항목 (빈 네모)', madeTask);
+  await page.keyboard.type('계란');
+  await page.waitForTimeout(150);
+  await tapBelow(lastTask);
+  await page.keyboard.type('빵');
+  await page.waitForTimeout(150);
+  // 눌렀다가 아무것도 안 쓰고 다른 곳을 누르면 빈 항목은 사라진다
+  await tapBelow(lastTask);
+  await page.locator('.mk-doc p', { hasText: '위 줄' }).tap();
+  await page.waitForTimeout(900);
+  const tapped = read('아랫줄.md');
+  check('아랫줄 누르기: 쓴 항목은 목록으로 저장', /- \[ \] 우유\n- \[ \] 계란\n- \[ \] 빵\n/.test(tapped), tapped);
+  check('아랫줄 누르기: 안 쓰고 떠나면 빈 항목 없음 · 빈 줄 그대로', !/- \[ \]\s*\n/.test(tapped.replace(/- \[ \] \S.*\n/g, '')) && (await page.locator('.mk-doc li[data-item-type="task"]').count()) === 3, tapped);
   await back();
   await page.waitForTimeout(300);
 

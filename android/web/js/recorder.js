@@ -3,7 +3,7 @@
 //   끝내면 소리 파일(.m4a)과 받아쓴 글이 그 메모에 들어간다. 알림에서 끝내도(앱이 꺼져 있어도) 다음에 열 때 들어간다.
 import { app } from './state.js';
 import { native, call, on, record } from './native.js';
-import { toast } from './ui.js';
+import { toast, progress } from './ui.js';
 import { recordingClock as formatDuration } from '../../app/js/core/voice-card.js';
 import { haptic } from '../../app/js/dom.js';
 
@@ -62,20 +62,37 @@ export function sttStatus() {
 export const sttReady = () => (sttEngine() === 'system' ? Boolean(sttStatus().system) : sttStatus().model === 'ready');
 
 let downloading = null;
-/** Vosk 한국어 모델 받기 (약 87MB, 한 번만) — 진행은 on('sttModel') */
-export function downloadModel() {
-  downloading ??= call('sttModel', {})
+const MODEL_SIZE = () => (sttStatus().modelSize ?? '약 87MB').replace('약 ', '');
+// 받는 동안은 화면 위 진행 알약에 몇 % 인지 (목록·메모 어디서든), 풀어서 설치하는 동안은 "설치하는 중"
+function showModelProgress(p) {
+  if (!downloading) return;
+  if (p >= 90) progress('받아쓰기 데이터 설치하는 중…', p);
+  else progress(`받아쓰기 데이터 다운로드 중 ${Math.round(p / 0.9)}% · ${MODEL_SIZE()}`, p);
+}
+on('sttModel', ({ progress: p }) => showModelProgress(p ?? 0));
+/**
+ * Vosk 한국어 모델 받기 (약 87MB, 한 번만) — then: 설치됨, catch: 못 받음 (다시 시도 단추를 보여 준 뒤)
+ * @param {() => void} [after] 설치되면 이어서 할 일 (다시 시도해서 설치돼도)
+ */
+export function downloadModel(after) {
+  if (downloading) return after ? downloading.then(after) : downloading;
+  downloading = call('sttModel', {})
     .then((st) => {
-      toast('받아쓰기 데이터를 설치했어요');
+      progress(null);
+      toast('받아쓰기 데이터를 설치했어요 ✓');
+      after?.();
       return st;
     })
     .catch((err) => {
-      toast(err.message || '다운로드하지 못했어요. 인터넷 연결을 확인해 주세요', true);
+      progress(null);
+      toast(err.message || '다운로드하지 못했어요. 인터넷 연결을 확인해 주세요', true, { label: '다시 시도', run: () => downloadModel(after).catch(() => {}) });
       throw err;
     })
     .finally(() => (downloading = null));
+  showModelProgress(0);
   return downloading;
 }
+export const modelDownloading = () => Boolean(downloading);
 
 let status = { active: false, paused: false, memoId: null, elapsedMs: 0, stt: false, text: '', partial: '' };
 let attached = null; // 지금 열린 메모 id
@@ -215,7 +232,8 @@ export async function start(memoId) {
     haptic(20);
     if (sttOn() && !res?.stt) {
       // 모델이 없으면 녹음은 그대로 하면서 받아 두고, 끝내면 녹음 파일로 받아쓴다
-      if (sttEngine() === 'vosk' && sttStatus().model !== 'ready') {
+      if (sttEngine() === 'vosk' && downloading) toast('받아쓰기 데이터를 받는 중이에요. 녹음은 계속돼요');
+      else if (sttEngine() === 'vosk' && sttStatus().model !== 'ready') {
         toast('받아쓰기 데이터가 필요해요. 녹음은 계속돼요', false, { label: '다운로드', run: () => downloadModel().catch(() => {}) });
       } else toast(res?.reason || '받아쓰기를 쓸 수 없어 녹음만 해요');
     }

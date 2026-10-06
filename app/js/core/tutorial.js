@@ -196,90 +196,82 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'welcome', win: 'list', target: [], emoji: '👋',
     title: '반가워요! 메모킹이에요',
-    text: '하나씩 직접 눌러 보면서 배워 볼게요. 2분이면 끝나요. 언제든 그만둘 수 있어요.',
+    text: '직접 눌러 보며 2분이면 배워요. 언제든 그만둘 수 있어요.',
     next: '시작할게요 🚀', skip: '나중에 볼게요',
   },
   {
-    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]'], advance: 'memo-created', emoji: '✨',
+    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]', '#fab'], advance: 'memo-created', emoji: '✨',
     title: '첫 메모를 만들어 볼까요?',
     text: '노란 + 를 누르면 🎙️ 음성 · ✍️ 손 · ✏️ 글 메모가 펼쳐져요.',
     try: '+ 를 누르고 "글 메모"를 골라 보세요',
   },
+  // 글 쓰는 단계: 쓰는 줄과 그 아래(write) · 도구막대는 비워 두고, 다 쓰고 손을 멈추면 넘어간다 (치는 도중엔 그대로)
   {
-    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], advance: 'typed', emoji: '✍️',
+    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], write: true, advance: 'typed', emoji: '✍️',
     title: '떠오르는 생각을 적어 보세요',
-    text: '첫 줄은 메모 제목이 되고, 적는 대로 저절로 저장돼요. 💾 저장 단추는 없어요!',
-    try: '아무 말이나 한 줄 적어 보세요',
+    text: '첫 줄은 제목이 되고, 적는 대로 저절로 저장돼요.',
+    try: '한 줄 적어 보세요 — 다 쓰고 손을 떼면 다음으로',
     next: '다음',
   },
   {
-    id: 'format', win: 'note', target: ['#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], advance: 'formatted', emoji: '🎨',
+    id: 'format', win: 'note', target: ['#format-bar [data-cmd="bold"]', '#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], write: true, advance: 'formatted', emoji: '🎨',
     title: '글자를 꾸며 볼까요',
-    text: '글자를 고르고 아래 도구막대의 B · A · 형광펜을 눌러요.',
-    try: '글자를 꾹 눌러 고르고 B 를 눌러 보세요',
+    text: '아래 도구막대의 B · A · 형광펜으로 꾸며요. 누른 다음부터 쓰는 글자에 들어가요.',
+    try: '줄을 바꾸고 B 를 누른 뒤 써 보세요',
     next: LATER,
   },
   {
-    id: 'lists', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *'], advance: 'tasked', emoji: '✅',
-    image: 'clear.jpg',
+    id: 'lists', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], write: true, advance: 'tasked', emoji: '✅',
+    image: 'm-clear.jpg',
     title: '할 일 목록 만들기',
-    text: '체크리스트 단추를 누르면 네모 칸이 생겨요. 모두 끝내면 CLEAR 도장이 쾅! 🎊',
+    text: '체크리스트 단추를 누르면 네모 칸이 생겨요. 줄바꿈이나 쓰던 줄 아래를 누르면 다음 칸이 이어지고, 모두 끝내면 CLEAR 도장! 🎊',
     try: '체크리스트 단추를 눌러 보세요',
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], emoji: '🖐️', image: 'move.jpg',
+    id: 'move', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], emoji: '🖐️', image: 'm-move.jpg',
     title: '꾹 눌러 옮기기',
-    text: '줄이나 사진을 꾹 누르면 살짝 들려요. 그대로 끌어서 원하는 자리에 놓으면 끝!',
+    text: '줄이나 사진·표를 꾹 누르면 살짝 들려요. 그대로 끌어서 원하는 자리에 놓으면 끝!',
     next: '다음',
   },
   {
     id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
-    image: 'add.jpg',
     title: '+ 로 더 많은 것 넣기',
     text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 주석 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
     try: '왼쪽 아래 + 를 눌러 펼쳐 보세요',
     next: LATER,
   },
   {
-    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'ink-done', emoji: '✍️',
-    image: 'ink.jpg',
+    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'ink-done', emoji: '✍️',
     title: '손으로 그리기',
-    text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기, 두 손가락으로 화면을 넘겨요.',
-    try: '"손 메모"를 눌러 아무거나 그리고 ✓ 완료를 눌러 보세요',
+    text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기를 고르고, 두 손가락으로 화면을 넘겨요.',
+    try: '"손 메모"를 눌러 쓱 그리고 ✓ 완료',
     next: LATER,
   },
   {
-    id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '.ProseMirror > *'], advance: 'annotate-done', emoji: '🖍️',
-    image: 'annotate.jpg',
+    id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'annotate-done', emoji: '🖍️',
     title: '글 위에 바로 그리기',
-    text: '"주석"은 글자 위에 밑줄이나 동그라미를 그리는 기능이에요. 글의 자리는 그대로예요.',
+    text: '"주석"은 글자 위에 밑줄이나 동그라미를 긋는 기능이에요. 글의 자리는 그대로예요.',
     try: '+ › "주석"을 눌러 글 위에 쓱 긋고 ✓ 완료',
     next: LATER,
   },
   {
-    id: 'voice', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], emoji: '🎙️', image: 'voice.jpg',
+    id: 'voice', win: 'note', target: ['#add-btn', '#format-bar'], emoji: '🎙️', image: 'm-voice.jpg',
     title: '말로 메모하기',
-    text: '"음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
+    text: '+ › "음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
     next: '다음',
   },
   {
-    id: 'tag', win: 'note', target: ['.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror > *', '.tag-suggest', '.tag-suggest-bar:not([hidden])'], advance: 'tagged', emoji: '🏷️',
+    id: 'tag', win: 'note', target: ['.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror > *', '.tag-suggest', '.tag-suggest-bar:not([hidden])'], write: true, advance: 'tagged', emoji: '🏷️',
     title: '#으로 태그 달기',
     text: '같은 태그가 붙은 메모끼리 모아 볼 수 있어요. 아래에 추천 태그도 떠요.',
     try: '#할일 처럼 적어 보세요',
     next: LATER,
   },
   {
-    id: 'bell', win: 'note', target: ['#bell-btn'], emoji: '⏰',
-    title: '잊지 않게 알림 맞추기',
-    text: '종 단추로 원하는 날짜와 시간에 이 메모를 알려 드려요. 매일·매주 되풀이도 돼요.',
-    next: '다음',
-  },
-  {
-    id: 'links', win: 'note', target: ['#links-btn'], emoji: '🔗',
-    title: '메모끼리 이어 두기',
-    text: '고리 단추로 관련된 메모를 이어 둘 수 있어요. 같은 태그를 쓴 메모도 여기서 보여요.',
+    id: 'bell', win: 'note', target: ['#bell-btn'], keep: ['#links-btn'], emoji: '⏰',
+    title: '알림 · 이어 두기',
+    text: '⏰ 종: 원하는 날짜·시간에 이 메모를 알려 줘요 (매일·매주도). 🔗 고리: 관련 메모를 이어 둬요.',
     next: '다음',
   },
   {
@@ -291,13 +283,13 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'cards', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
     title: '메모는 모두 여기에',
-    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유·색·지우기)가 떠요. 왼쪽으로 밀면 지우기 — 태블릿에서는 오른쪽으로 밀면 지금 메모 옆에 나란히 열려요.',
+    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유·색·지우기)가 떠요. 왼쪽으로 밀면 지우기예요.',
     next: '다음',
   },
   {
     id: 'layout', win: 'list', target: ['#layout-btn'], keep: ['#cards'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
-    text: '카드를 두 줄로 볼지, 한 줄씩 볼지 고를 수 있어요.',
+    text: '카드를 두 줄로 볼지, 한 줄씩 볼지 골라요.',
     try: '이 단추를 눌러 보세요',
     next: LATER,
   },
@@ -311,7 +303,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'share', win: 'list', target: [], emoji: '📤',
     title: '다른 앱에서 바로 담기',
-    text: '인터넷·사진·녹음 앱에서 "공유 › 메모킹"을 누르면 바로 메모가 돼요. 녹음 파일은 글로 받아 적어 줘요.',
+    text: '인터넷·사진·녹음 앱에서 "공유 › 메모킹"을 누르면 바로 메모가 돼요.',
     next: '다음',
   },
   {
@@ -327,6 +319,9 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: '메모 쓰러 가기 ✏️',
   },
 ];
+
+/** 글로 판정하는 직접 해 보기는 손을 멈춘 뒤에 넘어간다 (치는 도중·한글 조합 중에 넘어가지 않게) */
+export const TUTORIAL_SETTLE_MS = { typed: 1800, tagged: 1500, formatted: 1200, styled: 900, tasked: 700 };
 
 /** 사용자가 직접 해서 넘어가는 일들 (PC 메인 프로세스가 이 이름만 받는다) */
 export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'formatted', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'note-closed', 'layout-changed', 'tag-filtered'];
@@ -367,7 +362,7 @@ export function tutorialCounts(md, tags = []) {
 export function tutorialDone(advance, base, now) {
   if (!base) return false;
   switch (advance) {
-    case 'typed': return now.text > 0 && now.text !== base.text;
+    case 'typed': return now.text - base.text >= 2;
     case 'formatted': return now.marks > base.marks;
     case 'styled': return now.blocks > base.blocks;
     case 'tasked': return now.tasks > base.tasks;
