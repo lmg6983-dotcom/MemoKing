@@ -966,6 +966,10 @@ export async function runSmoke({
       const barShown = formatStep && (await js(tutWin(), `!document.body.classList.contains('bar-hidden')`));
       check('글을 쓰면 → 저절로 다음 단계 (튜토리얼 동안 서식 도구막대는 보임)', formatStep && barShown);
       await coachNext(tutWin());
+      await waitStep(tutWin, 'add');
+      await coachNext(tutWin());
+      await waitStep(tutWin, 'ink');
+      await coachNext(tutWin());
       await waitStep(tutWin, 'lists');
       await coachNext(tutWin());
       await waitStep(tutWin, 'tag');
