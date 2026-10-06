@@ -280,7 +280,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .card-tags { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; opacity: 0.75; }
 .card-meta { display: flex; align-items: center; gap: 6px; flex: none; opacity: 0.7; }
 .card-time { font-variant-numeric: tabular-nums; }
-.card.leaving { animation: card-out 0.2s ease-in forwards; }
+.card.leaving { animation: card-out 0.2s var(--ease-out) forwards; }
 @keyframes card-out { to { opacity: 0; transform: scale(0.92); } }
 .cards .item { animation: mk-pop-in 0.16s ease-out both; }
 
@@ -336,7 +336,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .switch::after {
   top: 3px; left: 3px; width: 18px; height: 18px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  transition: transform 0.28s cubic-bezier(0.3, 1.4, 0.5, 1), width 0.15s ease-out, background-color 0.15s;
+  transition: transform 0.28s var(--ease-pop), width 0.15s ease-out, background-color 0.15s;
 }
 /* 누르는 동안 손잡이가 살짝 늘어난다 (움직일 쪽으로) — 켜고 끄는 스위치라는 것이 손에 느껴지게 */
 .switch:active::after { width: 22px; }
@@ -349,8 +349,8 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .note-screen { background: var(--note-bg); color: var(--note-text); } /* 글자색 변수는 note.css */
 .note-screen .icon-btn { color: var(--note-muted); }
 .note-screen .icon-btn:active { background: var(--note-hover); }
-.note-screen.entering { animation: note-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.note-screen.leaving { animation: note-out 0.16s ease-in forwards; }
+.note-screen.entering { animation: note-in 0.2s var(--ease-out); }
+.note-screen.leaving { animation: note-out 0.16s var(--ease-out) forwards; }
 @keyframes note-in { from { opacity: 0; transform: translateY(24px); } }
 @keyframes note-out { to { opacity: 0; transform: translateY(24px); } }
 
@@ -431,7 +431,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   background: var(--surface-2);
   color: var(--text);
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
-  animation: sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: sheet-up 0.24s var(--ease-drawer);
 }
 @keyframes sheet-up { from { transform: translateY(40%); opacity: 0; } }
 .sheet-grip { width: 40px; height: 4px; margin: 4px auto 10px; border-radius: 2px; background: var(--line); }
@@ -645,7 +645,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #f
   border-radius: 16px;
   background: color-mix(in srgb, var(--note-bg) 70%, var(--note-text) 8%);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
-  animation: sheet-up 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: sheet-up 0.24s var(--ease-drawer);
 }
 .rec-head { display: flex; align-items: center; gap: 8px; }
 .rec-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #e5484d; box-shadow: 0 0 0 4px rgba(229, 72, 77, 0.2); animation: mk-blink 1.2s ease-in-out infinite; }
@@ -738,15 +738,15 @@ body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #f
 .toast-action:active { background: var(--brand-yellow-hover); }
 
 /* ---------- + 위성 버튼 ---------- */
-.fab { z-index: 21; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.fab svg { transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.fab { z-index: 21; transition: transform 0.2s var(--ease-out); }
+.fab svg { transition: transform 0.22s var(--ease-out); }
 .fab.open { background: var(--surface-2); color: var(--text-strong); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
 .fab.open svg { transform: rotate(45deg); }
 .fab-scrim { position: absolute; inset: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); animation: mk-fade-in 0.15s ease-out; }
 .fab-menu { position: absolute; right: 20px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 21; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
-.fab-sat { display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none; color: var(--text-strong); animation: sat-out 0.26s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.fab-sat { display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none; color: var(--text-strong); animation: sat-out 0.26s var(--ease-pop) both; }
 .fab-sat:nth-child(1) { animation-delay: 0.03s; }
-.fab-menu.closing .fab-sat { animation: sat-in 0.14s ease-in both; }
+.fab-menu.closing .fab-sat { animation: sat-in 0.14s var(--ease-out) both; }
 .fab-sat-label { padding: 6px 12px; border-radius: 10px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14.5px; }
 .fab-sat-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-right: 4px; border-radius: 18px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.2); }
 .fab-sat[data-new="voice"] .fab-sat-btn { background: #e5484d; color: #fff; }
@@ -757,7 +757,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #f
 
 /* ---------- 바로 지우기: 카드는 밀려 접히고, 메모 화면은 휴지통으로 ---------- */
 .cards .item.removing { overflow: hidden; animation: card-remove 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-.cards .item.removing .card { animation: card-fly 0.24s ease-in forwards; }
+.cards .item.removing .card { animation: card-fly 0.24s var(--ease-out) forwards; }
 @keyframes card-remove { 60% { height: var(--h, auto); opacity: 0.4; } to { height: 0; margin-top: -10px; opacity: 0; } }
 @keyframes card-fly { to { transform: translateX(var(--fly, 110%)) rotate(6deg); opacity: 0; } }
 .card.swiping { transition: none; z-index: 2; }
@@ -769,7 +769,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #f
 /* 태블릿: 오른쪽으로 밀면 열기 (지우기는 왼쪽으로만) — 안내는 카드 왼쪽 안에 (옆 메모 칸에 가리지 않게) */
 .card.swipe-open.swipe-ready { box-shadow: 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
 .card.swipe-open.swipe-ready::before { content: attr(data-open-label); right: auto; left: 10px; background: var(--brand-yellow); color: var(--on-brand); }
-.note-screen.trashing { animation: note-trash 0.26s cubic-bezier(0.5, 0, 0.75, 0) forwards; transform-origin: 85% 100%; }
+.note-screen.trashing { animation: note-trash 0.26s var(--ease-out) forwards; transform-origin: 85% 100%; }
 @keyframes note-trash { to { opacity: 0; transform: translateY(30%) scale(0.35) rotate(-6deg); border-radius: 40px; } }
 
 /* 인쇄·PDF: 메모 내용만 */
@@ -792,11 +792,11 @@ body.two-pane.pane-list { --L: var(--list-w); }
 body.two-pane .list-screen { right: 0; }
 body.two-pane.note-open .list-screen { right: auto; width: var(--list-w); border-right: 1px solid var(--line); }
 body.two-pane.note-open:not(.pane-list) .list-screen { visibility: hidden; }
-body.two-pane.pane-list .list-screen { animation: list-out 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+body.two-pane.pane-list .list-screen { animation: list-out 0.2s var(--ease-out); }
 @keyframes list-out { from { transform: translateX(-24px); opacity: 0.4; } }
-body.two-pane .note-screen { left: var(--L); right: 0; transition: left 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), right 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+body.two-pane .note-screen { left: var(--L); right: 0; transition: left 0.22s var(--ease-out), right 0.22s var(--ease-out); }
 body.two-pane .note-screen.entering { animation: pane-in 0.18s ease-out; }
-body.two-pane .note-screen.leaving { animation: pane-out 0.14s ease-in forwards; }
+body.two-pane .note-screen.leaving { animation: pane-out 0.14s var(--ease-out) forwards; }
 @keyframes pane-in { from { opacity: 0; transform: translateX(16px); } }
 @keyframes pane-out { to { opacity: 0; } }
 body.two-pane .pane-empty:not([hidden]) {
@@ -820,7 +820,7 @@ body.two-pane .sheet, body.two-pane .sheet.links-panel {
   width: min(560px, calc(100vw - 48px)); max-height: min(86%, 760px);
   border-radius: 22px;
   transform: translateX(-50%);
-  animation: sheet-pop 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: sheet-pop 0.2s var(--ease-out);
 }
 @keyframes sheet-pop { from { opacity: 0; transform: translate(-50%, 24px); } }
 body.two-pane .sheet .sheet-grip { display: none; }
@@ -867,7 +867,7 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   position: relative;
 }
 .note-screen #format-bar button.add-btn.open { background: color-mix(in srgb, var(--note-text) 14%, transparent); color: var(--note-text); }
-.note-screen #format-bar button.add-btn svg { width: 20px; height: 20px; transition: transform 0.24s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.note-screen #format-bar button.add-btn svg { width: 20px; height: 20px; transition: transform 0.24s var(--ease-pop); }
 .note-screen #format-bar button.add-btn.open svg { transform: rotate(45deg); } /* + → × */
 .note-screen #format-bar button.add-btn.recording::after {
   content: "";
@@ -889,7 +889,7 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   align-items: flex-start;
   gap: 10px;
 }
-.add-sat { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: var(--text-strong); animation: add-sat-out 0.26s cubic-bezier(0.2, 1.3, 0.4, 1) both; -webkit-tap-highlight-color: transparent; }
+.add-sat { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: var(--text-strong); animation: add-sat-out 0.26s var(--ease-pop) both; -webkit-tap-highlight-color: transparent; }
 .add-sat:nth-child(1) { animation-delay: 0s; }
 .add-sat:nth-child(2) { animation-delay: 0.03s; }
 .add-sat:nth-child(3) { animation-delay: 0.06s; }
@@ -897,7 +897,7 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 .add-sat:nth-child(5) { animation-delay: 0.12s; }
 .add-sat:nth-child(6) { animation-delay: 0.15s; }
 .add-sat:nth-child(7) { animation-delay: 0.18s; }
-.add-menu.closing .add-sat { animation: add-sat-in 0.14s ease-in both; animation-delay: 0s; }
+.add-menu.closing .add-sat { animation: add-sat-in 0.14s var(--ease-out) both; animation-delay: 0s; }
 .add-sat-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 16px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.18), inset 0 0 0 1px var(--line); }
 .add-sat-btn svg { width: 22px; height: 22px; }
 .add-sat-btn.rec { background: #e5484d; color: #fff; box-shadow: 0 6px 16px rgba(229, 72, 77, 0.35); }

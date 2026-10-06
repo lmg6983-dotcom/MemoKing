@@ -174,7 +174,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 }
 /* 목록 밖으로 나가면 미리보기 창이 이어받으므로 흐리게 */
 body.drag-outside .drag-clone { opacity: 0.25; }
-.drag-clone.returning { transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s; }
+.drag-clone.returning { transition: transform 0.25s var(--ease-out), opacity 0.25s; }
 .drag-clone.drop-out { opacity: 0 !important; transition: opacity 0.2s ease-out; }
 
 /* 놓아서 열린 카드가 한 번 반짝인다 */
@@ -759,9 +759,9 @@ body.is-dragging .card:hover { transform: none; }
   color: var(--on-brand);
   box-shadow: 0 4px 12px rgba(17, 17, 17, 0.2), 0 1px 3px rgba(17, 17, 17, 0.12);
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.15s ease-out;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.15s ease-out;
 }
-.fab svg { width: 22px; height: 22px; transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.fab svg { width: 22px; height: 22px; transition: transform 0.22s var(--ease-out); }
 .fab:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(17, 17, 17, 0.26), 0 2px 4px rgba(17, 17, 17, 0.12); }
 .fab:active { transform: scale(0.94); }
 /* 펼친 동안: 위성 단추와 같은 앱 바탕 (버튼에 검정 바탕은 쓰지 않음) */
@@ -770,9 +770,9 @@ body.is-dragging .card:hover { transform: none; }
 body:not([data-tab="memos"]):not([data-tab="reminders"]) :is(.fab, .fab-menu, .fab-scrim) { display: none; }
 .fab-scrim { position: fixed; inset: 44px 0 0; z-index: 30; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); animation: mk-fade-in 0.15s ease-out; }
 .fab-menu { position: fixed; right: 18px; bottom: 72px; z-index: 31; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
-.fab-sat { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: var(--text-strong); cursor: pointer; animation: fab-sat-out 0.26s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.fab-sat { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: var(--text-strong); cursor: pointer; animation: fab-sat-out 0.26s var(--ease-pop) both; }
 .fab-sat:nth-child(1) { animation-delay: 0.03s; }
-.fab-menu.closing .fab-sat { animation: fab-sat-in 0.14s ease-in both; }
+.fab-menu.closing .fab-sat { animation: fab-sat-in 0.14s var(--ease-out) both; }
 .fab-sat-label { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 13px; }
 .fab-sat-label kbd { padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--muted); }
 .fab-sat-btn { display: grid; place-items: center; width: 38px; height: 38px; margin-right: 3px; border-radius: 13px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.2); transition: transform 0.12s ease-out; }
@@ -792,7 +792,7 @@ body:not([data-tab="memos"]):not([data-tab="reminders"]) :is(.fab, .fab-menu, .f
 
 /* 지우는 카드: 옆으로 날아가고 그 자리가 접힌다 (휴대폰과 같음) */
 .cards .item.removing { overflow: hidden; animation: card-remove 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-.cards .item.removing .card { animation: card-fly 0.24s ease-in forwards; }
+.cards .item.removing .card { animation: card-fly 0.24s var(--ease-out) forwards; }
 .cards .item.removing .card-actions { display: none; }
 @keyframes card-remove { 60% { opacity: 0.4; } to { height: 0; margin-top: -10px; opacity: 0; } }
 @keyframes card-fly { to { transform: translateX(110%) rotate(6deg); opacity: 0; } }

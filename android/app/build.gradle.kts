@@ -38,8 +38,8 @@ android {
         applicationId = "com.memoking.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 49
-        versionName = "0.14.3"
+        versionCode = 50
+        versionName = "0.14.4"
 
         // Google Drive 동기화용 OAuth 클라이언트 ("데스크톱 앱" 유형). 비워 두면 앱 설정에서 붙여 넣는다.
         // 넣는 곳: android/local.properties 의 memoking.googleClientId / memoking.googleClientSecret,
