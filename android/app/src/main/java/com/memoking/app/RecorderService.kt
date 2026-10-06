@@ -294,6 +294,7 @@ class RecorderService : Service() {
                     } catch (e: Exception) {
                         ""
                     }
+                    synchronized(parts) { Transcript.relabel(parts, transcriber?.speakers()) }
                     if (tail.isNotBlank()) synchronized(parts) { parts.add(Transcript.Line(tail)) }
                     transcriber?.close()
                 }
