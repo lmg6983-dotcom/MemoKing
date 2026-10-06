@@ -22,11 +22,6 @@ export function loneUrl(text) {
   }
 }
 
-// 붙여넣은 HTML 이 그 주소 하나만 담고 있는가 (주소창 복사·"링크 주소 복사"는 HTML 이 없거나 <a> 하나)
-export function htmlIsJustLink(html, url) {
-  return pastedLinkTitle(html, url) !== null;
-}
-
 /**
  * 링크 하나만 복사했을 때 그 링크 글자 (엣지 주소창 복사는 <a href="주소">페이지 제목</a>).
  * @returns {string|null} 제목('' = 글자가 주소 그대로이거나 HTML 없음), 링크 말고 다른 내용이 있으면 null

@@ -5,9 +5,8 @@ import { toLocalIso } from './core/time.js';
 
 const $ = (id) => document.getElementById(id);
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
-const pad = (v) => String(v).padStart(2, '0');
 // <input type="datetime-local"> 값: 2026-09-30T14:00
-const localInputValue = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const localInputValue = (d) => toLocalIso(d).slice(0, 16);
 
 /**
  * @param {{ api: object, memoId: string, setStatus: (text: string, isError?: boolean) => void, onToggle?: (open: boolean) => void }} options

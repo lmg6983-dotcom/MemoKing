@@ -4,6 +4,7 @@
 //   받아쓰기(켰고 데이터가 있으면): 녹음하는 소리를 16kHz 로 바꿔 메인 프로세스(desktop/stt)로 보내고,
 //   한 문장이 끝날 때마다 패널에 글이 나타난다. 끝내면 소리와 받아쓴 글이 한 음성 카드로.
 import { voiceCardMarkdown, recordingClock, recordingWhen } from './core/voice-card.js';
+import { icon as svg } from './icons.js';
 
 // 앞에서부터 이 PC 의 녹음기가 만들 수 있는 것 — MP4(AAC, 없으면 Opus)는 길이가 바로 보여 끌어서 넘기기 쉽다.
 // WebM 은 녹음기가 길이를 적지 않아 마지막 수단
@@ -268,12 +269,4 @@ export function setupVoiceRecorder(opts) {
       return Boolean(rec);
     },
   };
-}
-
-function svg(name) {
-  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-  use.setAttribute('href', `#i-${name}`);
-  s.append(use);
-  return s;
 }

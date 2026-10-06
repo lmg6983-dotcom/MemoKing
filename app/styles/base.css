@@ -31,7 +31,8 @@
   --focus-ring: #111111;
 
   --shadow-card: 0 1px 2px rgba(17, 17, 17, 0.06), 0 2px 8px rgba(17, 17, 17, 0.04);
-  --shadow-pop: 0 12px 32px rgba(17, 17, 17, 0.16);
+  /* 떠 있는 판(메뉴·말풍선·대화상자): 1px 테두리와 어울리게 넓게 번지는 그림자 대신 가까운 그림자 두 겹 */
+  --shadow-pop: 0 2px 6px rgba(17, 17, 17, 0.1), 0 10px 20px rgba(17, 17, 17, 0.1);
   /* 안내 말풍선·알림 띠·토스트: 검정 대신 앱 바탕 (다크 모드에선 어두운 앱 바탕) */
   --bubble-bg: var(--surface-2);
   --bubble-fg: var(--text-strong);
@@ -66,6 +67,18 @@
   --charcoal-bg: #1c1c1b; --charcoal-bar: #111111; --charcoal-chip: #111111;
   --note-text-default: #1f1f1c;
   --note-black-text: #f5f4ef;
+
+  /* 녹음·지우기 빨강 — 녹음 점·막대·단추, 밀어 지우기, CLEAR 도장이 함께 쓴다 */
+  --rec: #e5484d;
+  --rec-hover: #d63c41;
+  --on-rec: #ffffff;
+  --rec-on-dark: #ff8b8f; /* 검정 메모 위의 CLEAR 도장 */
+
+  /* 움직임 — 곡선은 여기서만 정한다 (Emil Kowalski 기준: 나타나고 사라지는 건 ease-out, 화면 안에서 옮겨 가는 건 ease-in-out) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);     /* 강한 ease-out: 처음이 빨라 바로 반응하는 느낌 */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* 화면 안에서 자리를 옮길 때 */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);  /* 아래에서 올라오는 시트 (iOS 서랍 곡선) */
+  --ease-pop: cubic-bezier(0.2, 1.3, 0.4, 1);     /* 살짝 튀는 등장 — 드문 축하 순간에만 (튜토리얼 · 체크리스트 CLEAR 도장). 자주 보는 메뉴·창은 --ease-out */
   color-scheme: light;
 }
 
@@ -86,7 +99,7 @@
     --on-danger: #1a0506;
     --focus-ring: #ffcc00;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.6);
+    --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 14px rgba(0, 0, 0, 0.45);
 
     --yellow-bg: #3a3317; --yellow-bar: #4a401a;
     --green-bg: #1e3322; --green-bar: #26402b; --green-chip: #5cc46a;
@@ -145,10 +158,10 @@ svg { width: 20px; height: 20px; flex: none; }
   cursor: pointer;
   transition: background-color 0.15s ease-out;
 }
-.icon-btn:hover { background: var(--hover); color: var(--text); }
+@media (hover: hover) and (pointer: fine) { .icon-btn:hover { background: var(--hover); color: var(--text); } }
 .icon-btn.primary { background: var(--brand-yellow); color: var(--on-brand); }
-.icon-btn.primary:hover { background: var(--brand-yellow-hover); }
-.icon-btn.danger:hover { color: var(--danger); }
+@media (hover: hover) and (pointer: fine) { .icon-btn.primary:hover { background: var(--brand-yellow-hover); } }
+@media (hover: hover) and (pointer: fine) { .icon-btn.danger:hover { color: var(--danger); } }
 
 /* 버튼: 기본(앱 바탕 + 테두리) · primary(노랑, 한 화면에 하나) · danger — 버튼에 검정 바탕은 쓰지 않는다 */
 .btn {
@@ -166,10 +179,10 @@ svg { width: 20px; height: 20px; flex: none; }
   cursor: pointer;
   transition: background-color 0.15s ease-out, transform 0.1s ease-out;
 }
-.btn:hover { background: var(--fill-hover); }
+@media (hover: hover) and (pointer: fine) { .btn:hover { background: var(--fill-hover); } }
 .btn:active { transform: scale(0.98); }
 .btn.primary { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
-.btn.primary:hover { background: var(--brand-yellow-hover); }
+@media (hover: hover) and (pointer: fine) { .btn.primary:hover { background: var(--brand-yellow-hover); } }
 .btn.danger { background: var(--danger); color: var(--on-danger); box-shadow: none; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -197,8 +210,12 @@ svg { width: 20px; height: 20px; flex: none; }
   word-break: break-all;
 }
 
+/* 동작 줄이기: 0 으로 끄지 않고 '덜, 부드럽게' — 위치·크기 움직임은 빼고 색·투명도 변화만 남겨 무엇이 바뀌었는지는 보이게 한다 */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after, ::backdrop { animation: none !important; transition: none !important; }
+  *, *::before, *::after, ::backdrop {
+    animation: none !important;
+    transition-property: opacity, color, background-color, border-color, outline-color, box-shadow !important;
+  }
 }
 
 /* ---------- 튜토리얼 말풍선 (v0.12.0) ---------- */
@@ -208,7 +225,6 @@ svg { width: 20px; height: 20px; flex: none; }
   border-radius: 12px;
   box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px rgba(0, 0, 0, 0.45);
   pointer-events: none; /* 비춘 버튼을 실제로 눌러 볼 수 있게 */
-  transition: left 0.2s ease-out, top 0.2s ease-out, width 0.2s ease-out, height 0.2s ease-out;
 }
 .coach-spot.center { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); }
 .coach-bubble {
@@ -225,7 +241,7 @@ svg { width: 20px; height: 20px; flex: none; }
 }
 @keyframes coach-in { from { opacity: 0; transform: scale(0.96); } }
 .coach-bubble.wide { width: min(440px, calc(100vw - 24px)); }
-.coach-bubble.enter { animation: coach-pop 0.32s cubic-bezier(0.2, 1.3, 0.4, 1); }
+.coach-bubble.enter { animation: coach-pop 0.32s var(--ease-pop); }
 @keyframes coach-pop { from { opacity: 0; transform: translateY(8px) scale(0.94); } }
 /* 머리: 이모지 · 진행 막대 · 몇 번째 */
 .coach-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
@@ -236,8 +252,8 @@ svg { width: 20px; height: 20px; flex: none; }
 }
 @keyframes coach-bounce { 0% { transform: scale(0.4) rotate(-20deg); } 70% { transform: scale(1.12) rotate(6deg); } }
 .coach-progress { flex: 1; height: 6px; border-radius: 999px; background: var(--fill-tab); overflow: hidden; }
-.coach-progress i { display: block; height: 100%; border-radius: inherit; background: var(--brand-yellow); transition: width 0.35s ease-out; }
-.coach-count { flex: none; font-size: 11px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.coach-progress i { display: block; height: 100%; border-radius: inherit; background: var(--brand-yellow); transform-origin: left center; transition: transform 0.35s var(--ease-out); }
+.coach-count { flex: none; font-size: 12px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .coach-bubble h3 { margin: 2px 0 6px; font-size: 17px; line-height: 24px; font-weight: 800; letter-spacing: -0.015em; }
 .coach-bubble p { margin: 0 0 10px; font-size: 13.5px; line-height: 21px; color: var(--text-strong); }
 /* 해 냈을 때 칭찬 */
@@ -272,7 +288,7 @@ svg { width: 20px; height: 20px; flex: none; }
 @keyframes coach-nudge { 0%, 70%, 100% { transform: none; } 80% { transform: translateX(3px); } 90% { transform: translateX(-2px); } }
 .coach-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .coach-skip { padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.coach-skip:hover { background: var(--fill-hover); color: var(--text-strong); }
+@media (hover: hover) and (pointer: fine) { .coach-skip:hover { background: var(--fill-hover); color: var(--text-strong); } }
 .coach-next { height: 34px; padding: 0 14px; font-size: 13px; }
 .coach-next.coach-later { height: 32px; font-size: 12.5px; color: var(--text-muted); }
 /* 직접 해 보는 단계: 비춘 곳이 두근두근 · 둘레는 아주 옅게만 (글자를 고르고 메뉴를 보며 해 볼 수 있게) */
@@ -287,7 +303,7 @@ svg { width: 20px; height: 20px; flex: none; }
   border: 0; border-radius: 8px; background: none; color: var(--text-muted); cursor: pointer;
 }
 .coach-fold::before { content: ""; width: 8px; height: 8px; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-2px) rotate(45deg); transition: transform 0.15s; }
-.coach-fold:hover { background: var(--fill-hover); color: var(--text-strong); }
+@media (hover: hover) and (pointer: fine) { .coach-fold:hover { background: var(--fill-hover); color: var(--text-strong); } }
 .coach-bubble.mini {
   width: auto; max-width: min(340px, calc(100vw - 24px)); padding: 7px 10px 7px 7px; border-radius: 16px; cursor: pointer;
   box-shadow: var(--shadow-pop), 0 0 0 2px var(--brand-yellow);
@@ -356,7 +372,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   pointer-events: none;
   background: var(--surface-1);
   box-shadow: var(--shadow-card);
-  transition: transform 0.28s cubic-bezier(0.3, 1.3, 0.5, 1), width 0.28s cubic-bezier(0.3, 1.3, 0.5, 1), height 0.2s ease-out, opacity 0.15s;
+  transition: transform 0.24s var(--ease-out), opacity 0.15s;
 }
 
 /* 켜기/끄기 스위치 (체크박스) — 메모 창 · 목록 · PDF · 휴대폰 (휴대폰은 mobile.css 가 손가락 크기로) */
@@ -421,4 +437,4 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   font: inherit;
   cursor: pointer;
 }
-.zoom-badge button:hover { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
+@media (hover: hover) and (pointer: fine) { .zoom-badge button:hover { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; } }

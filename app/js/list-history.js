@@ -1,7 +1,7 @@
 // 목록 창 "알림 보관함" 탭 — Windows 알림 기록 (갤럭시 NotiStar 처럼)
 import { icon } from './icons.js';
+import { hhmm } from './core/time.js';
 
-const pad = (v) => String(v).padStart(2, '0');
 // 알림 그림 주소 (안드로이드는 window.memoking.historyBase 로 자기 주소를 알려 준다)
 const historyUrl = (name) => `${globalThis.memoking?.historyBase ?? 'memoking://history/'}${encodeURIComponent(name)}`;
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
@@ -81,7 +81,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     text.className = 'noti-text';
     const meta = document.createElement('div');
     meta.className = 'noti-meta';
-    meta.textContent = `${e.app} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    meta.textContent = `${e.app} · ${hhmm(d)}`;
     const title = document.createElement('div');
     title.className = 'noti-title';
     title.textContent = e.title;

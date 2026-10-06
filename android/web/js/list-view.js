@@ -330,11 +330,13 @@ let swipe = null;
 el.cards.addEventListener('touchstart', (e) => {
   const card = e.target.closest('.card');
   if (!card || e.touches.length !== 1) return;
-  swipe = { card, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, active: false };
+  swipe = { card, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, active: false, t: e.timeStamp, vx: 0, id: e.touches[0].identifier };
 }, { passive: true });
 el.cards.addEventListener('touchmove', (e) => {
   if (!swipe) return;
-  const t = e.touches[0];
+  // 두 번째 손가락이 닿아도 카드가 튀지 않게 첫 손가락만 따른다
+  const t = [...e.touches].find((x) => x.identifier === swipe.id);
+  if (!t) return;
   const dx = t.clientX - swipe.x;
   const dy = t.clientY - swipe.y;
   if (!swipe.active) {
@@ -347,6 +349,10 @@ el.cards.addEventListener('touchmove', (e) => {
     swipe.card.classList.add('swiping');
   }
   e.preventDefault();
+  // 손을 뗄 때의 빠르기 (px/ms) — 짧게 '휙' 밀어도 지워지게
+  const dt = e.timeStamp - swipe.t;
+  if (dt > 0) swipe.vx = (dx - swipe.dx) / dt;
+  swipe.t = e.timeStamp;
   swipe.dx = dx;
   const w = swipe.card.offsetWidth || 1;
   // 태블릿: 오른쪽으로 밀면 열기 — 카드는 목록 안에서만 살짝 따라온다 · 지우기는 왼쪽으로만
@@ -365,16 +371,20 @@ el.cards.addEventListener('touchmove', (e) => {
   swipe.card.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / w * 0.7));
   swipe.card.classList.toggle('swipe-ready', ready);
 }, { passive: false });
-function endSwipe() {
+function endSwipe(e) {
   if (!swipe) return;
+  // 다른 손가락만 뗀 경우는 계속 민다
+  if (e?.touches && [...e.touches].some((x) => x.identifier === swipe.id)) return;
   const { card, dx, active } = swipe;
+  // 멈췄다가 뗀 건 튕긴 게 아니다
+  const vx = e && e.timeStamp - swipe.t < 100 ? swipe.vx : 0;
   swipe = null;
   if (!active) return;
   const opening = card.classList.contains('swipe-open');
   card.classList.remove('swiping', 'swipe-ready', 'swipe-open');
   const w = card.offsetWidth || 1;
   if (opening) {
-    card.style.transition = 'transform 0.22s cubic-bezier(0.2, 1.3, 0.4, 1)';
+    card.style.transition = 'transform 0.22s cubic-bezier(0.23, 1, 0.32, 1)';
     card.style.transform = '';
     setTimeout(() => (card.style.transition = ''), 240);
     if (dx > w * 0.28) {
@@ -385,15 +395,17 @@ function endSwipe() {
     }
     return;
   }
-  if (Math.abs(dx) > w * 0.38) {
-    card.style.transition = 'transform 0.18s ease-in, opacity 0.18s ease-in';
+  // 멀리 밀었거나, 같은 방향으로 휙 튕겼으면 (빠르기 0.11px/ms 넘음 · 너무 짧은 건 빼고) 지운다
+  const flick = Math.abs(vx) > 0.11 && Math.sign(vx) === Math.sign(dx) && Math.abs(dx) > w * 0.12;
+  if (Math.abs(dx) > w * 0.38 || flick) {
+    card.style.transition = 'transform 0.18s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.18s cubic-bezier(0.23, 1, 0.32, 1)';
     card.style.transform = `translateX(${Math.sign(dx) * w * 1.3}px) rotate(${Math.sign(dx) * 8}deg)`;
     card.style.opacity = '0';
     card.dataset.swiped = '1';
     setTimeout(() => app.deleteMemo(card.dataset.id), 120);
     return;
   }
-  card.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s';
+  card.style.transition = 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s';
   card.style.transform = '';
   card.style.opacity = '';
   setTimeout(() => (card.style.transition = ''), 220);
@@ -447,7 +459,7 @@ function glideCards(change) {
 el.layoutBtn.addEventListener('click', () => {
   layout = layout === 'rows' ? 'grid' : 'rows';
   tutEvent('layout-changed');
-  el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.3, 1.4, 0.5, 1)' });
+  el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   glideCards(() => {
     applyLayout(layout);
     render();

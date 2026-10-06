@@ -1,4 +1,4 @@
-import { haptic, reduceMotion, replayClass } from './dom.js';
+import { flipFrom, haptic, reduceMotion, replayClass } from './dom.js';
 // 튜토리얼 말풍선 — 비출 요소 둘레만 밝게 두고 나머지를 어둡게, 옆에 안내 말풍선. (PC·휴대폰 함께)
 // 화면은 그대로 눌러지므로(따라 하기) 비춘 버튼을 실제로 눌러 볼 수 있다.
 //   - 머리: 단계 이모지 · 진행 막대 · 몇 번째인지
@@ -58,6 +58,7 @@ export function setupCoach(api, o = {}) {
     const vh = window.innerHeight;
     const pad = 6;
     let r = null;
+    const prevSpot = spot.hidden ? null : spot.getBoundingClientRect();
     if (target) {
       const t = target.getBoundingClientRect();
       r = {
@@ -66,6 +67,7 @@ export function setupCoach(api, o = {}) {
       };
       Object.assign(spot.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.right - r.left}px`, height: `${r.bottom - r.top}px` });
       spot.classList.remove('center');
+      flipFrom(spot, prevSpot);
     } else {
       // 비출 곳이 없으면 화면 전체를 어둡게 하고 가운데에 말풍선
       Object.assign(spot.style, { left: `${vw / 2}px`, top: `${vh / 2}px`, width: '0px', height: '0px' });
@@ -204,7 +206,7 @@ export function setupCoach(api, o = {}) {
     const emoji = el('span', 'coach-emoji', step.emoji ?? '💡');
     const bar = el('div', 'coach-progress');
     const fill = el('i');
-    fill.style.width = `${Math.round(((step.index + 1) / step.total) * 100)}%`;
+    fill.style.transform = `scaleX(${(step.index + 1) / step.total})`;
     bar.append(fill);
     head.append(emoji, bar, el('span', 'coach-count', `${step.index + 1} / ${step.total}`));
     if (step.advance) {

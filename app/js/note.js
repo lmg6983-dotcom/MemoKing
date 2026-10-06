@@ -287,7 +287,7 @@ function applyTop(on) {
     el.topBtn.querySelector('svg').animate(on
       ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
       : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
-    { duration: on ? 200 : 280, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    { duration: on ? 200 : 280, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   }
   el.topBtn.setAttribute('aria-pressed', String(on));
   const label = on ? '늘 위에 두기 끄기' : '다른 창보다 늘 위에 두기';
@@ -373,7 +373,7 @@ $('delete-btn').addEventListener('click', async () => {
   // 묻지 않고 바로 휴지통으로 (목록 창에 되돌리기) — 창이 휴지통으로 빨려 들어가듯 사라진다
   saved = current; // 삭제하는 메모는 저장하지 않는다
   if (!reduceMotion()) {
-    await document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {});
+    await document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'forwards' }).finished.catch(() => {});
   }
   await api.memo.remove(id);
 });

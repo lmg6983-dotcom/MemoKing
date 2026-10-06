@@ -1092,15 +1092,6 @@ export async function settled() {
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 60)));
 }
 
-/** 본문을 통째로 바꾸고 저장 (다시 받아쓴 글을 녹음 아래에 넣을 때) */
-export function replaceBody(md) {
-  if (!editor) return;
-  editor.setMarkdown(md);
-  current = editor.getMarkdown();
-  saved = '';
-  flush();
-}
-
 /** 받아쓴 글 등을 메모 끝에 (서식대로) */
 export function appendText(md) {
   if (!editor || !md) return;

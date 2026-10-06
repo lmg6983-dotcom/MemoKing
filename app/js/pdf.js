@@ -1,6 +1,7 @@
 // PDF 만들기 창 — 크기·비율·방향·여백을 고르면 미리보기가 바로 바뀌고, 저장하면 메인 프로세스가 PDF 를 만든다.
 import { PAPERS, RATIOS, MARGINS, pageSize, keepRatio, ratioLabel, mmToPx } from './core/pdf-page.js';
 import { attachSliders } from './seg-slider.js';
+import { flipFrom } from './dom.js';
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
@@ -60,12 +61,14 @@ function render() {
   const ph = mmToPx(s.height);
   const scale = Math.min((stage.width - 32) / pw, (stage.height - 32) / ph);
   const sheet = $('sheet');
+  const before = sheet.getBoundingClientRect();
   sheet.style.width = `${pw * scale}px`;
   sheet.style.height = `${ph * scale}px`;
   const frame = $('frame');
   frame.style.width = `${pw}px`;
   frame.style.height = `${ph}px`;
   frame.style.transform = `scale(${scale})`;
+  flipFrom(sheet, before);
   document.body.dataset.pages = '';
   $('summary').textContent = `${s.width} × ${s.height}mm · ${ratioLabel(s.width, s.height)}`;
   // 쪽 내용은 잠깐 멈춘 뒤에 다시 그린다 (입력하는 동안 깜빡이지 않게)

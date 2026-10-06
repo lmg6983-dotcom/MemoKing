@@ -120,4 +120,3 @@ export function screenChanged() {
   send();
 }
 
-export const tutorialActive = () => state.active;

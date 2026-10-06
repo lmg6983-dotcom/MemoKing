@@ -137,7 +137,7 @@ function renderNow() {
 
 // ---------- 움직임 (디자인 시스템: 짧고 조용하게, 움직임 줄이기 존중) ----------
 
-const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+const EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
 let firstCards = true;
 
 function cardRects() {
@@ -1018,7 +1018,7 @@ function glideCards(change) {
 el.layoutBtn.addEventListener('click', () => {
   layout = layout === 'rows' ? 'grid' : 'rows';
   tutEvent('layout-changed');
-  if (!reduceMotion()) el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.3, 1.4, 0.5, 1)' });
+  if (!reduceMotion()) el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   glideCards(() => {
     applyLayout();
     renderNow();
@@ -1048,7 +1048,7 @@ const showListTop = (on, animate = true) => {
   icon.animate(on
     ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
     : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
-  { duration: on ? 200 : 280, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  { duration: on ? 200 : 280, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
 };
 // 버튼은 붙이기만 (떼기는 창 위의 왕관 스티커를 눌러서). 상태는 list:on-top 으로 돌아온다
 listTopBtn.addEventListener('click', () => {

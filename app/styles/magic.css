@@ -9,7 +9,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
   overflow: hidden;
   -webkit-app-region: drag; /* 테두리·빈 곳을 끌면 창이 옮겨진다 */
 }
-.magic.enter { animation: magic-in 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.magic.enter { animation: magic-in 0.16s var(--ease-out) both; }
 @keyframes magic-in { from { opacity: 0; transform: translateY(-6px) scale(0.985); } to { opacity: 1; transform: none; } }
 
 .magic-grip { display: flex; justify-content: center; padding: 6px 0 0; cursor: grab; }
@@ -32,12 +32,12 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
   caret-color: #e0a800;
 }
 .magic-input::placeholder { color: #a0a0a0; }
-.magic-clear { -webkit-app-region: no-drag; flex: none; width: 24px; height: 24px; margin-top: 3px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.07); color: #666; font-size: 11px; cursor: pointer; }
+.magic-clear { -webkit-app-region: no-drag; flex: none; width: 24px; height: 24px; margin-top: 3px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.07); color: #666; font-size: 12px; cursor: pointer; }
 .magic-clear:hover { background: rgba(0, 0, 0, 0.14); color: #111; }
 
 .magic-results { -webkit-app-region: no-drag; list-style: none; margin: 0; padding: 4px 8px 6px; max-height: 430px; overflow-y: auto; border-top: 1px solid var(--mk-line); }
 .magic-results:empty { display: none; }
-.magic-section { display: flex; align-items: center; gap: 6px; padding: 9px 10px 4px; color: #8c8c8c; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; }
+.magic-section { display: flex; align-items: center; gap: 6px; padding: 9px 10px 4px; color: #8c8c8c; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; }
 .magic-section .count { padding: 0 6px; border-radius: 99px; background: rgba(0, 0, 0, 0.06); font-weight: 600; }
 .magic-row { display: flex; align-items: center; gap: 11px; min-height: 38px; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
 .magic-row[aria-selected="true"] { background: var(--mk-sel); }
@@ -50,7 +50,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-row .s { font-size: 12px; color: #858585; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .magic-row .s:empty { display: none; }
 .magic-row b { font-weight: 800; color: #111; background: rgba(255, 205, 0, 0.38); border-radius: 3px; padding: 0 1px; }
-.magic-row .side { flex: none; color: #9a9a9a; font-size: 11.5px; }
+.magic-row .side { flex: none; color: #9a9a9a; font-size: 12px; }
 .magic-row .act { flex: none; display: none; align-items: center; gap: 4px; color: #6b5a00; font-size: 12px; font-weight: 600; }
 .magic-row[aria-selected="true"] .act { display: inline-flex; }
 .magic-row[aria-selected="true"] .side { display: none; }
@@ -63,7 +63,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
   height: 24px; padding: 0 10px 0 8px;
   border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 999px;
   background: transparent; color: #8a8a8a;
-  font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.08s;
 }
 .magic-chip:hover { border-color: rgba(0, 0, 0, 0.25); color: #333; }
@@ -72,7 +72,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-chip.on { border-color: transparent; background: #fff1b8; color: #111; }
 .magic-chip.on .chip-dot { background: #22a35a; box-shadow: none; }
 .magic-chip:focus-visible { outline: 2px solid #e0a800; outline-offset: 1px; }
-.magic-hint { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 10px; height: 18px; overflow: hidden; min-width: 0; color: #9a9a9a; font-size: 11px; white-space: nowrap; }
+.magic-hint { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 10px; height: 18px; overflow: hidden; min-width: 0; color: #9a9a9a; font-size: 12px; white-space: nowrap; }
 kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.06); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12); color: #555; font: 600 10.5px/16px inherit; text-align: center; }
 
 @media (prefers-color-scheme: dark) {
