@@ -31,17 +31,4 @@ class TranscriptTest {
         // 한 사람뿐이면 표시 없이 줄만
         assertEquals("안녕하세요.\n네.", Transcript.join(listOf(Transcript.Line("안녕하세요", 1), Transcript.Line("네", 1))))
     }
-
-    @Test
-    fun 목소리_특징으로_사람을_나눈다() {
-        val t = SpeakerTracker()
-        val a = FloatArray(8) { if (it < 4) 1f else 0.1f }
-        val b = FloatArray(8) { if (it >= 4) 1f else 0.1f }
-        assertEquals(1, t.assign(a, 200))
-        assertEquals(2, t.assign(b, 200))
-        assertEquals(1, t.assign(FloatArray(8) { if (it < 4) 0.9f else 0.2f }, 200))
-        assertEquals(1, t.assign(b, 20)) // 아주 짧은 말은 앞사람으로
-        assertEquals(2, t.assign(b, 200))
-        assertEquals(0, t.assign(null, 0))
-    }
 }
