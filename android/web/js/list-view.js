@@ -384,7 +384,7 @@ function endSwipe(e) {
   card.classList.remove('swiping', 'swipe-ready', 'swipe-open');
   const w = card.offsetWidth || 1;
   if (opening) {
-    card.style.transition = 'transform 0.22s cubic-bezier(0.2, 1.3, 0.4, 1)';
+    card.style.transition = 'transform 0.22s cubic-bezier(0.23, 1, 0.32, 1)';
     card.style.transform = '';
     setTimeout(() => (card.style.transition = ''), 240);
     if (dx > w * 0.28) {
@@ -459,7 +459,7 @@ function glideCards(change) {
 el.layoutBtn.addEventListener('click', () => {
   layout = layout === 'rows' ? 'grid' : 'rows';
   tutEvent('layout-changed');
-  el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.3, 1.4, 0.5, 1)' });
+  el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   glideCards(() => {
     applyLayout(layout);
     render();

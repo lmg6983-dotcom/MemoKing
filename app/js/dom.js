@@ -14,3 +14,21 @@ export function replayClass(el, cls) {
   void el.offsetWidth;
   el.classList.add(cls);
 }
+
+// 자리·크기가 바뀐 요소를 transform 으로만 옛 자리에서 미끄러져 오게 (FLIP).
+//   width·left 같은 배치 속성을 애니메이션하지 않아 매 프레임 레이아웃을 다시 잡지 않는다.
+//   prev: 바꾸기 전 getBoundingClientRect(). 요소의 인라인 transform(자리 잡기용 translate)은 끝값으로 지킨다
+export function flipFrom(el, prev, { duration = 200, easing = 'cubic-bezier(0.23, 1, 0.32, 1)' } = {}) {
+  const next = el.getBoundingClientRect();
+  if (!prev?.width || !prev.height || !next.width || !next.height || reduceMotion()) return;
+  const dx = prev.left - next.left;
+  const dy = prev.top - next.top;
+  const sx = prev.width / next.width;
+  const sy = prev.height / next.height;
+  if (!dx && !dy && sx === 1 && sy === 1) return;
+  const base = el.style.transform || '';
+  el.animate([
+    { transformOrigin: '0 0', transform: `translate(${dx}px, ${dy}px) ${base} scale(${sx}, ${sy})` },
+    { transformOrigin: '0 0', transform: base || 'none' },
+  ], { duration, easing });
+}

@@ -1,3 +1,5 @@
+import { flipFrom } from './dom.js';
+
 // 여럿 중 하나 고르기(탭·종류 고르기)의 선택 표시가 다음 칸으로 미끄러져 간다 — 데스크탑·휴대폰 함께
 //   무엇이 바뀌었는지 눈으로 따라갈 수 있게. 칸의 aria-selected / aria-checked 가 바뀌면 저절로 따라간다
 //   (각 화면의 고르기 코드는 그대로 두고, 이 표시만 얹는다). 움직임 줄이기 설정이면 바로 옮긴다
@@ -25,11 +27,18 @@ export function attachSlider(box, { className = 'seg-thumb' } = {}) {
       return;
     }
     if (first) thumb.style.transition = 'none'; // 처음은 제자리에 바로
+    const before = thumb.offsetWidth !== sel.offsetWidth || thumb.offsetHeight !== sel.offsetHeight ? thumb.getBoundingClientRect() : null;
     thumb.style.opacity = '1';
     thumb.style.width = `${sel.offsetWidth}px`;
     thumb.style.height = `${sel.offsetHeight}px`;
     thumb.style.borderRadius = getComputedStyle(sel).borderRadius;
     thumb.style.transform = `translate(${sel.offsetLeft}px, ${sel.offsetTop}px)`;
+    // 칸 폭이 다르면 크기는 바로 바꾸고 transform 으로 옛 크기에서 늘어나게 (자리만 바뀌면 CSS transform 전환이 미끄러뜨림)
+    if (before && !first) {
+      thumb.style.transition = 'opacity 0.15s';
+      flipFrom(thumb, before, { duration: 240 });
+      requestAnimationFrame(() => (thumb.style.transition = ''));
+    }
     if (first) {
       void thumb.offsetWidth;
       thumb.style.transition = '';

@@ -1018,7 +1018,7 @@ function glideCards(change) {
 el.layoutBtn.addEventListener('click', () => {
   layout = layout === 'rows' ? 'grid' : 'rows';
   tutEvent('layout-changed');
-  if (!reduceMotion()) el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.3, 1.4, 0.5, 1)' });
+  if (!reduceMotion()) el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   glideCards(() => {
     applyLayout();
     renderNow();
