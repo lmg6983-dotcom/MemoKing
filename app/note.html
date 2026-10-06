@@ -104,7 +104,8 @@
       </div>
 
       <div class="rem-pane" data-pane="at" hidden>
-        <label class="rem-row"><input type="datetime-local" id="at-input"></label>
+        <input type="hidden" id="at-input">
+        <div id="at-picker" class="date-picker" aria-label="날짜와 시각"></div>
       </div>
 
       <div class="rem-pane" data-pane="repeat" hidden>
@@ -119,8 +120,9 @@
             <span id="rep-month-wrap"><input type="number" id="rep-month" min="1" max="12" value="1"> 월</span>
             <span id="rep-day-wrap"><input type="number" id="rep-day" min="1" max="31" value="1"> 일</span>
           </span>
-          <input type="time" id="rep-time" value="09:00">
+          <input type="hidden" id="rep-time" value="09:00">
         </label>
+        <div id="rep-time-picker" class="date-picker" aria-label="알릴 시각"></div>
         <div class="chips weekdays" id="rep-weekdays" hidden>
           <button type="button" data-wd="1">월</button><button type="button" data-wd="2">화</button><button type="button" data-wd="3">수</button>
           <button type="button" data-wd="4">목</button><button type="button" data-wd="5">금</button><button type="button" data-wd="6">토</button>

@@ -4,6 +4,33 @@
 //   - 글자를 다시 누르면 떼어 평소처럼 키보드가 올라온다
 // 마우스(PC)에는 아무 일도 하지 않는다.
 const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
+
+// ---------- 다루기 방식 (휴대폰 메모 화면 오른쪽 아래 다이얼, android/web/js/mode-knob.js) ----------
+//   'both' 지금처럼(PC·기본): 글을 고치다가 꾹 누르면 옮기기
+//   'edit' 글 고치기: 옮기기 손짓을 끄고 꾹 누르면 글자 고르기(복사·고치기) · 키보드 씀
+//   'move' 옮기기: 키보드 없이, 짧게 눌러도 줄·항목을 들어 옮김
+//   'draw' 글 위에 그리기: 키보드 없이 (그리기는 ink-annotate.js)
+let mode = 'both';
+export const touchMode = () => mode;
+/** 지금 끌어 옮기기 손짓을 받는가 */
+export const canDrag = () => mode === 'both' || mode === 'move';
+/** 옮기기 방식에서는 글자 고르기와 겹치지 않으니 짧게만 누르면 들어 올린다 (스크롤하려고 미는 것과는 구분) */
+export const MOVE_MODE_HOLD_MS = 180;
+export const holdFor = (ms) => (mode === 'move' ? Math.min(ms, MOVE_MODE_HOLD_MS) : ms);
+
+/** 다루기 방식을 바꾼다 — 편집기 본문(dom)의 키보드도 함께 (고치기만 키보드를 쓴다) */
+export function setTouchMode(next, dom) {
+  mode = next;
+  if (!dom) return;
+  if (next === 'move' || next === 'draw') {
+    dom.setAttribute('inputmode', 'none');
+    dom.dataset.mkNoKeyboard = '1';
+    if (dom.contains(document.activeElement) || document.activeElement === dom) dom.blur();
+  } else {
+    dom.removeAttribute('inputmode');
+    delete dom.dataset.mkNoKeyboard;
+  }
+}
 const NO_KEYBOARD_TARGET = 'img, .mk-media, .mk-link-card, .mk-file, a[href], .mk-math, .mk-math-block, .mk-voice-bar';
 
 /** 옮기기 시작: 키보드를 막고, 떠 있으면 내린다 */
@@ -17,7 +44,7 @@ export function holdKeyboard(view, { hide = true } = {}) {
 
 /** 손가락이 닿을 때: 내용(그림 등)이면 키보드를 막고, 글자면 다시 풀어 준다 */
 export function keyboardFor(view, target) {
-  if (!coarse()) return;
+  if (!coarse() || mode === 'move' || mode === 'draw') return; // 옮기기·그리기 방식은 글자를 눌러도 키보드를 올리지 않는다
   const el = target instanceof Element ? target : target?.parentElement;
   if (!el || !view.dom.contains(el)) return;
   const dom = view.dom;

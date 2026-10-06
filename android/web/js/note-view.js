@@ -21,6 +21,8 @@ import { conflictCopyBody, isBlankBody, sameBody } from '../../app/js/core/memo-
 import { haptic, reduceMotion, replayClass } from '../../app/js/dom.js';
 import { createClearStamp } from '../../app/js/clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from '../../app/js/suggest-chips.js';
+import { setTouchMode } from '../../app/js/keyboard-guard.js';
+import { setupModeKnob } from './mode-knob.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -494,7 +496,8 @@ async function pickAndInsert(accept) {
     setStatus(`파일 ${files.length}개 추가 중…`);
     const items = tempsToItems(files);
     // 쓰던 자리가 있으면 그 자리에, 아니면(키보드를 내리고 버튼만 누름) 메모 끝에
-    const typing = el.editorRoot.contains(document.activeElement);
+    //   (+ 를 펼치면 키보드를 닫으므로, 펼칠 때 쓰던 중이었는지를 본다)
+    const typing = addFromCursor || el.editorRoot.contains(document.activeElement);
     editor.insertItems(items, { atCursor: typing });
     flush();
     setStatus(`파일 ${items.length}개를 추가했어요`);
@@ -666,20 +669,31 @@ el.styleMenu.addEventListener('click', (e) => {
 const addMenu = $('add-menu');
 const addBtn = $('add-btn');
 let addCloseTimer = 0;
+let addFromCursor = false; // + 를 펼칠 때 글을 쓰던 중이었나 (사진·파일을 커서 자리에 넣을지)
 function openAddMenu() {
   closePalette();
   closeStyleMenu();
   clearTimeout(addCloseTimer);
   addMenu.classList.remove('closing');
   addMenu.hidden = false;
-  const r = addBtn.getBoundingClientRect();
-  addMenu.style.left = `${Math.max(8, Math.round(r.left))}px`;
-  addMenu.style.bottom = `${Math.round(window.innerHeight - r.top + 12)}px`;
+  // 키보드를 닫는다 — 위성 단추가 글자판에 가리지 않게 (커서 자리는 편집기가 기억해 넣을 곳은 그대로)
+  addFromCursor = el.editorRoot.contains(document.activeElement);
+  if (addFromCursor) document.activeElement.blur();
+  placeAddMenu();
   addBtn.classList.add('open');
   addBtn.setAttribute('aria-expanded', 'true');
   haptic(8);
   tutEvent('add-opened');
 }
+// + 단추 바로 위에 — 키보드가 닫히며 도구막대가 내려가도 따라간다
+function placeAddMenu() {
+  const r = addBtn.getBoundingClientRect();
+  addMenu.style.left = `${Math.max(8, Math.round(r.left))}px`;
+  addMenu.style.bottom = `${Math.round(window.innerHeight - r.top + 12)}px`;
+}
+window.addEventListener('resize', () => {
+  if (!addMenu.hidden) placeAddMenu();
+});
 /** 뒤로 가기: 손 메모 그리기 화면 → 주석 모드 순으로 저장하고 닫는다 (취소는 없다) */
 export function closeInk() {
   if (document.querySelector('.ink-sheet:not(.closing)')) {
@@ -710,7 +724,6 @@ const ADD = {
   table: () => editor.insertTable(),
   math: () => editor.setStyle('math'),
   ink: () => editor.insertInk().then(() => tutEvent('ink-done')),
-  annotate: () => annotation?.toggle(),
 };
 addMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서(키보드) 유지
 addMenu.addEventListener('click', (e) => {
@@ -799,6 +812,56 @@ export function setKeyboard(open) {
   el.screen.classList.toggle('keyboard', open);
 }
 
+// ---------- 다루기 방식 다이얼 (오른쪽 아래): 글 고치기 · 옮기기 · 글 위에 그리기 ----------
+//   고치기: 꾹 누르면 글자 고르기(복사·고치기), 옮기기 손짓 없음, 키보드 씀
+//   옮기기: 키보드 없이 줄·그림을 짧게 눌러 끌기 · 그리기: 키보드 없이 글 위에 그리기 (완료하면 앞의 방식으로)
+//   고치기·옮기기는 기억해 두고 메모를 열 때 이어 쓴다 (새 글 메모는 쓰려고 연 것이니 고치기로)
+const MODE_KEY = 'memoking.touchMode';
+let knob = null;
+let restMode = 'edit'; // 그리기를 끝내면 돌아갈 방식
+function storedMode() {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'move' ? 'move' : 'edit';
+  } catch {
+    return 'edit';
+  }
+}
+function applyMode(mode, { user = false } = {}) {
+  el.screen.dataset.touchMode = mode;
+  setTouchMode(mode, el.editorRoot.querySelector('.ProseMirror'));
+  closeAddMenu();
+  if (mode !== 'draw') {
+    restMode = mode;
+    try {
+      localStorage.setItem(MODE_KEY, mode);
+    } catch {
+      // 이번에만
+    }
+  }
+  if (mode === 'draw') annotation?.enter();
+  else if (annotation?.active) annotation.exit();
+  // 고치기로 돌렸으면 바로 쓸 수 있게 (커서는 있던 자리)
+  if (user && mode === 'edit' && editor) editor.focus();
+  if (user && mode === 'move') tutEvent('mode-moved');
+}
+/** 글을 써야 하는 때(튜토리얼의 쓰기 단계 등): 다이얼을 글 고치기로 — 이름표로 바뀐 것을 알린다 */
+export function useEditMode() {
+  if (knob && knob.mode !== 'edit') knob.set('edit');
+}
+function setupKnob() {
+  knob ??= setupModeKnob(el.screen, { value: storedMode(), onChange: (m) => applyMode(m, { user: true }) });
+  // 다이얼은 아래쪽 막대들(도구막대 · 녹음 판 · 추천 태그 줄) 바로 위 — 녹음 정지 단추 등을 가리지 않고,
+  //   키보드가 올라와 막대가 움직여도 따라간다
+  const stack = [el.formatBar, $('rec-panel'), el.tagBar].filter(Boolean);
+  const place = () => {
+    const bottom = el.screen.getBoundingClientRect().bottom;
+    const tops = stack.filter((e) => e.offsetHeight).map((e) => e.getBoundingClientRect().top);
+    el.screen.style.setProperty('--fb-h', `${Math.max(0, Math.round(bottom - Math.min(bottom, ...tops)))}px`);
+  };
+  const ro = new ResizeObserver(place);
+  for (const e of [el.screen, ...stack]) ro.observe(e);
+}
+
 // ---------- 위쪽 버튼 ----------
 
 $('back-btn').addEventListener('click', () => app.noteBack());
@@ -880,6 +943,9 @@ export async function openNote(memoId, options = {}) {
     });
     // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 (열기만 해도 저장되는 일 방지)
     current = saved = editor.getMarkdown();
+    if (!knob) setupKnob();
+    if (options.fresh && !options.record && !options.ink) knob.set('edit', { quiet: true }); // 새 글 메모는 쓰려고 연 것
+    applyMode(knob.mode === 'draw' ? restMode : knob.mode); // 새로 만든 편집기에도 키보드 설정을
     reminderPanel.set(memo.reminders);
     refreshLinks();
     el.undoBtn.disabled = true;
@@ -901,6 +967,9 @@ export async function openNote(memoId, options = {}) {
       },
       onMode: (on) => {
         closeAddMenu();
+        // 다이얼도 맞춘다: 그리기를 끝내면(완료·뒤로) 앞의 방식으로
+        if (!on && knob?.mode === 'draw') knob.set(restMode, { quiet: true });
+        if (on && knob && knob.mode !== 'draw') knob.set('draw', { quiet: true });
         el.screen.classList.toggle('annotating', on);
         if (on) document.activeElement?.blur(); // 키보드를 내리고 그리기
         else tutEvent('annotate-done');

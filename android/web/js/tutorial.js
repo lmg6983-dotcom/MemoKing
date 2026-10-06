@@ -13,6 +13,7 @@ const listeners = [];
 let screen = () => 'list';
 let markdown = () => '';
 let append = () => {};
+let edit = () => {};
 let coach = null;
 let base = null;
 const counts = (md) => tutorialCounts(md, extractTags(md));
@@ -37,16 +38,19 @@ const api = {
   },
 };
 
-/** @param {{ screen: () => 'list'|'note', markdown: () => string, append: (md: string) => void }} o */
+/** @param {{ screen: () => 'list'|'note', markdown: () => string, append: (md: string) => void, edit?: () => void }} o */
 export function setupTutorial(o) {
   screen = o.screen;
   markdown = o.markdown;
   append = o.append;
+  edit = o.edit ?? edit;
   coach = setupCoach(api, {
     onStep: (step) => {
       base = step ? counts(markdown()) : null;
       // 옮기기를 배우기 전: 옮겨 볼 예시 목록을 메모 끝에
       if (step?.sample && screen() === 'note' && !hasTutorialSample(markdown())) append(TUTORIAL_SAMPLE);
+      // 글을 써 보는 단계: 다이얼이 옮기기·그리기여도 키보드가 뜨게 글 고치기로
+      if (step?.write && screen() === 'note') edit();
     },
   });
 }

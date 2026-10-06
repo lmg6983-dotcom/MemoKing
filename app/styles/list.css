@@ -792,10 +792,9 @@ body:not([data-tab="memos"]):not([data-tab="reminders"]) :is(.fab, .fab-menu, .f
 .drag-hint { bottom: 28px; }
 
 /* 지우는 카드: 옆으로 날아가고 그 자리가 접힌다 (휴대폰과 같음) */
-.cards .item.removing { overflow: hidden; animation: card-remove 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-.cards .item.removing .card { animation: card-fly 0.24s var(--ease-out) forwards; }
-.cards .item.removing .card-actions { display: none; }
-@keyframes card-remove { 60% { opacity: 0.4; } to { height: 0; margin-top: -10px; opacity: 0; } }
+/* 지운 카드의 떠 있는 복사본 — 날아가는 동안 남은 카드는 빈자리로 미끄러진다 (list.js deleteMemo) */
+.card-ghost { position: fixed; z-index: 30; margin: 0; pointer-events: none; animation: card-fly 0.24s var(--ease-out) forwards; }
+.card-ghost .card-actions { display: none; }
 @keyframes card-fly { to { transform: translateX(110%) rotate(6deg); opacity: 0; } }
 .fab-sat:nth-child(2) { animation-delay: 0.05s; }
 .fab-sat[data-new="ink"] .fab-sat-btn { background: var(--brand-yellow); color: var(--on-brand); }

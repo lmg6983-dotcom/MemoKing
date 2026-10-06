@@ -445,13 +445,19 @@ function confirmDialog(message, okLabel = '삭제') {
 async function deleteMemo(id) {
   const memo = state.memos.find((m) => m.id === id);
   if (!memo) return;
-  // 묻지 않고 바로 휴지통으로 — 카드가 옆으로 밀려 날아가고 그 자리가 접히며(휴대폰과 같음), 아래에 "되돌리기"
-  const item = el.cards.querySelector(`.card[data-id="${CSS.escape(id)}"]`)?.closest('.item');
-  if (item && !reduceMotion()) {
-    item.style.height = `${item.offsetHeight}px`;
-    void item.offsetHeight;
-    item.classList.add('removing');
-    await new Promise((r) => setTimeout(r, 280));
+  // 묻지 않고 바로 휴지통으로 — 카드의 떠 있는 복사본이 옆으로 날아가는 동안 목록은 곧바로 다시 그려져
+  //   남은 카드가 빈자리로 미끄러진다 (휴대폰과 같음), 아래에 "되돌리기"
+  const card = el.cards.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+  if (card && !reduceMotion()) {
+    const r = card.getBoundingClientRect();
+    const ghost = card.cloneNode(true);
+    ghost.classList.add('card-ghost');
+    ghost.removeAttribute('data-id');
+    Object.assign(ghost.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    document.body.append(ghost);
+    card.style.visibility = 'hidden';
+    ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
+    setTimeout(() => ghost.remove(), 600);
   }
   await api.memo.remove(id);
 }

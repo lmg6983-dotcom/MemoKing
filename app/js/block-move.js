@@ -11,7 +11,7 @@
 //   - 글 문단·제목·표·코드 블록·인용·음성 카드는 목록 항목과 같은 방식: 글자를 꾹(마우스 0.3초·터치 0.4초) 누르면
 //     테두리가 점점 진해지다 들어 올려진다 (그 전에 움직이면 지금처럼 글자 고르기·스크롤). 목록 항목은 list-drag.js
 //     PC 는 어느 줄에서든 Alt+↑ / Alt+↓
-import { holdKeyboard, keyboardFor, edgeScroll } from './keyboard-guard.js';
+import { holdKeyboard, keyboardFor, edgeScroll, canDrag, holdFor, touchMode } from './keyboard-guard.js';
 import { Plugin, PluginKey, TextSelection, NodeSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
 import { HOLD_MS, TOUCH_HOLD_MS } from './list-drag.js';
@@ -253,11 +253,13 @@ export function createBlockMove({ readOnly = false } = {}) {
       },
       handleDOMEvents: readOnly ? {} : {
         mousedown(view, event) {
+          if (!canDrag()) return false; // 글 고치기 방식: 내용을 눌러도 옮기지 않는다
           if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) mover?.press(event, 'mouse');
           return false; // 그냥 누르면 지금처럼 (고르기·열기)
         },
         touchstart(view, event) {
           keyboardFor(view, event.target);
+          if (!canDrag()) return false;
           if (event.touches.length === 1) mover?.press(event, 'touch');
           else mover?.cancelPress();
           return false; // 그냥 누르면 고르기, 밀면 스크롤
@@ -287,7 +289,7 @@ class Mover {
     // 재생 막대는 플레이어(RangeTouch)가 손가락이 닿는 순간 기본 동작을 막아 편집기에는 오지 않는다 —
     // 그 전에(잡는 단계) 직접 받아 꾹 누르기를 잰다
     this.onScrubTouch = (e) => {
-      if (e.touches.length !== 1 || !(e.target instanceof Element) || !e.target.closest('.mk-media input, .mk-media .plyr__progress')) return;
+      if (!canDrag() || e.touches.length !== 1 || !(e.target instanceof Element) || !e.target.closest('.mk-media input, .mk-media .plyr__progress')) return;
       keyboardFor(view, e.target);
       this.press(e, 'touch');
     };
@@ -365,7 +367,7 @@ class Mover {
         if (p.media && p.media.el.currentTime !== p.media.time) p.media.el.currentTime = p.media.time; // 재생 막대를 눌러 감긴 것 되돌리기
         if (document.activeElement instanceof HTMLInputElement) document.activeElement.blur();
         this.lift(p);
-      }, text ? (kind === 'touch' ? TOUCH_HOLD_MS : HOLD_MS) : io.hold);
+      }, holdFor(text ? (kind === 'touch' ? TOUCH_HOLD_MS : HOLD_MS) : io.hold));
     }
   }
 
@@ -673,7 +675,10 @@ class Mover {
     const hint = document.createElement('div');
     hint.className = 'mk-move-hint';
     hint.setAttribute('role', 'status');
-    hint.textContent = coarse() ? '꾹 눌러 끌면 다른 줄로 옮겨요' : '끌어서 다른 줄로 옮길 수 있어요 · Alt+↑↓';
+    // 휴대폰 다이얼이 글 고치기면 옮기는 방법은 다이얼부터 (옮기기 방식에서는 짧게 눌러 끈다)
+    hint.textContent = touchMode() === 'edit' ? '옮기려면 오른쪽 아래 다이얼을 옮기기로 돌려요'
+      : touchMode() === 'move' ? '짧게 눌러 끌면 다른 줄로 옮겨요'
+        : coarse() ? '꾹 눌러 끌면 다른 줄로 옮겨요' : '끌어서 다른 줄로 옮길 수 있어요 · Alt+↑↓';
     document.body.append(hint);
     const r = dom.getBoundingClientRect();
     const w = hint.offsetWidth;

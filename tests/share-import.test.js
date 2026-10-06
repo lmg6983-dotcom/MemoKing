@@ -52,3 +52,9 @@ test('.md 파일: 머리말 빼기', () => {
   assert.equal(isTextDocument('a.bin', 'text/markdown'), true);
   assert.equal(isTextDocument('a.pdf', 'application/pdf'), false);
 });
+
+test('보이는 글로 복사: 줄바꿈(<br />)은 글자로 남지 않는다 (휴대폰 메모 메뉴 › 텍스트 복사)', () => {
+  assert.equal(shareText('가나<br />다라'), '가나\n다라');
+  assert.equal(shareText('첫줄\n\n<br />\n\n둘째'), '첫줄\n\n둘째');
+  assert.doesNotMatch(shareText('- [ ] 우유<br />2개\n\n> 인용<br/>둘'), /<br|\\/);
+});
