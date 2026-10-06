@@ -77,7 +77,24 @@ export function setupDrivePanel({ api, onVault, confirm }) {
       return;
     }
     if (!info.connected) return login();
-    return openFolders();
+    return info.active ? openFolders() : autoFolder(); // 연결된 뒤 "폴더 변경" 만 폴더 목록
+  }
+
+  // 로그인하면 바로: "메모킹 동기화" 폴더를 찾거나(휴대폰이 먼저 만들었을 수 있음) 만들어 맞춘다 — 폴더를 고를 일이 없게
+  async function autoFolder() {
+    step('syncing');
+    try {
+      const res = await api.drive.auto();
+      onVault(res.info);
+      render(res.drive);
+      dialog.close();
+      const st = res.status ?? {};
+      if (st.state === 'error') await confirm(`Google Drive와 연결했지만 동기화하지 못했어요.\n${st.error}`, '확인');
+    } catch (err) {
+      dialog.close();
+      await confirm(`Google Drive와 연결하지 못했어요.\n${cleanError(err)}`, '확인');
+    }
+    refresh();
   }
 
   async function login() {
@@ -88,7 +105,7 @@ export function setupDrivePanel({ api, onVault, confirm }) {
       if (run !== loginRun) return;
       info = await api.drive.status();
       render();
-      await openFolders();
+      await autoFolder();
     } catch (err) {
       if (run !== loginRun) return;
       dialog.close();
@@ -259,6 +276,16 @@ export function setupDrivePanel({ api, onVault, confirm }) {
   });
 
   api.on('drive:status', (next) => render(next));
-  refresh();
+  refresh().then(async () => {
+    // 업데이트로 연결 방식이 바뀐 경우: 한 번 묻고, 누르면 바로 다시 연결 (메모는 그대로)
+    if (!info?.reconnect || info.connected) return;
+    try {
+      if (sessionStorage.getItem('mk-drive-reconnect-asked')) return;
+      sessionStorage.setItem('mk-drive-reconnect-asked', '1');
+    } catch {
+      // 이번에만 묻기
+    }
+    if (await confirm('Google Drive 동기화를 다시 켜 주세요.\n연결 방식이 더 안전하게 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC 에 그대로 있어요.', '다시 연결')) connect();
+  });
   return { refresh };
 }

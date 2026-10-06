@@ -1576,6 +1576,14 @@ async function useDriveFolder(folderId, folderName) {
   return { info: vaultInfo(), status, drive: driveInfo() };
 }
 
+// 연결하기 한 번으로: 메모킹이 만든 "메모킹 동기화" 폴더를 찾아(휴대폰이 먼저 만들었을 수 있다) 쓰고, 없으면 만든다
+const SYNC_FOLDER = '메모킹 동기화';
+async function autoDriveFolder() {
+  const found = (await driveApi.folders('root')).find((f) => f.name === SYNC_FOLDER);
+  const folder = found ?? await driveApi.createFolder('root', SYNC_FOLDER);
+  return useDriveFolder(folder.id, folder.name);
+}
+
 // ---------- Windows 시작 시 자동 실행 ----------
 // 개발 실행(npx electron)은 실행 파일 경로가 npm 캐시라 불안정하므로 설치판에서만 쓴다.
 
@@ -2017,6 +2025,7 @@ function registerIpc() {
     return { id: f.id, name: f.name };
   });
   ipcMain.handle('drive:use', (_e, folderId, name) => useDriveFolder(String(folderId), String(name)));
+  ipcMain.handle('drive:auto', () => autoDriveFolder());
   ipcMain.handle('drive:sync', () => driveSync.run());
   ipcMain.handle('drive:disconnect', () => {
     driveAuth.signOut();

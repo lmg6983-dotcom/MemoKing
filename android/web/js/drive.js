@@ -26,8 +26,10 @@ export function startConnect(done) {
       if (loggingIn && browserLogin) drive.cancelLogin();
     },
   });
-  if (s.connected) openFolders();
-  else if (s.nativeAvailable) {
+  if (s.connected) {
+    if (s.active) openFolders(); // "폴더 변경"
+    else autoConnect();
+  } else if (s.nativeAvailable) {
     // 휴대폰 구글 계정: 바로 계정 고르기·허용 화면으로
     showStep('login');
     login(false);
@@ -74,7 +76,7 @@ async function login(browser) {
   try {
     const { email } = await call('driveLogin', { browser });
     toast(email ? `${email} 계정으로 연결했어요` : '구글 계정으로 연결했어요');
-    openFolders();
+    autoConnect();
   } catch (err) {
     if (!sheet.hidden) toast(err.message, true);
   } finally {
@@ -86,7 +88,23 @@ async function login(browser) {
 $('drive-login').addEventListener('click', () => login(!drive.status().nativeAvailable));
 $('login-cancel').addEventListener('click', () => drive.cancelLogin());
 
-// ---------- ③ 폴더 고르기 ----------
+// ---------- ③ 폴더: 로그인하면 바로 "메모킹 동기화" 폴더를 찾거나 만들어 맞춘다 (고를 일 없게) ----------
+
+async function autoConnect() {
+  showStep('syncing');
+  try {
+    const { status, folderName } = await call('driveAuto', {});
+    closeSheet(sheet);
+    onConnected();
+    if (status.state === 'error') toast(status.error, true);
+    else toast(`Google Drive "${folderName}" 폴더와 동기화했어요`);
+  } catch (err) {
+    toast(err.message, true);
+    closeSheet(sheet);
+  }
+}
+
+// ---------- ③-1 폴더 바꾸기 (고급: 연결된 뒤 "폴더 변경") ----------
 
 function openFolders() {
   path = [{ id: 'root', name: '내 드라이브' }];

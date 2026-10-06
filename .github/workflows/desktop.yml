@@ -31,6 +31,21 @@ jobs:
       - name: 단위 테스트
         run: npm test
 
+      # 구글 로그인 연결 정보(데스크톱 앱 유형 OAuth 클라이언트)를 설치 파일에 넣어, 사용자가 붙여 넣지 않고 바로 로그인하게
+      # (저장소 Settings › Secrets 의 MEMOKING_GOOGLE_CLIENT_ID · MEMOKING_GOOGLE_CLIENT_SECRET — 휴대폰 APK 와 같은 값)
+      - name: Google 연결 정보 넣기
+        shell: bash
+        env:
+          MEMOKING_GOOGLE_CLIENT_ID: ${{ secrets.MEMOKING_GOOGLE_CLIENT_ID }}
+          MEMOKING_GOOGLE_CLIENT_SECRET: ${{ secrets.MEMOKING_GOOGLE_CLIENT_SECRET }}
+        run: |
+          if [ -n "$MEMOKING_GOOGLE_CLIENT_ID" ]; then
+            node -e 'require("fs").writeFileSync("desktop/google-client.json", JSON.stringify({ id: process.env.MEMOKING_GOOGLE_CLIENT_ID, secret: process.env.MEMOKING_GOOGLE_CLIENT_SECRET || "" }))'
+            echo "연결 정보를 넣었어요"
+          else
+            echo "연결 정보 비밀값이 없어 사용자가 처음 한 번 붙여 넣어요"
+          fi
+
       - name: 설치 파일 빌드 (npm run dist — 자동 점검은 화면이 없는 빌드 서버라 건너뜀)
         run: node scripts/build-dist.mjs --no-smoke
 

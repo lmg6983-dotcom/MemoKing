@@ -1108,4 +1108,13 @@ if (info.vault?.ok) openVault();
 else showSetup(info.vault ? '메모 폴더에 더 이상 접근할 수 없어요. 폴더를 다시 골라 주세요.' : '');
 native.ready();
 await handleIntent();
+// 업데이트로 Drive 연결 방식이 바뀐 경우: 한 번 알려 주고, 누르면 바로 다시 연결 (메모는 그대로)
+try {
+  const ds = drive.status();
+  if (ds.reconnect && !ds.connected && app.vault) {
+    toast('Google Drive 동기화를 다시 켜 주세요 (메모는 그대로예요)', false, { label: '연결', run: () => startConnect(() => openVault()) });
+  }
+} catch {
+  // 미리보기 등
+}
 document.documentElement.dataset.ready = 'true';

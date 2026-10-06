@@ -1057,18 +1057,23 @@ try {
   // Google Drive 연결 (미리보기 서버의 가짜 Drive): 설정 › 연결하기 › (휴대폰 구글 계정) › 폴더 › 지금 메모 함께 올리기
   const count = await page.locator('.card').count();
   await page.tap('#settings-btn');
-  await page.tap('#drive-connect'); // 휴대폰 구글 계정으로 바로 (계정 고르기·허용은 미리보기에서 생략)
-  await page.waitForSelector('.folder-item.suggest');
-  check('Drive: 로그인 뒤 폴더 목록 (메모킹 동기화 폴더가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
-  check('Drive: 내 드라이브 맨 위는 고를 수 없음', await page.isDisabled('#folder-use'));
-  await page.tap('.folder-item.suggest');
-  await page.waitForTimeout(200);
-  check('Drive: 지금 메모 함께 올리기 보임', await page.isVisible('#import-row'));
-  await page.tap('#folder-use');
-  await page.waitForTimeout(1000);
+  await page.tap('#drive-connect'); // 휴대폰 구글 계정으로 바로 (계정 고르기·허용은 미리보기에서 생략) → 폴더는 저절로
+  await page.waitForFunction(() => document.getElementById('drive-sheet').hidden, null, { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(600);
   await shot('06-drive');
+  const auto = (await devLog()).log.find((l) => l.driveAuto)?.driveAuto;
   const used = (await devLog()).log.find((l) => l.driveUse)?.driveUse;
-  check('Drive: 폴더 연결 (지금 메모 함께)', used?.name === '메모킹 동기화' && used?.importLocal === true);
+  check('Drive: 연결하기 한 번으로 "메모킹 동기화" 폴더에 연결 (폴더 고르기 없음)', auto?.name === '메모킹 동기화' && used?.folderId === auto.folderId);
+  check('Drive: 지금 휴대폰 메모를 함께 옮김', used?.importLocal === true);
+  // 고급: 연결된 뒤 "폴더 변경" 은 폴더 목록 (메모킹이 만든 폴더만)
+  if (!(await page.isVisible('#drive-connect'))) await page.tap('#settings-btn');
+  await page.tap('#drive-connect');
+  await page.waitForSelector('.folder-item.suggest');
+  check('Drive: 폴더 변경은 목록에서 (메모킹 동기화가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
+  await page.evaluate(() => window.__mk.back());
+  await page.waitForTimeout(300);
+  if (await page.isVisible('#settings-sheet')) await page.evaluate(() => window.__mk.back());
+  await page.waitForTimeout(300);
   check('Drive: 연결 뒤 메모 그대로 보임', (await page.locator('.card').count()) === count);
   check('Drive: 목록 위 동기화 버튼', await page.isVisible('#sync-btn'));
 

@@ -375,6 +375,17 @@ class Bridge(private val activity: MainActivity) {
                     JSONObject().put("vault", vaultInfo()).put("status", status.json())
                 }
             }
+            // 연결하기 한 번으로: 메모킹이 만든 "메모킹 동기화" 폴더를 찾아(PC 가 먼저 만들었을 수 있다) 쓰고, 없으면 만든다.
+            // 지금까지의 휴대폰 메모(예전 Drive 폴더의 사본 포함)는 함께 옮겨 맞춘다
+            "driveAuto" -> pool.execute {
+                resolve(id) {
+                    val api = DriveApi(ctx)
+                    val folder = api.folders("root").firstOrNull { it.name == DriveSync.SYNC_FOLDER } ?: api.createFolder("root", DriveSync.SYNC_FOLDER)
+                    val from = Vaults.current(ctx)?.takeIf { DriveSync.folderId(ctx) != folder.id }
+                    val status = DriveSync.use(ctx, folder.id, folder.name, from)
+                    JSONObject().put("vault", vaultInfo()).put("status", status.json()).put("folderName", folder.name)
+                }
+            }
             "driveSync" -> pool.execute { resolve(id) { DriveSync.syncBlocking(ctx).json() } }
             else -> resolve(id) { throw IllegalArgumentException("알 수 없는 기능: $method") }
         }

@@ -24,6 +24,8 @@ import java.util.concurrent.TimeUnit
  */
 object DriveSync {
     const val PREFIX = "drive:"
+    /** 메모킹이 Drive 에 만드는 폴더 (PC 와 같은 이름 — desktop/main.js SYNC_FOLDER) */
+    const val SYNC_FOLDER = "메모킹 동기화"
     private const val KEY_FOLDER_NAME = "driveFolderName"
     private const val JOB_ID = 4201
 

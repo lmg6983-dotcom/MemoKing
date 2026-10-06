@@ -297,6 +297,17 @@ const calls = {
     log.push({ driveUse: { folderId, name, importLocal } });
     return { vault: { internal: false, drive: true, label: `Google Drive › ${name}`, ok: true }, status: fakeDrive.status };
   },
+  // 휴대폰 Bridge.kt driveAuto 흉내: "메모킹 동기화" 폴더를 찾거나 만들고, 지금 메모를 함께 옮긴다
+  driveAuto: async () => {
+    let f = (fakeDrive.folders.root ?? []).find((x) => x.name === '메모킹 동기화');
+    if (!f) {
+      f = { id: `f-${randomUUID().slice(0, 6)}`, name: '메모킹 동기화' };
+      (fakeDrive.folders.root ??= []).push(f);
+    }
+    const res = await calls.driveUse({ folderId: f.id, name: f.name, import: true });
+    log.push({ driveAuto: { folderId: f.id, name: f.name } });
+    return { ...res, folderName: f.name };
+  },
   driveSync: async () => {
     fakeDrive.status = { ...fakeDrive.status, state: 'idle', lastSync: Date.now() };
     return fakeDrive.status;

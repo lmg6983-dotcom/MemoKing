@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld('memoking', {
     folders: invoke('drive:folders'),
     createFolder: invoke('drive:create-folder'),
     use: invoke('drive:use'),
+    auto: invoke('drive:auto'),
     sync: invoke('drive:sync'),
     disconnect: invoke('drive:disconnect'),
   },
