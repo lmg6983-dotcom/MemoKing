@@ -1,3 +1,5 @@
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -37,9 +39,9 @@ val sherpaAar: File = rootDir.resolve(".gradle/sherpa-onnx/sherpa-onnx-$sherpaVe
     if (!aar.isFile) {
         aar.parentFile.mkdirs()
         val part = File(aar.parentFile, "${aar.name}.part")
-        java.net.URI("https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaVersion/sherpa-onnx-$sherpaVersion.aar").toURL()
+        URI("https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaVersion/sherpa-onnx-$sherpaVersion.aar").toURL()
             .openStream().use { input -> part.outputStream().use { input.copyTo(it) } }
-        val sha = java.security.MessageDigest.getInstance("SHA-256").digest(part.readBytes()).joinToString("") { "%02x".format(it) }
+        val sha = MessageDigest.getInstance("SHA-256").digest(part.readBytes()).joinToString("") { "%02x".format(it) }
         check(sha == sherpaSha256) { "sherpa-onnx AAR 체크섬이 달라요: $sha" }
         part.renameTo(aar)
     }
