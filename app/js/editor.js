@@ -486,6 +486,52 @@ function buildTagDecorations(doc) {
   return DecorationSet.create(doc, tagRanges(doc).map((r) => Decoration.inline(r.from, r.to, { class: 'mk-tag', 'data-tag': r.name })));
 }
 
+// 다 쓴 태그(뒤에 띄어쓰기가 있는 알약)는 한 덩어리 — 사진처럼 다룬다:
+//   눌러서 알약 가운데에 커서가 서면 끝으로, 화살표로 들어오면 건너편으로 · 바로 뒤에서 지우면 태그째, 바로 앞에서 Delete 도
+//   (쓰는 중인 태그는 뒤가 비어 있어 글자 하나씩 고칠 수 있다)
+function doneTagAt(doc, pos, { lineEnd = false } = {}) {
+  const $pos = doc.resolve(pos);
+  if (!$pos.parent.isTextblock) return null;
+  const start = $pos.start();
+  for (const r of tagRanges(doc)) {
+    if (r.to < start || r.from > $pos.end()) continue;
+    if (r.from > pos || r.to < pos) continue;
+    const next = doc.textBetween(r.to, Math.min(r.to + 1, $pos.end()), '\n', '\ufffc');
+    if (/^\s$/.test(next) || (lineEnd && r.to === $pos.end())) return r;
+  }
+  return null;
+}
+const tagCapsule = $prose(() => new Plugin({
+  key: new PluginKey('memoking-tag-capsule'),
+  appendTransaction(trs, old, state) {
+    if (trs.some((tr) => tr.docChanged) || !state.selection.empty || state.selection.eq(old.selection)) return null;
+    const pos = state.selection.head;
+    const tag = doneTagAt(state.doc, pos, { lineEnd: true }); // 커서만 옮긴 것이니 줄 끝 태그도 다 쓴 것
+    if (!tag || pos <= tag.from || pos >= tag.to) return null;
+    // 왼쪽에서 들어오면 끝으로, 오른쪽에서 들어오면 앞으로, 눌러서 들어오면 끝으로
+    const prev = old.selection.head;
+    const to = prev >= tag.to && prev - pos === 1 ? tag.from : tag.to;
+    return state.tr.setSelection(TextSelection.create(state.doc, to));
+  },
+  props: {
+    handleKeyDown(view, event) {
+      if (event.key !== 'Backspace' && event.key !== 'Delete') return false;
+      const { selection, doc } = view.state;
+      if (!selection.empty) return false;
+      const pos = selection.head;
+      const tag = doneTagAt(doc, pos);
+      if (!tag || (event.key === 'Backspace' ? pos !== tag.to : pos !== tag.from)) return false;
+      // 태그 양옆이 모두 띄어쓰기(또는 줄 앞)면 띄어쓰기 하나도 함께 — 빈칸 두 개가 남지 않게
+      const $from = doc.resolve(tag.from);
+      const before = tag.from > $from.start() ? doc.textBetween(tag.from - 1, tag.from) : ' ';
+      const after = doc.textBetween(tag.to, Math.min(tag.to + 1, $from.end()));
+      const to = /\s/.test(before) && /^\s$/.test(after) ? tag.to + 1 : tag.to;
+      view.dispatch(view.state.tr.delete(tag.from, to).scrollIntoView());
+      return true;
+    },
+  },
+}));
+
 // # 자동완성: 커서 바로 앞이 "#글자" 이면 지금까지 쓴 태그를 권한다.
 // ↑↓ 고르기, Enter·Tab 넣기, Esc 닫기. 한글 입력 중(조합 중)에는 Enter 를 가로채지 않는다.
 const TAG_BEFORE_CURSOR = new RegExp(`(^|[\\s(\\[{,;:!?'"“‘>])#(${TAG_CHAR}*)$`, 'u');
@@ -555,9 +601,12 @@ function createTagSuggest(getTags) {
     view.focus();
   }
 
-  function update(v) {
+  // typed: 글자를 쳐서 바뀐 때만 새로 연다 (이미 쓴 태그를 누르거나 커서만 옮겨 온 때는 열지 않는다)
+  let typingAt = null;
+  function update(v, prev) {
     view = v;
     const { selection } = v.state;
+    const typed = prev ? !prev.doc.eq(v.state.doc) : false;
     const $from = selection.$from;
     if (!selection.empty || !$from.parent.isTextblock || $from.parent.type.spec.code
       || $from.marks().some((m) => m.type.spec.code || m.type.name === 'link')) return hide();
@@ -565,11 +614,14 @@ function createTagSuggest(getTags) {
     const m = TAG_BEFORE_CURSOR.exec(before);
     if (!m) {
       dismissedAt = null;
+      typingAt = null;
       return hide();
     }
     const prefix = m[2];
     const from = $from.pos - prefix.length - 1;
     if (dismissedAt === from) return hide();
+    if (typed) typingAt = from;
+    else if (typingAt !== from && !(active && active.from === from)) return hide();
     if (fetchedFor !== from && !loading) {
       tags = null;
       fetchedFor = from;
@@ -578,7 +630,7 @@ function createTagSuggest(getTags) {
       loading ??= Promise.resolve(getTags?.()).then((list) => {
         tags = list ?? [];
         loading = null;
-        if (view) update(view);
+        if (view) update(view, null);
       }).catch(() => {
         tags = [];
         loading = null;
@@ -1420,7 +1472,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     props: { handleKeyDown: (v, event) => suggest.handleKeyDown(v, event) },
     view: (v) => {
       suggest.update(v);
-      return { update: (next) => suggest.update(next), destroy: () => suggest.destroy() };
+      return { update: (next, prev) => suggest.update(next, prev), destroy: () => suggest.destroy() };
     },
   }));
   const stateWatcher = $prose(() => new Plugin({
@@ -1546,6 +1598,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(contentLines)
     .use(tidy)
     .use(tagHighlight)
+    .use(tagCapsule)
     .use(stateWatcher)
     .create();
 

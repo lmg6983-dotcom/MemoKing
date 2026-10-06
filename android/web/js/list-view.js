@@ -189,7 +189,8 @@ function filterCount() {
 export function render() {
   const narrowed = Boolean(state.query) || filterCount() > 0;
   const memos = filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
-  layoutCards(memos);
+  // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)
+  glideCards(() => layoutCards(memos));
   el.empty.hidden = memos.length > 0;
   if (!memos.length) renderEmpty(narrowed);
   $('count-memos').textContent = state.memos.length ? String(state.memos.length) : '';
@@ -442,17 +443,18 @@ try {
 applyLayout(layout);
 // 카드들이 새 자리로 미끄러져 간다 (FLIP: 옛 자리 → 새 자리) — 모양이 바뀐 것을 눈으로 따라갈 수 있게
 function glideCards(change) {
-  const before = new Map([...el.cards.querySelectorAll('.card')].map((c) => [c.dataset.id, c.getBoundingClientRect()]));
+  const before = new Map([...el.cards.querySelectorAll('.card')].map((c) => [c.dataset.id, c.getBoundingClientRect()]).filter(([, r]) => r.width));
   change();
-  if (reduceMotion()) return;
   for (const c of el.cards.querySelectorAll('.card')) {
     const a = before.get(c.dataset.id);
     if (!a) continue;
+    c.closest('.item').style.animation = 'none'; // 이미 있던 카드는 다시 튀어나오지 않는다 (새 카드만 등장 움직임)
+    if (reduceMotion()) continue;
     const b = c.getBoundingClientRect();
     const dx = a.left - b.left;
     const dy = a.top - b.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' });
+    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 300, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   }
 }
 
@@ -507,16 +509,23 @@ export function filterTag(name) {
   $('view-memos').scrollTop = 0;
 }
 
-/** 지우는 카드가 옆으로 밀려 접히며 사라진다 */
-export async function animateRemove(id, { dir = 1 } = {}) {
+/**
+ * 지우는 카드: 떠 있는 복사본이 옆으로 날아가는 동안, 목록은 곧바로 다시 그려져 남은 카드가 빈자리로 미끄러진다
+ *   (예전: 그 줄만 접힌 뒤 두 줄 배치를 다시 짜며 카드가 툭 건너뛰었다)
+ */
+export function animateRemove(id, { dir = 1 } = {}) {
   const card = el.cards.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
-  const item = card?.closest('.item');
-  if (!item) return;
-  item.style.height = `${item.offsetHeight}px`;
-  item.style.setProperty('--fly', `${dir * 110}%`);
-  void item.offsetHeight;
-  item.classList.add('removing');
-  await new Promise((r) => setTimeout(r, 280));
+  if (!card) return;
+  const r = card.getBoundingClientRect();
+  const ghost = card.cloneNode(true);
+  ghost.classList.add('card-ghost');
+  ghost.removeAttribute('data-id');
+  Object.assign(ghost.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, transform: card.style.transform, opacity: card.style.opacity });
+  ghost.style.setProperty('--fly', `${dir * 110}%`);
+  document.body.append(ghost);
+  card.style.visibility = 'hidden'; // 다시 그리기 전까지 같은 카드가 둘로 보이지 않게
+  ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
+  setTimeout(() => ghost.remove(), 600);
 }
 
 /** 알림 보관함 탭이 보이면 다시 그린다 (새 알림·설정에서 돌아옴) */

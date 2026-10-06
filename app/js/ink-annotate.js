@@ -129,9 +129,17 @@ export function setupAnnotation(o) {
     toolbar?.update();
   }
 
+  let entering = null; // 불러오는 동안 또 불려도 그리기판을 하나만 (둘이면 획이 두 번 저장된다)
   async function enter() {
     if (on) return;
-    await ensureLoaded();
+    if (entering) return entering;
+    entering = ensureLoaded();
+    try {
+      await entering;
+    } finally {
+      entering = null;
+    }
+    if (on) return;
     on = true;
     if (tools.tool === 'eraser' && !anchored.length) tools.tool = 'pen';
     hist = inkHistory(anchored);
@@ -191,6 +199,7 @@ export function setupAnnotation(o) {
     const changed = hist.changed();
     anchored = hist.get();
     hist = null;
+    surface?.destroy(); // 그림판(layer)은 다음에도 쓰므로 손 입력만 떼어 낸다
     surface = null;
     // 그리기판이 붙인 것들을 걷어 내고 보이기만 하는 층으로
     layer.replaceChildren(view);

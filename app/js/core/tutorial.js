@@ -225,15 +225,16 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['.ProseMirror > ul:last-of-type', '.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], sample: true, emoji: '↕️', image: 'm-move.jpg',
-    title: '꾹 눌러 옮기기',
-    text: '연습하라고 장보기 목록을 넣어 뒀어요. 줄이나 사진·표를 꾹 누르면 살짝 들려요. 그대로 끌어서 원하는 자리에 놓으면 끝!',
-    next: '다음',
+    id: 'move', win: 'note', target: ['.mode-knob .mk-stop-move', '.mode-knob'], keep: ['.ProseMirror > *', '.mode-knob'], sample: true, advance: 'mode-moved', emoji: '↕️', image: 'm-move.jpg',
+    title: '다이얼로 옮기기',
+    text: '오른쪽 아래 다이얼로 글 고치기 · 옮기기 · 글 위에 그리기를 골라요. 옮기기에서는 줄·사진·표를 짧게 눌러 끌면 돼요 (연습용 장보기 목록을 넣어 뒀어요). 글을 복사하거나 고칠 땐 글 고치기로.',
+    try: '다이얼 둘레의 옮기기(네 방향 화살표)를 눌러 보세요',
+    next: LATER,
   },
   {
     id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     title: '+ 로 더 많은 것 넣기',
-    text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 글 위에 그리기 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
+    text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
     try: '왼쪽 아래 + 를 눌러 펼쳐 보세요',
     next: LATER,
   },
@@ -245,10 +246,10 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'annotate-done', emoji: '🖍️',
+    id: 'annotate', win: 'note', target: ['.mode-knob .mk-stop-draw', '.mode-knob'], keep: ['.mode-knob', '.mk-annot-bar'], advance: 'annotate-done', emoji: '🖍️',
     title: '글 위에 바로 그리기',
-    text: '"글 위에 그리기"로 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요.',
-    try: '+ › "글 위에 그리기"를 눌러 글 위에 쓱 긋고 ✓ 완료',
+    text: '다이얼을 글 위에 그리기로 돌리면 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요. 완료하면 앞의 방식으로 돌아가요.',
+    try: '다이얼 맨 위 그리기를 눌러 글 위에 쓱 긋고 ✓ 완료',
     next: LATER,
   },
   {
@@ -320,7 +321,7 @@ export const MOBILE_TUTORIAL_STEPS = [
 export const TUTORIAL_SETTLE_MS = { typed: 1800, tagged: 1500, styled: 900, tasked: 700 };
 
 /** 사용자가 직접 해서 넘어가는 일들 (PC 메인 프로세스가 이 이름만 받는다) */
-export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'note-closed', 'layout-changed', 'tag-filtered'];
+export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'note-closed', 'layout-changed', 'tag-filtered', 'mode-moved'];
 
 /**
  * 사용자가 한 일(event)로 몇 번째 단계가 되는지. 끝나면 -1.

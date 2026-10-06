@@ -2,11 +2,10 @@
 import { icon } from './icons.js';
 import { describeReminder, nextLabel, isDone } from './core/reminders.js';
 import { toLocalIso } from './core/time.js';
+import { dateTimePicker, timePicker } from './date-picker.js';
 
 const $ = (id) => document.getElementById(id);
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
-// <input type="datetime-local"> 값: 2026-09-30T14:00
-const localInputValue = (d) => toLocalIso(d).slice(0, 16);
 
 /**
  * @param {{ api: object, memoId: string, setStatus: (text: string, isError?: boolean) => void, onToggle?: (open: boolean) => void }} options
@@ -32,6 +31,12 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle }) {
   };
   let reminders = [];
   let kind = 'timer';
+  // 날짜는 달력, 시각은 칩·목록 (휴대폰 기본 다이얼 대신) — 고른 값은 위 입력칸에 그대로
+  const atPicker = dateTimePicker($('at-picker'), { input: el.atInput });
+  timePicker($('rep-time-picker'), { value: el.time.value, onChange: (hhmm) => (el.time.value = hhmm) });
+  let atChosen = false;
+  $('at-picker').addEventListener('click', () => (atChosen = true));
+  $('at-picker').addEventListener('change', () => (atChosen = true));
 
   // ---------- 목록 ----------
 
@@ -101,10 +106,11 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle }) {
     kind = next;
     for (const b of el.kinds.querySelectorAll('[data-kind]')) b.setAttribute('aria-checked', String(b.dataset.kind === kind));
     for (const pane of el.form.querySelectorAll('[data-pane]')) pane.hidden = pane.dataset.pane !== kind;
-    if (kind === 'at' && !el.atInput.value) {
+    if (kind === 'at' && !atChosen) {
+      // 처음엔 한 시간 뒤 정각
       const d = new Date(Date.now() + 60 * 60 * 1000);
       d.setMinutes(0, 0, 0);
-      el.atInput.value = localInputValue(d);
+      atPicker.set(d);
     }
     if (kind === 'repeat') syncRepeat();
   }

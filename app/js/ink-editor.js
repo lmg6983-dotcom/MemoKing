@@ -81,6 +81,8 @@ function setTone(node, tool, color) {
  *   getStrokes·setStrokes 의 좌표는 svg 안 좌표(px)
  */
 export function createInkSurface(svg, o) {
+  const ac = new AbortController();
+  const { signal } = ac;
   const committed = svgEl('g', { class: 'ink-strokes' });
   const live = svgEl('path', { class: 'ink-live' });
   // 마우스·펜을 올려 두면 지금 도구의 굵기·색을 미리 보여 준다 (지우개는 점선 고리)
@@ -176,7 +178,7 @@ export function createInkSurface(svg, o) {
     const pen = e.pointerType === 'pen';
     drawing = { id: e.pointerId, stroke: { tool, color: o.tools.color[tool], size: size(tool), pen, pts: [point(x, y, pen ? e.pressure || 0.5 : 0.5)] } };
     schedule();
-  });
+  }, { signal });
 
   svg.addEventListener('pointermove', (e) => {
     const p = pointers.get(e.pointerId);
@@ -218,7 +220,7 @@ export function createInkSurface(svg, o) {
       }
     }
     if (!drawing.erase) schedule();
-  });
+  }, { signal });
 
   const end = (e) => {
     pointers.delete(e.pointerId);
@@ -236,14 +238,15 @@ export function createInkSurface(svg, o) {
     schedule();
     render();
   };
-  svg.addEventListener('pointerup', end);
-  svg.addEventListener('pointercancel', end);
+  svg.addEventListener('pointerup', end, { signal });
+  svg.addEventListener('pointercancel', end, { signal });
   svg.addEventListener('pointerleave', (e) => {
     if (e.pointerType !== 'touch' && !drawing) showRing(0, 0, false);
-  });
-  svg.addEventListener('contextmenu', (e) => e.preventDefault());
+  }, { signal });
+  svg.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
 
-  return { render, cancel: cancelDrawing };
+  // 같은 그림판(svg)에 다시 그리기판을 만들 때 앞의 것이 남아 획을 두 번 받지 않게 — 끝낼 때 destroy()
+  return { render, cancel: cancelDrawing, destroy: () => ac.abort() };
 }
 
 /** 되돌리기·다시 하기 기록 (획 목록의 앞뒤 모습) */

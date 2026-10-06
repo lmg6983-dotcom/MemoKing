@@ -12,7 +12,7 @@
 //   - 커서가 있는 항목에 흐린 점선 테두리 (Enter 로 새 항목을 만들면 따라간다)
 import { Plugin, PluginKey, TextSelection, Decoration, DecorationSet, sinkListItem, liftListItem } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
-import { holdKeyboard, edgeScroll } from './keyboard-guard.js';
+import { holdKeyboard, edgeScroll, canDrag, holdFor } from './keyboard-guard.js';
 import { HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
 import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
@@ -36,6 +36,7 @@ const LISTEN = { capture: true, passive: false }; // 터치로 끄는 동안 화
 const isItem = (node) => node?.type.name === 'list_item';
 
 export const SWIPE_DISTANCE = 48; // 이만큼 옆으로 밀면 하위·상위로
+const EDIT_SWIPE_WINDOW_MS = 350; // 글 고치기 방식: 손가락을 댄 뒤 이 안에 옆으로 밀어야 하위·상위 (더 머물면 글자 고르기)
 // 들어 올린 항목을 움직이지 않고 더 누르고 있으면 목록 전체를 옮긴다 (GATHER_MS 부터 목록 테두리가 차오름)
 export const WHOLE_LIST_MS = 650;
 const GATHER_MS = 200;
@@ -607,9 +608,11 @@ export function createListDrag({ readOnly = false } = {}) {
     cancelPress();
     hideDeleteButton(true);
     const io = INPUT[kind];
-    press = { li, view, kind, x: pt.clientX, y: pt.clientY };
+    press = { li, view, kind, x: pt.clientX, y: pt.clientY, t0: Date.now() };
+    // 글 고치기 방식(휴대폰 다이얼): 꾹 누르기는 글자 고르기에 맡기고, 곧바로 옆으로 미는 것만 하위·상위로
+    const lifting = canDrag();
     // 잠깐 뒤(그냥 누르는 클릭에는 깜빡이지 않게)부터 테두리가 점점 진해진다 → 다 진해지면 들어 올림
-    press.markTimer = setTimeout(() => {
+    if (lifting) press.markTimer = setTimeout(() => {
       const pos = press && itemPosOf(view, li);
       if (pos == null) return;
       press.marked = true;
@@ -619,6 +622,11 @@ export function createListDrag({ readOnly = false } = {}) {
       const p = pointOf(e);
       const dx = p.clientX - press.x;
       const dy = p.clientY - press.y;
+      // 글 고치기 방식: 누른 채 머문 뒤의 움직임은 글자 고르기 (밀기로 보지 않는다)
+      if (!lifting && Date.now() - press.t0 > EDIT_SWIPE_WINDOW_MS) {
+        cancelPress();
+        return;
+      }
       // (터치) 옆으로 먼저 밀면 하위·상위로 옮기기
       if (kind === 'touch' && Math.abs(dx) > SWIPE_START && Math.abs(dx) > Math.abs(dy) * 1.6) {
         const { li: item, x: x0, y: y0 } = press;
@@ -633,11 +641,11 @@ export function createListDrag({ readOnly = false } = {}) {
       }
     };
     press.up = () => cancelPress();
-    press.timer = setTimeout(() => {
+    if (lifting) press.timer = setTimeout(() => {
       const p = press;
       cancelPress({ keepMark: true });
       if (p?.li.isConnected) lift(view, p.li, p.x2 ?? p.x, p.y2 ?? p.y, kind);
-    }, io.hold);
+    }, holdFor(io.hold));
     window.addEventListener(io.move, press.move, LISTEN);
     window.addEventListener(io.up, press.up, LISTEN);
     if (io.cancel) window.addEventListener(io.cancel, press.up, LISTEN);
@@ -661,11 +669,12 @@ export function createListDrag({ readOnly = false } = {}) {
       },
       handleDOMEvents: readOnly ? {} : {
         mousedown(view, event) {
+          if (!canDrag()) return false; // 글 고치기 방식: 꾹 눌러도 글자 고르기
           if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && event.detail === 1) startPress(view, event);
           return false; // 편집기는 지금처럼 (커서 놓기·글자 선택)
         },
         touchstart(view, event) {
-          if (event.touches.length === 1) startPress(view, event, 'touch');
+          if (event.touches.length === 1) startPress(view, event, 'touch'); // 글 고치기 방식도 옆으로 휙 밀기(하위·상위)는 받는다
           else cancelPress();
           return false; // 그냥 누르면 지금처럼 커서, 밀면 스크롤
         },

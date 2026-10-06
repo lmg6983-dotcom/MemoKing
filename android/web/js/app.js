@@ -350,7 +350,7 @@ memoSheet.addEventListener('click', async (e) => {
       break;
     case 'copy':
       closeSheet(memoSheet);
-      native.copyText(body);
+      native.copyText(shareText(body)); // 마크다운 원문(<br /> · \* · - [ ]) 대신 보이는 글 그대로
       toast('텍스트를 복사했어요');
       break;
     case 'print':
@@ -385,7 +385,7 @@ async function deleteMemo(id) {
     }
     note.discardAndClose();
     $('note-screen').classList.remove('trashing');
-  } else if (motion) await list.animateRemove(id);
+  } else if (motion) list.animateRemove(id);
   haptic(10);
   let name;
   try {
@@ -1072,6 +1072,7 @@ setupTutorial({
   screen: () => (note.isOpen() ? 'note' : 'list'),
   markdown: () => (note.isOpen() ? note.editorMarkdown() : ''),
   append: (md) => note.appendText(md),
+  edit: () => note.useEditMode(),
 });
 const info = native.info();
 if (info.vault?.ok) openVault();
