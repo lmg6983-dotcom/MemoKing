@@ -6,6 +6,7 @@ import { native, call, on, record } from './native.js';
 import { toast } from './ui.js';
 import { recordingClock as formatDuration } from '../../app/js/core/voice-card.js';
 import { haptic } from '../../app/js/dom.js';
+import { icon as svg } from '../../app/js/icons.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -119,14 +120,6 @@ function renderLines(box, text) {
   }
 }
 
-function svg(name) {
-  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-  use.setAttribute('href', `#i-${name}`);
-  s.append(use);
-  return s;
-}
-
 // 목록 화면에서도 녹음 중임을 (+ 버튼 위 작은 알약, 누르면 그 메모로)
 function renderPill() {
   if (!el.pill) {
@@ -154,9 +147,6 @@ function setStatus(next) {
   if (was && !status.active) el.panel.hidden = true;
   render();
 }
-
-export const isRecording = () => status.active;
-export const recordingMemo = () => (status.active ? status.memoId : null);
 
 export function attach(memoId) {
   attached = memoId;
@@ -267,11 +257,3 @@ export async function resume() {
     }
   }
 }
-
-export const nativeInfo = () => {
-  try {
-    return native.info().record ?? {};
-  } catch {
-    return {};
-  }
-};

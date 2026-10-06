@@ -6,8 +6,6 @@ const $ = (id) => document.getElementById(id);
 let deps = null; // { note }
 let listShown = false;
 
-export const listBeside = () => listShown;
-
 /** @param {{ note }} d */
 export function setupPanes(d) {
   deps = d;

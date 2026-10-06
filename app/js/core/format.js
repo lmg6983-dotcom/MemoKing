@@ -1,16 +1,6 @@
 // 화면 표시용 시각 형식
 import { pad2 as pad, hhmm, koClock, koMonthDay } from './time.js';
 
-// 목록 카드: 오늘이면 시:분, 올해면 월.일, 아니면 연.월.일
-export function formatTime(value, now = Date.now()) {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  const n = new Date(now);
-  if (d.toDateString() === n.toDateString()) return hhmm(d);
-  if (d.getFullYear() === n.getFullYear()) return `${d.getMonth() + 1}.${d.getDate()}`;
-  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
-}
-
 // 녹음 시간: 1:05
 export function formatDuration(ms) {
   const s = Math.floor(ms / 1000);

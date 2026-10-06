@@ -220,7 +220,6 @@ export function mediaKindOf(src, alt = '') {
   return null;
 }
 export const isAudio = (src, alt) => mediaKindOf(src, alt) === 'audio';
-export const isVideo = (src, alt) => mediaKindOf(src, alt) === 'video';
 
 export function isBlankBody(body) {
   return plainLines(body).length === 0 && extractAttachments(body).length === 0;
