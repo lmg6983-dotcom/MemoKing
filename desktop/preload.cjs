@@ -7,6 +7,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
+  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -94,8 +95,20 @@ contextBridge.exposeInMainWorld('memoking', {
     move: (x, y) => ipcRenderer.send('drag:move', { x, y }),
     end: (point) => ipcRenderer.invoke('drag:end', point ?? null),
   },
+  // 받아쓰기 (PC): 데이터 받기 · 녹음하며 받아쓰기 · 소리 파일 받아쓰기
+  stt: {
+    status: invoke('stt:status'),
+    download: invoke('stt:download'),
+    remove: invoke('stt:remove'),
+    setOptions: invoke('stt:options'),
+    start: invoke('stt:start'),
+    audio: (id, samples) => ipcRenderer.send('stt:audio', id, samples),
+    stop: invoke('stt:stop'),
+    transcribe: invoke('stt:transcribe'),
+  },
   attachments: {
     save: invoke('attachment:save'),
+    read: invoke('attachment:read'),
     open: invoke('attachment:open'),
     fetch: invoke('attachment:fetch'),
     info: invoke('attachment:info'),

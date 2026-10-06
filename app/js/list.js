@@ -532,6 +532,7 @@ async function loadSettings() {
   showMagic(s.magic);
   showQuickMemo(s.quickMemo);
   $('trash-days').value = String(s.trashDays);
+  if (api.stt) renderStt(await api.stt.status());
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
 }
 function showQuickMemo(q) {
@@ -539,6 +540,49 @@ function showQuickMemo(q) {
   $('quick-memo-note').textContent = q.enabled && !q.registered
     ? '다른 프로그램이 이 단축키를 쓰고 있어서 켜지 못했어요'
     : '어디서든 고른 내용을 바로 메모로 만들어요. 두 번 누르면 화면 영역 캡처';
+}
+// ---------- 음성 녹음 · 받아쓰기 (desktop/stt) ----------
+// 데이터는 처음 한 번 받는다 (받아쓰기 약 80MB, 말한 사람 나누기 약 30MB) — 이 PC 의 앱 데이터 폴더에, 메모 폴더에는 넣지 않음
+function renderStt(st) {
+  if (!st || !api.stt) return;
+  const asr = st.asr;
+  const pct = (p) => `${Math.round((p ?? 0) * 100)}%`;
+  $('stt-enabled').checked = st.enabled;
+  $('stt-note').textContent = asr.state === 'ready' ? '말하면 문장마다 글로 나타나고, 끝내면 소리와 함께 음성 카드로'
+    : asr.state === 'downloading' ? `받아쓰기 데이터를 받는 중… ${pct(asr.progress)}`
+      : asr.error ? `받지 못했어요: ${asr.error}` : `받아쓰기 데이터(${asr.size})가 필요해요 — 한 번만 받으면 돼요`;
+  const dl = $('stt-download');
+  dl.hidden = asr.state === 'ready';
+  dl.disabled = asr.state === 'downloading';
+  dl.textContent = asr.state === 'downloading' ? `받는 중… ${pct(asr.progress)}` : `받아쓰기 데이터 받기 (${asr.size})`;
+  $('stt-remove').hidden = asr.state !== 'ready';
+  const spk = st.speaker;
+  const sw = $('stt-speaker');
+  sw.checked = st.speakerOn;
+  sw.disabled = !st.enabled;
+  $('stt-speaker-note').textContent = spk.state === 'downloading' ? `말한 사람 나누기 데이터를 받는 중… ${pct(spk.progress)}`
+    : spk.error && st.speakerOn ? `받지 못했어요: ${spk.error}`
+      : st.speakerOn && spk.state !== 'ready' ? `데이터(${spk.size})를 받으면 켜져요`
+        : '녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요 (긴 녹음은 몇 분 걸려요)';
+}
+if (api.stt) {
+  api.on('stt:status', renderStt);
+  $('stt-enabled').addEventListener('change', async (e) => renderStt(await api.stt.setOptions({ enabled: e.target.checked })));
+  $('stt-download').addEventListener('click', async () => {
+    const st = await api.stt.download('asr');
+    renderStt(st);
+  });
+  $('stt-remove').addEventListener('click', async () => {
+    if (!(await confirmDialog('받아쓰기 데이터를 지울까요?\n다시 쓰려면 다시 받아야 해요.', '지우기'))) return;
+    renderStt(await api.stt.remove('asr'));
+  });
+  $('stt-speaker').addEventListener('change', async (e) => {
+    let st = await api.stt.setOptions({ speaker: e.target.checked });
+    renderStt(st);
+    if (e.target.checked && st.speaker.state === 'missing') renderStt(await api.stt.download('speaker'));
+  });
+} else {
+  for (const x of ['stt-enabled', 'stt-download', 'stt-speaker']) $(x).closest('label, div').hidden = true;
 }
 $('quick-memo').addEventListener('change', async (e) => showQuickMemo(await api.settings.setQuickMemo(e.target.checked)));
 $('auto-start').addEventListener('change', async (e) => {

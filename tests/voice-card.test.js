@@ -41,3 +41,16 @@ test('PC 녹음: 만들 수 있는 형식 고르기 · 마이크 오류 안내',
   assert.match(micErrorText({ name: 'NotFoundError' }), /찾지 못했/);
   assert.match(micErrorText(new Error('x')), /시작하지 못했/);
 });
+
+test('받아쓴 글이 없는 소리 찾기 · 음성 카드 글 통째로 바꾸기', async () => {
+  const { audioNeedingTranscript, replaceTranscript, voiceCardMarkdown } = await import('../app/js/core/voice-card.js');
+  const card = voiceCardMarkdown({ alt: '녹음', src: 'attachments/a.m4a' }, '안녕하세요.\n반가워요.');
+  const empty = voiceCardMarkdown({ alt: '녹음', src: 'attachments/b.m4a' }, '');
+  const body = `# 회의\n\n${card}\n\n${empty}\n\n![소리](attachments/c.mp3)\n\n![사진](attachments/d.png)`;
+  assert.deepEqual(audioNeedingTranscript(body), ['attachments/b.m4a', 'attachments/c.mp3']);
+  const next = replaceTranscript(body, 'attachments/a.m4a', '화자 1: 안녕하세요.\n화자 2: 반가워요.');
+  assert.match(next, /> \*\*화자 1:\*\* 안녕하세요\.\n>\n> \*\*화자 2:\*\* 반가워요\.\n\n> !\[녹음\]\(attachments\/b\.m4a\)/);
+  assert.ok(!/^> 안녕하세요/m.test(next));
+  assert.match(replaceTranscript(body, 'attachments/c.mp3', '새 글'), /> !\[소리\]\(attachments\/c\.mp3\)\n>\n> 새 글/);
+  assert.equal(replaceTranscript(body, 'attachments/zz.m4a', 'x'), null);
+});

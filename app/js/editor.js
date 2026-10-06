@@ -26,7 +26,7 @@ import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt } from './table-extras.js';
 import { createListDrag } from './list-drag.js';
 import { createBlockMove, createContentLines, MEDIA_SCRUB } from './block-move.js';
-import { createVoiceCards, isVoiceCard } from './voice-card-view.js';
+import { createVoiceCards, isVoiceCard, voiceAudioOf } from './voice-card-view.js';
 import { createTidy } from './tidy.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
 import { create as createConfetti } from '../vendor/confetti.js';
@@ -1790,6 +1790,29 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       editor.action(insert(md));
     },
     // 이 소리 파일 줄에 받아쓴 글을 붙여 음성 카드로 (이미 카드면 끝에 이어서). 소리 줄이 없으면 false
+    // 음성 카드의 받아쓴 글을 통째로 바꾼다 (말한 사람을 나눈 뒤 "화자 N:" 을 붙일 때). 카드가 아니면 붙이기. 소리 줄이 없으면 false
+    replaceTranscript(src, transcript) {
+      const v = view();
+      let card = null;
+      v.state.doc.descendants((node, pos) => {
+        if (card) return false;
+        if (voiceAudioOf(node)?.attrs.src === src) {
+          card = { node, pos };
+          return false;
+        }
+        return true;
+      });
+      if (!card) return this.attachTranscript(src, transcript);
+      const lines = transcriptLines(transcript);
+      const parse = (md) => editor.action((ctx) => ctx.get(parserCtx)(md));
+      const from = card.pos + 1 + card.node.firstChild.nodeSize;
+      const to = card.pos + card.node.nodeSize - 1;
+      const tr = v.state.tr;
+      if (lines.length) tr.replaceWith(from, to, parse(lines.join('\n\n')).content);
+      else if (to > from) tr.delete(from, to);
+      v.dispatch(tr);
+      return true;
+    },
     attachTranscript(src, transcript) {
       const v = view();
       const { doc } = v.state;

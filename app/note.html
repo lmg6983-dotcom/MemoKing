@@ -36,6 +36,7 @@
     <button class="menu-item" id="pin-toggle" role="menuitem"><svg><use href="#i-pin"/></svg><span>맨 위에 고정</span></button>
     <button class="menu-item" id="show-list" role="menuitem"><svg><use href="#i-list"/></svg><span>메모 목록 열기</span></button>
     <button class="menu-item" id="pdf-btn" role="menuitem"><svg><use href="#i-pdf"/></svg><span>PDF로 저장</span></button>
+    <button class="menu-item" id="transcribe-btn" role="menuitem"><svg><use href="#i-mic"/></svg><span>소리 받아쓰기</span></button>
     <button class="menu-item danger" id="delete-btn" role="menuitem"><svg><use href="#i-trash"/></svg><span>삭제</span></button>
   </div>
 
@@ -53,6 +54,7 @@
 
   <!-- 녹음 중: 빨간 점 · 시간 · 소리 크기 · 잠시 멈춤 · 끝내기 (끝내면 소리 파일이 음성 카드로 메모 끝에) -->
   <div id="rec-panel" class="rec-panel desk-rec" role="region" aria-label="녹음" hidden>
+    <div class="rec-row">
     <span class="rec-dot" aria-hidden="true"></span>
     <b id="rec-time" class="rec-time">00:00</b>
     <span id="rec-state" class="rec-state">녹음 중</span>
@@ -60,6 +62,8 @@
     <span class="grow"></span>
     <button id="rec-pause" class="rec-btn" title="일시 정지" aria-label="일시 정지"><svg><use href="#i-pause"/></svg></button>
     <button id="rec-stop" class="rec-btn stop" title="녹음 끝내기 (Ctrl+Shift+R)"><svg><use href="#i-stop"/></svg><span>끝내기</span></button>
+    </div>
+    <div id="rec-text" class="rec-text" aria-live="polite" hidden></div>
   </div>
 
   <main id="editor" class="editor"></main>

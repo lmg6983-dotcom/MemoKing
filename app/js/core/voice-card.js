@@ -85,3 +85,44 @@ export function recordingWhen(ms) {
   const h = d.getHours();
   return `${d.getMonth() + 1}월 ${d.getDate()}일 ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${pad2(d.getMinutes())}`;
 }
+
+const AUDIO_SRC = /\.(m4a|weba|ogg|oga|opus|mp3|aac|wav|flac)$/i;
+const MEDIA_LINE = /!\[[^\]]*\]\(<?([^)>]+)>?\)/;
+
+/**
+ * 메모 본문에서 받아쓴 글이 아직 없는 소리 파일들 (음성 카드의 글이 비었거나, 그냥 소리 줄)
+ * @returns {string[]} src 목록
+ */
+export function audioNeedingTranscript(body) {
+  const lines = String(body ?? '').split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(MEDIA_LINE);
+    if (!m || !AUDIO_SRC.test(m[1].split(/[?#]/)[0])) continue;
+    if (/^>\s?/.test(lines[i])) {
+      let j = i + 1;
+      let text = '';
+      while (j < lines.length && /^>/.test(lines[j]) && !MEDIA_LINE.test(lines[j])) text += lines[j++].replace(/^>\s?/, '');
+      if (text.trim()) continue;
+    }
+    if (!out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+
+/**
+ * 음성 카드의 받아쓴 글을 통째로 바꾼다 (말한 사람을 나눈 뒤 "화자 N:" 을 붙일 때). 카드가 아니면 attachTranscript 처럼
+ * @returns {string | null} 소리 줄이 없으면 null
+ */
+export function replaceTranscript(body, src, transcript) {
+  const lines = String(body ?? '').split('\n');
+  const re = new RegExp(`!\\[[^\\]]*\\]\\(<?${escapeRe(src)}>?\\)`);
+  const at = lines.findIndex((l) => re.test(l));
+  if (at < 0) return null;
+  if (!/^>\s?/.test(lines[at])) return attachTranscript(body, src, transcript);
+  let end = at;
+  while (end + 1 < lines.length && /^>/.test(lines[end + 1])) end++;
+  const add = transcriptLines(transcript);
+  lines.splice(at + 1, end - at, ...add.flatMap((l) => ['>', `> ${l}`]));
+  return lines.join('\n');
+}

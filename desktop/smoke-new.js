@@ -3,6 +3,8 @@
 // 이번 버전: v0.19.0 — 메모 목록을 휴대폰과 같은 모양으로 (엇갈려 쌓은 카드 · 격자/한 줄씩 단추 · 오른쪽 아래 + 와 위성 버튼)
 //            · 음성 메모 녹음 (+ › 음성 메모, 메모 창의 마이크 단추·Ctrl+Shift+R)
 //   녹음은 점검용 가짜 마이크(삐 소리)로 한다 (main.js 가 점검 때만 켬)
+//   v0.20.0 — PC 받아쓰기: MEMOKING_STT_DIR(받아 둔 데이터)·MEMOKING_FAKE_AUDIO(가짜 마이크가 들려줄 한국어 wav)가 있으면
+//             녹음하며 받아쓰기 · 음성 카드 · 말한 사람 나누기 · 메뉴의 소리 받아쓰기까지
 import { app } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -192,6 +194,60 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList }
     await until(() => lj(`!!document.querySelector('.card[data-id="${voice.id}"] .card-badge')`), '목록 카드 소리 표시').catch(() => {});
     const badge = await lj(`!!document.querySelector('.card[data-id="${voice.id}"] .card-meta .card-badge')`);
     check('목록 카드에 소리 표시', badge);
+
+    // 8) 받아쓰기 (데이터와 한국어 소리가 있을 때만)
+    if (process.env.MEMOKING_STT_DIR && process.env.MEMOKING_FAKE_AUDIO) {
+      await lj(`document.getElementById('settings-btn').click()`);
+      await wait(400);
+      let sttUi = await lj(`({ on: document.getElementById('stt-enabled').checked, note: document.getElementById('stt-note').textContent, dl: document.getElementById('stt-download').hidden })`);
+      await lj(`document.getElementById('stt-speaker').click()`);
+      await until(() => lj(`document.getElementById('stt-speaker').checked`), '말한 사람 나누기 켬').catch(() => {});
+      await capture(getList(), 'smoke-new-stt-settings.png');
+      await lj(`document.getElementById('settings-dialog').close()`);
+      check('설정 › 음성 녹음: 받아쓰기 켜짐 · 데이터 있음(받기 단추 숨김) · 말한 사람 나누기 켜기', sttUi.on && sttUi.dl && /문장마다/.test(sttUi.note), JSON.stringify(sttUi));
+      before = new Set(noteWins.keys());
+      await lj(`document.getElementById('fab').click()`);
+      await wait(250);
+      await lj(`document.querySelector('#fab-menu [data-new="voice"]').click()`);
+      const talk = await newWindow(before);
+      const tj = (code) => js(talk.win, code);
+      const live = await until(async () => {
+        const t = await tj(`[...document.querySelectorAll('#rec-text > div:not(.rec-hint):not(.rec-listening)')].map((d) => d.textContent)`);
+        return t.length >= 2 && t;
+      }, '녹음하며 받아쓴 글', 30000).catch(() => null);
+      const state = await tj(`document.getElementById('rec-state').textContent`);
+      await capture(talk.win, 'smoke-new-stt-live.png');
+      check('녹음하는 동안 문장마다 글이 나타남 ("받아쓰는 중")', live && state === '받아쓰는 중' && live.some((l) => /생각을 하면서/.test(l)), JSON.stringify({ live, state }));
+      await tj(`document.getElementById('rec-stop').click()`);
+      const body = await until(() => {
+        const m = vault.get(talk.id);
+        return m && /> !\[녹음/.test(m.body) && /> .*(생각|괜찮은|주민등록증|지하철)/.test(m.body) && m.body;
+      }, '받아쓴 글이 든 음성 카드', 20000).catch(() => null);
+      check('끝내기 → 소리와 받아쓴 글이 한 음성 카드로 (문장마다 줄)', body && (body.match(/^> (?!!\[)\S/gm) ?? []).length >= 2, body);
+      const labelled = await until(() => {
+        const m = vault.get(talk.id);
+        return m && /\*\*화자 \d:\*\*/.test(m.body) && m.body;
+      }, '화자 이름표', 60000).catch(() => null);
+      const cardUi = await tj(`({ card: !!document.querySelector('.mk-voice'), spk: document.querySelectorAll('.mk-voice [class*="mk-spk-"]').length })`);
+      await capture(talk.win, 'smoke-new-stt-card.png');
+      check('말한 사람을 나눈 뒤 음성 카드에 "화자 N:" 이름표', labelled, labelled ?? vault.get(talk.id)?.body);
+      // 메뉴 › 소리 받아쓰기: 받아쓴 글이 없는 소리 파일
+      const wavRel = vault.saveAttachment(fs.readFileSync(process.env.MEMOKING_FAKE_AUDIO), 'wav');
+      const fileMemo = vault.create();
+      vault.save(fileMemo, `# 회의 녹음\n\n![회의](${wavRel})\n`);
+      await lj(`window.memoking.memo.open(${JSON.stringify(fileMemo)})`);
+      const fw = await until(() => noteWins.get(fileMemo), '소리 메모 창');
+      await ready(fw);
+      await js(fw, `document.getElementById('transcribe-btn').click()`);
+      const filed = await until(() => {
+        const m = vault.get(fileMemo);
+        return m && /> !\[회의\]/.test(m.body) && /주민등록증/.test(m.body) && m.body;
+      }, '소리 받아쓰기', 40000).catch(() => null);
+      check('메뉴 › 소리 받아쓰기 → 그 소리의 음성 카드에 받아쓴 글', filed, filed ?? vault.get(fileMemo)?.body);
+      void cardUi;
+      fw.close();
+      talk.win.close();
+    }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;

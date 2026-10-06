@@ -12,6 +12,7 @@ import { setupCoach } from './coach.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSliders } from './seg-slider.js';
 import { setupVoiceRecorder } from './voice-recorder.js';
+import { audioNeedingTranscript } from './core/voice-card.js';
 
 const SAVE_DELAY = 600;
 const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
@@ -50,6 +51,26 @@ const el = {
 let editor = null;
 let reminderPanel = null;
 let recorder = null; // 음성 녹음 (voice-recorder.js)
+
+// 녹음 받아쓰기를 메인 프로세스와 잇는다 (녹음마다 번호)
+function sttBridge() {
+  let seq = 0;
+  let cur = 0;
+  const lineFns = [];
+  const speakFns = [];
+  api.on('stt:line', ({ id: n, text }) => n === cur && lineFns.forEach((f) => f(text)));
+  api.on('stt:speaking', ({ id: n, on }) => n === cur && speakFns.forEach((f) => f(on)));
+  return {
+    start: () => {
+      cur = ++seq;
+      return api.stt.start(cur);
+    },
+    audio: (samples) => api.stt.audio(cur, samples),
+    stop: ({ src }) => api.stt.stop(cur, { memoId: id, src }),
+    onLine: (f) => lineFns.push(f),
+    onSpeaking: (f) => speakFns.push(f),
+  };
+}
 let memo = null;
 let current = '';   // 편집기의 최신 마크다운
 let saved = '';     // 마지막으로 저장한 마크다운
@@ -308,6 +329,61 @@ $('pdf-btn').addEventListener('click', async () => {
   await flush(); // 지금 적은 내용까지 PDF 에
   api.pdf.open(id);
 });
+// 소리 받아쓰기: 이 메모의 받아쓴 글이 없는 소리 파일들을 글로 (녹음할 때 받아쓰기 데이터가 없었거나, 넣은 소리 파일)
+//   소리를 16kHz 로 풀어(브라우저 디코더) 메인 프로세스의 받아쓰기로 → 그 소리의 음성 카드에. 말한 사람은 나눈 뒤 다시 고친다
+async function decode16k(src) {
+  let rel = src;
+  try {
+    rel = decodeURI(src);
+  } catch {
+    // 이미 풀린 경로
+  }
+  const bytes = await api.attachments.read(rel);
+  const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const ctx = new AudioContext({ sampleRate: 16000 });
+  try {
+    const audio = await ctx.decodeAudioData(buf);
+    const out = new Float32Array(audio.length);
+    for (let c = 0; c < audio.numberOfChannels; c++) {
+      const ch = audio.getChannelData(c);
+      for (let i = 0; i < ch.length; i++) out[i] += ch[i] / audio.numberOfChannels;
+    }
+    return out;
+  } finally {
+    ctx.close().catch(() => {});
+  }
+}
+async function transcribeAudio() {
+  closeMenu();
+  if (!editor) return;
+  const st = await api.stt.status();
+  if (st.asr.state !== 'ready') return setStatus('받아쓰기 데이터를 먼저 받아 주세요 · 목록 창 설정 › 음성 녹음', true);
+  const list = audioNeedingTranscript(editor.getMarkdown());
+  if (!list.length) return setStatus('받아쓸 소리가 없어요 (모두 받아썼어요)');
+  let done = 0;
+  for (const [i, src] of list.entries()) {
+    setStatus(list.length > 1 ? `받아쓰는 중… (${i + 1}/${list.length})` : '받아쓰는 중…');
+    try {
+      const r = await api.stt.transcribe({ memoId: id, src, samples: await decode16k(src) });
+      if (r.error) throw new Error(r.error);
+      if (r.text && editor.attachTranscript(src, r.text)) done++;
+    } catch (err) {
+      console.error(err);
+      setStatus(err.message || '받아쓰지 못했어요', true);
+      return;
+    }
+  }
+  await flush();
+  setStatus(done ? `받아쓴 글을 넣었어요${st.speakerOn && st.speaker.state === 'ready' ? ' · 말한 사람을 나누는 중…' : ''}` : '알아들은 말이 없어요');
+}
+$('transcribe-btn').addEventListener('click', transcribeAudio);
+// 말한 사람을 나눈 뒤: 음성 카드의 받아쓴 글에 "화자 N:" 을 붙여 다시
+api.on('stt:speakers', async ({ src, text }) => {
+  if (!editor?.replaceTranscript(src, text)) return;
+  await flush();
+  setStatus('말한 사람을 나눴어요');
+});
+
 $('show-list').addEventListener('click', () => {
   api.win.showList();
   closeMenu();
@@ -1337,6 +1413,8 @@ if (!memo) {
     panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
     buttons: () => document.querySelectorAll('[data-action="record"]'),
     saveAudio: (bytes, ext) => api.attachments.save(bytes, ext),
+    text: $('rec-text'),
+    stt: sttBridge(),
     // 빈 메모면 제목을 달고, 소리(음성 카드)는 메모 끝에 (휴대폰과 같음)
     insert: async (card, heading) => {
       if (isBlankBody(editor.getMarkdown())) editor.setMarkdown(`# ${heading}\n`);

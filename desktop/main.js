@@ -23,6 +23,8 @@ import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
 import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
+import { createSttService } from './stt/stt-service.js';
+import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
 import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
@@ -40,6 +42,8 @@ const SMOKE = process.argv.includes('--smoke');
 if (SMOKE) {
   app.commandLine.appendSwitch('use-fake-device-for-media-stream');
   app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
+  // 받아쓰기 점검: 가짜 마이크가 삐 소리 대신 이 소리 파일(16kHz wav)을 들려준다
+  if (process.env.MEMOKING_FAKE_AUDIO) app.commandLine.appendSwitch('use-file-for-fake-audio-capture', process.env.MEMOKING_FAKE_AUDIO);
 }
 // Windows 로그인 때 자동 실행된 경우: 창 없이 알림 영역에서 조용히 시작
 const HIDDEN_START = process.argv.includes('--hidden');
@@ -55,6 +59,10 @@ const ASSETS_DIR = path.join(import.meta.dirname, '..', 'assets');
 const APP_ICON = path.join(ASSETS_DIR, 'icons', 'memoking.ico');
 const APP_ICON_PNG = path.join(ASSETS_DIR, 'icons', 'icon-256.png');
 // PowerShell 이 읽어야 하므로 설치판에서는 asar 밖(app.asar.unpacked)에 둔다
+// 받아쓰기 작업 스레드와 엔진(WebAssembly)은 asar 밖에 둔다 (작업 스레드가 파일로 읽는다)
+const unpacked = (p) => p.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+const STT_WORKER = unpacked(path.join(import.meta.dirname, 'stt', 'stt-worker.js'));
+const STT_VENDOR = unpacked(path.join(import.meta.dirname, 'vendor'));
 const POPUP_HELPER = path.join(import.meta.dirname, '..', 'scripts', 'popup-watch.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 const CLIPBOARD_HELPER = path.join(import.meta.dirname, '..', 'scripts', 'clipboard-helper.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 const QUICK_MEMO_KEY = 'Control+Alt+C';
@@ -1989,7 +1997,87 @@ const onQuickMemoKey = createDoublePress({
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 
+// ---------- 받아쓰기 (stt/stt-service.js) ----------
+// 메모 창마다 녹음 하나: 작업 id = "창 번호:녹음 번호"
+let stt = null;
+const sttOptions = () => ({ enabled: settings.stt?.enabled !== false, speaker: settings.stt?.speaker === true });
+function initStt() {
+  stt = createSttService({
+    dir: process.env.MEMOKING_STT_DIR || path.join(app.getPath('userData'), 'stt'),
+    workerPath: STT_WORKER,
+    vendor: STT_VENDOR,
+    fetch: (url) => net.fetch(url),
+    getVault: () => vault,
+    getOptions: sttOptions,
+    onStatus: (status) => {
+      for (const w of [listWin, ...noteWins.values()]) if (w && !w.isDestroyed()) w.webContents.send('stt:status', status);
+    },
+    // 말한 사람을 나눈 뒤: 열린 메모면 그 창이 음성 카드를 고치고, 닫혔으면 파일을 직접
+    onSpeakers: ({ memoId, src, text }) => {
+      const win = noteWins.get(memoId);
+      if (win && !win.isDestroyed()) return win.webContents.send('stt:speakers', { src, text });
+      const memo = vault?.get(memoId);
+      const next = memo && replaceTranscript(memo.body, src, text);
+      if (next && next !== memo.body) vault.save(memoId, next);
+    },
+  });
+}
+const sttKey = (e, id) => `${e.sender.id}:${id}`;
+const sttSenders = new Map(); // 작업 id → 창 (닫히면 그 창의 녹음 받아쓰기를 거둔다)
+
 function registerIpc() {
+  ipcMain.handle('stt:status', () => stt.status());
+  ipcMain.handle('stt:download', async (_e, pack) => {
+    try {
+      return await stt.download(pack);
+    } catch (err) {
+      return { ...stt.status(), error: err.message };
+    }
+  });
+  ipcMain.handle('stt:remove', (_e, pack) => stt.remove(pack));
+  ipcMain.handle('stt:options', (_e, next) => {
+    settings.stt = { ...sttOptions(), ...(next ?? {}) };
+    saveSettings();
+    stt.emit();
+    return stt.status();
+  });
+  ipcMain.handle('stt:start', (e, id) => {
+    const key = sttKey(e, id);
+    const wc = e.sender;
+    const res = stt.start(key, {
+      onLine: (text) => !wc.isDestroyed() && wc.send('stt:line', { id, text }),
+      onSpeaking: (on) => !wc.isDestroyed() && wc.send('stt:speaking', { id, on }),
+    });
+    if (res.stt && !sttSenders.has(wc.id)) {
+      sttSenders.set(wc.id, new Set());
+      wc.once('destroyed', () => {
+        for (const k of sttSenders.get(wc.id) ?? []) stt.cancel(k);
+        sttSenders.delete(wc.id);
+      });
+    }
+    if (res.stt) sttSenders.get(wc.id).add(key);
+    return res;
+  });
+  ipcMain.on('stt:audio', (e, id, samples) => {
+    if (samples instanceof Float32Array) stt.audio(sttKey(e, id), samples);
+  });
+  ipcMain.handle('stt:stop', async (e, id, target) => {
+    const key = sttKey(e, id);
+    sttSenders.get(e.sender.id)?.delete(key);
+    try {
+      return await stt.stop(key, target);
+    } catch (err) {
+      return { text: '', error: err.message };
+    }
+  });
+  ipcMain.handle('stt:transcribe', async (_e, job) => {
+    try {
+      return await stt.transcribe({ memoId: job?.memoId, src: job?.src, samples: job?.samples });
+    } catch (err) {
+      return { text: '', error: err.message };
+    }
+  });
+
   ipcMain.handle('app:info', () => vaultInfo());
   ipcMain.handle('vault:use', (_e, dir) => {
     const info = openVault(dir);
@@ -2279,6 +2367,13 @@ function registerIpc() {
     return result;
   });
 
+  // 메모 폴더의 첨부 파일 내용 (소리 받아쓰기 — 메모 창이 풀어서 받아쓰기로 보낸다). 폴더 밖 경로는 vault.resolve 가 거부
+  ipcMain.handle('attachment:read', (_e, rel) => {
+    const file = vault?.resolve(String(rel ?? ''));
+    if (!file || !fs.existsSync(file)) throw new Error('파일을 찾지 못했어요');
+    if (fs.statSync(file).size > 500 * 1024 * 1024) throw new Error('파일이 너무 커요 (500MB 넘음)');
+    return new Uint8Array(fs.readFileSync(file));
+  });
   ipcMain.handle('attachment:save', (_e, bytes, ext) => {
     if (!vault) throw new Error('메모 폴더가 아직 없어요.');
     if (!(bytes instanceof Uint8Array)) throw new TypeError('넣으려는 파일을 읽지 못했어요.');
@@ -2554,6 +2649,7 @@ app.whenReady().then(async () => {
     permission === 'media' && (details?.mediaType ?? 'audio') === 'audio' && isNoteWindow(wc)
   ));
   registerVaultProtocol();
+  initStt();
   registerIpc();
   try {
     createTray();
@@ -2631,6 +2727,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  stt?.close();
   topWatch.stop();
   globalShortcut.unregisterAll();
   captureHelper.stop();

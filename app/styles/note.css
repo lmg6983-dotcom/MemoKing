@@ -1438,8 +1438,8 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 /* ---------- v0.19.0: 음성 녹음 (PC) — 위쪽 막대 아래 한 줄: 빨간 점 · 시간 · 소리 크기 · 잠시 멈춤 · 끝내기 ---------- */
 .desk-rec {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   flex: none;
   margin: 0 10px 6px;
   padding: 6px 6px 6px 12px;
@@ -1449,6 +1449,11 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
   animation: desk-rec-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .desk-rec[hidden] { display: none; }
+.desk-rec .rec-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.desk-rec .rec-text { max-height: 28vh; padding: 2px 6px 2px 0; overflow-y: auto; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--note-text); }
+.desk-rec .rec-text[hidden] { display: none; }
+.desk-rec .rec-hint, .desk-rec .rec-listening { color: var(--note-muted); font-size: 12.5px; }
+.desk-rec .rec-listening { animation: desk-rec-blink 1.2s ease-in-out infinite; }
 .desk-rec .grow { flex: 1; }
 .desk-rec .rec-dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: #e5484d; box-shadow: 0 0 0 4px rgba(229, 72, 77, 0.2); animation: desk-rec-blink 1.2s ease-in-out infinite; }
 .desk-rec.paused .rec-dot { animation: none; background: var(--note-muted); box-shadow: none; }

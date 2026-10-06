@@ -141,6 +141,19 @@
     <div class="dialog-actions left sub-actions">
       <button id="history-apps-btn" class="btn">모을 앱 선택 <span id="blocked-count" class="trash-count"></span></button>
     </div>
+    <p class="label">음성 녹음 · 받아쓰기 <small>인터넷 없이 이 PC 안에서</small></p>
+    <label class="setting-row">
+      <input type="checkbox" id="stt-enabled" class="switch">
+      <span>녹음하며 받아쓰기 <small id="stt-note"></small></span>
+    </label>
+    <div class="dialog-actions left sub-actions stt-actions">
+      <button id="stt-download" class="btn">받아쓰기 데이터 받기</button>
+      <button id="stt-remove" class="link-btn danger" hidden>지우기</button>
+    </div>
+    <label class="setting-row sub-row">
+      <input type="checkbox" id="stt-speaker" class="switch">
+      <span>말한 사람 나누기 <small id="stt-speaker-note">녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요</small></span>
+    </label>
     <label class="setting-row">
       <input type="checkbox" id="fit-tables" class="switch">
       <span>넓은 표 맞춤 <small>표가 잘리지 않게 글자를 줄이고, 그래도 넓으면 창을 넓혀요</small></span>
