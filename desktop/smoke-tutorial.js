@@ -156,12 +156,6 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await press(note(), '.ProseMirror', '[write] 본문');
     note().webContents.insertText('장보기 목록');
     await wait(200);
-    await arrive(note, 'format', { praise: true });
-    // 글자 고르기: 첫 줄 글자를 끌어서 → B
-    const t = await probe(note(), '.ProseMirror > :first-child', 'text');
-    check('[format] 고를 글자가 말풍선에 가려지지 않음', t.ok, JSON.stringify(t));
-    await drag(note(), [[t.left + 1, t.top + 8], [t.right - 1, t.top + 8]]);
-    await press(note(), '[data-cmd="bold"]', '[format] 굵게(B)');
     await arrive(note, 'style', { praise: true });
     await press(note(), '.format-bar .style-btn', '[style] "본문" 단추');
     await wait(250);
@@ -169,6 +163,8 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await arrive(note, 'lists', { praise: true });
     await press(note(), '[data-cmd="task"]', '[lists] 체크리스트');
     await arrive(note, 'move', { praise: true });
+    const items = await js(note(), `[...document.querySelectorAll('.ProseMirror li')].map((li) => li.textContent.trim())`);
+    check('[move] 옮겨 볼 예시 목록(우유·달걀·사과·식빵)이 저절로 들어감', ['우유', '달걀', '사과', '식빵'].every((w) => items.includes(w)), JSON.stringify(items));
     await next(note, 'move');
     await arrive(note, 'add');
     await press(note(), '#add-btn', '[add] 왼쪽 아래 +');

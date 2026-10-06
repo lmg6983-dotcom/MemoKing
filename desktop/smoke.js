@@ -963,9 +963,9 @@ export async function runSmoke({
       tutWin().webContents.focus();
       await js(tutWin(), `document.querySelector('.mk-doc').focus()`);
       await type(tutWin(), '튜토리얼 메모');
-      const formatStep = await waitStep(tutWin, 'format');
-      const barShown = formatStep && (await js(tutWin(), `!document.body.classList.contains('bar-hidden')`));
-      check('글을 쓰면 → 저절로 다음 단계 (튜토리얼 동안 서식 도구막대는 보임)', formatStep && barShown);
+      const styleStep = await waitStep(tutWin, 'style');
+      const barShown = styleStep && (await js(tutWin(), `!document.body.classList.contains('bar-hidden')`));
+      check('글을 쓰면 → 저절로 다음 단계 (튜토리얼 동안 서식 도구막대는 보임)', styleStep && barShown);
       // 안내만 하는 단계는 "다음"으로, 직접 해 보는 단계(태그·닫기)는 실제로 해서 넘어간다
       const stepIds = TUTORIAL_STEPS.map((x) => x.id);
       const walk = async (win, from, to) => {
@@ -974,7 +974,7 @@ export async function runSmoke({
           await waitStep(win, id);
         }
       };
-      await walk(tutWin, 'format', 'tag');
+      await walk(tutWin, 'style', 'tag');
       await type(tutWin(), ' #할일 ');
       const crownStep = await waitStep(tutWin, 'crown');
       check('#태그를 쓰면 → 저절로 다음 단계', crownStep);
