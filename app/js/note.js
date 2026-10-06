@@ -11,12 +11,14 @@ import { extractTags } from './core/tags.js';
 import { setupCoach } from './coach.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSliders } from './seg-slider.js';
+import { setupVoiceRecorder } from './voice-recorder.js';
 
 const SAVE_DELAY = 600;
 const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 
 const api = window.memoking;
-const id = new URLSearchParams(location.search).get('id');
+const params = new URLSearchParams(location.search);
+const id = params.get('id');
 const $ = (x) => document.getElementById(x);
 const el = {
   status: $('status'),
@@ -47,6 +49,7 @@ const el = {
 
 let editor = null;
 let reminderPanel = null;
+let recorder = null; // 음성 녹음 (voice-recorder.js)
 let memo = null;
 let current = '';   // 편집기의 최신 마크다운
 let saved = '';     // 마지막으로 저장한 마크다운
@@ -765,6 +768,7 @@ const actions = {
   style: (btn) => (styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
   file: () => el.fileInput.click(),
   table: () => editor.insertTable(),
+  record: () => recorder?.toggle(),
   color: (btn) => (paletteKind === 'color' ? closePalette() : openPalette('color', btn)),
   highlight: (btn) => (paletteKind === 'highlight' ? closePalette() : openPalette('highlight', btn)),
 };
@@ -872,6 +876,7 @@ const SHORTCUTS = {
   'ctrl+shift+Digit9': ['cmd', 'task'],
   'ctrl+shift+KeyB': ['cmd', 'quote'],
   'ctrl+shift+KeyI': ['action', 'file'],
+  'ctrl+shift+KeyR': ['action', 'record'],
   'ctrl+shift+KeyT': ['app', 'top'],
   'ctrl+shift+KeyA': ['app', 'reminders'],
   'ctrl+KeyK': ['app', 'links'],
@@ -1126,6 +1131,7 @@ async function autoTagOnClose() {
 }
 
 async function closeWindow() {
+  await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
   await autoTagOnClose();
   await flush();
   api.win.close();
@@ -1134,6 +1140,7 @@ async function closeWindow() {
 // Ctrl+W: 스택이면 보이는 탭만 닫는다 (탭의 × 와 같음). 스택이 아니면 창을 닫는다.
 async function closeTabOrWindow() {
   if (tabsEl.hidden) return closeWindow();
+  await recorder?.finish();
   await autoTagOnClose();
   await flush();
   api.stack.remove(id);
@@ -1326,9 +1333,22 @@ if (!memo) {
     onToggle: (open) => open && !el.linksPanel.hidden && toggleLinks(false),
   });
   reminderPanel.set(memo.reminders);
+  recorder = setupVoiceRecorder({
+    panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
+    buttons: () => document.querySelectorAll('[data-action="record"]'),
+    saveAudio: (bytes, ext) => api.attachments.save(bytes, ext),
+    // 빈 메모면 제목을 달고, 소리(음성 카드)는 메모 끝에 (휴대폰과 같음)
+    insert: async (card, heading) => {
+      if (isBlankBody(editor.getMarkdown())) editor.setMarkdown(`# ${heading}\n`);
+      editor.appendMarkdown(card);
+      await flush();
+    },
+    notice: setStatus,
+  });
   if (memo.alarm) showAlarm(memo.alarm);
   editor.focus();
   if (memo.capture) await applyCapture(memo.capture);
+  if (params.get('record') === '1') recorder.start(); // 목록 + › 음성 메모
   // 표가 넘치면 메모를 줄여 맞추기 (설정) — 열 때 한 번, 그리고 본문이 바뀔 때(표 붙여넣기·넣기)
   try {
     fitTables = (await api.settings.get())?.fitTables !== false;

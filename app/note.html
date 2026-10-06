@@ -51,6 +51,17 @@
     <button id="alarm-ok" class="banner-btn primary">확인했어요</button>
   </div>
 
+  <!-- 녹음 중: 빨간 점 · 시간 · 소리 크기 · 잠시 멈춤 · 끝내기 (끝내면 소리 파일이 음성 카드로 메모 끝에) -->
+  <div id="rec-panel" class="rec-panel desk-rec" role="region" aria-label="녹음" hidden>
+    <span class="rec-dot" aria-hidden="true"></span>
+    <b id="rec-time" class="rec-time">00:00</b>
+    <span id="rec-state" class="rec-state">녹음 중</span>
+    <span id="rec-wave" class="rec-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    <span class="grow"></span>
+    <button id="rec-pause" class="rec-btn" title="일시 정지" aria-label="일시 정지"><svg><use href="#i-pause"/></svg></button>
+    <button id="rec-stop" class="rec-btn stop" title="녹음 끝내기 (Ctrl+Shift+R)"><svg><use href="#i-stop"/></svg><span>끝내기</span></button>
+  </div>
+
   <main id="editor" class="editor"></main>
 
   <!-- 태그 없는 메모: 추천 태그 (누르면 달기) — 휴대폰과 같음 -->
@@ -169,6 +180,7 @@
       <span class="sep"></span>
       <button data-action="file" title="첨부 (Ctrl+Shift+I)"><svg><use href="#i-clip"/></svg></button>
       <button data-action="table" title="표 넣기"><svg><use href="#i-table"/></svg></button>
+      <button data-action="record" class="rec-tool" title="음성 녹음 (Ctrl+Shift+R)" aria-label="음성 녹음 (Ctrl+Shift+R)" aria-pressed="false"><svg><use href="#i-mic"/></svg></button>
       <span class="sep"></span>
       <button data-action="style" class="style-btn" title="스타일 (본문·제목·인용·코드 블록)" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
       <span class="sep"></span>

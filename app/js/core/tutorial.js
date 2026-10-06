@@ -12,9 +12,9 @@ export const TUTORIAL_STEPS = [
     next: '시작하기', skip: '다음에 할게요',
   },
   {
-    id: 'new-memo', win: 'list', target: ['#new-btn'], advance: 'memo-created',
+    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden])', '#fab'], advance: 'memo-created',
     title: '첫 메모를 만들어 볼게요',
-    text: '노란 + 버튼을 눌러 보세요. 단축키는 Ctrl+N이에요.',
+    text: '오른쪽 아래 노란 + 버튼을 누르고 글 메모를 골라 보세요. 음성 메모를 고르면 바로 녹음이 시작돼요. 단축키는 Ctrl+N이에요.',
   },
   {
     id: 'write', win: 'note', target: ['#editor'], advance: 'typed',
@@ -60,7 +60,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'cards', win: 'list', target: ['#cards'],
     title: '메모는 여기 모여요',
-    text: '카드를 목록 밖으로 끌어 놓으면 그 자리에 메모가 열려요. 떠 있는 다른 메모 위에 놓으면 한 창의 탭으로 합쳐져요.',
+    text: '카드를 목록 밖으로 끌어 놓으면 그 자리에 메모가 열려요. 떠 있는 다른 메모 위에 놓으면 한 창의 탭으로 합쳐져요. 위쪽 네모 단추로 격자·한 줄씩 보기를 바꿔요.',
     next: '다음',
   },
   {

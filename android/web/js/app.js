@@ -7,7 +7,7 @@ import { shareText } from '../../app/js/core/share-text.js';
 import { importText, isTextDocument, stripFrontMatter } from '../../app/js/core/markdown-import.js';
 import { mediaKind } from '../../app/js/media.js';
 import { vocabularyFrom, fixTranscript } from '../../app/js/core/transcript-fix.js';
-import { voiceCardMarkdown, attachTranscript } from '../../app/js/core/voice-card.js';
+import { voiceCardMarkdown, attachTranscript, recordingWhen } from '../../app/js/core/voice-card.js';
 import { native, call, on, setBackHandler, drive, history, fs } from './native.js';
 import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
@@ -475,11 +475,7 @@ function sttVocab() {
 app.sttTerms = () => sttVocab().map((t) => t.term);
 const polish = (text) => fixTranscript(text, sttVocab());
 
-function whenLabel(ms) {
-  const d = new Date(ms || Date.now());
-  const h = d.getHours();
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+const whenLabel = recordingWhen;
 
 app.deliverRecording = async (r) => {
   if (!app.vault || !r?.temp) return;

@@ -4,6 +4,7 @@
 import { app } from './state.js';
 import { native, call, on, record } from './native.js';
 import { toast } from './ui.js';
+import { recordingClock as formatDuration } from '../../app/js/core/voice-card.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -81,12 +82,7 @@ let tickBase = { at: 0, elapsed: 0 };
 let ticker = 0;
 let stopping = false;
 
-const pad = (n) => String(n).padStart(2, '0');
-export function formatDuration(ms) {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(s / 3600);
-  return h ? `${h}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}` : `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
-}
+export { recordingClock as formatDuration } from '../../app/js/core/voice-card.js';
 
 function elapsed() {
   if (!status.active) return status.elapsedMs;

@@ -69,3 +69,19 @@ export function attachTranscript(body, src, transcript) {
   lines.splice(at, 1, ...(rest ? [rest, '', ...card] : card));
   return lines.join('\n');
 }
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** 녹음 길이: 02:31 · 1:02:31 (휴대폰·PC 같은 모양) */
+export function recordingClock(ms) {
+  const s = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+  const h = Math.floor(s / 3600);
+  return h ? `${h}:${pad2(Math.floor(s / 60) % 60)}:${pad2(s % 60)}` : `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+}
+
+/** 녹음한 때: 10월 4일 오후 3:12 */
+export function recordingWhen(ms) {
+  const d = new Date(ms || Date.now());
+  const h = d.getHours();
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${pad2(d.getMinutes())}`;
+}

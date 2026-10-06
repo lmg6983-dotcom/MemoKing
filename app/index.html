@@ -34,12 +34,12 @@
 
   <section id="main" class="main" hidden>
     <div class="toolbar">
-      <button id="new-btn" class="icon-btn primary" title="새 메모 (Ctrl+N)" aria-label="새 메모"><svg><use href="#i-plus"/></svg></button>
       <label class="search">
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
       </label>
       <button id="filter-btn" class="icon-btn filter-btn" title="필터 (색·담긴 것)" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
+      <button id="layout-btn" class="icon-btn layout-btn" title="한 줄씩 보기" aria-label="한 줄씩 보기"><svg><use href="#i-rows"/></svg></button>
       <button id="settings-btn" class="icon-btn" title="설정" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
     </div>
 
@@ -61,7 +61,8 @@
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">모두 지우기</button>
       </div>
-      <ul id="cards" class="cards" aria-label="메모 목록"></ul>
+      <p id="count" class="result-count" role="status" hidden></p>
+      <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
     </div>
 
@@ -96,9 +97,14 @@
       </div>
     </div>
     <div id="drag-hint" class="drag-hint" role="status" aria-live="polite"></div>
-    <footer class="status">
-      <span id="count"></span>
-    </footer>
+
+    <!-- 새 메모: + 를 누르면 위로 위성 버튼 두 개 (음성 메모 · 글 메모) — 휴대폰과 같음 -->
+    <div id="fab-scrim" class="fab-scrim" hidden></div>
+    <div id="fab-menu" class="fab-menu" role="menu" aria-label="새 메모 종류" hidden>
+      <button class="fab-sat" data-new="voice" role="menuitem"><span class="fab-sat-label">음성 메모</span><span class="fab-sat-btn"><svg><use href="#i-mic"/></svg></span></button>
+      <button class="fab-sat" data-new="text" role="menuitem"><span class="fab-sat-label">글 메모 <kbd>Ctrl+N</kbd></span><span class="fab-sat-btn"><svg><use href="#i-pen"/></svg></span></button>
+    </div>
+    <button id="fab" class="fab" title="새 메모" aria-label="새 메모" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
   </section>
 
   <dialog id="settings-dialog" class="dialog">

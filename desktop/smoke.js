@@ -235,7 +235,7 @@ export async function runSmoke({
     check('v0.1.0 메모를 md 파일로 옮김', old && old.pinned, old?.file);
 
     // 2) 새 메모: 제목·굵게·체크리스트를 단축키로
-    const n1 = await newNote(() => js(list, `document.getElementById('new-btn').click()`));
+    const n1 = await newNote(() => js(list, `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await type(n1.win, '장보기 목록');
     await key(n1.win, '1', ['control']);
     await key(n1.win, 'Enter');
@@ -313,7 +313,7 @@ export async function runSmoke({
       attachments.join(', '));
 
     // 5) 두 번째 메모 + 연결 패널에서 검색해 연결
-    const n2 = await newNote(() => js(list, `document.getElementById('new-btn').click()`));
+    const n2 = await newNote(() => js(list, `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await type(n2.win, '마트 영수증');
     await key(n2.win, 'Enter');
     await type(n2.win, '우유와 계란을 샀다');
@@ -394,13 +394,13 @@ export async function runSmoke({
     const panelShown = await js(reopened.win, `(() => { const p = document.getElementById('more-panel'); const r = p.getBoundingClientRect(); return !p.hidden && r.left >= 0 && r.right <= innerWidth; })()`);
     await capture(reopened.win, 'smoke-toolbar-narrow.png');
     await key(reopened.win, 'Escape');
-    // 서식 버튼 12개 (v0.17.4 H1·H2 → 스타일 고르기, v0.17.15 인용 버튼 → 스타일 고르기)
-    check('좁은 창: 넘친 버튼은 » 더보기로 (12개 모두 접근 가능 — 표 버튼 포함)',
-      narrow.fits && narrow.moreShown && narrow.inPanel > 0 && narrow.inBar + narrow.inPanel === 12 && panelShown, JSON.stringify({ ...narrow, panelShown }));
+    // 서식 버튼 13개 (v0.17.4 H1·H2 → 스타일 고르기, v0.17.15 인용 버튼 → 스타일 고르기, v0.19.0 음성 녹음)
+    check('좁은 창: 넘친 버튼은 » 더보기로 (13개 모두 접근 가능 — 표·녹음 버튼 포함)',
+      narrow.fits && narrow.moreShown && narrow.inPanel > 0 && narrow.inBar + narrow.inPanel === 13 && panelShown, JSON.stringify({ ...narrow, panelShown }));
     reopened.win.setSize(760, 520);
     await wait(500);
     const wide = await toolbar();
-    check('넓은 창: 모든 버튼이 막대에 (더보기 없음)', wide.fits && !wide.moreShown && wide.inBar === 12, JSON.stringify(wide));
+    check('넓은 창: 모든 버튼이 막대에 (더보기 없음)', wide.fits && !wide.moreShown && wide.inBar === 13, JSON.stringify(wide));
     await capture(reopened.win, 'smoke-toolbar-wide.png');
     reopened.win.setBounds(wideBounds);
     await wait(300);
@@ -553,7 +553,7 @@ export async function runSmoke({
     const { server, base } = await startImageServer();
     imageServer = server;
     const png = fs.readFileSync(ICON_PNG);
-    const webNote = await newNote(() => js(getList(), `document.getElementById('new-btn').click()`));
+    const webNote = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     // 상태 표시는 곧 "저장됨" 으로 바뀌므로 변화 기록에서 안내 문구를 찾는다
     await js(webNote.win, `new MutationObserver(() => (window.__statusLog ??= []).push(document.getElementById('status').textContent))
       .observe(document.getElementById('status'), { childList: true, characterData: true, subtree: true })`);
@@ -617,7 +617,7 @@ export async function runSmoke({
       document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
     })()`);
     const articleUrl = `${base}/article.html`;
-    const linkNote = await newNote(() => js(getList(), `document.getElementById('new-btn').click()`));
+    const linkNote = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await pasteText(linkNote.win, articleUrl);
     const cardTitle = await until(() => js(linkNote.win, `(() => { const c = document.querySelector('.mk-link-card[data-state="ok"]'); return c && c.querySelector('.lc-title').textContent; })()`), '링크 카드').catch(() => null);
     check('빈 줄에 주소 붙여넣기 → 링크 카드 (사이트 제목)', cardTitle === '메모킹 기사 제목', cardTitle);
@@ -710,7 +710,7 @@ export async function runSmoke({
 
     // 13-2) 태그 · # 자동완성 · 목록 필터 (v0.11.0)
     const lj = (code) => js(getList(), code);
-    const tagNote1 = await newNote(() => lj(`document.getElementById('new-btn').click()`));
+    const tagNote1 = await newNote(() => lj(`(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await type(tagNote1.win, '주간 회의');
     await key(tagNote1.win, 'Enter');
     await type(tagNote1.win, '#업무 안건 정리 #회의');
@@ -722,7 +722,7 @@ export async function runSmoke({
     const tagMd1 = readMemo(tagNote1.id);
     check('줄 맨 앞 #태그 도 파일에 #태그 그대로 (\\# 아님)', /\n#업무 안건 정리 #회의\n/.test(tagMd1) && !tagMd1.includes('\\#'), tagMd1.split('---').slice(2).join('---'));
 
-    const tagNote2 = await newNote(() => lj(`document.getElementById('new-btn').click()`));
+    const tagNote2 = await newNote(() => lj(`(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await type(tagNote2.win, '출장 준비물 ');
     await type(tagNote2.win, '#');
     const allSuggest = await until(() => js(tagNote2.win, `(() => { const b = document.querySelector('.tag-suggest'); return b && !b.hidden && [...b.querySelectorAll('.tag-suggest-item span')].map((s) => s.textContent); })()`), '자동완성 목록').catch(() => null);
@@ -801,7 +801,7 @@ export async function runSmoke({
     const tabShown = (id) => Boolean(noteWins.get(id)?.isVisible());
     const tabsIn = (id) => js(noteWins.get(id), `[...document.querySelectorAll('#stack-tabs .stack-tab')].map((t) => ({ id: t.dataset.tabId, title: t.querySelector('.stack-title').textContent, on: t.getAttribute('aria-selected') === 'true' }))`);
     async function titledNote(title) {
-      const n = await newNote(() => lj(`document.getElementById('new-btn').click()`));
+      const n = await newNote(() => lj(`(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
       await type(n.win, title);
       await until(() => vault.get(n.id)?.title === title, `${title} 저장`).catch(() => {});
       return n;
@@ -949,11 +949,11 @@ export async function runSmoke({
     await coachNext(getList());
     const newStep = await waitStep(getList, 'new-memo');
     await wait(350); // 비추는 테두리가 옮겨 가는 움직임(0.2초)이 끝난 뒤
-    const spotOnBtn = await js(getList(), `(() => { const s = document.querySelector('.coach-spot').getBoundingClientRect(); const b = document.getElementById('new-btn').getBoundingClientRect(); return s.left <= b.left && s.right >= b.right && s.top <= b.top && s.bottom >= b.bottom && s.width < b.width + 20; })()`);
+    const spotOnBtn = await js(getList(), `(() => { const s = document.querySelector('.coach-spot').getBoundingClientRect(); const b = document.getElementById('fab').getBoundingClientRect(); return s.left <= b.left && s.right >= b.right && s.top <= b.top && s.bottom >= b.bottom && s.width < b.width + 20; })()`);
     const noNext = await js(getList(), `!document.querySelector('.coach-bubble .coach-next') && !!document.querySelector('.coach-try')`);
     check('따라 하기 단계: + 버튼만 밝게 비추고 "직접 해 보세요" (다음 버튼 없음)', newStep && spotOnBtn && noNext);
     const notesBeforeTutorial = new Set(noteWins.keys());
-    await js(getList(), `document.getElementById('new-btn').click()`);
+    await js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`);
     const tutMemo = await until(() => [...noteWins.keys()].find((k) => !notesBeforeTutorial.has(k)), '튜토리얼 메모').catch(() => null);
     const tutWin = () => noteWins.get(tutMemo);
     const writeStep = tutMemo && (await ready(tutWin()).then(() => waitStep(tutWin, 'write')));

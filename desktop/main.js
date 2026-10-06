@@ -35,6 +35,11 @@ import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../ap
 import { normalizeReminder, describeReminder } from '../app/js/core/reminders.js';
 
 const SMOKE = process.argv.includes('--smoke');
+// 점검 때는 가짜 마이크(삐 소리)로 녹음한다 — 실제 마이크·권한 창 없이
+if (SMOKE) {
+  app.commandLine.appendSwitch('use-fake-device-for-media-stream');
+  app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
+}
 // Windows 로그인 때 자동 실행된 경우: 창 없이 알림 영역에서 조용히 시작
 const HIDDEN_START = process.argv.includes('--hidden');
 const LOGIN_ARGS = ['--hidden'];
@@ -325,7 +330,7 @@ function defaultNoteBounds() {
 
 // inactive: 하던 작업의 키보드 포커스를 뺏지 않고 연다 (빠른 메모)
 // 스택에 든 메모면 그 스택 창에서 이 메모의 탭을 보여 준다.
-function openNote(id, { inactive = false } = {}) {
+function openNote(id, { inactive = false, record = false } = {}) {
   if (stacks?.stackOf(id)) return showTab(id, { inactive });
   const existing = noteWins.get(id);
   if (existing) {
@@ -337,11 +342,11 @@ function openNote(id, { inactive = false } = {}) {
     }
     return existing;
   }
-  return createNoteWindow(id, { inactive });
+  return createNoteWindow(id, { inactive, record });
 }
 
 // show: false 면 숨긴 채로 만들어 둔다 (스택의 다른 탭 — 누르면 바로 보이도록)
-function createNoteWindow(id, { inactive = false, show = true, bounds = null } = {}) {
+function createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false } = {}) {
   const memo = vault?.get(id);
   if (!memo) return null;
 
@@ -416,7 +421,7 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null } =
       saveSettings();
     }
   });
-  win.loadFile(path.join(APP_DIR, 'note.html'), { query: { id } });
+  win.loadFile(path.join(APP_DIR, 'note.html'), { query: record ? { id, record: '1' } : { id } });
   return win;
 }
 
@@ -1104,8 +1109,10 @@ function animateBounds(win, to, duration = 180) {
 
 function createNote(options) {
   if (!vault) return null;
-  const id = vault.create(options);
-  openNote(id);
+  // record: 열리자마자 녹음을 시작하는 음성 메모 (목록 + › 음성 메모)
+  const { record = false, ...rest } = options ?? {};
+  const id = vault.create(rest);
+  openNote(id, { record: Boolean(record) });
   // 튜토리얼 "첫 메모 만들기" 단계
   if (tutorial.active && TUTORIAL_STEPS[tutorial.index]?.advance === 'memo-created') {
     tutorial.memoId = id;
@@ -2484,9 +2491,22 @@ app.on('second-instance', () => createListWindow());
 app.whenReady().then(async () => {
   if (!gotLock) return;
   app.setAppUserModelId(APP_ID);
-  // 카메라·마이크·위치 등 어떤 권한도 쓰지 않는다 (v0.6.0 에서 녹음 기능 삭제)
-  session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
-  session.defaultSession.setPermissionCheckHandler(() => false);
+  // 권한은 메모 창의 마이크(음성 메모 녹음)만 — 카메라·위치·화면 등은 쓰지 않는다
+  const isNoteWindow = (wc) => {
+    try {
+      const url = new URL(wc?.getURL() ?? '');
+      return url.protocol === 'file:' && url.pathname.endsWith('/note.html');
+    } catch {
+      return false;
+    }
+  };
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
+    const types = details?.mediaTypes ?? [];
+    callback(permission === 'media' && types.length > 0 && types.every((t) => t === 'audio') && isNoteWindow(wc));
+  });
+  session.defaultSession.setPermissionCheckHandler((wc, permission, _origin, details) => (
+    permission === 'media' && (details?.mediaType ?? 'audio') === 'audio' && isNoteWindow(wc)
+  ));
   registerVaultProtocol();
   registerIpc();
   try {
