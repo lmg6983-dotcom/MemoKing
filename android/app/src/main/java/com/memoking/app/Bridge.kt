@@ -289,6 +289,21 @@ class Bridge(private val activity: MainActivity) {
             "exactAlarmSettings" -> activity.runOnUiThread { activity.openExactAlarmSettings(id) }
             "historyPermission" -> activity.runOnUiThread { activity.openNotificationAccess(id) }
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
+            // 화자 구분: {} 모델 받고 켜기 · {on} 켜기/끄기 · {delete} 모델 지우기
+            "speakerModel" -> pool.execute {
+                resolve(id) {
+                    when {
+                        a.optBoolean("delete") -> SpeakerModel.delete(ctx)
+                        a.has("on") -> SpeakerModel.setOn(ctx, a.optBoolean("on"))
+                        else -> {
+                            if (!SpeakerModel.supported()) throw IllegalStateException("이 휴대폰에서는 화자 구분을 쓸 수 없어요")
+                            SpeakerModel.download(ctx) { p -> activity.runOnUiThread { activity.emit("speakerModel", JSONObject().put("progress", p)) } }
+                            SpeakerModel.setOn(ctx, true)
+                        }
+                    }
+                    Stt.status(ctx)
+                }
+            }
             "micPermission" -> activity.runOnUiThread { activity.requestMicPermission(id) }
             "recordStart" -> activity.runOnUiThread {
                 resolve(id) { RecorderService.start(activity, a.getString("memoId"), a.optBoolean("stt", true), terms(a)) }

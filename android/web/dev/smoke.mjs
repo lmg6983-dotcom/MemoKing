@@ -445,8 +445,15 @@ try {
   await page.tap('#settings-btn');
   await page.locator('#rec-stt').scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
-  check('설정: 받아쓰기는 Google 음성 인식 하나 (방식 고르기·데이터 받기 없음)', (await page.locator('#stt-engine, #stt-model-row, #spk-row').count()) === 0 && (await page.textContent('#rec-stt-note')).includes('Google'));
+  check('설정: 받아쓰기는 Google 음성 인식 하나 (방식 고르기·데이터 받기 없음)', (await page.locator('#stt-engine, #stt-model-row').count()) === 0 && (await page.textContent('#rec-stt-note')).includes('Google'));
   await shot('17-settings-stt');
+  check('설정: 화자 구분 줄 (처음엔 다운로드)', await page.isVisible('#spk-row') && (await page.textContent('#spk-btn')) === '다운로드' && (await page.textContent('#spk-note')).includes('화자 1·2'));
+  await page.tap('#spk-btn');
+  await page.waitForTimeout(300);
+  check('설정: 화자 구분 받으면 켜짐 → 끄기 단추', (await page.textContent('#spk-btn')) === '끄기' && (await page.textContent('#spk-note')).includes('사용 중'));
+  await page.tap('#spk-btn');
+  await page.waitForTimeout(300);
+  check('설정: 화자 구분 끄기 → 켜기 단추', (await page.textContent('#spk-btn')) === '켜기');
   await page.tap('#trash-btn');
   await page.waitForTimeout(200);
   await shot('04-trash');
@@ -1272,13 +1279,11 @@ try {
     await page.tap('#fab-menu [data-new="text"]');
     const write = await stepIs('write');
     await page.keyboard.type('튜토리얼 메모');
-    const format = await stepIs('format');
+    const lists = await stepIs('lists');
     const praised = await page.isVisible('.coach-bubble .coach-praise');
     await page.waitForTimeout(500);
     await shot('25-tutorial-praise');
-    check('새 메모 → 메모 화면에서 다음 말풍선 · 글을 쓰면 "잘했어요" 칭찬과 함께 다음', write && format && praised, JSON.stringify({ write, format, praised }));
-    await page.tap('.coach-bubble .coach-next'); // 다음에 해 볼게요
-    await stepIs('lists');
+    check('새 메모 → 메모 화면에서 다음 말풍선 · 글을 쓰면 "잘했어요" 칭찬과 함께 다음', write && lists && praised, JSON.stringify({ write, lists, praised }));
     await page.evaluate(() => document.querySelector('#format-bar [data-cmd="task"]').click());
     const move = await stepIs('move');
     await page.waitForTimeout(400);

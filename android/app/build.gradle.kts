@@ -1,3 +1,5 @@
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -30,6 +32,21 @@ val syncWeb by tasks.registering(Sync::class) {
     into(webOut)
 }
 
+// 화자 구분 엔진 sherpa-onnx (Apache-2.0) — Maven 에 없어 GitHub 릴리스의 AAR 을 받아 쓴다 (받은 것은 android/.gradle/ 에 두고 다시 받지 않음)
+val sherpaVersion = "1.13.8"
+val sherpaSha256 = "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
+val sherpaAar: File = rootDir.resolve(".gradle/sherpa-onnx/sherpa-onnx-$sherpaVersion.aar").also { aar ->
+    if (!aar.isFile) {
+        aar.parentFile.mkdirs()
+        val part = File(aar.parentFile, "${aar.name}.part")
+        URI("https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaVersion/sherpa-onnx-$sherpaVersion.aar").toURL()
+            .openStream().use { input -> part.outputStream().use { input.copyTo(it) } }
+        val sha = MessageDigest.getInstance("SHA-256").digest(part.readBytes()).joinToString("") { "%02x".format(it) }
+        check(sha == sherpaSha256) { "sherpa-onnx AAR 체크섬이 달라요: $sha" }
+        part.renameTo(aar)
+    }
+}
+
 android {
     namespace = "com.memoking.app"
     compileSdk = 35
@@ -39,7 +56,12 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 52
-        versionName = "0.14.6"
+        versionName = "0.15.1"
+
+        // 화자 구분 엔진(sherpa-onnx)은 휴대폰 CPU(ARM) 용만 넣는다 — x86 까지 넣으면 APK 가 30MB 더 커진다
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
 
         // Google Drive 동기화용 OAuth 클라이언트 ("데스크톱 앱" 유형). 비워 두면 앱 설정에서 붙여 넣는다.
         // 넣는 곳: android/local.properties 의 memoking.googleClientId / memoking.googleClientSecret,
@@ -82,6 +104,8 @@ android {
 dependencies {
     // 휴대폰에 로그인된 구글 계정으로 Drive 권한 받기 (계정 고르기·허용만)
     implementation("com.google.android.gms:play-services-auth:21.3.0")
+    // 화자 구분: 목소리 특징 엔진 (위에서 받은 AAR)
+    implementation(files(sherpaAar))
 
 
     // 동기화 엔진 단위 테스트 (PC 에서 JVM 으로)

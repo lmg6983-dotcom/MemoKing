@@ -30,11 +30,13 @@ interface Transcriber {
     /** 남은 소리까지 마저 옮기고 끝낸다 → 마지막 조각 */
     fun finish(): String
     fun close()
+    /** finish() 뒤: 받아쓴 문장(listener 의 final) 순서대로 화자 번호 (화자 구분을 안 쓰면 null) */
+    fun speakers(): IntArray? = null
 }
 
 /**
  * 받아쓴 글 조각: final = 한 문장이 끝남, partial = 말하는 중(바뀔 수 있음)
- * speaker = 말한 사람 번호 (휴대폰 음성 인식은 알려 주지 않으므로 늘 0)
+ * speaker = 말한 사람 번호 (말하는 중에는 늘 0 — 화자 구분은 녹음이 끝난 뒤 Transcriber.speakers() 로)
  */
 typealias SttListener = (final: String?, partial: String?, speaker: Int) -> Unit
 
@@ -55,8 +57,43 @@ object Stt {
      * @param terms 이 메모 폴더에서 자주 쓰는 낱말(태그·제목 등) — 휴대폰 음성 인식에 "이런 말이 나올 수 있어요" 힌트로
      * 받아쓰기 엔진에 넘기기 전에 소리를 다듬는다 (SpeechConditioner: 낮은 웅웅 소리 빼기 · 작은 목소리 키우기)
      */
-    fun create(ctx: Context, listener: SttListener, terms: List<String> = emptyList()): Transcriber =
-        Conditioned(SystemTranscriber(ctx, listener, terms))
+    fun create(ctx: Context, listener: SttListener, terms: List<String> = emptyList()): Transcriber {
+        val labeler = if (SpeakerModel.on(ctx)) try {
+            SpeakerLabeler(SpeakerModel.load(ctx))
+        } catch (e: Throwable) { // 엔진을 못 불러와도(드문 기기) 받아쓰기는 그대로
+            android.util.Log.w("MemoKing", "화자 구분을 시작하지 못했어요", e)
+            null
+        } else null
+        if (labeler == null) return Conditioned(SystemTranscriber(ctx, listener, terms))
+        val marking: SttListener = { final, part, spk ->
+            if (!final.isNullOrBlank()) labeler.mark()
+            listener(final, part, spk)
+        }
+        return Labeled(Conditioned(SystemTranscriber(ctx, marking, terms)), labeler)
+    }
+
+    /** 화자 구분: 원래 소리(다듬기 전)로 목소리 특징을 모으고, 끝나면 문장별 화자 번호 */
+    private class Labeled(private val inner: Transcriber, private val labeler: SpeakerLabeler) : Transcriber {
+        private var labels: IntArray? = null
+        override fun feed(pcm: ByteArray, len: Int) {
+            labeler.feed(pcm, len)
+            inner.feed(pcm, len)
+        }
+        override fun finish(): String {
+            val tail = inner.finish()
+            labels = try {
+                labeler.finish()
+            } catch (e: Throwable) {
+                null
+            }
+            return tail
+        }
+        override fun close() {
+            inner.close()
+            labeler.close()
+        }
+        override fun speakers() = labels
+    }
 
     /** 받아쓰기용으로만 다듬은 소리를 넘긴다 (녹음 파일은 원래 소리 그대로) */
     private class Conditioned(private val inner: Transcriber) : Transcriber {
@@ -71,6 +108,10 @@ object Stt {
     }
 
     fun status(ctx: Context): JSONObject = JSONObject().put("system", systemAvailable(ctx))
+        .put("speakerSupported", SpeakerModel.supported())
+        .put("speaker", if (SpeakerModel.ready(ctx)) "ready" else if (SpeakerModel.progress >= 0) "downloading" else "missing")
+        .put("speakerOn", SpeakerModel.on(ctx))
+        .put("speakerSize", SpeakerModel.SIZE_LABEL)
 
     /** 예전 버전이 받아 둔 Vosk 받아쓰기·말한 사람 데이터(약 100MB)를 지워 저장 공간을 돌려준다 */
     fun removeOldModels(ctx: Context) {
@@ -261,6 +302,7 @@ object FileTranscriber {
         try {
             AudioDecoder.decode16k(file, onProgress) { pcm -> stt.feed(pcm, pcm.size) }
             val tail = stt.finish()
+            synchronized(parts) { Transcript.relabel(parts, stt.speakers()) }
             if (tail.isNotBlank()) synchronized(parts) { parts.add(Transcript.Line(tail, 0)) }
             onProgress(100)
         } finally {
@@ -420,4 +462,10 @@ object Transcript {
     }
 
     fun joinText(parts: List<String>) = join(parts.map { Line(it) })
+
+    /** 녹음이 끝난 뒤 받은 화자 번호(문장 순서대로)를 붙인다 */
+    fun relabel(parts: MutableList<Line>, speakers: IntArray?) {
+        if (speakers == null) return
+        for (i in parts.indices) if (i < speakers.size) parts[i] = parts[i].copy(speaker = speakers[i])
+    }
 }
