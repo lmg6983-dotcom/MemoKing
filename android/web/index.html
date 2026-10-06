@@ -481,23 +481,6 @@
       <input type="checkbox" id="rec-stt" class="switch" checked>
       <span>녹음하며 받아쓰기 <small id="rec-stt-note">말하는 내용을 바로 텍스트로 적어요</small></span>
     </label>
-    <div class="setting-row select-row stt-engine-row">
-      <span>받아쓰기 방식 <small id="stt-engine-note">인터넷 없이 휴대폰 안에서만 처리해요. 녹음 내용이 밖으로 나가지 않아요</small>
-        <span class="seg wide" id="stt-engine" role="radiogroup" aria-label="받아쓰기 방식">
-          <button type="button" role="radio" data-value="vosk" aria-checked="true">보안 우선</button>
-          <button type="button" role="radio" data-value="system" aria-checked="false">정확도 우선</button>
-        </span>
-      </span>
-    </div>
-    <div class="setting-row" id="stt-model-row">
-      <span>받아쓰기 데이터 <small id="stt-model-note"></small></span>
-      <button id="stt-model-btn" class="btn small">다운로드</button>
-    </div>
-    <div class="setting-row" id="spk-row">
-      <span>화자 구분 <small id="spk-note"></small></span>
-      <button id="spk-btn" class="btn small">다운로드</button>
-    </div>
-
     <p class="label">도움말</p>
     <div class="sheet-actions">
       <button id="tutorial-btn" class="btn">🎓 사용법 둘러보기</button>
@@ -552,8 +535,6 @@
     </form>
   </dialog>
 
-  <!-- 오래 걸리는 일(받아쓰기 데이터 다운로드)의 진행: 끝날 때까지 위에 떠 있다 -->
-  <div id="progress-pill" class="progress-pill" role="status" aria-live="polite" hidden><span id="progress-text"></span><span class="progress-track"><i id="progress-bar"></i></span></div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden><span id="toast-text"></span><button id="toast-action" class="toast-action" hidden></button></div>
 </body>
 </html>

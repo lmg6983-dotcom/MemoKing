@@ -116,23 +116,6 @@ export function toast(text, isError = false, action = null) {
   toastTimer = setTimeout(() => (el.hidden = true), action ? 5000 : isError ? 4500 : 2600);
 }
 
-/**
- * 오래 걸리는 일의 진행 (끝날 때까지 떠 있음) — percent 가 null 이면 얼마나 남았는지 모르는 "하는 중"
- * @param {string | null} text  null 이면 닫는다
- */
-export function progress(text, percent = null) {
-  const el = $('progress-pill');
-  document.body.classList.toggle('has-progress', text != null);
-  if (text == null) {
-    el.hidden = true;
-    return;
-  }
-  $('progress-text').textContent = text;
-  el.classList.toggle('busy', percent == null);
-  $('progress-bar').style.width = `${Math.max(0, Math.min(100, percent ?? 0))}%`;
-  el.hidden = false;
-}
-
 // ---------- 넓은 화면 (펼친 폴더블 · 태블릿): 목록과 메모를 나란히 ----------
 
 const wide = window.matchMedia('(min-width: 640px) and (min-height: 460px)');

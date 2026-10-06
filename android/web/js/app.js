@@ -516,16 +516,8 @@ app.deliverRecording = async (r) => {
     list.refresh();
   }
   toast(transcript ? `녹음(${duration})과 받아쓴 내용을 저장했어요` : `녹음(${duration})을 저장했어요`);
-  // 녹음 중에는 못 받아썼으면(모델이 없었음) 이제 녹음 파일로
-  if (r.sttPending && recorder.sttOn()) {
-    if (recorder.sttReady()) transcribeInto(memoId, [item]);
-    else if (recorder.sttEngine() === 'vosk') {
-      toast('받아쓰기 데이터를 다운로드하면 이 녹음을 텍스트로 옮겨요', false, {
-        label: '다운로드',
-        run: () => recorder.downloadModel(() => transcribeInto(memoId, [item])).catch(() => {}),
-      });
-    }
-  }
+  // 녹음 중에 받아쓰지 못했으면(음성 인식이 잠깐 안 됐음) 이제 녹음 파일로
+  if (r.sttPending && recorder.sttOn() && recorder.sttReady()) transcribeInto(memoId, [item]);
 };
 
 // ---------- 설정 ----------
@@ -565,84 +557,13 @@ function openSettings() {
   renderDrive();
   $('auto-tags').checked = note.autoTagsOn();
   $('rec-stt').checked = recorder.sttOn();
-  $('rec-stt-note').textContent = '말하는 내용을 바로 텍스트로 적어요';
-  markEngine(recorder.sttEngine());
-  $('stt-engine').querySelector('[data-value="system"]').disabled = !info.record?.system;
-  refreshSttRow();
+  $('rec-stt-note').textContent = recorder.sttReady()
+    ? '말하는 내용을 휴대폰의 Google 음성 인식으로 바로 텍스트로 적어요'
+    : '이 휴대폰은 Google 음성 인식(안드로이드 13 이상)을 쓸 수 없어 녹음만 해요';
+  $('rec-stt').disabled = !recorder.sttReady();
   openSheet($('settings-sheet'));
 }
 
-function refreshSttRow(progress) {
-  const st = recorder.sttStatus();
-  const vosk = recorder.sttEngine() === 'vosk';
-  $('stt-model-row').hidden = !vosk;
-  $('stt-engine-note').textContent = vosk
-    ? '인터넷 없이 휴대폰 안에서만 처리해요. 녹음 내용이 밖으로 나가지 않아요'
-    : '휴대폰의 음성 인식으로 더 정확하게 받아써요. 인터넷을 쓸 수 있어요';
-  const busy = progress != null || st.model === 'downloading';
-  $('stt-model-note').textContent = st.model === 'ready'
-    ? '설치됨'
-    : busy ? `다운로드 중 ${progress ?? st.progress ?? 0}%` : `처음 한 번 필요해요 · ${(st.modelSize ?? '약 87MB').replace('약 ', '')} · Wi-Fi 권장`;
-  $('stt-model-btn').textContent = st.model === 'ready' ? '삭제' : busy ? '다운로드 중' : '다운로드';
-  $('stt-model-btn').disabled = busy;
-  refreshSpeakerRow();
-}
-
-// 말한 사람 나누기: Vosk 말한 사람 모델(약 13MB)을 받으면 받아쓴 글에 "화자 1·2" 이름표
-function refreshSpeakerRow(progress) {
-  const st = recorder.sttStatus();
-  const vosk = recorder.sttEngine() === 'vosk';
-  $('spk-row').hidden = !vosk || st.model !== 'ready';
-  const busy = progress != null || st.speaker === 'downloading';
-  const ready = st.speaker === 'ready';
-  $('spk-note').textContent = busy
-    ? `다운로드 중 ${progress ?? 0}%`
-    : ready
-      ? st.speakerOn ? '사용 중 · 말하는 사람마다 "화자 1·2"로 표시해요' : '사용 안 함'
-      : `목소리로 참석자를 구분해 "화자 1·2"로 표시해요 · ${(st.speakerSize ?? '약 13MB').replace('약 ', '')}`;
-  $('spk-btn').textContent = busy ? '다운로드 중' : ready ? (st.speakerOn ? '끄기' : '켜기') : '다운로드';
-  $('spk-btn').disabled = busy;
-}
-$('spk-btn').addEventListener('click', async () => {
-  const st = recorder.sttStatus();
-  try {
-    if (st.speaker === 'ready') await call('speakerModel', { on: !st.speakerOn });
-    else {
-      refreshSpeakerRow(0);
-      await call('speakerModel', {});
-      toast('화자 구분을 켰어요. 다음 녹음부터 적용돼요');
-    }
-  } catch (err) {
-    toast(err.message || '다운로드하지 못했어요. 인터넷 연결을 확인해 주세요', true);
-  }
-  refreshSpeakerRow();
-});
-on('speakerModel', ({ progress }) => {
-  if (!$('settings-sheet').hidden) refreshSpeakerRow(progress < 100 ? progress : undefined);
-});
-function markEngine(engine) {
-  for (const b of $('stt-engine').querySelectorAll('[data-value]')) b.setAttribute('aria-checked', String(b.dataset.value === engine));
-}
-$('stt-engine').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-value]');
-  if (!b || b.disabled) return;
-  markEngine(b.dataset.value);
-  recorder.setSttEngine(b.dataset.value);
-  refreshSttRow();
-});
-$('stt-model-btn').addEventListener('click', async () => {
-  if (recorder.sttStatus().model === 'ready') {
-    if (!(await confirmDialog('받아쓰기 데이터를 삭제할까요?\n받아쓰기를 다시 쓰려면 다운로드해야 해요.', '삭제'))) return;
-    await call('sttModel', { delete: true }).catch((err) => toast(err.message, true));
-    refreshSttRow();
-    return;
-  }
-  refreshSttRow(0);
-  recorder.downloadModel().catch(() => {}).finally(() => refreshSttRow());
-});
-on('sttModel', ({ progress }) => {
-  if (!$('settings-sheet').hidden) refreshSttRow(progress < 100 ? progress : undefined);
-});
 $('auto-tags').addEventListener('change', () => note.setAutoTags($('auto-tags').checked));
 $('rec-stt').addEventListener('change', () => recorder.setStt($('rec-stt').checked));
 $('settings-btn').addEventListener('click', openSettings);
@@ -803,7 +724,7 @@ function askAudioImport(files) {
     }
     return li;
   }));
-  const canStt = true; // Vosk 는 모든 안드로이드 버전 (모델이 없으면 받은 뒤)
+  const canStt = recorder.sttReady(); // 휴대폰의 Google 음성 인식 (안드로이드 13+)
   let last = true;
   try {
     last = localStorage.getItem(IMPORT_STT_KEY) !== 'off';
@@ -812,9 +733,9 @@ function askAudioImport(files) {
   }
   $('import-stt').checked = canStt && last;
   $('import-stt').disabled = !canStt;
-  $('import-stt-note').textContent = recorder.sttReady()
-    ? '소리 내용을 글로 옮겨 메모에 함께 넣어요 (길면 시간이 걸려요)'
-    : `소리 내용을 글로 옮겨요 · 받아쓰기 모델(${recorder.sttStatus().modelSize ?? '약 87MB'})을 먼저 한 번 받아요`;
+  $('import-stt-note').textContent = canStt
+    ? '소리 내용을 Google 음성 인식으로 글로 옮겨 메모에 함께 넣어요 (길면 시간이 걸려요)'
+    : '이 휴대폰은 Google 음성 인식(안드로이드 13 이상)을 쓸 수 없어 소리 파일만 넣어요';
   $('import-sheet-title').textContent = files.length > 1 ? `음성 파일 ${files.length}개로 메모 만들기` : '음성 파일로 메모 만들기';
   return new Promise((resolve) => {
     let done = false;
@@ -845,7 +766,7 @@ async function transcribeInto(memoId, items) {
   for (const item of items) {
     try {
       toast('받아쓰는 중…');
-      const res = await call('transcribe', { rel: item.src, engine: recorder.sttEngine(), terms: app.sttTerms() });
+      const res = await call('transcribe', { rel: item.src, terms: app.sttTerms() });
       const text = polish(String(res?.text ?? '').trim());
       if (!text) {
         toast('인식된 말소리가 없어요');
@@ -931,16 +852,7 @@ async function memoFromShare(payload) {
       toast(tags.length ? `메모를 만들었어요 · ${tags.map((t) => `#${t}`).join(' ')}` : '메모를 만들었어요');
     },
   });
-  if (stt && audioItems.length) {
-    if (!recorder.sttReady() && recorder.sttEngine() === 'vosk') {
-      try {
-        await recorder.downloadModel(); // 진행은 화면 위 알약에
-      } catch {
-        return;
-      }
-    }
-    transcribeInto(id, audioItems);
-  }
+  if (stt && audioItems.length && recorder.sttReady()) transcribeInto(id, audioItems);
 }
 
 // 글 없이 파일만 받았을 때의 제목: 파일 이름(Screenshot_2026….png) 대신 사람이 읽는 이름 — 음성 메모와 같은 모양

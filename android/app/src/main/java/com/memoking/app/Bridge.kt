@@ -58,8 +58,8 @@ class Bridge(private val activity: MainActivity) {
             .put("sdk", android.os.Build.VERSION.SDK_INT)
             .put("vault", vaultInfo() ?: JSONObject.NULL)
             .put("exactAlarms", Alarms.exactAllowed(ctx))
-            // 녹음·받아쓰기: Vosk(오픈소스)는 모든 버전, 휴대폰 음성 인식은 안드로이드 13+
-            .put("record", JSONObject().put("stt", true).put("system", Stt.systemAvailable(ctx)))
+            // 녹음은 모든 버전, 받아쓰기는 휴대폰의 Google 음성 인식(안드로이드 13+)
+            .put("record", JSONObject().put("stt", Stt.systemAvailable(ctx)).put("system", Stt.systemAvailable(ctx)))
     }
 
     @JavascriptInterface
@@ -291,45 +291,22 @@ class Bridge(private val activity: MainActivity) {
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
             "micPermission" -> activity.runOnUiThread { activity.requestMicPermission(id) }
             "recordStart" -> activity.runOnUiThread {
-                resolve(id) { RecorderService.start(activity, a.getString("memoId"), a.optBoolean("stt", true), a.optString("engine", Stt.ENGINE_VOSK), terms(a)) }
+                resolve(id) { RecorderService.start(activity, a.getString("memoId"), a.optBoolean("stt", true), terms(a)) }
             }
             "recordStop" -> pool.execute { resolve(id) { RecorderService.stop(ctx) } }
             // 소리 파일 받아쓰기: 메모 폴더의 파일(rel) 또는 임시 파일(temp)
             "transcribe" -> pool.execute {
                 resolve(id) {
-                    val engine = a.optString("engine", Stt.ENGINE_VOSK)
-                    Stt.unavailableReason(ctx, engine)?.let { throw IllegalStateException(it) }
+                    Stt.unavailableReason(ctx)?.let { throw IllegalStateException(it) }
                     val (file, temporary) = audioFile(a)
                     try {
-                        val text = FileTranscriber.run(ctx, file, engine, terms(a)) { p ->
+                        val text = FileTranscriber.run(ctx, file, terms(a)) { p ->
                             activity.runOnUiThread { activity.emit("transcribe", JSONObject().put("progress", p)) }
                         }
                         JSONObject().put("text", text)
                     } finally {
                         if (temporary) file.delete()
                     }
-                }
-            }
-            // 받아쓰기 모델(Vosk 한국어) 받기·지우기
-            "sttModel" -> pool.execute {
-                resolve(id) {
-                    if (a.optBoolean("delete")) VoskModels.delete(ctx)
-                    else VoskModels.download(ctx) { p -> activity.runOnUiThread { activity.emit("sttModel", JSONObject().put("progress", p)) } }
-                    Stt.status(ctx)
-                }
-            }
-            // 말한 사람 모델(Vosk, 약 13MB) 받기·지우기·켜고 끄기
-            "speakerModel" -> pool.execute {
-                resolve(id) {
-                    when {
-                        a.optBoolean("delete") -> SpeakerModels.delete(ctx)
-                        a.has("on") -> SpeakerModels.setOn(ctx, a.optBoolean("on"))
-                        else -> {
-                            SpeakerModels.download(ctx) { p -> activity.runOnUiThread { activity.emit("speakerModel", JSONObject().put("progress", p)) } }
-                            SpeakerModels.setOn(ctx, true)
-                        }
-                    }
-                    Stt.status(ctx)
                 }
             }
             // 보내기: 그림(base64) 같은 파일 · PDF

@@ -443,13 +443,10 @@ try {
   check('지우기: 휴지통으로', !fs.existsSync(path.join(vault, '로고 사진.md')) && fs.readdirSync(path.join(vault, '_memoking/trash')).some((f) => f.startsWith('로고 사진 (')));
   check('지우기: 그 메모만 쓰던 첨부도 휴지통으로', fs.existsSync(path.join(vault, '_memoking/trash/attachments/20261001-090000-ab12.png')));
   await page.tap('#settings-btn');
-  await page.locator('#stt-engine').scrollIntoViewIfNeeded();
-  await page.tap('#stt-engine [data-value="system"]');
-  await page.waitForTimeout(400);
-  check('설정: 받아쓰기 엔진은 미끄러지는 고르기 칸', (await page.getAttribute('#stt-engine [data-value="system"]', 'aria-checked')) === 'true' && (await page.evaluate(() => Math.round(new DOMMatrix(getComputedStyle(document.querySelector('#stt-engine > .seg-thumb')).transform).m41) === document.querySelector('#stt-engine [data-value="system"]').offsetLeft)));
-  await shot('17-settings-stt');
-  await page.tap('#stt-engine [data-value="vosk"]');
+  await page.locator('#rec-stt').scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
+  check('설정: 받아쓰기는 Google 음성 인식 하나 (방식 고르기·데이터 받기 없음)', (await page.locator('#stt-engine, #stt-model-row, #spk-row').count()) === 0 && (await page.textContent('#rec-stt-note')).includes('Google'));
+  await shot('17-settings-stt');
   await page.tap('#trash-btn');
   await page.waitForTimeout(200);
   await shot('04-trash');
@@ -671,38 +668,18 @@ try {
   check('음성 메모: 소리 파일 + 받아쓴 글', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 음성 메모'), f && read(f));
   check('음성 카드: 소리와 받아쓴 글이 한 칸(인용), 문장마다 줄 · 화자 이름표', f && /^> !\[녹음/m.test(read(f)) && read(f).includes('>\n> **화자 2:** 다음 주 출시 일정을 정리했어요.\n>\n> 표로 공유할게요.'), f && read(f));
 
-  // 받아쓰기 데이터가 아직 없는 사람의 첫 녹음: 다운로드를 누르면 끝날 때까지 진행이 보인다 (전에는 아무 반응 없어 보임)
-  await post('/dev/model', { state: 'missing' });
+  // Google 음성 인식을 못 쓰는 휴대폰(안드로이드 13 아래): 녹음은 그대로, 받아쓰기는 못 한다고 바로 알림 (기다리게 하지 않음)
+  await post('/dev/stt', { system: false });
   await page.tap('#fab');
   await page.tap('[data-new="voice"]');
   await page.waitForSelector('#rec-panel:not([hidden])');
   await page.waitForTimeout(300);
-  check('첫 녹음(데이터 없음): 녹음은 하면서 다운로드 단추 알림', await page.isVisible('#toast-action') && (await page.textContent('#toast-text')).includes('받아쓰기 데이터'));
-  await page.tap('#toast-action');
-  await page.waitForTimeout(200);
-  const pill = async () => ((await page.isVisible('#progress-pill')) ? (await page.textContent('#progress-text')) : '');
-  check('다운로드: 누르자마자 진행 알약 (0%)', (await pill()).includes('다운로드 중 0%') && (await devLog()).log.some((l) => l.sttModel === 'start'), await pill());
-  await page.evaluate(() => window.__mk.emit('sttModel', { progress: 45 }));
-  await page.waitForTimeout(100);
-  const bar = await page.evaluate(() => document.getElementById('progress-bar').style.width);
-  check('다운로드: 몇 % 인지 글자·막대로', (await pill()).includes('50%') && bar === '45%', `${await pill()} ${bar}`);
-  await page.evaluate(() => window.__mk.emit('sttModel', { progress: 95 }));
-  await page.waitForTimeout(100);
-  check('다운로드: 다 받고 풀 때는 "설치하는 중"', (await pill()).includes('설치하는 중'), await pill());
-  await shot('11b-model-download');
-  await post('/dev/model', { state: 'fail' });
-  await page.waitForTimeout(400);
-  check('다운로드 실패: 알약은 닫히고 다시 시도 단추', !(await page.isVisible('#progress-pill')) && (await page.textContent('#toast-action')) === '다시 시도', await page.textContent('#toast-text'));
-  await page.tap('#toast-action');
-  await page.waitForTimeout(200);
-  check('다시 시도: 다시 진행 알약', (await pill()).includes('다운로드 중'));
-  await post('/dev/model', { state: 'finish' });
-  await page.waitForTimeout(400);
-  check('설치 끝: 알약 닫히고 "설치했어요"', !(await page.isVisible('#progress-pill')) && (await page.textContent('#toast-text')).includes('설치했어요'));
+  check('받아쓰기 못 쓰는 휴대폰: 녹음은 하면서 "녹음만 해요" 알림 (다운로드 단추 없음)', (await page.textContent('#toast-text')).includes('녹음만') && !(await page.isVisible('#toast-action')), await page.textContent('#toast-text'));
   await page.tap('#rec-stop');
   await page.waitForTimeout(1200);
   await back();
   await page.waitForTimeout(400);
+  await post('/dev/stt', { system: true });
 
   // 소리·표·수식·글 문단도 자유롭게 옮기기 (모두 꾹 눌러 들어 올리기)
   fs.writeFileSync(path.join(vault, 'attachments/move-test.m4a'), Buffer.from('fake'));

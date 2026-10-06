@@ -32,7 +32,7 @@ import java.util.UUID
  *
  * 마이크(AudioRecord, 16kHz 모노) 소리 하나를 두 곳에 나눠 준다:
  *   1) AAC 로 눌러(MediaCodec) .m4a 파일로 (MediaMuxer)  → 메모의 attachments/ 에 들어간다
- *   2) 받아쓰기(Stt.kt: 오픈소스 Vosk 또는 휴대폰 음성 인식) → 받아쓴 글이 메모에 함께 들어간다
+ *   2) 받아쓰기(Stt.kt: 휴대폰의 Google 음성 인식) → 받아쓴 글이 메모에 함께 들어간다
  * 끝나면 결과를 앱 안에 적어 두고(RecordStore) 화면이 메모에 넣은 뒤 지운다 — 알림에서 끝내 앱이 꺼져 있어도 잃지 않는다.
  */
 class RecorderService : Service() {
@@ -55,11 +55,11 @@ class RecorderService : Service() {
         fun hasMic(ctx: Context) = ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
         /** 녹음 시작 → { stt: 받아쓰는지, reason: 못 받아쓰는 이유 } */
-        fun start(ctx: Context, memoId: String, stt: Boolean, engine: String, terms: List<String> = emptyList()): JSONObject {
+        fun start(ctx: Context, memoId: String, stt: Boolean, terms: List<String> = emptyList()): JSONObject {
             if (session != null) throw IllegalStateException("이미 녹음하고 있어요")
             if (!hasMic(ctx)) throw IllegalStateException("마이크 권한이 없어요")
-            val reason = if (stt) Stt.unavailableReason(ctx, engine) else null
-            val s = Session(ctx.applicationContext, memoId, stt && reason == null, engine, wantedStt = stt, terms = terms)
+            val reason = if (stt) Stt.unavailableReason(ctx) else null
+            val s = Session(ctx.applicationContext, memoId, stt && reason == null, wantedStt = stt, terms = terms)
             session = s
             val intent = Intent(ctx, RecorderService::class.java).setAction(ACTION_START)
             try {
@@ -201,7 +201,6 @@ class RecorderService : Service() {
         private val ctx: Context,
         val memoId: String,
         val stt: Boolean,
-        private val engine: String,
         private val wantedStt: Boolean,
         private val terms: List<String> = emptyList(),
     ) {
@@ -251,7 +250,7 @@ class RecorderService : Service() {
             }
             val encoder = AacEncoder(file, Stt.SAMPLE_RATE)
             val transcriber = if (stt) try {
-                Stt.create(ctx, engine, { final, part, spk -> onText(final, part, spk) }, terms)
+                Stt.create(ctx, { final, part, spk -> onText(final, part, spk) }, terms)
             } catch (e: Exception) {
                 android.util.Log.w("MemoKing", "받아쓰기를 시작하지 못했어요", e)
                 sttError = true

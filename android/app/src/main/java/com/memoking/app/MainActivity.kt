@@ -69,6 +69,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.memoking.app.drive.GoogleAuth.upgradeScope(this) // 예전 Drive 전체 권한 연결이면 다시 연결하게
+        Thread { Stt.removeOldModels(this) }.start() // 예전에 받아 둔 Vosk 받아쓰기 데이터 정리
         root = FrameLayout(this)
         web = WebView(this)
         root.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))

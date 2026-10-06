@@ -41,9 +41,6 @@ android {
         versionCode = 48
         versionName = "0.14.2"
 
-        // 받아쓰기(Vosk) 네이티브 라이브러리: 실제 휴대폰용만 (APK 크기)
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
-
         // Google Drive 동기화용 OAuth 클라이언트 ("데스크톱 앱" 유형). 비워 두면 앱 설정에서 붙여 넣는다.
         // 넣는 곳: android/local.properties 의 memoking.googleClientId / memoking.googleClientSecret,
         //         또는 환경 변수 MEMOKING_GOOGLE_CLIENT_ID / MEMOKING_GOOGLE_CLIENT_SECRET (GitHub Actions 비밀 값)
@@ -86,8 +83,6 @@ dependencies {
     // 휴대폰에 로그인된 구글 계정으로 Drive 권한 받기 (계정 고르기·허용만)
     implementation("com.google.android.gms:play-services-auth:21.3.0")
 
-    // 받아쓰기: 오픈소스 음성 인식 Vosk (alphacep/vosk-api, Apache-2.0) — 인터넷 없이 휴대폰 안에서 한국어를 글로
-    implementation("com.alphacephei:vosk-android:0.3.75")
 
     // 동기화 엔진 단위 테스트 (PC 에서 JVM 으로)
     testImplementation("junit:junit:4.13.2")
