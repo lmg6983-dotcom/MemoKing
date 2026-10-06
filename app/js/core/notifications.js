@@ -1,20 +1,12 @@
 // Windows 알림 보관함 — 알림 DB(wpndatabase.db) 의 값 해석 (순수 함수, 단위 테스트 대상)
+import { decodeEntities, XML_ENTITIES } from './entities.js';
 
 // Windows FILETIME(1601년부터 100나노초 단위, BigInt) → 밀리초 시각
 export function fileTimeToMs(ticks) {
   return Number(BigInt(ticks) / 10000n) - 11644473600000;
 }
 
-const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
-function decodeXml(text) {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
-    if (e[0] === '#') {
-      const code = e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
-    }
-    return ENTITIES[e.toLowerCase()] ?? m;
-  });
-}
+const decodeXml = (text) => decodeEntities(text, XML_ENTITIES);
 
 /**
  * 토스트 알림 XML → { title, body, image }

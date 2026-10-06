@@ -3,10 +3,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const EVENTS = [
-  'memos:changed', 'memo:external', 'memo:removed', 'memo:meta', 'memo:links-changed', 'vault:indexed', 'vault:opened',
+  'memos:changed', 'memo:external', 'memo:removed', 'memo:trashed', 'memo:meta', 'memo:links-changed', 'vault:indexed', 'vault:opened',
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
-  'stack:state', 'stack:hover', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
+  'stack:state', 'stack:hover', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
+  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -25,12 +26,15 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   tags: {
     list: invoke('tags:list'),
+    auto: invoke('tags:auto'),
+    suggest: invoke('tags:suggest'),
   },
   memo: {
     open: invoke('memo:open'),
     create: invoke('memo:create'),
     get: invoke('memo:get'),
     save: invoke('memo:save'),
+    keepCopy: invoke('memo:keep-copy'),
     // 창이 닫히는 순간에는 비동기 저장이 끝나기 전에 창이 사라질 수 있어 동기 저장을 쓴다.
     saveSync: (id, body) => ipcRenderer.sendSync('memo:save-sync', id, body),
     set: invoke('memo:set'),
@@ -50,12 +54,30 @@ contextBridge.exposeInMainWorld('memoking', {
     remove: invoke('history:remove'),
     clear: invoke('history:clear'),
     toMemo: invoke('history:to-memo'),
+    // 앱마다 모으지 않기
+    apps: invoke('history:apps'),
+    blockApp: invoke('history:block'),
+    unblockApp: invoke('history:unblock'),
+  },
+  // Google Drive 직접 동기화 (Google Drive 데스크탑 앱 없이)
+  drive: {
+    status: invoke('drive:status'),
+    setClient: invoke('drive:set-client'),
+    login: invoke('drive:login'),
+    cancelLogin: invoke('drive:cancel-login'),
+    folders: invoke('drive:folders'),
+    createFolder: invoke('drive:create-folder'),
+    use: invoke('drive:use'),
+    auto: invoke('drive:auto'),
+    sync: invoke('drive:sync'),
+    disconnect: invoke('drive:disconnect'),
   },
   settings: {
     get: invoke('app:settings'),
     setAutoStart: invoke('app:set-auto-start'),
     setQuickMemo: invoke('app:set-quick-memo'),
     setFitTables: invoke('app:set-fit-tables'),
+    setAutoTags: invoke('app:set-auto-tags'),
     setMagic: invoke('app:set-magic'),
     setTrashDays: invoke('app:set-trash-days'),
   },
@@ -73,8 +95,20 @@ contextBridge.exposeInMainWorld('memoking', {
     move: (x, y) => ipcRenderer.send('drag:move', { x, y }),
     end: (point) => ipcRenderer.invoke('drag:end', point ?? null),
   },
+  // 받아쓰기 (PC): 데이터 받기 · 녹음하며 받아쓰기 · 소리 파일 받아쓰기
+  stt: {
+    status: invoke('stt:status'),
+    download: invoke('stt:download'),
+    remove: invoke('stt:remove'),
+    setOptions: invoke('stt:options'),
+    start: invoke('stt:start'),
+    audio: (id, samples) => ipcRenderer.send('stt:audio', id, samples),
+    stop: invoke('stt:stop'),
+    transcribe: invoke('stt:transcribe'),
+  },
   attachments: {
     save: invoke('attachment:save'),
+    read: invoke('attachment:read'),
     open: invoke('attachment:open'),
     fetch: invoke('attachment:fetch'),
     info: invoke('attachment:info'),
@@ -126,6 +160,7 @@ contextBridge.exposeInMainWorld('memoking', {
     toggleListTop: invoke('list:toggle-top'),
     listOnTop: invoke('list:on-top'),
     toggleTop: invoke('win:toggle-top'),
+    inking: invoke('win:inking'),
     showList: invoke('list:show'),
     growWidth: invoke('win:grow-width'),
   },

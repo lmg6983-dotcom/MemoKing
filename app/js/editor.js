@@ -1,6 +1,6 @@
 // 서식 편집기 (Milkdown) — 화면에는 서식이 적용된 모습, 저장은 마크다운.
 import {
-  Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx,
+  Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx, parserCtx,
   commonmark, imageSchema, linkSchema, toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand,
   wrapInHeadingCommand, turnIntoTextCommand, wrapInBulletListCommand, wrapInOrderedListCommand,
   wrapInBlockquoteCommand, createCodeBlockCommand, insertHrCommand, liftListItemCommand, htmlSchema,
@@ -8,11 +8,16 @@ import {
   callCommand, getMarkdown, replaceAll, insert, $view, $prose, $markSchema, $nodeSchema, $remark, Plugin, PluginKey, TextSelection,
   toggleMark, Decoration, DecorationSet, insertTableCommand, tableSchema,
   addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, columnResizing,
-  splitCell, CellSelection, TableMap,
+  splitCell, CellSelection, TableMap, selectedRect, undoDepth, redoDepth,
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
 import { mediaKindOf, trimTrailingBreaks } from './core/memo-file.js';
+import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkForDark } from './core/ink.js';
+import { getStroke } from '../vendor/perfect-freehand.js';
+import { openInkEditor } from './ink-editor.js';
+import { icon } from './icons.js';
+import { remarkEmptyTasks } from './core/empty-tasks.js';
 import { remarkInlineHtmlMarks, stringifyHandlers, safeColor, DEFAULT_HIGHLIGHT } from './core/html-marks.js';
 import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
 import { vaultUrl, mediaKind, baseName } from './media.js';
@@ -22,9 +27,16 @@ import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } fr
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
-import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells } from './table-extras.js';
+import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt } from './table-extras.js';
 import { createListDrag } from './list-drag.js';
+import { createBlockMove, createContentLines, MEDIA_SCRUB } from './block-move.js';
+import { createTapList } from './tap-list.js';
+import { createVoiceCards, isVoiceCard, voiceAudioOf } from './voice-card-view.js';
+import { createTidy } from './tidy.js';
+import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
 import { create as createConfetti } from '../vendor/confetti.js';
+import { mathPlugins, insertMathBlock } from './math.js';
+import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
 // 모두 마크다운 이미지 문법 ![설명](attachments/파일) 로 저장하고, 확장자로 구분해 보여준다.
@@ -54,30 +66,86 @@ function playerOptions(kind) {
     blankVideo: '',
     i18n: PLYR_I18N,
     speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
-    settings: ['speed'],
+    settings: kind === 'video' ? ['speed'] : [], // 소리는 설정(재생 속도) 단추 없이 — 막대를 넓게
     // 스티커 창은 좁으므로 음량 막대는 빼고 음소거 버튼만 (시간 표시가 줄바꿈되지 않게)
     controls: kind === 'video'
       ? ['play-large', 'play', 'progress', 'current-time', 'mute', 'settings', 'fullscreen']
-      : ['play', 'progress', 'current-time', 'duration', 'mute', 'settings'],
+      : ['play', 'progress', 'current-time', 'duration', 'mute'],
     keyboard: { focused: true, global: false },
     tooltips: { controls: true, seek: true },
   };
 }
 
-function mediaView(node) {
+// 플레이어에서 누르면 그 기능이 되는 곳 (재생 막대·단추). 그중 MEDIA_SCRUB(설정 메뉴)은 꾹 눌러도 옮기지 않음
+const MEDIA_CONTROL = `${MEDIA_SCRUB}, .plyr__progress, input, [role="slider"], .plyr__control, button`;
+
+// 손 메모 이어 그리기 (편집기마다 createNoteEditor 가 정함: (view, getPos) => void)
+let inkEditHandler = null;
+let inkReader = null; // 손 메모 SVG 글 읽기 (createNoteEditor 의 readAttachment)
+const INK_FILE = '손 메모';
+
+// 손 메모 한 칸: 그린 만큼의 그림 + (마우스를 올리거나 고르면) "이어 그리기" — PC 는 두 번 눌러도
+function inkView(node, view, getPos) {
+  const dom = document.createElement('span');
+  dom.className = `mk-ink bg-${bgOfAlt(node.attrs.alt)}`;
+  dom.contentEditable = 'false';
+  const img = document.createElement('img');
+  img.src = vaultUrl(node.attrs.src);
+  img.alt = node.attrs.alt ?? '';
+  img.draggable = false;
+  img.onerror = () => dom.classList.add('broken');
+  img.className = 'ink-light-src';
+  // 투명 바탕: 어두운 화면용 그림도 함께 (검은 펜 ↔ 흰 펜만 바꿈) — 어느 것을 보일지는 CSS 가 메모 색·다크 모드로 고른다
+  const bg = bgOfAlt(node.attrs.alt);
+  if (bg === 'none' && inkReader) {
+    inkReader(node.attrs.src).then((text) => {
+      const dark = inkForDark(parseInkSvg(text) ?? { strokes: [] });
+      const svg = dark && inkToSvg(dark, getStroke);
+      if (!svg) return;
+      const alt = img.cloneNode();
+      alt.className = 'ink-dark-src';
+      alt.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+      alt.addEventListener('dblclick', open);
+      img.after(alt);
+    }).catch(() => {});
+  }
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.className = 'mk-ink-edit';
+  edit.append(icon('pen'), '이어 그리기');
+  const open = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof getPos === 'function' && view.editable) inkEditHandler?.(view, getPos());
+  };
+  edit.addEventListener('mousedown', (e) => e.preventDefault());
+  edit.addEventListener('click', open);
+  img.addEventListener('dblclick', open);
+  dom.append(img, edit);
+  return {
+    dom,
+    stopEvent: (e) => e.target === edit || edit.contains(e.target),
+    ignoreMutation: () => true,
+    selectNode: () => dom.classList.add('ProseMirror-selectednode'),
+    deselectNode: () => dom.classList.remove('ProseMirror-selectednode'),
+  };
+}
+
+function mediaView(node, view, getPos) {
   const { src, alt, title } = node.attrs;
+  if (isInk(src, alt)) return inkView(node, view, getPos);
   const kind = mediaKindOf(src, alt);
   if (kind === 'audio' || kind === 'video') {
     injectPlyrSprite();
     const dom = document.createElement('span');
     dom.className = `mk-media mk-${kind}`;
     dom.contentEditable = 'false';
-    if (alt) {
-      const label = document.createElement('span');
-      label.className = 'mk-media-label';
-      label.textContent = alt;
-      dom.append(label);
-    }
+    // 이름 줄 = 잡는 곳: 꾹 눌러(휴대폰)·끌어(PC) 이 줄을 옮긴다 — 플레이어 단추는 재생용
+    const label = document.createElement('span');
+    label.className = 'mk-media-label';
+    label.title = '잡고 끌어서 옮기기';
+    label.textContent = alt || baseName(String(src).split('/').pop() ?? '') || (kind === 'video' ? '동영상' : '소리');
+    dom.append(label);
     const el = document.createElement(kind);
     el.preload = 'metadata';
     el.src = vaultUrl(src);
@@ -86,7 +154,14 @@ function mediaView(node) {
     const player = new Plyr(el, playerOptions(kind));
     return {
       dom,
-      stopEvent: () => true, // 플레이어 조작이 편집기로 새지 않게
+      // 상자 어디를 꾹 눌러도 줄을 옮긴다 (이름 줄·시간·빈 곳·동영상 화면은 편집기로).
+      // 재생 단추·재생 막대는 짧게 누르거나 밀면 그 기능, 꾹 누르면 옮기기 — 손가락이 닿는 순간만 편집기도 받는다
+      stopEvent: (e) => {
+        const t = e.target instanceof Element ? e.target : null;
+        if (!t || !t.closest(MEDIA_CONTROL)) return false;
+        if (e.type === 'touchstart' && !t.closest(MEDIA_SCRUB)) return false;
+        return true;
+      },
       ignoreMutation: () => true,
       destroy: () => player.destroy(),
     };
@@ -255,6 +330,7 @@ const linkCardSchema = $nodeSchema('mk_link_card', () => ({
   },
 }));
 const linkCards = $remark('memoking-link-cards', () => remarkLinkCards);
+const emptyTasks = $remark('memoking-empty-tasks', () => remarkEmptyTasks);
 
 // 같은 주소의 카드가 여러 번 그려져도 한 번만 묻는다
 const previewRequests = new Map();
@@ -758,7 +834,8 @@ function normalizePastedTables(html) {
  *   fetchPreview: 링크 카드에 보여줄 제목·설명·사진 (메인 프로세스가 메모 폴더에 모아 둔 것)
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false }) {
+  if (readAttachment) inkReader = readAttachment; // 그림 칸(inkView)이 만들어지기 전에
   let ready = false;
   let editor = null;
   const view = () => editor.ctx.get(editorViewCtx);
@@ -766,9 +843,33 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   // 넣은 파일은 각자 한 줄(문단)을 차지한다.
   // 빈 줄이면 그 줄을 바꾸고, 글이 있는 줄이면 그 줄 바로 아래에 넣는다.
   // item: { kind: 'image'|'audio'|'video', src, alt } 또는 { kind: 'file', src, name } (파일 칩 = 링크)
+  // 음성 카드(받아쓴 글) 안에는 글자만 — 손 메모·사진·파일·표·수식 같은 칸은 카드 바로 아래로
+  function voiceCardDepth($pos) {
+    for (let d = $pos.depth; d > 0; d--) if (isVoiceCard($pos.node(d))) return d;
+    return 0;
+  }
+  function afterVoiceCard(state, pos) {
+    const $p = state.doc.resolve(Math.min(pos, state.doc.content.size));
+    const d = voiceCardDepth($p);
+    return d ? $p.after(d) : pos;
+  }
+  /** 커서가 음성 카드 안이면 카드 바로 아래 빈 줄로 (없으면 만든다) */
+  function leaveVoiceCard() {
+    const v = view();
+    const { $from } = v.state.selection;
+    const d = voiceCardDepth($from);
+    if (!d) return;
+    const after = $from.after(d);
+    const next = v.state.doc.resolve(after).nodeAfter;
+    let tr = v.state.tr;
+    if (!(next?.type.name === 'paragraph' && next.content.size === 0)) tr = tr.insert(after, v.state.schema.nodes.paragraph.create());
+    v.dispatch(tr.setSelection(TextSelection.create(tr.doc, after + 1)));
+  }
+
   function insertBlocks(pos, items) {
     const v = view();
     const { schema } = v.state;
+    pos = afterVoiceCard(v.state, pos);
     const paragraphs = items.map((item) => {
       if (item.kind === 'file') {
         return schema.nodes.paragraph.create(null, schema.text(item.name, [schema.marks.link.create({ href: item.src })]));
@@ -777,9 +878,15 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     });
     const $pos = v.state.doc.resolve(Math.min(pos, v.state.doc.content.size));
     const size = paragraphs.reduce((sum, p) => sum + p.nodeSize, 0);
+    // 표 칸에는 글 한 줄만 들어간다 — 칸 안이면 표 바로 아래에 (표가 둘로 쪼개지지 않게)
+    let depth = $pos.depth;
+    while (depth > 1 && !$pos.node(depth - 1).canReplaceWith($pos.index(depth - 1) + 1, $pos.index(depth - 1) + 1, schema.nodes.paragraph)) depth--;
     let tr = v.state.tr;
     let end;
-    if ($pos.depth > 0 && $pos.parent.isTextblock && $pos.parent.content.size === 0) {
+    if (depth < $pos.depth) {
+      tr = tr.insert($pos.after(depth), paragraphs);
+      end = $pos.after(depth) + size;
+    } else if ($pos.depth > 0 && $pos.parent.isTextblock && $pos.parent.content.size === 0) {
       tr = tr.replaceWith($pos.before(), $pos.after(), paragraphs);
       end = $pos.before() + size;
     } else if ($pos.depth > 0 && $pos.parent.isTextblock) {
@@ -795,6 +902,63 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     v.dispatch(tr.scrollIntoView());
     v.focus();
   }
+
+  // ---------- 손 메모 (콘텐츠): 그린 만큼의 SVG 한 칸 ----------
+  async function saveInk(doc) {
+    const svg = inkToSvg(doc, getStroke);
+    if (!svg) return null;
+    const src = await saveFile(new File([svg], `${INK_FILE}.svg`, { type: 'image/svg+xml' }));
+    return { src, alt: inkAlt(doc.bg) };
+  }
+  // 새 손 메모: 그리기 화면 → 완료하면 커서 자리에 (빈 메모면 첫 줄)
+  function insertInk() {
+    const at = view().state.selection.from;
+    return new Promise((resolve) => {
+      openInkEditor({
+        onSave: async (doc) => {
+          if (!doc) return;
+          const item = await saveInk(doc);
+          if (item) insertBlocks(at, [{ kind: 'image', ...item }]);
+          resolve(item);
+        },
+        onClose: () => {
+          resolve(null);
+          view().focus();
+        },
+      });
+    });
+  }
+  // 손 메모 이어 그리기: 그 칸의 SVG 안 자료를 열고, 완료하면 새 파일로 바꾼다 (다 지우면 칸도 지움)
+  async function editInk(v, pos) {
+    const node = v.state.doc.nodeAt(pos);
+    if (!node || node.type.name !== 'image' || !isInk(node.attrs.src, node.attrs.alt)) return;
+    let doc = null;
+    try {
+      doc = parseInkSvg(await readAttachment?.(node.attrs.src));
+    } catch (err) {
+      console.warn('손 메모를 읽지 못했어요', err);
+    }
+    if (!doc) {
+      onNotice?.('이 그림은 고칠 수 없어요 (메모킹으로 그린 손 메모가 아니에요)', true);
+      return;
+    }
+    openInkEditor({
+      doc,
+      onSave: async (next) => {
+        const cur = v.state.doc.nodeAt(pos);
+        if (cur !== node && cur?.attrs.src !== node.attrs.src) return; // 그 사이 글이 바뀌어 자리가 달라짐
+        if (next === null) {
+          v.dispatch(v.state.tr.delete(pos, pos + node.nodeSize));
+          return;
+        }
+        if (!next) return;
+        const item = await saveInk(next);
+        if (item) v.dispatch(v.state.tr.setNodeMarkup(pos, null, { ...node.attrs, src: item.src, alt: item.alt }));
+      },
+      onClose: () => v.focus(),
+    });
+  }
+  if (!readOnly) inkEditHandler = (v, pos) => editInk(v, pos); // 보기만 하는 편집기(PDF·옆 메모)는 이어 그리기 없음
 
   async function filesToItems(files) {
     const items = [];
@@ -917,6 +1081,179 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     v.dispatch(tr.scrollIntoView());
   }
 
+  // ---------- 표 칸 안에 붙여넣기 ----------
+  // 칸에는 글 한 줄(문단 하나)만 들어간다. 그대로 붙이면 줄마다 옆 칸을 덮어쓰거나(표 기능이 줄을 칸으로 읽음),
+  // 표가 둘로 쪼개지거나, 표를 늘리다 멈춰 아무것도 붙지 않는다. 그래서 칸 안에서는 직접:
+  //   표(엑셀·시트의 칸, 탭으로 나뉜 글) → 지금 칸부터 오른쪽·아래로 칸마다 글을 채운다 (모자라면 표를 늘림, 칸 모양은 그대로)
+  //   여러 줄·여러 문단 → 줄마다 칸 안 줄바꿈(<br>)으로 이어 지금 칸에
+  // 칸 여러 개를 골라 두고 붙이면(CellSelection) 표 기능에 맡긴다.
+
+  const cellBreak = (schema) => schema.nodes.html.create({ value: '<br>' });
+
+  // 블록들 → 칸 한 줄에 들어갈 글 노드들 (줄 사이는 <br>)
+  function inlineLines(schema, fragment) {
+    const inline = [];
+    const line = (nodes) => {
+      if (!nodes.length) return;
+      if (inline.length) inline.push(cellBreak(schema));
+      inline.push(...nodes);
+    };
+    fragment.descendants((node) => {
+      if (node.type.name === 'math_block') {
+        if (node.attrs.value) line([schema.nodes.math_inline.create({ value: node.attrs.value })]);
+        return false;
+      }
+      if (node.type.name === 'mk_link_card') {
+        line([schema.text(node.attrs.title || node.attrs.href, [schema.marks.link.create({ href: node.attrs.href })])]);
+        return false;
+      }
+      if (!node.isTextblock) return true;
+      if (node.type.spec.code) {
+        for (const t of node.textContent.split('\n')) line(t ? [schema.text(t)] : []);
+      } else {
+        const nodes = [];
+        node.forEach((c) => nodes.push(c));
+        line(nodes);
+      }
+      return false;
+    });
+    return inline;
+  }
+
+  const textLines = (schema, text) => {
+    const out = [];
+    String(text ?? '').trim().split(/[ \t]*\n[ \t]*/).forEach((t, i) => {
+      if (i && out.length) out.push(cellBreak(schema));
+      if (t) out.push(schema.text(t));
+    });
+    return out;
+  };
+
+  // 붙일 것이 표 조각뿐이면 칸 글 격자 [행][열] = 글 노드들 (아니면 null — 표 앞뒤에 다른 글이 있으면 모두 한 칸에 이어 붙인다)
+  function sliceGrid(schema, slice) {
+    const rows = [];
+    let loose = null; // 행 없이 칸만 (편집기 안에서 칸을 복사한 경우)
+    if (!slice?.content.childCount) return null;
+    for (let i = 0; i < slice.content.childCount; i++) if (!slice.content.child(i).type.spec.tableRole) return null;
+    slice.content.descendants((node) => {
+      const role = node.type.spec.tableRole;
+      if (role === 'row') {
+        const row = [];
+        node.forEach((cell) => row.push(inlineLines(schema, cell.content)));
+        rows.push(row);
+        return false;
+      }
+      if (role === 'cell' || role === 'header_cell') {
+        (loose ??= []).push(inlineLines(schema, node.content));
+        return false;
+      }
+      return true;
+    });
+    if (rows.length) return rows;
+    return loose ? [loose] : null;
+  }
+
+  // 지금 칸부터 grid 크기만큼 들어가게 표를 늘린다 (오른쪽에 열, 아래에 행)
+  function growTableFor(tr, rect, rows, cols) {
+    const { map, table, tableStart } = rect;
+    const addRows = rect.top + rows - map.height;
+    const addCols = rect.left + cols - map.width;
+    const { schema } = tr.doc.type;
+    // 새 칸의 정렬은 그 열의 머리글을 따른다 (새 열은 정렬 없음 — 파일에 :- 같은 표시가 새로 생기지 않게)
+    const head = table.firstChild;
+    const alignOf = (c) => (c < map.width ? head?.maybeChild(c)?.attrs.alignment ?? null : null);
+    if (addCols > 0) {
+      table.forEach((row, offset) => {
+        const type = row.type.name === 'table_header_row' ? schema.nodes.table_header : schema.nodes.table_cell;
+        tr.insert(tr.mapping.map(tableStart + offset + row.nodeSize - 1), Array.from({ length: addCols }, () => type.createAndFill({ alignment: null })));
+      });
+    }
+    if (addRows > 0) {
+      const width = Math.max(map.width, rect.left + cols);
+      const newRows = Array.from({ length: addRows }, () => schema.nodes.table_row.create(null, Array.from({ length: width }, (_, c) => schema.nodes.table_cell.createAndFill({ alignment: alignOf(c) }))));
+      tr.insert(tr.mapping.map(tableStart + table.content.size), newRows);
+    }
+  }
+
+  // 칸마다 글을 바꿔 넣는다 (머리글·정렬·너비 같은 칸 모양은 그대로). 채운 칸들을 골라 둔다
+  function fillCells(v, grid) {
+    const rect = selectedRect(v.state);
+    const rows = grid.length;
+    const cols = Math.max(...grid.map((r) => r.length));
+    const tr = v.state.tr;
+    growTableFor(tr, rect, rows, cols);
+    // 늘린 뒤의 표 기준 자리 (그 뒤에 바꾼 칸들만큼 옮겨 읽는다)
+    const table = tr.doc.nodeAt(rect.tableStart - 1);
+    const map = TableMap.get(table);
+    const mapFrom = tr.mapping.maps.length;
+    const posOf = (rel) => tr.mapping.slice(mapFrom).map(rect.tableStart + rel);
+    const done = new Set();
+    let first = null;
+    let last = null;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const row = rect.top + r;
+        const col = rect.left + c;
+        const rel = map.map[row * map.width + col];
+        if (done.has(rel)) continue; // 합친 칸은 한 번만
+        done.add(rel);
+        const at = map.findCell(rel);
+        if (at.top !== row || at.left !== col) continue; // 합친 칸의 첫 칸이 아니면 그대로
+        const cell = tr.doc.nodeAt(posOf(rel));
+        const para = cell?.firstChild;
+        if (!para?.isTextblock) continue;
+        const from = posOf(rel) + 2; // 칸 · 문단 여는 자리 다음
+        tr.replaceWith(from, from + para.content.size, grid[r][c] ?? []);
+        first ??= rel;
+        last = rel;
+      }
+    }
+    if (first == null) return false;
+    if (first === last) {
+      tr.setSelection(TextSelection.create(tr.doc, posOf(last) + tr.doc.nodeAt(posOf(last)).nodeSize - 2)); // 그 칸 글 끝
+    } else {
+      tr.setSelection(CellSelection.create(tr.doc, posOf(first), posOf(last)));
+    }
+    v.dispatch(tr.scrollIntoView());
+    return true;
+  }
+
+  // 여러 줄·여러 문단을 지금 칸에 (줄 사이 <br>)
+  function pasteLines(v, slice) {
+    const first = slice?.content.firstChild;
+    if (!first || first.isInline || (slice.content.childCount === 1 && first.type.name === 'paragraph')) return false; // 한 줄은 평소대로
+    const inline = inlineLines(v.state.schema, slice.content);
+    if (!inline.length) return false;
+    const tr = v.state.tr.deleteSelection();
+    const pos = tr.selection.from;
+    tr.insert(pos, inline);
+    tr.setSelection(TextSelection.create(tr.doc, pos + inline.reduce((sum, n) => sum + n.nodeSize, 0)));
+    v.dispatch(tr.scrollIntoView());
+    return true;
+  }
+
+  // 표 기능(gfm)의 붙여넣기보다 먼저 받아야 해서 따로 (아래 .use 순서)
+  const cellPaste = $prose(() => new Plugin({
+    key: new PluginKey('memoking-cell-paste'),
+    props: {
+      handlePaste(v, event, slice) {
+        const data = event.clipboardData;
+        if (readOnly || !data || data.files.length || !isInTable(v.state) || v.state.selection instanceof CellSelection) return false;
+        if (v.state.selection.$from.parent.type.spec.code) return false;
+        const { schema } = v.state;
+        const html = data.getData('text/html');
+        // 엑셀·시트의 글자만(탭으로 나뉜 글) 복사한 경우: 줄 → 행, 탭 → 열
+        const tsv = html ? null : parseTsv(data.getData('text/plain'));
+        // 진짜 표(HTML 에 표가 있음)일 때만 칸으로 — 그냥 여러 줄도 붙이는 자리(칸)에 맞춰 칸들로 읽히므로
+        const grid = tsv ? tsv.map((row) => row.map((t) => textLines(schema, t))) : /<t(able|r|d|h)[\s>]/i.test(html) ? sliceGrid(schema, slice) : null;
+        pastedTablesAt = 0; // 있던 표의 열 너비·정렬을 붙여넣은 표처럼 저절로 맞추지 않게
+        const handled = grid?.length ? fillCells(v, grid) : pasteLines(v, slice);
+        if (handled) event.preventDefault();
+        return handled;
+      },
+    },
+  }));
+
   const pastePlugin = $prose(() => new Plugin({
     key: new PluginKey('memoking-paste'),
     props: {
@@ -935,6 +1272,14 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
             v.pasteHTML(gridToHtml(grid));
             return true;
           }
+        }
+        // 마크다운 원문을 글자로만 감싼 HTML(메신저·메모 앱 복사 등)이면 HTML 대신 마크다운으로 그린다
+        const plain = data?.getData('text/plain') ?? '';
+        if (!files.length && html && looksLikeMarkdown(plain) && !/<(h[1-6]|ul|ol|li|table|pre|blockquote|img|strong|b|em|a)[\s>]/i.test(html)
+          && !v.state.selection.$from.parent.type.spec.code && editor) {
+          event.preventDefault();
+          editor.action(insert(normalizeMath(plain.replace(/\r\n?/g, '\n'))));
+          return true;
         }
         const url = files.length ? null : loneUrl(data?.getData('text/plain'));
         const linkTitle = url ? pastedLinkTitle(html, url) : null;
@@ -1056,9 +1401,15 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
   }));
 
-  const media = $view(imageSchema.node, () => (node) => mediaView(node));
+  const media = $view(imageSchema.node, () => (node, v, getPos) => mediaView(node, v, getPos));
   const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
   const listDrag = $prose(() => createListDrag({ readOnly }));
+  const blockMove = $prose(() => createBlockMove({ readOnly }));
+  // 휴대폰: 목록 아래 빈 줄을 누르면 목록이 이어진다 (보기만 할 때는 없음)
+  const tapList = $prose(() => (tapContinuesList && !readOnly ? createTapList() : new Plugin({})));
+  const voiceCards = $prose(() => createVoiceCards());
+  const contentLines = $prose(() => createContentLines());
+  const tidy = $prose(() => createTidy({ readOnly }));
   const taskToggle = $prose(() => new Plugin({
     key: new PluginKey('memoking-task-toggle'),
     props: { handleDOMEvents: { mousedown: toggleTaskOnClick } },
@@ -1094,10 +1445,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .config((ctx) => {
       ctx.set(rootCtx, root);
       ctx.set(defaultValueCtx, markdown);
-      // 목록 기호는 "-" (Obsidian·GitHub 와 같은 관례), 밑줄·색·하이라이트는 HTML 태그로 저장
+      // 목록 기호는 "-" (Obsidian·GitHub 와 같은 관례), 가로줄은 손으로 치는 "---", 밑줄·색·하이라이트는 HTML 태그로 저장
       ctx.update(remarkStringifyOptionsCtx, (prev) => ({
         ...prev,
         bullet: '-',
+        rule: '-',
         handlers: { ...prev.handlers, ...stringifyHandlers },
       }));
       ctx.update(editorViewOptionsCtx, (prev) => ({
@@ -1163,6 +1515,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       }));
     })
     .use(commonmark)
+    .use(cellPaste) // 표 칸에 여러 줄 붙이기 — 표 기능보다 먼저
     .use(gfm)
     .use(tableTab)
     .use(tableAutoFit)
@@ -1172,7 +1525,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(inlineHtmlMarks)
     .use(linkCards)
+    .use(emptyTasks)
     .use(linkCardSchema)
+    .use(mathPlugins({ readOnly }))
     .use(underlineMark)
     .use(colorMark)
     .use(highlightMark)
@@ -1185,6 +1540,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(cardView)
     .use(taskToggle)
     .use(listDrag)
+    .use(blockMove)
+    .use(tapList)
+    .use(voiceCards)
+    .use(contentLines)
+    .use(tidy)
     .use(tagHighlight)
     .use(stateWatcher)
     .create();
@@ -1212,10 +1572,29 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return null;
   }
 
+  // 제목 · 점 목록 · 번호 목록 · 체크리스트는 한 줄에 하나만 (서로 바꾸면 앞의 것은 풀린다)
+
+  // 목록 밖으로 (겹친 목록이면 바깥까지)
+  function leaveLists() {
+    for (let i = 0; i < 8 && parentOfType(['list_item']); i++) {
+      const before = view().state.doc;
+      call(liftListItemCommand);
+      if (view().state.doc === before) break; // 더 풀 수 없음
+    }
+  }
+
+  function leaveHeading() {
+    if (parentOfType(['heading'])) call(turnIntoTextCommand);
+  }
+
   function toggleHeading(level) {
     const heading = parentOfType(['heading']);
-    if (heading && heading.node.attrs.level === level) call(turnIntoTextCommand);
-    else call(wrapInHeadingCommand, level);
+    if (heading && heading.node.attrs.level === level) {
+      call(turnIntoTextCommand);
+      return;
+    }
+    leaveLists();
+    call(wrapInHeadingCommand, level);
   }
 
   // 선택한 범위(커서만 있으면 그 줄)의 목록 항목들
@@ -1288,7 +1667,32 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     if (tr.docChanged) v.dispatch(tr);
   }
 
+  // 이어진 목록 하나(지금 줄이 든 단계)를 통째로 다른 목록으로 — 한 줄씩 바꾸지 않아도 되게
+  //   checked: null = 체크리스트 풀기, 'task' = 체크리스트로(이미 체크한 항목은 그대로)
+  function convertList(list, typeName, checked) {
+    const v = view();
+    const target = v.state.schema.nodes[typeName];
+    if (!target) return;
+    const tr = v.state.tr;
+    if (list.node.type !== target) {
+      const attrs = { ...list.node.attrs };
+      if (typeName === 'ordered_list') attrs.order = list.node.attrs.order ?? 1;
+      tr.setNodeMarkup(list.pos, target, attrs);
+    }
+    let pos = list.pos + 1;
+    list.node.forEach((item) => {
+      if (item.type.name === 'list_item') {
+        const next = { ...item.attrs, listType: typeName === 'ordered_list' ? 'ordered' : 'bullet' };
+        next.checked = checked === 'task' ? (item.attrs.checked ?? false) : null;
+        if (next.checked !== item.attrs.checked || next.listType !== item.attrs.listType) tr.setNodeMarkup(pos, undefined, next);
+      }
+      pos += item.nodeSize;
+    });
+    if (tr.docChanged) v.dispatch(tr);
+  }
+
   function toggleList(type) {
+    leaveHeading();
     const list = parentOfType(['bullet_list', 'ordered_list']);
     const items = itemsInSelection();
     const anyTask = items.some((i) => i.node.attrs.checked != null);
@@ -1299,11 +1703,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     if (!list) {
       splitLinesInSelection();
       if (!wrapLinesInList(type)) call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
-    } else if (list.node.type.name !== type) {
-      call(liftListItemCommand);
-      call(type === 'bullet_list' ? wrapInBulletListCommand : wrapInOrderedListCommand);
+      setCheckedInSelection(null);
+      return;
     }
-    setCheckedInSelection(null);
+    convertList(list, type, null);
   }
 
   function toggleTask() {
@@ -1313,11 +1716,15 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       call(liftListItemCommand);
       return;
     }
-    if (!parentOfType(['list_item'])) {
+    leaveHeading();
+    const list = parentOfType(['bullet_list', 'ordered_list']);
+    if (!list) {
       splitLinesInSelection();
       if (!wrapLinesInList('bullet_list')) call(wrapInBulletListCommand);
+      setCheckedInSelection(false); // 고른 줄마다 체크 네모
+      return;
     }
-    setCheckedInSelection(false); // 고른 줄마다 체크 네모
+    convertList(list, 'bullet_list', 'task'); // 체크리스트는 번호 없이, 이어진 목록 전체를
   }
 
   // 글자 색·하이라이트: 색을 주면 그 색으로 바꾸고, null 이면 지운다.
@@ -1352,6 +1759,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const { $from, $to } = view().state.selection;
       return $from.blockRange($to, (n) => n.type.name === 'blockquote');
     };
+    if (name === 'math') {
+      leaveVoiceCard();
+      insertMathBlock(view());
+      return;
+    }
     if (name === 'quote') {
       if (parentOfType(['heading', 'code_block'])) call(turnIntoTextCommand); // 인용은 본문 글을 감싼다
       if (!active.quote) call(wrapInBlockquoteCommand);
@@ -1365,7 +1777,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     } else if (/^h[1-3]$/.test(name)) {
       const level = Number(name[1]);
       const heading = parentOfType(['heading']);
-      if (!heading || heading.node.attrs.level !== level) call(wrapInHeadingCommand, level);
+      if (!heading || heading.node.attrs.level !== level) {
+        leaveLists(); // 제목은 목록 밖 한 줄 (제목·목록은 한 줄에 하나만)
+        call(wrapInHeadingCommand, level);
+      }
     } else if (name === 'codeBlock') {
       if (!parentOfType(['code_block'])) call(createCodeBlockCommand);
     }
@@ -1411,6 +1826,17 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
     // 표 ----------------------------------------------------------
     insertTable() {
+      leaveVoiceCard();
+      // 표 안에서 누르면 그 표 바로 아래 빈 줄에 (표 안에 표는 마크다운에 없어 표가 둘로 쪼개진다)
+      const v = view();
+      const outer = tableAt(v.state);
+      if (outer) {
+        const after = outer.pos + outer.node.nodeSize;
+        const next = v.state.doc.resolve(after).nodeAfter;
+        let tr = v.state.tr;
+        if (!(next?.type.name === 'paragraph' && next.content.size === 0)) tr = tr.insert(after, v.state.schema.nodes.paragraph.create());
+        v.dispatch(tr.setSelection(TextSelection.create(tr.doc, after + 1)));
+      }
       call(insertTableCommand, { row: 3, col: 3 });
       view().focus();
     },
@@ -1458,6 +1884,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     toggleTextColor: (color) => toggleColor('mk_color', color),
     toggleHighlight: (color) => toggleColor('mk_highlight', color),
     getMarkdown: () => unescapeTags(trimTrailingBreaks(editor.action(getMarkdown()))),
+    // 보이는 그대로의 글 (목록은 • 1. ☐/☑, 표는 탭) — 다른 앱으로 보내기
+    plainText: () => plainTextOf(view().state.doc.content),
+    // 지금 보이는 본문 DOM (그림·PDF 로 보내기)
+    dom: () => view().dom,
     // 붙여넣은 인터넷 사진 받기가 모두 끝날 때까지 (최대 timeout)
     async imagesSettled(timeout = 25_000) {
       const end = Date.now() + timeout;
@@ -1484,8 +1914,13 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       if (text) data.setData('text/plain', text);
       view().dom.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
     },
-    insertItems(items) {
-      if (items.length) insertBlocks(view().state.doc.content.size, items);
+    // atCursor: 커서 자리에 (안드로이드에서 앱이 저장해 둔 파일을 넣을 때). 기본은 문서 끝
+    insertItems(items, { atCursor = false } = {}) {
+      if (items.length) insertBlocks(atCursor ? view().state.selection.from : view().state.doc.content.size, items);
+    },
+    // 마크다운을 커서 자리에 서식대로 넣는다 (공유받은 마크다운 글·녹음 받아쓰기)
+    insertMarkdown(md) {
+      if (md) editor.action(insert(md));
     },
     // 문서를 통째로 다시 쓰지 않고 끝에 끼워 넣는다 (받는 중인 사진의 주소 교체와 엇갈리지 않게)
     appendMarkdown(md) {
@@ -1499,6 +1934,64 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       v.dispatch(v.state.tr.setSelection(TextSelection.near(v.state.doc.resolve(v.state.doc.content.size), -1)));
       editor.action(insert(md));
     },
+    // 이 소리 파일 줄에 받아쓴 글을 붙여 음성 카드로 (이미 카드면 끝에 이어서). 소리 줄이 없으면 false
+    // 음성 카드의 받아쓴 글을 통째로 바꾼다 (말한 사람을 나눈 뒤 "화자 N:" 을 붙일 때). 카드가 아니면 붙이기. 소리 줄이 없으면 false
+    replaceTranscript(src, transcript) {
+      const v = view();
+      let card = null;
+      v.state.doc.descendants((node, pos) => {
+        if (card) return false;
+        if (voiceAudioOf(node)?.attrs.src === src) {
+          card = { node, pos };
+          return false;
+        }
+        return true;
+      });
+      if (!card) return this.attachTranscript(src, transcript);
+      const lines = transcriptLines(transcript);
+      const parse = (md) => editor.action((ctx) => ctx.get(parserCtx)(md));
+      const from = card.pos + 1 + card.node.firstChild.nodeSize;
+      const to = card.pos + card.node.nodeSize - 1;
+      const tr = v.state.tr;
+      if (lines.length) tr.replaceWith(from, to, parse(lines.join('\n\n')).content);
+      else if (to > from) tr.delete(from, to);
+      v.dispatch(tr);
+      return true;
+    },
+    attachTranscript(src, transcript) {
+      const v = view();
+      const { doc } = v.state;
+      let found = null;
+      doc.descendants((node, pos) => {
+        if (found) return false;
+        if (node.type.name === 'image' && node.attrs.src === src) found = { node, pos };
+        return true;
+      });
+      if (!found) return false;
+      const parse = (md) => editor.action((ctx) => ctx.get(parserCtx)(md));
+      const $p = doc.resolve(found.pos);
+      const card = $p.depth >= 2 && isVoiceCard($p.node($p.depth - 1)) ? $p.depth - 1 : null;
+      const tr = v.state.tr;
+      if (card != null) {
+        const lines = transcriptLines(transcript);
+        if (!lines.length) return true;
+        tr.insert($p.after(card) - 1, parse(lines.join('\n\n')).content);
+      } else {
+        const para = $p.node($p.depth);
+        const alone = para.childCount === 1 || para.textContent.trim() === '';
+        const cardDoc = parse(voiceCardMarkdown({ alt: found.node.attrs.alt, src }, transcript));
+        if (alone) tr.replaceWith($p.before(), $p.after(), cardDoc.content);
+        else {
+          tr.insert($p.after(), cardDoc.content);
+          tr.delete(found.pos, found.pos + found.node.nodeSize);
+        }
+      }
+      v.dispatch(tr.scrollIntoView());
+      return true;
+    },
+    // 손 메모: 새로 그려 넣기 · 그 자리의 손 메모 이어 그리기
+    insertInk: () => insertInk(),
+    editInk: (pos) => editInk(view(), pos),
     // 커서 자리에 파일들을 넣는다.
     async insertFiles(files) {
       const pos = view().state.selection.from;
@@ -1514,6 +2007,14 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
 function isEmptyDoc(doc) {
   return doc.childCount === 1 && doc.firstChild.type.name === 'paragraph' && doc.firstChild.content.size === 0;
 }
+
+const safeDepth = (fn, state) => {
+  try {
+    return fn(state);
+  } catch {
+    return 1; // 기록 기능이 없으면 늘 누를 수 있게
+  }
+};
 
 // 도구막대 버튼을 눌린 상태로 보여주기 위한 현재 서식
 function activeFormats(state) {
@@ -1536,18 +2037,20 @@ function activeFormats(state) {
     code: Boolean(findMark(marks.inlineCode)),
     color: findMark(marks.mk_color)?.attrs.color ?? null,
     highlight: findMark(marks.mk_highlight)?.attrs.color ?? null,
+    canUndo: safeDepth(undoDepth, state) > 0,
+    canRedo: safeDepth(redoDepth, state) > 0,
   };
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d);
     const name = node.type.name;
     if (name === 'heading') active[`h${node.attrs.level}`] = true;
     if (name === 'code_block') active.codeBlock = true;
-    if (name === 'blockquote') active.quote = true;
+    if (name === 'blockquote' && !isVoiceCard(node)) active.quote = true;
     if (name === 'list_item' && node.attrs.checked != null && active.task === undefined) active.task = true;
     if (name === 'bullet_list' && !active.task && !active.ordered) active.bullet ??= true;
-    if (name === 'ordered_list' && !active.bullet) active.ordered ??= true;
+    if (name === 'ordered_list' && !active.task && !active.bullet) active.ordered ??= true;
   }
-  if (active.task) active.bullet = false;
+  for (let d = $from.depth; d > 0; d--) if ($from.node(d).type.name === 'blockquote' && !isVoiceCard($from.node(d))) active.quote = true;
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d);
     if (node.type.name === 'table_header_row') active.tableHeader = true;

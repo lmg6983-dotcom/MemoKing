@@ -20,24 +20,26 @@
     <img class="setup-logo" src="assets/mark-256.png" alt="메모킹" draggable="false">
     <h1>반가워요, 메모킹이에요</h1>
     <h2 class="setup-sub">메모를 어디에 보관할까요?</h2>
-    <p>메모 하나가 이 폴더에 <b>파일 하나</b>로 보관돼요.<br>
-      Google Drive 폴더를 고르면 다른 PC에서도 같은 메모를 볼 수 있어요.</p>
+    <p>메모는 폴더에 <b>파일</b>로 저장돼요.<br>
+      Google Drive 폴더를 고르면 다른 PC·휴대폰과 함께 써요.</p>
     <div class="path-box" id="suggested-path"></div>
     <div class="setup-actions">
-      <button id="use-suggested" class="btn primary">이 폴더에 보관하기</button>
-      <button id="choose-folder" class="btn">다른 폴더 고르기</button>
+      <button id="use-suggested" class="btn primary">이 폴더에 저장</button>
+      <button id="choose-folder" class="btn">다른 폴더 선택</button>
     </div>
+    <p class="setup-or">Google Drive 데스크탑 앱이 없어도 돼요</p>
+    <button id="setup-drive" class="btn drive-start"><svg><use href="#i-cloud"/></svg>Google 계정으로 동기화</button>
     <p id="setup-error" class="setup-error" hidden></p>
   </section>
 
   <section id="main" class="main" hidden>
     <div class="toolbar">
-      <button id="new-btn" class="icon-btn primary" title="새 메모 (Ctrl+N)" aria-label="새 메모"><svg><use href="#i-plus"/></svg></button>
       <label class="search">
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
       </label>
       <button id="filter-btn" class="icon-btn filter-btn" title="필터 (색·담긴 것)" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
+      <button id="layout-btn" class="icon-btn layout-btn" title="한 줄씩 보기" aria-label="한 줄씩 보기"><svg><use href="#i-rows"/></svg></button>
       <button id="settings-btn" class="icon-btn" title="설정" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
     </div>
 
@@ -59,15 +61,16 @@
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">모두 지우기</button>
       </div>
-      <ul id="cards" class="cards" aria-label="메모 목록"></ul>
-      <p id="empty" class="empty" hidden></p>
+      <p id="count" class="result-count" role="status" hidden></p>
+      <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
+      <div id="empty" class="empty" hidden></div>
     </div>
 
     <!-- 알림 예약: 모든 메모의 알림을 한 번에 -->
     <div class="view" id="view-reminders" role="tabpanel" hidden>
       <div id="reminder-groups" class="rows"></div>
       <p id="reminders-empty" class="empty" hidden>예약한 알림이 없어요.
-        메모 창 위쪽 종 모양 버튼(Ctrl+Shift+A)으로 추가할 수 있어요.</p>
+        메모 창 위쪽의 종 버튼(Ctrl+Shift+A)으로 추가하세요.</p>
     </div>
 
     <!-- 알림 보관함: 알림 센터에서 사라진 Windows 알림 기록 -->
@@ -75,13 +78,13 @@
       <div id="history-consent" class="consent" hidden>
         <svg class="consent-icon"><use href="#i-inbox"/></svg>
         <h3>알림 보관함</h3>
-        <p>알림 센터에서 사라진 알림도 여기에 모아둘게요.</p>
+        <p>알림 센터에서 사라진 알림도 여기서 다시 볼 수 있어요.</p>
         <ul>
-          <li>다른 앱(메신저·메일 등) 알림의 <b>제목과 내용</b>을 읽어서 보관해요.</li>
-          <li>보관한 알림은 <b>이 PC에만</b> 남고, 메모 폴더에는 올라가지 않아요.</li>
-          <li>언제든 끌 수 있고, 하나씩 또는 한 번에 지울 수 있어요.</li>
+          <li>메신저·메일 등 다른 앱 알림의 <b>제목과 내용</b>을 보관해요.</li>
+          <li>보관한 알림은 <b>이 PC에만</b> 저장돼요.</li>
+          <li>언제든 끄거나 삭제할 수 있어요.</li>
         </ul>
-        <button id="history-enable" class="btn strong">보관 시작하기</button>
+        <button id="history-enable" class="btn primary">보관 시작하기</button>
       </div>
       <div id="history-body" hidden>
         <div class="history-bar">
@@ -94,9 +97,15 @@
       </div>
     </div>
     <div id="drag-hint" class="drag-hint" role="status" aria-live="polite"></div>
-    <footer class="status">
-      <span id="count"></span>
-    </footer>
+
+    <!-- 새 메모: + 를 누르면 위로 위성 버튼 두 개 (음성 메모 · 글 메모) — 휴대폰과 같음 -->
+    <div id="fab-scrim" class="fab-scrim" hidden></div>
+    <div id="fab-menu" class="fab-menu" role="menu" aria-label="새 메모 종류" hidden>
+      <button class="fab-sat" data-new="voice" role="menuitem"><span class="fab-sat-label">음성 메모</span><span class="fab-sat-btn"><svg><use href="#i-mic"/></svg></span></button>
+      <button class="fab-sat" data-new="ink" role="menuitem"><span class="fab-sat-label">손 메모</span><span class="fab-sat-btn"><svg><use href="#i-ink"/></svg></span></button>
+      <button class="fab-sat" data-new="text" role="menuitem"><span class="fab-sat-label">글 메모 <kbd>Ctrl+N</kbd></span><span class="fab-sat-btn"><svg><use href="#i-pen"/></svg></span></button>
+    </div>
+    <button id="fab" class="fab" title="새 메모" aria-label="새 메모" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
   </section>
 
   <dialog id="settings-dialog" class="dialog">
@@ -105,59 +114,143 @@
     <div class="path-box" id="vault-path"></div>
     <div class="dialog-actions left">
       <button id="reveal-vault" class="btn">폴더 열기</button>
-      <button id="change-vault" class="btn">폴더 바꾸기</button>
+      <button id="change-vault" class="btn">폴더 변경</button>
+    </div>
+    <p class="label">Google Drive 동기화 <small>구글 로그인만 하면 돼요</small></p>
+    <div class="drive-box" id="drive-box">
+      <svg class="drive-box-icon"><use href="#i-cloud"/></svg>
+      <div class="drive-box-text"><b id="drive-title"></b><small id="drive-sub"></small></div>
+    </div>
+    <div class="dialog-actions left">
+      <button id="drive-connect" class="btn">연결하기</button>
+      <button id="drive-sync-now" class="btn">지금 동기화</button>
+      <button id="drive-disconnect" class="btn">연결 끊기</button>
     </div>
     <p class="label">편의 기능</p>
     <label class="setting-row">
       <input type="checkbox" id="auto-start" class="switch">
-      <span>PC를 켜면 메모킹도 함께 켜기 <small id="auto-start-note"></small></span>
+      <span>PC를 켜면 메모킹 자동 실행 <small id="auto-start-note"></small></span>
     </label>
     <label class="setting-row">
       <input type="checkbox" id="quick-memo" class="switch">
-      <span>빠른 메모 <kbd>Ctrl+Alt+C</kbd> <small id="quick-memo-note">어디서든 고른 내용을 바로 메모로 만들어요. 두 번 누르면 화면 영역 캡처</small></span>
+      <span>빠른 메모 <kbd>Ctrl+Alt+C</kbd> <small id="quick-memo-note">고른 내용을 바로 메모로 · 두 번 누르면 화면 캡처</small></span>
     </label>
     <label class="setting-row">
       <input type="checkbox" id="history-enabled" class="switch">
-      <span>Windows 알림 모아두기 <small>카카오톡 알림 창도 함께 모아요 · 알림 보관함 탭에서 볼 수 있어요</small></span>
+      <span>Windows 알림 모아두기 <small>카카오톡 알림도 함께 · 알림 보관함 탭에서 보기</small></span>
+    </label>
+    <div class="dialog-actions left sub-actions">
+      <button id="history-apps-btn" class="btn">모을 앱 선택 <span id="blocked-count" class="trash-count"></span></button>
+    </div>
+    <p class="label">음성 녹음 · 받아쓰기 <small>인터넷 없이 이 PC 안에서</small></p>
+    <label class="setting-row">
+      <input type="checkbox" id="stt-enabled" class="switch">
+      <span>녹음하며 받아쓰기 <small id="stt-note"></small></span>
+    </label>
+    <div class="dialog-actions left sub-actions stt-actions">
+      <button id="stt-download" class="btn">받아쓰기 데이터 받기</button>
+      <button id="stt-remove" class="link-btn danger" hidden>지우기</button>
+    </div>
+    <label class="setting-row sub-row">
+      <input type="checkbox" id="stt-speaker" class="switch">
+      <span>말한 사람 나누기 <small id="stt-speaker-note">녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요</small></span>
     </label>
     <label class="setting-row">
       <input type="checkbox" id="fit-tables" class="switch">
-      <span>표가 넘치면 메모를 줄여 맞추기 <small>표가 메모 폭보다 넓으면 글자를 줄여 표가 잘리지 않게 해요. 더 못 줄이면 메모 창을 넓혀요</small></span>
+      <span>넓은 표 맞춤 <small>표가 잘리지 않게 글자를 줄이고, 그래도 넓으면 창을 넓혀요</small></span>
+    </label>
+    <label class="setting-row">
+      <input type="checkbox" id="auto-tags" class="switch" checked>
+      <span>태그 자동 추가 <small>태그 없는 메모를 닫을 때 확실한 태그만 달아요</small></span>
     </label>
     <label class="setting-row">
       <input type="checkbox" id="magic-enabled" class="switch">
-      <span>매직키 <kbd>Ctrl+Alt+Space</kbd> <small>어디서든 작은 입력창을 띄워 바로 메모로 만들어요 (맥OS Spotlight 처럼)</small></span>
+      <span>매직키 <kbd>Ctrl+Alt+Space</kbd> <small>어디서든 입력창을 띄워 바로 메모 · 검색 (Spotlight 처럼)</small></span>
     </label>
     <div id="magic-modules-row" class="setting-sub" hidden>
       <p class="label sub">매직키 기능</p>
       <div id="magic-modules-list" class="magic-settings-modules"></div>
     </div>
-    <p class="label">지운 메모</p>
+    <p class="label">휴지통</p>
     <div class="dialog-actions left">
       <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
     </div>
     <label class="setting-row select-row">
-      <span>오래된 메모 자동 영구 삭제 <small>휴지통에 이 기간보다 오래 있던 메모를 지워요</small></span>
-      <select id="trash-days" aria-label="자동 영구 삭제 기간">
-        <option value="7">7일 뒤</option>
-        <option value="30">30일 뒤</option>
-        <option value="90">90일 뒤</option>
-        <option value="365">1년 뒤</option>
-        <option value="0">하지 않음</option>
+      <span>휴지통 자동 비우기 <small>기간이 지난 메모를 영구 삭제해요</small></span>
+      <select id="trash-days" aria-label="휴지통 자동 비우기 기간">
+        <option value="7">7일 후</option>
+        <option value="30">30일 후</option>
+        <option value="90">90일 후</option>
+        <option value="365">1년 후</option>
+        <option value="0">안 함</option>
       </select>
     </label>
     <p class="label">도움말</p>
     <div class="dialog-actions left">
-      <button id="tutorial-btn" class="btn">사용법 둘러보기</button>
+      <button id="tutorial-btn" class="btn">사용법 보기</button>
     </div>
     <p class="version" id="version"></p>
-    <p class="copyright">© 2026 메모킹 · 만든 사람 lmg6983@gmail.com</p>
+    <p class="copyright">© 2026 메모킹 · 문의 lmg6983@gmail.com</p>
     <form method="dialog" class="dialog-actions">
       <button class="btn primary">닫기</button>
     </form>
   </dialog>
 
   <!-- 휴지통: 지운 메모 되살리기·영구 삭제 -->
+  <!-- Google Drive 연결: ① OAuth 클라이언트 ② 로그인 ③ 폴더 고르기 -->
+  <dialog id="drive-dialog" class="dialog drive-dialog">
+    <h2>Google Drive 연결</h2>
+    <div class="drive-step" data-step="client" hidden>
+      <p class="hint">처음 한 번, 안내서(메모킹 폴더의 DRIVE-SETUP)를 따라 발급한 <b>연결 정보</b>를 넣어 주세요.</p>
+      <label class="field"><span>연결 ID</span><input id="client-id" type="text" autocomplete="off" spellcheck="false" placeholder="….apps.googleusercontent.com"></label>
+      <label class="field"><span>연결 비밀번호</span><input id="client-secret" type="text" autocomplete="off" spellcheck="false" placeholder="GOCSPX-…"></label>
+      <div class="dialog-actions">
+        <button class="btn" data-close>취소</button>
+        <button id="client-save" class="btn primary">로그인</button>
+      </div>
+    </div>
+    <div class="drive-step" data-step="login" hidden>
+      <p class="hint">브라우저에서 <b>휴대폰과 같은 구글 계정</b>으로 로그인하고 <b>허용</b>을 누르세요.</p>
+      <div class="wait"><span class="spinner"></span><span>브라우저에서 로그인해 주세요…</span></div>
+      <div class="dialog-actions">
+        <button id="client-edit" class="link-btn">연결 정보 바꾸기</button>
+        <span class="grow"></span>
+        <button id="login-cancel" class="btn">취소</button>
+      </div>
+    </div>
+    <div class="drive-step" data-step="folder" hidden>
+      <p class="hint">메모킹은 <b>메모킹이 만든 폴더만</b> 봐요. 처음이면 <b>새 폴더</b>(보통 <b>메모킹 동기화</b>)를 만들고, 휴대폰에서도 같은 폴더를 고르면 메모가 함께 보여요.</p>
+      <p class="drive-account" id="drive-account"></p>
+      <nav class="crumbs" id="crumbs" aria-label="폴더 위치"></nav>
+      <ul class="folder-list" id="folder-list"></ul>
+      <div class="new-folder" id="new-folder-row" hidden>
+        <input id="new-folder-name" type="text" autocomplete="off" spellcheck="false" placeholder="새 폴더 이름">
+        <button id="new-folder-ok" class="btn">만들기</button>
+      </div>
+      <p class="hint small" id="folder-local"></p>
+      <div class="dialog-actions">
+        <button id="folder-new" class="btn">새 폴더</button>
+        <span class="grow"></span>
+        <button class="btn" data-close>취소</button>
+        <button id="folder-use" class="btn primary"></button>
+      </div>
+    </div>
+    <div class="drive-step" data-step="syncing" hidden>
+      <div class="wait big"><span class="spinner"></span><span>메모를 동기화하는 중…<br><small>메모가 많으면 시간이 조금 걸려요</small></span></div>
+    </div>
+  </dialog>
+
+  <!-- 알림 보관함: 앱마다 모을지 고르기 -->
+  <dialog id="apps-dialog" class="dialog apps-dialog">
+    <h2>알림 모을 앱</h2>
+    <p class="trash-note">끈 앱의 알림은 보관하지 않아요. 언제든 다시 켤 수 있어요.</p>
+    <ul id="apps-list" class="apps-list" aria-label="알림을 보낸 앱"></ul>
+    <p id="apps-empty" class="empty" hidden>아직 알림이 온 앱이 없어요.</p>
+    <form method="dialog" class="dialog-actions">
+      <button class="btn primary">닫기</button>
+    </form>
+  </dialog>
+
   <dialog id="trash-dialog" class="dialog trash-dialog">
     <h2>휴지통</h2>
     <p class="trash-note" id="trash-note"></p>
@@ -175,7 +268,7 @@
       <p id="confirm-message"></p>
       <div class="dialog-actions">
         <button value="cancel" class="btn">취소</button>
-        <button value="ok" class="btn danger" id="confirm-ok">지우기</button>
+        <button value="ok" class="btn danger" id="confirm-ok">삭제</button>
       </div>
     </form>
   </dialog>

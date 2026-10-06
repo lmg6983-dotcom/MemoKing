@@ -30,6 +30,7 @@ export class NotificationHistory extends EventEmitter {
     this.interval = interval;
     this.state = { lastArrival: '0', entries: [] };
     this.appNames = new Map();
+    this.blocked = new Set(); // 모으지 않을 앱 id (사용자가 고름)
     this.timer = null;
     this.saveTimer = null;
     this.load();
@@ -71,6 +72,7 @@ export class NotificationHistory extends EventEmitter {
       memoId: entry.memoId ?? null,
       ...(entry.via ? { via: entry.via } : {}), // 팝업 알림을 읽은 방법: uia·msaa·win32(글자 그대로) / ocr(그림 글자 인식)
     };
+    if (this.blocked.has(item.appId) && item.source !== 'memoking') return null;
     if (this.state.entries.some((e) => e.id === item.id)) return null;
     this.state.entries.unshift(item);
     this.state.entries.sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
@@ -82,6 +84,40 @@ export class NotificationHistory extends EventEmitter {
 
   list({ query = '', app = '' } = {}) {
     return this.state.entries.filter((e) => (!app || e.app === app) && matchesQuery(e, query));
+  }
+
+  /** 모으지 않을 앱 id 들 */
+  setBlocked(ids) {
+    this.blocked = new Set(ids);
+  }
+
+  /** 이 앱의 알림을 모두 지운다 (메모킹 자신의 알림은 남김). 지운 개수 */
+  removeApp(appId) {
+    const keep = [];
+    let removed = 0;
+    for (const e of this.state.entries) {
+      if (e.appId === appId && e.source !== 'memoking') {
+        this.removeImage(e);
+        removed++;
+      } else keep.push(e);
+    }
+    if (!removed) return 0;
+    this.state.entries = keep;
+    this.save();
+    this.emit('changed');
+    return removed;
+  }
+
+  /** 앱 id 별 이름·개수 (모을 앱 고르기용, 많은 순) */
+  appList() {
+    const apps = new Map();
+    for (const e of this.state.entries) {
+      if (e.source === 'memoking') continue;
+      const a = apps.get(e.appId) ?? { appId: e.appId, app: e.app, count: 0 };
+      a.count++;
+      apps.set(e.appId, a);
+    }
+    return [...apps.values()].sort((a, b) => b.count - a.count);
   }
 
   // 앱별 개수 (거르기 단추용, 많은 순)

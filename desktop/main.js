@@ -1,7 +1,7 @@
 // Electron 메인 프로세스 — 목록 창·스티커 창 관리, 설정, 메모 폴더(볼트) 연결.
 import {
   app, BrowserWindow, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, net, Notification,
-  powerMonitor, protocol, screen, session, shell, Tray,
+  powerMonitor, protocol, safeStorage, screen, session, shell, Tray,
 } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,12 +11,20 @@ import { Vault } from './vault.js';
 import { isInside, dropBounds, tweenBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 import { createAlarmRunner } from './alarms.js';
 import { NotificationHistory } from './notification-history.js';
+import { GoogleAuth } from './drive/google-auth.js';
+import { DriveApi } from './drive/drive-api.js';
+import { DriveSync, insideDriveForDesktop, copyVault } from './drive/drive-sync.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
 import { LinkPreviews } from './link-previews.js';
 import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
+import { autoTagsFor } from '../app/js/core/auto-tags.js';
+import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
+import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
+import { createSttService } from './stt/stt-service.js';
+import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
 import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
@@ -24,12 +32,19 @@ import { searchMemos } from '../app/js/core/memo-search.js';
 import { FileIndex } from './file-index.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
-import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
+import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
 import { normalizeReminder, describeReminder } from '../app/js/core/reminders.js';
 
 const SMOKE = process.argv.includes('--smoke');
+// 점검 때는 가짜 마이크(삐 소리)로 녹음한다 — 실제 마이크·권한 창 없이
+if (SMOKE) {
+  app.commandLine.appendSwitch('use-fake-device-for-media-stream');
+  app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
+  // 받아쓰기 점검: 가짜 마이크가 삐 소리 대신 이 소리 파일(16kHz wav)을 들려준다
+  if (process.env.MEMOKING_FAKE_AUDIO) app.commandLine.appendSwitch('use-file-for-fake-audio-capture', process.env.MEMOKING_FAKE_AUDIO);
+}
 // Windows 로그인 때 자동 실행된 경우: 창 없이 알림 영역에서 조용히 시작
 const HIDDEN_START = process.argv.includes('--hidden');
 const LOGIN_ARGS = ['--hidden'];
@@ -44,6 +59,10 @@ const ASSETS_DIR = path.join(import.meta.dirname, '..', 'assets');
 const APP_ICON = path.join(ASSETS_DIR, 'icons', 'memoking.ico');
 const APP_ICON_PNG = path.join(ASSETS_DIR, 'icons', 'icon-256.png');
 // PowerShell 이 읽어야 하므로 설치판에서는 asar 밖(app.asar.unpacked)에 둔다
+// 받아쓰기 작업 스레드와 엔진(WebAssembly)은 asar 밖에 둔다 (작업 스레드가 파일로 읽는다)
+const unpacked = (p) => p.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+const STT_WORKER = unpacked(path.join(import.meta.dirname, 'stt', 'stt-worker.js'));
+const STT_VENDOR = unpacked(path.join(import.meta.dirname, 'vendor'));
 const POPUP_HELPER = path.join(import.meta.dirname, '..', 'scripts', 'popup-watch.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 const CLIPBOARD_HELPER = path.join(import.meta.dirname, '..', 'scripts', 'clipboard-helper.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 const QUICK_MEMO_KEY = 'Control+Alt+C';
@@ -80,7 +99,10 @@ let settings = {
   tutorialDone: false, // 처음 실행 튜토리얼을 마쳤거나 건너뛰었는지
   trashDays: 30, // 휴지통에 이 날짜보다 오래 있던 메모를 저절로 영구 삭제 (0 = 하지 않음)
   listOnTop: false, // 목록 창도 다른 창보다 늘 위에
+  historyBlocked: {}, // 알림 보관함에 모으지 않을 앱 { 앱 id: 앱 이름 }
+  drive: null, // Google Drive 직접 동기화: { folderId, folderName } (메모 폴더를 이 Drive 폴더와 맞춘다)
   fitTables: true, // 표가 메모 본문보다 넓으면 메모를 줄여 맞추고, 더 못 줄이면 창을 넓힌다
+  autoTags: true, // 태그 없는 메모를 닫을 때 확실한 추천 태그를 저절로 (휴대폰과 같음)
   magic: undefined, // 매직키 (Ctrl+Alt+Space): { enabled, modules } — normalizeMagicSettings 로 정리
   magicPos: null, // 매직키 창을 끌어 옮긴 자리 { x, y }
 };
@@ -145,6 +167,7 @@ function openVault(dir) {
     const next = new Vault(dir);
     next.on('changed', ({ external, removed }) => {
       pushList();
+      driveSync?.request(3000); // 고친 것을 잠시 뒤 Google Drive 로
       for (const id of external) sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) sendToNote(id, 'memo:removed');
     });
@@ -158,10 +181,10 @@ function openVault(dir) {
     migrateV1();
     loadStacks();
     purgeTrash();
+    configureDrive();
   } catch (err) {
     console.error('메모 폴더 열기 실패', err);
     vaultError = '메모 폴더를 열지 못했어요. 폴더가 있는지, Google Drive가 연결돼 있는지 확인해 주세요.';
-    console.error(err);
   }
   listWin?.webContents.send('vault:opened', vaultInfo());
   pushList();
@@ -255,12 +278,19 @@ function titleBarOverlay() {
   return { color: titleBarDim ? TITLEBAR_DIM[dark ? 'dark' : 'light'][titleBarDim] : base, symbolColor: dark ? '#f5f4ef' : '#111111', height: 44 };
 }
 
+// 창을 앞으로: 내려 둔 창은 되살리고, 보이게 한 뒤 (inactive 가 아니면) 포커스까지
+function bringToFront(win, { inactive = false, raise = false } = {}) {
+  if (win.isMinimized()) win.restore();
+  if (inactive) win.showInactive();
+  else win.show();
+  if (raise) win.moveTop();
+  if (!inactive) win.focus();
+}
+
 // tab: 'memos' | 'reminders' | 'history' — 트레이 메뉴 등에서 바로 그 탭으로 연다
 function createListWindow(tab) {
   if (listWin) {
-    if (listWin.isMinimized()) listWin.restore();
-    listWin.show();
-    listWin.focus();
+    bringToFront(listWin);
     if (tab) listWin.webContents.send('list:tab', tab);
     return listWin;
   }
@@ -301,8 +331,9 @@ function createListWindow(tab) {
   return listWin;
 }
 
-function defaultNoteBounds() {
-  const { width, height } = DEFAULT_NOTE_SIZE;
+// size: 손 메모로 만드는 새 메모는 그리기 좋게 넓게
+function defaultNoteBounds(size = DEFAULT_NOTE_SIZE) {
+  const { width, height } = size;
   const n = noteWins.size;
   const anchor = listWin?.getBounds() ?? screen.getPrimaryDisplay().workArea;
   const area = screen.getDisplayMatching(anchor).workArea;
@@ -315,29 +346,24 @@ function defaultNoteBounds() {
 
 // inactive: 하던 작업의 키보드 포커스를 뺏지 않고 연다 (빠른 메모)
 // 스택에 든 메모면 그 스택 창에서 이 메모의 탭을 보여 준다.
-function openNote(id, { inactive = false } = {}) {
+function openNote(id, { inactive = false, record = false, ink = false, big = false } = {}) {
   if (stacks?.stackOf(id)) return showTab(id, { inactive });
   const existing = noteWins.get(id);
   if (existing) {
-    if (existing.isMinimized()) existing.restore();
-    if (inactive) existing.showInactive();
-    else {
-      existing.show();
-      existing.focus();
-    }
+    bringToFront(existing, { inactive });
     return existing;
   }
-  return createNoteWindow(id, { inactive });
+  return createNoteWindow(id, { inactive, record, ink, big });
 }
 
 // show: false 면 숨긴 채로 만들어 둔다 (스택의 다른 탭 — 누르면 바로 보이도록)
-function createNoteWindow(id, { inactive = false, show = true, bounds = null } = {}) {
+function createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false, ink = false, big = false } = {}) {
   const memo = vault?.get(id);
   if (!memo) return null;
 
   const saved = settings.noteBounds[id];
   const win = new BrowserWindow({
-    ...(bounds ?? (onScreen(saved) ? saved : defaultNoteBounds())),
+    ...(bounds ?? (onScreen(saved) ? saved : defaultNoteBounds(ink || big ? { width: 560, height: 640 } : DEFAULT_NOTE_SIZE))),
     minWidth: 240,
     minHeight: 200,
     frame: false,
@@ -406,7 +432,7 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null } =
       saveSettings();
     }
   });
-  win.loadFile(path.join(APP_DIR, 'note.html'), { query: { id } });
+  win.loadFile(path.join(APP_DIR, 'note.html'), { query: { id, ...(record ? { record: '1' } : {}), ...(ink ? { ink: '1' } : {}) } });
   return win;
 }
 
@@ -605,10 +631,13 @@ function removeFromStack(id, mode = 'close') {
 }
 
 // 커서 아래에 있는, 합칠 수 있는 다른 메모 창 (자기 스택 제외)
+// 손 메모·주석을 그리는 창 (v0.22.0): 그 창을 끌어도 탭으로 합치지 않고, 다른 메모가 그 창으로 합쳐 들어오지도 않는다
+const inkingWins = new WeakSet();
+
 function stackTargetAt(point, excludeId) {
   const own = stacks?.stackOf(excludeId)?.memos ?? [excludeId];
   for (const [mid, w] of noteWins) {
-    if (own.includes(mid) || w.isDestroyed() || !w.isVisible() || w.isMinimized()) continue;
+    if (own.includes(mid) || w.isDestroyed() || !w.isVisible() || w.isMinimized() || inkingWins.has(w)) continue;
     if (isInside(point, w.getBounds())) return mid;
   }
   return null;
@@ -645,6 +674,8 @@ function clearStackTarget(state) {
 let windowDrag = null; // { id, target, armed, timer }
 
 function trackWindowDrag(id, point = screen.getCursorScreenPoint()) {
+  const w = noteWins.get(id);
+  if (w && inkingWins.has(w)) return; // 그리는 중: 창은 옮겨지지만 합치기는 없음
   if (windowDrag?.id !== id) {
     clearStackTarget(windowDrag);
     windowDrag = { id, target: null, armed: false, timer: null };
@@ -722,10 +753,51 @@ function tearEnd(point) {
 function setTopmost(win, on) {
   if (!win || win.isDestroyed()) return;
   win.setAlwaysOnTop(on, 'floating');
-  if (on && !win.isAlwaysOnTop()) {
-    win.setAlwaysOnTop(false);
-    win.setAlwaysOnTop(true, 'floating');
-  }
+  if (on) reassertTop(win);
+  refreshTopWatch();
+}
+
+// 늘 위를 Windows 에 다시 건다. Electron 은 켜 둔 줄 알면 같은 값을 건너뛰므로, 껐다 켜서 HWND_TOPMOST 를 실제로 건다
+// (늘 위 창들 중 맨 위로 — 포커스는 그대로)
+function reassertTop(win) {
+  if (!win || win.isDestroyed() || !win.isVisible() || win.isMinimized()) return;
+  win.setAlwaysOnTop(false);
+  win.setAlwaysOnTop(true, 'floating');
+}
+
+// ---------- 늘 위 지키기 (Windows, foreground-watch.js) ----------
+// Windows 가 늘 위를 몰래 풀었거나, 다른 프로그램의 늘 위 창(브라우저 동영상 작은 창 등)이 앞으로 와 위에 올라간 경우
+const onTopWins = () => [
+  ...(settings.listOnTop && listWin && !listWin.isDestroyed() ? [listWin] : []),
+  ...[...noteWins].filter(([id, w]) => settings.onTop[id] === true && !w.isDestroyed()).map(([, w]) => w),
+];
+// 메모킹이 잠깐 띄우는 맨 위 화면(영역 캡처·매직키·끄는 미리보기) 동안에는 건드리지 않는다
+const ownOverlayOpen = () => Boolean(areaCapture) || [ghostWin, magicWin].some((w) => w && !w.isDestroyed() && w.isVisible());
+let raiseTimer = 0;
+const topWatch = new ForegroundWatch({
+  onEvent: (e) => {
+    if (ownOverlayOpen()) return;
+    if (e.type === 'lost') {
+      const win = onTopWins().find((w) => hwndOf(w) === e.hwnd);
+      if (win) reassertTop(win);
+      return;
+    }
+    // 다른 프로그램의 늘 위 창이 앞으로 옴 → 메모킹의 늘 위 창을 그 위로 (캡처 도구·시작 메뉴 등은 빼고)
+    if (!e.topmost || LEAVE_ON_TOP.has(e.name)) return;
+    if (BrowserWindow.getAllWindows().some((w) => hwndOf(w) === e.hwnd)) return;
+    clearTimeout(raiseTimer);
+    raiseTimer = setTimeout(() => {
+      if (!ownOverlayOpen()) for (const w of onTopWins()) reassertTop(w);
+    }, 120);
+  },
+});
+let topWatchTimer = 0;
+function refreshTopWatch() {
+  clearTimeout(topWatchTimer);
+  topWatchTimer = setTimeout(() => {
+    if (quitting) return topWatch.stop();
+    topWatch.update(onTopWins().map(hwndOf));
+  }, 300);
 }
 
 const STICKER = { width: 64, height: 52 };
@@ -747,7 +819,7 @@ function closeStickerWin(entry, { peel = false } = {}) {
     if (win.isDestroyed()) return;
     win.destroy();
     // 아직 붙여 둔 상태면 늘 위를 다시 확인
-    if (!owner.isDestroyed() && stickers.get(owner.id)) setTopmost(owner, true);
+    if (!owner.isDestroyed() && stickers.get(owner.id)) reassertTop(owner);
   };
   if (peel && win.isVisible()) {
     win.webContents.send('sticker:peel');
@@ -807,8 +879,11 @@ function setSticker(owner, on, { animate = true } = {}) {
   };
   const visible = () => {
     if (owner.isDestroyed()) return;
-    if (owner.isVisible() && !owner.isMinimized()) openStickerWin(entry, false);
-    else closeStickerWin(entry);
+    if (owner.isVisible() && !owner.isMinimized()) {
+      openStickerWin(entry, false);
+      reassertTop(owner); // 숨었다 보이거나 최소화에서 돌아오면 Windows 가 늘 위를 잊는 일이 있다
+    } else closeStickerWin(entry);
+    refreshTopWatch();
   };
   const events = { move: sync, resize: sync, show: visible, hide: visible, minimize: visible, restore: visible };
   for (const [name, fn] of Object.entries(events)) owner.on(name, fn);
@@ -820,6 +895,7 @@ function setSticker(owner, on, { animate = true } = {}) {
     entry.off();
     closeStickerWin(entry);
     if (stickers.get(owner.id) === entry) stickers.delete(owner.id);
+    refreshTopWatch();
   });
   openStickerWin(entry, animate);
 }
@@ -1094,10 +1170,13 @@ function animateBounds(win, to, duration = 180) {
 
 function createNote(options) {
   if (!vault) return null;
-  const id = vault.create(options);
-  openNote(id);
-  // 튜토리얼 "첫 메모 만들기" 단계
-  if (tutorial.active && TUTORIAL_STEPS[tutorial.index]?.advance === 'memo-created') {
+  // record: 열리자마자 녹음을 시작하는 음성 메모 (목록 + › 음성 메모)
+  const { record = false, ink = false, ...rest } = options ?? {};
+  const id = vault.create(rest);
+  // 튜토리얼 "첫 메모 만들기" 단계: 말풍선과 함께 해 볼 수 있게 넓은 창으로
+  const forTutorial = tutorial.active && TUTORIAL_STEPS[tutorial.index]?.advance === 'memo-created';
+  openNote(id, { record: Boolean(record), ink: Boolean(ink), big: forTutorial });
+  if (forTutorial) {
     tutorial.memoId = id;
     tutorialEvent('memo-created');
   }
@@ -1107,11 +1186,11 @@ function createNote(options) {
 // ---------- 처음 실행 튜토리얼 ----------
 // 단계는 core/tutorial.js. 말풍선은 단계의 창(목록 창 또는 튜토리얼 중 만든 메모 창)에만 띄운다.
 
-let tutorial = { active: false, index: -1, memoId: null };
+let tutorial = { active: false, index: -1, memoId: null, praise: false };
 
 function tutorialPayload() {
   const step = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
-  return step ? { ...step, index: tutorial.index, total: TUTORIAL_STEPS.length } : null;
+  return step ? { ...step, index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise } : null;
 }
 
 function tutorialWin(step) {
@@ -1129,16 +1208,14 @@ function sendTutorial() {
 
 function startTutorial() {
   if (!vault) return false;
-  tutorial = { active: true, index: 0, memoId: null };
-  const w = createListWindow('memos');
-  w.show();
-  w.focus();
+  tutorial = { active: true, index: 0, memoId: null, praise: false };
+  createListWindow('memos');
   sendTutorial(); // 목록 창이 아직 불러오는 중이면 창이 tutorial:current 로 받아 간다
   return true;
 }
 
 function finishTutorial() {
-  tutorial = { active: false, index: -1, memoId: null };
+  tutorial = { active: false, index: -1, memoId: null, praise: false };
   settings.tutorialDone = true;
   settings.tutorialInstall = installMark();
   saveSettings();
@@ -1150,16 +1227,13 @@ function tutorialEvent(event) {
   const next = advanceTutorial(tutorial.index, event);
   if (next === tutorial.index) return;
   if (next < 0) return finishTutorial();
+  tutorial.praise = event !== 'next' && event === TUTORIAL_STEPS[tutorial.index]?.advance; // 직접 해 냈으면 다음 말풍선에서 칭찬
   tutorial.index = next;
   const step = TUTORIAL_STEPS[next];
   // 메모 단계인데 메모 창이 없으면(먼저 닫음) 목록 단계로
   if (step.win === 'note' && !noteWins.get(tutorial.memoId)) return tutorialEvent('note-closed');
   const w = step.win === 'list' ? createListWindow('memos') : noteWins.get(tutorial.memoId);
-  if (w && !w.isDestroyed()) {
-    if (w.isMinimized()) w.restore();
-    w.show();
-    w.focus();
-  }
+  if (w && !w.isDestroyed()) bringToFront(w);
   sendTutorial();
 }
 
@@ -1194,9 +1268,9 @@ async function openVaultFile(file, win) {
       : (await dialog.showMessageBox(win ?? undefined, {
         type: 'warning',
         title: '메모킹',
-        message: `"${name}" 은(는) 프로그램 파일이에요. 실행할까요?`,
-        detail: '메모 폴더는 다른 PC와 함께 쓰는 곳이에요. 직접 넣은 파일이 맞는지 확인해 주세요.',
-        buttons: ['실행하기', '취소'],
+        message: `"${name}"은(는) 프로그램 파일이에요. 실행할까요?`,
+        detail: '다른 기기와 함께 쓰는 폴더예요. 직접 넣은 파일이 맞는지 확인해 주세요.',
+        buttons: ['실행', '취소'],
         defaultId: 1,
         cancelId: 1,
         noLink: true,
@@ -1248,10 +1322,7 @@ function revealNote(id) {
   const win = (stacks?.stackOf(id) ? openNote(id) : noteWins.get(id)) ?? openNote(id);
   if (!win) return null;
   const bring = () => {
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.moveTop();
-    win.focus();
+    bringToFront(win, { raise: true });
     win.webContents.send('memo:highlight');
   };
   if (win.webContents.isLoading()) win.once('ready-to-show', bring);
@@ -1325,6 +1396,7 @@ function initHistory() {
   });
   history.on('changed', () => listWin?.webContents.send('history:changed'));
   history.on('error', (err) => console.warn('[알림 보관함]', err.message));
+  history.setBlocked(Object.keys(settings.historyBlocked ?? {}));
   if (settings.historyEnabled) history.start();
   syncPopupWatch();
 }
@@ -1452,6 +1524,32 @@ function setHistoryEnabled(on) {
   return settings.historyEnabled;
 }
 
+// 앱마다 모으지 않기: { 앱 id: 앱 이름 }
+function blockHistoryApp(appId, appName, removeExisting) {
+  if (!appId || !history) return 0;
+  settings.historyBlocked = { ...(settings.historyBlocked ?? {}), [appId]: appName || appId };
+  saveSettings();
+  history.setBlocked(Object.keys(settings.historyBlocked));
+  return removeExisting ? history.removeApp(appId) : 0;
+}
+
+function unblockHistoryApp(appId) {
+  const next = { ...(settings.historyBlocked ?? {}) };
+  delete next[appId];
+  settings.historyBlocked = next;
+  saveSettings();
+  history?.setBlocked(Object.keys(next));
+  history?.emit('changed');
+}
+
+// 모을 앱 고르기: 알림이 온 앱 + 끈 앱
+function historyApps() {
+  const blocked = settings.historyBlocked ?? {};
+  const apps = new Map((history?.appList() ?? []).map((a) => [a.appId, { ...a, blocked: Boolean(blocked[a.appId]) }]));
+  for (const [appId, app] of Object.entries(blocked)) if (!apps.has(appId)) apps.set(appId, { appId, app, count: 0, blocked: true });
+  return [...apps.values()];
+}
+
 // 보관한 알림을 메모로 만든다
 function historyToMemo(entryId) {
   const e = history?.get(entryId);
@@ -1461,6 +1559,90 @@ function historyToMemo(entryId) {
   const id = vault.import({ body });
   openNote(id);
   return id;
+}
+
+// ---------- Google Drive 직접 동기화 (Google Drive 데스크탑 앱 없이) ----------
+// 메모 폴더(이 PC)를 고른 Drive 폴더와 맞춘다. 휴대폰 메모킹과 같은 규칙(desktop/drive/sync-engine.js).
+
+let driveAuth = null;
+let driveApi = null;
+let driveSync = null;
+
+function initDrive() {
+  driveAuth = new GoogleAuth({
+    file: path.join(app.getPath('userData'), 'google-auth.json'),
+    bundledClient: path.join(import.meta.dirname, 'google-client.json'),
+    fetch: (...args) => net.fetch(...args),
+    openExternal: (url) => shell.openExternal(url),
+    safeStorage,
+  });
+  driveApi = new DriveApi({ auth: driveAuth, fetch: (...args) => net.fetch(...args) });
+  driveSync = new DriveSync({ api: driveApi, auth: driveAuth, stateDir: path.join(app.getPath('userData'), 'drive') });
+  driveSync.on('status', (st) => {
+    if (st.changed) vault?.scan(); // 내려받은 메모를 바로 목록·열린 창에
+    listWin?.webContents.send('drive:status', driveInfo());
+  });
+  // 예전(Drive 전체 권한) 연결이었으면: 고른 Drive 폴더도 잊고 다시 연결하게 (메모는 이 PC 에 그대로)
+  if (driveAuth.scopeUpgraded && settings.drive) {
+    settings.drive = null;
+    saveSettings();
+  }
+  configureDrive();
+}
+
+function configureDrive() {
+  if (!driveSync) return;
+  const d = settings.drive;
+  driveSync.configure(d?.folderId && vault ? { folderId: d.folderId, folderName: d.folderName, root: vault.root } : null);
+  driveSync.request(2000);
+}
+
+function driveInfo() {
+  return {
+    configured: driveAuth?.configured ?? false,
+    connected: driveAuth?.connected ?? false,
+    email: driveAuth?.email ?? '',
+    active: Boolean(settings.drive?.folderId) && (driveSync?.active ?? false),
+    folderId: settings.drive?.folderId ?? '',
+    folderName: settings.drive?.folderName ?? '',
+    root: vault?.root ?? '',
+    insideDriveApp: insideDriveForDesktop(vault?.root),
+    reconnect: driveAuth?.scopeUpgraded ?? false, // 연결 방식이 바뀌어 다시 연결해야 함
+    status: driveSync?.status ?? { state: 'off' },
+  };
+}
+
+// 이 Drive 폴더와 맞추기 시작. 지금 메모 폴더가 Google Drive 데스크탑 앱 폴더(G:\내 드라이브…) 안이면
+// 두 번 동기화가 되지 않게 이 PC 의 문서\메모킹 으로 옮겨 맞춘다 — 메모킹은 자기가 만든 Drive 파일만 보므로
+// (drive.file) Drive 앱이 올린 메모를 내려받을 수 없다: 원래 폴더의 메모를 먼저 복사해 두고, 첫 동기화 때 새 Drive 폴더로 올린다.
+async function useDriveFolder(folderId, folderName) {
+  let root = vault?.root;
+  if (!root || insideDriveForDesktop(root)) root = path.join(app.getPath('documents'), '메모킹');
+  const moving = root !== vault?.root;
+  if (moving) {
+    // 열린 메모 창이 닫히며 남은 글을 원래 폴더에 저장한 뒤 복사한다
+    const wins = [...noteWins.values()].filter((w) => !w.isDestroyed());
+    await Promise.all(wins.map((w) => new Promise((resolve) => {
+      w.once('closed', resolve);
+      setTimeout(resolve, 3000); // 닫히지 않는 창이 있어도 멈추지 않게
+      w.close();
+    })));
+    if (vault?.root) copyVault(vault.root, root);
+  }
+  settings.drive = { folderId, folderName };
+  saveSettings();
+  if (moving) openVault(root); // → configureDrive
+  else configureDrive();
+  const status = await driveSync.run();
+  return { info: vaultInfo(), status, drive: driveInfo() };
+}
+
+// 연결하기 한 번으로: 메모킹이 만든 "메모킹 동기화" 폴더를 찾아(휴대폰이 먼저 만들었을 수 있다) 쓰고, 없으면 만든다
+const SYNC_FOLDER = '메모킹 동기화';
+async function autoDriveFolder() {
+  const found = (await driveApi.folders('root')).find((f) => f.name === SYNC_FOLDER);
+  const folder = found ?? await driveApi.createFolder('root', SYNC_FOLDER);
+  return useDriveFolder(folder.id, folder.name);
 }
 
 // ---------- Windows 시작 시 자동 실행 ----------
@@ -1501,6 +1683,7 @@ function appSettings() {
     historyEnabled: settings.historyEnabled,
     quickMemo: { enabled: settings.quickMemo, registered: globalShortcut.isRegistered(QUICK_MEMO_KEY), key: 'Ctrl+Alt+C' },
     fitTables: settings.fitTables !== false,
+    autoTags: settings.autoTags !== false,
     magic: normalizeMagicSettings(settings.magic),
     magicIndex: fileIndex?.status() ?? null, // 파일 검색 목록: 개수·만든 때
     version: app.getVersion(),
@@ -1663,7 +1846,7 @@ function captureToMemo(dir, info, point) {
   const where = captureWhere(capture.source);
   return openCaptureMemo(capture, point, {
     title: '메모를 만들었어요',
-    body: `${captureTitle(capture)}${where ? `\n${where}에서 가져왔어요` : ''} · 누르면 메모로 가요`,
+    body: `${captureTitle(capture)}${where ? `\n${where}에서 가져왔어요` : ''} · 눌러서 열기`,
   });
 }
 
@@ -1798,8 +1981,8 @@ function finishAreaCapture(senderId, rect) {
     source: { window: '화면 캡처', process: '', url: null, time: new Date().toISOString(), copied: false },
   };
   return openCaptureMemo(capture, c.point, {
-    title: '화면을 캡처해 메모를 만들었어요',
-    body: `${crop.width} × ${crop.height} 그림을 클립보드에도 복사했어요 · 누르면 메모로 가요`,
+    title: '화면 캡처로 메모를 만들었어요',
+    body: `${crop.width} × ${crop.height} 이미지를 클립보드에도 복사했어요 · 눌러서 열기`,
   });
 }
 
@@ -1814,7 +1997,87 @@ const onQuickMemoKey = createDoublePress({
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 
+// ---------- 받아쓰기 (stt/stt-service.js) ----------
+// 메모 창마다 녹음 하나: 작업 id = "창 번호:녹음 번호"
+let stt = null;
+const sttOptions = () => ({ enabled: settings.stt?.enabled !== false, speaker: settings.stt?.speaker === true });
+function initStt() {
+  stt = createSttService({
+    dir: process.env.MEMOKING_STT_DIR || path.join(app.getPath('userData'), 'stt'),
+    workerPath: STT_WORKER,
+    vendor: STT_VENDOR,
+    fetch: (url) => net.fetch(url),
+    getVault: () => vault,
+    getOptions: sttOptions,
+    onStatus: (status) => {
+      for (const w of [listWin, ...noteWins.values()]) if (w && !w.isDestroyed()) w.webContents.send('stt:status', status);
+    },
+    // 말한 사람을 나눈 뒤: 열린 메모면 그 창이 음성 카드를 고치고, 닫혔으면 파일을 직접
+    onSpeakers: ({ memoId, src, text }) => {
+      const win = noteWins.get(memoId);
+      if (win && !win.isDestroyed()) return win.webContents.send('stt:speakers', { src, text });
+      const memo = vault?.get(memoId);
+      const next = memo && replaceTranscript(memo.body, src, text);
+      if (next && next !== memo.body) vault.save(memoId, next);
+    },
+  });
+}
+const sttKey = (e, id) => `${e.sender.id}:${id}`;
+const sttSenders = new Map(); // 작업 id → 창 (닫히면 그 창의 녹음 받아쓰기를 거둔다)
+
 function registerIpc() {
+  ipcMain.handle('stt:status', () => stt.status());
+  ipcMain.handle('stt:download', async (_e, pack) => {
+    try {
+      return await stt.download(pack);
+    } catch (err) {
+      return { ...stt.status(), error: err.message };
+    }
+  });
+  ipcMain.handle('stt:remove', (_e, pack) => stt.remove(pack));
+  ipcMain.handle('stt:options', (_e, next) => {
+    settings.stt = { ...sttOptions(), ...(next ?? {}) };
+    saveSettings();
+    stt.emit();
+    return stt.status();
+  });
+  ipcMain.handle('stt:start', (e, id) => {
+    const key = sttKey(e, id);
+    const wc = e.sender;
+    const res = stt.start(key, {
+      onLine: (text) => !wc.isDestroyed() && wc.send('stt:line', { id, text }),
+      onSpeaking: (on) => !wc.isDestroyed() && wc.send('stt:speaking', { id, on }),
+    });
+    if (res.stt && !sttSenders.has(wc.id)) {
+      sttSenders.set(wc.id, new Set());
+      wc.once('destroyed', () => {
+        for (const k of sttSenders.get(wc.id) ?? []) stt.cancel(k);
+        sttSenders.delete(wc.id);
+      });
+    }
+    if (res.stt) sttSenders.get(wc.id).add(key);
+    return res;
+  });
+  ipcMain.on('stt:audio', (e, id, samples) => {
+    if (samples instanceof Float32Array) stt.audio(sttKey(e, id), samples);
+  });
+  ipcMain.handle('stt:stop', async (e, id, target) => {
+    const key = sttKey(e, id);
+    sttSenders.get(e.sender.id)?.delete(key);
+    try {
+      return await stt.stop(key, target);
+    } catch (err) {
+      return { text: '', error: err.message };
+    }
+  });
+  ipcMain.handle('stt:transcribe', async (_e, job) => {
+    try {
+      return await stt.transcribe({ memoId: job?.memoId, src: job?.src, samples: job?.samples });
+    } catch (err) {
+      return { text: '', error: err.message };
+    }
+  });
+
   ipcMain.handle('app:info', () => vaultInfo());
   ipcMain.handle('vault:use', (_e, dir) => {
     const info = openVault(dir);
@@ -1831,11 +2094,11 @@ function registerIpc() {
     if (action === 'next' || action === 'skip') tutorialEvent(action);
   });
   ipcMain.handle('tutorial:event', (_e, name) => {
-    if (name === 'typed' || name === 'tagged') tutorialEvent(name);
+    if (TUTORIAL_EVENTS.includes(name) && name !== 'memo-created' && name !== 'note-closed') tutorialEvent(name);
   });
   ipcMain.handle('vault:choose', async (event) => {
     const result = await dialog.showOpenDialog(senderWindow(event), {
-      title: '메모를 보관할 폴더 고르기',
+      title: '메모를 저장할 폴더 선택',
       defaultPath: vault?.root ?? suggestedVaultPath(),
       properties: ['openDirectory', 'createDirectory'],
     });
@@ -1851,6 +2114,10 @@ function registerIpc() {
   ipcMain.handle('memos:list', () => listMemos());
   // 지금까지 쓴 태그 (많이 쓴 순) — 메모 창의 # 자동완성
   ipcMain.handle('tags:list', () => collectTags(vault?.list() ?? []));
+  // 밖에서 들어온 메모(화면 캡처·빠른 메모)에 저절로 달 태그 — 내용에 맞는 기존 태그 + 들어온 곳 태그
+  // 태그 없는 메모의 추천 태그 (휴대폰과 같은 알고리즘 — 이미 쓰는 태그와 정합성 있게)
+  ipcMain.handle('tags:suggest', (_e, body, id) => suggestTagsFor(String(body ?? ''), vault?.bodies() ?? [], { excludeId: id }));
+  ipcMain.handle('tags:auto', (_e, body, source, id) => autoTagsFor(String(body ?? ''), vault?.bodies() ?? [], { source, excludeId: id }));
   ipcMain.handle('memos:search', (_e, query, excludeId) => withOpenFlag(vault?.search(String(query ?? ''), excludeId) ?? []));
 
   // 예약 알림: 메모 하나의 알림 목록을 통째로 저장 (추가·삭제·켜기/끄기)
@@ -1874,6 +2141,38 @@ function registerIpc() {
   ipcMain.handle('history:remove', (_e, id) => history?.remove(id) ?? false);
   ipcMain.handle('history:clear', () => history?.clear());
   ipcMain.handle('history:to-memo', (_e, id) => historyToMemo(id));
+  ipcMain.handle('history:apps', () => historyApps());
+  // Google Drive 직접 동기화
+  ipcMain.handle('drive:status', () => driveInfo());
+  ipcMain.handle('drive:set-client', (_e, id, secret) => {
+    driveAuth.setClient(id, secret);
+    return driveInfo();
+  });
+  ipcMain.handle('drive:login', async () => {
+    await driveAuth.login();
+    const email = await driveApi.about().catch(() => '');
+    if (email) driveAuth.setEmail(email);
+    if (listWin) bringToFront(listWin);
+    return { email };
+  });
+  ipcMain.handle('drive:cancel-login', () => driveAuth.cancelLogin());
+  ipcMain.handle('drive:folders', async (_e, parent) => (await driveApi.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name })));
+  ipcMain.handle('drive:create-folder', async (_e, parent, name) => {
+    const f = await driveApi.createFolder(String(parent || 'root'), String(name));
+    return { id: f.id, name: f.name };
+  });
+  ipcMain.handle('drive:use', (_e, folderId, name) => useDriveFolder(String(folderId), String(name)));
+  ipcMain.handle('drive:auto', () => autoDriveFolder());
+  ipcMain.handle('drive:sync', () => driveSync.run());
+  ipcMain.handle('drive:disconnect', () => {
+    driveAuth.signOut();
+    settings.drive = null;
+    saveSettings();
+    configureDrive();
+    return driveInfo();
+  });
+  ipcMain.handle('history:block', (_e, appId, app, removeExisting) => blockHistoryApp(String(appId ?? ''), String(app ?? ''), Boolean(removeExisting)));
+  ipcMain.handle('history:unblock', (_e, appId) => unblockHistoryApp(String(appId ?? '')));
   ipcMain.handle('clipboard:write-text', (_e, text) => clipboard.writeText(String(text ?? '')));
 
   // 설정 (자동 실행)
@@ -1884,6 +2183,11 @@ function registerIpc() {
     settings.fitTables = Boolean(on);
     saveSettings();
     return settings.fitTables;
+  });
+  ipcMain.handle('app:set-auto-tags', (_e, on) => {
+    settings.autoTags = Boolean(on);
+    saveSettings();
+    return settings.autoTags;
   });
   ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings(next));
   // 매직키 창 아래 캡슐: 쓸 수 있는 모듈 모두와 켜짐 여부 (누르면 켜고 끔)
@@ -2008,6 +2312,15 @@ function registerIpc() {
     noteWins.get(id)?.setTitle(summary.title);
     return summary;
   });
+  // 쓰는 중에 다른 기기에서도 고친 메모: 들어온 내용을 사본 메모로 따로 남긴다 (열어 둔 동안은 한 사본만 고쳐 쓴다)
+  ipcMain.handle('memo:keep-copy', (_e, sourceId, body, copyId) => {
+    if (!vault || typeof body !== 'string') return null;
+    if (copyId && vault.get(copyId)) {
+      vault.save(copyId, body);
+      return copyId;
+    }
+    return vault.import({ body, color: vault.get(sourceId)?.color });
+  });
   ipcMain.on('memo:save-sync', (event, id, body) => {
     try {
       if (typeof body === 'string' && vault) vault.save(id, body);
@@ -2029,9 +2342,12 @@ function registerIpc() {
   ipcMain.handle('memo:remove', (_e, id) => {
     removeFromStack(id, 'none'); // 스택이면 옆 탭이 보이게
     const win = noteWins.get(id);
+    const title = vault?.get?.(id)?.title ?? '';
     const ok = vault?.trash(id) ?? false;
     win?.destroy();
-    return ok;
+    // 묻지 않고 지우므로 목록 창에 "되돌리기" (메모 창에서 지워도)
+    if (typeof ok === 'string') listWin?.webContents.send('memo:trashed', { name: ok, title });
+    return Boolean(ok);
   });
   // 메모를 PDF 로
   ipcMain.handle('pdf:open', (_e, id) => openPdfWindow(String(id)));
@@ -2047,6 +2363,13 @@ function registerIpc() {
     return result;
   });
 
+  // 메모 폴더의 첨부 파일 내용 (소리 받아쓰기 — 메모 창이 풀어서 받아쓰기로 보낸다). 폴더 밖 경로는 vault.resolve 가 거부
+  ipcMain.handle('attachment:read', (_e, rel) => {
+    const file = vault?.resolve(String(rel ?? ''));
+    if (!file || !fs.existsSync(file)) throw new Error('파일을 찾지 못했어요');
+    if (fs.statSync(file).size > 500 * 1024 * 1024) throw new Error('파일이 너무 커요 (500MB 넘음)');
+    return new Uint8Array(fs.readFileSync(file));
+  });
   ipcMain.handle('attachment:save', (_e, bytes, ext) => {
     if (!vault) throw new Error('메모 폴더가 아직 없어요.');
     if (!(bytes instanceof Uint8Array)) throw new TypeError('넣으려는 파일을 읽지 못했어요.');
@@ -2123,7 +2446,7 @@ function registerIpc() {
   ipcMain.handle('stack:menu', (event, id) => {
     Menu.buildFromTemplate([
       { label: '따로 떼어 보기', click: () => removeFromStack(String(id), 'detach') },
-      { label: '스택에서 빼기', click: () => removeFromStack(String(id), 'close') },
+      { label: '탭 닫기', click: () => removeFromStack(String(id), 'close') },
     ]).popup({ window: senderWindow(event) });
   });
   ipcMain.handle('win:minimize', (event) => senderWindow(event)?.minimize());
@@ -2148,6 +2471,16 @@ function registerIpc() {
     if (!listWin || senderWindow(event) !== listWin) return;
     titleBarDim = level === 'dialog' || level === 'coach' ? level : false;
     listWin.setTitleBarOverlay(titleBarOverlay());
+  });
+  ipcMain.handle('win:inking', (event, on) => {
+    const win = senderWindow(event);
+    if (!win) return;
+    if (!on) return void inkingWins.delete(win);
+    inkingWins.add(win);
+    if (windowDrag && noteWins.get(windowDrag.id) === win) {
+      clearStackTarget(windowDrag);
+      windowDrag = null;
+    }
   });
   ipcMain.handle('win:toggle-top', (event, id) => {
     const win = senderWindow(event);
@@ -2223,7 +2556,8 @@ let trayMenuTemplate = [];
 const shorten = (text, max = 28) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 function createTray() {
-  tray = new Tray(APP_ICON);
+  // .ico 는 Windows 에서만 읽힌다 (다른 곳에서는 PNG)
+  tray = new Tray(process.platform === 'win32' ? APP_ICON : APP_ICON_PNG);
   tray.setToolTip('메모킹 · 누르면 메모 목록이 열려요');
   tray.on('click', () => createListWindow());
   tray.on('double-click', () => createListWindow());
@@ -2236,21 +2570,21 @@ function updateTrayMenu() {
   trayMenuTemplate = [
     { label: '메모 목록 열기', click: () => createListWindow() },
     { label: '새 메모', enabled: Boolean(vault), click: () => createNote({}) },
-    { label: '화면 영역을 캡처해 메모 만들기', enabled: Boolean(vault), click: () => startAreaCapture() },
+    { label: '화면 캡처로 새 메모', enabled: Boolean(vault), click: () => startAreaCapture() },
     { label: '복사해 둔 내용으로 새 메모', enabled: Boolean(vault), click: () => quickMemo({ copy: false }) },
     { type: 'separator' },
     { label: '최근 메모', enabled: false },
     ...(recent.length
       ? recent.map((m) => ({ label: `   ${shorten(m.title)}`, click: () => openNote(m.id) }))
-      : [{ label: '   아직 없어요', enabled: false }]),
+      : [{ label: '   없음', enabled: false }]),
     { type: 'separator' },
-    { label: '예약한 알림 보기', click: () => createListWindow('reminders') },
+    { label: '알림 예약', click: () => createListWindow('reminders') },
     { label: '알림 보관함', click: () => createListWindow('history') },
     { label: '열린 메모 모두 앞으로', enabled: noteWins.size > 0, click: showAllNotes },
     { label: '메모 폴더 열기', enabled: Boolean(vault), click: () => shell.openPath(vault.root) },
     { type: 'separator' },
     {
-      label: '빠른 메모 Ctrl+Alt+C (두 번 누르면 화면 영역 캡처)',
+      label: '빠른 메모 Ctrl+Alt+C (두 번: 화면 캡처)',
       type: 'checkbox',
       checked: settings.quickMemo && globalShortcut.isRegistered(QUICK_MEMO_KEY),
       click: (item) => setQuickMemo(item.checked),
@@ -2263,8 +2597,8 @@ function updateTrayMenu() {
       click: (item) => setAutoStart(item.checked),
     },
     { type: 'separator' },
-    { label: '사용법 둘러보기', enabled: Boolean(vault), click: startTutorial },
-    { label: '메모킹 끄기', click: quitApp },
+    { label: '사용법 보기', enabled: Boolean(vault), click: startTutorial },
+    { label: '메모킹 종료', click: quitApp },
   ];
   tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate));
 }
@@ -2273,9 +2607,7 @@ function showAllNotes() {
   for (const [id, win] of noteWins) {
     const stack = stacks?.stackOf(id);
     if (stack && stack.active !== id) continue; // 스택의 숨은 탭
-    if (win.isMinimized()) win.restore();
-    win.showInactive();
-    win.moveTop();
+    bringToFront(win, { inactive: true, raise: true });
   }
 }
 
@@ -2304,25 +2636,46 @@ app.on('second-instance', () => createListWindow());
 app.whenReady().then(async () => {
   if (!gotLock) return;
   app.setAppUserModelId(APP_ID);
-  // 카메라·마이크·위치 등 어떤 권한도 쓰지 않는다 (v0.6.0 에서 녹음 기능 삭제)
-  session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
-  session.defaultSession.setPermissionCheckHandler(() => false);
+  // 권한은 메모 창의 마이크(음성 메모 녹음)만 — 카메라·위치·화면 등은 쓰지 않는다
+  const isNoteWindow = (wc) => {
+    try {
+      const url = new URL(wc?.getURL() ?? '');
+      return url.protocol === 'file:' && url.pathname.endsWith('/note.html');
+    } catch {
+      return false;
+    }
+  };
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
+    const types = details?.mediaTypes ?? [];
+    callback(permission === 'media' && types.length > 0 && types.every((t) => t === 'audio') && isNoteWindow(wc));
+  });
+  session.defaultSession.setPermissionCheckHandler((wc, permission, _origin, details) => (
+    permission === 'media' && (details?.mediaType ?? 'audio') === 'audio' && isNoteWindow(wc)
+  ));
   registerVaultProtocol();
+  initStt();
   registerIpc();
-  createTray();
+  try {
+    createTray();
+  } catch (err) {
+    console.error('알림 영역 아이콘을 만들지 못했어요', err); // 아이콘이 없어도 메모 창·알림은 그대로 뜨게
+  }
   nativeTheme.on('updated', () => {
     listWin?.setTitleBarOverlay(titleBarOverlay());
     for (const [id, win] of noteWins) win.setBackgroundColor(noteBg(vault?.get(id)?.color));
   });
 
   // 절전에서 깨어나면 그 사이 알림을 바로 확인
-  powerMonitor.on('resume', () => alarms.tick());
+  powerMonitor.on('resume', () => {
+    alarms.tick();
+    driveSync?.request(3000);
+  });
   powerMonitor.on('unlock-screen', () => alarms.tick());
 
   if (SMOKE) {
     // 점검 모듈을 불러오지 못하면 멈춰 기다리지 말고 바로 실패로 끝낸다
     // --new: 이번에 바뀐 기능만 확인하는 짧은 점검 (smoke-new.js)
-    const { prepareSmoke, runSmoke } = await import(process.argv.includes('--new') ? './smoke-new.js' : './smoke.js').catch((err) => {
+    const { prepareSmoke, runSmoke } = await import(process.argv.includes('--tutorial') ? './smoke-tutorial.js' : process.argv.includes('--new') ? './smoke-new.js' : './smoke.js').catch((err) => {
       console.error('✖ 점검 모듈 오류', err);
       app.exit(1);
       return {};
@@ -2337,9 +2690,9 @@ app.whenReady().then(async () => {
       getTray: () => tray, getTrayMenu: () => trayMenuTemplate,
       alarms, smokeToasts, getHistory: () => history, appSettings, quickMemo, registerQuickMemoKey,
       getCapturePoint: () => lastCapturePoint, smokeOpened, smokeConfirmAnswers,
-      getStacks: () => stacks, trackWindowDrag, endWindowDrag, stackInto, getTabTear: () => tabTear, getSettings: () => settings, stickers, reloadSettings: loadSettings, installMark,
+      getStacks: () => stacks, isInking: (id) => inkingWins.has(noteWins.get(id)), trackWindowDrag, endWindowDrag, stackInto, getTabTear: () => tabTear, getSettings: () => settings, stickers, reloadSettings: loadSettings, installMark,
       startAreaCapture, getAreaCapture: () => areaCapture, smokeClipboard, onQuickMemoKey,
-      createPopupWatcher, getHistory: () => history, smokePdf, getPdfWin: () => pdfWin, openPdfWindow,
+      createPopupWatcher, smokePdf, getPdfWin: () => pdfWin, openPdfWindow,
       startTutorial, getTutorial: () => tutorial,
       captureToMemo, smokeToastsList: smokeToasts, getTitleBarOverlay: () => titleBarOverlay(),
     });
@@ -2348,6 +2701,7 @@ app.whenReady().then(async () => {
 
   loadSettings();
   initHistory();
+  initDrive();
   // 설치판 첫 실행: 자동 실행을 기본으로 켜 둔다 (설정·트레이 메뉴에서 끌 수 있음)
   if (autoStartAvailable() && !settings.autoStartSet) setAutoStart(true);
   if (settings.vaultPath) openVault(settings.vaultPath);
@@ -2377,6 +2731,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  stt?.close();
+  topWatch.stop();
   globalShortcut.unregisterAll();
   captureHelper.stop();
   alarms.stop();

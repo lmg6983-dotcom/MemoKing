@@ -15,8 +15,9 @@ body.selecting .dim { display: none; }
   top: -28px;
   padding: 2px 8px;
   border-radius: 6px;
-  background: var(--brand-black);
-  color: var(--on-black);
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
+  box-shadow: var(--bubble-shadow);
   font: 600 12px/20px var(--font-sans);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -29,10 +30,10 @@ body.selecting .dim { display: none; }
   transform: translateX(-50%);
   padding: 8px 16px;
   border-radius: 999px;
-  background: var(--brand-black);
-  color: var(--on-black);
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
   font: 600 13px/20px var(--font-sans);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--bubble-shadow);
   pointer-events: none;
   transition: opacity 0.15s ease-out;
 }

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메모킹 MemoKing</title>
+  <meta name="description" content="메모킹 — 폴더에 마크다운 파일로 보관하는 스티커 메모 앱 (Windows · Android)">
+  <link rel="icon" href="icon.png">
+  <style>
+    :root { --bg: #f6f5f1; --text: #111; --muted: #6b6860; --card: #fff; --line: #e8e6df; --yellow: #ffcc00; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0e0e0d; --text: #f5f4ef; --muted: #a3a098; --card: #1a1a18; --line: #2e2d29; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif; line-height: 1.7; }
+    main { max-width: 720px; margin: 0 auto; padding: 48px 20px 64px; }
+    header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+    header img { width: 72px; height: 72px; }
+    h1 { margin: 0; font-size: 32px; letter-spacing: -0.02em; }
+    .sub { margin: 0; color: var(--muted); }
+    section { margin-top: 20px; padding: 20px 22px; border-radius: 16px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line); }
+    h2 { margin: 0 0 8px; font-size: 19px; }
+    ul { margin: 0; padding-left: 20px; }
+    a { color: inherit; text-decoration-color: var(--yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; font-weight: 600; }
+    .btn { display: inline-block; margin-top: 8px; padding: 12px 20px; border-radius: 12px; background: var(--yellow); color: #111; text-decoration: none; }
+    footer { margin-top: 32px; font-size: 14px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icon.png" alt="메모킹 아이콘">
+    <div>
+      <h1>메모킹 MemoKing</h1>
+      <p class="sub">폴더에 마크다운 파일로 보관하는 스티커 메모 앱 · Windows · Android</p>
+    </div>
+  </header>
+
+  <section>
+    <h2>메모킹은</h2>
+    <ul>
+      <li>메모 하나를 내가 고른 폴더 안의 <b>마크다운 파일 하나</b>로 보관해요. 메모는 언제나 내 파일이에요.</li>
+      <li>Windows 에서는 스티커 메모 창으로, Android 에서는 휴대폰 화면에 맞춰 같은 메모를 써요.</li>
+      <li>휴대폰 앱은 <b>Google Drive</b> 의 메모 폴더와 직접 동기화해서 PC 와 같은 메모를 보여 줘요.</li>
+      <li>서식·체크리스트·사진·파일·태그·예약 알림·메모 연결, 지운 메모 휴지통, 알림 보관함(휴대폰)을 지원해요.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>내려받기</h2>
+    <p>Android: <a href="https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk">MemoKing-android.apk</a></p>
+    <p>소스와 안내: <a href="https://github.com/lmg6983-dotcom/MemoKing">github.com/lmg6983-dotcom/MemoKing</a></p>
+  </section>
+
+  <section>
+    <h2>개인정보</h2>
+    <p>메모킹은 서버가 없고, 메모와 알림을 다른 곳으로 보내지 않아요. 자세한 내용은 <a href="privacy.html">개인정보처리방침</a>을 보세요.</p>
+  </section>
+
+  <footer>© 2026 메모킹 · 문의 <a href="mailto:lmg6983@gmail.com">lmg6983@gmail.com</a></footer>
+</main>
+</body>
+</html>

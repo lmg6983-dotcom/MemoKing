@@ -6,8 +6,7 @@ import { EventEmitter } from 'node:events';
 import { randomUUID, randomBytes } from 'node:crypto';
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
-  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS,
-} from '../app/js/core/memo-file.js';
+  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS, conflictCopyBody, sameBody, normalizeInkPath } from '../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { normalizeTables } from '../app/js/core/table-sizes.js';
@@ -232,6 +231,11 @@ export class Vault extends EventEmitter {
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0));
   }
 
+  // 태그 추천용: 메모마다 본문
+  bodies() {
+    return [...this.entries.values()].filter((e) => e.file).map((e) => ({ id: e.id, body: e.body }));
+  }
+
   // 매직키 메모 검색용: 메모마다 제목·본문 글
   searchable() {
     return [...this.entries.values()]
@@ -262,6 +266,7 @@ export class Vault extends EventEmitter {
       links: entry.meta.links,
       reminders: entry.meta.reminders,
       tables: entry.meta.tables ?? [],
+      ink: entry.meta.ink ?? '',
       created: entry.meta.created,
       updated: entry.meta.updated,
     };
@@ -343,15 +348,18 @@ export class Vault extends EventEmitter {
       this.entries.set(id, entry);
     }
     if (entry.body === body && entry.file) return this.summary(entry);
+    const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
     entry.body = body;
     entry.meta.updated = toLocalIso();
     if (!entry.file && isBlankBody(body)) return this.summary(entry);
-    this.write(entry);
+    this.write(entry, known);
     this.changed([id]);
     return this.summary(entry);
   }
 
-  write(entry) {
+  // known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것을 넘긴다)
+  write(entry, known = entry.body) {
+    if (entry.file) this.keepChangedOnDisk(entry, known);
     if (!entry.file) entry.file = this.uniqueFile(titleToFileName(extractTitle(entry.body)));
     const file = this.abs(entry.file);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -361,6 +369,21 @@ export class Vault extends EventEmitter {
     entry.mtimeMs = stat.mtimeMs;
     entry.size = stat.size;
     entry.idSaved = true;
+  }
+
+  // 마지막으로 읽은(쓴) 뒤 다른 기기(동기화)가 이 파일을 바꿨는데 아직 알아채기 전에 덮어쓰려 할 때: 그쪽 내용을 먼저
+  // 사본 메모로 남긴다 ("제목 (다른 기기 …)") — 자동 저장이 들어온 내용을 몰래 지우지 않게
+  keepChangedOnDisk(entry, known) {
+    let theirs;
+    try {
+      const st = fs.statSync(this.abs(entry.file));
+      if (st.mtimeMs === entry.mtimeMs && st.size === entry.size) return;
+      theirs = parseMemoFile(fs.readFileSync(this.abs(entry.file), 'utf8')).body;
+    } catch {
+      return; // 파일이 없어졌으면 그냥 다시 쓴다
+    }
+    if (sameBody(theirs, known) || sameBody(theirs, entry.body) || isBlankBody(theirs)) return;
+    this.import({ body: conflictCopyBody(theirs), color: entry.meta.color });
   }
 
   // 같은 폴더에서 겹치지 않는 파일명: "제목.md", "제목 (2).md", ...
@@ -405,6 +428,7 @@ export class Vault extends EventEmitter {
     if (patch.color && COLORS.includes(patch.color)) entry.meta.color = patch.color;
     if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
     if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
+    if (typeof patch.ink === 'string') entry.meta.ink = normalizeInkPath(patch.ink);
     if (entry.file) this.write(entry);
     this.changed([id]);
     return this.get(id);
@@ -429,11 +453,13 @@ export class Vault extends EventEmitter {
     const entry = this.entries.get(id);
     if (!entry) return false;
     this.entries.delete(id);
+    let trashed = null;
     if (entry.file) {
       const base = path.posix.basename(entry.file, '.md');
       const dest = path.join(this.trashDir, `${base} (${stamp()}).md`);
       try {
         fs.renameSync(this.abs(entry.file), dest);
+        trashed = path.basename(dest);
       } catch (err) {
         if (err.code !== 'ENOENT') {
           this.entries.set(id, entry);
@@ -444,7 +470,7 @@ export class Vault extends EventEmitter {
     this.orphans.delete(id);
     this.trashAttachments(extractAttachments(entry.body));
     this.changed([id]);
-    return true;
+    return trashed ?? true; // 휴지통 파일 이름 (되돌리기에 씀)
   }
 
   // 밖에서 없어진 메모가 그동안 돌아오지 않았으면(이름만 바뀐 경우는 같은 id 로 돌아옴) 첨부를 치운다

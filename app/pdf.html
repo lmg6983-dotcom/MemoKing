@@ -24,7 +24,7 @@
     <div class="seg" role="radiogroup" aria-label="크기 고르는 방법" id="kind">
       <button type="button" data-kind="paper" aria-checked="true">종이</button>
       <button type="button" data-kind="ratio" aria-checked="false">카드 비율</button>
-      <button type="button" data-kind="custom" aria-checked="false">직접</button>
+      <button type="button" data-kind="custom" aria-checked="false">직접 입력</button>
     </div>
 
     <div class="panel" data-panel="paper">
@@ -50,7 +50,7 @@
         <span class="times">×</span>
         <label>세로 <input type="number" id="ch" min="50" max="1200" step="1" value="150"> mm</label>
       </div>
-      <label class="check-row"><input type="checkbox" id="lock" checked> 비율 그대로 바꾸기</label>
+      <label class="check-row"><input type="checkbox" id="lock" checked> 비율 유지</label>
     </div>
 
     <p class="label">여백</p>
@@ -62,7 +62,7 @@
     </div>
 
     <label class="setting-row"><input type="checkbox" id="bg" class="switch"><span>메모 색 바탕</span></label>
-    <label class="setting-row"><input type="checkbox" id="date" class="switch" checked><span>날짜 넣기</span></label>
+    <label class="setting-row"><input type="checkbox" id="date" class="switch" checked><span>날짜 표시</span></label>
 
     <div class="actions">
       <label class="check-row open-row"><input type="checkbox" id="open-after" checked> 저장한 뒤 열기</label>

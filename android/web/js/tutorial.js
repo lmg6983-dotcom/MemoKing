@@ -1,0 +1,115 @@
+// 휴대폰 튜토리얼 — PC 와 같은 말풍선(coach.js) · 같은 규칙(core/tutorial.js), 진행만 이 화면 안에서 맡는다
+//   (PC 는 메인 프로세스가 창 사이를 오가며 맡는다)
+//   - 처음 메모 폴더를 연 뒤 한 번 저절로 · 설정 › "사용법 둘러보기"로 언제든 다시
+//   - 단계의 화면(목록 · 메모)이 보일 때만 말풍선 — 화면이 바뀌면 screenChanged()
+//   - 직접 해 보기: 화면들이 tutEvent('add-opened') 처럼 알리고, 본문 변화는 textChanged(md) 로 판정
+import { MOBILE_TUTORIAL_STEPS as STEPS, TUTORIAL_SETTLE_MS, advanceTutorial, tutorialCounts, tutorialDone } from '../../app/js/core/tutorial.js';
+import { extractTags } from '../../app/js/core/tags.js';
+import { setupCoach } from '../../app/js/coach.js';
+
+const DONE_KEY = 'memoking.tutorialDone';
+let state = { active: false, index: -1, praise: false };
+const listeners = [];
+let screen = () => 'list';
+let markdown = () => '';
+let coach = null;
+let base = null;
+const counts = (md) => tutorialCounts(md, extractTags(md));
+
+function payload() {
+  const step = state.active ? STEPS[state.index] : null;
+  return step && step.win === screen() ? { ...step, index: state.index, total: STEPS.length, praise: state.praise } : null;
+}
+function send() {
+  const p = payload();
+  for (const cb of listeners) cb(p);
+}
+
+// coach.js 가 PC 에서 쓰는 api 모양 그대로
+const api = {
+  on(event, cb) {
+    if (event === 'tutorial:step') listeners.push(cb);
+  },
+  tutorial: {
+    action: (action) => (action === 'next' || action === 'skip') && event(action),
+    current: async () => payload(),
+  },
+};
+
+/** @param {{ screen: () => 'list'|'note', markdown: () => string }} o */
+export function setupTutorial(o) {
+  screen = o.screen;
+  markdown = o.markdown;
+  coach = setupCoach(api, { onStep: (step) => (base = step ? counts(markdown()) : null) });
+}
+
+export function startTutorial() {
+  state = { active: true, index: 0, praise: false };
+  send();
+}
+
+/** 처음이면 한 번 저절로 */
+export function maybeStartTutorial() {
+  let done = false;
+  try {
+    done = Boolean(localStorage.getItem(DONE_KEY));
+  } catch {
+    done = true; // 기록할 수 없으면 매번 띄우지 않게
+  }
+  if (!done && !state.active) startTutorial();
+}
+
+function finish() {
+  state = { active: false, index: -1, praise: false };
+  try {
+    localStorage.setItem(DONE_KEY, '1');
+  } catch {
+    // 이번에만
+  }
+  send();
+}
+
+function event(name) {
+  if (!state.active) return;
+  const next = advanceTutorial(state.index, name, STEPS);
+  if (next === state.index) return;
+  if (next < 0) return finish();
+  state.praise = name !== 'next' && name === STEPS[state.index]?.advance;
+  state.index = next;
+  // 메모 단계인데 메모가 닫혀 있으면 목록 단계로
+  if (STEPS[next].win === 'note' && screen() !== 'note') return event('note-closed');
+  send();
+}
+
+/** 직접 해 보기: 지금 단계가 이 일을 기다리면 다음으로 */
+export function tutEvent(name) {
+  if (state.active && STEPS[state.index]?.advance === name) event(name);
+}
+
+/**
+ * 메모 글이 바뀔 때 — 쓰기 · 꾸미기 · 체크리스트 · 태그 판정
+ *   해 냈어도 바로 넘기지 않고 손을 멈출 때까지 기다린다 (글자를 치는 중·한글 조합 중·"#할" 까지만 쳤을 때 넘어가지 않게)
+ */
+let settleTimer = 0;
+export function textChanged(md) {
+  clearTimeout(settleTimer);
+  const advance = state.active ? STEPS[state.index]?.advance : null;
+  if (!advance || !base || coach?.step?.id !== STEPS[state.index].id) return;
+  if (!tutorialDone(advance, base, counts(md))) return;
+  const id = STEPS[state.index].id;
+  settleTimer = setTimeout(() => {
+    const now = markdown();
+    if (!state.active || STEPS[state.index]?.id !== id || !base || !tutorialDone(advance, base, counts(now))) return;
+    base = null;
+    event(advance);
+  }, TUTORIAL_SETTLE_MS[advance] ?? 900);
+}
+
+/** 목록 ↔ 메모 화면이 바뀌면 (메모를 닫으면 메모 단계는 끝) */
+export function screenChanged() {
+  if (!state.active) return;
+  if (screen() === 'list' && STEPS[state.index]?.win === 'note') return event('note-closed');
+  send();
+}
+
+export const tutorialActive = () => state.active;

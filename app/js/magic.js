@@ -1,3 +1,4 @@
+import { replayClass } from './dom.js';
 // 매직키 창 — 입력한 글을 바로 메모로(기본), 입력하는 대로 메모·폴더·파일을 찾아 바로 연다.
 //   비어 있으면 최근 메모 · 쓰면 맨 위 "새 메모로 저장" 그 아래 메모 / 폴더 / 파일
 //   ↑↓ 고르기 · Enter 실행(고른 줄 오른쪽에 무엇을 하는지 표시) · Ctrl+Enter 다른 실행 · Esc 글 지우기 → 닫기
@@ -321,9 +322,7 @@ async function reset() {
   updatePlaceholder();
   render();
   search(); // 최근 메모
-  box.classList.remove('enter');
-  void box.offsetWidth;
-  box.classList.add('enter');
+  replayClass(box, 'enter');
   setTimeout(() => input.focus(), 0);
 }
 api.onShow(reset);

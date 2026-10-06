@@ -2,16 +2,17 @@
 // Node(데스크탑 메인)와 브라우저(화면, 추후 안드로이드) 양쪽에서 쓰는 순수 함수만 둔다.
 import { parse as parseYaml, stringify as stringifyYaml } from '../../vendor/yaml.js';
 import { tableLineText } from './tables.js';
-import { toLocalIso } from './time.js';
+import { toLocalIso, hhmm, koMonthDay } from './time.js';
 import { normalizeReminder, serializeReminder } from './reminders.js';
 import { normalizeTables } from './table-sizes.js';
 
 export const COLORS = ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal'];
+export const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 export const DEFAULT_COLOR = 'yellow';
 export const UNTITLED = '제목 없음';
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders', 'tables'];
+const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders', 'tables', 'ink'];
 const AUDIO_EXT = /\.(weba|ogg|oga|opus|mp3|m4a|aac|wav|flac)$/i;
 const VIDEO_EXT = /\.(mp4|m4v|mov|ogv|mkv)$/i;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
@@ -50,8 +51,15 @@ export function normalizeMeta(data) {
     links: Array.isArray(data.links) ? [...new Set(data.links.filter((v) => typeof v === 'string' && v))] : [],
     reminders: Array.isArray(data.reminders) ? data.reminders.map((r) => normalizeReminder(r)).filter(Boolean) : [],
     tables: normalizeTables(data.tables), // 표 열 너비·행 높이·머리글 강조 (표 순서대로)
+    ink: normalizeInkPath(data.ink), // 주석(메모 위에 그린 손 메모)이 든 파일
     extra,
   };
+}
+
+// 주석 파일은 메모 폴더의 attachments/ 안의 것만 (../ 로 밖을 가리키지 않게)
+export function normalizeInkPath(value) {
+  const v = typeof value === 'string' ? value.trim() : '';
+  return /^attachments\/[^/\\]+$/.test(v) && !v.includes('..') ? v : '';
 }
 
 function asIsoString(value) {
@@ -68,6 +76,7 @@ export function serializeMemoFile(meta, body) {
   if (meta.reminders?.length) data.reminders = meta.reminders.map(serializeReminder);
   const tables = normalizeTables(meta.tables);
   if (tables.length) data.tables = tables;
+  if (normalizeInkPath(meta.ink)) data.ink = normalizeInkPath(meta.ink);
   Object.assign(data, meta.extra);
   const yaml = stringifyYaml(data, { lineWidth: 0 }).trimEnd();
   const text = body.replace(/\r\n/g, '\n').replace(/\s+$/, '');
@@ -85,6 +94,9 @@ export { toLocalIso };
 
 // ---------- 본문 분석 ----------
 
+/** 마크다운 자동 링크 <https://…> · <mailto:…> · <이름@주소> */
+export const AUTOLINK = /<((?:https?|ftp|mailto):[^\s<>]+|[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)>/gi;
+
 // 한 줄의 마크다운 기호를 걷어내 사람이 읽는 글자만 남긴다.
 function stripInline(line) {
   return line
@@ -93,6 +105,7 @@ function stripInline(line) {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<br\s*\/?>/gi, ' ')
+    .replace(AUTOLINK, '$1') // 맨주소·이메일은 <https://…> 로 저장된다 — 태그로 보고 지우지 않게 주소를 남긴다
     .replace(/<\/?[a-z][^>]*>/gi, '') // <u>, <mark>, <span style=…> 같은 서식 태그는 글자만 남긴다
     .replace(/(\*\*|__|~~)(.+?)\1/g, '$2')
     .replace(/(^|[^\\*_])[*_](?=\S)(.+?)(?<=\S)[*_]/g, '$1$2')
@@ -106,7 +119,7 @@ function stripBlock(line) {
   return line
     .replace(/^\s{0,3}#{1,6}\s+/, '')
     .replace(/^\s*>\s?/, '')
-    .replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/, '');
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:\\?\[[ xX]\](?:\s+|$))?/, ''); // 빈 체크리스트 항목("- [ ]")도
 }
 
 // 코드 블록 울타리(```)는 빼고, 각 줄을 읽는 글자로 바꾼다.
@@ -137,8 +150,14 @@ export function extractTitle(body) {
 }
 
 // 제목(첫 줄)을 뺀 나머지로 만든 미리보기
+//   카드에서 읽기 좋게: 공유하기로 붙은 "출처: …" 줄은 빼고, 수식 표시($)는 걷어낸다
 export function extractPreview(body, maxLength = 160) {
-  return plainLines(body).slice(1).join(' ').slice(0, maxLength);
+  return plainLines(body)
+    .slice(1)
+    .filter((l) => !/^출처\s*[:：]/.test(l))
+    .join(' ')
+    .replace(/\${1,2}([^$]+?)\${1,2}/g, '$1')
+    .slice(0, maxLength);
 }
 
 export function extractHeadings(body) {
@@ -207,6 +226,31 @@ export function isBlankBody(body) {
   return plainLines(body).length === 0 && extractAttachments(body).length === 0;
 }
 
+// ---------- 같은 메모를 두 기기에서 동시에 고쳤을 때 ----------
+// 열어 둔 메모에 아직 저장하지 않은 글이 있는데 다른 기기(동기화)에서 바뀐 내용이 들어오면, 지금 쓰는 글은 그대로 두고
+// 들어온 내용은 사본 메모로 남긴다 — 아무것도 잃지 않게 (Drive 동기화의 "(PC 충돌 …)" 사본과 같은 생각)
+//   사본 제목: "회의 메모 (다른 기기 10월 5일 08:34)"
+
+/** 같은 본문인가 — 파일에 쓸 때 줄바꿈(\r\n)·끝 공백을 맞추므로 그만큼은 같은 것으로 본다 */
+export function sameBody(a, b) {
+  const norm = (v) => String(v ?? '').replace(/\r\n/g, '\n').replace(/\s+$/, '');
+  return norm(a) === norm(b);
+}
+
+export function conflictLabel(date = new Date()) {
+  return `다른 기기 ${koMonthDay(date)} ${hhmm(date)}`;
+}
+
+/** 사본 본문: 첫 줄(제목)에 "(다른 기기 …)" 를 붙인다. 제목 줄이 없으면 제목 줄을 만든다 */
+export function conflictCopyBody(body, label = conflictLabel()) {
+  const text = String(body ?? '').replace(/\r\n/g, '\n');
+  const lines = text.split('\n');
+  const i = lines.findIndex((l) => l.trim());
+  if (i >= 0 && /^\s{0,3}#{1,6}\s+\S/.test(lines[i])) lines[i] = `${lines[i].trimEnd()} (${label})`;
+  else lines.splice(Math.max(0, i), 0, `# ${extractTitle(text)} (${label})`, '');
+  return lines.join('\n');
+}
+
 // ---------- 파일명 ----------
 
 const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
@@ -218,9 +262,11 @@ export function titleToFileName(title) {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^[.\s]+|[.\s]+$/g, '')
+    .replace(/^(~\$\s*)+/, '') // ~$ 로 시작하는 파일은 오피스 임시 파일로 보고 목록에서 빼므로
     .slice(0, 60)
     .trim();
   if (!name) name = UNTITLED;
-  if (RESERVED.test(name)) name += '_';
+  // 윈도우는 점 뒤가 있어도(con.txt) 장치 이름으로 본다 → 만들 수 없는 파일
+  if (RESERVED.test(name.split('.')[0].trim())) name = name.replace(/^([^.]*?)(\s*)(?=\.|$)/, '$1_$2');
   return name;
 }

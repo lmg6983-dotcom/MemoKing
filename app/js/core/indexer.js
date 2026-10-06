@@ -51,7 +51,7 @@ export function summarize(body) {
   return summary;
 }
 
-function tfidfVectors(docs) {
+export function tfidfVectors(docs) {
   const df = new Map();
   const tfs = docs.map((tokens) => {
     const tf = new Map();
@@ -74,7 +74,7 @@ function tfidfVectors(docs) {
   });
 }
 
-function cosine(a, b) {
+export function cosine(a, b) {
   const [small, large] = a.size <= b.size ? [a, b] : [b, a];
   let sum = 0;
   for (const [t, w] of small) {

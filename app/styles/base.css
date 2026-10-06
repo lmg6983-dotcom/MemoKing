@@ -32,6 +32,11 @@
 
   --shadow-card: 0 1px 2px rgba(17, 17, 17, 0.06), 0 2px 8px rgba(17, 17, 17, 0.04);
   --shadow-pop: 0 12px 32px rgba(17, 17, 17, 0.16);
+  /* 안내 말풍선·알림 띠·토스트: 검정 대신 앱 바탕 (다크 모드에선 어두운 앱 바탕) */
+  --bubble-bg: var(--surface-2);
+  --bubble-fg: var(--text-strong);
+  --bubble-line: var(--line);
+  --bubble-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
 
   --font-sans: "Pretendard Variable", Pretendard, "Malgun Gothic", system-ui, sans-serif;
   --radius-sm: 8px;
@@ -115,6 +120,8 @@ html, body {
   font-family: var(--font-sans);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  word-break: keep-all; /* 한글은 낱말 단위로 줄바꿈 (휴대폰과 같음) */
+  overflow-wrap: anywhere;
 }
 
 button, input, textarea, select { font: inherit; color: inherit; }
@@ -143,7 +150,7 @@ svg { width: 20px; height: 20px; flex: none; }
 .icon-btn.primary:hover { background: var(--brand-yellow-hover); }
 .icon-btn.danger:hover { color: var(--danger); }
 
-/* 버튼: 기본(흰 바탕) · primary(노랑, 한 화면에 하나) · strong(검정) · danger */
+/* 버튼: 기본(앱 바탕 + 테두리) · primary(노랑, 한 화면에 하나) · danger — 버튼에 검정 바탕은 쓰지 않는다 */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -163,13 +170,6 @@ svg { width: 20px; height: 20px; flex: none; }
 .btn:active { transform: scale(0.98); }
 .btn.primary { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
 .btn.primary:hover { background: var(--brand-yellow-hover); }
-.btn.strong { background: var(--brand-black); color: var(--on-black); box-shadow: none; }
-.btn.strong:hover { background: #2a2a28; }
-/* 다크 모드에서는 검정 바탕 위라 강조 버튼을 밝게 뒤집는다 */
-@media (prefers-color-scheme: dark) {
-  .btn.strong { background: var(--text-strong); color: var(--surface-0); }
-  .btn.strong:hover { background: #ffffff; }
-}
 .btn.danger { background: var(--danger); color: var(--on-danger); box-shadow: none; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -224,21 +224,100 @@ svg { width: 20px; height: 20px; flex: none; }
   animation: coach-in 0.15s ease-out;
 }
 @keyframes coach-in { from { opacity: 0; transform: scale(0.96); } }
-.coach-count { font-size: 11px; font-weight: 700; color: var(--text-muted); }
-.coach-bubble h3 { margin: 2px 0 6px; font-size: 17px; line-height: 24px; font-weight: 800; letter-spacing: -0.015em; }
-.coach-bubble p { margin: 0 0 12px; font-size: 13.5px; line-height: 21px; color: var(--text-strong); }
-.coach-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.coach-try {
-  margin-right: auto;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--brand-yellow-soft);
-  font-size: 12px;
-  font-weight: 700;
+.coach-bubble.wide { width: min(440px, calc(100vw - 24px)); }
+.coach-bubble.enter { animation: coach-pop 0.32s cubic-bezier(0.2, 1.3, 0.4, 1); }
+@keyframes coach-pop { from { opacity: 0; transform: translateY(8px) scale(0.94); } }
+/* 머리: 이모지 · 진행 막대 · 몇 번째 */
+.coach-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.coach-emoji {
+  display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px;
+  background: var(--brand-yellow-soft); font-size: 21px; line-height: 1;
+  animation: coach-bounce 0.6s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
+@keyframes coach-bounce { 0% { transform: scale(0.4) rotate(-20deg); } 70% { transform: scale(1.12) rotate(6deg); } }
+.coach-progress { flex: 1; height: 6px; border-radius: 999px; background: var(--fill-tab); overflow: hidden; }
+.coach-progress i { display: block; height: 100%; border-radius: inherit; background: var(--brand-yellow); transition: width 0.35s ease-out; }
+.coach-count { flex: none; font-size: 11px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.coach-bubble h3 { margin: 2px 0 6px; font-size: 17px; line-height: 24px; font-weight: 800; letter-spacing: -0.015em; }
+.coach-bubble p { margin: 0 0 10px; font-size: 13.5px; line-height: 21px; color: var(--text-strong); }
+/* 해 냈을 때 칭찬 */
+.coach-praise {
+  display: inline-block; margin: 0 0 6px; padding: 3px 10px; border-radius: 999px;
+  background: var(--brand-yellow); color: var(--on-brand); font-size: 12.5px; font-weight: 800;
+  animation: coach-praise 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes coach-praise { from { transform: scale(0.3); opacity: 0; } }
+.coach-confetti {
+  position: absolute; top: 18px; z-index: 1; font-size: 18px; pointer-events: none;
+  animation: coach-confetti 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes coach-confetti {
+  0% { transform: translate(0, 0) scale(0.4) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1.1) rotate(var(--r)); opacity: 0; }
+}
+/* 실제 화면 사진 — 누르면 말풍선이 넓어지며 크게 */
+.coach-shot {
+  display: block; width: 100%; max-height: 150px; margin: 0 0 10px; border-radius: 12px;
+  object-fit: cover; object-position: top center; cursor: zoom-in;
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card); background: var(--fill-tab);
+}
+.coach-bubble.wide .coach-shot { max-height: 320px; object-fit: contain; cursor: zoom-out; }
+/* 직접 해 보기 */
+.coach-try {
+  margin: 0 0 10px; padding: 8px 11px; border-radius: 12px;
+  background: var(--brand-yellow-soft); box-shadow: inset 0 0 0 1.5px var(--brand-yellow);
+  font-size: 13px; font-weight: 700; line-height: 19px;
+  animation: coach-nudge 1.6s ease-in-out 0.4s infinite;
+}
+@keyframes coach-nudge { 0%, 70%, 100% { transform: none; } 80% { transform: translateX(3px); } 90% { transform: translateX(-2px); } }
+.coach-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .coach-skip { padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .coach-skip:hover { background: var(--fill-hover); color: var(--text-strong); }
 .coach-next { height: 34px; padding: 0 14px; font-size: 13px; }
+.coach-next.coach-later { height: 32px; font-size: 12.5px; color: var(--text-muted); }
+/* 직접 해 보는 단계: 비춘 곳이 두근두근 · 둘레는 아주 옅게만 (글자를 고르고 메뉴를 보며 해 볼 수 있게) */
+.coach-spot.pulse { animation: coach-pulse 1.4s ease-in-out infinite; }
+@keyframes coach-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px rgba(0, 0, 0, 0.12); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--brand-yellow) 55%, transparent), 0 0 0 9999px rgba(0, 0, 0, 0.12); }
+}
+/* 접기 단추 · 접힌 알약 (직접 해 보는 동안 가리지 않게) */
+.coach-fold {
+  display: grid; place-items: center; flex: none; width: 26px; height: 26px; margin: -4px -6px -4px 0; padding: 0;
+  border: 0; border-radius: 8px; background: none; color: var(--text-muted); cursor: pointer;
+}
+.coach-fold::before { content: ""; width: 8px; height: 8px; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-2px) rotate(45deg); transition: transform 0.15s; }
+.coach-fold:hover { background: var(--fill-hover); color: var(--text-strong); }
+.coach-bubble.mini {
+  width: auto; max-width: min(340px, calc(100vw - 24px)); padding: 7px 10px 7px 7px; border-radius: 16px; cursor: pointer;
+  box-shadow: var(--shadow-pop), 0 0 0 2px var(--brand-yellow);
+}
+.coach-bubble.mini :is(h3, p, .coach-shot, .coach-actions, .coach-praise, .coach-progress, .coach-count) { display: none; }
+.coach-bubble.mini .coach-head { margin: 0; gap: 8px; }
+.coach-bubble.mini .coach-emoji { width: 30px; height: 30px; font-size: 17px; border-radius: 10px; animation: none; }
+.coach-bubble.mini .coach-try { order: 0; margin: 0; padding: 0; background: none; box-shadow: none; animation: none; font-size: 12.5px; }
+.coach-bubble.mini { display: flex; align-items: center; gap: 8px; }
+.coach-bubble.mini .coach-head { order: 0; }
+.coach-bubble.mini .coach-try { order: 1; flex: 1; min-width: 0; }
+.coach-bubble.mini .coach-head .coach-fold { display: none; } /* 접힌 알약은 눌러서 펼친다 */
+.coach-mini-skip { display: none; }
+.coach-bubble.mini .coach-mini-skip {
+  display: block; flex: none; order: 2; margin: 0 0 0 4px; padding: 5px 9px; border: 0; border-radius: 10px;
+  background: var(--fill-tab); color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+/* 휴대폰: 말풍선을 작게 (화면을 덜 가리게), 키보드가 올라와 화면이 낮으면 사진은 빼고 */
+@media (max-width: 560px) {
+  .coach-bubble { width: min(340px, calc(100vw - 20px)); padding: 12px 14px 10px; }
+  .coach-head { margin-bottom: 6px; }
+  .coach-emoji { width: 32px; height: 32px; font-size: 18px; border-radius: 10px; }
+  .coach-bubble h3 { margin: 0 0 4px; font-size: 15.5px; line-height: 21px; }
+  .coach-bubble p { margin: 0 0 8px; font-size: 13px; line-height: 19px; }
+  .coach-try { margin: 0 0 8px; padding: 7px 10px; font-size: 12.5px; line-height: 18px; }
+  .coach-shot { height: 128px; max-height: none; object-fit: cover; object-position: center; }
+}
+@media (max-height: 620px) and (max-width: 560px) { .coach-shot { display: none; } }
+/* 손 메모 그리기·주석·녹음 중에는 말풍선을 잠시 숨긴다 (그리기를 가리지 않게) — 끝나면 다음 단계로 */
+body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .coach-bubble) { visibility: hidden; }
 
 /* ---------- 움직임 (v0.16.1) — 짧고 조용하게. 움직임 줄이기는 위 규칙이 모두 멈춘다 ---------- */
 /* 아이콘 버튼·버튼: 누르면 살짝 눌림 */
@@ -256,6 +335,90 @@ svg { width: 20px; height: 20px; flex: none; }
 @starting-style { .dialog[open]::backdrop { background-color: rgba(0, 0, 0, 0); } }
 
 @keyframes mk-pop-in { from { opacity: 0; transform: scale(0.95); } }
+/* 여러 화면이 같이 쓰는 움직임: 나타나기 · 깜빡이기(녹음 중 등) · 돌기(불러오는 중) */
+@keyframes mk-fade-in { from { opacity: 0; } }
+@keyframes mk-blink { 50% { opacity: 0.35; } }
+@keyframes mk-spin { to { transform: rotate(360deg); } }
 @keyframes mk-slide-in-right { from { opacity: 0; transform: translateX(16px); } }
 @keyframes mk-rise-in { from { opacity: 0; transform: translateY(6px); } }
 @keyframes mk-drop-in { from { opacity: 0; transform: translateY(-6px); } }
+
+/* 여럿 중 하나 고르기: 선택 표시(흰 칸)가 다음 칸으로 미끄러진다 (seg-slider.js) */
+.mk-slider { position: relative; isolation: isolate; }
+.mk-slider > button { position: relative; z-index: 1; transition: color 0.18s ease-out; }
+.mk-slider > button:active { transform: scale(0.96); }
+.mk-slider > [aria-selected="true"], .mk-slider > [aria-checked="true"] { background: none !important; box-shadow: none !important; }
+.seg-thumb, .mk-slider > .tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.28s cubic-bezier(0.3, 1.3, 0.5, 1), width 0.28s cubic-bezier(0.3, 1.3, 0.5, 1), height 0.2s ease-out, opacity 0.15s;
+}
+
+/* 켜기/끄기 스위치 (체크박스) — 메모 창 · 목록 · PDF · 휴대폰 (휴대폰은 mobile.css 가 손가락 크기로) */
+.switch {
+  appearance: none;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex: none;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--text-faint); /* 꺼진 스위치도 바탕과 3:1 이상 */
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface-1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s;
+}
+.switch:checked { background: var(--brand-yellow); }
+.switch:checked::after { transform: translateX(16px); background: var(--brand-black); }
+.switch:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Ctrl+휠 확대 배지 (메모 창 · 목록 창) */
+.zoom-badge {
+  position: fixed;
+  right: 14px;
+  bottom: 16px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
+  font: 600 12px/22px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--bubble-shadow);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+  pointer-events: none;
+}
+.zoom-badge.show { opacity: 1; transform: none; pointer-events: auto; }
+.zoom-badge button {
+  height: 22px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fill-tab);
+  box-shadow: inset 0 0 0 1px var(--bubble-line);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.zoom-badge button:hover { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }

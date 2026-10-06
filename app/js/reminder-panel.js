@@ -59,7 +59,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle }) {
     sub.className = 'rem-sub';
     const next = nextLabel(r);
     const state = isDone(r) ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : next ? `다음 ${next}` : '';
-    sub.textContent = [state, r.action === 'open' ? '메모 띄우기' : '알림만 보내기'].filter(Boolean).join(' · ');
+    sub.textContent = [state, r.action === 'open' ? '메모 바로 열기' : '알림으로 받기'].filter(Boolean).join(' · ');
     text.append(title, sub);
 
     const toggle = document.createElement('input');
@@ -77,7 +77,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle }) {
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'icon-btn';
-    del.title = '지우기';
+    del.title = '삭제';
     del.setAttribute('aria-label', `${title.textContent} 지우기`);
     del.append(icon('trash'));
     del.addEventListener('click', () => save(reminders.filter((x) => x.id !== r.id)));

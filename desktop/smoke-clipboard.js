@@ -48,7 +48,7 @@ export async function runClipboardChecks({
 
   const backup = helper('backup', { Dir: backupDir });
   try {
-    const { id, win } = await newNote(() => js(list, `document.getElementById('new-btn').click()`));
+    const { id, win } = await newNote(() => js(list, `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     win.webContents.insertText('붙여넣기 점검');
     await wait(100);
 
@@ -203,7 +203,7 @@ export async function runClipboardChecks({
 
     // Q4) 실제 복사: 메모 창에서 글을 선택해 두고 빠른 메모 → 도우미가 앞 창에 Ctrl+C 를 보내 복사
     clip.text('이전 클립보드 내용');
-    const src = await newNote(() => js(list, `document.getElementById('new-btn').click()`));
+    const src = await newNote(() => js(list, `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     src.win.webContents.insertText('선택해서 빠른 메모로 보낼 글');
     await wait(200);
     src.win.focus();

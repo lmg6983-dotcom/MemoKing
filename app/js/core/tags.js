@@ -56,7 +56,9 @@ export function unescapeTags(md) {
       return line;
     }
     if (fence) return line;
-    return line.replace(new RegExp(`(^|[\\s>\\]])\\\\#(?=${TAG_CHAR})`, 'gu'), '$1#');
+    // 줄 맨 앞 띄어쓰기(&#x20;)는 보이지도 않으니 버린다 — " #할일" 처럼 띄우고 태그를 쳐도 "&#x20;\#할일" 이 되지 않게
+    const trimmed = line.replace(/^((?:\s*>)*\s*(?:[-*+] (?:\[[ xX]\] )?|\d+[.)] )?)(?:&#x20;)+/, '$1');
+    return trimmed.replace(new RegExp(`(^|[\\s>\\]])\\\\#(?=${TAG_CHAR})`, 'gu'), '$1#');
   }).join('\n');
 }
 

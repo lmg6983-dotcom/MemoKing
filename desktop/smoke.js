@@ -7,6 +7,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { dropBounds, DEFAULT_NOTE_SIZE } from './placement.js';
+import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
 
 const ICON_PNG = path.join(import.meta.dirname, '..', 'assets', 'icons', 'icon-256.png');
 
@@ -235,7 +236,7 @@ export async function runSmoke({
     check('v0.1.0 메모를 md 파일로 옮김', old && old.pinned, old?.file);
 
     // 2) 새 메모: 제목·굵게·체크리스트를 단축키로
-    const n1 = await newNote(() => js(list, `document.getElementById('new-btn').click()`));
+    const n1 = await newNote(() => js(list, `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await type(n1.win, '장보기 목록');
     await key(n1.win, '1', ['control']);
     await key(n1.win, 'Enter');
@@ -313,7 +314,7 @@ export async function runSmoke({
       attachments.join(', '));
 
     // 5) 두 번째 메모 + 연결 패널에서 검색해 연결
-    const n2 = await newNote(() => js(list, `document.getElementById('new-btn').click()`));
+    const n2 = await newNote(() => js(list, `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await type(n2.win, '마트 영수증');
     await key(n2.win, 'Enter');
     await type(n2.win, '우유와 계란을 샀다');
@@ -394,12 +395,13 @@ export async function runSmoke({
     const panelShown = await js(reopened.win, `(() => { const p = document.getElementById('more-panel'); const r = p.getBoundingClientRect(); return !p.hidden && r.left >= 0 && r.right <= innerWidth; })()`);
     await capture(reopened.win, 'smoke-toolbar-narrow.png');
     await key(reopened.win, 'Escape');
-    check('좁은 창: 넘친 버튼은 » 더보기로 (14개 모두 접근 가능 — v0.13.0 표 버튼 포함)',
-      narrow.fits && narrow.moreShown && narrow.inPanel > 0 && narrow.inBar + narrow.inPanel === 14 && panelShown, JSON.stringify({ ...narrow, panelShown }));
+    // 서식 버튼 11개 (v0.21.0 첨부·표·녹음은 + 콘텐츠 추가 안으로 — 휴대폰과 같음)
+    check('좁은 창: 넘친 버튼은 » 더보기로 (11개 모두 접근 가능 — + 콘텐츠 추가 포함)',
+      narrow.fits && narrow.moreShown && narrow.inPanel > 0 && narrow.inBar + narrow.inPanel === 11 && panelShown, JSON.stringify({ ...narrow, panelShown }));
     reopened.win.setSize(760, 520);
     await wait(500);
     const wide = await toolbar();
-    check('넓은 창: 모든 버튼이 막대에 (더보기 없음)', wide.fits && !wide.moreShown && wide.inBar === 14, JSON.stringify(wide));
+    check('넓은 창: 모든 버튼이 막대에 (더보기 없음)', wide.fits && !wide.moreShown && wide.inBar === 11, JSON.stringify(wide));
     await capture(reopened.win, 'smoke-toolbar-wide.png');
     reopened.win.setBounds(wideBounds);
     await wait(300);
@@ -530,7 +532,7 @@ export async function runSmoke({
     await wait(300);
     const menu = labels();
     check('트레이 아이콘·메뉴 (목록 열기, 새 메모, 최근 메모, 종료)',
-      getTray() && !getTray().isDestroyed() && ['메모 목록 열기', '새 메모', '메모킹 끄기'].every((l) => menu.includes(l)) && menu.includes('장보기 목록'),
+      getTray() && !getTray().isDestroyed() && ['메모 목록 열기', '새 메모', '메모킹 종료'].every((l) => menu.includes(l)) && menu.includes('장보기 목록'),
       menu.join(' | '));
 
     list.close();
@@ -552,7 +554,7 @@ export async function runSmoke({
     const { server, base } = await startImageServer();
     imageServer = server;
     const png = fs.readFileSync(ICON_PNG);
-    const webNote = await newNote(() => js(getList(), `document.getElementById('new-btn').click()`));
+    const webNote = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     // 상태 표시는 곧 "저장됨" 으로 바뀌므로 변화 기록에서 안내 문구를 찾는다
     await js(webNote.win, `new MutationObserver(() => (window.__statusLog ??= []).push(document.getElementById('status').textContent))
       .observe(document.getElementById('status'), { childList: true, characterData: true, subtree: true })`);
@@ -616,7 +618,7 @@ export async function runSmoke({
       document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
     })()`);
     const articleUrl = `${base}/article.html`;
-    const linkNote = await newNote(() => js(getList(), `document.getElementById('new-btn').click()`));
+    const linkNote = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await pasteText(linkNote.win, articleUrl);
     const cardTitle = await until(() => js(linkNote.win, `(() => { const c = document.querySelector('.mk-link-card[data-state="ok"]'); return c && c.querySelector('.lc-title').textContent; })()`), '링크 카드').catch(() => null);
     check('빈 줄에 주소 붙여넣기 → 링크 카드 (사이트 제목)', cardTitle === '메모킹 기사 제목', cardTitle);
@@ -709,7 +711,7 @@ export async function runSmoke({
 
     // 13-2) 태그 · # 자동완성 · 목록 필터 (v0.11.0)
     const lj = (code) => js(getList(), code);
-    const tagNote1 = await newNote(() => lj(`document.getElementById('new-btn').click()`));
+    const tagNote1 = await newNote(() => lj(`(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await type(tagNote1.win, '주간 회의');
     await key(tagNote1.win, 'Enter');
     await type(tagNote1.win, '#업무 안건 정리 #회의');
@@ -721,7 +723,7 @@ export async function runSmoke({
     const tagMd1 = readMemo(tagNote1.id);
     check('줄 맨 앞 #태그 도 파일에 #태그 그대로 (\\# 아님)', /\n#업무 안건 정리 #회의\n/.test(tagMd1) && !tagMd1.includes('\\#'), tagMd1.split('---').slice(2).join('---'));
 
-    const tagNote2 = await newNote(() => lj(`document.getElementById('new-btn').click()`));
+    const tagNote2 = await newNote(() => lj(`(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await type(tagNote2.win, '출장 준비물 ');
     await type(tagNote2.win, '#');
     const allSuggest = await until(() => js(tagNote2.win, `(() => { const b = document.querySelector('.tag-suggest'); return b && !b.hidden && [...b.querySelectorAll('.tag-suggest-item span')].map((s) => s.textContent); })()`), '자동완성 목록').catch(() => null);
@@ -800,7 +802,7 @@ export async function runSmoke({
     const tabShown = (id) => Boolean(noteWins.get(id)?.isVisible());
     const tabsIn = (id) => js(noteWins.get(id), `[...document.querySelectorAll('#stack-tabs .stack-tab')].map((t) => ({ id: t.dataset.tabId, title: t.querySelector('.stack-title').textContent, on: t.getAttribute('aria-selected') === 'true' }))`);
     async function titledNote(title) {
-      const n = await newNote(() => lj(`document.getElementById('new-btn').click()`));
+      const n = await newNote(() => lj(`(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
       await type(n.win, title);
       await until(() => vault.get(n.id)?.title === title, `${title} 저장`).catch(() => {});
       return n;
@@ -948,11 +950,11 @@ export async function runSmoke({
     await coachNext(getList());
     const newStep = await waitStep(getList, 'new-memo');
     await wait(350); // 비추는 테두리가 옮겨 가는 움직임(0.2초)이 끝난 뒤
-    const spotOnBtn = await js(getList(), `(() => { const s = document.querySelector('.coach-spot').getBoundingClientRect(); const b = document.getElementById('new-btn').getBoundingClientRect(); return s.left <= b.left && s.right >= b.right && s.top <= b.top && s.bottom >= b.bottom && s.width < b.width + 20; })()`);
+    const spotOnBtn = await js(getList(), `(() => { const s = document.querySelector('.coach-spot').getBoundingClientRect(); const b = document.getElementById('fab').getBoundingClientRect(); return s.left <= b.left && s.right >= b.right && s.top <= b.top && s.bottom >= b.bottom && s.width < b.width + 20; })()`);
     const noNext = await js(getList(), `!document.querySelector('.coach-bubble .coach-next') && !!document.querySelector('.coach-try')`);
     check('따라 하기 단계: + 버튼만 밝게 비추고 "직접 해 보세요" (다음 버튼 없음)', newStep && spotOnBtn && noNext);
     const notesBeforeTutorial = new Set(noteWins.keys());
-    await js(getList(), `document.getElementById('new-btn').click()`);
+    await js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`);
     const tutMemo = await until(() => [...noteWins.keys()].find((k) => !notesBeforeTutorial.has(k)), '튜토리얼 메모').catch(() => null);
     const tutWin = () => noteWins.get(tutMemo);
     const writeStep = tutMemo && (await ready(tutWin()).then(() => waitStep(tutWin, 'write')));
@@ -964,25 +966,26 @@ export async function runSmoke({
       const formatStep = await waitStep(tutWin, 'format');
       const barShown = formatStep && (await js(tutWin(), `!document.body.classList.contains('bar-hidden')`));
       check('글을 쓰면 → 저절로 다음 단계 (튜토리얼 동안 서식 도구막대는 보임)', formatStep && barShown);
-      await coachNext(tutWin());
-      await waitStep(tutWin, 'lists');
-      await coachNext(tutWin());
-      await waitStep(tutWin, 'tag');
+      // 안내만 하는 단계는 "다음"으로, 직접 해 보는 단계(태그·닫기)는 실제로 해서 넘어간다
+      const stepIds = TUTORIAL_STEPS.map((x) => x.id);
+      const walk = async (win, from, to) => {
+        for (const id of stepIds.slice(stepIds.indexOf(from) + 1, stepIds.indexOf(to) + 1)) {
+          await coachNext(win());
+          await waitStep(win, id);
+        }
+      };
+      await walk(tutWin, 'format', 'tag');
       await type(tutWin(), ' #할일 ');
       const crownStep = await waitStep(tutWin, 'crown');
       check('#태그를 쓰면 → 저절로 다음 단계', crownStep);
-      await coachNext(tutWin());
-      await waitStep(tutWin, 'bar');
+      await walk(tutWin, 'crown', 'bar');
       await capture(tutWin(), 'smoke-tutorial-note.png');
       await coachNext(tutWin());
       await waitStep(tutWin, 'close');
       await js(tutWin(), `document.getElementById('close-btn').click()`);
       const cardsStep = await waitStep(getList, 'cards');
       check('메모를 닫으면 → 목록 창으로 돌아와 다음 단계', cardsStep && !noteWins.has(tutMemo) && vault.get(tutMemo)?.title.startsWith('튜토리얼 메모'), JSON.stringify({ cardsStep, open: noteWins.has(tutMemo), title: vault.get(tutMemo)?.title }));
-      for (const id of ['filters', 'tabs', 'quick', 'magic', 'settings', 'done']) {
-        await coachNext(getList());
-        await waitStep(getList, id);
-      }
+      await walk(getList, 'cards', 'done');
       await coachNext(getList());
       const finished = await until(async () => !getTutorial().active && (await bubbleStep(getList())) === null, '튜토리얼 끝').catch(() => false);
       check('마지막 단계까지 → 말풍선이 사라지고 끝', finished);
@@ -1103,7 +1106,7 @@ export async function runSmoke({
     check('메모킹 알림도 보관함에 기록', history.list().filter((e) => e.source === 'memoking').length >= 3);
     await listJs(`document.querySelector('[data-tab="history"]').click()`);
     await wait(300);
-    await listJs(`document.getElementById('history-disable').click()`); // "보관 켜기"
+    await listJs(`document.getElementById('history-enable').click()`); // 설명·동의 화면의 "보관 시작하기"
     const collected = await until(() => history.list().filter((e) => e.source === 'windows').length === 2, '알림 수집').catch(() => false);
     await wait(400);
     const shown = await listJs(`[...document.querySelectorAll('#history-rows .noti-title')].map((t) => t.textContent)`);
@@ -1128,7 +1131,7 @@ export async function runSmoke({
     const notiMd = readMemo(memoFromNoti.id);
     check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림 · /.test(notiMd));
     await closeNote(memoFromNoti.id);
-    await listJs(`document.querySelector('#history-rows .noti [aria-label="지우기"]').click()`);
+    await listJs(`document.querySelector('#history-rows .noti [aria-label="삭제"]').click()`);
     await wait(300);
     check('보관한 알림 지우기', history.list({ query: '회의' }).length === 0);
     await listJs(`(() => { const s = document.getElementById('search'); s.value = ''; s.dispatchEvent(new Event('input')); })()`);
@@ -1146,7 +1149,7 @@ export async function runSmoke({
     // 17) 빠른 메모 단축키 등록 확인 — 점검 중 사용자의 Ctrl+Alt+C 를 붙잡지 않도록 바로 해제
     const registered = registerQuickMemoKey();
     // 설치된 메모킹이 켜져 있으면 그쪽이 단축키를 쓰고 있으므로 등록 확인은 건너뛴다
-    const otherRunning = !registered && execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    const otherRunning = !registered && process.platform === 'win32' && execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
       "Get-CimInstance Win32_Process -Filter \"Name='MemoKing.exe'\" | ForEach-Object { $_.ExecutablePath }"], { encoding: 'utf8' })
       .split(/\r?\n/).map((p) => p.trim().toLowerCase()).filter(Boolean)
       .some((p) => p !== process.execPath.toLowerCase());

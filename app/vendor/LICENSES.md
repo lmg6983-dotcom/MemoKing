@@ -6,6 +6,10 @@
 | yaml | 2.9.1 | ISC | github:eemeli/yaml |
 | plyr | 3.8.4 | MIT | git://github.com/sampotts/plyr |
 | pretendard | 1.3.9 | OFL-1.1 | https://github.com/orioncactus/pretendard |
+| katex | 0.16.22 | MIT | https://github.com/KaTeX/KaTeX |
+| remark-math | 6.0.0 | MIT | https://github.com/remarkjs/remark-math/tree/main/packages/remark-math |
+| html-to-image | 1.11.13 | MIT | https://github.com/bubkoo/html-to-image |
 | canvas-confetti | 1.9.4 | ISC | https://github.com/catdad/canvas-confetti |
 | tesseract.js (+ tesseract.js-core, kor tessdata_best) | 7.0.0 | Apache-2.0 | https://github.com/naptha/tesseract.js |
 | fuzzysort | 4.0.2 | MIT | https://github.com/farzher/fuzzysort |
+| perfect-freehand | 1.2.3 | MIT | https://github.com/steveruizok/perfect-freehand |

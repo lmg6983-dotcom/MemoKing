@@ -2,6 +2,8 @@
 import { icon } from './icons.js';
 
 const pad = (v) => String(v).padStart(2, '0');
+// 알림 그림 주소 (안드로이드는 window.memoking.historyBase 로 자기 주소를 알려 준다)
+const historyUrl = (name) => `${globalThis.memoking?.historyBase ?? 'memoking://history/'}${encodeURIComponent(name)}`;
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
 
 function dayLabel(d, now = new Date()) {
@@ -35,7 +37,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     if (e.image && e.source !== 'popup') {
       const img = document.createElement('img');
       img.className = 'avatar';
-      img.src = `memoking://history/${encodeURIComponent(e.image)}`;
+      img.src = historyUrl(e.image);
       img.alt = '';
       img.onerror = () => img.replaceWith(letter(e));
       return img;
@@ -101,7 +103,7 @@ export function setupHistoryTab({ api, els, confirm }) {
       if (e.body) div.classList.add('has-text');
       const shot = document.createElement('img');
       shot.className = 'noti-shot';
-      shot.src = `memoking://history/${encodeURIComponent(e.image)}`;
+      shot.src = historyUrl(e.image);
       shot.alt = `${e.app} 알림 창`;
       shot.loading = 'lazy';
       shot.onerror = () => shot.remove();
@@ -113,14 +115,21 @@ export function setupHistoryTab({ api, els, confirm }) {
     actions.append(
       actionButton('note', '메모로 만들기', () => api.history.toMemo(e.id)),
       actionButton('copy', '복사', () => api.copyText([e.title, e.body].filter(Boolean).join('\n'))),
-      actionButton('trash', '지우기', () => api.history.remove(e.id)),
+      actionButton('trash', '삭제', () => api.history.remove(e.id)),
     );
+    // 이 앱 알림 그만 모으기 (안드로이드)
+    if (api.history.block && e.source !== 'memoking') actions.append(actionButton('block', `${e.app} 알림 그만 모으기`, () => api.history.block(e)));
 
     div.append(avatar(e), text, actions);
     // 누르면 내용 펼치기 / 메모킹 알림은 그 메모 열기
     div.addEventListener('click', () => {
       if (e.memoId) api.memo.open(e.memoId);
-      else div.classList.toggle('expanded');
+      else {
+        // 펼친 알림은 하나만: 다른 알림을 누르면 앞의 것은 접는다
+        const open = !div.classList.contains('expanded');
+        for (const other of els.rows.querySelectorAll('.noti.expanded')) other.classList.remove('expanded');
+        div.classList.toggle('expanded', open);
+      }
     });
     return div;
   }
@@ -163,7 +172,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     refresh();
   });
   els.clear.addEventListener('click', async () => {
-    if (await confirm(`보관한 알림 ${data.total}개를 모두 지울까요?\n지운 알림은 되돌릴 수 없어요.`, '모두 지우기')) api.history.clear();
+    if (await confirm(`보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`, '모두 삭제')) api.history.clear();
   });
   els.app.addEventListener('change', () => {
     app = els.app.value;

@@ -7,7 +7,7 @@
 //       action: open            # open(메모 띄우기) | notify(알림만)
 //       created: 2026-09-30T10:00:00+09:00
 //       last: 2026-10-01T09:00:02+09:00   # 마지막으로 울린 시각
-import { toLocalIso, dateKey } from './time.js';
+import { toLocalIso, dateKey, hhmm } from './time.js';
 
 export const KINDS = ['timer', 'at', 'repeat', 'startup'];
 export const EVERY = ['day', 'week', 'month', 'year'];
@@ -50,7 +50,7 @@ export function normalizeReminder(raw, now = new Date()) {
     const every = EVERY.includes(src.every) ? src.every : 'day';
     const repeat = { every, time: parseTime(src.time).text };
     if (every === 'week') {
-      const days = Array.isArray(src.weekdays) ? src.weekdays.map(Number).filter((d) => d >= 0 && d <= 6) : [];
+      const days = Array.isArray(src.weekdays) ? src.weekdays.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [];
       repeat.weekdays = [...new Set(days.length ? days : [validDate(r.created).getDay()])].sort((a, b) => a - b);
     }
     if (every === 'month' || every === 'year') repeat.day = Math.min(31, Math.max(1, Number(src.day) || 1));
@@ -151,8 +151,6 @@ export const isDone = (r) => !r.enabled && Boolean(r.last) && (r.kind === 'timer
 
 // ---------- 화면용 문구 ----------
 
-const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
 // 오늘 14:00 / 내일 09:00 / 10월 3일(금) 09:00 / 2027년 1월 2일(토) 09:00
 export function formatWhen(date, now = new Date()) {
   const d = new Date(date);
@@ -176,8 +174,8 @@ export function describeReminder(r, now = new Date()) {
       const { every, time, weekdays, day, month } = r.repeat;
       if (every === 'day') return `매일 ${time}`;
       if (every === 'week') {
-        const names = weekdays.length === 7 ? '매일' : weekdays.map((w) => WEEKDAY[w]).join('·');
-        return `매주 ${names} ${time}`;
+        if (weekdays.length === 7) return `매일 ${time}`; // "매주 매일" 이 아니라
+        return `매주 ${weekdays.map((w) => WEEKDAY[w]).join('·')} ${time}`;
       }
       if (every === 'month') return `매월 ${day}일 ${time}`;
       return `매년 ${month}월 ${day}일 ${time}`;

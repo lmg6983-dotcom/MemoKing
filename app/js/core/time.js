@@ -13,5 +13,14 @@ export function toLocalIso(date = new Date()) {
   );
 }
 
+// ---------- 화면 표시 조각 (format · reminders · voice-card · memo-file 이 함께 쓴다) ----------
+export const pad2 = (v) => String(v).padStart(2, '0');
+/** 09:05 */
+export const hhmm = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+/** 오후 3:12 */
+export const koClock = (d) => `${d.getHours() < 12 ? '오전' : '오후'} ${d.getHours() % 12 || 12}:${pad2(d.getMinutes())}`;
+/** 10월 4일 */
+export const koMonthDay = (d) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
+
 // 같은 날인지 비교용 키: 2026-09-29
 export const dateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;

@@ -14,6 +14,7 @@ function inlineText(node, breakAs = '\n') {
   node.forEach((child) => {
     if (child.isText) s += child.text;
     else if (isBreak(child)) s += breakAs;
+    else if (child.type.name === 'math_inline') s += `$${child.attrs.value}$`;
     else if (child.type.name === 'html') s += ''; // 그 밖의 HTML 조각(밑줄·색 표시 등)은 글이 아니다
     else if (child.isInline && child.content.size) s += inlineText(child, breakAs);
   });
@@ -72,20 +73,30 @@ export function plainTextOf(fragment, { openStart = 0, openEnd = 0 } = {}) {
       });
       return;
     }
-    if (name === 'table') {
-      node.forEach((row) => {
-        const cells = [];
-        row.forEach((cell) => {
-          const parts = [];
-          cell.forEach((b) => parts.push(inlineText(b, ' ')));
-          cells.push(parts.join(' ').replace(/\t/g, ' ').trim());
-        });
-        lines.push(indent + cells.join('\t'));
+    // 표 · 칸 몇 개만 고른 것(행들): 행마다 한 줄, 칸 사이는 탭
+    const row = (r) => {
+      const cells = [];
+      r.forEach((cell) => {
+        const parts = [];
+        cell.forEach((b) => parts.push(inlineText(b, ' ')));
+        cells.push(parts.join(' ').replace(/\t/g, ' ').trim());
       });
+      lines.push(indent + cells.join('\t'));
+    };
+    if (name === 'table') {
+      node.forEach(row);
+      return;
+    }
+    if (name === 'table_row' || name === 'table_header_row') {
+      row(node);
       return;
     }
     if (name === 'hr') {
       lines.push(`${indent}———`);
+      return;
+    }
+    if (name === 'math_block') {
+      lines.push(...String(node.attrs.value ?? '').split('\n').map((l) => indent + l));
       return;
     }
     if (name === 'mk_link_card') {

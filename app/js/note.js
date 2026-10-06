@@ -1,21 +1,29 @@
 // 스티커 메모 창 — 메모 1개 = 창 1개 = 파일 1개.
 import { injectIcons, icon } from './icons.js';
 import { createNoteEditor } from './editor.js';
-import { COLORS, extractTitle, isBlankBody } from './core/memo-file.js';
+import { COLORS, COLOR_NAMES, extractTitle, isBlankBody, conflictCopyBody, sameBody } from './core/memo-file.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from './core/html-marks.js';
 import { fileExtension } from './media.js';
 import { isDataImage, decodeDataImage } from './core/remote-images.js';
 import { setupReminderPanel } from './reminder-panel.js';
 import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
+import { tutorialCounts, tutorialDone } from './core/tutorial.js';
 import { setupCoach } from './coach.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
+import { attachSliders } from './seg-slider.js';
+import { setupVoiceRecorder } from './voice-recorder.js';
+import { setupAnnotation } from './ink-annotate.js';
+import { audioNeedingTranscript } from './core/voice-card.js';
+import { reduceMotion, replayClass } from './dom.js';
+import { createClearStamp } from './clear-stamp.js';
+import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 
 const SAVE_DELAY = 600;
-const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 
 const api = window.memoking;
-const id = new URLSearchParams(location.search).get('id');
+const params = new URLSearchParams(location.search);
+const id = params.get('id');
 const $ = (x) => document.getElementById(x);
 const el = {
   status: $('status'),
@@ -46,8 +54,31 @@ const el = {
 
 let editor = null;
 let reminderPanel = null;
+let recorder = null; // 음성 녹음 (voice-recorder.js)
+let annotation = null; // 주석: 메모 위에 그리기 (ink-annotate.js)
+
+// 녹음 받아쓰기를 메인 프로세스와 잇는다 (녹음마다 번호)
+function sttBridge() {
+  let seq = 0;
+  let cur = 0;
+  const lineFns = [];
+  const speakFns = [];
+  api.on('stt:line', ({ id: n, text }) => n === cur && lineFns.forEach((f) => f(text)));
+  api.on('stt:speaking', ({ id: n, on }) => n === cur && speakFns.forEach((f) => f(on)));
+  return {
+    start: () => {
+      cur = ++seq;
+      return api.stt.start(cur);
+    },
+    audio: (samples) => api.stt.audio(cur, samples),
+    stop: ({ src }) => api.stt.stop(cur, { memoId: id, src }),
+    onLine: (f) => lineFns.push(f),
+    onSpeaking: (f) => speakFns.push(f),
+  };
+}
 let memo = null;
 let current = '';   // 편집기의 최신 마크다운
+let tutBase = null; // 튜토리얼 직접 해 보기 단계가 시작될 때의 본문 수 (core/tutorial.js tutorialCounts)
 let saved = '';     // 마지막으로 저장한 마크다운
 let saveTimer = null;
 let pendingExternal = null;
@@ -65,12 +96,55 @@ function isDirty() {
   return current !== saved;
 }
 
+// ---------- 추천 태그 (휴대폰과 같음): 태그 없는 메모에 이 폴더의 태그 중 맞는 것을 아래 막대에 ----------
+const tagBar = $('tag-suggest-bar');
+let tagTimer = 0;
+let tagDismissed = false;
+let tagSeq = 0;
+function scheduleTagBar() {
+  clearTimeout(tagTimer);
+  tagTimer = setTimeout(renderTagBar, 1500); // 쓰는 동안은 기다렸다가
+}
+async function renderTagBar() {
+  if (!tagBar || !editor || tagDismissed) return;
+  const body = editor.getMarkdown();
+  if (extractTags(body).length) {
+    tagBar.hidden = true;
+    return;
+  }
+  const seq = ++tagSeq;
+  let list = [];
+  try {
+    list = (await api.tags.suggest?.(body, id)) ?? [];
+  } catch {
+    list = [];
+  }
+  if (seq !== tagSeq) return;
+  fillSuggestChips($('tag-suggest-chips'), list, addTags);
+  tagBar.hidden = list.length === 0;
+}
+function addTags(names) {
+  if (!editor || !names.length) return;
+  editor.appendMarkdown(names.map((n) => `#${n}`).join(' '));
+  flush();
+  setStatus(`${names.map((n) => `#${n}`).join(' ')} 태그를 달았어요`);
+  tagBar.hidden = true;
+}
+tagBar?.addEventListener('mousedown', (e) => e.preventDefault()); // 커서 유지
+$('tag-suggest-close')?.addEventListener('click', () => {
+  tagDismissed = true;
+  tagBar.hidden = true;
+});
+
 function onChange(md) {
   current = md;
-  // 튜토리얼 따라 하기: 글을 쓰면 · 태그를 붙이면 다음 단계로
+  scheduleTagBar();
+  // 튜토리얼 따라 하기: 글을 쓰면 · 꾸미면 · 체크리스트 · 태그를 붙이면 (단계 시작 때보다 늘면) 다음 단계로
   const advance = coach?.step?.advance;
-  if (advance === 'typed' && !isBlankBody(md)) api.tutorial.event('typed');
-  if (advance === 'tagged' && extractTags(md).length) api.tutorial.event('tagged');
+  if (advance && tutBase && tutorialDone(advance, tutBase, tutCounts(md))) {
+    tutBase = null;
+    api.tutorial.event(advance);
+  }
   document.title = extractTitle(md);
   if (current === saved) return;
   setStatus('');
@@ -78,24 +152,8 @@ function onChange(md) {
   saveTimer = setTimeout(flush, SAVE_DELAY);
 }
 
-// 빈 메모 안내 문구: 편집기 내용이 바뀌는 즉시 끄고 켠다. 한글 조합 중에는 글자가 아직 문서에 안 들어왔어도 끈다.
-let docEmpty = true;
-let composing = false;
-function showPlaceholder(empty = docEmpty) {
-  docEmpty = empty;
-  el.editorRoot.classList.toggle('is-empty', empty && !composing);
-}
-el.editorRoot.addEventListener('compositionstart', () => {
-  composing = true;
-  showPlaceholder();
-});
-el.editorRoot.addEventListener('compositionend', () => {
-  composing = false;
-  showPlaceholder();
-});
-el.editorRoot.addEventListener('beforeinput', (e) => {
-  if (e.inputType.startsWith('insert') && docEmpty) el.editorRoot.classList.remove('is-empty');
-});
+// 빈 메모 안내 문구
+const showPlaceholder = trackPlaceholder(el.editorRoot);
 
 async function flush() {
   clearTimeout(saveTimer);
@@ -108,7 +166,7 @@ async function flush() {
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
-    setStatus('저장하지 못했어요. 메모 폴더가 연결돼 있는지 확인해 주세요.', true);
+    setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
   }
 }
 
@@ -131,23 +189,56 @@ function applyExternal(next) {
   setStatus('바뀐 내용을 불러왔어요');
 }
 
-api.on('memo:external', (next) => {
+let conflictCopy = null; // 쓰는 중에 다른 기기에서도 고쳐 들어온 내용을 따로 남긴 사본 메모 (창이 열린 동안 한 사본만)
+
+function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
+  el.bannerText.textContent = text;
+  $('banner-load').hidden = !load;
+  if (load) $('banner-load').textContent = load;
+  $('banner-keep').textContent = keep;
+  el.banner.hidden = false;
+}
+
+api.on('memo:external', async (next) => {
   if (!next) return;
-  if (!isDirty()) applyExternal(next);
-  else {
-    pendingExternal = next;
-    el.bannerText.textContent = '다른 곳에서 이 메모를 고쳤어요.';
-    el.banner.hidden = false;
+  if (sameBody(next.body, current)) {
+    saved = current; // 지금 쓰는 글과 같은 내용 — 할 일 없음
+    return;
   }
+  if (!isDirty()) return applyExternal(next);
+  // 쓰는 중에 다른 기기에서도 고쳤을 때: 지금 쓰는 글은 이 메모에 그대로 저장하고, 들어온 내용은 사본 메모로 따로
+  // (고르기 전에 자동 저장이 들어온 내용을 덮어써 사라지는 일이 없게 — 휴대폰과 같게). 사본을 못 만들면 예전처럼 고르게
+  let copied = isBlankBody(next.body);
+  if (!copied) {
+    try {
+      conflictCopy = await api.memo.keepCopy(id, conflictCopyBody(next.body), conflictCopy);
+      copied = Boolean(conflictCopy);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  if (!copied) {
+    pendingExternal = next;
+    showBanner('다른 기기에서 이 메모가 바뀌었어요.', { load: '바뀐 내용 보기', keep: '지금 내용 두기' });
+    return;
+  }
+  pendingExternal = null;
+  await flush();
+  showBanner(conflictCopy ? '다른 기기에서도 이 메모를 고쳤어요. 그쪽 내용은 따로 저장해 뒀어요.' : '다른 기기에서도 이 메모를 고쳤어요.', { load: conflictCopy ? '그쪽 내용 보기' : null, keep: '확인' });
 });
 api.on('memo:removed', () => {
-  el.bannerText.textContent = '메모 폴더에서 이 메모가 사라졌어요. 계속 쓰면 다시 저장할게요.';
-  $('banner-load').hidden = true;
-  el.banner.hidden = false;
+  showBanner('이 메모가 메모 폴더에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
 });
-$('banner-load').addEventListener('click', () => pendingExternal && applyExternal(pendingExternal));
+$('banner-load').addEventListener('click', () => {
+  if (pendingExternal) return applyExternal(pendingExternal);
+  if (conflictCopy) {
+    el.banner.hidden = true;
+    api.memo.open(conflictCopy);
+  }
+});
 $('banner-keep').addEventListener('click', () => {
   el.banner.hidden = true;
+  if (!pendingExternal) return; // 사본으로 따로 남긴 뒤라 고를 것이 없다
   pendingExternal = null;
   saved = '';
   flush(); // 내 내용으로 덮어쓴다
@@ -156,11 +247,14 @@ $('banner-keep').addEventListener('click', () => {
 // ---------- 색·고정·항상 위 ----------
 
 function applyMeta(next) {
+  const inkBefore = memo?.ink ?? '';
   memo = { ...memo, ...next };
+  // 다른 기기에서 주석이 바뀌면 다시 (주석을 그리는 중이면 끝낼 때 내 것이 저장된다)
+  if (annotation && !annotation.active && (memo.ink ?? '') !== inkBefore) annotation.load(Boolean(memo.ink));
   document.body.dataset.color = memo.color;
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
-  el.pinToggle.querySelector('span').textContent = memo.pinned ? '목록 맨 위 고정 풀기' : '목록 맨 위에 고정';
+  el.pinToggle.querySelector('span').textContent = memo.pinned ? '고정 해제' : '맨 위에 고정';
 }
 
 for (const color of COLORS) {
@@ -189,7 +283,7 @@ function applyTop(on) {
   el.topBtn.classList.toggle('peeled', on);
   el.topBtn.tabIndex = on ? -1 : 0;
   el.topBtn.setAttribute('aria-hidden', String(on));
-  if (changed && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (changed && !reduceMotion()) {
     el.topBtn.querySelector('svg').animate(on
       ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
       : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
@@ -206,6 +300,7 @@ function applyTop(on) {
 async function toggleTop() {
   if (topOn) return;
   applyTop(await api.win.toggleTop(id));
+  if (topOn) tutEvent('crown-on');
 }
 el.topBtn.addEventListener('click', toggleTop);
 $('pdf-btn').addEventListener('click', async () => {
@@ -213,20 +308,73 @@ $('pdf-btn').addEventListener('click', async () => {
   await flush(); // 지금 적은 내용까지 PDF 에
   api.pdf.open(id);
 });
+// 소리 받아쓰기: 이 메모의 받아쓴 글이 없는 소리 파일들을 글로 (녹음할 때 받아쓰기 데이터가 없었거나, 넣은 소리 파일)
+//   소리를 16kHz 로 풀어(브라우저 디코더) 메인 프로세스의 받아쓰기로 → 그 소리의 음성 카드에. 말한 사람은 나눈 뒤 다시 고친다
+function decodePath(src) {
+  try {
+    return decodeURI(src);
+  } catch {
+    return src; // 이미 풀린 경로
+  }
+}
+async function decode16k(src) {
+  const bytes = await api.attachments.read(decodePath(src));
+  const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const ctx = new AudioContext({ sampleRate: 16000 });
+  try {
+    const audio = await ctx.decodeAudioData(buf);
+    const out = new Float32Array(audio.length);
+    for (let c = 0; c < audio.numberOfChannels; c++) {
+      const ch = audio.getChannelData(c);
+      for (let i = 0; i < ch.length; i++) out[i] += ch[i] / audio.numberOfChannels;
+    }
+    return out;
+  } finally {
+    ctx.close().catch(() => {});
+  }
+}
+async function transcribeAudio() {
+  closeMenu();
+  if (!editor) return;
+  const st = await api.stt.status();
+  if (st.asr.state !== 'ready') return setStatus('받아쓰기 데이터를 먼저 받아 주세요 · 목록 창 설정 › 음성 녹음', true);
+  const list = audioNeedingTranscript(editor.getMarkdown());
+  if (!list.length) return setStatus('받아쓸 소리가 없어요 (모두 받아썼어요)');
+  let done = 0;
+  for (const [i, src] of list.entries()) {
+    setStatus(list.length > 1 ? `받아쓰는 중… (${i + 1}/${list.length})` : '받아쓰는 중…');
+    try {
+      const r = await api.stt.transcribe({ memoId: id, src, samples: await decode16k(src) });
+      if (r.error) throw new Error(r.error);
+      if (r.text && editor.attachTranscript(src, r.text)) done++;
+    } catch (err) {
+      console.error(err);
+      setStatus(err.message || '받아쓰지 못했어요', true);
+      return;
+    }
+  }
+  await flush();
+  setStatus(done ? `받아쓴 글을 넣었어요${st.speakerOn && st.speaker.state === 'ready' ? ' · 말한 사람을 나누는 중…' : ''}` : '알아들은 말이 없어요');
+}
+$('transcribe-btn').addEventListener('click', transcribeAudio);
+// 말한 사람을 나눈 뒤: 음성 카드의 받아쓴 글에 "화자 N:" 을 붙여 다시
+api.on('stt:speakers', async ({ src, text }) => {
+  if (!editor?.replaceTranscript(src, text)) return;
+  await flush();
+  setStatus('말한 사람을 나눴어요');
+});
+
 $('show-list').addEventListener('click', () => {
   api.win.showList();
   closeMenu();
 });
 $('delete-btn').addEventListener('click', async () => {
   closeMenu();
-  if (!isBlankBody(current)) {
-    $('confirm-message').textContent = `"${extractTitle(current)}" 메모를 지울까요?\n지운 메모는 메모 폴더 안 휴지통에 보관돼요.`;
-    el.confirm.returnValue = '';
-    el.confirm.showModal();
-    const ok = await new Promise((resolve) => el.confirm.addEventListener('close', () => resolve(el.confirm.returnValue === 'ok'), { once: true }));
-    if (!ok) return;
-  }
+  // 묻지 않고 바로 휴지통으로 (목록 창에 되돌리기) — 창이 휴지통으로 빨려 들어가듯 사라진다
   saved = current; // 삭제하는 메모는 저장하지 않는다
+  if (!reduceMotion()) {
+    await document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {});
+  }
   await api.memo.remove(id);
 });
 
@@ -333,9 +481,7 @@ api.on('memo:links-changed', refreshLinks);
 function showAlarm(alarm) {
   $('alarm-text').textContent = alarm.label; // 종 아이콘이 앞에 있으므로 글자만
   $('alarm-banner').hidden = false;
-  $('alarm-banner').classList.remove('ring');
-  void $('alarm-banner').offsetWidth; // 애니메이션 다시 시작
-  $('alarm-banner').classList.add('ring');
+  replayClass($('alarm-banner'), 'ring');
 }
 $('alarm-ok').addEventListener('click', () => {
   $('alarm-banner').hidden = true;
@@ -345,9 +491,7 @@ api.on('memo:alarm', showAlarm);
 
 // 빠른 메모 알림을 눌러 이 메모로 왔을 때 등: 창 테두리가 두 번 반짝여 "이 메모" 임을 알린다
 api.on('memo:highlight', () => {
-  document.body.classList.remove('highlight');
-  void document.body.offsetWidth; // 애니메이션 다시 시작
-  document.body.classList.add('highlight');
+  replayClass(document.body, 'highlight');
 });
 document.body.addEventListener('animationend', (e) => {
   if (e.animationName === 'note-highlight') document.body.classList.remove('highlight');
@@ -371,12 +515,22 @@ async function applyCapture(c) {
   editor.focusEnd();
   // 웹 사진을 받는 중에 저장하면 주소 교체와 엇갈릴 수 있어, 받기가 끝난 뒤 한 번에 저장
   if (c.html) {
-    setStatus('사진을 메모 폴더에 받고 있어요');
+    setStatus('사진을 저장하는 중…');
     await editor.imagesSettled();
   }
+  // 태그를 저절로: 화면 캡처는 #캡처, 웹에서 가져온 것은 링크, 그 밖은 공유 (+ 내용에 맞는 기존 태그)
+  const source = c.source.window === '화면 캡처' ? 'capture' : c.source.url ? 'link' : 'share';
+  let tags = [];
+  try {
+    tags = (await api.tags.auto?.(editor.getMarkdown(), source, id)) ?? [];
+  } catch {
+    tags = [];
+  }
+  if (tags.length) editor.appendMarkdown(tags.map((t) => `#${t}`).join(' '));
   await flush();
   const skipped = c.skipped.length ? ` · 폴더 ${c.skipped.length}개는 넣을 수 없어서 뺐어요` : '';
-  setStatus(c.source.copied ? `고른 내용으로 메모를 만들었어요${skipped}` : `복사해 둔 내용으로 메모를 만들었어요${skipped}`);
+  const tagged = tags.length ? ` · ${tags.map((t) => `#${t}`).join(' ')}` : '';
+  setStatus(c.source.copied ? `고른 내용으로 메모를 만들었어요${tagged}${skipped}` : `복사해 둔 내용으로 메모를 만들었어요${tagged}${skipped}`);
 }
 
 // ---------- 파일 넣기 ----------
@@ -402,13 +556,17 @@ async function insertFiles(files) {
     await editor.insertFiles(files);
   } catch (err) {
     console.error(err);
-    setStatus('파일을 넣지 못했어요. 다시 시도해 주세요.', true);
+    setStatus('파일을 추가하지 못했어요. 다시 시도해 주세요', true);
   }
 }
 
 el.fileInput.addEventListener('change', () => {
   insertFiles([...el.fileInput.files]);
   el.fileInput.value = '';
+});
+$('photo-input').addEventListener('change', (e) => {
+  insertFiles([...e.target.files]);
+  e.target.value = '';
 });
 
 // ---------- 링크·파일 한 번 눌러 열기 ----------
@@ -662,10 +820,60 @@ styleMenu.addEventListener('keydown', (e) => {
   }
 });
 
+// ---------- 콘텐츠 추가 (+): 위로 위성 단추 (휴대폰과 같음) ----------
+const addMenu = $('add-menu');
+const addBtn = $('add-btn');
+let addCloseTimer = 0;
+function openAddMenu() {
+  closePalette();
+  closeStyleMenu();
+  closeMore();
+  clearTimeout(addCloseTimer);
+  addMenu.classList.remove('closing');
+  addMenu.hidden = false;
+  const r = addBtn.getBoundingClientRect();
+  addMenu.style.left = `${Math.max(8, Math.round(r.left))}px`;
+  addMenu.style.bottom = `${Math.round(window.innerHeight - r.top + 10)}px`;
+  addBtn.classList.add('open');
+  addBtn.setAttribute('aria-expanded', 'true');
+  tutEvent('add-opened');
+}
+function closeAddMenu() {
+  if (addMenu.hidden || addMenu.classList.contains('closing')) return false;
+  addBtn.classList.remove('open');
+  addBtn.setAttribute('aria-expanded', 'false');
+  addMenu.classList.add('closing');
+  addCloseTimer = setTimeout(() => {
+    addMenu.hidden = true;
+    addMenu.classList.remove('closing');
+  }, 150);
+  return true;
+}
+const ADD = {
+  record: () => recorder?.toggle(),
+  ink: () => editor.insertInk().then(() => tutEvent('ink-done')),
+  annotate: () => annotation?.toggle(),
+  photo: () => $('photo-input').click(),
+  file: () => el.fileInput.click(),
+  table: () => editor.insertTable(),
+  math: () => editor.setStyle('math'),
+};
+addMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서 유지
+addMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-add]');
+  if (!b || !editor) return;
+  closeAddMenu();
+  ADD[b.dataset.add]?.();
+});
+
 const actions = {
+  add: () => (addMenu.hidden || addMenu.classList.contains('closing') ? openAddMenu() : closeAddMenu()),
+  ink: () => editor.insertInk().then(() => tutEvent('ink-done')),
+  annotate: () => annotation?.toggle(),
   style: (btn) => (styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
   file: () => el.fileInput.click(),
   table: () => editor.insertTable(),
+  record: () => recorder?.toggle(),
   color: (btn) => (paletteKind === 'color' ? closePalette() : openPalette('color', btn)),
   highlight: (btn) => (paletteKind === 'highlight' ? closePalette() : openPalette('highlight', btn)),
 };
@@ -689,6 +897,7 @@ for (const container of [el.formatBar, el.morePanel]) {
 
 // 도구막대·팝업 밖을 누르면 팝업을 닫는다
 document.addEventListener('mousedown', (e) => {
+  if (!addMenu.hidden && !addMenu.contains(e.target) && !e.target.closest?.('[data-action="add"]')) closeAddMenu();
   if (!el.palette.hidden && !el.palette.contains(e.target) && !e.target.closest?.('[data-action="color"],[data-action="highlight"]')) closePalette();
   if (!el.morePanel.hidden && !el.morePanel.contains(e.target) && !el.moreBtn.contains(e.target) && !el.palette.contains(e.target) && !styleMenu.contains(e.target)) closeMore();
   if (!styleMenu.hidden && !styleMenu.contains(e.target) && !e.target.closest?.('[data-action="style"]')) closeStyleMenu();
@@ -724,22 +933,22 @@ function showTableBar(table) {
   // 머리글 행만 남았을 때 머리글에서 누르면, 열이 하나뿐일 때 누르면 표 전체를 지운다 (표 막대에 "표 지우기"가 따로 없음)
   const lastRow = table.header && table.rows <= 1;
   delRow.disabled = table.header && !lastRow;
-  delRow.textContent = lastRow ? '표 지우기' : '행 지우기';
-  delRow.title = lastRow ? '머리글 행만 남았어요. 누르면 표를 지워요' : table.header ? '머리글 행은 지울 수 없어요 (아래 행을 다 지운 뒤 누르면 표를 지워요)' : '이 행 지우기';
+  delRow.textContent = lastRow ? '표 삭제' : '행 삭제';
+  delRow.title = lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : '이 행 지우기';
   // 셀 병합: 여러 칸을 골랐으면 "셀 병합", 병합한 칸 안이면 "병합 풀기"
   const merge = tableBar.querySelector('[data-table="merge"]');
   merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
   merge.disabled = !table.canMerge && !table.merged;
   merge.title = table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요';
-  delCol.textContent = table.cols <= 1 ? '표 지우기' : '열 지우기';
-  delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 지워요' : '이 열 지우기';
+  delCol.textContent = table.cols <= 1 ? '표 삭제' : '열 삭제';
+  delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제';
 }
 tableBar.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서가 표 안에 남게
 tableBar.addEventListener('click', (e) => {
   const b = e.target.closest('[data-table]');
   if (!b || b.disabled) return;
   // 마지막 남은 머리글 행·열을 지우면 표 전체를 지운다
-  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.textContent === '표 지우기';
+  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.textContent === '표 삭제';
   editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
 });
 
@@ -773,6 +982,9 @@ const SHORTCUTS = {
   'ctrl+shift+Digit9': ['cmd', 'task'],
   'ctrl+shift+KeyB': ['cmd', 'quote'],
   'ctrl+shift+KeyI': ['action', 'file'],
+  'ctrl+shift+KeyR': ['action', 'record'],
+  'ctrl+shift+KeyD': ['action', 'ink'],
+  'ctrl+shift+KeyE': ['action', 'annotate'],
   'ctrl+shift+KeyT': ['app', 'top'],
   'ctrl+shift+KeyA': ['app', 'reminders'],
   'ctrl+KeyK': ['app', 'links'],
@@ -783,6 +995,7 @@ const SHORTCUTS = {
 window.addEventListener('keydown', (e) => {
   if (!editor || el.confirm.open) return;
   if (e.key === 'Escape') {
+    if (closeAddMenu()) return;
     if (!styleMenu.hidden) closeStyleMenu();
     else if (!el.palette.hidden) closePalette();
     else if (!el.morePanel.hidden) closeMore();
@@ -839,12 +1052,25 @@ zoomBadge.append(zoomText, zoomReset);
 document.body.append(zoomBadge);
 let zoomTimer = 0;
 
+// 매직 줌 (휴대폰과 같음): 100% 보다 크게는 페이지째 — 100% 의 폭으로 배치한 채 크게, 넓어지면 옆으로 밀어 보기.
+// 100% 보다 작게는 글자 크기만 줄여 줄이 창 폭에 다시 맞춰진다 (넓은 표를 맞추는 축소도 이쪽)
+function applyMagicZoom() {
+  const root = el.editorRoot;
+  const cs = getComputedStyle(root);
+  const base = Math.max(200, root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+  root.style.setProperty('--note-zoom', String(zoom));
+  root.classList.toggle('zoomed', zoom > 1);
+  // 폭은 확대되는 요소 자신에게 (저절로 맞는 폭은 확대해도 창 폭에 맞춰져 버리므로)
+  for (const child of root.children) child.style.width = zoom > 1 ? `${base}px` : '';
+}
+new ResizeObserver(() => applyMagicZoom()).observe(el.editorRoot);
+
 function setZoom(z, { show = true } = {}) {
   const scroller = el.editorRoot;
   // 보던 곳이 그대로 보이게: 스크롤 위치를 배율에 맞춰 옮긴다
   const ratio = scroller.scrollHeight > scroller.clientHeight ? scroller.scrollTop / (scroller.scrollHeight - scroller.clientHeight) : 0;
   zoom = clampZoom(z);
-  el.editorRoot.style.setProperty('--note-zoom', String(zoom));
+  applyMagicZoom();
   document.body.dataset.zoom = String(zoom);
   scroller.scrollTop = ratio * Math.max(0, scroller.scrollHeight - scroller.clientHeight);
   try {
@@ -854,7 +1080,7 @@ function setZoom(z, { show = true } = {}) {
     // 기억 못 해도 지금 창에서는 그대로
   }
   if (!show) return;
-  zoomText.textContent = `확대 ${zoomLabel(zoom)}`;
+  zoomText.textContent = zoom >= 1 ? `매직 줌 · 확대 ${zoomLabel(zoom)}` : `매직 줌 · 글자 ${zoomLabel(zoom)}`;
   zoomReset.hidden = zoom === 1;
   zoomBadge.classList.add('show');
   clearTimeout(zoomTimer);
@@ -961,43 +1187,33 @@ document.documentElement.addEventListener('mouseleave', () => {
 });
 updateBar();
 
-// ---------- CLEAR 도장: 체크리스트를 모두 끝내면 (v0.17.13) ----------
-const clearStamp = document.createElement('div');
-clearStamp.className = 'clear-stamp';
-clearStamp.textContent = 'CLEAR';
-clearStamp.setAttribute('role', 'status');
-clearStamp.setAttribute('aria-label', '체크리스트를 모두 끝냈어요');
-clearStamp.hidden = true;
-document.body.append(clearStamp);
-// 메모 본문(편집 영역)의 정중앙
-const placeClearStamp = () => {
-  const r = el.editorRoot.getBoundingClientRect();
-  clearStamp.style.left = `${Math.round(r.left + r.width / 2)}px`;
-  clearStamp.style.top = `${Math.round(r.top + r.height / 2)}px`;
-};
-new ResizeObserver(() => {
-  if (!clearStamp.hidden) placeClearStamp();
-}).observe(el.editorRoot);
+// ---------- CLEAR 도장: 체크리스트를 모두 끝내면 ----------
+const clearStamp = createClearStamp(document.body, el.editorRoot);
+function showTasks(tasks, opts) {
+  document.body.dataset.tasks = tasks.total ? `${tasks.done}/${tasks.total}` : '';
+  clearStamp.show(tasks, opts);
+}
 
-// 편집기가 알려 주는 체크리스트 진행 → 도장 (처음 열 때는 그냥 찍혀 있고, 방금 끝냈을 때만 "쿵")
-function showTasks({ total, done }, { initial = false } = {}) {
-  const clear = total > 0 && done === total;
-  const was = !clearStamp.hidden;
-  clearStamp.hidden = !clear;
-  document.body.dataset.tasks = total ? `${done}/${total}` : '';
-  if (!clear) {
-    clearStamp.classList.remove('stamp-in');
-    return;
-  }
-  placeClearStamp();
-  if (!was && !initial) {
-    clearStamp.classList.remove('stamp-in');
-    void clearStamp.offsetWidth; // 애니메이션 다시
-    clearStamp.classList.add('stamp-in');
+// 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)
+async function autoTagOnClose() {
+  if (!editor || tagDismissed) return;
+  try {
+    const s = await api.settings.get();
+    if (s?.autoTags === false) return;
+    const body = editor.getMarkdown();
+    if (isBlankBody(body) || extractTags(body).length) return;
+    const list = (await api.tags.suggest?.(body, id)) ?? [];
+    const sure = list.filter((t) => t.sure && t.existing).slice(0, 2);
+    if (sure.length) editor.appendMarkdown(sure.map((t) => `#${t.name}`).join(' '));
+  } catch {
+    // 태그를 못 달아도 닫기는 그대로
   }
 }
 
 async function closeWindow() {
+  await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
+  await annotation?.exit(); // 주석을 그리던 중이면 저장하고 닫는다
+  await autoTagOnClose();
   await flush();
   api.win.close();
 }
@@ -1005,6 +1221,8 @@ async function closeWindow() {
 // Ctrl+W: 스택이면 보이는 탭만 닫는다 (탭의 × 와 같음). 스택이 아니면 창을 닫는다.
 async function closeTabOrWindow() {
   if (tabsEl.hidden) return closeWindow();
+  await recorder?.finish();
+  await autoTagOnClose();
   await flush();
   api.stack.remove(id);
 }
@@ -1028,6 +1246,11 @@ el.editorRoot.addEventListener('mousedown', (e) => {
 
 const tabsEl = $('stack-tabs');
 let coach = null; // 튜토리얼 말풍선
+const tutCounts = (md) => tutorialCounts(md, extractTags(md));
+/** 직접 해 보기: 지금 단계가 이 일을 기다리면 알린다 */
+function tutEvent(name) {
+  if (coach?.step?.advance === name) api.tutorial.event(name);
+}
 
 const TAB_CHARS = 7;
 function renderStack(state) {
@@ -1050,7 +1273,7 @@ function renderStack(state) {
     const close = document.createElement('button');
     close.className = 'stack-close';
     close.type = 'button';
-    close.title = '스택에서 빼기';
+    close.title = '탭 닫기';
     close.setAttribute('aria-label', `${m.title} 스택에서 빼기`);
     close.dataset.closeTab = m.id;
     close.append(icon('close'));
@@ -1157,6 +1380,10 @@ api.on('stack:state', renderStack);
 api.on('stack:hover', (on) => {
   $('stack-drop').hidden = !on;
 });
+// 손 메모·주석을 그리는 동안: 창을 끌어도 다른 메모와 합치지 않게 (ink-editor.js inkMode)
+window.addEventListener('memoking:inking', (e) => {
+  api.win.inking?.(e.detail)?.catch?.(() => {});
+});
 // 다른 탭으로 바뀌어 숨겨질 때 바로 저장
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && editor) flush();
@@ -1166,10 +1393,10 @@ document.addEventListener('visibilitychange', () => {
 
 injectIcons();
 paintSwatchBars();
-coach = setupCoach(api);
+coach = setupCoach(api, { onStep: (step) => (tutBase = step ? tutCounts(current ?? '') : null) });
 memo = await api.memo.get(id);
 if (!memo) {
-  setStatus('메모를 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요.', true);
+  setStatus('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
 } else {
   applyMeta(memo);
   applyTop(memo.onTop === true);
@@ -1179,6 +1406,7 @@ if (!memo) {
   editor = await createNoteEditor(el.editorRoot, {
     markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus,
     tables: memo.tables ?? [], onTables: saveTables,
+    readAttachment: async (src) => new TextDecoder().decode(await api.attachments.read(decodePath(src))),
     fetchPreview: (url) => api.links.preview(url),
     openLink: (url) => api.links.open(url),
     getTags: () => api.tags.list(),
@@ -1188,6 +1416,7 @@ if (!memo) {
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();
   refreshLinks();
+  scheduleTagBar();
   reminderPanel = setupReminderPanel({
     api,
     memoId: id,
@@ -1195,9 +1424,46 @@ if (!memo) {
     onToggle: (open) => open && !el.linksPanel.hidden && toggleLinks(false),
   });
   reminderPanel.set(memo.reminders);
+  recorder = setupVoiceRecorder({
+    panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
+    buttons: () => document.querySelectorAll('[data-action="record"]'),
+    saveAudio: (bytes, ext) => api.attachments.save(bytes, ext),
+    text: $('rec-text'),
+    stt: sttBridge(),
+    // 빈 메모면 제목을 달고, 소리(음성 카드)는 메모 끝에 (휴대폰과 같음)
+    insert: async (card, heading) => {
+      if (isBlankBody(editor.getMarkdown())) editor.setMarkdown(`# ${heading}\n`);
+      editor.appendMarkdown(card);
+      await flush();
+    },
+    notice: setStatus,
+  });
   if (memo.alarm) showAlarm(memo.alarm);
   editor.focus();
   if (memo.capture) await applyCapture(memo.capture);
+  if (params.get('record') === '1') recorder.start(); // 목록 + › 음성 메모
+  if (params.get('ink') === '1') editor.insertInk(); // 목록 + › 손 메모
+  // 주석: 메모 위에 겹쳐 그린 손 메모 (머리말 ink: 의 파일)
+  annotation = setupAnnotation({
+    scroller: el.editorRoot,
+    docEl: () => el.editorRoot.querySelector('.ProseMirror'),
+    read: async () => (memo.ink ? JSON.parse(new TextDecoder().decode(await api.attachments.read(memo.ink))) : null),
+    save: async (data) => {
+      const rel = data ? await saveFile(new File([JSON.stringify(data)], '글 위에 그리기.json', { type: 'application/json' })) : '';
+      const next = await api.memo.set(id, { ink: rel });
+      if (next) memo = { ...memo, ...next };
+    },
+    onMode: (on) => {
+      setStatus(on ? '글 위에 그리기 · 다 그렸으면 완료 (Esc)' : '');
+      if (!on) {
+        editor.focus();
+        tutEvent('annotate-done');
+      }
+    },
+    notice: setStatus,
+  });
+  annotation.start();
+  annotation.load(Boolean(memo.ink));
   // 표가 넘치면 메모를 줄여 맞추기 (설정) — 열 때 한 번, 그리고 본문이 바뀔 때(표 붙여넣기·넣기)
   try {
     fitTables = (await api.settings.get())?.fitTables !== false;
@@ -1208,3 +1474,5 @@ if (!memo) {
   scheduleFit();
   document.documentElement.dataset.ready = 'true';
 }
+
+attachSliders(document, '.seg'); // 알림 종류 고르기: 선택 표시가 미끄러진다
