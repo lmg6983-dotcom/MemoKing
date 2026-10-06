@@ -6,7 +6,7 @@
 //   - 콘텐츠로서 손 메모(openInkEditor): 메모 위에 덮는 그리기 화면 → 완료(또는 Esc·뒤로)하면 그린 만큼의 SVG 한 칸. 취소는 없다
 //   주석으로서 손 메모(메모 위에 겹쳐 그리기)는 ink-annotate.js 가 같은 그리기판·도구 막대를 쓴다
 import { getStroke } from '../vendor/perfect-freehand.js';
-import { point, strokePath, strokesHit, PEN_COLORS, HIGHLIGHT_COLORS, SIZES, normalizeInk, inkBounds, INK_BG } from './core/ink.js';
+import { point, strokePath, strokesHit, PEN_COLORS, HIGHLIGHT_COLORS, SIZES, normalizeInk, inkBounds, INK_BG, inkTone } from './core/ink.js';
 import { icon } from './icons.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -54,12 +54,22 @@ const svgEl = (tag, attrs = {}) => {
   return e;
 };
 
+/** 획 하나 → path (검은·흰 펜에는 ink-k·ink-w — 어두운 화면에서 CSS 가 서로 바꿔 칠한다) */
+export function strokeEl(s) {
+  const p = svgEl('path', { d: strokePath(s, getStroke), fill: s.color });
+  if (s.tool === 'highlighter') p.setAttribute('fill-opacity', '0.4');
+  const tone = inkTone(s);
+  if (tone) p.setAttribute('class', tone);
+  return p;
+}
 function paint(g, strokes) {
-  g.replaceChildren(...strokes.map((s) => {
-    const p = svgEl('path', { d: strokePath(s, getStroke), fill: s.color });
-    if (s.tool === 'highlighter') p.setAttribute('fill-opacity', '0.4');
-    return p;
-  }));
+  g.replaceChildren(...strokes.map(strokeEl));
+}
+/** 색 표시(단추·점·붓 미리 보기)에도 같은 밝기 성질 */
+function setTone(node, tool, color) {
+  node.classList.remove('ink-k', 'ink-w');
+  const tone = inkTone({ tool, color });
+  if (tone) node.classList.add(tone);
 }
 
 /**
@@ -97,6 +107,7 @@ export function createInkSurface(svg, o) {
     if (drawing?.stroke) {
       live.setAttribute('fill', drawing.stroke.color);
       live.setAttribute('fill-opacity', drawing.stroke.tool === 'highlighter' ? '0.4' : '1');
+      setTone(live, drawing.stroke.tool, drawing.stroke.color);
     }
   }
   const schedule = () => {
@@ -116,7 +127,10 @@ export function createInkSurface(svg, o) {
     cursor.setAttribute('cy', String(y));
     cursor.setAttribute('r', on ? String(Math.max(2, size(tool) / 2)) : '0');
     cursor.classList.toggle('erase', tool === 'eraser');
-    if (tool !== 'eraser') cursor.style.setProperty('--c', o.tools.color[tool]);
+    if (tool !== 'eraser') {
+      cursor.style.setProperty('--c', o.tools.color[tool]);
+      setTone(cursor, tool, o.tools.color[tool]);
+    } else setTone(cursor, 'highlighter', '');
     svg.classList.toggle('has-cursor', on);
   }
 
@@ -386,7 +400,10 @@ export function createInkToolbar(o) {
       const dot = el('span');
       const px = t === 'eraser' ? 8 + i * 6 : t === 'highlighter' ? 8 + i * 4 : Math.max(3, sz * 1.6);
       dot.style.width = dot.style.height = `${Math.min(24, px)}px`;
-      if (t !== 'eraser') dot.style.background = o.tools.color[t];
+      if (t !== 'eraser') {
+        dot.style.setProperty('--c', o.tools.color[t]);
+        setTone(dot, t, o.tools.color[t]);
+      }
       b.append(dot);
       b.addEventListener('click', () => {
         o.tools.size[t] = i;
@@ -413,6 +430,7 @@ export function createInkToolbar(o) {
     const colors = list.map((c) => {
       const b = el('button', 'ink-color', { type: 'button', title: c, 'aria-label': `색 ${c}`, 'aria-pressed': String(o.tools.color[t] === c) });
       b.style.setProperty('--c', c);
+      setTone(b, t, c);
       b.addEventListener('click', () => {
         o.tools.color[t] = c;
         o.tools.save();
@@ -444,12 +462,17 @@ export function createInkToolbar(o) {
     const t = o.tools.tool;
     for (const [k, b] of Object.entries(toolBtns)) {
       b.setAttribute('aria-pressed', String(k === t));
-      b.querySelector('.ink-tool-color')?.style.setProperty('--c', o.tools.color[k]);
+      const bar = b.querySelector('.ink-tool-color');
+      if (bar) {
+        bar.style.setProperty('--c', o.tools.color[k]);
+        setTone(bar, k, o.tools.color[k]);
+      }
     }
     const dot = styleBtn.firstElementChild;
     const sz = SIZES[t][o.tools.size[t]];
     styleBtn.dataset.tool = t;
     dot.style.setProperty('--c', t === 'eraser' ? 'transparent' : o.tools.color[t]);
+    setTone(dot, t === 'eraser' ? 'highlighter' : t, o.tools.color[t]);
     dot.style.setProperty('--d', `${t === 'eraser' ? 8 + o.tools.size[t] * 5 : Math.min(20, Math.max(6, sz * (t === 'highlighter' ? 0.7 : 2.2)))}px`);
     styleBtn.setAttribute('aria-expanded', String(popKind === 'style'));
     styleBtn.title = t === 'eraser' ? '지우개 굵기 · 모두 지우기' : `${TOOL_NAMES[t]} 색 · 굵기`;

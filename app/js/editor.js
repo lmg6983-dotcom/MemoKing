@@ -13,7 +13,7 @@ import {
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
 import { mediaKindOf, trimTrailingBreaks } from './core/memo-file.js';
-import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg } from './core/ink.js';
+import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkForDark } from './core/ink.js';
 import { getStroke } from '../vendor/perfect-freehand.js';
 import { openInkEditor } from './ink-editor.js';
 import { icon } from './icons.js';
@@ -80,6 +80,7 @@ const MEDIA_CONTROL = `${MEDIA_SCRUB}, .plyr__progress, input, [role="slider"], 
 
 // 손 메모 이어 그리기 (편집기마다 createNoteEditor 가 정함: (view, getPos) => void)
 let inkEditHandler = null;
+let inkReader = null; // 손 메모 SVG 글 읽기 (createNoteEditor 의 readAttachment)
 const INK_FILE = '손 메모';
 
 // 손 메모 한 칸: 그린 만큼의 그림 + (마우스를 올리거나 고르면) "이어 그리기" — PC 는 두 번 눌러도
@@ -92,6 +93,21 @@ function inkView(node, view, getPos) {
   img.alt = node.attrs.alt ?? '';
   img.draggable = false;
   img.onerror = () => dom.classList.add('broken');
+  img.className = 'ink-light-src';
+  // 투명 바탕: 어두운 화면용 그림도 함께 (검은 펜 ↔ 흰 펜만 바꿈) — 어느 것을 보일지는 CSS 가 메모 색·다크 모드로 고른다
+  const bg = bgOfAlt(node.attrs.alt);
+  if (bg === 'none' && inkReader) {
+    inkReader(node.attrs.src).then((text) => {
+      const dark = inkForDark(parseInkSvg(text) ?? { strokes: [] });
+      const svg = dark && inkToSvg(dark, getStroke);
+      if (!svg) return;
+      const alt = img.cloneNode();
+      alt.className = 'ink-dark-src';
+      alt.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+      alt.addEventListener('dblclick', open);
+      img.after(alt);
+    }).catch(() => {});
+  }
   const edit = document.createElement('button');
   edit.type = 'button';
   edit.className = 'mk-ink-edit';
@@ -818,6 +834,7 @@ function normalizePastedTables(html) {
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
 export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment }) {
+  inkReader = readAttachment ?? null; // 그림 칸(inkView)이 만들어지기 전에
   let ready = false;
   let editor = null;
   const view = () => editor.ctx.get(editorViewCtx);

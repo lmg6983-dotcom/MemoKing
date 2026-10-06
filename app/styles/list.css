@@ -856,9 +856,9 @@ body.is-dragging .card:hover { transform: none; }
 .fab svg { width: 22px; height: 22px; transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .fab:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(17, 17, 17, 0.26), 0 2px 4px rgba(17, 17, 17, 0.12); }
 .fab:active { transform: scale(0.94); }
-.fab.open { background: var(--brand-black); color: var(--on-black); }
+/* 펼친 동안: 위성 단추와 같은 앱 바탕 (버튼에 검정 바탕은 쓰지 않음) */
+.fab.open { background: var(--surface-2); color: var(--text-strong); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
 .fab.open svg { transform: rotate(45deg); }
-@media (prefers-color-scheme: dark) { .fab.open { background: var(--surface-2); color: var(--text-strong); } }
 body:not([data-tab="memos"]):not([data-tab="reminders"]) :is(.fab, .fab-menu, .fab-scrim) { display: none; }
 .fab-scrim { position: fixed; inset: 44px 0 0; z-index: 30; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); animation: mk-fade-in 0.15s ease-out; }
 .fab-scrim[hidden], .fab-menu[hidden] { display: none; }

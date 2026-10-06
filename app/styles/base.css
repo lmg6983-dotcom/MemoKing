@@ -145,7 +145,7 @@ svg { width: 20px; height: 20px; flex: none; }
 .icon-btn.primary:hover { background: var(--brand-yellow-hover); }
 .icon-btn.danger:hover { color: var(--danger); }
 
-/* 버튼: 기본(흰 바탕) · primary(노랑, 한 화면에 하나) · strong(검정) · danger */
+/* 버튼: 기본(앱 바탕 + 테두리) · primary(노랑, 한 화면에 하나) · danger — 버튼에 검정 바탕은 쓰지 않는다 */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -165,13 +165,6 @@ svg { width: 20px; height: 20px; flex: none; }
 .btn:active { transform: scale(0.98); }
 .btn.primary { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
 .btn.primary:hover { background: var(--brand-yellow-hover); }
-.btn.strong { background: var(--brand-black); color: var(--on-black); box-shadow: none; }
-.btn.strong:hover { background: #2a2a28; }
-/* 다크 모드에서는 검정 바탕 위라 강조 버튼을 밝게 뒤집는다 */
-@media (prefers-color-scheme: dark) {
-  .btn.strong { background: var(--text-strong); color: var(--surface-0); }
-  .btn.strong:hover { background: #ffffff; }
-}
 .btn.danger { background: var(--danger); color: var(--on-danger); box-shadow: none; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 

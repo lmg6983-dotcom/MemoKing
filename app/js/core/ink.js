@@ -16,6 +16,27 @@ export const PEN_COLORS = ['#1f1f1c', '#2f6fdf', '#e5484d', '#2f9e44', '#f08c00'
 export const HIGHLIGHT_COLORS = ['#ffd43b', '#8ce99a', '#ffa8a8', '#a5d8ff'];
 export const SIZES = { pen: [2.5, 4, 7], highlighter: [14, 20, 28], eraser: [10, 18, 30] };
 
+/** 어두운 화면(다크 모드 · 검은 메모)에서 검은 펜이 그려 보이는 색 */
+export const INK_LIGHT = '#f5f4ef';
+/** 획의 밝기 성질: 검은 펜 'ink-k' · 흰 펜 'ink-w' · 그 밖(색 펜·형광펜) '' — 어두운 화면에서는 이 둘만 서로 바꿔 보인다 */
+export function inkTone(stroke) {
+  if (stroke?.tool === 'highlighter') return '';
+  const c = String(stroke?.color ?? '').toLowerCase();
+  return c === PEN_COLORS[0] ? 'ink-k' : c === '#ffffff' ? 'ink-w' : '';
+}
+/** 어두운 화면용 손 메모: 검은 펜 ↔ 흰 펜만 바꾼다 (색 펜·형광펜은 그대로 — 원노트처럼). 바꿀 획이 없으면 null */
+export function inkForDark(doc) {
+  const ink = normalizeInk(doc);
+  let changed = false;
+  const strokes = ink.strokes.map((s) => {
+    const tone = inkTone(s);
+    if (!tone) return s;
+    changed = true;
+    return { ...s, color: tone === 'ink-k' ? INK_LIGHT : PEN_COLORS[0] };
+  });
+  return changed ? { ...ink, strokes } : null;
+}
+
 /** 이 그림이 손 메모인가 (SVG + 이름이 "손 메모"로 시작) */
 export function isInk(src, alt = '') {
   return /\.svg$/i.test(String(src ?? '').split(/[?#]/)[0]) && String(alt ?? '').startsWith(INK_ALT);

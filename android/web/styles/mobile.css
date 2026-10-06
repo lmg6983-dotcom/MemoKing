@@ -197,7 +197,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   white-space: nowrap;
 }
 .chip svg { width: 15px; height: 15px; }
-.chip[aria-pressed="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-black); color: var(--on-black); box-shadow: none; }
+.chip[aria-pressed="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; } /* PC 목록과 같음 */
 @media (prefers-color-scheme: dark) {
   .chip[aria-pressed="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
 }
@@ -806,9 +806,8 @@ body[data-note-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #f
 /* ---------- + 위성 버튼 ---------- */
 .fab { z-index: 21; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .fab svg { transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.fab.open { background: var(--brand-black); color: var(--on-black); }
+.fab.open { background: var(--surface-2); color: var(--text-strong); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
 .fab.open svg { transform: rotate(45deg); }
-@media (prefers-color-scheme: dark) { .fab.open { background: var(--surface-2); color: var(--text-strong); } }
 .fab-scrim { position: absolute; inset: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); animation: fade-in 0.15s ease-out; }
 .fab-scrim[hidden], .fab-menu[hidden] { display: none; }
 .fab-menu { position: absolute; right: 20px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 21; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }

@@ -315,12 +315,14 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--brand-black);
-  color: var(--on-black);
+  background: var(--surface-2);
+  color: var(--text-strong);
+  box-shadow: 0 2px 6px rgba(17, 17, 17, 0.18), inset 0 0 0 1px var(--line);
   opacity: 0;
   cursor: pointer;
-  transition: opacity 0.15s ease-out;
+  transition: opacity 0.15s ease-out, color 0.15s ease-out;
 }
+.lc-remove:hover { color: var(--danger); }
 .lc-remove svg { width: 14px; height: 14px; }
 .mk-link-card:hover .lc-remove, .lc-remove:focus-visible { opacity: 1; }
 @media (max-width: 260px) { .lc-thumb { display: none; } }
@@ -1504,18 +1506,18 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-title svg { width: 18px; height: 18px; }
 .ink-hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--note-muted); transition: color 0.15s; }
 .ink-hint.warn { color: #d9480f; font-weight: 600; }
-/* 완료: 하나뿐인 큰 단추 (취소 없음 — 닫으면 저장) */
+/* 완료: 하나뿐인 주 버튼 = 브랜드 노랑 (취소 없음 — 닫으면 저장). 다크 모드에서도 노랑 그대로 (휴대폰 다크 도구막대의 + 와 같음) */
 .ink-done {
   display: inline-flex; align-items: center; gap: 5px; flex: none; height: 34px; padding: 0 14px 0 11px;
-  border: 0; border-radius: 999px; background: var(--brand-black, #111); color: var(--on-black, #fff);
+  border: 0; border-radius: 999px; background: var(--brand-yellow); color: var(--on-brand);
   font: inherit; font-weight: 800; font-size: 13.5px; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); transition: transform 0.12s ease-out, box-shadow 0.12s;
+  box-shadow: 0 2px 6px rgba(17, 17, 17, 0.14), inset 0 0 0 1px rgba(17, 17, 17, 0.06); transition: background-color 0.15s ease-out, transform 0.12s ease-out, box-shadow 0.12s;
 }
 .ink-done svg { width: 17px; height: 17px; }
-.ink-done:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.26); }
+.ink-done:hover { background: var(--brand-yellow-hover); box-shadow: 0 4px 12px rgba(17, 17, 17, 0.2), inset 0 0 0 1px rgba(17, 17, 17, 0.06); }
 .ink-done:active { transform: scale(0.94); }
 .ink-done:disabled { opacity: 0.6; }
-[data-color="charcoal"] .ink-done { background: var(--brand-yellow); color: var(--on-brand, #111); }
+.ink-dock .ink-done { box-shadow: none; }
 .ink-scroll { position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .ink-page { position: relative; }
 .ink-canvas { display: block; touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }
@@ -1545,36 +1547,43 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-sheet[data-bg="white"] .ink-empty b { color: #1f1f1c; }
 @keyframes ink-wiggle { 50% { transform: translateX(4px) rotate(-4deg); } }
 
-/* ---------- 떠 있는 도구 막대 (dock) ---------- */
+/* ---------- 떠 있는 도구 막대 (dock) ----------
+   메모 색과 상관없이 + 메뉴 위성 단추와 같은 앱 바탕(surface-2)에 앱 글자색 — 어느 메모 색·다크 모드에서도 같은 모양.
+   버튼에 검정 바탕은 쓰지 않는다: 하나뿐인 주 버튼(완료)은 브랜드 노랑, 고른 것은 옅은 노랑 + 노랑 테두리 (목록 거르기·메뉴 선택과 같음) */
+.ink-dock, .mk-annot-caption, .mk-doc .mk-ink-edit {
+  --ink-ui-bg: var(--surface-2, #fff);
+  --ink-ui-fg: var(--text-strong, #111);
+  --ink-ui-muted: var(--text-muted, #6b6860);
+  --ink-ui-line: var(--line, #e8e6df);
+  --ink-ui-sel: var(--brand-yellow-soft, #fff6cc);
+}
 .ink-dock {
   position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 3; transform: translateX(-50%);
   display: flex; align-items: center; gap: 2px; max-width: calc(100% - 16px); padding: 5px;
-  border-radius: 18px; background: var(--note-bg); color: var(--note-text);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 11%, transparent);
+  border-radius: 18px; background: var(--ink-ui-bg); color: var(--ink-ui-fg);
+  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--ink-ui-line);
   -webkit-app-region: no-drag; user-select: none; -webkit-user-select: none;
   animation: ink-dock-in 0.24s cubic-bezier(0.2, 1.2, 0.4, 1);
 }
 @keyframes ink-dock-in { from { opacity: 0; transform: translate(-50%, 16px) scale(0.96); } }
 .ink-group { display: flex; align-items: center; gap: 2px; flex: none; padding: 0 3px; }
-.ink-group + .ink-group { border-left: 1px solid color-mix(in srgb, var(--note-text) 12%, transparent); }
+.ink-group + .ink-group { border-left: 1px solid var(--ink-ui-line); }
 .ink-group[hidden] { display: none; }
 .ink-btn {
   position: relative; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 12px;
-  background: none; color: var(--note-text); cursor: pointer; transition: background 0.12s, transform 0.12s ease-out;
+  background: none; color: var(--ink-ui-fg); cursor: pointer; transition: background 0.12s, transform 0.12s ease-out;
 }
 .ink-btn svg { width: 20px; height: 20px; }
-.ink-btn:hover { background: color-mix(in srgb, var(--note-text) 8%, transparent); }
+.ink-btn:hover { background: var(--fill-hover); }
 .ink-btn:active { transform: scale(0.9); }
 .ink-btn:disabled { opacity: 0.3; cursor: default; background: none; transform: none; }
-/* 고른 도구: 진하게 + 위로 살짝 (한 번 더 누르면 색·굵기) */
-.ink-tool[aria-pressed="true"] { background: var(--brand-black, #111); color: var(--on-black, #fff); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
-[data-color="charcoal"] .ink-tool[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand, #111); }
+/* 고른 도구: 옅은 노랑 + 노랑 테두리, 위로 살짝 (한 번 더 누르면 색·굵기) */
+.ink-tool[aria-pressed="true"], .ink-tool[aria-pressed="true"]:hover { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); transform: translateY(-2px); }
 .ink-tool-color { position: absolute; left: 9px; right: 9px; bottom: 4px; height: 3px; border-radius: 2px; background: var(--c); box-shadow: 0 0 0 1px rgba(128, 128, 128, 0.35); }
-.ink-tool[aria-pressed="true"] .ink-tool-color { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4); }
-.ink-style-dot { display: block; width: var(--d, 10px); height: var(--d, 10px); border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--note-bg), 0 0 0 3.5px color-mix(in srgb, var(--note-text) 30%, transparent); transition: width 0.15s, height 0.15s; }
-.ink-style[data-tool="eraser"] .ink-style-dot { background: none; box-shadow: none; border: 1.6px dashed color-mix(in srgb, var(--note-text) 70%, transparent); }
-.ink-style[aria-expanded="true"], .ink-bg-btn[aria-expanded="true"] { background: color-mix(in srgb, var(--note-text) 12%, transparent); }
-.ink-bg-swatch { display: block; width: 20px; height: 20px; border-radius: 6px; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--note-text) 45%, transparent); background-image: repeating-conic-gradient(color-mix(in srgb, var(--note-text) 14%, transparent) 0 25%, transparent 0 50%); background-size: 8px 8px; }
+.ink-style-dot { display: block; width: var(--d, 10px); height: var(--d, 10px); border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.5), 0 0 0 2px var(--ink-ui-bg), 0 0 0 3.5px color-mix(in srgb, var(--ink-ui-fg) 30%, transparent); transition: width 0.15s, height 0.15s; }
+.ink-style[data-tool="eraser"] .ink-style-dot { background: none; box-shadow: none; border: 1.6px dashed color-mix(in srgb, var(--ink-ui-fg) 70%, transparent); }
+.ink-style[aria-expanded="true"], .ink-bg-btn[aria-expanded="true"] { background: var(--fill-hover); box-shadow: inset 0 0 0 1px var(--ink-ui-line); }
+.ink-bg-swatch { display: block; width: 20px; height: 20px; border-radius: 6px; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink-ui-fg) 45%, transparent); background-image: repeating-conic-gradient(color-mix(in srgb, var(--ink-ui-fg) 14%, transparent) 0 25%, transparent 0 50%); background-size: 8px 8px; }
 .ink-bg-btn[data-bg="white"] .ink-bg-swatch { background: #fff; }
 .ink-bg-btn[data-bg="black"] .ink-bg-swatch { background: #111; }
 .ink-dock .ink-done { margin-left: 4px; height: 36px; }
@@ -1583,28 +1592,29 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-pop {
   position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%);
   display: grid; gap: 10px; width: max-content; max-width: min(340px, calc(100vw - 24px)); padding: 12px;
-  border-radius: 16px; background: var(--note-bg); color: var(--note-text);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 11%, transparent);
+  border-radius: 16px; background: var(--ink-ui-bg); color: var(--ink-ui-fg);
+  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--ink-ui-line);
 }
 .ink-pop[hidden] { display: none; }
 .ink-pop.in { animation: ink-pop-in 0.18s cubic-bezier(0.2, 1.3, 0.4, 1); }
 @keyframes ink-pop-in { from { opacity: 0; transform: translate(-50%, 8px) scale(0.94); } }
-.ink-pop-title { margin-bottom: 6px; font-size: 11.5px; font-weight: 700; color: var(--note-muted); }
+.ink-pop-title { margin-bottom: 6px; font-size: 11.5px; font-weight: 700; color: var(--ink-ui-muted); }
 .ink-pop-items { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.ink-pop-hint { font-size: 11.5px; color: var(--note-muted); max-width: 260px; }
+.ink-pop-hint { font-size: 11.5px; color: var(--ink-ui-muted); max-width: 260px; }
 .ink-color { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.45); cursor: pointer; flex: none; transition: transform 0.12s ease-out; }
 .ink-color:hover { transform: scale(1.1); }
-.ink-color[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--note-bg), 0 0 0 4px var(--note-text); transform: scale(1.05); }
-.ink-size { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 5%, transparent); cursor: pointer; }
-.ink-size span { display: block; border-radius: 50%; background: var(--note-text); }
-.ink-size[aria-pressed="true"] { background: color-mix(in srgb, var(--note-text) 15%, transparent); box-shadow: inset 0 0 0 2px var(--note-text); }
-.ink-bg { display: grid; justify-items: center; gap: 5px; width: 66px; padding: 7px 4px 6px; border: 0; border-radius: 12px; background: none; color: var(--note-text); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
-.ink-bg:hover { background: color-mix(in srgb, var(--note-text) 7%, transparent); }
-.ink-bg[aria-checked="true"] { background: color-mix(in srgb, var(--note-text) 13%, transparent); box-shadow: inset 0 0 0 2px var(--note-text); }
-.ink-bg-preview { display: block; width: 40px; height: 30px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.5); background-image: repeating-conic-gradient(color-mix(in srgb, var(--note-text) 14%, transparent) 0 25%, transparent 0 50%); background-size: 10px 10px; }
+.ink-color[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink-ui-bg), 0 0 0 4px var(--ink-ui-fg); transform: scale(1.05); }
+.ink-size { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px; background: var(--fill-tab); cursor: pointer; }
+.ink-size:hover { background: var(--fill-hover); }
+.ink-size span { display: block; border-radius: 50%; background: var(--c, var(--ink-ui-fg)); }
+.ink-size[aria-pressed="true"] { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); }
+.ink-bg { display: grid; justify-items: center; gap: 5px; width: 66px; padding: 7px 4px 6px; border: 0; border-radius: 12px; background: none; color: var(--ink-ui-fg); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ink-bg:hover { background: var(--fill-hover); }
+.ink-bg[aria-checked="true"] { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); }
+.ink-bg-preview { display: block; width: 40px; height: 30px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.5); background-image: repeating-conic-gradient(color-mix(in srgb, var(--ink-ui-fg) 14%, transparent) 0 25%, transparent 0 50%); background-size: 10px 10px; }
 .ink-bg-white .ink-bg-preview { background: #fff; }
 .ink-bg-black .ink-bg-preview { background: #111; }
-.ink-clear { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: color-mix(in srgb, #e5484d 12%, transparent); color: #d63a3f; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ink-clear { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .ink-clear svg { width: 16px; height: 16px; }
 .ink-clear:disabled { opacity: 0.4; cursor: default; }
 @media (pointer: coarse) {
@@ -1623,12 +1633,30 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 /* 메모 안의 손 메모 한 칸: 그린 만큼의 크기 (넓으면 본문 폭에 맞춤), 누르면(PC 는 두 번) 이어 그리기 */
 .mk-doc .mk-ink { display: inline-block; position: relative; max-width: 100%; vertical-align: top; border-radius: 12px; line-height: 0; }
 .mk-doc .mk-ink img { display: block; max-width: 100%; height: auto; border-radius: 12px; user-select: none; -webkit-user-drag: none; }
-.mk-doc .mk-ink-edit { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 9px; border: 0; border-radius: 999px; background: var(--brand-black, #111); color: var(--on-black, #fff); font: 600 12px/1 var(--font-sans, inherit); opacity: 0; transition: opacity 0.12s; cursor: pointer; }
+.mk-doc .mk-ink-edit { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--ink-ui-bg); color: var(--ink-ui-fg); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--ink-ui-line); font: 700 12px/1 var(--font-sans, inherit); opacity: 0; transition: opacity 0.12s, background-color 0.12s; cursor: pointer; }
+.mk-doc .mk-ink-edit:hover { background: var(--brand-yellow); color: var(--on-brand); }
 .mk-doc .mk-ink-edit svg { width: 14px; height: 14px; }
 .mk-doc .mk-ink:hover .mk-ink-edit, .mk-doc .mk-ink.ProseMirror-selectednode .mk-ink-edit { opacity: 1; }
 .mk-doc .mk-ink.ProseMirror-selectednode img { outline: 2px solid var(--note-text); outline-offset: 2px; }
-/* 투명 바탕 손 메모는 검은 메모에서 밝게 (색은 그대로 비슷하게) */
-body[data-color="charcoal"] .mk-doc .mk-ink.bg-none img, [data-color="charcoal"] .mk-doc .mk-ink.bg-none img { filter: invert(1) hue-rotate(180deg); }
+/* 어두운 화면(검은 메모 · 다크 모드의 모든 메모)에서 투명 바탕 잉크: 검은 펜 ↔ 흰 펜만 바꿔 보인다 (색 펜·형광펜은 그대로 — 원노트처럼).
+   파일에는 원래 색 그대로. 그리기 화면 · 주석 · 색 고르기 · 붓 미리 보기 · 메모 안 그림이 모두 같은 규칙이라 고른 색 = 보이는 색 */
+.mk-doc .mk-ink .ink-dark-src { display: none; }
+[data-color="charcoal"] .mk-doc .mk-ink.bg-none:has(.ink-dark-src) .ink-light-src { display: none; }
+[data-color="charcoal"] .mk-doc .mk-ink.bg-none .ink-dark-src { display: block; }
+:is([data-color="charcoal"] .mk-annot, .mk-annot-bar[data-color="charcoal"], .ink-sheet[data-color="charcoal"][data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
+:is([data-color="charcoal"] .mk-annot, .mk-annot-bar[data-color="charcoal"], .ink-sheet[data-color="charcoal"][data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
+@media (prefers-color-scheme: dark) {
+  .mk-doc .mk-ink.bg-none:has(.ink-dark-src) .ink-light-src { display: none; }
+  .mk-doc .mk-ink.bg-none .ink-dark-src { display: block; }
+  :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
+  :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
+}
+@media print {
+  .mk-doc .mk-ink .ink-light-src { display: block !important; }
+  .mk-doc .mk-ink .ink-dark-src { display: none !important; }
+  .mk-annot .ink-k { fill: #1f1f1c !important; }
+  .mk-annot .ink-w { fill: #ffffff !important; }
+}
 
 /* ---------- v0.21.0: 콘텐츠 추가 (+) — 위로 위성 단추 (휴대폰 mobile.css 가 손가락 크기로 덮어씀) ---------- */
 .format-bar button.add-btn { position: relative; }
@@ -1672,7 +1700,7 @@ body.annotating .format-bar, body.annotating .table-bar, body.annotating .tag-su
 .mk-annot-bar .ink-dock { position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); }
 .mk-annot-caption {
   position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%);
-  padding: 6px 12px; border-radius: 999px; background: var(--brand-black, #111); color: var(--on-black, #fff);
+  padding: 6px 12px; border-radius: 999px; background: var(--ink-ui-bg); color: var(--ink-ui-fg); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--ink-ui-line);
   font-size: 12.5px; font-weight: 700; white-space: nowrap; pointer-events: none;
   animation: mk-annot-caption 3.2s ease-in-out forwards;
 }

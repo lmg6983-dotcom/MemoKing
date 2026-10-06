@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../../..');
-const outDir = path.join(repo, 'out', 'android');
+const outDir = path.join(repo, 'out', process.env.MK_DARK ? 'android-dark' : 'android');
 const port = 8799;
 const base = `http://localhost:${port}`;
 
@@ -100,7 +100,8 @@ fs.mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch();
 const errors = [];
 try {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'ko-KR' });
+  // MK_DARK=1: 다크 모드로 같은 점검 (화면 사진은 out/android-dark)
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'ko-KR', colorScheme: process.env.MK_DARK ? 'dark' : 'light' });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => { errors.push(e.message); if (process.env.MK_DUMP) console.log('PAGEERROR', e.stack); });
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -1089,6 +1090,10 @@ try {
     await page.waitForTimeout(150);
     await shot('20-ink-editor');
     const live = await page.locator('.ink-sheet .ink-strokes path').count();
+    // 검은 펜은 밝은 화면에선 검게, 다크 모드에선 밝게 보인다 (파일에는 검정 그대로)
+    const penFill = await page.evaluate(() => getComputedStyle(document.querySelector('.ink-sheet .ink-strokes path')).fill);
+    const wantFill = process.env.MK_DARK ? 'rgb(245, 244, 239)' : 'rgb(31, 31, 28)';
+    check(`검은 펜이 ${process.env.MK_DARK ? '다크 모드에서 밝게' : '밝은 화면에서 검게'} 보임 · 버튼에 검정 바탕 없음`, penFill === wantFill && await page.evaluate(() => [...document.querySelectorAll('.ink-sheet button')].every((b) => { const c = getComputedStyle(b).backgroundColor; return c !== 'rgb(17, 17, 17)' && c !== 'rgb(0, 0, 0)'; })), penFill);
     check('손 메모: + › 손 메모 → 그리기 화면 (취소 없이 완료 하나 · 떠 있는 도구 막대가 화면 안에 · 처음 안내) · 그린 획이 보임', sheet.tools === 3 && sheet.bg && sheet.head === '완료' && sheet.fits && sheet.empty && live === 2, JSON.stringify({ sheet, live }));
     // 형광펜을 고르고 한 번 더 누르면 색·굵기 판 (형광 색 4가지)
     await page.tap('.ink-sheet .ink-tool-highlighter');
@@ -1099,17 +1104,22 @@ try {
     const penBack = await page.evaluate(() => document.querySelectorAll('.ink-sheet .ink-pop .ink-color').length);
     check('고른 도구를 한 번 더 누르면 색·굵기 판 · 판이 열린 채 도구를 바꾸면 그 도구의 색으로', hlPop === 4 && penBack === 7, JSON.stringify({ hlPop, penBack }));
     await page.tap('.ink-sheet .ink-done');
-    await page.waitForSelector('.mk-doc .mk-ink img');
+    await page.waitForSelector('.mk-doc .mk-ink img', { state: 'attached' });
     const body1 = await waitFile((b) => /!\[손 메모\]/.test(b));
     const svgRel = body1.match(/!\[손 메모\]\((attachments\/[^)]+\.svg)\)/)?.[1];
     const svg1 = svgRel ? read(svgRel) : '';
     const vb = svg1.match(/viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/)?.slice(1).map(Number) ?? [];
-    const shown = await page.locator('.mk-doc .mk-ink img').evaluate((img) => ({ w: img.naturalWidth, h: img.naturalHeight, ok: img.complete && img.naturalWidth > 0 }));
+    const shown = await page.locator('.mk-doc .mk-ink img.ink-light-src').evaluate((img) => ({ w: img.naturalWidth, h: img.naturalHeight, ok: img.complete && img.naturalWidth > 0 }));
     check('완료 → 메모 안에 손 메모 한 칸 (SVG 파일 · 다시 고칠 수 있는 자료 포함)', svgRel && /memoking-ink/.test(svg1) && (svg1.match(/<path /g) ?? []).length === 2 && shown.ok, body1);
     check('손 메모 크기 = 그린 만큼 (화면 전체가 아니라)', vb[0] > 150 && vb[0] < 230 && vb[1] > 100 && vb[1] < 170 && shown.w === vb[0], JSON.stringify({ vb, shown }));
+    const shownSrc = await page.waitForFunction((dark) => {
+      const vis = [...document.querySelectorAll('.mk-doc .mk-ink img')].filter((i) => i.offsetWidth > 0);
+      return vis.length === 1 && (dark ? vis[0].classList.contains('ink-dark-src') && vis[0].src.startsWith('data:') : vis[0].classList.contains('ink-light-src')) && vis[0].className;
+    }, Boolean(process.env.MK_DARK), { timeout: 5000 }).then((h) => h.jsonValue()).catch(() => null);
+    check(`메모 안 투명 바탕 손 메모: ${process.env.MK_DARK ? '다크 모드는 검은 펜을 밝게 바꾼 그림' : '원래 그림'} 하나만 보임`, shownSrc, String(shownSrc));
     await shot('21-ink-in-memo');
     // 이어 그리기: 칸을 골라 "이어 그리기" → 같은 획이 보이고, 흰 바탕으로 바꿔 한 획 더
-    await page.tap('.mk-doc .mk-ink img');
+    await page.tap('.mk-doc .mk-ink img:visible');
     await page.waitForTimeout(200);
     await page.evaluate(() => document.querySelector('.mk-doc .mk-ink-edit').click());
     await page.waitForSelector('.ink-sheet');

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getStroke } from '../app/vendor/perfect-freehand.js';
-import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkBounds, strokesHit, anchorStroke, placeStroke, findAnchor, normalizeInk, point } from '../app/js/core/ink.js';
+import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkBounds, strokesHit, anchorStroke, placeStroke, findAnchor, normalizeInk, point, inkForDark, inkTone, INK_LIGHT } from '../app/js/core/ink.js';
 
 const line = (x0, y0, x1, y1, extra = {}) => ({ tool: 'pen', color: '#1f1f1c', size: 4, pts: Array.from({ length: 11 }, (_, i) => point(x0 + ((x1 - x0) * i) / 10, y0 + ((y1 - y0) * i) / 10, 0.5)), ...extra });
 
@@ -60,4 +60,19 @@ test('주석: 획은 그 아래 문단을 따라가고, 폭이 달라지면 같�
   assert.equal(p.size, 8);
   // 그 문단이 없어지면 원래 번호 (끝을 넘으면 마지막)
   assert.equal(findAnchor([{ top: 0, text: 'x' }], s.anchor), 0);
+});
+
+test('어두운 화면용: 검은 펜 ↔ 흰 펜만 바꾸고 색 펜·형광펜은 그대로', () => {
+  const doc = { bg: 'none', strokes: [
+    { tool: 'pen', color: '#1F1F1C', size: 4, pts: [[0, 0, 0.5], [10, 10, 0.5]] },
+    { tool: 'pen', color: '#ffffff', size: 4, pts: [[0, 0, 0.5]] },
+    { tool: 'pen', color: '#2f6fdf', size: 4, pts: [[0, 0, 0.5]] },
+    { tool: 'highlighter', color: '#ffd43b', size: 20, pts: [[0, 0, 0.5]] },
+  ] };
+  const dark = inkForDark(doc);
+  assert.deepEqual(dark.strokes.map((s) => s.color), [INK_LIGHT, '#1f1f1c', '#2f6fdf', '#ffd43b']);
+  assert.deepEqual(doc.strokes.map((s) => inkTone(s)), ['ink-k', 'ink-w', '', '']);
+  assert.equal(inkForDark({ strokes: [doc.strokes[2], doc.strokes[3]] }), null);
+  // 둘레는 그대로 → 어두운 그림도 같은 크기
+  assert.equal(inkToSvg(dark, getStroke).match(/viewBox="[^"]+"/)[0], inkToSvg(doc, getStroke).match(/viewBox="[^"]+"/)[0]);
 });

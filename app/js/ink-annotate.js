@@ -4,9 +4,8 @@
 //     완료 · Esc · 뒤로 가기 = 저장하고 끝내기 (취소는 없다 — 되돌리기·모두 지우기로)
 //   - 획은 그 아래 문단을 따라간다 (core/ink.js anchorStroke·placeStroke): 글이 늘어 문단이 밀려도, 창 폭이 바뀌어도 같은 자리
 //   - 저장: 완료할 때 JSON 파일 하나 → 메모 머리말 ink: (자료가 없으면 머리말에서 뺀다)
-import { getStroke } from '../vendor/perfect-freehand.js';
-import { anchorStroke, placeStroke, normalizeInk, strokePath } from './core/ink.js';
-import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys, inkMode } from './ink-editor.js';
+import { anchorStroke, placeStroke, normalizeInk } from './core/ink.js';
+import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys, inkMode, strokeEl } from './ink-editor.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 
@@ -81,13 +80,7 @@ export function setupAnnotation(o) {
     cache = screenStrokes();
     if (surface) surface.render();
     else {
-      view.replaceChildren(...cache.map((s) => {
-        const p = document.createElementNS(SVGNS, 'path');
-        p.setAttribute('d', strokePath(s, getStroke));
-        p.setAttribute('fill', s.color);
-        if (s.tool === 'highlighter') p.setAttribute('fill-opacity', '0.4');
-        return p;
-      }));
+      view.replaceChildren(...cache.map(strokeEl));
     }
   }
 
