@@ -22,6 +22,7 @@ import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
+import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
 import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
@@ -737,10 +738,51 @@ function tearEnd(point) {
 function setTopmost(win, on) {
   if (!win || win.isDestroyed()) return;
   win.setAlwaysOnTop(on, 'floating');
-  if (on && !win.isAlwaysOnTop()) {
-    win.setAlwaysOnTop(false);
-    win.setAlwaysOnTop(true, 'floating');
-  }
+  if (on) reassertTop(win);
+  refreshTopWatch();
+}
+
+// 늘 위를 Windows 에 다시 건다. Electron 은 켜 둔 줄 알면 같은 값을 건너뛰므로, 껐다 켜서 HWND_TOPMOST 를 실제로 건다
+// (늘 위 창들 중 맨 위로 — 포커스는 그대로)
+function reassertTop(win) {
+  if (!win || win.isDestroyed() || !win.isVisible() || win.isMinimized()) return;
+  win.setAlwaysOnTop(false);
+  win.setAlwaysOnTop(true, 'floating');
+}
+
+// ---------- 늘 위 지키기 (Windows, foreground-watch.js) ----------
+// Windows 가 늘 위를 몰래 풀었거나, 다른 프로그램의 늘 위 창(브라우저 동영상 작은 창 등)이 앞으로 와 위에 올라간 경우
+const onTopWins = () => [
+  ...(settings.listOnTop && listWin && !listWin.isDestroyed() ? [listWin] : []),
+  ...[...noteWins].filter(([id, w]) => settings.onTop[id] === true && !w.isDestroyed()).map(([, w]) => w),
+];
+// 메모킹이 잠깐 띄우는 맨 위 화면(영역 캡처·매직키·끄는 미리보기) 동안에는 건드리지 않는다
+const ownOverlayOpen = () => Boolean(areaCapture) || [ghostWin, magicWin].some((w) => w && !w.isDestroyed() && w.isVisible());
+let raiseTimer = 0;
+const topWatch = new ForegroundWatch({
+  onEvent: (e) => {
+    if (ownOverlayOpen()) return;
+    if (e.type === 'lost') {
+      const win = onTopWins().find((w) => hwndOf(w) === e.hwnd);
+      if (win) reassertTop(win);
+      return;
+    }
+    // 다른 프로그램의 늘 위 창이 앞으로 옴 → 메모킹의 늘 위 창을 그 위로 (캡처 도구·시작 메뉴 등은 빼고)
+    if (!e.topmost || LEAVE_ON_TOP.has(e.name)) return;
+    if (BrowserWindow.getAllWindows().some((w) => hwndOf(w) === e.hwnd)) return;
+    clearTimeout(raiseTimer);
+    raiseTimer = setTimeout(() => {
+      if (!ownOverlayOpen()) for (const w of onTopWins()) reassertTop(w);
+    }, 120);
+  },
+});
+let topWatchTimer = 0;
+function refreshTopWatch() {
+  clearTimeout(topWatchTimer);
+  topWatchTimer = setTimeout(() => {
+    if (quitting) return topWatch.stop();
+    topWatch.update(onTopWins().map(hwndOf));
+  }, 300);
 }
 
 const STICKER = { width: 64, height: 52 };
@@ -762,7 +804,7 @@ function closeStickerWin(entry, { peel = false } = {}) {
     if (win.isDestroyed()) return;
     win.destroy();
     // 아직 붙여 둔 상태면 늘 위를 다시 확인
-    if (!owner.isDestroyed() && stickers.get(owner.id)) setTopmost(owner, true);
+    if (!owner.isDestroyed() && stickers.get(owner.id)) reassertTop(owner);
   };
   if (peel && win.isVisible()) {
     win.webContents.send('sticker:peel');
@@ -822,8 +864,11 @@ function setSticker(owner, on, { animate = true } = {}) {
   };
   const visible = () => {
     if (owner.isDestroyed()) return;
-    if (owner.isVisible() && !owner.isMinimized()) openStickerWin(entry, false);
-    else closeStickerWin(entry);
+    if (owner.isVisible() && !owner.isMinimized()) {
+      openStickerWin(entry, false);
+      reassertTop(owner); // 숨었다 보이거나 최소화에서 돌아오면 Windows 가 늘 위를 잊는 일이 있다
+    } else closeStickerWin(entry);
+    refreshTopWatch();
   };
   const events = { move: sync, resize: sync, show: visible, hide: visible, minimize: visible, restore: visible };
   for (const [name, fn] of Object.entries(events)) owner.on(name, fn);
@@ -835,6 +880,7 @@ function setSticker(owner, on, { animate = true } = {}) {
     entry.off();
     closeStickerWin(entry);
     if (stickers.get(owner.id) === entry) stickers.delete(owner.id);
+    refreshTopWatch();
   });
   openStickerWin(entry, animate);
 }
@@ -2585,6 +2631,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  topWatch.stop();
   globalShortcut.unregisterAll();
   captureHelper.stop();
   alarms.stop();
