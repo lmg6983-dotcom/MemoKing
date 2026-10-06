@@ -7,6 +7,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { dropBounds, DEFAULT_NOTE_SIZE } from './placement.js';
+import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
 
 const ICON_PNG = path.join(import.meta.dirname, '..', 'assets', 'icons', 'icon-256.png');
 
@@ -965,29 +966,26 @@ export async function runSmoke({
       const formatStep = await waitStep(tutWin, 'format');
       const barShown = formatStep && (await js(tutWin(), `!document.body.classList.contains('bar-hidden')`));
       check('글을 쓰면 → 저절로 다음 단계 (튜토리얼 동안 서식 도구막대는 보임)', formatStep && barShown);
-      await coachNext(tutWin());
-      await waitStep(tutWin, 'add');
-      await coachNext(tutWin());
-      await waitStep(tutWin, 'ink');
-      await coachNext(tutWin());
-      await waitStep(tutWin, 'lists');
-      await coachNext(tutWin());
-      await waitStep(tutWin, 'tag');
+      // 안내만 하는 단계는 "다음"으로, 직접 해 보는 단계(태그·닫기)는 실제로 해서 넘어간다
+      const stepIds = TUTORIAL_STEPS.map((x) => x.id);
+      const walk = async (win, from, to) => {
+        for (const id of stepIds.slice(stepIds.indexOf(from) + 1, stepIds.indexOf(to) + 1)) {
+          await coachNext(win());
+          await waitStep(win, id);
+        }
+      };
+      await walk(tutWin, 'format', 'tag');
       await type(tutWin(), ' #할일 ');
       const crownStep = await waitStep(tutWin, 'crown');
       check('#태그를 쓰면 → 저절로 다음 단계', crownStep);
-      await coachNext(tutWin());
-      await waitStep(tutWin, 'bar');
+      await walk(tutWin, 'crown', 'bar');
       await capture(tutWin(), 'smoke-tutorial-note.png');
       await coachNext(tutWin());
       await waitStep(tutWin, 'close');
       await js(tutWin(), `document.getElementById('close-btn').click()`);
       const cardsStep = await waitStep(getList, 'cards');
       check('메모를 닫으면 → 목록 창으로 돌아와 다음 단계', cardsStep && !noteWins.has(tutMemo) && vault.get(tutMemo)?.title.startsWith('튜토리얼 메모'), JSON.stringify({ cardsStep, open: noteWins.has(tutMemo), title: vault.get(tutMemo)?.title }));
-      for (const id of ['filters', 'tabs', 'quick', 'magic', 'settings', 'done']) {
-        await coachNext(getList());
-        await waitStep(getList, id);
-      }
+      await walk(getList, 'cards', 'done');
       await coachNext(getList());
       const finished = await until(async () => !getTutorial().active && (await bubbleStep(getList())) === null, '튜토리얼 끝').catch(() => false);
       check('마지막 단계까지 → 말풍선이 사라지고 끝', finished);

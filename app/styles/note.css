@@ -1520,6 +1520,18 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-done:active { transform: scale(0.94); }
 .ink-done:disabled { opacity: 0.6; }
 .ink-dock .ink-done { box-shadow: none; }
+/* 막대 안의 단추는 줄지 않고, 막대는 늘 화면 안 — 좁으면 완료는 ✓ 동그라미로 (막대 밖으로 삐져나오지 않게) */
+.ink-dock { width: max-content; box-sizing: border-box; }
+.ink-dock > *, .ink-group > * { flex-shrink: 0; }
+@media (max-width: 480px) {
+  .ink-dock .ink-done { width: 42px; padding: 0; justify-content: center; border-radius: 14px; }
+  .ink-dock .ink-done .ink-done-label { display: none; }
+  .ink-dock .ink-done svg { width: 20px; height: 20px; }
+}
+@media (max-width: 380px) {
+  .ink-dock .ink-btn, .ink-dock .ink-done { width: 38px; height: 40px; }
+  .ink-dock .ink-group { padding: 0 1px; }
+}
 .ink-scroll { position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .ink-page { position: relative; }
 .ink-canvas { display: block; touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }

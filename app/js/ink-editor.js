@@ -322,8 +322,10 @@ export function createInkToolbar(o) {
   }
   let doneBtn = null;
   if (o.done) {
-    doneBtn = el('button', 'ink-done', { type: 'button', title: `${o.done.label} (Esc)` });
-    doneBtn.append(icon('check'), document.createTextNode(o.done.label));
+    doneBtn = el('button', 'ink-done', { type: 'button', title: `${o.done.label} (Esc)`, 'aria-label': o.done.label });
+    const label = el('span', 'ink-done-label');
+    label.textContent = o.done.label;
+    doneBtn.append(icon('check'), label);
     doneBtn.addEventListener('click', () => o.done.run());
     bar.append(doneBtn);
   }

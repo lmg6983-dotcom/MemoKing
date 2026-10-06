@@ -5,7 +5,7 @@
 // 달러 하나($5)는 돈 표시와 겹치므로 수식으로 보지 않는다(파일의 $ 가 \$ 로 바뀌지 않게). 칠 때는 $x^2$ 처럼
 // 달러 하나로 감싸도 수식이 된다(앞뒤에 띄어쓰기가 없을 때만, 저장은 $$x^2$$).
 // 그리기(KaTeX, 265KB)는 수식이 처음 보일 때 불러온다.
-import { $nodeSchema, $remark, $prose, $view, remarkMath, InputRule, inputRules, TextSelection } from '../vendor/milkdown.js';
+import { $nodeSchema, $remark, $prose, $view, remarkMath, InputRule, inputRules, TextSelection, Plugin, PluginKey } from '../vendor/milkdown.js';
 
 let katexLoad = null;
 function loadKatex() {
@@ -240,19 +240,62 @@ export const mathInputRules = $prose(() => inputRules({
       if (/^\d+([.,]\d+)?$/.test(value)) return null; // $5$ 같은 돈 표시는 그대로
       return state.tr.replaceWith(from, end, type.create({ value }));
     }),
-    new InputRule(/^\$\$\s$/, (state, _match, start, end) => {
-      const type = state.schema.nodes.math_block;
-      const $start = state.doc.resolve(start);
-      if (!type || $start.parent.type.name !== 'paragraph' || $start.parent.content.size !== end - start) return null;
-      if (!blockFits($start, $start.depth, type, true)) return null; // 표 칸 안은 그대로 글자로 (표가 둘로 쪼개지지 않게)
-      return state.tr.replaceRangeWith($start.before(), $start.after(), type.create({ value: '' }));
-    }),
+    new InputRule(/^\$\$\s$/, (state, _match, start) => dollarBlock(state, start)),
   ],
 }));
 
+// 빈 줄의 $$ → 빈 수식 블록 + "바로 고치기 창을 열어 줘" 표시 (한 번에 창이 뜨게 — 블록을 또 누르지 않아도)
+const mathOpenKey = new PluginKey('memoking-math-open');
+let openSeq = 0;
+function dollarBlock(state, start) {
+  const type = state.schema.nodes.math_block;
+  const $start = state.doc.resolve(start);
+  if (!type || $start.parent.type.name !== 'paragraph' || $start.parent.textContent.trim() !== '$$') return null;
+  if (!blockFits($start, $start.depth, type, true)) return null; // 표 칸 안은 그대로 글자로 (표가 둘로 쪼개지지 않게)
+  const pos = $start.before();
+  return state.tr.replaceRangeWith(pos, $start.after(), type.create({ value: '' })).setMeta(mathOpenKey, { id: ++openSeq, pos });
+}
+export const mathOpenPlugin = $prose(() => new Plugin({
+  key: mathOpenKey,
+  // 뒤따라 붙는 정리 트랜잭션(빈 줄 정리 등)에도 남도록 자리를 따라 옮겨 둔다 (id 로 한 번만 연다)
+  state: {
+    init: () => null,
+    apply: (tr, prev) => tr.getMeta(mathOpenKey) ?? (prev && tr.docChanged ? { ...prev, pos: tr.mapping.map(prev.pos) } : prev),
+  },
+  props: {
+    // 빈 줄에 $$ 치고 Enter 도 같게
+    handleKeyDown(view, e) {
+      if (e.key !== 'Enter' || e.shiftKey || e.isComposing || !view.editable) return false;
+      const { $from, empty } = view.state.selection;
+      if (!empty || $from.parent.type.name !== 'paragraph' || $from.parent.textContent.trim() !== '$$') return false;
+      const tr = dollarBlock(view.state, $from.start());
+      if (!tr) return false;
+      view.dispatch(tr.scrollIntoView());
+      return true;
+    },
+  },
+  view: () => {
+    let handled = null;
+    return {
+      update(view) {
+        const want = mathOpenKey.getState(view.state);
+        if (!want || want.id === handled) return;
+        handled = want.id;
+        requestAnimationFrame(() => openBlockEditor(view, want.pos));
+      },
+    };
+  },
+}));
+function openBlockEditor(view, pos) {
+  if (view.isDestroyed) return;
+  const dom = view.nodeDOM(pos);
+  const at = view.state.doc.nodeAt(pos);
+  if (dom && at?.type.name === 'math_block') openEditor(view, () => pos, at, dom);
+}
+
 /** 편집기에 붙일 플러그인들 */
 export function mathPlugins({ readOnly = false } = {}) {
-  return [mathRemark, mathInlineSchema, mathBlockSchema, mathInlineView(readOnly), mathBlockView(readOnly), mathInputRules].flat();
+  return [mathRemark, mathInlineSchema, mathBlockSchema, mathInlineView(readOnly), mathBlockView(readOnly), mathInputRules, ...(readOnly ? [] : [mathOpenPlugin])].flat();
 }
 
 // depth 의 줄 자리(replace: 그 줄 대신, 아니면 그 줄 바로 뒤)에 수식 블록이 들어갈 수 있나 — 표 칸에는 글 줄만 들어간다
@@ -280,10 +323,6 @@ export function insertMathBlock(view) {
     pos = depth > 0 ? $from.after(depth) : $from.pos;
     tr = view.state.tr.insert(pos, node);
   }
-  view.dispatch(tr.scrollIntoView());
-  requestAnimationFrame(() => {
-    const dom = view.nodeDOM(pos);
-    const at = view.state.doc.nodeAt(pos);
-    if (dom && at?.type === type) openEditor(view, () => pos, at, dom);
-  });
+  view.dispatch(tr.setMeta(mathOpenKey, { id: ++openSeq, pos }).scrollIntoView());
+  if (!mathOpenKey.get(view.state)) requestAnimationFrame(() => openBlockEditor(view, pos)); // 읽기 전용 등 플러그인이 없을 때
 }

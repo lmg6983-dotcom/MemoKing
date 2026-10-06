@@ -1145,8 +1145,12 @@ try {
     await draw([[p.x, p.y], [p.x + 60, p.y + 4], [p.x + 120, p.y - 2], [p.x + 180, p.y + 3]]);
     await page.waitForTimeout(150);
     await shot('22-annotate');
-    const annBar = await page.evaluate(() => { const r = document.querySelector('.mk-annot-bar .ink-dock').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && !!document.querySelector('.mk-annot-scroller'); });
-    check('주석 모드: 도구 막대(완료 포함)가 화면 안에 · 본문 둘레 점선', annBar);
+    const annBar = await page.evaluate(() => {
+      const r = document.querySelector('.mk-annot-bar .ink-dock').getBoundingClientRect();
+      const d = document.querySelector('.mk-annot-bar .ink-done').getBoundingClientRect();
+      return r.left >= 0 && r.right <= innerWidth && d.left >= r.left && d.right <= r.right + 0.5 && !!document.querySelector('.mk-annot-scroller');
+    });
+    check('주석 모드: 도구 막대가 화면 안에 · 완료 버튼이 막대 바탕 안에 · 본문 둘레 점선', annBar);
     await page.tap('.mk-annot-bar .ink-done');
     const body3 = await waitFile((b) => /^ink: /m.test(b));
     const inkRel = body3.match(/^ink: (attachments\/\S+\.json)$/m)?.[1];

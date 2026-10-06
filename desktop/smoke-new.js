@@ -317,6 +317,16 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
       const sats = await js(again, `[...document.querySelectorAll('#add-menu:not([hidden]) .add-sat')].map((b) => b.dataset.add).join()`);
       await capture(again, 'smoke-new-add-menu.png');
       check('메모 창 + → 음성 녹음·손 메모·주석·사진·파일·표·수식', sats === 'record,ink,annotate,photo,file,table,math', sats);
+      // + › 수식: 한 번에 고치기 창이 뜬다 (실제 마우스로)
+      const mclick = async (sel) => {
+        const r = await js(again, `(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+        for (const type of ['mouseDown', 'mouseUp']) again.webContents.sendInputEvent({ type, x: Math.round(r.x), y: Math.round(r.y), button: 'left', clickCount: 1 });
+      };
+      await mclick('.add-sat[data-add="math"]');
+      const mathOpen = await until(() => js(again, `!!document.querySelector('.mk-math-editor')`), '수식 창', 3000).catch(() => false);
+      const mathState = await js(again, `({ editors: document.querySelectorAll('.mk-math-editor').length, blocks: document.querySelectorAll('.mk-math-block').length })`);
+      await capture(again, 'smoke-new-math.png');
+      check('+ › 수식 → 한 번에 수식 고치기 창', mathOpen, JSON.stringify(mathState));
       again.close();
     }
 
