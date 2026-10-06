@@ -66,7 +66,7 @@ export const TUTORIAL_STEPS = [
     id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     image: 'add.jpg',
     title: '+ 로 더 많은 것 넣기',
-    text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 주석 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
+    text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 글 위에 그리기 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
     try: '왼쪽 아래 + 를 눌러 펼쳐 보세요',
     next: LATER,
   },
@@ -82,8 +82,8 @@ export const TUTORIAL_STEPS = [
     id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '.ProseMirror > *'], advance: 'annotate-done', emoji: '🖍️',
     image: 'annotate.jpg',
     title: '글 위에 바로 그리기',
-    text: '"주석"은 글자 위에 밑줄이나 동그라미를 그리는 기능이에요. 글의 자리는 그대로예요.',
-    try: '+ › "주석"을 눌러 글 위에 쓱 긋고 ✓ 완료',
+    text: '"글 위에 그리기"로 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요.',
+    try: '+ › "글 위에 그리기"를 눌러 글 위에 쓱 긋고 ✓ 완료',
     next: LATER,
   },
   {
@@ -237,7 +237,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     title: '+ 로 더 많은 것 넣기',
-    text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 주석 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
+    text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 글 위에 그리기 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
     try: '왼쪽 아래 + 를 눌러 펼쳐 보세요',
     next: LATER,
   },
@@ -251,8 +251,8 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'annotate-done', emoji: '🖍️',
     title: '글 위에 바로 그리기',
-    text: '"주석"은 글자 위에 밑줄이나 동그라미를 긋는 기능이에요. 글의 자리는 그대로예요.',
-    try: '+ › "주석"을 눌러 글 위에 쓱 긋고 ✓ 완료',
+    text: '"글 위에 그리기"로 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요.',
+    try: '+ › "글 위에 그리기"를 눌러 글 위에 쓱 긋고 ✓ 완료',
     next: LATER,
   },
   {

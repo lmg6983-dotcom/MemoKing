@@ -224,7 +224,6 @@ function showSetup(error = '') {
 
 app.showList = () => {
   closeAllSheets();
-  panes.closePane('peek');
   note.closeNote();
   list.refresh();
   list.show();
@@ -235,8 +234,6 @@ app.noteBack = () => {
   if (isTwoPane()) panes.toggleList();
   else app.showList();
 };
-// 목록 카드를 오른쪽으로 밀기 (태블릿): 지금 메모 옆에 열기
-app.openBeside = (id) => panes.openBeside(id);
 app.isNoteOpen = () => note.isOpen();
 
 // 넓은 화면: 메모를 고르지 않았으면 오른쪽에 안내
@@ -262,9 +259,8 @@ app.filterByTag = (name) => {
 app.openMemo = async (id, options = {}) => {
   if (!app.vault) return;
   closeAllSheets();
-  // 태블릿: 옆 메모를 고르면 그쪽을 고치는 칸으로 · 새로 열면 목록은 숨기고 메모를 가득
-  if (!options.beside && isTwoPane() && id === panes.peekId()) return panes.activatePeek();
-  if (!options.beside && isTwoPane()) panes.hideListForMemo();
+  // 태블릿: 새로 열면 목록은 숨기고 메모를 가득
+  if (isTwoPane()) panes.hideListForMemo();
   $('list-screen').hidden = false; // 메모 뒤에 목록이 있어야 닫을 때 바로 보인다
   await note.openNote(id, options);
   syncPane();
@@ -945,7 +941,6 @@ function openVault() {
   app.previews.reset();
   vault.on('changed', (detail) => {
     note.onVaultChanged(detail);
-    panes.peekChanged(detail?.ids);
     clearTimeout(changeTimer);
     changeTimer = setTimeout(() => list.refresh(), 60);
     alarms.scheduleSoon();
@@ -985,6 +980,8 @@ on('sync', (st) => {
   if (st.conflicts?.length) toast(`두 기기에서 동시에 고친 메모 ${st.conflicts.length}개는 사본으로 남겼어요`);
 });
 on('alarm', () => alarms.tick());
+// S펜 버튼을 누르고 있는지 (앱이 알려 줌) → 손 메모 그리기가 지우개로 (app/js/ink-editor.js)
+on('penButton', ({ down }) => window.dispatchEvent(new CustomEvent('memoking:pen-button', { detail: Boolean(down) })));
 on('keyboard', ({ open }) => {
   nativeKeyboard = true;
   note.setKeyboard(open);
@@ -1024,7 +1021,7 @@ setBackHandler(() => {
   if (note.closeAddMenu()) return true;
   if (setFabMenu(false)) return true;
   if (sheetOpen()) return closeTopSheet();
-  if (panes.back()) return true; // 태블릿: 옆에 꺼낸 목록 → 옆 메모 순으로 닫기
+  if (panes.back()) return true; // 태블릿: 옆에 꺼낸 목록부터 넣기
   if (note.isOpen()) {
     app.showList();
     return true;
@@ -1036,7 +1033,7 @@ setBackHandler(() => {
 // ---------- 시작 ----------
 
 list.setup();
-panes.setupPanes({ note, openMemo: (id, o) => app.openMemo(id, o), deleteMemo: (id) => deleteMemo(id), showList: () => app.showList() });
+panes.setupPanes({ note });
 setupTutorial({ screen: () => (note.isOpen() ? 'note' : 'list'), markdown: () => (note.isOpen() ? note.editorMarkdown() : '') });
 const info = native.info();
 if (info.vault?.ok) openVault();

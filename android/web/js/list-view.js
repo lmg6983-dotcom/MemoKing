@@ -349,12 +349,12 @@ el.cards.addEventListener('touchmove', (e) => {
   e.preventDefault();
   swipe.dx = dx;
   const w = swipe.card.offsetWidth || 1;
-  // 태블릿: 오른쪽으로 밀면 열기(지금 메모가 있으면 옆에) — 카드는 목록 안에서만 살짝 따라온다 · 지우기는 왼쪽으로만
+  // 태블릿: 오른쪽으로 밀면 열기 — 카드는 목록 안에서만 살짝 따라온다 · 지우기는 왼쪽으로만
   const open = isTwoPane() && dx > 0;
   swipe.card.classList.toggle('swipe-open', open);
   if (open) {
     const pull = Math.min(dx, w * 0.32) + Math.max(0, dx - w * 0.32) * 0.15;
-    swipe.card.dataset.openLabel = app.isNoteOpen?.() ? '옆에 열기 ▸' : '열기 ▸';
+    swipe.card.dataset.openLabel = '열기 ▸';
     swipe.card.style.transform = `translateX(${pull}px)`;
     swipe.card.style.opacity = '';
     swipe.card.classList.toggle('swipe-ready', dx > w * 0.28);
@@ -381,7 +381,7 @@ function endSwipe() {
       card.dataset.swiped = '1';
       setTimeout(() => delete card.dataset.swiped, 400);
       haptic(8);
-      app.openBeside(card.dataset.id);
+      app.openMemo(card.dataset.id);
     }
     return;
   }

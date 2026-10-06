@@ -1162,6 +1162,29 @@ try {
     await page.tap('.ink-sheet .ink-tool-pen');
     const penBack = await page.evaluate(() => document.querySelectorAll('.ink-sheet .ink-pop .ink-color').length);
     check('고른 도구를 한 번 더 누르면 색·굵기 판 · 판이 열린 채 도구를 바꾸면 그 도구의 색으로', hlPop === 4 && penBack === 7, JSON.stringify({ hlPop, penBack }));
+    // S펜 버튼(갤럭시 탭): 누른 채 그으면 지우개 — 웹 신호(buttons=2)로도, 앱이 알려 주는 신호로도
+    const sPen = await page.evaluate(async () => {
+      const svg = document.querySelector('.ink-sheet .ink-canvas');
+      const r = svg.getBoundingClientRect();
+      const count = () => svg.querySelectorAll('g path, :scope > path').length;
+      const fire = (type, x, y, buttons, id) => svg.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: id, pointerType: 'pen', isPrimary: true, clientX: r.left + x, clientY: r.top + y, buttons, button: type === 'pointermove' ? -1 : (buttons & 2 ? 2 : 0), pressure: 0.5 }));
+      const line = (y, buttons, id) => { fire('pointerdown', 60, y, buttons, id); for (let x = 60; x <= 200; x += 10) fire('pointermove', x, y, buttons, id); fire('pointerup', 200, y, 0, id); };
+      const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+      const before = count();
+      line(420, 1, 91); await wait(80);
+      const drawn = count();
+      line(420, 3, 92); await wait(80); // 펜 끝 + 옆 버튼
+      const erasedWeb = count();
+      line(470, 1, 93); await wait(80);
+      window.dispatchEvent(new CustomEvent('memoking:pen-button', { detail: true }));
+      line(470, 1, 94); await wait(80);
+      window.dispatchEvent(new CustomEvent('memoking:pen-button', { detail: false }));
+      const erasedApp = count();
+      line(520, 1, 95); await wait(80); // 버튼을 떼면 다시 펜
+      return { before, drawn, erasedWeb, erasedApp, after: count() };
+    });
+    check('S펜 버튼을 누른 채 그으면 지우개 · 떼면 다시 펜', sPen.drawn === sPen.before + 1 && sPen.erasedWeb === sPen.before && sPen.erasedApp === sPen.before && sPen.after === sPen.before + 1, JSON.stringify(sPen));
+    for (let i = 0; i < 5; i++) await page.evaluate(() => document.querySelector('.ink-sheet button[title^="되돌리기"]')?.click()); // 시험용 획 되돌리기
     await page.tap('.ink-sheet .ink-done');
     await page.waitForSelector('.mk-doc .mk-ink img', { state: 'attached' });
     const body1 = await waitFile((b) => /!\[손 메모\]/.test(b));

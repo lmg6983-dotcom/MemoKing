@@ -96,7 +96,8 @@ export function createInkSurface(svg, o) {
     const k = o.scale?.() ?? 1;
     return [(e.clientX - r.left) / k, (e.clientY - r.top) / k];
   };
-  const isEraser = (e) => o.tools.tool === 'eraser' || (e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) === 32));
+  // 지우개: 고른 도구 · 펜 뒤쪽(지우개 끝) · 펜 옆 버튼(S펜 버튼 — 누른 채 그리면 지우개, 떼면 다시 펜)
+  const isEraser = (e) => o.tools.tool === 'eraser' || (e.pointerType === 'pen' && (penButtonDown || e.button === 5 || e.button === 2 || (e.buttons & 32) === 32 || (e.buttons & 2) === 2));
   const size = (tool) => SIZES[tool][o.tools.size[tool]];
 
   function render() {
@@ -198,6 +199,14 @@ export function createInkSurface(svg, o) {
       }
       return;
     }
+    // 그리다가 펜 버튼을 누르면 거기서부터 지우개 (그은 데까지는 남긴다)
+    if (!drawing.erase && drawing.stroke.pen && isEraser(e)) {
+      const done = drawing.stroke;
+      if (done.pts.length > 1) o.setStrokes([...o.getStrokes(), done], { undoable: true });
+      drawing = { id: drawing.id, erase: true, before: o.getStrokes(), removed: false };
+      schedule();
+      render();
+    }
     const events = e.getCoalescedEvents?.() ?? [e];
     for (const ev of events.length ? events : [e]) {
       const [x, y] = local(ev);
@@ -268,6 +277,12 @@ export function inkHistory(initial = []) {
     changed: () => undo.length > 0,
   };
 }
+
+// S펜 버튼을 누르고 있는지 — 휴대폰 앱이 알려 준다 (웹 화면이 버튼을 못 받는 기기도 있어서)
+let penButtonDown = false;
+window.addEventListener('memoking:pen-button', (e) => {
+  penButtonDown = Boolean(e.detail);
+});
 
 const TOOL_NAMES = { pen: '펜', highlighter: '형광펜', eraser: '지우개' };
 const BG_NAMES = { none: '투명', white: '흰색', black: '검정' };

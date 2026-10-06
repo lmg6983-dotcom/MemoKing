@@ -129,17 +129,6 @@
   </section>
 
   <!-- 태블릿 나란히 보기: 옆 메모(보기만, 누르면 고치기) · 끌 때 안내 -->
-  <section id="peek-screen" class="screen note-screen peek-screen" data-color="yellow" aria-label="옆 메모 (누르면 고치기)" hidden>
-    <header class="bar peek-bar">
-      <b class="peek-title"></b>
-      <span class="peek-hint">✏️ 눌러서 고치기</span>
-    </header>
-    <main id="peek-editor" class="editor peek-editor"></main>
-  </section>
-  <div id="pane-edge-left" class="pane-edge left" hidden><span>↩ 목록으로</span></div>
-  <div id="pane-edge-right" class="pane-edge right" hidden><span>🗑 지우기</span></div>
-  <div id="pane-badge" class="pane-badge" hidden></div>
-  <div id="pane-slot" class="pane-slot" hidden><span>놓으면 제자리</span></div>
 
   <!-- ========== 메모 ========== -->
   <section id="note-screen" class="screen note-screen" data-color="yellow" hidden>
@@ -233,7 +222,7 @@
     <div id="add-menu" class="add-menu" role="menu" aria-label="콘텐츠 추가" hidden>
       <button class="add-sat" data-add="record" data-action="record" role="menuitem"><span class="add-sat-btn rec"><svg><use href="#i-mic"/></svg></span><span class="add-sat-label">음성 녹음</span></button>
       <button class="add-sat" data-add="ink" role="menuitem"><span class="add-sat-btn ink"><svg><use href="#i-ink"/></svg></span><span class="add-sat-label">손 메모</span></button>
-      <button class="add-sat" data-add="annotate" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-pen"/></svg></span><span class="add-sat-label">주석 (위에 그리기)</span></button>
+      <button class="add-sat" data-add="annotate" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-pen"/></svg></span><span class="add-sat-label">글 위에 그리기</span></button>
       <button class="add-sat" data-add="photo" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-photo"/></svg></span><span class="add-sat-label">사진</span></button>
       <button class="add-sat" data-add="file" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-clip"/></svg></span><span class="add-sat-label">파일</span></button>
       <button class="add-sat" data-add="table" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-table"/></svg></span><span class="add-sat-label">표</span></button>

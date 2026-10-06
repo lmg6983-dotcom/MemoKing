@@ -45,7 +45,7 @@ async function gesture(pts, { hold = 0, step = 16 } = {}) {
   await wait(350);
 }
 const rect = (sel) => page.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2, r: r.right, b: r.bottom }; }, sel);
-const state = () => page.evaluate(() => ({ cls: ['note-open', 'pane-list', 'pane-split', 'active-right'].filter((c) => document.body.classList.contains(c)), active: document.querySelector('#note-screen:not([hidden]) .ProseMirror')?.textContent.slice(0, 12) ?? null, peek: document.querySelector('#peek-screen:not([hidden]) .peek-title')?.textContent ?? null, noteL: Math.round(document.getElementById('note-screen').getBoundingClientRect().left), peekL: Math.round(document.getElementById('peek-screen').getBoundingClientRect().left) }));
+const state = () => page.evaluate(() => ({ cls: ['note-open', 'pane-list'].filter((c) => document.body.classList.contains(c)), active: document.querySelector('#note-screen:not([hidden]) .ProseMirror')?.textContent.slice(0, 12) ?? null, noteL: Math.round(document.getElementById('note-screen').getBoundingClientRect().left) }));
 const card = (title) => `.card:has(.card-title:text-is("${title}"))`;
 const cardRect = async (title) => (await page.locator(card(title)).boundingBox());
 
@@ -69,73 +69,32 @@ await wait(400);
 st = await state();
 check('≡ → 목록이 옆에 · 메모는 오른쪽', st.cls.includes('pane-list') && st.noteL > 300, JSON.stringify(st));
 await shot('list-beside');
-// 3) 오른쪽으로 밀기 → 옆에 열기 (안내가 카드 안에 보임)
+// 3) 오른쪽으로 밀기 → 열기 (화면 나누기는 없음: 그 메모가 화면 가득) — 안내가 카드 안에 보임
 const c2 = await cardRect('장보기');
 await touch('touchStart', c2.x + 30, c2.y + c2.height / 2);
 for (let i = 1; i <= 10; i++) { await touch('touchMove', c2.x + 30 + i * 18, c2.y + c2.height / 2 + 1); await wait(16); }
 await wait(100);
-const label = await page.evaluate(() => { const c = document.querySelector('.card.swipe-open.swipe-ready'); if (!c) return null; const s = getComputedStyle(c, '::before'); const r = c.getBoundingClientRect(); const listR = document.getElementById('list-screen').getBoundingClientRect(); return { text: s.content, cardRight: r.right, listRight: listR.right, labelLeft: r.left + 10 }; });
+const label = await page.evaluate(() => { const c = document.querySelector('.card.swipe-open.swipe-ready'); if (!c) return null; const s = getComputedStyle(c, '::before'); const r = c.getBoundingClientRect(); const listR = document.getElementById('list-screen').getBoundingClientRect(); return { text: s.content, listRight: listR.right, labelLeft: r.left + 10 }; });
 await shot('swipe-open-label');
 await touch('touchEnd', 0, 0);
 await wait(700);
-check('오른쪽으로 밀면 "옆에 열기" 안내가 목록 안(카드 왼쪽)에 보임', label && /옆에 열기/.test(label.text) && label.labelLeft < label.listRight - 60, JSON.stringify(label));
+check('오른쪽으로 밀면 "열기" 안내가 목록 안(카드 왼쪽)에 보임', label && /열기/.test(label.text) && !/옆에/.test(label.text) && label.labelLeft < label.listRight - 60, JSON.stringify(label));
 st = await state();
-check('→ 두 메모 나란히: 새 메모(장보기)는 오른쪽 고치는 칸 · 회의는 왼쪽 보기 칸 · 목록 숨김', st.cls.includes('pane-split') && st.cls.includes('active-right') && /장보기/.test(st.active) && st.peek === '회의' && !st.cls.includes('pane-list'), JSON.stringify(st));
-await shot('split');
-// 4) 옆 메모를 누르면 그쪽이 고치는 칸
-const pk = await rect('#peek-screen .peek-editor');
-await page.touchscreen.tap(pk.cx, pk.cy);
-await wait(700);
+check('→ 밀어 연 메모(장보기)가 화면 가득 · 목록 숨김 · 화면 나누기 없음', /장보기/.test(st.active) && !st.cls.includes('pane-list') && st.noteL === 0 && (await page.locator('#peek-screen, .pane-badge, .pane-edge').count()) === 0, JSON.stringify(st));
+await shot('opened-full');
+// 4) 뒤로 가기: 옆에 꺼낸 목록부터 넣고, 그다음 메모를 닫는다
+await page.tap('#back-btn');
+await wait(400);
+check('≡ → 목록이 다시 옆에', (await state()).cls.includes('pane-list'));
+await page.evaluate(() => window.__mk.back());
+await wait(400);
 st = await state();
-check('옆 메모 누르기 → 회의가 고치는 칸(왼쪽 그대로) · 장보기는 보기 칸(오른쪽)', /회의/.test(st.active) && st.peek === '장보기' && !st.cls.includes('active-right') && st.noteL === 0, JSON.stringify(st));
-const editable = await page.evaluate(() => document.querySelector('#note-screen .ProseMirror').getAttribute('contenteditable'));
-check('고치는 칸만 고칠 수 있음 · 보기 칸은 보기만', editable === 'true' && (await page.evaluate(() => document.querySelector('#peek-screen .ProseMirror').getAttribute('contenteditable'))) === 'false');
-await shot('split-swapped-roles');
-// 5) 맨 위 막대를 꾹 눌러 다른 메모 위에 놓기 → 자리 바꾸기
-let bar = await rect('#note-screen .bar');
-const pr = await rect('#peek-screen');
-const hold = async (from, path, opts = {}) => {
-  await touch('touchStart', ...from);
-  await wait(450);
-  for (const p of path) { await touch('touchMove', ...p); await wait(opts.step ?? 24); }
-};
-await hold([bar.x + 200, bar.cy], [[bar.x + 300, bar.cy + 20], [pr.x + 200, pr.y + 200], [pr.cx, pr.cy]]);
-await wait(150);
-const midSwap = await page.evaluate(() => ({ lifted: !!document.querySelector('.pane-lifted'), target: !!document.querySelector('.pane-swap-target'), badge: document.getElementById('pane-badge').textContent, shown: !document.getElementById('pane-badge').hidden }));
-await shot('drag-swap');
-await touch('touchEnd', 0, 0);
+check('뒤로 → 목록을 넣고 메모는 그대로', !st.cls.includes('pane-list') && /장보기/.test(st.active), JSON.stringify(st));
+await page.evaluate(() => window.__mk.back());
 await wait(500);
-st = await state();
-check('막대를 꾹 눌러 들기 → 다른 메모 위: 보라 점선 + "⇅ 자리 바꾸기"', midSwap.lifted && midSwap.target && midSwap.shown && /자리 바꾸기/.test(midSwap.badge), JSON.stringify(midSwap));
-check('놓으면 자리 바꿈: 회의(고치는 칸)가 오른쪽으로', st.cls.includes('active-right') && /회의/.test(st.active) && st.noteL > 600, JSON.stringify(st));
-await shot('swapped');
-// 6) 왼쪽 끝으로 던지기 → 목록으로 (그 칸만 닫힘, 목록이 옆에)
-const pbar = await rect('#peek-screen .bar');
-await hold([pbar.x + 200, pbar.cy], [[pbar.x + 150, pbar.cy], [pbar.x + 60, pbar.cy], [20, pbar.cy]], { step: 12 });
-const midClose = await page.evaluate(() => ({ peekText: document.querySelector('#peek-screen .ProseMirror')?.textContent ?? 'none', zone: document.body.dataset.paneZone, badge: document.getElementById('pane-badge').textContent }));
-await shot('drag-close');
-await touch('touchEnd', 0, 0);
-await wait(700);
-st = await state();
-check('왼쪽 끝으로 던지기 → "↩ 목록으로" → 그 메모만 닫히고 목록이 옆에', midClose.zone === 'close' && /목록으로/.test(midClose.badge) && !st.cls.includes('pane-split') && st.cls.includes('pane-list') && /회의/.test(st.active), JSON.stringify({ midClose, st }));
-await shot('closed-to-list');
-// 7) 다시 옆에 열고 오른쪽 끝으로 던지기 → 지우기
-const c4 = await cardRect('지울 메모');
-await gesture(Array.from({ length: 12 }, (_, i) => [c4.x + 30 + i * 18, c4.y + c4.height / 2]));
-await wait(600);
-st = await state();
-check('목록에서 "지울 메모"를 옆에 열기', st.cls.includes('pane-split') && /지울 메모/.test(st.active), JSON.stringify(st));
-bar = await rect('#note-screen .bar');
-await hold([bar.x + 200, bar.cy], [[bar.x + 300, bar.cy], [1100, bar.cy], [1262, bar.cy]], { step: 12 });
-const midDel = await page.evaluate(() => ({ zone: document.body.dataset.paneZone, badge: document.getElementById('pane-badge').textContent }));
-await shot('drag-delete');
-await touch('touchEnd', 0, 0);
-await wait(900);
-st = await state();
-const gone = !fs.existsSync(path.join(vault, '지울 메모.md'));
-check('오른쪽 끝으로 던지기 → "🗑 지우기" → 휴지통 · 남은 메모(회의)가 가득', midDel.zone === 'delete' && gone && !st.cls.includes('pane-split') && /회의/.test(st.active), JSON.stringify({ midDel, st, gone }));
-check('지운 뒤 되돌리기 알림', await page.isVisible('.toast.has-action'));
-await shot('deleted');
+check('한 번 더 뒤로 → 메모 닫고 목록 가득', !(await state()).cls.includes('note-open'));
+await page.tap(card('회의'));
+await wait(500);
 // 8) 목록에서 왼쪽으로 밀기 → 지우기
 await page.tap('#back-btn');
 await wait(400);

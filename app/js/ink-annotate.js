@@ -97,7 +97,7 @@ export function setupAnnotation(o) {
       const data = await o.read();
       anchored = normalizeInk(data ?? {}).strokes.filter((s) => s.anchor);
     } catch (err) {
-      console.warn('주석을 읽지 못했어요', err);
+      console.warn('글 위에 그린 것을 읽지 못했어요', err);
       anchored = [];
     }
     schedule();
@@ -172,7 +172,7 @@ export function setupAnnotation(o) {
     // 잠깐 보이는 안내: 무엇을 하는 중인지 (그리기 시작하면 사라짐)
     const caption = document.createElement('div');
     caption.className = 'mk-annot-caption';
-    caption.textContent = '글 위에 주석을 그려요 · 글은 그대로예요';
+    caption.textContent = '글 위에 밑줄·동그라미를 그려요 · 글은 그대로예요';
     bar.append(caption, toolbar.el);
     document.body.append(bar);
     document.body.classList.add('annotating');
@@ -206,10 +206,10 @@ export function setupAnnotation(o) {
     if (!changed) return;
     try {
       await o.save(anchored.length ? { v: 1, strokes: anchored } : null);
-      o.notice?.(anchored.length ? '주석을 저장했어요' : '주석을 모두 지웠어요');
+      o.notice?.(anchored.length ? '글 위에 그린 것을 저장했어요' : '글 위에 그린 것을 모두 지웠어요');
     } catch (err) {
       console.error(err);
-      o.notice?.('주석을 저장하지 못했어요', true);
+      o.notice?.('글 위에 그린 것을 저장하지 못했어요', true);
     }
   }
 

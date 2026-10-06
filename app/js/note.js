@@ -1449,12 +1449,12 @@ if (!memo) {
     docEl: () => el.editorRoot.querySelector('.ProseMirror'),
     read: async () => (memo.ink ? JSON.parse(new TextDecoder().decode(await api.attachments.read(memo.ink))) : null),
     save: async (data) => {
-      const rel = data ? await saveFile(new File([JSON.stringify(data)], '주석.json', { type: 'application/json' })) : '';
+      const rel = data ? await saveFile(new File([JSON.stringify(data)], '글 위에 그리기.json', { type: 'application/json' })) : '';
       const next = await api.memo.set(id, { ink: rel });
       if (next) memo = { ...memo, ...next };
     },
     onMode: (on) => {
-      setStatus(on ? '주석: 메모 위에 그려요 · 다 그렸으면 완료 (Esc)' : '');
+      setStatus(on ? '글 위에 그리기 · 다 그렸으면 완료 (Esc)' : '');
       if (!on) {
         editor.focus();
         tutEvent('annotate-done');

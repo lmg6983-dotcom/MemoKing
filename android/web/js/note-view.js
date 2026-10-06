@@ -895,7 +895,7 @@ export async function openNote(memoId, options = {}) {
       read: async () => (memo?.ink ? (await fetch(vaultUrl(memo.ink))).json() : null),
       save: async (data) => {
         const memoId = id; // 닫으면서 저장할 때도 그 메모에
-        const rel = data ? await saveFile(new File([JSON.stringify(data)], '주석.json', { type: 'application/json' })) : '';
+        const rel = data ? await saveFile(new File([JSON.stringify(data)], '글 위에 그리기.json', { type: 'application/json' })) : '';
         if (memoId && app.vault.get(memoId)) app.vault.setMeta(memoId, { ink: rel });
         if (memoId === id && memo) memo = { ...memo, ink: rel };
       },

@@ -16,6 +16,7 @@ import android.print.PrintManager
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -112,6 +113,29 @@ class MainActivity : Activity() {
         RecorderService.listener = { ev -> runOnUiThread { if (pageReady) emit("record", ev) } }
         web.loadUrl(WebServer.START)
         if (savedInstanceState == null) handleIntent(intent)
+    }
+
+    // ---------- S펜 버튼 (갤럭시 탭 등): 누른 채 그리면 지우개 ----------
+    //   웹 화면도 펜 버튼을 pointer 이벤트(buttons)로 받지만, 기기마다 다를 수 있어 앱이 직접 알려 준다
+
+    private var penButton = false
+
+    private fun trackPenButton(ev: MotionEvent) {
+        if (ev.pointerCount == 0 || ev.getToolType(0) != MotionEvent.TOOL_TYPE_STYLUS) return
+        val down = ev.isButtonPressed(MotionEvent.BUTTON_STYLUS_PRIMARY) || ev.isButtonPressed(MotionEvent.BUTTON_SECONDARY)
+        if (down == penButton) return
+        penButton = down
+        if (pageReady) emit("penButton", JSONObject().put("down", down))
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        trackPenButton(ev)
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun dispatchGenericMotionEvent(ev: MotionEvent): Boolean {
+        trackPenButton(ev) // 화면 위에 펜을 띄운 채(호버) 버튼을 누를 때
+        return super.dispatchGenericMotionEvent(ev)
     }
 
     // ---------- 화면 가장자리 (상태 막대·내비게이션 막대·키보드) ----------
