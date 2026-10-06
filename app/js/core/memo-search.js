@@ -1,3 +1,5 @@
+import { textMatcher } from './text-match.js';
+
 // 매직키의 메모 검색 — 띄어 쓴 낱말이 모두 들어간 메모를, 제목에 있는 것·최근 것부터 (순수 함수, 단위 테스트 대상)
 
 /**
@@ -10,13 +12,14 @@ export function searchMemos(memos, query, limit = 5) {
   const q = String(query ?? '').trim().toLowerCase();
   if (!q) return [];
   const terms = q.split(/\s+/).filter(Boolean);
+  const matches = textMatcher(q);
   const found = [];
   for (const m of memos ?? []) {
     const title = String(m.title ?? '');
     const text = String(m.text ?? '');
     const lt = title.toLowerCase();
     const lx = text.toLowerCase();
-    if (!terms.every((t) => lt.includes(t) || lx.includes(t))) continue;
+    if (!matches(title, text)) continue;
     let score = 0;
     if (lt.includes(q)) score += 4; // 제목에 찾는 말 그대로
     if (lt.startsWith(q)) score += 2;

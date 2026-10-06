@@ -104,7 +104,8 @@ export function setupCoach(api, o = {}) {
       if (vw < 560) for (let y = m; y <= vh - bh - m; y += 12) candidates.push({ left: (vw - bw) / 2, top: y });
       const score = (c) => {
         const box = { left: c.left, top: c.top, right: c.left + bw, bottom: c.top + bh };
-        let sum = r ? overlap(box, r) * 4 : 0; // 눌러야 할 곳은 절대 가리지 않게
+        const onTarget = r ? overlap(box, r) : 0;
+        let sum = onTarget * 4 + (onTarget > 0 ? 1e6 : 0); // 눌러야 할 곳은 절대 가리지 않게 (해 볼 곳이 아무리 넓어도 조금이라도 가리면 뒤로)
         for (const k of avoid) sum += overlap(box, k);
         return sum;
       };

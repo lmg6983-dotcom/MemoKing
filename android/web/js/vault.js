@@ -9,6 +9,7 @@ import { extractTags } from '../../app/js/core/tags.js';
 import { normalizeTables } from '../../app/js/core/table-sizes.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
+import { textMatcher } from '../../app/js/core/text-match.js';
 
 export const APP_DIR = '_memoking';
 export const ATTACH_DIR = 'attachments';
@@ -190,12 +191,11 @@ export class Vault extends EventTarget {
   }
 
   search(query, excludeId = null) {
-    const q = query.trim().toLowerCase();
+    const matches = textMatcher(query);
     return this.list().filter((m) => {
       if (m.id === excludeId) return false;
-      if (!q) return true;
       const entry = this.entries.get(m.id);
-      return m.title.toLowerCase().includes(q) || plainLines(entry.body).join('\n').toLowerCase().includes(q);
+      return matches(m.title, plainLines(entry.body).join('\n'));
     });
   }
 
