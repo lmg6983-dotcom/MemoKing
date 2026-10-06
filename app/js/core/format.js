@@ -1,13 +1,12 @@
 // 화면 표시용 시각 형식
-
-const pad = (v) => String(v).padStart(2, '0');
+import { pad2 as pad, hhmm, koClock, koMonthDay } from './time.js';
 
 // 목록 카드: 오늘이면 시:분, 올해면 월.일, 아니면 연.월.일
 export function formatTime(value, now = Date.now()) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
   const n = new Date(now);
-  if (d.toDateString() === n.toDateString()) return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (d.toDateString() === n.toDateString()) return hhmm(d);
   if (d.getFullYear() === n.getFullYear()) return `${d.getMonth() + 1}.${d.getDate()}`;
   return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
 }
@@ -22,7 +21,7 @@ export function formatDuration(ms) {
 export function formatStamp(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
-  return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${hhmm(d)}`;
 }
 
 // 목록 카드: 사람이 말하듯 — 방금 · 5분 전 · 오후 3:20 · 어제 오후 3:20 · 화요일 · 10월 2일 · 25.10.02
@@ -35,11 +34,10 @@ export function friendlyTime(value, now = Date.now()) {
   const n = new Date(now);
   const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const days = Math.round((day(n) - day(d)) / 86_400_000);
-  const h = d.getHours();
-  const clock = `${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${pad(d.getMinutes())}`;
+  const clock = koClock(d);
   if (days === 0) return clock;
   if (days === 1) return `어제 ${clock}`;
   if (days > 1 && days < 7) return `${'일월화수목금토'[d.getDay()]}요일`;
-  if (d.getFullYear() === n.getFullYear()) return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  if (d.getFullYear() === n.getFullYear()) return koMonthDay(d);
   return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
 }

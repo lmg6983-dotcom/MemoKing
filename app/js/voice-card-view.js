@@ -7,6 +7,7 @@
 import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { mediaKindOf } from './core/memo-file.js';
 import { SPEAKER_LINE } from './core/voice-card.js';
+import { haptic } from './dom.js';
 
 export const voiceCardKey = new PluginKey('memoking-voice-card');
 const FOLD_KEY = 'memoking.voiceFold';
@@ -125,7 +126,7 @@ function voiceView(node) {
   toggle.addEventListener('mousedown', (e) => e.preventDefault());
   toggle.addEventListener('click', (e) => {
     e.preventDefault();
-    navigator.vibrate?.(8);
+    haptic(8);
     setFolded(!folded);
   });
   dom.mkUnfold = () => setFolded(false, false);

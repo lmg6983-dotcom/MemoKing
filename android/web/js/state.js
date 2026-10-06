@@ -18,6 +18,3 @@ export const app = {
   sttTerms: () => [],
 };
 
-export const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
-
-export const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;

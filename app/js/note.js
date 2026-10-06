@@ -1,7 +1,7 @@
 // 스티커 메모 창 — 메모 1개 = 창 1개 = 파일 1개.
 import { injectIcons, icon } from './icons.js';
 import { createNoteEditor } from './editor.js';
-import { COLORS, extractTitle, isBlankBody, conflictCopyBody, sameBody } from './core/memo-file.js';
+import { COLORS, COLOR_NAMES, extractTitle, isBlankBody, conflictCopyBody, sameBody } from './core/memo-file.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from './core/html-marks.js';
 import { fileExtension } from './media.js';
 import { isDataImage, decodeDataImage } from './core/remote-images.js';
@@ -15,9 +15,11 @@ import { attachSliders } from './seg-slider.js';
 import { setupVoiceRecorder } from './voice-recorder.js';
 import { setupAnnotation } from './ink-annotate.js';
 import { audioNeedingTranscript } from './core/voice-card.js';
+import { reduceMotion, replayClass } from './dom.js';
+import { createClearStamp } from './clear-stamp.js';
+import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 
 const SAVE_DELAY = 600;
-const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 
 const api = window.memoking;
 const params = new URLSearchParams(location.search);
@@ -118,24 +120,7 @@ async function renderTagBar() {
     list = [];
   }
   if (seq !== tagSeq) return;
-  const chips = $('tag-suggest-chips');
-  chips.replaceChildren(...list.map((t) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = `tag-chip${t.sure ? ' sure' : ''}${t.existing ? '' : ' new'}`;
-    b.textContent = `+ #${t.name}`;
-    if (t.why) b.title = t.why;
-    b.addEventListener('click', () => addTags([t.name]));
-    return b;
-  }));
-  if (list.length > 1) {
-    const all = document.createElement('button');
-    all.type = 'button';
-    all.className = 'link-btn';
-    all.textContent = '모두 달기';
-    all.addEventListener('click', () => addTags(list.map((t) => t.name)));
-    chips.append(all);
-  }
+  fillSuggestChips($('tag-suggest-chips'), list, addTags);
   tagBar.hidden = list.length === 0;
 }
 function addTags(names) {
@@ -167,24 +152,8 @@ function onChange(md) {
   saveTimer = setTimeout(flush, SAVE_DELAY);
 }
 
-// 빈 메모 안내 문구: 편집기 내용이 바뀌는 즉시 끄고 켠다. 한글 조합 중에는 글자가 아직 문서에 안 들어왔어도 끈다.
-let docEmpty = true;
-let composing = false;
-function showPlaceholder(empty = docEmpty) {
-  docEmpty = empty;
-  el.editorRoot.classList.toggle('is-empty', empty && !composing);
-}
-el.editorRoot.addEventListener('compositionstart', () => {
-  composing = true;
-  showPlaceholder();
-});
-el.editorRoot.addEventListener('compositionend', () => {
-  composing = false;
-  showPlaceholder();
-});
-el.editorRoot.addEventListener('beforeinput', (e) => {
-  if (e.inputType.startsWith('insert') && docEmpty) el.editorRoot.classList.remove('is-empty');
-});
+// 빈 메모 안내 문구
+const showPlaceholder = trackPlaceholder(el.editorRoot);
 
 async function flush() {
   clearTimeout(saveTimer);
@@ -314,7 +283,7 @@ function applyTop(on) {
   el.topBtn.classList.toggle('peeled', on);
   el.topBtn.tabIndex = on ? -1 : 0;
   el.topBtn.setAttribute('aria-hidden', String(on));
-  if (changed && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (changed && !reduceMotion()) {
     el.topBtn.querySelector('svg').animate(on
       ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
       : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
@@ -403,7 +372,7 @@ $('delete-btn').addEventListener('click', async () => {
   closeMenu();
   // 묻지 않고 바로 휴지통으로 (목록 창에 되돌리기) — 창이 휴지통으로 빨려 들어가듯 사라진다
   saved = current; // 삭제하는 메모는 저장하지 않는다
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (!reduceMotion()) {
     await document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {});
   }
   await api.memo.remove(id);
@@ -512,9 +481,7 @@ api.on('memo:links-changed', refreshLinks);
 function showAlarm(alarm) {
   $('alarm-text').textContent = alarm.label; // 종 아이콘이 앞에 있으므로 글자만
   $('alarm-banner').hidden = false;
-  $('alarm-banner').classList.remove('ring');
-  void $('alarm-banner').offsetWidth; // 애니메이션 다시 시작
-  $('alarm-banner').classList.add('ring');
+  replayClass($('alarm-banner'), 'ring');
 }
 $('alarm-ok').addEventListener('click', () => {
   $('alarm-banner').hidden = true;
@@ -524,9 +491,7 @@ api.on('memo:alarm', showAlarm);
 
 // 빠른 메모 알림을 눌러 이 메모로 왔을 때 등: 창 테두리가 두 번 반짝여 "이 메모" 임을 알린다
 api.on('memo:highlight', () => {
-  document.body.classList.remove('highlight');
-  void document.body.offsetWidth; // 애니메이션 다시 시작
-  document.body.classList.add('highlight');
+  replayClass(document.body, 'highlight');
 });
 document.body.addEventListener('animationend', (e) => {
   if (e.animationName === 'note-highlight') document.body.classList.remove('highlight');
@@ -1222,40 +1187,11 @@ document.documentElement.addEventListener('mouseleave', () => {
 });
 updateBar();
 
-// ---------- CLEAR 도장: 체크리스트를 모두 끝내면 (v0.17.13) ----------
-const clearStamp = document.createElement('div');
-clearStamp.className = 'clear-stamp';
-clearStamp.textContent = 'CLEAR';
-clearStamp.setAttribute('role', 'status');
-clearStamp.setAttribute('aria-label', '체크리스트를 모두 끝냈어요');
-clearStamp.hidden = true;
-document.body.append(clearStamp);
-// 메모 본문(편집 영역)의 정중앙
-const placeClearStamp = () => {
-  const r = el.editorRoot.getBoundingClientRect();
-  clearStamp.style.left = `${Math.round(r.left + r.width / 2)}px`;
-  clearStamp.style.top = `${Math.round(r.top + r.height / 2)}px`;
-};
-new ResizeObserver(() => {
-  if (!clearStamp.hidden) placeClearStamp();
-}).observe(el.editorRoot);
-
-// 편집기가 알려 주는 체크리스트 진행 → 도장 (처음 열 때는 그냥 찍혀 있고, 방금 끝냈을 때만 "쿵")
-function showTasks({ total, done }, { initial = false } = {}) {
-  const clear = total > 0 && done === total;
-  const was = !clearStamp.hidden;
-  clearStamp.hidden = !clear;
-  document.body.dataset.tasks = total ? `${done}/${total}` : '';
-  if (!clear) {
-    clearStamp.classList.remove('stamp-in');
-    return;
-  }
-  placeClearStamp();
-  if (!was && !initial) {
-    clearStamp.classList.remove('stamp-in');
-    void clearStamp.offsetWidth; // 애니메이션 다시
-    clearStamp.classList.add('stamp-in');
-  }
+// ---------- CLEAR 도장: 체크리스트를 모두 끝내면 ----------
+const clearStamp = createClearStamp(document.body, el.editorRoot);
+function showTasks(tasks, opts) {
+  document.body.dataset.tasks = tasks.total ? `${tasks.done}/${tasks.total}` : '';
+  clearStamp.show(tasks, opts);
 }
 
 // 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)

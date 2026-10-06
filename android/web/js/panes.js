@@ -5,7 +5,7 @@
 //   - 둘일 때 각 메모 맨 위 막대를 꾹 눌러 끌면: 다른 메모 위에 놓아 자리 바꾸기 · 왼쪽 끝으로 던져 목록으로 · 오른쪽 끝으로 던져 지우기
 import { isTwoPane } from './ui.js';
 import { showPeek, hidePeek, peekId, peekChanged } from './peek-view.js';
-import { reduceMotion } from './state.js';
+import { haptic, reduceMotion } from '../../app/js/dom.js';
 
 const $ = (id) => document.getElementById(id);
 let deps = null; // { note, openMemo, deleteMemo, showList, refreshList }
@@ -187,7 +187,7 @@ function lift(e) {
   $('pane-slot').hidden = false;
   document.body.classList.add('pane-dragging');
   edges(true);
-  navigator.vibrate?.(12);
+  haptic(12);
   badge(null);
   void e;
 }
@@ -207,7 +207,7 @@ function onMove(e) {
   const zone = zoneAt(e.clientX, e.clientY);
   if (zone !== drag.zone) {
     drag.zone = zone;
-    navigator.vibrate?.(6);
+    haptic(6);
     for (const p of [$('note-screen'), $('peek-screen')]) p.classList.toggle('pane-swap-target', zone === 'swap' && p !== drag.pane);
     document.body.dataset.paneZone = zone ?? '';
   }
@@ -303,7 +303,7 @@ async function onUp(e) {
   } else if (action === 'swap') {
     reset();
     swapPanes();
-    navigator.vibrate?.(10);
+    haptic(10);
   } else {
     pane.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)';
     pane.style.transform = '';

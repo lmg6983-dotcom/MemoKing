@@ -8,6 +8,7 @@
 import { getStroke } from '../vendor/perfect-freehand.js';
 import { point, strokePath, strokesHit, PEN_COLORS, HIGHLIGHT_COLORS, SIZES, normalizeInk, inkBounds, INK_BG, inkTone } from './core/ink.js';
 import { icon } from './icons.js';
+import { haptic, replayClass } from './dom.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const STATE_KEY = 'memoking.inkTools';
@@ -270,9 +271,6 @@ export function inkHistory(initial = []) {
 
 const TOOL_NAMES = { pen: '펜', highlighter: '형광펜', eraser: '지우개' };
 const BG_NAMES = { none: '투명', white: '흰색', black: '검정' };
-const haptic = () => {
-  if (matchMedia('(pointer: coarse)').matches) navigator.vibrate?.(6);
-};
 
 /**
  * 도구 막대 — 떠 있는 한 줄 (dock): [펜 · 형광펜 · 지우개] [색·굵기] [되돌리기 · 다시 하기] [바탕] [완료]
@@ -338,12 +336,10 @@ export function createInkToolbar(o) {
   function togglePop(kind) {
     if (popKind === kind) return closePop();
     popKind = kind;
-    haptic();
+    haptic(6);
     fillPop();
     pop.hidden = false;
-    pop.classList.remove('in');
-    void pop.offsetWidth; // 다시 열 때도 움직임이 보이게
-    pop.classList.add('in');
+    replayClass(pop, 'in');
     document.addEventListener('pointerdown', outside, true);
     update();
   }
@@ -385,7 +381,7 @@ export function createInkToolbar(o) {
           else if (bg !== 'black' && o.tools.color.pen === '#ffffff') o.tools.color.pen = PEN_COLORS[0];
           o.tools.save();
           o.onBg?.(bg);
-          haptic();
+          haptic(6);
           fillPop();
           update();
         });
@@ -410,7 +406,7 @@ export function createInkToolbar(o) {
       b.addEventListener('click', () => {
         o.tools.size[t] = i;
         o.tools.save();
-        haptic();
+        haptic(6);
         fillPop();
         update();
       });
@@ -422,7 +418,7 @@ export function createInkToolbar(o) {
       clear.disabled = !(o.canClear?.() ?? false);
       clear.addEventListener('click', () => {
         o.onClear?.();
-        haptic();
+        haptic(6);
         closePop();
       });
       pop.replaceChildren(row('지우개 굵기', ...sizes), ...(o.onClear ? [row('', clear)] : []), hintRow('닿은 획을 통째로 지워요 · 되돌리기로 살릴 수 있어요'));
@@ -436,7 +432,7 @@ export function createInkToolbar(o) {
       b.addEventListener('click', () => {
         o.tools.color[t] = c;
         o.tools.save();
-        haptic();
+        haptic(6);
         fillPop();
         update();
       });
@@ -453,7 +449,7 @@ export function createInkToolbar(o) {
   function setTool(tool) {
     o.tools.tool = tool;
     o.tools.save();
-    haptic();
+    haptic(6);
     if (popKind === 'style') fillPop();
     else closePop();
     update();

@@ -1,3 +1,4 @@
+import { haptic, reduceMotion, replayClass } from './dom.js';
 // 튜토리얼 말풍선 — 비출 요소 둘레만 밝게 두고 나머지를 어둡게, 옆에 안내 말풍선. (PC·휴대폰 함께)
 // 화면은 그대로 눌러지므로(따라 하기) 비춘 버튼을 실제로 눌러 볼 수 있다.
 //   - 머리: 단계 이모지 · 진행 막대 · 몇 번째인지
@@ -205,9 +206,7 @@ export function setupCoach(api, o = {}) {
     document.body.classList.add('coaching');
     if (step.praise) confetti();
     // 바뀐 단계마다 다시 나타나는 움직임
-    bubble.classList.remove('enter');
-    void bubble.offsetWidth;
-    bubble.classList.add('enter');
+    replayClass(bubble, 'enter');
     place();
     // 창 크기·목록 내용이 바뀌어도 따라가게
     timer = setInterval(place, 400);
@@ -217,7 +216,7 @@ export function setupCoach(api, o = {}) {
 
   // 해 냈을 때: 말풍선에서 이모지 꽃가루 (움직임 줄이기에서는 생략)
   function confetti() {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reduceMotion()) return;
     const pieces = ['🎉', '✨', '⭐', '🎊', '💛', '👑'];
     for (let i = 0; i < 12; i++) {
       const p = document.createElement('span');
@@ -231,7 +230,7 @@ export function setupCoach(api, o = {}) {
       bubble.append(p);
       setTimeout(() => p.remove(), 1300);
     }
-    if (matchMedia('(pointer: coarse)').matches) navigator.vibrate?.([10, 40, 14]); // 휴대폰만 (PC 크롬은 막고 경고를 남긴다)
+    haptic([10, 40, 14]); // 휴대폰만 (PC 크롬은 막고 경고를 남긴다)
   }
 
   bubble.addEventListener('click', (e) => {

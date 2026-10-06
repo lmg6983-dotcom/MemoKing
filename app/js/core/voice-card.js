@@ -7,6 +7,8 @@
 //     > 오늘 안건입니다.
 //   첫 줄이 소리 하나뿐인 인용 = 음성 카드 (편집기가 접을 수 있는 카드로 보여 준다)
 //   받아쓴 글은 문장마다 한 줄, 말한 사람이 바뀌는 줄 앞에 **화자 N:**
+import { pad2, koClock, koMonthDay } from './time.js';
+import { isAudio } from './memo-file.js';
 
 export const SPEAKER_LINE = /^화자\s*(\d+)\s*[:：]\s*/;
 
@@ -70,7 +72,6 @@ export function attachTranscript(body, src, transcript) {
   return lines.join('\n');
 }
 
-const pad2 = (n) => String(n).padStart(2, '0');
 
 /** 녹음 길이: 02:31 · 1:02:31 (휴대폰·PC 같은 모양) */
 export function recordingClock(ms) {
@@ -82,12 +83,10 @@ export function recordingClock(ms) {
 /** 녹음한 때: 10월 4일 오후 3:12 */
 export function recordingWhen(ms) {
   const d = new Date(ms || Date.now());
-  const h = d.getHours();
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${pad2(d.getMinutes())}`;
+  return `${koMonthDay(d)} ${koClock(d)}`;
 }
 
-const AUDIO_SRC = /\.(m4a|weba|ogg|oga|opus|mp3|aac|wav|flac)$/i;
-const MEDIA_LINE = /!\[[^\]]*\]\(<?([^)>]+)>?\)/;
+const MEDIA_LINE = /!\[([^\]]*)\]\(<?([^)>]+)>?\)/; // [1] 설명 · [2] 주소
 
 /**
  * 메모 본문에서 받아쓴 글이 아직 없는 소리 파일들 (음성 카드의 글이 비었거나, 그냥 소리 줄)
@@ -98,14 +97,14 @@ export function audioNeedingTranscript(body) {
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(MEDIA_LINE);
-    if (!m || !AUDIO_SRC.test(m[1].split(/[?#]/)[0])) continue;
+    if (!m || !isAudio(m[2], m[1])) continue; // 소리 구분은 메모 파일과 같은 규칙 (예전 .webm 녹음도)
     if (/^>\s?/.test(lines[i])) {
       let j = i + 1;
       let text = '';
       while (j < lines.length && /^>/.test(lines[j]) && !MEDIA_LINE.test(lines[j])) text += lines[j++].replace(/^>\s?/, '');
       if (text.trim()) continue;
     }
-    if (!out.includes(m[1])) out.push(m[1]);
+    if (!out.includes(m[2])) out.push(m[2]);
   }
   return out;
 }

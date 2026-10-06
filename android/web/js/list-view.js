@@ -5,11 +5,12 @@ import { vaultUrl } from '../../app/js/media.js';
 import { setupRemindersTab } from '../../app/js/list-reminders.js';
 import { setupHistoryTab } from '../../app/js/list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../../app/js/core/tags.js';
-import { COLORS } from '../../app/js/core/memo-file.js';
-import { app, COLOR_NAMES } from './state.js';
+import { COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
+import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog, isTwoPane } from './ui.js';
 import { tutEvent } from './tutorial.js';
+import { haptic, reduceMotion } from '../../app/js/dom.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -379,7 +380,7 @@ function endSwipe() {
     if (dx > w * 0.28) {
       card.dataset.swiped = '1';
       setTimeout(() => delete card.dataset.swiped, 400);
-      navigator.vibrate?.(8);
+      haptic(8);
       app.openBeside(card.dataset.id);
     }
     return;
@@ -410,7 +411,7 @@ el.cards.addEventListener('contextmenu', (e) => {
   const card = e.target.closest('.card');
   if (!card) return;
   e.preventDefault();
-  navigator.vibrate?.(12);
+  haptic(12);
   app.memoMenu(card.dataset.id);
 });
 
@@ -431,7 +432,7 @@ applyLayout(layout);
 function glideCards(change) {
   const before = new Map([...el.cards.querySelectorAll('.card')].map((c) => [c.dataset.id, c.getBoundingClientRect()]));
   change();
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (reduceMotion()) return;
   for (const c of el.cards.querySelectorAll('.card')) {
     const a = before.get(c.dataset.id);
     if (!a) continue;

@@ -2,11 +2,12 @@
 // Node(데스크탑 메인)와 브라우저(화면, 추후 안드로이드) 양쪽에서 쓰는 순수 함수만 둔다.
 import { parse as parseYaml, stringify as stringifyYaml } from '../../vendor/yaml.js';
 import { tableLineText } from './tables.js';
-import { toLocalIso } from './time.js';
+import { toLocalIso, hhmm, koMonthDay } from './time.js';
 import { normalizeReminder, serializeReminder } from './reminders.js';
 import { normalizeTables } from './table-sizes.js';
 
 export const COLORS = ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal'];
+export const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 export const DEFAULT_COLOR = 'yellow';
 export const UNTITLED = '제목 없음';
 
@@ -237,8 +238,7 @@ export function sameBody(a, b) {
 }
 
 export function conflictLabel(date = new Date()) {
-  const pad = (v) => String(v).padStart(2, '0');
-  return `다른 기기 ${date.getMonth() + 1}월 ${date.getDate()}일 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `다른 기기 ${koMonthDay(date)} ${hhmm(date)}`;
 }
 
 /** 사본 본문: 첫 줄(제목)에 "(다른 기기 …)" 를 붙인다. 제목 줄이 없으면 제목 줄을 만든다 */

@@ -5,6 +5,7 @@ import { app } from './state.js';
 import { native, call, on, record } from './native.js';
 import { toast } from './ui.js';
 import { recordingClock as formatDuration } from '../../app/js/core/voice-card.js';
+import { haptic } from '../../app/js/dom.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -211,7 +212,7 @@ export async function start(memoId) {
     }
     const res = await call('recordStart', { memoId, stt: sttOn(), engine: sttEngine(), terms: app.sttTerms?.() ?? [] });
     setStatus({ active: true, paused: false, memoId, elapsedMs: 0, stt: Boolean(res?.stt), text: '', partial: '' });
-    navigator.vibrate?.(20);
+    haptic(20);
     if (sttOn() && !res?.stt) {
       // 모델이 없으면 녹음은 그대로 하면서 받아 두고, 끝내면 녹음 파일로 받아쓴다
       if (sttEngine() === 'vosk' && sttStatus().model !== 'ready') {

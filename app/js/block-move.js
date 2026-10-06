@@ -20,6 +20,7 @@ import { mediaKindOf } from './core/memo-file.js';
 import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
 import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
+import { haptic } from './dom.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
 
@@ -360,7 +361,7 @@ class Mover {
       p.timer = setTimeout(() => {
         if (this.pressing !== p) return;
         this.cancelPress({ keepMark: true });
-        navigator.vibrate?.(12);
+        haptic(12);
         if (p.media && p.media.el.currentTime !== p.media.time) p.media.el.currentTime = p.media.time; // 재생 막대를 눌러 감긴 것 되돌리기
         if (document.activeElement instanceof HTMLInputElement) document.activeElement.blur();
         this.lift(p);
@@ -434,7 +435,7 @@ class Mover {
     this.drag = d;
     document.body.classList.add('mk-block-dragging');
     document.body.dataset.dragGain = d.gain.toFixed(2); // 점검용 · 보정 배율
-    if (p.kind === 'touch') navigator.vibrate?.(15);
+    if (p.kind === 'touch') haptic(15);
     this.judge();
 
     const io = INPUT[p.kind];
@@ -512,7 +513,7 @@ class Mover {
       d.lastKey = key;
       d.lastCy = cy;
       d.drop = next;
-      if (d.kind === 'touch' && next) navigator.vibrate?.(6); // 놓을 자리가 바뀔 때 톡
+      if (d.kind === 'touch' && next) haptic(6); // 놓을 자리가 바뀔 때 톡
     } else d.lastCy = d.lastCy ?? cy;
     this.preview();
   }

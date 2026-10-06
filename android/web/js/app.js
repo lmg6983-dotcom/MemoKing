@@ -1,7 +1,7 @@
 // 메모킹 안드로이드 — 시작, 화면 바꾸기, 설정·휴지통, 다른 앱에서 받은 것, 예약 알림
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
-import { extractTitle, isBlankBody, COLORS } from '../../app/js/core/memo-file.js';
+import { extractTitle, isBlankBody, COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
 import { shareText } from '../../app/js/core/share-text.js';
 import { importText, isTextDocument, stripFrontMatter } from '../../app/js/core/markdown-import.js';
@@ -15,7 +15,7 @@ import { Vault } from './vault.js';
 import { LinkPreviews } from './web-fetch.js';
 import { createAlarms } from './alarms.js';
 import { injectMobileIcons } from './m-icons.js';
-import { app, COLOR_NAMES } from './state.js';
+import { app } from './state.js';
 import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
 import { renderMemoImage } from './share-image.js';
@@ -25,6 +25,7 @@ import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent } from './tu
 import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml } from './print-html.js';
+import { haptic, reduceMotion } from '../../app/js/dom.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -378,7 +379,7 @@ async function deleteMemo(id) {
   if (!app.vault?.get(id)) return;
   const inNote = note.currentId() === id;
   const body = inNote ? note.editorMarkdown() : app.vault.get(id)?.body ?? '';
-  const motion = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const motion = !reduceMotion();
   if (inNote) {
     note.flush();
     if (motion) {
@@ -388,7 +389,7 @@ async function deleteMemo(id) {
     note.discardAndClose();
     $('note-screen').classList.remove('trashing');
   } else if (motion) await list.animateRemove(id);
-  navigator.vibrate?.(10);
+  haptic(10);
   let name;
   try {
     name = app.vault.trash(id);
@@ -990,7 +991,7 @@ function setFabMenu(open) {
   if (open) {
     fabMenu.hidden = false;
     fabMenu.classList.remove('closing');
-    navigator.vibrate?.(8);
+    haptic(8);
   } else {
     fabMenu.classList.add('closing');
     setTimeout(() => {

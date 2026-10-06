@@ -16,6 +16,7 @@ import { holdKeyboard, edgeScroll } from './keyboard-guard.js';
 import { HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
 import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
+import { haptic } from './dom.js';
 
 export const listDragKey = new PluginKey('memoking-list-drag');
 
@@ -350,7 +351,7 @@ export function createListDrag({ readOnly = false } = {}) {
     drag.frames.label(kind ?? null, BADGES[kind] ?? '', { x: drag.x, y: drag.y }, drag.kind);
     // 놓을 자리가 바뀔 때 톡 (터치)
     const key = drag.drop ? (drag.drop.cross ? `c:${drag.drop.kind}:${drag.drop.pos}` : `${drag.drop.kind}:${drag.drop.index}`) : drag.shift ? `s:${drag.shift}` : '';
-    if (key && key !== drag.buzzKey && drag.kind === 'touch') navigator.vibrate?.(6);
+    if (key && key !== drag.buzzKey && drag.kind === 'touch') haptic(6);
     drag.buzzKey = key;
   }
 
@@ -467,7 +468,7 @@ export function createListDrag({ readOnly = false } = {}) {
       }, GATHER_MS);
       drag.wholeTimer = setTimeout(() => liftWholeList(view), WHOLE_LIST_MS);
     }
-    if (kind === 'touch') navigator.vibrate?.(15); // 들어 올렸다는 느낌
+    if (kind === 'touch') haptic(15); // 들어 올렸다는 느낌
     document.body.classList.add('mk-list-dragging');
     previewSame(view, null); // 들어 올린 모습
     drag.block = (e) => e.preventDefault();
@@ -568,7 +569,7 @@ export function createListDrag({ readOnly = false } = {}) {
       if (view.isDestroyed) return;
       const dir = Math.abs(dx) >= SWIPE_DISTANCE ? Math.sign(dx) : 0;
       if (commit && dir && shiftItem(view, pos, dir)) {
-        navigator.vibrate?.(12);
+        haptic(12);
         flashMoved(view);
         return;
       }

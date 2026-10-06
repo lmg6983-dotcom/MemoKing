@@ -7,7 +7,7 @@
 //       action: open            # open(메모 띄우기) | notify(알림만)
 //       created: 2026-09-30T10:00:00+09:00
 //       last: 2026-10-01T09:00:02+09:00   # 마지막으로 울린 시각
-import { toLocalIso, dateKey } from './time.js';
+import { toLocalIso, dateKey, hhmm } from './time.js';
 
 export const KINDS = ['timer', 'at', 'repeat', 'startup'];
 export const EVERY = ['day', 'week', 'month', 'year'];
@@ -150,8 +150,6 @@ export function markFired(r, now = new Date()) {
 export const isDone = (r) => !r.enabled && Boolean(r.last) && (r.kind === 'timer' || r.kind === 'at' || r.startup === 'once');
 
 // ---------- 화면용 문구 ----------
-
-const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
 // 오늘 14:00 / 내일 09:00 / 10월 3일(금) 09:00 / 2027년 1월 2일(토) 09:00
 export function formatWhen(date, now = new Date()) {

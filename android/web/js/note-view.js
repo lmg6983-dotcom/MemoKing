@@ -9,7 +9,7 @@ import { setupReminderPanel } from '../../app/js/reminder-panel.js';
 import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
 import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
-import { app, reduceMotion } from './state.js';
+import { app } from './state.js';
 import { tutEvent, textChanged, screenChanged } from './tutorial.js';
 import { call } from './native.js';
 import { fetchRemoteImage } from './web-fetch.js';
@@ -18,6 +18,9 @@ import * as recorder from './recorder.js';
 import { setupAnnotation } from '../../app/js/ink-annotate.js';
 import { autoTagsFor } from '../../app/js/core/auto-tags.js';
 import { conflictCopyBody, isBlankBody, sameBody } from '../../app/js/core/memo-file.js';
+import { haptic, reduceMotion, replayClass } from '../../app/js/dom.js';
+import { createClearStamp } from '../../app/js/clear-stamp.js';
+import { fillSuggestChips, trackPlaceholder } from '../../app/js/suggest-chips.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -89,23 +92,7 @@ function onChange(md) {
 }
 
 // 빈 메모 안내 문구 (한글 조합 중에도 바로 끈다)
-let docEmpty = true;
-let composing = false;
-function showPlaceholder(empty = docEmpty) {
-  docEmpty = empty;
-  el.editorRoot.classList.toggle('is-empty', empty && !composing);
-}
-el.editorRoot.addEventListener('compositionstart', () => {
-  composing = true;
-  showPlaceholder();
-});
-el.editorRoot.addEventListener('compositionend', () => {
-  composing = false;
-  showPlaceholder();
-});
-el.editorRoot.addEventListener('beforeinput', (e) => {
-  if (e.inputType.startsWith('insert') && docEmpty) el.editorRoot.classList.remove('is-empty');
-});
+const showPlaceholder = trackPlaceholder(el.editorRoot);
 
 /** 쓰던 내용을 바로 저장 (화면을 떠나거나 앱이 뒤로 갈 때) */
 export function flush() {
@@ -217,16 +204,12 @@ function applyMeta(next) {
 function showAlarm(alarm) {
   $('alarm-text').textContent = alarm.label;
   $('alarm-banner').hidden = false;
-  $('alarm-banner').classList.remove('ring');
-  void $('alarm-banner').offsetWidth;
-  $('alarm-banner').classList.add('ring');
+  replayClass($('alarm-banner'), 'ring');
 }
 $('alarm-ok').addEventListener('click', () => ($('alarm-banner').hidden = true));
 
 function highlight() {
-  el.screen.classList.remove('highlight');
-  void el.screen.offsetWidth;
-  el.screen.classList.add('highlight');
+  replayClass(el.screen, 'highlight');
 }
 el.screen.addEventListener('animationend', (e) => {
   if (e.animationName === 'note-highlight') el.screen.classList.remove('highlight');
@@ -401,21 +384,7 @@ function renderTagBar() {
   }
   const list = currentSuggestions();
   el.tagBar.hidden = list.length === 0;
-  el.tagChips.replaceChildren(...list.map((t) => {
-    const b = tagChip(t.name, { add: true, onClick: () => addTags([t.name]) });
-    if (t.sure) b.classList.add('sure');
-    if (!t.existing) b.classList.add('new');
-    if (t.why) b.title = t.why;
-    return b;
-  }));
-  if (list.length > 1) {
-    const all = document.createElement('button');
-    all.type = 'button';
-    all.className = 'link-btn';
-    all.textContent = '모두 달기';
-    all.addEventListener('click', () => addTags(list.map((t) => t.name)));
-    el.tagChips.append(all);
-  }
+  fillSuggestChips(el.tagChips, list, addTags, (name, onClick) => tagChip(name, { add: true, onClick }));
 }
 function scheduleTagBar() {
   clearTimeout(suggestTimer);
@@ -708,7 +677,7 @@ function openAddMenu() {
   addMenu.style.bottom = `${Math.round(window.innerHeight - r.top + 12)}px`;
   addBtn.classList.add('open');
   addBtn.setAttribute('aria-expanded', 'true');
-  navigator.vibrate?.(8);
+  haptic(8);
   tutEvent('add-opened');
 }
 /** 뒤로 가기: 손 메모 그리기 화면 → 주석 모드 순으로 저장하고 닫는다 (취소는 없다) */
@@ -955,7 +924,7 @@ export function closeNote({ quiet = false } = {}) {
   if (!id) return;
   flush();
   flushTables();
-  clearStamp.hidden = true;
+  clearStamp.hide();
   const closing = id;
   const body = current;
   closePalette();
@@ -997,7 +966,7 @@ export function discardAndClose() {
   closeStyleMenu();
   recorder.detach();
   pendingTables = null;
-  clearStamp.hidden = true;
+  clearStamp.hide();
   clearTimeout(saveTimer);
   editor?.destroy();
   editor = null;
@@ -1027,39 +996,10 @@ function flushTables() {
   }
 }
 
-// ---------- CLEAR 도장: 체크리스트를 모두 끝내면 (데스크탑 v0.17.13 과 같음) ----------
-const clearStamp = document.createElement('div');
-clearStamp.className = 'clear-stamp';
-clearStamp.textContent = 'CLEAR';
-clearStamp.setAttribute('role', 'status');
-clearStamp.setAttribute('aria-label', '체크리스트를 모두 끝냈어요');
-clearStamp.hidden = true;
-el.screen.append(clearStamp);
-const placeClearStamp = () => {
-  const r = el.editorRoot.getBoundingClientRect();
-  clearStamp.style.left = `${Math.round(r.left + r.width / 2)}px`;
-  clearStamp.style.top = `${Math.round(r.top + r.height / 2)}px`;
-};
-new ResizeObserver(() => {
-  if (!clearStamp.hidden) placeClearStamp();
-}).observe(el.editorRoot);
-
-// 처음 열 때는 그냥 찍혀 있고, 방금 끝냈을 때만 "쿵"
-function showTasks({ total, done }, { initial = false } = {}) {
-  const clear = total > 0 && done === total;
-  const was = !clearStamp.hidden;
-  clearStamp.hidden = !clear;
-  if (!clear) {
-    clearStamp.classList.remove('stamp-in');
-    return;
-  }
-  placeClearStamp();
-  if (!was && !initial) {
-    clearStamp.classList.remove('stamp-in');
-    void clearStamp.offsetWidth;
-    clearStamp.classList.add('stamp-in');
-    navigator.vibrate?.(30);
-  }
+// ---------- CLEAR 도장: 체크리스트를 모두 끝내면 (PC 와 같음) ----------
+const clearStamp = createClearStamp(el.screen, el.editorRoot);
+function showTasks(tasks, opts) {
+  clearStamp.show(tasks, opts);
 }
 
 // ---------- 두 손가락으로 본문 확대·축소: 매직 줌 ----------

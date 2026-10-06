@@ -185,7 +185,6 @@ function openVault(dir) {
   } catch (err) {
     console.error('메모 폴더 열기 실패', err);
     vaultError = '메모 폴더를 열지 못했어요. 폴더가 있는지, Google Drive가 연결돼 있는지 확인해 주세요.';
-    console.error(err);
   }
   listWin?.webContents.send('vault:opened', vaultInfo());
   pushList();
@@ -279,12 +278,19 @@ function titleBarOverlay() {
   return { color: titleBarDim ? TITLEBAR_DIM[dark ? 'dark' : 'light'][titleBarDim] : base, symbolColor: dark ? '#f5f4ef' : '#111111', height: 44 };
 }
 
+// 창을 앞으로: 내려 둔 창은 되살리고, 보이게 한 뒤 (inactive 가 아니면) 포커스까지
+function bringToFront(win, { inactive = false, raise = false } = {}) {
+  if (win.isMinimized()) win.restore();
+  if (inactive) win.showInactive();
+  else win.show();
+  if (raise) win.moveTop();
+  if (!inactive) win.focus();
+}
+
 // tab: 'memos' | 'reminders' | 'history' — 트레이 메뉴 등에서 바로 그 탭으로 연다
 function createListWindow(tab) {
   if (listWin) {
-    if (listWin.isMinimized()) listWin.restore();
-    listWin.show();
-    listWin.focus();
+    bringToFront(listWin);
     if (tab) listWin.webContents.send('list:tab', tab);
     return listWin;
   }
@@ -344,12 +350,7 @@ function openNote(id, { inactive = false, record = false, ink = false, big = fal
   if (stacks?.stackOf(id)) return showTab(id, { inactive });
   const existing = noteWins.get(id);
   if (existing) {
-    if (existing.isMinimized()) existing.restore();
-    if (inactive) existing.showInactive();
-    else {
-      existing.show();
-      existing.focus();
-    }
+    bringToFront(existing, { inactive });
     return existing;
   }
   return createNoteWindow(id, { inactive, record, ink, big });
@@ -1208,9 +1209,7 @@ function sendTutorial() {
 function startTutorial() {
   if (!vault) return false;
   tutorial = { active: true, index: 0, memoId: null, praise: false };
-  const w = createListWindow('memos');
-  w.show();
-  w.focus();
+  createListWindow('memos');
   sendTutorial(); // 목록 창이 아직 불러오는 중이면 창이 tutorial:current 로 받아 간다
   return true;
 }
@@ -1234,11 +1233,7 @@ function tutorialEvent(event) {
   // 메모 단계인데 메모 창이 없으면(먼저 닫음) 목록 단계로
   if (step.win === 'note' && !noteWins.get(tutorial.memoId)) return tutorialEvent('note-closed');
   const w = step.win === 'list' ? createListWindow('memos') : noteWins.get(tutorial.memoId);
-  if (w && !w.isDestroyed()) {
-    if (w.isMinimized()) w.restore();
-    w.show();
-    w.focus();
-  }
+  if (w && !w.isDestroyed()) bringToFront(w);
   sendTutorial();
 }
 
@@ -1327,10 +1322,7 @@ function revealNote(id) {
   const win = (stacks?.stackOf(id) ? openNote(id) : noteWins.get(id)) ?? openNote(id);
   if (!win) return null;
   const bring = () => {
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.moveTop();
-    win.focus();
+    bringToFront(win, { raise: true });
     win.webContents.send('memo:highlight');
   };
   if (win.webContents.isLoading()) win.once('ready-to-show', bring);
@@ -2160,11 +2152,7 @@ function registerIpc() {
     await driveAuth.login();
     const email = await driveApi.about().catch(() => '');
     if (email) driveAuth.setEmail(email);
-    if (listWin) {
-      if (listWin.isMinimized()) listWin.restore();
-      listWin.show();
-      listWin.focus();
-    }
+    if (listWin) bringToFront(listWin);
     return { email };
   });
   ipcMain.handle('drive:cancel-login', () => driveAuth.cancelLogin());
@@ -2619,9 +2607,7 @@ function showAllNotes() {
   for (const [id, win] of noteWins) {
     const stack = stacks?.stackOf(id);
     if (stack && stack.active !== id) continue; // 스택의 숨은 탭
-    if (win.isMinimized()) win.restore();
-    win.showInactive();
-    win.moveTop();
+    bringToFront(win, { inactive: true, raise: true });
   }
 }
 
@@ -2706,7 +2692,7 @@ app.whenReady().then(async () => {
       getCapturePoint: () => lastCapturePoint, smokeOpened, smokeConfirmAnswers,
       getStacks: () => stacks, isInking: (id) => inkingWins.has(noteWins.get(id)), trackWindowDrag, endWindowDrag, stackInto, getTabTear: () => tabTear, getSettings: () => settings, stickers, reloadSettings: loadSettings, installMark,
       startAreaCapture, getAreaCapture: () => areaCapture, smokeClipboard, onQuickMemoKey,
-      createPopupWatcher, getHistory: () => history, smokePdf, getPdfWin: () => pdfWin, openPdfWindow,
+      createPopupWatcher, smokePdf, getPdfWin: () => pdfWin, openPdfWindow,
       startTutorial, getTutorial: () => tutorial,
       captureToMemo, smokeToastsList: smokeToasts, getTitleBarOverlay: () => titleBarOverlay(),
     });

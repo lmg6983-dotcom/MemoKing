@@ -1,3 +1,4 @@
+import { haptic } from './dom.js';
 // 지우기 단추 (×) — 꾹 눌렀다 그 자리에 놓은 것의 오른쪽 위에 잠깐 (block-move.js 내용 줄·목록 전체 · list-drag.js 목록 항목 함께)
 //   흰 동그라미에 빨간 ×. 한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
 //   누르면: 대상이 붉게 비쳤다가 작아지며 흐려지고, 그 자리가 접히며 아래 줄들이 부드럽게 올라온 뒤 지운다.
@@ -43,7 +44,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     e.preventDefault();
     e.stopPropagation();
     if (view.state.doc.nodeAt(pos) !== node) return hideDeleteButton();
-    navigator.vibrate?.(15);
+    haptic(15);
     // 단추는 눌린 듯 작아지며 사라지고
     clearTimeout(del.timer);
     window.removeEventListener('scroll', place, true);

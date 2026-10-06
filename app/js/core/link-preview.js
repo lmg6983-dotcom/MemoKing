@@ -6,6 +6,7 @@
 // 설명·사진은 메모 폴더의 _memoking/link-previews.json 에 모아 두어 다른 PC 에서도 보인다.
 // (순수 함수 — 브라우저·Node 양쪽, 단위 테스트 대상)
 
+import { decodeEntities } from './entities.js';
 export const CARD_TITLE = '미리보기';
 
 const URL_ONLY = /^https?:\/\/[^\s<>"'`]+$/i;
@@ -65,17 +66,7 @@ export function hostOf(url) {
 
 // ---------- 웹페이지에서 제목·설명·사진 읽기 ----------
 
-const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', hellip: '…', ndash: '–', mdash: '—', laquo: '«', raquo: '»' };
-
-export function decodeEntities(s) {
-  return String(s ?? '').replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, code) => {
-    if (code[0] === '#') {
-      const n = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
-      return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : m;
-    }
-    return ENTITIES[code.toLowerCase()] ?? m;
-  });
-}
+export { decodeEntities }; // 예전 이름 그대로 (core/entities.js)
 
 const clean = (s, max) => {
   const t = decodeEntities(s).replace(/\s+/g, ' ').trim();

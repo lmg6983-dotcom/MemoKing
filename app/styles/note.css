@@ -5,15 +5,18 @@ body {
   height: 100vh;
   overflow: hidden;
   background: var(--note-bg);
+  color: var(--note-text);
+}
+/* 메모 바탕 위 글자색 — PC 메모 창(body) · 휴대폰 메모 화면 · 휴대폰 공유 그림 종이 */
+body, .note-screen, .share-paper {
   --note-text: var(--note-fg);
   --note-muted: rgba(17, 17, 17, 0.64); /* 노랑·초록 메모 위 대비 4.5:1 이상 */
   --note-hover: rgba(17, 17, 17, 0.07);
-  color: var(--note-text);
 }
 @media (prefers-color-scheme: dark) {
-  body { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
+  body, .note-screen, .share-paper { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
 }
-body[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.1); }
+:is(body, .note-screen, .share-paper)[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.1); }
 
 .icon-btn { width: 30px; height: 30px; color: var(--note-muted); }
 .icon-btn:hover { background: var(--note-hover); color: var(--note-text); }
@@ -514,7 +517,6 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
   gap: 2px;
   max-width: calc(100vw - 12px);
 }
-.more-panel[hidden] { display: none; }
 .more-panel button { color: var(--muted); }
 .more-panel button:hover { background: var(--hover); color: var(--text); }
 .more-panel .sep { background: var(--muted); }
@@ -571,33 +573,6 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .rem-item .icon-btn { width: 26px; height: 26px; }
 .rem-item .icon-btn svg { width: 15px; height: 15px; }
 
-/* 켜기/끄기 스위치 (체크박스) */
-.switch {
-  appearance: none;
-  position: relative;
-  width: 36px;
-  height: 20px;
-  flex: none;
-  margin: 0;
-  border-radius: 999px;
-  background: var(--text-faint); /* 꺼진 스위치도 바탕과 3:1 이상 */
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.switch::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--surface-1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: transform 0.15s;
-}
-.switch:checked { background: var(--brand-yellow); }
-.switch:checked::after { transform: translateX(16px); background: var(--brand-black); }
 
 .reminder-form { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .reminder-form h4 { margin: 0 0 8px; }
@@ -636,7 +611,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .rem-submit { width: 100%; }
 
 /* ---------- 이 메모예요: 창 테두리 반짝임 (빠른 메모 알림을 눌렀을 때 등) ---------- */
-body.highlight::after {
+body.highlight::after, .note-screen.highlight::after { /* 휴대폰 메모 화면은 mobile.css 가 absolute 로 */
   content: "";
   position: fixed;
   inset: 0;
@@ -651,15 +626,24 @@ body.highlight::after {
   50% { opacity: 1; }
 }
 
-/* ---------- 메모 스택: 탭 줄 (v0.12.0) ---------- */
-body.stacked { --tabs-h: 34px; }
+/* ---------- 메모 스택: 서류철 옆 색인 탭 (v0.12.0 · 세로 v0.16.4) ---------- */
+/* 탭은 창 왼쪽 가장자리에 세로로 달린다. 탭마다 그 메모의 색, 보이는 탭은 메모 바탕과 이어진다 */
+body.stacked { --tabs-h: 0px; --tabs-w: 30px; padding-left: var(--tabs-w); }
 .stack-tabs {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  width: var(--tabs-w);
   display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: var(--tabs-h);
+  flex-direction: column;
+  align-items: stretch;
   flex: none;
-  padding: 0 6px;
+  padding: 10px 0 10px 3px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
   background: color-mix(in srgb, var(--note-bar) 78%, #000 12%);
   -webkit-app-region: drag;
   user-select: none;
@@ -669,32 +653,35 @@ body.stacked { --tabs-h: 34px; }
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 0 1 160px;
-  min-width: 44px;
-  height: 28px;
-  padding: 0 4px 0 10px;
-  border-radius: 8px 8px 0 0;
-  color: var(--note-muted);
+  flex: none;
+  min-width: 0;
+  margin: 0 0 -6px 0; /* 위아래 탭과 살짝 겹침 */
+  padding: 12px 0 8px;
+  writing-mode: vertical-rl; /* 한글은 세로로 똑바로 */
+  border-radius: 9px 0 0 9px;
+  clip-path: polygon(0 7px, 100% 0, 100% 100%, 0 calc(100% - 7px));
+  background: var(--note-bar);
+  color: var(--note-fg);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   -webkit-app-region: no-drag;
 }
-.stack-tab:hover { background: color-mix(in srgb, var(--note-bar) 60%, transparent); color: var(--note-text); }
-.stack-tab[aria-selected="true"] { background: var(--note-bar); color: var(--note-text); }
+.stack-tab:hover { z-index: 1; background: color-mix(in srgb, var(--note-bar) 82%, var(--note-fg) 8%); }
+.stack-tab[aria-selected="true"] { z-index: 2; background: var(--note-bg); }
 .stack-tab[aria-selected="true"]::after {
   content: "";
   position: absolute;
-  left: 8px;
-  right: 8px;
-  top: 0;
-  height: 2px;
-  border-radius: 0 0 2px 2px;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
   background: var(--brand-yellow);
 }
 body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: var(--brand-black); }
-.stack-dot { width: 8px; height: 8px; flex: none; border-radius: 3px; background: var(--note-chip); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.3); }
-.stack-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* 제목 7자가 줄임표 없이 보이는 길이 */
+.stack-title { flex: none; min-width: 0; white-space: nowrap; line-height: 1; letter-spacing: 0.02em; }
 .stack-close {
   display: grid;
   place-items: center;
@@ -708,6 +695,7 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
   color: inherit;
   opacity: 0;
   cursor: pointer;
+  writing-mode: horizontal-tb;
 }
 .stack-close svg { width: 12px; height: 12px; }
 .stack-close:hover { background: var(--note-hover); }
@@ -718,13 +706,14 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
   width: 26px;
   height: 26px;
   flex: none;
-  margin: 0 0 1px 2px;
+  margin: 12px auto 0;
   padding: 0;
   border: 0;
   border-radius: 7px;
   background: none;
   color: var(--note-muted);
   cursor: pointer;
+  writing-mode: horizontal-tb;
   -webkit-app-region: no-drag;
 }
 .stack-add svg { width: 15px; height: 15px; }
@@ -818,8 +807,6 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
 /* 탭 끌기 (v0.14.0): 탭 줄 안에서는 탭이 들려 커서를 따라온다 */
 .stack-tab.lifting {
   z-index: 2;
-  background: var(--note-bar);
-  color: var(--note-text);
   box-shadow: var(--shadow-pop);
   cursor: grabbing;
   pointer-events: none;
@@ -838,7 +825,6 @@ body.tab-dragging, body.tab-dragging * { cursor: grabbing !important; }
 .banner:not([hidden]) { animation: mk-drop-in 0.18s ease-out; }
 /* 다른 메모를 끌어 와 머물 때 표시는 서서히 */
 .stack-drop:not([hidden]) { animation: mk-fade-in 0.12s ease-out; }
-@keyframes mk-fade-in { from { opacity: 0; } }
 /* 서식 버튼·탭: 누르면 살짝 눌림 */
 .format-bar button, .more-panel button, .stack-tab, .stack-add { transition: background-color 0.15s ease-out, color 0.15s ease-out, transform 0.1s ease-out; }
 .format-bar button:active, .more-panel button:active, .stack-add:active { transform: scale(0.92); }
@@ -848,45 +834,6 @@ body.tab-dragging, body.tab-dragging * { cursor: grabbing !important; }
 .lc-main:hover { transform: translateY(-1px); }
 .mk-doc a[href^="attachments/"]:active { transform: scale(0.97); }
 
-/* ---------- 스택 탭: 서류철 옆 색인 탭 (v0.16.4) ---------- */
-/* 탭은 창 왼쪽 가장자리에 세로로 달린다 (서류철 옆의 색인 탭). 보이는 탭은 메모 바탕과 이어진다 */
-body.stacked { --tabs-h: 0px; --tabs-w: 30px; padding-left: var(--tabs-w); }
-.stack-tabs {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 30;
-  width: var(--tabs-w);
-  height: auto;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  padding: 10px 0 10px 3px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-.stack-tab {
-  writing-mode: vertical-rl; /* 한글은 세로로 똑바로 */
-  flex: 0 1 132px;
-  min-width: 0;
-  min-height: 46px;
-  height: auto;
-  margin: 0 0 -6px 0; /* 위아래 탭과 살짝 겹침 */
-  padding: 12px 0 8px;
-  gap: 6px;
-  border-radius: 9px 0 0 9px;
-  clip-path: polygon(0 7px, 100% 0, 100% 100%, 0 calc(100% - 7px));
-  background: color-mix(in srgb, var(--note-bar) 50%, transparent);
-  transition: background-color 0.15s ease-out, color 0.15s ease-out, transform 0.1s ease-out;
-}
-.stack-tab:hover { background: color-mix(in srgb, var(--note-bar) 80%, transparent); z-index: 1; }
-.stack-tab[aria-selected="true"] { z-index: 2; background: var(--note-bg); }
-.stack-tab[aria-selected="true"]::after { left: 0; right: auto; top: 12px; bottom: 12px; width: 2px; height: auto; border-radius: 0 2px 2px 0; }
-.stack-tab .stack-close { writing-mode: horizontal-tb; }
-.stack-add { writing-mode: horizontal-tb; flex: none; margin: 12px auto 0; }
-
 /* 왕관 버튼: 켜면 왕관이 스티커가 되어 버튼은 빈 자리 (빈 자리에 마우스를 올리면 점선 자국) */
 .crown-btn { position: relative; }
 .crown-btn.peeled svg { opacity: 0; }
@@ -894,49 +841,10 @@ body.stacked { --tabs-h: 0px; --tabs-w: 30px; padding-left: var(--tabs-w); }
 /* 붙은 동안 버튼 자리는 비어 있고 마우스·키보드 반응 없음 (왕관은 스티커를 눌러서만 뗀다) */
 .crown-btn.peeled { visibility: hidden; pointer-events: none; }
 
-/* 색인 탭: 탭마다 그 메모의 색, 제목 7자가 줄임표 없이 보이는 길이 */
-.stack-tab[data-color] { background: var(--note-bar); color: var(--note-fg); }
-.stack-tab[data-color]:hover { background: color-mix(in srgb, var(--note-bar) 82%, var(--note-fg) 8%); }
-.stack-tab[data-color][aria-selected="true"] { background: var(--note-bg); }
-.stack-tab { flex: none; min-height: 0; }
-.stack-tab .stack-title { flex: none; overflow: visible; text-overflow: clip; white-space: nowrap; line-height: 1; letter-spacing: 0.02em; }
-
 /* ---------- v0.17.2: Ctrl+마우스 휠로 본문 확대·축소 (웹 브라우저처럼 글·사진·표가 함께) ---------- */
 #editor > * { zoom: var(--note-zoom, 1); } /* 본문 요소에도 .editor class 가 붙으므로 id 로 (두 번 확대되지 않게) */
 #editor.zoomed { overflow-x: auto; } /* 매직 줌: 100% 보다 크게는 옆으로 밀어 보기 */
-.zoom-badge {
-  position: fixed;
-  right: 14px;
-  bottom: 54px;
-  z-index: 40;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px 4px 12px;
-  border-radius: 999px;
-  background: var(--bubble-bg);
-  color: var(--bubble-fg);
-  font: 600 12px/22px var(--font-sans);
-  font-variant-numeric: tabular-nums;
-  box-shadow: var(--bubble-shadow);
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
-  pointer-events: none;
-}
-.zoom-badge.show { opacity: 1; transform: none; pointer-events: auto; }
-.zoom-badge button {
-  height: 22px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--fill-tab);
-  box-shadow: inset 0 0 0 1px var(--bubble-line);
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.zoom-badge button:hover { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
+.zoom-badge { bottom: 54px; } /* 모양은 base.css · 메모 창은 아래 막대 위로 */
 
 /* ---------- v0.17.2: 표 열 너비·행 높이를 자유롭게 ---------- */
 /* 열 너비를 정한 표는 끈 대로 (좁게도 넓게도) — 너비를 안 정한 표는 지금처럼 내용에 맞춤 */
@@ -1058,23 +966,17 @@ body.mk-row-resizing { user-select: none; }
   white-space: nowrap;
 }
 body[data-color="charcoal"] .clear-stamp { color: #ff8b8f; border-color: #ff8b8f; opacity: 0.58; }
-.clear-stamp[hidden] { display: none; }
 .clear-stamp.stamp-in { animation: clear-stamp-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 @keyframes clear-stamp-in {
   0% { transform: translate(-50%, -50%) rotate(-14deg) scale(2.4); opacity: 0; }
   60% { transform: translate(-50%, -50%) rotate(-14deg) scale(0.94); opacity: 0.7; }
   100% { transform: translate(-50%, -50%) rotate(-14deg) scale(1); opacity: 0.5; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .clear-stamp.stamp-in { animation: none; }
-  .mk-doc .mk-sorting > li, .mk-doc li.mk-lift > p { transition: none; animation: none; }
-}
 @media print { .clear-stamp { display: none !important; } }
 
 /* ---------- v0.17.16: 아래 서식 도구막대 — 메모 창이 활성이거나 마우스가 아래쪽에 있을 때만 미끄러져 올라온다 ---------- */
 .format-bar { position: relative; z-index: 2; background: var(--note-bg); transition: margin-bottom 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease-out; }
 body.bar-hidden .format-bar { margin-bottom: calc(-1 * var(--bar-h, 38px)); opacity: 0; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .format-bar { transition: none; } }
 
 /* ---------- v0.17.17: 끌기 — 커서 옆 안내 · 놓은 항목 반짝 ---------- */
 .mk-drag-badge {
@@ -1085,12 +987,10 @@ body.bar-hidden .format-bar { margin-bottom: calc(-1 * var(--bar-h, 38px)); opac
   animation: mk-badge-in 0.12s ease-out;
 }
 .mk-drag-badge[data-kind="swap"] { background: #7a4dff; color: #fff; }
-.mk-drag-badge[hidden] { display: none; }
 @keyframes mk-badge-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 .mk-doc li.mk-dropped { border-radius: 6px; animation: mk-dropped 0.7s ease-out; }
 @keyframes mk-dropped { 0% { background: color-mix(in srgb, var(--note-text) 16%, transparent); } 100% { background: transparent; } }
 .mk-doc li.mk-swap-target::after { border-color: #7a4dff !important; }
-@media (prefers-reduced-motion: reduce) { .mk-drag-badge, .mk-doc li.mk-dropped { animation: none; } }
 
 /* ---------- 그림·소리·동영상·파일·링크 카드 줄 옮기기 (block-move.js) — 내용 자체를 잡아 끈다 ---------- */
 /* 마우스를 올리면 "잡을 수 있다" (손 모양 + 흐린 점선), 끄는 동안 "잡고 있다" */
@@ -1133,9 +1033,6 @@ body.mk-block-dragging .mk-doc .ProseMirror-selectednode { outline: none; }
   animation: mk-hint 3.6s ease-out forwards;
 }
 @keyframes mk-hint { 0% { opacity: 0; transform: translateY(4px); } 6%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .mk-doc .mk-block-sorting, .mk-doc .mk-block-lift > *, .mk-doc .mk-block-pressing { transition: none; animation: none; }
-}
 @media print { .mk-move-hint { display: none !important; } }
 
 /* ---------- v0.18.0: 목록 끌기 — 떠오른 그림자·바탕을 점선 테두리와 같은 틀(::after)에 (체크 네모·글머리까지 함께) ---------- */
@@ -1255,7 +1152,6 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-spk-4 { --spk: #d98a1c; }
 .mk-spk-5 { --spk: #1d9aa8; }
 .mk-voice-bar { display: flex; padding: 4px 0; user-select: none; -webkit-user-select: none; }
-.mk-voice-bar[hidden] { display: none; }
 .mk-voice-toggle {
   display: flex;
   align-items: center;
@@ -1284,9 +1180,6 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-voice.folded .mk-voice-body > :not(:first-child) { display: none; }
 .mk-voice.mk-voice-anim .mk-voice-body > :not(:first-child) { animation: mk-voice-in 0.24s ease-out both; }
 @keyframes mk-voice-in { from { opacity: 0; transform: translateY(-4px); } }
-@media (prefers-reduced-motion: reduce) {
-  .mk-voice-chev, .mk-voice.mk-voice-anim .mk-voice-body > :not(:first-child) { transition: none; animation: none; }
-}
 
 /* 그림만 든 줄: 칸이 그림만 감싸게 (줄 높이·보이지 않는 줄바꿈 여백 없애기) — block-move.js 의 mk-image-line */
 .mk-doc p.mk-image-line { width: fit-content; max-width: 100%; margin: 6px 0; line-height: 0; font-size: 0; }
@@ -1354,7 +1247,6 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 
 /* 추천 태그 막대 (태그 없는 메모, 본문 아래) — PC. 휴대폰은 mobile.css 가 크기를 덮어쓴다 */
 .tag-suggest-bar { display: flex; align-items: center; gap: 6px; flex: none; padding: 3px 4px 3px 10px; border-top: 1px solid color-mix(in srgb, var(--note-text) 8%, transparent); animation: mk-pop-in 0.18s ease-out; }
-.tag-suggest-bar[hidden] { display: none; }
 .tag-suggest-bar .tsb-label { display: inline-flex; align-items: center; gap: 3px; flex: none; font-size: 11.5px; font-weight: 700; color: var(--note-muted); }
 .tag-suggest-bar .tsb-label svg { width: 13px; height: 13px; }
 .tag-suggest-bar .tsb-chips { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
@@ -1381,7 +1273,6 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
   transition: left 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
     width 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.mk-drag-frame[hidden] { display: none; }
 /* 들어 올린 것: 손을 바로 따라온다 (미끄러지지 않음). 틈(4px)은 메모 바탕으로 덮어 아래 줄이 비치지 않게, 들어 올릴 때 "톡" */
 .mk-drag-frame.lift {
   transition: none;
@@ -1413,10 +1304,6 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
   border-radius: 1.5px;
   background: inherit;
   transform: rotate(45deg);
-}
-@media (prefers-reduced-motion: reduce) {
-  .mk-drag-frame, .mk-drag-badge[data-side] { transition: none; }
-  .mk-drag-frame.lift, .mk-drop-slot { animation: none; }
 }
 /* 틀이 그리므로 내용 쪽에는 바탕만 (들어 올린 것은 아래 줄을 가리게, 맞바꿀 상대는 표시용 이름만) */
 body.mk-block-dragging .mk-doc .mk-block-lift { box-shadow: none; border-radius: 8px; opacity: 1; }
@@ -1453,14 +1340,12 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
   animation: desk-rec-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.desk-rec[hidden] { display: none; }
 .desk-rec .rec-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .desk-rec .rec-text { max-height: 28vh; padding: 2px 6px 2px 0; overflow-y: auto; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--note-text); }
-.desk-rec .rec-text[hidden] { display: none; }
 .desk-rec .rec-hint, .desk-rec .rec-listening { color: var(--note-muted); font-size: 12.5px; }
-.desk-rec .rec-listening { animation: desk-rec-blink 1.2s ease-in-out infinite; }
+.desk-rec .rec-listening { animation: mk-blink 1.2s ease-in-out infinite; }
 .desk-rec .grow { flex: 1; }
-.desk-rec .rec-dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: #e5484d; box-shadow: 0 0 0 4px rgba(229, 72, 77, 0.2); animation: desk-rec-blink 1.2s ease-in-out infinite; }
+.desk-rec .rec-dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: #e5484d; box-shadow: 0 0 0 4px rgba(229, 72, 77, 0.2); animation: mk-blink 1.2s ease-in-out infinite; }
 .desk-rec.paused .rec-dot { animation: none; background: var(--note-muted); box-shadow: none; }
 .desk-rec .rec-time { flex: none; white-space: nowrap; font-size: 15px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 .desk-rec .rec-state { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--note-muted); }
@@ -1475,10 +1360,8 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .desk-rec .rec-btn:active { transform: scale(0.96); }
 .desk-rec .rec-btn:disabled { opacity: 0.6; cursor: progress; }
 .format-bar [data-action="record"].active, .more-panel [data-action="record"].active { color: #fff; background: #e5484d; }
-.format-bar [data-action="record"].active svg, .more-panel [data-action="record"].active svg { animation: desk-rec-blink 1.2s ease-in-out infinite; }
+.format-bar [data-action="record"].active svg, .more-panel [data-action="record"].active svg { animation: mk-blink 1.2s ease-in-out infinite; }
 @keyframes desk-rec-in { from { opacity: 0; transform: translateY(-4px); } }
-@keyframes desk-rec-blink { 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .desk-rec, .desk-rec .rec-dot, .format-bar [data-action="record"].active svg { animation: none; } .desk-rec .rec-wave i { transition: none; } }
 @media print { .desk-rec { display: none !important; } }
 
 /* ---------- 손 메모 (ink-editor.js · ink-annotate.js, PC·휴대폰 함께) ---------- */
@@ -1583,7 +1466,6 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 @keyframes ink-dock-in { from { opacity: 0; transform: translate(-50%, 16px) scale(0.96); } }
 .ink-group { display: flex; align-items: center; gap: 2px; flex: none; padding: 0 3px; }
 .ink-group + .ink-group { border-left: 1px solid var(--ink-ui-line); }
-.ink-group[hidden] { display: none; }
 .ink-btn {
   position: relative; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 12px;
   background: none; color: var(--ink-ui-fg); cursor: pointer; transition: background 0.12s, transform 0.12s ease-out;
@@ -1610,7 +1492,6 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
   border-radius: 16px; background: var(--ink-ui-bg); color: var(--ink-ui-fg);
   box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--ink-ui-line);
 }
-.ink-pop[hidden] { display: none; }
 .ink-pop.in { animation: ink-pop-in 0.18s cubic-bezier(0.2, 1.3, 0.4, 1); }
 @keyframes ink-pop-in { from { opacity: 0; transform: translate(-50%, 8px) scale(0.94); } }
 .ink-pop-title { margin-bottom: 6px; font-size: 11.5px; font-weight: 700; color: var(--ink-ui-muted); }
@@ -1643,7 +1524,6 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
   .ink-btn { width: 36px; height: 38px; }
   .ink-group { padding: 0 1px; }
 }
-@media (prefers-reduced-motion: reduce) { .ink-sheet, .ink-sheet.closing, .ink-dock, .ink-pop.in, .ink-empty svg, .mk-annot-caption { animation: none; } }
 
 /* 메모 안의 손 메모 한 칸: 그린 만큼의 크기 (넓으면 본문 폭에 맞춤), 누르면(PC 는 두 번) 이어 그리기 */
 .mk-doc .mk-ink { display: inline-block; position: relative; max-width: 100%; vertical-align: top; border-radius: 12px; line-height: 0; }
@@ -1680,10 +1560,9 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .format-bar button.add-btn.open svg { transform: rotate(45deg); }
 body.recording .format-bar button.add-btn::after {
   content: ""; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%;
-  background: #e5484d; box-shadow: 0 0 0 2px var(--note-bg); animation: desk-rec-blink 1.2s ease-in-out infinite;
+  background: #e5484d; box-shadow: 0 0 0 2px var(--note-bg); animation: mk-blink 1.2s ease-in-out infinite;
 }
 .add-menu { position: fixed; z-index: 40; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 7px; }
-.add-menu[hidden] { display: none; }
 .add-sat { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--text-strong, var(--note-text)); cursor: pointer; animation: add-sat-out 0.24s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
 .add-sat:nth-child(2) { animation-delay: 0.02s; }
 .add-sat:nth-child(3) { animation-delay: 0.04s; }
@@ -1696,13 +1575,12 @@ body.recording .format-bar button.add-btn::after {
 .add-sat-btn svg { width: 17px; height: 17px; }
 .add-sat-btn.rec { background: #e5484d; color: #fff; }
 .add-sat-btn.ink { background: var(--brand-yellow); color: var(--on-brand); }
-.add-sat.active .add-sat-btn.rec { animation: desk-rec-blink 1.2s ease-in-out infinite; }
+.add-sat.active .add-sat-btn.rec { animation: mk-blink 1.2s ease-in-out infinite; }
 .add-sat-label { padding: 3px 9px; border-radius: 8px; background: var(--surface-2, #fff); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 12.5px; white-space: nowrap; }
 .add-sat:hover .add-sat-btn, .add-sat:focus-visible .add-sat-btn { transform: scale(1.07); }
 .add-sat:active .add-sat-btn { transform: scale(0.92); }
 @keyframes add-sat-out { from { opacity: 0; transform: translate(-6px, 24px) scale(0.5); } }
 @keyframes add-sat-in { to { opacity: 0; transform: translate(-6px, 24px) scale(0.5); } }
-@media (prefers-reduced-motion: reduce) { .add-sat, .add-menu.closing .add-sat { animation: none; } }
 @media print { .add-menu { display: none !important; } }
 
 /* 주석: 글 위에 겹친 층 (칸을 차지하지 않음). 평소엔 보이기만, 주석 모드에서만 그리기 */

@@ -12,6 +12,7 @@ import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
+import { reduceMotion } from './dom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -136,7 +137,6 @@ function renderNow() {
 
 // ---------- 움직임 (디자인 시스템: 짧고 조용하게, 움직임 줄이기 존중) ----------
 
-const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 let firstCards = true;
 
