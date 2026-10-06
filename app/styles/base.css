@@ -278,14 +278,12 @@ svg { width: 20px; height: 20px; flex: none; }
   box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card); background: var(--fill-tab);
 }
 .coach-bubble.wide .coach-shot { max-height: 320px; object-fit: contain; cursor: zoom-out; }
-/* 직접 해 보기 */
+/* 직접 해 보기 — 말풍선 안의 글 칸 (노란 테두리는 화면에서 눌러 볼 곳 하나에만 쓴다) */
 .coach-try {
   margin: 0 0 10px; padding: 8px 11px; border-radius: 12px;
-  background: var(--brand-yellow-soft); box-shadow: inset 0 0 0 1.5px var(--brand-yellow);
+  background: var(--fill-tab);
   font-size: 13px; font-weight: 700; line-height: 19px;
-  animation: coach-nudge 1.6s ease-in-out 0.4s infinite;
 }
-@keyframes coach-nudge { 0%, 70%, 100% { transform: none; } 80% { transform: translateX(3px); } 90% { transform: translateX(-2px); } }
 .coach-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .coach-skip { padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .coach-skip:hover { background: var(--fill-hover); color: var(--text-strong); } }
@@ -306,7 +304,7 @@ svg { width: 20px; height: 20px; flex: none; }
 @media (hover: hover) and (pointer: fine) { .coach-fold:hover { background: var(--fill-hover); color: var(--text-strong); } }
 .coach-bubble.mini {
   width: auto; max-width: min(340px, calc(100vw - 24px)); padding: 7px 10px 7px 7px; border-radius: 16px; cursor: pointer;
-  box-shadow: var(--shadow-pop), 0 0 0 2px var(--brand-yellow);
+  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
 }
 .coach-bubble.mini :is(h3, p, .coach-shot, .coach-actions, .coach-praise, .coach-progress, .coach-count) { display: none; }
 .coach-bubble.mini .coach-head { margin: 0; gap: 8px; }

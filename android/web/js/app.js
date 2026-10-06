@@ -21,7 +21,7 @@ import * as recorder from './recorder.js';
 import { renderMemoImage } from './share-image.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
-import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent } from './tutorial.js';
+import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
 import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml } from './print-html.js';
@@ -230,8 +230,9 @@ app.showList = () => {
   syncPane();
 };
 // 메모 위 막대의 ← (휴대폰: 목록으로) · ≡ (태블릿: 목록을 옆에 꺼내기·넣기)
+//   튜토리얼이 "목록으로 돌아가요"를 기다리는 동안은 태블릿도 메모를 닫는다 (옆에 꺼내기만 하면 다음 단계로 못 감)
 app.noteBack = () => {
-  if (isTwoPane()) panes.toggleList();
+  if (isTwoPane() && !tutorialWaitsFor('note-closed')) panes.toggleList();
   else app.showList();
 };
 app.isNoteOpen = () => note.isOpen();

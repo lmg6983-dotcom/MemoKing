@@ -36,6 +36,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
+// 삼성 S펜 옆 버튼을 누른 채 닿을 때의 동작 번호 (삼성 기기 전용, 표준 MotionEvent 에 없음)
+private const val SPEN_ACTION_DOWN = 211
+private const val SPEN_ACTION_UP = 212
+private const val SPEN_ACTION_MOVE = 213
+private const val SPEN_ACTION_CANCEL = 214
+
 /**
  * 메모킹 안드로이드 — 화면 하나(WebView)에 휴대폰용 화면(android/web)을 띄우고,
  * 메모 폴더·알림·공유 같은 휴대폰 기능은 Bridge 로 이어 준다.
@@ -120,15 +126,52 @@ class MainActivity : Activity() {
 
     private var penButton = false
 
-    private fun trackPenButton(ev: MotionEvent) {
-        if (ev.pointerCount == 0 || ev.getToolType(0) != MotionEvent.TOOL_TYPE_STYLUS) return
-        val down = ev.isButtonPressed(MotionEvent.BUTTON_STYLUS_PRIMARY) || ev.isButtonPressed(MotionEvent.BUTTON_SECONDARY)
+    private fun setPenButton(down: Boolean) {
         if (down == penButton) return
         penButton = down
         if (pageReady) emit("penButton", JSONObject().put("down", down))
     }
 
+    private fun trackPenButton(ev: MotionEvent) {
+        if (ev.pointerCount == 0 || ev.getToolType(0) != MotionEvent.TOOL_TYPE_STYLUS) return
+        setPenButton(ev.isButtonPressed(MotionEvent.BUTTON_STYLUS_PRIMARY) || ev.isButtonPressed(MotionEvent.BUTTON_SECONDARY))
+    }
+
+    // 갤럭시(삼성) S펜: 옆 버튼을 누른 채 화면에 대면 터치가 표준 DOWN·UP·MOVE 가 아니라 삼성 전용 동작 번호
+    //   (211 누름 · 212 뗌 · 213 움직임 · 214 취소)로 온다. 웹 화면(WebView)은 이 번호를 몰라 그리기·지우기를 못 받으므로
+    //   표준 동작으로 바꾸고, 펜 버튼이 눌렸다는 표시(buttonState)를 붙여 웹이 그 자리에서 지우개로 알게 한다
+    private fun samsungPenEvent(ev: MotionEvent): MotionEvent? {
+        val action = when (ev.actionMasked) {
+            SPEN_ACTION_DOWN -> MotionEvent.ACTION_DOWN
+            SPEN_ACTION_UP -> MotionEvent.ACTION_UP
+            SPEN_ACTION_MOVE -> MotionEvent.ACTION_MOVE
+            SPEN_ACTION_CANCEL -> MotionEvent.ACTION_CANCEL
+            else -> return null
+        }
+        val n = ev.pointerCount
+        val props = Array(n) { i -> MotionEvent.PointerProperties().also { ev.getPointerProperties(i, it) } }
+        val coords = Array(n) { i -> MotionEvent.PointerCoords().also { ev.getPointerCoords(i, it) } }
+        val buttons = if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) 0
+            else ev.buttonState or MotionEvent.BUTTON_STYLUS_PRIMARY or MotionEvent.BUTTON_SECONDARY
+        return MotionEvent.obtain(
+            ev.downTime, ev.eventTime, action, n, props, coords, ev.metaState, buttons,
+            ev.xPrecision, ev.yPrecision, ev.deviceId, ev.edgeFlags, ev.source, ev.flags,
+        )
+    }
+
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        val spen = samsungPenEvent(ev)
+        if (spen != null) {
+            // 웹에 버튼 소식을 먼저 보내고(지우개로), 바꾼 터치를 넘긴다. 떼면 다음 획이 지우개로 시작하지 않게 풀어 둔다
+            val lifted = spen.actionMasked == MotionEvent.ACTION_UP || spen.actionMasked == MotionEvent.ACTION_CANCEL
+            if (!lifted) setPenButton(true)
+            return try {
+                super.dispatchTouchEvent(spen)
+            } finally {
+                spen.recycle()
+                if (lifted) setPenButton(false)
+            }
+        }
         trackPenButton(ev)
         return super.dispatchTouchEvent(ev)
     }
