@@ -3,8 +3,7 @@
 // 그래서 PC 와 휴대폰이 같은 폴더를 동기화해 써도 서로의 메모를 그대로 읽는다.
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
-  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS, conflictCopyBody, sameBody,
-} from '../../app/js/core/memo-file.js';
+  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS, conflictCopyBody, sameBody, normalizeInkPath } from '../../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { normalizeTables } from '../../app/js/core/table-sizes.js';
@@ -222,6 +221,7 @@ export class Vault extends EventTarget {
       links: entry.meta.links,
       reminders: entry.meta.reminders,
       tables: entry.meta.tables ?? [],
+      ink: entry.meta.ink ?? '',
       created: entry.meta.created,
       updated: entry.meta.updated,
     };
@@ -381,6 +381,7 @@ export class Vault extends EventTarget {
     if (patch.color && COLORS.includes(patch.color)) entry.meta.color = patch.color;
     if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
     if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
+    if (typeof patch.ink === 'string') entry.meta.ink = normalizeInkPath(patch.ink);
     if (entry.file) this.write(entry);
     this.changed([id]);
     return this.get(id);

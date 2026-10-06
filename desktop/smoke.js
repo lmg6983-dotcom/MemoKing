@@ -394,13 +394,13 @@ export async function runSmoke({
     const panelShown = await js(reopened.win, `(() => { const p = document.getElementById('more-panel'); const r = p.getBoundingClientRect(); return !p.hidden && r.left >= 0 && r.right <= innerWidth; })()`);
     await capture(reopened.win, 'smoke-toolbar-narrow.png');
     await key(reopened.win, 'Escape');
-    // 서식 버튼 13개 (v0.17.4 H1·H2 → 스타일 고르기, v0.17.15 인용 버튼 → 스타일 고르기, v0.19.0 음성 녹음)
-    check('좁은 창: 넘친 버튼은 » 더보기로 (13개 모두 접근 가능 — 표·녹음 버튼 포함)',
-      narrow.fits && narrow.moreShown && narrow.inPanel > 0 && narrow.inBar + narrow.inPanel === 13 && panelShown, JSON.stringify({ ...narrow, panelShown }));
+    // 서식 버튼 11개 (v0.21.0 첨부·표·녹음은 + 콘텐츠 추가 안으로 — 휴대폰과 같음)
+    check('좁은 창: 넘친 버튼은 » 더보기로 (11개 모두 접근 가능 — + 콘텐츠 추가 포함)',
+      narrow.fits && narrow.moreShown && narrow.inPanel > 0 && narrow.inBar + narrow.inPanel === 11 && panelShown, JSON.stringify({ ...narrow, panelShown }));
     reopened.win.setSize(760, 520);
     await wait(500);
     const wide = await toolbar();
-    check('넓은 창: 모든 버튼이 막대에 (더보기 없음)', wide.fits && !wide.moreShown && wide.inBar === 13, JSON.stringify(wide));
+    check('넓은 창: 모든 버튼이 막대에 (더보기 없음)', wide.fits && !wide.moreShown && wide.inBar === 11, JSON.stringify(wide));
     await capture(reopened.win, 'smoke-toolbar-wide.png');
     reopened.win.setBounds(wideBounds);
     await wait(300);

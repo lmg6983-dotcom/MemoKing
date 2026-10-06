@@ -227,7 +227,7 @@ try {
   await post('/dev/pick', [{ name: '보고서.pdf', mime: 'application/pdf', base64: Buffer.from('%PDF-1.4').toString('base64') }]);
   await page.tap('#add-btn');
   await page.waitForTimeout(350);
-  check('도구막대: + 를 누르면 위성 단추 5개 (음성 녹음·사진·파일·표·수식)', (await page.locator('#add-menu:not([hidden]) .add-sat').count()) === 5);
+  check('도구막대: + 를 누르면 위성 단추 7개 (음성 녹음·손 메모·주석·사진·파일·표·수식)', (await page.locator('#add-menu:not([hidden]) .add-sat').count()) === 7);
   await shot('19-add-menu');
   await page.tap('[data-add="file"]');
   await page.waitForTimeout(800);
@@ -1053,6 +1053,95 @@ try {
   await back();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(300);
+
+  // ---------- 손 메모: 콘텐츠로서 (+ › 손 메모) · 주석으로서 (+ › 주석) ----------
+  {
+    const idea = () => fs.readdirSync(vault).find((f) => f.startsWith('아이디어'));
+    const waitFile = async (test, ms = 6000) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+        const body = read(idea());
+        if (test(body)) return body;
+        await page.waitForTimeout(150);
+      }
+      return read(idea());
+    };
+    await page.tap('.card:has(.card-title:text-is("아이디어"))');
+    await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+    await page.waitForTimeout(300);
+    const draw = async (pts) => {
+      await page.mouse.move(pts[0][0], pts[0][1]);
+      await page.mouse.down();
+      for (const [x, y] of pts.slice(1)) await page.mouse.move(x, y, { steps: 4 });
+      await page.mouse.up();
+    };
+    const wave = (x0, y0, w = 160) => Array.from({ length: 12 }, (_, i) => [x0 + (w * i) / 11, y0 + Math.sin(i / 1.6) * 18]);
+    await page.tap('#add-btn');
+    await page.waitForTimeout(250);
+    await page.tap('.add-sat[data-add="ink"]');
+    await page.waitForSelector('.ink-sheet');
+    const sheet = await page.evaluate(() => ({ tools: document.querySelectorAll('.ink-sheet .ink-tools .ink-btn').length, bgs: document.querySelectorAll('.ink-sheet .ink-bg').length }));
+    await draw(wave(60, 260));
+    await draw(wave(80, 340, 120));
+    await page.waitForTimeout(150);
+    await shot('20-ink-editor');
+    const live = await page.locator('.ink-sheet .ink-strokes path').count();
+    check('손 메모: + › 손 메모 → 그리기 화면 (펜·형광펜·지우개 · 바탕 3가지) · 그린 획이 보임', sheet.tools === 3 && sheet.bgs === 3 && live === 2, JSON.stringify({ sheet, live }));
+    await page.tap('.ink-sheet .ink-head-btn.primary');
+    await page.waitForSelector('.mk-doc .mk-ink img');
+    const body1 = await waitFile((b) => /!\[손 메모\]/.test(b));
+    const svgRel = body1.match(/!\[손 메모\]\((attachments\/[^)]+\.svg)\)/)?.[1];
+    const svg1 = svgRel ? read(svgRel) : '';
+    const vb = svg1.match(/viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/)?.slice(1).map(Number) ?? [];
+    const shown = await page.locator('.mk-doc .mk-ink img').evaluate((img) => ({ w: img.naturalWidth, h: img.naturalHeight, ok: img.complete && img.naturalWidth > 0 }));
+    check('완료 → 메모 안에 손 메모 한 칸 (SVG 파일 · 다시 고칠 수 있는 자료 포함)', svgRel && /memoking-ink/.test(svg1) && (svg1.match(/<path /g) ?? []).length === 2 && shown.ok, body1);
+    check('손 메모 크기 = 그린 만큼 (화면 전체가 아니라)', vb[0] > 150 && vb[0] < 230 && vb[1] > 100 && vb[1] < 170 && shown.w === vb[0], JSON.stringify({ vb, shown }));
+    await shot('21-ink-in-memo');
+    // 이어 그리기: 칸을 골라 "이어 그리기" → 같은 획이 보이고, 흰 바탕으로 바꿔 한 획 더
+    await page.tap('.mk-doc .mk-ink img');
+    await page.waitForTimeout(200);
+    await page.evaluate(() => document.querySelector('.mk-doc .mk-ink-edit').click());
+    await page.waitForSelector('.ink-sheet');
+    await page.waitForTimeout(200);
+    const again = await page.locator('.ink-sheet .ink-strokes path').count();
+    await page.tap('.ink-sheet .ink-bg[data-bg="white"]');
+    await draw(wave(70, 300, 100));
+    await page.tap('.ink-sheet .ink-head-btn.primary');
+    const body2 = await waitFile((b) => /!\[손 메모 · 흰 바탕\]/.test(b));
+    const svgRel2 = body2.match(/!\[손 메모 · 흰 바탕\]\((attachments\/[^)]+\.svg)\)/)?.[1];
+    const svg2 = svgRel2 ? read(svgRel2) : '';
+    check('이어 그리기: 그린 획을 그대로 열고, 더 그리고 흰 바탕으로 저장', again === 2 && svgRel2 && svgRel2 !== svgRel && (svg2.match(/<path /g) ?? []).length === 3 && /<rect [^>]*#ffffff/.test(svg2), JSON.stringify({ again, svgRel2, body2 }));
+    // 주석: 글 위에 그리기 (칸을 차지하지 않음)
+    const docH = await page.evaluate(() => document.querySelector('.ProseMirror').getBoundingClientRect().height);
+    await page.tap('#add-btn');
+    await page.waitForTimeout(250);
+    await page.tap('.add-sat[data-add="annotate"]');
+    await page.waitForSelector('.mk-annot.drawing');
+    await page.waitForTimeout(300); // + 메뉴가 닫히는 동안
+    const p = await page.evaluate(() => { const el = [...document.querySelectorAll('.ProseMirror > p')].find((x) => x.textContent.includes('머리말')); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 12 }; });
+    await draw([[p.x, p.y], [p.x + 60, p.y + 4], [p.x + 120, p.y - 2], [p.x + 180, p.y + 3]]);
+    await page.waitForTimeout(150);
+    await shot('22-annotate');
+    await page.tap('.mk-annot-bar .ink-head-btn.primary');
+    const body3 = await waitFile((b) => /^ink: /m.test(b));
+    const inkRel = body3.match(/^ink: (attachments\/\S+\.json)$/m)?.[1];
+    const ann = inkRel ? JSON.parse(read(inkRel)) : null;
+    const docH2 = await page.evaluate(() => document.querySelector('.ProseMirror').getBoundingClientRect().height);
+    check('주석: + › 주석 → 글 위에 그리고 완료 → 머리말 ink: 파일 (문단에 붙임) · 칸을 차지하지 않음', inkRel && ann?.strokes?.length === 1 && ann.strokes[0].anchor && Math.abs(docH2 - docH) < 1 && (await page.locator('.mk-annot path').count()) === 1, JSON.stringify({ inkRel, ann: ann?.strokes?.[0]?.anchor, docH, docH2 }));
+    // 위에 줄이 생겨 문단이 밀리면 주석도 따라 내려간다
+    const before = await page.evaluate(() => document.querySelector('.mk-annot path').getBoundingClientRect().top);
+    await page.evaluate(() => { const h = document.querySelector('.ProseMirror > *'); h.focus?.(); });
+    await page.tap('.ProseMirror > :first-child');
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('위에 새 줄');
+    await page.waitForTimeout(400);
+    const after = await page.evaluate(() => document.querySelector('.mk-annot path').getBoundingClientRect().top);
+    check('글이 늘어 문단이 밀리면 주석도 그 문단을 따라감', after - before > 15, JSON.stringify({ before, after }));
+    await shot('23-annotate-follow');
+    await back();
+    await page.waitForTimeout(400);
+  }
 
   // Google Drive 연결 (미리보기 서버의 가짜 Drive): 설정 › 연결하기 › (휴대폰 구글 계정) › 폴더 › 지금 메모 함께 올리기
   const count = await page.locator('.card').count();

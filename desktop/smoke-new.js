@@ -3,6 +3,7 @@
 // 이번 버전: v0.19.0 — 메모 목록을 휴대폰과 같은 모양으로 (엇갈려 쌓은 카드 · 격자/한 줄씩 단추 · 오른쪽 아래 + 와 위성 버튼)
 //            · 음성 메모 녹음 (+ › 음성 메모, 메모 창의 마이크 단추·Ctrl+Shift+R)
 //   녹음은 점검용 가짜 마이크(삐 소리)로 한다 (main.js 가 점검 때만 켬)
+//   v0.21.0 — 손 메모 (콘텐츠: 목록 + › 손 메모 · 메모 + › 손 메모, 주석: + › 주석 · Ctrl+Shift+E), 도구막대는 휴대폰처럼 + 하나로
 //   v0.20.0 — PC 받아쓰기: MEMOKING_STT_DIR(받아 둔 데이터)·MEMOKING_FAKE_AUDIO(가짜 마이크가 들려줄 한국어 wav)가 있으면
 //             녹음하며 받아쓰기 · 음성 카드 · 말한 사람 나누기 · 메뉴의 소리 받아쓰기까지
 import { app } from 'electron';
@@ -140,7 +141,7 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList }
     await lj(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
     await wait(300);
     const closed = await lj(`document.getElementById('fab-menu').hidden`);
-    check('오른쪽 아래 노란 + (위 도구막대의 + 는 없어짐) → 위성 버튼 음성 메모·글 메모, Esc 로 닫힘', fab.right > 10 && fab.right < 30 && fab.bottom > 10 && fab.bottom < 30 && !fab.toolbarPlus && menu.open && menu.sats.join() === 'voice,text' && menu.expanded === 'true' && closed, JSON.stringify({ fab, menu, closed }));
+    check('오른쪽 아래 노란 + (위 도구막대의 + 는 없어짐) → 위성 버튼 음성 메모·글 메모, Esc 로 닫힘', fab.right > 10 && fab.right < 30 && fab.bottom > 10 && fab.bottom < 30 && !fab.toolbarPlus && menu.open && menu.sats.join() === 'voice,ink,text' && menu.expanded === 'true' && closed, JSON.stringify({ fab, menu, closed }));
     let before = new Set(noteWins.keys());
     await lj(`document.getElementById('fab').click()`);
     await wait(250);
@@ -157,7 +158,7 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList }
     await lj(`document.querySelector('#fab-menu [data-new="voice"]').click()`);
     const voice = await newWindow(before);
     const vj = (code) => js(voice.win, code);
-    const recOn = await until(() => vj(`!document.getElementById('rec-panel').hidden && document.querySelector('.format-bar [data-action="record"]').classList.contains('active')`), '녹음 시작', 8000).catch(() => false);
+    const recOn = await until(() => vj(`!document.getElementById('rec-panel').hidden && document.querySelector('.add-sat[data-action="record"]').classList.contains('active') && document.body.classList.contains('recording')`), '녹음 시작', 8000).catch(() => false);
     await wait(2600);
     const during = await vj(`({ time: document.getElementById('rec-time').textContent, wave: [...document.querySelectorAll('#rec-wave i')].some((i) => parseFloat(i.style.getPropertyValue('--lv') || 0) > 0.02) })`);
     await capture(voice.win, 'smoke-new-recording.png');
@@ -194,6 +195,91 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList }
     await until(() => lj(`!!document.querySelector('.card[data-id="${voice.id}"] .card-badge')`), '목록 카드 소리 표시').catch(() => {});
     const badge = await lj(`!!document.querySelector('.card[data-id="${voice.id}"] .card-meta .card-badge')`);
     check('목록 카드에 소리 표시', badge);
+
+    // 8) 손 메모: 목록 + › 손 메모 → 그리기 화면 → 완료하면 그린 만큼의 SVG 한 칸, 두 번 눌러 이어 그리기, 주석은 글 위에
+    {
+      before = new Set(noteWins.keys());
+      await lj(`document.getElementById('fab').click()`);
+      await wait(250);
+      await lj(`document.querySelector('#fab-menu [data-new="ink"]').click()`);
+      const ink = await newWindow(before);
+      const ij = (code) => js(ink.win, code);
+      const sheetOpen = await until(() => ij(`!!document.querySelector('.ink-sheet')`), '그리기 화면', 6000).catch(() => false);
+      const size = ink.win.getSize();
+      const mouse = (type, x, y, extra = {}) => ink.win.webContents.sendInputEvent({ type, x: Math.round(x), y: Math.round(y), button: 'left', clickCount: 1, ...extra });
+      const stroke = async (pts) => {
+        mouse('mouseMove', pts[0][0], pts[0][1]);
+        await wait(30);
+        mouse('mouseDown', pts[0][0], pts[0][1]);
+        for (const [x, y] of pts.slice(1)) {
+          mouse('mouseMove', x, y, { modifiers: ['leftButtonDown'] });
+          await wait(16);
+        }
+        mouse('mouseUp', pts.at(-1)[0], pts.at(-1)[1]);
+        await wait(80);
+      };
+      const wave = (x0, y0, w) => Array.from({ length: 14 }, (_, i) => [x0 + (w * i) / 13, y0 + Math.sin(i / 1.7) * 16]);
+      await stroke(wave(60, 140, 200));
+      await stroke(wave(80, 220, 140));
+      const drawn = await ij(`document.querySelectorAll('.ink-sheet .ink-strokes path').length`);
+      await capture(ink.win, 'smoke-new-ink-editor.png');
+      check('목록 + › 손 메모 → 넓은 메모 창에 그리기 화면 · 마우스로 그린 획', sheetOpen && size[0] >= 540 && drawn === 2, JSON.stringify({ sheetOpen, size, drawn }));
+      await ij(`document.querySelector('.ink-sheet .ink-head-btn.primary').click()`);
+      const inkBody = await until(() => {
+        const m = vault.get(ink.id);
+        return m && /!\[손 메모\]\(attachments\/[^)]+\.svg\)/.test(m.body) && m.body;
+      }, '손 메모 저장', 8000).catch(() => null);
+      const svgRel = inkBody?.match(/\((attachments\/[^)]+\.svg)\)/)?.[1];
+      const svgText = svgRel ? fs.readFileSync(path.join(VAULT, svgRel), 'utf8') : '';
+      const shown = await until(() => ij(`(() => { const i = document.querySelector('.mk-ink img'); return i && i.complete && i.naturalWidth > 0 && { w: i.naturalWidth, h: i.naturalHeight }; })()`), '손 메모 칸').catch(() => null);
+      check('완료 → 메모에 그린 만큼의 손 메모 한 칸 (SVG · 고칠 자료 포함)', svgRel && /memoking-ink/.test(svgText) && shown && shown.w > 180 && shown.w < 260 && shown.h < 160, JSON.stringify({ inkBody, shown }));
+      await capture(ink.win, 'smoke-new-ink-memo.png');
+      // 두 번 누르면 이어 그리기 → 검은 바탕으로 한 획 더
+      await ij(`document.querySelector('.mk-ink img').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+      const reopened = await until(() => ij(`document.querySelectorAll('.ink-sheet .ink-strokes path').length`), '이어 그리기', 6000).catch(() => 0);
+      await ij(`document.querySelector('.ink-sheet .ink-bg[data-bg="black"]').click()`);
+      await ij(`document.querySelector('.ink-sheet .ink-color[style*="#ffffff"]')?.click()`);
+      await stroke(wave(60, 300, 120));
+      await ij(`document.querySelector('.ink-sheet .ink-head-btn.primary').click()`);
+      const inkBody2 = await until(() => {
+        const m = vault.get(ink.id);
+        return m && /!\[손 메모 · 검은 바탕\]/.test(m.body) && m.body;
+      }, '이어 그린 손 메모', 8000).catch(() => null);
+      const svg2 = inkBody2 ? fs.readFileSync(path.join(VAULT, inkBody2.match(/\((attachments\/[^)]+\.svg)\)/)[1]), 'utf8') : '';
+      check('두 번 누르면 이어 그리기 (그린 획 그대로) → 검은 바탕·흰 펜으로 저장', reopened === 2 && (svg2.match(/<path /g) ?? []).length === 3 && /#111111/.test(svg2) && /fill="#ffffff"/.test(svg2), JSON.stringify({ reopened, inkBody2 }));
+      // 주석: Ctrl+Shift+E → 글 위에 그리기 → Esc 로 끝내면 머리말 ink:
+      await ij(`(() => { const v = document.querySelector('.ProseMirror'); v.focus(); })()`);
+      ink.win.webContents.insertText('');
+      await ij(`document.querySelector('.ProseMirror').focus()`);
+      ink.win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'E', modifiers: ['control', 'shift'] });
+      const annotOn = await until(() => ij(`!!document.querySelector('.mk-annot.drawing') && !!document.querySelector('.mk-annot-bar')`), '주석 모드', 5000).catch(() => false);
+      const at = await ij(`(() => { const r = document.querySelector('.ProseMirror > :first-child').getBoundingClientRect(); return { x: r.left + 10, y: r.top + 20 }; })()`);
+      await stroke([[at.x, at.y], [at.x + 60, at.y + 3], [at.x + 120, at.y - 2]]);
+      await capture(ink.win, 'smoke-new-annotate.png');
+      ink.win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+      const annBody = await until(() => {
+        const m = vault.get(ink.id);
+        return m?.ink && m;
+      }, '주석 저장', 8000).catch(() => null);
+      const ann = annBody ? JSON.parse(fs.readFileSync(path.join(VAULT, annBody.ink), 'utf8')) : null;
+      const raw = annBody ? fs.readFileSync(path.join(VAULT, annBody.file), 'utf8') : '';
+      check('주석: Ctrl+Shift+E → 글 위에 그리고 Esc → 머리말 ink: 파일 (제목 문단에 붙음) · 보이는 층에 남음', annotOn && ann?.strokes?.length === 1 && ann.strokes[0].anchor?.b === 0 && /^ink: attachments\//m.test(raw) && (await ij(`document.querySelectorAll('.mk-annot path').length`)) === 1, JSON.stringify({ annotOn, ann: ann?.strokes?.[0]?.anchor, raw: raw.slice(0, 200) }));
+      ink.win.close();
+      await until(() => !noteWins.get(ink.id), '손 메모 창 닫힘').catch(() => {});
+      // 다시 열면 주석이 그대로 보인다
+      await lj(`window.memoking.memo.open(${JSON.stringify(ink.id)})`);
+      const again = await until(() => noteWins.get(ink.id), '다시 열기');
+      await ready(again);
+      const kept = await until(() => js(again, `document.querySelectorAll('.mk-annot path').length`), '주석 다시 보임', 5000).catch(() => 0);
+      check('다시 열어도 주석이 그 자리에', kept === 1, String(kept));
+      // + 메뉴: 음성 녹음·손 메모·주석·사진·파일·표·수식 (휴대폰과 같음)
+      await js(again, `document.getElementById('add-btn').click()`);
+      await wait(300);
+      const sats = await js(again, `[...document.querySelectorAll('#add-menu:not([hidden]) .add-sat')].map((b) => b.dataset.add).join()`);
+      await capture(again, 'smoke-new-add-menu.png');
+      check('메모 창 + → 음성 녹음·손 메모·주석·사진·파일·표·수식', sats === 'record,ink,annotate,photo,file,table,math', sats);
+      again.close();
+    }
 
     // 8) 받아쓰기 (데이터와 한국어 소리가 있을 때만)
     if (process.env.MEMOKING_STT_DIR && process.env.MEMOKING_FAKE_AUDIO) {

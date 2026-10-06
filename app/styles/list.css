@@ -893,3 +893,5 @@ body:not([data-tab="memos"]):not([data-tab="reminders"]) :is(.fab, .fab-menu, .f
 @media (prefers-reduced-motion: reduce) {
   .fab-sat, .fab-menu.closing .fab-sat, .cards .item.removing, .cards .item.removing .card { animation: none; }
 }
+.fab-sat:nth-child(2) { animation-delay: 0.05s; }
+.fab-sat[data-new="ink"] .fab-sat-btn { background: var(--brand-yellow); color: var(--on-brand); }

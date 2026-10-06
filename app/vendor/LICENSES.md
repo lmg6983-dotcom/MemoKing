@@ -12,3 +12,4 @@
 | canvas-confetti | 1.9.4 | ISC | https://github.com/catdad/canvas-confetti |
 | tesseract.js (+ tesseract.js-core, kor tessdata_best) | 7.0.0 | Apache-2.0 | https://github.com/naptha/tesseract.js |
 | fuzzysort | 4.0.2 | MIT | https://github.com/farzher/fuzzysort |
+| perfect-freehand | 1.2.3 | MIT | https://github.com/steveruizok/perfect-freehand |

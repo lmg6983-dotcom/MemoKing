@@ -325,8 +325,9 @@ function createListWindow(tab) {
   return listWin;
 }
 
-function defaultNoteBounds() {
-  const { width, height } = DEFAULT_NOTE_SIZE;
+// size: 손 메모로 만드는 새 메모는 그리기 좋게 넓게
+function defaultNoteBounds(size = DEFAULT_NOTE_SIZE) {
+  const { width, height } = size;
   const n = noteWins.size;
   const anchor = listWin?.getBounds() ?? screen.getPrimaryDisplay().workArea;
   const area = screen.getDisplayMatching(anchor).workArea;
@@ -339,7 +340,7 @@ function defaultNoteBounds() {
 
 // inactive: 하던 작업의 키보드 포커스를 뺏지 않고 연다 (빠른 메모)
 // 스택에 든 메모면 그 스택 창에서 이 메모의 탭을 보여 준다.
-function openNote(id, { inactive = false, record = false } = {}) {
+function openNote(id, { inactive = false, record = false, ink = false } = {}) {
   if (stacks?.stackOf(id)) return showTab(id, { inactive });
   const existing = noteWins.get(id);
   if (existing) {
@@ -351,17 +352,17 @@ function openNote(id, { inactive = false, record = false } = {}) {
     }
     return existing;
   }
-  return createNoteWindow(id, { inactive, record });
+  return createNoteWindow(id, { inactive, record, ink });
 }
 
 // show: false 면 숨긴 채로 만들어 둔다 (스택의 다른 탭 — 누르면 바로 보이도록)
-function createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false } = {}) {
+function createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false, ink = false } = {}) {
   const memo = vault?.get(id);
   if (!memo) return null;
 
   const saved = settings.noteBounds[id];
   const win = new BrowserWindow({
-    ...(bounds ?? (onScreen(saved) ? saved : defaultNoteBounds())),
+    ...(bounds ?? (onScreen(saved) ? saved : defaultNoteBounds(ink ? { width: 560, height: 640 } : DEFAULT_NOTE_SIZE))),
     minWidth: 240,
     minHeight: 200,
     frame: false,
@@ -430,7 +431,7 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null, re
       saveSettings();
     }
   });
-  win.loadFile(path.join(APP_DIR, 'note.html'), { query: record ? { id, record: '1' } : { id } });
+  win.loadFile(path.join(APP_DIR, 'note.html'), { query: { id, ...(record ? { record: '1' } : {}), ...(ink ? { ink: '1' } : {}) } });
   return win;
 }
 
@@ -1164,9 +1165,9 @@ function animateBounds(win, to, duration = 180) {
 function createNote(options) {
   if (!vault) return null;
   // record: 열리자마자 녹음을 시작하는 음성 메모 (목록 + › 음성 메모)
-  const { record = false, ...rest } = options ?? {};
+  const { record = false, ink = false, ...rest } = options ?? {};
   const id = vault.create(rest);
-  openNote(id, { record: Boolean(record) });
+  openNote(id, { record: Boolean(record), ink: Boolean(ink) });
   // 튜토리얼 "첫 메모 만들기" 단계
   if (tutorial.active && TUTORIAL_STEPS[tutorial.index]?.advance === 'memo-created') {
     tutorial.memoId = id;

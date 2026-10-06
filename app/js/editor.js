@@ -13,6 +13,10 @@ import {
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
 import { mediaKindOf, trimTrailingBreaks } from './core/memo-file.js';
+import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg } from './core/ink.js';
+import { getStroke } from '../vendor/perfect-freehand.js';
+import { openInkEditor } from './ink-editor.js';
+import { icon } from './icons.js';
 import { remarkEmptyTasks } from './core/empty-tasks.js';
 import { remarkInlineHtmlMarks, stringifyHandlers, safeColor, DEFAULT_HIGHLIGHT } from './core/html-marks.js';
 import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
@@ -74,8 +78,45 @@ function playerOptions(kind) {
 // 플레이어에서 누르면 그 기능이 되는 곳 (재생 막대·단추). 그중 MEDIA_SCRUB(설정 메뉴)은 꾹 눌러도 옮기지 않음
 const MEDIA_CONTROL = `${MEDIA_SCRUB}, .plyr__progress, input, [role="slider"], .plyr__control, button`;
 
-function mediaView(node) {
+// 손 메모 이어 그리기 (편집기마다 createNoteEditor 가 정함: (view, getPos) => void)
+let inkEditHandler = null;
+const INK_FILE = '손 메모';
+
+// 손 메모 한 칸: 그린 만큼의 그림 + (마우스를 올리거나 고르면) "이어 그리기" — PC 는 두 번 눌러도
+function inkView(node, view, getPos) {
+  const dom = document.createElement('span');
+  dom.className = `mk-ink bg-${bgOfAlt(node.attrs.alt)}`;
+  dom.contentEditable = 'false';
+  const img = document.createElement('img');
+  img.src = vaultUrl(node.attrs.src);
+  img.alt = node.attrs.alt ?? '';
+  img.draggable = false;
+  img.onerror = () => dom.classList.add('broken');
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.className = 'mk-ink-edit';
+  edit.append(icon('pen'), '이어 그리기');
+  const open = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof getPos === 'function') inkEditHandler?.(view, getPos());
+  };
+  edit.addEventListener('mousedown', (e) => e.preventDefault());
+  edit.addEventListener('click', open);
+  img.addEventListener('dblclick', open);
+  dom.append(img, edit);
+  return {
+    dom,
+    stopEvent: (e) => e.target === edit || edit.contains(e.target),
+    ignoreMutation: () => true,
+    selectNode: () => dom.classList.add('ProseMirror-selectednode'),
+    deselectNode: () => dom.classList.remove('ProseMirror-selectednode'),
+  };
+}
+
+function mediaView(node, view, getPos) {
   const { src, alt, title } = node.attrs;
+  if (isInk(src, alt)) return inkView(node, view, getPos);
   const kind = mediaKindOf(src, alt);
   if (kind === 'audio' || kind === 'video') {
     injectPlyrSprite();
@@ -776,7 +817,7 @@ function normalizePastedTables(html) {
  *   fetchPreview: 링크 카드에 보여줄 제목·설명·사진 (메인 프로세스가 메모 폴더에 모아 둔 것)
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment }) {
   let ready = false;
   let editor = null;
   const view = () => editor.ctx.get(editorViewCtx);
@@ -819,6 +860,63 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     v.dispatch(tr.scrollIntoView());
     v.focus();
   }
+
+  // ---------- 손 메모 (콘텐츠): 그린 만큼의 SVG 한 칸 ----------
+  async function saveInk(doc) {
+    const svg = inkToSvg(doc, getStroke);
+    if (!svg) return null;
+    const src = await saveFile(new File([svg], `${INK_FILE}.svg`, { type: 'image/svg+xml' }));
+    return { src, alt: inkAlt(doc.bg) };
+  }
+  // 새 손 메모: 그리기 화면 → 완료하면 커서 자리에 (빈 메모면 첫 줄)
+  function insertInk() {
+    const at = view().state.selection.from;
+    return new Promise((resolve) => {
+      openInkEditor({
+        onSave: async (doc) => {
+          if (!doc) return;
+          const item = await saveInk(doc);
+          if (item) insertBlocks(at, [{ kind: 'image', ...item }]);
+          resolve(item);
+        },
+        onClose: () => {
+          resolve(null);
+          view().focus();
+        },
+      });
+    });
+  }
+  // 손 메모 이어 그리기: 그 칸의 SVG 안 자료를 열고, 완료하면 새 파일로 바꾼다 (다 지우면 칸도 지움)
+  async function editInk(v, pos) {
+    const node = v.state.doc.nodeAt(pos);
+    if (!node || node.type.name !== 'image' || !isInk(node.attrs.src, node.attrs.alt)) return;
+    let doc = null;
+    try {
+      doc = parseInkSvg(await readAttachment?.(node.attrs.src));
+    } catch (err) {
+      console.warn('손 메모를 읽지 못했어요', err);
+    }
+    if (!doc) {
+      onNotice?.('이 그림은 고칠 수 없어요 (메모킹으로 그린 손 메모가 아니에요)', true);
+      return;
+    }
+    openInkEditor({
+      doc,
+      onSave: async (next) => {
+        const cur = v.state.doc.nodeAt(pos);
+        if (cur !== node && cur?.attrs.src !== node.attrs.src) return; // 그 사이 글이 바뀌어 자리가 달라짐
+        if (next === null) {
+          v.dispatch(v.state.tr.delete(pos, pos + node.nodeSize));
+          return;
+        }
+        if (!next) return;
+        const item = await saveInk(next);
+        if (item) v.dispatch(v.state.tr.setNodeMarkup(pos, null, { ...node.attrs, src: item.src, alt: item.alt }));
+      },
+      onClose: () => v.focus(),
+    });
+  }
+  inkEditHandler = (v, pos) => editInk(v, pos);
 
   async function filesToItems(files) {
     const items = [];
@@ -1261,7 +1359,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
   }));
 
-  const media = $view(imageSchema.node, () => (node) => mediaView(node));
+  const media = $view(imageSchema.node, () => (node, v, getPos) => mediaView(node, v, getPos));
   const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
   const listDrag = $prose(() => createListDrag({ readOnly }));
   const blockMove = $prose(() => createBlockMove({ readOnly }));
@@ -1844,6 +1942,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       v.dispatch(tr.scrollIntoView());
       return true;
     },
+    // 손 메모: 새로 그려 넣기 · 그 자리의 손 메모 이어 그리기
+    insertInk: () => insertInk(),
+    editInk: (pos) => editInk(view(), pos),
     // 커서 자리에 파일들을 넣는다.
     async insertFiles(files) {
       const pos = view().state.selection.from;

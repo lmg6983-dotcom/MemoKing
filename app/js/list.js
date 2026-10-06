@@ -483,7 +483,7 @@ api.on('memo:trashed', showUndo);
 el.useSuggested.addEventListener('click', async () => applyInfo(await api.vault.use(state.info.suggestedPath)));
 el.chooseFolder.addEventListener('click', async () => applyInfo(await api.vault.choose()));
 
-// ---------- 새 메모: + 를 누르면 위로 위성 버튼 두 개 (음성 메모 · 글 메모) — 휴대폰과 같음 ----------
+// ---------- 새 메모: + 를 누르면 위로 위성 버튼 (음성 메모 · 손 메모 · 글 메모) — 휴대폰과 같음 ----------
 function setFabMenu(open, { keyboard = false } = {}) {
   if (open === !el.fabMenu.hidden) return false;
   el.fab.setAttribute('aria-expanded', String(open));
@@ -508,7 +508,7 @@ el.fabMenu.addEventListener('click', (e) => {
   const b = e.target.closest('[data-new]');
   if (!b) return;
   setFabMenu(false);
-  api.memo.create(b.dataset.new === 'voice' ? { record: true } : {});
+  api.memo.create(b.dataset.new === 'voice' ? { record: true } : b.dataset.new === 'ink' ? { ink: true } : {});
 });
 el.settingsBtn.addEventListener('click', async () => {
   await loadSettings();

@@ -1475,3 +1475,130 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 @keyframes desk-rec-blink { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .desk-rec, .desk-rec .rec-dot, .format-bar [data-action="record"].active svg { animation: none; } .desk-rec .rec-wave i { transition: none; } }
 @media print { .desk-rec { display: none !important; } }
+
+/* ---------- 손 메모 (ink-editor.js · ink-annotate.js, PC·휴대폰 함께) ---------- */
+.ink-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: var(--note-bg);
+  color: var(--note-text);
+  animation: ink-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.ink-sheet.closing { animation: ink-out 0.16s ease-in forwards; }
+@keyframes ink-in { from { opacity: 0; transform: translateY(14px); } }
+@keyframes ink-out { to { opacity: 0; transform: translateY(14px); } }
+.ink-head { display: flex; align-items: center; gap: 10px; flex: none; padding: 8px 10px; border-bottom: 1px solid color-mix(in srgb, var(--note-text) 10%, transparent); }
+.ink-title { font-size: 15px; }
+.ink-hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--note-muted); text-align: center; }
+.ink-head-btn { flex: none; height: 32px; padding: 0 14px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font: inherit; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+.ink-head-btn.primary { background: var(--brand-black, #111); color: var(--on-black, #fff); }
+.ink-head-btn:disabled { opacity: 0.5; }
+.ink-scroll { position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.ink-page { position: relative; }
+.ink-canvas { display: block; touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.ink-sheet[data-bg="white"] .ink-page { background: #ffffff; }
+.ink-sheet[data-bg="black"] .ink-page { background: #111111; }
+/* 투명 바탕: 메모 바탕 위에 옅은 모눈 (그린 그림에는 들어가지 않음) */
+.ink-sheet[data-bg="none"] .ink-page { background-image: radial-gradient(color-mix(in srgb, var(--note-text) 16%, transparent) 1px, transparent 1.2px); background-size: 24px 24px; }
+.ink-live { pointer-events: none; }
+.ink-eraser-ring { fill: none; stroke: color-mix(in srgb, var(--note-text) 55%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; pointer-events: none; }
+.ink-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 6px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-top: 1px solid color-mix(in srgb, var(--note-text) 10%, transparent);
+  background: var(--note-bg);
+}
+.ink-toolbar::-webkit-scrollbar { display: none; }
+.ink-group { display: flex; align-items: center; gap: 2px; flex: none; padding: 0 4px; }
+.ink-group + .ink-group { border-left: 1px solid color-mix(in srgb, var(--note-text) 12%, transparent); }
+.ink-group[hidden] { display: none; }
+.ink-btn { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--note-text); cursor: pointer; }
+.ink-btn svg { width: 19px; height: 19px; }
+.ink-btn:hover { background: color-mix(in srgb, var(--note-text) 8%, transparent); }
+.ink-btn[aria-pressed="true"] { background: var(--brand-black, #111); color: var(--on-black, #fff); }
+.ink-btn:disabled { opacity: 0.35; cursor: default; background: none; }
+.ink-color { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.45); cursor: pointer; flex: none; margin: 0 1px; }
+.ink-color[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--note-bg), 0 0 0 4px var(--note-text); }
+.ink-size { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; }
+.ink-size span { display: block; border-radius: 50%; background: var(--note-text); }
+.ink-size[aria-pressed="true"] { background: color-mix(in srgb, var(--note-text) 13%, transparent); }
+.ink-bg { height: 28px; padding: 0 9px; border: 0; border-radius: 8px; background: none; color: var(--note-text); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.ink-bg[aria-checked="true"] { background: var(--brand-black, #111); color: var(--on-black, #fff); }
+@media (pointer: coarse) {
+  .ink-btn { width: 42px; height: 42px; }
+  .ink-color { width: 30px; height: 30px; }
+  .ink-size { width: 36px; height: 36px; }
+  .ink-head-btn { height: 38px; }
+}
+@media (prefers-reduced-motion: reduce) { .ink-sheet, .ink-sheet.closing { animation: none; } }
+
+/* 메모 안의 손 메모 한 칸: 그린 만큼의 크기 (넓으면 본문 폭에 맞춤), 누르면(PC 는 두 번) 이어 그리기 */
+.mk-doc .mk-ink { display: inline-block; position: relative; max-width: 100%; vertical-align: top; border-radius: 12px; line-height: 0; }
+.mk-doc .mk-ink img { display: block; max-width: 100%; height: auto; border-radius: 12px; user-select: none; -webkit-user-drag: none; }
+.mk-doc .mk-ink-edit { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 9px; border: 0; border-radius: 999px; background: var(--brand-black, #111); color: var(--on-black, #fff); font: 600 12px/1 var(--font-sans, inherit); opacity: 0; transition: opacity 0.12s; cursor: pointer; }
+.mk-doc .mk-ink-edit svg { width: 14px; height: 14px; }
+.mk-doc .mk-ink:hover .mk-ink-edit, .mk-doc .mk-ink.ProseMirror-selectednode .mk-ink-edit { opacity: 1; }
+.mk-doc .mk-ink.ProseMirror-selectednode img { outline: 2px solid var(--note-text); outline-offset: 2px; }
+/* 투명 바탕 손 메모는 검은 메모에서 밝게 (색은 그대로 비슷하게) */
+body[data-color="charcoal"] .mk-doc .mk-ink.bg-none img, [data-color="charcoal"] .mk-doc .mk-ink.bg-none img { filter: invert(1) hue-rotate(180deg); }
+
+/* ---------- v0.21.0: 콘텐츠 추가 (+) — 위로 위성 단추 (휴대폰 mobile.css 가 손가락 크기로 덮어씀) ---------- */
+.format-bar button.add-btn { position: relative; }
+.format-bar button.add-btn svg { transition: transform 0.22s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.format-bar button.add-btn.open { background: color-mix(in srgb, var(--note-text) 14%, transparent); }
+.format-bar button.add-btn.open svg { transform: rotate(45deg); }
+body.recording .format-bar button.add-btn::after {
+  content: ""; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%;
+  background: #e5484d; box-shadow: 0 0 0 2px var(--note-bg); animation: desk-rec-blink 1.2s ease-in-out infinite;
+}
+.add-menu { position: fixed; z-index: 40; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 7px; }
+.add-menu[hidden] { display: none; }
+.add-sat { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--text-strong, var(--note-text)); cursor: pointer; animation: add-sat-out 0.24s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.add-sat:nth-child(2) { animation-delay: 0.02s; }
+.add-sat:nth-child(3) { animation-delay: 0.04s; }
+.add-sat:nth-child(4) { animation-delay: 0.06s; }
+.add-sat:nth-child(5) { animation-delay: 0.08s; }
+.add-sat:nth-child(6) { animation-delay: 0.1s; }
+.add-sat:nth-child(7) { animation-delay: 0.12s; }
+.add-menu.closing .add-sat { animation: add-sat-in 0.13s ease-in both; animation-delay: 0s; }
+.add-sat-btn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: var(--surface-2, #fff); color: var(--text-strong, #111); box-shadow: 0 4px 12px rgba(17, 17, 17, 0.16), inset 0 0 0 1px var(--line, rgba(0, 0, 0, 0.08)); transition: transform 0.12s ease-out; }
+.add-sat-btn svg { width: 17px; height: 17px; }
+.add-sat-btn.rec { background: #e5484d; color: #fff; }
+.add-sat-btn.ink { background: var(--brand-yellow); color: var(--on-brand); }
+.add-sat.active .add-sat-btn.rec { animation: desk-rec-blink 1.2s ease-in-out infinite; }
+.add-sat-label { padding: 3px 9px; border-radius: 8px; background: var(--surface-2, #fff); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+.add-sat:hover .add-sat-btn, .add-sat:focus-visible .add-sat-btn { transform: scale(1.07); }
+.add-sat:active .add-sat-btn { transform: scale(0.92); }
+@keyframes add-sat-out { from { opacity: 0; transform: translate(-6px, 24px) scale(0.5); } }
+@keyframes add-sat-in { to { opacity: 0; transform: translate(-6px, 24px) scale(0.5); } }
+@media (prefers-reduced-motion: reduce) { .add-sat, .add-menu.closing .add-sat { animation: none; } }
+@media print { .add-menu { display: none !important; } }
+
+/* 주석: 글 위에 겹친 층 (칸을 차지하지 않음). 평소엔 보이기만, 주석 모드에서만 그리기 */
+.mk-annot { position: absolute; z-index: 4; overflow: visible; pointer-events: none; }
+.mk-annot.drawing { pointer-events: auto; touch-action: none; cursor: crosshair; }
+body.annotating .mk-doc { user-select: none; -webkit-user-select: none; }
+body.annotating .format-bar, body.annotating .table-bar, body.annotating .tag-suggest-bar { display: none !important; }
+.mk-annot-bar {
+  position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 60;
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px;
+  border-radius: 14px; background: var(--note-bg); color: var(--note-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
+  animation: ink-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mk-annot-bar .ink-toolbar { flex: 1; min-width: 0; padding: 0; border: 0; background: none; }
+.mk-annot-label { flex: none; font-weight: 800; font-size: 13px; }
+@media print { .mk-annot-bar { display: none !important; } }
+/* 주석 층은 확대되는 본문과 따로 — 화면 좌표로 스스로 맞춘다 (두 번 확대되지 않게) */
+#editor > .mk-annot { zoom: 1; margin: 0; }
+/* 그리기 화면·주석 막대는 메모 색을 그대로 (data-color) — 글자 색도 그 색에서 */
+.ink-sheet[data-color], .mk-annot-bar[data-color] { --note-text: var(--note-fg); --note-muted: color-mix(in srgb, var(--note-fg) 64%, transparent); }

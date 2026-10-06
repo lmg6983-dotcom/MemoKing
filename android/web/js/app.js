@@ -254,7 +254,7 @@ app.openMemo = async (id, options = {}) => {
   syncPane();
 };
 
-app.newMemo = async ({ color, voice = false } = {}) => {
+app.newMemo = async ({ color, voice = false, ink = false } = {}) => {
   if (!app.vault) return null;
   let pick = color;
   if (!pick) {
@@ -265,7 +265,7 @@ app.newMemo = async ({ color, voice = false } = {}) => {
     }
   }
   const id = app.vault.create({ color: pick });
-  await app.openMemo(id, { fresh: true, record: Boolean(voice) });
+  await app.openMemo(id, { fresh: true, record: Boolean(voice), ink: Boolean(ink) });
   return id;
 };
 
@@ -986,7 +986,7 @@ fabMenu.addEventListener('click', (e) => {
   const b = e.target.closest('[data-new]');
   if (!b) return;
   setFabMenu(false);
-  app.newMemo({ voice: b.dataset.new === 'voice' });
+  app.newMemo({ voice: b.dataset.new === 'voice', ink: b.dataset.new === 'ink' });
 });
 
 // ---------- 메모 폴더 열기 ----------
@@ -1085,6 +1085,7 @@ setBackHandler(() => {
   if (closeConfirm()) return true;
   if (note.closePalette()) return true;
   if (note.closeStyleMenu()) return true;
+  if (note.closeInk()) return true;
   if (note.closeAddMenu()) return true;
   if (setFabMenu(false)) return true;
   if (sheetOpen()) return closeTopSheet();

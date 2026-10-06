@@ -86,7 +86,7 @@ function blockInfo(doc, pos, inner) {
 // 소리·동영상 플레이어에서 꾹 눌러도 옮기지 않는 곳 (설정 메뉴). 재생 막대는 밀면 감기, 꾹 누르면 옮기기 —
 // 누르는 사이 감긴 재생 위치는 들어 올릴 때 되돌린다
 export const MEDIA_SCRUB = '.plyr__menu__container';
-const GRAB_TARGET = 'img.mk-image, .mk-media, .mk-link-card, [data-link-card], a, .mk-math-block, hr';
+const GRAB_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card], a, .mk-math-block, hr';
 const NO_GRAB = '.plyr__controls, .plyr__control, button, input, select, textarea, [contenteditable="true"] [contenteditable="true"]';
 
 /** 화면에서 누른 곳(target)이 옮길 수 있는 내용 줄이면 그 줄 */
@@ -602,7 +602,7 @@ class Mover {
     const { view } = this;
     const dom = view.nodeDOM(block.pos);
     if (!(dom instanceof Element)) return;
-    const media = isContentParagraph(block.node) ? dom.querySelector('img.mk-image, .mk-media, .mk-link-card') : null;
+    const media = isContentParagraph(block.node) ? dom.querySelector('img.mk-image, .mk-ink, .mk-media, .mk-link-card') : null;
     const deco = (spec) => {
       if (spec) this.decorate([{ pos: block.pos, ...spec }]);
       else if (!this.drag && !this.pressing) this.decorate([]);

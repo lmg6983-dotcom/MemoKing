@@ -3,7 +3,7 @@
 import { icon } from '../../app/js/icons.js';
 import { createNoteEditor } from '../../app/js/editor.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from '../../app/js/core/html-marks.js';
-import { fileExtension, mediaKind, baseName } from '../../app/js/media.js';
+import { fileExtension, mediaKind, baseName, vaultUrl } from '../../app/js/media.js';
 import { isDataImage, decodeDataImage } from '../../app/js/core/remote-images.js';
 import { setupReminderPanel } from '../../app/js/reminder-panel.js';
 import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
@@ -14,6 +14,7 @@ import { call } from './native.js';
 import { fetchRemoteImage } from './web-fetch.js';
 import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
+import { setupAnnotation } from '../../app/js/ink-annotate.js';
 import { autoTagsFor } from '../../app/js/core/auto-tags.js';
 import { conflictCopyBody, isBlankBody, sameBody } from '../../app/js/core/memo-file.js';
 
@@ -49,6 +50,7 @@ const el = {
 };
 
 let editor = null;
+let annotation = null; // 주석: 메모 위에 그리기 (app/js/ink-annotate.js)
 let reminderPanel = null;
 let id = null;
 let memo = null;
@@ -706,6 +708,18 @@ function openAddMenu() {
   addBtn.setAttribute('aria-expanded', 'true');
   navigator.vibrate?.(8);
 }
+/** 뒤로 가기: 손 메모 그리기 화면(한 번 더 누르면 버림) → 주석 모드 순으로 닫는다 */
+export function closeInk() {
+  if (document.querySelector('.ink-sheet:not(.closing)')) {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return true;
+  }
+  if (annotation?.active) {
+    annotation.exit();
+    return true;
+  }
+  return false;
+}
 export function closeAddMenu() {
   if (addMenu.hidden || addMenu.classList.contains('closing')) return false;
   addBtn.classList.remove('open');
@@ -723,6 +737,8 @@ const ADD = {
   record: () => recorder.toggle(),
   table: () => editor.insertTable(),
   math: () => editor.setStyle('math'),
+  ink: () => editor.insertInk(),
+  annotate: () => annotation?.toggle(),
 };
 addMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서(키보드) 유지
 addMenu.addEventListener('click', (e) => {
@@ -887,6 +903,7 @@ export async function openNote(memoId, options = {}) {
       onTasks: showTasks,
       tables: memo.tables ?? [],
       onTables: saveTables,
+      readAttachment: async (src) => (await fetch(vaultUrl(src))).text(),
     });
     // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 (열기만 해도 저장되는 일 방지)
     current = saved = editor.getMarkdown();
@@ -899,7 +916,26 @@ export async function openNote(memoId, options = {}) {
     if (options.alarm) showAlarm(options.alarm);
     if (options.highlight) highlight();
     if (options.capture) await options.capture(editor);
+    annotation ??= setupAnnotation({
+      scroller: el.editorRoot,
+      docEl: () => el.editorRoot.querySelector('.ProseMirror'),
+      read: async () => (memo?.ink ? (await fetch(vaultUrl(memo.ink))).json() : null),
+      save: async (data) => {
+        const memoId = id; // 닫으면서 저장할 때도 그 메모에
+        const rel = data ? await saveFile(new File([JSON.stringify(data)], '주석.json', { type: 'application/json' })) : '';
+        if (memoId && app.vault.get(memoId)) app.vault.setMeta(memoId, { ink: rel });
+        if (memoId === id && memo) memo = { ...memo, ink: rel };
+      },
+      onMode: (on) => {
+        closeAddMenu();
+        el.screen.classList.toggle('annotating', on);
+        if (on) document.activeElement?.blur(); // 키보드를 내리고 그리기
+      },
+      notice: (text, err) => toast(text, err),
+    });
+    annotation.load(Boolean(memo.ink));
     if (options.record) recorder.start(memoId);
+    else if (options.ink) editor.insertInk();
     else if (options.fresh && !options.capture) editor.focus();
   })();
   try {
@@ -922,6 +958,7 @@ export function closeNote({ quiet = false } = {}) {
   clearTimeout(suggestTimer);
   el.tagBar.hidden = true;
   recorder.detach();
+  annotation?.exit(); // 주석을 그리던 중이면 저장
   for (const panel of [el.linksPanel, $('reminder-panel')]) if (!panel.hidden) closeSheet(panel);
   editor?.destroy();
   editor = null;
@@ -1044,7 +1081,7 @@ function applyZoom(focus) {
   root.style.setProperty('--note-zoom', String(zoom));
   // 폭은 확대되는 요소(편집기 바로 아래 틀) 자신에게 — 저절로 맞는 폭은 확대해도 화면 폭에 맞춰져 버리므로
   //   작게(100% 아래)는 폭을 비워 두어 줄이 화면 폭에 다시 맞춰지게
-  for (const child of root.children) child.style.width = zoom > 1 ? `${base}px` : '';
+  for (const child of root.children) if (!child.classList.contains('mk-annot')) child.style.width = zoom > 1 ? `${base}px` : ''; // 주석 층은 스스로 맞춘다
   root.classList.toggle('zoomed', zoom > 1);
   root.classList.toggle('zoomed-out', zoom < 1);
   // 두 손가락 가운데(focus)의 내용이 그 자리에 머물게 스크롤을 맞춘다

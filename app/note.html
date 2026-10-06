@@ -170,6 +170,9 @@
   </div>
   <footer class="format-bar" id="format-bar" role="toolbar" aria-label="서식">
     <div class="format-items" id="format-items">
+      <!-- 콘텐츠 추가: 누르면 위로 음성 녹음 · 손 메모 · 주석 · 사진 · 파일 · 표 · 수식 (휴대폰과 같음) -->
+      <button data-action="add" id="add-btn" class="add-btn" title="콘텐츠 추가 (음성 녹음·손 메모·주석·사진·파일·표·수식)" aria-label="콘텐츠 추가" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
+      <span class="sep"></span>
       <button data-cmd="bold" title="굵게 (Ctrl+B)"><b>B</b></button>
       <button data-cmd="italic" title="기울임 (Ctrl+I)"><i>I</i></button>
       <button data-cmd="underline" title="밑줄 (Ctrl+U)"><u>U</u></button>
@@ -182,10 +185,6 @@
         <svg><use href="#i-highlighter"/></svg><span class="swatch-bar" data-bar="highlight"></span>
       </button>
       <span class="sep"></span>
-      <button data-action="file" title="첨부 (Ctrl+Shift+I)"><svg><use href="#i-clip"/></svg></button>
-      <button data-action="table" title="표 넣기"><svg><use href="#i-table"/></svg></button>
-      <button data-action="record" class="rec-tool" title="음성 녹음 (Ctrl+Shift+R)" aria-label="음성 녹음 (Ctrl+Shift+R)" aria-pressed="false"><svg><use href="#i-mic"/></svg></button>
-      <span class="sep"></span>
       <button data-action="style" class="style-btn" title="스타일 (본문·제목·인용·코드 블록)" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
       <span class="sep"></span>
       <button data-cmd="bullet" title="점 목록 (Ctrl+Shift+8)"><svg><use href="#i-bullet"/></svg></button>
@@ -195,6 +194,15 @@
     <button id="more-btn" class="more-btn" title="서식 더보기" aria-label="서식 더보기" aria-haspopup="true" hidden><svg><use href="#i-chevrons"/></svg></button>
   </footer>
 
+  <div id="add-menu" class="add-menu" role="menu" aria-label="콘텐츠 추가" hidden>
+    <button class="add-sat" data-add="record" data-action="record" role="menuitem" title="음성 녹음 (Ctrl+Shift+R)"><span class="add-sat-btn rec"><svg><use href="#i-mic"/></svg></span><span class="add-sat-label">음성 녹음</span></button>
+    <button class="add-sat" data-add="ink" role="menuitem" title="손 메모 (Ctrl+Shift+D)"><span class="add-sat-btn ink"><svg><use href="#i-ink"/></svg></span><span class="add-sat-label">손 메모</span></button>
+    <button class="add-sat" data-add="annotate" role="menuitem" title="메모 위에 그리기 (Ctrl+Shift+E)"><span class="add-sat-btn"><svg><use href="#i-pen"/></svg></span><span class="add-sat-label">주석 (위에 그리기)</span></button>
+    <button class="add-sat" data-add="photo" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-photo"/></svg></span><span class="add-sat-label">사진</span></button>
+    <button class="add-sat" data-add="file" role="menuitem" title="첨부 (Ctrl+Shift+I)"><span class="add-sat-btn"><svg><use href="#i-clip"/></svg></span><span class="add-sat-label">파일</span></button>
+    <button class="add-sat" data-add="table" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-table"/></svg></span><span class="add-sat-label">표</span></button>
+    <button class="add-sat" data-add="math" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-sigma"/></svg></span><span class="add-sat-label">수식</span></button>
+  </div>
   <div id="more-panel" class="pop more-panel" role="toolbar" aria-label="서식 더보기" hidden></div>
   <!-- 스타일 고르기: 그 스타일 모양 그대로 미리 보임, 지금 줄의 스타일에 표시 -->
   <div id="style-menu" class="pop style-menu" role="listbox" aria-label="스타일" hidden>
@@ -213,6 +221,7 @@
   </div>
 
   <input id="file-input" type="file" multiple hidden>
+  <input id="photo-input" type="file" accept="image/*" multiple hidden>
 
   <dialog id="confirm-dialog" class="dialog">
     <form method="dialog">

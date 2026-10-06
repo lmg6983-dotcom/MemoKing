@@ -12,6 +12,7 @@ import { setupCoach } from './coach.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSliders } from './seg-slider.js';
 import { setupVoiceRecorder } from './voice-recorder.js';
+import { setupAnnotation } from './ink-annotate.js';
 import { audioNeedingTranscript } from './core/voice-card.js';
 
 const SAVE_DELAY = 600;
@@ -51,6 +52,7 @@ const el = {
 let editor = null;
 let reminderPanel = null;
 let recorder = null; // 음성 녹음 (voice-recorder.js)
+let annotation = null; // 주석: 메모 위에 그리기 (ink-annotate.js)
 
 // 녹음 받아쓰기를 메인 프로세스와 잇는다 (녹음마다 번호)
 function sttBridge() {
@@ -272,7 +274,10 @@ $('banner-keep').addEventListener('click', () => {
 // ---------- 색·고정·항상 위 ----------
 
 function applyMeta(next) {
+  const inkBefore = memo?.ink ?? '';
   memo = { ...memo, ...next };
+  // 다른 기기에서 주석이 바뀌면 다시 (주석을 그리는 중이면 끝낼 때 내 것이 저장된다)
+  if (annotation && !annotation.active && (memo.ink ?? '') !== inkBefore) annotation.load(Boolean(memo.ink));
   document.body.dataset.color = memo.color;
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
@@ -331,14 +336,15 @@ $('pdf-btn').addEventListener('click', async () => {
 });
 // 소리 받아쓰기: 이 메모의 받아쓴 글이 없는 소리 파일들을 글로 (녹음할 때 받아쓰기 데이터가 없었거나, 넣은 소리 파일)
 //   소리를 16kHz 로 풀어(브라우저 디코더) 메인 프로세스의 받아쓰기로 → 그 소리의 음성 카드에. 말한 사람은 나눈 뒤 다시 고친다
-async function decode16k(src) {
-  let rel = src;
+function decodePath(src) {
   try {
-    rel = decodeURI(src);
+    return decodeURI(src);
   } catch {
-    // 이미 풀린 경로
+    return src; // 이미 풀린 경로
   }
-  const bytes = await api.attachments.read(rel);
+}
+async function decode16k(src) {
+  const bytes = await api.attachments.read(decodePath(src));
   const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const ctx = new AudioContext({ sampleRate: 16000 });
   try {
@@ -587,6 +593,10 @@ async function insertFiles(files) {
 el.fileInput.addEventListener('change', () => {
   insertFiles([...el.fileInput.files]);
   el.fileInput.value = '';
+});
+$('photo-input').addEventListener('change', (e) => {
+  insertFiles([...e.target.files]);
+  e.target.value = '';
 });
 
 // ---------- 링크·파일 한 번 눌러 열기 ----------
@@ -840,7 +850,55 @@ styleMenu.addEventListener('keydown', (e) => {
   }
 });
 
+// ---------- 콘텐츠 추가 (+): 위로 위성 단추 (휴대폰과 같음) ----------
+const addMenu = $('add-menu');
+const addBtn = $('add-btn');
+let addCloseTimer = 0;
+function openAddMenu() {
+  closePalette();
+  closeStyleMenu();
+  closeMore();
+  clearTimeout(addCloseTimer);
+  addMenu.classList.remove('closing');
+  addMenu.hidden = false;
+  const r = addBtn.getBoundingClientRect();
+  addMenu.style.left = `${Math.max(8, Math.round(r.left))}px`;
+  addMenu.style.bottom = `${Math.round(window.innerHeight - r.top + 10)}px`;
+  addBtn.classList.add('open');
+  addBtn.setAttribute('aria-expanded', 'true');
+}
+function closeAddMenu() {
+  if (addMenu.hidden || addMenu.classList.contains('closing')) return false;
+  addBtn.classList.remove('open');
+  addBtn.setAttribute('aria-expanded', 'false');
+  addMenu.classList.add('closing');
+  addCloseTimer = setTimeout(() => {
+    addMenu.hidden = true;
+    addMenu.classList.remove('closing');
+  }, 150);
+  return true;
+}
+const ADD = {
+  record: () => recorder?.toggle(),
+  ink: () => editor.insertInk(),
+  annotate: () => annotation?.toggle(),
+  photo: () => $('photo-input').click(),
+  file: () => el.fileInput.click(),
+  table: () => editor.insertTable(),
+  math: () => editor.setStyle('math'),
+};
+addMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서 유지
+addMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-add]');
+  if (!b || !editor) return;
+  closeAddMenu();
+  ADD[b.dataset.add]?.();
+});
+
 const actions = {
+  add: () => (addMenu.hidden || addMenu.classList.contains('closing') ? openAddMenu() : closeAddMenu()),
+  ink: () => editor.insertInk(),
+  annotate: () => annotation?.toggle(),
   style: (btn) => (styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
   file: () => el.fileInput.click(),
   table: () => editor.insertTable(),
@@ -868,6 +926,7 @@ for (const container of [el.formatBar, el.morePanel]) {
 
 // 도구막대·팝업 밖을 누르면 팝업을 닫는다
 document.addEventListener('mousedown', (e) => {
+  if (!addMenu.hidden && !addMenu.contains(e.target) && !e.target.closest?.('[data-action="add"]')) closeAddMenu();
   if (!el.palette.hidden && !el.palette.contains(e.target) && !e.target.closest?.('[data-action="color"],[data-action="highlight"]')) closePalette();
   if (!el.morePanel.hidden && !el.morePanel.contains(e.target) && !el.moreBtn.contains(e.target) && !el.palette.contains(e.target) && !styleMenu.contains(e.target)) closeMore();
   if (!styleMenu.hidden && !styleMenu.contains(e.target) && !e.target.closest?.('[data-action="style"]')) closeStyleMenu();
@@ -953,6 +1012,8 @@ const SHORTCUTS = {
   'ctrl+shift+KeyB': ['cmd', 'quote'],
   'ctrl+shift+KeyI': ['action', 'file'],
   'ctrl+shift+KeyR': ['action', 'record'],
+  'ctrl+shift+KeyD': ['action', 'ink'],
+  'ctrl+shift+KeyE': ['action', 'annotate'],
   'ctrl+shift+KeyT': ['app', 'top'],
   'ctrl+shift+KeyA': ['app', 'reminders'],
   'ctrl+KeyK': ['app', 'links'],
@@ -963,6 +1024,7 @@ const SHORTCUTS = {
 window.addEventListener('keydown', (e) => {
   if (!editor || el.confirm.open) return;
   if (e.key === 'Escape') {
+    if (closeAddMenu()) return;
     if (!styleMenu.hidden) closeStyleMenu();
     else if (!el.palette.hidden) closePalette();
     else if (!el.morePanel.hidden) closeMore();
@@ -1208,6 +1270,7 @@ async function autoTagOnClose() {
 
 async function closeWindow() {
   await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
+  await annotation?.exit(); // 주석을 그리던 중이면 저장하고 닫는다
   await autoTagOnClose();
   await flush();
   api.win.close();
@@ -1392,6 +1455,7 @@ if (!memo) {
   editor = await createNoteEditor(el.editorRoot, {
     markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus,
     tables: memo.tables ?? [], onTables: saveTables,
+    readAttachment: async (src) => new TextDecoder().decode(await api.attachments.read(decodePath(src))),
     fetchPreview: (url) => api.links.preview(url),
     openLink: (url) => api.links.open(url),
     getTags: () => api.tags.list(),
@@ -1427,6 +1491,25 @@ if (!memo) {
   editor.focus();
   if (memo.capture) await applyCapture(memo.capture);
   if (params.get('record') === '1') recorder.start(); // 목록 + › 음성 메모
+  if (params.get('ink') === '1') editor.insertInk(); // 목록 + › 손 메모
+  // 주석: 메모 위에 겹쳐 그린 손 메모 (머리말 ink: 의 파일)
+  annotation = setupAnnotation({
+    scroller: el.editorRoot,
+    docEl: () => el.editorRoot.querySelector('.ProseMirror'),
+    read: async () => (memo.ink ? JSON.parse(new TextDecoder().decode(await api.attachments.read(memo.ink))) : null),
+    save: async (data) => {
+      const rel = data ? await saveFile(new File([JSON.stringify(data)], '주석.json', { type: 'application/json' })) : '';
+      const next = await api.memo.set(id, { ink: rel });
+      if (next) memo = { ...memo, ...next };
+    },
+    onMode: (on) => {
+      setStatus(on ? '주석: 메모 위에 그려요 · 다 그렸으면 완료 (Esc)' : '');
+      if (!on) editor.focus();
+    },
+    notice: setStatus,
+  });
+  annotation.start();
+  annotation.load(Boolean(memo.ink));
   // 표가 넘치면 메모를 줄여 맞추기 (설정) — 열 때 한 번, 그리고 본문이 바뀔 때(표 붙여넣기·넣기)
   try {
     fitTables = (await api.settings.get())?.fitTables !== false;

@@ -11,7 +11,7 @@ export const DEFAULT_COLOR = 'yellow';
 export const UNTITLED = '제목 없음';
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders', 'tables'];
+const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders', 'tables', 'ink'];
 const AUDIO_EXT = /\.(weba|ogg|oga|opus|mp3|m4a|aac|wav|flac)$/i;
 const VIDEO_EXT = /\.(mp4|m4v|mov|ogv|mkv)$/i;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
@@ -50,8 +50,15 @@ export function normalizeMeta(data) {
     links: Array.isArray(data.links) ? [...new Set(data.links.filter((v) => typeof v === 'string' && v))] : [],
     reminders: Array.isArray(data.reminders) ? data.reminders.map((r) => normalizeReminder(r)).filter(Boolean) : [],
     tables: normalizeTables(data.tables), // 표 열 너비·행 높이·머리글 강조 (표 순서대로)
+    ink: normalizeInkPath(data.ink), // 주석(메모 위에 그린 손 메모)이 든 파일
     extra,
   };
+}
+
+// 주석 파일은 메모 폴더의 attachments/ 안의 것만 (../ 로 밖을 가리키지 않게)
+export function normalizeInkPath(value) {
+  const v = typeof value === 'string' ? value.trim() : '';
+  return /^attachments\/[^/\\]+$/.test(v) && !v.includes('..') ? v : '';
 }
 
 function asIsoString(value) {
@@ -68,6 +75,7 @@ export function serializeMemoFile(meta, body) {
   if (meta.reminders?.length) data.reminders = meta.reminders.map(serializeReminder);
   const tables = normalizeTables(meta.tables);
   if (tables.length) data.tables = tables;
+  if (normalizeInkPath(meta.ink)) data.ink = normalizeInkPath(meta.ink);
   Object.assign(data, meta.extra);
   const yaml = stringifyYaml(data, { lineWidth: 0 }).trimEnd();
   const text = body.replace(/\r\n/g, '\n').replace(/\s+$/, '');
