@@ -204,14 +204,14 @@ const sync = {
     fakeDone = fakeDone.filter((r) => r.id !== id);
     return true;
   },
-  sttStatus: () => ({ system: fakeStt.system }),
+  sttStatus: () => ({ system: fakeStt.system, speakerSupported: true, speaker: fakeStt.speaker, speakerOn: fakeStt.speakerOn, speakerSize: '약 28MB' }),
 };
 
 
 
 let fakeRec = null;
 // 받아쓰기(휴대폰 Google 음성 인식): 점검 도구가 /dev/stt 로 "이 휴대폰은 못 씀"(안드로이드 13 아래)을 흉내 낸다
-const fakeStt = { system: true };
+const fakeStt = { system: true, speaker: 'missing', speakerOn: false };
 let fakeDone = [];
 const recordState = () => (fakeRec
   ? { active: true, paused: Boolean(fakeRec.paused), memoId: fakeRec.memoId, elapsedMs: Date.now() - fakeRec.at, stt: fakeRec.stt, text: fakeRec.stt ? '오늘 회의를 시작하겠습니다' : '', partial: '' }
@@ -316,6 +316,12 @@ const calls = {
   },
   exactAlarmSettings: async () => true,
   micPermission: async () => true,
+  speakerModel: async (a) => {
+    if (a.delete) Object.assign(fakeStt, { speaker: 'missing', speakerOn: false });
+    else if ('on' in a) fakeStt.speakerOn = Boolean(a.on);
+    else Object.assign(fakeStt, { speaker: 'ready', speakerOn: true });
+    return sync.sttStatus();
+  },
   recordStart: async ({ memoId, stt }) => {
     fakeRec = { memoId, stt, at: Date.now() };
     log.push({ recordStart: { memoId, stt } });

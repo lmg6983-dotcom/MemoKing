@@ -557,8 +557,41 @@ function openSettings() {
     ? '말하는 내용을 휴대폰의 Google 음성 인식으로 바로 텍스트로 적어요'
     : '이 휴대폰은 Google 음성 인식(안드로이드 13 이상)을 쓸 수 없어 녹음만 해요';
   $('rec-stt').disabled = !recorder.sttReady();
+  refreshSpeakerRow();
   openSheet($('settings-sheet'));
 }
+
+// 화자 구분: 화자 모델(약 28MB)을 받으면 녹음이 끝날 때 받아쓴 문장에 "화자 1·2" 이름표
+function refreshSpeakerRow(progress) {
+  const st = recorder.sttStatus();
+  $('spk-row').hidden = !recorder.sttReady() || st.speakerSupported === false;
+  const busy = progress != null || st.speaker === 'downloading';
+  const ready = st.speaker === 'ready';
+  $('spk-note').textContent = busy
+    ? `다운로드 중 ${progress ?? 0}%`
+    : ready
+      ? st.speakerOn ? '사용 중 · 녹음이 끝나면 말한 사람마다 "화자 1·2"로 표시해요' : '사용 안 함'
+      : `목소리로 참석자를 구분해 "화자 1·2"로 표시해요 · ${(st.speakerSize ?? '약 28MB').replace('약 ', '')}`;
+  $('spk-btn').textContent = busy ? '다운로드 중' : ready ? (st.speakerOn ? '끄기' : '켜기') : '다운로드';
+  $('spk-btn').disabled = busy;
+}
+$('spk-btn').addEventListener('click', async () => {
+  const st = recorder.sttStatus();
+  try {
+    if (st.speaker === 'ready') await call('speakerModel', { on: !st.speakerOn });
+    else {
+      refreshSpeakerRow(0);
+      await call('speakerModel', {});
+      toast('화자 구분을 켰어요. 다음 녹음부터 적용돼요');
+    }
+  } catch (err) {
+    toast(err.message || '다운로드하지 못했어요. 인터넷 연결을 확인해 주세요', true);
+  }
+  refreshSpeakerRow();
+});
+on('speakerModel', ({ progress }) => {
+  if (!$('settings-sheet').hidden) refreshSpeakerRow(progress < 100 ? progress : undefined);
+});
 
 $('auto-tags').addEventListener('change', () => note.setAutoTags($('auto-tags').checked));
 $('rec-stt').addEventListener('change', () => recorder.setStt($('rec-stt').checked));
