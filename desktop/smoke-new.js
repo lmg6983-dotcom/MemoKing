@@ -271,6 +271,26 @@ export async function runSmoke({ noteWins, getVault, createListWindow, getList, 
       const shown = await until(() => ij(`(() => { const i = document.querySelector('.mk-ink img'); return i && i.complete && i.naturalWidth > 0 && { w: i.naturalWidth, h: i.naturalHeight }; })()`), '손 메모 칸').catch(() => null);
       check('완료 → 메모에 그린 만큼의 손 메모 한 칸 (SVG · 고칠 자료 포함)', svgRel && /memoking-ink/.test(svgText) && shown && shown.w > 180 && shown.w < 260 && shown.h < 160, JSON.stringify({ inkBody, shown }));
       await capture(ink.win, 'smoke-new-ink-memo.png');
+      // 그림을 눌렀을 때 글자 커서(깜빡이는 막대)가 그림 높이로 생기지 않아야 한다
+      const caretProbe = async (fx, fy) => {
+        const p = await ij(`(() => { const r = document.querySelector('.mk-ink').getBoundingClientRect(); return { x: r.left + r.width * ${fx}, y: r.top + r.height * ${fy} }; })()`);
+        mouse('mouseMove', p.x, p.y);
+        await wait(30);
+        mouse('mouseDown', p.x, p.y);
+        await wait(60);
+        mouse('mouseUp', p.x, p.y);
+        await wait(300);
+        return ij(`(() => { const s = getSelection(); const pm = document.querySelector('.ProseMirror'); const r = s.rangeCount ? [...s.getRangeAt(0).getClientRects()] : []; return { collapsed: s.isCollapsed, node: s.anchorNode?.nodeName, h: Math.round(Math.max(0, ...r.map((x) => x.height))), hide: pm.classList.contains('ProseMirror-hideselection'), caret: getComputedStyle(s.anchorNode?.nodeType === 1 ? s.anchorNode : s.anchorNode?.parentElement ?? pm).caretColor, selected: !!document.querySelector('.mk-ink.ProseMirror-selectednode') }; })()`);
+      };
+      const carets = [await caretProbe(0.5, 0.5), await caretProbe(0.96, 0.5), await caretProbe(0.04, 0.9)];
+      // 그림 줄 안에 글자 커서를 두어도(휴대폰 눌러 커서 두기·그림 옆 누르기) → 그림을 통째로 고름 · 치면 아래 새 줄에
+      await ij(`(() => { const p = document.querySelector('.ProseMirror p.mk-image-line'); const r = document.createRange(); r.setStart(p, p.childNodes.length); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+      await wait(250);
+      const cursorIn = await ij(`!!document.querySelector('.mk-ink.ProseMirror-selectednode') && !getSelection().isCollapsed`);
+      ink.win.webContents.insertText('그림 아래');
+      await wait(250);
+      const typedBelow = await ij(`(() => { const line = document.querySelector('.ProseMirror p.mk-image-line'); return !!document.querySelector('.mk-ink') && line.nextElementSibling?.textContent === '그림 아래'; })()`);
+      check('손 메모를 눌러도 글자 커서가 그림 높이로 깜빡이지 않음 (그림을 통째로 고름 · 커서 숨김) · 치면 그림은 그대로 아래 줄에', carets.every((c) => c.selected && c.hide && c.caret === 'rgba(0, 0, 0, 0)') && cursorIn && typedBelow, JSON.stringify({ carets, cursorIn, typedBelow }));
       // 두 번 누르면 이어 그리기 → 검은 바탕으로 한 획 더
       await ij(`document.querySelector('.mk-ink img').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
       const reopened = await until(() => ij(`document.querySelectorAll('.ink-sheet .ink-strokes path').length`), '이어 그리기', 6000).catch(() => 0);

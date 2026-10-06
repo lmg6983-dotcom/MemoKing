@@ -1290,6 +1290,7 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 
 /* 그림만 든 줄: 칸이 그림만 감싸게 (줄 높이·보이지 않는 줄바꿈 여백 없애기) — block-move.js 의 mk-image-line */
 .mk-doc p.mk-image-line { width: fit-content; max-width: 100%; margin: 6px 0; line-height: 0; font-size: 0; }
+.mk-doc p.mk-image-line:not(:has(.mk-media)) { caret-color: transparent; } /* 그림 옆 커서가 그림 높이로 깜빡이지 않게 (곧 그림을 통째로 고른다) */
 .mk-doc p.mk-image-line > br, .mk-doc p.mk-image-line > img.ProseMirror-separator { display: none; }
 .mk-doc p.mk-image-line .mk-image { margin: 0; vertical-align: top; }
 .mk-doc p.mk-image-line .mk-media { margin: 0; line-height: normal; font-size: 13px; }

@@ -16,6 +16,7 @@ import { Plugin, PluginKey, TextSelection, NodeSelection, Decoration, Decoration
 import { previewOrder, dropAt } from './core/list-order.js';
 import { HOLD_MS, TOUCH_HOLD_MS } from './list-drag.js';
 import { isVoiceCard } from './voice-card-view.js';
+import { mediaKindOf } from './core/memo-file.js';
 import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
 import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
@@ -711,11 +712,60 @@ function scrollerOf(node) {
 
 // 그림만 든 줄: 줄 높이·보이지 않는 줄바꿈이 만든 여백을 없애 칸(누를 때 테두리)이 그림만 감싸게
 const imageOnly = (node) => isContentParagraph(node) && node.content.content.every((c) => c.type.name === 'image' || INLINE_CONTENT.has(c.type.name));
+// 그림만 든 줄 안에 글자 커서가 놓이면(그림 옆을 누름 · 휴대폰에서 눌러 커서 두기) 그 그림을 통째로 고른다 —
+// 커서가 그림 높이만큼 길게 깜빡이지 않게 (사진을 눌렀을 때와 같음). 소리·동영상 줄은 플레이어를 쓰므로 그대로
+function pictureAtCursor(selection) {
+  if (!(selection instanceof TextSelection) || !selection.empty) return null;
+  const { $from } = selection;
+  const line = $from.parent;
+  if (!imageOnly(line)) return null;
+  const images = [];
+  line.forEach((child, offset) => {
+    if (child.type.name === 'image') images.push({ child, pos: $from.start() + offset });
+  });
+  if (!images.length || images.some(({ child }) => /^(audio|video)$/.test(mediaKindOf(child.attrs.src, child.attrs.alt)))) return null;
+  // 커서 바로 앞이나 뒤의 그림 (줄 끝이면 마지막 그림)
+  return images.find(({ pos, child }) => $from.pos <= pos + child.nodeSize) ?? images.at(-1);
+}
+
+function writeBelowPicture(view, text) {
+  if (!view.editable) return false;
+  const sel = view.state.selection;
+  if (!(sel instanceof NodeSelection) || sel.node.type.name !== 'image') return false;
+  const $p = view.state.doc.resolve(sel.from);
+  if (!imageOnly($p.parent) || $p.depth < 1) return false;
+  const after = $p.after();
+  const { schema } = view.state;
+  const tr = view.state.tr.insert(after, schema.nodes.paragraph.create(null, text ? schema.text(text) : null));
+  view.dispatch(tr.setSelection(TextSelection.create(tr.doc, after + 1 + text.length)).scrollIntoView());
+  return true;
+}
+
 export function createContentLines() {
   let cache = { doc: null, set: DecorationSet.empty };
   return new Plugin({
     key: new PluginKey('memoking-content-lines'),
+    appendTransaction(trs, _old, state) {
+      if (!trs.some((tr) => tr.selectionSet)) return null;
+      const pic = pictureAtCursor(state.selection);
+      return pic ? state.tr.setSelection(NodeSelection.create(state.doc, pic.pos)) : null;
+    },
     props: {
+      // 그림을 고른 채 Enter · 글자를 치면 그림을 바꿔치지 않고 그림 줄 아래 새 줄에서 쓴다
+      handleKeyDown(view, e) {
+        if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.ctrlKey || e.metaKey) return false;
+        return writeBelowPicture(view, '');
+      },
+      handleTextInput(view, _from, _to, text) {
+        return writeBelowPicture(view, text);
+      },
+      handleDOMEvents: {
+        // 한글 조합이 시작될 때도 (조합은 handleTextInput 을 거치지 않는다) 먼저 아래 새 줄로
+        compositionstart: (view) => {
+          writeBelowPicture(view, '');
+          return false;
+        },
+      },
       decorations(state) {
         if (cache.doc === state.doc) return cache.set;
         const decos = [];
