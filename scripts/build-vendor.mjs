@@ -17,6 +17,7 @@ const DEPS = {
   katex: '0.16.22',
   'remark-math': '6.0.0',
   'html-to-image': '1.11.13',
+  'es-hangul': '2.4.0',
   esbuild: '0.28.2',
 };
 
@@ -51,6 +52,7 @@ await esbuild.build({
     plyr: join(ROOT, 'scripts', 'vendor', 'plyr.js'),
     katex: join(ROOT, 'scripts', 'vendor', 'katex.js'),
     'html-to-image': join(ROOT, 'scripts', 'vendor', 'html-to-image.js'),
+    'es-hangul': join(ROOT, 'scripts', 'vendor', 'es-hangul.js'),
   },
   outdir: OUT,
   bundle: true,

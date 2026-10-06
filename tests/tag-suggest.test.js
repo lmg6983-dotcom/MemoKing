@@ -90,3 +90,13 @@ test('unescapeTags: 줄 맨 앞 띄어쓰기를 버리고 태그를 살린다 ("
   assert.equal(unescapeTags('> &#x20;글'), '> 글');
   assert.equal(unescapeTags('가운데 &#x20; 그대로'), '가운데 &#x20; 그대로');
 });
+
+test('새 태그 핵심어에 움직임·꾸밈 말과 조사 붙은 말은 안 나옴', () => {
+  const names = (body) => suggestTagsFor(body, []).map((t) => t.name);
+  const bad = ['pc에서고침', '가서', '멋졌다', '읽은', '빠른', '재미있었고', '폰에서'];
+  for (const body of ['# 출장\n\n부산으로 출장 가서 거래처를 만났다. 서울에서 기차 타고', '# 독후감\n\n어제 읽은 책은 정말 재미있었고 주인공이 멋졌다', '# 빠른 메모\n\n급하게 PC에서 고침 폰에서도 확인했어요', '# 빠른 메모\n\n급하게 PC에서고침 폰에서도 확인했어요']) {
+    const got = names(body);
+    assert.ok(!got.some((n) => bad.includes(n)), `${body.split('\n')[0]} → ${got}`);
+  }
+  assert.deepEqual(names('# 출장\n\n부산으로 출장 가서 거래처를 만났다. 서울에서 기차 타고').slice(0, 2), ['출장', '거래처']);
+});

@@ -52,7 +52,8 @@ const STOP = new Set(['오늘', '내일', '어제', '이번', '다음', '지난'
   '사람', '생각', '이것', '그것', '저것', '우리', '그냥', '정말', '진짜', '시간', '때문', '하나', '여기', '거기', '무엇', '어디', '언제', '모두', '전체',
   '주간', '월간', '오전', '오후', '이번주', '다음주', '지난주', 'the', 'and', 'for', 'with', 'this', 'that']);
 // 움직임·꾸밈 말의 꼴 (명사가 아닌 것)
-const NOT_NOUN = /(하다|했다|한다|하기|하고|해서|하면|하는|했던|되다|된다|됐다|있다|없다|같다|싶다|겠다|이다|이고|이며|어요|아요|해요|세요|니다|는데|지만|으면|려고|도록|면서|어서|아서|할|될|던|았|었|게|히|이|기|음|임)$/;
+//   (멋졌다·갔다 같은 지난 일, 읽은·빠른 같은 꾸밈, 가서·와서 같은 이음도)
+const NOT_NOUN = /([았었였졌겠됐왔갔웠렸켰쳤셨텼][다고]|에서|에게|있고|없고|^[가와봐써줘둬놔]서|은|른|하다|했다|한다|하기|하고|해서|하면|하는|했던|되다|된다|됐다|있다|없다|같다|싶다|겠다|이다|이고|이며|어요|아요|해요|세요|니다|는데|지만|으면|려고|도록|면서|어서|아서|할|될|던|았|었|게|히|이|기|음|임)$/;
 
 const keyOf = (name) => normalizeTag(name);
 // 본문에 이 말이 낱말로 나오는가: 줄기가 같거나 줄기가 이 말로 시작 (세 글자 이상이면 글 속 어디든)
@@ -187,8 +188,8 @@ export function suggestTagsFor(body, memos, { limit = 3, excludeId } = {}) {
   if (out.length < limit) {
     const title = new Set(tokenize(extractTitle(body)).map(stem));
     const words = [...target.entries()]
-      .map(([t, w]) => [stem(t), w * (title.has(stem(t)) ? 2 : 1)])
-      .filter(([t]) => t.length >= 2 && t.length <= 10 && isValidTag(t) && !STOP.has(t) && !/\d/.test(t) && !(isHangul(t) && NOT_NOUN.test(t)))
+      .map(([t, w]) => [stem(stem(t)), w * (title.has(stem(t)) ? 2 : 1)]) // 폰에서도 → 폰에서 → 폰 (조사가 겹쳐도)
+      .filter(([t]) => t.length >= 2 && t.length <= 10 && isValidTag(t) && !STOP.has(t) && !/\d/.test(t) && !(isHangul(t) && NOT_NOUN.test(t)) && !/[a-z].*(에서|에게)/.test(t)) // pc에서고침 처럼 영어+조사가 붙은 말도
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
     const seen = new Set();
     for (const [t, w] of words) {
