@@ -34,13 +34,6 @@ export const TUTORIAL_STEPS = [
     next: '다음',
   },
   {
-    id: 'format', win: 'note', target: ['#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], advance: 'formatted', emoji: '🎨',
-    title: '글자를 꾸며 볼까요',
-    text: '글자를 고르고 아래 도구막대의 굵게(B) · 글자 색(A) · 형광펜을 눌러요.',
-    try: '방금 쓴 글자를 끌어서 고르고 B 를 눌러 보세요',
-    next: LATER,
-  },
-  {
     id: 'style', win: 'note', target: ['.format-bar .style-btn', '#format-bar'], keep: ['.ProseMirror > *', '#style-menu:not([hidden])'], advance: 'styled', emoji: '🔠',
     title: '제목·인용으로 바꾸기',
     text: '"본문" 단추를 누르면 그 줄이 제목 · 인용 · 코드 모양으로 바뀌어요.',
@@ -214,13 +207,6 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: '다음',
   },
   {
-    id: 'format', win: 'note', target: ['#format-bar [data-cmd="bold"]', '#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], write: true, advance: 'formatted', emoji: '🎨',
-    title: '글자를 꾸며 볼까요',
-    text: '아래 도구막대의 B · A · 형광펜으로 꾸며요. 누른 다음부터 쓰는 글자에 들어가요.',
-    try: '줄을 바꾸고 B 를 누른 뒤 써 보세요',
-    next: LATER,
-  },
-  {
     id: 'lists', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], write: true, advance: 'tasked', emoji: '✅',
     image: 'm-clear.jpg',
     title: '할 일 목록 만들기',
@@ -244,7 +230,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'ink-done', emoji: '✍️',
     title: '손으로 그리기',
-    text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기를 고르고, 두 손가락으로 화면을 넘겨요.',
+    text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기를 골라요.',
     try: '"손 메모"를 눌러 쓱 그리고 ✓ 완료',
     next: LATER,
   },
@@ -321,10 +307,10 @@ export const MOBILE_TUTORIAL_STEPS = [
 ];
 
 /** 글로 판정하는 직접 해 보기는 손을 멈춘 뒤에 넘어간다 (치는 도중·한글 조합 중에 넘어가지 않게) */
-export const TUTORIAL_SETTLE_MS = { typed: 1800, tagged: 1500, formatted: 1200, styled: 900, tasked: 700 };
+export const TUTORIAL_SETTLE_MS = { typed: 1800, tagged: 1500, styled: 900, tasked: 700 };
 
 /** 사용자가 직접 해서 넘어가는 일들 (PC 메인 프로세스가 이 이름만 받는다) */
-export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'formatted', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'note-closed', 'layout-changed', 'tag-filtered'];
+export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'note-closed', 'layout-changed', 'tag-filtered'];
 
 /**
  * 사용자가 한 일(event)로 몇 번째 단계가 되는지. 끝나면 -1.
@@ -345,13 +331,12 @@ export function advanceTutorial(index, event, steps = TUTORIAL_STEPS) {
 
 /**
  * 직접 해 보기 판정용 수 세기 (마크다운 본문) — 단계가 시작될 때와 비교해 늘었으면 해 낸 것
- *   marks: 굵게·기울임·색·형광펜 · blocks: 제목·인용 · tasks: 체크 칸 · tags: #태그
+ *   blocks: 제목·인용 · tasks: 체크 칸 · tags: #태그
  */
 export function tutorialCounts(md, tags = []) {
   const text = String(md ?? '');
   return {
     text: text.replace(/\s/g, '').length,
-    marks: (text.match(/\*\*[^*\n]+\*\*|(?<![*\w])\*[^*\s][^*\n]*\*|<mark\b|<u>|<span style="[^"]*color|==[^=\n]+==/g) ?? []).length,
     blocks: (text.match(/^(#{1,6} |> )/gm) ?? []).length, // 첫 줄을 제목으로 바꿔도 셈 (단계 시작 때와 견주므로)
     tasks: (text.match(/^\s*[-*+] \[[ xX]\]/gm) ?? []).length,
     tags: tags.length,
@@ -363,7 +348,6 @@ export function tutorialDone(advance, base, now) {
   if (!base) return false;
   switch (advance) {
     case 'typed': return now.text - base.text >= 2;
-    case 'formatted': return now.marks > base.marks;
     case 'styled': return now.blocks > base.blocks;
     case 'tasked': return now.tasks > base.tasks;
     case 'tagged': return now.tags > base.tags;

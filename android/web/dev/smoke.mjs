@@ -1272,13 +1272,11 @@ try {
     await page.tap('#fab-menu [data-new="text"]');
     const write = await stepIs('write');
     await page.keyboard.type('튜토리얼 메모');
-    const format = await stepIs('format');
+    const lists = await stepIs('lists');
     const praised = await page.isVisible('.coach-bubble .coach-praise');
     await page.waitForTimeout(500);
     await shot('25-tutorial-praise');
-    check('새 메모 → 메모 화면에서 다음 말풍선 · 글을 쓰면 "잘했어요" 칭찬과 함께 다음', write && format && praised, JSON.stringify({ write, format, praised }));
-    await page.tap('.coach-bubble .coach-next'); // 다음에 해 볼게요
-    await stepIs('lists');
+    check('새 메모 → 메모 화면에서 다음 말풍선 · 글을 쓰면 "잘했어요" 칭찬과 함께 다음', write && lists && praised, JSON.stringify({ write, lists, praised }));
     await page.evaluate(() => document.querySelector('#format-bar [data-cmd="task"]').click());
     const move = await stepIs('move');
     await page.waitForTimeout(400);

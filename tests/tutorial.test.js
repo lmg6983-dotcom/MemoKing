@@ -22,9 +22,6 @@ for (const [name, steps] of [['PC', TUTORIAL_STEPS], ['휴대폰', MOBILE_TUTORI
 
 test('직접 해 보기: 단계 시작 때보다 늘었을 때만', () => {
   const base = tutorialCounts('제목\n\n글', []);
-  assert.equal(tutorialDone('formatted', base, tutorialCounts('제목\n\n**글**', [])), true);
-  assert.equal(tutorialDone('formatted', base, tutorialCounts('제목\n\n<mark>글</mark>', [])), true);
-  assert.equal(tutorialDone('formatted', base, base), false);
   assert.equal(tutorialDone('styled', base, tutorialCounts('제목\n\n## 글', [])), true);
   assert.equal(tutorialDone('styled', tutorialCounts('제목', []), tutorialCounts('## 제목', [])), true, '첫 줄을 제목으로 바꿔도 셈');
   assert.equal(tutorialDone('styled', tutorialCounts('# 제목', []), tutorialCounts('# 제목\n', [])), false, '처음부터 있던 제목은 세지 않음');
@@ -35,9 +32,9 @@ test('직접 해 보기: 단계 시작 때보다 늘었을 때만', () => {
 });
 
 test('다음에 해 볼게요(next) · 직접 해 냄(advance) 모두 다음 단계로, 끝내기는 -1', () => {
-  const i = TUTORIAL_STEPS.findIndex((s) => s.id === 'format');
+  const i = TUTORIAL_STEPS.findIndex((s) => s.id === 'style');
   assert.equal(advanceTutorial(i, 'next'), i + 1);
-  assert.equal(advanceTutorial(i, 'formatted'), i + 1);
+  assert.equal(advanceTutorial(i, 'styled'), i + 1);
   assert.equal(advanceTutorial(i, 'tasked'), i, '다른 단계의 일은 무시');
   assert.equal(advanceTutorial(i, 'skip'), -1);
   const m = MOBILE_TUTORIAL_STEPS.findIndex((s) => s.id === 'ink');

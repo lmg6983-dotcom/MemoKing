@@ -156,12 +156,6 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await press(note(), '.ProseMirror', '[write] 본문');
     note().webContents.insertText('장보기 목록');
     await wait(200);
-    await arrive(note, 'format', { praise: true });
-    // 글자 고르기: 첫 줄 글자를 끌어서 → B
-    const t = await probe(note(), '.ProseMirror > :first-child', 'text');
-    check('[format] 고를 글자가 말풍선에 가려지지 않음', t.ok, JSON.stringify(t));
-    await drag(note(), [[t.left + 1, t.top + 8], [t.right - 1, t.top + 8]]);
-    await press(note(), '[data-cmd="bold"]', '[format] 굵게(B)');
     await arrive(note, 'style', { praise: true });
     await press(note(), '.format-bar .style-btn', '[style] "본문" 단추');
     await wait(250);
