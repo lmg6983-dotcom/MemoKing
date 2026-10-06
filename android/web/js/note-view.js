@@ -10,6 +10,7 @@ import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
 import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
 import { app, reduceMotion } from './state.js';
+import { tutEvent, textChanged, screenChanged } from './tutorial.js';
 import { call } from './native.js';
 import { fetchRemoteImage } from './web-fetch.js';
 import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
@@ -79,6 +80,7 @@ function isDirty() {
 
 function onChange(md) {
   current = md;
+  textChanged(md); // 튜토리얼 직접 해 보기 (쓰기·꾸미기·체크리스트·태그)
   if (current === saved) return;
   if (!el.tagBar.hidden || !extractTags(md).length) scheduleTagBar();
   setStatus('');
@@ -707,6 +709,7 @@ function openAddMenu() {
   addBtn.classList.add('open');
   addBtn.setAttribute('aria-expanded', 'true');
   navigator.vibrate?.(8);
+  tutEvent('add-opened');
 }
 /** 뒤로 가기: 손 메모 그리기 화면 → 주석 모드 순으로 저장하고 닫는다 (취소는 없다) */
 export function closeInk() {
@@ -737,7 +740,7 @@ const ADD = {
   record: () => recorder.toggle(),
   table: () => editor.insertTable(),
   math: () => editor.setStyle('math'),
-  ink: () => editor.insertInk(),
+  ink: () => editor.insertInk().then(() => tutEvent('ink-done')),
   annotate: () => annotation?.toggle(),
 };
 addMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서(키보드) 유지
@@ -930,6 +933,7 @@ export async function openNote(memoId, options = {}) {
         closeAddMenu();
         el.screen.classList.toggle('annotating', on);
         if (on) document.activeElement?.blur(); // 키보드를 내리고 그리기
+        else tutEvent('annotate-done');
       },
       notice: (text, err) => toast(text, err),
     });
@@ -943,6 +947,7 @@ export async function openNote(memoId, options = {}) {
   } finally {
     opening = null;
   }
+  screenChanged(); // 튜토리얼: 메모 단계 말풍선
 }
 
 /** 목록으로: 저장하고, 빈 메모는 치우고, 제목이 바뀌었으면 파일 이름을 맞춘다 */
@@ -963,6 +968,7 @@ export function closeNote({ quiet = false } = {}) {
   editor?.destroy();
   editor = null;
   id = null;
+  screenChanged(); // 튜토리얼: 메모 단계는 끝 → 목록 단계로
   memo = null;
   pendingExternal = null;
   delete document.body.dataset.noteColor;

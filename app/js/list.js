@@ -234,7 +234,10 @@ function renderFilters() {
 
 el.tagStrip.addEventListener('click', (e) => {
   const b = e.target.closest('[data-tag]');
-  if (b) toggleTagFilter(b.dataset.tag);
+  if (b) {
+    toggleTagFilter(b.dataset.tag);
+    tutEvent('tag-filtered');
+  }
 });
 el.colorFilter.addEventListener('click', (e) => {
   const b = e.target.closest('[data-filter-color]');
@@ -913,7 +916,11 @@ api.on('vault:opened', (info) => {
 // ---------- 시작 ----------
 
 injectIcons();
-setupCoach(api);
+const coach = setupCoach(api);
+/** 튜토리얼 직접 해 보기: 지금 단계가 이 일을 기다리면 알린다 */
+const tutEvent = (name) => {
+  if (coach.step?.advance === name) api.tutorial.event(name);
+};
 // 목록 폭이 바뀌어 줄 수가 달라지면 다시 쌓는다 (다음 화면에서 한 번만)
 let relayoutFrame = 0;
 function relayoutIfNeeded() {
@@ -1010,6 +1017,7 @@ function glideCards(change) {
 }
 el.layoutBtn.addEventListener('click', () => {
   layout = layout === 'rows' ? 'grid' : 'rows';
+  tutEvent('layout-changed');
   if (!reduceMotion()) el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.3, 1.4, 0.5, 1)' });
   glideCards(() => {
     applyLayout();

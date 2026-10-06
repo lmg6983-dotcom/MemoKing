@@ -32,7 +32,7 @@ import { searchMemos } from '../app/js/core/memo-search.js';
 import { FileIndex } from './file-index.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
-import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
+import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
 import { normalizeReminder, describeReminder } from '../app/js/core/reminders.js';
@@ -1184,11 +1184,11 @@ function createNote(options) {
 // ---------- 처음 실행 튜토리얼 ----------
 // 단계는 core/tutorial.js. 말풍선은 단계의 창(목록 창 또는 튜토리얼 중 만든 메모 창)에만 띄운다.
 
-let tutorial = { active: false, index: -1, memoId: null };
+let tutorial = { active: false, index: -1, memoId: null, praise: false };
 
 function tutorialPayload() {
   const step = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
-  return step ? { ...step, index: tutorial.index, total: TUTORIAL_STEPS.length } : null;
+  return step ? { ...step, index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise } : null;
 }
 
 function tutorialWin(step) {
@@ -1206,7 +1206,7 @@ function sendTutorial() {
 
 function startTutorial() {
   if (!vault) return false;
-  tutorial = { active: true, index: 0, memoId: null };
+  tutorial = { active: true, index: 0, memoId: null, praise: false };
   const w = createListWindow('memos');
   w.show();
   w.focus();
@@ -1215,7 +1215,7 @@ function startTutorial() {
 }
 
 function finishTutorial() {
-  tutorial = { active: false, index: -1, memoId: null };
+  tutorial = { active: false, index: -1, memoId: null, praise: false };
   settings.tutorialDone = true;
   settings.tutorialInstall = installMark();
   saveSettings();
@@ -1227,6 +1227,7 @@ function tutorialEvent(event) {
   const next = advanceTutorial(tutorial.index, event);
   if (next === tutorial.index) return;
   if (next < 0) return finishTutorial();
+  tutorial.praise = event !== 'next' && event === TUTORIAL_STEPS[tutorial.index]?.advance; // 직접 해 냈으면 다음 말풍선에서 칭찬
   tutorial.index = next;
   const step = TUTORIAL_STEPS[next];
   // 메모 단계인데 메모 창이 없으면(먼저 닫음) 목록 단계로
@@ -2100,7 +2101,7 @@ function registerIpc() {
     if (action === 'next' || action === 'skip') tutorialEvent(action);
   });
   ipcMain.handle('tutorial:event', (_e, name) => {
-    if (name === 'typed' || name === 'tagged') tutorialEvent(name);
+    if (TUTORIAL_EVENTS.includes(name) && name !== 'memo-created' && name !== 'note-closed') tutorialEvent(name);
   });
   ipcMain.handle('vault:choose', async (event) => {
     const result = await dialog.showOpenDialog(senderWindow(event), {

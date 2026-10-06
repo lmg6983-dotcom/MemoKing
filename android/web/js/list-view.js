@@ -9,6 +9,7 @@ import { COLORS } from '../../app/js/core/memo-file.js';
 import { app, COLOR_NAMES } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog } from './ui.js';
+import { tutEvent } from './tutorial.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -248,7 +249,10 @@ el.tagStrip.addEventListener('click', (e) => {
   if (!b) return;
   const i = state.filter.tags.findIndex((t) => sameTag(t, b.dataset.tag));
   if (i >= 0) state.filter.tags.splice(i, 1);
-  else state.filter.tags.push(b.dataset.tag);
+  else {
+    state.filter.tags.push(b.dataset.tag);
+    tutEvent('tag-filtered');
+  }
   render();
 });
 el.colorFilter.addEventListener('click', (e) => {
@@ -417,6 +421,7 @@ function glideCards(change) {
 
 el.layoutBtn.addEventListener('click', () => {
   layout = layout === 'rows' ? 'grid' : 'rows';
+  tutEvent('layout-changed');
   el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.3, 1.4, 0.5, 1)' });
   glideCards(() => {
     applyLayout(layout);

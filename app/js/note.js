@@ -8,6 +8,7 @@ import { isDataImage, decodeDataImage } from './core/remote-images.js';
 import { setupReminderPanel } from './reminder-panel.js';
 import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
+import { tutorialCounts, tutorialDone } from './core/tutorial.js';
 import { setupCoach } from './coach.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSliders } from './seg-slider.js';
@@ -75,6 +76,7 @@ function sttBridge() {
 }
 let memo = null;
 let current = '';   // 편집기의 최신 마크다운
+let tutBase = null; // 튜토리얼 직접 해 보기 단계가 시작될 때의 본문 수 (core/tutorial.js tutorialCounts)
 let saved = '';     // 마지막으로 저장한 마크다운
 let saveTimer = null;
 let pendingExternal = null;
@@ -152,10 +154,12 @@ $('tag-suggest-close')?.addEventListener('click', () => {
 function onChange(md) {
   current = md;
   scheduleTagBar();
-  // 튜토리얼 따라 하기: 글을 쓰면 · 태그를 붙이면 다음 단계로
+  // 튜토리얼 따라 하기: 글을 쓰면 · 꾸미면 · 체크리스트 · 태그를 붙이면 (단계 시작 때보다 늘면) 다음 단계로
   const advance = coach?.step?.advance;
-  if (advance === 'typed' && !isBlankBody(md)) api.tutorial.event('typed');
-  if (advance === 'tagged' && extractTags(md).length) api.tutorial.event('tagged');
+  if (advance && tutBase && tutorialDone(advance, tutBase, tutCounts(md))) {
+    tutBase = null;
+    api.tutorial.event(advance);
+  }
   document.title = extractTitle(md);
   if (current === saved) return;
   setStatus('');
@@ -327,6 +331,7 @@ function applyTop(on) {
 async function toggleTop() {
   if (topOn) return;
   applyTop(await api.win.toggleTop(id));
+  if (topOn) tutEvent('crown-on');
 }
 el.topBtn.addEventListener('click', toggleTop);
 $('pdf-btn').addEventListener('click', async () => {
@@ -866,6 +871,7 @@ function openAddMenu() {
   addMenu.style.bottom = `${Math.round(window.innerHeight - r.top + 10)}px`;
   addBtn.classList.add('open');
   addBtn.setAttribute('aria-expanded', 'true');
+  tutEvent('add-opened');
 }
 function closeAddMenu() {
   if (addMenu.hidden || addMenu.classList.contains('closing')) return false;
@@ -880,7 +886,7 @@ function closeAddMenu() {
 }
 const ADD = {
   record: () => recorder?.toggle(),
-  ink: () => editor.insertInk(),
+  ink: () => editor.insertInk().then(() => tutEvent('ink-done')),
   annotate: () => annotation?.toggle(),
   photo: () => $('photo-input').click(),
   file: () => el.fileInput.click(),
@@ -897,7 +903,7 @@ addMenu.addEventListener('click', (e) => {
 
 const actions = {
   add: () => (addMenu.hidden || addMenu.classList.contains('closing') ? openAddMenu() : closeAddMenu()),
-  ink: () => editor.insertInk(),
+  ink: () => editor.insertInk().then(() => tutEvent('ink-done')),
   annotate: () => annotation?.toggle(),
   style: (btn) => (styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
   file: () => el.fileInput.click(),
@@ -1304,6 +1310,11 @@ el.editorRoot.addEventListener('mousedown', (e) => {
 
 const tabsEl = $('stack-tabs');
 let coach = null; // 튜토리얼 말풍선
+const tutCounts = (md) => tutorialCounts(md, extractTags(md));
+/** 직접 해 보기: 지금 단계가 이 일을 기다리면 알린다 */
+function tutEvent(name) {
+  if (coach?.step?.advance === name) api.tutorial.event(name);
+}
 
 const TAB_CHARS = 7;
 function renderStack(state) {
@@ -1446,7 +1457,7 @@ document.addEventListener('visibilitychange', () => {
 
 injectIcons();
 paintSwatchBars();
-coach = setupCoach(api);
+coach = setupCoach(api, { onStep: (step) => (tutBase = step ? tutCounts(current ?? '') : null) });
 memo = await api.memo.get(id);
 if (!memo) {
   setStatus('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
@@ -1508,7 +1519,10 @@ if (!memo) {
     },
     onMode: (on) => {
       setStatus(on ? '주석: 메모 위에 그려요 · 다 그렸으면 완료 (Esc)' : '');
-      if (!on) editor.focus();
+      if (!on) {
+        editor.focus();
+        tutEvent('annotate-done');
+      }
     },
     notice: setStatus,
   });

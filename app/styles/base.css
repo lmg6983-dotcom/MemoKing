@@ -224,21 +224,65 @@ svg { width: 20px; height: 20px; flex: none; }
   animation: coach-in 0.15s ease-out;
 }
 @keyframes coach-in { from { opacity: 0; transform: scale(0.96); } }
-.coach-count { font-size: 11px; font-weight: 700; color: var(--text-muted); }
-.coach-bubble h3 { margin: 2px 0 6px; font-size: 17px; line-height: 24px; font-weight: 800; letter-spacing: -0.015em; }
-.coach-bubble p { margin: 0 0 12px; font-size: 13.5px; line-height: 21px; color: var(--text-strong); }
-.coach-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.coach-try {
-  margin-right: auto;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--brand-yellow-soft);
-  font-size: 12px;
-  font-weight: 700;
+.coach-bubble.wide { width: min(440px, calc(100vw - 24px)); }
+.coach-bubble.enter { animation: coach-pop 0.32s cubic-bezier(0.2, 1.3, 0.4, 1); }
+@keyframes coach-pop { from { opacity: 0; transform: translateY(8px) scale(0.94); } }
+/* 머리: 이모지 · 진행 막대 · 몇 번째 */
+.coach-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.coach-emoji {
+  display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px;
+  background: var(--brand-yellow-soft); font-size: 21px; line-height: 1;
+  animation: coach-bounce 0.6s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
+@keyframes coach-bounce { 0% { transform: scale(0.4) rotate(-20deg); } 70% { transform: scale(1.12) rotate(6deg); } }
+.coach-progress { flex: 1; height: 6px; border-radius: 999px; background: var(--fill-tab); overflow: hidden; }
+.coach-progress i { display: block; height: 100%; border-radius: inherit; background: var(--brand-yellow); transition: width 0.35s ease-out; }
+.coach-count { flex: none; font-size: 11px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.coach-bubble h3 { margin: 2px 0 6px; font-size: 17px; line-height: 24px; font-weight: 800; letter-spacing: -0.015em; }
+.coach-bubble p { margin: 0 0 10px; font-size: 13.5px; line-height: 21px; color: var(--text-strong); }
+/* 해 냈을 때 칭찬 */
+.coach-praise {
+  display: inline-block; margin: 0 0 6px; padding: 3px 10px; border-radius: 999px;
+  background: var(--brand-yellow); color: var(--on-brand); font-size: 12.5px; font-weight: 800;
+  animation: coach-praise 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes coach-praise { from { transform: scale(0.3); opacity: 0; } }
+.coach-confetti {
+  position: absolute; top: 18px; z-index: 1; font-size: 18px; pointer-events: none;
+  animation: coach-confetti 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes coach-confetti {
+  0% { transform: translate(0, 0) scale(0.4) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1.1) rotate(var(--r)); opacity: 0; }
+}
+/* 실제 화면 사진 — 누르면 말풍선이 넓어지며 크게 */
+.coach-shot {
+  display: block; width: 100%; max-height: 150px; margin: 0 0 10px; border-radius: 12px;
+  object-fit: cover; object-position: top center; cursor: zoom-in;
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card); background: var(--fill-tab);
+}
+.coach-bubble.wide .coach-shot { max-height: 320px; object-fit: contain; cursor: zoom-out; }
+/* 직접 해 보기 */
+.coach-try {
+  margin: 0 0 10px; padding: 8px 11px; border-radius: 12px;
+  background: var(--brand-yellow-soft); box-shadow: inset 0 0 0 1.5px var(--brand-yellow);
+  font-size: 13px; font-weight: 700; line-height: 19px;
+  animation: coach-nudge 1.6s ease-in-out 0.4s infinite;
+}
+@keyframes coach-nudge { 0%, 70%, 100% { transform: none; } 80% { transform: translateX(3px); } 90% { transform: translateX(-2px); } }
+.coach-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .coach-skip { padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .coach-skip:hover { background: var(--fill-hover); color: var(--text-strong); }
 .coach-next { height: 34px; padding: 0 14px; font-size: 13px; }
+.coach-next.coach-later { height: 32px; font-size: 12.5px; color: var(--text-muted); }
+/* 직접 해 보는 단계: 비춘 곳이 두근두근 */
+.coach-spot.pulse { animation: coach-pulse 1.4s ease-in-out infinite; }
+@keyframes coach-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px rgba(0, 0, 0, 0.4); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--brand-yellow) 55%, transparent), 0 0 0 9999px rgba(0, 0, 0, 0.4); }
+}
+/* 손 메모 그리기·주석·녹음 중에는 말풍선을 잠시 숨긴다 (그리기를 가리지 않게) — 끝나면 다음 단계로 */
+body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .coach-bubble) { visibility: hidden; }
 
 /* ---------- 움직임 (v0.16.1) — 짧고 조용하게. 움직임 줄이기는 위 규칙이 모두 멈춘다 ---------- */
 /* 아이콘 버튼·버튼: 누르면 살짝 눌림 */

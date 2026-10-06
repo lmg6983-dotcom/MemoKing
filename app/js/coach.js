@@ -1,8 +1,15 @@
-// 튜토리얼 말풍선 — 비출 요소 둘레만 밝게 두고 나머지를 어둡게, 옆에 안내 말풍선.
+// 튜토리얼 말풍선 — 비출 요소 둘레만 밝게 두고 나머지를 어둡게, 옆에 안내 말풍선. (PC·휴대폰 함께)
 // 화면은 그대로 눌러지므로(따라 하기) 비춘 버튼을 실제로 눌러 볼 수 있다.
-// 단계 진행은 메인 프로세스가 맡고(core/tutorial.js), 여기서는 보여 주고 버튼만 전한다.
+//   - 머리: 단계 이모지 · 진행 막대 · 몇 번째인지
+//   - 직접 해 보기 단계: 비춘 곳이 두근두근 + "👉 이렇게 해 보세요" — 해 내면 다음 말풍선에 "🎉 잘했어요!" 와 꽃가루
+//   - 실제 화면 사진(app/assets/tutorial/): 누르면 크게
+// 단계 진행은 PC 는 메인 프로세스, 휴대폰은 tutorial.js 가 맡고(core/tutorial.js), 여기서는 보여 주고 버튼만 전한다.
 
-export function setupCoach(api) {
+const PRAISE = ['🎉 잘했어요!', '👏 완벽해요!', '✨ 멋져요!', '🙌 좋아요!', '💯 바로 그거예요!'];
+const shotUrl = (name) => new URL(`../assets/tutorial/${name}`, import.meta.url).href;
+
+/** @param {{ onStep?: (step: object|null) => void }} [o] onStep: 단계가 바뀔 때 (직접 해 보기 판정의 시작점) */
+export function setupCoach(api, o = {}) {
   const spot = document.createElement('div');
   spot.className = 'coach-spot';
   const bubble = document.createElement('div');
@@ -71,40 +78,88 @@ export function setupCoach(api) {
   }
 
   function show(next) {
+    const prevId = step?.id;
     step = next;
     clearInterval(timer);
     if (!step) {
       spot.hidden = true;
       bubble.hidden = true;
       document.body.classList.remove('coaching');
+      if (prevId) o.onStep?.(null);
       return;
     }
-    const count = document.createElement('div');
-    count.className = 'coach-count';
-    count.textContent = `${step.index + 1} / ${step.total}`;
-    const title = document.createElement('h3');
-    title.textContent = step.title;
-    const text = document.createElement('p');
-    text.textContent = step.text;
-    const actions = document.createElement('div');
-    actions.className = 'coach-actions';
-    if (step.advance) {
-      const hint = document.createElement('span');
-      hint.className = 'coach-try';
-      hint.textContent = '직접 해 보세요';
-      actions.append(hint);
+    const el = (tag, className, text) => {
+      const e = document.createElement(tag);
+      if (className) e.className = className;
+      if (text != null) e.textContent = text;
+      return e;
+    };
+    // 머리: 이모지 · 진행 막대 · 몇 번째
+    const head = el('div', 'coach-head');
+    const emoji = el('span', 'coach-emoji', step.emoji ?? '💡');
+    const bar = el('div', 'coach-progress');
+    const fill = el('i');
+    fill.style.width = `${Math.round(((step.index + 1) / step.total) * 100)}%`;
+    bar.append(fill);
+    head.append(emoji, bar, el('span', 'coach-count', `${step.index + 1} / ${step.total}`));
+    const parts = [head];
+    if (step.praise) parts.push(el('div', 'coach-praise', PRAISE[step.index % PRAISE.length]));
+    parts.push(el('h3', '', step.title), el('p', '', step.text));
+    if (step.image) {
+      const img = el('img', 'coach-shot');
+      img.src = shotUrl(step.image);
+      img.alt = `${step.title} 화면`;
+      img.title = '눌러서 크게 보기';
+      img.addEventListener('click', () => {
+        bubble.classList.toggle('wide');
+        place();
+      });
+      img.addEventListener('load', place);
+      parts.push(img);
     }
-    actions.append(button(step.skip ?? '건너뛰기', 'coach-skip', 'skip'));
-    if (step.next) actions.append(button(step.next, 'btn primary coach-next', 'next'));
-    bubble.replaceChildren(count, title, text, actions);
+    if (step.advance) parts.push(el('div', 'coach-try', `👉 ${step.try ?? '직접 해 보세요'}`));
+    const actions = el('div', 'coach-actions');
+    actions.append(button(step.skip ?? '튜토리얼 그만하기', 'coach-skip', 'skip'));
+    // 직접 해 보는 단계의 "다음"은 이 단계만 건너뛰기 (옅은 단추) — 안내만 하는 단계는 노란 다음
+    if (step.next) actions.append(button(step.next, step.advance ? 'btn coach-next coach-later' : 'btn primary coach-next', 'next'));
+    parts.push(actions);
+    bubble.replaceChildren(...parts);
     bubble.dataset.step = step.id;
+    bubble.classList.remove('wide');
+    bubble.classList.toggle('trying', Boolean(step.advance));
+    spot.classList.toggle('pulse', Boolean(step.advance));
     spot.hidden = false;
     bubble.hidden = false;
     document.body.classList.add('coaching');
+    if (step.praise) confetti();
+    // 바뀐 단계마다 다시 나타나는 움직임
+    bubble.classList.remove('enter');
+    void bubble.offsetWidth;
+    bubble.classList.add('enter');
     place();
     // 창 크기·목록 내용이 바뀌어도 따라가게
     timer = setInterval(place, 400);
-    bubble.querySelector('.coach-next')?.focus();
+    if (!step.advance) bubble.querySelector('.coach-next')?.focus({ preventScroll: true });
+    if (step.id !== prevId) o.onStep?.(step);
+  }
+
+  // 해 냈을 때: 말풍선에서 이모지 꽃가루 (움직임 줄이기에서는 생략)
+  function confetti() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const pieces = ['🎉', '✨', '⭐', '🎊', '💛', '👑'];
+    for (let i = 0; i < 12; i++) {
+      const p = document.createElement('span');
+      p.className = 'coach-confetti';
+      p.textContent = pieces[i % pieces.length];
+      p.style.left = `${8 + Math.random() * 84}%`;
+      p.style.setProperty('--dx', `${(Math.random() - 0.5) * 120}px`);
+      p.style.setProperty('--dy', `${-60 - Math.random() * 90}px`);
+      p.style.setProperty('--r', `${(Math.random() - 0.5) * 220}deg`);
+      p.style.animationDelay = `${Math.random() * 0.12}s`;
+      bubble.append(p);
+      setTimeout(() => p.remove(), 1300);
+    }
+    if (matchMedia('(pointer: coarse)').matches) navigator.vibrate?.([10, 40, 14]); // 휴대폰만 (PC 크롬은 막고 경고를 남긴다)
   }
 
   bubble.addEventListener('click', (e) => {

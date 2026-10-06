@@ -102,6 +102,14 @@ const errors = [];
 try {
   // MK_DARK=1: 다크 모드로 같은 점검 (화면 사진은 out/android-dark)
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'ko-KR', colorScheme: process.env.MK_DARK ? 'dark' : 'light' });
+  // 처음 실행 튜토리얼은 저절로 뜨지 않게 (아래에서 설정 › 사용법 둘러보기로 따로 점검)
+  await ctx.addInitScript(() => {
+    try {
+      localStorage.setItem('memoking.tutorialDone', '1');
+    } catch {
+      // 없음
+    }
+  });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => { errors.push(e.message); if (process.env.MK_DUMP) console.log('PAGEERROR', e.stack); });
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -1168,6 +1176,44 @@ try {
     const after = await page.evaluate(() => document.querySelector('.mk-annot path').getBoundingClientRect().top);
     check('글이 늘어 문단이 밀리면 주석도 그 문단을 따라감', after - before > 15, JSON.stringify({ before, after }));
     await shot('23-annotate-follow');
+    await back();
+    await page.waitForTimeout(400);
+  }
+
+  // 튜토리얼: 설정 › 사용법 둘러보기 → 직접 해 보면 칭찬과 함께 다음 단계 (휴대폰도 PC 와 같은 말풍선)
+  {
+    const stepIs = (id) => page.waitForSelector(`.coach-bubble:not([hidden])[data-step="${id}"]`, { timeout: 5000 }).then(() => true).catch(() => false);
+    await page.tap('#settings-btn');
+    await page.waitForTimeout(300);
+    await page.tap('#tutorial-btn');
+    const welcome = await stepIs('welcome');
+    const head = await page.evaluate(() => ({ emoji: document.querySelector('.coach-emoji')?.textContent, bar: !!document.querySelector('.coach-progress i') }));
+    await shot('24-tutorial-welcome');
+    await page.tap('.coach-bubble .coach-next');
+    const newMemo = await stepIs('new-memo');
+    const trying = await page.evaluate(() => !!document.querySelector('.coach-try') && document.querySelector('.coach-spot').classList.contains('pulse'));
+    check('튜토리얼: 설정 › 사용법 둘러보기 → 이모지·진행 막대 · 직접 해 보기 단계는 두근두근 + 👉 안내', welcome && head.emoji === '👋' && head.bar && newMemo && trying, JSON.stringify({ welcome, head, newMemo, trying }));
+    await page.tap('#fab');
+    await page.waitForTimeout(300);
+    await page.tap('#fab-menu [data-new="text"]');
+    const write = await stepIs('write');
+    await page.keyboard.type('튜토리얼 메모');
+    const format = await stepIs('format');
+    const praised = await page.isVisible('.coach-bubble .coach-praise');
+    await page.waitForTimeout(500);
+    await shot('25-tutorial-praise');
+    check('새 메모 → 메모 화면에서 다음 말풍선 · 글을 쓰면 "잘했어요" 칭찬과 함께 다음', write && format && praised, JSON.stringify({ write, format, praised }));
+    await page.tap('.coach-bubble .coach-next'); // 다음에 해 볼게요
+    await stepIs('lists');
+    await page.evaluate(() => document.querySelector('#format-bar [data-cmd="task"]').click());
+    const move = await stepIs('move');
+    await page.waitForTimeout(400);
+    const shotShown = await page.evaluate(() => { const i = document.querySelector('.coach-shot'); return i && i.complete && i.naturalWidth > 0; });
+    await shot('26-tutorial-shot');
+    check('체크리스트를 만들면 다음 단계 · 실제 화면 사진이 보임', move && shotShown, JSON.stringify({ move, shotShown }));
+    await page.tap('.coach-bubble .coach-skip');
+    const ended = await page.waitForSelector('.coach-bubble', { state: 'hidden', timeout: 3000 }).then(() => true).catch(() => false);
+    check('튜토리얼 그만하기 → 말풍선이 사라짐', ended && !(await page.evaluate(() => document.body.classList.contains('coaching'))));
     await back();
     await page.waitForTimeout(400);
   }

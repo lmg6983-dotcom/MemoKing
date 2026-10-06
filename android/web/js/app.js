@@ -21,6 +21,7 @@ import * as recorder from './recorder.js';
 import { renderMemoImage } from './share-image.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
+import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent } from './tutorial.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml } from './print-html.js';
 
@@ -266,6 +267,7 @@ app.newMemo = async ({ color, voice = false, ink = false } = {}) => {
   }
   const id = app.vault.create({ color: pick });
   await app.openMemo(id, { fresh: true, record: Boolean(voice), ink: Boolean(ink) });
+  if (!voice && !ink) tutEvent('memo-created');
   return id;
 };
 
@@ -735,6 +737,11 @@ function renderTrash() {
     return li;
   }));
 }
+$('tutorial-btn').addEventListener('click', () => {
+  closeAllSheets();
+  if (note.isOpen()) app.showList();
+  setTimeout(startTutorial, 250);
+});
 $('trash-btn').addEventListener('click', () => {
   renderTrash();
   openSheet($('trash-sheet'));
@@ -1028,6 +1035,7 @@ function openVault() {
   alarms.start();
   alarms.schedule();
   renderDrive();
+  setTimeout(maybeStartTutorial, 700); // 처음이면 사용법 둘러보기 (메모 폴더를 연 뒤 한 번)
   if (app.vaultInfo?.drive) drive.syncSoon();
   recorder.resume(); // 녹음이 도는 중인지, 꺼져 있는 동안 끝난 녹음이 있는지
   if (pendingIntent) {
@@ -1100,6 +1108,7 @@ setBackHandler(() => {
 // ---------- 시작 ----------
 
 list.setup();
+setupTutorial({ screen: () => (note.isOpen() ? 'note' : 'list'), markdown: () => (note.isOpen() ? note.editorMarkdown() : '') });
 const info = native.info();
 if (info.vault?.ok) openVault();
 else showSetup(info.vault ? '메모 폴더에 더 이상 접근할 수 없어요. 폴더를 다시 골라 주세요.' : '');
