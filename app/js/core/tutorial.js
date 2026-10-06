@@ -6,10 +6,20 @@
 //   emoji: 말풍선 머리의 그림 글자 · image: 실제 화면 사진 (app/assets/tutorial/)
 //   advance: 사용자가 이걸 하면 다음 단계로 (직접 해 보기) — 해 내면 "잘했어요" 칭찬과 함께 넘어간다
 //   try: 직접 해 보기 안내 (👉 로 보인다)
+//   sample: 이 단계가 뜨면 메모 끝에 예시 목록(TUTORIAL_SAMPLE)을 저절로 넣는다 (옮겨 볼 줄이 있게)
 //   next: "다음" 버튼 글자. advance 와 함께 있으면 "다음에 해 볼게요" 처럼 이 단계만 건너뛰기
 //         (없으면 직접 해 봐야 넘어감 — 튜토리얼 끝내기는 언제나 있음)
 
 const LATER = '다음에 해 볼게요';
+
+/** 옮기기를 배우기 전에 메모 끝에 저절로 넣는 예시 목록 */
+export const TUTORIAL_SAMPLE = '- [ ] 우유\n- [ ] 달걀\n- [ ] 사과\n- [ ] 식빵';
+
+/** 예시 목록이 이미 들어 있는지 (단계가 다시 떠도 두 번 넣지 않게) */
+export function hasTutorialSample(md) {
+  const text = String(md ?? '');
+  return TUTORIAL_SAMPLE.split('\n').every((line) => text.includes(line.replace('- [ ] ', '')));
+}
 
 export const TUTORIAL_STEPS = [
   // ---------- 시작 (목록 창) ----------
@@ -49,9 +59,9 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], emoji: '🖐️', image: 'move.jpg',
+    id: 'move', win: 'note', target: ['.ProseMirror > ul:last-of-type', '.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], sample: true, emoji: '🖐️', image: 'move.jpg',
     title: '줄을 옮기고 싶을 때',
-    text: '줄을 꾹 누르면 살짝 들려요. 끌어서 원하는 자리에 놓으면 끝! 키보드로는 Alt+↑↓ 예요.',
+    text: '연습하라고 장보기 목록을 넣어 뒀어요. 줄을 꾹 누르면 살짝 들려요. 끌어서 원하는 자리에 놓으면 끝! 키보드로는 Alt+↑↓ 예요.',
     next: '다음',
   },
   // ---------- + 로 넣기 ----------
@@ -215,9 +225,9 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], emoji: '🖐️', image: 'm-move.jpg',
+    id: 'move', win: 'note', target: ['.ProseMirror > ul:last-of-type', '.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], sample: true, emoji: '🖐️', image: 'm-move.jpg',
     title: '꾹 눌러 옮기기',
-    text: '줄이나 사진·표를 꾹 누르면 살짝 들려요. 그대로 끌어서 원하는 자리에 놓으면 끝!',
+    text: '연습하라고 장보기 목록을 넣어 뒀어요. 줄이나 사진·표를 꾹 누르면 살짝 들려요. 그대로 끌어서 원하는 자리에 놓으면 끝!',
     next: '다음',
   },
   {

@@ -162,8 +162,12 @@ await wait(2000); // 손을 멈추면 다음으로
 await atStep('lists');
 await tapOn('#format-bar [data-cmd="task"]', '체크리스트');
 
-// 5) 옮기기 (안내)
+// 5) 옮기기 (안내) — 옮겨 볼 예시 목록이 저절로 들어 있어야 한다
 await atStep('move');
+await wait(300);
+const items = await page.$$eval('.ProseMirror li', (lis) => lis.map((li) => li.textContent.trim()));
+check('[move] 옮겨 볼 예시 목록(우유·달걀·사과·식빵)이 저절로 들어감', ['우유', '달걀', '사과', '식빵'].every((w) => items.includes(w)), JSON.stringify(items));
+await shot('move-sample');
 await nextBtn();
 
 // 6) + 펼치기
@@ -233,7 +237,7 @@ for (const s of STEPS.filter((s) => s.win === 'list' && STEPS.indexOf(s) > STEPS
 await wait(400);
 check('튜토리얼 끝: 말풍선이 사라짐', !(await stepId()));
 const saved = fs.readdirSync(vault).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(vault, f), 'utf8')).find((t) => t.includes('주말 장보기 목록'));
-check('따라 하며 쓴 메모가 그대로 저장 (제목 · 체크리스트 · 태그)', saved && /- \[ \]/.test(saved) && saved.includes('#할일'), saved);
+check('따라 하며 쓴 메모가 그대로 저장 (제목 · 체크리스트 · 예시 목록 · 태그)', saved && /- \[ \]/.test(saved) && saved.includes('- [ ] 식빵') && saved.includes('#할일'), saved);
 check('화면 오류 없음', errors.length === 0, errors.join(' | '));
 await browser.close();
 console.log(failed ? `튜토리얼 점검 실패 ${failed}개` : '휴대폰 튜토리얼 점검 모두 통과');

@@ -163,6 +163,8 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await arrive(note, 'lists', { praise: true });
     await press(note(), '[data-cmd="task"]', '[lists] 체크리스트');
     await arrive(note, 'move', { praise: true });
+    const items = await js(note(), `[...document.querySelectorAll('.ProseMirror li')].map((li) => li.textContent.trim())`);
+    check('[move] 옮겨 볼 예시 목록(우유·달걀·사과·식빵)이 저절로 들어감', ['우유', '달걀', '사과', '식빵'].every((w) => items.includes(w)), JSON.stringify(items));
     await next(note, 'move');
     await arrive(note, 'add');
     await press(note(), '#add-btn', '[add] 왼쪽 아래 +');

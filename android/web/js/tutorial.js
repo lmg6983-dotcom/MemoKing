@@ -3,7 +3,7 @@
 //   - 처음 메모 폴더를 연 뒤 한 번 저절로 · 설정 › "사용법 둘러보기"로 언제든 다시
 //   - 단계의 화면(목록 · 메모)이 보일 때만 말풍선 — 화면이 바뀌면 screenChanged()
 //   - 직접 해 보기: 화면들이 tutEvent('add-opened') 처럼 알리고, 본문 변화는 textChanged(md) 로 판정
-import { MOBILE_TUTORIAL_STEPS as STEPS, TUTORIAL_SETTLE_MS, advanceTutorial, tutorialCounts, tutorialDone } from '../../app/js/core/tutorial.js';
+import { MOBILE_TUTORIAL_STEPS as STEPS, TUTORIAL_SETTLE_MS, TUTORIAL_SAMPLE, advanceTutorial, hasTutorialSample, tutorialCounts, tutorialDone } from '../../app/js/core/tutorial.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { setupCoach } from '../../app/js/coach.js';
 
@@ -12,6 +12,7 @@ let state = { active: false, index: -1, praise: false };
 const listeners = [];
 let screen = () => 'list';
 let markdown = () => '';
+let append = () => {};
 let coach = null;
 let base = null;
 const counts = (md) => tutorialCounts(md, extractTags(md));
@@ -36,11 +37,18 @@ const api = {
   },
 };
 
-/** @param {{ screen: () => 'list'|'note', markdown: () => string }} o */
+/** @param {{ screen: () => 'list'|'note', markdown: () => string, append: (md: string) => void }} o */
 export function setupTutorial(o) {
   screen = o.screen;
   markdown = o.markdown;
-  coach = setupCoach(api, { onStep: (step) => (base = step ? counts(markdown()) : null) });
+  append = o.append;
+  coach = setupCoach(api, {
+    onStep: (step) => {
+      base = step ? counts(markdown()) : null;
+      // 옮기기를 배우기 전: 옮겨 볼 예시 목록을 메모 끝에
+      if (step?.sample && screen() === 'note' && !hasTutorialSample(markdown())) append(TUTORIAL_SAMPLE);
+    },
+  });
 }
 
 export function startTutorial() {

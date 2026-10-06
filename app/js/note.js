@@ -8,7 +8,7 @@ import { isDataImage, decodeDataImage } from './core/remote-images.js';
 import { setupReminderPanel } from './reminder-panel.js';
 import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
-import { tutorialCounts, tutorialDone } from './core/tutorial.js';
+import { tutorialCounts, tutorialDone, TUTORIAL_SAMPLE, hasTutorialSample } from './core/tutorial.js';
 import { setupCoach } from './coach.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSliders } from './seg-slider.js';
@@ -1393,7 +1393,16 @@ document.addEventListener('visibilitychange', () => {
 
 injectIcons();
 paintSwatchBars();
-coach = setupCoach(api, { onStep: (step) => (tutBase = step ? tutCounts(current ?? '') : null) });
+coach = setupCoach(api, {
+  onStep: (step) => {
+    tutBase = step ? tutCounts(current ?? '') : null;
+    // 옮기기를 배우기 전: 옮겨 볼 예시 목록을 메모 끝에
+    if (step?.sample && editor && !hasTutorialSample(editor.getMarkdown())) {
+      editor.appendMarkdown(TUTORIAL_SAMPLE);
+      flush();
+    }
+  },
+});
 memo = await api.memo.get(id);
 if (!memo) {
   setStatus('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
