@@ -158,27 +158,23 @@ check('[write] 치기 시작하면 말풍선은 작은 알약 · 쓰는 줄을 �
 await shot('write-typing');
 await wait(2000); // 손을 멈추면 다음으로
 
-// 4) 꾸미기: B 를 누르고 쓰기
-await atStep('format');
-await page.keyboard.press('Enter');
-await tapOn('#format-bar [data-cmd="bold"]', 'B');
-await typeSlowly('우유 사기');
-check('[format] 치는 동안 쓰는 줄을 안 가림', await coversCaret().then((c) => c.hit === 0), JSON.stringify(await coversCaret()));
-await shot('format-typed');
-
-// 5) 체크리스트
+// 4) 체크리스트
 await atStep('lists');
 await tapOn('#format-bar [data-cmd="task"]', '체크리스트');
 
-// 6) 옮기기 (안내)
+// 5) 옮기기 (안내) — 옮겨 볼 예시 목록이 저절로 들어 있어야 한다
 await atStep('move');
+await wait(300);
+const items = await page.$$eval('.ProseMirror li', (lis) => lis.map((li) => li.textContent.trim()));
+check('[move] 옮겨 볼 예시 목록(우유·달걀·사과·식빵)이 저절로 들어감', ['우유', '달걀', '사과', '식빵'].every((w) => items.includes(w)), JSON.stringify(items));
+await shot('move-sample');
 await nextBtn();
 
-// 7) + 펼치기
+// 6) + 펼치기
 await atStep('add');
 await tapOn('#add-btn', '도구막대 +');
 
-// 8) 손 메모
+// 7) 손 메모
 await atStep('ink');
 await tapOn('#add-menu:not([hidden]) [data-add="ink"]', '손 메모');
 await page.waitForSelector('.ink-sheet');
@@ -191,7 +187,7 @@ await wait(200);
 await tapOn('.ink-done', '손 메모 완료');
 await wait(500);
 
-// 9) 주석
+// 8) 주석
 await atStep('annotate');
 await tapOn('#add-btn', '도구막대 +');
 await tapOn('#add-menu:not([hidden]) [data-add="annotate"]', '주석');
@@ -206,11 +202,11 @@ await wait(200);
 await tapOn('.ink-done', '주석 완료');
 await wait(500);
 
-// 10) 음성 (안내)
+// 9) 음성 (안내)
 await atStep('voice');
 await nextBtn();
 
-// 11) 태그: 끝 줄을 누르고 #할일 — "#할" 에서 넘어가면 안 된다
+// 10) 태그: 끝 줄을 누르고 #할일 — "#할" 에서 넘어가면 안 된다
 await atStep('tag');
 const last = await page.locator('.ProseMirror > *').last().boundingBox();
 await page.touchscreen.tap(last.x + last.width - 4, last.y + last.height / 2);
@@ -241,7 +237,7 @@ for (const s of STEPS.filter((s) => s.win === 'list' && STEPS.indexOf(s) > STEPS
 await wait(400);
 check('튜토리얼 끝: 말풍선이 사라짐', !(await stepId()));
 const saved = fs.readdirSync(vault).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(vault, f), 'utf8')).find((t) => t.includes('주말 장보기 목록'));
-check('따라 하며 쓴 메모가 그대로 저장 (제목 · 굵게 · 체크리스트 · 태그)', saved && /\*\*우유 사기\*\*/.test(saved) && /- \[ \]/.test(saved) && saved.includes('#할일'), saved);
+check('따라 하며 쓴 메모가 그대로 저장 (제목 · 체크리스트 · 예시 목록 · 태그)', saved && /- \[ \]/.test(saved) && saved.includes('- [ ] 식빵') && saved.includes('#할일'), saved);
 check('화면 오류 없음', errors.length === 0, errors.join(' | '));
 await browser.close();
 console.log(failed ? `튜토리얼 점검 실패 ${failed}개` : '휴대폰 튜토리얼 점검 모두 통과');

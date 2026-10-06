@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial, tutorialCounts, tutorialDone } from '../app/js/core/tutorial.js';
+import { TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS, TUTORIAL_EVENTS, TUTORIAL_SAMPLE, hasTutorialSample, advanceTutorial, tutorialCounts, tutorialDone } from '../app/js/core/tutorial.js';
 
 for (const [name, steps] of [['PC', TUTORIAL_STEPS], ['휴대폰', MOBILE_TUTORIAL_STEPS]]) {
   test(`${name} 튜토리얼: 단계마다 이모지 · 갈 길이 있음 · 사진 파일이 있음`, () => {
@@ -22,9 +22,6 @@ for (const [name, steps] of [['PC', TUTORIAL_STEPS], ['휴대폰', MOBILE_TUTORI
 
 test('직접 해 보기: 단계 시작 때보다 늘었을 때만', () => {
   const base = tutorialCounts('제목\n\n글', []);
-  assert.equal(tutorialDone('formatted', base, tutorialCounts('제목\n\n**글**', [])), true);
-  assert.equal(tutorialDone('formatted', base, tutorialCounts('제목\n\n<mark>글</mark>', [])), true);
-  assert.equal(tutorialDone('formatted', base, base), false);
   assert.equal(tutorialDone('styled', base, tutorialCounts('제목\n\n## 글', [])), true);
   assert.equal(tutorialDone('styled', tutorialCounts('제목', []), tutorialCounts('## 제목', [])), true, '첫 줄을 제목으로 바꿔도 셈');
   assert.equal(tutorialDone('styled', tutorialCounts('# 제목', []), tutorialCounts('# 제목\n', [])), false, '처음부터 있던 제목은 세지 않음');
@@ -35,11 +32,22 @@ test('직접 해 보기: 단계 시작 때보다 늘었을 때만', () => {
 });
 
 test('다음에 해 볼게요(next) · 직접 해 냄(advance) 모두 다음 단계로, 끝내기는 -1', () => {
-  const i = TUTORIAL_STEPS.findIndex((s) => s.id === 'format');
+  const i = TUTORIAL_STEPS.findIndex((s) => s.id === 'style');
   assert.equal(advanceTutorial(i, 'next'), i + 1);
-  assert.equal(advanceTutorial(i, 'formatted'), i + 1);
+  assert.equal(advanceTutorial(i, 'styled'), i + 1);
   assert.equal(advanceTutorial(i, 'tasked'), i, '다른 단계의 일은 무시');
   assert.equal(advanceTutorial(i, 'skip'), -1);
   const m = MOBILE_TUTORIAL_STEPS.findIndex((s) => s.id === 'ink');
   assert.equal(MOBILE_TUTORIAL_STEPS[advanceTutorial(m, 'note-closed', MOBILE_TUTORIAL_STEPS)].win, 'list', '메모를 먼저 닫으면 목록 단계로');
+});
+
+test('옮기기 전 예시 목록: PC·휴대폰 모두 옮기기 단계에서 한 번만', () => {
+  for (const steps of [TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS]) {
+    assert.deepEqual(steps.filter((s) => s.sample).map((s) => s.id), ['move']);
+  }
+  assert.match(TUTORIAL_SAMPLE, /^- \[ \] /m, '체크리스트 줄');
+  assert.ok(TUTORIAL_SAMPLE.split('\n').length >= 3, '옮겨 볼 줄이 넉넉히');
+  assert.equal(hasTutorialSample('제목\n\n- [ ] 글'), false);
+  assert.equal(hasTutorialSample(`제목\n\n${TUTORIAL_SAMPLE}`), true);
+  assert.equal(hasTutorialSample(`제목\n\n${TUTORIAL_SAMPLE.replace(/\[ \]/g, '[x]')}`), true, '체크해도 다시 넣지 않음');
 });

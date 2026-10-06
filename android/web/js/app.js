@@ -1067,7 +1067,11 @@ setBackHandler(() => {
 
 list.setup();
 panes.setupPanes({ note });
-setupTutorial({ screen: () => (note.isOpen() ? 'note' : 'list'), markdown: () => (note.isOpen() ? note.editorMarkdown() : '') });
+setupTutorial({
+  screen: () => (note.isOpen() ? 'note' : 'list'),
+  markdown: () => (note.isOpen() ? note.editorMarkdown() : ''),
+  append: (md) => note.appendText(md),
+});
 const info = native.info();
 if (info.vault?.ok) openVault();
 else showSetup(info.vault ? '메모 폴더에 더 이상 접근할 수 없어요. 폴더를 다시 골라 주세요.' : '');
