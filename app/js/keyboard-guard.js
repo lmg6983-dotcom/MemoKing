@@ -12,6 +12,15 @@ const coarse = () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? fal
 //   'draw' 글 위에 그리기: 키보드 없이 (그리기는 ink-annotate.js)
 let mode = 'both';
 export const touchMode = () => mode;
+// 마지막으로 닿은 것이 펜인가 — pointerdown 이 touchstart 보다 먼저 오므로, touchType 을 알려 주지 않는 WebView 에서도 안다
+let lastPointer = { type: '', at: 0 };
+globalThis.addEventListener?.('pointerdown', (e) => {
+  lastPointer = { type: e.pointerType, at: e.timeStamp };
+}, { capture: true, passive: true });
+/** 방금(0.6초 안) 펜이 닿았나 */
+export const penJustTouched = (now = globalThis.performance?.now() ?? 0) => lastPointer.type === 'pen' && now - lastPointer.at < 600;
+/** S펜(스타일러스)으로 닿은 터치인가 — 펜은 손가락과 같은 touch 이벤트로도 오므로 */
+export const isStylusTouch = (e) => e?.touches?.[0]?.touchType === 'stylus' || e?.pointerType === 'pen' || (e?.type === 'touchstart' && penJustTouched(e.timeStamp));
 /** 지금 끌어 옮기기 손짓을 받는가 */
 export const canDrag = () => mode === 'both' || mode === 'move';
 /** 옮기기 방식에서는 글자 고르기와 겹치지 않으니 짧게만 누르면 들어 올린다 (스크롤하려고 미는 것과는 구분) */

@@ -12,7 +12,7 @@
 //   - 커서가 있는 항목에 흐린 점선 테두리 (Enter 로 새 항목을 만들면 따라간다)
 import { Plugin, PluginKey, TextSelection, Decoration, DecorationSet, sinkListItem, liftListItem } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
-import { holdKeyboard, edgeScroll, canDrag, holdFor } from './keyboard-guard.js';
+import { holdKeyboard, edgeScroll, canDrag, holdFor, isStylusTouch } from './keyboard-guard.js';
 import { HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
 import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
@@ -674,6 +674,11 @@ export function createListDrag({ readOnly = false } = {}) {
           return false; // 편집기는 지금처럼 (커서 놓기·글자 선택)
         },
         touchstart(view, event) {
+          // 글 고치기 방식에서 S펜으로 긋는 것은 손글씨(글자 입력) — 옆으로 밀기(하위·상위)로 보지 않는다
+          if (!canDrag() && isStylusTouch(event)) {
+            cancelPress();
+            return false;
+          }
           if (event.touches.length === 1) startPress(view, event, 'touch'); // 글 고치기 방식도 옆으로 휙 밀기(하위·상위)는 받는다
           else cancelPress();
           return false; // 그냥 누르면 지금처럼 커서, 밀면 스크롤
