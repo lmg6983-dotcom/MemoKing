@@ -53,7 +53,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
   async function capture(win, name) {
     await wait(400);
     try {
-      fs.writeFileSync(path.join(OUT, name), (await win.webContents.capturePage()).toPNG());
+      const img = await Promise.race([win.webContents.capturePage(), wait(3000).then(() => { throw new Error('시간 초과'); })]);
+      fs.writeFileSync(path.join(OUT, name), img.toPNG());
     } catch (err) {
       console.warn(`화면을 찍지 못했어요 (${name}): ${err.message}`); // 화면 없는 점검 환경 — 점검은 이어서
     }
