@@ -52,6 +52,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-row b { font-weight: 800; color: #111; background: rgba(255, 205, 0, 0.38); border-radius: 3px; padding: 0 1px; }
 .magic-row .side { flex: none; color: #9a9a9a; font-size: 12px; }
 .magic-row[aria-selected="true"] .side { display: none; }
+.magic-row.kind-opms .ico { border-radius: 7px; background: #1f3b73; color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -0.02em; }
 .magic-row.kind-more .ico { border-radius: 7px; background: rgba(0, 0, 0, 0.06); font-weight: 800; }
 .magic-row.kind-more .t { font-weight: 700; }
 /* 고른 줄 오른쪽의 할 일 단추 (← → 로 옮김) — 고른 단추만 이름까지 */

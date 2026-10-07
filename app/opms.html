@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <title>메모킹 — OPMS</title>
+  <link rel="stylesheet" href="styles/base.css" />
+  <link rel="stylesheet" href="styles/opms.css" />
+</head>
+<body>
+  <header class="op-top">
+    <form id="op-form" class="op-search" role="search">
+      <input id="op-input" type="search" placeholder="관리번호 또는 출원번호" aria-label="관리번호 또는 출원번호" autocomplete="off" spellcheck="false" />
+      <button type="submit" class="op-btn">찾기</button>
+    </form>
+    <div id="op-head" class="op-head" hidden>
+      <div class="op-refs"><b id="op-our"></b><span id="op-your"></span><span id="op-badge" class="op-badge" hidden></span></div>
+      <div id="op-sub" class="op-sub"></div>
+    </div>
+  </header>
+  <nav id="op-tabs" class="op-tabs" role="tablist" aria-label="보기" hidden>
+    <button type="button" role="tab" data-tab="info" aria-selected="true">정보</button>
+    <button type="button" role="tab" data-tab="wrapper" aria-selected="false">전자포대</button>
+    <button type="button" role="tab" data-tab="bills" aria-selected="false">청구서</button>
+    <button type="button" role="tab" data-tab="foreign" aria-selected="false">해외출원</button>
+  </nav>
+  <main id="op-main" class="op-main" tabindex="-1"></main>
+  <footer id="op-foot" class="op-foot" hidden></footer>
+  <script type="module" src="js/opms-view.js"></script>
+</body>
+</html>

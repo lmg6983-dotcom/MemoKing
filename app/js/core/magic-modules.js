@@ -9,7 +9,7 @@ export const MAGIC_MODULES = [
   { id: 'notes', name: '메모 검색', description: '입력하는 대로 메모의 제목·내용에서 찾아 바로 열어요', ready: true, defaultOn: true },
   { id: 'files', name: '파일 검색', description: 'PC 의 파일·폴더·프로그램 이름을 바로 찾아 열어요. 따로 설치할 것 없이 메모킹이 이름 목록을 만들어 두어요 (이 PC 안에서만, 내용은 읽지 않음)', ready: true, defaultOn: true },
   { id: 'calc', name: '계산기', description: '수식을 입력하면 바로 계산해요', ready: false, defaultOn: false },
-  { id: 'opms', name: 'OPMS 검색', description: '회사 OPMS 시스템을 바로 검색해요', ready: false, defaultOn: false },
+  { id: 'opms', name: 'OPMS 검색', description: '관리번호·출원번호를 쓰면 회사 OPMS 사건을 찾아 서지정보·전자포대·청구서를 봐요 (사내망에서만)', ready: true, defaultOn: true },
 ];
 
 /**
@@ -35,3 +35,9 @@ export const activeModules = (settings) => {
 export function memoBodyFromText(text) {
   return String(text ?? '').replace(/\r\n/g, '\n').replace(/^\s*\n+/, '').replace(/\s+$/, '');
 }
+
+// OPMS 로 찾아볼 만한 말인가: 관리번호·출원번호처럼 숫자가 든 4~40글자 한 줄 — 아무 글이나 회사 서버에 보내지 않게
+export const looksLikeRef = (q) => {
+  const s = String(q ?? '').trim();
+  return s.length >= 4 && s.length <= 40 && /\d/.test(s) && !s.includes('\n');
+};

@@ -1,0 +1,82 @@
+/* OPMS 창 (opms-view.js) — 사건 찾기 · 정보 · 전자포대 · 청구서 · 해외출원 */
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column;
+  background: var(--surface-1); color: var(--text);
+  font-family: var(--font-sans); font-size: 13px;
+  --op-accent: #1f3b73;
+  --sel: #fff1b8;
+}
+@media (prefers-color-scheme: dark) { body { --op-accent: #8fb3ff; --sel: rgba(255, 205, 0, 0.18); } }
+
+.op-top { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+.op-search { display: flex; gap: 8px; max-width: 520px; }
+.op-search input {
+  flex: 1; min-width: 0; height: 34px; padding: 0 12px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-0); color: var(--text);
+  font: inherit; font-size: 14px; outline: none;
+}
+.op-search input:focus { border-color: var(--brand-yellow); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-yellow) 30%, transparent); }
+.op-btn {
+  height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); color: var(--text);
+  font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.op-btn:hover:not(:disabled) { background: var(--surface-0); }
+.op-btn.primary { border-color: transparent; background: var(--brand-yellow); color: #1b1600; }
+.op-btn.primary:hover:not(:disabled) { background: var(--brand-yellow-hover); }
+.op-btn:disabled { opacity: 0.5; cursor: default; }
+.op-btn:active:not(:disabled) { transform: scale(0.97); }
+.op-link { border: 0; padding: 0 2px; background: none; color: var(--op-accent); font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.op-link:hover { text-decoration: underline; }
+
+.op-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.op-refs { display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; font-size: 18px; }
+.op-refs b { font-weight: 800; }
+.op-refs span { color: var(--muted); }
+.op-badge { margin-left: 8px; padding: 2px 8px; border-radius: 99px; background: color-mix(in srgb, var(--op-accent) 14%, transparent); color: var(--op-accent) !important; font-size: 12px; font-weight: 700; }
+.op-sub { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.op-tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.op-tabs button {
+  height: 36px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none;
+  color: var(--muted); font: inherit; font-weight: 700; cursor: pointer;
+}
+.op-tabs button[aria-selected="true"] { border-bottom-color: var(--brand-yellow); color: var(--text); }
+.op-tabs button:hover { color: var(--text); }
+
+.op-main { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 20px; outline: none; }
+.op-msg { margin: 18px 2px; color: var(--muted); }
+.op-msg.err { color: #b42318; }
+@media (prefers-color-scheme: dark) { .op-msg.err { color: #ff8a80; } }
+.op-h { margin: 22px 2px 8px; font-size: 13px; color: var(--muted); }
+
+.op-info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 0; }
+.op-info > div { display: grid; grid-template-columns: 112px 1fr; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--line); min-width: 0; }
+.op-info > div.wide { grid-column: 1 / -1; }
+.op-info dt { color: var(--muted); }
+.op-info dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+.op-table { width: 100%; border-collapse: collapse; }
+.op-table th, .op-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.op-table th { position: sticky; top: -14px; background: var(--surface-1); color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.op-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.op-table .chk { width: 28px; }
+.op-table tbody tr:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.op-table tbody tr:has(input:checked) { background: var(--sel); }
+
+.op-copy { padding: 0 3px; margin: 0 -3px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; cursor: copy; text-align: left; }
+.op-copy:hover { background: color-mix(in srgb, var(--brand-yellow) 30%, transparent); }
+.op-copy.done::after { content: " ✓ 복사"; color: #1e7a45; font-size: 11px; font-weight: 700; }
+
+.op-pick { display: flex; flex-direction: column; gap: 2px; width: 100%; margin: 0 0 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.op-pick:hover { border-color: var(--brand-yellow); }
+.op-pick span { color: var(--muted); }
+
+.op-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--surface-0); }
+.op-label { color: var(--muted); font-weight: 700; }
+.op-dir { min-width: 0; max-width: 40%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.op-status { flex: 1; min-width: 120px; color: var(--muted); }
+.op-status.ok { color: #1e7a45; font-weight: 700; }
+.op-status.err { color: #b42318; font-weight: 700; }
+@media (prefers-color-scheme: dark) { .op-status.ok { color: #6fd39a; } .op-status.err { color: #ff8a80; } }
+@media (max-width: 720px) { .op-info { grid-template-columns: 1fr; } }

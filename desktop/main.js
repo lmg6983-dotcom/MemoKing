@@ -31,6 +31,7 @@ import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY, MAG
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
 import { FileIndex } from './file-index.js';
+import { Opms, looksLikeRef, foreignSummary, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -56,6 +57,7 @@ const PRELOAD = path.join(import.meta.dirname, 'preload.cjs');
 const OCR_PRELOAD = path.join(import.meta.dirname, 'ocr-preload.cjs');
 const MAGIC_PRELOAD = path.join(import.meta.dirname, 'magic-preload.cjs');
 const FINDER_PRELOAD = path.join(import.meta.dirname, 'finder-preload.cjs');
+const OPMS_PRELOAD = path.join(import.meta.dirname, 'opms-preload.cjs');
 const ASSETS_DIR = path.join(import.meta.dirname, '..', 'assets');
 // 창·작업표시줄·알림 영역 아이콘 (npm run icons 로 생성, 16~256px 9개 크기)
 const APP_ICON = path.join(ASSETS_DIR, 'icons', 'memoking.ico');
@@ -131,6 +133,11 @@ function loadSettings() {
     if (!('tutorialDone' in loaded)) settings.tutorialDone = true;
     // 새로 설치·업데이트·다시 설치했으면 튜토리얼을 다시 (같은 설치에서는 한 번만)
     if (settings.tutorialInstall !== installMark()) settings.tutorialDone = false;
+    // OPMS 검색이 "준비 중" 이던 때 저장된 꺼짐은 한 번 켠다 (그 뒤로는 사용자가 고른 대로)
+    if (!settings.opmsIntroduced && settings.magic?.modules) {
+      settings.magic = { ...settings.magic, modules: { ...settings.magic.modules, opms: true } };
+      settings.opmsIntroduced = true;
+    }
   } catch {
     // 첫 실행
   }
@@ -1811,7 +1818,18 @@ function copyFileToClipboard(p) {
 
 // 매직키 · 전체 결과 창의 줄마다 하는 일 (PowerToys Run 처럼): 열기 · 경로 복사 · 폴더 열기 · 파일 복사 · 메모 내용 복사
 //   파일은 방금 찾아 보여 준 것만. 반환 { ok, message, close } — close 면 매직키 창을 닫는다
-async function magicAct({ action, path: p, id } = {}) {
+async function magicAct({ action, path: p, id, opms } = {}) {
+  if (opms != null) {
+    const c = caseOf(opms);
+    if (action === 'copyOur' || action === 'copyApp') {
+      const text = action === 'copyOur' ? c.ourref : c.n_app;
+      if (!text) return { ok: false, message: action === 'copyOur' ? '관리번호가 없어요' : '출원번호가 없어요' };
+      clipboard.writeText(text);
+      return { ok: true, message: `${action === 'copyOur' ? '관리번호' : '출원번호'}를 복사했어요`, close: true };
+    }
+    showOpms(c.idx, action === 'wrapper' ? 'wrapper' : 'info');
+    return { ok: true, close: true };
+  }
   if (id != null) {
     const memo = vault?.get(String(id));
     if (!memo) return { ok: false };
@@ -1839,6 +1857,52 @@ async function magicAct({ action, path: p, id } = {}) {
   if (err) notice('열지 못했어요', err);
   return { ok: !err, close: true };
 }
+
+// ---------- OPMS (회사 사건 관리) — 매직키 "OPMS 검색" 모듈 + OPMS 창 (opms.js) ----------
+//   서버 주소·전자포대 저장 폴더는 settings.opms { host, wrapperDir } (점검 때는 MEMOKING_OPMS_HOST)
+const opmsSettings = () => ({ host: process.env.MEMOKING_OPMS_HOST || settings.opms?.host || OPMS_HOST, wrapperDir: settings.opms?.wrapperDir || DEFAULT_WRAPPER_DIR });
+const opmsClient = () => new Opms({ host: opmsSettings().host });
+const opmsCases = new Map(); // 찾아 보여 준 사건 (idx → 줄) — 창이 열 수 있는 것은 이것뿐
+const rememberCases = (rows) => {
+  for (const r of rows) if (r.idx) opmsCases.set(String(r.idx), r);
+  while (opmsCases.size > 300) opmsCases.delete(opmsCases.keys().next().value);
+};
+// 목록 한 줄에 보일 것
+const opmsBrief = (r) => ({
+  idx: r.idx, ourref: r.ourref, yourref: r.yourref, n_app: r.n_app, div: r.div,
+  applicant: r.applicant, title: r.title_kor, accepted: cleanDate(r.d_accept),
+});
+let opmsWin = null;
+let opmsLastDir = '';
+function showOpms(idx, tab = 'info') {
+  if (!opmsWin || opmsWin.isDestroyed()) {
+    opmsWin = new BrowserWindow({
+      width: 980,
+      height: 700,
+      minWidth: 620,
+      minHeight: 420,
+      show: false,
+      title: '메모킹 — OPMS',
+      autoHideMenuBar: true,
+      ...windowIcon,
+      webPreferences: { preload: OPMS_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
+    });
+    opmsWin.loadFile(path.join(APP_DIR, 'opms.html'));
+    opmsWin.once('ready-to-show', () => opmsWin?.show());
+    opmsWin.on('closed', () => { opmsWin = null; });
+    opmsWin.webContents.once('did-finish-load', () => opmsWin?.webContents.send('opms:show', { idx, tab }));
+  } else {
+    opmsWin.webContents.send('opms:show', { idx, tab });
+    if (opmsWin.isMinimized()) opmsWin.restore();
+    opmsWin.show();
+  }
+  opmsWin.focus();
+}
+const caseOf = (idx) => {
+  const c = opmsCases.get(String(idx ?? ''));
+  if (!c) throw new Error('찾아본 사건이 아니에요 — 다시 찾아 주세요');
+  return c;
+};
 
 // ---------- 전체 결과 창 — 매직키에서 "다른 n건" 을 고르면 (Everything 처럼 모두 · 열 정렬) ----------
 let finderWin = null;
@@ -2321,6 +2385,56 @@ function registerIpc() {
     return { notes, folders, files, more, index: fileIndex?.status() ?? null };
   });
   ipcMain.handle('magic:act', (_e, req) => magicAct(req)); // 닫기는 창이 (복사했다는 표시를 잠깐 보여 준 뒤)
+  // 매직키 OPMS 검색: 관리번호·출원번호처럼 보일 때만, 짧게 기다린다 (사내망이 아니면 금방 "접속 못 함")
+  ipcMain.handle('magic:opms-search', async (_e, query) => {
+    const q = String(query ?? '').slice(0, 40);
+    if (!activeModules(settings.magic).some((m) => m.id === 'opms') || !looksLikeRef(q)) return { cases: [], total: 0 };
+    try {
+      const rows = await opmsClient().find(q, { timeoutMs: 5000, retries: 0 });
+      rememberCases(rows);
+      return { cases: rows.slice(0, 6).map(opmsBrief), total: rows.length };
+    } catch (err) {
+      return { cases: [], total: 0, error: err.offline ? '사내망에 연결돼 있지 않아 OPMS 를 찾지 못했어요' : err.message };
+    }
+  });
+  // OPMS 창
+  ipcMain.handle('opms:search', async (_e, query) => {
+    const rows = await opmsClient().find(String(query ?? '').slice(0, 60), { retries: 1 });
+    rememberCases(rows);
+    return rows.map(opmsBrief);
+  });
+  ipcMain.handle('opms:case', async (_e, idx) => {
+    const c = caseOf(idx);
+    const foreign = await opmsClient().foreign(c).catch(() => []);
+    return { case: c, foreign, summary: foreignSummary(c, foreign), ...opmsSettings() };
+  });
+  ipcMain.handle('opms:mywork', (_e, idx) => opmsClient().mywork(caseOf(idx).idx));
+  ipcMain.handle('opms:bills', (_e, idx) => opmsClient().bills(caseOf(idx).idx));
+  ipcMain.handle('opms:attachments', (_e, idx) => opmsClient().attachments(caseOf(idx).idx));
+  ipcMain.handle('opms:download', async (event, { idx, ns, all } = {}) => {
+    const c = caseOf(idx);
+    const client = opmsClient();
+    const list = await client.attachments(c.idx);
+    const want = new Set((Array.isArray(ns) ? ns : []).map(Number));
+    const items = all ? list : list.filter((it) => want.has(it.n));
+    const res = await client.download(c, items, {
+      baseDir: opmsSettings().wrapperDir,
+      all: Boolean(all),
+      onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', p); },
+    });
+    opmsLastDir = res.dir;
+    if (!SMOKE) shell.openPath(res.dir); // 받은 폴더를 탐색기로 (OPMS 조회 프로그램처럼)
+    return res;
+  });
+  ipcMain.handle('opms:open-folder', () => (opmsLastDir ? shell.openPath(opmsLastDir) : ''));
+  ipcMain.handle('opms:choose-dir', async (event) => {
+    const r = await dialog.showOpenDialog(senderWindow(event), { title: '전자포대를 저장할 폴더', defaultPath: opmsSettings().wrapperDir, properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return opmsSettings().wrapperDir;
+    settings.opms = { ...settings.opms, wrapperDir: r.filePaths[0] };
+    saveSettings();
+    return r.filePaths[0];
+  });
+  ipcMain.handle('opms:copy', (_e, text) => clipboard.writeText(String(text ?? '').slice(0, 2000)));
   ipcMain.handle('magic:open-all', (_e, query) => {
     magicWin?.hide();
     showFinder(String(query ?? '').slice(0, 200));
@@ -2812,7 +2926,7 @@ app.whenReady().then(async () => {
       createPopupWatcher, smokePdf, getPdfWin: () => pdfWin, openPdfWindow,
       startTutorial, getTutorial: () => tutorial,
       captureToMemo, smokeToastsList: smokeToasts, getTitleBarOverlay: () => titleBarOverlay(),
-      showMagic, getMagic: () => magicWin, getFinder: () => finderWin, useFileIndex: (idx) => { fileIndex = idx; },
+      showMagic, getMagic: () => magicWin, getFinder: () => finderWin, useFileIndex: (idx) => { fileIndex = idx; }, getOpms: () => opmsWin,
     });
     return;
   }
