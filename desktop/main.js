@@ -1790,7 +1790,16 @@ const shownPath = (p) => typeof p === 'string' && (lastFileResults.has(p) || las
 function copyFileToClipboard(p) {
   return new Promise((resolve) => {
     if (process.platform === 'win32') {
-      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '& { Set-Clipboard -LiteralPath $args[0] }', p], { windowsHide: true, timeout: 8000 }, (err) => resolve(!err));
+      // 탐색기가 붙여 넣는 형식(파일 목록, CF_HDROP) — 빠른 메모·클립보드 점검이 쓰는 도우미의 files 동작.
+      //   경로는 파일로 넘긴다 (powershell -Command 뒤의 인자는 명령 글에 붙어 버려 경로가 전달되지 않았다)
+      const list = path.join(os.tmpdir(), `memoking-copy-${process.pid}-${Date.now()}.txt`);
+      fs.writeFileSync(list, `${p}\r\n`, 'utf8');
+      execFile('powershell.exe', ['-STA', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', CLIPBOARD_HELPER, '-Action', 'files', '-ListFile', list],
+        { windowsHide: true, timeout: 15000 }, (err) => {
+          if (err) console.error('파일을 클립보드에 넣지 못했어요', err.message);
+          fs.rmSync(list, { force: true });
+          resolve(!err);
+        });
     } else if (process.platform === 'darwin') {
       execFile('osascript', ['-e', 'on run argv', '-e', 'set the clipboard to (POSIX file (item 1 of argv))', '-e', 'end run', p], { timeout: 8000 }, (err) => resolve(!err));
     } else {
