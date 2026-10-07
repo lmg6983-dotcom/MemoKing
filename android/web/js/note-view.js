@@ -22,7 +22,7 @@ import { haptic, reduceMotion, replayClass } from '../../app/js/dom.js';
 import { createClearStamp } from '../../app/js/clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from '../../app/js/suggest-chips.js';
 import { setTouchMode } from '../../app/js/keyboard-guard.js';
-import { setupModeKnob } from './mode-knob.js';
+import { setupModeKnob, MODES } from './mode-knob.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -856,6 +856,8 @@ export function setKeyboard(open) {
 //   고치기·옮기기는 기억해 두고 메모를 열 때 이어 쓴다 (새 글 메모는 쓰려고 연 것이니 고치기로)
 const MODE_KEY = 'memoking.touchMode';
 let knob = null;
+let placeKnob = () => {};
+const DOCK_H = 52; // 아래 막대 높이 (mobile.css 의 #format-bar · .move-bar · 그리기 도구 막대)
 let restMode = 'edit'; // 그리기를 끝내면 돌아갈 방식
 function storedMode() {
   try {
@@ -864,9 +866,12 @@ function storedMode() {
     return 'edit';
   }
 }
-function applyMode(mode, { user = false } = {}) {
+function applyMode(mode, { user = false, quiet = false } = {}) {
   el.screen.dataset.touchMode = mode;
   $('mode-guide').hidden = true; // 앞 방식의 안내는 거둔다
+  // 다이얼로 바꾸면 어느 방식이든 같은 자리(아래 가운데 흰 안내)에 무엇이 되었는지
+  const m = MODES.find((x) => x.id === mode);
+  if (user && !quiet && m) showGuide(m.hint, m.label);
   setTouchMode(mode, el.editorRoot.querySelector('.ProseMirror'));
   closeAddMenu();
   if (mode !== 'draw') {
@@ -885,9 +890,9 @@ function applyMode(mode, { user = false } = {}) {
 }
 // 아래쪽 안내 (그리기 도구 막대와 같은 흰 모양) — 잠깐 떴다 사라진다
 let guideTimer = 0;
-function showGuide(text) {
+function showGuide(text, title = '') {
   const g = $('mode-guide');
-  g.textContent = text;
+  g.replaceChildren(...(title ? [Object.assign(document.createElement('b'), { textContent: title }), ' · '] : []), text);
   g.hidden = false;
   replayClass(g, 'show');
   clearTimeout(guideTimer);
@@ -917,22 +922,26 @@ el.editorRoot.addEventListener('pointerup', (e) => {
   }, 30);
 });
 
-/** 글을 써야 하는 때(튜토리얼의 쓰기 단계 등): 다이얼을 글 고치기로 — 이름표로 바뀐 것을 알린다 */
+/** 글을 써야 하는 때(튜토리얼의 쓰기 단계 등): 다이얼을 글 고치기로 — 안내로 바뀐 것을 알린다 */
 export function useEditMode() {
   if (knob && knob.mode !== 'edit') knob.set('edit');
 }
 function setupKnob() {
-  knob ??= setupModeKnob(el.screen, { value: storedMode(), onChange: (m) => applyMode(m, { user: true }) });
+  knob ??= setupModeKnob(el.screen, { value: storedMode(), onChange: (m, { quiet }) => applyMode(m, { user: true, quiet }) });
   // 다이얼은 아래쪽 막대들(도구막대 · 녹음 판 · 추천 태그 줄) 바로 위 — 녹음 정지 단추 등을 가리지 않고,
   //   키보드가 올라와 막대가 움직여도 따라간다
-  const stack = [el.formatBar, $('move-bar'), $('rec-panel'), el.tagBar].filter(Boolean);
-  const place = () => {
+  //   도구막대 · 옮기기 막대 · 그리기 도구 막대는 같은 높이(52px)·같은 자리라 그만큼은 고정 — 방식을 바꿔도
+  //   (막대가 올라오는 움직임 도중에 재더라도) 다이얼 · 안내가 제자리. 녹음 판 · 추천 태그 줄이 더 얹히면 그만큼 위로
+  const extras = [el.formatBar, $('rec-panel'), el.tagBar].filter(Boolean); // 도구막대도 — 두 줄로 접힐 때(좁은 화면) 위로
+  placeKnob = () => {
     const bottom = el.screen.getBoundingClientRect().bottom;
-    const tops = stack.filter((e) => e.offsetHeight).map((e) => e.getBoundingClientRect().top);
-    el.screen.style.setProperty('--fb-h', `${Math.max(0, Math.round(bottom - Math.min(bottom, ...tops)))}px`);
+    const base = DOCK_H + (parseFloat(getComputedStyle($('move-bar')).marginBottom) || 8);
+    const tops = extras.filter((e) => e.offsetHeight).map((e) => e.getBoundingClientRect().top);
+    const over = tops.length ? Math.round(bottom - Math.min(...tops)) : 0;
+    el.screen.style.setProperty('--fb-h', `${Math.max(base, over)}px`);
   };
-  const ro = new ResizeObserver(place);
-  for (const e of [el.screen, ...stack]) ro.observe(e);
+  const ro = new ResizeObserver(() => placeKnob());
+  for (const e of [el.screen, ...extras]) ro.observe(e);
 }
 
 // ---------- 위쪽 버튼 ----------
@@ -1045,6 +1054,7 @@ export async function openNote(memoId, options = {}) {
         if (!on && knob?.mode === 'draw') knob.set(restMode, { quiet: true });
         if (on && knob && knob.mode !== 'draw') knob.set('draw', { quiet: true });
         el.screen.classList.toggle('annotating', on);
+        placeKnob(); // 그리기 도구 막대가 생기고 없어질 때
         if (on) document.activeElement?.blur(); // 키보드를 내리고 그리기
         else tutEvent('annotate-done');
       },

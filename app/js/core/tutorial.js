@@ -225,10 +225,10 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['.mode-knob .mk-stop-move', '.mode-knob'], keep: ['.ProseMirror > *', '.mode-knob'], sample: true, advance: 'mode-moved', emoji: '↕️', image: 'm-move.jpg',
+    id: 'move', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.ProseMirror > *', '.mode-knob'], sample: true, advance: 'mode-moved', emoji: '↕️', image: 'm-move.jpg',
     title: '다이얼로 옮기기',
     text: '오른쪽 아래 다이얼로 글 고치기 · 옮기기 · 글 위에 그리기를 골라요. 옮기기에서는 줄·사진·표를 짧게 눌러 끌면 돼요 (연습용 장보기 목록을 넣어 뒀어요). 글을 복사하거나 고칠 땐 글 고치기로.',
-    try: '다이얼 둘레의 옮기기(네 방향 화살표)를 눌러 보세요',
+    try: '오른쪽 아래 다이얼을 한 번 눌러 옮기기로 돌려 보세요',
     next: LATER,
   },
   {
@@ -246,10 +246,10 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'annotate', win: 'note', target: ['.mode-knob .mk-stop-draw', '.mode-knob'], keep: ['.mode-knob', '.mk-annot-bar'], advance: 'annotate-done', emoji: '🖍️',
+    id: 'annotate', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.mode-knob', '.mk-annot-bar'], advance: 'annotate-done', emoji: '🖍️',
     title: '글 위에 바로 그리기',
-    text: '다이얼을 글 위에 그리기로 돌리면 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요. 다 그렸으면 다이얼을 다른 방식으로 돌리면 저장돼요.',
-    try: '다이얼 맨 위 그리기를 눌러 글 위에 쓱 긋고, 다이얼을 글 고치기로',
+    text: '다이얼을 글 위에 그리기로 돌리면 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요. 다 그렸으면 다이얼을 한 번 더 눌러 글 고치기로 돌리면 저장돼요.',
+    try: '다이얼을 누르면 둘레에 칸이 펼쳐져요 — 맨 위 그리기를 눌러 글 위에 쓱 긋고, 다이얼을 다시 눌러 끝내요',
     next: LATER,
   },
   {

@@ -1,14 +1,14 @@
 // 메모 화면 오른쪽 아래(엄지 자리) 다루기 방식 다이얼 — 글 고치기 · 옮기기 · 글 위에 그리기
 //   - 다이얼을 누르면 다음 방식으로 한 칸 돌아가고, 둘레의 아이콘을 누르면 그 방식으로 바로
 //   - 다이얼을 손가락으로 돌리면(끌면) 가까운 칸에 딸깍 맞춰진다
-//   - 바뀔 때마다 톡 진동 + 잠깐 이름표 ("옮기기 — 줄을 짧게 눌러 끌어요")
-//   무엇을 하는지는 note-view.js 의 onChange 가 정한다 (키보드·옮기기 손짓·그리기)
+//   - 둘레의 칸은 다이얼을 누르거나 돌리는 동안(과 잠깐 뒤)만 펼친다 — 방식과 상관없이 늘 같게
+//   - 바뀔 때마다 톡 진동. 무엇을 하는지·안내 문구는 note-view.js 의 onChange 가 정한다 (늘 같은 자리의 안내)
 import { haptic } from '../../app/js/dom.js';
 
 export const MODES = [
   { id: 'edit', label: '글 고치기', hint: '글자를 꾹 누르면 골라서 복사·고칠 수 있어요', icon: 'type', angle: 180 },
-  { id: 'move', label: '옮기기', hint: '', icon: 'move', angle: 225 }, // 안내는 도구막대 자리의 "옮기기 모드" 막대가
-  { id: 'draw', label: '글 위에 그리기', hint: '', icon: 'highlighter', angle: 270 }, // 안내는 그리기 도구 막대가 직접 띄운다
+  { id: 'move', label: '옮기기', hint: '줄·사진을 짧게 눌러 끌어요', icon: 'move', angle: 225 },
+  { id: 'draw', label: '글 위에 그리기', hint: '밑줄·동그라미를 그려요 · 글은 그대로예요', icon: 'highlighter', angle: 270 },
 ];
 const byId = (id) => MODES.find((m) => m.id === id) ?? MODES[0];
 
@@ -23,7 +23,7 @@ function svg(name) {
 
 /**
  * @param {HTMLElement} host 다이얼을 넣을 곳 (메모 화면)
- * @param {{ value: string, onChange: (mode: string) => void }} o
+ * @param {{ value: string, onChange: (mode: string, o: { quiet: boolean }) => void }} o
  */
 export function setupModeKnob(host, { value, onChange }) {
   let mode = byId(value).id;
@@ -53,14 +53,18 @@ export function setupModeKnob(host, { value, onChange }) {
   const face = document.createElement('span');
   face.className = 'mk-dial-face';
   dial.append(face, notch);
-  const tag = document.createElement('div');
-  tag.className = 'mode-knob-tag';
-  tag.setAttribute('role', 'status');
-  root.append(...stops, dial, tag);
+  root.append(...stops, dial);
   host.append(root);
 
-  let tagTimer = 0;
-  function render({ announce = false } = {}) {
+  // 둘레 칸 펼치기: 누르는 동안 + 손을 뗀 뒤 잠깐 (그 사이 칸을 바로 누를 수 있게)
+  let foldTimer = 0;
+  function unfold(hold = false) {
+    clearTimeout(foldTimer);
+    root.classList.add('open');
+    if (!hold) foldTimer = setTimeout(() => root.classList.remove('open'), 2200);
+  }
+
+  function render() {
     const m = byId(mode);
     root.dataset.mode = mode;
     // 눈금: 0° 가 오른쪽(3시) — 칸의 각도로 돌린다 (CSS 전환이 이어서 돌려 주므로 중간에 바꿔도 부드럽다)
@@ -68,26 +72,27 @@ export function setupModeKnob(host, { value, onChange }) {
     face.replaceChildren(svg(m.icon));
     for (const b of stops) b.setAttribute('aria-checked', String(b.dataset.mode === mode));
     dial.setAttribute('aria-label', `다루기 방식: ${m.label} (누르면 다음 방식)`);
-    if (!announce || !m.hint) {
-      tag.classList.remove('show');
-      return;
-    }
-    tag.replaceChildren(Object.assign(document.createElement('b'), { textContent: m.label }), document.createTextNode(m.hint));
-    tag.classList.add('show');
-    clearTimeout(tagTimer);
-    tagTimer = setTimeout(() => tag.classList.remove('show'), 2200);
   }
 
   function choose(next, { quiet = false } = {}) {
     next = byId(next).id;
     if (next === mode) return;
     mode = next;
-    render({ announce: !quiet });
+    render();
     if (!quiet) haptic(10);
-    onChange(mode);
+    onChange(mode, { quiet });
   }
 
-  for (const b of stops) b.addEventListener('click', () => choose(b.dataset.mode));
+  // 손가락으로 다이얼을 톡 누르면 pointerup 다음에 click 이 한 번 더 온다 — 그 사이 화면이 바뀌어
+  //   펼친 칸이 손가락 밑에 오면 그 칸이 눌린 것이 되므로, 다이얼을 뗀 직후의 칸 누름은 받지 않는다
+  let dialUpAt = 0;
+  for (const b of stops) {
+    b.addEventListener('click', () => {
+      if (performance.now() - dialUpAt < 400) return;
+      choose(b.dataset.mode);
+      unfold();
+    });
+  }
 
   // 누르기 = 다음 칸 · 돌리기(끌기) = 가까운 칸
   let turn = null;
@@ -95,6 +100,7 @@ export function setupModeKnob(host, { value, onChange }) {
     const r = dial.getBoundingClientRect();
     turn = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
     dial.setPointerCapture?.(e.pointerId);
+    unfold(true);
   });
   dial.addEventListener('pointermove', (e) => {
     if (!turn || e.pointerId !== turn.id) return;
@@ -110,6 +116,8 @@ export function setupModeKnob(host, { value, onChange }) {
     if (!turn || e.pointerId !== turn.id) return;
     const tapped = !turn.moved;
     turn = null;
+    dialUpAt = performance.now();
+    unfold();
     if (tapped && e.type === 'pointerup') {
       const i = MODES.findIndex((m) => m.id === mode);
       choose(MODES[(i + 1) % MODES.length].id);
@@ -117,16 +125,19 @@ export function setupModeKnob(host, { value, onChange }) {
   };
   dial.addEventListener('click', (e) => {
     if (e.detail !== 0) return; // 손가락·마우스는 pointerup 이 맡는다 — 키보드 Enter·Space 만
+    unfold();
     const i = MODES.findIndex((m) => m.id === mode);
     choose(MODES[(i + 1) % MODES.length].id);
   });
   dial.addEventListener('pointerup', end);
   dial.addEventListener('pointercancel', end);
+  root.addEventListener('focusin', () => turn || unfold()); // Tab 으로 왔을 때도 칸이 보이게
   // 키보드(블루투스 키보드 등): 화살표로 칸 옮기기
   root.addEventListener('keydown', (e) => {
     const dir = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
     if (!dir) return;
     e.preventDefault();
+    unfold();
     const i = MODES.findIndex((m) => m.id === mode);
     choose(MODES[(i + dir + MODES.length) % MODES.length].id);
   });
@@ -136,7 +147,7 @@ export function setupModeKnob(host, { value, onChange }) {
     get mode() {
       return mode;
     },
-    /** 바깥에서 바뀐 때 (그리기를 "완료"로 끝냄 · 새 메모는 고치기로) — quiet 면 이름표·진동 없이 */
+    /** 바깥에서 바뀐 때 (그리기를 뒤로 가기로 끝냄 · 새 메모는 고치기로) — quiet 면 안내·진동 없이 */
     set: (next, opts) => choose(next, opts),
     el: root,
   };
