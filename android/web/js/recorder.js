@@ -178,6 +178,13 @@ export async function start(memoId) {
   }
 }
 
+// 화면이 막 바뀐 때(다루기 방식을 바꿔 도구막대가 생기는 등)는 "끝내기" 가 손가락 밑으로 밀려올 수 있다 —
+//   그 순간의 누름으로 회의 녹음이 끝나 버리지 않게 잠깐 받지 않는다
+let holdUntil = 0;
+export function holdStop(ms = 600) {
+  holdUntil = performance.now() + ms;
+}
+
 export async function stop() {
   if (!status.active || stopping) return;
   stopping = true;
@@ -202,7 +209,10 @@ export function toggle() {
   return start(attached);
 }
 
-el.stop.addEventListener('click', () => stop());
+el.stop.addEventListener('click', () => {
+  if (performance.now() < holdUntil) return;
+  stop();
+});
 el.pause.addEventListener('click', () => {
   try {
     const next = status.paused ? record.resume() : record.pause();
