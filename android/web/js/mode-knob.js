@@ -7,7 +7,7 @@ import { haptic } from '../../app/js/dom.js';
 
 export const MODES = [
   { id: 'edit', label: '글 고치기', hint: '글자를 꾹 누르면 골라서 복사·고칠 수 있어요', icon: 'type', angle: 180 },
-  { id: 'move', label: '옮기기', hint: '줄·그림을 짧게 눌러 끌어 옮겨요 (키보드 없이)', icon: 'move', angle: 225 },
+  { id: 'move', label: '옮기기', hint: '', icon: 'move', angle: 225 }, // 안내는 도구막대 자리의 "옮기기 모드" 막대가
   { id: 'draw', label: '글 위에 그리기', hint: '', icon: 'highlighter', angle: 270 }, // 안내는 그리기 도구 막대가 직접 띄운다
 ];
 const byId = (id) => MODES.find((m) => m.id === id) ?? MODES[0];

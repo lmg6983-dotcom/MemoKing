@@ -195,10 +195,7 @@
     <!-- 서식 도구막대: 휴대폰에서는 옆으로 밀어서 더 보기 (되돌리기·다시 하기는 위 막대에) -->
     <footer class="format-bar" id="format-bar" role="toolbar" aria-label="서식">
       <div class="format-items" id="format-items">
-        <!-- 콘텐츠 추가: 누르면 위로 사진·파일·음성 녹음·표·수식 (평소엔 이 단추 하나) -->
-        <button data-action="add" id="add-btn" class="add-btn" aria-label="콘텐츠 추가" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
-        <span class="sep"></span>
-        <!-- 자주 쓰는 순서: 글자 서식 → 목록 → 스타일 -->
+        <!-- 자주 쓰는 순서: 글자 서식 → 목록 → 스타일 (글자 색·형광펜: 누르면 고른 색, 꾹 누르면 색 고르기) -->
         <button data-cmd="bold" aria-label="굵게"><b>B</b></button>
         <button data-cmd="italic" aria-label="기울임"><i>I</i></button>
         <button data-cmd="underline" aria-label="밑줄"><u>U</u></button>
@@ -217,6 +214,16 @@
         <button data-action="style" class="style-btn" aria-label="스타일" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
       </div>
     </footer>
+
+    <!-- 옮기기 방식: 도구막대 대신 (고칠 수 없으니) — 글자를 누르면 글 고치기로 -->
+    <div id="move-bar" class="move-bar" role="status">
+      <svg aria-hidden="true"><use href="#i-move"/></svg>
+      <span class="move-bar-text"><b>옮기기 모드</b><small>줄·사진을 짧게 눌러 끌어요 · 글자를 누르면 글 고치기</small></span>
+    </div>
+    <!-- 왼쪽 아래(엄지 자리) 콘텐츠 추가: 누르면 위로 사진·파일·음성 녹음·표·수식 — 오른쪽 아래 다이얼과 같은 크기 -->
+    <button data-action="add" id="add-btn" class="add-btn add-fab" aria-label="콘텐츠 추가" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
+    <!-- 방식이 저절로 바뀌었을 때 등 아래쪽 안내 (그리기 도구 막대와 같은 흰 모양) -->
+    <div id="mode-guide" class="mode-guide" role="status" aria-live="polite" hidden></div>
 
     <!-- 콘텐츠 추가 위성 단추 (+ 위로 펼쳐짐) -->
     <div id="add-menu" class="add-menu" role="menu" aria-label="콘텐츠 추가" hidden>

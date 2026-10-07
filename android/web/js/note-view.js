@@ -737,11 +737,47 @@ const actions = {
   add: () => (addMenu.hidden || addMenu.classList.contains('closing') ? openAddMenu() : closeAddMenu()),
   table: () => editor.insertTable(),
   style: (btn) => (el.styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
-  color: (btn) => (paletteKind === 'color' ? closePalette() : openPalette('color', btn)),
-  highlight: (btn) => (paletteKind === 'highlight' ? closePalette() : openPalette('highlight', btn)),
+  // 글자 색·형광펜: 누르면 고른(지난번) 색을 바로, 꾹 누르면 색 고르기 판 (아래 longPressColor)
+  color: (btn) => applyPreset('color', btn),
+  highlight: (btn) => applyPreset('highlight', btn),
 };
+function applyPreset(kind, btn) {
+  if (btn.dataset.longPressed) {
+    delete btn.dataset.longPressed; // 꾹 눌러 판을 연 손가락을 뗀 것 — 색은 판에서
+    return;
+  }
+  if (paletteKind) return closePalette();
+  PALETTES[kind].apply(lastColor[kind]);
+  haptic(6);
+}
+// 꾹(0.45초) 누르면 색 고르기 판 — 판에서 고른 색은 다음부터 누르기만 해도 쓰는 색이 된다
+for (const btn of el.formatBar.querySelectorAll('[data-action="color"], [data-action="highlight"]')) {
+  let timer = 0;
+  btn.addEventListener('pointerdown', () => {
+    delete btn.dataset.longPressed;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      btn.dataset.longPressed = '1';
+      haptic(12);
+      closeStyleMenu();
+      closeAddMenu();
+      openPalette(btn.dataset.action, btn);
+    }, 450);
+  });
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) btn.addEventListener(t, () => clearTimeout(timer));
+  btn.addEventListener('contextmenu', (e) => e.preventDefault()); // 꾹 누를 때 휴대폰 메뉴 대신
+}
 
 el.formatBar.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서(키보드)를 유지
+// + 는 도구막대 밖(왼쪽 아래) — 펼치면 키보드를 닫는다 (openAddMenu)
+//   누르는 순간 초점이 단추로 옮겨 가지 않게 (쓰던 중이었는지 알아야 사진·파일을 커서 자리에 넣는다)
+addBtn.addEventListener('mousedown', (e) => e.preventDefault());
+addBtn.addEventListener('click', () => {
+  if (!editor) return;
+  closePalette();
+  closeStyleMenu();
+  actions.add();
+});
 el.formatBar.addEventListener('click', (e) => {
   const btn = e.target.closest('button');
   if (!btn || !editor) return;
@@ -810,6 +846,8 @@ function showActive(active) {
 // 키보드가 올라와 있을 때만 "키보드 닫기" 버튼
 export function setKeyboard(open) {
   el.screen.classList.toggle('keyboard', open);
+  // 키보드가 올라와 화면이 줄면 쓰던 줄이 가려지지 않게 다시 맞춘다
+  if (open) requestAnimationFrame(() => editor?.revealCaret());
 }
 
 // ---------- 다루기 방식 다이얼 (오른쪽 아래): 글 고치기 · 옮기기 · 글 위에 그리기 ----------
@@ -828,6 +866,7 @@ function storedMode() {
 }
 function applyMode(mode, { user = false } = {}) {
   el.screen.dataset.touchMode = mode;
+  $('mode-guide').hidden = true; // 앞 방식의 안내는 거둔다
   setTouchMode(mode, el.editorRoot.querySelector('.ProseMirror'));
   closeAddMenu();
   if (mode !== 'draw') {
@@ -844,6 +883,40 @@ function applyMode(mode, { user = false } = {}) {
   if (user && mode === 'edit' && editor) editor.focus();
   if (user && mode === 'move') tutEvent('mode-moved');
 }
+// 아래쪽 안내 (그리기 도구 막대와 같은 흰 모양) — 잠깐 떴다 사라진다
+let guideTimer = 0;
+function showGuide(text) {
+  const g = $('mode-guide');
+  g.textContent = text;
+  g.hidden = false;
+  replayClass(g, 'show');
+  clearTimeout(guideTimer);
+  guideTimer = setTimeout(() => (g.hidden = true), 2600);
+}
+// 옮기기 방식에서 글자를 톡 누르면(커서를 놓으려는 것) 글 고치기로 넘어가 그 자리에서 쓴다
+//   끌기·스크롤(움직임)·꾹 누르기는 아니고, 체크 네모·그림·링크·단추를 누른 것도 아닐 때만
+let tapDown = null;
+el.editorRoot.addEventListener('pointerdown', (e) => {
+  tapDown = knob?.mode === 'move' && e.isPrimary ? { x: e.clientX, y: e.clientY, t: e.timeStamp } : null;
+}, true);
+el.editorRoot.addEventListener('pointerup', (e) => {
+  const d = tapDown;
+  tapDown = null;
+  if (!d || knob?.mode !== 'move' || e.timeStamp - d.t > 300 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return;
+  const t = e.target instanceof Element ? e.target : null;
+  const block = t?.closest('.ProseMirror p, .ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror td, .ProseMirror th, .ProseMirror pre');
+  if (!block || t.closest('a, img, button, input, .mk-media, .mk-link-card, .mk-file, .mk-math, .mk-math-block')) return; // 태그 알약도 글자다
+  const li = block.closest('li');
+  if (li && e.clientX < block.getBoundingClientRect().left) return; // 체크 네모
+  if (document.querySelector('.mk-list-dragging, .mk-block-dragging, body.mk-list-dragging, body.mk-block-dragging')) return;
+  // 손가락을 뗀 뒤 편집기가 커서를 놓으면 그 자리 그대로 키보드와 함께
+  setTimeout(() => {
+    if (knob?.mode !== 'move') return;
+    knob.set('edit', { quiet: true }); // → applyMode: 키보드를 풀고 그 커서에 초점
+    showGuide('글 고치기로 바꿨어요 · 옮기려면 다이얼을 옮기기로');
+  }, 30);
+});
+
 /** 글을 써야 하는 때(튜토리얼의 쓰기 단계 등): 다이얼을 글 고치기로 — 이름표로 바뀐 것을 알린다 */
 export function useEditMode() {
   if (knob && knob.mode !== 'edit') knob.set('edit');
@@ -852,7 +925,7 @@ function setupKnob() {
   knob ??= setupModeKnob(el.screen, { value: storedMode(), onChange: (m) => applyMode(m, { user: true }) });
   // 다이얼은 아래쪽 막대들(도구막대 · 녹음 판 · 추천 태그 줄) 바로 위 — 녹음 정지 단추 등을 가리지 않고,
   //   키보드가 올라와 막대가 움직여도 따라간다
-  const stack = [el.formatBar, $('rec-panel'), el.tagBar].filter(Boolean);
+  const stack = [el.formatBar, $('move-bar'), $('rec-panel'), el.tagBar].filter(Boolean);
   const place = () => {
     const bottom = el.screen.getBoundingClientRect().bottom;
     const tops = stack.filter((e) => e.offsetHeight).map((e) => e.getBoundingClientRect().top);
@@ -940,6 +1013,7 @@ export async function openNote(memoId, options = {}) {
       onTables: saveTables,
       readAttachment: async (src) => (await fetch(vaultUrl(src))).text(),
       tapContinuesList: true, // 목록 아래 줄을 눌러 줄을 바꾸는 사람도 목록이 이어지게
+      scrollMargin: 96, // 쓰는 줄이 아래쪽 + · 다이얼에 가리지 않게
     });
     // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 (열기만 해도 저장되는 일 방지)
     current = saved = editor.getMarkdown();
@@ -975,6 +1049,7 @@ export async function openNote(memoId, options = {}) {
         else tutEvent('annotate-done');
       },
       notice: (text, err) => toast(text, err),
+      done: false, // 끝내기는 다이얼(또는 뒤로 가기) — 완료 단추와 겹치지 않게
     });
     annotation.load(Boolean(memo.ink));
     if (options.record) recorder.start(memoId);
