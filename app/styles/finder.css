@@ -55,9 +55,5 @@ body {
 .finder-foot { display: flex; flex: none; gap: 14px; align-items: center; height: 30px; padding: 0 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .finder-count { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
 .finder-status { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.finder-status.flash { color: #1e7a45; font-weight: 700; }
-.finder-status.flash.err { color: #b42318; }
-@media (prefers-color-scheme: dark) {
-  .finder-status.flash { color: #6fd39a; }
-  .finder-status.flash.err { color: #ff8a80; }
-}
+.finder-status.flash { color: var(--ok-text); font-weight: 700; }
+.finder-status.flash.err { color: var(--err-text); }

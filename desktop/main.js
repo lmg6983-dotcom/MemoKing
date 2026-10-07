@@ -2404,8 +2404,12 @@ function registerIpc() {
     return rows.map(opmsBrief);
   });
   ipcMain.handle('opms:case', async (_e, idx) => {
-    const c = caseOf(idx);
-    const foreign = await opmsClient().foreign(c).catch(() => []);
+    // 찾아본 사건만 — 서지는 서버에서 새로 (창의 "새로 고침"), 못 받으면 찾을 때 받은 것으로
+    const known = caseOf(idx);
+    const client = opmsClient();
+    const c = (await client.caseByIdx(known.idx).catch(() => null)) ?? known;
+    rememberCases([c]);
+    const foreign = await client.foreign(c).catch(() => []);
     return { case: c, foreign, summary: foreignSummary(c, foreign), ...opmsSettings() };
   });
   ipcMain.handle('opms:mywork', (_e, idx) => opmsClient().mywork(caseOf(idx).idx));

@@ -139,6 +139,7 @@ tabsEl.addEventListener('click', (e) => {
   if (b) show(b.dataset.tab);
 });
 tabsEl.addEventListener('keydown', (e) => {
+  if (!e.target.closest('[data-tab]')) return;
   const order = ['info', 'wrapper', 'bills', 'foreign'];
   const dir = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
   if (!dir) return;
@@ -156,14 +157,26 @@ async function load(kind, fn) {
 async function show(which) {
   if (!current) return;
   tab = which;
-  for (const b of tabsEl.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  for (const b of tabsEl.querySelectorAll('[data-tab]')) {
+    const on = b.dataset.tab === tab;
+    b.setAttribute('aria-selected', String(on));
+    b.tabIndex = on ? 0 : -1; // Tab 은 고른 탭 하나로 — 탭 사이는 ← →
+  }
+  main.setAttribute('aria-labelledby', `op-tab-${tab}`);
   foot.hidden = tab !== 'wrapper';
   const my = ++seq;
   const c = current.case;
   try {
     if (tab === 'info') {
       main.replaceChildren(infoGrid(c), el('h3', 'op-h', '업무배분'), el('p', 'op-msg', '불러오는 중…'));
-      const rows = await load('mywork', api.mywork);
+      let rows;
+      try {
+        rows = await load('mywork', api.mywork);
+      } catch (err) {
+        // 업무배분만 못 불러와도 위의 서지정보는 그대로 둔다
+        if (my === seq) main.lastChild.replaceWith(el('p', 'op-msg err', `업무배분을 불러오지 못했어요 — ${errText(err)}`));
+        return;
+      }
       if (my !== seq) return;
       main.lastChild.replaceWith(table([
         ['업무', (r) => r.div_job],
@@ -236,6 +249,8 @@ function infoGrid(c) {
 // ---------- 전자포대 ----------
 
 let attach = [];
+// 받는 중에 다른 탭에 다녀와도 진행 표시가 이어지고, 두 번 겹쳐 받지 않게 — { idx, text, cls, title, done }
+let dl = null;
 async function showWrapper(my) {
   message('전자포대 목록을 불러오는 중…');
   attach = await load('wrapper', api.attachments);
@@ -285,45 +300,64 @@ async function showWrapper(my) {
   });
   const status = el('span', 'op-status');
   status.setAttribute('role', 'status');
+  const busy = () => Boolean(dl && !dl.done);
+  const paint = () => {
+    if (!dl || dl.idx !== current.case.idx) return;
+    status.className = `op-status ${dl.cls ?? ''}`;
+    status.textContent = dl.text;
+    status.title = dl.title ?? '';
+    if (dl.done && dl.saved != null) {
+      foot.querySelector('.op-open')?.remove();
+      const openBtn = el('button', 'op-link op-open', '폴더 열기');
+      openBtn.type = 'button';
+      openBtn.addEventListener('click', () => api.openFolder());
+      status.after(openBtn);
+    }
+  };
   const getSome = el('button', 'op-btn', '고른 것 받기');
   getSome.type = 'button';
   const getAll = el('button', 'op-btn primary', `전체 받기 (${attach.length})`);
   getAll.type = 'button';
   getAll.disabled = !attach.length;
   foot.replaceChildren(el('span', 'op-label', '저장 위치'), dir, change, status, getSome, getAll);
+  paint();
 
   function sync() {
     const n = boxes.filter((b) => b.checked).length;
     all.checked = n > 0 && n === boxes.length;
     all.indeterminate = n > 0 && n < boxes.length;
     getSome.textContent = n ? `고른 ${n}개 받기` : '고른 것 받기';
-    getSome.disabled = !n;
+    getSome.disabled = !n || busy();
+    getAll.disabled = !attach.length || busy();
+    change.disabled = busy();
   }
   sync();
 
   async function run(isAll) {
+    if (busy()) return;
     const ns = boxes.filter((b) => b.checked).map((b) => Number(b.value));
-    getSome.disabled = getAll.disabled = true;
-    status.className = 'op-status';
-    status.textContent = '받는 중…';
+    const idx = current.case.idx;
+    dl = { idx, text: '받는 중…', cls: '', done: false };
+    sync();
+    paint();
     try {
-      const res = await api.download({ idx: current.case.idx, ns, all: isAll });
+      const res = await api.download({ idx, ns, all: isAll });
       const parts = [`${res.saved}개 저장`];
       if (res.skipped) parts.push(`${res.skipped}개는 이미 있음`);
       if (res.failed.length) parts.push(`${res.failed.length}개 실패`);
-      status.className = `op-status ${res.failed.length ? 'err' : 'ok'}`;
-      status.textContent = `${res.failed.length ? '' : '✓ '}${parts.join(' · ')}${isAll ? ' · 사건정보.txt' : ''}`;
-      status.title = res.failed.map((f) => `${f.name}: ${f.error}`).join('\n');
-      foot.querySelector('.op-open')?.remove();
-      const openBtn = el('button', 'op-link op-open', '폴더 열기');
-      openBtn.type = 'button';
-      openBtn.addEventListener('click', () => api.openFolder());
-      status.after(openBtn);
+      dl = {
+        idx, done: true, saved: res.saved, cls: res.failed.length ? 'err' : 'ok',
+        text: `${res.failed.length ? '' : '✓ '}${parts.join(' · ')}${isAll ? ' · 사건정보.txt' : ''}`,
+        title: res.failed.map((f) => `${f.name}: ${f.error}`).join('\n'),
+      };
     } catch (err) {
-      status.className = 'op-status err';
-      status.textContent = errText(err);
-    } finally {
-      getAll.disabled = !attach.length;
+      dl = { idx, done: true, cls: 'err', text: errText(err) };
+    }
+    // 그사이 탭을 옮겼다 왔으면 새로 그린 막대에 (지금 보이는 것이 이 사건의 전자포대일 때만)
+    if (tab === 'wrapper' && current.case.idx === idx) {
+      const live = foot.querySelector('.op-status');
+      if (live && live !== status) return show('wrapper');
+      paint();
       sync();
     }
   }
@@ -332,8 +366,27 @@ async function showWrapper(my) {
 }
 
 api.onProgress((p) => {
+  if (!dl || dl.done || !p.total || p.i >= p.total) return;
+  dl.text = `받는 중… ${p.i + 1}/${p.total} · ${p.name}`;
   const s = foot.querySelector('.op-status');
-  if (s && p.total && p.i < p.total) s.textContent = `받는 중… ${p.i + 1}/${p.total} · ${p.name}`;
+  if (s && tab === 'wrapper' && current?.case.idx === dl.idx) s.textContent = dl.text;
+});
+
+// 새로 고침: 이 사건의 업무배분 · 청구서 · 전자포대 · 해외출원을 서버에서 다시
+$('op-refresh').addEventListener('click', () => {
+  if (!current) return;
+  for (const k of [...cache.keys()]) if (k.startsWith(`${current.case.idx}:`)) cache.delete(k);
+  open(current.case.idx, tab);
+});
+
+// Esc: 찾는 칸에 글이 있으면 지우고, 아니면 창 닫기 (모두 찾기 창과 같게)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || e.isComposing) return;
+  if (document.activeElement === input && input.value) {
+    input.value = '';
+    return;
+  }
+  window.close();
 });
 
 api.onShow(({ idx, tab: which }) => {

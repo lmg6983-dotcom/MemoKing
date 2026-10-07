@@ -16,6 +16,7 @@ body {
   border: 1px solid var(--line); border-radius: 10px; background: var(--surface-0); color: var(--text);
   font: inherit; font-size: 14px; outline: none;
 }
+.op-search input::placeholder { color: var(--text-muted); }
 .op-search input:focus { border-color: var(--brand-yellow); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-yellow) 30%, transparent); }
 .op-btn {
   height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); color: var(--text);
@@ -36,18 +37,25 @@ body {
 .op-badge { margin-left: 8px; padding: 2px 8px; border-radius: 99px; background: color-mix(in srgb, var(--op-accent) 14%, transparent); color: var(--op-accent) !important; font-size: 12px; font-weight: 700; }
 .op-sub { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.op-tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.op-tabs { display: flex; align-items: center; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.op-tabs [role="tablist"] { display: flex; gap: 2px; }
 .op-tabs button {
   height: 36px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none;
   color: var(--muted); font: inherit; font-weight: 700; cursor: pointer;
 }
 .op-tabs button[aria-selected="true"] { border-bottom-color: var(--brand-yellow); color: var(--text); }
 .op-tabs button:hover { color: var(--text); }
+.op-tabs .op-refresh { margin-left: auto; border-bottom: 0; font-weight: 600; }
+/* 키보드로 옮겨 다닐 때만 보이는 테두리 (메모킹 노랑) */
+:is(.op-btn, .op-link, .op-copy, .op-pick, .op-tabs button):focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; border-radius: 6px; }
+.op-table input[type="checkbox"] { accent-color: var(--brand-yellow); }
 
 .op-main { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 20px; outline: none; }
 .op-msg { margin: 18px 2px; color: var(--muted); }
-.op-msg.err { color: #b42318; }
-@media (prefers-color-scheme: dark) { .op-msg.err { color: #ff8a80; } }
+.op-msg.err { color: var(--err-text); }
+/* 처음 연 빈 창: 무엇을 하면 되는지 */
+.op-empty { margin: 56px auto 0; max-width: 360px; text-align: center; color: var(--muted); line-height: 1.6; }
+.op-empty b { display: block; margin-bottom: 4px; color: var(--text); font-size: 15px; }
 .op-h { margin: 22px 2px 8px; font-size: 13px; color: var(--muted); }
 
 .op-info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 0; }
@@ -66,7 +74,7 @@ body {
 
 .op-copy { padding: 0 3px; margin: 0 -3px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; cursor: copy; text-align: left; }
 .op-copy:hover { background: color-mix(in srgb, var(--brand-yellow) 30%, transparent); }
-.op-copy.done::after { content: " ✓ 복사"; color: #1e7a45; font-size: 11px; font-weight: 700; }
+.op-copy.done::after { content: " ✓ 복사"; color: var(--ok-text); font-size: 11px; font-weight: 700; }
 
 .op-pick { display: flex; flex-direction: column; gap: 2px; width: 100%; margin: 0 0 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .op-pick:hover { border-color: var(--brand-yellow); }
@@ -76,7 +84,6 @@ body {
 .op-label { color: var(--muted); font-weight: 700; }
 .op-dir { min-width: 0; max-width: 40%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .op-status { flex: 1; min-width: 120px; color: var(--muted); }
-.op-status.ok { color: #1e7a45; font-weight: 700; }
-.op-status.err { color: #b42318; font-weight: 700; }
-@media (prefers-color-scheme: dark) { .op-status.ok { color: #6fd39a; } .op-status.err { color: #ff8a80; } }
+.op-status.ok { color: var(--ok-text); font-weight: 700; }
+.op-status.err { color: var(--err-text); font-weight: 700; }
 @media (max-width: 720px) { .op-info { grid-template-columns: 1fr; } }

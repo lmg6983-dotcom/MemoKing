@@ -52,14 +52,14 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-row b { font-weight: 800; color: #111; background: rgba(255, 205, 0, 0.38); border-radius: 3px; padding: 0 1px; }
 .magic-row .side { flex: none; color: #9a9a9a; font-size: 12px; }
 .magic-row[aria-selected="true"] .side { display: none; }
-.magic-row.kind-opms .ico { border-radius: 7px; background: #1f3b73; color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -0.02em; }
+.magic-row.kind-opms .ico { border-radius: 7px; background: var(--opms-mark, #1f3b73); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -0.02em; }
 .magic-row.kind-more .ico { border-radius: 7px; background: rgba(0, 0, 0, 0.06); font-weight: 800; }
 .magic-row.kind-more .t { font-weight: 700; }
 /* 고른 줄 오른쪽의 할 일 단추 (← → 로 옮김) — 고른 단추만 이름까지 */
 .magic-row .acts { display: none; flex: none; align-items: center; gap: 3px; }
 .magic-row[aria-selected="true"] .acts { display: inline-flex; }
-.magic-flash { color: #1e7a45; font-weight: 700; }
-.magic-flash.err { color: #b42318; }
+.magic-flash { color: var(--ok-text); font-weight: 700; }
+.magic-flash.err { color: var(--err-text); }
 .magic-note { padding: 8px 12px 10px; color: #8a8a8a; font-size: 12.5px; }
 
 .magic-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px 10px 14px; border-top: 1px solid var(--mk-line); }
@@ -82,12 +82,11 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.06); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12); color: #555; font: 600 10.5px/16px inherit; text-align: center; }
 
 @media (prefers-color-scheme: dark) {
+  .magic-row.kind-opms .ico { --opms-mark: #3d63b8; }
   body { --mk-sel: rgba(255, 205, 0, 0.18); --mk-line: rgba(255, 255, 255, 0.08); }
   .magic { background: #26262a; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08); }
   .magic-input, .magic-row .t, .magic-row b { color: #f3f3f3; }
   .magic-grip span { background: rgba(255, 255, 255, 0.2); }
-  .magic-flash { color: #6fd39a; }
-  .magic-flash.err { color: #ff8a80; }
   .magic-chip { border-color: rgba(255, 255, 255, 0.14); }
   .magic-chip.on { background: rgba(255, 205, 0, 0.18); color: #f3f3f3; }
   kbd { background: rgba(255, 255, 255, 0.1); color: #ddd; }
