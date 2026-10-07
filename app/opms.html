@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <title>메모킹 — OPMS</title>
+  <link rel="stylesheet" href="styles/base.css" />
+  <link rel="stylesheet" href="styles/opms.css" />
+</head>
+<body>
+  <header class="op-top">
+    <form id="op-form" class="op-search" role="search">
+      <input id="op-input" type="search" placeholder="관리번호 또는 출원번호" aria-label="관리번호 또는 출원번호" autocomplete="off" spellcheck="false" />
+      <button type="submit" class="op-btn">찾기</button>
+    </form>
+    <div id="op-head" class="op-head" hidden>
+      <div class="op-refs"><b id="op-our"></b><span id="op-your"></span><span id="op-badge" class="op-badge" hidden></span></div>
+      <div id="op-sub" class="op-sub"></div>
+    </div>
+  </header>
+  <nav id="op-tabs" class="op-tabs" aria-label="보기" hidden>
+    <div role="tablist" aria-label="사건 정보">
+      <button type="button" role="tab" id="op-tab-info" data-tab="info" aria-controls="op-main" aria-selected="true">정보</button>
+      <button type="button" role="tab" id="op-tab-wrapper" data-tab="wrapper" aria-controls="op-main" aria-selected="false" tabindex="-1">전자포대</button>
+      <button type="button" role="tab" id="op-tab-bills" data-tab="bills" aria-controls="op-main" aria-selected="false" tabindex="-1">청구서</button>
+      <button type="button" role="tab" id="op-tab-foreign" data-tab="foreign" aria-controls="op-main" aria-selected="false" tabindex="-1">해외출원</button>
+    </div>
+    <button type="button" id="op-refresh" class="op-refresh" title="서버에서 다시 불러오기">새로 고침</button>
+  </nav>
+  <main id="op-main" class="op-main" role="tabpanel" aria-labelledby="op-tab-info" tabindex="-1">
+    <div class="op-empty"><b>관리번호 또는 출원번호로 찾아 보세요</b>사무소·출원인 관리번호, 출원번호(하이픈 없이도) 모두 돼요. 매직키(Ctrl+Alt+Space)에 써도 찾아져요.</div>
+  </main>
+  <footer id="op-foot" class="op-foot" hidden></footer>
+  <script type="module" src="js/opms-view.js"></script>
+</body>
+</html>

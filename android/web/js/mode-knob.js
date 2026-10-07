@@ -83,12 +83,17 @@ export function setupModeKnob(host, { value, onChange }) {
     onChange(mode, { quiet });
   }
 
-  // 손가락으로 다이얼을 톡 누르면 pointerup 다음에 click 이 한 번 더 온다 — 그 사이 화면이 바뀌어
-  //   펼친 칸이 손가락 밑에 오면 그 칸이 눌린 것이 되므로, 다이얼을 뗀 직후의 칸 누름은 받지 않는다
+  // 손가락으로 다이얼을 톡 누르면 pointerup 다음에 click 이 한 번 더 온다 — 그 사이 방식이 바뀌어 화면이 움직이면
+  //   (도구막대가 생기며 녹음 판이 올라오는 등) 손가락 밑에 온 다른 것(펼친 칸 · 녹음 "끝내기")이 눌린 것이 되므로,
+  //   다이얼을 뗀 직후의 click 은 다이얼 말고는 받지 않는다
   let dialUpAt = 0;
+  document.addEventListener('click', (e) => {
+    if (performance.now() - dialUpAt >= 400 || dial.contains(e.target)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
   for (const b of stops) {
     b.addEventListener('click', () => {
-      if (performance.now() - dialUpAt < 400) return;
       choose(b.dataset.mode);
       unfold();
     });

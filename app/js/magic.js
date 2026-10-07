@@ -1,5 +1,6 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
+import { looksLikeRef } from './core/magic-modules.js';
 // 매직키 창 — 입력한 글을 바로 메모로(기본), 입력하는 대로 메모·폴더·파일을 찾아 바로 연다.
 //   비어 있으면 최근 메모 · 쓰면 맨 위 "새 메모로 저장" 그 아래 메모 / 폴더 / 파일 (비슷한 것부터 몇 개씩)
 //   다 못 보여 준 나머지는 맨 아래 "다른 n건 더 보기" — 고르면 전체 결과 창(모두 찾기)
@@ -22,6 +23,8 @@ let selected = 0;
 let activeAct = 0; // 고른 줄의 몇 번째 할 일 (← →)
 let seq = 0;
 let results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
+// OPMS 는 회사 서버에 따로 묻는다 (메모·파일 결과를 기다리게 하지 않게) — { query, loading, cases, total, error }
+let opms = { query: '', loading: false, cases: [], total: 0, error: '' };
 
 const isOn = (id) => modules.some((m) => m.id === id && m.on);
 
@@ -41,6 +44,7 @@ function renderModules() {
       modules = await api.toggleModule(m.id).catch(() => modules);
       renderModules();
       updatePlaceholder();
+      searchOpms();
       search();
     });
     return chip;
@@ -49,7 +53,7 @@ function renderModules() {
 
 function updatePlaceholder() {
   const memo = isOn('memo');
-  const find = isOn('notes') || isOn('files');
+  const find = isOn('notes') || isOn('files') || isOn('opms');
   input.placeholder = memo && find ? '메모를 쓰거나, 메모·파일을 찾아요' : memo ? '메모를 쓰고 Enter' : find ? '메모·파일 찾기' : '아래에서 기능을 켜 주세요';
 }
 
@@ -116,7 +120,12 @@ function row(r, index, query) {
   const side = document.createElement('span');
   side.className = 'side';
   li.append(ico, txt, side, actionButtons(r, 0, (k) => run(index, { act: k })));
-  if (r.kind === 'more') {
+  if (r.kind === 'opms') {
+    ico.textContent = 'O';
+    t.append(highlighted([r.ourref, r.n_app].filter(Boolean).join(' · ') || r.yourref || '관리번호 없음', query));
+    s.textContent = [r.applicant, r.title].filter(Boolean).join(' · ');
+    side.textContent = r.div || '';
+  } else if (r.kind === 'more') {
     ico.textContent = '⋯';
     t.textContent = `다른 ${r.count.toLocaleString()}건 더 보기`;
     s.textContent = '모두 찾기 창에서 비슷한 것부터 전부 — 이름 · 경로 · 크기 · 고친 때';
@@ -181,6 +190,14 @@ function render() {
   const nodes = [];
   const add = (r) => nodes.push(row(r, rows.push(r) - 1, query || raw));
   if (query && isOn('memo')) add({ kind: 'new' });
+  // 관리번호·출원번호를 쓰면 OPMS 사건이 맨 위 (찾는 중 · 사내망이 아님도 이 자리에)
+  if (query && isOn('opms') && opms.query === query) {
+    if (opms.cases.length) {
+      nodes.push(section('OPMS', opms.total));
+      opms.cases.forEach((c) => add({ kind: 'opms', ...c }));
+    } else if (opms.loading) nodes.push(note('OPMS 에서 찾는 중…'));
+    else if (opms.error) nodes.push(note(opms.error));
+  }
   if (results.notes.length) {
     nodes.push(section(results.recent ? '최근 메모' : '메모', results.recent ? 0 : results.notes.length));
     results.notes.forEach((n) => add({ kind: 'note', ...n }));
@@ -195,7 +212,7 @@ function render() {
   }
   if (query && results.more > 0) add({ kind: 'more', count: results.more });
   const searched = isOn('notes') || isOn('files');
-  if (query && searched && !results.notes.length && !results.folders.length && !results.files.length) {
+  if (query && searched && !results.notes.length && !results.folders.length && !results.files.length && !opms.cases.length && !opms.loading) {
     nodes.push(note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모·파일이 없어요 — Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모·파일이 없어요`));
   }
   if (query && isOn('files') && results.index && !results.index.count) {
@@ -266,10 +283,32 @@ async function search() {
   render();
 }
 
+// OPMS: 치는 동안은 기다렸다가(0.35초) 한 번만 — 관리번호·출원번호처럼 보일 때만
+let opmsTimer = 0;
+let opmsSeq = 0;
+function searchOpms() {
+  const query = input.value.trim();
+  clearTimeout(opmsTimer);
+  if (!isOn('opms') || !looksLikeRef(query)) {
+    opms = { query: '', loading: false, cases: [], total: 0, error: '' };
+    return;
+  }
+  if (opms.query === query && !opms.loading) return;
+  opms = { query, loading: true, cases: [], total: 0, error: '' };
+  const my = ++opmsSeq;
+  opmsTimer = setTimeout(async () => {
+    const res = await api.opmsSearch(query).catch((err) => ({ cases: [], total: 0, error: err.message }));
+    if (my !== opmsSeq) return;
+    opms = { query, loading: false, cases: res.cases ?? [], total: res.total ?? 0, error: res.error ?? '' };
+    render();
+  }, 350);
+}
+
 let searchTimer = 0;
 input.addEventListener('input', () => {
   resizeInput();
   selected = 0;
+  searchOpms();
   render(); // "새 메모로 저장" 줄은 바로
   clearTimeout(searchTimer);
   searchTimer = setTimeout(search, 70);
@@ -308,7 +347,8 @@ async function run(i, { alt = false, act = 0 } = {}) {
     await api.openAll(input.value.trim()).catch(() => {});
     return;
   }
-  const res = await api.act(r.kind === 'note' ? { action: id, id: r.id } : { action: id, path: r.path }).catch(() => null);
+  const req = r.kind === 'note' ? { action: id, id: r.id } : r.kind === 'opms' ? { action: id, opms: r.idx } : { action: id, path: r.path };
+  const res = await api.act(req).catch(() => null);
   if (res?.message) {
     flash(res.ok, res.message);
     if (res.ok) setTimeout(() => api.close(), 650); // 복사했다는 표시를 잠깐 보여 주고
@@ -365,6 +405,7 @@ async function reset() {
   selected = 0;
   activeAct = 0;
   results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
+  opms = { query: '', loading: false, cases: [], total: 0, error: '' };
   resizeInput();
   modules = await api.modules().catch(() => []);
   renderModules();

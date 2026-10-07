@@ -868,6 +868,7 @@ function storedMode() {
 }
 function applyMode(mode, { user = false, quiet = false } = {}) {
   el.screen.dataset.touchMode = mode;
+  recorder.holdStop(); // 아래 막대가 바뀌며 녹음 판이 움직인다 — 그 사이 눌림으로 녹음이 끝나지 않게
   $('mode-guide').hidden = true; // 앞 방식의 안내는 거둔다
   // 다이얼로 바꾸면 어느 방식이든 같은 자리(아래 가운데 흰 안내)에 무엇이 되었는지
   const m = MODES.find((x) => x.id === mode);

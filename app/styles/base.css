@@ -27,6 +27,8 @@
   --text-muted: #6b6860;
   --text-faint: #8f8c83;
   --danger: #d93036;
+  --ok-text: #1e7a45; /* 복사했어요 · 저장 같은 성공 글 */
+  --err-text: #b42318; /* 실패 글 (빨강 바탕이 아닌 글자) */
   --on-danger: #ffffff;
   --focus-ring: #111111;
 
@@ -96,6 +98,8 @@
     --text-muted: #a3a098;
     --text-faint: #77746c;
     --danger: #ff6b70;
+    --ok-text: #6fd39a;
+    --err-text: #ff8a80;
     --on-danger: #1a0506;
     --focus-ring: #ffcc00;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);

@@ -11,6 +11,9 @@ const ICONS = {
   save: 'M5 12l5 5L20 7',
   saveOpen: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
   more: 'M4 6h16M4 12h16M4 18h10',
+  wrapper: 'M12 4v11M7 10l5 5 5-5M5 20h14',
+  copyOur: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
+  copyApp: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M7 12h6M7 16h4M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
 };
 
 /** 이 줄에서 할 수 있는 일 (첫 번째가 Enter) */
@@ -26,6 +29,8 @@ export function actionsFor(r) {
       return [{ id: 'open', label: r.app ? '실행' : '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '폴더 열기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '파일 복사' }];
     case 'more':
       return [{ id: 'more', label: '모두 보기' }];
+    case 'opms':
+      return [{ id: 'open', label: '사건 보기' }, { id: 'wrapper', label: '전자포대' }, { id: 'copyOur', label: '관리번호 복사' }, { id: 'copyApp', label: '출원번호 복사' }];
     default:
       return [];
   }
