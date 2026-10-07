@@ -1,0 +1,18 @@
+/* 매직키 · 모두 찾기 창: 고른 줄의 할 일 단추 (magic-actions.js) — 그림만, 고른 것은 이름까지 */
+.act-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; min-width: 26px; padding: 0 6px; box-sizing: border-box;
+  border: 0; border-radius: 8px; background: transparent; color: #6f6a5a;
+  font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer;
+  transition: background-color 0.12s ease-out, color 0.12s ease-out;
+}
+.act-btn svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.act-btn .act-label { display: none; }
+.act-btn.on { padding: 0 9px 0 7px; background: #ffd84d; color: #2b2400; }
+.act-btn.on .act-label { display: inline; }
+.act-btn:not(.on):hover { background: rgba(0, 0, 0, 0.08); color: #111; }
+.act-btn:active { transform: scale(0.96); }
+@media (prefers-color-scheme: dark) {
+  .act-btn { color: #c9c4b3; }
+  .act-btn:not(.on):hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+}

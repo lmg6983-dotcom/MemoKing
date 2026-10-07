@@ -29,6 +29,7 @@ import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '..
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
 import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
+import { shareText } from '../app/js/core/share-text.js';
 import { FileIndex } from './file-index.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
@@ -54,6 +55,7 @@ const APP_DIR = path.join(import.meta.dirname, '..', 'app');
 const PRELOAD = path.join(import.meta.dirname, 'preload.cjs');
 const OCR_PRELOAD = path.join(import.meta.dirname, 'ocr-preload.cjs');
 const MAGIC_PRELOAD = path.join(import.meta.dirname, 'magic-preload.cjs');
+const FINDER_PRELOAD = path.join(import.meta.dirname, 'finder-preload.cjs');
 const ASSETS_DIR = path.join(import.meta.dirname, '..', 'assets');
 // 창·작업표시줄·알림 영역 아이콘 (npm run icons 로 생성, 16~256px 9개 크기)
 const APP_ICON = path.join(ASSETS_DIR, 'icons', 'memoking.ico');
@@ -1781,6 +1783,83 @@ async function fileIcon(p, isDir) {
   return iconCache.get(key);
 }
 let lastFileResults = new Set(); // 매직키 창이 열 수 있는 파일 = 방금 찾아 보여 준 것만
+let lastFinderResults = new Set(); // 전체 결과 창이 방금 보여 준 것
+const shownPath = (p) => typeof p === 'string' && (lastFileResults.has(p) || lastFinderResults.has(p));
+
+// 파일(폴더)을 클립보드에 — 탐색기·Finder 에서 붙여 넣으면 복사된다
+function copyFileToClipboard(p) {
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '& { Set-Clipboard -LiteralPath $args[0] }', p], { windowsHide: true, timeout: 8000 }, (err) => resolve(!err));
+    } else if (process.platform === 'darwin') {
+      execFile('osascript', ['-e', 'on run argv', '-e', 'set the clipboard to (POSIX file (item 1 of argv))', '-e', 'end run', p], { timeout: 8000 }, (err) => resolve(!err));
+    } else {
+      clipboard.writeBuffer('x-special/gnome-copied-files', Buffer.from(`copy\n${pathToFileURL(p).href}`));
+      resolve(true);
+    }
+  });
+}
+
+// 매직키 · 전체 결과 창의 줄마다 하는 일 (PowerToys Run 처럼): 열기 · 경로 복사 · 폴더 열기 · 파일 복사 · 메모 내용 복사
+//   파일은 방금 찾아 보여 준 것만. 반환 { ok, message, close } — close 면 매직키 창을 닫는다
+async function magicAct({ action, path: p, id } = {}) {
+  if (id != null) {
+    const memo = vault?.get(String(id));
+    if (!memo) return { ok: false };
+    if (action === 'copyText') {
+      clipboard.writeText(shareText(memo.body));
+      return { ok: true, message: '메모 내용을 복사했어요', close: true };
+    }
+    revealNote(String(id));
+    return { ok: true, close: true };
+  }
+  if (!shownPath(p) || !fs.existsSync(p)) return { ok: false, message: '찾을 수 없어요' };
+  if (action === 'copyPath') {
+    clipboard.writeText(p);
+    return { ok: true, message: '경로를 복사했어요', close: true };
+  }
+  if (action === 'copyFile') {
+    const ok = await copyFileToClipboard(p);
+    return ok ? { ok, message: fs.statSync(p).isDirectory() ? '폴더를 복사했어요 — 붙여 넣으면 돼요' : '파일을 복사했어요 — 붙여 넣으면 돼요', close: true } : { ok, message: '복사하지 못했어요' };
+  }
+  if (action === 'reveal') {
+    shell.showItemInFolder(p);
+    return { ok: true, close: true };
+  }
+  const err = await shell.openPath(p);
+  if (err) notice('열지 못했어요', err);
+  return { ok: !err, close: true };
+}
+
+// ---------- 전체 결과 창 — 매직키에서 "다른 n건" 을 고르면 (Everything 처럼 모두 · 열 정렬) ----------
+let finderWin = null;
+function showFinder(query) {
+  if (!finderWin || finderWin.isDestroyed()) {
+    finderWin = new BrowserWindow({
+      width: 960,
+      height: 620,
+      minWidth: 560,
+      minHeight: 360,
+      show: false,
+      title: '메모킹 — 모두 찾기',
+      autoHideMenuBar: true,
+      ...windowIcon,
+      webPreferences: { preload: FINDER_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
+    });
+    finderWin.loadFile(path.join(APP_DIR, 'finder.html'));
+    finderWin.once('ready-to-show', () => finderWin?.show());
+    finderWin.on('closed', () => {
+      finderWin = null;
+      lastFinderResults = new Set();
+    });
+    finderWin.webContents.once('did-finish-load', () => finderWin?.webContents.send('finder:query', String(query ?? '')));
+  } else {
+    finderWin.webContents.send('finder:query', String(query ?? ''));
+    if (finderWin.isMinimized()) finderWin.restore();
+    finderWin.show();
+  }
+  finderWin.focus();
+}
 
 function registerMagicKey() {
   globalShortcut.unregister(MAGIC_KEY);
@@ -2213,34 +2292,63 @@ function registerIpc() {
       return { notes: recent, recent: true, folders: [], files: [], index: fileIndex?.status() ?? null };
     }
     const updatedOf = new Map((vault?.list() ?? []).map((m) => [m.id, m.updated]));
-    const notes = mods.has('notes') && vault ? searchMemos(vault.searchable(), q, 5).map((n) => ({ ...n, updated: updatedOf.get(n.id) })) : [];
+    const memos = mods.has('notes') && vault ? vault.searchable() : [];
+    const notes = searchMemos(memos, q, 5).map((n) => ({ ...n, updated: updatedOf.get(n.id) }));
+    const notesTotal = notes.length < 5 ? notes.length : searchMemos(memos, q, Infinity).length;
     let folders = [];
     let files = [];
+    let totalFolders = 0;
+    let totalFiles = 0;
     if (mods.has('files') && fileIndex) {
-      ({ folders, files } = fileIndex.searchSplit(q, { folders: 3, files: 6 }));
+      ({ folders, files, totalFolders, totalFiles } = fileIndex.searchSplit(q, { folders: 3, files: 6 }));
       lastFileResults = new Set([...folders, ...files].map((f) => f.path));
       const home = os.homedir();
       const shown = (p) => (p.toLowerCase().startsWith(home.toLowerCase()) ? `~${p.slice(home.length)}` : p);
       const withIcon = (list) => Promise.all(list.map(async (f) => ({ ...f, where: shown(path.dirname(f.path)), icon: await fileIcon(f.path, f.isDir) })));
       [folders, files] = await Promise.all([withIcon(folders), withIcon(files)]);
     }
-    return { notes, folders, files, index: fileIndex?.status() ?? null };
+    // 보여 주지 못한 나머지 개수 → "다른 n건" 줄 (고르면 전체 결과 창)
+    const more = Math.max(0, notesTotal - notes.length) + Math.max(0, totalFolders - folders.length) + Math.max(0, totalFiles - files.length);
+    return { notes, folders, files, more, index: fileIndex?.status() ?? null };
   });
-  ipcMain.handle('magic:open-memo', (_e, id) => {
-    if (!vault?.get(String(id))) return false;
+  ipcMain.handle('magic:act', (_e, req) => magicAct(req)); // 닫기는 창이 (복사했다는 표시를 잠깐 보여 준 뒤)
+  ipcMain.handle('magic:open-all', (_e, query) => {
     magicWin?.hide();
-    revealNote(String(id));
+    showFinder(String(query ?? '').slice(0, 200));
     return true;
   });
-  ipcMain.handle('magic:open-file', async (_e, { path: p, reveal } = {}) => {
-    if (!lastFileResults.has(p) || !fs.existsSync(p)) return false; // 방금 보여 준 결과만
-    magicWin?.hide();
-    if (reveal) shell.showItemInFolder(p);
-    else {
-      const err = await shell.openPath(p);
-      if (err) notice('열지 못했어요', err);
+  // 전체 결과 창: 메모 · 폴더 · 파일을 비슷한 것부터 많이 (파일은 2000개까지 — 그 밖은 개수만)
+  ipcMain.handle('finder:search', async (_e, query) => {
+    const q = String(query ?? '').slice(0, 200);
+    if (!q.trim()) {
+      lastFinderResults = new Set();
+      return { items: [], total: 0, index: fileIndex?.status() ?? null };
     }
-    return true;
+    const mods = new Set(activeModules(settings.magic).map((m) => m.id));
+    const updatedOf = new Map((vault?.list() ?? []).map((m) => [m.id, m.updated]));
+    const notes = mods.has('notes') && vault ? searchMemos(vault.searchable(), q, 300).map((n) => ({ kind: 'note', ...n, updated: updatedOf.get(n.id) })) : [];
+    const found = mods.has('files') && fileIndex ? fileIndex.searchAll(q, 2000) : { items: [], total: 0 };
+    lastFinderResults = new Set(found.items.map((f) => f.path));
+    const home = os.homedir();
+    const shown = (p) => (p.toLowerCase().startsWith(home.toLowerCase()) ? `~${p.slice(home.length)}` : p);
+    const files = await Promise.all(found.items.map(async (f) => ({ kind: f.isDir ? 'folder' : 'file', ...f, where: shown(path.dirname(f.path)), icon: await fileIcon(f.path, f.isDir) })));
+    return { items: [...notes, ...files], total: notes.length + found.total, index: fileIndex?.status() ?? null };
+  });
+  // 보이는 줄의 크기 · 고친 때 (스크롤하는 대로 조금씩)
+  ipcMain.handle('finder:stat', async (_e, paths) => {
+    const list = (Array.isArray(paths) ? paths : []).filter(shownPath).slice(0, 200);
+    return Object.fromEntries(await Promise.all(list.map(async (p) => {
+      try {
+        const st = await fs.promises.stat(p);
+        return [p, { size: st.isDirectory() ? null : st.size, mtime: st.mtimeMs }];
+      } catch {
+        return [p, null];
+      }
+    })));
+  });
+  ipcMain.handle('finder:act', async (_e, req) => {
+    const res = await magicAct(req);
+    return { ...res, close: false };
   });
   // 결과 목록 높이에 맞춰 창 높이를 바꾼다 (위치는 그대로)
   ipcMain.on('magic:resize', (_e, h) => {
@@ -2695,6 +2803,7 @@ app.whenReady().then(async () => {
       createPopupWatcher, smokePdf, getPdfWin: () => pdfWin, openPdfWindow,
       startTutorial, getTutorial: () => tutorial,
       captureToMemo, smokeToastsList: smokeToasts, getTitleBarOverlay: () => titleBarOverlay(),
+      showMagic, getMagic: () => magicWin, getFinder: () => finderWin, useFileIndex: (idx) => { fileIndex = idx; },
     });
     return;
   }

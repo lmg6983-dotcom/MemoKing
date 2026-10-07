@@ -1,0 +1,63 @@
+/* 모두 찾기 창 (finder.js) — Everything 처럼 한 줄씩, 열 머리로 줄 세우기 */
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column;
+  background: var(--surface-1); color: var(--text);
+  font-family: var(--font-sans); font-size: 13px;
+  --cols: minmax(220px, 2.2fr) minmax(160px, 2fr) 84px 132px;
+  --sel: #fff1b8;
+}
+@media (prefers-color-scheme: dark) { body { --sel: rgba(255, 205, 0, 0.18); } }
+
+.finder-top { display: flex; align-items: center; gap: 12px; padding: 12px 14px 10px; border-bottom: 1px solid var(--line); }
+.finder-input {
+  flex: 1; min-width: 0; height: 36px; padding: 0 12px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-0); color: var(--text);
+  font: inherit; font-size: 15px; outline: none;
+}
+.finder-input:focus { border-color: var(--brand-yellow); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-yellow) 30%, transparent); }
+.finder-tabs { display: flex; flex: none; gap: 2px; padding: 3px; border-radius: 10px; background: var(--surface-0); }
+.finder-tabs button {
+  height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted);
+  font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.finder-tabs button[aria-selected="true"] { background: var(--surface-2); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), inset 0 0 0 1px var(--line); }
+.finder-tabs .n { margin-left: 2px; color: var(--text-faint); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.finder-head, .frow { display: grid; grid-template-columns: var(--cols); align-items: center; }
+.finder-head { flex: none; padding: 0 8px; border-bottom: 1px solid var(--line); background: var(--surface-1); }
+.finder-head button {
+  display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 8px; border: 0; background: transparent;
+  color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; text-align: left; cursor: pointer;
+}
+.finder-head button:hover { color: var(--text); }
+.finder-head .sorted { color: var(--text); }
+.finder-head .sorted::after { content: "▲"; font-size: 8px; }
+.finder-head .sorted[data-dir="desc"]::after { content: "▼"; }
+.finder-head .col-size, .frow .col-size { justify-content: flex-end; text-align: right; }
+
+.finder-scroll { position: relative; flex: 1; min-height: 0; overflow: auto; padding: 0 8px; }
+.finder-list { position: relative; }
+.frow { position: absolute; left: 0; right: 0; height: 34px; border-radius: 8px; cursor: default; }
+.frow[aria-selected="true"] { background: var(--sel); }
+.frow:not([aria-selected="true"]):hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.frow > span { min-width: 0; padding: 0 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.frow .col-name { display: flex; align-items: center; gap: 8px; }
+.frow .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.frow .acts { display: inline-flex; flex: none; gap: 2px; margin-left: auto; }
+.frow .ico { flex: none; width: 18px; height: 18px; display: grid; place-items: center; font-size: 13px; }
+.frow .ico img { width: 18px; height: 18px; }
+.frow .dot { width: 12px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16); }
+.frow b { font-weight: 800; background: color-mix(in srgb, var(--brand-yellow) 38%, transparent); border-radius: 3px; padding: 0 1px; }
+.frow .col-where, .frow .col-size, .frow .col-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.finder-empty { margin: 40px 0; color: var(--muted); text-align: center; }
+
+.finder-foot { display: flex; flex: none; gap: 14px; align-items: center; height: 30px; padding: 0 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.finder-count { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+.finder-status { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.finder-status.flash { color: #1e7a45; font-weight: 700; }
+.finder-status.flash.err { color: #b42318; }
+@media (prefers-color-scheme: dark) {
+  .finder-status.flash { color: #6fd39a; }
+  .finder-status.flash.err { color: #ff8a80; }
+}

@@ -64,3 +64,23 @@ test('파일 검색: 들어가지 않을 폴더 · 찾을 곳 순서', () => {
     ['C:\\Users\\me', false], ['C:\\', false], ['D:\\', false],
   ]);
 });
+
+test('파일 검색: 몇 개만 보여 줘도 맞는 것 전체 개수를 센다 (나머지는 "다른 n건" → 모두 찾기 창)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-index-many-'));
+  for (let i = 0; i < 30; i++) fs.writeFileSync(path.join(root, `견적서 ${String(i).padStart(2, '0')}.xlsx`), '');
+  fs.mkdirSync(path.join(root, '견적서 모음'));
+  fs.writeFileSync(path.join(root, '다른 문서.txt'), '');
+  const idx = new FileIndex({ roots: () => [{ dir: root }] });
+  idx.stopped = false;
+  await idx.rebuild();
+  const split = idx.searchSplit('견적서', { folders: 3, files: 6 });
+  assert.equal(split.files.length, 6);
+  assert.equal(split.totalFiles, 30);
+  assert.equal(split.totalFolders, 1);
+  // 모두 찾기 창: 비슷한 것부터 전부
+  const all = idx.searchAll('견적서', 2000);
+  assert.equal(all.total, 31);
+  assert.equal(all.items.length, 31);
+  assert.equal(all.items[0].name, '견적서 모음'); // 얕고 짧은 이름이 먼저
+  assert.equal(idx.searchAll('없는말', 10).total, 0);
+});
