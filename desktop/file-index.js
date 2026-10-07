@@ -185,25 +185,36 @@ export class FileIndex {
   }
 
   /**
-   * 이름으로 찾기 (철자가 조금 달라도, 띄어 쓴 낱말은 모두 들어간 것). 프로그램 바로 가기·얕은 곳을 조금 앞으로
-   * @returns {{ name: string, path: string, isDir: boolean, app: boolean }[]}
-   */
-  /**
-   * 이름으로 찾기 — 폴더와 파일(프로그램 포함)을 따로 몇 개씩 (폴더가 파일들에 묻혀 안 보이는 일이 없게)
-   * @returns {{ folders: object[], files: object[] }}
+   * 이름으로 찾기 — 폴더와 파일(프로그램 포함)을 따로 몇 개씩 (폴더가 파일들에 묻혀 안 보이는 일이 없게).
+   *   total* = 맞는 것 전체 개수 (보여 주지 못한 나머지는 "다른 n건" 으로 — 전체 결과 창에서)
+   * @returns {{ folders: object[], files: object[], totalFolders: number, totalFiles: number }}
    */
   searchSplit(query, { folders = 3, files = 6 } = {}) {
-    const all = this.search(query, (folders + files) * 4);
-    return { folders: all.filter((r) => r.isDir).slice(0, folders), files: all.filter((r) => !r.isDir).slice(0, files) };
+    const { items, folders: totalFolders, files: totalFiles } = this.searchAll(query, (folders + files) * 4);
+    return { folders: items.filter((r) => r.isDir).slice(0, folders), files: items.filter((r) => !r.isDir).slice(0, files), totalFolders, totalFiles };
   }
 
+  /** 비슷한 것부터 limit 개 */
   search(query, limit = 8) {
+    return this.searchAll(query, limit).items;
+  }
+
+  /**
+   * 비슷한 것부터 limit 개 + 맞는 것 전체 개수 (폴더 · 파일)
+   * @returns {{ items: { name: string, path: string, isDir: boolean, app: boolean }[], total: number, folders: number, files: number }}
+   */
+  searchAll(query, limit = 8) {
+    const none = { items: [], total: 0, folders: 0, files: 0 };
     const q = String(query ?? '').trim();
-    if (!q || !this.snapshot) return [];
+    if (!q || !this.snapshot) return none;
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    // 후보는 많아야 이만큼 점수를 매긴다 (전체 결과 창은 더 많이) — 개수는 끝까지 센다
+    const cap = Math.max(4000, limit * 4);
     // 1) 빠른 거르기: 낱말마다 글자들이 이름에 순서대로 들어 있는가 (붙어 있으면 더 앞으로)
     const contiguous = [];
     const loose = [];
+    let folders = 0;
+    let files = 0;
     const { lower } = this;
     for (let i = 0; i < lower.length; i++) {
       const name = lower[i];
@@ -227,14 +238,16 @@ export class FileIndex {
         }
       }
       if (!all) continue;
-      if (whole) contiguous.push(i);
-      else if (loose.length < 4000) loose.push(i);
-      if (contiguous.length >= 4000) break;
+      if (this.entries[i].d) folders++;
+      else files++;
+      if (whole) {
+        if (contiguous.length < cap) contiguous.push(i);
+      } else if (loose.length < cap) loose.push(i);
     }
     // 2) 후보만 fuzzysort 로 점수 (프로그램 바로 가기·이름이 찾는 말로 시작·얕은 곳을 조금 앞으로)
     const ql = q.toLowerCase();
     const scored = [];
-    for (const i of [...contiguous, ...loose].slice(0, 6000)) {
+    for (const i of [...contiguous, ...loose].slice(0, cap * 1.5)) {
       const e = this.entries[i];
       const r = fuzzysort.single(q, e.n);
       if (!r) continue;
@@ -242,15 +255,15 @@ export class FileIndex {
       scored.push({ e, score: r.score * (1 + bonus) });
     }
     scored.sort((a, b) => b.score - a.score);
-    const out = [];
+    const items = [];
     const seenPath = new Set();
     for (const { e } of scored) {
       const p = e.p.toLowerCase();
       if (seenPath.has(p)) continue;
       seenPath.add(p);
-      out.push({ name: e.a ? e.n.replace(/\.(lnk|url)$/i, '') : e.n, path: e.p, isDir: e.d, app: e.a });
-      if (out.length >= limit) break;
+      items.push({ name: e.a ? e.n.replace(/\.(lnk|url)$/i, '') : e.n, path: e.p, isDir: e.d, app: e.a });
+      if (items.length >= limit) break;
     }
-    return out;
+    return { items, total: folders + files, folders, files };
   }
 }

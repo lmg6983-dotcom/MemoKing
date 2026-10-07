@@ -922,6 +922,24 @@ el.editorRoot.addEventListener('pointerup', (e) => {
   }, 30);
 });
 
+// 글 아래 빈 자리(빈 메모라면 거의 화면 전체)를 누르면 글 끝에 커서를 두고 키보드를 올린다 —
+//   편집기 본문은 글 높이만큼이라 넓은 화면(태블릿)에서는 그 밖을 누르기 쉽다. 옮기기 방식이면 글 고치기로 넘어간다
+el.editorRoot.addEventListener('click', (e) => {
+  const pm = el.editorRoot.querySelector('.ProseMirror');
+  if (!editor || !pm || !(e.target instanceof Element) || pm.contains(e.target) || knob?.mode === 'draw') return;
+  if (e.target.closest('button, a, input, .mk-annot')) return;
+  if (e.clientY < pm.getBoundingClientRect().bottom) return; // 글 옆 여백은 편집기가 알아서
+  if (document.querySelector('.mk-list-dragging, .mk-block-dragging, body.mk-list-dragging, body.mk-block-dragging')) return;
+  if (knob?.mode === 'move') {
+    knob.set('edit', { quiet: true });
+    showGuide('글 고치기로 바꿨어요 · 옮기려면 다이얼을 옮기기로');
+  }
+  // 앞서 그림 등을 눌러 키보드를 막아 두었더라도 글을 쓰려는 것이니 푼다
+  pm.removeAttribute('inputmode');
+  delete pm.dataset.mkNoKeyboard;
+  editor.focusEnd();
+});
+
 /** 글을 써야 하는 때(튜토리얼의 쓰기 단계 등): 다이얼을 글 고치기로 — 안내로 바뀐 것을 알린다 */
 export function useEditMode() {
   if (knob && knob.mode !== 'edit') knob.set('edit');

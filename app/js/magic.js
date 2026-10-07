@@ -1,7 +1,10 @@
 import { replayClass } from './dom.js';
+import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
 // 매직키 창 — 입력한 글을 바로 메모로(기본), 입력하는 대로 메모·폴더·파일을 찾아 바로 연다.
-//   비어 있으면 최근 메모 · 쓰면 맨 위 "새 메모로 저장" 그 아래 메모 / 폴더 / 파일
-//   ↑↓ 고르기 · Enter 실행(고른 줄 오른쪽에 무엇을 하는지 표시) · Ctrl+Enter 다른 실행 · Esc 글 지우기 → 닫기
+//   비어 있으면 최근 메모 · 쓰면 맨 위 "새 메모로 저장" 그 아래 메모 / 폴더 / 파일 (비슷한 것부터 몇 개씩)
+//   다 못 보여 준 나머지는 맨 아래 "다른 n건 더 보기" — 고르면 전체 결과 창(모두 찾기)
+//   ↑↓ 고르기 · ← → 할 일 고르기(열기 · 경로 복사 · 폴더 열기 · 파일 복사, 고른 줄 오른쪽 단추) · Enter 실행
+//   Ctrl+Enter 다른 실행 · Ctrl+Shift+C 경로 복사 · Ctrl+Shift+E 폴더 열기 · Esc 글 지우기 → 닫기
 //   아래 캡슐 = 기능 모듈, 누르면 켜고 끈다
 const api = window.magic;
 const box = document.getElementById('magic');
@@ -16,8 +19,9 @@ const COLORS = { yellow: '#ffe58a', green: '#c8ecb4', pink: '#ffc9d6', purple: '
 let modules = []; // { id, name, description, on }
 let rows = []; // { kind: 'new' | 'note' | 'folder' | 'file', ... }
 let selected = 0;
+let activeAct = 0; // 고른 줄의 몇 번째 할 일 (← →)
 let seq = 0;
-let results = { notes: [], folders: [], files: [], recent: false, index: null };
+let results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
 
 const isOn = (id) => modules.some((m) => m.id === id && m.on);
 
@@ -91,8 +95,8 @@ function ago(iso) {
   return `${date.getMonth() + 1}월 ${date.getDate()}일`;
 }
 
-const ACTION = { new: ['저장', '저장하고 열기'], note: ['열기', ''], folder: ['열기', '폴더에서 보기'], file: ['열기', '폴더에서 보기'] };
-const actionOf = (r) => (r.kind === 'file' && r.app ? ['실행', '폴더에서 보기'] : ACTION[r.kind]);
+// Ctrl+Enter 로 하는 다른 실행
+const ALT_ACTION = { new: 'saveOpen', folder: 'reveal', file: 'reveal' };
 
 function row(r, index, query) {
   const li = document.createElement('li');
@@ -111,12 +115,12 @@ function row(r, index, query) {
   txt.append(t, s);
   const side = document.createElement('span');
   side.className = 'side';
-  const act = document.createElement('span');
-  act.className = 'act';
-  act.innerHTML = '<kbd>↵</kbd> ';
-  act.append(actionOf(r)[0]);
-  li.append(ico, txt, side, act);
-  if (r.kind === 'new') {
+  li.append(ico, txt, side, actionButtons(r, 0, (k) => run(index, { act: k })));
+  if (r.kind === 'more') {
+    ico.textContent = '⋯';
+    t.textContent = `다른 ${r.count.toLocaleString()}건 더 보기`;
+    s.textContent = '모두 찾기 창에서 비슷한 것부터 전부 — 이름 · 경로 · 크기 · 고친 때';
+  } else if (r.kind === 'new') {
     ico.textContent = '✎';
     t.textContent = '새 메모로 저장';
     s.textContent = query.split('\n')[0];
@@ -144,7 +148,7 @@ function row(r, index, query) {
     if (selected !== index) select(index);
   });
   li.addEventListener('mousedown', (e) => e.preventDefault()); // 입력 칸 포커스 유지
-  li.addEventListener('click', (e) => run(index, { alt: e.ctrlKey || e.metaKey }));
+  li.addEventListener('click', (e) => run(index, { alt: e.ctrlKey || e.metaKey, act: index === selected ? activeAct : 0 }));
   return li;
 }
 
@@ -189,6 +193,7 @@ function render() {
     nodes.push(section('파일', results.files.length));
     results.files.forEach((f) => add({ kind: 'file', ...f }));
   }
+  if (query && results.more > 0) add({ kind: 'more', count: results.more });
   const searched = isOn('notes') || isOn('files');
   if (query && searched && !results.notes.length && !results.folders.length && !results.files.length) {
     nodes.push(note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모·파일이 없어요 — Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모·파일이 없어요`));
@@ -208,11 +213,22 @@ function fit() {
 }
 
 function select(i, { scroll = true } = {}) {
+  if (i !== selected) activeAct = 0;
   selected = i;
   for (const el of resultsEl.querySelectorAll('.magic-row')) el.setAttribute('aria-selected', String(Number(el.dataset.index) === i));
+  markAct();
   input.setAttribute('aria-activedescendant', rows[i] ? `magic-row-${i}` : '');
   if (scroll) resultsEl.querySelector(`.magic-row[data-index="${i}"]`)?.scrollIntoView({ block: 'nearest' });
   updateHint();
+}
+
+// 고른 줄의 할 일 단추 중 지금 것 표시
+function markAct() {
+  const li = resultsEl.querySelector(`.magic-row[data-index="${selected}"]`);
+  li?.querySelectorAll('.act-btn').forEach((b, k) => {
+    b.classList.toggle('on', k === activeAct);
+    b.setAttribute('aria-pressed', String(k === activeAct));
+  });
 }
 
 function updateHint() {
@@ -220,9 +236,9 @@ function updateHint() {
   // 중요한 것부터 (자리가 모자라면 뒤의 것이 가려진다)
   const parts = [];
   if (r) {
-    const [main, alt] = actionOf(r);
-    parts.push(['↵', main]);
-    if (alt) parts.push(['Ctrl ↵', alt]);
+    const acts = actionsFor(r);
+    parts.push(['↵', acts[activeAct]?.label ?? '']);
+    if (acts.length > 1) parts.push(['← →', '할 일']);
   }
   parts.push(['Esc', input.value ? '지우기' : '닫기']);
   if (rows.length > 1) parts.push(['↑↓', '고르기']);
@@ -240,13 +256,13 @@ async function search() {
   const query = input.value;
   const my = ++seq;
   if (!isOn('notes') && !isOn('files')) {
-    results = { notes: [], folders: [], files: [], recent: false, index: null };
+    results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
     render();
     return;
   }
   const res = await api.search(query).catch(() => null);
   if (my !== seq || !res) return; // 더 새 입력이 있으면 버린다
-  results = { notes: [], folders: [], files: [], recent: false, ...res };
+  results = { notes: [], folders: [], files: [], more: 0, recent: false, ...res };
   render();
 }
 
@@ -275,19 +291,38 @@ function clearText() {
 clearBtn.addEventListener('mousedown', (e) => e.preventDefault());
 clearBtn.addEventListener('click', clearText);
 
-async function run(i, { alt = false } = {}) {
+// 실행: act = 고른 할 일(몇 번째), alt = Ctrl+Enter (다른 실행)
+async function run(i, { alt = false, act = 0 } = {}) {
   const r = rows[i];
   if (!r) return;
+  const acts = actionsFor(r);
+  const id = (alt && ALT_ACTION[r.kind]) || acts[act]?.id || acts[0]?.id;
   if (r.kind === 'new') {
     const text = input.value;
-    await api.run({ module: 'memo', text, open: alt }).catch(() => {});
+    await api.run({ module: 'memo', text, open: id === 'saveOpen' }).catch(() => {});
     input.value = '';
     api.close();
     return;
   }
-  if (r.kind === 'note') await api.openMemo(r.id);
-  else await api.openFile(r.path, alt);
-  input.value = '';
+  if (r.kind === 'more') {
+    await api.openAll(input.value.trim()).catch(() => {});
+    return;
+  }
+  const res = await api.act(r.kind === 'note' ? { action: id, id: r.id } : { action: id, path: r.path }).catch(() => null);
+  if (res?.message) {
+    flash(res.ok, res.message);
+    if (res.ok) setTimeout(() => api.close(), 650); // 복사했다는 표시를 잠깐 보여 주고
+    return;
+  }
+  if (res?.ok) api.close();
+}
+
+// 아래 안내 자리에 잠깐 (복사했어요 · 찾을 수 없어요)
+function flash(ok, text) {
+  const span = document.createElement('span');
+  span.className = `magic-flash${ok ? '' : ' err'}`;
+  span.textContent = `${ok ? '✓ ' : ''}${text}`;
+  hintEl.replaceChildren(span);
 }
 
 input.addEventListener('keydown', (e) => {
@@ -299,6 +334,19 @@ input.addEventListener('keydown', (e) => {
     return;
   }
   const oneLine = !input.value.includes('\n');
+  if (oneLine && rows[selected]) {
+    const k = actionKey(e, { row: rows[selected], active: activeAct, input });
+    if (k) {
+      e.preventDefault();
+      if (k.run) run(selected, { act: actionsFor(rows[selected]).findIndex((a) => a.id === k.run) });
+      else {
+        activeAct = k.move;
+        markAct();
+        updateHint();
+      }
+      return;
+    }
+  }
   if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && oneLine && rows.length) {
     e.preventDefault();
     select((selected + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length);
@@ -307,7 +355,7 @@ input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     if (e.shiftKey) return; // 줄바꿈
     e.preventDefault();
-    if (rows.length) run(selected, { alt: e.ctrlKey || e.metaKey });
+    if (rows.length) run(selected, { alt: e.ctrlKey || e.metaKey, act: activeAct });
   }
 });
 
@@ -315,7 +363,8 @@ input.addEventListener('keydown', (e) => {
 async function reset() {
   input.value = '';
   selected = 0;
-  results = { notes: [], folders: [], files: [], recent: false, index: null };
+  activeAct = 0;
+  results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
   resizeInput();
   modules = await api.modules().catch(() => []);
   renderModules();
