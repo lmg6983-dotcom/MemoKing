@@ -886,7 +886,7 @@ function normalizePastedTables(html) {
  *   fetchPreview: 링크 카드에 보여줄 제목·설명·사진 (메인 프로세스가 메모 폴더에 모아 둔 것)
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false, scrollMargin = 0 }) {
   if (readAttachment) inkReader = readAttachment; // 그림 칸(inkView)이 만들어지기 전에
   let ready = false;
   let editor = null;
@@ -1508,6 +1508,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         ...prev,
         attributes: { class: 'mk-doc', spellcheck: 'false', 'aria-label': '메모 내용' },
         editable: () => !readOnly,
+        // 커서를 화면 아래쪽 떠 있는 단추들(휴대폰: + · 다이얼) 위에 두도록 스크롤할 여백
+        ...(scrollMargin ? { scrollMargin: { top: 8, bottom: scrollMargin, left: 5, right: 5 }, scrollThreshold: { top: 0, bottom: scrollMargin, left: 0, right: 0 } } : {}),
       }));
       // Milkdown 7.22.2 버그 우회: 제목 없는 이미지 ![a](b) 의 title 을 null 로 넘겨 불러오기가 실패한다.
       // 마크다운 표는 머리글 행만 있어도 된다 (Milkdown 기본은 "머리글 행 + 행 1개 이상")
@@ -2052,6 +2054,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       if (items.length) insertBlocks(pos, items);
     },
     focus: () => view().focus(),
+    /** 커서가 보이게 스크롤 (키보드가 올라와 화면이 줄었을 때 등) */
+    revealCaret: () => {
+      const v = view();
+      if (v.hasFocus()) v.dispatch(v.state.tr.scrollIntoView());
+    },
     destroy: () => editor.destroy(),
   };
 }

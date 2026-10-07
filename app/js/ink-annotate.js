@@ -175,7 +175,8 @@ export function setupAnnotation(o) {
         afterChange();
       },
       canClear: () => hist.get().length > 0,
-      done: { label: '완료', run: () => exit() },
+      // 휴대폰은 다이얼을 돌려 끝내므로 완료 단추가 없다 (o.done === false) — 뒤로 가기로도 끝난다
+      done: o.done === false ? null : { label: '완료', run: () => exit() },
     });
     // 잠깐 보이는 안내: 무엇을 하는 중인지 (그리기 시작하면 사라짐)
     const caption = document.createElement('div');

@@ -234,7 +234,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     title: '+ 로 더 많은 것 넣기',
-    text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
+    text: '왼쪽 아래 둥근 + 에 녹음 · 손 메모 · 사진 · 파일 · 표 · 수식이 모여 있어요. 펼치면 키보드는 잠깐 닫혀요.',
     try: '왼쪽 아래 + 를 눌러 펼쳐 보세요',
     next: LATER,
   },
@@ -248,8 +248,8 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'annotate', win: 'note', target: ['.mode-knob .mk-stop-draw', '.mode-knob'], keep: ['.mode-knob', '.mk-annot-bar'], advance: 'annotate-done', emoji: '🖍️',
     title: '글 위에 바로 그리기',
-    text: '다이얼을 글 위에 그리기로 돌리면 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요. 완료하면 앞의 방식으로 돌아가요.',
-    try: '다이얼 맨 위 그리기를 눌러 글 위에 쓱 긋고 ✓ 완료',
+    text: '다이얼을 글 위에 그리기로 돌리면 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요. 다 그렸으면 다이얼을 다른 방식으로 돌리면 저장돼요.',
+    try: '다이얼 맨 위 그리기를 눌러 글 위에 쓱 긋고, 다이얼을 글 고치기로',
     next: LATER,
   },
   {

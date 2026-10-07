@@ -269,8 +269,9 @@ try {
     await page.waitForTimeout(200);
     await page.tap('.mode-knob .mk-stop-move');
     await page.waitForTimeout(250);
-    const knob = await page.evaluate(() => ({ mode: document.querySelector('.mode-knob').dataset.mode, im: document.querySelector('.mk-doc').getAttribute('inputmode'), tag: document.querySelector('.mode-knob-tag').classList.contains('show') }));
-    check('다이얼: 글 고치기에서는 꾹 눌러도 옮기지 않음 · 옮기기로 돌리면 키보드 막고 이름표', !liftedInEdit && knob.mode === 'move' && knob.im === 'none' && knob.tag, JSON.stringify({ liftedInEdit, knob }));
+    const knob = await page.evaluate(() => ({ mode: document.querySelector('.mode-knob').dataset.mode, im: document.querySelector('.mk-doc').getAttribute('inputmode'),
+      bar: getComputedStyle(document.getElementById('move-bar')).display !== 'none', tools: getComputedStyle(document.getElementById('format-bar')).display, plus: getComputedStyle(document.getElementById('add-btn')).display }));
+    check('다이얼: 글 고치기에서는 꾹 눌러도 옮기지 않음 · 옮기기로 돌리면 키보드 막고 도구막대·+ 대신 "옮기기 모드" 막대', !liftedInEdit && knob.mode === 'move' && knob.im === 'none' && knob.bar && knob.tools === 'none' && knob.plus === 'none', JSON.stringify({ liftedInEdit, knob }));
     await shot('05b-knob-move');
   }
   // 둘째 항목을 꾹 눌러 첫째 항목 가운데로 → 맞바꾸기
@@ -446,16 +447,22 @@ try {
   const order = ['# 로고 사진', '![로고]', '새 아이콘 시안'].map((t) => logo.indexOf(t));
   check('그림 줄 옮기기: 제목 바로 아래로 끼움', order[0] < order[1] && order[1] < order[2], logo);
   await page.locator('.mk-doc p', { hasText: '새 아이콘 시안' }).tap();
-  check('옮기기 방식: 글자를 눌러도 키보드를 올리지 않음', (await page.getAttribute('.mk-doc', 'inputmode')) === 'none');
-  await page.tap('.mode-knob .mk-dial'); // 옮기기 → 그리기
+  await page.waitForTimeout(400);
+  const tapEdit = await page.evaluate(() => ({ mode: document.querySelector('.mode-knob').dataset.mode, im: document.querySelector('.mk-doc').getAttribute('inputmode'),
+    focus: document.querySelector('.mk-doc').contains(document.activeElement) || document.activeElement === document.querySelector('.mk-doc'),
+    guide: !document.getElementById('mode-guide').hidden && document.getElementById('mode-guide').textContent }));
+  check('옮기기 방식: 글자를 톡 누르면 글 고치기로 · 그 자리에 커서와 키보드 · 아래에 안내', tapEdit.mode === 'edit' && tapEdit.im === null && tapEdit.focus && /글 고치기로/.test(tapEdit.guide), JSON.stringify(tapEdit));
+  await shot('06e-tap-to-edit');
+  await page.tap('.mode-knob .mk-dial'); // 글 고치기 → 옮기기 (누르면 다음 방식)
   await page.waitForTimeout(300);
-  const drawOn = await page.evaluate(() => document.body.classList.contains('annotating'));
-  await page.tap('.mk-annot-bar .ink-done');
+  const nextMove = await page.getAttribute('.mode-knob', 'data-mode');
+  await page.tap('.mode-knob .mk-stop-draw'); // 둘레 칸 = 그 방식으로 바로
+  await page.waitForTimeout(400);
+  const drawOn = await page.evaluate(() => ({ on: document.body.classList.contains('annotating'), done: document.querySelectorAll('.mk-annot-bar .ink-done').length }));
+  await page.tap('.mode-knob .mk-stop-edit'); // 그리기는 다이얼로 끝낸다 (완료 단추 없음)
   await page.waitForTimeout(300);
-  await page.tap('.mode-knob .mk-stop-edit');
-  await page.waitForTimeout(300);
-  const editBack = await page.evaluate(() => ({ mode: document.querySelector('.mode-knob').dataset.mode, im: document.querySelector('.mk-doc').getAttribute('inputmode'), focus: document.querySelector('.mk-doc').contains(document.activeElement) || document.activeElement === document.querySelector('.mk-doc') }));
-  check('다이얼: 누르면 다음 방식(그리기) · 완료하면 앞의 방식 · 글 고치기로 돌리면 키보드와 커서', drawOn && editBack.mode === 'edit' && editBack.im === null && editBack.focus, JSON.stringify({ drawOn, editBack }));
+  const editBack = await page.evaluate(() => ({ mode: document.querySelector('.mode-knob').dataset.mode, annot: document.body.classList.contains('annotating'), im: document.querySelector('.mk-doc').getAttribute('inputmode'), focus: document.querySelector('.mk-doc').contains(document.activeElement) || document.activeElement === document.querySelector('.mk-doc') }));
+  check('다이얼: 누르면 다음 방식 · 둘레 칸은 바로 · 그리기는 완료 단추 없이 다이얼로 끝 · 글 고치기로 돌리면 키보드와 커서', nextMove === 'move' && drawOn.on && drawOn.done === 0 && editBack.mode === 'edit' && !editBack.annot && editBack.im === null && editBack.focus, JSON.stringify({ nextMove, drawOn, editBack }));
   await back();
   await page.waitForTimeout(300);
 
@@ -970,7 +977,8 @@ try {
   await page.waitForTimeout(300);
   check('음성 카드: 다시 펴기', (await page.locator('.mk-voice.folded').count()) === 0);
   {
-    // 접기 막대도 꾹 누르면 카드째로 들어 올림 (놓아도 접히지 않음)
+    // 접기 막대도 꾹 누르면 카드째로 들어 올림 (놓아도 접히지 않음) — 옮기기 방식에서 (글자를 누르면 글 고치기로 넘어가므로 다시)
+    await setMode('move');
     const b = await page.locator('.mk-voice-toggle').boundingBox();
     await touch('touchStart', b.x + b.width / 2, b.y + b.height / 2);
     await page.waitForTimeout(550);
@@ -1080,6 +1088,7 @@ try {
     await page.tap(`.card[data-id="${id}"]`);
     await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror li');
     await page.waitForTimeout(800);
+    await setMode('move'); // 꾹 눌러 들어 올리기는 옮기기 방식에서
     const { parseMemoFile } = await import('../../../app/js/core/memo-file.js');
     const body = () => parseMemoFile(read('목록 지우기.md')).body;
     const liBox = (t) => page.locator('.mk-doc li', { hasText: t }).first().boundingBox();
@@ -1175,6 +1184,8 @@ try {
       await page.mouse.up();
     };
     const wave = (x0, y0, w = 160) => Array.from({ length: 12 }, (_, i) => [x0 + (w * i) / 11, y0 + Math.sin(i / 1.6) * 18]);
+    await setMode('edit'); // + 는 글 고치기에만 (옮기기·그리기에서는 숨음)
+    check('다이얼: 옮기기에서 숨었던 + 가 글 고치기에서 다시', await page.isVisible('#add-btn'));
     await page.tap('#add-btn');
     await page.waitForTimeout(250);
     await page.tap('.add-sat[data-add="ink"]');
@@ -1266,11 +1277,11 @@ try {
     await shot('22-annotate');
     const annBar = await page.evaluate(() => {
       const r = document.querySelector('.mk-annot-bar .ink-dock').getBoundingClientRect();
-      const d = document.querySelector('.mk-annot-bar .ink-done').getBoundingClientRect();
-      return r.left >= 0 && r.right <= innerWidth && d.left >= r.left && d.right <= r.right + 0.5 && !!document.querySelector('.mk-annot-scroller');
+      const k = document.querySelector('.mode-knob').getBoundingClientRect();
+      return r.left >= 0 && r.right <= innerWidth && !document.querySelector('.mk-annot-bar .ink-done') && k.bottom <= r.top && !!document.querySelector('.mk-annot-scroller');
     });
-    check('주석 모드: 도구 막대가 화면 안에 · 완료 버튼이 막대 바탕 안에 · 본문 둘레 점선', annBar);
-    await page.tap('.mk-annot-bar .ink-done');
+    check('주석 모드: 도구 막대가 화면 안에 · 완료 단추 없음(다이얼로 끝냄) · 다이얼은 막대 위 · 본문 둘레 점선', annBar);
+    await page.tap('.mode-knob .mk-stop-edit'); // 다이얼을 돌려 끝내면 저장
     const body3 = await waitFile((b) => /^ink: /m.test(b));
     const inkRel = body3.match(/^ink: (attachments\/\S+\.json)$/m)?.[1];
     const ann = inkRel ? JSON.parse(read(inkRel)) : null;
