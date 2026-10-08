@@ -49,9 +49,12 @@ jobs:
       - name: 설치 파일 빌드 (npm run dist — 자동 점검은 화면이 없는 빌드 서버라 건너뜀)
         run: node scripts/build-dist.mjs --no-smoke
 
+      # 빌드 결과물 보관함은 저장 공간 한도가 있어 짧게 두고, 가득 차도 릴리스(다운로드 링크)는 올라가게
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: memoking-desktop
+          retention-days: 3
           path: dist/*.exe
           if-no-files-found: error
 
