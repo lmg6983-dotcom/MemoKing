@@ -1,12 +1,12 @@
 // 목록·체크리스트 항목 순서 바꾸기 (편집기 플러그인)
-//   - 항목에 마우스를 올리면 옮길 수 있다는 흐린 점선 테두리, 글자를 꾹(0.3초) 누르면 테두리가 점점 진해지다가
+//   - 항목에 마우스를 올리면 옮길 수 있다는 흐린 점선 테두리, 글자를 꾹(0.35초) 누르면 테두리가 점점 진해지다가
 //     들어 올려지고, 그대로 끌면 순서를 바꾼다
 //     (바로 끌면 지금처럼 글자 선택 — 여러 줄을 골라 체크리스트로 바꾸는 일과 겹치지 않게)
 //   - 다른 항목의 가운데에 놓으면 두 항목이 서로 맞바뀌고, 위·아래 가장자리(줄과 줄 사이)에 놓으면 그 사이에 끼워진다
 //   - 놓기 전에 바뀔 모습을 미리 보여 준다 (같은 목록은 항목들이 바뀔 자리로 미끄러지고 놓을 자리에 점선 칸, 다른 목록은
 //     얇은 칸·테두리). 안내 캡슐은 그 틀 오른쪽에 — 그림·글 줄 옮기기(block-move.js)와 같은 틀(drag-frames.js)
 //   - 하위 항목은 함께 움직인다. Esc 로 취소. 키보드: Alt+↑ / Alt+↓ 로 한 칸 위·아래로
-//   - 휴대폰(터치): 글자를 꾹(0.4초) 누르면 들어 올려지고, 손가락을 떼지 않고 끌면 같은 규칙으로 옮긴다
+//   - 휴대폰(터치): 글자를 꾹(0.35초) 누르면 들어 올려지고, 손가락을 떼지 않고 끌면 같은 규칙으로 옮긴다
 //   - 하위·상위 항목: 항목을 오른쪽으로 밀면 바로 위 항목의 하위로, 왼쪽으로 밀면 한 단계 위로 (터치는 그냥 옆으로 밀기,
 //     마우스는 꾹 눌러 들어 올린 채 옆으로) — 체크리스트·점 목록·번호 목록 모두
 //   - 커서가 있는 항목에 흐린 점선 테두리 (Enter 로 새 항목을 만들면 따라간다)
@@ -20,9 +20,11 @@ import { haptic } from './dom.js';
 
 export const listDragKey = new PluginKey('memoking-list-drag');
 
-export const HOLD_MS = 300; // 이만큼 누르고 있으면 들어 올림 (그동안 테두리가 점점 진해진다)
+// 이만큼 누르고 있으면 들어 올림 (그동안 테두리가 점점 진해진다). PC·휴대폰이 같은 손맛이 되게 마우스·터치 모두 0.35초
+//   (터치는 휴대폰의 글자 고르기(약 0.5초)보다 먼저여야 한다)
+export const HOLD_MS = 350;
 const MOVE_TOLERANCE = 5; // 그 전에 이만큼 움직이면 글자 선택으로 본다
-export const TOUCH_HOLD_MS = 400; // 터치: 휴대폰의 글자 고르기(약 0.5초)보다 조금 먼저
+export const TOUCH_HOLD_MS = HOLD_MS;
 const TOUCH_TOLERANCE = 10; // 손가락은 조금 흔들린다
 
 // 마우스와 터치의 이벤트 이름·좌표를 하나로
@@ -109,7 +111,7 @@ export function swapItemsTr(state, src, other) {
 }
 
 // 커서가 있는 (가장 안쪽) 항목
-function currentItem(state) {
+export function currentItem(state) {
   const { $from } = state.selection;
   for (let d = $from.depth; d > 0; d--) if (isItem($from.node(d))) return { node: $from.node(d), pos: $from.before(d) };
   return null;

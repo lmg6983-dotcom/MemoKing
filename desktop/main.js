@@ -2686,6 +2686,23 @@ function registerIpc() {
     const next = stacks?.neighbor(String(id), dir < 0 ? -1 : 1);
     return next ? Boolean(showTab(next)) : false;
   });
+  // 끌지 않고 합치기: 메모 메뉴 › 다른 메모 창과 합치기… → 지금 떠 있는 다른 메모 창(스택은 하나로) 중에서 고르기
+  ipcMain.handle('stack:join-menu', (event, id) => {
+    const self = String(id);
+    const mine = stacks?.stackOf(self);
+    const seen = new Set();
+    const items = [];
+    for (const [m, w] of noteWins) {
+      if (m === self || w.isDestroyed() || !w.isVisible() || mine?.memos.includes(m)) continue;
+      const key = stacks?.stackOf(m)?.memos[0] ?? m;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const count = stacks?.stackOf(m)?.memos.length ?? 1;
+      items.push({ label: `${vault?.get(m)?.title || '제목 없음'}${count > 1 ? ` (탭 ${count}개)` : ''}`, click: () => stackInto(m, self) });
+    }
+    Menu.buildFromTemplate(items.length ? items : [{ label: '합칠 수 있는 다른 메모 창이 없어요', enabled: false }])
+      .popup({ window: senderWindow(event) });
+  });
   ipcMain.handle('stack:menu', (event, id) => {
     Menu.buildFromTemplate([
       { label: '따로 떼어 보기', click: () => removeFromStack(String(id), 'detach') },

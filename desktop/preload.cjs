@@ -154,6 +154,7 @@ contextBridge.exposeInMainWorld('memoking', {
     tearMove: (x, y) => ipcRenderer.send('stack:tear-move', { x, y }),
     tearEnd: (x, y) => ipcRenderer.invoke('stack:tear-end', x == null ? null : { x, y }),
     cycle: invoke('stack:cycle'),
+    joinMenu: invoke('stack:join-menu'),
     menu: invoke('stack:menu'),
   },
   win: {

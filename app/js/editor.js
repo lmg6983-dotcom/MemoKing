@@ -28,8 +28,8 @@ import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt } from './table-extras.js';
-import { createListDrag } from './list-drag.js';
-import { createBlockMove, createContentLines, MEDIA_SCRUB } from './block-move.js';
+import { createListDrag, moveItemBy, currentItem } from './list-drag.js';
+import { createBlockMove, createContentLines, MEDIA_SCRUB, moveBlockBy } from './block-move.js';
 import { createTapList } from './tap-list.js';
 import { createVoiceCards, isVoiceCard, voiceAudioOf } from './voice-card-view.js';
 import { createTidy } from './tidy.js';
@@ -1842,6 +1842,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }
 
   const commands = {
+    // 끌지 않고 한 줄 위·아래로 (Alt+↑/↓ 와 같음 — 목록 안에서는 그 항목, 아니면 그 줄)
+    moveUp: () => moveLineBy(view().state, view().dispatch, -1),
+    moveDown: () => moveLineBy(view().state, view().dispatch, 1),
     bold: () => call(toggleStrongCommand),
     italic: () => call(toggleEmphasisCommand),
     underline: () => {
@@ -2096,6 +2099,15 @@ const safeDepth = (fn, state) => {
 };
 
 // 도구막대 버튼을 눌린 상태로 보여주기 위한 현재 서식
+// 목록 항목이면 같은 목록 안에서, 아니면 그 줄을 한 칸 (dispatch 가 없으면 할 수 있는지만)
+function moveLineBy(state, dispatch, dir) {
+  try {
+    return currentItem(state) ? moveItemBy(state, dispatch, dir) : moveBlockBy(state, dispatch, dir);
+  } catch {
+    return false;
+  }
+}
+
 function activeFormats(state) {
   const { $from, from, to, empty } = state.selection;
   const marks = state.schema.marks;
@@ -2119,6 +2131,8 @@ function activeFormats(state) {
     canUndo: safeDepth(undoDepth, state) > 0,
     canRedo: safeDepth(redoDepth, state) > 0,
   };
+  active.canMoveUp = moveLineBy(state, null, -1);
+  active.canMoveDown = moveLineBy(state, null, 1);
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d);
     const name = node.type.name;

@@ -845,6 +845,8 @@ function showActive(active) {
   el.undoBtn.disabled = !active.canUndo;
   el.redoBtn.disabled = !active.canRedo;
   for (const btn of el.formatBar.querySelectorAll('[data-cmd]')) btn.classList.toggle('active', Boolean(active[btn.dataset.cmd]));
+  el.formatBar.querySelector('[data-cmd="moveUp"]').disabled = !active.canMoveUp;
+  el.formatBar.querySelector('[data-cmd="moveDown"]').disabled = !active.canMoveDown;
   for (const kind of ['color', 'highlight']) {
     for (const btn of el.formatBar.querySelectorAll(`[data-action="${kind}"]`)) btn.classList.toggle('active', Boolean(active[kind]));
   }

@@ -508,6 +508,12 @@ $('versions-btn').addEventListener('click', () => {
   toggleVersions(true);
 });
 $('versions-close').addEventListener('click', () => toggleVersions(false));
+// 끌어서 합치기(스택)의 메뉴 버전 — 끌기가 어려운 사람도
+$('join-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  api.stack.joinMenu(id);
+});
 $('shortcuts-btn').addEventListener('click', () => {
   closeMenu();
   toggleShortcutSheet();

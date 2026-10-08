@@ -1,14 +1,14 @@
 // 그림·소리·동영상·파일·링크 카드 같은 "내용" 줄 옮기기 (편집기 플러그인, 데스크탑·휴대폰 함께)
 // 따로 손잡이·버튼 없이 내용 자체를 잡아 옮긴다 (목록·체크리스트 끌기와 같은 감각)
 //   - 마우스: 내용을 누른 채 끌면 바로 들어 올려진다 (그냥 누르면 지금처럼 고르기·열기)
-//   - 터치: 꾹(0.4초) 누르면 테두리가 진해지다 "톡" 들어 올려지고, 손가락을 떼지 않고 끈다 (그냥 밀면 스크롤)
+//   - 터치: 꾹(0.35초) 누르면 테두리가 진해지다 "톡" 들어 올려지고, 손가락을 떼지 않고 끈다 (그냥 밀면 스크롤)
 //   - 끄는 줄은 손을 따라오고, 다른 줄들은 놓으면 될 자리로 미끄러져 틈을 연다.
 //     다른 줄의 가운데 = 맞바꾸기, 줄과 줄 사이 = 끼우기 (그 틀 오른쪽에 ⇅ 맞바꾸기 / ↳ 여기에 넣기 — drag-frames.js). Esc 취소
 //   - 키보드: 내용을 고른 채 Alt+↑ / Alt+↓ 로 한 줄씩
 //   - 처음 한 번, 내용을 고르면 옮기는 방법을 작은 안내로 알려 준다
 //   - 줄 = 같은 상자(본문·인용·목록 항목) 안의 블록 하나
 //   - 소리·동영상은 위의 이름 줄, 수식 블록·가로줄은 그대로 잡는다
-//   - 글 문단·제목·표·코드 블록·인용·음성 카드는 목록 항목과 같은 방식: 글자를 꾹(마우스 0.3초·터치 0.4초) 누르면
+//   - 글 문단·제목·표·코드 블록·인용·음성 카드는 목록 항목과 같은 방식: 글자를 꾹(마우스 0.35초·터치 0.4초) 누르면
 //     테두리가 점점 진해지다 들어 올려진다 (그 전에 움직이면 지금처럼 글자 고르기·스크롤). 목록 항목은 list-drag.js
 //     PC 는 어느 줄에서든 Alt+↑ / Alt+↓
 import { holdKeyboard, keyboardFor, edgeScroll, canDrag, holdFor, touchMode } from './keyboard-guard.js';
@@ -214,7 +214,7 @@ export function moveBlockBy(state, dispatch, dir) {
 // 마우스·터치 이벤트 이름과 좌표를 하나로 (list-drag.js 와 같은 기준)
 const INPUT = {
   mouse: { move: 'mousemove', up: 'mouseup', cancel: null, hold: 0, tolerance: 4 },
-  touch: { move: 'touchmove', up: 'touchend', cancel: 'touchcancel', hold: 400, tolerance: 10 },
+  touch: { move: 'touchmove', up: 'touchend', cancel: 'touchcancel', hold: TOUCH_HOLD_MS, tolerance: 10 },
 };
 const pointOf = (e) => e.touches?.[0] ?? e.changedTouches?.[0] ?? e;
 const LISTEN = { capture: true, passive: false };

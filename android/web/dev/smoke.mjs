@@ -619,6 +619,14 @@ try {
   await page.click('#format-bar [data-cmd="task"]');
   await page.waitForTimeout(900);
   check('목록: 체크리스트로도 통째로', /- \[ \] 사과\n- \[ \] 배\n- \[ \] 감/.test(read(f)), read(f));
+  // 끌지 않고 순서 바꾸기: 도구막대의 한 줄 위로 · 아래로 (커서는 "감")
+  check('한 줄 아래로: 마지막 항목이면 흐리게', await page.isDisabled('#format-bar [data-cmd="moveDown"]'));
+  await page.click('#format-bar [data-cmd="moveUp"]');
+  await page.waitForTimeout(900);
+  check('한 줄 위로 → 항목 하나가 위로', /- \[ \] 사과\n- \[ \] 감\n- \[ \] 배/.test(read(f)), read(f));
+  await page.click('#format-bar [data-cmd="moveDown"]');
+  await page.waitForTimeout(900);
+  check('한 줄 아래로 → 제자리', /- \[ \] 사과\n- \[ \] 배\n- \[ \] 감/.test(read(f)), read(f));
   // 오른쪽으로 밀면 하위 항목
   const third = await page.locator('.mk-doc li').nth(2).boundingBox();
   await touch('touchStart', third.x + 30, third.y + third.height / 2);

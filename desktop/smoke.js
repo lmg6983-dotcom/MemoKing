@@ -455,6 +455,7 @@ export async function runSmoke({
     check('Ctrl+/ → 단축키 한눈에 보기', sheetOpen);
     if (sheetOpen) await capture(v1.win, 'smoke-shortcuts.png');
     await js(v1.win, `document.querySelector('dialog.shortcut-sheet')?.close()`);
+    check('메뉴: 다른 메모 창과 합치기 (끌지 않고 스택으로)', await js(v1.win, `Boolean(document.getElementById('join-btn'))`));
     await closeNote(v1.id);
 
     // 11) 목록 카드를 끌어 화면에 놓기 (v0.4.0)

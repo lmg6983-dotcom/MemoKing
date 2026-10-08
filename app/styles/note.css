@@ -270,7 +270,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
   border-radius: 4px;
   background: var(--note-hover);
   color: var(--note-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 16px;
 }

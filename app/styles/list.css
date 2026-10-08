@@ -249,7 +249,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   border-radius: 999px;
   background: var(--border);
   color: var(--text-strong);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 17px;
 }
@@ -362,7 +362,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   border-radius: 999px;
   background: var(--brand-yellow);
   color: var(--on-brand);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 15px;
 }
@@ -489,7 +489,7 @@ body:not([data-tab="memos"]) .filter-btn { display: none; }
   padding: 0 6px;
   border-radius: 999px;
   background: var(--fill-tab);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 18px;
 }

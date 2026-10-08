@@ -1,7 +1,7 @@
 // 처음 그 상황이 됐을 때 한 번만 뜨는 작은 힌트 (PC·휴대폰 함께).
 // 꾹 누르기·옆으로 밀기처럼 눈에 안 보이는 동작을 튜토리얼 없이 알려 준다.
 //   - 힌트마다 한 번만 (localStorage 'memoking.hints'), 한 번에 하나만, 튜토리얼 말풍선이 떠 있으면 뜨지 않음
-//   - 6초 뒤 저절로 사라지고, "알겠어요" 나 아무 곳을 눌러도 닫힘
+//   - 6초 뒤 저절로 사라지고(마우스를 올리거나 단추에 포커스가 있는 동안은 멈춤), "알겠어요" 나 아무 곳을 눌러도 닫힘
 import { reduceMotion } from './dom.js';
 
 const KEY = 'memoking.hints';
@@ -75,6 +75,17 @@ export function hintOnce(name, text, { anchor = null } = {}) {
   // 이 힌트를 띄운 바로 그 누르기로 닫히지 않게 다음 틱부터
   setTimeout(() => current?.bubble === bubble && document.addEventListener('pointerdown', onDown, true), 0);
   current = { bubble, onDown, timer: setTimeout(close, SHOW_MS) };
+  // 읽는 동안에는 사라지지 않게: 올려 두거나(포커스) 하면 멈추고, 떠나면 다시 6초
+  const hold = () => current?.bubble === bubble && clearTimeout(current.timer);
+  const resume = () => {
+    if (current?.bubble !== bubble || bubble.matches(':hover') || bubble.contains(document.activeElement)) return;
+    clearTimeout(current.timer);
+    current.timer = setTimeout(close, SHOW_MS);
+  };
+  bubble.addEventListener('pointerenter', hold);
+  bubble.addEventListener('focusin', hold);
+  bubble.addEventListener('pointerleave', resume);
+  bubble.addEventListener('focusout', () => setTimeout(resume, 0));
   return true;
 }
 
