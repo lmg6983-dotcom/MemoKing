@@ -171,6 +171,24 @@ try {
   check('메뉴: 색 바꾸기', /color: green/.test(read('회의 메모.md')));
   await back();
 
+  // 이전 버전: 고치기 전 내용으로 되돌리고, 다시 되돌려 방금 내용으로
+  await page.tap('#menu-btn');
+  await page.tap('[data-memo-action="versions"]');
+  await page.waitForTimeout(300);
+  const versionCount = await page.locator('#versions-list .version-item').count();
+  check('메뉴 › 이전 버전: 고치기 전 내용이 보임', versionCount > 0, String(versionCount));
+  if (versionCount) {
+    await page.tap('#versions-list .version-restore');
+    await page.waitForTimeout(400);
+    const docText = () => page.locator('.mk-doc').innerText();
+    check('되돌리기 → 파일과 화면이 그 버전으로', !read('회의 메모.md').includes('휴대폰에서 추가') && !(await docText()).includes('휴대폰에서 추가'));
+    await shot('05b-versions');
+    await page.tap('#versions-list .version-restore'); // 맨 위 = 되돌리기 직전 내용
+    await page.waitForTimeout(400);
+    check('되돌리기를 되돌림 → 방금 내용 그대로', read('회의 메모.md').includes('휴대폰에서 추가') && (await docText()).includes('휴대폰에서 추가'));
+  }
+  await back();
+
   // 알림 추가
   await page.tap('#bell-btn');
   await page.tap('.rem-submit');

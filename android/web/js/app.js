@@ -26,6 +26,7 @@ import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml } from './print-html.js';
 import { haptic, reduceMotion } from '../../app/js/dom.js';
+import { renderVersions } from '../../app/js/versions-view.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -308,7 +309,7 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="open"]').hidden = inNote;
   memoSheet.querySelector('[data-memo-action="print"]').hidden = !inNote;
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
-  pin.querySelector('span').textContent = memo.pinned ? '고정 해제' : '맨 위에 고정';
+  pin.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -342,7 +343,7 @@ memoSheet.addEventListener('click', async (e) => {
       note.flush();
       app.vault.setMeta(id, { pinned: !memo.pinned });
       closeSheet(memoSheet);
-      toast(memo.pinned ? '고정을 해제했어요' : '맨 위에 고정했어요');
+      toast(memo.pinned ? '목록 고정을 풀었어요' : '목록 맨 위에 고정했어요');
       break;
     case 'share':
       closeSheet(memoSheet);
@@ -362,9 +363,31 @@ memoSheet.addEventListener('click', async (e) => {
       closeSheet(memoSheet);
       deleteMemo(id);
       break;
+    case 'versions':
+      closeSheet(memoSheet);
+      openVersions(id);
+      break;
     default:
   }
 });
+
+// ---------- 이전 버전 ----------
+
+const versionsSheet = $('versions-sheet');
+function openVersions(id) {
+  note.flush(); // 지금 내용이 버전으로 남도록 먼저 저장
+  const show = () => renderVersions($('versions-list'), app.vault.versions(id), (name) => {
+    if (note.currentId() === id) note.flush();
+    const restored = app.vault.restoreVersion(id, name);
+    if (!restored) return toast('그 버전을 찾지 못했어요', true);
+    if (note.currentId() === id) note.showRestored(restored);
+    toast('되돌렸어요');
+    show();
+  });
+  show();
+  openSheet(versionsSheet);
+}
+$('versions-close').addEventListener('click', () => closeSheet(versionsSheet));
 
 // ---------- 지우기: 묻지 않고 바로 휴지통으로 (애니메이션 + 되돌리기) ----------
 

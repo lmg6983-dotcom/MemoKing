@@ -2591,6 +2591,14 @@ function registerIpc() {
     return m ? { title: m.title, body: m.body, color: m.color, tables: m.tables, created: m.created, updated: m.updated } : null;
   });
   ipcMain.handle('pdf:save', (event, id, options) => savePdf(String(id), options ?? {}, BrowserWindow.fromWebContents(event.sender)));
+  // 버전 기록: 목록 · 하나 보기 · 되돌리기
+  ipcMain.handle('memo:versions', (_e, id) => vault?.versions(String(id)) ?? []);
+  ipcMain.handle('memo:version', (_e, id, name) => vault?.version(String(id), String(name)) ?? null);
+  ipcMain.handle('memo:restore-version', (_e, id, name) => {
+    const restored = vault?.restoreVersion(String(id), String(name)) ?? null;
+    if (restored) noteWins.get(String(id))?.setTitle(restored.title);
+    return restored;
+  });
   ipcMain.handle('memo:links', (_e, id) => vault?.links(id) ?? { links: [], backlinks: [], suggestions: [] });
   ipcMain.handle('memo:link', (_e, id, targetId, on) => {
     const result = vault?.link(id, targetId, on !== false);

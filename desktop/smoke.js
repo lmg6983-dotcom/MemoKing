@@ -434,6 +434,29 @@ export async function runSmoke({
     check('다시 열어도 항상 위 유지 (창·버튼 모두)', t2.win.isAlwaysOnTop() && (await pressed(t2.win)) === 'true');
     await closeNote(t2.id);
 
+    // 10-1) 압정·"고정" 은 목록 맨 위에 고정에만 · 이전 버전 · 단축키 보기 (v0.27)
+    const v1 = await openN1();
+    check('메뉴: "목록 맨 위에 고정" (늘 위에 두기와 다른 이름)', /목록 (맨 위에 고정|고정 풀기)/.test(await js(v1.win, `document.querySelector('#pin-toggle span').textContent`)));
+    await js(v1.win, `document.getElementById('versions-btn').click()`);
+    const versionCount = () => js(v1.win, `document.querySelectorAll('#versions-list .version-item').length`);
+    const hasVersions = await until(async () => !(await js(v1.win, `document.getElementById('versions-panel').hidden`)) && (await versionCount()) > 0, '이전 버전 패널').catch(() => false);
+    check('메뉴 › 이전 버전 → 고치기 전 내용이 버전으로 보임', hasVersions);
+    if (hasVersions) {
+      const before = readMemo(v1.id);
+      const n = await versionCount();
+      await js(v1.win, `document.querySelector('#versions-list .version-restore').click()`);
+      const restored = await until(async () => readMemo(v1.id) !== before && (await versionCount()) > n, '되돌리기').catch(() => false);
+      check('되돌리기 → 파일이 그 버전으로 · 방금 내용도 버전에 남음', restored);
+      await capture(v1.win, 'smoke-versions.png');
+    }
+    await key(v1.win, 'Escape');
+    await key(v1.win, '/', ['control']);
+    const sheetOpen = await until(() => js(v1.win, `Boolean(document.querySelector('dialog.shortcut-sheet')?.open)`), '단축키 보기').catch(() => false);
+    check('Ctrl+/ → 단축키 한눈에 보기', sheetOpen);
+    if (sheetOpen) await capture(v1.win, 'smoke-shortcuts.png');
+    await js(v1.win, `document.querySelector('dialog.shortcut-sheet')?.close()`);
+    await closeNote(v1.id);
+
     // 11) 목록 카드를 끌어 화면에 놓기 (v0.4.0)
     //     실제 마우스 대신 화면 좌표가 담긴 포인터 이벤트를 카드에 보낸다.
     const lb = list.getBounds();

@@ -18,6 +18,9 @@ import { audioNeedingTranscript } from './core/voice-card.js';
 import { reduceMotion, replayClass } from './dom.js';
 import { createClearStamp } from './clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
+import { renderVersions } from './versions-view.js';
+import { hintOnce } from './hints.js';
+import { toggleShortcutSheet } from './shortcut-sheet.js';
 
 const SAVE_DELAY = 600;
 
@@ -254,7 +257,7 @@ function applyMeta(next) {
   document.body.dataset.color = memo.color;
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
-  el.pinToggle.querySelector('span').textContent = memo.pinned ? '고정 해제' : '맨 위에 고정';
+  el.pinToggle.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
 }
 
 for (const color of COLORS) {
@@ -466,12 +469,51 @@ async function toggleLinks(force) {
   el.linksPanel.hidden = force === undefined ? !el.linksPanel.hidden : !force;
   if (!el.linksPanel.hidden) {
     if (reminderPanel?.open) reminderPanel.toggle(false); // 패널은 하나씩
+    if (!versionsPanel.hidden) toggleVersions(false);
     await flush();
     await refreshLinks();
     el.linkSearch.focus();
   } else editor.focus();
 }
 el.linksBtn.addEventListener('click', () => toggleLinks());
+
+// ---------- 이전 버전 ----------
+
+const versionsPanel = $('versions-panel');
+async function refreshVersions() {
+  const versions = await api.memo.versions(id);
+  renderVersions($('versions-list'), versions, restoreVersion);
+}
+async function restoreVersion(name) {
+  await flush(); // 지금 내용이 버전으로 남도록 먼저 저장
+  const restored = await api.memo.restoreVersion(id, name);
+  if (!restored) return setStatus('그 버전을 찾지 못했어요', true);
+  editor.setMarkdown(restored.body, restored.tables ?? []);
+  current = saved = editor.getMarkdown();
+  setStatus('되돌렸어요');
+  await refreshVersions();
+}
+async function toggleVersions(force) {
+  versionsPanel.hidden = force === undefined ? !versionsPanel.hidden : !force;
+  if (!versionsPanel.hidden) {
+    if (!el.linksPanel.hidden) toggleLinks(false);
+    if (reminderPanel?.open) reminderPanel.toggle(false);
+    await flush();
+    await refreshVersions();
+    $('versions-close').focus();
+  } else editor.focus();
+}
+$('versions-btn').addEventListener('click', () => {
+  closeMenu();
+  toggleVersions(true);
+});
+$('versions-close').addEventListener('click', () => toggleVersions(false));
+$('shortcuts-btn').addEventListener('click', () => {
+  closeMenu();
+  toggleShortcutSheet();
+});
+// 메모 창을 몇 번 써 본 뒤 한 번: 단축키 모음이 있다는 것
+setTimeout(() => hintOnce('shortcuts', 'Ctrl+/ 를 누르면 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn }), 2500);
 $('links-close').addEventListener('click', () => toggleLinks(false));
 api.on('memo:links-changed', refreshLinks);
 
@@ -952,8 +994,16 @@ tableBar.addEventListener('click', (e) => {
   editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
 });
 
+// 처음 그 상황이 됐을 때 한 번만: 눈에 안 보이는 동작(꾹 눌러 옮기기·테두리 끌기) 알려 주기
+// (그림·파일 옮기기 안내는 block-move.js 가 따로)
+function firstTimeHints(active) {
+  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab 은 다음 칸, 마지막 칸에서 Tab 은 새 줄이에요', { anchor: tableBar });
+  else if (active.task || active.bullet || active.ordered) hintOnce('list-move', '목록 항목은 글자를 꾹 누르면 들어 올려져 순서를 바꿀 수 있어요. 키보드는 Alt+↑ / Alt+↓', { anchor: el.editorRoot.querySelector('li') });
+}
+
 function showActive(active) {
   showTableBar(active.table);
+  firstTimeHints(active);
   showStyle(active);
   for (const btn of document.querySelectorAll('[data-cmd]')) {
     btn.classList.toggle('active', Boolean(active[btn.dataset.cmd]));
@@ -988,6 +1038,7 @@ const SHORTCUTS = {
   'ctrl+shift+KeyT': ['app', 'top'],
   'ctrl+shift+KeyA': ['app', 'reminders'],
   'ctrl+KeyK': ['app', 'links'],
+  'ctrl+Slash': ['app', 'shortcuts'],
   'ctrl+KeyN': ['app', 'new'],
   'ctrl+KeyW': ['app', 'close'],
 };
@@ -1001,6 +1052,7 @@ window.addEventListener('keydown', (e) => {
     else if (!el.morePanel.hidden) closeMore();
     else if (!el.menu.hidden) closeMenu();
     else if (!el.linksPanel.hidden) toggleLinks(false);
+    else if (!versionsPanel.hidden) toggleVersions(false);
     else if (reminderPanel?.open) reminderPanel.toggle(false);
     return;
   }
@@ -1029,6 +1081,7 @@ window.addEventListener('keydown', (e) => {
   else if (name === 'reminders') reminderPanel?.toggle();
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
+  else if (name === 'shortcuts') toggleShortcutSheet();
 }, true);
 
 // ---------- 본문 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 웹 브라우저처럼 글·사진·표가 함께 ----------

@@ -265,7 +265,8 @@
     <h3 id="memo-sheet-title" class="sheet-title"></h3>
     <div class="swatches" id="swatches" role="radiogroup" aria-label="메모 색"></div>
     <button class="menu-item" data-memo-action="open"><svg><use href="#i-note"/></svg><span>열기</span></button>
-    <button class="menu-item" data-memo-action="pin"><svg><use href="#i-pin"/></svg><span>맨 위에 고정</span></button>
+    <button class="menu-item" data-memo-action="pin"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
+    <button class="menu-item" data-memo-action="versions"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
     <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>공유</span></button>
     <button class="menu-item" data-memo-action="copy"><svg><use href="#i-copy"/></svg><span>텍스트 복사</span></button>
     <button class="menu-item" data-memo-action="print"><svg><use href="#i-pdf"/></svg><span>인쇄</span></button>
@@ -364,6 +365,17 @@
     <h4 id="links-suggest-title">비슷한 메모 <small>연결하거나 같은 태그를 달 수 있어요</small></h4>
     <ul id="links-suggest" class="link-list"></ul>
   </aside>
+
+  <!-- 이전 버전: 쓰는 동안 10분마다 남긴 내용으로 되돌리기 -->
+  <section id="versions-sheet" class="sheet links-panel versions-panel" role="dialog" aria-labelledby="versions-sheet-title" hidden>
+    <div class="sheet-grip"></div>
+    <header class="links-head">
+      <b id="versions-sheet-title">이전 버전</b>
+      <button id="versions-close" class="icon-btn" aria-label="이전 버전 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <p class="versions-hint">쓰는 동안 10분마다 그때 내용을 남겨 둬요(30일). 되돌려도 지금 내용이 여기에 남아요.</p>
+    <ul id="versions-list" class="link-list versions-list"></ul>
+  </section>
 
   <!-- 다른 앱으로 보내기: 글 · 그림 · PDF -->
   <section id="share-sheet" class="sheet share-sheet" role="dialog" aria-labelledby="share-sheet-title" hidden>

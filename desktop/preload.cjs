@@ -41,6 +41,9 @@ contextBridge.exposeInMainWorld('memoking', {
     remove: invoke('memo:remove'),
     links: invoke('memo:links'),
     link: invoke('memo:link'),
+    versions: invoke('memo:versions'),
+    version: invoke('memo:version'),
+    restoreVersion: invoke('memo:restore-version'),
   },
   // 예약 알림
   reminders: {

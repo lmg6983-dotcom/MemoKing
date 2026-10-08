@@ -123,6 +123,12 @@ function applyExternal(next) {
   setStatus('바뀐 내용을 불러왔어요');
 }
 
+/** 이전 버전으로 되돌린 내용을 지금 화면에 */
+export function showRestored(next) {
+  applyExternal(next);
+  setStatus('되돌렸어요');
+}
+
 /** 메모 폴더가 바뀌었을 때 (vault 'changed') */
 export function onVaultChanged({ ids, external, removed }) {
   if (!id || !editor) return;

@@ -33,8 +33,10 @@
 
   <div id="menu" class="menu" role="menu" hidden>
     <div class="swatches" id="swatches"></div>
-    <button class="menu-item" id="pin-toggle" role="menuitem"><svg><use href="#i-pin"/></svg><span>맨 위에 고정</span></button>
+    <button class="menu-item" id="pin-toggle" role="menuitem"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
     <button class="menu-item" id="show-list" role="menuitem"><svg><use href="#i-list"/></svg><span>메모 목록 열기</span></button>
+    <button class="menu-item" id="versions-btn" role="menuitem"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
+    <button class="menu-item" id="shortcuts-btn" role="menuitem"><svg><use href="#i-keyboard"/></svg><span>단축키 보기 <small>Ctrl+/</small></span></button>
     <button class="menu-item" id="pdf-btn" role="menuitem"><svg><use href="#i-pdf"/></svg><span>PDF로 저장</span></button>
     <button class="menu-item" id="transcribe-btn" role="menuitem"><svg><use href="#i-mic"/></svg><span>소리 받아쓰기</span></button>
     <button class="menu-item danger" id="delete-btn" role="menuitem"><svg><use href="#i-trash"/></svg><span>삭제</span></button>
@@ -157,6 +159,16 @@
     <ul id="links-in" class="link-list"></ul>
     <h4>비슷한 메모</h4>
     <ul id="links-suggest" class="link-list"></ul>
+  </aside>
+
+  <!-- 버전 기록: 자동 저장 전 내용을 10분마다 남겨 두고, 고른 때로 되돌린다 -->
+  <aside id="versions-panel" class="links-panel versions-panel" hidden>
+    <header class="links-head">
+      <b>이전 버전</b>
+      <button id="versions-close" class="icon-btn" aria-label="이전 버전 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <p class="versions-hint">쓰는 동안 10분마다 그때 내용을 남겨 둬요(30일). 되돌려도 지금 내용이 여기에 남아요.</p>
+    <ul id="versions-list" class="link-list versions-list"></ul>
   </aside>
 
   <!-- 서식 도구막대: 창 폭에 들어가지 않는 버튼은 끝의 » 더보기 안으로 옮겨진다 (note.js layoutToolbar) -->

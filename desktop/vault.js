@@ -12,6 +12,8 @@ import { extractTags } from '../app/js/core/tags.js';
 import { normalizeTables } from '../app/js/core/table-sizes.js';
 import { taskProgress } from '../app/js/core/tasks.js';
 import { textMatcher } from '../app/js/core/text-match.js';
+import {
+  VERSIONS_DIR, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune, describeVersions } from '../app/js/core/versions.js';
 
 export const APP_DIR = '_memoking';
 export const ATTACH_DIR = 'attachments';
@@ -352,9 +354,83 @@ export class Vault extends EventEmitter {
     entry.body = body;
     entry.meta.updated = toLocalIso();
     if (!entry.file && isBlankBody(body)) return this.summary(entry);
+    if (entry.file) this.keepVersion(id, known);
     this.write(entry, known);
     this.changed([id]);
     return this.summary(entry);
+  }
+
+  // ---------- 버전 기록 (_memoking/versions/<id>/<시각>.md) ----------
+
+  versionDir(id) {
+    const safe = safeVersionId(id);
+    return safe ? path.join(this.root, ...VERSIONS_DIR.split('/'), safe) : null;
+  }
+
+  #versionNames(id) {
+    const dir = this.versionDir(id);
+    try {
+      return dir ? fs.readdirSync(dir).filter(isVersionName) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  // 덮어쓰기 전 내용(before)을 남긴다. 계속 쓰는 동안은 10분에 하나, force 면 바로 (되돌리기 직전·다른 기기 내용)
+  keepVersion(id, before, { force = false } = {}) {
+    const dir = this.versionDir(id);
+    if (!dir) return null;
+    try {
+      const names = this.#versionNames(id);
+      const newest = names.map((name) => ({ name, at: versionTime(name) })).sort((a, b) => b.at - a.at)[0];
+      const latest = newest ? { at: newest.at, body: fs.readFileSync(path.join(dir, newest.name), 'utf8') } : null;
+      if (!shouldKeepVersion(before, latest, { force })) return null;
+      fs.mkdirSync(dir, { recursive: true });
+      let name = versionName();
+      for (let n = 2; names.includes(name); n++) name = versionName().replace(/\.md$/, `-${n}.md`);
+      writeAtomic(path.join(dir, name), before);
+      for (const old of versionsToPrune([...names, name])) fs.rmSync(path.join(dir, old), { force: true });
+      return name;
+    } catch (err) {
+      this.emit('error', err);
+      return null;
+    }
+  }
+
+  versions(id) {
+    const dir = this.versionDir(id);
+    if (!dir) return [];
+    return describeVersions(this.#versionNames(id).map((name) => {
+      try {
+        return { name, at: versionTime(name), body: fs.readFileSync(path.join(dir, name), 'utf8') };
+      } catch {
+        return { name, at: null };
+      }
+    }));
+  }
+
+  version(id, name) {
+    const dir = this.versionDir(id);
+    if (!dir || !isVersionName(name)) return null;
+    try {
+      return fs.readFileSync(path.join(dir, name), 'utf8');
+    } catch {
+      return null;
+    }
+  }
+
+  // 지금 내용도 버전으로 남겨 두고(되돌리기를 되돌릴 수 있게) 고른 버전으로 바꾼다
+  restoreVersion(id, name) {
+    const body = this.version(id, name);
+    const entry = this.entries.get(id);
+    if (body === null || !entry) return null;
+    this.keepVersion(id, entry.body, { force: true });
+    const known = entry.body;
+    entry.body = body;
+    entry.meta.updated = toLocalIso();
+    this.write(entry, known);
+    this.changed([id]);
+    return this.get(id);
   }
 
   // known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것을 넘긴다)
@@ -383,6 +459,7 @@ export class Vault extends EventEmitter {
       return; // 파일이 없어졌으면 그냥 다시 쓴다
     }
     if (sameBody(theirs, known) || sameBody(theirs, entry.body) || isBlankBody(theirs)) return;
+    this.keepVersion(entry.id, theirs, { force: true }); // 버전 기록에서도 되찾을 수 있게
     this.import({ body: conflictCopyBody(theirs), color: entry.meta.color });
   }
 

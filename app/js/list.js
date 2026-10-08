@@ -382,7 +382,7 @@ function renderCard(memo) {
   // 목록 맨 위에 고정 (압정)
   const pin = document.createElement('button');
   pin.className = `icon-btn card-pin${memo.pinned ? ' on' : ''}`;
-  pin.title = memo.pinned ? '고정 해제' : '맨 위에 고정';
+  pin.title = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
   pin.setAttribute('aria-label', `${memo.title} ${pin.title}`);
   pin.setAttribute('aria-pressed', String(Boolean(memo.pinned)));
   pin.dataset.pin = memo.id;
