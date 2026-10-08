@@ -212,6 +212,11 @@ class MainActivity : Activity() {
         }
     }
 
+    /** S펜으로 글자 칸에 쓰면 글자로 바꾸는 손글씨 입력을 켜고 끈다 (메모 화면이 다루기 방식·설정에 맞춰 부른다) */
+    fun setHandwriting(on: Boolean) {
+        if (Build.VERSION.SDK_INT >= 33) web.isAutoHandwritingEnabled = on
+    }
+
     /** 화면이 바뀔 때 위·아래 막대 색을 맞춘다 (메모를 열면 메모 색) */
     fun setChrome(color: String, darkIcons: Boolean) {
         val c = try {

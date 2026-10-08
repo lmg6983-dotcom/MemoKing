@@ -155,6 +155,12 @@ class Bridge(private val activity: MainActivity) {
         activity.runOnUiThread { activity.setChrome(color, darkIcons) }
     }
 
+    /** S펜 손글씨 → 글자 (안드로이드 14+ 손글씨 입력): 글 고치기 방식이고 설정이 켜져 있을 때만 */
+    @JavascriptInterface
+    fun setHandwriting(on: Boolean): String = reply {
+        activity.runOnUiThread { activity.setHandwriting(on) }
+    }
+
     @JavascriptInterface
     fun takeIntent(): String = reply { activity.takePendingIntent() }
 

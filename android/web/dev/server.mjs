@@ -133,6 +133,10 @@ const sync = {
     log.push({ copyText: text });
     return true;
   },
+  setHandwriting: (on) => {
+    log.push({ setHandwriting: on });
+    return null;
+  },
   setChrome: (color, dark) => {
     log.push({ setChrome: [color, dark] });
     return null;

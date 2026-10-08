@@ -11,7 +11,7 @@ import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
 import { app } from './state.js';
 import { tutEvent, textChanged, screenChanged } from './tutorial.js';
-import { call } from './native.js';
+import { call, native } from './native.js';
 import { fetchRemoteImage } from './web-fetch.js';
 import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
@@ -21,7 +21,7 @@ import { conflictCopyBody, isBlankBody, sameBody } from '../../app/js/core/memo-
 import { haptic, reduceMotion, replayClass } from '../../app/js/dom.js';
 import { createClearStamp } from '../../app/js/clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from '../../app/js/suggest-chips.js';
-import { setTouchMode } from '../../app/js/keyboard-guard.js';
+import { setTouchMode, penJustTouched } from '../../app/js/keyboard-guard.js';
 import { setupModeKnob, MODES } from './mode-knob.js';
 
 const SAVE_DELAY = 600;
@@ -866,8 +866,60 @@ function storedMode() {
     return 'edit';
   }
 }
+// ---------- S펜 손글씨 → 글자 (안드로이드 14+ · 삼성 S펜으로 텍스트 쓰기) ----------
+//   글 고치기 방식에서만, 설정에서 끌 수도 있다. 옮기기 · 그리기에서는 펜이 닿아도 커서 막대·손글씨가 생기지 않게
+//   (웹 화면: touch-action 에서 handwriting 을 빼면 그 칸은 손글씨를 시작하지 않는다 · 앱: WebView 손글씨 켜고 끄기)
+const PEN_WRITE_KEY = 'memoking.penHandwriting'; // 'edit'(기본) | 'off'
+const PEN_HINT_KEY = 'memoking.penWriteHint';
+export function penWriting() {
+  try {
+    return localStorage.getItem(PEN_WRITE_KEY) === 'off' ? 'off' : 'edit';
+  } catch {
+    return 'edit';
+  }
+}
+export function setPenWriting(value) {
+  try {
+    localStorage.setItem(PEN_WRITE_KEY, value === 'off' ? 'off' : 'edit');
+  } catch {
+    // 이번에만
+  }
+  applyHandwriting(el.screen.dataset.touchMode);
+}
+let handwritingOn = null;
+function applyHandwriting(mode) {
+  const on = mode === 'edit' && penWriting() !== 'off';
+  el.screen.dataset.handwriting = on ? 'on' : 'off';
+  if (on === handwritingOn) return;
+  handwritingOn = on;
+  try {
+    native.setHandwriting(on);
+  } catch {
+    // 미리보기 · 예전 앱
+  }
+}
+// 옮기기 · 그리기에서 펜이 글에 닿아 편집기에 초점이 가면 바로 놓는다 — 초점이 없으면 커서 막대도, 손글씨 입력도 생기지 않는다
+//   (WebView 가 touch-action 의 handwriting 을 모르는 기기에서도 막히게)
+el.editorRoot.addEventListener('focusin', (e) => {
+  const mode = el.screen.dataset.touchMode;
+  if (mode === 'edit' || !penJustTouched()) return;
+  if (e.target instanceof HTMLElement && e.target.closest('.ProseMirror')) e.target.closest('.ProseMirror').blur();
+});
+// 글 고치기에서 펜을 처음 대면 한 번만: 무엇이 되는지와 끄는 곳
+el.editorRoot.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'pen' || el.screen.dataset.handwriting !== 'on') return;
+  try {
+    if (localStorage.getItem(PEN_HINT_KEY)) return;
+    localStorage.setItem(PEN_HINT_KEY, '1');
+  } catch {
+    return;
+  }
+  showGuide('글자 칸에 쓰면 글자로 바뀌어요 · 톡 누르면 커서, 꾹 누르면 고르기 · 설정에서 끌 수 있어요', 'S펜 손글씨');
+}, true);
+
 function applyMode(mode, { user = false, quiet = false } = {}) {
   el.screen.dataset.touchMode = mode;
+  applyHandwriting(mode);
   recorder.holdStop(); // 아래 막대가 바뀌며 녹음 판이 움직인다 — 그 사이 눌림으로 녹음이 끝나지 않게
   $('mode-guide').hidden = true; // 앞 방식의 안내는 거둔다
   // 다이얼로 바꾸면 어느 방식이든 같은 자리(아래 가운데 흰 안내)에 무엇이 되었는지
@@ -903,7 +955,8 @@ function showGuide(text, title = '') {
 //   끌기·스크롤(움직임)·꾹 누르기는 아니고, 체크 네모·그림·링크·단추를 누른 것도 아닐 때만
 let tapDown = null;
 el.editorRoot.addEventListener('pointerdown', (e) => {
-  tapDown = knob?.mode === 'move' && e.isPrimary ? { x: e.clientX, y: e.clientY, t: e.timeStamp } : null;
+  // 손가락만 — S펜은 옮기기에서 끌기·고르기에 쓰므로 톡 눌러도 글 고치기로 넘어가지 않는다
+  tapDown = knob?.mode === 'move' && e.isPrimary && e.pointerType !== 'pen' ? { x: e.clientX, y: e.clientY, t: e.timeStamp } : null;
 }, true);
 el.editorRoot.addEventListener('pointerup', (e) => {
   const d = tapDown;
@@ -928,6 +981,7 @@ el.editorRoot.addEventListener('pointerup', (e) => {
 el.editorRoot.addEventListener('click', (e) => {
   const pm = el.editorRoot.querySelector('.ProseMirror');
   if (!editor || !pm || !(e.target instanceof Element) || pm.contains(e.target) || knob?.mode === 'draw') return;
+  if (knob?.mode === 'move' && e.pointerType === 'pen') return; // 옮기기에서 펜으로 빈 곳을 눌러도 글 고치기로 넘어가지 않는다
   if (e.target.closest('button, a, input, .mk-annot')) return;
   if (e.clientY < pm.getBoundingClientRect().bottom) return; // 글 옆 여백은 편집기가 알아서
   if (document.querySelector('.mk-list-dragging, .mk-block-dragging, body.mk-list-dragging, body.mk-block-dragging')) return;

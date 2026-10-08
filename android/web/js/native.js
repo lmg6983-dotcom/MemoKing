@@ -34,6 +34,7 @@ export const native = {
   useInternalVault: sync('useInternalVault'),
   copyText: sync('copyText'),
   setChrome: sync('setChrome'),
+  setHandwriting: sync('setHandwriting'),
   takeIntent: sync('takeIntent'),
   ready: sync('ready'),
   scheduleAlarms: (items) => unwrap(raw.scheduleAlarms(JSON.stringify(items))),

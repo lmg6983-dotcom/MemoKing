@@ -1061,6 +1061,10 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 .mk-annot-caption { display: none; }
 /* 본문 끝이 다이얼 밑에 숨지 않게 */
 .note-screen .editor { padding-bottom: 140px; }
+/* S펜 손글씨 → 글자: 글 고치기 방식 + 설정이 켜진 때만. touch-action 에 handwriting 이 없으면 그 칸은 손글씨를 시작하지 않는다
+   (손가락 스크롤·확대는 그대로). 옮기기 · 그리기에서는 펜이 닿아도 커서 막대가 보이지 않게 */
+.note-screen[data-handwriting="off"] .ProseMirror { touch-action: pan-x pan-y; } /* pinch-zoom 까지 넣으면 manipulation 과 같아져 손글씨가 다시 켜진다 (확대는 앱이 직접) */
+.note-screen:is([data-touch-mode="move"], [data-touch-mode="draw"]) .ProseMirror { caret-color: transparent; }
 /* 글 고치기: 옮기기 테두리(항목 둘레 점선)는 쉬게 */
 .note-screen[data-touch-mode="edit"] .mk-doc li::after { border-color: transparent !important; }
 @media print { .mode-knob { display: none !important; } }

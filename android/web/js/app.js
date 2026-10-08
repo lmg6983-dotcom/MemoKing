@@ -553,6 +553,7 @@ function openSettings() {
   refreshHistoryRow();
   renderDrive();
   $('auto-tags').checked = note.autoTagsOn();
+  $('pen-writing').value = note.penWriting();
   $('rec-stt').checked = recorder.sttOn();
   $('rec-stt-note').textContent = recorder.sttReady()
     ? '말하는 내용을 휴대폰의 Google 음성 인식으로 바로 텍스트로 적어요'
@@ -595,6 +596,7 @@ on('speakerModel', ({ progress }) => {
 });
 
 $('auto-tags').addEventListener('change', () => note.setAutoTags($('auto-tags').checked));
+$('pen-writing').addEventListener('change', () => note.setPenWriting($('pen-writing').value));
 $('rec-stt').addEventListener('change', () => recorder.setStt($('rec-stt').checked));
 $('settings-btn').addEventListener('click', openSettings);
 $('history-enabled').addEventListener('change', () => enableHistory($('history-enabled').checked));
