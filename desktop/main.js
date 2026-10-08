@@ -1358,7 +1358,7 @@ function fireReminder(memoId, reminder, info) {
   const memo = vault?.get(memoId);
   if (!memo) return;
   const kind = info.missed ? '놓친 알림' : info.startup ? '켤 때 알림' : '알림';
-  const alarm = { reminderId: reminder.id, label: `${kind} · ${describeReminder(reminder)}`, missed: Boolean(info.missed) };
+  const alarm = { reminderId: reminder.id, label: `${kind}, ${describeReminder(reminder)}`, missed: Boolean(info.missed) };
   history?.add({ source: 'memoking', appId: APP_ID, app: '메모킹', title: memo.title, body: alarm.label, memoId });
 
   if (reminder.action === 'open') {
@@ -1564,7 +1564,7 @@ function historyToMemo(entryId) {
   const e = history?.get(entryId);
   if (!e || !vault) return null;
   const when = new Date(e.time).toLocaleString('ko-KR');
-  const body = `# ${e.title || e.app}\n\n${e.body ? `${e.body}\n\n` : ''}> ${e.app} 알림 · ${when}`;
+  const body = `# ${e.title || e.app}\n\n${e.body ? `${e.body}\n\n` : ''}> ${e.app} 알림, ${when}`;
   const id = vault.import({ body });
   openNote(id);
   return id;
@@ -1675,7 +1675,7 @@ function purgeTrash() {
   if (!vault || !(settings.trashDays > 0)) return null;
   try {
     const r = vault.emptyTrash({ olderThanDays: settings.trashDays });
-    if (r.memos || r.files) console.log(`[휴지통] 오래된 메모 ${r.memos}개·첨부 ${r.files}개를 영구 삭제`);
+    if (r.memos || r.files) console.log(`[휴지통] 오래된 메모 ${r.memos}개와 첨부 ${r.files}개를 영구 삭제`);
     return r;
   } catch (err) {
     console.error('휴지통 비우기 실패', err);
@@ -1992,13 +1992,13 @@ async function quickMemo({ copy = true, onlyPid = 0 } = {}) {
 function captureToMemo(dir, info, point) {
   const capture = buildCapture(readCaptureDir(dir), info, vault);
   if (!capture) {
-    notice('가져올 내용이 없어요', '글·파일·그림을 고른 뒤 Ctrl+Alt+C를 눌러 주세요.');
+    notice('가져올 내용이 없어요', '글, 파일, 그림을 고른 뒤 Ctrl+Alt+C를 눌러 주세요.');
     return null;
   }
   const where = captureWhere(capture.source);
   return openCaptureMemo(capture, point, {
     title: '메모를 만들었어요',
-    body: `${captureTitle(capture)}${where ? `\n${where}에서 가져왔어요` : ''} · 눌러서 열기`,
+    body: `${captureTitle(capture)}${where ? `\n${where}에서 가져왔어요` : ''}\n눌러서 열기`,
   });
 }
 
@@ -2134,7 +2134,7 @@ function finishAreaCapture(senderId, rect) {
   };
   return openCaptureMemo(capture, c.point, {
     title: '화면 캡처로 메모를 만들었어요',
-    body: `${crop.width} × ${crop.height} 이미지를 클립보드에도 복사했어요 · 눌러서 열기`,
+    body: `${crop.width} × ${crop.height} 이미지를 클립보드에도 복사했어요. 눌러서 열기`,
   });
 }
 
@@ -2731,7 +2731,7 @@ function registerIpc() {
 async function fetchRemoteImage(url) {
   if (!vault) throw new Error('메모 폴더가 아직 없어요.');
   const target = new URL(url);
-  if (!/^https?:$/.test(target.protocol)) throw new Error('인터넷 주소(http·https)만 받을 수 있어요.');
+  if (!/^https?:$/.test(target.protocol)) throw new Error('인터넷 주소(http, https)만 받을 수 있어요.');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20_000);
   try {
@@ -2793,7 +2793,7 @@ const shorten = (text, max = 28) => (text.length > max ? `${text.slice(0, max - 
 function createTray() {
   // .ico 는 Windows 에서만 읽힌다 (다른 곳에서는 PNG)
   tray = new Tray(process.platform === 'win32' ? APP_ICON : APP_ICON_PNG);
-  tray.setToolTip('메모킹 · 누르면 메모 목록이 열려요');
+  tray.setToolTip('메모킹: 누르면 메모 목록이 열려요');
   tray.on('click', () => createListWindow());
   tray.on('double-click', () => createListWindow());
   updateTrayMenu();

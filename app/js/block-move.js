@@ -678,7 +678,7 @@ class Mover {
     // 휴대폰 다이얼이 글 고치기면 옮기는 방법은 다이얼부터 (옮기기 방식에서는 짧게 눌러 끈다)
     hint.textContent = touchMode() === 'edit' ? '옮기려면 오른쪽 아래 다이얼을 옮기기로 돌려요'
       : touchMode() === 'move' ? '짧게 눌러 끌면 다른 줄로 옮겨요'
-        : coarse() ? '꾹 눌러 끌면 다른 줄로 옮겨요' : '끌어서 다른 줄로 옮길 수 있어요 · Alt+↑↓';
+        : coarse() ? '꾹 눌러 끌면 다른 줄로 옮겨요' : '끌어서 다른 줄로 옮길 수 있어요 (Alt+↑↓)';
     document.body.append(hint);
     const r = dom.getBoundingClientRect();
     const w = hint.offsetWidth;

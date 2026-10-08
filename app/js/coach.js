@@ -217,8 +217,8 @@ export function setupCoach(api, o = {}) {
     if (step.advance) {
       // 접기·펴기 (직접 해 볼 때 가리지 않게)
       const fold = button('', 'coach-fold', 'fold');
-      fold.title = '말풍선 접기 · 펴기';
-      fold.setAttribute('aria-label', '말풍선 접기 · 펴기');
+      fold.title = '말풍선 접기와 펴기';
+      fold.setAttribute('aria-label', '말풍선 접기와 펴기');
       head.append(fold);
     }
     const parts = [head];

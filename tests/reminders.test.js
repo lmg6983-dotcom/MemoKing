@@ -81,7 +81,7 @@ test('파일을 손으로 고친 값도 안전하게', () => {
 
 test('설명 문구', () => {
   assert.equal(describeReminder(repeat({ every: 'week', weekdays: [0, 1, 2, 3, 4, 5, 6], time: '09:00' })), '매일 09:00');
-  assert.equal(describeReminder(repeat({ every: 'week', weekdays: [1, 3], time: '09:00' })), '매주 월·수 09:00');
+  assert.equal(describeReminder(repeat({ every: 'week', weekdays: [1, 3], time: '09:00' })), '매주 월, 수 09:00');
   assert.equal(describeReminder(repeat({ every: 'month', day: 15, time: '18:30' })), '매월 15일 18:30');
   assert.equal(describeReminder(normalizeReminder({ kind: 'timer', at: iso(2026, 10, 1, 9), minutes: 120 })), '2시간 타이머');
 });

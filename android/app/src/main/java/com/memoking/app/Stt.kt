@@ -49,7 +49,7 @@ object Stt {
     /** 지금 받아쓸 수 있는가 — 안 되면 이유 */
     fun unavailableReason(ctx: Context): String? = when {
         Build.VERSION.SDK_INT < 33 -> "이 휴대폰(안드로이드 13 아래)은 받아쓰기를 쓸 수 없어 녹음만 해요"
-        !SpeechRecognizer.isRecognitionAvailable(ctx) -> "휴대폰에 Google 음성 인식이 없어 녹음만 해요 (Google 앱을 설치·업데이트해 주세요)"
+        !SpeechRecognizer.isRecognitionAvailable(ctx) -> "휴대폰에 Google 음성 인식이 없어 녹음만 해요 (Google 앱을 설치하거나 업데이트해 주세요)"
         else -> null
     }
 

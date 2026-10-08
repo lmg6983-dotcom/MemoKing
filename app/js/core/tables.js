@@ -120,5 +120,5 @@ export function tableLineText(line) {
     .split(/(?<!\\)\|/)
     .map((c) => c.replace(/\\\|/g, '|').trim())
     .filter(Boolean)
-    .join(' · ');
+    .join(', ');
 }

@@ -37,7 +37,7 @@
     <details class="setup-help">
       <summary>PC와 같은 메모를 쓰려면?</summary>
       <p>PC 메모킹은 Google Drive 폴더(예: <code>내 드라이브 › 메모킹</code>)에 메모를 저장해요.
-        <b>Google Drive와 동기화</b>를 고르고 PC와 같은 계정·폴더를 선택하면 두 기기의 메모가 같아져요.</p>
+        <b>Google Drive와 동기화</b>를 고르고 PC와 같은 계정과 폴더를 선택하면 두 기기의 메모가 같아져요.</p>
     </details>
     <p id="setup-error" class="setup-error" hidden></p>
   </section>
@@ -56,7 +56,7 @@
     <div class="searchbar">
       <label class="search">
         <svg class="search-icon"><use href="#i-search"/></svg>
-        <input id="search" type="search" placeholder="메모 검색 · #태그" aria-label="메모 검색" autocomplete="off" enterkeyhint="search">
+        <input id="search" type="search" placeholder="메모나 #태그 검색" aria-label="메모 검색" autocomplete="off" enterkeyhint="search">
       </label>
       <button id="filter-btn" class="icon-btn filter-btn" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
     </div>
@@ -93,7 +93,7 @@
         <h3>알림 보관함</h3>
         <p>지웠거나 놓친 알림도 여기서 다시 볼 수 있어요.</p>
         <ul>
-          <li>메신저·메일 등 다른 앱 알림의 <b>제목과 내용</b>을 보관해요.</li>
+          <li>메신저, 메일 등 다른 앱 알림의 <b>제목과 내용</b>을 보관해요.</li>
           <li>휴대폰 설정에서 <b>알림 접근</b>을 허용해 주세요.</li>
           <li>보관한 알림은 <b>이 휴대폰에만</b> 저장돼요.</li>
           <li>언제든 끄거나 삭제할 수 있어요.</li>
@@ -213,12 +213,16 @@
         <span class="sep"></span>
         <button data-action="style" class="style-btn" aria-label="스타일" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
       </div>
+      <!-- S펜을 쓰는 기기에서만: 펜으로 쓰다가 키보드로 치고 싶을 때 (글자를 누르면 손글씨 입력이 먼저 떠서) -->
+      <button data-action="keyboard" id="kb-btn" class="kb-btn" aria-label="키보드 꺼내기" aria-pressed="false">
+        <svg class="kb-up" aria-hidden="true"><use href="#i-keyboard"/></svg><svg class="kb-down" aria-hidden="true"><use href="#i-keyboard-down"/></svg>
+      </button>
     </footer>
 
     <!-- 옮기기 방식: 도구막대 대신 (고칠 수 없으니) — 글자를 누르면 글 고치기로 -->
     <div id="move-bar" class="move-bar" role="status">
       <svg aria-hidden="true"><use href="#i-move"/></svg>
-      <span class="move-bar-text"><b>옮기기 모드</b><small>줄·사진을 짧게 눌러 끌어요 · 글자를 누르면 글 고치기</small></span>
+      <span class="move-bar-text"><b>옮기기 모드</b><small>줄이나 사진을 짧게 눌러 끌어요. 글자를 누르면 글 고치기로 바뀌어요</small></span>
     </div>
     <!-- 왼쪽 아래(엄지 자리) 콘텐츠 추가: 누르면 위로 사진·파일·음성 녹음·표·수식 — 오른쪽 아래 다이얼과 같은 크기 -->
     <button data-action="add" id="add-btn" class="add-btn add-fab" aria-label="콘텐츠 추가" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
@@ -281,7 +285,7 @@
       <h4>새 알림</h4>
       <div class="seg" id="rem-kind" role="radiogroup" aria-label="알림 종류">
         <button type="button" data-kind="timer" aria-checked="true">타이머</button>
-        <button type="button" data-kind="at" aria-checked="false">날짜·시간</button>
+        <button type="button" data-kind="at" aria-checked="false">날짜와 시간</button>
         <button type="button" data-kind="repeat" aria-checked="false">반복</button>
         <button type="button" data-kind="startup" aria-checked="false">앱 열 때</button>
       </div>
@@ -368,7 +372,7 @@
     <div class="share-choices">
       <button class="share-choice" data-share="text"><svg><use href="#i-text"/></svg><b>텍스트</b><small>목록 모양 그대로</small></button>
       <button class="share-choice" data-share="image"><svg><use href="#i-image"/></svg><b>이미지</b><small>메모 그대로 한 장</small></button>
-      <button class="share-choice" data-share="pdf"><svg><use href="#i-pdf"/></svg><b>PDF</b><small>문서·인쇄용</small></button>
+      <button class="share-choice" data-share="pdf"><svg><use href="#i-pdf"/></svg><b>PDF</b><small>문서, 인쇄용</small></button>
     </div>
     <p id="share-busy" class="wait" hidden><span class="spinner"></span><span id="share-busy-text">만드는 중…</span></p>
   </section>
@@ -469,7 +473,7 @@
       <button id="history-apps-2" class="btn">모을 앱 선택 <span id="blocked-count" class="trash-count"></span></button>
     </div>
 
-    <p class="label">태그 · 녹음</p>
+    <p class="label">태그와 녹음</p>
     <label class="setting-row">
       <input type="checkbox" id="auto-tags" class="switch" checked>
       <span>태그 자동 추가 <small>태그 없는 메모를 닫을 때 확실한 태그만 달아요</small></span>
@@ -484,7 +488,7 @@
     </div>
     <p class="label">S펜</p>
     <label class="setting-row select-row">
-      <span>손글씨를 글자로 <small>글자 칸에 S펜으로 쓰면 글자로 바꿔요 · 옮기기·그리기에서는 늘 꺼져 있어요</small></span>
+      <span>손글씨를 글자로 <small>글 고치기에서 S펜으로 쓰면 글자로 바꿔요. 옮기기와 그리기에서는 늘 꺼져 있어요</small></span>
       <select id="pen-writing" aria-label="S펜 손글씨를 글자로">
         <option value="edit">글 고치기에서만</option>
         <option value="off">끄기</option>
@@ -510,7 +514,7 @@
       </select>
     </label>
     <p class="version" id="version"></p>
-    <p class="copyright">© 2026 메모킹 · 문의 lmg6983@gmail.com</p>
+    <p class="copyright">© 2026 메모킹 | 문의 lmg6983@gmail.com</p>
   </section>
 
   <!-- 알림 보관함: 앱마다 모을지 고르기 -->

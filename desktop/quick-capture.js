@@ -156,7 +156,7 @@ export function captureTitle(capture, max = 60) {
   const firstLine = (s) => String(s ?? '').split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? '';
   const fromHtml = (html) => firstLine(String(html ?? '')
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, '')
-    .replace(/<\/t[dh]>\s*(?=<t[dh][\s>])/gi, ' · ') // 표의 첫 줄은 "품목 · 가격"
+    .replace(/<\/t[dh]>\s*(?=<t[dh][\s>])/gi, ', ') // 표의 첫 줄은 "품목 · 가격"
     .replace(/<\/(p|div|h[1-6]|li|tr|br)\s*>|<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"'));
@@ -184,5 +184,5 @@ export function sourceLine(source) {
   const esc = (s) => s.replace(/([\\[\]*_`<>])/g, '\\$1');
   const title = (source.window || source.process || '').trim();
   const where = source.url ? `[${esc(title || source.url)}](${source.url})` : esc(title || '클립보드');
-  return `> 출처: ${where} · ${when}`;
+  return `> 출처: ${where}, ${when}`;
 }

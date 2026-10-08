@@ -54,7 +54,7 @@ function renderModules() {
 function updatePlaceholder() {
   const memo = isOn('memo');
   const find = isOn('notes') || isOn('files') || isOn('opms');
-  input.placeholder = memo && find ? '메모를 쓰거나, 메모·파일을 찾아요' : memo ? '메모를 쓰고 Enter' : find ? '메모·파일 찾기' : '아래에서 기능을 켜 주세요';
+  input.placeholder = memo && find ? '메모를 쓰거나, 메모와 파일을 찾아요' : memo ? '메모를 쓰고 Enter' : find ? '메모와 파일 찾기' : '아래에서 기능을 켜 주세요';
 }
 
 // ---------- 결과 ----------
@@ -122,13 +122,13 @@ function row(r, index, query) {
   li.append(ico, txt, side, actionButtons(r, 0, (k) => run(index, { act: k })));
   if (r.kind === 'opms') {
     ico.textContent = 'O';
-    t.append(highlighted([r.ourref, r.n_app].filter(Boolean).join(' · ') || r.yourref || '관리번호 없음', query));
-    s.textContent = [r.applicant, r.title].filter(Boolean).join(' · ');
+    t.append(highlighted([r.ourref, r.n_app].filter(Boolean).join(', ') || r.yourref || '관리번호 없음', query));
+    s.textContent = [r.applicant, r.title].filter(Boolean).join(', ');
     side.textContent = r.div || '';
   } else if (r.kind === 'more') {
     ico.textContent = '⋯';
     t.textContent = `다른 ${r.count.toLocaleString()}건 더 보기`;
-    s.textContent = '모두 찾기 창에서 비슷한 것부터 전부 — 이름 · 경로 · 크기 · 고친 때';
+    s.textContent = '모두 찾기 창에서 비슷한 것부터 전부 보여 줘요 (이름, 경로, 크기, 고친 때)';
   } else if (r.kind === 'new') {
     ico.textContent = '✎';
     t.textContent = '새 메모로 저장';
@@ -213,7 +213,7 @@ function render() {
   if (query && results.more > 0) add({ kind: 'more', count: results.more });
   const searched = isOn('notes') || isOn('files');
   if (query && searched && !results.notes.length && !results.folders.length && !results.files.length && !opms.cases.length && !opms.loading) {
-    nodes.push(note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모·파일이 없어요 — Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모·파일이 없어요`));
+    nodes.push(note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요. Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`));
   }
   if (query && isOn('files') && results.index && !results.index.count) {
     nodes.push(note(results.index.building ? '파일 목록을 만드는 중이에요 — 처음 한 번만, 잠시 뒤 파일도 찾아져요' : '파일 목록이 아직 없어요'));

@@ -81,7 +81,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     text.className = 'noti-text';
     const meta = document.createElement('div');
     meta.className = 'noti-meta';
-    meta.textContent = `${e.app} · ${hhmm(d)}`;
+    meta.textContent = `${e.app}, ${hhmm(d)}`;
     const title = document.createElement('div');
     title.className = 'noti-title';
     title.textContent = e.title;
@@ -95,7 +95,7 @@ export function setupHistoryTab({ api, els, confirm }) {
       tag.className = 'noti-via';
       tag.textContent = '글자 인식';
       tag.title = '알림 창에서 글자를 그대로 읽을 수 없어 그림에서 글자를 인식했어요. 틀린 글자가 있을 수 있어요';
-      meta.append(' · ', tag);
+      meta.append('  ', tag);
     }
     if (e.body) text.append(body);
     if (e.image && e.source === 'popup') {

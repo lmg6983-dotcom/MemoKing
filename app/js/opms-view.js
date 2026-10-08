@@ -100,7 +100,7 @@ form.addEventListener('submit', async (e) => {
   const pick = (r) => {
     const b = el('button', 'op-pick', null);
     b.type = 'button';
-    b.append(el('b', '', [r.ourref, r.yourref].filter(Boolean).join(' / ') || '-'), el('span', '', [r.n_app, r.applicant, r.title].filter(Boolean).join(' · ')));
+    b.append(el('b', '', [r.ourref, r.yourref].filter(Boolean).join(' / ') || '-'), el('span', '', [r.n_app, r.applicant, r.title].filter(Boolean).join(', ')));
     b.addEventListener('click', () => open(r.idx, 'info'));
     return b;
   };
@@ -125,7 +125,7 @@ async function open(idx, which = 'info') {
   const badge = $('op-badge');
   badge.hidden = !current.summary;
   badge.textContent = current.summary;
-  $('op-sub').textContent = [c.div, c.applicant, c.title_kor].filter(Boolean).join(' · ');
+  $('op-sub').textContent = [c.div, c.applicant, c.title_kor].filter(Boolean).join(', ');
   head.hidden = false;
   tabsEl.hidden = false;
   document.title = `OPMS — ${c.ourref || c.yourref || c.n_app || ''}`;
@@ -347,7 +347,7 @@ async function showWrapper(my) {
       if (res.failed.length) parts.push(`${res.failed.length}개 실패`);
       dl = {
         idx, done: true, saved: res.saved, cls: res.failed.length ? 'err' : 'ok',
-        text: `${res.failed.length ? '' : '✓ '}${parts.join(' · ')}${isAll ? ' · 사건정보.txt' : ''}`,
+        text: `${res.failed.length ? '' : '✓ '}${parts.join(', ')}${isAll ? ', 사건정보.txt 포함' : ''}`,
         title: res.failed.map((f) => `${f.name}: ${f.error}`).join('\n'),
       };
     } catch (err) {
@@ -367,7 +367,7 @@ async function showWrapper(my) {
 
 api.onProgress((p) => {
   if (!dl || dl.done || !p.total || p.i >= p.total) return;
-  dl.text = `받는 중… ${p.i + 1}/${p.total} · ${p.name}`;
+  dl.text = `받는 중… ${p.i + 1}/${p.total} ${p.name}`;
   const s = foot.querySelector('.op-status');
   if (s && tab === 'wrapper' && current?.case.idx === dl.idx) s.textContent = dl.text;
 });

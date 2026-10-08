@@ -133,6 +133,10 @@ const sync = {
     log.push({ copyText: text });
     return true;
   },
+  showKeyboard: (show) => {
+    log.push({ showKeyboard: show });
+    return null;
+  },
   setHandwriting: (on) => {
     log.push({ setHandwriting: on });
     return null;

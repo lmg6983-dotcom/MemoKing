@@ -30,7 +30,7 @@ export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
   const foot = document.createElement('div');
   foot.className = 'share-foot';
   const d = new Date();
-  foot.textContent = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} · 메모킹`;
+  foot.textContent = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}  메모킹`;
   paper.append(doc, foot);
   document.body.append(paper);
   try {

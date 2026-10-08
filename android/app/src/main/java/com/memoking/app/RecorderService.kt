@@ -88,7 +88,7 @@ class RecorderService : Service() {
             val nm = ctx.getSystemService(NotificationManager::class.java)!!
             if (nm.getNotificationChannel(CHANNEL) != null) return
             val ch = NotificationChannel(CHANNEL, "녹음", NotificationManager.IMPORTANCE_LOW)
-            ch.description = "녹음하는 동안 보이는 알림 (시간·멈춤·끝내기)"
+            ch.description = "녹음하는 동안 보이는 알림 (시간, 멈춤, 끝내기)"
             ch.setShowBadge(false)
             nm.createNotificationChannel(ch)
         }
@@ -183,7 +183,7 @@ class RecorderService : Service() {
         val b = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_crown)
             .setColor(0xFFE5484D.toInt())
-            .setContentTitle(if (s.paused) "녹음 일시 정지" else if (s.stt) "녹음·받아쓰는 중" else "녹음 중")
+            .setContentTitle(if (s.paused) "녹음 일시 정지" else if (s.stt) "녹음하며 받아쓰는 중" else "녹음 중")
             .setContentText(s.lastText().ifEmpty { "눌러서 메모 열기" })
             .setOngoing(true)
             .setOnlyAlertOnce(true)

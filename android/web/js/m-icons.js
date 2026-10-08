@@ -13,6 +13,7 @@ const ICONS = {
   // 다루기 방식 다이얼 (mode-knob.js): 글자 커서 · 네 방향 화살표
   type: `<path d="M9 4.5h6M9 19.5h6M12 4.5v15" ${stroke} stroke-width="2"/>`,
   move: `<path d="M12 3.5v17M3.5 12h17" ${stroke}/><path d="M9.5 6L12 3.5 14.5 6M9.5 18l2.5 2.5 2.5-2.5M6 9.5L3.5 12 6 14.5M18 9.5l2.5 2.5-2.5 2.5" ${stroke}/>`,
+  keyboard: `<rect x="3" y="6" width="18" height="12" rx="2" ${stroke}/><path d="M7 10h.01M10.5 10h.01M14 10h.01M17.5 10h.01M8 14h8" ${stroke}/>`,
   'keyboard-down': `<rect x="3" y="3.5" width="18" height="11" rx="2" ${stroke}/><path d="M7 7.5h.01M10.5 7.5h.01M14 7.5h.01M17.5 7.5h.01M8 11h8" ${stroke}/><path d="M9 18l3 3 3-3" ${stroke}/>`,
 };
 

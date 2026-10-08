@@ -161,6 +161,12 @@ class Bridge(private val activity: MainActivity) {
         activity.runOnUiThread { activity.setHandwriting(on) }
     }
 
+    /** 키보드 꺼내기 · 넣기 (S펜으로 쓰다가 키보드로 치고 싶을 때) */
+    @JavascriptInterface
+    fun showKeyboard(show: Boolean): String = reply {
+        activity.runOnUiThread { activity.showKeyboard(show) }
+    }
+
     @JavascriptInterface
     fun takeIntent(): String = reply { activity.takePendingIntent() }
 

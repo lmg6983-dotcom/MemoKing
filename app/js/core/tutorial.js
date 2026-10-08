@@ -32,7 +32,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]'], advance: 'memo-created', emoji: '✨',
     title: '첫 메모를 만들어 볼까요?',
-    text: '오른쪽 아래 노란 + 를 누르면 🎙️ 음성 · 🎨 손 · ✏️ 글 메모가 펼쳐져요.',
+    text: '오른쪽 아래 노란 + 를 누르면 🎙️ 음성, 🎨 손, ✏️ 글 메모가 펼쳐져요.',
     try: '+ 를 누르고 "글 메모"를 골라 보세요',
   },
   // ---------- 쓰기 (메모 창) ----------
@@ -45,8 +45,8 @@ export const TUTORIAL_STEPS = [
   },
   {
     id: 'style', win: 'note', target: ['.format-bar .style-btn', '#format-bar'], keep: ['.ProseMirror > *', '#style-menu:not([hidden])'], advance: 'styled', emoji: '🔠',
-    title: '제목·인용으로 바꾸기',
-    text: '"본문" 단추를 누르면 그 줄이 제목 · 인용 · 코드 모양으로 바뀌어요.',
+    title: '제목이나 인용으로 바꾸기',
+    text: '"본문" 단추를 누르면 그 줄이 제목, 인용, 코드 모양으로 바뀌어요.',
     try: '"본문"을 누르고 "제목 2"를 골라 보세요',
     next: LATER,
   },
@@ -69,7 +69,7 @@ export const TUTORIAL_STEPS = [
     id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     image: 'add.jpg',
     title: '+ 로 더 많은 것 넣기',
-    text: '도구막대 맨 왼쪽 + 에 녹음 · 손 메모 · 글 위에 그리기 · 사진 · 파일 · 표 · 수식이 모여 있어요.',
+    text: '도구막대 맨 왼쪽 + 에 녹음, 손 메모, 글 위에 그리기, 사진, 파일, 표, 수식이 모여 있어요.',
     try: '왼쪽 아래 + 를 눌러 펼쳐 보세요',
     next: LATER,
   },
@@ -77,7 +77,7 @@ export const TUTORIAL_STEPS = [
     id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'ink-done', emoji: '🎨',
     image: 'ink.jpg',
     title: '손으로 그리기',
-    text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기, 잘못 그리면 ↩️ 되돌리기.',
+    text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색과 굵기, 잘못 그리면 ↩️ 되돌리기.',
     try: '"손 메모"를 눌러 아무거나 그리고 ✓ 완료를 눌러 보세요',
     next: LATER,
   },
@@ -113,7 +113,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'bell', win: 'note', target: ['#bell-btn', '.bar'], emoji: '⏰',
     title: '잊지 않게 알림 맞추기',
-    text: '종 단추로 원하는 날짜와 시간에 이 메모를 알려 드려요. 매일·매주 되풀이도 돼요.',
+    text: '종 단추로 원하는 날짜와 시간에 이 메모를 알려 드려요. 매일, 매주 되풀이도 돼요.',
     next: '다음',
   },
   {
@@ -183,7 +183,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'settings', win: 'list', target: ['#settings-btn'], emoji: '⚙️',
     title: '내게 맞게 바꾸기',
-    text: '휴지통 · 음성 받아쓰기 · 알림 보관은 설정에 있어요. 이 안내도 설정에서 언제든 다시 볼 수 있어요.',
+    text: '휴지통, 음성 받아쓰기, 알림 보관은 설정에 있어요. 이 안내도 설정에서 언제든 다시 볼 수 있어요.',
     next: '다음',
   },
   {
@@ -205,7 +205,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]', '#fab'], advance: 'memo-created', emoji: '✨',
     title: '첫 메모를 만들어 볼까요?',
-    text: '노란 + 를 누르면 🎙️ 음성 · 🎨 손 · ✏️ 글 메모가 펼쳐져요.',
+    text: '노란 + 를 누르면 🎙️ 음성, 🎨 손, ✏️ 글 메모가 펼쳐져요.',
     try: '+ 를 누르고 "글 메모"를 골라 보세요',
   },
   // 글 쓰는 단계: 쓰는 줄과 그 아래(write) · 도구막대는 비워 두고, 다 쓰고 손을 멈추면 넘어간다 (치는 도중엔 그대로)
@@ -227,21 +227,21 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'move', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.ProseMirror > *', '.mode-knob'], sample: true, advance: 'mode-moved', emoji: '↕️', image: 'm-move.jpg',
     title: '다이얼로 옮기기',
-    text: '오른쪽 아래 다이얼로 글 고치기 · 옮기기 · 글 위에 그리기를 골라요. 옮기기에서는 줄·사진·표를 짧게 눌러 끌면 돼요 (연습용 장보기 목록을 넣어 뒀어요). 글을 복사하거나 고칠 땐 글 고치기로.',
+    text: '오른쪽 아래 다이얼로 글 고치기, 옮기기, 글 위에 그리기를 골라요. 옮기기에서는 줄, 사진, 표를 짧게 눌러 끌면 돼요 (연습용 장보기 목록을 넣어 뒀어요). 글을 복사하거나 고칠 땐 글 고치기로.',
     try: '오른쪽 아래 다이얼을 한 번 눌러 옮기기로 돌려 보세요',
     next: LATER,
   },
   {
     id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     title: '+ 로 더 많은 것 넣기',
-    text: '왼쪽 아래 둥근 + 에 녹음 · 손 메모 · 사진 · 파일 · 표 · 수식이 모여 있어요. 펼치면 키보드는 잠깐 닫혀요.',
+    text: '왼쪽 아래 둥근 + 에 녹음, 손 메모, 사진, 파일, 표, 수식이 모여 있어요. 펼치면 키보드는 잠깐 닫혀요.',
     try: '왼쪽 아래 + 를 눌러 펼쳐 보세요',
     next: LATER,
   },
   {
     id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'ink-done', emoji: '🎨',
     title: '손으로 그리기',
-    text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색·굵기를 골라요.',
+    text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색과 굵기를 골라요.',
     try: '"손 메모"를 눌러 쓱 그리고 ✓ 완료',
     next: LATER,
   },
@@ -267,8 +267,8 @@ export const MOBILE_TUTORIAL_STEPS = [
   },
   {
     id: 'bell', win: 'note', target: ['#bell-btn'], keep: ['#links-btn'], emoji: '⏰',
-    title: '알림 · 이어 두기',
-    text: '⏰ 종: 원하는 날짜·시간에 이 메모를 알려 줘요 (매일·매주도). 🔗 고리: 관련 메모를 이어 둬요.',
+    title: '알림과 이어 두기',
+    text: '⏰ 종: 원하는 날짜와 시간에 이 메모를 알려 줘요 (매일, 매주도). 🔗 고리: 관련 메모를 이어 둬요.',
     next: '다음',
   },
   {
@@ -280,7 +280,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'cards', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
     title: '메모는 모두 여기에',
-    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유·색·지우기)가 떠요. 왼쪽으로 밀면 지우기예요.',
+    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유, 색, 지우기)가 떠요. 왼쪽으로 밀면 지우기예요.',
     next: '다음',
   },
   {
@@ -300,7 +300,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'share', win: 'list', target: [], emoji: '📤',
     title: '다른 앱에서 바로 담기',
-    text: '인터넷·사진·녹음 앱에서 "공유 › 메모킹"을 누르면 바로 메모가 돼요.',
+    text: '인터넷, 사진, 녹음 앱에서 "공유 › 메모킹"을 누르면 바로 메모가 돼요.',
     next: '다음',
   },
   {

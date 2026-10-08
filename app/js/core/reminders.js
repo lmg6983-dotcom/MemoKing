@@ -175,7 +175,7 @@ export function describeReminder(r, now = new Date()) {
       if (every === 'day') return `매일 ${time}`;
       if (every === 'week') {
         if (weekdays.length === 7) return `매일 ${time}`; // "매주 매일" 이 아니라
-        return `매주 ${weekdays.map((w) => WEEKDAY[w]).join('·')} ${time}`;
+        return `매주 ${weekdays.map((w) => WEEKDAY[w]).join(', ')} ${time}`;
       }
       if (every === 'month') return `매월 ${day}일 ${time}`;
       return `매년 ${month}월 ${day}일 ${time}`;

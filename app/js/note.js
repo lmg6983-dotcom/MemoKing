@@ -337,7 +337,7 @@ async function transcribeAudio() {
   closeMenu();
   if (!editor) return;
   const st = await api.stt.status();
-  if (st.asr.state !== 'ready') return setStatus('받아쓰기 데이터를 먼저 받아 주세요 · 목록 창 설정 › 음성 녹음', true);
+  if (st.asr.state !== 'ready') return setStatus('받아쓰기 데이터를 먼저 받아 주세요 (목록 창 설정 › 음성 녹음)', true);
   const list = audioNeedingTranscript(editor.getMarkdown());
   if (!list.length) return setStatus('받아쓸 소리가 없어요 (모두 받아썼어요)');
   let done = 0;
@@ -354,7 +354,7 @@ async function transcribeAudio() {
     }
   }
   await flush();
-  setStatus(done ? `받아쓴 글을 넣었어요${st.speakerOn && st.speaker.state === 'ready' ? ' · 말한 사람을 나누는 중…' : ''}` : '알아들은 말이 없어요');
+  setStatus(done ? `받아쓴 글을 넣었어요${st.speakerOn && st.speaker.state === 'ready' ? '. 말한 사람을 나누는 중…' : ''}` : '알아들은 말이 없어요');
 }
 $('transcribe-btn').addEventListener('click', transcribeAudio);
 // 말한 사람을 나눈 뒤: 음성 카드의 받아쓴 글에 "화자 N:" 을 붙여 다시
@@ -528,8 +528,8 @@ async function applyCapture(c) {
   }
   if (tags.length) editor.appendMarkdown(tags.map((t) => `#${t}`).join(' '));
   await flush();
-  const skipped = c.skipped.length ? ` · 폴더 ${c.skipped.length}개는 넣을 수 없어서 뺐어요` : '';
-  const tagged = tags.length ? ` · ${tags.map((t) => `#${t}`).join(' ')}` : '';
+  const skipped = c.skipped.length ? `. 폴더 ${c.skipped.length}개는 넣을 수 없어서 뺐어요` : '';
+  const tagged = tags.length ? `, ${tags.map((t) => `#${t}`).join(' ')}` : '';
   setStatus(c.source.copied ? `고른 내용으로 메모를 만들었어요${tagged}${skipped}` : `복사해 둔 내용으로 메모를 만들었어요${tagged}${skipped}`);
 }
 
@@ -629,7 +629,7 @@ el.editorRoot.addEventListener('mouseover', async (e) => {
   const program = a.dataset.file === 'program';
   hint.textContent = !info?.exists
     ? '이 PC의 메모 폴더에 파일이 아직 없어요'
-    : `${a.textContent} · ${formatBytes(info.size)} · ${program ? '누르면 실행할지 물어볼게요' : '누르면 열려요'}`;
+    : `${a.textContent} (${formatBytes(info.size)}). ${program ? '누르면 실행할지 물어볼게요' : '누르면 열려요'}`;
   const r = a.getBoundingClientRect();
   hint.hidden = false;
   const left = Math.max(6, Math.min(r.left, window.innerWidth - hint.offsetWidth - 6));
@@ -1080,7 +1080,7 @@ function setZoom(z, { show = true } = {}) {
     // 기억 못 해도 지금 창에서는 그대로
   }
   if (!show) return;
-  zoomText.textContent = zoom >= 1 ? `매직 줌 · 확대 ${zoomLabel(zoom)}` : `매직 줌 · 글자 ${zoomLabel(zoom)}`;
+  zoomText.textContent = zoom >= 1 ? `매직 줌: 확대 ${zoomLabel(zoom)}` : `매직 줌: 글자 ${zoomLabel(zoom)}`;
   zoomReset.hidden = zoom === 1;
   zoomBadge.classList.add('show');
   clearTimeout(zoomTimer);
@@ -1463,7 +1463,7 @@ if (!memo) {
       if (next) memo = { ...memo, ...next };
     },
     onMode: (on) => {
-      setStatus(on ? '글 위에 그리기 · 다 그렸으면 완료 (Esc)' : '');
+      setStatus(on ? '글 위에 그리기. 다 그렸으면 완료 (Esc)' : '');
       if (!on) {
         editor.focus();
         tutEvent('annotate-done');

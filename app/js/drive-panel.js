@@ -39,7 +39,7 @@ export function setupDrivePanel({ api, onVault, confirm }) {
       title = `${info.email || 'Google 계정'} 로그인됨`;
       sub = '맞출 Drive 폴더를 아직 고르지 않았어요';
     } else if (on) {
-      title = `${info.email || 'Google 계정'} · 내 드라이브 › ${info.folderName || '메모킹'}`;
+      title = `${info.email || 'Google 계정'}, 내 드라이브 › ${info.folderName || '메모킹'}`;
       if (st.state === 'syncing') sub = '동기화하는 중…';
       else if (st.state === 'error') sub = st.error || '동기화하지 못했어요';
       else if (st.lastSync) sub = `마지막 동기화 ${formatStamp(st.lastSync)}`;

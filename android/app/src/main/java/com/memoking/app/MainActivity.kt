@@ -217,6 +217,21 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 33) web.isAutoHandwritingEnabled = on
     }
 
+    /**
+     * 키보드를 꺼내거나 넣는다 — S펜으로 쓰는 중에는 글자를 눌러도 손글씨 입력이 먼저 떠서 키보드를 부를 수가 없어,
+     * 메모 화면의 키보드 단추가 부른다 (편집기에 초점을 준 뒤)
+     */
+    fun showKeyboard(show: Boolean) {
+        if (show) web.requestFocus()
+        if (Build.VERSION.SDK_INT >= 30) {
+            val c = web.windowInsetsController ?: window.insetsController
+            if (show) c?.show(WindowInsets.Type.ime()) else c?.hide(WindowInsets.Type.ime())
+        } else {
+            val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            if (show) imm?.showSoftInput(web, 0) else imm?.hideSoftInputFromWindow(web.windowToken, 0)
+        }
+    }
+
     /** 화면이 바뀔 때 위·아래 막대 색을 맞춘다 (메모를 열면 메모 색) */
     fun setChrome(color: String, darkIcons: Boolean) {
         val c = try {

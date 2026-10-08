@@ -169,7 +169,7 @@ function renderEmpty(narrowed) {
     actions.append(b);
   };
   if (narrowed) {
-    button('검색·필터 풀기', () => {
+    button('검색과 필터 풀기', () => {
       state.filter = { tags: [], colors: [], kinds: [] };
       el.search.value = '';
       el.search.dispatchEvent(new Event('input', { bubbles: true }));
@@ -237,7 +237,7 @@ function renderFilters() {
     ...state.filter.colors.map((c) => COLOR_NAMES[c] ?? c),
     ...state.filter.kinds.map((kid) => KIND_FILTERS.find((k) => k.id === kid)?.label ?? kid),
   ];
-  el.filterSummaryText.textContent = `필터 ${n}개 · ${parts.join(', ')}`;
+  el.filterSummaryText.textContent = `필터 ${n}개: ${parts.join(', ')}`;
 }
 
 const toggleIn = (list, value) => {
@@ -310,7 +310,7 @@ function setTab(tab) {
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
   el.filterBtn.hidden = tab !== 'memos';
-  el.search.placeholder = { memos: '메모 검색 · #태그', reminders: '알림 검색', history: '보관한 알림 검색' }[tab];
+  el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '알림 검색', history: '보관한 알림 검색' }[tab];
   $('fab').hidden = tab === 'history';
   if (tab === 'reminders') remindersTab.refresh();
   runSearch();

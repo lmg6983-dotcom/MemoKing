@@ -63,7 +63,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle }) {
     sub.className = 'rem-sub';
     const next = nextLabel(r);
     const state = isDone(r) ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : next ? `다음 ${next}` : '';
-    sub.textContent = [state, r.action === 'open' ? '메모 바로 열기' : '알림으로 받기'].filter(Boolean).join(' · ');
+    sub.textContent = [state, r.action === 'open' ? '메모 바로 열기' : '알림으로 받기'].filter(Boolean).join(', ');
     text.append(title, sub);
 
     const toggle = document.createElement('input');
@@ -187,7 +187,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle }) {
       return;
     }
     await save([...reminders, reminder]);
-    setStatus(`알림을 추가했어요 · ${describeReminder(reminders.at(-1) ?? reminder)}`);
+    setStatus(`알림을 추가했어요: ${describeReminder(reminders.at(-1) ?? reminder)}`);
   });
 
   // ---------- 패널 열고 닫기 ----------

@@ -46,9 +46,9 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
     if (when) {
       const b = document.createElement('b');
       b.textContent = when;
-      sub.append(b, ' · ');
+      sub.append(b, ', ');
     }
-    sub.append(`${describeReminder(r)} · ${r.action === 'open' ? '메모 띄우기' : '알림만 보내기'}`);
+    sub.append(`${describeReminder(r)}, ${r.action === 'open' ? '메모 띄우기' : '알림만 보내기'}`);
     text.append(title, sub);
     main.append(dot, text);
     main.addEventListener('click', () => api.memo.open(item.memoId));

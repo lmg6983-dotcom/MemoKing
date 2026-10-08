@@ -67,7 +67,7 @@ if (memo) {
   if (q.get('date') === '1') {
     const f = (v) => new Date(v).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
     const foot = document.getElementById('print-date');
-    foot.textContent = f(memo.created) === f(memo.updated) ? f(memo.created) : `${f(memo.created)} 만듦 · ${f(memo.updated)} 고침`;
+    foot.textContent = f(memo.created) === f(memo.updated) ? f(memo.created) : `${f(memo.created)} 만듦, ${f(memo.updated)} 고침`;
     foot.hidden = false;
   }
   await document.fonts.ready;
