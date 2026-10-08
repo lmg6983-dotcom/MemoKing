@@ -11,7 +11,7 @@ const REPEAT_AHEAD = 14; // 매일 알림이면 2주치
 
 export function alarmLabel(reminder, info = {}) {
   const kind = info.missed ? '놓친 알림' : info.startup ? '켤 때 알림' : '알림';
-  return `${kind} · ${describeReminder(reminder)}`;
+  return `${kind}, ${describeReminder(reminder)}`;
 }
 
 /**

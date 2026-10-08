@@ -181,7 +181,7 @@ export function setupAnnotation(o) {
     // 잠깐 보이는 안내: 무엇을 하는 중인지 (그리기 시작하면 사라짐)
     const caption = document.createElement('div');
     caption.className = 'mk-annot-caption';
-    caption.textContent = '글 위에 밑줄·동그라미를 그려요 · 글은 그대로예요';
+    caption.textContent = '글 위에 밑줄이나 동그라미를 그려요. 글은 그대로예요';
     bar.append(caption, toolbar.el);
     document.body.append(bar);
     document.body.classList.add('annotating');

@@ -35,6 +35,7 @@ export const native = {
   copyText: sync('copyText'),
   setChrome: sync('setChrome'),
   setHandwriting: sync('setHandwriting'),
+  showKeyboard: sync('showKeyboard'),
   takeIntent: sync('takeIntent'),
   ready: sync('ready'),
   scheduleAlarms: (items) => unwrap(raw.scheduleAlarms(JSON.stringify(items))),

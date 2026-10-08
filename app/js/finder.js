@@ -230,7 +230,7 @@ function status(text, ok = true) {
   }
   const r = view[selected];
   const acts = r ? actionsFor(r) : [];
-  statusEl.textContent = r ? `${r.path ?? nameOf(r)}  ·  ↵ ${acts[activeAct]?.label ?? ''}${acts.length > 1 ? '  ·  ← → 할 일' : ''}` : '';
+  statusEl.textContent = r ? `${r.path ?? nameOf(r)}    ↵ ${acts[activeAct]?.label ?? ''}${acts.length > 1 ? '    ← → 할 일' : ''}` : '';
 }
 
 let flashTimer = 0;

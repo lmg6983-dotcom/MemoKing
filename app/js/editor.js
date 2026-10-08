@@ -1059,7 +1059,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     }
     const failed = srcs.length - saved.size;
     onNotice?.(failed
-      ? `사진 ${saved.size}개를 저장했어요 · ${failed}개는 받지 못해서 인터넷 주소로 두었어요`
+      ? `사진 ${saved.size}개를 저장했어요. ${failed}개는 받지 못해서 인터넷 주소로 두었어요`
       : `사진 ${saved.size}개를 메모 폴더에 저장했어요`, failed > 0);
   }
 
@@ -1447,8 +1447,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         fitTable(tr, node, pos, { available, measure });
         fitted++;
       });
-      if (skipped.size) onNotice?.(`붙여넣은 표에 ${[...skipped].join('·')}이 있어 열 너비를 자동으로 맞추지 않았어요. 표를 확인해 주세요`);
-      else if (fitted) onNotice?.('붙여넣은 표의 열 너비·정렬을 내용에 맞춰 정리했어요');
+      if (skipped.size) onNotice?.(`붙여넣은 표에 ${[...skipped].join(', ')}이 있어 열 너비를 자동으로 맞추지 않았어요. 표를 확인해 주세요`);
+      else if (fitted) onNotice?.('붙여넣은 표의 열 너비와 정렬을 내용에 맞춰 정리했어요');
       return tr.docChanged ? tr : null;
     },
   }));
@@ -1918,7 +1918,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
             p += row.nodeSize;
           });
           v.dispatch(tr.setMeta(tableExtrasKey, { set: marks }));
-          onNotice?.('표의 열 너비·정렬을 내용에 맞춰 정리했어요');
+          onNotice?.('표의 열 너비와 정렬을 내용에 맞춰 정리했어요');
         }
         return v.focus();
       }
@@ -1957,6 +1957,25 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       extras.setLoading(false);
     },
     // 빠른 메모(Ctrl+Alt+C)로 받은 내용 채우기 --------------------------------
+    /** 휴대폰 다루기 방식: 글 고치기에서만 고칠 수 있게 (옮기기·그리기에서는 커서·손글씨 입력이 생기지 않게) */
+    setEditable(on) {
+      const v = view();
+      const next = Boolean(on) && !readOnly;
+      if (v.editable === next) return;
+      v.setProps({ editable: () => next });
+    },
+    /** 화면의 그 자리(손가락이 닿은 곳)에 커서를 두고 초점 */
+    focusAt(x, y) {
+      const v = view();
+      const hit = v.posAtCoords({ left: x, top: y });
+      if (hit) v.dispatch(v.state.tr.setSelection(TextSelection.near(v.state.doc.resolve(hit.pos))));
+      v.focus();
+    },
+    /** 커서를 화면 아래 떠 있는 단추들 위로 둘 여백 — S펜으로 쓰는 동안은 0 (쓰는 중에 글이 움직이면 획이 엉뚱한 곳에 가므로) */
+    setScrollMargin(px) {
+      const m = Math.max(0, Number(px) || 0);
+      view().setProps({ scrollMargin: { top: 8, bottom: m || 8, left: 5, right: 5 }, scrollThreshold: { top: 0, bottom: m, left: 0, right: 0 } });
+    },
     focusEnd() {
       const v = view();
       v.dispatch(v.state.tr.setSelection(TextSelection.near(v.state.doc.resolve(v.state.doc.content.size), -1)));

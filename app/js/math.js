@@ -118,7 +118,7 @@ function openEditor(view, getPos, node, anchor) {
   const actions = document.createElement('div');
   actions.className = 'mk-math-actions';
   const hint = document.createElement('span');
-  hint.textContent = 'LaTeX · Enter 완료';
+  hint.textContent = 'LaTeX (Enter 로 완료)';
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.textContent = '삭제';

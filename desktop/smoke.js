@@ -687,7 +687,7 @@ export async function runSmoke({
     const ran = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '프로그램 실행').catch(() => null);
     check('프로그램 파일(.bat) → 먼저 묻고, 취소하면 실행 안 함', cancelled.length === 1 && cancelled[0].kind === 'confirm' && Boolean(ran) && ran.target.endsWith('.bat'), JSON.stringify({ cancelled, ran }));
     const hintText = await js(linkNote.win, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return new Promise((r) => setTimeout(() => r(document.querySelector('.hover-hint')?.textContent ?? ''), 300)); })()`);
-    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt · \d+B · 누르면 열려요/.test(hintText), hintText);
+    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 누르면 열려요/.test(hintText), hintText);
 
     // 사진은 두 번 누르면 기본 사진 앱으로
     await key(linkNote.win, 'End', ['control']);
@@ -1064,7 +1064,7 @@ export async function runSmoke({
     await js(rn.win, `window.memoking.reminders.set(${JSON.stringify(n1.id)}, [
       ...${JSON.stringify(saved)}, { kind: 'at', at: ${JSON.stringify(past(20_000))}, action: 'notify' }])`);
     const toast = await until(() => smokeToasts.find((t) => t.memoId === n1.id), 'Windows 알림').catch(() => null);
-    check('시각이 된 알림 → Windows 알림 (제목·알림 설명)', toast && toast.title === '장보기 목록' && /알림 · /.test(toast.body), JSON.stringify(toast));
+    check('시각이 된 알림 → Windows 알림 (제목·알림 설명)', toast && toast.title === '장보기 목록' && /알림, /.test(toast.body), JSON.stringify(toast));
     const done = remindersOf(n1.id).find((r) => r.kind === 'at');
     check('한 번짜리 알림은 울린 뒤 꺼짐(완료)', done && !done.enabled && done.last);
     await closeNote(rn.id);
@@ -1129,7 +1129,7 @@ export async function runSmoke({
     check('보관함 검색', JSON.stringify(searched) === JSON.stringify(['김대리']), JSON.stringify(searched));
     const memoFromNoti = await newNote(() => listJs(`document.querySelector('#history-rows .noti [aria-label="메모로 만들기"]').click()`));
     const notiMd = readMemo(memoFromNoti.id);
-    check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림 · /.test(notiMd));
+    check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림, /.test(notiMd));
     await closeNote(memoFromNoti.id);
     await listJs(`document.querySelector('#history-rows .noti [aria-label="삭제"]').click()`);
     await wait(300);

@@ -734,6 +734,7 @@ addMenu.addEventListener('click', (e) => {
 });
 
 const actions = {
+  keyboard: () => toggleKeyboard(),
   add: () => (addMenu.hidden || addMenu.classList.contains('closing') ? openAddMenu() : closeAddMenu()),
   table: () => editor.insertTable(),
   style: (btn) => (el.styleMenu.hidden ? openStyleMenu(btn) : closeStyleMenu()),
@@ -846,8 +847,36 @@ function showActive(active) {
 // 키보드가 올라와 있을 때만 "키보드 닫기" 버튼
 export function setKeyboard(open) {
   el.screen.classList.toggle('keyboard', open);
-  // 키보드가 올라와 화면이 줄면 쓰던 줄이 가려지지 않게 다시 맞춘다
-  if (open) requestAnimationFrame(() => editor?.revealCaret());
+  $('kb-btn')?.setAttribute('aria-pressed', String(open));
+  $('kb-btn')?.setAttribute('aria-label', open ? '키보드 넣기' : '키보드 꺼내기');
+  // 키보드가 올라와 화면이 줄면 쓰던 줄이 가려지지 않게 다시 맞춘다 (S펜으로 쓰는 중에는 글을 움직이지 않는다 — 손글씨 막대가 떠도)
+  if (open && !penWriting_) requestAnimationFrame(() => editor?.revealCaret());
+  // 키보드 단추로 꺼냈던 키보드를 넣으면 손글씨를 다시
+  if (!open && kbTyping) {
+    kbTyping = false;
+    applyHandwriting(el.screen.dataset.touchMode);
+  }
+}
+
+// 키보드 단추 (펜을 쓰는 기기, 글 고치기): S펜으로 쓰는 중에도 키보드로 치고 싶을 때. 한 번 더 누르면 넣는다
+export function toggleKeyboard() {
+  if (!editor) return;
+  if (el.screen.classList.contains('keyboard')) {
+    native.showKeyboard?.(false);
+    return;
+  }
+  kbTyping = true;
+  penDone();
+  applyHandwriting(el.screen.dataset.touchMode); // 키보드로 치는 동안 펜으로 누르면 커서만 옮긴다
+  const pm = el.editorRoot.querySelector('.ProseMirror');
+  pm?.removeAttribute('inputmode');
+  if (pm) delete pm.dataset.mkNoKeyboard;
+  editor.focus();
+  try {
+    native.showKeyboard(true);
+  } catch {
+    // 미리보기
+  }
 }
 
 // ---------- 다루기 방식 다이얼 (오른쪽 아래): 글 고치기 · 옮기기 · 글 위에 그리기 ----------
@@ -887,8 +916,9 @@ export function setPenWriting(value) {
   applyHandwriting(el.screen.dataset.touchMode);
 }
 let handwritingOn = null;
+let kbTyping = false; // 키보드 단추로 키보드를 꺼낸 동안은 손글씨를 잠깐 쉰다 (펜으로 눌러도 커서만 옮기게)
 function applyHandwriting(mode) {
-  const on = mode === 'edit' && penWriting() !== 'off';
+  const on = mode === 'edit' && penWriting() !== 'off' && !kbTyping;
   el.screen.dataset.handwriting = on ? 'on' : 'off';
   if (on === handwritingOn) return;
   handwritingOn = on;
@@ -898,13 +928,62 @@ function applyHandwriting(mode) {
     // 미리보기 · 예전 앱
   }
 }
-// 옮기기 · 그리기에서 펜이 글에 닿아 편집기에 초점이 가면 바로 놓는다 — 초점이 없으면 커서 막대도, 손글씨 입력도 생기지 않는다
-//   (WebView 가 touch-action 의 handwriting 을 모르는 기기에서도 막히게)
+// 옮기기 · 그리기에서 펜이 글에 닿아 편집기에 초점이 가면 바로 놓는다 (편집기는 그때 고칠 수 없게 두지만 한 번 더)
 el.editorRoot.addEventListener('focusin', (e) => {
   const mode = el.screen.dataset.touchMode;
   if (mode === 'edit' || !penJustTouched()) return;
   if (e.target instanceof HTMLElement && e.target.closest('.ProseMirror')) e.target.closest('.ProseMirror').blur();
 });
+
+// 펜을 쓰는 기기: 한 번이라도 펜이 닿거나 화면 위에 뜨면 키보드 단추를 보인다 (손가락만 쓰면 글자를 눌러 키보드가 뜨니 필요 없다)
+const PEN_SEEN_KEY = 'memoking.penSeen';
+const markPen = () => {
+  if (el.screen.classList.contains('pen-seen')) return;
+  el.screen.classList.add('pen-seen');
+  try {
+    localStorage.setItem(PEN_SEEN_KEY, '1');
+  } catch {
+    // 이번에만
+  }
+};
+try {
+  if (localStorage.getItem(PEN_SEEN_KEY)) el.screen.classList.add('pen-seen');
+} catch {
+  // 처음
+}
+el.screen.addEventListener('pointerover', (e) => e.pointerType === 'pen' && markPen(), { passive: true });
+
+// S펜으로 쓰는 동안(글 고치기): 글이 움직이지 않게 — 커서 따라 스크롤 · 키보드 자리 맞추기를 쉰다.
+//   손글씨는 화면에 그은 자리로 들어가는데, 쓰는 사이 글이 밀리면 다음 획이 엉뚱한 곳에 닿거나 씹힌다.
+//   펜을 뗀 뒤 2.5초 동안 아무것도 쓰지 않으면(손글씨가 넣는 글도 포함) 원래대로
+let penWriting_ = false;
+let penIdle = 0;
+function penActive() {
+  if (!penWriting_) {
+    penWriting_ = true;
+    editor?.setScrollMargin(0);
+    el.screen.classList.add('pen-writing');
+  }
+  clearTimeout(penIdle);
+  penIdle = setTimeout(penDone, 2500);
+}
+function penDone() {
+  clearTimeout(penIdle);
+  if (!penWriting_) return;
+  penWriting_ = false;
+  editor?.setScrollMargin(96);
+  el.screen.classList.remove('pen-writing');
+}
+el.editorRoot.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'pen') {
+    markPen();
+    if (el.screen.dataset.handwriting === 'on') penActive();
+  } else if (penWriting_) penDone(); // 손가락으로 돌아오면 바로 원래대로
+}, true);
+for (const type of ['beforeinput', 'compositionupdate']) {
+  el.editorRoot.addEventListener(type, () => penWriting_ && penActive(), true); // 손글씨가 글을 넣는 동안은 쓰는 중
+}
+
 // 글 고치기에서 펜을 처음 대면 한 번만: 무엇이 되는지와 끄는 곳
 el.editorRoot.addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'pen' || el.screen.dataset.handwriting !== 'on') return;
@@ -914,11 +993,17 @@ el.editorRoot.addEventListener('pointerdown', (e) => {
   } catch {
     return;
   }
-  showGuide('글자 칸에 쓰면 글자로 바뀌어요 · 톡 누르면 커서, 꾹 누르면 고르기 · 설정에서 끌 수 있어요', 'S펜 손글씨');
+  showGuide('글자 칸에 쓰면 글자로 바뀌어요. 톡 누르면 커서, 꾹 누르면 고르기예요. 키보드는 아래 키보드 단추로 꺼내요', 'S펜 손글씨', 4200);
 }, true);
 
 function applyMode(mode, { user = false, quiet = false } = {}) {
   el.screen.dataset.touchMode = mode;
+  // 글 고치기에서만 고칠 수 있다 — 옮기기·그리기에서 펜을 대도 커서 막대·손글씨 아이콘이 생기지 않게 (고칠 칸이 없으므로)
+  editor?.setEditable(mode === 'edit');
+  if (mode !== 'edit') {
+    kbTyping = false;
+    penDone();
+  }
   applyHandwriting(mode);
   recorder.holdStop(); // 아래 막대가 바뀌며 녹음 판이 움직인다 — 그 사이 눌림으로 녹음이 끝나지 않게
   $('mode-guide').hidden = true; // 앞 방식의 안내는 거둔다
@@ -943,52 +1028,51 @@ function applyMode(mode, { user = false, quiet = false } = {}) {
 }
 // 아래쪽 안내 (그리기 도구 막대와 같은 흰 모양) — 잠깐 떴다 사라진다
 let guideTimer = 0;
-function showGuide(text, title = '') {
+function showGuide(text, title = '', ms = 2600) {
   const g = $('mode-guide');
-  g.replaceChildren(...(title ? [Object.assign(document.createElement('b'), { textContent: title }), ' · '] : []), text);
+  // 제목은 굵게 한 줄, 설명은 그 아래 (가운데 점으로 잇지 않는다)
+  g.replaceChildren(...(title ? [Object.assign(document.createElement('b'), { textContent: title }), document.createElement('br')] : []), text);
   g.hidden = false;
   replayClass(g, 'show');
   clearTimeout(guideTimer);
-  guideTimer = setTimeout(() => (g.hidden = true), 2600);
+  guideTimer = setTimeout(() => (g.hidden = true), ms);
 }
-// 옮기기 방식에서 글자를 톡 누르면(커서를 놓으려는 것) 글 고치기로 넘어가 그 자리에서 쓴다
+// 옮기기 방식에서 글을 톡 누르면(커서를 놓으려는 것) 글 고치기로 넘어가 누른 그 자리에 커서를 둔다 (빈 자리면 가까운 줄)
+//   손가락만 — S펜은 옮기기에서 끌기에 쓰므로 톡 눌러도 넘어가지 않는다.
 //   끌기·스크롤(움직임)·꾹 누르기는 아니고, 체크 네모·그림·링크·단추를 누른 것도 아닐 때만
 let tapDown = null;
 el.editorRoot.addEventListener('pointerdown', (e) => {
-  // 손가락만 — S펜은 옮기기에서 끌기·고르기에 쓰므로 톡 눌러도 글 고치기로 넘어가지 않는다
   tapDown = knob?.mode === 'move' && e.isPrimary && e.pointerType !== 'pen' ? { x: e.clientX, y: e.clientY, t: e.timeStamp } : null;
 }, true);
 el.editorRoot.addEventListener('pointerup', (e) => {
   const d = tapDown;
   tapDown = null;
-  if (!d || knob?.mode !== 'move' || e.timeStamp - d.t > 300 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return;
+  if (!d || !editor || knob?.mode !== 'move' || e.timeStamp - d.t > 300 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return;
   const t = e.target instanceof Element ? e.target : null;
-  const block = t?.closest('.ProseMirror p, .ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror td, .ProseMirror th, .ProseMirror pre');
-  if (!block || t.closest('a, img, button, input, .mk-media, .mk-link-card, .mk-file, .mk-math, .mk-math-block')) return; // 태그 알약도 글자다
-  const li = block.closest('li');
-  if (li && e.clientX < block.getBoundingClientRect().left) return; // 체크 네모
+  if (!t || t.closest('a, img, button, input, .mk-media, .mk-link-card, .mk-file, .mk-math, .mk-math-block, .mk-annot')) return; // 태그 알약도 글자다
+  const li = t.closest('.ProseMirror li');
+  const firstBlock = li?.querySelector(':scope > p, :scope > div');
+  if (li && firstBlock && e.clientX < firstBlock.getBoundingClientRect().left) return; // 체크 네모
   if (document.querySelector('.mk-list-dragging, .mk-block-dragging, body.mk-list-dragging, body.mk-block-dragging')) return;
-  // 손가락을 뗀 뒤 편집기가 커서를 놓으면 그 자리 그대로 키보드와 함께
+  const { clientX: x, clientY: y } = e;
   setTimeout(() => {
     if (knob?.mode !== 'move') return;
-    knob.set('edit', { quiet: true }); // → applyMode: 키보드를 풀고 그 커서에 초점
-    showGuide('글 고치기로 바꿨어요 · 옮기려면 다이얼을 옮기기로');
+    knob.set('edit', { quiet: true }); // → applyMode: 고칠 수 있게 · 키보드를 풀고
+    const pm = el.editorRoot.querySelector('.ProseMirror');
+    pm?.removeAttribute('inputmode');
+    if (pm) delete pm.dataset.mkNoKeyboard;
+    editor.focusAt(x, y);
+    showGuide('옮기려면 다이얼을 옮기기로 돌려요', '글 고치기로 바꿨어요');
   }, 30);
 });
 
-// 글 아래 빈 자리(빈 메모라면 거의 화면 전체)를 누르면 글 끝에 커서를 두고 키보드를 올린다 —
-//   편집기 본문은 글 높이만큼이라 넓은 화면(태블릿)에서는 그 밖을 누르기 쉽다. 옮기기 방식이면 글 고치기로 넘어간다
+// 글 고치기에서 글 아래 빈 자리(편집기 밖)를 누르면 글 끝에 커서를 두고 키보드를 올린다
 el.editorRoot.addEventListener('click', (e) => {
   const pm = el.editorRoot.querySelector('.ProseMirror');
-  if (!editor || !pm || !(e.target instanceof Element) || pm.contains(e.target) || knob?.mode === 'draw') return;
-  if (knob?.mode === 'move' && e.pointerType === 'pen') return; // 옮기기에서 펜으로 빈 곳을 눌러도 글 고치기로 넘어가지 않는다
+  if (!editor || !pm || !(e.target instanceof Element) || pm.contains(e.target) || knob?.mode !== 'edit') return;
   if (e.target.closest('button, a, input, .mk-annot')) return;
   if (e.clientY < pm.getBoundingClientRect().bottom) return; // 글 옆 여백은 편집기가 알아서
   if (document.querySelector('.mk-list-dragging, .mk-block-dragging, body.mk-list-dragging, body.mk-block-dragging')) return;
-  if (knob?.mode === 'move') {
-    knob.set('edit', { quiet: true });
-    showGuide('글 고치기로 바꿨어요 · 옮기려면 다이얼을 옮기기로');
-  }
   // 앞서 그림 등을 눌러 키보드를 막아 두었더라도 글을 쓰려는 것이니 푼다
   pm.removeAttribute('inputmode');
   delete pm.dataset.mkNoKeyboard;
@@ -1270,7 +1354,10 @@ function applyZoom(focus) {
   }
 }
 applyZoom();
-new ResizeObserver(() => applyZoom()).observe(el.editorRoot);
+new ResizeObserver(() => {
+  applyZoom();
+  el.screen.style.setProperty('--editor-h', `${el.editorRoot.clientHeight}px`); // 글 고치기의 본문 높이 (빈 자리도 글자 칸)
+}).observe(el.editorRoot);
 new MutationObserver(() => applyZoom()).observe(el.editorRoot, { childList: true }); // 새 메모를 열면 그 본문에도
 let pinch = null;
 const spread = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
@@ -1285,7 +1372,7 @@ el.editorRoot.addEventListener('touchmove', (e) => {
   if (next === zoom) return;
   zoom = next;
   applyZoom(middle(e.touches));
-  setStatus(zoom >= 1 ? `매직 줌 · 확대 ${zoomLabel(zoom)}` : `매직 줌 · 글자 ${zoomLabel(zoom)}`);
+  setStatus(zoom >= 1 ? `매직 줌: 확대 ${zoomLabel(zoom)}` : `매직 줌: 글자 ${zoomLabel(zoom)}`);
 }, { passive: false });
 el.editorRoot.addEventListener('touchend', (e) => {
   if (!pinch || e.touches.length >= 2) return;

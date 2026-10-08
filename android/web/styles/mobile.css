@@ -1065,6 +1065,19 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
    (손가락 스크롤·확대는 그대로). 옮기기 · 그리기에서는 펜이 닿아도 커서 막대가 보이지 않게 */
 .note-screen[data-handwriting="off"] .ProseMirror { touch-action: pan-x pan-y; } /* pinch-zoom 까지 넣으면 manipulation 과 같아져 손글씨가 다시 켜진다 (확대는 앱이 직접) */
 .note-screen:is([data-touch-mode="move"], [data-touch-mode="draw"]) .ProseMirror { caret-color: transparent; }
+/* 글 고치기: 본문이 화면 아래까지 — 빈 자리에 S펜으로 써도 글자 칸 안이라 손글씨가 시작된다 (글 높이만큼이면 아래 빈 곳은 씹힌다).
+   --editor-h 는 note-view.js 가 편집 영역 높이로 맞춘다 */
+.note-screen[data-touch-mode="edit"] .ProseMirror { min-height: max(0px, calc(var(--editor-h, 60vh) - 150px)); }
+/* 키보드 단추: 펜을 쓰는 기기의 글 고치기에서만, 도구막대 오른쪽 끝 (넘쳐도 밀려나지 않게) */
+.note-screen .kb-btn { display: none; }
+.note-screen.pen-seen[data-touch-mode="edit"] .kb-btn {
+  display: inline-grid; place-items: center; flex: none; margin-left: 4px;
+  box-shadow: -1px 0 0 var(--line);
+  border-radius: 0 10px 10px 0;
+}
+.note-screen .kb-btn .kb-down, .note-screen.keyboard .kb-btn .kb-up { display: none; }
+.note-screen.keyboard .kb-btn .kb-down { display: block; }
+.note-screen .kb-btn[aria-pressed="true"] { background: var(--brand-yellow-soft); }
 /* 글 고치기: 옮기기 테두리(항목 둘레 점선)는 쉬게 */
 .note-screen[data-touch-mode="edit"] .mk-doc li::after { border-color: transparent !important; }
 @media print { .mode-knob { display: none !important; } }

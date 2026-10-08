@@ -28,7 +28,7 @@
       <svg><use href="#i-link"/></svg><span id="links-count" class="count"></span>
     </button>
     <button id="menu-btn" class="icon-btn" title="메뉴" aria-label="메뉴" aria-haspopup="true"><svg><use href="#i-more"/></svg></button>
-    <button id="close-btn" class="icon-btn" title="닫기 (Ctrl+W) · 자동 저장" aria-label="닫기"><svg><use href="#i-close"/></svg></button>
+    <button id="close-btn" class="icon-btn" title="닫기 (Ctrl+W), 자동 저장돼요" aria-label="닫기"><svg><use href="#i-close"/></svg></button>
   </header>
 
   <div id="menu" class="menu" role="menu" hidden>
@@ -87,7 +87,7 @@
       <h4>새 알림</h4>
       <div class="seg" id="rem-kind" role="radiogroup" aria-label="알림 종류">
         <button type="button" data-kind="timer" aria-checked="true">타이머</button>
-        <button type="button" data-kind="at" aria-checked="false">날짜·시간</button>
+        <button type="button" data-kind="at" aria-checked="false">날짜와 시간</button>
         <button type="button" data-kind="repeat" aria-checked="false">반복</button>
         <button type="button" data-kind="startup" aria-checked="false">앱 열 때</button>
       </div>
@@ -168,12 +168,12 @@
     <button type="button" data-table="delCol">열 삭제</button>
     <span class="table-bar-sep"></span>
     <button type="button" data-table="merge" title="끌어서 고른 칸들을 하나로 합치기">셀 병합</button>
-    <button type="button" data-table="autoFit" title="내용·본문 폭에 맞춰 열 너비·정렬을 자동으로 (번호·날짜는 좁게, 긴 설명 열에 공간). 칸 오른쪽·아래 테두리를 끌면 직접 조절">자동 조정</button>
+    <button type="button" data-table="autoFit" title="내용과 본문 폭에 맞춰 열 너비와 정렬을 자동으로 (번호, 날짜는 좁게, 긴 설명 열에 공간). 칸 오른쪽이나 아래 테두리를 끌면 직접 조절">자동 조정</button>
   </div>
   <footer class="format-bar" id="format-bar" role="toolbar" aria-label="서식">
     <div class="format-items" id="format-items">
       <!-- 콘텐츠 추가: 누르면 위로 음성 녹음 · 손 메모 · 주석 · 사진 · 파일 · 표 · 수식 (휴대폰과 같음) -->
-      <button data-action="add" id="add-btn" class="add-btn" title="콘텐츠 추가 (음성 녹음·손 메모·글 위에 그리기·사진·파일·표·수식)" aria-label="콘텐츠 추가" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
+      <button data-action="add" id="add-btn" class="add-btn" title="콘텐츠 추가 (음성 녹음, 손 메모, 글 위에 그리기, 사진, 파일, 표, 수식)" aria-label="콘텐츠 추가" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
       <span class="sep"></span>
       <button data-cmd="bold" title="굵게 (Ctrl+B)"><b>B</b></button>
       <button data-cmd="italic" title="기울임 (Ctrl+I)"><i>I</i></button>
@@ -187,7 +187,7 @@
         <svg><use href="#i-highlighter"/></svg><span class="swatch-bar" data-bar="highlight"></span>
       </button>
       <span class="sep"></span>
-      <button data-action="style" class="style-btn" title="스타일 (본문·제목·인용·코드 블록)" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
+      <button data-action="style" class="style-btn" title="스타일 (본문, 제목, 인용, 코드 블록)" aria-haspopup="listbox" aria-expanded="false"><span class="style-name">본문</span><span class="style-caret" aria-hidden="true"></span></button>
       <span class="sep"></span>
       <button data-cmd="bullet" title="점 목록 (Ctrl+Shift+8)"><svg><use href="#i-bullet"/></svg></button>
       <button data-cmd="ordered" title="번호 목록 (Ctrl+Shift+7)"><svg><use href="#i-ordered"/></svg></button>
@@ -199,7 +199,7 @@
   <div id="add-menu" class="add-menu" role="menu" aria-label="콘텐츠 추가" hidden>
     <button class="add-sat" data-add="record" data-action="record" role="menuitem" title="음성 녹음 (Ctrl+Shift+R)"><span class="add-sat-btn rec"><svg><use href="#i-mic"/></svg></span><span class="add-sat-label">음성 녹음</span></button>
     <button class="add-sat" data-add="ink" role="menuitem" title="손 메모 (Ctrl+Shift+D)"><span class="add-sat-btn ink"><svg><use href="#i-ink"/></svg></span><span class="add-sat-label">손 메모</span></button>
-    <button class="add-sat" data-add="annotate" role="menuitem" title="글 위에 밑줄·동그라미를 그려요 (Ctrl+Shift+E)"><span class="add-sat-btn"><svg><use href="#i-pen"/></svg></span><span class="add-sat-label">글 위에 그리기</span></button>
+    <button class="add-sat" data-add="annotate" role="menuitem" title="글 위에 밑줄이나 동그라미를 그려요 (Ctrl+Shift+E)"><span class="add-sat-btn"><svg><use href="#i-pen"/></svg></span><span class="add-sat-label">글 위에 그리기</span></button>
     <button class="add-sat" data-add="photo" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-photo"/></svg></span><span class="add-sat-label">사진</span></button>
     <button class="add-sat" data-add="file" role="menuitem" title="첨부 (Ctrl+Shift+I)"><span class="add-sat-btn"><svg><use href="#i-clip"/></svg></span><span class="add-sat-label">파일</span></button>
     <button class="add-sat" data-add="table" role="menuitem"><span class="add-sat-btn"><svg><use href="#i-table"/></svg></span><span class="add-sat-label">표</span></button>

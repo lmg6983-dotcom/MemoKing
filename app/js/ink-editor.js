@@ -311,7 +311,7 @@ export function createInkToolbar(o) {
   const tools = group('ink-tools');
   const toolBtns = {};
   for (const [t, label, key] of [['pen', '펜', 'P'], ['highlighter', '형광펜', 'H'], ['eraser', '지우개 (획 지우기)', 'E']]) {
-    const b = btn(`ink-tool ink-tool-${t}`, `${label} (${key}) — 한 번 더 누르면 ${t === 'eraser' ? '굵기·모두 지우기' : '색·굵기'}`, t, () => {
+    const b = btn(`ink-tool ink-tool-${t}`, `${label} (${key}) — 한 번 더 누르면 ${t === 'eraser' ? '굵기, 모두 지우기' : '색과 굵기'}`, t, () => {
       if (o.tools.tool === t) togglePop('style');
       else setTool(t);
     });
@@ -319,7 +319,7 @@ export function createInkToolbar(o) {
     toolBtns[t] = b;
     tools.append(b);
   }
-  const styleBtn = btn('ink-style', '색 · 굵기', el('span', 'ink-style-dot'), () => togglePop('style'));
+  const styleBtn = btn('ink-style', '색과 굵기', el('span', 'ink-style-dot'), () => togglePop('style'));
   styleBtn.setAttribute('aria-haspopup', 'true');
   const styleGroup = group();
   styleGroup.append(styleBtn);
@@ -330,7 +330,7 @@ export function createInkToolbar(o) {
   bar.append(tools, styleGroup, history);
   let bgBtn = null;
   if (o.bg) {
-    bgBtn = btn('ink-bg-btn', '바탕 (투명 · 흰색 · 검정)', el('span', 'ink-bg-swatch'), () => togglePop('bg'));
+    bgBtn = btn('ink-bg-btn', '바탕 (투명, 흰색, 검정)', el('span', 'ink-bg-swatch'), () => togglePop('bg'));
     bgBtn.setAttribute('aria-haspopup', 'true');
     const g = group();
     g.append(bgBtn);
@@ -439,7 +439,7 @@ export function createInkToolbar(o) {
         haptic(6);
         closePop();
       });
-      pop.replaceChildren(row('지우개 굵기', ...sizes), ...(o.onClear ? [row('', clear)] : []), hintRow('닿은 획을 통째로 지워요 · 되돌리기로 살릴 수 있어요'));
+      pop.replaceChildren(row('지우개 굵기', ...sizes), ...(o.onClear ? [row('', clear)] : []), hintRow('닿은 획을 통째로 지워요. 되돌리기로 살릴 수 있어요'));
       return;
     }
     const list = t === 'highlighter' ? HIGHLIGHT_COLORS : PEN_COLORS;
@@ -491,7 +491,7 @@ export function createInkToolbar(o) {
     setTone(dot, t === 'eraser' ? 'highlighter' : t, o.tools.color[t]);
     dot.style.setProperty('--d', `${t === 'eraser' ? 8 + o.tools.size[t] * 5 : Math.min(20, Math.max(6, sz * (t === 'highlighter' ? 0.7 : 2.2)))}px`);
     styleBtn.setAttribute('aria-expanded', String(popKind === 'style'));
-    styleBtn.title = t === 'eraser' ? '지우개 굵기 · 모두 지우기' : `${TOOL_NAMES[t]} 색 · 굵기`;
+    styleBtn.title = t === 'eraser' ? '지우개 굵기, 모두 지우기' : `${TOOL_NAMES[t]} 색과 굵기`;
     if (bgBtn) {
       bgBtn.dataset.bg = o.tools.bg;
       bgBtn.setAttribute('aria-expanded', String(popKind === 'bg'));
@@ -559,7 +559,7 @@ export function openInkEditor({ doc = null, onSave, onClose, title = '손 메모
   const empty = el('div', 'ink-empty', { 'aria-hidden': 'true' });
   empty.append(icon('ink'));
   const emptyText = el('div');
-  emptyText.innerHTML = '<b>여기에 그려 보세요</b><span>펜 · 손가락 · 마우스 — 두 손가락으로 화면 넘기기</span>';
+  emptyText.innerHTML = '<b>여기에 그려 보세요</b><span>펜, 손가락, 마우스로 그려요. 두 손가락으로 화면을 넘겨요</span>';
   empty.append(emptyText);
   page.append(svg);
   scroller.append(page, empty);
@@ -583,7 +583,7 @@ export function openInkEditor({ doc = null, onSave, onClose, title = '손 메모
     onClear: () => {
       hist.set([], { undoable: true });
       refresh();
-      flash('모두 지웠어요 · 되돌리기로 살릴 수 있어요');
+      flash('모두 지웠어요. 되돌리기로 살릴 수 있어요');
     },
     canClear: () => hist.get().length > 0,
   });
@@ -627,7 +627,7 @@ export function openInkEditor({ doc = null, onSave, onClose, title = '손 메모
   function status() {
     if (flashTimer) return;
     const n = hist.get().length;
-    hint.textContent = editing && !n ? '다 지웠어요 · 완료하면 이 손 메모를 메모에서 빼요'
+    hint.textContent = editing && !n ? '다 지웠어요. 완료하면 이 손 메모를 메모에서 빼요'
       : !n ? '완료하면 그린 만큼 메모에 들어가요'
         : changed() ? '완료하면 메모에 저장돼요' : '';
     hint.classList.toggle('warn', editing && !n);
@@ -672,7 +672,7 @@ export function openInkEditor({ doc = null, onSave, onClose, title = '손 메모
       }
     } catch (err) {
       console.error(err);
-      flash('저장하지 못했어요 · 다시 눌러 보세요');
+      flash('저장하지 못했어요. 다시 눌러 보세요');
       done.disabled = false;
       closing = false;
       return;

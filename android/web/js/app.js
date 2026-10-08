@@ -80,7 +80,7 @@ app.api = {
       const e = history.all().entries.find((x) => x.id === id);
       if (!e || !app.vault) return null;
       const when = new Date(e.time).toLocaleString('ko-KR');
-      const memoId = app.vault.import({ body: `# ${e.title || e.app}\n\n${e.body ? `${e.body}\n\n` : ''}> ${e.app} 알림 · ${when}` });
+      const memoId = app.vault.import({ body: `# ${e.title || e.app}\n\n${e.body ? `${e.body}\n\n` : ''}> ${e.app} 알림, ${when}` });
       await app.openMemo(memoId);
       toast('알림으로 메모를 만들었어요');
       return memoId;
@@ -180,7 +180,7 @@ function refreshHistoryRow() {
   $('blocked-count').textContent = blockedCount ? `${blockedCount}개 꺼짐` : '';
   $('history-note').textContent = enabled && !granted
     ? '휴대폰 설정에서 "알림 접근"을 허용해 주세요'
-    : '보관함 탭에 모아요 · 이 휴대폰에만 저장'
+    : '보관함 탭에 모아요. 이 휴대폰에만 저장해요'
 }
 
 let notifyAsked = false;
@@ -494,7 +494,7 @@ const whenLabel = recordingWhen;
 app.deliverRecording = async (r) => {
   if (!app.vault || !r?.temp) return;
   const duration = recorder.formatDuration(r.durationMs ?? 0);
-  const alt = `녹음 ${whenLabel(r.startedAt)} · ${duration}`;
+  const alt = `녹음 ${whenLabel(r.startedAt)} (${duration})`;
   const [item] = note.tempsToItems([{ temp: r.temp, name: r.name || 'recording.m4a', mime: r.mime || 'audio/mp4' }]);
   item.alt = alt;
   const transcript = polish(String(r.transcript ?? '').trim());
@@ -502,11 +502,11 @@ app.deliverRecording = async (r) => {
   const card = voiceCardMarkdown(item, transcript);
   let memoId = r.memoId;
   if (note.currentId() === memoId) {
-    note.insertRecording(card, `음성 메모 · ${whenLabel(r.startedAt)}`);
+    note.insertRecording(card, `음성 메모 ${whenLabel(r.startedAt)}`);
   } else {
     const memo = memoId && app.vault.get(memoId);
     const parts = card;
-    const heading = `# 음성 메모 · ${whenLabel(r.startedAt)}`;
+    const heading = `# 음성 메모 ${whenLabel(r.startedAt)}`;
     if (memo && !isBlankBody(memo.body)) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
     else if (memo) app.vault.save(memoId, `${heading}\n\n${parts}\n`);
     else memoId = app.vault.import({ body: `${heading}\n\n${parts}\n` });
@@ -572,8 +572,8 @@ function refreshSpeakerRow(progress) {
   $('spk-note').textContent = busy
     ? `다운로드 중 ${progress ?? 0}%`
     : ready
-      ? st.speakerOn ? '사용 중 · 녹음이 끝나면 말한 사람마다 "화자 1·2"로 표시해요' : '사용 안 함'
-      : `목소리로 참석자를 구분해 "화자 1·2"로 표시해요 · ${(st.speakerSize ?? '약 28MB').replace('약 ', '')}`;
+      ? st.speakerOn ? '사용 중이에요. 녹음이 끝나면 말한 사람마다 "화자 1, 화자 2"로 표시해요' : '사용 안 함'
+      : `목소리로 참석자를 구분해 "화자 1, 화자 2"로 표시해요 (${(st.speakerSize ?? '약 28MB').replace('약 ', '')}`;
   $('spk-btn').textContent = busy ? '다운로드 중' : ready ? (st.speakerOn ? '끄기' : '켜기') : '다운로드';
   $('spk-btn').disabled = busy;
 }
@@ -739,7 +739,7 @@ function sourceLine(appName) {
   const d = new Date();
   const pad = (v) => String(v).padStart(2, '0');
   const when = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  return `> 출처: ${esc(appName || '공유하기')} · ${when}`;
+  return `> 출처: ${esc(appName || '공유하기')}, ${when}`;
 }
 
 // 받은 소리 파일: 받아쓸지 그때마다 묻는다 (지난번 고른 것이 기본)
@@ -881,7 +881,7 @@ async function memoFromShare(payload) {
       const tags = note.autoTagIncoming(source);
       note.flush();
       document.activeElement?.blur(); // 키보드는 올리지 않는다 (이어 쓰려면 누르기)
-      toast(tags.length ? `메모를 만들었어요 · ${tags.map((t) => `#${t}`).join(' ')}` : '메모를 만들었어요');
+      toast(tags.length ? `메모를 만들었어요, ${tags.map((t) => `#${t}`).join(' ')}` : '메모를 만들었어요');
     },
   });
   if (stt && audioItems.length && recorder.sttReady()) transcribeInto(id, audioItems);
@@ -892,13 +892,13 @@ async function memoFromShare(payload) {
 const SCREENSHOT = /screen ?shot|screencap|스크린샷|화면 ?캡처|캡처/i;
 function sharedFilesTitle(files, audioCount, fromApp = '') {
   const when = whenLabel(Date.now());
-  if (audioCount === files.length) return `음성 메모 · ${when}`;
+  if (audioCount === files.length) return `음성 메모 ${when}`;
   const images = files.filter((f) => mediaKind({ name: f.name || '', type: f.mime || '' }) === 'image');
   if (images.length === files.length) {
-    if (files.some((f) => SCREENSHOT.test(f.name || '')) || SCREENSHOT.test(fromApp)) return `화면 캡처 · ${when}`;
-    return files.length === 1 ? `사진 · ${when}` : `사진 ${files.length}장 · ${when}`;
+    if (files.some((f) => SCREENSHOT.test(f.name || '')) || SCREENSHOT.test(fromApp)) return `화면 캡처 ${when}`;
+    return files.length === 1 ? `사진 ${when}` : `사진 ${files.length}장 ${when}`;
   }
-  return files.length === 1 ? files[0].name : `파일 ${files.length}개 · ${when}`;
+  return files.length === 1 ? files[0].name : `파일 ${files.length}개 ${when}`;
 }
 
 async function handleIntent() {

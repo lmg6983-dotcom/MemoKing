@@ -235,7 +235,7 @@ try {
   check('공유하기: 새 메모', Boolean(shared));
   check('공유하기: 줄마다 문단', /좋은 문장\n\n둘째 줄/.test(sharedText), sharedText);
   check('공유하기: 사진을 첨부로', /!\[photo\]\(attachments\/\d{8}-\d{6}-[0-9a-f]{4}\.png\)/.test(sharedText));
-  check('공유하기: 출처 한 줄', /> 출처: Chrome · /.test(sharedText));
+  check('공유하기: 출처 한 줄', /> 출처: Chrome, /.test(sharedText));
   check('공유하기: 태그를 저절로 (내용 태그가 없으면 #공유)', /#공유(\s|$)/.test(sharedText), sharedText);
 
   // 파일 넣기 (키보드를 내린 상태 → 메모 끝에)
@@ -949,7 +949,7 @@ try {
   await page.waitForTimeout(1500);
   f = fileWith('출처: 스크린샷');
   check('화면 캡처: #캡처 태그를 저절로', f && /#캡처/.test(read(f)), f && read(f));
-  check('화면 캡처: 제목은 파일 이름 대신 "화면 캡처 · 날짜"', f && /^# 화면 캡처 · \d+월 \d+일/m.test(read(f)) && !read(f).includes('# Screenshot'), f && read(f));
+  check('화면 캡처: 제목은 파일 이름 대신 "화면 캡처 날짜"', f && /^# 화면 캡처 \d+월 \d+일/m.test(read(f)) && !read(f).includes('# Screenshot'), f && read(f));
   await back();
   await page.waitForTimeout(300);
 

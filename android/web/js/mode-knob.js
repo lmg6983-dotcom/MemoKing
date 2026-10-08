@@ -6,9 +6,9 @@
 import { haptic } from '../../app/js/dom.js';
 
 export const MODES = [
-  { id: 'edit', label: '글 고치기', hint: '글자를 꾹 누르면 골라서 복사·고칠 수 있어요', icon: 'type', angle: 180 },
-  { id: 'move', label: '옮기기', hint: '줄·사진을 짧게 눌러 끌어요', icon: 'move', angle: 225 },
-  { id: 'draw', label: '글 위에 그리기', hint: '밑줄·동그라미를 그려요 · 글은 그대로예요', icon: 'highlighter', angle: 270 },
+  { id: 'edit', label: '글 고치기', hint: '글자를 꾹 누르면 골라서 복사하거나 고칠 수 있어요', icon: 'type', angle: 180 },
+  { id: 'move', label: '옮기기', hint: '줄이나 사진을 짧게 눌러 끌어요', icon: 'move', angle: 225 },
+  { id: 'draw', label: '글 위에 그리기', hint: '밑줄이나 동그라미를 그려요. 글은 그대로예요', icon: 'highlighter', angle: 270 },
 ];
 const byId = (id) => MODES.find((m) => m.id === id) ?? MODES[0];
 

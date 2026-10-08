@@ -114,7 +114,7 @@ function openFolders() {
   // 지금까지의 메모(휴대폰 폴더 또는 예전 Drive 폴더의 휴대폰 사본)를 새 폴더로 함께
   const count = app.vault ? app.vault.list().length : 0;
   $('import-row').hidden = count === 0;
-  $('import-note').textContent = `메모 ${count}개 · 같은 이름이 이미 있으면 그쪽을 둬요`;
+  $('import-note').textContent = `메모 ${count}개. 같은 이름이 이미 있으면 그쪽을 둬요`;
   loadFolders();
 }
 
@@ -233,9 +233,9 @@ export function renderStatus(s = drive.status()) {
     $('drive-title').textContent = `내 드라이브 › ${s.folderName || '메모 폴더'}`;
     $('drive-sub').textContent = !s.connected
       ? '로그인이 끊겼어요. 연결하기를 눌러 다시 로그인해 주세요'
-      : st.state === 'syncing' ? [s.email, '동기화하는 중…'].filter(Boolean).join(' · ')
+      : st.state === 'syncing' ? [s.email, '동기화하는 중…'].filter(Boolean).join(', ')
       : st.state === 'error' ? st.error
-      : [s.email, st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'].filter(Boolean).join(' · ');
+      : [s.email, st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'].filter(Boolean).join(', ');
   } else {
     $('drive-title').textContent = s.connected ? '폴더를 선택하세요' : '연결 안 됨';
     $('drive-sub').textContent = s.connected ? s.email : 'PC와 같은 메모를 함께 써요';

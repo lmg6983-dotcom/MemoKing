@@ -70,7 +70,7 @@ function render() {
   frame.style.transform = `scale(${scale})`;
   flipFrom(sheet, before);
   document.body.dataset.pages = '';
-  $('summary').textContent = `${s.width} × ${s.height}mm · ${ratioLabel(s.width, s.height)}`;
+  $('summary').textContent = `${s.width} × ${s.height}mm (${ratioLabel(s.width, s.height)})`;
   // 쪽 내용은 잠깐 멈춘 뒤에 다시 그린다 (입력하는 동안 깜빡이지 않게)
   clearTimeout(frameTimer);
   frameTimer = setTimeout(() => {
@@ -85,7 +85,7 @@ window.addEventListener('message', (e) => {
   const s = size();
   const n = e.data.pages;
   document.body.dataset.pages = String(n);
-  $('summary').textContent = `${s.width} × ${s.height}mm · ${ratioLabel(s.width, s.height)} · ${n}쪽`;
+  $('summary').textContent = `${s.width} × ${s.height}mm (${ratioLabel(s.width, s.height)}), ${n}쪽`;
 });
 
 $('kind').addEventListener('click', (e) => {

@@ -168,7 +168,7 @@ object NotiStore {
             val sender = last?.getCharSequence("sender")?.toString()?.trim()
             val conversation = x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()?.trim()
             if (!text.isNullOrEmpty()) body = text
-            if (!sender.isNullOrEmpty()) title = if (!conversation.isNullOrEmpty() && conversation != sender) "$conversation · $sender" else sender
+            if (!sender.isNullOrEmpty()) title = if (!conversation.isNullOrEmpty() && conversation != sender) "$conversation, $sender" else sender
         }
         if (title.isEmpty() && body.isEmpty()) return null
         val pm = ctx.packageManager

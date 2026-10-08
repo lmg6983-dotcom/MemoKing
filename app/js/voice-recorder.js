@@ -175,7 +175,7 @@ export function setupVoiceRecorder(opts) {
         } else if (st?.stt) {
           opts.stt.stop({ src: '' }).catch(() => {}); // 받아쓰기가 시작되기 전에 녹음을 끝냄 — 메인 쪽 작업도 거둔다
         } else if (st?.reason === 'missing') {
-          opts.notice('받아쓰기 데이터가 없어 녹음만 해요 · 목록 창 설정 › 음성 녹음에서 받을 수 있어요');
+          opts.notice('받아쓰기 데이터가 없어 녹음만 해요. 목록 창 설정 › 음성 녹음에서 받을 수 있어요');
         }
       } catch (err) {
         console.error(err);
@@ -238,11 +238,11 @@ export function setupVoiceRecorder(opts) {
         speakers = Boolean(t?.speakers);
         if (t?.error) console.warn('받아쓰기:', t.error);
       }
-      const card = voiceCardMarkdown({ alt: `녹음 ${when} · ${duration}`, src }, text);
-      await opts.insert(card, `음성 메모 · ${when}`);
+      const card = voiceCardMarkdown({ alt: `녹음 ${when} (${duration})`, src }, text);
+      await opts.insert(card, `음성 메모 ${when}`);
       opts.notice(text
-        ? `녹음(${duration})과 받아쓴 글을 저장했어요${speakers ? ' · 말한 사람을 나누는 중…' : ''}`
-        : `녹음(${duration})을 저장했어요${r.stt ? ' · 알아들은 말이 없어요' : ''}`);
+        ? `녹음(${duration})과 받아쓴 글을 저장했어요${speakers ? '. 말한 사람을 나누는 중…' : ''}`
+        : `녹음(${duration})을 저장했어요${r.stt ? '. 알아들은 말이 없어요' : ''}`);
       return src;
     })().catch((err) => {
       console.error(err);

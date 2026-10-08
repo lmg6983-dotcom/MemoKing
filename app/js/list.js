@@ -229,7 +229,7 @@ function renderFilters() {
     ...state.filter.colors.map((c) => COLOR_LABEL[c] ?? c),
     ...state.filter.kinds.map((id) => KIND_FILTERS.find((k) => k.id === id)?.label ?? id),
   ];
-  el.filterSummaryText.textContent = `필터 ${n}개 · ${parts.join(', ')}`;
+  el.filterSummaryText.textContent = `필터 ${n}개: ${parts.join(', ')}`;
 }
 
 el.tagStrip.addEventListener('click', (e) => {
@@ -280,7 +280,7 @@ function renderEmpty(narrowed) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'btn primary';
-  b.textContent = narrowed ? '검색·필터 풀기' : '새 메모 (Ctrl+N)';
+  b.textContent = narrowed ? '검색과 필터 풀기' : '새 메모 (Ctrl+N)';
   b.addEventListener('click', () => {
     if (!narrowed) return api.memo.create();
     state.filter = { tags: [], colors: [], kinds: [] };
@@ -607,7 +607,7 @@ $('auto-tags').addEventListener('change', async (e) => {
 // 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)
 let magicState = { enabled: true, modules: {} };
 let magicIndex = null; // 파일 검색 목록 상태 { count, builtAt, building }
-const indexNote = (st) => (!st ? '' : st.building && !st.count ? ' · 파일 목록을 만드는 중…' : st.count ? ` · 파일 ${st.count.toLocaleString('ko-KR')}개${st.building ? ' (새로 고치는 중)' : ''}` : '');
+const indexNote = (st) => (!st ? '' : st.building && !st.count ? ', 파일 목록을 만드는 중…' : st.count ? `, 파일 ${st.count.toLocaleString('ko-KR')}개${st.building ? ' (새로 고치는 중)' : ''}` : '');
 function renderMagicModules() {
   const list = $('magic-modules-list');
   list.replaceChildren(...MAGIC_MODULES.map((m) => {
@@ -881,7 +881,7 @@ function cancelDrag() {
 
 api.on('drag:state', ({ outside }) => {
   document.body.classList.toggle('drag-outside', outside);
-  el.dragHint.textContent = outside ? '놓으면 여기에 열려요 · 취소는 Esc' : '목록 밖으로 끌어내면 그 자리에 열려요';
+  el.dragHint.textContent = outside ? '놓으면 여기에 열려요. 취소는 Esc' : '목록 밖으로 끌어내면 그 자리에 열려요';
 });
 
 el.search.addEventListener('input', () => {
@@ -1105,7 +1105,7 @@ async function renderTrash() {
     title.textContent = t.title;
     const sub = document.createElement('div');
     sub.className = 'trash-sub';
-    sub.textContent = [`${agoText(t.deletedAt)} 지움`, t.preview].filter(Boolean).join(' · ');
+    sub.textContent = [`${agoText(t.deletedAt)} 지움`, t.preview].filter(Boolean).join(', ');
     text.append(title, sub);
     const restore = document.createElement('button');
     restore.className = 'btn trash-restore';
