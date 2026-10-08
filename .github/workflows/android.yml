@@ -42,9 +42,12 @@ jobs:
           MEMOKING_GOOGLE_CLIENT_SECRET: ${{ secrets.MEMOKING_GOOGLE_CLIENT_SECRET }}
         run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
 
+      # 빌드 결과물 보관함은 저장 공간 한도가 있어 짧게 두고, 가득 차도 릴리스(다운로드 링크)는 올라가게
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: memoking-android
+          retention-days: 3
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
