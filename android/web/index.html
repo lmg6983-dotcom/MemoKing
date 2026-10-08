@@ -83,7 +83,7 @@
 
     <div class="view" id="view-reminders" role="tabpanel" hidden>
       <div id="reminder-groups" class="rows"></div>
-      <p id="reminders-empty" class="empty" hidden>예약한 알림이 없어요.<br>메모 위쪽의 종 버튼으로 추가하세요.</p>
+      <p id="reminders-empty" class="empty" hidden>예약한 알림이 없어요.<br>메모 위쪽의 종 버튼으로 추가할 수 있어요.</p>
     </div>
 
     <!-- 알림 보관함: 휴대폰에 온 다른 앱 알림 (app/js/list-history.js 가 그림) -->
@@ -271,7 +271,7 @@
     <button class="menu-item" data-memo-action="pin"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
     <button class="menu-item" data-memo-action="versions"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
     <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>공유</span></button>
-    <button class="menu-item" data-memo-action="copy"><svg><use href="#i-copy"/></svg><span>텍스트 복사</span></button>
+    <button class="menu-item" data-memo-action="copy"><svg><use href="#i-copy"/></svg><span>글 복사</span></button>
     <button class="menu-item" data-memo-action="print"><svg><use href="#i-pdf"/></svg><span>인쇄</span></button>
     <button class="menu-item danger" data-memo-action="delete"><svg><use href="#i-trash"/></svg><span>삭제</span></button>
   </section>
@@ -359,7 +359,7 @@
       <p id="links-tags-empty" class="hint small" hidden>태그를 달면 같은 태그의 메모와 이어져요.</p>
       <div id="links-tag-suggest" class="chip-row link-tag-suggest"></div>
     </section>
-    <input id="link-search" class="link-search" type="search" placeholder="연결할 메모 검색" autocomplete="off">
+    <input id="link-search" class="link-search" type="search" aria-label="연결할 메모 검색" placeholder="연결할 메모 검색" autocomplete="off">
     <ul id="link-results" class="link-list"></ul>
     <h4>연결한 메모</h4>
     <ul id="links-out" class="link-list"></ul>
@@ -385,8 +385,8 @@
     <div class="sheet-grip"></div>
     <h3 id="share-sheet-title" class="sheet-title">공유</h3>
     <div class="share-choices">
-      <button class="share-choice" data-share="text"><svg><use href="#i-text"/></svg><b>텍스트</b><small>목록 모양 그대로</small></button>
-      <button class="share-choice" data-share="image"><svg><use href="#i-image"/></svg><b>이미지</b><small>메모 그대로 한 장</small></button>
+      <button class="share-choice" data-share="text"><svg><use href="#i-text"/></svg><b>글</b><small>목록 모양 그대로</small></button>
+      <button class="share-choice" data-share="image"><svg><use href="#i-image"/></svg><b>그림</b><small>메모 그대로 한 장</small></button>
       <button class="share-choice" data-share="pdf"><svg><use href="#i-pdf"/></svg><b>PDF</b><small>문서, 인쇄용</small></button>
     </div>
     <p id="share-busy" class="wait" hidden><span class="spinner"></span><span id="share-busy-text">만드는 중…</span></p>
@@ -399,7 +399,7 @@
     <ul id="import-files" class="import-files"></ul>
     <label class="setting-row">
       <input type="checkbox" id="import-stt" class="switch" checked>
-      <span>받아쓰기 <small id="import-stt-note">음성을 텍스트로 바꿔 함께 넣어요. 긴 파일은 시간이 걸려요</small></span>
+      <span>받아쓰기 <small id="import-stt-note">음성을 글로 받아써 함께 넣어요. 긴 파일은 시간이 걸려요</small></span>
     </label>
     <div class="sheet-actions">
       <button id="import-cancel" class="btn">취소</button>
@@ -472,7 +472,7 @@
       <button id="change-vault" class="btn">위치 변경</button>
       <button id="use-internal-2" class="btn">이 휴대폰에만 저장</button>
     </div>
-    <p class="hint" id="vault-hint">PC와 함께 쓰려면 Google Drive를 연결하세요.</p>
+    <p class="hint" id="vault-hint">PC와 함께 쓰려면 Google Drive를 연결해 주세요.</p>
 
     <p class="label">알림</p>
     <div class="setting-row" id="notify-row">
@@ -495,11 +495,11 @@
     </label>
     <label class="setting-row">
       <input type="checkbox" id="rec-stt" class="switch" checked>
-      <span>녹음하며 받아쓰기 <small id="rec-stt-note">말하는 내용을 바로 텍스트로 적어요</small></span>
+      <span>녹음하며 받아쓰기 <small id="rec-stt-note">말하는 내용을 바로 글로 받아써요</small></span>
     </label>
     <div class="setting-row" id="spk-row">
-      <span>화자 구분 <small id="spk-note"></small></span>
-      <button id="spk-btn" class="btn small">다운로드</button>
+      <span>말한 사람 나누기 <small id="spk-note"></small></span>
+      <button id="spk-btn" class="btn small">받기</button>
     </div>
     <p class="label">S펜</p>
     <label class="setting-row select-row">

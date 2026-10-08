@@ -31,13 +31,13 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
   font-family: inherit;
   caret-color: #e0a800;
 }
-.magic-input::placeholder { color: #a0a0a0; }
+.magic-input::placeholder { color: var(--muted, #6b6860); }
 .magic-clear { -webkit-app-region: no-drag; flex: none; width: 24px; height: 24px; margin-top: 3px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.07); color: #666; font-size: 12px; cursor: pointer; }
 .magic-clear:hover { background: rgba(0, 0, 0, 0.14); color: #111; }
 
 .magic-results { -webkit-app-region: no-drag; list-style: none; margin: 0; padding: 4px 8px 6px; max-height: 430px; overflow-y: auto; border-top: 1px solid var(--mk-line); }
 .magic-results:empty { display: none; }
-.magic-section { display: flex; align-items: center; gap: 6px; padding: 9px 10px 4px; color: #8c8c8c; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; }
+.magic-section { display: flex; align-items: center; gap: 6px; padding: 9px 10px 4px; color: var(--muted, #6b6860); font-size: 12px; font-weight: 700; letter-spacing: 0.03em; }
 .magic-section .count { padding: 0 6px; border-radius: 99px; background: rgba(0, 0, 0, 0.06); font-weight: 600; }
 .magic-row { display: flex; align-items: center; gap: 11px; min-height: 38px; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
 .magic-row[aria-selected="true"] { background: var(--mk-sel); }

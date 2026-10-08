@@ -10,7 +10,7 @@ import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog, isTwoPane } from './ui.js';
 import { tutEvent } from './tutorial.js';
-import { haptic, reduceMotion } from '../../app/js/dom.js';
+import { haptic, reduceMotion, tabKeys, syncTabStops } from '../../app/js/dom.js';
 import { hintOnce } from '../../app/js/hints.js';
 
 const $ = (x) => document.getElementById(x);
@@ -315,6 +315,7 @@ el.search.addEventListener('keydown', (e) => {
 function setTab(tab) {
   state.tab = tab;
   for (const b of document.querySelectorAll('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  syncTabStops(document.querySelector('.tabs'));
   $('view-memos').hidden = tab !== 'memos';
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
@@ -324,6 +325,7 @@ function setTab(tab) {
   if (tab === 'reminders') remindersTab.refresh();
   runSearch();
 }
+tabKeys(document.querySelector('.tabs'));
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');
   if (b) setTab(b.dataset.tab);

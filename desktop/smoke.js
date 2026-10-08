@@ -1151,6 +1151,14 @@ export async function runSmoke({
     await until(async () => (await titlesNow()).length === 1, '보관함 검색 반영').catch(() => {});
     const searched = await titlesNow();
     check('보관함 검색', JSON.stringify(searched) === JSON.stringify(['김대리']), JSON.stringify(searched));
+    // 키보드로: 알림 글 부분은 단추 (Enter 로 펼치기), 탭은 ←→ 로 옮겨 다님
+    await listJs(`document.querySelector('#history-rows .noti .noti-text').focus()`);
+    // 단추는 Enter 의 글자(char) 이벤트로 눌린다 — key() 는 keyDown·keyUp 만 보내므로 char 를 더한다
+    getList().webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
+    getList().webContents.sendInputEvent({ type: 'char', keyCode: '\r' });
+    getList().webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
+    await wait(150);
+    check('보관함: 키보드(Enter)로 알림 펼치기', await listJs(`(() => { const b = document.querySelector('#history-rows .noti .noti-text'); return b.getAttribute('aria-expanded') === 'true' && b.closest('.noti').classList.contains('expanded'); })()`));
     const memoFromNoti = await newNote(() => listJs(`document.querySelector('#history-rows .noti [aria-label="메모로 만들기"]').click()`));
     const notiMd = readMemo(memoFromNoti.id);
     check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림, /.test(notiMd));
@@ -1158,6 +1166,11 @@ export async function runSmoke({
     await listJs(`document.querySelector('#history-rows .noti [aria-label="삭제"]').click()`);
     await wait(300);
     check('보관한 알림 지우기', history.list({ query: '회의' }).length === 0);
+    await listJs(`document.querySelector('.tabs [aria-selected="true"]').focus()`);
+    await key(getList(), 'Left');
+    const tabAfter = await listJs(`document.querySelector('.tabs [aria-selected="true"]').dataset.tab`);
+    await key(getList(), 'Right');
+    check('탭: ← → 로 옆 탭', tabAfter === 'reminders' && (await listJs(`document.querySelector('.tabs [aria-selected="true"]').dataset.tab`)) === 'history', tabAfter);
     await listJs(`(() => { const s = document.getElementById('search'); s.value = ''; s.dispatchEvent(new Event('input')); })()`);
 
     // 16) 설정: 자동 실행 (개발 실행에서는 끄기 상태로 안내, 설치판은 켜기 가능)

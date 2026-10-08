@@ -32,3 +32,25 @@ export function flipFrom(el, prev, { duration = 200, easing = 'cubic-bezier(0.23
     { transformOrigin: '0 0', transform: base || 'none' },
   ], { duration, easing });
 }
+
+/**
+ * 탭 줄(role=tablist)을 키보드로: ←→ 로 옆 탭, Home·End 로 처음·끝 (누른 것과 같게 click)
+ * Tab 키로는 고른 탭 하나에만 들르게(나머지는 tabindex -1) — 고를 때마다 syncTabStops 를 부른다
+ */
+export function tabKeys(tablist) {
+  tablist.addEventListener('keydown', (e) => {
+    const tabs = [...tablist.querySelectorAll('[role="tab"]')].filter((t) => !t.hidden);
+    const i = tabs.indexOf(document.activeElement);
+    if (i < 0) return;
+    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    const t = tabs[(next + tabs.length) % tabs.length];
+    t.focus();
+    t.click();
+  });
+  syncTabStops(tablist);
+}
+export function syncTabStops(tablist) {
+  for (const t of tablist.querySelectorAll('[role="tab"]')) t.tabIndex = t.getAttribute('aria-selected') === 'true' ? 0 : -1;
+}

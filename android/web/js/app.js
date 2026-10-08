@@ -1,4 +1,6 @@
 // 메모킹 안드로이드 — 시작, 화면 바꾸기, 설정·휴지통, 다른 앱에서 받은 것, 예약 알림
+import { daysAgoText } from '../../app/js/core/time.js';
+import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
 import { extractTitle, isBlankBody, COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
@@ -352,7 +354,7 @@ memoSheet.addEventListener('click', async (e) => {
     case 'copy':
       closeSheet(memoSheet);
       native.copyText(shareText(body)); // 마크다운 원문(<br /> · \* · - [ ]) 대신 보이는 글 그대로
-      toast('텍스트를 복사했어요');
+      toast('글을 복사했어요');
       break;
     case 'print':
       closeSheet(memoSheet);
@@ -424,12 +426,12 @@ async function deleteMemo(id) {
     toast('메모를 삭제했어요');
     return;
   }
-  toast('휴지통으로 옮겼어요', false, {
+  toast(trashedText(titleOf(body)), false, {
     label: '되돌리기',
     run: () => {
       const restored = app.vault.restoreTrash(name);
       list.refresh();
-      toast(restored ? '메모를 복원했어요' : '복원하지 못했어요', !restored);
+      toast(restored ? '메모를 되살렸어요' : '되살리지 못했어요', !restored);
     },
   });
 }
@@ -579,7 +581,7 @@ function openSettings() {
   $('pen-writing').value = note.penWriting();
   $('rec-stt').checked = recorder.sttOn();
   $('rec-stt-note').textContent = recorder.sttReady()
-    ? '말하는 내용을 휴대폰의 Google 음성 인식으로 바로 텍스트로 적어요'
+    ? '말하는 내용을 휴대폰의 Google 음성 인식으로 바로 글로 받아써요'
     : '이 휴대폰은 Google 음성 인식(안드로이드 13 이상)을 쓸 수 없어 녹음만 해요';
   $('rec-stt').disabled = !recorder.sttReady();
   refreshSpeakerRow();
@@ -593,11 +595,11 @@ function refreshSpeakerRow(progress) {
   const busy = progress != null || st.speaker === 'downloading';
   const ready = st.speaker === 'ready';
   $('spk-note').textContent = busy
-    ? `다운로드 중 ${progress ?? 0}%`
+    ? `데이터를 받는 중… ${progress ?? 0}%`
     : ready
-      ? st.speakerOn ? '사용 중이에요. 녹음이 끝나면 말한 사람마다 "화자 1, 화자 2"로 표시해요' : '사용 안 함'
-      : `목소리로 참석자를 구분해 "화자 1, 화자 2"로 표시해요 (${(st.speakerSize ?? '약 28MB').replace('약 ', '')}`;
-  $('spk-btn').textContent = busy ? '다운로드 중' : ready ? (st.speakerOn ? '끄기' : '켜기') : '다운로드';
+      ? st.speakerOn ? '켜져 있어요. 녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요' : '꺼져 있어요'
+      : `녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요 (데이터 ${(st.speakerSize ?? '약 28MB').replace('약 ', '')}`;
+  $('spk-btn').textContent = busy ? '받는 중' : ready ? (st.speakerOn ? '끄기' : '켜기') : '받기';
   $('spk-btn').disabled = busy;
 }
 $('spk-btn').addEventListener('click', async () => {
@@ -607,10 +609,10 @@ $('spk-btn').addEventListener('click', async () => {
     else {
       refreshSpeakerRow(0);
       await call('speakerModel', {});
-      toast('화자 구분을 켰어요. 다음 녹음부터 적용돼요');
+      toast('말한 사람 나누기를 켰어요. 다음 녹음부터 붙어요');
     }
   } catch (err) {
-    toast(err.message || '다운로드하지 못했어요. 인터넷 연결을 확인해 주세요', true);
+    toast(err.message || '받지 못했어요. 인터넷 연결을 확인해 주세요', true);
   }
   refreshSpeakerRow();
 });
@@ -703,17 +705,16 @@ function renderTrash() {
     title.textContent = t.title;
     const sub = document.createElement('span');
     sub.className = 'trash-sub';
-    const at = new Date(t.deletedAt);
-    sub.textContent = `${at.getMonth() + 1}월 ${at.getDate()}일에 지움${t.attachments ? ` · 첨부 ${t.attachments}개` : ''}`;
+    sub.textContent = [`${daysAgoText(t.deletedAt)} 지움`, t.attachments ? `첨부 ${t.attachments}개` : ''].filter(Boolean).join(', ');
     text.append(title, sub);
     const restore = document.createElement('button');
     restore.className = 'btn';
-    restore.textContent = '복원';
+    restore.textContent = '되살리기';
     restore.addEventListener('click', () => {
       const id = app.vault.restoreTrash(t.name);
       renderTrash();
       list.refresh();
-      toast(id ? '메모를 복원했어요' : '복원하지 못했어요', !id);
+      toast(id ? '메모를 되살렸어요' : '되살리지 못했어요', !id);
     });
     const del = document.createElement('button');
     del.className = 'icon-btn danger';

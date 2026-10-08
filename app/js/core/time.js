@@ -24,3 +24,9 @@ export const koMonthDay = (d) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
 
 // 같은 날인지 비교용 키: 2026-09-29
 export const dateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+/** 휴지통 등 "언제" — 오늘 · 어제 · 3일 전 (PC·휴대폰 같은 말) */
+export function daysAgoText(iso, now = new Date()) {
+  const days = Math.floor((new Date(now).setHours(0, 0, 0, 0) - new Date(iso).setHours(0, 0, 0, 0)) / 86400000);
+  return days <= 0 ? '오늘' : days === 1 ? '어제' : `${days}일 전`;
+}

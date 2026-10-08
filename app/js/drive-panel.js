@@ -141,7 +141,7 @@ export function setupDrivePanel({ api, onVault, confirm }) {
     });
     const use = $('folder-use');
     use.disabled = cur.id === 'root';
-    use.textContent = cur.id === 'root' ? '폴더를 선택하세요' : `"${cur.name}" 폴더 사용`;
+    use.textContent = cur.id === 'root' ? '폴더를 골라 주세요' : `"${cur.name}" 폴더 사용`;
     const list = $('folder-list');
     list.innerHTML = '<li class="loading">불러오는 중…</li>';
     let folders;

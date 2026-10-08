@@ -502,13 +502,13 @@ try {
   await page.waitForTimeout(300);
   check('설정: 받아쓰기는 Google 음성 인식 하나 (방식 고르기·데이터 받기 없음)', (await page.locator('#stt-engine, #stt-model-row').count()) === 0 && (await page.textContent('#rec-stt-note')).includes('Google'));
   await shot('17-settings-stt');
-  check('설정: 화자 구분 줄 (처음엔 다운로드)', await page.isVisible('#spk-row') && (await page.textContent('#spk-btn')) === '다운로드' && (await page.textContent('#spk-note')).includes('화자 1·2'));
+  check('설정: 말한 사람 나누기 줄 (처음엔 받기)', await page.isVisible('#spk-row') && (await page.textContent('#spk-btn')) === '받기' && (await page.textContent('#spk-note')).includes('화자 1:'));
   await page.tap('#spk-btn');
   await page.waitForTimeout(300);
-  check('설정: 화자 구분 받으면 켜짐 → 끄기 단추', (await page.textContent('#spk-btn')) === '끄기' && (await page.textContent('#spk-note')).includes('사용 중'));
+  check('설정: 말한 사람 나누기 받으면 켜짐 → 끄기 단추', (await page.textContent('#spk-btn')) === '끄기' && (await page.textContent('#spk-note')).includes('켜져 있어요'));
   await page.tap('#spk-btn');
   await page.waitForTimeout(300);
-  check('설정: 화자 구분 끄기 → 켜기 단추', (await page.textContent('#spk-btn')) === '켜기');
+  check('설정: 말한 사람 나누기 끄기 → 켜기 단추', (await page.textContent('#spk-btn')) === '켜기');
   await page.tap('#trash-btn');
   await page.waitForTimeout(200);
   await shot('04-trash');
