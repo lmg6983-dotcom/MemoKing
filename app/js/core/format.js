@@ -31,3 +31,10 @@ export function friendlyTime(value, now = Date.now()) {
   if (d.getFullYear() === n.getFullYear()) return koMonthDay(d);
   return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
 }
+
+// "‘장보기 목록’ 메모를 휴지통으로 옮겼어요" — 어떤 메모인지 (길면 앞 18자)
+export function trashedText(title) {
+  const t = String(title ?? '').trim();
+  if (!t) return '메모를 휴지통으로 옮겼어요';
+  return `‘${t.length > 18 ? `${t.slice(0, 18)}…` : t}’ 메모를 휴지통으로 옮겼어요`;
+}

@@ -15,9 +15,12 @@ import { attachSliders } from './seg-slider.js';
 import { setupVoiceRecorder } from './voice-recorder.js';
 import { setupAnnotation } from './ink-annotate.js';
 import { audioNeedingTranscript } from './core/voice-card.js';
-import { reduceMotion, replayClass } from './dom.js';
+import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups } from './dom.js';
 import { createClearStamp } from './clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
+import { renderVersions } from './versions-view.js';
+import { hintOnce } from './hints.js';
+import { toggleShortcutSheet } from './shortcut-sheet.js';
 
 const SAVE_DELAY = 600;
 
@@ -254,7 +257,7 @@ function applyMeta(next) {
   document.body.dataset.color = memo.color;
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
-  el.pinToggle.querySelector('span').textContent = memo.pinned ? '고정 해제' : '맨 위에 고정';
+  el.pinToggle.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
 }
 
 for (const color of COLORS) {
@@ -337,7 +340,7 @@ async function transcribeAudio() {
   closeMenu();
   if (!editor) return;
   const st = await api.stt.status();
-  if (st.asr.state !== 'ready') return setStatus('받아쓰기 데이터를 먼저 받아 주세요 (목록 창 설정 › 음성 녹음)', true);
+  if (st.asr.state !== 'ready') return setStatus('받아쓰기 데이터를 먼저 받아 주세요 (목록 창 설정 › 음성 녹음과 받아쓰기)', true);
   const list = audioNeedingTranscript(editor.getMarkdown());
   if (!list.length) return setStatus('받아쓸 소리가 없어요 (모두 받아썼어요)');
   let done = 0;
@@ -380,16 +383,22 @@ $('delete-btn').addEventListener('click', async () => {
 
 api.on('memo:meta', applyMeta);
 
-function toggleMenu() {
+function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
+  el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
+  if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
 }
 function closeMenu() {
+  if (el.menu.hidden) return;
   el.menu.hidden = true;
+  el.menuBtn.setAttribute('aria-expanded', 'false');
+  if (el.menu.contains(document.activeElement)) el.menuBtn.focus(); // 키보드로 쓰던 사람이 제자리로
 }
 el.menuBtn.addEventListener('click', (e) => {
   e.stopPropagation();
-  toggleMenu();
+  toggleMenu(e);
 });
+menuKeys(el.menu, '.menu-item');
 document.addEventListener('mousedown', (e) => {
   if (!el.menu.hidden && !el.menu.contains(e.target) && !el.menuBtn.contains(e.target)) closeMenu();
 });
@@ -466,12 +475,57 @@ async function toggleLinks(force) {
   el.linksPanel.hidden = force === undefined ? !el.linksPanel.hidden : !force;
   if (!el.linksPanel.hidden) {
     if (reminderPanel?.open) reminderPanel.toggle(false); // 패널은 하나씩
+    if (!versionsPanel.hidden) toggleVersions(false);
     await flush();
     await refreshLinks();
     el.linkSearch.focus();
   } else editor.focus();
 }
 el.linksBtn.addEventListener('click', () => toggleLinks());
+
+// ---------- 이전 버전 ----------
+
+const versionsPanel = $('versions-panel');
+async function refreshVersions() {
+  const versions = await api.memo.versions(id);
+  renderVersions($('versions-list'), versions, restoreVersion);
+}
+async function restoreVersion(name) {
+  await flush(); // 지금 내용이 버전으로 남도록 먼저 저장
+  const restored = await api.memo.restoreVersion(id, name);
+  if (!restored) return setStatus('그 버전을 찾지 못했어요', true);
+  editor.setMarkdown(restored.body, restored.tables ?? []);
+  current = saved = editor.getMarkdown();
+  setStatus('되돌렸어요');
+  await refreshVersions();
+}
+async function toggleVersions(force) {
+  versionsPanel.hidden = force === undefined ? !versionsPanel.hidden : !force;
+  if (!versionsPanel.hidden) {
+    if (!el.linksPanel.hidden) toggleLinks(false);
+    if (reminderPanel?.open) reminderPanel.toggle(false);
+    await flush();
+    await refreshVersions();
+    $('versions-close').focus();
+  } else editor.focus();
+}
+$('versions-btn').addEventListener('click', () => {
+  closeMenu();
+  toggleVersions(true);
+});
+$('versions-close').addEventListener('click', () => toggleVersions(false));
+// 끌어서 합치기(스택)의 메뉴 버전 — 끌기가 어려운 사람도
+$('join-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  api.stack.joinMenu(id);
+});
+$('shortcuts-btn').addEventListener('click', () => {
+  closeMenu();
+  toggleShortcutSheet();
+});
+// 메모 창을 몇 번 써 본 뒤 한 번: 단축키 모음이 있다는 것
+setTimeout(() => hintOnce('shortcuts', 'Ctrl+/ 를 누르면 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn }), 2500);
 $('links-close').addEventListener('click', () => toggleLinks(false));
 api.on('memo:links-changed', refreshLinks);
 
@@ -842,6 +896,7 @@ function closeAddMenu() {
   if (addMenu.hidden || addMenu.classList.contains('closing')) return false;
   addBtn.classList.remove('open');
   addBtn.setAttribute('aria-expanded', 'false');
+  if (addMenu.contains(document.activeElement)) addBtn.focus(); // 키보드로 쓰던 사람이 제자리로 (고른 동작이 편집기로 옮겨 감)
   addMenu.classList.add('closing');
   addCloseTimer = setTimeout(() => {
     addMenu.hidden = true;
@@ -859,6 +914,14 @@ const ADD = {
   math: () => editor.setStyle('math'),
 };
 addMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서 유지
+// 키보드: + 에서 ↑ 를 누르면 펼치고 가장 가까운(맨 아래) 항목으로, 항목 사이는 ↑↓
+menuKeys(addMenu, '.add-sat');
+addBtn.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  if (addMenu.hidden || addMenu.classList.contains('closing')) openAddMenu();
+  requestAnimationFrame(() => [...addMenu.querySelectorAll('.add-sat')].filter((b) => !b.hidden).at(-1)?.focus());
+});
 addMenu.addEventListener('click', (e) => {
   const b = e.target.closest('[data-add]');
   if (!b || !editor) return;
@@ -952,8 +1015,16 @@ tableBar.addEventListener('click', (e) => {
   editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
 });
 
+// 처음 그 상황이 됐을 때 한 번만: 눈에 안 보이는 동작(꾹 눌러 옮기기·테두리 끌기) 알려 주기
+// (그림·파일 옮기기 안내는 block-move.js 가 따로)
+function firstTimeHints(active) {
+  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab 은 다음 칸, 마지막 칸에서 Tab 은 새 줄이에요', { anchor: tableBar });
+  else if (active.task || active.bullet || active.ordered) hintOnce('list-move', '목록 항목은 글자를 꾹 누르면 들어 올려져 순서를 바꿀 수 있어요. 키보드는 Alt+↑ / Alt+↓', { anchor: el.editorRoot.querySelector('li') });
+}
+
 function showActive(active) {
   showTableBar(active.table);
+  firstTimeHints(active);
   showStyle(active);
   for (const btn of document.querySelectorAll('[data-cmd]')) {
     btn.classList.toggle('active', Boolean(active[btn.dataset.cmd]));
@@ -988,6 +1059,7 @@ const SHORTCUTS = {
   'ctrl+shift+KeyT': ['app', 'top'],
   'ctrl+shift+KeyA': ['app', 'reminders'],
   'ctrl+KeyK': ['app', 'links'],
+  'ctrl+Slash': ['app', 'shortcuts'],
   'ctrl+KeyN': ['app', 'new'],
   'ctrl+KeyW': ['app', 'close'],
 };
@@ -1001,6 +1073,7 @@ window.addEventListener('keydown', (e) => {
     else if (!el.morePanel.hidden) closeMore();
     else if (!el.menu.hidden) closeMenu();
     else if (!el.linksPanel.hidden) toggleLinks(false);
+    else if (!versionsPanel.hidden) toggleVersions(false);
     else if (reminderPanel?.open) reminderPanel.toggle(false);
     return;
   }
@@ -1029,6 +1102,7 @@ window.addEventListener('keydown', (e) => {
   else if (name === 'reminders') reminderPanel?.toggle();
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
+  else if (name === 'shortcuts') toggleShortcutSheet();
 }, true);
 
 // ---------- 본문 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 웹 브라우저처럼 글·사진·표가 함께 ----------
@@ -1485,3 +1559,6 @@ if (!memo) {
 }
 
 attachSliders(document, '.seg'); // 알림 종류 고르기: 선택 표시가 미끄러진다
+
+// 고르기 칸(role=radiogroup): 칸마다 radio, 화살표로 고르기 (dom.js)
+radioGroups();

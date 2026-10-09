@@ -122,7 +122,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   border-radius: 999px;
   background: var(--brand-yellow);
   color: var(--on-brand);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 16px;
 }
@@ -154,7 +154,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 }
 .tabs button svg { width: 16px; height: 16px; }
 .tabs button[aria-selected="true"] { background: var(--surface-1); color: var(--text-strong); box-shadow: var(--shadow-card); }
-.tab-count { font-size: 12px; font-weight: 700; color: var(--text-faint); }
+.tab-count { font-size: 12px; font-weight: 700; color: var(--muted); }
 
 .view {
   flex: 1;
@@ -212,7 +212,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .tag-strip::-webkit-scrollbar { display: none; }
 .filter-summary { display: flex; align-items: center; gap: 8px; margin: 0 16px 8px; font-size: 13px; color: var(--muted); }
 .filter-summary span { flex: 1; }
-.link-btn { min-height: 40px; padding: 6px 8px; border: 0; background: none; color: var(--text-strong); font-weight: 700; font-size: 13px; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.link-btn { min-height: var(--tap); padding: 6px 8px; border: 0; background: none; color: var(--text-strong); font-weight: 700; font-size: 13px; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 
 /* 카드: 바탕이 실제 메모 색. 기본은 두 줄 격자, 목록 모양이면 한 줄씩 */
 .cards {
@@ -327,12 +327,12 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .row-dot { width: 12px; height: 12px; flex: none; border-radius: 4px; background: var(--note-chip); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.25); }
 .row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .row-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 700; }
-.row-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; font-size: 12.5px; color: var(--muted); }
-.row-sub svg { width: 14px; height: 14px; }
+.row-sub { display: flex; align-items: flex-start; gap: 4px; line-height: 1.45; font-size: 12.5px; color: var(--muted); }
+.row-sub svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
 .row-sub b { color: var(--text-strong); }
 
 /* 켜기/끄기 스위치 — 모양은 base.css, 휴대폰은 손가락에 맞게 조금 크게 · 손잡이가 통통 튀게 */
-.switch { width: 40px; height: 24px; margin: 0 6px; background: var(--line); transition: background-color 0.15s ease-out; }
+.switch { width: 40px; height: 24px; margin: 0 6px; /* 보이는 크기는 그대로, 누르는 자리는 아래 ::before 로 44px */ background: var(--line); transition: background-color 0.15s ease-out; }
 .switch::after {
   top: 3px; left: 3px; width: 18px; height: 18px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
@@ -344,7 +344,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .switch:checked::after { transform-origin: right center; }
 .switch:checked:active::after { transform: translateX(16px) scaleX(1.22); }
 .seg.wide { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; margin: 6px 0 0; }
-.seg.wide button { height: 36px; font-size: 13px; }
+.seg.wide button { height: var(--tap); font-size: 13px; }
 .seg button:disabled { opacity: 0.4; }
 
 /* ========== 메모 ========== */
@@ -367,7 +367,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .note-screen .count-btn .count, .note-screen .links-btn .count { font-size: 12.5px; }
 
 .note-screen .banner { font-size: 13.5px; padding: 10px 12px; }
-.note-screen .banner-btn { height: 34px; padding: 0 12px; font-size: 13px; }
+.note-screen .banner-btn { height: var(--tap); padding: 0 12px; font-size: 13px; }
 
 .note-screen .editor {
   padding: 8px 20px 40px;
@@ -392,18 +392,19 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   scroll-snap-type: x proximity;
 }
 .note-screen .format-items::-webkit-scrollbar { display: none; }
-.note-screen .format-bar button { min-width: 42px; height: 42px; border-radius: 10px; font-size: 15px; }
+.note-screen .format-bar button { min-width: var(--tap); height: var(--tap); border-radius: 10px; font-size: 15px; }
 .note-screen .format-bar button svg { width: 21px; height: 21px; }
 .note-screen .format-bar button :is(b, i, u, s) { font-size: 17px; }
 .note-screen .format-bar .sep { height: 22px; margin: 0 4px; }
 .note-screen .format-bar button:hover { background: none; }
 .note-screen .format-bar button:active { background: var(--note-hover); }
+.note-screen .format-bar button:disabled { opacity: 0.32; }
 .note-screen .format-bar button.active { background: color-mix(in srgb, var(--note-text) 14%, transparent); color: var(--note-text); }
 .note-screen .table-bar { overflow-x: auto; }
-.note-screen .table-bar button { height: 38px; padding: 0 12px; font-size: 13.5px; }
+.note-screen .table-bar button { height: var(--tap); padding: 0 12px; font-size: 13.5px; }
 .note-screen .palette { width: min(300px, calc(100vw - 24px)); }
 .note-screen .palette-swatch { min-height: 36px; }
-.note-screen .tag-suggest-item { min-height: 40px; font-size: 15px; }
+.note-screen .tag-suggest-item { min-height: var(--tap); font-size: 15px; }
 
 /* 이 메모예요: 알림으로 열렸을 때 테두리 반짝임 */
 .note-screen.highlight::after { position: absolute; } /* 나머지 모양은 note.css */
@@ -448,8 +449,8 @@ h2.sheet-title { font-size: 20px; }
 .sheet .link-open { min-height: 44px; font-size: 15px; }
 .sheet h4 { font-size: 13px; }
 .sheet .reminder-form input, .sheet .reminder-form select { height: 40px; font-size: 15px; }
-.sheet .seg button { height: 38px; font-size: 13.5px; }
-.sheet .chips button { height: 36px; padding: 0 12px; font-size: 14px; }
+.sheet .seg button { height: var(--tap); font-size: 13.5px; }
+.sheet .chips button { height: var(--tap); padding: 0 12px; font-size: 14px; }
 .sheet .rem-radio { min-height: 40px; font-size: 14.5px; }
 .sheet .rem-item { min-height: 52px; }
 .sheet .dp-day { height: 44px; font-size: 15px; border-radius: 12px; }
@@ -458,7 +459,7 @@ h2.sheet-title { font-size: 20px; }
 .sheet .dp-summary { font-size: 14.5px; }
 .sheet .rem-title { font-size: 15px; }
 .sheet .btn { height: 46px; font-size: 15px; }
-.sheet .btn.small { height: 38px; padding: 0 14px; font-size: 14px; }
+.sheet .btn.small { height: var(--tap); padding: 0 14px; font-size: 14px; }
 
 .sheet .label { margin: 18px 4px 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -466,9 +467,11 @@ h2.sheet-title { font-size: 20px; }
 .hint { margin: 10px 4px 0; font-size: 13px; line-height: 1.55; color: var(--muted); }
 .setting-row { display: flex; align-items: center; gap: 12px; padding: 6px 4px; font-size: 15px; }
 .setting-row > span { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+/* 설정 줄은 모두 같은 모양: 글은 왼쪽, 고르는 것(스위치·단추·목록)은 오른쪽 — 안드로이드 설정과 같게 */
+.setting-row > .switch { order: 2; flex: none; margin: 0 2px 0 0; }
 .setting-row small { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
-.setting-row select { height: 40px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); }
-.version, .copyright { margin: 18px 4px 0; font-size: 12px; color: var(--text-faint); text-align: center; }
+.setting-row select { height: var(--tap); padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); }
+.version, .copyright { margin: 18px 4px 0; font-size: 12px; color: var(--muted); text-align: center; }
 .copyright { margin-top: 2px; }
 .trash-count { font-size: 12px; color: var(--muted); }
 
@@ -562,7 +565,7 @@ h2.sheet-title { font-size: 20px; }
 .trash-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .trash-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 700; }
 .trash-sub { font-size: 12.5px; color: var(--muted); }
-.trash-item .btn { height: 36px; padding: 0 12px; font-size: 13.5px; }
+.trash-item .btn { height: var(--tap); padding: 0 12px; font-size: 13.5px; }
 
 /* 잠깐 알림: 위 가운데 (아래쪽은 + 버튼·서식 막대·시트가 차지) */
 .toast {
@@ -570,6 +573,7 @@ h2.sheet-title { font-size: 20px; }
   left: 50%;
   top: calc(12px + env(safe-area-inset-top));
   z-index: 950; /* 튜토리얼 말풍선(901) 위 — 알림의 단추를 말풍선이 가리지 않게 */
+  width: max-content; /* left: 50% 이면 폭이 화면 반으로 줄어 글이 여러 줄로 접힌다 */
   max-width: calc(100vw - 32px);
   padding: 12px 18px;
   border-radius: 14px;
@@ -630,7 +634,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 
 /* ---------- 메모 위 막대: 되돌리기·다시 하기 (누를 것이 없으면 흐리게) ---------- */
 .note-screen .bar .icon-btn:disabled { opacity: 0.32; }
-.note-screen .bar #undo-btn, .note-screen .bar #redo-btn { width: 40px; }
+.note-screen .bar #undo-btn, .note-screen .bar #redo-btn { width: var(--tap); }
 .note-screen .bar #undo-btn svg, .note-screen .bar #redo-btn svg { width: 21px; height: 21px; }
 
 /* ---------- 서식 도구막대: 스타일 고르기 (H1·H2 대신) ---------- */
@@ -663,7 +667,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .rec-wave i { display: block; width: 3px; height: 22px; border-radius: 2px; background: var(--rec); transform: scaleY(calc(0.12 + var(--lv, 0) * 0.88)); transition: transform 0.12s ease-out; }
 .rec-panel.paused .rec-wave i { background: var(--note-muted); transform: scaleY(0.12); }
 .rec-spk { display: inline-block; margin-right: 4px; padding: 0 7px; border-radius: 999px; font-size: 0.8em; font-weight: 700; line-height: 1.6; color: #fff; background: var(--spk, #2f6fdf); }
-.rec-btn { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 38px; min-width: 38px; padding: 0 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font-weight: 700; font-size: 14px; }
+.rec-btn { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: var(--tap); min-width: var(--tap); padding: 0 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font-weight: 700; font-size: 14px; }
 .rec-btn svg { width: 18px; height: 18px; }
 .rec-btn.stop { background: var(--rec); color: var(--on-rec); }
 .rec-btn:active { transform: scale(0.96); }
@@ -706,6 +710,9 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .link-borrow { display: flex; gap: 6px; width: 100%; padding: 0 0 6px 30px; }
 .link-borrow .tag-chip { height: 28px; font-size: 12.5px; }
 .links-panel .link-item { flex-wrap: wrap; }
+/* 연결 패널의 + · ✕ 는 PC(26px) 크기 그대로면 손가락으로 누르기 어렵다 */
+:is(.links-panel .link-item, .rem-item) .icon-btn { width: var(--tap); height: var(--tap); }
+:is(.links-panel .link-item, .rem-item) .icon-btn svg { width: 18px; height: 18px; }
 
 /* ---------- 보내기 (글 · 그림 · PDF) ---------- */
 .share-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 4px 0 8px; }
@@ -1081,3 +1088,11 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 /* 글 고치기: 옮기기 테두리(항목 둘레 점선)는 쉬게 */
 .note-screen[data-touch-mode="edit"] .mk-doc li::after { border-color: transparent !important; }
 @media print { .mode-knob { display: none !important; } }
+
+/* 알림 보관함: 글 부분은 키보드로 갈 수 있는 단추 (모양은 그대로) */
+button.noti-text { display: block; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.noti-meta, .noti-title { display: block; }
+
+/* 스위치는 작게 보이되 손가락으로 누르는 자리는 44px (WCAG 2.5.5 · 안드로이드 48dp 에 가깝게) */
+.switch { position: relative; }
+.switch::before { content: ""; position: absolute; inset: -10px -4px; }

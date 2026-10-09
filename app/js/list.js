@@ -1,4 +1,6 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
+import { daysAgoText } from './core/time.js';
+import { trashedText } from './core/format.js';
 import { injectIcons, icon } from './icons.js';
 import { friendlyTime } from './core/format.js';
 import { vaultUrl } from './media.js';
@@ -12,7 +14,7 @@ import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups } from './dom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -382,7 +384,7 @@ function renderCard(memo) {
   // 목록 맨 위에 고정 (압정)
   const pin = document.createElement('button');
   pin.className = `icon-btn card-pin${memo.pinned ? ' on' : ''}`;
-  pin.title = memo.pinned ? '고정 해제' : '맨 위에 고정';
+  pin.title = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
   pin.setAttribute('aria-label', `${memo.title} ${pin.title}`);
   pin.setAttribute('aria-pressed', String(Boolean(memo.pinned)));
   pin.dataset.pin = memo.id;
@@ -471,10 +473,21 @@ function showUndo({ name, title }) {
     bar.id = 'undo-bar';
     bar.className = 'undo-bar';
     bar.setAttribute('role', 'status');
+    // 읽는 동안(마우스를 올리거나 되돌리기에 포커스) 사라지지 않게
+    const hold = () => clearTimeout(undoTimer);
+    const resume = () => {
+      if (bar.hidden || bar.matches(':hover') || bar.contains(document.activeElement)) return;
+      clearTimeout(undoTimer);
+      undoTimer = setTimeout(() => (bar.hidden = true), 6000);
+    };
+    bar.addEventListener('pointerenter', hold);
+    bar.addEventListener('focusin', hold);
+    bar.addEventListener('pointerleave', resume);
+    bar.addEventListener('focusout', () => setTimeout(resume, 0));
     document.body.append(bar);
   }
   const text = document.createElement('span');
-  text.textContent = '휴지통으로 옮겼어요';
+  text.textContent = trashedText(title);
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = '되돌리기';
@@ -522,7 +535,7 @@ el.fabMenu.addEventListener('click', (e) => {
 el.settingsBtn.addEventListener('click', async () => {
   await loadSettings();
   drivePanel?.refresh();
-  el.settings.showModal();
+  openPanelDialog(el.settings);
 });
 
 // ---------- 설정: 자동 실행 · 알림 보관 ----------
@@ -712,7 +725,7 @@ async function showBlockedCount() {
 }
 $('history-apps-btn').addEventListener('click', async () => {
   await renderApps();
-  $('apps-dialog').showModal();
+  openPanelDialog($('apps-dialog'));
 });
 
 const historyTab = setupHistoryTab({
@@ -732,6 +745,7 @@ function showTab(tab) {
   if (!TAB_PLACEHOLDER[tab]) return;
   activeTab = tab;
   for (const b of document.querySelectorAll('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  syncTabStops(document.querySelector('.tabs'));
   for (const name of Object.keys(TAB_PLACEHOLDER)) $(`view-${name}`).hidden = name !== tab;
   document.body.dataset.tab = tab;
   el.search.placeholder = TAB_PLACEHOLDER[tab];
@@ -744,6 +758,7 @@ function showTab(tab) {
   if (tab === 'history') historyTab.setQuery('');
 }
 for (const b of document.querySelectorAll('.tabs [data-tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
+tabKeys(document.querySelector('.tabs'));
 api.on('list:tab', showTab);
 api.on('reminders:changed', () => remindersTab.refresh());
 api.on('history:changed', () => activeTab === 'history' && historyTab.refresh());
@@ -1078,10 +1093,13 @@ const trashEl = {
   dialog: $('trash-dialog'), list: $('trash-list'), empty: $('trash-empty'), note: $('trash-note'), clear: $('trash-clear'),
 };
 const DAYS_LABEL = { 7: '7일', 30: '30일', 90: '90일', 365: '1년' };
-function agoText(iso) {
-  const d = new Date(iso);
-  const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
-  return days <= 0 ? '오늘' : days === 1 ? '어제' : `${days}일 전`;
+const agoText = (iso) => daysAgoText(iso);
+
+// 설정·휴지통처럼 둘러보는 창: 열 때 창 자체에 포커스 (첫 단추에 굵은 포커스 테두리가 먼저 생기지 않게, Tab 을 누르면 첫 단추부터)
+function openPanelDialog(dialog) {
+  dialog.tabIndex = -1;
+  dialog.showModal();
+  dialog.focus();
 }
 async function renderTrash() {
   const [items, s] = await Promise.all([api.trash.list(), api.settings.get()]);
@@ -1110,7 +1128,7 @@ async function renderTrash() {
     const restore = document.createElement('button');
     restore.className = 'btn trash-restore';
     restore.dataset.restore = t.name;
-    restore.textContent = '복원';
+    restore.textContent = '되살리기';
     const remove = document.createElement('button');
     remove.className = 'icon-btn danger trash-remove';
     remove.dataset.remove = t.name;
@@ -1128,7 +1146,7 @@ async function refreshTrashCount() {
 $('trash-btn').addEventListener('click', async () => {
   el.settings.close();
   await renderTrash();
-  trashEl.dialog.showModal();
+  openPanelDialog(trashEl.dialog);
 });
 $('trash-close').addEventListener('click', () => trashEl.dialog.close());
 trashEl.list.addEventListener('click', async (e) => {
@@ -1170,3 +1188,6 @@ $('count-memos').textContent = String(state.memos.length);
 await remindersTab.refresh();
 showTab(new URLSearchParams(location.search).get('tab') ?? 'memos');
 document.documentElement.dataset.ready = 'true';
+
+// 고르기 칸(role=radiogroup): 칸마다 radio, 화살표로 고르기 (dom.js)
+radioGroups();

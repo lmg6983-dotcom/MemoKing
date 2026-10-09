@@ -10,6 +10,9 @@ import { normalizeTables } from '../../app/js/core/table-sizes.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
+import {
+  VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
+  describeVersions } from '../../app/js/core/versions.js';
 
 export const APP_DIR = '_memoking';
 export const ATTACH_DIR = 'attachments';
@@ -47,6 +50,7 @@ export class Vault extends EventTarget {
     this.index = null;
     this.indexTimer = null;
     this.pollTimer = null;
+    this.latestVersion = new Map(); // 메모 id → 가장 최근 버전 {at, body} (저장할 때마다 폴더를 읽지 않게)
   }
 
   emit(type, detail) {
@@ -306,9 +310,86 @@ export class Vault extends EventTarget {
     entry.body = body;
     entry.meta.updated = toLocalIso();
     if (!entry.file && isBlankBody(body)) return this.summary(entry);
+    if (entry.file) this.keepVersion(id, known);
     this.write(entry, known);
     this.changed([id]);
     return this.summary(entry);
+  }
+
+  // ---------- 버전 기록 (_memoking/versions/<id>/<시각>.md) — 데스크탑과 같은 규칙 ----------
+
+  versionDir(id) {
+    const safe = safeVersionId(id);
+    return safe ? `${VERSIONS_DIR}/${safe}` : null;
+  }
+
+  versionNames(id) {
+    const dir = this.versionDir(id);
+    try {
+      return dir ? fs.list(dir).filter((e) => !e.dir && isVersionName(e.name)).map((e) => e.name) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  keepVersion(id, before, { force = false } = {}) {
+    const dir = this.versionDir(id);
+    if (!dir) return null;
+    const cached = this.latestVersion.get(id);
+    if (!force && cached && Date.now() - cached.at < VERSION_GAP_MS) return null;
+    try {
+      const names = this.versionNames(id);
+      const newest = names.map((name) => ({ name, at: versionTime(name) })).sort((a, b) => b.at - a.at)[0];
+      const latest = newest ? { at: newest.at, body: fs.readText(`${dir}/${newest.name}`) ?? '' } : null;
+      if (latest) this.latestVersion.set(id, latest);
+      if (!shouldKeepVersion(before, latest, { force })) return null;
+      fs.mkdirs(dir);
+      let name = versionName();
+      for (let n = 2; names.includes(name); n++) name = versionName().replace(/\.md$/, `-${n}.md`);
+      fs.writeText(`${dir}/${name}`, before);
+      this.latestVersion.set(id, { at: versionTime(name), body: before });
+      for (const old of versionsToPrune([...names, name])) fs.remove(`${dir}/${old}`);
+      return name;
+    } catch (err) {
+      console.error('버전을 남기지 못했어요', err);
+      return null;
+    }
+  }
+
+  versions(id) {
+    const dir = this.versionDir(id);
+    if (!dir) return [];
+    return describeVersions(this.versionNames(id).map((name) => {
+      try {
+        return { name, at: versionTime(name), body: fs.readText(`${dir}/${name}`) ?? '' };
+      } catch {
+        return { name, at: null };
+      }
+    }));
+  }
+
+  version(id, name) {
+    const dir = this.versionDir(id);
+    if (!dir || !isVersionName(name)) return null;
+    try {
+      return fs.readText(`${dir}/${name}`);
+    } catch {
+      return null;
+    }
+  }
+
+  // 지금 내용도 버전으로 남겨 두고(되돌리기를 되돌릴 수 있게) 고른 버전으로 바꾼다
+  restoreVersion(id, name) {
+    const body = this.version(id, name);
+    const entry = this.entries.get(id);
+    if (body === null || body === undefined || !entry) return null;
+    this.keepVersion(id, entry.body, { force: true });
+    const known = entry.body;
+    entry.body = body;
+    entry.meta.updated = toLocalIso();
+    this.write(entry, known);
+    this.changed([id]);
+    return this.get(id);
   }
 
   // known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것을 넘긴다)
@@ -334,6 +415,7 @@ export class Vault extends EventTarget {
       return;
     }
     if (sameBody(theirs, known) || sameBody(theirs, entry.body) || isBlankBody(theirs)) return;
+    this.keepVersion(entry.id, theirs, { force: true }); // 버전 기록에서도 되찾을 수 있게
     this.import({ body: conflictCopyBody(theirs), color: entry.meta.color });
   }
 

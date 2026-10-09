@@ -127,7 +127,7 @@ async function loadFolders() {
   $('folder-empty').hidden = true;
   const use = $('folder-use');
   use.disabled = here.id === 'root';
-  use.textContent = here.id === 'root' ? '폴더를 선택하세요' : `"${here.name}" 폴더 사용`;
+  use.textContent = here.id === 'root' ? '폴더를 골라 주세요' : `"${here.name}" 폴더 사용`;
   let folders;
   try {
     folders = await call('driveFolders', { parent: here.id });
@@ -237,7 +237,7 @@ export function renderStatus(s = drive.status()) {
       : st.state === 'error' ? st.error
       : [s.email, st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'].filter(Boolean).join(', ');
   } else {
-    $('drive-title').textContent = s.connected ? '폴더를 선택하세요' : '연결 안 됨';
+    $('drive-title').textContent = s.connected ? '폴더를 골라 주세요' : '연결 안 됨';
     $('drive-sub').textContent = s.connected ? s.email : 'PC와 같은 메모를 함께 써요';
   }
   if (s.reconnect && !s.connected) {

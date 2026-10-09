@@ -23,6 +23,13 @@ const ICONS = {
   mic: `<rect x="9" y="3.5" width="6" height="11" rx="3" ${stroke}/><path d="M5.5 11.5a6.5 6.5 0 0013 0M12 18v2.5" ${stroke}/>`,
   photo: `<rect x="3.5" y="5" width="17" height="14" rx="2.5" ${stroke}/><circle cx="9" cy="10" r="1.6" ${stroke}/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4" ${stroke}/>`,
   sigma: `<path d="M18 5H6l6.5 7L6 19h12" ${stroke} stroke-width="2"/>`,
+  // 한 줄 위로 · 아래로 (휴대폰 도구막대 — 끌지 않고 순서 바꾸기)
+  'line-up': `<path d="M12 19V6M6.5 11.5L12 6l5.5 5.5" ${stroke}/><path d="M5 3h14" ${stroke}/>`,
+  'line-down': `<path d="M12 5v13M6.5 12.5L12 18l5.5-5.5" ${stroke}/><path d="M5 21h14" ${stroke}/>`,
+  // 이전 버전: 거꾸로 도는 시계
+  history: `<path d="M3.5 12a8.5 8.5 0 102.5-6" ${stroke}/><path d="M3 4v4h4" ${stroke}/><path d="M12 7.5V12l3 2" ${stroke}/>`,
+  // 단축키 한눈에 보기: 자판
+  keys: `<rect x="2.5" y="6" width="19" height="12" rx="2" ${stroke}/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" ${stroke} stroke-width="2"/>`,
   undo: `<path d="M9 14L4 9l5-5" ${stroke}/><path d="M4 9h10.5a5.5 5.5 0 010 11H11" ${stroke}/>`,
   redo: `<path d="M15 14l5-5-5-5" ${stroke}/><path d="M20 9H9.5a5.5 5.5 0 000 11H13" ${stroke}/>`,
   eraser: `<path d="M8.5 19.5h11" ${stroke}/><path d="M4.6 14.6l9.2-9.2a2 2 0 012.8 0l3 3a2 2 0 010 2.8l-7.8 7.8a2 2 0 01-1.4.5H8.3a2 2 0 01-1.4-.6l-2.3-2.3a1.4 1.4 0 010-2z" ${stroke}/><path d="M9.5 9.7l4.8 4.8" ${stroke}/>`,
@@ -57,7 +64,7 @@ const ICONS = {
   block: `<circle cx="12" cy="12" r="8.5" ${stroke}/><path d="M6 6l12 12" ${stroke}/>`,
   cloud: `<path d="M7 18.5h10.5a4 4 0 00.6-7.95A6 6 0 006.6 9.1 4.75 4.75 0 007 18.5z" ${stroke}/>`,
   folder: `<path d="M3.5 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2h-13a2 2 0 01-2-2V7z" ${stroke}/>`,
-  // 다른 창보다 늘 위에 두기: 창 + 위 화살표 (압정은 "목록 맨 위에 고정" 에만 쓴다)
+  // (예전) 다른 창보다 늘 위에 두기: 창 + 위 화살표 — 지금은 왕관. 압정은 "목록 맨 위에 고정" 에만, "고정" 이라는 말도 그쪽에만 쓴다
   ontop: `<rect x="3.5" y="4.5" width="17" height="15" rx="2" ${stroke}/><path d="M3.5 8.5h17" ${stroke}/><path d="M12 17v-5.5M9.2 14l2.8-2.8 2.8 2.8" ${stroke} stroke-width="2"/>`,
   // (예전) 기울어진 압정
   pushpin: `<g transform="rotate(40 12 12)"><path d="M9 3h6l-1 6 3 3v2h-4v6l-1 1.5-1-1.5v-6H7v-2l3-3-1-6z" ${stroke}/></g>`,

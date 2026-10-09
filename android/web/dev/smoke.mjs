@@ -171,6 +171,24 @@ try {
   check('메뉴: 색 바꾸기', /color: green/.test(read('회의 메모.md')));
   await back();
 
+  // 이전 버전: 고치기 전 내용으로 되돌리고, 다시 되돌려 방금 내용으로
+  await page.tap('#menu-btn');
+  await page.tap('[data-memo-action="versions"]');
+  await page.waitForTimeout(300);
+  const versionCount = await page.locator('#versions-list .version-item').count();
+  check('메뉴 › 이전 버전: 고치기 전 내용이 보임', versionCount > 0, String(versionCount));
+  if (versionCount) {
+    await page.tap('#versions-list .version-restore');
+    await page.waitForTimeout(400);
+    const docText = () => page.locator('.mk-doc').innerText();
+    check('되돌리기 → 파일과 화면이 그 버전으로', !read('회의 메모.md').includes('휴대폰에서 추가') && !(await docText()).includes('휴대폰에서 추가'));
+    await shot('05b-versions');
+    await page.tap('#versions-list .version-restore'); // 맨 위 = 되돌리기 직전 내용
+    await page.waitForTimeout(400);
+    check('되돌리기를 되돌림 → 방금 내용 그대로', read('회의 메모.md').includes('휴대폰에서 추가') && (await docText()).includes('휴대폰에서 추가'));
+  }
+  await back();
+
   // 알림 추가
   await page.tap('#bell-btn');
   await page.tap('.rem-submit');
@@ -484,13 +502,13 @@ try {
   await page.waitForTimeout(300);
   check('설정: 받아쓰기는 Google 음성 인식 하나 (방식 고르기·데이터 받기 없음)', (await page.locator('#stt-engine, #stt-model-row').count()) === 0 && (await page.textContent('#rec-stt-note')).includes('Google'));
   await shot('17-settings-stt');
-  check('설정: 화자 구분 줄 (처음엔 다운로드)', await page.isVisible('#spk-row') && (await page.textContent('#spk-btn')) === '다운로드' && (await page.textContent('#spk-note')).includes('화자 1·2'));
+  check('설정: 말한 사람 나누기 줄 (처음엔 받기)', await page.isVisible('#spk-row') && (await page.textContent('#spk-btn')) === '받기' && (await page.textContent('#spk-note')).includes('화자 1:'));
   await page.tap('#spk-btn');
   await page.waitForTimeout(300);
-  check('설정: 화자 구분 받으면 켜짐 → 끄기 단추', (await page.textContent('#spk-btn')) === '끄기' && (await page.textContent('#spk-note')).includes('사용 중'));
+  check('설정: 말한 사람 나누기 받으면 켜짐 → 끄기 단추', (await page.textContent('#spk-btn')) === '끄기' && (await page.textContent('#spk-note')).includes('켜져 있어요'));
   await page.tap('#spk-btn');
   await page.waitForTimeout(300);
-  check('설정: 화자 구분 끄기 → 켜기 단추', (await page.textContent('#spk-btn')) === '켜기');
+  check('설정: 말한 사람 나누기 끄기 → 켜기 단추', (await page.textContent('#spk-btn')) === '켜기');
   await page.tap('#trash-btn');
   await page.waitForTimeout(200);
   await shot('04-trash');
@@ -601,6 +619,14 @@ try {
   await page.click('#format-bar [data-cmd="task"]');
   await page.waitForTimeout(900);
   check('목록: 체크리스트로도 통째로', /- \[ \] 사과\n- \[ \] 배\n- \[ \] 감/.test(read(f)), read(f));
+  // 끌지 않고 순서 바꾸기: 도구막대의 한 줄 위로 · 아래로 (커서는 "감")
+  check('한 줄 아래로: 마지막 항목이면 흐리게', await page.isDisabled('#format-bar [data-cmd="moveDown"]'));
+  await page.click('#format-bar [data-cmd="moveUp"]');
+  await page.waitForTimeout(900);
+  check('한 줄 위로 → 항목 하나가 위로', /- \[ \] 사과\n- \[ \] 감\n- \[ \] 배/.test(read(f)), read(f));
+  await page.click('#format-bar [data-cmd="moveDown"]');
+  await page.waitForTimeout(900);
+  check('한 줄 아래로 → 제자리', /- \[ \] 사과\n- \[ \] 배\n- \[ \] 감/.test(read(f)), read(f));
   // 오른쪽으로 밀면 하위 항목
   const third = await page.locator('.mk-doc li').nth(2).boundingBox();
   await touch('touchStart', third.x + 30, third.y + third.height / 2);
@@ -703,6 +729,14 @@ try {
   await page.waitForTimeout(1200);
   for (const lv of [0.2, 0.9, 0.6, 0.8, 0.3, 0.7, 0.5]) await page.evaluate((level) => window.__mk.emit('record', { type: 'level', level }), lv);
   check('녹음: 소리 크기 막대가 움직임', (await page.evaluate(() => getComputedStyle(document.querySelector('#rec-wave i:last-child')).getPropertyValue('--lv'))).trim() === '0.50');
+  const overlap = await page.evaluate(() => {
+    const stop = document.getElementById('rec-stop').getBoundingClientRect();
+    return [...document.querySelectorAll('.mk-dial, #add-btn')].some((f) => {
+      const r = f.getBoundingClientRect();
+      return r.width && r.left < stop.right && r.right > stop.left && r.top < stop.bottom && r.bottom > stop.top;
+    });
+  });
+  check('녹음: 다이얼 · + 단추가 끝내기 단추를 가리지 않음', !overlap);
   await shot('11-recording');
   await page.tap('#rec-stop');
   await page.waitForTimeout(1200);

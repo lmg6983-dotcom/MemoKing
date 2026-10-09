@@ -10,7 +10,8 @@ import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog, isTwoPane } from './ui.js';
 import { tutEvent } from './tutorial.js';
-import { haptic, reduceMotion } from '../../app/js/dom.js';
+import { haptic, reduceMotion, tabKeys, syncTabStops } from '../../app/js/dom.js';
+import { hintOnce } from '../../app/js/hints.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -195,6 +196,14 @@ export function render() {
   if (!memos.length) renderEmpty(narrowed);
   $('count-memos').textContent = state.memos.length ? String(state.memos.length) : '';
   renderFilters();
+  if (memos.length >= 2) setTimeout(hintCards, 800);
+}
+
+// 카드가 두 개 이상 보일 때 한 번: 옆으로 밀기·꾹 누르기 (눈에 안 보이는 동작)
+function hintCards() {
+  const card = document.querySelector('.item .card');
+  if (!card?.getClientRects().length) return; // 목록이 안 보이면 다음에
+  hintOnce('card-gestures', '카드를 옆으로 밀면 휴지통으로 가요(되돌리기 있어요). 꾹 누르면 색, 고정, 보내기 메뉴가 떠요', { anchor: card });
 }
 
 // ---------- 필터 ----------
@@ -306,6 +315,7 @@ el.search.addEventListener('keydown', (e) => {
 function setTab(tab) {
   state.tab = tab;
   for (const b of document.querySelectorAll('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  syncTabStops(document.querySelector('.tabs'));
   $('view-memos').hidden = tab !== 'memos';
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
@@ -315,6 +325,7 @@ function setTab(tab) {
   if (tab === 'reminders') remindersTab.refresh();
   runSearch();
 }
+tabKeys(document.querySelector('.tabs'));
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');
   if (b) setTab(b.dataset.tab);

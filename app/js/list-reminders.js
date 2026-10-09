@@ -40,15 +40,17 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
     title.textContent = item.title;
     const sub = document.createElement('span');
     sub.className = 'row-sub';
-    sub.append(icon(KIND_ICON[r.kind]));
     // 굵게: 다음 알림 시각(또는 완료·꺼짐) · 보통: 설정 설명 · 알림 방식
+    // 글은 한 덩어리(span)로 — 칸 사이 간격(gap)이 쉼표 앞에 빈칸을 만들지 않게, 길면 잘리지 않고 다음 줄로
+    const words = document.createElement('span');
     const when = isDone(r) ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : nextLabel(r);
     if (when) {
       const b = document.createElement('b');
       b.textContent = when;
-      sub.append(b, ', ');
+      words.append(b, ', ');
     }
-    sub.append(`${describeReminder(r)}, ${r.action === 'open' ? '메모 띄우기' : '알림만 보내기'}`);
+    words.append(`${describeReminder(r)}, ${r.action === 'open' ? '메모 띄우기' : '알림만 보내기'}`);
+    sub.append(icon(KIND_ICON[r.kind]), words);
     text.append(title, sub);
     main.append(dot, text);
     main.addEventListener('click', () => api.memo.open(item.memoId));
@@ -57,7 +59,7 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
     toggle.type = 'checkbox';
     toggle.className = 'switch';
     toggle.checked = r.enabled;
-    toggle.setAttribute('aria-label', `${item.title} 알림 ${r.enabled ? '끄기' : '켜기'}`);
+    toggle.setAttribute('aria-label', `${item.title} 알림`); // 켜짐·꺼짐은 스위치가 스스로 읽어 준다
     toggle.addEventListener('change', () => update(item, (list) => list.map((x) => (x.id === r.id
       ? { ...x, enabled: toggle.checked, last: toggle.checked && isDone(x) ? null : x.last }
       : x))));

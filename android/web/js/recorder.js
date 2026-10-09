@@ -91,7 +91,7 @@ function render() {
   if (!text && !status.partial) {
     const span = document.createElement('span');
     span.className = 'rec-hint';
-    span.textContent = status.stt ? '말하면 여기에 텍스트로 나타나요' : '녹음만 하고 있어요';
+    span.textContent = status.stt ? '말하면 여기에 글로 나타나요' : '녹음만 하고 있어요';
     el.text.append(span);
   }
   el.text.scrollTop = el.text.scrollHeight;

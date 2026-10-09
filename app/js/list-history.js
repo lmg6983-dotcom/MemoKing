@@ -77,15 +77,18 @@ export function setupHistoryTab({ api, els, confirm }) {
     div.className = `row noti${e.source === 'memoking' ? ' self' : ''}`;
     div.dataset.id = e.id;
 
-    const text = document.createElement('div');
+    // 글 부분은 단추: Tab 으로 가서 Enter·Space 로 펼치거나(메모킹 알림은) 그 메모 열기. 누르면 줄의 click 으로 이어진다
+    const text = document.createElement('button');
+    text.type = 'button';
     text.className = 'noti-text';
-    const meta = document.createElement('div');
+    if (!e.memoId) text.setAttribute('aria-expanded', 'false');
+    const meta = document.createElement('span');
     meta.className = 'noti-meta';
     meta.textContent = `${e.app}, ${hhmm(d)}`;
-    const title = document.createElement('div');
+    const title = document.createElement('span');
     title.className = 'noti-title';
     title.textContent = e.title;
-    const body = document.createElement('div');
+    const body = document.createElement('span');
     body.className = 'noti-body';
     body.textContent = e.body;
     text.append(meta, title);
@@ -127,8 +130,12 @@ export function setupHistoryTab({ api, els, confirm }) {
       else {
         // 펼친 알림은 하나만: 다른 알림을 누르면 앞의 것은 접는다
         const open = !div.classList.contains('expanded');
-        for (const other of els.rows.querySelectorAll('.noti.expanded')) other.classList.remove('expanded');
+        for (const other of els.rows.querySelectorAll('.noti.expanded')) {
+          other.classList.remove('expanded');
+          other.querySelector('.noti-text')?.setAttribute('aria-expanded', 'false');
+        }
         div.classList.toggle('expanded', open);
+        text.setAttribute('aria-expanded', String(open));
       }
     });
     return div;

@@ -434,6 +434,46 @@ export async function runSmoke({
     check('다시 열어도 항상 위 유지 (창·버튼 모두)', t2.win.isAlwaysOnTop() && (await pressed(t2.win)) === 'true');
     await closeNote(t2.id);
 
+    // 10-1) 압정·"고정" 은 목록 맨 위에 고정에만 · 이전 버전 · 단축키 보기 (v0.27)
+    const v1 = await openN1();
+    check('메뉴: "목록 맨 위에 고정" (늘 위에 두기와 다른 이름)', /목록 (맨 위에 고정|고정 풀기)/.test(await js(v1.win, `document.querySelector('#pin-toggle span').textContent`)));
+    await js(v1.win, `document.getElementById('versions-btn').click()`);
+    const versionCount = () => js(v1.win, `document.querySelectorAll('#versions-list .version-item').length`);
+    const hasVersions = await until(async () => !(await js(v1.win, `document.getElementById('versions-panel').hidden`)) && (await versionCount()) > 0, '이전 버전 패널').catch(() => false);
+    check('메뉴 › 이전 버전 → 고치기 전 내용이 버전으로 보임', hasVersions);
+    if (hasVersions) {
+      const before = readMemo(v1.id);
+      const n = await versionCount();
+      await js(v1.win, `document.querySelector('#versions-list .version-restore').click()`);
+      const restored = await until(async () => readMemo(v1.id) !== before && (await versionCount()) > n, '되돌리기').catch(() => false);
+      check('되돌리기 → 파일이 그 버전으로 · 방금 내용도 버전에 남음', restored);
+      await capture(v1.win, 'smoke-versions.png');
+    }
+    await key(v1.win, 'Escape');
+    await key(v1.win, '/', ['control']);
+    const sheetOpen = await until(() => js(v1.win, `Boolean(document.querySelector('dialog.shortcut-sheet')?.open)`), '단축키 보기').catch(() => false);
+    check('Ctrl+/ → 단축키 한눈에 보기', sheetOpen);
+    if (sheetOpen) await capture(v1.win, 'smoke-shortcuts.png');
+    await js(v1.win, `document.querySelector('dialog.shortcut-sheet')?.close()`);
+    check('메뉴: 다른 메모 창과 합치기 (끌지 않고 스택으로)', await js(v1.win, `Boolean(document.getElementById('join-btn'))`));
+    // 키보드로 메뉴: Enter 로 열면 첫 항목에, ↓ 로 다음, Esc 로 닫으면 ⋯ 단추로 돌아옴
+    const press = async (win, keyCode, char) => {
+      win.webContents.sendInputEvent({ type: 'keyDown', keyCode });
+      if (char) win.webContents.sendInputEvent({ type: 'char', keyCode: char });
+      win.webContents.sendInputEvent({ type: 'keyUp', keyCode });
+      await wait(150);
+    };
+    await js(v1.win, `document.getElementById('menu-btn').focus()`);
+    await press(v1.win, 'Enter', '\r');
+    const firstFocused = await js(v1.win, `document.activeElement?.id === 'pin-toggle' && document.getElementById('menu-btn').getAttribute('aria-expanded') === 'true'`);
+    await press(v1.win, 'Down');
+    const secondFocused = await js(v1.win, `document.activeElement?.id === 'show-list'`);
+    await press(v1.win, 'Escape');
+    const backToBtn = await js(v1.win, `document.getElementById('menu').hidden && document.activeElement?.id === 'menu-btn'`);
+    check('메뉴: 키보드로 열기(첫 항목) · ↓ 다음 · Esc 닫고 ⋯ 로', firstFocused && secondFocused && backToBtn, JSON.stringify([firstFocused, secondFocused, backToBtn]));
+    check('알림 종류 칸: 칸마다 radio (화면 읽기에 "4개 중 1번째, 선택됨")', await js(v1.win, `document.querySelectorAll('#rem-kind [role="radio"]').length === 4 && document.querySelectorAll('#rem-kind [tabindex="0"]').length === 1`));
+    await closeNote(v1.id);
+
     // 11) 목록 카드를 끌어 화면에 놓기 (v0.4.0)
     //     실제 마우스 대신 화면 좌표가 담긴 포인터 이벤트를 카드에 보낸다.
     const lb = list.getBounds();
@@ -1127,6 +1167,14 @@ export async function runSmoke({
     await until(async () => (await titlesNow()).length === 1, '보관함 검색 반영').catch(() => {});
     const searched = await titlesNow();
     check('보관함 검색', JSON.stringify(searched) === JSON.stringify(['김대리']), JSON.stringify(searched));
+    // 키보드로: 알림 글 부분은 단추 (Enter 로 펼치기), 탭은 ←→ 로 옮겨 다님
+    await listJs(`document.querySelector('#history-rows .noti .noti-text').focus()`);
+    // 단추는 Enter 의 글자(char) 이벤트로 눌린다 — key() 는 keyDown·keyUp 만 보내므로 char 를 더한다
+    getList().webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
+    getList().webContents.sendInputEvent({ type: 'char', keyCode: '\r' });
+    getList().webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
+    await wait(150);
+    check('보관함: 키보드(Enter)로 알림 펼치기', await listJs(`(() => { const b = document.querySelector('#history-rows .noti .noti-text'); return b.getAttribute('aria-expanded') === 'true' && b.closest('.noti').classList.contains('expanded'); })()`));
     const memoFromNoti = await newNote(() => listJs(`document.querySelector('#history-rows .noti [aria-label="메모로 만들기"]').click()`));
     const notiMd = readMemo(memoFromNoti.id);
     check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림, /.test(notiMd));
@@ -1134,6 +1182,11 @@ export async function runSmoke({
     await listJs(`document.querySelector('#history-rows .noti [aria-label="삭제"]').click()`);
     await wait(300);
     check('보관한 알림 지우기', history.list({ query: '회의' }).length === 0);
+    await listJs(`document.querySelector('.tabs [aria-selected="true"]').focus()`);
+    await key(getList(), 'Left');
+    const tabAfter = await listJs(`document.querySelector('.tabs [aria-selected="true"]').dataset.tab`);
+    await key(getList(), 'Right');
+    check('탭: ← → 로 옆 탭', tabAfter === 'reminders' && (await listJs(`document.querySelector('.tabs [aria-selected="true"]').dataset.tab`)) === 'history', tabAfter);
     await listJs(`(() => { const s = document.getElementById('search'); s.value = ''; s.dispatchEvent(new Event('input')); })()`);
 
     // 16) 설정: 자동 실행 (개발 실행에서는 끄기 상태로 안내, 설치판은 켜기 가능)

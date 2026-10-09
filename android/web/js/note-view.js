@@ -123,6 +123,12 @@ function applyExternal(next) {
   setStatus('바뀐 내용을 불러왔어요');
 }
 
+/** 이전 버전으로 되돌린 내용을 지금 화면에 */
+export function showRestored(next) {
+  applyExternal(next);
+  setStatus('되돌렸어요');
+}
+
 /** 메모 폴더가 바뀌었을 때 (vault 'changed') */
 export function onVaultChanged({ ids, external, removed }) {
   if (!id || !editor) return;
@@ -839,6 +845,8 @@ function showActive(active) {
   el.undoBtn.disabled = !active.canUndo;
   el.redoBtn.disabled = !active.canRedo;
   for (const btn of el.formatBar.querySelectorAll('[data-cmd]')) btn.classList.toggle('active', Boolean(active[btn.dataset.cmd]));
+  el.formatBar.querySelector('[data-cmd="moveUp"]').disabled = !active.canMoveUp;
+  el.formatBar.querySelector('[data-cmd="moveDown"]').disabled = !active.canMoveDown;
   for (const kind of ['color', 'highlight']) {
     for (const btn of el.formatBar.querySelectorAll(`[data-action="${kind}"]`)) btn.classList.toggle('active', Boolean(active[kind]));
   }
@@ -1099,6 +1107,9 @@ function setupKnob() {
   };
   const ro = new ResizeObserver(() => placeKnob());
   for (const e of [el.screen, ...extras]) ro.observe(e);
+  // 녹음 판 · 추천 태그 줄은 아래에서 미끄러져 올라온다 — 크기가 바뀐 순간(움직이기 전)에 재면 아직 아래에 있어
+  //   다이얼이 "끝내기" 단추를 가리므로, 다 올라온 뒤 한 번 더 잰다
+  for (const e of extras) e.addEventListener('animationend', () => placeKnob());
 }
 
 // ---------- 위쪽 버튼 ----------

@@ -147,7 +147,7 @@ svg { width: 20px; height: 20px; flex: none; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-::placeholder { color: var(--text-faint); }
+::placeholder { color: var(--muted); } /* 흐린 색(--text-faint)은 대비 3:1 정도라 글자에는 쓰지 않는다 — 4.5:1 이상 */
 
 .icon-btn {
   display: inline-grid;
@@ -199,6 +199,7 @@ svg { width: 20px; height: 20px; flex: none; }
   color: var(--text);
   box-shadow: var(--shadow-pop);
 }
+.dialog:focus { outline: none; } /* 창 자체(열 때 포커스)에는 테두리 없음 — 안의 단추는 그대로 */
 .dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
 .dialog h2 { margin: 0 0 12px; font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
 .dialog p { margin: 0 0 16px; line-height: 1.6; white-space: pre-line; }
@@ -440,3 +441,54 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   cursor: pointer;
 }
 @media (hover: hover) and (pointer: fine) { .zoom-badge button:hover { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; } }
+
+/* ---------- 한 번만 뜨는 힌트 (hints.js) ---------- */
+.hint-bubble {
+  position: fixed;
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 10px 10px 10px 14px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--text-strong);
+  color: var(--bg);
+  box-shadow: var(--shadow-pop);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  animation: coach-in 0.15s ease-out;
+}
+.hint-bubble.bottom { left: 8px; right: 8px; bottom: 64px; width: fit-content; margin: 0 auto; }
+.hint-bubble.leaving { opacity: 0; transition: opacity 0.15s ease-out; }
+.hint-bubble p { margin: 0; }
+.hint-ok {
+  flex: none;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--brand-yellow);
+  color: #111;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- 단축키 한눈에 보기 (shortcut-sheet.js) ---------- */
+.shortcut-sheet:focus { outline: none; }
+.shortcut-sheet { width: min(520px, calc(100vw - 24px)); max-height: calc(100vh - 48px); overflow-y: auto; }
+.shortcut-sheet header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.shortcut-sheet h3 { margin: 0; font-size: 16px; }
+.shortcut-sheet h4 { margin: 14px 0 6px; font-size: 12px; color: var(--muted); }
+.shortcut-sheet dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; margin: 0; font-size: 13px; }
+.shortcut-sheet dt { color: var(--text); }
+.shortcut-sheet dd { margin: 0; text-align: right; white-space: nowrap; }
+.shortcut-sheet kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  font-family: inherit;
+  font-size: 12px;
+}

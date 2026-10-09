@@ -270,7 +270,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
   border-radius: 4px;
   background: var(--note-hover);
   color: var(--note-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 16px;
 }
@@ -444,6 +444,16 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .link-item .icon-btn { width: 26px; height: 26px; }
 .link-item .icon-btn svg { width: 15px; height: 15px; }
 .link-score { font-size: 12px; color: var(--muted); }
+
+/* ---------- 이전 버전 (links-panel 모양을 같이 씀) ---------- */
+.versions-hint { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.versions-list:empty::after { content: "아직 남겨 둔 버전이 없어요. 고치기 시작하면 10분마다 남아요"; }
+.version-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border); }
+.version-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.version-text b { font-size: 13px; color: var(--text-strong); }
+.version-title, .version-preview { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+.version-preview { color: var(--muted); }
+.version-restore { flex: none; height: 28px; padding: 0 10px; font-size: 12px; }
 
 /* ---------- 서식 도구막대 ---------- */
 /* 창 폭에 안 들어가는 버튼은 note.js 가 » 더보기 패널로 옮긴다 (스크롤로 숨기지 않음) */

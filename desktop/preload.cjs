@@ -41,6 +41,9 @@ contextBridge.exposeInMainWorld('memoking', {
     remove: invoke('memo:remove'),
     links: invoke('memo:links'),
     link: invoke('memo:link'),
+    versions: invoke('memo:versions'),
+    version: invoke('memo:version'),
+    restoreVersion: invoke('memo:restore-version'),
   },
   // 예약 알림
   reminders: {
@@ -151,6 +154,7 @@ contextBridge.exposeInMainWorld('memoking', {
     tearMove: (x, y) => ipcRenderer.send('stack:tear-move', { x, y }),
     tearEnd: (x, y) => ipcRenderer.invoke('stack:tear-end', x == null ? null : { x, y }),
     cycle: invoke('stack:cycle'),
+    joinMenu: invoke('stack:join-menu'),
     menu: invoke('stack:menu'),
   },
   win: {
