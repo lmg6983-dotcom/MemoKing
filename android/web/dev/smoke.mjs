@@ -480,6 +480,7 @@ try {
   await page.tap('.mode-knob .mk-dial'); // 글 고치기 → 옮기기 (누르면 다음 방식)
   await page.waitForTimeout(300);
   const nextMove = await page.getAttribute('.mode-knob', 'data-mode');
+  check('다이얼: 한 번 본 방식의 안내는 다시 뜨지 않음 (메모를 가리지 않게)', nextMove === 'move' && await page.isHidden('#mode-guide'));
   await pickMode(page, 'draw'); // 둘레 칸 = 그 방식으로 바로
   await page.waitForTimeout(400);
   const drawOn = await page.evaluate(() => ({ on: document.body.classList.contains('annotating'), done: document.querySelectorAll('.mk-annot-bar .ink-done').length }));
