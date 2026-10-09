@@ -26,7 +26,7 @@ import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { plainTextOf } from './clipboard-text.js';
-import { findTags, unescapeTags, suggestTags, TAG_CHAR } from './core/tags.js';
+import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt } from './table-extras.js';
 import { createListDrag, moveItemBy, currentItem } from './list-drag.js';
 import { createBlockMove, createContentLines, MEDIA_SCRUB, moveBlockBy } from './block-move.js';
@@ -533,14 +533,16 @@ const tagCapsule = $prose(() => new Plugin({
 }));
 
 // # 자동완성: 커서 바로 앞이 "#글자" 이면 지금까지 쓴 태그를 권한다.
-// ↑↓ 고르기, Enter·Tab 넣기, Esc 닫기. 한글 입력 중(조합 중)에는 Enter 를 가로채지 않는다.
+// 맨 위는 늘 지금 쓴 그대로(#회 → "#회"), 처음엔 그것이 골라져 있다 — Enter 는 쓴 그대로 두고 줄을 바꾸고(목록은 닫힘),
+//   ↑↓ 로 다른 태그를 골랐을 때만 Enter·Tab 이 그 태그로 바꾼다 (모르는 사이 다른 태그로 바뀌지 않게). Esc 닫기.
+//   # 만 쳤을 때도 처음엔 아무것도 골라져 있지 않다. 한글 입력 중(조합 중)에는 Enter 를 가로채지 않는다.
 const TAG_BEFORE_CURSOR = new RegExp(`(^|[\\s(\\[{,;:!?'"“‘>])#(${TAG_CHAR}*)$`, 'u');
 
 function createTagSuggest(getTags) {
   let tags = null; // # 를 새로 칠 때마다 받아 온다 (다른 메모에서 새 태그가 생겼을 수 있음)
   let fetchedFor = null;
   let loading = null;
-  let active = null; // { from, to, prefix, items, index }
+  let active = null; // { from, to, prefix, items, index, typed } — index -1 = 쓴 그대로, typed = 맨 위 "쓴 그대로" 줄
   let dismissedAt = null; // Esc 로 닫은 # 의 위치 (커서가 떠날 때까지 다시 열지 않음)
   let view = null;
 
@@ -564,8 +566,21 @@ function createTagSuggest(getTags) {
     box.replaceChildren();
     const head = document.createElement('div');
     head.className = 'tag-suggest-head';
-    head.textContent = active.prefix ? `"${active.prefix}" 로 시작하는 태그` : '지금까지 쓴 태그';
+    head.textContent = active.prefix ? 'Enter 는 쓴 그대로, ↓ 로 고르기' : '지금까지 쓴 태그 (↓ 로 고르기)';
     box.append(head);
+    if (active.typed) {
+      const row = document.createElement('div');
+      row.className = 'tag-suggest-item typed';
+      row.dataset.index = '-1';
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(active.index === -1));
+      const name = document.createElement('span');
+      name.textContent = `#${active.prefix}`;
+      const note = document.createElement('small');
+      note.textContent = active.typed.count ? `${active.typed.count}` : '새 태그';
+      row.append(name, note);
+      box.append(row);
+    }
     active.items.forEach((t, i) => {
       const row = document.createElement('div');
       row.className = 'tag-suggest-item';
@@ -591,7 +606,7 @@ function createTagSuggest(getTags) {
   }
 
   function choose(index) {
-    const t = active?.items[index];
+    const t = index === -1 ? (active?.typed && { name: active.prefix }) : active?.items[index];
     if (!t || !view) return;
     const { from, to } = active;
     hide();
@@ -638,21 +653,30 @@ function createTagSuggest(getTags) {
       return;
     }
     const items = suggestTags(tags, prefix);
-    if (!items.length) return hide();
-    const index = active && active.from === from ? Math.min(active.index, items.length - 1) : 0;
-    active = { from, to: $from.pos, prefix, items, index };
+    // 맨 위 "쓴 그대로" 줄 (이미 있는 태그와 같으면 그 개수를 함께)
+    const typedRow = prefix ? { count: tags.find((t) => sameTag(t.name, prefix))?.count ?? 0 } : null;
+    if (!items.length) return hide(); // 권할 다른 태그가 없으면 목록도 없다 — 쓴 그대로
+    const index = active && active.from === from ? Math.min(active.index, items.length - 1) : -1;
+    active = { from, to: $from.pos, prefix, items, index, typed: typedRow };
     render();
   }
 
   function handleKeyDown(v, event) {
     if (!active || box.hidden || event.isComposing || event.keyCode === 229) return false;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      const n = active.items.length;
-      active.index = (active.index + (event.key === 'ArrowDown' ? 1 : n - 1)) % n;
+      // -1(쓴 그대로) → 0 → … → 마지막 → -1 로 돈다
+      const n = active.items.length + 1;
+      active.index = ((active.index + 1 + (event.key === 'ArrowDown' ? 1 : n - 1)) % n) - 1;
       render();
       return true;
     }
     if (event.key === 'Enter' || event.key === 'Tab') {
+      if (active.index === -1) {
+        // 쓴 그대로: 목록만 닫고 Enter 는 원래대로(줄 바꿈), Tab 은 아무것도 바꾸지 않는다
+        dismissedAt = active.from;
+        hide();
+        return event.key === 'Tab';
+      }
       choose(active.index);
       return true;
     }

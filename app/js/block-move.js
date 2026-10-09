@@ -265,6 +265,11 @@ export function createBlockMove({ readOnly = false } = {}) {
           return false; // 그냥 누르면 고르기, 밀면 스크롤
         },
         dragstart(_view, event) {
+          // 휴대폰 글 고치기: 그림·글을 브라우저 끌어 놓기로 옮기지 않는다 (옮기기는 다이얼의 옮기기 방식에서만)
+          if (touchMode() === 'edit') {
+            event.preventDefault();
+            return true;
+          }
           if (!mover?.busy()) return false;
           event.preventDefault(); // 브라우저 그림 끌어 놓기 대신 줄 옮기기
           return true;
@@ -734,10 +739,19 @@ function pictureAtCursor(selection) {
   return images.find(({ pos, child }) => $from.pos <= pos + child.nodeSize) ?? images.at(-1);
 }
 
+// pos(줄 경계) 다음의 첫 글 줄에 커서 — 없으면 거기에 빈 줄을 만들어 (그림 옆에 글자가 붙지 않게)
+function caretBelow(tr, pos) {
+  const next = TextSelection.findFrom(tr.doc.resolve(pos), 1, true); // (Selection 의 정적 함수 — 번들은 TextSelection 만 내보냄)
+  if (next) return tr.setSelection(next);
+  tr.insert(pos, tr.doc.type.schema.nodes.paragraph.create());
+  return tr.setSelection(TextSelection.create(tr.doc, pos + 1));
+}
+
 function writeBelowPicture(view, text) {
   if (!view.editable) return false;
   const sel = view.state.selection;
-  if (!(sel instanceof NodeSelection) || sel.node.type.name !== 'image') return false;
+  const onPicture = sel instanceof NodeSelection ? sel.node.type.name === 'image' : Boolean(pictureAtCursor(sel)); // 글 고치기: 그림 줄의 커서
+  if (!onPicture) return false;
   const $p = view.state.doc.resolve(sel.from);
   if (!imageOnly($p.parent) || $p.depth < 1) return false;
   const after = $p.after();
@@ -754,9 +768,29 @@ export function createContentLines() {
     appendTransaction(trs, _old, state) {
       if (!trs.some((tr) => tr.selectionSet)) return null;
       const pic = pictureAtCursor(state.selection);
-      return pic ? state.tr.setSelection(NodeSelection.create(state.doc, pic.pos)) : null;
+      if (!pic) return null;
+      // 휴대폰 글 고치기: 그림을 고르지 않는다 (그림은 옮기기 방식에서만 다룬다). 커서는 그 자리에 두고 — 커서가 움직일 때마다
+      //   문서를 고치면 안드로이드의 Enter 처리와 엇갈린다 — 그 줄에서 쓰기 시작하면 writeBelowPicture 가 아래 새 줄로 보낸다
+      if (touchMode() === 'edit') return null;
+      return state.tr.setSelection(NodeSelection.create(state.doc, pic.pos));
     },
     props: {
+      // 휴대폰 글 고치기: 그림·링크 카드·파일·수식 같은 내용을 눌러도 골라지지(테두리) 않는다.
+      //   눌러서 여는 동작(파일 열기·수식 고치기 등)은 각자의 click 으로 그대로 된다
+      //   그림·카드처럼 줄을 차지하는 것은 누르면 커서를 그 아래 글 줄로 (바로 이어 쓸 수 있게)
+      //   손 메모는 고르는 대신 바로 이어 그리기 (휴대폰은 고른 뒤 단추를 누르던 것을 한 번에)
+      handleClickOn(view, _pos, node, nodePos, event, direct) {
+        if (!direct || touchMode() !== 'edit' || !node.isAtom || node.isText) return false;
+        const ink = event.target instanceof Element ? event.target.closest('.mk-ink') : null;
+        if (ink) {
+          ink.querySelector('.mk-ink-edit')?.click();
+          return true;
+        }
+        const $n = view.state.doc.resolve(nodePos);
+        const line = node.isBlock ? nodePos + node.nodeSize : imageOnly($n.parent) ? $n.after() : null;
+        if (line != null) view.dispatch(caretBelow(view.state.tr, line).scrollIntoView());
+        return true;
+      },
       // 그림을 고른 채 Enter · 글자를 치면 그림을 바꿔치지 않고 그림 줄 아래 새 줄에서 쓴다
       handleKeyDown(view, e) {
         if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.ctrlKey || e.metaKey) return false;

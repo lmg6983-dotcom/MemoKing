@@ -1096,3 +1096,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 스위치는 작게 보이되 손가락으로 누르는 자리는 44px (WCAG 2.5.5 · 안드로이드 48dp 에 가깝게) */
 .switch { position: relative; }
 .switch::before { content: ""; position: absolute; inset: -10px -4px; }
+
+/* 글 고치기: 그림·영상·카드를 끌거나 골라지지 않게 (옮기기는 다이얼의 옮기기 방식에서만) */
+.note-screen[data-touch-mode="edit"] .mk-doc :is(img, .mk-media, .mk-link-card, .mk-file) { -webkit-user-drag: none; }
+.note-screen[data-touch-mode="edit"] .mk-doc .ProseMirror-selectednode { outline: none; }

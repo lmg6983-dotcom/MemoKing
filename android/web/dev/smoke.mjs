@@ -970,6 +970,7 @@ try {
   await page.waitForTimeout(300);
   check('다듬기: 갈라진 같은 목록은 한 목록으로', (await page.locator('.mk-doc ul').count()) === 1 && (await page.locator('.mk-doc ul > li').count()) === 4);
   await page.locator('.mk-doc p', { hasText: '둘째 문단' }).tap();
+  await page.waitForTimeout(300);
   await page.keyboard.press('End');
   await page.keyboard.type('  끝이에요  정말 .');
   await page.waitForTimeout(200);
@@ -1052,6 +1053,7 @@ try {
     await page.waitForTimeout(1000);
     check('왕복: 열기만 하면 파일 그대로', read('왕 테스트.md') === fileText);
     await page.locator('.mk-doc p', { hasText: '끝 문단' }).tap();
+    await page.waitForTimeout(300);
     await page.keyboard.press('End');
     await page.keyboard.type('!');
     await page.locator('.mk-doc h1').first().tap();
@@ -1295,9 +1297,8 @@ try {
     check(`메모 안 투명 바탕 손 메모: ${process.env.MK_DARK ? '다크 모드는 검은 펜을 밝게 바꾼 그림' : '원래 그림'} 하나만 보임`, shownSrc, String(shownSrc));
     await shot('21-ink-in-memo');
     // 이어 그리기: 칸을 골라 "이어 그리기" → 같은 획이 보이고, 흰 바탕으로 바꿔 한 획 더
+    // 글 고치기에서는 손 메모를 톡 누르면 고르지 않고 바로 이어 그리기
     await page.tap('.mk-doc .mk-ink img:visible');
-    await page.waitForTimeout(200);
-    await page.evaluate(() => document.querySelector('.mk-doc .mk-ink-edit').click());
     await page.waitForSelector('.ink-sheet');
     await page.waitForTimeout(200);
     const again = await page.locator('.ink-sheet .ink-strokes path').count();
@@ -1333,11 +1334,14 @@ try {
     check('주석: 다이얼 › 그리기 → 글 위에 그리고 완료 → 머리말 ink: 파일 (문단에 붙임) · 칸을 차지하지 않음', inkRel && ann?.strokes?.length === 1 && ann.strokes[0].anchor && Math.abs(docH2 - docH) < 1 && (await page.locator('.mk-annot path').count()) === 1, JSON.stringify({ inkRel, n: ann?.strokes?.length, ann: ann?.strokes?.[0]?.anchor, docH, docH2, paths: await page.locator('.mk-annot path').count() }));
     // 위에 줄이 생겨 문단이 밀리면 주석도 따라 내려간다
     const before = await page.evaluate(() => document.querySelector('.mk-annot path').getBoundingClientRect().top);
-    await page.evaluate(() => { const h = document.querySelector('.ProseMirror > *'); h.focus?.(); });
-    await page.tap('.ProseMirror > :first-child');
-    await page.keyboard.press('End');
+    // 주석이 붙은 문단(ann 의 anchor)의 맨 앞에 커서를 두고 Enter 두 번 → 그 위에 빈 줄이 생겨 문단이 밀린다
+    //   (예전에는 제목을 누르고 쳤는데, 이 환경에서는 그 누르기가 커서를 옮기지 않아 앞 단계에서 골라 둔 그림 아래에 줄이 생겨 우연히 통과했다)
+    const anchored = page.locator('.ProseMirror > p', { hasText: ann?.strokes?.[0]?.anchor?.f?.slice(0, 8) ?? '' }).first();
+    await anchored.tap({ position: { x: 3, y: 8 } });
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Home');
     await page.keyboard.press('Enter');
-    await page.keyboard.type('위에 새 줄');
+    await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
     const after = await page.evaluate(() => document.querySelector('.mk-annot path').getBoundingClientRect().top);
     check('글이 늘어 문단이 밀리면 주석도 그 문단을 따라감', after - before > 15, JSON.stringify({ before, after }));
