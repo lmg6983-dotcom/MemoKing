@@ -456,6 +456,22 @@ export async function runSmoke({
     if (sheetOpen) await capture(v1.win, 'smoke-shortcuts.png');
     await js(v1.win, `document.querySelector('dialog.shortcut-sheet')?.close()`);
     check('메뉴: 다른 메모 창과 합치기 (끌지 않고 스택으로)', await js(v1.win, `Boolean(document.getElementById('join-btn'))`));
+    // 키보드로 메뉴: Enter 로 열면 첫 항목에, ↓ 로 다음, Esc 로 닫으면 ⋯ 단추로 돌아옴
+    const press = async (win, keyCode, char) => {
+      win.webContents.sendInputEvent({ type: 'keyDown', keyCode });
+      if (char) win.webContents.sendInputEvent({ type: 'char', keyCode: char });
+      win.webContents.sendInputEvent({ type: 'keyUp', keyCode });
+      await wait(150);
+    };
+    await js(v1.win, `document.getElementById('menu-btn').focus()`);
+    await press(v1.win, 'Enter', '\r');
+    const firstFocused = await js(v1.win, `document.activeElement?.id === 'pin-toggle' && document.getElementById('menu-btn').getAttribute('aria-expanded') === 'true'`);
+    await press(v1.win, 'Down');
+    const secondFocused = await js(v1.win, `document.activeElement?.id === 'show-list'`);
+    await press(v1.win, 'Escape');
+    const backToBtn = await js(v1.win, `document.getElementById('menu').hidden && document.activeElement?.id === 'menu-btn'`);
+    check('메뉴: 키보드로 열기(첫 항목) · ↓ 다음 · Esc 닫고 ⋯ 로', firstFocused && secondFocused && backToBtn, JSON.stringify([firstFocused, secondFocused, backToBtn]));
+    check('알림 종류 칸: 칸마다 radio (화면 읽기에 "4개 중 1번째, 선택됨")', await js(v1.win, `document.querySelectorAll('#rem-kind [role="radio"]').length === 4 && document.querySelectorAll('#rem-kind [tabindex="0"]').length === 1`));
     await closeNote(v1.id);
 
     // 11) 목록 카드를 끌어 화면에 놓기 (v0.4.0)

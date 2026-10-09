@@ -1107,6 +1107,9 @@ function setupKnob() {
   };
   const ro = new ResizeObserver(() => placeKnob());
   for (const e of [el.screen, ...extras]) ro.observe(e);
+  // 녹음 판 · 추천 태그 줄은 아래에서 미끄러져 올라온다 — 크기가 바뀐 순간(움직이기 전)에 재면 아직 아래에 있어
+  //   다이얼이 "끝내기" 단추를 가리므로, 다 올라온 뒤 한 번 더 잰다
+  for (const e of extras) e.addEventListener('animationend', () => placeKnob());
 }
 
 // ---------- 위쪽 버튼 ----------

@@ -15,7 +15,7 @@ import { attachSliders } from './seg-slider.js';
 import { setupVoiceRecorder } from './voice-recorder.js';
 import { setupAnnotation } from './ink-annotate.js';
 import { audioNeedingTranscript } from './core/voice-card.js';
-import { reduceMotion, replayClass } from './dom.js';
+import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups } from './dom.js';
 import { createClearStamp } from './clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
@@ -340,7 +340,7 @@ async function transcribeAudio() {
   closeMenu();
   if (!editor) return;
   const st = await api.stt.status();
-  if (st.asr.state !== 'ready') return setStatus('받아쓰기 데이터를 먼저 받아 주세요 (목록 창 설정 › 음성 녹음)', true);
+  if (st.asr.state !== 'ready') return setStatus('받아쓰기 데이터를 먼저 받아 주세요 (목록 창 설정 › 음성 녹음과 받아쓰기)', true);
   const list = audioNeedingTranscript(editor.getMarkdown());
   if (!list.length) return setStatus('받아쓸 소리가 없어요 (모두 받아썼어요)');
   let done = 0;
@@ -383,16 +383,22 @@ $('delete-btn').addEventListener('click', async () => {
 
 api.on('memo:meta', applyMeta);
 
-function toggleMenu() {
+function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
+  el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
+  if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
 }
 function closeMenu() {
+  if (el.menu.hidden) return;
   el.menu.hidden = true;
+  el.menuBtn.setAttribute('aria-expanded', 'false');
+  if (el.menu.contains(document.activeElement)) el.menuBtn.focus(); // 키보드로 쓰던 사람이 제자리로
 }
 el.menuBtn.addEventListener('click', (e) => {
   e.stopPropagation();
-  toggleMenu();
+  toggleMenu(e);
 });
+menuKeys(el.menu, '.menu-item');
 document.addEventListener('mousedown', (e) => {
   if (!el.menu.hidden && !el.menu.contains(e.target) && !el.menuBtn.contains(e.target)) closeMenu();
 });
@@ -890,6 +896,7 @@ function closeAddMenu() {
   if (addMenu.hidden || addMenu.classList.contains('closing')) return false;
   addBtn.classList.remove('open');
   addBtn.setAttribute('aria-expanded', 'false');
+  if (addMenu.contains(document.activeElement)) addBtn.focus(); // 키보드로 쓰던 사람이 제자리로 (고른 동작이 편집기로 옮겨 감)
   addMenu.classList.add('closing');
   addCloseTimer = setTimeout(() => {
     addMenu.hidden = true;
@@ -907,6 +914,14 @@ const ADD = {
   math: () => editor.setStyle('math'),
 };
 addMenu.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서 유지
+// 키보드: + 에서 ↑ 를 누르면 펼치고 가장 가까운(맨 아래) 항목으로, 항목 사이는 ↑↓
+menuKeys(addMenu, '.add-sat');
+addBtn.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  if (addMenu.hidden || addMenu.classList.contains('closing')) openAddMenu();
+  requestAnimationFrame(() => [...addMenu.querySelectorAll('.add-sat')].filter((b) => !b.hidden).at(-1)?.focus());
+});
 addMenu.addEventListener('click', (e) => {
   const b = e.target.closest('[data-add]');
   if (!b || !editor) return;
@@ -1544,3 +1559,6 @@ if (!memo) {
 }
 
 attachSliders(document, '.seg'); // 알림 종류 고르기: 선택 표시가 미끄러진다
+
+// 고르기 칸(role=radiogroup): 칸마다 radio, 화살표로 고르기 (dom.js)
+radioGroups();

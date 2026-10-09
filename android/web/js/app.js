@@ -27,7 +27,7 @@ import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWai
 import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml } from './print-html.js';
-import { haptic, reduceMotion } from '../../app/js/dom.js';
+import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
 
 const $ = (x) => document.getElementById(x);
@@ -1115,3 +1115,6 @@ try {
   // 미리보기 등
 }
 document.documentElement.dataset.ready = 'true';
+
+// 고르기 칸(role=radiogroup): 칸마다 radio, 화살표로 고르기 (dom.js)
+radioGroups();

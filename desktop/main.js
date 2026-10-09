@@ -2134,7 +2134,7 @@ function finishAreaCapture(senderId, rect) {
   };
   return openCaptureMemo(capture, c.point, {
     title: '화면 캡처로 메모를 만들었어요',
-    body: `${crop.width} × ${crop.height} 이미지를 클립보드에도 복사했어요. 눌러서 열기`,
+    body: `${crop.width} × ${crop.height} 그림을 클립보드에도 복사했어요. 눌러서 열기`,
   });
 }
 

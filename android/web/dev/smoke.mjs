@@ -729,6 +729,14 @@ try {
   await page.waitForTimeout(1200);
   for (const lv of [0.2, 0.9, 0.6, 0.8, 0.3, 0.7, 0.5]) await page.evaluate((level) => window.__mk.emit('record', { type: 'level', level }), lv);
   check('녹음: 소리 크기 막대가 움직임', (await page.evaluate(() => getComputedStyle(document.querySelector('#rec-wave i:last-child')).getPropertyValue('--lv'))).trim() === '0.50');
+  const overlap = await page.evaluate(() => {
+    const stop = document.getElementById('rec-stop').getBoundingClientRect();
+    return [...document.querySelectorAll('.mk-dial, #add-btn')].some((f) => {
+      const r = f.getBoundingClientRect();
+      return r.width && r.left < stop.right && r.right > stop.left && r.top < stop.bottom && r.bottom > stop.top;
+    });
+  });
+  check('녹음: 다이얼 · + 단추가 끝내기 단추를 가리지 않음', !overlap);
   await shot('11-recording');
   await page.tap('#rec-stop');
   await page.waitForTimeout(1200);

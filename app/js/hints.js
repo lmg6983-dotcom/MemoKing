@@ -61,7 +61,8 @@ export function hintOnce(name, text, { anchor = null } = {}) {
   bubble.append(p, ok);
   document.body.append(bubble);
   const r = anchor?.getBoundingClientRect?.();
-  if (r && r.width) {
+  // 비출 것이 화면 밖(스크롤로 가려짐)이면 화면 아래 가운데에
+  if (r && r.width && r.bottom > 0 && r.top < window.innerHeight) {
     const w = bubble.offsetWidth;
     const h = bubble.offsetHeight;
     const left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);

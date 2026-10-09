@@ -14,7 +14,7 @@ import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups } from './dom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -1188,3 +1188,6 @@ $('count-memos').textContent = String(state.memos.length);
 await remindersTab.refresh();
 showTab(new URLSearchParams(location.search).get('tab') ?? 'memos');
 document.documentElement.dataset.ready = 'true';
+
+// 고르기 칸(role=radiogroup): 칸마다 radio, 화살표로 고르기 (dom.js)
+radioGroups();
