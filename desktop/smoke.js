@@ -1196,6 +1196,11 @@ export async function runSmoke({
     const expected = appSettings().autoStart.available;
     check('설정: Windows 시작 시 자동 실행 (설치판에서만 켤 수 있음)', auto.disabled === !expected && (expected || /설치한 메모킹/.test(auto.note)), JSON.stringify(auto));
     await capture(lw, 'smoke-settings.png');
+    await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight / 2 - 120; })()`);
+    await capture(lw, 'smoke-settings-2.png');
+    await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight; })()`);
+    await capture(lw, 'smoke-settings-3.png');
+    await js(lw, `document.getElementById('settings-dialog').scrollTop = 0`);
     await listJs(`document.getElementById('settings-dialog').close()`);
     await listJs(`document.querySelector('[data-tab="memos"]').click()`);
 

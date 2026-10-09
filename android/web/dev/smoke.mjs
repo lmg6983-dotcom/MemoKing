@@ -502,13 +502,16 @@ try {
   await page.waitForTimeout(300);
   check('설정: 받아쓰기는 Google 음성 인식 하나 (방식 고르기·데이터 받기 없음)', (await page.locator('#stt-engine, #stt-model-row').count()) === 0 && (await page.textContent('#rec-stt-note')).includes('Google'));
   await shot('17-settings-stt');
-  check('설정: 말한 사람 나누기 줄 (처음엔 받기)', await page.isVisible('#spk-row') && (await page.textContent('#spk-btn')) === '받기' && (await page.textContent('#spk-note')).includes('화자 1:'));
-  await page.tap('#spk-btn');
-  await page.waitForTimeout(300);
-  check('설정: 말한 사람 나누기 받으면 켜짐 → 끄기 단추', (await page.textContent('#spk-btn')) === '끄기' && (await page.textContent('#spk-note')).includes('켜져 있어요'));
-  await page.tap('#spk-btn');
-  await page.waitForTimeout(300);
-  check('설정: 말한 사람 나누기 끄기 → 켜기 단추', (await page.textContent('#spk-btn')) === '켜기');
+  // 둘 중 하나(켜고 끄기)는 모두 같은 스위치 — 말한 사람 나누기·S펜 손글씨도 (예전엔 단추·목록 상자)
+  check('설정: 켜고 끄기는 모두 스위치 (단추·목록 상자 없음)', (await page.locator('#spk-btn, select#pen-writing').count()) === 0
+    && (await page.locator('#spk-switch.switch, #pen-writing.switch').count()) === 2);
+  check('설정: 말한 사람 나누기 (처음엔 꺼짐, 켜면 데이터를 받는다고 안내)', await page.isVisible('#spk-row') && !(await page.isChecked('#spk-switch')) && (await page.textContent('#spk-note')).includes('켜면 데이터'));
+  await page.tap('#spk-row');
+  await page.waitForTimeout(400);
+  check('설정: 말한 사람 나누기 켜기 → 받고 켜짐', await page.isChecked('#spk-switch'));
+  await page.tap('#spk-row');
+  await page.waitForTimeout(400);
+  check('설정: 말한 사람 나누기 끄기', !(await page.isChecked('#spk-switch')));
   await page.tap('#trash-btn');
   await page.waitForTimeout(200);
   await shot('04-trash');

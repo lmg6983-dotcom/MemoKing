@@ -74,6 +74,9 @@ body {
 .check-row input { accent-color: var(--brand-black); }
 
 .setting-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13.5px; cursor: pointer; }
+/* 켜고 끄기는 모두 스위치, 글은 왼쪽·스위치는 오른쪽 (메모킹 설정과 같은 모양) */
+.setting-row > .switch { order: 2; flex: none; margin-left: auto; }
+.setting-row > span { flex: 1; min-width: 0; }
 
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; }
 .open-row { margin: 0; width: 100%; }
