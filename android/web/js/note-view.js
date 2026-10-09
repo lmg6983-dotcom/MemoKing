@@ -1015,9 +1015,9 @@ function applyMode(mode, { user = false, quiet = false } = {}) {
   applyHandwriting(mode);
   recorder.holdStop(); // 아래 막대가 바뀌며 녹음 판이 움직인다 — 그 사이 눌림으로 녹음이 끝나지 않게
   $('mode-guide').hidden = true; // 앞 방식의 안내는 거둔다
-  // 다이얼로 바꾸면 어느 방식이든 같은 자리(아래 가운데 흰 안내)에 무엇이 되었는지
+  // 다이얼로 바꾸면 그 방식이 무엇인지 아래 가운데 흰 안내로 — 방식마다 처음 한 번만 (돌릴 때마다 뜨면 메모를 가린다)
   const m = MODES.find((x) => x.id === mode);
-  if (user && !quiet && m) showGuide(m.hint, m.label);
+  if (user && !quiet && m) showGuideOnce(`mode-${m.id}`, m.hint, m.label);
   setTouchMode(mode, el.editorRoot.querySelector('.ProseMirror'));
   closeAddMenu();
   if (mode !== 'draw') {
@@ -1036,6 +1036,23 @@ function applyMode(mode, { user = false, quiet = false } = {}) {
 }
 // 아래쪽 안내 (그리기 도구 막대와 같은 흰 모양) — 잠깐 떴다 사라진다
 let guideTimer = 0;
+// 힌트처럼 한 번만: 같은 안내는 이 휴대폰에서 다시 띄우지 않는다 (다이얼을 돌릴 때마다 메모를 가리지 않게)
+const GUIDES_SEEN_KEY = 'memoking.guidesSeen';
+function showGuideOnce(name, text, title) {
+  let seen = [];
+  try {
+    seen = JSON.parse(localStorage.getItem(GUIDES_SEEN_KEY) ?? '[]');
+  } catch {
+    seen = [];
+  }
+  if (seen.includes(name)) return;
+  try {
+    localStorage.setItem(GUIDES_SEEN_KEY, JSON.stringify([...seen, name]));
+  } catch {
+    // 저장 못 해도 이번에는 보여 준다
+  }
+  showGuide(text, title);
+}
 function showGuide(text, title = '', ms = 2600) {
   const g = $('mode-guide');
   // 제목은 굵게 한 줄, 설명은 그 아래 (가운데 점으로 잇지 않는다)
@@ -1070,7 +1087,7 @@ el.editorRoot.addEventListener('pointerup', (e) => {
     pm?.removeAttribute('inputmode');
     if (pm) delete pm.dataset.mkNoKeyboard;
     editor.focusAt(x, y);
-    showGuide('옮기려면 다이얼을 옮기기로 돌려요', '글 고치기로 바꿨어요');
+    showGuideOnce('tap-to-edit', '옮기려면 다이얼을 옮기기로 돌려요', '글 고치기로 바꿨어요');
   }, 30);
 });
 

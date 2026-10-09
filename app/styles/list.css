@@ -581,7 +581,7 @@ body.is-dragging .card:hover { transform: none; }
 .crown-btn { position: relative; }
 
 /* 설정: 위 항목에 딸린 줄 (켜져 있을 때만 쓸 수 있음) */
-.setting-row.sub-row { margin-left: 46px; }
+.setting-row.sub-row { margin-left: 20px; }
 .setting-row.sub-row:has(input:disabled) { opacity: 0.5; cursor: default; }
 
 /* 팝업 알림을 찍은 그림: 글 아래에 (펼치면 크게) */
@@ -590,7 +590,7 @@ body.is-dragging .card:hover { transform: none; }
 .noti.has-text:not(.expanded) .noti-shot { display: none; }
 
 /* ---------- 알림 모을 앱 고르기 ---------- */
-.sub-actions { margin: 2px 0 12px 46px; }
+.sub-actions { margin: 2px 0 12px 20px; } /* 위 줄에 딸린 단추: 하위 줄(sub-row)과 같은 들여쓰기 */
 .apps-list { margin: 0 0 12px; padding: 0; list-style: none; max-height: calc(100vh - 44px - 220px); min-height: 60px; overflow-y: auto; }
 .app-row { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
 .app-row .avatar { width: 28px; height: 28px; font-size: 13px; }
@@ -712,11 +712,14 @@ body.is-dragging .card:hover { transform: none; }
 .cards[data-layout="rows"] .card-clear { font-size: 18px; padding: 1px 10px 0; border-width: 3px; }
 
 /* ---------- v0.17.13: 매직키 설정 ---------- */
-.setting-sub { margin: 0 0 8px; padding: 2px 0 0 34px; }
+.setting-sub { margin: 0 0 8px; padding: 2px 0 0 20px; }
 .label.sub { margin: 4px 0; font-size: 12px; opacity: 0.8; }
 .magic-settings-modules { display: flex; flex-direction: column; gap: 8px; }
 .magic-mod { display: flex; align-items: flex-start; gap: 10px; }
 .magic-mod > span { font-size: 13px; line-height: 1.35; }
+/* 설정의 켜고 끄기는 PC·휴대폰 모두 같은 모양: 글은 왼쪽, 스위치는 오른쪽 (모을 앱 고르기 창과도 같게) */
+:is(.setting-row, .magic-mod) > .switch { order: 2; flex: none; margin-left: auto; }
+:is(.setting-row, .magic-mod) > span { flex: 1; min-width: 0; }
 .magic-mod small { display: block; color: var(--muted); font-size: 12px; }
 .magic-mod em { color: var(--muted); font-style: normal; }
 .magic-mod.soon > span { opacity: 0.6; }

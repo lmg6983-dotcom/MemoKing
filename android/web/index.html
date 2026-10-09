@@ -497,17 +497,14 @@
       <input type="checkbox" id="rec-stt" class="switch" checked>
       <span>녹음하며 받아쓰기 <small id="rec-stt-note">말하는 내용을 바로 글로 받아써요</small></span>
     </label>
-    <div class="setting-row" id="spk-row">
+    <label class="setting-row" id="spk-row">
+      <input type="checkbox" id="spk-switch" class="switch">
       <span>말한 사람 나누기 <small id="spk-note"></small></span>
-      <button id="spk-btn" class="btn small">받기</button>
-    </div>
+    </label>
     <p class="label">S펜</p>
-    <label class="setting-row select-row">
+    <label class="setting-row">
+      <input type="checkbox" id="pen-writing" class="switch" checked>
       <span>손글씨를 글자로 <small>글 고치기에서 S펜으로 쓰면 글자로 바꿔요. 옮기기와 그리기에서는 늘 꺼져 있어요</small></span>
-      <select id="pen-writing" aria-label="S펜 손글씨를 글자로">
-        <option value="edit">글 고치기에서만</option>
-        <option value="off">끄기</option>
-      </select>
     </label>
     <p class="label">도움말</p>
     <div class="sheet-actions">

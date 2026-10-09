@@ -769,17 +769,29 @@ export async function runSmoke({
     const allSuggest = await until(() => js(tagNote2.win, `(() => { const b = document.querySelector('.tag-suggest'); return b && !b.hidden && [...b.querySelectorAll('.tag-suggest-item span')].map((s) => s.textContent); })()`), '자동완성 목록').catch(() => null);
     check('# 입력 → 지금까지 쓴 태그 목록', Array.isArray(allSuggest) && allSuggest.includes('#업무') && allSuggest.includes('#회의'), JSON.stringify(allSuggest));
     await type(tagNote2.win, '업');
-    const narrowed = await until(() => js(tagNote2.win, `(() => { const s = [...document.querySelectorAll('.tag-suggest:not([hidden]) .tag-suggest-item span')].map((x) => x.textContent); return s.length === 1 && s; })()`), '좁혀진 목록').catch(() => null);
-    check('이어 친 글자로 좁히기 (#업 → #업무)', narrowed?.[0] === '#업무', JSON.stringify(narrowed));
+    const narrowed = await until(() => js(tagNote2.win, `(() => { const s = [...document.querySelectorAll('.tag-suggest:not([hidden]) .tag-suggest-item span')].map((x) => x.textContent); return s.length === 2 && s; })()`), '좁혀진 목록').catch(() => null);
+    const typedFirst = await js(tagNote2.win, `document.querySelector('.tag-suggest .tag-suggest-item')?.getAttribute('aria-selected') === 'true'`);
+    check('자동완성 맨 위는 쓴 그대로, 처음엔 그것이 골라짐 (#업 → [#업, #업무])', JSON.stringify(narrowed) === JSON.stringify(['#업', '#업무']) && typedFirst, JSON.stringify(narrowed));
+    await key(tagNote2.win, 'Down');
     await key(tagNote2.win, 'Enter');
     const afterPick = await until(() => js(tagNote2.win, `(() => { const p = document.querySelector('.mk-doc p'); return p && p.textContent.includes('#업무') && { text: p.textContent, open: !document.querySelector('.tag-suggest')?.hidden, paras: document.querySelectorAll('.mk-doc > p').length }; })()`), 'Enter 로 넣기').catch(() => null);
-    check('Enter → 태그를 넣고 목록 닫기 (줄바꿈 안 함)', afterPick?.text === '출장 준비물 #업무 ' && !afterPick.open && afterPick.paras === 1, JSON.stringify(afterPick));
+    check('↓ 로 고른 뒤 Enter → 그 태그를 넣고 목록 닫기 (줄바꿈 안 함)', afterPick?.text === '출장 준비물 #업무 ' && !afterPick.open && afterPick.paras === 1, JSON.stringify(afterPick));
     await type(tagNote2.win, '#');
     await until(() => js(tagNote2.win, `!document.querySelector('.tag-suggest')?.hidden`), '다시 열림').catch(() => {});
     await key(tagNote2.win, 'Escape');
     const escClosed = await js(tagNote2.win, `document.querySelector('.tag-suggest')?.hidden !== false`);
     await type(tagNote2.win, '여행');
     check('Esc → 목록 닫고 새 태그는 그냥 계속 쓰기', escClosed && (await js(tagNote2.win, `document.querySelector('.mk-doc p').textContent`)) === '출장 준비물 #업무 #여행');
+    // 쓴 그대로 Enter: 비슷한 태그가 있어도(#업 → #업무) 바뀌지 않고 줄만 바뀜
+    await type(tagNote2.win, ' #업');
+    await until(() => js(tagNote2.win, `!document.querySelector('.tag-suggest')?.hidden`), '목록 열림').catch(() => {});
+    await key(tagNote2.win, 'Enter');
+    const kept = await until(() => js(tagNote2.win, `(() => { const ps = [...document.querySelectorAll('.mk-doc > p')].map((p) => p.textContent); return ps.length === 2 && ps; })()`), '줄 바뀜').catch(() => null);
+    check('쓴 그대로 Enter → 다른 태그로 바뀌지 않고 줄 바꿈', kept?.[0] === '출장 준비물 #업무 #여행 #업', JSON.stringify(kept));
+    // 뒤의 점검(카드 태그·AI 요약)이 세는 태그가 달라지지 않게 방금 쓴 " #업" 과 줄 바꿈을 되돌린다
+    await js(tagNote2.win, `(() => { const p = document.querySelector('.mk-doc p'); const sel = getSelection(); sel.selectAllChildren(document.querySelector('.mk-doc')); sel.collapseToEnd(); })()`);
+    for (let i = 0; i < 4; i++) await key(tagNote2.win, 'Backspace');
+    await until(() => js(tagNote2.win, `document.querySelectorAll('.mk-doc > p').length === 1 && document.querySelector('.mk-doc p').textContent === '출장 준비물 #업무 #여행'`), '되돌리기').catch(() => {});
     await closeNote(tagNote2.id);
 
     // 목록: 카드의 태그, 태그 줄, 필터
@@ -1196,6 +1208,11 @@ export async function runSmoke({
     const expected = appSettings().autoStart.available;
     check('설정: Windows 시작 시 자동 실행 (설치판에서만 켤 수 있음)', auto.disabled === !expected && (expected || /설치한 메모킹/.test(auto.note)), JSON.stringify(auto));
     await capture(lw, 'smoke-settings.png');
+    await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight / 2 - 120; })()`);
+    await capture(lw, 'smoke-settings-2.png');
+    await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight; })()`);
+    await capture(lw, 'smoke-settings-3.png');
+    await js(lw, `document.getElementById('settings-dialog').scrollTop = 0`);
     await listJs(`document.getElementById('settings-dialog').close()`);
     await listJs(`document.querySelector('[data-tab="memos"]').click()`);
 

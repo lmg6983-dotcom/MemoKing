@@ -578,7 +578,7 @@ function openSettings() {
   refreshHistoryRow();
   renderDrive();
   $('auto-tags').checked = note.autoTagsOn();
-  $('pen-writing').value = note.penWriting();
+  $('pen-writing').checked = note.penWriting() !== 'off';
   $('rec-stt').checked = recorder.sttOn();
   $('rec-stt-note').textContent = recorder.sttReady()
     ? '말하는 내용을 휴대폰의 Google 음성 인식으로 바로 글로 받아써요'
@@ -588,7 +588,7 @@ function openSettings() {
   openSheet($('settings-sheet'));
 }
 
-// 화자 구분: 화자 모델(약 28MB)을 받으면 녹음이 끝날 때 받아쓴 문장에 "화자 1·2" 이름표
+// 말한 사람 나누기: 다른 켜고 끄기와 같은 스위치 (PC 설정과 같음). 데이터(약 28MB)가 없으면 켤 때 받고, 받는 동안은 켜진 채 잠금
 function refreshSpeakerRow(progress) {
   const st = recorder.sttStatus();
   $('spk-row').hidden = !recorder.sttReady() || st.speakerSupported === false;
@@ -596,17 +596,16 @@ function refreshSpeakerRow(progress) {
   const ready = st.speaker === 'ready';
   $('spk-note').textContent = busy
     ? `데이터를 받는 중… ${progress ?? 0}%`
-    : ready
-      ? st.speakerOn ? '켜져 있어요. 녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요' : '꺼져 있어요'
-      : `녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요 (데이터 ${(st.speakerSize ?? '약 28MB').replace('약 ', '')}`;
-  $('spk-btn').textContent = busy ? '받는 중' : ready ? (st.speakerOn ? '끄기' : '켜기') : '받기';
-  $('spk-btn').disabled = busy;
+    : `녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요${ready ? '' : ` (켜면 데이터 ${(st.speakerSize ?? '약 28MB').replace('약 ', '')}를 받아요)`}`;
+  $('spk-switch').checked = busy || (ready && st.speakerOn);
+  $('spk-switch').disabled = busy;
 }
-$('spk-btn').addEventListener('click', async () => {
+$('spk-switch').addEventListener('change', async () => {
+  const on = $('spk-switch').checked;
   const st = recorder.sttStatus();
   try {
-    if (st.speaker === 'ready') await call('speakerModel', { on: !st.speakerOn });
-    else {
+    if (st.speaker === 'ready') await call('speakerModel', { on });
+    else if (on) {
       refreshSpeakerRow(0);
       await call('speakerModel', {});
       toast('말한 사람 나누기를 켰어요. 다음 녹음부터 붙어요');
@@ -621,7 +620,7 @@ on('speakerModel', ({ progress }) => {
 });
 
 $('auto-tags').addEventListener('change', () => note.setAutoTags($('auto-tags').checked));
-$('pen-writing').addEventListener('change', () => note.setPenWriting($('pen-writing').value));
+$('pen-writing').addEventListener('change', () => note.setPenWriting($('pen-writing').checked ? 'edit' : 'off'));
 $('rec-stt').addEventListener('change', () => recorder.setStt($('rec-stt').checked));
 $('settings-btn').addEventListener('click', openSettings);
 $('history-enabled').addEventListener('change', () => enableHistory($('history-enabled').checked));
