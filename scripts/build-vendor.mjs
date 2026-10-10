@@ -18,6 +18,9 @@ const DEPS = {
   'remark-math': '6.0.0',
   'html-to-image': '1.11.13',
   'es-hangul': '2.4.0',
+  'chrono-node': '2.10.1',
+  '@modelcontextprotocol/sdk': '1.30.1',
+  zod: '4.6.5',
   esbuild: '0.28.2',
 };
 
@@ -53,6 +56,7 @@ await esbuild.build({
     katex: join(ROOT, 'scripts', 'vendor', 'katex.js'),
     'html-to-image': join(ROOT, 'scripts', 'vendor', 'html-to-image.js'),
     'es-hangul': join(ROOT, 'scripts', 'vendor', 'es-hangul.js'),
+    chrono: join(ROOT, 'scripts', 'vendor', 'chrono.js'),
   },
   outdir: OUT,
   bundle: true,
@@ -64,6 +68,21 @@ await esbuild.build({
   legalComments: 'eof',
   nodePaths: [MODULES],
   logLevel: 'info',
+});
+// AI 비서 연결(MCP) 서버는 PC 메인 프로세스(node)에서만 — desktop/vendor 로 따로
+await esbuild.build({
+  entryPoints: { 'mcp-sdk': join(ROOT, 'scripts', 'vendor', 'mcp-sdk.js') },
+  outdir: join(ROOT, 'desktop', 'vendor'),
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node20',
+  minify: true,
+  legalComments: 'eof',
+  nodePaths: [MODULES],
+  logLevel: 'info',
+  // esm 묶음 안의 require (일부 의존성) 를 위해
+  banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
 });
 copyFileSync(join(MODULES, '@milkdown', 'prose', 'lib', 'style', 'prosemirror.css'), join(OUT, 'prosemirror.css'));
 copyFileSync(join(MODULES, 'plyr', 'dist', 'plyr.css'), join(OUT, 'plyr.css'));

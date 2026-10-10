@@ -10,7 +10,7 @@ const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: '
 /**
  * @param {{ api: object, memoId: string, setStatus: (text: string, isError?: boolean) => void, onToggle?: (open: boolean) => void }} options
  */
-export function setupReminderPanel({ api, memoId, setStatus, onToggle }) {
+export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange }) {
   const el = {
     panel: $('reminder-panel'),
     list: $('reminder-list'),
@@ -94,9 +94,12 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle }) {
     try {
       reminders = (await api.reminders.set(memoId, next)) ?? next;
       render();
+      onChange?.(reminders);
+      return true;
     } catch (err) {
       console.error(err);
       setStatus('알림을 저장하지 못했어요. 다시 시도해 주세요.', true);
+      return false;
     }
   }
 
@@ -211,6 +214,21 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle }) {
     set(list) {
       reminders = list ?? [];
       render();
+      onChange?.(reminders);
+    },
+    get list() {
+      return reminders;
+    },
+    /** 글 속 날짜 밑줄에서: 그 시각 알림(알림만)을 더한다 */
+    async addAt(at) {
+      if (at <= new Date()) {
+        setStatus('이미 지난 시각이에요', true);
+        return false;
+      }
+      const reminder = { kind: 'at', action: 'notify', enabled: true, created: toLocalIso(new Date()), at: toLocalIso(at) };
+      if (!(await save([...reminders, reminder]))) return false;
+      setStatus(`알림을 맞췄어요: ${describeReminder(reminders.at(-1) ?? reminder)}`);
+      return true;
     },
     toggle,
     get open() {

@@ -6,6 +6,7 @@ import { TEXT_COLORS, HIGHLIGHT_COLORS } from './core/html-marks.js';
 import { fileExtension } from './media.js';
 import { isDataImage, decodeDataImage } from './core/remote-images.js';
 import { setupReminderPanel } from './reminder-panel.js';
+import { reminderAt } from './date-remind.js';
 import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
 import { tutorialCounts, tutorialDone, TUTORIAL_SAMPLE, hasTutorialSample } from './core/tutorial.js';
@@ -1517,6 +1518,8 @@ if (!memo) {
     getTags: () => api.tags.list(),
     onEmpty: showPlaceholder,
     onTasks: showTasks,
+    onDateReminder: ({ at }) => reminderPanel?.addAt(at) ?? false,
+    hasReminderAt: (at) => reminderAt(reminderPanel?.list, at),
   });
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();
@@ -1527,6 +1530,7 @@ if (!memo) {
     memoId: id,
     setStatus,
     onToggle: (open) => open && !el.linksPanel.hidden && toggleLinks(false),
+    onChange: () => editor?.refreshDates(),
   });
   reminderPanel.set(memo.reminders);
   recorder = setupVoiceRecorder({

@@ -19,7 +19,7 @@ export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
   doc.classList.remove('ProseMirror-focused');
   doc.style.setProperty('--note-zoom', '1');
   for (const n of doc.querySelectorAll('.lc-remove, .ProseMirror-separator, .ProseMirror-trailingBreak, .mk-drag-badge, .ProseMirror-gapcursor')) n.remove();
-  for (const n of doc.querySelectorAll('.mk-caret-item, .mk-lift, .mk-swap-target')) n.classList.remove('mk-caret-item', 'mk-lift', 'mk-swap-target');
+  for (const n of doc.querySelectorAll('.mk-caret-item, .mk-lift, .mk-swap-target, .mk-date')) n.classList.remove('mk-caret-item', 'mk-lift', 'mk-swap-target', 'mk-date', 'mk-date-set');
   for (const media of doc.querySelectorAll('.mk-media')) {
     const label = media.querySelector('.mk-media-label')?.textContent || '';
     const chip = document.createElement('span');

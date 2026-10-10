@@ -1102,6 +1102,29 @@ export async function runSmoke({
     const lw = getList();
     const listJs = (code) => js(getList(), code);
     const remindersOf = (id) => getVault().get(id)?.reminders ?? [];
+    // 14-00) 글 속 날짜 → 알림: 점선 밑줄, 커서를 옮기면(치는 중 말고) 단추, 누르면 그 시각 알림
+    {
+      const dn = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
+      await type(dn.win, '다음 주 화요일 오후 2시 반 발표');
+      await wait(300);
+      const under = await js(dn.win, `document.querySelector('.mk-doc .mk-date')?.textContent ?? ''`);
+      const typingChip = await js(dn.win, `Boolean(document.querySelector('.mk-date-chip'))`);
+      await key(dn.win, 'Home');
+      const chip = await until(() => js(dn.win, `document.querySelector('.mk-date-chip')?.textContent ?? null`), '날짜 단추').catch(() => '');
+      check('글 속 날짜: 밑줄 · 치는 중에는 단추 없음 · 커서를 옮기면 "알림 맞추기" 단추',
+        under === '다음 주 화요일 오후 2시 반' && !typingChip && /오후 2:30 알림 맞추기/.test(chip), JSON.stringify({ under, typingChip, chip }));
+      await capture(dn.win, 'smoke-date-chip.png');
+      await js(dn.win, `document.querySelector('.mk-date-chip').click()`);
+      const set = await until(() => remindersOf(dn.id).find((r) => r.kind === 'at'), '날짜 알림 저장').catch(() => null);
+      const at = set ? new Date(set.at) : null;
+      check('글 속 날짜: 누르면 그 시각(화요일 14:30) 알림이 저장되고 밑줄이 실선으로',
+        Boolean(at) && at.getDay() === 2 && at.getHours() === 14 && at.getMinutes() === 30 && at > new Date()
+        && await until(() => js(dn.win, `Boolean(document.querySelector('.mk-doc .mk-date-set'))`), '실선').catch(() => false), set?.at);
+      // 뒤의 알림 예약 탭 점검이 세는 알림 수에 섞이지 않게 지운다
+      await js(dn.win, `document.querySelector('#reminder-list .rem-item .icon-btn')?.click()`);
+      await until(() => remindersOf(dn.id).length === 0, '날짜 알림 지우기').catch(() => {});
+      await closeNote(dn.id);
+    }
     // 14-0) 알림 보관함 탭: 처음에는 동의 안내부터
     await listJs(`document.querySelector('[data-tab="history"]').click()`);
     await wait(300);

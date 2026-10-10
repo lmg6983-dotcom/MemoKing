@@ -6,6 +6,7 @@ import { TEXT_COLORS, HIGHLIGHT_COLORS } from '../../app/js/core/html-marks.js';
 import { fileExtension, mediaKind, baseName, vaultUrl } from '../../app/js/media.js';
 import { isDataImage, decodeDataImage } from '../../app/js/core/remote-images.js';
 import { setupReminderPanel } from '../../app/js/reminder-panel.js';
+import { reminderAt } from '../../app/js/date-remind.js';
 import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
 import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
@@ -1160,6 +1161,7 @@ function setupPanels() {
       if (open) adoptSheet(panel, () => reminderPanel.toggle(false));
       else releaseSheet(panel);
     },
+    onChange: () => editor?.refreshDates(),
   });
 }
 
@@ -1215,6 +1217,8 @@ export async function openNote(memoId, options = {}) {
       tables: memo.tables ?? [],
       onTables: saveTables,
       readAttachment: async (src) => (await fetch(vaultUrl(src))).text(),
+      onDateReminder: ({ at }) => reminderPanel?.addAt(at) ?? false,
+      hasReminderAt: (at) => reminderAt(reminderPanel?.list, at),
       tapContinuesList: true, // 목록 아래 줄을 눌러 줄을 바꾸는 사람도 목록이 이어지게
       scrollMargin: 96, // 쓰는 줄이 아래쪽 + · 다이얼에 가리지 않게
     });

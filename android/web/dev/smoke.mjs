@@ -260,6 +260,44 @@ try {
   await page.waitForTimeout(300);
   check('빈 메모: 파일을 남기지 않음', fs.readdirSync(vault).length === before);
 
+  // 글 속 날짜 → 알림: 점선 밑줄, 누르면 아래에 "알림 맞추기" 단추 (치는 중에는 뜨지 않음)
+  // 뒤로 가기 첫 번은 키보드(초점)를 닫는다 — 메모 화면이 남아 있으면 한 번 더
+  for (let i = 0; i < 3 && await page.isVisible('#note-screen'); i++) {
+    await back();
+    await page.waitForTimeout(400);
+  }
+  await page.tap('#fab');
+  await page.tap('[data-new="text"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.keyboard.type('# 날짜 알림');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('내일 오후 3시 치과');
+  await page.waitForTimeout(300);
+  const dateUnderline = await page.locator('.mk-doc .mk-date').first().textContent().catch(() => '');
+  check('날짜 알림: "내일 오후 3시" 에 점선 밑줄', dateUnderline === '내일 오후 3시', dateUnderline);
+  check('날짜 알림: 치는 중에는 단추가 뜨지 않음', (await page.locator('.mk-date-chip').count()) === 0);
+  {
+    const box = await page.locator('.mk-doc .mk-date').first().boundingBox();
+    const bar = await page.locator('#format-bar').boundingBox().catch(() => null);
+    if (box) await page.touchscreen.tap(box.x + 12, box.y + box.height / 2);
+    if (!box) console.log('no date box', JSON.stringify(bar));
+  }
+  await page.waitForTimeout(300);
+  const chipText = await page.textContent('.mk-date-chip').catch(() => '');
+  check('날짜 알림: 날짜를 누르면 "내일 오후 3:00 알림 맞추기" 단추', /내일 오후 3:00 알림 맞추기/.test(chipText), chipText);
+  await shot('02c-date-chip');
+  await page.tap('.mk-date-chip');
+  await page.waitForTimeout(800);
+  const dateMemo = fs.existsSync(path.join(vault, '날짜 알림.md')) ? read('날짜 알림.md') : '';
+  const tomorrow3 = new Date();
+  tomorrow3.setDate(tomorrow3.getDate() + 1);
+  tomorrow3.setHours(15, 0, 0, 0);
+  const atLine = /\n\s+at: "?([^"\n]+)"?/.exec(dateMemo)?.[1];
+  check('날짜 알림: 누르면 그 시각 알림이 메모에 저장', Boolean(atLine) && Math.abs(Date.parse(atLine) - tomorrow3.getTime()) < 60_000, atLine ?? dateMemo.slice(0, 300));
+  check('날짜 알림: 맞춘 날짜는 실선 밑줄', (await page.locator('.mk-doc .mk-date-set').count()) === 1);
+  await back();
+  await page.waitForTimeout(300);
+
   // 다른 앱에서 공유하기
   const png = fs.readFileSync(path.join(repo, 'assets/icons/icon-256.png')).toString('base64');
   await post('/dev/intent', { type: 'share', text: '좋은 문장\n둘째 줄', app: 'Chrome', files: [{ name: 'photo.png', mime: 'image/png', base64: png }] });
