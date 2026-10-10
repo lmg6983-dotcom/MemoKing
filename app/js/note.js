@@ -1605,8 +1605,8 @@ if (!memo) {
     getTags: () => api.tags.list(),
     onEmpty: showPlaceholder,
     onTasks: showTasks,
-    onDateReminder: ({ at }) => reminderPanel?.addAt(at) ?? false,
-    hasReminderAt: (at) => reminderAt(reminderPanel?.list, at),
+    onDateReminder: ({ at, repeat }) => (repeat ? reminderPanel?.addRepeat(repeat) : reminderPanel?.addAt(at)) ?? false,
+    hasReminderAt: (at, repeat) => reminderAt(reminderPanel?.list, at, repeat),
   });
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();

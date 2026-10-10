@@ -318,6 +318,24 @@ try {
   const atLine = /\n\s+at: "?([^"\n]+)"?/.exec(dateMemo)?.[1];
   check('날짜 알림: 누르면 그 시각 알림이 메모에 저장', Boolean(atLine) && Math.abs(Date.parse(atLine) - tomorrow3.getTime()) < 60_000, atLine ?? dateMemo.slice(0, 300));
   check('날짜 알림: 맞춘 날짜는 실선 밑줄', (await page.locator('.mk-doc .mk-date-set').count()) === 1);
+  // 되풀이: "매주 수요일 저녁 7시" → 🔁 반복 알림
+  await page.locator('.mk-doc p').last().click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('매주 수요일 저녁 7시 운동');
+  await page.waitForTimeout(300);
+  {
+    const boxes = await page.locator('.mk-doc .mk-date').all();
+    const box = await boxes.at(-1)?.boundingBox();
+    if (box) await page.touchscreen.tap(box.x + 12, box.y + box.height / 2);
+  }
+  await page.waitForTimeout(300);
+  const repChip = await page.textContent('.mk-date-chip').catch(() => '');
+  check('날짜 알림: "매주 수요일 저녁 7시" → 🔁 매주 반복 알림 단추', /🔁 매주 수요일 오후 7:00 알림 맞추기/.test(repChip ?? ''), repChip);
+  if (repChip) await page.tap('.mk-date-chip');
+  await page.waitForTimeout(800);
+  const repMd = fs.existsSync(path.join(vault, '날짜 알림.md')) ? read('날짜 알림.md') : '';
+  check('날짜 알림: 반복 알림으로 저장 (매주 수 19:00)', /kind: repeat[\s\S]*every: week[\s\S]*weekdays:\s*\n?\s*-?\s*\[?3/.test(repMd) && /time: "?19:00/.test(repMd), repMd.slice(0, 500));
   await back();
   await page.waitForTimeout(300);
   for (let i = 0; i < 3 && await page.isVisible('#note-screen'); i++) {

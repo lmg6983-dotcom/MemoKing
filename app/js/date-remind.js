@@ -20,6 +20,16 @@ export function dateLabel(at, now = new Date()) {
   return `${date} ${koClock(at)}`;
 }
 
+/** 되풀이 알림 설명: "매주 월요일 오전 10:00" */
+export function repeatLabel(repeat, at) {
+  const clock = koClock(at);
+  if (repeat.every === 'day') return `매일 ${clock}`;
+  if (repeat.every === 'week') return `매주 ${repeat.weekdays.map((w) => `${WEEKDAY[w]}요일`).join(', ')} ${clock}`;
+  if (repeat.every === 'month') return `매달 ${repeat.day}일 ${clock}`;
+  return `매년 ${repeat.month}월 ${repeat.day}일 ${clock}`;
+}
+const chipLabel = (d) => (d.repeat ? repeatLabel(d.repeat, d.at) : dateLabel(d.at));
+
 function findInDoc(doc, now) {
   const found = [];
   doc.descendants((node, pos) => {
@@ -28,7 +38,7 @@ function findInDoc(doc, now) {
     if (!node.isTextblock) return true;
     // 그림·줄바꿈 같은 글 아닌 것도 한 글자로 세면 글자 자리 = 문서 위치
     const text = node.textBetween(0, node.content.size, null, '￼');
-    if (!/\d|내일|모레|글피|요일|정오|자정|[A-Za-z]/.test(text)) return false;
+    if (!/\d|내일|낼|모레|글피|요일|욜|주말|정오|자정|매일|날마다|하루|이틀|사흘|나흘|닷새|열흘|일주일|시|크리스마스|[A-Za-z]/.test(text)) return false;
     for (const d of findAllDates(text, { chrono, now })) {
       // 인라인 코드·링크 안은 빼고
       const $from = doc.resolve(pos + 1 + d.from);
@@ -46,12 +56,12 @@ function findInDoc(doc, now) {
  */
 export function createDateRemind({ readOnly = false, onAdd, hasReminderAt } = {}) {
   if (readOnly || !onAdd) return new Plugin({ key: dateRemindKey });
-  const isSet = (at) => Boolean(hasReminderAt?.(at));
+  const isSet = (d) => Boolean(hasReminderAt?.(d.at, d.repeat));
   const build = (doc) => {
     const dates = findInDoc(doc, new Date());
     const decos = dates.map((d) => Decoration.inline(d.from, d.to, {
-      class: isSet(d.at) ? 'mk-date mk-date-set' : 'mk-date',
-      title: isSet(d.at) ? `${dateLabel(d.at)} 알림이 맞춰져 있어요` : `누르면 ${dateLabel(d.at)} 알림을 맞출 수 있어요`,
+      class: isSet(d) ? 'mk-date mk-date-set' : 'mk-date',
+      title: isSet(d) ? `${chipLabel(d)} 알림이 맞춰져 있어요` : `누르면 ${chipLabel(d)} 알림을 맞출 수 있어요`,
     }, { date: d }));
     return DecorationSet.create(doc, decos);
   };
@@ -115,20 +125,21 @@ class DateChip {
     if (!hit) return this.hide();
     const date = hit.spec.date;
     if (this.current && this.current.from === hit.from && this.current.at.getTime() === date.at.getTime()) return this.place();
-    this.current = { from: hit.from, to: hit.to, at: date.at, text: date.text, hasTime: date.hasTime };
+    this.current = { from: hit.from, to: hit.to, at: date.at, text: date.text, hasTime: date.hasTime, repeat: date.repeat ?? null };
     this.show();
   }
 
   show() {
     this.hide({ keepCurrent: true });
-    const { at } = this.current;
-    const set = this.isSet(at);
+    const cur = this.current;
+    const set = this.isSet(cur);
+    const icon = cur.repeat ? '🔁' : '🔔';
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = `mk-date-chip${set ? ' set' : ''}`;
-    chip.textContent = set ? `🔔 ${dateLabel(at)} 알림 맞춤` : `🔔 ${dateLabel(at)} 알림 맞추기`;
+    chip.textContent = set ? `${icon} ${chipLabel(cur)} 알림 맞춤` : `${icon} ${chipLabel(cur)} 알림 맞추기`;
     chip.disabled = set;
-    chip.setAttribute('aria-label', chip.textContent.replace('🔔 ', ''));
+    chip.setAttribute('aria-label', chip.textContent.replace(/^\S+ /, ''));
     // 편집기의 커서·초점을 빼앗지 않게 (누르는 순간 편집기가 흐려지면 단추가 사라짐)
     chip.addEventListener('pointerdown', (e) => e.preventDefault());
     chip.addEventListener('mousedown', (e) => e.preventDefault());
@@ -136,13 +147,13 @@ class DateChip {
       const cur = this.current;
       if (!cur || chip.disabled) return;
       chip.disabled = true;
-      const ok = await this.onAdd({ at: cur.at, text: cur.text, hasTime: cur.hasTime });
+      const ok = await this.onAdd({ at: cur.at, text: cur.text, hasTime: cur.hasTime, repeat: cur.repeat });
       if (ok === false) {
         chip.disabled = false;
         return;
       }
       chip.classList.add('set');
-      chip.textContent = `🔔 ${dateLabel(cur.at)} 알림 맞춤`;
+      chip.textContent = `${cur.repeat ? '🔁' : '🔔'} ${chipLabel(cur)} 알림 맞춤`;
       refreshDateRemind(this.view);
       setTimeout(() => this.hide(), 1400);
     });
@@ -186,7 +197,15 @@ class DateChip {
   }
 }
 
-/** 메모의 알림 중 그 시각(1분 안)에 울리는 것이 있는지 */
-export function reminderAt(reminders, at) {
-  return (reminders ?? []).some((r) => r.enabled !== false && r.at && Math.abs(Date.parse(r.at) - at.getTime()) < SAME_MS);
+/** 메모의 알림 중 그 시각(1분 안)에 울리는 것이 있는지 — 되풀이면 같은 되풀이 알림이 있는지 */
+export function reminderAt(reminders, at, repeat = null) {
+  return (reminders ?? []).some((r) => {
+    if (r.enabled === false) return false;
+    if (repeat) {
+      const x = r.kind === 'repeat' ? r.repeat : null;
+      return Boolean(x) && x.every === repeat.every && x.time === repeat.time
+        && (x.weekdays ?? []).join() === (repeat.weekdays ?? []).join() && (x.day ?? null) === (repeat.day ?? null) && (x.month ?? null) === (repeat.month ?? null);
+    }
+    return r.at && r.kind !== 'repeat' && Math.abs(Date.parse(r.at) - at.getTime()) < SAME_MS;
+  });
 }

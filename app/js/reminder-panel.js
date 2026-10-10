@@ -219,6 +219,17 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     get list() {
       return reminders;
     },
+    /** 글 속 "매주 월요일 10시" 같은 말에서: 되풀이 알림(알림만)을 더한다 */
+    async addRepeat(repeat) {
+      const r = { every: repeat.every, time: repeat.time };
+      if (repeat.every === 'week') r.weekdays = repeat.weekdays;
+      if (repeat.every === 'month' || repeat.every === 'year') r.day = repeat.day;
+      if (repeat.every === 'year') r.month = repeat.month;
+      const reminder = { kind: 'repeat', action: 'notify', enabled: true, created: toLocalIso(new Date()), repeat: r };
+      if (!(await save([...reminders, reminder]))) return false;
+      setStatus(`알림을 맞췄어요: ${describeReminder(reminders.at(-1) ?? reminder)}`);
+      return true;
+    },
     /** 글 속 날짜 밑줄에서: 그 시각 알림(알림만)을 더한다 */
     async addAt(at) {
       if (at <= new Date()) {
