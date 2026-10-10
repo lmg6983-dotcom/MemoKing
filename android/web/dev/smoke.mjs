@@ -207,6 +207,29 @@ try {
   }
   await back();
 
+  // 홈 화면 위젯: 메뉴 › 홈 화면에 놓기 → 앱에 놓기 요청 + 보일 줄(체크 줄 번호 포함)을 보냄, 고치면 다시 보냄
+  {
+    const memoId = /^id: (\S+)/m.exec(read('회의 메모.md'))?.[1];
+    await page.tap('#menu-btn');
+    await page.tap('[data-memo-action="widget"]');
+    await page.waitForTimeout(300);
+    const wlog = await devLog();
+    const sent = wlog.widgetData?.[memoId];
+    check('메뉴 › 홈 화면에 놓기: 위젯 놓기 요청 + 제목·줄을 보냄',
+      wlog.log.some((l) => l.widgetPin === memoId) && sent?.title === '회의 메모' && sent.file === '회의 메모.md' && sent.lines.length > 0,
+      JSON.stringify(sent)?.slice(0, 300));
+    await page.locator('.mk-doc p').last().click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' 위젯');
+    await page.waitForTimeout(1500);
+    const resent = (await devLog()).widgetData?.[memoId];
+    check('위젯: 메모를 고치면 위젯 내용도 다시', JSON.stringify(resent?.lines ?? []).includes('위젯'), JSON.stringify(resent?.lines ?? []).slice(-200));
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(900);
+  }
+
   // 알림 추가
   await page.tap('#bell-btn');
   await page.tap('.rem-submit');
@@ -297,6 +320,22 @@ try {
   check('날짜 알림: 맞춘 날짜는 실선 밑줄', (await page.locator('.mk-doc .mk-date-set').count()) === 1);
   await back();
   await page.waitForTimeout(300);
+  for (let i = 0; i < 3 && await page.isVisible('#note-screen'); i++) {
+    await back();
+    await page.waitForTimeout(400);
+  }
+
+  // 위젯 고르기 목록에서 놓은 위젯을 누름 → 앱이 열리고 안내, 누르는 메모가 그 위젯에 (메모는 열지 않음)
+  await post('/dev/intent', { type: 'widget-pick', widgetId: 7 });
+  await page.evaluate(() => window.__mk.emit('intent', null));
+  await page.waitForTimeout(400);
+  const pickToast = await page.textContent('#toast').catch(() => '');
+  await page.tap('.card[data-id="00000000-0000-4000-8000-000000000001"]');
+  await page.waitForTimeout(400);
+  const picked = (await devLog()).log.find((l) => l.widgetAssign)?.widgetAssign;
+  check('위젯 고르기: 안내 후 누른 메모를 그 위젯에 (메모는 열지 않음)',
+    /위젯에 보일 메모/.test(pickToast ?? '') && picked?.[0] === 7 && picked?.[1] === '00000000-0000-4000-8000-000000000001' && await page.isHidden('#note-screen'),
+    JSON.stringify({ pickToast, picked }));
 
   // 다른 앱에서 공유하기
   const png = fs.readFileSync(path.join(repo, 'assets/icons/icon-256.png')).toString('base64');

@@ -21,6 +21,7 @@ import { app } from './state.js';
 import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
 import { renderMemoImage } from './share-image.js';
+import * as widgets from './widgets.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
@@ -262,6 +263,7 @@ app.filterByTag = (name) => {
 
 app.openMemo = async (id, options = {}) => {
   if (!app.vault) return;
+  if (widgets.takePick(id, { toast })) return; // 위젯에 보일 메모를 고르는 중
   closeAllSheets();
   // 태블릿: 새로 열면 목록은 숨기고 메모를 가득
   if (isTwoPane()) panes.hideListForMemo();
@@ -368,6 +370,11 @@ memoSheet.addEventListener('click', async (e) => {
     case 'versions':
       closeSheet(memoSheet);
       openVersions(id);
+      break;
+    case 'widget':
+      closeSheet(memoSheet);
+      note.flush();
+      widgets.pin(id, { toast });
       break;
     default:
   }
@@ -938,7 +945,9 @@ async function handleIntent() {
   if (payload.type === 'open' && payload.memoId) {
     app.openMemo(payload.memoId, { alarm: payload.label ? { label: payload.label } : undefined, highlight: true });
   } else if (payload.type === 'new') {
-    app.newMemo();
+    app.newMemo({ voice: payload.voice === true });
+  } else if (payload.type === 'widget-pick') {
+    widgets.startPick(payload.widgetId, { toast });
   } else if (payload.type === 'share') {
     await memoFromShare(payload);
   }
@@ -1003,6 +1012,7 @@ function openVault() {
     clearTimeout(changeTimer);
     changeTimer = setTimeout(() => list.refresh(), 60);
     alarms.scheduleSoon();
+    widgets.publishSoon();
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
   $('setup').hidden = true;
@@ -1019,11 +1029,13 @@ function openVault() {
   setTimeout(maybeStartTutorial, 700); // 처음이면 사용법 둘러보기 (메모 폴더를 연 뒤 한 번)
   if (app.vaultInfo?.drive) drive.syncSoon();
   recorder.resume(); // 녹음이 도는 중인지, 꺼져 있는 동안 끝난 녹음이 있는지
+  widgets.publishSoon(0); // 앱이 꺼져 있는 동안 바뀐 메모(동기화 등)를 위젯에도
   if (pendingIntent) {
     const p = pendingIntent;
     pendingIntent = null;
     if (p.type === 'open') app.openMemo(p.memoId, { alarm: p.label ? { label: p.label } : undefined, highlight: true });
-    else if (p.type === 'new') app.newMemo();
+    else if (p.type === 'new') app.newMemo({ voice: p.voice === true });
+    else if (p.type === 'widget-pick') widgets.startPick(p.widgetId, { toast });
     else if (p.type === 'share') memoFromShare(p);
   }
 }
@@ -1031,6 +1043,7 @@ function openVault() {
 // ---------- 앱의 소식 ----------
 
 on('intent', handleIntent);
+on('widget', () => app.vault?.scan()); // 위젯에서 할 일을 체크함 → 파일을 다시 읽는다
 on('history', () => list.refreshHistory());
 // Google Drive 동기화 소식: 내려받은 게 있으면 메모 폴더를 바로 다시 읽는다
 on('sync', (st) => {
