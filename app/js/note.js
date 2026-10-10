@@ -520,9 +520,20 @@ $('join-btn').addEventListener('click', async () => {
   await flush();
   api.stack.joinMenu(id);
 });
+// 단축키 모음: 전역 단축키(빠른 메모·매직키)는 설정에서 바꾼 키로
+async function openShortcutSheet() {
+  let keys;
+  try {
+    const s = await api.settings.get();
+    keys = { quickMemo: s.shortcuts?.quickMemo?.key, magic: s.shortcuts?.magic?.key };
+  } catch {
+    keys = undefined;
+  }
+  toggleShortcutSheet(keys);
+}
 $('shortcuts-btn').addEventListener('click', () => {
   closeMenu();
-  toggleShortcutSheet();
+  openShortcutSheet();
 });
 // 메모 창을 몇 번 써 본 뒤 한 번: 단축키 모음이 있다는 것
 setTimeout(() => hintOnce('shortcuts', 'Ctrl+/ 를 누르면 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn }), 2500);
@@ -708,6 +719,9 @@ const PALETTES = {
   color: { title: '글자 색', colors: TEXT_COLORS, apply: (c) => editor.setTextColor(c) },
   highlight: { title: '형광펜', colors: HIGHLIGHT_COLORS, apply: (c) => editor.setHighlight(c) },
 };
+// 지금 커서·고른 글자에 칠해진 색 (showActive 가 채움) — 판에서 같은 색을 다시 누르면 지우고, 판에 지금 색을 표시
+const appliedColor = { color: null, highlight: null };
+const sameColor = (a, b) => Boolean(a && b) && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
 // 마지막으로 쓴 색 (이 PC 에서만 기억하는 편의 설정)
 const lastColor = { color: TEXT_COLORS[0].value, highlight: HIGHLIGHT_COLORS[0].value };
 try {
@@ -738,7 +752,8 @@ function openPalette(kind, anchor) {
       b.classList.add('text-sample');
       b.style.color = value;
     } else b.style.background = value;
-    b.setAttribute('aria-checked', String(value === lastColor[kind]));
+    b.setAttribute('aria-checked', String(sameColor(value, appliedColor[kind] ?? lastColor[kind])));
+    if (sameColor(value, appliedColor[kind])) b.title = `${name} (다시 누르면 색을 지워요)`;
     return b;
   }));
   el.palette.hidden = false;
@@ -753,6 +768,7 @@ function closePalette() {
 function applyPaletteColor(color) {
   const kind = paletteKind;
   if (!kind) return;
+  if (color && sameColor(color, appliedColor[kind])) color = null; // 지금 칠해진 색을 다시 고르면 지운다
   if (color) {
     lastColor[kind] = color;
     try {
@@ -1023,6 +1039,8 @@ function firstTimeHints(active) {
 }
 
 function showActive(active) {
+  appliedColor.color = active.color ?? null;
+  appliedColor.highlight = active.highlight ?? null;
   showTableBar(active.table);
   firstTimeHints(active);
   showStyle(active);
@@ -1102,7 +1120,7 @@ window.addEventListener('keydown', (e) => {
   else if (name === 'reminders') reminderPanel?.toggle();
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
-  else if (name === 'shortcuts') toggleShortcutSheet();
+  else if (name === 'shortcuts') openShortcutSheet();
 }, true);
 
 // ---------- 본문 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 웹 브라우저처럼 글·사진·표가 함께 ----------

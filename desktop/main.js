@@ -27,7 +27,8 @@ import { createSttService } from './stt/stt-service.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
-import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_KEY, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
+import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
+import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
 import { FileIndex } from './file-index.js';
@@ -69,7 +70,6 @@ const STT_WORKER = unpacked(path.join(import.meta.dirname, 'stt', 'stt-worker.js
 const STT_VENDOR = unpacked(path.join(import.meta.dirname, 'vendor'));
 const POPUP_HELPER = path.join(import.meta.dirname, '..', 'scripts', 'popup-watch.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 const CLIPBOARD_HELPER = path.join(import.meta.dirname, '..', 'scripts', 'clipboard-helper.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
-const QUICK_MEMO_KEY = 'Control+Alt+C';
 
 // 스티커 창이 뜨는 순간의 배경색 (화면 CSS 와 같은 값)
 const NOTE_BG = {
@@ -109,6 +109,7 @@ let settings = {
   autoTags: true, // 태그 없는 메모를 닫을 때 확실한 추천 태그를 저절로 (휴대폰과 같음)
   magic: undefined, // 매직키 (Ctrl+Alt+Space): { enabled, modules } — normalizeMagicSettings 로 정리
   magicPos: null, // 매직키 창을 끌어 옮긴 자리 { x, y }
+  shortcuts: undefined, // 전역 단축키를 바꾼 것 { quickMemo, magic } (Electron 단축키 글자) — normalizeShortcuts 로 정리
 };
 let settingsTimer = null;
 
@@ -534,6 +535,7 @@ function showTab(id, { inactive = false, bounds: at = null } = {}) {
     win.setBounds(shown?.getNormalBounds() ?? bounds);
     setTopmost(win, top);
     setSticker(win, top, { animate: false });
+    if (top) handOverSticker(shown, win); // 왕관은 그 자리에 그대로 (번쩍이지 않게)
     if (inactive) win.showInactive();
     else {
       win.show();
@@ -581,6 +583,7 @@ function stackInto(targetId, movingId) {
     if (win.isMinimized()) win.restore();
     win.setAlwaysOnTop(top, 'floating');
     setSticker(win, top, { animate: false });
+    if (top) handOverSticker(targetWin, win);
     if (win.isVisible()) animateBounds(win, bounds);
     else win.setBounds(bounds);
     win.show();
@@ -866,6 +869,21 @@ function openStickerWin(entry, animate) {
     win.webContents.send('sticker:show', { animate });
   });
   win.loadFile(path.join(APP_DIR, 'sticker.html'));
+}
+
+// 스택에서 탭을 바꿀 때: 보이던 탭의 왕관 스티커 창을 새 탭으로 그대로 넘긴다.
+//   (탭마다 스티커 창을 새로 만들고 없애면, 새 창을 불러오는 사이 왕관이 사라졌다 나타나 번쩍인다)
+function handOverSticker(from, to) {
+  if (!from || !to || from === to || from.isDestroyed() || to.isDestroyed()) return false;
+  const a = stickers.get(from.id);
+  const b = stickers.get(to.id);
+  if (!a?.win || a.win.isDestroyed() || !b || b.win) return false;
+  const win = a.win;
+  a.win = null; // 이전 탭이 숨을 때 이 창을 없애지 않게
+  b.win = win;
+  win.setParentWindow(to);
+  win.setBounds(stickerBounds(to));
+  return true;
 }
 
 function setSticker(owner, on, { animate = true } = {}) {
@@ -1199,7 +1217,10 @@ let tutorial = { active: false, index: -1, memoId: null, praise: false };
 
 function tutorialPayload() {
   const step = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
-  return step ? { ...step, index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise } : null;
+  if (!step) return null;
+  // 단축키를 바꿨으면 안내 글도 지금 키로
+  const keys = (t) => (typeof t === 'string' ? withShortcuts(t, settings.shortcuts) : t);
+  return { ...step, title: keys(step.title), text: keys(step.text), index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise };
 }
 
 function tutorialWin(step) {
@@ -1690,7 +1711,8 @@ function appSettings() {
     trashCount: vault?.trashList().length ?? 0,
     autoStart: { available: autoStartAvailable(), enabled: getAutoStart() },
     historyEnabled: settings.historyEnabled,
-    quickMemo: { enabled: settings.quickMemo, registered: globalShortcut.isRegistered(QUICK_MEMO_KEY), key: 'Ctrl+Alt+C' },
+    quickMemo: { enabled: settings.quickMemo, registered: shortcutStatus('quickMemo').registered, key: shortcutLabel('quickMemo') },
+    shortcuts: { quickMemo: shortcutStatus('quickMemo'), magic: shortcutStatus('magic') },
     fitTables: settings.fitTables !== false,
     autoTags: settings.autoTags !== false,
     magic: normalizeMagicSettings(settings.magic),
@@ -1698,6 +1720,60 @@ function appSettings() {
     version: app.getVersion(),
   };
 }
+
+// ---------- 전역 단축키 (빠른 메모·매직키) — 설정에서 바꿀 수 있다 ----------
+// 다른 앱이 먼저 같은 키를 잡고 있으면 Windows 가 등록을 거절한다 → 설정에 "다른 앱이 쓰고 있어요" 로 알리고,
+//   그 앱이 놓아 주면 쓸 수 있게 1분마다 다시 시도한다
+const shortcutKey = (name) => normalizeShortcuts(settings.shortcuts)[name];
+const shortcutLabel = (name) => displayAccelerator(shortcutKey(name));
+const heldKeys = { quickMemo: null, magic: null }; // 지금 메모킹이 잡고 있는 키
+let shortcutsPaused = false; // 설정에서 새 키를 누르는 동안은 잠시 놓는다 (누른 키가 빠른 메모를 띄우지 않게)
+
+function shortcutStatus(name) {
+  const enabled = name === 'quickMemo' ? settings.quickMemo && process.platform === 'win32' : normalizeMagicSettings(settings.magic).enabled;
+  const key = shortcutKey(name);
+  return { key, label: displayAccelerator(key), isDefault: key === DEFAULT_SHORTCUTS[name], enabled, registered: Boolean(heldKeys[name]) && globalShortcut.isRegistered(key) };
+}
+
+/** 단축키를 바꾼다. acc 가 null 이면 기본값으로. 다른 앱이 쓰고 있으면 바꾸지 않고 알린다 */
+function setShortcut(name, acc) {
+  if (!(name in DEFAULT_SHORTCUTS)) return { ok: false, reason: 'invalid' };
+  const next = acc ?? DEFAULT_SHORTCUTS[name];
+  if (!isValidAccelerator(next)) return { ok: false, reason: 'invalid', status: shortcutStatus(name) };
+  const other = name === 'quickMemo' ? 'magic' : 'quickMemo';
+  if (next === shortcutKey(other)) return { ok: false, reason: 'same', other: SHORTCUT_NAMES[other], status: shortcutStatus(name) };
+  const prev = shortcutKey(name);
+  const enabled = shortcutStatus(name).enabled;
+  if (enabled && next !== prev) {
+    // 새 키를 먼저 잡아 본다 — 안 되면(다른 앱이 쓰는 중) 지금 키를 그대로 둔다
+    if (!globalShortcut.register(next, () => {})) return { ok: false, reason: 'taken', label: displayAccelerator(next), status: shortcutStatus(name) };
+    globalShortcut.unregister(next);
+  }
+  settings.shortcuts = { ...normalizeShortcuts(settings.shortcuts), [name]: next };
+  saveSettings();
+  if (name === 'quickMemo') registerQuickMemoKey();
+  else registerMagicKey();
+  updateTrayMenu();
+  return { ok: true, status: shortcutStatus(name) };
+}
+
+function pauseShortcuts(on) {
+  shortcutsPaused = Boolean(on);
+  registerQuickMemoKey();
+  registerMagicKey();
+}
+
+// 다른 앱이 잡고 있어 못 잡은 단축키를 1분마다 다시 (그 앱이 끝나면 메모킹이 쓸 수 있게)
+setInterval(() => {
+  if (shortcutsPaused) return;
+  const before = [shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered].join();
+  if (shortcutStatus('quickMemo').enabled && !shortcutStatus('quickMemo').registered) registerQuickMemoKey();
+  if (shortcutStatus('magic').enabled && !shortcutStatus('magic').registered) registerMagicKey();
+  if ([shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered].join() !== before) {
+    updateTrayMenu();
+    listWin?.webContents.send('shortcuts:changed');
+  }
+}, 60_000).unref?.();
 
 // ---------- 빠른 메모 (Ctrl+Alt+C) ----------
 // 어느 앱에서든 선택한 글·파일·그림을 복사해 마우스 위치에 새 메모로 띄운다.
@@ -1707,11 +1783,16 @@ const pendingCaptures = new Map(); // 새 메모 창이 열리면 채울 내용
 let capturing = false;
 
 function registerQuickMemoKey() {
-  globalShortcut.unregister(QUICK_MEMO_KEY);
-  if (!settings.quickMemo || process.platform !== 'win32') return false;
-  const ok = globalShortcut.register(QUICK_MEMO_KEY, () => onQuickMemoKey());
-  if (!ok) console.warn('Ctrl+Alt+C 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다');
-  else captureHelper.start(); // 미리 띄워 두어 누르자마자 동작하게
+  if (heldKeys.quickMemo) globalShortcut.unregister(heldKeys.quickMemo);
+  heldKeys.quickMemo = null;
+  if (!settings.quickMemo || process.platform !== 'win32' || shortcutsPaused) return false;
+  const key = shortcutKey('quickMemo');
+  const ok = globalShortcut.register(key, () => onQuickMemoKey());
+  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다`);
+  else {
+    heldKeys.quickMemo = key;
+    captureHelper.start(); // 미리 띄워 두어 누르자마자 동작하게
+  }
   return ok;
 }
 
@@ -1935,10 +2016,13 @@ function showFinder(query) {
 }
 
 function registerMagicKey() {
-  globalShortcut.unregister(MAGIC_KEY);
-  if (!normalizeMagicSettings(settings.magic).enabled) return false;
-  const ok = globalShortcut.register(MAGIC_KEY, () => showMagic());
-  if (!ok) console.warn('Ctrl+Alt+Space 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다');
+  if (heldKeys.magic) globalShortcut.unregister(heldKeys.magic);
+  heldKeys.magic = null;
+  if (!normalizeMagicSettings(settings.magic).enabled || shortcutsPaused) return false;
+  const key = shortcutKey('magic');
+  const ok = globalShortcut.register(key, () => showMagic());
+  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다`);
+  else heldKeys.magic = key;
   return ok;
 }
 
@@ -1980,7 +2064,7 @@ async function quickMemo({ copy = true, onlyPid = 0 } = {}) {
     return captureToMemo(dir, info, point);
   } catch (err) {
     console.error('빠른 메모 실패', err);
-    notice('메모를 만들지 못했어요', 'Ctrl+Alt+C를 한 번 더 눌러 주세요.');
+    notice('메모를 만들지 못했어요', `${shortcutLabel('quickMemo')}를 한 번 더 눌러 주세요.`);
     return null;
   } finally {
     capturing = false;
@@ -1992,7 +2076,7 @@ async function quickMemo({ copy = true, onlyPid = 0 } = {}) {
 function captureToMemo(dir, info, point) {
   const capture = buildCapture(readCaptureDir(dir), info, vault);
   if (!capture) {
-    notice('가져올 내용이 없어요', '글, 파일, 그림을 고른 뒤 Ctrl+Alt+C를 눌러 주세요.');
+    notice('가져올 내용이 없어요', `글, 파일, 그림을 고른 뒤 ${shortcutLabel('quickMemo')}를 눌러 주세요.`);
     return null;
   }
   const where = captureWhere(capture.source);
@@ -2037,7 +2121,7 @@ async function startAreaCapture({ show = !SMOKE } = {}) {
   }
   if (!sources.length) {
     areaCapture = null;
-    notice('화면을 캡처하지 못했어요', '잠시 뒤 Ctrl+Alt+C 를 두 번 다시 눌러 주세요.');
+    notice('화면을 캡처하지 못했어요', `잠시 뒤 ${shortcutLabel('quickMemo')} 를 두 번 다시 눌러 주세요.`);
     return false;
   }
   for (const d of displays) {
@@ -2331,6 +2415,8 @@ function registerIpc() {
   ipcMain.handle('app:settings', () => appSettings());
   ipcMain.handle('app:set-auto-start', (_e, on) => setAutoStart(on));
   ipcMain.handle('app:set-quick-memo', (_e, on) => setQuickMemo(on));
+  ipcMain.handle('shortcuts:set', (_e, name, acc) => setShortcut(String(name), acc == null ? null : String(acc)));
+  ipcMain.handle('shortcuts:pause', (_e, on) => pauseShortcuts(on));
   ipcMain.handle('app:set-fit-tables', (_e, on) => {
     settings.fitTables = Boolean(on);
     saveSettings();
@@ -2844,9 +2930,9 @@ function updateTrayMenu() {
     { label: '메모 폴더 열기', enabled: Boolean(vault), click: () => shell.openPath(vault.root) },
     { type: 'separator' },
     {
-      label: '빠른 메모 Ctrl+Alt+C (두 번: 화면 캡처)',
+      label: `빠른 메모 ${shortcutLabel('quickMemo')} (두 번: 화면 캡처)${settings.quickMemo && !shortcutStatus('quickMemo').registered ? ' — 다른 앱이 쓰는 중' : ''}`,
       type: 'checkbox',
-      checked: settings.quickMemo && globalShortcut.isRegistered(QUICK_MEMO_KEY),
+      checked: settings.quickMemo && shortcutStatus('quickMemo').registered,
       click: (item) => setQuickMemo(item.checked),
     },
     {

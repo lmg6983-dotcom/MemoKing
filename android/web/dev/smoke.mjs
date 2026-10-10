@@ -158,6 +158,24 @@ try {
   await page.waitForTimeout(300);
   await shot('02-note');
   check('메모: 하이라이트 표시', await page.locator('.mk-doc mark').count() === 1);
+  // 형광펜 단추를 짧게 누르면 켜고 끄기: 칠해진 글자를 고르고 누르면 지워지고, 다시 누르면 칠해진다
+  await page.locator('.mk-doc mark').tap();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const t = document.querySelector('.mk-doc mark').firstChild;
+    const r = document.createRange();
+    r.setStart(t, 0);
+    r.setEnd(t, t.length);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+  });
+  await page.waitForTimeout(300);
+  await page.tap('#format-bar [data-action="highlight"]');
+  await page.waitForTimeout(300);
+  const hlOff = (await page.locator('.mk-doc mark').count()) === 0;
+  await page.tap('#format-bar [data-action="highlight"]');
+  await page.waitForTimeout(300);
+  check('형광펜 단추: 다시 누르면 지워짐 · 또 누르면 다시', hlOff && (await page.locator('.mk-doc mark').count()) === 1, String(hlOff));
   await page.locator('.mk-doc p').last().tap();
   await page.keyboard.press('End');
   await page.keyboard.type(' 휴대폰에서 추가');
