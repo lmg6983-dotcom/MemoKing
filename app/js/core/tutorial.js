@@ -106,7 +106,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'crown', win: 'note', target: ['#top-btn'], advance: 'crown-on', emoji: '👑',
     title: '늘 위에 띄워 두기',
-    text: '왕관을 누르면 이 메모가 다른 창에 가려지지 않아요. 창 위에 붙은 왕관 스티커를 누르면 떼어져요.',
+    text: '왕관을 누르면 이 메모가 다른 창에 가려지지 않아요. 창 위에 붙은 왕관 스티커를 누르거나 Ctrl+Shift+T 를 다시 누르면 떼어져요.',
     try: '왕관을 눌러 보세요',
     next: LATER,
   },

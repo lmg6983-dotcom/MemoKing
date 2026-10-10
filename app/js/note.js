@@ -294,16 +294,20 @@ function applyTop(on) {
   }
   el.topBtn.setAttribute('aria-pressed', String(on));
   const label = on ? '늘 위에 두기 끄기' : '다른 창보다 늘 위에 두기';
-  el.topBtn.title = '왕관 스티커를 붙여 다른 창보다 늘 위에 두기 (Ctrl+Shift+T)';
+  el.topBtn.title = '왕관 스티커를 붙여 다른 창보다 늘 위에 두기 (Ctrl+Shift+T, 다시 누르면 떼기)';
   el.topBtn.setAttribute('aria-label', label);
   document.body.classList.toggle('on-top', on);
 }
 
-// 버튼·Ctrl+Shift+T 는 붙이기만 (떼기는 창 위의 왕관 스티커를 눌러서)
+// 버튼은 붙이기만 (붙으면 버튼이 숨고, 떼기는 창 위의 왕관 스티커를 눌러서). Ctrl+Shift+T 는 붙이고 떼기 둘 다
 async function toggleTop() {
   if (topOn) return;
   applyTop(await api.win.toggleTop(id));
   if (topOn) tutEvent('crown-on');
+}
+async function toggleTopKey() {
+  if (!topOn) return toggleTop();
+  applyTop(await api.win.toggleTop(id)); // 스티커가 떼어지는 모습은 스티커를 누를 때와 같다
 }
 el.topBtn.addEventListener('click', toggleTop);
 $('pdf-btn').addEventListener('click', async () => {
@@ -1116,7 +1120,7 @@ window.addEventListener('keydown', (e) => {
     else editor.toggleHighlight(lastColor.highlight);
   } else if (kind === 'action') actions[name]();
   else if (name === 'links') toggleLinks();
-  else if (name === 'top') toggleTop();
+  else if (name === 'top') toggleTopKey();
   else if (name === 'reminders') reminderPanel?.toggle();
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
