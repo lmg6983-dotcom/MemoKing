@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('memoking', {
   memo: {
     open: invoke('memo:open'),
     handoff: invoke('memo:handoff'), // 다른 기기에서 방금 고친 메모 { id, title, from } | null
+    // 잠금 메모: lock(id, 비밀번호) · openLock(id, 비밀번호) → 메모 | { error } · unlock(id) 잠금 풀기
+    lock: invoke('memo:lock'),
+    openLock: invoke('memo:open-lock'),
+    unlock: invoke('memo:unlock'),
     create: invoke('memo:create'),
     get: invoke('memo:get'),
     save: invoke('memo:save'),

@@ -22,6 +22,8 @@ import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast,
 import * as recorder from './recorder.js';
 import { renderMemoImage } from '../../app/js/share-image.js';
 import * as widgets from './widgets.js';
+import { lockDialog } from '../../app/js/lock-ui.js';
+import { newLockSession } from '../../app/js/core/memo-lock.js';
 import { handoffFrom, handoffText } from '../../app/js/core/handoff.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
@@ -315,6 +317,7 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="print"]').hidden = !inNote;
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
   pin.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
+  memoSheet.querySelector('[data-memo-action="lock"] span').textContent = memo.locked ? '잠금 풀기' : '잠그기';
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -371,6 +374,31 @@ memoSheet.addEventListener('click', async (e) => {
     case 'versions':
       closeSheet(memoSheet);
       openVersions(id);
+      break;
+    case 'lock':
+      closeSheet(memoSheet);
+      note.flush();
+      if (memo.locked) {
+        if (note.currentId() !== id || memo.needsPassword) {
+          toast('먼저 비밀번호로 열고, 메뉴에서 잠금을 풀어 주세요');
+          app.openMemo(id);
+          break;
+        }
+        if (!(await confirmDialog('잠금을 풀까요? 내용이 그대로 파일에 저장되고, 비밀번호 없이 열려요.', '잠금 풀기'))) break;
+        if (app.vault.unlock(id)) toast('잠금을 풀었어요');
+        break;
+      }
+      if (await lockDialog({
+        onLock: async (password) => {
+          try {
+            note.flush();
+            const session = await newLockSession(password);
+            return app.vault.lock(id, session) ? null : '잠그지 못했어요';
+          } catch (err) {
+            return err.message;
+          }
+        },
+      })) toast(note.currentId() === id ? '잠갔어요. 메모를 닫으면 다시 비밀번호로 열려요' : '잠갔어요');
       break;
     case 'widget':
       closeSheet(memoSheet);

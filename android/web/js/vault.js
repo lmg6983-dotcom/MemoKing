@@ -9,6 +9,7 @@ import { extractTags } from '../../app/js/core/tags.js';
 import { normalizeTables } from '../../app/js/core/table-sizes.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
+import { isLockedBody, sealBody, unsealBody } from '../../app/js/core/memo-lock.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
@@ -47,6 +48,7 @@ export class Vault extends EventTarget {
     this.orphanTimer = null;
     /** @type {Map<string, {id, file: string|null, meta, body, mtimeMs, size, idSaved: boolean}>} */
     this.entries = new Map();
+    this.locks = new Map(); // 연 잠금 메모: id → 세션 (메모를 닫으면 잊는다)
     this.index = null;
     this.indexTimer = null;
     this.pollTimer = null;
@@ -184,6 +186,7 @@ export class Vault extends EventTarget {
       reminderCount: entry.meta.reminders.filter((r) => r.enabled).length,
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
       tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
+      locked: isLockedBody(entry.body),
     };
   }
 
@@ -215,10 +218,14 @@ export class Vault extends EventTarget {
   get(id) {
     const entry = this.entries.get(id);
     if (!entry) return null;
+    const plain = this.plainOf(entry);
+    const locked = isLockedBody(entry.body);
     return {
       id,
       file: entry.file,
-      body: entry.body,
+      body: plain ?? entry.body, // 잠긴 메모는 연(비밀번호를 넣은) 동안만 푼 글
+      locked,
+      needsPassword: locked && plain === null,
       title: extractTitle(entry.body),
       color: entry.meta.color,
       pinned: entry.meta.pinned,
@@ -306,6 +313,16 @@ export class Vault extends EventTarget {
       entry = this.newEntry(id);
       this.entries.set(id, entry);
     }
+    // 잠근 글을 바깥에서 고쳐 넘기는 일은 없다 (자동 태그 등) — 암호문이 깨지지 않게 그대로 둔다
+    if (isLockedBody(body) && entry.file && body !== entry.body) return this.summary(entry);
+    if (isLockedBody(entry.body) && !isLockedBody(body)) {
+      // 잠긴 메모: 연 동안만 저장할 수 있고, 저장은 늘 다시 잠근 글로 (풀린 글이 파일에 닿지 않게)
+      const session = this.locks.get(id);
+      const plain = session ? this.plainOf(entry) : null;
+      if (plain === null) return this.summary(entry); // 열지 않았거나, 다른 기기가 다른 비밀번호로 다시 잠금 → 덮어쓰지 않음
+      if (entry.file && plain === body) return this.summary(entry);
+      body = sealBody(body, session);
+    }
     if (entry.body === body && entry.file) return this.summary(entry);
     const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
     entry.body = body;
@@ -316,6 +333,78 @@ export class Vault extends EventTarget {
     this.write(entry, known);
     this.changed([id]);
     return this.summary(entry);
+  }
+
+  // ---------- 잠금 메모 (core/memo-lock.js) ----------
+  // 비밀번호로 만든 열쇠(세션)는 메모를 연 동안만 여기에 — 닫으면 closeLock 으로 잊는다. 열쇠 만들기(느림)는 부르는 쪽이 비동기로
+
+  /** 이 메모의 본문 (잠겼으면 세션으로 푼 글, 못 풀면 null) */
+  plainOf(entry) {
+    if (!isLockedBody(entry.body)) return entry.body;
+    const session = this.locks.get(entry.id);
+    return session ? unsealBody(entry.body, session) : null;
+  }
+
+  /** 비밀번호를 넣어 연다 (세션이 이 메모를 풀 수 있어야) */
+  openLock(id, session) {
+    const entry = this.entries.get(id);
+    if (!entry || !isLockedBody(entry.body) || unsealBody(entry.body, session) === null) return null;
+    this.locks.set(id, session);
+    return this.get(id);
+  }
+
+  closeLock(id) {
+    this.locks.delete(id);
+  }
+
+  /** 다른 기기와 동시에 고친 내용의 사본: 원래 메모가 잠겼으면 사본도 같은 열쇠로 잠근다 (풀린 글이 사본으로 새지 않게) */
+  importCopyOf(sourceId, body, { color } = {}) {
+    const session = this.locks.get(sourceId);
+    if (!session && this.entries.get(sourceId) && isLockedBody(this.entries.get(sourceId).body) && !isLockedBody(body)) return null;
+    const id = this.import({ body: session && !isLockedBody(body) ? sealBody(body, session) : body, color });
+    if (session) this.locks.set(id, session);
+    return id;
+  }
+
+  /** 잠그기: 지금 본문을 잠근 글로 바꾸고, 잠그기 전 버전 기록(풀린 글)은 지운다 */
+  lock(id, session) {
+    const entry = this.entries.get(id);
+    if (!entry || isLockedBody(entry.body)) return null;
+    const known = entry.body;
+    entry.body = sealBody(known, session);
+    entry.meta.updated = toLocalIso();
+    entry.meta.device = 'phone';
+    this.write(entry, known);
+    this.purgeVersions(id);
+    this.locks.set(id, session);
+    this.changed([id]);
+    return this.get(id);
+  }
+
+  /** 잠금 풀기 (연 동안만): 본문을 풀린 글로 */
+  unlock(id) {
+    const entry = this.entries.get(id);
+    const plain = entry ? this.plainOf(entry) : null;
+    if (!entry || !isLockedBody(entry.body) || plain === null) return null;
+    const known = entry.body;
+    entry.body = plain;
+    entry.meta.updated = toLocalIso();
+    this.write(entry, known);
+    this.purgeVersions(id); // 잠긴 동안의 버전은 이제 열 수 없는 글이므로
+    this.locks.delete(id);
+    this.changed([id]);
+    return this.get(id);
+  }
+
+  purgeVersions(id) {
+    const dir = this.versionDir(id);
+    if (!dir) return;
+    try {
+      for (const name of this.versionNames(id)) fs.remove(`${dir}/${name}`);
+    } catch {
+      // 다음에 다시
+    }
+    this.latestVersion?.delete(id);
   }
 
   // ---------- 버전 기록 (_memoking/versions/<id>/<시각>.md) — 데스크탑과 같은 규칙 ----------

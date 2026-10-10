@@ -20,6 +20,7 @@ import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { handoffFrom, HANDOFF_MS } from '../app/js/core/handoff.js';
+import { newLockSession, openLock } from '../app/js/core/memo-lock.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
@@ -447,6 +448,7 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null, re
   });
   win.on('closed', () => {
     noteWins.delete(id);
+    vault?.closeLock(id); // 잠금 메모는 창을 닫으면 다시 비밀번호로
     if (id === tutorial.memoId) tutorialEvent('note-closed');
     vault?.finalize(id);
     // 비워 두어 지워진 메모(+ 로 만들고 안 쓴 탭 등)는 스택에서도 뺀다
@@ -2725,6 +2727,25 @@ function registerIpc() {
     pendingCaptures.delete(id);
     return { ...memo, onTop: settings.onTop[id] === true, alarm, capture, stack: stackState(id) };
   });
+  // 잠금 메모: 열쇠 만들기는 느려서(비밀번호 → PBKDF2) 비동기, 잠그고 푸는 저장은 vault 가 동기로
+  ipcMain.handle('memo:lock', async (_e, id, password) => {
+    try {
+      const session = await newLockSession(String(password ?? ''));
+      return vault?.lock(String(id), session) ?? { error: '이미 잠긴 메모예요' };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+  ipcMain.handle('memo:open-lock', async (_e, id, password) => {
+    const sealed = vault?.entries.get(String(id))?.body;
+    try {
+      const { session } = await openLock(sealed, String(password ?? ''));
+      return vault.openLock(String(id), session) ?? { error: '메모를 열지 못했어요' };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+  ipcMain.handle('memo:unlock', (_e, id) => vault?.unlock(String(id)) ?? { error: '먼저 비밀번호로 열어 주세요' });
   ipcMain.handle('memo:save', (_e, id, body) => {
     if (typeof body !== 'string') throw new TypeError('본문이 문자열이 아닙니다.');
     const summary = vault.save(id, body);
@@ -2738,7 +2759,7 @@ function registerIpc() {
       vault.save(copyId, body);
       return copyId;
     }
-    return vault.import({ body, color: vault.get(sourceId)?.color });
+    return vault.importCopyOf(sourceId, body, { color: vault.get(sourceId)?.color });
   });
   ipcMain.on('memo:save-sync', (event, id, body) => {
     try {

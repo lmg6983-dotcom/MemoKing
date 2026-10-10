@@ -21,6 +21,8 @@ const DEPS = {
   'chrono-node': '2.10.1',
   '@modelcontextprotocol/sdk': '1.30.1',
   zod: '4.6.5',
+  '@noble/ciphers': '2.4.0',
+  '@noble/hashes': '2.4.0',
   esbuild: '0.28.2',
 };
 
@@ -57,6 +59,7 @@ await esbuild.build({
     'html-to-image': join(ROOT, 'scripts', 'vendor', 'html-to-image.js'),
     'es-hangul': join(ROOT, 'scripts', 'vendor', 'es-hangul.js'),
     chrono: join(ROOT, 'scripts', 'vendor', 'chrono.js'),
+    'noble-crypto': join(ROOT, 'scripts', 'vendor', 'noble-crypto.js'),
   },
   outdir: OUT,
   bundle: true,

@@ -24,7 +24,10 @@ export function publish(only = null) {
   if (!ids.length) return;
   const memos = ids.map((id) => {
     const memo = app.vault.get(id);
-    return memo?.file ? widgetMemo(memo) : { id, gone: true };
+    if (!memo?.file) return { id, gone: true };
+    // 잠긴 메모는 위젯에 내용을 보이지 않는다 (열어 둔 동안에도)
+    if (memo.locked) return { id, title: memo.title, color: memo.color ?? 'yellow', file: memo.file, lines: [{ t: '🔒 잠긴 메모예요', kind: 'text' }] };
+    return widgetMemo(memo);
   });
   try {
     native.publish(JSON.stringify(memos));

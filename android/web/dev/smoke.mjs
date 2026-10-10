@@ -337,6 +337,63 @@ try {
     /위젯에 보일 메모/.test(pickToast ?? '') && picked?.[0] === 7 && picked?.[1] === '00000000-0000-4000-8000-000000000001' && await page.isHidden('#note-screen'),
     JSON.stringify({ pickToast, picked }));
 
+  // 잠금 메모: 메뉴 › 잠그기 → 파일에 풀린 글 없음, 쓰는 동안도 잠근 채 저장, 닫았다 열면 비밀번호 → 잠금 풀기
+  {
+    await page.tap('#fab');
+    await page.tap('[data-new="text"]');
+    await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+    await page.keyboard.type('# 휴대폰 비밀');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('현관 비번 4321');
+    await page.waitForTimeout(900);
+    const lockMd = () => (fs.existsSync(path.join(vault, '휴대폰 비밀.md')) ? read('휴대폰 비밀.md') : '');
+    await page.tap('#menu-btn');
+    await page.tap('[data-memo-action="lock"]');
+    await page.waitForSelector('.lock-dialog[open]');
+    await page.fill('#lock-pass-1', 'abcd1234');
+    await page.fill('#lock-pass-2', 'abcd1234');
+    await shot('02e-lock-dialog');
+    await page.tap('.lock-dialog .btn.primary');
+    await page.waitForSelector('.lock-dialog', { state: 'detached', timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    const allVault = () => fs.readdirSync(vault, { recursive: true }).map((f) => path.join(vault, f)).filter((f) => fs.statSync(f).isFile() && /\.(md|json)$/.test(f)).map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+    check('휴대폰 잠그기: 파일·버전에 풀린 글 없음, 제목만', /memoking-lock v1/.test(lockMd()) && /# 휴대폰 비밀/.test(lockMd()) && !allVault().includes('현관 비번'), lockMd().slice(0, 200));
+    await page.locator('.mk-doc p').last().click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' 바꿈');
+    await page.waitForTimeout(1500);
+    check('휴대폰 잠긴 메모: 쓰는 동안도 잠근 글로 저장', !allVault().includes('바꿈') && /memoking-lock/.test(lockMd()));
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+    const lockedId = /^id: (\S+)/m.exec(lockMd())?.[1];
+    await page.tap(`.card[data-id="${lockedId}"]`);
+    await page.waitForSelector('.lock-screen');
+    await page.waitForTimeout(400); // 메모 화면이 다 나타난 뒤
+    await shot('02f-lock-screen');
+    await page.fill('#lock-open-pass', 'nope1234');
+    await page.tap('.lock-screen .btn.primary');
+    await page.waitForFunction(() => /비밀번호가 달라요/.test(document.querySelector('.lock-screen .lock-error')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {});
+    const wrongMsg = await page.textContent('.lock-screen .lock-error').catch(() => '');
+    await page.fill('#lock-open-pass', 'abcd1234');
+    await page.tap('.lock-screen .btn.primary');
+    await page.waitForSelector('#note-screen .ProseMirror', { timeout: 15000 }).catch(() => {});
+    const openedText = await page.locator('.mk-doc').innerText().catch(() => '');
+    check('휴대폰 잠긴 메모: 틀리면 안내, 맞으면 열림', /비밀번호가 달라요/.test(wrongMsg ?? '') && openedText.includes('바꿈'), JSON.stringify({ wrongMsg, openedText: openedText.slice(0, 80) }));
+    await page.tap('#menu-btn');
+    const unlockLabel = await page.textContent('[data-memo-action="lock"] span');
+    await page.tap('[data-memo-action="lock"]');
+    await page.waitForSelector('#confirm-dialog[open]');
+    await page.tap('#confirm-ok');
+    await page.waitForTimeout(600);
+    check('휴대폰 잠금 풀기: 메뉴 "잠금 풀기" · 풀면 파일에 원래 글', unlockLabel === '잠금 풀기' && lockMd().includes('현관 비번') && !/memoking-lock/.test(lockMd()), unlockLabel);
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+  }
+
   // 이어 쓰기: PC 에서 방금 고친 메모가 들어오면 "PC에서 방금 고친 메모: … [열기]"
   {
     const nowIso = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');

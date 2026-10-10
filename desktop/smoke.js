@@ -648,7 +648,7 @@ export async function runSmoke({
     const localOf = (alt) => new RegExp(`!\\[${alt}\\]\\((attachments/[^)\\s]+)\\)`).exec(webMd)?.[1];
     const catFile = localOf('고양이');
     check('웹 글+사진 붙여넣기 → 글은 서식대로', webMd.includes('## 웹 기사 제목') && webMd.includes('기사 본문 첫 문단'),
-      webMd.split('---').slice(2).join('---').slice(0, 200));
+      JSON.stringify(webMd.slice(0, 400)));
     check('인터넷 사진 → attachments 에 저장 (원본과 같은 파일)',
       Boolean(catFile) && fs.readFileSync(path.join(VAULT, catFile)).equals(png) && !webMd.includes(`${base}/cat.png`), catFile);
     check('지연 로딩 사진 → 진짜 주소(data-src)에서 받아 저장', Boolean(localOf('지연 로딩')), webMd.match(/!\[지연 로딩\][^\n]*/)?.[0]);
@@ -1152,6 +1152,50 @@ export async function runSmoke({
       check('이어 쓰기: [열기] → 그 메모 창', hn?.id === '00000000-0000-4000-8000-00000000f0e1');
       if (hn) await closeNote(hn.id);
       getVault().trash('00000000-0000-4000-8000-00000000f0e1'); // 뒤 점검의 메모 수에 섞이지 않게
+    }
+    // 14-02) 잠금 메모: 비밀번호로 잠그면 파일·버전에 풀린 글이 없고, 쓰는 동안도 잠근 채 저장, 닫았다 열면 비밀번호
+    {
+      const ln = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
+      await type(ln.win, '은행 메모');
+      await key(ln.win, 'Enter');
+      await type(ln.win, '계좌 비밀 1234');
+      await until(() => getVault().get(ln.id)?.file && readMemo(ln.id).includes('계좌 비밀'), '잠그기 전 저장').catch(() => {});
+      const lockFile = () => readMemo(ln.id);
+      const vaultText = () => fs.readdirSync(VAULT, { recursive: true }).map((f) => path.join(VAULT, f)).filter((f) => fs.statSync(f).isFile() && /\.(md|json)$/.test(f)).map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+      await js(ln.win, `document.getElementById('menu-btn').click()`);
+      await js(ln.win, `document.getElementById('lock-btn').click()`);
+      await until(() => js(ln.win, `Boolean(document.querySelector('.lock-dialog[open]'))`), '잠그기 창');
+      await capture(ln.win, 'smoke-lock-dialog.png');
+      await js(ln.win, `(() => { document.getElementById('lock-pass-1').value = 'abcd1234'; document.getElementById('lock-pass-2').value = 'abcd1234'; document.querySelector('.lock-dialog form').requestSubmit(); })()`);
+      const sealed = await until(() => /memoking-lock v1/.test(lockFile()), '잠근 파일', 15000).catch(() => false);
+      const clean = await until(() => !vaultText().includes('계좌 비밀'), '색인도 다시', 8000).catch(() => false); // 색인(index.json)은 잠시 뒤 다시 쓴다
+      const leak = clean ? '' : fs.readdirSync(VAULT, { recursive: true }).filter((f) => { try { return fs.readFileSync(path.join(VAULT, f), 'utf8').includes('계좌 비밀'); } catch { return false; } }).join(', ');
+      check('잠그기: 파일·버전·색인 어디에도 풀린 글이 없고 제목만', sealed && clean && /# 은행 메모/.test(lockFile()), leak || lockFile().slice(0, 200));
+      await key(ln.win, 'End', ['control']);
+      await type(ln.win, ' 추가함');
+      await until(() => getVault().get(ln.id)?.body.includes('추가함'), '잠긴 채 저장', 8000).catch(() => {});
+      await wait(2000); // 색인까지
+      check('잠긴 메모: 쓰는 동안 저장도 잠근 글로', getVault().get(ln.id)?.body.includes('추가함') && !vaultText().includes('추가함') && /memoking-lock/.test(lockFile()));
+      await closeNote(ln.id);
+      check('잠긴 메모: 창을 닫으면 다시 잠김', getVault().get(ln.id)?.needsPassword === true);
+      await js(getList(), `document.querySelector('.card[data-id="${ln.id}"]').click()`);
+      const lo = { id: ln.id, win: await until(() => noteWins.get(ln.id), '잠긴 메모 창') };
+      await until(() => js(lo.win, `Boolean(document.querySelector('.lock-screen'))`), '비밀번호 화면');
+      await capture(lo.win, 'smoke-lock-screen.png');
+      await js(lo.win, `(() => { document.getElementById('lock-open-pass').value = 'wrong123'; document.querySelector('.lock-screen').requestSubmit(); })()`);
+      const wrong = await until(() => js(lo.win, `document.querySelector('.lock-screen .lock-error')?.textContent || null`), '틀린 비밀번호', 10000).catch(() => '');
+      await js(lo.win, `(() => { document.getElementById('lock-open-pass').value = 'abcd1234'; document.querySelector('.lock-screen').requestSubmit(); })()`);
+      const opened = await until(() => js(lo.win, `!document.querySelector('.lock-screen') && (document.querySelector('.mk-doc')?.textContent ?? '').includes('추가함')`), '비밀번호로 열기', 10000).catch(() => false);
+      check('잠긴 메모: 틀린 비밀번호는 안내, 맞으면 열림', /비밀번호가 달라요/.test(wrong) && opened, wrong);
+      await js(lo.win, `document.getElementById('menu-btn').click()`);
+      const unlockLabel = await js(lo.win, `document.querySelector('#lock-btn span').textContent`);
+      await js(lo.win, `document.getElementById('lock-btn').click()`);
+      await until(() => js(lo.win, `document.getElementById('confirm-dialog').open`), '잠금 풀기 확인');
+      await js(lo.win, `document.getElementById('confirm-ok').click()`);
+      const plainAgain = await until(() => !/memoking-lock/.test(lockFile()) && lockFile().includes('계좌 비밀'), '잠금 풀기', 8000).catch(() => false);
+      check('잠금 풀기: 메뉴가 "잠금 풀기" · 풀면 파일에 원래 글', unlockLabel === '잠금 풀기' && plainAgain, unlockLabel);
+      await closeNote(lo.id);
+      getVault().trash(ln.id);
     }
     // 14-0) 알림 보관함 탭: 처음에는 동의 안내부터
     await listJs(`document.querySelector('[data-tab="history"]').click()`);

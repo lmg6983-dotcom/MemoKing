@@ -1687,3 +1687,31 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .share-paper .mk-doc li::after { display: none; }
 .share-media { display: inline-block; margin: 4px 0; padding: 4px 10px; border-radius: 8px; background: var(--note-hover); font-size: 14px; font-weight: 600; }
 .share-foot { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--note-hover); font-size: 12px; color: var(--note-muted); text-align: right; }
+
+/* ---------- 잠금 메모 (lock-ui.js, PC·휴대폰): 비밀번호 정하기 창 · 잠긴 메모 화면 ---------- */
+.lock-dialog { width: min(360px, calc(100vw - 32px)); }
+.lock-note { color: var(--muted); font-size: 13px; }
+.lock-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
+.lock-field input {
+  min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-0); color: var(--text); font: inherit; font-size: 15px;
+}
+.lock-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.lock-error { min-height: 1.4em; margin: 0 0 10px; color: var(--danger); font-size: 13px; }
+.lock-error:empty { margin-bottom: 4px; }
+.lock-screen {
+  position: absolute; inset: 0; z-index: 40;
+  display: flex; flex-direction: column; align-items: stretch; justify-content: center;
+  padding: 24px max(24px, calc(50% - 170px));
+  background: var(--note-bg); color: var(--note-fg);
+}
+.lock-screen h2 { margin: 0 0 4px; font-size: 18px; text-align: center; overflow-wrap: anywhere; }
+.lock-screen .lock-note { margin: 0 0 18px; text-align: center; color: var(--note-muted); }
+.lock-screen .lock-icon { font-size: 34px; text-align: center; margin-bottom: 8px; }
+.lock-screen .lock-field { color: var(--note-muted); }
+@media (pointer: coarse) { .lock-field input { min-height: 48px; font-size: 16px; } }
+/* 비밀번호를 넣기 전: 서식 막대·+ 는 숨김 */
+.memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
+.memo-locked #bell-btn, .memo-locked #links-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
+.lock-dialog h2 { margin-bottom: 8px; }
+.lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }

@@ -8,6 +8,7 @@ import { isDataImage, decodeDataImage } from './core/remote-images.js';
 import { setupReminderPanel } from './reminder-panel.js';
 import { reminderAt } from './date-remind.js';
 import { renderMemoImage } from './share-image.js';
+import { lockDialog, lockScreen } from './lock-ui.js';
 import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
 import { tutorialCounts, tutorialDone, TUTORIAL_SAMPLE, hasTutorialSample } from './core/tutorial.js';
@@ -206,6 +207,14 @@ function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
 
 api.on('memo:external', async (next) => {
   if (!next) return;
+  if (next.needsPassword) {
+    // 다른 기기에서 다른 비밀번호로 다시 잠갔다 — 이 창의 열쇠로는 풀 수 없으니 덮어쓰지 않고 닫는다
+    clearTimeout(saveTimer);
+    saved = current = editor?.getMarkdown() ?? current;
+    setStatus('다른 기기에서 이 메모의 비밀번호를 바꿨어요. 다시 열어 주세요', true);
+    setTimeout(() => window.close(), 2500);
+    return;
+  }
   if (sameBody(next.body, current)) {
     saved = current; // 지금 쓰는 글과 같은 내용 — 할 일 없음
     return;
@@ -328,6 +337,49 @@ async function memoImage(kind) {
   }
 }
 $('image-copy-btn').addEventListener('click', () => memoImage('copy'));
+/** 확인 창 (confirm-dialog): 확인 단추 글자를 바꿔 쓴다 */
+function confirmDialog(message, okLabel) {
+  return new Promise((resolve) => {
+    $('confirm-message').textContent = message;
+    $('confirm-ok').textContent = okLabel;
+    el.confirm.addEventListener('close', () => resolve(el.confirm.returnValue === 'ok'), { once: true });
+    el.confirm.returnValue = '';
+    el.confirm.showModal();
+  });
+}
+// 잠그기 / 잠금 풀기 (연 동안만)
+function showLockState() {
+  const label = $('lock-btn').querySelector('span');
+  label.textContent = memo?.locked ? '잠금 풀기' : '잠그기';
+  document.body.classList.toggle('is-locked', Boolean(memo?.locked));
+}
+$('lock-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  if (memo?.locked) {
+    const ok = await confirmDialog('잠금을 풀까요? 내용이 그대로 파일에 저장되고, 비밀번호 없이 열려요.', '잠금 풀기');
+    if (!ok) return;
+    const r = await api.memo.unlock(id);
+    if (r?.error) return setStatus(r.error, true);
+    memo = { ...memo, ...r };
+    showLockState();
+    setStatus('잠금을 풀었어요');
+    return;
+  }
+  const locked = await lockDialog({
+    onLock: async (password) => {
+      await flush();
+      const r = await api.memo.lock(id, password);
+      if (r?.error) return r.error;
+      memo = { ...memo, ...r };
+      return null;
+    },
+  });
+  editor?.focus(); // 창이 닫히면 쓰던 자리로
+  if (!locked) return;
+  showLockState();
+  setStatus('잠갔어요. 창을 닫으면 다시 비밀번호로 열려요');
+});
 $('image-save-btn').addEventListener('click', () => memoImage('save'));
 $('pdf-btn').addEventListener('click', async () => {
   closeMenu();
@@ -1311,7 +1363,7 @@ function showTasks(tasks, opts) {
 
 // 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)
 async function autoTagOnClose() {
-  if (!editor || tagDismissed) return;
+  if (!editor || tagDismissed || memo?.locked) return; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
   try {
     const s = await api.settings.get();
     if (s?.autoTags === false) return;
@@ -1519,6 +1571,23 @@ coach = setupCoach(api, {
   },
 });
 memo = await api.memo.get(id);
+// 잠긴 메모: 비밀번호를 넣어야 편집기를 만든다 (풀린 글은 메인 프로세스가 이 창을 닫을 때까지만 기억)
+if (memo?.needsPassword) {
+  document.body.dataset.color = memo.color;
+  document.title = memo.title;
+  document.body.classList.add('memo-locked');
+  await lockScreen(el.editorRoot, {
+    title: memo.title,
+    onTry: async (password) => {
+      const r = await api.memo.openLock(id, password);
+      if (r?.error) return r.error;
+      memo = { ...memo, ...r };
+      return null;
+    },
+    onCancel: () => window.close(),
+  });
+  document.body.classList.remove('memo-locked');
+}
 if (!memo) {
   setStatus('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
 } else {
@@ -1551,6 +1620,7 @@ if (!memo) {
     onChange: () => editor?.refreshDates(),
   });
   reminderPanel.set(memo.reminders);
+  showLockState();
   recorder = setupVoiceRecorder({
     panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
     buttons: () => document.querySelectorAll('[data-action="record"]'),

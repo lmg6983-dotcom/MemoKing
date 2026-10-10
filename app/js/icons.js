@@ -11,6 +11,7 @@ const ICONS = {
   close: `<path d="M6 6l12 12M18 6L6 18" ${stroke} stroke-width="2"/>`,
   check: `<path d="M5 12.5l4.5 4.5L19 7.5" ${stroke} stroke-width="2.2"/>`,
   more: '<circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/>',
+  lock: `<rect x="5" y="10.5" width="14" height="10" rx="2" ${stroke}/><path d="M8 10.5V7.5a4 4 0 018 0v3" ${stroke}/>`,
   pin: `<path d="M9 4h6l-1 6 3 3v2h-4v5l-1 1-1-1v-5H7v-2l3-3-1-6z" ${stroke}/>`,
   'pin-fill': '<path d="M9 4h6l-1 6 3 3v2h-4v5l-1 1-1-1v-5H7v-2l3-3-1-6z" fill="currentColor"/>',
   link: `<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1" ${stroke}/>`,

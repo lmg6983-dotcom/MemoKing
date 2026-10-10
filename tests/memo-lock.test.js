@@ -34,3 +34,17 @@ test('짧은 비밀번호는 거절, 잠기지 않은 글은 isLocked=false', as
   await assert.rejects(() => lockBody(body, '12'), /4자 이상/);
   assert.equal(isLockedBody(body), false);
 });
+
+test('세션: 한 번 연 열쇠로 저장마다 다시 잠그고 풀기 (동기)', async () => {
+  const { newLockSession, sealBody, unsealBody, openLock } = await import('../app/js/core/memo-lock.js');
+  const session = await newLockSession('사과1234', FAST);
+  const a = sealBody('# 메모\n\n첫 글', session);
+  const b = sealBody('# 메모\n\n고친 글', session);
+  assert.notEqual(parseLocked(a).iv, parseLocked(b).iv, '저장마다 새 IV');
+  assert.equal(parseLocked(a).salt, parseLocked(b).salt, '소금은 그대로 (다른 기기 세션으로도 풀림)');
+  assert.equal(unsealBody(b, session), '# 메모\n\n고친 글');
+  const other = await openLock(b, '사과1234'); // 다른 기기가 비밀번호로 연 세션
+  assert.equal(unsealBody(sealBody('# 메모\n\n휴대폰', other.session), session), '# 메모\n\n휴대폰');
+  const relocked = await lockBody('# 메모', '새비밀번호', FAST); // 다른 비밀번호로 다시 잠금 → 이전 세션으로는 못 풂
+  assert.equal(unsealBody(relocked, session), null);
+});
