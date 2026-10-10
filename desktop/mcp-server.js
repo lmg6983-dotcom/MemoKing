@@ -1,0 +1,196 @@
+// AI 비서 연결 (MCP 서버) — Claude 데스크톱 같은 AI 비서가 메모킹 메모를 찾고, 읽고, 새로 남기게 한다.
+//   AI 비서가 이 파일을 메모킹 실행 파일로 띄운다 (ELECTRON_RUN_AS_NODE=1, 표준 입출력으로 주고받음 — 공식 MCP SDK, MIT).
+//   메모 폴더는 메모킹 설정 파일(--settings)에서 매번 읽는다 (설정에서 폴더를 바꿔도 다시 연결할 필요 없게).
+//   쓰기(새 메모·덧붙이기)는 설정의 "AI 가 메모를 쓰도록 허용" 이 켜져 있을 때만. 잠근 메모는 내용을 보여 주지 않는다.
+//   켜져 있는 메모킹 앱은 폴더를 지켜보다가 바뀐 파일을 바로 다시 읽는다 (다른 기기 동기화와 같은 길).
+import fs from 'node:fs';
+import { McpServer, StdioServerTransport, z } from './vendor/mcp-sdk.js';
+import { Vault } from './vault.js';
+import { extractTags } from '../app/js/core/tags.js';
+import { isLockedBody } from '../app/js/core/memo-lock.js';
+import { describeReminder, nextTime } from '../app/js/core/reminders.js';
+
+const argv = process.argv.slice(2);
+const arg = (name) => {
+  const i = argv.indexOf(name);
+  return i >= 0 ? argv[i + 1] : null;
+};
+const SETTINGS = arg('--settings');
+const VERSION = arg('--version') ?? '1';
+
+function settings() {
+  try {
+    return JSON.parse(fs.readFileSync(SETTINGS, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+let vault = null;
+let vaultPath = null;
+
+/** 지금 메모 폴더 (설정에서 바뀌었으면 새로 연다) */
+function openVault() {
+  const s = settings();
+  const root = arg('--vault') ?? s.vaultPath;
+  if (!root || !fs.existsSync(root)) throw new Error('메모킹 메모 폴더를 찾지 못했어요. 메모킹을 한 번 실행해 폴더를 정해 주세요.');
+  if (vault && vaultPath === root) {
+    vault.scan({ silent: true });
+    return vault;
+  }
+  vault = new Vault(root);
+  // 이 프로세스는 읽고 쓰기만 — 색인 다시 쓰기·첨부 치우기는 켜져 있는 메모킹 앱이 맡는다
+  vault.scheduleIndex = () => {};
+  vault.flushOrphans = () => vault.orphans.clear();
+  vault.open();
+  vaultPath = root;
+  return vault;
+}
+
+const canWrite = () => settings().mcp?.write !== false;
+
+const text = (value) => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }] });
+const fail = (message) => ({ content: [{ type: 'text', text: message }], isError: true });
+
+function findMemo(v, ref) {
+  const key = String(ref ?? '').trim();
+  if (!key) return null;
+  const byId = v.get(key);
+  if (byId?.file) return byId;
+  const all = v.list();
+  const exact = all.find((m) => m.title === key) ?? all.find((m) => m.title.toLowerCase() === key.toLowerCase());
+  if (exact) return v.get(exact.id);
+  const found = v.search(key)[0];
+  return found ? v.get(found.id) : null;
+}
+
+const summaryOf = (v, m) => {
+  const memo = v.get(m.id);
+  const locked = isLockedBody(memo.body);
+  return {
+    id: m.id,
+    title: m.title,
+    tags: locked ? [] : m.tags,
+    updated: m.updated,
+    pinned: m.pinned || undefined,
+    locked: locked || undefined,
+    preview: locked ? '(잠긴 메모)' : m.preview,
+    tasks: m.tasks?.total ? `${m.tasks.done}/${m.tasks.total} 끝냄` : undefined,
+  };
+};
+
+const server = new McpServer(
+  { name: 'memoking', version: VERSION },
+  {
+    instructions:
+      '메모킹(MemoKing) 사용자의 메모(마크다운)를 찾고 읽고 남기는 도구입니다. 먼저 search_memos 로 찾고 read_memo 로 읽으세요. '
+      + '새로 남길 때는 첫 줄을 "# 제목" 으로 쓰면 그 제목이 파일 이름이 됩니다. #태그 는 본문 어디에나 쓸 수 있습니다. '
+      + '잠긴 메모(locked)는 내용을 볼 수 없습니다.',
+  },
+);
+
+server.registerTool('search_memos', {
+  title: '메모 찾기',
+  description: '메모킹 메모를 찾습니다. query 를 비우면 최근에 고친 메모부터. 제목·본문·#태그·초성(ㅈㅂㄱ)으로 찾을 수 있습니다.',
+  inputSchema: { query: z.string().optional().describe('찾을 말 (비우면 최근 메모)'), tag: z.string().optional().describe('이 태그가 있는 메모만 (# 없이)'), limit: z.number().int().min(1).max(50).optional() },
+  annotations: { readOnlyHint: true },
+}, async ({ query = '', tag, limit = 10 }) => {
+  try {
+    const v = openVault();
+    let list = query.trim() ? v.search(query.trim()) : v.list();
+    if (tag) {
+      const want = tag.replace(/^#/, '').toLowerCase();
+      list = list.filter((m) => m.tags.some((t) => t.toLowerCase() === want));
+    }
+    const shown = list.slice(0, limit).map((m) => summaryOf(v, m));
+    return text({ total: list.length, memos: shown });
+  } catch (err) {
+    return fail(err.message);
+  }
+});
+
+server.registerTool('read_memo', {
+  title: '메모 읽기',
+  description: '메모 한 개의 전체 내용(마크다운)을 읽습니다. memo 에는 id 또는 제목을 넣으세요.',
+  inputSchema: { memo: z.string().describe('메모 id 또는 제목') },
+  annotations: { readOnlyHint: true },
+}, async ({ memo }) => {
+  try {
+    const v = openVault();
+    const m = findMemo(v, memo);
+    if (!m) return fail(`"${memo}" 메모를 찾지 못했어요. search_memos 로 먼저 찾아 주세요.`);
+    if (isLockedBody(m.body)) return fail(`"${m.title}" 은(는) 잠긴 메모라 내용을 볼 수 없어요.`);
+    const reminders = (m.reminders ?? []).filter((r) => r.enabled).map((r) => {
+      const next = nextTime(r);
+      return { when: describeReminder(r), next: Number.isFinite(next) ? new Date(next).toISOString() : null };
+    });
+    return text({ id: m.id, title: m.title, file: m.file, updated: m.updated, tags: extractTags(m.body), reminders, content: m.body });
+  } catch (err) {
+    return fail(err.message);
+  }
+});
+
+server.registerTool('list_tags', {
+  title: '태그 목록',
+  description: '메모에 쓰인 #태그 와 메모 수 (많이 쓴 순).',
+  inputSchema: {},
+  annotations: { readOnlyHint: true },
+}, async () => {
+  try {
+    const v = openVault();
+    const counts = new Map();
+    for (const m of v.list()) for (const t of m.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+    return text([...counts].sort((a, b) => b[1] - a[1]).map(([tag, memos]) => ({ tag, memos })));
+  } catch (err) {
+    return fail(err.message);
+  }
+});
+
+server.registerTool('create_memo', {
+  title: '새 메모 남기기',
+  description: '새 메모를 만듭니다. content 는 마크다운 — 첫 줄을 "# 제목" 으로 쓰세요. 체크리스트는 "- [ ] 할 일".',
+  inputSchema: {
+    content: z.string().min(1).describe('메모 내용 (마크다운)'),
+    color: z.enum(['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal']).optional().describe('메모 색 (기본 노랑)'),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false },
+}, async ({ content, color }) => {
+  if (!canWrite()) return fail('메모킹 설정에서 "AI가 메모를 남기도록 허용" 이 꺼져 있어요.');
+  try {
+    const v = openVault();
+    const id = v.create({ color });
+    v.save(id, `${content.trim()}\n`);
+    v.finalize(id);
+    const m = v.get(id);
+    return text({ ok: true, id, title: m.title, file: m.file });
+  } catch (err) {
+    return fail(err.message);
+  }
+});
+
+server.registerTool('append_to_memo', {
+  title: '메모에 덧붙이기',
+  description: '이미 있는 메모의 끝에 내용을 덧붙입니다 (지우거나 고치지 않음). memo 에는 id 또는 제목.',
+  inputSchema: { memo: z.string().describe('메모 id 또는 제목'), content: z.string().min(1).describe('덧붙일 마크다운') },
+  annotations: { readOnlyHint: false, destructiveHint: false },
+}, async ({ memo, content }) => {
+  if (!canWrite()) return fail('메모킹 설정에서 "AI가 메모를 남기도록 허용" 이 꺼져 있어요.');
+  try {
+    const v = openVault();
+    const m = findMemo(v, memo);
+    if (!m) return fail(`"${memo}" 메모를 찾지 못했어요.`);
+    if (isLockedBody(m.body)) return fail(`"${m.title}" 은(는) 잠긴 메모라 덧붙일 수 없어요.`);
+    // 목록 끝에 목록을 덧붙이면 한 목록으로 이어지게 (빈 줄 없이)
+    const before = m.body.replace(/\s+$/, '');
+    const add = content.trim();
+    const isItem = (line) => /^\s*(?:[-*+]|\d+[.)])\s/.test(line ?? '');
+    const gap = isItem(before.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
+    const body = `${before}${gap}${add}\n`;
+    v.save(m.id, body);
+    return text({ ok: true, id: m.id, title: m.title });
+  } catch (err) {
+    return fail(err.message);
+  }
+});
+
+await server.connect(new StdioServerTransport());

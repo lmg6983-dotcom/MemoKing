@@ -110,6 +110,7 @@ let settings = {
   magic: undefined, // 매직키 (Ctrl+Alt+Space): { enabled, modules } — normalizeMagicSettings 로 정리
   magicPos: null, // 매직키 창을 끌어 옮긴 자리 { x, y }
   shortcuts: undefined, // 전역 단축키를 바꾼 것 { quickMemo, magic } (Electron 단축키 글자) — normalizeShortcuts 로 정리
+  mcp: undefined, // AI 비서 연결: { write } (write 가 false 면 찾기·읽기만) — 연결 자체는 AI 앱의 설정 파일에
 };
 let settingsTimer = null;
 
@@ -1717,9 +1718,76 @@ function appSettings() {
     autoTags: settings.autoTags !== false,
     magic: normalizeMagicSettings(settings.magic),
     magicIndex: fileIndex?.status() ?? null, // 파일 검색 목록: 개수·만든 때
+    mcp: mcpStatus(),
     version: app.getVersion(),
   };
 }
+
+// ---------- AI 비서 연결 (MCP) ----------
+// Claude 데스크톱 같은 AI 앱이 메모킹 실행 파일을 "MCP 서버"(desktop/mcp-server.js)로 띄워 메모를 찾고 읽고 남긴다.
+//   연결 = AI 앱 설정 파일(claude_desktop_config.json)의 mcpServers 에 메모킹을 적기. 다른 서버 설정은 건드리지 않는다
+const MCP_NAME = 'memoking';
+const claudeConfigFile = () => process.env.MEMOKING_CLAUDE_CONFIG || path.join(app.getPath('appData'), 'Claude', 'claude_desktop_config.json');
+
+function mcpServerEntry() {
+  // 설치판에서도 asar 안의 파일을 그대로 (ELECTRON_RUN_AS_NODE 로 띄운 실행 파일은 asar 를 읽을 수 있다)
+  return {
+    command: process.execPath,
+    args: [path.join(import.meta.dirname, 'mcp-server.js'), '--settings', settingsFile(), '--version', app.getVersion()],
+    env: { ELECTRON_RUN_AS_NODE: '1' },
+  };
+}
+
+function readClaudeConfig() {
+  const file = claudeConfigFile();
+  if (!fs.existsSync(file)) return {};
+  const text = fs.readFileSync(file, 'utf8');
+  if (!text.trim()) return {};
+  const json = JSON.parse(text); // 깨진 파일이면 예외 — 덮어쓰지 않는다
+  if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('알 수 없는 모양');
+  return json;
+}
+
+function mcpStatus() {
+  const file = claudeConfigFile();
+  let entry = null;
+  let broken = false;
+  try {
+    entry = readClaudeConfig().mcpServers?.[MCP_NAME] ?? null;
+  } catch {
+    broken = true;
+  }
+  return {
+    claudeFound: fs.existsSync(path.dirname(file)), // Claude 데스크톱을 설치(한 번 실행)했는지
+    connected: Boolean(entry),
+    stale: Boolean(entry) && entry.command !== process.execPath, // 메모킹을 다른 곳에 다시 설치함 → 다시 연결
+    broken,
+    write: settings.mcp?.write !== false,
+  };
+}
+
+function mcpConnect(on) {
+  const file = claudeConfigFile();
+  let config;
+  try {
+    config = readClaudeConfig();
+  } catch {
+    return { ...mcpStatus(), error: 'Claude 데스크톱 설정 파일을 읽지 못해서 건드리지 않았어요. "설정 복사" 로 직접 넣어 주세요' };
+  }
+  const servers = { ...(config.mcpServers ?? {}) };
+  if (on) servers[MCP_NAME] = mcpServerEntry();
+  else delete servers[MCP_NAME];
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    if (fs.existsSync(file) && !fs.existsSync(`${file}.memoking-backup`)) fs.copyFileSync(file, `${file}.memoking-backup`); // 처음 한 번 원래 설정을 남겨 둔다
+    fs.writeFileSync(file, `${JSON.stringify({ ...config, mcpServers: servers }, null, 2)}\n`);
+  } catch (err) {
+    return { ...mcpStatus(), error: `설정 파일에 쓰지 못했어요 (${err.message})` };
+  }
+  return mcpStatus();
+}
+
+const mcpSnippet = () => JSON.stringify({ mcpServers: { [MCP_NAME]: mcpServerEntry() } }, null, 2);
 
 // ---------- 전역 단축키 (빠른 메모·매직키) — 설정에서 바꿀 수 있다 ----------
 // 다른 앱이 먼저 같은 키를 잡고 있으면 Windows 가 등록을 거절한다 → 설정에 "다른 앱이 쓰고 있어요" 로 알리고,
@@ -2428,6 +2496,16 @@ function registerIpc() {
     return settings.autoTags;
   });
   ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings(next));
+  ipcMain.handle('mcp:connect', (_e, on) => mcpConnect(on !== false));
+  ipcMain.handle('mcp:copy', () => {
+    clipboard.writeText(mcpSnippet());
+    return true;
+  });
+  ipcMain.handle('mcp:set-write', (_e, on) => {
+    settings.mcp = { ...(settings.mcp ?? {}), write: Boolean(on) };
+    saveSettings();
+    return mcpStatus();
+  });
   // 매직키 창 아래 캡슐: 쓸 수 있는 모듈 모두와 켜짐 여부 (누르면 켜고 끔)
   const magicModuleList = () => {
     const m = normalizeMagicSettings(settings.magic);

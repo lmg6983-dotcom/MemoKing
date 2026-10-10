@@ -87,6 +87,12 @@ contextBridge.exposeInMainWorld('memoking', {
     setShortcut: invoke('shortcuts:set'),
     pauseShortcuts: invoke('shortcuts:pause'),
   },
+  // AI 비서 연결 (MCP): connect(true|false) · copy() 다른 AI 앱용 설정 글 복사 · setWrite(켜기)
+  mcp: {
+    connect: invoke('mcp:connect'),
+    copy: invoke('mcp:copy'),
+    setWrite: invoke('mcp:set-write'),
+  },
   // 휴지통 (지운 메모)
   trash: {
     list: invoke('trash:list'),

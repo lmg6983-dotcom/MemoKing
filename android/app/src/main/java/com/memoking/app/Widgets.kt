@@ -46,7 +46,7 @@ object Widgets {
     fun memoOf(ctx: Context, widgetId: Int): String? = map(ctx).getString(widgetId.toString(), null)
 
     /** 위젯에 놓인 메모 id 들 (화면이 이 메모들의 내용을 보내 준다) */
-    fun memoIds(ctx: Context): JSONArray = JSONArray(allIds(ctx).mapNotNull { memoOf(ctx, it) }.distinct())
+    fun memoIds(ctx: Context): JSONArray = JSONArray(allIds(ctx).toList().mapNotNull { memoOf(ctx, it) }.distinct())
 
     fun assign(ctx: Context, widgetId: Int, memoId: String) {
         map(ctx).edit().putString(widgetId.toString(), memoId).apply()
@@ -56,7 +56,7 @@ object Widgets {
     fun forget(ctx: Context, widgetIds: IntArray) {
         map(ctx).edit().apply { widgetIds.forEach { remove(it.toString()) } }.apply()
         // 어느 위젯에도 없는 메모의 내용은 지운다
-        val used = allIds(ctx).mapNotNull { memoOf(ctx, it) }.toSet()
+        val used = allIds(ctx).toList().mapNotNull { memoOf(ctx, it) }.toSet()
         data(ctx).edit().apply { data(ctx).all.keys.filter { it !in used }.forEach { remove(it) } }.apply()
     }
 

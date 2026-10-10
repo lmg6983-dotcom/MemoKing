@@ -132,6 +132,7 @@ export function plainLines(body) {
       continue;
     }
     if (!fence && /^\s*([-*_])(\s*\1){2,}\s*$/.test(raw)) continue; // 구분선
+    if (!fence && /^\s*<!--.*-->\s*$/.test(raw)) continue; // 한 줄 HTML 주석 (화면에 안 보임 — 잠금 메모의 암호문 등)
     // 표 줄은 "품목 · 가격" 처럼, 구분선(|---|) 은 뺀다
     const cells = fence ? null : tableLineText(raw);
     const text = fence ? raw.trim() : cells !== null ? stripInline(cells) : stripInline(stripBlock(raw));

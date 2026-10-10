@@ -1320,6 +1320,55 @@ export async function runSmoke({
         check('단축키 바꾸기: 다른 앱이 쓰는 키면 바꾸지 않고 알림', appSettings().shortcuts.magic.key === 'Control+Alt+Space' && /다른 앱이 이미 쓰고/.test(takenNote), takenNote);
       }
     }
+    // AI 비서 연결 (MCP): 연결 → Claude 설정 파일에 메모킹이 적힘(다른 서버는 그대로) → 적힌 명령으로 띄우면 도구가 보임 → 끊기
+    {
+      const cfgDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-claude-'));
+      const cfg = path.join(cfgDir, 'claude_desktop_config.json');
+      fs.writeFileSync(cfg, JSON.stringify({ mcpServers: { other: { command: 'x' } }, theme: 'dark' }));
+      process.env.MEMOKING_CLAUDE_CONFIG = cfg;
+      await listJs(`document.getElementById('settings-dialog').close()`);
+      await listJs(`document.getElementById('settings-btn').click()`);
+      await wait(300);
+      await listJs(`document.getElementById('mcp-connect').click()`);
+      const written = await until(() => {
+        try {
+          return JSON.parse(fs.readFileSync(cfg, 'utf8')).mcpServers?.memoking ?? null;
+        } catch {
+          return null;
+        }
+      }, 'MCP 연결').catch(() => null);
+      const kept = JSON.parse(fs.readFileSync(cfg, 'utf8'));
+      const title = await listJs(`document.getElementById('mcp-title').textContent`);
+      check('AI 비서 연결: Claude 설정 파일에 메모킹 (다른 서버·설정은 그대로) · 연결됨 표시',
+        Boolean(written) && kept.mcpServers.other?.command === 'x' && kept.theme === 'dark' && written.env?.ELECTRON_RUN_AS_NODE === '1' && /연결됨/.test(title), JSON.stringify({ written, title }));
+      // 적힌 명령 그대로 띄워 MCP 로 묻기 (initialize → tools/list)
+      const { spawn } = await import('node:child_process');
+      const tools = await new Promise((resolve) => {
+        const child = spawn(written.command, written.args, { env: { ...process.env, ...written.env }, stdio: ['pipe', 'pipe', 'pipe'] });
+        let out = '';
+        const timer = setTimeout(() => { child.kill(); resolve(`시간 초과: ${out}`); }, 15000);
+        child.stdout.on('data', (d) => {
+          out += d;
+          const line = out.split('\n').find((l) => l.includes('"id":2'));
+          if (line) {
+            clearTimeout(timer);
+            child.kill();
+            resolve(JSON.parse(line).result?.tools?.map((t) => t.name) ?? line);
+          }
+        });
+        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '1' } } })}\n`);
+        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' })}\n`);
+      });
+      check('AI 비서 연결: 적힌 명령으로 띄우면 메모킹 도구 (찾기·읽기·남기기·덧붙이기)',
+        Array.isArray(tools) && ['search_memos', 'read_memo', 'create_memo', 'append_to_memo'].every((t) => tools.includes(t)), JSON.stringify(tools).slice(0, 300));
+      await listJs(`document.getElementById('mcp-box').scrollIntoView({ block: 'center' })`);
+      await capture(lw, 'smoke-settings-mcp.png');
+      await listJs(`document.getElementById('mcp-disconnect').click()`);
+      const removed = await until(() => !JSON.parse(fs.readFileSync(cfg, 'utf8')).mcpServers?.memoking, 'MCP 끊기').catch(() => false);
+      check('AI 비서 연결: 끊으면 메모킹만 빠짐', removed && JSON.parse(fs.readFileSync(cfg, 'utf8')).mcpServers.other?.command === 'x');
+      delete process.env.MEMOKING_CLAUDE_CONFIG;
+    }
     await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight / 2 - 120; })()`);
     await capture(lw, 'smoke-settings-2.png');
     await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight; })()`);

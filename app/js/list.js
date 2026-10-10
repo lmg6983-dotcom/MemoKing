@@ -555,6 +555,7 @@ async function loadSettings() {
   showMagic(s.magic);
   showQuickMemo(s.quickMemo);
   showShortcuts(s.shortcuts);
+  showMcp(s.mcp);
   $('trash-days').value = String(s.trashDays);
   if (api.stt) renderStt(await api.stt.status());
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
@@ -565,6 +566,36 @@ function showQuickMemo(q) {
     ? '다른 앱이 이 단축키를 먼저 쓰고 있어서 작동하지 않아요. 아래에서 다른 키로 바꿔 주세요'
     : '어디서든 고른 내용을 바로 메모로 만들어요. 두 번 누르면 화면 영역 캡처';
 }
+
+// ---------- AI 비서 연결 (MCP) ----------
+function showMcp(m, message = '') {
+  if (!m) return;
+  $('mcp-title').textContent = m.connected && !m.stale ? 'Claude 데스크톱에 연결됨' : m.stale ? '다시 연결이 필요해요' : '연결 안 됨';
+  $('mcp-sub').textContent = message || (m.broken
+    ? 'Claude 데스크톱 설정 파일을 읽지 못했어요. 설정 복사로 직접 넣어 주세요'
+    : m.stale ? '메모킹을 다른 곳에 다시 설치했어요. 연결을 눌러 새 위치로 맞춰 주세요'
+      : m.connected ? 'Claude 데스크톱을 껐다 켜면 메모킹 도구(메모 찾기, 읽기, 남기기)가 보여요'
+        : m.claudeFound ? '연결하면 Claude에게 "장보기 메모에 우유 추가해 줘" 처럼 부탁할 수 있어요'
+          : 'Claude 데스크톱이 없으면 설정 복사로 다른 AI 앱(Cursor 등)에 넣을 수 있어요');
+  $('mcp-box').classList.toggle('on', m.connected && !m.stale);
+  $('mcp-connect').textContent = m.stale ? '다시 연결' : 'Claude 데스크톱에 연결';
+  $('mcp-connect').hidden = m.connected && !m.stale;
+  $('mcp-disconnect').hidden = !m.connected;
+  $('mcp-write').checked = m.write;
+}
+$('mcp-connect').addEventListener('click', async () => {
+  const m = await api.mcp.connect(true);
+  showMcp(m, m.error ?? '연결했어요. Claude 데스크톱을 껐다 켜면 메모킹 도구가 보여요');
+});
+$('mcp-disconnect').addEventListener('click', async () => {
+  const m = await api.mcp.connect(false);
+  showMcp(m, m.error ?? '');
+});
+$('mcp-copy').addEventListener('click', async () => {
+  await api.mcp.copy();
+  showMcp((await api.settings.get()).mcp, '설정을 복사했어요. AI 앱의 MCP 설정(mcpServers)에 붙여 넣어 주세요');
+});
+$('mcp-write').addEventListener('change', async (e) => showMcp(await api.mcp.setWrite(e.target.checked)));
 
 // ---------- 전역 단축키 바꾸기 (빠른 메모·매직키) ----------
 // 키 단추를 누르고 새 조합을 누르면 바뀐다. 다른 앱이 이미 쓰는 키면 바꾸지 않고 알려 준다 (Esc·다른 곳 누르기 = 그만)

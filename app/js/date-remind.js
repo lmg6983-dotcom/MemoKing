@@ -104,9 +104,9 @@ class DateChip {
     // 처음 밑줄이 생긴 때 한 번만: 무슨 뜻인지
     if (!this.hinted && view.editable && decos && decos.find().length) {
       this.hinted = true;
+      // 화면 아래 가운데에 (날짜 바로 아래는 알림 단추가 뜨는 자리) · 단추가 이미 떠 있으면 그것이 설명이므로 띄우지 않는다
       setTimeout(() => {
-        const first = view.dom.querySelector('.mk-date');
-        if (first) hintOnce('date-remind', '밑줄 친 날짜를 누르면 그 시각에 알림을 맞출 수 있어요', { anchor: first });
+        if (!this.chip && view.dom.querySelector('.mk-date')) hintOnce('date-remind', '밑줄 친 날짜를 누르면 그 시각에 알림을 맞출 수 있어요');
       }, 900);
     }
     const hit = sel.empty && view.editable && !this.typing && decos
