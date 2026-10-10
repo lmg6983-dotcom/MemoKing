@@ -354,7 +354,11 @@ class Mover {
         this.lift(p);
       } else this.cancelPress(); // 터치는 꾹 누르기 전에 밀면 스크롤
     };
-    p.up = () => this.cancelPress();
+    p.up = () => {
+      this.cancelPress();
+      // 누르는 동안에는 안내를 미뤘으므로 손을 뗀 뒤에 — 휴대폰 옮기기 방식은 글을 고를 수 없어 누른 줄로 알려 준다
+      this.hintIfNew(p.block);
+    };
     window.addEventListener(io.move, p.move, LISTEN);
     window.addEventListener(io.up, p.up, LISTEN);
     if (io.cancel) window.addEventListener(io.cancel, p.up, LISTEN);
@@ -656,8 +660,14 @@ class Mover {
   update(view, prev) {
     this.view = view;
     hideDeleteIfChanged(view);
-    if (this.drag || this.pressing) return;
-    const block = view.editable ? contentBlockAt(view.state) : null;
+    this.hintIfNew();
+  }
+
+  hintIfNew(pressed = null) {
+    const { view } = this;
+    if (this.drag || this.pressing || view.isDestroyed) return;
+    if (!view.editable && !pressed) return; // 고칠 수 없을 때(옮기기 방식)는 누른 줄로만 — 고르기가 바뀌어도 안내를 지우지 않게
+    const block = view.editable ? contentBlockAt(view.state) : pressed;
     const key = block ? `${block.pos}` : null;
     if (key === this.lastBlock) return;
     this.lastBlock = key;

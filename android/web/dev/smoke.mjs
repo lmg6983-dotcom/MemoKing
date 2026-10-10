@@ -397,7 +397,9 @@ try {
   await page.waitForTimeout(400);
   await page.locator('.mk-doc img.mk-image').first().tap();
   await page.waitForTimeout(200);
-  check('그림 줄 옮기기: 처음 한 번 옮기는 방법 안내 (옮기기 방식: 짧게 눌러)', (await page.textContent('.mk-move-hint').catch(() => '')).includes('짧게 눌러'));
+  const moveHintDbg = await page.evaluate(() => ({ mode: document.querySelector('.mode-knob')?.dataset.mode, hint: document.querySelector('.mk-move-hint')?.textContent ?? null,
+    seen: localStorage.getItem('memoking.hint.blockMove'), sel: document.querySelector('.ProseMirror-selectednode')?.className ?? null }));
+  check('그림 줄 옮기기: 처음 한 번 옮기는 방법 안내 (옮기기 방식: 짧게 눌러)', (moveHintDbg.hint ?? '').includes('짧게 눌러'), JSON.stringify(moveHintDbg));
   check('그림 누르기: 키보드를 올리지 않음', (await page.getAttribute('.mk-doc', 'inputmode')) === 'none');
   await shot('06-move-hint');
   check('그림 줄 옮기기: 따로 버튼·손잡이 없음', (await page.locator('.mk-move-bar, .mk-move-grip').count()) === 0);

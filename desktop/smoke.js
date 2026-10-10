@@ -442,11 +442,15 @@ export async function runSmoke({
     const clickedOn = await until(async () => t1.win.isAlwaysOnTop() && (await pressed(t1.win)) === 'true', '버튼으로 켜기').catch(() => false);
     check('고정 버튼 → 창이 항상 위 + 버튼 켜짐 표시', clickedOn);
     await capture(t1.win, 'smoke-on-top.png');
+    // 왕관 스티커가 붙어 있어도 Ctrl+Shift+T 로 뗄 수 있다 (스티커도 함께 사라짐)
+    const stuckBefore = !stickers || Boolean(stickers.get(t1.win.id));
     await key(t1.win, 'T', ['control', 'shift']);
-    const keyOff = await until(async () => !t1.win.isAlwaysOnTop() && (await pressed(t1.win)) === 'false', '단축키로 끄기').catch(() => false);
+    const keyOff = await until(async () => !t1.win.isAlwaysOnTop() && (await pressed(t1.win)) === 'false'
+      && (!stickers || !stickers.get(t1.win.id)), '단축키로 끄기').catch(() => false);
     await key(t1.win, 'T', ['control', 'shift']);
-    const keyOn = await until(() => t1.win.isAlwaysOnTop(), '단축키로 켜기').catch(() => false);
-    check('Ctrl+Shift+T 로 끄고 켜기', keyOff && keyOn);
+    const keyOn = await until(async () => t1.win.isAlwaysOnTop() && (await pressed(t1.win)) === 'true'
+      && (!stickers || Boolean(stickers.get(t1.win.id))), '단축키로 켜기').catch(() => false);
+    check('Ctrl+Shift+T 로 끄고 켜기 (붙은 왕관 스티커도 떼고 다시 붙음)', stuckBefore && keyOff && keyOn, JSON.stringify({ stuckBefore, keyOff, keyOn }));
     await closeNote(t1.id);
     const t2 = await openN1();
     check('다시 열어도 항상 위 유지 (창·버튼 모두)', t2.win.isAlwaysOnTop() && (await pressed(t2.win)) === 'true');
@@ -650,7 +654,7 @@ export async function runSmoke({
     check('지연 로딩 사진 → 진짜 주소(data-src)에서 받아 저장', Boolean(localOf('지연 로딩')), webMd.match(/!\[지연 로딩\][^\n]*/)?.[0]);
     check('글 안에 박힌 data: 사진 → 파일로 풀어서 저장 (메모에 data: 없음)', Boolean(localOf('박힌 그림')) && !webMd.includes('data:image'));
     check('받지 못한 사진(404·그림 아님) → 인터넷 주소 그대로 + 안내',
-      webMd.includes(`${base}/missing.png`) && webMd.includes(`${base}/page.html`) && /3개를 저장했어요 · 2개는 받지 못해/.test(webStatus), webStatus);
+      webMd.includes(`${base}/missing.png`) && webMd.includes(`${base}/page.html`) && /3개를 저장했어요\. 2개는 받지 못해/.test(webStatus), webStatus);
     check('저장한 사진의 제목(title) 중복 제거', !/!\[고양이\]\([^)]*"고양이"\)/.test(webMd));
     await capture(webNote.win, 'smoke-web-images.png');
 
@@ -1308,8 +1312,14 @@ export async function runSmoke({
       "Get-CimInstance Win32_Process -Filter \"Name='MemoKing.exe'\" | ForEach-Object { $_.ExecutablePath }"], { encoding: 'utf8' })
       .split(/\r?\n/).map((p) => p.trim().toLowerCase()).filter(Boolean)
       .some((p) => p !== process.execPath.toLowerCase());
-    check(otherRunning ? '빠른 메모 단축키 등록 — 건너뜀: 설치된 메모킹이 실행 중이라 이미 사용 중' : '빠른 메모 단축키 Ctrl+Alt+C 전역 등록',
-      otherRunning || (registered && appSettings().quickMemo.registered));
+    if (process.platform === 'win32') {
+      check(otherRunning ? '빠른 메모 단축키 등록 — 건너뜀: 설치된 메모킹이 실행 중이라 이미 사용 중' : '빠른 메모 단축키 Ctrl+Alt+C 전역 등록',
+        otherRunning || (registered && appSettings().quickMemo.registered));
+    } else {
+      // 빠른 메모(화면 글 가져오기)는 Windows 전용 — 다른 운영체제에서는 키를 잡지 않아야 다른 앱의 Ctrl+Alt+C 를 빼앗지 않는다
+      check('빠른 메모 단축키: Windows 가 아니면 등록하지 않음 (다른 앱 키를 빼앗지 않음)',
+        !registered && !appSettings().quickMemo.registered && !globalShortcut.isRegistered('Control+Alt+C'));
+    }
     globalShortcut.unregister('Control+Alt+C');
 
     // 13) 실제 시스템 클립보드 붙여넣기 — 클립보드를 바꾸므로 npm run smoke:clipboard 에서만
