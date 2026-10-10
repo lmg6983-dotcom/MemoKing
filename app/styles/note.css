@@ -1676,3 +1676,14 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 @media (pointer: coarse) { .mk-date-chip { min-height: 44px; padding: 10px 18px; font-size: 14px; } }
 @media (prefers-reduced-motion: reduce) { .mk-date-chip { animation: none; } }
 @media print { .mk-date-chip { display: none !important; } .mk-doc .mk-date { text-decoration: none; } }
+
+/* ---------- 메모를 그림 한 장으로 (share-image.js, PC·휴대폰): 화면 밖에 그려 찍는 종이 ---------- */
+.share-paper {
+  padding: 36px 40px 22px;
+  background: var(--note-bg);
+  color: var(--note-fg);
+}
+.share-paper .mk-doc { font-size: 17px; line-height: 1.7; outline: none; }
+.share-paper .mk-doc li::after { display: none; }
+.share-media { display: inline-block; margin: 4px 0; padding: 4px 10px; border-radius: 8px; background: var(--note-hover); font-size: 14px; font-weight: 600; }
+.share-foot { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--note-hover); font-size: 12px; color: var(--note-muted); text-align: right; }

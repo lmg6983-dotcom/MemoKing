@@ -7,6 +7,7 @@ import { fileExtension } from './media.js';
 import { isDataImage, decodeDataImage } from './core/remote-images.js';
 import { setupReminderPanel } from './reminder-panel.js';
 import { reminderAt } from './date-remind.js';
+import { renderMemoImage } from './share-image.js';
 import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
 import { tutorialCounts, tutorialDone, TUTORIAL_SAMPLE, hasTutorialSample } from './core/tutorial.js';
@@ -311,6 +312,23 @@ async function toggleTopKey() {
   applyTop(await api.win.toggleTop(id)); // 스티커가 떼어지는 모습은 스티커를 누를 때와 같다
 }
 el.topBtn.addEventListener('click', toggleTop);
+// 메모를 그림 카드(PNG) 한 장으로 — 메모 색 종이에 본문 그대로 (휴대폰 "그림으로 공유" 와 같은 모양)
+async function memoImage(kind) {
+  closeMenu();
+  await flush();
+  setStatus('그림을 만드는 중…');
+  try {
+    const base64 = await renderMemoImage(editor, { color: memo?.color ?? document.body.dataset.color });
+    const r = kind === 'copy' ? await api.image.copy(base64) : await api.image.save(id, base64);
+    if (r?.cancelled) return setStatus('');
+    setStatus(kind === 'copy' ? '그림을 복사했어요. 붙여 넣으면 돼요' : `그림으로 저장했어요: ${r?.name ?? ''}`);
+  } catch (err) {
+    console.error(err);
+    setStatus('그림을 만들지 못했어요. 다시 해 주세요', true);
+  }
+}
+$('image-copy-btn').addEventListener('click', () => memoImage('copy'));
+$('image-save-btn').addEventListener('click', () => memoImage('save'));
 $('pdf-btn').addEventListener('click', async () => {
   closeMenu();
   await flush(); // 지금 적은 내용까지 PDF 에

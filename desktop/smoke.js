@@ -1120,6 +1120,21 @@ export async function runSmoke({
       check('글 속 날짜: 누르면 그 시각(화요일 14:30) 알림이 저장되고 밑줄이 실선으로',
         Boolean(at) && at.getDay() === 2 && at.getHours() === 14 && at.getMinutes() === 30 && at > new Date()
         && await until(() => js(dn.win, `Boolean(document.querySelector('.mk-doc .mk-date-set'))`), '실선').catch(() => false), set?.at);
+      // 메모를 그림 카드로 저장 (점검에서는 저장 창 없이 임시 폴더에) — 복사는 클립보드를 바꾸므로 smoke:clipboard 에서만
+      await js(dn.win, `document.getElementById('image-save-btn').click()`);
+      const savedMsg = await until(() => js(dn.win, `/그림으로 저장했어요/.test(document.getElementById('status').textContent) ? document.getElementById('status').textContent : null`), '그림 저장', 15000).catch(() => '');
+      const pngName = /저장했어요: (.+\.png)/.exec(savedMsg ?? '')?.[1];
+      const pngFile = pngName ? path.join(app.getPath('temp'), pngName) : '';
+      const pngOk = Boolean(pngFile) && fs.existsSync(pngFile) && fs.readFileSync(pngFile).subarray(1, 4).toString() === 'PNG' && fs.statSync(pngFile).size > 5000;
+      check('메뉴 › 그림으로 저장: 메모 색 종이의 PNG 그림', pngOk, savedMsg);
+      if (pngOk) fs.copyFileSync(pngFile, path.join(OUT, 'smoke-memo-card.png'));
+      if (process.argv.includes('--clipboard')) {
+        const { clipboard } = await import('electron');
+        clipboard.clear();
+        await js(dn.win, `document.getElementById('image-copy-btn').click()`);
+        const copied = await until(() => !clipboard.readImage().isEmpty(), '그림 복사', 15000).catch(() => false);
+        check('메뉴 › 그림으로 복사: 클립보드에 그림', copied);
+      }
       // 뒤의 알림 예약 탭 점검이 세는 알림 수에 섞이지 않게 지운다
       await js(dn.win, `document.querySelector('#reminder-list .rem-item .icon-btn')?.click()`);
       await until(() => remindersOf(dn.id).length === 0, '날짜 알림 지우기').catch(() => {});

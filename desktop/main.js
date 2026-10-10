@@ -2749,6 +2749,28 @@ function registerIpc() {
     return Boolean(ok);
   });
   // 메모를 PDF 로
+  ipcMain.handle('image:copy', (_e, base64) => {
+    const img = nativeImage.createFromBuffer(Buffer.from(String(base64), 'base64'));
+    if (img.isEmpty()) throw new Error('그림이 비어 있어요');
+    clipboard.writeImage(img);
+    return { ok: true };
+  });
+  ipcMain.handle('image:save', async (event, id, base64) => {
+    const memo = vault?.get(String(id));
+    const name = `${pdfFileName(memo?.title ?? '메모').replace(/\.pdf$/i, '')}.png`;
+    let file = SMOKE ? path.join(app.getPath('temp'), `memoking-smoke-${Date.now()}.png`) : null;
+    if (!file) {
+      const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender) ?? undefined, {
+        title: '그림으로 저장',
+        defaultPath: path.join(app.getPath('pictures'), name),
+        filters: [{ name: 'PNG 그림', extensions: ['png'] }],
+      });
+      if (r.canceled || !r.filePath) return { cancelled: true };
+      file = r.filePath;
+    }
+    fs.writeFileSync(file, Buffer.from(String(base64), 'base64'));
+    return { file, name: path.basename(file) };
+  });
   ipcMain.handle('pdf:open', (_e, id) => openPdfWindow(String(id)));
   ipcMain.handle('pdf:memo', (_e, id) => {
     const m = vault?.get(String(id));

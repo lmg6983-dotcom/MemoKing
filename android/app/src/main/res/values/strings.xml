@@ -10,10 +10,10 @@
     <string name="shortcut_voice">음성 메모</string>
     <string name="shortcut_voice_long">녹음해서 메모하기</string>
     <string name="widget_label">메모킹 메모</string>
-    <string name="widget_desc">메모 한 개를 홈 화면에 · 할 일은 바로 체크</string>
+    <string name="widget_desc">메모 한 개를 홈 화면에 두고 할 일은 바로 체크해요</string>
     <string name="widget_pick">눌러서 보일 메모를 골라요</string>
     <string name="widget_loading">메모킹을 열면 내용이 보여요</string>
-    <string name="widget_empty">비어 있는 메모예요 · 눌러서 쓰기</string>
+    <string name="widget_empty">비어 있는 메모예요. 눌러서 써 보세요</string>
     <string name="tile_new">새 메모</string>
     <string name="tile_voice">음성 메모</string>
 </resources>

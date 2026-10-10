@@ -20,7 +20,7 @@ import { injectMobileIcons } from './m-icons.js';
 import { app } from './state.js';
 import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
-import { renderMemoImage } from './share-image.js';
+import { renderMemoImage } from '../../app/js/share-image.js';
 import * as widgets from './widgets.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';

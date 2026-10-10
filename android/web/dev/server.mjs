@@ -370,6 +370,7 @@ const calls = {
   },
   shareFile: async (a) => {
     log.push({ shareFile: { name: a.name, mime: a.mime, bytes: Math.round((a.base64?.length ?? 0) * 0.75) } });
+    if (a.mime === 'image/png' && process.env.MK_SHARE_OUT) fs.writeFileSync(process.env.MK_SHARE_OUT, Buffer.from(a.base64, 'base64'));
     return true;
   },
   sharePdf: async (a) => {

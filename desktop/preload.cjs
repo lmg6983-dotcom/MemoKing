@@ -131,6 +131,11 @@ contextBridge.exposeInMainWorld('memoking', {
     open: invoke('link:open'),
   },
   // 메모를 PDF 로
+  // 메모를 그림 카드로: copy(base64) · save(메모 id, base64) → { file, name } | { cancelled }
+  image: {
+    copy: invoke('image:copy'),
+    save: invoke('image:save'),
+  },
   pdf: {
     open: invoke('pdf:open'),
     memo: invoke('pdf:memo'),
