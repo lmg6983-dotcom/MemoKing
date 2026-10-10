@@ -162,7 +162,7 @@ const PASTE_FILE = `(() => {
 export async function runSmoke({
   getList, noteWins, getVault, createListWindow, getGhost, getTray, getTrayMenu, alarms, smokeToasts, getHistory, appSettings,
   quickMemo, registerQuickMemoKey, getCapturePoint, smokeOpened = [], smokeConfirmAnswers = [],
-  getStacks, trackWindowDrag, endWindowDrag, startTutorial, getTutorial,
+  getStacks, trackWindowDrag, endWindowDrag, startTutorial, getTutorial, stickers,
 }) {
   const errors = [];
   let imageServer = null;
@@ -971,6 +971,29 @@ export async function runSmoke({
       await key(noteWins.get(sC.id), 'Tab', ['control', 'shift']);
       const back = await until(() => tabShown(newTab) && !tabShown(sC.id), 'Ctrl+Shift+Tab').catch(() => false);
       check('Ctrl+Tab / Ctrl+Shift+Tab → 다음·이전 탭', cycled && back);
+      // 늘 위에 둔 스택에서 탭을 바꿔도 왕관 스티커가 사라졌다 나타나지(번쩍이지) 않고 같은 스티커가 새 탭으로 옮겨 간다
+      if (stickers) {
+        const stickerOf = (id) => stickers.get(noteWins.get(id)?.id)?.win;
+        await js(noteWins.get(newTab), `document.getElementById('top-btn').click()`);
+        const stuck = await until(() => stickerOf(newTab)?.isVisible(), '왕관 스티커').catch(() => false);
+        const first = stickerOf(newTab);
+        let gaps = 0;
+        const sampler = setInterval(() => {
+          const shown = [newTab, sC.id].some((m) => stickerOf(m)?.isVisible?.());
+          if (!shown) gaps++;
+        }, 10);
+        await key(noteWins.get(newTab), 'Tab', ['control']);
+        await until(() => tabShown(sC.id) && !tabShown(newTab), 'Ctrl+Tab (늘 위)').catch(() => {});
+        await wait(400);
+        clearInterval(sampler);
+        const same = stickerOf(sC.id) === first && !stickerOf(newTab);
+        check('늘 위 스택: 탭을 바꿔도 왕관이 사라지지 않고 같은 스티커가 옮겨 감', stuck && gaps === 0 && same, JSON.stringify({ stuck: Boolean(stuck), gaps, same }));
+        await key(noteWins.get(sC.id), 'Tab', ['control', 'shift']);
+        await until(() => tabShown(newTab), '되돌아가기').catch(() => {});
+        // 뒤 점검을 위해 늘 위에 두기를 끈다 (스티커 누르기)
+        await stickerOf(newTab)?.webContents.executeJavaScript(`window.memoking.sticker.peel()`).catch(() => {});
+        await until(() => !noteWins.get(newTab).isAlwaysOnTop(), '늘 위 끄기').catch(() => {});
+      }
       // 창을 옮기면 숨은 탭도 같은 자리
       const moved = { x: aBounds.x + 30, y: aBounds.y + 20, width: 340, height: 320 };
       noteWins.get(newTab).setBounds(moved);
@@ -1226,6 +1249,50 @@ export async function runSmoke({
     const expected = appSettings().autoStart.available;
     check('설정: Windows 시작 시 자동 실행 (설치판에서만 켤 수 있음)', auto.disabled === !expected && (expected || /설치한 메모킹/.test(auto.note)), JSON.stringify(auto));
     await capture(lw, 'smoke-settings.png');
+    // 전역 단축키 바꾸기: 키 단추 → 새 조합을 누르면 저장(다른 앱이 쓰는 키면 그대로 두고 알림) · 같은 키는 거절 · 기본값으로
+    {
+      const press = async (keyCode, modifiers = []) => {
+        lw.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+        lw.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+        await wait(250);
+      };
+      const label0 = await js(lw, `document.getElementById('sc-magic').textContent`);
+      await js(lw, `document.getElementById('sc-magic').click()`);
+      await wait(250);
+      const asking = await js(lw, `document.getElementById('sc-magic').classList.contains('capturing')`);
+      await press('M', ['control', 'alt']);
+      const after = await js(lw, `({ label: document.getElementById('sc-magic').textContent, note: document.getElementById('sc-magic-note').textContent })`);
+      const saved = appSettings().shortcuts.magic;
+      // 이 점검 환경은 전역 단축키를 잡을 수 없어(위 "전역 등록" 점검) "다른 앱이 쓰는 중" 으로 남을 수 있다 — 둘 다 맞는 결과
+      const changed = saved.key === 'Control+Alt+M' && after.label === 'Ctrl+Alt+M' && /키로 바꿨어요/.test(after.note);
+      const refused = saved.key === 'Control+Alt+Space' && /다른 앱이 이미 쓰고/.test(after.note);
+      check('단축키 바꾸기: 키 단추 → 새 조합 → 바뀜(또는 다른 앱이 쓰면 그대로 두고 알림)', label0 === 'Ctrl+Alt+Space' && asking && (changed || refused), JSON.stringify({ label0, asking, after, saved: saved.key }));
+      await js(lw, `document.getElementById('sc-magic').click()`);
+      await wait(250);
+      await press('C', ['control', 'alt']);
+      const sameNote = await js(lw, `document.getElementById('sc-magic-note').textContent`);
+      check('단축키 바꾸기: 빠른 메모와 같은 키는 거절', /빠른 메모와 같은 키/.test(sameNote), sameNote);
+      await js(lw, `document.getElementById('sc-magic').click()`);
+      await wait(250);
+      await press('C', ['control']);
+      const reservedNote = await js(lw, `document.getElementById('sc-magic-note').textContent`);
+      await press('Escape');
+      check('단축키 바꾸기: 복사(Ctrl+C) 같은 흔한 키는 거절 · Esc 로 그만', /늘 쓰는 키/.test(reservedNote) && !(await js(lw, `document.getElementById('sc-magic').classList.contains('capturing')`)), reservedNote);
+      if (changed) {
+        await js(lw, `document.getElementById('sc-magic-reset').click()`);
+        await until(() => appSettings().shortcuts.magic.key === 'Control+Alt+Space', '기본값으로').catch(() => {});
+      }
+      check('단축키: 기본값으로 되돌리기', appSettings().shortcuts.magic.key === 'Control+Alt+Space');
+      // 다른 앱이 이미 잡고 있는 키 (점검에서는 먼저 잡아 두어 흉내) → 바꾸지 않고 "다른 앱이 이미 쓰고 있어요"
+      if (globalShortcut.register('Control+Alt+J', () => {})) {
+        await js(lw, `document.getElementById('sc-magic').click()`);
+        await wait(250);
+        await press('J', ['control', 'alt']);
+        const takenNote = await js(lw, `document.getElementById('sc-magic-note').textContent`);
+        globalShortcut.unregister('Control+Alt+J');
+        check('단축키 바꾸기: 다른 앱이 쓰는 키면 바꾸지 않고 알림', appSettings().shortcuts.magic.key === 'Control+Alt+Space' && /다른 앱이 이미 쓰고/.test(takenNote), takenNote);
+      }
+    }
     await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight / 2 - 120; })()`);
     await capture(lw, 'smoke-settings-2.png');
     await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight; })()`);

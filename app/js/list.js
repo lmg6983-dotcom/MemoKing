@@ -1,6 +1,7 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
 import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
+import { acceleratorFromKey, displayAccelerator } from './core/accelerators.js';
 import { injectIcons, icon } from './icons.js';
 import { friendlyTime } from './core/format.js';
 import { vaultUrl } from './media.js';
@@ -553,6 +554,7 @@ async function loadSettings() {
   magicIndex = s.magicIndex ?? null;
   showMagic(s.magic);
   showQuickMemo(s.quickMemo);
+  showShortcuts(s.shortcuts);
   $('trash-days').value = String(s.trashDays);
   if (api.stt) renderStt(await api.stt.status());
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
@@ -560,9 +562,98 @@ async function loadSettings() {
 function showQuickMemo(q) {
   $('quick-memo').checked = q.enabled && q.registered;
   $('quick-memo-note').textContent = q.enabled && !q.registered
-    ? '다른 프로그램이 이 단축키를 쓰고 있어서 켜지 못했어요'
+    ? '다른 앱이 이 단축키를 먼저 쓰고 있어서 작동하지 않아요. 아래에서 다른 키로 바꿔 주세요'
     : '어디서든 고른 내용을 바로 메모로 만들어요. 두 번 누르면 화면 영역 캡처';
 }
+
+// ---------- 전역 단축키 바꾸기 (빠른 메모·매직키) ----------
+// 키 단추를 누르고 새 조합을 누르면 바뀐다. 다른 앱이 이미 쓰는 키면 바꾸지 않고 알려 준다 (Esc·다른 곳 누르기 = 그만)
+let shortcutState = {};
+const SC_TAKEN = '다른 앱이 이 키를 먼저 쓰고 있어서 작동하지 않아요 (예: 같은 단축키를 쓰는 다른 프로그램). 다른 키로 바꿔 주세요';
+function showShortcuts(sc) {
+  shortcutState = sc ?? {};
+  for (const name of ['quickMemo', 'magic']) {
+    const st = shortcutState[name];
+    if (!st) continue;
+    $(`sc-${name}`).textContent = st.label;
+    $(`sc-${name}`).setAttribute('aria-label', `${name === 'quickMemo' ? '빠른 메모' : '매직키'} 단축키 ${st.label}, 눌러서 바꾸기`);
+    $(`sc-${name}-reset`).hidden = st.isDefault;
+    $(`sc-${name}-note`).textContent = st.enabled && !st.registered ? SC_TAKEN : '';
+    $(`sc-${name}-note`).classList.toggle('warn', st.enabled && !st.registered);
+    $(name === 'quickMemo' ? 'quick-memo-kbd' : 'magic-kbd').textContent = st.label;
+  }
+}
+let capturing = null; // { name, btn, onKey, onBlur }
+async function stopCapture(message = '', warn = false) {
+  if (!capturing) return;
+  const { name, onKey, onDown } = capturing;
+  capturing = null;
+  window.removeEventListener('keydown', onKey, true);
+  document.removeEventListener('pointerdown', onDown, true);
+  $(`sc-${name}`).classList.remove('capturing');
+  await api.settings.pauseShortcuts(false);
+  const s = await api.settings.get();
+  showShortcuts(s.shortcuts);
+  showQuickMemo(s.quickMemo);
+  if (message) {
+    $(`sc-${name}-note`).textContent = message;
+    $(`sc-${name}-note`).classList.toggle('warn', warn);
+  }
+}
+async function startCapture(name) {
+  if (capturing) await stopCapture();
+  const btn = $(`sc-${name}`);
+  await api.settings.pauseShortcuts(true); // 지금 키를 눌러도 빠른 메모가 뜨지 않게 잠시 놓는다
+  btn.classList.add('capturing');
+  btn.textContent = '새 키 조합을 누르세요…';
+  $(`sc-${name}-note`).textContent = 'Ctrl, Alt, Win 중 하나와 함께 눌러요. Esc 는 그만';
+  $(`sc-${name}-note`).classList.remove('warn');
+  const onKey = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.metaKey) return stopCapture();
+    const r = acceleratorFromKey(e);
+    if (r.pending) {
+      btn.textContent = `${[e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Win'].filter(Boolean).join('+')}+…`;
+      return;
+    }
+    if (r.error) {
+      $(`sc-${name}-note`).textContent = r.error;
+      $(`sc-${name}-note`).classList.add('warn');
+      return; // 계속 기다린다
+    }
+    const res = await api.settings.setShortcut(name, r.acc);
+    if (res.ok) return stopCapture(`${displayAccelerator(r.acc)} 키로 바꿨어요`);
+    if (res.reason === 'taken') return stopCapture(`${res.label} 키는 다른 앱이 이미 쓰고 있어요. 다른 키를 골라 주세요`, true);
+    if (res.reason === 'same') return stopCapture(`${res.other}와 같은 키예요. 다른 키를 골라 주세요`, true);
+    return stopCapture('이 키는 쓸 수 없어요', true);
+  };
+  const onDown = (e) => {
+    if (e.target !== btn) stopCapture();
+  };
+  capturing = { name, onKey, onDown };
+  window.addEventListener('keydown', onKey, true);
+  document.addEventListener('pointerdown', onDown, true);
+}
+for (const name of ['quickMemo', 'magic']) {
+  $(`sc-${name}`).addEventListener('click', () => (capturing?.name === name ? stopCapture() : startCapture(name)));
+  $(`sc-${name}-reset`).addEventListener('click', async () => {
+    const res = await api.settings.setShortcut(name, null);
+    const s = await api.settings.get();
+    showShortcuts(s.shortcuts);
+    showQuickMemo(s.quickMemo);
+    if (!res.ok && res.reason === 'taken') {
+      $(`sc-${name}-note`).textContent = `기본 키 ${res.label} 키는 다른 앱이 쓰고 있어요`;
+      $(`sc-${name}-note`).classList.add('warn');
+    }
+  });
+}
+// 다른 앱이 놓아 주어 1분마다 다시 잡기에 성공했을 때 등
+api.on('shortcuts:changed', async () => {
+  const s = await api.settings.get();
+  showShortcuts(s.shortcuts);
+  showQuickMemo(s.quickMemo);
+});
 // ---------- 음성 녹음 · 받아쓰기 (desktop/stt) ----------
 // 데이터는 처음 한 번 받는다 (받아쓰기 약 80MB, 말한 사람 나누기 약 30MB) — 이 PC 의 앱 데이터 폴더에, 메모 폴더에는 넣지 않음
 function renderStt(st) {

@@ -133,8 +133,14 @@
     </label>
     <label class="setting-row">
       <input type="checkbox" id="quick-memo" class="switch">
-      <span>빠른 메모 <kbd>Ctrl+Alt+C</kbd> <small id="quick-memo-note">고른 내용을 바로 메모로, 두 번 누르면 화면 캡처</small></span>
+      <span>빠른 메모 <kbd id="quick-memo-kbd">Ctrl+Alt+C</kbd> <small id="quick-memo-note">고른 내용을 바로 메모로, 두 번 누르면 화면 캡처</small></span>
     </label>
+    <div class="shortcut-row" data-shortcut="quickMemo">
+      <span class="shortcut-label">단축키</span>
+      <button type="button" class="kbd-btn" id="sc-quickMemo" aria-describedby="sc-quickMemo-note">…</button>
+      <button type="button" class="link-btn sc-reset" id="sc-quickMemo-reset" hidden>기본값으로</button>
+      <small class="sc-note" id="sc-quickMemo-note" role="status"></small>
+    </div>
     <label class="setting-row">
       <input type="checkbox" id="history-enabled" class="switch">
       <span>Windows 알림 모아두기 <small>카카오톡 알림도 함께 모아 알림 보관함 탭에서 봐요</small></span>
@@ -165,8 +171,14 @@
     </label>
     <label class="setting-row">
       <input type="checkbox" id="magic-enabled" class="switch">
-      <span>매직키 <kbd>Ctrl+Alt+Space</kbd> <small>어디서든 입력창을 띄워 바로 메모하고 찾아요 (Spotlight 처럼)</small></span>
+      <span>매직키 <kbd id="magic-kbd">Ctrl+Alt+Space</kbd> <small>어디서든 입력창을 띄워 바로 메모하고 찾아요 (Spotlight 처럼)</small></span>
     </label>
+    <div class="shortcut-row" data-shortcut="magic">
+      <span class="shortcut-label">단축키</span>
+      <button type="button" class="kbd-btn" id="sc-magic" aria-describedby="sc-magic-note">…</button>
+      <button type="button" class="link-btn sc-reset" id="sc-magic-reset" hidden>기본값으로</button>
+      <small class="sc-note" id="sc-magic-note" role="status"></small>
+    </div>
     <div id="magic-modules-row" class="setting-sub" hidden>
       <p class="label sub">매직키 기능</p>
       <div id="magic-modules-list" class="magic-settings-modules"></div>

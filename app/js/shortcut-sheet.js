@@ -1,9 +1,10 @@
 // 단축키 한눈에 보기 (Ctrl+/ · 메뉴 › 단축키 보기)
 import { SHORTCUT_GROUPS } from './core/shortcuts.js';
+import { withShortcuts } from './core/accelerators.js';
 
 let dialog = null;
 
-function build() {
+function build(shortcuts) {
   dialog = document.createElement('dialog');
   dialog.className = 'dialog shortcut-sheet';
   dialog.setAttribute('aria-labelledby', 'shortcut-sheet-title');
@@ -28,7 +29,7 @@ function build() {
       const dt = document.createElement('dt');
       dt.textContent = what;
       const dd = document.createElement('dd');
-      for (const [i, part] of keys.split(' / ').entries()) {
+      for (const [i, part] of withShortcuts(keys, shortcuts).split(' / ').entries()) { // 바꾼 전역 단축키는 지금 키로
         if (i) dd.append(' / ');
         const k = document.createElement('kbd');
         k.textContent = part;
@@ -45,8 +46,11 @@ function build() {
   document.body.append(dialog);
 }
 
-export function toggleShortcutSheet() {
-  if (!dialog) build();
+/** @param {object} [shortcuts] 설정의 전역 단축키 (바꿨으면 그 키로 보인다) */
+export function toggleShortcutSheet(shortcuts) {
+  if (dialog?.open) return dialog.close();
+  dialog?.remove();
+  build(shortcuts);
   if (dialog.open) dialog.close();
   else {
     dialog.showModal();

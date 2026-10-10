@@ -520,9 +520,20 @@ $('join-btn').addEventListener('click', async () => {
   await flush();
   api.stack.joinMenu(id);
 });
+// 단축키 모음: 전역 단축키(빠른 메모·매직키)는 설정에서 바꾼 키로
+async function openShortcutSheet() {
+  let keys;
+  try {
+    const s = await api.settings.get();
+    keys = { quickMemo: s.shortcuts?.quickMemo?.key, magic: s.shortcuts?.magic?.key };
+  } catch {
+    keys = undefined;
+  }
+  toggleShortcutSheet(keys);
+}
 $('shortcuts-btn').addEventListener('click', () => {
   closeMenu();
-  toggleShortcutSheet();
+  openShortcutSheet();
 });
 // 메모 창을 몇 번 써 본 뒤 한 번: 단축키 모음이 있다는 것
 setTimeout(() => hintOnce('shortcuts', 'Ctrl+/ 를 누르면 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn }), 2500);
@@ -1109,7 +1120,7 @@ window.addEventListener('keydown', (e) => {
   else if (name === 'reminders') reminderPanel?.toggle();
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
-  else if (name === 'shortcuts') toggleShortcutSheet();
+  else if (name === 'shortcuts') openShortcutSheet();
 }, true);
 
 // ---------- 본문 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 웹 브라우저처럼 글·사진·표가 함께 ----------
