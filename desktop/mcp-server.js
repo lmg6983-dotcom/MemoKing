@@ -38,7 +38,7 @@ function openVault() {
     vault.scan({ silent: true });
     return vault;
   }
-  vault = new Vault(root);
+  vault = new Vault(root, { device: 'ai' });
   // 이 프로세스는 읽고 쓰기만 — 색인 다시 쓰기·첨부 치우기는 켜져 있는 메모킹 앱이 맡는다
   vault.scheduleIndex = () => {};
   vault.flushOrphans = () => vault.orphans.clear();

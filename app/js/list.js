@@ -3,6 +3,7 @@ import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
 import { acceleratorFromKey, displayAccelerator } from './core/accelerators.js';
 import { injectIcons, icon } from './icons.js';
+import { handoffText } from './core/handoff.js';
 import { friendlyTime } from './core/format.js';
 import { vaultUrl } from './media.js';
 import { setupRemindersTab } from './list-reminders.js';
@@ -502,6 +503,53 @@ function showUndo({ name, title }) {
   undoTimer = setTimeout(() => (bar.hidden = true), 6000);
 }
 api.on('memo:trashed', showUndo);
+
+// ---------- 이어 쓰기: 다른 기기에서 방금 고친 메모 → 위쪽에 "열기" 막대 (2분 뒤, 또는 열면 사라짐) ----------
+let handoffTimer = null;
+function showHandoff(h) {
+  if (!h) return;
+  let bar = $('handoff-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'handoff-bar';
+    bar.className = 'undo-bar handoff-bar';
+    bar.setAttribute('role', 'status');
+    bar.addEventListener('pointerenter', () => clearTimeout(handoffTimer));
+    bar.addEventListener('pointerleave', () => {
+      clearTimeout(handoffTimer);
+      handoffTimer = setTimeout(() => (bar.hidden = true), 20_000);
+    });
+    document.body.append(bar);
+  }
+  // 두 줄: 작게 "휴대폰에서 방금 고친 메모" · 굵게 제목 (좁은 목록 창에서도 제목이 보이게)
+  const text = document.createElement('span');
+  text.className = 'handoff-text';
+  const from = document.createElement('small');
+  from.textContent = handoffText(h.from, '').replace(/:\s*$/, '');
+  const title = document.createElement('b');
+  title.textContent = h.title;
+  text.append(from, title);
+  text.title = handoffText(h.from, h.title);
+  const open = document.createElement('button');
+  open.type = 'button';
+  open.textContent = '열기';
+  open.addEventListener('click', () => {
+    bar.hidden = true;
+    api.memo.open(h.id);
+  });
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'handoff-close';
+  close.setAttribute('aria-label', '안내 닫기');
+  close.append(icon('close'));
+  close.addEventListener('click', () => (bar.hidden = true));
+  bar.replaceChildren(text, open, close);
+  bar.hidden = false;
+  clearTimeout(handoffTimer);
+  handoffTimer = setTimeout(() => (bar.hidden = true), 120_000);
+}
+api.on('memo:handoff', showHandoff);
+api.memo.handoff().then(showHandoff).catch(() => {});
 
 el.useSuggested.addEventListener('click', async () => applyInfo(await api.vault.use(state.info.suggestedPath)));
 el.chooseFolder.addEventListener('click', async () => applyInfo(await api.vault.choose()));

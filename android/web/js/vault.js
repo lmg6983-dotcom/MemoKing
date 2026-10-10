@@ -228,6 +228,7 @@ export class Vault extends EventTarget {
       ink: entry.meta.ink ?? '',
       created: entry.meta.created,
       updated: entry.meta.updated,
+      device: entry.meta.device ?? null,
     };
   }
 
@@ -309,6 +310,7 @@ export class Vault extends EventTarget {
     const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
     entry.body = body;
     entry.meta.updated = toLocalIso();
+    entry.meta.device = 'phone'; // 이어 쓰기 안내: 다른 기기가 "방금 여기서 고쳤다" 를 알 수 있게
     if (!entry.file && isBlankBody(body)) return this.summary(entry);
     if (entry.file) this.keepVersion(id, known);
     this.write(entry, known);

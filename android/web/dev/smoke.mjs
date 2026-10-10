@@ -337,6 +337,25 @@ try {
     /위젯에 보일 메모/.test(pickToast ?? '') && picked?.[0] === 7 && picked?.[1] === '00000000-0000-4000-8000-000000000001' && await page.isHidden('#note-screen'),
     JSON.stringify({ pickToast, picked }));
 
+  // 이어 쓰기: PC 에서 방금 고친 메모가 들어오면 "PC에서 방금 고친 메모: … [열기]"
+  {
+    const nowIso = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
+    write('PC에서 쓴 메모.md', `---\nid: 00000000-0000-4000-8000-0000000000pc\ncreated: ${nowIso}\nupdated: ${nowIso}\ncolor: blue\ndevice: pc\n---\n# PC에서 쓴 메모\n\n회의 정리\n`);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForTimeout(800);
+    const handoffToast = await page.textContent('#toast-text').catch(() => '');
+    const hasOpen = await page.isVisible('#toast-action');
+    check('이어 쓰기: PC에서 방금 고친 메모를 알리고 [열기]', /PC에서 방금 고친 메모: PC에서 쓴 메모/.test(handoffToast ?? '') && hasOpen, handoffToast);
+    await shot('02d-handoff');
+    if (hasOpen) await page.tap('#toast-action');
+    await page.waitForTimeout(600);
+    check('이어 쓰기: [열기] 를 누르면 그 메모', (await page.locator('.mk-doc h1').first().textContent().catch(() => '')) === 'PC에서 쓴 메모');
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+  }
+
   // 다른 앱에서 공유하기
   const png = fs.readFileSync(path.join(repo, 'assets/icons/icon-256.png')).toString('base64');
   await post('/dev/intent', { type: 'share', text: '좋은 문장\n둘째 줄', app: 'Chrome', files: [{ name: 'photo.png', mime: 'image/png', base64: png }] });

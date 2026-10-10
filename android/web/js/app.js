@@ -22,6 +22,7 @@ import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast,
 import * as recorder from './recorder.js';
 import { renderMemoImage } from '../../app/js/share-image.js';
 import * as widgets from './widgets.js';
+import { handoffFrom, handoffText } from '../../app/js/core/handoff.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
@@ -1013,6 +1014,7 @@ function openVault() {
     changeTimer = setTimeout(() => list.refresh(), 60);
     alarms.scheduleSoon();
     widgets.publishSoon();
+    for (const id of detail.ids ?? []) if (!detail.removed?.includes(id) && checkHandoff(id)) break;
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
   $('setup').hidden = true;
@@ -1030,6 +1032,8 @@ function openVault() {
   if (app.vaultInfo?.drive) drive.syncSoon();
   recorder.resume(); // 녹음이 도는 중인지, 꺼져 있는 동안 끝난 녹음이 있는지
   widgets.publishSoon(0); // 앱이 꺼져 있는 동안 바뀐 메모(동기화 등)를 위젯에도
+  // 켜기 전에 PC 에서 방금 고친 메모가 있으면 (가장 최근 하나)
+  if (!pendingIntent) for (const m of vault.list().sort((a, b) => (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0)).slice(0, 5)) if (checkHandoff(m.id)) break;
   if (pendingIntent) {
     const p = pendingIntent;
     pendingIntent = null;
@@ -1038,6 +1042,17 @@ function openVault() {
     else if (p.type === 'widget-pick') widgets.startPick(p.widgetId, { toast });
     else if (p.type === 'share') memoFromShare(p);
   }
+}
+
+// ---------- 이어 쓰기: PC·AI 비서에서 방금 고친 메모 → "PC에서 방금 고친 메모: 장보기 [열기]" ----------
+const handoffSeen = new Set();
+function checkHandoff(id) {
+  const memo = app.vault?.get(id);
+  if (!memo?.file || note.currentId() === id) return false; // 지금 보고 있는 메모는 화면이 새 내용을 보여 준다
+  const from = handoffFrom(memo, { mine: 'phone', seen: handoffSeen });
+  if (!from) return false;
+  toast(handoffText(from, memo.title), false, { label: '열기', run: () => app.openMemo(id) });
+  return true;
 }
 
 // ---------- 앱의 소식 ----------

@@ -19,6 +19,7 @@ import { LinkPreviews } from './link-previews.js';
 import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
+import { handoffFrom, HANDOFF_MS } from '../app/js/core/handoff.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
@@ -176,17 +177,22 @@ function openVault(dir) {
   vault = null;
   try {
     const next = new Vault(dir);
-    next.on('changed', ({ external, removed }) => {
+    next.on('changed', ({ ids, external, removed }) => {
       pushList();
       driveSync?.request(3000); // 고친 것을 잠시 뒤 Google Drive 로
       for (const id of external) sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) sendToNote(id, 'memo:removed');
+      for (const id of ids) if (!removed.includes(id)) checkHandoff(next.get(id));
     });
     next.on('indexed', (index) => listWin?.webContents.send('vault:indexed', index.generatedAt));
     next.on('error', (err) => console.error('[vault]', err));
     next.open();
     vault = next;
     vaultError = null;
+    // 켜기 전에 다른 기기에서 방금 고친 메모가 있으면 (가장 최근 하나)
+    for (const m of next.list().sort((a, b) => (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0)).slice(0, 5)) {
+      if (checkHandoff(next.get(m.id))) break;
+    }
     settings.vaultPath = next.root;
     saveSettings();
     migrateV1();
@@ -204,6 +210,18 @@ function openVault(dir) {
 
 function vaultInfo() {
   return { vaultPath: vault?.root ?? null, vaultError, suggestedPath: suggestedVaultPath(), version: app.getVersion() };
+}
+
+// ---------- 이어 쓰기: 다른 기기(휴대폰·AI 비서)에서 방금 고친 메모 → 목록 창 위에 "열기" 막대 ----------
+const handoffSeen = new Set();
+let lastHandoff = null;
+function checkHandoff(memo) {
+  if (!memo?.file || noteWins.has(memo.id)) return false; // 이 PC 에서 열어 둔 메모는 창이 알아서 새 내용을 보여 준다
+  const from = handoffFrom(memo, { mine: 'pc', seen: handoffSeen });
+  if (!from) return false;
+  lastHandoff = { id: memo.id, title: memo.title, from, at: Date.now() };
+  listWin?.webContents.send('memo:handoff', lastHandoff);
+  return true;
 }
 
 // 목록 카드에 "지금 열려 있는 메모" 표시를 붙인다.
@@ -2694,6 +2712,8 @@ function registerIpc() {
   });
 
   ipcMain.handle('memo:open', (_e, id) => Boolean(openNote(id)));
+  // 목록 창이 늦게 열렸을 때: 아직 "방금" 인 이어 쓰기 안내
+  ipcMain.handle('memo:handoff', () => (lastHandoff && Date.now() - lastHandoff.at < HANDOFF_MS && !noteWins.has(lastHandoff.id) ? lastHandoff : null));
   ipcMain.handle('memo:create', (_e, options) => createNote(options ?? {}));
   ipcMain.handle('memo:get', (_e, id) => {
     const memo = vault?.get(id);

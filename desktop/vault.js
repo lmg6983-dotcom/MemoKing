@@ -48,9 +48,10 @@ function stamp(date = new Date()) {
 }
 
 export class Vault extends EventEmitter {
-  constructor(root, { orphanDelay = ORPHAN_DELAY } = {}) {
+  constructor(root, { orphanDelay = ORPHAN_DELAY, device = 'pc' } = {}) {
     super();
     this.root = path.resolve(root);
+    this.device = device; // 내용을 고친 곳으로 머리말에 남김 (pc · ai)
     this.orphanDelay = orphanDelay;
     this.orphans = new Map(); // 없어진 메모 id → 그 메모가 쓰던 첨부 (확인 대기)
     this.orphanTimer = null;
@@ -271,6 +272,7 @@ export class Vault extends EventEmitter {
       ink: entry.meta.ink ?? '',
       created: entry.meta.created,
       updated: entry.meta.updated,
+      device: entry.meta.device ?? null,
     };
   }
 
@@ -353,6 +355,7 @@ export class Vault extends EventEmitter {
     const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
     entry.body = body;
     entry.meta.updated = toLocalIso();
+    entry.meta.device = this.device; // 이어 쓰기 안내: 다른 기기가 "방금 여기서 고쳤다" 를 알 수 있게
     if (!entry.file && isBlankBody(body)) return this.summary(entry);
     if (entry.file) this.keepVersion(id, known);
     this.write(entry, known);

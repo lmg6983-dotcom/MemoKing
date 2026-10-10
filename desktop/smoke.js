@@ -1140,6 +1140,19 @@ export async function runSmoke({
       await until(() => remindersOf(dn.id).length === 0, '날짜 알림 지우기').catch(() => {});
       await closeNote(dn.id);
     }
+    // 14-01) 이어 쓰기: 휴대폰에서 방금 고친 메모가 들어오면 목록 위에 "휴대폰에서 방금 고친 메모: … [열기]"
+    {
+      const nowIso = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
+      fs.writeFileSync(path.join(VAULT, '휴대폰에서 쓴 메모.md'), `---\nid: 00000000-0000-4000-8000-00000000f0e1\ncreated: ${nowIso}\nupdated: ${nowIso}\ncolor: green\ndevice: phone\n---\n# 휴대폰에서 쓴 메모\n\n지하철에서 적음\n`);
+      getVault().scan();
+      const bar = await until(() => listJs(`(() => { const b = document.getElementById('handoff-bar'); return b && !b.hidden ? b.textContent : null; })()`), '이어 쓰기 막대').catch(() => '');
+      await capture(getList(), 'smoke-handoff.png');
+      check('이어 쓰기: 휴대폰에서 방금 고친 메모를 목록 위에 [열기]', /휴대폰에서 방금 고친 메모\s*휴대폰에서 쓴 메모/.test(bar ?? '') && /열기/.test(bar ?? ''), bar);
+      const hn = await newNote(() => listJs(`document.querySelector('#handoff-bar button').click()`)).catch(() => null);
+      check('이어 쓰기: [열기] → 그 메모 창', hn?.id === '00000000-0000-4000-8000-00000000f0e1');
+      if (hn) await closeNote(hn.id);
+      getVault().trash('00000000-0000-4000-8000-00000000f0e1'); // 뒤 점검의 메모 수에 섞이지 않게
+    }
     // 14-0) 알림 보관함 탭: 처음에는 동의 안내부터
     await listJs(`document.querySelector('[data-tab="history"]').click()`);
     await wait(300);
