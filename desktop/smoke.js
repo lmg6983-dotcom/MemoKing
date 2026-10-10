@@ -261,10 +261,28 @@ export async function runSmoke({
     await js(n1.win, `document.querySelector('[data-action="color"]').click()`);
     await until(() => js(n1.win, `!document.getElementById('palette').hidden`), '색판 열림');
     await js(n1.win, `document.querySelector('#palette [data-color="#e03131"]').click()`);
+    // 판에서 지금 칠해진 색을 다시 고르면 지워지고, 한 번 더 고르면 다시 칠해진다
+    const redNow = () => js(n1.win, `[...document.querySelectorAll('.mk-doc span[data-mk-color]')].some((s) => s.textContent.includes('빨강'))`);
+    const redOn = await redNow();
+    await js(n1.win, `document.querySelector('[data-action="color"]').click()`);
+    await until(() => js(n1.win, `!document.getElementById('palette').hidden`), '색판 열림');
+    const marked = await js(n1.win, `document.querySelector('#palette [data-color="#e03131"]').getAttribute('aria-checked')`);
+    await js(n1.win, `document.querySelector('#palette [data-color="#e03131"]').click()`);
+    const redOff = !(await redNow());
+    await js(n1.win, `document.querySelector('[data-action="color"]').click()`);
+    await until(() => js(n1.win, `!document.getElementById('palette').hidden`), '색판 열림');
+    await js(n1.win, `document.querySelector('#palette [data-color="#e03131"]').click()`);
+    check('글자 색: 판에 지금 색 표시 · 같은 색을 다시 고르면 지워짐 · 또 고르면 다시', redOn && marked === 'true' && redOff && (await redNow()), JSON.stringify({ redOn, marked, redOff }));
     await key(n1.win, 'Right');
     await key(n1.win, 'Right');
     await select2();
     await key(n1.win, 'H', ['control', 'shift']);
+    const markNow = () => js(n1.win, `[...document.querySelectorAll('.mk-doc mark')].some((m) => m.textContent.includes('형광'))`);
+    const hlOn = await markNow();
+    await key(n1.win, 'H', ['control', 'shift']);
+    const hlOff = !(await markNow());
+    await key(n1.win, 'H', ['control', 'shift']);
+    check('형광펜: 다시 누르면 지워짐 · 또 누르면 다시', hlOn && hlOff && (await markNow()), JSON.stringify({ hlOn, hlOff }));
     await key(n1.win, 'End');
     await key(n1.win, 'Enter');
     await key(n1.win, '9', ['control', 'shift']);

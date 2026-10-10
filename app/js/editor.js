@@ -2150,7 +2150,8 @@ function activeFormats(state) {
     underline: Boolean(findMark(marks.mk_underline)),
     strike: Boolean(findMark(marks.strike_through)),
     code: Boolean(findMark(marks.inlineCode)),
-    color: findMark(marks.mk_color)?.attrs.color ?? null,
+    // 색 값이 비어 있는 글자 색도 '칠해짐'으로 (그래야 다시 눌러 지울 수 있다)
+    color: (() => { const m = findMark(marks.mk_color); return m ? m.attrs.color || 'currentColor' : null; })(),
     highlight: findMark(marks.mk_highlight)?.attrs.color ?? null,
     canUndo: safeDepth(undoDepth, state) > 0,
     canRedo: safeDepth(redoDepth, state) > 0,

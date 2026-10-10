@@ -565,6 +565,9 @@ const PALETTES = {
   highlight: { title: '형광펜', colors: HIGHLIGHT_COLORS, apply: (c) => editor.setHighlight(c) },
 };
 const lastColor = { color: TEXT_COLORS[0].value, highlight: HIGHLIGHT_COLORS[0].value };
+// 지금 커서·고른 글자에 칠해진 색 (showActive 가 채움) — 판에서 같은 색을 다시 누르면 지우고, 판에 지금 색을 표시
+const appliedColor = { color: null, highlight: null };
+const sameColor = (a, b) => Boolean(a && b) && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
 try {
   Object.assign(lastColor, JSON.parse(localStorage.getItem('memoking.lastColor') ?? '{}'));
 } catch {
@@ -591,7 +594,8 @@ function openPalette(kind, anchor) {
       b.classList.add('text-sample');
       b.style.color = value;
     } else b.style.background = value;
-    b.setAttribute('aria-checked', String(value === lastColor[kind]));
+    b.setAttribute('aria-checked', String(sameColor(value, appliedColor[kind] ?? lastColor[kind])));
+    if (sameColor(value, appliedColor[kind])) b.title = '다시 누르면 색을 지워요';
     return b;
   }));
   el.palette.hidden = false;
@@ -611,6 +615,7 @@ export function closePalette() {
 function applyPaletteColor(color) {
   const kind = paletteKind;
   if (!kind) return;
+  if (color && sameColor(color, appliedColor[kind])) color = null; // 지금 칠해진 색을 다시 고르면 지운다
   if (color) {
     lastColor[kind] = color;
     try {
@@ -754,7 +759,9 @@ function applyPreset(kind, btn) {
     return;
   }
   if (paletteKind) return closePalette();
-  PALETTES[kind].apply(lastColor[kind]);
+  // 누르기 = 켜고 끄기: 이미 칠해져 있으면 지우고, 아니면 지난번 색으로 (PC 단축키 Ctrl+Shift+C·H 와 같음)
+  if (kind === 'color') editor.toggleTextColor(lastColor.color);
+  else editor.toggleHighlight(lastColor.highlight);
   haptic(6);
 }
 // 꾹(0.45초) 누르면 색 고르기 판 — 판에서 고른 색은 다음부터 누르기만 해도 쓰는 색이 된다
@@ -836,6 +843,8 @@ el.tableBar.addEventListener('click', (e) => {
 });
 
 function showActive(active) {
+  appliedColor.color = active.color ?? null;
+  appliedColor.highlight = active.highlight ?? null;
   showTableBar(active.table);
   currentStyle = styleOf(active);
   for (const b of document.querySelectorAll('[data-action="style"]')) {
