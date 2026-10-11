@@ -96,7 +96,9 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
 
   function renderItem(r) {
     const li = document.createElement('li');
-    li.className = `rem-item${r.enabled && !(isPastEvent(r) && !nextLabel(r)) ? '' : ' off'}`;
+    // 미리 알림을 다 보낸 한 번짜리 일정은 일정이 지날 때까지는 "끝" 이 아니다 (꺼진 것처럼 흐리게 하지 않음)
+    const sentAll = isDone(r) && r.kind === 'at' && !isPastEvent(r);
+    li.className = `rem-item${(r.enabled || sentAll) && !(isPastEvent(r) && !nextLabel(r)) ? '' : ' off'}`;
     li.dataset.id = r.id;
     li.append(icon(KIND_ICON[r.kind], 'rem-kind-icon'));
 
@@ -108,7 +110,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     const sub = document.createElement('div');
     sub.className = 'rem-sub';
     const next = nextLabel(r);
-    const state = isDone(r) || (isPastEvent(r) && !next) ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : next ? `다음 알림 ${next}` : '';
+    const state = sentAll ? '알림을 모두 보냈어요' : isDone(r) || (isPastEvent(r) && !next) ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : next ? `다음 알림 ${next}` : '';
     const alerts = isEvent(r) ? `알림 ${describeAlerts(r)}` : '';
     sub.textContent = [alerts, state, r.action === 'open' ? '메모 바로 열기' : '알림으로 받기'].filter(Boolean).join(', ');
     text.append(title, sub);

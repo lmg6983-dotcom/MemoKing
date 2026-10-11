@@ -55,4 +55,11 @@ class WidgetToggleTest {
     fun stampKeepsCrlf() {
         assertEquals("---\r\nid: a\r\nupdated: N\r\ndevice: phone\r\n---\r\nx", Widgets.stampEdit("---\r\nid: a\r\nupdated: O\r\n---\r\nx", "N"))
     }
+
+    @Test
+    fun unicodeSpacesCountLikeJavaScript() {
+        // 전각 공백(\u3000)·NBSP 뒤의 할 일도 widget-lines.js 처럼 할 일
+        assertEquals("- [x]\u3000할 일", Widgets.toggleTaskText("- [ ]\u3000할 일", 0))
+        assertEquals("- [x]\u00A0우유", Widgets.toggleTaskText("- [ ]\u00A0우유", 0))
+    }
 }

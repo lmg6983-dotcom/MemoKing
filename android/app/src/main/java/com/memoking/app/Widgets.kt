@@ -254,8 +254,9 @@ object Widgets {
 
     // ---------- 체크 ----------
 
-    private val TASK = Regex("""^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\](?:\s+|$)""")
-    private val FENCE = Regex("""^\s*(```|~~~)""")
+    // (?U): \s 가 자바스크립트처럼 유니코드 공백(전각 공백 등)도 — widget-lines.js 와 같은 줄을 할 일로 센다
+    private val TASK = Regex("""(?U)^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\](?:\s+|$)""")
+    private val FENCE = Regex("""(?U)^\s*(```|~~~)""")
 
     /**
      * 메모 파일의 할 일을 체크/해제한 새 글 (머리말은 건드리지 않음). 찾지 못하면 null.

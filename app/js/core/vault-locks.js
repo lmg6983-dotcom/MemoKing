@@ -4,7 +4,7 @@
 //            vault.keepVersion · vault.purgeVersions · vault.versions · vault.version · vault.rescanSoon · vault.copyOf(Map)
 
 /** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
-const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
+export const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
 import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey, lockedMayUse } from './memo-lock.js';
 import { isBlankBody, sameBody, conflictCopyBody, extractAttachments } from './memo-file.js';
 import { toLocalIso } from './time.js';
@@ -27,6 +27,15 @@ class LockMethods {
     const entry = this.entries.get(id);
     if (!entry || !isLockedBody(entry.body) || unsealBody(entry.body, session) === null) return null;
     this.locks.set(id, session);
+    // 첨부 표가 없는 잠긴 메모(예전 잠금·사본): 연 김에 적어 둔다 — 없으면 첨부 정리가 모두 멈추므로
+    if (!Array.isArray(entry.meta.extra?.lockRefs)) {
+      this.setLockRefs(entry, unsealBody(entry.body, session));
+      try {
+        this.write(entry, entry.body, { copy: false });
+      } catch {
+        // 다음에 다시
+      }
+    }
     // 이제 제 비밀번호로 연 메모 (원래 메모에 묶인 사본이 아님)
     const source = this.copyOf.get(id);
     if (source) this.lockCopies.get(source)?.delete(id);
@@ -53,7 +62,11 @@ class LockMethods {
     if (session && !isLockedBody(body)) {
       entry.body = sealBody(body, session);
       this.setLockRefs(entry, body); // 한 번에 쓴다 (첨부 표까지)
-    } else entry.body = body;
+    } else {
+      entry.body = body;
+      const plain = session && unsealBody(body, session);
+      if (typeof plain === 'string') this.setLockRefs(entry, plain);
+    }
     this.write(entry);
     this.changed([id]);
     if (session) {
@@ -104,7 +117,18 @@ class LockMethods {
       return undefined;
     }
     const mine = entry.body;
-    const copied = copy && !isBlankBody(mine) && !sameBody(mine, known) && Boolean(this.import({ body: mine, color: entry.meta.color }));
+    let copied = false;
+    if (copy && !isBlankBody(mine) && !sameBody(mine, known)) {
+      const copyId = this.create({ color: entry.meta.color });
+      const c = this.entries.get(copyId);
+      c.body = mine;
+      // 잠근 글이면 첨부 표도 (들고 있는 열쇠로 풀어) — 표 없는 잠긴 메모는 첨부 정리를 멈추게 하므로
+      const plain = isLockedBody(mine) && session ? unsealBody(mine, session) : null;
+      if (typeof plain === 'string') this.setLockRefs(c, plain);
+      this.write(c);
+      this.changed([copyId]);
+      copied = true;
+    }
     entry.body = known; // 곧 다시 읽을 때 "바뀌었다" 로 알아채고 열린 화면에 알리게
     this.rescanSoon();
     return copied ? 'copied' : 'locked';
@@ -114,7 +138,7 @@ class LockMethods {
   canRestore(entry, versionBody) {
     // 풀린 메모에 잠긴 버전: 들고 있는 열쇠로 풀리는 것만 (못 푸는 글로 바꿔 내가 못 열게 되지 않게)
     if (!isLockedBody(entry.body)) return !isLockedBody(versionBody) || this.locks.get(entry.id)?.salt === parseLocked(versionBody)?.salt;
-    if (!isLockedBody(versionBody)) return false;
+    if (!isLockedBody(versionBody) || !this.locks.has(entry.id)) return false; // 잠긴 메모는 비밀번호로 연 동안만
     return parseLocked(versionBody)?.salt === parseLocked(entry.body)?.salt;
   }
 
@@ -176,7 +200,10 @@ class LockMethods {
     } catch {
       return;
     }
-    if (names.some((name) => parseLocked(this.version(id, name) ?? '')?.salt !== salt)) this.purgeVersions(id);
+    // 버전은 시간 순: 잠기기 전(풀린)·예전 비밀번호 버전은 앞쪽에 있으므로 가장 오래된 것과 가장 새 것만 본다
+    const sorted = [...names].sort();
+    const check = [...new Set([sorted[0], sorted.at(-1)])].filter(Boolean);
+    if (check.some((name) => parseLocked(this.version(id, name) ?? '')?.salt !== salt)) this.purgeVersions(id);
   }
 
   /** 열쇠를 들고 있는 메모인가 (원래 메모가 열려 있는 사본은 제외 — 사본을 따로 열 때는 비밀번호를 묻는다) */

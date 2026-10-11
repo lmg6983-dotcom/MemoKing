@@ -10,7 +10,7 @@ import { normalizeTables } from '../../app/js/core/table-sizes.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
 import { isLockedBody, parseLocked } from '../../app/js/core/memo-lock.js';
-import { installLockMethods } from '../../app/js/core/vault-locks.js';
+import { installLockMethods, metaSnapshot } from '../../app/js/core/vault-locks.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
@@ -324,14 +324,17 @@ export class Vault extends EventTarget {
       entry = this.newEntry(id);
       this.entries.set(id, entry);
     }
+    const before = metaSnapshot(entry.meta); // 쓰지 못하면 머리말을 되돌린다 (잠근 글의 첨부 표 포함)
     // 잠긴 메모: 연 동안만 저장할 수 있고, 저장은 늘 다시 잠근 글로 (core/vault-locks.js)
     const sealed = this.sealForSave(entry, body);
     if (sealed.same) return this.summary(entry);
-    if (sealed.refused) return { ...this.summary(entry), refused: true }; // 저장되지 않았다고 화면이 알게
+    if (sealed.refused) {
+      entry.meta = before;
+      return { ...this.summary(entry), refused: true }; // 저장되지 않았다고 화면이 알게
+    }
     body = sealed.body;
     if (entry.body === body && entry.file) return this.summary(entry);
     const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
-    const before = { ...entry.meta, extra: { ...entry.meta.extra } };
     entry.body = body;
     entry.meta.updated = toLocalIso();
     entry.meta.device = 'phone'; // 이어 쓰기 안내: 다른 기기가 "방금 여기서 고쳤다" 를 알 수 있게
@@ -439,7 +442,7 @@ export class Vault extends EventTarget {
     // 잠긴 메모에 풀린 버전(또는 다른 비밀번호의 버전)을 덮어 잠금을 풀거나 비밀번호를 되돌리지 않게
     if (!this.canRestore(entry, body)) return { error: '잠긴 메모에는 잠기기 전 버전을 되돌릴 수 없어요' };
     this.keepVersion(id, entry.body, { force: true });
-    const before = { ...entry.meta, extra: { ...entry.meta.extra } };
+    const before = metaSnapshot(entry.meta);
     const known = entry.body;
     entry.body = body;
     this.refreshLockRefs(entry); // 되돌린 글의 첨부도 첨부 정리에서 지키게

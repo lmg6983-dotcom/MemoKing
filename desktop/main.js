@@ -20,7 +20,7 @@ import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { handoffFrom, HANDOFF_MS } from '../app/js/core/handoff.js';
-import { newLockSession, openLock } from '../app/js/core/memo-lock.js';
+import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
@@ -2764,6 +2764,8 @@ function registerIpc() {
   });
   ipcMain.handle('memo:open-lock', async (_e, id, password) => {
     const sealed = vault?.entries.get(String(id))?.body;
+    // 비밀번호 화면이 떠 있는 사이 다른 기기에서 잠금을 풀었다: 비밀번호 없이 그대로 연다
+    if (vault && sealed != null && !isLockedBody(sealed)) return vault.get(String(id));
     try {
       const { session } = await openLock(sealed, String(password ?? ''));
       // 확인하는 사이 창이 닫혔으면 열쇠를 남기지 않는다 (닫힌 메모가 비밀번호 없이 열리지 않게)

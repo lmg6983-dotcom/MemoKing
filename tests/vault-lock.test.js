@@ -226,3 +226,45 @@ test('열지 않은 잠긴 메모를 지우면 그 메모만 쓰던 첨부도 �
   assert.ok(fs.existsSync(path.join(root, 'attachments', 'keep.png')), '다른 메모도 쓰는 첨부는 남음');
   v.close();
 });
+
+test('비밀번호가 바뀐 사이 저장해 생긴 잠긴 사본도 첨부 표를 가져 첨부 정리가 멈추지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  fs.writeFileSync(path.join(root, 'attachments', 'gone.png'), 'png');
+  const id = v.create();
+  v.save(id, '# 금고\n\n글');
+  v.lock(id, await newLockSession('사과1234', FAST));
+  const file = path.join(root, v.get(id).file);
+  const text = fs.readFileSync(file, 'utf8');
+  const head = /^---\n[\s\S]*?\n---\n/.exec(text)[0];
+  const { lockBody } = await import('../app/js/core/memo-lock.js');
+  await new Promise((r) => setTimeout(r, 20));
+  fs.writeFileSync(file, head + await lockBody('# 금고\n\n글', 'newpass9', FAST)); // 다른 기기가 비밀번호를 바꿈
+  const r = v.save(id, '# 금고\n\n글 더');
+  assert.equal(r.copied, true);
+  const copy = [...v.entries.values()].find((e) => e.id !== id);
+  assert.ok(Array.isArray(copy.meta.extra?.lockRefs), '사본에 첨부 표');
+  // 다른 메모가 쓰던 사진을 지우면 정리됨 (모든 첨부를 붙잡지 않음)
+  const a = v.create();
+  v.save(a, '# 보통\n\n![](attachments/gone.png)');
+  v.trash(a);
+  assert.ok(!fs.existsSync(path.join(root, 'attachments', 'gone.png')));
+  v.close();
+});
+
+test('잠긴 메모는 비밀번호로 연 동안만 버전을 되돌림', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '# 금고\n\n하나');
+  v.lock(id, await newLockSession('사과1234', FAST));
+  v.save(id, '# 금고\n\n둘');
+  v.keepVersion(id, v.entries.get(id).body, { force: true });
+  v.save(id, '# 금고\n\n셋');
+  const name = v.versionNames(id)[0];
+  v.closeLock(id);
+  assert.ok(v.restoreVersion(id, name)?.error, '닫힌 잠긴 메모는 되돌리지 않음');
+  v.close();
+});

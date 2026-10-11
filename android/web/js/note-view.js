@@ -8,7 +8,7 @@ import { isDataImage, decodeDataImage } from '../../app/js/core/remote-images.js
 import { setupReminderPanel } from '../../app/js/reminder-panel.js';
 import { reminderAt } from '../../app/js/date-remind.js';
 import { lockScreen } from '../../app/js/lock-ui.js';
-import { openLock } from '../../app/js/core/memo-lock.js';
+import { openLock, isLockedBody } from '../../app/js/core/memo-lock.js';
 import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
 import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
@@ -1261,7 +1261,12 @@ export async function openNote(memoId, options = {}) {
         onTry: async (password) => {
           try {
             // 비밀번호 화면이 떠 있는 사이 다른 기기가 다시 잠갔을 수 있어 지금 파일의 암호문으로
-            const { session } = await openLock(app.vault.entries.get(memoId)?.body ?? memo.body, password);
+            const now = app.vault.entries.get(memoId)?.body ?? memo.body;
+            if (!isLockedBody(now)) {
+              memo = app.vault.get(memoId); // 그사이 다른 기기에서 잠금을 풀었다 — 그대로 연다
+              return null;
+            }
+            const { session } = await openLock(now, password);
             const r = app.vault.openLock(memoId, session);
             if (!r) return '메모를 열지 못했어요';
             memo = r;
