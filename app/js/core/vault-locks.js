@@ -1,9 +1,12 @@
 // 잠금 메모의 메모 폴더 쪽 규칙 (PC desktop/vault.js · 휴대폰 android/web/js/vault.js 가 함께 쓴다 — 한 곳만 고치면 되게)
 //   비밀번호로 만든 열쇠(세션)는 메모를 연 동안만 vault.locks 에 — 닫으면 closeLock 으로 잊는다. 열쇠 만들기(느림)는 부르는 쪽이 비동기로
 //   쓰는 것: vault.entries · vault.locks · vault.lockCopies · vault.device · vault.create · vault.write · vault.changed · vault.get
-//            vault.keepVersion · vault.purgeVersions · vault.rescanSoon
-import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs } from './memo-lock.js';
-import { isBlankBody, sameBody, conflictCopyBody } from './memo-file.js';
+//            vault.keepVersion · vault.purgeVersions · vault.versions · vault.version · vault.rescanSoon · vault.copyOf(Map)
+
+/** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
+const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
+import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockedMayUse } from './memo-lock.js';
+import { isBlankBody, sameBody, conflictCopyBody, extractAttachments } from './memo-file.js';
 import { toLocalIso } from './time.js';
 
 class LockMethods {
@@ -24,14 +27,20 @@ class LockMethods {
     const entry = this.entries.get(id);
     if (!entry || !isLockedBody(entry.body) || unsealBody(entry.body, session) === null) return null;
     this.locks.set(id, session);
-    for (const set of this.lockCopies.values()) set.delete(id); // 이제 제 비밀번호로 연 메모
+    // 이제 제 비밀번호로 연 메모 (원래 메모에 묶인 사본이 아님)
+    const source = this.copyOf.get(id);
+    if (source) this.lockCopies.get(source)?.delete(id);
+    this.copyOf.delete(id);
     return this.get(id);
   }
 
   /** 메모를 닫을 때: 열쇠를 잊는다 (그 메모를 연 동안 만든 사본의 열쇠도 함께 — 사본은 원래 메모가 열려 있는 동안만 고쳐 쓴다) */
   closeLock(id) {
     this.locks.delete(id);
-    for (const copy of this.lockCopies.get(id) ?? []) this.locks.delete(copy);
+    for (const copy of this.lockCopies.get(id) ?? []) {
+      this.locks.delete(copy);
+      this.copyOf.delete(copy);
+    }
     this.lockCopies.delete(id);
   }
 
@@ -52,6 +61,7 @@ class LockMethods {
       this.locks.set(id, session);
       if (!this.lockCopies.has(sourceId)) this.lockCopies.set(sourceId, new Set());
       this.lockCopies.get(sourceId).add(id);
+      this.copyOf.set(id, sourceId);
     }
     return id;
   }
@@ -63,8 +73,15 @@ class LockMethods {
   sealForSave(entry, body) {
     // 잠근 글을 바깥에서 고쳐 넘기는 일은 없다 (자동 태그 등) — 암호문이 깨지지 않게 그대로 둔다
     if (isLockedBody(body) && entry.file && body !== entry.body) return { same: true };
-    if (!isLockedBody(entry.body) || isLockedBody(body)) return { body };
+    if (isLockedBody(body)) return { body };
     const session = this.locks.get(entry.id);
+    // 열쇠를 들고 있는 메모(연 잠긴 메모)인데 파일이 사라져 다시 만드는 중: 풀린 글이 새 파일로 나가지 않게 잠근 채로
+    if (!isLockedBody(entry.body)) {
+      if (!session || entry.file) return { body };
+      const sealed = sealBody(body, session);
+      entry.meta.extra = { ...entry.meta.extra, lockRefs: lockRefs(body, sealed) };
+      return { body: sealed };
+    }
     const plain = session ? this.plainOf(entry) : null;
     if (plain === null) return { refused: true }; // 열지 않았거나, 다른 기기가 다른 비밀번호로 다시 잠금 → 덮어쓰지 않음
     if (entry.file && plain === body) return { same: true };
@@ -100,14 +117,46 @@ class LockMethods {
     return parseLocked(versionBody)?.salt === parseLocked(entry.body)?.salt;
   }
 
-  /** 열지 않은(풀 수 없는) 잠긴 메모들 — 첨부 정리가 그 메모의 사진을 치우지 않게 */
-  sealedEntries() {
-    return [...this.entries.values()].filter((e) => isLockedBody(e.body) && this.plainOf(e) === null);
+  /**
+   * 첨부 정리가 지우면 안 되는 것: 메모들이 쓰는 첨부(연 잠긴 메모는 한 번만 풀어서) + 열지 않은 잠긴 메모가 쓸 수 있는 것
+   * @param {{ body: string, meta?: object }[]} [more] 휴지통의 메모 등 함께 볼 것
+   * @returns {(src: string) => boolean}
+   */
+  attachmentGuard(more = []) {
+    const inUse = new Set();
+    const sealed = [];
+    for (const e of [...this.entries.values(), ...more]) {
+      if (!isLockedBody(e.body)) {
+        for (const src of extractAttachments(e.body)) inUse.add(src);
+        continue;
+      }
+      const plain = e.id && this.entries.get(e.id) === e ? this.plainOf(e) : null;
+      if (plain === null) sealed.push(e);
+      else for (const src of extractAttachments(plain)) inUse.add(src);
+    }
+    return (src) => inUse.has(src) || sealed.some((e) => lockedMayUse(e, src));
+  }
+
+  /**
+   * 잠긴 메모의 버전 기록 중 지금 비밀번호로 잠긴 것이 아닌 것(잠기기 전 풀린 글·바꾸기 전 비밀번호)이 있으면 지운다
+   * — 다른 기기에서 잠그거나 비밀번호를 바꿨을 때, 이 기기를 꺼 둔 사이였어도
+   */
+  dropUnsafeVersions(id) {
+    const entry = this.entries.get(id);
+    const salt = entry && parseLocked(entry.body)?.salt;
+    if (!salt) return;
+    let list;
+    try {
+      list = this.versions(id);
+    } catch {
+      return;
+    }
+    if (list.some((v) => parseLocked(this.version(id, v.name) ?? '')?.salt !== salt)) this.purgeVersions(id);
   }
 
   /** 열쇠를 들고 있는 메모인가 (원래 메모가 열려 있는 사본은 제외 — 사본을 따로 열 때는 비밀번호를 묻는다) */
   isCopyLock(id) {
-    return [...this.lockCopies.values()].some((set) => set.has(id));
+    return this.copyOf.has(id);
   }
 
   /**
@@ -118,11 +167,15 @@ class LockMethods {
     const entry = this.entries.get(id);
     if (!entry || isLockedBody(entry.body)) return null;
     const known = entry.body;
+    const before = metaSnapshot(entry.meta);
     entry.body = sealBody(known, session);
     this.setLockRefs(entry, known);
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device;
-    if (this.write(entry, known, { copy: false }) !== true) return null; // 그사이 다른 기기가 잠금 — 아무것도 바꾸지 않음
+    if (this.write(entry, known, { copy: false }) !== true) {
+      entry.meta = before; // 그사이 다른 기기가 잠금 — 아무것도 바꾸지 않음
+      return null;
+    }
     this.purgeVersions(id);
     if (keepOpen) this.locks.set(id, session);
     else this.locks.delete(id);
@@ -136,12 +189,16 @@ class LockMethods {
     const plain = entry ? this.plainOf(entry) : null;
     if (!entry || !isLockedBody(entry.body) || plain === null) return null;
     const known = entry.body;
+    const before = metaSnapshot(entry.meta);
     entry.body = plain;
     const { lockRefs: _refs, ...extra } = entry.meta.extra ?? {};
     entry.meta.extra = extra;
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device; // 이어 쓰기 안내가 엉뚱한 기기 이름을 대지 않게
-    if (this.write(entry, known, { copy: false }) !== true) return null; // 그사이 다른 기기가 다시 잠금
+    if (this.write(entry, known, { copy: false }) !== true) {
+      entry.meta = before; // 그사이 다른 기기가 다시 잠금
+      return null;
+    }
     this.purgeVersions(id); // 잠긴 동안의 버전은 이제 열 수 없는 글이므로
     this.locks.delete(id);
     this.changed([id]);

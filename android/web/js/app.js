@@ -571,7 +571,8 @@ function openHeld(memoId) {
   return Boolean(session && app.vault.openLock(memoId, session));
 }
 function closeHeld(memoId, opened) {
-  if (opened && note.currentId() !== memoId) app.vault.closeLock(memoId);
+  // 편집기로 연 메모가 아니면 다시 잠근다 (비밀번호 화면이 떠 있는 중이어도 — 그 화면이 열쇠를 다시 받는다)
+  if (opened && !(note.currentId() === memoId && note.getEditor())) app.vault.closeLock(memoId);
 }
 
 app.deliverRecording = async (r) => {

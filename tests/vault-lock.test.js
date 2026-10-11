@@ -174,3 +174,39 @@ test('잠긴 메모에 잠기기 전(풀린) 버전은 되돌리지 않음', asy
   assert.match(fs.readFileSync(file, 'utf8'), /memoking-lock/);
   v.close();
 });
+
+test('연 잠긴 메모의 파일이 지워진 뒤 계속 쓰면 다시 만드는 파일도 잠근 채로', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '# 금고\n\n비밀 글');
+  v.lock(id, await newLockSession('사과1234', FAST));
+  fs.rmSync(path.join(root, v.get(id).file)); // 다른 기기가 지움
+  v.scan();
+  v.save(id, '# 금고\n\n비밀 글 이어 씀');
+  const files = fs.readdirSync(root).filter((f) => f.endsWith('.md'));
+  assert.ok(files.length >= 1);
+  for (const f of files) assert.ok(!fs.readFileSync(path.join(root, f), 'utf8').includes('비밀 글'), `${f} 에 풀린 글 없음`);
+  v.close();
+});
+
+test('꺼 둔 사이 다른 기기에서 잠근 메모: 켤 때 이 기기의 풀린 버전 기록을 지움', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '# 일기\n\n오늘 일');
+  v.keepVersion(id, '# 일기\n\n어제 일', { force: true });
+  assert.ok(v.versions(id).length > 0);
+  const file = path.join(root, v.get(id).file);
+  v.close();
+  const text = fs.readFileSync(file, 'utf8');
+  const head = /^---\n[\s\S]*?\n---\n/.exec(text)[0];
+  const { lockBody } = await import('../app/js/core/memo-lock.js');
+  fs.writeFileSync(file, head + await lockBody('# 일기\n\n오늘 일', 'pc12345', FAST)); // 꺼 둔 사이 PC 가 잠금
+  const v2 = new Vault(root);
+  v2.open();
+  assert.equal(v2.versions(id).length, 0);
+  v2.close();
+});

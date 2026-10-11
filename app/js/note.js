@@ -224,9 +224,10 @@ api.on('memo:external', async (next) => {
     const wasLocked = Boolean(memo?.locked);
     const what = wasLocked ? '다른 기기에서 이 메모의 비밀번호를 바꿨어요.' : '다른 기기에서 이 메모를 잠갔어요.';
     let kept = '';
-    if (isDirty() && !isBlankBody(current)) {
+    const snapshot = isDirty() ? current : null; // 사본으로 남길 글 (기다리는 동안 더 친 글은 창을 닫을 때 다시 사본으로)
+    if (snapshot !== null && !isBlankBody(snapshot)) {
       try {
-        const copy = await api.memo.keepCopy(id, current, null, { unlocked: !wasLocked });
+        const copy = await api.memo.keepCopy(id, snapshot, null, { unlocked: !wasLocked });
         if (copy) kept = wasLocked ? ' 쓰던 내용은 예전 비밀번호로 잠근 사본 메모로 남겼어요.' : ' 쓰던 내용은 사본 메모로 따로 남겼어요.';
       } catch (err) {
         console.error(err);
@@ -237,7 +238,7 @@ api.on('memo:external', async (next) => {
         return;
       }
     }
-    saved = current;
+    if (snapshot !== null) saved = snapshot;
     setStatus(`${what}${kept} 다시 열 때 비밀번호를 넣어 주세요`, true);
     setTimeout(() => window.close(), kept ? 4000 : 2500);
     return;

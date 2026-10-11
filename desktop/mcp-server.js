@@ -222,7 +222,8 @@ server.registerTool('append_to_memo', {
     const isItem = (line) => /^\s*(?:[-*+]|\d+[.)])\s/.test(line ?? '');
     const gap = isItem(before.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
     const body = `${before}${gap}${add}\n`;
-    v.save(m.id, body);
+    const saved = v.save(m.id, body);
+    if (saved?.refused) return fail(`"${m.title}" 은(는) 방금 다른 기기에서 잠겨 덧붙이지 못했어요.`);
     return text({ ok: true, id: m.id, title: m.title });
   } catch (err) {
     return fail(err.message);
