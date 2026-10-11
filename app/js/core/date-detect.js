@@ -217,7 +217,7 @@ const DATE_RULES = [
   },
   // 15일까지 · 25일에 — 이번 달(지났으면 다음 달). "3일 동안" · "3일에 걸쳐" · "1일 1식" 은 날짜가 아님
   {
-    re: /(?<![0-9가-힣./-])(\d{1,2})일(?=\s?(?:까지|에(?!\s?걸쳐)|부터|날|\(|오전|오후|아침|점심|저녁|밤|낮|새벽|\d{1,2}\s?시|\d{1,2}:)|\s*$|[,.!?])/g,
+    re: /(?<![0-9가-힣./-])(\d{1,2})일(?=\s?(?:까지|에(?!\s?걸쳐)|부터|날|\(|오전|오후|아침|점심|저녁|밤|낮|새벽|\d{1,2}\s?시|\d{1,2}:|\d{1,2}\s?(?:am|pm|AM|PM)\b)|\s*$|[,.!?])/g,
     date: (m, now) => {
       const d = +m[1];
       if (d < 1 || d > 31) return null;
@@ -455,7 +455,19 @@ export function findAllDates(text, { chrono = null, now = new Date() } = {}) {
     if (!k) continue;
     en.splice(i, 1);
     if (k.hasTime || k.repeat) continue; // 이미 시각이 있거나 되풀이면 영어 쪽만 버린다
-    k.at = new Date(k.at.getFullYear(), k.at.getMonth(), k.at.getDate(), e.at.getHours(), e.at.getMinutes());
+    let at = new Date(k.at.getFullYear(), k.at.getMonth(), k.at.getDate(), e.at.getHours(), e.at.getMinutes());
+    // 요일 말("일요일 3pm"): 날짜만으로 다음 주로 넘겼어도 이번 그 시각이 아직이면 이번 주로, 지났으면 다음 주로 (한국어 시각과 같은 규칙)
+    const weekday = /요일|욜/.test(k.text);
+    const week = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes());
+    if (weekday && week(at, -7) > now) at = week(at, -7);
+    if (at.getTime() <= now.getTime() + 30_000) {
+      if (weekday) at = week(at, 7);
+      else {
+        ko.splice(ko.indexOf(k), 1); // 그 시각이 이미 지났다 — 일정으로 보이지 않게
+        continue;
+      }
+    }
+    k.at = at;
     k.to = e.to;
     k.text = s.slice(k.from, e.to).trim();
     k.hasTime = true;

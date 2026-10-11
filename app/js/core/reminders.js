@@ -10,13 +10,12 @@
 //       allDay: true            # (일정) 하루 종일 — at 은 그날 00:00, 미리 알림은 그 기준 ("당일 오전 9시" = -540)
 //       created: 2026-09-30T10:00:00+09:00
 //       last: 2026-10-01T09:00:02+09:00   # 마지막으로 울린 시각
-import { toLocalIso, dateKey, hhmm, dayLabel } from './time.js';
+import { toLocalIso, dateKey, hhmm, dayLabel, WEEKDAY } from './time.js';
 
 export const KINDS = ['timer', 'at', 'repeat', 'startup'];
 export const EVERY = ['day', 'week', 'month', 'year'];
 export const STARTUP = ['every', 'daily', 'once'];
 export const ACTIONS = ['open', 'notify'];
-const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
 const MISSED_AFTER_MS = 2 * 60 * 1000; // 이보다 늦게 울리면 "놓친 알림"
 
 const validDate = (value) => {
@@ -59,7 +58,6 @@ function normalizeAlerts(raw, allDay = false) {
     .sort((a, b) => b - a).slice(0, MAX_ALERTS);
 }
 
-const pad2 = (v) => String(v).padStart(2, '0');
 /** 하루 안의 분 → "오전 9시", "오후 5시 30분" */
 function clockOfMinutes(min) {
   const h = Math.floor(min / 60);
@@ -228,7 +226,14 @@ export function nextAlert(r, after) {
   const consider = (start) => {
     for (const offset of offs) {
       const t = alertTime(start, offset, Boolean(r.allDay));
-      if (t > base && (!best || t < best.at)) best = { at: t, start, offset };
+      if (!(t > base)) continue;
+      if (!best || t < best.at) best = { at: t, start, offset, also: [] };
+      else if (t.getTime() === best.at.getTime() && !(start.getTime() === best.start.getTime() && offset === best.offset)) {
+        // 같은 때에 울릴 다른 알림 (매일 9시 일정의 "정시" 와 다음 날 일정의 "하루 전") — 하나로 울리되 둘 다 알린다
+        const other = { start, offset };
+        if (other.offset < best.offset) [best.start, best.offset, other.start, other.offset] = [other.start, other.offset, best.start, best.offset];
+        best.also.push(other);
+      }
     }
   };
   if (r.kind === 'timer' || r.kind === 'at') {
@@ -323,8 +328,7 @@ export const isPastEvent = (r, now = new Date()) => r.kind === 'at' && (eventEnd
 // 오늘 14:00 / 모레 09:00 / 10월 3일 (금) 09:00 / 2027년 1월 2일 (토) 09:00 — 날 이름은 time.js 의 dayLabel 한 가지
 export const formatWhen = (date, now = new Date()) => `${dayLabel(date, now)} ${hhmm(new Date(date))}`;
 
-/** 날짜만: 오늘 · 내일 · 모레 · 10월 3일 (금) · 2027년 1월 2일 (토) */
-export const formatDay = (date, now = new Date()) => dayLabel(date, now);
+
 
 // 알림 설정 자체의 설명: "매주 월·수 09:00", "10분 타이머", "하루에 한 번, 처음 켤 때"
 export function describeReminder(r, now = new Date()) {
@@ -332,7 +336,7 @@ export function describeReminder(r, now = new Date()) {
     case 'timer':
       return `${r.minutes >= 60 && r.minutes % 60 === 0 ? `${r.minutes / 60}시간` : `${r.minutes}분`} 타이머`;
     case 'at':
-      return r.allDay ? `${formatDay(r.at, now)} 하루 종일` : formatWhen(r.at, now);
+      return r.allDay ? `${dayLabel(r.at, now)} 하루 종일` : formatWhen(r.at, now);
     case 'repeat': {
       const { every, weekdays, day, month } = r.repeat;
       const time = r.allDay ? '하루 종일' : r.repeat.time;
@@ -406,6 +410,7 @@ export function upcomingAlerts(r, from, count) {
       if (starts.size >= count) break;
       starts.add(key);
     }
+    for (const a of next.also ?? []) starts.add(a.start.getTime());
     out.push(next);
     cursor = next.at;
   }
@@ -417,15 +422,18 @@ export function alarmLabel(r, info = {}, now = new Date()) {
   if (info.startup) return `켤 때 알림, ${describeReminder(r, now)}`;
   if (!isEvent(r) || !info.start) return `${info.missed ? '놓친 알림' : '알림'}, ${describeReminder(r, now)}`;
   const start = new Date(info.start);
-  const when = r.allDay ? `${formatDay(start, now)} 하루 종일` : formatWhen(start, now);
-  if (info.missed) return `놓친 알림, ${when}`;
-  if (r.allDay) return when;
+  const when = r.allDay ? `${dayLabel(start, now)} 하루 종일` : formatWhen(start, now);
+  // 같은 때에 함께 울린 다른 회차의 미리 알림 ("…, 다음 일정 내일 09:00")
+  const more = (info.also ?? []).map((a) => (r.allDay ? `${dayLabel(new Date(a.start), now)} 하루 종일` : formatWhen(new Date(a.start), now)));
+  const tail = more.length ? `, 다음 일정 ${more.join(', ')}` : '';
+  if (info.missed) return `놓친 알림, ${when}${tail}`;
+  if (r.allDay) return `${when}${tail}`;
   const mins = Math.round((start.getTime() - now.getTime()) / 60_000);
   let soon = '';
   if (mins <= 0) soon = '지금 시작';
   else if (mins < 60) soon = `${mins}분 뒤`;
   else if (mins < 1440) soon = mins % 60 ? `${Math.floor(mins / 60)}시간 ${mins % 60}분 뒤` : `${mins / 60}시간 뒤`;
-  return soon ? `${when} (${soon})` : when;
+  return `${soon ? `${when} (${soon})` : when}${tail}`;
 }
 
 /** 알림 제목: 일정 이름(없으면 메모 제목) */

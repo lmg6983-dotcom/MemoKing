@@ -69,7 +69,7 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
 
   const tick = () => run((r, t) => {
     const due = dueOccurrence(r, t);
-    return due ? { missed: due.missed, at: due.at.getTime(), start: due.start, offset: due.offset } : null;
+    return due ? { missed: due.missed, at: due.at.getTime(), start: due.start, offset: due.offset, also: due.also } : null;
   });
 
   // 앱을 켤 때 (실행할 때 알림) — 처음 켤 때 한 번만
@@ -93,7 +93,7 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
       const lastFired = r.last ? new Date(r.last) : null;
       const from = lastFired && lastFired > now ? lastFired : now;
       for (const next of upcomingAlerts(r, from, r.kind === 'repeat' ? AHEAD : 1)) {
-        const label = alarmLabel(r, { start: next.start, offset: next.offset }, next.at);
+        const label = alarmLabel(r, { start: next.start, offset: next.offset, also: next.also }, next.at);
         items.push({
           key: keyOf(memoId, r, next.offset), at: next.at.getTime(), title,
           text: [label, preview].filter(Boolean).join('\n'), memoId, label: title === memoTitle ? label : `${title}, ${label}`, action: r.action,

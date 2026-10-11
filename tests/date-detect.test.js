@@ -258,3 +258,15 @@ test('지난 날 말 바로 뒤의 영어 시각은 일정이 아님 ("어제 3p
   assert.equal(merged[0].text, '내일 3pm');
   assert.equal(fmt(merged[0].at), '2026-10-11 15:00');
 });
+
+test('한국어 날 + 영어 시각: 요일은 이번 주 그 시각, 지난 시각은 빼고, "15일 7am" 은 15일', async () => {
+  const { casual } = await import('../app/vendor/chrono.js');
+  const sun10 = new Date(2026, 9, 11, 10, 0); // 일요일 오전 10시
+  const a = findAllDates('일요일 3pm 회의', { chrono: casual, now: sun10 });
+  assert.equal(fmt(a[0].at), '2026-10-11 15:00');
+  const b = findAllDates('일요일 7am', { chrono: casual, now: sun10 });
+  assert.equal(fmt(b[0].at), '2026-10-18 7:00');
+  const c = findAllDates('15일 7am 미팅', { chrono: casual, now: sun10 });
+  assert.equal(c.length, 1);
+  assert.equal(fmt(c[0].at), '2026-10-15 7:00');
+});
