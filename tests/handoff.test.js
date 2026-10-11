@@ -29,3 +29,13 @@ test('머리말 device 가 파일에 남고 다시 읽힌다', () => {
   assert.equal(parseMemoFile(text).meta.device, 'phone');
   assert.equal(parseMemoFile('---\nid: a\ndevice: toaster\n---\n# t').meta.device, null);
 });
+
+test('pickHandoff: 열어 둔 메모는 본 것으로만 치고, 다른 메모 하나를 고름', async () => {
+  const { pickHandoff } = await import('../app/js/core/handoff.js');
+  const now = Date.parse('2026-10-11T10:00:00+09:00');
+  const m = (id) => ({ id, file: `${id}.md`, device: 'phone', updated: '2026-10-11T09:58:00+09:00', title: id });
+  const seen = new Set();
+  const hit = pickHandoff([m('a'), m('b'), m('c')], { mine: 'pc', seen, now, isOpen: (id) => id === 'a' });
+  assert.equal(hit.memo.id, 'b');
+  assert.equal(pickHandoff([m('a')], { mine: 'pc', seen, now }), null, '열어 둔 동안 본 메모는 닫은 뒤에도 다시 뜨지 않음');
+});

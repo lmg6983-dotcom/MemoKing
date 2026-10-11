@@ -24,7 +24,7 @@ import { renderMemoImage } from '../../app/js/share-image.js';
 import * as widgets from './widgets.js';
 import { lockDialog } from '../../app/js/lock-ui.js';
 import { newLockSession } from '../../app/js/core/memo-lock.js';
-import { handoffFrom, handoffText } from '../../app/js/core/handoff.js';
+import { pickHandoff, recentlyUpdated, handoffText } from '../../app/js/core/handoff.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
@@ -1098,7 +1098,7 @@ function openVault() {
     alarms.scheduleSoon();
     widgets.publishSoon();
     // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (휴대폰에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
-    for (const id of detail.external ?? []) if (!detail.removed?.includes(id) && checkHandoff(id)) break;
+    showHandoff((detail.external ?? []).filter((id) => !detail.removed?.includes(id)));
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
   $('setup').hidden = true;
@@ -1117,7 +1117,7 @@ function openVault() {
   recorder.resume(); // 녹음이 도는 중인지, 꺼져 있는 동안 끝난 녹음이 있는지
   widgets.publishSoon(0); // 앱이 꺼져 있는 동안 바뀐 메모(동기화 등)를 위젯에도
   // 켜기 전에 PC 에서 방금 고친 메모가 있으면 (가장 최근 하나)
-  if (!pendingIntent) for (const m of vault.list().sort((a, b) => (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0)).slice(0, 5)) if (checkHandoff(m.id)) break;
+  if (!pendingIntent) showHandoff(recentlyUpdated(vault.list()).map((m) => m.id));
   if (pendingIntent) {
     const p = pendingIntent;
     pendingIntent = null;
@@ -1130,18 +1130,10 @@ function openVault() {
 
 // ---------- 이어 쓰기: PC·AI 비서에서 방금 고친 메모 → "PC에서 방금 고친 메모: 장보기 [열기]" ----------
 const handoffSeen = new Set();
-function checkHandoff(id) {
-  const memo = app.vault?.get(id);
-  if (!memo?.file) return false;
-  if (note.currentId() === id) {
-    // 지금 보고 있는 메모는 화면이 새 내용을 보여 준다 — 본 것으로 쳐서, 닫은 뒤에 뒤늦게 뜨지 않게
-    handoffFrom(memo, { mine: 'phone', seen: handoffSeen });
-    return false;
-  }
-  const from = handoffFrom(memo, { mine: 'phone', seen: handoffSeen });
-  if (!from) return false;
-  toast(handoffText(from, memo.title), false, { label: '열기', run: () => app.openMemo(id) });
-  return true;
+// 규칙(지금 보고 있는 메모는 본 것으로, 처음 하나만)은 core/handoff.js 의 pickHandoff — PC 와 같음
+function showHandoff(ids) {
+  const hit = pickHandoff(ids.map((id) => app.vault?.get(id)), { mine: 'phone', seen: handoffSeen, isOpen: (id) => note.currentId() === id });
+  if (hit) toast(handoffText(hit.from, hit.memo.title), false, { label: '열기', run: () => app.openMemo(hit.memo.id) });
 }
 
 // ---------- 앱의 소식 ----------

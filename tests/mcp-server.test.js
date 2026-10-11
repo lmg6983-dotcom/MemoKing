@@ -107,3 +107,24 @@ test('설정 파일을 읽지 못하면 AI 가 메모를 쓰지 못함 (읽기�
     fs.rmSync(base, { recursive: true, force: true });
   }
 });
+
+test('제목이 같은 메모가 여럿이면 덧붙이지 않고 id 를 고르게 함', async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-mcp-'));
+  const dir = path.join(base, 'vault');
+  fs.mkdirSync(dir);
+  fs.mkdirSync(path.join(dir, '지난주'));
+  fs.writeFileSync(path.join(dir, '장보기.md'), '# 장보기\n\n- 달걀\n');
+  fs.writeFileSync(path.join(dir, '지난주', '장보기.md'), '# 장보기\n\n- 빵\n');
+  const s = connect(dir);
+  try {
+    await s.call('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
+    s.proc.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+    const r = (await s.call('tools/call', { name: 'append_to_memo', arguments: { memo: '장보기', content: '- 우유' } })).result;
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /2개/);
+    assert.ok(!fs.readFileSync(path.join(dir, '장보기.md'), 'utf8').includes('우유'));
+  } finally {
+    s.proc.kill();
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});

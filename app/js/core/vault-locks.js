@@ -183,7 +183,13 @@ class LockMethods {
       if (!Array.isArray(refs)) return () => true;
       sealed.push({ salt: parseLocked(e.body)?.salt, refs: new Set(refs) });
     }
-    return (src) => inUse.has(src) || sealed.some((x) => x.refs.has(lockRefKey(src, x.salt)));
+    const cache = new Map(); // 같은 첨부를 여러 번 묻지 않게
+    return (src) => {
+      if (inUse.has(src)) return true;
+      if (!sealed.length) return false;
+      if (!cache.has(src)) cache.set(src, sealed.some((x) => x.refs.size && x.refs.has(lockRefKey(src, x.salt))));
+      return cache.get(src);
+    };
   }
 
   /**

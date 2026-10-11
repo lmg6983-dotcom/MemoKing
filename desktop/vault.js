@@ -178,7 +178,8 @@ export class Vault extends EventEmitter {
     // 밖에서 지워진 메모의 첨부는 잠시 뒤 다시 확인하고 치운다
     if (removed.length <= MAX_EXTERNAL_REMOVALS) {
       for (const id of removed) {
-        const srcs = extractAttachments(this.entries.get(id)?.body ?? '');
+        const gone = this.entries.get(id);
+        const srcs = gone ? this.attachmentsOf(gone) : []; // 잠긴 메모도 머리말의 표로
         if (srcs.length) this.orphans.set(id, srcs);
       }
       if (this.orphans.size) {

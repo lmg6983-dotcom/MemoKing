@@ -2,7 +2,7 @@
 //   앱이 켜져 있을 때: 15초마다 살펴 울릴 때가 된 알림을 울리고 메모 파일에 last 를 적는다.
 //   앱이 꺼져 있을 때: 다음 알림 시각들을 시스템 알람에 맡겨 둔다 (Alarms.kt). 그때 울린 알림은
 //                     다음에 앱을 켰을 때 다시 울리지 않고 last 만 적는다 (wasFired).
-import { dueOccurrence, dueAtStartup, markFired, upcomingAlerts, alarmLabel as eventLabel, alarmTitle } from '../../app/js/core/reminders.js';
+import { dueOccurrence, dueAtStartup, markFired, upcomingAlerts, alarmLabel, alarmTitle } from '../../app/js/core/reminders.js';
 import { extractPreview } from '../../app/js/core/memo-file.js';
 import { native } from './native.js';
 
@@ -10,9 +10,7 @@ import { native } from './native.js';
 const keyOf = (memoId, reminder, offset = 0) => `${memoId}/${reminder.id}${offset ? `/${offset}` : ''}`;
 const AHEAD = 14; // 앞으로 몇 회차의 알림을 시스템에 맡길지 (매일 일정이면 알림이 몇 개든 2주치)
 
-export function alarmLabel(reminder, info = {}, now = new Date()) {
-  return eventLabel(reminder, info, now);
-}
+export { alarmLabel };
 
 /**
  * @param {{ getVault: () => import('./vault.js').Vault | null,

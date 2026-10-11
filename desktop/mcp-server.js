@@ -90,8 +90,11 @@ function findMemo(v, ref, { exact = false } = {}) {
   const byId = v.get(key);
   if (byId?.file) return byId;
   const all = v.list();
-  const same = all.find((m) => m.title === key) ?? all.find((m) => m.title.toLowerCase() === key.toLowerCase());
-  if (same) return v.get(same.id);
+  let same = all.filter((m) => m.title === key);
+  if (!same.length) same = all.filter((m) => m.title.toLowerCase() === key.toLowerCase());
+  // 고치는 도구는 제목이 같은 메모가 여럿이면 고르지 않는다 (엉뚱한 쪽에 덧붙이지 않게 — id 로 다시)
+  if (exact && same.length > 1) return { ambiguous: same };
+  if (same.length) return v.get(same[0].id);
   if (exact) return null;
   const found = v.search(key)[0];
   return found ? v.get(found.id) : null;
@@ -216,6 +219,7 @@ server.registerTool('append_to_memo', {
   try {
     const v = openVault();
     const m = findMemo(v, memo, { exact: true });
+    if (m?.ambiguous) return fail(`제목이 "${memo}" 인 메모가 ${m.ambiguous.length}개예요: ${m.ambiguous.map((x) => `${x.title} (id: ${x.id}, ${x.updated ?? ''})`).join(', ')} — 덧붙일 메모의 id 로 다시 불러 주세요.`);
     if (!m) {
       const near = closeTitles(v, memo);
       return fail(`"${memo}" 와(과) 제목이 같은 메모가 없어요.${near.length ? ` 비슷한 메모: ${near.join(', ')} — 맞는 것의 id 로 다시 불러 주세요.` : ' search_memos 로 먼저 찾아 주세요.'}`);

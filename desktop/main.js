@@ -19,7 +19,7 @@ import { LinkPreviews } from './link-previews.js';
 import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
-import { handoffFrom, HANDOFF_MS } from '../app/js/core/handoff.js';
+import { pickHandoff, recentlyUpdated, HANDOFF_MS } from '../app/js/core/handoff.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { StackStore } from './stacks.js';
@@ -184,7 +184,7 @@ function openVault(dir) {
       for (const id of external) sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) sendToNote(id, 'memo:removed');
       // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (이 PC 에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
-      for (const id of external) if (!removed.includes(id) && checkHandoff(next.get(id))) break; // 한 번에 하나만 (휴대폰과 같게)
+      showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id))); // 한 번에 하나만
     });
     next.on('indexed', (index) => listWin?.webContents.send('vault:indexed', index.generatedAt));
     next.on('error', (err) => console.error('[vault]', err));
@@ -192,9 +192,7 @@ function openVault(dir) {
     vault = next;
     vaultError = null;
     // 켜기 전에 다른 기기에서 방금 고친 메모가 있으면 (가장 최근 하나)
-    for (const m of next.list().sort((a, b) => (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0)).slice(0, 5)) {
-      if (checkHandoff(next.get(m.id))) break;
-    }
+    showHandoff(recentlyUpdated(next.list()).map((m) => next.get(m.id)));
     settings.vaultPath = next.root;
     saveSettings();
     migrateV1();
@@ -217,18 +215,12 @@ function vaultInfo() {
 // ---------- 이어 쓰기: 다른 기기(휴대폰·AI 비서)에서 방금 고친 메모 → 목록 창 위에 "열기" 막대 ----------
 const handoffSeen = new Set();
 let lastHandoff = null;
-function checkHandoff(memo) {
-  if (!memo?.file) return false;
-  if (noteWins.has(memo.id)) {
-    // 이 PC 에서 열어 둔 메모는 창이 알아서 새 내용을 보여 준다 — 본 것으로 쳐서, 창을 닫은 뒤에 뒤늦게 뜨지 않게
-    handoffFrom(memo, { mine: 'pc', seen: handoffSeen });
-    return false;
-  }
-  const from = handoffFrom(memo, { mine: 'pc', seen: handoffSeen });
-  if (!from) return false;
-  lastHandoff = { id: memo.id, title: memo.title, from, at: Date.now() };
+// 규칙(열어 둔 메모는 본 것으로, 처음 하나만)은 core/handoff.js 의 pickHandoff — 휴대폰과 같음
+function showHandoff(memos) {
+  const hit = pickHandoff(memos, { mine: 'pc', seen: handoffSeen, isOpen: (id) => noteWins.has(id) });
+  if (!hit) return;
+  lastHandoff = { id: hit.memo.id, title: hit.memo.title, from: hit.from, at: Date.now() };
   listWin?.webContents.send('memo:handoff', lastHandoff);
-  return true;
 }
 
 // 목록 카드에 "지금 열려 있는 메모" 표시를 붙인다.
@@ -2786,10 +2778,8 @@ function registerIpc() {
   // unlocked: 이 창에서는 잠기지 않았던 글 (다른 기기가 방금 잠근 메모에 쓰던 내용) — 열쇠가 없으니 그대로 사본으로
   ipcMain.handle('memo:keep-copy', (_e, sourceId, body, copyId, { unlocked = false } = {}) => {
     if (!vault || typeof body !== 'string') return null;
-    if (copyId && vault.get(copyId)) {
-      vault.save(copyId, body);
-      return copyId;
-    }
+    // 이미 만든 사본에 고쳐 쓴다 — 거절되면(열쇠를 잃은 잠긴 사본) 새 사본으로 (들어온 내용이 사라지지 않게)
+    if (copyId && vault.get(copyId) && !vault.save(copyId, body)?.refused) return copyId;
     if (unlocked && !vault.locks.has(sourceId)) return vault.import({ body, color: vault.get(sourceId)?.color });
     return vault.importCopyOf(sourceId, body, { color: vault.get(sourceId)?.color });
   });
