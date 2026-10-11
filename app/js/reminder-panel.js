@@ -97,8 +97,8 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   function renderItem(r) {
     const li = document.createElement('li');
     // 미리 알림을 다 보낸 한 번짜리 일정은 일정이 지날 때까지는 "끝" 이 아니다 (꺼진 것처럼 흐리게 하지 않음)
-    const sentAll = isDone(r) && r.kind === 'at' && !isPastEvent(r);
-    li.className = `rem-item${(r.enabled || sentAll) && !(isPastEvent(r) && !nextLabel(r)) ? '' : ' off'}`;
+    const sentAll = r.enabled && r.kind === 'at' && Boolean(r.last) && !isPastEvent(r) && !nextLabel(r);
+    li.className = `rem-item${r.enabled && !(isPastEvent(r) && !nextLabel(r)) ? '' : ' off'}`;
     li.dataset.id = r.id;
     li.append(icon(KIND_ICON[r.kind], 'rem-kind-icon'));
 

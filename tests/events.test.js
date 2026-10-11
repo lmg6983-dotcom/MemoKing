@@ -24,8 +24,11 @@ test('일정 + 미리 알림 여러 개: 하루 전·30분 전 차례로, 마지
   const r = event({ at: iso(2026, 10, 5, 15, 0), title: '치과', alerts: [30, 1440] });
   const { rang, final } = ring(r, at(2026, 10, 4, 0, 0), at(2026, 10, 5, 16, 0));
   assert.deepEqual(rang, ['하루 전 @ 4일 15:00', '30분 전 @ 5일 14:30']);
-  assert.equal(final.enabled, false);
-  assert.equal(isDone(final), true);
+  // 미리 알림을 다 보냈어도 일정 전에는 켜진 채로 ("알림을 모두 보냈어요"), 더 울리지 않고, 일정이 지나면 끝
+  assert.equal(final.enabled, true);
+  assert.equal(dueOccurrence(final, at(2026, 10, 5, 16, 0)), null);
+  assert.equal(isPastEvent(final, at(2026, 10, 5, 16, 0)), true);
+  assert.equal(isLive(final, at(2026, 10, 5, 14, 40)), false);
 });
 
 test('하루 전 알림이 남아 있으면 첫 알림 뒤에도 켜져 있음', () => {
@@ -129,16 +132,13 @@ test('하루 전 알림이 울린 뒤 껐다 켜도: "끝났어요" 아님, 하�
   assert.equal(dueOccurrence(on, at(2026, 10, 5, 14, 30)).offset, 30);
 });
 
-test('다 울리고 끝난 일정을 다시 켜도 울린 알림은 다시 울리지 않음', () => {
+test('일정이 지난 뒤 끝난 일정을 다시 켜도 울린 알림은 다시 울리지 않음', () => {
   const r = event({ at: iso(2026, 10, 5, 15, 0), alerts: [30] });
-  const done = markFired(r, at(2026, 10, 5, 14, 30));
+  const done = markFired(r, at(2026, 10, 5, 16, 0)); // 꺼져 있다가 일정 뒤에 울림(놓친 알림) → 끝
   assert.equal(isDone(done), true);
-  const early = reenable(done);
-  assert.equal(early.last, done.last, '일정 전에 다시 켜도 이미 울린 30분 전은 다시 울리지 않음');
-  assert.equal(dueOccurrence(early, at(2026, 10, 5, 14, 40)), null);
-  const late = reenable(done);
-  assert.equal(late.last, done.last, '이미 지난 일정은 울린 기록을 지킴');
-  assert.equal(dueOccurrence(late, at(2026, 10, 6, 9, 0)), null, '지난 알림이 놓친 알림으로 울리지 않음');
+  const again = reenable(done);
+  assert.equal(again.last, done.last);
+  assert.equal(dueOccurrence(again, at(2026, 10, 5, 16, 1)), null);
 });
 
 test('오전 10시에 만든 오늘 하루 종일 일정: 당일 오전 9시는 "놓친 알림" 으로 울리지 않음', () => {

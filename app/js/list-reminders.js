@@ -152,9 +152,7 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
     const r = item.reminder;
     const past = (r.allDay ? addDays(dayStart(start), 1) : start) < new Date();
     const div = document.createElement('div');
-    // 미리 알림을 다 보내 꺼진 일정도 아직 오지 않았으면 흐리게 하지 않는다 (사용자가 끈 것만 흐리게)
-    const sentAll = !r.enabled && isDone(r);
-    div.className = `row ev-row${(r.enabled || sentAll) && !past ? '' : ' off'}`;
+    div.className = `row ev-row${r.enabled && !past ? '' : ' off'}`;
     div.dataset.color = item.color;
     div.dataset.memo = item.memoId;
     div.dataset.reminder = r.id;
@@ -178,7 +176,7 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
     const parts = [];
     if (r.title && r.title !== item.title) parts.push(`메모: ${item.title}`);
     if (r.kind === 'repeat') parts.push(describeReminder(r));
-    parts.push(r.enabled ? `알림 ${describeAlerts(r)}` : sentAll ? `알림 ${describeAlerts(r)} (보냄)` : '알림 꺼짐');
+    parts.push(r.enabled ? `알림 ${describeAlerts(r)}` : '알림 꺼짐');
     words.textContent = parts.join(', ');
     sub.append(icon(KIND_ICON[r.kind]), words);
     text.append(title, sub);

@@ -281,7 +281,9 @@ export function dueAtStartup(r, now = new Date()) {
 
 // 울린 뒤 상태: 한 번짜리(타이머·일정·다음 실행 한 번)는 남은 미리 알림이 없으면 꺼져서 "완료" 로 남는다
 export function markFired(r, now = new Date()) {
-  const once = r.kind === 'timer' || (r.kind === 'at' && !nextAlert(r, now)) || (r.kind === 'startup' && r.startup === 'once');
+  // 한 번짜리 일정은 미리 알림을 다 보냈어도 일정이 지나기 전에는 끄지 않는다 ("알림을 모두 보냈어요" — 꺼진 것처럼 보이지 않게)
+  const eventOver = !Array.isArray(r.alerts) || isPastEvent(r, now);
+  const once = r.kind === 'timer' || (r.kind === 'at' && !nextAlert(r, now) && eventOver) || (r.kind === 'startup' && r.startup === 'once');
   return { ...r, last: toLocalIso(now), enabled: once ? false : r.enabled };
 }
 

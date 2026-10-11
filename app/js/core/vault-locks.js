@@ -143,7 +143,12 @@ class LockMethods {
       } catch {
         // 다음에 다시
       }
-      if (wrote !== true) entry.meta = before; // 쓰지 못한 표는 남기지 않는다 (다음에 열 때 다시)
+      if (wrote !== true && isLockedBody(entry.body) && entry.meta.extra?.lockRefs) entry.meta = before; // 쓰지 못한 표는 남기지 않는다
+      // 그사이 다른 기기에서 잠금을 풀었으면 그대로 연다
+      if (!isLockedBody(entry.body)) {
+        this.locks.delete(id);
+        return this.get(id);
+      }
       // 그사이 다른 기기가 다른 비밀번호로 다시 잠근 글을 받아들였다면 이 열쇠로는 열 수 없다 — 다시 비밀번호로
       if (unsealBody(entry.body, session) === null) {
         this.locks.delete(id);
@@ -172,20 +177,13 @@ class LockMethods {
     const session = this.locks.get(sourceId);
     if (!session && this.entries.get(sourceId) && isLockedBody(this.entries.get(sourceId).body) && !isLockedBody(body)) return null;
     if (isLockedBody(body) && !(session && unsealBody(body, session) !== null)) return null; // 열 수 없는 잠금 형식 글은 사본으로도 만들지 않음
-    const id = this.create({ color });
-    const entry = this.entries.get(id);
-    if (session && !isLockedBody(body)) {
-      const hide = this.entries.get(sourceId)?.meta.extra?.lockHideTitle === true;
-      if (hide) entry.meta.extra = { ...entry.meta.extra, lockHideTitle: true };
-      entry.body = sealBody(body, session, { hideTitle: hide });
-      this.setLockRefs(entry, body); // 한 번에 쓴다 (첨부 표까지)
-    } else {
-      entry.body = body;
-      const plain = session && unsealBody(body, session);
-      if (typeof plain === 'string') this.setLockRefs(entry, plain);
+    const source = this.entries.get(sourceId);
+    let id;
+    if (session && !isLockedBody(body)) id = this.newCopy(source, sealBody(body, session, sealOpts(source ?? { meta: {} })), body);
+    else {
+      const plain = session ? unsealBody(body, session) : null;
+      id = this.newCopy(source, body, typeof plain === 'string' ? plain : null);
     }
-    this.write(entry);
-    this.changed([id]);
     if (session) {
       // 열쇠는 원래 메모에 묶어 둔다 — 사본을 따로 누르면 비밀번호를 묻고, 원래 메모를 닫으면 함께 잊는다
       this.locks.set(id, session);
@@ -203,7 +201,8 @@ class LockMethods {
   sealForSave(entry, body) {
     // 잠근 글을 바깥에서 고쳐 넘기는 일은 없다 (자동 태그 등) — 암호문이 깨지지 않게 그대로 둔다
     // 잠금 형식 글을 통째로(붙여 넣기 등): 지금 파일과 같으면 할 일 없음, 다르면 아무도 열 수 없게 되므로 저장하지 않는다
-    if (isLockedBody(body)) return entry.file && body === entry.body ? { same: true } : { refused: true, invalid: true };
+    // (연 잠긴 메모에 암호문이 들어오면 그건 붙여 넣은 것 — 열지 않은 메모에 그대로 돌려준 것만 할 일 없음)
+    if (isLockedBody(body)) return entry.file && body === entry.body && !this.locks.has(entry.id) ? { same: true } : { refused: true, invalid: true };
     const session = this.locks.get(entry.id);
     // 열쇠를 들고 있는 메모(연 잠긴 메모)인데 파일이 사라져 다시 만드는 중: 풀린 글이 새 파일로 나가지 않게 잠근 채로
     if (!isLockedBody(entry.body)) {
@@ -242,15 +241,8 @@ class LockMethods {
     const mine = entry.body;
     let copied = false;
     if (copy && !isBlankBody(mine) && !sameBody(mine, known)) {
-      const copyId = this.create({ color: entry.meta.color });
-      const c = this.entries.get(copyId);
-      c.body = mine;
-      if (entry.meta.extra?.lockHideTitle) c.meta.extra = { ...c.meta.extra, lockHideTitle: true }; // 제목 숨기기도 그대로
-      // 잠근 글이면 첨부 표도 (들고 있는 열쇠로 풀어) — 표 없는 잠긴 메모는 첨부 정리를 멈추게 하므로
       const plain = isLockedBody(mine) && session ? unsealBody(mine, session) : null;
-      if (typeof plain === 'string') this.setLockRefs(c, plain);
-      this.write(c);
-      this.changed([copyId]);
+      this.newCopy(entry, mine, typeof plain === 'string' ? plain : null);
       copied = true;
     }
     entry.body = known; // 곧 다시 읽을 때 "바뀌었다" 로 알아채고 열린 화면에 알리게
@@ -268,19 +260,19 @@ class LockMethods {
 
   /** 첨부 폴더의 파일들 ("attachments/이름") — 잠긴 메모를 지울 때 그 메모의 첨부를 찾는 데 */
   attachmentFiles() {
-    return this.listDir('attachments').map((name) => `attachments/${name}`);
+    return this.listDir(this.attachDirRel).map((name) => `${this.attachDirRel}/${name}`);
   }
 
   /** 휴지통에 옮겨 둔 첨부들 ("attachments/이름") — 잠긴 메모를 되살릴 때 */
   trashAttachmentFiles() {
-    return this.listDir('_memoking/trash/attachments').map((name) => `attachments/${name}`);
+    return this.listDir(this.trashAttachDirRel).map((name) => `${this.attachDirRel}/${name}`);
   }
 
   /** 이 메모가 쓰는 첨부 (잠겼으면 열쇠로 풀거나, 열지 않았으면 머리말의 표로 첨부 폴더에서 찾는다) — 메모를 지울 때 */
-  attachmentsOf(entry) {
+  attachmentsOf(entry, files = () => this.attachmentFiles()) {
     const plain = this.plainOf(entry);
     if (plain !== null) return extractAttachments(plain);
-    return lockedFiles(entry.body, entry.meta, () => this.attachmentFiles());
+    return lockedFiles(entry.body, entry.meta, files);
   }
 
   /** 잠긴 글을 통째로 바꾼 뒤(버전 되돌리기): 첨부 표를 그 글에 맞게 — 풀 수 없으면 표를 지워 "알 수 없음"(치우지 않음)으로 */
@@ -373,6 +365,23 @@ class LockMethods {
   /** 다른 기기에서 바뀐 글을 받아들였다고 (다시 읽은 것처럼) 알린다 — 열린 화면이 새 글·잠금을 알게 */
   notifyExternalSoon(id) {
     setTimeout(() => this.emit('changed', { ids: [id], external: [id], removed: [] }), 0);
+  }
+
+  /**
+   * 사본 메모 하나 (잠근 글이면 원래 메모의 "제목 숨기기" 와 첨부 표까지 — plain 은 그 첨부 표를 만들 풀린 글)
+   * @returns {string} 새 메모 id
+   */
+  newCopy(source, body, plain = null) {
+    const id = this.create({ color: source?.meta.color });
+    const c = this.entries.get(id);
+    c.body = body;
+    if (isLockedBody(body)) {
+      if (source?.meta.extra?.lockHideTitle) c.meta.extra = { ...c.meta.extra, lockHideTitle: true };
+      if (plain !== null) this.setLockRefs(c, plain);
+    }
+    this.write(c);
+    this.changed([id]);
+    return id;
   }
 
   /** 열쇠를 들고 있는 메모인가 (원래 메모가 열려 있는 사본은 제외 — 사본을 따로 열 때는 비밀번호를 묻는다) */

@@ -176,10 +176,12 @@ export class Vault extends EventEmitter {
     const removed = [...this.entries.keys()].filter((id) => !next.has(id));
     for (const id of removed) changed.add(id);
     // 밖에서 지워진 메모의 첨부는 잠시 뒤 다시 확인하고 치운다
+    let attachList = null;
+    const listFiles = () => (attachList ??= this.attachmentFiles());
     if (removed.length <= MAX_EXTERNAL_REMOVALS) {
       for (const id of removed) {
         const gone = this.entries.get(id);
-        const srcs = gone ? this.attachmentsOf(gone) : []; // 잠긴 메모도 머리말의 표로
+        const srcs = gone ? this.attachmentsOf(gone, listFiles) : []; // 잠긴 메모도 머리말의 표로 (첨부 폴더는 한 번만 읽음)
         if (srcs.length) this.orphans.set(id, srcs);
       }
       if (this.orphans.size) {
@@ -365,8 +367,6 @@ export class Vault extends EventEmitter {
     return id;
   }
 
-
-
   // ---------- 잠금 메모: plainOf · openLock · closeLock · lock · unlock 등은 core/vault-locks.js (PC·휴대폰 같음) ----------
 
   purgeVersions(id) {
@@ -384,10 +384,6 @@ export class Vault extends EventEmitter {
   versionNames(id) {
     return this.#versionNames(id);
   }
-
-
-
-
 
   #versionNames(id) {
     const dir = this.versionDir(id);
@@ -441,8 +437,6 @@ export class Vault extends EventEmitter {
     }
   }
 
-
-
   // known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것을 넘긴다)
   write(entry, known = entry.body, { copy = true } = {}) {
     // 그사이 다른 기기가 이 메모를 잠갔다면 덮어쓰지 않는다 (잠금이 풀리거나 비밀번호가 되돌아가지 않게)
@@ -461,8 +455,6 @@ export class Vault extends EventEmitter {
     entry.idSaved = true;
     return true;
   }
-
-
 
   rescanSoon() {
     clearTimeout(this.scanTimer);
@@ -484,6 +476,10 @@ export class Vault extends EventEmitter {
       return null;
     }
   }
+
+  /** 첨부 폴더 · 휴지통의 첨부 폴더 (메모 폴더 기준) — core/vault-locks.js 가 잠긴 메모의 첨부를 찾을 때 */
+  get attachDirRel() { return ATTACH_DIR; }
+  get trashAttachDirRel() { return `${APP_DIR}/trash/${ATTACH_DIR}`; }
 
   /** 폴더 안의 파일 이름들 (rel: 메모 폴더 기준 "attachments" 등, 없으면 []) */
   listDir(rel) {

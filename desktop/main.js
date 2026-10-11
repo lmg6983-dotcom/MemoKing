@@ -2691,6 +2691,7 @@ function registerIpc() {
     const body = memoBodyFromText(payload.text);
     if (!body) return { ok: false };
     const id = vault.import({ body });
+    if (!id) return { ok: false }; // 잠금 형식 글 등 메모로 만들 수 없는 글
     if (payload.open) openNote(id);
     else notice('메모를 만들었어요', body.split('\n')[0].slice(0, 40));
     return { ok: true, id };
@@ -2767,8 +2768,13 @@ function registerIpc() {
       return { error: err.message };
     }
   });
-  ipcMain.handle('memo:unlock', (_e, id) => vault?.unlock(String(id)) ?? {
-    error: vault?.get(String(id))?.needsPassword ? '먼저 비밀번호로 열어 주세요' : '그사이 다른 기기에서 이 메모가 바뀌어 풀지 못했어요. 다시 해 주세요',
+  ipcMain.handle('memo:unlock', (_e, id) => {
+    if (!vault) return { error: '메모 폴더가 열려 있지 않아요' };
+    const m = vault.get(String(id));
+    if (!m) return { error: '메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요' };
+    if (!m.locked) return m; // 이미 풀려 있다 (다른 기기에서 풀었음)
+    if (m.needsPassword) return { error: '먼저 비밀번호로 열어 주세요' };
+    return vault.unlock(String(id)) ?? { error: '그사이 다른 기기에서 이 메모가 바뀌어 풀지 못했어요. 다시 해 주세요' };
   });
   ipcMain.handle('memo:save', (_e, id, body) => {
     if (typeof body !== 'string') throw new TypeError('본문이 문자열이 아닙니다.');
