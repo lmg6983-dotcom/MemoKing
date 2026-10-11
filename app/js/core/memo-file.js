@@ -30,8 +30,11 @@ export function parseMemoFile(text) {
   if (match) {
     try {
       const parsed = parseYaml(match[1]);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) data = parsed;
-      body = source.slice(match[0].length);
+      // 머리말(키: 값)일 때만 떼어 낸다 — "---" 구분선으로 시작하는 글의 첫 문단·목록이 사라지지 않게
+      if (parsed == null || (typeof parsed === 'object' && !Array.isArray(parsed))) {
+        data = parsed ?? {}; // 빈 머리말도 머리말
+        body = source.slice(match[0].length);
+      }
     } catch {
       data = {};
     }
