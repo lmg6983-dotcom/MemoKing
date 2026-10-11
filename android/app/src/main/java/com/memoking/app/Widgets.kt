@@ -114,6 +114,15 @@ object Widgets {
      * 앱이 꺼져 있는 동안 동기화로 받은 파일 중 다른 기기에서 잠근 메모가 있으면 위젯의 내용(풀린 글)을 바로 숨긴다.
      * (위젯 내용은 앱 화면이 만들어 보내므로, 앱을 열 때까지 예전 글이 홈 화면에 남지 않게)
      */
+    /** 머리말 뒤 첫 "# 제목" 줄의 제목 (없으면 null) */
+    fun visibleTitle(text: String): String? {
+        val lines = text.split("\n")
+        var start = 0
+        if (lines.firstOrNull()?.trimEnd() == "---") start = ((1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return null) + 1
+        val line = (start until lines.size).map { lines[it].trim() }.firstOrNull { it.isNotEmpty() } ?: return null
+        return if (line.startsWith("# ")) line.removePrefix("# ").trim() else null
+    }
+
     fun hideLocked(ctx: Context) {
         val storage = Vaults.current(ctx) ?: return
         var changed = false
@@ -124,6 +133,9 @@ object Widgets {
             if (file.isEmpty() || memo.optBoolean("locked")) continue
             val text = read(storage, file) ?: continue
             if (!looksLocked(text)) continue
+            // 제목도 잠근 파일에 보이는 제목으로 ("제목도 숨기기" 로 잠갔으면 "잠긴 메모")
+            val shownTitle = visibleTitle(text)
+            if (shownTitle != null) memo.put("title", shownTitle)
             memo.put("locked", true).put("lines", JSONArray().put(JSONObject().put("t", "🔒 잠긴 메모예요").put("kind", "text")))
             edit.putString(memoId, memo.toString())
             changed = true

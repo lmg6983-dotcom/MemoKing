@@ -303,3 +303,52 @@ test('제목도 숨겨 잠근 메모는 이후 저장에도 제목을 숨김', a
   assert.equal(v.list().find((m) => m.id === id).title, '잠긴 메모');
   v.close();
 });
+
+test('머리말만 쓰는 사이 들어온 잠금: 그쪽 첨부 표를 받아들이고 일정 이름은 빼고 풀린 버전은 지움', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  const other = new Vault(root, { device: 'phone' });
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 상담\n\n내일 3시');
+    v.keepVersion(id, '# 상담\n\n예전', { force: true });
+    v.setReminders(id, [{ id: 'r1', kind: 'at', at: new Date(Date.now() + 86_400_000).toISOString(), title: '정신과 상담', alerts: [10], action: 'notify', enabled: true, created: new Date().toISOString(), last: null }]);
+    other.open(); // 다른 기기 (같은 폴더)
+    await new Promise((r) => setTimeout(r, 20));
+    other.lock(id, await newLockSession('phone999', FAST), { keepOpen: false });
+    v.setMeta(id, { pinned: true }); // 다시 읽기 전에 고정
+    await new Promise((r) => setTimeout(r, 30));
+    const text = fs.readFileSync(path.join(root, '상담.md'), 'utf8');
+    assert.match(text, /memoking-lock/);
+    assert.match(text, /lockRefs:/);
+    assert.match(text, /pinned: true/);
+    assert.ok(!text.includes('정신과 상담'), '일정 이름 빠짐');
+    assert.equal(v.versionNames(id).length, 0, '풀린 버전 지움');
+  } finally {
+    other.close();
+    v.close();
+  }
+});
+
+test('다른 기기가 제목을 숨겨 잠그며 파일 이름을 바꾼 사이 머리말만 써도 풀린 글로 되살리지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  const other = new Vault(root, { device: 'phone' });
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 상담\n\n비밀 내용');
+    other.open();
+    await new Promise((r) => setTimeout(r, 20));
+    other.lock(id, await newLockSession('phone999', FAST), { hideTitle: true, keepOpen: false });
+    v.setMeta(id, { pinned: true });
+    await new Promise((r) => setTimeout(r, 30));
+    for (const f of fs.readdirSync(root).filter((n) => n.endsWith('.md'))) {
+      assert.ok(!fs.readFileSync(path.join(root, f), 'utf8').includes('비밀 내용'), `${f} 에 풀린 글 없음`);
+    }
+  } finally {
+    other.close();
+    v.close();
+  }
+});

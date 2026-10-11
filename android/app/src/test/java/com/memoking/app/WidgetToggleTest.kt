@@ -62,4 +62,10 @@ class WidgetToggleTest {
         assertEquals("- [x]\u3000할 일", Widgets.toggleTaskText("- [ ]\u3000할 일", 0))
         assertEquals("- [x]\u00A0우유", Widgets.toggleTaskText("- [ ]\u00A0우유", 0))
     }
+
+    @Test
+    fun visibleTitleOfLockedFile() {
+        assertEquals("잠긴 메모", Widgets.visibleTitle("---\nid: a\n---\n# 잠긴 메모\n\n🔒 잠긴 메모예요.\n\n<!-- memoking-lock v1 -->"))
+        assertNull(Widgets.visibleTitle("---\nid: a\n---\n그냥 글"))
+    }
 }

@@ -2779,7 +2779,10 @@ function registerIpc() {
   ipcMain.handle('memo:keep-copy', (_e, sourceId, body, copyId, { unlocked = false } = {}) => {
     if (!vault || typeof body !== 'string') return null;
     // 이미 만든 사본에 고쳐 쓴다 — 거절되면(열쇠를 잃은 잠긴 사본) 새 사본으로 (들어온 내용이 사라지지 않게)
-    if (copyId && vault.get(copyId) && !vault.save(copyId, body)?.refused) return copyId;
+    if (copyId && vault.get(copyId)) {
+      const r = vault.save(copyId, body);
+      if (!r?.refused || r.copied) return copyId; // copied: 그사이 잠긴 사본 대신 들어온 내용을 이미 새 사본으로 남김
+    }
     if (unlocked && !vault.locks.has(sourceId)) return vault.import({ body, color: vault.get(sourceId)?.color });
     return vault.importCopyOf(sourceId, body, { color: vault.get(sourceId)?.color });
   });

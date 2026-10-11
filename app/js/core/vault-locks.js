@@ -140,8 +140,8 @@ class LockMethods {
 
   /** 버전 되돌리기를 해도 되는가 — 잠긴 메모에 풀린 버전·다른 비밀번호 버전을 덮어 잠금을 풀거나 비밀번호를 되돌리지 않게 */
   canRestore(entry, versionBody) {
-    // 풀린 메모에 잠긴 버전: 들고 있는 열쇠로 풀리는 것만 (못 푸는 글로 바꿔 내가 못 열게 되지 않게)
-    if (!isLockedBody(entry.body)) return !isLockedBody(versionBody) || this.locks.get(entry.id)?.salt === parseLocked(versionBody)?.salt;
+    // 풀린 메모에는 잠긴 버전을 되돌리지 않는다 (다시 잠그려면 메뉴의 잠그기로 — 풀린 버전 기록이 남지 않게)
+    if (!isLockedBody(entry.body)) return !isLockedBody(versionBody);
     if (!isLockedBody(versionBody) || !this.locks.has(entry.id)) return false; // 잠긴 메모는 비밀번호로 연 동안만
     return parseLocked(versionBody)?.salt === parseLocked(entry.body)?.salt;
   }
@@ -184,7 +184,11 @@ class LockMethods {
         continue;
       }
       const refs = e.meta?.extra?.lockRefs;
-      if (!Array.isArray(refs)) return () => true;
+      if (!Array.isArray(refs)) {
+        // 표가 없는 예전 잠금: 살아 있는 메모면 알 수 없으니 모두 남긴다(열면 표가 생김). 휴지통의 것은 열 수 없으므로 막지 않는다
+        if (this.entries.get(e.id) === e) return () => true;
+        continue;
+      }
       sealed.push({ salt: parseLocked(e.body)?.salt, refs: new Set(refs) });
     }
     const cache = new Map(); // 같은 첨부를 여러 번 묻지 않게
@@ -217,6 +221,24 @@ class LockMethods {
     if (check.some((name) => parseLocked(this.version(id, name) ?? '')?.salt !== salt)) this.purgeVersions(id);
   }
 
+  /**
+   * 머리말만 쓰는 사이 다른 기기가 글을 바꿨다: 그쪽 글과 잠금 정보(첨부 표·제목 숨기기)를 그대로 받아들이고 우리 머리말만 더한다
+   * (잠긴 글이면 일정 이름을 빼고, 이 기기의 풀린 버전을 지우고, 열린 화면에 알린다)
+   */
+  adoptTheirs(entry, theirs, theirMeta) {
+    entry.body = theirs;
+    const { lockRefs: _r, lockHideTitle: _h, ...rest } = entry.meta.extra ?? {};
+    const lockInfo = {};
+    if (theirMeta?.extra?.lockRefs) lockInfo.lockRefs = theirMeta.extra.lockRefs;
+    if (theirMeta?.extra?.lockHideTitle) lockInfo.lockHideTitle = true;
+    entry.meta.extra = { ...rest, ...(isLockedBody(theirs) ? lockInfo : {}) };
+    if (isLockedBody(theirs)) {
+      entry.meta.reminders = (entry.meta.reminders ?? []).map(({ title: _t, ...r }) => r);
+      setTimeout(() => this.dropUnsafeVersions(entry.id), 0);
+    }
+    this.notifyExternalSoon(entry.id);
+  }
+
   /** 다른 기기에서 바뀐 글을 받아들였다고 (다시 읽은 것처럼) 알린다 — 열린 화면이 새 글·잠금을 알게 */
   notifyExternalSoon(id) {
     setTimeout(() => this.emit('changed', { ids: [id], external: [id], removed: [] }), 0);
@@ -239,6 +261,8 @@ class LockMethods {
     const { lockHideTitle: _h, ...rest } = entry.meta.extra ?? {};
     entry.meta.extra = hideTitle ? { ...rest, lockHideTitle: true } : rest;
     entry.body = sealBody(known, session, { hideTitle });
+    // 글에서 짐작한 일정 이름은 비밀일 수 있어 풀린 머리말에 남기지 않는다 (알림엔 메모 제목)
+    entry.meta.reminders = (entry.meta.reminders ?? []).map(({ title: _t, ...r }) => r);
     this.setLockRefs(entry, known);
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device;

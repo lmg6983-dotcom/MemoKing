@@ -205,7 +205,8 @@ function keepTheirsAsCopy(next) {
     try {
       const body = conflictCopyBody(next.body);
       // 이미 만든 사본에 고쳐 쓴다 — 거절되면(열쇠를 잃은 잠긴 사본) 새 사본으로
-      if (!(conflictCopy && app.vault.get(conflictCopy) && !app.vault.save(conflictCopy, body)?.refused)) {
+      const kept = conflictCopy && app.vault.get(conflictCopy) ? app.vault.save(conflictCopy, body) : null;
+      if (!kept || (kept.refused && !kept.copied)) {
         conflictCopy = app.vault.importCopyOf(id, body, { color: next.color });
       }
       if (!conflictCopy) throw new Error('잠긴 메모의 사본을 만들 수 없어요');
