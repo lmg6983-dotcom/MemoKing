@@ -556,7 +556,7 @@ function linkItem(target, { onRemove, onAdd, score } = {}) {
 
 async function setLink(targetId, on) {
   await flush();
-  await api.memo.link(id, targetId, on);
+  if (!(await api.memo.link(id, targetId, on))) setStatus('연결을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
   el.linkSearch.value = '';
   el.linkResults.replaceChildren();
   await refreshLinks();

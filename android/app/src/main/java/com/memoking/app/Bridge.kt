@@ -178,7 +178,18 @@ class Bridge(private val activity: MainActivity) {
 
     /** 위젯에 보일 내용 [{id, title, color, file, lines}] */
     @JavascriptInterface
-    fun widgetPublish(json: String): String = reply { Widgets.publish(ctx, JSONArray(json)) }
+    fun widgetPublish(json: String): String = reply {
+        val memos = JSONArray(json)
+        val app = ctx.applicationContext
+        // 위젯의 파일 일은 한 줄로 (체크·잠긴 메모 숨기기와 서로 덮어쓰지 않게)
+        Widgets.io.execute {
+            try {
+                Widgets.publish(app, memos)
+            } catch (e: Exception) {
+                android.util.Log.w("MemoKing", "위젯 내용 보내기 실패", e)
+            }
+        }
+    }
 
     /** 위젯 고르기 목록에서 놓은 위젯에 메모를 정함 */
     @JavascriptInterface

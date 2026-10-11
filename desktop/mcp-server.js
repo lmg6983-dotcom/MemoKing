@@ -234,18 +234,18 @@ server.registerTool('append_to_memo', {
     if (!content.trim()) return fail('덧붙일 내용이 비어 있어요.');
     if (/<!--\s*memoking-lock/.test(content)) return fail('잠금 정보가 든 글은 덧붙일 수 없어요.');
     // 목록 끝에 목록을 덧붙이면 한 목록으로 이어지게 (빈 줄 없이)
-    const before = m.body.replace(/\s+$/, '');
     const add = content.trim();
     const isItem = (line) => /^\s*(?:[-*+]|\d+[.)])\s/.test(line ?? '');
-    const gap = isItem(before.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
-    const body = `${before}${gap}${add}\n`;
-    let saved = v.save(m.id, body);
+    const appended = (body) => {
+      const before = body.replace(/\s+$/, '');
+      const gap = isItem(before.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
+      return `${before}${gap}${add}\n`;
+    };
+    let saved = v.save(m.id, appended(m.body));
     if (saved?.retry) {
       v.scan({ silent: true }); // 파일이 잠깐 없었다 (동기화로 이름이 바뀌는 중 등) — 다시 읽고 한 번 더
       const again = v.get(m.id); // 같은 id 로만 (제목으로 찾으면 다른 메모에 덧붙일 수 있다)
-      const prev = again?.body.replace(/\s+$/, '');
-      const sep = prev && isItem(prev.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
-      saved = !again ? { refused: true, retry: true } : isLockedBody(again.body) ? { refused: true } : v.save(m.id, `${prev}${sep}${add}\n`);
+      saved = !again ? { refused: true, retry: true } : isLockedBody(again.body) ? { refused: true } : v.save(m.id, appended(again.body));
     }
     if (saved?.refused) {
       return fail(saved.retry

@@ -71,6 +71,7 @@ let conflictCopy = null; // 쓰는 중에 다른 기기에서도 고쳐 들어�
 let opening = null;
 let refusedSave = false; // 마지막 저장이 거절됐다 (다른 기기가 잠근 메모)
 let retrySave = false; // 파일이 잠깐 없어 저장을 미뤘다 (다시 읽은 뒤 다시 저장)
+let closingSave = false; // closeNote 가 저장을 마무리하는 중
 
 export const currentId = () => id;
 export const isOpen = () => id !== null;
@@ -105,13 +106,14 @@ const showPlaceholder = trackPlaceholder(el.editorRoot);
 export function flush() {
   clearTimeout(saveTimer);
   saveTimer = null;
+  retrySave = false;
   flushTables(); // 표 너비·높이도 (앱을 내릴 때 함께)
   if (!id || !isDirty()) return;
   const body = current;
   try {
     const r = app.vault.save(id, body);
-    retrySave = Boolean(r?.retry);
     if (r?.retry) {
+      retrySave = true;
       saveTimer = setTimeout(flush, 800); // 파일을 다시 읽은 뒤 다시 저장 (닫을 때는 closeNote 가 바로)
       return;
     }
@@ -163,7 +165,7 @@ export function lockChanged(locked) {
 
 /** 메모 폴더가 바뀌었을 때 (vault 'changed') */
 export function onVaultChanged({ ids, external, removed }) {
-  if (!id || !editor) return;
+  if (!id || !editor || closingSave) return; // 닫는 중 다시 읽은 것은 closeNote 가 맡는다 (사본·닫기를 두 번 하지 않게)
   if (removed.includes(id)) {
     showBanner('이 메모가 저장 위치에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
     return;
@@ -1346,7 +1348,10 @@ export async function openNote(memoId, options = {}) {
       save: async (data) => {
         const memoId = id; // 닫으면서 저장할 때도 그 메모에
         const rel = data ? await saveFile(new File([JSON.stringify(data)], '글 위에 그리기.json', { type: 'application/json' })) : '';
-        if (memoId && app.vault.get(memoId)) app.vault.setMeta(memoId, { ink: rel });
+        if (memoId && app.vault.get(memoId) && !app.vault.setMeta(memoId, { ink: rel })) {
+          toast('그린 것을 메모에 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true); // 파일이 잠깐 없는 등
+          return;
+        }
         if (memoId === id && memo) memo = { ...memo, ink: rel };
       },
       onMode: (on) => {
@@ -1382,8 +1387,13 @@ export function closeNote({ quiet = false } = {}) {
   flush();
   if (retrySave) {
     // 파일이 잠깐 없었다 — 기다리지 않고 지금 다시 읽어 한 번 더 (그래도 안 되면 아래에서 사본으로)
-    app.vault.scan();
-    flush();
+    closingSave = true;
+    try {
+      app.vault.scan();
+      flush();
+    } finally {
+      closingSave = false;
+    }
     clearTimeout(saveTimer);
     saveTimer = null;
     if (retrySave) refusedSave = true;

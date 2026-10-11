@@ -5,6 +5,8 @@ import { widget as native } from './native.js';
 import { app } from './state.js';
 
 let timer = null;
+let goneTimer = null;
+const GONE_RECHECK = 65_000; // Widgets.kt 의 GONE_CONFIRM_MS 보다 조금 길게
 let pickFor = null; // 위젯 고르기 목록에서 놓은 위젯: 다음에 누르는 메모를 그 위젯에
 
 /** 메모 폴더가 바뀌면 잠시 뒤 위젯 내용을 다시 보낸다 (위젯이 없으면 아무 일 없음) */
@@ -33,6 +35,11 @@ export function publish(only = null) {
     native.publish(JSON.stringify(memos));
   } catch (err) {
     console.warn('[위젯]', err);
+  }
+  // 없어진 메모: 위젯은 한동안 계속 없을 때만 놓아 준다 (Widgets.kt) — 그때 한 번 더 보내 확인하게
+  if (memos.some((m) => m.gone)) {
+    clearTimeout(goneTimer);
+    goneTimer = setTimeout(() => publish(), GONE_RECHECK);
   }
 }
 

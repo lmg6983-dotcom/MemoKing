@@ -2797,7 +2797,11 @@ function registerIpc() {
   });
   ipcMain.on('memo:save-sync', (event, id, body) => {
     try {
-      const r = typeof body === 'string' && vault ? vault.save(id, body) : null;
+      let r = typeof body === 'string' && vault ? vault.save(id, body) : null;
+      if (r?.retry) {
+        vault.scan(); // 파일이 잠깐 없었다 — 창을 닫는 중이라 기다리지 않고 지금 다시 읽어 한 번 더
+        r = vault.save(id, body);
+      }
       // 창을 닫는 순간인데 잠긴 메모라 저장되지 않았다: 쓰던 글을 사본 메모로 (이 창에서 연 열쇠가 있으면 그 열쇠로 잠근 채)
       if (r?.refused && !r.copied && !r.invalid && !isBlankBody(body)) {
         if (vault.locks.has(id)) vault.importCopyOf(id, body, { color: vault.get(id)?.color });

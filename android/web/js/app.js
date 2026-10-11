@@ -329,7 +329,10 @@ swatches.addEventListener('click', (e) => {
   const s = e.target.closest('[data-color]');
   if (!s || !menuFor) return;
   note.flush();
-  app.vault.setMeta(menuFor, { color: s.dataset.color });
+  if (!app.vault.setMeta(menuFor, { color: s.dataset.color })) {
+    toast('색을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+    return;
+  }
   try {
     localStorage.setItem('memoking.newColor', s.dataset.color); // 다음 새 메모도 이 색으로
   } catch {
@@ -600,6 +603,7 @@ app.deliverRecording = async (r) => {
   let memoId = r.memoId;
   let lockedOut = false;
   let missing = false;
+  let secretOut = false; // 잠긴 메모의 녹음을 풀린 새 메모에 넣었다
   // 편집기가 떠 있을 때만 화면에 (잠긴 메모의 비밀번호 화면이면 아직 편집기가 없다 — 파일에 넣는다)
   if (note.currentId() === memoId && note.getEditor()) {
     note.insertRecording(card, `음성 메모 ${whenLabel(r.startedAt)}`);
@@ -623,6 +627,7 @@ app.deliverRecording = async (r) => {
       if (res?.retry || res?.gone) {
         // 다시 읽어도 메모 파일이 없다 — 녹음을 잃지 않게 새 메모에 (잠긴 메모였으면 받아쓴 글은 넣지 않음)
         missing = true;
+        secretOut = memo.locked;
         memoId = app.vault.import({ body: `${heading}\n\n${memo.locked ? voiceCardMarkdown(item, '') : parts}\n` });
       } else if (res?.refused && !res.copied) {
         // 그사이 다른 기기가 다시 잠가 넣지 못했다 — 소리만 새 메모에 (받아쓴 글은 잠긴 글이었을 수 있어 넣지 않음)
@@ -636,9 +641,11 @@ app.deliverRecording = async (r) => {
   if (lockedOut) toast(`잠긴 메모를 열 수 없어 녹음(${duration})은 새 메모에 저장했어요`, true);
   else if (missing) toast(`원래 메모에 넣지 못해 녹음(${duration})은 새 메모에 저장했어요`, true);
   else toast(transcript ? `녹음(${duration})과 받아쓴 내용을 저장했어요` : `녹음(${duration})을 저장했어요`);
-  if (lockedOut || !(r.sttPending && recorder.sttOn() && recorder.sttReady())) app.heldLocks.delete(r.memoId);
+  // 잠긴 메모의 녹음을 (파일이 없어) 풀린 새 메모에 넣었으면 나중에 받아쓴 글도 넣지 않는다
+  const transcribeLater = !lockedOut && !secretOut && r.sttPending && recorder.sttOn() && recorder.sttReady();
+  if (!transcribeLater || memoId !== r.memoId) app.heldLocks.delete(r.memoId); // 받아쓸 곳이 다른 메모면 원래 메모의 열쇠는 지금 거둔다
   // 녹음 중에 받아쓰지 못했으면(음성 인식이 잠깐 안 됐음) 이제 녹음 파일로
-  if (!lockedOut && r.sttPending && recorder.sttOn() && recorder.sttReady()) transcribeInto(memoId, [item]); // 끝나면 transcribeInto 가 열쇠를 거둔다
+  if (transcribeLater) transcribeInto(memoId, [item]); // 끝나면 transcribeInto 가 열쇠를 거둔다
 };
 
 // ---------- 설정 ----------
