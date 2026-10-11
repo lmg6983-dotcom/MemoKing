@@ -33,6 +33,7 @@ import { createBlockMove, createContentLines, MEDIA_SCRUB, moveBlockBy } from '.
 import { createTapList } from './tap-list.js';
 import { createVoiceCards, isVoiceCard, voiceAudioOf } from './voice-card-view.js';
 import { createTidy } from './tidy.js';
+import { createDateRemind, refreshDateRemind } from './date-remind.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
 import { create as createConfetti } from '../vendor/confetti.js';
 import { mathPlugins, insertMathBlock } from './math.js';
@@ -910,7 +911,7 @@ function normalizePastedTables(html) {
  *   fetchPreview: 링크 카드에 보여줄 제목·설명·사진 (메인 프로세스가 메모 폴더에 모아 둔 것)
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false, scrollMargin = 0 }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false, scrollMargin = 0, onDateReminder, hasReminderAt }) {
   if (readAttachment) inkReader = readAttachment; // 그림 칸(inkView)이 만들어지기 전에
   let ready = false;
   let editor = null;
@@ -1486,6 +1487,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   const voiceCards = $prose(() => createVoiceCards());
   const contentLines = $prose(() => createContentLines());
   const tidy = $prose(() => createTidy({ readOnly }));
+  const dateRemind = $prose(() => createDateRemind({ readOnly, onAdd: onDateReminder, hasReminderAt }));
   const taskToggle = $prose(() => new Plugin({
     key: new PluginKey('memoking-task-toggle'),
     props: { handleDOMEvents: { mousedown: toggleTaskOnClick } },
@@ -1625,6 +1627,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(tidy)
     .use(tagHighlight)
     .use(tagCapsule)
+    .use(dateRemind)
     .use(stateWatcher)
     .create();
 
@@ -1985,6 +1988,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
     // 빠른 메모(Ctrl+Alt+C)로 받은 내용 채우기 --------------------------------
     /** 휴대폰 다루기 방식: 글 고치기에서만 고칠 수 있게 (옮기기·그리기에서는 커서·손글씨 입력이 생기지 않게) */
+    /** 알림 목록이 바뀌었을 때 글 속 날짜 밑줄(맞춤 표시)을 다시 */
+    refreshDates() {
+      refreshDateRemind(view());
+    },
     setEditable(on) {
       const v = view();
       const next = Boolean(on) && !readOnly;

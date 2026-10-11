@@ -148,6 +148,9 @@ function setStatus(next) {
   render();
 }
 
+/** 녹음 중인 메모 (없으면 null) */
+export const recordingFor = () => (status.active ? status.memoId : null);
+
 export function attach(memoId) {
   attached = memoId;
   render();

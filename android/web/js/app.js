@@ -20,7 +20,11 @@ import { injectMobileIcons } from './m-icons.js';
 import { app } from './state.js';
 import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
-import { renderMemoImage } from './share-image.js';
+import { renderMemoImage } from '../../app/js/share-image.js';
+import * as widgets from './widgets.js';
+import { lockDialog } from '../../app/js/lock-ui.js';
+import { newLockSession } from '../../app/js/core/memo-lock.js';
+import { pickHandoff, recentlyUpdated, handoffText } from '../../app/js/core/handoff.js';
 import * as list from './list-view.js';
 import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
@@ -262,6 +266,9 @@ app.filterByTag = (name) => {
 
 app.openMemo = async (id, options = {}) => {
   if (!app.vault) return;
+  // 위젯에 보일 메모를 고르는 중: 목록 카드를 누른 것만 고른 것으로, 다른 길(새 메모·알림 등)로 열면 고르기를 그만둔다
+  if (options.fromList && widgets.takePick(id, { toast })) return;
+  widgets.cancelPick();
   closeAllSheets();
   // 태블릿: 새로 열면 목록은 숨기고 메모를 가득
   if (isTwoPane()) panes.hideListForMemo();
@@ -312,6 +319,7 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="print"]').hidden = !inNote;
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
   pin.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
+  memoSheet.querySelector('[data-memo-action="lock"] span').textContent = memo.locked ? '잠금 풀기' : '잠그기';
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -369,6 +377,43 @@ memoSheet.addEventListener('click', async (e) => {
       closeSheet(memoSheet);
       openVersions(id);
       break;
+    case 'lock':
+      closeSheet(memoSheet);
+      note.flush();
+      if (memo.locked) {
+        if (note.currentId() !== id || memo.needsPassword) {
+          toast('먼저 비밀번호로 열고, 메뉴에서 잠금을 풀어 주세요');
+          app.openMemo(id);
+          break;
+        }
+        if (!(await confirmDialog('잠금을 풀까요? 내용이 그대로 파일에 저장되고, 비밀번호 없이 열려요.', '잠금 풀기'))) break;
+        if (app.vault.unlock(id)) {
+          note.lockChanged(false);
+          toast('잠금을 풀었어요');
+        } else toast('잠금을 풀지 못했어요. 그사이 다른 기기에서 다시 잠갔을 수 있어요 — 메모를 다시 열어 주세요', true);
+        break;
+      }
+      if (await lockDialog({
+        title: memo.title,
+        onLock: async (password, { hideTitle }) => {
+          try {
+            note.flush();
+            const session = await newLockSession(password);
+            // 목록에서 잠갔으면 열쇠를 들고 있지 않는다 — 바로 눌러도 비밀번호를 묻게
+            if (!app.vault.lock(id, session, { keepOpen: note.currentId() === id, hideTitle })) return '잠그지 못했어요. 그사이 다른 기기에서 잠갔을 수 있어요';
+            if (note.currentId() === id) note.lockChanged(true);
+            return null;
+          } catch (err) {
+            return err.message;
+          }
+        },
+      })) toast(note.currentId() === id ? '잠갔어요. 메모를 닫으면 다시 비밀번호로 열려요' : '잠갔어요');
+      break;
+    case 'widget':
+      closeSheet(memoSheet);
+      note.flush();
+      widgets.pin(id, { toast });
+      break;
     default:
   }
 });
@@ -382,6 +427,7 @@ function openVersions(id) {
     if (note.currentId() === id) note.flush();
     const restored = app.vault.restoreVersion(id, name);
     if (!restored) return toast('그 버전을 찾지 못했어요', true);
+    if (restored.error) return toast(restored.error, true);
     if (note.currentId() === id) note.showRestored(restored);
     toast('되돌렸어요');
     show();
@@ -516,6 +562,20 @@ const polish = (text) => fixTranscript(text, sttVocab());
 
 const whenLabel = recordingWhen;
 
+// 녹음하던 잠긴 메모를 닫았을 때 들고 있는 열쇠 (memoId → 세션) — 녹음·받아쓰기를 넣을 때만 잠깐 연다
+app.heldLocks = new Map();
+/** 닫힌 잠긴 메모를 잠깐 연다: 열었으면 true, 열 필요가 없으면 null, 못 열면 false */
+function openHeld(memoId) {
+  const memo = memoId && app.vault.get(memoId);
+  if (!memo?.needsPassword) return null;
+  const session = app.heldLocks.get(memoId);
+  return Boolean(session && app.vault.openLock(memoId, session));
+}
+function closeHeld(memoId, opened) {
+  // 편집기로 연 메모가 아니면 다시 잠근다 (비밀번호 화면이 떠 있는 중이어도 — 그 화면이 열쇠를 다시 받는다)
+  if (opened && !(note.currentId() === memoId && note.getEditor())) app.vault.closeLock(memoId);
+}
+
 app.deliverRecording = async (r) => {
   if (!app.vault || !r?.temp) return;
   const duration = recorder.formatDuration(r.durationMs ?? 0);
@@ -526,20 +586,30 @@ app.deliverRecording = async (r) => {
   // 소리와 받아쓴 글을 한 칸(음성 카드)에 — 문장마다 줄, 말한 사람이 바뀌면 이름표
   const card = voiceCardMarkdown(item, transcript);
   let memoId = r.memoId;
-  if (note.currentId() === memoId) {
+  let lockedOut = false;
+  // 편집기가 떠 있을 때만 화면에 (잠긴 메모의 비밀번호 화면이면 아직 편집기가 없다 — 파일에 넣는다)
+  if (note.currentId() === memoId && note.getEditor()) {
     note.insertRecording(card, `음성 메모 ${whenLabel(r.startedAt)}`);
   } else {
+    const opened = openHeld(memoId);
     const memo = memoId && app.vault.get(memoId);
     const parts = card;
     const heading = `# 음성 메모 ${whenLabel(r.startedAt)}`;
-    if (memo && !isBlankBody(memo.body)) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
+    if (memo?.needsPassword) {
+      // 잠긴 메모를 열 열쇠가 없다(앱을 다시 켬 등) — 잠긴 글에 덧붙이면 저장되지 않으므로, 소리만 새 메모에 (받아쓴 글은 넣지 않음)
+      lockedOut = true;
+      memoId = app.vault.import({ body: `${heading}\n\n${voiceCardMarkdown(item, '')}\n` });
+    } else if (memo && !isBlankBody(memo.body)) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
     else if (memo) app.vault.save(memoId, `${heading}\n\n${parts}\n`);
     else memoId = app.vault.import({ body: `${heading}\n\n${parts}\n` });
+    closeHeld(r.memoId, opened);
     list.refresh();
   }
-  toast(transcript ? `녹음(${duration})과 받아쓴 내용을 저장했어요` : `녹음(${duration})을 저장했어요`);
+  if (lockedOut) toast(`잠긴 메모를 열 수 없어 녹음(${duration})은 새 메모에 저장했어요`, true);
+  else toast(transcript ? `녹음(${duration})과 받아쓴 내용을 저장했어요` : `녹음(${duration})을 저장했어요`);
+  if (lockedOut || !(r.sttPending && recorder.sttOn() && recorder.sttReady())) app.heldLocks.delete(r.memoId);
   // 녹음 중에 받아쓰지 못했으면(음성 인식이 잠깐 안 됐음) 이제 녹음 파일로
-  if (r.sttPending && recorder.sttOn() && recorder.sttReady()) transcribeInto(memoId, [item]);
+  if (!lockedOut && r.sttPending && recorder.sttOn() && recorder.sttReady()) transcribeInto(memoId, [item]); // 끝나면 transcribeInto 가 열쇠를 거둔다
 };
 
 // ---------- 설정 ----------
@@ -817,7 +887,22 @@ function askAudioImport(files) {
 }
 
 // 메모 폴더의 소리 파일을 받아써서 그 메모 끝에 넣는다 (오래 걸리므로 메모를 만든 뒤 따로)
+// 받아쓰는 중인 메모 (그사이 잠긴 메모를 닫아도 열쇠를 들고 있다가 넣게)
+app.transcribing = new Map(); // memoId → 진행 중인 수
 async function transcribeInto(memoId, items) {
+  app.transcribing.set(memoId, (app.transcribing.get(memoId) ?? 0) + 1);
+  try {
+    await transcribeEach(memoId, items);
+  } finally {
+    const n = (app.transcribing.get(memoId) ?? 1) - 1;
+    if (n > 0) app.transcribing.set(memoId, n);
+    else {
+      app.transcribing.delete(memoId);
+      app.heldLocks.delete(memoId);
+    }
+  }
+}
+async function transcribeEach(memoId, items) {
   for (const item of items) {
     try {
       toast('받아쓰는 중…');
@@ -828,13 +913,20 @@ async function transcribeInto(memoId, items) {
         continue;
       }
       // 그 소리 줄에 붙여 음성 카드로 (소리 줄을 못 찾으면 메모 끝에)
-      if (note.currentId() === memoId) {
+      if (note.currentId() === memoId && note.getEditor()) {
         if (!note.attachTranscript(item.src, text)) note.appendText(importText(text).markdown);
       } else {
+        const opened = openHeld(memoId);
         const memo = app.vault.get(memoId);
+        if (memo?.needsPassword) {
+          closeHeld(memoId, opened);
+          toast('잠긴 메모라 받아쓴 내용을 넣지 못했어요. 메모를 열고 다시 받아써 주세요', true);
+          continue;
+        }
         const next = memo && attachTranscript(memo.body, item.src, text);
         if (next) app.vault.save(memoId, next);
         else if (memo) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${importText(text).markdown}\n`);
+        closeHeld(memoId, opened);
       }
       toast('받아쓴 내용을 추가했어요');
     } catch (err) {
@@ -938,7 +1030,9 @@ async function handleIntent() {
   if (payload.type === 'open' && payload.memoId) {
     app.openMemo(payload.memoId, { alarm: payload.label ? { label: payload.label } : undefined, highlight: true });
   } else if (payload.type === 'new') {
-    app.newMemo();
+    app.newMemo({ voice: payload.voice === true });
+  } else if (payload.type === 'widget-pick') {
+    widgets.startPick(payload.widgetId, { toast });
   } else if (payload.type === 'share') {
     await memoFromShare(payload);
   }
@@ -1003,6 +1097,9 @@ function openVault() {
     clearTimeout(changeTimer);
     changeTimer = setTimeout(() => list.refresh(), 60);
     alarms.scheduleSoon();
+    widgets.publishSoon();
+    // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (휴대폰에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
+    showHandoff((detail.external ?? []).filter((id) => !detail.removed?.includes(id)));
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
   $('setup').hidden = true;
@@ -1019,18 +1116,31 @@ function openVault() {
   setTimeout(maybeStartTutorial, 700); // 처음이면 사용법 둘러보기 (메모 폴더를 연 뒤 한 번)
   if (app.vaultInfo?.drive) drive.syncSoon();
   recorder.resume(); // 녹음이 도는 중인지, 꺼져 있는 동안 끝난 녹음이 있는지
+  widgets.publishSoon(0); // 앱이 꺼져 있는 동안 바뀐 메모(동기화 등)를 위젯에도
+  // 켜기 전에 PC 에서 방금 고친 메모가 있으면 (가장 최근 하나)
+  if (!pendingIntent) showHandoff(recentlyUpdated(vault.list()).map((m) => m.id));
   if (pendingIntent) {
     const p = pendingIntent;
     pendingIntent = null;
     if (p.type === 'open') app.openMemo(p.memoId, { alarm: p.label ? { label: p.label } : undefined, highlight: true });
-    else if (p.type === 'new') app.newMemo();
+    else if (p.type === 'new') app.newMemo({ voice: p.voice === true });
+    else if (p.type === 'widget-pick') widgets.startPick(p.widgetId, { toast });
     else if (p.type === 'share') memoFromShare(p);
   }
+}
+
+// ---------- 이어 쓰기: PC·AI 비서에서 방금 고친 메모 → "PC에서 방금 고친 메모: 장보기 [열기]" ----------
+const handoffSeen = new Set();
+// 규칙(지금 보고 있는 메모는 본 것으로, 처음 하나만)은 core/handoff.js 의 pickHandoff — PC 와 같음
+function showHandoff(ids) {
+  const hit = pickHandoff(ids.map((id) => app.vault?.get(id)), { mine: 'phone', seen: handoffSeen, isOpen: (id) => note.currentId() === id });
+  if (hit) toast(handoffText(hit.from, hit.memo.title), false, { label: '열기', run: () => app.openMemo(hit.memo.id) });
 }
 
 // ---------- 앱의 소식 ----------
 
 on('intent', handleIntent);
+on('widget', () => app.vault?.scan()); // 위젯에서 할 일을 체크함 → 파일을 다시 읽는다
 on('history', () => list.refreshHistory());
 // Google Drive 동기화 소식: 내려받은 게 있으면 메모 폴더를 바로 다시 읽는다
 on('sync', (st) => {
@@ -1068,7 +1178,9 @@ on('app', (state) => {
   }
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) note.flush();
+  if (!document.hidden) return;
+  note.flush();
+  widgets.cancelPick(); // 위젯 고르기 중에 앱을 떠나면 그만 (돌아와 연 메모가 위젯에 놓이지 않게)
 });
 
 // 뒤로 가기: 확인 창 → 색판 → 시트 → 메모 → 목록의 검색·필터 → (앱이 뒤로)

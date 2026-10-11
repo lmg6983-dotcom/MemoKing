@@ -207,8 +207,33 @@ try {
   }
   await back();
 
+  // 홈 화면 위젯: 메뉴 › 홈 화면에 놓기 → 앱에 놓기 요청 + 보일 줄(체크 줄 번호 포함)을 보냄, 고치면 다시 보냄
+  {
+    const memoId = /^id: (\S+)/m.exec(read('회의 메모.md'))?.[1];
+    await page.tap('#menu-btn');
+    await page.tap('[data-memo-action="widget"]');
+    await page.waitForTimeout(300);
+    const wlog = await devLog();
+    const sent = wlog.widgetData?.[memoId];
+    check('메뉴 › 홈 화면에 놓기: 위젯 놓기 요청 + 제목·줄을 보냄',
+      wlog.log.some((l) => l.widgetPin === memoId) && sent?.title === '회의 메모' && sent.file === '회의 메모.md' && sent.lines.length > 0,
+      JSON.stringify(sent)?.slice(0, 300));
+    await page.locator('.mk-doc p').last().click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' 위젯');
+    await page.waitForTimeout(1500);
+    const resent = (await devLog()).widgetData?.[memoId];
+    check('위젯: 메모를 고치면 위젯 내용도 다시', JSON.stringify(resent?.lines ?? []).includes('위젯'), JSON.stringify(resent?.lines ?? []).slice(-200));
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(900);
+  }
+
   // 알림 추가
   await page.tap('#bell-btn');
+  check('일정과 알림 패널: 처음엔 "일정" (이름·미리 알림 칩)', await page.isVisible('#rem-title') && (await page.locator('#rem-alerts button').count()) >= 5);
+  await page.tap('#rem-kind [data-kind="timer"]');
   await page.tap('.rem-submit');
   await page.waitForTimeout(300);
   check('알림 패널: 10분 타이머 추가', /kind: timer/.test(read('회의 메모.md')));
@@ -259,6 +284,213 @@ try {
   await back();
   await page.waitForTimeout(300);
   check('빈 메모: 파일을 남기지 않음', fs.readdirSync(vault).length === before);
+
+  // 글 속 날짜 → 알림: 점선 밑줄, 누르면 아래에 "알림 맞추기" 단추 (치는 중에는 뜨지 않음)
+  // 뒤로 가기 첫 번은 키보드(초점)를 닫는다 — 메모 화면이 남아 있으면 한 번 더
+  for (let i = 0; i < 3 && await page.isVisible('#note-screen'); i++) {
+    await back();
+    await page.waitForTimeout(400);
+  }
+  await page.tap('#fab');
+  await page.tap('[data-new="text"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.keyboard.type('# 날짜 알림');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('내일 오후 3시 치과');
+  await page.waitForTimeout(300);
+  const dateUnderline = await page.locator('.mk-doc .mk-date').first().textContent().catch(() => '');
+  check('날짜 알림: "내일 오후 3시" 에 점선 밑줄', dateUnderline === '내일 오후 3시', dateUnderline);
+  check('날짜 알림: 치는 중에는 단추가 뜨지 않음', (await page.locator('.mk-date-chip').count()) === 0);
+  {
+    const box = await page.locator('.mk-doc .mk-date').first().boundingBox();
+    const bar = await page.locator('#format-bar').boundingBox().catch(() => null);
+    if (box) await page.touchscreen.tap(box.x + 12, box.y + box.height / 2);
+    if (!box) console.log('no date box', JSON.stringify(bar));
+  }
+  await page.waitForTimeout(300);
+  const chipText = await page.textContent('.mk-date-chip').catch(() => '');
+  check('날짜 알림: 날짜를 누르면 "📅 일정 추가: 내일 오후 3:00" 단추', /일정 추가: 내일 오후 3:00/.test(chipText), chipText);
+  await shot('02c-date-chip');
+  await page.tap('.mk-date-chip');
+  await page.waitForSelector('.event-dialog[open]', { timeout: 5000 }).catch(() => {});
+  const evName = await page.inputValue('#event-name').catch(() => '');
+  check('일정 창: 이름을 줄에서 짐작 ("치과")', evName === '치과', evName);
+  // 미리 알림: 기본(10분 전)은 빼고 30분 전 · 하루 전
+  const chipBtn = (label) => page.locator('.event-alerts button', { hasText: label }).first();
+  if ((await chipBtn('10분 전').getAttribute('aria-pressed')) === 'true') await chipBtn('10분 전').tap();
+  await chipBtn('30분 전').tap();
+  await chipBtn('하루 전').tap();
+  await shot('02c2-event-dialog');
+  await page.tap('#event-save');
+  await page.waitForTimeout(800);
+  const dateMemo = fs.existsSync(path.join(vault, '날짜 알림.md')) ? read('날짜 알림.md') : '';
+  const tomorrow3 = new Date();
+  tomorrow3.setDate(tomorrow3.getDate() + 1);
+  tomorrow3.setHours(15, 0, 0, 0);
+  const atLine = /\n\s+at: "?([^"\n]+)"?/.exec(dateMemo)?.[1];
+  check('일정 저장: 내일 15:00 · 이름 치과 · 미리 알림 하루 전과 30분 전', Boolean(atLine) && Math.abs(Date.parse(atLine) - tomorrow3.getTime()) < 60_000
+    && /title: 치과/.test(dateMemo) && /alerts:\s*\n\s*- 1440\s*\n\s*- 30/.test(dateMemo), dateMemo.slice(0, 400));
+  {
+    const sched = (await devLog()).scheduled.filter((x) => x.memoId && /치과/.test(x.title ?? ''));
+    const times = sched.map((x) => x.at).sort();
+    check('휴대폰 시스템 알람: 일정 시각이 아니라 하루 전·30분 전에 (제목 치과)',
+      times.length === 2 && Math.abs(times[0] - (tomorrow3.getTime() - 1440 * 60_000)) < 60_000 && Math.abs(times[1] - (tomorrow3.getTime() - 30 * 60_000)) < 60_000,
+      JSON.stringify(sched.map((x) => [new Date(x.at).toString().slice(4, 21), x.title, x.label])));
+  }
+  check('날짜 알림: 맞춘 날짜는 실선 밑줄', (await page.locator('.mk-doc .mk-date-set').count()) === 1);
+  // 되풀이: "매주 수요일 저녁 7시" → 반복 일정 (줄 끝을 눌러 커서를 옮긴 뒤 새 줄에)
+  {
+    const line = await page.locator('.mk-doc p').last().boundingBox();
+    await page.touchscreen.tap(line.x + line.width - 4, line.y + line.height / 2);
+    await page.waitForTimeout(200);
+  }
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('매주 수요일 저녁 7시 운동');
+  await page.waitForTimeout(300);
+  {
+    const boxes = await page.locator('.mk-doc .mk-date').all();
+    const box = await boxes.at(-1)?.boundingBox();
+    if (box) await page.touchscreen.tap(box.x + 12, box.y + box.height / 2);
+  }
+  await page.waitForTimeout(300);
+  const repChip = await page.textContent('.mk-date-chip').catch(() => '');
+  check('날짜 알림: "매주 수요일 저녁 7시" → 반복 일정 단추', /일정 추가: 매주 수요일 오후 7:00/.test(repChip ?? ''), repChip);
+  if (repChip) await page.tap('.mk-date-chip');
+  await page.waitForSelector('.event-dialog[open]', { timeout: 5000 }).catch(() => {});
+  check('일정 창(반복): 🔁 매주 수요일 표시 · 이름 "운동"', /매주 수요일/.test(await page.textContent('.event-dialog .event-repeat').catch(() => '')) && (await page.inputValue('#event-name').catch(() => '')) === '운동');
+  await page.tap('#event-save');
+  await page.waitForTimeout(800);
+  const repMd = fs.existsSync(path.join(vault, '날짜 알림.md')) ? read('날짜 알림.md') : '';
+  check('날짜 알림: 반복 알림으로 저장 (매주 수 19:00)', /kind: repeat[\s\S]*every: week[\s\S]*weekdays:\s*\n?\s*-?\s*\[?3/.test(repMd) && /time: "?19:00/.test(repMd), repMd.slice(0, 500));
+  // 목록 › 일정 탭: 한 달 달력 + 고른 날·다가오는 일정 (치과는 내일, 미리 알림 함께)
+  for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+    await back();
+    await page.waitForTimeout(400);
+  }
+  await page.tap('[data-tab="reminders"]');
+  await page.waitForTimeout(500);
+  const cal = await page.evaluate(() => ({
+    days: document.querySelectorAll('#reminder-groups .cal-day').length,
+    rows: [...document.querySelectorAll('#reminder-groups .ev-row')].map((r) => r.textContent),
+  }));
+  check('일정 탭: 달력 42칸 · 다가오는 일정에 "치과 · 알림 30분 전, 하루 전"', cal.days === 42 && cal.rows.some((t) => /치과/.test(t) && /알림 30분 전, 하루 전/.test(t)), JSON.stringify(cal));
+  await shot('02g-calendar');
+  await page.tap('[data-tab="memos"]');
+  await page.waitForTimeout(300);
+
+  await back();
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 3 && await page.isVisible('#note-screen'); i++) {
+    await back();
+    await page.waitForTimeout(400);
+  }
+
+  // 위젯 고르기 목록에서 놓은 위젯을 누름 → 앱이 열리고 안내, 누르는 메모가 그 위젯에 (메모는 열지 않음)
+  await post('/dev/intent', { type: 'widget-pick', widgetId: 7 });
+  await page.evaluate(() => window.__mk.emit('intent', null));
+  await page.waitForTimeout(400);
+  const pickToast = await page.textContent('#toast').catch(() => '');
+  await page.tap('.card[data-id="00000000-0000-4000-8000-000000000001"]');
+  await page.waitForTimeout(400);
+  const picked = (await devLog()).log.find((l) => l.widgetAssign)?.widgetAssign;
+  check('위젯 고르기: 안내 후 누른 메모를 그 위젯에 (메모는 열지 않음)',
+    /위젯에 보일 메모/.test(pickToast ?? '') && picked?.[0] === 7 && picked?.[1] === '00000000-0000-4000-8000-000000000001' && await page.isHidden('#note-screen'),
+    JSON.stringify({ pickToast, picked }));
+
+  // 위젯 고르기를 시작하고 그냥 + 새 메모를 누르면: 고르기는 끝나고 새 메모가 열린다 (위젯에 놓이지 않음)
+  {
+    const assignsBefore = (await devLog()).log.filter((l) => l.widgetAssign).length;
+    await post('/dev/intent', { type: 'widget-pick', widgetId: 8 });
+    await page.evaluate(() => window.__mk.emit('intent', null));
+    await page.waitForTimeout(400);
+    await page.tap('#fab');
+    await page.tap('[data-new="text"]');
+    await page.waitForTimeout(500);
+    const assignsAfter = (await devLog()).log.filter((l) => l.widgetAssign).length;
+    check('위젯 고르기 중 + 새 메모: 메모가 열리고 위젯에 놓이지 않음', assignsAfter === assignsBefore && await page.isVisible('#note-screen'),
+      JSON.stringify({ assignsBefore, assignsAfter }));
+    for (let i = 0; i < 3 && await page.isVisible('#note-screen'); i++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+  }
+
+  // 잠금 메모: 메뉴 › 잠그기 → 파일에 풀린 글 없음, 쓰는 동안도 잠근 채 저장, 닫았다 열면 비밀번호 → 잠금 풀기
+  {
+    await page.tap('#fab');
+    await page.tap('[data-new="text"]');
+    await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+    await page.keyboard.type('# 휴대폰 비밀');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('현관 비번 4321');
+    await page.waitForTimeout(900);
+    const lockMd = () => (fs.existsSync(path.join(vault, '휴대폰 비밀.md')) ? read('휴대폰 비밀.md') : '');
+    await page.tap('#menu-btn');
+    await page.tap('[data-memo-action="lock"]');
+    await page.waitForSelector('.lock-dialog[open]');
+    await page.fill('#lock-pass-1', 'abcd1234');
+    await page.fill('#lock-pass-2', 'abcd1234');
+    await shot('02e-lock-dialog');
+    await page.tap('.lock-dialog .btn.primary');
+    await page.waitForSelector('.lock-dialog', { state: 'detached', timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    const allVault = () => fs.readdirSync(vault, { recursive: true }).map((f) => path.join(vault, f)).filter((f) => fs.statSync(f).isFile() && /\.(md|json)$/.test(f)).map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+    check('휴대폰 잠그기: 파일·버전에 풀린 글 없음, 제목만', /memoking-lock v1/.test(lockMd()) && /# 휴대폰 비밀/.test(lockMd()) && !allVault().includes('현관 비번'), lockMd().slice(0, 200));
+    await page.locator('.mk-doc p').last().click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' 바꿈');
+    await page.waitForTimeout(1500);
+    check('휴대폰 잠긴 메모: 쓰는 동안도 잠근 글로 저장', !allVault().includes('바꿈') && /memoking-lock/.test(lockMd()));
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+    const lockedId = /^id: (\S+)/m.exec(lockMd())?.[1];
+    await page.tap(`.card[data-id="${lockedId}"]`);
+    await page.waitForSelector('.lock-screen');
+    await page.waitForTimeout(400); // 메모 화면이 다 나타난 뒤
+    await shot('02f-lock-screen');
+    await page.fill('#lock-open-pass', 'nope1234');
+    await page.tap('.lock-screen .btn.primary');
+    await page.waitForFunction(() => /비밀번호가 달라요/.test(document.querySelector('.lock-screen .lock-error')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {});
+    const wrongMsg = await page.textContent('.lock-screen .lock-error').catch(() => '');
+    await page.fill('#lock-open-pass', 'abcd1234');
+    await page.tap('.lock-screen .btn.primary');
+    await page.waitForSelector('#note-screen .ProseMirror', { timeout: 15000 }).catch(() => {});
+    const openedText = await page.locator('.mk-doc').innerText().catch(() => '');
+    check('휴대폰 잠긴 메모: 틀리면 안내, 맞으면 열림', /비밀번호가 달라요/.test(wrongMsg ?? '') && openedText.includes('바꿈'), JSON.stringify({ wrongMsg, openedText: openedText.slice(0, 80) }));
+    await page.tap('#menu-btn');
+    const unlockLabel = await page.textContent('[data-memo-action="lock"] span');
+    await page.tap('[data-memo-action="lock"]');
+    await page.waitForSelector('#confirm-dialog[open]');
+    await page.tap('#confirm-ok');
+    await page.waitForTimeout(600);
+    check('휴대폰 잠금 풀기: 메뉴 "잠금 풀기" · 풀면 파일에 원래 글', unlockLabel === '잠금 풀기' && lockMd().includes('현관 비번') && !/memoking-lock/.test(lockMd()), unlockLabel);
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+  }
+
+  // 이어 쓰기: PC 에서 방금 고친 메모가 들어오면 "PC에서 방금 고친 메모: … [열기]"
+  {
+    const nowIso = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
+    write('PC에서 쓴 메모.md', `---\nid: 00000000-0000-4000-8000-0000000000pc\ncreated: ${nowIso}\nupdated: ${nowIso}\ncolor: blue\ndevice: pc\n---\n# PC에서 쓴 메모\n\n회의 정리\n`);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForTimeout(800);
+    const handoffToast = await page.textContent('#toast-text').catch(() => '');
+    const hasOpen = await page.isVisible('#toast-action');
+    check('이어 쓰기: PC에서 방금 고친 메모를 알리고 [열기]', /PC에서 방금 고친 메모: PC에서 쓴 메모/.test(handoffToast ?? '') && hasOpen, handoffToast);
+    await shot('02d-handoff');
+    if (hasOpen) await page.tap('#toast-action');
+    await page.waitForTimeout(600);
+    check('이어 쓰기: [열기] 를 누르면 그 메모', (await page.locator('.mk-doc h1').first().textContent().catch(() => '')) === 'PC에서 쓴 메모');
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+  }
 
   // 다른 앱에서 공유하기
   const png = fs.readFileSync(path.join(repo, 'assets/icons/icon-256.png')).toString('base64');

@@ -6,6 +6,9 @@ import { TEXT_COLORS, HIGHLIGHT_COLORS } from './core/html-marks.js';
 import { fileExtension } from './media.js';
 import { isDataImage, decodeDataImage } from './core/remote-images.js';
 import { setupReminderPanel } from './reminder-panel.js';
+import { reminderAt } from './date-remind.js';
+import { renderMemoImage } from './share-image.js';
+import { lockDialog, lockScreen } from './lock-ui.js';
 import { formatBytes } from './core/file-kinds.js';
 import { extractTags } from './core/tags.js';
 import { tutorialCounts, tutorialDone, TUTORIAL_SAMPLE, hasTutorialSample } from './core/tutorial.js';
@@ -164,7 +167,16 @@ async function flush() {
   if (!isDirty()) return;
   const body = current;
   try {
-    await api.memo.save(id, body);
+    const r = await api.memo.save(id, body);
+    if (r?.invalid) return setStatus('잠금 메모 형식의 글은 그대로 저장할 수 없어요 (아무도 열 수 없게 돼요). 글을 고쳐 주세요', true);
+    if (r?.refused) {
+      // 다른 기기가 이 메모를 잠갔다 — 파일은 그쪽 것 그대로. 사본으로 남겼으면 쓴 글은 안전, 아니면 아직 저장 안 된 글로 둔다
+      if (r.copied) {
+        saved = body;
+        setStatus('다른 기기에서 이 메모를 잠가, 쓰던 내용은 사본 메모로 남겼어요', true);
+      } else setStatus('잠긴 메모라 저장하지 못했어요. 쓰던 글을 복사해 두세요', true);
+      return;
+    }
     saved = body;
     setStatus('저장했어요');
   } catch (err) {
@@ -203,7 +215,40 @@ function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
 }
 
 api.on('memo:external', async (next) => {
-  if (!next) return;
+  // 아직 편집기가 없다(잠긴 메모의 비밀번호 화면) — 비밀번호 화면은 열 때 지금 파일로 푸므로 할 일이 없다
+  // (같은 비밀번호로 다른 기기가 고친 것을 "비밀번호를 바꿨어요" 로 오해해 창을 닫지 않게)
+  if (!next || !editor) return;
+  if (next.needsPassword) {
+    // 다른 기기에서 이 메모를 잠갔거나(이 창에선 안 잠긴 메모) 다른 비밀번호로 다시 잠갔다 — 이 창의 열쇠로는 풀 수 없으니
+    // 메모를 덮어쓰지 않는다. 다만 아직 저장 못 한 쓰던 글은 사본 메모로 먼저 남긴 뒤 닫는다 (쓰던 글이 사라지지 않게)
+    clearTimeout(saveTimer);
+    const wasLocked = Boolean(memo?.locked);
+    const what = wasLocked ? '다른 기기에서 이 메모의 비밀번호를 바꿨어요.' : '다른 기기에서 이 메모를 잠갔어요.';
+    let kept = '';
+    const snapshot = isDirty() ? current : null; // 사본으로 남길 글 (기다리는 동안 더 친 글은 창을 닫을 때 다시 사본으로)
+    if (snapshot !== null && !isBlankBody(snapshot)) {
+      try {
+        const copy = await api.memo.keepCopy(id, snapshot, null, { unlocked: !wasLocked });
+        if (copy) kept = wasLocked ? ' 쓰던 내용은 예전 비밀번호로 잠근 사본 메모로 남겼어요.' : ' 쓰던 내용은 사본 메모로 따로 남겼어요.';
+      } catch (err) {
+        console.error(err);
+      }
+      if (!kept) {
+        // 사본도 못 만들었다 — 창을 닫지 않고 글을 그대로 둔다 (복사해 둘 수 있게)
+        setStatus(`${what} 쓰던 내용을 저장하지 못했어요. 글을 복사해 두세요`, true);
+        return;
+      }
+    }
+    if (snapshot !== null) saved = snapshot;
+    setStatus(`${what}${kept} 다시 열 때 비밀번호를 넣어 주세요`, true);
+    setTimeout(() => window.close(), kept ? 4000 : 2500);
+    return;
+  }
+  // 다른 기기에서 잠금을 풀었으면(또는 이 창의 열쇠로 풀리는 잠금이면) 메뉴의 잠금 상태를 맞춘다
+  if (Boolean(memo?.locked) !== Boolean(next.locked)) {
+    memo = { ...memo, locked: next.locked };
+    showLockState();
+  }
   if (sameBody(next.body, current)) {
     saved = current; // 지금 쓰는 글과 같은 내용 — 할 일 없음
     return;
@@ -310,6 +355,67 @@ async function toggleTopKey() {
   applyTop(await api.win.toggleTop(id)); // 스티커가 떼어지는 모습은 스티커를 누를 때와 같다
 }
 el.topBtn.addEventListener('click', toggleTop);
+// 메모를 그림 카드(PNG) 한 장으로 — 메모 색 종이에 본문 그대로 (휴대폰 "그림으로 공유" 와 같은 모양)
+async function memoImage(kind) {
+  closeMenu();
+  await flush();
+  setStatus('그림을 만드는 중…');
+  try {
+    const base64 = await renderMemoImage(editor, { color: memo?.color ?? document.body.dataset.color });
+    const r = kind === 'copy' ? await api.image.copy(base64) : await api.image.save(id, base64);
+    if (r?.cancelled) return setStatus('');
+    setStatus(kind === 'copy' ? '그림을 복사했어요. 붙여 넣으면 돼요' : `그림으로 저장했어요: ${r?.name ?? ''}`);
+  } catch (err) {
+    console.error(err);
+    setStatus('그림을 만들지 못했어요. 다시 해 주세요', true);
+  }
+}
+$('image-copy-btn').addEventListener('click', () => memoImage('copy'));
+/** 확인 창 (confirm-dialog): 확인 단추 글자를 바꿔 쓴다 */
+function confirmDialog(message, okLabel) {
+  return new Promise((resolve) => {
+    $('confirm-message').textContent = message;
+    $('confirm-ok').textContent = okLabel;
+    el.confirm.addEventListener('close', () => resolve(el.confirm.returnValue === 'ok'), { once: true });
+    el.confirm.returnValue = '';
+    el.confirm.showModal();
+  });
+}
+// 잠그기 / 잠금 풀기 (연 동안만)
+function showLockState() {
+  const label = $('lock-btn').querySelector('span');
+  label.textContent = memo?.locked ? '잠금 풀기' : '잠그기';
+  document.body.classList.toggle('is-locked', Boolean(memo?.locked));
+}
+$('lock-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  if (memo?.locked) {
+    const ok = await confirmDialog('잠금을 풀까요? 내용이 그대로 파일에 저장되고, 비밀번호 없이 열려요.', '잠금 풀기');
+    if (!ok) return;
+    const r = await api.memo.unlock(id);
+    if (r?.error) return setStatus(r.error, true);
+    memo = { ...memo, ...r };
+    showLockState();
+    setStatus('잠금을 풀었어요');
+    return;
+  }
+  const locked = await lockDialog({
+    title: memo?.title ?? '',
+    onLock: async (password, { hideTitle }) => {
+      await flush();
+      const r = await api.memo.lock(id, password, { hideTitle });
+      if (r?.error) return r.error;
+      memo = { ...memo, ...r };
+      return null;
+    },
+  });
+  editor?.focus(); // 창이 닫히면 쓰던 자리로
+  if (!locked) return;
+  showLockState();
+  setStatus('잠갔어요. 창을 닫으면 다시 비밀번호로 열려요');
+});
+$('image-save-btn').addEventListener('click', () => memoImage('save'));
 $('pdf-btn').addEventListener('click', async () => {
   closeMenu();
   await flush(); // 지금 적은 내용까지 PDF 에
@@ -498,6 +604,7 @@ async function restoreVersion(name) {
   await flush(); // 지금 내용이 버전으로 남도록 먼저 저장
   const restored = await api.memo.restoreVersion(id, name);
   if (!restored) return setStatus('그 버전을 찾지 못했어요', true);
+  if (restored.error) return setStatus(restored.error, true);
   editor.setMarkdown(restored.body, restored.tables ?? []);
   current = saved = editor.getMarkdown();
   setStatus('되돌렸어요');
@@ -1292,7 +1399,7 @@ function showTasks(tasks, opts) {
 
 // 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)
 async function autoTagOnClose() {
-  if (!editor || tagDismissed) return;
+  if (!editor || tagDismissed || memo?.locked) return; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
   try {
     const s = await api.settings.get();
     if (s?.autoTags === false) return;
@@ -1500,6 +1607,25 @@ coach = setupCoach(api, {
   },
 });
 memo = await api.memo.get(id);
+// 잠긴 메모: 비밀번호를 넣어야 편집기를 만든다 (풀린 글은 메인 프로세스가 이 창을 닫을 때까지만 기억)
+if (memo?.needsPassword) {
+  document.body.dataset.color = memo.color;
+  document.title = memo.title;
+  document.body.classList.add('memo-locked');
+  const opened = await lockScreen(el.editorRoot, {
+    title: memo.title,
+    onTry: async (password) => {
+      const r = await api.memo.openLock(id, password);
+      if (r?.error) return r.error;
+      memo = { ...memo, ...r };
+      return null;
+    },
+    onCancel: () => window.close(),
+  });
+  // "닫기": 창이 닫히는 동안 암호문으로 편집기를 만들지 않는다 (여기서 멈춤)
+  if (!opened) await new Promise(() => {});
+  document.body.classList.remove('memo-locked');
+}
 if (!memo) {
   setStatus('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
 } else {
@@ -1517,6 +1643,8 @@ if (!memo) {
     getTags: () => api.tags.list(),
     onEmpty: showPlaceholder,
     onTasks: showTasks,
+    onDateReminder: (event) => reminderPanel?.addEvent(event) ?? false,
+    hasReminderAt: (d) => reminderAt(reminderPanel?.list, d),
   });
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();
@@ -1527,8 +1655,10 @@ if (!memo) {
     memoId: id,
     setStatus,
     onToggle: (open) => open && !el.linksPanel.hidden && toggleLinks(false),
+    onChange: () => editor?.refreshDates(),
   });
   reminderPanel.set(memo.reminders);
+  showLockState();
   recorder = setupVoiceRecorder({
     panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
     buttons: () => document.querySelectorAll('[data-action="record"]'),

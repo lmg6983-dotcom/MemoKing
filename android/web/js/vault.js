@@ -3,12 +3,15 @@
 // 그래서 PC 와 휴대폰이 같은 폴더를 동기화해 써도 서로의 메모를 그대로 읽는다.
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
-  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS, conflictCopyBody, sameBody, normalizeInkPath } from '../../app/js/core/memo-file.js';
+  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS, normalizeInkPath } from '../../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { normalizeTables } from '../../app/js/core/table-sizes.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
+import { isLockedBody, parseLocked } from '../../app/js/core/memo-lock.js';
+import { isPastEvent } from '../../app/js/core/reminders.js';
+import { installLockMethods, lockedFiles } from '../../app/js/core/vault-locks.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
@@ -47,6 +50,10 @@ export class Vault extends EventTarget {
     this.orphanTimer = null;
     /** @type {Map<string, {id, file: string|null, meta, body, mtimeMs, size, idSaved: boolean}>} */
     this.entries = new Map();
+    this.locks = new Map(); // 연 잠금 메모: id → 세션 (메모를 닫으면 잊는다)
+    this.device = 'phone'; // 내용을 고친 곳으로 머리말에 남김
+    this.lockCopies = new Map(); // 잠긴 메모 id → 그 메모를 연 동안 만든 사본 id 들 (같은 열쇠)
+    this.copyOf = new Map(); // 사본 id → 원래 메모 id
     this.index = null;
     this.indexTimer = null;
     this.pollTimer = null;
@@ -71,6 +78,8 @@ export class Vault extends EventTarget {
       this.index = null;
     }
     this.scan({ silent: true });
+    // 꺼 둔 사이 다른 기기에서 잠근 메모의 풀린 버전이 이 기기에 남지 않게
+    for (const e of this.entries.values()) if (isLockedBody(e.body)) this.dropUnsafeVersions(e.id);
     const guide = `${APP_DIR}/README.md`;
     if (fs.readText(guide) !== AGENT_GUIDE) fs.writeText(guide, AGENT_GUIDE);
     this.writeIndex();
@@ -109,6 +118,7 @@ export class Vault extends EventTarget {
     const next = new Map([...this.entries].filter(([, e]) => !e.file)); // 아직 파일이 없는 새 메모
     const changed = new Set();
     const external = [];
+    const lockedNow = [];
 
     for (const { file, mtime, size } of files) {
       const prev = prevByFile.get(file);
@@ -137,14 +147,19 @@ export class Vault extends EventTarget {
       const old = this.entries.get(id);
       next.set(id, { id, file, meta, body, mtimeMs: mtime, size, idSaved });
       changed.add(id);
-      if (old && old.body !== body) external.push(id);
+      if (!old || old.body !== body) external.push(id); // 밖에서 새로 들어온 메모도
+      // 다른 기기에서 잠갔거나 비밀번호를 바꾼 메모: 이 기기에 남은 풀린 버전·예전 비밀번호 버전을 지운다 (아래에서)
+      if (isLockedBody(body) && old && parseLocked(old.body)?.salt !== parseLocked(body).salt) lockedNow.push(id);
     }
 
     const removed = [...this.entries.keys()].filter((id) => !next.has(id));
     for (const id of removed) changed.add(id);
+    let attachList = null;
+    const listFiles = () => (attachList ??= this.attachmentFiles());
     if (removed.length <= MAX_EXTERNAL_REMOVALS) {
       for (const id of removed) {
-        const srcs = extractAttachments(this.entries.get(id)?.body ?? '');
+        const gone = this.entries.get(id);
+        const srcs = gone ? this.attachmentsOf(gone, listFiles) : []; // 잠긴 메모도 머리말의 표로 (첨부 폴더는 한 번만 읽음)
         if (srcs.length) this.orphans.set(id, srcs);
       }
       if (this.orphans.size) {
@@ -153,6 +168,7 @@ export class Vault extends EventTarget {
       }
     }
     this.entries = next;
+    for (const id of lockedNow) this.dropUnsafeVersions(id);
 
     if (changed.size && !silent) {
       this.emit('changed', { ids: [...changed], external, removed });
@@ -181,9 +197,10 @@ export class Vault extends EventTarget {
       hasAudio: has('audio'),
       hasVideo: has('video'),
       hasFile: has('file'),
-      reminderCount: entry.meta.reminders.filter((r) => r.enabled).length,
+      reminderCount: entry.meta.reminders.filter((r) => r.enabled && !isPastEvent(r)).length, // 지난 한 번짜리 일정은 세지 않음
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
       tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
+      locked: isLockedBody(entry.body),
     };
   }
 
@@ -215,10 +232,15 @@ export class Vault extends EventTarget {
   get(id) {
     const entry = this.entries.get(id);
     if (!entry) return null;
+    // 다른 메모를 연 동안 만든 잠긴 사본은 따로 열 때 비밀번호를 묻는다
+    const plain = this.isCopyLock(id) ? null : this.plainOf(entry);
+    const locked = isLockedBody(entry.body);
     return {
       id,
       file: entry.file,
-      body: entry.body,
+      body: plain ?? entry.body, // 잠긴 메모는 연(비밀번호를 넣은) 동안만 푼 글
+      locked,
+      needsPassword: locked && plain === null,
       title: extractTitle(entry.body),
       color: entry.meta.color,
       pinned: entry.meta.pinned,
@@ -228,6 +250,7 @@ export class Vault extends EventTarget {
       ink: entry.meta.ink ?? '',
       created: entry.meta.created,
       updated: entry.meta.updated,
+      device: entry.meta.device ?? null,
     };
   }
 
@@ -246,7 +269,8 @@ export class Vault extends EventTarget {
   setReminders(id, reminders) {
     const entry = this.entries.get(id);
     if (!entry) return null;
-    entry.meta.reminders = reminders;
+    // 잠긴 메모의 일정 이름은 머리말(풀린 글)에 남기지 않는다 — 글에서 짐작한 이름이 비밀일 수 있음 (알림엔 메모 제목)
+    entry.meta.reminders = isLockedBody(entry.body) ? reminders.map(({ title: _t, ...r }) => r) : reminders;
     if (entry.file || !isBlankBody(entry.body)) this.write(entry);
     this.changed([id]);
     return entry.meta.reminders;
@@ -289,6 +313,7 @@ export class Vault extends EventTarget {
   }
 
   import({ body, created, updated, pinned = false, color }) {
+    if (isLockedBody(body)) return null; // 잠금 형식 글은 아무도 열 수 없는 메모가 되므로 새 메모로 만들지 않는다
     const id = this.create({ color });
     const entry = this.entries.get(id);
     Object.assign(entry.meta, { created: created ?? entry.meta.created, updated: updated ?? entry.meta.updated, pinned });
@@ -298,22 +323,17 @@ export class Vault extends EventTarget {
     return id;
   }
 
-  save(id, body) {
-    let entry = this.entries.get(id);
-    if (!entry) {
-      // 쓰는 사이 파일이 지워졌다면, 화면에 남아 있는 내용으로 되살린다.
-      entry = this.newEntry(id);
-      this.entries.set(id, entry);
+  // ---------- 잠금 메모: plainOf · openLock · closeLock · lock · unlock 등은 core/vault-locks.js (PC·휴대폰 같음) ----------
+
+  purgeVersions(id) {
+    const dir = this.versionDir(id);
+    if (!dir) return;
+    try {
+      for (const name of this.versionNames(id)) fs.remove(`${dir}/${name}`);
+    } catch {
+      // 다음에 다시
     }
-    if (entry.body === body && entry.file) return this.summary(entry);
-    const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
-    entry.body = body;
-    entry.meta.updated = toLocalIso();
-    if (!entry.file && isBlankBody(body)) return this.summary(entry);
-    if (entry.file) this.keepVersion(id, known);
-    this.write(entry, known);
-    this.changed([id]);
-    return this.summary(entry);
+    this.latestVersion?.delete(id);
   }
 
   // ---------- 버전 기록 (_memoking/versions/<id>/<시각>.md) — 데스크탑과 같은 규칙 ----------
@@ -378,45 +398,50 @@ export class Vault extends EventTarget {
     }
   }
 
-  // 지금 내용도 버전으로 남겨 두고(되돌리기를 되돌릴 수 있게) 고른 버전으로 바꾼다
-  restoreVersion(id, name) {
-    const body = this.version(id, name);
-    const entry = this.entries.get(id);
-    if (body === null || body === undefined || !entry) return null;
-    this.keepVersion(id, entry.body, { force: true });
-    const known = entry.body;
-    entry.body = body;
-    entry.meta.updated = toLocalIso();
-    this.write(entry, known);
-    this.changed([id]);
-    return this.get(id);
-  }
-
   // known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것을 넘긴다)
-  write(entry, known = entry.body) {
-    if (entry.file) this.keepChangedOnDisk(entry, known);
+  write(entry, known = entry.body, { copy = true } = {}) {
+    // 그사이 다른 기기가 이 메모를 잠갔다면 덮어쓰지 않는다 (잠금이 풀리거나 비밀번호가 되돌아가지 않게)
+    if (entry.file) {
+      const kept = this.keepChangedOnDisk(entry, known, { copy });
+      if (kept === 'locked' || kept === 'copied' || kept === 'skipped') return kept;
+    }
     if (!entry.file) entry.file = this.uniqueFile(titleToFileName(extractTitle(entry.body)));
     entry.meta.id = entry.id;
     const stat = fs.writeText(entry.file, serializeMemoFile(entry.meta, entry.body));
     entry.mtimeMs = stat?.mtime ?? Date.now();
     entry.size = stat?.size ?? 0;
     entry.idSaved = true;
+    return true;
   }
 
-  // 마지막으로 읽은(쓴) 뒤 다른 기기(동기화)가 이 파일을 바꿨는데 아직 알아채기 전에 덮어쓰려 할 때: 그쪽 내용을 먼저
-  // 사본 메모로 남긴다 ("제목 (다른 기기 …)") — 자동 저장이 들어온 내용을 몰래 지우지 않게
-  keepChangedOnDisk(entry, known) {
-    let theirs;
+  rescanSoon() {
+    clearTimeout(this.rescanTimer);
+    this.rescanTimer = setTimeout(() => this.scan(), 50);
+  }
+
+  /** 덮어쓰기 전 확인용: 마지막으로 읽은(쓴) 뒤 파일이 바뀌었으면 { body, meta }, 사라졌으면 'missing', 그대로면 null */
+  readDiskIfChanged(entry) {
     try {
       const st = fs.stat(entry.file);
-      if (!st || (st.mtime === entry.mtimeMs && st.size === entry.size)) return;
-      theirs = parseMemoFile(fs.readText(entry.file) ?? '').body;
+      if (!st) return 'missing';
+      if (st.mtime === entry.mtimeMs && st.size === entry.size) return null;
+      return parseMemoFile(fs.readText(entry.file) ?? '');
     } catch {
-      return;
+      return null;
     }
-    if (sameBody(theirs, known) || sameBody(theirs, entry.body) || isBlankBody(theirs)) return;
-    this.keepVersion(entry.id, theirs, { force: true }); // 버전 기록에서도 되찾을 수 있게
-    this.import({ body: conflictCopyBody(theirs), color: entry.meta.color });
+  }
+
+  /** 첨부 폴더 · 휴지통의 첨부 폴더 (메모 폴더 기준) — core/vault-locks.js 가 잠긴 메모의 첨부를 찾을 때 */
+  get attachDirRel() { return ATTACH_DIR; }
+  get trashAttachDirRel() { return `${APP_DIR}/trash/${ATTACH_DIR}`; }
+
+  /** 폴더 안의 파일 이름들 (rel: 메모 폴더 기준 "attachments" 등, 없으면 []) */
+  listDir(rel) {
+    try {
+      return (fs.list(rel) ?? []).filter((e) => !e.dir).map((e) => e.name);
+    } catch {
+      return [];
+    }
   }
 
   // 같은 폴더에서 겹치지 않는 파일명: "제목.md", "제목 (2).md", ...
@@ -498,7 +523,8 @@ export class Vault extends EventTarget {
       }
     }
     this.orphans.delete(id);
-    this.trashAttachments(extractAttachments(entry.body));
+    this.trashAttachments(this.attachmentsOf(entry)); // 열지 않은 잠긴 메모도 머리말의 표로
+    this.closeLock(id); // 지운 잠긴 메모의 열쇠를 남기지 않는다 (되살리면 다시 비밀번호로)
     this.changed([id]);
     return trashed ?? true; // 휴지통 파일 이름 (되돌리기에 씀)
   }
@@ -514,11 +540,11 @@ export class Vault extends EventTarget {
 
   // 지운 메모가 쓰던 첨부 중 남은 메모가 쓰지 않는 것만 _memoking/trash/attachments/ 로 옮긴다.
   trashAttachments(srcs) {
-    const inUse = new Set();
-    for (const e of this.entries.values()) for (const src of extractAttachments(e.body)) inUse.add(src);
+    // 남은 메모(열지 않은 잠긴 메모 포함)가 쓰는 첨부는 남긴다 (core/vault-locks.js)
+    const used = this.attachmentGuard();
     const moved = [];
     for (const src of new Set(srcs)) {
-      if (!src.startsWith(`${ATTACH_DIR}/`) || inUse.has(src)) continue;
+      if (!src.startsWith(`${ATTACH_DIR}/`) || used(src)) continue;
       const from = this.resolve(src);
       if (!from || fs.stat(from)?.dir !== false) continue;
       const dir = `${TRASH_DIR}/${ATTACH_DIR}`;
@@ -584,8 +610,9 @@ export class Vault extends EventTarget {
   restoreTrash(name) {
     const file = this.trashFile(name);
     if (!file) return null;
-    const { body } = parseMemoFile(fs.readText(file) ?? '');
-    for (const src of extractAttachments(body)) {
+    const { body, meta } = parseMemoFile(fs.readText(file) ?? '');
+    // 잠긴 메모는 머리말의 표로 휴지통의 첨부에서 찾아 함께 되살린다 (core/vault-locks.js)
+    for (const src of lockedFiles(body, meta, () => this.trashAttachmentFiles())) {
       if (!src.startsWith(`${ATTACH_DIR}/`)) continue;
       const live = this.resolve(src);
       const held = `${TRASH_DIR}/${src}`;
@@ -603,12 +630,11 @@ export class Vault extends EventTarget {
   }
 
   purgeTrashAttachments(srcs, olderThan = Infinity) {
-    const inUse = new Set();
-    for (const e of this.entries.values()) for (const s of extractAttachments(e.body)) inUse.add(s);
-    for (const t of this.trashEntries()) for (const s of extractAttachments(t.body)) inUse.add(s);
+    // 살아 있는 메모·휴지통의 메모(열지 않은 잠긴 메모 포함)가 쓰는 첨부는 지우지 않는다 (core/vault-locks.js)
+    const used = this.attachmentGuard([...this.trashEntries()]);
     let removed = 0;
     for (const src of new Set(srcs)) {
-      if (!src.startsWith(`${ATTACH_DIR}/`) || inUse.has(src)) continue;
+      if (!src.startsWith(`${ATTACH_DIR}/`) || used(src)) continue;
       const held = `${TRASH_DIR}/${src}`;
       const stat = fs.stat(held);
       if (!stat || stat.dir || stat.mtime > olderThan) continue;
@@ -697,3 +723,5 @@ export class Vault extends EventTarget {
     }
   }
 }
+
+installLockMethods(Vault);

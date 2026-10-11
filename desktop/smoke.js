@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { dropBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
+import { lockBody } from '../app/js/core/memo-lock.js';
 
 const ICON_PNG = path.join(import.meta.dirname, '..', 'assets', 'icons', 'icon-256.png');
 
@@ -648,7 +649,7 @@ export async function runSmoke({
     const localOf = (alt) => new RegExp(`!\\[${alt}\\]\\((attachments/[^)\\s]+)\\)`).exec(webMd)?.[1];
     const catFile = localOf('고양이');
     check('웹 글+사진 붙여넣기 → 글은 서식대로', webMd.includes('## 웹 기사 제목') && webMd.includes('기사 본문 첫 문단'),
-      webMd.split('---').slice(2).join('---').slice(0, 200));
+      JSON.stringify(webMd.slice(0, 400)));
     check('인터넷 사진 → attachments 에 저장 (원본과 같은 파일)',
       Boolean(catFile) && fs.readFileSync(path.join(VAULT, catFile)).equals(png) && !webMd.includes(`${base}/cat.png`), catFile);
     check('지연 로딩 사진 → 진짜 주소(data-src)에서 받아 저장', Boolean(localOf('지연 로딩')), webMd.match(/!\[지연 로딩\][^\n]*/)?.[0]);
@@ -1102,6 +1103,137 @@ export async function runSmoke({
     const lw = getList();
     const listJs = (code) => js(getList(), code);
     const remindersOf = (id) => getVault().get(id)?.reminders ?? [];
+    // 14-00) 글 속 날짜 → 알림: 점선 밑줄, 커서를 옮기면(치는 중 말고) 단추, 누르면 그 시각 알림
+    {
+      const dn = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
+      await type(dn.win, '다음 주 화요일 오후 2시 반 발표');
+      await wait(300);
+      const under = await js(dn.win, `document.querySelector('.mk-doc .mk-date')?.textContent ?? ''`);
+      const typingChip = await js(dn.win, `Boolean(document.querySelector('.mk-date-chip'))`);
+      await key(dn.win, 'Home');
+      const chip = await until(() => js(dn.win, `document.querySelector('.mk-date-chip')?.textContent ?? null`), '날짜 단추').catch(() => '');
+      check('글 속 날짜: 밑줄 · 치는 중에는 단추 없음 · 커서를 옮기면 "📅 일정 추가" 단추',
+        under === '다음 주 화요일 오후 2시 반' && !typingChip && /일정 추가: .*오후 2:30/.test(chip), JSON.stringify({ under, typingChip, chip }));
+      await capture(dn.win, 'smoke-date-chip.png');
+      // 단추 → 일정 창: 이름은 줄에서 짐작(발표), 미리 알림은 고른다 (구글 캘린더처럼 시각이 아니라 미리)
+      await js(dn.win, `document.querySelector('.mk-date-chip').click()`);
+      const dlg = await until(() => js(dn.win, `document.querySelector('.event-dialog[open]') ? {
+        name: document.getElementById('event-name').value,
+        when: document.getElementById('event-when').textContent,
+        pressed: [...document.querySelectorAll('.event-alerts [aria-pressed="true"]')].map((b) => b.textContent),
+        chips: [...document.querySelectorAll('.event-alerts button')].map((b) => b.textContent),
+      } : null`), '일정 창').catch(() => null);
+      check('일정 창: 이름 짐작(발표) · 때 · 미리 알림 고르기 (기본 10분 전)',
+        dlg?.name === '발표' && /오후 2:30/.test(dlg.when) && dlg.pressed.length === 1 && /10분 전/.test(dlg.pressed[0]),
+        JSON.stringify(dlg));
+      await capture(dn.win, 'smoke-event-dialog.png');
+      await js(dn.win, `(() => { [...document.querySelectorAll('.event-alerts button')].find((b) => b.textContent.includes('하루 전')).click(); document.getElementById('event-save').click(); })()`);
+      const set = await until(() => remindersOf(dn.id).find((r) => r.kind === 'at'), '일정 저장').catch(() => null);
+      const at = set ? new Date(set.at) : null;
+      check('일정 저장: 화요일 14:30 · 이름 "발표" · 미리 알림 하루 전과 10분 전 · 밑줄이 실선으로',
+        Boolean(at) && at.getDay() === 2 && at.getHours() === 14 && at.getMinutes() === 30 && at > new Date()
+        && set.title === '발표' && JSON.stringify(set.alerts) === '[1440,10]'
+        && await until(() => js(dn.win, `Boolean(document.querySelector('.mk-doc .mk-date-set'))`), '실선').catch(() => false), JSON.stringify(set));
+      // 메모를 그림 카드로 저장 (점검에서는 저장 창 없이 임시 폴더에) — 복사는 클립보드를 바꾸므로 smoke:clipboard 에서만
+      await js(dn.win, `document.getElementById('image-save-btn').click()`);
+      const savedMsg = await until(() => js(dn.win, `/그림으로 저장했어요/.test(document.getElementById('status').textContent) ? document.getElementById('status').textContent : null`), '그림 저장', 15000).catch(() => '');
+      const pngName = /저장했어요: (.+\.png)/.exec(savedMsg ?? '')?.[1];
+      const pngFile = pngName ? path.join(app.getPath('temp'), pngName) : '';
+      const pngOk = Boolean(pngFile) && fs.existsSync(pngFile) && fs.readFileSync(pngFile).subarray(1, 4).toString() === 'PNG' && fs.statSync(pngFile).size > 5000;
+      check('메뉴 › 그림으로 저장: 메모 색 종이의 PNG 그림', pngOk, savedMsg);
+      if (pngOk) fs.copyFileSync(pngFile, path.join(OUT, 'smoke-memo-card.png'));
+      if (process.argv.includes('--clipboard')) {
+        const { clipboard } = await import('electron');
+        clipboard.clear();
+        await js(dn.win, `document.getElementById('image-copy-btn').click()`);
+        const copied = await until(() => !clipboard.readImage().isEmpty(), '그림 복사', 15000).catch(() => false);
+        check('메뉴 › 그림으로 복사: 클립보드에 그림', copied);
+      }
+      // 뒤의 알림 예약 탭 점검이 세는 알림 수에 섞이지 않게 지운다
+      await js(dn.win, `document.querySelector('#reminder-list .rem-item .icon-btn')?.click()`);
+      await until(() => remindersOf(dn.id).length === 0, '날짜 알림 지우기').catch(() => {});
+      await closeNote(dn.id);
+    }
+    // 14-01) 이어 쓰기: 휴대폰에서 방금 고친 메모가 들어오면 목록 위에 "휴대폰에서 방금 고친 메모: … [열기]"
+    {
+      const nowIso = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
+      fs.writeFileSync(path.join(VAULT, '휴대폰에서 쓴 메모.md'), `---\nid: 00000000-0000-4000-8000-00000000f0e1\ncreated: ${nowIso}\nupdated: ${nowIso}\ncolor: green\ndevice: phone\n---\n# 휴대폰에서 쓴 메모\n\n지하철에서 적음\n`);
+      getVault().scan();
+      const bar = await until(() => listJs(`(() => { const b = document.getElementById('handoff-bar'); return b && !b.hidden ? b.textContent : null; })()`), '이어 쓰기 막대').catch(() => '');
+      await capture(getList(), 'smoke-handoff.png');
+      check('이어 쓰기: 휴대폰에서 방금 고친 메모를 목록 위에 [열기]', /휴대폰에서 방금 고친 메모\s*휴대폰에서 쓴 메모/.test(bar ?? '') && /열기/.test(bar ?? ''), bar);
+      const hn = await newNote(() => listJs(`document.querySelector('#handoff-bar button').click()`)).catch(() => null);
+      check('이어 쓰기: [열기] → 그 메모 창', hn?.id === '00000000-0000-4000-8000-00000000f0e1');
+      if (hn) await closeNote(hn.id);
+      getVault().trash('00000000-0000-4000-8000-00000000f0e1'); // 뒤 점검의 메모 수에 섞이지 않게
+    }
+    // 14-02) 잠금 메모: 비밀번호로 잠그면 파일·버전에 풀린 글이 없고, 쓰는 동안도 잠근 채 저장, 닫았다 열면 비밀번호
+    {
+      const ln = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
+      await type(ln.win, '은행 메모');
+      await key(ln.win, 'Enter');
+      await type(ln.win, '계좌 비밀 1234');
+      await until(() => getVault().get(ln.id)?.file && readMemo(ln.id).includes('계좌 비밀'), '잠그기 전 저장').catch(() => {});
+      const lockFile = () => readMemo(ln.id);
+      const vaultText = () => fs.readdirSync(VAULT, { recursive: true }).map((f) => path.join(VAULT, f)).filter((f) => fs.statSync(f).isFile() && /\.(md|json)$/.test(f)).map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+      await js(ln.win, `document.getElementById('menu-btn').click()`);
+      await js(ln.win, `document.getElementById('lock-btn').click()`);
+      await until(() => js(ln.win, `Boolean(document.querySelector('.lock-dialog[open]'))`), '잠그기 창');
+      await capture(ln.win, 'smoke-lock-dialog.png');
+      await js(ln.win, `(() => { document.getElementById('lock-pass-1').value = 'abcd1234'; document.getElementById('lock-pass-2').value = 'abcd1234'; document.querySelector('.lock-dialog form').requestSubmit(); })()`);
+      const sealed = await until(() => /memoking-lock v1/.test(lockFile()), '잠근 파일', 15000).catch(() => false);
+      const clean = await until(() => !vaultText().includes('계좌 비밀'), '색인도 다시', 8000).catch(() => false); // 색인(index.json)은 잠시 뒤 다시 쓴다
+      const leak = clean ? '' : fs.readdirSync(VAULT, { recursive: true }).filter((f) => { try { return fs.readFileSync(path.join(VAULT, f), 'utf8').includes('계좌 비밀'); } catch { return false; } }).join(', ');
+      check('잠그기: 파일·버전·색인 어디에도 풀린 글이 없고 제목만', sealed && clean && /# 은행 메모/.test(lockFile()), leak || lockFile().slice(0, 200));
+      await key(ln.win, 'End', ['control']);
+      await type(ln.win, ' 추가함');
+      await until(() => getVault().get(ln.id)?.body.includes('추가함'), '잠긴 채 저장', 8000).catch(() => {});
+      await wait(2000); // 색인까지
+      check('잠긴 메모: 쓰는 동안 저장도 잠근 글로', getVault().get(ln.id)?.body.includes('추가함') && !vaultText().includes('추가함') && /memoking-lock/.test(lockFile()));
+      await closeNote(ln.id);
+      check('잠긴 메모: 창을 닫으면 다시 잠김', getVault().get(ln.id)?.needsPassword === true);
+      await js(getList(), `document.querySelector('.card[data-id="${ln.id}"]').click()`);
+      const lo = { id: ln.id, win: await until(() => noteWins.get(ln.id), '잠긴 메모 창') };
+      await until(() => js(lo.win, `Boolean(document.querySelector('.lock-screen'))`), '비밀번호 화면');
+      await capture(lo.win, 'smoke-lock-screen.png');
+      await js(lo.win, `(() => { document.getElementById('lock-open-pass').value = 'wrong123'; document.querySelector('.lock-screen').requestSubmit(); })()`);
+      const wrong = await until(() => js(lo.win, `document.querySelector('.lock-screen .lock-error')?.textContent || null`), '틀린 비밀번호', 10000).catch(() => '');
+      await js(lo.win, `(() => { document.getElementById('lock-open-pass').value = 'abcd1234'; document.querySelector('.lock-screen').requestSubmit(); })()`);
+      const opened = await until(() => js(lo.win, `!document.querySelector('.lock-screen') && (document.querySelector('.mk-doc')?.textContent ?? '').includes('추가함')`), '비밀번호로 열기', 10000).catch(() => false);
+      check('잠긴 메모: 틀린 비밀번호는 안내, 맞으면 열림', /비밀번호가 달라요/.test(wrong) && opened, wrong);
+      await js(lo.win, `document.getElementById('menu-btn').click()`);
+      const unlockLabel = await js(lo.win, `document.querySelector('#lock-btn span').textContent`);
+      await js(lo.win, `document.getElementById('lock-btn').click()`);
+      await until(() => js(lo.win, `document.getElementById('confirm-dialog').open`), '잠금 풀기 확인');
+      await js(lo.win, `document.getElementById('confirm-ok').click()`);
+      const plainAgain = await until(() => !/memoking-lock/.test(lockFile()) && lockFile().includes('계좌 비밀'), '잠금 풀기', 8000).catch(() => false);
+      check('잠금 풀기: 메뉴가 "잠금 풀기" · 풀면 파일에 원래 글', unlockLabel === '잠금 풀기' && plainAgain, unlockLabel);
+      await closeNote(lo.id);
+      getVault().trash(ln.id);
+    }
+    // 14-03) 쓰는 중에 다른 기기(휴대폰)가 이 메모를 잠그면: 저장 못 한 글은 사본 메모로 남기고, "잠갔어요" 라고 알린 뒤 닫힘
+    {
+      const wn = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
+      await type(wn.win, '여행 계획');
+      await key(wn.win, 'Enter');
+      await type(wn.win, '첫 줄');
+      await until(() => getVault().get(wn.id)?.file && readMemo(wn.id).includes('첫 줄'), '잠그기 전 저장').catch(() => {});
+      const file = path.join(VAULT, getVault().get(wn.id).file);
+      const text = fs.readFileSync(file, 'utf8');
+      const head = /^---\n[\s\S]*?\n---\n/.exec(text)?.[0] ?? '';
+      const sealed = await lockBody(text.slice(head.length), 'phone999', { iterations: 1000 });
+      const before = new Set(getVault().list().map((m) => m.id));
+      await type(wn.win, ' 아직 저장 안 한 글'); // 자동 저장 전에
+      fs.writeFileSync(file, head + sealed); // 휴대폰이 잠금
+      getVault().scan();
+      const status = await until(() => js(wn.win, `/잠갔어요/.test(document.getElementById('status').textContent) ? document.getElementById('status').textContent : null`), '잠금 안내', 8000).catch(() => '');
+      const copy = await until(() => getVault().list().find((m) => !before.has(m.id) && getVault().get(m.id)?.body.includes('아직 저장 안 한 글')), '사본 메모', 8000).catch(() => null);
+      check('쓰는 중에 휴대폰이 잠그면: 쓰던 글은 사본 메모로 남고 "잠갔어요" 안내 (비밀번호를 바꿨다고 하지 않음)',
+        Boolean(copy) && /사본 메모/.test(status ?? '') && !/비밀번호를 바꿨/.test(status ?? '') && /memoking-lock/.test(fs.readFileSync(file, 'utf8')), status);
+      await until(() => !noteWins.has(wn.id), '창 닫힘', 8000).catch(() => {});
+      if (copy) getVault().trash(copy.id);
+      getVault().trash(wn.id);
+    }
     // 14-0) 알림 보관함 탭: 처음에는 동의 안내부터
     await listJs(`document.querySelector('[data-tab="history"]').click()`);
     await wait(300);
@@ -1149,11 +1281,15 @@ export async function runSmoke({
     await listJs(`document.querySelector('[data-tab="reminders"]').click()`);
     await wait(400);
     const tab = await listJs(`({
-      rows: document.querySelectorAll('#reminder-groups .row').length,
-      first: document.querySelector('#reminder-groups .row .row-sub')?.textContent,
+      days: document.querySelectorAll('#reminder-groups .cal-day').length,
+      today: document.querySelector('#reminder-groups .cal-day.today[aria-pressed="true"]') !== null,
+      dots: document.querySelectorAll('#reminder-groups .cal-dots i').length,
+      events: [...document.querySelectorAll('#reminder-groups .ev-row')].map((r) => r.textContent),
+      timer: document.querySelector('#reminder-groups .rem-row-item .row-sub')?.textContent,
       count: document.getElementById('count-reminders').textContent,
     })`);
-    check('알림 예약 탭: 모든 알림을 다가오는 순으로 (타이머가 먼저)', tab.rows === 2 && /5분 타이머/.test(tab.first) && tab.count === '2', JSON.stringify(tab));
+    check('일정 탭: 한 달 달력(오늘 선택) · 매주 월 일정이 날짜별로 점·목록 (미리 알림 표시) · 타이머는 따로',
+      tab.days === 42 && tab.today && tab.dots >= 4 && tab.events.some((t) => /09:30|9:30/.test(t) && /알림 10분 전/.test(t)) && /5분 타이머/.test(tab.timer) && tab.count === '2', JSON.stringify(tab));
     await capture(lw, 'smoke-reminders-tab.png');
 
     // 14-3) 알림만: 시각이 되면 Windows 알림 (점검 때는 기록만) → 한 번짜리는 "완료"
@@ -1161,7 +1297,7 @@ export async function runSmoke({
     await js(rn.win, `window.memoking.reminders.set(${JSON.stringify(n1.id)}, [
       ...${JSON.stringify(saved)}, { kind: 'at', at: ${JSON.stringify(past(20_000))}, action: 'notify' }])`);
     const toast = await until(() => smokeToasts.find((t) => t.memoId === n1.id), 'Windows 알림').catch(() => null);
-    check('시각이 된 알림 → Windows 알림 (제목·알림 설명)', toast && toast.title === '장보기 목록' && /알림, /.test(toast.body), JSON.stringify(toast));
+    check('시각이 된 알림 → Windows 알림 (제목·때)', toast && toast.title === '장보기 목록' && /오늘 \d{2}:\d{2}/.test(toast.body), JSON.stringify(toast));
     const done = remindersOf(n1.id).find((r) => r.kind === 'at');
     check('한 번짜리 알림은 울린 뒤 꺼짐(완료)', done && !done.enabled && done.last);
     await closeNote(rn.id);
@@ -1296,6 +1432,55 @@ export async function runSmoke({
         globalShortcut.unregister('Control+Alt+J');
         check('단축키 바꾸기: 다른 앱이 쓰는 키면 바꾸지 않고 알림', appSettings().shortcuts.magic.key === 'Control+Alt+Space' && /다른 앱이 이미 쓰고/.test(takenNote), takenNote);
       }
+    }
+    // AI 비서 연결 (MCP): 연결 → Claude 설정 파일에 메모킹이 적힘(다른 서버는 그대로) → 적힌 명령으로 띄우면 도구가 보임 → 끊기
+    {
+      const cfgDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-claude-'));
+      const cfg = path.join(cfgDir, 'claude_desktop_config.json');
+      fs.writeFileSync(cfg, JSON.stringify({ mcpServers: { other: { command: 'x' } }, theme: 'dark' }));
+      process.env.MEMOKING_CLAUDE_CONFIG = cfg;
+      await listJs(`document.getElementById('settings-dialog').close()`);
+      await listJs(`document.getElementById('settings-btn').click()`);
+      await wait(300);
+      await listJs(`document.getElementById('mcp-connect').click()`);
+      const written = await until(() => {
+        try {
+          return JSON.parse(fs.readFileSync(cfg, 'utf8')).mcpServers?.memoking ?? null;
+        } catch {
+          return null;
+        }
+      }, 'MCP 연결').catch(() => null);
+      const kept = JSON.parse(fs.readFileSync(cfg, 'utf8'));
+      const title = await listJs(`document.getElementById('mcp-title').textContent`);
+      check('AI 비서 연결: Claude 설정 파일에 메모킹 (다른 서버·설정은 그대로) · 연결됨 표시',
+        Boolean(written) && kept.mcpServers.other?.command === 'x' && kept.theme === 'dark' && written.env?.ELECTRON_RUN_AS_NODE === '1' && /연결됨/.test(title), JSON.stringify({ written, title }));
+      // 적힌 명령 그대로 띄워 MCP 로 묻기 (initialize → tools/list)
+      const { spawn } = await import('node:child_process');
+      const tools = await new Promise((resolve) => {
+        const child = spawn(written.command, written.args, { env: { ...process.env, ...written.env }, stdio: ['pipe', 'pipe', 'pipe'] });
+        let out = '';
+        const timer = setTimeout(() => { child.kill(); resolve(`시간 초과: ${out}`); }, 15000);
+        child.stdout.on('data', (d) => {
+          out += d;
+          const line = out.split('\n').find((l) => l.includes('"id":2'));
+          if (line) {
+            clearTimeout(timer);
+            child.kill();
+            resolve(JSON.parse(line).result?.tools?.map((t) => t.name) ?? line);
+          }
+        });
+        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '1' } } })}\n`);
+        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' })}\n`);
+      });
+      check('AI 비서 연결: 적힌 명령으로 띄우면 메모킹 도구 (찾기·읽기·남기기·덧붙이기)',
+        Array.isArray(tools) && ['search_memos', 'read_memo', 'create_memo', 'append_to_memo'].every((t) => tools.includes(t)), JSON.stringify(tools).slice(0, 300));
+      await listJs(`document.getElementById('mcp-box').scrollIntoView({ block: 'center' })`);
+      await capture(lw, 'smoke-settings-mcp.png');
+      await listJs(`document.getElementById('mcp-disconnect').click()`);
+      const removed = await until(() => !JSON.parse(fs.readFileSync(cfg, 'utf8')).mcpServers?.memoking, 'MCP 끊기').catch(() => false);
+      check('AI 비서 연결: 끊으면 메모킹만 빠짐', removed && JSON.parse(fs.readFileSync(cfg, 'utf8')).mcpServers.other?.command === 'x');
+      delete process.env.MEMOKING_CLAUDE_CONFIG;
     }
     await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight / 2 - 120; })()`);
     await capture(lw, 'smoke-settings-2.png');

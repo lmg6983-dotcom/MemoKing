@@ -10,6 +10,11 @@
 | remark-math | 6.0.0 | MIT | https://github.com/remarkjs/remark-math/tree/main/packages/remark-math |
 | html-to-image | 1.11.13 | MIT | https://github.com/bubkoo/html-to-image |
 | es-hangul | 2.4.0 | MIT | https://github.com/toss/es-hangul |
+| chrono-node | 2.10.1 | MIT | https://github.com/wanasit/chrono |
+| @modelcontextprotocol/sdk | 1.30.1 | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
+| zod | 4.6.5 | MIT | https://github.com/colinhacks/zod |
+| @noble/ciphers | 2.4.0 | MIT | https://github.com/paulmillr/noble-ciphers |
+| @noble/hashes | 2.4.0 | MIT | https://github.com/paulmillr/noble-hashes |
 | canvas-confetti | 1.9.4 | ISC | https://github.com/catdad/canvas-confetti |
 | tesseract.js (+ tesseract.js-core, kor tessdata_best) | 7.0.0 | Apache-2.0 | https://github.com/naptha/tesseract.js |
 | fuzzysort | 4.0.2 | MIT | https://github.com/farzher/fuzzysort |

@@ -158,7 +158,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'tabs', win: 'list', target: ['.tabs'], emoji: '🔔',
     title: '알림은 한곳에서',
-    text: '"알림 예약"에서는 맞춰 둔 알림을, "알림 보관함"에서는 지나간 Windows 알림을 다시 볼 수 있어요.',
+    text: '"일정"에서는 달력으로 일정과 미리 알림을, "알림 보관함"에서는 지나간 Windows 알림을 다시 볼 수 있어요.',
     next: '다음',
   },
   // ---------- 어디서든 ----------

@@ -86,6 +86,53 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- 홈 화면 메모 위젯 -->
+        <receiver
+            android:name=".MemoWidget"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/memo_widget_info" />
+        </receiver>
+        <service
+            android:name=".MemoWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+        <!-- 위젯의 할 일 줄을 누르면: 보이지 않게 열려 체크만 하고 닫힘 -->
+        <activity
+            android:name=".WidgetTapActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- 빠른 설정 타일: 새 메모 · 음성 메모 -->
+        <service
+            android:name=".NewMemoTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_note"
+            android:label="@string/tile_new"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".VoiceMemoTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_mic"
+            android:label="@string/tile_voice"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name=".VaultFileProvider"
             android:authorities="com.memoking.app.files"

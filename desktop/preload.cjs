@@ -6,7 +6,7 @@ const EVENTS = [
   'memos:changed', 'shortcuts:changed', 'memo:external', 'memo:removed', 'memo:trashed', 'memo:meta', 'memo:links-changed', 'vault:indexed', 'vault:opened',
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
-  'stack:state', 'stack:hover', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
+  'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
   'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
@@ -31,6 +31,11 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   memo: {
     open: invoke('memo:open'),
+    handoff: invoke('memo:handoff'), // 다른 기기에서 방금 고친 메모 { id, title, from } | null
+    // 잠금 메모: lock(id, 비밀번호) · openLock(id, 비밀번호) → 메모 | { error } · unlock(id) 잠금 풀기
+    lock: invoke('memo:lock'),
+    openLock: invoke('memo:open-lock'),
+    unlock: invoke('memo:unlock'),
     create: invoke('memo:create'),
     get: invoke('memo:get'),
     save: invoke('memo:save'),
@@ -87,6 +92,12 @@ contextBridge.exposeInMainWorld('memoking', {
     setShortcut: invoke('shortcuts:set'),
     pauseShortcuts: invoke('shortcuts:pause'),
   },
+  // AI 비서 연결 (MCP): connect(true|false) · copy() 다른 AI 앱용 설정 글 복사 · setWrite(켜기)
+  mcp: {
+    connect: invoke('mcp:connect'),
+    copy: invoke('mcp:copy'),
+    setWrite: invoke('mcp:set-write'),
+  },
   // 휴지통 (지운 메모)
   trash: {
     list: invoke('trash:list'),
@@ -125,6 +136,11 @@ contextBridge.exposeInMainWorld('memoking', {
     open: invoke('link:open'),
   },
   // 메모를 PDF 로
+  // 메모를 그림 카드로: copy(base64) · save(메모 id, base64) → { file, name } | { cancelled }
+  image: {
+    copy: invoke('image:copy'),
+    save: invoke('image:save'),
+  },
   pdf: {
     open: invoke('pdf:open'),
     memo: invoke('pdf:memo'),

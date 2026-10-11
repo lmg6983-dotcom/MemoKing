@@ -19,6 +19,8 @@ import { LinkPreviews } from './link-previews.js';
 import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
+import { pickHandoff, recentlyUpdated, HANDOFF_MS } from '../app/js/core/handoff.js';
+import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { StackStore } from './stacks.js';
 import { PopupWatcher } from './popup-watch.js';
@@ -36,9 +38,9 @@ import { Opms, looksLikeRef, foreignSummary, cleanDate, DEFAULT_HOST as OPMS_HOS
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
-import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
+import { toLocalIso, extractPreview, isBlankBody } from '../app/js/core/memo-file.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
-import { normalizeReminder, describeReminder } from '../app/js/core/reminders.js';
+import { normalizeReminder, alarmLabel, alarmTitle } from '../app/js/core/reminders.js';
 
 const SMOKE = process.argv.includes('--smoke');
 // 점검 때는 가짜 마이크(삐 소리)로 녹음한다 — 실제 마이크·권한 창 없이
@@ -110,6 +112,7 @@ let settings = {
   magic: undefined, // 매직키 (Ctrl+Alt+Space): { enabled, modules } — normalizeMagicSettings 로 정리
   magicPos: null, // 매직키 창을 끌어 옮긴 자리 { x, y }
   shortcuts: undefined, // 전역 단축키를 바꾼 것 { quickMemo, magic } (Electron 단축키 글자) — normalizeShortcuts 로 정리
+  mcp: undefined, // AI 비서 연결: { write } (write 가 false 면 찾기·읽기만) — 연결 자체는 AI 앱의 설정 파일에
 };
 let settingsTimer = null;
 
@@ -175,17 +178,21 @@ function openVault(dir) {
   vault = null;
   try {
     const next = new Vault(dir);
-    next.on('changed', ({ external, removed }) => {
+    next.on('changed', ({ ids, external, removed }) => {
       pushList();
       driveSync?.request(3000); // 고친 것을 잠시 뒤 Google Drive 로
       for (const id of external) sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) sendToNote(id, 'memo:removed');
+      // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (이 PC 에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
+      showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id))); // 한 번에 하나만
     });
     next.on('indexed', (index) => listWin?.webContents.send('vault:indexed', index.generatedAt));
     next.on('error', (err) => console.error('[vault]', err));
     next.open();
     vault = next;
     vaultError = null;
+    // 켜기 전에 다른 기기에서 방금 고친 메모가 있으면 (가장 최근 하나)
+    showHandoff(recentlyUpdated(next.list()).map((m) => next.get(m.id)));
     settings.vaultPath = next.root;
     saveSettings();
     migrateV1();
@@ -203,6 +210,17 @@ function openVault(dir) {
 
 function vaultInfo() {
   return { vaultPath: vault?.root ?? null, vaultError, suggestedPath: suggestedVaultPath(), version: app.getVersion() };
+}
+
+// ---------- 이어 쓰기: 다른 기기(휴대폰·AI 비서)에서 방금 고친 메모 → 목록 창 위에 "열기" 막대 ----------
+const handoffSeen = new Set();
+let lastHandoff = null;
+// 규칙(열어 둔 메모는 본 것으로, 처음 하나만)은 core/handoff.js 의 pickHandoff — 휴대폰과 같음
+function showHandoff(memos) {
+  const hit = pickHandoff(memos, { mine: 'pc', seen: handoffSeen, isOpen: (id) => noteWins.has(id) });
+  if (!hit) return;
+  lastHandoff = { id: hit.memo.id, title: hit.memo.title, from: hit.from, at: Date.now() };
+  listWin?.webContents.send('memo:handoff', lastHandoff);
 }
 
 // 목록 카드에 "지금 열려 있는 메모" 표시를 붙인다.
@@ -428,6 +446,9 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null, re
   });
   win.on('closed', () => {
     noteWins.delete(id);
+    // 잠긴 메모의 말한 사람 나누기가 아직 도는 중이면: 끝난 결과를 그 메모에 넣을 때만 쓸 열쇠를 따로 들고 있는다
+    if (vault?.locks.has(id) && stt?.pendingFor?.(id)) holdLock(id, vault.locks.get(id));
+    vault?.closeLock(id); // 잠금 메모는 창을 닫으면 다시 비밀번호로
     if (id === tutorial.memoId) tutorialEvent('note-closed');
     vault?.finalize(id);
     // 비워 두어 지워진 메모(+ 로 만들고 안 쓴 탭 등)는 스택에서도 뺀다
@@ -1087,7 +1108,7 @@ async function dragStart(id) {
   ghostWin.webContents.send('ghost:data', {
     color: memo.color,
     title: memo.title,
-    preview: extractPreview(memo.body, 400),
+    preview: memo.locked ? '' : extractPreview(memo.body, 400),
     open: noteWins.has(id),
   });
   // 첫 끌기에서는 미리보기 창이 준비되기 전에 이미 목록 밖으로 나갔을 수 있다.
@@ -1378,9 +1399,11 @@ function pushReminders() {
 function fireReminder(memoId, reminder, info) {
   const memo = vault?.get(memoId);
   if (!memo) return;
-  const kind = info.missed ? '놓친 알림' : info.startup ? '켤 때 알림' : '알림';
-  const alarm = { reminderId: reminder.id, label: `${kind}, ${describeReminder(reminder)}`, missed: Boolean(info.missed) };
-  history?.add({ source: 'memoking', appId: APP_ID, app: '메모킹', title: memo.title, body: alarm.label, memoId });
+  // 일정은 "치과 · 내일 15:00 (30분 뒤)" — 미리 알림이 울리는 때와 일정 시작을 함께
+  const title = alarmTitle(reminder, memo.title);
+  const label = alarmLabel(reminder, info);
+  const alarm = { reminderId: reminder.id, label: title === memo.title ? label : `${title}, ${label}`, missed: Boolean(info.missed) };
+  history?.add({ source: 'memoking', appId: APP_ID, app: '메모킹', title, body: label, memoId });
 
   if (reminder.action === 'open') {
     // 메모 띄우기: 창을 화면 앞에 열고 창 안에 알림 띠
@@ -1396,17 +1419,17 @@ function fireReminder(memoId, reminder, info) {
       win.once('focus', () => win.flashFrame(false));
     }
   } else {
-    showToast(memoId, memo, alarm);
+    showToast(memoId, memo, { ...alarm, title, label });
   }
   pushReminders();
 }
 
 // 알림만: Windows 알림(토스트). 누르면 메모가 앞으로 온다.
 function showToast(memoId, memo, alarm) {
-  const preview = extractPreview(memo.body, 120);
+  const preview = memo.locked ? '' : extractPreview(memo.body, 120); // 잠긴 메모는 연 동안에도 알림에 내용을 싣지 않는다
   toast({
     memoId,
-    title: memo.title,
+    title: alarm.title ?? memo.title,
     body: preview ? `${alarm.label}\n${preview}` : alarm.label,
     onClick: () => revealNote(memoId),
   });
@@ -1717,9 +1740,76 @@ function appSettings() {
     autoTags: settings.autoTags !== false,
     magic: normalizeMagicSettings(settings.magic),
     magicIndex: fileIndex?.status() ?? null, // 파일 검색 목록: 개수·만든 때
+    mcp: mcpStatus(),
     version: app.getVersion(),
   };
 }
+
+// ---------- AI 비서 연결 (MCP) ----------
+// Claude 데스크톱 같은 AI 앱이 메모킹 실행 파일을 "MCP 서버"(desktop/mcp-server.js)로 띄워 메모를 찾고 읽고 남긴다.
+//   연결 = AI 앱 설정 파일(claude_desktop_config.json)의 mcpServers 에 메모킹을 적기. 다른 서버 설정은 건드리지 않는다
+const MCP_NAME = 'memoking';
+const claudeConfigFile = () => process.env.MEMOKING_CLAUDE_CONFIG || path.join(app.getPath('appData'), 'Claude', 'claude_desktop_config.json');
+
+function mcpServerEntry() {
+  // 설치판에서도 asar 안의 파일을 그대로 (ELECTRON_RUN_AS_NODE 로 띄운 실행 파일은 asar 를 읽을 수 있다)
+  return {
+    command: process.execPath,
+    args: [path.join(import.meta.dirname, 'mcp-server.js'), '--settings', settingsFile(), '--version', app.getVersion()],
+    env: { ELECTRON_RUN_AS_NODE: '1' },
+  };
+}
+
+function readClaudeConfig() {
+  const file = claudeConfigFile();
+  if (!fs.existsSync(file)) return {};
+  const text = fs.readFileSync(file, 'utf8');
+  if (!text.trim()) return {};
+  const json = JSON.parse(text); // 깨진 파일이면 예외 — 덮어쓰지 않는다
+  if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('알 수 없는 모양');
+  return json;
+}
+
+function mcpStatus() {
+  const file = claudeConfigFile();
+  let entry = null;
+  let broken = false;
+  try {
+    entry = readClaudeConfig().mcpServers?.[MCP_NAME] ?? null;
+  } catch {
+    broken = true;
+  }
+  return {
+    claudeFound: fs.existsSync(path.dirname(file)), // Claude 데스크톱을 설치(한 번 실행)했는지
+    connected: Boolean(entry),
+    stale: Boolean(entry) && entry.command !== process.execPath, // 메모킹을 다른 곳에 다시 설치함 → 다시 연결
+    broken,
+    write: settings.mcp?.write !== false,
+  };
+}
+
+function mcpConnect(on) {
+  const file = claudeConfigFile();
+  let config;
+  try {
+    config = readClaudeConfig();
+  } catch {
+    return { ...mcpStatus(), error: 'Claude 데스크톱 설정 파일을 읽지 못해서 건드리지 않았어요. "설정 복사" 로 직접 넣어 주세요' };
+  }
+  const servers = { ...(config.mcpServers ?? {}) };
+  if (on) servers[MCP_NAME] = mcpServerEntry();
+  else delete servers[MCP_NAME];
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    if (fs.existsSync(file) && !fs.existsSync(`${file}.memoking-backup`)) fs.copyFileSync(file, `${file}.memoking-backup`); // 처음 한 번 원래 설정을 남겨 둔다
+    fs.writeFileSync(file, `${JSON.stringify({ ...config, mcpServers: servers }, null, 2)}\n`);
+  } catch (err) {
+    return { ...mcpStatus(), error: `설정 파일에 쓰지 못했어요 (${err.message})` };
+  }
+  return mcpStatus();
+}
+
+const mcpSnippet = () => JSON.stringify({ mcpServers: { [MCP_NAME]: mcpServerEntry() } }, null, 2);
 
 // ---------- 전역 단축키 (빠른 메모·매직키) — 설정에서 바꿀 수 있다 ----------
 // 다른 앱이 먼저 같은 키를 잡고 있으면 Windows 가 등록을 거절한다 → 설정에 "다른 앱이 쓰고 있어요" 로 알리고,
@@ -2236,6 +2326,14 @@ const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 // ---------- 받아쓰기 (stt/stt-service.js) ----------
 // 메모 창마다 녹음 하나: 작업 id = "창 번호:녹음 번호"
 let stt = null;
+// 창을 닫은 잠긴 메모의 열쇠 — 말한 사람 나누기 결과를 넣을 때 한 번만 쓰고 버린다 (늦어도 30분 뒤엔 버림)
+const heldLocks = new Map();
+function holdLock(memoId, session) {
+  clearTimeout(heldLocks.get(memoId)?.timer);
+  const timer = setTimeout(() => heldLocks.delete(memoId), 30 * 60_000);
+  timer.unref?.();
+  heldLocks.set(memoId, { session, timer });
+}
 const sttOptions = () => ({ enabled: settings.stt?.enabled !== false, speaker: settings.stt?.speaker === true });
 function initStt() {
   stt = createSttService({
@@ -2251,10 +2349,17 @@ function initStt() {
     // 말한 사람을 나눈 뒤: 열린 메모면 그 창이 음성 카드를 고치고, 닫혔으면 파일을 직접
     onSpeakers: ({ memoId, src, text }) => {
       const win = noteWins.get(memoId);
-      if (win && !win.isDestroyed()) return win.webContents.send('stt:speakers', { src, text });
+      // 편집기가 떠 있는 창에만 (잠긴 메모의 비밀번호 화면이면 창은 받을 수 없다 — 아래에서 파일에)
+      if (win && !win.isDestroyed() && !vault?.get(memoId)?.needsPassword) return win.webContents.send('stt:speakers', { src, text });
+      // 창을 닫은(또는 아직 비밀번호를 넣지 않은) 잠긴 메모: 들고 있던 열쇠로 잠깐 열어 넣고 다시 잠근다 (열쇠가 없으면 넣지 못함 — 잠긴 글은 고칠 수 없다)
+      const held = heldLocks.get(memoId);
+      heldLocks.delete(memoId);
+      const opened = Boolean(held && vault?.get(memoId)?.needsPassword && vault.openLock(memoId, held.session));
+      clearTimeout(held?.timer);
       const memo = vault?.get(memoId);
-      const next = memo && replaceTranscript(memo.body, src, text);
+      const next = memo && !memo.needsPassword && replaceTranscript(memo.body, src, text);
       if (next && next !== memo.body) vault.save(memoId, next);
+      if (opened) vault.closeLock(memoId); // 창이 비밀번호 화면이면 열쇠는 그 화면이 다시 받는다
     },
   });
 }
@@ -2428,6 +2533,16 @@ function registerIpc() {
     return settings.autoTags;
   });
   ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings(next));
+  ipcMain.handle('mcp:connect', (_e, on) => mcpConnect(on !== false));
+  ipcMain.handle('mcp:copy', () => {
+    clipboard.writeText(mcpSnippet());
+    return true;
+  });
+  ipcMain.handle('mcp:set-write', (_e, on) => {
+    settings.mcp = { ...(settings.mcp ?? {}), write: Boolean(on) };
+    saveSettings();
+    return mcpStatus();
+  });
   // 매직키 창 아래 캡슐: 쓸 수 있는 모듈 모두와 켜짐 여부 (누르면 켜고 끔)
   const magicModuleList = () => {
     const m = normalizeMagicSettings(settings.magic);
@@ -2576,6 +2691,7 @@ function registerIpc() {
     const body = memoBodyFromText(payload.text);
     if (!body) return { ok: false };
     const id = vault.import({ body });
+    if (!id) return { ok: false }; // 잠금 형식 글 등 메모로 만들 수 없는 글
     if (payload.open) openNote(id);
     else notice('메모를 만들었어요', body.split('\n')[0].slice(0, 40));
     return { ok: true, id };
@@ -2616,6 +2732,8 @@ function registerIpc() {
   });
 
   ipcMain.handle('memo:open', (_e, id) => Boolean(openNote(id)));
+  // 목록 창이 늦게 열렸을 때: 아직 "방금" 인 이어 쓰기 안내
+  ipcMain.handle('memo:handoff', () => (lastHandoff && Date.now() - lastHandoff.at < HANDOFF_MS && !noteWins.has(lastHandoff.id) ? lastHandoff : null));
   ipcMain.handle('memo:create', (_e, options) => createNote(options ?? {}));
   ipcMain.handle('memo:get', (_e, id) => {
     const memo = vault?.get(id);
@@ -2627,6 +2745,37 @@ function registerIpc() {
     pendingCaptures.delete(id);
     return { ...memo, onTop: settings.onTop[id] === true, alarm, capture, stack: stackState(id) };
   });
+  // 잠금 메모: 열쇠 만들기는 느려서(비밀번호 → PBKDF2) 비동기, 잠그고 푸는 저장은 vault 가 동기로
+  ipcMain.handle('memo:lock', async (_e, id, password, opts) => {
+    try {
+      const session = await newLockSession(String(password ?? ''));
+      // 잠그는 사이 창이 닫혔으면 열쇠는 들고 있지 않는다
+      return vault?.lock(String(id), session, { keepOpen: noteWins.has(String(id)), hideTitle: opts?.hideTitle === true }) ?? { error: '잠그지 못했어요. 이미 잠겼거나 그사이 다른 기기에서 잠갔을 수 있어요' };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+  ipcMain.handle('memo:open-lock', async (_e, id, password) => {
+    const sealed = vault?.entries.get(String(id))?.body;
+    // 비밀번호 화면이 떠 있는 사이 다른 기기에서 잠금을 풀었다: 비밀번호 없이 그대로 연다
+    if (vault && sealed != null && !isLockedBody(sealed)) return vault.get(String(id));
+    try {
+      const { session } = await openLock(sealed, String(password ?? ''));
+      // 확인하는 사이 창이 닫혔으면 열쇠를 남기지 않는다 (닫힌 메모가 비밀번호 없이 열리지 않게)
+      if (!noteWins.has(String(id))) return { error: '메모 창이 닫혔어요' };
+      return vault.openLock(String(id), session) ?? { error: '메모를 열지 못했어요' };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+  ipcMain.handle('memo:unlock', (_e, id) => {
+    if (!vault) return { error: '메모 폴더가 열려 있지 않아요' };
+    const m = vault.get(String(id));
+    if (!m) return { error: '메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요' };
+    if (!m.locked) return m; // 이미 풀려 있다 (다른 기기에서 풀었음)
+    if (m.needsPassword) return { error: '먼저 비밀번호로 열어 주세요' };
+    return vault.unlock(String(id)) ?? { error: '그사이 다른 기기에서 이 메모가 바뀌어 풀지 못했어요. 다시 해 주세요' };
+  });
   ipcMain.handle('memo:save', (_e, id, body) => {
     if (typeof body !== 'string') throw new TypeError('본문이 문자열이 아닙니다.');
     const summary = vault.save(id, body);
@@ -2634,17 +2783,25 @@ function registerIpc() {
     return summary;
   });
   // 쓰는 중에 다른 기기에서도 고친 메모: 들어온 내용을 사본 메모로 따로 남긴다 (열어 둔 동안은 한 사본만 고쳐 쓴다)
-  ipcMain.handle('memo:keep-copy', (_e, sourceId, body, copyId) => {
+  // unlocked: 이 창에서는 잠기지 않았던 글 (다른 기기가 방금 잠근 메모에 쓰던 내용) — 열쇠가 없으니 그대로 사본으로
+  ipcMain.handle('memo:keep-copy', (_e, sourceId, body, copyId, { unlocked = false } = {}) => {
     if (!vault || typeof body !== 'string') return null;
+    // 이미 만든 사본에 고쳐 쓴다 — 거절되면(열쇠를 잃은 잠긴 사본) 새 사본으로 (들어온 내용이 사라지지 않게)
     if (copyId && vault.get(copyId)) {
-      vault.save(copyId, body);
-      return copyId;
+      const r = vault.save(copyId, body);
+      if (!r?.refused || r.copied) return copyId; // copied: 그사이 잠긴 사본 대신 들어온 내용을 이미 새 사본으로 남김
     }
-    return vault.import({ body, color: vault.get(sourceId)?.color });
+    if (unlocked && !vault.locks.has(sourceId)) return vault.import({ body, color: vault.get(sourceId)?.color });
+    return vault.importCopyOf(sourceId, body, { color: vault.get(sourceId)?.color });
   });
   ipcMain.on('memo:save-sync', (event, id, body) => {
     try {
-      if (typeof body === 'string' && vault) vault.save(id, body);
+      const r = typeof body === 'string' && vault ? vault.save(id, body) : null;
+      // 창을 닫는 순간인데 잠긴 메모라 저장되지 않았다: 쓰던 글을 사본 메모로 (이 창에서 연 열쇠가 있으면 그 열쇠로 잠근 채)
+      if (r?.refused && !r.copied && !r.invalid && !isBlankBody(body)) {
+        if (vault.locks.has(id)) vault.importCopyOf(id, body, { color: vault.get(id)?.color });
+        else vault.import({ body, color: vault.get(id)?.color });
+      }
       event.returnValue = true;
     } catch (err) {
       console.error('저장 실패', err);
@@ -2671,6 +2828,28 @@ function registerIpc() {
     return Boolean(ok);
   });
   // 메모를 PDF 로
+  ipcMain.handle('image:copy', (_e, base64) => {
+    const img = nativeImage.createFromBuffer(Buffer.from(String(base64), 'base64'));
+    if (img.isEmpty()) throw new Error('그림이 비어 있어요');
+    clipboard.writeImage(img);
+    return { ok: true };
+  });
+  ipcMain.handle('image:save', async (event, id, base64) => {
+    const memo = vault?.get(String(id));
+    const name = `${pdfFileName(memo?.title ?? '메모').replace(/\.pdf$/i, '')}.png`;
+    let file = SMOKE ? path.join(app.getPath('temp'), `memoking-smoke-${Date.now()}.png`) : null;
+    if (!file) {
+      const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender) ?? undefined, {
+        title: '그림으로 저장',
+        defaultPath: path.join(app.getPath('pictures'), name),
+        filters: [{ name: 'PNG 그림', extensions: ['png'] }],
+      });
+      if (r.canceled || !r.filePath) return { cancelled: true };
+      file = r.filePath;
+    }
+    fs.writeFileSync(file, Buffer.from(String(base64), 'base64'));
+    return { file, name: path.basename(file) };
+  });
   ipcMain.handle('pdf:open', (_e, id) => openPdfWindow(String(id)));
   ipcMain.handle('pdf:memo', (_e, id) => {
     const m = vault?.get(String(id));
@@ -2682,7 +2861,7 @@ function registerIpc() {
   ipcMain.handle('memo:version', (_e, id, name) => vault?.version(String(id), String(name)) ?? null);
   ipcMain.handle('memo:restore-version', (_e, id, name) => {
     const restored = vault?.restoreVersion(String(id), String(name)) ?? null;
-    if (restored) noteWins.get(String(id))?.setTitle(restored.title);
+    if (restored && !restored.error) noteWins.get(String(id))?.setTitle(restored.title);
     return restored;
   });
   ipcMain.handle('memo:links', (_e, id) => vault?.links(id) ?? { links: [], backlinks: [], suggestions: [] });
@@ -2982,6 +3161,15 @@ app.on('second-instance', () => createListWindow());
 app.whenReady().then(async () => {
   if (!gotLock) return;
   app.setAppUserModelId(APP_ID);
+  // AI 비서 연결이 예전 설치 위치를 가리키면(업데이트로 실행 파일 위치가 바뀜) 켤 때 새 위치로 고쳐 둔다
+  if (app.isPackaged) {
+    try {
+      const mcp = mcpStatus();
+      if (mcp.stale && !mcp.broken) mcpConnect(true);
+    } catch (err) {
+      console.warn('AI 비서 연결 확인 실패', err);
+    }
+  }
   // 권한은 메모 창의 마이크(음성 메모 녹음)만 — 카메라·위치·화면 등은 쓰지 않는다
   const isNoteWindow = (wc) => {
     try {

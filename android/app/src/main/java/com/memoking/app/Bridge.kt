@@ -170,6 +170,24 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun takeIntent(): String = reply { activity.takePendingIntent() }
 
+    // ---------- 홈 화면 위젯 (Widgets.kt) ----------
+
+    /** 위젯에 놓인 메모 id 들 */
+    @JavascriptInterface
+    fun widgetMemoIds(): String = reply { Widgets.memoIds(ctx) }
+
+    /** 위젯에 보일 내용 [{id, title, color, file, lines}] */
+    @JavascriptInterface
+    fun widgetPublish(json: String): String = reply { Widgets.publish(ctx, JSONArray(json)) }
+
+    /** 위젯 고르기 목록에서 놓은 위젯에 메모를 정함 */
+    @JavascriptInterface
+    fun widgetAssign(widgetId: Int, memoId: String): String = reply { Widgets.assign(ctx, widgetId, memoId) }
+
+    /** 메모를 홈 화면에 위젯으로 놓기 (런처가 위치를 물음). 런처가 지원하지 않으면 false */
+    @JavascriptInterface
+    fun widgetPin(memoId: String): String = reply { Widgets.requestPin(ctx, memoId) }
+
     @JavascriptInterface
     fun ready(): String = reply { activity.runOnUiThread { activity.onPageReady() } }
 

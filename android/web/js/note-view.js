@@ -6,6 +6,9 @@ import { TEXT_COLORS, HIGHLIGHT_COLORS } from '../../app/js/core/html-marks.js';
 import { fileExtension, mediaKind, baseName, vaultUrl } from '../../app/js/media.js';
 import { isDataImage, decodeDataImage } from '../../app/js/core/remote-images.js';
 import { setupReminderPanel } from '../../app/js/reminder-panel.js';
+import { reminderAt } from '../../app/js/date-remind.js';
+import { lockScreen } from '../../app/js/lock-ui.js';
+import { openLock, isLockedBody } from '../../app/js/core/memo-lock.js';
 import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
 import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
@@ -66,6 +69,7 @@ let saveTimer = null;
 let pendingExternal = null;
 let conflictCopy = null; // 쓰는 중에 다른 기기에서도 고쳐 들어온 내용을 따로 남긴 사본 메모 (여는 동안 한 사본만 고쳐 쓴다)
 let opening = null;
+let refusedSave = false; // 마지막 저장이 거절됐다 (다른 기기가 잠근 메모)
 
 export const currentId = () => id;
 export const isOpen = () => id !== null;
@@ -104,7 +108,24 @@ export function flush() {
   if (!id || !isDirty()) return;
   const body = current;
   try {
-    app.vault.save(id, body);
+    const r = app.vault.save(id, body);
+    if (r?.invalid) {
+      refusedSave = false; // 사본으로 남기지 않는다 (잠금 형식 글은 사본도 열 수 없다)
+      setStatus('잠금 메모 형식의 글은 그대로 저장할 수 없어요. 글을 고쳐 주세요', true);
+      return;
+    }
+    if (r?.refused) {
+      // 다른 기기가 이 메모를 잠갔다 — 사본으로 남겼으면 쓴 글은 안전, 아니면 닫을 때 사본으로 (closeNote)
+      if (r.copied) {
+        saved = body;
+        setStatus('다른 기기에서 이 메모를 잠가, 쓰던 내용은 사본 메모로 남겼어요', true);
+      } else {
+        refusedSave = true;
+        setStatus('잠긴 메모라 저장하지 못했어요', true);
+      }
+      return;
+    }
+    refusedSave = false;
     saved = body;
     setStatus('저장했어요');
   } catch (err) {
@@ -129,6 +150,11 @@ export function showRestored(next) {
   setStatus('되돌렸어요');
 }
 
+/** 메뉴에서 잠그거나 풀었을 때: 이 화면이 아는 잠금 상태를 맞춘다 */
+export function lockChanged(locked) {
+  if (memo) memo = { ...memo, locked };
+}
+
 /** 메모 폴더가 바뀌었을 때 (vault 'changed') */
 export function onVaultChanged({ ids, external, removed }) {
   if (!id || !editor) return;
@@ -139,6 +165,29 @@ export function onVaultChanged({ ids, external, removed }) {
   if (external.includes(id)) {
     const next = app.vault.get(id);
     if (!next) return;
+    if (next.needsPassword) {
+      // 다른 기기에서 이 메모를 잠갔거나(여기선 안 잠긴 메모) 다른 비밀번호로 다시 잠갔다 — 덮어쓰지 않는다.
+      // 아직 저장 못 한 쓰던 글은 사본 메모로 먼저 남기고 닫는다 (PC 와 같게, 쓰던 글이 사라지지 않게)
+      const wasLocked = Boolean(memo?.locked);
+      const what = wasLocked ? '다른 기기에서 이 메모의 비밀번호를 바꿨어요.' : '다른 기기에서 이 메모를 잠갔어요.';
+      let kept = '';
+      if (isDirty() && !isBlankBody(current)) {
+        try {
+          const copy = wasLocked ? app.vault.importCopyOf(id, current, { color: next.color }) : app.vault.import({ body: current, color: next.color });
+          if (copy) kept = wasLocked ? ' 쓰던 내용은 예전 비밀번호로 잠근 사본 메모로 남겼어요.' : ' 쓰던 내용은 사본 메모로 따로 남겼어요.';
+        } catch (err) {
+          console.error(err);
+        }
+        if (!kept) {
+          setStatus(`${what} 쓰던 내용을 저장하지 못했어요. 글을 복사해 두세요`, true);
+          return;
+        }
+      }
+      saved = current;
+      toast(`${what}${kept} 다시 열 때 비밀번호를 넣어 주세요`, true);
+      closeNote();
+      return;
+    }
     if (sameBody(next.body, current)) saved = current; // 지금 쓰는 글과 같은 내용 — 할 일 없음
     else if (!isDirty()) applyExternal(next);
     else keepTheirsAsCopy(next);
@@ -146,6 +195,7 @@ export function onVaultChanged({ ids, external, removed }) {
   if (ids.includes(id)) {
     const next = app.vault.get(id);
     if (next) {
+      if (memo && !next.needsPassword) memo = { ...memo, locked: next.locked }; // 다른 기기에서 잠금을 풀었으면
       applyMeta(next);
       reminderPanel?.set(next.reminders);
     }
@@ -159,8 +209,12 @@ function keepTheirsAsCopy(next) {
   if (!copied) {
     try {
       const body = conflictCopyBody(next.body);
-      if (conflictCopy && app.vault.get(conflictCopy)) app.vault.save(conflictCopy, body);
-      else conflictCopy = app.vault.import({ body, color: next.color });
+      // 이미 만든 사본에 고쳐 쓴다 — 거절되면(열쇠를 잃은 잠긴 사본) 새 사본으로
+      const kept = conflictCopy && app.vault.get(conflictCopy) ? app.vault.save(conflictCopy, body) : null;
+      if (!kept || (kept.refused && !kept.copied)) {
+        conflictCopy = app.vault.importCopyOf(id, body, { color: next.color });
+      }
+      if (!conflictCopy) throw new Error('잠긴 메모의 사본을 만들 수 없어요');
       copied = true;
     } catch (err) {
       console.error(err);
@@ -1160,6 +1214,7 @@ function setupPanels() {
       if (open) adoptSheet(panel, () => reminderPanel.toggle(false));
       else releaseSheet(panel);
     },
+    onChange: () => editor?.refreshDates(),
   });
 }
 
@@ -1169,7 +1224,13 @@ function setupPanels() {
  */
 export async function openNote(memoId, options = {}) {
   setupPanels();
-  if (opening) await opening;
+  if (opening) {
+    // 잠긴 메모의 비밀번호 화면이 떠 있는 채로 다른 메모를 고르면: 그 화면을 닫고 고른 메모로 (뒤로 가기를 기다리지 않게)
+    const lockCancel = el.editorRoot.querySelector('.lock-screen [data-lock-cancel]');
+    if (lockCancel && id === memoId) return; // 같은 메모 — 이미 비밀번호를 묻는 중
+    lockCancel?.click();
+    await opening;
+  }
   if (id === memoId && editor) {
     if (options.alarm) showAlarm(options.alarm);
     if (options.highlight) highlight();
@@ -1200,6 +1261,44 @@ export async function openNote(memoId, options = {}) {
     el.editorRoot.replaceChildren();
     el.editorRoot.scrollTop = 0;
     $('format-items').scrollLeft = 0; // 도구막대는 늘 처음(+ · 굵게)부터 — 지난 메모에서 옆으로 밀어 둔 채로 열리지 않게
+    if (memo.needsPassword) {
+      // 잠긴 메모: 비밀번호를 넣어야 편집기를 만든다 (열쇠는 메모를 닫을 때까지만)
+      el.screen.classList.add('memo-locked');
+      const opened = await lockScreen(el.editorRoot, {
+        title: memo.title,
+        onTry: async (password) => {
+          try {
+            // 비밀번호 화면이 떠 있는 사이 다른 기기가 다시 잠갔을 수 있어 지금 파일의 암호문으로
+            const now = app.vault.entries.get(memoId)?.body ?? memo.body;
+            if (!isLockedBody(now)) {
+              const opened = app.vault.get(memoId); // 그사이 다른 기기에서 잠금을 풀었다 — 그대로 연다
+              if (!opened) return '메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요';
+              memo = opened;
+              return null;
+            }
+            const { session } = await openLock(now, password);
+            const r = app.vault.openLock(memoId, session);
+            if (!r) return '메모를 열지 못했어요';
+            memo = r;
+            return null;
+          } catch (err) {
+            return err.message;
+          }
+        },
+        onCancel: () => {},
+      });
+      if (id === memoId || id === null) el.screen.classList.remove('memo-locked'); // 그사이 다른 메모가 열렸으면 그 화면은 그대로
+      if (!opened) {
+        app.vault.closeLock(memoId); // 확인 중에 닫았으면 맞았어도 열쇠를 남기지 않는다
+        if (id === memoId) {
+          id = null;
+          memo = null;
+          el.screen.hidden = true;
+        }
+        return;
+      }
+      current = saved = memo.body;
+    }
     editor = await createNoteEditor(el.editorRoot, {
       markdown: memo.body,
       onChange,
@@ -1215,6 +1314,8 @@ export async function openNote(memoId, options = {}) {
       tables: memo.tables ?? [],
       onTables: saveTables,
       readAttachment: async (src) => (await fetch(vaultUrl(src))).text(),
+      onDateReminder: (event) => reminderPanel?.addEvent(event) ?? false,
+      hasReminderAt: (d) => reminderAt(reminderPanel?.list, d),
       tapContinuesList: true, // 목록 아래 줄을 눌러 줄을 바꾸는 사람도 목록이 이어지게
       scrollMargin: 96, // 쓰는 줄이 아래쪽 + · 다이얼에 가리지 않게
     });
@@ -1271,7 +1372,20 @@ export async function openNote(memoId, options = {}) {
 /** 목록으로: 저장하고, 빈 메모는 치우고, 제목이 바뀌었으면 파일 이름을 맞춘다 */
 export function closeNote({ quiet = false } = {}) {
   if (!id) return;
+  el.editorRoot.querySelector('.lock-screen [data-lock-cancel]')?.click(); // 비밀번호 화면에서 뒤로 가기 = 닫기
   flush();
+  if (refusedSave && isDirty() && !isBlankBody(current)) {
+    // 저장이 거절된 채로 닫는다: 쓰던 글을 사본 메모로 (연 열쇠가 있으면 잠근 채)
+    try {
+      if (app.vault.locks.has(id)) app.vault.importCopyOf(id, current, {});
+      else app.vault.import({ body: current });
+      saved = current;
+      toast('저장하지 못한 내용은 사본 메모로 남겼어요', true);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  refusedSave = false;
   flushTables();
   clearStamp.hide();
   const closing = id;
@@ -1295,7 +1409,10 @@ export function closeNote({ quiet = false } = {}) {
   } catch (err) {
     console.error(err);
   }
-  if (app.vault.get(closing)) autoTag(closing, body);
+  if (app.vault.get(closing) && !app.vault.get(closing).locked) autoTag(closing, body);
+  // 잠긴 메모에서 녹음하던 중에 닫으면: 열쇠는 앱이 따로 들고 있다가 녹음·받아쓰기를 그 메모에 넣을 때만 잠깐 쓴다
+  if ((recorder.recordingFor() === closing || app.transcribing?.has(closing)) && app.vault.locks.has(closing)) app.heldLocks.set(closing, app.vault.locks.get(closing));
+  app.vault.closeLock(closing); // 잠금 메모는 닫으면 다시 비밀번호로
   document.activeElement?.blur();
   if (quiet || reduceMotion()) {
     el.screen.hidden = true;

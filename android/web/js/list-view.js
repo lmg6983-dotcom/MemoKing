@@ -335,7 +335,7 @@ document.querySelector('.tabs').addEventListener('click', (e) => {
 
 el.cards.addEventListener('click', (e) => {
   const card = e.target.closest('.card');
-  if (card) app.openMemo(card.dataset.id);
+  if (card) app.openMemo(card.dataset.id, { fromList: true });
 });
 // 카드를 옆으로 밀어 지우기 (여러 개를 빨리 지울 때) — 묻지 않고 휴지통으로, 되돌리기 가능
 let swipe = null;
@@ -403,7 +403,7 @@ function endSwipe(e) {
       card.dataset.swiped = '1';
       setTimeout(() => delete card.dataset.swiped, 400);
       haptic(8);
-      app.openMemo(card.dataset.id);
+      app.openMemo(card.dataset.id, { fromList: true });
     }
     return;
   }

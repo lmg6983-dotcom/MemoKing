@@ -12,7 +12,9 @@ export const DEFAULT_COLOR = 'yellow';
 export const UNTITLED = '제목 없음';
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders', 'tables', 'ink'];
+const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders', 'tables', 'ink', 'device'];
+// 마지막으로 내용을 고친 곳 (이어 쓰기 안내: "휴대폰에서 방금 고친 메모")
+export const DEVICES = ['pc', 'phone', 'ai'];
 const AUDIO_EXT = /\.(weba|ogg|oga|opus|mp3|m4a|aac|wav|flac)$/i;
 const VIDEO_EXT = /\.(mp4|m4v|mov|ogv|mkv)$/i;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
@@ -52,6 +54,7 @@ export function normalizeMeta(data) {
     reminders: Array.isArray(data.reminders) ? data.reminders.map((r) => normalizeReminder(r)).filter(Boolean) : [],
     tables: normalizeTables(data.tables), // 표 열 너비·행 높이·머리글 강조 (표 순서대로)
     ink: normalizeInkPath(data.ink), // 주석(메모 위에 그린 손 메모)이 든 파일
+    device: DEVICES.includes(data.device) ? data.device : null,
     extra,
   };
 }
@@ -77,6 +80,7 @@ export function serializeMemoFile(meta, body) {
   const tables = normalizeTables(meta.tables);
   if (tables.length) data.tables = tables;
   if (normalizeInkPath(meta.ink)) data.ink = normalizeInkPath(meta.ink);
+  if (DEVICES.includes(meta.device)) data.device = meta.device;
   Object.assign(data, meta.extra);
   const yaml = stringifyYaml(data, { lineWidth: 0 }).trimEnd();
   const text = body.replace(/\r\n/g, '\n').replace(/\s+$/, '');
@@ -132,6 +136,7 @@ export function plainLines(body) {
       continue;
     }
     if (!fence && /^\s*([-*_])(\s*\1){2,}\s*$/.test(raw)) continue; // 구분선
+    if (!fence && /^\s*<!--.*-->\s*$/.test(raw)) continue; // 한 줄 HTML 주석 (화면에 안 보임 — 잠금 메모의 암호문 등)
     // 표 줄은 "품목 · 가격" 처럼, 구분선(|---|) 은 뺀다
     const cells = fence ? null : tableLineText(raw);
     const text = fence ? raw.trim() : cells !== null ? stripInline(cells) : stripInline(stripBlock(raw));

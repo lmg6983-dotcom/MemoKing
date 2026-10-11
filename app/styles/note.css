@@ -1654,3 +1654,73 @@ body.annotating .format-bar, body.annotating .table-bar, body.annotating .tag-su
 body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 /* 보기만 하는 편집기(옆 메모·PDF)에는 이어 그리기 단추 없음 */
 .mk-doc[contenteditable="false"] .mk-ink-edit { display: none; }
+
+/* ---------- 글 속 날짜 → 알림 (date-remind.js): 점선 밑줄, 누르면 아래에 알림 맞추기 단추 ---------- */
+.mk-doc .mk-date {
+  text-decoration: underline dotted color-mix(in srgb, currentColor 55%, transparent);
+  text-decoration-thickness: 1.5px; text-underline-offset: 3px;
+  cursor: pointer;
+}
+.mk-doc .mk-date-set { text-decoration-style: solid; text-decoration-color: var(--accent-strong); }
+.mk-date-chip {
+  position: fixed; z-index: 60;
+  min-height: 32px; padding: 6px 14px; border: 0; border-radius: 99px;
+  background: var(--bubble-bg); color: var(--bubble-fg); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
+  box-shadow: var(--bubble-shadow); cursor: pointer;
+  animation: mk-date-chip 0.16s ease-out;
+}
+.mk-date-chip:hover:not(:disabled) { filter: brightness(1.12); }
+.mk-date-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mk-date-chip.set { cursor: default; opacity: 0.92; }
+@keyframes mk-date-chip { from { opacity: 0; transform: translateY(-3px); } }
+@media (pointer: coarse) { .mk-date-chip { min-height: 44px; padding: 10px 18px; font-size: 14px; } }
+@media (prefers-reduced-motion: reduce) { .mk-date-chip { animation: none; } }
+@media print { .mk-date-chip { display: none !important; } .mk-doc .mk-date { text-decoration: none; } }
+
+/* ---------- 메모를 그림 한 장으로 (share-image.js, PC·휴대폰): 화면 밖에 그려 찍는 종이 ---------- */
+.share-paper {
+  padding: 36px 40px 22px;
+  background: var(--note-bg);
+  color: var(--note-fg);
+}
+.share-paper .mk-doc { font-size: 17px; line-height: 1.7; outline: none; }
+.share-paper .mk-doc li::after { display: none; }
+.share-media { display: inline-block; margin: 4px 0; padding: 4px 10px; border-radius: 8px; background: var(--note-hover); font-size: 14px; font-weight: 600; }
+.share-foot { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--note-hover); font-size: 12px; color: var(--note-muted); text-align: right; }
+
+/* ---------- 잠금 메모 (lock-ui.js, PC·휴대폰): 비밀번호 정하기 창 · 잠긴 메모 화면 ---------- */
+.lock-dialog { width: min(360px, calc(100vw - 32px)); }
+.lock-note { color: var(--muted); font-size: 13px; }
+.lock-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
+.lock-field input {
+  min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-0); color: var(--text); font: inherit; font-size: 15px;
+}
+.lock-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.lock-error { min-height: 1.4em; margin: 0 0 10px; color: var(--danger); font-size: 13px; }
+.lock-error:empty { margin-bottom: 4px; }
+.lock-screen {
+  position: absolute; inset: 0; z-index: 40;
+  display: flex; flex-direction: column; align-items: stretch; justify-content: center;
+  padding: 24px max(24px, calc(50% - 170px));
+  background: var(--note-bg); color: var(--note-fg);
+}
+.lock-screen h2 { margin: 0 0 4px; font-size: 18px; text-align: center; overflow-wrap: anywhere; }
+.lock-screen .lock-note { margin: 0 0 18px; text-align: center; color: var(--note-muted); }
+.lock-screen .lock-icon { font-size: 34px; text-align: center; margin-bottom: 8px; }
+.lock-screen .lock-field { color: var(--note-muted); }
+@media (pointer: coarse) { .lock-field input { min-height: 48px; font-size: 16px; } }
+/* 비밀번호를 넣기 전: 서식 막대·+ 는 숨김 */
+.memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
+.memo-locked #bell-btn, .memo-locked #links-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
+.lock-dialog h2 { margin-bottom: 8px; }
+.lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
+.lock-hide-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 4px 0; font-size: 13px; color: var(--muted); }
+
+
+/* 일정과 알림 패널: 이름 · 하루 종일 · 미리 알림 (reminder-panel.js) */
+.rem-title-row input { flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-0); color: var(--text); font: inherit; }
+.rem-allday-row { justify-content: space-between; }
+.rem-alerts-label { margin: 8px 0 6px; font-size: 12.5px; font-weight: 600; }
+.rem-alerts-label small { font-weight: 400; color: var(--muted); }
+.rem-alerts button[aria-pressed="true"]::before { content: '✓ '; }

@@ -97,6 +97,13 @@ object DriveSync {
             return Status("error", status.lastSync, message).also(::publish)
         }
         saveState(file, state)
+        if (result.downloaded > 0) {
+            try {
+                com.memoking.app.Widgets.hideLocked(ctx) // 다른 기기에서 잠근 메모를 홈 화면 위젯에서 바로 숨김
+            } catch (e: Exception) {
+                android.util.Log.w("MemoKing", "위젯 확인 실패", e)
+            }
+        }
         GoogleAuth.ensureEmail(ctx)
         return Status("idle", System.currentTimeMillis(), "", result.localChanged, result.conflicts).also(::publish)
     }

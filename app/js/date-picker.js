@@ -1,6 +1,7 @@
 // 예약 알림의 날짜·시각 고르기 — 휴대폰 기본 입력(돌리는 다이얼·시계판) 대신 달력 한 장과 시각 칩.
 //   값은 원래 입력칸(<input id="at-input"> · <input id="rep-time">)에 그대로 써 넣어 reminder-panel.js 의 계산은 바뀌지 않는다.
 //   PC 메모 창 · 휴대폰이 함께 쓴다.
+import { dayLabel } from './core/time.js';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 const pad = (n) => String(n).padStart(2, '0');
@@ -108,11 +109,10 @@ export function dateTimePicker(box, { input }) {
     input.value = `${picked.getFullYear()}-${pad(picked.getMonth() + 1)}-${pad(picked.getDate())}T${pad(picked.getHours())}:${pad(picked.getMinutes())}`;
     const d = picked;
     const today = now();
-    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-    const day = sameDay(d, today) ? '오늘' : sameDay(d, tomorrow) ? '내일' : `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEK[d.getDay()]})`;
-    summary.textContent = `${day} ${timeLabel(d.getHours(), d.getMinutes())}에 알려요`;
+    summary.textContent = `${dayLabel(d, today)} ${timeLabel(d.getHours(), d.getMinutes())}에 알려요`;
     summary.classList.toggle('past', d <= today);
     if (d <= today) summary.textContent = '이미 지난 시각이에요 — 앞으로의 시각을 골라 주세요';
+    input.dispatchEvent(new Event('input')); // 알림 패널이 이미 지난 미리 알림을 다시 가리게
   };
 
   function drawMonth() {

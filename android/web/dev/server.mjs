@@ -151,6 +151,23 @@ const sync = {
     return p;
   },
   ready: () => null,
+  // 홈 화면 위젯 (가짜): 놓인 메모 id · 보낸 내용을 기록
+  widgetMemoIds: () => [...widgetMemos],
+  widgetPublish: (json) => {
+    for (const m of JSON.parse(json)) widgetData[m.id] = m;
+    log.push({ widgetPublish: JSON.parse(json).map((m) => m.id) });
+    return null;
+  },
+  widgetAssign: (widgetId, memoId) => {
+    widgetMemos.add(memoId);
+    log.push({ widgetAssign: [widgetId, memoId] });
+    return null;
+  },
+  widgetPin: (memoId) => {
+    widgetMemos.add(memoId);
+    log.push({ widgetPin: memoId });
+    return true;
+  },
   scheduleAlarms: (json) => {
     scheduled = JSON.parse(json);
     log.push({ scheduleAlarms: scheduled.length });
@@ -234,6 +251,8 @@ const fakeDrive = {
 const driveInfo = () => ({ ...fakeDrive, configured: true, builtIn: false, nativeAvailable: !process.env.NO_PLAY_SERVICES, browserConfigured: fakeDrive.configured, folders: undefined });
 const fakeHistory = { enabled: false, granted: false, blocked: {}, entries: [] };
 let pendingIntent = null;
+const widgetMemos = new Set();
+const widgetData = {};
 let scheduled = [];
 let pickQueue = []; // 점검용: 다음 pickFiles 가 돌려줄 파일들 [{ name, mime, base64 }]
 
@@ -351,6 +370,7 @@ const calls = {
   },
   shareFile: async (a) => {
     log.push({ shareFile: { name: a.name, mime: a.mime, bytes: Math.round((a.base64?.length ?? 0) * 0.75) } });
+    if (a.mime === 'image/png' && process.env.MK_SHARE_OUT) fs.writeFileSync(process.env.MK_SHARE_OUT, Buffer.from(a.base64, 'base64'));
     return true;
   },
   sharePdf: async (a) => {
@@ -442,7 +462,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (p === '/dev/log') {
-      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ log, scheduled, vaultRoot }));
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ log, scheduled, vaultRoot, widgetData }));
       return;
     }
     if (p.startsWith('/vault/')) return serveFile(res, vaultPath(p.slice('/vault/'.length)), req);

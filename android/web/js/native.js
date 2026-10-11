@@ -1,7 +1,7 @@
 // 앱(Kotlin)과 주고받기 — window.MemoKingNative (android/app/.../Bridge.kt)
 //   바로 답하는 함수: {"v": 값} | {"err": "이유"} 글자 → 값 또는 예외
 //   오래 걸리는 일: call(이름, 인자) → Promise (앱이 __mk.resolve 로 알려 줌)
-//   앱이 보내는 소식: on('intent' | 'alarm' | 'app' | 'keyboard' | 'record' | 'transcribe', fn)
+//   앱이 보내는 소식: on('intent' | 'alarm' | 'app' | 'keyboard' | 'record' | 'transcribe' | 'widget', fn)
 
 const raw = window.MemoKingNative;
 if (!raw) throw new Error('메모킹 앱 안에서 열어 주세요 (MemoKingNative 없음)');
@@ -42,6 +42,14 @@ export const native = {
   wasFired: sync('wasFired'),
   notify: (item) => unwrap(raw.notify(JSON.stringify(item))),
   sttStatus: sync('sttStatus'), // 받아쓰기 모델·엔진 상태
+};
+
+// 홈 화면 위젯 (Widgets.kt)
+export const widget = {
+  memoIds: sync('widgetMemoIds'),
+  publish: sync('widgetPublish'),
+  assign: sync('widgetAssign'),
+  pin: sync('widgetPin'),
 };
 
 // 알림 보관함 (NotiService.kt)

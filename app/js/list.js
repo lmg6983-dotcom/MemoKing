@@ -3,6 +3,7 @@ import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
 import { acceleratorFromKey, displayAccelerator } from './core/accelerators.js';
 import { injectIcons, icon } from './icons.js';
+import { handoffText } from './core/handoff.js';
 import { friendlyTime } from './core/format.js';
 import { vaultUrl } from './media.js';
 import { setupRemindersTab } from './list-reminders.js';
@@ -503,6 +504,54 @@ function showUndo({ name, title }) {
 }
 api.on('memo:trashed', showUndo);
 
+// ---------- 이어 쓰기: 다른 기기에서 방금 고친 메모 → 위쪽에 "열기" 막대 (2분 뒤, 또는 열면 사라짐) ----------
+let handoffTimer = null;
+function showHandoff(h) {
+  if (!h) return;
+  let bar = $('handoff-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'handoff-bar';
+    bar.className = 'undo-bar handoff-bar';
+    bar.setAttribute('role', 'status');
+    bar.addEventListener('pointerenter', () => clearTimeout(handoffTimer));
+    bar.addEventListener('pointerleave', () => {
+      clearTimeout(handoffTimer);
+      handoffTimer = setTimeout(() => (bar.hidden = true), 20_000);
+    });
+    document.body.append(bar);
+  }
+  // 두 줄: 작게 "휴대폰에서 방금 고친 메모" · 굵게 제목 (좁은 목록 창에서도 제목이 보이게)
+  const text = document.createElement('span');
+  text.className = 'handoff-text';
+  const from = document.createElement('small');
+  from.textContent = handoffText(h.from, '').replace(/:\s*$/, '');
+  const title = document.createElement('b');
+  title.textContent = h.title;
+  text.append(from, title);
+  text.title = handoffText(h.from, h.title);
+  const open = document.createElement('button');
+  open.type = 'button';
+  open.textContent = '열기';
+  bar.dataset.id = h.id;
+  open.addEventListener('click', () => {
+    bar.hidden = true;
+    api.memo.open(h.id);
+  });
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'handoff-close';
+  close.setAttribute('aria-label', '안내 닫기');
+  close.append(icon('close'));
+  close.addEventListener('click', () => (bar.hidden = true));
+  bar.replaceChildren(text, open, close);
+  bar.hidden = false;
+  clearTimeout(handoffTimer);
+  handoffTimer = setTimeout(() => (bar.hidden = true), 120_000);
+}
+api.on('memo:handoff', showHandoff);
+api.memo.handoff().then(showHandoff).catch(() => {});
+
 el.useSuggested.addEventListener('click', async () => applyInfo(await api.vault.use(state.info.suggestedPath)));
 el.chooseFolder.addEventListener('click', async () => applyInfo(await api.vault.choose()));
 
@@ -555,6 +604,7 @@ async function loadSettings() {
   showMagic(s.magic);
   showQuickMemo(s.quickMemo);
   showShortcuts(s.shortcuts);
+  showMcp(s.mcp);
   $('trash-days').value = String(s.trashDays);
   if (api.stt) renderStt(await api.stt.status());
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
@@ -565,6 +615,36 @@ function showQuickMemo(q) {
     ? '다른 앱이 이 단축키를 먼저 쓰고 있어서 작동하지 않아요. 아래에서 다른 키로 바꿔 주세요'
     : '어디서든 고른 내용을 바로 메모로 만들어요. 두 번 누르면 화면 영역 캡처';
 }
+
+// ---------- AI 비서 연결 (MCP) ----------
+function showMcp(m, message = '') {
+  if (!m) return;
+  $('mcp-title').textContent = m.connected && !m.stale ? 'Claude 데스크톱에 연결됨' : m.stale ? '다시 연결이 필요해요' : '연결 안 됨';
+  $('mcp-sub').textContent = message || (m.broken
+    ? 'Claude 데스크톱 설정 파일을 읽지 못했어요. 설정 복사로 직접 넣어 주세요'
+    : m.stale ? '메모킹을 다른 곳에 다시 설치했어요. 연결을 눌러 새 위치로 맞춰 주세요'
+      : m.connected ? 'Claude 데스크톱을 껐다 켜면 메모킹 도구(메모 찾기, 읽기, 남기기)가 보여요'
+        : m.claudeFound ? '연결하면 Claude에게 "장보기 메모에 우유 추가해 줘" 처럼 부탁할 수 있어요'
+          : 'Claude 데스크톱이 없으면 설정 복사로 다른 AI 앱(Cursor 등)에 넣을 수 있어요');
+  $('mcp-box').classList.toggle('on', m.connected && !m.stale);
+  $('mcp-connect').textContent = m.stale ? '다시 연결' : 'Claude 데스크톱에 연결';
+  $('mcp-connect').hidden = m.connected && !m.stale;
+  $('mcp-disconnect').hidden = !m.connected;
+  $('mcp-write').checked = m.write;
+}
+$('mcp-connect').addEventListener('click', async () => {
+  const m = await api.mcp.connect(true);
+  showMcp(m, m.error ?? '연결했어요. Claude 데스크톱을 껐다 켜면 메모킹 도구가 보여요');
+});
+$('mcp-disconnect').addEventListener('click', async () => {
+  const m = await api.mcp.connect(false);
+  showMcp(m, m.error ?? '');
+});
+$('mcp-copy').addEventListener('click', async () => {
+  await api.mcp.copy();
+  showMcp((await api.settings.get()).mcp, '설정을 복사했어요. AI 앱의 MCP 설정(mcpServers)에 붙여 넣어 주세요');
+});
+$('mcp-write').addEventListener('change', async (e) => showMcp(await api.mcp.setWrite(e.target.checked)));
 
 // ---------- 전역 단축키 바꾸기 (빠른 메모·매직키) ----------
 // 키 단추를 누르고 새 조합을 누르면 바뀐다. 다른 앱이 이미 쓰는 키면 바꾸지 않고 알려 준다 (Esc·다른 곳 누르기 = 그만)
@@ -1015,6 +1095,9 @@ document.addEventListener('keydown', (e) => {
 
 api.on('memos:changed', (memos) => {
   state.memos = memos;
+  // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
+  const hb = $('handoff-bar');
+  if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;
   $('count-memos').textContent = String(memos.length);
   if (activeTab !== 'memos') return remindersTab.refresh(); // 메모 제목이 바뀌면 알림 탭에도
   if (state.query) runSearch();
