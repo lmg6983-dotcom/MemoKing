@@ -7,7 +7,8 @@
 //   날짜 뒤 시각:  오후 3시 · 3시 반 · 3시 20분 · 15:30 · 세 시 · 열한 시 반 · 저녁(시각 없이 때만: 19시)
 //   시각만:        오전·오후 없는 1~6시는 오후, 7~11시는 오전. 이미 지났으면 찾지 않음 (새벽·자정은 다음 날로)
 
-const DAY_MS = 86_400_000;
+// 하루·한 주 뒤는 달력으로 더한다 (서머타임이 바뀌는 날에도 같은 시각이 되게)
+const plusDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes());
 export const DEFAULT_HOUR = 9; // 날짜만 적었으면 그날 아침 9시
 
 const WEEKDAYS = '일월화수목금토';
@@ -317,8 +318,8 @@ function rangeEnd(text, end) {
 function nextRepeat(at, repeat, now) {
   let next = at;
   for (let i = 0; i < 400 && next <= now; i++) {
-    if (repeat.every === 'day') next = new Date(next.getTime() + DAY_MS);
-    else if (repeat.every === 'week') next = new Date(next.getTime() + 7 * DAY_MS);
+    if (repeat.every === 'day') next = plusDays(next, 1);
+    else if (repeat.every === 'week') next = plusDays(next, 7);
     else {
       const months = repeat.every === 'year' ? 12 : 1;
       const base = new Date(next.getFullYear(), next.getMonth() + months, 1, next.getHours(), next.getMinutes());
@@ -378,14 +379,14 @@ export function findDates(text, now = new Date()) {
       if (rule.needsMore && !paren && !(t?.explicit)) continue;
       if (t) {
         let at = atTime(date, t);
-        if ((rule.rollWeek || r.rollWeek) && at <= now) at = new Date(at.getTime() + 7 * DAY_MS);
+        if ((rule.rollWeek || r.rollWeek) && at <= now) at = plusDays(at, 7);
         add(from, t.end, at, true, { past, repeat: r.repeat });
       } else if (r.today) {
         taken.push({ from, to }); // "오늘" 만은 알림 시각이 없다
       } else {
         let at = atTime(date, { h: DEFAULT_HOUR, min: 0 });
         // 오늘이 그 요일이고 9시가 지났으면: 날짜만 적은 "금요일" 은 다음 주
-        if ((rule.rollWeek || r.rollWeek) && at <= now) at = new Date(at.getTime() + 7 * DAY_MS);
+        if ((rule.rollWeek || r.rollWeek) && at <= now) at = plusDays(at, 7);
         add(from, to, at, false, { past, repeat: r.repeat });
       }
     }
@@ -403,7 +404,7 @@ export function findDates(text, now = new Date()) {
     if (!t.period && t.h === 24 && !t.midnight) continue;
     const end = rangeEnd(s, from + m[0].length);
     let at = atTime(ymd(now), t);
-    if (at <= now && (t.period === '새벽' || t.midnight)) at = new Date(at.getTime() + DAY_MS);
+    if (at <= now && (t.period === '새벽' || t.midnight)) at = plusDays(at, 1);
     add(from, end, at, true);
   }
 

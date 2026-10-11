@@ -225,3 +225,16 @@ test('날짜 차이는 서머타임이 있는 시간대에서도 정확 (오클�
   const out = execFileSync(process.execPath, ['-e', code], { env: { ...process.env, TZ: 'Pacific/Auckland' }, cwd: fileURLToPath(new URL('..', import.meta.url)) }).toString().trim();
   assert.equal(out, '1,2,내일'); // 2026-09-27 에 서머타임 시작
 });
+
+test('서머타임이 바뀌는 날: 하루 종일 "당일 오전 9시" 는 오전 9시, "매일 오후 3시" 는 다음 날도 오후 3시 (뉴욕)', { skip: process.platform === 'win32' && 'TZ 를 바꿀 수 없음' }, async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const code = `Promise.all([import('./app/js/core/reminders.js'), import('./app/js/core/date-detect.js')]).then(([rm, dd]) => {
+    const r = rm.normalizeReminder({ id: 'a', kind: 'at', allDay: true, at: new Date(2026, 2, 8).toISOString(), alerts: [-540, 900], created: new Date(2026, 2, 1).toISOString() });
+    const a = rm.nextAlert(r, new Date(2026, 2, 7, 12)); // 3/8 이 서머타임 시작
+    const d = dd.findDates('매일 오후 3시 약', new Date(2026, 2, 7, 16))[0];
+    console.log([a.at.getHours(), a.at.getDate(), d.at.getHours(), d.repeat.time].join(','));
+  })`;
+  const out = execFileSync(process.execPath, ['-e', code], { env: { ...process.env, TZ: 'America/New_York' }, cwd: fileURLToPath(new URL('..', import.meta.url)) }).toString().trim();
+  assert.equal(out, '9,8,15,15:00');
+});

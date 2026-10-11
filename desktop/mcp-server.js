@@ -18,11 +18,12 @@ const arg = (name) => {
 const SETTINGS = arg('--settings');
 const VERSION = arg('--version') ?? '1';
 
+/** 메모킹 설정 (읽지 못하면 null — 그때는 쓰기를 막는다) */
 function settings() {
   try {
     return JSON.parse(fs.readFileSync(SETTINGS, 'utf8'));
   } catch {
-    return {};
+    return null;
   }
 }
 
@@ -41,7 +42,7 @@ function closeVault() {
 
 /** 지금 메모 폴더 (설정에서 바뀌었으면 새로 연다) */
 function openVault() {
-  const s = settings();
+  const s = settings() ?? {};
   const root = arg('--vault') ?? s.vaultPath;
   if (!root || !fs.existsSync(root)) {
     // 폴더를 옮겼거나 외장·네트워크 드라이브가 빠졌다 — 연결은 그대로 두고, 폴더가 돌아오면 다시 연다
@@ -71,7 +72,11 @@ function openVault() {
 process.on('uncaughtException', (err) => console.error('[memoking-mcp]', err?.message ?? err));
 process.on('unhandledRejection', (err) => console.error('[memoking-mcp]', err?.message ?? err));
 
-const canWrite = () => settings().mcp?.write !== false;
+// 쓰기는 설정의 "AI 가 메모를 남기도록 허용"(기본 켜짐)을 따른다 — 설정 파일을 읽지 못하면 막는다
+const canWrite = () => {
+  const s = settings();
+  return Boolean(s) && s.mcp?.write !== false;
+};
 
 const text = (value) => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }] });
 const fail = (message) => ({ content: [{ type: 'text', text: message }], isError: true });

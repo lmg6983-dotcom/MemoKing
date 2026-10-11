@@ -419,10 +419,13 @@ class MainActivity : Activity() {
             ACTION_NEW_MEMO -> deliver(JSONObject().put("type", "new"))
             ACTION_NEW_VOICE -> deliver(JSONObject().put("type", "new").put("voice", true))
             // 위젯 고르기 목록에서 놓은 위젯을 누름 → 보일 메모 고르기
-            Widgets.ACTION_PICK -> deliver(
-                JSONObject().put("type", "widget-pick")
-                    .put("widgetId", intent.getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, -1)),
-            )
+            // (위젯이 함께 보낸 표가 맞을 때만 — 다른 앱의 흉내는 무시)
+            Widgets.ACTION_PICK -> if (intent.getStringExtra(Widgets.EXTRA_TOKEN) == Widgets.pickToken(this)) {
+                deliver(
+                    JSONObject().put("type", "widget-pick")
+                        .put("widgetId", intent.getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, -1)),
+                )
+            }
             // 다른 앱의 "다른 앱으로 열기"(소리 파일·마크다운·글 파일) → 공유하기와 같게 새 메모
             Intent.ACTION_VIEW -> {
                 val uri = intent.data ?: return

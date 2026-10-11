@@ -42,6 +42,16 @@ object Widgets {
     const val EXTRA_TOKEN = "token"
     private const val PIN_TOKENS = "widget_pin_tokens" // 놓기 요청마다 한 번 쓰는 표 (메모 id → "표|요청 시각")
     private const val PIN_WAIT_MS = 10 * 60_000L
+    private const val PICK_TOKEN = "widget_pick_token"
+
+    /**
+     * 위젯을 눌러 "보일 메모 고르기" 를 시작할 때 함께 보내는 이 앱만 아는 표 — 메모킹 화면은 밖에 열려 있으므로
+     * 다른 앱이 고르기를 흉내 내 다음에 누르는 메모를 엉뚱한 위젯에 놓게 하지 못하게
+     */
+    fun pickToken(ctx: Context): String {
+        val prefs = ctx.getSharedPreferences(PIN_TOKENS, Context.MODE_PRIVATE)
+        return prefs.getString(PICK_TOKEN, null) ?: java.util.UUID.randomUUID().toString().also { prefs.edit().putString(PICK_TOKEN, it).apply() }
+    }
 
     private fun map(ctx: Context) = ctx.getSharedPreferences(MAP, Context.MODE_PRIVATE)
     private fun data(ctx: Context) = ctx.getSharedPreferences(DATA, Context.MODE_PRIVATE)
@@ -72,8 +82,8 @@ object Widgets {
         val used = allIds(ctx).toList().mapNotNull { memoOf(ctx, it) }.toSet()
         val tokens = ctx.getSharedPreferences(PIN_TOKENS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        val pending = tokens.all.filter { (_, v) -> now - ((v as? String)?.substringAfter('|')?.toLongOrNull() ?: 0L) < PIN_WAIT_MS }.keys
-        tokens.edit().apply { tokens.all.keys.filter { it !in pending }.forEach { remove(it) } }.apply()
+        val pending = tokens.all.filter { (k, v) -> k != PICK_TOKEN && now - ((v as? String)?.substringAfter('|')?.toLongOrNull() ?: 0L) < PIN_WAIT_MS }.keys
+        tokens.edit().apply { tokens.all.keys.filter { it !in pending && it != PICK_TOKEN }.forEach { remove(it) } }.apply()
         val edit = data(ctx).edit()
         for (k in 0 until memos.length()) {
             val m = memos.getJSONObject(k)
@@ -214,6 +224,7 @@ object Widgets {
             val pick = Intent(ctx, MainActivity::class.java).setAction(if (memoId == null) ACTION_PICK else MainActivity.ACTION_OPEN_MEMO)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                 .putExtra(EXTRA_MEMO, memoId ?: "")
+                .putExtra(EXTRA_TOKEN, pickToken(ctx))
                 .setData(Uri.parse("memoking://widget/$widgetId")) // 위젯마다 다른 PendingIntent 가 되게
             v.setOnClickPendingIntent(R.id.widget_root, activityIntent(ctx, pick, 1000 + widgetId))
             return v
@@ -346,7 +357,15 @@ object Widgets {
 }
 
 class MemoWidget : AppWidgetProvider() {
-    override fun onUpdate(ctx: Context, mgr: AppWidgetManager, ids: IntArray) = Widgets.update(ctx, ids)
+    // 주기적으로도(위젯 설정의 updatePeriodMillis): 앱이 꺼져 있는 사이 다른 동기화 앱(Syncthing 등)으로 잠긴 메모를 숨긴다
+    override fun onUpdate(ctx: Context, mgr: AppWidgetManager, ids: IntArray) {
+        try {
+            Widgets.hideLocked(ctx)
+        } catch (e: Exception) {
+            android.util.Log.w("MemoKing", "위젯 확인 실패", e)
+        }
+        Widgets.update(ctx, ids)
+    }
 
     override fun onDeleted(ctx: Context, ids: IntArray) = Widgets.forget(ctx, ids)
 

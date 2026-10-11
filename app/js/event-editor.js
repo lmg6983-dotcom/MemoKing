@@ -82,7 +82,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
     function render() {
       when.textContent = `📅 ${eventWhen(startAt(), isAllDay)}`;
       const set = picked[kind()];
-      const live = new Set(pendingAlerts(ALERT_PRESETS[kind()], startAt(), { repeat: Boolean(repeatLabel) }));
+      const live = new Set(pendingAlerts(ALERT_PRESETS[kind()], startAt(), { repeat: Boolean(repeatLabel), allDay: isAllDay }));
       chips.replaceChildren(...ALERT_PRESETS[kind()].map((offset) => {
         const b = el('button', { type: 'button', 'data-alert': String(offset) }, alertLabel(offset, isAllDay));
         const past = !live.has(offset);
@@ -98,8 +98,8 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
         });
         return b;
       }));
-      const active = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel) });
-      const fb = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay) });
+      const active = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), allDay: isAllDay });
+      const fb = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay), allDay: isAllDay });
       none.textContent = active.length ? '' : fb.length ? `고른 알림 시각이 지나 ${alertLabel(fb[0], isAllDay)}에 알려요` : '알림 없이 달력에만 보여요';
     }
     allDaySwitch.addEventListener('change', () => {
@@ -122,7 +122,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
     });
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const chosen = pendingAlerts([...picked[kind()]], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay) });
+      const chosen = pendingAlerts([...picked[kind()]], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay), allDay: isAllDay });
       // 기본값으로는 고른 것을 그대로 (이번 일정엔 이미 지나 빠진 "하루 전" 도 다음 일정엔 다시 고른 채로)
       remember(kind(), [...picked[kind()]].sort((a, b) => b - a));
       finish({ title: name.value.replace(/\s+/g, ' ').trim(), allDay: isAllDay, start: startAt(), alerts: chosen });

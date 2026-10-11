@@ -608,7 +608,7 @@ app.deliverRecording = async (r) => {
   else toast(transcript ? `녹음(${duration})과 받아쓴 내용을 저장했어요` : `녹음(${duration})을 저장했어요`);
   if (lockedOut || !(r.sttPending && recorder.sttOn() && recorder.sttReady())) app.heldLocks.delete(r.memoId);
   // 녹음 중에 받아쓰지 못했으면(음성 인식이 잠깐 안 됐음) 이제 녹음 파일로
-  if (!lockedOut && r.sttPending && recorder.sttOn() && recorder.sttReady()) transcribeInto(memoId, [item]).finally(() => app.heldLocks.delete(memoId));
+  if (!lockedOut && r.sttPending && recorder.sttOn() && recorder.sttReady()) transcribeInto(memoId, [item]); // 끝나면 transcribeInto 가 열쇠를 거둔다
 };
 
 // ---------- 설정 ----------

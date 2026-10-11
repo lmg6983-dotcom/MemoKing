@@ -8,8 +8,9 @@ import { spawn } from 'node:child_process';
 const SERVER = path.join(import.meta.dirname, '..', 'desktop', 'mcp-server.js');
 
 /** 표준 입출력으로 MCP 서버와 주고받기 */
-function connect(vaultDir) {
-  const proc = spawn(process.execPath, [SERVER, '--vault', vaultDir, '--settings', path.join(vaultDir, '..', 'none.json')], { stdio: ['pipe', 'pipe', 'pipe'] });
+function connect(vaultDir, { settingsFile = path.join(vaultDir, '..', 'settings.json') } = {}) {
+  if (!fs.existsSync(settingsFile) && !settingsFile.endsWith('none.json')) fs.writeFileSync(settingsFile, '{}'); // 기본 설정 (쓰기 허용)
+  const proc = spawn(process.execPath, [SERVER, '--vault', vaultDir, '--settings', settingsFile], { stdio: ['pipe', 'pipe', 'pipe'] });
   const waiting = new Map();
   let buf = '';
   let exited = null;
@@ -82,6 +83,25 @@ test('덧붙이기는 제목이 딱 맞는 메모에만, 빈 내용은 거절', 
     const blank = await tool('create_memo', { content: '   ' });
     assert.equal(blank.isError, true);
     assert.match(blank.content[0].text, /비어 있어요/);
+  } finally {
+    s.proc.kill();
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('설정 파일을 읽지 못하면 AI 가 메모를 쓰지 못함 (읽기는 됨)', async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-mcp-'));
+  const dir = path.join(base, 'vault');
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, '메모.md'), '# 메모\n\n글\n');
+  const s = connect(dir, { settingsFile: path.join(base, 'none.json') });
+  try {
+    await s.call('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
+    s.proc.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+    const tool = (name, args) => s.call('tools/call', { name, arguments: args }).then((r) => r.result);
+    assert.match((await tool('search_memos', {})).content[0].text, /메모/);
+    const w = await tool('create_memo', { content: '# 새 메모' });
+    assert.equal(w.isError, true);
   } finally {
     s.proc.kill();
     fs.rmSync(base, { recursive: true, force: true });

@@ -5,7 +5,7 @@
 
 /** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
 const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
-import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockedMayUse } from './memo-lock.js';
+import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey, lockedMayUse } from './memo-lock.js';
 import { isBlankBody, sameBody, conflictCopyBody, extractAttachments } from './memo-file.js';
 import { toLocalIso } from './time.js';
 
@@ -144,17 +144,22 @@ class LockMethods {
    */
   attachmentGuard(more = []) {
     const inUse = new Set();
-    const sealed = [];
+    const sealed = []; // 열지 않은 잠긴 메모: { salt, refs } (암호문은 한 번만 읽는다) — 표가 없으면 무엇이든 쓸 수 있다고 본다
     for (const e of [...this.entries.values(), ...more]) {
       if (!isLockedBody(e.body)) {
         for (const src of extractAttachments(e.body)) inUse.add(src);
         continue;
       }
       const plain = e.id && this.entries.get(e.id) === e ? this.plainOf(e) : null;
-      if (plain === null) sealed.push(e);
-      else for (const src of extractAttachments(plain)) inUse.add(src);
+      if (plain !== null) {
+        for (const src of extractAttachments(plain)) inUse.add(src);
+        continue;
+      }
+      const refs = e.meta?.extra?.lockRefs;
+      if (!Array.isArray(refs)) return () => true;
+      sealed.push({ salt: parseLocked(e.body)?.salt, refs: new Set(refs) });
     }
-    return (src) => inUse.has(src) || sealed.some((e) => lockedMayUse(e, src));
+    return (src) => inUse.has(src) || sealed.some((x) => x.refs.has(lockRefKey(src, x.salt)));
   }
 
   /**

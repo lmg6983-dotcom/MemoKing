@@ -87,10 +87,10 @@ export function alertLabel(offset, allDay = false) {
  * 아직 울릴 수 있는 미리 알림만 (지금보다 뒤) — 일정 창·알림 패널·코어가 함께 쓰는 한 가지 규칙.
  * 반복 일정은 다음 회차에 울리므로 모두 남긴다.
  */
-export function pendingAlerts(alerts, start, { repeat = false, now = new Date(), fallback = null } = {}) {
+export function pendingAlerts(alerts, start, { repeat = false, now = new Date(), fallback = null, allDay = false } = {}) {
   const list = [...new Set(alerts ?? [])].sort((a, b) => b - a);
   if (repeat) return list;
-  const future = (o) => new Date(start).getTime() - o * 60_000 > new Date(now).getTime();
+  const future = (o) => alertTime(new Date(start), o, allDay).getTime() > new Date(now).getTime();
   const keep = list.filter(future);
   // 알림을 골랐는데 모두 지났다면(5분 뒤 일정에 "10분 전"): 아무 알림 없이 두지 않고 정시(하루 종일은 당일 오전 9시)에
   if (!keep.length && list.length && fallback !== null && future(fallback)) return [fallback];
@@ -98,6 +98,15 @@ export function pendingAlerts(alerts, start, { repeat = false, now = new Date(),
 }
 /** 지난 알림 대신 울릴 때: 시각 있는 일정은 정시, 하루 종일은 당일 오전 9시 */
 export const fallbackAlert = (allDay) => (allDay ? -540 : 0);
+
+/**
+ * 미리 알림이 울릴 때. 하루 종일 일정은 벽시계 기준("하루 전 오전 9시" 는 서머타임이 바뀌는 날에도 오전 9시),
+ * 시각 있는 일정은 시작에서 그만큼 앞
+ */
+export function alertTime(start, offset, allDay = false) {
+  if (allDay) return new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, -offset);
+  return new Date(start.getTime() - offset * 60_000);
+}
 
 /** "10분 전, 하루 전" */
 export const describeAlerts = (r) => {
@@ -218,7 +227,7 @@ export function nextAlert(r, after) {
   let best = null;
   const consider = (start) => {
     for (const offset of offs) {
-      const t = new Date(start.getTime() - offset * 60_000);
+      const t = alertTime(start, offset, Boolean(r.allDay));
       if (t > base && (!best || t < best.at)) best = { at: t, start, offset };
     }
   };

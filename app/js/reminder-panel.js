@@ -53,7 +53,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   function renderAlerts() {
     const k = alertKind();
     const start = chosenStart();
-    const live = start ? new Set(pendingAlerts(ALERT_PRESETS[k], start)) : null;
+    const live = start ? new Set(pendingAlerts(ALERT_PRESETS[k], start, { allDay: k === 'allDay' })) : null;
     el.alerts.replaceChildren(...ALERT_PRESETS[k].map((offset) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -228,7 +228,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   let dropped = [];
   let fellBack = false;
   function withPending(r, start, now) {
-    const keep = pendingAlerts(r.alerts, start, { now, fallback: fallbackAlert(Boolean(r.allDay)) });
+    const keep = pendingAlerts(r.alerts, start, { now, fallback: fallbackAlert(Boolean(r.allDay)), allDay: Boolean(r.allDay) });
     dropped = r.alerts.filter((o) => !keep.includes(o));
     fellBack = keep.length > 0 && !r.alerts.includes(keep[0]); // 고른 것이 모두 지나 정시(당일 오전 9시)로 바꿈
     return { ...r, alerts: keep };
@@ -271,9 +271,9 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
       setStatus(err.message, true);
       return;
     }
+    if (!(await save([...reminders, reminder]))) return;
     // 기본값으로는 고른 것을 그대로 기억 (이번 일정에 맞지 않아 빠진 "하루 전" 도 다음 일정엔 다시) — 만들기에 성공했을 때만
     if (isEvent(reminder)) remember(alertKind(), [...picked[alertKind()]].sort((a, b) => b - a));
-    if (!(await save([...reminders, reminder]))) return;
     const saved = reminders.at(-1) ?? reminder;
     el.title.value = '';
     setStatus(isEvent(saved)
@@ -316,7 +316,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
      */
     async addEvent(e) {
       const now = new Date();
-      const base = { action: 'notify', enabled: true, created: toLocalIso(now), alerts: pendingAlerts(e.alerts ?? [], e.start, { repeat: Boolean(e.repeat), now, fallback: fallbackAlert(Boolean(e.allDay)) }) };
+      const base = { action: 'notify', enabled: true, created: toLocalIso(now), alerts: pendingAlerts(e.alerts ?? [], e.start, { repeat: Boolean(e.repeat), now, fallback: fallbackAlert(Boolean(e.allDay)), allDay: Boolean(e.allDay) }) };
       if (e.title) base.title = e.title;
       let reminder;
       if (e.repeat) {
