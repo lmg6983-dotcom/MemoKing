@@ -59,6 +59,7 @@ function openVault() {
   v.scheduleIndex = () => {};
   v.flushOrphans = () => v.orphans.clear();
   v.watch = () => {};
+  v.writeIndex = () => {}; // 색인·안내 파일은 켜져 있는 메모킹 앱이 쓴다 (두 프로세스가 같은 파일을 쓰지 않게)
   v.on('error', (err) => console.error('[memoking-mcp]', err.message));
   v.open();
   vault = v;
@@ -87,9 +88,8 @@ function findMemo(v, ref) {
   return found ? v.get(found.id) : null;
 }
 
-const summaryOf = (v, m) => {
-  const memo = v.get(m.id);
-  const locked = isLockedBody(memo.body);
+const summaryOf = (m) => {
+  const locked = Boolean(m.locked);
   return {
     id: m.id,
     title: m.title,
@@ -125,7 +125,7 @@ server.registerTool('search_memos', {
       const want = tag.replace(/^#/, '').toLowerCase();
       list = list.filter((m) => m.tags.some((t) => t.toLowerCase() === want));
     }
-    const shown = list.slice(0, limit).map((m) => summaryOf(v, m));
+    const shown = list.slice(0, limit).map(summaryOf);
     return text({ total: list.length, memos: shown });
   } catch (err) {
     return fail(err.message);

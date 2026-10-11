@@ -248,7 +248,9 @@ export function dueOccurrence(r, now = new Date()) {
   // 만들기 전에 이미 지난 알림은 건너뛴다 (내일 아침 일정에 오늘 지난 "하루 전", 오전 10시에 만든 오늘 하루 종일 일정의
   // "당일 오전 9시" 는 울리지 않음). 예전 알림(미리 알림 없음)은 그대로 "놓친 알림" 으로.
   const skipBefore = (n) => n.at.getTime() < created.getTime() - (n.offset > 0 ? 0 : MISSED_AFTER_MS);
-  for (let i = 0; next && (next.offset > 0 || Array.isArray(r.alerts)) && skipBefore(next) && i < 50; i++) next = nextAlert(r, next.at);
+  // (하루 종일 일정은 미리 알림이 생긴 뒤의 것이라 alerts 가 없어도 같은 규칙)
+  const fresh = Array.isArray(r.alerts) || r.allDay === true;
+  for (let i = 0; next && (next.offset > 0 || fresh) && skipBefore(next) && i < 50; i++) next = nextAlert(r, next.at);
   if (!next || next.at > now) return null;
   return { ...next, missed: now - next.at > MISSED_AFTER_MS };
 }

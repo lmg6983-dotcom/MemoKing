@@ -77,7 +77,8 @@ export function sealBody(plain, session) {
   const iv = random(12);
   const data = gcm(session.key, iv).encrypt(new TextEncoder().encode(String(plain)));
   const title = extractTitle(String(plain));
-  const head = title && title !== UNTITLED ? `# ${title.replace(/^#+\s*/, '')}\n\n` : '';
+  // 제목이 없어도 "제목 없음" 줄을 둔다 — 없으면 안내 문구가 제목(파일 이름·목록·위젯)이 돼 버린다
+  const head = `# ${title && title !== UNTITLED ? title.replace(/^#+\s*/, '') : UNTITLED}\n\n`;
   return `${head}${LOCK_NOTICE}\n\n<!-- memoking-lock ${LOCK_VERSION} n=${session.iterations} s=${session.salt} i=${b64(iv)} c=${b64(data)} -->\n`;
 }
 

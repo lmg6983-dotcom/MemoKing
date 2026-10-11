@@ -197,3 +197,8 @@ test('날 이름은 한 가지로: 모레 · "(월)" 띄어 쓰기 · 다른 해
   assert.equal(formatWhen(at(2026, 10, 12, 9, 0), now), '모레 09:00');
   assert.equal(formatDay(at(2026, 10, 13), now), dayLabel(at(2026, 10, 13), now));
 });
+
+test('alerts 가 없는 하루 종일 일정도 만들기 전 "당일 오전 9시" 는 울리지 않음', () => {
+  const r = normalizeReminder({ id: 'x', kind: 'at', allDay: true, at: iso(2026, 10, 5), created: iso(2026, 10, 5, 10, 0) });
+  assert.equal(dueOccurrence(r, at(2026, 10, 5, 10, 0)), null);
+});

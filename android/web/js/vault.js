@@ -409,6 +409,7 @@ export class Vault extends EventTarget {
     const known = entry.body;
     entry.body = plain;
     entry.meta.updated = toLocalIso();
+    entry.meta.device = 'phone'; // 이어 쓰기 안내가 엉뚱한 기기 이름을 대지 않게
     this.write(entry, known);
     this.purgeVersions(id); // 잠긴 동안의 버전은 이제 열 수 없는 글이므로
     this.locks.delete(id);
@@ -498,6 +499,7 @@ export class Vault extends EventTarget {
     const known = entry.body;
     entry.body = body;
     entry.meta.updated = toLocalIso();
+    entry.meta.device = 'phone';
     this.write(entry, known);
     this.changed([id]);
     return this.get(id);

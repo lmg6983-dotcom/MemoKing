@@ -143,9 +143,25 @@ export function onVaultChanged({ ids, external, removed }) {
     const next = app.vault.get(id);
     if (!next) return;
     if (next.needsPassword) {
-      // 다른 기기에서 다른 비밀번호로 다시 잠갔다 — 덮어쓰지 않고 닫는다
+      // 다른 기기에서 이 메모를 잠갔거나(여기선 안 잠긴 메모) 다른 비밀번호로 다시 잠갔다 — 덮어쓰지 않는다.
+      // 아직 저장 못 한 쓰던 글은 사본 메모로 먼저 남기고 닫는다 (PC 와 같게, 쓰던 글이 사라지지 않게)
+      const wasLocked = Boolean(memo?.locked);
+      const what = wasLocked ? '다른 기기에서 이 메모의 비밀번호를 바꿨어요.' : '다른 기기에서 이 메모를 잠갔어요.';
+      let kept = '';
+      if (isDirty() && !isBlankBody(current)) {
+        try {
+          const copy = wasLocked ? app.vault.importCopyOf(id, current, { color: next.color }) : app.vault.import({ body: current, color: next.color });
+          if (copy) kept = wasLocked ? ' 쓰던 내용은 예전 비밀번호로 잠근 사본 메모로 남겼어요.' : ' 쓰던 내용은 사본 메모로 따로 남겼어요.';
+        } catch (err) {
+          console.error(err);
+        }
+        if (!kept) {
+          setStatus(`${what} 쓰던 내용을 저장하지 못했어요. 글을 복사해 두세요`, true);
+          return;
+        }
+      }
       saved = current;
-      toast('다른 기기에서 이 메모의 비밀번호를 바꿨어요. 다시 열어 주세요', true);
+      toast(`${what}${kept} 다시 열 때 비밀번호를 넣어 주세요`, true);
       closeNote();
       return;
     }
@@ -1225,7 +1241,8 @@ export async function openNote(memoId, options = {}) {
         title: memo.title,
         onTry: async (password) => {
           try {
-            const { session } = await openLock(memo.body, password);
+            // 비밀번호 화면이 떠 있는 사이 다른 기기가 다시 잠갔을 수 있어 지금 파일의 암호문으로
+            const { session } = await openLock(app.vault.entries.get(memoId)?.body ?? memo.body, password);
             const r = app.vault.openLock(memoId, session);
             if (!r) return '메모를 열지 못했어요';
             memo = r;

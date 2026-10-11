@@ -60,3 +60,9 @@ test('잠금 형식 글을 붙여 넣은 보통 메모는 잠긴 메모가 아�
   assert.ok(isLockedBody(`﻿${locked.replace(/\n/g, '\r\n')}`));
   assert.ok(isLockedBody(comment), '제목·안내 없이 암호문만');
 });
+
+test('제목 없는 메모를 잠가도 안내 문구가 제목이 되지 않음 ("제목 없음")', async () => {
+  const locked = await lockBody('![사진](attachments/a.png)\n', '사과1234', FAST);
+  assert.equal(extractTitle(locked), '제목 없음');
+  assert.ok(isLockedBody(locked));
+});

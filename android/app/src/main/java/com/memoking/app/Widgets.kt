@@ -73,6 +73,44 @@ object Widgets {
         update(ctx, allIds(ctx))
     }
 
+    /** 잠긴 메모 파일인가 (앱이 꺼져 있을 때 위젯을 지키는 데만 — 넉넉히: 잠금 주석이 있으면 숨긴다) */
+    fun looksLocked(text: String) = text.contains("<!-- memoking-lock ")
+
+    private fun parse(raw: String?): JSONObject? = try {
+        raw?.let { JSONObject(it) }
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun read(storage: Storage, file: String): String? = try {
+        storage.openRead(file).use { it.readBytes().toString(Charsets.UTF_8) }
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * 앱이 꺼져 있는 동안 동기화로 받은 파일 중 다른 기기에서 잠근 메모가 있으면 위젯의 내용(풀린 글)을 바로 숨긴다.
+     * (위젯 내용은 앱 화면이 만들어 보내므로, 앱을 열 때까지 예전 글이 홈 화면에 남지 않게)
+     */
+    fun hideLocked(ctx: Context) {
+        val storage = Vaults.current(ctx) ?: return
+        var changed = false
+        val edit = data(ctx).edit()
+        for ((memoId, raw) in data(ctx).all) {
+            val memo = parse(raw as? String) ?: continue
+            val file = memo.optString("file")
+            if (file.isEmpty() || memo.optBoolean("locked")) continue
+            val text = read(storage, file) ?: continue
+            if (!looksLocked(text)) continue
+            memo.put("locked", true).put("lines", JSONArray().put(JSONObject().put("t", "🔒 잠긴 메모예요").put("kind", "text")))
+            edit.putString(memoId, memo.toString())
+            changed = true
+        }
+        if (!changed) return
+        edit.apply()
+        update(ctx, allIds(ctx))
+    }
+
     fun memo(ctx: Context, memoId: String): JSONObject? = data(ctx).getString(memoId, null)?.let {
         try {
             JSONObject(it)
