@@ -166,6 +166,7 @@ export class Vault extends EventTarget {
         this.orphanTimer = setTimeout(() => this.flushOrphans(), this.orphanDelay);
       }
     }
+    this.rememberRemoved(removed); // 파일이 잠깐 없던 메모를 곧 다시 저장할 때 머리말(알림·잠금 설정)을 잃지 않게
     this.entries = next;
     for (const id of lockedNow) this.dropUnsafeVersions(id);
 

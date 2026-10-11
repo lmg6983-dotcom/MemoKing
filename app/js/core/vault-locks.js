@@ -25,6 +25,8 @@ export function lockedFiles(body, meta, files) {
 }
 
 /** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
+const REMOVED_KEEP_MS = 10 * 60_000; // 사라진 메모의 머리말을 기억해 두는 시간
+
 export const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
 /** 파일에 있는 머리말 그대로의 사본 (머리말만 쓰는 사이 다른 기기가 고쳤을 때, 이 기기가 바꾼 항목만 골라 더하려고) */
 export const diskCopy = (meta) => JSON.parse(JSON.stringify(meta ?? {}));
@@ -57,6 +59,11 @@ class LockMethods {
     if (!entry) {
       // 쓰는 사이 파일이 지워졌다면, 화면에 남아 있는 내용으로 되살린다.
       entry = this.newEntry(id);
+      const lost = this.removedMeta?.get(id); // 다시 읽다 잠깐 사라졌던 메모: 그 머리말로 (알림·잠금 "제목도 숨기기" 등)
+      if (lost) {
+        entry.meta = metaSnapshot(lost.meta);
+        this.removedMeta.delete(id);
+      }
       this.entries.set(id, entry);
     }
     const before = metaSnapshot(entry.meta); // 쓰지 못하면 머리말을 되돌린다 (잠근 글의 첨부 표 포함)
@@ -76,7 +83,14 @@ class LockMethods {
     if (!entry.file && isBlankBody(body)) return this.summary(entry);
     if (entry.file) this.keepVersion(id, known);
     // 그사이 다른 기기가 잠금: 저장하지 않음 (쓰던 글을 사본 메모로 남겼으면 copied)
-    const wrote = this.write(entry, known);
+    let wrote;
+    try {
+      wrote = this.write(entry, known);
+    } catch (err) {
+      entry.meta = before; // 쓰다 오류(디스크가 가득 참 등) — 다시 저장할 때 "같은 글" 로 건너뛰지 않게 되돌린다
+      entry.body = known;
+      throw err;
+    }
     if (wrote !== true) {
       entry.meta = before; // 쓰지 않았으니 글·머리말도 그대로 (다시 저장할 때 "같은 글" 로 건너뛰지 않게)
       entry.body = known;
@@ -172,6 +186,7 @@ class LockMethods {
     if (disk === 'missing') {
       // 파일이 없어졌다(다른 기기가 지웠거나 이름을 바꿈 — "제목도 숨기기" 로 잠그며 바꾼 것일 수도): 바로 되살려 쓰지 않고
       // 먼저 다시 읽는다. 정말 지워진 메모면 다음 저장이 새로 만들고, 이름만 바뀐 잠긴 메모면 풀린 글이 새로 생기지 않는다
+      entry.body = known; // 쓰지 않았으니 글도 그대로 (잠그기·풀기·되돌리기가 메모리에만 바뀐 채 남지 않게)
       this.rescanSoon();
       return 'skipped';
     }
@@ -191,6 +206,17 @@ class LockMethods {
     this.keepVersion(entry.id, theirs, { force: true }); // 버전 기록에서도 되찾을 수 있게
     this.import({ body: conflictCopyBody(theirs), color: entry.meta.color });
     return undefined;
+  }
+
+  /** 다시 읽다 사라진 메모의 머리말을 잠시 기억한다 — 곧 같은 id 로 다시 저장하면(파일이 잠깐 없었음) 그 머리말로 */
+  rememberRemoved(ids) {
+    this.removedMeta ??= new Map();
+    const now = Date.now();
+    for (const [id, v] of this.removedMeta) if (now - v.at > REMOVED_KEEP_MS) this.removedMeta.delete(id);
+    for (const id of ids) {
+      const e = this.entries.get(id);
+      if (e) this.removedMeta.set(id, { meta: metaSnapshot(e.meta), at: now });
+    }
   }
 
   /** 이 메모의 본문 (잠겼으면 세션으로 푼 글, 못 풀면 null) */

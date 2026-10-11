@@ -530,3 +530,47 @@ test('머리말 합치기: 이 기기가 지운 항목은 (그쪽이 바꾸지 �
   assert.deepEqual(entry.meta.extra, { keep: 1, theirs: 4 });
   assert.equal(entry.body, 'new');
 });
+
+test('파일이 잠깐 없어 다시 읽은 뒤 저장해도 알림·고정 같은 머리말은 그대로', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 약\n\n아침');
+    v.setMeta(id, { pinned: true });
+    const rem = { id: 'r1', kind: 'at', at: new Date(Date.now() + 86_400_000).toISOString(), alerts: [10], action: 'notify', enabled: true, created: new Date().toISOString(), last: null };
+    v.setReminders(id, [rem]);
+    fs.unlinkSync(path.join(root, v.get(id).file));
+    assert.equal(v.save(id, '# 약\n\n아침 저녁').retry, true);
+    v.scan({ silent: true });
+    const r = v.save(id, '# 약\n\n아침 저녁');
+    assert.ok(!r.refused);
+    const text = fs.readFileSync(path.join(root, v.get(id).file), 'utf8');
+    assert.match(text, /pinned: true/);
+    assert.match(text, /r1/);
+    assert.match(text, /아침 저녁/);
+  } finally {
+    v.close();
+  }
+});
+
+test('쓰다 오류가 나면 글을 되돌려, 같은 글로 다시 저장할 때 건너뛰지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 하나\n\n글');
+    const write = v.write;
+    v.write = () => {
+      throw new Error('디스크가 가득 참');
+    };
+    assert.throws(() => v.save(id, '# 하나\n\n글 더'));
+    v.write = write;
+    v.save(id, '# 하나\n\n글 더');
+    assert.match(fs.readFileSync(path.join(root, v.get(id).file), 'utf8'), /글 더/);
+  } finally {
+    v.close();
+  }
+});

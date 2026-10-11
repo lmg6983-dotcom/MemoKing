@@ -189,6 +189,7 @@ export class Vault extends EventEmitter {
         this.orphanTimer = setTimeout(() => this.flushOrphans(), this.orphanDelay);
       }
     }
+    this.rememberRemoved(removed); // 파일이 잠깐 없던 메모를 곧 다시 저장할 때 머리말(알림·잠금 설정)을 잃지 않게
     this.entries = next;
     for (const id of lockedNow) this.dropUnsafeVersions(id);
 
@@ -472,8 +473,9 @@ export class Vault extends EventEmitter {
     let st;
     try {
       st = fs.statSync(this.abs(entry.file));
-    } catch {
-      return 'missing';
+    } catch (err) {
+      // 정말 없을 때만 'missing' — 백신·OneDrive 가 잠깐 붙잡은 것(EBUSY·EPERM)은 그대로 써 본다 (안 되면 쓰기가 오류를 낸다)
+      return err.code === 'ENOENT' || err.code === 'ENOTDIR' ? 'missing' : null;
     }
     if (st.mtimeMs === entry.mtimeMs && st.size === entry.size) return null;
     try {

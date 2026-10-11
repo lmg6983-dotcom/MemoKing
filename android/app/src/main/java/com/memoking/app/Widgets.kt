@@ -67,16 +67,31 @@ object Widgets {
     /** 위젯에 놓인 메모 id 들 (화면이 이 메모들의 내용을 보내 준다) */
     fun memoIds(ctx: Context): JSONArray = JSONArray(allIds(ctx).toList().mapNotNull { memoOf(ctx, it) }.distinct())
 
+    // 놓기·치우기도 위젯의 파일 일과 같은 줄에서 (내용 보내기·잠긴 메모 숨기기가 옛 표를 다시 써 넣지 않게)
     fun assign(ctx: Context, widgetId: Int, memoId: String) {
-        map(ctx).edit().putString(widgetId.toString(), memoId).apply()
-        update(ctx, intArrayOf(widgetId))
+        val app = ctx.applicationContext
+        queued("위젯 정하기") {
+            map(app).edit().putString(widgetId.toString(), memoId).apply()
+            update(app, intArrayOf(widgetId))
+        }
     }
 
     fun forget(ctx: Context, widgetIds: IntArray) {
-        map(ctx).edit().apply { widgetIds.forEach { remove(it.toString()) } }.apply()
-        // 어느 위젯에도 없는 메모의 내용은 지운다
-        val used = allIds(ctx).toList().mapNotNull { memoOf(ctx, it) }.toSet()
-        data(ctx).edit().apply { data(ctx).all.keys.filter { it !in used }.forEach { remove(it) } }.apply()
+        val app = ctx.applicationContext
+        queued("위젯 치우기") {
+            map(app).edit().apply { widgetIds.forEach { remove(it.toString()) } }.apply()
+            // 어느 위젯에도 없는 메모의 내용은 지운다
+            val used = allIds(app).toList().mapNotNull { memoOf(app, it) }.toSet()
+            data(app).edit().apply { data(app).all.keys.filter { it !in used }.forEach { remove(it) } }.apply()
+        }
+    }
+
+    private fun queued(what: String, block: () -> Unit) = io.execute {
+        try {
+            block()
+        } catch (e: Exception) {
+            android.util.Log.w("MemoKing", "$what 실패", e)
+        }
     }
 
     /** 화면이 보낸 내용: [{id, title, color, file, lines:[{t, kind, done?, i?}]}] — 지워진 메모는 {id, gone:true} */

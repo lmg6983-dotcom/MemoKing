@@ -52,7 +52,13 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
       const info = pick(reminder, t);
       if (!info) continue;
       // 울리기 "전에" 먼저 울림 표시(last)를 파일에 적어, 같은 알림이 두 번 울리지 않게 한다.
-      if (!vault.updateReminder(memoId, markFired(reminder, t))) continue; // 적지 못했으면 다시 읽은 뒤 다음 차례에
+      let marked = null;
+      try {
+        marked = vault.updateReminder(memoId, markFired(reminder, t));
+      } catch (err) {
+        console.error('울림 표시를 적지 못했습니다', err); // 이 메모만 건너뛰고 다른 알림은 계속
+      }
+      if (!marked) continue; // 적지 못했으면 다시 읽은 뒤 다음 차례에
       // 시스템 알람이 이미 울렸으면 알림 막대에 다시 띄우지 않는다
       const already = info.at && native.wasFired(keyOf(memoId, reminder, info.offset), info.at);
       try {
