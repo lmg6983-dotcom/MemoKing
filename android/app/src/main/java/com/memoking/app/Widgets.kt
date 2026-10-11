@@ -44,6 +44,9 @@ object Widgets {
     private const val PIN_WAIT_MS = 10 * 60_000L
     private const val PICK_TOKEN = "widget_pick_token"
 
+    /** 위젯의 파일 일(체크·잠긴 메모 숨기기)은 이 한 줄로 차례대로 — 빠르게 두 번 눌러도 서로 덮어쓰지 않게 */
+    val io: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newSingleThreadExecutor()
+
     /**
      * 위젯을 눌러 "보일 메모 고르기" 를 시작할 때 함께 보내는 이 앱만 아는 표 — 메모킹 화면은 밖에 열려 있으므로
      * 다른 앱이 고르기를 흉내 내 다음에 누르는 메모를 엉뚱한 위젯에 놓게 하지 못하게
@@ -161,7 +164,9 @@ object Widgets {
                 content
             } ?: run {
                 if (System.currentTimeMillis() - missedAt >= 6 * 3600_000L) {
+                    // 찾지 못한 메모는 내용을 숨겨 둔다 (그사이 다른 기기가 이름을 바꿔 잠갔을 수도 — 앱을 열면 다시 맞춤)
                     memo.put("missedAt", System.currentTimeMillis())
+                    memo.put("lines", JSONArray().put(JSONObject().put("t", "메모킹을 열면 내용이 보여요").put("kind", "text")))
                     edit.putString(memoId, memo.toString())
                     changed = true
                 }
@@ -417,7 +422,7 @@ class MemoWidget : AppWidgetProvider() {
         // 파일 읽기는 화면 스레드가 아닌 곳에서 (메모 폴더를 뒤지는 동안 멈춘 것처럼 보이지 않게)
         val app = ctx.applicationContext
         val pending = goAsync()
-        Thread {
+        Widgets.io.execute {
             try {
                 Widgets.hideLocked(app)
             } catch (e: Exception) {
@@ -426,7 +431,7 @@ class MemoWidget : AppWidgetProvider() {
                 Widgets.update(app, ids)
                 pending.finish()
             }
-        }.start()
+        }
     }
 
     override fun onDeleted(ctx: Context, ids: IntArray) = Widgets.forget(ctx, ids)
@@ -517,20 +522,27 @@ class WidgetTapActivity : Activity() {
         val taskText = intent.getStringExtra(Widgets.EXTRA_TASK_TEXT)
         val shownDone = if (intent.hasExtra(Widgets.EXTRA_TASK_DONE)) intent.getBooleanExtra(Widgets.EXTRA_TASK_DONE, false) else null
         if (memoId.isNotEmpty() && task >= 0) {
-            // 파일 읽고 쓰기는 화면 스레드 밖에서 (느린 저장소에서도 누른 뒤 멈추지 않게)
+            // 파일 읽고 쓰기는 화면 스레드 밖에서, 차례대로 — 끝나면 이 (보이지 않는) 화면에서 필요하면 앱을 열고 닫는다
             val app = applicationContext
-            Thread {
+            Widgets.io.execute {
                 val ok = try {
                     Widgets.toggleTask(app, memoId, task, taskText, shownDone)
                 } catch (e: Exception) {
                     android.util.Log.w("MemoKing", "위젯 체크 실패", e)
                     false
                 }
-                if (!ok) openMemo(app, memoId) // 파일을 못 찾았으면(이름이 바뀌었는 등) 앱에서 열어 다시 맞추게
-            }.start()
-        } else if (memoId.isNotEmpty()) {
-            openMemo(this, memoId)
+                runOnUiThread {
+                    if (!ok) openMemo(this, memoId) // 파일을 못 찾았으면(이름이 바뀌었는 등) 앱에서 열어 다시 맞추게
+                    close()
+                }
+            }
+            return
         }
+        if (memoId.isNotEmpty()) openMemo(this, memoId)
+        close()
+    }
+
+    private fun close() {
         finish()
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)

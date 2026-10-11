@@ -27,6 +27,25 @@ export function lockedFiles(body, meta, files) {
 export const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
 /** 파일에 있는 머리말 그대로의 사본 (머리말만 쓰는 사이 다른 기기가 고쳤을 때, 이 기기가 바꾼 항목만 골라 더하려고) */
 export const diskCopy = (meta) => JSON.parse(JSON.stringify(meta ?? {}));
+/**
+ * 알림 목록 합치기 (알림마다): 그쪽 목록을 바탕으로, 이 기기에서 새로 만든 것은 더하고, 이 기기에서 바꾼 것(울림 기록 등)은
+ * 바꾼 대로, 이 기기에서 지운 것은 빼고 — 그쪽에서 지운 것은 되살리지 않는다
+ */
+export function mergeReminders(mine = [], disk = [], theirs = []) {
+  const key = (r) => JSON.stringify(r);
+  const diskById = new Map((disk ?? []).map((r) => [r.id, r]));
+  const mineById = new Map((mine ?? []).map((r) => [r.id, r]));
+  const out = [];
+  for (const t of theirs ?? []) {
+    const d = diskById.get(t.id);
+    const m = mineById.get(t.id);
+    if (d && !m) continue; // 이 기기에서 지움
+    out.push(m && d && key(m) !== key(d) ? m : t); // 이 기기에서 바꿨으면 그것
+  }
+  for (const m of mine ?? []) if (!diskById.has(m.id) && !out.some((r) => r.id === m.id)) out.push(m); // 이 기기에서 새로 만듦
+  return out;
+}
+
 /** 이 메모를 잠글 때 고른 것 (제목도 숨기기) — 저장마다 같게 */
 const sealOpts = (entry) => ({ hideTitle: entry.meta.extra?.lockHideTitle === true });
 
@@ -58,7 +77,8 @@ class LockMethods {
     // 그사이 다른 기기가 잠금: 저장하지 않음 (쓰던 글을 사본 메모로 남겼으면 copied)
     const wrote = this.write(entry, known);
     if (wrote !== true) {
-      entry.meta = before; // 쓰지 않았으니 머리말도 그대로
+      entry.meta = before; // 쓰지 않았으니 글·머리말도 그대로 (다시 저장할 때 "같은 글" 로 건너뛰지 않게)
+      entry.body = known;
       // skipped: 파일이 잠깐 없어 다시 읽는 중 — 화면은 조용히 곧 다시 저장한다
       return { ...this.summary(entry), refused: true, copied: wrote === 'copied', retry: wrote === 'skipped' };
     }
@@ -373,7 +393,8 @@ class LockMethods {
     const merged = { ...(theirMeta ?? {}), extra: { ...(theirMeta?.extra ?? {}) } };
     for (const k of Object.keys(mine)) {
       if (k === 'extra' || k === 'id') continue;
-      if (!disk || !same(mine[k], disk[k])) merged[k] = mine[k];
+      if (k === 'reminders') merged.reminders = mergeReminders(mine.reminders, disk?.reminders, theirMeta?.reminders);
+      else if (!disk || !same(mine[k], disk[k])) merged[k] = mine[k];
     }
     for (const k of Object.keys(mine.extra ?? {})) {
       if (k === 'lockRefs' || k === 'lockHideTitle') continue; // 잠금 정보는 늘 그쪽 것 (그 글에 맞는 것)

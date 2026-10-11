@@ -204,7 +204,8 @@ server.registerTool('create_memo', {
   try {
     const v = openVault();
     const id = v.create({ color });
-    v.save(id, `${content.trim()}\n`);
+    const saved = v.save(id, `${content.trim()}\n`);
+    if (saved?.refused) return fail('메모를 남기지 못했어요. 잠시 뒤 다시 해 주세요.');
     v.finalize(id);
     const m = v.get(id);
     if (!m) return fail('메모를 남기지 못했어요.');
@@ -238,8 +239,17 @@ server.registerTool('append_to_memo', {
     const isItem = (line) => /^\s*(?:[-*+]|\d+[.)])\s/.test(line ?? '');
     const gap = isItem(before.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
     const body = `${before}${gap}${add}\n`;
-    const saved = v.save(m.id, body);
-    if (saved?.refused) return fail(`"${m.title}" 은(는) 방금 다른 기기에서 잠겨 덧붙이지 못했어요.`);
+    let saved = v.save(m.id, body);
+    if (saved?.retry) {
+      v.scan({ silent: true }); // 파일이 잠깐 없었다 (동기화로 이름이 바뀌는 중 등) — 다시 읽고 한 번 더
+      const again = findMemo(v, m.id);
+      saved = again && !isLockedBody(again.body) ? v.save(m.id, `${again.body.replace(/\s+$/, '')}${gap}${add}\n`) : { refused: true };
+    }
+    if (saved?.refused) {
+      return fail(saved.retry
+        ? `"${m.title}" 메모 파일이 잠깐 보이지 않아 덧붙이지 못했어요. 잠시 뒤 다시 해 주세요.`
+        : `"${m.title}" 은(는) 방금 다른 기기에서 잠겨 덧붙이지 못했어요.`);
+    }
     return text({ ok: true, id: m.id, title: m.title });
   } catch (err) {
     return fail(err.message);

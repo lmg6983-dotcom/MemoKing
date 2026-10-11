@@ -462,3 +462,34 @@ test('머리말만 쓰는 사이 다른 기기가 지운 알림은 되살아나�
     v.close();
   }
 });
+
+test('알림 합치기: 그쪽에서 지운 것은 되살리지 않고, 이 기기의 울림 기록·새 알림은 남김', async () => {
+  const { mergeReminders } = await import('../app/js/core/vault-locks.js');
+  const a = { id: 'a', last: null };
+  const b = { id: 'b', last: null };
+  const disk = [a, b];
+  const mine = [{ id: 'a', last: '2026-10-11T09:00:00+09:00' }, b, { id: 'c', last: null }]; // a 울림, c 새로
+  const theirs = [a]; // 그쪽에서 b 지움
+  assert.deepEqual(mergeReminders(mine, disk, theirs).map((r) => [r.id, r.last]), [['a', '2026-10-11T09:00:00+09:00'], ['c', null]]);
+});
+
+test('파일이 잠깐 없어 저장을 미뤘으면, 다시 저장할 때 "같은 글" 로 건너뛰지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 메모\n\n처음');
+    const file = path.join(root, v.get(id).file);
+    const keep = fs.readFileSync(file, 'utf8');
+    fs.rmSync(file);
+    assert.equal(v.save(id, '# 메모\n\n고침').retry, true);
+    fs.writeFileSync(file, keep); // 돌아옴 (동기화 교체 등)
+    v.scan();
+    const r = v.save(id, '# 메모\n\n고침');
+    assert.ok(!r.refused);
+    assert.match(fs.readFileSync(file, 'utf8'), /고침/);
+  } finally {
+    v.close();
+  }
+});

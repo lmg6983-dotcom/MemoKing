@@ -568,7 +568,13 @@ app.heldLocks = new Map();
 // 열쇠는 늦어도 30분 뒤 버린다 (녹음이 버려지는 등 넣을 일이 끝내 없을 때 닫힌 잠긴 메모의 열쇠가 남지 않게)
 app.holdLock = (memoId, session) => {
   app.heldLocks.set(memoId, session);
-  setTimeout(() => app.heldLocks.get(memoId) === session && app.heldLocks.delete(memoId), 30 * 60_000);
+  const expire = () => {
+    if (app.heldLocks.get(memoId) !== session) return;
+    // 아직 녹음·받아쓰기 중이면 더 기다린다 (긴 회의 녹음이 끝났을 때 넣을 열쇠가 없어지지 않게)
+    if (recorder.recordingFor() === memoId || app.transcribing?.has(memoId)) setTimeout(expire, 10 * 60_000);
+    else app.heldLocks.delete(memoId);
+  };
+  setTimeout(expire, 30 * 60_000);
 };
 /** 닫힌 잠긴 메모를 잠깐 연다: 열었으면 true, 열 필요가 없으면 null, 못 열면 false */
 function openHeld(memoId) {
@@ -606,7 +612,12 @@ app.deliverRecording = async (r) => {
       lockedOut = true;
       memoId = app.vault.import({ body: `${heading}\n\n${voiceCardMarkdown(item, '')}\n` });
     } else if (memo) {
-      const r = app.vault.save(memoId, isBlankBody(memo.body) ? `${heading}\n\n${parts}\n` : `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
+      const next = isBlankBody(memo.body) ? `${heading}\n\n${parts}\n` : `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`;
+      let r = app.vault.save(memoId, next);
+      if (r?.retry) {
+        app.vault.scan(); // 파일이 잠깐 없었다 — 다시 읽고 한 번 더
+        r = app.vault.save(memoId, next);
+      }
       if (r?.refused && !r.copied) {
         // 그사이 다른 기기가 다시 잠가 넣지 못했다 — 소리만 새 메모에 (받아쓴 글은 잠긴 글이었을 수 있어 넣지 않음)
         lockedOut = true;

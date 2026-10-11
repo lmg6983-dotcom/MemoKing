@@ -110,6 +110,7 @@ export function flush() {
   try {
     const r = app.vault.save(id, body);
     if (r?.retry) {
+      refusedSave = true; // 이대로 닫으면 사본으로 남긴다 (closeNote)
       saveTimer = setTimeout(flush, 800); // 파일을 다시 읽은 뒤 다시 저장
       return;
     }
