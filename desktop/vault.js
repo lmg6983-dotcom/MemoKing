@@ -162,7 +162,7 @@ export class Vault extends EventEmitter {
       const old = this.entries.get(id);
       next.set(id, { id, file, meta, body, mtimeMs: stat.mtimeMs, size: stat.size, idSaved });
       changed.add(id);
-      if (old && old.body !== body) external.push(id);
+      if (!old || old.body !== body) external.push(id); // 밖에서 새로 들어온 메모도
     }
 
     const removed = [...this.entries.keys()].filter((id) => !next.has(id));
@@ -390,6 +390,11 @@ export class Vault extends EventEmitter {
     if (!isLockedBody(entry.body)) return entry.body;
     const session = this.locks.get(entry.id);
     return session ? unsealBody(entry.body, session) : null;
+  }
+
+  /** 풀 수 없는(열지 않은) 잠긴 메모가 있는가 — 첨부 정리는 그 메모가 쓰는 첨부를 모르므로 멈춘다 */
+  lockedUnknown() {
+    return [...this.entries.values()].some((e) => this.plainOf(e) === null);
   }
 
   /** 비밀번호를 넣어 연다 (세션이 이 메모를 풀 수 있어야) */
@@ -653,7 +658,7 @@ export class Vault extends EventEmitter {
       }
     }
     this.orphans.delete(id);
-    this.trashAttachments(extractAttachments(entry.body));
+    this.trashAttachments(extractAttachments(this.plainOf(entry) ?? ''));
     this.changed([id]);
     return trashed ?? true; // 휴지통 파일 이름 (되돌리기에 씀)
   }
@@ -671,8 +676,10 @@ export class Vault extends EventEmitter {
   // 지운 메모가 쓰던 첨부 중 남은 메모가 쓰지 않는 것만 _memoking/trash/attachments/ 로 옮긴다.
   // (메모도 휴지통으로 가므로 함께 두어 되살릴 수 있게. 같은 사진을 두 메모가 쓰면 남긴다.)
   trashAttachments(srcs) {
+    // 열지 않은 잠긴 메모는 무엇을 쓰는지 알 수 없다 — 그 메모의 사진을 치우지 않게 아무것도 옮기지 않는다
+    if (this.lockedUnknown()) return [];
     const inUse = new Set();
-    for (const e of this.entries.values()) for (const src of extractAttachments(e.body)) inUse.add(src);
+    for (const e of this.entries.values()) for (const src of extractAttachments(this.plainOf(e))) inUse.add(src);
     const moved = [];
     for (const src of new Set(srcs)) {
       if (!src.startsWith(`${ATTACH_DIR}/`) || inUse.has(src)) continue;
@@ -769,8 +776,10 @@ export class Vault extends EventEmitter {
 
   // 휴지통의 첨부 중 살아 있는 메모·휴지통에 남은 메모가 쓰지 않는 것을 지운다 (olderThan: 이 시각보다 먼저 들어온 것만)
   #purgeTrashAttachments(srcs, olderThan = Infinity) {
+    // 열지 않은 잠긴 메모(휴지통 것 포함)가 있으면 어느 첨부를 쓰는지 알 수 없어 지우지 않는다
+    if (this.lockedUnknown() || [...this.#trashEntries()].some((t) => isLockedBody(t.body))) return 0;
     const inUse = new Set();
-    for (const e of this.entries.values()) for (const s of extractAttachments(e.body)) inUse.add(s);
+    for (const e of this.entries.values()) for (const s of extractAttachments(this.plainOf(e))) inUse.add(s);
     for (const t of this.#trashEntries()) for (const s of extractAttachments(t.body)) inUse.add(s);
     let removed = 0;
     for (const src of new Set(srcs)) {

@@ -183,7 +183,8 @@ function openVault(dir) {
       driveSync?.request(3000); // 고친 것을 잠시 뒤 Google Drive 로
       for (const id of external) sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) sendToNote(id, 'memo:removed');
-      for (const id of ids) if (!removed.includes(id)) checkHandoff(next.get(id));
+      // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (이 PC 에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
+      for (const id of external) if (!removed.includes(id)) checkHandoff(next.get(id));
     });
     next.on('indexed', (index) => listWin?.webContents.send('vault:indexed', index.generatedAt));
     next.on('error', (err) => console.error('[vault]', err));
@@ -217,7 +218,12 @@ function vaultInfo() {
 const handoffSeen = new Set();
 let lastHandoff = null;
 function checkHandoff(memo) {
-  if (!memo?.file || noteWins.has(memo.id)) return false; // 이 PC 에서 열어 둔 메모는 창이 알아서 새 내용을 보여 준다
+  if (!memo?.file) return false;
+  if (noteWins.has(memo.id)) {
+    // 이 PC 에서 열어 둔 메모는 창이 알아서 새 내용을 보여 준다 — 본 것으로 쳐서, 창을 닫은 뒤에 뒤늦게 뜨지 않게
+    handoffFrom(memo, { mine: 'pc', seen: handoffSeen });
+    return false;
+  }
   const from = handoffFrom(memo, { mine: 'pc', seen: handoffSeen });
   if (!from) return false;
   lastHandoff = { id: memo.id, title: memo.title, from, at: Date.now() };
@@ -1108,7 +1114,7 @@ async function dragStart(id) {
   ghostWin.webContents.send('ghost:data', {
     color: memo.color,
     title: memo.title,
-    preview: extractPreview(memo.body, 400),
+    preview: memo.locked ? '' : extractPreview(memo.body, 400),
     open: noteWins.has(id),
   });
   // 첫 끌기에서는 미리보기 창이 준비되기 전에 이미 목록 밖으로 나갔을 수 있다.
@@ -1426,7 +1432,7 @@ function fireReminder(memoId, reminder, info) {
 
 // 알림만: Windows 알림(토스트). 누르면 메모가 앞으로 온다.
 function showToast(memoId, memo, alarm) {
-  const preview = extractPreview(memo.body, 120);
+  const preview = memo.locked ? '' : extractPreview(memo.body, 120); // 잠긴 메모는 연 동안에도 알림에 내용을 싣지 않는다
   toast({
     memoId,
     title: alarm.title ?? memo.title,

@@ -80,3 +80,18 @@ test('잠긴 메모의 사본: 원래 메모를 연 동안만 같은 열쇠, 사
   assert.equal(v.openLock(copy, session).body, '# 비밀 (사본)\n\n다시 들어온 글');
   v.close();
 });
+
+test('잠긴 메모만 쓰는 사진은 다른 메모를 지워도 치우지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  fs.writeFileSync(path.join(root, 'attachments', 'x.png'), 'png');
+  const a = v.create();
+  v.save(a, '# 보통\n\n![](attachments/x.png)');
+  const b = v.create();
+  v.save(b, '# 비밀\n\n![](attachments/x.png)');
+  v.lock(b, await newLockSession('사과1234', FAST), { keepOpen: false });
+  v.trash(a);
+  assert.ok(fs.existsSync(path.join(root, 'attachments', 'x.png')), '잠긴 메모의 사진이 남아 있어야');
+  v.close();
+});

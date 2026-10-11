@@ -42,4 +42,12 @@ class WidgetToggleTest {
         assertEquals("- [x] 우유", Widgets.toggleTaskText("- [x] 우유", 0, "우유", false))
         assertEquals("- [ ] 우유", Widgets.toggleTaskText("- [x] 우유", 0, "우유", true))
     }
+
+    @Test
+    fun stampsUpdatedAndDevice() {
+        val text = "---\nid: a\nupdated: 2026-10-01T09:00:00+09:00\ndevice: pc\n---\n- [x] 우유"
+        assertEquals("---\nid: a\nupdated: 2026-10-11T10:00:00+09:00\ndevice: phone\n---\n- [x] 우유", Widgets.stampEdit(text, "2026-10-11T10:00:00+09:00"))
+        assertEquals("---\nid: a\nupdated: N\ndevice: phone\n---\nx", Widgets.stampEdit("---\nid: a\nupdated: O\n---\nx", "N"))
+        assertEquals("머리말 없음", "- [ ] a", Widgets.stampEdit("- [ ] a", "N"))
+    }
 }

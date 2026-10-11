@@ -1361,6 +1361,8 @@ export function closeNote({ quiet = false } = {}) {
     console.error(err);
   }
   if (app.vault.get(closing) && !app.vault.get(closing).locked) autoTag(closing, body);
+  // 잠긴 메모에서 녹음하던 중에 닫으면: 열쇠는 앱이 따로 들고 있다가 녹음·받아쓰기를 그 메모에 넣을 때만 잠깐 쓴다
+  if (recorder.recordingFor() === closing && app.vault.locks.has(closing)) app.heldLocks.set(closing, app.vault.locks.get(closing));
   app.vault.closeLock(closing); // 잠금 메모는 닫으면 다시 비밀번호로
   document.activeElement?.blur();
   if (quiet || reduceMotion()) {

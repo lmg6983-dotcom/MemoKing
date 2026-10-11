@@ -555,6 +555,19 @@ const polish = (text) => fixTranscript(text, sttVocab());
 
 const whenLabel = recordingWhen;
 
+// 녹음하던 잠긴 메모를 닫았을 때 들고 있는 열쇠 (memoId → 세션) — 녹음·받아쓰기를 넣을 때만 잠깐 연다
+app.heldLocks = new Map();
+/** 닫힌 잠긴 메모를 잠깐 연다: 열었으면 true, 열 필요가 없으면 null, 못 열면 false */
+function openHeld(memoId) {
+  const memo = memoId && app.vault.get(memoId);
+  if (!memo?.needsPassword) return null;
+  const session = app.heldLocks.get(memoId);
+  return Boolean(session && app.vault.openLock(memoId, session));
+}
+function closeHeld(memoId, opened) {
+  if (opened && note.currentId() !== memoId) app.vault.closeLock(memoId);
+}
+
 app.deliverRecording = async (r) => {
   if (!app.vault || !r?.temp) return;
   const duration = recorder.formatDuration(r.durationMs ?? 0);
@@ -565,20 +578,29 @@ app.deliverRecording = async (r) => {
   // 소리와 받아쓴 글을 한 칸(음성 카드)에 — 문장마다 줄, 말한 사람이 바뀌면 이름표
   const card = voiceCardMarkdown(item, transcript);
   let memoId = r.memoId;
+  let lockedOut = false;
   if (note.currentId() === memoId) {
     note.insertRecording(card, `음성 메모 ${whenLabel(r.startedAt)}`);
   } else {
+    const opened = openHeld(memoId);
     const memo = memoId && app.vault.get(memoId);
     const parts = card;
     const heading = `# 음성 메모 ${whenLabel(r.startedAt)}`;
-    if (memo && !isBlankBody(memo.body)) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
+    if (memo?.needsPassword) {
+      // 잠긴 메모를 열 열쇠가 없다(앱을 다시 켬 등) — 잠긴 글에 덧붙이면 저장되지 않으므로, 소리만 새 메모에 (받아쓴 글은 넣지 않음)
+      lockedOut = true;
+      memoId = app.vault.import({ body: `${heading}\n\n${voiceCardMarkdown(item, '')}\n` });
+    } else if (memo && !isBlankBody(memo.body)) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
     else if (memo) app.vault.save(memoId, `${heading}\n\n${parts}\n`);
     else memoId = app.vault.import({ body: `${heading}\n\n${parts}\n` });
+    closeHeld(r.memoId, opened);
     list.refresh();
   }
-  toast(transcript ? `녹음(${duration})과 받아쓴 내용을 저장했어요` : `녹음(${duration})을 저장했어요`);
+  if (lockedOut) toast(`잠긴 메모를 열 수 없어 녹음(${duration})은 새 메모에 저장했어요`, true);
+  else toast(transcript ? `녹음(${duration})과 받아쓴 내용을 저장했어요` : `녹음(${duration})을 저장했어요`);
+  if (lockedOut || !(r.sttPending && recorder.sttOn() && recorder.sttReady())) app.heldLocks.delete(r.memoId);
   // 녹음 중에 받아쓰지 못했으면(음성 인식이 잠깐 안 됐음) 이제 녹음 파일로
-  if (r.sttPending && recorder.sttOn() && recorder.sttReady()) transcribeInto(memoId, [item]);
+  if (!lockedOut && r.sttPending && recorder.sttOn() && recorder.sttReady()) transcribeInto(memoId, [item]).finally(() => app.heldLocks.delete(memoId));
 };
 
 // ---------- 설정 ----------
@@ -870,10 +892,17 @@ async function transcribeInto(memoId, items) {
       if (note.currentId() === memoId) {
         if (!note.attachTranscript(item.src, text)) note.appendText(importText(text).markdown);
       } else {
+        const opened = openHeld(memoId);
         const memo = app.vault.get(memoId);
+        if (memo?.needsPassword) {
+          closeHeld(memoId, opened);
+          toast('잠긴 메모라 받아쓴 내용을 넣지 못했어요. 메모를 열고 다시 받아써 주세요', true);
+          continue;
+        }
         const next = memo && attachTranscript(memo.body, item.src, text);
         if (next) app.vault.save(memoId, next);
         else if (memo) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${importText(text).markdown}\n`);
+        closeHeld(memoId, opened);
       }
       toast('받아쓴 내용을 추가했어요');
     } catch (err) {
@@ -1045,7 +1074,8 @@ function openVault() {
     changeTimer = setTimeout(() => list.refresh(), 60);
     alarms.scheduleSoon();
     widgets.publishSoon();
-    for (const id of detail.ids ?? []) if (!detail.removed?.includes(id) && checkHandoff(id)) break;
+    // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (휴대폰에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
+    for (const id of detail.external ?? []) if (!detail.removed?.includes(id) && checkHandoff(id)) break;
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
   $('setup').hidden = true;
@@ -1079,7 +1109,12 @@ function openVault() {
 const handoffSeen = new Set();
 function checkHandoff(id) {
   const memo = app.vault?.get(id);
-  if (!memo?.file || note.currentId() === id) return false; // 지금 보고 있는 메모는 화면이 새 내용을 보여 준다
+  if (!memo?.file) return false;
+  if (note.currentId() === id) {
+    // 지금 보고 있는 메모는 화면이 새 내용을 보여 준다 — 본 것으로 쳐서, 닫은 뒤에 뒤늦게 뜨지 않게
+    handoffFrom(memo, { mine: 'phone', seen: handoffSeen });
+    return false;
+  }
   const from = handoffFrom(memo, { mine: 'phone', seen: handoffSeen });
   if (!from) return false;
   toast(handoffText(from, memo.title), false, { label: '열기', run: () => app.openMemo(id) });

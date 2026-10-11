@@ -39,6 +39,8 @@ object Widgets {
     const val ACTION_TAP = "com.memoking.app.WIDGET_TAP"
     const val ACTION_PICK = "com.memoking.app.WIDGET_PICK"
     const val ACTION_PINNED = "com.memoking.app.WIDGET_PINNED"
+    const val EXTRA_TOKEN = "token"
+    private const val PIN_TOKENS = "widget_pin_tokens" // 놓기 요청마다 한 번 쓰는 표 (메모 id → 표)
 
     private fun map(ctx: Context) = ctx.getSharedPreferences(MAP, Context.MODE_PRIVATE)
     private fun data(ctx: Context) = ctx.getSharedPreferences(DATA, Context.MODE_PRIVATE)
@@ -123,12 +125,25 @@ object Widgets {
     fun requestPin(ctx: Context, memoId: String): Boolean {
         val mgr = manager(ctx)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !mgr.isRequestPinAppWidgetSupported) return false
+        // 위젯 받는 곳은 런처가 부를 수 있게 밖에 열려 있다 — 다른 앱이 "놓았어요" 를 흉내 내 위젯을 엉뚱한 메모로 바꾸지 못하게
+        // 이 요청에만 맞는 표를 함께 보내고, 받을 때 맞춰 본 뒤 버린다
+        val token = java.util.UUID.randomUUID().toString()
+        ctx.getSharedPreferences(PIN_TOKENS, Context.MODE_PRIVATE).edit().putString(memoId, token).apply()
         val callback = PendingIntent.getBroadcast(
             ctx, memoId.hashCode(),
-            Intent(ctx, MemoWidget::class.java).setAction(ACTION_PINNED).putExtra(EXTRA_MEMO, memoId),
+            Intent(ctx, MemoWidget::class.java).setAction(ACTION_PINNED).putExtra(EXTRA_MEMO, memoId).putExtra(EXTRA_TOKEN, token),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE, // 런처가 위젯 id 를 채워 넣는다
         )
         return mgr.requestPinAppWidget(ComponentName(ctx, MemoWidget::class.java), null, callback)
+    }
+
+    /** 놓기 요청의 표가 맞는지 (맞으면 버림 — 한 번만) */
+    fun takePinToken(ctx: Context, memoId: String, token: String?): Boolean {
+        val prefs = ctx.getSharedPreferences(PIN_TOKENS, Context.MODE_PRIVATE)
+        val want = prefs.getString(memoId, null) ?: return false
+        if (token == null || token != want) return false
+        prefs.edit().remove(memoId).apply()
+        return true
     }
 
     fun update(ctx: Context, ids: IntArray) {
@@ -262,6 +277,29 @@ object Widgets {
         return lines.joinToString("\n")
     }
 
+    /**
+     * 머리말에 "휴대폰에서 지금 고침" 을 적는다 (updated · device) — 다른 고친 길과 같게, PC 의 이어 쓰기 안내·정렬이 맞게.
+     * 머리말이 없으면 그대로.
+     */
+    fun stampEdit(text: String, now: String): String {
+        val lines = text.split("\n").toMutableList()
+        if (lines.firstOrNull()?.trimEnd() != "---") return text
+        val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return text
+        var hasDevice = false
+        for (k in 1 until end) {
+            if (lines[k].startsWith("updated:")) lines[k] = "updated: $now"
+            if (lines[k].startsWith("device:")) {
+                lines[k] = "device: phone"
+                hasDevice = true
+            }
+        }
+        if (!hasDevice) lines.add(end, "device: phone")
+        return lines.joinToString("\n")
+    }
+
+    private fun nowIso(): String =
+        java.time.OffsetDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+
     /** 위젯에서 체크: 파일을 고치고, 위젯도 바로 그 모양으로 */
     fun toggleTask(ctx: Context, memoId: String, index: Int, taskText: String? = null, shownDone: Boolean? = null): Boolean {
         val memo = memo(ctx, memoId) ?: return false
@@ -269,7 +307,10 @@ object Widgets {
         val storage = Vaults.current(ctx) ?: return false
         val text = storage.openRead(file).use { it.readBytes().toString(Charsets.UTF_8) }
         val next = toggleTaskText(text, index, taskText, shownDone) ?: return false
-        if (next != text) storage.write(file) { it.write(next.toByteArray(Charsets.UTF_8)) }
+        if (next != text) {
+            val stamped = stampEdit(next, nowIso())
+            storage.write(file) { it.write(stamped.toByteArray(Charsets.UTF_8)) }
+        }
         DriveSync.request(ctx, 3000)
         val lines = memo.optJSONArray("lines") ?: JSONArray()
         for (k in 0 until lines.length()) {
@@ -296,7 +337,8 @@ class MemoWidget : AppWidgetProvider() {
         if (intent.action == Widgets.ACTION_PINNED) {
             val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             val memoId = intent.getStringExtra(Widgets.EXTRA_MEMO)
-            if (id != AppWidgetManager.INVALID_APPWIDGET_ID && !memoId.isNullOrEmpty()) Widgets.assign(ctx, id, memoId)
+            if (id != AppWidgetManager.INVALID_APPWIDGET_ID && !memoId.isNullOrEmpty()
+                && Widgets.takePinToken(ctx, memoId, intent.getStringExtra(Widgets.EXTRA_TOKEN))) Widgets.assign(ctx, id, memoId)
             return
         }
         super.onReceive(ctx, intent)

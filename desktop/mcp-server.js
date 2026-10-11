@@ -76,17 +76,24 @@ const canWrite = () => settings().mcp?.write !== false;
 const text = (value) => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }] });
 const fail = (message) => ({ content: [{ type: 'text', text: message }], isError: true });
 
-function findMemo(v, ref) {
+/**
+ * id 또는 제목으로 메모 찾기. exact: 고치는 도구(덧붙이기)는 id·제목이 딱 맞을 때만 — 비슷한 말이 든 엉뚱한 메모를 고치지 않게
+ */
+function findMemo(v, ref, { exact = false } = {}) {
   const key = String(ref ?? '').trim();
   if (!key) return null;
   const byId = v.get(key);
   if (byId?.file) return byId;
   const all = v.list();
-  const exact = all.find((m) => m.title === key) ?? all.find((m) => m.title.toLowerCase() === key.toLowerCase());
-  if (exact) return v.get(exact.id);
+  const same = all.find((m) => m.title === key) ?? all.find((m) => m.title.toLowerCase() === key.toLowerCase());
+  if (same) return v.get(same.id);
+  if (exact) return null;
   const found = v.search(key)[0];
   return found ? v.get(found.id) : null;
 }
+
+/** 비슷한 제목 몇 개 (찾지 못했을 때 AI 가 다시 고를 수 있게) */
+const closeTitles = (v, ref) => v.search(String(ref ?? '').trim()).slice(0, 5).map((m) => `${m.title} (id: ${m.id})`);
 
 const summaryOf = (m) => {
   const locked = Boolean(m.locked);
@@ -179,12 +186,14 @@ server.registerTool('create_memo', {
   annotations: { readOnlyHint: false, destructiveHint: false },
 }, async ({ content, color }) => {
   if (!canWrite()) return fail('메모킹 설정에서 "AI가 메모를 남기도록 허용" 이 꺼져 있어요.');
+  if (!content.trim()) return fail('메모 내용이 비어 있어요. content 에 남길 글을 넣어 주세요.');
   try {
     const v = openVault();
     const id = v.create({ color });
     v.save(id, `${content.trim()}\n`);
     v.finalize(id);
     const m = v.get(id);
+    if (!m) return fail('메모를 남기지 못했어요.');
     return text({ ok: true, id, title: m.title, file: m.file });
   } catch (err) {
     return fail(err.message);
@@ -193,16 +202,20 @@ server.registerTool('create_memo', {
 
 server.registerTool('append_to_memo', {
   title: '메모에 덧붙이기',
-  description: '이미 있는 메모의 끝에 내용을 덧붙입니다 (지우거나 고치지 않음). memo 에는 id 또는 제목.',
+  description: '이미 있는 메모의 끝에 내용을 덧붙입니다 (지우거나 고치지 않음). memo 에는 id 또는 정확한 제목 (모르면 search_memos 로 먼저 찾기).',
   inputSchema: { memo: z.string().describe('메모 id 또는 제목'), content: z.string().min(1).describe('덧붙일 마크다운') },
   annotations: { readOnlyHint: false, destructiveHint: false },
 }, async ({ memo, content }) => {
   if (!canWrite()) return fail('메모킹 설정에서 "AI가 메모를 남기도록 허용" 이 꺼져 있어요.');
   try {
     const v = openVault();
-    const m = findMemo(v, memo);
-    if (!m) return fail(`"${memo}" 메모를 찾지 못했어요.`);
+    const m = findMemo(v, memo, { exact: true });
+    if (!m) {
+      const near = closeTitles(v, memo);
+      return fail(`"${memo}" 와(과) 제목이 같은 메모가 없어요.${near.length ? ` 비슷한 메모: ${near.join(', ')} — 맞는 것의 id 로 다시 불러 주세요.` : ' search_memos 로 먼저 찾아 주세요.'}`);
+    }
     if (isLockedBody(m.body)) return fail(`"${m.title}" 은(는) 잠긴 메모라 덧붙일 수 없어요.`);
+    if (!content.trim()) return fail('덧붙일 내용이 비어 있어요.');
     // 목록 끝에 목록을 덧붙이면 한 목록으로 이어지게 (빈 줄 없이)
     const before = m.body.replace(/\s+$/, '');
     const add = content.trim();

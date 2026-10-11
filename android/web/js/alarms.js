@@ -35,7 +35,7 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
         native.notify({
           key: keyOf(memoId, reminder, info.offset),
           title,
-          text: [label, extractPreview(memo.body, 120)].filter(Boolean).join('\n'),
+          text: [label, memo.locked ? '' : extractPreview(memo.body, 120)].filter(Boolean).join('\n'), // 잠긴 메모는 연 동안에도 내용을 알림에 보이지 않는다
           memoId,
           label: alarm.label,
         });
@@ -89,7 +89,7 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
       if (!r.enabled || r.kind === 'startup') continue;
       if (r.kind === 'timer' && r.last) continue;
       const memo = vault.get(memoId);
-      const preview = extractPreview(memo?.body ?? '', 120);
+      const preview = memo?.locked ? '' : extractPreview(memo?.body ?? '', 120); // 잠긴 메모의 풀린 글이 예약 알림에 실리지 않게
       const title = alarmTitle(r, memoTitle);
       // 앞으로 울릴 알림(미리 알림 포함)을 몇 번 함께 맡겨, 앱을 한동안 열지 않아도 계속 울리게 한다
       const lastFired = r.last ? new Date(r.last) : null;

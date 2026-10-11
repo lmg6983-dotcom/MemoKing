@@ -60,3 +60,30 @@ test('메모 폴더가 사라져도(옮김·드라이브 빠짐) AI 비서 연�
     fs.rmSync(base, { recursive: true, force: true });
   }
 });
+
+test('덧붙이기는 제목이 딱 맞는 메모에만, 빈 내용은 거절', async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-mcp-'));
+  const dir = path.join(base, 'vault');
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, '주말 장보기 목록.md'), '# 주말 장보기 목록\n\n- 달걀\n');
+  fs.writeFileSync(path.join(dir, '일기.md'), '# 일기\n\n오늘 장보기를 했다\n');
+  const s = connect(dir);
+  try {
+    await s.call('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
+    s.proc.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+    const tool = (name, args) => s.call('tools/call', { name, arguments: args }).then((r) => r.result);
+    const miss = await tool('append_to_memo', { memo: '장보기', content: '- 우유' });
+    assert.equal(miss.isError, true);
+    assert.match(miss.content[0].text, /비슷한 메모/);
+    assert.ok(!fs.readFileSync(path.join(dir, '일기.md'), 'utf8').includes('우유'), '엉뚱한 메모를 고치지 않음');
+    const ok = await tool('append_to_memo', { memo: '주말 장보기 목록', content: '- 우유' });
+    assert.ok(!ok.isError);
+    assert.match(fs.readFileSync(path.join(dir, '주말 장보기 목록.md'), 'utf8'), /- 우유/);
+    const blank = await tool('create_memo', { content: '   ' });
+    assert.equal(blank.isError, true);
+    assert.match(blank.content[0].text, /비어 있어요/);
+  } finally {
+    s.proc.kill();
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
