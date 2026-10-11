@@ -143,6 +143,8 @@ class DateChip {
     this.chip = null;
     this.current = null;
     this.typing = false;
+    // 메모를 열어 둔 사이 시각이 지나면 밑줄도 거둔다 (지난 "3시 회의" 에 일정 추가 단추가 남지 않게)
+    this.tick = setInterval(() => !this.view.isDestroyed && !this.suspended && refreshDateRemind(this.view), 60_000);
     // 누르기·화살표로 커서를 옮겼을 때만 단추 — 치는 중(글이 바뀐 직후)에는 띄우지 않는다
     this.onPointer = () => (this.typing = false);
     this.onKey = (e) => {
@@ -244,6 +246,7 @@ class DateChip {
   }
 
   destroy() {
+    clearInterval(this.tick);
     this.hide();
     this.view.dom.removeEventListener('pointerdown', this.onPointer);
     this.view.dom.removeEventListener('keydown', this.onKey);

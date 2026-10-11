@@ -179,10 +179,10 @@ class LockMethods {
     if (isLockedBody(body) && !(session && unsealBody(body, session) !== null)) return null; // 열 수 없는 잠금 형식 글은 사본으로도 만들지 않음
     const source = this.entries.get(sourceId);
     let id;
-    if (session && !isLockedBody(body)) id = this.newCopy(source, sealBody(body, session, sealOpts(source ?? { meta: {} })), body);
+    if (session && !isLockedBody(body)) id = this.newCopy(source, sealBody(body, session, sealOpts(source ?? { meta: {} })), body, color);
     else {
       const plain = session ? unsealBody(body, session) : null;
-      id = this.newCopy(source, body, typeof plain === 'string' ? plain : null);
+      id = this.newCopy(source, body, typeof plain === 'string' ? plain : null, color);
     }
     if (session) {
       // 열쇠는 원래 메모에 묶어 둔다 — 사본을 따로 누르면 비밀번호를 묻고, 원래 메모를 닫으면 함께 잊는다
@@ -371,8 +371,8 @@ class LockMethods {
    * 사본 메모 하나 (잠근 글이면 원래 메모의 "제목 숨기기" 와 첨부 표까지 — plain 은 그 첨부 표를 만들 풀린 글)
    * @returns {string} 새 메모 id
    */
-  newCopy(source, body, plain = null) {
-    const id = this.create({ color: source?.meta.color });
+  newCopy(source, body, plain = null, color = source?.meta.color) {
+    const id = this.create({ color });
     const c = this.entries.get(id);
     c.body = body;
     if (isLockedBody(body)) {

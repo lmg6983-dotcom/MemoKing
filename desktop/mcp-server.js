@@ -8,7 +8,7 @@ import { McpServer, StdioServerTransport, z } from './vendor/mcp-sdk.js';
 import { Vault } from './vault.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { isLockedBody } from '../app/js/core/memo-lock.js';
-import { describeReminder, nextTime } from '../app/js/core/reminders.js';
+import { describeReminder, nextTime, isPastEvent } from '../app/js/core/reminders.js';
 
 const argv = process.argv.slice(2);
 const arg = (name) => {
@@ -160,7 +160,7 @@ server.registerTool('read_memo', {
     // 제목·id 가 딱 맞지 않아 찾기로 고른 메모면 그렇다고 알린다 (다른 메모를 그 메모로 오해하지 않게)
     const exactHit = m.id === String(memo).trim() || m.title.toLowerCase() === String(memo).trim().toLowerCase();
     if (isLockedBody(m.body)) return fail(`"${m.title}" 은(는) 잠긴 메모라 내용을 볼 수 없어요.`);
-    const reminders = (m.reminders ?? []).filter((r) => r.enabled).map((r) => {
+    const reminders = (m.reminders ?? []).filter((r) => r.enabled && !isPastEvent(r)).map((r) => {
       const next = nextTime(r);
       return { when: describeReminder(r), next: Number.isFinite(next) ? new Date(next).toISOString() : null };
     });

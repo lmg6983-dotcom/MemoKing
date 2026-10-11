@@ -344,8 +344,12 @@ export function findDates(text, now = new Date()) {
   const overlaps = (from, to) => taken.some((r) => from < r.to && to > r.from);
   const add = (from, to, at, hasTime, { past = false, repeat = null } = {}) => {
     if (overlaps(from, to)) return;
-    taken.push({ from, to });
-    if (past || !(at instanceof Date) || Number.isNaN(at.getTime())) return;
+    const span = { from, to };
+    taken.push(span);
+    if (past || !(at instanceof Date) || Number.isNaN(at.getTime())) {
+      span.skipped = true; // 지난 날 — 바로 뒤의 영어 시각도 지난 때로 (findAllDates)
+      return;
+    }
     // 되풀이는 이미 지났으면 다음 차례로
     if (repeat) at = nextRepeat(at, repeat, now);
     if (at.getTime() <= now.getTime() + 30_000) return;
@@ -409,7 +413,9 @@ export function findDates(text, now = new Date()) {
     add(from, end, at, true);
   }
 
-  return found.sort((a, b) => a.from - b.from);
+  const result = found.sort((a, b) => a.from - b.from);
+  Object.defineProperty(result, 'skipped', { value: taken.filter((t) => t.skipped) }); // 지난 날로 읽고 버린 자리
+  return result;
 }
 
 /**
@@ -437,6 +443,22 @@ export function findEnglishDates(text, chrono, now = new Date()) {
 /** 한국어 + 영어를 합쳐 겹치지 않게 */
 export function findAllDates(text, { chrono = null, now = new Date() } = {}) {
   const ko = findDates(text, now);
-  const en = findEnglishDates(text, chrono, now).filter((e) => !ko.some((k) => e.from < k.to && e.to > k.from));
+  const s = String(text ?? '');
+  // 한국어 날짜와 겹치거나, 지난 날 말 바로 뒤에 붙은 영어 시각("어제 3pm")은 빼고
+  const afterPast = (e) => (ko.skipped ?? []).some((k) => (e.from < k.to && e.to > k.from) || (k.to <= e.from && !s.slice(k.to, e.from).trim()));
+  const en = findEnglishDates(text, chrono, now).filter((e) => !ko.some((k) => e.from < k.to && e.to > k.from) && !afterPast(e));
+  // 한국어 날 말 바로 뒤의 영어 시각("내일 3pm")은 그날 그 시각 하나로 (오늘 3pm 을 따로 만들지 않게)
+  for (let i = en.length - 1; i >= 0; i--) {
+    const e = en[i];
+    if (!e.hasTime) continue;
+    const k = ko.find((x) => x.to <= e.from && !s.slice(x.to, e.from).trim());
+    if (!k) continue;
+    en.splice(i, 1);
+    if (k.hasTime || k.repeat) continue; // 이미 시각이 있거나 되풀이면 영어 쪽만 버린다
+    k.at = new Date(k.at.getFullYear(), k.at.getMonth(), k.at.getDate(), e.at.getHours(), e.at.getMinutes());
+    k.to = e.to;
+    k.text = s.slice(k.from, e.to).trim();
+    k.hasTime = true;
+  }
   return [...ko, ...en].sort((a, b) => a.from - b.from);
 }

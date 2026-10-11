@@ -12,6 +12,7 @@ import { extractTags } from '../app/js/core/tags.js';
 import { normalizeTables } from '../app/js/core/table-sizes.js';
 import { taskProgress } from '../app/js/core/tasks.js';
 import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
+import { isPastEvent } from '../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles } from '../app/js/core/vault-locks.js';
 import { textMatcher } from '../app/js/core/text-match.js';
 import {
@@ -237,7 +238,7 @@ export class Vault extends EventEmitter {
       hasAudio: has('audio'),
       hasVideo: has('video'),
       hasFile: has('file'),
-      reminderCount: entry.meta.reminders.filter((r) => r.enabled).length,
+      reminderCount: entry.meta.reminders.filter((r) => r.enabled && !isPastEvent(r)).length, // 지난 한 번짜리 일정은 세지 않음
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
       tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
       locked: isLockedBody(entry.body),

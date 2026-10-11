@@ -249,3 +249,12 @@ test('"낼" 이 "내다" 일 때는 날짜가 아님', () => table([
   ['회비 낼 사람', null, null],
   ['낼 아침 회의', '낼 아침', '2026-10-11 8:00'],
 ]));
+
+test('지난 날 말 바로 뒤의 영어 시각은 일정이 아님 ("어제 3pm")', async () => {
+  const { casual } = await import('../app/vendor/chrono.js');
+  assert.deepEqual(findAllDates('어제 3pm 회의', { chrono: casual, now: NOW }), []);
+  const merged = findAllDates('내일 3pm 회의', { chrono: casual, now: NOW });
+  assert.equal(merged.length, 1, '내일 3pm 은 하나');
+  assert.equal(merged[0].text, '내일 3pm');
+  assert.equal(fmt(merged[0].at), '2026-10-11 15:00');
+});

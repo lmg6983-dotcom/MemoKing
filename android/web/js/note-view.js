@@ -1271,7 +1271,9 @@ export async function openNote(memoId, options = {}) {
             // 비밀번호 화면이 떠 있는 사이 다른 기기가 다시 잠갔을 수 있어 지금 파일의 암호문으로
             const now = app.vault.entries.get(memoId)?.body ?? memo.body;
             if (!isLockedBody(now)) {
-              memo = app.vault.get(memoId); // 그사이 다른 기기에서 잠금을 풀었다 — 그대로 연다
+              const opened = app.vault.get(memoId); // 그사이 다른 기기에서 잠금을 풀었다 — 그대로 연다
+              if (!opened) return '메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요';
+              memo = opened;
               return null;
             }
             const { session } = await openLock(now, password);

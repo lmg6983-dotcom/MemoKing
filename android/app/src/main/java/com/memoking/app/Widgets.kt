@@ -89,6 +89,9 @@ object Widgets {
             val m = memos.getJSONObject(k)
             if (m.optBoolean("gone")) edit.remove(m.getString("id")) else edit.putString(m.getString("id"), m.toString())
         }
+        // 지워진 메모가 놓인 위젯은 "보일 메모 고르기" 로 되돌린다 (영원히 "열면 보여요" 로 남지 않게)
+        val gone = (0 until memos.length()).map { memos.getJSONObject(it) }.filter { it.optBoolean("gone") }.map { it.getString("id") }.toSet()
+        if (gone.isNotEmpty()) map(ctx).edit().apply { map(ctx).all.filter { (_, v) -> v in gone }.keys.forEach { remove(it) } }.apply()
         val incoming = (0 until memos.length()).map { memos.getJSONObject(it).getString("id") }.toSet()
         data(ctx).all.keys.filter { it !in used && it !in pending && it !in incoming }.forEach { edit.remove(it) }
         edit.apply()
