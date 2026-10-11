@@ -40,6 +40,7 @@ export function lockDialog({ onLock }) {
     dialog.append(form);
     document.body.append(dialog);
     let done = false;
+    let busy = false; // 잠그는 중에는 취소할 수 없다 (창만 닫히고 메모는 잠기는 일이 없게 — 끝나면 결과대로 닫힘)
     const finish = (value) => {
       if (done) return;
       done = true;
@@ -47,10 +48,10 @@ export function lockDialog({ onLock }) {
       dialog.remove();
       resolve(value);
     };
-    cancel.addEventListener('click', () => finish(false));
+    cancel.addEventListener('click', () => !busy && finish(false));
     dialog.addEventListener('cancel', (e) => {
       e.preventDefault();
-      finish(false);
+      if (!busy) finish(false);
     });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -60,9 +61,18 @@ export function lockDialog({ onLock }) {
         error.textContent = problem;
         return;
       }
+      busy = true;
       ok.disabled = true;
+      cancel.disabled = true;
       ok.textContent = '잠그는 중…';
-      const fail = await onLock(pw);
+      let fail;
+      try {
+        fail = await onLock(pw);
+      } catch (err) {
+        fail = err?.message || '잠그지 못했어요';
+      }
+      busy = false;
+      cancel.disabled = false;
       if (fail) {
         error.textContent = fail;
         ok.disabled = false;

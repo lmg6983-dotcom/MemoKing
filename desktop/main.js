@@ -2755,12 +2755,14 @@ function registerIpc() {
     return summary;
   });
   // 쓰는 중에 다른 기기에서도 고친 메모: 들어온 내용을 사본 메모로 따로 남긴다 (열어 둔 동안은 한 사본만 고쳐 쓴다)
-  ipcMain.handle('memo:keep-copy', (_e, sourceId, body, copyId) => {
+  // unlocked: 이 창에서는 잠기지 않았던 글 (다른 기기가 방금 잠근 메모에 쓰던 내용) — 열쇠가 없으니 그대로 사본으로
+  ipcMain.handle('memo:keep-copy', (_e, sourceId, body, copyId, { unlocked = false } = {}) => {
     if (!vault || typeof body !== 'string') return null;
     if (copyId && vault.get(copyId)) {
       vault.save(copyId, body);
       return copyId;
     }
+    if (unlocked && !vault.locks.has(sourceId)) return vault.import({ body, color: vault.get(sourceId)?.color });
     return vault.importCopyOf(sourceId, body, { color: vault.get(sourceId)?.color });
   });
   ipcMain.on('memo:save-sync', (event, id, body) => {

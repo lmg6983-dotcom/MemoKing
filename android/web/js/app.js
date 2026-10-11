@@ -393,7 +393,8 @@ memoSheet.addEventListener('click', async (e) => {
           try {
             note.flush();
             const session = await newLockSession(password);
-            return app.vault.lock(id, session) ? null : '잠그지 못했어요';
+            // 목록에서 잠갔으면 열쇠를 들고 있지 않는다 — 바로 눌러도 비밀번호를 묻게
+            return app.vault.lock(id, session, { keepOpen: note.currentId() === id }) ? null : '잠그지 못했어요';
           } catch (err) {
             return err.message;
           }

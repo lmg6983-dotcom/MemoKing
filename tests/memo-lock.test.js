@@ -48,3 +48,15 @@ test('세션: 한 번 연 열쇠로 저장마다 다시 잠그고 풀기 (동기
   const relocked = await lockBody('# 메모', '새비밀번호', FAST); // 다른 비밀번호로 다시 잠금 → 이전 세션으로는 못 풂
   assert.equal(unsealBody(relocked, session), null);
 });
+
+test('잠금 형식 글을 붙여 넣은 보통 메모는 잠긴 메모가 아니다', async () => {
+  const locked = await lockBody(body, '사과1234', FAST);
+  const comment = locked.slice(locked.indexOf('<!--'));
+  assert.equal(isLockedBody(`# 메모 앱 연구\n\n이런 줄이 파일에 있어요:\n\n${comment}\n그 뒤 글`), false);
+  assert.equal(isLockedBody(`# 붙여 넣음\n\n설명 한 줄\n\n${comment}`), false);
+  assert.equal(parseLocked(`앞 글 ${comment}`), null);
+  // 잠근 파일 그대로(줄 끝 \r\n · 앞 BOM 이어도)는 잠긴 메모
+  assert.ok(isLockedBody(locked));
+  assert.ok(isLockedBody(`﻿${locked.replace(/\n/g, '\r\n')}`));
+  assert.ok(isLockedBody(comment), '제목·안내 없이 암호문만');
+});

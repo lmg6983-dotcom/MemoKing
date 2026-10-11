@@ -59,6 +59,7 @@ export class Vault extends EventEmitter {
     /** @type {Map<string, {id, file: string|null, meta, body, mtimeMs, size, idSaved: boolean}>} */
     this.entries = new Map();
     this.locks = new Map(); // 연 잠금 메모: id → 세션 (메모를 닫으면 잊는다)
+    this.lockCopies = new Map(); // 잠긴 메모 id → 그 메모를 연 동안 만든 사본 id 들 (같은 열쇠)
     this.index = null;
     this.indexTimer = null;
     this.scanTimer = null;
@@ -262,7 +263,8 @@ export class Vault extends EventEmitter {
   get(id) {
     const entry = this.entries.get(id);
     if (!entry) return null;
-    const plain = this.plainOf(entry);
+    // 다른 메모를 연 동안 만든 잠긴 사본은 따로 열 때 비밀번호를 묻는다
+    const plain = this.isCopyLock(id) ? null : this.plainOf(entry);
     const locked = isLockedBody(entry.body);
     return {
       id,
@@ -395,11 +397,15 @@ export class Vault extends EventEmitter {
     const entry = this.entries.get(id);
     if (!entry || !isLockedBody(entry.body) || unsealBody(entry.body, session) === null) return null;
     this.locks.set(id, session);
+    for (const set of this.lockCopies.values()) set.delete(id); // 이제 제 비밀번호로 연 메모
     return this.get(id);
   }
 
+  /** 메모를 닫을 때: 열쇠를 잊는다 (그 메모를 연 동안 만든 사본의 열쇠도 함께 — 사본은 원래 메모가 열려 있는 동안만 고쳐 쓴다) */
   closeLock(id) {
     this.locks.delete(id);
+    for (const copy of this.lockCopies.get(id) ?? []) this.locks.delete(copy);
+    this.lockCopies.delete(id);
   }
 
   /** 다른 기기와 동시에 고친 내용의 사본: 원래 메모가 잠겼으면 사본도 같은 열쇠로 잠근다 (풀린 글이 사본으로 새지 않게) */
@@ -407,12 +413,25 @@ export class Vault extends EventEmitter {
     const session = this.locks.get(sourceId);
     if (!session && this.entries.get(sourceId) && isLockedBody(this.entries.get(sourceId).body) && !isLockedBody(body)) return null;
     const id = this.import({ body: session && !isLockedBody(body) ? sealBody(body, session) : body, color });
-    if (session) this.locks.set(id, session);
+    if (session) {
+      // 열쇠는 원래 메모에 묶어 둔다 — 사본을 따로 누르면 비밀번호를 묻고, 원래 메모를 닫으면 함께 잊는다
+      this.locks.set(id, session);
+      if (!this.lockCopies.has(sourceId)) this.lockCopies.set(sourceId, new Set());
+      this.lockCopies.get(sourceId).add(id);
+    }
     return id;
   }
 
-  /** 잠그기: 지금 본문을 잠근 글로 바꾸고, 잠그기 전 버전 기록(풀린 글)은 지운다 */
-  lock(id, session) {
+  /** 열쇠를 들고 있는 메모인가 (원래 메모가 열려 있는 사본은 제외 — 사본을 따로 열 때는 비밀번호를 묻는다) */
+  isCopyLock(id) {
+    return [...this.lockCopies.values()].some((set) => set.has(id));
+  }
+
+  /**
+   * 잠그기: 지금 본문을 잠근 글로 바꾸고, 잠그기 전 버전 기록(풀린 글)은 지운다
+   * keepOpen: 그 메모가 지금 열려 있을 때만 열쇠를 들고 있는다 (목록에서 잠갔으면 바로 비밀번호로 열리게)
+   */
+  lock(id, session, { keepOpen = true } = {}) {
     const entry = this.entries.get(id);
     if (!entry || isLockedBody(entry.body)) return null;
     const known = entry.body;
@@ -421,7 +440,8 @@ export class Vault extends EventEmitter {
     entry.meta.device = this.device;
     this.write(entry, known);
     this.purgeVersions(id);
-    this.locks.set(id, session);
+    if (keepOpen) this.locks.set(id, session);
+    else this.locks.delete(id);
     this.changed([id]);
     return this.get(id);
   }

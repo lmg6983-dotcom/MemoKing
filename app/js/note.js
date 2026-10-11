@@ -208,11 +208,28 @@ function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
 api.on('memo:external', async (next) => {
   if (!next) return;
   if (next.needsPassword) {
-    // 다른 기기에서 다른 비밀번호로 다시 잠갔다 — 이 창의 열쇠로는 풀 수 없으니 덮어쓰지 않고 닫는다
+    // 다른 기기에서 이 메모를 잠갔거나(이 창에선 안 잠긴 메모) 다른 비밀번호로 다시 잠갔다 — 이 창의 열쇠로는 풀 수 없으니
+    // 메모를 덮어쓰지 않는다. 다만 아직 저장 못 한 쓰던 글은 사본 메모로 먼저 남긴 뒤 닫는다 (쓰던 글이 사라지지 않게)
     clearTimeout(saveTimer);
-    saved = current = editor?.getMarkdown() ?? current;
-    setStatus('다른 기기에서 이 메모의 비밀번호를 바꿨어요. 다시 열어 주세요', true);
-    setTimeout(() => window.close(), 2500);
+    const wasLocked = Boolean(memo?.locked);
+    const what = wasLocked ? '다른 기기에서 이 메모의 비밀번호를 바꿨어요.' : '다른 기기에서 이 메모를 잠갔어요.';
+    let kept = '';
+    if (isDirty() && !isBlankBody(current)) {
+      try {
+        const copy = await api.memo.keepCopy(id, current, null, { unlocked: !wasLocked });
+        if (copy) kept = wasLocked ? ' 쓰던 내용은 예전 비밀번호로 잠근 사본 메모로 남겼어요.' : ' 쓰던 내용은 사본 메모로 따로 남겼어요.';
+      } catch (err) {
+        console.error(err);
+      }
+      if (!kept) {
+        // 사본도 못 만들었다 — 창을 닫지 않고 글을 그대로 둔다 (복사해 둘 수 있게)
+        setStatus(`${what} 쓰던 내용을 저장하지 못했어요. 글을 복사해 두세요`, true);
+        return;
+      }
+    }
+    saved = current;
+    setStatus(`${what}${kept} 다시 열 때 비밀번호를 넣어 주세요`, true);
+    setTimeout(() => window.close(), kept ? 4000 : 2500);
     return;
   }
   if (sameBody(next.body, current)) {
@@ -1576,7 +1593,7 @@ if (memo?.needsPassword) {
   document.body.dataset.color = memo.color;
   document.title = memo.title;
   document.body.classList.add('memo-locked');
-  await lockScreen(el.editorRoot, {
+  const opened = await lockScreen(el.editorRoot, {
     title: memo.title,
     onTry: async (password) => {
       const r = await api.memo.openLock(id, password);
@@ -1586,6 +1603,8 @@ if (memo?.needsPassword) {
     },
     onCancel: () => window.close(),
   });
+  // "닫기": 창이 닫히는 동안 암호문으로 편집기를 만들지 않는다 (여기서 멈춤)
+  if (!opened) await new Promise(() => {});
   document.body.classList.remove('memo-locked');
 }
 if (!memo) {

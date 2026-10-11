@@ -1181,7 +1181,13 @@ function setupPanels() {
  */
 export async function openNote(memoId, options = {}) {
   setupPanels();
-  if (opening) await opening;
+  if (opening) {
+    // 잠긴 메모의 비밀번호 화면이 떠 있는 채로 다른 메모를 고르면: 그 화면을 닫고 고른 메모로 (뒤로 가기를 기다리지 않게)
+    const lockCancel = el.editorRoot.querySelector('.lock-screen [data-lock-cancel]');
+    if (lockCancel && id === memoId) return; // 같은 메모 — 이미 비밀번호를 묻는 중
+    lockCancel?.click();
+    await opening;
+  }
   if (id === memoId && editor) {
     if (options.alarm) showAlarm(options.alarm);
     if (options.highlight) highlight();

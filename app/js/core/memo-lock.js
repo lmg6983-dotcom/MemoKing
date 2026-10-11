@@ -15,7 +15,13 @@ import { extractTitle, UNTITLED } from './memo-file.js';
 export const LOCK_VERSION = 'v1';
 export const LOCK_ITERATIONS = 310_000;
 export const LOCK_NOTICE = '🔒 잠긴 메모예요. 메모킹에서 비밀번호를 넣으면 열려요.';
-const LOCK_RE = /<!--\s*memoking-lock\s+(v\d+)\s+n=(\d+)\s+s=([A-Za-z0-9+/=]+)\s+i=([A-Za-z0-9+/=]+)\s+c=([A-Za-z0-9+/=]+)\s*-->/;
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// 잠긴 메모 파일의 본문 전체 모양: (제목 줄) (안내 한 줄) 암호문 주석 — 그 밖의 글이 있으면 잠긴 메모가 아니다
+// (암호문 주석을 붙여 넣은 보통 메모가 잠긴 메모로 오인돼 열 수도 고칠 수도 없게 되는 일이 없게)
+const LOCK_RE = new RegExp(
+  `^\\uFEFF?\\s*(?:#[^\\n]*\\n\\s*)?(?:${escapeRe(LOCK_NOTICE)}\\s*)?`
+  + '<!--\\s*memoking-lock\\s+(v\\d+)\\s+n=(\\d+)\\s+s=([A-Za-z0-9+/=]+)\\s+i=([A-Za-z0-9+/=]+)\\s+c=([A-Za-z0-9+/=]+)\\s*-->\\s*$',
+);
 
 export const isLockedBody = (body) => LOCK_RE.test(String(body ?? ''));
 

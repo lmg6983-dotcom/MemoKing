@@ -48,3 +48,35 @@ test('잠그면 파일·버전 어디에도 풀린 글이 남지 않고, 연 동
   v.close();
   v2.close();
 });
+
+test('목록에서 잠그면 열쇠를 들고 있지 않아 바로 눌러도 비밀번호를 묻는다', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '# 비밀\n\n목록에서 잠근 글');
+  const memo = v.lock(id, await newLockSession('사과1234', FAST), { keepOpen: false });
+  assert.equal(memo.needsPassword, true);
+  assert.ok(!memo.body.includes('목록에서 잠근 글'));
+  assert.ok(!v.get(id).body.includes('목록에서 잠근 글'));
+  v.close();
+});
+
+test('잠긴 메모의 사본: 원래 메모를 연 동안만 같은 열쇠, 사본을 따로 열면 비밀번호를 묻고, 원래 메모를 닫으면 잊는다', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '# 비밀\n\n원래 글');
+  v.lock(id, await newLockSession('사과1234', FAST));
+  const copy = v.importCopyOf(id, '# 비밀 (사본)\n\n다른 기기 글');
+  assert.ok(copy);
+  assert.ok(!allText(root).includes('다른 기기 글'));
+  assert.equal(v.get(copy).needsPassword, true, '사본을 바로 누르면 비밀번호');
+  assert.ok(!v.get(copy).body.includes('다른 기기 글'));
+  v.save(copy, '# 비밀 (사본)\n\n다시 들어온 글'); // 원래 메모가 열린 동안은 사본을 고쳐 쓸 수 있음
+  v.closeLock(id);
+  const { session } = await openLock(v.entries.get(copy).body, '사과1234');
+  assert.equal(v.openLock(copy, session).body, '# 비밀 (사본)\n\n다시 들어온 글');
+  v.close();
+});
