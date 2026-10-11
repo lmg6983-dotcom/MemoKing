@@ -63,7 +63,7 @@
 
     <nav class="tabs" role="tablist" aria-label="보기">
       <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
-      <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-bell"/></svg>알림 예약 <span class="tab-count" id="count-reminders"></span></button>
+      <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-calendar"/></svg>일정 <span class="tab-count" id="count-reminders"></span></button>
       <button role="tab" data-tab="history" aria-selected="false"><svg><use href="#i-inbox"/></svg>보관함</button>
     </nav>
 
@@ -83,7 +83,7 @@
 
     <div class="view" id="view-reminders" role="tabpanel" hidden>
       <div id="reminder-groups" class="rows"></div>
-      <p id="reminders-empty" class="empty" hidden>예약한 알림이 없어요.<br>메모 위쪽의 종 버튼으로 추가할 수 있어요.</p>
+      <p id="reminders-empty" class="empty" hidden>아직 일정이 없어요.<br>메모에 "내일 오후 3시 치과" 처럼 쓰고 밑줄을 누르거나, 메모 위쪽의 종 버튼으로 만들 수 있어요.</p>
     </div>
 
     <!-- 알림 보관함: 휴대폰에 온 다른 앱 알림 (app/js/list-history.js 가 그림) -->
@@ -282,21 +282,22 @@
   <aside id="reminder-panel" class="sheet links-panel reminder-panel" hidden>
     <div class="sheet-grip"></div>
     <header class="links-head">
-      <b>알림 예약</b>
-      <button id="reminder-close" class="icon-btn" aria-label="알림 예약 닫기"><svg><use href="#i-close"/></svg></button>
+      <b>일정과 알림</b>
+      <button id="reminder-close" class="icon-btn" aria-label="일정과 알림 닫기"><svg><use href="#i-close"/></svg></button>
     </header>
     <ul id="reminder-list" class="reminder-list"></ul>
 
     <form id="reminder-form" class="reminder-form">
-      <h4>새 알림</h4>
-      <div class="seg" id="rem-kind" role="radiogroup" aria-label="알림 종류">
-        <button type="button" data-kind="timer" aria-checked="true">타이머</button>
-        <button type="button" data-kind="at" aria-checked="false">날짜와 시간</button>
-        <button type="button" data-kind="repeat" aria-checked="false">반복</button>
+      <h4>새로 만들기</h4>
+      <div class="seg" id="rem-kind" role="radiogroup" aria-label="만들 것">
+        <button type="button" data-kind="at" aria-checked="true">일정</button>
+        <button type="button" data-kind="repeat" aria-checked="false">반복 일정</button>
+        <button type="button" data-kind="timer" aria-checked="false">타이머</button>
         <button type="button" data-kind="startup" aria-checked="false">앱 열 때</button>
       </div>
+      <label class="rem-row rem-title-row" id="rem-title-row">이름 <input type="text" id="rem-title" maxlength="80" autocomplete="off" placeholder="일정 이름 (비우면 메모 제목)"></label>
 
-      <div class="rem-pane" data-pane="timer">
+      <div class="rem-pane" data-pane="timer" hidden>
         <div class="chips" id="timer-presets">
           <button type="button" data-min="5">5분</button>
           <button type="button" data-min="10" aria-pressed="true">10분</button>
@@ -307,7 +308,7 @@
         <label class="rem-row">직접 입력 <input type="number" id="timer-min" min="1" max="10080" value="10" inputmode="numeric"> 분 후</label>
       </div>
 
-      <div class="rem-pane" data-pane="at" hidden>
+      <div class="rem-pane" data-pane="at">
         <input type="hidden" id="at-input">
         <div id="at-picker" class="date-picker" aria-label="날짜와 시각"></div>
       </div>
@@ -340,11 +341,16 @@
         <label class="rem-radio"><input type="radio" name="startup" value="once"> 다음에 열 때 한 번만</label>
       </div>
 
+      <div class="rem-alerts-wrap" id="rem-alerts-wrap">
+        <label class="rem-row rem-allday-row" id="rem-allday-row"><span>하루 종일</span><input type="checkbox" class="switch" id="rem-allday"></label>
+        <p class="rem-alerts-label" id="rem-alerts-label">미리 알림 <small>여러 개 고를 수 있어요</small></p>
+        <div class="chips rem-alerts" id="rem-alerts" role="group" aria-labelledby="rem-alerts-label"></div>
+      </div>
       <div class="rem-action" role="radiogroup" aria-label="알림 방식">
         <label class="rem-radio"><input type="radio" name="action" value="notify" checked> 알림으로 받기</label>
         <label class="rem-radio"><input type="radio" name="action" value="open"> 메모 바로 열기 <small>앱이 열려 있을 때</small></label>
       </div>
-      <button type="submit" class="btn primary rem-submit">알림 추가</button>
+      <button type="submit" class="btn primary rem-submit" id="rem-submit">일정 추가</button>
     </form>
   </aside>
 

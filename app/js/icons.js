@@ -54,6 +54,7 @@ const ICONS = {
   copy: `<rect x="8" y="8" width="12" height="12" rx="2" ${stroke}/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" ${stroke}/>`,
   note: `<path d="M5 4.5h14v10l-5 5H5z" ${stroke}/><path d="M14 19.5v-5h5M8.5 9h7M8.5 12.5h4" ${stroke}/>`,
   inbox: `<path d="M3.5 13.5l2.5-8h12l2.5 8v5a1.5 1.5 0 01-1.5 1.5h-14a1.5 1.5 0 01-1.5-1.5z" ${stroke}/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5" ${stroke}/>`,
+  'chev-right': `<path d="M9 6l6 6-6 6" ${stroke} stroke-width="2"/>`,
   chevrons: `<path d="M6 7l5 5-5 5M13 7l5 5-5 5" ${stroke} stroke-width="2"/>`,
   list: `<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" ${stroke} stroke-width="2.2"/>`,
   filter: `<path d="M4 5.5h16l-6.2 7.3V19l-3.6-1.8v-4.4L4 5.5z" ${stroke}/>`,

@@ -1254,8 +1254,8 @@ export async function openNote(memoId, options = {}) {
       tables: memo.tables ?? [],
       onTables: saveTables,
       readAttachment: async (src) => (await fetch(vaultUrl(src))).text(),
-      onDateReminder: ({ at, repeat }) => (repeat ? reminderPanel?.addRepeat(repeat) : reminderPanel?.addAt(at)) ?? false,
-      hasReminderAt: (at, repeat) => reminderAt(reminderPanel?.list, at, repeat),
+      onDateReminder: (event) => reminderPanel?.addEvent(event) ?? false,
+      hasReminderAt: (d) => reminderAt(reminderPanel?.list, d),
       tapContinuesList: true, // 목록 아래 줄을 눌러 줄을 바꾸는 사람도 목록이 이어지게
       scrollMargin: 96, // 쓰는 줄이 아래쪽 + · 다이얼에 가리지 않게
     });

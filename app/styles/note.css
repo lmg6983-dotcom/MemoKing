@@ -1715,3 +1715,11 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .memo-locked #bell-btn, .memo-locked #links-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
 .lock-dialog h2 { margin-bottom: 8px; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
+
+
+/* 일정과 알림 패널: 이름 · 하루 종일 · 미리 알림 (reminder-panel.js) */
+.rem-title-row input { flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-0); color: var(--text); font: inherit; }
+.rem-allday-row { justify-content: space-between; }
+.rem-alerts-label { margin: 8px 0 6px; font-size: 12.5px; font-weight: 600; }
+.rem-alerts-label small { font-weight: 400; color: var(--muted); }
+.rem-alerts button[aria-pressed="true"]::before { content: '✓ '; }

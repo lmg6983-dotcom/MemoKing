@@ -1111,15 +1111,28 @@ export async function runSmoke({
       const typingChip = await js(dn.win, `Boolean(document.querySelector('.mk-date-chip'))`);
       await key(dn.win, 'Home');
       const chip = await until(() => js(dn.win, `document.querySelector('.mk-date-chip')?.textContent ?? null`), '날짜 단추').catch(() => '');
-      check('글 속 날짜: 밑줄 · 치는 중에는 단추 없음 · 커서를 옮기면 "알림 맞추기" 단추',
-        under === '다음 주 화요일 오후 2시 반' && !typingChip && /오후 2:30 알림 맞추기/.test(chip), JSON.stringify({ under, typingChip, chip }));
+      check('글 속 날짜: 밑줄 · 치는 중에는 단추 없음 · 커서를 옮기면 "📅 일정 추가" 단추',
+        under === '다음 주 화요일 오후 2시 반' && !typingChip && /일정 추가: .*오후 2:30/.test(chip), JSON.stringify({ under, typingChip, chip }));
       await capture(dn.win, 'smoke-date-chip.png');
+      // 단추 → 일정 창: 이름은 줄에서 짐작(발표), 미리 알림은 고른다 (구글 캘린더처럼 시각이 아니라 미리)
       await js(dn.win, `document.querySelector('.mk-date-chip').click()`);
-      const set = await until(() => remindersOf(dn.id).find((r) => r.kind === 'at'), '날짜 알림 저장').catch(() => null);
+      const dlg = await until(() => js(dn.win, `document.querySelector('.event-dialog[open]') ? {
+        name: document.getElementById('event-name').value,
+        when: document.getElementById('event-when').textContent,
+        pressed: [...document.querySelectorAll('.event-alerts [aria-pressed="true"]')].map((b) => b.textContent),
+        chips: [...document.querySelectorAll('.event-alerts button')].map((b) => b.textContent),
+      } : null`), '일정 창').catch(() => null);
+      check('일정 창: 이름 짐작(발표) · 때 · 미리 알림 고르기 (기본 10분 전)',
+        dlg?.name === '발표' && /오후 2:30/.test(dlg.when) && dlg.pressed.length === 1 && /10분 전/.test(dlg.pressed[0]),
+        JSON.stringify(dlg));
+      await capture(dn.win, 'smoke-event-dialog.png');
+      await js(dn.win, `(() => { [...document.querySelectorAll('.event-alerts button')].find((b) => b.textContent.includes('하루 전')).click(); document.getElementById('event-save').click(); })()`);
+      const set = await until(() => remindersOf(dn.id).find((r) => r.kind === 'at'), '일정 저장').catch(() => null);
       const at = set ? new Date(set.at) : null;
-      check('글 속 날짜: 누르면 그 시각(화요일 14:30) 알림이 저장되고 밑줄이 실선으로',
+      check('일정 저장: 화요일 14:30 · 이름 "발표" · 미리 알림 하루 전과 10분 전 · 밑줄이 실선으로',
         Boolean(at) && at.getDay() === 2 && at.getHours() === 14 && at.getMinutes() === 30 && at > new Date()
-        && await until(() => js(dn.win, `Boolean(document.querySelector('.mk-doc .mk-date-set'))`), '실선').catch(() => false), set?.at);
+        && set.title === '발표' && JSON.stringify(set.alerts) === '[1440,10]'
+        && await until(() => js(dn.win, `Boolean(document.querySelector('.mk-doc .mk-date-set'))`), '실선').catch(() => false), JSON.stringify(set));
       // 메모를 그림 카드로 저장 (점검에서는 저장 창 없이 임시 폴더에) — 복사는 클립보드를 바꾸므로 smoke:clipboard 에서만
       await js(dn.win, `document.getElementById('image-save-btn').click()`);
       const savedMsg = await until(() => js(dn.win, `/그림으로 저장했어요/.test(document.getElementById('status').textContent) ? document.getElementById('status').textContent : null`), '그림 저장', 15000).catch(() => '');
@@ -1244,11 +1257,15 @@ export async function runSmoke({
     await listJs(`document.querySelector('[data-tab="reminders"]').click()`);
     await wait(400);
     const tab = await listJs(`({
-      rows: document.querySelectorAll('#reminder-groups .row').length,
-      first: document.querySelector('#reminder-groups .row .row-sub')?.textContent,
+      days: document.querySelectorAll('#reminder-groups .cal-day').length,
+      today: document.querySelector('#reminder-groups .cal-day.today[aria-pressed="true"]') !== null,
+      dots: document.querySelectorAll('#reminder-groups .cal-dots i').length,
+      events: [...document.querySelectorAll('#reminder-groups .ev-row')].map((r) => r.textContent),
+      timer: document.querySelector('#reminder-groups .rem-row-item .row-sub')?.textContent,
       count: document.getElementById('count-reminders').textContent,
     })`);
-    check('알림 예약 탭: 모든 알림을 다가오는 순으로 (타이머가 먼저)', tab.rows === 2 && /5분 타이머/.test(tab.first) && tab.count === '2', JSON.stringify(tab));
+    check('일정 탭: 한 달 달력(오늘 선택) · 매주 월 일정이 날짜별로 점·목록 (미리 알림 표시) · 타이머는 따로',
+      tab.days === 42 && tab.today && tab.dots >= 4 && tab.events.some((t) => /09:30|9:30/.test(t) && /알림 10분 전/.test(t)) && /5분 타이머/.test(tab.timer) && tab.count === '2', JSON.stringify(tab));
     await capture(lw, 'smoke-reminders-tab.png');
 
     // 14-3) 알림만: 시각이 되면 Windows 알림 (점검 때는 기록만) → 한 번짜리는 "완료"
@@ -1256,7 +1273,7 @@ export async function runSmoke({
     await js(rn.win, `window.memoking.reminders.set(${JSON.stringify(n1.id)}, [
       ...${JSON.stringify(saved)}, { kind: 'at', at: ${JSON.stringify(past(20_000))}, action: 'notify' }])`);
     const toast = await until(() => smokeToasts.find((t) => t.memoId === n1.id), 'Windows 알림').catch(() => null);
-    check('시각이 된 알림 → Windows 알림 (제목·알림 설명)', toast && toast.title === '장보기 목록' && /알림, /.test(toast.body), JSON.stringify(toast));
+    check('시각이 된 알림 → Windows 알림 (제목·때)', toast && toast.title === '장보기 목록' && /오늘 \d{2}:\d{2}/.test(toast.body), JSON.stringify(toast));
     const done = remindersOf(n1.id).find((r) => r.kind === 'at');
     check('한 번짜리 알림은 울린 뒤 꺼짐(완료)', done && !done.enabled && done.last);
     await closeNote(rn.id);

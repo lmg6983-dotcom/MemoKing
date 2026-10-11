@@ -21,7 +21,7 @@
     <button id="top-btn" class="icon-btn top-btn crown-btn" title="왕관 스티커를 붙여 다른 창보다 늘 위에 두기 (Ctrl+Shift+T, 다시 누르면 떼기)" aria-label="다른 창보다 늘 위에 두기" aria-pressed="false">
       <svg><use href="#i-crown-line"/></svg>
     </button>
-    <button id="bell-btn" class="icon-btn count-btn bell-btn" title="알림 예약 (Ctrl+Shift+A)" aria-label="예약 알림">
+    <button id="bell-btn" class="icon-btn count-btn bell-btn" title="일정과 알림 (Ctrl+Shift+A)" aria-label="일정과 알림">
       <svg><use href="#i-bell"/></svg><span id="bell-count" class="count"></span>
     </button>
     <button id="links-btn" class="icon-btn links-btn" title="메모 연결 (Ctrl+K)" aria-label="메모 연결">
@@ -84,21 +84,22 @@
   <!-- 예약 알림 패널 -->
   <aside id="reminder-panel" class="links-panel reminder-panel" hidden>
     <header class="links-head">
-      <b>알림 예약</b>
-      <button id="reminder-close" class="icon-btn" aria-label="알림 예약 닫기"><svg><use href="#i-close"/></svg></button>
+      <b>일정과 알림</b>
+      <button id="reminder-close" class="icon-btn" aria-label="일정과 알림 닫기"><svg><use href="#i-close"/></svg></button>
     </header>
     <ul id="reminder-list" class="reminder-list"></ul>
 
     <form id="reminder-form" class="reminder-form">
-      <h4>새 알림</h4>
-      <div class="seg" id="rem-kind" role="radiogroup" aria-label="알림 종류">
-        <button type="button" data-kind="timer" aria-checked="true">타이머</button>
-        <button type="button" data-kind="at" aria-checked="false">날짜와 시간</button>
-        <button type="button" data-kind="repeat" aria-checked="false">반복</button>
+      <h4>새로 만들기</h4>
+      <div class="seg" id="rem-kind" role="radiogroup" aria-label="만들 것">
+        <button type="button" data-kind="at" aria-checked="true">일정</button>
+        <button type="button" data-kind="repeat" aria-checked="false">반복 일정</button>
+        <button type="button" data-kind="timer" aria-checked="false">타이머</button>
         <button type="button" data-kind="startup" aria-checked="false">앱 열 때</button>
       </div>
+      <label class="rem-row rem-title-row" id="rem-title-row">이름 <input type="text" id="rem-title" maxlength="80" autocomplete="off" placeholder="일정 이름 (비우면 메모 제목)"></label>
 
-      <div class="rem-pane" data-pane="timer">
+      <div class="rem-pane" data-pane="timer" hidden>
         <div class="chips" id="timer-presets">
           <button type="button" data-min="5">5분</button>
           <button type="button" data-min="10" aria-pressed="true">10분</button>
@@ -109,7 +110,7 @@
         <label class="rem-row">직접 입력 <input type="number" id="timer-min" min="1" max="10080" value="10"> 분 후</label>
       </div>
 
-      <div class="rem-pane" data-pane="at" hidden>
+      <div class="rem-pane" data-pane="at">
         <input type="hidden" id="at-input">
         <div id="at-picker" class="date-picker" aria-label="날짜와 시각"></div>
       </div>
@@ -142,11 +143,16 @@
         <label class="rem-radio"><input type="radio" name="startup" value="once"> 다음에 열 때 한 번만</label>
       </div>
 
+      <div class="rem-alerts-wrap" id="rem-alerts-wrap">
+        <label class="rem-row rem-allday-row" id="rem-allday-row"><span>하루 종일</span><input type="checkbox" class="switch" id="rem-allday"></label>
+        <p class="rem-alerts-label" id="rem-alerts-label">미리 알림 <small>여러 개 고를 수 있어요</small></p>
+        <div class="chips rem-alerts" id="rem-alerts" role="group" aria-labelledby="rem-alerts-label"></div>
+      </div>
       <div class="rem-action" role="radiogroup" aria-label="알림 방식">
         <label class="rem-radio"><input type="radio" name="action" value="notify" checked> 알림으로 받기</label>
         <label class="rem-radio"><input type="radio" name="action" value="open"> 메모 바로 열기</label>
       </div>
-      <button type="submit" class="btn primary rem-submit">알림 추가</button>
+      <button type="submit" class="btn primary rem-submit" id="rem-submit">일정 추가</button>
     </form>
   </aside>
 

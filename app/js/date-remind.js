@@ -1,12 +1,14 @@
-// 글 속 날짜에 알림 맞추기 — "내일 오후 3시" 같은 말에 점선 밑줄, 그 말을 누르면(또는 커서를 옮기면)
-// 바로 아래에 "🔔 10월 11일 (일) 오후 3:00 알림" 단추가 뜨고, 누르면 그 시각에 이 메모 알림을 맞춘다.
-//   치는 중에는 단추를 띄우지 않는다 (누르거나 화살표로 옮겼을 때만) · 이미 맞춘 시각이면 밑줄이 실선 + "맞춤" 표시
+// 글 속 날짜로 일정 만들기 — "내일 오후 3시 치과" 같은 말에 점선 밑줄, 그 말을 누르면(또는 커서를 옮기면)
+// 바로 아래에 "📅 일정 추가: 내일 오후 3:00" 단추. 누르면 일정 창(event-editor.js)에서 이름(치과)과
+// 미리 알림(30분 전 · 하루 전 …)을 고르고 저장 — 구글 캘린더처럼 일정 시각이 아니라 "미리" 알린다.
+//   치는 중에는 단추를 띄우지 않는다 (누르거나 화살표로 옮겼을 때만) · 이미 일정이 있으면 밑줄이 실선 + "일정 있어요"
 //   PC·휴대폰 같은 코드. 날짜 찾기는 core/date-detect.js (한국어) + chrono (영어, MIT)
 import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { casual as chrono } from '../vendor/chrono.js';
 import { findAllDates } from './core/date-detect.js';
 import { koClock, koMonthDay } from './core/time.js';
 import { hintOnce } from './hints.js';
+import { openEventEditor } from './event-editor.js';
 
 export const dateRemindKey = new PluginKey('memoking-date-remind');
 const WEEKDAY = '일월화수목금토';
@@ -28,7 +30,20 @@ export function repeatLabel(repeat, at) {
   if (repeat.every === 'month') return `매달 ${repeat.day}일 ${clock}`;
   return `매년 ${repeat.month}월 ${repeat.day}일 ${clock}`;
 }
-const chipLabel = (d) => (d.repeat ? repeatLabel(d.repeat, d.at) : dateLabel(d.at));
+const chipLabel = (d) => (d.repeat ? repeatLabel(d.repeat, d.at) : d.hasTime ? dateLabel(d.at) : dateLabel(d.at).replace(/ (오전|오후) .*$/, ''));
+
+/** 일정 이름 짐작: 그 줄에서 날짜 말을 빼고 남은 말 ("내일 오후 3시 치과" → "치과", "15일까지 보고서 제출" → "보고서 제출") */
+export function guessTitle(line, from, to) {
+  const rest = `${line.slice(0, from)} ${line.slice(to)}`
+    .replace(/\uFFFC/g, ' ')
+    .replace(/^\s*(?:까지|에는|에|부터|은|는|이|가|의|쯤|경)(?=\s|$)/, '')
+    .replace(/(?:^|\s)(?:까지|에는|에|부터)(?=\s)/g, ' ')
+    .replace(/[\s,:·\-–~]+$/, '')
+    .replace(/^[\s,:·\-–~]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return rest.slice(0, 40);
+}
 
 function findInDoc(doc, now) {
   const found = [];
@@ -43,7 +58,7 @@ function findInDoc(doc, now) {
       // 인라인 코드·링크 안은 빼고
       const $from = doc.resolve(pos + 1 + d.from);
       if ($from.marks().some((m) => m.type.spec.code || m.type.name === 'link')) continue;
-      found.push({ ...d, from: pos + 1 + d.from, to: pos + 1 + d.to });
+      found.push({ ...d, from: pos + 1 + d.from, to: pos + 1 + d.to, title: guessTitle(text, d.from, d.to) });
     }
     return false;
   });
@@ -56,12 +71,12 @@ function findInDoc(doc, now) {
  */
 export function createDateRemind({ readOnly = false, onAdd, hasReminderAt } = {}) {
   if (readOnly || !onAdd) return new Plugin({ key: dateRemindKey });
-  const isSet = (d) => Boolean(hasReminderAt?.(d.at, d.repeat));
+  const isSet = (d) => Boolean(hasReminderAt?.(d));
   const build = (doc) => {
     const dates = findInDoc(doc, new Date());
     const decos = dates.map((d) => Decoration.inline(d.from, d.to, {
       class: isSet(d) ? 'mk-date mk-date-set' : 'mk-date',
-      title: isSet(d) ? `${chipLabel(d)} 알림이 맞춰져 있어요` : `누르면 ${chipLabel(d)} 알림을 맞출 수 있어요`,
+      title: isSet(d) ? `${chipLabel(d)} 일정이 있어요` : `누르면 ${chipLabel(d)} 일정을 만들고 미리 알림을 고를 수 있어요`,
     }, { date: d }));
     return DecorationSet.create(doc, decos);
   };
@@ -119,13 +134,14 @@ class DateChip {
         if (!this.chip && view.dom.querySelector('.mk-date')) hintOnce('date-remind', '밑줄 친 날짜를 누르면 그 시각에 알림을 맞출 수 있어요');
       }, 900);
     }
+    if (this.suspended) return this.hide();
     const hit = sel.empty && view.editable && !this.typing && decos
       ? decos.find(sel.from, sel.from).find((d) => sel.from >= d.from && sel.from <= d.to)
       : null;
     if (!hit) return this.hide();
     const date = hit.spec.date;
     if (this.current && this.current.from === hit.from && this.current.at.getTime() === date.at.getTime()) return this.place();
-    this.current = { from: hit.from, to: hit.to, at: date.at, text: date.text, hasTime: date.hasTime, repeat: date.repeat ?? null };
+    this.current = { from: hit.from, to: hit.to, at: date.at, text: date.text, hasTime: date.hasTime, repeat: date.repeat ?? null, title: date.title ?? '' };
     this.show();
   }
 
@@ -133,29 +149,33 @@ class DateChip {
     this.hide({ keepCurrent: true });
     const cur = this.current;
     const set = this.isSet(cur);
-    const icon = cur.repeat ? '🔁' : '🔔';
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = `mk-date-chip${set ? ' set' : ''}`;
-    chip.textContent = set ? `${icon} ${chipLabel(cur)} 알림 맞춤` : `${icon} ${chipLabel(cur)} 알림 맞추기`;
+    chip.textContent = set ? `📅 일정 있어요: ${chipLabel(cur)}` : `📅 일정 추가: ${chipLabel(cur)}`;
     chip.disabled = set;
-    chip.setAttribute('aria-label', chip.textContent.replace(/^\S+ /, ''));
+    chip.setAttribute('aria-label', set ? `${chipLabel(cur)} 일정이 있어요` : `${chipLabel(cur)} 일정 추가`);
     // 편집기의 커서·초점을 빼앗지 않게 (누르는 순간 편집기가 흐려지면 단추가 사라짐)
     chip.addEventListener('pointerdown', (e) => e.preventDefault());
     chip.addEventListener('mousedown', (e) => e.preventDefault());
     chip.addEventListener('click', async () => {
-      const cur = this.current;
-      if (!cur || chip.disabled) return;
-      chip.disabled = true;
-      const ok = await this.onAdd({ at: cur.at, text: cur.text, hasTime: cur.hasTime, repeat: cur.repeat });
-      if (ok === false) {
-        chip.disabled = false;
-        return;
-      }
-      chip.classList.add('set');
-      chip.textContent = `${cur.repeat ? '🔁' : '🔔'} ${chipLabel(cur)} 알림 맞춤`;
-      refreshDateRemind(this.view);
-      setTimeout(() => this.hide(), 1400);
+      const c = this.current;
+      if (!c || chip.disabled) return;
+      this.hide();
+      this.suspended = true; // 일정 창이 떠 있는 동안은 단추를 다시 띄우지 않는다
+      // 일정 창: 이름(줄에서 짐작) · 때 · 미리 알림 고르기
+      const picked = await openEventEditor({
+        title: c.title,
+        start: c.at,
+        allDay: !c.hasTime && !c.repeat,
+        repeatLabel: c.repeat ? repeatLabel(c.repeat, c.at) : null,
+      });
+      this.suspended = false;
+      this.typing = true; // 창을 닫은 뒤 같은 자리에 단추가 바로 다시 뜨지 않게 (커서를 옮기면 다시)
+      if (!picked) return;
+      const ok = await this.onAdd({ ...picked, repeat: c.repeat, text: c.text });
+      if (ok !== false) refreshDateRemind(this.view);
+      if (!this.view.isDestroyed) this.view.focus();
     });
     document.body.append(chip);
     this.chip = chip;
@@ -197,15 +217,18 @@ class DateChip {
   }
 }
 
-/** 메모의 알림 중 그 시각(1분 안)에 울리는 것이 있는지 — 되풀이면 같은 되풀이 알림이 있는지 */
-export function reminderAt(reminders, at, repeat = null) {
+/** 메모에 이 날짜의 일정(또는 예전 알림)이 이미 있는지 — 되풀이면 같은 되풀이, 날짜만이면 같은 날 */
+export function reminderAt(reminders, { at, repeat = null, hasTime = true }) {
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   return (reminders ?? []).some((r) => {
-    if (r.enabled === false) return false;
+    if (r.enabled === false && !r.last) return false;
     if (repeat) {
       const x = r.kind === 'repeat' ? r.repeat : null;
       return Boolean(x) && x.every === repeat.every && x.time === repeat.time
         && (x.weekdays ?? []).join() === (repeat.weekdays ?? []).join() && (x.day ?? null) === (repeat.day ?? null) && (x.month ?? null) === (repeat.month ?? null);
     }
-    return r.at && r.kind !== 'repeat' && Math.abs(Date.parse(r.at) - at.getTime()) < SAME_MS;
+    if (!r.at || r.kind !== 'at') return false;
+    if (!hasTime) return sameDay(new Date(r.at), at);
+    return Math.abs(Date.parse(r.at) - at.getTime()) < SAME_MS;
   });
 }

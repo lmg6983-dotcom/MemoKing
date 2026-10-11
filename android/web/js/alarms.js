@@ -2,16 +2,16 @@
 //   앱이 켜져 있을 때: 15초마다 살펴 울릴 때가 된 알림을 울리고 메모 파일에 last 를 적는다.
 //   앱이 꺼져 있을 때: 다음 알림 시각들을 시스템 알람에 맡겨 둔다 (Alarms.kt). 그때 울린 알림은
 //                     다음에 앱을 켰을 때 다시 울리지 않고 last 만 적는다 (wasFired).
-import { dueOccurrence, dueAtStartup, markFired, nextOccurrence, describeReminder } from '../../app/js/core/reminders.js';
+import { dueOccurrence, dueAtStartup, markFired, nextAlert, alarmLabel as eventLabel, alarmTitle } from '../../app/js/core/reminders.js';
 import { extractPreview } from '../../app/js/core/memo-file.js';
 import { native } from './native.js';
 
-const keyOf = (memoId, reminder) => `${memoId}/${reminder.id}`;
-const REPEAT_AHEAD = 14; // 매일 알림이면 2주치
+// 일정의 미리 알림마다 따로 (같은 일정의 "하루 전" 과 "30분 전" 이 서로를 지우지 않게)
+const keyOf = (memoId, reminder, offset = 0) => `${memoId}/${reminder.id}${offset ? `/${offset}` : ''}`;
+const AHEAD = 14; // 앞으로 몇 번의 알림을 시스템에 맡길지 (매일 일정이면 2주치)
 
-export function alarmLabel(reminder, info = {}) {
-  const kind = info.missed ? '놓친 알림' : info.startup ? '켤 때 알림' : '알림';
-  return `${kind}, ${describeReminder(reminder)}`;
+export function alarmLabel(reminder, info = {}, now = new Date()) {
+  return eventLabel(reminder, info, now);
 }
 
 /**
@@ -27,13 +27,15 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
     const vault = getVault();
     const memo = vault?.get(memoId);
     if (!memo) return;
-    const alarm = { reminderId: reminder.id, label: alarmLabel(reminder, info), missed: Boolean(info.missed) };
+    const title = alarmTitle(reminder, memo.title);
+    const label = alarmLabel(reminder, info);
+    const alarm = { reminderId: reminder.id, label: title === memo.title ? label : `${title}, ${label}`, missed: Boolean(info.missed) };
     if (!silent) {
       try {
         native.notify({
-          key: keyOf(memoId, reminder),
-          title: memo.title,
-          text: [alarm.label, extractPreview(memo.body, 120)].filter(Boolean).join('\n'),
+          key: keyOf(memoId, reminder, info.offset),
+          title,
+          text: [label, extractPreview(memo.body, 120)].filter(Boolean).join('\n'),
           memoId,
           label: alarm.label,
         });
@@ -55,7 +57,7 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
       // 울리기 "전에" 먼저 울림 표시(last)를 파일에 적어, 같은 알림이 두 번 울리지 않게 한다.
       vault.updateReminder(memoId, markFired(reminder, t));
       // 시스템 알람이 이미 울렸으면 알림 막대에 다시 띄우지 않는다
-      const already = info.at && native.wasFired(keyOf(memoId, reminder), info.at);
+      const already = info.at && native.wasFired(keyOf(memoId, reminder, info.offset), info.at);
       try {
         fire(memoId, reminder, info, { silent: already });
       } catch (err) {
@@ -69,7 +71,7 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
 
   const tick = () => run((r, t) => {
     const due = dueOccurrence(r, t);
-    return due ? { missed: due.missed, at: due.at.getTime() } : null;
+    return due ? { missed: due.missed, at: due.at.getTime(), start: due.start, offset: due.offset } : null;
   });
 
   // 앱을 켤 때 (실행할 때 알림) — 처음 켤 때 한 번만
@@ -83,19 +85,24 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
     if (!vault) return;
     const now = new Date();
     const items = [];
-    for (const { memoId, title, reminder: r } of vault.allReminders()) {
+    for (const { memoId, title: memoTitle, reminder: r } of vault.allReminders()) {
       if (!r.enabled || r.kind === 'startup') continue;
-      if ((r.kind === 'timer' || r.kind === 'at') && r.last) continue;
-      const label = alarmLabel(r);
+      if (r.kind === 'timer' && r.last) continue;
       const memo = vault.get(memoId);
-      const text = [label, extractPreview(memo?.body ?? '', 120)].filter(Boolean).join('\n');
-      // 반복 알림은 앞으로 몇 회차를 함께 맡겨, 앱을 한동안 열지 않아도 계속 울리게 한다
-      let from = now;
-      for (let i = 0; i < (r.kind === 'repeat' ? REPEAT_AHEAD : 1); i++) {
-        const next = nextOccurrence(r, from);
+      const preview = extractPreview(memo?.body ?? '', 120);
+      const title = alarmTitle(r, memoTitle);
+      // 앞으로 울릴 알림(미리 알림 포함)을 몇 번 함께 맡겨, 앱을 한동안 열지 않아도 계속 울리게 한다
+      const lastFired = r.last ? new Date(r.last) : null;
+      let from = lastFired && lastFired > now ? lastFired : now;
+      for (let i = 0; i < (r.kind === 'repeat' ? AHEAD : 6); i++) {
+        const next = nextAlert(r, from);
         if (!next) break;
-        items.push({ key: keyOf(memoId, r), at: next.getTime(), title, text, memoId, label, action: r.action });
-        from = next;
+        const label = alarmLabel(r, { start: next.start, offset: next.offset }, next.at);
+        items.push({
+          key: keyOf(memoId, r, next.offset), at: next.at.getTime(), title,
+          text: [label, preview].filter(Boolean).join('\n'), memoId, label: title === memoTitle ? label : `${title}, ${label}`, action: r.action,
+        });
+        from = next.at;
       }
     }
     try {

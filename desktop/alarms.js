@@ -32,7 +32,7 @@ export function createAlarmRunner({ getVault, fire, now = () => new Date(), inte
   // 날짜·시간·반복·타이머
   const tick = () => run((r, t) => {
     const due = dueOccurrence(r, t);
-    return due ? { missed: due.missed } : null;
+    return due ? { missed: due.missed, start: due.start, offset: due.offset } : null;
   });
 
   // 앱을 시작할 때 (실행할 때 알림) — 프로그램이 켜질 때 한 번만 부른다

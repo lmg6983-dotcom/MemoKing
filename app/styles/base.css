@@ -492,3 +492,69 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   font-family: inherit;
   font-size: 12px;
 }
+
+/* ---------- 일정 창 (event-editor.js, PC·휴대폰): 이름 · 때 · 미리 알림 ---------- */
+.event-dialog { width: min(380px, calc(100vw - 32px)); }
+.event-dialog h2 { margin-bottom: 10px; }
+.event-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+.event-field input {
+  min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-0); color: var(--text); font: inherit; font-size: 15px;
+}
+.event-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.event-dialog .event-when { margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--text); }
+.event-dialog .event-repeat { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.event-allday { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-bottom: 6px; font-size: 14px; }
+.event-dialog .event-label { margin: 6px 0 6px; font-size: 12px; color: var(--muted); }
+.event-alerts { display: flex; flex-wrap: wrap; gap: 6px; }
+.event-alerts button {
+  min-height: 34px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 99px;
+  background: var(--surface-0); color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
+}
+.event-alerts button[aria-pressed="true"] { border-color: transparent; background: var(--accent); color: var(--on-brand); font-weight: 700; }
+.event-alerts button[aria-pressed="true"]::before { content: '✓ '; }
+.event-alerts button:disabled { opacity: 0.4; cursor: default; text-decoration: line-through; }
+.event-alerts button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.event-dialog .event-none { min-height: 1.3em; margin: 6px 0 12px; font-size: 12.5px; color: var(--muted); }
+@media (pointer: coarse) { .event-alerts button { min-height: 44px; padding: 10px 14px; font-size: 14px; } .event-field input { min-height: 48px; font-size: 16px; } }
+
+/* ---------- 일정 탭 (list-reminders.js, PC·휴대폰): 한 달 달력 + 고른 날·다가오는 일정 ---------- */
+.cal { margin: 4px 0 6px; padding: 10px 8px 8px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-1); }
+.cal-head { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; }
+.cal-title { flex: 1; text-align: center; font-size: 15px; }
+.cal-nav { width: 36px; height: 36px; }
+.cal-prev svg { transform: rotate(180deg); }
+.cal-today { margin-left: 4px; font-size: 13px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-wd { padding: 2px 0 4px; text-align: center; font-size: 11.5px; color: var(--muted); }
+.cal-wd:first-child { color: var(--danger); }
+.cal-day {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px;
+  min-height: 44px; padding: 5px 0 4px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--text); font: inherit; cursor: pointer;
+}
+.cal-day:hover { background: var(--hover); }
+.cal-day.other { color: var(--muted); opacity: 0.55; }
+.cal-day:nth-child(7n + 8) .cal-num { color: var(--danger); } /* 일요일 */
+.cal-num { display: grid; place-items: center; min-width: 26px; height: 26px; border-radius: 99px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.cal-day.today .cal-num { background: var(--text-strong); color: var(--surface-0); font-weight: 800; }
+.cal-day[aria-pressed="true"] { background: var(--brand-yellow-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-dots { display: flex; gap: 3px; height: 6px; }
+.cal-dots i { width: 6px; height: 6px; border-radius: 99px; background: var(--note-chip); }
+.ev-row .ev-time { flex: none; width: 70px; font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.ev-row.off { opacity: 0.55; }
+.ev-none { margin: 2px 6px 10px; font-size: 13px; color: var(--muted); }
+.rows-title.ev-upcoming-title { margin-top: 18px; color: var(--text); font-size: 13px; }
+.rows-title.ev-sub-title { margin-top: 8px; font-weight: 600; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-day[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 18%, transparent); } }
+.event-dialog { max-height: calc(100vh - 16px); }
+@media (max-height: 520px) {
+  .event-dialog { padding-top: 14px; padding-bottom: 12px; }
+  .event-dialog h2 { margin-bottom: 6px; font-size: 16px; line-height: 22px; }
+  .event-field { margin-bottom: 6px; }
+  .event-field span { display: none; } /* 이름 칸의 "일정" 글자는 빈칸 안내(placeholder)로 */
+  .event-field input { min-height: 34px; }
+  .event-allday { min-height: 32px; margin-bottom: 2px; }
+  .event-dialog .event-none { margin: 4px 0 8px; }
+}

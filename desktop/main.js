@@ -40,7 +40,7 @@ import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
-import { normalizeReminder, describeReminder } from '../app/js/core/reminders.js';
+import { normalizeReminder, alarmLabel, alarmTitle } from '../app/js/core/reminders.js';
 
 const SMOKE = process.argv.includes('--smoke');
 // 점검 때는 가짜 마이크(삐 소리)로 녹음한다 — 실제 마이크·권한 창 없이
@@ -1399,9 +1399,11 @@ function pushReminders() {
 function fireReminder(memoId, reminder, info) {
   const memo = vault?.get(memoId);
   if (!memo) return;
-  const kind = info.missed ? '놓친 알림' : info.startup ? '켤 때 알림' : '알림';
-  const alarm = { reminderId: reminder.id, label: `${kind}, ${describeReminder(reminder)}`, missed: Boolean(info.missed) };
-  history?.add({ source: 'memoking', appId: APP_ID, app: '메모킹', title: memo.title, body: alarm.label, memoId });
+  // 일정은 "치과 · 내일 15:00 (30분 뒤)" — 미리 알림이 울리는 때와 일정 시작을 함께
+  const title = alarmTitle(reminder, memo.title);
+  const label = alarmLabel(reminder, info);
+  const alarm = { reminderId: reminder.id, label: title === memo.title ? label : `${title}, ${label}`, missed: Boolean(info.missed) };
+  history?.add({ source: 'memoking', appId: APP_ID, app: '메모킹', title, body: label, memoId });
 
   if (reminder.action === 'open') {
     // 메모 띄우기: 창을 화면 앞에 열고 창 안에 알림 띠
@@ -1417,7 +1419,7 @@ function fireReminder(memoId, reminder, info) {
       win.once('focus', () => win.flashFrame(false));
     }
   } else {
-    showToast(memoId, memo, alarm);
+    showToast(memoId, memo, { ...alarm, title, label });
   }
   pushReminders();
 }
@@ -1427,7 +1429,7 @@ function showToast(memoId, memo, alarm) {
   const preview = extractPreview(memo.body, 120);
   toast({
     memoId,
-    title: memo.title,
+    title: alarm.title ?? memo.title,
     body: preview ? `${alarm.label}\n${preview}` : alarm.label,
     onClick: () => revealNote(memoId),
   });

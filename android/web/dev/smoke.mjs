@@ -232,6 +232,8 @@ try {
 
   // 알림 추가
   await page.tap('#bell-btn');
+  check('일정과 알림 패널: 처음엔 "일정" (이름·미리 알림 칩)', await page.isVisible('#rem-title') && (await page.locator('#rem-alerts button').count()) >= 5);
+  await page.tap('#rem-kind [data-kind="timer"]');
   await page.tap('.rem-submit');
   await page.waitForTimeout(300);
   check('알림 패널: 10분 타이머 추가', /kind: timer/.test(read('회의 메모.md')));
@@ -307,19 +309,41 @@ try {
   }
   await page.waitForTimeout(300);
   const chipText = await page.textContent('.mk-date-chip').catch(() => '');
-  check('날짜 알림: 날짜를 누르면 "내일 오후 3:00 알림 맞추기" 단추', /내일 오후 3:00 알림 맞추기/.test(chipText), chipText);
+  check('날짜 알림: 날짜를 누르면 "📅 일정 추가: 내일 오후 3:00" 단추', /일정 추가: 내일 오후 3:00/.test(chipText), chipText);
   await shot('02c-date-chip');
   await page.tap('.mk-date-chip');
+  await page.waitForSelector('.event-dialog[open]', { timeout: 5000 }).catch(() => {});
+  const evName = await page.inputValue('#event-name').catch(() => '');
+  check('일정 창: 이름을 줄에서 짐작 ("치과")', evName === '치과', evName);
+  // 미리 알림: 기본(10분 전)은 빼고 30분 전 · 하루 전
+  const chipBtn = (label) => page.locator('.event-alerts button', { hasText: label }).first();
+  if ((await chipBtn('10분 전').getAttribute('aria-pressed')) === 'true') await chipBtn('10분 전').tap();
+  await chipBtn('30분 전').tap();
+  await chipBtn('하루 전').tap();
+  await shot('02c2-event-dialog');
+  await page.tap('#event-save');
   await page.waitForTimeout(800);
   const dateMemo = fs.existsSync(path.join(vault, '날짜 알림.md')) ? read('날짜 알림.md') : '';
   const tomorrow3 = new Date();
   tomorrow3.setDate(tomorrow3.getDate() + 1);
   tomorrow3.setHours(15, 0, 0, 0);
   const atLine = /\n\s+at: "?([^"\n]+)"?/.exec(dateMemo)?.[1];
-  check('날짜 알림: 누르면 그 시각 알림이 메모에 저장', Boolean(atLine) && Math.abs(Date.parse(atLine) - tomorrow3.getTime()) < 60_000, atLine ?? dateMemo.slice(0, 300));
+  check('일정 저장: 내일 15:00 · 이름 치과 · 미리 알림 하루 전과 30분 전', Boolean(atLine) && Math.abs(Date.parse(atLine) - tomorrow3.getTime()) < 60_000
+    && /title: 치과/.test(dateMemo) && /alerts:\s*\n\s*- 1440\s*\n\s*- 30/.test(dateMemo), dateMemo.slice(0, 400));
+  {
+    const sched = (await devLog()).scheduled.filter((x) => x.memoId && /치과/.test(x.title ?? ''));
+    const times = sched.map((x) => x.at).sort();
+    check('휴대폰 시스템 알람: 일정 시각이 아니라 하루 전·30분 전에 (제목 치과)',
+      times.length === 2 && Math.abs(times[0] - (tomorrow3.getTime() - 1440 * 60_000)) < 60_000 && Math.abs(times[1] - (tomorrow3.getTime() - 30 * 60_000)) < 60_000,
+      JSON.stringify(sched.map((x) => [new Date(x.at).toString().slice(4, 21), x.title, x.label])));
+  }
   check('날짜 알림: 맞춘 날짜는 실선 밑줄', (await page.locator('.mk-doc .mk-date-set').count()) === 1);
-  // 되풀이: "매주 수요일 저녁 7시" → 🔁 반복 알림
-  await page.locator('.mk-doc p').last().click();
+  // 되풀이: "매주 수요일 저녁 7시" → 반복 일정 (줄 끝을 눌러 커서를 옮긴 뒤 새 줄에)
+  {
+    const line = await page.locator('.mk-doc p').last().boundingBox();
+    await page.touchscreen.tap(line.x + line.width - 4, line.y + line.height / 2);
+    await page.waitForTimeout(200);
+  }
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
   await page.keyboard.type('매주 수요일 저녁 7시 운동');
@@ -331,11 +355,30 @@ try {
   }
   await page.waitForTimeout(300);
   const repChip = await page.textContent('.mk-date-chip').catch(() => '');
-  check('날짜 알림: "매주 수요일 저녁 7시" → 🔁 매주 반복 알림 단추', /🔁 매주 수요일 오후 7:00 알림 맞추기/.test(repChip ?? ''), repChip);
+  check('날짜 알림: "매주 수요일 저녁 7시" → 반복 일정 단추', /일정 추가: 매주 수요일 오후 7:00/.test(repChip ?? ''), repChip);
   if (repChip) await page.tap('.mk-date-chip');
+  await page.waitForSelector('.event-dialog[open]', { timeout: 5000 }).catch(() => {});
+  check('일정 창(반복): 🔁 매주 수요일 표시 · 이름 "운동"', /매주 수요일/.test(await page.textContent('.event-dialog .event-repeat').catch(() => '')) && (await page.inputValue('#event-name').catch(() => '')) === '운동');
+  await page.tap('#event-save');
   await page.waitForTimeout(800);
   const repMd = fs.existsSync(path.join(vault, '날짜 알림.md')) ? read('날짜 알림.md') : '';
   check('날짜 알림: 반복 알림으로 저장 (매주 수 19:00)', /kind: repeat[\s\S]*every: week[\s\S]*weekdays:\s*\n?\s*-?\s*\[?3/.test(repMd) && /time: "?19:00/.test(repMd), repMd.slice(0, 500));
+  // 목록 › 일정 탭: 한 달 달력 + 고른 날·다가오는 일정 (치과는 내일, 미리 알림 함께)
+  for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+    await back();
+    await page.waitForTimeout(400);
+  }
+  await page.tap('[data-tab="reminders"]');
+  await page.waitForTimeout(500);
+  const cal = await page.evaluate(() => ({
+    days: document.querySelectorAll('#reminder-groups .cal-day').length,
+    rows: [...document.querySelectorAll('#reminder-groups .ev-row')].map((r) => r.textContent),
+  }));
+  check('일정 탭: 달력 42칸 · 다가오는 일정에 "치과 · 알림 30분 전, 하루 전"', cal.days === 42 && cal.rows.some((t) => /치과/.test(t) && /알림 30분 전, 하루 전/.test(t)), JSON.stringify(cal));
+  await shot('02g-calendar');
+  await page.tap('[data-tab="memos"]');
+  await page.waitForTimeout(300);
+
   await back();
   await page.waitForTimeout(300);
   for (let i = 0; i < 3 && await page.isVisible('#note-screen'); i++) {
