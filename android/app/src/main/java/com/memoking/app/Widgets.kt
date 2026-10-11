@@ -42,6 +42,7 @@ object Widgets {
     const val EXTRA_TOKEN = "token"
     private const val PIN_TOKENS = "widget_pin_tokens" // 놓기 요청마다 한 번 쓰는 표 (메모 id → "표|요청 시각")
     private const val PIN_WAIT_MS = 10 * 60_000L
+    private const val GONE_CONFIRM_MS = 60_000L // 메모 파일이 이만큼 계속 없으면 지워진 것으로 본다
     private const val PICK_TOKEN = "widget_pick_token"
 
     /** 위젯의 파일 일(체크·잠긴 메모 숨기기)은 이 한 줄로 차례대로 — 빠르게 두 번 눌러도 서로 덮어쓰지 않게 */
@@ -88,12 +89,26 @@ object Widgets {
         val pending = tokens.all.filter { (k, v) -> k != PICK_TOKEN && now - ((v as? String)?.substringAfter('|')?.toLongOrNull() ?: 0L) < PIN_WAIT_MS }.keys
         tokens.edit().apply { tokens.all.keys.filter { it !in pending && it != PICK_TOKEN }.forEach { remove(it) } }.apply()
         val edit = data(ctx).edit()
+        val gone = mutableSetOf<String>()
         for (k in 0 until memos.length()) {
             val m = memos.getJSONObject(k)
-            if (m.optBoolean("gone")) edit.remove(m.getString("id")) else edit.putString(m.getString("id"), m.toString())
+            val id = m.getString("id")
+            if (!m.optBoolean("gone")) {
+                edit.putString(id, m.toString())
+                continue
+            }
+            // 파일이 잠깐 없을 수도 있다(동기화가 바꿔 쓰는 중 등) — 처음엔 내용만 숨기고, 한동안 계속 없을 때만 위젯을 놓는다
+            val prev = memo(ctx, id)
+            val goneAt = prev?.optLong("goneAt", 0L) ?: 0L
+            if (prev == null || (goneAt > 0 && now - goneAt >= GONE_CONFIRM_MS)) {
+                edit.remove(id)
+                gone += id
+            } else if (goneAt == 0L) {
+                prev.put("goneAt", now).put("lines", JSONArray().put(JSONObject().put("t", "메모킹을 열면 내용이 보여요").put("kind", "text")))
+                edit.putString(id, prev.toString())
+            }
         }
         // 지워진 메모가 놓인 위젯은 "보일 메모 고르기" 로 되돌린다 (영원히 "열면 보여요" 로 남지 않게)
-        val gone = (0 until memos.length()).map { memos.getJSONObject(it) }.filter { it.optBoolean("gone") }.map { it.getString("id") }.toSet()
         if (gone.isNotEmpty()) map(ctx).edit().apply { map(ctx).all.filter { (_, v) -> v in gone }.keys.forEach { remove(it) } }.apply()
         val incoming = (0 until memos.length()).map { memos.getJSONObject(it).getString("id") }.toSet()
         data(ctx).all.keys.filter { it !in used && it !in pending && it !in incoming }.forEach { edit.remove(it) }
@@ -421,15 +436,19 @@ class MemoWidget : AppWidgetProvider() {
     override fun onUpdate(ctx: Context, mgr: AppWidgetManager, ids: IntArray) {
         // 파일 읽기는 화면 스레드가 아닌 곳에서 (메모 폴더를 뒤지는 동안 멈춘 것처럼 보이지 않게)
         val app = ctx.applicationContext
+        Widgets.update(app, ids) // 줄 서 기다리지 않고 지금 아는 내용으로 먼저 그린다
         val pending = goAsync()
+        val done = java.util.concurrent.atomic.AtomicBoolean(false)
+        val finish = { if (done.compareAndSet(false, true)) pending.finish() }
+        // 앞선 파일 일이 길어도 방송을 오래 붙잡지 않게 (시스템이 앱을 멈춘 것으로 보지 않도록)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ finish() }, 8_000L)
         Widgets.io.execute {
             try {
                 Widgets.hideLocked(app)
             } catch (e: Exception) {
                 android.util.Log.w("MemoKing", "위젯 확인 실패", e)
             } finally {
-                Widgets.update(app, ids)
-                pending.finish()
+                finish()
             }
         }
     }

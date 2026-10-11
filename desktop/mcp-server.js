@@ -242,12 +242,14 @@ server.registerTool('append_to_memo', {
     let saved = v.save(m.id, body);
     if (saved?.retry) {
       v.scan({ silent: true }); // 파일이 잠깐 없었다 (동기화로 이름이 바뀌는 중 등) — 다시 읽고 한 번 더
-      const again = findMemo(v, m.id);
-      saved = again && !isLockedBody(again.body) ? v.save(m.id, `${again.body.replace(/\s+$/, '')}${gap}${add}\n`) : { refused: true };
+      const again = v.get(m.id); // 같은 id 로만 (제목으로 찾으면 다른 메모에 덧붙일 수 있다)
+      const prev = again?.body.replace(/\s+$/, '');
+      const sep = prev && isItem(prev.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
+      saved = !again ? { refused: true, retry: true } : isLockedBody(again.body) ? { refused: true } : v.save(m.id, `${prev}${sep}${add}\n`);
     }
     if (saved?.refused) {
       return fail(saved.retry
-        ? `"${m.title}" 메모 파일이 잠깐 보이지 않아 덧붙이지 못했어요. 잠시 뒤 다시 해 주세요.`
+        ? `"${m.title}" 메모 파일이 보이지 않아 덧붙이지 못했어요 (지워졌거나 동기화 중일 수 있어요). 잠시 뒤 다시 해 주세요.`
         : `"${m.title}" 은(는) 방금 다른 기기에서 잠겨 덧붙이지 못했어요.`);
     }
     return text({ ok: true, id: m.id, title: m.title });

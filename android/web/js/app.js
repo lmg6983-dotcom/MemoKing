@@ -352,9 +352,9 @@ memoSheet.addEventListener('click', async (e) => {
       break;
     case 'pin':
       note.flush();
-      app.vault.setMeta(id, { pinned: !memo.pinned });
       closeSheet(memoSheet);
-      toast(memo.pinned ? '목록 고정을 풀었어요' : '목록 맨 위에 고정했어요');
+      if (!app.vault.setMeta(id, { pinned: !memo.pinned })) toast('고정을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+      else toast(memo.pinned ? '목록 고정을 풀었어요' : '목록 맨 위에 고정했어요');
       break;
     case 'share':
       closeSheet(memoSheet);
@@ -599,6 +599,7 @@ app.deliverRecording = async (r) => {
   const card = voiceCardMarkdown(item, transcript);
   let memoId = r.memoId;
   let lockedOut = false;
+  let missing = false;
   // 편집기가 떠 있을 때만 화면에 (잠긴 메모의 비밀번호 화면이면 아직 편집기가 없다 — 파일에 넣는다)
   if (note.currentId() === memoId && note.getEditor()) {
     note.insertRecording(card, `음성 메모 ${whenLabel(r.startedAt)}`);
@@ -612,13 +613,18 @@ app.deliverRecording = async (r) => {
       lockedOut = true;
       memoId = app.vault.import({ body: `${heading}\n\n${voiceCardMarkdown(item, '')}\n` });
     } else if (memo) {
-      const next = isBlankBody(memo.body) ? `${heading}\n\n${parts}\n` : `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`;
-      let r = app.vault.save(memoId, next);
-      if (r?.retry) {
-        app.vault.scan(); // 파일이 잠깐 없었다 — 다시 읽고 한 번 더
-        r = app.vault.save(memoId, next);
+      const nextOf = (m) => (isBlankBody(m.body) ? `${heading}\n\n${parts}\n` : `${m.body.replace(/\s+$/, '')}\n\n${parts}\n`);
+      let res = app.vault.save(memoId, nextOf(memo));
+      if (res?.retry) {
+        app.vault.scan(); // 파일이 잠깐 없었다 — 다시 읽은 글에 덧붙여 한 번 더
+        const fresh = app.vault.get(memoId);
+        res = fresh && !fresh.needsPassword ? app.vault.save(memoId, nextOf(fresh)) : { refused: true, gone: !fresh };
       }
-      if (r?.refused && !r.copied) {
+      if (res?.retry || res?.gone) {
+        // 다시 읽어도 메모 파일이 없다 — 녹음을 잃지 않게 새 메모에 (잠긴 메모였으면 받아쓴 글은 넣지 않음)
+        missing = true;
+        memoId = app.vault.import({ body: `${heading}\n\n${memo.locked ? voiceCardMarkdown(item, '') : parts}\n` });
+      } else if (res?.refused && !res.copied) {
         // 그사이 다른 기기가 다시 잠가 넣지 못했다 — 소리만 새 메모에 (받아쓴 글은 잠긴 글이었을 수 있어 넣지 않음)
         lockedOut = true;
         memoId = app.vault.import({ body: `${heading}\n\n${voiceCardMarkdown(item, '')}\n` });
@@ -628,6 +634,7 @@ app.deliverRecording = async (r) => {
     list.refresh();
   }
   if (lockedOut) toast(`잠긴 메모를 열 수 없어 녹음(${duration})은 새 메모에 저장했어요`, true);
+  else if (missing) toast(`원래 메모에 넣지 못해 녹음(${duration})은 새 메모에 저장했어요`, true);
   else toast(transcript ? `녹음(${duration})과 받아쓴 내용을 저장했어요` : `녹음(${duration})을 저장했어요`);
   if (lockedOut || !(r.sttPending && recorder.sttOn() && recorder.sttReady())) app.heldLocks.delete(r.memoId);
   // 녹음 중에 받아쓰지 못했으면(음성 인식이 잠깐 안 됐음) 이제 녹음 파일로

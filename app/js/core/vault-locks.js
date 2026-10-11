@@ -400,6 +400,17 @@ class LockMethods {
       if (k === 'lockRefs' || k === 'lockHideTitle') continue; // 잠금 정보는 늘 그쪽 것 (그 글에 맞는 것)
       if (!disk || !same(mine.extra[k], disk.extra?.[k])) merged.extra[k] = mine.extra[k];
     }
+    // 이 기기가 지운 항목도 (그쪽이 그사이 바꾸지 않았으면) 지운 채로
+    if (disk) {
+      for (const k of Object.keys(disk)) {
+        if (k === 'extra' || k === 'id' || k in mine) continue;
+        if (same(theirMeta?.[k], disk[k])) delete merged[k];
+      }
+      for (const k of Object.keys(disk.extra ?? {})) {
+        if (k === 'lockRefs' || k === 'lockHideTitle' || k in (mine.extra ?? {})) continue;
+        if (same(theirMeta?.extra?.[k], disk.extra[k])) delete merged.extra[k];
+      }
+    }
     merged.id = mine.id;
     entry.meta = merged;
     if (isLockedBody(theirs)) {

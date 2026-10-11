@@ -70,6 +70,7 @@ let pendingExternal = null;
 let conflictCopy = null; // 쓰는 중에 다른 기기에서도 고쳐 들어온 내용을 따로 남긴 사본 메모 (여는 동안 한 사본만 고쳐 쓴다)
 let opening = null;
 let refusedSave = false; // 마지막 저장이 거절됐다 (다른 기기가 잠근 메모)
+let retrySave = false; // 파일이 잠깐 없어 저장을 미뤘다 (다시 읽은 뒤 다시 저장)
 
 export const currentId = () => id;
 export const isOpen = () => id !== null;
@@ -109,9 +110,9 @@ export function flush() {
   const body = current;
   try {
     const r = app.vault.save(id, body);
+    retrySave = Boolean(r?.retry);
     if (r?.retry) {
-      refusedSave = true; // 이대로 닫으면 사본으로 남긴다 (closeNote)
-      saveTimer = setTimeout(flush, 800); // 파일을 다시 읽은 뒤 다시 저장
+      saveTimer = setTimeout(flush, 800); // 파일을 다시 읽은 뒤 다시 저장 (닫을 때는 closeNote 가 바로)
       return;
     }
     if (r?.invalid) {
@@ -321,7 +322,7 @@ function linkItem(target, { onRemove, onAdd, score } = {}) {
 
 function setLink(targetId, on) {
   flush();
-  app.vault.link(id, targetId, on);
+  if (!app.vault.link(id, targetId, on)) toast('연결을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
   el.linkSearch.value = '';
   el.linkResults.replaceChildren();
   refreshLinks();
@@ -1379,6 +1380,15 @@ export function closeNote({ quiet = false } = {}) {
   if (!id) return;
   el.editorRoot.querySelector('.lock-screen [data-lock-cancel]')?.click(); // 비밀번호 화면에서 뒤로 가기 = 닫기
   flush();
+  if (retrySave) {
+    // 파일이 잠깐 없었다 — 기다리지 않고 지금 다시 읽어 한 번 더 (그래도 안 되면 아래에서 사본으로)
+    app.vault.scan();
+    flush();
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (retrySave) refusedSave = true;
+  }
+  retrySave = false;
   if (refusedSave && isDirty() && !isBlankBody(current)) {
     // 저장이 거절된 채로 닫는다: 쓰던 글을 사본 메모로 (연 열쇠가 있으면 잠근 채)
     try {

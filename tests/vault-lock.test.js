@@ -493,3 +493,40 @@ test('파일이 잠깐 없어 저장을 미뤘으면, 다시 저장할 때 "같�
     v.close();
   }
 });
+
+test('파일이 사라진 사이 고정·연결을 바꾸면: 바뀐 것처럼 보이지 않고 null', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    const a = v.create();
+    v.save(a, '# 하나\n\n글');
+    const b = v.create();
+    v.save(b, '# 둘\n\n글');
+    fs.unlinkSync(path.join(root, v.get(a).file)); // 동기화가 바꿔 쓰는 중 등
+    assert.equal(v.setMeta(a, { pinned: true }), null);
+    assert.equal(v.get(a).pinned, false, '고정되지 않은 채로');
+    assert.equal(v.link(a, b), null);
+    assert.equal(v.links(a).links.length, 0, '연결되지 않은 채로');
+  } finally {
+    v.close();
+  }
+});
+
+test('머리말 합치기: 이 기기가 지운 항목은 (그쪽이 바꾸지 않았으면) 지운 채로', async () => {
+  const { installLockMethods } = await import('../app/js/core/vault-locks.js');
+  class Fake {
+    emit() {}
+  }
+  installLockMethods(Fake);
+  const f = new Fake();
+  const entry = {
+    id: 'x',
+    body: 'old',
+    meta: { id: 'x', pinned: false, reminders: [], extra: { keep: 1 } }, // 이 기기에서 extra.gone 을 지움
+    diskMeta: { id: 'x', pinned: false, reminders: [], extra: { keep: 1, gone: 2, theirs: 3 } },
+  };
+  f.adoptTheirs(entry, 'new', { id: 'x', pinned: false, reminders: [], extra: { keep: 1, gone: 2, theirs: 4 } });
+  assert.deepEqual(entry.meta.extra, { keep: 1, theirs: 4 });
+  assert.equal(entry.body, 'new');
+});

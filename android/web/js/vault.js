@@ -11,7 +11,7 @@ import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
 import { isLockedBody, parseLocked } from '../../app/js/core/memo-lock.js';
 import { isLiveCached } from '../../app/js/core/reminders.js';
-import { installLockMethods, lockedFiles, diskCopy } from '../../app/js/core/vault-locks.js';
+import { installLockMethods, lockedFiles, diskCopy, metaSnapshot } from '../../app/js/core/vault-locks.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
@@ -491,11 +491,15 @@ export class Vault extends EventTarget {
   setMeta(id, patch) {
     const entry = this.entries.get(id);
     if (!entry) return null;
+    const prev = metaSnapshot(entry.meta);
     if (patch.color && COLORS.includes(patch.color)) entry.meta.color = patch.color;
     if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
     if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
     if (typeof patch.ink === 'string') entry.meta.ink = normalizeInkPath(patch.ink);
-    if (entry.file) this.write(entry);
+    if (entry.file && this.write(entry) !== true) {
+      entry.meta = prev; // 쓰지 못했다 — 바뀐 것처럼 보이지 않게
+      return null;
+    }
     this.changed([id]);
     return this.get(id);
   }
@@ -507,10 +511,17 @@ export class Vault extends EventTarget {
     const links = new Set(entry.meta.links);
     if (on) links.add(targetId);
     else links.delete(targetId);
+    const prev = entry.meta.links;
     entry.meta.links = [...links];
     // 상대 메모에 id 가 저장돼 있어야 파일명이 바뀌어도 연결이 유지된다.
-    if (on && target.file && !target.idSaved) this.write(target);
-    if (entry.file) this.write(entry);
+    if (on && target.file && !target.idSaved && this.write(target) !== true) {
+      entry.meta.links = prev;
+      return null;
+    }
+    if (entry.file && this.write(entry) !== true) {
+      entry.meta.links = prev; // 쓰지 못했다 — 연결된 것처럼 보이지 않게
+      return null;
+    }
     this.changed([id, targetId]);
     return this.links(id);
   }
