@@ -40,7 +40,7 @@ import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview, isBlankBody } from '../app/js/core/memo-file.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
-import { normalizeReminder, alarmLabel, alarmTitle } from '../app/js/core/reminders.js';
+import { normalizeReminder, alarmText } from '../app/js/core/reminders.js';
 
 const SMOKE = process.argv.includes('--smoke');
 // 점검 때는 가짜 마이크(삐 소리)로 녹음한다 — 실제 마이크·권한 창 없이
@@ -1400,9 +1400,8 @@ function fireReminder(memoId, reminder, info) {
   const memo = vault?.get(memoId);
   if (!memo) return;
   // 일정은 "치과 · 내일 15:00 (30분 뒤)" — 미리 알림이 울리는 때와 일정 시작을 함께
-  const title = alarmTitle(reminder, memo.title);
-  const label = alarmLabel(reminder, info);
-  const alarm = { reminderId: reminder.id, label: title === memo.title ? label : `${title}, ${label}`, missed: Boolean(info.missed) };
+  const { title, label, full } = alarmText(reminder, memo.title, info);
+  const alarm = { reminderId: reminder.id, label: full, missed: Boolean(info.missed) };
   history?.add({ source: 'memoking', appId: APP_ID, app: '메모킹', title, body: label, memoId });
 
   if (reminder.action === 'open') {
@@ -2358,8 +2357,9 @@ function initStt() {
       clearTimeout(held?.timer);
       const memo = vault?.get(memoId);
       const next = memo && !memo.needsPassword && replaceTranscript(memo.body, src, text);
-      if (next && next !== memo.body) vault.save(memoId, next);
-      if (opened) vault.closeLock(memoId); // 창이 비밀번호 화면이면 열쇠는 그 화면이 다시 받는다
+      const r = next && next !== memo.body ? vault.save(memoId, next) : null;
+      if (opened) vault.closeLock(memoId);
+      if ((memo?.needsPassword || r?.refused) && held) notice('말한 사람 나누기를 넣지 못했어요', '그사이 메모가 다른 기기에서 잠겨 바뀌었어요'); // 창이 비밀번호 화면이면 열쇠는 그 화면이 다시 받는다
     },
   });
 }
@@ -2466,6 +2466,7 @@ function registerIpc() {
     if (!vault || !Array.isArray(list)) return null;
     const reminders = list.map((r) => normalizeReminder(r)).filter(Boolean);
     const saved = vault.setReminders(id, reminders);
+    if (!saved) throw new Error('그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요');
     sendToNote(id, 'memo:reminders', saved);
     pushReminders();
     alarms.tick(); // 방금 만든 알림이 이미 울릴 때면 바로
@@ -2796,7 +2797,11 @@ function registerIpc() {
   });
   ipcMain.on('memo:save-sync', (event, id, body) => {
     try {
-      const r = typeof body === 'string' && vault ? vault.save(id, body) : null;
+      let r = typeof body === 'string' && vault ? vault.save(id, body) : null;
+      if (r?.retry) {
+        vault.scan(); // 파일이 잠깐 없었다 — 창을 닫는 중이라 기다리지 않고 지금 다시 읽어 한 번 더
+        r = vault.save(id, body);
+      }
       // 창을 닫는 순간인데 잠긴 메모라 저장되지 않았다: 쓰던 글을 사본 메모로 (이 창에서 연 열쇠가 있으면 그 열쇠로 잠근 채)
       if (r?.refused && !r.copied && !r.invalid && !isBlankBody(body)) {
         if (vault.locks.has(id)) vault.importCopyOf(id, body, { color: vault.get(id)?.color });

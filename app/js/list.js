@@ -955,7 +955,14 @@ el.cards.addEventListener('click', (e) => {
     // 목록이 새로 오기 전에 한 번 더 눌러도 맞게 되도록 바로 바꿔 보여 준다
     m.pinned = !m.pinned;
     render();
-    return api.memo.set(m.id, { pinned: m.pinned });
+    const want = m.pinned;
+    return api.memo.set(m.id, { pinned: want }).then((memo) => {
+      // 저장하지 못했다(파일이 잠깐 없는 등) — 바꿔 보여 준 것을 되돌린다
+      if (!memo && m.pinned === want) {
+        m.pinned = !want;
+        render();
+      }
+    });
   }
   const cardTag = e.target.closest('[data-card-tag]');
   if (cardTag) return toggleTagFilter(cardTag.dataset.cardTag, { only: true });

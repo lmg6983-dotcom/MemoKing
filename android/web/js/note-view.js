@@ -70,6 +70,8 @@ let pendingExternal = null;
 let conflictCopy = null; // 쓰는 중에 다른 기기에서도 고쳐 들어온 내용을 따로 남긴 사본 메모 (여는 동안 한 사본만 고쳐 쓴다)
 let opening = null;
 let refusedSave = false; // 마지막 저장이 거절됐다 (다른 기기가 잠근 메모)
+let retrySave = false; // 파일이 잠깐 없어 저장을 미뤘다 (다시 읽은 뒤 다시 저장)
+let closingSave = false; // closeNote 가 저장을 마무리하는 중
 
 export const currentId = () => id;
 export const isOpen = () => id !== null;
@@ -104,11 +106,17 @@ const showPlaceholder = trackPlaceholder(el.editorRoot);
 export function flush() {
   clearTimeout(saveTimer);
   saveTimer = null;
+  retrySave = false;
   flushTables(); // 표 너비·높이도 (앱을 내릴 때 함께)
   if (!id || !isDirty()) return;
   const body = current;
   try {
     const r = app.vault.save(id, body);
+    if (r?.retry) {
+      retrySave = true;
+      saveTimer = setTimeout(flush, 800); // 파일을 다시 읽은 뒤 다시 저장 (닫을 때는 closeNote 가 바로)
+      return;
+    }
     if (r?.invalid) {
       refusedSave = false; // 사본으로 남기지 않는다 (잠금 형식 글은 사본도 열 수 없다)
       setStatus('잠금 메모 형식의 글은 그대로 저장할 수 없어요. 글을 고쳐 주세요', true);
@@ -130,6 +138,7 @@ export function flush() {
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
+    refusedSave = true; // 이대로 닫으면 사본 메모로라도 남긴다 (closeNote)
     setStatus('저장하지 못했어요. 저장 위치를 확인해 주세요', true);
   }
 }
@@ -157,7 +166,7 @@ export function lockChanged(locked) {
 
 /** 메모 폴더가 바뀌었을 때 (vault 'changed') */
 export function onVaultChanged({ ids, external, removed }) {
-  if (!id || !editor) return;
+  if (!id || !editor || closingSave) return; // 닫는 중 다시 읽은 것은 closeNote 가 맡는다 (사본·닫기를 두 번 하지 않게)
   if (removed.includes(id)) {
     showBanner('이 메모가 저장 위치에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
     return;
@@ -316,7 +325,7 @@ function linkItem(target, { onRemove, onAdd, score } = {}) {
 
 function setLink(targetId, on) {
   flush();
-  app.vault.link(id, targetId, on);
+  if (!app.vault.link(id, targetId, on)) toast('연결을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
   el.linkSearch.value = '';
   el.linkResults.replaceChildren();
   refreshLinks();
@@ -1340,7 +1349,10 @@ export async function openNote(memoId, options = {}) {
       save: async (data) => {
         const memoId = id; // 닫으면서 저장할 때도 그 메모에
         const rel = data ? await saveFile(new File([JSON.stringify(data)], '글 위에 그리기.json', { type: 'application/json' })) : '';
-        if (memoId && app.vault.get(memoId)) app.vault.setMeta(memoId, { ink: rel });
+        if (memoId && app.vault.get(memoId) && !app.vault.setMeta(memoId, { ink: rel })) {
+          toast('그린 것을 메모에 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true); // 파일이 잠깐 없는 등
+          return;
+        }
         if (memoId === id && memo) memo = { ...memo, ink: rel };
       },
       onMode: (on) => {
@@ -1374,6 +1386,20 @@ export function closeNote({ quiet = false } = {}) {
   if (!id) return;
   el.editorRoot.querySelector('.lock-screen [data-lock-cancel]')?.click(); // 비밀번호 화면에서 뒤로 가기 = 닫기
   flush();
+  if (retrySave) {
+    // 파일이 잠깐 없었다 — 기다리지 않고 지금 다시 읽어 한 번 더 (그래도 안 되면 아래에서 사본으로)
+    closingSave = true;
+    try {
+      app.vault.scan();
+      flush();
+    } finally {
+      closingSave = false;
+    }
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (retrySave) refusedSave = true;
+  }
+  retrySave = false;
   if (refusedSave && isDirty() && !isBlankBody(current)) {
     // 저장이 거절된 채로 닫는다: 쓰던 글을 사본 메모로 (연 열쇠가 있으면 잠근 채)
     try {
@@ -1383,6 +1409,13 @@ export function closeNote({ quiet = false } = {}) {
       toast('저장하지 못한 내용은 사본 메모로 남겼어요', true);
     } catch (err) {
       console.error(err);
+      // 사본도 남기지 못했다(저장 위치에 쓸 수 없음) — 쓰던 글을 잃지 않게 클립보드로
+      try {
+        native.copyText(current);
+        toast('저장하지 못해 쓰던 내용을 클립보드에 복사해 두었어요. 저장 위치를 확인해 주세요', true);
+      } catch {
+        toast('저장하지 못했어요. 저장 위치를 확인해 주세요', true);
+      }
     }
   }
   refusedSave = false;
@@ -1411,7 +1444,7 @@ export function closeNote({ quiet = false } = {}) {
   }
   if (app.vault.get(closing) && !app.vault.get(closing).locked) autoTag(closing, body);
   // 잠긴 메모에서 녹음하던 중에 닫으면: 열쇠는 앱이 따로 들고 있다가 녹음·받아쓰기를 그 메모에 넣을 때만 잠깐 쓴다
-  if ((recorder.recordingFor() === closing || app.transcribing?.has(closing)) && app.vault.locks.has(closing)) app.heldLocks.set(closing, app.vault.locks.get(closing));
+  if ((recorder.recordingFor() === closing || app.transcribing?.has(closing)) && app.vault.locks.has(closing)) app.holdLock(closing, app.vault.locks.get(closing));
   app.vault.closeLock(closing); // 잠금 메모는 닫으면 다시 비밀번호로
   document.activeElement?.blur();
   if (quiet || reduceMotion()) {

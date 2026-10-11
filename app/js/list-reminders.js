@@ -1,15 +1,13 @@
 // 목록 창 "일정" 탭 (PC·휴대폰 같음) — 구글 캘린더처럼: 위에 한 달 달력(일정 있는 날에 점), 아래에 고른 날의 일정과
 // 다가오는 일정. 일정마다 언제 미리 알리는지(30분 전, 하루 전 …)를 함께 보인다. 타이머·앱 열 때 알림은 맨 아래 따로.
 import { icon } from './icons.js';
-import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween } from './core/reminders.js';
-import { koClock, koFullDate, relativeDay, WEEKDAY } from './core/time.js';
+import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd } from './core/reminders.js';
+import { koClock, koFullDate, relativeDay, WEEKDAY, startOfDay, addDays, sameDay } from './core/time.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
 
-const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const dayStart = startOfDay;
 const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
 /** "오늘 · 10월 12일 (월)" 같은 날 이름 */
@@ -150,7 +148,7 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
 
   function eventRow({ item, start }) {
     const r = item.reminder;
-    const past = (r.allDay ? addDays(dayStart(start), 1) : start) < new Date();
+    const past = occurrenceEnd(start, r.allDay) < new Date(); // core 의 "지난 일정" 규칙과 같게
     const div = document.createElement('div');
     div.className = `row ev-row${r.enabled && !past ? '' : ' off'}`;
     div.dataset.color = item.color;

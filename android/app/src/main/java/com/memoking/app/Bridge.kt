@@ -178,7 +178,15 @@ class Bridge(private val activity: MainActivity) {
 
     /** 위젯에 보일 내용 [{id, title, color, file, lines}] */
     @JavascriptInterface
-    fun widgetPublish(json: String): String = reply { Widgets.publish(ctx, JSONArray(json)) }
+    fun widgetPublish(json: String): String = reply {
+        val memos = JSONArray(json)
+        // 위젯의 파일 일은 한 줄로 (체크·잠긴 메모 숨기기와 서로 덮어쓰지 않게) — 끝날 때까지 기다려, 이어서 놓기·고르기가 내용을 보게
+        try {
+            Widgets.io.submit<Unit> { Widgets.publish(ctx, memos) }.get(10, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (e: java.util.concurrent.ExecutionException) {
+            throw e.cause ?: e
+        }
+    }
 
     /** 위젯 고르기 목록에서 놓은 위젯에 메모를 정함 */
     @JavascriptInterface
