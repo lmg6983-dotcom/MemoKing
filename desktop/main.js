@@ -2767,7 +2767,9 @@ function registerIpc() {
       return { error: err.message };
     }
   });
-  ipcMain.handle('memo:unlock', (_e, id) => vault?.unlock(String(id)) ?? { error: '먼저 비밀번호로 열어 주세요' });
+  ipcMain.handle('memo:unlock', (_e, id) => vault?.unlock(String(id)) ?? {
+    error: vault?.get(String(id))?.needsPassword ? '먼저 비밀번호로 열어 주세요' : '그사이 다른 기기에서 이 메모가 바뀌어 풀지 못했어요. 다시 해 주세요',
+  });
   ipcMain.handle('memo:save', (_e, id, body) => {
     if (typeof body !== 'string') throw new TypeError('본문이 문자열이 아닙니다.');
     const summary = vault.save(id, body);

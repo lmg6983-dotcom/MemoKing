@@ -310,6 +310,7 @@ export class Vault extends EventTarget {
   }
 
   import({ body, created, updated, pinned = false, color }) {
+    if (isLockedBody(body)) return null; // 잠금 형식 글은 아무도 열 수 없는 메모가 되므로 새 메모로 만들지 않는다
     const id = this.create({ color });
     const entry = this.entries.get(id);
     Object.assign(entry.meta, { created: created ?? entry.meta.created, updated: updated ?? entry.meta.updated, pinned });
@@ -341,23 +342,9 @@ export class Vault extends EventTarget {
     return safe ? `${VERSIONS_DIR}/${safe}` : null;
   }
 
-  /** 휴지통에 옮겨 둔 첨부들 ("attachments/이름") — 잠긴 메모를 되살릴 때 */
-  trashAttachmentFiles() {
-    try {
-      return (fs.list(`${TRASH_DIR}/${ATTACH_DIR}`) ?? []).filter((e) => !e.dir).map((e) => `${ATTACH_DIR}/${e.name}`);
-    } catch {
-      return [];
-    }
-  }
 
-  /** 첨부 폴더의 파일들 ("attachments/이름") — 잠긴 메모를 지울 때 그 메모의 첨부를 찾는 데 */
-  attachmentFiles() {
-    try {
-      return (fs.list(ATTACH_DIR) ?? []).filter((e) => !e.dir).map((e) => `${ATTACH_DIR}/${e.name}`);
-    } catch {
-      return [];
-    }
-  }
+
+
 
   versionNames(id) {
     const dir = this.versionDir(id);
@@ -448,6 +435,15 @@ export class Vault extends EventTarget {
       return parseMemoFile(fs.readText(entry.file) ?? '');
     } catch {
       return null;
+    }
+  }
+
+  /** 폴더 안의 파일 이름들 (rel: 메모 폴더 기준 "attachments" 등, 없으면 []) */
+  listDir(rel) {
+    try {
+      return (fs.list(rel) ?? []).filter((e) => !e.dir).map((e) => e.name);
+    } catch {
+      return [];
     }
   }
 

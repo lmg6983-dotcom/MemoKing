@@ -1288,9 +1288,11 @@ export async function openNote(memoId, options = {}) {
       el.screen.classList.remove('memo-locked');
       if (!opened) {
         app.vault.closeLock(memoId); // 확인 중에 닫았으면 맞았어도 열쇠를 남기지 않는다
-        id = null;
-        memo = null;
-        el.screen.hidden = true;
+        if (id === memoId) {
+          id = null;
+          memo = null;
+          el.screen.hidden = true;
+        }
         return;
       }
       current = saved = memo.body;

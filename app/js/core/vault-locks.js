@@ -135,12 +135,15 @@ class LockMethods {
     this.locks.set(id, session);
     // 첨부 표가 없는 잠긴 메모(예전 잠금·사본): 연 김에 적어 둔다 — 없으면 첨부 정리가 모두 멈추므로
     if (!Array.isArray(entry.meta.extra?.lockRefs)) {
+      const before = metaSnapshot(entry.meta);
       this.setLockRefs(entry, unsealBody(entry.body, session));
+      let wrote = false;
       try {
-        this.write(entry, entry.body, { copy: false });
+        wrote = this.write(entry, entry.body, { copy: false });
       } catch {
         // 다음에 다시
       }
+      if (wrote !== true) entry.meta = before; // 쓰지 못한 표는 남기지 않는다 (다음에 열 때 다시)
       // 그사이 다른 기기가 다른 비밀번호로 다시 잠근 글을 받아들였다면 이 열쇠로는 열 수 없다 — 다시 비밀번호로
       if (unsealBody(entry.body, session) === null) {
         this.locks.delete(id);
@@ -168,6 +171,7 @@ class LockMethods {
   importCopyOf(sourceId, body, { color } = {}) {
     const session = this.locks.get(sourceId);
     if (!session && this.entries.get(sourceId) && isLockedBody(this.entries.get(sourceId).body) && !isLockedBody(body)) return null;
+    if (isLockedBody(body) && !(session && unsealBody(body, session) !== null)) return null; // 열 수 없는 잠금 형식 글은 사본으로도 만들지 않음
     const id = this.create({ color });
     const entry = this.entries.get(id);
     if (session && !isLockedBody(body)) {
@@ -198,9 +202,8 @@ class LockMethods {
    */
   sealForSave(entry, body) {
     // 잠근 글을 바깥에서 고쳐 넘기는 일은 없다 (자동 태그 등) — 암호문이 깨지지 않게 그대로 둔다
-    if (isLockedBody(body) && entry.file && isLockedBody(entry.body) && body !== entry.body) return { same: true };
-    // 풀린 메모에 잠금 형식 글을 통째로(붙여 넣기 등): 아무도 열 수 없는 메모가 되므로 저장하지 않는다
-    if (isLockedBody(body)) return isLockedBody(entry.body) ? { body } : { refused: true, invalid: true };
+    // 잠금 형식 글을 통째로(붙여 넣기 등): 지금 파일과 같으면 할 일 없음, 다르면 아무도 열 수 없게 되므로 저장하지 않는다
+    if (isLockedBody(body)) return entry.file && body === entry.body ? { same: true } : { refused: true, invalid: true };
     const session = this.locks.get(entry.id);
     // 열쇠를 들고 있는 메모(연 잠긴 메모)인데 파일이 사라져 다시 만드는 중: 풀린 글이 새 파일로 나가지 않게 잠근 채로
     if (!isLockedBody(entry.body)) {
@@ -242,6 +245,7 @@ class LockMethods {
       const copyId = this.create({ color: entry.meta.color });
       const c = this.entries.get(copyId);
       c.body = mine;
+      if (entry.meta.extra?.lockHideTitle) c.meta.extra = { ...c.meta.extra, lockHideTitle: true }; // 제목 숨기기도 그대로
       // 잠근 글이면 첨부 표도 (들고 있는 열쇠로 풀어) — 표 없는 잠긴 메모는 첨부 정리를 멈추게 하므로
       const plain = isLockedBody(mine) && session ? unsealBody(mine, session) : null;
       if (typeof plain === 'string') this.setLockRefs(c, plain);
@@ -260,6 +264,16 @@ class LockMethods {
     if (!isLockedBody(entry.body)) return !isLockedBody(versionBody);
     if (!isLockedBody(versionBody) || !this.locks.has(entry.id)) return false; // 잠긴 메모는 비밀번호로 연 동안만
     return parseLocked(versionBody)?.salt === parseLocked(entry.body)?.salt;
+  }
+
+  /** 첨부 폴더의 파일들 ("attachments/이름") — 잠긴 메모를 지울 때 그 메모의 첨부를 찾는 데 */
+  attachmentFiles() {
+    return this.listDir('attachments').map((name) => `attachments/${name}`);
+  }
+
+  /** 휴지통에 옮겨 둔 첨부들 ("attachments/이름") — 잠긴 메모를 되살릴 때 */
+  trashAttachmentFiles() {
+    return this.listDir('_memoking/trash/attachments').map((name) => `attachments/${name}`);
   }
 
   /** 이 메모가 쓰는 첨부 (잠겼으면 열쇠로 풀거나, 열지 않았으면 머리말의 표로 첨부 폴더에서 찾는다) — 메모를 지울 때 */

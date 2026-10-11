@@ -129,12 +129,14 @@ test('하루 전 알림이 울린 뒤 껐다 켜도: "끝났어요" 아님, 하�
   assert.equal(dueOccurrence(on, at(2026, 10, 5, 14, 30)).offset, 30);
 });
 
-test('다 울리고 끝난 일정을 다시 켜면 처음부터', () => {
+test('다 울리고 끝난 일정을 다시 켜도 울린 알림은 다시 울리지 않음', () => {
   const r = event({ at: iso(2026, 10, 5, 15, 0), alerts: [30] });
   const done = markFired(r, at(2026, 10, 5, 14, 30));
   assert.equal(isDone(done), true);
-  assert.equal(reenable(done, at(2026, 10, 5, 14, 40)).last, null, '일정 전이면 처음부터');
-  const late = reenable(done, at(2026, 10, 6, 9, 0));
+  const early = reenable(done);
+  assert.equal(early.last, done.last, '일정 전에 다시 켜도 이미 울린 30분 전은 다시 울리지 않음');
+  assert.equal(dueOccurrence(early, at(2026, 10, 5, 14, 40)), null);
+  const late = reenable(done);
   assert.equal(late.last, done.last, '이미 지난 일정은 울린 기록을 지킴');
   assert.equal(dueOccurrence(late, at(2026, 10, 6, 9, 0)), null, '지난 알림이 놓친 알림으로 울리지 않음');
 });
