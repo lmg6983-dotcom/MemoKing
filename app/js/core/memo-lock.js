@@ -10,10 +10,12 @@
 //   자동 저장·창 닫기 저장이 늘 잠근 글만 쓴다. 한 번 연 메모는 "세션"(열쇠·소금)을 들고 있다가 저장마다 새 IV 로 잠근다.
 //   제목만 보인다 — 본문·태그·첨부 경로는 암호문 안에. (첨부 파일 자체는 암호화하지 않음: 화면에 그렇게 알린다)
 import { gcm, pbkdf2Async, sha256 } from '../../vendor/noble-crypto.js';
-import { extractTitle, UNTITLED } from './memo-file.js';
+import { extractTitle, extractAttachments, UNTITLED } from './memo-file.js';
 
 export const LOCK_VERSION = 'v1';
 export const LOCK_ITERATIONS = 310_000;
+const MIN_ITERATIONS = 1000;
+const MAX_ITERATIONS = 2_000_000;
 export const LOCK_NOTICE = '🔒 잠긴 메모예요. 메모킹에서 비밀번호를 넣으면 열려요.';
 const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // 잠긴 메모 파일의 본문 전체 모양: (제목 줄) (안내 한 줄) 암호문 주석 — 그 밖의 글이 있으면 잠긴 메모가 아니다
@@ -66,6 +68,8 @@ export async function openLock(lockedBody, password) {
   const p = parseLocked(lockedBody);
   if (!p) throw new Error('잠긴 메모가 아니에요');
   if (p.version !== LOCK_VERSION) throw new Error('이 메모킹보다 새 버전에서 잠근 메모예요. 메모킹을 업데이트해 주세요');
+  // 파일에 적힌 반복 횟수를 그대로 믿지 않는다 (망가지거나 고쳐진 값으로 몇 시간씩 멈추거나 영영 못 열지 않게)
+  if (!(p.iterations >= MIN_ITERATIONS && p.iterations <= MAX_ITERATIONS)) throw new Error('잠금 정보가 망가진 메모예요. 열 수 없어요');
   const session = { key: await deriveKey(password, unb64(p.salt), p.iterations), salt: p.salt, iterations: p.iterations };
   const plain = unsealBody(lockedBody, session);
   if (plain == null) throw new Error('비밀번호가 달라요');
@@ -91,6 +95,30 @@ export function unsealBody(lockedBody, session) {
   } catch {
     return null;
   }
+}
+
+// ---------- 잠긴 메모가 쓰는 첨부 ----------
+// 첨부 경로는 암호문 안에만 있으므로, 첨부 정리(지운 메모의 사진 치우기)가 잠긴 메모의 사진을 치우지 않도록
+// 머리말 lockRefs 에 "경로 + 그 메모의 소금" 해시만 적어 둔다 (경로 자체는 드러나지 않음)
+const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+export const lockRefKey = (src, salt) => hex(sha256(new TextEncoder().encode(`${salt}\n${src}`))).slice(0, 20);
+
+/** 잠근 글(lockedBody)과 그 풀린 글(plain)로 머리말에 적을 표들 */
+export function lockRefs(plain, lockedBody) {
+  const p = parseLocked(lockedBody);
+  return p ? [...new Set(extractAttachments(plain))].map((src) => lockRefKey(src, p.salt)) : [];
+}
+
+/**
+ * 이 잠긴 메모(열지 않음)가 이 첨부를 쓸 수 있는가 — 표가 없는 예전 잠금이면 알 수 없으니 true (치우지 않음)
+ * @param {{ body: string, meta?: { extra?: { lockRefs?: string[] } } }} entry
+ */
+export function lockedMayUse(entry, src) {
+  const p = parseLocked(entry.body);
+  if (!p) return false;
+  const refs = entry.meta?.extra?.lockRefs;
+  if (!Array.isArray(refs)) return true;
+  return refs.includes(lockRefKey(src, p.salt));
 }
 
 /** 한 번에 잠그기 (테스트·간단한 쓰임) */

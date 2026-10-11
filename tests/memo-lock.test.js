@@ -66,3 +66,11 @@ test('제목 없는 메모를 잠가도 안내 문구가 제목이 되지 않음
   assert.equal(extractTitle(locked), '제목 없음');
   assert.ok(isLockedBody(locked));
 });
+
+test('파일의 반복 횟수가 망가졌으면 오래 멈추지 않고 바로 안내', async () => {
+  const locked = await lockBody(body, '사과1234', FAST);
+  for (const n of ['99999999999', '0']) {
+    const broken = locked.replace(/n=\d+/, `n=${n}`);
+    await assert.rejects(() => unlockBody(broken, '사과1234'), /망가진/);
+  }
+});

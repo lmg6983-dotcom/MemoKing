@@ -202,3 +202,8 @@ test('alerts 가 없는 하루 종일 일정도 만들기 전 "당일 오전 9�
   const r = normalizeReminder({ id: 'x', kind: 'at', allDay: true, at: iso(2026, 10, 5), created: iso(2026, 10, 5, 10, 0) });
   assert.equal(dueOccurrence(r, at(2026, 10, 5, 10, 0)), null);
 });
+
+test('파일의 이상한 미리 알림 값은 버림 (시각 있는 일정의 음수, 하루 종일의 -1440)', () => {
+  assert.deepEqual(event({ at: iso(2026, 10, 5, 15, 0), alerts: [-30, 10] }).alerts, [10]);
+  assert.deepEqual(event({ at: iso(2026, 10, 5), allDay: true, alerts: [-1440, -540] }).alerts, [-540]);
+});

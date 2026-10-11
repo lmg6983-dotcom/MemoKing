@@ -95,3 +95,40 @@ test('잠긴 메모만 쓰는 사진은 다른 메모를 지워도 치우지 않
   assert.ok(fs.existsSync(path.join(root, 'attachments', 'x.png')), '잠긴 메모의 사진이 남아 있어야');
   v.close();
 });
+
+test('자동 저장이 동기화와 겹쳐도 다른 기기의 잠금을 풀지 않음 (쓰던 글은 사본으로)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '# 여행\n\n첫 줄');
+  const file = path.join(root, v.get(id).file);
+  const text = fs.readFileSync(file, 'utf8');
+  const head = /^---\n[\s\S]*?\n---\n/.exec(text)[0];
+  const { lockBody } = await import('../app/js/core/memo-lock.js');
+  await new Promise((r) => setTimeout(r, 20)); // 파일 시각이 달라지게
+  fs.writeFileSync(file, head + await lockBody('# 여행\n\n첫 줄', 'phone999', FAST)); // 휴대폰이 잠금 (아직 다시 읽기 전)
+  const r = v.save(id, '# 여행\n\n첫 줄 그리고 PC 에서 쓴 글');
+  assert.equal(r.refused, true);
+  assert.equal(r.copied, true);
+  assert.match(fs.readFileSync(file, 'utf8'), /memoking-lock/, '파일은 잠긴 그대로');
+  assert.ok(v.list().some((m) => m.id !== id && v.get(m.id).body.includes('PC 에서 쓴 글')), '쓰던 글은 사본 메모로');
+  v.close();
+});
+
+test('잠긴 메모가 있어도 다른 메모만 쓰던 사진은 치우고, 잠긴 메모의 사진은 남김 (경로는 파일에 드러나지 않음)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  for (const f of ['mine.png', 'other.png']) fs.writeFileSync(path.join(root, 'attachments', f), 'png');
+  const locked = v.create();
+  v.save(locked, '# 비밀\n\n![](attachments/mine.png)');
+  v.lock(locked, await newLockSession('사과1234', FAST), { keepOpen: false });
+  assert.ok(!fs.readFileSync(path.join(root, v.get(locked).file), 'utf8').includes('mine.png'), '경로는 숨김');
+  const a = v.create();
+  v.save(a, '# 보통\n\n![](attachments/other.png)\n![](attachments/mine.png)');
+  v.trash(a);
+  assert.ok(fs.existsSync(path.join(root, 'attachments', 'mine.png')), '잠긴 메모의 사진은 남음');
+  assert.ok(!fs.existsSync(path.join(root, 'attachments', 'other.png')), '다른 사진은 휴지통으로');
+  v.close();
+});

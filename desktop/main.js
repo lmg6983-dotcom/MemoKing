@@ -38,7 +38,7 @@ import { Opms, looksLikeRef, foreignSummary, cleanDate, DEFAULT_HOST as OPMS_HOS
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
-import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
+import { toLocalIso, extractPreview, isBlankBody } from '../app/js/core/memo-file.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
 import { normalizeReminder, alarmLabel, alarmTitle } from '../app/js/core/reminders.js';
 
@@ -184,7 +184,7 @@ function openVault(dir) {
       for (const id of external) sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) sendToNote(id, 'memo:removed');
       // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (이 PC 에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
-      for (const id of external) if (!removed.includes(id)) checkHandoff(next.get(id));
+      for (const id of external) if (!removed.includes(id) && checkHandoff(next.get(id))) break; // 한 번에 하나만 (휴대폰과 같게)
     });
     next.on('indexed', (index) => listWin?.webContents.send('vault:indexed', index.generatedAt));
     next.on('error', (err) => console.error('[vault]', err));
@@ -454,6 +454,8 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null, re
   });
   win.on('closed', () => {
     noteWins.delete(id);
+    // 잠긴 메모의 말한 사람 나누기가 아직 도는 중이면: 끝난 결과를 그 메모에 넣을 때만 쓸 열쇠를 따로 들고 있는다
+    if (vault?.locks.has(id) && stt?.pendingFor?.(id)) holdLock(id, vault.locks.get(id));
     vault?.closeLock(id); // 잠금 메모는 창을 닫으면 다시 비밀번호로
     if (id === tutorial.memoId) tutorialEvent('note-closed');
     vault?.finalize(id);
@@ -2332,6 +2334,14 @@ const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 // ---------- 받아쓰기 (stt/stt-service.js) ----------
 // 메모 창마다 녹음 하나: 작업 id = "창 번호:녹음 번호"
 let stt = null;
+// 창을 닫은 잠긴 메모의 열쇠 — 말한 사람 나누기 결과를 넣을 때 한 번만 쓰고 버린다 (늦어도 30분 뒤엔 버림)
+const heldLocks = new Map();
+function holdLock(memoId, session) {
+  clearTimeout(heldLocks.get(memoId)?.timer);
+  const timer = setTimeout(() => heldLocks.delete(memoId), 30 * 60_000);
+  timer.unref?.();
+  heldLocks.set(memoId, { session, timer });
+}
 const sttOptions = () => ({ enabled: settings.stt?.enabled !== false, speaker: settings.stt?.speaker === true });
 function initStt() {
   stt = createSttService({
@@ -2348,9 +2358,15 @@ function initStt() {
     onSpeakers: ({ memoId, src, text }) => {
       const win = noteWins.get(memoId);
       if (win && !win.isDestroyed()) return win.webContents.send('stt:speakers', { src, text });
+      // 창을 닫은 잠긴 메모: 들고 있던 열쇠로 잠깐 열어 넣고 다시 잠근다 (열쇠가 없으면 넣지 못함 — 잠긴 글은 고칠 수 없다)
+      const held = heldLocks.get(memoId);
+      heldLocks.delete(memoId);
+      const opened = Boolean(held && vault?.get(memoId)?.needsPassword && vault.openLock(memoId, held.session));
+      clearTimeout(held?.timer);
       const memo = vault?.get(memoId);
-      const next = memo && replaceTranscript(memo.body, src, text);
+      const next = memo && !memo.needsPassword && replaceTranscript(memo.body, src, text);
       if (next && next !== memo.body) vault.save(memoId, next);
+      if (opened && !noteWins.has(memoId)) vault.closeLock(memoId);
     },
   });
 }
@@ -2773,7 +2789,12 @@ function registerIpc() {
   });
   ipcMain.on('memo:save-sync', (event, id, body) => {
     try {
-      if (typeof body === 'string' && vault) vault.save(id, body);
+      const r = typeof body === 'string' && vault ? vault.save(id, body) : null;
+      // 창을 닫는 순간인데 잠긴 메모라 저장되지 않았다: 쓰던 글을 사본 메모로 (이 창에서 연 열쇠가 있으면 그 열쇠로 잠근 채)
+      if (r?.refused && !r.copied && !isBlankBody(body)) {
+        if (vault.locks.has(id)) vault.importCopyOf(id, body, { color: vault.get(id)?.color });
+        else vault.import({ body, color: vault.get(id)?.color });
+      }
       event.returnValue = true;
     } catch (err) {
       console.error('저장 실패', err);

@@ -40,7 +40,8 @@ object Widgets {
     const val ACTION_PICK = "com.memoking.app.WIDGET_PICK"
     const val ACTION_PINNED = "com.memoking.app.WIDGET_PINNED"
     const val EXTRA_TOKEN = "token"
-    private const val PIN_TOKENS = "widget_pin_tokens" // 놓기 요청마다 한 번 쓰는 표 (메모 id → 표)
+    private const val PIN_TOKENS = "widget_pin_tokens" // 놓기 요청마다 한 번 쓰는 표 (메모 id → "표|요청 시각")
+    private const val PIN_WAIT_MS = 10 * 60_000L
 
     private fun map(ctx: Context) = ctx.getSharedPreferences(MAP, Context.MODE_PRIVATE)
     private fun data(ctx: Context) = ctx.getSharedPreferences(DATA, Context.MODE_PRIVATE)
@@ -66,11 +67,20 @@ object Widgets {
 
     /** 화면이 보낸 내용: [{id, title, color, file, lines:[{t, kind, done?, i?}]}] — 지워진 메모는 {id, gone:true} */
     fun publish(ctx: Context, memos: JSONArray) {
+        // 어느 위젯에도 없는 메모의 내용은 남기지 않는다 — 놓기를 취소한 메모의 글이 남아 있지 않게
+        // (놓기를 요청한 지 얼마 안 된 메모는 런처가 아직 묻는 중일 수 있어 남긴다)
+        val used = allIds(ctx).toList().mapNotNull { memoOf(ctx, it) }.toSet()
+        val tokens = ctx.getSharedPreferences(PIN_TOKENS, Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val pending = tokens.all.filter { (_, v) -> now - ((v as? String)?.substringAfter('|')?.toLongOrNull() ?: 0L) < PIN_WAIT_MS }.keys
+        tokens.edit().apply { tokens.all.keys.filter { it !in pending }.forEach { remove(it) } }.apply()
         val edit = data(ctx).edit()
         for (k in 0 until memos.length()) {
             val m = memos.getJSONObject(k)
             if (m.optBoolean("gone")) edit.remove(m.getString("id")) else edit.putString(m.getString("id"), m.toString())
         }
+        val incoming = (0 until memos.length()).map { memos.getJSONObject(it).getString("id") }.toSet()
+        data(ctx).all.keys.filter { it !in used && it !in pending && it !in incoming }.forEach { edit.remove(it) }
         edit.apply()
         update(ctx, allIds(ctx))
     }
@@ -128,7 +138,7 @@ object Widgets {
         // 위젯 받는 곳은 런처가 부를 수 있게 밖에 열려 있다 — 다른 앱이 "놓았어요" 를 흉내 내 위젯을 엉뚱한 메모로 바꾸지 못하게
         // 이 요청에만 맞는 표를 함께 보내고, 받을 때 맞춰 본 뒤 버린다
         val token = java.util.UUID.randomUUID().toString()
-        ctx.getSharedPreferences(PIN_TOKENS, Context.MODE_PRIVATE).edit().putString(memoId, token).apply()
+        ctx.getSharedPreferences(PIN_TOKENS, Context.MODE_PRIVATE).edit().putString(memoId, "$token|${System.currentTimeMillis()}").apply()
         val callback = PendingIntent.getBroadcast(
             ctx, memoId.hashCode(),
             Intent(ctx, MemoWidget::class.java).setAction(ACTION_PINNED).putExtra(EXTRA_MEMO, memoId).putExtra(EXTRA_TOKEN, token),
@@ -140,7 +150,7 @@ object Widgets {
     /** 놓기 요청의 표가 맞는지 (맞으면 버림 — 한 번만) */
     fun takePinToken(ctx: Context, memoId: String, token: String?): Boolean {
         val prefs = ctx.getSharedPreferences(PIN_TOKENS, Context.MODE_PRIVATE)
-        val want = prefs.getString(memoId, null) ?: return false
+        val want = prefs.getString(memoId, null)?.substringBefore('|') ?: return false
         if (token == null || token != want) return false
         prefs.edit().remove(memoId).apply()
         return true

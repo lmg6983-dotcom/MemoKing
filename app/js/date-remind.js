@@ -40,21 +40,38 @@ export function guessTitle(line, from, to) {
   return rest.slice(0, 40);
 }
 
+const DATE_HINT = /\d|내일|낼|모레|글피|요일|욜|주말|정오|자정|매일|날마다|하루|이틀|사흘|나흘|닷새|열흘|일주일|시|크리스마스|[A-Za-z]/;
+
+/** 글 한 덩이(문단·제목·목록 줄)의 날짜들 — pos 는 그 덩이의 문서 위치 */
+function datesInBlock(doc, node, pos, now) {
+  // 끝낸 할 일·코드 블록 안은 빼고
+  const $pos = doc.resolve(pos);
+  for (let d = $pos.depth; d > 0; d--) {
+    const anc = $pos.node(d);
+    if (anc.type.name === 'list_item' && anc.attrs.checked === true) return [];
+    if (anc.type.spec.code) return [];
+  }
+  if (node.type.spec.code) return [];
+  // 그림·줄바꿈 같은 글 아닌 것도 한 글자로 세면 글자 자리 = 문서 위치
+  const text = node.textBetween(0, node.content.size, null, '￼');
+  if (!DATE_HINT.test(text)) return [];
+  const found = [];
+  for (const d of findAllDates(text, { chrono, now })) {
+    // 인라인 코드·링크 안은 빼고
+    const $from = doc.resolve(pos + 1 + d.from);
+    if ($from.marks().some((m) => m.type.spec.code || m.type.name === 'link')) continue;
+    found.push({ ...d, from: pos + 1 + d.from, to: pos + 1 + d.to, title: guessTitle(text, d.from, d.to) });
+  }
+  return found;
+}
+
 function findInDoc(doc, now) {
   const found = [];
   doc.descendants((node, pos) => {
-    if (node.type.name === 'list_item' && node.attrs.checked === true) return false; // 끝낸 할 일은 빼고
+    if (node.type.name === 'list_item' && node.attrs.checked === true) return false;
     if (node.type.spec.code) return false;
     if (!node.isTextblock) return true;
-    // 그림·줄바꿈 같은 글 아닌 것도 한 글자로 세면 글자 자리 = 문서 위치
-    const text = node.textBetween(0, node.content.size, null, '￼');
-    if (!/\d|내일|낼|모레|글피|요일|욜|주말|정오|자정|매일|날마다|하루|이틀|사흘|나흘|닷새|열흘|일주일|시|크리스마스|[A-Za-z]/.test(text)) return false;
-    for (const d of findAllDates(text, { chrono, now })) {
-      // 인라인 코드·링크 안은 빼고
-      const $from = doc.resolve(pos + 1 + d.from);
-      if ($from.marks().some((m) => m.type.spec.code || m.type.name === 'link')) continue;
-      found.push({ ...d, from: pos + 1 + d.from, to: pos + 1 + d.to, title: guessTitle(text, d.from, d.to) });
-    }
+    found.push(...datesInBlock(doc, node, pos, now));
     return false;
   });
   return found;
@@ -67,13 +84,37 @@ function findInDoc(doc, now) {
 export function createDateRemind({ readOnly = false, onAdd, hasReminderAt } = {}) {
   if (readOnly || !onAdd) return new Plugin({ key: dateRemindKey });
   const isSet = (d) => Boolean(hasReminderAt?.(d));
-  const build = (doc) => {
-    const dates = findInDoc(doc, new Date());
-    const decos = dates.map((d) => Decoration.inline(d.from, d.to, {
-      class: isSet(d) ? 'mk-date mk-date-set' : 'mk-date',
-      title: isSet(d) ? `${chipLabel(d)} 일정이 있어요` : `누르면 ${chipLabel(d)} 일정을 만들고 미리 알림을 고를 수 있어요`,
-    }, { date: d }));
-    return DecorationSet.create(doc, decos);
+  const deco = (d) => {
+    const set = isSet(d);
+    return Decoration.inline(d.from, d.to, {
+      class: set ? 'mk-date mk-date-set' : 'mk-date',
+      title: set ? `${chipLabel(d)} 일정이 있어요` : `누르면 ${chipLabel(d)} 일정을 만들고 미리 알림을 고를 수 있어요`,
+    }, { date: d });
+  };
+  const build = (doc) => DecorationSet.create(doc, findInDoc(doc, new Date()).map(deco));
+  // 글이 바뀌면 바뀐 덩이만 다시 찾는다 (긴 메모에서 글자마다 메모 전체를 다시 읽어 느려지지 않게)
+  const update = (tr, old) => {
+    const doc = tr.doc;
+    let set = old.map(tr.mapping, doc);
+    const blocks = new Map();
+    tr.mapping.maps.forEach((map, i) => {
+      const rest = tr.mapping.slice(i + 1);
+      map.forEach((_a, _b, from, to) => {
+        const a = Math.max(0, rest.map(from, -1) - 1);
+        const b = Math.min(doc.content.size, rest.map(to, 1) + 1);
+        doc.nodesBetween(a, b, (node, pos) => {
+          if (!node.isTextblock) return true;
+          blocks.set(pos, node);
+          return false;
+        });
+      });
+    });
+    const now = new Date();
+    for (const [pos, node] of blocks) {
+      set = set.remove(set.find(pos, pos + node.nodeSize));
+      set = set.add(doc, datesInBlock(doc, node, pos, now).map(deco));
+    }
+    return set;
   };
 
   return new Plugin({
@@ -81,7 +122,7 @@ export function createDateRemind({ readOnly = false, onAdd, hasReminderAt } = {}
     state: {
       init: (_, state) => build(state.doc),
       // 글이 바뀌거나, 알림 목록이 바뀌었다고 알려 오면(refresh) 다시 찾는다
-      apply: (tr, old, _prev, state) => (tr.docChanged || tr.getMeta(dateRemindKey) ? build(state.doc) : old),
+      apply: (tr, old, _prev, state) => (tr.getMeta(dateRemindKey) ? build(state.doc) : tr.docChanged ? update(tr, old) : old),
     },
     props: {
       decorations: (state) => dateRemindKey.getState(state),

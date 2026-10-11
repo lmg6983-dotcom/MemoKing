@@ -69,6 +69,7 @@ let saveTimer = null;
 let pendingExternal = null;
 let conflictCopy = null; // 쓰는 중에 다른 기기에서도 고쳐 들어온 내용을 따로 남긴 사본 메모 (여는 동안 한 사본만 고쳐 쓴다)
 let opening = null;
+let refusedSave = false; // 마지막 저장이 거절됐다 (다른 기기가 잠근 메모)
 
 export const currentId = () => id;
 export const isOpen = () => id !== null;
@@ -107,7 +108,19 @@ export function flush() {
   if (!id || !isDirty()) return;
   const body = current;
   try {
-    app.vault.save(id, body);
+    const r = app.vault.save(id, body);
+    if (r?.refused) {
+      // 다른 기기가 이 메모를 잠갔다 — 사본으로 남겼으면 쓴 글은 안전, 아니면 닫을 때 사본으로 (closeNote)
+      if (r.copied) {
+        saved = body;
+        setStatus('다른 기기에서 이 메모를 잠가, 쓰던 내용은 사본 메모로 남겼어요', true);
+      } else {
+        refusedSave = true;
+        setStatus('잠긴 메모라 저장하지 못했어요', true);
+      }
+      return;
+    }
+    refusedSave = false;
     saved = body;
     setStatus('저장했어요');
   } catch (err) {
@@ -1337,6 +1350,18 @@ export function closeNote({ quiet = false } = {}) {
   if (!id) return;
   el.editorRoot.querySelector('.lock-screen [data-lock-cancel]')?.click(); // 비밀번호 화면에서 뒤로 가기 = 닫기
   flush();
+  if (refusedSave && isDirty() && !isBlankBody(current)) {
+    // 저장이 거절된 채로 닫는다: 쓰던 글을 사본 메모로 (연 열쇠가 있으면 잠근 채)
+    try {
+      if (app.vault.locks.has(id)) app.vault.importCopyOf(id, current, {});
+      else app.vault.import({ body: current });
+      saved = current;
+      toast('저장하지 못한 내용은 사본 메모로 남겼어요', true);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  refusedSave = false;
   flushTables();
   clearStamp.hide();
   const closing = id;

@@ -51,9 +51,11 @@ export function alertsOf(r) {
   return [...new Set(list)].sort((a, b) => b - a);
 }
 
-function normalizeAlerts(raw) {
+// 시각 있는 일정은 시작 전(0 이상)만, 하루 종일은 그날 안(자정 직전까지)과 그 전 — 이름("정시"·"당일 오후 12시")이 실제와 어긋나지 않게
+function normalizeAlerts(raw, allDay = false) {
   if (!Array.isArray(raw)) return null;
-  return [...new Set(raw.map((v) => Math.round(Number(v))).filter((v) => Number.isFinite(v) && v >= -1440 && v <= MAX_ALERT_MIN))]
+  const min = allDay ? -1439 : 0;
+  return [...new Set(raw.map((v) => Math.round(Number(v))).filter((v) => Number.isFinite(v) && v >= min && v <= MAX_ALERT_MIN))]
     .sort((a, b) => b - a).slice(0, MAX_ALERTS);
 }
 
@@ -111,7 +113,7 @@ export function normalizeReminder(raw, now = new Date()) {
   if (isEvent(r)) {
     const title = typeof raw.title === 'string' ? raw.title.replace(/\s+/g, ' ').trim().slice(0, 80) : '';
     if (title) r.title = title;
-    const alerts = normalizeAlerts(raw.alerts);
+    const alerts = normalizeAlerts(raw.alerts, raw.allDay === true);
     if (alerts) r.alerts = alerts;
     if (raw.allDay === true) r.allDay = true;
   }

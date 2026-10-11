@@ -167,7 +167,15 @@ async function flush() {
   if (!isDirty()) return;
   const body = current;
   try {
-    await api.memo.save(id, body);
+    const r = await api.memo.save(id, body);
+    if (r?.refused) {
+      // 다른 기기가 이 메모를 잠갔다 — 파일은 그쪽 것 그대로. 사본으로 남겼으면 쓴 글은 안전, 아니면 아직 저장 안 된 글로 둔다
+      if (r.copied) {
+        saved = body;
+        setStatus('다른 기기에서 이 메모를 잠가, 쓰던 내용은 사본 메모로 남겼어요', true);
+      } else setStatus('잠긴 메모라 저장하지 못했어요. 쓰던 글을 복사해 두세요', true);
+      return;
+    }
     saved = body;
     setStatus('저장했어요');
   } catch (err) {

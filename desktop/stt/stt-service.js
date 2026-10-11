@@ -316,8 +316,11 @@ export function createSttService(opts) {
     });
   }
 
+  /** 이 메모의 받아쓰기(말한 사람 나누기 포함)가 아직 끝나지 않았는가 */
+  const pendingFor = (memoId) => [...jobs.values()].some((j) => j.memoId === memoId);
+
   return {
-    status, download, remove, start, audio, stop, cancel, transcribe, ready,
+    status, download, remove, start, audio, stop, cancel, transcribe, ready, pendingFor,
     emit,
     close: () => worker?.terminate(),
   };
