@@ -352,3 +352,21 @@ test('다른 기기가 제목을 숨겨 잠그며 파일 이름을 바꾼 사이
     v.close();
   }
 });
+
+test('휴지통에서 되살린 잠긴 메모는 그 첨부도 함께 돌아옴', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    fs.writeFileSync(path.join(root, 'attachments', 'a.png'), 'png');
+    const id = v.create();
+    v.save(id, '# 금고\n\n![](attachments/a.png)');
+    v.lock(id, await newLockSession('사과1234', FAST), { keepOpen: false });
+    const name = v.trash(id);
+    assert.ok(!fs.existsSync(path.join(root, 'attachments', 'a.png')), '지우면 휴지통으로');
+    v.restoreTrash(typeof name === 'string' ? name : v.trashList()[0].name);
+    assert.ok(fs.existsSync(path.join(root, 'attachments', 'a.png')), '되살리면 돌아옴');
+  } finally {
+    v.close();
+  }
+});

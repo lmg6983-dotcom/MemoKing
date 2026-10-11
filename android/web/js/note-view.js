@@ -109,6 +109,10 @@ export function flush() {
   const body = current;
   try {
     const r = app.vault.save(id, body);
+    if (r?.invalid) {
+      setStatus('잠금 메모 형식의 글은 그대로 저장할 수 없어요. 글을 고쳐 주세요', true);
+      return;
+    }
     if (r?.refused) {
       // 다른 기기가 이 메모를 잠갔다 — 사본으로 남겼으면 쓴 글은 안전, 아니면 닫을 때 사본으로 (closeNote)
       if (r.copied) {

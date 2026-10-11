@@ -168,6 +168,7 @@ async function flush() {
   const body = current;
   try {
     const r = await api.memo.save(id, body);
+    if (r?.invalid) return setStatus('잠금 메모 형식의 글은 그대로 저장할 수 없어요 (아무도 열 수 없게 돼요). 글을 고쳐 주세요', true);
     if (r?.refused) {
       // 다른 기기가 이 메모를 잠갔다 — 파일은 그쪽 것 그대로. 사본으로 남겼으면 쓴 글은 안전, 아니면 아직 저장 안 된 글로 둔다
       if (r.copied) {

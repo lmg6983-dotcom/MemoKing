@@ -4,12 +4,26 @@
 //            vault.keepVersion · vault.purgeVersions · vault.versions · vault.version · vault.rescanSoon · vault.copyOf(Map)
 
 /** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
+/**
+ * 잠긴 메모(열지 않음)가 쓰는 첨부 파일들 — 머리말의 표로 후보(files) 중에서 고른다 (표가 없는 예전 잠금이면 알 수 없어 없음)
+ * 풀린 메모면 글에서 바로
+ */
+export function lockedFiles(body, meta, files) {
+  if (!isLockedBody(body)) return extractAttachments(body);
+  const refs = meta?.extra?.lockRefs;
+  const salt = parseLocked(body)?.salt;
+  if (!Array.isArray(refs) || !salt) return [];
+  const want = new Set(refs);
+  return files().filter((src) => want.has(lockRefKey(src, salt)));
+}
+
 export const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
 /** 이 메모를 잠글 때 고른 것 (제목도 숨기기) — 저장마다 같게 */
 const sealOpts = (entry) => ({ hideTitle: entry.meta.extra?.lockHideTitle === true });
-import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey, lockedMayUse } from './memo-lock.js';
+import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey } from './memo-lock.js';
 import { isBlankBody, sameBody, conflictCopyBody, extractAttachments } from './memo-file.js';
 import { toLocalIso } from './time.js';
+import { versionTime } from './versions.js';
 
 class LockMethods {
   /** 이 메모의 본문 (잠겼으면 세션으로 푼 글, 못 풀면 null) */
@@ -36,6 +50,11 @@ class LockMethods {
         this.write(entry, entry.body, { copy: false });
       } catch {
         // 다음에 다시
+      }
+      // 그사이 다른 기기가 다른 비밀번호로 다시 잠근 글을 받아들였다면 이 열쇠로는 열 수 없다 — 다시 비밀번호로
+      if (unsealBody(entry.body, session) === null) {
+        this.locks.delete(id);
+        return null;
       }
     }
     // 이제 제 비밀번호로 연 메모 (원래 메모에 묶인 사본이 아님)
@@ -90,7 +109,8 @@ class LockMethods {
   sealForSave(entry, body) {
     // 잠근 글을 바깥에서 고쳐 넘기는 일은 없다 (자동 태그 등) — 암호문이 깨지지 않게 그대로 둔다
     if (isLockedBody(body) && entry.file && isLockedBody(entry.body) && body !== entry.body) return { same: true };
-    if (isLockedBody(body)) return { body };
+    // 풀린 메모에 잠금 형식 글을 통째로(붙여 넣기 등): 아무도 열 수 없는 메모가 되므로 저장하지 않는다
+    if (isLockedBody(body)) return isLockedBody(entry.body) ? { body } : { refused: true, invalid: true };
     const session = this.locks.get(entry.id);
     // 열쇠를 들고 있는 메모(연 잠긴 메모)인데 파일이 사라져 다시 만드는 중: 풀린 글이 새 파일로 나가지 않게 잠근 채로
     if (!isLockedBody(entry.body)) {
@@ -117,7 +137,7 @@ class LockMethods {
     const theirsPlain = session ? unsealBody(theirs, session) : null;
     if (theirsPlain !== null) {
       this.keepVersion(entry.id, theirs, { force: true });
-      if (!isBlankBody(theirsPlain)) this.importCopyOf(entry.id, conflictCopyBody(theirsPlain), { color: entry.meta.color });
+      if (copy && !isBlankBody(theirsPlain)) this.importCopyOf(entry.id, conflictCopyBody(theirsPlain), { color: entry.meta.color });
       return undefined;
     }
     const mine = entry.body;
@@ -150,8 +170,7 @@ class LockMethods {
   attachmentsOf(entry) {
     const plain = this.plainOf(entry);
     if (plain !== null) return extractAttachments(plain);
-    if (!Array.isArray(entry.meta?.extra?.lockRefs)) return []; // 표가 없는 예전 잠금: 알 수 없으니 그대로 둔다
-    return this.attachmentFiles().filter((src) => lockedMayUse(entry, src));
+    return lockedFiles(entry.body, entry.meta, () => this.attachmentFiles());
   }
 
   /** 잠긴 글을 통째로 바꾼 뒤(버전 되돌리기): 첨부 표를 그 글에 맞게 — 풀 수 없으면 표를 지워 "알 수 없음"(치우지 않음)으로 */
@@ -216,8 +235,10 @@ class LockMethods {
       return;
     }
     // 버전은 시간 순: 잠기기 전(풀린)·예전 비밀번호 버전은 앞쪽에 있으므로 가장 오래된 것과 가장 새 것만 본다
-    const sorted = [...names].sort();
-    const check = [...new Set([sorted[0], sorted.at(-1)])].filter(Boolean);
+    // (같은 초에 둘 이상이면 "-2" 처럼 붙으므로 이름이 아니라 시각으로 — 가장 새 시각의 것은 모두 본다)
+    const timed = names.map((name) => ({ name, at: versionTime(name) ?? 0 })).sort((a, b) => a.at - b.at || a.name.localeCompare(b.name));
+    const newest = timed.at(-1)?.at;
+    const check = [...new Set([timed[0]?.name, ...timed.filter((v) => v.at === newest).map((v) => v.name)])].filter(Boolean);
     if (check.some((name) => parseLocked(this.version(id, name) ?? '')?.salt !== salt)) this.purgeVersions(id);
   }
 

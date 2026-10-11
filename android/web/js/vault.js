@@ -10,7 +10,7 @@ import { normalizeTables } from '../../app/js/core/table-sizes.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
 import { isLockedBody, parseLocked } from '../../app/js/core/memo-lock.js';
-import { installLockMethods, metaSnapshot } from '../../app/js/core/vault-locks.js';
+import { installLockMethods, metaSnapshot, lockedFiles } from '../../app/js/core/vault-locks.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
@@ -372,6 +372,15 @@ export class Vault extends EventTarget {
     return safe ? `${VERSIONS_DIR}/${safe}` : null;
   }
 
+  /** 휴지통에 옮겨 둔 첨부들 ("attachments/이름") — 잠긴 메모를 되살릴 때 */
+  trashAttachmentFiles() {
+    try {
+      return (fs.list(`${TRASH_DIR}/${ATTACH_DIR}`) ?? []).filter((e) => !e.dir).map((e) => `${ATTACH_DIR}/${e.name}`);
+    } catch {
+      return [];
+    }
+  }
+
   /** 첨부 폴더의 파일들 ("attachments/이름") — 잠긴 메모를 지울 때 그 메모의 첨부를 찾는 데 */
   attachmentFiles() {
     try {
@@ -675,8 +684,9 @@ export class Vault extends EventTarget {
   restoreTrash(name) {
     const file = this.trashFile(name);
     if (!file) return null;
-    const { body } = parseMemoFile(fs.readText(file) ?? '');
-    for (const src of extractAttachments(body)) {
+    const { body, meta } = parseMemoFile(fs.readText(file) ?? '');
+    // 잠긴 메모는 머리말의 표로 휴지통의 첨부에서 찾아 함께 되살린다 (core/vault-locks.js)
+    for (const src of lockedFiles(body, meta, () => this.trashAttachmentFiles())) {
       if (!src.startsWith(`${ATTACH_DIR}/`)) continue;
       const live = this.resolve(src);
       const held = `${TRASH_DIR}/${src}`;

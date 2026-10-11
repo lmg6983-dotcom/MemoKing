@@ -104,16 +104,28 @@ object Widgets {
         null
     }
 
+    /** 메모 폴더(맨 위)에서 머리말 id 가 같은 메모 파일 (경로, 내용) */
+    private fun findById(storage: Storage, memoId: String): Pair<String, String>? {
+        val idLine = Regex("(?m)^id:\\s*['\"]?" + Regex.escape(memoId) + "['\"]?\\s*$")
+        val names = try {
+            storage.list("").filter { !it.dir && it.name.endsWith(".md", ignoreCase = true) }.map { it.name }
+        } catch (e: Exception) {
+            return null
+        }
+        for (name in names) {
+            val text = read(storage, name) ?: continue
+            val head = text.substringBefore("\n---", "").take(2000)
+            if (idLine.containsMatchIn(head)) return name to text
+        }
+        return null
+    }
+
     private fun read(storage: Storage, file: String): String? = try {
         storage.openRead(file).use { it.readBytes().toString(Charsets.UTF_8) }
     } catch (e: Exception) {
         null
     }
 
-    /**
-     * 앱이 꺼져 있는 동안 동기화로 받은 파일 중 다른 기기에서 잠근 메모가 있으면 위젯의 내용(풀린 글)을 바로 숨긴다.
-     * (위젯 내용은 앱 화면이 만들어 보내므로, 앱을 열 때까지 예전 글이 홈 화면에 남지 않게)
-     */
     /** 머리말 뒤 첫 "# 제목" 줄의 제목 (없으면 null) */
     fun visibleTitle(text: String): String? {
         val lines = text.split("\n")
@@ -123,6 +135,10 @@ object Widgets {
         return if (line.startsWith("# ")) line.removePrefix("# ").trim() else null
     }
 
+    /**
+     * 앱이 꺼져 있는 동안 동기화로 받은 파일 중 다른 기기에서 잠근 메모가 있으면 위젯의 내용(풀린 글)을 바로 숨긴다.
+     * (위젯 내용은 앱 화면이 만들어 보내므로, 앱을 열 때까지 예전 글이 홈 화면에 남지 않게)
+     */
     fun hideLocked(ctx: Context) {
         val storage = Vaults.current(ctx) ?: return
         var changed = false
@@ -131,7 +147,11 @@ object Widgets {
             val memo = parse(raw as? String) ?: continue
             val file = memo.optString("file")
             if (file.isEmpty() || memo.optBoolean("locked")) continue
-            val text = read(storage, file) ?: continue
+            // 다른 기기가 잠그며 이름을 바꿨으면("제목도 숨기기") 같은 id 의 파일을 찾는다
+            val text = read(storage, file) ?: findById(storage, memoId)?.let { (renamed, content) ->
+                memo.put("file", renamed)
+                content
+            } ?: continue
             if (!looksLocked(text)) continue
             // 제목도 잠근 파일에 보이는 제목으로 ("제목도 숨기기" 로 잠갔으면 "잠긴 메모")
             val shownTitle = visibleTitle(text)

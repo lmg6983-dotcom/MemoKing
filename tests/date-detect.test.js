@@ -243,3 +243,9 @@ test('매년 2월 29일: 평년에도 찾고 28일에 (반복 알림과 같은 �
   assert.deepEqual(r.repeat, { every: 'year', month: 2, day: 29, time: '09:00' });
   assert.equal(first('매년 4월 31일'), null);
 });
+
+test('"낼" 이 "내다" 일 때는 날짜가 아님', () => table([
+  ['제가 낼게요', null, null],
+  ['회비 낼 사람', null, null],
+  ['낼 아침 회의', '낼 아침', '2026-10-11 8:00'],
+]));
