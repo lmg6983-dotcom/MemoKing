@@ -180,14 +180,11 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun widgetPublish(json: String): String = reply {
         val memos = JSONArray(json)
-        val app = ctx.applicationContext
-        // 위젯의 파일 일은 한 줄로 (체크·잠긴 메모 숨기기와 서로 덮어쓰지 않게)
-        Widgets.io.execute {
-            try {
-                Widgets.publish(app, memos)
-            } catch (e: Exception) {
-                android.util.Log.w("MemoKing", "위젯 내용 보내기 실패", e)
-            }
+        // 위젯의 파일 일은 한 줄로 (체크·잠긴 메모 숨기기와 서로 덮어쓰지 않게) — 끝날 때까지 기다려, 이어서 놓기·고르기가 내용을 보게
+        try {
+            Widgets.io.submit<Unit> { Widgets.publish(ctx, memos) }.get(10, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (e: java.util.concurrent.ExecutionException) {
+            throw e.cause ?: e
         }
     }
 

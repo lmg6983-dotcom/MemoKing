@@ -98,14 +98,12 @@ object DriveSync {
         }
         saveState(file, state)
         if (result.downloaded > 0) {
-            // 다른 기기에서 잠근 메모를 홈 화면 위젯에서 바로 숨김 (위젯의 파일 일은 한 줄로 — 체크·내용 보내기와 서로 덮어쓰지 않게)
-            val app = ctx.applicationContext
-            com.memoking.app.Widgets.io.execute {
-                try {
-                    com.memoking.app.Widgets.hideLocked(app)
-                } catch (e: Exception) {
-                    android.util.Log.w("MemoKing", "위젯 확인 실패", e)
-                }
+            // 다른 기기에서 잠근 메모를 홈 화면 위젯에서 바로 숨김 — 위젯의 파일 일은 한 줄로(체크·내용 보내기와 서로 덮어쓰지 않게),
+            // 동기화가 끝났다고 알리기 전에 마친다 (그 뒤 앱이 바로 꺼져도 풀린 글이 위젯에 남지 않게)
+            try {
+                com.memoking.app.Widgets.io.submit<Unit> { com.memoking.app.Widgets.hideLocked(ctx) }.get(20, TimeUnit.SECONDS)
+            } catch (e: Exception) {
+                android.util.Log.w("MemoKing", "위젯 확인 실패", e)
             }
         }
         GoogleAuth.ensureEmail(ctx)

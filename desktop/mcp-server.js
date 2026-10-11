@@ -200,7 +200,7 @@ server.registerTool('create_memo', {
 }, async ({ content, color }) => {
   if (!canWrite()) return fail('메모킹 설정에서 "AI가 메모를 남기도록 허용" 이 꺼져 있어요.');
   if (!content.trim()) return fail('메모 내용이 비어 있어요. content 에 남길 글을 넣어 주세요.');
-  if (isLockedBody(content)) return fail('잠금 메모 형식의 글은 남길 수 없어요 (아무도 열 수 없는 메모가 돼요).');
+  if (isLockedBody(content) || /<!--\s*memoking-lock/.test(content)) return fail('잠금 정보가 든 글은 남길 수 없어요 (아무도 열 수 없는 메모가 될 수 있어요).');
   try {
     const v = openVault();
     const id = v.create({ color });
@@ -239,7 +239,7 @@ server.registerTool('append_to_memo', {
     const appended = (body) => {
       const before = body.replace(/\s+$/, '');
       const gap = isItem(before.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
-      return `${before}${gap}${add}\n`;
+      return before ? `${before}${gap}${add}\n` : `${add}\n`; // 빈 메모면 앞에 빈 줄 없이
     };
     let saved = v.save(m.id, appended(m.body));
     if (saved?.retry) {

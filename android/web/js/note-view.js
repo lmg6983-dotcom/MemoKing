@@ -138,6 +138,7 @@ export function flush() {
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
+    refusedSave = true; // 이대로 닫으면 사본 메모로라도 남긴다 (closeNote)
     setStatus('저장하지 못했어요. 저장 위치를 확인해 주세요', true);
   }
 }
@@ -1408,6 +1409,13 @@ export function closeNote({ quiet = false } = {}) {
       toast('저장하지 못한 내용은 사본 메모로 남겼어요', true);
     } catch (err) {
       console.error(err);
+      // 사본도 남기지 못했다(저장 위치에 쓸 수 없음) — 쓰던 글을 잃지 않게 클립보드로
+      try {
+        native.copyText(current);
+        toast('저장하지 못해 쓰던 내용을 클립보드에 복사해 두었어요. 저장 위치를 확인해 주세요', true);
+      } catch {
+        toast('저장하지 못했어요. 저장 위치를 확인해 주세요', true);
+      }
     }
   }
   refusedSave = false;

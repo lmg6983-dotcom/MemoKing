@@ -6,7 +6,8 @@
 //   저장(save)·버전 되돌리기·덮어쓰기 전 확인(keepChangedOnDisk)도 여기 — PC·휴대폰이 같은 규칙으로
 
 import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey } from './memo-lock.js';
-import { isBlankBody, sameBody, conflictCopyBody, extractAttachments } from './memo-file.js';
+import { isBlankBody, sameBody, conflictCopyBody, extractAttachments, COLORS, normalizeInkPath } from './memo-file.js';
+import { normalizeTables } from './table-sizes.js';
 import { toLocalIso } from './time.js';
 import { versionTime } from './versions.js';
 
@@ -84,6 +85,46 @@ class LockMethods {
     }
     this.changed([id]);
     return this.summary(entry);
+  }
+
+  /** 색·고정·표 크기·그림 — 머리말만 쓴다. 쓰지 못했으면 되돌리고 null */
+  setMeta(id, patch) {
+    const entry = this.entries.get(id);
+    if (!entry) return null;
+    const prev = metaSnapshot(entry.meta);
+    if (patch.color && COLORS.includes(patch.color)) entry.meta.color = patch.color;
+    if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
+    if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
+    if (typeof patch.ink === 'string') entry.meta.ink = normalizeInkPath(patch.ink);
+    if (entry.file && this.write(entry) !== true) {
+      entry.meta = prev; // 쓰지 못했다 — 바뀐 것처럼 보이지 않게
+      return null;
+    }
+    this.changed([id]);
+    return this.get(id);
+  }
+
+  /** 메모 연결 — 쓰지 못했으면 되돌리고 null */
+  link(id, targetId, on = true) {
+    const entry = this.entries.get(id);
+    const target = this.entries.get(targetId);
+    if (!entry || !target || id === targetId) return null;
+    const links = new Set(entry.meta.links);
+    if (on) links.add(targetId);
+    else links.delete(targetId);
+    const prev = entry.meta.links;
+    entry.meta.links = [...links];
+    // 상대 메모에 id 가 저장돼 있어야 파일명이 바뀌어도 연결이 유지된다.
+    if (on && target.file && !target.idSaved && this.write(target) !== true) {
+      entry.meta.links = prev;
+      return null;
+    }
+    if (entry.file && this.write(entry) !== true) {
+      entry.meta.links = prev; // 쓰지 못했다 — 연결된 것처럼 보이지 않게
+      return null;
+    }
+    this.changed([id, targetId]);
+    return this.links(id);
   }
 
   // 지금 내용도 버전으로 남겨 두고(되돌리기를 되돌릴 수 있게) 고른 버전으로 바꾼다
