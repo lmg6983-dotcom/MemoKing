@@ -87,7 +87,8 @@ export class Vault extends EventEmitter {
     // 꺼 둔 사이 다른 기기에서 잠근 메모의 풀린 버전이 이 기기에 남지 않게
     for (const e of this.entries.values()) if (isLockedBody(e.body)) this.dropUnsafeVersions(e.id);
     const guide = path.join(this.appDir, 'README.md');
-    if (!fs.existsSync(guide) || fs.readFileSync(guide, 'utf8') !== AGENT_GUIDE) writeAtomic(guide, AGENT_GUIDE);
+    // 안내·색인 파일은 켜져 있는 메모킹 앱이 쓴다 (AI 비서 연결 프로세스는 쓰지 않음 — 두 프로세스가 같은 파일을 쓰지 않게)
+    if (this.device !== 'ai' && (!fs.existsSync(guide) || fs.readFileSync(guide, 'utf8') !== AGENT_GUIDE)) writeAtomic(guide, AGENT_GUIDE);
     this.writeIndex();
     this.watch();
   }
@@ -468,6 +469,7 @@ export class Vault extends EventEmitter {
     const before = { ...entry.meta, extra: { ...entry.meta.extra } };
     const known = entry.body;
     entry.body = body;
+    this.refreshLockRefs(entry); // 되돌린 글의 첨부도 첨부 정리에서 지키게
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device;
     if (this.write(entry, known, { copy: false }) !== true) {

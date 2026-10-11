@@ -322,10 +322,19 @@ object Widgets {
             storage.write(file) { it.write(stamped.toByteArray(Charsets.UTF_8)) }
         }
         DriveSync.request(ctx, 3000)
+        // 위젯도 바로 그 모양으로 — 파일에서 글로 찾아 고쳤으면 위젯에서도 같은 글의 줄을 (번호가 아니라)
         val lines = memo.optJSONArray("lines") ?: JSONArray()
+        val shown = taskText?.trim()
+        var target = -1
         for (k in 0 until lines.length()) {
             val l = lines.getJSONObject(k)
-            if (l.optString("kind") == "task" && l.optInt("i", -1) == index) l.put("done", if (shownDone != null) !shownDone else !l.optBoolean("done"))
+            if (l.optString("kind") != "task") continue
+            val match = if (shown != null) l.optString("r") == shown else l.optInt("i", -1) == index
+            if (match && (target < 0 || kotlin.math.abs(l.optInt("i") - index) < kotlin.math.abs(lines.getJSONObject(target).optInt("i") - index))) target = k
+        }
+        if (target >= 0) {
+            val l = lines.getJSONObject(target)
+            l.put("done", if (shownDone != null) !shownDone else !l.optBoolean("done"))
         }
         data(ctx).edit().putString(memoId, memo.toString()).apply()
         update(ctx, allIds(ctx).filter { memoOf(ctx, it) == memoId }.toIntArray())

@@ -886,7 +886,22 @@ function askAudioImport(files) {
 }
 
 // 메모 폴더의 소리 파일을 받아써서 그 메모 끝에 넣는다 (오래 걸리므로 메모를 만든 뒤 따로)
+// 받아쓰는 중인 메모 (그사이 잠긴 메모를 닫아도 열쇠를 들고 있다가 넣게)
+app.transcribing = new Map(); // memoId → 진행 중인 수
 async function transcribeInto(memoId, items) {
+  app.transcribing.set(memoId, (app.transcribing.get(memoId) ?? 0) + 1);
+  try {
+    await transcribeEach(memoId, items);
+  } finally {
+    const n = (app.transcribing.get(memoId) ?? 1) - 1;
+    if (n > 0) app.transcribing.set(memoId, n);
+    else {
+      app.transcribing.delete(memoId);
+      app.heldLocks.delete(memoId);
+    }
+  }
+}
+async function transcribeEach(memoId, items) {
   for (const item of items) {
     try {
       toast('받아쓰는 중…');

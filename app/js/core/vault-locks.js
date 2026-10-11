@@ -72,7 +72,7 @@ class LockMethods {
    */
   sealForSave(entry, body) {
     // 잠근 글을 바깥에서 고쳐 넘기는 일은 없다 (자동 태그 등) — 암호문이 깨지지 않게 그대로 둔다
-    if (isLockedBody(body) && entry.file && body !== entry.body) return { same: true };
+    if (isLockedBody(body) && entry.file && isLockedBody(entry.body) && body !== entry.body) return { same: true };
     if (isLockedBody(body)) return { body };
     const session = this.locks.get(entry.id);
     // 열쇠를 들고 있는 메모(연 잠긴 메모)인데 파일이 사라져 다시 만드는 중: 풀린 글이 새 파일로 나가지 않게 잠근 채로
@@ -112,9 +112,21 @@ class LockMethods {
 
   /** 버전 되돌리기를 해도 되는가 — 잠긴 메모에 풀린 버전·다른 비밀번호 버전을 덮어 잠금을 풀거나 비밀번호를 되돌리지 않게 */
   canRestore(entry, versionBody) {
-    if (!isLockedBody(entry.body)) return !isLockedBody(versionBody) || this.locks.has(entry.id);
+    // 풀린 메모에 잠긴 버전: 들고 있는 열쇠로 풀리는 것만 (못 푸는 글로 바꿔 내가 못 열게 되지 않게)
+    if (!isLockedBody(entry.body)) return !isLockedBody(versionBody) || this.locks.get(entry.id)?.salt === parseLocked(versionBody)?.salt;
     if (!isLockedBody(versionBody)) return false;
     return parseLocked(versionBody)?.salt === parseLocked(entry.body)?.salt;
+  }
+
+  /** 잠긴 글을 통째로 바꾼 뒤(버전 되돌리기): 첨부 표를 그 글에 맞게 — 풀 수 없으면 표를 지워 "알 수 없음"(치우지 않음)으로 */
+  refreshLockRefs(entry) {
+    if (!isLockedBody(entry.body)) return;
+    const plain = this.plainOf(entry);
+    if (plain !== null) this.setLockRefs(entry, plain);
+    else {
+      const { lockRefs: _refs, ...extra } = entry.meta.extra ?? {};
+      entry.meta.extra = extra;
+    }
   }
 
   /**

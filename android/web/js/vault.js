@@ -433,6 +433,7 @@ export class Vault extends EventTarget {
     const before = { ...entry.meta, extra: { ...entry.meta.extra } };
     const known = entry.body;
     entry.body = body;
+    this.refreshLockRefs(entry); // 되돌린 글의 첨부도 첨부 정리에서 지키게
     entry.meta.updated = toLocalIso();
     entry.meta.device = 'phone';
     if (this.write(entry, known, { copy: false }) !== true) {

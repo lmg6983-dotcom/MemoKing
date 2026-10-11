@@ -217,3 +217,11 @@ test('고른 알림이 모두 지났으면 정시로 (하루 종일은 당일 �
   assert.deepEqual(pendingAlerts([900], at(2026, 10, 6), { now: at(2026, 10, 5, 10, 0), fallback: fallbackAlert(true) }), [-540]);
   assert.deepEqual(pendingAlerts([-540], at(2026, 10, 5), { now: at(2026, 10, 5, 10, 0), fallback: fallbackAlert(true) }), []);
 });
+
+test('날짜 차이는 서머타임이 있는 시간대에서도 정확 (오클랜드)', { skip: process.platform === 'win32' && 'TZ 를 바꿀 수 없음' }, async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const code = "import('./app/js/core/time.js').then(({ daysFrom, dayLabel }) => { const now = new Date(2026, 8, 26, 10); console.log([daysFrom(new Date(2026, 8, 27, 9), now), daysFrom(new Date(2026, 8, 28, 9), now), dayLabel(new Date(2026, 8, 27, 9), now)].join(',')); })";
+  const out = execFileSync(process.execPath, ['-e', code], { env: { ...process.env, TZ: 'Pacific/Auckland' }, cwd: fileURLToPath(new URL('..', import.meta.url)) }).toString().trim();
+  assert.equal(out, '1,2,내일'); // 2026-09-27 에 서머타임 시작
+});

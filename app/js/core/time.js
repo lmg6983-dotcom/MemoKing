@@ -23,7 +23,8 @@ export const koClock = (d) => `${d.getHours() < 12 ? '오전' : '오후'} ${d.ge
 export const koMonthDay = (d) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
 
 const WEEKDAY = '일월화수목금토';
-const dayNumber = (d) => Math.round(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86_400_000);
+// 현지 날짜(연·월·일)를 UTC 날짜 수로 — 시간대·서머타임과 상관없이 하루 차이가 정확히 1
+const dayNumber = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000;
 /** 오늘부터 며칠 뒤인지 (어제 -1 · 오늘 0 · 내일 1) */
 export const daysFrom = (d, now = new Date()) => dayNumber(new Date(d)) - dayNumber(new Date(now));
 /** 10월 12일 (월) · 다른 해면 2027년 1월 2일 (토) */

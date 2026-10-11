@@ -2756,7 +2756,8 @@ function registerIpc() {
   ipcMain.handle('memo:lock', async (_e, id, password) => {
     try {
       const session = await newLockSession(String(password ?? ''));
-      return vault?.lock(String(id), session) ?? { error: '이미 잠긴 메모예요' };
+      // 잠그는 사이 창이 닫혔으면 열쇠는 들고 있지 않는다
+      return vault?.lock(String(id), session, { keepOpen: noteWins.has(String(id)) }) ?? { error: '잠그지 못했어요. 이미 잠겼거나 그사이 다른 기기에서 잠갔을 수 있어요' };
     } catch (err) {
       return { error: err.message };
     }
@@ -2765,6 +2766,8 @@ function registerIpc() {
     const sealed = vault?.entries.get(String(id))?.body;
     try {
       const { session } = await openLock(sealed, String(password ?? ''));
+      // 확인하는 사이 창이 닫혔으면 열쇠를 남기지 않는다 (닫힌 메모가 비밀번호 없이 열리지 않게)
+      if (!noteWins.has(String(id))) return { error: '메모 창이 닫혔어요' };
       return vault.openLock(String(id), session) ?? { error: '메모를 열지 못했어요' };
     } catch (err) {
       return { error: err.message };
