@@ -75,5 +75,10 @@ class WidgetToggleTest {
         val plain = "---\n- [ ] 첫 할 일\n---\n- [ ] 둘째"
         assertEquals("---\n- [x] 첫 할 일\n---\n- [ ] 둘째", Widgets.toggleTaskText(plain, 0))
         assertEquals(plain, Widgets.stampEdit(plain, "2026-10-11T10:00:00+09:00"))
+        assertNull("구분선 둘", Widgets.headerEnd("---\n---\n- [ ] a".split("\n")))
+        // 한글·띄어쓰기 키 · 첫 줄 주석 · BOM 이 붙은 머리말은 머리말
+        assertEquals(3, Widgets.headerEnd("---\n마감 날짜: 2026-10-12\nid: a\n---\n# 제목".split("\n")))
+        assertEquals(3, Widgets.headerEnd("---\n# synced\nid: a\n---\n# 제목".split("\n")))
+        assertEquals("제목", Widgets.visibleTitle("\uFEFF---\nid: a\n---\n# 제목"))
     }
 }

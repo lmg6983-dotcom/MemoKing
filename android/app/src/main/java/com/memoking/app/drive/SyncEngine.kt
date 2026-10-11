@@ -62,7 +62,6 @@ class SyncEngine(
         private val LOCAL_ONLY = setOf("_memoking/index.json")
         private const val MERGE_JSON = "_memoking/link-previews.json"
         private const val MASS_DELETE_MIN = 20
-        private const val BUFFER_MAX = 16L * 1024 * 1024 // 이보다 큰 첨부(녹음 등)는 받으며 바로 쓴다
 
         fun skipName(name: String) = name.startsWith(".") || name.startsWith("~$") || name.endsWith(".tmp") || name == "desktop.ini" || name == "Thumbs.db"
         fun skipPath(rel: String) = rel in LOCAL_ONLY || rel.split('/').any(::skipName)
@@ -185,19 +184,23 @@ class SyncEngine(
 
         fun download(rel: String, item: Remote.Item, expect: Local?) {
             // 둘러본 뒤 휴대폰에서 또 고쳤으면 이번에는 건드리지 않는다 (다음 차례에)
-            val nowLocal = local.stat(rel)
-            if (expect != null && (nowLocal == null || nowLocal.mtime != expect.mtime || nowLocal.size != expect.size)) return
-            if (expect == null && nowLocal != null) return
-            // 메모처럼 작은 파일은 다 받은 뒤에 쓴다 — 고른 폴더(SAF)는 바꿔치기 쓰기가 안 돼, 받다 끊기면 반쪽 파일이 남으므로
-            val entry = if (item.size in 0..BUFFER_MAX) {
-                val buf = java.io.ByteArrayOutputStream()
-                remote.download(item.id, buf)
-                local.write(rel) { buf.writeTo(it) }
-            } else {
-                local.write(rel) { remote.download(item.id, it) }
+            fun untouched(): Boolean {
+                val nowLocal = local.stat(rel)
+                return if (expect != null) nowLocal != null && nowLocal.mtime == expect.mtime && nowLocal.size == expect.size else nowLocal == null
             }
-            record(rel, item.id, item.md5 ?: "", entry)
-            downloaded++
+            if (!untouched()) return
+            // 먼저 임시 파일에 다 받고 나서 옮겨 쓴다 — 고른 폴더(SAF)는 바꿔치기 쓰기가 안 돼, 받다 끊기면 반쪽 파일이 남아
+            // 다음 동기화 때 "휴대폰에서 고친 것" 으로 Drive 의 온전한 파일을 덮어쓰므로 (임시 파일은 "." 으로 시작해 동기화하지 않음)
+            val tmp = "_memoking/.download-${System.nanoTime()}.tmp"
+            try {
+                local.write(tmp) { remote.download(item.id, it) }
+                if (!untouched()) return // 받는 사이 휴대폰에서 고쳤다 — 덮어쓰지 않고 다음 차례에
+                val entry = local.openRead(tmp).use { input -> local.write(rel) { input.copyTo(it) } }
+                record(rel, item.id, item.md5 ?: "", entry)
+                downloaded++
+            } finally {
+                local.delete(tmp)
+            }
         }
 
         fun conflictName(rel: String): String {

@@ -170,14 +170,17 @@ export class SyncEngine {
 
     // 내려받기는 임시 파일에 받아 바꿔치기. 둘러본 뒤 이 PC 에서 또 고쳤으면 이번에는 건드리지 않는다
     const download = async (rel, item, expect) => {
-      const now = this.stat(rel);
-      if (expect && (!now || now.mtime !== expect.mtime || now.size !== expect.size)) return;
-      if (!expect && now) return;
+      const untouched = () => {
+        const now = this.stat(rel);
+        return expect ? Boolean(now) && now.mtime === expect.mtime && now.size === expect.size : !now;
+      };
+      if (!untouched()) return;
       const dest = this.abs(rel);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.${randomBytes(3).toString('hex')}.tmp`);
       try {
         await this.remote.download(item.id, tmp);
+        if (!untouched()) return; // 받는 사이 이 PC 에서 고쳤다 — 덮어쓰지 않고 다음 차례에
         fs.renameSync(tmp, dest);
       } finally {
         fs.rmSync(tmp, { force: true });
