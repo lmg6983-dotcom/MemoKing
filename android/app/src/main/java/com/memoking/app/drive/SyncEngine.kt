@@ -62,6 +62,7 @@ class SyncEngine(
         private val LOCAL_ONLY = setOf("_memoking/index.json")
         private const val MERGE_JSON = "_memoking/link-previews.json"
         private const val MASS_DELETE_MIN = 20
+        private const val BUFFER_MAX = 16L * 1024 * 1024 // 이보다 큰 첨부(녹음 등)는 받으며 바로 쓴다
 
         fun skipName(name: String) = name.startsWith(".") || name.startsWith("~$") || name.endsWith(".tmp") || name == "desktop.ini" || name == "Thumbs.db"
         fun skipPath(rel: String) = rel in LOCAL_ONLY || rel.split('/').any(::skipName)
@@ -187,7 +188,14 @@ class SyncEngine(
             val nowLocal = local.stat(rel)
             if (expect != null && (nowLocal == null || nowLocal.mtime != expect.mtime || nowLocal.size != expect.size)) return
             if (expect == null && nowLocal != null) return
-            val entry = local.write(rel) { remote.download(item.id, it) }
+            // 메모처럼 작은 파일은 다 받은 뒤에 쓴다 — 고른 폴더(SAF)는 바꿔치기 쓰기가 안 돼, 받다 끊기면 반쪽 파일이 남으므로
+            val entry = if (item.size in 0..BUFFER_MAX) {
+                val buf = java.io.ByteArrayOutputStream()
+                remote.download(item.id, buf)
+                local.write(rel) { buf.writeTo(it) }
+            } else {
+                local.write(rel) { remote.download(item.id, it) }
+            }
             record(rel, item.id, item.md5 ?: "", entry)
             downloaded++
         }

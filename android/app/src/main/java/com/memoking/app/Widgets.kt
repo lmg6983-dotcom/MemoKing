@@ -162,11 +162,26 @@ object Widgets {
         null
     }
 
+    private val HEADER_KEY = Regex("""^[A-Za-z_][\w-]*\s*:(\s|$)""")
+
+    /**
+     * 머리말(--- 사이의 "키: 값")이 끝나는 줄 번호 (없으면 null) — app/js/core/memo-file.js 와 같은 규칙:
+     * "---" 구분선으로 시작하는 보통 글(첫 문단·목록)은 머리말이 아니다 (거기에 device 를 적거나 할 일을 빼고 세지 않게)
+     */
+    fun headerEnd(lines: List<String>): Int? {
+        if (lines.firstOrNull()?.trimEnd() != "---") return null
+        val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return null
+        val body = (1 until end).map { lines[it].trimEnd() }.filter { it.isNotBlank() }
+        if (body.isEmpty()) return end // 빈 머리말도 머리말
+        if (!HEADER_KEY.containsMatchIn(body[0])) return null
+        // 키: 값 · 들여 쓴 줄(목록·이어진 값) · 주석만
+        return if (body.all { HEADER_KEY.containsMatchIn(it) || it[0].isWhitespace() || it.startsWith("- ") || it.startsWith("#") }) end else null
+    }
+
     /** 머리말 뒤 첫 "# 제목" 줄의 제목 (없으면 null) */
     fun visibleTitle(text: String): String? {
         val lines = text.split("\n")
-        var start = 0
-        if (lines.firstOrNull()?.trimEnd() == "---") start = ((1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return null) + 1
+        val start = headerEnd(lines)?.plus(1) ?: 0
         val line = (start until lines.size).map { lines[it].trim() }.firstOrNull { it.isNotEmpty() } ?: return null
         return if (line.startsWith("# ")) line.removePrefix("# ").trim() else null
     }
@@ -356,11 +371,7 @@ object Widgets {
      */
     fun toggleTaskText(text: String, index: Int, taskText: String? = null, shownDone: Boolean? = null): String? {
         val lines = text.split("\n").toMutableList()
-        var start = 0
-        if (lines.firstOrNull()?.trimEnd() == "---") {
-            val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return null
-            start = end + 1
-        }
+        val start = headerEnd(lines)?.plus(1) ?: 0
         // (줄 번호, 체크 칸 자리, 할 일 글)
         val tasks = mutableListOf<Triple<Int, Int, String>>()
         var fence = false
@@ -394,8 +405,7 @@ object Widgets {
      */
     fun stampEdit(text: String, now: String): String {
         val lines = text.split("\n").toMutableList()
-        if (lines.firstOrNull()?.trimEnd() != "---") return text
-        val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return text
+        val end = headerEnd(lines) ?: return text
         var hasDevice = false
         val cr = if (lines[0].endsWith("\r")) "\r" else "" // 줄 끝(\r\n)을 파일 그대로
         for (k in 1 until end) {

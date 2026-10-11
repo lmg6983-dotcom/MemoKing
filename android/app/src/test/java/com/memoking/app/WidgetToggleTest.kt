@@ -68,4 +68,12 @@ class WidgetToggleTest {
         assertEquals("잠긴 메모", Widgets.visibleTitle("---\nid: a\n---\n# 잠긴 메모\n\n🔒 잠긴 메모예요.\n\n<!-- memoking-lock v1 -->"))
         assertNull(Widgets.visibleTitle("---\nid: a\n---\n그냥 글"))
     }
+
+    @Test
+    fun dividerAtTopIsNotFrontmatter() {
+        // 머리말 없이 "---" 구분선으로 시작하는 글 (app/js/core/memo-file.js 와 같은 규칙)
+        val plain = "---\n- [ ] 첫 할 일\n---\n- [ ] 둘째"
+        assertEquals("---\n- [x] 첫 할 일\n---\n- [ ] 둘째", Widgets.toggleTaskText(plain, 0))
+        assertEquals(plain, Widgets.stampEdit(plain, "2026-10-11T10:00:00+09:00"))
+    }
 }
