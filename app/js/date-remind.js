@@ -6,7 +6,7 @@
 import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { casual as chrono } from '../vendor/chrono.js';
 import { findAllDates } from './core/date-detect.js';
-import { koClock, dayLabel, WEEKDAY } from './core/time.js';
+import { koClock, dayLabel, WEEKDAY, sameDay } from './core/time.js';
 import { hintOnce } from './hints.js';
 import { openEventEditor } from './event-editor.js';
 
@@ -39,7 +39,8 @@ export function guessTitle(line, from, to) {
   return rest.slice(0, 40);
 }
 
-const DATE_HINT = /\d|내일|낼|모레|글피|요일|욜|주말|정오|자정|매일|날마다|하루|이틀|사흘|나흘|닷새|열흘|일주일|시|크리스마스|[A-Za-z]/;
+// 빠른 거르기 — date-detect.js 가 읽는 말을 하나라도 빠뜨리면 그 줄의 날짜를 못 찾는다 ("한 달 뒤" · "엿새 후" · "삼십 분 뒤")
+const DATE_HINT = /\d|내일|낼|모레|글피|요일|욜|주말|정오|자정|매일|날마다|일주일|시|뒤|후|있다가|이따|지나서|크리스마스|[A-Za-z]/;
 
 /** 글 한 덩이(문단·제목·목록 줄)의 날짜들 — pos 는 그 덩이의 문서 위치 */
 function datesInBlock(doc, node, pos, now) {
@@ -257,7 +258,6 @@ class DateChip {
 
 /** 메모에 이 날짜의 일정(또는 예전 알림)이 이미 있는지 — 되풀이면 같은 되풀이, 날짜만이면 같은 날 */
 export function reminderAt(reminders, { at, repeat = null, hasTime = true }) {
-  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   return (reminders ?? []).some((r) => {
     if (r.enabled === false && !r.last) return false;
     if (repeat) {
@@ -266,7 +266,8 @@ export function reminderAt(reminders, { at, repeat = null, hasTime = true }) {
         && (x.weekdays ?? []).join() === (repeat.weekdays ?? []).join() && (x.day ?? null) === (repeat.day ?? null) && (x.month ?? null) === (repeat.month ?? null);
     }
     if (!r.at || r.kind !== 'at') return false;
-    if (!hasTime) return sameDay(new Date(r.at), at);
+    // 날짜만 적었거나, 시각이 있어도 일정 창에서 하루 종일로 바꿔 만든 일정이면 같은 날이면 맞춤
+    if (!hasTime || r.allDay) return sameDay(new Date(r.at), at);
     return Math.abs(Date.parse(r.at) - at.getTime()) < SAME_MS;
   });
 }

@@ -18,7 +18,14 @@ export function createAlarmRunner({ getVault, fire, now = () => new Date(), inte
     for (const { memoId, reminder } of vault.allReminders()) {
       const info = pick(reminder, t);
       if (!info) continue;
-      vault.updateReminder(memoId, markFired(reminder, t));
+      // 울림 표시를 적지 못했으면(그사이 파일이 바뀜) 이번엔 울리지 않는다 — 다시 읽은 뒤 다음 차례에 (두 번 울리지 않게)
+      let marked = null;
+      try {
+        marked = vault.updateReminder(memoId, markFired(reminder, t));
+      } catch (err) {
+        console.error('울림 표시를 적지 못했습니다', err); // 이 메모만 건너뛰고 다른 알림은 계속
+      }
+      if (!marked) continue;
       try {
         fire(memoId, reminder, info);
       } catch (err) {
@@ -32,7 +39,7 @@ export function createAlarmRunner({ getVault, fire, now = () => new Date(), inte
   // 날짜·시간·반복·타이머
   const tick = () => run((r, t) => {
     const due = dueOccurrence(r, t);
-    return due ? { missed: due.missed, start: due.start, offset: due.offset } : null;
+    return due ? { missed: due.missed, start: due.start, offset: due.offset, also: due.also } : null;
   });
 
   // 앱을 시작할 때 (실행할 때 알림) — 프로그램이 켜질 때 한 번만 부른다

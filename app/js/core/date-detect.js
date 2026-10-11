@@ -7,6 +7,8 @@
 //   날짜 뒤 시각:  오후 3시 · 3시 반 · 3시 20분 · 15:30 · 세 시 · 열한 시 반 · 저녁(시각 없이 때만: 19시)
 //   시각만:        오전·오후 없는 1~6시는 오후, 7~11시는 오전. 이미 지났으면 찾지 않음 (새벽·자정은 다음 날로)
 
+import { startOfDay, addDays } from './time.js';
+
 // 하루·한 주 뒤는 달력으로 더한다 (서머타임이 바뀌는 날에도 같은 시각이 되게)
 const plusDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes());
 export const DEFAULT_HOUR = 9; // 날짜만 적었으면 그날 아침 9시
@@ -45,9 +47,7 @@ const count = (text) => (/^\d+$/.test(text) ? Number(text) : NATIVE_COUNT[text] 
 const PERIOD_HOUR = { 새벽: 6, 아침: 8, 오전: 9, 점심: 12, 낮: 13, 오후: 14, 저녁: 19, 밤: 21 };
 const PERIOD_RE = '오전|오후|아침|점심|저녁|밤|낮|새벽';
 
-const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const ymd = (d) => ({ y: d.getFullYear(), mo: d.getMonth(), d: d.getDate() });
-const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const weekdayIndex = (ch) => WEEKDAYS.indexOf(ch);
 const atTime = (date, t) => new Date(date.y, date.mo, date.d, t.h, t.min);
 const validDay = (date) => {
@@ -217,11 +217,12 @@ const DATE_RULES = [
   },
   // 15일까지 · 25일에 — 이번 달(지났으면 다음 달). "3일 동안" · "3일에 걸쳐" · "1일 1식" 은 날짜가 아님
   {
-    re: /(?<![0-9가-힣./-])(\d{1,2})일(?=\s?(?:까지|에(?!\s?걸쳐)|부터|날|\(|오전|오후|아침|점심|저녁|밤|낮|새벽|\d{1,2}\s?시|\d{1,2}:)|\s*$|[,.!?])/g,
+    re: /(?<![0-9가-힣./-])(\d{1,2})일(?=\s?(?:까지|에(?!\s?걸쳐)|부터|날|\(|오전|오후|아침|점심|저녁|밤|낮|새벽|\d{1,2}\s?시|\d{1,2}:|\d{1,2}\s?(?:am|pm|AM|PM)\b))/g, // 줄 끝·문장부호 앞의 "3일" 은 기간("휴가 3일")일 때가 많아 날짜로 읽지 않음
     date: (m, now) => {
       const d = +m[1];
       if (d < 1 || d > 31) return null;
       let date = { y: now.getFullYear(), mo: now.getMonth(), d };
+      // 이번 달이 지났으면 다음 달 — 다음 달에 그날이 없으면(1월 31일의 "30일까지") 어느 달인지 알 수 없어 찾지 않는다(아래 validDay)
       if (new Date(date.y, date.mo, d, 23, 59) < now || !validDay(date)) {
         const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         date = { y: next.getFullYear(), mo: next.getMonth(), d };
@@ -342,7 +343,7 @@ export function findDates(text, now = new Date()) {
   const found = [];
   const taken = []; // 날짜 말이 차지한 자리 (지난 날 포함)
   const overlaps = (from, to) => taken.some((r) => from < r.to && to > r.from);
-  const add = (from, to, at, hasTime, { past = false, repeat = null } = {}) => {
+  const add = (from, to, at, hasTime, { past = false, repeat = null, rollWeek = false } = {}) => {
     if (overlaps(from, to)) return;
     const span = { from, to };
     taken.push(span);
@@ -354,6 +355,8 @@ export function findDates(text, now = new Date()) {
     if (repeat) at = nextRepeat(at, repeat, now);
     if (at.getTime() <= now.getTime() + 30_000) return;
     const item = { from, to, text: s.slice(from, to).trim(), at, hasTime };
+    // 요일만 적은 말("화요일")인지 — 영어 시각을 붙일 때 이번 주/다음 주를 다시 고른다 (findAllDates). 결과 모양에는 드러내지 않음
+    if (rollWeek) Object.defineProperty(item, 'rollWeek', { value: true });
     if (repeat) item.repeat = { ...repeat, time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };
     found.push(item);
   };
@@ -385,14 +388,14 @@ export function findDates(text, now = new Date()) {
       if (t) {
         let at = atTime(date, t);
         if ((rule.rollWeek || r.rollWeek) && at <= now) at = plusDays(at, 7);
-        add(from, t.end, at, true, { past, repeat: r.repeat });
+        add(from, t.end, at, true, { past, repeat: r.repeat, rollWeek: Boolean(rule.rollWeek || r.rollWeek) });
       } else if (r.today) {
         taken.push({ from, to }); // "오늘" 만은 알림 시각이 없다
       } else {
         let at = atTime(date, { h: DEFAULT_HOUR, min: 0 });
         // 오늘이 그 요일이고 9시가 지났으면: 날짜만 적은 "금요일" 은 다음 주
         if ((rule.rollWeek || r.rollWeek) && at <= now) at = plusDays(at, 7);
-        add(from, to, at, false, { past, repeat: r.repeat });
+        add(from, to, at, false, { past, repeat: r.repeat, rollWeek: Boolean(rule.rollWeek || r.rollWeek) });
       }
     }
   }
@@ -454,8 +457,39 @@ export function findAllDates(text, { chrono = null, now = new Date() } = {}) {
     const k = ko.find((x) => x.to <= e.from && !s.slice(x.to, e.from).trim());
     if (!k) continue;
     en.splice(i, 1);
-    if (k.hasTime || k.repeat) continue; // 이미 시각이 있거나 되풀이면 영어 쪽만 버린다
-    k.at = new Date(k.at.getFullYear(), k.at.getMonth(), k.at.getDate(), e.at.getHours(), e.at.getMinutes());
+    if (k.hasTime) continue; // 이미 시각이 있으면 영어 쪽만 버린다
+    if (k.repeat) {
+      // 되풀이("매일 3pm"): 되풀이 시각을 영어 시각으로 (지났으면 다음 차례)
+      let at = new Date(k.at.getFullYear(), k.at.getMonth(), k.at.getDate(), e.at.getHours(), e.at.getMinutes());
+      // 기본 9시가 지나 다음 차례로 넘겼던 것을, 새 시각이면 아직인 이번 차례로 되돌린다 ("매일 3pm" 을 오전 10시에 = 오늘 3시)
+      const step = { day: 1, week: 7 }[k.repeat.every];
+      while (step && plusDays(at, -step) > now) at = plusDays(at, -step);
+      if (k.repeat.every === 'month' || k.repeat.every === 'year') {
+        // 매달·매년: 이번 차례(이번 달·올해 그날)부터 다시 — 기본 9시가 지나 다음 차례로 넘겼던 것을 되돌림
+        const mo = k.repeat.every === 'year' ? k.repeat.month - 1 : now.getMonth();
+        const dim = new Date(now.getFullYear(), mo + 1, 0).getDate();
+        at = new Date(now.getFullYear(), mo, Math.min(k.repeat.day, dim), at.getHours(), at.getMinutes());
+      }
+      at = nextRepeat(at, k.repeat, now);
+      k.at = at;
+      k.repeat = { ...k.repeat, time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };
+      k.to = e.to;
+      k.text = s.slice(k.from, e.to).trim();
+      k.hasTime = true;
+      continue;
+    }
+    let at = new Date(k.at.getFullYear(), k.at.getMonth(), k.at.getDate(), e.at.getHours(), e.at.getMinutes());
+    // 요일 말("일요일 3pm"): 날짜만으로 다음 주로 넘겼어도 이번 그 시각이 아직이면 이번 주로, 지났으면 다음 주로 (한국어 시각과 같은 규칙)
+    const weekday = Boolean(k.rollWeek); // 요일만 적은 말 ("다음 주 화요일"·"10월 30일 (금요일)" 은 아님)
+    if (weekday && plusDays(at, -7) > now) at = plusDays(at, -7);
+    if (at.getTime() <= now.getTime() + 30_000) {
+      if (weekday) at = plusDays(at, 7);
+      else {
+        ko.splice(ko.indexOf(k), 1); // 그 시각이 이미 지났다 — 일정으로 보이지 않게
+        continue;
+      }
+    }
+    k.at = at;
     k.to = e.to;
     k.text = s.slice(k.from, e.to).trim();
     k.hasTime = true;

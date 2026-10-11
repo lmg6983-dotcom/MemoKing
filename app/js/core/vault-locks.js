@@ -6,7 +6,8 @@
 //   저장(save)·버전 되돌리기·덮어쓰기 전 확인(keepChangedOnDisk)도 여기 — PC·휴대폰이 같은 규칙으로
 
 import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey } from './memo-lock.js';
-import { isBlankBody, sameBody, conflictCopyBody, extractAttachments } from './memo-file.js';
+import { isBlankBody, sameBody, conflictCopyBody, extractAttachments, COLORS, normalizeInkPath } from './memo-file.js';
+import { normalizeTables } from './table-sizes.js';
 import { toLocalIso } from './time.js';
 import { versionTime } from './versions.js';
 
@@ -24,7 +25,30 @@ export function lockedFiles(body, meta, files) {
 }
 
 /** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
+const REMOVED_KEEP_MS = 10 * 60_000; // 사라진 메모의 머리말을 기억해 두는 시간
+
 export const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
+/** 파일에 있는 머리말 그대로의 사본 (머리말만 쓰는 사이 다른 기기가 고쳤을 때, 이 기기가 바꾼 항목만 골라 더하려고) */
+export const diskCopy = (meta) => JSON.parse(JSON.stringify(meta ?? {}));
+/**
+ * 알림 목록 합치기 (알림마다): 그쪽 목록을 바탕으로, 이 기기에서 새로 만든 것은 더하고, 이 기기에서 바꾼 것(울림 기록 등)은
+ * 바꾼 대로, 이 기기에서 지운 것은 빼고 — 그쪽에서 지운 것은 되살리지 않는다
+ */
+export function mergeReminders(mine = [], disk = [], theirs = []) {
+  const key = (r) => JSON.stringify(r);
+  const diskById = new Map((disk ?? []).map((r) => [r.id, r]));
+  const mineById = new Map((mine ?? []).map((r) => [r.id, r]));
+  const out = [];
+  for (const t of theirs ?? []) {
+    const d = diskById.get(t.id);
+    const m = mineById.get(t.id);
+    if (d && !m) continue; // 이 기기에서 지움
+    out.push(m && d && key(m) !== key(d) ? m : t); // 이 기기에서 바꿨으면 그것
+  }
+  for (const m of mine ?? []) if (!diskById.has(m.id) && !out.some((r) => r.id === m.id)) out.push(m); // 이 기기에서 새로 만듦
+  return out;
+}
+
 /** 이 메모를 잠글 때 고른 것 (제목도 숨기기) — 저장마다 같게 */
 const sealOpts = (entry) => ({ hideTitle: entry.meta.extra?.lockHideTitle === true });
 
@@ -35,6 +59,11 @@ class LockMethods {
     if (!entry) {
       // 쓰는 사이 파일이 지워졌다면, 화면에 남아 있는 내용으로 되살린다.
       entry = this.newEntry(id);
+      const lost = this.removedMeta?.get(id); // 다시 읽다 잠깐 사라졌던 메모: 그 머리말로 (알림·잠금 "제목도 숨기기" 등)
+      if (lost) {
+        entry.meta = metaSnapshot(lost.meta);
+        this.removedMeta.delete(id);
+      }
       this.entries.set(id, entry);
     }
     const before = metaSnapshot(entry.meta); // 쓰지 못하면 머리말을 되돌린다 (잠근 글의 첨부 표 포함)
@@ -54,13 +83,62 @@ class LockMethods {
     if (!entry.file && isBlankBody(body)) return this.summary(entry);
     if (entry.file) this.keepVersion(id, known);
     // 그사이 다른 기기가 잠금: 저장하지 않음 (쓰던 글을 사본 메모로 남겼으면 copied)
-    const wrote = this.write(entry, known);
+    let wrote;
+    try {
+      wrote = this.write(entry, known);
+    } catch (err) {
+      entry.meta = before; // 쓰다 오류(디스크가 가득 참 등) — 다시 저장할 때 "같은 글" 로 건너뛰지 않게 되돌린다
+      entry.body = known;
+      throw err;
+    }
     if (wrote !== true) {
-      entry.meta = before; // 쓰지 않았으니 머리말도 그대로
-      return { ...this.summary(entry), refused: true, copied: wrote === 'copied' };
+      entry.meta = before; // 쓰지 않았으니 글·머리말도 그대로 (다시 저장할 때 "같은 글" 로 건너뛰지 않게)
+      entry.body = known;
+      // skipped: 파일이 잠깐 없어 다시 읽는 중 — 화면은 조용히 곧 다시 저장한다
+      return { ...this.summary(entry), refused: true, copied: wrote === 'copied', retry: wrote === 'skipped' };
     }
     this.changed([id]);
     return this.summary(entry);
+  }
+
+  /** 색·고정·표 크기·그림 — 머리말만 쓴다. 쓰지 못했으면 되돌리고 null */
+  setMeta(id, patch) {
+    const entry = this.entries.get(id);
+    if (!entry) return null;
+    const prev = metaSnapshot(entry.meta);
+    if (patch.color && COLORS.includes(patch.color)) entry.meta.color = patch.color;
+    if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
+    if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
+    if (typeof patch.ink === 'string') entry.meta.ink = normalizeInkPath(patch.ink);
+    if (entry.file && this.write(entry) !== true) {
+      entry.meta = prev; // 쓰지 못했다 — 바뀐 것처럼 보이지 않게
+      return null;
+    }
+    this.changed([id]);
+    return this.get(id);
+  }
+
+  /** 메모 연결 — 쓰지 못했으면 되돌리고 null */
+  link(id, targetId, on = true) {
+    const entry = this.entries.get(id);
+    const target = this.entries.get(targetId);
+    if (!entry || !target || id === targetId) return null;
+    const links = new Set(entry.meta.links);
+    if (on) links.add(targetId);
+    else links.delete(targetId);
+    const prev = entry.meta.links;
+    entry.meta.links = [...links];
+    // 상대 메모에 id 가 저장돼 있어야 파일명이 바뀌어도 연결이 유지된다.
+    if (on && target.file && !target.idSaved && this.write(target) !== true) {
+      entry.meta.links = prev;
+      return null;
+    }
+    if (entry.file && this.write(entry) !== true) {
+      entry.meta.links = prev; // 쓰지 못했다 — 연결된 것처럼 보이지 않게
+      return null;
+    }
+    this.changed([id, targetId]);
+    return this.links(id);
   }
 
   // 지금 내용도 버전으로 남겨 두고(되돌리기를 되돌릴 수 있게) 고른 버전으로 바꾼다
@@ -77,12 +155,26 @@ class LockMethods {
     this.refreshLockRefs(entry); // 되돌린 글의 첨부도 첨부 정리에서 지키게
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device;
-    if (this.write(entry, known, { copy: false }) !== true) {
-      entry.meta = before;
-      return { error: '그사이 다른 기기에서 이 메모가 바뀌어 되돌리지 못했어요. 다시 해 주세요' };
-    }
+    if (this.safeWrite(entry, known, before) !== true) return { error: '그사이 다른 기기에서 이 메모가 바뀌어 되돌리지 못했어요. 다시 해 주세요' };
     this.changed([id]);
     return this.get(id);
+  }
+
+  /**
+   * 잠그기·풀기·되돌리기의 쓰기: 쓰지 못했거나(그사이 바뀜) 쓰다 오류가 나면 글·머리말을 그대로 되돌린다
+   * (메모리에만 잠긴 글이 남아 열쇠 없이 잠긴 것처럼 되지 않게). 오류는 다시 던진다
+   */
+  safeWrite(entry, known, before) {
+    let wrote;
+    try {
+      wrote = this.write(entry, known, { copy: false });
+    } catch (err) {
+      entry.body = known;
+      entry.meta = before;
+      throw err;
+    }
+    if (wrote !== true) entry.meta = before;
+    return wrote;
   }
 
   /**
@@ -92,9 +184,9 @@ class LockMethods {
   keepChangedOnDisk(entry, known, { copy = true } = {}) {
     const disk = this.readDiskIfChanged(entry); // null: 그대로(또는 못 읽음) · 'missing' · { body, meta }
     if (disk === 'missing') {
-      // 글을 고친 저장이면 되살려 쓰지만, 머리말만 쓰는 것이면(다른 기기가 이름을 바꿨거나 지움) 쓰지 않고 다시 읽는다
-      // — 다른 기기가 "제목도 숨기기" 로 잠그며 이름을 바꾼 메모를 풀린 글로 되살리지 않게
-      if (!sameBody(entry.body, known)) return undefined;
+      // 파일이 없어졌다(다른 기기가 지웠거나 이름을 바꿈 — "제목도 숨기기" 로 잠그며 바꾼 것일 수도): 바로 되살려 쓰지 않고
+      // 먼저 다시 읽는다. 정말 지워진 메모면 다음 저장이 새로 만들고, 이름만 바뀐 잠긴 메모면 풀린 글이 새로 생기지 않는다
+      entry.body = known; // 쓰지 않았으니 글도 그대로 (잠그기·풀기·되돌리기가 메모리에만 바뀐 채 남지 않게)
       this.rescanSoon();
       return 'skipped';
     }
@@ -114,6 +206,17 @@ class LockMethods {
     this.keepVersion(entry.id, theirs, { force: true }); // 버전 기록에서도 되찾을 수 있게
     this.import({ body: conflictCopyBody(theirs), color: entry.meta.color });
     return undefined;
+  }
+
+  /** 다시 읽다 사라진 메모의 머리말을 잠시 기억한다 — 곧 같은 id 로 다시 저장하면(파일이 잠깐 없었음) 그 머리말로 */
+  rememberRemoved(ids) {
+    this.removedMeta ??= new Map();
+    const now = Date.now();
+    for (const [id, v] of this.removedMeta) if (now - v.at > REMOVED_KEEP_MS) this.removedMeta.delete(id);
+    for (const id of ids) {
+      const e = this.entries.get(id);
+      if (e) this.removedMeta.set(id, { meta: metaSnapshot(e.meta), at: now });
+    }
   }
 
   /** 이 메모의 본문 (잠겼으면 세션으로 푼 글, 못 풀면 null) */
@@ -350,11 +453,33 @@ class LockMethods {
    */
   adoptTheirs(entry, theirs, theirMeta) {
     entry.body = theirs;
-    const { lockRefs: _r, lockHideTitle: _h, ...rest } = entry.meta.extra ?? {};
-    const lockInfo = {};
-    if (theirMeta?.extra?.lockRefs) lockInfo.lockRefs = theirMeta.extra.lockRefs;
-    if (theirMeta?.extra?.lockHideTitle) lockInfo.lockHideTitle = true;
-    entry.meta.extra = { ...rest, ...(isLockedBody(theirs) ? lockInfo : {}) };
+    // 머리말: 그쪽 것을 바탕으로, 이 기기가 (마지막으로 읽은 뒤) 바꾼 항목만 더한다 — 그쪽에서 지운 알림이 되살아나지 않게
+    const disk = entry.diskMeta;
+    const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    const mine = entry.meta;
+    const merged = { ...(theirMeta ?? {}), extra: { ...(theirMeta?.extra ?? {}) } };
+    for (const k of Object.keys(mine)) {
+      if (k === 'extra' || k === 'id') continue;
+      if (k === 'reminders') merged.reminders = mergeReminders(mine.reminders, disk?.reminders, theirMeta?.reminders);
+      else if (!disk || !same(mine[k], disk[k])) merged[k] = mine[k];
+    }
+    for (const k of Object.keys(mine.extra ?? {})) {
+      if (k === 'lockRefs' || k === 'lockHideTitle') continue; // 잠금 정보는 늘 그쪽 것 (그 글에 맞는 것)
+      if (!disk || !same(mine.extra[k], disk.extra?.[k])) merged.extra[k] = mine.extra[k];
+    }
+    // 이 기기가 지운 항목도 (그쪽이 그사이 바꾸지 않았으면) 지운 채로
+    if (disk) {
+      for (const k of Object.keys(disk)) {
+        if (k === 'extra' || k === 'id' || k in mine) continue;
+        if (same(theirMeta?.[k], disk[k])) delete merged[k];
+      }
+      for (const k of Object.keys(disk.extra ?? {})) {
+        if (k === 'lockRefs' || k === 'lockHideTitle' || k in (mine.extra ?? {})) continue;
+        if (same(theirMeta?.extra?.[k], disk.extra[k])) delete merged.extra[k];
+      }
+    }
+    merged.id = mine.id;
+    entry.meta = merged;
     if (isLockedBody(theirs)) {
       entry.meta.reminders = (entry.meta.reminders ?? []).map(({ title: _t, ...r }) => r);
       setTimeout(() => this.dropUnsafeVersions(entry.id), 0);
@@ -406,10 +531,7 @@ class LockMethods {
     this.setLockRefs(entry, known);
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device;
-    if (this.write(entry, known, { copy: false }) !== true) {
-      entry.meta = before; // 그사이 다른 기기가 잠금 — 아무것도 바꾸지 않음
-      return null;
-    }
+    if (this.safeWrite(entry, known, before) !== true) return null; // 그사이 다른 기기가 잠금 — 아무것도 바꾸지 않음
     this.purgeVersions(id);
     if (keepOpen) this.locks.set(id, session);
     else this.locks.delete(id);
@@ -430,10 +552,7 @@ class LockMethods {
     entry.meta.extra = extra;
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device; // 이어 쓰기 안내가 엉뚱한 기기 이름을 대지 않게
-    if (this.write(entry, known, { copy: false }) !== true) {
-      entry.meta = before; // 그사이 다른 기기가 다시 잠금
-      return null;
-    }
+    if (this.safeWrite(entry, known, before) !== true) return null; // 그사이 다른 기기가 다시 잠금
     this.purgeVersions(id); // 잠긴 동안의 버전은 이제 열 수 없는 글이므로
     this.locks.delete(id);
     this.changed([id]);

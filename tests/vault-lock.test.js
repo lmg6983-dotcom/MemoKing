@@ -393,3 +393,184 @@ test('잠금 풀기 직전 같은 비밀번호로 다른 기기가 고쳤으면:
     v.close();
   }
 });
+
+test('잠긴 메모를 휴지통에서 영구 삭제하면 그 메모의 첨부도 지움 · 휴지통 목록에 첨부 수', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    fs.writeFileSync(path.join(root, 'attachments', 's.png'), 'png');
+    const id = v.create();
+    v.save(id, '# 금고\n\n![](attachments/s.png)');
+    v.lock(id, await newLockSession('사과1234', FAST), { keepOpen: false });
+    v.trash(id);
+    const item = v.trashList()[0];
+    assert.equal(item.attachments, 1);
+    v.deleteTrash(item.name);
+    assert.ok(!fs.existsSync(path.join(root, '_memoking', 'trash', 'attachments', 's.png')));
+  } finally {
+    v.close();
+  }
+});
+
+test('파일이 사라진 사이 글을 저장하면 바로 되살리지 않고 다시 읽은 뒤 (이름이 바뀐 잠긴 메모를 풀린 글로 되살리지 않게)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  const other = new Vault(root, { device: 'phone' });
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 장보기\n\n비밀 목록');
+    other.open();
+    await new Promise((r) => setTimeout(r, 20));
+    other.lock(id, await newLockSession('phone999', FAST), { hideTitle: true, keepOpen: false });
+    const r = v.save(id, '# 장보기\n\n비밀 목록 더');
+    assert.equal(r.retry, true);
+    await new Promise((res) => setTimeout(res, 500)); // 다시 읽음 (파일 감시가 0.3초 모았다가 읽음)
+    const again = v.save(id, '# 장보기\n\n비밀 목록 더');
+    assert.equal(again.refused, true, '다시 읽으니 잠긴 메모 — 저장 거절');
+    for (const f of fs.readdirSync(root).filter((n) => n.endsWith('.md'))) {
+      assert.ok(!fs.readFileSync(path.join(root, f), 'utf8').includes('비밀 목록'), `${f} 에 풀린 글 없음`);
+    }
+  } finally {
+    other.close();
+    v.close();
+  }
+});
+
+test('머리말만 쓰는 사이 다른 기기가 지운 알림은 되살아나지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  const other = new Vault(root, { device: 'phone' });
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 약\n\n아침');
+    const rem = { id: 'r1', kind: 'at', at: new Date(Date.now() + 86_400_000).toISOString(), alerts: [10], action: 'notify', enabled: true, created: new Date().toISOString(), last: null };
+    v.setReminders(id, [rem]);
+    other.open();
+    await new Promise((r) => setTimeout(r, 20));
+    other.save(id, '# 약\n\n아침 저녁');
+    other.setReminders(id, []); // 휴대폰이 알림을 지움
+    v.setMeta(id, { pinned: true }); // PC 는 아직 모르고 고정만
+    const text = fs.readFileSync(path.join(root, v.get(id).file), 'utf8');
+    assert.ok(!/reminders:/.test(text), '지운 알림이 되살아나지 않음');
+    assert.match(text, /pinned: true/);
+    assert.match(text, /아침 저녁/);
+  } finally {
+    other.close();
+    v.close();
+  }
+});
+
+test('알림 합치기: 그쪽에서 지운 것은 되살리지 않고, 이 기기의 울림 기록·새 알림은 남김', async () => {
+  const { mergeReminders } = await import('../app/js/core/vault-locks.js');
+  const a = { id: 'a', last: null };
+  const b = { id: 'b', last: null };
+  const disk = [a, b];
+  const mine = [{ id: 'a', last: '2026-10-11T09:00:00+09:00' }, b, { id: 'c', last: null }]; // a 울림, c 새로
+  const theirs = [a]; // 그쪽에서 b 지움
+  assert.deepEqual(mergeReminders(mine, disk, theirs).map((r) => [r.id, r.last]), [['a', '2026-10-11T09:00:00+09:00'], ['c', null]]);
+});
+
+test('파일이 잠깐 없어 저장을 미뤘으면, 다시 저장할 때 "같은 글" 로 건너뛰지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 메모\n\n처음');
+    const file = path.join(root, v.get(id).file);
+    const keep = fs.readFileSync(file, 'utf8');
+    fs.rmSync(file);
+    assert.equal(v.save(id, '# 메모\n\n고침').retry, true);
+    fs.writeFileSync(file, keep); // 돌아옴 (동기화 교체 등)
+    v.scan();
+    const r = v.save(id, '# 메모\n\n고침');
+    assert.ok(!r.refused);
+    assert.match(fs.readFileSync(file, 'utf8'), /고침/);
+  } finally {
+    v.close();
+  }
+});
+
+test('파일이 사라진 사이 고정·연결을 바꾸면: 바뀐 것처럼 보이지 않고 null', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    const a = v.create();
+    v.save(a, '# 하나\n\n글');
+    const b = v.create();
+    v.save(b, '# 둘\n\n글');
+    fs.unlinkSync(path.join(root, v.get(a).file)); // 동기화가 바꿔 쓰는 중 등
+    assert.equal(v.setMeta(a, { pinned: true }), null);
+    assert.equal(v.get(a).pinned, false, '고정되지 않은 채로');
+    assert.equal(v.link(a, b), null);
+    assert.equal(v.links(a).links.length, 0, '연결되지 않은 채로');
+  } finally {
+    v.close();
+  }
+});
+
+test('머리말 합치기: 이 기기가 지운 항목은 (그쪽이 바꾸지 않았으면) 지운 채로', async () => {
+  const { installLockMethods } = await import('../app/js/core/vault-locks.js');
+  class Fake {
+    emit() {}
+  }
+  installLockMethods(Fake);
+  const f = new Fake();
+  const entry = {
+    id: 'x',
+    body: 'old',
+    meta: { id: 'x', pinned: false, reminders: [], extra: { keep: 1 } }, // 이 기기에서 extra.gone 을 지움
+    diskMeta: { id: 'x', pinned: false, reminders: [], extra: { keep: 1, gone: 2, theirs: 3 } },
+  };
+  f.adoptTheirs(entry, 'new', { id: 'x', pinned: false, reminders: [], extra: { keep: 1, gone: 2, theirs: 4 } });
+  assert.deepEqual(entry.meta.extra, { keep: 1, theirs: 4 });
+  assert.equal(entry.body, 'new');
+});
+
+test('파일이 잠깐 없어 다시 읽은 뒤 저장해도 알림·고정 같은 머리말은 그대로', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 약\n\n아침');
+    v.setMeta(id, { pinned: true });
+    const rem = { id: 'r1', kind: 'at', at: new Date(Date.now() + 86_400_000).toISOString(), alerts: [10], action: 'notify', enabled: true, created: new Date().toISOString(), last: null };
+    v.setReminders(id, [rem]);
+    fs.unlinkSync(path.join(root, v.get(id).file));
+    assert.equal(v.save(id, '# 약\n\n아침 저녁').retry, true);
+    v.scan({ silent: true });
+    const r = v.save(id, '# 약\n\n아침 저녁');
+    assert.ok(!r.refused);
+    const text = fs.readFileSync(path.join(root, v.get(id).file), 'utf8');
+    assert.match(text, /pinned: true/);
+    assert.match(text, /r1/);
+    assert.match(text, /아침 저녁/);
+  } finally {
+    v.close();
+  }
+});
+
+test('쓰다 오류가 나면 글을 되돌려, 같은 글로 다시 저장할 때 건너뛰지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 하나\n\n글');
+    const write = v.write;
+    v.write = () => {
+      throw new Error('디스크가 가득 참');
+    };
+    assert.throws(() => v.save(id, '# 하나\n\n글 더'));
+    v.write = write;
+    v.save(id, '# 하나\n\n글 더');
+    assert.match(fs.readFileSync(path.join(root, v.get(id).file), 'utf8'), /글 더/);
+  } finally {
+    v.close();
+  }
+});

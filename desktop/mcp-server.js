@@ -200,11 +200,12 @@ server.registerTool('create_memo', {
 }, async ({ content, color }) => {
   if (!canWrite()) return fail('메모킹 설정에서 "AI가 메모를 남기도록 허용" 이 꺼져 있어요.');
   if (!content.trim()) return fail('메모 내용이 비어 있어요. content 에 남길 글을 넣어 주세요.');
-  if (isLockedBody(content)) return fail('잠금 메모 형식의 글은 남길 수 없어요 (아무도 열 수 없는 메모가 돼요).');
+  if (isLockedBody(content) || /<!--\s*memoking-lock/.test(content)) return fail('잠금 정보가 든 글은 남길 수 없어요 (아무도 열 수 없는 메모가 될 수 있어요).');
   try {
     const v = openVault();
     const id = v.create({ color });
-    v.save(id, `${content.trim()}\n`);
+    const saved = v.save(id, `${content.trim()}\n`);
+    if (saved?.refused) return fail('메모를 남기지 못했어요. 잠시 뒤 다시 해 주세요.');
     v.finalize(id);
     const m = v.get(id);
     if (!m) return fail('메모를 남기지 못했어요.');
@@ -233,13 +234,24 @@ server.registerTool('append_to_memo', {
     if (!content.trim()) return fail('덧붙일 내용이 비어 있어요.');
     if (/<!--\s*memoking-lock/.test(content)) return fail('잠금 정보가 든 글은 덧붙일 수 없어요.');
     // 목록 끝에 목록을 덧붙이면 한 목록으로 이어지게 (빈 줄 없이)
-    const before = m.body.replace(/\s+$/, '');
     const add = content.trim();
     const isItem = (line) => /^\s*(?:[-*+]|\d+[.)])\s/.test(line ?? '');
-    const gap = isItem(before.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
-    const body = `${before}${gap}${add}\n`;
-    const saved = v.save(m.id, body);
-    if (saved?.refused) return fail(`"${m.title}" 은(는) 방금 다른 기기에서 잠겨 덧붙이지 못했어요.`);
+    const appended = (body) => {
+      const before = body.replace(/\s+$/, '');
+      const gap = isItem(before.split('\n').at(-1)) && isItem(add.split('\n')[0]) ? '\n' : '\n\n';
+      return before ? `${before}${gap}${add}\n` : `${add}\n`; // 빈 메모면 앞에 빈 줄 없이
+    };
+    let saved = v.save(m.id, appended(m.body));
+    if (saved?.retry) {
+      v.scan({ silent: true }); // 파일이 잠깐 없었다 (동기화로 이름이 바뀌는 중 등) — 다시 읽고 한 번 더
+      const again = v.get(m.id); // 같은 id 로만 (제목으로 찾으면 다른 메모에 덧붙일 수 있다)
+      saved = !again ? { refused: true, retry: true } : isLockedBody(again.body) ? { refused: true } : v.save(m.id, appended(again.body));
+    }
+    if (saved?.refused) {
+      return fail(saved.retry
+        ? `"${m.title}" 메모 파일이 보이지 않아 덧붙이지 못했어요 (지워졌거나 동기화 중일 수 있어요). 잠시 뒤 다시 해 주세요.`
+        : `"${m.title}" 은(는) 방금 다른 기기에서 잠겨 덧붙이지 못했어요.`);
+    }
     return text({ ok: true, id: m.id, title: m.title });
   } catch (err) {
     return fail(err.message);

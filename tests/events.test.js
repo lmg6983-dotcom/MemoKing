@@ -195,12 +195,11 @@ test('반복 일정은 만든 날 전에는 달력에 없음', () => {
 
 test('날 이름은 한 가지로: 모레 · "(월)" 띄어 쓰기 · 다른 해', async () => {
   const { dayLabel } = await import('../app/js/core/time.js');
-  const { formatWhen, formatDay } = await import('../app/js/core/reminders.js');
+  const { formatWhen } = await import('../app/js/core/reminders.js');
   const now = at(2026, 10, 10, 10, 0);
   assert.deepEqual([-1, 0, 1, 2, 3].map((n) => dayLabel(at(2026, 10, 10 + n), now)), ['어제', '오늘', '내일', '모레', '10월 13일 (화)']);
   assert.equal(dayLabel(at(2027, 1, 2), now), '2027년 1월 2일 (토)');
   assert.equal(formatWhen(at(2026, 10, 12, 9, 0), now), '모레 09:00');
-  assert.equal(formatDay(at(2026, 10, 13), now), dayLabel(at(2026, 10, 13), now));
 });
 
 test('alerts 가 없는 하루 종일 일정도 만들기 전 "당일 오전 9시" 는 울리지 않음', () => {
@@ -242,4 +241,14 @@ test('서머타임이 바뀌는 날: 하루 종일 "당일 오전 9시" 는 오�
   })`;
   const out = execFileSync(process.execPath, ['-e', code], { env: { ...process.env, TZ: 'America/New_York' }, cwd: fileURLToPath(new URL('..', import.meta.url)) }).toString().trim();
   assert.equal(out, '9,8,15,15:00');
+});
+
+test('같은 때에 겹친 두 알림(매일 9시 일정의 정시 + 다음 날 일정의 하루 전): 한 번 울리며 둘 다 알림', async () => {
+  const { alarmLabel } = await import('../app/js/core/reminders.js');
+  const r = normalizeReminder({ id: 'd', kind: 'repeat', repeat: { every: 'day', time: '09:00' }, alerts: [1440, 0], created: iso(2026, 10, 1, 8, 0) });
+  const n = nextAlert(r, at(2026, 10, 3, 8, 0));
+  assert.equal(n.offset, 0);
+  assert.equal(n.also.length, 1);
+  assert.deepEqual(n.also[0].start, at(2026, 10, 4, 9, 0));
+  assert.match(alarmLabel(r, n, at(2026, 10, 3, 9, 0)), /다음 일정 내일 09:00/);
 });

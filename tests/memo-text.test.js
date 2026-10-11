@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { plainLines, extractTitle } from '../app/js/core/memo-file.js';
+import { plainLines, extractTitle, parseMemoFile } from '../app/js/core/memo-file.js';
 import { shareText } from '../app/js/core/share-text.js';
 
 // 맨주소·이메일은 편집기가 <https://…> 로 저장한다 — 제목·미리보기·검색·보내기 글에서 사라지지 않게
@@ -23,4 +23,10 @@ test('파일 이름: 윈도우에서 만들 수 없거나 목록에서 빠지는
   assert.equal(titleToFileName('...'), '제목 없음');
   assert.equal(titleToFileName('a/b\\c:d*e?f"g<h>i|j'), 'a b c d e f g h i j');
   assert.equal(titleToFileName('회의 메모.'), '회의 메모');
+});
+
+// 머리말 없이 "---" 구분선으로 시작하는 글: 첫 문단을 머리말로 떼어 내 잃지 않게
+test('파일 읽기: 키: 값 이 아닌 "---" 사이 글은 본문', () => {
+  assert.equal(parseMemoFile('---\n오늘 회의\n---\n할 일\n').body, '---\n오늘 회의\n---\n할 일\n');
+  assert.equal(parseMemoFile('---\ncolor: pink\n---\n본문\n').body, '본문\n');
 });

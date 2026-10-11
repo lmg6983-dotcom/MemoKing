@@ -6,14 +6,13 @@ import { EventEmitter } from 'node:events';
 import { randomUUID, randomBytes } from 'node:crypto';
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
-  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS, normalizeInkPath } from '../app/js/core/memo-file.js';
+  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS } from '../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
-import { normalizeTables } from '../app/js/core/table-sizes.js';
 import { taskProgress } from '../app/js/core/tasks.js';
 import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
-import { isPastEvent } from '../app/js/core/reminders.js';
-import { installLockMethods, lockedFiles } from '../app/js/core/vault-locks.js';
+import { isLiveCached } from '../app/js/core/reminders.js';
+import { installLockMethods, lockedFiles, diskCopy } from '../app/js/core/vault-locks.js';
 import { textMatcher } from '../app/js/core/text-match.js';
 import {
   VERSIONS_DIR, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune, describeVersions } from '../app/js/core/versions.js';
@@ -167,9 +166,9 @@ export class Vault extends EventEmitter {
       meta.updated ??= toLocalIso(new Date(stat.mtimeMs));
       meta.created ??= toLocalIso(new Date(stat.birthtimeMs || stat.mtimeMs));
       const old = this.entries.get(id);
-      next.set(id, { id, file, meta, body, mtimeMs: stat.mtimeMs, size: stat.size, idSaved });
+      next.set(id, { id, file, meta, body, mtimeMs: stat.mtimeMs, size: stat.size, idSaved, diskMeta: diskCopy(meta) });
       changed.add(id);
-      if (!old || old.body !== body) external.push(id); // 밖에서 새로 들어온 메모도
+      if ((!old || old.body !== body) && !this.ownFiles?.has(file)) external.push(id); // 밖에서 새로 들어온 메모도 (이 기기가 되살린 것은 빼고)
       // 다른 기기에서 잠갔거나 비밀번호를 바꾼 메모: 이 기기에 남은 풀린 버전·예전 비밀번호 버전을 지운다 (아래에서)
       if (isLockedBody(body) && old && parseLocked(old.body)?.salt !== parseLocked(body).salt) lockedNow.push(id);
     }
@@ -190,6 +189,7 @@ export class Vault extends EventEmitter {
         this.orphanTimer = setTimeout(() => this.flushOrphans(), this.orphanDelay);
       }
     }
+    this.rememberRemoved(removed); // 파일이 잠깐 없던 메모를 곧 다시 저장할 때 머리말(알림·잠금 설정)을 잃지 않게
     this.entries = next;
     for (const id of lockedNow) this.dropUnsafeVersions(id);
 
@@ -238,7 +238,7 @@ export class Vault extends EventEmitter {
       hasAudio: has('audio'),
       hasVideo: has('video'),
       hasFile: has('file'),
-      reminderCount: entry.meta.reminders.filter((r) => r.enabled && !isPastEvent(r)).length, // 지난 한 번짜리 일정은 세지 않음
+      reminderCount: entry.meta.reminders.filter((r) => isLiveCached(r)).length, // 종 버튼·일정 탭과 같은 규칙 (앞으로 울릴 것만)
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
       tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
       locked: isLockedBody(entry.body),
@@ -315,8 +315,13 @@ export class Vault extends EventEmitter {
     const entry = this.entries.get(id);
     if (!entry) return null;
     // 잠긴 메모의 일정 이름은 머리말(풀린 글)에 남기지 않는다 — 글에서 짐작한 이름이 비밀일 수 있음 (알림엔 메모 제목)
+    const prev = entry.meta.reminders;
     entry.meta.reminders = isLockedBody(entry.body) ? reminders.map(({ title: _t, ...r }) => r) : reminders;
-    if (entry.file || !isBlankBody(entry.body)) this.write(entry);
+    const wrote = entry.file || !isBlankBody(entry.body) ? this.write(entry) : true;
+    if (wrote !== true) {
+      entry.meta.reminders = prev; // 쓰지 못했다(그사이 파일이 사라지는 등) — 저장된 것처럼 보이지 않게 null
+      return null;
+    }
     this.changed([id]);
     return entry.meta.reminders;
   }
@@ -454,6 +459,7 @@ export class Vault extends EventEmitter {
     entry.mtimeMs = stat.mtimeMs;
     entry.size = stat.size;
     entry.idSaved = true;
+    entry.diskMeta = diskCopy(entry.meta); // 지금 파일에 있는 머리말
     return true;
   }
 
@@ -467,8 +473,9 @@ export class Vault extends EventEmitter {
     let st;
     try {
       st = fs.statSync(this.abs(entry.file));
-    } catch {
-      return 'missing';
+    } catch (err) {
+      // 정말 없을 때만 'missing' — 백신·OneDrive 가 잠깐 붙잡은 것(EBUSY·EPERM)은 그대로 써 본다 (안 되면 쓰기가 오류를 낸다)
+      return err.code === 'ENOENT' || err.code === 'ENOTDIR' ? 'missing' : null;
     }
     if (st.mtimeMs === entry.mtimeMs && st.size === entry.size) return null;
     try {
@@ -527,32 +534,7 @@ export class Vault extends EventEmitter {
     }
   }
 
-  setMeta(id, patch) {
-    const entry = this.entries.get(id);
-    if (!entry) return null;
-    if (patch.color && COLORS.includes(patch.color)) entry.meta.color = patch.color;
-    if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
-    if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
-    if (typeof patch.ink === 'string') entry.meta.ink = normalizeInkPath(patch.ink);
-    if (entry.file) this.write(entry);
-    this.changed([id]);
-    return this.get(id);
-  }
-
-  link(id, targetId, on = true) {
-    const entry = this.entries.get(id);
-    const target = this.entries.get(targetId);
-    if (!entry || !target || id === targetId) return null;
-    const links = new Set(entry.meta.links);
-    if (on) links.add(targetId);
-    else links.delete(targetId);
-    entry.meta.links = [...links];
-    // 상대 메모에 id 가 저장돼 있어야 파일명이 바뀌어도 연결이 유지된다.
-    if (on && target.file && !target.idSaved) this.write(target);
-    if (entry.file) this.write(entry);
-    this.changed([id, targetId]);
-    return this.links(id);
-  }
+  // setMeta · link 는 core/vault-locks.js (PC·휴대폰 같음 — 쓰지 못하면 되돌리고 null)
 
   trash(id) {
     const entry = this.entries.get(id);
@@ -662,7 +644,7 @@ export class Vault extends EventEmitter {
         preview: extractPreview(t.body, 100),
         color: COLORS.includes(t.meta.color) ? t.meta.color : 'yellow',
         deletedAt: new Date(t.at).toISOString(),
-        attachments: extractAttachments(t.body).length,
+        attachments: lockedFiles(t.body, t.meta, () => this.trashAttachmentFiles()).length, // 잠긴 메모는 머리말의 표로
       }));
   }
 
@@ -685,7 +667,13 @@ export class Vault extends EventEmitter {
     }
     const target = this.uniqueFile(titleToFileName(extractTitle(body)));
     fs.renameSync(file, this.abs(target));
-    this.scan();
+    // 이 기기에서 되살린 메모는 "다른 기기에서 방금 고친 메모" 로 알리지 않는다
+    this.ownFiles = new Set([target]);
+    try {
+      this.scan();
+    } finally {
+      this.ownFiles = null;
+    }
     return [...this.entries.values()].find((e) => e.file === target)?.id ?? null;
   }
 
@@ -709,9 +697,9 @@ export class Vault extends EventEmitter {
   deleteTrash(name) {
     const file = this.trashFile(name);
     if (!file) return false;
-    const { body } = parseMemoFile(fs.readFileSync(file, 'utf8'));
+    const { body, meta } = parseMemoFile(fs.readFileSync(file, 'utf8'));
     fs.rmSync(file, { force: true });
-    this.#purgeTrashAttachments(extractAttachments(body));
+    this.#purgeTrashAttachments(lockedFiles(body, meta, () => this.trashAttachmentFiles()));
     return true;
   }
 

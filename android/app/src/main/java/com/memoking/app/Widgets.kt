@@ -42,7 +42,11 @@ object Widgets {
     const val EXTRA_TOKEN = "token"
     private const val PIN_TOKENS = "widget_pin_tokens" // 놓기 요청마다 한 번 쓰는 표 (메모 id → "표|요청 시각")
     private const val PIN_WAIT_MS = 10 * 60_000L
+    private const val GONE_CONFIRM_MS = 60_000L // 메모 파일이 이만큼 계속 없으면 지워진 것으로 본다
     private const val PICK_TOKEN = "widget_pick_token"
+
+    /** 위젯의 파일 일(체크·잠긴 메모 숨기기)은 이 한 줄로 차례대로 — 빠르게 두 번 눌러도 서로 덮어쓰지 않게 */
+    val io: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newSingleThreadExecutor()
 
     /**
      * 위젯을 눌러 "보일 메모 고르기" 를 시작할 때 함께 보내는 이 앱만 아는 표 — 메모킹 화면은 밖에 열려 있으므로
@@ -63,16 +67,31 @@ object Widgets {
     /** 위젯에 놓인 메모 id 들 (화면이 이 메모들의 내용을 보내 준다) */
     fun memoIds(ctx: Context): JSONArray = JSONArray(allIds(ctx).toList().mapNotNull { memoOf(ctx, it) }.distinct())
 
+    // 놓기·치우기도 위젯의 파일 일과 같은 줄에서 (내용 보내기·잠긴 메모 숨기기가 옛 표를 다시 써 넣지 않게)
     fun assign(ctx: Context, widgetId: Int, memoId: String) {
-        map(ctx).edit().putString(widgetId.toString(), memoId).apply()
-        update(ctx, intArrayOf(widgetId))
+        val app = ctx.applicationContext
+        queued("위젯 정하기") {
+            map(app).edit().putString(widgetId.toString(), memoId).apply()
+            update(app, intArrayOf(widgetId))
+        }
     }
 
     fun forget(ctx: Context, widgetIds: IntArray) {
-        map(ctx).edit().apply { widgetIds.forEach { remove(it.toString()) } }.apply()
-        // 어느 위젯에도 없는 메모의 내용은 지운다
-        val used = allIds(ctx).toList().mapNotNull { memoOf(ctx, it) }.toSet()
-        data(ctx).edit().apply { data(ctx).all.keys.filter { it !in used }.forEach { remove(it) } }.apply()
+        val app = ctx.applicationContext
+        queued("위젯 치우기") {
+            map(app).edit().apply { widgetIds.forEach { remove(it.toString()) } }.apply()
+            // 어느 위젯에도 없는 메모의 내용은 지운다
+            val used = allIds(app).toList().mapNotNull { memoOf(app, it) }.toSet()
+            data(app).edit().apply { data(app).all.keys.filter { it !in used }.forEach { remove(it) } }.apply()
+        }
+    }
+
+    private fun queued(what: String, block: () -> Unit) = io.execute {
+        try {
+            block()
+        } catch (e: Exception) {
+            android.util.Log.w("MemoKing", "$what 실패", e)
+        }
     }
 
     /** 화면이 보낸 내용: [{id, title, color, file, lines:[{t, kind, done?, i?}]}] — 지워진 메모는 {id, gone:true} */
@@ -85,12 +104,26 @@ object Widgets {
         val pending = tokens.all.filter { (k, v) -> k != PICK_TOKEN && now - ((v as? String)?.substringAfter('|')?.toLongOrNull() ?: 0L) < PIN_WAIT_MS }.keys
         tokens.edit().apply { tokens.all.keys.filter { it !in pending && it != PICK_TOKEN }.forEach { remove(it) } }.apply()
         val edit = data(ctx).edit()
+        val gone = mutableSetOf<String>()
         for (k in 0 until memos.length()) {
             val m = memos.getJSONObject(k)
-            if (m.optBoolean("gone")) edit.remove(m.getString("id")) else edit.putString(m.getString("id"), m.toString())
+            val id = m.getString("id")
+            if (!m.optBoolean("gone")) {
+                edit.putString(id, m.toString())
+                continue
+            }
+            // 파일이 잠깐 없을 수도 있다(동기화가 바꿔 쓰는 중 등) — 처음엔 내용만 숨기고, 한동안 계속 없을 때만 위젯을 놓는다
+            val prev = memo(ctx, id)
+            val goneAt = prev?.optLong("goneAt", 0L) ?: 0L
+            if (prev == null || (goneAt > 0 && now - goneAt >= GONE_CONFIRM_MS)) {
+                edit.remove(id)
+                gone += id
+            } else if (goneAt == 0L) {
+                prev.put("goneAt", now).put("lines", JSONArray().put(JSONObject().put("t", "메모킹을 열면 내용이 보여요").put("kind", "text")))
+                edit.putString(id, prev.toString())
+            }
         }
         // 지워진 메모가 놓인 위젯은 "보일 메모 고르기" 로 되돌린다 (영원히 "열면 보여요" 로 남지 않게)
-        val gone = (0 until memos.length()).map { memos.getJSONObject(it) }.filter { it.optBoolean("gone") }.map { it.getString("id") }.toSet()
         if (gone.isNotEmpty()) map(ctx).edit().apply { map(ctx).all.filter { (_, v) -> v in gone }.keys.forEach { remove(it) } }.apply()
         val incoming = (0 until memos.length()).map { memos.getJSONObject(it).getString("id") }.toSet()
         data(ctx).all.keys.filter { it !in used && it !in pending && it !in incoming }.forEach { edit.remove(it) }
@@ -129,11 +162,26 @@ object Widgets {
         null
     }
 
+    private val HEADER_KEY = Regex("""^[A-Za-z_][\w-]*\s*:(\s|$)""")
+
+    /**
+     * 머리말(--- 사이의 "키: 값")이 끝나는 줄 번호 (없으면 null) — app/js/core/memo-file.js 와 같은 규칙:
+     * "---" 구분선으로 시작하는 보통 글(첫 문단·목록)은 머리말이 아니다 (거기에 device 를 적거나 할 일을 빼고 세지 않게)
+     */
+    fun headerEnd(lines: List<String>): Int? {
+        if (lines.firstOrNull()?.trimEnd() != "---") return null
+        val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return null
+        val body = (1 until end).map { lines[it].trimEnd() }.filter { it.isNotBlank() }
+        if (body.isEmpty()) return end // 빈 머리말도 머리말
+        if (!HEADER_KEY.containsMatchIn(body[0])) return null
+        // 키: 값 · 들여 쓴 줄(목록·이어진 값) · 주석만
+        return if (body.all { HEADER_KEY.containsMatchIn(it) || it[0].isWhitespace() || it.startsWith("- ") || it.startsWith("#") }) end else null
+    }
+
     /** 머리말 뒤 첫 "# 제목" 줄의 제목 (없으면 null) */
     fun visibleTitle(text: String): String? {
         val lines = text.split("\n")
-        var start = 0
-        if (lines.firstOrNull()?.trimEnd() == "---") start = ((1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return null) + 1
+        val start = headerEnd(lines)?.plus(1) ?: 0
         val line = (start until lines.size).map { lines[it].trim() }.firstOrNull { it.isNotEmpty() } ?: return null
         return if (line.startsWith("# ")) line.removePrefix("# ").trim() else null
     }
@@ -151,11 +199,32 @@ object Widgets {
             val file = memo.optString("file")
             if (file.isEmpty() || memo.optBoolean("locked")) continue
             // 다른 기기가 잠그며 이름을 바꿨으면("제목도 숨기기") 같은 id 의 파일을 찾는다
-            val text = read(storage, file) ?: findById(storage, memoId)?.let { (renamed, content) ->
-                memo.put("file", renamed)
+            var renamed = false
+            // 파일이 없으면 같은 id 의 파일을 찾는다 — 못 찾았으면 6시간 동안은 다시 찾지 않는다 (매번 메모 폴더 전체를 읽지 않게)
+            val missedAt = memo.optLong("missedAt", 0L)
+            val text = read(storage, file) ?: (if (System.currentTimeMillis() - missedAt < 6 * 3600_000L) null else findById(storage, memoId))?.let { (newFile, content) ->
+                memo.put("file", newFile)
+                memo.remove("missedAt")
+                renamed = true
                 content
+            } ?: run {
+                if (System.currentTimeMillis() - missedAt >= 6 * 3600_000L) {
+                    // 찾지 못한 메모는 내용을 숨겨 둔다 (그사이 다른 기기가 이름을 바꿔 잠갔을 수도 — 앱을 열면 다시 맞춤)
+                    memo.put("missedAt", System.currentTimeMillis())
+                    memo.put("lines", JSONArray().put(JSONObject().put("t", "메모킹을 열면 내용이 보여요").put("kind", "text")))
+                    edit.putString(memoId, memo.toString())
+                    changed = true
+                }
+                null
             } ?: continue
-            if (!looksLocked(text)) continue
+            if (!looksLocked(text)) {
+                // 이름만 바뀐 메모: 새 이름을 기억해 다음에 메모 폴더 전체를 다시 뒤지지 않게
+                if (renamed) {
+                    edit.putString(memoId, memo.toString())
+                    changed = true
+                }
+                continue
+            }
             // 제목도 잠근 파일에 보이는 제목으로 ("제목도 숨기기" 로 잠갔으면 "잠긴 메모")
             val shownTitle = visibleTitle(text)
             if (shownTitle != null) memo.put("title", shownTitle)
@@ -302,11 +371,7 @@ object Widgets {
      */
     fun toggleTaskText(text: String, index: Int, taskText: String? = null, shownDone: Boolean? = null): String? {
         val lines = text.split("\n").toMutableList()
-        var start = 0
-        if (lines.firstOrNull()?.trimEnd() == "---") {
-            val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return null
-            start = end + 1
-        }
+        val start = headerEnd(lines)?.plus(1) ?: 0
         // (줄 번호, 체크 칸 자리, 할 일 글)
         val tasks = mutableListOf<Triple<Int, Int, String>>()
         var fence = false
@@ -340,8 +405,7 @@ object Widgets {
      */
     fun stampEdit(text: String, now: String): String {
         val lines = text.split("\n").toMutableList()
-        if (lines.firstOrNull()?.trimEnd() != "---") return text
-        val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return text
+        val end = headerEnd(lines) ?: return text
         var hasDevice = false
         val cr = if (lines[0].endsWith("\r")) "\r" else "" // 줄 끝(\r\n)을 파일 그대로
         for (k in 1 until end) {
@@ -395,12 +459,23 @@ object Widgets {
 class MemoWidget : AppWidgetProvider() {
     // 주기적으로도(위젯 설정의 updatePeriodMillis): 앱이 꺼져 있는 사이 다른 동기화 앱(Syncthing 등)으로 잠긴 메모를 숨긴다
     override fun onUpdate(ctx: Context, mgr: AppWidgetManager, ids: IntArray) {
-        try {
-            Widgets.hideLocked(ctx)
-        } catch (e: Exception) {
-            android.util.Log.w("MemoKing", "위젯 확인 실패", e)
+        // 파일 읽기는 화면 스레드가 아닌 곳에서 (메모 폴더를 뒤지는 동안 멈춘 것처럼 보이지 않게)
+        val app = ctx.applicationContext
+        Widgets.update(app, ids) // 줄 서 기다리지 않고 지금 아는 내용으로 먼저 그린다
+        val pending = goAsync()
+        val done = java.util.concurrent.atomic.AtomicBoolean(false)
+        val finish = { if (done.compareAndSet(false, true)) pending.finish() }
+        // 앞선 파일 일이 길어도 방송을 오래 붙잡지 않게 (시스템이 앱을 멈춘 것으로 보지 않도록)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ finish() }, 8_000L)
+        Widgets.io.execute {
+            try {
+                Widgets.hideLocked(app)
+            } catch (e: Exception) {
+                android.util.Log.w("MemoKing", "위젯 확인 실패", e)
+            } finally {
+                finish()
+            }
         }
-        Widgets.update(ctx, ids)
     }
 
     override fun onDeleted(ctx: Context, ids: IntArray) = Widgets.forget(ctx, ids)
@@ -491,24 +566,35 @@ class WidgetTapActivity : Activity() {
         val taskText = intent.getStringExtra(Widgets.EXTRA_TASK_TEXT)
         val shownDone = if (intent.hasExtra(Widgets.EXTRA_TASK_DONE)) intent.getBooleanExtra(Widgets.EXTRA_TASK_DONE, false) else null
         if (memoId.isNotEmpty() && task >= 0) {
-            val ok = try {
-                Widgets.toggleTask(applicationContext, memoId, task, taskText, shownDone)
-            } catch (e: Exception) {
-                android.util.Log.w("MemoKing", "위젯 체크 실패", e)
-                false
+            // 파일 읽고 쓰기는 화면 스레드 밖에서, 차례대로 — 끝나면 이 (보이지 않는) 화면에서 필요하면 앱을 열고 닫는다
+            val app = applicationContext
+            Widgets.io.execute {
+                val ok = try {
+                    Widgets.toggleTask(app, memoId, task, taskText, shownDone)
+                } catch (e: Exception) {
+                    android.util.Log.w("MemoKing", "위젯 체크 실패", e)
+                    false
+                }
+                runOnUiThread {
+                    if (!ok) openMemo(this, memoId) // 파일을 못 찾았으면(이름이 바뀌었는 등) 앱에서 열어 다시 맞추게
+                    close()
+                }
             }
-            if (!ok) openMemo(memoId) // 파일을 못 찾았으면(이름이 바뀌었는 등) 앱에서 열어 다시 맞추게
-        } else if (memoId.isNotEmpty()) {
-            openMemo(memoId)
+            return
         }
+        if (memoId.isNotEmpty()) openMemo(this, memoId)
+        close()
+    }
+
+    private fun close() {
         finish()
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)
     }
 
-    private fun openMemo(memoId: String) {
-        startActivity(
-            Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_OPEN_MEMO).putExtra(Widgets.EXTRA_MEMO, memoId)
+    private fun openMemo(ctx: Context, memoId: String) {
+        ctx.startActivity(
+            Intent(ctx, MainActivity::class.java).setAction(MainActivity.ACTION_OPEN_MEMO).putExtra(Widgets.EXTRA_MEMO, memoId)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
