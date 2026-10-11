@@ -11,7 +11,7 @@ import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
 import { isLockedBody, parseLocked } from '../../app/js/core/memo-lock.js';
 import { isLiveCached } from '../../app/js/core/reminders.js';
-import { installLockMethods, lockedFiles } from '../../app/js/core/vault-locks.js';
+import { installLockMethods, lockedFiles, diskCopy } from '../../app/js/core/vault-locks.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
@@ -145,7 +145,7 @@ export class Vault extends EventTarget {
       meta.updated ??= toLocalIso(new Date(mtime || Date.now()));
       meta.created ??= meta.updated;
       const old = this.entries.get(id);
-      next.set(id, { id, file, meta, body, mtimeMs: mtime, size, idSaved });
+      next.set(id, { id, file, meta, body, mtimeMs: mtime, size, idSaved, diskMeta: diskCopy(meta) });
       changed.add(id);
       if ((!old || old.body !== body) && !this.ownFiles?.has(file)) external.push(id); // 밖에서 새로 들어온 메모도 (이 기기가 되살린 것은 빼고)
       // 다른 기기에서 잠갔거나 비밀번호를 바꾼 메모: 이 기기에 남은 풀린 버전·예전 비밀번호 버전을 지운다 (아래에서)
@@ -416,6 +416,7 @@ export class Vault extends EventTarget {
     entry.mtimeMs = stat?.mtime ?? Date.now();
     entry.size = stat?.size ?? 0;
     entry.idSaved = true;
+    entry.diskMeta = diskCopy(entry.meta); // 지금 파일에 있는 머리말
     return true;
   }
 

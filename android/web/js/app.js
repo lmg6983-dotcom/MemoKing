@@ -565,6 +565,11 @@ const whenLabel = recordingWhen;
 
 // 녹음하던 잠긴 메모를 닫았을 때 들고 있는 열쇠 (memoId → 세션) — 녹음·받아쓰기를 넣을 때만 잠깐 연다
 app.heldLocks = new Map();
+// 열쇠는 늦어도 30분 뒤 버린다 (녹음이 버려지는 등 넣을 일이 끝내 없을 때 닫힌 잠긴 메모의 열쇠가 남지 않게)
+app.holdLock = (memoId, session) => {
+  app.heldLocks.set(memoId, session);
+  setTimeout(() => app.heldLocks.get(memoId) === session && app.heldLocks.delete(memoId), 30 * 60_000);
+};
 /** 닫힌 잠긴 메모를 잠깐 연다: 열었으면 true, 열 필요가 없으면 null, 못 열면 false */
 function openHeld(memoId) {
   const memo = memoId && app.vault.get(memoId);

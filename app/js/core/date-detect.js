@@ -222,6 +222,7 @@ const DATE_RULES = [
       const d = +m[1];
       if (d < 1 || d > 31) return null;
       let date = { y: now.getFullYear(), mo: now.getMonth(), d };
+      // 이번 달이 지났으면 다음 달 — 다음 달에 그날이 없으면(1월 31일의 "30일까지") 어느 달인지 알 수 없어 찾지 않는다(아래 validDay)
       if (new Date(date.y, date.mo, d, 23, 59) < now || !validDay(date)) {
         const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         date = { y: next.getFullYear(), mo: next.getMonth(), d };
@@ -463,6 +464,12 @@ export function findAllDates(text, { chrono = null, now = new Date() } = {}) {
       // 기본 9시가 지나 다음 차례로 넘겼던 것을, 새 시각이면 아직인 이번 차례로 되돌린다 ("매일 3pm" 을 오전 10시에 = 오늘 3시)
       const step = { day: 1, week: 7 }[k.repeat.every];
       while (step && plusDays(at, -step) > now) at = plusDays(at, -step);
+      if (k.repeat.every === 'month' || k.repeat.every === 'year') {
+        // 매달·매년: 이번 차례(이번 달·올해 그날)부터 다시 — 기본 9시가 지나 다음 차례로 넘겼던 것을 되돌림
+        const mo = k.repeat.every === 'year' ? k.repeat.month - 1 : now.getMonth();
+        const dim = new Date(now.getFullYear(), mo + 1, 0).getDate();
+        at = new Date(now.getFullYear(), mo, Math.min(k.repeat.day, dim), at.getHours(), at.getMinutes());
+      }
       at = nextRepeat(at, k.repeat, now);
       k.at = at;
       k.repeat = { ...k.repeat, time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };

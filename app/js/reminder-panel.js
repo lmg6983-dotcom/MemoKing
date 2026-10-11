@@ -120,6 +120,11 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     toggle.type = 'checkbox';
     toggle.className = 'switch';
     toggle.checked = r.enabled && !over;
+    if (over && r.enabled) {
+      // 지난 한 번짜리 일정은 다시 켤 수 없다 (켜도 울릴 때가 없음) — 눌러도 아무 일 없는 스위치로 두지 않게
+      toggle.disabled = true;
+      toggle.title = '지난 일정이에요';
+    }
     toggle.title = r.enabled ? '끄기' : '켜기';
     toggle.setAttribute('aria-label', `${title.textContent} ${r.enabled ? '끄기' : '켜기'}`);
     toggle.addEventListener('change', () => {

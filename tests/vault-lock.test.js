@@ -412,3 +412,53 @@ test('잠긴 메모를 휴지통에서 영구 삭제하면 그 메모의 첨부�
     v.close();
   }
 });
+
+test('파일이 사라진 사이 글을 저장하면 바로 되살리지 않고 다시 읽은 뒤 (이름이 바뀐 잠긴 메모를 풀린 글로 되살리지 않게)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  const other = new Vault(root, { device: 'phone' });
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 장보기\n\n비밀 목록');
+    other.open();
+    await new Promise((r) => setTimeout(r, 20));
+    other.lock(id, await newLockSession('phone999', FAST), { hideTitle: true, keepOpen: false });
+    const r = v.save(id, '# 장보기\n\n비밀 목록 더');
+    assert.equal(r.retry, true);
+    await new Promise((res) => setTimeout(res, 500)); // 다시 읽음 (파일 감시가 0.3초 모았다가 읽음)
+    const again = v.save(id, '# 장보기\n\n비밀 목록 더');
+    assert.equal(again.refused, true, '다시 읽으니 잠긴 메모 — 저장 거절');
+    for (const f of fs.readdirSync(root).filter((n) => n.endsWith('.md'))) {
+      assert.ok(!fs.readFileSync(path.join(root, f), 'utf8').includes('비밀 목록'), `${f} 에 풀린 글 없음`);
+    }
+  } finally {
+    other.close();
+    v.close();
+  }
+});
+
+test('머리말만 쓰는 사이 다른 기기가 지운 알림은 되살아나지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  const other = new Vault(root, { device: 'phone' });
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 약\n\n아침');
+    const rem = { id: 'r1', kind: 'at', at: new Date(Date.now() + 86_400_000).toISOString(), alerts: [10], action: 'notify', enabled: true, created: new Date().toISOString(), last: null };
+    v.setReminders(id, [rem]);
+    other.open();
+    await new Promise((r) => setTimeout(r, 20));
+    other.save(id, '# 약\n\n아침 저녁');
+    other.setReminders(id, []); // 휴대폰이 알림을 지움
+    v.setMeta(id, { pinned: true }); // PC 는 아직 모르고 고정만
+    const text = fs.readFileSync(path.join(root, v.get(id).file), 'utf8');
+    assert.ok(!/reminders:/.test(text), '지운 알림이 되살아나지 않음');
+    assert.match(text, /pinned: true/);
+    assert.match(text, /아침 저녁/);
+  } finally {
+    other.close();
+    v.close();
+  }
+});

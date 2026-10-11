@@ -13,7 +13,7 @@ import { normalizeTables } from '../app/js/core/table-sizes.js';
 import { taskProgress } from '../app/js/core/tasks.js';
 import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
 import { isLiveCached } from '../app/js/core/reminders.js';
-import { installLockMethods, lockedFiles } from '../app/js/core/vault-locks.js';
+import { installLockMethods, lockedFiles, diskCopy } from '../app/js/core/vault-locks.js';
 import { textMatcher } from '../app/js/core/text-match.js';
 import {
   VERSIONS_DIR, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune, describeVersions } from '../app/js/core/versions.js';
@@ -167,7 +167,7 @@ export class Vault extends EventEmitter {
       meta.updated ??= toLocalIso(new Date(stat.mtimeMs));
       meta.created ??= toLocalIso(new Date(stat.birthtimeMs || stat.mtimeMs));
       const old = this.entries.get(id);
-      next.set(id, { id, file, meta, body, mtimeMs: stat.mtimeMs, size: stat.size, idSaved });
+      next.set(id, { id, file, meta, body, mtimeMs: stat.mtimeMs, size: stat.size, idSaved, diskMeta: diskCopy(meta) });
       changed.add(id);
       if ((!old || old.body !== body) && !this.ownFiles?.has(file)) external.push(id); // 밖에서 새로 들어온 메모도 (이 기기가 되살린 것은 빼고)
       // 다른 기기에서 잠갔거나 비밀번호를 바꾼 메모: 이 기기에 남은 풀린 버전·예전 비밀번호 버전을 지운다 (아래에서)
@@ -459,6 +459,7 @@ export class Vault extends EventEmitter {
     entry.mtimeMs = stat.mtimeMs;
     entry.size = stat.size;
     entry.idSaved = true;
+    entry.diskMeta = diskCopy(entry.meta); // 지금 파일에 있는 머리말
     return true;
   }
 

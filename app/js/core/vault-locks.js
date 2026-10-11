@@ -25,6 +25,8 @@ export function lockedFiles(body, meta, files) {
 
 /** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
 export const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
+/** 파일에 있는 머리말 그대로의 사본 (머리말만 쓰는 사이 다른 기기가 고쳤을 때, 이 기기가 바꾼 항목만 골라 더하려고) */
+export const diskCopy = (meta) => JSON.parse(JSON.stringify(meta ?? {}));
 /** 이 메모를 잠글 때 고른 것 (제목도 숨기기) — 저장마다 같게 */
 const sealOpts = (entry) => ({ hideTitle: entry.meta.extra?.lockHideTitle === true });
 
@@ -57,7 +59,8 @@ class LockMethods {
     const wrote = this.write(entry, known);
     if (wrote !== true) {
       entry.meta = before; // 쓰지 않았으니 머리말도 그대로
-      return { ...this.summary(entry), refused: true, copied: wrote === 'copied' };
+      // skipped: 파일이 잠깐 없어 다시 읽는 중 — 화면은 조용히 곧 다시 저장한다
+      return { ...this.summary(entry), refused: true, copied: wrote === 'copied', retry: wrote === 'skipped' };
     }
     this.changed([id]);
     return this.summary(entry);
@@ -106,9 +109,8 @@ class LockMethods {
   keepChangedOnDisk(entry, known, { copy = true } = {}) {
     const disk = this.readDiskIfChanged(entry); // null: 그대로(또는 못 읽음) · 'missing' · { body, meta }
     if (disk === 'missing') {
-      // 글을 고친 저장이면 되살려 쓰지만, 머리말만 쓰는 것이면(다른 기기가 이름을 바꿨거나 지움) 쓰지 않고 다시 읽는다
-      // — 다른 기기가 "제목도 숨기기" 로 잠그며 이름을 바꾼 메모를 풀린 글로 되살리지 않게
-      if (!sameBody(entry.body, known)) return undefined;
+      // 파일이 없어졌다(다른 기기가 지웠거나 이름을 바꿈 — "제목도 숨기기" 로 잠그며 바꾼 것일 수도): 바로 되살려 쓰지 않고
+      // 먼저 다시 읽는다. 정말 지워진 메모면 다음 저장이 새로 만들고, 이름만 바뀐 잠긴 메모면 풀린 글이 새로 생기지 않는다
       this.rescanSoon();
       return 'skipped';
     }
@@ -364,11 +366,21 @@ class LockMethods {
    */
   adoptTheirs(entry, theirs, theirMeta) {
     entry.body = theirs;
-    const { lockRefs: _r, lockHideTitle: _h, ...rest } = entry.meta.extra ?? {};
-    const lockInfo = {};
-    if (theirMeta?.extra?.lockRefs) lockInfo.lockRefs = theirMeta.extra.lockRefs;
-    if (theirMeta?.extra?.lockHideTitle) lockInfo.lockHideTitle = true;
-    entry.meta.extra = { ...rest, ...(isLockedBody(theirs) ? lockInfo : {}) };
+    // 머리말: 그쪽 것을 바탕으로, 이 기기가 (마지막으로 읽은 뒤) 바꾼 항목만 더한다 — 그쪽에서 지운 알림이 되살아나지 않게
+    const disk = entry.diskMeta;
+    const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    const mine = entry.meta;
+    const merged = { ...(theirMeta ?? {}), extra: { ...(theirMeta?.extra ?? {}) } };
+    for (const k of Object.keys(mine)) {
+      if (k === 'extra' || k === 'id') continue;
+      if (!disk || !same(mine[k], disk[k])) merged[k] = mine[k];
+    }
+    for (const k of Object.keys(mine.extra ?? {})) {
+      if (k === 'lockRefs' || k === 'lockHideTitle') continue; // 잠금 정보는 늘 그쪽 것 (그 글에 맞는 것)
+      if (!disk || !same(mine.extra[k], disk.extra?.[k])) merged.extra[k] = mine.extra[k];
+    }
+    merged.id = mine.id;
+    entry.meta = merged;
     if (isLockedBody(theirs)) {
       entry.meta.reminders = (entry.meta.reminders ?? []).map(({ title: _t, ...r }) => r);
       setTimeout(() => this.dropUnsafeVersions(entry.id), 0);

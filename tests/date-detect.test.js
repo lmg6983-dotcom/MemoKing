@@ -288,3 +288,10 @@ test('되풀이 + 영어 시각은 그 시각으로 ("매일 3pm"), 기간 "휴�
   assert.deepEqual(findAllDates('휴가 3일', { chrono: casual, now }), []);
   assert.deepEqual(findAllDates('남은 기간 20일.', { chrono: casual, now }), []);
 });
+
+test('"매달 15일 3pm" · "매년 10월 15일 3pm" 은 오늘 그날이면 오늘', async () => {
+  const { casual } = await import('../app/vendor/chrono.js');
+  const now = new Date(2026, 9, 15, 10, 0);
+  assert.equal(fmt(findAllDates('매달 15일 3pm', { chrono: casual, now })[0].at), '2026-10-15 15:00');
+  assert.equal(fmt(findAllDates('매년 10월 15일 3pm', { chrono: casual, now })[0].at), '2026-10-15 15:00');
+});

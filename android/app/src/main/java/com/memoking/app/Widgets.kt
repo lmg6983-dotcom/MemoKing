@@ -152,10 +152,20 @@ object Widgets {
             if (file.isEmpty() || memo.optBoolean("locked")) continue
             // 다른 기기가 잠그며 이름을 바꿨으면("제목도 숨기기") 같은 id 의 파일을 찾는다
             var renamed = false
-            val text = read(storage, file) ?: findById(storage, memoId)?.let { (newFile, content) ->
+            // 파일이 없으면 같은 id 의 파일을 찾는다 — 못 찾았으면 6시간 동안은 다시 찾지 않는다 (매번 메모 폴더 전체를 읽지 않게)
+            val missedAt = memo.optLong("missedAt", 0L)
+            val text = read(storage, file) ?: (if (System.currentTimeMillis() - missedAt < 6 * 3600_000L) null else findById(storage, memoId))?.let { (newFile, content) ->
                 memo.put("file", newFile)
+                memo.remove("missedAt")
                 renamed = true
                 content
+            } ?: run {
+                if (System.currentTimeMillis() - missedAt >= 6 * 3600_000L) {
+                    memo.put("missedAt", System.currentTimeMillis())
+                    edit.putString(memoId, memo.toString())
+                    changed = true
+                }
+                null
             } ?: continue
             if (!looksLocked(text)) {
                 // 이름만 바뀐 메모: 새 이름을 기억해 다음에 메모 폴더 전체를 다시 뒤지지 않게
@@ -507,24 +517,28 @@ class WidgetTapActivity : Activity() {
         val taskText = intent.getStringExtra(Widgets.EXTRA_TASK_TEXT)
         val shownDone = if (intent.hasExtra(Widgets.EXTRA_TASK_DONE)) intent.getBooleanExtra(Widgets.EXTRA_TASK_DONE, false) else null
         if (memoId.isNotEmpty() && task >= 0) {
-            val ok = try {
-                Widgets.toggleTask(applicationContext, memoId, task, taskText, shownDone)
-            } catch (e: Exception) {
-                android.util.Log.w("MemoKing", "위젯 체크 실패", e)
-                false
-            }
-            if (!ok) openMemo(memoId) // 파일을 못 찾았으면(이름이 바뀌었는 등) 앱에서 열어 다시 맞추게
+            // 파일 읽고 쓰기는 화면 스레드 밖에서 (느린 저장소에서도 누른 뒤 멈추지 않게)
+            val app = applicationContext
+            Thread {
+                val ok = try {
+                    Widgets.toggleTask(app, memoId, task, taskText, shownDone)
+                } catch (e: Exception) {
+                    android.util.Log.w("MemoKing", "위젯 체크 실패", e)
+                    false
+                }
+                if (!ok) openMemo(app, memoId) // 파일을 못 찾았으면(이름이 바뀌었는 등) 앱에서 열어 다시 맞추게
+            }.start()
         } else if (memoId.isNotEmpty()) {
-            openMemo(memoId)
+            openMemo(this, memoId)
         }
         finish()
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)
     }
 
-    private fun openMemo(memoId: String) {
-        startActivity(
-            Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_OPEN_MEMO).putExtra(Widgets.EXTRA_MEMO, memoId)
+    private fun openMemo(ctx: Context, memoId: String) {
+        ctx.startActivity(
+            Intent(ctx, MainActivity::class.java).setAction(MainActivity.ACTION_OPEN_MEMO).putExtra(Widgets.EXTRA_MEMO, memoId)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
