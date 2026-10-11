@@ -600,9 +600,14 @@ app.deliverRecording = async (r) => {
       // 잠긴 메모를 열 열쇠가 없다(앱을 다시 켬 등) — 잠긴 글에 덧붙이면 저장되지 않으므로, 소리만 새 메모에 (받아쓴 글은 넣지 않음)
       lockedOut = true;
       memoId = app.vault.import({ body: `${heading}\n\n${voiceCardMarkdown(item, '')}\n` });
-    } else if (memo && !isBlankBody(memo.body)) app.vault.save(memoId, `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
-    else if (memo) app.vault.save(memoId, `${heading}\n\n${parts}\n`);
-    else memoId = app.vault.import({ body: `${heading}\n\n${parts}\n` });
+    } else if (memo) {
+      const r = app.vault.save(memoId, isBlankBody(memo.body) ? `${heading}\n\n${parts}\n` : `${memo.body.replace(/\s+$/, '')}\n\n${parts}\n`);
+      if (r?.refused && !r.copied) {
+        // 그사이 다른 기기가 다시 잠가 넣지 못했다 — 소리만 새 메모에 (받아쓴 글은 잠긴 글이었을 수 있어 넣지 않음)
+        lockedOut = true;
+        memoId = app.vault.import({ body: `${heading}\n\n${voiceCardMarkdown(item, '')}\n` });
+      }
+    } else memoId = app.vault.import({ body: `${heading}\n\n${parts}\n` });
     closeHeld(r.memoId, opened);
     list.refresh();
   }

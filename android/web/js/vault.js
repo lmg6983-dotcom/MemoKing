@@ -147,7 +147,7 @@ export class Vault extends EventTarget {
       const old = this.entries.get(id);
       next.set(id, { id, file, meta, body, mtimeMs: mtime, size, idSaved });
       changed.add(id);
-      if (!old || old.body !== body) external.push(id); // 밖에서 새로 들어온 메모도
+      if ((!old || old.body !== body) && !this.ownFiles?.has(file)) external.push(id); // 밖에서 새로 들어온 메모도 (이 기기가 되살린 것은 빼고)
       // 다른 기기에서 잠갔거나 비밀번호를 바꾼 메모: 이 기기에 남은 풀린 버전·예전 비밀번호 버전을 지운다 (아래에서)
       if (isLockedBody(body) && old && parseLocked(old.body)?.salt !== parseLocked(body).salt) lockedNow.push(id);
     }
@@ -607,7 +607,7 @@ export class Vault extends EventTarget {
         preview: extractPreview(t.body, 100),
         color: COLORS.includes(t.meta.color) ? t.meta.color : 'yellow',
         deletedAt: new Date(t.at).toISOString(),
-        attachments: extractAttachments(t.body).length,
+        attachments: lockedFiles(t.body, t.meta, () => this.trashAttachmentFiles()).length, // 잠긴 메모는 머리말의 표로
       }));
   }
 
@@ -630,7 +630,13 @@ export class Vault extends EventTarget {
     }
     const target = this.uniqueFile(titleToFileName(extractTitle(body)));
     if (!fs.move(file, target)) return null;
-    this.scan();
+    // 이 기기에서 되살린 메모는 "다른 기기에서 방금 고친 메모" 로 알리지 않는다
+    this.ownFiles = new Set([target]);
+    try {
+      this.scan();
+    } finally {
+      this.ownFiles = null;
+    }
     return [...this.entries.values()].find((e) => e.file === target)?.id ?? null;
   }
 
@@ -651,9 +657,9 @@ export class Vault extends EventTarget {
   deleteTrash(name) {
     const file = this.trashFile(name);
     if (!file) return false;
-    const { body } = parseMemoFile(fs.readText(file) ?? '');
+    const { body, meta } = parseMemoFile(fs.readText(file) ?? '');
     fs.remove(file);
-    this.purgeTrashAttachments(extractAttachments(body));
+    this.purgeTrashAttachments(lockedFiles(body, meta, () => this.trashAttachmentFiles()));
     return true;
   }
 

@@ -304,11 +304,13 @@ export function isDone(r) {
 // (예전 한 번짜리 알림 — 미리 알림이 없던 것 — 은 울린 기록이 있으면 다시 울리지 않으므로 처음부터)
 export const reenable = (r) => ({ ...r, enabled: true, last: isDone(r) && (r.kind !== 'at' || !Array.isArray(r.alerts)) ? null : r.last });
 
-/** 하루 종일이면 그날 끝, 아니면 시작 시각 — 한 번짜리 일정이 지났는지 볼 때 */
+/** 일정(한 회차)이 끝나는 때: 하루 종일이면 그날 끝, 아니면 시작 시각 */
+export const occurrenceEnd = (start, allDay) => (allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) : new Date(start));
+
+/** 한 번짜리 일정이 끝나는 때 */
 function eventEnd(r) {
   const t = validDate(r.at);
-  if (!t) return null;
-  return r.allDay ? new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1) : t;
+  return t ? occurrenceEnd(t, r.allDay) : null;
 }
 
 /**

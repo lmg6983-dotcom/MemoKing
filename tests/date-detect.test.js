@@ -277,3 +277,14 @@ test('"다음 주 화요일 3pm" · "10월 30일 (금요일) 3pm" 은 한 주 �
   assert.equal(fmt(findAllDates('다음 주 화요일 3pm 회의', { chrono: casual, now: mon })[0].at), '2026-10-20 15:00');
   assert.equal(fmt(findAllDates('10월 30일 (금요일) 3pm', { chrono: casual, now: mon })[0].at), '2026-10-30 15:00');
 });
+
+test('되풀이 + 영어 시각은 그 시각으로 ("매일 3pm"), 기간 "휴가 3일" 은 날짜가 아님', async () => {
+  const { casual } = await import('../app/vendor/chrono.js');
+  const now = new Date(2026, 9, 11, 10, 0);
+  const d = findAllDates('매일 3pm 약 먹기', { chrono: casual, now })[0];
+  assert.equal(fmt(d.at), '2026-10-11 15:00');
+  assert.equal(d.repeat.time, '15:00');
+  assert.equal(findAllDates('매주 월요일 3pm 회의', { chrono: casual, now })[0].repeat.time, '15:00');
+  assert.deepEqual(findAllDates('휴가 3일', { chrono: casual, now }), []);
+  assert.deepEqual(findAllDates('남은 기간 20일.', { chrono: casual, now }), []);
+});

@@ -404,12 +404,19 @@ object Widgets {
 class MemoWidget : AppWidgetProvider() {
     // 주기적으로도(위젯 설정의 updatePeriodMillis): 앱이 꺼져 있는 사이 다른 동기화 앱(Syncthing 등)으로 잠긴 메모를 숨긴다
     override fun onUpdate(ctx: Context, mgr: AppWidgetManager, ids: IntArray) {
-        try {
-            Widgets.hideLocked(ctx)
-        } catch (e: Exception) {
-            android.util.Log.w("MemoKing", "위젯 확인 실패", e)
-        }
-        Widgets.update(ctx, ids)
+        // 파일 읽기는 화면 스레드가 아닌 곳에서 (메모 폴더를 뒤지는 동안 멈춘 것처럼 보이지 않게)
+        val app = ctx.applicationContext
+        val pending = goAsync()
+        Thread {
+            try {
+                Widgets.hideLocked(app)
+            } catch (e: Exception) {
+                android.util.Log.w("MemoKing", "위젯 확인 실패", e)
+            } finally {
+                Widgets.update(app, ids)
+                pending.finish()
+            }
+        }.start()
     }
 
     override fun onDeleted(ctx: Context, ids: IntArray) = Widgets.forget(ctx, ids)

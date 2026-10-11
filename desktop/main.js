@@ -2357,8 +2357,9 @@ function initStt() {
       clearTimeout(held?.timer);
       const memo = vault?.get(memoId);
       const next = memo && !memo.needsPassword && replaceTranscript(memo.body, src, text);
-      if (next && next !== memo.body) vault.save(memoId, next);
-      if (opened) vault.closeLock(memoId); // 창이 비밀번호 화면이면 열쇠는 그 화면이 다시 받는다
+      const r = next && next !== memo.body ? vault.save(memoId, next) : null;
+      if (opened) vault.closeLock(memoId);
+      if ((memo?.needsPassword || r?.refused) && held) notice('말한 사람 나누기를 넣지 못했어요', '그사이 메모가 다른 기기에서 잠겨 바뀌었어요'); // 창이 비밀번호 화면이면 열쇠는 그 화면이 다시 받는다
     },
   });
 }

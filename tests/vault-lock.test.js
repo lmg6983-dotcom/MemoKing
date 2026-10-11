@@ -393,3 +393,22 @@ test('잠금 풀기 직전 같은 비밀번호로 다른 기기가 고쳤으면:
     v.close();
   }
 });
+
+test('잠긴 메모를 휴지통에서 영구 삭제하면 그 메모의 첨부도 지움 · 휴지통 목록에 첨부 수', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    fs.writeFileSync(path.join(root, 'attachments', 's.png'), 'png');
+    const id = v.create();
+    v.save(id, '# 금고\n\n![](attachments/s.png)');
+    v.lock(id, await newLockSession('사과1234', FAST), { keepOpen: false });
+    v.trash(id);
+    const item = v.trashList()[0];
+    assert.equal(item.attachments, 1);
+    v.deleteTrash(item.name);
+    assert.ok(!fs.existsSync(path.join(root, '_memoking', 'trash', 'attachments', 's.png')));
+  } finally {
+    v.close();
+  }
+});
