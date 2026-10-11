@@ -10,7 +10,7 @@ import { normalizeTables } from '../../app/js/core/table-sizes.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
 import { isLockedBody, parseLocked } from '../../app/js/core/memo-lock.js';
-import { isLive } from '../../app/js/core/reminders.js';
+import { isLiveCached } from '../../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles } from '../../app/js/core/vault-locks.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import {
@@ -197,7 +197,7 @@ export class Vault extends EventTarget {
       hasAudio: has('audio'),
       hasVideo: has('video'),
       hasFile: has('file'),
-      reminderCount: entry.meta.reminders.filter((r) => isLive(r)).length, // 종 버튼·일정 탭과 같은 규칙 (앞으로 울릴 것만)
+      reminderCount: entry.meta.reminders.filter((r) => isLiveCached(r)).length, // 종 버튼·일정 탭과 같은 규칙 (앞으로 울릴 것만)
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
       tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
       locked: isLockedBody(entry.body),
@@ -270,8 +270,13 @@ export class Vault extends EventTarget {
     const entry = this.entries.get(id);
     if (!entry) return null;
     // 잠긴 메모의 일정 이름은 머리말(풀린 글)에 남기지 않는다 — 글에서 짐작한 이름이 비밀일 수 있음 (알림엔 메모 제목)
+    const prev = entry.meta.reminders;
     entry.meta.reminders = isLockedBody(entry.body) ? reminders.map(({ title: _t, ...r }) => r) : reminders;
-    if (entry.file || !isBlankBody(entry.body)) this.write(entry);
+    const wrote = entry.file || !isBlankBody(entry.body) ? this.write(entry) : true;
+    if (wrote !== true) {
+      entry.meta.reminders = prev; // 쓰지 못했다(그사이 파일이 사라지는 등) — 저장된 것처럼 보이지 않게 null
+      return null;
+    }
     this.changed([id]);
     return entry.meta.reminders;
   }

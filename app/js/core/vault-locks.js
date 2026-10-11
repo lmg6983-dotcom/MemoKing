@@ -77,12 +77,26 @@ class LockMethods {
     this.refreshLockRefs(entry); // 되돌린 글의 첨부도 첨부 정리에서 지키게
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device;
-    if (this.write(entry, known, { copy: false }) !== true) {
-      entry.meta = before;
-      return { error: '그사이 다른 기기에서 이 메모가 바뀌어 되돌리지 못했어요. 다시 해 주세요' };
-    }
+    if (this.safeWrite(entry, known, before) !== true) return { error: '그사이 다른 기기에서 이 메모가 바뀌어 되돌리지 못했어요. 다시 해 주세요' };
     this.changed([id]);
     return this.get(id);
+  }
+
+  /**
+   * 잠그기·풀기·되돌리기의 쓰기: 쓰지 못했거나(그사이 바뀜) 쓰다 오류가 나면 글·머리말을 그대로 되돌린다
+   * (메모리에만 잠긴 글이 남아 열쇠 없이 잠긴 것처럼 되지 않게). 오류는 다시 던진다
+   */
+  safeWrite(entry, known, before) {
+    let wrote;
+    try {
+      wrote = this.write(entry, known, { copy: false });
+    } catch (err) {
+      entry.body = known;
+      entry.meta = before;
+      throw err;
+    }
+    if (wrote !== true) entry.meta = before;
+    return wrote;
   }
 
   /**
@@ -406,10 +420,7 @@ class LockMethods {
     this.setLockRefs(entry, known);
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device;
-    if (this.write(entry, known, { copy: false }) !== true) {
-      entry.meta = before; // 그사이 다른 기기가 잠금 — 아무것도 바꾸지 않음
-      return null;
-    }
+    if (this.safeWrite(entry, known, before) !== true) return null; // 그사이 다른 기기가 잠금 — 아무것도 바꾸지 않음
     this.purgeVersions(id);
     if (keepOpen) this.locks.set(id, session);
     else this.locks.delete(id);
@@ -430,10 +441,7 @@ class LockMethods {
     entry.meta.extra = extra;
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device; // 이어 쓰기 안내가 엉뚱한 기기 이름을 대지 않게
-    if (this.write(entry, known, { copy: false }) !== true) {
-      entry.meta = before; // 그사이 다른 기기가 다시 잠금
-      return null;
-    }
+    if (this.safeWrite(entry, known, before) !== true) return null; // 그사이 다른 기기가 다시 잠금
     this.purgeVersions(id); // 잠긴 동안의 버전은 이제 열 수 없는 글이므로
     this.locks.delete(id);
     this.changed([id]);

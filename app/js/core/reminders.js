@@ -301,7 +301,8 @@ export function isDone(r) {
 
 /** 다시 켤 때: 끝난 것만 처음부터(울린 기록 지움), 중간에 끈 것은 울린 기록을 지켜 이미 울린 알림이 또 울리지 않게 */
 // 일정은 울린 기록을 늘 지킨다 — 이미 울린 미리 알림이 "놓친 알림" 으로 다시 울리지 않게 (남은 알림만 울림)
-export const reenable = (r) => ({ ...r, enabled: true, last: isDone(r) && r.kind !== 'at' ? null : r.last });
+// (예전 한 번짜리 알림 — 미리 알림이 없던 것 — 은 울린 기록이 있으면 다시 울리지 않으므로 처음부터)
+export const reenable = (r) => ({ ...r, enabled: true, last: isDone(r) && (r.kind !== 'at' || !Array.isArray(r.alerts)) ? null : r.last });
 
 /** 하루 종일이면 그날 끝, 아니면 시작 시각 — 한 번짜리 일정이 지났는지 볼 때 */
 function eventEnd(r) {
@@ -438,3 +439,22 @@ export function alarmLabel(r, info = {}, now = new Date()) {
 
 /** 알림 제목: 일정 이름(없으면 메모 제목) */
 export const alarmTitle = (r, memoTitle) => (isEvent(r) && r.title) || memoTitle;
+
+/**
+ * 알림 하나의 글 (PC·휴대폰 같음): title 알림 제목 · label 때 · full 메모 띠·보관함에 쓰는 한 줄 ("치과, 내일 15:00 (30분 뒤)")
+ */
+export function alarmText(r, memoTitle, info = {}, now = new Date()) {
+  const title = alarmTitle(r, memoTitle);
+  const label = alarmLabel(r, info, now);
+  return { title, label, full: title === memoTitle ? label : `${title}, ${label}` };
+}
+
+// 살아 있는 알림 세기는 반복 일정 계산이 들어가 무겁다 — 목록을 다시 그릴 때마다 하지 않게 알림마다 1분 기억
+const liveCache = new WeakMap();
+export function isLiveCached(r, now = new Date()) {
+  const hit = liveCache.get(r);
+  if (hit && Math.abs(now - hit.t) < 60_000) return hit.v;
+  const v = isLive(r, now);
+  liveCache.set(r, { t: now.getTime(), v });
+  return v;
+}

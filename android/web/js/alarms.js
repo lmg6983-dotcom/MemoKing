@@ -2,7 +2,7 @@
 //   앱이 켜져 있을 때: 15초마다 살펴 울릴 때가 된 알림을 울리고 메모 파일에 last 를 적는다.
 //   앱이 꺼져 있을 때: 다음 알림 시각들을 시스템 알람에 맡겨 둔다 (Alarms.kt). 그때 울린 알림은
 //                     다음에 앱을 켰을 때 다시 울리지 않고 last 만 적는다 (wasFired).
-import { dueOccurrence, dueAtStartup, markFired, upcomingAlerts, alarmLabel, alarmTitle } from '../../app/js/core/reminders.js';
+import { dueOccurrence, dueAtStartup, markFired, upcomingAlerts, alarmLabel, alarmText, alarmTitle } from '../../app/js/core/reminders.js';
 import { extractPreview } from '../../app/js/core/memo-file.js';
 import { native } from './native.js';
 
@@ -25,9 +25,8 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
     const vault = getVault();
     const memo = vault?.get(memoId);
     if (!memo) return;
-    const title = alarmTitle(reminder, memo.title);
-    const label = alarmLabel(reminder, info);
-    const alarm = { reminderId: reminder.id, label: title === memo.title ? label : `${title}, ${label}`, missed: Boolean(info.missed) };
+    const { title, label, full } = alarmText(reminder, memo.title, info);
+    const alarm = { reminderId: reminder.id, label: full, missed: Boolean(info.missed) };
     if (!silent) {
       try {
         native.notify({
@@ -53,7 +52,7 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
       const info = pick(reminder, t);
       if (!info) continue;
       // 울리기 "전에" 먼저 울림 표시(last)를 파일에 적어, 같은 알림이 두 번 울리지 않게 한다.
-      vault.updateReminder(memoId, markFired(reminder, t));
+      if (!vault.updateReminder(memoId, markFired(reminder, t))) continue; // 적지 못했으면 다시 읽은 뒤 다음 차례에
       // 시스템 알람이 이미 울렸으면 알림 막대에 다시 띄우지 않는다
       const already = info.at && native.wasFired(keyOf(memoId, reminder, info.offset), info.at);
       try {
@@ -93,10 +92,10 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
       const lastFired = r.last ? new Date(r.last) : null;
       const from = lastFired && lastFired > now ? lastFired : now;
       for (const next of upcomingAlerts(r, from, r.kind === 'repeat' ? AHEAD : 1)) {
-        const label = alarmLabel(r, { start: next.start, offset: next.offset, also: next.also }, next.at);
+        const { label, full } = alarmText(r, memoTitle, { start: next.start, offset: next.offset, also: next.also }, next.at);
         items.push({
           key: keyOf(memoId, r, next.offset), at: next.at.getTime(), title,
-          text: [label, preview].filter(Boolean).join('\n'), memoId, label: title === memoTitle ? label : `${title}, ${label}`, action: r.action,
+          text: [label, preview].filter(Boolean).join('\n'), memoId, label: full, action: r.action,
         });
       }
     }

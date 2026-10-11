@@ -6,7 +6,7 @@
 import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { casual as chrono } from '../vendor/chrono.js';
 import { findAllDates } from './core/date-detect.js';
-import { koClock, dayLabel, WEEKDAY } from './core/time.js';
+import { koClock, dayLabel, WEEKDAY, sameDay } from './core/time.js';
 import { hintOnce } from './hints.js';
 import { openEventEditor } from './event-editor.js';
 
@@ -257,7 +257,6 @@ class DateChip {
 
 /** 메모에 이 날짜의 일정(또는 예전 알림)이 이미 있는지 — 되풀이면 같은 되풀이, 날짜만이면 같은 날 */
 export function reminderAt(reminders, { at, repeat = null, hasTime = true }) {
-  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   return (reminders ?? []).some((r) => {
     if (r.enabled === false && !r.last) return false;
     if (repeat) {

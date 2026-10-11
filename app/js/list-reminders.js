@@ -2,14 +2,12 @@
 // 다가오는 일정. 일정마다 언제 미리 알리는지(30분 전, 하루 전 …)를 함께 보인다. 타이머·앱 열 때 알림은 맨 아래 따로.
 import { icon } from './icons.js';
 import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween } from './core/reminders.js';
-import { koClock, koFullDate, relativeDay, WEEKDAY } from './core/time.js';
+import { koClock, koFullDate, relativeDay, WEEKDAY, startOfDay, addDays, sameDay } from './core/time.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
 
-const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const dayStart = startOfDay;
 const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
 /** "오늘 · 10월 12일 (월)" 같은 날 이름 */

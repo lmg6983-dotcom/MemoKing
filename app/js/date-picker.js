@@ -1,12 +1,10 @@
 // 예약 알림의 날짜·시각 고르기 — 휴대폰 기본 입력(돌리는 다이얼·시계판) 대신 달력 한 장과 시각 칩.
 //   값은 원래 입력칸(<input id="at-input"> · <input id="rep-time">)에 그대로 써 넣어 reminder-panel.js 의 계산은 바뀌지 않는다.
 //   PC 메모 창 · 휴대폰이 함께 쓴다.
-import { dayLabel } from './core/time.js';
+import { dayLabel, sameDay, startOfDay } from './core/time.js';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 const pad = (n) => String(n).padStart(2, '0');
-const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
 function el(tag, className, text) {
   const e = document.createElement(tag);

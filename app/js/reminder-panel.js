@@ -187,7 +187,12 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     if ((every === 'month' || every === 'year') && !el.day.dataset.touched) el.day.value = String(now.getDate());
   }
 
+  /** 새 알림과 (이미 지나 뺀 미리 알림이 있으면) 그 안내 — { reminder, note } */
   function build() {
+    const out = buildReminder();
+    return out.reminder ? out : { reminder: out, note: '' };
+  }
+  function buildReminder() {
     const now = new Date();
     const action = el.form.querySelector('input[name="action"]:checked').value;
     const base = { kind, action, enabled: true, created: toLocalIso(now) };
@@ -228,19 +233,18 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   }
 
   // 이미 지난 미리 알림은 빼고(일정 창과 같은 규칙), 뺀 것은 저장 뒤에 알려 준다
-  let dropped = [];
-  let fellBack = false;
   function withPending(r, start, now) {
-    const keep = pendingAlerts(r.alerts, start, { now, fallback: fallbackAlert(Boolean(r.allDay)), allDay: Boolean(r.allDay) });
-    dropped = r.alerts.filter((o) => !keep.includes(o));
-    fellBack = keep.length > 0 && !r.alerts.includes(keep[0]); // 고른 것이 모두 지나 정시(당일 오전 9시)로 바꿈
-    return { ...r, alerts: keep };
-  }
-  function droppedNote(r) {
-    if (!dropped.length) return '';
-    const names = dropped.map((o) => alertLabel(o, Boolean(r.allDay))).join(', ');
-    if (fellBack) return ` ${names} 알림은 이미 지난 시각이라 ${alertLabel(r.alerts[0], Boolean(r.allDay))}에 알려요.`;
-    return r.alerts.length ? ` ${names} 알림은 이미 지난 시각이라 뺐어요.` : ` ${names} 알림은 이미 지난 시각이라, 알림 없이 달력에만 넣었어요.`;
+    const allDay = Boolean(r.allDay);
+    const keep = pendingAlerts(r.alerts, start, { now, fallback: fallbackAlert(allDay), allDay });
+    const dropped = r.alerts.filter((o) => !keep.includes(o));
+    const fellBack = keep.length > 0 && !r.alerts.includes(keep[0]); // 고른 것이 모두 지나 정시(당일 오전 9시)로 바꿈
+    let note = '';
+    if (dropped.length) {
+      const names = dropped.map((o) => alertLabel(o, allDay)).join(', ');
+      if (fellBack) note = ` ${names} 알림은 이미 지난 시각이라 ${alertLabel(keep[0], allDay)}에 알려요.`;
+      else note = keep.length ? ` ${names} 알림은 이미 지난 시각이라 뺐어요.` : ` ${names} 알림은 이미 지난 시각이라, 알림 없이 달력에만 넣었어요.`;
+    }
+    return { reminder: { ...r, alerts: keep }, note };
   }
 
   el.kinds.addEventListener('click', (e) => {
@@ -266,10 +270,9 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   el.form.addEventListener('submit', async (e) => {
     e.preventDefault();
     let reminder;
-    dropped = [];
-    fellBack = false;
+    let note = '';
     try {
-      reminder = build();
+      ({ reminder, note } = build());
     } catch (err) {
       setStatus(err.message, true);
       return;
@@ -280,7 +283,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     const saved = reminders.at(-1) ?? reminder;
     el.title.value = '';
     setStatus(isEvent(saved)
-      ? `일정을 추가했어요: ${saved.title ? `${saved.title}, ` : ''}${describeReminder(saved)} (알림: ${describeAlerts(saved)}).${droppedNote(saved)}`
+      ? `일정을 추가했어요: ${saved.title ? `${saved.title}, ` : ''}${describeReminder(saved)} (알림: ${describeAlerts(saved)}).${note}`
       : `알림을 추가했어요: ${describeReminder(saved)}`);
     renderAlerts();
   });

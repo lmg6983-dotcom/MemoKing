@@ -24,6 +24,12 @@ export const koMonthDay = (d) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
 
 export const WEEKDAY = '일월화수목금토';
 // 현지 날짜(연·월·일)를 UTC 날짜 수로 — 시간대·서머타임과 상관없이 하루 차이가 정확히 1
+/** 그날 0시 */
+export const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+/** n 날 뒤 0시 (달력으로 — 서머타임과 상관없이) */
+export const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+/** 같은 날인가 */
+export const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 const dayNumber = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000;
 /** 오늘부터 며칠 뒤인지 (어제 -1 · 오늘 0 · 내일 1) */
 export const daysFrom = (d, now = new Date()) => dayNumber(new Date(d)) - dayNumber(new Date(now));

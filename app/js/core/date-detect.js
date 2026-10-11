@@ -7,6 +7,8 @@
 //   날짜 뒤 시각:  오후 3시 · 3시 반 · 3시 20분 · 15:30 · 세 시 · 열한 시 반 · 저녁(시각 없이 때만: 19시)
 //   시각만:        오전·오후 없는 1~6시는 오후, 7~11시는 오전. 이미 지났으면 찾지 않음 (새벽·자정은 다음 날로)
 
+import { startOfDay, addDays } from './time.js';
+
 // 하루·한 주 뒤는 달력으로 더한다 (서머타임이 바뀌는 날에도 같은 시각이 되게)
 const plusDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes());
 export const DEFAULT_HOUR = 9; // 날짜만 적었으면 그날 아침 9시
@@ -45,9 +47,7 @@ const count = (text) => (/^\d+$/.test(text) ? Number(text) : NATIVE_COUNT[text] 
 const PERIOD_HOUR = { 새벽: 6, 아침: 8, 오전: 9, 점심: 12, 낮: 13, 오후: 14, 저녁: 19, 밤: 21 };
 const PERIOD_RE = '오전|오후|아침|점심|저녁|밤|낮|새벽';
 
-const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const ymd = (d) => ({ y: d.getFullYear(), mo: d.getMonth(), d: d.getDate() });
-const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const weekdayIndex = (ch) => WEEKDAYS.indexOf(ch);
 const atTime = (date, t) => new Date(date.y, date.mo, date.d, t.h, t.min);
 const validDay = (date) => {
@@ -342,7 +342,7 @@ export function findDates(text, now = new Date()) {
   const found = [];
   const taken = []; // 날짜 말이 차지한 자리 (지난 날 포함)
   const overlaps = (from, to) => taken.some((r) => from < r.to && to > r.from);
-  const add = (from, to, at, hasTime, { past = false, repeat = null } = {}) => {
+  const add = (from, to, at, hasTime, { past = false, repeat = null, rollWeek = false } = {}) => {
     if (overlaps(from, to)) return;
     const span = { from, to };
     taken.push(span);
@@ -354,6 +354,8 @@ export function findDates(text, now = new Date()) {
     if (repeat) at = nextRepeat(at, repeat, now);
     if (at.getTime() <= now.getTime() + 30_000) return;
     const item = { from, to, text: s.slice(from, to).trim(), at, hasTime };
+    // 요일만 적은 말("화요일")인지 — 영어 시각을 붙일 때 이번 주/다음 주를 다시 고른다 (findAllDates). 결과 모양에는 드러내지 않음
+    if (rollWeek) Object.defineProperty(item, 'rollWeek', { value: true });
     if (repeat) item.repeat = { ...repeat, time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };
     found.push(item);
   };
@@ -385,14 +387,14 @@ export function findDates(text, now = new Date()) {
       if (t) {
         let at = atTime(date, t);
         if ((rule.rollWeek || r.rollWeek) && at <= now) at = plusDays(at, 7);
-        add(from, t.end, at, true, { past, repeat: r.repeat });
+        add(from, t.end, at, true, { past, repeat: r.repeat, rollWeek: Boolean(rule.rollWeek || r.rollWeek) });
       } else if (r.today) {
         taken.push({ from, to }); // "오늘" 만은 알림 시각이 없다
       } else {
         let at = atTime(date, { h: DEFAULT_HOUR, min: 0 });
         // 오늘이 그 요일이고 9시가 지났으면: 날짜만 적은 "금요일" 은 다음 주
         if ((rule.rollWeek || r.rollWeek) && at <= now) at = plusDays(at, 7);
-        add(from, to, at, false, { past, repeat: r.repeat });
+        add(from, to, at, false, { past, repeat: r.repeat, rollWeek: Boolean(rule.rollWeek || r.rollWeek) });
       }
     }
   }
@@ -457,7 +459,7 @@ export function findAllDates(text, { chrono = null, now = new Date() } = {}) {
     if (k.hasTime || k.repeat) continue; // 이미 시각이 있거나 되풀이면 영어 쪽만 버린다
     let at = new Date(k.at.getFullYear(), k.at.getMonth(), k.at.getDate(), e.at.getHours(), e.at.getMinutes());
     // 요일 말("일요일 3pm"): 날짜만으로 다음 주로 넘겼어도 이번 그 시각이 아직이면 이번 주로, 지났으면 다음 주로 (한국어 시각과 같은 규칙)
-    const weekday = /요일|욜/.test(k.text);
+    const weekday = Boolean(k.rollWeek); // 요일만 적은 말 ("다음 주 화요일"·"10월 30일 (금요일)" 은 아님)
     const week = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes());
     if (weekday && week(at, -7) > now) at = week(at, -7);
     if (at.getTime() <= now.getTime() + 30_000) {

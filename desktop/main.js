@@ -40,7 +40,7 @@ import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview, isBlankBody } from '../app/js/core/memo-file.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
-import { normalizeReminder, alarmLabel, alarmTitle } from '../app/js/core/reminders.js';
+import { normalizeReminder, alarmText } from '../app/js/core/reminders.js';
 
 const SMOKE = process.argv.includes('--smoke');
 // 점검 때는 가짜 마이크(삐 소리)로 녹음한다 — 실제 마이크·권한 창 없이
@@ -1400,9 +1400,8 @@ function fireReminder(memoId, reminder, info) {
   const memo = vault?.get(memoId);
   if (!memo) return;
   // 일정은 "치과 · 내일 15:00 (30분 뒤)" — 미리 알림이 울리는 때와 일정 시작을 함께
-  const title = alarmTitle(reminder, memo.title);
-  const label = alarmLabel(reminder, info);
-  const alarm = { reminderId: reminder.id, label: title === memo.title ? label : `${title}, ${label}`, missed: Boolean(info.missed) };
+  const { title, label, full } = alarmText(reminder, memo.title, info);
+  const alarm = { reminderId: reminder.id, label: full, missed: Boolean(info.missed) };
   history?.add({ source: 'memoking', appId: APP_ID, app: '메모킹', title, body: label, memoId });
 
   if (reminder.action === 'open') {
@@ -2466,6 +2465,7 @@ function registerIpc() {
     if (!vault || !Array.isArray(list)) return null;
     const reminders = list.map((r) => normalizeReminder(r)).filter(Boolean);
     const saved = vault.setReminders(id, reminders);
+    if (!saved) throw new Error('그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요');
     sendToNote(id, 'memo:reminders', saved);
     pushReminders();
     alarms.tick(); // 방금 만든 알림이 이미 울릴 때면 바로

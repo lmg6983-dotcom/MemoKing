@@ -270,3 +270,10 @@ test('한국어 날 + 영어 시각: 요일은 이번 주 그 시각, 지난 시
   assert.equal(c.length, 1);
   assert.equal(fmt(c[0].at), '2026-10-15 7:00');
 });
+
+test('"다음 주 화요일 3pm" · "10월 30일 (금요일) 3pm" 은 한 주 앞당기지 않음', async () => {
+  const { casual } = await import('../app/vendor/chrono.js');
+  const mon = new Date(2026, 9, 12, 10, 0);
+  assert.equal(fmt(findAllDates('다음 주 화요일 3pm 회의', { chrono: casual, now: mon })[0].at), '2026-10-20 15:00');
+  assert.equal(fmt(findAllDates('10월 30일 (금요일) 3pm', { chrono: casual, now: mon })[0].at), '2026-10-30 15:00');
+});

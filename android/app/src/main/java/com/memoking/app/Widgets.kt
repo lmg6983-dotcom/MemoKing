@@ -151,11 +151,20 @@ object Widgets {
             val file = memo.optString("file")
             if (file.isEmpty() || memo.optBoolean("locked")) continue
             // 다른 기기가 잠그며 이름을 바꿨으면("제목도 숨기기") 같은 id 의 파일을 찾는다
-            val text = read(storage, file) ?: findById(storage, memoId)?.let { (renamed, content) ->
-                memo.put("file", renamed)
+            var renamed = false
+            val text = read(storage, file) ?: findById(storage, memoId)?.let { (newFile, content) ->
+                memo.put("file", newFile)
+                renamed = true
                 content
             } ?: continue
-            if (!looksLocked(text)) continue
+            if (!looksLocked(text)) {
+                // 이름만 바뀐 메모: 새 이름을 기억해 다음에 메모 폴더 전체를 다시 뒤지지 않게
+                if (renamed) {
+                    edit.putString(memoId, memo.toString())
+                    changed = true
+                }
+                continue
+            }
             // 제목도 잠근 파일에 보이는 제목으로 ("제목도 숨기기" 로 잠갔으면 "잠긴 메모")
             val shownTitle = visibleTitle(text)
             if (shownTitle != null) memo.put("title", shownTitle)

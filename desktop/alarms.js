@@ -18,7 +18,8 @@ export function createAlarmRunner({ getVault, fire, now = () => new Date(), inte
     for (const { memoId, reminder } of vault.allReminders()) {
       const info = pick(reminder, t);
       if (!info) continue;
-      vault.updateReminder(memoId, markFired(reminder, t));
+      // 울림 표시를 적지 못했으면(그사이 파일이 바뀜) 이번엔 울리지 않는다 — 다시 읽은 뒤 다음 차례에 (두 번 울리지 않게)
+      if (!vault.updateReminder(memoId, markFired(reminder, t))) continue;
       try {
         fire(memoId, reminder, info);
       } catch (err) {

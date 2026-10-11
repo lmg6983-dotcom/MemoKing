@@ -196,6 +196,7 @@ app.setReminders = (memoId, next) => {
   note.flush(); // 아직 파일이 없는 새 메모면 먼저 저장
   const reminders = next.map((r) => normalizeReminder(r)).filter(Boolean);
   const saved = app.vault.setReminders(memoId, reminders);
+  if (!saved) throw new Error('그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요');
   alarms.schedule();
   alarms.tick(); // 방금 만든 알림이 이미 울릴 때면 바로
   if (!notifyAsked && reminders.some((r) => r.enabled)) {
