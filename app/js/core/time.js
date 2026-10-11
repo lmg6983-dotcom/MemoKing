@@ -22,6 +22,26 @@ export const koClock = (d) => `${d.getHours() < 12 ? '오전' : '오후'} ${d.ge
 /** 10월 4일 */
 export const koMonthDay = (d) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
 
+const WEEKDAY = '일월화수목금토';
+const dayNumber = (d) => Math.round(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86_400_000);
+/** 오늘부터 며칠 뒤인지 (어제 -1 · 오늘 0 · 내일 1) */
+export const daysFrom = (d, now = new Date()) => dayNumber(new Date(d)) - dayNumber(new Date(now));
+/** 10월 12일 (월) · 다른 해면 2027년 1월 2일 (토) */
+export function koFullDate(date, now = new Date()) {
+  const d = new Date(date);
+  const year = d.getFullYear() === new Date(now).getFullYear() ? '' : `${d.getFullYear()}년 `;
+  return `${year}${koMonthDay(d)} (${WEEKDAY[d.getDay()]})`;
+}
+/** 어제 · 오늘 · 내일 · 모레 (그 밖은 null) */
+export function relativeDay(date, now = new Date()) {
+  return { [-1]: '어제', 0: '오늘', 1: '내일', 2: '모레' }[daysFrom(date, now)] ?? null;
+}
+/**
+ * 날 이름 — 일정·알림·달력·날짜 밑줄이 모두 이 한 가지로: 오늘 · 내일 · 모레 · 10월 12일 (월) · 2027년 1월 2일 (토)
+ * 시각을 붙일 때는 `${dayLabel(d)} ${koClock(d)}`
+ */
+export const dayLabel = (date, now = new Date()) => relativeDay(date, now) ?? koFullDate(date, now);
+
 // 같은 날인지 비교용 키: 2026-09-29
 export const dateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 

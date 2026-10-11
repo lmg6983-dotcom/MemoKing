@@ -79,7 +79,14 @@ const DATE_RULES = [
   // 매년 M월 D일 (되풀이 — "M월 D일" 보다 먼저)
   {
     re: /(?<![가-힣])매년\s?(\d{1,2})월\s?(\d{1,2})일/g,
-    date: (m, now) => ({ date: { y: now.getFullYear(), mo: +m[1] - 1, d: +m[2] }, repeat: { every: 'year', month: +m[1], day: +m[2] } }),
+    // 2월 29일은 평년엔 28일에 (반복 알림 코어와 같은 규칙) — 4월 31일처럼 어느 해에도 없는 날만 버린다
+    date: (m, now) => {
+      const mo = +m[1] - 1;
+      const day = +m[2];
+      if (mo < 0 || mo > 11 || day < 1 || day > new Date(2000, mo + 1, 0).getDate()) return { date: { y: now.getFullYear(), mo, d: day } };
+      const y = now.getFullYear();
+      return { date: { y, mo, d: Math.min(day, new Date(y, mo + 1, 0).getDate()) }, repeat: { every: 'year', month: +m[1], day } };
+    },
   },
   // 2026-10-12, 2026.10.12, 2026/10/12
   {
@@ -237,7 +244,9 @@ const TIME_RE = new RegExp(
   'g',
 );
 // 때만 (시각 없이): 날짜 바로 뒤에서만 읽는다 ("내일 저녁")
-const PERIOD_ONLY_RE = new RegExp(`(${PERIOD_RE})(?![가-힣]{2})(?!\\s?(?:\\d|${NATIVE_HOUR_RE})\\s?시)`, 'y');
+// 때 말 뒤에 붙어도 되는 토씨만 ("저녁에", "아침부터") — "낮잠" · "밤샘" · "아침밥" 처럼 다른 낱말이면 때가 아님
+const PERIOD_TAIL = '(?:에는|에도|에|엔|쯤에?|께|부터|까지|즈음|경|중|이나|은|는|이|의)?(?![가-힣])';
+const PERIOD_ONLY_RE = new RegExp(`(${PERIOD_RE})(?=${PERIOD_TAIL})(?!\\s?(?:\\d|${NATIVE_HOUR_RE})\\s?시)`, 'y');
 
 function timeOf(m) {
   if (m[10]) return m[10] === '정오' ? { h: 12, min: 0, explicit: true } : { h: 24, min: 0, explicit: true, midnight: true };

@@ -1,10 +1,9 @@
 // 일정 추가·고치기 창 (PC·휴대폰 같음) — 구글 캘린더처럼: 일정 이름과 때를 보여 주고, "언제 미리 알릴지"는 사용자가 고른다.
 //   미리 알림은 여러 개 (정시 · 10분 전 · 30분 전 · 1시간 전 · 하루 전 · 일주일 전 / 하루 종일이면 당일·전날·일주일 전 오전 9시)
 //   아무것도 고르지 않으면 "알림 없음" — 달력에만 보인다. 고른 알림은 다음 일정의 기본값으로 기억한다.
-import { ALERT_PRESETS, DEFAULT_ALERTS, alertLabel } from './core/reminders.js';
-import { koClock } from './core/time.js';
+import { ALERT_PRESETS, DEFAULT_ALERTS, alertLabel, pendingAlerts } from './core/reminders.js';
+import { koClock, dayLabel } from './core/time.js';
 
-const WEEKDAY = '일월화수목금토';
 const KEY = 'memoking.eventAlerts';
 
 export function remembered(kind) {
@@ -28,12 +27,7 @@ export function remember(kind, alerts) {
 
 /** "10월 12일 (월) 오후 3:00" · 하루 종일이면 "10월 12일 (월) 하루 종일" */
 export function eventWhen(start, allDay, now = new Date()) {
-  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((day(start) - day(now)) / 86_400_000);
-  const year = start.getFullYear() === now.getFullYear() ? '' : `${start.getFullYear()}년 `;
-  const date = diff === 0 ? '오늘' : diff === 1 ? '내일' : diff === 2 ? '모레'
-    : `${year}${start.getMonth() + 1}월 ${start.getDate()}일 (${WEEKDAY[start.getDay()]})`;
-  return `${date} ${allDay ? '하루 종일' : koClock(start)}`;
+  return `${dayLabel(start, now)} ${allDay ? '하루 종일' : koClock(start)}`;
 }
 
 function el(tag, attrs = {}, text = '') {
@@ -88,10 +82,10 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
     function render() {
       when.textContent = `📅 ${eventWhen(startAt(), isAllDay)}`;
       const set = picked[kind()];
-      const now = Date.now();
+      const live = new Set(pendingAlerts(ALERT_PRESETS[kind()], startAt(), { repeat: Boolean(repeatLabel) }));
       chips.replaceChildren(...ALERT_PRESETS[kind()].map((offset) => {
         const b = el('button', { type: 'button', 'data-alert': String(offset) }, alertLabel(offset, isAllDay));
-        const past = !repeatLabel && startAt().getTime() - offset * 60_000 <= now;
+        const past = !live.has(offset);
         b.setAttribute('aria-pressed', String(set.has(offset) && !past));
         if (past) {
           b.disabled = true;
@@ -104,7 +98,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
         });
         return b;
       }));
-      const active = [...set].filter((o) => repeatLabel || startAt().getTime() - o * 60_000 > now);
+      const active = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel) });
       none.textContent = active.length ? '' : '알림 없이 달력에만 보여요';
     }
     allDaySwitch.addEventListener('change', () => {
@@ -127,9 +121,9 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
     });
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const now = Date.now();
-      const chosen = [...picked[kind()]].filter((o) => repeatLabel || startAt().getTime() - o * 60_000 > now).sort((a, b) => b - a);
-      remember(kind(), chosen);
+      const chosen = pendingAlerts([...picked[kind()]], startAt(), { repeat: Boolean(repeatLabel) });
+      // 기본값으로는 고른 것을 그대로 (이번 일정엔 이미 지나 빠진 "하루 전" 도 다음 일정엔 다시 고른 채로)
+      remember(kind(), [...picked[kind()]].sort((a, b) => b - a));
       finish({ title: name.value.replace(/\s+/g, ' ').trim(), allDay: isAllDay, start: startAt(), alerts: chosen });
     });
 

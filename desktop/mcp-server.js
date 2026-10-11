@@ -29,23 +29,46 @@ function settings() {
 let vault = null;
 let vaultPath = null;
 
+function closeVault() {
+  try {
+    vault?.close();
+  } catch {
+    // 이미 사라진 폴더
+  }
+  vault = null;
+  vaultPath = null;
+}
+
 /** 지금 메모 폴더 (설정에서 바뀌었으면 새로 연다) */
 function openVault() {
   const s = settings();
   const root = arg('--vault') ?? s.vaultPath;
-  if (!root || !fs.existsSync(root)) throw new Error('메모킹 메모 폴더를 찾지 못했어요. 메모킹을 한 번 실행해 폴더를 정해 주세요.');
+  if (!root || !fs.existsSync(root)) {
+    // 폴더를 옮겼거나 외장·네트워크 드라이브가 빠졌다 — 연결은 그대로 두고, 폴더가 돌아오면 다시 연다
+    closeVault();
+    throw new Error('메모킹 메모 폴더를 찾지 못했어요. 메모 폴더를 옮겼거나 드라이브가 빠졌다면 메모킹에서 폴더를 다시 정해 주세요.');
+  }
   if (vault && vaultPath === root) {
     vault.scan({ silent: true });
     return vault;
   }
-  vault = new Vault(root, { device: 'ai' });
-  // 이 프로세스는 읽고 쓰기만 — 색인 다시 쓰기·첨부 치우기는 켜져 있는 메모킹 앱이 맡는다
-  vault.scheduleIndex = () => {};
-  vault.flushOrphans = () => vault.orphans.clear();
-  vault.open();
+  closeVault();
+  const v = new Vault(root, { device: 'ai' });
+  // 이 프로세스는 읽고 쓰기만 — 색인 다시 쓰기·첨부 치우기·폴더 지켜보기는 켜져 있는 메모킹 앱이 맡는다
+  // (도구를 부를 때마다 다시 읽으므로 감시·주기 확인이 필요 없고, 폴더가 사라져도 타이머가 서버를 멈추지 않게)
+  v.scheduleIndex = () => {};
+  v.flushOrphans = () => v.orphans.clear();
+  v.watch = () => {};
+  v.on('error', (err) => console.error('[memoking-mcp]', err.message));
+  v.open();
+  vault = v;
   vaultPath = root;
   return vault;
 }
+
+// 어떤 예외도 AI 비서와의 연결(표준 입출력)을 끊지 않게 — 다음 도구 호출에서 다시 시도
+process.on('uncaughtException', (err) => console.error('[memoking-mcp]', err?.message ?? err));
+process.on('unhandledRejection', (err) => console.error('[memoking-mcp]', err?.message ?? err));
 
 const canWrite = () => settings().mcp?.write !== false;
 

@@ -6,7 +6,7 @@
 import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { casual as chrono } from '../vendor/chrono.js';
 import { findAllDates } from './core/date-detect.js';
-import { koClock, koMonthDay } from './core/time.js';
+import { koClock, dayLabel } from './core/time.js';
 import { hintOnce } from './hints.js';
 import { openEventEditor } from './event-editor.js';
 
@@ -14,13 +14,8 @@ export const dateRemindKey = new PluginKey('memoking-date-remind');
 const WEEKDAY = '일월화수목금토';
 const SAME_MS = 60_000; // 알림이 이 안에 있으면 "이미 맞춤"
 
-/** "10월 11일 (일) 오후 3:00" — 오늘·내일은 그렇게 */
-export function dateLabel(at, now = new Date()) {
-  const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const diff = Math.round((day(at) - day(now)) / 86_400_000);
-  const date = diff === 0 ? '오늘' : diff === 1 ? '내일' : diff === 2 ? '모레' : `${koMonthDay(at)} (${WEEKDAY[at.getDay()]})`;
-  return `${date} ${koClock(at)}`;
-}
+/** "10월 11일 (일) 오후 3:00" — 오늘·내일·모레는 그렇게 */
+export const dateLabel = (at, now = new Date()) => `${dayLabel(at, now)} ${koClock(at)}`;
 
 /** 되풀이 알림 설명: "매주 월요일 오전 10:00" */
 export function repeatLabel(repeat, at) {

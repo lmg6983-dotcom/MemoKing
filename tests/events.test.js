@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeReminder, serializeReminder, nextAlert, dueOccurrence, markFired, isDone, alertLabel, describeAlerts, describeReminder, nextLabel, occurrencesBetween } from '../app/js/core/reminders.js';
+import { normalizeReminder, serializeReminder, nextAlert, dueOccurrence, markFired, isDone, reenable, isLive, isPastEvent, pendingAlerts, upcomingAlerts, alertLabel, describeAlerts, describeReminder, nextLabel, occurrencesBetween } from '../app/js/core/reminders.js';
 import { toLocalIso } from '../app/js/core/time.js';
 
 const at = (y, m, d, h = 0, min = 0) => new Date(y, m - 1, d, h, min, 0, 0);
@@ -46,7 +46,7 @@ test('하루 종일 일정: 당일 오전 9시 · 하루 전 오전 9시', () =>
   const r = event({ at: iso(2026, 10, 7, 0, 0), allDay: true, alerts: [-540, 900] });
   const { rang } = ring(r, at(2026, 10, 5, 0, 0), at(2026, 10, 8, 0, 0));
   assert.deepEqual(rang, ['하루 전 오전 9시 @ 6일 9:00', '당일 오전 9시 @ 7일 9:00']);
-  assert.equal(describeReminder(r, at(2026, 10, 1)), '10월 7일(수) 하루 종일');
+  assert.equal(describeReminder(r, at(2026, 10, 1)), '10월 7일 (수) 하루 종일');
   assert.equal(describeAlerts(r), '당일 오전 9시, 하루 전 오전 9시');
 });
 
@@ -114,4 +114,86 @@ test('알림 없음: 달력에만 있고 울리지 않음', () => {
   assert.equal(dueOccurrence(r, at(2026, 10, 5, 15, 0)), null);
   assert.equal(occurrencesBetween(r, at(2026, 10, 1), at(2026, 11, 1)).length, 1);
   assert.deepEqual(normalizeReminder(serializeReminder(r)).alerts, []);
+});
+
+// ---------- 버그 고침 재현 ----------
+
+test('하루 전 알림이 울린 뒤 껐다 켜도: "끝났어요" 아님, 하루 전이 다시 울리지 않음', () => {
+  const r = event({ at: iso(2026, 10, 5, 15, 0), alerts: [30, 1440] });
+  const fired = markFired(r, at(2026, 10, 4, 15, 0)); // 하루 전 울림
+  const off = { ...fired, enabled: false };
+  assert.equal(isDone(off), false); // 꺼짐이지 끝이 아님
+  const on = reenable(off);
+  assert.equal(on.last, fired.last); // 울린 기록을 지킴
+  assert.equal(dueOccurrence(on, at(2026, 10, 4, 16, 0)), null); // 하루 전이 "놓친 알림" 으로 또 울리지 않음
+  assert.equal(dueOccurrence(on, at(2026, 10, 5, 14, 30)).offset, 30);
+});
+
+test('다 울리고 끝난 일정을 다시 켜면 처음부터', () => {
+  const r = event({ at: iso(2026, 10, 5, 15, 0), alerts: [30] });
+  const done = markFired(r, at(2026, 10, 5, 14, 30));
+  assert.equal(isDone(done), true);
+  assert.equal(reenable(done).last, null);
+});
+
+test('오전 10시에 만든 오늘 하루 종일 일정: 당일 오전 9시는 "놓친 알림" 으로 울리지 않음', () => {
+  const r = event({ at: iso(2026, 10, 5), allDay: true, alerts: [-540], created: iso(2026, 10, 5, 10, 0) });
+  assert.equal(dueOccurrence(r, at(2026, 10, 5, 10, 0)), null);
+  assert.equal(dueOccurrence(r, at(2026, 10, 5, 23, 0)), null);
+});
+
+test('만들기 전에 지난 정시 알림도 새 일정이면 울리지 않음 (알림 패널에서 지난 시각을 골라도)', () => {
+  const r = event({ at: iso(2026, 10, 5, 9, 0), alerts: [0], created: iso(2026, 10, 5, 10, 0) });
+  assert.equal(dueOccurrence(r, at(2026, 10, 5, 10, 0)), null);
+  // 예전 알림(미리 알림 없음)은 그대로 놓친 알림
+  const legacy = event({ at: iso(2026, 10, 5, 9, 0), created: iso(2026, 10, 5, 10, 0) });
+  assert.equal(dueOccurrence(legacy, at(2026, 10, 5, 10, 0)).missed, true);
+});
+
+test('이미 지난 미리 알림 거르기: 5분 뒤 일정에 10분 전은 빠짐, 반복 일정은 그대로', () => {
+  const now = at(2026, 10, 5, 9, 0);
+  assert.deepEqual(pendingAlerts([10, 0], at(2026, 10, 5, 9, 5), { now }), [0]);
+  assert.deepEqual(pendingAlerts([10], at(2026, 10, 5, 9, 5), { now }), []);
+  assert.deepEqual(pendingAlerts([10, 1440], at(2026, 10, 5, 9, 5), { repeat: true, now }), [1440, 10]);
+  // 오늘 하루 종일 · 오전 10시: 당일 오전 9시는 지남
+  assert.deepEqual(pendingAlerts([-540, 900], at(2026, 10, 5), { now: at(2026, 10, 5, 10, 0) }), []);
+});
+
+test('휴대폰 예약: 알림 개수가 아니라 회차로 센다 (매일 + 알림 3개 → 14회차)', () => {
+  const r = normalizeReminder({ id: 'd', kind: 'repeat', repeat: { every: 'day', time: '09:00' }, alerts: [0, 10, 60], created: iso(2026, 10, 1, 8, 0) });
+  const list = upcomingAlerts(r, at(2026, 10, 1, 7, 0), 14);
+  assert.equal(new Set(list.map((x) => x.start.getTime())).size, 14);
+  assert.equal(list.length, 42);
+  assert.deepEqual(list.at(-1).start, at(2026, 10, 14, 9, 0));
+  // 한 번짜리는 그 일정의 알림 모두
+  assert.equal(upcomingAlerts(event({ at: iso(2026, 10, 5, 15, 0), alerts: [30, 1440] }), at(2026, 10, 1), 1).length, 2);
+});
+
+test('알림 없는 일정은 켜짐으로 세지 않음 (종 버튼과 탭 숫자가 같게)', () => {
+  const now = at(2026, 10, 3);
+  const noAlert = event({ at: iso(2026, 10, 5, 15, 0), alerts: [] });
+  assert.equal(isLive(noAlert, now), false);
+  assert.equal(isLive(event({ at: iso(2026, 10, 5, 15, 0), alerts: [10] }), now), true);
+  assert.equal(isLive(normalizeReminder({ id: 's', kind: 'startup' }), now), true);
+  assert.equal(isPastEvent(noAlert, at(2026, 10, 5, 15, 0)), true);
+  assert.equal(isPastEvent(event({ at: iso(2026, 10, 5), allDay: true, alerts: [] }), at(2026, 10, 5, 23, 0)), false);
+});
+
+test('반복 일정은 만든 날 전에는 달력에 없음', () => {
+  const r = normalizeReminder({ id: 'w', kind: 'repeat', repeat: { every: 'week', weekdays: [1], time: '10:00' }, created: iso(2026, 10, 7, 8, 0) });
+  assert.deepEqual(occurrencesBetween(r, at(2026, 1, 1), at(2026, 2, 1)), []);
+  assert.deepEqual(occurrencesBetween(r, at(2026, 10, 1), at(2026, 10, 20)).map((d) => d.getDate()), [12, 19]);
+  // 만든 날의 회차는 보임
+  const daily = normalizeReminder({ id: 'd', kind: 'repeat', repeat: { every: 'day', time: '09:00' }, created: iso(2026, 10, 7, 10, 0) });
+  assert.deepEqual(occurrencesBetween(daily, at(2026, 10, 6), at(2026, 10, 9)).map((d) => d.getDate()), [7, 8]);
+});
+
+test('날 이름은 한 가지로: 모레 · "(월)" 띄어 쓰기 · 다른 해', async () => {
+  const { dayLabel } = await import('../app/js/core/time.js');
+  const { formatWhen, formatDay } = await import('../app/js/core/reminders.js');
+  const now = at(2026, 10, 10, 10, 0);
+  assert.deepEqual([-1, 0, 1, 2, 3].map((n) => dayLabel(at(2026, 10, 10 + n), now)), ['어제', '오늘', '내일', '모레', '10월 13일 (화)']);
+  assert.equal(dayLabel(at(2027, 1, 2), now), '2027년 1월 2일 (토)');
+  assert.equal(formatWhen(at(2026, 10, 12, 9, 0), now), '모레 09:00');
+  assert.equal(formatDay(at(2026, 10, 13), now), dayLabel(at(2026, 10, 13), now));
 });

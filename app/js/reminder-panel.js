@@ -1,7 +1,7 @@
 // 메모 창의 "일정과 알림" 패널 — 목록(켜기/끄기·삭제)과 새로 만들기
 //   일정 · 반복 일정: 이름 + 미리 알림(구글 캘린더처럼 여러 개, 정시에 울리는 게 아니라 미리) · 타이머 · 앱 열 때
 import { icon } from './icons.js';
-import { describeReminder, describeAlerts, nextLabel, isDone, isEvent, ALERT_PRESETS, alertLabel } from './core/reminders.js';
+import { describeReminder, describeAlerts, nextLabel, isDone, isEvent, isLive, isPastEvent, reenable, pendingAlerts, ALERT_PRESETS, alertLabel } from './core/reminders.js';
 import { remembered, remember } from './event-editor.js';
 import { toLocalIso } from './core/time.js';
 import { dateTimePicker, timePicker } from './date-picker.js';
@@ -43,14 +43,28 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   // 미리 알림 고른 것 (시각 있는 일정 · 하루 종일 따로) — 처음엔 지난번에 고른 것
   const picked = { timed: new Set(remembered('timed')), allDay: new Set(remembered('allDay')) };
   const alertKind = () => (kind === 'at' && el.allDay.checked ? 'allDay' : 'timed');
+  /** 지금 고른 날짜의 시작 (한 번짜리 일정만, 반복·잘못된 값이면 null) — 이미 지난 미리 알림을 가리는 데 */
+  function chosenStart() {
+    if (kind !== 'at') return null;
+    const at = new Date(el.atInput.value);
+    if (Number.isNaN(at.getTime())) return null;
+    return el.allDay.checked ? new Date(at.getFullYear(), at.getMonth(), at.getDate()) : at;
+  }
   function renderAlerts() {
     const k = alertKind();
+    const start = chosenStart();
+    const live = start ? new Set(pendingAlerts(ALERT_PRESETS[k], start)) : null;
     el.alerts.replaceChildren(...ALERT_PRESETS[k].map((offset) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.dataset.alert = String(offset);
       b.textContent = alertLabel(offset, k === 'allDay');
-      b.setAttribute('aria-pressed', String(picked[k].has(offset)));
+      const past = live ? !live.has(offset) : false;
+      b.setAttribute('aria-pressed', String(picked[k].has(offset) && !past));
+      if (past) {
+        b.disabled = true;
+        b.title = '이미 지난 시각이에요';
+      }
       b.addEventListener('click', () => {
         if (picked[k].has(offset)) picked[k].delete(offset);
         else picked[k].add(offset);
@@ -60,6 +74,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     }));
   }
   el.allDay.addEventListener('change', renderAlerts);
+  el.atInput.addEventListener('input', renderAlerts);
   // 날짜는 달력, 시각은 칩·목록 (휴대폰 기본 다이얼 대신) — 고른 값은 위 입력칸에 그대로
   const atPicker = dateTimePicker($('at-picker'), { input: el.atInput });
   timePicker($('rep-time-picker'), { value: el.time.value, onChange: (hhmm) => (el.time.value = hhmm) });
@@ -70,7 +85,9 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   // ---------- 목록 ----------
 
   function render() {
-    const enabled = reminders.filter((r) => r.enabled).length;
+    // 일정 탭 숫자와 같은 규칙: 앞으로 울릴 것이 있는 알림만 (알림 없는 일정·지난 일정은 세지 않음)
+    const now = new Date();
+    const enabled = reminders.filter((r) => isLive(r, now)).length;
     el.count.textContent = enabled ? String(enabled) : '';
     el.btn.classList.toggle('has-links', enabled > 0);
     el.btn.title = enabled ? `일정과 알림 ${enabled}개 (Ctrl+Shift+A)` : '일정과 알림 (Ctrl+Shift+A)';
@@ -79,7 +96,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
 
   function renderItem(r) {
     const li = document.createElement('li');
-    li.className = `rem-item${r.enabled ? '' : ' off'}`;
+    li.className = `rem-item${r.enabled && !(isPastEvent(r) && !nextLabel(r)) ? '' : ' off'}`;
     li.dataset.id = r.id;
     li.append(icon(KIND_ICON[r.kind], 'rem-kind-icon'));
 
@@ -91,7 +108,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     const sub = document.createElement('div');
     sub.className = 'rem-sub';
     const next = nextLabel(r);
-    const state = isDone(r) ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : next ? `다음 알림 ${next}` : '';
+    const state = isDone(r) || (isPastEvent(r) && !next) ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : next ? `다음 알림 ${next}` : '';
     const alerts = isEvent(r) ? `알림 ${describeAlerts(r)}` : '';
     sub.textContent = [alerts, state, r.action === 'open' ? '메모 바로 열기' : '알림으로 받기'].filter(Boolean).join(', ');
     text.append(title, sub);
@@ -103,8 +120,8 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     toggle.title = r.enabled ? '끄기' : '켜기';
     toggle.setAttribute('aria-label', `${title.textContent} ${r.enabled ? '끄기' : '켜기'}`);
     toggle.addEventListener('change', () => {
-      // 완료된 한 번짜리 알림을 다시 켜면 처음부터 (울린 기록 지움)
-      const next = { ...r, enabled: toggle.checked, last: toggle.checked && isDone(r) ? null : r.last };
+      // 끝난 한 번짜리 알림을 다시 켜면 처음부터, 중간에 끈 것은 이미 울린 알림을 다시 울리지 않게
+      const next = toggle.checked ? reenable(r) : { ...r, enabled: false };
       save(reminders.map((x) => (x.id === r.id ? next : x)));
     });
 
@@ -144,13 +161,13 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     el.alertsWrap.hidden = !event;
     el.allDayRow.hidden = kind !== 'at';
     el.submit.textContent = event ? '일정 추가' : kind === 'timer' ? '타이머 추가' : '알림 추가';
-    renderAlerts();
     if (kind === 'at' && !atChosen) {
       // 처음엔 한 시간 뒤 정각
       const d = new Date(Date.now() + 60 * 60 * 1000);
       d.setMinutes(0, 0, 0);
       atPicker.set(d);
     }
+    renderAlerts();
     if (kind === 'repeat') syncRepeat();
   }
 
@@ -180,6 +197,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     if (kind === 'at' || kind === 'repeat') {
       const t = el.title.value.replace(/\s+/g, ' ').trim();
       if (t) event.title = t;
+      // 기본값으로는 고른 것을 그대로 기억 (이번 일정에 맞지 않아 빠진 "하루 전" 도 다음 일정엔 다시)
       event.alerts = [...picked[alertKind()]].sort((a, b) => b - a);
       remember(alertKind(), event.alerts);
     }
@@ -189,10 +207,10 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
       if (el.allDay.checked) {
         at = new Date(at.getFullYear(), at.getMonth(), at.getDate());
         if (at < new Date(now.getFullYear(), now.getMonth(), now.getDate())) throw new Error('이미 지난 날이에요. 앞으로의 날을 골라 주세요');
-        return { ...base, ...event, at: toLocalIso(at), allDay: true };
+        return withPending({ ...base, ...event, at: toLocalIso(at), allDay: true }, at, now);
       }
       if (at <= now) throw new Error('이미 지난 시각이에요. 앞으로의 시각을 골라 주세요');
-      return { ...base, ...event, at: toLocalIso(at) };
+      return withPending({ ...base, ...event, at: toLocalIso(at) }, at, now);
     }
     if (kind === 'repeat') {
       const every = el.every.value;
@@ -206,6 +224,19 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
       return { ...base, ...event, repeat };
     }
     return { ...base, startup: el.form.querySelector('input[name="startup"]:checked').value };
+  }
+
+  // 이미 지난 미리 알림은 빼고(일정 창과 같은 규칙), 뺀 것은 저장 뒤에 알려 준다
+  let dropped = [];
+  function withPending(r, start, now) {
+    const keep = pendingAlerts(r.alerts, start, { now });
+    dropped = r.alerts.filter((o) => !keep.includes(o));
+    return { ...r, alerts: keep };
+  }
+  function droppedNote(r) {
+    if (!dropped.length) return '';
+    const names = dropped.map((o) => alertLabel(o, Boolean(r.allDay))).join(', ');
+    return r.alerts.length ? ` ${names} 알림은 이미 지난 시각이라 뺐어요.` : ` ${names} 알림은 이미 지난 시각이라, 알림 없이 달력에만 넣었어요.`;
   }
 
   el.kinds.addEventListener('click', (e) => {
@@ -231,6 +262,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   el.form.addEventListener('submit', async (e) => {
     e.preventDefault();
     let reminder;
+    dropped = [];
     try {
       reminder = build();
     } catch (err) {
@@ -241,8 +273,9 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     const saved = reminders.at(-1) ?? reminder;
     el.title.value = '';
     setStatus(isEvent(saved)
-      ? `일정을 추가했어요: ${saved.title ? `${saved.title}, ` : ''}${describeReminder(saved)} (알림: ${describeAlerts(saved)})`
+      ? `일정을 추가했어요: ${saved.title ? `${saved.title}, ` : ''}${describeReminder(saved)} (알림: ${describeAlerts(saved)}).${droppedNote(saved)}`
       : `알림을 추가했어요: ${describeReminder(saved)}`);
+    renderAlerts();
   });
 
   // ---------- 패널 열고 닫기 ----------
@@ -278,7 +311,8 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
      * @param {{ title?: string, start: Date, allDay?: boolean, alerts: number[], repeat?: object|null }} e
      */
     async addEvent(e) {
-      const base = { action: 'notify', enabled: true, created: toLocalIso(new Date()), alerts: e.alerts ?? [] };
+      const now = new Date();
+      const base = { action: 'notify', enabled: true, created: toLocalIso(now), alerts: pendingAlerts(e.alerts ?? [], e.start, { repeat: Boolean(e.repeat), now }) };
       if (e.title) base.title = e.title;
       let reminder;
       if (e.repeat) {

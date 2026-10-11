@@ -2,13 +2,13 @@
 //   앱이 켜져 있을 때: 15초마다 살펴 울릴 때가 된 알림을 울리고 메모 파일에 last 를 적는다.
 //   앱이 꺼져 있을 때: 다음 알림 시각들을 시스템 알람에 맡겨 둔다 (Alarms.kt). 그때 울린 알림은
 //                     다음에 앱을 켰을 때 다시 울리지 않고 last 만 적는다 (wasFired).
-import { dueOccurrence, dueAtStartup, markFired, nextAlert, alarmLabel as eventLabel, alarmTitle } from '../../app/js/core/reminders.js';
+import { dueOccurrence, dueAtStartup, markFired, upcomingAlerts, alarmLabel as eventLabel, alarmTitle } from '../../app/js/core/reminders.js';
 import { extractPreview } from '../../app/js/core/memo-file.js';
 import { native } from './native.js';
 
 // 일정의 미리 알림마다 따로 (같은 일정의 "하루 전" 과 "30분 전" 이 서로를 지우지 않게)
 const keyOf = (memoId, reminder, offset = 0) => `${memoId}/${reminder.id}${offset ? `/${offset}` : ''}`;
-const AHEAD = 14; // 앞으로 몇 번의 알림을 시스템에 맡길지 (매일 일정이면 2주치)
+const AHEAD = 14; // 앞으로 몇 회차의 알림을 시스템에 맡길지 (매일 일정이면 알림이 몇 개든 2주치)
 
 export function alarmLabel(reminder, info = {}, now = new Date()) {
   return eventLabel(reminder, info, now);
@@ -93,16 +93,13 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
       const title = alarmTitle(r, memoTitle);
       // 앞으로 울릴 알림(미리 알림 포함)을 몇 번 함께 맡겨, 앱을 한동안 열지 않아도 계속 울리게 한다
       const lastFired = r.last ? new Date(r.last) : null;
-      let from = lastFired && lastFired > now ? lastFired : now;
-      for (let i = 0; i < (r.kind === 'repeat' ? AHEAD : 6); i++) {
-        const next = nextAlert(r, from);
-        if (!next) break;
+      const from = lastFired && lastFired > now ? lastFired : now;
+      for (const next of upcomingAlerts(r, from, r.kind === 'repeat' ? AHEAD : 1)) {
         const label = alarmLabel(r, { start: next.start, offset: next.offset }, next.at);
         items.push({
           key: keyOf(memoId, r, next.offset), at: next.at.getTime(), title,
           text: [label, preview].filter(Boolean).join('\n'), memoId, label: title === memoTitle ? label : `${title}, ${label}`, action: r.action,
         });
-        from = next.at;
       }
     }
     try {

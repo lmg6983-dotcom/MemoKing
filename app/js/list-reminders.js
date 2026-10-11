@@ -1,12 +1,11 @@
 // 목록 창 "일정" 탭 (PC·휴대폰 같음) — 구글 캘린더처럼: 위에 한 달 달력(일정 있는 날에 점), 아래에 고른 날의 일정과
 // 다가오는 일정. 일정마다 언제 미리 알리는지(30분 전, 하루 전 …)를 함께 보인다. 타이머·앱 열 때 알림은 맨 아래 따로.
 import { icon } from './icons.js';
-import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, occurrencesBetween } from './core/reminders.js';
-import { koClock } from './core/time.js';
+import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween } from './core/reminders.js';
+import { koClock, koFullDate, relativeDay } from './core/time.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const WEEKDAY = '일월화수목금토';
-const DAY_MS = 86_400_000;
 const UPCOMING_DAYS = 30;
 
 const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -16,9 +15,8 @@ const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
 /** "오늘 · 10월 12일 (월)" 같은 날 이름 */
 export function dayHeading(d, now = new Date()) {
-  const diff = Math.round((dayStart(d) - dayStart(now)) / DAY_MS);
-  const name = `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY[d.getDay()]})`;
-  return diff === 0 ? `오늘, ${name}` : diff === 1 ? `내일, ${name}` : name;
+  const rel = relativeDay(d, now);
+  return rel ? `${rel}, ${koFullDate(d, now)}` : koFullDate(d, now);
 }
 
 export function setupRemindersTab({ api, container, empty, countEl }) {
@@ -27,6 +25,8 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
   const today = () => dayStart(new Date());
   let month = new Date(today().getFullYear(), today().getMonth(), 1);
   let selected = today();
+  let shownToday = today();
+  const emptyHtml = empty.innerHTML; // "아직 일정이 없어요" (찾을 때는 "찾는 일정이 없어요" 로 바꿨다가 되돌림)
 
   async function refresh() {
     items = await api.reminders.all();
@@ -236,7 +236,7 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
     toggle.checked = r.enabled;
     toggle.setAttribute('aria-label', `${item.title} 알림`);
     toggle.addEventListener('change', () => update(item, (list) => list.map((x) => (x.id === r.id
-      ? { ...x, enabled: toggle.checked, last: toggle.checked && isDone(x) ? null : x.last }
+      ? (toggle.checked ? reenable(x) : { ...x, enabled: false })
       : x))));
 
     const del = document.createElement('button');
@@ -260,6 +260,14 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
   function render() {
     const now = new Date();
     const t = today();
+    // 창을 켜 둔 채 자정이 지나면: "오늘" 을 보고 있었다면 새 오늘로 (다가오는 일정이 사라지지 않게)
+    if (!sameDay(t, shownToday)) {
+      if (sameDay(selected, shownToday)) {
+        selected = t;
+        month = new Date(t.getFullYear(), t.getMonth(), 1);
+      }
+      shownToday = t;
+    }
     const out = [calendar()];
 
     // 고른 날
@@ -297,9 +305,14 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
     if (off.length) out.push(heading(`꺼졌거나 끝난 알림 ${off.length}`), ...off.map(row));
 
     container.replaceChildren(...out);
-    empty.hidden = items.length > 0;
-    // 탭 숫자: 앞으로 울릴 알림이 있는 것
-    const live = items.filter((i) => i.reminder.enabled && nextTime(i.reminder, now) < Infinity).length;
+    // 찾는 말에 맞는 일정·알림이 하나도 없으면 그렇게 알려 준다
+    const searching = Boolean(query.trim());
+    const found = items.some(matches);
+    empty.hidden = searching ? found : items.length > 0;
+    if (searching && !found) empty.textContent = '찾는 일정이 없어요.';
+    else if (empty.innerHTML !== emptyHtml) empty.innerHTML = emptyHtml;
+    // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)
+    const live = items.filter((i) => isLive(i.reminder, now)).length;
     countEl.textContent = live ? String(live) : '';
   }
 

@@ -10,7 +10,7 @@
 //       allDay: true            # (일정) 하루 종일 — at 은 그날 00:00, 미리 알림은 그 기준 ("당일 오전 9시" = -540)
 //       created: 2026-09-30T10:00:00+09:00
 //       last: 2026-10-01T09:00:02+09:00   # 마지막으로 울린 시각
-import { toLocalIso, dateKey, hhmm } from './time.js';
+import { toLocalIso, dateKey, hhmm, dayLabel } from './time.js';
 
 export const KINDS = ['timer', 'at', 'repeat', 'startup'];
 export const EVERY = ['day', 'week', 'month', 'year'];
@@ -79,6 +79,16 @@ export function alertLabel(offset, allDay = false) {
   if (offset % 60 === 0) return `${offset / 60}시간 전`;
   if (offset > 60) return `${Math.floor(offset / 60)}시간 ${offset % 60}분 전`;
   return `${offset}분 전`;
+}
+
+/**
+ * 아직 울릴 수 있는 미리 알림만 (지금보다 뒤) — 일정 창·알림 패널·코어가 함께 쓰는 한 가지 규칙.
+ * 반복 일정은 다음 회차에 울리므로 모두 남긴다.
+ */
+export function pendingAlerts(alerts, start, { repeat = false, now = new Date() } = {}) {
+  const list = [...new Set(alerts ?? [])].sort((a, b) => b - a);
+  if (repeat) return list;
+  return list.filter((o) => new Date(start).getTime() - o * 60_000 > new Date(now).getTime());
 }
 
 /** "10분 전, 하루 전" */
@@ -235,8 +245,10 @@ export function dueOccurrence(r, now = new Date()) {
   // 반복은 만든 때(또는 마지막으로 울린 때)부터, 한 번짜리는 처음부터 (지난 시각의 정시 알림은 예전처럼 "놓친 알림")
   const from = last ?? (r.kind === 'repeat' ? created : new Date(0));
   let next = nextAlert(r, from);
-  // 만들기 전에 이미 지난 "미리" 알림은 건너뛴다 (내일 아침 일정에 오늘 지난 "하루 전" 은 울리지 않음)
-  for (let i = 0; next && next.offset > 0 && next.at < created && i < 50; i++) next = nextAlert(r, next.at);
+  // 만들기 전에 이미 지난 알림은 건너뛴다 (내일 아침 일정에 오늘 지난 "하루 전", 오전 10시에 만든 오늘 하루 종일 일정의
+  // "당일 오전 9시" 는 울리지 않음). 예전 알림(미리 알림 없음)은 그대로 "놓친 알림" 으로.
+  const skipBefore = (n) => n.at.getTime() < created.getTime() - (n.offset > 0 ? 0 : MISSED_AFTER_MS);
+  for (let i = 0; next && (next.offset > 0 || Array.isArray(r.alerts)) && skipBefore(next) && i < 50; i++) next = nextAlert(r, next.at);
   if (!next || next.at > now) return null;
   return { ...next, missed: now - next.at > MISSED_AFTER_MS };
 }
@@ -254,33 +266,43 @@ export function markFired(r, now = new Date()) {
   return { ...r, last: toLocalIso(now), enabled: once ? false : r.enabled };
 }
 
-export const isDone = (r) => !r.enabled && Boolean(r.last) && (r.kind === 'timer' || r.kind === 'at' || r.startup === 'once');
+/** 끝난 알림: 한 번짜리가 울릴 것을 다 울리고 꺼진 것 (하루 전만 울리고 끈 일정은 "끝" 이 아니라 "꺼짐") */
+export function isDone(r) {
+  if (r.enabled || !r.last) return false;
+  if (r.kind === 'timer' || r.startup === 'once') return true;
+  return r.kind === 'at' && !nextAlert(r, validDate(r.last) ?? new Date(0));
+}
+
+/** 다시 켤 때: 끝난 것만 처음부터(울린 기록 지움), 중간에 끈 것은 울린 기록을 지켜 이미 울린 알림이 또 울리지 않게 */
+export const reenable = (r) => ({ ...r, enabled: true, last: isDone(r) ? null : r.last });
+
+/** 하루 종일이면 그날 끝, 아니면 시작 시각 — 한 번짜리 일정이 지났는지 볼 때 */
+function eventEnd(r) {
+  const t = validDate(r.at);
+  if (!t) return null;
+  return r.allDay ? new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1) : t;
+}
+
+/**
+ * 살아 있는 알림 (종 버튼·일정 탭 숫자가 함께 세는 것): 켜져 있고 앞으로 울릴 것이 있거나, 켤 때 알림.
+ * 알림 없는 일정은 울리지 않으니 세지 않는다.
+ */
+export function isLive(r, now = new Date()) {
+  if (!r.enabled) return false;
+  if (r.kind === 'startup') return true;
+  return nextTime(r, now) < Infinity;
+}
+
+/** 알림 없이 달력에만 둔 한 번짜리 일정이 이미 지났는가 */
+export const isPastEvent = (r, now = new Date()) => r.kind === 'at' && (eventEnd(r) ?? Infinity) <= now;
 
 // ---------- 화면용 문구 ----------
 
-// 오늘 14:00 / 내일 09:00 / 10월 3일(금) 09:00 / 2027년 1월 2일(토) 09:00
-export function formatWhen(date, now = new Date()) {
-  const d = new Date(date);
-  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((day(d) - day(now)) / 86_400_000);
-  if (diff === 0) return `오늘 ${hhmm(d)}`;
-  if (diff === 1) return `내일 ${hhmm(d)}`;
-  if (diff === -1) return `어제 ${hhmm(d)}`;
-  const year = d.getFullYear() === now.getFullYear() ? '' : `${d.getFullYear()}년 `;
-  return `${year}${d.getMonth() + 1}월 ${d.getDate()}일(${WEEKDAY[d.getDay()]}) ${hhmm(d)}`;
-}
+// 오늘 14:00 / 모레 09:00 / 10월 3일 (금) 09:00 / 2027년 1월 2일 (토) 09:00 — 날 이름은 time.js 의 dayLabel 한 가지
+export const formatWhen = (date, now = new Date()) => `${dayLabel(date, now)} ${hhmm(new Date(date))}`;
 
-/** 날짜만: 오늘 · 내일 · 10월 3일(금) · 2027년 1월 2일(토) */
-export function formatDay(date, now = new Date()) {
-  const d = new Date(date);
-  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((day(d) - day(now)) / 86_400_000);
-  if (diff === 0) return '오늘';
-  if (diff === 1) return '내일';
-  if (diff === -1) return '어제';
-  const year = d.getFullYear() === now.getFullYear() ? '' : `${d.getFullYear()}년 `;
-  return `${year}${d.getMonth() + 1}월 ${d.getDate()}일(${WEEKDAY[d.getDay()]})`;
-}
+/** 날짜만: 오늘 · 내일 · 모레 · 10월 3일 (금) · 2027년 1월 2일 (토) */
+export const formatDay = (date, now = new Date()) => dayLabel(date, now);
 
 // 알림 설정 자체의 설명: "매주 월·수 09:00", "10분 타이머", "하루에 한 번, 처음 켤 때"
 export function describeReminder(r, now = new Date()) {
@@ -333,12 +355,37 @@ export function occurrencesBetween(r, from, to, limit = 100) {
     if (t && t >= from && t < to) out.push(t);
     return out;
   }
-  let cursor = new Date(from.getTime() - 1);
+  // 만든 날보다 앞의 회차는 없다 (1월 달력에 10월부터 시작한 매주 일정이 보이지 않게)
+  const created = validDate(r.created);
+  const begin = created ? Math.max(from.getTime(), new Date(created.getFullYear(), created.getMonth(), created.getDate()).getTime()) : from.getTime();
+  let cursor = new Date(begin - 1);
   for (let i = 0; i < limit; i++) {
     const next = nextOccurrence(r, cursor);
     if (!next || next >= to) break;
     out.push(next);
     cursor = next;
+  }
+  return out;
+}
+
+/**
+ * 앞으로 울릴 알림들 — 회차(일정 시작) count 번까지. 휴대폰이 앱이 꺼져 있을 때 시스템에 맡겨 둘 목록.
+ * 알림 개수가 아니라 회차로 센다 (매일 일정에 알림 3개여도 count=14 면 2주치)
+ */
+export function upcomingAlerts(r, from, count) {
+  const out = [];
+  const starts = new Set();
+  let cursor = new Date(from);
+  for (let i = 0; i < count * MAX_ALERTS + MAX_ALERTS; i++) {
+    const next = nextAlert(r, cursor);
+    if (!next) break;
+    const key = next.start.getTime();
+    if (!starts.has(key)) {
+      if (starts.size >= count) break;
+      starts.add(key);
+    }
+    out.push(next);
+    cursor = next.at;
   }
   return out;
 }
