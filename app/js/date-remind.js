@@ -6,12 +6,11 @@
 import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { casual as chrono } from '../vendor/chrono.js';
 import { findAllDates } from './core/date-detect.js';
-import { koClock, dayLabel } from './core/time.js';
+import { koClock, dayLabel, WEEKDAY } from './core/time.js';
 import { hintOnce } from './hints.js';
 import { openEventEditor } from './event-editor.js';
 
 export const dateRemindKey = new PluginKey('memoking-date-remind');
-const WEEKDAY = '일월화수목금토';
 const SAME_MS = 60_000; // 알림이 이 안에 있으면 "이미 맞춤"
 
 /** "10월 11일 (일) 오후 3:00" — 오늘·내일·모레는 그렇게 */

@@ -5,6 +5,8 @@
 
 /** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
 export const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
+/** 이 메모를 잠글 때 고른 것 (제목도 숨기기) — 저장마다 같게 */
+const sealOpts = (entry) => ({ hideTitle: entry.meta.extra?.lockHideTitle === true });
 import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey, lockedMayUse } from './memo-lock.js';
 import { isBlankBody, sameBody, conflictCopyBody, extractAttachments } from './memo-file.js';
 import { toLocalIso } from './time.js';
@@ -60,7 +62,9 @@ class LockMethods {
     const id = this.create({ color });
     const entry = this.entries.get(id);
     if (session && !isLockedBody(body)) {
-      entry.body = sealBody(body, session);
+      const hide = this.entries.get(sourceId)?.meta.extra?.lockHideTitle === true;
+      if (hide) entry.meta.extra = { ...entry.meta.extra, lockHideTitle: true };
+      entry.body = sealBody(body, session, { hideTitle: hide });
       this.setLockRefs(entry, body); // 한 번에 쓴다 (첨부 표까지)
     } else {
       entry.body = body;
@@ -91,14 +95,14 @@ class LockMethods {
     // 열쇠를 들고 있는 메모(연 잠긴 메모)인데 파일이 사라져 다시 만드는 중: 풀린 글이 새 파일로 나가지 않게 잠근 채로
     if (!isLockedBody(entry.body)) {
       if (!session || entry.file) return { body };
-      const sealed = sealBody(body, session);
+      const sealed = sealBody(body, session, sealOpts(entry));
       entry.meta.extra = { ...entry.meta.extra, lockRefs: lockRefs(body, sealed) };
       return { body: sealed };
     }
     const plain = session ? this.plainOf(entry) : null;
     if (plain === null) return { refused: true }; // 열지 않았거나, 다른 기기가 다른 비밀번호로 다시 잠금 → 덮어쓰지 않음
     if (entry.file && plain === body) return { same: true };
-    const sealed = sealBody(body, session);
+    const sealed = sealBody(body, session, sealOpts(entry));
     entry.meta.extra = { ...entry.meta.extra, lockRefs: lockRefs(body, sealed) }; // 첨부 정리가 이 메모의 사진을 치우지 않게
     return { body: sealed };
   }
@@ -197,6 +201,7 @@ class LockMethods {
    * — 다른 기기에서 잠그거나 비밀번호를 바꿨을 때, 이 기기를 꺼 둔 사이였어도
    */
   dropUnsafeVersions(id) {
+    if (this.device === 'ai') return; // AI 비서 연결 프로세스는 버전 기록을 건드리지 않는다 (켜져 있는 앱이 맡음)
     const entry = this.entries.get(id);
     const salt = entry && parseLocked(entry.body)?.salt;
     if (!salt) return;
@@ -212,6 +217,11 @@ class LockMethods {
     if (check.some((name) => parseLocked(this.version(id, name) ?? '')?.salt !== salt)) this.purgeVersions(id);
   }
 
+  /** 다른 기기에서 바뀐 글을 받아들였다고 (다시 읽은 것처럼) 알린다 — 열린 화면이 새 글·잠금을 알게 */
+  notifyExternalSoon(id) {
+    setTimeout(() => this.emit('changed', { ids: [id], external: [id], removed: [] }), 0);
+  }
+
   /** 열쇠를 들고 있는 메모인가 (원래 메모가 열려 있는 사본은 제외 — 사본을 따로 열 때는 비밀번호를 묻는다) */
   isCopyLock(id) {
     return this.copyOf.has(id);
@@ -221,12 +231,14 @@ class LockMethods {
    * 잠그기: 지금 본문을 잠근 글로 바꾸고, 잠그기 전 버전 기록(풀린 글)은 지운다
    * keepOpen: 그 메모가 지금 열려 있을 때만 열쇠를 들고 있는다 (목록에서 잠갔으면 바로 비밀번호로 열리게)
    */
-  lock(id, session, { keepOpen = true } = {}) {
+  lock(id, session, { keepOpen = true, hideTitle = false } = {}) {
     const entry = this.entries.get(id);
     if (!entry || isLockedBody(entry.body)) return null;
     const known = entry.body;
     const before = metaSnapshot(entry.meta);
-    entry.body = sealBody(known, session);
+    const { lockHideTitle: _h, ...rest } = entry.meta.extra ?? {};
+    entry.meta.extra = hideTitle ? { ...rest, lockHideTitle: true } : rest;
+    entry.body = sealBody(known, session, { hideTitle });
     this.setLockRefs(entry, known);
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device;
@@ -237,6 +249,7 @@ class LockMethods {
     this.purgeVersions(id);
     if (keepOpen) this.locks.set(id, session);
     else this.locks.delete(id);
+    if (hideTitle) this.finalize(id); // 파일 이름(첫 줄)도 바로 "잠긴 메모" 로
     this.changed([id]);
     return this.get(id);
   }
@@ -249,7 +262,7 @@ class LockMethods {
     const known = entry.body;
     const before = metaSnapshot(entry.meta);
     entry.body = plain;
-    const { lockRefs: _refs, ...extra } = entry.meta.extra ?? {};
+    const { lockRefs: _refs, lockHideTitle: _hide, ...extra } = entry.meta.extra ?? {};
     entry.meta.extra = extra;
     entry.meta.updated = toLocalIso();
     entry.meta.device = this.device; // 이어 쓰기 안내가 엉뚱한 기기 이름을 대지 않게

@@ -400,9 +400,10 @@ $('lock-btn').addEventListener('click', async () => {
     return;
   }
   const locked = await lockDialog({
-    onLock: async (password) => {
+    title: memo?.title ?? '',
+    onLock: async (password, { hideTitle }) => {
       await flush();
-      const r = await api.memo.lock(id, password);
+      const r = await api.memo.lock(id, password, { hideTitle });
       if (r?.error) return r.error;
       memo = { ...memo, ...r };
       return null;

@@ -266,7 +266,8 @@ export class Vault extends EventTarget {
   setReminders(id, reminders) {
     const entry = this.entries.get(id);
     if (!entry) return null;
-    entry.meta.reminders = reminders;
+    // 잠긴 메모의 일정 이름은 머리말(풀린 글)에 남기지 않는다 — 글에서 짐작한 이름이 비밀일 수 있음 (알림엔 메모 제목)
+    entry.meta.reminders = isLockedBody(entry.body) ? reminders.map(({ title: _t, ...r }) => r) : reminders;
     if (entry.file || !isBlankBody(entry.body)) this.write(entry);
     this.changed([id]);
     return entry.meta.reminders;
@@ -338,7 +339,7 @@ export class Vault extends EventTarget {
     const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
     entry.body = body;
     entry.meta.updated = toLocalIso();
-    entry.meta.device = 'phone'; // 이어 쓰기 안내: 다른 기기가 "방금 여기서 고쳤다" 를 알 수 있게
+    entry.meta.device = this.device; // 이어 쓰기 안내: 다른 기기가 "방금 여기서 고쳤다" 를 알 수 있게
     if (!entry.file && isBlankBody(body)) return this.summary(entry);
     if (entry.file) this.keepVersion(id, known);
     // 그사이 다른 기기가 잠금: 저장하지 않음 (쓰던 글을 사본 메모로 남겼으면 copied)
@@ -448,7 +449,7 @@ export class Vault extends EventTarget {
     entry.body = body;
     this.refreshLockRefs(entry); // 되돌린 글의 첨부도 첨부 정리에서 지키게
     entry.meta.updated = toLocalIso();
-    entry.meta.device = 'phone';
+    entry.meta.device = this.device;
     if (this.write(entry, known, { copy: false }) !== true) {
       entry.meta = before;
       return { error: '그사이 다른 기기에서 이 메모를 잠가 되돌리지 못했어요' };
@@ -485,6 +486,13 @@ export class Vault extends EventTarget {
       return;
     }
     if (sameBody(theirs, known) || sameBody(theirs, entry.body) || isBlankBody(theirs)) return;
+    // 이번 쓰기는 글을 바꾸지 않는다(고정·색·알림 등 머리말만): 들어온 글을 그대로 두고 머리말만 더해 쓴다 — 그쪽 글을
+    // 되돌리거나(잠금 풀림 포함) 사본을 만들지 않게. 열린 화면에는 바뀐 글로 알린다
+    if (sameBody(entry.body, known)) {
+      entry.body = theirs;
+      this.notifyExternalSoon(entry.id);
+      return;
+    }
     // 잠근 글이 들어왔다: 같은 비밀번호로 고친 것이면 보통 고침처럼, 잠갔거나 비밀번호를 바꿨으면 덮어쓰지 않음 (core/vault-locks.js)
     if (isLockedBody(theirs)) return this.lockedOnDisk(entry, known, theirs, { copy });
     this.keepVersion(entry.id, theirs, { force: true }); // 버전 기록에서도 되찾을 수 있게
@@ -576,6 +584,7 @@ export class Vault extends EventTarget {
     }
     this.orphans.delete(id);
     this.trashAttachments(this.attachmentsOf(entry)); // 열지 않은 잠긴 메모도 머리말의 표로
+    this.closeLock(id); // 지운 잠긴 메모의 열쇠를 남기지 않는다 (되살리면 다시 비밀번호로)
     this.changed([id]);
     return trashed ?? true; // 휴지통 파일 이름 (되돌리기에 씀)
   }

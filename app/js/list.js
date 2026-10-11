@@ -533,6 +533,7 @@ function showHandoff(h) {
   const open = document.createElement('button');
   open.type = 'button';
   open.textContent = '열기';
+  bar.dataset.id = h.id;
   open.addEventListener('click', () => {
     bar.hidden = true;
     api.memo.open(h.id);
@@ -1094,6 +1095,9 @@ document.addEventListener('keydown', (e) => {
 
 api.on('memos:changed', (memos) => {
   state.memos = memos;
+  // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
+  const hb = $('handoff-bar');
+  if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;
   $('count-memos').textContent = String(memos.length);
   if (activeTab !== 'memos') return remindersTab.refresh(); // 메모 제목이 바뀌면 알림 탭에도
   if (state.query) runSearch();

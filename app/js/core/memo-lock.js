@@ -16,6 +16,7 @@ export const LOCK_VERSION = 'v1';
 export const LOCK_ITERATIONS = 310_000;
 const MIN_ITERATIONS = 1000;
 const MAX_ITERATIONS = 2_000_000;
+export const LOCKED_TITLE = '잠긴 메모';
 export const LOCK_NOTICE = '🔒 잠긴 메모예요. 메모킹에서 비밀번호를 넣으면 열려요.';
 const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // 잠긴 메모 파일의 본문 전체 모양: (제목 줄) (안내 한 줄) 암호문 주석 — 그 밖의 글이 있으면 잠긴 메모가 아니다
@@ -76,13 +77,17 @@ export async function openLock(lockedBody, password) {
   return { plain, session };
 }
 
-/** 세션 열쇠로 잠근 본문 (동기 — 저장마다 새 IV) */
-export function sealBody(plain, session) {
+/**
+ * 세션 열쇠로 잠근 본문 (동기 — 저장마다 새 IV)
+ * hideTitle: 제목도 숨긴다 (목록·파일 이름에 "잠긴 메모") — 잠글 때 사용자가 고르고 머리말 lockHideTitle 에 남는다
+ */
+export function sealBody(plain, session, { hideTitle = false } = {}) {
   const iv = random(12);
   const data = gcm(session.key, iv).encrypt(new TextEncoder().encode(String(plain)));
-  const title = extractTitle(String(plain));
-  // 제목이 없어도 "제목 없음" 줄을 둔다 — 없으면 안내 문구가 제목(파일 이름·목록·위젯)이 돼 버린다
-  const head = `# ${title && title !== UNTITLED ? title.replace(/^#+\s*/, '') : UNTITLED}\n\n`;
+  // 목록에 보일 제목(첫 줄) — 숨기기를 골랐거나 제목이 없으면 "잠긴 메모"
+  // (제목 줄이 늘 있어야 안내 문구가 제목·파일 이름이 되지 않는다)
+  const title = hideTitle ? '' : extractTitle(String(plain));
+  const head = `# ${title && title !== UNTITLED ? title.replace(/^#+\s*/, '') : LOCKED_TITLE}\n\n`;
   return `${head}${LOCK_NOTICE}\n\n<!-- memoking-lock ${LOCK_VERSION} n=${session.iterations} s=${session.salt} i=${b64(iv)} c=${b64(data)} -->\n`;
 }
 
@@ -122,8 +127,8 @@ export function lockedMayUse(entry, src) {
 }
 
 /** 한 번에 잠그기 (테스트·간단한 쓰임) */
-export async function lockBody(plain, password, o) {
-  return sealBody(plain, await newLockSession(password, o));
+export async function lockBody(plain, password, o = {}) {
+  return sealBody(plain, await newLockSession(password, o), o);
 }
 
 /** 한 번에 풀기 */

@@ -394,12 +394,13 @@ memoSheet.addEventListener('click', async (e) => {
         break;
       }
       if (await lockDialog({
-        onLock: async (password) => {
+        title: memo.title,
+        onLock: async (password, { hideTitle }) => {
           try {
             note.flush();
             const session = await newLockSession(password);
             // 목록에서 잠갔으면 열쇠를 들고 있지 않는다 — 바로 눌러도 비밀번호를 묻게
-            if (!app.vault.lock(id, session, { keepOpen: note.currentId() === id })) return '잠그지 못했어요. 그사이 다른 기기에서 잠갔을 수 있어요';
+            if (!app.vault.lock(id, session, { keepOpen: note.currentId() === id, hideTitle })) return '잠그지 못했어요. 그사이 다른 기기에서 잠갔을 수 있어요';
             if (note.currentId() === id) note.lockChanged(true);
             return null;
           } catch (err) {

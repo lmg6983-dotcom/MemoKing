@@ -268,3 +268,38 @@ test('잠긴 메모는 비밀번호로 연 동안만 버전을 되돌림', async
   assert.ok(v.restoreVersion(id, name)?.error, '닫힌 잠긴 메모는 되돌리지 않음');
   v.close();
 });
+
+test('고정·알림처럼 머리말만 쓰는 사이 다른 기기가 잠갔으면: 잠금을 되돌리지 않고 머리말만 더함', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '# 약속\n\n내일');
+  const file = path.join(root, v.get(id).file);
+  const text = fs.readFileSync(file, 'utf8');
+  const head = /^---\n[\s\S]*?\n---\n/.exec(text)[0];
+  const { lockBody } = await import('../app/js/core/memo-lock.js');
+  await new Promise((r) => setTimeout(r, 20));
+  fs.writeFileSync(file, head + await lockBody('# 약속\n\n내일', 'phone999', FAST));
+  v.setReminders(id, [{ id: 'r1', kind: 'at', at: new Date(Date.now() + 86_400_000).toISOString(), title: '비밀 이름', alerts: [10], action: 'notify', enabled: true, created: new Date().toISOString(), last: null }]);
+  const after = fs.readFileSync(file, 'utf8');
+  assert.match(after, /memoking-lock/, '잠금은 그대로');
+  assert.match(after, /reminders:/, '알림은 더해짐');
+  assert.equal(v.list().length, 1, '사본을 만들지 않음');
+  v.close();
+});
+
+test('제목도 숨겨 잠근 메모는 이후 저장에도 제목을 숨김', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '카드 비번 1234\n\n메모');
+  v.lock(id, await newLockSession('사과1234', FAST), { hideTitle: true });
+  v.save(id, '카드 비번 1234\n\n메모 더');
+  v.finalize(id);
+  const file = v.get(id).file;
+  assert.ok(!file.includes('1234') && !fs.readFileSync(path.join(root, file), 'utf8').includes('1234'));
+  assert.equal(v.list().find((m) => m.id === id).title, '잠긴 메모');
+  v.close();
+});

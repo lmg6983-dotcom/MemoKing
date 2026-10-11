@@ -2745,11 +2745,11 @@ function registerIpc() {
     return { ...memo, onTop: settings.onTop[id] === true, alarm, capture, stack: stackState(id) };
   });
   // 잠금 메모: 열쇠 만들기는 느려서(비밀번호 → PBKDF2) 비동기, 잠그고 푸는 저장은 vault 가 동기로
-  ipcMain.handle('memo:lock', async (_e, id, password) => {
+  ipcMain.handle('memo:lock', async (_e, id, password, opts) => {
     try {
       const session = await newLockSession(String(password ?? ''));
       // 잠그는 사이 창이 닫혔으면 열쇠는 들고 있지 않는다
-      return vault?.lock(String(id), session, { keepOpen: noteWins.has(String(id)) }) ?? { error: '잠그지 못했어요. 이미 잠겼거나 그사이 다른 기기에서 잠갔을 수 있어요' };
+      return vault?.lock(String(id), session, { keepOpen: noteWins.has(String(id)), hideTitle: opts?.hideTitle === true }) ?? { error: '잠그지 못했어요. 이미 잠겼거나 그사이 다른 기기에서 잠갔을 수 있어요' };
     } catch (err) {
       return { error: err.message };
     }
@@ -3150,6 +3150,15 @@ app.on('second-instance', () => createListWindow());
 app.whenReady().then(async () => {
   if (!gotLock) return;
   app.setAppUserModelId(APP_ID);
+  // AI 비서 연결이 예전 설치 위치를 가리키면(업데이트로 실행 파일 위치가 바뀜) 켤 때 새 위치로 고쳐 둔다
+  if (app.isPackaged) {
+    try {
+      const mcp = mcpStatus();
+      if (mcp.stale && !mcp.broken) mcpConnect(true);
+    } catch (err) {
+      console.warn('AI 비서 연결 확인 실패', err);
+    }
+  }
   // 권한은 메모 창의 마이크(음성 메모 녹음)만 — 카메라·위치·화면 등은 쓰지 않는다
   const isNoteWindow = (wc) => {
     try {

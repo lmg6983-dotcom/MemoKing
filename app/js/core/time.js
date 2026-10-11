@@ -22,7 +22,7 @@ export const koClock = (d) => `${d.getHours() < 12 ? '오전' : '오후'} ${d.ge
 /** 10월 4일 */
 export const koMonthDay = (d) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
 
-const WEEKDAY = '일월화수목금토';
+export const WEEKDAY = '일월화수목금토';
 // 현지 날짜(연·월·일)를 UTC 날짜 수로 — 시간대·서머타임과 상관없이 하루 차이가 정확히 1
 const dayNumber = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000;
 /** 오늘부터 며칠 뒤인지 (어제 -1 · 오늘 0 · 내일 1) */

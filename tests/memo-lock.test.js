@@ -61,9 +61,9 @@ test('잠금 형식 글을 붙여 넣은 보통 메모는 잠긴 메모가 아�
   assert.ok(isLockedBody(comment), '제목·안내 없이 암호문만');
 });
 
-test('제목 없는 메모를 잠가도 안내 문구가 제목이 되지 않음 ("제목 없음")', async () => {
+test('제목 없는 메모를 잠가도 안내 문구가 제목이 되지 않음 ("잠긴 메모")', async () => {
   const locked = await lockBody('![사진](attachments/a.png)\n', '사과1234', FAST);
-  assert.equal(extractTitle(locked), '제목 없음');
+  assert.equal(extractTitle(locked), '잠긴 메모');
   assert.ok(isLockedBody(locked));
 });
 
@@ -73,4 +73,12 @@ test('파일의 반복 횟수가 망가졌으면 오래 멈추지 않고 바로 
     const broken = locked.replace(/n=\d+/, `n=${n}`);
     await assert.rejects(() => unlockBody(broken, '사과1234'), /망가진/);
   }
+});
+
+test('제목도 숨기기를 고르면 첫 줄이 잠근 파일에 드러나지 않음', async () => {
+  const shown = await lockBody('은행 비밀번호 4821\n둘째 줄\n', '사과1234', FAST);
+  assert.equal(extractTitle(shown), '은행 비밀번호 4821', '고르지 않으면 제목(첫 줄)은 보임 — 잠글 때 창에 보여 줌');
+  const hidden = await lockBody('은행 비밀번호 4821\n둘째 줄\n', '사과1234', { ...FAST, hideTitle: true });
+  assert.ok(!hidden.includes('4821'));
+  assert.equal(extractTitle(hidden), '잠긴 메모');
 });

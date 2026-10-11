@@ -1715,6 +1715,7 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .memo-locked #bell-btn, .memo-locked #links-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
 .lock-dialog h2 { margin-bottom: 8px; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
+.lock-hide-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 4px 0; font-size: 13px; color: var(--muted); }
 
 
 /* 일정과 알림 패널: 이름 · 하루 종일 · 미리 알림 (reminder-panel.js) */

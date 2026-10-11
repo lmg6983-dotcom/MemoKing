@@ -17,25 +17,30 @@ function passwordField(label, id) {
 }
 
 /**
- * 잠글 때: 비밀번호 두 번 → 맞으면 onLock(비밀번호) (실패하면 그 이유를 창에 보여 줌)
- * @param {{ onLock: (password: string) => Promise<string|null> }} o onLock 은 실패 이유 또는 null
+ * 잠글 때: 비밀번호 두 번 → 맞으면 onLock(비밀번호, { hideTitle }) (실패하면 그 이유를 창에 보여 줌)
+ *   title: 목록에 보일 제목(첫 줄) — 그대로 보여 주고, "제목도 숨기기" 를 고를 수 있게
+ * @param {{ onLock: (password: string, o: { hideTitle: boolean }) => Promise<string|null>, title?: string }} o onLock 은 실패 이유 또는 null
  * @returns {Promise<boolean>} 잠갔는지
  */
-export function lockDialog({ onLock }) {
+export function lockDialog({ onLock, title = '' }) {
   return new Promise((resolve) => {
     const dialog = el('dialog', { class: 'dialog lock-dialog', 'aria-labelledby': 'lock-dialog-title' });
     const form = el('form', { method: 'dialog' });
     const first = passwordField('비밀번호 (4자 이상)', 'lock-pass-1');
     const second = passwordField('한 번 더', 'lock-pass-2');
     const error = el('p', { class: 'lock-error', role: 'alert' });
+    // 목록에 보일 제목 — 첫 줄이 비밀이면 숨길 수 있게
+    const hideRow = el('label', { class: 'lock-hide-title' });
+    const hide = el('input', { type: 'checkbox', class: 'switch', id: 'lock-hide-title' });
+    hideRow.append(el('span', {}, title ? `제목도 숨기기 (목록에 "${title}" 대신 "잠긴 메모")` : '제목도 숨기기'), hide);
     const cancel = el('button', { type: 'button', class: 'btn' }, '취소');
     const ok = el('button', { type: 'submit', class: 'btn primary' }, '잠그기');
     const actions = el('div', { class: 'dialog-actions' });
     actions.append(cancel, ok);
     form.append(
       el('h2', { id: 'lock-dialog-title' }, '메모 잠그기'),
-      el('p', { class: 'lock-note' }, '비밀번호를 잊으면 아무도 열 수 없어요. 메모킹도 되찾아 드릴 수 없어요.\n제목은 목록에 보이고, 넣은 사진과 파일은 잠기지 않아요.'),
-      first.wrap, second.wrap, error, actions,
+      el('p', { class: 'lock-note' }, '비밀번호를 잊으면 아무도 열 수 없어요. 메모킹도 되찾아 드릴 수 없어요.\n제목(첫 줄)은 목록에 보이고, 넣은 사진과 파일은 잠기지 않아요.'),
+      first.wrap, second.wrap, hideRow, error, actions,
     );
     dialog.append(form);
     document.body.append(dialog);
@@ -67,7 +72,7 @@ export function lockDialog({ onLock }) {
       ok.textContent = '잠그는 중…';
       let fail;
       try {
-        fail = await onLock(pw);
+        fail = await onLock(pw, { hideTitle: hide.checked });
       } catch (err) {
         fail = err?.message || '잠그지 못했어요';
       }

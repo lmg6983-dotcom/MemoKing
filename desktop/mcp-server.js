@@ -157,12 +157,17 @@ server.registerTool('read_memo', {
     const v = openVault();
     const m = findMemo(v, memo);
     if (!m) return fail(`"${memo}" 메모를 찾지 못했어요. search_memos 로 먼저 찾아 주세요.`);
+    // 제목·id 가 딱 맞지 않아 찾기로 고른 메모면 그렇다고 알린다 (다른 메모를 그 메모로 오해하지 않게)
+    const exactHit = m.id === String(memo).trim() || m.title.toLowerCase() === String(memo).trim().toLowerCase();
     if (isLockedBody(m.body)) return fail(`"${m.title}" 은(는) 잠긴 메모라 내용을 볼 수 없어요.`);
     const reminders = (m.reminders ?? []).filter((r) => r.enabled).map((r) => {
       const next = nextTime(r);
       return { when: describeReminder(r), next: Number.isFinite(next) ? new Date(next).toISOString() : null };
     });
-    return text({ id: m.id, title: m.title, file: m.file, updated: m.updated, tags: extractTags(m.body), reminders, content: m.body });
+    return text({
+      ...(exactHit ? {} : { note: `"${memo}" 와(과) 제목이 같은 메모가 없어 가장 비슷한 메모를 읽었어요: "${m.title}"` }),
+      id: m.id, title: m.title, file: m.file, updated: m.updated, tags: extractTags(m.body), reminders, content: m.body,
+    });
   } catch (err) {
     return fail(err.message);
   }

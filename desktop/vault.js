@@ -311,7 +311,8 @@ export class Vault extends EventEmitter {
   setReminders(id, reminders) {
     const entry = this.entries.get(id);
     if (!entry) return null;
-    entry.meta.reminders = reminders;
+    // 잠긴 메모의 일정 이름은 머리말(풀린 글)에 남기지 않는다 — 글에서 짐작한 이름이 비밀일 수 있음 (알림엔 메모 제목)
+    entry.meta.reminders = isLockedBody(entry.body) ? reminders.map(({ title: _t, ...r }) => r) : reminders;
     if (entry.file || !isBlankBody(entry.body)) this.write(entry);
     this.changed([id]);
     return entry.meta.reminders;
@@ -528,6 +529,13 @@ export class Vault extends EventEmitter {
       return; // 파일이 없어졌으면 그냥 다시 쓴다
     }
     if (sameBody(theirs, known) || sameBody(theirs, entry.body) || isBlankBody(theirs)) return;
+    // 이번 쓰기는 글을 바꾸지 않는다(고정·색·알림 등 머리말만): 들어온 글을 그대로 두고 머리말만 더해 쓴다 — 그쪽 글을
+    // 되돌리거나(잠금 풀림 포함) 사본을 만들지 않게. 열린 화면에는 바뀐 글로 알린다
+    if (sameBody(entry.body, known)) {
+      entry.body = theirs;
+      this.notifyExternalSoon(entry.id);
+      return;
+    }
     // 잠근 글이 들어왔다: 같은 비밀번호로 고친 것이면 보통 고침처럼, 잠갔거나 비밀번호를 바꿨으면 덮어쓰지 않음 (core/vault-locks.js)
     if (isLockedBody(theirs)) return this.lockedOnDisk(entry, known, theirs, { copy });
     this.keepVersion(entry.id, theirs, { force: true }); // 버전 기록에서도 되찾을 수 있게
@@ -622,6 +630,7 @@ export class Vault extends EventEmitter {
     }
     this.orphans.delete(id);
     this.trashAttachments(this.attachmentsOf(entry)); // 열지 않은 잠긴 메모도 머리말의 표로
+    this.closeLock(id); // 지운 잠긴 메모의 열쇠를 남기지 않는다 (되살리면 다시 비밀번호로)
     this.changed([id]);
     return trashed ?? true; // 휴지통 파일 이름 (되돌리기에 씀)
   }
