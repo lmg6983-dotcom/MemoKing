@@ -293,7 +293,8 @@ export function isDone(r) {
 }
 
 /** 다시 켤 때: 끝난 것만 처음부터(울린 기록 지움), 중간에 끈 것은 울린 기록을 지켜 이미 울린 알림이 또 울리지 않게 */
-export const reenable = (r) => ({ ...r, enabled: true, last: isDone(r) ? null : r.last });
+// (이미 지난 한 번짜리 일정은 다시 켜도 지난 알림을 "놓친 알림" 으로 울리지 않는다)
+export const reenable = (r, now = new Date()) => ({ ...r, enabled: true, last: isDone(r) && !isPastEvent(r, now) ? null : r.last });
 
 /** 하루 종일이면 그날 끝, 아니면 시작 시각 — 한 번짜리 일정이 지났는지 볼 때 */
 function eventEnd(r) {

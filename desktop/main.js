@@ -2790,7 +2790,7 @@ function registerIpc() {
     try {
       const r = typeof body === 'string' && vault ? vault.save(id, body) : null;
       // 창을 닫는 순간인데 잠긴 메모라 저장되지 않았다: 쓰던 글을 사본 메모로 (이 창에서 연 열쇠가 있으면 그 열쇠로 잠근 채)
-      if (r?.refused && !r.copied && !isBlankBody(body)) {
+      if (r?.refused && !r.copied && !r.invalid && !isBlankBody(body)) {
         if (vault.locks.has(id)) vault.importCopyOf(id, body, { color: vault.get(id)?.color });
         else vault.import({ body, color: vault.get(id)?.color });
       }

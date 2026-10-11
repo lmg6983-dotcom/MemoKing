@@ -114,17 +114,6 @@ export function lockRefs(plain, lockedBody) {
   return p ? [...new Set(extractAttachments(plain))].map((src) => lockRefKey(src, p.salt)) : [];
 }
 
-/**
- * 이 잠긴 메모(열지 않음)가 이 첨부를 쓸 수 있는가 — 표가 없는 예전 잠금이면 알 수 없으니 true (치우지 않음)
- * @param {{ body: string, meta?: { extra?: { lockRefs?: string[] } } }} entry
- */
-export function lockedMayUse(entry, src) {
-  const p = parseLocked(entry.body);
-  if (!p) return false;
-  const refs = entry.meta?.extra?.lockRefs;
-  if (!Array.isArray(refs)) return true;
-  return refs.includes(lockRefKey(src, p.salt));
-}
 
 /** 한 번에 잠그기 (테스트·간단한 쓰임) */
 export async function lockBody(plain, password, o = {}) {

@@ -110,6 +110,7 @@ export function flush() {
   try {
     const r = app.vault.save(id, body);
     if (r?.invalid) {
+      refusedSave = false; // 사본으로 남기지 않는다 (잠금 형식 글은 사본도 열 수 없다)
       setStatus('잠금 메모 형식의 글은 그대로 저장할 수 없어요. 글을 고쳐 주세요', true);
       return;
     }

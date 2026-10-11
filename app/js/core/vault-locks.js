@@ -2,8 +2,14 @@
 //   비밀번호로 만든 열쇠(세션)는 메모를 연 동안만 vault.locks 에 — 닫으면 closeLock 으로 잊는다. 열쇠 만들기(느림)는 부르는 쪽이 비동기로
 //   쓰는 것: vault.entries · vault.locks · vault.lockCopies · vault.device · vault.create · vault.write · vault.changed · vault.get
 //            vault.keepVersion · vault.purgeVersions · vault.versions · vault.version · vault.rescanSoon · vault.copyOf(Map)
+//            vault.newEntry · vault.summary · vault.import · vault.readDiskIfChanged (플랫폼마다: 파일 읽기만)
+//   저장(save)·버전 되돌리기·덮어쓰기 전 확인(keepChangedOnDisk)도 여기 — PC·휴대폰이 같은 규칙으로
 
-/** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
+import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey } from './memo-lock.js';
+import { isBlankBody, sameBody, conflictCopyBody, extractAttachments } from './memo-file.js';
+import { toLocalIso } from './time.js';
+import { versionTime } from './versions.js';
+
 /**
  * 잠긴 메모(열지 않음)가 쓰는 첨부 파일들 — 머리말의 표로 후보(files) 중에서 고른다 (표가 없는 예전 잠금이면 알 수 없어 없음)
  * 풀린 메모면 글에서 바로
@@ -17,15 +23,99 @@ export function lockedFiles(body, meta, files) {
   return files().filter((src) => want.has(lockRefKey(src, salt)));
 }
 
+/** 머리말을 바꾸기 전 모습 (저장이 거절되면 되돌린다) */
 export const metaSnapshot = (meta) => ({ ...meta, extra: { ...meta.extra } });
 /** 이 메모를 잠글 때 고른 것 (제목도 숨기기) — 저장마다 같게 */
 const sealOpts = (entry) => ({ hideTitle: entry.meta.extra?.lockHideTitle === true });
-import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey } from './memo-lock.js';
-import { isBlankBody, sameBody, conflictCopyBody, extractAttachments } from './memo-file.js';
-import { toLocalIso } from './time.js';
-import { versionTime } from './versions.js';
 
 class LockMethods {
+  /** 메모 저장 (잠긴 메모는 다시 잠근 글로). 저장되지 않았으면 refused(사본을 남겼으면 copied, 잠금 형식 글이면 invalid) */
+  save(id, body) {
+    let entry = this.entries.get(id);
+    if (!entry) {
+      // 쓰는 사이 파일이 지워졌다면, 화면에 남아 있는 내용으로 되살린다.
+      entry = this.newEntry(id);
+      this.entries.set(id, entry);
+    }
+    const before = metaSnapshot(entry.meta); // 쓰지 못하면 머리말을 되돌린다 (잠근 글의 첨부 표 포함)
+    // 잠긴 메모: 연 동안만 저장할 수 있고, 저장은 늘 다시 잠근 글로
+    const sealed = this.sealForSave(entry, body);
+    if (sealed.same) return this.summary(entry);
+    if (sealed.refused) {
+      entry.meta = before;
+      return { ...this.summary(entry), refused: true, invalid: Boolean(sealed.invalid) }; // 저장되지 않았다고 화면이 알게
+    }
+    body = sealed.body;
+    if (entry.body === body && entry.file) return this.summary(entry);
+    const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
+    entry.body = body;
+    entry.meta.updated = toLocalIso();
+    entry.meta.device = this.device; // 이어 쓰기 안내: 다른 기기가 "방금 여기서 고쳤다" 를 알 수 있게
+    if (!entry.file && isBlankBody(body)) return this.summary(entry);
+    if (entry.file) this.keepVersion(id, known);
+    // 그사이 다른 기기가 잠금: 저장하지 않음 (쓰던 글을 사본 메모로 남겼으면 copied)
+    const wrote = this.write(entry, known);
+    if (wrote !== true) {
+      entry.meta = before; // 쓰지 않았으니 머리말도 그대로
+      return { ...this.summary(entry), refused: true, copied: wrote === 'copied' };
+    }
+    this.changed([id]);
+    return this.summary(entry);
+  }
+
+  // 지금 내용도 버전으로 남겨 두고(되돌리기를 되돌릴 수 있게) 고른 버전으로 바꾼다
+  restoreVersion(id, name) {
+    const body = this.version(id, name);
+    const entry = this.entries.get(id);
+    if (body == null || !entry) return null;
+    // 잠긴 메모에 풀린 버전(또는 다른 비밀번호의 버전)을 덮어 잠금을 풀거나 비밀번호를 되돌리지 않게
+    if (!this.canRestore(entry, body)) return { error: '잠긴 메모에는 잠기기 전 버전을 되돌릴 수 없어요' };
+    this.keepVersion(id, entry.body, { force: true });
+    const before = metaSnapshot(entry.meta);
+    const known = entry.body;
+    entry.body = body;
+    this.refreshLockRefs(entry); // 되돌린 글의 첨부도 첨부 정리에서 지키게
+    entry.meta.updated = toLocalIso();
+    entry.meta.device = this.device;
+    if (this.write(entry, known, { copy: false }) !== true) {
+      entry.meta = before;
+      return { error: '그사이 다른 기기에서 이 메모가 바뀌어 되돌리지 못했어요. 다시 해 주세요' };
+    }
+    this.changed([id]);
+    return this.get(id);
+  }
+
+  /**
+   * 마지막으로 읽은(쓴) 뒤 다른 기기(동기화)가 이 파일을 바꿨는데 아직 알아채기 전에 덮어쓰려 할 때 (write 가 부른다)
+   *   undefined: 그대로 쓴다 · 'locked' / 'copied': 쓰지 않음(잠금) · 'skipped': 쓰지 않음(파일이 사라짐, 머리말만이라)
+   */
+  keepChangedOnDisk(entry, known, { copy = true } = {}) {
+    const disk = this.readDiskIfChanged(entry); // null: 그대로(또는 못 읽음) · 'missing' · { body, meta }
+    if (disk === 'missing') {
+      // 글을 고친 저장이면 되살려 쓰지만, 머리말만 쓰는 것이면(다른 기기가 이름을 바꿨거나 지움) 쓰지 않고 다시 읽는다
+      // — 다른 기기가 "제목도 숨기기" 로 잠그며 이름을 바꾼 메모를 풀린 글로 되살리지 않게
+      if (!sameBody(entry.body, known)) return undefined;
+      this.rescanSoon();
+      return 'skipped';
+    }
+    if (!disk) return undefined;
+    const theirs = disk.body;
+    if (sameBody(theirs, known) || sameBody(theirs, entry.body) || isBlankBody(theirs)) return undefined;
+    // 이번 쓰기는 글을 바꾸지 않는다(고정·색·알림 등 머리말만): 들어온 글을 그대로 두고 머리말만 더해 쓴다
+    if (sameBody(entry.body, known)) return this.adoptTheirs(entry, theirs, disk.meta);
+    // 잠근 글이 들어왔다: 같은 비밀번호로 고친 것이면 보통 고침처럼, 잠갔거나 비밀번호를 바꿨으면 덮어쓰지 않음
+    if (isLockedBody(theirs)) return this.lockedOnDisk(entry, known, theirs, { copy });
+    if (!copy) {
+      // 잠그기·풀기·되돌리기 중: 그쪽 글을 덮어쓰지 않고 멈춘다 (부르는 쪽이 "다시 해 주세요")
+      entry.body = known;
+      this.rescanSoon();
+      return 'locked';
+    }
+    this.keepVersion(entry.id, theirs, { force: true }); // 버전 기록에서도 되찾을 수 있게
+    this.import({ body: conflictCopyBody(theirs), color: entry.meta.color });
+    return undefined;
+  }
+
   /** 이 메모의 본문 (잠겼으면 세션으로 푼 글, 못 풀면 null) */
   plainOf(entry) {
     if (!isLockedBody(entry.body)) return entry.body;
@@ -136,8 +226,14 @@ class LockMethods {
     const session = this.locks.get(entry.id);
     const theirsPlain = session ? unsealBody(theirs, session) : null;
     if (theirsPlain !== null) {
+      if (!copy) {
+        // 잠그기·풀기·되돌리기 중 같은 비밀번호로 다른 기기가 고쳤다: 그쪽 글을 덮어쓰지 않고 멈춘다 (다시 하면 새 글로)
+        entry.body = known;
+        this.rescanSoon();
+        return 'locked';
+      }
       this.keepVersion(entry.id, theirs, { force: true });
-      if (copy && !isBlankBody(theirsPlain)) this.importCopyOf(entry.id, conflictCopyBody(theirsPlain), { color: entry.meta.color });
+      if (!isBlankBody(theirsPlain)) this.importCopyOf(entry.id, conflictCopyBody(theirsPlain), { color: entry.meta.color });
       return undefined;
     }
     const mine = entry.body;

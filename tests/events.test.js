@@ -133,7 +133,10 @@ test('다 울리고 끝난 일정을 다시 켜면 처음부터', () => {
   const r = event({ at: iso(2026, 10, 5, 15, 0), alerts: [30] });
   const done = markFired(r, at(2026, 10, 5, 14, 30));
   assert.equal(isDone(done), true);
-  assert.equal(reenable(done).last, null);
+  assert.equal(reenable(done, at(2026, 10, 5, 14, 40)).last, null, '일정 전이면 처음부터');
+  const late = reenable(done, at(2026, 10, 6, 9, 0));
+  assert.equal(late.last, done.last, '이미 지난 일정은 울린 기록을 지킴');
+  assert.equal(dueOccurrence(late, at(2026, 10, 6, 9, 0)), null, '지난 알림이 놓친 알림으로 울리지 않음');
 });
 
 test('오전 10시에 만든 오늘 하루 종일 일정: 당일 오전 9시는 "놓친 알림" 으로 울리지 않음', () => {

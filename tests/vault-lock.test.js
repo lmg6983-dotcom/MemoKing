@@ -370,3 +370,26 @@ test('휴지통에서 되살린 잠긴 메모는 그 첨부도 함께 돌아옴'
     v.close();
   }
 });
+
+test('잠금 풀기 직전 같은 비밀번호로 다른 기기가 고쳤으면: 덮어쓰지 않고 멈춤 (그쪽 글이 사라지지 않게)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  try {
+    v.open();
+    const id = v.create();
+    v.save(id, '# 일기\n\n처음');
+    const session = await newLockSession('사과1234', FAST);
+    v.lock(id, session);
+    const file = path.join(root, v.get(id).file);
+    const head = /^---\n[\s\S]*?\n---\n/.exec(fs.readFileSync(file, 'utf8'))[0];
+    const { sealBody } = await import('../app/js/core/memo-lock.js');
+    await new Promise((r) => setTimeout(r, 20));
+    fs.writeFileSync(file, head + sealBody('# 일기\n\n휴대폰에서 고친 글', session));
+    assert.equal(v.unlock(id), null);
+    const { unsealBody } = await import('../app/js/core/memo-lock.js');
+    const body = fs.readFileSync(file, 'utf8').slice(head.length);
+    assert.equal(unsealBody(body, session), '# 일기\n\n휴대폰에서 고친 글');
+  } finally {
+    v.close();
+  }
+});
