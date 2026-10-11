@@ -1,7 +1,7 @@
 // 일정 추가·고치기 창 (PC·휴대폰 같음) — 구글 캘린더처럼: 일정 이름과 때를 보여 주고, "언제 미리 알릴지"는 사용자가 고른다.
 //   미리 알림은 여러 개 (정시 · 10분 전 · 30분 전 · 1시간 전 · 하루 전 · 일주일 전 / 하루 종일이면 당일·전날·일주일 전 오전 9시)
 //   아무것도 고르지 않으면 "알림 없음" — 달력에만 보인다. 고른 알림은 다음 일정의 기본값으로 기억한다.
-import { ALERT_PRESETS, DEFAULT_ALERTS, alertLabel, pendingAlerts } from './core/reminders.js';
+import { ALERT_PRESETS, DEFAULT_ALERTS, alertLabel, pendingAlerts, fallbackAlert } from './core/reminders.js';
 import { koClock, dayLabel } from './core/time.js';
 
 const KEY = 'memoking.eventAlerts';
@@ -99,7 +99,8 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
         return b;
       }));
       const active = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel) });
-      none.textContent = active.length ? '' : '알림 없이 달력에만 보여요';
+      const fb = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay) });
+      none.textContent = active.length ? '' : fb.length ? `고른 알림 시각이 지나 ${alertLabel(fb[0], isAllDay)}에 알려요` : '알림 없이 달력에만 보여요';
     }
     allDaySwitch.addEventListener('change', () => {
       isAllDay = allDaySwitch.checked;
@@ -121,7 +122,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
     });
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const chosen = pendingAlerts([...picked[kind()]], startAt(), { repeat: Boolean(repeatLabel) });
+      const chosen = pendingAlerts([...picked[kind()]], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay) });
       // 기본값으로는 고른 것을 그대로 (이번 일정엔 이미 지나 빠진 "하루 전" 도 다음 일정엔 다시 고른 채로)
       remember(kind(), [...picked[kind()]].sort((a, b) => b - a));
       finish({ title: name.value.replace(/\s+/g, ' ').trim(), allDay: isAllDay, start: startAt(), alerts: chosen });

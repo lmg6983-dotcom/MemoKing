@@ -2357,8 +2357,9 @@ function initStt() {
     // 말한 사람을 나눈 뒤: 열린 메모면 그 창이 음성 카드를 고치고, 닫혔으면 파일을 직접
     onSpeakers: ({ memoId, src, text }) => {
       const win = noteWins.get(memoId);
-      if (win && !win.isDestroyed()) return win.webContents.send('stt:speakers', { src, text });
-      // 창을 닫은 잠긴 메모: 들고 있던 열쇠로 잠깐 열어 넣고 다시 잠근다 (열쇠가 없으면 넣지 못함 — 잠긴 글은 고칠 수 없다)
+      // 편집기가 떠 있는 창에만 (잠긴 메모의 비밀번호 화면이면 창은 받을 수 없다 — 아래에서 파일에)
+      if (win && !win.isDestroyed() && !vault?.get(memoId)?.needsPassword) return win.webContents.send('stt:speakers', { src, text });
+      // 창을 닫은(또는 아직 비밀번호를 넣지 않은) 잠긴 메모: 들고 있던 열쇠로 잠깐 열어 넣고 다시 잠근다 (열쇠가 없으면 넣지 못함 — 잠긴 글은 고칠 수 없다)
       const held = heldLocks.get(memoId);
       heldLocks.delete(memoId);
       const opened = Boolean(held && vault?.get(memoId)?.needsPassword && vault.openLock(memoId, held.session));
@@ -2366,7 +2367,7 @@ function initStt() {
       const memo = vault?.get(memoId);
       const next = memo && !memo.needsPassword && replaceTranscript(memo.body, src, text);
       if (next && next !== memo.body) vault.save(memoId, next);
-      if (opened && !noteWins.has(memoId)) vault.closeLock(memoId);
+      if (opened) vault.closeLock(memoId); // 창이 비밀번호 화면이면 열쇠는 그 화면이 다시 받는다
     },
   });
 }
@@ -2854,7 +2855,7 @@ function registerIpc() {
   ipcMain.handle('memo:version', (_e, id, name) => vault?.version(String(id), String(name)) ?? null);
   ipcMain.handle('memo:restore-version', (_e, id, name) => {
     const restored = vault?.restoreVersion(String(id), String(name)) ?? null;
-    if (restored) noteWins.get(String(id))?.setTitle(restored.title);
+    if (restored && !restored.error) noteWins.get(String(id))?.setTitle(restored.title);
     return restored;
   });
   ipcMain.handle('memo:links', (_e, id) => vault?.links(id) ?? { links: [], backlinks: [], suggestions: [] });

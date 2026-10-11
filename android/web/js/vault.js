@@ -9,7 +9,7 @@ import { extractTags } from '../../app/js/core/tags.js';
 import { normalizeTables } from '../../app/js/core/table-sizes.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
-import { isLockedBody, sealBody, lockRefs, lockedMayUse } from '../../app/js/core/memo-lock.js';
+import { isLockedBody, lockedMayUse } from '../../app/js/core/memo-lock.js';
 import { installLockMethods } from '../../app/js/core/vault-locks.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import {
@@ -143,6 +143,8 @@ export class Vault extends EventTarget {
       next.set(id, { id, file, meta, body, mtimeMs: mtime, size, idSaved });
       changed.add(id);
       if (!old || old.body !== body) external.push(id); // 밖에서 새로 들어온 메모도
+      // 다른 기기에서 잠근 메모: 이 기기에 남은 잠기기 전 버전(풀린 글)을 지운다
+      if (old && !isLockedBody(old.body) && isLockedBody(body)) this.purgeVersions(id);
     }
 
     const removed = [...this.entries.keys()].filter((id) => !next.has(id));
@@ -317,19 +319,11 @@ export class Vault extends EventTarget {
       entry = this.newEntry(id);
       this.entries.set(id, entry);
     }
-    // 잠근 글을 바깥에서 고쳐 넘기는 일은 없다 (자동 태그 등) — 암호문이 깨지지 않게 그대로 둔다
-    if (isLockedBody(body) && entry.file && body !== entry.body) return this.summary(entry);
-    if (isLockedBody(entry.body) && !isLockedBody(body)) {
-      // 잠긴 메모: 연 동안만 저장할 수 있고, 저장은 늘 다시 잠근 글로 (풀린 글이 파일에 닿지 않게)
-      const session = this.locks.get(id);
-      const plain = session ? this.plainOf(entry) : null;
-      // 열지 않았거나, 다른 기기가 다른 비밀번호로 다시 잠금 → 덮어쓰지 않음 (refused: 저장되지 않았다고 화면이 알게)
-      if (plain === null) return { ...this.summary(entry), refused: true };
-      if (entry.file && plain === body) return this.summary(entry);
-      const sealed = sealBody(body, session);
-      entry.meta.extra = { ...entry.meta.extra, lockRefs: lockRefs(body, sealed) }; // 첨부 정리가 이 메모의 사진을 치우지 않게
-      body = sealed;
-    }
+    // 잠긴 메모: 연 동안만 저장할 수 있고, 저장은 늘 다시 잠근 글로 (core/vault-locks.js)
+    const sealed = this.sealForSave(entry, body);
+    if (sealed.same) return this.summary(entry);
+    if (sealed.refused) return { ...this.summary(entry), refused: true }; // 저장되지 않았다고 화면이 알게
+    body = sealed.body;
     if (entry.body === body && entry.file) return this.summary(entry);
     const known = entry.body; // 파일에 있다고 알고 있는 내용 (바꾸기 전)
     entry.body = body;
@@ -424,21 +418,23 @@ export class Vault extends EventTarget {
     const body = this.version(id, name);
     const entry = this.entries.get(id);
     if (body === null || body === undefined || !entry) return null;
+    // 잠긴 메모에 풀린 버전(또는 다른 비밀번호의 버전)을 덮어 잠금을 풀거나 비밀번호를 되돌리지 않게
+    if (!this.canRestore(entry, body)) return { error: '잠긴 메모에는 잠기기 전 버전을 되돌릴 수 없어요' };
     this.keepVersion(id, entry.body, { force: true });
     const known = entry.body;
     entry.body = body;
     entry.meta.updated = toLocalIso();
     entry.meta.device = 'phone';
-    this.write(entry, known);
+    if (this.write(entry, known, { copy: false }) !== true) return { error: '그사이 다른 기기에서 이 메모를 잠가 되돌리지 못했어요' };
     this.changed([id]);
     return this.get(id);
   }
 
   // known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것을 넘긴다)
-  write(entry, known = entry.body) {
+  write(entry, known = entry.body, { copy = true } = {}) {
     // 그사이 다른 기기가 이 메모를 잠갔다면 덮어쓰지 않는다 (잠금이 풀리거나 비밀번호가 되돌아가지 않게)
     if (entry.file) {
-      const kept = this.keepChangedOnDisk(entry, known);
+      const kept = this.keepChangedOnDisk(entry, known, { copy });
       if (kept === 'locked' || kept === 'copied') return kept;
     }
     if (!entry.file) entry.file = this.uniqueFile(titleToFileName(extractTitle(entry.body)));
@@ -452,7 +448,7 @@ export class Vault extends EventTarget {
 
   // 마지막으로 읽은(쓴) 뒤 다른 기기(동기화)가 이 파일을 바꿨는데 아직 알아채기 전에 덮어쓰려 할 때: 그쪽 내용을 먼저
   // 사본 메모로 남긴다 ("제목 (다른 기기 …)") — 자동 저장이 들어온 내용을 몰래 지우지 않게
-  keepChangedOnDisk(entry, known) {
+  keepChangedOnDisk(entry, known, { copy = true } = {}) {
     let theirs;
     try {
       const st = fs.stat(entry.file);
@@ -462,15 +458,8 @@ export class Vault extends EventTarget {
       return;
     }
     if (sameBody(theirs, known) || sameBody(theirs, entry.body) || isBlankBody(theirs)) return;
-    if (isLockedBody(theirs)) {
-      // 다른 기기가 방금 잠갔거나 다시 잠갔다: 우리 글은 사본 메모로 남기고(잠근 글이면 잠근 채) 파일은 그대로 둔다.
-      // 메모는 아는 내용으로 되돌려 두어, 곧 다시 읽을 때 "바뀌었다" 로 알아채고 열린 화면에 알린다
-      const mine = entry.body;
-      const copied = !isBlankBody(mine) && !sameBody(mine, known) && Boolean(this.import({ body: mine, color: entry.meta.color }));
-      entry.body = known;
-      this.rescanSoon();
-      return copied ? 'copied' : 'locked';
-    }
+    // 잠근 글이 들어왔다: 같은 비밀번호로 고친 것이면 보통 고침처럼, 잠갔거나 비밀번호를 바꿨으면 덮어쓰지 않음 (core/vault-locks.js)
+    if (isLockedBody(theirs)) return this.lockedOnDisk(entry, known, theirs, { copy });
     this.keepVersion(entry.id, theirs, { force: true }); // 버전 기록에서도 되찾을 수 있게
     this.import({ body: conflictCopyBody(theirs), color: entry.meta.color });
   }
@@ -576,9 +565,10 @@ export class Vault extends EventTarget {
   // 지운 메모가 쓰던 첨부 중 남은 메모가 쓰지 않는 것만 _memoking/trash/attachments/ 로 옮긴다.
   trashAttachments(srcs) {
     const inUse = new Set();
-    for (const e of this.entries.values()) for (const src of extractAttachments(this.plainOf(e) ?? '')) inUse.add(src);
+    for (const e of this.entries.values()) for (const src of extractAttachments(e.body)) inUse.add(src); // 잠긴 메모는 아래 sealed·열린 것은 위에서
+    for (const e of this.entries.values()) if (isLockedBody(e.body) && this.locks.has(e.id)) for (const src of extractAttachments(this.plainOf(e) ?? '')) inUse.add(src);
     // 열지 않은 잠긴 메모가 쓰는 첨부도 남긴다 (머리말의 lockRefs 로 — 표가 없으면 알 수 없으니 남김)
-    const sealed = [...this.entries.values()].filter((e) => this.plainOf(e) === null);
+    const sealed = this.sealedEntries();
     const moved = [];
     for (const src of new Set(srcs)) {
       if (!src.startsWith(`${ATTACH_DIR}/`) || inUse.has(src) || sealed.some((e) => lockedMayUse(e, src))) continue;
@@ -667,9 +657,10 @@ export class Vault extends EventTarget {
 
   purgeTrashAttachments(srcs, olderThan = Infinity) {
     const inUse = new Set();
-    for (const e of this.entries.values()) for (const s of extractAttachments(this.plainOf(e) ?? '')) inUse.add(s);
+    for (const e of this.entries.values()) for (const s of extractAttachments(e.body)) inUse.add(s);
+    for (const e of this.entries.values()) if (isLockedBody(e.body) && this.locks.has(e.id)) for (const s of extractAttachments(this.plainOf(e) ?? '')) inUse.add(s);
     // 열지 않은 잠긴 메모(휴지통 것 포함)가 쓰는 첨부는 지우지 않는다
-    const sealed = [...this.entries.values()].filter((e) => this.plainOf(e) === null)
+    const sealed = this.sealedEntries()
       .concat([...this.trashEntries()].filter((t) => isLockedBody(t.body)));
     for (const t of this.trashEntries()) for (const s of extractAttachments(t.body)) inUse.add(s);
     let removed = 0;

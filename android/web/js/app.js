@@ -387,7 +387,10 @@ memoSheet.addEventListener('click', async (e) => {
           break;
         }
         if (!(await confirmDialog('잠금을 풀까요? 내용이 그대로 파일에 저장되고, 비밀번호 없이 열려요.', '잠금 풀기'))) break;
-        if (app.vault.unlock(id)) toast('잠금을 풀었어요');
+        if (app.vault.unlock(id)) {
+          note.lockChanged(false);
+          toast('잠금을 풀었어요');
+        } else toast('잠금을 풀지 못했어요. 그사이 다른 기기에서 다시 잠갔을 수 있어요 — 메모를 다시 열어 주세요', true);
         break;
       }
       if (await lockDialog({
@@ -396,7 +399,9 @@ memoSheet.addEventListener('click', async (e) => {
             note.flush();
             const session = await newLockSession(password);
             // 목록에서 잠갔으면 열쇠를 들고 있지 않는다 — 바로 눌러도 비밀번호를 묻게
-            return app.vault.lock(id, session, { keepOpen: note.currentId() === id }) ? null : '잠그지 못했어요';
+            if (!app.vault.lock(id, session, { keepOpen: note.currentId() === id })) return '잠그지 못했어요. 그사이 다른 기기에서 잠갔을 수 있어요';
+            if (note.currentId() === id) note.lockChanged(true);
+            return null;
           } catch (err) {
             return err.message;
           }
@@ -421,6 +426,7 @@ function openVersions(id) {
     if (note.currentId() === id) note.flush();
     const restored = app.vault.restoreVersion(id, name);
     if (!restored) return toast('그 버전을 찾지 못했어요', true);
+    if (restored.error) return toast(restored.error, true);
     if (note.currentId() === id) note.showRestored(restored);
     toast('되돌렸어요');
     show();
@@ -579,7 +585,8 @@ app.deliverRecording = async (r) => {
   const card = voiceCardMarkdown(item, transcript);
   let memoId = r.memoId;
   let lockedOut = false;
-  if (note.currentId() === memoId) {
+  // 편집기가 떠 있을 때만 화면에 (잠긴 메모의 비밀번호 화면이면 아직 편집기가 없다 — 파일에 넣는다)
+  if (note.currentId() === memoId && note.getEditor()) {
     note.insertRecording(card, `음성 메모 ${whenLabel(r.startedAt)}`);
   } else {
     const opened = openHeld(memoId);
@@ -889,7 +896,7 @@ async function transcribeInto(memoId, items) {
         continue;
       }
       // 그 소리 줄에 붙여 음성 카드로 (소리 줄을 못 찾으면 메모 끝에)
-      if (note.currentId() === memoId) {
+      if (note.currentId() === memoId && note.getEditor()) {
         if (!note.attachTranscript(item.src, text)) note.appendText(importText(text).markdown);
       } else {
         const opened = openHeld(memoId);

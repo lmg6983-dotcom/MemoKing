@@ -132,3 +132,45 @@ test('잠긴 메모가 있어도 다른 메모만 쓰던 사진은 치우고, �
   assert.ok(!fs.existsSync(path.join(root, 'attachments', 'other.png')), '다른 사진은 휴지통으로');
   v.close();
 });
+
+test('같은 비밀번호로 다른 기기가 고친 것은 "잠갔다" 가 아니라 보통 동시 고침 (그쪽 글은 잠근 사본, 내 글은 저장)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '# 일기\n\n처음');
+  const session = await newLockSession('사과1234', FAST);
+  v.lock(id, session);
+  const file = path.join(root, v.get(id).file);
+  const text = fs.readFileSync(file, 'utf8');
+  const head = /^---\n[\s\S]*?\n---\n/.exec(text)[0];
+  const { sealBody } = await import('../app/js/core/memo-lock.js');
+  await new Promise((r) => setTimeout(r, 20));
+  fs.writeFileSync(file, head + sealBody('# 일기\n\n처음\n휴대폰에서 씀', session)); // 같은 비밀번호로 휴대폰이 고침
+  const r = v.save(id, '# 일기\n\n처음\nPC 에서 씀');
+  assert.ok(!r.refused, '저장됨');
+  assert.equal(v.get(id).body, '# 일기\n\n처음\nPC 에서 씀');
+  const copy = v.list().find((m) => m.id !== id);
+  assert.ok(copy && v.entries.get(copy.id).body.includes('memoking-lock'), '그쪽 글은 잠근 사본으로');
+  v.close();
+});
+
+test('잠긴 메모에 잠기기 전(풀린) 버전은 되돌리지 않음', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  const id = v.create();
+  v.save(id, '# 메모\n\n예전 글');
+  v.keepVersion(id, '# 메모\n\n예전 글', { force: true });
+  const name = v.versions(id)[0]?.name;
+  const file = path.join(root, v.get(id).file);
+  const text = fs.readFileSync(file, 'utf8');
+  const head = /^---\n[\s\S]*?\n---\n/.exec(text)[0];
+  const { lockBody } = await import('../app/js/core/memo-lock.js');
+  fs.writeFileSync(file, head + await lockBody('# 메모\n\n예전 글', 'phone999', FAST)); // 다른 기기가 잠금
+  v.scan();
+  assert.equal(v.versions(id).length, 0, '이 기기에 남은 풀린 버전은 지움');
+  if (name) assert.ok(v.restoreVersion(id, name) === null || v.restoreVersion(id, name)?.error);
+  assert.match(fs.readFileSync(file, 'utf8'), /memoking-lock/);
+  v.close();
+});

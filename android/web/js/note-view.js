@@ -145,6 +145,11 @@ export function showRestored(next) {
   setStatus('되돌렸어요');
 }
 
+/** 메뉴에서 잠그거나 풀었을 때: 이 화면이 아는 잠금 상태를 맞춘다 */
+export function lockChanged(locked) {
+  if (memo) memo = { ...memo, locked };
+}
+
 /** 메모 폴더가 바뀌었을 때 (vault 'changed') */
 export function onVaultChanged({ ids, external, removed }) {
   if (!id || !editor) return;
@@ -185,6 +190,7 @@ export function onVaultChanged({ ids, external, removed }) {
   if (ids.includes(id)) {
     const next = app.vault.get(id);
     if (next) {
+      if (memo && !next.needsPassword) memo = { ...memo, locked: next.locked }; // 다른 기기에서 잠금을 풀었으면
       applyMeta(next);
       reminderPanel?.set(next.reminders);
     }

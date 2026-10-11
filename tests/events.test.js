@@ -207,3 +207,13 @@ test('파일의 이상한 미리 알림 값은 버림 (시각 있는 일정의 �
   assert.deepEqual(event({ at: iso(2026, 10, 5, 15, 0), alerts: [-30, 10] }).alerts, [10]);
   assert.deepEqual(event({ at: iso(2026, 10, 5), allDay: true, alerts: [-1440, -540] }).alerts, [-540]);
 });
+
+test('고른 알림이 모두 지났으면 정시로 (하루 종일은 당일 오전 9시), 정시도 지났으면 없음', async () => {
+  const { fallbackAlert } = await import('../app/js/core/reminders.js');
+  const now = at(2026, 10, 5, 14, 55);
+  assert.deepEqual(pendingAlerts([10], at(2026, 10, 5, 15, 0), { now, fallback: fallbackAlert(false) }), [0]);
+  assert.deepEqual(pendingAlerts([10, 0], at(2026, 10, 5, 15, 0), { now, fallback: 0 }), [0]);
+  assert.deepEqual(pendingAlerts([], at(2026, 10, 5, 15, 0), { now, fallback: 0 }), [], '알림 없음을 고른 것은 그대로');
+  assert.deepEqual(pendingAlerts([900], at(2026, 10, 6), { now: at(2026, 10, 5, 10, 0), fallback: fallbackAlert(true) }), [-540]);
+  assert.deepEqual(pendingAlerts([-540], at(2026, 10, 5), { now: at(2026, 10, 5, 10, 0), fallback: fallbackAlert(true) }), []);
+});

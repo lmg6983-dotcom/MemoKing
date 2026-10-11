@@ -242,6 +242,11 @@ api.on('memo:external', async (next) => {
     setTimeout(() => window.close(), kept ? 4000 : 2500);
     return;
   }
+  // 다른 기기에서 잠금을 풀었으면(또는 이 창의 열쇠로 풀리는 잠금이면) 메뉴의 잠금 상태를 맞춘다
+  if (Boolean(memo?.locked) !== Boolean(next.locked)) {
+    memo = { ...memo, locked: next.locked };
+    showLockState();
+  }
   if (sameBody(next.body, current)) {
     saved = current; // 지금 쓰는 글과 같은 내용 — 할 일 없음
     return;
@@ -596,6 +601,7 @@ async function restoreVersion(name) {
   await flush(); // 지금 내용이 버전으로 남도록 먼저 저장
   const restored = await api.memo.restoreVersion(id, name);
   if (!restored) return setStatus('그 버전을 찾지 못했어요', true);
+  if (restored.error) return setStatus(restored.error, true);
   editor.setMarkdown(restored.body, restored.tables ?? []);
   current = saved = editor.getMarkdown();
   setStatus('되돌렸어요');

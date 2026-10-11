@@ -87,11 +87,17 @@ export function alertLabel(offset, allDay = false) {
  * 아직 울릴 수 있는 미리 알림만 (지금보다 뒤) — 일정 창·알림 패널·코어가 함께 쓰는 한 가지 규칙.
  * 반복 일정은 다음 회차에 울리므로 모두 남긴다.
  */
-export function pendingAlerts(alerts, start, { repeat = false, now = new Date() } = {}) {
+export function pendingAlerts(alerts, start, { repeat = false, now = new Date(), fallback = null } = {}) {
   const list = [...new Set(alerts ?? [])].sort((a, b) => b - a);
   if (repeat) return list;
-  return list.filter((o) => new Date(start).getTime() - o * 60_000 > new Date(now).getTime());
+  const future = (o) => new Date(start).getTime() - o * 60_000 > new Date(now).getTime();
+  const keep = list.filter(future);
+  // 알림을 골랐는데 모두 지났다면(5분 뒤 일정에 "10분 전"): 아무 알림 없이 두지 않고 정시(하루 종일은 당일 오전 9시)에
+  if (!keep.length && list.length && fallback !== null && future(fallback)) return [fallback];
+  return keep;
 }
+/** 지난 알림 대신 울릴 때: 시각 있는 일정은 정시, 하루 종일은 당일 오전 9시 */
+export const fallbackAlert = (allDay) => (allDay ? -540 : 0);
 
 /** "10분 전, 하루 전" */
 export const describeAlerts = (r) => {

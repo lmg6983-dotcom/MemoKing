@@ -1,7 +1,7 @@
 // 메모 창의 "일정과 알림" 패널 — 목록(켜기/끄기·삭제)과 새로 만들기
 //   일정 · 반복 일정: 이름 + 미리 알림(구글 캘린더처럼 여러 개, 정시에 울리는 게 아니라 미리) · 타이머 · 앱 열 때
 import { icon } from './icons.js';
-import { describeReminder, describeAlerts, nextLabel, isDone, isEvent, isLive, isPastEvent, reenable, pendingAlerts, ALERT_PRESETS, alertLabel } from './core/reminders.js';
+import { describeReminder, describeAlerts, nextLabel, isDone, isEvent, isLive, isPastEvent, reenable, pendingAlerts, fallbackAlert, ALERT_PRESETS, alertLabel } from './core/reminders.js';
 import { remembered, remember } from './event-editor.js';
 import { toLocalIso } from './core/time.js';
 import { dateTimePicker, timePicker } from './date-picker.js';
@@ -228,14 +228,17 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
 
   // 이미 지난 미리 알림은 빼고(일정 창과 같은 규칙), 뺀 것은 저장 뒤에 알려 준다
   let dropped = [];
+  let fellBack = false;
   function withPending(r, start, now) {
-    const keep = pendingAlerts(r.alerts, start, { now });
+    const keep = pendingAlerts(r.alerts, start, { now, fallback: fallbackAlert(Boolean(r.allDay)) });
     dropped = r.alerts.filter((o) => !keep.includes(o));
+    fellBack = keep.length > 0 && !r.alerts.includes(keep[0]); // 고른 것이 모두 지나 정시(당일 오전 9시)로 바꿈
     return { ...r, alerts: keep };
   }
   function droppedNote(r) {
     if (!dropped.length) return '';
     const names = dropped.map((o) => alertLabel(o, Boolean(r.allDay))).join(', ');
+    if (fellBack) return ` ${names} 알림은 이미 지난 시각이라 ${alertLabel(r.alerts[0], Boolean(r.allDay))}에 알려요.`;
     return r.alerts.length ? ` ${names} 알림은 이미 지난 시각이라 뺐어요.` : ` ${names} 알림은 이미 지난 시각이라, 알림 없이 달력에만 넣었어요.`;
   }
 
@@ -263,6 +266,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     e.preventDefault();
     let reminder;
     dropped = [];
+    fellBack = false;
     try {
       reminder = build();
     } catch (err) {
@@ -312,7 +316,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
      */
     async addEvent(e) {
       const now = new Date();
-      const base = { action: 'notify', enabled: true, created: toLocalIso(now), alerts: pendingAlerts(e.alerts ?? [], e.start, { repeat: Boolean(e.repeat), now }) };
+      const base = { action: 'notify', enabled: true, created: toLocalIso(now), alerts: pendingAlerts(e.alerts ?? [], e.start, { repeat: Boolean(e.repeat), now, fallback: fallbackAlert(Boolean(e.allDay)) }) };
       if (e.title) base.title = e.title;
       let reminder;
       if (e.repeat) {
