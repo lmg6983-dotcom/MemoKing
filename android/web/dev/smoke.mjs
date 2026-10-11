@@ -398,6 +398,24 @@ try {
     /위젯에 보일 메모/.test(pickToast ?? '') && picked?.[0] === 7 && picked?.[1] === '00000000-0000-4000-8000-000000000001' && await page.isHidden('#note-screen'),
     JSON.stringify({ pickToast, picked }));
 
+  // 위젯 고르기를 시작하고 그냥 + 새 메모를 누르면: 고르기는 끝나고 새 메모가 열린다 (위젯에 놓이지 않음)
+  {
+    const assignsBefore = (await devLog()).log.filter((l) => l.widgetAssign).length;
+    await post('/dev/intent', { type: 'widget-pick', widgetId: 8 });
+    await page.evaluate(() => window.__mk.emit('intent', null));
+    await page.waitForTimeout(400);
+    await page.tap('#fab');
+    await page.tap('[data-new="text"]');
+    await page.waitForTimeout(500);
+    const assignsAfter = (await devLog()).log.filter((l) => l.widgetAssign).length;
+    check('위젯 고르기 중 + 새 메모: 메모가 열리고 위젯에 놓이지 않음', assignsAfter === assignsBefore && await page.isVisible('#note-screen'),
+      JSON.stringify({ assignsBefore, assignsAfter }));
+    for (let i = 0; i < 3 && await page.isVisible('#note-screen'); i++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+  }
+
   // 잠금 메모: 메뉴 › 잠그기 → 파일에 풀린 글 없음, 쓰는 동안도 잠근 채 저장, 닫았다 열면 비밀번호 → 잠금 풀기
   {
     await page.tap('#fab');

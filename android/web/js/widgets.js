@@ -54,7 +54,15 @@ export function startPick(widgetId, { toast }) {
   toast('위젯에 보일 메모를 눌러 골라 주세요');
 }
 
-/** 메모를 열려고 할 때: 고르는 중이면 위젯에 놓고 true (열지 않음) */
+/**
+ * 고르기를 그만둔다 — 앱을 떠나거나(홈·뒤로), 목록 카드가 아닌 길(+ 새 메모 · 알림 · 다른 메모 연결)로 메모를 열 때.
+ * 그래야 나중에 연 메모가 엉뚱하게 위젯에 놓이지 않는다.
+ */
+export function cancelPick() {
+  pickFor = null;
+}
+
+/** 목록에서 메모 카드를 눌렀을 때: 고르는 중이면 위젯에 놓고 true (열지 않음) */
 export function takePick(id, { toast }) {
   if (pickFor == null) return false;
   const widgetId = pickFor;

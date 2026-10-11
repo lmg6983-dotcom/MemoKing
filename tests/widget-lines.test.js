@@ -31,3 +31,8 @@ test('위젯 메모: 제목과 같은 첫 제목 줄은 빼고', () => {
   assert.equal(w.color, 'green');
   assert.equal(w.file, '장보기.md');
 });
+
+test('할 일 줄은 원래 글(r)도 함께 — 위젯이 늦게 갱신돼 순서가 바뀌었어도 앱이 같은 할 일을 찾게 (Widgets.kt toggleTaskText)', () => {
+  const lines = widgetLines('- [ ] **우유** 2개\n- [x] 빵  ');
+  assert.deepEqual(lines.map((l) => [l.t, l.r, l.i]), [['우유 2개', '**우유** 2개', 0], ['빵', '빵', 1]]);
+});

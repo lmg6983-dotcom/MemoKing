@@ -26,4 +26,20 @@ class WidgetToggleTest {
     fun missingTaskIsNull() {
         assertNull(Widgets.toggleTaskText(memo, 9))
     }
+
+    @Test
+    fun findsTheSameTaskAfterReorder() {
+        // 위젯은 [A, B] 를 보고 있는데 PC 에서 순서가 [B, A] 로 바뀜 → 위젯의 B(1번)를 누르면 파일의 B 가 체크
+        val reordered = "- [ ] B\n- [ ] A"
+        assertEquals("- [x] B\n- [ ] A", Widgets.toggleTaskText(reordered, 1, "B", false))
+        assertEquals("같은 자리면 그대로", "- [ ] B\n- [x] A", Widgets.toggleTaskText(reordered, 1, "A", false))
+        assertNull("그 할 일이 없어졌으면 아무것도 바꾸지 않음", Widgets.toggleTaskText(reordered, 0, "C", false))
+    }
+
+    @Test
+    fun setsTheOppositeOfWhatTheWidgetShowed() {
+        // 위젯에는 안 끝낸 할 일로 보였는데 파일에선 이미 체크됨 → 누르면 체크된 채로 (풀어 버리지 않음)
+        assertEquals("- [x] 우유", Widgets.toggleTaskText("- [x] 우유", 0, "우유", false))
+        assertEquals("- [ ] 우유", Widgets.toggleTaskText("- [x] 우유", 0, "우유", true))
+    }
 }

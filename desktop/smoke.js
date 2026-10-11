@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { dropBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
+import { lockBody } from '../app/js/core/memo-lock.js';
 
 const ICON_PNG = path.join(import.meta.dirname, '..', 'assets', 'icons', 'icon-256.png');
 
@@ -1209,6 +1210,29 @@ export async function runSmoke({
       check('잠금 풀기: 메뉴가 "잠금 풀기" · 풀면 파일에 원래 글', unlockLabel === '잠금 풀기' && plainAgain, unlockLabel);
       await closeNote(lo.id);
       getVault().trash(ln.id);
+    }
+    // 14-03) 쓰는 중에 다른 기기(휴대폰)가 이 메모를 잠그면: 저장 못 한 글은 사본 메모로 남기고, "잠갔어요" 라고 알린 뒤 닫힘
+    {
+      const wn = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
+      await type(wn.win, '여행 계획');
+      await key(wn.win, 'Enter');
+      await type(wn.win, '첫 줄');
+      await until(() => getVault().get(wn.id)?.file && readMemo(wn.id).includes('첫 줄'), '잠그기 전 저장').catch(() => {});
+      const file = path.join(VAULT, getVault().get(wn.id).file);
+      const text = fs.readFileSync(file, 'utf8');
+      const head = /^---\n[\s\S]*?\n---\n/.exec(text)?.[0] ?? '';
+      const sealed = await lockBody(text.slice(head.length), 'phone999', { iterations: 1000 });
+      const before = new Set(getVault().list().map((m) => m.id));
+      await type(wn.win, ' 아직 저장 안 한 글'); // 자동 저장 전에
+      fs.writeFileSync(file, head + sealed); // 휴대폰이 잠금
+      getVault().scan();
+      const status = await until(() => js(wn.win, `/잠갔어요/.test(document.getElementById('status').textContent) ? document.getElementById('status').textContent : null`), '잠금 안내', 8000).catch(() => '');
+      const copy = await until(() => getVault().list().find((m) => !before.has(m.id) && getVault().get(m.id)?.body.includes('아직 저장 안 한 글')), '사본 메모', 8000).catch(() => null);
+      check('쓰는 중에 휴대폰이 잠그면: 쓰던 글은 사본 메모로 남고 "잠갔어요" 안내 (비밀번호를 바꿨다고 하지 않음)',
+        Boolean(copy) && /사본 메모/.test(status ?? '') && !/비밀번호를 바꿨/.test(status ?? '') && /memoking-lock/.test(fs.readFileSync(file, 'utf8')), status);
+      await until(() => !noteWins.has(wn.id), '창 닫힘', 8000).catch(() => {});
+      if (copy) getVault().trash(copy.id);
+      getVault().trash(wn.id);
     }
     // 14-0) 알림 보관함 탭: 처음에는 동의 안내부터
     await listJs(`document.querySelector('[data-tab="history"]').click()`);

@@ -34,6 +34,8 @@ object Widgets {
     private const val DATA = "widget_data" // 메모 id → 보일 내용(JSON)
     const val EXTRA_MEMO = "memoId"
     const val EXTRA_TASK = "task"
+    const val EXTRA_TASK_TEXT = "taskText" // 위젯에 보인 할 일의 원래 글 (순서가 바뀌었어도 같은 할 일을 찾게)
+    const val EXTRA_TASK_DONE = "taskDone" // 위젯에 보인 체크 상태 (누르면 그 반대로)
     const val ACTION_TAP = "com.memoking.app.WIDGET_TAP"
     const val ACTION_PICK = "com.memoking.app.WIDGET_PICK"
     const val ACTION_PINNED = "com.memoking.app.WIDGET_PINNED"
@@ -182,18 +184,22 @@ object Widgets {
     private val FENCE = Regex("""^\s*(```|~~~)""")
 
     /**
-     * 메모 파일의 index 번째 할 일을 체크/해제한 새 글 (머리말은 건드리지 않음). 찾지 못하면 null.
+     * 메모 파일의 할 일을 체크/해제한 새 글 (머리말은 건드리지 않음). 찾지 못하면 null.
      * 할 일 세는 규칙은 app/js/core/widget-lines.js 와 같다.
+     *   text(위젯에 보인 그 할 일의 원래 글)가 있으면: index 번째가 그 글이 아닐 때(위젯이 갱신되기 전에 PC 에서 순서가 바뀜)
+     *   같은 글인 할 일 중 index 에 가장 가까운 것을 고친다 — 없으면 null (엉뚱한 할 일을 체크하지 않게).
+     *   shownDone(위젯에 보인 상태)이 있으면 그 반대로 맞춘다 (이미 그렇게 바뀌어 있으면 그대로).
      */
-    fun toggleTaskText(text: String, index: Int): String? {
+    fun toggleTaskText(text: String, index: Int, taskText: String? = null, shownDone: Boolean? = null): String? {
         val lines = text.split("\n").toMutableList()
         var start = 0
         if (lines.firstOrNull()?.trimEnd() == "---") {
             val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return null
             start = end + 1
         }
+        // (줄 번호, 체크 칸 자리, 할 일 글)
+        val tasks = mutableListOf<Triple<Int, Int, String>>()
         var fence = false
-        var n = 0
         for (k in start until lines.size) {
             val line = lines[k]
             if (FENCE.containsMatchIn(line)) {
@@ -202,27 +208,35 @@ object Widgets {
             }
             if (fence) continue
             val m = TASK.find(line) ?: continue
-            if (n++ != index) continue
-            val box = m.groups[1]!!.range.first
-            lines[k] = line.substring(0, box) + (if (line[box] == ' ') "x" else " ") + line.substring(box + 1)
-            return lines.joinToString("\n")
+            tasks.add(Triple(k, m.groups[1]!!.range.first, line.substring(m.range.last + 1).trim()))
         }
-        return null
+        val shown = taskText?.trim()
+        val target = when {
+            shown == null -> tasks.getOrNull(index)
+            tasks.getOrNull(index)?.third == shown -> tasks[index]
+            else -> tasks.withIndex().filter { it.value.third == shown }.minByOrNull { kotlin.math.abs(it.index - index) }?.value
+        } ?: return null
+        val (k, box) = target
+        val line = lines[k]
+        val checked = line[box] != ' '
+        val want = if (shownDone != null) !shownDone else !checked
+        lines[k] = line.substring(0, box) + (if (want) "x" else " ") + line.substring(box + 1)
+        return lines.joinToString("\n")
     }
 
     /** 위젯에서 체크: 파일을 고치고, 위젯도 바로 그 모양으로 */
-    fun toggleTask(ctx: Context, memoId: String, index: Int): Boolean {
+    fun toggleTask(ctx: Context, memoId: String, index: Int, taskText: String? = null, shownDone: Boolean? = null): Boolean {
         val memo = memo(ctx, memoId) ?: return false
         val file = memo.optString("file").ifEmpty { return false }
         val storage = Vaults.current(ctx) ?: return false
         val text = storage.openRead(file).use { it.readBytes().toString(Charsets.UTF_8) }
-        val next = toggleTaskText(text, index) ?: return false
-        storage.write(file) { it.write(next.toByteArray(Charsets.UTF_8)) }
+        val next = toggleTaskText(text, index, taskText, shownDone) ?: return false
+        if (next != text) storage.write(file) { it.write(next.toByteArray(Charsets.UTF_8)) }
         DriveSync.request(ctx, 3000)
         val lines = memo.optJSONArray("lines") ?: JSONArray()
         for (k in 0 until lines.length()) {
             val l = lines.getJSONObject(k)
-            if (l.optString("kind") == "task" && l.optInt("i", -1) == index) l.put("done", !l.optBoolean("done"))
+            if (l.optString("kind") == "task" && l.optInt("i", -1) == index) l.put("done", if (shownDone != null) !shownDone else !l.optBoolean("done"))
         }
         data(ctx).edit().putString(memoId, memo.toString()).apply()
         update(ctx, allIds(ctx).filter { memoOf(ctx, it) == memoId }.toIntArray())
@@ -299,7 +313,11 @@ class MemoWidgetService : RemoteViewsService() {
                 v.setViewVisibility(R.id.row_check, View.GONE)
             }
             val fill = Intent().putExtra(Widgets.EXTRA_MEMO, memoId ?: "")
-            if (kind == "task") fill.putExtra(Widgets.EXTRA_TASK, line.optInt("i", -1))
+            if (kind == "task") {
+                fill.putExtra(Widgets.EXTRA_TASK, line.optInt("i", -1))
+                if (line.has("r")) fill.putExtra(Widgets.EXTRA_TASK_TEXT, line.optString("r"))
+                fill.putExtra(Widgets.EXTRA_TASK_DONE, done)
+            }
             v.setOnClickFillInIntent(R.id.row, fill)
             return v
         }
@@ -315,9 +333,11 @@ class WidgetTapActivity : Activity() {
         super.onCreate(savedInstanceState)
         val memoId = intent.getStringExtra(Widgets.EXTRA_MEMO).orEmpty()
         val task = intent.getIntExtra(Widgets.EXTRA_TASK, -1)
+        val taskText = intent.getStringExtra(Widgets.EXTRA_TASK_TEXT)
+        val shownDone = if (intent.hasExtra(Widgets.EXTRA_TASK_DONE)) intent.getBooleanExtra(Widgets.EXTRA_TASK_DONE, false) else null
         if (memoId.isNotEmpty() && task >= 0) {
             val ok = try {
-                Widgets.toggleTask(applicationContext, memoId, task)
+                Widgets.toggleTask(applicationContext, memoId, task, taskText, shownDone)
             } catch (e: Exception) {
                 android.util.Log.w("MemoKing", "위젯 체크 실패", e)
                 false

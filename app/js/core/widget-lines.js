@@ -1,6 +1,7 @@
 // 휴대폰 홈 화면 위젯에 보일 줄들 — 메모 마크다운을 꾸밈 없는 글 줄로 (순수 함수, 단위 테스트 대상).
 //   체크리스트 줄은 몇 번째 할 일인지(i)를 함께 — 위젯에서 체크하면 앱(Widgets.kt toggleTask)이 파일의 i 번째 할 일을 바꾼다.
 //   할 일 세는 규칙은 Widgets.kt 와 같아야 한다: 코드 블록(``` ~~~) 안은 세지 않음, "- [ ]" "* [x]" "1. [ ]" 모두 할 일
+//   r 은 그 할 일의 원래 글(마크다운 그대로) — 위젯이 갱신되기 전에 PC 에서 순서가 바뀌었어도 Widgets.kt 가 같은 할 일을 찾게
 export const TASK_RE = /^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\](?:\s+|$)(.*)$/;
 const FENCE_RE = /^\s*(```|~~~)/;
 export const WIDGET_MAX_LINES = 40;
@@ -24,7 +25,7 @@ export function plainInline(text) {
 
 /**
  * @param {string} body 머리말을 뺀 메모 본문
- * @returns {{ t: string, kind: 'h'|'task'|'bullet'|'text', done?: boolean, i?: number }[]}
+ * @returns {{ t: string, kind: 'h'|'task'|'bullet'|'text', done?: boolean, i?: number, r?: string }[]}
  */
 export function widgetLines(body, max = WIDGET_MAX_LINES) {
   const out = [];
@@ -42,7 +43,7 @@ export function widgetLines(body, max = WIDGET_MAX_LINES) {
     const tm = TASK_RE.exec(line);
     if (tm) {
       const i = task++;
-      if (out.length < max) out.push({ t: plainInline(tm[2]), kind: 'task', done: tm[1] !== ' ', i });
+      if (out.length < max) out.push({ t: plainInline(tm[2]), kind: 'task', done: tm[1] !== ' ', i, r: tm[2].trim() });
       continue;
     }
     if (out.length >= max) continue; // 할 일 수는 끝까지 센다 (뒤쪽 줄 번호가 맞게)

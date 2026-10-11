@@ -266,7 +266,9 @@ app.filterByTag = (name) => {
 
 app.openMemo = async (id, options = {}) => {
   if (!app.vault) return;
-  if (widgets.takePick(id, { toast })) return; // 위젯에 보일 메모를 고르는 중
+  // 위젯에 보일 메모를 고르는 중: 목록 카드를 누른 것만 고른 것으로, 다른 길(새 메모·알림 등)로 열면 고르기를 그만둔다
+  if (options.fromList && widgets.takePick(id, { toast })) return;
+  widgets.cancelPick();
   closeAllSheets();
   // 태블릿: 새로 열면 목록은 숨기고 메모를 가득
   if (isTwoPane()) panes.hideListForMemo();
@@ -1125,7 +1127,9 @@ on('app', (state) => {
   }
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) note.flush();
+  if (!document.hidden) return;
+  note.flush();
+  widgets.cancelPick(); // 위젯 고르기 중에 앱을 떠나면 그만 (돌아와 연 메모가 위젯에 놓이지 않게)
 });
 
 // 뒤로 가기: 확인 창 → 색판 → 시트 → 메모 → 목록의 검색·필터 → (앱이 뒤로)
