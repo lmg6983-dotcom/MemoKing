@@ -197,9 +197,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     if (kind === 'at' || kind === 'repeat') {
       const t = el.title.value.replace(/\s+/g, ' ').trim();
       if (t) event.title = t;
-      // 기본값으로는 고른 것을 그대로 기억 (이번 일정에 맞지 않아 빠진 "하루 전" 도 다음 일정엔 다시)
       event.alerts = [...picked[alertKind()]].sort((a, b) => b - a);
-      remember(alertKind(), event.alerts);
     }
     if (kind === 'at') {
       let at = new Date(el.atInput.value);
@@ -273,6 +271,8 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
       setStatus(err.message, true);
       return;
     }
+    // 기본값으로는 고른 것을 그대로 기억 (이번 일정에 맞지 않아 빠진 "하루 전" 도 다음 일정엔 다시) — 만들기에 성공했을 때만
+    if (isEvent(reminder)) remember(alertKind(), [...picked[alertKind()]].sort((a, b) => b - a));
     if (!(await save([...reminders, reminder]))) return;
     const saved = reminders.at(-1) ?? reminder;
     el.title.value = '';

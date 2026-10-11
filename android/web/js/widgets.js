@@ -50,6 +50,7 @@ export function pin(id, { toast }) {
 
 /** 위젯 고르기 목록에서 놓은 위젯을 눌렀을 때: 다음에 누르는 메모를 그 위젯에 */
 export function startPick(widgetId, { toast }) {
+  if (!Number.isInteger(widgetId) || widgetId < 0) return; // 위젯 번호가 없는 요청은 무시
   pickFor = widgetId;
   toast('위젯에 보일 메모를 눌러 골라 주세요');
 }

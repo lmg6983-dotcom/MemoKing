@@ -296,14 +296,15 @@ object Widgets {
         if (lines.firstOrNull()?.trimEnd() != "---") return text
         val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return text
         var hasDevice = false
+        val cr = if (lines[0].endsWith("\r")) "\r" else "" // 줄 끝(\r\n)을 파일 그대로
         for (k in 1 until end) {
-            if (lines[k].startsWith("updated:")) lines[k] = "updated: $now"
+            if (lines[k].startsWith("updated:")) lines[k] = "updated: $now$cr"
             if (lines[k].startsWith("device:")) {
-                lines[k] = "device: phone"
+                lines[k] = "device: phone$cr"
                 hasDevice = true
             }
         }
-        if (!hasDevice) lines.add(end, "device: phone")
+        if (!hasDevice) lines.add(end, "device: phone$cr")
         return lines.joinToString("\n")
     }
 

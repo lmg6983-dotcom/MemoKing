@@ -11,7 +11,7 @@ import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { normalizeTables } from '../app/js/core/table-sizes.js';
 import { taskProgress } from '../app/js/core/tasks.js';
-import { isLockedBody } from '../app/js/core/memo-lock.js';
+import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
 import { installLockMethods } from '../app/js/core/vault-locks.js';
 import { textMatcher } from '../app/js/core/text-match.js';
 import {
@@ -170,7 +170,7 @@ export class Vault extends EventEmitter {
       changed.add(id);
       if (!old || old.body !== body) external.push(id); // 밖에서 새로 들어온 메모도
       // 다른 기기에서 잠갔거나 비밀번호를 바꾼 메모: 이 기기에 남은 풀린 버전·예전 비밀번호 버전을 지운다 (아래에서)
-      if (isLockedBody(body) && old && old.body !== body) lockedNow.push(id);
+      if (isLockedBody(body) && old && parseLocked(old.body)?.salt !== parseLocked(body).salt) lockedNow.push(id);
     }
 
     const removed = [...this.entries.keys()].filter((id) => !next.has(id));
@@ -406,6 +406,19 @@ export class Vault extends EventEmitter {
     return safe ? path.join(this.root, ...VERSIONS_DIR.split('/'), safe) : null;
   }
 
+  versionNames(id) {
+    return this.#versionNames(id);
+  }
+
+  /** 첨부 폴더의 파일들 ("attachments/이름") — 잠긴 메모를 지울 때 그 메모의 첨부를 찾는 데 */
+  attachmentFiles() {
+    try {
+      return fs.readdirSync(path.join(this.root, ATTACH_DIR), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => `${ATTACH_DIR}/${d.name}`);
+    } catch {
+      return [];
+    }
+  }
+
   #versionNames(id) {
     const dir = this.versionDir(id);
     try {
@@ -604,7 +617,7 @@ export class Vault extends EventEmitter {
       }
     }
     this.orphans.delete(id);
-    this.trashAttachments(extractAttachments(this.plainOf(entry) ?? ''));
+    this.trashAttachments(this.attachmentsOf(entry)); // 열지 않은 잠긴 메모도 머리말의 표로
     this.changed([id]);
     return trashed ?? true; // 휴지통 파일 이름 (되돌리기에 씀)
   }

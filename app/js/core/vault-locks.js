@@ -118,6 +118,14 @@ class LockMethods {
     return parseLocked(versionBody)?.salt === parseLocked(entry.body)?.salt;
   }
 
+  /** 이 메모가 쓰는 첨부 (잠겼으면 열쇠로 풀거나, 열지 않았으면 머리말의 표로 첨부 폴더에서 찾는다) — 메모를 지울 때 */
+  attachmentsOf(entry) {
+    const plain = this.plainOf(entry);
+    if (plain !== null) return extractAttachments(plain);
+    if (!Array.isArray(entry.meta?.extra?.lockRefs)) return []; // 표가 없는 예전 잠금: 알 수 없으니 그대로 둔다
+    return this.attachmentFiles().filter((src) => lockedMayUse(entry, src));
+  }
+
   /** 잠긴 글을 통째로 바꾼 뒤(버전 되돌리기): 첨부 표를 그 글에 맞게 — 풀 수 없으면 표를 지워 "알 수 없음"(치우지 않음)으로 */
   refreshLockRefs(entry) {
     if (!isLockedBody(entry.body)) return;
@@ -157,13 +165,13 @@ class LockMethods {
     const entry = this.entries.get(id);
     const salt = entry && parseLocked(entry.body)?.salt;
     if (!salt) return;
-    let list;
+    let names;
     try {
-      list = this.versions(id);
+      names = this.versionNames(id);
     } catch {
       return;
     }
-    if (list.some((v) => parseLocked(this.version(id, v.name) ?? '')?.salt !== salt)) this.purgeVersions(id);
+    if (names.some((name) => parseLocked(this.version(id, name) ?? '')?.salt !== salt)) this.purgeVersions(id);
   }
 
   /** 열쇠를 들고 있는 메모인가 (원래 메모가 열려 있는 사본은 제외 — 사본을 따로 열 때는 비밀번호를 묻는다) */

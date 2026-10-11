@@ -187,6 +187,7 @@ server.registerTool('create_memo', {
 }, async ({ content, color }) => {
   if (!canWrite()) return fail('메모킹 설정에서 "AI가 메모를 남기도록 허용" 이 꺼져 있어요.');
   if (!content.trim()) return fail('메모 내용이 비어 있어요. content 에 남길 글을 넣어 주세요.');
+  if (isLockedBody(content)) return fail('잠금 메모 형식의 글은 남길 수 없어요 (아무도 열 수 없는 메모가 돼요).');
   try {
     const v = openVault();
     const id = v.create({ color });
@@ -216,6 +217,7 @@ server.registerTool('append_to_memo', {
     }
     if (isLockedBody(m.body)) return fail(`"${m.title}" 은(는) 잠긴 메모라 덧붙일 수 없어요.`);
     if (!content.trim()) return fail('덧붙일 내용이 비어 있어요.');
+    if (/<!--\s*memoking-lock/.test(content)) return fail('잠금 정보가 든 글은 덧붙일 수 없어요.');
     // 목록 끝에 목록을 덧붙이면 한 목록으로 이어지게 (빈 줄 없이)
     const before = m.body.replace(/\s+$/, '');
     const add = content.trim();

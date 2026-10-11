@@ -210,3 +210,19 @@ test('꺼 둔 사이 다른 기기에서 잠근 메모: 켤 때 이 기기의 �
   assert.equal(v2.versions(id).length, 0);
   v2.close();
 });
+
+test('열지 않은 잠긴 메모를 지우면 그 메모만 쓰던 첨부도 휴지통으로 (머리말의 표로 찾음)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
+  const v = new Vault(root);
+  v.open();
+  for (const f of ['secret.png', 'keep.png']) fs.writeFileSync(path.join(root, 'attachments', f), 'png');
+  const keep = v.create();
+  v.save(keep, '# 다른 메모\n\n![](attachments/keep.png)');
+  const id = v.create();
+  v.save(id, '# 비밀\n\n![](attachments/secret.png)\n![](attachments/keep.png)');
+  v.lock(id, await newLockSession('사과1234', FAST), { keepOpen: false });
+  v.trash(id);
+  assert.ok(!fs.existsSync(path.join(root, 'attachments', 'secret.png')), '그 메모만 쓰던 첨부는 휴지통으로');
+  assert.ok(fs.existsSync(path.join(root, 'attachments', 'keep.png')), '다른 메모도 쓰는 첨부는 남음');
+  v.close();
+});

@@ -100,15 +100,20 @@ export function lockScreen(container, { title, onTry, onCancel }) {
     const error = el('p', { class: 'lock-error', role: 'alert' });
     const open = el('button', { type: 'submit', class: 'btn primary' }, '열기');
     const actions = el('div', { class: 'dialog-actions' });
-    let cancel = null;
+    let busy = false;
+    let cancelLater = false;
+    const close = () => {
+      screen.remove();
+      onCancel();
+      resolve(false);
+    };
     if (onCancel) {
-      // 여는 중(비밀번호 확인)에는 닫지 않는다 — 닫은 뒤에 확인이 끝나 열쇠가 남는 일이 없게 (확인이 끝나면 다시 누를 수 있음)
-      cancel = el('button', { type: 'button', class: 'btn', 'data-lock-cancel': '' }, '닫기');
+      // 여는 중(비밀번호 확인)에 닫으면: 확인이 끝난 뒤에 닫는다 (맞았어도 열지 않음 — 부르는 쪽이 열쇠를 거둔다)
+      const cancel = el('button', { type: 'button', class: 'btn', 'data-lock-cancel': '' }, '닫기');
       cancel.addEventListener('click', () => {
-        if (cancel.disabled) return;
-        screen.remove();
-        onCancel();
-        resolve(false);
+        if (!busy) return close();
+        cancelLater = true;
+        cancel.textContent = '닫는 중…';
       });
       actions.append(cancel);
     }
@@ -123,7 +128,7 @@ export function lockScreen(container, { title, onTry, onCancel }) {
       e.preventDefault();
       if (!field.input.value) return field.input.focus();
       open.disabled = true;
-      if (cancel) cancel.disabled = true;
+      busy = true;
       open.textContent = '여는 중…';
       let fail;
       try {
@@ -131,7 +136,8 @@ export function lockScreen(container, { title, onTry, onCancel }) {
       } catch (err) {
         fail = err?.message || '열지 못했어요';
       }
-      if (cancel) cancel.disabled = false;
+      busy = false;
+      if (cancelLater) return close();
       if (fail) {
         error.textContent = fail;
         open.disabled = false;

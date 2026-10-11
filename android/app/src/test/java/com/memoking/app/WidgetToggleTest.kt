@@ -50,4 +50,9 @@ class WidgetToggleTest {
         assertEquals("---\nid: a\nupdated: N\ndevice: phone\n---\nx", Widgets.stampEdit("---\nid: a\nupdated: O\n---\nx", "N"))
         assertEquals("머리말 없음", "- [ ] a", Widgets.stampEdit("- [ ] a", "N"))
     }
+
+    @Test
+    fun stampKeepsCrlf() {
+        assertEquals("---\r\nid: a\r\nupdated: N\r\ndevice: phone\r\n---\r\nx", Widgets.stampEdit("---\r\nid: a\r\nupdated: O\r\n---\r\nx", "N"))
+    }
 }
