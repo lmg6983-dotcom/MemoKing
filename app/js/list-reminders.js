@@ -88,7 +88,8 @@ export function setupRemindersTab({ api, container, empty, countEl, notify = (te
 
     const grid = document.createElement('div');
     grid.className = 'cal-grid';
-    grid.setAttribute('role', 'grid');
+    grid.setAttribute('role', 'group');
+    grid.setAttribute('aria-label', `${month.getFullYear()}년 ${month.getMonth() + 1}월`);
     for (const w of WEEKDAY) {
       const h = document.createElement('span');
       h.className = 'cal-wd';
@@ -316,7 +317,9 @@ export function setupRemindersTab({ api, container, empty, countEl, notify = (te
     if (active.length) out.push(heading(`타이머와 알림 ${active.length}`), ...active.map(row));
     if (off.length) out.push(heading(`꺼졌거나 끝난 알림 ${off.length}`), ...off.map(row));
 
+    const top = container.scrollTop; // 다시 그려도 보던 자리 그대로 (1분마다 새로 그릴 때·켜고 끌 때)
     container.replaceChildren(...out);
+    if (top) container.scrollTop = top;
     // 찾는 말에 맞는 일정·알림이 하나도 없으면 그렇게 알려 준다
     const searching = Boolean(query.trim());
     const found = items.some(matches);

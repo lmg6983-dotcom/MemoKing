@@ -29,7 +29,7 @@ import { createSttService } from './stt/stt-service.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
-import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
+import { normalizeMagicSettings, activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
@@ -2152,6 +2152,8 @@ function setMagicSettings(next) {
   registerMagicKey();
   syncFileIndex();
   if (!settings.magic.enabled && magicWin && !magicWin.isDestroyed()) magicWin.hide();
+  // 열려 있는 매직키 창의 캡슐도 바로 (설정에서 끈 기능은 캡슐이 사라짐)
+  if (magicWin && !magicWin.isDestroyed()) magicWin.webContents.send('magic:modules-changed', magicChips(settings.magic).map(({ id, name, description, on }) => ({ id, name, description, on })));
   return settings.magic;
 }
 
@@ -2594,16 +2596,11 @@ function registerIpc() {
     saveSettings();
     return mcpStatus();
   });
-  // 매직키 창 아래 캡슐: 쓸 수 있는 모듈 모두와 켜짐 여부 (누르면 켜고 끔)
-  const magicModuleList = () => {
-    const m = normalizeMagicSettings(settings.magic);
-    return MAGIC_MODULES.filter((x) => x.ready).map(({ id, name, description }) => ({ id, name, description, on: m.enabled && m.modules[id] }));
-  };
+  // 매직키 창 아래 캡슐: 설정에서 켠 기능만 (설정에서 끈 기능은 캡슐도 없음), 누르면 잠깐 끄고 켬
+  const magicModuleList = () => magicChips(settings.magic).map(({ id, name, description, on }) => ({ id, name, description, on }));
   ipcMain.handle('magic:modules', () => magicModuleList());
   ipcMain.handle('magic:toggle-module', (_e, id) => {
-    const m = normalizeMagicSettings(settings.magic);
-    if (!(id in m.modules)) return magicModuleList();
-    setMagicSettings({ ...m, modules: { ...m.modules, [id]: !m.modules[id] } });
+    setMagicSettings(toggleMagicChip(settings.magic, String(id)));
     return magicModuleList();
   });
   ipcMain.on('magic:close', () => { if (magicWin && !magicWin.isDestroyed()) magicWin.hide(); });

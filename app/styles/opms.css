@@ -30,7 +30,10 @@ body {
 .op-link { border: 0; padding: 0 2px; background: none; color: var(--op-accent); font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .op-link:hover { text-decoration: underline; }
 
-.op-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.op-head { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.op-head-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.op-actions { flex: none; display: flex; gap: 6px; }
+.op-memo { min-width: 132px; } /* "✓ 메모로 만들었어요" 로 바뀌어도 자리가 흔들리지 않게 */
 .op-refs { display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; font-size: 18px; }
 .op-refs b { font-weight: 800; }
 .op-refs span { color: var(--muted); }

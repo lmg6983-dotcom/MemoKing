@@ -872,12 +872,12 @@ $('auto-tags').addEventListener('change', async (e) => {
 });
 
 // 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)
-let magicState = { enabled: true, modules: {} };
+let magicState = { enabled: true, modules: {}, paused: {} };
 let magicIndex = null; // 파일 검색 목록 상태 { count, builtAt, building }
 const indexNote = (st) => (!st ? '' : st.building && !st.count ? ', 파일 목록을 만드는 중…' : st.count ? `, 파일 ${st.count.toLocaleString('ko-KR')}개${st.building ? ' (새로 고치는 중)' : ''}` : '');
 function renderMagicModules() {
   const list = $('magic-modules-list');
-  list.replaceChildren(...MAGIC_MODULES.map((m) => {
+  list.replaceChildren(...MAGIC_MODULES.filter((m) => m.ready).map((m) => { // 준비 중인 기능은 설정에도 보이지 않게
     const row = document.createElement('label');
     row.className = `magic-mod${m.ready ? '' : ' soon'}`;
     const cb = document.createElement('input');
@@ -886,7 +886,10 @@ function renderMagicModules() {
     cb.checked = m.ready && magicState.modules[m.id] !== false && !!magicState.modules[m.id];
     cb.disabled = !m.ready || !magicState.enabled;
     cb.addEventListener('change', async () => {
-      magicState = await api.settings.setMagic({ enabled: magicState.enabled, modules: { ...magicState.modules, [m.id]: cb.checked } });
+      // 설정에서 켜면 매직키 창에서 잠깐 꺼 둔 것도 함께 풀어 바로 쓰게 (끈 기능은 매직키 창에 캡슐도 없음)
+      const paused = { ...(magicState.paused ?? {}) };
+      delete paused[m.id];
+      magicState = await api.settings.setMagic({ enabled: magicState.enabled, modules: { ...magicState.modules, [m.id]: cb.checked }, paused });
       renderMagicModules();
     });
     const text = document.createElement('span');
@@ -897,7 +900,7 @@ function renderMagicModules() {
       text.append(em);
     }
     const small = document.createElement('small');
-    small.textContent = m.description + (m.id === 'files' && cb.checked ? indexNote(magicIndex) : '');
+    small.textContent = m.description + (m.id === 'files' && cb.checked ? indexNote(magicIndex) : '') + (cb.checked && magicState.paused?.[m.id] ? ' · 지금은 매직키 창에서 잠깐 꺼 둠' : '');
     text.append(' ', small);
     row.append(cb, text);
     return row;
@@ -910,7 +913,7 @@ function showMagic(magic) {
   renderMagicModules();
 }
 $('magic-enabled').addEventListener('change', async (e) => {
-  magicState = await api.settings.setMagic({ enabled: e.target.checked, modules: magicState.modules });
+  magicState = await api.settings.setMagic({ enabled: e.target.checked, modules: magicState.modules, paused: magicState.paused });
   showMagic(magicState);
 });
 $('history-enabled').addEventListener('change', async (e) => {
@@ -920,7 +923,7 @@ $('history-enabled').addEventListener('change', async (e) => {
 
 // ---------- 탭: 메모 · 알림 예약 · 알림 보관함 ----------
 
-const TAB_PLACEHOLDER = { memos: '메모 검색 (Ctrl+F)', reminders: '알림 검색', history: '보관한 알림 검색' };
+const TAB_PLACEHOLDER = { memos: '메모 검색 (Ctrl+F)', reminders: '일정 검색', history: '보관한 알림 검색' };
 let activeTab = 'memos';
 
 const remindersTab = setupRemindersTab({
@@ -1255,14 +1258,18 @@ function setListZoom(z, { show = true } = {}) {
   listZoomTimer = setTimeout(() => listZoomBadge.classList.remove('show'), 1600);
 }
 setListZoom(listZoom, { show: false });
+/** 카드 확대·축소는 메모 탭에서만 (일정·보관함은 카드가 아니라서) */
+const zoomable = () => activeTab === 'memos' && !el.main.hidden;
 window.addEventListener('wheel', (e) => {
   if (!e.ctrlKey) return;
   e.preventDefault(); // 창 전체(Chromium) 확대는 막는다
+  if (!zoomable()) return; // 메모 카드에만 — 일정·보관함 탭에서는 아무 일 없음
   if (e.deltaY) setListZoom(stepZoom(listZoom, e.deltaY < 0 ? 1 : -1));
 }, { passive: false });
 window.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || (e.shiftKey && e.code !== 'Equal')) return;
   if (e.target.closest?.('input, textarea, [contenteditable="true"]') && e.code !== 'Equal' && e.code !== 'Minus') return;
+  if (!zoomable() && /^(Equal|Minus|NumpadAdd|NumpadSubtract)$/.test(e.code)) return void e.preventDefault();
   if (e.code === 'Equal' || e.code === 'NumpadAdd') setListZoom(stepZoom(listZoom, 1));
   else if (e.code === 'Minus' || e.code === 'NumpadSubtract') setListZoom(stepZoom(listZoom, -1));
   else return;
@@ -1360,6 +1367,8 @@ const DAYS_LABEL = { 7: '7일', 30: '30일', 90: '90일', 365: '1년' };
 const agoText = (iso) => daysAgoText(iso);
 
 // 설정·휴지통처럼 둘러보는 창: 열 때 창 자체에 포커스 (첫 단추에 굵은 포커스 테두리가 먼저 생기지 않게, Tab 을 누르면 첫 단추부터)
+// 설정·휴지통·알림 모을 앱 창: 위 오른쪽 × 로 닫기 (긴 설정을 끝까지 내려가지 않아도 되게, Esc 도 그대로)
+document.addEventListener('click', (e) => e.target.closest('[data-dialog-close]')?.closest('dialog')?.close());
 function openPanelDialog(dialog) {
   dialog.tabIndex = -1;
   dialog.showModal();

@@ -14,21 +14,44 @@ export const MAGIC_MODULES = [
 
 /**
  * 저장된 설정 → 쓸 수 있는 설정. 모르는 모듈은 버리고, 준비 중인 모듈은 늘 꺼 둔다.
+ *   modules: 설정 창에서 켠 기능 (꺼 두면 매직키 창에 아예 나오지 않음)
+ *   paused: 매직키 창 아래 캡슐로 잠깐 끈 기능 (설정에서 켠 것만, 다시 누르면 켜짐)
  * @param {any} raw
- * @returns {{ enabled: boolean, modules: Record<string, boolean> }}
+ * @returns {{ enabled: boolean, modules: Record<string, boolean>, paused: Record<string, boolean> }}
  */
 export function normalizeMagicSettings(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const saved = src.modules && typeof src.modules === 'object' ? src.modules : {};
+  const savedPaused = src.paused && typeof src.paused === 'object' ? src.paused : {};
   const modules = {};
-  for (const m of MAGIC_MODULES) modules[m.id] = m.ready ? (typeof saved[m.id] === 'boolean' ? saved[m.id] : m.defaultOn) : false;
-  return { enabled: typeof src.enabled === 'boolean' ? src.enabled : true, modules };
+  const paused = {};
+  for (const m of MAGIC_MODULES) {
+    modules[m.id] = m.ready ? (typeof saved[m.id] === 'boolean' ? saved[m.id] : m.defaultOn) : false;
+    if (modules[m.id] && savedPaused[m.id] === true) paused[m.id] = true;
+  }
+  return { enabled: typeof src.enabled === 'boolean' ? src.enabled : true, modules, paused };
 }
 
-// 켜져 있고 쓸 수 있는 모듈들 (표시 순서대로)
+/** 매직키 창 아래 캡슐에 보일 기능: 설정에서 켠 것만 (켜짐 = 잠깐 끄지 않았음) */
+export const magicChips = (settings) => {
+  const s = normalizeMagicSettings(settings);
+  return s.enabled ? MAGIC_MODULES.filter((m) => m.ready && s.modules[m.id]).map((m) => ({ ...m, on: !s.paused[m.id] })) : [];
+};
+
+/** 매직키 창에서 잠깐 끄고 켜기 — 설정에서 꺼 둔 기능은 그대로(켜지지 않음) */
+export function toggleMagicChip(settings, id) {
+  const s = normalizeMagicSettings(settings);
+  if (!s.modules[id]) return s;
+  const paused = { ...s.paused };
+  if (paused[id]) delete paused[id];
+  else paused[id] = true;
+  return { ...s, paused };
+}
+
+// 지금 쓰는 모듈들: 설정에서 켜고, 매직키 창에서 잠깐 끄지 않은 것 (표시 순서대로)
 export const activeModules = (settings) => {
   const s = normalizeMagicSettings(settings);
-  return s.enabled ? MAGIC_MODULES.filter((m) => m.ready && s.modules[m.id]) : [];
+  return s.enabled ? MAGIC_MODULES.filter((m) => m.ready && s.modules[m.id] && !s.paused[m.id]) : [];
 };
 
 // 매직키 입력 → 메모 본문. 앞뒤 빈 줄은 빼고, 줄바꿈은 그대로 (첫 줄이 메모 제목이 된다)

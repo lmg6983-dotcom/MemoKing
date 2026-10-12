@@ -320,7 +320,8 @@ function setTab(tab) {
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
   el.filterBtn.hidden = tab !== 'memos';
-  el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '알림 검색', history: '보관한 알림 검색' }[tab];
+  el.layoutBtn.hidden = tab !== 'memos'; // 한 줄씩 보기도 메모 탭에서만
+  el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: '보관한 알림 검색' }[tab];
   $('fab').hidden = tab === 'history' || tab === 'reminders'; // 보관함·일정 탭엔 + 없음 (일정은 달력의 "＋ 일정 추가" 로)
   if (tab === 'reminders') remindersTab.refresh();
   runSearch();

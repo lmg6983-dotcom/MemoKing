@@ -60,7 +60,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-row[aria-selected="true"] .acts { display: inline-flex; }
 .magic-flash { color: var(--ok-text); font-weight: 700; }
 .magic-flash.err { color: var(--err-text); }
-.magic-note { padding: 8px 12px 10px; color: #8a8a8a; font-size: 12.5px; }
+.magic-note { padding: 8px 12px 10px; color: #6e6e6e; font-size: 12.5px; } /* 흰 바탕에서 4.5:1 넘게 */
 
 .magic-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px 10px 14px; border-top: 1px solid var(--mk-line); }
 .magic-modules { -webkit-app-region: no-drag; display: flex; flex: none; gap: 6px; }
@@ -68,7 +68,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
   display: inline-flex; align-items: center; gap: 6px;
   height: 24px; padding: 0 10px 0 8px;
   border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 999px;
-  background: transparent; color: #8a8a8a;
+  background: transparent; color: #6e6e6e;
   font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.08s;
 }
@@ -77,8 +77,9 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-chip .chip-dot { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #b5b5b5; transition: background 0.15s, box-shadow 0.15s; }
 .magic-chip.on { border-color: transparent; background: #fff1b8; color: #111; }
 .magic-chip.on .chip-dot { background: #22a35a; box-shadow: none; }
+.magic-chip:not(.on) { text-decoration: line-through; text-decoration-color: rgba(0, 0, 0, 0.35); } /* 잠깐 꺼 둠 — 켜진 것과 한눈에 */
 .magic-chip:focus-visible { outline: 2px solid #e0a800; outline-offset: 1px; }
-.magic-hint { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 10px; height: 18px; overflow: hidden; min-width: 0; color: #9a9a9a; font-size: 12px; white-space: nowrap; }
+.magic-hint { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 10px; height: 18px; overflow: hidden; min-width: 0; color: #707070; font-size: 12px; white-space: nowrap; }
 kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.06); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12); color: #555; font: 600 10.5px/16px inherit; text-align: center; }
 
 @media (prefers-color-scheme: dark) {
@@ -87,7 +88,9 @@ kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px
   .magic { background: #26262a; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08); }
   .magic-input, .magic-row .t, .magic-row b { color: #f3f3f3; }
   .magic-grip span { background: rgba(255, 255, 255, 0.2); }
-  .magic-chip { border-color: rgba(255, 255, 255, 0.14); }
+  .magic-chip { border-color: rgba(255, 255, 255, 0.14); color: #a8a8a8; }
+  .magic-chip:not(.on) { text-decoration-color: rgba(255, 255, 255, 0.35); }
+  .magic-note, .magic-hint { color: #a0a0a0; }
   .magic-chip.on { background: rgba(255, 205, 0, 0.18); color: #f3f3f3; }
   kbd { background: rgba(255, 255, 255, 0.1); color: #ddd; }
 }
