@@ -268,3 +268,40 @@ test('OPMS 전자포대: 내용이 같은 예전 파일은 그대로 쓴다 · �
   assert.deepEqual(['a.pdf', 'b.HWP', 'c.xlsx', 'invoice.pdf.exe', 'x.lnk', 'y.hta', 'z.js', 'w.vb', 'v.msix', 'noext', 'p.pdf. '].map(isOpenableFile),
     [true, true, true, false, false, false, false, false, false, false, true]);
 });
+
+test('OPMS 전자포대 기록: 동시 첫 사용 · 예전 기록 검사 · 깨진 기록 보존 · 서버별 · 같은 이름 동시 저장', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-index-'));
+  const index = path.join(dir, 'idx', 'opms-files.json');
+  fs.mkdirSync(path.dirname(index));
+  fs.writeFileSync(index, '{ 깨진');
+  const c = { ourref: 'Q-1', yourref: '' };
+  const caseDir = path.join(dir, wrapperFolderName(c));
+  fs.mkdirSync(caseDir);
+  // 예전 기록: 잘린 파일(크기 다름) · 폴더 밖을 가리키는 이름은 믿지 않는다
+  fs.writeFileSync(path.join(caseDir, '잘림.pdf'), 'AB');
+  fs.writeFileSync(path.join(dir, 'secret.pdf'), 'SECRET');
+  fs.writeFileSync(path.join(caseDir, '.memoking.json'), JSON.stringify({ 'u/cut': { name: '잘림.pdf', bytes: 10 }, 'u/evil': { name: '../secret.pdf', bytes: 6 } }));
+  let fetched = 0;
+  const bodies = { 'u/cut': 'ABCDEFGHIJ', 'u/evil': 'EVIL', 'u/a': 'AAA', 'u/b': 'BBB' };
+  const mk = (host) => new Opms({ host, fetch: async (url) => { fetched++; return new Response(bodies[url.split('/').slice(-2).join('/')]); }, retries: 0, filesIndex: index });
+  const client = mk('http://one');
+  const [cut, evil] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/cut', FILE_NAME_ORI: '잘림.pdf' }, { FILE_NAME_UPLOAD: 'u/evil', FILE_NAME_ORI: 'evil.pdf' }]);
+  const [f1, f2] = await Promise.all([client.fileFor(c, cut, dir), client.fileFor(c, evil, dir)]);
+  assert.equal(fs.readFileSync(f1, 'utf8'), 'ABCDEFGHIJ');
+  assert.equal(path.dirname(f2), caseDir);
+  assert.equal(fs.readFileSync(path.join(dir, 'secret.pdf'), 'utf8'), 'SECRET');
+  assert.equal(fs.readFileSync(path.join(caseDir, '잘림.pdf'), 'utf8'), 'AB'); // 예전 파일은 그대로
+  assert.ok(fs.readdirSync(path.dirname(index)).some((f) => f.includes('.broken-')));
+  // 같은 이름으로 정해진 두 서류를 동시에 저장해도 서로 덮어쓰지 않는다
+  const a = { n: 1, name: '같은.pdf', upload: 'u/a' };
+  const b = { n: 2, name: '같은.pdf', upload: 'u/b' };
+  const [fa, fb] = await Promise.all([client.fileFor(c, a, dir), client.fileFor(c, b, dir)]);
+  assert.notEqual(fa, fb);
+  assert.deepEqual([fs.readFileSync(fa, 'utf8'), fs.readFileSync(fb, 'utf8')], ['AAA', 'BBB']);
+  // 다른 서버의 같은 upload 는 다른 서류
+  const before = fetched;
+  await mk('http://two').fileFor(c, a, dir);
+  assert.equal(fetched, before + 1);
+  await client.files.writing;
+  assert.equal(fs.existsSync(path.join(caseDir, '.memoking.json')), false);
+});

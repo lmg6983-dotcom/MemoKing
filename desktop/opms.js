@@ -419,52 +419,93 @@ class FileIndex {
   constructor(file) {
     this.file = file;
     this.data = null;
+    this.loading = null; // 처음 읽기는 한 번만 (동시에 불러도 같은 기록을 함께 쓰게)
+    this.folders = new Map(); // 폴더 → 기록을 준비하는 일 (예전 기록 옮기기가 끝나기 전에 빈 기록을 보지 않게)
+    this.locks = new Map(); // 폴더 → 마지막 저장 일 (한 폴더 안의 저장은 차례로 — 같은 이름에 두 서류가 동시에 들어가지 않게)
     this.writing = Promise.resolve();
   }
 
-  async load() {
-    if (this.data) return this.data;
-    try {
-      const d = this.file ? JSON.parse(await fs.promises.readFile(this.file, 'utf8')) : {};
-      this.data = d && typeof d === 'object' && !Array.isArray(d) ? d : {};
-    } catch {
-      this.data = {};
-    }
-    return this.data;
+  load() {
+    this.loading ??= (async () => {
+      let raw = null;
+      try {
+        if (this.file) raw = await fs.promises.readFile(this.file, 'utf8');
+      } catch {
+        // 아직 없음
+      }
+      try {
+        const d = raw == null ? {} : JSON.parse(raw);
+        this.data = d && typeof d === 'object' && !Array.isArray(d) ? d : {};
+      } catch {
+        // 깨진 기록은 지우지 않고 옆에 남겨 둔다 (새 기록으로 덮어 다른 사건 기록까지 잃지 않게)
+        await fs.promises.rename(this.file, `${this.file}.broken-${Date.now()}`).catch(() => {});
+        this.data = {};
+      }
+      return this.data;
+    })();
+    return this.loading;
   }
 
-  static key(dir) {
-    return path.resolve(dir).toLowerCase();
+  /** 기록 칸: 서버마다 · 폴더마다 (서버를 바꾸면 같은 upload 라도 다른 서류) */
+  static key(dir, host = '') {
+    return `${String(host).toLowerCase()}|${path.resolve(dir).toLowerCase()}`;
   }
 
   /** 이 폴더의 기록 (0.31.2 의 폴더 안 기록이 있으면 가져온다) */
-  async folder(dir) {
-    const data = await this.load();
-    const k = FileIndex.key(dir);
-    if (!data[k]) {
-      data[k] = {};
-      try {
-        const legacy = JSON.parse(await fs.promises.readFile(path.join(dir, LEGACY_MANIFEST), 'utf8'));
-        for (const [upload, v] of Object.entries(legacy ?? {})) if (v?.name) data[k][upload] = v.name;
-        await fs.promises.rm(path.join(dir, LEGACY_MANIFEST), { force: true });
-        this.save();
-      } catch {
-        // 없음
-      }
-    }
-    return data[k];
+  folder(dir, host) {
+    const k = FileIndex.key(dir, host);
+    if (!this.folders.has(k)) this.folders.set(k, this.prepare(dir, k));
+    return this.folders.get(k);
   }
 
-  /** 기록 남기기 — 실패해도(읽기 전용 · 백신이 잡고 있음) 받은 파일은 그대로 쓴다. 쓰기는 차례로 */
+  async prepare(dir, k) {
+    const data = await this.load();
+    if (data[k]) return data[k];
+    const rec = {};
+    const legacyFile = path.join(dir, LEGACY_MANIFEST);
+    let legacy = null;
+    try {
+      legacy = JSON.parse(await fs.promises.readFile(legacyFile, 'utf8'));
+    } catch {
+      // 없음
+    }
+    if (legacy && typeof legacy === 'object') {
+      for (const [upload, v] of Object.entries(legacy)) {
+        // 이름은 이 폴더 안의 파일 이름일 때만, 크기가 기록과 같을 때만 (받다 끊긴 파일은 다시 받게)
+        const name = String(v?.name ?? '');
+        if (!name || safeFilename(name, '') !== name || path.basename(name) !== name) continue;
+        const size = await fs.promises.stat(path.join(dir, name)).then((st) => st.size, () => -1);
+        if (size >= 0 && size === v.bytes) rec[upload] = name;
+      }
+    }
+    data[k] = rec;
+    // 새 기록에 잘 남긴 뒤에만 예전 기록을 지운다
+    if (legacy && await this.save()) await fs.promises.rm(legacyFile, { force: true }).catch(() => {});
+    return rec;
+  }
+
+  /** 한 폴더 안의 저장 일을 차례로 */
+  exclusive(dir, job) {
+    const k = path.resolve(dir).toLowerCase();
+    const run = (this.locks.get(k) ?? Promise.resolve()).then(job, job);
+    const settled = run.catch(() => {});
+    this.locks.set(k, settled);
+    settled.then(() => { if (this.locks.get(k) === settled) this.locks.delete(k); });
+    return run;
+  }
+
+  /** 기록 남기기 → 잘 남겼으면 true. 실패해도(읽기 전용 · 백신이 잡고 있음) 받은 파일은 그대로 쓴다. 쓰기는 차례로 */
   save() {
-    if (!this.file) return this.writing;
-    this.writing = this.writing.then(async () => {
+    if (!this.file) return Promise.resolve(false);
+    const run = this.writing.then(async () => {
       const tmp = `${this.file}.${process.pid}.tmp`;
       await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
       await fs.promises.writeFile(tmp, JSON.stringify(this.data), 'utf8');
       await fs.promises.rename(tmp, this.file);
-    }).catch(() => {});
-    return this.writing;
+      return true;
+    }).catch(() => false);
+    this.writing = run;
+    return run;
   }
 }
 const fileIndexes = new Map(); // 기록 파일 → FileIndex (창마다 새 Opms 를 만들어도 같은 기록 · 같은 "받는 중" 을 함께 쓰게)
@@ -598,18 +639,25 @@ export class Opms {
   saveOne(dir, it) {
     const dest = path.join(dir, safeFilename(it.name, `attachment_${it.n}.bin`));
     if (path.dirname(dest) !== dir) return Promise.resolve(null); // 이름에 경로가 섞였으면 건너뛴다 (safeFilename 이 막지만 한 번 더)
-    const key = `${FileIndex.key(dir)}\n${String(it.upload ?? '').trim()}`;
-    if (!savingFiles.has(key)) savingFiles.set(key, this.saveFresh(dir, dest, it).finally(() => savingFiles.delete(key)));
+    const key = `${FileIndex.key(dir, this.host)}\n${String(it.upload ?? '').trim()}`;
+    if (!savingFiles.has(key)) {
+      savingFiles.set(key, this.files.exclusive(dir, () => this.saveFresh(dir, dest, it)).finally(() => savingFiles.delete(key)));
+    }
     return savingFiles.get(key);
   }
 
   async saveFresh(dir, dest, it) {
     const upload = String(it.upload ?? '').trim();
-    const folder = await this.files.folder(dir);
+    const folder = await this.files.folder(dir, this.host);
     const known = folder[upload];
-    if (known && await exists(path.join(dir, known))) return { file: path.join(dir, known), reused: true };
+    const knownFile = known ? path.join(dir, known) : null;
+    if (knownFile && path.dirname(knownFile) === dir && await exists(knownFile)) return { file: knownFile, reused: true };
     const res = await this.request(this.attachmentUrl(upload), { headers: { 'User-Agent': USER_AGENT } });
     const data = Buffer.from(await res.arrayBuffer());
+    // 받다 끊김: 압축하지 않은 응답이면 Content-Length 와 받은 크기가 같아야 한다 (압축 응답은 풀린 크기라 비교하지 않음)
+    const expected = Number(res.headers?.get?.('content-length'));
+    const encoded = String(res.headers?.get?.('content-encoding') ?? 'identity').toLowerCase();
+    if (encoded === 'identity' && Number.isFinite(expected) && expected > 0 && expected !== data.length) throw new Error('받는 중에 끊겼어요. 다시 해 주세요');
     const claimed = new Set(Object.entries(folder).filter(([u]) => u !== upload).map(([, n]) => n.toLowerCase()));
     let file = dest;
     if (await exists(file) || claimed.has(path.basename(file).toLowerCase())) {
@@ -626,10 +674,14 @@ export class Opms {
     const part = `${file}.${process.pid}-${Date.now().toString(36)}.part`;
     try {
       await fs.promises.writeFile(part, data);
-      await fs.promises.rename(part, file);
-    } catch (err) {
+      // 한 폴더 안의 저장은 차례로라 여기서 그 이름은 비어 있다 — 그래도 혹시 생겼으면 덮어쓰지 않는다
+      //   (하드 링크를 못 만드는 곳 — USB · 일부 공유 폴더 — 에서는 "없을 때만 복사")
+      await fs.promises.link(part, file).catch((err) => {
+        if (err.code === 'EEXIST') throw err;
+        return fs.promises.copyFile(part, file, fs.constants.COPYFILE_EXCL);
+      });
+    } finally {
       await fs.promises.rm(part, { force: true }).catch(() => {});
-      throw err;
     }
     folder[upload] = path.basename(file);
     this.files.save();
