@@ -166,19 +166,23 @@ export function safeFilename(name, fallback) {
 }
 
 /**
- * 저장할 때만: 이 폴더에 두기에 너무 긴 이름이면 줄인다 (보통 이름은 그대로 — 목록 · 예전 기록 · 다른 PC 와 같게).
- *   Windows 는 전체 경로 260자(탐색기 · Office · 한글이 열 수 있게), 그 밖은 이름 255바이트. 꼬리 " (2)" · 확장자는 남긴다
+ * 저장할 때만: 너무 긴 이름은 줄인다 (보통 이름은 그대로 — 목록 · 예전 기록 · 다른 PC 와 같게).
+ *   한도는 PC · 폴더와 상관없이 같다 (110자 · 240바이트) — 폴더를 함께 쓰는 PC 들이 같은 이름을 고르게,
+ *   Windows 에서 폴더 경로를 더해도 Excel(218자) · 탐색기가 열 수 있게. 가운데를 줄여 앞 · 끝(" 1부" · " 2부" 처럼
+ *   서류를 가르는 끝말)과 꼬리 " (2)" · 확장자는 남긴다
  */
-export function fitName(dir, name, platform = process.platform) {
-  const win = platform === 'win32';
-  const room = 16; // 나중에 붙을 수 있는 " (No.12-3)" 자리
-  const max = win ? Math.max(40, 259 - dir.length - 1 - room) : 255 - room;
-  const size = (t) => (win ? t.length : Buffer.byteLength(t));
-  if (size(name) <= max) return name;
+const NAME_CHARS = 110;
+const NAME_BYTES = 240;
+export function fitName(name) {
+  const fits = (t) => t.length <= NAME_CHARS && Buffer.byteLength(t) <= NAME_BYTES;
+  if (fits(name)) return name;
   const tail = /( \((?:\d+|No\.[\d-]+)\))?(\.[A-Za-z0-9]{1,10})?$/.exec(name)[0];
-  const chars = [...name.slice(0, name.length - tail.length)];
-  while (chars.length > 1 && size(`${chars.join('')}…${tail}`) > max) chars.pop();
-  return `${chars.join('').trimEnd()}…${tail}`;
+  const stem = [...name.slice(0, name.length - tail.length)];
+  const keepEnd = Math.min(20, Math.floor(stem.length / 3));
+  const end = stem.slice(stem.length - keepEnd).join('');
+  const head = stem.slice(0, stem.length - keepEnd);
+  while (head.length > 1 && !fits(`${head.join('')}…${end}${tail}`)) head.pop();
+  return `${head.join('').trimEnd()}…${end}${tail}`;
 }
 
 // "열기" 로 바로 여는 것은 서류 · 그림 · 압축 파일만. 그 밖의 것(실행 파일 · 바로 가기 · 스크립트 · 모르는 형식)은
@@ -593,8 +597,8 @@ class FileIndex {
       // 평소 기록보다 옛 끌 때 기록은 지운다 (나중에 평소 기록을 지우거나 깨져도 옛것이 살아나지 않게) — 더 새 번호는 그대로
       for (const q of [...this.quitSeqs]) {
         if (q >= seq) continue;
-        this.quitSeqs.delete(q);
-        await fs.promises.rm(this.quitFile(q), { force: true }).catch(() => {});
+        // 지우지 못했으면(잠깐 잠김) 기억해 두고 다음 쓰기 때 다시
+        if (await fs.promises.rm(this.quitFile(q), { force: true }).then(() => true, () => false)) this.quitSeqs.delete(q);
       }
       return true;
     } catch {
@@ -868,7 +872,7 @@ export class Opms {
    *     (받는 동안 같은 사건의 이미 받은 파일 열기를 막지 않게)
    */
   saveOne(dir, it) {
-    const dest = path.join(dir, fitName(dir, safeFilename(it.name, `attachment_${it.n}.bin`)));
+    const dest = path.join(dir, fitName(safeFilename(it.name, `attachment_${it.n}.bin`)));
     if (path.dirname(dest) !== dir) return Promise.resolve(null); // 이름에 경로가 섞였으면 건너뛴다 (safeFilename 이 막지만 한 번 더)
     const key = `${FileIndex.key(dir, this.host)}\n${String(it.upload ?? '').trim()}`;
     if (!savingFiles.has(key)) savingFiles.set(key, this.saveFresh(dir, dest, it).finally(() => savingFiles.delete(key)));
@@ -895,6 +899,13 @@ export class Opms {
       if (now) return { file: now, reused: true };
       const claimed = new Set(Object.entries(folder).filter(([u]) => u !== upload).map(([, n]) => n.toLowerCase()));
       const base = path.basename(dest);
+      // 예전 판이 줄이지 않은 긴 이름으로 받아 둔 그 서류가 있으면 그것을 쓴다
+      const full = path.join(dir, safeFilename(it.name, base));
+      if (full !== dest && path.dirname(full) === dir && !claimed.has(path.basename(full).toLowerCase()) && await sameBytes(full, data)) {
+        folder[upload] = path.basename(full);
+        this.files.save();
+        return { file: full, reused: true };
+      }
       // 이름 후보: 원래 이름 → (No.n) → (No.n-2) … 내용이 같은 파일이 있으면 그것, 아니면 첫 빈 이름.
       //   고른 이름이 그사이 생겼으면(다른 PC 의 파일이 동기화로 들어옴) 다음 후보로
       let file = null;

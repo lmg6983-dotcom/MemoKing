@@ -393,20 +393,27 @@ test('OPMS 전자포대 기록: 바로 기록 · 앱을 끌 때는 따로(.quit)
   // 아주 긴 서류 이름도 받는다 (이름은 줄이고 확장자는 남김) — 이름 고르기가 끝없이 돌지 않게
   const long = `${'가'.repeat(300)}.pdf`;
   const saved = await client.saveOne(caseDir, { n: 3, name: long, upload: 'u/long' });
-  assert.ok(saved.file.endsWith('.pdf') && Buffer.byteLength(path.basename(saved.file)) <= 255);
+  assert.ok(saved.file.endsWith('.pdf') && Buffer.byteLength(path.basename(saved.file)) <= 240);
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
   assert.deepEqual(fs.readdirSync(caseDir).filter((f) => f.endsWith('.part')), []);
 });
 
-test('OPMS 전자포대: 너무 긴 이름만 저장할 때 줄임 (꼬리 · 확장자 유지, Windows 는 전체 경로 260자 안)', () => {
-  assert.equal(fitName('/tmp/x', '보통 이름.pdf'), '보통 이름.pdf');
-  const linux = fitName('/tmp/x', `${'가'.repeat(80)} (2).pdf`, 'linux');
-  assert.ok(linux.endsWith('… (2).pdf') && Buffer.byteLength(linux) <= 255 - 16);
-  const dir = String.raw`C:\Users\me\Google Drive\전자포대\FPD20260271E_1020260012345`;
-  const win = fitName(dir, `${'a'.repeat(200)} (No.3).pdf`, 'win32');
-  assert.ok(win.endsWith('… (No.3).pdf') && dir.length + 1 + win.length + 16 <= 259);
+test('OPMS 전자포대: 너무 긴 이름만 저장할 때 줄임 (가운데를 줄여 앞 · 끝말 · 꼬리 · 확장자 유지, 어느 PC 든 같은 결과)', async () => {
+  assert.equal(fitName('보통 이름.pdf'), '보통 이름.pdf');
+  const one = fitName(`${'가'.repeat(85)} 1부.pdf`);
+  const two = fitName(`${'가'.repeat(85)} 2부.pdf`);
+  assert.notEqual(one, two);
+  assert.ok(one.endsWith(' 1부.pdf') && one.includes('…') && one.length <= 110 && Buffer.byteLength(one) <= 240);
+  assert.ok(fitName(`${'a'.repeat(200)} (No.3).xlsx`).endsWith(' (No.3).xlsx'));
   // 목록에 보이는 이름은 줄이지 않는다
   assert.equal(attachmentItems([{ FILE_NAME_UPLOAD: 'u', FILE_NAME_ORI: `${'나'.repeat(90)}.pdf` }])[0].name, `${'나'.repeat(90)}.pdf`);
+  // 예전 판이 긴 이름 그대로 받아 둔 같은 서류는 그대로 쓴다
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-long-'));
+  const longName = `${'b'.repeat(150)}.pdf`;
+  fs.writeFileSync(path.join(dir, longName), 'SAME');
+  const client = new Opms({ fetch: async () => new Response('SAME'), retries: 0 });
+  const r = await client.saveOne(dir, { n: 1, name: longName, upload: 'u/long' });
+  assert.deepEqual([path.basename(r.file), r.reused], [longName, true]);
 });
 
 test('OPMS 전자포대 기록: 끌 때 기록이 여럿이면 가장 새것(깨졌으면 그다음) · 평소 기록이 새로 남으면 옛것만 지움', async () => {
