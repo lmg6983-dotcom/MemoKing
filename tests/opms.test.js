@@ -470,3 +470,20 @@ test('OPMS 전자포대 기록: 0.31.3 의 기록(폴더 경로만)을 이어받
   const rec = (await client.files.load())[`${client.host.toLowerCase()}|${path.resolve(caseDir).toLowerCase()}`];
   assert.deepEqual(rec, { 'u/2': '다른.pdf', 'u/1': '의견서.pdf' });
 });
+
+test('OPMS 전자포대: 서버가 응답하지 않으면 남은 파일은 기다리지 않고 함께 실패 · 끊긴 받기는 한 번 더 받아 봄', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-offline-'));
+  const c = { ourref: 'W-1', yourref: '' };
+  let calls = 0;
+  const off = new Opms({ fetch: async () => { calls++; throw new Error('ECONNREFUSED'); }, retries: 0 });
+  const items = [1, 2, 3].map((n) => ({ n, name: `${n}.pdf`, upload: `u/${n}` }));
+  const res = await off.download(c, items, { baseDir: dir });
+  assert.equal(calls, 1);
+  assert.equal(res.failed.length, 3);
+  // Content-Length 보다 짧게 끝나면 다시 받아 본다
+  let tries = 0;
+  const flaky = new Opms({ fetch: async () => (++tries === 1 ? new Response('AB', { headers: { 'content-length': '4' } }) : new Response('ABCD')), retries: 1 });
+  const [it] = items;
+  const ok = await flaky.download(c, [it], { baseDir: dir });
+  assert.deepEqual([ok.saved, tries], [1, 2]);
+});

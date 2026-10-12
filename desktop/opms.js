@@ -519,9 +519,14 @@ class FileIndex {
     return this.loading;
   }
 
+  /** 폴더만의 키 (잠금 · 0.31.3 기록의 키) */
+  static folderKey(dir) {
+    return path.resolve(dir).toLowerCase();
+  }
+
   /** 기록 칸: 서버마다 · 폴더마다 (서버를 바꾸면 같은 upload 라도 다른 서류) */
   static key(dir, host = '') {
-    return `${String(host).toLowerCase()}|${path.resolve(dir).toLowerCase()}`;
+    return `${String(host).toLowerCase()}|${FileIndex.folderKey(dir)}`;
   }
 
   /** 이 폴더의 기록 (0.31.2 의 폴더 안 기록이 있으면 가져온다) */
@@ -538,7 +543,7 @@ class FileIndex {
     let changed = !data[k];
     // 예전 기록을 이어받는다 (이미 있는 것이 이김) — 고쳐 둔 파일을 다시 받지 않게
     //   0.31.3: 서버 구분 없이 폴더 경로만으로 기록 (어느 서버였는지 모르니 이 폴더를 처음 여는 서버가 이어받음)
-    const oldKey = path.resolve(dir).toLowerCase();
+    const oldKey = FileIndex.folderKey(dir);
     const old = data[oldKey];
     if (old && typeof old === 'object') {
       for (const [upload, name] of Object.entries(old)) if (!rec[upload] && validRecordName(name)) rec[upload] = name;
@@ -567,7 +572,7 @@ class FileIndex {
 
   /** 한 폴더 안의 저장 일을 차례로 */
   exclusive(dir, job) {
-    const k = path.resolve(dir).toLowerCase();
+    const k = FileIndex.folderKey(dir);
     const run = (this.locks.get(k) ?? Promise.resolve()).then(job, job);
     const settled = run.catch(() => {});
     this.locks.set(k, settled);
@@ -714,7 +719,8 @@ async function sweepOld(dir, match) {
   }
 }
 // 지금의 "~$mk-….part" 와 예전 판(0.31.2 · 0.31.5)이 남겼을 수 있는 "<이름>.<pid>-<시각>.part"
-const isPartFile = (name) => (name.startsWith(PART_PREFIX) && name.endsWith('.part')) || /\.\d+-[0-9a-z]+\.part$/.test(name);
+//   (예전 꼴은 pid(숫자 2~7자리) - Date.now() 36진수(8자리 이상) 그대로일 때만 — 사용자 파일 "drawing.2-a.part" 같은 것은 건드리지 않음)
+const isPartFile = (name) => (name.startsWith(PART_PREFIX) && name.endsWith('.part')) || /\.\d{2,7}-[0-9a-z]{8,9}\.part$/.test(name);
 const sweepParts = (dir) => sweepOld(dir, isPartFile);
 
 async function markFromServer(file, host) {
@@ -786,7 +792,13 @@ export class Opms {
           chunks.push(Buffer.from(value));
         }
       }
-      return { res, data: Buffer.concat(chunks) };
+      const data = Buffer.concat(chunks);
+      // 받다 끊김: 압축하지 않은 응답이면 Content-Length 와 받은 크기가 같아야 한다 (압축 응답은 풀린 크기라 비교하지 않음)
+      //   — 여기서 던지면 request() 가 한 번 더 받아 본다
+      const expected = Number(res.headers?.get?.('content-length'));
+      const encoded = String(res.headers?.get?.('content-encoding') ?? 'identity').toLowerCase();
+      if (encoded === 'identity' && Number.isFinite(expected) && expected > 0 && expected !== data.length) throw new Error('받는 중에 끊겼어요. 다시 해 주세요');
+      return { res, data };
     } catch (err) {
       ctl.abort(err); // 멈춤 · 오류로 그만둘 때 연결도 끊는다
       throw err;
@@ -904,11 +916,7 @@ export class Opms {
     };
     const had = await knownFile();
     if (had) return { file: had, reused: true };
-    const { res, data } = await this.request(this.attachmentUrl(upload), { headers: { 'User-Agent': USER_AGENT } }, { timeoutMs: this.downloadIdleMs, retries: Math.min(1, this.retries), bytes: true });
-    // 받다 끊김: 압축하지 않은 응답이면 Content-Length 와 받은 크기가 같아야 한다 (압축 응답은 풀린 크기라 비교하지 않음)
-    const expected = Number(res.headers?.get?.('content-length'));
-    const encoded = String(res.headers?.get?.('content-encoding') ?? 'identity').toLowerCase();
-    if (encoded === 'identity' && Number.isFinite(expected) && expected > 0 && expected !== data.length) throw new Error('받는 중에 끊겼어요. 다시 해 주세요');
+    const { data } = await this.request(this.attachmentUrl(upload), { headers: { 'User-Agent': USER_AGENT } }, { timeoutMs: this.downloadIdleMs, retries: Math.min(1, this.retries), bytes: true });
     return this.files.exclusive(dir, async () => {
       const now = await knownFile();
       if (now) return { file: now, reused: true };
@@ -987,6 +995,11 @@ export class Opms {
         done.push({ ...it, name: path.basename(r.file) }); // 실제로 저장된 이름 (다른 이름으로 피해 저장했을 수도)
       } catch (err) {
         failed.push({ name: it.name, error: err.message });
+        if (err.offline) {
+          // 서버가 응답하지 않으면 남은 파일마다 다시 기다리지 않고 함께 실패로 (30개면 한 시간씩 걸리지 않게)
+          for (const rest of items.slice(i + 1)) failed.push({ name: rest.name, error: err.message });
+          break;
+        }
       }
     }
     if (all) {

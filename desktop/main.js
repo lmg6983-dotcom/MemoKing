@@ -393,12 +393,16 @@ function trackPaint(win) {
   let mark;
   paintedOf.set(win, new Promise((resolve) => { mark = resolve; }));
   const wc = win.webContents;
+  const onShow = () => {
+    if (!wc.isLoading()) mark();
+    else wc.once('did-finish-load', mark);
+  };
   win.once('ready-to-show', mark);
   wc.once('did-fail-load', mark);
   wc.once('render-process-gone', mark);
-  win.on('show', () => {
-    if (!wc.isLoading()) mark();
-    else wc.once('did-finish-load', mark);
+  win.on('show', onShow);
+  paintedOf.get(win).then(() => {
+    if (!win.isDestroyed()) win.off('show', onShow); // 그린 뒤로는 더 볼 일이 없다
   });
 }
 function whenPainted(win, fn) {
@@ -2706,6 +2710,7 @@ function registerIpc() {
     return text.split('\n').length;
   });
   ipcMain.handle('opms:bills', (_e, idx) => opmsClient().bills(caseOf(idx).idx));
+  const gonePicks = (picked, list) => picked.filter((u) => !list.some((it) => it.upload === u)).length;
   // 전자포대 목록은 사건마다 잠깐 기억해 둔다 — "열기" 마다 DB 를 다시 묻지 않게 (목록을 새로 보면 갱신)
   const attachCache = new Map(); // "서버 주소 + 사건 idx" → { at, list } (설정에서 서버를 바꾸면 다른 칸)
   const ATTACH_TTL = 5 * 60_000;
@@ -2723,17 +2728,21 @@ function registerIpc() {
     const c = caseOf(idx);
     const client = opmsClient();
     // 줄은 서버 파일 경로(upload)로 찾는다 — 번호(n)는 서버 목록이 바뀌면 다른 서류를 가리킬 수 있어서
-    const want = [...new Set((Array.isArray(uploads) ? uploads : []).map(String))];
+    const picked = (Array.isArray(uploads) ? uploads : []).map(String); // 고른 줄마다 하나 (같은 파일이 두 줄이면 두 번)
+    const want = [...new Set(picked)];
     let list = await attachmentsOf(c);
     if (!all && want.some((u) => !list.some((it) => it.upload === u))) list = await attachmentsOf(c, { fresh: true });
     // 같은 서버 파일이 두 줄에 걸려 있어도 한 번만 받는다
-    const items = (all ? list : list.filter((it) => want.includes(it.upload))).filter((it, i, arr) => arr.findIndex((x) => x.upload === it.upload) === i);
+    const rows = all ? list : list.filter((it) => want.includes(it.upload));
+    const items = rows.filter((it, i, arr) => arr.findIndex((x) => x.upload === it.upload) === i);
+    const sameFileRows = (all ? rows.length : picked.length - gonePicks(picked, list)) - items.length; // 받은 파일과 같은 파일인 나머지 줄
     const gone = all ? [] : want.filter((u) => !list.some((it) => it.upload === u));
     const res = await client.download(c, items, {
       baseDir: opmsSettings().wrapperDir,
       all: Boolean(all),
       onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', p); },
     });
+    if (sameFileRows > 0) res.skipped += sameFileRows; // 고른 줄 수와 결과 수가 맞게 ("이미 있음" 으로)
     // 고른 줄이 그사이 서버 목록에서 사라졌으면 실패로 알린다 ("0개 저장" 으로 조용히 끝나지 않게)
     for (const u of gone) res.failed.push({ upload: u, name: path.basename(u), error: 'OPMS 목록에서 사라졌어요. 새로 고침 해 주세요' }); // 화면이 고른 줄의 이름으로 바꿔 보여 줌
     opmsLastDir = res.dir;
