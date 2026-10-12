@@ -316,7 +316,7 @@ test('OPMS 전자포대: 이름 속 점 · 요약의 HTML 글자 · 사건정보
   const c = { ourref: 'R-1', yourref: '' };
   fs.mkdirSync(path.join(dir, wrapperFolderName(c)));
   fs.writeFileSync(path.join(dir, wrapperFolderName(c), '통지서.pdf'), 'OTHER');
-  // 큰 파일: 조금씩이라도 오면 끝까지 (멈춘 시간 80ms 제한 · 30ms 마다 한 조각 · 전체 300ms) — 아예 멈추면 실패
+  // 큰 파일: 조금씩이라도 오면 끝까지 (멈춘 시간 300ms 제한 · 25ms 마다 한 조각 · 전체 600ms) — 아예 멈추면 실패
   const trickle = (n, gap) => new Response(new ReadableStream({ async start(ctl) {
     for (let i = 0; i < n; i++) {
       await new Promise((r) => setTimeout(r, gap));
@@ -324,14 +324,14 @@ test('OPMS 전자포대: 이름 속 점 · 요약의 HTML 글자 · 사건정보
     }
     ctl.close();
   } }));
-  const client = new Opms({ fetch: async () => trickle(10, 30), retries: 0, downloadIdleMs: 80 });
-  const stuck = new Opms({ fetch: async () => trickle(2, 500), retries: 0, downloadIdleMs: 80 });
+  const client = new Opms({ fetch: async () => trickle(24, 25), retries: 0, downloadIdleMs: 300 });
+  const stuck = new Opms({ fetch: async () => trickle(2, 1500), retries: 0, downloadIdleMs: 300 });
   await assert.rejects(stuck.saveOne(path.join(dir, wrapperFolderName(c)), { n: 9, name: '멈춤.pdf', upload: 'u/9' }), /멈췄어요/);
   assert.equal(fs.existsSync(path.join(dir, wrapperFolderName(c), '멈춤.pdf')), false);
   const res = await client.download(c, [{ n: 1, name: '통지서.pdf', size: '4 B', upload: 'u/1' }], { baseDir: dir, all: true });
   assert.deepEqual(res.failed, []);
   assert.match(fs.readFileSync(path.join(res.dir, '사건정보.txt'), 'utf8'), /1\. 통지서 \(No\.1\)\.pdf/);
-  assert.equal(fs.readFileSync(path.join(res.dir, '통지서 (No.1).pdf'), 'utf8'), 'MMMMMMMMME');
+  assert.equal(fs.readFileSync(path.join(res.dir, '통지서 (No.1).pdf'), 'utf8'), `${'M'.repeat(23)}E`);
 });
 
 test('OPMS 전자포대: 기록이 없을 때 같은 내용의 (No.n) 사본을 또 만들지 않음 · 받는 중에도 이미 받은 파일은 바로 열림', async () => {
@@ -353,9 +353,24 @@ test('OPMS 전자포대: 기록이 없을 때 같은 내용의 (No.n) 사본을 
   await client.fileFor(c, { n: 2, name: 'b.pdf', upload: 'u/b' }, dir);
   const slow = client.fileFor(c, { n: 3, name: 'c.pdf', upload: 'u/slow' }, dir);
   await new Promise((r) => setTimeout(r, 30));
-  const t0 = Date.now();
-  assert.equal(path.basename(await client.fileFor(c, { n: 2, name: 'b.pdf', upload: 'u/b' }, dir)), 'b.pdf');
-  assert.ok(Date.now() - t0 < 200);
+  // 느린 받기는 release() 전에는 끝나지 않으니, 잠금에 걸렸다면 이 열기도 끝나지 않는다
+  const opened = await Promise.race([client.fileFor(c, { n: 2, name: 'b.pdf', upload: 'u/b' }, dir), new Promise((r) => setTimeout(() => r('막힘'), 3000))]);
+  assert.equal(path.basename(opened), 'b.pdf');
   release();
   assert.equal(fs.readFileSync(await slow, 'utf8'), 'S');
+});
+
+test('OPMS 전자포대 기록: 앱을 끌 때 바로 남기고 기다리던 save() 도 끝남 · 끝난 뒤의 비동기 쓰기는 덮지 않음', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-flush-'));
+  const index = path.join(dir, 'opms-files.json');
+  const client = new Opms({ fetch: async () => new Response('X'), retries: 0, filesIndex: index });
+  const c = { ourref: 'T-1', yourref: '' };
+  fs.mkdirSync(path.join(dir, wrapperFolderName(c)), { recursive: true });
+  await client.saveOne(path.join(dir, wrapperFolderName(c)), { n: 1, name: 'x.pdf', upload: 'u/x' });
+  const waiting = client.files.save();
+  client.files.flushSync();
+  assert.equal(await waiting, true);
+  assert.match(fs.readFileSync(index, 'utf8'), /u\/x/);
+  assert.equal(await client.files.writeNow(), false);
+  assert.deepEqual(fs.readdirSync(path.join(dir, wrapperFolderName(c))), ['x.pdf']);
 });

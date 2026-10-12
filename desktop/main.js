@@ -387,11 +387,19 @@ function openNote(id, { inactive = false, record = false, ink = false, big = fal
 // show: false 면 숨긴 채로 만들어 둔다 (스택의 다른 탭 — 누르면 바로 보이도록)
 // 첫 화면을 그린 창 ('ready-to-show' 가 이미 지나감). 불러오기(isLoading)는 그 뒤에도 이어질 수 있어
 //   "아직 불러오는 중이면 ready-to-show 를 기다린다" 로는 놓친다 — 그린 적이 있는지로 판단
-//   ready-to-show 는 첫 화면 전에 이미 보인(show) 창에는 오지 않으니, 보이는 창은 바로 · 'show' 도 그린 것으로 친다
+//   ready-to-show 는 첫 화면 전에 이미 보인(show) 창에는 오지 않으니, 그런 창은 불러오기가 끝나면(did-finish-load) —
+//   화면 스크립트가 'memo:highlight' 등을 들을 준비가 된 뒤에. 둘 중 먼저 오는 것으로 한 번만
 const paintedWins = new WeakSet();
 function whenPainted(win, fn) {
-  if (paintedWins.has(win) || win.isVisible()) fn();
-  else win.once('ready-to-show', fn);
+  let done = false;
+  const run = () => {
+    if (done || win.isDestroyed()) return;
+    done = true;
+    fn();
+  };
+  if (paintedWins.has(win) || (win.isVisible() && !win.webContents.isLoading())) return run();
+  win.once('ready-to-show', run);
+  win.webContents.once('did-finish-load', run);
 }
 
 function createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false, ink = false, big = false } = {}) {
@@ -443,7 +451,6 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null, re
   });
   win.on('resized', remember);
   win.once('ready-to-show', () => paintedWins.add(win));
-  win.once('show', () => paintedWins.add(win));
   if (show) win.once('ready-to-show', () => (inactive ? win.showInactive() : win.show()));
   pushList();
   // 스택 창을 닫으면(Alt+F4 등) 숨은 탭들도 함께 닫는다
@@ -2720,7 +2727,7 @@ function registerIpc() {
       onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', p); },
     });
     // 고른 줄이 그사이 서버 목록에서 사라졌으면 실패로 알린다 ("0개 저장" 으로 조용히 끝나지 않게)
-    for (const u of gone) res.failed.push({ name: path.basename(u), error: 'OPMS 목록에서 사라졌어요. 새로 고침 해 주세요' });
+    for (const u of gone) res.failed.push({ upload: u, name: path.basename(u), error: 'OPMS 목록에서 사라졌어요. 새로 고침 해 주세요' }); // 화면이 고른 줄의 이름으로 바꿔 보여 줌
     opmsLastDir = res.dir;
     if (!SMOKE) shell.openPath(res.dir); // 받은 폴더를 탐색기로 (OPMS 조회 프로그램처럼)
     return res;
@@ -3342,6 +3349,10 @@ app.whenReady().then(async () => {
   });
 
   // 절전에서 깨어나면 그 사이 알림을 바로 확인
+  // Windows 를 끄거나 로그오프할 때는 will-quit 가 오지 않는다 — 창의 session-end 와 (리눅스 · 맥) shutdown 에서 기록 남기기
+  for (const w of BrowserWindow.getAllWindows()) w.on('session-end', flushOpmsFiles);
+  app.on('browser-window-created', (_e, w) => w.on('session-end', flushOpmsFiles));
+  powerMonitor.on('shutdown', flushOpmsFiles);
   powerMonitor.on('resume', () => {
     alarms.tick();
     driveSync?.request(3000);

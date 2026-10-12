@@ -470,6 +470,7 @@ class FileIndex {
   }
 
   async prepare(dir, k) {
+    sweepParts(dir);
     const data = await this.load();
     if (data[k]) return data[k];
     const rec = {};
@@ -510,39 +511,63 @@ class FileIndex {
    */
   save() {
     if (!this.file || this.readOnly) return Promise.resolve(false);
-    if (!this.pending) {
-      this.pending = new Promise((resolve) => {
-        this.timer = setTimeout(() => {
-          this.timer = null;
-          this.pending = null;
-          const run = this.writing.then(async () => {
-            const tmp = `${this.file}.${process.pid}.tmp`;
-            await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
-            await fs.promises.writeFile(tmp, JSON.stringify(this.data), 'utf8');
-            await fs.promises.rename(tmp, this.file);
-            return true;
-          }).catch(() => false);
-          this.writing = run;
-          resolve(run);
-        }, 300);
-      });
-    }
+    this.dirty = true;
+    this.pending ??= new Promise((resolve) => {
+      this.settle = resolve;
+      this.timer = setTimeout(() => resolve(this.writeNow()), 300);
+    });
     return this.pending;
   }
 
-  /** 모아 둔 기록을 지금 바로 (앱을 끌 때 — 기다릴 수 없으니 동기로) */
-  flushSync() {
-    if (!this.timer || !this.data) return;
+  /** 모아 둔 기록을 지금 (전체 받기 · 열기가 끝날 때 — 끄기 직전에 몰리지 않게) */
+  writeNow() {
+    if (!this.file || this.readOnly) return Promise.resolve(false);
     clearTimeout(this.timer);
+    const settle = this.settle;
     this.timer = null;
     this.pending = null;
-    try {
-      fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      fs.writeFileSync(`${this.file}.${process.pid}.tmp`, JSON.stringify(this.data), 'utf8');
-      fs.renameSync(`${this.file}.${process.pid}.tmp`, this.file);
-    } catch {
-      // 다음 실행 때 다시 받는 정도
+    this.settle = null;
+    if (!this.dirty) {
+      settle?.(this.writing);
+      return this.writing;
     }
+    this.dirty = false;
+    const run = this.writing.then(async () => {
+      const tmp = `${this.file}.${process.pid}.tmp`;
+      await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
+      await fs.promises.writeFile(tmp, JSON.stringify(this.data), 'utf8');
+      if (this.closed) return false; // 앱을 끄며 flushSync 가 이미 최신 기록을 남김 — 옛 기록으로 덮지 않게
+      await fs.promises.rename(tmp, this.file);
+      return true;
+    }).catch(() => false);
+    this.writing = run;
+    settle?.(run);
+    return run;
+  }
+
+  /**
+   * 앱을 끌 때 — 기다릴 수 없으니 동기로. 쓰는 중인 비동기 기록과 다른 임시 파일을 쓰고, 그 뒤의 비동기 이름 바꾸기는 막는다
+   *   (모아 둔 것이 없어도 쓰는 중이었을 수 있으니 기록이 있으면 늘 남긴다)
+   */
+  flushSync() {
+    if (!this.file || this.readOnly || !this.data || this.closed) return;
+    this.closed = true;
+    clearTimeout(this.timer);
+    const settle = this.settle;
+    this.timer = null;
+    this.pending = null;
+    this.settle = null;
+    let ok = false;
+    try {
+      const tmp = `${this.file}.${process.pid}.quit.tmp`;
+      fs.mkdirSync(path.dirname(this.file), { recursive: true });
+      fs.writeFileSync(tmp, JSON.stringify(this.data), 'utf8');
+      fs.renameSync(tmp, this.file);
+      ok = true;
+    } catch {
+      // 다음 실행 때 내용을 비교해 다시 맞춘다
+    }
+    settle?.(ok);
   }
 }
 /** 앱을 끌 때: 아직 쓰지 않은 전자포대 기록을 모두 남긴다 */
@@ -567,9 +592,11 @@ const DOWNLOAD_IDLE_MS = 60_000;
 const MACRO_EXT = new Set(['doc', 'dot', 'xls', 'xlt', 'ppt', 'pot', 'pps', 'rtf',
   'docm', 'dotm', 'xlsm', 'xltm', 'xlsb', 'xlam', 'pptm', 'potm', 'ppsm', 'ppam', 'sldm']);
 // 새 파일을 "그 이름이 비어 있을 때만" 제자리에: 같은 폴더의 임시 파일에 다 쓴 뒤 하드 링크(있으면 실패 · 한 번에 나타남).
-//   하드 링크를 못 만드는 곳(USB · 일부 공유 폴더)에서는 한 번 더 비어 있는지 보고 이름 바꾸기
+//   하드 링크를 못 만드는 곳(USB · Drive 스트리밍 등)에서는 바로 앞에서 비어 있는지 다시 보고 이름 바꾸기.
+//   임시 파일 이름은 짧게(긴 서류 이름도 255자를 넘지 않게) · "~$" 로 시작 (Office 임시 파일처럼 동기화 프로그램이 건너뜀)
+const PART_PREFIX = '~$mk-';
 async function placeNew(file, data) {
-  const part = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}-${Date.now().toString(36)}.part`);
+  const part = path.join(path.dirname(file), `${PART_PREFIX}${process.pid.toString(36)}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.part`);
   try {
     await fs.promises.writeFile(part, data, { flag: 'wx' });
     try {
@@ -581,6 +608,18 @@ async function placeNew(file, data) {
     }
   } finally {
     await fs.promises.rm(part, { force: true }).catch(() => fs.promises.rm(part, { force: true }).catch(() => {}));
+  }
+}
+
+// 끊긴 저장이 남긴 임시 파일 정리 (10분 넘은 것만 — 다른 PC 가 지금 쓰는 중일 수 있으니)
+async function sweepParts(dir) {
+  const names = await fs.promises.readdir(dir).catch(() => []);
+  const old = Date.now() - 10 * 60_000;
+  for (const name of names) {
+    if (!name.startsWith(PART_PREFIX) || !name.endsWith('.part')) continue;
+    const file = path.join(dir, name);
+    const st = await fs.promises.stat(file).catch(() => null);
+    if (st && st.mtimeMs < old) await fs.promises.rm(file, { force: true }).catch(() => {});
   }
 }
 
@@ -639,7 +678,10 @@ export class Opms {
     arm();
     try {
       const res = await Promise.race([this.fetch(url, { ...init, signal: ctl.signal }), stall]);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        res.body?.cancel().catch(() => {}); // 오류 본문은 읽지 않고 연결을 놓는다
+        throw new Error(`HTTP ${res.status}`);
+      }
       const chunks = [];
       const reader = res.body?.getReader();
       if (reader) {
@@ -651,6 +693,9 @@ export class Opms {
         }
       }
       return { res, data: Buffer.concat(chunks) };
+    } catch (err) {
+      ctl.abort(err); // 멈춤 · 오류로 그만둘 때 연결도 끊는다
+      throw err;
     } finally {
       clearTimeout(timer);
     }
@@ -743,7 +788,7 @@ export class Opms {
    *   - 전에 받은 그 서류(기록에 있음)면 다시 받지 않는다 — 사용자가 고쳐 저장했어도 그대로
    *   - 기록에 없는 같은 이름 파일(예전 방식으로 받은 것 · 사용자가 둔 것 · 다른 PC 가 받은 것)은 덮어쓰지 않는다:
    *     받아 보고 내용이 같은 파일이 있으면 그것을 쓰고, 없으면 "이름 (No.3).pdf" 처럼 빈 이름에 저장
-   *   - 같은 폴더의 임시 파일(.part)에 다 쓴 뒤 그 이름이 비어 있을 때만 제 이름으로 (반쯤 쓰인 파일이 제 이름으로 보이지 않게)
+   *   - 같은 폴더의 임시 파일(~$mk-….part)에 다 쓴 뒤 그 이름이 비어 있을 때만 제 이름으로 (반쯤 쓰인 파일이 제 이름으로 보이지 않게)
    *   - 같은 파일을 동시에(전체 받기 중에 열기) 부르면 한 번만 받는다. 이름 고르기 · 저장 · 기록만 폴더마다 차례로
    *     (받는 동안 같은 사건의 이미 받은 파일 열기를 막지 않게)
    */
@@ -775,20 +820,25 @@ export class Opms {
       if (now) return { file: now, reused: true };
       const claimed = new Set(Object.entries(folder).filter(([u]) => u !== upload).map(([, n]) => n.toLowerCase()));
       const base = path.basename(dest);
-      // 이름 후보: 원래 이름 → (No.n) → (No.n-2) … 내용이 같은 파일이 있으면 그것, 아니면 첫 빈 이름
+      // 이름 후보: 원래 이름 → (No.n) → (No.n-2) … 내용이 같은 파일이 있으면 그것, 아니면 첫 빈 이름.
+      //   고른 이름이 그사이 생겼으면(다른 PC 의 파일이 동기화로 들어옴) 다음 후보로
       let file = null;
       for (let k = 0; !file; k++) {
         const cand = path.join(dir, k === 0 ? base : numberedName(base, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
         if (claimed.has(path.basename(cand).toLowerCase())) continue;
         if (!await exists(cand)) {
-          file = cand;
+          try {
+            await placeNew(cand, data);
+            file = cand;
+          } catch (err) {
+            if (err.code !== 'EEXIST' || k > 50) throw err;
+          }
         } else if (await sameBytes(cand, data)) {
           folder[upload] = path.basename(cand); // 예전에(다른 PC 에서) 받아 둔 바로 그 서류
           this.files.save();
           return { file: cand, reused: true };
         }
       }
-      await placeNew(file, data);
       await markFromServer(file, this.host);
       folder[upload] = path.basename(file);
       this.files.save();
@@ -800,7 +850,9 @@ export class Opms {
   async fileFor(c, it, baseDir) {
     const dir = path.join(baseDir, wrapperFolderName(c));
     await fs.promises.mkdir(dir, { recursive: true });
-    return (await this.saveOne(dir, it))?.file ?? null;
+    const file = (await this.saveOne(dir, it))?.file ?? null;
+    this.files.writeNow(); // 열기 하나는 바로 기록 (끄기 직전 몇백 ms 에 몰리지 않게)
+    return file;
   }
 
   /**
@@ -830,6 +882,7 @@ export class Opms {
       const [mywork, foreign] = await Promise.all([this.mywork(c.idx).catch(() => []), this.foreign(c).catch(() => [])]);
       await fs.promises.writeFile(path.join(dir, '사건정보.txt'), caseInfoText(c, { mywork, foreign, files: done }), 'utf8');
     }
+    this.files.writeNow(); // 다 받았으면 바로 기록
     onProgress({ i: items.length, total: items.length, name: '' });
     return { dir, saved, skipped, failed };
   }

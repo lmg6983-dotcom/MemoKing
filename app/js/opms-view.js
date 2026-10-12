@@ -478,7 +478,7 @@ async function showWrapper(my) {
       dl = {
         idx, done: true, saved: res.saved, cls: res.failed.length ? 'err' : 'ok',
         text: `${res.failed.length ? '' : '✓ '}${parts.join(', ')}${isAll ? ', 사건정보.txt 포함' : ''}`,
-        title: res.failed.map((f) => `${f.name}: ${f.error}`).join('\n'),
+        title: res.failed.map((f) => `${attach.find((a) => f.upload && a.upload === f.upload)?.name ?? f.name}: ${f.error}`).join('\n'),
       };
     } catch (err) {
       dl = { idx, done: true, cls: 'err', text: errText(err) };
