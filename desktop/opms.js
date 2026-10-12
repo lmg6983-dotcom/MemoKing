@@ -496,6 +496,11 @@ class FileIndex {
       if (this.file) {
         const quits = await this.quitFiles();
         for (const q of quits) this.quitSeqs.add(q.seq);
+        // 평소 기록보다 옛 끌 때 기록은 지난번에 지우지 못하고 남은 것 — 지금 지운다
+        for (const q of quits) {
+          if (q.seq > (Number(this.data['#seq']) || 0)) continue;
+          if (await fs.promises.rm(q.file, { force: true }).then(() => true, () => false)) this.quitSeqs.delete(q.seq);
+        }
         for (const q of quits) {
           if (q.seq <= (Number(this.data['#seq']) || 0)) break;
           try {
@@ -899,19 +904,24 @@ export class Opms {
       if (now) return { file: now, reused: true };
       const claimed = new Set(Object.entries(folder).filter(([u]) => u !== upload).map(([, n]) => n.toLowerCase()));
       const base = path.basename(dest);
-      // 예전 판이 줄이지 않은 긴 이름으로 받아 둔 그 서류가 있으면 그것을 쓴다
-      const full = path.join(dir, safeFilename(it.name, base));
-      if (full !== dest && path.dirname(full) === dir && !claimed.has(path.basename(full).toLowerCase()) && await sameBytes(full, data)) {
-        folder[upload] = path.basename(full);
-        this.files.save();
-        return { file: full, reused: true };
+      const nameAt = (b, k) => (k === 0 ? b : numberedName(b, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
+      // 예전 판이 줄이지 않은 긴 이름(그리고 그 " (No.n)" 들)으로 받아 둔 그 서류가 있으면 그것을 쓴다 — 새로 쓰지는 않음
+      const fullBase = safeFilename(it.name, base);
+      for (let k = 0; fullBase !== base && k <= 5; k++) {
+        const old = path.join(dir, nameAt(fullBase, k));
+        if (path.dirname(old) !== dir || claimed.has(path.basename(old).toLowerCase())) continue;
+        if (await sameBytes(old, data)) {
+          folder[upload] = path.basename(old);
+          this.files.save();
+          return { file: old, reused: true };
+        }
       }
       // 이름 후보: 원래 이름 → (No.n) → (No.n-2) … 내용이 같은 파일이 있으면 그것, 아니면 첫 빈 이름.
       //   고른 이름이 그사이 생겼으면(다른 PC 의 파일이 동기화로 들어옴) 다음 후보로
       let file = null;
       let raced = -1;
       for (let k = 0; !file; k++) {
-        const cand = path.join(dir, k === 0 ? base : numberedName(base, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
+        const cand = path.join(dir, nameAt(base, k));
         if (k > 200) throw new Error(`${base}: 저장할 이름을 정하지 못했어요`);
         if (claimed.has(path.basename(cand).toLowerCase())) continue;
         if (!await taken(cand)) {

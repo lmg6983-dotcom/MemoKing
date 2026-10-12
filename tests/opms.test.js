@@ -414,6 +414,18 @@ test('OPMS 전자포대: 너무 긴 이름만 저장할 때 줄임 (가운데를
   const client = new Opms({ fetch: async () => new Response('SAME'), retries: 0 });
   const r = await client.saveOne(dir, { n: 1, name: longName, upload: 'u/long' });
   assert.deepEqual([path.basename(r.file), r.reused], [longName, true]);
+  // 예전 판의 " (No.n)" 이 붙은 긴 이름도
+  const numbered = numberedName(`${'c'.repeat(150)}.pdf`, 'No.2');
+  fs.writeFileSync(path.join(dir, numbered), 'SAME');
+  const r2 = await client.saveOne(dir, { n: 2, name: `${'c'.repeat(150)}.pdf`, upload: 'u/long2' });
+  assert.deepEqual([path.basename(r2.file), r2.reused], [numbered, true]);
+  // 내용이 다른 긴 이름 파일(사용자가 고친 것 · 다른 서류)은 가져다 쓰지 않고 줄인 이름으로 새로 저장
+  const otherName = `${'d'.repeat(150)}.pdf`;
+  fs.writeFileSync(path.join(dir, otherName), 'EDITED');
+  const r3 = await client.saveOne(dir, { n: 3, name: otherName, upload: 'u/long3' });
+  assert.equal(r3.reused, false);
+  assert.equal(path.basename(r3.file), fitName(otherName));
+  assert.equal(fs.readFileSync(path.join(dir, otherName), 'utf8'), 'EDITED');
 });
 
 test('OPMS 전자포대 기록: 끌 때 기록이 여럿이면 가장 새것(깨졌으면 그다음) · 평소 기록이 새로 남으면 옛것만 지움', async () => {
@@ -421,11 +433,13 @@ test('OPMS 전자포대 기록: 끌 때 기록이 여럿이면 가장 새것(깨
   const index = path.join(dir, 'opms-files.json');
   const rec = (seq, name) => JSON.stringify({ '#seq': seq, 'h|/x': { 'u/1': name } });
   fs.writeFileSync(index, rec(2, 'main.pdf'));
+  fs.writeFileSync(`${index}.quit-1`, rec(1, 'stale.pdf')); // 지난번에 지우지 못한 옛것 — 읽을 때 지움
   fs.writeFileSync(`${index}.quit-3`, rec(3, 'quit3.pdf'));
   fs.writeFileSync(`${index}.quit-9`, '{ 깨짐');
   const client = new Opms({ fetch: async () => new Response('X'), retries: 0, filesIndex: index });
   const data = await client.files.load();
   assert.equal(data['h|/x']['u/1'], 'quit3.pdf');
+  assert.equal(fs.existsSync(`${index}.quit-1`), false);
   assert.equal(client.files.seq, 3);
   await client.files.save(); // seq 4 — quit-3 은 지우고, 더 큰 번호(9)는 그대로
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f.includes('.quit-')).sort(), ['opms-files.json.quit-9']);
