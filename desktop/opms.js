@@ -534,37 +534,34 @@ class FileIndex {
   async prepare(dir, k) {
     sweepParts(dir);
     const data = await this.load();
-    if (data[k]) return data[k];
-    const rec = {};
-    // 0.31.3 은 서버 구분 없이 폴더 경로만으로 기록했다 — 그 기록을 이어받는다 (고쳐 둔 파일을 다시 받지 않게)
+    const rec = data[k] && typeof data[k] === 'object' ? data[k] : {};
+    let changed = !data[k];
+    // 예전 기록을 이어받는다 (이미 있는 것이 이김) — 고쳐 둔 파일을 다시 받지 않게
+    //   0.31.3: 서버 구분 없이 폴더 경로만으로 기록 (어느 서버였는지 모르니 이 폴더를 처음 여는 서버가 이어받음)
     const oldKey = path.resolve(dir).toLowerCase();
     const old = data[oldKey];
     if (old && typeof old === 'object') {
-      for (const [upload, name] of Object.entries(old)) {
-        if (typeof name === 'string' && name && safeFilename(name, '') === name && path.basename(name) === name) rec[upload] = name;
-      }
+      for (const [upload, name] of Object.entries(old)) if (!rec[upload] && validRecordName(name)) rec[upload] = name;
       delete data[oldKey];
+      changed = true;
     }
-    const legacyFile = path.join(dir, LEGACY_MANIFEST);
+    //   0.31.2: 사건 폴더 안의 .memoking.json — 다 받은 뒤에만 기록했으니 크기가 달라졌으면 사용자가 고친 것, 그대로 인정.
+    //   지우지 않는다 (사건 폴더가 여러 PC 가 함께 쓰는 Drive 폴더면 다른 PC 도 읽어 가야 하니까)
     let legacy = null;
     try {
-      legacy = JSON.parse(await fs.promises.readFile(legacyFile, 'utf8'));
+      legacy = JSON.parse(await fs.promises.readFile(path.join(dir, LEGACY_MANIFEST), 'utf8'));
     } catch {
       // 없음
     }
     if (legacy && typeof legacy === 'object') {
       for (const [upload, v] of Object.entries(legacy)) {
-        if (rec[upload]) continue;
-        // 이 폴더 안의 파일 이름만. 0.31.2 는 다 받은 뒤에만 기록했으니 크기가 달라졌으면 사용자가 고친 것 — 그대로 인정
-        //   (0.31.2 는 기본 서버만 썼으니 지금 서버의 기록으로 옮긴다)
-        const name = String(v?.name ?? '');
-        if (name && safeFilename(name, '') === name && path.basename(name) === name) rec[upload] = name;
+        if (rec[upload] || !validRecordName(v?.name)) continue;
+        rec[upload] = v.name;
+        changed = true;
       }
     }
     data[k] = rec;
-    if (old) this.save();
-    // 예전 기록은 지우지 않는다: 사건 폴더가 여러 PC 가 함께 쓰는 Drive 폴더면 다른 PC 도 읽어 가야 하니까
-    if (legacy) this.save();
+    if (changed && (old || legacy)) this.save();
     return rec;
   }
 
@@ -658,6 +655,8 @@ class FileIndex {
 export function flushOpmsFiles() {
   for (const index of fileIndexes.values()) index.flushSync();
 }
+// 기록에 남은 이름은 이 폴더 안의 파일 이름일 때만 믿는다 (경로가 섞이거나 이상한 글자가 든 것은 버림)
+const validRecordName = (name) => typeof name === 'string' && name !== '' && safeFilename(name, '') === name && path.basename(name) === name;
 const fileIndexes = new Map(); // 기록 파일 → FileIndex (창마다 새 Opms 를 만들어도 같은 기록 · 같은 "받는 중" 을 함께 쓰게)
 const savingFiles = new Map(); // 저장할 경로 → 받는 중인 일 (열기 · 전체 받기가 같은 파일을 동시에 받지 않게)
 const sameBytes = async (file, data) => {

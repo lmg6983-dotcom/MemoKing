@@ -459,8 +459,14 @@ test('OPMS 전자포대 기록: 0.31.3 의 기록(폴더 경로만)을 이어받
   fs.mkdirSync(caseDir);
   fs.writeFileSync(path.join(caseDir, '의견서.pdf'), '고친 내용');
   const index = path.join(dir, 'opms-files.json');
-  fs.writeFileSync(index, JSON.stringify({ [path.resolve(caseDir).toLowerCase()]: { 'u/1': '의견서.pdf' } }));
+  // 새 판이 이미 같은 폴더에 다른 서류를 받아 기록(서버별 키)을 만들어 둔 경우에도 이어받는다
   const client = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: index });
+  fs.writeFileSync(index, JSON.stringify({
+    [path.resolve(caseDir).toLowerCase()]: { 'u/1': '의견서.pdf', 'u/bad': '../밖.pdf' },
+    [`${client.host.toLowerCase()}|${path.resolve(caseDir).toLowerCase()}`]: { 'u/2': '다른.pdf' },
+  }));
   const file = await client.fileFor(c, { n: 1, name: '의견서.pdf', upload: 'u/1' }, dir);
   assert.equal(fs.readFileSync(file, 'utf8'), '고친 내용');
+  const rec = (await client.files.load())[`${client.host.toLowerCase()}|${path.resolve(caseDir).toLowerCase()}`];
+  assert.deepEqual(rec, { 'u/2': '다른.pdf', 'u/1': '의견서.pdf' });
 });

@@ -376,8 +376,9 @@ let attach = [];
 let dl = null;
 async function showWrapper(my) {
   message('전자포대 목록을 불러오는 중…');
-  attach = await load('wrapper', api.attachments);
-  if (my !== seq) return;
+  const list = await load('wrapper', api.attachments);
+  if (my !== seq) return; // 그사이 다른 사건으로 옮겼으면 지금 화면의 목록을 덮지 않는다
+  attach = list;
   const all = el('input');
   all.type = 'checkbox';
   all.setAttribute('aria-label', '모두 고르기');

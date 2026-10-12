@@ -2726,7 +2726,8 @@ function registerIpc() {
     const want = [...new Set((Array.isArray(uploads) ? uploads : []).map(String))];
     let list = await attachmentsOf(c);
     if (!all && want.some((u) => !list.some((it) => it.upload === u))) list = await attachmentsOf(c, { fresh: true });
-    const items = all ? list : list.filter((it) => want.includes(it.upload));
+    // 같은 서버 파일이 두 줄에 걸려 있어도 한 번만 받는다
+    const items = (all ? list : list.filter((it) => want.includes(it.upload))).filter((it, i, arr) => arr.findIndex((x) => x.upload === it.upload) === i);
     const gone = all ? [] : want.filter((u) => !list.some((it) => it.upload === u));
     const res = await client.download(c, items, {
       baseDir: opmsSettings().wrapperDir,
