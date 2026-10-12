@@ -3,10 +3,10 @@
 //   (1줄 = 열 이름, 2~4줄 = 정보, 5줄부터 = 자료). 전자포대 원본은 <서버>/OPMS/<FILE_NAME_UPLOAD>
 //   찾는 말은 모두 따옴표를 겹쳐(') SQL 글 안에 값으로만 넣는다.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 export { looksLikeRef } from '../app/js/core/magic-modules.js';
 import { progressItems } from '../app/js/core/opms-progress.js';
+import { decodeEntities } from '../app/js/core/entities.js';
 
 export const DEFAULT_HOST = 'http://121.254.172.35:8181';
 export const DEFAULT_WRAPPER_DIR = 'G:\\내 드라이브\\work(firstlaw)\\포대';
@@ -193,12 +193,6 @@ export function numberedName(name, k) {
 const SUMMARY_COLUMNS = ['SUMMARY', 'DOC_SUMMARY', 'SUMM', 'DOC_SUMM', 'ABSTRACT', 'DOC_MEMO'];
 const WRITER_COLUMNS = ['REG_NAME', 'REG_USER_NAME', 'REG_PER_NAME', 'USR_NAME', 'USER_NAME', 'WRITER', 'WRITER_NAME'];
 const SUMMARY_MAX = 120;
-const ENTITIES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
-const decodeEntities = (t) => t.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, e) => {
-  if (e[0] !== '#') return ENTITIES[e.toLowerCase()] ?? all;
-  const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1));
-  return code > 0 && code < 0x110000 ? String.fromCodePoint(code) : all;
-});
 const pickColumn = (r, names, max = 40) => {
   const keys = new Map(Object.keys(r).map((k) => [k.toUpperCase(), k]));
   for (const n of names) {
@@ -488,7 +482,8 @@ class FileIndex {
     }
     if (legacy && typeof legacy === 'object') {
       for (const [upload, v] of Object.entries(legacy)) {
-        // 이 폴더 안의 파일 이름만 (0.31.2 는 다 받은 뒤에만 기록했으니 크기가 달라졌으면 사용자가 고친 것 — 그대로 인정)
+        // 이 폴더 안의 파일 이름만. 0.31.2 는 다 받은 뒤에만 기록했으니 크기가 달라졌으면 사용자가 고친 것 — 그대로 인정
+        //   (0.31.2 는 기본 서버만 썼으니 지금 서버의 기록으로 옮긴다)
         const name = String(v?.name ?? '');
         if (name && safeFilename(name, '') === name && path.basename(name) === name) rec[upload] = name;
       }
@@ -511,24 +506,48 @@ class FileIndex {
 
   /**
    * 기록 남기기 → 잘 남겼으면 true. 잠깐 모았다가 한 번에 (전체 받기 150개면 150번이 아니라 몇 번만).
-   *   실패해도(읽기 전용 · 백신이 잡고 있음) 받은 파일은 그대로 쓴다. 쓰기는 차례로
+   *   실패해도(읽기 전용 · 백신이 잡고 있음) 받은 파일은 그대로 쓴다. 쓰기는 차례로. 앱을 끌 때는 flushSync()
    */
   save() {
     if (!this.file || this.readOnly) return Promise.resolve(false);
-    this.pending ??= new Promise((r) => setTimeout(r, 300)).then(() => {
-      this.pending = null;
-      const run = this.writing.then(async () => {
-        const tmp = `${this.file}.${process.pid}.tmp`;
-        await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
-        await fs.promises.writeFile(tmp, JSON.stringify(this.data), 'utf8');
-        await fs.promises.rename(tmp, this.file);
-        return true;
-      }).catch(() => false);
-      this.writing = run;
-      return run;
-    });
+    if (!this.pending) {
+      this.pending = new Promise((resolve) => {
+        this.timer = setTimeout(() => {
+          this.timer = null;
+          this.pending = null;
+          const run = this.writing.then(async () => {
+            const tmp = `${this.file}.${process.pid}.tmp`;
+            await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
+            await fs.promises.writeFile(tmp, JSON.stringify(this.data), 'utf8');
+            await fs.promises.rename(tmp, this.file);
+            return true;
+          }).catch(() => false);
+          this.writing = run;
+          resolve(run);
+        }, 300);
+      });
+    }
     return this.pending;
   }
+
+  /** 모아 둔 기록을 지금 바로 (앱을 끌 때 — 기다릴 수 없으니 동기로) */
+  flushSync() {
+    if (!this.timer || !this.data) return;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.pending = null;
+    try {
+      fs.mkdirSync(path.dirname(this.file), { recursive: true });
+      fs.writeFileSync(`${this.file}.${process.pid}.tmp`, JSON.stringify(this.data), 'utf8');
+      fs.renameSync(`${this.file}.${process.pid}.tmp`, this.file);
+    } catch {
+      // 다음 실행 때 다시 받는 정도
+    }
+  }
+}
+/** 앱을 끌 때: 아직 쓰지 않은 전자포대 기록을 모두 남긴다 */
+export function flushOpmsFiles() {
+  for (const index of fileIndexes.values()) index.flushSync();
 }
 const fileIndexes = new Map(); // 기록 파일 → FileIndex (창마다 새 Opms 를 만들어도 같은 기록 · 같은 "받는 중" 을 함께 쓰게)
 const savingFiles = new Map(); // 저장할 경로 → 받는 중인 일 (열기 · 전체 받기가 같은 파일을 동시에 받지 않게)
@@ -541,10 +560,30 @@ const sameBytes = async (file, data) => {
   }
 };
 const exists = (file) => fs.promises.stat(file).then(() => true, () => false);
-const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
-// 매크로가 들 수 있는 예전 Office 형식은 Windows 의 "인터넷에서 받은 파일" 표시(Zone.Identifier)를 붙여
-//   Office 가 제한된 보기로 열게 한다 (브라우저로 받은 것과 같게)
-const MACRO_EXT = new Set(['doc', 'dot', 'xls', 'xlt', 'ppt', 'pot', 'pps', 'rtf']);
+// 파일 받기: 전체 시간이 아니라 "멈춘 시간" 으로 끊는다 (큰 파일이 느리게라도 오면 끝까지 · 아예 멈추면 1분 뒤)
+const DOWNLOAD_IDLE_MS = 60_000;
+// 매크로가 들 수 있는 Office 형식은 Windows 의 "인터넷에서 받은 파일" 표시(Zone.Identifier)를 붙여
+//   Office 가 제한된 보기 · 인터넷 매크로 차단을 그대로 하게 한다 (브라우저로 받은 것과 같게)
+const MACRO_EXT = new Set(['doc', 'dot', 'xls', 'xlt', 'ppt', 'pot', 'pps', 'rtf',
+  'docm', 'dotm', 'xlsm', 'xltm', 'xlsb', 'xlam', 'pptm', 'potm', 'ppsm', 'ppam', 'sldm']);
+// 새 파일을 "그 이름이 비어 있을 때만" 제자리에: 같은 폴더의 임시 파일에 다 쓴 뒤 하드 링크(있으면 실패 · 한 번에 나타남).
+//   하드 링크를 못 만드는 곳(USB · 일부 공유 폴더)에서는 한 번 더 비어 있는지 보고 이름 바꾸기
+async function placeNew(file, data) {
+  const part = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}-${Date.now().toString(36)}.part`);
+  try {
+    await fs.promises.writeFile(part, data, { flag: 'wx' });
+    try {
+      await fs.promises.link(part, file);
+    } catch (err) {
+      if (err.code === 'EEXIST') throw err;
+      if (await exists(file)) throw Object.assign(new Error(`${path.basename(file)} 이(가) 이미 있어요`), { code: 'EEXIST' });
+      await fs.promises.rename(part, file);
+    }
+  } finally {
+    await fs.promises.rm(part, { force: true }).catch(() => fs.promises.rm(part, { force: true }).catch(() => {}));
+  }
+}
+
 async function markFromServer(file, host) {
   if (process.platform !== 'win32') return;
   const ext = path.extname(file).slice(1).toLowerCase();
@@ -555,20 +594,23 @@ async function markFromServer(file, host) {
 export class Opms {
   /** @param {{ host?: string, fetch?: typeof fetch, timeoutMs?: number, retries?: number }} o */
   /** filesIndex: 받은 전자포대 파일 기록을 둘 JSON 경로 (없으면 이 프로그램이 켜져 있는 동안만 기억) */
-  constructor({ host = DEFAULT_HOST, fetch: f = globalThis.fetch, timeoutMs = 15000, retries = 2, filesIndex = null } = {}) {
-    Object.assign(this, { host: String(host).replace(/\/+$/, ''), fetch: f, timeoutMs, retries });
+  constructor({ host = DEFAULT_HOST, fetch: f = globalThis.fetch, timeoutMs = 15000, retries = 2, filesIndex = null, downloadIdleMs = DOWNLOAD_IDLE_MS } = {}) {
+    Object.assign(this, { host: String(host).replace(/\/+$/, ''), fetch: f, timeoutMs, retries, downloadIdleMs });
     if (!fileIndexes.has(filesIndex)) fileIndexes.set(filesIndex, new FileIndex(filesIndex));
     this.files = fileIndexes.get(filesIndex);
   }
 
-  /** bytes: 응답 본문까지 받아 { res, data } — 본문 받기도 시간 제한 · 다시 하기 안에서 */
+  /**
+   * bytes: 응답 본문까지 받아 { res, data } — 이때 timeoutMs 는 "아무것도 오지 않은 시간" (조금씩이라도 오면 계속).
+   *   본문 받기도 다시 하기 안에서
+   */
   async request(url, init, { timeoutMs = this.timeoutMs, retries = this.retries, bytes = false } = {}) {
     let last;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
+        if (bytes) return await this.fetchBytes(url, init, timeoutMs);
         const res = await this.fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        if (bytes) return { res, data: Buffer.from(await res.arrayBuffer()) };
         return res;
       } catch (err) {
         last = err;
@@ -578,6 +620,40 @@ export class Opms {
     const e = new Error(`OPMS 서버(${this.host})에 접속하지 못했어요 — 사내망에 연결돼 있는지 확인해 주세요 (${last?.message ?? last})`);
     e.offline = true;
     throw e;
+  }
+
+  async fetchBytes(url, init, idleMs) {
+    const ctl = new AbortController();
+    let timer;
+    let stalled;
+    const stall = new Promise((_, reject) => { stalled = reject; });
+    stall.catch(() => {});
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const err = new Error('서버 응답이 멈췄어요');
+        ctl.abort(err);
+        stalled(err);
+      }, idleMs);
+    };
+    arm();
+    try {
+      const res = await Promise.race([this.fetch(url, { ...init, signal: ctl.signal }), stall]);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const chunks = [];
+      const reader = res.body?.getReader();
+      if (reader) {
+        for (;;) {
+          arm();
+          const { done, value } = await Promise.race([reader.read(), stall]);
+          if (done) break;
+          chunks.push(Buffer.from(value));
+        }
+      }
+      return { res, data: Buffer.concat(chunks) };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async select(sql, opts) {
@@ -665,62 +741,59 @@ export class Opms {
   /**
    * 전자포대 파일 하나를 dir 에 저장 → { file, reused }.
    *   - 전에 받은 그 서류(기록에 있음)면 다시 받지 않는다 — 사용자가 고쳐 저장했어도 그대로
-   *   - 그 이름에 기록에 없는 파일이 있으면(예전 방식으로 받은 것 · 사용자가 둔 것) 덮어쓰지 않는다:
-   *     받아 보고 내용이 같으면 그 파일을 쓰고, 다르면 "이름 (No.3).pdf" 처럼 다른 이름으로 저장
-   *   - 받는 동안은 임시 파일(.part)에 쓰고 다 받은 뒤 이름을 바꾼다 (반쯤 쓰인 파일이 보이지 않게)
-   *   - 같은 파일을 동시에(전체 받기 중에 열기) 부르면 한 번만 받는다
+   *   - 기록에 없는 같은 이름 파일(예전 방식으로 받은 것 · 사용자가 둔 것 · 다른 PC 가 받은 것)은 덮어쓰지 않는다:
+   *     받아 보고 내용이 같은 파일이 있으면 그것을 쓰고, 없으면 "이름 (No.3).pdf" 처럼 빈 이름에 저장
+   *   - 같은 폴더의 임시 파일(.part)에 다 쓴 뒤 그 이름이 비어 있을 때만 제 이름으로 (반쯤 쓰인 파일이 제 이름으로 보이지 않게)
+   *   - 같은 파일을 동시에(전체 받기 중에 열기) 부르면 한 번만 받는다. 이름 고르기 · 저장 · 기록만 폴더마다 차례로
+   *     (받는 동안 같은 사건의 이미 받은 파일 열기를 막지 않게)
    */
   saveOne(dir, it) {
     const dest = path.join(dir, safeFilename(it.name, `attachment_${it.n}.bin`));
     if (path.dirname(dest) !== dir) return Promise.resolve(null); // 이름에 경로가 섞였으면 건너뛴다 (safeFilename 이 막지만 한 번 더)
     const key = `${FileIndex.key(dir, this.host)}\n${String(it.upload ?? '').trim()}`;
-    if (!savingFiles.has(key)) {
-      savingFiles.set(key, this.files.exclusive(dir, () => this.saveFresh(dir, dest, it)).finally(() => savingFiles.delete(key)));
-    }
+    if (!savingFiles.has(key)) savingFiles.set(key, this.saveFresh(dir, dest, it).finally(() => savingFiles.delete(key)));
     return savingFiles.get(key);
   }
 
   async saveFresh(dir, dest, it) {
     const upload = String(it.upload ?? '').trim();
     const folder = await this.files.folder(dir, this.host);
-    const known = folder[upload];
-    const knownFile = known ? path.join(dir, known) : null;
-    if (knownFile && path.dirname(knownFile) === dir && await exists(knownFile)) return { file: knownFile, reused: true };
-    // 큰 파일(수십 MB · VPN)도 받게: 파일 받기는 시간 제한을 넉넉히 (DB 조회의 15초가 아니라)
-    const { res, data } = await this.request(this.attachmentUrl(upload), { headers: { 'User-Agent': USER_AGENT } }, { timeoutMs: DOWNLOAD_TIMEOUT_MS, bytes: true });
+    const knownFile = async () => {
+      const name = folder[upload];
+      const file = name ? path.join(dir, name) : null;
+      return file && path.dirname(file) === dir && await exists(file) ? file : null;
+    };
+    const had = await knownFile();
+    if (had) return { file: had, reused: true };
+    const { res, data } = await this.request(this.attachmentUrl(upload), { headers: { 'User-Agent': USER_AGENT } }, { timeoutMs: this.downloadIdleMs, retries: Math.min(1, this.retries), bytes: true });
     // 받다 끊김: 압축하지 않은 응답이면 Content-Length 와 받은 크기가 같아야 한다 (압축 응답은 풀린 크기라 비교하지 않음)
     const expected = Number(res.headers?.get?.('content-length'));
     const encoded = String(res.headers?.get?.('content-encoding') ?? 'identity').toLowerCase();
     if (encoded === 'identity' && Number.isFinite(expected) && expected > 0 && expected !== data.length) throw new Error('받는 중에 끊겼어요. 다시 해 주세요');
-    const claimed = new Set(Object.entries(folder).filter(([u]) => u !== upload).map(([, n]) => n.toLowerCase()));
-    let file = dest;
-    if (await exists(file) || claimed.has(path.basename(file).toLowerCase())) {
-      if (!claimed.has(path.basename(file).toLowerCase()) && await sameBytes(file, data)) {
-        folder[upload] = path.basename(file); // 예전에 받아 둔 바로 그 서류
-        this.files.save();
-        return { file, reused: true };
-      }
+    return this.files.exclusive(dir, async () => {
+      const now = await knownFile();
+      if (now) return { file: now, reused: true };
+      const claimed = new Set(Object.entries(folder).filter(([u]) => u !== upload).map(([, n]) => n.toLowerCase()));
       const base = path.basename(dest);
-      for (let k = 0; await exists(file) || claimed.has(path.basename(file).toLowerCase()); k++) {
-        file = path.join(dir, numberedName(base, k ? `No.${it.n}-${k + 1}` : `No.${it.n}`));
+      // 이름 후보: 원래 이름 → (No.n) → (No.n-2) … 내용이 같은 파일이 있으면 그것, 아니면 첫 빈 이름
+      let file = null;
+      for (let k = 0; !file; k++) {
+        const cand = path.join(dir, k === 0 ? base : numberedName(base, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
+        if (claimed.has(path.basename(cand).toLowerCase())) continue;
+        if (!await exists(cand)) {
+          file = cand;
+        } else if (await sameBytes(cand, data)) {
+          folder[upload] = path.basename(cand); // 예전에(다른 PC 에서) 받아 둔 바로 그 서류
+          this.files.save();
+          return { file: cand, reused: true };
+        }
       }
-    }
-    // 임시 파일은 사건 폴더(Drive 등 동기화 폴더일 수 있음)가 아니라 PC 의 임시 폴더에
-    const part = path.join(os.tmpdir(), `memoking-${process.pid}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.part`);
-    try {
-      await fs.promises.writeFile(part, data);
-      // 한 폴더 안의 저장은 차례로라 여기서 그 이름은 비어 있다 — 그래도 혹시 생겼으면 덮어쓰지 않는다 ("없을 때만 복사")
-      await fs.promises.copyFile(part, file, fs.constants.COPYFILE_EXCL);
-    } catch (err) {
-      if (err.code !== 'EEXIST') await fs.promises.rm(file, { force: true }).catch(() => {}); // 복사하다 만 파일
-      throw err;
-    } finally {
-      await fs.promises.rm(part, { force: true }).catch(() => {});
-    }
-    await markFromServer(file, this.host);
-    folder[upload] = path.basename(file);
-    this.files.save();
-    return { file, reused: false };
+      await placeNew(file, data);
+      await markFromServer(file, this.host);
+      folder[upload] = path.basename(file);
+      this.files.save();
+      return { file, reused: false };
+    });
   }
 
   /** 전자포대 파일 하나를 사건 폴더에 저장(이미 있으면 그대로)하고 그 경로 — "열기" 단추 */

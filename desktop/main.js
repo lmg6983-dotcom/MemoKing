@@ -34,7 +34,7 @@ import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcu
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
 import { FileIndex } from './file-index.js';
-import { Opms, isOpenableFile, looksLikeRef, foreignSummary, caseMemoMarkdown, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
+import { Opms, isOpenableFile, flushOpmsFiles, looksLikeRef, foreignSummary, caseMemoMarkdown, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -387,9 +387,10 @@ function openNote(id, { inactive = false, record = false, ink = false, big = fal
 // show: false 면 숨긴 채로 만들어 둔다 (스택의 다른 탭 — 누르면 바로 보이도록)
 // 첫 화면을 그린 창 ('ready-to-show' 가 이미 지나감). 불러오기(isLoading)는 그 뒤에도 이어질 수 있어
 //   "아직 불러오는 중이면 ready-to-show 를 기다린다" 로는 놓친다 — 그린 적이 있는지로 판단
+//   ready-to-show 는 첫 화면 전에 이미 보인(show) 창에는 오지 않으니, 보이는 창은 바로 · 'show' 도 그린 것으로 친다
 const paintedWins = new WeakSet();
 function whenPainted(win, fn) {
-  if (paintedWins.has(win)) fn();
+  if (paintedWins.has(win) || win.isVisible()) fn();
   else win.once('ready-to-show', fn);
 }
 
@@ -442,6 +443,7 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null, re
   });
   win.on('resized', remember);
   win.once('ready-to-show', () => paintedWins.add(win));
+  win.once('show', () => paintedWins.add(win));
   if (show) win.once('ready-to-show', () => (inactive ? win.showInactive() : win.show()));
   pushList();
   // 스택 창을 닫으면(Alt+F4 등) 숨은 탭들도 함께 닫는다
@@ -1397,6 +1399,10 @@ function toast(t) {
   }
   if (!Notification.isSupported()) return false;
   const n = new Notification({ title: t.title, body: t.body, icon: APP_ICON_PNG });
+  n.on('failed', () => { // Windows 가 알림을 띄우지 못함 (앱 알림 꺼짐 등) — 알림 말고 다른 길로 알리게
+    liveToasts.delete(n);
+    t.onFail?.();
+  });
   n.on('click', () => {
     liveToasts.delete(n);
     t.onClick?.();
@@ -2225,13 +2231,16 @@ function openCaptureMemo(capture, point, message) {
   };
   win?.once('show', seen);
   win?.once('closed', seen);
-  const told = toast({ memoId: id, kind: 'quick-memo', ...message, onClick: () => revealNote(id) });
-  // 알림을 띄울 수 없는 PC 면 알릴 길이 없으니 예전처럼 포커스는 뺏지 않고 바로 보여 준다
-  if (!told && win) whenPainted(win, () => {
-    if (win.isDestroyed()) return;
-    win.showInactive();
-    win.webContents.send('memo:highlight');
-  });
+  // 알림을 띄울 수 없으면(지원 안 됨 · Windows 가 띄우지 못함) 알릴 길이 없으니 포커스는 뺏지 않고 바로 보여 준다
+  const showNow = () => {
+    if (!win || win.isDestroyed()) return;
+    whenPainted(win, () => {
+      if (win.isDestroyed()) return;
+      win.showInactive();
+      win.webContents.send('memo:highlight');
+    });
+  };
+  if (!toast({ memoId: id, kind: 'quick-memo', ...message, onClick: () => revealNote(id), onFail: showNow })) showNow();
   return id;
 }
 
@@ -2699,15 +2708,19 @@ function registerIpc() {
   ipcMain.handle('opms:download', async (event, { idx, uploads, all } = {}) => {
     const c = caseOf(idx);
     const client = opmsClient();
-    const list = await attachmentsOf(c);
     // 줄은 서버 파일 경로(upload)로 찾는다 — 번호(n)는 서버 목록이 바뀌면 다른 서류를 가리킬 수 있어서
-    const want = new Set((Array.isArray(uploads) ? uploads : []).map(String));
-    const items = all ? list : list.filter((it) => want.has(it.upload));
+    const want = [...new Set((Array.isArray(uploads) ? uploads : []).map(String))];
+    let list = await attachmentsOf(c);
+    if (!all && want.some((u) => !list.some((it) => it.upload === u))) list = await attachmentsOf(c, { fresh: true });
+    const items = all ? list : list.filter((it) => want.includes(it.upload));
+    const gone = all ? [] : want.filter((u) => !list.some((it) => it.upload === u));
     const res = await client.download(c, items, {
       baseDir: opmsSettings().wrapperDir,
       all: Boolean(all),
       onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', p); },
     });
+    // 고른 줄이 그사이 서버 목록에서 사라졌으면 실패로 알린다 ("0개 저장" 으로 조용히 끝나지 않게)
+    for (const u of gone) res.failed.push({ name: path.basename(u), error: 'OPMS 목록에서 사라졌어요. 새로 고침 해 주세요' });
     opmsLastDir = res.dir;
     if (!SMOKE) shell.openPath(res.dir); // 받은 폴더를 탐색기로 (OPMS 조회 프로그램처럼)
     return res;
@@ -2805,7 +2818,11 @@ function registerIpc() {
     const id = vault.import({ body });
     if (!id) return { ok: false }; // 잠금 형식 글 등 메모로 만들 수 없는 글
     if (payload.open) openNote(id);
-    else if (!toast({ memoId: id, kind: 'magic-memo', title: '메모를 만들었어요', body: `${body.split('\n')[0].slice(0, 40)}\n눌러서 열기`, onClick: () => revealNote(id) })) openNote(id, { inactive: true }); // 누르면 그 메모가 뜬다 (알림을 못 띄우면 바로)
+    else {
+      // 누르면 그 메모가 뜬다 (알림을 못 띄우면 바로)
+      const showNow = () => openNote(id, { inactive: true });
+      if (!toast({ memoId: id, kind: 'magic-memo', title: '메모를 만들었어요', body: `${body.split('\n')[0].slice(0, 40)}\n눌러서 열기`, onClick: () => revealNote(id), onFail: showNow })) showNow();
+    }
     return { ok: true, id };
   });
   // 표가 넘칠 때: 메모 창을 더 넓게 (요청한 본문 폭이 들어가도록, 화면 안에서). 반환: 실제로 넓힌 본문 폭(px)
@@ -3391,6 +3408,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  flushOpmsFiles();
   stt?.close();
   topWatch.stop();
   globalShortcut.unregisterAll();

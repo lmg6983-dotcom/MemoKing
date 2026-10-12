@@ -216,7 +216,7 @@ test('OPMS 전자포대: 같은 파일 이름은 오래된 것부터 그대로 �
   // 같은 파일을 동시에 열면 한 번만 받는다
   await Promise.all([client.fileFor(c, items[1], dir), client.fileFor(c, items[1], dir)]);
   assert.equal(fetched, 3);
-  assert.deepEqual(fs.readdirSync(path.dirname(f1)).filter((f) => f.endsWith('.part')), []);
+  assert.deepEqual(fs.readdirSync(path.dirname(f1)).filter((f) => f.endsWith('.part')), []); // 임시 파일은 같은 폴더에 썼다가 지움
 });
 
 test('OPMS 전자포대: 이름만 같은 예전 파일은 덮어쓰지 않고 · 고쳐 저장한 파일은 그대로', async () => {
@@ -253,7 +253,9 @@ test('OPMS 전자포대: 이름만 같은 예전 파일은 덮어쓰지 않고 �
   assert.equal(await client.files.save(), true);
   assert.ok(fs.existsSync(index));
   // 다음에 켜도(새 기록 읽기) 기억한다
-  const again = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: `${index}` });
+  // 다음 실행 = 디스크의 기록을 새로 읽는 다른 기록 (같은 파일을 가리키는 다른 경로 글자로)
+  const again = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: `${path.dirname(index)}${path.sep}.${path.sep}${path.basename(index)}` });
+  assert.notEqual(again.files, client.files);
   assert.equal(await again.fileFor(c, items[1], dir), oldest);
 });
 
@@ -314,10 +316,46 @@ test('OPMS 전자포대: 이름 속 점 · 요약의 HTML 글자 · 사건정보
   const c = { ourref: 'R-1', yourref: '' };
   fs.mkdirSync(path.join(dir, wrapperFolderName(c)));
   fs.writeFileSync(path.join(dir, wrapperFolderName(c), '통지서.pdf'), 'OTHER');
-  // 본문이 15초(DB 조회 시간 제한)보다 오래 걸려도 받는다: 여기서는 timeoutMs 50ms · 본문 120ms
-  const slow = () => new Response(new ReadableStream({ async start(ctl) { await new Promise((r) => setTimeout(r, 120)); ctl.enqueue(new TextEncoder().encode('MINE')); ctl.close(); } }));
-  const client = new Opms({ fetch: async () => slow(), retries: 0, timeoutMs: 50 });
+  // 큰 파일: 조금씩이라도 오면 끝까지 (멈춘 시간 80ms 제한 · 30ms 마다 한 조각 · 전체 300ms) — 아예 멈추면 실패
+  const trickle = (n, gap) => new Response(new ReadableStream({ async start(ctl) {
+    for (let i = 0; i < n; i++) {
+      await new Promise((r) => setTimeout(r, gap));
+      ctl.enqueue(new TextEncoder().encode(i === n - 1 ? 'E' : 'M'));
+    }
+    ctl.close();
+  } }));
+  const client = new Opms({ fetch: async () => trickle(10, 30), retries: 0, downloadIdleMs: 80 });
+  const stuck = new Opms({ fetch: async () => trickle(2, 500), retries: 0, downloadIdleMs: 80 });
+  await assert.rejects(stuck.saveOne(path.join(dir, wrapperFolderName(c)), { n: 9, name: '멈춤.pdf', upload: 'u/9' }), /멈췄어요/);
+  assert.equal(fs.existsSync(path.join(dir, wrapperFolderName(c), '멈춤.pdf')), false);
   const res = await client.download(c, [{ n: 1, name: '통지서.pdf', size: '4 B', upload: 'u/1' }], { baseDir: dir, all: true });
   assert.deepEqual(res.failed, []);
   assert.match(fs.readFileSync(path.join(res.dir, '사건정보.txt'), 'utf8'), /1\. 통지서 \(No\.1\)\.pdf/);
+  assert.equal(fs.readFileSync(path.join(res.dir, '통지서 (No.1).pdf'), 'utf8'), 'MMMMMMMMME');
+});
+
+test('OPMS 전자포대: 기록이 없을 때 같은 내용의 (No.n) 사본을 또 만들지 않음 · 받는 중에도 이미 받은 파일은 바로 열림', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-dup-'));
+  const c = { ourref: 'S-1', yourref: '' };
+  const caseDir = path.join(dir, wrapperFolderName(c));
+  fs.mkdirSync(caseDir);
+  fs.writeFileSync(path.join(caseDir, 'a.pdf'), 'EDITED');
+  const it = { n: 1, name: 'a.pdf', upload: 'u/a' };
+  for (let i = 0; i < 3; i++) {
+    // 매번 기록 없이(다른 PC · 기록을 못 읽음) — 같은 내용의 사본이 있으면 그것을 쓴다
+    const fresh = new Opms({ fetch: async () => new Response('SERVER'), retries: 0, filesIndex: path.join(dir, `idx-${i}.json`) });
+    assert.equal(path.basename(await fresh.fileFor(c, it, dir)), 'a (No.1).pdf');
+  }
+  assert.deepEqual(fs.readdirSync(caseDir).sort(), ['a (No.1).pdf', 'a.pdf']);
+  // 느린 받기 중에 같은 사건의 이미 받은 파일 열기는 기다리지 않는다
+  let release;
+  const client = new Opms({ fetch: async (url) => (url.endsWith('slow') ? new Response(new ReadableStream({ start(ctl) { release = () => { ctl.enqueue(new TextEncoder().encode('S')); ctl.close(); }; } })) : new Response('FAST')), retries: 0 });
+  await client.fileFor(c, { n: 2, name: 'b.pdf', upload: 'u/b' }, dir);
+  const slow = client.fileFor(c, { n: 3, name: 'c.pdf', upload: 'u/slow' }, dir);
+  await new Promise((r) => setTimeout(r, 30));
+  const t0 = Date.now();
+  assert.equal(path.basename(await client.fileFor(c, { n: 2, name: 'b.pdf', upload: 'u/b' }, dir)), 'b.pdf');
+  assert.ok(Date.now() - t0 < 200);
+  release();
+  assert.equal(fs.readFileSync(await slow, 'utf8'), 'S');
 });
