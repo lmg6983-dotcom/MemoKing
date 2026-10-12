@@ -73,7 +73,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
     actions.append(cancel, save);
 
     form.append(el('h2', { id: 'event-title-h' }, heading), nameWrap, when);
-    if (repeatLabel) form.append(el('p', { class: 'event-repeat' }, `🔁 ${repeatLabel}`));
+    if (repeatLabel) form.append(el('p', { class: 'event-repeat' }, `반복: ${repeatLabel}`));
     else form.append(allDayRow);
     form.append(alertsLabel, chips, none, actions);
     dialog.append(form);
@@ -89,7 +89,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
       onLimit: (text) => (none.textContent = text),
     });
     function render() {
-      when.textContent = `📅 ${eventWhen(startAt(), isAllDay)}`;
+      when.textContent = eventWhen(startAt(), isAllDay);
       const set = picked[kind()];
       const active = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), allDay: isAllDay });
       const fb = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay), allDay: isAllDay });

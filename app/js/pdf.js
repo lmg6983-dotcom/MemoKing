@@ -40,6 +40,7 @@ function radios(container, attr, value) {
 const size = () => pageSize(opt);
 
 let frameTimer = 0;
+let view = { pw: 0, ph: 0, scale: 1 }; // 지금 미리보기: 쪽 크기(px)와 줄인 비율
 function render() {
   radios($('kind'), 'kind', opt.kind);
   for (const p of document.querySelectorAll('[data-panel]')) p.hidden = p.dataset.panel !== opt.kind;
@@ -69,6 +70,8 @@ function render() {
   frame.style.height = `${ph}px`;
   frame.style.transform = `scale(${scale})`;
   flipFrom(sheet, before);
+  sheet.classList.remove('multi');
+  view = { pw, ph, scale };
   document.body.dataset.pages = '';
   $('summary').textContent = `${s.width} × ${s.height}mm (${ratioLabel(s.width, s.height)})`;
   // 쪽 내용은 잠깐 멈춘 뒤에 다시 그린다 (입력하는 동안 깜빡이지 않게)
@@ -85,6 +88,15 @@ window.addEventListener('message', (e) => {
   const s = size();
   const n = e.data.pages;
   document.body.dataset.pages = String(n);
+  // 여러 쪽이면 쪽을 모두 위아래로 이어 보이고, 미리보기 칸은 스크롤 (첫 쪽 크기는 그대로)
+  const { ph, scale } = view;
+  const total = n > 1 ? n * ph + (n - 1) * (Number(e.data.gap) || 0) : ph;
+  const sheet = $('sheet');
+  const frame = $('frame');
+  sheet.classList.toggle('multi', n > 1);
+  sheet.style.height = `${total * scale}px`;
+  frame.style.height = `${total}px`;
+  frame.title = n > 1 ? `미리보기 ${n}쪽` : '미리보기';
   $('summary').textContent = `${s.width} × ${s.height}mm (${ratioLabel(s.width, s.height)}), ${n}쪽`;
 });
 

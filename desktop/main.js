@@ -567,12 +567,16 @@ function showTab(id, { inactive = false, bounds: at = null } = {}) {
     const shown = now ? visibleStackWin(now, id) : null;
     win.setBounds(shown?.getNormalBounds() ?? bounds);
     setTopmost(win, top);
-    setSticker(win, top, { animate: false });
-    if (top) handOverSticker(shown, win); // 왕관은 그 자리에 그대로 (번쩍이지 않게)
-    win.webContents.send('memo:on-top', top); // 메모 창의 왕관 단추도 스택과 같게 (붙어 있으면 숨김)
     // 탭 바꾸기가 번쩍이지 않게: 숨어 있던 탭 창은 투명하게 띄워(Windows 의 창 나타나기 효과·숨어 있는 동안의
     //   묵은 화면이 보이지 않게) 새로 한 번 그린 뒤에 한꺼번에 보이고, 그다음에 이전 탭을 숨긴다
     const veiled = Boolean(shown) && !win.isVisible() && process.platform === 'win32';
+    setSticker(win, top, { animate: false });
+    const sticker = top ? stickers.get(win.id) : null;
+    // 왕관: 투명한 새 탭이 화면에 뜬 다음에 넘긴다. 숨은 창으로 먼저 넘기면 왕관이 아직 보이는 이전 탭 아래로
+    //   깔렸다가 다시 올라와 번쩍인다 (주인 창보다 위라는 규칙은 보이는 주인에게만 지켜짐)
+    if (sticker && veiled) sticker.hold = true;
+    else if (top) handOverSticker(shown, win); // 왕관은 그 자리에 그대로
+    win.webContents.send('memo:on-top', top); // 메모 창의 왕관 단추도 스택과 같게 (붙어 있으면 숨김)
     if (veiled) win.setOpacity(0);
     if (inactive) win.showInactive();
     else {
@@ -590,6 +594,10 @@ function showTab(id, { inactive = false, bounds: at = null } = {}) {
     if (!veiled) return void setTimeout(hideOthers, 30); // 새 탭이 나타난 다음에 다른 탭은 모두 숨긴다 (보이는 탭은 언제나 하나)
     painted(win).then(() => {
       if (win.isDestroyed()) return;
+      if (sticker?.hold) {
+        sticker.hold = false;
+        if (stickers.get(win.id) === sticker && !handOverSticker(shown, win)) openStickerWin(sticker, false);
+      }
       win.setOpacity(1);
       setTimeout(hideOthers, 16); // 한 화면 뒤 (새 탭이 실제로 화면에 나온 다음)
     });
@@ -943,12 +951,13 @@ function setSticker(owner, on, { animate = true } = {}) {
     openStickerWin(cur, false); // 이미 붙어 있음 (창이 지금 보이면 스티커도)
     return;
   }
-  const entry = { owner, win: null, off: () => {} };
+  const entry = { owner, win: null, off: () => {}, hold: false };
   const sync = () => {
     if (entry.win && !entry.win.isDestroyed() && !owner.isDestroyed()) entry.win.setBounds(stickerBounds(owner));
   };
   const visible = () => {
     if (owner.isDestroyed()) return;
+    if (entry.hold) return; // 스택 탭 바꾸는 중: 왕관은 이전 탭에서 넘겨받는다 (새로 만들면 둘이 겹쳐 번쩍임)
     if (owner.isVisible() && !owner.isMinimized()) {
       openStickerWin(entry, false);
       reassertTop(owner); // 숨었다 보이거나 최소화에서 돌아오면 Windows 가 늘 위를 잊는 일이 있다

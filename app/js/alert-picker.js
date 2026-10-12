@@ -1,6 +1,6 @@
 // 미리 알림 고르기 (PC·휴대폰, 메모 창의 일정 만들기 · 일정 창 · 일정 탭에서 바로 만들기가 함께 씀)
 //   자주 쓰는 시각 칩 + "직접 정하기" (몇 분·시간·일·주 전 / 하루 종일이면 며칠 전 몇 시) — 정한 시각은 칩으로 더해진다.
-//   이미 지난 시각은 고를 수 없게 흐리게, 한 일정에 MAX_ALERTS 개까지.
+//   이번 일정에 이미 지난 시각은 칩에서 빼고, 한 일정에 MAX_ALERTS 개까지.
 import { ALERT_PRESETS, MAX_ALERTS, MAX_ALERT_MIN, alertLabel, pendingAlerts, validAlert } from './core/reminders.js';
 
 function el(tag, attrs = {}, text = '') {
@@ -31,7 +31,15 @@ const DAYS_BEFORE = [0, 1, 2, 3, 4, 5, 6, 7, 14, 21, 28];
  */
 export function alertPicker(box, { picked, kind, start = () => null, repeat = () => false, onChange = () => {}, onLimit = () => {} }) {
   const custom = el('div', { class: 'alert-custom', hidden: '' });
-  box.after(custom);
+  const moreRow = el('div', { class: 'alert-more-row' });
+  const more = el('button', { type: 'button', class: 'alert-more', 'aria-expanded': 'false' }, '직접 정하기');
+  moreRow.append(more);
+  box.after(moreRow, custom);
+  more.addEventListener('click', () => {
+    customOpen = !customOpen;
+    render();
+    if (customOpen) custom.querySelector('input, select')?.focus();
+  });
   let customOpen = false;
 
   function render() {
@@ -39,20 +47,18 @@ export function alertPicker(box, { picked, kind, start = () => null, repeat = ()
     const allDay = k === 'allDay';
     const set = picked[k];
     const s = start();
-    const offsets = [...new Set([...ALERT_PRESETS[k], ...set])].sort((a, b) => a - b);
-    const live = s && !repeat() ? new Set(pendingAlerts(offsets, s, { allDay })) : null;
+    // 이번 일정에 이미 지난 시각(5분 뒤 일정의 "1시간 전" 등)은 아예 보이지 않는다 — 눌리지 않는 칩을 두지 않게
+    const all = [...new Set([...ALERT_PRESETS[k], ...set])].sort((a, b) => a - b);
+    const live = s && !repeat() ? new Set(pendingAlerts(all, s, { allDay })) : null;
+    const offsets = live ? all.filter((o) => live.has(o)) : all;
+    const count = () => (live ? [...set].filter((o) => live.has(o)).length : set.size);
     const chips = offsets.map((offset) => {
       const b = el('button', { type: 'button', 'data-alert': String(offset) }, alertLabel(offset, allDay));
-      const past = live ? !live.has(offset) : false;
-      b.setAttribute('aria-pressed', String(set.has(offset) && !past));
+      b.setAttribute('aria-pressed', String(set.has(offset)));
       if (!ALERT_PRESETS[k].includes(offset)) b.classList.add('custom');
-      if (past) {
-        b.disabled = true;
-        b.title = '이미 지난 시각이에요';
-      }
       b.addEventListener('click', () => {
         if (set.has(offset)) set.delete(offset);
-        else if (set.size >= MAX_ALERTS) {
+        else if (count() >= MAX_ALERTS) {
           onLimit(`미리 알림은 ${MAX_ALERTS}개까지 고를 수 있어요`);
           return;
         } else set.add(offset);
@@ -61,13 +67,8 @@ export function alertPicker(box, { picked, kind, start = () => null, repeat = ()
       });
       return b;
     });
-    const more = el('button', { type: 'button', class: 'alert-more', 'aria-expanded': String(customOpen) }, customOpen ? '닫기' : '+ 직접 정하기');
-    more.addEventListener('click', () => {
-      customOpen = !customOpen;
-      render();
-      if (customOpen) custom.querySelector('input, select')?.focus();
-    });
-    box.replaceChildren(...chips, more);
+    more.setAttribute('aria-expanded', String(customOpen));
+    box.replaceChildren(...chips);
     custom.hidden = !customOpen;
     if (customOpen && custom.dataset.kind !== k) drawCustom(k);
   }
@@ -112,7 +113,11 @@ export function alertPicker(box, { picked, kind, start = () => null, repeat = ()
 
   function pick(v, k) {
     const set = picked[k];
-    if (!set.has(v) && set.size >= MAX_ALERTS) return onLimit(`미리 알림은 ${MAX_ALERTS}개까지 고를 수 있어요`);
+    const s = start();
+    const allDay = k === 'allDay';
+    if (s && !repeat() && !pendingAlerts([v], s, { allDay }).length) return onLimit('이 일정에는 이미 지난 시각이에요');
+    const live = s && !repeat() ? [...set].filter((o) => pendingAlerts([o], s, { allDay }).length) : [...set];
+    if (!set.has(v) && live.length >= MAX_ALERTS) return onLimit(`미리 알림은 ${MAX_ALERTS}개까지 고를 수 있어요`);
     set.add(v);
     customOpen = false;
     render();

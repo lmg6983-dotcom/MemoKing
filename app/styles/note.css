@@ -578,6 +578,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 }
 
 .reminder-list { margin: 0; padding: 0; list-style: none; }
+.reminder-panel.creating .reminder-list:empty { display: none; } /* 만드는 동안은 "아직 알림이 없어요" 숨김 */
 .reminder-list:empty::after { content: "아직 알림이 없어요"; display: block; padding: 6px 2px 2px; font-size: 12px; color: var(--muted); }
 .rem-item { display: flex; align-items: center; gap: 8px; padding: 7px 4px; border-radius: 8px; }
 @media (hover: hover) and (pointer: fine) { .rem-item:hover { background: var(--hover); } }
@@ -599,7 +600,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .rem-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
 .rem-inline { display: inline-flex; gap: 6px; align-items: center; }
 .reminder-form input[type="number"] { width: 58px; }
-.reminder-form input, .reminder-form select {
+.reminder-form input:not(.switch):not([type="radio"]), .reminder-form select { /* 스위치는 base.css 모양 그대로 */
   height: 30px;
   padding: 0 6px;
   border: 1px solid var(--border);
@@ -647,8 +648,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .dp-day[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; box-shadow: none; }
 .dp-day:disabled { color: var(--text-faint); opacity: 0.45; cursor: default; }
 @media (hover: hover) and (pointer: fine) { .dp-day:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--hover); } }
-.dp-quick { flex-wrap: nowrap; margin-bottom: 6px; overflow-x: auto; scrollbar-width: none; }
-.dp-quick button { flex: none; }
+.dp-quick { flex-wrap: wrap; margin-bottom: 6px; } /* 잘려 보이지 않게 줄을 바꿔 다 보인다 */
 .dp-time { display: flex; gap: 6px; }
 .dp-time select { flex: 1; }
 .dp-summary { margin: 8px 0 0; font-size: 13px; font-weight: 700; }
@@ -1728,3 +1728,5 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .rem-title-row input { flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-0); color: var(--text); font: inherit; }
 .rem-allday-row { justify-content: space-between; }
 .rem-alerts button[aria-pressed="true"]::before { content: '✓ '; }
+
+.reminder-panel { --flow-bg: var(--surface-2); }

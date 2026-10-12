@@ -449,7 +449,7 @@ h2.sheet-title { font-size: 20px; }
 .sheet .link-search { height: 44px; font-size: 15px; border-radius: 12px; }
 .sheet .link-open { min-height: 44px; font-size: 15px; }
 .sheet h4 { font-size: 13px; }
-.sheet .reminder-form input, .sheet .reminder-form select { height: 40px; font-size: 15px; }
+.sheet .reminder-form input:not(.switch):not([type="radio"]), .sheet .reminder-form select { height: 40px; font-size: 15px; }
 .sheet .seg button { height: var(--tap); font-size: 13.5px; }
 .sheet .chips button { height: var(--tap); padding: 0 12px; font-size: 14px; }
 .sheet .rem-radio { min-height: 40px; font-size: 14.5px; }
@@ -460,7 +460,12 @@ h2.sheet-title { font-size: 20px; }
 .sheet .rem-kinds button small { font-size: 13px; }
 .sheet .rem-answer { min-height: 46px; padding: 10px 4px; }
 .sheet .rem-answer b { font-size: 15px; }
-.sheet .rem-next, .sheet .rem-start { height: 50px; font-size: 16px; border-radius: 14px; }
+.sheet .rem-start { height: 50px; font-size: 16px; border-radius: 14px; }
+.sheet .flow-footer { padding-bottom: 0; }
+.sheet .flow-footer .btn { min-height: 52px; font-size: 16px; border-radius: 14px; }
+.sheet .alert-more { min-height: var(--tap); font-size: 14.5px; }
+/* 시트를 스크롤해도 제목·닫기는 위에 붙어 있게 */
+.sheet > .links-head { position: sticky; top: -6px; z-index: 3; margin: -6px -16px 10px; padding: 12px 16px 8px; background: var(--flow-bg, var(--surface-2)); }
 .sheet .alert-custom select, .sheet .alert-custom input { height: 44px; font-size: 15px; }
 .sheet .dp-day { height: 44px; font-size: 15px; border-radius: 12px; }
 .sheet .dp-title { font-size: 16px; }
@@ -1112,5 +1117,5 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 
 /* 고른 날 제목 옆 "＋ 일정 추가" (list-reminders.js) */
 .ev-day-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ev-add { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--fill-tab, var(--hover)); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.ev-add { text-decoration: none; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--fill-tab, var(--hover)); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .ev-add svg { width: 16px; height: 16px; }

@@ -291,6 +291,7 @@
       <!-- 토스처럼 한 번에 하나씩: 무엇을 → 언제 → 미리 알림 → 확인. 답한 단계는 위에 한 줄로 접히고, 누르면 다시 고친다 (reminder-panel.js) -->
       <button type="button" class="btn rem-start" id="rem-start"><svg><use href="#i-plus"/></svg><span>새 일정·알림 만들기</span></button>
       <div class="rem-steps" id="rem-steps" hidden>
+        <p class="flow-progress" id="rem-progress" aria-live="polite"></p>
         <ol class="rem-answers" id="rem-answers"></ol>
 
         <section class="rem-step" data-step="kind">
@@ -350,14 +351,12 @@
             <label class="rem-radio"><input type="radio" name="startup" value="daily"> 하루 한 번 (처음 열 때)</label>
             <label class="rem-radio"><input type="radio" name="startup" value="once"> 다음에 열 때 한 번만</label>
           </div>
-          <button type="button" class="btn primary rem-next" data-next>다음</button>
         </section>
 
         <section class="rem-step rem-alerts-wrap" data-step="alerts" id="rem-alerts-wrap" hidden>
           <p class="rem-q" id="rem-alerts-label">언제 미리 알려 드릴까요? <small>여러 개 고를 수 있어요</small></p>
           <div class="chips rem-alerts" id="rem-alerts" role="group" aria-labelledby="rem-alerts-label"></div>
           <p class="rem-hint" id="rem-alerts-hint" role="status"></p>
-          <button type="button" class="btn primary rem-next" data-next>다음</button>
         </section>
 
         <section class="rem-step" data-step="finish" hidden>
@@ -367,11 +366,12 @@
             <label class="rem-radio"><input type="radio" name="action" value="notify" checked> 알림으로 받기</label>
             <label class="rem-radio"><input type="radio" name="action" value="open"> 메모 바로 열기 <small>앱이 열려 있을 때</small></label>
           </div>
-          <div class="rem-finish-actions">
-            <button type="button" class="btn rem-cancel" id="rem-cancel">취소</button>
-            <button type="submit" class="btn primary rem-submit" id="rem-submit">일정 추가</button>
-          </div>
         </section>
+        <!-- 아래 막대: 왼쪽 취소·이전, 오른쪽 다음 → 마지막에 "일정 추가" (토스처럼 늘 같은 자리) -->
+        <div class="flow-footer">
+          <button type="button" class="btn rem-back" id="rem-back">취소</button>
+          <button type="button" class="btn primary rem-submit" id="rem-next">다음</button>
+        </div>
       </div>
     </form>
   </aside>

@@ -6,6 +6,7 @@ import { icon } from './icons.js';
 import { describeReminder, describeAlerts, nextLabel, isDone, isEvent, isLive, isPastEvent, reenable, pendingAlerts, fallbackAlert, alertLabel } from './core/reminders.js';
 import { remembered, remember, eventWhen } from './event-editor.js';
 import { alertPicker } from './alert-picker.js';
+import { defaultEventStart } from './quick-event.js';
 import { toLocalIso } from './core/time.js';
 import { dateTimePicker, timePicker } from './date-picker.js';
 
@@ -38,13 +39,14 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     allDay: $('rem-allday'),
     allDayRow: $('rem-allday-row'),
     alerts: $('rem-alerts'),
-    submit: $('rem-submit'),
+    submit: $('rem-next'), // 아래 막대 오른쪽: 다음 → 마지막에 "일정 추가"
     start: $('rem-start'),
     steps: $('rem-steps'),
     answers: $('rem-answers'),
     whenQ: $('rem-when-q'),
     hint: $('rem-alerts-hint'),
-    cancel: $('rem-cancel'),
+    back: $('rem-back'), // 아래 막대 왼쪽: 첫 질문에서는 취소, 그다음은 이전
+    progress: $('rem-progress'),
   };
   let reminders = [];
   let kind = 'at';
@@ -177,6 +179,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   const WHEN_Q = { at: '언제예요?', repeat: '얼마나 자주, 몇 시에요?', timer: '몇 분 뒤에 알려 드릴까요?', startup: '언제 알려 드릴까요?' };
   const STARTUP_NAME = { every: '열 때마다', daily: '하루 한 번', once: '다음에 열 때 한 번' };
   let step = 'kind';
+  let submitLabel = '일정 추가';
   const stepsOf = () => (kind === 'at' || kind === 'repeat' ? ['kind', 'when', 'alerts', 'finish'] : ['kind', 'when', 'finish']);
 
   /** 답한 단계 한 줄: "일정" · "10월 13일 (화) 오후 3:00" · "10분 전, 하루 전" */
@@ -223,6 +226,10 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
       return li;
     }));
     if (step === 'alerts') renderAlerts();
+    el.progress.textContent = `${at + 1} / ${order.length}`;
+    el.back.textContent = at === 0 ? '취소' : '이전';
+    el.submit.textContent = step === 'finish' ? submitLabel : '다음';
+    el.panel.classList.toggle('creating', !el.steps.hidden);
     if (focus) {
       const sec = el.form.querySelector(`[data-step="${step}"]`);
       const target = step === 'kind' ? el.kinds.querySelector('[aria-checked="true"]')
@@ -265,12 +272,10 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     el.titleRow.hidden = !event;
     el.allDayRow.hidden = kind !== 'at';
     el.whenQ.textContent = WHEN_Q[kind];
-    el.submit.textContent = event ? '일정 추가' : kind === 'timer' ? '타이머 추가' : '알림 추가';
+    submitLabel = event ? '일정 추가' : kind === 'timer' ? '타이머 추가' : '알림 추가';
+    if (step === 'finish') el.submit.textContent = submitLabel;
     if (kind === 'at' && !atChosen) {
-      // 처음엔 한 시간 뒤 정각
-      const d = new Date(Date.now() + 60 * 60 * 1000);
-      d.setMinutes(0, 0, 0);
-      atPicker.set(d);
+      atPicker.set(defaultEventStart());
     }
     renderAlerts();
     if (kind === 'repeat') syncRepeat();
@@ -356,18 +361,22 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     // 마우스·손가락으로 고르면 바로 다음 질문 (화살표 키로 고를 때는 그 자리에)
     if (e.detail > 0) goto('when');
   });
+  el.submit.addEventListener('click', () => (step === 'finish' ? el.form.requestSubmit() : nextStep()));
   el.form.addEventListener('click', (e) => {
-    if (e.target.closest('[data-next]')) nextStep();
     const back = e.target.closest('[data-goto]');
     if (back) goto(back.dataset.goto);
   });
   el.start.addEventListener('click', () => {
     el.start.hidden = true;
     el.steps.hidden = false;
-    goto('kind');
+    goto('kind'); // (만드는 동안 "아직 알림이 없어요" 는 숨김 — goto 가 creating 표시)
   });
-  el.cancel.addEventListener('click', () => {
-    resetFlow();
+  el.back.addEventListener('click', () => {
+    const order = stepsOf();
+    const at = order.indexOf(step);
+    if (at > 0) return goto(order[at - 1]);
+    resetFlow(); // 첫 질문에서는 그만두기
+    el.panel.classList.toggle('creating', !el.steps.hidden);
     if (!el.start.hidden) el.start.focus();
   });
   // 이름 칸에서 Enter = 추가 (다른 단계 칸의 Enter 는 다음 단계로)
@@ -380,10 +389,11 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     goto('when');
   });
   el.form.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' || e.isComposing || e.defaultPrevented || step === 'finish') return;
+    if (e.key !== 'Enter' || e.isComposing || e.defaultPrevented) return;
     if (e.target.matches('input[type="number"], input[type="text"]')) {
       e.preventDefault();
-      nextStep();
+      if (step === 'finish') el.form.requestSubmit();
+      else nextStep();
     }
   });
   el.presets.addEventListener('click', (e) => {

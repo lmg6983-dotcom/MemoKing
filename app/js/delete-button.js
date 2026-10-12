@@ -10,6 +10,15 @@ const COLLAPSE_MS = 200; // 그 자리 접기
 
 let current = null;
 
+/** 대상을 담고 스크롤되는 상자 (없으면 null = 창) */
+function scrollParent(el) {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const oy = getComputedStyle(p).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p;
+  }
+  return null;
+}
+
 /**
  * @param {import('prosemirror-view').EditorView} view
  * @param {{ pos: number, node: import('prosemirror-model').Node, target: Element, label?: string,
@@ -29,10 +38,17 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   btn.setAttribute('aria-label', label);
   btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6"/></svg>';
   document.body.append(btn);
+  // 단추는 화면에 고정(position: fixed)이라, 큰 그림을 스크롤하면 위 막대에 올라탈 수 있다 →
+  //   편집기에서 보이는 칸 안으로만: 대상의 위가 가려지면 보이는 부분의 위에 붙고, 대상이 다 가려지면 숨는다
+  const scroller = scrollParent(target);
   const place = () => {
     const r = target.getBoundingClientRect();
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    const top = Math.max(r.top - 9, box.top + 4);
+    const visible = r.bottom - 12 > box.top + 4 && r.top < box.bottom - 12 && top + 24 <= Math.min(r.bottom + 9, box.bottom);
+    btn.style.visibility = visible ? '' : 'hidden';
     btn.style.left = `${Math.round(Math.min(window.innerWidth - 32, r.right - 22))}px`;
-    btn.style.top = `${Math.round(Math.max(4, r.top - 9))}px`;
+    btn.style.top = `${Math.round(top)}px`;
   };
   place();
   const setMark = (on) => {
