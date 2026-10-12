@@ -173,3 +173,21 @@ test('OPMS 전자포대: 최신순으로 받아 위에 새 서류 · No. 는 오
   ]);
   assert.deepEqual(items.map((x) => `${x.n}:${x.name}`), ['2:의견서.pdf', '1:출원서.pdf']);
 });
+
+test('OPMS 진행사항: 받은 서류·낸 서류를 한 줄씩 (최신이 위, 순서·부서 코드는 빼고)', async () => {
+  const { progressItems, dueState } = await import('../app/js/core/opms-progress.js');
+  const items = progressItems([
+    { no_rec: '-', d_rec: '-', rec_memo: '인용참증(29조2항), 기재불비(42조4항2호)', n_extend: '0', d_pre: '2026-07-13', pre_doc: '우선심사신청서', clerk: '이민균', part_code: '600900', pre_div: '특허청', reg_per: '이태정', d_reg: '2026-07-15', sort: '1' },
+    { no_rec: '9520260664921 68', d_rec: '2026-07-23', d_noti: '2026-07-22', rec_doc: '우선심사결정서', sort: '2' },
+    { no_rec: '952026085686456', d_rec: '2026-09-17', d_noti: '2026-09-16', rec_doc: '의견제출통지서', n_extend: '0', d_due: '2027-01-16', clerk: '이민균', part_code: '600900', sort: '3' },
+  ]);
+  assert.deepEqual(items.map((x) => `${x.date} ${x.kind} ${x.title}`), ['2026-09-16 수신 의견제출통지서', '2026-07-22 수신 우선심사결정서', '2026-07-13 제출 우선심사신청서']);
+  assert.equal(items[0].due, '2027-01-16');
+  assert.deepEqual(items[0].meta, [['접수번호', '952026085686456'], ['접수일', '2026-09-17'], ['담당', '이민균']]);
+  assert.deepEqual(items[2].meta, [['제출처', '특허청'], ['담당', '이민균']]);
+  assert.match(items[2].memo, /인용참증/);
+  const now = new Date(2026, 11, 20);
+  assert.deepEqual(['2026-12-01', '2027-01-10', '2027-06-01', ''].map((d) => dueState(d, now)), ['past', 'soon', 'later', '']);
+  const md = caseMemoMarkdown({ ourref: 'P-1' }, { details: { novelty: [], sections: [{ id: 'progress', label: '진행사항', rows: [{ d_noti: '2026-09-16', rec_doc: '의견제출통지서', d_due: '2027-01-16', clerk: '이민균' }] }] } });
+  assert.match(md, /## 진행사항\n\n- 2026-09-16 \*\*수신\*\* 의견제출통지서 \(기한 2027-01-16\) — 담당 이민균\n/);
+});

@@ -3,6 +3,8 @@
 //   탭: 정보(서지 + 업무배분 + 신규성 의제 · 진행사항 · 메모) · 전자포대(골라 받기 / 전체 받기 → 저장 폴더 열기) · 청구서 · 해외출원
 //   "메모로 만들기": 고른 사건의 서지 · 업무배분 · 해외출원을 새 메모 한 장으로
 //   글은 모두 textContent 로 넣는다 (서버 값을 HTML 로 읽지 않는다)
+import { progressItems, dueState } from './core/opms-progress.js';
+
 const api = window.opms;
 const $ = (id) => document.getElementById(id);
 const form = $('op-form');
@@ -53,6 +55,7 @@ function table(cols, rows, { empty = '없어요' } = {}) {
       const td = el('td', kind ?? '');
       if (v instanceof Node) td.append(v);
       else td.textContent = dash(v);
+      if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) td.classList.add('date'); // 날짜는 한 줄로
       row.append(td);
     }
     tbody.append(row);
@@ -251,6 +254,7 @@ async function showDetails(box, my) {
     if (!sec.table) continue;
     out.push(el('h3', 'op-h', sec.label));
     if (sec.error) out.push(el('p', 'op-msg err', `불러오지 못했어요 — ${sec.error}`));
+    else if (sec.id === 'progress') out.push(progressTimeline(sec.rows));
     else out.push(table(sec.columns.map((x) => [x.label, (r) => r[x.key]]), sec.rows, { empty: `${sec.label}이(가) 없어요` }));
   }
   const missing = d.missing.filter((m) => !(m === '신규성 의제' && d.novelty.length));
@@ -271,6 +275,40 @@ async function showDetails(box, my) {
     out.push(p);
   }
   box.replaceChildren(...out);
+}
+
+// 진행사항: 넓은 표 대신 한 줄씩 — 날짜 · 수신/제출 · 서류 이름 · 기한, 아래에 메모와 접수번호·담당 등 (최신이 위)
+function progressTimeline(rows) {
+  const items = progressItems(rows);
+  if (!items.length) return el('p', 'op-msg', '진행사항이 없어요');
+  const list = el('ol', 'op-timeline');
+  for (const it of items) {
+    const li = el('li', `op-tl ${it.kind === '제출' ? 'sent' : 'recv'}`);
+    const date = el('time', 'op-tl-date', it.date || '날짜 없음');
+    const body = el('div', 'op-tl-body');
+    const head = el('div', 'op-tl-head');
+    head.append(el('span', 'op-tl-kind', it.kind), el('b', 'op-tl-title', it.title));
+    if (it.due) {
+      const state = dueState(it.due);
+      const due = el('span', `op-tl-due ${state}`, `기한 ${it.due}`);
+      if (state === 'past') due.title = '기한이 지났어요';
+      head.append(due);
+    }
+    body.append(head);
+    if (it.memo) body.append(el('p', 'op-tl-memo', it.memo));
+    if (it.meta.length) {
+      const meta = el('p', 'op-tl-meta');
+      it.meta.forEach(([k, v], i) => {
+        if (i) meta.append(' · ');
+        meta.append(`${k} `);
+        meta.append(el('span', 'op-tl-v', v));
+      });
+      body.append(meta);
+    }
+    li.append(date, body);
+    list.append(li);
+  }
+  return list;
 }
 
 function infoGrid(c) {

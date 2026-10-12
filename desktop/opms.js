@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 export { looksLikeRef } from '../app/js/core/magic-modules.js';
+import { progressItems } from '../app/js/core/opms-progress.js';
 
 export const DEFAULT_HOST = 'http://121.254.172.35:8181';
 export const DEFAULT_WRAPPER_DIR = 'G:\\내 드라이브\\work(firstlaw)\\포대';
@@ -250,6 +251,15 @@ export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '', d
   }
   for (const sec of details?.sections ?? []) {
     if (!sec.rows?.length) continue;
+    if (sec.id === 'progress') {
+      // 진행사항은 한 줄씩: "- 2026-07-13 **제출** 우선심사신청서 (기한 …) — 메모 · 접수번호 …"
+      L.push('', `## ${sec.label}`, '');
+      for (const it of progressItems(sec.rows)) {
+        const extra = [it.memo, ...it.meta.map(([k, v]) => `${k} ${v}`)].filter(Boolean).join(' · ');
+        L.push(`- ${it.date || '날짜 없음'} **${it.kind}** ${oneLine(it.title)}${it.due ? ` (기한 ${it.due})` : ''}${extra ? ` — ${oneLine(extra)}` : ''}`);
+      }
+      continue;
+    }
     L.push('', `## ${sec.label}`, '', `| ${sec.columns.map((x) => cell(x.label)).join(' | ')} |`, `| ${sec.columns.map(() => '---').join(' | ')} |`);
     for (const r of sec.rows) L.push(`| ${sec.columns.map((x) => cell(r[x.key])).join(' | ')} |`);
   }
@@ -340,9 +350,10 @@ const COLUMN_LABELS = {
   per_name: '담당', writer: '쓴 사람', reg_name: '쓴 사람', reg_user: '쓴 사람', user_name: '쓴 사람', name: '이름',
   d_reg: '등록일', reg_date: '등록일', d_date: '날짜', d_proc: '처리일', d_due: '기한', d_end: '완료', d_rec: '접수',
   d_pub: '공개일', d_disclose: '공개일', d_novelty: '의제일', n_doc: '문서번호', doc_name: '문서',
+  no_rec: '접수번호', d_noti: '통지일', rec_doc: '받은 서류', rec_memo: '메모', d_pre: '제출일', pre_doc: '낸 서류', pre_div: '제출처', clerk: '담당', reg_per: '등록자', n_extend: '연장',
 };
 // 화면에 보이지 않을 열: 번호·삭제 표시·바꾼 사람/때 같은 내부 값
-const HIDDEN_COLUMN = /^(idx|idx_.*|.*_idx|del_flag|ck_del|deleteflg|grp_key|upd_.*|mod_.*|reg_id|user_id|.*_id|rowid|seq)$/i;
+const HIDDEN_COLUMN = /^(idx|idx_.*|.*_idx|del_flag|ck_del|deleteflg|grp_key|upd_.*|mod_.*|reg_id|user_id|.*_id|rowid|seq|sort|part_code)$/i;
 
 /** 표 줄 → { columns: [{ key, label }], rows: [{key: 값}] } — 비어 있는 열·내부 열은 빼고, 날짜는 YYYY-MM-DD */
 export function detailRows(rows) {
