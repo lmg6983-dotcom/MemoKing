@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  isRunnableFile,
+  isOpenableFile,
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
   wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
   buildAttachSql, groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf,
@@ -219,34 +219,52 @@ test('OPMS 전자포대: 같은 파일 이름은 오래된 것부터 그대로 �
   assert.deepEqual(fs.readdirSync(path.dirname(f1)).filter((f) => f.endsWith('.part')), []);
 });
 
-test('OPMS 전자포대: 이름만 같은 예전 파일 · 받다 끊긴 파일은 믿지 않고 새로 받는다', async () => {
+test('OPMS 전자포대: 이름만 같은 예전 파일은 덮어쓰지 않고 · 고쳐 저장한 파일은 그대로', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-legacy-'));
-  const caseDir = path.join(dir, 'P-2');
+  const caseDir = path.join(dir, wrapperFolderName({ ourref: 'P-2', yourref: '' }));
   fs.mkdirSync(caseDir);
   // 예전 방식: 최신 통지서가 "이름 그대로" 로 저장돼 있음 — 지금은 그 이름이 가장 오래된 서류 몫
   fs.writeFileSync(path.join(caseDir, '통지서.pdf'), 'NEWEST');
-  const bodies = { 'u/1': 'OLDEST', 'u/2': 'NEWEST' };
+  const bodies = { 'u/1': 'OLDEST', 'u/2': 'NEWEST', 'u/3': 'THIRD' };
   let fetched = 0;
-  const client = new Opms({ fetch: async (url) => { fetched++; return new Response(bodies[url.split('/').slice(-2).join('/')]); }, retries: 0 });
+  const index = path.join(dir, 'index', 'opms-files.json');
+  const client = new Opms({ fetch: async (url) => { fetched++; return new Response(bodies[url.split('/').slice(-2).join('/')]); }, retries: 0, filesIndex: index });
   const items = attachmentItems([{ FILE_NAME_UPLOAD: 'u/2', FILE_NAME_ORI: '통지서.pdf' }, { FILE_NAME_UPLOAD: 'u/1', FILE_NAME_ORI: '통지서.pdf' }]);
   const c = { ourref: 'P-2', yourref: '' };
+  // 가장 오래된 서류: 그 이름의 파일은 내용이 달라 그대로 두고 다른 이름으로
   const oldest = await client.fileFor(c, items[1], dir);
+  assert.equal(path.basename(oldest), '통지서 (No.1).pdf');
   assert.equal(fs.readFileSync(oldest, 'utf8'), 'OLDEST');
-  assert.equal(fs.readFileSync(await client.fileFor(c, items[0], dir), 'utf8'), 'NEWEST');
-  assert.equal(path.basename(await client.fileFor(c, items[0], dir)), '통지서 (2).pdf');
-  assert.equal(fetched, 2);
-  // 받은 뒤 파일이 잘려 크기가 다르면 다시 받는다
-  fs.writeFileSync(oldest, 'OLD');
-  await client.fileFor(c, items[1], dir);
-  assert.equal(fs.readFileSync(oldest, 'utf8'), 'OLDEST');
-  assert.equal(fetched, 3);
-  // 받다 끊기면(Content-Length 와 다름) 파일을 남기지 않는다
-  const cut = new Opms({ fetch: async () => new Response('AB', { headers: { 'content-length': '10' } }), retries: 0 });
-  const [part] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/9', FILE_NAME_ORI: '끊김.pdf' }]);
-  await assert.rejects(cut.fileFor(c, part, dir), /끊겼/);
-  assert.equal(fs.existsSync(path.join(caseDir, '끊김.pdf')), false);
+  assert.equal(fs.readFileSync(path.join(caseDir, '통지서.pdf'), 'utf8'), 'NEWEST');
+  // 사용자가 고쳐 저장해도(크기가 바뀌어도) 다시 받지 않는다
+  fs.writeFileSync(oldest, 'OLDEST + 내 메모');
+  assert.equal(await client.fileFor(c, items[1], dir), oldest);
+  assert.equal(fs.readFileSync(oldest, 'utf8'), 'OLDEST + 내 메모');
+  assert.equal(fetched, 1);
+  // 0.31.2 가 사건 폴더에 남긴 기록은 읽어 옮기고 지운다
+  const caseDir3 = path.join(dir, wrapperFolderName({ ourref: 'P-3', yourref: '' }));
+  fs.mkdirSync(caseDir3);
+  fs.writeFileSync(path.join(caseDir3, '셋.pdf'), 'THIRD!');
+  fs.writeFileSync(path.join(caseDir3, '.memoking.json'), JSON.stringify({ 'u/3': { name: '셋.pdf', bytes: 6 } }));
+  const [third] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/3', FILE_NAME_ORI: '셋.pdf' }]);
+  assert.equal(path.basename(await client.fileFor({ ourref: 'P-3', yourref: '' }, third, dir)), '셋.pdf');
+  assert.equal(fs.existsSync(path.join(caseDir3, '.memoking.json')), false);
+  assert.equal(fetched, 1);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(fs.existsSync(index));
+  // 다음에 켜도(새 기록 읽기) 기억한다
+  const again = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: `${index}` });
+  assert.equal(await again.fileFor(c, items[1], dir), oldest);
 });
 
-test('OPMS 전자포대: 실행되는 파일은 "열기" 로 실행하지 않는다', () => {
-  assert.deepEqual(['a.pdf', 'b.hwp', 'invoice.pdf.exe', 'x.LNK', 'y.hta', 'z.js', 'w.bat. ', 'noext'].map(isRunnableFile), [false, false, true, true, true, true, true, false]);
+test('OPMS 전자포대: 내용이 같은 예전 파일은 그대로 쓴다 · 서류가 아닌 파일은 "열기" 로 실행하지 않는다', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-same-'));
+  fs.mkdirSync(path.join(dir, 'P-4'));
+  fs.writeFileSync(path.join(dir, 'P-4', '같음.pdf'), 'SAME');
+  const client = new Opms({ fetch: async () => new Response('SAME'), retries: 0 });
+  const [it] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/same', FILE_NAME_ORI: '같음.pdf' }]);
+  const r = await client.saveOne(path.join(dir, 'P-4'), it);
+  assert.deepEqual([path.basename(r.file), r.reused], ['같음.pdf', true]);
+  assert.deepEqual(['a.pdf', 'b.HWP', 'c.xlsx', 'invoice.pdf.exe', 'x.lnk', 'y.hta', 'z.js', 'w.vb', 'v.msix', 'noext', 'p.pdf. '].map(isOpenableFile),
+    [true, true, true, false, false, false, false, false, false, false, true]);
 });

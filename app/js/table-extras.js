@@ -514,13 +514,21 @@ function rowInline(row, schema) {
   const parts = [];
   row.forEach((cell) => {
     const inline = [];
+    const space = () => {
+      const last = inline[inline.length - 1];
+      if (last && !(last.isText && last.text.endsWith(' '))) inline.push(schema.text(' '));
+    };
+    // 칸 안의 줄바꿈 · 여러 문단 · 목록 항목은 띄어쓰기 하나로
     cell.descendants((n) => {
-      if (!n.isInline) return true;
-      if (isBreak(n)) {
-        if (inline.length) inline.push(schema.text(' '));
-      } else inline.push(n);
+      if (!n.isInline) {
+        if (n.isTextblock) space();
+        return true;
+      }
+      if (isBreak(n)) space();
+      else inline.push(n);
       return false;
     });
+    while (inline.length && inline[inline.length - 1].isText && !inline[inline.length - 1].text.trim()) inline.pop();
     // 띄어쓰기만 있는 칸은 건너뛴다 (그림 · 파일 칩처럼 글자가 없는 것만 든 칸은 남긴다)
     if (!inline.some((n) => !n.isText || n.text.trim())) return;
     if (parts.length) parts.push(schema.text(' · '));
