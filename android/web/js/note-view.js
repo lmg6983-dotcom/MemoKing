@@ -898,6 +898,9 @@ function showTableBar(table) {
   const merge = el.tableBar.querySelector('[data-table="merge"]');
   merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
   merge.disabled = !table.canMerge && !table.merged;
+  // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만
+  el.tableBar.querySelector('[data-table="splitTable"]').hidden = !table.canSplit;
+  el.tableBar.querySelector('[data-table="joinTable"]').hidden = !table.canJoin;
 }
 el.tableBar.addEventListener('mousedown', (e) => e.preventDefault());
 el.tableBar.addEventListener('click', (e) => {

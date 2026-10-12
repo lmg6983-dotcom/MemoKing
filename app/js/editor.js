@@ -27,7 +27,7 @@ import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } fr
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
-import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt } from './table-extras.js';
+import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable } from './table-extras.js';
 import { createListDrag, moveItemBy, currentItem } from './list-drag.js';
 import { createBlockMove, createContentLines, MEDIA_SCRUB, moveBlockBy } from './block-move.js';
 import { createTapList } from './tap-list.js';
@@ -1715,28 +1715,67 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     v.dispatch(tr);
   }
 
-  // 고른 줄(문단)마다 항목 하나인 목록으로 감싼다 — Milkdown 의 감싸기(wrapIn)는 고른 문단을 모두 항목 하나에 넣어
-  // 체크 네모가 맨 위 하나만 생긴다. 제목·표 등 문단이 아닌 것이 섞이면 false (Milkdown 기본 동작으로)
+  // 끌어서 고른 범위의 끝 다듬기: 앞 줄의 맨 끝에서 시작했거나(마우스로 줄 앞에서부터 끌면 흔함) 다음 줄 맨 앞에서 끝나면
+  //   그 줄은 고른 것이 아니다 → 목록 등을 그 줄에까지 적용하지 않게 범위에서 뺀다
+  function trimLineSelection() {
+    const v = view();
+    const { state } = v;
+    const { from, to, empty } = state.selection;
+    if (empty || !(state.selection instanceof TextSelection)) return;
+    let a = from;
+    let b = to;
+    const $a = state.doc.resolve(a);
+    if ($a.parent.isTextblock && $a.parentOffset === $a.parent.content.size && a < b) {
+      const next = TextSelection.findFrom(state.doc.resolve(Math.min($a.after(), state.doc.content.size)), 1, true);
+      if (next && next.from <= b) a = next.from;
+    }
+    const $b = state.doc.resolve(b);
+    if ($b.parent.isTextblock && $b.parentOffset === 0 && b > a) {
+      const prev = TextSelection.findFrom(state.doc.resolve(Math.max($b.before(), 0)), -1, true);
+      if (prev && prev.to >= a) b = prev.to;
+    }
+    if (a !== from || b !== to) v.dispatch(state.tr.setSelection(TextSelection.create(state.doc, a, b)));
+  }
+
+  // 고른 줄마다 항목 하나인 목록으로 감싼다 — Milkdown 의 감싸기(wrapIn)는 고른 문단을 모두 항목 하나에 넣어
+  //   체크 네모가 맨 위 하나만 생긴다. 고른 범위에 섞인 것도 줄마다: 제목은 글 줄로, 이미 있는 목록은 그 항목들을 그대로 옮기고,
+  //   그 밖의 칸(표·코드 등)은 항목 하나에 담는다. 고른 범위 앞뒤의 줄은 건드리지 않는다
   function wrapLinesInList(typeName) {
     const v = view();
     const { state } = v;
     const { $from, $to } = state.selection;
-    const range = $from.blockRange($to);
+    const range = $from.blockRange($to, (node) => !['list_item', 'bullet_list', 'ordered_list'].includes(node.type.name));
     const listType = state.schema.nodes[typeName];
     const itemType = state.schema.nodes.list_item;
+    const paragraph = state.schema.nodes.paragraph;
     if (!range || !listType || !itemType) return false;
+    const listAttr = typeName === 'ordered_list' ? 'ordered' : 'bullet';
     const items = [];
-    for (let i = range.startIndex; i < range.endIndex; i++) {
-      const block = range.parent.child(i);
-      if (block.type.name !== 'paragraph') return false;
-      items.push(itemType.create({ listType: typeName === 'ordered_list' ? 'ordered' : 'bullet' }, block));
-    }
+    const add = (block) => {
+      if (block.type.name === 'bullet_list' || block.type.name === 'ordered_list') {
+        block.forEach((item) => items.push(item.type === itemType ? itemType.create({ ...item.attrs, listType: listAttr }, item.content) : itemType.create({ listType: listAttr }, item)));
+      } else if (block.type.name === 'heading') items.push(itemType.create({ listType: listAttr }, paragraph.create(null, block.content)));
+      else items.push(itemType.create({ listType: listAttr }, block));
+    };
+    for (let i = range.startIndex; i < range.endIndex; i++) add(range.parent.child(i));
     if (!items.length) return false;
-    const list = listType.create(null, items);
+    let list;
+    try {
+      list = listType.create(null, items);
+      list.check();
+    } catch {
+      return false;
+    }
     const tr = state.tr.replaceWith(range.start, range.end, list);
     tr.setSelection(TextSelection.between(tr.doc.resolve(range.start + 1), tr.doc.resolve(range.start + list.nodeSize - 1)));
     v.dispatch(tr.scrollIntoView());
     return true;
+  }
+
+  // 고른 범위가 지금 목록 하나 안에만 있는가 (목록 밖의 줄까지 골랐으면 false)
+  function selectionInside(list) {
+    const { from, to } = view().state.selection;
+    return from >= list.pos && to <= list.pos + list.node.nodeSize;
   }
 
   // 선택한 항목 모두의 체크 상태 (null = 체크리스트 아님, false/true = 체크리스트)
@@ -1774,13 +1813,22 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }
 
   function toggleList(type) {
+    trimLineSelection();
     leaveHeading();
     const list = parentOfType(['bullet_list', 'ordered_list']);
     const items = itemsInSelection();
     const anyTask = items.some((i) => i.node.attrs.checked != null);
-    if (list && list.node.type.name === type && !anyTask) {
+    if (list && selectionInside(list) && list.node.type.name === type && !anyTask) {
       call(liftListItemCommand);
       return;
+    }
+    // 목록 밖의 줄까지 골랐으면: 고른 줄 모두를 줄마다 항목 하나인 목록 하나로
+    if (list && !selectionInside(list)) {
+      splitLinesInSelection();
+      if (wrapLinesInList(type)) {
+        setCheckedInSelection(null);
+        return;
+      }
     }
     if (!list) {
       splitLinesInSelection();
@@ -1792,6 +1840,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }
 
   function toggleTask() {
+    trimLineSelection();
     const items = itemsInSelection();
     // 고른 항목이 모두 체크리스트면 체크리스트를 푼다
     if (items.length && items.every((i) => i.node.attrs.checked != null)) {
@@ -1800,9 +1849,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     }
     leaveHeading();
     const list = parentOfType(['bullet_list', 'ordered_list']);
-    if (!list) {
+    if (!list || !selectionInside(list)) {
       splitLinesInSelection();
-      if (!wrapLinesInList('bullet_list')) call(wrapInBulletListCommand);
+      if (!wrapLinesInList('bullet_list') && !list) call(wrapInBulletListCommand);
       setCheckedInSelection(false); // 고른 줄마다 체크 네모
       return;
     }
@@ -1933,6 +1982,12 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       }
       if (name === 'merge') {
         mergeOrSplit(v);
+        return v.focus();
+      }
+      if (name === 'splitTable' || name === 'joinTable') {
+        const result = (name === 'splitTable' ? splitTableAt : joinNextTable)(v.state, v.dispatch);
+        if (result !== true) onNotice?.(result, true);
+        else onNotice?.(name === 'splitTable' ? '표를 둘로 나눴어요 (아래 표에도 머리글 행)' : '아래 표를 이어 붙였어요');
         return v.focus();
       }
       if (name === 'autoFit') {
@@ -2188,6 +2243,8 @@ function activeFormats(state) {
         header: Boolean(active.tableHeader),
         accent: isAccent(state, { node, pos: $from.before(d) }),
         canMerge: multi,
+        canSplit: splitTableAt(state) === true, // 이 행부터 아래를 새 표로
+        canJoin: joinNextTable(state) === true, // 바로 아래 표(같은 열 수)를 이어 붙이기
         merged: !multi && ((cellNode?.attrs.colspan ?? 1) > 1 || (cellNode?.attrs.rowspan ?? 1) > 1),
       };
       break;

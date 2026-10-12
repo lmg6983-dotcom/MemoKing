@@ -921,6 +921,63 @@ try {
   check('도구막대: H1·H2·태그·키보드·사진 버튼 없음', (await page.locator('#format-bar [data-cmd="h1"], #format-bar [data-cmd="h2"], #format-bar [data-action="tag"], #format-bar [data-action="done"], #format-bar [data-action="camera"]').count()) === 0);
   check('위 막대: 되돌리기·다시 하기', (await page.locator('#note-screen .bar #undo-btn, #note-screen .bar #redo-btn').count()) === 2);
 
+  // 끌어서 고른 줄만 목록으로: 앞 줄 맨 끝에서 시작한 선택은 그 줄을 빼고, 고른 줄마다 항목 하나
+  await newText();
+  await page.keyboard.type('# 고른 줄 목록');
+  for (const t of ['머리 줄', '하나', '둘', '셋']) {
+    await page.keyboard.press('Enter');
+    await page.keyboard.type(t);
+  }
+  const selectLines = (startText, endText) => page.evaluate(([a, b]) => {
+    const ps = [...document.querySelectorAll('#note-screen .mk-doc p')];
+    const pa = ps.find((p) => p.textContent === a);
+    const pb = ps.find((p) => p.textContent === b);
+    const r = document.createRange();
+    r.setStart(pa.firstChild, pa.textContent.length); // 앞 줄의 맨 끝에서
+    r.setEnd(pb.firstChild, pb.textContent.length);
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    document.dispatchEvent(new Event('selectionchange'));
+  }, [startText, endText]);
+  await selectLines('머리 줄', '셋');
+  await page.waitForTimeout(150);
+  await page.click('#format-bar [data-cmd="bullet"]');
+  await page.waitForTimeout(900);
+  let g = fileWith('고른 줄 목록');
+  check('끌어 고른 줄 목록: 앞 줄 끝에서 시작해도 그 줄은 그대로 · 고른 줄마다 항목 하나', g && /\n머리 줄\n\n- 하나\n- 둘\n- 셋/.test(read(g)), g && read(g));
+  // 목록과 그 아래 글 줄을 함께 고르면 모두 한 목록으로 (줄마다 항목)
+  await page.evaluate(() => { // 커서를 "셋" 끝에 (고른 범위를 풀고)
+    const p = [...document.querySelectorAll('#note-screen .mk-doc li p')].find((x) => x.textContent === '셋');
+    getSelection().collapse(p.firstChild, p.textContent.length);
+    document.dispatchEvent(new Event('selectionchange'));
+  });
+  await page.waitForTimeout(150);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter'); // 빈 항목에서 Enter → 목록 밖 글 줄로
+  await page.keyboard.type('넷');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('다섯');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const items = [...document.querySelectorAll('#note-screen .mk-doc li p')];
+    const ps = [...document.querySelectorAll('#note-screen .mk-doc > p')];
+    const first = items.find((p) => p.textContent === '둘');
+    const last = ps.find((p) => p.textContent === '다섯');
+    const r = document.createRange();
+    r.setStart(first.firstChild, 0);
+    r.setEnd(last.firstChild, last.textContent.length);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    document.dispatchEvent(new Event('selectionchange'));
+  });
+  await page.waitForTimeout(150);
+  await page.click('#format-bar [data-cmd="ordered"]');
+  await page.waitForTimeout(900);
+  check('목록 + 아래 글 줄을 함께 고르면 줄마다 항목인 한 목록으로', /1\. 하나\n2\. 둘\n3\. 셋\n4\. 넷\n5\. 다섯/.test(read(g)), read(g));
+  await back();
+  await page.waitForTimeout(300);
+
   // 이어진 목록 하나를 바꾸면 통째로
   await newText();
   await page.keyboard.type('# 목록 바꾸기');
@@ -1196,6 +1253,30 @@ try {
   check('도구막대: + › 표', (await page.locator('.mk-doc table').count()) === 1);
   check('도구막대: 평소엔 + 하나 (첨부·녹음·표 단추 없음)', (await page.locator('#format-bar [data-action="file"], #format-bar [data-action="record"], #format-bar [data-action="table"]').count()) === 0);
   if (process.env.MK_PDF) await page.pdf({ path: path.join(outDir, 'share-images.pdf'), format: 'A4' });
+  await back();
+  await page.waitForTimeout(300);
+
+  // 표 나누기 · 아래 표와 합치기 (열 수가 같을 때)
+  write('표 나누기.md', '---\nid: 00000000-0000-4000-8000-0000000000df\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 표 나누기\n\n| 이름 | 수량 |\n| --- | --- |\n| 사과 | 1 |\n| 배 | 2 |\n| 감 | 3 |\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000df"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await setMode('edit');
+  await page.locator('.mk-doc td', { hasText: '배' }).tap();
+  await page.waitForTimeout(300);
+  check('표 막대: 두 번째 본문 행이면 "표 나누기" · 아래에 표가 없으면 "아래 표와 합치기" 없음', await page.isVisible('#table-bar [data-table="splitTable"]') && await page.isHidden('#table-bar [data-table="joinTable"]'));
+  await page.tap('#table-bar [data-table="splitTable"]');
+  await page.waitForTimeout(900);
+  const split = read('표 나누기.md');
+  check('표 나누기: 이 행부터 새 표 (머리글 행도 함께)', /\| 이름 \| 수량 \|\n\| -+ \| -+ \|\n\| 사과 \| 1 +\|\n\n+\| 이름 \| 수량 \|\n\| -+ \| -+ \|\n\| 배 +\| 2 +\|\n\| 감 +\| 3 +\|/.test(split), split);
+  await page.locator('.mk-doc td', { hasText: '사과' }).tap();
+  await page.waitForTimeout(300);
+  check('표 막대: 아래에 열 수가 같은 표가 있으면 "아래 표와 합치기"', await page.isVisible('#table-bar [data-table="joinTable"]'));
+  await page.tap('#table-bar [data-table="joinTable"]');
+  await page.waitForTimeout(900);
+  const joined = read('표 나누기.md');
+  check('아래 표와 합치기: 머리글이 같으면 한 번만 · 한 표로', (await page.locator('.mk-doc table').count()) === 1 && /\| 사과 \| 1 +\|\n\| 배 +\| 2 +\|\n\| 감 +\| 3 +\|/.test(joined), joined);
   await back();
   await page.waitForTimeout(300);
 

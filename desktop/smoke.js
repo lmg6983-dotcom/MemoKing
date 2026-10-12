@@ -728,6 +728,25 @@ export async function runSmoke({
       dt.setData('text/plain', ${JSON.stringify(text)});
       document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
     })()`);
+    // CLEAR 도장: 아래 도구막대가 숨었다 나타나도 제자리 (본문 높이가 바뀌어도 움직이지 않음)
+    {
+      const stampNote = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
+      await pasteText(stampNote.win, '# 도장\n\n- [x] 하나\n- [x] 둘\n');
+      await until(() => js(stampNote.win, `!document.querySelector('.clear-stamp').hidden`), 'CLEAR 도장').catch(() => {});
+      const tops = await js(stampNote.win, `(async () => {
+        const top = () => Math.round(document.querySelector('.clear-stamp').getBoundingClientRect().top + document.querySelector('.clear-stamp').getBoundingClientRect().height / 2);
+        await new Promise((r) => setTimeout(r, 500));
+        const shown = top();
+        document.body.classList.add('bar-hidden');
+        await new Promise((r) => setTimeout(r, 500));
+        const hidden = top();
+        document.body.classList.remove('bar-hidden');
+        await new Promise((r) => setTimeout(r, 500));
+        return { visible: !document.querySelector('.clear-stamp').hidden, shown, hidden, back: top() };
+      })()`);
+      check('CLEAR 도장: 도구막대가 숨었다 나타나도 움직이지 않음', tops.visible && Math.abs(tops.shown - tops.hidden) <= 1 && Math.abs(tops.shown - tops.back) <= 1, JSON.stringify(tops));
+      await closeNote(stampNote.id);
+    }
     const articleUrl = `${base}/article.html`;
     const linkNote = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await pasteText(linkNote.win, articleUrl);

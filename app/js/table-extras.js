@@ -410,3 +410,97 @@ export function resetTableSize(view) {
   view.dispatch(tr);
   return true;
 }
+
+// ---------- 표 나누기 · 아래 표와 합치기 ----------
+// 마크다운 표에는 머리글 행이 꼭 있어야 해서: 나누면 아래 표 맨 위에 머리글 행을 한 번 더 둔다.
+// 합칠 때 아래 표의 머리글이 위 표와 같으면 버리고, 다르면 보통 행으로 이어 붙인다.
+
+/** 커서가 든 표와 그 행 번호 — { node, pos, depth, row } | null */
+function tableAndRow(state) {
+  const { $from } = state.selection;
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === 'table') return { node: $from.node(d), pos: $from.before(d), depth: d, row: $from.index(d) };
+  }
+  return null;
+}
+
+/**
+ * 커서가 있는 행부터 아래를 새 표로 떼어 낸다
+ * @returns {true|string} true = 나눔(또는 나눌 수 있음), 문자열 = 못 나누는 이유
+ */
+export function splitTableAt(state, dispatch) {
+  const t = tableAndRow(state);
+  if (!t) return '표 안에 커서를 두세요';
+  if (t.row < 2) return '나눌 행(머리글 아래 두 번째 행부터)에 커서를 두세요';
+  // 합친 칸이 나누는 줄을 걸치면 나눌 수 없다
+  const map = TableMap.get(t.node);
+  for (const cellPos of new Set(map.map)) {
+    const at = map.findCell(cellPos);
+    if (at.top < t.row && at.bottom > t.row) return '나누는 줄에 걸친 합친 칸을 먼저 풀어 주세요';
+  }
+  if (!dispatch) return true;
+  const rows = [];
+  t.node.forEach((r) => rows.push(r));
+  const upper = t.node.type.create(t.node.attrs, rows.slice(0, t.row));
+  const lower = t.node.type.create(t.node.attrs, [rows[0], ...rows.slice(t.row)]);
+  // 두 표는 바로 이어 둔다 (사이에 빈 줄을 두면 마크다운에 "<br />" 이 남는다 — 저장할 때 표 둘로 나뉨)
+  const tr = state.tr.replaceWith(t.pos, t.pos + t.node.nodeSize, [upper, lower]);
+  // 커서: 아래 표의 첫 본문 행 첫 칸
+  const lowerPos = t.pos + upper.nodeSize;
+  const firstBody = lowerPos + 1 + lower.child(0).nodeSize;
+  tr.setSelection(TextSelection.near(tr.doc.resolve(firstBody + 2)));
+  dispatch(tr.scrollIntoView());
+  return true;
+}
+
+/** 표 바로 아래(빈 줄은 건너뜀)의 표 — { node, pos, from } | null (from = 지울 범위의 시작) */
+function nextTable(doc, t) {
+  const end = t.pos + t.node.nodeSize;
+  const $end = doc.resolve(end);
+  const parent = $end.parent;
+  let i = $end.index();
+  let pos = end;
+  while (i < parent.childCount) {
+    const n = parent.child(i);
+    if (n.type.name === 'table') return { node: n, pos };
+    if (n.type.name !== 'paragraph' || n.content.size > 0) return null;
+    pos += n.nodeSize;
+    i++;
+  }
+  return null;
+}
+
+const rowText = (row) => {
+  const out = [];
+  row.forEach((cell) => out.push(cell.textContent.trim()));
+  return out.join('\u0001');
+};
+
+/**
+ * 커서가 있는 표에 바로 아래 표를 이어 붙인다 (열 수가 같을 때만)
+ * @returns {true|string}
+ */
+export function joinNextTable(state, dispatch) {
+  const t = tableAndRow(state);
+  if (!t) return '표 안에 커서를 두세요';
+  const next = nextTable(state.doc, t);
+  if (!next) return '바로 아래에 이어 붙일 표가 없어요';
+  if (TableMap.get(t.node).width !== TableMap.get(next.node).width) return '열 수가 같은 표끼리만 합칠 수 있어요';
+  if (!dispatch) return true;
+  const { schema } = state;
+  const rows = [];
+  t.node.forEach((r) => rows.push(r));
+  next.node.forEach((r, _o, i) => {
+    if (i > 0) return rows.push(r);
+    if (rowText(r) === rowText(t.node.child(0))) return undefined; // 머리글이 같으면 한 번만
+    // 머리글이 다르면 보통 행으로
+    const cells = [];
+    r.forEach((cell) => cells.push(schema.nodes.table_cell.create(cell.attrs, cell.content)));
+    return rows.push(schema.nodes.table_row.create(null, cells));
+  });
+  const joined = t.node.type.create(t.node.attrs, rows);
+  const tr = state.tr.replaceWith(t.pos, next.pos + next.node.nodeSize, joined);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(state.selection.from, t.pos + joined.nodeSize - 2))));
+  dispatch(tr.scrollIntoView());
+  return true;
+}
