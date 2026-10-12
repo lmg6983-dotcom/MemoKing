@@ -325,11 +325,11 @@ try {
   await page.waitForSelector('.event-dialog[open]', { timeout: 5000 }).catch(() => {});
   const evName = await page.inputValue('#event-name').catch(() => '');
   check('일정 창: 이름을 줄에서 짐작 ("치과")', evName === '치과', evName);
-  // 미리 알림: 기본(10분 전)은 빼고 30분 전 · 하루 전
+  // 미리 알림: 기본(10분 전)은 빼고 30분 전 · 2시간 전 ("하루 전" 은 오후 3시가 지나면 이미 지난 시각이라 숨겨짐)
   const chipBtn = (label) => page.locator('.event-alerts button', { hasText: label }).first();
   if ((await chipBtn('10분 전').getAttribute('aria-pressed')) === 'true') await chipBtn('10분 전').tap();
   await chipBtn('30분 전').tap();
-  await chipBtn('하루 전').tap();
+  await chipBtn('2시간 전').tap();
   await shot('02c2-event-dialog');
   await page.tap('#event-save');
   await page.waitForTimeout(800);
@@ -338,13 +338,13 @@ try {
   tomorrow3.setDate(tomorrow3.getDate() + 1);
   tomorrow3.setHours(15, 0, 0, 0);
   const atLine = /\n\s+at: "?([^"\n]+)"?/.exec(dateMemo)?.[1];
-  check('일정 저장: 내일 15:00 · 이름 치과 · 미리 알림 하루 전과 30분 전', Boolean(atLine) && Math.abs(Date.parse(atLine) - tomorrow3.getTime()) < 60_000
-    && /title: 치과/.test(dateMemo) && /alerts:\s*\n\s*- 1440\s*\n\s*- 30/.test(dateMemo), dateMemo.slice(0, 400));
+  check('일정 저장: 내일 15:00 · 이름 치과 · 미리 알림 2시간 전과 30분 전', Boolean(atLine) && Math.abs(Date.parse(atLine) - tomorrow3.getTime()) < 60_000
+    && /title: 치과/.test(dateMemo) && /alerts:\s*\n\s*- 120\s*\n\s*- 30/.test(dateMemo), dateMemo.slice(0, 400));
   {
     const sched = (await devLog()).scheduled.filter((x) => x.memoId && /치과/.test(x.title ?? ''));
     const times = sched.map((x) => x.at).sort();
-    check('휴대폰 시스템 알람: 일정 시각이 아니라 하루 전·30분 전에 (제목 치과)',
-      times.length === 2 && Math.abs(times[0] - (tomorrow3.getTime() - 1440 * 60_000)) < 60_000 && Math.abs(times[1] - (tomorrow3.getTime() - 30 * 60_000)) < 60_000,
+    check('휴대폰 시스템 알람: 일정 시각이 아니라 2시간 전·30분 전에 (제목 치과)',
+      times.length === 2 && Math.abs(times[0] - (tomorrow3.getTime() - 120 * 60_000)) < 60_000 && Math.abs(times[1] - (tomorrow3.getTime() - 30 * 60_000)) < 60_000,
       JSON.stringify(sched.map((x) => [new Date(x.at).toString().slice(4, 21), x.title, x.label])));
   }
   check('날짜 알림: 맞춘 날짜는 실선 밑줄', (await page.locator('.mk-doc .mk-date-set').count()) === 1);
@@ -384,7 +384,7 @@ try {
     days: document.querySelectorAll('#reminder-groups .cal-day').length,
     rows: [...document.querySelectorAll('#reminder-groups .ev-row')].map((r) => r.textContent),
   }));
-  check('일정 탭: 달력 42칸 · 다가오는 일정에 "치과 · 알림 30분 전, 하루 전"', cal.days === 42 && cal.rows.some((t) => /치과/.test(t) && /알림 30분 전, 하루 전/.test(t)), JSON.stringify(cal));
+  check('일정 탭: 달력 42칸 · 다가오는 일정에 "치과 · 알림 30분 전, 2시간 전"', cal.days === 42 && cal.rows.some((t) => /치과/.test(t) && /알림 30분 전, 2시간 전/.test(t)), JSON.stringify(cal));
   await shot('02g-calendar');
   check('일정 탭: + 버튼 없음 (보관함처럼)', await page.isHidden('#fab'));
   // 달력에서 바로 일정 만들기: 고른 날 › ＋ 일정 추가 → 이름·시각 → 미리 알림 → 새 메모 / 있는 메모
@@ -584,6 +584,41 @@ try {
     const follows = seen.some((x) => /translate3d\(-\d/.test(x.t)) && seen.some((x) => /translate3d\(\d/.test(x.t));
     check('목록 카드 좌우로 흔들기: 카드만 따라오고 화면은 그대로 · 놓으면 제자리', follows && seen.every((x) => x.sl === 0)
       && await page.isVisible(cardSel) && await page.isHidden('#memo-sheet') && !(await page.$eval(cardSel, (c) => c.style.transform)), JSON.stringify(seen.slice(0, 4)));
+    const cardX = () => page.$eval(cardSel, (c) => c.style.transform);
+    // 처음에 위아래로 조금 흔들리며(비스듬히) 밀어도 밀린다
+    await touch('touchStart', cx, cy);
+    for (const [mx, my] of [[3, 5], [8, 8], [20, 11], [45, 13], [70, 14]]) await touch('touchMove', cx + mx, cy + my);
+    await page.waitForTimeout(40);
+    const diag = await cardX();
+    await touch('touchMove', cx + 2, cy + 14);
+    await page.waitForTimeout(40);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(300);
+    check('목록 카드: 비스듬히 밀어도(처음에 위아래로 조금 흔들려도) 밀림', /translate3d\(\d/.test(diag), diag);
+    // 꾹 눌렀다가(메뉴가 뜰 때쯤) 그대로 옆으로 밀면 메뉴 대신 밀기
+    await touch('touchStart', cx, cy);
+    await page.waitForTimeout(30);
+    await page.dispatchEvent(cardSel, 'contextmenu');
+    for (const mx of [-12, -30, -60]) await touch('touchMove', cx + mx, cy);
+    await page.waitForTimeout(40);
+    const held = await cardX();
+    await touch('touchMove', cx - 2, cy);
+    await page.waitForTimeout(40);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(350);
+    check('목록 카드: 꾹 눌렀다가 밀면 메뉴 대신 밀기', /translate3d\(-\d/.test(held) && await page.isHidden('#memo-sheet'), held);
+    // 꾹 누르고 밀지 않고 떼면 메뉴 (실제 길게 누르기처럼 오래 누른 뒤 떼야 "눌림" 이 따라오지 않는다)
+    await touch('touchStart', cx, cy);
+    await page.waitForTimeout(30);
+    await page.dispatchEvent(cardSel, 'contextmenu');
+    await page.waitForTimeout(700);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(400);
+    check('목록 카드: 꾹 누르고 떼면 메뉴', await page.isVisible('#memo-sheet'), JSON.stringify(await page.evaluate(() => ({
+      note: !document.getElementById('note-screen').hidden, sheet: document.getElementById('memo-sheet').className, hidden: document.getElementById('memo-sheet').hidden,
+    }))));
+    await back();
+    await page.waitForTimeout(400);
   }
   await page.tap('.card[data-id="00000000-0000-4000-8000-000000000001"]');
   await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');

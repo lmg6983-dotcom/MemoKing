@@ -376,22 +376,22 @@ el.cards.addEventListener('touchmove', (e) => {
   const dx = t.clientX - swipe.x;
   const dy = t.clientY - swipe.y;
   if (!swipe.active) {
-    if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+    // 방향은 손가락이 10px 움직였을 때 한 번만 정한다 — 처음에 살짝 위아래로 흔들려도(비스듬히 밀어도) 가로가 세로의 0.8배 넘으면 밀기
+    if (Math.hypot(dx, dy) < 10) return;
+    if (Math.abs(dx) < Math.abs(dy) * 0.8) {
       swipe = null; // 세로 = 스크롤
       return;
     }
-    if (Math.abs(dx) < 14) return;
-    if (!e.cancelable) {
-      swipe = null; // 브라우저가 이미 스크롤 중 — 카드와 화면이 함께 움직이지 않게 밀기는 하지 않는다
-      return;
-    }
+    // 스크롤이 아직 미끄러지는 중에 누르면 브라우저가 첫 움직임을 막을 수 없게(cancelable=false) 보내도 밀기는 한다
+    //   — 아래 swipe-lock 이 목록 스크롤을 멈춰 화면이 같이 움직이지 않는다
     swipe.active = true;
-    swipe.x = t.clientX - Math.sign(dx) * 14; // 문턱만큼 뛰지 않고 손가락 자리에서 이어서
+    swipe.menu = false; // 꾹 눌렀다가 밀면 메뉴 대신 밀기
+    swipe.x = t.clientX - Math.sign(dx) * Math.min(10, Math.abs(dx)); // 문턱만큼 뛰지 않고 손가락 자리에서 이어서
     swipe.w = swipe.card.offsetWidth || 1; // 크기는 한 번만 읽는다 (움직일 때마다 읽으면 레이아웃을 다시 계산)
     swipe.card.classList.add('swiping');
     el.screen.classList.add('swipe-lock');
   }
-  e.preventDefault();
+  if (e.cancelable) e.preventDefault();
   const nx = t.clientX - swipe.x;
   // 손을 뗄 때의 빠르기 (px/ms) — 짧게 '휙' 밀어도 지워지게
   const dt = e.timeStamp - swipe.t;
@@ -404,11 +404,19 @@ function endSwipe(e) {
   if (!swipe) return;
   // 다른 손가락만 뗀 경우는 계속 민다
   if (e?.touches && [...e.touches].some((x) => x.identifier === swipe.id)) return;
-  const { card, dx, active } = swipe;
+  const { card, dx, active, menu } = swipe;
   // 멈췄다가 뗀 건 튕긴 게 아니다
   const vx = e && e.timeStamp - swipe.t < 100 ? swipe.vx : 0;
   swipe = null;
-  if (!active) return;
+  if (!active) {
+    if (menu) {
+      // 꾹 누른 채 밀지 않고 뗐으면 메뉴 — 뒤따르는 "눌림" 으로 메모가 열리지 않게 잠깐 막는다
+      card.dataset.swiped = '1';
+      setTimeout(() => delete card.dataset.swiped, 400);
+      app.memoMenu(card.dataset.id);
+    }
+    return;
+  }
   cancelAnimationFrame(swipeFrame);
   swipeFrame = 0;
   el.screen.classList.remove('swipe-lock');
@@ -456,8 +464,12 @@ el.cards.addEventListener('contextmenu', (e) => {
   if (!card) return;
   e.preventDefault();
   if (swipe?.active || card.classList.contains('swiping')) return; // 누른 채 옆으로 밀고 있으면 메뉴는 띄우지 않는다
-  swipe = null;
   haptic(12);
+  // 손가락으로 꾹 누른 것이면 메뉴는 뗄 때 — 그 사이 옆으로 밀면 메뉴 대신 밀기 (잠깐 멈췄다 밀어도 밀리게)
+  if (swipe && swipe.card.dataset.id === card.dataset.id) { // 목록을 다시 그렸으면 카드 요소가 바뀌었을 수 있어 메모로 비교
+    swipe.menu = true;
+    return;
+  }
   app.memoMenu(card.dataset.id);
 });
 
