@@ -21,6 +21,7 @@ function syncScrim() {
 export function openSheet(el, { onClose } = {}) {
   if (sheets.some((s) => s.el === el)) return;
   el.hidden = false;
+  openedAt = performance.now();
   sheets.push({
     el,
     close: () => {
@@ -65,7 +66,12 @@ export function closeAllSheets() {
 
 export const sheetOpen = () => sheets.length > 0;
 
-$('scrim').addEventListener('click', closeTopSheet);
+// 열자마자 들어온 "눌림"(꾹 눌렀다 뗀 손가락이 바로 아래 바탕을 누른 것으로 잡힘)으로 닫히지 않게 잠깐은 무시
+let openedAt = 0;
+$('scrim').addEventListener('click', () => {
+  if (performance.now() - openedAt < 350) return;
+  closeTopSheet();
+});
 
 // 시트 손잡이를 아래로 끌면 닫힘
 let drag = null;
