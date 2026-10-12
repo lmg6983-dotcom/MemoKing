@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  isOpenableFile,
+  isOpenableFile, numberedName, fitName,
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
   wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
   buildAttachSql, groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf,
@@ -216,7 +216,7 @@ test('OPMS 전자포대: 같은 파일 이름은 오래된 것부터 그대로 �
   // 같은 파일을 동시에 열면 한 번만 받는다
   await Promise.all([client.fileFor(c, items[1], dir), client.fileFor(c, items[1], dir)]);
   assert.equal(fetched, 3);
-  assert.deepEqual(fs.readdirSync(path.dirname(f1)).filter((f) => f.endsWith('.part')), []);
+  assert.deepEqual(fs.readdirSync(path.dirname(f1)).filter((f) => f.endsWith('.part')), []); // 임시 파일은 같은 폴더에 썼다가 지움
 });
 
 test('OPMS 전자포대: 이름만 같은 예전 파일은 덮어쓰지 않고 · 고쳐 저장한 파일은 그대로', async () => {
@@ -241,19 +241,21 @@ test('OPMS 전자포대: 이름만 같은 예전 파일은 덮어쓰지 않고 �
   assert.equal(await client.fileFor(c, items[1], dir), oldest);
   assert.equal(fs.readFileSync(oldest, 'utf8'), 'OLDEST + 내 메모');
   assert.equal(fetched, 1);
-  // 0.31.2 가 사건 폴더에 남긴 기록은 읽어 옮기고 지운다
+  // 0.31.2 가 사건 폴더에 남긴 기록은 읽어 온다 (다른 PC 도 읽게 지우지 않음)
   const caseDir3 = path.join(dir, wrapperFolderName({ ourref: 'P-3', yourref: '' }));
   fs.mkdirSync(caseDir3);
   fs.writeFileSync(path.join(caseDir3, '셋.pdf'), 'THIRD!');
   fs.writeFileSync(path.join(caseDir3, '.memoking.json'), JSON.stringify({ 'u/3': { name: '셋.pdf', bytes: 6 } }));
   const [third] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/3', FILE_NAME_ORI: '셋.pdf' }]);
   assert.equal(path.basename(await client.fileFor({ ourref: 'P-3', yourref: '' }, third, dir)), '셋.pdf');
-  assert.equal(fs.existsSync(path.join(caseDir3, '.memoking.json')), false);
+  assert.equal(fs.existsSync(path.join(caseDir3, '.memoking.json')), true);
   assert.equal(fetched, 1);
-  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(await client.files.save(), true);
   assert.ok(fs.existsSync(index));
   // 다음에 켜도(새 기록 읽기) 기억한다
-  const again = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: `${index}` });
+  // 다음 실행 = 디스크의 기록을 새로 읽는 다른 기록 (같은 파일을 가리키는 다른 경로 글자로)
+  const again = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: `${path.dirname(index)}${path.sep}.${path.sep}${path.basename(index)}` });
+  assert.notEqual(again.files, client.files);
   assert.equal(await again.fileFor(c, items[1], dir), oldest);
 });
 
@@ -267,4 +269,252 @@ test('OPMS 전자포대: 내용이 같은 예전 파일은 그대로 쓴다 · �
   assert.deepEqual([path.basename(r.file), r.reused], ['같음.pdf', true]);
   assert.deepEqual(['a.pdf', 'b.HWP', 'c.xlsx', 'invoice.pdf.exe', 'x.lnk', 'y.hta', 'z.js', 'w.vb', 'v.msix', 'noext', 'p.pdf. '].map(isOpenableFile),
     [true, true, true, false, false, false, false, false, false, false, true]);
+});
+
+test('OPMS 전자포대 기록: 동시 첫 사용 · 예전 기록 검사 · 깨진 기록 보존 · 서버별 · 같은 이름 동시 저장', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-index-'));
+  const index = path.join(dir, 'idx', 'opms-files.json');
+  fs.mkdirSync(path.dirname(index));
+  fs.writeFileSync(index, '{ 깨진');
+  const c = { ourref: 'Q-1', yourref: '' };
+  const caseDir = path.join(dir, wrapperFolderName(c));
+  fs.mkdirSync(caseDir);
+  // 예전 기록: 고쳐 저장해 크기가 달라진 파일은 그대로 인정 · 폴더 밖을 가리키는 이름은 믿지 않는다
+  fs.writeFileSync(path.join(caseDir, '고침.pdf'), 'AB + 메모');
+  fs.writeFileSync(path.join(dir, 'secret.pdf'), 'SECRET');
+  fs.writeFileSync(path.join(caseDir, '.memoking.json'), JSON.stringify({ 'u/edit': { name: '고침.pdf', bytes: 2 }, 'u/evil': { name: '../secret.pdf', bytes: 6 } }));
+  let fetched = 0;
+  const bodies = { 'u/edit': 'AB', 'u/evil': 'EVIL', 'u/a': 'AAA', 'u/b': 'BBB' };
+  const mk = (host) => new Opms({ host, fetch: async (url) => { fetched++; return new Response(bodies[url.split('/').slice(-2).join('/')]); }, retries: 0, filesIndex: index });
+  const client = mk('http://one');
+  const [edit, evil] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/edit', FILE_NAME_ORI: '고침.pdf' }, { FILE_NAME_UPLOAD: 'u/evil', FILE_NAME_ORI: 'evil.pdf' }]);
+  const [f1, f2] = await Promise.all([client.fileFor(c, edit, dir), client.fileFor(c, evil, dir)]);
+  assert.equal(fs.readFileSync(f1, 'utf8'), 'AB + 메모');
+  assert.equal(path.dirname(f2), caseDir);
+  assert.equal(fs.readFileSync(f2, 'utf8'), 'EVIL');
+  assert.equal(fetched, 1);
+  assert.equal(fs.readFileSync(path.join(dir, 'secret.pdf'), 'utf8'), 'SECRET');
+  assert.ok(fs.readdirSync(path.dirname(index)).some((f) => f.includes('.broken-')));
+  // 같은 이름으로 정해진 두 서류를 동시에 저장해도 서로 덮어쓰지 않는다
+  const a = { n: 1, name: '같은.pdf', upload: 'u/a' };
+  const b = { n: 2, name: '같은.pdf', upload: 'u/b' };
+  const [fa, fb] = await Promise.all([client.fileFor(c, a, dir), client.fileFor(c, b, dir)]);
+  assert.notEqual(fa, fb);
+  assert.deepEqual([fs.readFileSync(fa, 'utf8'), fs.readFileSync(fb, 'utf8')], ['AAA', 'BBB']);
+  // 다른 서버의 같은 upload 는 다른 서류
+  const before = fetched;
+  await mk('http://two').fileFor(c, a, dir);
+  assert.equal(fetched, before + 1);
+  assert.equal(await client.files.save(), true);
+  assert.equal(fs.readdirSync(caseDir).some((f) => f.endsWith('.part')), false);
+});
+
+test('OPMS 전자포대: 이름 속 점 · 요약의 HTML 글자 · 사건정보.txt 에는 실제 저장 이름 · 느린 큰 파일', async () => {
+  assert.deepEqual([numberedName('Mr. Kim 의견서', 2), numberedName('v1.2 final', 2), numberedName('a.pdf', 3)], ['Mr. Kim 의견서 (2)', 'v1.2 final (2)', 'a (3).pdf']);
+  assert.equal(attachmentItems([{ FILE_NAME_UPLOAD: 'u', DOC_MEMO: '<p>A&amp;B &lt;보정&gt; &#39;1&#39;</p>' }])[0].summary, "A&B <보정> '1'");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-info-'));
+  const c = { ourref: 'R-1', yourref: '' };
+  fs.mkdirSync(path.join(dir, wrapperFolderName(c)));
+  fs.writeFileSync(path.join(dir, wrapperFolderName(c), '통지서.pdf'), 'OTHER');
+  // 큰 파일: 조금씩이라도 오면 끝까지 (멈춘 시간 300ms 제한 · 25ms 마다 한 조각 · 전체 600ms) — 아예 멈추면 실패
+  const trickle = (n, gap) => new Response(new ReadableStream({ async start(ctl) {
+    for (let i = 0; i < n; i++) {
+      await new Promise((r) => setTimeout(r, gap));
+      ctl.enqueue(new TextEncoder().encode(i === n - 1 ? 'E' : 'M'));
+    }
+    ctl.close();
+  } }));
+  const client = new Opms({ fetch: async () => trickle(24, 25), retries: 0, downloadIdleMs: 300 });
+  const stuck = new Opms({ fetch: async () => trickle(2, 1500), retries: 0, downloadIdleMs: 300 });
+  await assert.rejects(stuck.saveOne(path.join(dir, wrapperFolderName(c)), { n: 9, name: '멈춤.pdf', upload: 'u/9' }), /멈췄어요/);
+  assert.equal(fs.existsSync(path.join(dir, wrapperFolderName(c), '멈춤.pdf')), false);
+  const res = await client.download(c, [{ n: 1, name: '통지서.pdf', size: '4 B', upload: 'u/1' }], { baseDir: dir, all: true });
+  assert.deepEqual(res.failed, []);
+  assert.match(fs.readFileSync(path.join(res.dir, '사건정보.txt'), 'utf8'), /1\. 통지서 \(No\.1\)\.pdf/);
+  assert.equal(fs.readFileSync(path.join(res.dir, '통지서 (No.1).pdf'), 'utf8'), `${'M'.repeat(23)}E`);
+});
+
+test('OPMS 전자포대: 기록이 없을 때 같은 내용의 (No.n) 사본을 또 만들지 않음 · 받는 중에도 이미 받은 파일은 바로 열림', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-dup-'));
+  const c = { ourref: 'S-1', yourref: '' };
+  const caseDir = path.join(dir, wrapperFolderName(c));
+  fs.mkdirSync(caseDir);
+  fs.writeFileSync(path.join(caseDir, 'a.pdf'), 'EDITED');
+  const it = { n: 1, name: 'a.pdf', upload: 'u/a' };
+  for (let i = 0; i < 3; i++) {
+    // 매번 기록 없이(다른 PC · 기록을 못 읽음) — 같은 내용의 사본이 있으면 그것을 쓴다
+    const fresh = new Opms({ fetch: async () => new Response('SERVER'), retries: 0, filesIndex: path.join(dir, `idx-${i}.json`) });
+    assert.equal(path.basename(await fresh.fileFor(c, it, dir)), 'a (No.1).pdf');
+  }
+  assert.deepEqual(fs.readdirSync(caseDir).sort(), ['a (No.1).pdf', 'a.pdf']);
+  // 느린 받기 중에 같은 사건의 이미 받은 파일 열기는 기다리지 않는다
+  let release;
+  const client = new Opms({ fetch: async (url) => (url.endsWith('slow') ? new Response(new ReadableStream({ start(ctl) { release = () => { ctl.enqueue(new TextEncoder().encode('S')); ctl.close(); }; } })) : new Response('FAST')), retries: 0 });
+  await client.fileFor(c, { n: 2, name: 'b.pdf', upload: 'u/b' }, dir);
+  const slow = client.fileFor(c, { n: 3, name: 'c.pdf', upload: 'u/slow' }, dir);
+  await new Promise((r) => setTimeout(r, 30));
+  // 느린 받기는 release() 전에는 끝나지 않으니, 잠금에 걸렸다면 이 열기도 끝나지 않는다
+  const opened = await Promise.race([client.fileFor(c, { n: 2, name: 'b.pdf', upload: 'u/b' }, dir), new Promise((r) => setTimeout(() => r('막힘'), 3000))]);
+  assert.equal(path.basename(opened), 'b.pdf');
+  release();
+  assert.equal(fs.readFileSync(await slow, 'utf8'), 'S');
+});
+
+test('OPMS 전자포대 기록: 바로 기록 · 앱을 끌 때는 따로(.quit) 더 큰 번호로 — 다음 실행은 새것을 읽음', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-flush-'));
+  const index = path.join(dir, 'opms-files.json');
+  const client = new Opms({ fetch: async () => new Response('X'), retries: 0, filesIndex: index });
+  const c = { ourref: 'T-1', yourref: '' };
+  const caseDir = path.join(dir, wrapperFolderName(c));
+  fs.mkdirSync(caseDir, { recursive: true });
+  await client.saveOne(caseDir, { n: 1, name: 'x.pdf', upload: 'u/x' });
+  await client.files.save();
+  assert.match(fs.readFileSync(index, 'utf8'), /u\/x/);
+  // 끄는 순간: 평소 기록을 쓰는 중이어도 따로 남기고, 그 평소 기록이 뒤늦게 끝나도 다음 실행은 더 큰 번호를 읽는다
+  client.files.data[Object.keys(client.files.data).find((k) => k !== '#seq')]['u/y'] = 'y.pdf';
+  const inFlight = client.files.save();
+  client.files.flushSync();
+  await inFlight;
+  const quitName = fs.readdirSync(dir).find((f) => f.startsWith('opms-files.json.quit-'));
+  const quit = JSON.parse(fs.readFileSync(path.join(dir, quitName), 'utf8'));
+  assert.ok(quit['#seq'] > JSON.parse(fs.readFileSync(index, 'utf8'))['#seq']);
+  fs.writeFileSync(path.join(caseDir, 'y.pdf'), 'Y');
+  const next = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: `${dir}${path.sep}.${path.sep}opms-files.json` });
+  assert.equal(path.basename(await next.fileFor(c, { n: 2, name: 'y.pdf', upload: 'u/y' }, dir)), 'y.pdf');
+  // 끄기가 취소돼 계속 쓰면 평소 기록이 더 큰 번호로 이어진다
+  client.files.data[Object.keys(client.files.data).find((k) => k !== '#seq')]['u/z'] = 'z.pdf';
+  assert.equal(await client.files.save(), true);
+  assert.ok(JSON.parse(fs.readFileSync(index, 'utf8'))['#seq'] > quit['#seq']);
+  const quits = () => fs.readdirSync(dir).filter((f) => f.includes('.quit'));
+  assert.deepEqual(quits(), []); // 더 새 평소 기록이 남았으니 옛 끌 때 기록은 지움
+  // 바뀐 것이 없으면 끌 때 다시 쓰지 않는다 (창마다 session-end 가 와도)
+  client.files.flushSync();
+  assert.deepEqual(quits(), []);
+  // 아주 긴 서류 이름도 받는다 (이름은 줄이고 확장자는 남김) — 이름 고르기가 끝없이 돌지 않게
+  const long = `${'가'.repeat(300)}.pdf`;
+  const saved = await client.saveOne(caseDir, { n: 3, name: long, upload: 'u/long' });
+  assert.ok(saved.file.endsWith('.pdf') && Buffer.byteLength(path.basename(saved.file)) <= 240);
+  assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
+  assert.deepEqual(fs.readdirSync(caseDir).filter((f) => f.endsWith('.part')), []);
+});
+
+test('OPMS 전자포대: 너무 긴 이름만 저장할 때 줄임 (가운데를 줄여 앞 · 끝말 · 꼬리 · 확장자 유지, 어느 PC 든 같은 결과)', async () => {
+  assert.equal(fitName('보통 이름.pdf'), '보통 이름.pdf');
+  const one = fitName(`${'가'.repeat(85)} 1부.pdf`);
+  const two = fitName(`${'가'.repeat(85)} 2부.pdf`);
+  assert.notEqual(one, two);
+  assert.ok(one.endsWith(' 1부.pdf') && one.includes('…') && one.length <= 110 && Buffer.byteLength(one) <= 240);
+  assert.ok(fitName(`${'a'.repeat(200)} (No.3).xlsx`).endsWith(' (No.3).xlsx'));
+  // 목록에 보이는 이름은 줄이지 않는다
+  assert.equal(attachmentItems([{ FILE_NAME_UPLOAD: 'u', FILE_NAME_ORI: `${'나'.repeat(90)}.pdf` }])[0].name, `${'나'.repeat(90)}.pdf`);
+  // 예전 판이 긴 이름 그대로 받아 둔 같은 서류는 그대로 쓴다
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-long-'));
+  const longName = `${'b'.repeat(150)}.pdf`;
+  fs.writeFileSync(path.join(dir, longName), 'SAME');
+  const client = new Opms({ fetch: async () => new Response('SAME'), retries: 0 });
+  const r = await client.saveOne(dir, { n: 1, name: longName, upload: 'u/long' });
+  assert.deepEqual([path.basename(r.file), r.reused], [longName, true]);
+  // 예전 판의 " (No.n)" 이 붙은 긴 이름도
+  const numbered = numberedName(`${'c'.repeat(150)}.pdf`, 'No.2');
+  fs.writeFileSync(path.join(dir, numbered), 'SAME');
+  const r2 = await client.saveOne(dir, { n: 2, name: `${'c'.repeat(150)}.pdf`, upload: 'u/long2' });
+  assert.deepEqual([path.basename(r2.file), r2.reused], [numbered, true]);
+  // 내용이 다른 긴 이름 파일(사용자가 고친 것 · 다른 서류)은 가져다 쓰지 않고 줄인 이름으로 새로 저장
+  const otherName = `${'d'.repeat(150)}.pdf`;
+  fs.writeFileSync(path.join(dir, otherName), 'EDITED');
+  const r3 = await client.saveOne(dir, { n: 3, name: otherName, upload: 'u/long3' });
+  assert.equal(r3.reused, false);
+  assert.equal(path.basename(r3.file), fitName(otherName));
+  assert.equal(fs.readFileSync(path.join(dir, otherName), 'utf8'), 'EDITED');
+});
+
+test('OPMS 전자포대 기록: 끌 때 기록이 여럿이면 가장 새것(깨졌으면 그다음) · 평소 기록이 새로 남으면 옛것만 지움', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-quits-'));
+  const index = path.join(dir, 'opms-files.json');
+  const rec = (seq, name) => JSON.stringify({ '#seq': seq, 'h|/x': { 'u/1': name } });
+  fs.writeFileSync(index, rec(2, 'main.pdf'));
+  fs.writeFileSync(`${index}.quit-1`, rec(1, 'stale.pdf')); // 지난번에 지우지 못한 옛것 — 읽을 때 지움
+  fs.writeFileSync(`${index}.quit-3`, rec(3, 'quit3.pdf'));
+  fs.writeFileSync(`${index}.quit-9`, '{ 깨짐');
+  const client = new Opms({ fetch: async () => new Response('X'), retries: 0, filesIndex: index });
+  const data = await client.files.load();
+  assert.equal(data['h|/x']['u/1'], 'quit3.pdf');
+  assert.equal(fs.existsSync(`${index}.quit-1`), false);
+  assert.equal(client.files.seq, 3);
+  await client.files.save(); // seq 4 — quit-3 은 지우고, 더 큰 번호(9)는 그대로
+  assert.deepEqual(fs.readdirSync(dir).filter((f) => f.includes('.quit-')).sort(), ['opms-files.json.quit-9']);
+  // 끌 때 새로 쓴 기록(더 큰 번호)은 그 뒤 평소 기록이 지우지 않는다
+  client.files.data['h|/x']['u/2'] = 'b.pdf';
+  const inFlight = client.files.save();
+  client.files.flushSync();
+  await inFlight;
+  const left = fs.readdirSync(dir).filter((f) => f.includes('.quit-'));
+  assert.ok(left.some((f) => Number(f.split('quit-')[1]) === client.files.quitSeq));
+});
+
+test('OPMS 전자포대 기록: 0.31.3 의 기록(폴더 경로만)을 이어받아 고쳐 둔 파일을 다시 받지 않음', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-v313-'));
+  const c = { ourref: 'V-1', yourref: '' };
+  const caseDir = path.join(dir, wrapperFolderName(c));
+  fs.mkdirSync(caseDir);
+  fs.writeFileSync(path.join(caseDir, '의견서.pdf'), '고친 내용');
+  const index = path.join(dir, 'opms-files.json');
+  // 새 판이 이미 같은 폴더에 다른 서류를 받아 기록(서버별 키)을 만들어 둔 경우에도 이어받는다
+  const client = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: index });
+  fs.writeFileSync(index, JSON.stringify({
+    [path.resolve(caseDir).toLowerCase()]: { 'u/1': '의견서.pdf', 'u/bad': '../밖.pdf' },
+    [`${client.host.toLowerCase()}|${path.resolve(caseDir).toLowerCase()}`]: { 'u/2': '다른.pdf' },
+  }));
+  const file = await client.fileFor(c, { n: 1, name: '의견서.pdf', upload: 'u/1' }, dir);
+  assert.equal(fs.readFileSync(file, 'utf8'), '고친 내용');
+  const rec = (await client.files.load())[`${client.host.toLowerCase()}|${path.resolve(caseDir).toLowerCase()}`];
+  assert.deepEqual(rec, { 'u/2': '다른.pdf', 'u/1': '의견서.pdf' });
+});
+
+test('OPMS 전자포대: 서버가 응답하지 않으면 남은 파일은 기다리지 않고 함께 실패 · 끊긴 받기는 한 번 더 받아 봄', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-offline-'));
+  const c = { ourref: 'W-1', yourref: '' };
+  let calls = 0;
+  const off = new Opms({ fetch: async () => { calls++; throw new Error('ECONNREFUSED'); }, retries: 0 });
+  const items = [1, 2, 3].map((n) => ({ n, name: `${n}.pdf`, upload: `u/${n}` }));
+  const res = await off.download(c, items, { baseDir: dir });
+  assert.equal(calls, 1);
+  assert.equal(res.failed.length, 3);
+  // Content-Length 보다 짧게 끝나면 다시 받아 본다
+  let tries = 0;
+  const flaky = new Opms({ fetch: async () => (++tries === 1 ? new Response('AB', { headers: { 'content-length': '4' } }) : new Response('ABCD')), retries: 1 });
+  const [it] = items;
+  const ok = await flaky.download(c, [it], { baseDir: dir });
+  assert.deepEqual([ok.saved, tries], [1, 2]);
+});
+
+test('OPMS 전자포대: 한 파일이 404 여도 나머지는 받음 · 같은 파일을 가리키는 줄은 그 결과를 따름', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-404-'));
+  const c = { ourref: 'X-1', yourref: '' };
+  const client = new Opms({ fetch: async (url) => (url.endsWith('gone') ? new Response('', { status: 404 }) : new Response('OK')), retries: 0 });
+  const res = await client.download(c, [
+    { n: 1, name: '없음.pdf', upload: 'u/gone' },
+    { n: 2, name: '있음.pdf', upload: 'u/ok' },
+    { n: 3, name: '있음 (2).pdf', upload: 'u/ok' }, // 같은 서버 파일
+    { n: 4, name: '없음 (2).pdf', upload: 'u/gone' },
+  ], { baseDir: dir, all: true });
+  assert.deepEqual([res.saved, res.skipped, res.failed.length], [1, 1, 2]);
+  assert.ok(fs.existsSync(path.join(res.dir, '사건정보.txt')));
+});
+
+test('OPMS 전자포대: 응답을 받다 끊겨도 그 파일만 실패 · 업무배분 조회가 닿지 않으면 사건정보.txt 를 덮지 않음', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-cut-'));
+  const c = { ourref: 'Y-1', yourref: '' };
+  const broken = () => new Response(new ReadableStream({ start(ctl) { ctl.enqueue(new TextEncoder().encode('AB')); ctl.error(new TypeError('terminated')); } }));
+  const client = new Opms({ fetch: async (url) => (url.endsWith('cut') ? broken() : new Response('OK')), retries: 0 });
+  const res = await client.download(c, [{ n: 1, name: '끊김.pdf', upload: 'u/cut' }, { n: 2, name: '정상.pdf', upload: 'u/ok' }], { baseDir: dir });
+  assert.deepEqual([res.saved, res.failed.length], [1, 1]);
+  assert.doesNotMatch(res.failed[0].error, /사내망/);
+  // 파일은 모두 이미 있고 서버에는 닿지 않음 → 예전 사건정보.txt 그대로
+  fs.writeFileSync(path.join(res.dir, '사건정보.txt'), '예전 내용');
+  const offline = new Opms({ fetch: async () => { throw new Error('ECONNREFUSED'); }, retries: 0 });
+  offline.files = client.files; // 같은 기록 (정상.pdf 는 이미 받음)
+  const again = await offline.download(c, [{ n: 2, name: '정상.pdf', upload: 'u/ok' }], { baseDir: dir, all: true });
+  assert.equal(again.skipped, 1);
+  assert.equal(fs.readFileSync(path.join(res.dir, '사건정보.txt'), 'utf8'), '예전 내용');
 });

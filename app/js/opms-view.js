@@ -357,7 +357,7 @@ function openButton(r) {
     b.disabled = true;
     b.textContent = '여는 중…';
     try {
-      const res = await api.openFile({ idx, n: r.n });
+      const res = await api.openFile({ idx, upload: r.upload });
       b.title = hint;
       say(idx, res?.shown ? '' : 'ok', res?.shown ? `${r.name}: ${res.message}` : `✓ ${r.name} 열었어요`);
     } catch (err) {
@@ -376,8 +376,9 @@ let attach = [];
 let dl = null;
 async function showWrapper(my) {
   message('전자포대 목록을 불러오는 중…');
-  attach = await load('wrapper', api.attachments);
-  if (my !== seq) return;
+  const list = await load('wrapper', api.attachments);
+  if (my !== seq) return; // 그사이 다른 사건으로 옮겼으면 지금 화면의 목록을 덮지 않는다
+  attach = list;
   const all = el('input');
   all.type = 'checkbox';
   all.setAttribute('aria-label', '모두 고르기');
@@ -386,7 +387,7 @@ async function showWrapper(my) {
     [all, (r) => {
       const b = el('input');
       b.type = 'checkbox';
-      b.value = String(r.n);
+      b.value = r.upload; // 서버 파일 경로로 고른다 (번호는 서버 목록이 바뀌면 달라질 수 있음)
       b.setAttribute('aria-label', `${r.name} 고르기`);
       b.addEventListener('change', sync);
       boxes.push(b);
@@ -465,20 +466,21 @@ async function showWrapper(my) {
 
   async function run(isAll) {
     if (busy()) return;
-    const ns = boxes.filter((b) => b.checked).map((b) => Number(b.value));
+    const uploads = boxes.filter((b) => b.checked).map((b) => b.value);
     const idx = current.case.idx;
+    const names = new Map(attach.map((a) => [a.upload, a.name])); // 받는 사이 다른 사건을 열어도 이 사건의 이름으로 알리게
     dl = { idx, text: '받는 중…', cls: '', done: false };
     sync();
     paint();
     try {
-      const res = await api.download({ idx, ns, all: isAll });
+      const res = await api.download({ idx, uploads, all: isAll });
       const parts = [`${res.saved}개 저장`];
       if (res.skipped) parts.push(`${res.skipped}개는 이미 있음`);
       if (res.failed.length) parts.push(`${res.failed.length}개 실패`);
       dl = {
         idx, done: true, saved: res.saved, cls: res.failed.length ? 'err' : 'ok',
         text: `${res.failed.length ? '' : '✓ '}${parts.join(', ')}${isAll ? ', 사건정보.txt 포함' : ''}`,
-        title: res.failed.map((f) => `${f.name}: ${f.error}`).join('\n'),
+        title: res.failed.map((f) => `${(f.upload && names.get(f.upload)) || f.name}: ${f.error}`).join('\n'),
       };
     } catch (err) {
       dl = { idx, done: true, cls: 'err', text: errText(err) };

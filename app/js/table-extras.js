@@ -528,7 +528,22 @@ function rowInline(row, schema) {
       else inline.push(n);
       return false;
     });
-    while (inline.length && inline[inline.length - 1].isText && !inline[inline.length - 1].text.trim()) inline.pop();
+    // 칸 앞뒤 띄어쓰기는 걷어낸다 (" · " 앞뒤에 띄어쓰기가 겹치지 않게)
+    const trimEdge = (at, cut) => {
+      while (inline.length) {
+        const i = at === 'end' ? inline.length - 1 : 0;
+        const n = inline[i];
+        if (!n.isText) return;
+        const text = cut(n.text);
+        if (text) {
+          inline[i] = n.text === text ? n : schema.text(text, n.marks);
+          return;
+        }
+        inline.splice(i, 1);
+      }
+    };
+    trimEdge('start', (t) => t.replace(/^\s+/, ''));
+    trimEdge('end', (t) => t.replace(/\s+$/, ''));
     // 띄어쓰기만 있는 칸은 건너뛴다 (그림 · 파일 칩처럼 글자가 없는 것만 든 칸은 남긴다)
     if (!inline.some((n) => !n.isText || n.text.trim())) return;
     if (parts.length) parts.push(schema.text(' · '));

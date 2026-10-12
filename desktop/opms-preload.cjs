@@ -9,8 +9,8 @@ contextBridge.exposeInMainWorld('opms', {
   copySchema: () => ipcRenderer.invoke('opms:schema-copy'), // 표를 못 찾았을 때 표 목록 복사
   bills: (idx) => ipcRenderer.invoke('opms:bills', idx),
   attachments: (idx) => ipcRenderer.invoke('opms:attachments', idx),
-  download: (req) => ipcRenderer.invoke('opms:download', req), // { idx, ns: [번호], all }
-  openFile: (req) => ipcRenderer.invoke('opms:open-file', req), // { idx, n } — 받아 두고 바로 열기
+  download: (req) => ipcRenderer.invoke('opms:download', req), // { idx, uploads: [서버 파일 경로], all }
+  openFile: (req) => ipcRenderer.invoke('opms:open-file', req), // { idx, upload } — 받아 두고 바로 열기
   openFolder: () => ipcRenderer.invoke('opms:open-folder'),
   chooseDir: () => ipcRenderer.invoke('opms:choose-dir'),
   copy: (text) => ipcRenderer.invoke('opms:copy', text),
