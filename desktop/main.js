@@ -385,11 +385,13 @@ function openNote(id, { inactive = false, record = false, ink = false, big = fal
 }
 
 // show: false 면 숨긴 채로 만들어 둔다 (스택의 다른 탭 — 누르면 바로 보이도록)
-// 첫 화면을 그린 창 ('ready-to-show' 가 이미 지나감). 불러오기(isLoading)는 그 뒤에도 이어질 수 있어
-//   "아직 불러오는 중이면 ready-to-show 를 기다린다" 로는 놓친다 — 그린 적이 있는지로 판단
-//   ready-to-show 는 첫 화면 전에 이미 보인(show) 창에는 오지 않으니, 그런 창은 불러오기가 끝나면(did-finish-load) —
-//   화면 스크립트가 'memo:highlight' 등을 들을 준비가 된 뒤에. 둘 중 먼저 오는 것으로 한 번만
+// 첫 화면을 그린 창. 숨긴 창은 'ready-to-show' 를 기다리면 된다. 첫 화면 전에 이미 보인(show) 창에는 ready-to-show 가
+//   오지 않으니 불러오기가 끝나면(did-finish-load — 화면 스크립트가 'memo:highlight' 등을 들을 준비가 됨) 그린 것으로 친다
 const paintedWins = new WeakSet();
+const shownEarlyWins = new WeakSet(); // 그리기 전에 보인 적이 있는 창
+function markPainted(win) {
+  paintedWins.add(win);
+}
 function whenPainted(win, fn) {
   let done = false;
   const run = () => {
@@ -397,9 +399,19 @@ function whenPainted(win, fn) {
     done = true;
     fn();
   };
-  if (paintedWins.has(win) || (win.isVisible() && !win.webContents.isLoading())) return run();
+  if (paintedWins.has(win)) return run();
+  if (shownEarlyWins.has(win)) {
+    if (!win.webContents.isLoading()) {
+      markPainted(win);
+      return run();
+    }
+    return win.webContents.once('did-finish-load', () => {
+      markPainted(win);
+      run();
+    });
+  }
   win.once('ready-to-show', run);
-  win.webContents.once('did-finish-load', run);
+  win.once('show', () => whenPainted(win, run)); // 기다리는 사이 다른 곳에서 먼저 보여 주면 (그 창엔 ready-to-show 가 안 옴)
 }
 
 function createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false, ink = false, big = false } = {}) {
@@ -450,7 +462,13 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null, re
     endWindowDrag(id);
   });
   win.on('resized', remember);
-  win.once('ready-to-show', () => paintedWins.add(win));
+  win.once('ready-to-show', () => markPainted(win));
+  win.on('show', () => {
+    if (paintedWins.has(win)) return;
+    shownEarlyWins.add(win); // 그리기 전에 보임 — 이 창에는 ready-to-show 가 오지 않는다
+    if (!win.webContents.isLoading()) markPainted(win);
+    else win.webContents.once('did-finish-load', () => markPainted(win));
+  });
   if (show) win.once('ready-to-show', () => (inactive ? win.showInactive() : win.show()));
   pushList();
   // 스택 창을 닫으면(Alt+F4 등) 숨은 탭들도 함께 닫는다

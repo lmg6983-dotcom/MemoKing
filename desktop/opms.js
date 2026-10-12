@@ -2,6 +2,7 @@
 //   opms_lookup_v2.py 를 옮긴 것. 사내망 서버의 /servlet/Jbori 에 SELECT 글을 보내고, 줄마다 \x01 로 나뉜 표를 받는다
 //   (1줄 = 열 이름, 2~4줄 = 정보, 5줄부터 = 자료). 전자포대 원본은 <서버>/OPMS/<FILE_NAME_UPLOAD>
 //   찾는 말은 모두 따옴표를 겹쳐(') SQL 글 안에 값으로만 넣는다.
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 export { looksLikeRef } from '../app/js/core/magic-modules.js';
@@ -424,7 +425,13 @@ class FileIndex {
     this.loading = null; // 처음 읽기는 한 번만 (동시에 불러도 같은 기록을 함께 쓰게)
     this.folders = new Map(); // 폴더 → 기록을 준비하는 일 (예전 기록 옮기기가 끝나기 전에 빈 기록을 보지 않게)
     this.locks = new Map(); // 폴더 → 마지막 저장 일 (한 폴더 안의 저장은 차례로 — 같은 이름에 두 서류가 동시에 들어가지 않게)
-    this.writing = Promise.resolve();
+    this.seq = 0; // 기록마다 하나씩 커지는 번호 — 끌 때 쓴 기록(quit)과 평소 기록 중 새것을 고르려고
+    this.dirty = false;
+    this.flushing = null;
+  }
+
+  get quitFile() {
+    return `${this.file}.quit`;
   }
 
   load() {
@@ -444,14 +451,24 @@ class FileIndex {
           }
         }
       }
+      const asObject = (d) => (d && typeof d === 'object' && !Array.isArray(d) ? d : {});
       try {
-        const d = raw == null ? {} : JSON.parse(raw);
-        this.data = d && typeof d === 'object' && !Array.isArray(d) ? d : {};
+        this.data = asObject(raw == null ? {} : JSON.parse(raw));
       } catch {
         // 깨진 기록은 지우지 않고 옆에 남겨 둔다 (새 기록으로 덮어 다른 사건 기록까지 잃지 않게)
         await fs.promises.rename(this.file, `${this.file}.broken-${Date.now()}`).catch(() => {});
         this.data = {};
       }
+      // 끌 때 남긴 기록이 더 새것이면 그것으로 (그때 쓰던 평소 기록이 뒤늦게 옛 내용으로 끝났을 수 있어서)
+      if (this.file) {
+        try {
+          const quit = asObject(JSON.parse(await fs.promises.readFile(this.quitFile, 'utf8')));
+          if ((Number(quit['#seq']) || 0) > (Number(this.data['#seq']) || 0)) this.data = quit;
+        } catch {
+          // 없음 · 깨짐 — 평소 기록으로
+        }
+      }
+      this.seq = Number(this.data['#seq']) || 0;
       return this.data;
     })();
     return this.loading;
@@ -506,68 +523,64 @@ class FileIndex {
   }
 
   /**
-   * 기록 남기기 → 잘 남겼으면 true. 잠깐 모았다가 한 번에 (전체 받기 150개면 150번이 아니라 몇 번만).
-   *   실패해도(읽기 전용 · 백신이 잡고 있음) 받은 파일은 그대로 쓴다. 쓰기는 차례로. 앱을 끌 때는 flushSync()
+   * 기록 남기기 → 잘 남겼으면 true. 바로 쓴다 — 쓰는 중에 들어온 것은 모아서 한 번 더 (전체 받기 중에도 쓰기가 쌓이지 않게).
+   *   실패해도(읽기 전용 · 백신이 잡고 있음) 받은 파일은 그대로 쓴다
    */
   save() {
     if (!this.file || this.readOnly) return Promise.resolve(false);
     this.dirty = true;
-    this.pending ??= new Promise((resolve) => {
-      this.settle = resolve;
-      this.timer = setTimeout(() => resolve(this.writeNow()), 300);
-    });
-    return this.pending;
+    this.flushing ??= (async () => {
+      let ok = false;
+      try {
+        while (this.dirty) {
+          this.dirty = false;
+          ok = await this.writeOnce();
+        }
+      } finally {
+        this.flushing = null;
+      }
+      return ok;
+    })();
+    return this.flushing;
   }
 
-  /** 모아 둔 기록을 지금 (전체 받기 · 열기가 끝날 때 — 끄기 직전에 몰리지 않게) */
-  writeNow() {
-    if (!this.file || this.readOnly) return Promise.resolve(false);
-    clearTimeout(this.timer);
-    const settle = this.settle;
-    this.timer = null;
-    this.pending = null;
-    this.settle = null;
-    if (!this.dirty) {
-      settle?.(this.writing);
-      return this.writing;
-    }
-    this.dirty = false;
-    const run = this.writing.then(async () => {
-      const tmp = `${this.file}.${process.pid}.tmp`;
+  async writeOnce() {
+    const seq = ++this.seq;
+    this.data['#seq'] = seq;
+    const json = JSON.stringify(this.data);
+    const tmp = `${this.file}.${process.pid}-${seq}.tmp`;
+    try {
       await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
-      await fs.promises.writeFile(tmp, JSON.stringify(this.data), 'utf8');
-      if (this.closed) return false; // 앱을 끄며 flushSync 가 이미 최신 기록을 남김 — 옛 기록으로 덮지 않게
+      await fs.promises.writeFile(tmp, json, 'utf8');
       await fs.promises.rename(tmp, this.file);
       return true;
-    }).catch(() => false);
-    this.writing = run;
-    settle?.(run);
-    return run;
+    } catch {
+      await fs.promises.rm(tmp, { force: true }).catch(() => {});
+      return false;
+    }
   }
 
   /**
-   * 앱을 끌 때 — 기다릴 수 없으니 동기로. 쓰는 중인 비동기 기록과 다른 임시 파일을 쓰고, 그 뒤의 비동기 이름 바꾸기는 막는다
-   *   (모아 둔 것이 없어도 쓰는 중이었을 수 있으니 기록이 있으면 늘 남긴다)
+   * 앱을 끌 때 — 기다릴 수 없으니 동기로, 쓰는 중인 평소 기록과 겹치지 않게 따로 둔 파일(.quit)에 더 큰 번호로.
+   *   다음에 켤 때 둘 중 번호가 큰 것을 읽는다. 끄기가 취소돼도 그 뒤의 평소 기록은 번호가 더 커서 그대로 이어진다
    */
   flushSync() {
-    if (!this.file || this.readOnly || !this.data || this.closed) return;
-    this.closed = true;
-    clearTimeout(this.timer);
-    const settle = this.settle;
-    this.timer = null;
-    this.pending = null;
-    this.settle = null;
-    let ok = false;
+    if (!this.file || this.readOnly || !this.data || (!this.dirty && !this.flushing)) return;
+    this.dirty = false;
+    const seq = ++this.seq;
+    this.data['#seq'] = seq;
+    const tmp = `${this.quitFile}.${process.pid}.tmp`;
     try {
-      const tmp = `${this.file}.${process.pid}.quit.tmp`;
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       fs.writeFileSync(tmp, JSON.stringify(this.data), 'utf8');
-      fs.renameSync(tmp, this.file);
-      ok = true;
+      fs.renameSync(tmp, this.quitFile);
     } catch {
-      // 다음 실행 때 내용을 비교해 다시 맞춘다
+      try {
+        fs.rmSync(tmp, { force: true });
+      } catch {
+        // 다음 실행 때 내용을 비교해 다시 맞춘다
+      }
     }
-    settle?.(ok);
   }
 }
 /** 앱을 끌 때: 아직 쓰지 않은 전자포대 기록을 모두 남긴다 */
@@ -596,9 +609,10 @@ const MACRO_EXT = new Set(['doc', 'dot', 'xls', 'xlt', 'ppt', 'pot', 'pps', 'rtf
 //   임시 파일 이름은 짧게(긴 서류 이름도 255자를 넘지 않게) · "~$" 로 시작 (Office 임시 파일처럼 동기화 프로그램이 건너뜀)
 const PART_PREFIX = '~$mk-';
 async function placeNew(file, data) {
-  const part = path.join(path.dirname(file), `${PART_PREFIX}${process.pid.toString(36)}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.part`);
+  // 임의 이름이라 겹치지 않는다 — 그래서 아래의 EEXIST 는 늘 제 이름이 이미 있다는 뜻
+  const part = path.join(path.dirname(file), `${PART_PREFIX}${randomBytes(6).toString('hex')}.part`);
   try {
-    await fs.promises.writeFile(part, data, { flag: 'wx' });
+    await fs.promises.writeFile(part, data);
     try {
       await fs.promises.link(part, file);
     } catch (err) {
@@ -823,6 +837,7 @@ export class Opms {
       // 이름 후보: 원래 이름 → (No.n) → (No.n-2) … 내용이 같은 파일이 있으면 그것, 아니면 첫 빈 이름.
       //   고른 이름이 그사이 생겼으면(다른 PC 의 파일이 동기화로 들어옴) 다음 후보로
       let file = null;
+      let raced = 0;
       for (let k = 0; !file; k++) {
         const cand = path.join(dir, k === 0 ? base : numberedName(base, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
         if (claimed.has(path.basename(cand).toLowerCase())) continue;
@@ -831,7 +846,8 @@ export class Opms {
             await placeNew(cand, data);
             file = cand;
           } catch (err) {
-            if (err.code !== 'EEXIST' || k > 50) throw err;
+            if (err.code !== 'EEXIST' || ++raced > 5) throw err;
+            k--; // 그사이 생긴 그 파일을 다시 본다 (같은 서류면 그것을 쓰게)
           }
         } else if (await sameBytes(cand, data)) {
           folder[upload] = path.basename(cand); // 예전에(다른 PC 에서) 받아 둔 바로 그 서류
@@ -850,9 +866,7 @@ export class Opms {
   async fileFor(c, it, baseDir) {
     const dir = path.join(baseDir, wrapperFolderName(c));
     await fs.promises.mkdir(dir, { recursive: true });
-    const file = (await this.saveOne(dir, it))?.file ?? null;
-    this.files.writeNow(); // 열기 하나는 바로 기록 (끄기 직전 몇백 ms 에 몰리지 않게)
-    return file;
+    return (await this.saveOne(dir, it))?.file ?? null;
   }
 
   /**
@@ -882,7 +896,6 @@ export class Opms {
       const [mywork, foreign] = await Promise.all([this.mywork(c.idx).catch(() => []), this.foreign(c).catch(() => [])]);
       await fs.promises.writeFile(path.join(dir, '사건정보.txt'), caseInfoText(c, { mywork, foreign, files: done }), 'utf8');
     }
-    this.files.writeNow(); // 다 받았으면 바로 기록
     onProgress({ i: items.length, total: items.length, name: '' });
     return { dir, saved, skipped, failed };
   }

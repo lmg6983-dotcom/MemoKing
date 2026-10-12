@@ -360,17 +360,30 @@ test('OPMS 전자포대: 기록이 없을 때 같은 내용의 (No.n) 사본을 
   assert.equal(fs.readFileSync(await slow, 'utf8'), 'S');
 });
 
-test('OPMS 전자포대 기록: 앱을 끌 때 바로 남기고 기다리던 save() 도 끝남 · 끝난 뒤의 비동기 쓰기는 덮지 않음', async () => {
+test('OPMS 전자포대 기록: 바로 기록 · 앱을 끌 때는 따로(.quit) 더 큰 번호로 — 다음 실행은 새것을 읽음', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-flush-'));
   const index = path.join(dir, 'opms-files.json');
   const client = new Opms({ fetch: async () => new Response('X'), retries: 0, filesIndex: index });
   const c = { ourref: 'T-1', yourref: '' };
-  fs.mkdirSync(path.join(dir, wrapperFolderName(c)), { recursive: true });
-  await client.saveOne(path.join(dir, wrapperFolderName(c)), { n: 1, name: 'x.pdf', upload: 'u/x' });
-  const waiting = client.files.save();
-  client.files.flushSync();
-  assert.equal(await waiting, true);
+  const caseDir = path.join(dir, wrapperFolderName(c));
+  fs.mkdirSync(caseDir, { recursive: true });
+  await client.saveOne(caseDir, { n: 1, name: 'x.pdf', upload: 'u/x' });
+  await client.files.save();
   assert.match(fs.readFileSync(index, 'utf8'), /u\/x/);
-  assert.equal(await client.files.writeNow(), false);
-  assert.deepEqual(fs.readdirSync(path.join(dir, wrapperFolderName(c))), ['x.pdf']);
+  // 끄는 순간: 평소 기록을 쓰는 중이어도 따로 남기고, 그 평소 기록이 뒤늦게 끝나도 다음 실행은 더 큰 번호를 읽는다
+  client.files.data[Object.keys(client.files.data).find((k) => k !== '#seq')]['u/y'] = 'y.pdf';
+  const inFlight = client.files.save();
+  client.files.flushSync();
+  await inFlight;
+  const quit = JSON.parse(fs.readFileSync(`${index}.quit`, 'utf8'));
+  assert.ok(quit['#seq'] > JSON.parse(fs.readFileSync(index, 'utf8'))['#seq']);
+  fs.writeFileSync(path.join(caseDir, 'y.pdf'), 'Y');
+  const next = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: `${dir}${path.sep}.${path.sep}opms-files.json` });
+  assert.equal(path.basename(await next.fileFor(c, { n: 2, name: 'y.pdf', upload: 'u/y' }, dir)), 'y.pdf');
+  // 끄기가 취소돼 계속 쓰면 평소 기록이 더 큰 번호로 이어진다
+  client.files.data[Object.keys(client.files.data).find((k) => k !== '#seq')]['u/z'] = 'z.pdf';
+  assert.equal(await client.files.save(), true);
+  assert.ok(JSON.parse(fs.readFileSync(index, 'utf8'))['#seq'] > quit['#seq']);
+  assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
+  assert.deepEqual(fs.readdirSync(caseDir).filter((f) => f.endsWith('.part')), []);
 });
