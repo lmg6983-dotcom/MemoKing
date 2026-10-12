@@ -501,3 +501,20 @@ test('OPMS 전자포대: 한 파일이 404 여도 나머지는 받음 · 같은 
   assert.deepEqual([res.saved, res.skipped, res.failed.length], [1, 1, 2]);
   assert.ok(fs.existsSync(path.join(res.dir, '사건정보.txt')));
 });
+
+test('OPMS 전자포대: 응답을 받다 끊겨도 그 파일만 실패 · 업무배분 조회가 닿지 않으면 사건정보.txt 를 덮지 않음', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-cut-'));
+  const c = { ourref: 'Y-1', yourref: '' };
+  const broken = () => new Response(new ReadableStream({ start(ctl) { ctl.enqueue(new TextEncoder().encode('AB')); ctl.error(new TypeError('terminated')); } }));
+  const client = new Opms({ fetch: async (url) => (url.endsWith('cut') ? broken() : new Response('OK')), retries: 0 });
+  const res = await client.download(c, [{ n: 1, name: '끊김.pdf', upload: 'u/cut' }, { n: 2, name: '정상.pdf', upload: 'u/ok' }], { baseDir: dir });
+  assert.deepEqual([res.saved, res.failed.length], [1, 1]);
+  assert.doesNotMatch(res.failed[0].error, /사내망/);
+  // 파일은 모두 이미 있고 서버에는 닿지 않음 → 예전 사건정보.txt 그대로
+  fs.writeFileSync(path.join(res.dir, '사건정보.txt'), '예전 내용');
+  const offline = new Opms({ fetch: async () => { throw new Error('ECONNREFUSED'); }, retries: 0 });
+  offline.files = client.files; // 같은 기록 (정상.pdf 는 이미 받음)
+  const again = await offline.download(c, [{ n: 2, name: '정상.pdf', upload: 'u/ok' }], { baseDir: dir, all: true });
+  assert.equal(again.skipped, 1);
+  assert.equal(fs.readFileSync(path.join(res.dir, '사건정보.txt'), 'utf8'), '예전 내용');
+});

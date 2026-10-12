@@ -749,16 +749,19 @@ export class Opms {
       try {
         if (bytes) return await this.fetchBytes(url, init, timeoutMs);
         const res = await this.fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { answered: true });
         return res;
       } catch (err) {
         last = err;
         if (attempt < retries) await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
       }
     }
-    const e = new Error(`OPMS 서버(${this.host})에 접속하지 못했어요 — 사내망에 연결돼 있는지 확인해 주세요 (${last?.message ?? last})`);
-    // 서버가 답은 했다(HTTP 404 · 500, 받다 끊김) — 그 파일만의 문제이지 "연결 안 됨" 이 아님
-    e.offline = !/^HTTP \d|끊겼어요/.test(String(last?.message ?? ''));
+    // 서버가 답은 했다(HTTP 404 · 500, 받다 끊김 · 멈춤) — 그 요청만의 문제이지 "연결 안 됨" 이 아님
+    const answered = Boolean(last?.answered);
+    const e = new Error(answered
+      ? `OPMS 서버가 요청을 처리하지 못했어요 (${last?.message ?? last})`
+      : `OPMS 서버(${this.host})에 접속하지 못했어요 — 사내망에 연결돼 있는지 확인해 주세요 (${last?.message ?? last})`);
+    e.offline = !answered;
     throw e;
   }
 
@@ -777,8 +780,10 @@ export class Opms {
       }, idleMs);
     };
     arm();
+    let answered = false; // 서버가 응답 머리를 보냄 — 그 뒤의 오류는 "연결 안 됨" 이 아니라 이 파일만의 문제
     try {
       const res = await Promise.race([this.fetch(url, { ...init, signal: ctl.signal }), stall]);
+      answered = true;
       if (!res.ok) {
         res.body?.cancel().catch(() => {}); // 오류 본문은 읽지 않고 연결을 놓는다
         throw new Error(`HTTP ${res.status}`);
@@ -802,6 +807,7 @@ export class Opms {
       return { res, data };
     } catch (err) {
       ctl.abort(err); // 멈춤 · 오류로 그만둘 때 연결도 끊는다
+      if (answered && err && typeof err === 'object') err.answered = true;
       throw err;
     } finally {
       clearTimeout(timer);
@@ -930,11 +936,13 @@ export class Opms {
         this.files.save();
         return { file, reused: true };
       };
-      const nameAt = (b, k) => (k === 0 ? b : numberedName(b, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
+      // " (No.n)" 을 붙인 이름도 길이 한도 안으로 (꼬리는 남기고 가운데를 줄임)
+      const numbered = (b, k) => (k === 0 ? b : numberedName(b, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
+      const nameAt = (b, k) => fitName(numbered(b, k));
       // 예전 판이 줄이지 않은 긴 이름(그리고 그 " (No.n)" 들)으로 받아 둔 그 서류가 있으면 그것을 쓴다 — 새로 쓰지는 않음
       const fullBase = safeFilename(it.name, base);
       for (let k = 0; fullBase !== base && k <= 5; k++) {
-        const old = path.join(dir, nameAt(fullBase, k));
+        const old = path.join(dir, numbered(fullBase, k)); // 예전 판은 줄이지 않았다
         if (path.dirname(old) !== dir || claimed.has(path.basename(old).toLowerCase())) continue;
         if (await sameBytes(old, data)) return adopt(old);
       }
@@ -1012,15 +1020,21 @@ export class Opms {
         if (err.offline) {
           // 서버에 닿지 않으면 남은 파일마다 다시 기다리지 않고 함께 실패로 (30개면 한 시간씩 걸리지 않게)
           offline = true;
-          for (const rest of items.slice(i + 1)) failed.push({ name: rest.name, error: err.message });
+          for (const rest of items.slice(i + 1)) {
+            if (outcome.get(rest.upload) === 'saved') skipped++; // 같은 파일을 앞에서 이미 받음
+            else failed.push({ name: rest.name, error: err.message });
+          }
           break;
         }
       }
     }
     // 사건정보.txt 는 서버에 닿았을 때만 (닿지 않으면 업무배분 · 해외출원이 비어 예전 파일을 빈 내용으로 덮게 됨)
+    //   (파일은 모두 이미 있어 서버에 묻지 않았어도, 업무배분 조회가 닿지 않으면 쓰지 않는다)
     if (all && !offline) {
-      const [mywork, foreign] = await Promise.all([this.mywork(c.idx).catch(() => []), this.foreign(c).catch(() => [])]);
-      await fs.promises.writeFile(path.join(dir, '사건정보.txt'), caseInfoText(c, { mywork, foreign, files: done }), 'utf8');
+      const [mywork, foreign] = await Promise.all([this.mywork(c.idx).then((v) => v, (err) => err), this.foreign(c).catch(() => [])]);
+      if (!(mywork instanceof Error && mywork.offline)) {
+        await fs.promises.writeFile(path.join(dir, '사건정보.txt'), caseInfoText(c, { mywork: Array.isArray(mywork) ? mywork : [], foreign, files: done }), 'utf8');
+      }
     }
     onProgress({ i: items.length, total: items.length, name: '' });
     return { dir, saved, skipped, failed };
