@@ -901,7 +901,8 @@ function applyPaletteColor(color) {
 
 el.palette.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 선택 유지
 el.palette.addEventListener('click', (e) => {
-  const swatch = e.target.closest('[data-color]');
+  // 색 칩만 (판 밖의 [data-color] — 메모 창 자체의 메모 색 — 을 잡으면 "색 지우기"가 그 색으로 칠해 버린다)
+  const swatch = e.target.closest('.palette-swatch[data-color]');
   if (swatch) applyPaletteColor(swatch.dataset.color);
   else if (e.target.closest('#palette-clear')) applyPaletteColor(null);
 });
@@ -1135,6 +1136,10 @@ function showTableBar(table) {
   merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
   merge.disabled = !table.canMerge && !table.merged;
   merge.title = table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요';
+  tableBar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
+  // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만 (머리글 아래 두 번째 행부터 · 바로 아래에 열 수가 같은 표)
+  tableBar.querySelector('[data-table="splitTable"]').hidden = !table.canSplit;
+  tableBar.querySelector('[data-table="joinTable"]').hidden = !table.canJoin;
   delCol.textContent = table.cols <= 1 ? '표 삭제' : '열 삭제';
   delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제';
 }
@@ -1396,7 +1401,7 @@ document.documentElement.addEventListener('mouseleave', () => {
 updateBar();
 
 // ---------- CLEAR 도장: 체크리스트를 모두 끝내면 ----------
-const clearStamp = createClearStamp(document.body, el.editorRoot);
+const clearStamp = createClearStamp(document.body, el.editorRoot, { reserve: () => barHeight() }); // 도구막대가 숨었다 나와도 제자리
 function showTasks(tasks, opts) {
   document.body.dataset.tasks = tasks.total ? `${tasks.done}/${tasks.total}` : '';
   clearStamp.show(tasks, opts);

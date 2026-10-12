@@ -1,6 +1,6 @@
 // 메모를 PDF 쪽으로 — 메인 프로세스의 PDF 만들기(printToPDF)와 PDF 만들기 창의 미리보기가 함께 쓴다.
 //   ?id=메모&w=210&h=297&m=16&bg=1&date=1           (길이는 mm)
-//   &preview=1  미리보기: 첫 쪽만 쪽 모양으로 보이고, 몇 쪽인지 부모 창에 알린다
+//   &preview=1  미리보기: 쪽마다 쪽 모양으로 이어 보이고(내용을 쪽 높이로 잘라서), 몇 쪽인지 부모 창에 알린다
 import { createNoteEditor } from './editor.js';
 import { injectIcons } from './icons.js';
 
@@ -11,6 +11,7 @@ const W = Number(q.get('w')) || 210;
 const H = Number(q.get('h')) || 297;
 const M = Number(q.get('m')) || 0;
 const preview = q.get('preview') === '1';
+const PAGE_GAP = 28; // 미리보기 쪽 사이 (실제 크기 px — 줄여 보이면 10px 쯤)
 const root = document.getElementById('editor');
 
 const style = document.createElement('style');
@@ -73,6 +74,39 @@ if (memo) {
   await document.fonts.ready;
   await settled();
 }
-document.documentElement.dataset.pages = String(pages());
+const count = pages();
+if (preview && count > 1) paginate(count);
+document.documentElement.dataset.pages = String(count);
 document.documentElement.dataset.ready = 'true';
-if (preview) window.parent.postMessage({ type: 'pdf-preview', pages: pages() }, '*');
+if (preview) window.parent.postMessage({ type: 'pdf-preview', pages: count, gap: PAGE_GAP }, '*');
+
+/**
+ * 미리보기 쪽 나누기: 그린 본문을 쪽마다 복사해, 쪽의 글 칸 높이만큼씩 올려 보이게 한다
+ *   (PDF 의 쪽 나눔과 같은 높이로 자른다 — 그림이 쪽 끝에 걸리면 실제 PDF 는 다음 쪽으로 넘길 수 있다)
+ */
+function paginate(n) {
+  const mm = 96 / 25.4;
+  const content = (H - 2 * M) * mm;
+  const date = document.getElementById('print-date');
+  const list = document.createElement('div');
+  list.className = 'pv-pages';
+  for (let i = 0; i < n; i++) {
+    const page = document.createElement('section');
+    page.className = 'pv-page';
+    page.setAttribute('aria-label', `${i + 1}쪽`);
+    const view = document.createElement('div');
+    view.className = 'pv-view';
+    const flow = document.createElement('div');
+    flow.className = 'pv-flow';
+    flow.style.transform = `translateY(${-i * content}px)`;
+    flow.append(root.cloneNode(true));
+    if (!date.hidden) flow.append(date.cloneNode(true));
+    view.append(flow);
+    page.append(view);
+    list.append(page);
+  }
+  root.style.display = 'none';
+  date.hidden = true;
+  document.body.append(list);
+  document.documentElement.classList.add('multi');
+}

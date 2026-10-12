@@ -322,7 +322,7 @@ class Bridge(private val activity: MainActivity) {
             "openFile" -> activity.runOnUiThread { activity.openVaultFile(id, a.getString("rel")) }
             "openUrl" -> activity.runOnUiThread { activity.openUrl(id, a.getString("url")) }
             "share" -> activity.runOnUiThread { activity.shareText(id, a.optString("title"), a.getString("text")) }
-            "print" -> activity.runOnUiThread { activity.printPage(id, a.optString("title", "메모")) }
+            "print" -> activity.runOnUiThread { activity.printPage(id, a.optString("title", "메모"), a.optString("html").ifBlank { null }) }
             "notifyPermission" -> activity.runOnUiThread { activity.requestNotifyPermission(id) }
             "exactAlarmSettings" -> activity.runOnUiThread { activity.openExactAlarmSettings(id) }
             "historyPermission" -> activity.runOnUiThread { activity.openNotificationAccess(id) }

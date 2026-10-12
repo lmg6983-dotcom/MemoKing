@@ -29,12 +29,12 @@ import { createSttService } from './stt/stt-service.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
-import { normalizeMagicSettings, activeModules, memoBodyFromText, MAGIC_MODULES } from '../app/js/core/magic-modules.js';
+import { normalizeMagicSettings, activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
 import { FileIndex } from './file-index.js';
-import { Opms, looksLikeRef, foreignSummary, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
+import { Opms, looksLikeRef, foreignSummary, caseMemoMarkdown, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -537,6 +537,12 @@ function syncStackBounds(id, bounds) {
   saveSettings();
 }
 
+/** 창이 지금 모습을 한 번 새로 그릴 때까지 (requestAnimationFrame 두 번) — 늦어도 150ms */
+function painted(win) {
+  const frame = win.webContents.executeJavaScript('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))', true).catch(() => false);
+  return Promise.race([frame, new Promise((r) => setTimeout(r, 150))]);
+}
+
 // 스택에서 id 의 탭을 보여 준다
 // bounds: 보여 줄 자리를 정해 줄 때 (보이던 탭이 스택에서 빠져 나가면 그 창의 자리를 이어받는다)
 function showTab(id, { inactive = false, bounds: at = null } = {}) {
@@ -544,6 +550,12 @@ function showTab(id, { inactive = false, bounds: at = null } = {}) {
   const current = visibleStackWin(stack, id);
   const bounds = at ?? current?.getNormalBounds() ?? (onScreen(settings.noteBounds[id]) ? settings.noteBounds[id] : defaultNoteBounds());
   const top = stackOnTop(stack);
+  // 늘 위(왕관)는 스택 전체가 함께 — 나중에 들어온 탭(+ 새 탭 등)도 같은 상태로 적어 둔다.
+  //   안 그러면 그 탭을 보일 때 창은 늘 위인데 메모 창은 "왕관 붙이기" 단추를 다시 보인다
+  if (top && stack.memos.some((m) => settings.onTop[m] !== true)) {
+    for (const m of stack.memos) settings.onTop[m] = true;
+    saveSettings();
+  }
   let win = noteWins.get(id);
   const reveal = () => {
     if (win.isDestroyed()) return;
@@ -555,22 +567,40 @@ function showTab(id, { inactive = false, bounds: at = null } = {}) {
     const shown = now ? visibleStackWin(now, id) : null;
     win.setBounds(shown?.getNormalBounds() ?? bounds);
     setTopmost(win, top);
+    // 탭 바꾸기가 번쩍이지 않게: 숨어 있던 탭 창은 투명하게 띄워(Windows 의 창 나타나기 효과·숨어 있는 동안의
+    //   묵은 화면이 보이지 않게) 새로 한 번 그린 뒤에 한꺼번에 보이고, 그다음에 이전 탭을 숨긴다
+    const veiled = Boolean(shown) && !win.isVisible() && process.platform === 'win32';
     setSticker(win, top, { animate: false });
-    if (top) handOverSticker(shown, win); // 왕관은 그 자리에 그대로 (번쩍이지 않게)
+    const sticker = top ? stickers.get(win.id) : null;
+    // 왕관: 투명한 새 탭이 화면에 뜬 다음에 넘긴다. 숨은 창으로 먼저 넘기면 왕관이 아직 보이는 이전 탭 아래로
+    //   깔렸다가 다시 올라와 번쩍인다 (주인 창보다 위라는 규칙은 보이는 주인에게만 지켜짐)
+    if (sticker && veiled) sticker.hold = true;
+    else if (top) handOverSticker(shown, win); // 왕관은 그 자리에 그대로
+    win.webContents.send('memo:on-top', top); // 메모 창의 왕관 단추도 스택과 같게 (붙어 있으면 숨김)
+    if (veiled) win.setOpacity(0);
     if (inactive) win.showInactive();
     else {
       win.show();
       win.focus();
     }
-    // 새 탭이 나타난 다음에 다른 탭은 모두 숨겨 깜빡이지 않게 (보이는 탭은 언제나 하나)
-    setTimeout(() => {
+    const hideOthers = () => {
       const st = stacks.stackOf(id);
       if (!st || st.active !== id) return;
       for (const m of st.memos) {
         const w = noteWins.get(m);
         if (m !== id && w && !w.isDestroyed() && w.isVisible()) w.hide();
       }
-    }, 30);
+    };
+    if (!veiled) return void setTimeout(hideOthers, 30); // 새 탭이 나타난 다음에 다른 탭은 모두 숨긴다 (보이는 탭은 언제나 하나)
+    painted(win).then(() => {
+      if (win.isDestroyed()) return;
+      if (sticker?.hold) {
+        sticker.hold = false;
+        if (stickers.get(win.id) === sticker && !handOverSticker(shown, win)) openStickerWin(sticker, false);
+      }
+      win.setOpacity(1);
+      setTimeout(hideOthers, 16); // 한 화면 뒤 (새 탭이 실제로 화면에 나온 다음)
+    });
   };
   if (!win) {
     win = createNoteWindow(id, { show: false, bounds });
@@ -921,12 +951,13 @@ function setSticker(owner, on, { animate = true } = {}) {
     openStickerWin(cur, false); // 이미 붙어 있음 (창이 지금 보이면 스티커도)
     return;
   }
-  const entry = { owner, win: null, off: () => {} };
+  const entry = { owner, win: null, off: () => {}, hold: false };
   const sync = () => {
     if (entry.win && !entry.win.isDestroyed() && !owner.isDestroyed()) entry.win.setBounds(stickerBounds(owner));
   };
   const visible = () => {
     if (owner.isDestroyed()) return;
+    if (entry.hold) return; // 스택 탭 바꾸는 중: 왕관은 이전 탭에서 넘겨받는다 (새로 만들면 둘이 겹쳐 번쩍임)
     if (owner.isVisible() && !owner.isMinimized()) {
       openStickerWin(entry, false);
       reassertTop(owner); // 숨었다 보이거나 최소화에서 돌아오면 Windows 가 늘 위를 잊는 일이 있다
@@ -1379,16 +1410,6 @@ function revealNote(id) {
   if (win.webContents.isLoading()) win.once('ready-to-show', bring);
   else bring();
   return win;
-}
-
-// 포커스는 뺏지 않고 잠깐 맨 위에 띄워 "여기 생겼다" 를 보여 준 뒤 원래대로 (사용자가 켠 항상 위는 유지)
-function peekOnTop(win, id, ms = 2500) {
-  if (win.isDestroyed()) return;
-  win.setAlwaysOnTop(true, 'floating');
-  win.webContents.send('memo:highlight');
-  setTimeout(() => {
-    if (!win.isDestroyed() && settings.onTop[id] !== true) win.setAlwaysOnTop(false);
-  }, ms);
 }
 
 function pushReminders() {
@@ -2121,6 +2142,8 @@ function setMagicSettings(next) {
   registerMagicKey();
   syncFileIndex();
   if (!settings.magic.enabled && magicWin && !magicWin.isDestroyed()) magicWin.hide();
+  // 열려 있는 매직키 창의 캡슐도 바로 (설정에서 끈 기능은 캡슐이 사라짐)
+  if (magicWin && !magicWin.isDestroyed()) magicWin.webContents.send('magic:modules-changed', magicChips(settings.magic).map(({ id, name, description, on }) => ({ id, name, description, on })));
   return settings.magic;
 }
 
@@ -2175,15 +2198,20 @@ function captureToMemo(dir, info, point) {
   });
 }
 
-// 가져온 내용(capture)으로 새 메모 창 + Windows 알림 (빠른 메모·영역 캡처가 함께 씀)
+// 가져온 내용(capture)으로 새 메모 + Windows 알림 (빠른 메모 Ctrl+Alt+C · 영역 캡처 C+C 가 함께 씀)
+//   하던 일을 가로막지 않게 메모 창은 바로 띄우지 않는다: 숨긴 창에서 가져온 내용을 채워 저장해 두고,
+//   알림을 누르면 그 메모가 마우스 자리에 뜬다 (매직키로 만든 메모와 같음). 한동안 안 열면 숨긴 창은 닫는다(메모는 남음)
+const UNSEEN_CAPTURE_MS = 3 * 60_000;
 function openCaptureMemo(capture, point, message) {
   const id = vault.create();
   pendingCaptures.set(id, { ...capture, sourceMd: sourceLine(capture.source) });
   settings.noteBounds[id] = boundsAt(id, point); // 마우스가 있는 자리에
-  // Windows 는 다른 앱에서 작업 중일 때 새 창을 맨 앞으로 가져오지 못하게 막으므로,
-  // 포커스는 뺏지 않고 잠깐 맨 위에 보여 주고 + Windows 알림 (누르면 그 메모로 이동)
-  const win = openNote(id, { inactive: true });
-  win?.once('ready-to-show', () => peekOnTop(win, id));
+  const win = createNoteWindow(id, { show: false });
+  const closeUnseen = setTimeout(() => {
+    if (win && !win.isDestroyed() && !win.isVisible()) win.close();
+  }, UNSEEN_CAPTURE_MS);
+  win?.once('show', () => clearTimeout(closeUnseen));
+  win?.once('closed', () => clearTimeout(closeUnseen));
   toast({ memoId: id, kind: 'quick-memo', ...message, onClick: () => revealNote(id) });
   return id;
 }
@@ -2473,6 +2501,25 @@ function registerIpc() {
     return saved;
   });
   ipcMain.handle('reminders:all', () => vault?.allReminders() ?? []);
+  // 일정 탭 달력에서 바로 만들기: 고른 메모(없으면 일정 이름을 제목으로 한 새 메모)에 일정 하나를 더한다 → 메모 id
+  ipcMain.handle('reminders:add', (_e, id, reminder, newTitle) => {
+    if (!vault) return null;
+    const r = normalizeReminder(reminder);
+    if (!r) return null;
+    let memoId = id ? String(id) : null;
+    if (!memoId) {
+      const title = String(newTitle ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || '새 일정';
+      memoId = vault.import({ body: `# ${title}\n` });
+    }
+    const memo = memoId ? vault.get(memoId) : null;
+    if (!memo) throw new Error('메모를 찾지 못했어요');
+    const saved = vault.setReminders(memoId, [...(memo.reminders ?? []), r]);
+    if (!saved) throw new Error('그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요');
+    sendToNote(memoId, 'memo:reminders', saved);
+    pushReminders();
+    alarms.tick();
+    return memoId;
+  });
 
   // 알림 보관함
   ipcMain.handle('history:list', (_e, filter) => {
@@ -2544,16 +2591,11 @@ function registerIpc() {
     saveSettings();
     return mcpStatus();
   });
-  // 매직키 창 아래 캡슐: 쓸 수 있는 모듈 모두와 켜짐 여부 (누르면 켜고 끔)
-  const magicModuleList = () => {
-    const m = normalizeMagicSettings(settings.magic);
-    return MAGIC_MODULES.filter((x) => x.ready).map(({ id, name, description }) => ({ id, name, description, on: m.enabled && m.modules[id] }));
-  };
+  // 매직키 창 아래 캡슐: 설정에서 켠 기능만 (설정에서 끈 기능은 캡슐도 없음), 누르면 잠깐 끄고 켬
+  const magicModuleList = () => magicChips(settings.magic).map(({ id, name, description, on }) => ({ id, name, description, on }));
   ipcMain.handle('magic:modules', () => magicModuleList());
   ipcMain.handle('magic:toggle-module', (_e, id) => {
-    const m = normalizeMagicSettings(settings.magic);
-    if (!(id in m.modules)) return magicModuleList();
-    setMagicSettings({ ...m, modules: { ...m.modules, [id]: !m.modules[id] } });
+    setMagicSettings(toggleMagicChip(settings.magic, String(id)));
     return magicModuleList();
   });
   ipcMain.on('magic:close', () => { if (magicWin && !magicWin.isDestroyed()) magicWin.hide(); });
@@ -2615,6 +2657,12 @@ function registerIpc() {
     return { case: c, foreign, summary: foreignSummary(c, foreign), ...opmsSettings() };
   });
   ipcMain.handle('opms:mywork', (_e, idx) => opmsClient().mywork(caseOf(idx).idx));
+  ipcMain.handle('opms:details', (_e, idx) => opmsClient().details(caseOf(idx))); // 신규성 의제 · 진행사항 · 메모
+  ipcMain.handle('opms:schema-copy', async () => {
+    const text = await opmsClient().schemaText();
+    clipboard.writeText(text.slice(0, 200_000));
+    return text.split('\n').length;
+  });
   ipcMain.handle('opms:bills', (_e, idx) => opmsClient().bills(caseOf(idx).idx));
   ipcMain.handle('opms:attachments', (_e, idx) => opmsClient().attachments(caseOf(idx).idx));
   ipcMain.handle('opms:download', async (event, { idx, ns, all } = {}) => {
@@ -2632,6 +2680,20 @@ function registerIpc() {
     if (!SMOKE) shell.openPath(res.dir); // 받은 폴더를 탐색기로 (OPMS 조회 프로그램처럼)
     return res;
   });
+  // 전자포대 한 파일 바로 열기: 저장 폴더(사건 폴더)에 받아 두고(이미 있으면 그대로) 기본 앱으로
+  ipcMain.handle('opms:open-file', async (_e, { idx, n } = {}) => {
+    const c = caseOf(idx);
+    const client = opmsClient();
+    const it = (await client.attachments(c.idx)).find((x) => x.n === Number(n));
+    if (!it) throw new Error('그 파일을 찾지 못했어요. 새로 고침 뒤 다시 해 주세요');
+    const file = await client.fileFor(c, it, opmsSettings().wrapperDir);
+    if (!file) throw new Error('파일 이름이 이상해 열 수 없어요');
+    opmsLastDir = path.dirname(file);
+    if (SMOKE) return file;
+    const err = await shell.openPath(file);
+    if (err) throw new Error(err);
+    return file;
+  });
   ipcMain.handle('opms:open-folder', () => (opmsLastDir ? shell.openPath(opmsLastDir) : ''));
   ipcMain.handle('opms:choose-dir', async (event) => {
     const r = await dialog.showOpenDialog(senderWindow(event), { title: '전자포대를 저장할 폴더', defaultPath: opmsSettings().wrapperDir, properties: ['openDirectory', 'createDirectory'] });
@@ -2641,6 +2703,18 @@ function registerIpc() {
     return r.filePaths[0];
   });
   ipcMain.handle('opms:copy', (_e, text) => clipboard.writeText(String(text ?? '').slice(0, 2000)));
+  // 사건 정보를 메모 한 장으로 (서지 · 업무배분 · 해외출원) → 새 메모 창
+  ipcMain.handle('opms:to-memo', async (_e, idx) => {
+    if (!vault) throw new Error('메모 폴더가 아직 없어요');
+    const known = caseOf(idx);
+    const client = opmsClient();
+    const c = (await client.caseByIdx(known.idx).catch(() => null)) ?? known;
+    const [foreign, mywork, details] = await Promise.all([client.foreign(c).catch(() => []), client.mywork(c.idx).catch(() => []), client.details(c).catch(() => null)]);
+    const id = vault.import({ body: caseMemoMarkdown(c, { mywork, foreign, summary: foreignSummary(c, foreign), details }) });
+    if (!id) throw new Error('메모를 만들지 못했어요');
+    openNote(id);
+    return id;
+  });
   ipcMain.handle('magic:open-all', (_e, query) => {
     magicWin?.hide();
     showFinder(String(query ?? '').slice(0, 200));
@@ -2694,7 +2768,7 @@ function registerIpc() {
     const id = vault.import({ body });
     if (!id) return { ok: false }; // 잠금 형식 글 등 메모로 만들 수 없는 글
     if (payload.open) openNote(id);
-    else notice('메모를 만들었어요', body.split('\n')[0].slice(0, 40));
+    else toast({ memoId: id, kind: 'magic-memo', title: '메모를 만들었어요', body: `${body.split('\n')[0].slice(0, 40)}\n눌러서 열기`, onClick: () => revealNote(id) }); // 누르면 그 메모가 뜬다
     return { ok: true, id };
   });
   // 표가 넘칠 때: 메모 창을 더 넓게 (요청한 본문 폭이 들어가도록, 화면 안에서). 반환: 실제로 넓힌 본문 폭(px)
@@ -2736,6 +2810,14 @@ function registerIpc() {
   // 목록 창이 늦게 열렸을 때: 아직 "방금" 인 이어 쓰기 안내
   ipcMain.handle('memo:handoff', () => (lastHandoff && Date.now() - lastHandoff.at < HANDOFF_MS && !noteWins.has(lastHandoff.id) ? lastHandoff : null));
   ipcMain.handle('memo:create', (_e, options) => createNote(options ?? {}));
+  // 목록 창에 끌어다 놓은 파일(.md · .txt · 그림 …)로 만든 메모 — 글은 목록 창이 만들어 보낸다. open: 창도 띄울지
+  ipcMain.handle('memo:import', (_e, body, opts) => {
+    if (!vault) throw new Error('메모 폴더가 아직 없어요');
+    const id = vault.import({ body: String(body ?? '').slice(0, 5_000_000) });
+    if (!id) throw new Error('이 파일로는 메모를 만들 수 없어요');
+    if (opts?.open) openNote(id);
+    return id;
+  });
   ipcMain.handle('memo:get', (_e, id) => {
     const memo = vault?.get(id);
     // 창 상태(항상 위)는 기기별 설정이라 파일이 아닌 설정에서 붙인다.

@@ -261,6 +261,12 @@ export async function runSmoke({
     await select2();
     await js(n1.win, `document.querySelector('[data-action="color"]').click()`);
     await until(() => js(n1.win, `!document.getElementById('palette').hidden`), '색판 열림');
+    await capture(n1.win, 'smoke-palette.png');
+    const swatchFit = await js(n1.win, `(() => {
+      const box = document.getElementById('palette').getBoundingClientRect();
+      return [...document.querySelectorAll('#palette .palette-swatch')].every((b) => { const r = b.getBoundingClientRect(); return r.left >= box.left - 0.5 && r.right <= box.right + 0.5; });
+    })()`);
+    check('글자 색 판: 색 칩이 판 밖으로 넘치지 않음', swatchFit);
     await js(n1.win, `document.querySelector('#palette [data-color="#e03131"]').click()`);
     // 판에서 지금 칠해진 색을 다시 고르면 지워지고, 한 번 더 고르면 다시 칠해진다
     const redNow = () => js(n1.win, `[...document.querySelectorAll('.mk-doc span[data-mk-color]')].some((s) => s.textContent.includes('빨강'))`);
@@ -622,6 +628,8 @@ export async function runSmoke({
     await js(webNote.win, `new MutationObserver(() => (window.__statusLog ??= []).push(document.getElementById('status').textContent))
       .observe(document.getElementById('status'), { childList: true, characterData: true, subtree: true })`);
     webNote.win.webContents.insertText('웹에서 가져온 글');
+    // 글이 들어간 뒤에 Enter (먼저 오면 Enter 가 글 넣기에 묻혀 사라질 때가 있다)
+    await until(() => js(webNote.win, `document.querySelector('.mk-doc').textContent.includes('웹에서 가져온 글')`), '첫 줄').catch(() => {});
     await key(webNote.win, 'Enter');
     // 키 입력은 비동기라, 새 줄이 생긴 뒤에 붙여넣는다 (안 그러면 붙인 제목이 첫 줄에 합쳐짐)
     await until(() => js(webNote.win, `document.querySelectorAll('.mk-doc > *').length >= 2`), '새 줄').catch(() => {});
@@ -672,7 +680,53 @@ export async function runSmoke({
     await key(webNote.win, 'Z', ['control']);
     const undone = await until(() => !readMemo(webNote.id).includes('마크다운 사진'), 'Ctrl+Z').catch(() => false);
     check('Ctrl+Z 한 번 → 붙여넣기 전체 취소 (사진 주소 교체는 따로 남지 않음)', undone && readMemo(webNote.id).includes('기사 본문 첫 문단'));
+    // PC: 그림에 마우스를 올리면 지우기 단추(×), 떠나면 거둠 — 누르면 그 그림 줄이 지워진다
+    const hoverDel = await js(webNote.win, `(async () => {
+      const img = document.querySelector('.mk-doc img.mk-image');
+      if (!img) return 'no image';
+      const r = img.getBoundingClientRect();
+      img.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
+      await new Promise((ok) => setTimeout(ok, 50));
+      const shown = Boolean(document.querySelector('.mk-delete-btn.hover'));
+      document.querySelector('.mk-doc').dispatchEvent(new MouseEvent('mouseleave'));
+      await new Promise((ok) => setTimeout(ok, 600));
+      return { shown, gone: !document.querySelector('.mk-delete-btn') };
+    })()`);
+    check('PC: 그림에 마우스를 올리면 지우기 단추 · 마우스가 떠나면 사라짐', hoverDel?.shown && hoverDel?.gone, JSON.stringify(hoverDel));
+    const imgCount = () => js(webNote.win, `document.querySelectorAll('.mk-doc img.mk-image').length`);
+    const beforeDel = await imgCount();
+    await js(webNote.win, `(() => {
+      const img = document.querySelector('.mk-doc img.mk-image');
+      const r = img.getBoundingClientRect();
+      img.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
+      document.querySelector('.mk-delete-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    })()`);
+    const deleted = await until(async () => (await imgCount()) === beforeDel - 1, '그림 지우기').catch(() => false);
+    check('PC: 마우스를 올려 뜬 × 를 누르면 그 그림이 지워짐', deleted, `${beforeDel} → ${await imgCount()}`);
     await closeNote(webNote.id);
+
+    // 13-0) 목록 창에 파일을 끌어다 놓으면 메모로 (.md 는 글 그대로, 그림은 메모 안에)
+    {
+      const before = new Set(getVault().list().map((m) => m.id));
+      await js(getList(), `(() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['# 끌어온 회의록\\n\\n- 안건 하나\\n- 안건 둘\\n'], '회의록.md', { type: 'text/markdown' }));
+        dt.items.add(new File([Uint8Array.from(atob('${png.toString('base64')}'), (c) => c.charCodeAt(0))], '끌어온 그림.png', { type: 'image/png' }));
+        for (const type of ['dragenter', 'dragover']) window.dispatchEvent(new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true }));
+        const shade = !document.querySelector('.file-drop').hidden;
+        window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+        return shade;
+      })()`);
+      const made = await until(() => {
+        const fresh = getVault().list().filter((m) => !before.has(m.id) && m.file);
+        return fresh.length >= 2 ? fresh : null;
+      }, '끌어다 놓은 파일 → 메모').catch(() => []);
+      const bodies = made.map((m) => readMemo(m.id));
+      check('목록 창에 파일을 끌어다 놓으면 메모로 (.md 는 글 그대로 · 그림은 파일 이름 제목 + 그림)',
+        bodies.some((b) => /# 끌어온 회의록\n\n- 안건 하나\n- 안건 둘/.test(b)) && bodies.some((b) => /# 끌어온 그림\n\n!\[끌어온 그림\.png\]\(attachments\/[^)]+\.png\)/.test(b)),
+        JSON.stringify(bodies.map((b) => b.slice(-160))));
+      for (const m of made) getVault().trash(m.id); // 뒤 점검의 메모 수에 섞이지 않게
+    }
 
     // 13-1) 링크 미리보기 카드 · 한 번 눌러 열기 (v0.10.0) — 실제 브라우저·프로그램은 띄우지 않고 기록만
     const pasteText = (win, text) => js(win, `(() => {
@@ -680,6 +734,25 @@ export async function runSmoke({
       dt.setData('text/plain', ${JSON.stringify(text)});
       document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
     })()`);
+    // CLEAR 도장: 아래 도구막대가 숨었다 나타나도 제자리 (본문 높이가 바뀌어도 움직이지 않음)
+    {
+      const stampNote = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
+      await pasteText(stampNote.win, '# 도장\n\n- [x] 하나\n- [x] 둘\n');
+      await until(() => js(stampNote.win, `!document.querySelector('.clear-stamp').hidden`), 'CLEAR 도장').catch(() => {});
+      const tops = await js(stampNote.win, `(async () => {
+        const top = () => Math.round(document.querySelector('.clear-stamp').getBoundingClientRect().top + document.querySelector('.clear-stamp').getBoundingClientRect().height / 2);
+        await new Promise((r) => setTimeout(r, 500));
+        const shown = top();
+        document.body.classList.add('bar-hidden');
+        await new Promise((r) => setTimeout(r, 500));
+        const hidden = top();
+        document.body.classList.remove('bar-hidden');
+        await new Promise((r) => setTimeout(r, 500));
+        return { visible: !document.querySelector('.clear-stamp').hidden, shown, hidden, back: top() };
+      })()`);
+      check('CLEAR 도장: 도구막대가 숨었다 나타나도 움직이지 않음', tops.visible && Math.abs(tops.shown - tops.hidden) <= 1 && Math.abs(tops.shown - tops.back) <= 1, JSON.stringify(tops));
+      await closeNote(stampNote.id);
+    }
     const articleUrl = `${base}/article.html`;
     const linkNote = await newNote(() => js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await pasteText(linkNote.win, articleUrl);
@@ -1291,6 +1364,28 @@ export async function runSmoke({
     check('일정 탭: 한 달 달력(오늘 선택) · 매주 월 일정이 날짜별로 점·목록 (미리 알림 표시) · 타이머는 따로',
       tab.days === 42 && tab.today && tab.dots >= 4 && tab.events.some((t) => /09:30|9:30/.test(t) && /알림 10분 전/.test(t)) && /5분 타이머/.test(tab.timer) && tab.count === '2', JSON.stringify(tab));
     await capture(lw, 'smoke-reminders-tab.png');
+    // 창을 줄이거나 넓혀도 달력이 잘리지 않는다 (가장 작은 창 300×380 · 낮고 넓은 창 · 넓은 창은 달력 왼쪽·목록 오른쪽)
+    {
+      const keep = lw.getBounds();
+      const fits = [];
+      for (const [w, h] of [[300, 380], [420, 520], [900, 420], [900, 700]]) {
+        lw.setBounds({ ...keep, width: w, height: h });
+        await wait(250);
+        fits.push(await js(lw, `(() => {
+          const box = document.getElementById('reminder-groups');
+          box.scrollTop = 0;
+          const cal = box.querySelector('.cal').getBoundingClientRect();
+          const view = box.getBoundingClientRect();
+          const list = box.querySelector('.ev-day-title').getBoundingClientRect();
+          return { size: '${w}x${h}', fits: cal.bottom <= view.bottom + 1 && cal.right <= view.right + 1, side: list.left >= cal.right };
+        })()`));
+      }
+      await capture(lw, 'smoke-reminders-wide.png');
+      lw.setBounds(keep);
+      await wait(200);
+      check('일정 탭: 창을 줄여도 달력 한 달이 다 보임 · 넓은 창은 달력 옆에 일정 목록',
+        fits.every((f) => f.fits) && fits.at(-1).side && fits.at(-2).side, JSON.stringify(fits));
+    }
 
     // 14-3) 알림만: 시각이 되면 Windows 알림 (점검 때는 기록만) → 한 번짜리는 "완료"
     const past = (ms) => new Date(Date.now() - ms).toISOString();

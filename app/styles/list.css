@@ -366,7 +366,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   font-weight: 700;
   line-height: 15px;
 }
-body:not([data-tab="memos"]) .filter-btn { display: none; }
+body:not([data-tab="memos"]) :is(.filter-btn, .layout-btn) { display: none; } /* 거르기·한 줄씩 보기는 메모 탭에서만 */
 
 .filter-panel {
   display: flex;
@@ -540,8 +540,9 @@ body.is-dragging .card-actions { visibility: hidden; }
 }
 .card-actions svg { width: 15px; height: 15px; }
 
-/* 마우스를 올리면 압정·지우기 묶음이 제목 줄 오른쪽에 뜨므로 제목은 그 앞에서 줄임 */
-.cards .item:hover .card-head { padding-right: 84px; }
+/* 마우스를 올리면 압정·지우기 묶음이 제목 줄 오른쪽 위에 겹쳐 뜬다 — 제목을 밀어 줄바꿈을 바꾸지 않고,
+   묶음 아래로 들어가는 글자 끝만 흐리게 (카드 높이·글자 자리는 그대로) */
+.cards .item:hover .card-head { -webkit-mask-image: linear-gradient(to left, transparent 0, transparent 88px, #000 120px); mask-image: linear-gradient(to left, transparent 0, transparent 88px, #000 120px); }
 
 /* 목록 창 늘 위에 두기: 창 제목 줄 오른쪽 끝 (Windows 최소화 버튼 바로 옆), 켜짐은 메모 창과 같은 은은한 바탕 */
 .titlebar-btn { margin-left: auto; width: 34px; height: 30px; -webkit-app-region: no-drag; }
@@ -771,7 +772,7 @@ body.is-dragging .card:hover { transform: none; }
 /* 펼친 동안: 위성 단추와 같은 앱 바탕 (버튼에 검정 바탕은 쓰지 않음) */
 .fab.open { background: var(--surface-2); color: var(--text-strong); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
 .fab.open svg { transform: rotate(45deg); }
-body:not([data-tab="memos"]):not([data-tab="reminders"]) :is(.fab, .fab-menu, .fab-scrim) { display: none; }
+body:not([data-tab="memos"]) :is(.fab, .fab-menu, .fab-scrim) { display: none; } /* 보관함·일정 탭엔 + 없음 (일정은 달력의 "＋ 일정 추가") */
 .fab-scrim { position: fixed; inset: 44px 0 0; z-index: 30; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); animation: mk-fade-in 0.15s ease-out; }
 .fab-menu { position: fixed; right: 18px; bottom: 72px; z-index: 31; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
 .fab-sat { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: var(--text-strong); cursor: pointer; animation: fab-sat-out 0.26s var(--ease-out) both; }
@@ -836,3 +837,38 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 }
 .handoff-bar .handoff-close:hover { background: var(--hover); opacity: 1; }
 .handoff-bar .handoff-close svg { width: 16px; height: 16px; }
+
+/* 고른 날 제목 옆 "＋ 일정 추가" (list-reminders.js) */
+.ev-day-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ev-add { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 0; border-radius: 999px; background: var(--fill-tab, var(--hover)); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.ev-add svg { width: 14px; height: 14px; }
+
+/* 파일을 끌어다 놓을 때 (list.js) — 목록 위에 "놓으면 메모로" */
+.file-drop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(2px); pointer-events: none; animation: mk-fade-in 0.12s ease-out; }
+.file-drop[hidden] { display: none; }
+.file-drop-box { display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(100%, 360px); padding: 28px 20px; border: 2px dashed var(--brand-yellow); border-radius: 16px; background: var(--surface-2); box-shadow: var(--shadow-pop); text-align: center; }
+.file-drop-box b { font-size: 16px; }
+.file-drop-box span { font-size: 12.5px; color: var(--muted); }
+
+/* 일정 탭 달력: 창 크기에 맞춰 (PC 목록 창은 작게 줄일 수 있어 달력이 잘리던 문제)
+   - 낮은 창: 칸을 줄여 한 달이 다 보이게  · 넓은 창: 달력은 왼쪽에 붙고 일정 목록은 오른쪽 */
+#view-reminders { container: evrows / size; } /* 크기는 창이 정함 (내용으로 늘지 않음) */
+@container evrows (max-height: 560px) {
+  .cal { padding: 6px 6px 4px; }
+  .cal-head { margin-bottom: 2px; }
+  .cal-nav { width: 28px; height: 28px; }
+  .cal-day { min-height: 30px; padding: 2px 0; gap: 1px; }
+  .cal-num { min-width: 22px; height: 22px; font-size: 12.5px; }
+  .cal-dots { height: 4px; }
+  .cal-dots i { width: 4px; height: 4px; }
+}
+@container evrows (max-height: 420px) {
+  .cal-day { min-height: 24px; padding: 1px 0; }
+  .cal-num { height: 20px; }
+  .cal-wd { padding: 0 0 2px; }
+}
+@container evrows (min-width: 640px) {
+  #reminder-groups { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); column-gap: 16px; align-content: start; }
+  #reminder-groups > * { grid-column: 2; }
+  #reminder-groups > .cal { grid-column: 1; grid-row: 1 / span 999; align-self: start; position: sticky; top: 0; }
+}

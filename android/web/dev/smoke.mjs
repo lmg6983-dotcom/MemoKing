@@ -232,8 +232,18 @@ try {
 
   // 알림 추가
   await page.tap('#bell-btn');
-  check('일정과 알림 패널: 처음엔 "일정" (이름·미리 알림 칩)', await page.isVisible('#rem-title') && (await page.locator('#rem-alerts button').count()) >= 5);
+  check('일정과 알림 패널: 처음엔 "무엇을 만들까요?" 한 가지만 · 아래 막대 "취소 | 다음"', await page.isVisible('#rem-kind [data-kind="at"]') && await page.isHidden('#rem-title') && (await page.textContent('#rem-back')) === '취소' && (await page.textContent('#rem-next')) === '다음');
+  await shot('05a-rem-kind');
+  await page.tap('#rem-kind [data-kind="at"]');
+  await shot('05b-rem-when');
+  await page.tap('#rem-next');
+  await page.tap('.alert-more');
+  await shot('05c-rem-alerts');
+  check('일정: 언제 → 미리 알림 (지난 시각은 빼고 칩 + 직접 정하기)', (await page.locator('#rem-alerts button').count()) >= 1 && (await page.locator('#rem-alerts button:disabled').count()) === 0 && await page.isVisible('.alert-more') && (await page.locator('.rem-answer').count()) === 2);
+  await page.tap('.rem-answer[data-goto="kind"]');
   await page.tap('#rem-kind [data-kind="timer"]');
+  await page.tap('#rem-next');
+  check('타이머: 언제 → 바로 확인 (미리 알림 단계 없음) · 아래 막대 "이전 | 타이머 추가"', (await page.textContent('#rem-next')) === '타이머 추가' && (await page.textContent('#rem-back')) === '이전' && await page.isHidden('#rem-title'));
   await page.tap('.rem-submit');
   await page.waitForTimeout(300);
   check('알림 패널: 10분 타이머 추가', /kind: timer/.test(read('회의 메모.md')));
@@ -376,6 +386,33 @@ try {
   }));
   check('일정 탭: 달력 42칸 · 다가오는 일정에 "치과 · 알림 30분 전, 하루 전"', cal.days === 42 && cal.rows.some((t) => /치과/.test(t) && /알림 30분 전, 하루 전/.test(t)), JSON.stringify(cal));
   await shot('02g-calendar');
+  check('일정 탭: + 버튼 없음 (보관함처럼)', await page.isHidden('#fab'));
+  // 달력에서 바로 일정 만들기: 고른 날 › ＋ 일정 추가 → 이름·시각 → 미리 알림 → 새 메모 / 있는 메모
+  await page.tap('.ev-add');
+  await page.waitForSelector('.quick-event[open]');
+  check('바로 일정 추가: 처음엔 이름·시각만 (미리 알림·메모 고르기는 숨김)', await page.isVisible('.qe-name') && await page.isHidden('.quick-event [data-step="alerts"]') && await page.isHidden('.qe-new'));
+  await page.fill('.qe-name', '팀 점심');
+  const qeNext = '.quick-event .flow-footer .btn.primary';
+  await page.tap(qeNext);
+  await page.tap(qeNext);
+  await shot('02h-quick-event-memo');
+  check('바로 일정 추가: 마지막엔 "새 메모"(처음 골라 둠) · 메모 목록 · 아래 단추 "새 메모로 만들기"', /팀 점심/.test(await page.textContent('.qe-new')) && (await page.getAttribute('.qe-new', 'aria-checked')) === 'true' && (await page.locator('.qe-memo').count()) > 1 && (await page.textContent(qeNext)) === '새 메모로 만들기');
+  await page.tap(qeNext);
+  await page.waitForTimeout(600);
+  const lunch = fs.existsSync(path.join(vault, '팀 점심.md')) ? read('팀 점심.md') : '';
+  check('바로 일정 추가: 일정 이름으로 새 메모 + 일정', /^# 팀 점심/m.test(lunch) && /kind: at/.test(lunch), lunch.slice(0, 300));
+  await page.tap('.ev-add');
+  await page.waitForSelector('.quick-event[open]');
+  await page.fill('.qe-name', '주간 보고');
+  await page.tap(qeNext);
+  await page.tap(qeNext);
+  await page.fill('.qe-search', '회의');
+  await page.waitForTimeout(200);
+  await page.tap('.qe-memo:not(.qe-new)');
+  check('바로 일정 추가: 메모를 고르면 아래 단추가 "\'회의 메모\'에 넣기"', (await page.textContent(qeNext)) === "'회의 메모'에 넣기", await page.textContent(qeNext));
+  await page.tap(qeNext);
+  await page.waitForTimeout(600);
+  check('바로 일정 추가: 있는 메모를 고르면 그 메모에 일정', /title: 주간 보고/.test(read('회의 메모.md')), read('회의 메모.md').slice(0, 400));
   await page.tap('[data-tab="memos"]');
   await page.waitForTimeout(300);
 
@@ -523,6 +560,31 @@ try {
   // 데스크탑과 같은 편집 기능: 체크리스트 끝내면 CLEAR 도장 · 꾹 눌러 끌어 줄 바꾸기 · 그림 줄 옮기기
   const cdp = await ctx.newCDPSession(page);
   const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  // 목록 카드를 누른 채 좌우로 흔들기: 카드만 손가락을 따라가고 화면은 옆으로 끌리지 않음 · 메뉴 안 뜸 · 제자리에서 놓으면 그대로
+  {
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+    const cardSel = '.card[data-id="00000000-0000-4000-8000-000000000001"]';
+    const box = await page.locator(cardSel).boundingBox();
+    const cy = box.y + box.height / 2;
+    const cx = box.x + box.width / 2;
+    await touch('touchStart', cx, cy);
+    const seen = [];
+    for (const dx of [20, 50, 80, 30, -20, -60, -90, -30, 20, 60, 10]) {
+      await touch('touchMove', cx + dx, cy);
+      await page.waitForTimeout(20);
+      seen.push(await page.evaluate((sel) => ({ t: document.querySelector(sel).style.transform, sl: document.querySelector('#list-screen .view:not([hidden])')?.scrollLeft ?? 0 }), cardSel));
+    }
+    await touch('touchMove', cx + 2, cy);
+    await page.waitForTimeout(40);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(350);
+    const follows = seen.some((x) => /translate3d\(-\d/.test(x.t)) && seen.some((x) => /translate3d\(\d/.test(x.t));
+    check('목록 카드 좌우로 흔들기: 카드만 따라오고 화면은 그대로 · 놓으면 제자리', follows && seen.every((x) => x.sl === 0)
+      && await page.isVisible(cardSel) && await page.isHidden('#memo-sheet') && !(await page.$eval(cardSel, (c) => c.style.transform)), JSON.stringify(seen.slice(0, 4)));
+  }
   await page.tap('.card[data-id="00000000-0000-4000-8000-000000000001"]');
   await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
   await page.waitForTimeout(300);
@@ -859,6 +921,63 @@ try {
   check('도구막대: H1·H2·태그·키보드·사진 버튼 없음', (await page.locator('#format-bar [data-cmd="h1"], #format-bar [data-cmd="h2"], #format-bar [data-action="tag"], #format-bar [data-action="done"], #format-bar [data-action="camera"]').count()) === 0);
   check('위 막대: 되돌리기·다시 하기', (await page.locator('#note-screen .bar #undo-btn, #note-screen .bar #redo-btn').count()) === 2);
 
+  // 끌어서 고른 줄만 목록으로: 앞 줄 맨 끝에서 시작한 선택은 그 줄을 빼고, 고른 줄마다 항목 하나
+  await newText();
+  await page.keyboard.type('# 고른 줄 목록');
+  for (const t of ['머리 줄', '하나', '둘', '셋']) {
+    await page.keyboard.press('Enter');
+    await page.keyboard.type(t);
+  }
+  const selectLines = (startText, endText) => page.evaluate(([a, b]) => {
+    const ps = [...document.querySelectorAll('#note-screen .mk-doc p')];
+    const pa = ps.find((p) => p.textContent === a);
+    const pb = ps.find((p) => p.textContent === b);
+    const r = document.createRange();
+    r.setStart(pa.firstChild, pa.textContent.length); // 앞 줄의 맨 끝에서
+    r.setEnd(pb.firstChild, pb.textContent.length);
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    document.dispatchEvent(new Event('selectionchange'));
+  }, [startText, endText]);
+  await selectLines('머리 줄', '셋');
+  await page.waitForTimeout(150);
+  await page.click('#format-bar [data-cmd="bullet"]');
+  await page.waitForTimeout(900);
+  let g = fileWith('고른 줄 목록');
+  check('끌어 고른 줄 목록: 앞 줄 끝에서 시작해도 그 줄은 그대로 · 고른 줄마다 항목 하나', g && /\n머리 줄\n\n- 하나\n- 둘\n- 셋/.test(read(g)), g && read(g));
+  // 목록과 그 아래 글 줄을 함께 고르면 모두 한 목록으로 (줄마다 항목)
+  await page.evaluate(() => { // 커서를 "셋" 끝에 (고른 범위를 풀고)
+    const p = [...document.querySelectorAll('#note-screen .mk-doc li p')].find((x) => x.textContent === '셋');
+    getSelection().collapse(p.firstChild, p.textContent.length);
+    document.dispatchEvent(new Event('selectionchange'));
+  });
+  await page.waitForTimeout(150);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter'); // 빈 항목에서 Enter → 목록 밖 글 줄로
+  await page.keyboard.type('넷');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('다섯');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const items = [...document.querySelectorAll('#note-screen .mk-doc li p')];
+    const ps = [...document.querySelectorAll('#note-screen .mk-doc > p')];
+    const first = items.find((p) => p.textContent === '둘');
+    const last = ps.find((p) => p.textContent === '다섯');
+    const r = document.createRange();
+    r.setStart(first.firstChild, 0);
+    r.setEnd(last.firstChild, last.textContent.length);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    document.dispatchEvent(new Event('selectionchange'));
+  });
+  await page.waitForTimeout(150);
+  await page.click('#format-bar [data-cmd="ordered"]');
+  await page.waitForTimeout(900);
+  check('목록 + 아래 글 줄을 함께 고르면 줄마다 항목인 한 목록으로', /1\. 하나\n2\. 둘\n3\. 셋\n4\. 넷\n5\. 다섯/.test(read(g)), read(g));
+  await back();
+  await page.waitForTimeout(300);
+
   // 이어진 목록 하나를 바꾸면 통째로
   await newText();
   await page.keyboard.type('# 목록 바꾸기');
@@ -926,6 +1045,13 @@ try {
   await page.tap('#menu-btn');
   await page.tap('[data-memo-action="share"]');
   await page.tap('[data-share="pdf"]');
+  await page.waitForSelector('#print-sheet:not([hidden])');
+  check('PDF: 먼저 내용 크기 고르기 (작게·보통·크게·아주 크게 + 직접)', (await page.locator('#print-size-seg [data-scale]').count()) === 4 && await page.isVisible('#print-scale'));
+  await page.tap('#print-size-seg [data-scale="1.2"]');
+  await page.waitForTimeout(400);
+  check('PDF: 크기를 고르면 미리보기도 그 크기로', /zoom: 1\.2/.test(await page.$eval('#print-frame', (f) => f.srcdoc)) && (await page.textContent('#print-scale-out')) === '120%');
+  await shot('09b-print-size');
+  await page.tap('#print-go');
   if (process.env.MK_PDF) {
     await page.pdf({ path: path.join(outDir, 'share.pdf'), format: 'A4' });
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -937,6 +1063,7 @@ try {
   // 앱은 이 인쇄 전용 HTML 을 보이지 않는 WebView 에 띄워 PDF 로 쓴다 → 따로 띄워 PDF 로 찍어 글자가 들었는지
   const pdfHtml = (await devLog()).log.filter((l) => l.sharePdf).at(-1)?.sharePdf?.html ?? '';
   check('보내기 PDF: 인쇄 전용 문서 (본문·print.css)', pdfHtml.includes('print-page') && pdfHtml.includes('print.css') && pdfHtml.includes('사과'));
+  check('보내기 PDF: 고른 크기(120%)로', /\.print-doc \{ zoom: 1\.2; \}/.test(pdfHtml));
   {
     const pp = await ctx.newPage();
     await pp.goto(`${base}/m/index.html#print-test`).catch(() => {});
@@ -1126,6 +1253,41 @@ try {
   check('도구막대: + › 표', (await page.locator('.mk-doc table').count()) === 1);
   check('도구막대: 평소엔 + 하나 (첨부·녹음·표 단추 없음)', (await page.locator('#format-bar [data-action="file"], #format-bar [data-action="record"], #format-bar [data-action="table"]').count()) === 0);
   if (process.env.MK_PDF) await page.pdf({ path: path.join(outDir, 'share-images.pdf'), format: 'A4' });
+  await back();
+  await page.waitForTimeout(300);
+
+  // 표 나누기 · 아래 표와 합치기 (열 수가 같을 때)
+  write('표 나누기.md', '---\nid: 00000000-0000-4000-8000-0000000000df\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 표 나누기\n\n| 이름 | 수량 |\n| --- | --- |\n| 사과 | 1 |\n| 배 | 2 |\n| 감 | 3 |\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000df"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await setMode('edit');
+  await page.locator('.mk-doc td', { hasText: '배' }).tap();
+  await page.waitForTimeout(300);
+  check('표 막대: 두 번째 본문 행이면 "표 나누기" · 아래에 표가 없으면 "아래 표와 합치기" 없음', await page.isVisible('#table-bar [data-table="splitTable"]') && await page.isHidden('#table-bar [data-table="joinTable"]'));
+  await page.tap('#table-bar [data-table="splitTable"]');
+  await page.waitForTimeout(900);
+  const split = read('표 나누기.md');
+  check('표 나누기: 이 행부터 새 표 (머리글 행도 함께)', /\| 이름 \| 수량 \|\n\| -+ \| -+ \|\n\| 사과 \| 1 +\|\n\n+\| 이름 \| 수량 \|\n\| -+ \| -+ \|\n\| 배 +\| 2 +\|\n\| 감 +\| 3 +\|/.test(split), split);
+  await page.locator('.mk-doc td', { hasText: '사과' }).tap();
+  await page.waitForTimeout(300);
+  check('표 막대: 아래에 열 수가 같은 표가 있으면 "아래 표와 합치기"', await page.isVisible('#table-bar [data-table="joinTable"]'));
+  await page.tap('#table-bar [data-table="joinTable"]');
+  await page.waitForTimeout(900);
+  const joined = read('표 나누기.md');
+  check('아래 표와 합치기: 머리글이 같으면 한 번만 · 한 표로', (await page.locator('.mk-doc table').count()) === 1 && /\| 사과 \| 1 +\|\n\| 배 +\| 2 +\|\n\| 감 +\| 3 +\|/.test(joined), joined);
+  // 머리글 없는 표도 있으니 첫 행을 따로 꾸미지 않는다 (원하면 "첫 행 강조")
+  const thWeight = await page.locator('.mk-doc th').first().evaluate((e) => getComputedStyle(e).fontWeight);
+  check('표 첫 행: 다른 행과 같은 글자 굵기', Number(thWeight) < 600, thWeight);
+  // 표 → 목록
+  await page.locator('.mk-doc td', { hasText: '배' }).tap();
+  await page.waitForTimeout(300);
+  await page.tap('#table-bar [data-table="toList"]');
+  await page.waitForTimeout(900);
+  const listed = read('표 나누기.md');
+  check('표 → 목록: 행마다 한 항목 (칸은 · 로 이음)', (await page.locator('.mk-doc table').count()) === 0
+    && /- 이름 · 수량\n- 사과 · 1\n- 배 · 2\n- 감 · 3/.test(listed), listed);
   await back();
   await page.waitForTimeout(300);
 

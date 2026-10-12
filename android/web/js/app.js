@@ -49,7 +49,22 @@ app.api = {
   reminders: {
     set: async (memoId, next) => app.setReminders(memoId ?? note.currentId(), next),
     all: async () => app.vault?.allReminders() ?? [],
+    // 일정 탭 달력에서 바로 만들기 (PC 의 reminders:add 와 같음): 고른 메모, 없으면 일정 이름으로 새 메모
+    add: async (memoId, reminder, newTitle) => {
+      if (!app.vault) return null;
+      let id = memoId;
+      if (!id) {
+        const title = String(newTitle ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || '새 일정';
+        id = app.vault.import({ body: `# ${title}\n` });
+      }
+      const memo = id ? app.vault.get(id) : null;
+      if (!memo) throw new Error('메모를 찾지 못했어요');
+      app.setReminders(id, [...(memo.reminders ?? []), reminder]);
+      list.refresh();
+      return id;
+    },
   },
+  memos: { search: async (query) => app.vault?.search(String(query ?? '')) ?? [] },
   memo: { open: (id) => app.openMemo(id) },
   copyText: async (text) => {
     native.copyText(text);
@@ -327,7 +342,7 @@ app.memoMenu = (id) => {
 
 swatches.addEventListener('click', (e) => {
   const s = e.target.closest('[data-color]');
-  if (!s || !menuFor) return;
+  if (!s || !swatches.contains(s) || !menuFor) return; // 칩 사이 빈 곳을 눌러 바깥의 [data-color] 를 잡지 않게
   note.flush();
   if (!app.vault.setMeta(menuFor, { color: s.dataset.color })) {
     toast('색을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
@@ -370,8 +385,7 @@ memoSheet.addEventListener('click', async (e) => {
       break;
     case 'print':
       closeSheet(memoSheet);
-      note.flush();
-      call('print', { title }).catch((err) => toast(err.message, true));
+      openPrint(id, 'print');
       break;
     case 'delete':
       closeSheet(memoSheet);
@@ -521,10 +535,16 @@ shareSheet.addEventListener('click', async (e) => {
     call('share', { title, text: shareText(body) }).catch((err) => toast(err.message, true));
     return;
   }
-  // 그림·PDF 는 메모 화면에 그려진 모습으로 만든다 (닫혀 있으면 연다)
+  // PDF 는 먼저 종이에 담을 내용 크기를 고른다 (미리보기와 함께)
+  if (kind === 'pdf') {
+    closeSheet(shareSheet);
+    openPrint(id, 'share');
+    return;
+  }
+  // 그림은 메모 화면에 그려진 모습으로 만든다 (닫혀 있으면 연다)
   for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = true;
   $('share-busy').hidden = false;
-  $('share-busy-text').textContent = kind === 'image' ? '이미지를 만드는 중…' : 'PDF를 만드는 중…';
+  $('share-busy-text').textContent = '이미지를 만드는 중…';
   try {
     if (note.currentId() !== id) {
       closeSheet(shareSheet);
@@ -533,14 +553,8 @@ shareSheet.addEventListener('click', async (e) => {
     }
     note.flush();
     await note.settled();
-    if (kind === 'image') {
-      const base64 = await renderMemoImage(note.getEditor(), { color: app.vault.get(id)?.color });
-      await call('shareFile', { base64, name: fileName(title, 'png'), mime: 'image/png', title });
-    } else {
-      // 앱이 PDF 를 바로 만들지 못하면 스스로 인쇄 화면("PDF로 저장")을 연다. 그래도 답이 없으면 계속 기다리지 않는다
-      const html = printHtml(note.getEditor().dom(), { title, color: app.vault.get(id)?.color });
-      await withTimeout(call('sharePdf', { title, name: fileName(title, 'pdf'), html }), PDF_WAIT_MS, 'PDF를 만들지 못했어요. 잠시 뒤 다시 해 주세요');
-    }
+    const base64 = await renderMemoImage(note.getEditor(), { color: app.vault.get(id)?.color });
+    await call('shareFile', { base64, name: fileName(title, 'png'), mime: 'image/png', title });
     closeSheet(shareSheet);
   } catch (err) {
     console.error(err);
@@ -548,6 +562,93 @@ shareSheet.addEventListener('click', async (e) => {
   } finally {
     $('share-busy').hidden = true;
     for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = false;
+  }
+});
+
+// ---------- PDF · 인쇄: 종이에 담을 내용 크기 ----------
+//   크기를 고르면 첫 쪽 미리보기가 바로 바뀐다. 고른 크기는 다음에도 (이 휴대폰에만)
+const printSheet = $('print-sheet');
+const SCALE_KEY = 'memoking.printScale';
+const printJob = { id: null, mode: 'share', scale: 1 };
+try {
+  printJob.scale = Math.min(2, Math.max(0.5, Number(localStorage.getItem(SCALE_KEY)) || 1));
+} catch {
+  // 기본 크기
+}
+
+function printTitle(id) {
+  return titleOf(note.currentId() === id ? note.editorMarkdown() : app.vault.get(id)?.body ?? '');
+}
+function printDoc(id, preview = false) {
+  return printHtml(note.getEditor().dom(), { title: printTitle(id), color: app.vault.get(id)?.color, scale: printJob.scale, preview });
+}
+let previewTimer = 0;
+function drawPrintSize() {
+  const pct = Math.round(printJob.scale * 100);
+  $('print-scale').value = String(pct);
+  $('print-scale-out').textContent = `${pct}%`;
+  for (const b of printSheet.querySelectorAll('[data-scale]')) b.setAttribute('aria-checked', String(Math.abs(Number(b.dataset.scale) - printJob.scale) < 0.001));
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    if (!printJob.id || printSheet.hidden) return;
+    $('print-frame').srcdoc = printDoc(printJob.id, true);
+  }, 120);
+}
+function fitPreview() {
+  const box = $('print-preview');
+  box.style.setProperty('--fit', String(box.clientWidth / 794));
+}
+async function openPrint(id, mode) {
+  if (note.currentId() !== id) await app.openMemo(id);
+  note.flush();
+  await note.settled();
+  printJob.id = id;
+  printJob.mode = mode;
+  $('print-sheet-title').textContent = mode === 'print' ? '인쇄할 크기' : 'PDF에 담을 크기';
+  $('print-go').textContent = mode === 'print' ? '인쇄' : 'PDF로 공유';
+  $('print-go').disabled = false;
+  $('print-busy').hidden = true;
+  openSheet(printSheet);
+  fitPreview();
+  drawPrintSize();
+}
+function setPrintScale(v) {
+  printJob.scale = Math.min(2, Math.max(0.5, v));
+  try {
+    localStorage.setItem(SCALE_KEY, String(printJob.scale));
+  } catch {
+    // 이번만
+  }
+  drawPrintSize();
+}
+printSheet.querySelector('#print-size-seg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-scale]');
+  if (b) setPrintScale(Number(b.dataset.scale));
+});
+$('print-scale').addEventListener('input', (e) => setPrintScale(Number(e.target.value) / 100));
+window.addEventListener('resize', () => !printSheet.hidden && fitPreview());
+$('print-go').addEventListener('click', async () => {
+  const id = printJob.id;
+  if (!id) return;
+  const title = printTitle(id);
+  const html = printDoc(id);
+  if (printJob.mode === 'print') {
+    closeSheet(printSheet);
+    call('print', { title, html }).catch((err) => toast(err.message, true));
+    return;
+  }
+  $('print-go').disabled = true;
+  $('print-busy').hidden = false;
+  try {
+    // 앱이 PDF 를 바로 만들지 못하면 스스로 인쇄 화면("PDF로 저장")을 연다. 그래도 답이 없으면 계속 기다리지 않는다
+    await withTimeout(call('sharePdf', { title, name: fileName(title, 'pdf'), html }), PDF_WAIT_MS, 'PDF를 만들지 못했어요. 잠시 뒤 다시 해 주세요');
+    closeSheet(printSheet);
+  } catch (err) {
+    console.error(err);
+    toast(err.message || 'PDF를 만들지 못했어요', true);
+  } finally {
+    $('print-go').disabled = false;
+    $('print-busy').hidden = true;
   }
 });
 

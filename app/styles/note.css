@@ -69,6 +69,11 @@ body, .note-screen, .share-paper {
   right: 6px;
   z-index: 20;
   width: 220px;
+  /* 메모 창이 작아도 항목이 잘리지 않게: 창 아래 끝까지만, 넘치면 메뉴 안에서 스크롤 */
+  max-height: calc(100vh - 38px - var(--tabs-h, 0px) - 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -534,8 +539,12 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 
 .palette { width: 188px; }
 .palette-title { padding: 2px 4px 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
-.palette-swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 0 2px 6px; }
+.palette-swatches { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; padding: 0 2px 6px; }
 .palette-swatch {
+  /* 칸 폭에 꼭 맞게 (단추 기본 안쪽 여백 때문에 마지막 칩이 판 밖으로 넘치던 문제) */
+  width: 100%;
+  min-width: 0;
+  padding: 0;
   aspect-ratio: 1;
   border: 2px solid transparent;
   border-radius: 7px;
@@ -573,6 +582,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 }
 
 .reminder-list { margin: 0; padding: 0; list-style: none; }
+.reminder-panel.creating .reminder-list:empty { display: none; } /* 만드는 동안은 "아직 알림이 없어요" 숨김 */
 .reminder-list:empty::after { content: "아직 알림이 없어요"; display: block; padding: 6px 2px 2px; font-size: 12px; color: var(--muted); }
 .rem-item { display: flex; align-items: center; gap: 8px; padding: 7px 4px; border-radius: 8px; }
 @media (hover: hover) and (pointer: fine) { .rem-item:hover { background: var(--hover); } }
@@ -594,7 +604,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .rem-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
 .rem-inline { display: inline-flex; gap: 6px; align-items: center; }
 .reminder-form input[type="number"] { width: 58px; }
-.reminder-form input, .reminder-form select {
+.reminder-form input:not(.switch):not([type="radio"]), .reminder-form select { /* 스위치는 base.css 모양 그대로 */
   height: 30px;
   padding: 0 6px;
   border: 1px solid var(--border);
@@ -621,6 +631,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .rem-action { margin-bottom: 10px; padding-top: 6px; border-top: 1px dashed var(--border); }
 .rem-submit { width: 100%; }
 
+
 /* 날짜·시각 고르기 (date-picker.js) — 다이얼 대신 달력 한 장 + 시각 칩 */
 .date-picker { margin-top: 2px; }
 .dp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
@@ -641,8 +652,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .dp-day[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; box-shadow: none; }
 .dp-day:disabled { color: var(--text-faint); opacity: 0.45; cursor: default; }
 @media (hover: hover) and (pointer: fine) { .dp-day:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--hover); } }
-.dp-quick { flex-wrap: nowrap; margin-bottom: 6px; overflow-x: auto; scrollbar-width: none; }
-.dp-quick button { flex: none; }
+.dp-quick { flex-wrap: wrap; margin-bottom: 6px; } /* 잘려 보이지 않게 줄을 바꿔 다 보인다 */
 .dp-time { display: flex; gap: 6px; }
 .dp-time select { flex: 1; }
 .dp-summary { margin: 8px 0 0; font-size: 13px; font-weight: 700; }
@@ -798,9 +808,10 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
   vertical-align: top;
   text-align: left;
 }
-.mk-doc th { font-weight: 700; }
-/* 머리글 행 바탕은 표 막대의 "머리글 강조"를 켰을 때만 (v0.17.2) */
-.mk-doc .mk-head-accent th { background: var(--note-hover); }
+/* 첫 행은 다른 행과 같은 모양 (머리글이 없는 표도 많다 — 마크다운 표의 첫 행은 늘 "머리글" 로 저장될 뿐).
+   머리글처럼 보이게 하려면 표 막대의 "머리글 강조"를 켠다 (그때만 굵게 · 바탕) */
+.mk-doc th { font-weight: inherit; }
+.mk-doc .mk-head-accent th { font-weight: 700; background: var(--note-hover); }
 .mk-doc th > p, .mk-doc td > p { margin: 0; }
 /* 여러 칸을 고르면 (드래그) 칸마다 옅은 노랑 */
 .mk-doc .selectedCell::after {
@@ -1721,6 +1732,6 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 /* 일정과 알림 패널: 이름 · 하루 종일 · 미리 알림 (reminder-panel.js) */
 .rem-title-row input { flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-0); color: var(--text); font: inherit; }
 .rem-allday-row { justify-content: space-between; }
-.rem-alerts-label { margin: 8px 0 6px; font-size: 12.5px; font-weight: 600; }
-.rem-alerts-label small { font-weight: 400; color: var(--muted); }
 .rem-alerts button[aria-pressed="true"]::before { content: '✓ '; }
+
+.reminder-panel { --flow-bg: var(--surface-2); }

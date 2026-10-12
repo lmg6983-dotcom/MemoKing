@@ -30,7 +30,10 @@ body {
 .op-link { border: 0; padding: 0 2px; background: none; color: var(--op-accent); font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .op-link:hover { text-decoration: underline; }
 
-.op-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.op-head { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.op-head-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.op-actions { flex: none; display: flex; gap: 6px; }
+.op-memo { min-width: 132px; } /* "✓ 메모로 만들었어요" 로 바뀌어도 자리가 흔들리지 않게 */
 .op-refs { display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; font-size: 18px; }
 .op-refs b { font-weight: 800; }
 .op-refs span { color: var(--muted); }
@@ -87,3 +90,30 @@ body {
 .op-status.ok { color: var(--ok-text); font-weight: 700; }
 .op-status.err { color: var(--err-text); font-weight: 700; }
 @media (max-width: 720px) { .op-info { grid-template-columns: 1fr; } }
+
+/* 날짜 칸은 줄바꿈 없이 */
+.op-table td.date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* 진행사항 타임라인 (opms-view.js progressTimeline): 왼쪽 날짜, 세로 줄 위의 점, 오른쪽 서류 */
+.op-timeline { margin: 0; padding: 0; list-style: none; }
+.op-tl { position: relative; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 14px; padding: 10px 2px 12px; }
+.op-tl + .op-tl { border-top: 1px solid var(--line); }
+.op-tl-date { padding-top: 1px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.op-tl-body { position: relative; min-width: 0; padding-left: 16px; }
+.op-tl-body::before { content: ""; position: absolute; left: 0; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--op-accent); }
+.op-tl.sent .op-tl-body::before { background: var(--brand-yellow); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.op-tl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.op-tl-kind { padding: 1px 7px; border-radius: 99px; background: color-mix(in srgb, var(--op-accent) 12%, transparent); color: var(--op-accent); font-size: 11.5px; font-weight: 800; }
+.op-tl.sent .op-tl-kind { background: color-mix(in srgb, var(--brand-yellow) 40%, transparent); color: var(--text); }
+.op-tl-title { font-size: 14px; }
+.op-tl-due { margin-left: auto; padding: 1px 8px; border-radius: 99px; background: var(--surface-0); color: var(--text); font-size: 12px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.op-tl-due.soon { background: color-mix(in srgb, var(--err-text) 14%, transparent); color: var(--err-text); }
+.op-tl-due.past { color: var(--muted); text-decoration: line-through; }
+.op-tl-memo { margin: 4px 0 0; line-height: 1.5; overflow-wrap: anywhere; }
+.op-tl-meta { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.op-tl-v { color: var(--text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* 전자포대: 요약은 넓게 줄바꿈, 열기 단추 칸은 좁게 */
+.op-table td.wide { min-width: 180px; max-width: 360px; white-space: normal; overflow-wrap: anywhere; }
+.op-table td.act { width: 1%; white-space: nowrap; text-align: right; }
+.op-open-file:disabled { opacity: 0.6; cursor: default; }

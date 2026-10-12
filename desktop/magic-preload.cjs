@@ -12,4 +12,5 @@ contextBridge.exposeInMainWorld('magic', {
   resize: (height) => ipcRenderer.send('magic:resize', height),
   close: () => ipcRenderer.send('magic:close'),
   onShow: (cb) => ipcRenderer.on('magic:show', () => cb()),
+  onModules: (cb) => ipcRenderer.on('magic:modules-changed', (_e, list) => cb(list)), // 설정에서 기능을 끄고 켜면
 });

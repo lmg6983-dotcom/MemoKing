@@ -1,7 +1,8 @@
 // 일정 추가·고치기 창 (PC·휴대폰 같음) — 구글 캘린더처럼: 일정 이름과 때를 보여 주고, "언제 미리 알릴지"는 사용자가 고른다.
 //   미리 알림은 여러 개 (정시 · 10분 전 · 30분 전 · 1시간 전 · 하루 전 · 일주일 전 / 하루 종일이면 당일·전날·일주일 전 오전 9시)
 //   아무것도 고르지 않으면 "알림 없음" — 달력에만 보인다. 고른 알림은 다음 일정의 기본값으로 기억한다.
-import { ALERT_PRESETS, DEFAULT_ALERTS, alertLabel, pendingAlerts, fallbackAlert } from './core/reminders.js';
+import { DEFAULT_ALERTS, MAX_ALERTS, alertLabel, pendingAlerts, fallbackAlert, validAlert } from './core/reminders.js';
+import { alertPicker } from './alert-picker.js';
 import { koClock, dayLabel } from './core/time.js';
 
 const KEY = 'memoking.eventAlerts';
@@ -9,7 +10,7 @@ const KEY = 'memoking.eventAlerts';
 export function remembered(kind) {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? '{}')[kind];
-    if (Array.isArray(v)) return v.filter((x) => ALERT_PRESETS[kind].includes(x));
+    if (Array.isArray(v)) return v.filter((x) => validAlert(x, kind === 'allDay')).slice(0, MAX_ALERTS); // 직접 정한 시각도 기억
   } catch {
     // 기본값
   }
@@ -72,38 +73,31 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
     actions.append(cancel, save);
 
     form.append(el('h2', { id: 'event-title-h' }, heading), nameWrap, when);
-    if (repeatLabel) form.append(el('p', { class: 'event-repeat' }, `🔁 ${repeatLabel}`));
+    if (repeatLabel) form.append(el('p', { class: 'event-repeat' }, `반복: ${repeatLabel}`));
     else form.append(allDayRow);
     form.append(alertsLabel, chips, none, actions);
     dialog.append(form);
 
     const kind = () => (isAllDay ? 'allDay' : 'timed');
     const startAt = () => (isAllDay ? dayStart : timed);
+    const alertBox = alertPicker(chips, {
+      picked,
+      kind,
+      start: startAt,
+      repeat: () => Boolean(repeatLabel),
+      onChange: () => render(),
+      onLimit: (text) => (none.textContent = text),
+    });
     function render() {
-      when.textContent = `📅 ${eventWhen(startAt(), isAllDay)}`;
+      when.textContent = eventWhen(startAt(), isAllDay);
       const set = picked[kind()];
-      const live = new Set(pendingAlerts(ALERT_PRESETS[kind()], startAt(), { repeat: Boolean(repeatLabel), allDay: isAllDay }));
-      chips.replaceChildren(...ALERT_PRESETS[kind()].map((offset) => {
-        const b = el('button', { type: 'button', 'data-alert': String(offset) }, alertLabel(offset, isAllDay));
-        const past = !live.has(offset);
-        b.setAttribute('aria-pressed', String(set.has(offset) && !past));
-        if (past) {
-          b.disabled = true;
-          b.title = '이미 지난 시각이에요';
-        }
-        b.addEventListener('click', () => {
-          if (set.has(offset)) set.delete(offset);
-          else set.add(offset);
-          render();
-        });
-        return b;
-      }));
       const active = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), allDay: isAllDay });
       const fb = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay), allDay: isAllDay });
       none.textContent = active.length ? '' : fb.length ? `고른 알림 시각이 지나 ${alertLabel(fb[0], isAllDay)}에 알려요` : '알림 없이 달력에만 보여요';
     }
     allDaySwitch.addEventListener('change', () => {
       isAllDay = allDaySwitch.checked;
+      alertBox.render();
       render();
     });
 

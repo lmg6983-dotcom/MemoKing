@@ -1,6 +1,8 @@
 import { haptic } from './dom.js';
 // 지우기 단추 (×) — 꾹 눌렀다 그 자리에 놓은 것의 오른쪽 위에 잠깐 (block-move.js 내용 줄·목록 전체 · list-drag.js 목록 항목 함께)
 //   흰 동그라미에 빨간 ×. 한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
+//   PC(마우스): 그림·손 메모·소리·파일·링크 카드에 마우스를 올려도 뜬다 (hover — 시간으로 사라지지 않고, 마우스가 떠나면 거둔다.
+//   빨갛게 비치는 표시는 × 위에 올렸을 때만)
 //   누르면: 대상이 붉게 비쳤다가 작아지며 흐려지고, 그 자리가 접히며 아래 줄들이 부드럽게 올라온 뒤 지운다.
 export const DELETE_SHOW_MS = 2500;
 const FADE_MS = 200; // 작아지며 흐려지기
@@ -8,28 +10,45 @@ const COLLAPSE_MS = 200; // 그 자리 접기
 
 let current = null;
 
+/** 대상을 담고 스크롤되는 상자 (없으면 null = 창) */
+function scrollParent(el) {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const oy = getComputedStyle(p).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p;
+  }
+  return null;
+}
+
 /**
  * @param {import('prosemirror-view').EditorView} view
  * @param {{ pos: number, node: import('prosemirror-model').Node, target: Element, label?: string,
  *           deco: (spec: { cls: string, style?: string } | null) => void, markTarget?: boolean,
- *           remove?: (view, pos: number, node) => void }} opts
+ *           remove?: (view, pos: number, node) => void, hover?: { enter: () => void, leave: () => void } }} opts
  *   pos·node: 지울 노드 · target: 단추를 붙일 상자 (사진·소리면 그 상자, 아니면 그 줄)
  *   deco: 지울 노드에 표시(데코레이션)를 달고 떼기 — 편집기가 그리는 줄은 class 를 직접 바꾸면 되돌려지므로
  *   markTarget: 대상 표시를 target 의 class 로 (사진·소리처럼 편집기가 다시 그리지 않는 상자)
  *   remove: 지우기 (기본은 그 노드를 지움)
  */
-export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', deco, markTarget = false, remove }) {
+export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', deco, markTarget = false, remove, hover = null }) {
   hideDeleteButton(true);
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'mk-delete-btn';
+  btn.className = `mk-delete-btn${hover ? ' hover' : ''}`;
+  btn.title = label;
   btn.setAttribute('aria-label', label);
   btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6"/></svg>';
   document.body.append(btn);
+  // 단추는 화면에 고정(position: fixed)이라, 큰 그림을 스크롤하면 위 막대에 올라탈 수 있다 →
+  //   편집기에서 보이는 칸 안으로만: 대상의 위가 가려지면 보이는 부분의 위에 붙고, 대상이 다 가려지면 숨는다
+  const scroller = scrollParent(target);
   const place = () => {
     const r = target.getBoundingClientRect();
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    const top = Math.max(r.top - 9, box.top + 4);
+    const visible = r.bottom - 12 > box.top + 4 && r.top < box.bottom - 12 && top + 24 <= Math.min(r.bottom + 9, box.bottom);
+    btn.style.visibility = visible ? '' : 'hidden';
     btn.style.left = `${Math.round(Math.min(window.innerWidth - 32, r.right - 22))}px`;
-    btn.style.top = `${Math.round(Math.max(4, r.top - 9))}px`;
+    btn.style.top = `${Math.round(top)}px`;
   };
   place();
   const setMark = (on) => {
@@ -37,8 +56,18 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     else if (on) deco({ cls: 'mk-delete-target' });
     else setTimeout(() => !view.isDestroyed && deco(null), 0); // 편집기 갱신 중일 수 있어 한 박자 뒤에
   };
-  setMark(true);
-  const del = { view, btn, pos, node, state: view.state, place, setMark };
+  if (!hover) setMark(true);
+  const del = { view, btn, pos, node, target, state: view.state, place, setMark: hover ? (on) => !on && setMark(false) : setMark };
+  if (hover) {
+    btn.addEventListener('mouseenter', () => {
+      hover.enter();
+      setMark(true);
+    });
+    btn.addEventListener('mouseleave', () => {
+      setMark(false);
+      hover.leave();
+    });
+  }
   current = del;
   const press = (e) => {
     e.preventDefault();
@@ -70,8 +99,11 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   btn.addEventListener('mousedown', press);
   btn.addEventListener('touchstart', press, { passive: false });
   window.addEventListener('scroll', place, true);
-  del.timer = setTimeout(() => hideDeleteButton(), DELETE_SHOW_MS);
+  if (!hover) del.timer = setTimeout(() => hideDeleteButton(), DELETE_SHOW_MS);
 }
+
+/** 지금 이 상자에 지우기 단추가 떠 있는가 */
+export const deleteShownFor = (target) => Boolean(current && current.target === target);
 
 export function hideDeleteButton(now = false) {
   const del = current;

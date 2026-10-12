@@ -30,6 +30,7 @@ const isOn = (id) => modules.some((m) => m.id === id && m.on);
 
 // ---------- 아래 캡슐: 기능 켜고 끄기 ----------
 function renderModules() {
+  modulesEl.hidden = modules.length === 0; // 설정에서 모두 꺼 두면 캡슐 줄도 없음
   modulesEl.replaceChildren(...modules.map((m) => {
     const chip = document.createElement('button');
     chip.type = 'button';
@@ -53,8 +54,10 @@ function renderModules() {
 
 function updatePlaceholder() {
   const memo = isOn('memo');
-  const find = isOn('notes') || isOn('files') || isOn('opms');
-  input.placeholder = memo && find ? '메모를 쓰거나, 메모와 파일을 찾아요' : memo ? '메모를 쓰고 Enter' : find ? '메모와 파일 찾기' : '아래에서 기능을 켜 주세요';
+  // 찾는 것: 켜진 기능만 이름에 (파일 검색을 껐으면 "파일" 이라고 하지 않게)
+  const what = [isOn('notes') && '메모', isOn('files') && '파일', isOn('opms') && 'OPMS'].filter(Boolean).join('·');
+  input.placeholder = memo && what ? `메모를 쓰거나, ${what} 찾기` : memo ? '메모를 쓰고 Enter' : what ? `${what} 찾기`
+    : modules.length ? '아래 캡슐을 눌러 기능을 켜 주세요' : '설정 › 매직키에서 기능을 켜 주세요';
 }
 
 // ---------- 결과 ----------
@@ -416,4 +419,10 @@ async function reset() {
   setTimeout(() => input.focus(), 0);
 }
 api.onShow(reset);
+api.onModules?.((list) => {
+  modules = list ?? [];
+  renderModules();
+  updatePlaceholder();
+  search();
+});
 reset();

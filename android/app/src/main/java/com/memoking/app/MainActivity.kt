@@ -614,8 +614,12 @@ class MainActivity : Activity() {
         }
     }
 
-    /** 지금 보이는 메모를 인쇄 화면으로 (안드로이드 인쇄 화면에서 "PDF로 저장") */
-    fun printPage(id: Int, title: String) {
+    /** 메모를 인쇄 화면으로 (안드로이드 인쇄 화면에서 "PDF로 저장"). html 이 있으면 그 인쇄 전용 문서(고른 내용 크기)로, 없으면 지금 화면 그대로 */
+    fun printPage(id: Int, title: String, html: String? = null) {
+        if (html != null) {
+            openPrintDialog(id, title, html)
+            return
+        }
         bridge.resolve(id) {
             val pm = getSystemService(PrintManager::class.java)!!
             pm.print(title, web.createPrintDocumentAdapter(title), null)

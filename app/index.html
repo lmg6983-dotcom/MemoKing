@@ -69,8 +69,6 @@
     <!-- 일정: 모든 메모의 일정을 달력과 목록으로 (list-reminders.js) -->
     <div class="view" id="view-reminders" role="tabpanel" hidden>
       <div id="reminder-groups" class="rows"></div>
-      <p id="reminders-empty" class="empty" hidden>아직 일정이 없어요.
-        메모에 "내일 오후 3시 치과" 처럼 쓰고 밑줄을 누르거나, 메모 창 위쪽의 종 버튼(Ctrl+Shift+A)으로 만들 수 있어요.</p>
     </div>
 
     <!-- 알림 보관함: 알림 센터에서 사라진 Windows 알림 기록 -->
@@ -108,8 +106,11 @@
     <button id="fab" class="fab" title="새 메모" aria-label="새 메모" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-plus"/></svg></button>
   </section>
 
-  <dialog id="settings-dialog" class="dialog">
-    <h2>설정</h2>
+  <dialog id="settings-dialog" class="dialog panel-dialog">
+    <header class="dialog-head">
+      <h2>설정</h2>
+      <button type="button" class="icon-btn dialog-x" data-dialog-close title="닫기 (Esc)" aria-label="설정 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
     <p class="label">메모 폴더</p>
     <div class="path-box" id="vault-path"></div>
     <div class="dialog-actions left">
@@ -217,9 +218,6 @@
     </div>
     <p class="version" id="version"></p>
     <p class="copyright">© 2026 메모킹 | 문의 lmg6983@gmail.com</p>
-    <form method="dialog" class="dialog-actions">
-      <button class="btn primary">닫기</button>
-    </form>
   </dialog>
 
   <!-- 휴지통: 지운 메모 되살리기·영구 삭제 -->
@@ -267,18 +265,21 @@
   </dialog>
 
   <!-- 알림 보관함: 앱마다 모을지 고르기 -->
-  <dialog id="apps-dialog" class="dialog apps-dialog">
-    <h2>알림 모을 앱</h2>
+  <dialog id="apps-dialog" class="dialog apps-dialog panel-dialog">
+    <header class="dialog-head">
+      <h2>알림 모을 앱</h2>
+      <button type="button" class="icon-btn dialog-x" data-dialog-close title="닫기 (Esc)" aria-label="알림 모을 앱 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
     <p class="trash-note">끈 앱의 알림은 보관하지 않아요. 언제든 다시 켤 수 있어요.</p>
     <ul id="apps-list" class="apps-list" aria-label="알림을 보낸 앱"></ul>
     <p id="apps-empty" class="empty" hidden>아직 알림이 온 앱이 없어요.</p>
-    <form method="dialog" class="dialog-actions">
-      <button class="btn primary">닫기</button>
-    </form>
   </dialog>
 
-  <dialog id="trash-dialog" class="dialog trash-dialog">
-    <h2>휴지통</h2>
+  <dialog id="trash-dialog" class="dialog trash-dialog panel-dialog">
+    <header class="dialog-head">
+      <h2>휴지통</h2>
+      <button type="button" class="icon-btn dialog-x" data-dialog-close title="닫기 (Esc)" aria-label="휴지통 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
     <p class="trash-note" id="trash-note"></p>
     <ul id="trash-list" class="trash-list" aria-label="지운 메모"></ul>
     <p id="trash-empty" class="empty trash-empty" hidden>휴지통이 비어 있어요.</p>

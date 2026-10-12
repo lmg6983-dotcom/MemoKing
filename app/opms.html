@@ -14,8 +14,14 @@
       <button type="submit" class="op-btn">찾기</button>
     </form>
     <div id="op-head" class="op-head" hidden>
-      <div class="op-refs"><b id="op-our"></b><span id="op-your"></span><span id="op-badge" class="op-badge" hidden></span></div>
-      <div id="op-sub" class="op-sub"></div>
+      <div class="op-head-text">
+        <div class="op-refs"><b id="op-our"></b><span id="op-your"></span><span id="op-badge" class="op-badge" hidden></span></div>
+        <div id="op-sub" class="op-sub"></div>
+      </div>
+      <!-- 고른 사건에 하는 일: 사건 머리줄 오른쪽 (탭 줄과 섞이지 않게) -->
+      <div class="op-actions">
+        <button type="button" id="op-memo" class="op-btn primary op-memo" title="이 사건의 서지 · 업무배분 · 해외출원을 새 메모로">메모로 만들기</button>
+      </div>
     </div>
   </header>
   <nav id="op-tabs" class="op-tabs" aria-label="보기" hidden>

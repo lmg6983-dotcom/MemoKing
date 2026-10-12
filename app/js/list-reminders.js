@@ -1,8 +1,11 @@
 // 목록 창 "일정" 탭 (PC·휴대폰 같음) — 구글 캘린더처럼: 위에 한 달 달력(일정 있는 날에 점), 아래에 고른 날의 일정과
 // 다가오는 일정. 일정마다 언제 미리 알리는지(30분 전, 하루 전 …)를 함께 보인다. 타이머·앱 열 때 알림은 맨 아래 따로.
+// 고른 날(오늘·앞으로)에는 "＋ 일정 추가" — 이름·시각 → 미리 알림 → 넣을 메모(새 메모 / 있는 메모)로 바로 만든다.
+// 이미 고른 날을 한 번 더 눌러도 같다.
 import { icon } from './icons.js';
 import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, WEEKDAY, startOfDay, addDays, sameDay } from './core/time.js';
+import { openQuickEvent } from './quick-event.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
@@ -16,14 +19,13 @@ export function dayHeading(d, now = new Date()) {
   return rel ? `${rel}, ${koFullDate(d, now)}` : koFullDate(d, now);
 }
 
-export function setupRemindersTab({ api, container, empty, countEl }) {
+export function setupRemindersTab({ api, container, countEl, notify = (text, isError) => isError && window.alert(text) }) {
   let items = []; // [{ memoId, title, color, reminder }]
   let query = '';
   const today = () => dayStart(new Date());
   let month = new Date(today().getFullYear(), today().getMonth(), 1);
   let selected = today();
   let shownToday = today();
-  const emptyHtml = empty.innerHTML; // "아직 일정이 없어요" (찾을 때는 "찾는 일정이 없어요" 로 바꿨다가 되돌림)
 
   async function refresh() {
     items = await api.reminders.all();
@@ -85,7 +87,8 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
 
     const grid = document.createElement('div');
     grid.className = 'cal-grid';
-    grid.setAttribute('role', 'grid');
+    grid.setAttribute('role', 'group');
+    grid.setAttribute('aria-label', `${month.getFullYear()}년 ${month.getMonth() + 1}월`);
     for (const w of WEEKDAY) {
       const h = document.createElement('span');
       h.className = 'cal-wd';
@@ -124,6 +127,7 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
       }
       cell.append(num, dots);
       cell.addEventListener('click', () => {
+        if (sameDay(d, selected) && d >= today()) return quickAdd(d); // 고른 날을 다시 누르면 바로 일정 추가
         selected = d;
         if (d.getMonth() !== month.getMonth()) month = new Date(d.getFullYear(), d.getMonth(), 1);
         render();
@@ -267,9 +271,20 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
     }
     const out = [calendar()];
 
-    // 고른 날
+    // 고른 날 (오늘·앞으로면 바로 일정 추가)
     const dayList = occurrences(selected, addDays(selected, 1));
-    out.push(heading(dayHeading(selected, now), 'ev-day-title'));
+    const dayTitle = heading(dayHeading(selected, now), 'ev-day-title');
+    if (selected >= t) {
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'link-btn ev-add';
+      add.append(icon('plus'), '일정 추가');
+      add.setAttribute('aria-label', `${dayHeading(selected, now)}에 일정 추가`);
+      const day = selected;
+      add.addEventListener('click', () => quickAdd(day));
+      dayTitle.append(add);
+    }
+    out.push(dayTitle);
     if (dayList.length) out.push(...dayList.map(eventRow));
     else {
       const p = document.createElement('p');
@@ -301,16 +316,40 @@ export function setupRemindersTab({ api, container, empty, countEl }) {
     if (active.length) out.push(heading(`타이머와 알림 ${active.length}`), ...active.map(row));
     if (off.length) out.push(heading(`꺼졌거나 끝난 알림 ${off.length}`), ...off.map(row));
 
-    container.replaceChildren(...out);
-    // 찾는 말에 맞는 일정·알림이 하나도 없으면 그렇게 알려 준다
+    // 일정이 하나도 없거나 찾는 일정이 없으면: 달력 아래에 짧은 한 줄로 (따로 큰 칸을 두면 달력이 그만큼 잘린다)
     const searching = Boolean(query.trim());
     const found = items.some(matches);
-    empty.hidden = searching ? found : items.length > 0;
-    if (searching && !found) empty.textContent = '찾는 일정이 없어요.';
-    else if (empty.innerHTML !== emptyHtml) empty.innerHTML = emptyHtml;
+    if (searching ? !found : !items.length) {
+      const hint = document.createElement('p');
+      hint.className = 'ev-hint';
+      hint.textContent = searching ? '찾는 일정이 없어요.' : '날짜를 고르고 "＋ 일정 추가"를 누르거나, 메모에 "내일 오후 3시 치과"처럼 쓰면 일정이 돼요.';
+      out.push(hint);
+    }
+    const top = container.scrollTop; // 다시 그려도 보던 자리 그대로 (1분마다 새로 그릴 때·켜고 끌 때)
+    container.replaceChildren(...out);
+    if (top) container.scrollTop = top;
     // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)
     const live = items.filter((i) => isLive(i.reminder, now)).length;
     countEl.textContent = live ? String(live) : '';
+  }
+
+  let adding = false;
+  async function quickAdd(day) {
+    if (adding || !api.reminders.add) return;
+    adding = true;
+    try {
+      const out = await openQuickEvent({ day, search: (q) => api.memos.search(q) });
+      if (!out) return;
+      await api.reminders.add(out.memoId, out.reminder, out.newTitle);
+      selected = dayStart(day);
+      await refresh();
+      notify(out.memoId ? '메모에 일정을 넣었어요' : `새 메모 "${out.newTitle}"에 일정을 만들었어요`);
+    } catch (err) {
+      console.error(err);
+      notify(err.message || '일정을 만들지 못했어요', true);
+    } finally {
+      adding = false;
+    }
   }
 
   setInterval(render, 60_000); // "다음 알림" · 지난 일정 흐리게 새로 계산
