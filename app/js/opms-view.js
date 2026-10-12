@@ -344,10 +344,10 @@ function openButton(r) {
   b.type = 'button';
   const hint = `${r.name} — 저장 폴더에 받아 두고 열어요 (전에 받은 그 파일이면 그대로)`;
   b.title = hint;
-  // 아래 막대의 상태 글: 받는 중(전체 · 고른 것 받기)이면 그 진행 표시를 덮지 않는다
-  const say = (cls, text) => {
+  // 아래 막대의 상태 글: 그사이 다른 사건 · 다른 탭으로 옮겼거나, 받는 중(전체 · 고른 것 받기)이면 쓰지 않는다
+  const say = (idx, cls, text) => {
     const s = foot.querySelector('.op-status');
-    if (!s || (dl && !dl.done && dl.idx === current.case.idx)) return;
+    if (!s || tab !== 'wrapper' || current?.case.idx !== idx || (dl && !dl.done && dl.idx === idx)) return;
     s.className = `op-status ${cls}`;
     s.textContent = text;
     s.title = '';
@@ -359,10 +359,10 @@ function openButton(r) {
     try {
       const res = await api.openFile({ idx, n: r.n });
       b.title = hint;
-      say(res?.shown ? '' : 'ok', res?.shown ? `${r.name}: ${res.message}` : `✓ ${r.name} 열었어요`);
+      say(idx, res?.shown ? '' : 'ok', res?.shown ? `${r.name}: ${res.message}` : `✓ ${r.name} 열었어요`);
     } catch (err) {
       b.title = `${hint}\n지난번: ${errText(err)}`;
-      say('err', `${r.name}: ${errText(err)}`);
+      say(idx, 'err', `${r.name}: ${errText(err)}`);
     } finally {
       b.textContent = '열기';
       b.disabled = false;

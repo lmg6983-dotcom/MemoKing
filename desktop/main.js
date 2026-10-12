@@ -34,7 +34,7 @@ import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcu
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
 import { FileIndex } from './file-index.js';
-import { Opms, isRunnableFile, looksLikeRef, foreignSummary, caseMemoMarkdown, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
+import { Opms, isOpenableFile, looksLikeRef, foreignSummary, caseMemoMarkdown, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -2052,7 +2052,7 @@ async function magicAct({ action, path: p, id, opms } = {}) {
 // ---------- OPMS (회사 사건 관리) — 매직키 "OPMS 검색" 모듈 + OPMS 창 (opms.js) ----------
 //   서버 주소·전자포대 저장 폴더는 settings.opms { host, wrapperDir } (점검 때는 MEMOKING_OPMS_HOST)
 const opmsSettings = () => ({ host: process.env.MEMOKING_OPMS_HOST || settings.opms?.host || OPMS_HOST, wrapperDir: settings.opms?.wrapperDir || DEFAULT_WRAPPER_DIR });
-const opmsClient = () => new Opms({ host: opmsSettings().host });
+const opmsClient = () => new Opms({ host: opmsSettings().host, filesIndex: path.join(app.getPath('userData'), 'opms-files.json') });
 const opmsCases = new Map(); // 찾아 보여 준 사건 (idx → 줄) — 창이 열 수 있는 것은 이것뿐
 const rememberCases = (rows) => {
   for (const r of rows) if (r.idx) opmsCases.set(String(r.idx), r);
@@ -2671,13 +2671,14 @@ function registerIpc() {
   });
   ipcMain.handle('opms:bills', (_e, idx) => opmsClient().bills(caseOf(idx).idx));
   // 전자포대 목록은 사건마다 잠깐 기억해 둔다 — "열기" 마다 DB 를 다시 묻지 않게 (목록을 새로 보면 갱신)
-  const attachCache = new Map(); // case idx → { at, list }
+  const attachCache = new Map(); // "서버 주소 + 사건 idx" → { at, list } (설정에서 서버를 바꾸면 다른 칸)
   const ATTACH_TTL = 5 * 60_000;
   const attachmentsOf = async (c, { fresh = false } = {}) => {
-    const hit = attachCache.get(c.idx);
+    const key = `${opmsSettings().host}\n${c.idx}`;
+    const hit = attachCache.get(key);
     if (!fresh && hit && Date.now() - hit.at < ATTACH_TTL) return hit.list;
     const list = await opmsClient().attachments(c.idx);
-    attachCache.set(c.idx, { at: Date.now(), list });
+    attachCache.set(key, { at: Date.now(), list });
     if (attachCache.size > 20) attachCache.delete(attachCache.keys().next().value);
     return list;
   };
@@ -2705,10 +2706,10 @@ function registerIpc() {
     const file = await opmsClient().fileFor(c, it, opmsSettings().wrapperDir);
     if (!file) throw new Error('파일 이름이 이상해 열 수 없어요');
     opmsLastDir = path.dirname(file);
-    // 실행 파일 · 바로 가기 등은 실수로 실행되지 않게 열지 않고 폴더에서 그 파일을 보여 준다
-    if (isRunnableFile(file)) {
+    // 서류 · 그림 · 압축 파일이 아니면(실행 파일 · 바로 가기 · 스크립트 등) 실수로 실행되지 않게 열지 않고 폴더에서 보여 준다
+    if (!isOpenableFile(file)) {
       if (!SMOKE) shell.showItemInFolder(file);
-      return { file, shown: true, message: '실행되는 파일이라 열지 않고 폴더에서 보여 줘요' };
+      return { file, shown: true, message: '서류가 아닌 파일이라 열지 않고 폴더에서 보여 줘요' };
     }
     if (SMOKE) return { file };
     const err = await shell.openPath(file);
