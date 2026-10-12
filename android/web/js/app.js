@@ -342,7 +342,7 @@ app.memoMenu = (id) => {
 
 swatches.addEventListener('click', (e) => {
   const s = e.target.closest('[data-color]');
-  if (!s || !menuFor) return;
+  if (!s || !swatches.contains(s) || !menuFor) return; // 칩 사이 빈 곳을 눌러 바깥의 [data-color] 를 잡지 않게
   note.flush();
   if (!app.vault.setMeta(menuFor, { color: s.dataset.color })) {
     toast('색을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);

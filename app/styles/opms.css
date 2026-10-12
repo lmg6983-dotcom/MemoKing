@@ -112,3 +112,8 @@ body {
 .op-tl-memo { margin: 4px 0 0; line-height: 1.5; overflow-wrap: anywhere; }
 .op-tl-meta { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .op-tl-v { color: var(--text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* 전자포대: 요약은 넓게 줄바꿈, 열기 단추 칸은 좁게 */
+.op-table td.wide { min-width: 180px; max-width: 360px; white-space: normal; overflow-wrap: anywhere; }
+.op-table td.act { width: 1%; white-space: nowrap; text-align: right; }
+.op-open-file:disabled { opacity: 0.6; cursor: default; }

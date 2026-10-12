@@ -171,18 +171,49 @@ export function fileSizeLabel(n) {
   return `${v} B`;
 }
 
-/** 전자포대 줄 → 화면에 보일 모양 (원본 경로가 없는 줄은 뺀다). 줄은 최신순, No. 는 오래된 것부터 1 (새 서류가 와도 번호가 그대로) */
+/** "의견서.pdf" + 2 → "의견서 (2).pdf" */
+export function numberedName(name, k) {
+  const m = /^(.*?)(\.[^.]{1,10})?$/.exec(name);
+  return `${m[1]} (${k})${m[2] ?? ''}`;
+}
+
+// 전자포대 줄의 요약 · 등록자 (회사 DB 열 이름이 정해져 있지 않아 흔한 이름 중 먼저 있는 것)
+const SUMMARY_COLUMNS = ['SUMMARY', 'DOC_SUMMARY', 'SUMM', 'DOC_SUMM', 'ABSTRACT', 'DOC_MEMO', 'MEMO', 'REMARK', 'CONTENTS', 'CONTENT'];
+const WRITER_COLUMNS = ['REG_NAME', 'REG_USER_NAME', 'REG_PER', 'REG_PER_NAME', 'USR_NAME', 'USER_NAME', 'WRITER', 'REG_USER', 'REG_ID', 'USR_ID'];
+const pickColumn = (r, names) => {
+  const keys = new Map(Object.keys(r).map((k) => [k.toUpperCase(), k]));
+  for (const n of names) {
+    const v = String(r[keys.get(n)] ?? '').trim();
+    if (keys.has(n) && v && v !== '-') return v.replace(/[\r\n]+/g, ' ');
+  }
+  return '';
+};
+
+/**
+ * 전자포대 줄 → 화면에 보일 모양 (원본 경로가 없는 줄은 뺀다). 줄은 최신순, No. 는 오래된 것부터 1 (새 서류가 와도 번호가 그대로)
+ *   같은 파일 이름이 여럿이면(같은 서식의 통지서 등) 오래된 것은 그대로, 다음 것부터 "이름 (2).pdf" — 저장할 때 덮어쓰거나 건너뛰지 않게
+ */
 export function attachmentItems(rows) {
   const kept = rows.filter((r) => String(r.FILE_NAME_UPLOAD ?? '').trim());
-  return kept
-    .map((r, i) => ({
-      n: kept.length - i,
-      date: cleanDate(r.registered_at || r.REG_DATE),
-      doc: String(r.DOC_NAME || r.DOC_GUBUN || '').trim(),
-      name: safeFilename(String(r.FILE_NAME_ORI || r.FILE_NAME || '').trim(), `attachment_${kept.length - i}.bin`),
-      size: fileSizeLabel(r.FILE_SIZE),
-      upload: String(r.FILE_NAME_UPLOAD).trim(),
-    }));
+  const items = kept.map((r, i) => ({
+    n: kept.length - i,
+    date: cleanDate(r.registered_at || r.REG_DATE),
+    doc: String(r.DOC_NAME || r.DOC_GUBUN || '').trim(),
+    name: safeFilename(String(r.FILE_NAME_ORI || r.FILE_NAME || '').trim(), `attachment_${kept.length - i}.bin`),
+    size: fileSizeLabel(r.FILE_SIZE),
+    summary: pickColumn(r, SUMMARY_COLUMNS),
+    writer: pickColumn(r, WRITER_COLUMNS),
+    upload: String(r.FILE_NAME_UPLOAD).trim(),
+  }));
+  // 이름 겹침: 오래된 것(No. 작은 것)부터 차례로 (대소문자 무시 — Windows 파일 이름처럼)
+  const used = new Set();
+  for (const it of [...items].sort((x, y) => x.n - y.n)) {
+    let name = it.name;
+    for (let k = 2; used.has(name.toLowerCase()); k++) name = numberedName(it.name, k);
+    used.add(name.toLowerCase());
+    it.name = name;
+  }
+  return items;
 }
 
 const dash = (v) => String(v ?? '').trim() || '-';
@@ -477,6 +508,26 @@ export class Opms {
    * 전자포대 받기: baseDir/<관리번호 폴더>/<파일 이름>. 이미 있는 파일은 건너뛴다. all 이면 사건정보.txt 도.
    * @returns {Promise<{ dir: string, saved: number, skipped: number, failed: { name: string, error: string }[] }>}
    */
+  /**
+   * 전자포대 파일 하나를 dir 에 저장 → { file, reused }. 이름은 사건 안에서 겹치지 않게 정해져 있어(attachmentItems)
+   * 같은 이름의 파일이 이미 있으면 전에 받은 그 서류 — 다시 받지 않고 그대로 쓴다
+   */
+  async saveOne(dir, it) {
+    const dest = path.join(dir, safeFilename(it.name, `attachment_${it.n}.bin`));
+    if (path.dirname(dest) !== dir) return null; // 이름에 경로가 섞였으면 건너뛴다 (safeFilename 이 막지만 한 번 더)
+    if (fs.existsSync(dest)) return { file: dest, reused: true };
+    const res = await this.request(this.attachmentUrl(it.upload), { headers: { 'User-Agent': USER_AGENT } });
+    await fs.promises.writeFile(dest, Buffer.from(await res.arrayBuffer()));
+    return { file: dest, reused: false };
+  }
+
+  /** 전자포대 파일 하나를 사건 폴더에 저장(이미 있으면 그대로)하고 그 경로 — "열기" 단추 */
+  async fileFor(c, it, baseDir) {
+    const dir = path.join(baseDir, wrapperFolderName(c));
+    await fs.promises.mkdir(dir, { recursive: true });
+    return (await this.saveOne(dir, it))?.file ?? null;
+  }
+
   async download(c, items, { baseDir, all = false, onProgress = () => {} } = {}) {
     const dir = path.join(baseDir, wrapperFolderName(c));
     await fs.promises.mkdir(dir, { recursive: true });
@@ -485,18 +536,12 @@ export class Opms {
     const failed = [];
     const done = [];
     for (const [i, it] of items.entries()) {
-      const dest = path.join(dir, safeFilename(it.name, `attachment_${it.n}.bin`));
-      if (path.dirname(dest) !== dir) continue; // 이름에 경로가 섞였으면 건너뛴다 (safeFilename 이 막지만 한 번 더)
       onProgress({ i, total: items.length, name: it.name });
-      if (fs.existsSync(dest)) {
-        skipped++;
-        done.push(it);
-        continue;
-      }
       try {
-        const res = await this.request(this.attachmentUrl(it.upload), { headers: { 'User-Agent': USER_AGENT } });
-        await fs.promises.writeFile(dest, Buffer.from(await res.arrayBuffer()));
-        saved++;
+        const r = await this.saveOne(dir, it);
+        if (!r) continue;
+        if (r.reused) skipped++;
+        else saved++;
         done.push(it);
       } catch (err) {
         failed.push({ name: it.name, error: err.message });

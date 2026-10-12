@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('opms', {
   bills: (idx) => ipcRenderer.invoke('opms:bills', idx),
   attachments: (idx) => ipcRenderer.invoke('opms:attachments', idx),
   download: (req) => ipcRenderer.invoke('opms:download', req), // { idx, ns: [번호], all }
+  openFile: (req) => ipcRenderer.invoke('opms:open-file', req), // { idx, n } — 받아 두고 바로 열기
   openFolder: () => ipcRenderer.invoke('opms:open-folder'),
   chooseDir: () => ipcRenderer.invoke('opms:choose-dir'),
   copy: (text) => ipcRenderer.invoke('opms:copy', text),

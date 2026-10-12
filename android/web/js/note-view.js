@@ -694,7 +694,8 @@ function applyPaletteColor(color) {
 
 el.palette.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 선택 유지
 el.palette.addEventListener('click', (e) => {
-  const swatch = e.target.closest('[data-color]');
+  // 색 칩만 (판 밖의 [data-color] — 메모 창 자체의 메모 색 — 을 잡으면 "색 지우기"가 그 색으로 칠해 버린다)
+  const swatch = e.target.closest('.palette-swatch[data-color]');
   if (swatch) applyPaletteColor(swatch.dataset.color);
   else if (e.target.closest('#palette-clear')) applyPaletteColor(null);
 });
@@ -898,6 +899,7 @@ function showTableBar(table) {
   const merge = el.tableBar.querySelector('[data-table="merge"]');
   merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
   merge.disabled = !table.canMerge && !table.merged;
+  el.tableBar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
   // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만
   el.tableBar.querySelector('[data-table="splitTable"]').hidden = !table.canSplit;
   el.tableBar.querySelector('[data-table="joinTable"]').hidden = !table.canJoin;

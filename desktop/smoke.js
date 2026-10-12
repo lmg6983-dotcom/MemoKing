@@ -261,6 +261,12 @@ export async function runSmoke({
     await select2();
     await js(n1.win, `document.querySelector('[data-action="color"]').click()`);
     await until(() => js(n1.win, `!document.getElementById('palette').hidden`), '색판 열림');
+    await capture(n1.win, 'smoke-palette.png');
+    const swatchFit = await js(n1.win, `(() => {
+      const box = document.getElementById('palette').getBoundingClientRect();
+      return [...document.querySelectorAll('#palette .palette-swatch')].every((b) => { const r = b.getBoundingClientRect(); return r.left >= box.left - 0.5 && r.right <= box.right + 0.5; });
+    })()`);
+    check('글자 색 판: 색 칩이 판 밖으로 넘치지 않음', swatchFit);
     await js(n1.win, `document.querySelector('#palette [data-color="#e03131"]').click()`);
     // 판에서 지금 칠해진 색을 다시 고르면 지워지고, 한 번 더 고르면 다시 칠해진다
     const redNow = () => js(n1.win, `[...document.querySelectorAll('.mk-doc span[data-mk-color]')].some((s) => s.textContent.includes('빨강'))`);

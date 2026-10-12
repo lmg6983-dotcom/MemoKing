@@ -539,8 +539,12 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 
 .palette { width: 188px; }
 .palette-title { padding: 2px 4px 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
-.palette-swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 0 2px 6px; }
+.palette-swatches { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; padding: 0 2px 6px; }
 .palette-swatch {
+  /* 칸 폭에 꼭 맞게 (단추 기본 안쪽 여백 때문에 마지막 칩이 판 밖으로 넘치던 문제) */
+  width: 100%;
+  min-width: 0;
+  padding: 0;
   aspect-ratio: 1;
   border: 2px solid transparent;
   border-radius: 7px;
@@ -804,9 +808,10 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
   vertical-align: top;
   text-align: left;
 }
-.mk-doc th { font-weight: 700; }
-/* 머리글 행 바탕은 표 막대의 "머리글 강조"를 켰을 때만 (v0.17.2) */
-.mk-doc .mk-head-accent th { background: var(--note-hover); }
+/* 첫 행은 다른 행과 같은 모양 (머리글이 없는 표도 많다 — 마크다운 표의 첫 행은 늘 "머리글" 로 저장될 뿐).
+   머리글처럼 보이게 하려면 표 막대의 "머리글 강조"를 켠다 (그때만 굵게 · 바탕) */
+.mk-doc th { font-weight: inherit; }
+.mk-doc .mk-head-accent th { font-weight: 700; background: var(--note-hover); }
 .mk-doc th > p, .mk-doc td > p { margin: 0; }
 /* 여러 칸을 고르면 (드래그) 칸마다 옅은 노랑 */
 .mk-doc .selectedCell::after {

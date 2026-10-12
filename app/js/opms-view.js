@@ -338,6 +338,33 @@ function infoGrid(c) {
 
 // ---------- 전자포대 ----------
 
+// 한 파일 바로 열기: 저장 폴더(사건 폴더)에 받아 두고 기본 앱으로 (이미 받은 파일은 그대로 연다)
+function openButton(r) {
+  const b = el('button', 'op-link op-open-file', '열기');
+  b.type = 'button';
+  b.title = `${r.name} — 저장 폴더에 받아 두고 열어요 (이미 있으면 그대로)`;
+  b.addEventListener('click', async () => {
+    const idx = current.case.idx;
+    b.disabled = true;
+    b.textContent = '여는 중…';
+    try {
+      await api.openFile({ idx, n: r.n });
+      b.textContent = '열기';
+    } catch (err) {
+      b.textContent = '열기';
+      b.title = errText(err);
+      const s = foot.querySelector('.op-status');
+      if (s) {
+        s.className = 'op-status err';
+        s.textContent = `${r.name}: ${errText(err)}`;
+      }
+    } finally {
+      b.disabled = false;
+    }
+  });
+  return b;
+}
+
 let attach = [];
 // 받는 중에 다른 탭에 다녀와도 진행 표시가 이어지고, 두 번 겹쳐 받지 않게 — { idx, text, cls, title, done }
 let dl = null;
@@ -362,16 +389,23 @@ async function showWrapper(my) {
     ['No.', (r) => String(r.n), 'num'],
     ['등록일', (r) => r.date],
     ['문서명', (r) => r.doc],
+    ...(attach.some((r) => r.summary) ? [['요약', (r) => r.summary, 'wide']] : []),
+    ...(attach.some((r) => r.writer) ? [['등록자', (r) => r.writer]] : []),
     ['파일명', (r) => r.name],
     ['크기', (r) => r.size, 'num'],
+    ['', (r) => openButton(r), 'act'],
   ], attach, { empty: '받을 수 있는 전자포대 파일이 없어요' });
   all.addEventListener('change', () => {
     for (const b of boxes) b.checked = all.checked;
     sync();
   });
-  // 줄을 눌러도 고르기
+  // 줄을 눌러도 고르기 (열기 단추는 빼고) · 줄을 두 번 누르면 바로 열기
+  t.querySelector('tbody')?.addEventListener('dblclick', (e) => {
+    if (e.target.closest('input, button')) return;
+    e.target.closest('tr')?.querySelector('.op-open-file')?.click();
+  });
   t.querySelector('tbody')?.addEventListener('click', (e) => {
-    if (e.target.closest('input')) return;
+    if (e.target.closest('input, button')) return;
     const b = e.target.closest('tr')?.querySelector('input[type="checkbox"]');
     if (!b) return;
     b.checked = !b.checked;

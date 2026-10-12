@@ -1277,6 +1277,17 @@ try {
   await page.waitForTimeout(900);
   const joined = read('표 나누기.md');
   check('아래 표와 합치기: 머리글이 같으면 한 번만 · 한 표로', (await page.locator('.mk-doc table').count()) === 1 && /\| 사과 \| 1 +\|\n\| 배 +\| 2 +\|\n\| 감 +\| 3 +\|/.test(joined), joined);
+  // 머리글 없는 표도 있으니 첫 행을 따로 꾸미지 않는다 (원하면 "첫 행 강조")
+  const thWeight = await page.locator('.mk-doc th').first().evaluate((e) => getComputedStyle(e).fontWeight);
+  check('표 첫 행: 다른 행과 같은 글자 굵기', Number(thWeight) < 600, thWeight);
+  // 표 → 목록
+  await page.locator('.mk-doc td', { hasText: '배' }).tap();
+  await page.waitForTimeout(300);
+  await page.tap('#table-bar [data-table="toList"]');
+  await page.waitForTimeout(900);
+  const listed = read('표 나누기.md');
+  check('표 → 목록: 행마다 한 항목 (칸은 · 로 이음)', (await page.locator('.mk-doc table').count()) === 0
+    && /- 이름 · 수량\n- 사과 · 1\n- 배 · 2\n- 감 · 3/.test(listed), listed);
   await back();
   await page.waitForTimeout(300);
 

@@ -504,3 +504,46 @@ export function joinNextTable(state, dispatch) {
   dispatch(tr.scrollIntoView());
   return true;
 }
+
+// ---------- 표 → 목록 · 글 ----------
+// 행마다 한 줄: 칸의 글을 " · " 로 이어서 (빈 칸은 건너뜀, 합친 칸 안의 줄바꿈은 띄어쓰기). 첫 행(머리글)도 첫 줄로.
+
+/** 표 한 행 → 한 줄의 글 조각들 (굵게·링크 등 글자 서식은 그대로) */
+function rowInline(row, schema) {
+  const parts = [];
+  row.forEach((cell) => {
+    const inline = [];
+    cell.forEach((block) => block.content.forEach((n) => {
+      const isBreak = n.type.name === 'hardbreak' || n.type.name === 'hard_break' || (n.type.name === 'html' && /^<br\s*\/?>$/i.test(String(n.attrs.value ?? '').trim()));
+      inline.push(isBreak ? schema.text(' ') : n);
+    }));
+    if (!cell.textContent.trim()) return;
+    if (parts.length) parts.push(schema.text(' · '));
+    parts.push(...inline);
+  });
+  return parts;
+}
+
+/**
+ * 커서가 든 표를 점 목록(kind 'list') 또는 글 줄(kind 'text')로 바꾼다 — 행마다 한 줄
+ * @returns {true|string}
+ */
+export function tableToBlocks(state, dispatch, kind) {
+  const t = tableAndRow(state);
+  if (!t) return '표 안에 커서를 두세요';
+  if (!dispatch) return true;
+  const { schema } = state;
+  const lines = [];
+  t.node.forEach((row) => {
+    const inline = rowInline(row, schema);
+    if (inline.length) lines.push(schema.nodes.paragraph.create(null, inline));
+  });
+  if (!lines.length) lines.push(schema.nodes.paragraph.create());
+  const blocks = kind === 'list'
+    ? [schema.nodes.bullet_list.create(null, lines.map((p) => schema.nodes.list_item.create({ listType: 'bullet' }, p)))]
+    : lines;
+  const tr = state.tr.replaceWith(t.pos, t.pos + t.node.nodeSize, blocks);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(t.pos + 1)));
+  dispatch(tr.scrollIntoView());
+  return true;
+}

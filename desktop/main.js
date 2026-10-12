@@ -1412,16 +1412,6 @@ function revealNote(id) {
   return win;
 }
 
-// 포커스는 뺏지 않고 잠깐 맨 위에 띄워 "여기 생겼다" 를 보여 준 뒤 원래대로 (사용자가 켠 항상 위는 유지)
-function peekOnTop(win, id, ms = 2500) {
-  if (win.isDestroyed()) return;
-  win.setAlwaysOnTop(true, 'floating');
-  win.webContents.send('memo:highlight');
-  setTimeout(() => {
-    if (!win.isDestroyed() && settings.onTop[id] !== true) win.setAlwaysOnTop(false);
-  }, ms);
-}
-
 function pushReminders() {
   listWin?.webContents.send('reminders:changed');
   updateTrayMenu();
@@ -2208,15 +2198,20 @@ function captureToMemo(dir, info, point) {
   });
 }
 
-// 가져온 내용(capture)으로 새 메모 창 + Windows 알림 (빠른 메모·영역 캡처가 함께 씀)
+// 가져온 내용(capture)으로 새 메모 + Windows 알림 (빠른 메모 Ctrl+Alt+C · 영역 캡처 C+C 가 함께 씀)
+//   하던 일을 가로막지 않게 메모 창은 바로 띄우지 않는다: 숨긴 창에서 가져온 내용을 채워 저장해 두고,
+//   알림을 누르면 그 메모가 마우스 자리에 뜬다 (매직키로 만든 메모와 같음). 한동안 안 열면 숨긴 창은 닫는다(메모는 남음)
+const UNSEEN_CAPTURE_MS = 3 * 60_000;
 function openCaptureMemo(capture, point, message) {
   const id = vault.create();
   pendingCaptures.set(id, { ...capture, sourceMd: sourceLine(capture.source) });
   settings.noteBounds[id] = boundsAt(id, point); // 마우스가 있는 자리에
-  // Windows 는 다른 앱에서 작업 중일 때 새 창을 맨 앞으로 가져오지 못하게 막으므로,
-  // 포커스는 뺏지 않고 잠깐 맨 위에 보여 주고 + Windows 알림 (누르면 그 메모로 이동)
-  const win = openNote(id, { inactive: true });
-  win?.once('ready-to-show', () => peekOnTop(win, id));
+  const win = createNoteWindow(id, { show: false });
+  const closeUnseen = setTimeout(() => {
+    if (win && !win.isDestroyed() && !win.isVisible()) win.close();
+  }, UNSEEN_CAPTURE_MS);
+  win?.once('show', () => clearTimeout(closeUnseen));
+  win?.once('closed', () => clearTimeout(closeUnseen));
   toast({ memoId: id, kind: 'quick-memo', ...message, onClick: () => revealNote(id) });
   return id;
 }
@@ -2685,6 +2680,20 @@ function registerIpc() {
     if (!SMOKE) shell.openPath(res.dir); // 받은 폴더를 탐색기로 (OPMS 조회 프로그램처럼)
     return res;
   });
+  // 전자포대 한 파일 바로 열기: 저장 폴더(사건 폴더)에 받아 두고(이미 있으면 그대로) 기본 앱으로
+  ipcMain.handle('opms:open-file', async (_e, { idx, n } = {}) => {
+    const c = caseOf(idx);
+    const client = opmsClient();
+    const it = (await client.attachments(c.idx)).find((x) => x.n === Number(n));
+    if (!it) throw new Error('그 파일을 찾지 못했어요. 새로 고침 뒤 다시 해 주세요');
+    const file = await client.fileFor(c, it, opmsSettings().wrapperDir);
+    if (!file) throw new Error('파일 이름이 이상해 열 수 없어요');
+    opmsLastDir = path.dirname(file);
+    if (SMOKE) return file;
+    const err = await shell.openPath(file);
+    if (err) throw new Error(err);
+    return file;
+  });
   ipcMain.handle('opms:open-folder', () => (opmsLastDir ? shell.openPath(opmsLastDir) : ''));
   ipcMain.handle('opms:choose-dir', async (event) => {
     const r = await dialog.showOpenDialog(senderWindow(event), { title: '전자포대를 저장할 폴더', defaultPath: opmsSettings().wrapperDir, properties: ['openDirectory', 'createDirectory'] });
@@ -2759,7 +2768,7 @@ function registerIpc() {
     const id = vault.import({ body });
     if (!id) return { ok: false }; // 잠금 형식 글 등 메모로 만들 수 없는 글
     if (payload.open) openNote(id);
-    else notice('메모를 만들었어요', body.split('\n')[0].slice(0, 40));
+    else toast({ memoId: id, kind: 'magic-memo', title: '메모를 만들었어요', body: `${body.split('\n')[0].slice(0, 40)}\n눌러서 열기`, onClick: () => revealNote(id) }); // 누르면 그 메모가 뜬다
     return { ok: true, id };
   });
   // 표가 넘칠 때: 메모 창을 더 넓게 (요청한 본문 폭이 들어가도록, 화면 안에서). 반환: 실제로 넓힌 본문 폭(px)

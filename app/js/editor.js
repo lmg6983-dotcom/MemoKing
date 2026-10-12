@@ -27,7 +27,7 @@ import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } fr
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { plainTextOf } from './clipboard-text.js';
 import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
-import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable } from './table-extras.js';
+import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable, tableToBlocks } from './table-extras.js';
 import { createListDrag, moveItemBy, currentItem } from './list-drag.js';
 import { createBlockMove, createContentLines, MEDIA_SCRUB, moveBlockBy } from './block-move.js';
 import { createTapList } from './tap-list.js';
@@ -1982,6 +1982,12 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       }
       if (name === 'merge') {
         mergeOrSplit(v);
+        return v.focus();
+      }
+      if (name === 'toList' || name === 'toText') {
+        const result = tableToBlocks(v.state, v.dispatch, name === 'toList' ? 'list' : 'text');
+        if (result !== true) onNotice?.(result, true);
+        else onNotice?.(name === 'toList' ? '표를 목록으로 바꿨어요 (행마다 한 줄, 되돌리기 Ctrl+Z)' : '표를 글로 바꿨어요 (행마다 한 줄, 되돌리기 Ctrl+Z)');
         return v.focus();
       }
       if (name === 'splitTable' || name === 'joinTable') {

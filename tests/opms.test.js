@@ -58,7 +58,7 @@ test('OPMS: 전자포대 폴더·파일 이름', () => {
     { FILE_NAME_UPLOAD: 'up/1.pdf', FILE_NAME_ORI: '출원서.pdf', DOC_NAME: '출원서', registered_at: '2026-01-02 10:00:00', FILE_SIZE: '1048576' },
     { FILE_NAME_UPLOAD: '', FILE_NAME_ORI: '빈 것' },
   ]);
-  assert.deepEqual(items, [{ n: 1, date: '2026-01-02', doc: '출원서', name: '출원서.pdf', size: '1.0 MB', upload: 'up/1.pdf' }]);
+  assert.deepEqual(items, [{ n: 1, date: '2026-01-02', doc: '출원서', name: '출원서.pdf', size: '1.0 MB', summary: '', writer: '', upload: 'up/1.pdf' }]);
   const txt = caseInfoText({ ourref: 'P-1', applicant: '메모킹' }, { files: items, now: new Date(2026, 0, 2, 3, 4, 5) });
   assert.match(txt, /\[OPMS 사건 정보\] P-1 \/ -/);
   assert.match(txt, /출원인\s+: 메모킹/);
@@ -190,4 +190,25 @@ test('OPMS 진행사항: 받은 서류·낸 서류를 한 줄씩 (최신이 위,
   assert.deepEqual(['2026-12-01', '2027-01-10', '2027-06-01', ''].map((d) => dueState(d, now)), ['past', 'soon', 'later', '']);
   const md = caseMemoMarkdown({ ourref: 'P-1' }, { details: { novelty: [], sections: [{ id: 'progress', label: '진행사항', rows: [{ d_noti: '2026-09-16', rec_doc: '의견제출통지서', d_due: '2027-01-16', clerk: '이민균' }] }] } });
   assert.match(md, /## 진행사항\n\n- 2026-09-16 \*\*수신\*\* 의견제출통지서 \(기한 2027-01-16\) — 담당 이민균\n/);
+});
+
+test('OPMS 전자포대: 같은 파일 이름은 오래된 것부터 그대로 · 다음은 "(2)" · 요약 · 등록자', async () => {
+  const items = attachmentItems([
+    { FILE_NAME_UPLOAD: 'u/3', FILE_NAME_ORI: '의견제출통지서.pdf', registered_at: '2026-09-17', SUMMARY: '진보성 없음', REG_NAME: '홍길동' },
+    { FILE_NAME_UPLOAD: 'u/2', FILE_NAME_ORI: '의견제출통지서.PDF', registered_at: '2026-05-01', MEMO: '기재불비' },
+    { FILE_NAME_UPLOAD: 'u/1', FILE_NAME_ORI: '의견제출통지서.pdf', registered_at: '2026-01-02' },
+  ]);
+  assert.deepEqual(items.map((x) => `${x.n}:${x.name}`), ['3:의견제출통지서 (3).pdf', '2:의견제출통지서 (2).PDF', '1:의견제출통지서.pdf']);
+  assert.deepEqual([items[0].summary, items[0].writer, items[1].summary], ['진보성 없음', '홍길동', '기재불비']);
+  // 받기: 이미 있는 이름은 그대로 쓰고, 없는 것만 받는다 · 열기용 한 파일
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-open-'));
+  let fetched = 0;
+  const client = new Opms({ fetch: async () => { fetched++; return new Response('pdf'); }, retries: 0 });
+  const c = { ourref: 'P-1', yourref: '' };
+  const f1 = await client.fileFor(c, items[2], dir);
+  const f2 = await client.fileFor(c, items[2], dir);
+  const f3 = await client.fileFor(c, items[0], dir);
+  assert.equal(f1, f2);
+  assert.equal(path.basename(f3), '의견제출통지서 (3).pdf');
+  assert.equal(fetched, 2);
 });
