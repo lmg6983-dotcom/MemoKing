@@ -927,7 +927,7 @@ const TAB_PLACEHOLDER = { memos: '메모 검색 (Ctrl+F)', reminders: '일정 �
 let activeTab = 'memos';
 
 const remindersTab = setupRemindersTab({
-  api, container: $('reminder-groups'), empty: $('reminders-empty'), countEl: $('count-reminders'),
+  api, container: $('reminder-groups'), countEl: $('count-reminders'),
 });
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockHistoryApp(appId, appName) {

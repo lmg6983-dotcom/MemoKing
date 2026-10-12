@@ -512,7 +512,6 @@ export function setup() {
   remindersTab = setupRemindersTab({
     api: app.api,
     container: $('reminder-groups'),
-    empty: $('reminders-empty'),
     countEl: $('count-reminders'),
     notify: (text, isError) => toast(text, isError),
   });

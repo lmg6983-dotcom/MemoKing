@@ -19,14 +19,13 @@ export function dayHeading(d, now = new Date()) {
   return rel ? `${rel}, ${koFullDate(d, now)}` : koFullDate(d, now);
 }
 
-export function setupRemindersTab({ api, container, empty, countEl, notify = (text, isError) => isError && window.alert(text) }) {
+export function setupRemindersTab({ api, container, countEl, notify = (text, isError) => isError && window.alert(text) }) {
   let items = []; // [{ memoId, title, color, reminder }]
   let query = '';
   const today = () => dayStart(new Date());
   let month = new Date(today().getFullYear(), today().getMonth(), 1);
   let selected = today();
   let shownToday = today();
-  const emptyHtml = empty.innerHTML; // "아직 일정이 없어요" (찾을 때는 "찾는 일정이 없어요" 로 바꿨다가 되돌림)
 
   async function refresh() {
     items = await api.reminders.all();
@@ -317,15 +316,18 @@ export function setupRemindersTab({ api, container, empty, countEl, notify = (te
     if (active.length) out.push(heading(`타이머와 알림 ${active.length}`), ...active.map(row));
     if (off.length) out.push(heading(`꺼졌거나 끝난 알림 ${off.length}`), ...off.map(row));
 
+    // 일정이 하나도 없거나 찾는 일정이 없으면: 달력 아래에 짧은 한 줄로 (따로 큰 칸을 두면 달력이 그만큼 잘린다)
+    const searching = Boolean(query.trim());
+    const found = items.some(matches);
+    if (searching ? !found : !items.length) {
+      const hint = document.createElement('p');
+      hint.className = 'ev-hint';
+      hint.textContent = searching ? '찾는 일정이 없어요.' : '날짜를 고르고 "＋ 일정 추가"를 누르거나, 메모에 "내일 오후 3시 치과"처럼 쓰면 일정이 돼요.';
+      out.push(hint);
+    }
     const top = container.scrollTop; // 다시 그려도 보던 자리 그대로 (1분마다 새로 그릴 때·켜고 끌 때)
     container.replaceChildren(...out);
     if (top) container.scrollTop = top;
-    // 찾는 말에 맞는 일정·알림이 하나도 없으면 그렇게 알려 준다
-    const searching = Boolean(query.trim());
-    const found = items.some(matches);
-    empty.hidden = searching ? found : items.length > 0;
-    if (searching && !found) empty.textContent = '찾는 일정이 없어요.';
-    else if (empty.innerHTML !== emptyHtml) empty.innerHTML = emptyHtml;
     // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)
     const live = items.filter((i) => isLive(i.reminder, now)).length;
     countEl.textContent = live ? String(live) : '';

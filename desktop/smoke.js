@@ -1339,6 +1339,28 @@ export async function runSmoke({
     check('일정 탭: 한 달 달력(오늘 선택) · 매주 월 일정이 날짜별로 점·목록 (미리 알림 표시) · 타이머는 따로',
       tab.days === 42 && tab.today && tab.dots >= 4 && tab.events.some((t) => /09:30|9:30/.test(t) && /알림 10분 전/.test(t)) && /5분 타이머/.test(tab.timer) && tab.count === '2', JSON.stringify(tab));
     await capture(lw, 'smoke-reminders-tab.png');
+    // 창을 줄이거나 넓혀도 달력이 잘리지 않는다 (가장 작은 창 300×380 · 낮고 넓은 창 · 넓은 창은 달력 왼쪽·목록 오른쪽)
+    {
+      const keep = lw.getBounds();
+      const fits = [];
+      for (const [w, h] of [[300, 380], [420, 520], [900, 420], [900, 700]]) {
+        lw.setBounds({ ...keep, width: w, height: h });
+        await wait(250);
+        fits.push(await js(lw, `(() => {
+          const box = document.getElementById('reminder-groups');
+          box.scrollTop = 0;
+          const cal = box.querySelector('.cal').getBoundingClientRect();
+          const view = box.getBoundingClientRect();
+          const list = box.querySelector('.ev-day-title').getBoundingClientRect();
+          return { size: '${w}x${h}', fits: cal.bottom <= view.bottom + 1 && cal.right <= view.right + 1, side: list.left >= cal.right };
+        })()`));
+      }
+      await capture(lw, 'smoke-reminders-wide.png');
+      lw.setBounds(keep);
+      await wait(200);
+      check('일정 탭: 창을 줄여도 달력 한 달이 다 보임 · 넓은 창은 달력 옆에 일정 목록',
+        fits.every((f) => f.fits) && fits.at(-1).side && fits.at(-2).side, JSON.stringify(fits));
+    }
 
     // 14-3) 알림만: 시각이 되면 Windows 알림 (점검 때는 기록만) → 한 번짜리는 "완료"
     const past = (ms) => new Date(Date.now() - ms).toISOString();

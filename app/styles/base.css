@@ -654,6 +654,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .ev-row .ev-time { flex: none; width: 70px; font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .ev-row.off { opacity: 0.55; }
 .ev-none { margin: 2px 6px 10px; font-size: 13px; color: var(--muted); }
+.ev-hint { margin: 4px 6px 12px; font-size: 12.5px; line-height: 1.5; color: var(--muted); } /* 일정이 없을 때 한 줄 안내 (달력 아래) */
 .rows-title.ev-upcoming-title { margin-top: 18px; color: var(--text); font-size: 13px; }
 .rows-title.ev-sub-title { margin-top: 8px; font-weight: 600; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-day[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 18%, transparent); } }
