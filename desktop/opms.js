@@ -160,9 +160,19 @@ export function wrapperFolderName(c, fallback = '') {
   return our || your || folderToken(fallback) || 'wrapper';
 }
 
+// 파일 이름 길이 한도: Windows 는 글자(UTF-16) 255, 그 밖은 바이트 255 — "(No.12-3)" 같은 꼬리가 붙을 자리를 남긴다
+const NAME_MAX = 180;
+const nameSize = (t) => (process.platform === 'win32' ? t.length : Buffer.byteLength(t));
+function capName(name) {
+  if (nameSize(name) <= NAME_MAX) return name;
+  const ext = /\.[A-Za-z0-9]{1,10}$/.exec(name)?.[0] ?? '';
+  const chars = [...name.slice(0, name.length - ext.length)];
+  while (chars.length && nameSize(chars.join('') + ext) > NAME_MAX) chars.pop();
+  return `${chars.join('').trim()}${ext}`;
+}
 export function safeFilename(name, fallback) {
   const clean = String(name ?? '').replace(/[\\/:*?"<>|\r\n]+/g, '_').replace(/^[.\s]+|[.\s]+$/g, '').trim();
-  return clean || fallback;
+  return clean ? capName(clean) : fallback;
 }
 
 // "열기" 로 바로 여는 것은 서류 · 그림 · 압축 파일만. 그 밖의 것(실행 파일 · 바로 가기 · 스크립트 · 모르는 형식)은
@@ -429,11 +439,21 @@ class FileIndex {
     this.dirty = false; // 아직 쓰기 시작하지 않은 바뀜
     this.unsaved = false; // 마지막 쓰기가 실패함 — 다음 save · 끌 때 다시
     this.flushing = null;
-    this.quitSeq = 0; // 남아 있는 .quit 기록의 번호 (평소 기록이 그보다 새로 남으면 지운다)
+    this.quitSeq = 0; // 이번 실행에서 마지막으로 쓴 끌 때 기록의 번호
   }
 
-  get quitFile() {
-    return `${this.file}.quit`;
+  /** 끌 때 기록은 번호마다 다른 파일 — 평소 기록이 옛 끌 때 기록을 지우는 중에 새로 쓴 것을 지우지 않게 */
+  quitFile(seq) {
+    return `${this.file}.quit-${seq}`;
+  }
+
+  async quitFiles() {
+    const base = `${path.basename(this.file)}.quit-`;
+    const names = await fs.promises.readdir(path.dirname(this.file)).catch(() => []);
+    return names
+      .filter((n) => n.startsWith(base) && /^\d+$/.test(n.slice(base.length)))
+      .map((n) => ({ file: path.join(path.dirname(this.file), n), seq: Number(n.slice(base.length)) }))
+      .sort((a, b) => b.seq - a.seq);
   }
 
   load() {
@@ -463,12 +483,15 @@ class FileIndex {
       }
       // 끌 때 남긴 기록이 더 새것이면 그것으로 (그때 쓰던 평소 기록이 뒤늦게 옛 내용으로 끝났을 수 있어서)
       if (this.file) {
-        try {
-          const quit = asObject(JSON.parse(await fs.promises.readFile(this.quitFile, 'utf8')));
-          this.quitSeq = Number(quit['#seq']) || 0;
-          if (this.quitSeq > (Number(this.data['#seq']) || 0)) this.data = quit;
-        } catch {
-          // 없음 · 깨짐 — 평소 기록으로
+        for (const q of await this.quitFiles()) {
+          if (q.seq <= (Number(this.data['#seq']) || 0)) break;
+          try {
+            this.data = asObject(JSON.parse(await fs.promises.readFile(q.file, 'utf8')));
+            this.data['#seq'] = Math.max(Number(this.data['#seq']) || 0, q.seq);
+            break;
+          } catch {
+            // 깨짐 — 그다음 것
+          }
         }
         sweepOld(path.dirname(this.file), (name) => name.startsWith(`${path.basename(this.file)}.`) && name.endsWith('.tmp')); // 끊긴 쓰기가 남긴 임시 파일
       }
@@ -558,11 +581,8 @@ class FileIndex {
       await fs.promises.writeFile(tmp, json, 'utf8');
       await fs.promises.rename(tmp, this.file);
       this.unsaved = false;
-      // 평소 기록이 끌 때 기록보다 새로 남았으면 그 끌 때 기록은 지운다 (나중에 평소 기록을 지우거나 깨져도 옛것이 살아나지 않게)
-      if (this.quitSeq && seq > this.quitSeq) {
-        this.quitSeq = 0;
-        await fs.promises.rm(this.quitFile, { force: true }).catch(() => {});
-      }
+      // 평소 기록보다 옛 끌 때 기록은 지운다 (나중에 평소 기록을 지우거나 깨져도 옛것이 살아나지 않게) — 더 새 번호는 그대로
+      for (const q of await this.quitFiles()) if (q.seq < seq) await fs.promises.rm(q.file, { force: true }).catch(() => {});
       return true;
     } catch {
       this.unsaved = true;
@@ -582,11 +602,11 @@ class FileIndex {
     if (!this.dirty && !this.unsaved && !pendingWrite) return;
     const seq = ++this.seq;
     this.data['#seq'] = seq;
-    const tmp = `${this.quitFile}.${process.pid}.tmp`;
+    const tmp = `${this.file}.${process.pid}-${seq}.quit.tmp`;
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       fs.writeFileSync(tmp, JSON.stringify(this.data), 'utf8');
-      fs.renameSync(tmp, this.quitFile);
+      fs.renameSync(tmp, this.quitFile(seq));
       this.quitSeq = seq;
       this.dirty = false;
       this.unsaved = false;
@@ -614,8 +634,12 @@ const sameBytes = async (file, data) => {
     return false;
   }
 };
-// 없다(ENOENT)고 확실할 때만 비어 있는 이름으로 — 읽지 못하는 것(지우는 중 · 권한 · 깨진 링크)은 있는 것으로 친다
-const exists = (file) => fs.promises.lstat(file).then(() => true, (err) => err.code !== 'ENOENT');
+const exists = (file) => fs.promises.stat(file).then(() => true, () => false);
+// 새 이름 고르기용: 있으면 true, 없다(ENOENT)고 확실하면 false, 그 밖의 오류(이름이 너무 김 · 읽을 수 없음)는 그대로 실패로
+const taken = (file) => fs.promises.lstat(file).then(() => true, (err) => {
+  if (err.code === 'ENOENT') return false;
+  throw err;
+});
 // 파일 받기: 전체 시간이 아니라 "멈춘 시간" 으로 끊는다 (큰 파일이 느리게라도 오면 끝까지 · 아예 멈추면 1분 뒤)
 const DOWNLOAD_IDLE_MS = 60_000;
 // 매크로가 들 수 있는 Office 형식은 Windows 의 "인터넷에서 받은 파일" 표시(Zone.Identifier)를 붙여
@@ -635,7 +659,7 @@ async function placeNew(file, data) {
       await fs.promises.link(part, file);
     } catch (err) {
       if (err.code === 'EEXIST') throw err;
-      if (await exists(file)) throw Object.assign(new Error(`${path.basename(file)} 이(가) 이미 있어요`), { code: 'EEXIST' });
+      if (await taken(file)) throw Object.assign(new Error(`${path.basename(file)} 이(가) 이미 있어요`), { code: 'EEXIST' });
       await fs.promises.rename(part, file);
     }
   } finally {
@@ -861,8 +885,9 @@ export class Opms {
       let raced = -1;
       for (let k = 0; !file; k++) {
         const cand = path.join(dir, k === 0 ? base : numberedName(base, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
+        if (k > 200) throw new Error(`${base}: 저장할 이름을 정하지 못했어요`);
         if (claimed.has(path.basename(cand).toLowerCase())) continue;
-        if (!await exists(cand)) {
+        if (!await taken(cand)) {
           try {
             await placeNew(cand, data);
             file = cand;

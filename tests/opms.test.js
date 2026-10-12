@@ -375,7 +375,8 @@ test('OPMS 전자포대 기록: 바로 기록 · 앱을 끌 때는 따로(.quit)
   const inFlight = client.files.save();
   client.files.flushSync();
   await inFlight;
-  const quit = JSON.parse(fs.readFileSync(`${index}.quit`, 'utf8'));
+  const quitName = fs.readdirSync(dir).find((f) => f.startsWith('opms-files.json.quit-'));
+  const quit = JSON.parse(fs.readFileSync(path.join(dir, quitName), 'utf8'));
   assert.ok(quit['#seq'] > JSON.parse(fs.readFileSync(index, 'utf8'))['#seq']);
   fs.writeFileSync(path.join(caseDir, 'y.pdf'), 'Y');
   const next = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: `${dir}${path.sep}.${path.sep}opms-files.json` });
@@ -384,10 +385,15 @@ test('OPMS 전자포대 기록: 바로 기록 · 앱을 끌 때는 따로(.quit)
   client.files.data[Object.keys(client.files.data).find((k) => k !== '#seq')]['u/z'] = 'z.pdf';
   assert.equal(await client.files.save(), true);
   assert.ok(JSON.parse(fs.readFileSync(index, 'utf8'))['#seq'] > quit['#seq']);
-  assert.equal(fs.existsSync(`${index}.quit`), false); // 더 새 평소 기록이 남았으니 끌 때 기록은 지움
+  const quits = () => fs.readdirSync(dir).filter((f) => f.includes('.quit'));
+  assert.deepEqual(quits(), []); // 더 새 평소 기록이 남았으니 옛 끌 때 기록은 지움
   // 바뀐 것이 없으면 끌 때 다시 쓰지 않는다 (창마다 session-end 가 와도)
   client.files.flushSync();
-  assert.equal(fs.existsSync(`${index}.quit`), false);
+  assert.deepEqual(quits(), []);
+  // 아주 긴 서류 이름도 받는다 (이름은 줄이고 확장자는 남김) — 이름 고르기가 끝없이 돌지 않게
+  const long = `${'가'.repeat(300)}.pdf`;
+  const saved = await client.saveOne(caseDir, { n: 3, name: long, upload: 'u/long' });
+  assert.ok(saved.file.endsWith('.pdf') && Buffer.byteLength(path.basename(saved.file)) <= 255);
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
   assert.deepEqual(fs.readdirSync(caseDir).filter((f) => f.endsWith('.part')), []);
 });
