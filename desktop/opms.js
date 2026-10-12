@@ -160,19 +160,25 @@ export function wrapperFolderName(c, fallback = '') {
   return our || your || folderToken(fallback) || 'wrapper';
 }
 
-// 파일 이름 길이 한도: Windows 는 글자(UTF-16) 255, 그 밖은 바이트 255 — "(No.12-3)" 같은 꼬리가 붙을 자리를 남긴다
-const NAME_MAX = 180;
-const nameSize = (t) => (process.platform === 'win32' ? t.length : Buffer.byteLength(t));
-function capName(name) {
-  if (nameSize(name) <= NAME_MAX) return name;
-  const ext = /\.[A-Za-z0-9]{1,10}$/.exec(name)?.[0] ?? '';
-  const chars = [...name.slice(0, name.length - ext.length)];
-  while (chars.length && nameSize(chars.join('') + ext) > NAME_MAX) chars.pop();
-  return `${chars.join('').trim()}${ext}`;
-}
 export function safeFilename(name, fallback) {
   const clean = String(name ?? '').replace(/[\\/:*?"<>|\r\n]+/g, '_').replace(/^[.\s]+|[.\s]+$/g, '').trim();
-  return clean ? capName(clean) : fallback;
+  return clean || fallback;
+}
+
+/**
+ * 저장할 때만: 이 폴더에 두기에 너무 긴 이름이면 줄인다 (보통 이름은 그대로 — 목록 · 예전 기록 · 다른 PC 와 같게).
+ *   Windows 는 전체 경로 260자(탐색기 · Office · 한글이 열 수 있게), 그 밖은 이름 255바이트. 꼬리 " (2)" · 확장자는 남긴다
+ */
+export function fitName(dir, name, platform = process.platform) {
+  const win = platform === 'win32';
+  const room = 16; // 나중에 붙을 수 있는 " (No.12-3)" 자리
+  const max = win ? Math.max(40, 259 - dir.length - 1 - room) : 255 - room;
+  const size = (t) => (win ? t.length : Buffer.byteLength(t));
+  if (size(name) <= max) return name;
+  const tail = /( \((?:\d+|No\.[\d-]+)\))?(\.[A-Za-z0-9]{1,10})?$/.exec(name)[0];
+  const chars = [...name.slice(0, name.length - tail.length)];
+  while (chars.length > 1 && size(`${chars.join('')}…${tail}`) > max) chars.pop();
+  return `${chars.join('').trimEnd()}…${tail}`;
 }
 
 // "열기" 로 바로 여는 것은 서류 · 그림 · 압축 파일만. 그 밖의 것(실행 파일 · 바로 가기 · 스크립트 · 모르는 형식)은
@@ -440,6 +446,7 @@ class FileIndex {
     this.unsaved = false; // 마지막 쓰기가 실패함 — 다음 save · 끌 때 다시
     this.flushing = null;
     this.quitSeq = 0; // 이번 실행에서 마지막으로 쓴 끌 때 기록의 번호
+    this.quitSeqs = new Set(); // 디스크에 있다고 아는 끌 때 기록들 (읽을 때 · 끌 때 쓸 때) — 쓸 때마다 폴더를 뒤지지 않게
   }
 
   /** 끌 때 기록은 번호마다 다른 파일 — 평소 기록이 옛 끌 때 기록을 지우는 중에 새로 쓴 것을 지우지 않게 */
@@ -483,7 +490,9 @@ class FileIndex {
       }
       // 끌 때 남긴 기록이 더 새것이면 그것으로 (그때 쓰던 평소 기록이 뒤늦게 옛 내용으로 끝났을 수 있어서)
       if (this.file) {
-        for (const q of await this.quitFiles()) {
+        const quits = await this.quitFiles();
+        for (const q of quits) this.quitSeqs.add(q.seq);
+        for (const q of quits) {
           if (q.seq <= (Number(this.data['#seq']) || 0)) break;
           try {
             this.data = asObject(JSON.parse(await fs.promises.readFile(q.file, 'utf8')));
@@ -582,7 +591,11 @@ class FileIndex {
       await fs.promises.rename(tmp, this.file);
       this.unsaved = false;
       // 평소 기록보다 옛 끌 때 기록은 지운다 (나중에 평소 기록을 지우거나 깨져도 옛것이 살아나지 않게) — 더 새 번호는 그대로
-      for (const q of await this.quitFiles()) if (q.seq < seq) await fs.promises.rm(q.file, { force: true }).catch(() => {});
+      for (const q of [...this.quitSeqs]) {
+        if (q >= seq) continue;
+        this.quitSeqs.delete(q);
+        await fs.promises.rm(this.quitFile(q), { force: true }).catch(() => {});
+      }
       return true;
     } catch {
       this.unsaved = true;
@@ -608,6 +621,7 @@ class FileIndex {
       fs.writeFileSync(tmp, JSON.stringify(this.data), 'utf8');
       fs.renameSync(tmp, this.quitFile(seq));
       this.quitSeq = seq;
+      this.quitSeqs.add(seq);
       this.dirty = false;
       this.unsaved = false;
     } catch {
@@ -634,7 +648,9 @@ const sameBytes = async (file, data) => {
     return false;
   }
 };
-const exists = (file) => fs.promises.stat(file).then(() => true, () => false);
+// 이미 받은 파일 다시 쓰기용: 없다(ENOENT)고 확실할 때만 없다고 본다 — 백신 · 동기화가 잠깐 잡고 있어도(EBUSY 등) 그 파일을 쓴다
+//   (지우는 중인 파일이면 여는 쪽에서 오류가 나고, 다음 번엔 ENOENT 라 새로 받는다)
+const exists = (file) => fs.promises.stat(file).then(() => true, (err) => err.code !== 'ENOENT');
 // 새 이름 고르기용: 있으면 true, 없다(ENOENT)고 확실하면 false, 그 밖의 오류(이름이 너무 김 · 읽을 수 없음)는 그대로 실패로
 const taken = (file) => fs.promises.lstat(file).then(() => true, (err) => {
   if (err.code === 'ENOENT') return false;
@@ -852,7 +868,7 @@ export class Opms {
    *     (받는 동안 같은 사건의 이미 받은 파일 열기를 막지 않게)
    */
   saveOne(dir, it) {
-    const dest = path.join(dir, safeFilename(it.name, `attachment_${it.n}.bin`));
+    const dest = path.join(dir, fitName(dir, safeFilename(it.name, `attachment_${it.n}.bin`)));
     if (path.dirname(dest) !== dir) return Promise.resolve(null); // 이름에 경로가 섞였으면 건너뛴다 (safeFilename 이 막지만 한 번 더)
     const key = `${FileIndex.key(dir, this.host)}\n${String(it.upload ?? '').trim()}`;
     if (!savingFiles.has(key)) savingFiles.set(key, this.saveFresh(dir, dest, it).finally(() => savingFiles.delete(key)));

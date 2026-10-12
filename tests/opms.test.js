@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  isOpenableFile, numberedName,
+  isOpenableFile, numberedName, fitName,
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
   wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
   buildAttachSql, groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf,
@@ -396,4 +396,37 @@ test('OPMS 전자포대 기록: 바로 기록 · 앱을 끌 때는 따로(.quit)
   assert.ok(saved.file.endsWith('.pdf') && Buffer.byteLength(path.basename(saved.file)) <= 255);
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
   assert.deepEqual(fs.readdirSync(caseDir).filter((f) => f.endsWith('.part')), []);
+});
+
+test('OPMS 전자포대: 너무 긴 이름만 저장할 때 줄임 (꼬리 · 확장자 유지, Windows 는 전체 경로 260자 안)', () => {
+  assert.equal(fitName('/tmp/x', '보통 이름.pdf'), '보통 이름.pdf');
+  const linux = fitName('/tmp/x', `${'가'.repeat(80)} (2).pdf`, 'linux');
+  assert.ok(linux.endsWith('… (2).pdf') && Buffer.byteLength(linux) <= 255 - 16);
+  const dir = String.raw`C:\Users\me\Google Drive\전자포대\FPD20260271E_1020260012345`;
+  const win = fitName(dir, `${'a'.repeat(200)} (No.3).pdf`, 'win32');
+  assert.ok(win.endsWith('… (No.3).pdf') && dir.length + 1 + win.length + 16 <= 259);
+  // 목록에 보이는 이름은 줄이지 않는다
+  assert.equal(attachmentItems([{ FILE_NAME_UPLOAD: 'u', FILE_NAME_ORI: `${'나'.repeat(90)}.pdf` }])[0].name, `${'나'.repeat(90)}.pdf`);
+});
+
+test('OPMS 전자포대 기록: 끌 때 기록이 여럿이면 가장 새것(깨졌으면 그다음) · 평소 기록이 새로 남으면 옛것만 지움', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-quits-'));
+  const index = path.join(dir, 'opms-files.json');
+  const rec = (seq, name) => JSON.stringify({ '#seq': seq, 'h|/x': { 'u/1': name } });
+  fs.writeFileSync(index, rec(2, 'main.pdf'));
+  fs.writeFileSync(`${index}.quit-3`, rec(3, 'quit3.pdf'));
+  fs.writeFileSync(`${index}.quit-9`, '{ 깨짐');
+  const client = new Opms({ fetch: async () => new Response('X'), retries: 0, filesIndex: index });
+  const data = await client.files.load();
+  assert.equal(data['h|/x']['u/1'], 'quit3.pdf');
+  assert.equal(client.files.seq, 3);
+  await client.files.save(); // seq 4 — quit-3 은 지우고, 더 큰 번호(9)는 그대로
+  assert.deepEqual(fs.readdirSync(dir).filter((f) => f.includes('.quit-')).sort(), ['opms-files.json.quit-9']);
+  // 끌 때 새로 쓴 기록(더 큰 번호)은 그 뒤 평소 기록이 지우지 않는다
+  client.files.data['h|/x']['u/2'] = 'b.pdf';
+  const inFlight = client.files.save();
+  client.files.flushSync();
+  await inFlight;
+  const left = fs.readdirSync(dir).filter((f) => f.includes('.quit-'));
+  assert.ok(left.some((f) => Number(f.split('quit-')[1]) === client.files.quitSeq));
 });
