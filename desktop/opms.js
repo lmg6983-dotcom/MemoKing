@@ -163,6 +163,14 @@ export function safeFilename(name, fallback) {
   return clean || fallback;
 }
 
+// 서버에서 받은 파일 중 바로 열면 프로그램이 실행되는 것들 — "열기" 로 실행하지 않고 폴더에서 보여 준다
+const RUNNABLE_EXT = new Set(['exe', 'com', 'scr', 'pif', 'msi', 'msp', 'msc', 'bat', 'cmd', 'ps1', 'psm1', 'vbs', 'vbe', 'js', 'jse', 'wsf', 'wsh',
+  'hta', 'lnk', 'url', 'reg', 'cpl', 'jar', 'appref-ms', 'application', 'gadget', 'inf', 'scf', 'settingcontent-ms', 'library-ms', 'dll', 'sys', 'chm', 'iso', 'img', 'vhd', 'vhdx']);
+export function isRunnableFile(name) {
+  const m = /\.([^.\\/]+)$/.exec(String(name ?? '').trim().replace(/[.\s]+$/, ''));
+  return Boolean(m && RUNNABLE_EXT.has(m[1].toLowerCase()));
+}
+
 export function fileSizeLabel(n) {
   const v = Number(n);
   if (!Number.isFinite(v) || v <= 0) return '-';
@@ -178,13 +186,16 @@ export function numberedName(name, k) {
 }
 
 // 전자포대 줄의 요약 · 등록자 (회사 DB 열 이름이 정해져 있지 않아 흔한 이름 중 먼저 있는 것)
-const SUMMARY_COLUMNS = ['SUMMARY', 'DOC_SUMMARY', 'SUMM', 'DOC_SUMM', 'ABSTRACT', 'DOC_MEMO', 'MEMO', 'REMARK', 'CONTENTS', 'CONTENT'];
-const WRITER_COLUMNS = ['REG_NAME', 'REG_USER_NAME', 'REG_PER', 'REG_PER_NAME', 'USR_NAME', 'USER_NAME', 'WRITER', 'REG_USER', 'REG_ID', 'USR_ID'];
-const pickColumn = (r, names) => {
+//   요약은 서류 요약 전용 열만 (MEMO · CONTENTS 처럼 본문이 통째로 든 열은 쓰지 않음), 등록자는 사람 이름 열만 (로그인 ID 열은 쓰지 않음)
+const SUMMARY_COLUMNS = ['SUMMARY', 'DOC_SUMMARY', 'SUMM', 'DOC_SUMM', 'ABSTRACT', 'DOC_MEMO'];
+const WRITER_COLUMNS = ['REG_NAME', 'REG_USER_NAME', 'REG_PER_NAME', 'USR_NAME', 'USER_NAME', 'WRITER', 'WRITER_NAME'];
+const SUMMARY_MAX = 120;
+const pickColumn = (r, names, max = 40) => {
   const keys = new Map(Object.keys(r).map((k) => [k.toUpperCase(), k]));
   for (const n of names) {
-    const v = String(r[keys.get(n)] ?? '').trim();
-    if (keys.has(n) && v && v !== '-') return v.replace(/[\r\n]+/g, ' ');
+    if (!keys.has(n)) continue;
+    const v = String(r[keys.get(n)] ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    if (v && v !== '-') return v.length > max ? `${v.slice(0, max - 1)}…` : v;
   }
   return '';
 };
@@ -201,7 +212,7 @@ export function attachmentItems(rows) {
     doc: String(r.DOC_NAME || r.DOC_GUBUN || '').trim(),
     name: safeFilename(String(r.FILE_NAME_ORI || r.FILE_NAME || '').trim(), `attachment_${kept.length - i}.bin`),
     size: fileSizeLabel(r.FILE_SIZE),
-    summary: pickColumn(r, SUMMARY_COLUMNS),
+    summary: pickColumn(r, SUMMARY_COLUMNS, SUMMARY_MAX),
     writer: pickColumn(r, WRITER_COLUMNS),
     upload: String(r.FILE_NAME_UPLOAD).trim(),
   }));
@@ -399,6 +410,32 @@ export function detailRows(rows) {
 
 // ---------- 서버와 주고받기 ----------
 
+// 사건 폴더마다 "어느 서류를 어떤 이름으로 받았는지" — 같은 이름의 다른 서류 · 받다 끊긴 파일을 알아보려고
+const MANIFEST = '.memoking.json';
+async function readManifest(dir) {
+  try {
+    const m = JSON.parse(await fs.promises.readFile(path.join(dir, MANIFEST), 'utf8'));
+    return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
+  } catch {
+    return {};
+  }
+}
+const manifestQueue = new Map(); // dir → 마지막 쓰기 (동시에 받아도 기록이 서로 지우지 않게 차례로)
+function updateManifest(dir, change) {
+  const run = (manifestQueue.get(dir) ?? Promise.resolve()).then(async () => {
+    const m = await readManifest(dir);
+    change(m);
+    const file = path.join(dir, MANIFEST);
+    const tmp = `${file}.${process.pid}.tmp`;
+    await fs.promises.writeFile(tmp, JSON.stringify(m, null, 1), 'utf8');
+    await fs.promises.rename(tmp, file);
+  });
+  const settled = run.catch(() => {});
+  manifestQueue.set(dir, settled);
+  settled.then(() => { if (manifestQueue.get(dir) === settled) manifestQueue.delete(dir); });
+  return run;
+}
+
 export class Opms {
   /** @param {{ host?: string, fetch?: typeof fetch, timeoutMs?: number, retries?: number }} o */
   constructor({ host = DEFAULT_HOST, fetch: f = globalThis.fetch, timeoutMs = 15000, retries = 2 } = {}) {
@@ -505,19 +542,47 @@ export class Opms {
   }
 
   /**
-   * 전자포대 받기: baseDir/<관리번호 폴더>/<파일 이름>. 이미 있는 파일은 건너뛴다. all 이면 사건정보.txt 도.
-   * @returns {Promise<{ dir: string, saved: number, skipped: number, failed: { name: string, error: string }[] }>}
+   * 전자포대 파일 하나를 dir 에 저장 → { file, reused }.
+   *   이름만 같다고 같은 서류로 치지 않는다: 사건 폴더의 .memoking.json 에 "어느 서류(upload)를 어떤 이름 · 크기로 받았는지" 적어 두고,
+   *   그 기록과 맞을 때만 다시 받지 않는다 (예전 방식으로 받아 둔 같은 이름의 다른 서류 · 받다 끊긴 파일은 새로 받아 바꾼다).
+   *   받는 동안은 임시 파일(.part)에 쓰고 다 받은 뒤 이름을 바꾼다 — 열려는 파일이 반쯤 쓰인 상태로 보이지 않게.
+   *   같은 파일을 동시에(전체 받기 중에 열기) 부르면 한 번만 받는다.
    */
-  /**
-   * 전자포대 파일 하나를 dir 에 저장 → { file, reused }. 이름은 사건 안에서 겹치지 않게 정해져 있어(attachmentItems)
-   * 같은 이름의 파일이 이미 있으면 전에 받은 그 서류 — 다시 받지 않고 그대로 쓴다
-   */
-  async saveOne(dir, it) {
+  saveOne(dir, it) {
     const dest = path.join(dir, safeFilename(it.name, `attachment_${it.n}.bin`));
-    if (path.dirname(dest) !== dir) return null; // 이름에 경로가 섞였으면 건너뛴다 (safeFilename 이 막지만 한 번 더)
-    if (fs.existsSync(dest)) return { file: dest, reused: true };
-    const res = await this.request(this.attachmentUrl(it.upload), { headers: { 'User-Agent': USER_AGENT } });
-    await fs.promises.writeFile(dest, Buffer.from(await res.arrayBuffer()));
+    if (path.dirname(dest) !== dir) return Promise.resolve(null); // 이름에 경로가 섞였으면 건너뛴다 (safeFilename 이 막지만 한 번 더)
+    this.saving ??= new Map();
+    const key = dest.toLowerCase();
+    if (!this.saving.has(key)) {
+      const job = this.saveFresh(dir, dest, it).finally(() => this.saving.delete(key));
+      this.saving.set(key, job);
+    }
+    return this.saving.get(key);
+  }
+
+  async saveFresh(dir, dest, it) {
+    const upload = String(it.upload ?? '').trim();
+    const name = path.basename(dest);
+    const known = (await readManifest(dir))[upload];
+    const size = await fs.promises.stat(dest).then((st) => st.size, () => -1);
+    if (known && known.name === name && known.bytes === size) return { file: dest, reused: true };
+    const res = await this.request(this.attachmentUrl(upload), { headers: { 'User-Agent': USER_AGENT } });
+    const data = Buffer.from(await res.arrayBuffer());
+    const expected = Number(res.headers?.get?.('content-length'));
+    if (Number.isFinite(expected) && expected > 0 && expected !== data.length) throw new Error('받는 중에 끊겼어요. 다시 해 주세요');
+    const part = `${dest}.${process.pid}-${Date.now().toString(36)}.part`;
+    try {
+      await fs.promises.writeFile(part, data);
+      await fs.promises.rename(part, dest);
+    } catch (err) {
+      await fs.promises.rm(part, { force: true }).catch(() => {});
+      if (err.code === 'EPERM' || err.code === 'EBUSY') throw new Error(`"${name}" 이(가) 다른 프로그램에서 열려 있어 바꾸지 못했어요. 닫고 다시 해 주세요`);
+      throw err;
+    }
+    await updateManifest(dir, (m) => {
+      for (const [k, v] of Object.entries(m)) if (k !== upload && v?.name?.toLowerCase() === name.toLowerCase()) delete m[k]; // 그 이름을 쓰던 다른 기록은 이제 틀림
+      m[upload] = { name, bytes: data.length };
+    });
     return { file: dest, reused: false };
   }
 
@@ -528,6 +593,10 @@ export class Opms {
     return (await this.saveOne(dir, it))?.file ?? null;
   }
 
+  /**
+   * 전자포대 받기: baseDir/<관리번호 폴더>/<파일 이름>. 전에 받은 그 서류가 그대로 있으면 건너뛴다. all 이면 사건정보.txt 도.
+   * @returns {Promise<{ dir: string, saved: number, skipped: number, failed: { name: string, error: string }[] }>}
+   */
   async download(c, items, { baseDir, all = false, onProgress = () => {} } = {}) {
     const dir = path.join(baseDir, wrapperFolderName(c));
     await fs.promises.mkdir(dir, { recursive: true });

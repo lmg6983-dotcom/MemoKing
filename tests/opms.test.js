@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  isRunnableFile,
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
   wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
   buildAttachSql, groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf,
@@ -195,11 +196,12 @@ test('OPMS 진행사항: 받은 서류·낸 서류를 한 줄씩 (최신이 위,
 test('OPMS 전자포대: 같은 파일 이름은 오래된 것부터 그대로 · 다음은 "(2)" · 요약 · 등록자', async () => {
   const items = attachmentItems([
     { FILE_NAME_UPLOAD: 'u/3', FILE_NAME_ORI: '의견제출통지서.pdf', registered_at: '2026-09-17', SUMMARY: '진보성 없음', REG_NAME: '홍길동' },
-    { FILE_NAME_UPLOAD: 'u/2', FILE_NAME_ORI: '의견제출통지서.PDF', registered_at: '2026-05-01', MEMO: '기재불비' },
+    { FILE_NAME_UPLOAD: 'u/2', FILE_NAME_ORI: '의견제출통지서.PDF', registered_at: '2026-05-01', DOC_MEMO: '<p>기재불비</p>', MEMO: '본문 통째', REG_ID: 'mkl123' },
     { FILE_NAME_UPLOAD: 'u/1', FILE_NAME_ORI: '의견제출통지서.pdf', registered_at: '2026-01-02' },
   ]);
   assert.deepEqual(items.map((x) => `${x.n}:${x.name}`), ['3:의견제출통지서 (3).pdf', '2:의견제출통지서 (2).PDF', '1:의견제출통지서.pdf']);
-  assert.deepEqual([items[0].summary, items[0].writer, items[1].summary], ['진보성 없음', '홍길동', '기재불비']);
+  assert.deepEqual([items[0].summary, items[0].writer, items[1].summary, items[1].writer], ['진보성 없음', '홍길동', '기재불비', '']);
+  assert.equal(attachmentItems([{ FILE_NAME_UPLOAD: 'u', SUMMARY: '가'.repeat(300) }])[0].summary.length, 120);
   // 받기: 이미 있는 이름은 그대로 쓰고, 없는 것만 받는다 · 열기용 한 파일
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-open-'));
   let fetched = 0;
@@ -211,4 +213,40 @@ test('OPMS 전자포대: 같은 파일 이름은 오래된 것부터 그대로 �
   assert.equal(f1, f2);
   assert.equal(path.basename(f3), '의견제출통지서 (3).pdf');
   assert.equal(fetched, 2);
+  // 같은 파일을 동시에 열면 한 번만 받는다
+  await Promise.all([client.fileFor(c, items[1], dir), client.fileFor(c, items[1], dir)]);
+  assert.equal(fetched, 3);
+  assert.deepEqual(fs.readdirSync(path.dirname(f1)).filter((f) => f.endsWith('.part')), []);
+});
+
+test('OPMS 전자포대: 이름만 같은 예전 파일 · 받다 끊긴 파일은 믿지 않고 새로 받는다', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-legacy-'));
+  const caseDir = path.join(dir, 'P-2');
+  fs.mkdirSync(caseDir);
+  // 예전 방식: 최신 통지서가 "이름 그대로" 로 저장돼 있음 — 지금은 그 이름이 가장 오래된 서류 몫
+  fs.writeFileSync(path.join(caseDir, '통지서.pdf'), 'NEWEST');
+  const bodies = { 'u/1': 'OLDEST', 'u/2': 'NEWEST' };
+  let fetched = 0;
+  const client = new Opms({ fetch: async (url) => { fetched++; return new Response(bodies[url.split('/').slice(-2).join('/')]); }, retries: 0 });
+  const items = attachmentItems([{ FILE_NAME_UPLOAD: 'u/2', FILE_NAME_ORI: '통지서.pdf' }, { FILE_NAME_UPLOAD: 'u/1', FILE_NAME_ORI: '통지서.pdf' }]);
+  const c = { ourref: 'P-2', yourref: '' };
+  const oldest = await client.fileFor(c, items[1], dir);
+  assert.equal(fs.readFileSync(oldest, 'utf8'), 'OLDEST');
+  assert.equal(fs.readFileSync(await client.fileFor(c, items[0], dir), 'utf8'), 'NEWEST');
+  assert.equal(path.basename(await client.fileFor(c, items[0], dir)), '통지서 (2).pdf');
+  assert.equal(fetched, 2);
+  // 받은 뒤 파일이 잘려 크기가 다르면 다시 받는다
+  fs.writeFileSync(oldest, 'OLD');
+  await client.fileFor(c, items[1], dir);
+  assert.equal(fs.readFileSync(oldest, 'utf8'), 'OLDEST');
+  assert.equal(fetched, 3);
+  // 받다 끊기면(Content-Length 와 다름) 파일을 남기지 않는다
+  const cut = new Opms({ fetch: async () => new Response('AB', { headers: { 'content-length': '10' } }), retries: 0 });
+  const [part] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/9', FILE_NAME_ORI: '끊김.pdf' }]);
+  await assert.rejects(cut.fileFor(c, part, dir), /끊겼/);
+  assert.equal(fs.existsSync(path.join(caseDir, '끊김.pdf')), false);
+});
+
+test('OPMS 전자포대: 실행되는 파일은 "열기" 로 실행하지 않는다', () => {
+  assert.deepEqual(['a.pdf', 'b.hwp', 'invoice.pdf.exe', 'x.LNK', 'y.hta', 'z.js', 'w.bat. ', 'noext'].map(isRunnableFile), [false, false, true, true, true, true, true, false]);
 });

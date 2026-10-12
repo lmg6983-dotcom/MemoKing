@@ -34,7 +34,7 @@ import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcu
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
 import { FileIndex } from './file-index.js';
-import { Opms, looksLikeRef, foreignSummary, caseMemoMarkdown, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
+import { Opms, isRunnableFile, looksLikeRef, foreignSummary, caseMemoMarkdown, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -2202,6 +2202,7 @@ function captureToMemo(dir, info, point) {
 //   하던 일을 가로막지 않게 메모 창은 바로 띄우지 않는다: 숨긴 창에서 가져온 내용을 채워 저장해 두고,
 //   알림을 누르면 그 메모가 마우스 자리에 뜬다 (매직키로 만든 메모와 같음). 한동안 안 열면 숨긴 창은 닫는다(메모는 남음)
 const UNSEEN_CAPTURE_MS = 3 * 60_000;
+const unseenCaptures = new Set(); // 그 숨긴 창들 — "모든 메모 보기" 같은 데서 같이 띄우지 않게
 function openCaptureMemo(capture, point, message) {
   const id = vault.create();
   pendingCaptures.set(id, { ...capture, sourceMd: sourceLine(capture.source) });
@@ -2210,8 +2211,13 @@ function openCaptureMemo(capture, point, message) {
   const closeUnseen = setTimeout(() => {
     if (win && !win.isDestroyed() && !win.isVisible()) win.close();
   }, UNSEEN_CAPTURE_MS);
-  win?.once('show', () => clearTimeout(closeUnseen));
-  win?.once('closed', () => clearTimeout(closeUnseen));
+  if (win) unseenCaptures.add(id);
+  const seen = () => {
+    clearTimeout(closeUnseen);
+    unseenCaptures.delete(id);
+  };
+  win?.once('show', seen);
+  win?.once('closed', seen);
   toast({ memoId: id, kind: 'quick-memo', ...message, onClick: () => revealNote(id) });
   return id;
 }
@@ -2664,11 +2670,22 @@ function registerIpc() {
     return text.split('\n').length;
   });
   ipcMain.handle('opms:bills', (_e, idx) => opmsClient().bills(caseOf(idx).idx));
-  ipcMain.handle('opms:attachments', (_e, idx) => opmsClient().attachments(caseOf(idx).idx));
+  // 전자포대 목록은 사건마다 잠깐 기억해 둔다 — "열기" 마다 DB 를 다시 묻지 않게 (목록을 새로 보면 갱신)
+  const attachCache = new Map(); // case idx → { at, list }
+  const ATTACH_TTL = 5 * 60_000;
+  const attachmentsOf = async (c, { fresh = false } = {}) => {
+    const hit = attachCache.get(c.idx);
+    if (!fresh && hit && Date.now() - hit.at < ATTACH_TTL) return hit.list;
+    const list = await opmsClient().attachments(c.idx);
+    attachCache.set(c.idx, { at: Date.now(), list });
+    if (attachCache.size > 20) attachCache.delete(attachCache.keys().next().value);
+    return list;
+  };
+  ipcMain.handle('opms:attachments', (_e, idx) => attachmentsOf(caseOf(idx), { fresh: true }));
   ipcMain.handle('opms:download', async (event, { idx, ns, all } = {}) => {
     const c = caseOf(idx);
     const client = opmsClient();
-    const list = await client.attachments(c.idx);
+    const list = await attachmentsOf(c);
     const want = new Set((Array.isArray(ns) ? ns : []).map(Number));
     const items = all ? list : list.filter((it) => want.has(it.n));
     const res = await client.download(c, items, {
@@ -2683,16 +2700,20 @@ function registerIpc() {
   // 전자포대 한 파일 바로 열기: 저장 폴더(사건 폴더)에 받아 두고(이미 있으면 그대로) 기본 앱으로
   ipcMain.handle('opms:open-file', async (_e, { idx, n } = {}) => {
     const c = caseOf(idx);
-    const client = opmsClient();
-    const it = (await client.attachments(c.idx)).find((x) => x.n === Number(n));
+    const it = (await attachmentsOf(c)).find((x) => x.n === Number(n));
     if (!it) throw new Error('그 파일을 찾지 못했어요. 새로 고침 뒤 다시 해 주세요');
-    const file = await client.fileFor(c, it, opmsSettings().wrapperDir);
+    const file = await opmsClient().fileFor(c, it, opmsSettings().wrapperDir);
     if (!file) throw new Error('파일 이름이 이상해 열 수 없어요');
     opmsLastDir = path.dirname(file);
-    if (SMOKE) return file;
+    // 실행 파일 · 바로 가기 등은 실수로 실행되지 않게 열지 않고 폴더에서 그 파일을 보여 준다
+    if (isRunnableFile(file)) {
+      if (!SMOKE) shell.showItemInFolder(file);
+      return { file, shown: true, message: '실행되는 파일이라 열지 않고 폴더에서 보여 줘요' };
+    }
+    if (SMOKE) return { file };
     const err = await shell.openPath(file);
     if (err) throw new Error(err);
-    return file;
+    return { file };
   });
   ipcMain.handle('opms:open-folder', () => (opmsLastDir ? shell.openPath(opmsLastDir) : ''));
   ipcMain.handle('opms:choose-dir', async (event) => {
@@ -3219,6 +3240,7 @@ function showAllNotes() {
   for (const [id, win] of noteWins) {
     const stack = stacks?.stackOf(id);
     if (stack && stack.active !== id) continue; // 스택의 숨은 탭
+    if (unseenCaptures.has(id)) continue; // 알림을 아직 안 누른 빠른 메모 · 캡처 (숨긴 창)
     bringToFront(win, { inactive: true, raise: true });
   }
 }
