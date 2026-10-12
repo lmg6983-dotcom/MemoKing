@@ -357,7 +357,7 @@ function openButton(r) {
     b.disabled = true;
     b.textContent = '여는 중…';
     try {
-      const res = await api.openFile({ idx, n: r.n });
+      const res = await api.openFile({ idx, upload: r.upload });
       b.title = hint;
       say(idx, res?.shown ? '' : 'ok', res?.shown ? `${r.name}: ${res.message}` : `✓ ${r.name} 열었어요`);
     } catch (err) {
@@ -386,7 +386,7 @@ async function showWrapper(my) {
     [all, (r) => {
       const b = el('input');
       b.type = 'checkbox';
-      b.value = String(r.n);
+      b.value = r.upload; // 서버 파일 경로로 고른다 (번호는 서버 목록이 바뀌면 달라질 수 있음)
       b.setAttribute('aria-label', `${r.name} 고르기`);
       b.addEventListener('change', sync);
       boxes.push(b);
@@ -465,13 +465,13 @@ async function showWrapper(my) {
 
   async function run(isAll) {
     if (busy()) return;
-    const ns = boxes.filter((b) => b.checked).map((b) => Number(b.value));
+    const uploads = boxes.filter((b) => b.checked).map((b) => b.value);
     const idx = current.case.idx;
     dl = { idx, text: '받는 중…', cls: '', done: false };
     sync();
     paint();
     try {
-      const res = await api.download({ idx, ns, all: isAll });
+      const res = await api.download({ idx, uploads, all: isAll });
       const parts = [`${res.saved}개 저장`];
       if (res.skipped) parts.push(`${res.skipped}개는 이미 있음`);
       if (res.failed.length) parts.push(`${res.failed.length}개 실패`);

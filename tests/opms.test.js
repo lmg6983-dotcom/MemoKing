@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  isOpenableFile,
+  isOpenableFile, numberedName,
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
   wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
   buildAttachSql, groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf,
@@ -241,16 +241,16 @@ test('OPMS 전자포대: 이름만 같은 예전 파일은 덮어쓰지 않고 �
   assert.equal(await client.fileFor(c, items[1], dir), oldest);
   assert.equal(fs.readFileSync(oldest, 'utf8'), 'OLDEST + 내 메모');
   assert.equal(fetched, 1);
-  // 0.31.2 가 사건 폴더에 남긴 기록은 읽어 옮기고 지운다
+  // 0.31.2 가 사건 폴더에 남긴 기록은 읽어 온다 (다른 PC 도 읽게 지우지 않음)
   const caseDir3 = path.join(dir, wrapperFolderName({ ourref: 'P-3', yourref: '' }));
   fs.mkdirSync(caseDir3);
   fs.writeFileSync(path.join(caseDir3, '셋.pdf'), 'THIRD!');
   fs.writeFileSync(path.join(caseDir3, '.memoking.json'), JSON.stringify({ 'u/3': { name: '셋.pdf', bytes: 6 } }));
   const [third] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/3', FILE_NAME_ORI: '셋.pdf' }]);
   assert.equal(path.basename(await client.fileFor({ ourref: 'P-3', yourref: '' }, third, dir)), '셋.pdf');
-  assert.equal(fs.existsSync(path.join(caseDir3, '.memoking.json')), false);
+  assert.equal(fs.existsSync(path.join(caseDir3, '.memoking.json')), true);
   assert.equal(fetched, 1);
-  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(await client.files.save(), true);
   assert.ok(fs.existsSync(index));
   // 다음에 켜도(새 기록 읽기) 기억한다
   const again = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: `${index}` });
@@ -277,20 +277,21 @@ test('OPMS 전자포대 기록: 동시 첫 사용 · 예전 기록 검사 · 깨
   const c = { ourref: 'Q-1', yourref: '' };
   const caseDir = path.join(dir, wrapperFolderName(c));
   fs.mkdirSync(caseDir);
-  // 예전 기록: 잘린 파일(크기 다름) · 폴더 밖을 가리키는 이름은 믿지 않는다
-  fs.writeFileSync(path.join(caseDir, '잘림.pdf'), 'AB');
+  // 예전 기록: 고쳐 저장해 크기가 달라진 파일은 그대로 인정 · 폴더 밖을 가리키는 이름은 믿지 않는다
+  fs.writeFileSync(path.join(caseDir, '고침.pdf'), 'AB + 메모');
   fs.writeFileSync(path.join(dir, 'secret.pdf'), 'SECRET');
-  fs.writeFileSync(path.join(caseDir, '.memoking.json'), JSON.stringify({ 'u/cut': { name: '잘림.pdf', bytes: 10 }, 'u/evil': { name: '../secret.pdf', bytes: 6 } }));
+  fs.writeFileSync(path.join(caseDir, '.memoking.json'), JSON.stringify({ 'u/edit': { name: '고침.pdf', bytes: 2 }, 'u/evil': { name: '../secret.pdf', bytes: 6 } }));
   let fetched = 0;
-  const bodies = { 'u/cut': 'ABCDEFGHIJ', 'u/evil': 'EVIL', 'u/a': 'AAA', 'u/b': 'BBB' };
+  const bodies = { 'u/edit': 'AB', 'u/evil': 'EVIL', 'u/a': 'AAA', 'u/b': 'BBB' };
   const mk = (host) => new Opms({ host, fetch: async (url) => { fetched++; return new Response(bodies[url.split('/').slice(-2).join('/')]); }, retries: 0, filesIndex: index });
   const client = mk('http://one');
-  const [cut, evil] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/cut', FILE_NAME_ORI: '잘림.pdf' }, { FILE_NAME_UPLOAD: 'u/evil', FILE_NAME_ORI: 'evil.pdf' }]);
-  const [f1, f2] = await Promise.all([client.fileFor(c, cut, dir), client.fileFor(c, evil, dir)]);
-  assert.equal(fs.readFileSync(f1, 'utf8'), 'ABCDEFGHIJ');
+  const [edit, evil] = attachmentItems([{ FILE_NAME_UPLOAD: 'u/edit', FILE_NAME_ORI: '고침.pdf' }, { FILE_NAME_UPLOAD: 'u/evil', FILE_NAME_ORI: 'evil.pdf' }]);
+  const [f1, f2] = await Promise.all([client.fileFor(c, edit, dir), client.fileFor(c, evil, dir)]);
+  assert.equal(fs.readFileSync(f1, 'utf8'), 'AB + 메모');
   assert.equal(path.dirname(f2), caseDir);
+  assert.equal(fs.readFileSync(f2, 'utf8'), 'EVIL');
+  assert.equal(fetched, 1);
   assert.equal(fs.readFileSync(path.join(dir, 'secret.pdf'), 'utf8'), 'SECRET');
-  assert.equal(fs.readFileSync(path.join(caseDir, '잘림.pdf'), 'utf8'), 'AB'); // 예전 파일은 그대로
   assert.ok(fs.readdirSync(path.dirname(index)).some((f) => f.includes('.broken-')));
   // 같은 이름으로 정해진 두 서류를 동시에 저장해도 서로 덮어쓰지 않는다
   const a = { n: 1, name: '같은.pdf', upload: 'u/a' };
@@ -302,6 +303,21 @@ test('OPMS 전자포대 기록: 동시 첫 사용 · 예전 기록 검사 · 깨
   const before = fetched;
   await mk('http://two').fileFor(c, a, dir);
   assert.equal(fetched, before + 1);
-  await client.files.writing;
-  assert.equal(fs.existsSync(path.join(caseDir, '.memoking.json')), false);
+  assert.equal(await client.files.save(), true);
+  assert.equal(fs.readdirSync(caseDir).some((f) => f.endsWith('.part')), false);
+});
+
+test('OPMS 전자포대: 이름 속 점 · 요약의 HTML 글자 · 사건정보.txt 에는 실제 저장 이름 · 느린 큰 파일', async () => {
+  assert.deepEqual([numberedName('Mr. Kim 의견서', 2), numberedName('v1.2 final', 2), numberedName('a.pdf', 3)], ['Mr. Kim 의견서 (2)', 'v1.2 final (2)', 'a (3).pdf']);
+  assert.equal(attachmentItems([{ FILE_NAME_UPLOAD: 'u', DOC_MEMO: '<p>A&amp;B &lt;보정&gt; &#39;1&#39;</p>' }])[0].summary, "A&B <보정> '1'");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-info-'));
+  const c = { ourref: 'R-1', yourref: '' };
+  fs.mkdirSync(path.join(dir, wrapperFolderName(c)));
+  fs.writeFileSync(path.join(dir, wrapperFolderName(c), '통지서.pdf'), 'OTHER');
+  // 본문이 15초(DB 조회 시간 제한)보다 오래 걸려도 받는다: 여기서는 timeoutMs 50ms · 본문 120ms
+  const slow = () => new Response(new ReadableStream({ async start(ctl) { await new Promise((r) => setTimeout(r, 120)); ctl.enqueue(new TextEncoder().encode('MINE')); ctl.close(); } }));
+  const client = new Opms({ fetch: async () => slow(), retries: 0, timeoutMs: 50 });
+  const res = await client.download(c, [{ n: 1, name: '통지서.pdf', size: '4 B', upload: 'u/1' }], { baseDir: dir, all: true });
+  assert.deepEqual(res.failed, []);
+  assert.match(fs.readFileSync(path.join(res.dir, '사건정보.txt'), 'utf8'), /1\. 통지서 \(No\.1\)\.pdf/);
 });

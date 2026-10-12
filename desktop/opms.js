@@ -3,6 +3,7 @@
 //   (1줄 = 열 이름, 2~4줄 = 정보, 5줄부터 = 자료). 전자포대 원본은 <서버>/OPMS/<FILE_NAME_UPLOAD>
 //   찾는 말은 모두 따옴표를 겹쳐(') SQL 글 안에 값으로만 넣는다.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 export { looksLikeRef } from '../app/js/core/magic-modules.js';
 import { progressItems } from '../app/js/core/opms-progress.js';
@@ -182,7 +183,8 @@ export function fileSizeLabel(n) {
 
 /** "의견서.pdf" + 2 → "의견서 (2).pdf" */
 export function numberedName(name, k) {
-  const m = /^(.*?)(\.[^.]{1,10})?$/.exec(name);
+  // 확장자는 끝의 ".영숫자" 만 ("Mr. Kim 의견서" · "v1.2 final" 처럼 이름 속 점은 확장자가 아님)
+  const m = /^(.*?)(\.[A-Za-z0-9]{1,10})?$/.exec(name);
   return `${m[1]} (${k})${m[2] ?? ''}`;
 }
 
@@ -191,11 +193,17 @@ export function numberedName(name, k) {
 const SUMMARY_COLUMNS = ['SUMMARY', 'DOC_SUMMARY', 'SUMM', 'DOC_SUMM', 'ABSTRACT', 'DOC_MEMO'];
 const WRITER_COLUMNS = ['REG_NAME', 'REG_USER_NAME', 'REG_PER_NAME', 'USR_NAME', 'USER_NAME', 'WRITER', 'WRITER_NAME'];
 const SUMMARY_MAX = 120;
+const ENTITIES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const decodeEntities = (t) => t.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, e) => {
+  if (e[0] !== '#') return ENTITIES[e.toLowerCase()] ?? all;
+  const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+  return code > 0 && code < 0x110000 ? String.fromCodePoint(code) : all;
+});
 const pickColumn = (r, names, max = 40) => {
   const keys = new Map(Object.keys(r).map((k) => [k.toUpperCase(), k]));
   for (const n of names) {
     if (!keys.has(n)) continue;
-    const v = String(r[keys.get(n)] ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    const v = decodeEntities(String(r[keys.get(n)] ?? '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
     if (v && v !== '-') return v.length > max ? `${v.slice(0, max - 1)}…` : v;
   }
   return '';
@@ -414,7 +422,7 @@ export function detailRows(rows) {
 // 받은 전자포대 파일 기록: 사건 폴더 → { 서류(upload) → 저장한 파일 이름 }
 //   이름만 같다고 같은 서류로 치지 않으려고. 사건 폴더가 아니라 앱 폴더에 한 파일로 둔다 (공유하는 폴더에 섞이지 않게).
 //   한 번 받은 서류는 그 뒤 크기가 바뀌어도(사용자가 고쳐 저장) 그대로 둔다.
-const LEGACY_MANIFEST = '.memoking.json'; // 0.31.2 가 사건 폴더에 남긴 기록 — 읽어 옮기고 지운다
+const LEGACY_MANIFEST = '.memoking.json'; // 0.31.2 가 사건 폴더에 남긴 기록 — 읽어 온다 (지우지 않음: 다른 PC 도 읽게)
 class FileIndex {
   constructor(file) {
     this.file = file;
@@ -428,10 +436,19 @@ class FileIndex {
   load() {
     this.loading ??= (async () => {
       let raw = null;
-      try {
-        if (this.file) raw = await fs.promises.readFile(this.file, 'utf8');
-      } catch {
-        // 아직 없음
+      if (this.file) {
+        // 백신 · 동기화 프로그램이 잠깐 잡고 있으면(EBUSY 등) 조금 뒤 다시. 끝내 못 읽으면 이번 실행 동안은
+        //   기록을 덮어쓰지 않는다 (빈 기록으로 바꿔 다른 사건 기록까지 잃지 않게)
+        for (let i = 0; i < 4; i++) {
+          try {
+            raw = await fs.promises.readFile(this.file, 'utf8');
+            break;
+          } catch (err) {
+            if (err.code === 'ENOENT') break;
+            if (i === 3) this.readOnly = true;
+            else await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+          }
+        }
       }
       try {
         const d = raw == null ? {} : JSON.parse(raw);
@@ -471,16 +488,14 @@ class FileIndex {
     }
     if (legacy && typeof legacy === 'object') {
       for (const [upload, v] of Object.entries(legacy)) {
-        // 이름은 이 폴더 안의 파일 이름일 때만, 크기가 기록과 같을 때만 (받다 끊긴 파일은 다시 받게)
+        // 이 폴더 안의 파일 이름만 (0.31.2 는 다 받은 뒤에만 기록했으니 크기가 달라졌으면 사용자가 고친 것 — 그대로 인정)
         const name = String(v?.name ?? '');
-        if (!name || safeFilename(name, '') !== name || path.basename(name) !== name) continue;
-        const size = await fs.promises.stat(path.join(dir, name)).then((st) => st.size, () => -1);
-        if (size >= 0 && size === v.bytes) rec[upload] = name;
+        if (name && safeFilename(name, '') === name && path.basename(name) === name) rec[upload] = name;
       }
     }
     data[k] = rec;
-    // 새 기록에 잘 남긴 뒤에만 예전 기록을 지운다
-    if (legacy && await this.save()) await fs.promises.rm(legacyFile, { force: true }).catch(() => {});
+    // 예전 기록은 지우지 않는다: 사건 폴더가 여러 PC 가 함께 쓰는 Drive 폴더면 다른 PC 도 읽어 가야 하니까
+    if (legacy) this.save();
     return rec;
   }
 
@@ -494,18 +509,25 @@ class FileIndex {
     return run;
   }
 
-  /** 기록 남기기 → 잘 남겼으면 true. 실패해도(읽기 전용 · 백신이 잡고 있음) 받은 파일은 그대로 쓴다. 쓰기는 차례로 */
+  /**
+   * 기록 남기기 → 잘 남겼으면 true. 잠깐 모았다가 한 번에 (전체 받기 150개면 150번이 아니라 몇 번만).
+   *   실패해도(읽기 전용 · 백신이 잡고 있음) 받은 파일은 그대로 쓴다. 쓰기는 차례로
+   */
   save() {
-    if (!this.file) return Promise.resolve(false);
-    const run = this.writing.then(async () => {
-      const tmp = `${this.file}.${process.pid}.tmp`;
-      await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
-      await fs.promises.writeFile(tmp, JSON.stringify(this.data), 'utf8');
-      await fs.promises.rename(tmp, this.file);
-      return true;
-    }).catch(() => false);
-    this.writing = run;
-    return run;
+    if (!this.file || this.readOnly) return Promise.resolve(false);
+    this.pending ??= new Promise((r) => setTimeout(r, 300)).then(() => {
+      this.pending = null;
+      const run = this.writing.then(async () => {
+        const tmp = `${this.file}.${process.pid}.tmp`;
+        await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
+        await fs.promises.writeFile(tmp, JSON.stringify(this.data), 'utf8');
+        await fs.promises.rename(tmp, this.file);
+        return true;
+      }).catch(() => false);
+      this.writing = run;
+      return run;
+    });
+    return this.pending;
   }
 }
 const fileIndexes = new Map(); // 기록 파일 → FileIndex (창마다 새 Opms 를 만들어도 같은 기록 · 같은 "받는 중" 을 함께 쓰게)
@@ -519,6 +541,16 @@ const sameBytes = async (file, data) => {
   }
 };
 const exists = (file) => fs.promises.stat(file).then(() => true, () => false);
+const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
+// 매크로가 들 수 있는 예전 Office 형식은 Windows 의 "인터넷에서 받은 파일" 표시(Zone.Identifier)를 붙여
+//   Office 가 제한된 보기로 열게 한다 (브라우저로 받은 것과 같게)
+const MACRO_EXT = new Set(['doc', 'dot', 'xls', 'xlt', 'ppt', 'pot', 'pps', 'rtf']);
+async function markFromServer(file, host) {
+  if (process.platform !== 'win32') return;
+  const ext = path.extname(file).slice(1).toLowerCase();
+  if (!MACRO_EXT.has(ext)) return;
+  await fs.promises.writeFile(`${file}:Zone.Identifier`, `[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=${host}\r\n`).catch(() => {});
+}
 
 export class Opms {
   /** @param {{ host?: string, fetch?: typeof fetch, timeoutMs?: number, retries?: number }} o */
@@ -529,12 +561,14 @@ export class Opms {
     this.files = fileIndexes.get(filesIndex);
   }
 
-  async request(url, init, { timeoutMs = this.timeoutMs, retries = this.retries } = {}) {
+  /** bytes: 응답 본문까지 받아 { res, data } — 본문 받기도 시간 제한 · 다시 하기 안에서 */
+  async request(url, init, { timeoutMs = this.timeoutMs, retries = this.retries, bytes = false } = {}) {
     let last;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const res = await this.fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (bytes) return { res, data: Buffer.from(await res.arrayBuffer()) };
         return res;
       } catch (err) {
         last = err;
@@ -652,8 +686,8 @@ export class Opms {
     const known = folder[upload];
     const knownFile = known ? path.join(dir, known) : null;
     if (knownFile && path.dirname(knownFile) === dir && await exists(knownFile)) return { file: knownFile, reused: true };
-    const res = await this.request(this.attachmentUrl(upload), { headers: { 'User-Agent': USER_AGENT } });
-    const data = Buffer.from(await res.arrayBuffer());
+    // 큰 파일(수십 MB · VPN)도 받게: 파일 받기는 시간 제한을 넉넉히 (DB 조회의 15초가 아니라)
+    const { res, data } = await this.request(this.attachmentUrl(upload), { headers: { 'User-Agent': USER_AGENT } }, { timeoutMs: DOWNLOAD_TIMEOUT_MS, bytes: true });
     // 받다 끊김: 압축하지 않은 응답이면 Content-Length 와 받은 크기가 같아야 한다 (압축 응답은 풀린 크기라 비교하지 않음)
     const expected = Number(res.headers?.get?.('content-length'));
     const encoded = String(res.headers?.get?.('content-encoding') ?? 'identity').toLowerCase();
@@ -671,18 +705,19 @@ export class Opms {
         file = path.join(dir, numberedName(base, k ? `No.${it.n}-${k + 1}` : `No.${it.n}`));
       }
     }
-    const part = `${file}.${process.pid}-${Date.now().toString(36)}.part`;
+    // 임시 파일은 사건 폴더(Drive 등 동기화 폴더일 수 있음)가 아니라 PC 의 임시 폴더에
+    const part = path.join(os.tmpdir(), `memoking-${process.pid}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.part`);
     try {
       await fs.promises.writeFile(part, data);
-      // 한 폴더 안의 저장은 차례로라 여기서 그 이름은 비어 있다 — 그래도 혹시 생겼으면 덮어쓰지 않는다
-      //   (하드 링크를 못 만드는 곳 — USB · 일부 공유 폴더 — 에서는 "없을 때만 복사")
-      await fs.promises.link(part, file).catch((err) => {
-        if (err.code === 'EEXIST') throw err;
-        return fs.promises.copyFile(part, file, fs.constants.COPYFILE_EXCL);
-      });
+      // 한 폴더 안의 저장은 차례로라 여기서 그 이름은 비어 있다 — 그래도 혹시 생겼으면 덮어쓰지 않는다 ("없을 때만 복사")
+      await fs.promises.copyFile(part, file, fs.constants.COPYFILE_EXCL);
+    } catch (err) {
+      if (err.code !== 'EEXIST') await fs.promises.rm(file, { force: true }).catch(() => {}); // 복사하다 만 파일
+      throw err;
     } finally {
       await fs.promises.rm(part, { force: true }).catch(() => {});
     }
+    await markFromServer(file, this.host);
     folder[upload] = path.basename(file);
     this.files.save();
     return { file, reused: false };
@@ -713,7 +748,7 @@ export class Opms {
         if (!r) continue;
         if (r.reused) skipped++;
         else saved++;
-        done.push(it);
+        done.push({ ...it, name: path.basename(r.file) }); // 실제로 저장된 이름 (다른 이름으로 피해 저장했을 수도)
       } catch (err) {
         failed.push({ name: it.name, error: err.message });
       }

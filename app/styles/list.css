@@ -541,8 +541,18 @@ body.is-dragging .card-actions { visibility: hidden; }
 .card-actions svg { width: 15px; height: 15px; }
 
 /* 마우스를 올리면 압정·지우기 묶음이 제목 줄 오른쪽 위에 겹쳐 뜬다 — 제목을 밀어 줄바꿈을 바꾸지 않고,
-   묶음 아래로 들어가는 글자 끝만 흐리게 (카드 높이·글자 자리는 그대로) */
-.cards .item:hover .card-head { -webkit-mask-image: linear-gradient(to left, transparent 0, transparent 88px, #000 120px); mask-image: linear-gradient(to left, transparent 0, transparent 88px, #000 120px); }
+   묶음 아래로 들어가는 첫 줄 끝만 흐리게 (둘째 줄은 그대로 · 카드 높이·글자 자리는 그대로) */
+.cards .item:hover .card-head {
+  --fade: linear-gradient(to left, transparent 0, transparent 88px, #000 120px);
+  -webkit-mask-image: var(--fade), linear-gradient(#000, #000);
+  mask-image: var(--fade), linear-gradient(#000, #000);
+  -webkit-mask-size: 100% 24px, 100% calc(100% - 24px);
+  mask-size: 100% 24px, 100% calc(100% - 24px);
+  -webkit-mask-position: 0 0, 0 100%;
+  mask-position: 0 0, 0 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
 
 /* 목록 창 늘 위에 두기: 창 제목 줄 오른쪽 끝 (Windows 최소화 버튼 바로 옆), 켜짐은 메모 창과 같은 은은한 바탕 */
 .titlebar-btn { margin-left: auto; width: 34px; height: 30px; -webkit-app-region: no-drag; }
