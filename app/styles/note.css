@@ -69,6 +69,11 @@ body, .note-screen, .share-paper {
   right: 6px;
   z-index: 20;
   width: 220px;
+  /* 메모 창이 작아도 항목이 잘리지 않게: 창 아래 끝까지만, 넘치면 메뉴 안에서 스크롤 */
+  max-height: calc(100vh - 38px - var(--tabs-h, 0px) - 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -620,6 +625,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .rem-radio small { color: var(--muted); }
 .rem-action { margin-bottom: 10px; padding-top: 6px; border-top: 1px dashed var(--border); }
 .rem-submit { width: 100%; }
+
 
 /* 날짜·시각 고르기 (date-picker.js) — 다이얼 대신 달력 한 장 + 시각 칩 */
 .date-picker { margin-top: 2px; }
@@ -1721,6 +1727,4 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 /* 일정과 알림 패널: 이름 · 하루 종일 · 미리 알림 (reminder-panel.js) */
 .rem-title-row input { flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-0); color: var(--text); font: inherit; }
 .rem-allday-row { justify-content: space-between; }
-.rem-alerts-label { margin: 8px 0 6px; font-size: 12.5px; font-weight: 600; }
-.rem-alerts-label small { font-weight: 400; color: var(--muted); }
 .rem-alerts button[aria-pressed="true"]::before { content: '✓ '; }

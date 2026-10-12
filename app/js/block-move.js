@@ -19,7 +19,7 @@ import { isVoiceCard } from './voice-card-view.js';
 import { mediaKindOf } from './core/memo-file.js';
 import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
-import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
+import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged, deleteShownFor } from './delete-button.js';
 import { haptic } from './dom.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
@@ -89,6 +89,8 @@ function blockInfo(doc, pos, inner) {
 // 누르는 사이 감긴 재생 위치는 들어 올릴 때 되돌린다
 export const MEDIA_SCRUB = '.plyr__menu__container';
 const GRAB_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card], a, .mk-math-block, hr';
+// PC 에서 마우스를 올리면 지우기 단추가 뜨는 "내용" (글자 링크·수식·가로줄은 빼고 — 글을 읽는 데 방해되지 않게)
+const HOVER_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card]';
 const NO_GRAB = '.plyr__controls, .plyr__control, button, input, select, textarea, [contenteditable="true"] [contenteditable="true"]';
 
 /** 화면에서 누른 곳(target)이 옮길 수 있는 내용 줄이면 그 줄 */
@@ -305,6 +307,36 @@ class Mover {
       e.detail.ok = this.liftAt(pos, x, y, kind);
     };
     view.dom.addEventListener('mk-lift-block', this.onLiftRequest);
+    // PC: 그림·손 메모·소리·파일·링크 카드에 마우스를 올리면 지우기 단추 (휴대폰은 꾹 눌렀다 놓기로)
+    this.hoverHost = null;
+    this.hoverTimer = 0;
+    if (window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) {
+      this.onHover = (e) => {
+        if (this.busy() || e.buttons) return;
+        const host = e.target instanceof Element ? e.target.closest(HOVER_TARGET) : null;
+        if (!host || !view.dom.contains(host)) return this.leaveHover();
+        clearTimeout(this.hoverTimer);
+        if (host === this.hoverHost && deleteShownFor(this.hoverTarget)) return;
+        const block = blockFromTarget(view, host);
+        if (!block || !isContentBlock(block.node)) return this.leaveHover();
+        this.hoverHost = host;
+        this.showDelete(block, true);
+      };
+      this.onHoverOut = () => this.leaveHover();
+      view.dom.addEventListener('mousemove', this.onHover);
+      view.dom.addEventListener('mouseleave', this.onHoverOut);
+    }
+  }
+
+  /** 마우스가 내용에서 떠나면 조금 뒤 단추를 거둔다 (× 로 옮겨 가는 사이에는 그대로) */
+  leaveHover() {
+    if (!this.hoverHost) return;
+    clearTimeout(this.hoverTimer);
+    this.hoverTimer = setTimeout(() => {
+      if (deleteShownFor(this.hoverTarget)) hideDeleteButton();
+      this.hoverHost = null;
+      this.hoverTarget = null;
+    }, 220);
   }
 
   /** 그 자리의 맨 바깥 줄을 바로 들어 올린다 (누르고 있는 손가락·마우스 그대로 이어서 끈다) */
@@ -611,7 +643,7 @@ class Mover {
 
   // ---------- 지우기 단추: 꾹 눌렀다 놓은 내용의 오른쪽 위 (delete-button.js) ----------
 
-  showDelete(block) {
+  showDelete(block, hovering = false) {
     const { view } = this;
     const dom = view.nodeDOM(block.pos);
     if (!(dom instanceof Element)) return;
@@ -621,7 +653,11 @@ class Mover {
       else if (!this.drag && !this.pressing) this.decorate([]);
     };
     const list = /list/.test(block.node.type.name);
-    showDeleteButton(view, { pos: block.pos, node: block.node, target: media ?? dom, markTarget: Boolean(media), deco, label: list ? '이 목록 지우기' : '이 내용 지우기' });
+    const target = media ?? dom;
+    if (!hovering) this.hoverHost = null;
+    this.hoverTarget = target;
+    const hover = hovering ? { enter: () => clearTimeout(this.hoverTimer), leave: () => this.leaveHover() } : null;
+    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: list ? '이 목록 지우기' : '이 내용 지우기', hover });
   }
 
   hideDelete(now = false) {
@@ -715,6 +751,11 @@ class Mover {
   destroy() {
     this.view.dom.removeEventListener('touchstart', this.onScrubTouch, true);
     this.view.dom.removeEventListener('mk-lift-block', this.onLiftRequest);
+    if (this.onHover) {
+      this.view.dom.removeEventListener('mousemove', this.onHover);
+      this.view.dom.removeEventListener('mouseleave', this.onHoverOut);
+    }
+    clearTimeout(this.hoverTimer);
     this.cancelPress();
     if (this.drag) this.finish(false);
     clearTimeout(this.flashTimer);

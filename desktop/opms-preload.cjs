@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('opms', {
   openFolder: () => ipcRenderer.invoke('opms:open-folder'),
   chooseDir: () => ipcRenderer.invoke('opms:choose-dir'),
   copy: (text) => ipcRenderer.invoke('opms:copy', text),
+  toMemo: (idx) => ipcRenderer.invoke('opms:to-memo', idx), // 사건 정보 → 새 메모
   onShow: (cb) => ipcRenderer.on('opms:show', (_e, req) => cb(req)),
   onProgress: (cb) => ipcRenderer.on('opms:progress', (_e, p) => cb(p)),
 });

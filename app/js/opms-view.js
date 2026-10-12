@@ -1,6 +1,7 @@
 // OPMS 창 — 매직키에서 사건을 고르면 열린다 (PC 전용, 사내망)
 //   위: 관리번호·출원번호 찾기 + 고른 사건 머리줄(사무소/출원인 관리번호 · 출원인 · 명칭 · 해외출원 배지)
 //   탭: 정보(서지 + 업무배분) · 전자포대(골라 받기 / 전체 받기 → 저장 폴더 열기) · 청구서 · 해외출원
+//   "메모로 만들기": 고른 사건의 서지 · 업무배분 · 해외출원을 새 메모 한 장으로
 //   글은 모두 textContent 로 넣는다 (서버 값을 HTML 로 읽지 않는다)
 const api = window.opms;
 const $ = (id) => document.getElementById(id);
@@ -377,6 +378,26 @@ $('op-refresh').addEventListener('click', () => {
   if (!current) return;
   for (const k of [...cache.keys()]) if (k.startsWith(`${current.case.idx}:`)) cache.delete(k);
   open(current.case.idx, tab);
+});
+
+// 메모로 만들기: 사건 정보를 메모 한 장으로 (메모 창이 열린다)
+$('op-memo').addEventListener('click', async () => {
+  if (!current) return;
+  const b = $('op-memo');
+  b.disabled = true;
+  b.textContent = '만드는 중…';
+  try {
+    await api.toMemo(current.case.idx);
+    b.textContent = '✓ 메모로 만들었어요';
+  } catch (err) {
+    b.textContent = '메모로 만들기';
+    message(errText(err), 'err');
+  } finally {
+    setTimeout(() => {
+      b.disabled = false;
+      b.textContent = '메모로 만들기';
+    }, 1500);
+  }
 });
 
 // Esc: 찾는 칸에 글이 있으면 지우고, 아니면 창 닫기 (모두 찾기 창과 같게)

@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('memoking', {
     openLock: invoke('memo:open-lock'),
     unlock: invoke('memo:unlock'),
     create: invoke('memo:create'),
+    import: invoke('memo:import'), // (본문, { open }) → 메모 id
     get: invoke('memo:get'),
     save: invoke('memo:save'),
     keepCopy: invoke('memo:keep-copy'),
@@ -54,6 +55,7 @@ contextBridge.exposeInMainWorld('memoking', {
   reminders: {
     set: invoke('reminders:set'),
     all: invoke('reminders:all'),
+    add: invoke('reminders:add'),
   },
   // 알림 보관함 (Windows 알림 기록)
   history: {

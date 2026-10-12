@@ -34,7 +34,7 @@ import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcu
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
 import { FileIndex } from './file-index.js';
-import { Opms, looksLikeRef, foreignSummary, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
+import { Opms, looksLikeRef, foreignSummary, caseMemoMarkdown, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
 import { TUTORIAL_STEPS, TUTORIAL_EVENTS, advanceTutorial } from '../app/js/core/tutorial.js';
@@ -537,6 +537,12 @@ function syncStackBounds(id, bounds) {
   saveSettings();
 }
 
+/** 창이 지금 모습을 한 번 새로 그릴 때까지 (requestAnimationFrame 두 번) — 늦어도 150ms */
+function painted(win) {
+  const frame = win.webContents.executeJavaScript('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))', true).catch(() => false);
+  return Promise.race([frame, new Promise((r) => setTimeout(r, 150))]);
+}
+
 // 스택에서 id 의 탭을 보여 준다
 // bounds: 보여 줄 자리를 정해 줄 때 (보이던 탭이 스택에서 빠져 나가면 그 창의 자리를 이어받는다)
 function showTab(id, { inactive = false, bounds: at = null } = {}) {
@@ -544,6 +550,12 @@ function showTab(id, { inactive = false, bounds: at = null } = {}) {
   const current = visibleStackWin(stack, id);
   const bounds = at ?? current?.getNormalBounds() ?? (onScreen(settings.noteBounds[id]) ? settings.noteBounds[id] : defaultNoteBounds());
   const top = stackOnTop(stack);
+  // 늘 위(왕관)는 스택 전체가 함께 — 나중에 들어온 탭(+ 새 탭 등)도 같은 상태로 적어 둔다.
+  //   안 그러면 그 탭을 보일 때 창은 늘 위인데 메모 창은 "왕관 붙이기" 단추를 다시 보인다
+  if (top && stack.memos.some((m) => settings.onTop[m] !== true)) {
+    for (const m of stack.memos) settings.onTop[m] = true;
+    saveSettings();
+  }
   let win = noteWins.get(id);
   const reveal = () => {
     if (win.isDestroyed()) return;
@@ -557,20 +569,30 @@ function showTab(id, { inactive = false, bounds: at = null } = {}) {
     setTopmost(win, top);
     setSticker(win, top, { animate: false });
     if (top) handOverSticker(shown, win); // 왕관은 그 자리에 그대로 (번쩍이지 않게)
+    win.webContents.send('memo:on-top', top); // 메모 창의 왕관 단추도 스택과 같게 (붙어 있으면 숨김)
+    // 탭 바꾸기가 번쩍이지 않게: 숨어 있던 탭 창은 투명하게 띄워(Windows 의 창 나타나기 효과·숨어 있는 동안의
+    //   묵은 화면이 보이지 않게) 새로 한 번 그린 뒤에 한꺼번에 보이고, 그다음에 이전 탭을 숨긴다
+    const veiled = Boolean(shown) && !win.isVisible() && process.platform === 'win32';
+    if (veiled) win.setOpacity(0);
     if (inactive) win.showInactive();
     else {
       win.show();
       win.focus();
     }
-    // 새 탭이 나타난 다음에 다른 탭은 모두 숨겨 깜빡이지 않게 (보이는 탭은 언제나 하나)
-    setTimeout(() => {
+    const hideOthers = () => {
       const st = stacks.stackOf(id);
       if (!st || st.active !== id) return;
       for (const m of st.memos) {
         const w = noteWins.get(m);
         if (m !== id && w && !w.isDestroyed() && w.isVisible()) w.hide();
       }
-    }, 30);
+    };
+    if (!veiled) return void setTimeout(hideOthers, 30); // 새 탭이 나타난 다음에 다른 탭은 모두 숨긴다 (보이는 탭은 언제나 하나)
+    painted(win).then(() => {
+      if (win.isDestroyed()) return;
+      win.setOpacity(1);
+      setTimeout(hideOthers, 16); // 한 화면 뒤 (새 탭이 실제로 화면에 나온 다음)
+    });
   };
   if (!win) {
     win = createNoteWindow(id, { show: false, bounds });
@@ -2473,6 +2495,25 @@ function registerIpc() {
     return saved;
   });
   ipcMain.handle('reminders:all', () => vault?.allReminders() ?? []);
+  // 일정 탭 달력에서 바로 만들기: 고른 메모(없으면 일정 이름을 제목으로 한 새 메모)에 일정 하나를 더한다 → 메모 id
+  ipcMain.handle('reminders:add', (_e, id, reminder, newTitle) => {
+    if (!vault) return null;
+    const r = normalizeReminder(reminder);
+    if (!r) return null;
+    let memoId = id ? String(id) : null;
+    if (!memoId) {
+      const title = String(newTitle ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || '새 일정';
+      memoId = vault.import({ body: `# ${title}\n` });
+    }
+    const memo = memoId ? vault.get(memoId) : null;
+    if (!memo) throw new Error('메모를 찾지 못했어요');
+    const saved = vault.setReminders(memoId, [...(memo.reminders ?? []), r]);
+    if (!saved) throw new Error('그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요');
+    sendToNote(memoId, 'memo:reminders', saved);
+    pushReminders();
+    alarms.tick();
+    return memoId;
+  });
 
   // 알림 보관함
   ipcMain.handle('history:list', (_e, filter) => {
@@ -2641,6 +2682,18 @@ function registerIpc() {
     return r.filePaths[0];
   });
   ipcMain.handle('opms:copy', (_e, text) => clipboard.writeText(String(text ?? '').slice(0, 2000)));
+  // 사건 정보를 메모 한 장으로 (서지 · 업무배분 · 해외출원) → 새 메모 창
+  ipcMain.handle('opms:to-memo', async (_e, idx) => {
+    if (!vault) throw new Error('메모 폴더가 아직 없어요');
+    const known = caseOf(idx);
+    const client = opmsClient();
+    const c = (await client.caseByIdx(known.idx).catch(() => null)) ?? known;
+    const [foreign, mywork] = await Promise.all([client.foreign(c).catch(() => []), client.mywork(c.idx).catch(() => [])]);
+    const id = vault.import({ body: caseMemoMarkdown(c, { mywork, foreign, summary: foreignSummary(c, foreign) }) });
+    if (!id) throw new Error('메모를 만들지 못했어요');
+    openNote(id);
+    return id;
+  });
   ipcMain.handle('magic:open-all', (_e, query) => {
     magicWin?.hide();
     showFinder(String(query ?? '').slice(0, 200));
@@ -2736,6 +2789,14 @@ function registerIpc() {
   // 목록 창이 늦게 열렸을 때: 아직 "방금" 인 이어 쓰기 안내
   ipcMain.handle('memo:handoff', () => (lastHandoff && Date.now() - lastHandoff.at < HANDOFF_MS && !noteWins.has(lastHandoff.id) ? lastHandoff : null));
   ipcMain.handle('memo:create', (_e, options) => createNote(options ?? {}));
+  // 목록 창에 끌어다 놓은 파일(.md · .txt · 그림 …)로 만든 메모 — 글은 목록 창이 만들어 보낸다. open: 창도 띄울지
+  ipcMain.handle('memo:import', (_e, body, opts) => {
+    if (!vault) throw new Error('메모 폴더가 아직 없어요');
+    const id = vault.import({ body: String(body ?? '').slice(0, 5_000_000) });
+    if (!id) throw new Error('이 파일로는 메모를 만들 수 없어요');
+    if (opts?.open) openNote(id);
+    return id;
+  });
   ipcMain.handle('memo:get', (_e, id) => {
     const memo = vault?.get(id);
     // 창 상태(항상 위)는 기기별 설정이라 파일이 아닌 설정에서 붙인다.

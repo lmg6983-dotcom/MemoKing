@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
-  wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, looksLikeRef, Opms,
+  wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
 } from '../desktop/opms.js';
 
 // 서버 응답 모양: 1줄 열 이름 · 2~4줄 정보 · 5줄부터 자료 (\x01 로 나눔)
@@ -96,4 +96,18 @@ test('OPMS: 서버와 주고받기 (찾기 · 전자포대 받기 · 사건정�
   // 서버가 없으면 알아듣게
   const off = new Opms({ fetch: async () => { throw new Error('ECONNREFUSED'); }, retries: 0 });
   await assert.rejects(off.find('P-1234'), (e) => e.offline && /사내망/.test(e.message));
+});
+
+test('OPMS: 사건 정보 → 메모 (제목 · 서지 표 · 업무배분 · 해외출원 · #OPMS)', () => {
+  const md = caseMemoMarkdown(
+    { ourref: 'FPD/2026-0271/E', title_kor: '메모 | 장치', applicant: '메모킹', d_app: '2026-01-02 00:00:00.0', memo: '' },
+    { mywork: [{ div_job: '출원', per_name: '홍길동', per_gubun: '변리사', d_due: '2026-02-01 00:00:00.0', detail: '첫 줄\n둘째 줄' }], foreign: [{ app_ncode: 'US', _div: 'PCT', n_app: 'US1' }], summary: 'US' },
+  );
+  assert.match(md, /^# FPD\/2026-0271\/E 메모 \| 장치\n/);
+  assert.match(md, /\| 출원일 \| 2026-01-02 \|/);
+  assert.match(md, /\| 발명명칭 \| 메모 \\\| 장치 \|/);
+  assert.doesNotMatch(md, /비고/);
+  assert.match(md, /## 업무배분[\s\S]*\| 출원 \| 홍길동\(변리사\) \| - \| 2026-02-01 \| - \| 첫 줄 둘째 줄 \|/);
+  assert.match(md, /## 해외출원[\s\S]*\| US \| PCT \|/);
+  assert.match(md, /\n#OPMS\n$/);
 });

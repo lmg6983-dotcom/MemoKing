@@ -5,7 +5,9 @@ import { acceleratorFromKey, displayAccelerator } from './core/accelerators.js';
 import { injectIcons, icon } from './icons.js';
 import { handoffText } from './core/handoff.js';
 import { friendlyTime } from './core/format.js';
-import { vaultUrl } from './media.js';
+import { vaultUrl, mediaKind, fileExtension } from './media.js';
+import { memoBodyFromFile } from './core/file-memo.js';
+import { isTextDocument } from './core/markdown-import.js';
 import { setupRemindersTab } from './list-reminders.js';
 import { setupHistoryTab } from './list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
@@ -114,6 +116,8 @@ function columnsFor(width) {
 }
 
 function layoutCards(memos) {
+  // 다시 쌓는 동안 목록이 잠깐 비어 스크롤이 맨 위로 튀지 않게 — 지우거나 바뀌어도 보던 자리 그대로
+  const top = el.cards.scrollTop;
   const cols = columnsFor(el.cards.clientWidth || window.innerWidth);
   lastCols = cols;
   const columns = Array.from({ length: cols }, () => {
@@ -126,6 +130,7 @@ function layoutCards(memos) {
     const shortest = columns.reduce((a, b) => (b.offsetHeight < a.offsetHeight ? b : a));
     shortest.append(renderCard(memo));
   }
+  if (top) el.cards.scrollTop = top;
 }
 
 const cardItems = () => el.cards.querySelectorAll('.item');
@@ -464,6 +469,84 @@ async function deleteMemo(id) {
     setTimeout(() => ghost.remove(), 600);
   }
   await api.memo.remove(id);
+}
+
+// ---------- 파일을 끌어다 놓으면 메모로 (.md · .txt · 그림 · 그 밖의 파일) ----------
+// 파일 하나에 메모 하나. 하나만 놓으면 그 메모 창을 바로 연다. 폴더는 넣지 않는다.
+const MAX_DROP_FILES = 30;
+const MAX_TEXT_BYTES = 5 * 1024 * 1024;
+const dropShade = document.createElement('div');
+dropShade.className = 'file-drop';
+dropShade.hidden = true;
+dropShade.innerHTML = '<div class="file-drop-box"><b>놓으면 메모로 만들어요</b><span>.md · .txt 는 글 그대로, 그림·파일은 메모 안에</span></div>';
+document.body.append(dropShade);
+const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => {
+  if (!hasFiles(e) || el.main.hidden) return;
+  e.preventDefault();
+  dragDepth++;
+  dropShade.hidden = false;
+});
+window.addEventListener('dragover', (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault(); // 놓을 수 있게 (안 하면 Electron 이 파일을 창에 열어 버린다)
+  e.dataTransfer.dropEffect = el.main.hidden ? 'none' : 'copy';
+});
+window.addEventListener('dragleave', (e) => {
+  if (!hasFiles(e)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) dropShade.hidden = true;
+});
+window.addEventListener('drop', async (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  dropShade.hidden = true;
+  if (el.main.hidden) return;
+  // 폴더는 빼고 (폴더는 webkitGetAsEntry 로만 알 수 있다)
+  const entries = [...e.dataTransfer.items].map((it) => it.webkitGetAsEntry?.());
+  const files = [...e.dataTransfer.files].filter((_f, i) => !entries[i]?.isDirectory).slice(0, MAX_DROP_FILES);
+  if (!files.length) return;
+  const made = [];
+  let failed = 0;
+  for (const file of files) {
+    try {
+      let body;
+      if (isTextDocument(file.name, file.type)) {
+        if (file.size > MAX_TEXT_BYTES) throw new Error('너무 큰 글 파일');
+        body = memoBodyFromFile({ name: file.name, kind: 'text', text: await file.text() });
+      } else {
+        const rel = await api.attachments.save(new Uint8Array(await file.arrayBuffer()), fileExtension(file));
+        body = memoBodyFromFile({ name: file.name, kind: mediaKind(file) === 'image' ? 'image' : 'file', rel });
+      }
+      made.push(await api.memo.import(body, { open: files.length === 1 }));
+    } catch (err) {
+      console.error(err);
+      failed++;
+    }
+  }
+  if (activeTab !== 'memos') showTab('memos');
+  flashStatus(made.length
+    ? `파일 ${made.length}개로 메모를 만들었어요${failed ? ` (${failed}개는 못 만들었어요)` : ''}`
+    : '이 파일로는 메모를 만들지 못했어요');
+});
+
+// 잠깐 보이는 안내 한 줄 (되돌리기 막대와 같은 자리·모양)
+let flashTimer = 0;
+function flashStatus(message) {
+  let bar = $('flash-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'flash-bar';
+    bar.className = 'undo-bar flash-bar';
+    bar.setAttribute('role', 'status');
+    document.body.append(bar);
+  }
+  bar.textContent = message;
+  bar.hidden = false;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => (bar.hidden = true), 3500);
 }
 
 // 지운 뒤 잠깐 "되돌리기" (메모 창에서 지워도 여기에)

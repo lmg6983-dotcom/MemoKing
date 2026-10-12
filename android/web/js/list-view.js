@@ -8,7 +8,7 @@ import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../
 import { COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
-import { matchChrome, confirmDialog, isTwoPane } from './ui.js';
+import { matchChrome, confirmDialog, isTwoPane, toast } from './ui.js';
 import { tutEvent } from './tutorial.js';
 import { haptic, reduceMotion, tabKeys, syncTabStops } from '../../app/js/dom.js';
 import { hintOnce } from '../../app/js/hints.js';
@@ -321,7 +321,7 @@ function setTab(tab) {
   $('view-history').hidden = tab !== 'history';
   el.filterBtn.hidden = tab !== 'memos';
   el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '알림 검색', history: '보관한 알림 검색' }[tab];
-  $('fab').hidden = tab === 'history';
+  $('fab').hidden = tab === 'history' || tab === 'reminders'; // 보관함·일정 탭엔 + 없음 (일정은 달력의 "＋ 일정 추가" 로)
   if (tab === 'reminders') remindersTab.refresh();
   runSearch();
 }
@@ -338,12 +338,35 @@ el.cards.addEventListener('click', (e) => {
   if (card) app.openMemo(card.dataset.id, { fromList: true });
 });
 // 카드를 옆으로 밀어 지우기 (여러 개를 빨리 지울 때) — 묻지 않고 휴지통으로, 되돌리기 가능
+//   카드는 손가락을 프레임마다 한 번만(requestAnimationFrame) 따라가고, 미는 동안은 compositor 층(will-change)이라
+//   좌우로 빠르게 흔들어도 끊기지 않는다. 가로 움직임은 브라우저가 화면을 끌지 않게(.card touch-action: pan-y)
+//   — 밀기 시작하면 목록 스크롤도 잠근다 (화면 전체가 같이 흔들리지 않게)
 let swipe = null;
+let swipeFrame = 0;
 el.cards.addEventListener('touchstart', (e) => {
   const card = e.target.closest('.card');
   if (!card || e.touches.length !== 1) return;
-  swipe = { card, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, active: false, t: e.timeStamp, vx: 0, id: e.touches[0].identifier };
+  swipe = { card, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, active: false, t: e.timeStamp, vx: 0, id: e.touches[0].identifier, w: 1 };
 }, { passive: true });
+function drawSwipe() {
+  swipeFrame = 0;
+  if (!swipe?.active) return;
+  const { card, dx, w } = swipe;
+  // 태블릿: 오른쪽으로 밀면 열기 — 카드는 목록 안에서만 살짝 따라온다 · 지우기는 왼쪽으로만
+  const open = isTwoPane() && dx > 0;
+  card.classList.toggle('swipe-open', open);
+  if (open) {
+    const pull = Math.min(dx, w * 0.32) + Math.max(0, dx - w * 0.32) * 0.15;
+    card.dataset.openLabel = '열기 ▸';
+    card.style.transform = `translate3d(${pull}px, 0, 0)`;
+    card.style.opacity = '';
+    card.classList.toggle('swipe-ready', dx > w * 0.28);
+    return;
+  }
+  card.style.transform = `translate3d(${dx}px, 0, 0) rotate(${dx / w * 4}deg)`;
+  card.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / w * 0.7));
+  card.classList.toggle('swipe-ready', Math.abs(dx) > w * 0.38);
+}
 el.cards.addEventListener('touchmove', (e) => {
   if (!swipe) return;
   // 두 번째 손가락이 닿아도 카드가 튀지 않게 첫 손가락만 따른다
@@ -357,31 +380,24 @@ el.cards.addEventListener('touchmove', (e) => {
       return;
     }
     if (Math.abs(dx) < 14) return;
+    if (!e.cancelable) {
+      swipe = null; // 브라우저가 이미 스크롤 중 — 카드와 화면이 함께 움직이지 않게 밀기는 하지 않는다
+      return;
+    }
     swipe.active = true;
+    swipe.x = t.clientX - Math.sign(dx) * 14; // 문턱만큼 뛰지 않고 손가락 자리에서 이어서
+    swipe.w = swipe.card.offsetWidth || 1; // 크기는 한 번만 읽는다 (움직일 때마다 읽으면 레이아웃을 다시 계산)
     swipe.card.classList.add('swiping');
+    el.screen.classList.add('swipe-lock');
   }
   e.preventDefault();
+  const nx = t.clientX - swipe.x;
   // 손을 뗄 때의 빠르기 (px/ms) — 짧게 '휙' 밀어도 지워지게
   const dt = e.timeStamp - swipe.t;
-  if (dt > 0) swipe.vx = (dx - swipe.dx) / dt;
+  if (dt > 0) swipe.vx = (nx - swipe.dx) / dt;
   swipe.t = e.timeStamp;
-  swipe.dx = dx;
-  const w = swipe.card.offsetWidth || 1;
-  // 태블릿: 오른쪽으로 밀면 열기 — 카드는 목록 안에서만 살짝 따라온다 · 지우기는 왼쪽으로만
-  const open = isTwoPane() && dx > 0;
-  swipe.card.classList.toggle('swipe-open', open);
-  if (open) {
-    const pull = Math.min(dx, w * 0.32) + Math.max(0, dx - w * 0.32) * 0.15;
-    swipe.card.dataset.openLabel = '열기 ▸';
-    swipe.card.style.transform = `translateX(${pull}px)`;
-    swipe.card.style.opacity = '';
-    swipe.card.classList.toggle('swipe-ready', dx > w * 0.28);
-    return;
-  }
-  const ready = Math.abs(dx) > w * 0.38;
-  swipe.card.style.transform = `translateX(${dx}px) rotate(${dx / w * 4}deg)`;
-  swipe.card.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / w * 0.7));
-  swipe.card.classList.toggle('swipe-ready', ready);
+  swipe.dx = nx;
+  if (!swipeFrame) swipeFrame = requestAnimationFrame(drawSwipe);
 }, { passive: false });
 function endSwipe(e) {
   if (!swipe) return;
@@ -392,6 +408,9 @@ function endSwipe(e) {
   const vx = e && e.timeStamp - swipe.t < 100 ? swipe.vx : 0;
   swipe = null;
   if (!active) return;
+  cancelAnimationFrame(swipeFrame);
+  swipeFrame = 0;
+  el.screen.classList.remove('swipe-lock');
   const opening = card.classList.contains('swipe-open');
   card.classList.remove('swiping', 'swipe-ready', 'swipe-open');
   const w = card.offsetWidth || 1;
@@ -435,6 +454,8 @@ el.cards.addEventListener('contextmenu', (e) => {
   const card = e.target.closest('.card');
   if (!card) return;
   e.preventDefault();
+  if (swipe?.active || card.classList.contains('swiping')) return; // 누른 채 옆으로 밀고 있으면 메뉴는 띄우지 않는다
+  swipe = null;
   haptic(12);
   app.memoMenu(card.dataset.id);
 });
@@ -492,6 +513,7 @@ export function setup() {
     container: $('reminder-groups'),
     empty: $('reminders-empty'),
     countEl: $('count-reminders'),
+    notify: (text, isError) => toast(text, isError),
   });
   historyTab = setupHistoryTab({
     api: app.api,

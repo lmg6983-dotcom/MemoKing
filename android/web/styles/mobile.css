@@ -159,6 +159,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .view {
   flex: 1;
   min-height: 0;
+  overflow-x: hidden; /* 밀어 지우는 카드가 기울어 삐져나와도 화면이 옆으로 끌리지 않게 */
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 2px 0 calc(96px + env(safe-area-inset-bottom));
@@ -453,6 +454,14 @@ h2.sheet-title { font-size: 20px; }
 .sheet .chips button { height: var(--tap); padding: 0 12px; font-size: 14px; }
 .sheet .rem-radio { min-height: 40px; font-size: 14.5px; }
 .sheet .rem-item { min-height: 52px; }
+.sheet .rem-q { font-size: 19px; margin-bottom: 14px; }
+.sheet .rem-kinds button { min-height: 60px; padding: 12px 14px; border-radius: 14px; }
+.sheet .rem-kinds button b { font-size: 16px; }
+.sheet .rem-kinds button small { font-size: 13px; }
+.sheet .rem-answer { min-height: 46px; padding: 10px 4px; }
+.sheet .rem-answer b { font-size: 15px; }
+.sheet .rem-next, .sheet .rem-start { height: 50px; font-size: 16px; border-radius: 14px; }
+.sheet .alert-custom select, .sheet .alert-custom input { height: 44px; font-size: 15px; }
 .sheet .dp-day { height: 44px; font-size: 15px; border-radius: 12px; }
 .sheet .dp-title { font-size: 16px; }
 .sheet .dp-time select { height: 44px; font-size: 15px; }
@@ -715,6 +724,14 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 :is(.links-panel .link-item, .rem-item) .icon-btn svg { width: 18px; height: 18px; }
 
 /* ---------- 보내기 (글 · 그림 · PDF) ---------- */
+/* PDF · 인쇄 내용 크기 (app.js openPrint) — A4 첫 쪽을 시트 폭에 맞춰 줄여 보인다 */
+.print-preview { position: relative; width: min(100%, 280px); aspect-ratio: 794 / 1123; margin: 0 auto 12px; overflow: hidden; border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
+.print-preview iframe { position: absolute; top: 0; left: 0; width: 794px; height: 1123px; border: 0; transform: scale(var(--fit, 0.35)); transform-origin: 0 0; pointer-events: none; }
+.print-size .seg { margin-bottom: 8px; }
+.print-range { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; color: var(--muted); }
+.print-range input { flex: 1; accent-color: var(--brand-yellow); }
+.print-range output { min-width: 3.2em; font-weight: 700; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+.print-go { width: 100%; margin-top: 6px; }
 .share-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 4px 0 8px; }
 .share-choice {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -762,7 +779,9 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 /* 지운 카드의 떠 있는 복사본 — 날아가는 동안 목록은 이미 다시 그려져 남은 카드가 미끄러진다 (list-view.js animateRemove) */
 .card-ghost { position: fixed; z-index: 30; margin: 0; pointer-events: none; animation: card-fly 0.24s var(--ease-out) forwards; }
 @keyframes card-fly { to { transform: translateX(var(--fly, 110%)) rotate(6deg); opacity: 0; } }
-.card.swiping { transition: none; z-index: 2; }
+.card { touch-action: pan-y; } /* 가로 움직임은 카드 밀기로 (브라우저가 화면을 옆으로 끌지 않음) */
+.card.swiping { transition: none; z-index: 2; will-change: transform, opacity; }
+.list-screen.swipe-lock .view { overflow-y: hidden; } /* 미는 동안 목록이 위아래로 같이 흔들리지 않게 */
 .card.swipe-ready { box-shadow: 0 0 0 2px var(--rec), var(--shadow-card); }
 .card.swipe-ready::before {
   content: "지우기"; position: absolute; top: 10px; right: 10px; z-index: 3;
@@ -1090,3 +1109,8 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 글 고치기: 그림·영상·카드를 끌거나 골라지지 않게 (옮기기는 다이얼의 옮기기 방식에서만) */
 .note-screen[data-touch-mode="edit"] .mk-doc :is(img, .mk-media, .mk-link-card, .mk-file) { -webkit-user-drag: none; }
 .note-screen[data-touch-mode="edit"] .mk-doc .ProseMirror-selectednode { outline: none; }
+
+/* 고른 날 제목 옆 "＋ 일정 추가" (list-reminders.js) */
+.ev-day-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ev-add { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--fill-tab, var(--hover)); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.ev-add svg { width: 16px; height: 16px; }

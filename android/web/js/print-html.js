@@ -9,9 +9,12 @@ const SCREEN_ONLY = /^(ProseMirror-selectednode|ProseMirror-hideselection|mk-blo
 
 /**
  * @param {Element} dom 편집기 본문 (.mk-doc)
- * @param {{ title: string, color?: string }} memo
+ * @param {{ title: string, color?: string, scale?: number, preview?: boolean }} memo
+ *   scale: 종이에 담을 내용 크기 (1 = 보통, 글·그림·표가 함께 커지고 작아진다)
+ *   preview: 첫 쪽 미리보기용 (A4 한 장 크기, 여백 포함)
  */
-export function printHtml(dom, { title, color = 'yellow' }) {
+export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = false }) {
+  const zoom = Math.min(2, Math.max(0.5, Number(scale) || 1));
   const doc = dom.cloneNode(true);
   doc.removeAttribute('contenteditable');
   doc.removeAttribute('inputmode');
@@ -42,6 +45,8 @@ ${links}
 .print-doc .mk-voice-body > p:first-child { line-height: normal; font-size: 11pt; }
 .print-doc p.mk-image-line { line-height: normal; font-size: inherit; }
 .print-doc .mk-doc li::after { border-color: transparent !important; }
+${zoom !== 1 ? `.print-doc { zoom: ${zoom}; }` : ''}
+${preview ? 'html.print-page body { box-sizing: border-box; width: 794px; height: 1123px; padding: 48px; overflow: hidden; background: #fff; }' : ''}
 </style>
 </head>
 <body data-color="${esc(color)}">

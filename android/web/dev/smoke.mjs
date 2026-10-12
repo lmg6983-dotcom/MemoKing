@@ -232,8 +232,18 @@ try {
 
   // 알림 추가
   await page.tap('#bell-btn');
-  check('일정과 알림 패널: 처음엔 "일정" (이름·미리 알림 칩)', await page.isVisible('#rem-title') && (await page.locator('#rem-alerts button').count()) >= 5);
+  check('일정과 알림 패널: 처음엔 "무엇을 만들까요?" 한 가지만', await page.isVisible('#rem-kind [data-kind="at"]') && await page.isHidden('#rem-title') && await page.isHidden('.rem-submit'));
+  await shot('05a-rem-kind');
+  await page.tap('#rem-kind [data-kind="at"]');
+  await shot('05b-rem-when');
+  await page.tap('[data-step="when"] [data-next]');
+  await page.tap('.alert-more');
+  await shot('05c-rem-alerts');
+  check('일정: 언제 → 미리 알림 (칩 + 직접 정하기)', (await page.locator('#rem-alerts button').count()) >= 5 && await page.isVisible('.alert-more') && (await page.locator('.rem-answer').count()) === 2);
+  await page.tap('.rem-answer[data-goto="kind"]');
   await page.tap('#rem-kind [data-kind="timer"]');
+  await page.tap('[data-step="when"] [data-next]');
+  check('타이머: 언제 → 바로 확인 (미리 알림 단계 없음)', await page.isVisible('.rem-submit') && await page.isHidden('#rem-title'));
   await page.tap('.rem-submit');
   await page.waitForTimeout(300);
   check('알림 패널: 10분 타이머 추가', /kind: timer/.test(read('회의 메모.md')));
@@ -376,6 +386,30 @@ try {
   }));
   check('일정 탭: 달력 42칸 · 다가오는 일정에 "치과 · 알림 30분 전, 하루 전"', cal.days === 42 && cal.rows.some((t) => /치과/.test(t) && /알림 30분 전, 하루 전/.test(t)), JSON.stringify(cal));
   await shot('02g-calendar');
+  check('일정 탭: + 버튼 없음 (보관함처럼)', await page.isHidden('#fab'));
+  // 달력에서 바로 일정 만들기: 고른 날 › ＋ 일정 추가 → 이름·시각 → 미리 알림 → 새 메모 / 있는 메모
+  await page.tap('.ev-add');
+  await page.waitForSelector('.quick-event[open]');
+  check('바로 일정 추가: 처음엔 이름·시각만 (미리 알림·메모 고르기는 숨김)', await page.isVisible('.qe-name') && await page.isHidden('.quick-event [data-step="alerts"]') && await page.isHidden('.qe-new'));
+  await page.fill('.qe-name', '팀 점심');
+  await page.tap('.quick-event [data-step="what"] .rem-next');
+  await page.tap('.quick-event [data-step="alerts"] .rem-next');
+  await shot('02h-quick-event-memo');
+  check('바로 일정 추가: 마지막에 "새 메모" 와 메모 검색', /팀 점심/.test(await page.textContent('.qe-new')) && (await page.locator('.qe-memo').count()) > 0);
+  await page.tap('.qe-new');
+  await page.waitForTimeout(600);
+  const lunch = fs.existsSync(path.join(vault, '팀 점심.md')) ? read('팀 점심.md') : '';
+  check('바로 일정 추가: 일정 이름으로 새 메모 + 일정', /^# 팀 점심/m.test(lunch) && /kind: at/.test(lunch), lunch.slice(0, 300));
+  await page.tap('.ev-add');
+  await page.waitForSelector('.quick-event[open]');
+  await page.fill('.qe-name', '주간 보고');
+  await page.tap('.quick-event [data-step="what"] .rem-next');
+  await page.tap('.quick-event [data-step="alerts"] .rem-next');
+  await page.fill('.qe-search', '회의');
+  await page.waitForTimeout(200);
+  await page.tap('.qe-memo');
+  await page.waitForTimeout(600);
+  check('바로 일정 추가: 있는 메모를 고르면 그 메모에 일정', /title: 주간 보고/.test(read('회의 메모.md')), read('회의 메모.md').slice(0, 400));
   await page.tap('[data-tab="memos"]');
   await page.waitForTimeout(300);
 
@@ -523,6 +557,31 @@ try {
   // 데스크탑과 같은 편집 기능: 체크리스트 끝내면 CLEAR 도장 · 꾹 눌러 끌어 줄 바꾸기 · 그림 줄 옮기기
   const cdp = await ctx.newCDPSession(page);
   const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  // 목록 카드를 누른 채 좌우로 흔들기: 카드만 손가락을 따라가고 화면은 옆으로 끌리지 않음 · 메뉴 안 뜸 · 제자리에서 놓으면 그대로
+  {
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
+    const cardSel = '.card[data-id="00000000-0000-4000-8000-000000000001"]';
+    const box = await page.locator(cardSel).boundingBox();
+    const cy = box.y + box.height / 2;
+    const cx = box.x + box.width / 2;
+    await touch('touchStart', cx, cy);
+    const seen = [];
+    for (const dx of [20, 50, 80, 30, -20, -60, -90, -30, 20, 60, 10]) {
+      await touch('touchMove', cx + dx, cy);
+      await page.waitForTimeout(20);
+      seen.push(await page.evaluate((sel) => ({ t: document.querySelector(sel).style.transform, sl: document.querySelector('#list-screen .view:not([hidden])')?.scrollLeft ?? 0 }), cardSel));
+    }
+    await touch('touchMove', cx + 2, cy);
+    await page.waitForTimeout(40);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(350);
+    const follows = seen.some((x) => /translate3d\(-\d/.test(x.t)) && seen.some((x) => /translate3d\(\d/.test(x.t));
+    check('목록 카드 좌우로 흔들기: 카드만 따라오고 화면은 그대로 · 놓으면 제자리', follows && seen.every((x) => x.sl === 0)
+      && await page.isVisible(cardSel) && await page.isHidden('#memo-sheet') && !(await page.$eval(cardSel, (c) => c.style.transform)), JSON.stringify(seen.slice(0, 4)));
+  }
   await page.tap('.card[data-id="00000000-0000-4000-8000-000000000001"]');
   await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
   await page.waitForTimeout(300);
@@ -926,6 +985,13 @@ try {
   await page.tap('#menu-btn');
   await page.tap('[data-memo-action="share"]');
   await page.tap('[data-share="pdf"]');
+  await page.waitForSelector('#print-sheet:not([hidden])');
+  check('PDF: 먼저 내용 크기 고르기 (작게·보통·크게·아주 크게 + 직접)', (await page.locator('#print-size-seg [data-scale]').count()) === 4 && await page.isVisible('#print-scale'));
+  await page.tap('#print-size-seg [data-scale="1.2"]');
+  await page.waitForTimeout(400);
+  check('PDF: 크기를 고르면 미리보기도 그 크기로', /zoom: 1\.2/.test(await page.$eval('#print-frame', (f) => f.srcdoc)) && (await page.textContent('#print-scale-out')) === '120%');
+  await shot('09b-print-size');
+  await page.tap('#print-go');
   if (process.env.MK_PDF) {
     await page.pdf({ path: path.join(outDir, 'share.pdf'), format: 'A4' });
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -937,6 +1003,7 @@ try {
   // 앱은 이 인쇄 전용 HTML 을 보이지 않는 WebView 에 띄워 PDF 로 쓴다 → 따로 띄워 PDF 로 찍어 글자가 들었는지
   const pdfHtml = (await devLog()).log.filter((l) => l.sharePdf).at(-1)?.sharePdf?.html ?? '';
   check('보내기 PDF: 인쇄 전용 문서 (본문·print.css)', pdfHtml.includes('print-page') && pdfHtml.includes('print.css') && pdfHtml.includes('사과'));
+  check('보내기 PDF: 고른 크기(120%)로', /\.print-doc \{ zoom: 1\.2; \}/.test(pdfHtml));
   {
     const pp = await ctx.newPage();
     await pp.goto(`${base}/m/index.html#print-test`).catch(() => {});

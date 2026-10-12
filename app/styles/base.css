@@ -515,6 +515,86 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .event-alerts button[aria-pressed="true"]::before { content: '✓ '; }
 .event-alerts button:disabled { opacity: 0.4; cursor: default; text-decoration: line-through; }
 .event-alerts button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 한 번에 한 질문 (토스처럼): 메모 창 알림 패널(reminder-panel.js) · 일정 탭 바로 만들기(quick-event.js) */
+.rem-start { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
+.rem-start svg { width: 16px; height: 16px; }
+.rem-answers { margin: 0 0 10px; padding: 0; list-style: none; }
+.rem-answers:empty { display: none; }
+.rem-answer {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 10px;
+  width: 100%; padding: 7px 4px; border: 0; border-bottom: 1px solid var(--border);
+  background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  animation: rem-fold 0.22s ease-out;
+}
+.rem-answer span { font-size: 12px; color: var(--muted); }
+.rem-answer b { min-width: 0; overflow: hidden; font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
+.rem-answer small { font-size: 12px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .rem-answer:hover { background: var(--hover); } }
+.rem-step { animation: rem-step-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.rem-q { margin: 2px 0 12px; font-size: 16px; font-weight: 800; line-height: 1.35; letter-spacing: -0.01em; }
+.rem-q:focus { outline: none; }
+.rem-q small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.rem-kinds { display: grid; gap: 6px; }
+.rem-kinds button {
+  display: grid; grid-template-columns: 22px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1);
+  color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, transform 0.12s;
+}
+.rem-kinds button svg { grid-row: span 2; width: 20px; height: 20px; }
+.rem-kinds button b { font-size: 14px; }
+.rem-kinds button small { font-size: 12px; color: var(--muted); }
+.rem-kinds button[aria-checked="true"] { border-color: var(--brand-yellow); box-shadow: inset 0 0 0 1px var(--brand-yellow); }
+.rem-kinds button:active { transform: scale(0.98); }
+@media (hover: hover) and (pointer: fine) { .rem-kinds button:hover { background: var(--hover); } }
+.rem-next { width: 100%; margin-top: 6px; }
+.rem-hint { min-height: 1.2em; margin: 0 0 6px; font-size: 12.5px; color: var(--muted); }
+.rem-finish-actions { display: flex; gap: 6px; }
+.rem-finish-actions .rem-cancel { flex: 0 0 auto; }
+.rem-finish-actions .rem-submit { flex: 1; width: auto; }
+.rem-flow .rem-title-row { margin-bottom: 10px; }
+.date-picker.all-day .dp-time-box, .date-picker.all-day .dp-summary { display: none; }
+.rem-allday-row { margin-bottom: 8px; }
+@keyframes rem-step-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes rem-fold { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .rem-step, .rem-answer { animation: none; } }
+/* 일정 탭 달력에서 바로 만들기 (quick-event.js) */
+.quick-event .qe-name {
+  width: 100%; min-height: 40px; margin-bottom: 8px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-0); color: var(--text); font: inherit; font-size: 15px;
+}
+.quick-event .qe-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.quick-event .qe-time .dp-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.quick-event .qe-time .dp-quick button { min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.quick-event .qe-time .dp-quick button[aria-pressed="true"] { border-color: transparent; background: var(--accent); color: var(--on-brand); font-weight: 700; }
+.quick-event .qe-time .dp-time { display: flex; gap: 6px; }
+.quick-event .qe-time select { flex: 1; height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
+.quick-event .qe-new { width: 100%; margin-bottom: 10px; }
+.quick-event .qe-search { width: 100%; height: 38px; margin-bottom: 6px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-0); color: var(--text); font: inherit; }
+.quick-event .qe-memos { max-height: min(40vh, 280px); margin: 0 0 8px; padding: 0; overflow-y: auto; list-style: none; }
+.quick-event .qe-memo { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 6px 8px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.quick-event .qe-memo span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) and (pointer: fine) { .quick-event .qe-memo:hover { background: var(--hover); } }
+.quick-event .row-dot { width: 12px; height: 12px; flex: none; border-radius: 4px; }
+.quick-event .qe-none { padding: 8px; font-size: 13px; color: var(--muted); }
+.quick-event .rem-answers { margin-bottom: 8px; }
+@media (pointer: coarse) {
+  .quick-event .qe-name, .quick-event .qe-search, .quick-event .qe-time select { min-height: 48px; font-size: 16px; }
+  .quick-event .qe-memo { min-height: 48px; font-size: 15px; }
+  .quick-event .qe-time .dp-quick button { min-height: 44px; font-size: 14px; }
+  .quick-event .rem-next, .quick-event .qe-new { height: 50px; font-size: 16px; }
+}
+/* 직접 정하는 미리 알림 (alert-picker.js — 일정 창 · 메모 창 알림 패널 · 일정 탭 바로 만들기) */
+.alert-more { border-style: dashed !important; }
+:is(.chips, .event-alerts) button.custom { border-style: dashed; }
+.alert-custom { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 8px; }
+.alert-custom[hidden] { display: none; }
+.alert-custom input, .alert-custom select {
+  height: 32px; padding: 0 6px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px;
+}
+.alert-custom input[type="number"] { width: 64px; }
+@media (pointer: coarse) { .alert-custom input, .alert-custom select, .alert-custom .btn { min-height: 44px; font-size: 15px; } }
 .event-dialog .event-none { min-height: 1.3em; margin: 6px 0 12px; font-size: 12.5px; color: var(--muted); }
 @media (pointer: coarse) { .event-alerts button { min-height: 44px; padding: 10px 14px; font-size: 14px; } .event-field input { min-height: 48px; font-size: 16px; } }
 

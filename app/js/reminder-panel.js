@@ -1,8 +1,11 @@
 // 메모 창의 "일정과 알림" 패널 — 목록(켜기/끄기·삭제)과 새로 만들기
-//   일정 · 반복 일정: 이름 + 미리 알림(구글 캘린더처럼 여러 개, 정시에 울리는 게 아니라 미리) · 타이머 · 앱 열 때
+//   새로 만들기는 토스처럼 한 번에 한 가지만 묻는다: 무엇을 → 언제 → (일정이면) 미리 알림 → 이름·확인.
+//   답한 단계는 위에 한 줄로 접히고, 그 줄을 누르면 그 단계로 돌아가 고친다.
+//   일정 · 반복 일정: 이름 + 미리 알림(구글 캘린더처럼 여러 개, 직접 정한 시각도) · 타이머 · 앱 열 때
 import { icon } from './icons.js';
-import { describeReminder, describeAlerts, nextLabel, isDone, isEvent, isLive, isPastEvent, reenable, pendingAlerts, fallbackAlert, ALERT_PRESETS, alertLabel } from './core/reminders.js';
-import { remembered, remember } from './event-editor.js';
+import { describeReminder, describeAlerts, nextLabel, isDone, isEvent, isLive, isPastEvent, reenable, pendingAlerts, fallbackAlert, alertLabel } from './core/reminders.js';
+import { remembered, remember, eventWhen } from './event-editor.js';
+import { alertPicker } from './alert-picker.js';
 import { toLocalIso } from './core/time.js';
 import { dateTimePicker, timePicker } from './date-picker.js';
 
@@ -32,11 +35,16 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     time: $('rep-time'),
     title: $('rem-title'),
     titleRow: $('rem-title-row'),
-    alertsWrap: $('rem-alerts-wrap'),
     allDay: $('rem-allday'),
     allDayRow: $('rem-allday-row'),
     alerts: $('rem-alerts'),
     submit: $('rem-submit'),
+    start: $('rem-start'),
+    steps: $('rem-steps'),
+    answers: $('rem-answers'),
+    whenQ: $('rem-when-q'),
+    hint: $('rem-alerts-hint'),
+    cancel: $('rem-cancel'),
   };
   let reminders = [];
   let kind = 'at';
@@ -50,30 +58,33 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     if (Number.isNaN(at.getTime())) return null;
     return el.allDay.checked ? new Date(at.getFullYear(), at.getMonth(), at.getDate()) : at;
   }
-  function renderAlerts() {
-    const k = alertKind();
+  const alertBox = alertPicker(el.alerts, {
+    picked,
+    kind: alertKind,
+    start: chosenStart,
+    repeat: () => kind === 'repeat',
+    onChange: () => (el.hint.textContent = alertHint()),
+    onLimit: (text) => (el.hint.textContent = text),
+  });
+  /** 고른 미리 알림이 이번 일정엔 모두 지났을 때 안내 */
+  function alertHint() {
     const start = chosenStart();
-    const live = start ? new Set(pendingAlerts(ALERT_PRESETS[k], start, { allDay: k === 'allDay' })) : null;
-    el.alerts.replaceChildren(...ALERT_PRESETS[k].map((offset) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.dataset.alert = String(offset);
-      b.textContent = alertLabel(offset, k === 'allDay');
-      const past = live ? !live.has(offset) : false;
-      b.setAttribute('aria-pressed', String(picked[k].has(offset) && !past));
-      if (past) {
-        b.disabled = true;
-        b.title = '이미 지난 시각이에요';
-      }
-      b.addEventListener('click', () => {
-        if (picked[k].has(offset)) picked[k].delete(offset);
-        else picked[k].add(offset);
-        renderAlerts();
-      });
-      return b;
-    }));
+    const set = [...picked[alertKind()]];
+    if (!set.length) return '알림 없이 달력에만 보여요';
+    if (!start) return '';
+    const allDay = alertKind() === 'allDay';
+    if (pendingAlerts(set, start, { allDay }).length) return '';
+    const fb = pendingAlerts(set, start, { fallback: fallbackAlert(allDay), allDay });
+    return fb.length ? `고른 시각이 모두 지나 ${alertLabel(fb[0], allDay)}에 알려요` : '';
   }
-  el.allDay.addEventListener('change', renderAlerts);
+  function renderAlerts() {
+    alertBox.render();
+    el.hint.textContent = alertHint();
+  }
+  el.allDay.addEventListener('change', () => {
+    $('at-picker').classList.toggle('all-day', el.allDay.checked); // 하루 종일이면 시각 고르기는 접는다
+    renderAlerts();
+  });
   el.atInput.addEventListener('input', renderAlerts);
   // 날짜는 달력, 시각은 칩·목록 (휴대폰 기본 다이얼 대신) — 고른 값은 위 입력칸에 그대로
   const atPicker = dateTimePicker($('at-picker'), { input: el.atInput });
@@ -161,14 +172,99 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
 
   // ---------- 새 알림 ----------
 
+  // ---------- 단계 ----------
+  const KIND_NAME = { at: '일정', repeat: '반복 일정', timer: '타이머', startup: '앱 열 때' };
+  const WHEN_Q = { at: '언제예요?', repeat: '얼마나 자주, 몇 시에요?', timer: '몇 분 뒤에 알려 드릴까요?', startup: '언제 알려 드릴까요?' };
+  const STARTUP_NAME = { every: '열 때마다', daily: '하루 한 번', once: '다음에 열 때 한 번' };
+  let step = 'kind';
+  const stepsOf = () => (kind === 'at' || kind === 'repeat' ? ['kind', 'when', 'alerts', 'finish'] : ['kind', 'when', 'finish']);
+
+  /** 답한 단계 한 줄: "일정" · "10월 13일 (화) 오후 3:00" · "10분 전, 하루 전" */
+  function answerOf(s) {
+    if (s === 'kind') return KIND_NAME[kind];
+    if (s === 'when') {
+      if (kind === 'at') {
+        const start = chosenStart();
+        return start ? eventWhen(start, el.allDay.checked) : '';
+      }
+      if (kind === 'timer') return `${Math.round(Number(el.timerMin.value)) || 0}분 뒤`;
+      if (kind === 'startup') return STARTUP_NAME[el.form.querySelector('input[name="startup"]:checked').value];
+      try {
+        return describeReminder(buildReminder());
+      } catch {
+        return '';
+      }
+    }
+    if (s === 'alerts') return describeAlerts({ kind: 'at', alerts: [...picked[alertKind()]], allDay: alertKind() === 'allDay' });
+    return '';
+  }
+  const STEP_LABEL = { kind: '만들 것', when: '언제', alerts: '미리 알림' };
+
+  function goto(next, { focus = true } = {}) {
+    step = next;
+    const order = stepsOf();
+    const at = order.indexOf(step);
+    for (const sec of el.form.querySelectorAll('[data-step]')) sec.hidden = sec.dataset.step !== step;
+    el.answers.replaceChildren(...order.slice(0, at).map((s) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rem-answer';
+      b.dataset.goto = s;
+      b.setAttribute('aria-label', `${STEP_LABEL[s]}: ${answerOf(s)}, 바꾸기`);
+      const label = document.createElement('span');
+      label.textContent = STEP_LABEL[s];
+      const value = document.createElement('b');
+      value.textContent = answerOf(s);
+      const edit = document.createElement('small');
+      edit.textContent = '바꾸기';
+      b.append(label, value, edit);
+      li.append(b);
+      return li;
+    }));
+    if (step === 'alerts') renderAlerts();
+    if (focus) {
+      const sec = el.form.querySelector(`[data-step="${step}"]`);
+      const target = step === 'kind' ? el.kinds.querySelector('[aria-checked="true"]')
+        : step === 'finish' && !el.titleRow.hidden ? el.title
+          : sec?.querySelector('.rem-q');
+      if (target && !target.hasAttribute('tabindex') && target.matches('.rem-q')) target.setAttribute('tabindex', '-1');
+      target?.focus({ preventScroll: true });
+      sec?.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function nextStep() {
+    const order = stepsOf();
+    if (step === 'when') {
+      // 다음으로 가기 전에 지금 단계 값이 맞는지 (지난 시각 · 요일 없음 · 분 없음)
+      try {
+        buildReminder();
+      } catch (err) {
+        setStatus(err.message, true);
+        return;
+      }
+    }
+    goto(order[Math.min(order.length - 1, order.indexOf(step) + 1)]);
+  }
+
+  /** 처음으로 (목록에 알림이 있으면 "새로 만들기" 단추만, 없으면 바로 첫 질문) */
+  function resetFlow() {
+    const open = reminders.length === 0;
+    el.start.hidden = open;
+    el.steps.hidden = !open;
+    el.title.value = '';
+    goto('kind', { focus: false });
+  }
+
   function setKind(next) {
     kind = next;
     for (const b of el.kinds.querySelectorAll('[data-kind]')) b.setAttribute('aria-checked', String(b.dataset.kind === kind));
     for (const pane of el.form.querySelectorAll('[data-pane]')) pane.hidden = pane.dataset.pane !== kind;
     const event = kind === 'at' || kind === 'repeat';
     el.titleRow.hidden = !event;
-    el.alertsWrap.hidden = !event;
     el.allDayRow.hidden = kind !== 'at';
+    el.whenQ.textContent = WHEN_Q[kind];
     el.submit.textContent = event ? '일정 추가' : kind === 'timer' ? '타이머 추가' : '알림 추가';
     if (kind === 'at' && !atChosen) {
       // 처음엔 한 시간 뒤 정각
@@ -255,7 +351,40 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
 
   el.kinds.addEventListener('click', (e) => {
     const b = e.target.closest('[data-kind]');
-    if (b) setKind(b.dataset.kind);
+    if (!b) return;
+    setKind(b.dataset.kind);
+    // 마우스·손가락으로 고르면 바로 다음 질문 (화살표 키로 고를 때는 그 자리에)
+    if (e.detail > 0) goto('when');
+  });
+  el.form.addEventListener('click', (e) => {
+    if (e.target.closest('[data-next]')) nextStep();
+    const back = e.target.closest('[data-goto]');
+    if (back) goto(back.dataset.goto);
+  });
+  el.start.addEventListener('click', () => {
+    el.start.hidden = true;
+    el.steps.hidden = false;
+    goto('kind');
+  });
+  el.cancel.addEventListener('click', () => {
+    resetFlow();
+    if (!el.start.hidden) el.start.focus();
+  });
+  // 이름 칸에서 Enter = 추가 (다른 단계 칸의 Enter 는 다음 단계로)
+  el.kinds.addEventListener('keydown', (e) => {
+    // 키보드: 화살표로 고르고 Enter(또는 Space)로 다음 질문
+    const b = e.target.closest('[data-kind]');
+    if (!b || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    setKind(b.dataset.kind);
+    goto('when');
+  });
+  el.form.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.isComposing || e.defaultPrevented || step === 'finish') return;
+    if (e.target.matches('input[type="number"], input[type="text"]')) {
+      e.preventDefault();
+      nextStep();
+    }
   });
   el.presets.addEventListener('click', (e) => {
     const b = e.target.closest('[data-min]');
@@ -287,11 +416,10 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     // 기본값으로는 고른 것을 그대로 기억 (이번 일정에 맞지 않아 빠진 "하루 전" 도 다음 일정엔 다시) — 만들기에 성공했을 때만
     if (isEvent(reminder)) remember(alertKind(), [...picked[alertKind()]].sort((a, b) => b - a));
     const saved = reminders.at(-1) ?? reminder;
-    el.title.value = '';
+    resetFlow();
     setStatus(isEvent(saved)
       ? `일정을 추가했어요: ${saved.title ? `${saved.title}, ` : ''}${describeReminder(saved)} (알림: ${describeAlerts(saved)}).${note}`
       : `알림을 추가했어요: ${describeReminder(saved)}`);
-    renderAlerts();
   });
 
   // ---------- 패널 열고 닫기 ----------
@@ -302,13 +430,15 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     onToggle?.(open);
     if (open) {
       render();
-      el.panel.querySelector('[aria-checked="true"]')?.focus();
+      resetFlow();
+      (el.start.hidden ? el.kinds.querySelector('[aria-checked="true"]') : el.start).focus();
     }
   }
   el.btn.addEventListener('click', () => toggle());
   $('reminder-close').addEventListener('click', () => toggle(false));
 
   setKind('at'); // 처음엔 "일정" (한 시간 뒤 정각 · 지난번에 고른 미리 알림)
+  resetFlow();
 
   // 목록이 1분마다 "다음 알림" 문구를 새로 계산
   setInterval(() => !el.panel.hidden && render(), 60_000);
@@ -317,6 +447,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     set(list) {
       reminders = list ?? [];
       render();
+      if (el.panel.hidden) resetFlow(); // 다른 메모로 바뀌면(휴대폰은 패널 하나를 같이 씀) 처음 질문부터 — 만드는 중이면 그대로
       onChange?.(reminders);
     },
     get list() {

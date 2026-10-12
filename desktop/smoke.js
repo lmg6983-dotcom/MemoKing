@@ -622,6 +622,8 @@ export async function runSmoke({
     await js(webNote.win, `new MutationObserver(() => (window.__statusLog ??= []).push(document.getElementById('status').textContent))
       .observe(document.getElementById('status'), { childList: true, characterData: true, subtree: true })`);
     webNote.win.webContents.insertText('웹에서 가져온 글');
+    // 글이 들어간 뒤에 Enter (먼저 오면 Enter 가 글 넣기에 묻혀 사라질 때가 있다)
+    await until(() => js(webNote.win, `document.querySelector('.mk-doc').textContent.includes('웹에서 가져온 글')`), '첫 줄').catch(() => {});
     await key(webNote.win, 'Enter');
     // 키 입력은 비동기라, 새 줄이 생긴 뒤에 붙여넣는다 (안 그러면 붙인 제목이 첫 줄에 합쳐짐)
     await until(() => js(webNote.win, `document.querySelectorAll('.mk-doc > *').length >= 2`), '새 줄').catch(() => {});
@@ -672,7 +674,53 @@ export async function runSmoke({
     await key(webNote.win, 'Z', ['control']);
     const undone = await until(() => !readMemo(webNote.id).includes('마크다운 사진'), 'Ctrl+Z').catch(() => false);
     check('Ctrl+Z 한 번 → 붙여넣기 전체 취소 (사진 주소 교체는 따로 남지 않음)', undone && readMemo(webNote.id).includes('기사 본문 첫 문단'));
+    // PC: 그림에 마우스를 올리면 지우기 단추(×), 떠나면 거둠 — 누르면 그 그림 줄이 지워진다
+    const hoverDel = await js(webNote.win, `(async () => {
+      const img = document.querySelector('.mk-doc img.mk-image');
+      if (!img) return 'no image';
+      const r = img.getBoundingClientRect();
+      img.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
+      await new Promise((ok) => setTimeout(ok, 50));
+      const shown = Boolean(document.querySelector('.mk-delete-btn.hover'));
+      document.querySelector('.mk-doc').dispatchEvent(new MouseEvent('mouseleave'));
+      await new Promise((ok) => setTimeout(ok, 600));
+      return { shown, gone: !document.querySelector('.mk-delete-btn') };
+    })()`);
+    check('PC: 그림에 마우스를 올리면 지우기 단추 · 마우스가 떠나면 사라짐', hoverDel?.shown && hoverDel?.gone, JSON.stringify(hoverDel));
+    const imgCount = () => js(webNote.win, `document.querySelectorAll('.mk-doc img.mk-image').length`);
+    const beforeDel = await imgCount();
+    await js(webNote.win, `(() => {
+      const img = document.querySelector('.mk-doc img.mk-image');
+      const r = img.getBoundingClientRect();
+      img.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
+      document.querySelector('.mk-delete-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    })()`);
+    const deleted = await until(async () => (await imgCount()) === beforeDel - 1, '그림 지우기').catch(() => false);
+    check('PC: 마우스를 올려 뜬 × 를 누르면 그 그림이 지워짐', deleted, `${beforeDel} → ${await imgCount()}`);
     await closeNote(webNote.id);
+
+    // 13-0) 목록 창에 파일을 끌어다 놓으면 메모로 (.md 는 글 그대로, 그림은 메모 안에)
+    {
+      const before = new Set(getVault().list().map((m) => m.id));
+      await js(getList(), `(() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['# 끌어온 회의록\\n\\n- 안건 하나\\n- 안건 둘\\n'], '회의록.md', { type: 'text/markdown' }));
+        dt.items.add(new File([Uint8Array.from(atob('${png.toString('base64')}'), (c) => c.charCodeAt(0))], '끌어온 그림.png', { type: 'image/png' }));
+        for (const type of ['dragenter', 'dragover']) window.dispatchEvent(new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true }));
+        const shade = !document.querySelector('.file-drop').hidden;
+        window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+        return shade;
+      })()`);
+      const made = await until(() => {
+        const fresh = getVault().list().filter((m) => !before.has(m.id) && m.file);
+        return fresh.length >= 2 ? fresh : null;
+      }, '끌어다 놓은 파일 → 메모').catch(() => []);
+      const bodies = made.map((m) => readMemo(m.id));
+      check('목록 창에 파일을 끌어다 놓으면 메모로 (.md 는 글 그대로 · 그림은 파일 이름 제목 + 그림)',
+        bodies.some((b) => /# 끌어온 회의록\n\n- 안건 하나\n- 안건 둘/.test(b)) && bodies.some((b) => /# 끌어온 그림\n\n!\[끌어온 그림\.png\]\(attachments\/[^)]+\.png\)/.test(b)),
+        JSON.stringify(bodies.map((b) => b.slice(-160))));
+      for (const m of made) getVault().trash(m.id); // 뒤 점검의 메모 수에 섞이지 않게
+    }
 
     // 13-1) 링크 미리보기 카드 · 한 번 눌러 열기 (v0.10.0) — 실제 브라우저·프로그램은 띄우지 않고 기록만
     const pasteText = (win, text) => js(win, `(() => {

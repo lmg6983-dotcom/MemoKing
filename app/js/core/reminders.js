@@ -35,12 +35,14 @@ const randomId = () => `r${Math.random().toString(36).slice(2, 8)}`;
 // ---------- 일정의 미리 알림 ----------
 // 시각이 있는 일정: 시작 몇 분 전. 하루 종일 일정: 그날 00:00 기준 몇 분 전 (음수 = 그날 안: -540 = 당일 오전 9시)
 export const ALERT_PRESETS = {
-  timed: [0, 10, 30, 60, 1440, 10080],
+  timed: [0, 5, 10, 30, 60, 120, 1440, 10080],
   allDay: [-540, 900, 9540], // 당일 오전 9시 · 하루 전 오전 9시 · 일주일 전 오전 9시
 };
 export const DEFAULT_ALERTS = { timed: [10], allDay: [-540] };
-const MAX_ALERTS = 5;
-const MAX_ALERT_MIN = 60 * 24 * 28;
+export const MAX_ALERTS = 5;
+export const MAX_ALERT_MIN = 60 * 24 * 28;
+/** 미리 알림 값이 쓸 수 있는 것인지 (직접 정한 값 포함) — normalizeAlerts 와 같은 범위 */
+export const validAlert = (v, allDay = false) => Number.isInteger(v) && v >= (allDay ? -1439 : 0) && v <= MAX_ALERT_MIN;
 export const isEvent = (r) => r.kind === 'at' || r.kind === 'repeat';
 
 /** 미리 알림 (분 전) — 먼저 울리는 것부터. 적지 않았으면 정시(하루 종일은 당일 오전 9시) 한 번, [] 는 "알림 없음" (달력에만) */
@@ -53,8 +55,7 @@ export function alertsOf(r) {
 // 시각 있는 일정은 시작 전(0 이상)만, 하루 종일은 그날 안(자정 직전까지)과 그 전 — 이름("정시"·"당일 오후 12시")이 실제와 어긋나지 않게
 function normalizeAlerts(raw, allDay = false) {
   if (!Array.isArray(raw)) return null;
-  const min = allDay ? -1439 : 0;
-  return [...new Set(raw.map((v) => Math.round(Number(v))).filter((v) => Number.isFinite(v) && v >= min && v <= MAX_ALERT_MIN))]
+  return [...new Set(raw.map((v) => Math.round(Number(v))).filter((v) => validAlert(v, allDay)))]
     .sort((a, b) => b - a).slice(0, MAX_ALERTS);
 }
 

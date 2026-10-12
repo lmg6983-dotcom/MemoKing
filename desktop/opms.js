@@ -219,6 +219,38 @@ export function caseInfoText(c, { mywork = [], foreign = [], files = [], now = n
   return L.join('\n');
 }
 
+/** 표 칸 하나: 줄바꿈은 띄어쓰기로, | 는 글자로 */
+const cell = (v) => oneLine(v).replace(/\|/g, '\\|');
+
+/**
+ * OPMS 창 "메모로" — 사건 정보를 메모 한 장(마크다운)으로: 제목 = 관리번호 + 명칭, 서지 표 · 업무배분 · 해외출원, #OPMS 태그
+ */
+export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '' } = {}) {
+  const ref = String(c.ourref || c.yourref || c.n_app || '사건').trim();
+  const title = [ref, String(c.title_kor ?? '').replace(/\s+/g, ' ').trim()].filter(Boolean).join(' ');
+  const L = [`# ${title}`, ''];
+  if (summary) L.push(`해외출원: ${summary}`, '');
+  L.push('| 항목 | 내용 |', '| --- | --- |');
+  for (const [k, v] of [
+    ['사무소관리번호', c.ourref], ['출원인관리번호', c.yourref], ['구분', c.div], ['출원인', c.applicant], ['발명자', c.inventor],
+    ['수임일', cleanDate(c.d_accept)], ['출원번호', c.n_app], ['출원일', cleanDate(c.d_app)], ['등록번호', c.n_issue],
+    ['등록일', cleanDate(c.d_issue)], ['발명명칭', c.title_kor], ['비고', c.memo],
+  ]) if (String(v ?? '').trim() || k !== '비고') L.push(`| ${k} | ${cell(v)} |`);
+  if (mywork.length) {
+    L.push('', '## 업무배분', '', '| 업무 | 담당 | 접수 | 기한 | 완료 | 상세 |', '| --- | --- | --- | --- | --- | --- |');
+    for (const r of mywork) {
+      const per = r.per_gubun ? `${dash(r.per_name)}(${r.per_gubun})` : r.per_name;
+      L.push(`| ${cell(r.div_job)} | ${cell(per)} | ${cell(cleanDate(r.d_rec))} | ${cell(cleanDate(r.d_due))} | ${cell(cleanDate(r.d_end))} | ${cell(r.detail || r.memo)} |`);
+    }
+  }
+  if (foreign.length) {
+    L.push('', '## 해외출원', '', '| 국가 | 구분 | 사무소관리번호 | 출원번호 | 상태 | 현지대리인 |', '| --- | --- | --- | --- | --- | --- |');
+    for (const f of foreign) L.push(`| ${cell(f.app_ncode || f._div)} | ${cell(f._div)} | ${cell(f.ourref)} | ${cell(f.n_app)} | ${cell(f.status)} | ${cell(f.attorney_out)} |`);
+  }
+  L.push('', '#OPMS', '');
+  return L.join('\n');
+}
+
 // ---------- 서버와 주고받기 ----------
 
 export class Opms {
