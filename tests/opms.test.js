@@ -384,6 +384,10 @@ test('OPMS 전자포대 기록: 바로 기록 · 앱을 끌 때는 따로(.quit)
   client.files.data[Object.keys(client.files.data).find((k) => k !== '#seq')]['u/z'] = 'z.pdf';
   assert.equal(await client.files.save(), true);
   assert.ok(JSON.parse(fs.readFileSync(index, 'utf8'))['#seq'] > quit['#seq']);
+  assert.equal(fs.existsSync(`${index}.quit`), false); // 더 새 평소 기록이 남았으니 끌 때 기록은 지움
+  // 바뀐 것이 없으면 끌 때 다시 쓰지 않는다 (창마다 session-end 가 와도)
+  client.files.flushSync();
+  assert.equal(fs.existsSync(`${index}.quit`), false);
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
   assert.deepEqual(fs.readdirSync(caseDir).filter((f) => f.endsWith('.part')), []);
 });

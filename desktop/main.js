@@ -385,33 +385,28 @@ function openNote(id, { inactive = false, record = false, ink = false, big = fal
 }
 
 // show: false 면 숨긴 채로 만들어 둔다 (스택의 다른 탭 — 누르면 바로 보이도록)
-// 첫 화면을 그린 창. 숨긴 창은 'ready-to-show' 를 기다리면 된다. 첫 화면 전에 이미 보인(show) 창에는 ready-to-show 가
-//   오지 않으니 불러오기가 끝나면(did-finish-load — 화면 스크립트가 'memo:highlight' 등을 들을 준비가 됨) 그린 것으로 친다
-const paintedWins = new WeakSet();
-const shownEarlyWins = new WeakSet(); // 그리기 전에 보인 적이 있는 창
-function markPainted(win) {
-  paintedWins.add(win);
+// 창마다 "첫 화면을 그렸다" 약속. 숨긴 창은 'ready-to-show' 로. 첫 화면 전에 이미 보인(show) 창에는 ready-to-show 가
+//   오지 않으니 불러오기가 끝나면(did-finish-load — 화면 스크립트가 'memo:highlight' 등을 들을 준비가 됨) 그린 것으로 친다.
+//   불러오기 실패 · 화면 프로세스가 죽어도 기다리는 일이 멈춰 있지 않게 끝낸다
+const paintedOf = new WeakMap();
+function trackPaint(win) {
+  let mark;
+  paintedOf.set(win, new Promise((resolve) => { mark = resolve; }));
+  const wc = win.webContents;
+  win.once('ready-to-show', mark);
+  wc.once('did-fail-load', mark);
+  wc.once('render-process-gone', mark);
+  win.on('show', () => {
+    if (!wc.isLoading()) mark();
+    else wc.once('did-finish-load', mark);
+  });
 }
 function whenPainted(win, fn) {
-  let done = false;
-  const run = () => {
-    if (done || win.isDestroyed()) return;
-    done = true;
-    fn();
-  };
-  if (paintedWins.has(win)) return run();
-  if (shownEarlyWins.has(win)) {
-    if (!win.webContents.isLoading()) {
-      markPainted(win);
-      return run();
-    }
-    return win.webContents.once('did-finish-load', () => {
-      markPainted(win);
-      run();
-    });
-  }
-  win.once('ready-to-show', run);
-  win.once('show', () => whenPainted(win, run)); // 기다리는 사이 다른 곳에서 먼저 보여 주면 (그 창엔 ready-to-show 가 안 옴)
+  const painted = paintedOf.get(win);
+  if (!painted) return fn();
+  painted.then(() => {
+    if (!win.isDestroyed()) fn();
+  });
 }
 
 function createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false, ink = false, big = false } = {}) {
@@ -462,13 +457,7 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null, re
     endWindowDrag(id);
   });
   win.on('resized', remember);
-  win.once('ready-to-show', () => markPainted(win));
-  win.on('show', () => {
-    if (paintedWins.has(win)) return;
-    shownEarlyWins.add(win); // 그리기 전에 보임 — 이 창에는 ready-to-show 가 오지 않는다
-    if (!win.webContents.isLoading()) markPainted(win);
-    else win.webContents.once('did-finish-load', () => markPainted(win));
-  });
+  trackPaint(win);
   if (show) win.once('ready-to-show', () => (inactive ? win.showInactive() : win.show()));
   pushList();
   // 스택 창을 닫으면(Alt+F4 등) 숨은 탭들도 함께 닫는다
@@ -3366,11 +3355,13 @@ app.whenReady().then(async () => {
     for (const [id, win] of noteWins) win.setBackgroundColor(noteBg(vault?.get(id)?.color));
   });
 
-  // 절전에서 깨어나면 그 사이 알림을 바로 확인
   // Windows 를 끄거나 로그오프할 때는 will-quit 가 오지 않는다 — 창의 session-end 와 (리눅스 · 맥) shutdown 에서 기록 남기기
+  //   (창이 여럿이면 여러 번 오지만 바뀐 것이 없으면 다시 쓰지 않는다)
   for (const w of BrowserWindow.getAllWindows()) w.on('session-end', flushOpmsFiles);
   app.on('browser-window-created', (_e, w) => w.on('session-end', flushOpmsFiles));
   powerMonitor.on('shutdown', flushOpmsFiles);
+
+  // 절전에서 깨어나면 그 사이 알림을 바로 확인
   powerMonitor.on('resume', () => {
     alarms.tick();
     driveSync?.request(3000);

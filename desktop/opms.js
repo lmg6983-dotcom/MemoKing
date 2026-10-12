@@ -426,8 +426,10 @@ class FileIndex {
     this.folders = new Map(); // 폴더 → 기록을 준비하는 일 (예전 기록 옮기기가 끝나기 전에 빈 기록을 보지 않게)
     this.locks = new Map(); // 폴더 → 마지막 저장 일 (한 폴더 안의 저장은 차례로 — 같은 이름에 두 서류가 동시에 들어가지 않게)
     this.seq = 0; // 기록마다 하나씩 커지는 번호 — 끌 때 쓴 기록(quit)과 평소 기록 중 새것을 고르려고
-    this.dirty = false;
+    this.dirty = false; // 아직 쓰기 시작하지 않은 바뀜
+    this.unsaved = false; // 마지막 쓰기가 실패함 — 다음 save · 끌 때 다시
     this.flushing = null;
+    this.quitSeq = 0; // 남아 있는 .quit 기록의 번호 (평소 기록이 그보다 새로 남으면 지운다)
   }
 
   get quitFile() {
@@ -463,10 +465,12 @@ class FileIndex {
       if (this.file) {
         try {
           const quit = asObject(JSON.parse(await fs.promises.readFile(this.quitFile, 'utf8')));
-          if ((Number(quit['#seq']) || 0) > (Number(this.data['#seq']) || 0)) this.data = quit;
+          this.quitSeq = Number(quit['#seq']) || 0;
+          if (this.quitSeq > (Number(this.data['#seq']) || 0)) this.data = quit;
         } catch {
           // 없음 · 깨짐 — 평소 기록으로
         }
+        sweepOld(path.dirname(this.file), (name) => name.startsWith(`${path.basename(this.file)}.`) && name.endsWith('.tmp')); // 끊긴 쓰기가 남긴 임시 파일
       }
       this.seq = Number(this.data['#seq']) || 0;
       return this.data;
@@ -553,8 +557,15 @@ class FileIndex {
       await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
       await fs.promises.writeFile(tmp, json, 'utf8');
       await fs.promises.rename(tmp, this.file);
+      this.unsaved = false;
+      // 평소 기록이 끌 때 기록보다 새로 남았으면 그 끌 때 기록은 지운다 (나중에 평소 기록을 지우거나 깨져도 옛것이 살아나지 않게)
+      if (this.quitSeq && seq > this.quitSeq) {
+        this.quitSeq = 0;
+        await fs.promises.rm(this.quitFile, { force: true }).catch(() => {});
+      }
       return true;
     } catch {
+      this.unsaved = true;
       await fs.promises.rm(tmp, { force: true }).catch(() => {});
       return false;
     }
@@ -562,11 +573,13 @@ class FileIndex {
 
   /**
    * 앱을 끌 때 — 기다릴 수 없으니 동기로, 쓰는 중인 평소 기록과 겹치지 않게 따로 둔 파일(.quit)에 더 큰 번호로.
-   *   다음에 켤 때 둘 중 번호가 큰 것을 읽는다. 끄기가 취소돼도 그 뒤의 평소 기록은 번호가 더 커서 그대로 이어진다
+   *   다음에 켤 때 둘 중 번호가 큰 것을 읽는다. 끄기가 취소돼도 그 뒤의 평소 기록은 번호가 더 커서 그대로 이어진다.
+   *   창마다 session-end 가 와도 바뀐 것이 없으면 다시 쓰지 않는다
    */
   flushSync() {
-    if (!this.file || this.readOnly || !this.data || (!this.dirty && !this.flushing)) return;
-    this.dirty = false;
+    if (!this.file || this.readOnly || !this.data) return;
+    const pendingWrite = this.flushing && this.quitSeq !== this.seq; // 쓰는 중인 평소 기록이 아직 끝나지 않음
+    if (!this.dirty && !this.unsaved && !pendingWrite) return;
     const seq = ++this.seq;
     this.data['#seq'] = seq;
     const tmp = `${this.quitFile}.${process.pid}.tmp`;
@@ -574,7 +587,11 @@ class FileIndex {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       fs.writeFileSync(tmp, JSON.stringify(this.data), 'utf8');
       fs.renameSync(tmp, this.quitFile);
+      this.quitSeq = seq;
+      this.dirty = false;
+      this.unsaved = false;
     } catch {
+      this.unsaved = true; // 끄기가 취소되면 다음 save 가 다시 쓴다
       try {
         fs.rmSync(tmp, { force: true });
       } catch {
@@ -597,7 +614,8 @@ const sameBytes = async (file, data) => {
     return false;
   }
 };
-const exists = (file) => fs.promises.stat(file).then(() => true, () => false);
+// 없다(ENOENT)고 확실할 때만 비어 있는 이름으로 — 읽지 못하는 것(지우는 중 · 권한 · 깨진 링크)은 있는 것으로 친다
+const exists = (file) => fs.promises.lstat(file).then(() => true, (err) => err.code !== 'ENOENT');
 // 파일 받기: 전체 시간이 아니라 "멈춘 시간" 으로 끊는다 (큰 파일이 느리게라도 오면 끝까지 · 아예 멈추면 1분 뒤)
 const DOWNLOAD_IDLE_MS = 60_000;
 // 매크로가 들 수 있는 Office 형식은 Windows 의 "인터넷에서 받은 파일" 표시(Zone.Identifier)를 붙여
@@ -626,16 +644,19 @@ async function placeNew(file, data) {
 }
 
 // 끊긴 저장이 남긴 임시 파일 정리 (10분 넘은 것만 — 다른 PC 가 지금 쓰는 중일 수 있으니)
-async function sweepParts(dir) {
+async function sweepOld(dir, match) {
   const names = await fs.promises.readdir(dir).catch(() => []);
   const old = Date.now() - 10 * 60_000;
   for (const name of names) {
-    if (!name.startsWith(PART_PREFIX) || !name.endsWith('.part')) continue;
+    if (!match(name)) continue;
     const file = path.join(dir, name);
     const st = await fs.promises.stat(file).catch(() => null);
-    if (st && st.mtimeMs < old) await fs.promises.rm(file, { force: true }).catch(() => {});
+    if (st?.isFile() && st.mtimeMs < old) await fs.promises.rm(file, { force: true }).catch(() => {});
   }
 }
+// 지금의 "~$mk-….part" 와 예전 판(0.31.2 · 0.31.5)이 남겼을 수 있는 "<이름>.<pid>-<시각>.part"
+const isPartFile = (name) => (name.startsWith(PART_PREFIX) && name.endsWith('.part')) || /\.\d+-[0-9a-z]+\.part$/.test(name);
+const sweepParts = (dir) => sweepOld(dir, isPartFile);
 
 async function markFromServer(file, host) {
   if (process.platform !== 'win32') return;
@@ -837,7 +858,7 @@ export class Opms {
       // 이름 후보: 원래 이름 → (No.n) → (No.n-2) … 내용이 같은 파일이 있으면 그것, 아니면 첫 빈 이름.
       //   고른 이름이 그사이 생겼으면(다른 PC 의 파일이 동기화로 들어옴) 다음 후보로
       let file = null;
-      let raced = 0;
+      let raced = -1;
       for (let k = 0; !file; k++) {
         const cand = path.join(dir, k === 0 ? base : numberedName(base, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
         if (claimed.has(path.basename(cand).toLowerCase())) continue;
@@ -846,8 +867,11 @@ export class Opms {
             await placeNew(cand, data);
             file = cand;
           } catch (err) {
-            if (err.code !== 'EEXIST' || ++raced > 5) throw err;
-            k--; // 그사이 생긴 그 파일을 다시 본다 (같은 서류면 그것을 쓰게)
+            if (err.code !== 'EEXIST') throw err;
+            if (raced !== k) {
+              raced = k;
+              k--; // 그사이 생긴 그 파일을 한 번 다시 본다 (같은 서류면 그것을 쓰게) — 또 그러면 다음 이름으로
+            }
           }
         } else if (await sameBytes(cand, data)) {
           folder[upload] = path.basename(cand); // 예전에(다른 PC 에서) 받아 둔 바로 그 서류
