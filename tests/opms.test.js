@@ -451,3 +451,16 @@ test('OPMS 전자포대 기록: 끌 때 기록이 여럿이면 가장 새것(깨
   const left = fs.readdirSync(dir).filter((f) => f.includes('.quit-'));
   assert.ok(left.some((f) => Number(f.split('quit-')[1]) === client.files.quitSeq));
 });
+
+test('OPMS 전자포대 기록: 0.31.3 의 기록(폴더 경로만)을 이어받아 고쳐 둔 파일을 다시 받지 않음', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-v313-'));
+  const c = { ourref: 'V-1', yourref: '' };
+  const caseDir = path.join(dir, wrapperFolderName(c));
+  fs.mkdirSync(caseDir);
+  fs.writeFileSync(path.join(caseDir, '의견서.pdf'), '고친 내용');
+  const index = path.join(dir, 'opms-files.json');
+  fs.writeFileSync(index, JSON.stringify({ [path.resolve(caseDir).toLowerCase()]: { 'u/1': '의견서.pdf' } }));
+  const client = new Opms({ fetch: async () => { throw new Error('받으면 안 됨'); }, retries: 0, filesIndex: index });
+  const file = await client.fileFor(c, { n: 1, name: '의견서.pdf', upload: 'u/1' }, dir);
+  assert.equal(fs.readFileSync(file, 'utf8'), '고친 내용');
+});

@@ -467,6 +467,7 @@ async function showWrapper(my) {
     if (busy()) return;
     const uploads = boxes.filter((b) => b.checked).map((b) => b.value);
     const idx = current.case.idx;
+    const names = new Map(attach.map((a) => [a.upload, a.name])); // 받는 사이 다른 사건을 열어도 이 사건의 이름으로 알리게
     dl = { idx, text: '받는 중…', cls: '', done: false };
     sync();
     paint();
@@ -478,7 +479,7 @@ async function showWrapper(my) {
       dl = {
         idx, done: true, saved: res.saved, cls: res.failed.length ? 'err' : 'ok',
         text: `${res.failed.length ? '' : '✓ '}${parts.join(', ')}${isAll ? ', 사건정보.txt 포함' : ''}`,
-        title: res.failed.map((f) => `${attach.find((a) => f.upload && a.upload === f.upload)?.name ?? f.name}: ${f.error}`).join('\n'),
+        title: res.failed.map((f) => `${(f.upload && names.get(f.upload)) || f.name}: ${f.error}`).join('\n'),
       };
     } catch (err) {
       dl = { idx, done: true, cls: 'err', text: errText(err) };

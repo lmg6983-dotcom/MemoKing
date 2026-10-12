@@ -536,6 +536,15 @@ class FileIndex {
     const data = await this.load();
     if (data[k]) return data[k];
     const rec = {};
+    // 0.31.3 은 서버 구분 없이 폴더 경로만으로 기록했다 — 그 기록을 이어받는다 (고쳐 둔 파일을 다시 받지 않게)
+    const oldKey = path.resolve(dir).toLowerCase();
+    const old = data[oldKey];
+    if (old && typeof old === 'object') {
+      for (const [upload, name] of Object.entries(old)) {
+        if (typeof name === 'string' && name && safeFilename(name, '') === name && path.basename(name) === name) rec[upload] = name;
+      }
+      delete data[oldKey];
+    }
     const legacyFile = path.join(dir, LEGACY_MANIFEST);
     let legacy = null;
     try {
@@ -545,6 +554,7 @@ class FileIndex {
     }
     if (legacy && typeof legacy === 'object') {
       for (const [upload, v] of Object.entries(legacy)) {
+        if (rec[upload]) continue;
         // 이 폴더 안의 파일 이름만. 0.31.2 는 다 받은 뒤에만 기록했으니 크기가 달라졌으면 사용자가 고친 것 — 그대로 인정
         //   (0.31.2 는 기본 서버만 썼으니 지금 서버의 기록으로 옮긴다)
         const name = String(v?.name ?? '');
@@ -552,6 +562,7 @@ class FileIndex {
       }
     }
     data[k] = rec;
+    if (old) this.save();
     // 예전 기록은 지우지 않는다: 사건 폴더가 여러 PC 가 함께 쓰는 Drive 폴더면 다른 PC 도 읽어 가야 하니까
     if (legacy) this.save();
     return rec;
@@ -904,17 +915,20 @@ export class Opms {
       if (now) return { file: now, reused: true };
       const claimed = new Set(Object.entries(folder).filter(([u]) => u !== upload).map(([, n]) => n.toLowerCase()));
       const base = path.basename(dest);
+      // 내용이 같은 기존 파일을 이 서류로 삼기 — 다른 PC 에서 동기화돼 온 파일엔 인터넷 표시가 없을 수 있으니 붙인다
+      const adopt = async (file) => {
+        await markFromServer(file, this.host);
+        folder[upload] = path.basename(file);
+        this.files.save();
+        return { file, reused: true };
+      };
       const nameAt = (b, k) => (k === 0 ? b : numberedName(b, k === 1 ? `No.${it.n}` : `No.${it.n}-${k}`));
       // 예전 판이 줄이지 않은 긴 이름(그리고 그 " (No.n)" 들)으로 받아 둔 그 서류가 있으면 그것을 쓴다 — 새로 쓰지는 않음
       const fullBase = safeFilename(it.name, base);
       for (let k = 0; fullBase !== base && k <= 5; k++) {
         const old = path.join(dir, nameAt(fullBase, k));
         if (path.dirname(old) !== dir || claimed.has(path.basename(old).toLowerCase())) continue;
-        if (await sameBytes(old, data)) {
-          folder[upload] = path.basename(old);
-          this.files.save();
-          return { file: old, reused: true };
-        }
+        if (await sameBytes(old, data)) return adopt(old);
       }
       // 이름 후보: 원래 이름 → (No.n) → (No.n-2) … 내용이 같은 파일이 있으면 그것, 아니면 첫 빈 이름.
       //   고른 이름이 그사이 생겼으면(다른 PC 의 파일이 동기화로 들어옴) 다음 후보로
@@ -936,9 +950,7 @@ export class Opms {
             }
           }
         } else if (await sameBytes(cand, data)) {
-          folder[upload] = path.basename(cand); // 예전에(다른 PC 에서) 받아 둔 바로 그 서류
-          this.files.save();
-          return { file: cand, reused: true };
+          return adopt(cand); // 예전에(다른 PC 에서) 받아 둔 바로 그 서류
         }
       }
       await markFromServer(file, this.host);
