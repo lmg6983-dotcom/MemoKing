@@ -6,6 +6,7 @@ import path from 'node:path';
 import {
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
   wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
+  groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf,
 } from '../desktop/opms.js';
 
 // 서버 응답 모양: 1줄 열 이름 · 2~4줄 정보 · 5줄부터 자료 (\x01 로 나눔)
@@ -110,4 +111,55 @@ test('OPMS: 사건 정보 → 메모 (제목 · 서지 표 · 업무배분 · �
   assert.match(md, /## 업무배분[\s\S]*\| 출원 \| 홍길동\(변리사\) \| - \| 2026-02-01 \| - \| 첫 줄 둘째 줄 \|/);
   assert.match(md, /## 해외출원[\s\S]*\| US \| PCT \|/);
   assert.match(md, /\n#OPMS\n$/);
+});
+
+test('OPMS 더 보기: 표 이름으로 신규성 의제 · 진행사항 · 메모 표 고르기 (사건으로 이어지는 표만)', () => {
+  const schema = groupSchema([
+    ...['idx', 'ourref', 'memo', 'ck_novelty', 'd_novelty'].map((c) => ({ TABLE_NAME: 'opms_app', COLUMN_NAME: c })),
+    ...['idx', 'idx_app', 'd_pub', 'content', 'del_flag'].map((c) => ({ TABLE_NAME: 'opms_app_novelty', COLUMN_NAME: c })),
+    ...['idx', 'idx_parent', 'd_proc', 'status', 'memo', 'del_flag'].map((c) => ({ TABLE_NAME: 'opms_app_progress', COLUMN_NAME: c })),
+    ...['idx', 'idx_parent', 'd_proc', 'status'].map((c) => ({ TABLE_NAME: 'view_opms_app_progress', COLUMN_NAME: c })),
+    ...['idx', 'idx_app', 'memo', 'reg_name', 'd_reg', 'upd_date'].map((c) => ({ TABLE_NAME: 'opms_app_memo', COLUMN_NAME: c })),
+    ...['idx', 'memo'].map((c) => ({ TABLE_NAME: 'opms_memo_template', COLUMN_NAME: c })), // 사건과 이어지지 않음
+    { TABLE_NAME: 'opms_bad;drop', COLUMN_NAME: 'idx_app' }, // 이상한 이름은 버림
+  ]);
+  const picks = pickDetailTables(schema);
+  assert.deepEqual(picks.novelty && [picks.novelty.table, picks.novelty.link], ['opms_app_novelty', 'idx_app']);
+  assert.equal(picks.progress.table, 'opms_app_progress'); // 보기(view_)보다 원래 표
+  assert.equal(picks.memo.table, 'opms_app_memo');
+  assert.deepEqual(noveltyColumnsOf(schema), ['ck_novelty', 'd_novelty']);
+  assert.equal(buildDetailSql(picks.progress, "7'"), "SELECT TOP 200 * FROM [opms_app_progress] WHERE [idx_parent] = '7''' AND [del_flag] = 'N' ORDER BY [idx] ASC");
+  assert.deepEqual(pickDetailTables(groupSchema([{ TABLE_NAME: 'opms_app', COLUMN_NAME: 'idx' }])), { novelty: null, progress: null, memo: null });
+});
+
+test('OPMS 더 보기: 보일 열만 (번호·삭제 표시·바꾼 때·빈 열은 빼고, 날짜는 YYYY-MM-DD)', () => {
+  const out = detailRows([
+    { idx: '1', idx_app: '7', memo: '첫 줄\n둘째 줄', reg_name: '홍길동', d_reg: '2026-01-02 10:00:00.0', upd_date: '2026-01-03', del_flag: 'N', empty: '' },
+    { idx: '2', idx_app: '7', memo: '회신', reg_name: '김철수', d_reg: '2026-02-01 00:00:00.0', upd_date: '', del_flag: 'N', empty: '' },
+  ]);
+  assert.deepEqual(out.columns, [{ key: 'memo', label: '메모' }, { key: 'reg_name', label: '쓴 사람' }, { key: 'd_reg', label: '등록일' }]);
+  assert.deepEqual(out.rows[0], { memo: '첫 줄 둘째 줄', reg_name: '홍길동', d_reg: '2026-01-02' });
+  assert.deepEqual(detailRows([]), { columns: [], rows: [] });
+});
+
+test('OPMS 더 보기: 서버에서 표 목록 → 고른 표 → 메모에도', async () => {
+  const sqls = [];
+  const fakeFetch = async (url, init = {}) => {
+    const sql = new URLSearchParams(init.body).get('sql');
+    sqls.push(sql);
+    if (/INFORMATION_SCHEMA/.test(sql)) return new Response(table(['TABLE_NAME', 'COLUMN_NAME'], [['opms_app', 'idx'], ['opms_app', 'd_novelty'], ['opms_app_memo', 'idx'], ['opms_app_memo', 'idx_app'], ['opms_app_memo', 'memo']]));
+    if (/FROM \[opms_app_memo\]/.test(sql)) return new Response(table(['idx', 'idx_app', 'memo'], [['1', '7', '심사관 면담 예정']]));
+    if (/SELECT \[d_novelty\] FROM opms_app/.test(sql)) return new Response(table(['d_novelty'], [['2025-12-01 00:00:00.0']]));
+    return new Response(table(['x'], []));
+  };
+  const client = new Opms({ fetch: fakeFetch, retries: 0 });
+  const d = await client.details({ idx: '7' });
+  assert.deepEqual(d.sections.find((x) => x.id === 'memo').rows, [{ memo: '심사관 면담 예정' }]);
+  assert.deepEqual(d.novelty, [{ label: '의제일', value: '2025-12-01' }]);
+  assert.deepEqual(d.missing, ['신규성 의제', '진행사항']); // 표로는 없음 (신규성 의제는 사건 표의 칸으로 보임)
+  await client.details({ idx: '7' });
+  assert.equal(sqls.filter((q) => /INFORMATION_SCHEMA/.test(q)).length, 1); // 표 목록은 한 번만
+  const md = caseMemoMarkdown({ ourref: 'P-1' }, { details: d });
+  assert.match(md, /## 신규성 의제\n\n\| 항목 \| 내용 \|\n\| --- \| --- \|\n\| 의제일 \| 2025-12-01 \|/);
+  assert.match(md, /## 메모\n\n\| 메모 \|\n\| --- \|\n\| 심사관 면담 예정 \|/);
 });

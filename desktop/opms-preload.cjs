@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('opms', {
   search: (query) => ipcRenderer.invoke('opms:search', query),
   case: (idx) => ipcRenderer.invoke('opms:case', idx),
   mywork: (idx) => ipcRenderer.invoke('opms:mywork', idx),
+  details: (idx) => ipcRenderer.invoke('opms:details', idx), // 신규성 의제 · 진행사항 · 메모
+  copySchema: () => ipcRenderer.invoke('opms:schema-copy'), // 표를 못 찾았을 때 표 목록 복사
   bills: (idx) => ipcRenderer.invoke('opms:bills', idx),
   attachments: (idx) => ipcRenderer.invoke('opms:attachments', idx),
   download: (req) => ipcRenderer.invoke('opms:download', req), // { idx, ns: [번호], all }

@@ -225,7 +225,7 @@ const cell = (v) => oneLine(v).replace(/\|/g, '\\|');
 /**
  * OPMS 창 "메모로" — 사건 정보를 메모 한 장(마크다운)으로: 제목 = 관리번호 + 명칭, 서지 표 · 업무배분 · 해외출원, #OPMS 태그
  */
-export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '' } = {}) {
+export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '', details = null } = {}) {
   const ref = String(c.ourref || c.yourref || c.n_app || '사건').trim();
   const title = [ref, String(c.title_kor ?? '').replace(/\s+/g, ' ').trim()].filter(Boolean).join(' ');
   const L = [`# ${title}`, ''];
@@ -243,12 +243,116 @@ export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '' } 
       L.push(`| ${cell(r.div_job)} | ${cell(per)} | ${cell(cleanDate(r.d_rec))} | ${cell(cleanDate(r.d_due))} | ${cell(cleanDate(r.d_end))} | ${cell(r.detail || r.memo)} |`);
     }
   }
+  // 신규성 의제 (사건 표의 칸) · 찾은 표마다 (신규성 의제 · 진행사항 · 메모)
+  if (details?.novelty?.length) {
+    L.push('', '## 신규성 의제', '', '| 항목 | 내용 |', '| --- | --- |');
+    for (const n of details.novelty) L.push(`| ${cell(n.label)} | ${cell(n.value)} |`);
+  }
+  for (const sec of details?.sections ?? []) {
+    if (!sec.rows?.length) continue;
+    L.push('', `## ${sec.label}`, '', `| ${sec.columns.map((x) => cell(x.label)).join(' | ')} |`, `| ${sec.columns.map(() => '---').join(' | ')} |`);
+    for (const r of sec.rows) L.push(`| ${sec.columns.map((x) => cell(r[x.key])).join(' | ')} |`);
+  }
   if (foreign.length) {
     L.push('', '## 해외출원', '', '| 국가 | 구분 | 사무소관리번호 | 출원번호 | 상태 | 현지대리인 |', '| --- | --- | --- | --- | --- | --- |');
     for (const f of foreign) L.push(`| ${cell(f.app_ncode || f._div)} | ${cell(f._div)} | ${cell(f.ourref)} | ${cell(f.n_app)} | ${cell(f.status)} | ${cell(f.attorney_out)} |`);
   }
   L.push('', '#OPMS', '');
   return L.join('\n');
+}
+
+// ---------- 더 보기: 신규성 의제 · 진행사항 · 메모 ----------
+// 이 세 가지가 어느 표에 있는지는 회사 DB 마다 이름이 달라, 처음 한 번 OPMS 의 표·열 목록(INFORMATION_SCHEMA)을 받아
+// 이름으로 고른다: 표 이름에 그 말이 들고, 사건 번호(idx)로 이어지는 열이 있는 표. 못 찾으면 그렇게 알리고, 표 목록을 복사할 수 있다.
+
+export const DETAIL_KINDS = [
+  { id: 'novelty', label: '신규성 의제', words: /novel|grace|except|nov(?![a-z])|ex30|30jo/i },
+  { id: 'progress', label: '진행사항', words: /progress|prog(?![a-z])|hist|step|proc(?![a-z])|process|timeline|tracking/i },
+  { id: 'memo', label: '메모', words: /memo|note|remark|comment/i },
+];
+// 사건(opms_app.idx)을 가리키는 열 이름 — 앞의 것일수록 먼저
+export const LINK_COLUMNS = ['idx_app', 'app_idx', 'idx_parent', 'idx_relation', 'idx_case', 'case_idx', 'parent_idx', 'idx_master'];
+// 이미 다른 탭에서 보이는 표 (다시 고르지 않음)
+const KNOWN_TABLES = /^(opms_app|opms_attach|view_opms_mywork(_per)?|view_opms_dem_kor|opms_out(_pri)?|view_opms_out_family|view_opms_family_link)$/i;
+const SAFE_NAME = /^[A-Za-z0-9_]+$/;
+
+export const buildSchemaSql = () =>
+  "SELECT TABLE_NAME, COLUMN_NAME\nFROM INFORMATION_SCHEMA.COLUMNS\nWHERE TABLE_NAME LIKE '%opms%'\nORDER BY TABLE_NAME, ORDINAL_POSITION";
+
+/** INFORMATION_SCHEMA 줄 → Map(표 이름 → [열 이름]) */
+export function groupSchema(rows) {
+  const out = new Map();
+  for (const r of rows) {
+    const t = String(r.TABLE_NAME ?? r.table_name ?? '').trim();
+    const c = String(r.COLUMN_NAME ?? r.column_name ?? '').trim();
+    if (!SAFE_NAME.test(t) || !SAFE_NAME.test(c)) continue;
+    if (!out.has(t)) out.set(t, []);
+    out.get(t).push(c);
+  }
+  return out;
+}
+
+const linkOf = (cols) => LINK_COLUMNS.find((l) => cols.some((c) => c.toLowerCase() === l)) ?? null;
+const realName = (cols, lower) => cols.find((c) => c.toLowerCase() === lower);
+
+/**
+ * 종류마다 가장 그럴듯한 표 하나: 이름에 그 말이 들고 사건으로 이어지는 열이 있는 표.
+ *   보기(view_)보다 원래 표, "app" 이 든 이름, 짧은 이름을 앞에
+ * @returns {Record<string, { table: string, link: string, columns: string[] } | null>}
+ */
+export function pickDetailTables(schema) {
+  const out = {};
+  for (const kind of DETAIL_KINDS) {
+    const cands = [];
+    for (const [table, cols] of schema) {
+      if (KNOWN_TABLES.test(table) || !kind.words.test(table.replace(/^(view_)?opms_?/i, ''))) continue;
+      const link = linkOf(cols);
+      if (!link) continue;
+      const score = (/^view_/i.test(table) ? 2 : 0) + (/app/i.test(table) ? 0 : 1) + table.length / 100 + LINK_COLUMNS.indexOf(link) / 10;
+      cands.push({ table, link: realName(cols, link), columns: cols, score });
+    }
+    cands.sort((a, b) => a.score - b.score);
+    out[kind.id] = cands[0] ? { table: cands[0].table, link: cands[0].link, columns: cands[0].columns } : null;
+  }
+  return out;
+}
+
+/** 사건 표(opms_app)에 바로 든 신규성 의제 칸 (예: ck_novelty, d_novelty) */
+export const noveltyColumnsOf = (schema) => {
+  const cols = [...schema].find(([t]) => t.toLowerCase() === 'opms_app')?.[1] ?? [];
+  return cols.filter((c) => DETAIL_KINDS[0].words.test(c));
+};
+
+export function buildDetailSql({ table, link, columns }, caseIdx) {
+  if (!SAFE_NAME.test(table) || !SAFE_NAME.test(link)) throw new Error('표 이름이 이상해요');
+  const has = (c) => columns.some((x) => x.toLowerCase() === c);
+  const where = [`[${link}] = '${sqlQuote(caseIdx)}'`];
+  if (has('del_flag')) where.push(`[${realName(columns, 'del_flag')}] = 'N'`);
+  if (has('ck_del')) where.push(`[${realName(columns, 'ck_del')}] = 'N'`);
+  const order = has('idx') ? ` ORDER BY [${realName(columns, 'idx')}] ASC` : '';
+  return `SELECT TOP 200 * FROM [${table}] WHERE ${where.join(' AND ')}${order}`;
+}
+
+// 화면에 보일 열 이름 (모르는 열은 이름 그대로)
+const COLUMN_LABELS = {
+  memo: '메모', content: '내용', contents: '내용', detail: '상세', note: '메모', remark: '비고', comment: '메모', title: '제목', subject: '제목',
+  status: '상태', state: '상태', step: '단계', div: '구분', div_sub: '세부', kind: '구분', type: '구분', gubun: '구분',
+  per_name: '담당', writer: '쓴 사람', reg_name: '쓴 사람', reg_user: '쓴 사람', user_name: '쓴 사람', name: '이름',
+  d_reg: '등록일', reg_date: '등록일', d_date: '날짜', d_proc: '처리일', d_due: '기한', d_end: '완료', d_rec: '접수',
+  d_pub: '공개일', d_disclose: '공개일', d_novelty: '의제일', n_doc: '문서번호', doc_name: '문서',
+};
+// 화면에 보이지 않을 열: 번호·삭제 표시·바꾼 사람/때 같은 내부 값
+const HIDDEN_COLUMN = /^(idx|idx_.*|.*_idx|del_flag|ck_del|deleteflg|grp_key|upd_.*|mod_.*|reg_id|user_id|.*_id|rowid|seq)$/i;
+
+/** 표 줄 → { columns: [{ key, label }], rows: [{key: 값}] } — 비어 있는 열·내부 열은 빼고, 날짜는 YYYY-MM-DD */
+export function detailRows(rows) {
+  if (!rows.length) return { columns: [], rows: [] };
+  const keys = Object.keys(rows[0]).filter((k) => !HIDDEN_COLUMN.test(k) && rows.some((r) => String(r[k] ?? '').trim()));
+  const columns = keys.map((key) => ({ key, label: COLUMN_LABELS[key.toLowerCase()] ?? key }));
+  return {
+    columns,
+    rows: rows.map((r) => Object.fromEntries(keys.map((k) => [k, /^\d{4}-\d{2}-\d{2}[ T]\d/.test(String(r[k] ?? '')) ? cleanDate(r[k]) : String(r[k] ?? '').replace(/[\r\n]+/g, ' ').trim()]))),
+  };
 }
 
 // ---------- 서버와 주고받기 ----------
@@ -284,6 +388,47 @@ export class Opms {
       body: body.toString(),
     }, opts);
     return parseResultset(await res.text());
+  }
+
+  /** OPMS 의 표·열 목록 (한 번 받아 두고 다시 씀) */
+  schema() {
+    this.schemaPromise ??= this.select(buildSchemaSql()).then(groupSchema).catch((err) => {
+      this.schemaPromise = null;
+      throw err;
+    });
+    return this.schemaPromise;
+  }
+
+  /**
+   * 신규성 의제 · 진행사항 · 메모 — 표를 찾은 것만 받아 온다
+   * @returns {Promise<{ sections: { id, label, table, columns, rows, error? }[], novelty: { label, value }[], missing: string[] }>}
+   */
+  async details(c) {
+    const schema = await this.schema();
+    const picks = pickDetailTables(schema);
+    const sections = await Promise.all(DETAIL_KINDS.map(async (kind) => {
+      const pick = picks[kind.id];
+      if (!pick) return { id: kind.id, label: kind.label, table: null, columns: [], rows: [] };
+      try {
+        return { id: kind.id, label: kind.label, table: pick.table, ...detailRows(await this.select(buildDetailSql(pick, c.idx))) };
+      } catch (err) {
+        return { id: kind.id, label: kind.label, table: pick.table, columns: [], rows: [], error: err.message };
+      }
+    }));
+    // 사건 표에 바로 든 신규성 의제 칸
+    const ncols = noveltyColumnsOf(schema);
+    let novelty = [];
+    if (ncols.length) {
+      const [row] = await this.select(`SELECT ${ncols.map((x) => `[${x}]`).join(', ')} FROM opms_app WHERE idx = '${sqlQuote(c.idx)}'`).catch(() => []);
+      novelty = ncols.map((k) => ({ label: COLUMN_LABELS[k.toLowerCase()] ?? k, value: cleanDate(row?.[k] ?? '') })).filter((x) => x.value);
+    }
+    return { sections, novelty, missing: sections.filter((x) => !x.table).map((x) => x.label) };
+  }
+
+  /** 문제 알리기용: OPMS 표 이름과 열 (못 찾았을 때 복사해 보낼 수 있게) */
+  async schemaText() {
+    const schema = await this.schema();
+    return [...schema].map(([t, cols]) => `${t}: ${cols.join(', ')}`).join('\n');
   }
 
   find(query, opts) {

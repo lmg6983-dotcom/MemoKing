@@ -2662,6 +2662,12 @@ function registerIpc() {
     return { case: c, foreign, summary: foreignSummary(c, foreign), ...opmsSettings() };
   });
   ipcMain.handle('opms:mywork', (_e, idx) => opmsClient().mywork(caseOf(idx).idx));
+  ipcMain.handle('opms:details', (_e, idx) => opmsClient().details(caseOf(idx))); // 신규성 의제 · 진행사항 · 메모
+  ipcMain.handle('opms:schema-copy', async () => {
+    const text = await opmsClient().schemaText();
+    clipboard.writeText(text.slice(0, 200_000));
+    return text.split('\n').length;
+  });
   ipcMain.handle('opms:bills', (_e, idx) => opmsClient().bills(caseOf(idx).idx));
   ipcMain.handle('opms:attachments', (_e, idx) => opmsClient().attachments(caseOf(idx).idx));
   ipcMain.handle('opms:download', async (event, { idx, ns, all } = {}) => {
@@ -2694,8 +2700,8 @@ function registerIpc() {
     const known = caseOf(idx);
     const client = opmsClient();
     const c = (await client.caseByIdx(known.idx).catch(() => null)) ?? known;
-    const [foreign, mywork] = await Promise.all([client.foreign(c).catch(() => []), client.mywork(c.idx).catch(() => [])]);
-    const id = vault.import({ body: caseMemoMarkdown(c, { mywork, foreign, summary: foreignSummary(c, foreign) }) });
+    const [foreign, mywork, details] = await Promise.all([client.foreign(c).catch(() => []), client.mywork(c.idx).catch(() => []), client.details(c).catch(() => null)]);
+    const id = vault.import({ body: caseMemoMarkdown(c, { mywork, foreign, summary: foreignSummary(c, foreign), details }) });
     if (!id) throw new Error('메모를 만들지 못했어요');
     openNote(id);
     return id;

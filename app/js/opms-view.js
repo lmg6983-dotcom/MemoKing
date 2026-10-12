@@ -1,6 +1,6 @@
 // OPMS 창 — 매직키에서 사건을 고르면 열린다 (PC 전용, 사내망)
 //   위: 관리번호·출원번호 찾기 + 고른 사건 머리줄(사무소/출원인 관리번호 · 출원인 · 명칭 · 해외출원 배지)
-//   탭: 정보(서지 + 업무배분) · 전자포대(골라 받기 / 전체 받기 → 저장 폴더 열기) · 청구서 · 해외출원
+//   탭: 정보(서지 + 업무배분 + 신규성 의제 · 진행사항 · 메모) · 전자포대(골라 받기 / 전체 받기 → 저장 폴더 열기) · 청구서 · 해외출원
 //   "메모로 만들기": 고른 사건의 서지 · 업무배분 · 해외출원을 새 메모 한 장으로
 //   글은 모두 textContent 로 넣는다 (서버 값을 HTML 로 읽지 않는다)
 const api = window.opms;
@@ -169,17 +169,21 @@ async function show(which) {
   const c = current.case;
   try {
     if (tab === 'info') {
-      main.replaceChildren(infoGrid(c), el('h3', 'op-h', '업무배분'), el('p', 'op-msg', '불러오는 중…'));
+      const work = el('p', 'op-msg', '불러오는 중…');
+      const more = el('div', 'op-more');
+      more.append(el('p', 'op-msg', '신규성 의제 · 진행사항 · 메모를 불러오는 중…'));
+      main.replaceChildren(infoGrid(c), el('h3', 'op-h', '업무배분'), work, more);
+      showDetails(more, my); // 업무배분과 따로 (한쪽이 늦거나 실패해도 다른 쪽은 보이게)
       let rows;
       try {
         rows = await load('mywork', api.mywork);
       } catch (err) {
         // 업무배분만 못 불러와도 위의 서지정보는 그대로 둔다
-        if (my === seq) main.lastChild.replaceWith(el('p', 'op-msg err', `업무배분을 불러오지 못했어요 — ${errText(err)}`));
+        if (my === seq) work.replaceWith(el('p', 'op-msg err', `업무배분을 불러오지 못했어요 — ${errText(err)}`));
         return;
       }
       if (my !== seq) return;
-      main.lastChild.replaceWith(table([
+      work.replaceWith(table([
         ['업무', (r) => r.div_job],
         ['담당', (r) => (r.per_gubun ? `${dash(r.per_name)}(${r.per_gubun})` : r.per_name)],
         ['접수', (r) => day(r.d_rec)],
@@ -220,6 +224,53 @@ async function show(which) {
   } catch (err) {
     if (my === seq) message(errText(err), 'err');
   }
+}
+
+// 신규성 의제 · 진행사항 · 메모 — OPMS 에서 그 표를 찾은 것만 (못 찾으면 알리고 표 목록을 복사할 수 있게)
+async function showDetails(box, my) {
+  let d;
+  try {
+    d = await load('details', api.details);
+  } catch (err) {
+    if (my === seq) box.replaceChildren(el('p', 'op-msg err', `신규성 의제 · 진행사항 · 메모를 불러오지 못했어요 — ${errText(err)}`));
+    return;
+  }
+  if (my !== seq) return;
+  const out = [];
+  if (d.novelty.length) {
+    out.push(el('h3', 'op-h', '신규성 의제'));
+    const dl = el('dl', 'op-info');
+    for (const n of d.novelty) {
+      const wrap = el('div');
+      wrap.append(el('dt', '', n.label), el('dd', '', n.value));
+      dl.append(wrap);
+    }
+    out.push(dl);
+  }
+  for (const sec of d.sections) {
+    if (!sec.table) continue;
+    out.push(el('h3', 'op-h', sec.label));
+    if (sec.error) out.push(el('p', 'op-msg err', `불러오지 못했어요 — ${sec.error}`));
+    else out.push(table(sec.columns.map((x) => [x.label, (r) => r[x.key]]), sec.rows, { empty: `${sec.label}이(가) 없어요` }));
+  }
+  const missing = d.missing.filter((m) => !(m === '신규성 의제' && d.novelty.length));
+  if (missing.length) {
+    const p = el('p', 'op-msg op-missing', `OPMS 에서 ${missing.join(' · ')} 표를 찾지 못했어요. `);
+    const copy = el('button', 'op-link', '표 목록 복사');
+    copy.type = 'button';
+    copy.title = 'OPMS 의 표 이름과 열을 복사해요 — 메모킹 개발자에게 보내 주면 맞춰 드려요';
+    copy.addEventListener('click', async () => {
+      try {
+        const n = await api.copySchema();
+        copy.textContent = `✓ 표 ${n}개 복사했어요`;
+      } catch (err) {
+        copy.textContent = `복사하지 못했어요 — ${errText(err)}`;
+      }
+    });
+    p.append(copy);
+    out.push(p);
+  }
+  box.replaceChildren(...out);
 }
 
 function infoGrid(c) {
