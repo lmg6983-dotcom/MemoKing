@@ -342,23 +342,29 @@ function infoGrid(c) {
 function openButton(r) {
   const b = el('button', 'op-link op-open-file', '열기');
   b.type = 'button';
-  b.title = `${r.name} — 저장 폴더에 받아 두고 열어요 (이미 있으면 그대로)`;
+  const hint = `${r.name} — 저장 폴더에 받아 두고 열어요 (전에 받은 그 파일이면 그대로)`;
+  b.title = hint;
+  // 아래 막대의 상태 글: 받는 중(전체 · 고른 것 받기)이면 그 진행 표시를 덮지 않는다
+  const say = (cls, text) => {
+    const s = foot.querySelector('.op-status');
+    if (!s || (dl && !dl.done && dl.idx === current.case.idx)) return;
+    s.className = `op-status ${cls}`;
+    s.textContent = text;
+    s.title = '';
+  };
   b.addEventListener('click', async () => {
     const idx = current.case.idx;
     b.disabled = true;
     b.textContent = '여는 중…';
     try {
-      await api.openFile({ idx, n: r.n });
-      b.textContent = '열기';
+      const res = await api.openFile({ idx, n: r.n });
+      b.title = hint;
+      say(res?.shown ? '' : 'ok', res?.shown ? `${r.name}: ${res.message}` : `✓ ${r.name} 열었어요`);
     } catch (err) {
-      b.textContent = '열기';
-      b.title = errText(err);
-      const s = foot.querySelector('.op-status');
-      if (s) {
-        s.className = 'op-status err';
-        s.textContent = `${r.name}: ${errText(err)}`;
-      }
+      b.title = `${hint}\n지난번: ${errText(err)}`;
+      say('err', `${r.name}: ${errText(err)}`);
     } finally {
+      b.textContent = '열기';
       b.disabled = false;
     }
   });

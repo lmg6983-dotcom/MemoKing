@@ -8,7 +8,7 @@
 //     - 겹친 띄어쓰기 "가  나" → "가 나", 줄 앞뒤의 띄어쓰기
 //     - 한글 뒤 문장부호 앞 띄어쓰기 "합니다 ." → "합니다."
 //     - 붙여넣기에 묻어 온 보이지 않는 글자(폭 없는 공백·BOM)와 줄바꿈 없는 공백(NBSP)
-//     - 의미 없는 빈 줄: 빈 줄이 둘 이상 이어지면 하나로, 문서 맨 앞의 빈 줄
+//     - 의미 없는 빈 줄: 빈 줄이 둘 이상 이어지면 하나로
 //     - 같은 종류인데 갈라진 목록: 바로 붙어 있는 같은 목록(점·번호·체크리스트)은 하나로 합친다
 //       (한 항목만 다른 목록으로 바꿨다 되돌리면 겉보기엔 한 목록인데 따로 노는 문제)
 import { Plugin, PluginKey } from '../vendor/milkdown.js';
@@ -56,7 +56,7 @@ function applyBlock(tr, pos) {
 }
 
 // 바로 붙은 같은 목록 합치기 · 겹친 빈 줄 줄이기 (커서가 든 곳은 빼고)
-function structureFixes(tr, cursor, { keepLeading = false } = {}) {
+function structureFixes(tr, cursor) {
   const joins = [];
   const drops = [];
   const visit = (node, inner) => {
@@ -79,10 +79,8 @@ function structureFixes(tr, cursor, { keepLeading = false } = {}) {
     flush();
   };
   visit(tr.doc, 0);
-  // 문서 맨 앞 빈 줄 (뒤에 내용이 있고 커서가 거기 없으면) — 단, 방금 만든 빈 줄은 그대로
-  //   (첫 줄 맨 앞에서 Enter 를 눌러 위에 빈 줄을 만들고 올라가 쓰려는 경우)
-  const first = tr.doc.firstChild;
-  if (!keepLeading && first?.type.name === 'paragraph' && first.content.size === 0 && tr.doc.childCount > 1 && cursor > first.nodeSize && !drops.some((d) => d.pos === 0)) drops.push({ pos: 0, size: first.nodeSize });
+  // 문서 맨 앞 빈 줄 하나는 지우지 않는다: 위를 비워 두고 나중에 올라가 쓰는 사람이 있다
+  //   (제목은 빈 줄을 건너뛴 첫 줄이라 상관없음 · 빈 줄이 여럿이면 위의 겹친 빈 줄 줄이기로 하나만 남음)
   // 뒤에서부터 (위치가 어긋나지 않게)
   const ops = [...joins.map((at) => ({ at, kind: 'join' })), ...drops.map((d) => ({ at: d.pos, size: d.size, kind: 'drop' }))].sort((x, y) => y.at - x.at);
   for (const op of ops) {
@@ -157,10 +155,7 @@ export function tidyAfter(trs, oldState, state) {
     });
     for (const pos of blocks.reverse()) applyBlock(tr, pos);
   }
-  // 맨 앞 빈 줄은 전부터 있던 것만 지운다 (이번에 생긴 빈 줄이면 남김)
-  const oldFirst = oldState.doc.firstChild;
-  const wasEmptyFirst = oldFirst?.type.name === 'paragraph' && oldFirst.content.size === 0;
-  structureFixes(tr, tr.selection.from, { keepLeading: !wasEmptyFirst });
+  structureFixes(tr, tr.selection.from);
   if (!tr.docChanged) return null;
   return tr.setMeta(tidyKey, true).setMeta('addToHistory', false);
 }

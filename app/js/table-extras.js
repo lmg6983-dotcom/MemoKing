@@ -508,16 +508,21 @@ export function joinNextTable(state, dispatch) {
 // ---------- 표 → 목록 · 글 ----------
 // 행마다 한 줄: 칸의 글을 " · " 로 이어서 (빈 칸은 건너뜀, 합친 칸 안의 줄바꿈은 띄어쓰기). 첫 행(머리글)도 첫 줄로.
 
-/** 표 한 행 → 한 줄의 글 조각들 (굵게·링크 등 글자 서식은 그대로) */
+/** 표 한 행 → 한 줄의 글 조각들 (굵게·링크 등 글자 서식 · 그림 · 파일 칩은 그대로) */
 function rowInline(row, schema) {
+  const isBreak = (n) => n.type.name === 'hardbreak' || n.type.name === 'hard_break' || (n.type.name === 'html' && /^<br\s*\/?>$/i.test(String(n.attrs.value ?? '').trim()));
   const parts = [];
   row.forEach((cell) => {
     const inline = [];
-    cell.forEach((block) => block.content.forEach((n) => {
-      const isBreak = n.type.name === 'hardbreak' || n.type.name === 'hard_break' || (n.type.name === 'html' && /^<br\s*\/?>$/i.test(String(n.attrs.value ?? '').trim()));
-      inline.push(isBreak ? schema.text(' ') : n);
-    }));
-    if (!cell.textContent.trim()) return;
+    cell.descendants((n) => {
+      if (!n.isInline) return true;
+      if (isBreak(n)) {
+        if (inline.length) inline.push(schema.text(' '));
+      } else inline.push(n);
+      return false;
+    });
+    // 띄어쓰기만 있는 칸은 건너뛴다 (그림 · 파일 칩처럼 글자가 없는 것만 든 칸은 남긴다)
+    if (!inline.some((n) => !n.isText || n.text.trim())) return;
     if (parts.length) parts.push(schema.text(' · '));
     parts.push(...inline);
   });
