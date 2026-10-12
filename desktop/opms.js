@@ -757,7 +757,8 @@ export class Opms {
       }
     }
     const e = new Error(`OPMS 서버(${this.host})에 접속하지 못했어요 — 사내망에 연결돼 있는지 확인해 주세요 (${last?.message ?? last})`);
-    e.offline = true;
+    // 서버가 답은 했다(HTTP 404 · 500, 받다 끊김) — 그 파일만의 문제이지 "연결 안 됨" 이 아님
+    e.offline = !/^HTTP \d|끊겼어요/.test(String(last?.message ?? ''));
     throw e;
   }
 
@@ -983,26 +984,41 @@ export class Opms {
     await fs.promises.mkdir(dir, { recursive: true });
     let saved = 0;
     let skipped = 0;
+    let offline = false;
     const failed = [];
     const done = [];
+    const outcome = new Map(); // 서버 파일 → 'saved' | 'failed' — 같은 파일을 가리키는 줄은 한 번만 받고 그 결과를 따른다
     for (const [i, it] of items.entries()) {
       onProgress({ i, total: items.length, name: it.name });
+      const was = outcome.get(it.upload);
+      if (was === 'saved') {
+        skipped++; // 같은 파일을 앞에서 받음 — "이미 있음"
+        continue;
+      }
+      if (was) {
+        failed.push({ name: it.name, error: was });
+        continue;
+      }
       try {
         const r = await this.saveOne(dir, it);
         if (!r) continue;
         if (r.reused) skipped++;
         else saved++;
+        outcome.set(it.upload, 'saved');
         done.push({ ...it, name: path.basename(r.file) }); // 실제로 저장된 이름 (다른 이름으로 피해 저장했을 수도)
       } catch (err) {
         failed.push({ name: it.name, error: err.message });
+        outcome.set(it.upload, err.message);
         if (err.offline) {
-          // 서버가 응답하지 않으면 남은 파일마다 다시 기다리지 않고 함께 실패로 (30개면 한 시간씩 걸리지 않게)
+          // 서버에 닿지 않으면 남은 파일마다 다시 기다리지 않고 함께 실패로 (30개면 한 시간씩 걸리지 않게)
+          offline = true;
           for (const rest of items.slice(i + 1)) failed.push({ name: rest.name, error: err.message });
           break;
         }
       }
     }
-    if (all) {
+    // 사건정보.txt 는 서버에 닿았을 때만 (닿지 않으면 업무배분 · 해외출원이 비어 예전 파일을 빈 내용으로 덮게 됨)
+    if (all && !offline) {
       const [mywork, foreign] = await Promise.all([this.mywork(c.idx).catch(() => []), this.foreign(c).catch(() => [])]);
       await fs.promises.writeFile(path.join(dir, '사건정보.txt'), caseInfoText(c, { mywork, foreign, files: done }), 'utf8');
     }

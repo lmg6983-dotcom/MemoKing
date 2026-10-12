@@ -487,3 +487,17 @@ test('OPMS 전자포대: 서버가 응답하지 않으면 남은 파일은 기�
   const ok = await flaky.download(c, [it], { baseDir: dir });
   assert.deepEqual([ok.saved, tries], [1, 2]);
 });
+
+test('OPMS 전자포대: 한 파일이 404 여도 나머지는 받음 · 같은 파일을 가리키는 줄은 그 결과를 따름', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-404-'));
+  const c = { ourref: 'X-1', yourref: '' };
+  const client = new Opms({ fetch: async (url) => (url.endsWith('gone') ? new Response('', { status: 404 }) : new Response('OK')), retries: 0 });
+  const res = await client.download(c, [
+    { n: 1, name: '없음.pdf', upload: 'u/gone' },
+    { n: 2, name: '있음.pdf', upload: 'u/ok' },
+    { n: 3, name: '있음 (2).pdf', upload: 'u/ok' }, // 같은 서버 파일
+    { n: 4, name: '없음 (2).pdf', upload: 'u/gone' },
+  ], { baseDir: dir, all: true });
+  assert.deepEqual([res.saved, res.skipped, res.failed.length], [1, 1, 2]);
+  assert.ok(fs.existsSync(path.join(res.dir, '사건정보.txt')));
+});
