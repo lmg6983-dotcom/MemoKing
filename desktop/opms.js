@@ -80,7 +80,7 @@ export const buildCaseByIdxSql = (idx) =>
 
 export const buildAttachSql = (groupKey) =>
   'SELECT *,\n       (CASE WHEN USR_DATE IS NOT NULL THEN USR_DATE ELSE REG_DATE END) AS registered_at\nFROM opms_attach\n' +
-  `WHERE DELETEFLG = 'N'\n  AND GRP_KEY = '${sqlQuote(groupKey)}'\n  AND ISNULL(DOC_NAME, '') <> 'HDR'\nORDER BY registered_at ASC, IDX ASC`;
+  `WHERE DELETEFLG = 'N'\n  AND GRP_KEY = '${sqlQuote(groupKey)}'\n  AND ISNULL(DOC_NAME, '') <> 'HDR'\nORDER BY registered_at DESC, IDX DESC`; // 최신순 (위에 새 서류)
 
 export const buildMyworkSql = (caseIdx) =>
   'SELECT W.div_job, W.detail, W.d_rec, W.d_due, W.d_end, W.memo,\n       P.per_name, P.per_gubun\nFROM view_opms_mywork W\n' +
@@ -170,15 +170,15 @@ export function fileSizeLabel(n) {
   return `${v} B`;
 }
 
-/** 전자포대 줄 → 화면에 보일 모양 (원본 경로가 없는 줄은 뺀다) */
+/** 전자포대 줄 → 화면에 보일 모양 (원본 경로가 없는 줄은 뺀다). 줄은 최신순, No. 는 오래된 것부터 1 (새 서류가 와도 번호가 그대로) */
 export function attachmentItems(rows) {
-  return rows
-    .filter((r) => String(r.FILE_NAME_UPLOAD ?? '').trim())
+  const kept = rows.filter((r) => String(r.FILE_NAME_UPLOAD ?? '').trim());
+  return kept
     .map((r, i) => ({
-      n: i + 1,
+      n: kept.length - i,
       date: cleanDate(r.registered_at || r.REG_DATE),
       doc: String(r.DOC_NAME || r.DOC_GUBUN || '').trim(),
-      name: safeFilename(String(r.FILE_NAME_ORI || r.FILE_NAME || '').trim(), `attachment_${i + 1}.bin`),
+      name: safeFilename(String(r.FILE_NAME_ORI || r.FILE_NAME || '').trim(), `attachment_${kept.length - i}.bin`),
       size: fileSizeLabel(r.FILE_SIZE),
       upload: String(r.FILE_NAME_UPLOAD).trim(),
     }));

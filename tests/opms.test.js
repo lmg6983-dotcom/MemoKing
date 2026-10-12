@@ -6,7 +6,7 @@ import path from 'node:path';
 import {
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
   wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
-  groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf,
+  buildAttachSql, groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf,
 } from '../desktop/opms.js';
 
 // 서버 응답 모양: 1줄 열 이름 · 2~4줄 정보 · 5줄부터 자료 (\x01 로 나눔)
@@ -162,4 +162,14 @@ test('OPMS 더 보기: 서버에서 표 목록 → 고른 표 → 메모에도',
   const md = caseMemoMarkdown({ ourref: 'P-1' }, { details: d });
   assert.match(md, /## 신규성 의제\n\n\| 항목 \| 내용 \|\n\| --- \| --- \|\n\| 의제일 \| 2025-12-01 \|/);
   assert.match(md, /## 메모\n\n\| 메모 \|\n\| --- \|\n\| 심사관 면담 예정 \|/);
+});
+
+test('OPMS 전자포대: 최신순으로 받아 위에 새 서류 · No. 는 오래된 것부터 1', () => {
+  assert.match(buildAttachSql('7'), /ORDER BY registered_at DESC, IDX DESC/);
+  const items = attachmentItems([
+    { FILE_NAME_UPLOAD: 'up/3.pdf', FILE_NAME_ORI: '의견서.pdf', registered_at: '2026-03-01' },
+    { FILE_NAME_UPLOAD: '', FILE_NAME_ORI: '빈 줄' },
+    { FILE_NAME_UPLOAD: 'up/1.pdf', FILE_NAME_ORI: '출원서.pdf', registered_at: '2026-01-02' },
+  ]);
+  assert.deepEqual(items.map((x) => `${x.n}:${x.name}`), ['2:의견서.pdf', '1:출원서.pdf']);
 });
