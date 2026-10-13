@@ -428,6 +428,14 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const inDoc = want.every((w) => shown.some((x) => x.includes(w))) && !shown.some((x) => x.startsWith('PRE:')) && shown.some((x) => x === 'LI:목록은 목록')
         && shown.some((x) => x === `P:${N}${N}직접 친 줄`) && lines === 2;
       check('줄 앞 띄어쓰기 · 줄바꿈: 메모장 글을 붙여도 · 직접 쳐도 그대로 (네 칸도 코드 블록이 되지 않음, 줄이 합쳐지지 않음)', inDoc, JSON.stringify({ shown, lines }));
+      // 워드 · 메모킹에서 복사한 서식 글(HTML)의 들여쓰기도 그대로
+      await js(nw, caretAtEnd);
+      key(nw, 'Enter');
+      await wait(80);
+      await js(nw, `(() => { const dt = new DataTransfer(); dt.setData('text/html', '<p>&nbsp;&nbsp;워드에서 들여 쓴 줄&nbsp;&nbsp;끝</p>'); dt.setData('text/plain', '  워드에서 들여 쓴 줄  끝'); document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`);
+      await wait(300);
+      const htmlLine = await js(nw, `[...document.querySelectorAll('.mk-doc p')].map((p) => p.textContent).find((t) => t.includes('워드에서')) ?? ''`);
+      check('서식 글(HTML)을 붙여도 줄 앞 들여쓰기 그대로 (글 속 겹친 빈칸은 보통 띄어쓰기)', htmlLine === `${N}${N}워드에서 들여 쓴 줄  끝`, JSON.stringify(htmlLine));
       // 줄을 나누다 앞에 남은 띄어쓰기는 일부러 넣은 것이 아니므로 다듬기가 지운다 ("앞말| 뒷말" 에서 Enter)
       await js(nw, caretAtEnd);
       key(nw, 'Enter');
@@ -540,6 +548,21 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     {
       const list = getList() ?? createListWindow();
       const vault = getVault();
+      // 빈 메모는 붙이지 않는다 (창을 닫으면 저절로 정리되므로)
+      const blank = vault.create();
+      const blankR = await (async () => {
+        const b0 = new Set(noteWins.keys());
+        windowManager.openNote(blank);
+        const bid = await until(() => [...noteWins.keys()].find((k) => !b0.has(k)), '빈 메모 창');
+        const bw = noteWins.get(bid);
+        await until(() => js(bw, `document.documentElement.dataset.ready === 'true'`), '빈 메모 준비');
+        await js(bw, `document.getElementById('menu-btn').click(); document.getElementById('widget-btn').click()`);
+        const status = await until(() => js(bw, `document.getElementById('status')?.textContent`), '빈 메모 안내', 3000).catch(() => '');
+        const r = { status, widget: windowManager.widgets.has(blank), open: !bw.isDestroyed() };
+        bw.close();
+        return r;
+      })();
+      check('빈 메모는 바탕화면에 붙이지 않고 알려 줌', /빈 메모/.test(blankR.status) && !blankR.widget && blankR.open, JSON.stringify(blankR));
       const wid = vault.import({ body: '# 자주 쓰는 안내\n\n전화 상담: 평일 9시~6시\n\n- 주소: 서울시 어딘가\n' });
       await until(() => js(list, `!!document.querySelector('[data-id="${wid}"]')`), '위젯 메모 카드');
       const before = new Set(noteWins.keys());

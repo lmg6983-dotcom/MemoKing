@@ -451,7 +451,7 @@ export class WindowManager {
   /**
    * 메모킹을 켤 때 · 메모 폴더를 열 때: 놓아 둔 위젯들을 그 자리에
    *   지금 폴더에 없는 메모의 위젯은 창만 닫고 기억은 남긴다 (Google Drive 가 아직 안 붙었거나 다른 폴더로 바꾼 경우 —
-   *   그 폴더가 돌아오면 다시 뜬다). 메모를 지우면 refreshWidgets 가 기억까지 지운다
+   *   그 폴더가 돌아오면 다시 뜬다). 이 PC 에서 메모를 지우면(vault 'trashed') 기억까지 지운다
    */
   restoreWidgets() {
     const vault = this.getVault();
@@ -465,8 +465,8 @@ export class WindowManager {
   }
 
   /**
-   * 메모가 바뀌면 그 위젯을 다시 그린다. 파일이 잠깐 없어지면(동기화 · 다른 앱이 지웠다 다시 씀) 창만 닫고 기억은 남겨,
-   *   돌아오면 다시 띄운다 (메모를 지우기로 지웠을 때만 removeWidget 으로 기억까지)
+   * 메모가 바뀌면 그 위젯을 다시 그린다. 파일이 없어지면(동기화 중 · 다른 기기 · 탐색기) 창만 닫고 기억은 남겨,
+   *   돌아오면(휴지통에서 되살림 포함) 다시 띄운다. 이 PC 에서 지웠을 때(vault 'trashed')만 removeWidget 으로 기억까지
    */
   refreshWidgets(ids) {
     for (const id of ids) {

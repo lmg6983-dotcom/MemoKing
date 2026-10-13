@@ -186,6 +186,10 @@ function openVault(dir) {
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));
     });
+    next.on('trashed', (id) => {
+      windowManager.removeWidget(id);
+      if (memoHotkeys.slotOf(id)) memoHotkeys.set(id, null); // 단축키는 놓아 다른 앱이 쓰게
+    });
     next.on('indexed', (index) => windowManager.listWin?.webContents.send('vault:indexed', index.generatedAt));
     next.on('error', (err) => console.error('[vault]', err));
     next.open();
@@ -617,6 +621,7 @@ function setShortcut(name, acc) {
   saveSettings();
   if (name === 'quickMemo') registerQuickMemoKey();
   else registerMagicKey();
+  memoHotkeys.register(); // 놓아 준 Ctrl+Alt+숫자를 메모 단축키가 다시 쓰게
   updateTrayMenu();
   return { ok: true, status: shortcutStatus(name) };
 }
@@ -692,6 +697,7 @@ setInterval(() => {
   const before = [shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered].join();
   if (shortcutStatus('quickMemo').enabled && !shortcutStatus('quickMemo').registered) registerQuickMemoKey();
   if (shortcutStatus('magic').enabled && !shortcutStatus('magic').registered) registerMagicKey();
+  if ([...memoHotkeys.failed].some((slot) => !memoHotkeys.reservedBy(slot))) memoHotkeys.register(); // 다른 앱이 쓰던 숫자를 놓았으면 이제 잡는다
   if ([shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered].join() !== before) {
     updateTrayMenu();
     windowManager.listWin?.webContents.send('shortcuts:changed');

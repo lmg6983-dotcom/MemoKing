@@ -600,17 +600,27 @@ const keepIndentPlugin = $prose(() => {
   });
 });
 
-function plainSpacesIn(fragment) {
+// 붙여 넣은 서식 글: 글 속 U+00A0 는 보통 띄어쓰기로, 줄 맨 앞(문단 처음 · 줄바꿈 뒤)의 U+00A0 는 들여쓰기라 그대로
+//   (메모킹 · 워드에서 복사한 들여쓴 줄이 붙여넣기에서도 들여 쓴 채로)
+function plainSpacesIn(fragment, lineStart = true) {
   let changed = false;
+  let atLine = lineStart;
   const out = [];
   fragment.forEach((node) => {
     let next = node;
     if (node.isText) {
-      if (node.text.includes(NBSP) && !node.marks.some((m) => m.type.spec.code)) next = node.type.schema.text(node.text.replaceAll(NBSP, ' '), node.marks);
-    } else if (!node.type.spec.code && !node.isLeaf) {
-      const inner = plainSpacesIn(node.content);
+      if (node.text.includes(NBSP) && !node.marks.some((m) => m.type.spec.code)) {
+        const lead = atLine ? /^\u00a0*/.exec(node.text)[0] : '';
+        const text = lead + node.text.slice(lead.length).replaceAll(NBSP, ' ');
+        if (text !== node.text) next = node.type.schema.text(text, node.marks);
+      }
+      atLine = false;
+    } else if (BREAKS.has(node.type.name)) atLine = true;
+    else if (!node.type.spec.code && !node.isLeaf) {
+      const inner = plainSpacesIn(node.content, true);
       if (inner !== node.content) next = node.copy(inner);
-    }
+      atLine = node.isInline ? false : atLine;
+    } else if (node.isInline) atLine = false;
     if (next !== node) changed = true;
     out.push(next);
   });
@@ -1468,8 +1478,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     props: {
       // 복사·끌기: 서식 없는 곳에 붙일 "일반 글자"는 마크다운(\ 이스케이프가 섞임)이 아니라 읽는 글로 (Milkdown 클립보드보다 먼저)
       clipboardTextSerializer: (slice) => plainTextOf(slice.content, { openStart: slice.openStart, openEnd: slice.openEnd }),
-      // 붙여 넣은 서식 글의 U+00A0 는 보통 띄어쓰기로 (웹 · 워드의 &nbsp; · 메모킹에서 복사한 겹친 빈칸) —
-      //   줄 앞 빈칸은 keepIndentPlugin 이 다시 U+00A0 로 지킨다
+      // 붙여 넣은 서식 글의 글 속 U+00A0 는 보통 띄어쓰기로 (웹 · 워드의 &nbsp; · 메모킹에서 복사한 겹친 빈칸), 줄 앞은 들여쓰기라 그대로
       transformPasted: (slice) => new slice.constructor(plainSpacesIn(slice.content), slice.openStart, slice.openEnd),
       transformPastedHTML: (html) => revealLazyImages(normalizePastedTables(html)),
       handlePaste(v, event) {
@@ -1496,7 +1505,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         // 메모장 등에서 복사한 일반 글자(HTML 없음): 마크다운으로 읽으면 줄 앞 띄어쓰기가 지워지므로, 줄마다 앞 빈칸을 지켜서
         //   여러 줄이면 줄바꿈도 그대로 (마크다운의 "부드러운 줄바꿈" 은 띄어쓰기로 보여 줄들이 한 줄로 합쳐진다 — keepIndentPlugin)
         //   고친 글로 붙여넣기를 한 번 더 하고, 그 뒤는 평소처럼 클립보드 플러그인이 서식대로
-        if (!plainPasting && !files.length && !html && (hasLeadingSpaces(plain) || plain.includes('\n')) && !v.state.selection.$from.parent.type.spec.code) {
+        //   (표 칸 안은 표 붙여넣기가 따로 — 칸 안 줄바꿈은 <br> 이라야 저장된다)
+        if (!plainPasting && !files.length && !html && (hasLeadingSpaces(plain) || plain.includes('\n')) && !v.state.selection.$from.parent.type.spec.code && !isInTable(v.state)) {
           event.preventDefault();
           const dt = new DataTransfer();
           dt.setData('text/plain', keepLeadingSpaces(plain.replace(/\r\n?/g, '\n')));

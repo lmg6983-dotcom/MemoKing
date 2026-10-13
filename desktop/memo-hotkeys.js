@@ -114,6 +114,18 @@ export class MemoHotkeys {
     } catch (err) {
       return { ok: false, error: err.message, state: this.state(id) };
     }
+    // 단축키를 바꾸는 중(잠시 놓음)이면 잡아 보고 바로 놓아 다른 앱이 쓰는지만 본다
+    if (slot != null && this.paused) {
+      const acc = hotkeyAccelerator(slot);
+      let free = false;
+      try {
+        free = globalShortcut.register(acc, () => {});
+      } catch {
+        free = false;
+      }
+      if (free) globalShortcut.unregister(acc);
+      else return { ok: false, error: `${hotkeyLabel(slot)} 는 다른 앱이 이미 쓰고 있어요. 다른 숫자를 골라 주세요`, state: this.state(id) };
+    }
     const before = this.settings.memoHotkeys;
     this.settings.memoHotkeys = next;
     this.register();

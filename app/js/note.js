@@ -489,7 +489,8 @@ $('widget-btn').addEventListener('click', async () => {
     setStatus('바탕화면에서 뗐어요');
     return;
   }
-  if (!(await api.widget.place(id))) setStatus('바탕화면에 붙이지 못했어요', true);
+  const r = await api.widget.place(id);
+  if (!r?.ok) setStatus(r?.error || '바탕화면에 붙이지 못했어요', true);
 });
 // 메모 단축키로 복사하기 직전: 막 고친 글까지 저장 (main.js memoHotkeyPressed)
 window.__memokingFlush = () => flush();
@@ -573,6 +574,11 @@ api.on('memo:meta', applyMeta);
 
 function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
+  // 다른 창(위젯의 떼기 · 다른 메모의 단축키)에서 바뀌었을 수 있어 열 때마다 다시 읽는다
+  if (!el.menu.hidden && memo) {
+    api.widget?.has(id).then(showWidgetState, () => {});
+    api.hotkeys?.state(id).then(showHotkey, () => {});
+  }
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
   if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
 }

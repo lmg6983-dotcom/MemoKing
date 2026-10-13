@@ -46,6 +46,16 @@ async function render() {
     markdown: memo.body,
     tables,
     readOnly: true,
+    // 투명 바탕 손 메모를 어두운 화면에서 흰 펜으로 그리려면 획 자료(SVG)를 읽어야 한다 (메모 창과 같게)
+    readAttachment: async (src) => {
+      let rel = src;
+      try {
+        rel = decodeURI(src);
+      } catch {
+        // 이미 풀린 주소
+      }
+      return new TextDecoder().decode(await api.attachments.read(rel));
+    },
     onChange: () => {},
     fetchPreview: (url) => api.links.preview(url),
     openLink: (url) => api.links.open(url),

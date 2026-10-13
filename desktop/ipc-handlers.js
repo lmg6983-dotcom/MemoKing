@@ -502,7 +502,13 @@ export function registerIpc(ctx) {
     // 잠긴 메모는 메모 창에서 풀어 둔 동안에도 바탕화면에는 내용을 보이지 않는다 (창을 닫아도 남아 있게 되므로)
     return { title: m.title, color: m.color, tables: m.tables, locked: m.locked, body: m.locked ? '' : m.body };
   });
-  ipcMain.handle('widget:place', (e, id) => wm.placeWidget(String(id), senderWindow(e)));
+  ipcMain.handle('widget:place', (e, id) => {
+    const m = getVault()?.get(String(id));
+    if (!m) return { ok: false, error: '메모를 찾지 못했어요' };
+    // 빈 메모는 창을 닫으면 저절로 정리(휴지통)되므로 붙이지 않는다
+    if (!m.locked && isBlankBody(m.body)) return { ok: false, error: '빈 메모예요. 내용을 쓴 뒤에 바탕화면에 붙여 주세요' };
+    return { ok: wm.placeWidget(String(id), senderWindow(e)) };
+  });
   ipcMain.handle('widget:remove', (_e, id) => wm.removeWidget(String(id)));
   ipcMain.handle('widget:has', (_e, id) => wm.hasWidget(String(id)));
   ipcMain.handle('widget:open-note', (_e, id) => Boolean(wm.revealNote(String(id))));
@@ -667,11 +673,6 @@ export function registerIpc(ctx) {
     const title = vault?.get?.(id)?.title ?? '';
     const ok = vault?.trash(id) ?? false;
     win?.destroy();
-    if (ok) {
-      // 지운 메모의 바탕화면 위젯 · 단축키도 거둔다 (단축키는 다른 앱이 쓸 수 있게 놓는다)
-      wm.removeWidget(String(id));
-      if (memoHotkeys.slotOf(String(id))) memoHotkeys.set(String(id), null);
-    }
     if (typeof ok === 'string') wm.listWin?.webContents.send('memo:trashed', { name: ok, title });
     return Boolean(ok);
   });
