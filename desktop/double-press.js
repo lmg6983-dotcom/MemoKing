@@ -2,17 +2,35 @@
 // (Ctrl+Alt+C 한 번 = 빠른 메모, 두 번 = 화면 영역 캡처)
 export function createDoublePress({ ms = 350, onSingle, onDouble, setTimer = setTimeout, clearTimer = clearTimeout }) {
   let timer = null;
+  let inCooldown = false;
+
   return function press() {
+    if (inCooldown) {
+      return 'ignore';
+    }
     if (timer) {
       clearTimer(timer);
       timer = null;
-      onDouble();
+      inCooldown = true;
+      setTimer(() => {
+        inCooldown = false;
+      }, ms);
+      try {
+        onDouble?.();
+      } catch (err) {
+        console.error('[double-press] onDouble 오류:', err);
+      }
       return 'double';
     }
     timer = setTimer(() => {
       timer = null;
-      onSingle();
+      try {
+        onSingle?.();
+      } catch (err) {
+        console.error('[double-press] onSingle 오류:', err);
+      }
     }, ms);
     return 'wait';
   };
 }
+
