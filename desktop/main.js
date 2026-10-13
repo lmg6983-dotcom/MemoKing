@@ -179,6 +179,7 @@ function openVault(dir) {
       driveSync?.request(3000);
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
+      windowManager.refreshWidgets([...new Set([...ids, ...removed])]);
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));
     });
     next.on('indexed', (index) => windowManager.listWin?.webContents.send('vault:indexed', index.generatedAt));
@@ -991,6 +992,7 @@ app.whenReady().then(async () => {
     if (!windowManager.openNote(id)) settings.openNotes = settings.openNotes.filter((x) => x !== id);
   }
   if (launched && launched.kind !== 'list') handleLaunch(process.argv);
+  windowManager.restoreWidgets(); // 바탕화면 위젯은 숨겨 시작해도(로그인 때 자동 실행) 그 자리에
   alarms.startup();
   alarms.start();
   registerQuickMemoKey();
@@ -1016,6 +1018,7 @@ app.on('will-quit', () => {
   windowManager.topWatch.stop();
   globalShortcut.unregisterAll();
   windowManager.captureHelper.stop();
+  windowManager.desktopPin.stop();
   alarms.stop();
   history?.stop();
   history?.save(true);

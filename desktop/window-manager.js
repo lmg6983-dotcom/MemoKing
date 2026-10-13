@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { isInside, dropBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 import { StackStore } from './stacks.js';
+import { DesktopPin } from './desktop-pin.js';
 import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
 import { Opms, isOpenableFile, cleanDate, foreignSummary, caseMemoMarkdown, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
@@ -61,6 +62,8 @@ export class WindowManager {
     this.spareTimer = 0;
     this.paintMarks = new WeakMap(); // 예비 창: 화면이 "메모를 그렸다" 고 알려 오면 부를 함수
     this.hotkeySlotOf = () => null; // 메모 단축키 칸 (main.js 가 채움)
+    this.widgets = new Map(); // 바탕화면 위젯: 메모 id → 창
+    this.desktopPin = new DesktopPin();
     this.hudWin = null;
     this.hudTimer = 0;
     this.smokeHud = [];
@@ -319,6 +322,126 @@ export class WindowManager {
     return win;
   }
 
+  // ---------- 바탕화면 위젯 ----------
+  // 메모를 바탕화면에 위젯처럼 (스티커 메모 앱처럼 늘 그 자리에): 작업 표시줄 · Alt+Tab 에 없고, 다른 앱 창 뒤 바탕화면 층에
+  //   (Windows: desktop-pin.js 가 바탕화면 창에 붙임 — Win+D 에도 남음). 내용은 읽기 전용 메모 그대로, 고치면 바로 바뀜
+  //   자리 · 크기는 이 PC 설정(settings.widgets)에 — 메모킹을 다시 켜면(로그인 때 자동 실행 포함) 그 자리에 다시
+
+  widgetBounds(id, near = null) {
+    const saved = settings.widgets?.[id];
+    if (saved && onScreen(saved)) return saved;
+    if (near) return near;
+    // 처음: 주 화면 오른쪽 위부터 차례로
+    const area = screen.getPrimaryDisplay().workArea;
+    const n = this.widgets.size;
+    const width = 260;
+    const height = 220;
+    return { x: area.x + area.width - width - 24 - (n % 3) * 28, y: area.y + 24 + n * 28, width, height };
+  }
+
+  openWidget(id, { near = null } = {}) {
+    const memo = this.getVault()?.get(id);
+    if (!memo) return null;
+    const existing = this.widgets.get(id);
+    if (existing && !existing.isDestroyed()) {
+      existing.showInactive();
+      return existing;
+    }
+    const bounds = this.widgetBounds(id, near);
+    const win = new BrowserWindow({
+      ...bounds,
+      minWidth: 180,
+      minHeight: 110,
+      frame: false,
+      show: false,
+      skipTaskbar: true,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      ...(process.platform === 'win32' ? { type: 'toolbar' } : {}), // 작업 전환(Alt+Tab)에도 안 나오게
+      title: memo.title,
+      backgroundColor: noteBg(memo.color),
+      ...windowIcon,
+      webPreferences,
+    });
+    guardWindow(win, { openWebPage });
+    this.widgets.set(id, win);
+    const remember = () => {
+      if (win.isDestroyed()) return;
+      settings.widgets = { ...(settings.widgets ?? {}), [id]: win.getBounds() };
+      saveSettings();
+    };
+    win.on('moved', remember);
+    win.on('resized', remember);
+    // 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로
+    win.on('blur', () => this.desktopPin.send('bottom', hwndOf(win)));
+    win.once('ready-to-show', () => {
+      if (win.isDestroyed()) return;
+      win.showInactive();
+      this.desktopPin.send('pin', hwndOf(win));
+    });
+    win.on('closed', () => {
+      if (this.widgets.get(id) === win) this.widgets.delete(id);
+    });
+    win.loadFile(path.join(APP_DIR, 'widget.html'), { query: { id } });
+    if (!settings.widgets?.[id]) {
+      settings.widgets = { ...(settings.widgets ?? {}), [id]: bounds };
+      saveSettings();
+    }
+    this.pushList();
+    return win;
+  }
+
+  /** 메모 창 메뉴 › 바탕화면에 위젯으로 놓기: 그 메모 창 자리에 위젯을 놓고 메모 창은 닫는다 */
+  placeWidget(id, fromWin = null) {
+    const near = fromWin && !fromWin.isDestroyed() ? fromWin.getBounds() : null;
+    if (near && settings.widgets?.[id]) delete settings.widgets[id]; // 메모 창이 있던 자리로 새로
+    const win = this.openWidget(id, { near });
+    if (!win) return false;
+    if (fromWin && !fromWin.isDestroyed()) fromWin.close();
+    return true;
+  }
+
+  removeWidget(id) {
+    if (settings.widgets?.[id]) {
+      const { [id]: _gone, ...rest } = settings.widgets;
+      settings.widgets = rest;
+      saveSettings();
+    }
+    const win = this.widgets.get(id);
+    this.widgets.delete(id);
+    if (win && !win.isDestroyed()) win.close();
+    this.pushList();
+    return true;
+  }
+
+  hasWidget(id) {
+    return Boolean(this.widgets.get(id)) || Boolean(settings.widgets?.[id]);
+  }
+
+  /** 메모킹을 켤 때: 놓아 둔 위젯들을 그 자리에 (지워진 메모는 뺀다) */
+  restoreWidgets() {
+    for (const id of Object.keys(settings.widgets ?? {})) {
+      if (this.getVault()?.get(id)) this.openWidget(id);
+      else this.removeWidget(id);
+    }
+  }
+
+  /** 메모가 바뀌면 그 위젯을 다시 그린다 (지워졌으면 거둔다) */
+  refreshWidgets(ids) {
+    for (const id of ids) {
+      const win = this.widgets.get(id);
+      if (!win || win.isDestroyed()) continue;
+      const memo = this.getVault()?.get(id);
+      if (!memo) this.removeWidget(id);
+      else {
+        win.setBackgroundColor(noteBg(memo.color));
+        win.setTitle(memo.title);
+        win.webContents.send('widget:changed');
+      }
+    }
+  }
+
   // ---------- 잠깐 알림 (HUD) ----------
   // 메모 단축키로 복사했을 때처럼 다른 앱을 쓰는 중에 "복사했어요" 만 잠깐 — 마우스 가까이, 포커스를 빼앗지 않고 1.6초 뒤 사라짐
   //   (Windows 알림은 알림 센터에 쌓이고 소리가 나서, 자주 쓰는 단축키에는 무겁다)
@@ -476,6 +599,7 @@ export class WindowManager {
       open: Boolean(this.noteWins.get(m.id)?.isVisible()),
       stack: this.stacks?.stackOf(m.id)?.memos.length ?? 0,
       hotkey: this.hotkeySlotOf(m.id),
+      widget: this.widgets.has(m.id),
     }));
   }
 

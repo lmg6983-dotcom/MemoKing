@@ -473,6 +473,23 @@ $('hotkey-btn').addEventListener('click', async () => {
   showHotkey(next);
   setStatus(next.slot ? `Ctrl+Alt+${next.slot} 로 이 메모를 불러와요` : '단축키를 풀었어요');
 });
+// 바탕화면에 붙이기: 이 메모 창 자리에 바탕화면 위젯을 놓고 창은 닫는다 (이미 붙어 있으면 떼기)
+let onDesktop = false;
+function showWidgetState(on) {
+  onDesktop = Boolean(on);
+  $('widget-btn').querySelector('span').textContent = onDesktop ? '바탕화면에서 떼기' : '바탕화면에 붙이기';
+}
+$('widget-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  if (onDesktop) {
+    await api.widget.remove(id);
+    showWidgetState(false);
+    setStatus('바탕화면에서 뗐어요');
+    return;
+  }
+  if (!(await api.widget.place(id))) setStatus('바탕화면에 붙이지 못했어요', true);
+});
 // 메모 단축키로 복사하기 직전: 막 고친 글까지 저장 (main.js memoHotkeyPressed)
 window.__memokingFlush = () => flush();
 $('image-save-btn').addEventListener('click', () => memoImage('save'));
@@ -1738,6 +1755,7 @@ if (!memo) {
   reminderPanel.set(memo.reminders);
   showLockState();
   api.hotkeys?.state(id).then(showHotkey, () => {});
+  api.widget?.has(id).then(showWidgetState, () => {});
   recorder = setupVoiceRecorder({
     panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
     buttons: () => document.querySelectorAll('[data-action="record"]'),

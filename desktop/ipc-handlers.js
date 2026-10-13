@@ -17,7 +17,8 @@ import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront } from './window-utils.js';
-import { SMOKE, toast, copyFileToClipboard, smokeOpened } from './utils.js';
+import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
+import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: Math.round(p.x), y: Math.round(p.y) } : null);
@@ -494,6 +495,24 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 창 크기 조정 ----------
+  // 바탕화면 위젯
+  ipcMain.handle('widget:memo', (_e, id) => {
+    const m = getVault()?.get(String(id));
+    if (!m) return null;
+    return { title: m.title, color: m.color, tables: m.tables, locked: m.needsPassword, body: m.needsPassword ? '' : m.body };
+  });
+  ipcMain.handle('widget:place', (e, id) => wm.placeWidget(String(id), senderWindow(e)));
+  ipcMain.handle('widget:remove', (_e, id) => wm.removeWidget(String(id)));
+  ipcMain.handle('widget:has', (_e, id) => wm.hasWidget(String(id)));
+  ipcMain.handle('widget:open-note', (_e, id) => Boolean(wm.revealNote(String(id))));
+  // 본문 복사 (메모 단축키와 같은 글: 제목 줄 빼고, 서식 기호 없이, 줄 앞 띄어쓰기 그대로)
+  ipcMain.handle('memo:copy-text', async (_e, id) => {
+    const m = getVault()?.get(String(id));
+    if (!m || m.needsPassword) return false;
+    await writeClipboard({ text: hotkeyCopyText(m.body) });
+    return true;
+  });
+
   // 메모 단축키 (Ctrl+Alt+1~9)
   ipcMain.handle('hotkey:state', (_e, id) => memoHotkeys.state(String(id)));
   ipcMain.handle('hotkey:set', (_e, id, slot, opts) => {

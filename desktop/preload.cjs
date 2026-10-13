@@ -7,7 +7,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
-  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide',
+  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'widget:changed',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -107,6 +107,15 @@ contextBridge.exposeInMainWorld('memoking', {
     remove: invoke('trash:delete'),
     empty: invoke('trash:empty'),
   },
+  // 바탕화면 위젯: memo(id) 읽기 전용 내용 · place(id) 이 메모 창 자리에 놓기(창은 닫힘) · remove(id) 떼기 · has(id) · openNote(id)
+  widget: {
+    memo: invoke('widget:memo'),
+    place: invoke('widget:place'),
+    remove: invoke('widget:remove'),
+    has: invoke('widget:has'),
+    openNote: invoke('widget:open-note'),
+  },
+  copyMemoText: invoke('memo:copy-text'), // 메모 본문을 서식 기호 없이 클립보드에 → true | false
   // 메모 단축키 (Ctrl+Alt+1~9): state(메모 id) · set(메모 id, 칸|null, { copy, show }) → { ok, error?, state }
   hotkeys: {
     state: invoke('hotkey:state'),

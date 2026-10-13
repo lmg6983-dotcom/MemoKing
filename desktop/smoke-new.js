@@ -522,6 +522,54 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('단축키 풀기 → 키를 놓아 다른 앱이 쓸 수 있게', off.ok && !memoHotkeys.held.has('3') && !getSettings().memoHotkeys?.['3'], JSON.stringify(getSettings().memoHotkeys));
     }
 
+    // ---------- v0.33 — 바탕화면 위젯 (메모 창 › 바탕화면에 붙이기) ----------
+    {
+      const list = getList() ?? createListWindow();
+      const vault = getVault();
+      const wid = vault.import({ body: '# 자주 쓰는 안내\n\n전화 상담: 평일 9시~6시\n\n- 주소: 서울시 어딘가\n' });
+      await until(() => js(list, `!!document.querySelector('[data-id="${wid}"]')`), '위젯 메모 카드');
+      const before = new Set(noteWins.keys());
+      await js(list, `document.querySelector('[data-id="${wid}"]').click()`);
+      const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '위젯 메모 창');
+      const nw = noteWins.get(nid);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '위젯 메모 준비');
+      const noteBounds = nw.getBounds();
+      await js(nw, `document.getElementById('menu-btn').click(); document.getElementById('widget-btn').click()`);
+      const ww = await until(() => windowManager.widgets.get(wid), '위젯 창', 4000).catch(() => null);
+      await until(() => ww && js(ww, `document.documentElement.dataset.ready === 'true'`), '위젯 준비', 6000).catch(() => {});
+      const noteClosed = await until(() => !noteWins.has(nid), '메모 창 닫힘', 3000).catch(() => false);
+      const look = ww ? await js(ww, `({ text: document.querySelector('.mk-doc')?.textContent ?? '', editable: document.querySelector('.mk-doc')?.getAttribute('contenteditable'), color: document.body.dataset.color, actions: document.querySelectorAll('.wg-actions button').length })`) : null;
+      const wb = ww?.getBounds();
+      check('바탕화면에 붙이기: 메모 창 자리에 위젯이 뜨고 메모 창은 닫힘 (읽기 전용 · 같은 색 · 복사/열기/떼기)',
+        Boolean(ww) && noteClosed && /전화 상담: 평일 9시~6시/.test(look?.text ?? '') && look?.editable === 'false' && look?.actions === 3
+          && wb && Math.abs(wb.x - noteBounds.x) <= 2 && Math.abs(wb.y - noteBounds.y) <= 2 && Boolean(getSettings().widgets?.[wid]),
+        JSON.stringify({ ww: Boolean(ww), noteClosed, look, wb, noteBounds }));
+      if (ww) await capture(ww, 'smoke-new-widget.png');
+      // 메모가 바뀌면 위젯도 바로
+      vault.save(wid, '# 자주 쓰는 안내\n\n전화 상담: 평일 10시~7시로 바뀜\n');
+      const updated = ww ? await until(() => js(ww, `document.querySelector('.mk-doc')?.textContent.includes('10시~7시')`), '위젯 다시 그림', 4000).catch(() => false) : false;
+      check('메모를 고치면 위젯도 바로 바뀜', updated);
+      // 본문 복사 단추: 제목 줄 빼고
+      clipboard.writeText('비움');
+      if (ww) await js(ww, `document.getElementById('wg-copy').click()`);
+      const copied = await until(async () => (await clipboard.readText()) === '전화 상담: 평일 10시~7시로 바뀜', '위젯 복사', 3000).catch(async () => clipboard.readText());
+      check('위젯 복사 단추: 본문만 클립보드에', copied === true, String(copied));
+      // 메모킹을 다시 켜면 그 자리에
+      ww?.destroy();
+      await wait(100);
+      windowManager.restoreWidgets();
+      const again = await until(() => windowManager.widgets.get(wid), '위젯 다시', 3000).catch(() => null);
+      const againBounds = again?.getBounds();
+      check('다시 켜면 놓아 둔 자리에 위젯', Boolean(again) && Math.abs(againBounds.x - wb.x) <= 2 && Math.abs(againBounds.y - wb.y) <= 2, JSON.stringify({ againBounds, wb }));
+      // 떼기
+      if (again) {
+        await until(() => js(again, `document.documentElement.dataset.ready === 'true'`), '위젯 준비 2', 6000).catch(() => {});
+        await js(again, `document.getElementById('wg-remove').click()`);
+      }
+      const gone = await until(() => !windowManager.widgets.has(wid) && !getSettings().widgets?.[wid], '위젯 떼기', 3000).catch(() => false);
+      check('떼기 → 위젯이 사라지고 다시 켜도 안 뜸 (메모는 그대로)', gone && Boolean(vault.get(wid)));
+    }
+
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {

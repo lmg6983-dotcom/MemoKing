@@ -6,6 +6,8 @@ const ICONS = {
   // 목록 늘 위에 두기 버튼: 선 왕관 (누르면 이 왕관이 창 위 가장자리 스티커가 된다)
   'crown-line': `<path d="M4 8.5l4 3.5L12 5.5l4 6.5 4-3.5-1.6 9H5.6L4 8.5z" ${stroke}/><circle cx="4" cy="7" r="1.3" fill="currentColor"/><circle cx="12" cy="4" r="1.3" fill="currentColor"/><circle cx="20" cy="7" r="1.3" fill="currentColor"/><path d="M6 20.5h12" ${stroke}/>`,
   // 메모 단축키 (Ctrl+Alt+숫자로 바로 불러오기)
+  // 바탕화면 위젯 (모니터)
+  desktop: `<rect x="3" y="4.5" width="18" height="12" rx="2" ${stroke}/><path d="M9 20h6M12 16.5V20" ${stroke}/>`,
   zap: `<path d="M13.5 2.5L5 13.5h6l-1 8 8.5-11h-6z" ${stroke}/>`,
   plus: `<path d="M12 5v14M5 12h14" ${stroke} stroke-width="2.2"/>`,
   search: `<circle cx="11" cy="11" r="6.5" ${stroke}/><path d="M16 16l4 4" ${stroke}/>`,
