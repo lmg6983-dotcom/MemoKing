@@ -39,7 +39,10 @@ export class MemoHotkeys {
     this.unregister();
     this.failed.clear();
     if (this.paused) return;
-    for (const slot of Object.keys(this.map)) {
+    const vault = this.getVault();
+    for (const [slot, b] of Object.entries(this.map)) {
+      // 없는 메모(다른 기기에서 지움 · 다른 폴더)의 칸은 잡지 않는다 — 다른 앱이 쓰게. 메모가 돌아오면 다시 (refresh)
+      if (vault && !vault.get(b.id)) continue;
       if (this.reservedBy(slot)) {
         this.failed.add(slot);
         continue;
@@ -57,6 +60,13 @@ export class MemoHotkeys {
         console.warn(`${hotkeyLabel(slot)} 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다`);
       }
     }
+  }
+
+  /** 메모가 생기거나 없어졌으면 잡은 키를 다시 맞춘다 (메모 폴더가 바뀔 때 · 다른 기기에서 지웠을 때) */
+  refresh() {
+    const vault = this.getVault();
+    const want = Object.entries(this.map).filter(([slot, b]) => !this.reservedBy(slot) && (!vault || vault.get(b.id))).map(([slot]) => slot);
+    if (want.some((slot) => !this.held.has(slot) && !this.failed.has(slot)) || [...this.held.keys()].some((slot) => !want.includes(slot))) this.register();
   }
 
   unregister() {

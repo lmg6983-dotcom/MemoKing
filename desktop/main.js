@@ -183,6 +183,7 @@ function openVault(dir) {
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
       windowManager.refreshWidgets([...new Set([...ids, ...removed])]);
+      if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));
     });
     next.on('indexed', (index) => windowManager.listWin?.webContents.send('vault:indexed', index.generatedAt));
@@ -195,7 +196,10 @@ function openVault(dir) {
     saveSettings();
     migrateV1();
     windowManager.loadStacks();
-    if (app.isReady()) windowManager.restoreWidgets(); // 바탕화면 위젯 — 숨겨 시작해도(로그인 때 자동 실행) 그 자리에
+    if (app.isReady()) {
+      windowManager.restoreWidgets(); // 바탕화면 위젯 — 숨겨 시작해도(로그인 때 자동 실행) 그 자리에
+      memoHotkeys.refresh(); // 다른 폴더의 메모 단축키
+    }
     purgeTrash(vault);
     configureDrive();
   } catch (err) {

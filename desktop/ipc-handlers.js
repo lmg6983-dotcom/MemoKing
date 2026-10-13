@@ -499,7 +499,8 @@ export function registerIpc(ctx) {
   ipcMain.handle('widget:memo', (_e, id) => {
     const m = getVault()?.get(String(id));
     if (!m) return null;
-    return { title: m.title, color: m.color, tables: m.tables, locked: m.needsPassword, body: m.needsPassword ? '' : m.body };
+    // 잠긴 메모는 메모 창에서 풀어 둔 동안에도 바탕화면에는 내용을 보이지 않는다 (창을 닫아도 남아 있게 되므로)
+    return { title: m.title, color: m.color, tables: m.tables, locked: m.locked, body: m.locked ? '' : m.body };
   });
   ipcMain.handle('widget:place', (e, id) => wm.placeWidget(String(id), senderWindow(e)));
   ipcMain.handle('widget:remove', (_e, id) => wm.removeWidget(String(id)));
@@ -508,7 +509,7 @@ export function registerIpc(ctx) {
   // 본문 복사 (메모 단축키와 같은 글: 제목 줄 빼고, 서식 기호 없이, 줄 앞 띄어쓰기 그대로)
   ipcMain.handle('memo:copy-text', async (_e, id) => {
     const m = getVault()?.get(String(id));
-    if (!m || m.needsPassword) return false;
+    if (!m || m.locked) return false;
     await writeClipboard({ text: hotkeyCopyText(m.body) });
     return true;
   });
@@ -745,7 +746,13 @@ export function registerIpc(ctx) {
     return result && result !== 'cancelled' ? '파일을 열지 못했어요. 이 파일을 열 수 있는 프로그램이 있는지 확인해 주세요.' : result;
   });
   ipcMain.handle('attachment:copy', async (_e, rel) => {
-    const file = getVault()?.resolve(String(rel ?? ''));
+    let decoded = String(rel ?? '');
+    try {
+      decoded = decodeURI(decoded);
+    } catch {
+      // 이미 디코딩됨
+    }
+    const file = getVault()?.resolve(decoded);
     if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return false;
     if (SMOKE) {
       smokeOpened.push({ kind: 'copy-file', target: file });

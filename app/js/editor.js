@@ -506,7 +506,9 @@ function doneTagAt(doc, pos, { lineEnd = false } = {}) {
 }
 // 줄 앞 띄어쓰기 지키기 (core/indent-spaces.js): 문단 · 제목 · 항목의 맨 앞이나 줄바꿈(Shift+Enter) 뒤에
 //   친 띄어쓰기 · 탭은 줄 바꿈 없는 빈칸(U+00A0)으로 바꿔 둔다 — 마크다운으로 저장했다 다시 열어도 그대로
-//   (바뀐 줄만 본다. 코드 블록 · 글 속 코드는 그대로). 붙여넣은 글의 줄바꿈도 그대로 줄바꿈으로
+//   일부러 넣은 것만: 줄 앞에서 친 띄어쓰기(handleTextInput)와 붙여 넣은 글의 들여쓰기(붙여넣기 트랜잭션의 바뀐 줄).
+//   줄을 나누다 앞에 남은 띄어쓰기는 보통 띄어쓰기로 두어 다듬기(tidy)가 지운다. 코드 블록 · 글 속 코드는 그대로.
+//   붙여넣은 글의 줄바꿈도 그대로 줄바꿈으로
 const BREAKS = new Set(['hardbreak', 'hard_break']);
 let plainPasting = false; // 메모장 같은 일반 글자를 붙이는 중 (아래 붙여넣기에서 잠깐)
 function indentFixes(doc, from, to) {
@@ -542,11 +544,28 @@ function changedRange(trs, doc) {
   })));
   return from > to ? null : { from: Math.max(0, from), to: Math.min(doc.content.size, to) };
 }
+/** 커서가 줄 맨 앞(또는 줄 앞 들여쓰기 바로 뒤)인가 */
+function atLineIndent($pos) {
+  if (!$pos.parent.isTextblock || $pos.parent.type.spec.code) return false;
+  let start = $pos.start();
+  // 줄바꿈(Shift+Enter) 뒤라면 그 줄의 시작부터
+  $pos.parent.forEach((child, offset) => {
+    if (BREAKS.has(child.type.name) && $pos.start() + offset < $pos.pos) start = $pos.start() + offset + child.nodeSize;
+  });
+  return /^\u00a0*$/.test($pos.doc.textBetween(start, $pos.pos, '', ''));
+}
 const keepIndentPlugin = $prose(() => {
   let composing = false; // 한글 조합 중에는 손대지 않는다 (조합이 끝난 뒤 그 줄이 다시 바뀔 때 고친다)
   return new Plugin({
     key: new PluginKey('memoking-keep-indent'),
     props: {
+      // 줄 앞에서 친 띄어쓰기 · 탭 → U+00A0 (일부러 들여 쓰는 것)
+      handleTextInput(view, from, to, text) {
+        if (composing || !/^[ \t]+$/.test(text) || !atLineIndent(view.state.doc.resolve(from))) return false;
+        const $from = view.state.doc.resolve(from);
+        view.dispatch(view.state.tr.insertText(keepIndent(text), from, to).setStoredMarks($from.marks()).scrollIntoView());
+        return true;
+      },
       handleDOMEvents: {
         compositionstart: () => {
           composing = true;
@@ -559,7 +578,9 @@ const keepIndentPlugin = $prose(() => {
       },
     },
     appendTransaction(trs, _old, state) {
-      if (composing || !trs.some((tr) => tr.docChanged)) return null;
+      // 붙여넣기 · 끌어다 놓기만 (치는 띄어쓰기는 handleTextInput 이 바로)
+      const pasted = plainPasting || trs.some((tr) => /^(paste|drop)$/.test(tr.getMeta('uiEvent') ?? ''));
+      if (composing || !pasted || !trs.some((tr) => tr.docChanged)) return null;
       const range = changedRange(trs, state.doc);
       if (!range) return null;
       const { from, to } = range;

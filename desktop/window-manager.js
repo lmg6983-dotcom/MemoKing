@@ -327,6 +327,18 @@ export class WindowManager {
   //   (Windows: desktop-pin.js 가 바탕화면 창에 붙임 — Win+D 에도 남음). 내용은 읽기 전용 메모 그대로, 고치면 바로 바뀜
   //   자리 · 크기는 이 PC 설정(settings.widgets)에 — 메모킹을 다시 켜면(로그인 때 자동 실행 포함) 그 자리에 다시
 
+  saveWidgetBounds(id, bounds) {
+    settings.widgets = { ...(settings.widgets ?? {}), [id]: bounds };
+    saveSettings();
+  }
+
+  forgetWidgetBounds(id) {
+    if (!settings.widgets?.[id]) return;
+    const { [id]: _gone, ...rest } = settings.widgets;
+    settings.widgets = rest;
+    saveSettings();
+  }
+
   widgetBounds(id, near = null) {
     const saved = settings.widgets?.[id];
     if (saved && onScreen(saved)) return saved;
@@ -345,8 +357,7 @@ export class WindowManager {
     const existing = this.widgets.get(id);
     if (existing && !existing.isDestroyed()) {
       if (!existing.webContents.isLoading()) existing.showInactive(); // 아직 불러오는 중이면 ready-to-show 가 보인다
-      settings.widgets = { ...(settings.widgets ?? {}), [id]: existing.getBounds() };
-      saveSettings();
+      this.saveWidgetBounds(id, existing.getBounds());
       return existing;
     }
     const bounds = this.widgetBounds(id, near);
@@ -368,11 +379,7 @@ export class WindowManager {
     });
     guardWindow(win, { openWebPage });
     this.widgets.set(id, win);
-    const remember = () => {
-      if (win.isDestroyed()) return;
-      settings.widgets = { ...(settings.widgets ?? {}), [id]: win.getBounds() };
-      saveSettings();
-    };
+    const remember = () => !win.isDestroyed() && this.saveWidgetBounds(id, win.getBounds());
     win.on('moved', remember);
     win.on('resized', remember);
     // 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로
@@ -383,18 +390,24 @@ export class WindowManager {
       this.desktopPin.send('pin', hwndOf(win));
     });
     win.on('session-end', () => (win.mkKeep = true)); // Windows 를 끌 때 닫히는 것은 그대로 기억
+    // Alt+F4 처럼 사람이 직접 닫으면(close 가 먼저 옴) 떼기와 같게
+    win.on('close', () => {
+      if (!win.mkKeep && !this.isQuitting()) win.mkUserClose = true;
+    });
     win.on('closed', () => {
       if (this.widgets.get(id) !== win) return;
       this.widgets.delete(id);
-      // Alt+F4 처럼 사람이 직접 닫았으면 떼기와 같게 (끌 때 · 폴더를 바꿀 때 닫힌 것은 기억해 두었다가 다시)
-      if (!win.mkKeep && !this.isQuitting()) this.removeWidget(id);
-      else this.pushList(); // 목록 카드의 바탕화면 표시
+      if (win.mkUserClose) return void this.removeWidget(id);
+      this.pushList(); // 목록 카드의 바탕화면 표시
+      // close 없이 사라짐 = 탐색기를 다시 시작해 바탕화면 창(주인)이 없어짐 — 조금 뒤 새 바탕화면에 다시 붙인다
+      if (!win.mkKeep && !this.isQuitting()) {
+        setTimeout(() => {
+          if (!this.isQuitting() && !this.widgets.has(id) && settings.widgets?.[id] && this.getVault()?.get(id)) this.openWidget(id);
+        }, 3000);
+      }
     });
     win.loadFile(path.join(APP_DIR, 'widget.html'), { query: { id } });
-    if (!settings.widgets?.[id]) {
-      settings.widgets = { ...(settings.widgets ?? {}), [id]: bounds };
-      saveSettings();
-    }
+    if (!settings.widgets?.[id]) this.saveWidgetBounds(id, bounds);
     this.pushList();
     return win;
   }
@@ -406,13 +419,12 @@ export class WindowManager {
     if (existing && !existing.isDestroyed()) {
       // 이미 바탕화면에 있으면 그 위젯을 메모 창 자리로 옮긴다
       if (near) existing.setBounds(near);
-    } else if (near && settings.widgets?.[id]) {
-      const { [id]: _old, ...rest } = settings.widgets; // 메모 창이 있던 자리로 새로
-      settings.widgets = rest;
-    }
+    } else if (near) this.forgetWidgetBounds(id); // 메모 창이 있던 자리로 새로
     const win = this.openWidget(id, { near });
     if (!win) return false;
-    if (fromWin && !fromWin.isDestroyed()) fromWin.close();
+    // 스택의 탭이면 그 탭만 빼서 닫는다 (창을 그냥 닫으면 스택의 다른 탭들도 함께 닫힘)
+    if (this.stacks?.stackOf(id)) this.removeFromStack(id, 'close');
+    else if (fromWin && !fromWin.isDestroyed()) fromWin.close();
     return true;
   }
 
@@ -424,11 +436,7 @@ export class WindowManager {
   }
 
   removeWidget(id) {
-    if (settings.widgets?.[id]) {
-      const { [id]: _gone, ...rest } = settings.widgets;
-      settings.widgets = rest;
-      saveSettings();
-    }
+    this.forgetWidgetBounds(id);
     const win = this.widgets.get(id);
     this.widgets.delete(id);
     if (win && !win.isDestroyed()) win.close(); // closed 는 이미 목록에서 뺀 창이라 아무 일도 하지 않는다

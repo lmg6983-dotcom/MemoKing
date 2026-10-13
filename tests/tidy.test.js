@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tidyText } from '../app/js/tidy-text.js';
 
-test('다듬기: 줄 끝 띄어쓰기만 — 줄 앞 들여쓰기 · 겹친 띄어쓰기는 그대로 (안내 문구 칸 맞춤)', () => {
-  assert.equal(tidyText('  가나  다라   마 '), '  가나  다라   마');
-  assert.equal(tidyText(' 가 ', { atEnd: false }), ' 가 ');
+test('다듬기: 남은 줄 앞뒤 띄어쓰기만 — 들여쓰기(U+00A0) · 겹친 띄어쓰기는 그대로 (안내 문구 칸 맞춤)', () => {
+  assert.equal(tidyText('  가나  다라   마 '), '가나  다라   마');
+  assert.equal(tidyText(' 가 ', { atStart: false, atEnd: false }), ' 가 ');
   assert.equal(tidyText('\u00a0\u00a0국내사업부 대표'), '\u00a0\u00a0국내사업부 대표');
 });
 

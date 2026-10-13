@@ -138,15 +138,7 @@ export async function copyBlock(view, pos, node, target) {
   }
   // 파일: 그 파일 자체를 (못 넣으면 아래처럼 이름을 글로)
   const file = attachmentOf(node);
-  if (file && host.file) {
-    let path = file;
-    try {
-      path = decodeURI(file);
-    } catch {
-      // 이미 풀린 주소
-    }
-    if (await host.file(path).catch(() => false)) return '파일';
-  }
+  if (file && host.file && (await host.file(file).catch(() => false))) return '파일';
   const slice = view.state.doc.slice(pos, pos + node.nodeSize);
   // 소리 · 동영상처럼 글이 없는 줄은 그 파일 이름(주소)을 글로
   const text = plainTextOf(slice.content).trim() || media?.attrs.title || media?.attrs.src || node.attrs?.href || node.attrs?.src || '';

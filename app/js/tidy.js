@@ -5,7 +5,7 @@
 //     3) 코드(코드 블록·인라인 코드)는 그대로, 한글 조합(IME) 중에는 아무것도 하지 않는다
 //     4) 되돌리기 기록에 남기지 않는다 (되돌리기를 누르면 내가 쓴 것이 돌아온다)
 //   고치는 것:
-//     - 줄 끝의 띄어쓰기 (줄 앞 들여쓰기 · 겹친 띄어쓰기는 일부러 쓴 것이라 그대로 — 안내 문구 칸 맞춤 등)
+//     - 줄을 나누다 남은 줄 앞 · 줄 끝 띄어쓰기 (일부러 들여 쓴 것은 U+00A0 라 그대로, 겹친 띄어쓰기도 그대로 — 안내 문구 칸 맞춤 등)
 //     - 한글 뒤 문장부호 앞 띄어쓰기 "합니다 ." → "합니다."
 //     - 붙여넣기에 묻어 온 보이지 않는 글자(폭 없는 공백·BOM). 줄바꿈 없는 공백(NBSP)은 줄 앞 들여쓰기라 그대로
 //     - 의미 없는 빈 줄: 빈 줄이 둘 이상 이어지면 하나로
@@ -31,10 +31,12 @@ function blockEdits(block, pos) {
   block.forEach((child, offset) => kids.push({ child, at: pos + 1 + offset }));
   kids.forEach(({ child, at }, i) => {
     if (!child.isText || hasCode(child)) return;
+    const prev = kids[i - 1]?.child;
     const next = kids[i + 1]?.child;
     const text = child.text;
+    const atStart = i === 0 || Boolean(prev && !prev.isText && prev.type.name.includes('break'));
     const atEnd = i === kids.length - 1 || Boolean(next && !next.isText && next.type.name.includes('break'));
-    const fixed = tidyText(text, { atEnd });
+    const fixed = tidyText(text, { atStart, atEnd });
     if (fixed !== text) edits.push({ from: at, to: at + child.nodeSize, text: fixed, marks: child.marks });
   });
   return edits.reverse();
