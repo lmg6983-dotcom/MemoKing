@@ -945,7 +945,10 @@ for (const [btn, shift] of [[el.undoBtn, false], [el.redoBtn, true]]) {
 
 // 표 막대: 표 안에 커서가 있을 때만
 function showTableBar(table) {
-  el.tableBar.hidden = !table;
+  if (el.tableBar.hidden !== !table) {
+    el.tableBar.hidden = !table;
+    placeKnob(); // + · 다이얼을 표 막대 위로 (닫히면 제자리)
+  }
   for (const b of document.querySelectorAll('[data-action="table"]')) b.classList.toggle('active', Boolean(table));
   if (!table) return;
   el.tableBar.querySelector('[data-table="delRow"]').disabled = table.header;
@@ -1246,7 +1249,8 @@ function setupKnob() {
   //   키보드가 올라와 막대가 움직여도 따라간다
   //   도구막대 · 옮기기 막대 · 그리기 도구 막대는 같은 높이(52px)·같은 자리라 그만큼은 고정 — 방식을 바꿔도
   //   (막대가 올라오는 움직임 도중에 재더라도) 다이얼 · 안내가 제자리. 녹음 판 · 추천 태그 줄이 더 얹히면 그만큼 위로
-  const extras = [el.formatBar, $('rec-panel'), el.tagBar].filter(Boolean); // 도구막대도 — 두 줄로 접힐 때(좁은 화면) 위로
+  // 도구막대도 — 두 줄로 접힐 때(좁은 화면) 위로. 표 막대도 — 표 안에 있으면 + · 다이얼이 표 막대를 가리지 않게 그 위로
+  const extras = [el.formatBar, el.tableBar, $('rec-panel'), el.tagBar].filter(Boolean);
   placeKnob = () => {
     const bottom = el.screen.getBoundingClientRect().bottom;
     const base = DOCK_H + (parseFloat(getComputedStyle($('move-bar')).marginBottom) || 8);

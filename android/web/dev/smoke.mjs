@@ -1642,10 +1642,24 @@ try {
     await settle();
     check('표 칸: 사진은 표 바로 아래에 (표 그대로)', /\| 사과 \| 1000 \|\n\n!\[칸\]\(attachments\//.test(body()), body());
     await intoCell('사과');
+    await page.waitForTimeout(300);
+    {
+      const bar = await page.locator('#table-bar').boundingBox();
+      const add = await page.locator('#add-btn').boundingBox();
+      const dial = await page.locator('.mode-knob').boundingBox();
+      check('표 막대: + · 다이얼이 표 막대를 가리지 않음 (그 위로)', bar && add.y + add.height <= bar.y + 1 && dial.y + dial.height <= bar.y + 1, JSON.stringify({ bar, add, dial }));
+    }
     await page.tap('#add-btn');
     await page.waitForTimeout(250);
     await page.tap('.add-sat[data-add="math"]');
     await page.waitForTimeout(400);
+    // 키보드가 올라와 보이는 칸이 줄어도 수식 창은 보이는 칸 안에 (예전에는 키보드 뒤로 숨어 '바로 닫힌' 것처럼 보였다)
+    await page.setViewportSize({ width: 390, height: 420 });
+    await page.waitForTimeout(300);
+    const mathBox = await page.locator('.mk-math-editor').boundingBox();
+    check('+ → 수식: 키보드가 올라와도 수식 창이 보이는 칸 안에', mathBox && mathBox.y >= 0 && mathBox.y + mathBox.height <= 420, JSON.stringify(mathBox));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(300);
     await page.keyboard.type('x^2');
     await page.keyboard.press('Enter');
     await settle();
