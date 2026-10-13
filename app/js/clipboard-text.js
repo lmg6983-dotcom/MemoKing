@@ -11,10 +11,13 @@ const isBreak = (node) => node.type.name === 'hardbreak' || node.type.name === '
   || (node.type.name === 'html' && /^<br\s*\/?>$/i.test(String(node.attrs.value ?? '').trim()));
 
 // 한 줄(글 덩어리) 안의 글
+// 글 조각: 줄 앞 들여쓰기(U+00A0)는 보통 띄어쓰기로 (글 속 코드는 그대로)
+const textOf = (node) => (node.marks.some((m) => m.type.spec.code) ? node.text : plainSpaces(node.text));
+
 function inlineText(node, breakAs = '\n') {
   let s = '';
   node.forEach((child) => {
-    if (child.isText) s += child.text;
+    if (child.isText) s += textOf(child);
     else if (isBreak(child)) s += breakAs;
     else if (child.type.name === 'math_inline') s += `$${child.attrs.value}$`;
     else if (child.type.name === 'html') s += ''; // 그 밖의 HTML 조각(밑줄·색 표시 등)은 글이 아니다
@@ -111,7 +114,7 @@ export function plainTextOf(fragment, { openStart = 0, openEnd = 0 } = {}) {
 
   fragment.forEach((node) => {
     if (node.isInline) {
-      if (node.isText) run += node.text;
+      if (node.isText) run += textOf(node);
       else if (isBreak(node)) {
         lines.push(run);
         run = '';
@@ -122,7 +125,7 @@ export function plainTextOf(fragment, { openStart = 0, openEnd = 0 } = {}) {
     block(node);
   });
   flush();
-  return plainSpaces(lines.join('\n'));
+  return lines.join('\n');
 }
 
 /** 복사한 HTML: 글 속 겹친 빈칸을 U+00A0 로 (코드는 그대로) — 워드 · 메일이 빈칸을 하나로 줄이지 않게 */

@@ -666,6 +666,11 @@ export function registerIpc(ctx) {
     const title = vault?.get?.(id)?.title ?? '';
     const ok = vault?.trash(id) ?? false;
     win?.destroy();
+    if (ok) {
+      // 지운 메모의 바탕화면 위젯 · 단축키도 거둔다 (단축키는 다른 앱이 쓸 수 있게 놓는다)
+      wm.removeWidget(String(id));
+      if (memoHotkeys.slotOf(String(id))) memoHotkeys.set(String(id), null);
+    }
     if (typeof ok === 'string') wm.listWin?.webContents.send('memo:trashed', { name: ok, title });
     return Boolean(ok);
   });

@@ -554,9 +554,9 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       if (ww) await js(ww, `document.getElementById('wg-copy').click()`);
       const copied = await until(async () => (await clipboard.readText()) === '전화 상담: 평일 10시~7시로 바뀜', '위젯 복사', 3000).catch(async () => clipboard.readText());
       check('위젯 복사 단추: 본문만 클립보드에', copied === true, String(copied));
-      // 메모킹을 다시 켜면 그 자리에
-      ww?.destroy();
-      await wait(100);
+      // 메모킹을 다시 켜면 그 자리에 (끌 때 닫힌 위젯은 기억)
+      windowManager.closeWidgetWindow(ww);
+      await until(() => !windowManager.widgets.has(wid), '위젯 창 닫힘', 3000).catch(() => {});
       windowManager.restoreWidgets();
       const again = await until(() => windowManager.widgets.get(wid), '위젯 다시', 3000).catch(() => null);
       const againBounds = again?.getBounds();
@@ -568,6 +568,12 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       }
       const gone = await until(() => !windowManager.widgets.has(wid) && !getSettings().widgets?.[wid], '위젯 떼기', 3000).catch(() => false);
       check('떼기 → 위젯이 사라지고 다시 켜도 안 뜸 (메모는 그대로)', gone && Boolean(vault.get(wid)));
+      // Alt+F4 로 닫아도 떼기와 같게
+      const w2 = windowManager.openWidget(wid);
+      await until(() => getSettings().widgets?.[wid], '위젯 다시 놓기', 2000).catch(() => {});
+      w2?.close();
+      const closedByUser = await until(() => !windowManager.widgets.has(wid) && !getSettings().widgets?.[wid], 'Alt+F4', 3000).catch(() => false);
+      check('위젯을 Alt+F4 로 닫으면 떼기와 같게 (다시 켜도 안 뜸)', closedByUser);
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

@@ -150,7 +150,10 @@ async function memoHotkeyPressed(slot) {
   if (bound.copy && !memo.needsPassword) {
     // 그 메모 창에서 막 고친 글까지 (저장 기다림 600ms 안에 눌러도)
     const win = windowManager.noteWins.get(bound.id);
-    if (win && !win.isDestroyed()) await win.webContents.executeJavaScript('window.__memokingFlush?.()', true).catch(() => {});
+    if (win && !win.isDestroyed()) {
+      const flushed = win.webContents.executeJavaScript('window.__memokingFlush?.()', true).catch(() => {});
+      await Promise.race([flushed, new Promise((r) => setTimeout(r, 800))]); // 저장이 막혀도 단축키는 바로
+    }
     const text = hotkeyCopyText(vault.get(bound.id)?.body ?? memo.body);
     try {
       await writeClipboard({ text });
@@ -192,7 +195,7 @@ function openVault(dir) {
     saveSettings();
     migrateV1();
     windowManager.loadStacks();
-    if (app.isReady()) windowManager.restoreWidgets(); // 바탕화면 위젯 (켤 때는 아래에서 한 번)
+    if (app.isReady()) windowManager.restoreWidgets(); // 바탕화면 위젯 — 숨겨 시작해도(로그인 때 자동 실행) 그 자리에
     purgeTrash(vault);
     configureDrive();
   } catch (err) {
@@ -599,7 +602,7 @@ function setShortcut(name, acc) {
   const other = name === 'quickMemo' ? 'magic' : 'quickMemo';
   if (next === shortcutKey(other)) return { ok: false, reason: 'same', other: SHORTCUT_NAMES[other], status: shortcutStatus(name) };
   // 메모 단축키(Ctrl+Alt+숫자)가 쓰는 키 — 단축키를 바꾸는 동안은 잠시 놓여 있으므로 잡은 키가 아니라 정해 둔 칸으로 본다
-  if (Object.keys(memoHotkeys.map).some((slot) => hotkeyAccelerator(slot) === next)) return { ok: false, reason: 'same', other: '메모 단축키', status: shortcutStatus(name) };
+  if (Object.entries(memoHotkeys.map).some(([slot, b]) => hotkeyAccelerator(slot) === next && (!vault || vault.get(b.id)))) return { ok: false, reason: 'same', other: '메모 단축키', status: shortcutStatus(name) };
   const prev = shortcutKey(name);
   const enabled = shortcutStatus(name).enabled;
   if (enabled && next !== prev) {
@@ -994,7 +997,6 @@ app.whenReady().then(async () => {
     if (!windowManager.openNote(id)) settings.openNotes = settings.openNotes.filter((x) => x !== id);
   }
   if (launched && launched.kind !== 'list') handleLaunch(process.argv);
-  windowManager.restoreWidgets(); // 바탕화면 위젯은 숨겨 시작해도(로그인 때 자동 실행) 그 자리에
   alarms.startup();
   alarms.start();
   registerQuickMemoKey();

@@ -344,7 +344,7 @@ export class WindowManager {
     if (!memo) return null;
     const existing = this.widgets.get(id);
     if (existing && !existing.isDestroyed()) {
-      existing.showInactive();
+      if (!existing.webContents.isLoading()) existing.showInactive(); // 아직 불러오는 중이면 ready-to-show 가 보인다
       settings.widgets = { ...(settings.widgets ?? {}), [id]: existing.getBounds() };
       saveSettings();
       return existing;
@@ -382,10 +382,13 @@ export class WindowManager {
       win.showInactive();
       this.desktopPin.send('pin', hwndOf(win));
     });
+    win.on('session-end', () => (win.mkKeep = true)); // Windows 를 끌 때 닫히는 것은 그대로 기억
     win.on('closed', () => {
       if (this.widgets.get(id) !== win) return;
       this.widgets.delete(id);
-      this.pushList(); // 목록 카드의 바탕화면 표시
+      // Alt+F4 처럼 사람이 직접 닫았으면 떼기와 같게 (끌 때 · 폴더를 바꿀 때 닫힌 것은 기억해 두었다가 다시)
+      if (!win.mkKeep && !this.isQuitting()) this.removeWidget(id);
+      else this.pushList(); // 목록 카드의 바탕화면 표시
     });
     win.loadFile(path.join(APP_DIR, 'widget.html'), { query: { id } });
     if (!settings.widgets?.[id]) {
@@ -413,6 +416,13 @@ export class WindowManager {
     return true;
   }
 
+  /** 위젯 창만 닫는다 (기억은 그대로 — 다시 켜면 뜸) */
+  closeWidgetWindow(win) {
+    if (!win || win.isDestroyed()) return;
+    win.mkKeep = true;
+    win.close();
+  }
+
   removeWidget(id) {
     if (settings.widgets?.[id]) {
       const { [id]: _gone, ...rest } = settings.widgets;
@@ -421,7 +431,7 @@ export class WindowManager {
     }
     const win = this.widgets.get(id);
     this.widgets.delete(id);
-    if (win && !win.isDestroyed()) win.close();
+    if (win && !win.isDestroyed()) win.close(); // closed 는 이미 목록에서 뺀 창이라 아무 일도 하지 않는다
     this.pushList();
     return true;
   }
@@ -438,7 +448,7 @@ export class WindowManager {
   restoreWidgets() {
     const vault = this.getVault();
     for (const [id, win] of this.widgets) {
-      if (!vault?.get(id) && !win.isDestroyed()) win.close();
+      if (!vault?.get(id)) this.closeWidgetWindow(win);
     }
     if (!vault) return;
     for (const id of Object.keys(settings.widgets ?? {})) {
@@ -446,13 +456,19 @@ export class WindowManager {
     }
   }
 
-  /** 메모가 바뀌면 그 위젯을 다시 그린다 (지워졌으면 거둔다) */
+  /**
+   * 메모가 바뀌면 그 위젯을 다시 그린다. 파일이 잠깐 없어지면(동기화 · 다른 앱이 지웠다 다시 씀) 창만 닫고 기억은 남겨,
+   *   돌아오면 다시 띄운다 (메모를 지우기로 지웠을 때만 removeWidget 으로 기억까지)
+   */
   refreshWidgets(ids) {
     for (const id of ids) {
       const win = this.widgets.get(id);
-      if (!win || win.isDestroyed()) continue;
       const memo = this.getVault()?.get(id);
-      if (!memo) this.removeWidget(id);
+      if (!win || win.isDestroyed()) {
+        if (memo && settings.widgets?.[id]) this.openWidget(id);
+        continue;
+      }
+      if (!memo) this.closeWidgetWindow(win);
       else {
         win.setBackgroundColor(noteBg(memo.color));
         win.setTitle(memo.title);
@@ -494,9 +510,10 @@ export class WindowManager {
     const x = Math.round(Math.min(Math.max(cursor.x - size.width / 2, area.x + 8), area.x + area.width - size.width - 8));
     const below = cursor.y + 28 + size.height <= area.y + area.height;
     const y = Math.round(below ? cursor.y + 28 : cursor.y - 28 - size.height);
-    clearTimeout(this.hudTimer);
+    const seq = (this.hudSeq = (this.hudSeq ?? 0) + 1); // 불러오는 사이 여러 번 불리면 마지막 것만
     this.hudLoaded.then(() => {
-      if (win.isDestroyed()) return;
+      if (win.isDestroyed() || seq !== this.hudSeq) return;
+      clearTimeout(this.hudTimer);
       win.setBounds({ x, y, ...size });
       win.webContents.send('hud:show', { title, body, kind });
       win.showInactive();

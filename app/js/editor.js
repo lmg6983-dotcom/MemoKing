@@ -526,40 +526,58 @@ function indentFixes(doc, from, to) {
   });
   return fixes;
 }
-const keepIndentPlugin = $prose(() => new Plugin({
-  key: new PluginKey('memoking-keep-indent'),
-  appendTransaction(trs, _old, state) {
-    if (!trs.some((tr) => tr.docChanged)) return null;
-    // 바뀐 범위 (모든 트랜잭션 뒤 문서 기준)
-    let from = Infinity;
-    let to = -Infinity;
-    trs.forEach((tr, t) => tr.mapping.maps.forEach((map, i) => map.forEach((_a, _b, start, end) => {
-      let a = tr.mapping.slice(i + 1).map(start, -1);
-      let b = tr.mapping.slice(i + 1).map(end, 1);
-      for (const later of trs.slice(t + 1)) {
-        a = later.mapping.map(a, -1);
-        b = later.mapping.map(b, 1);
-      }
-      from = Math.min(from, a);
-      to = Math.max(to, b);
-    })));
-    if (from > to) return null;
-    from = Math.max(0, from);
-    to = Math.min(state.doc.content.size, to);
-    const tr = state.tr;
-    // 붙여넣은 글의 줄바꿈: 마크다운으로 읽으면 "부드러운 줄바꿈"(띄어쓰기로 보임)이 된다 → 진짜 줄바꿈으로 (메모장 글이 한 줄로 합쳐지지 않게)
-    if (plainPasting) {
-      state.doc.nodesBetween(from, to, (node, pos) => {
-        if (node.type.spec.code) return false;
-        if (BREAKS.has(node.type.name) && node.attrs.isInline) tr.setNodeMarkup(pos, null, { ...node.attrs, isInline: false });
-        return true;
-      });
+/** 여러 트랜잭션이 바꾼 범위 (마지막 문서 기준) — 없으면 null */
+function changedRange(trs, doc) {
+  let from = Infinity;
+  let to = -Infinity;
+  trs.forEach((tr, t) => tr.mapping.maps.forEach((map, i) => map.forEach((_a, _b, start, end) => {
+    let a = tr.mapping.slice(i + 1).map(start, -1);
+    let b = tr.mapping.slice(i + 1).map(end, 1);
+    for (const later of trs.slice(t + 1)) {
+      a = later.mapping.map(a, -1);
+      b = later.mapping.map(b, 1);
     }
-    const fixes = indentFixes(tr.doc, from, to);
-    for (const f of fixes.reverse()) tr.replaceWith(f.from, f.to, state.schema.text(f.text, f.marks));
-    return tr.docChanged ? tr : null;
-  },
-}));
+    from = Math.min(from, a);
+    to = Math.max(to, b);
+  })));
+  return from > to ? null : { from: Math.max(0, from), to: Math.min(doc.content.size, to) };
+}
+const keepIndentPlugin = $prose(() => {
+  let composing = false; // 한글 조합 중에는 손대지 않는다 (조합이 끝난 뒤 그 줄이 다시 바뀔 때 고친다)
+  return new Plugin({
+    key: new PluginKey('memoking-keep-indent'),
+    props: {
+      handleDOMEvents: {
+        compositionstart: () => {
+          composing = true;
+          return false;
+        },
+        compositionend: () => {
+          composing = false;
+          return false;
+        },
+      },
+    },
+    appendTransaction(trs, _old, state) {
+      if (composing || !trs.some((tr) => tr.docChanged)) return null;
+      const range = changedRange(trs, state.doc);
+      if (!range) return null;
+      const { from, to } = range;
+      const tr = state.tr;
+      // 붙여넣은 글의 줄바꿈: 마크다운으로 읽으면 "부드러운 줄바꿈"(띄어쓰기로 보임)이 된다 → 진짜 줄바꿈으로 (메모장 글이 한 줄로 합쳐지지 않게)
+      if (plainPasting) {
+        state.doc.nodesBetween(from, to, (node, pos) => {
+          if (node.type.spec.code) return false;
+          if (BREAKS.has(node.type.name) && node.attrs.isInline) tr.setNodeMarkup(pos, null, { ...node.attrs, isInline: false });
+          return true;
+        });
+      }
+      const fixes = indentFixes(tr.doc, from, to);
+      for (const f of fixes.reverse()) tr.replaceWith(f.from, f.to, state.schema.text(f.text, f.marks));
+      return tr.docChanged ? tr : null;
+    },
+  });
+});
 
 function plainSpacesIn(fragment) {
   let changed = false;
@@ -1547,20 +1565,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     appendTransaction(trs, _old, state) {
       if (readOnly || !fitView || !pastedTablesAt || Date.now() - pastedTablesAt > 3000) return null;
       if (!trs.some((tr) => tr.docChanged)) return null;
-      // 바뀐 범위 (모든 트랜잭션 뒤 문서 기준)
-      let from = Infinity;
-      let to = -Infinity;
-      trs.forEach((tr, t) => tr.mapping.maps.forEach((map, i) => map.forEach((_a, _b, start, end) => {
-        let a = tr.mapping.slice(i + 1).map(start, -1);
-        let b = tr.mapping.slice(i + 1).map(end, 1);
-        for (const later of trs.slice(t + 1)) {
-          a = later.mapping.map(a, -1);
-          b = later.mapping.map(b, 1);
-        }
-        from = Math.min(from, a);
-        to = Math.max(to, b);
-      })));
-      if (!(to > from)) return null;
+      const range = changedRange(trs, state.doc);
+      if (!range || !(range.to > range.from)) return null;
+      const { from, to } = range;
       // 그 범위 안의, 아직 너비가 없는 표 = 방금 붙여넣은 표
       const tables = [];
       state.doc.nodesBetween(from, to, (node, pos) => {
