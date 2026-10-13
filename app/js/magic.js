@@ -402,9 +402,9 @@ input.addEventListener('keydown', (e) => {
   }
 });
 
-// 창이 다시 떠오를 때마다 비우고 포커스 (늘 떠 있다가 보였다 숨었다 한다)
+// 창이 다시 떠오를 때마다 포커스 (늘 떠 있다가 보였다 숨었다 한다) — 지난번에 친 글은 남겨 두고 통째로 골라 둔다:
+//   이어서 찾으려면 그대로 Enter · 방향키, 새로 찾으려면 바로 치면 바뀐다 (메모로 저장한 글은 그때 비움)
 async function reset() {
-  input.value = '';
   selected = 0;
   activeAct = 0;
   results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
@@ -414,9 +414,12 @@ async function reset() {
   renderModules();
   updatePlaceholder();
   render();
-  search(); // 최근 메모
+  search(); // 지난 글로 다시 찾기 (비어 있으면 최근 메모)
   replayClass(box, 'enter');
-  setTimeout(() => input.focus(), 0);
+  setTimeout(() => {
+    input.focus();
+    input.select();
+  }, 0);
 }
 api.onShow(reset);
 api.onModules?.((list) => {

@@ -1,6 +1,7 @@
 // 스티커 메모 창 — 메모 1개 = 창 1개 = 파일 1개.
 import { injectIcons, icon } from './icons.js';
 import { createNoteEditor } from './editor.js';
+import { setCopyHost } from './copy-content.js';
 import { COLORS, COLOR_NAMES, extractTitle, isBlankBody, conflictCopyBody, sameBody } from './core/memo-file.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from './core/html-marks.js';
 import { fileExtension } from './media.js';
@@ -28,6 +29,8 @@ import { toggleShortcutSheet } from './shortcut-sheet.js';
 const SAVE_DELAY = 600;
 
 const api = window.memoking;
+// 복사 단추 · 그림 Ctrl+C: 시스템 클립보드에 그림 그대로 / 서식 + 글
+setCopyHost({ image: (b64) => api.copyImage(b64), text: ({ text, html }) => api.copyRich({ text, html }) });
 const params = new URLSearchParams(location.search);
 const id = params.get('id');
 const $ = (x) => document.getElementById(x);
@@ -1128,27 +1131,31 @@ function showTableBar(table) {
   // 머리글 아래 행은 마지막 하나까지 지울 수 있다 (머리글 행만 남은 1행 표도 된다).
   // 머리글 행만 남았을 때 머리글에서 누르면, 열이 하나뿐일 때 누르면 표 전체를 지운다 (표 막대에 "표 지우기"가 따로 없음)
   const lastRow = table.header && table.rows <= 1;
+  const setBtn = (b, label, title) => {
+    b.querySelector('.lbl').textContent = label;
+    b.title = title;
+    b.setAttribute('aria-label', `${b.closest('.tb-group')?.getAttribute('aria-label') ?? ''} ${label}`.trim());
+  };
   delRow.disabled = table.header && !lastRow;
-  delRow.textContent = lastRow ? '표 삭제' : '행 삭제';
-  delRow.title = lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : '이 행 지우기';
-  // 셀 병합: 여러 칸을 골랐으면 "셀 병합", 병합한 칸 안이면 "병합 풀기"
+  delRow.dataset.wholeTable = lastRow ? '1' : '';
+  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : '이 행 삭제');
+  // 셀 병합: 여러 칸을 골랐으면 "병합", 병합한 칸 안이면 "병합 풀기"
   const merge = tableBar.querySelector('[data-table="merge"]');
-  merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
   merge.disabled = !table.canMerge && !table.merged;
-  merge.title = table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요';
+  setBtn(merge, table.merged ? '병합 풀기' : '병합', table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요');
   tableBar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
   // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만 (머리글 아래 두 번째 행부터 · 바로 아래에 열 수가 같은 표)
   tableBar.querySelector('[data-table="splitTable"]').hidden = !table.canSplit;
   tableBar.querySelector('[data-table="joinTable"]').hidden = !table.canJoin;
-  delCol.textContent = table.cols <= 1 ? '표 삭제' : '열 삭제';
-  delCol.title = table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제';
+  delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
+  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제');
 }
 tableBar.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서가 표 안에 남게
 tableBar.addEventListener('click', (e) => {
   const b = e.target.closest('[data-table]');
   if (!b || b.disabled) return;
   // 마지막 남은 머리글 행·열을 지우면 표 전체를 지운다
-  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.textContent === '표 삭제';
+  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.dataset.wholeTable === '1';
   editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
 });
 

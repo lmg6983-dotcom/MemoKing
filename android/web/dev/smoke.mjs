@@ -1266,8 +1266,15 @@ try {
   await page.waitForTimeout(350);
   await touch('touchEnd', ib.x + 40, ib.y + 40);
   await page.waitForTimeout(150);
-  check('꾹 눌렀다 놓으면: 오른쪽 위에 지우기 단추', await page.isVisible('.mk-delete-btn'));
+  check('꾹 눌렀다 놓으면: 오른쪽 위에 지우기 단추 · 그 왼쪽에 복사 단추', await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn'));
   await shot('18b-delete-btn');
+  // 복사 단추: 그림은 그림 자체(PNG)로 휴대폰 클립보드에 · 누르면 ✓
+  const copiedBefore = (await devLog()).log.filter((x) => x.copyImage).length;
+  await page.tap('.mk-copy-btn');
+  await page.waitForTimeout(600);
+  const logNow = await devLog();
+  const copies = logNow.log.filter((x) => x.copyImage);
+  check('복사 단추: 그림을 그림 그대로 클립보드에 · ✓ 표시', copies.length > copiedBefore && copies.at(-1).copyImage.bytes > 50 && await page.isVisible('.mk-copy-btn.done'), JSON.stringify(copies.at(-1)));
   await page.waitForTimeout(2500);
   check('지우기 단추: 2초 뒤 사라짐', (await page.locator('.mk-delete-btn').count()) === 0);
   await touch('touchStart', ib.x + 40, ib.y + 40);

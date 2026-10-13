@@ -26,6 +26,7 @@ import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { plainTextOf } from './clipboard-text.js';
+import { handleImageCopy } from './copy-content.js';
 import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable, tableToBlocks } from './table-extras.js';
 import { createListDrag, moveItemBy, currentItem } from './list-drag.js';
@@ -1336,6 +1337,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     props: {
       // 복사·끌기: 서식 없는 곳에 붙일 "일반 글자"는 마크다운(\ 이스케이프가 섞임)이 아니라 읽는 글로 (Milkdown 클립보드보다 먼저)
       clipboardTextSerializer: (slice) => plainTextOf(slice.content, { openStart: slice.openStart, openEnd: slice.openEnd }),
+      // 그림을 골라(눌러) 둔 채 Ctrl+C / Ctrl+X: 주소(<img src>)가 아니라 그림 자체를 복사 — 다른 앱에 그림으로 붙는다
+      handleDOMEvents: {
+        copy: (v, event) => handleImageCopy(v, event),
+        cut: (v, event) => handleImageCopy(v, event),
+      },
       transformPastedHTML: (html) => revealLazyImages(normalizePastedTables(html)),
       handlePaste(v, event) {
         const data = event.clipboardData;

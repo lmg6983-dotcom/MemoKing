@@ -1,14 +1,18 @@
 import { haptic } from './dom.js';
+import { copyBlock } from './copy-content.js';
 // 지우기 단추 (×) — 꾹 눌렀다 그 자리에 놓은 것의 오른쪽 위에 잠깐 (block-move.js 내용 줄·목록 전체 · list-drag.js 목록 항목 함께)
 //   흰 동그라미에 빨간 ×. 한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
 //   PC(마우스): 그림·손 메모·소리·파일·링크 카드에 마우스를 올려도 뜬다 (hover — 시간으로 사라지지 않고, 마우스가 떠나면 거둔다.
 //   빨갛게 비치는 표시는 × 위에 올렸을 때만)
 //   누르면: 대상이 붉게 비쳤다가 작아지며 흐려지고, 그 자리가 접히며 아래 줄들이 부드럽게 올라온 뒤 지운다.
+//   × 왼쪽에는 복사 단추 (그림은 그림으로, 그 밖의 내용은 서식 + 글로 — copy-content.js). 누르면 잠깐 ✓
 export const DELETE_SHOW_MS = 2500;
 const FADE_MS = 200; // 작아지며 흐려지기
 const COLLAPSE_MS = 200; // 그 자리 접기
 
 let current = null;
+const COPY_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.6"/><path d="M10.5 3.5v-.4A1.6 1.6 0 0 0 8.9 1.5H4.1A1.6 1.6 0 0 0 2.5 3.1v4.8a1.6 1.6 0 0 0 1.6 1.6h.4"/></svg>';
+const DONE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
 
 /** 대상을 담고 스크롤되는 상자 (없으면 null = 창) */
 function scrollParent(el) {
@@ -37,7 +41,14 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   btn.title = label;
   btn.setAttribute('aria-label', label);
   btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6"/></svg>';
-  document.body.append(btn);
+  // 복사 단추 (× 왼쪽)
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = `mk-copy-btn${hover ? ' hover' : ''}`;
+  copyBtn.title = '복사';
+  copyBtn.setAttribute('aria-label', '이 내용 복사');
+  copyBtn.innerHTML = COPY_ICON;
+  document.body.append(copyBtn, btn);
   // 단추는 화면에 고정(position: fixed)이라, 큰 그림을 스크롤하면 위 막대에 올라탈 수 있다 →
   //   편집기에서 보이는 칸 안으로만: 대상의 위가 가려지면 보이는 부분의 위에 붙고, 대상이 다 가려지면 숨는다
   const scroller = scrollParent(target);
@@ -46,9 +57,13 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
     const top = Math.max(r.top - 9, box.top + 4);
     const visible = r.bottom - 12 > box.top + 4 && r.top < box.bottom - 12 && top + 24 <= Math.min(r.bottom + 9, box.bottom);
+    const left = Math.round(Math.min(window.innerWidth - 32, r.right - 22));
     btn.style.visibility = visible ? '' : 'hidden';
-    btn.style.left = `${Math.round(Math.min(window.innerWidth - 32, r.right - 22))}px`;
+    btn.style.left = `${left}px`;
     btn.style.top = `${Math.round(top)}px`;
+    copyBtn.style.visibility = visible ? '' : 'hidden';
+    copyBtn.style.left = `${left - 30}px`;
+    copyBtn.style.top = `${Math.round(top)}px`;
   };
   place();
   const setMark = (on) => {
@@ -57,7 +72,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     else setTimeout(() => !view.isDestroyed && deco(null), 0); // 편집기 갱신 중일 수 있어 한 박자 뒤에
   };
   if (!hover) setMark(true);
-  const del = { view, btn, pos, node, target, state: view.state, place, setMark: hover ? (on) => !on && setMark(false) : setMark };
+  const del = { view, btn, copyBtn, pos, node, target, state: view.state, place, setMark: hover ? (on) => !on && setMark(false) : setMark };
   if (hover) {
     btn.addEventListener('mouseenter', () => {
       hover.enter();
@@ -67,7 +82,29 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       setMark(false);
       hover.leave();
     });
+    // 복사 단추 위에 있어도 단추들은 그대로 (붉은 표시는 × 위에서만)
+    copyBtn.addEventListener('mouseenter', () => hover.enter());
+    copyBtn.addEventListener('mouseleave', () => hover.leave());
   }
+  const copy = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (view.state.doc.nodeAt(pos) !== node) return hideDeleteButton();
+    haptic(8);
+    clearTimeout(del.timer); // 누른 뒤에는 ✓ 를 볼 만큼 더 둔다
+    copyBlock(view, pos, node, target).then((what) => {
+      copyBtn.classList.add('done');
+      copyBtn.innerHTML = DONE_ICON;
+      copyBtn.title = what === '그림' ? '그림을 복사했어요' : '내용을 복사했어요';
+    }, (err) => {
+      copyBtn.classList.add('failed');
+      copyBtn.title = `복사하지 못했어요: ${err?.message ?? err}`;
+    }).finally(() => {
+      if (!hover && current === del) del.timer = setTimeout(() => hideDeleteButton(), 1200);
+    });
+  };
+  copyBtn.addEventListener('mousedown', copy);
+  copyBtn.addEventListener('touchstart', copy, { passive: false });
   current = del;
   const press = (e) => {
     e.preventDefault();
@@ -79,6 +116,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     window.removeEventListener('scroll', place, true);
     current = null;
     btn.classList.add('pressed');
+    copyBtn.remove();
     setTimeout(() => btn.remove(), 180);
     if (markTarget) target.classList.remove('mk-delete-target');
     // 대상: 붉게 비쳤다가 작아지며 흐려지고 → 그 자리가 접힌다 (높이를 정해 두어야 접히는 모습이 보인다)
@@ -112,9 +150,16 @@ export function hideDeleteButton(now = false) {
   clearTimeout(del.timer);
   window.removeEventListener('scroll', del.place, true);
   if (!del.view.isDestroyed) del.setMark(false);
-  if (now) return del.btn.remove();
+  if (now) {
+    del.copyBtn.remove();
+    return del.btn.remove();
+  }
   del.btn.classList.add('fading');
-  setTimeout(() => del.btn.remove(), 260);
+  del.copyBtn.classList.add('fading');
+  setTimeout(() => {
+    del.btn.remove();
+    del.copyBtn.remove();
+  }, 260);
 }
 
 /** 그 편집기의 글이나 커서가 바뀌었으면 단추를 거둔다 (플러그인 view.update 에서) */

@@ -34,6 +34,8 @@ import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcu
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
 import { FileIndex } from './file-index.js';
+import * as electronApi from 'electron';
+import { jumpListCategories, launchAction, pushRecent } from './jump-list.js';
 import { Opms, isOpenableFile, flushOpmsFiles, looksLikeRef, foreignSummary, caseMemoMarkdown, cleanDate, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { execFile } from 'node:child_process';
@@ -91,7 +93,7 @@ const gotLock = SMOKE || app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'memoking', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+  { scheme: 'memoking', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
 ]);
 
 // ---------- 설정 ----------
@@ -446,6 +448,7 @@ function createNoteWindow(id, { inactive = false, show = true, bounds = null, re
   };
   win.on('show', () => {
     setOpen(true);
+    noteOpened(id); // 작업 표시줄 점프 목록의 "최근에 연 메모"
     pushList();
   });
   win.on('hide', () => {
@@ -2609,6 +2612,15 @@ function registerIpc() {
   ipcMain.handle('history:block', (_e, appId, app, removeExisting) => blockHistoryApp(String(appId ?? ''), String(app ?? ''), Boolean(removeExisting)));
   ipcMain.handle('history:unblock', (_e, appId) => unblockHistoryApp(String(appId ?? '')));
   ipcMain.handle('clipboard:write-text', (_e, text) => clipboard.writeText(String(text ?? '')));
+  // 메모 안의 그림 복사: PNG(base64) → 그림 (다른 앱에 그림으로 붙음) · 그 밖의 내용은 서식(HTML) + 글
+  ipcMain.handle('clipboard:write-image', async (_e, b64) => {
+    await writeClipboard({ png: Buffer.from(String(b64 ?? ''), 'base64') });
+    return true;
+  });
+  ipcMain.handle('clipboard:write-rich', async (_e, { text, html } = {}) => {
+    await writeClipboard({ text: String(text ?? ''), html: String(html ?? '') });
+    return true;
+  });
 
   // 설정 (자동 실행)
   ipcMain.handle('app:settings', () => appSettings());
@@ -2991,10 +3003,8 @@ function registerIpc() {
     return Boolean(ok);
   });
   // 메모를 PDF 로
-  ipcMain.handle('image:copy', (_e, base64) => {
-    const img = nativeImage.createFromBuffer(Buffer.from(String(base64), 'base64'));
-    if (img.isEmpty()) throw new Error('그림이 비어 있어요');
-    clipboard.writeImage(img);
+  ipcMain.handle('image:copy', async (_e, base64) => {
+    await writeClipboard({ png: Buffer.from(String(base64), 'base64') });
     return { ok: true };
   });
   ipcMain.handle('image:save', async (event, id, base64) => {
@@ -3231,7 +3241,14 @@ function registerVaultProtocol() {
     }
     const file = url.host === 'vault' ? vault?.resolve(rel) : url.host === 'history' ? history?.resolveImage(rel) : null;
     if (!file || !fs.existsSync(file)) return new Response('not found', { status: 404 });
-    return net.fetch(pathToFileURL(file).href, { headers: request.headers });
+    // 앱 화면이 그림을 캔버스로 읽을 수 있게 (그림 복사) — 앱 화면(file:// 의 오리진 "null" · memoking://)에만 허락
+    const origin = request.headers.get('origin');
+    if (!origin || !(origin === 'null' || origin.startsWith('memoking://'))) return net.fetch(pathToFileURL(file).href, { headers: request.headers });
+    return net.fetch(pathToFileURL(file).href, { headers: request.headers }).then((res) => {
+      const headers = new Headers(res.headers);
+      headers.set('Access-Control-Allow-Origin', origin);
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+    });
   });
 }
 
@@ -3252,7 +3269,69 @@ function createTray() {
   updateTrayMenu();
 }
 
+// ---------- Windows 작업 표시줄 점프 목록 (아이콘 오른쪽 클릭) ----------
+//   작업: 메모 목록 열기 · 새 메모 / 최근에 연 메모 (따로 한 칸). 누르면 메모킹이 인자와 함께 다시 실행되고,
+//   이미 켜져 있으면 second-instance 로 그 인자가 와서 handleLaunch 가 처리한다
+function noteOpened(id) {
+  settings.recentOpened = pushRecent(settings.recentOpened, id);
+  saveSettings();
+  updateJumpList();
+}
+
+let jumpTimer = null;
+function updateJumpList() {
+  if (process.platform !== 'win32' || SMOKE) return;
+  clearTimeout(jumpTimer);
+  jumpTimer = setTimeout(() => {
+    const recent = (settings.recentOpened ?? []).map((id) => vault?.get(id)).filter(Boolean);
+    const prefix = app.isPackaged ? [] : [app.getAppPath()]; // 개발 실행: electron.exe <앱 폴더> <인자>
+    try {
+      const res = app.setJumpList(jumpListCategories(recent, { program: process.execPath, prefix }));
+      if (res && res !== 'ok') console.warn('점프 목록:', res);
+    } catch (err) {
+      console.error('점프 목록을 만들지 못했어요', err);
+    }
+  }, 800);
+}
+
+/** 실행 인자(점프 목록 · 두 번째 실행)대로 — 처리했으면 true */
+function handleLaunch(argv) {
+  const act = launchAction(argv);
+  if (!act) return false;
+  if (act.kind === 'list') createListWindow();
+  else if (act.kind === 'new') {
+    if (!vault) createListWindow();
+    else createNote({});
+  } else if (act.kind === 'memo') {
+    if (vault?.get(act.id)) revealNote(act.id);
+    else createListWindow(); // 지워진 메모면 목록으로
+  }
+  return true;
+}
+
+// 클립보드에 그림 · 서식 있는 글 넣기 — Electron 44 의 clipboard 는 writeImage 대신 write([ClipboardItem]) (웹 Clipboard API 꼴).
+//   옛 판(writeImage · write({ text, html }))이면 그것으로
+async function writeClipboard({ png = null, text = null, html = null }) {
+  if (png) {
+    const image = nativeImage.createFromBuffer(png);
+    if (image.isEmpty()) throw new Error('그림을 읽지 못했어요');
+    png = image.toPNG(); // 어떤 형식이 와도 PNG 로
+  }
+  const Item = electronApi.ClipboardItem;
+  if (Item) {
+    const parts = {};
+    if (png) parts['image/png'] = new Blob([png], { type: 'image/png' });
+    if (html) parts['text/html'] = new Blob([html], { type: 'text/html' });
+    if (text != null) parts['text/plain'] = new Blob([text], { type: 'text/plain' });
+    await clipboard.write([new Item(parts)]);
+    return;
+  }
+  if (png && typeof clipboard.writeImage === 'function') clipboard.writeImage(nativeImage.createFromBuffer(png));
+  else clipboard.write({ ...(text != null ? { text } : {}), ...(html ? { html } : {}), ...(png ? { image: nativeImage.createFromBuffer(png) } : {}) });
+}
+
 function updateTrayMenu() {
+  updateJumpList(); // 메모 제목이 바뀌거나 지워지면 점프 목록도
   if (!tray || tray.isDestroyed()) return;
   const recent = vault?.list().slice(0, 5) ?? [];
   trayMenuTemplate = [
@@ -3320,7 +3399,9 @@ function showTrayNoticeOnce() {
 
 // ---------- 시작 / 종료 ----------
 
-app.on('second-instance', () => createListWindow());
+app.on('second-instance', (_e, argv) => {
+  if (!handleLaunch(argv)) createListWindow();
+});
 
 app.whenReady().then(async () => {
   if (!gotLock) return;
@@ -3411,10 +3492,14 @@ app.whenReady().then(async () => {
   if (autoStartAvailable() && !settings.autoStartSet) setAutoStart(true);
   if (settings.vaultPath) openVault(settings.vaultPath);
   // 로그인 때 자동 실행이면 목록 창 없이 알림 영역에서 조용히 시작
-  if (!HIDDEN_START || !vault) createListWindow();
+  const launched = launchAction(process.argv);
+  if (!HIDDEN_START || !vault) {
+    if (launched?.kind !== 'memo' || !vault?.get(launched.id)) createListWindow();
+  }
   for (const id of [...settings.openNotes]) {
     if (!openNote(id)) settings.openNotes = settings.openNotes.filter((x) => x !== id);
   }
+  if (launched && launched.kind !== 'list') handleLaunch(process.argv); // 꺼져 있을 때 점프 목록으로 켠 경우
   alarms.startup(); // "실행할 때" 알림
   alarms.start(); // 날짜·시간·반복·타이머 알림 (놓친 것 포함)
   registerQuickMemoKey(); // Ctrl+Alt+C 빠른 메모
