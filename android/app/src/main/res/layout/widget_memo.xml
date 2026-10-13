@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 홈 화면 메모 위젯 (Widgets.kt): 메모 색 종이 위에 제목 · + · 글 줄들 -->
+<!-- 홈 화면 메모 위젯 (Widgets.kt): 메모 색 종이 위에 제목 · + · 글 줄들.
+     앱이 내용을 보내기 전(처음 놓일 때 · 미리 보기)에도 노란 종이에 "메모킹" 이 보이게 기본값을 둔다 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -37,6 +38,8 @@
                 android:maxLines="1"
                 android:paddingTop="6dp"
                 android:paddingBottom="6dp"
+                android:text="@string/app_name"
+                android:textColor="@color/widget_text"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
@@ -46,7 +49,8 @@
                 android:layout_height="44dp"
                 android:contentDescription="@string/shortcut_new"
                 android:padding="11dp"
-                android:src="@drawable/ic_widget_add" />
+                android:src="@drawable/ic_widget_add"
+                android:tint="@color/widget_text" />
         </LinearLayout>
 
         <ListView
@@ -56,7 +60,8 @@
             android:layout_weight="1"
             android:divider="@null"
             android:dividerHeight="0dp"
-            android:scrollbars="none" />
+            android:scrollbars="none"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/widget_empty"
@@ -65,7 +70,8 @@
             android:layout_weight="1"
             android:gravity="center"
             android:paddingEnd="8dp"
-            android:textSize="14sp"
-            android:visibility="gone" />
+            android:text="@string/widget_loading"
+            android:textColor="@color/widget_muted"
+            android:textSize="14sp" />
     </LinearLayout>
 </FrameLayout>

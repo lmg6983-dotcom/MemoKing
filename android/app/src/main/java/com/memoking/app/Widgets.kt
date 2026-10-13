@@ -7,8 +7,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
-import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
@@ -275,31 +273,43 @@ object Widgets {
     fun update(ctx: Context, ids: IntArray) {
         val mgr = manager(ctx)
         for (id in ids) {
-            mgr.updateAppWidget(id, views(ctx, id))
+            // 한 위젯을 그리다 잘못돼도 빈(흰) 위젯으로 남지 않게: 누르면 메모킹이 열리는 기본 모양으로
+            val views = try {
+                views(ctx, id)
+            } catch (e: Exception) {
+                android.util.Log.w("MemoKing", "위젯 그리기 실패", e)
+                fallbackViews(ctx, id)
+            }
+            mgr.updateAppWidget(id, views)
             mgr.notifyAppWidgetViewDataChanged(id, R.id.widget_list)
         }
     }
 
+    private fun fallbackViews(ctx: Context, widgetId: Int): RemoteViews {
+        val v = RemoteViews(ctx.packageName, R.layout.widget_memo)
+        val open = Intent(ctx, MainActivity::class.java).setData(Uri.parse("memoking://widget/$widgetId/fallback"))
+        v.setOnClickPendingIntent(R.id.widget_root, activityIntent(ctx, open, 5000 + widgetId))
+        return v
+    }
+
     // ---------- 모양 ----------
 
-    private val LIGHT = mapOf(
-        "yellow" to "#FFF4B8", "green" to "#DDF5DF", "pink" to "#FFE0EC", "purple" to "#EDE3FF",
-        "blue" to "#DDEEFF", "gray" to "#F1F0EC", "charcoal" to "#1C1C1B",
+    // 종이 · 글자 색은 리소스로 (res/values · values-night 의 widget_colors.xml) — 다크 모드는 런처가 직접 고른다.
+    //   예전에는 흰 바탕 그림을 앱이 메모 색으로 칠했는데(setColorFilter), 런처에 따라 칠하기가 먹지 않으면
+    //   흰 바탕만 남고 (다크 모드의) 밝은 글자가 보이지 않았다
+    private val BACKGROUNDS = mapOf(
+        "yellow" to R.drawable.widget_bg_yellow, "green" to R.drawable.widget_bg_green, "pink" to R.drawable.widget_bg_pink,
+        "purple" to R.drawable.widget_bg_purple, "blue" to R.drawable.widget_bg_blue, "gray" to R.drawable.widget_bg_gray,
+        "charcoal" to R.drawable.widget_bg_charcoal,
     )
-    private val DARK = mapOf(
-        "yellow" to "#3A3317", "green" to "#1E3322", "pink" to "#3D2230", "purple" to "#2C2440",
-        "blue" to "#1C2D42", "gray" to "#262624", "charcoal" to "#141413",
-    )
 
-    private fun night(ctx: Context) =
-        (ctx.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    fun backgroundRes(color: String): Int = BACKGROUNDS[color] ?: R.drawable.widget_bg_yellow
 
-    fun background(ctx: Context, color: String): Int =
-        Color.parseColor((if (night(ctx)) DARK else LIGHT)[color] ?: (if (night(ctx)) DARK else LIGHT).getValue("yellow"))
-
-    fun darkText(ctx: Context, color: String) = !night(ctx) && color != "charcoal"
-    fun textColor(ctx: Context, color: String) = if (darkText(ctx, color)) Color.parseColor("#1F1F1C") else Color.parseColor("#F5F4EF")
-    fun mutedColor(ctx: Context, color: String) = if (darkText(ctx, color)) Color.parseColor("#8A1F1F1C") else Color.parseColor("#94F5F4EF")
+    /** 검정 메모만 글자색을 바꾼다 (나머지는 레이아웃의 @color/widget_text — 밝은/어두운 화면에 맞춰 런처가 고름) */
+    fun onDark(color: String) = color == "charcoal"
+    private val TEXT_ON_DARK = 0xFFF5F4EF.toInt()
+    val textOnDark get() = TEXT_ON_DARK
+    private val MUTED_ON_DARK = 0x94F5F4EF.toInt()
 
     private fun activityIntent(ctx: Context, intent: Intent, code: Int, mutable: Boolean = false): PendingIntent =
         PendingIntent.getActivity(
@@ -312,10 +322,12 @@ object Widgets {
         val memoId = memoOf(ctx, widgetId)
         val memo = memoId?.let { memo(ctx, it) }
         val color = memo?.optString("color", "yellow") ?: "yellow"
-        v.setInt(R.id.widget_bg, "setColorFilter", background(ctx, color))
-        v.setTextColor(R.id.widget_title, textColor(ctx, color))
-        v.setTextColor(R.id.widget_empty, mutedColor(ctx, color))
-        v.setInt(R.id.widget_add, "setColorFilter", textColor(ctx, color))
+        v.setImageViewResource(R.id.widget_bg, backgroundRes(color))
+        if (onDark(color)) {
+            v.setTextColor(R.id.widget_title, TEXT_ON_DARK)
+            v.setTextColor(R.id.widget_empty, MUTED_ON_DARK)
+            v.setInt(R.id.widget_add, "setColorFilter", TEXT_ON_DARK)
+        }
         v.setOnClickPendingIntent(
             R.id.widget_add,
             activityIntent(ctx, Intent(ctx, MainActivity::class.java).setAction(MainActivity.ACTION_NEW_MEMO), 1),
@@ -529,17 +541,17 @@ class MemoWidgetService : RemoteViewsService() {
             val kind = line.optString("kind")
             val done = line.optBoolean("done")
             val text = line.optString("t")
-            val fg = Widgets.textColor(ctx, color)
             val shown = SpannableString(if (kind == "bullet") "• $text" else text)
             if (kind == "h") shown.setSpan(StyleSpan(Typeface.BOLD), 0, shown.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             if (kind == "task" && done) shown.setSpan(StrikethroughSpan(), 0, shown.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             v.setTextViewText(R.id.row_text, shown)
-            v.setTextColor(R.id.row_text, if (kind == "task" && done) Widgets.mutedColor(ctx, color) else fg)
+            if (Widgets.onDark(color)) v.setTextColor(R.id.row_text, Widgets.textOnDark)
+            v.setFloat(R.id.row_text, "setAlpha", if (kind == "task" && done) 0.55f else 1f) // 끝낸 할 일은 흐리게
             v.setTextViewTextSize(R.id.row_text, android.util.TypedValue.COMPLEX_UNIT_SP, if (kind == "h") 15f else 14f)
             if (kind == "task") {
                 v.setViewVisibility(R.id.row_check, View.VISIBLE)
                 v.setImageViewResource(R.id.row_check, if (done) R.drawable.ic_widget_checked else R.drawable.ic_widget_unchecked)
-                v.setInt(R.id.row_check, "setColorFilter", fg)
+                if (Widgets.onDark(color)) v.setInt(R.id.row_check, "setColorFilter", Widgets.textOnDark)
                 v.setContentDescription(R.id.row_check, if (done) "끝냄: $text" else "할 일: $text")
             } else {
                 v.setViewVisibility(R.id.row_check, View.GONE)
