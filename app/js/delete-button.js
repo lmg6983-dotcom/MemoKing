@@ -17,6 +17,7 @@ const COPY_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="
 const DONE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
 const FAIL_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v5.5M8 12.2v.3"/></svg>';
 const SHARE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="11.5" cy="3.8" r="1.8"/><circle cx="4.5" cy="8" r="1.8"/><circle cx="11.5" cy="12.2" r="1.8"/><path d="M6.1 7.1l3.8-2.3M6.1 8.9l3.8 2.3"/></svg>';
+const OPEN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5L7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></svg>';
 const SAVE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.8 7l3.2 3.2L11.2 7M3 12.8h10"/></svg>';
 // 화면 읽기 프로그램에 "복사했어요" 를 알려 주는 숨은 자리 (하나만)
 function announce(text) {
@@ -72,8 +73,9 @@ function scrollParent(el) {
  *   deco: 지울 노드에 표시(데코레이션)를 달고 떼기 — 편집기가 그리는 줄은 class 를 직접 바꾸면 되돌려지므로
  *   markTarget: 대상 표시를 target 의 class 로 (사진·소리처럼 편집기가 다시 그리지 않는 상자)
  *   remove: 지우기 (기본은 그 노드를 지움)
+ *   open: { label, run } — 누르면 바로 열리던 것(파일·링크 카드·수식)은 누르면 단추만, 여는 것은 이 "열기" 단추로
  */
-export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', deco, markTarget = false, remove, hover = null, showMs = DELETE_SHOW_MS }) {
+export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', deco, markTarget = false, remove, hover = null, showMs = DELETE_SHOW_MS, open = null }) {
   hideDeleteButton(true);
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -95,7 +97,16 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   const copyBtn = actionBtn('mk-copy-btn', '복사', COPY_ICON);
   const saveBtn = actionBtn('mk-save-btn', '저장', SAVE_ICON);
   const shareBtn = canShare() ? actionBtn('mk-share-btn', '공유', SHARE_ICON) : null;
-  const extras = [copyBtn, saveBtn, shareBtn].filter(Boolean); // × 에서 왼쪽으로 차례로
+  let openBtn = null;
+  if (open) {
+    openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.className = `mk-open-btn${hover ? ' hover' : ''}`;
+    openBtn.title = open.label;
+    openBtn.setAttribute('aria-label', open.label);
+    openBtn.innerHTML = OPEN_ICON;
+  }
+  const extras = [copyBtn, saveBtn, shareBtn, openBtn].filter(Boolean); // × 에서 왼쪽으로 차례로 (열기는 ×에서 가장 먼 맨 왼쪽)
   document.body.append(...extras, btn);
   // 단추는 화면에 고정(position: fixed)이라, 큰 그림을 스크롤하면 위 막대에 올라탈 수 있다 →
   //   편집기에서 보이는 칸 안으로만: 대상의 위가 가려지면 보이는 부분의 위에 붙고, 대상이 다 가려지면 숨는다
@@ -177,6 +188,22 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : '내용을 복사했어요'));
   action(saveBtn, SAVE_ICON, () => saveBlock(view, pos, node, target), (name) => `저장했어요: ${name}`);
   if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, pos, node, target), () => '공유했어요');
+  if (openBtn) {
+    let opened = false;
+    const go = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (opened) return; // touchstart 뒤 따라오는 mousedown · click 은 한 번으로
+      opened = true;
+      if (view.state.doc.nodeAt(pos) !== node) return hideDeleteButton();
+      haptic(8);
+      hideDeleteButton(true);
+      open.run();
+    };
+    openBtn.addEventListener('mousedown', go);
+    openBtn.addEventListener('touchstart', go, { passive: false });
+    openBtn.addEventListener('click', go);
+  }
   current = del;
   const press = (e) => {
     e.preventDefault();

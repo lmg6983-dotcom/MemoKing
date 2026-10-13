@@ -1321,7 +1321,7 @@ try {
   {
     fs.writeFileSync(path.join(vault, 'attachments/voice-btn.m4a'), Buffer.from('fake audio'));
     fs.writeFileSync(path.join(vault, 'attachments/안내서.pdf'), Buffer.from('%PDF-1.4 fake'));
-    write('콘텐츠 단추.md', '---\nid: 00000000-0000-4000-8000-0000000000dd\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: purple\n---\n# 콘텐츠 단추\n\n> ![녹음 10월 14일](attachments/voice-btn.m4a)\n>\n> 도레미파솔라시도\n\n[안내서.pdf](attachments/안내서.pdf)\n\n끝\n');
+    write('콘텐츠 단추.md', '---\nid: 00000000-0000-4000-8000-0000000000dd\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: purple\n---\n# 콘텐츠 단추\n\n> ![녹음 10월 14일](attachments/voice-btn.m4a)\n>\n> 도레미파솔라시도\n\n[안내서.pdf](attachments/안내서.pdf)\n\n$$\nx^2\n$$\n\n끝\n');
     await back();
     await page.waitForTimeout(300);
     await page.evaluate(() => window.__mk.emit('app', 'resume'));
@@ -1358,6 +1358,35 @@ try {
     await page.waitForTimeout(500);
     const saved = (await devLog()).log.filter((x) => x.saveAs).at(-1);
     check('저장 단추: PDF 는 파일 그대로', saved?.saveAs.rel === 'attachments/안내서.pdf' && saved.saveAs.name === '안내서.pdf', JSON.stringify(saved));
+    await page.waitForTimeout(1900);
+    // 파일 칩을 짧게 눌러도 바로 열지 않고 단추 + 노란 "열기" (맨 왼쪽) → "열기"를 누르면 그때 연다
+    const tapAt = async (sel) => {
+      const b = await page.locator(sel).first().boundingBox();
+      await touch('touchStart', b.x + 10, b.y + b.height / 2);
+      await page.waitForTimeout(80);
+      await touch('touchEnd', b.x + 10, b.y + b.height / 2);
+      await page.waitForTimeout(400);
+    };
+    const opens0 = (await devLog()).log.filter((x) => x.openFile).length;
+    await tapAt('.mk-doc a[data-file]');
+    const row = await page.evaluate(() => ['.mk-open-btn', '.mk-share-btn', '.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
+    const openLabel = await page.getAttribute('.mk-open-btn', 'aria-label').catch(() => null);
+    const opens1 = (await devLog()).log.filter((x) => x.openFile).length;
+    check('파일 칩: 짧게 눌러도 바로 열지 않고 열기 · 공유 · 저장 · 복사 · × (왼쪽부터)', opens1 === opens0 && row.every((x) => x >= 0) && row.every((x, i) => i === 0 || row[i - 1] < x) && openLabel === '이 파일 열기', JSON.stringify({ row, openLabel, opens0, opens1 }));
+    await shot('18e-file-open-button');
+    await page.tap('.mk-open-btn');
+    await page.waitForTimeout(500);
+    const opened = (await devLog()).log.filter((x) => x.openFile);
+    check('열기 단추: 누르면 그 파일을 연다 (단추는 거둠)', opened.length === opens0 + 1 && opened.at(-1).openFile === 'attachments/안내서.pdf' && !(await page.locator('.mk-open-btn').count()), JSON.stringify(opened.at(-1)));
+    // 수식: 눌러도 고치기 창이 바로 뜨지 않고 단추 + "고치기"
+    await tapAt('.mk-doc .mk-math-block');
+    const mathRow = { editor: await page.locator('.mk-math-editor').count(), label: await page.getAttribute('.mk-open-btn', 'aria-label').catch(() => null) };
+    check('수식: 눌러도 바로 고치기 창이 뜨지 않고 단추 + "이 수식 고치기"', mathRow.editor === 0 && mathRow.label === '이 수식 고치기', JSON.stringify(mathRow));
+    await page.tap('.mk-open-btn');
+    await page.waitForTimeout(400);
+    check('고치기 단추: 누르면 수식 고치기 창', (await page.locator('.mk-math-editor').count()) === 1);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
     // 다음 점검을 위해 '그림 둘' 로 돌아감
     await back();
     await page.waitForTimeout(300);

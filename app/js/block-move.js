@@ -283,6 +283,22 @@ function virtualY(d) {
 const TAP_TARGET = 'img.mk-image, .mk-ink, .mk-media-label';
 const HOLD_TARGET = 'a[data-file], .mk-link-card, [data-link-card], .mk-math-block';
 const TAP_MS = 400;
+// 누르면 바로 열리던 것 → 단추 줄의 "열기" 단추가 그것을 대신 눌러 준다 (링크 카드는 안쪽 글 상자가 받는다)
+const OPEN_TARGET = 'a[data-file], .mk-link-card, [data-link-card], .mk-math-block';
+function openerOf(dom, kind) {
+  const host = dom.matches(OPEN_TARGET) ? dom : dom.querySelector(OPEN_TARGET);
+  if (!host) return null;
+  const math = host.matches('.mk-math-block');
+  return {
+    label: math ? '이 수식 고치기' : host.matches('a[data-file]') && host.dataset.file === 'program' ? `이 ${kind} 실행` : `이 ${kind} 열기`,
+    run: () => {
+      const at = host.querySelector('.lc-main') ?? host;
+      const e = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+      e.mkOpen = true;
+      at.dispatchEvent(e);
+    },
+  };
+}
 const HOLD_SHOW_MS = 450;
 const TAP_SHOW_MS = 5000;
 
@@ -294,6 +310,7 @@ export function createBlockMove({ readOnly = false } = {}) {
   // 꾹 눌러 단추를 띄웠으면 손을 뗄 때 오는 열기(click) · 길게 누르기 메뉴는 막는다
   const swallowOpen = (view) => {
     const stop = (e) => {
+      if (e.mkOpen) return; // "열기" 단추가 보낸 것은 그대로
       e.preventDefault();
       e.stopPropagation();
     };
@@ -368,10 +385,13 @@ export function createBlockMove({ readOnly = false } = {}) {
           const t = event.changedTouches?.[0];
           if (!t0 || !t || !mover || mover.busy() || touchMode() === 'draw' || Date.now() - t0.at > TAP_MS) return false;
           if (Math.hypot(t.clientX - t0.x, t.clientY - t0.y) > 10) return false;
-          const host = t0.target instanceof Element ? t0.target.closest(TAP_TARGET) : null;
+          const opens = t0.target instanceof Element ? t0.target.closest(HOLD_TARGET) : null;
+          const host = t0.target instanceof Element ? t0.target.closest(TAP_TARGET) ?? opens : null;
           if (!host || !view.dom.contains(host)) return false;
           const block = blockFromTarget(view, host);
           if (!block || !isContentBlock(block.node)) return false;
+          // 파일(PDF 등) · 링크 카드 · 수식: 누르자마자 열리지 않고 단추부터 — 여는 것은 단추 줄의 "열기"로
+          if (opens && host === opens) swallowOpen(view);
           // 편집기가 누른 그림을 고르고 난 뒤에 (고르기가 바뀌면 단추가 거둬지므로)
           setTimeout(() => !view.isDestroyed && !mover.busy() && mover.showDelete(block, false, { showMs: TAP_SHOW_MS }), 60);
           return false;
@@ -768,7 +788,7 @@ class Mover {
     if (!hovering) this.hoverHost = null;
     this.hoverTarget = target;
     const hover = hovering ? { enter: () => clearTimeout(this.hoverTimer), leave: () => this.leaveHover() } : null;
-    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, hover, showMs });
+    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, hover, showMs, open: media || block.node.type.name === 'math_block' ? openerOf(dom, kind) : null });
   }
 
   hideDelete(now = false) {
