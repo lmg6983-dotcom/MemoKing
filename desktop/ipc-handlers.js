@@ -25,6 +25,7 @@ const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x:
 export function registerIpc(ctx) {
   const {
     windowManager: wm,
+    memoHotkeys,
     getVault,
     openVault,
     vaultInfo,
@@ -493,6 +494,13 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 창 크기 조정 ----------
+  // 메모 단축키 (Ctrl+Alt+1~9)
+  ipcMain.handle('hotkey:state', (_e, id) => memoHotkeys.state(String(id)));
+  ipcMain.handle('hotkey:set', (_e, id, slot, opts) => {
+    const r = memoHotkeys.set(String(id), slot == null ? null : String(slot), { copy: opts?.copy !== false, show: opts?.show === true });
+    if (r.ok) wm.pushList();
+    return r;
+  });
   ipcMain.handle('win:spare', (e) => wm.spareWaiting(e.sender));
   ipcMain.on('win:painted', (e) => wm.notePainted(e.sender));
   ipcMain.handle('win:grow-width', (event, extra) => {

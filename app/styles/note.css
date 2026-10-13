@@ -1783,3 +1783,39 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
   .table-bar.grouped :is([data-table="addRow"], [data-table="delRow"], [data-table="addCol"], [data-table="delCol"]):not([data-whole-table="1"]) .lbl { display: none; }
   .table-bar.grouped :is([data-table="addRow"], [data-table="delRow"], [data-table="addCol"], [data-table="delCol"]) { padding: 0 6px; }
 }
+
+/* ---------- 메모 단축키 창 (hotkey-dialog.js): Ctrl+Alt+1~9 고르기 · 누르면 할 일 ---------- */
+/*   기본 메모 창(340×380)에도 들어가게: 숫자는 키보드 숫자 줄처럼 한 줄 */
+.hotkey-dialog { width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; padding: 18px 18px 16px; }
+.hotkey-dialog h2 { margin-bottom: 0; font-size: 18px; line-height: 26px; }
+.hotkey-dialog .hk-lead { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; }
+.hk-keys { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; margin-bottom: 12px; }
+.hk-key {
+  position: relative;
+  display: grid; place-items: center;
+  min-width: 0; height: 38px; padding: 0;
+  border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 7px;
+  background: var(--surface-1); color: var(--text); font: inherit; cursor: pointer;
+  transition: background-color 0.12s var(--ease-out), border-color 0.12s var(--ease-out), transform 0.08s var(--ease-out);
+}
+.hk-key b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* 다른 메모가 쓰는 숫자: 아래 작은 점 */
+.hk-key i { position: absolute; bottom: 4px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--text-muted); opacity: 0; }
+.hk-key.taken i { opacity: 1; }
+.hk-key.blocked { border-style: dashed; color: var(--text-faint); }
+.hk-key:disabled { cursor: not-allowed; opacity: 0.5; }
+@media (hover: hover) and (pointer: fine) { .hk-key:not(:disabled):hover { background: var(--fill-hover); } }
+.hk-key:active:not(:disabled) { transform: translateY(1px); }
+.hk-key[aria-checked="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); box-shadow: inset 0 0 0 1px var(--brand-yellow); }
+.hk-key[aria-checked="true"] i { background: var(--text-strong); }
+.hk-key:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.hk-what { display: flex; flex-direction: column; margin-bottom: 6px; }
+.hk-what .label { margin-bottom: 2px; font-size: 12px; color: var(--muted); }
+.hk-opt { display: flex; align-items: center; gap: 12px; padding: 5px 0; cursor: pointer; }
+.hk-opt > span { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.hk-opt b { font-size: 14px; font-weight: 600; line-height: 20px; }
+.hk-opt small { color: var(--muted); font-size: 12px; line-height: 16px; }
+.hk-opt .switch { flex: none; }
+.hotkey-dialog .hk-hint { min-height: 36px; margin: 0 0 2px; color: var(--muted); font-size: 12.5px; line-height: 18px; }
+.hotkey-dialog .lock-error:empty { min-height: 0; margin: 0; }
+.hotkey-dialog .hk-clear { margin-right: auto; }

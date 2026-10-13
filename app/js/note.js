@@ -25,6 +25,7 @@ import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
 import { hintOnce } from './hints.js';
 import { toggleShortcutSheet } from './shortcut-sheet.js';
+import { hotkeyDialog } from './hotkey-dialog.js';
 
 const SAVE_DELAY = 600;
 
@@ -458,6 +459,22 @@ $('lock-btn').addEventListener('click', async () => {
   showLockState();
   setStatus('잠갔어요. 창을 닫으면 다시 비밀번호로 열려요');
 });
+// 단축키로 불러오기 (Ctrl+Alt+1~9): 어느 앱에서든 이 메모를 복사하거나 띄운다 (hotkey-dialog.js)
+function showHotkey(state) {
+  $('hotkey-label').textContent = state?.slot ? `Ctrl+Alt+${state.slot}` : '';
+}
+$('hotkey-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  const state = await api.hotkeys.state(id);
+  const next = await hotkeyDialog({ state, onSave: (slot, opts) => api.hotkeys.set(id, slot, opts) });
+  editor?.focus();
+  if (!next) return;
+  showHotkey(next);
+  setStatus(next.slot ? `Ctrl+Alt+${next.slot} 로 이 메모를 불러와요` : '단축키를 풀었어요');
+});
+// 메모 단축키로 복사하기 직전: 막 고친 글까지 저장 (main.js memoHotkeyPressed)
+window.__memokingFlush = () => flush();
 $('image-save-btn').addEventListener('click', () => memoImage('save'));
 $('pdf-btn').addEventListener('click', async () => {
   closeMenu();
@@ -1720,6 +1737,7 @@ if (!memo) {
   });
   reminderPanel.set(memo.reminders);
   showLockState();
+  api.hotkeys?.state(id).then(showHotkey, () => {});
   recorder = setupVoiceRecorder({
     panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
     buttons: () => document.querySelectorAll('[data-action="record"]'),

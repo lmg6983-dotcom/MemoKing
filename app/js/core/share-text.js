@@ -42,7 +42,8 @@ export function inlineToText(line) {
 /** 마크다운 본문 → 보내기용 글 */
 export function shareText(markdown) {
   const out = [];
-  const lines = String(markdown ?? '').replace(/\r\n?/g, '\n').split('\n');
+  // 줄 끝의 \ 는 마크다운의 줄바꿈 표시 (Shift+Enter · 붙여넣은 여러 줄) — 글에는 넣지 않는다
+  const lines = String(markdown ?? '').replace(/\r\n?/g, '\n').split('\n').map((l) => l.replace(/(?<!\\)\\$/, ''));
   const counters = []; // 들여쓰기 단계마다 번호
   let fence = false;
   let mathBlock = false;
@@ -69,6 +70,14 @@ export function shareText(markdown) {
       const cells = raw.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => inlineToText(c.trim()).replace(/\n/g, ' '));
       out.push(cells.join(' | '));
       counters.length = 0;
+      continue;
+    }
+    // 줄 앞 들여쓰기(편집기가 줄 바꿈 없는 빈칸 U+00A0 로 지킨 것 — core/indent-spaces.js)는 그 칸 수 그대로
+    //   (목록 · 제목보다 먼저: U+00A0 로 시작하는 줄은 마크다운에서도 그냥 글)
+    const indent = /^\u00a0+/.exec(raw)?.[0];
+    if (indent) {
+      counters.length = 0;
+      out.push(' '.repeat(indent.length) + inlineToText(raw.slice(indent.length).trim()));
       continue;
     }
     const list = /^(\s*)([-*+]|(\d{1,9})[.)])\s+(\[([ xX])\]\s+)?(.*)$/.exec(raw);
@@ -111,5 +120,7 @@ export function shareText(markdown) {
     const m = /^((?: {2})*)([•]|[☐☑]|\d+\.) /.exec(line ?? '');
     return m ? `${m[1].length}:${m[2] === '•' ? 'b' : /\d/.test(m[2]) ? 'n' : 't'}` : null;
   };
-  return rows.filter((line, i) => line !== '' || !kind(rows[i - 1]) || kind(rows[i - 1]) !== kind(rows[i + 1])).join('\n').trim();
+  // 앞뒤 빈 줄만 걷고 첫 줄의 들여쓰기는 남긴다
+  return rows.filter((line, i) => line !== '' || !kind(rows[i - 1]) || kind(rows[i - 1]) !== kind(rows[i + 1])).join('\n')
+    .replace(/^(?:[ \t]*\n)+/, '').trimEnd();
 }

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <title>메모킹 알림</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/hud.css">
+  <script type="module" src="js/hud.js"></script>
+</head>
+<body>
+  <!-- 메모 단축키로 복사했을 때 마우스 가까이 잠깐 뜨는 말풍선 (포커스를 가져가지 않음) -->
+  <div id="hud" class="hud" role="status" aria-live="polite">
+    <span class="hud-icon" aria-hidden="true"></span>
+    <span class="hud-text"><b id="hud-title"></b><small id="hud-body"></small></span>
+  </div>
+</body>
+</html>

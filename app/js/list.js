@@ -373,6 +373,12 @@ function renderCard(memo) {
   if (memo.hasFile) meta.append(badge('clip', ''));
   if (memo.linkCount) meta.append(badge('link', memo.linkCount));
   if (memo.stack) meta.append(badge('tabs', memo.stack, 'stack'));
+  // 메모 단축키: Ctrl+Alt+숫자 로 어디서든 불러오는 메모 (메모 창 › 단축키로 불러오기)
+  if (memo.hotkey) {
+    const hk = badge('zap', memo.hotkey, 'hotkey');
+    hk.title = `Ctrl+Alt+${memo.hotkey} 로 불러와요`;
+    meta.append(hk);
+  }
   const time = document.createElement('span');
   time.className = 'card-time';
   time.textContent = friendlyTime(memo.updated);

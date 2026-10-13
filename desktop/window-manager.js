@@ -60,6 +60,10 @@ export class WindowManager {
     this.spare = null; // 미리 불러 둔 메모 창 { win, assign }
     this.spareTimer = 0;
     this.paintMarks = new WeakMap(); // 예비 창: 화면이 "메모를 그렸다" 고 알려 오면 부를 함수
+    this.hotkeySlotOf = () => null; // 메모 단축키 칸 (main.js 가 채움)
+    this.hudWin = null;
+    this.hudTimer = 0;
+    this.smokeHud = [];
 
     this.pdfWin = null;
     this.smokePdf = [];
@@ -315,6 +319,53 @@ export class WindowManager {
     return win;
   }
 
+  // ---------- 잠깐 알림 (HUD) ----------
+  // 메모 단축키로 복사했을 때처럼 다른 앱을 쓰는 중에 "복사했어요" 만 잠깐 — 마우스 가까이, 포커스를 빼앗지 않고 1.6초 뒤 사라짐
+  //   (Windows 알림은 알림 센터에 쌓이고 소리가 나서, 자주 쓰는 단축키에는 무겁다)
+
+  showHud({ title, body = '', kind = 'ok' }) {
+    if (SMOKE) this.smokeHud.push({ title, body, kind });
+    const size = { width: 340, height: 64 };
+    if (!this.hudWin || this.hudWin.isDestroyed()) {
+      this.hudWin = new BrowserWindow({
+        ...size,
+        frame: false,
+        transparent: true,
+        resizable: false,
+        movable: false,
+        focusable: false,
+        skipTaskbar: true,
+        alwaysOnTop: true,
+        show: false,
+        hasShadow: false,
+        webPreferences,
+      });
+      this.hudWin.setAlwaysOnTop(true, 'screen-saver');
+      this.hudWin.setIgnoreMouseEvents(true);
+      this.hudLoaded = new Promise((resolve) => this.hudWin.webContents.once('did-finish-load', resolve));
+      this.hudWin.on('closed', () => (this.hudWin = null));
+      this.hudWin.loadFile(path.join(APP_DIR, 'hud.html'));
+    }
+    const win = this.hudWin;
+    const cursor = screen.getCursorScreenPoint();
+    const area = screen.getDisplayNearestPoint(cursor).workArea;
+    const x = Math.round(Math.min(Math.max(cursor.x - size.width / 2, area.x + 8), area.x + area.width - size.width - 8));
+    const below = cursor.y + 28 + size.height <= area.y + area.height;
+    const y = Math.round(below ? cursor.y + 28 : cursor.y - 28 - size.height);
+    clearTimeout(this.hudTimer);
+    this.hudLoaded.then(() => {
+      if (win.isDestroyed()) return;
+      win.setBounds({ x, y, ...size });
+      win.webContents.send('hud:show', { title, body, kind });
+      win.showInactive();
+      this.hudTimer = setTimeout(() => {
+        if (win.isDestroyed()) return;
+        win.webContents.send('hud:hide');
+        this.hudTimer = setTimeout(() => !win.isDestroyed() && win.hide(), 220);
+      }, 1600);
+    });
+  }
+
   // ---------- 예비 메모 창 ----------
   // 메모 창을 열 때마다 편집기(milkdown·KaTeX 등)를 새로 읽고 컴파일하느라 한 박자 늦게 뜬다 →
   //   숨은 창 하나에 note.html 을 미리 불러 두고(메모는 아직 없음), 메모를 열면 그 창에 메모를 넣고 그린 뒤 보여 준다.
@@ -424,6 +475,7 @@ export class WindowManager {
       ...m,
       open: Boolean(this.noteWins.get(m.id)?.isVisible()),
       stack: this.stacks?.stackOf(m.id)?.memos.length ?? 0,
+      hotkey: this.hotkeySlotOf(m.id),
     }));
   }
 

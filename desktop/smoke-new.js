@@ -61,7 +61,7 @@ function fakeOpms() {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, host: `http://127.0.0.1:${server.address().port}` })));
 }
 
-export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow }) {
+export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow, memoHotkeys, smokeHud, windowManager }) {
   const checks = [];
   const errors = [];
   const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
@@ -456,6 +456,70 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         again.includes(`${N}${N}국내사업부 대표 안내${N.repeat(4)}네 칸 들여쓴 줄${N.repeat(4)}탭 줄`) && again.includes(`${N}${N}직접 친 줄`) && file.includes(`${N}${N}국내사업부`) && !/&#|&nbsp;/.test(file),
         JSON.stringify({ again: again.map((x) => [...x.slice(0, 3)].map((c) => c.codePointAt(0).toString(16)).join(' ') + ' ' + x), file: file.replace(/\u00a0/g, '⍽') }));
       nw.close();
+    }
+
+    // ---------- v0.33 — 메모 단축키 Ctrl+Alt+1~9 (복사 · 띄우기를 미리 골라 둠) ----------
+    {
+      const list = getList() ?? createListWindow();
+      const vault = getVault();
+      const N = ' ';
+      const hid = vault.import({ body: `# 배송 안내\n\n안녕하세요, **고객님**.\n${N}${N}국내사업부 대표 번호로 연락 주세요\n` });
+      await until(() => js(list, `!!document.querySelector('[data-id="${hid}"]')`), '단축키 메모 카드');
+      const before = new Set(noteWins.keys());
+      await js(list, `document.querySelector('[data-id="${hid}"]').click()`);
+      const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '단축키 메모 창');
+      const nw = noteWins.get(nid);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '단축키 메모 준비');
+      // 메뉴 › 단축키로 불러오기 → 3 · 내용 복사만
+      await js(nw, `document.getElementById('menu-btn').click(); document.getElementById('hotkey-btn').click()`);
+      await until(() => js(nw, `!!document.querySelector('.hotkey-dialog[open] .hk-key')`), '단축키 창');
+      const dlg = await js(nw, `(() => {
+        const d = document.querySelector('.hotkey-dialog');
+        const keys = d.querySelectorAll('.hk-key').length;
+        const [copy, show] = d.querySelectorAll('.hk-opt .switch');
+        const saveBtn = d.querySelector('button[type="submit"]');
+        const before = saveBtn.disabled; // 숫자를 고르기 전
+        d.querySelectorAll('.hk-key')[2].click();
+        copy.checked = false; copy.dispatchEvent(new Event('change'));
+        show.checked = false; show.dispatchEvent(new Event('change'));
+        const none = { disabled: saveBtn.disabled, error: d.querySelector('.lock-error').textContent };
+        copy.checked = true; copy.dispatchEvent(new Event('change'));
+        const hint = d.querySelector('.hk-hint').textContent;
+        const after = saveBtn.disabled;
+        return { keys, before, none, hint, after, fits: d.scrollHeight <= d.clientHeight + 1, size: [d.scrollHeight, d.clientHeight, innerHeight] };
+      })()`);
+      await capture(nw, 'smoke-new-hotkey-dialog.png');
+      await js(nw, `document.querySelector('.hotkey-dialog button[type="submit"]').click()`);
+      await until(() => js(nw, `!document.querySelector('.hotkey-dialog')`), '단축키 창 닫힘');
+      const saved = getSettings().memoHotkeys?.['3'];
+      const label = await js(nw, `document.getElementById('hotkey-label').textContent`);
+      check('메모 단축키 창: 1~9 · 복사/띄우기 중 하나는 꼭 · 저장하면 Ctrl+Alt+3 에 이 메모 (메뉴에 표시)',
+        dlg.keys === 9 && dlg.before && dlg.none.disabled && /하나는/.test(dlg.none.error) && !dlg.after && /Ctrl\+Alt\+3 를 누르면 내용을 복사해요/.test(dlg.hint) && dlg.fits
+          && saved?.id === hid && saved.copy && !saved.show && label === 'Ctrl+Alt+3' && memoHotkeys.held.has('3'),
+        JSON.stringify({ dlg, saved, label, held: [...memoHotkeys.held.keys()] }));
+      const badge = await until(() => js(list, `document.querySelector('[data-id="${hid}"] .card-badge.hotkey')?.textContent`), '목록 카드 단축키 표시', 3000).catch(() => '');
+      check('목록 카드: 단축키 숫자 표시', badge === '3', badge);
+      // 누르면: 제목 줄은 빼고 본문만, 줄 앞 띄어쓰기 그대로 클립보드에 + 마우스 가까이 "복사했어요"
+      nw.close();
+      await until(() => !noteWins.has(nid), '메모 창 닫힘');
+      clipboard.writeText('비움');
+      const hudBefore = smokeHud.length;
+      await memoHotkeys.onPress('3');
+      const text = await clipboard.readText();
+      const hud = smokeHud.slice(hudBefore);
+      check('Ctrl+Alt+3 → 본문만 복사 (줄 앞 띄어쓰기 그대로) · 창은 띄우지 않고 "복사했어요" 잠깐',
+        text === '안녕하세요, 고객님.\n  국내사업부 대표 번호로 연락 주세요' && !noteWins.has(hid) && /배송 안내.*복사했어요/.test(hud[0]?.title ?? '') && /Ctrl\+V/.test(hud[0]?.body ?? ''),
+        JSON.stringify({ text, hud }));
+      // 띄우기만으로 바꾸면: 누르면 메모 창이 뜬다
+      const r = memoHotkeys.set(hid, '3', { copy: false, show: true });
+      clipboard.writeText('비움');
+      await memoHotkeys.onPress('3');
+      const shownWin = await until(() => noteWins.get(hid)?.isVisible() && noteWins.get(hid), '단축키로 메모 띄우기', 4000).catch(() => null);
+      check('띄우기로 바꾸면 Ctrl+Alt+3 → 메모 창이 뜸 (클립보드는 그대로)', r.ok && Boolean(shownWin) && (await clipboard.readText()) === '비움', JSON.stringify({ r: r.ok, shown: Boolean(shownWin) }));
+      shownWin?.close();
+      // 풀기
+      const off = memoHotkeys.set(hid, null);
+      check('단축키 풀기 → 키를 놓아 다른 앱이 쓸 수 있게', off.ok && !memoHotkeys.held.has('3') && !getSettings().memoHotkeys?.['3'], JSON.stringify(getSettings().memoHotkeys));
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

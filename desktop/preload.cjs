@@ -7,7 +7,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
-  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers',
+  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -106,6 +106,11 @@ contextBridge.exposeInMainWorld('memoking', {
     restore: invoke('trash:restore'),
     remove: invoke('trash:delete'),
     empty: invoke('trash:empty'),
+  },
+  // 메모 단축키 (Ctrl+Alt+1~9): state(메모 id) · set(메모 id, 칸|null, { copy, show }) → { ok, error?, state }
+  hotkeys: {
+    state: invoke('hotkey:state'),
+    set: invoke('hotkey:set'),
   },
   copyText: invoke('clipboard:write-text'),
   copyRich: invoke('clipboard:write-rich'), // { text, html }

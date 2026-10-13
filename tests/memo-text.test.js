@@ -30,3 +30,10 @@ test('파일 읽기: 키: 값 이 아닌 "---" 사이 글은 본문', () => {
   assert.equal(parseMemoFile('---\n오늘 회의\n---\n할 일\n').body, '---\n오늘 회의\n---\n할 일\n');
   assert.equal(parseMemoFile('---\ncolor: pink\n---\n본문\n').body, '본문\n');
 });
+
+test('보내기 글: 줄 앞 들여쓰기(U+00A0)는 칸 수 그대로, 줄 끝 \\ 줄바꿈 표시는 빼고', () => {
+  const N = '\u00a0';
+  assert.equal(shareText(`# 안내\n\n${N}${N}국내사업부 대표\\\n${N.repeat(4)}담당: 홍길동\\\n끝 줄`), '안내\n\n  국내사업부 대표\n    담당: 홍길동\n끝 줄');
+  assert.equal(shareText(`${N}${N}첫 줄부터 들여쓰기`), '  첫 줄부터 들여쓰기');
+  assert.equal(shareText('경로 C:\\\\'), '경로 C:\\');
+});
