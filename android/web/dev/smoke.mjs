@@ -1284,6 +1284,39 @@ try {
   await page.tap('.mk-delete-btn');
   await page.waitForTimeout(1200);
   check('지우기 단추: 누르면 그 그림만 지움', (await page.locator('img.mk-image').count()) === 1 && !read('그림 둘.md').includes('two-a.png') && read('그림 둘.md').includes('two-b.png'), read('그림 둘.md'));
+  // 글 고치기 방식에서도 그림을 짧게 누르면(탭): 저장 · 복사 · 지우기 단추
+  await setMode('edit');
+  {
+    const ib2 = await page.locator('img.mk-image').first().boundingBox();
+    await touch('touchStart', ib2.x + 40, ib2.y + 40);
+    await page.waitForTimeout(80);
+    await touch('touchEnd', ib2.x + 40, ib2.y + 40);
+    await page.waitForTimeout(250);
+    const shown = await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn') && await page.isVisible('.mk-save-btn');
+    const order = await page.evaluate(() => ['.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
+    check('글 고치기 방식: 그림을 짧게 누르면 저장 · 복사 · × 단추 (왼쪽부터)', shown && order[0] < order[1] && order[1] < order[2], JSON.stringify({ shown, order }));
+    await shot('18c-tap-buttons');
+    // 저장 단추: 메모 폴더의 사진은 원본 파일 그대로 안드로이드 저장 창으로
+    await page.tap('.mk-save-btn');
+    await page.waitForTimeout(500);
+    const saves = (await devLog()).log.filter((x) => x.saveAs);
+    check('저장 단추: 사진은 원본 파일 그대로 저장 · ✓', saves.at(-1)?.saveAs.rel === 'attachments/two-b.png' && saves.at(-1).saveAs.name === 'two-b.png' && await page.isVisible('.mk-save-btn.done'), JSON.stringify(saves.at(-1)));
+    // 복사한 그림을 메모에 붙여 넣기 (WebView 는 클립보드의 그림을 주지 않고 주소 글만 — 앱이 클립보드에서 읽어 넣음)
+    await page.tap('.mk-copy-btn');
+    await page.waitForTimeout(500);
+    const before = await page.locator('img.mk-image').count();
+    await page.locator('.mk-doc p', { hasText: '끝' }).tap();
+    await page.waitForTimeout(150);
+    await page.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'content://com.memoking.app.files/share/%EB%A9%94%EB%AA%A8%ED%82%B9%20%EA%B7%B8%EB%A6%BC.png');
+      document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    await page.waitForTimeout(800);
+    const after = await page.locator('img.mk-image').count();
+    await page.waitForTimeout(800);
+    check('복사한 그림 붙여 넣기: 클립보드의 그림이 첨부로 메모에 (주소 글이 아니라)', after === before + 1 && !read('그림 둘.md').includes('content://') && (read('그림 둘.md').match(/!\[[^\]]*\]\(attachments\//g) ?? []).length === 2, JSON.stringify({ before, after, file: read('그림 둘.md').split('---').pop() }));
+  }
   // + › 표: 커서 자리에 표 (글을 고치는 일이니 다이얼을 글 고치기로)
   await setMode('edit');
   await page.locator('.mk-doc p', { hasText: '끝' }).tap();

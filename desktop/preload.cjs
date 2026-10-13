@@ -147,6 +147,8 @@ contextBridge.exposeInMainWorld('memoking', {
     fetch: invoke('attachment:fetch'),
     info: invoke('attachment:info'),
     copy: invoke('attachment:copy'), // 메모 폴더의 첨부를 파일 그대로 클립보드에 → true | false
+    // 내용 저장(저장 단추): { name, mime, rel? | base64? } → { name } | { cancelled } | { error }
+    saveAs: invoke('attachment:save-as'),
   },
   // 링크 미리보기 카드
   links: {

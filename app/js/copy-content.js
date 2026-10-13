@@ -14,6 +14,11 @@ let host = {
   text: null,
   /** @param {string} href 메모 폴더 안의 첨부 (attachments/…) → 넣었으면 true */
   file: null,
+  /**
+   * 저장: 어디에 둘지 고르는 창을 띄워 저장 → 저장한 파일 이름 | 'cancelled'
+   * @param {{ name: string, mime: string, rel?: string, base64?: string }} f rel: 메모 폴더의 첨부 그대로 · base64: 만든 내용
+   */
+  save: null,
 };
 
 /** 앱마다 클립보드에 넣는 방법 — { image(pngBase64), text({ text, html }), file(href) } (빠지면 브라우저 Clipboard API · 파일은 글로) */
@@ -167,4 +172,89 @@ export function handleImageCopy(view, event) {
     })
     .catch((err) => console.warn('그림 복사', err));
   return true;
+}
+
+// ---------- 저장 (지우기 · 복사 옆 저장 단추) ----------
+//   그림 · 소리 · 동영상 · 파일 칩 · 음성 카드: 그 파일 그대로 (손 메모처럼 그려진 그림 · 인터넷 그림은 PNG 로)
+//   표: CSV (엑셀에서 바로 열림, 한글이 깨지지 않게 BOM) · 그 밖(글 · 목록 · 수식 · 링크 카드): 글(.txt)
+
+const SAFE_NAME = /[\\/:*?"<>|\u0000-\u001f]+/g;
+/** 파일 이름으로 쓸 글 (앞 30자, 못 쓰는 글자는 빈칸) */
+export function fileNameOf(text, fallback = '메모 내용') {
+  const t = String(text ?? '').replace(SAFE_NAME, ' ').replace(/\s+/g, ' ').trim().slice(0, 30).trim();
+  return t || fallback;
+}
+
+/** 표 노드 → CSV 글 (칸 안 쉼표 · 따옴표 · 줄바꿈은 따옴표로 감쌈) */
+export function tableCsv(table) {
+  const rows = [];
+  table.forEach((row) => {
+    const cells = [];
+    row.forEach((cell) => {
+      const t = plainTextOf(cell.content).trim(); // 칸 안 문단 · 줄바꿈은 줄바꿈으로
+      cells.push(/[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t);
+    });
+    rows.push(cells.join(','));
+  });
+  return rows.join('\r\n');
+}
+
+function base64Of(text) {
+  const bytes = new TextEncoder().encode(text);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+/** 브라우저만 있을 때(앱 밖): 내려받기 */
+function download({ name, mime, base64, rel }) {
+  const a = document.createElement('a');
+  a.href = rel ?? `data:${mime};base64,${base64}`;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  return name;
+}
+
+const decodeRel = (src) => {
+  try {
+    return decodeURI(src);
+  } catch {
+    return src;
+  }
+};
+const baseNameOf = (rel) => rel.split('/').pop().replace(/^[0-9a-f]{6,}-/i, '');
+
+/**
+ * 편집기 안의 한 덩어리를 파일로 저장 → 저장한 파일 이름 | 'cancelled'
+ * @param {import('prosemirror-view').EditorView} view
+ */
+export async function saveBlock(view, pos, node, target) {
+  const save = host.save ?? download;
+  const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : null;
+  // 파일이 있는 것 (소리 · 동영상 · 파일 칩 · 음성 카드)
+  const file = attachmentOf(node);
+  if (file) {
+    const rel = decodeRel(file);
+    return save({ rel, name: baseNameOf(rel), mime: '' });
+  }
+  if (media) {
+    const { src, alt } = media.attrs;
+    const img = imageIn(target) ?? imageIn(view.nodeDOM(pos));
+    // 메모 폴더의 사진은 원본 그대로, 손 메모(그린 것) · 인터넷 사진은 화면 그대로 PNG
+    if (isAttachment(src) && mediaKindOf(src, alt) === 'image' && !/\.svg$/i.test(src)) {
+      const rel = decodeRel(src);
+      return save({ rel, name: baseNameOf(rel), mime: '' });
+    }
+    if (img) return save({ base64: await pngBase64(img), name: `${fileNameOf(alt, '그림')}.png`, mime: 'image/png' });
+  }
+  if (node.type.name === 'table') {
+    const first = node.firstChild?.firstChild?.textContent;
+    return save({ base64: base64Of(`\ufeff${tableCsv(node)}`), name: `${fileNameOf(first, '표')}.csv`, mime: 'text/csv' });
+  }
+  const slice = view.state.doc.slice(pos, pos + node.nodeSize);
+  const text = plainTextOf(slice.content).trim() || node.attrs?.href || '';
+  const name = node.type.name === 'math_block' ? '수식' : fileNameOf(text.split('\n')[0]);
+  return save({ base64: base64Of(text), name: `${name}.txt`, mime: 'text/plain' });
 }

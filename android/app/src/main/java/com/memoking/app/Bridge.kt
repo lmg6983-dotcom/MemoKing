@@ -373,6 +373,34 @@ class Bridge(private val activity: MainActivity) {
                     true
                 }
             }
+            // 클립보드의 그림 · 파일(content://) → 임시 파일 [{ temp, name, mime, size }] — 메모킹이나 다른 앱에서 복사한 그림을 메모에 붙여 넣기
+            //   (WebView 의 붙여넣기는 클립보드의 그림을 넘겨주지 않고 주소 글만 준다)
+            "clipboardFiles" -> activity.runOnUiThread {
+                val uris = try {
+                    val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val clip = clipboard.primaryClip
+                    buildList { if (clip != null) for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let(::add) }
+                } catch (e: Exception) {
+                    emptyList()
+                }
+                pool.execute { resolve(id) { activity.copyToTemp(uris) } }
+            }
+            // 저장 단추: 안드로이드 저장 창(어디에 · 무슨 이름으로)을 띄워 파일로 — { name, mime, rel? | base64? } → 저장한 이름 | null(그만둠)
+            "saveAs" -> pool.execute {
+                val (_, file) = Temp.create(ctx)
+                try {
+                    val rel = a.optString("rel")
+                    if (rel.isNotEmpty()) storage().openRead(rel).use { input -> file.outputStream().use { input.copyTo(it) } }
+                    else file.writeBytes(Base64.decode(a.getString("base64"), Base64.DEFAULT))
+                } catch (e: Exception) {
+                    file.delete()
+                    resolve(id) { throw e }
+                    return@execute
+                }
+                val name = a.optString("name", "메모 내용").replace(Regex("[\\\\/:*?\"<>|]+"), " ").trim().ifEmpty { "메모 내용" }
+                val mime = a.optString("mime").ifBlank { VaultFileProvider.mimeOf(name) }
+                activity.runOnUiThread { activity.saveAs(id, file, name, mime) }
+            }
             // 보내기: 그림(base64) 같은 파일 · PDF
             "shareFile" -> pool.execute {
                 val file = shareFile(a.optString("name", "메모"))

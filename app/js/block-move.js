@@ -277,8 +277,14 @@ function virtualY(d) {
 }
 
 /** @param {{ readOnly?: boolean }} options */
+// 휴대폰: 그림 · 손 메모를 짧게 누르면(탭) 단추를 띄운다 — 고를 시간을 넉넉히
+const TAP_TARGET = 'img.mk-image, .mk-ink';
+const TAP_MS = 400;
+const TAP_SHOW_MS = 5000;
+
 export function createBlockMove({ readOnly = false } = {}) {
   let mover = null;
+  let tap = null;
   return new Plugin({
     key: blockMoveKey,
     state: {
@@ -302,10 +308,27 @@ export function createBlockMove({ readOnly = false } = {}) {
         },
         touchstart(view, event) {
           keyboardFor(view, event.target);
+          // 짧게 눌렀다 떼면(탭) 그림 · 손 메모에 저장 · 복사 · 지우기 단추 — 글 고치기 방식에서도 (touchend)
+          const t = event.touches[0];
+          tap = event.touches.length === 1 && t ? { x: t.clientX, y: t.clientY, at: Date.now(), target: event.target } : null;
           if (!canDrag()) return false;
           if (event.touches.length === 1) mover?.press(event, 'touch');
           else mover?.cancelPress();
           return false; // 그냥 누르면 고르기, 밀면 스크롤
+        },
+        touchend(view, event) {
+          const t0 = tap;
+          tap = null;
+          const t = event.changedTouches?.[0];
+          if (!t0 || !t || !mover || mover.busy() || touchMode() === 'draw' || Date.now() - t0.at > TAP_MS) return false;
+          if (Math.hypot(t.clientX - t0.x, t.clientY - t0.y) > 10) return false;
+          const host = t0.target instanceof Element ? t0.target.closest(TAP_TARGET) : null;
+          if (!host || !view.dom.contains(host)) return false;
+          const block = blockFromTarget(view, host);
+          if (!block || !isContentBlock(block.node)) return false;
+          // 편집기가 누른 그림을 고르고 난 뒤에 (고르기가 바뀌면 단추가 거둬지므로)
+          setTimeout(() => !view.isDestroyed && !mover.busy() && mover.showDelete(block, false, { showMs: TAP_SHOW_MS }), 60);
+          return false;
         },
         dragstart(_view, event) {
           // 휴대폰 글 고치기: 그림·글을 브라우저 끌어 놓기로 옮기지 않는다 (옮기기는 다이얼의 옮기기 방식에서만)
@@ -684,7 +707,7 @@ class Mover {
 
   // ---------- 지우기 단추: 꾹 눌렀다 놓은 내용의 오른쪽 위 (delete-button.js) ----------
 
-  showDelete(block, hovering = false) {
+  showDelete(block, hovering = false, { showMs } = {}) {
     const { view } = this;
     const dom = view.nodeDOM(block.pos);
     if (!(dom instanceof Element)) return;
@@ -699,7 +722,7 @@ class Mover {
     if (!hovering) this.hoverHost = null;
     this.hoverTarget = target;
     const hover = hovering ? { enter: () => clearTimeout(this.hoverTimer), leave: () => this.leaveHover() } : null;
-    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, hover });
+    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, hover, showMs });
   }
 
   hideDelete(now = false) {

@@ -255,6 +255,7 @@ const widgetMemos = new Set();
 const widgetData = {};
 let scheduled = [];
 let pickQueue = []; // 점검용: 다음 pickFiles 가 돌려줄 파일들 [{ name, mime, base64 }]
+let clipboardImage = null; // 휴대폰 클립보드의 그림 흉내 (copyImage 가 넣고 clipboardFiles 가 꺼냄)
 
 function makeTemp(name, mime, bytes) {
   const id = randomUUID();
@@ -368,7 +369,16 @@ const calls = {
     log.push({ transcribe: rel });
     return { text: '받아쓴 글이에요.\n두 번째 문장이에요.' };
   },
+  // 클립보드의 그림 · 파일 → 임시 파일 (메모킹에서 복사한 그림을 붙여 넣기)
+  clipboardFiles: async () => (clipboardImage ? [makeTemp('메모킹 그림.png', 'image/png', clipboardImage)] : []),
+  // 저장 단추: 안드로이드 저장 창 흉내 — 고른 이름 그대로 저장한 것으로
+  saveAs: async (a) => {
+    const bytes = a.rel ? fs.readFileSync(vaultPath(a.rel)).length : Math.round((a.base64?.length ?? 0) * 0.75);
+    log.push({ saveAs: { name: a.name, mime: a.mime, rel: a.rel ?? null, bytes, text: a.base64 && /^text\//.test(a.mime) ? Buffer.from(a.base64, 'base64').toString('utf8') : null } });
+    return a.name;
+  },
   copyImage: async (a) => {
+    clipboardImage = Buffer.from(a.base64 ?? '', 'base64');
     log.push({ copyImage: { bytes: Math.round((a.base64?.length ?? 0) * 0.75) } });
     return true;
   },

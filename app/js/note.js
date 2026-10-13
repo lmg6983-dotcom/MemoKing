@@ -36,6 +36,12 @@ setCopyHost({
   image: (b64) => api.image.copy(b64),
   text: ({ text, html }) => api.copyRich({ text, html }),
   file: (href) => api.attachments.copy(href), // PDF · 소리 같은 첨부는 파일 그대로
+  // 저장 단추: 어디에 저장할지 고르는 창 → 저장한 파일 이름 | 'cancelled'
+  save: async (f) => {
+    const r = await api.attachments.saveAs(f);
+    if (r?.error) throw new Error(r.error);
+    return r?.cancelled ? 'cancelled' : r.name;
+  },
 });
 const params = new URLSearchParams(location.search);
 // 미리 불러 둔 예비 창(window-manager.js makeSpare): 편집기 코드는 다 읽어 두고, 열 메모가 정해질 때까지 기다린다

@@ -769,6 +769,36 @@ export function registerIpc(ctx) {
     }
     return copyFileToClipboard(file);
   });
+  ipcMain.handle('attachment:save-as', async (e, f = {}) => {
+    const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
+    let source = null;
+    if (f.rel) {
+      let decoded = String(f.rel);
+      try {
+        decoded = decodeURI(decoded);
+      } catch {
+        // 이미 디코딩됨
+      }
+      source = getVault()?.resolve(decoded);
+      if (!source || !fs.statSync(source, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
+    } else if (typeof f.base64 !== 'string') return { error: '저장할 내용이 없어요' };
+    const ext = path.extname(name).slice(1);
+    let file = SMOKE ? path.join(app.getPath('temp'), `memoking-smoke-save-${Date.now()}-${name}`) : null;
+    if (!file) {
+      const dir = /^image\//.test(f.mime ?? '') || /^(png|jpe?g|gif|webp|bmp)$/i.test(ext) ? app.getPath('pictures') : app.getPath('downloads');
+      const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(e.sender) ?? undefined, {
+        title: '저장',
+        defaultPath: path.join(dir, name),
+        filters: ext ? [{ name: `${ext.toUpperCase()} 파일`, extensions: [ext] }, { name: '모든 파일', extensions: ['*'] }] : [],
+      });
+      if (r.canceled || !r.filePath) return { cancelled: true };
+      file = r.filePath;
+    }
+    if (source) fs.copyFileSync(source, file);
+    else fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+    if (SMOKE) smokeOpened.push({ kind: 'save', target: file });
+    return { name: SMOKE ? name : path.basename(file) };
+  });
   ipcMain.handle('attachment:info', (_e, rel) => {
     let decoded = String(rel ?? '');
     try {
