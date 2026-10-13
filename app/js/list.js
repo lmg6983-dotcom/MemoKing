@@ -383,7 +383,7 @@ function renderCard(memo) {
   // 메모 단축키: Ctrl+Alt+숫자 로 어디서든 불러오는 메모 (메모 창 › 단축키로 불러오기)
   if (memo.hotkey) {
     const hk = badge('zap', memo.hotkey, 'hotkey');
-    hk.title = `${hotkeyLabel(memo.hotkey)} 로 불러와요`;
+    hk.title = `단축키 ${hotkeyLabel(memo.hotkey)}`;
     meta.append(hk);
   }
   const time = document.createElement('span');

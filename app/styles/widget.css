@@ -11,18 +11,18 @@ body.widget { position: relative; }
 .wg-grip {
   position: absolute; top: 6px; left: 50%;
   width: 28px; height: 4px; margin-left: -14px; border-radius: 2px;
-  background: color-mix(in srgb, var(--note-text) 14%, transparent);
+  background: color-mix(in srgb, var(--note-text) 32%, transparent); /* 끌 수 있다는 유일한 표시 — 메모 바탕 위 3:1 이상 */
   transition: background-color 0.16s var(--ease-out);
 }
-body.widget:hover .wg-grip { background: color-mix(in srgb, var(--note-text) 30%, transparent); }
+body.widget:hover .wg-grip { background: color-mix(in srgb, var(--note-text) 50%, transparent); }
 .wg-actions {
   display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--note-bg) 88%, transparent);
-  opacity: 0; transform: translateY(-2px);
-  transition: opacity 0.16s var(--ease-out), transform 0.16s var(--ease-out);
+  opacity: 0.32; /* 가만히 있을 때도 흐리게 — 무엇을 할 수 있는지 보이게 */
+  transition: opacity 0.16s var(--ease-out);
   -webkit-app-region: no-drag;
 }
-body.widget:hover .wg-actions, body.widget:focus-within .wg-actions { opacity: 1; transform: none; }
+body.widget:hover .wg-actions, body.widget:focus-within .wg-actions { opacity: 1; }
 .wg-btn { width: 26px; height: 26px; }
 .wg-btn svg { width: 16px; height: 16px; }
 .wg-btn.done { color: var(--ok-text); }
@@ -49,4 +49,4 @@ body.widget .mk-doc { cursor: text; }
   transition: opacity 0.16s var(--ease-out), transform 0.2s var(--ease-out);
 }
 .wg-toast.on { opacity: 1; transform: translate(-50%, 0); }
-@media (prefers-reduced-motion: reduce) { .wg-actions, .wg-toast { transition: none; transform: none; } .wg-toast.on, .wg-toast { transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .wg-actions, .wg-toast { transition: none; } .wg-toast.on, .wg-toast { transform: translate(-50%, 0); } }

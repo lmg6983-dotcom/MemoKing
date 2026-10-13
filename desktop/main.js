@@ -142,7 +142,7 @@ async function memoHotkeyPressed(slot) {
   const bound = memoHotkeys.map[slot];
   const memo = bound && vault?.get(bound.id);
   if (!memo) {
-    windowManager.showHud({ title: `${hotkeyLabel(slot)} 메모를 찾지 못했어요`, body: '지웠거나 다른 메모 폴더의 메모예요', kind: 'warn' });
+    windowManager.showHud({ title: `${hotkeyLabel(slot)}: 메모를 찾지 못했어요`, body: '지웠거나 다른 메모 폴더의 메모예요', kind: 'warn' });
     return;
   }
   const title = memo.title || '제목 없음';
@@ -165,7 +165,13 @@ async function memoHotkeyPressed(slot) {
   // 잠긴 메모는 비밀번호를 넣어야 하니 복사 대신 창을 띄운다
   const show = bound.show || (bound.copy && !copied);
   if (show) windowManager.revealNote(bound.id);
-  if (copied) windowManager.showHud({ title: `“${title}” 복사했어요`, body: show ? '' : 'Ctrl+V 로 붙여 넣으세요' });
+  // 붙여 넣는 법은 처음 몇 번만 (매일 수십 번 쓰는 사람에게는 군더더기)
+  const tip = !show && (settings.hotkeyTips ?? 0) < 3;
+  if (tip) {
+    settings.hotkeyTips = (settings.hotkeyTips ?? 0) + 1;
+    saveSettings();
+  }
+  if (copied) windowManager.showHud({ title: `“${title}” 내용을 복사했어요`, body: tip ? 'Ctrl+V 로 붙여 넣으세요' : '' });
   else if (bound.copy && memo.needsPassword) windowManager.showHud({ title: '잠긴 메모라 복사하지 않았어요', body: '비밀번호를 넣고 열어 주세요', kind: 'warn' });
   else if (bound.copy) windowManager.showHud({ title: '복사하지 못했어요', body: '다시 눌러 주세요', kind: 'warn' });
 }

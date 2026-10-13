@@ -392,7 +392,9 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await js(nw, `document.querySelector('.mk-delete-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
       }
       const mathGone = await until(() => js(nw, `!document.querySelector('.mk-doc .mk-math-block') && document.querySelector('.mk-doc').textContent.includes('끝 문단')`), '수식 지움', 3000).catch(() => false);
-      check('수식: 마우스를 올리면 "이 수식 지우기", 누르면 수식만 지워짐', mathLabel === '이 수식 지우기' && mathGone, JSON.stringify({ mathLabel, mathGone }));
+      const undoTip = await until(() => js(nw, `document.getElementById('mk-undo-hint')?.textContent`), '되돌리기 안내', 2000).catch(() => '');
+      check('수식: 마우스를 올리면 "이 수식 지우기", 누르면 수식만 지워지고 그 자리에 "수식을 지웠어요 · Ctrl+Z 로 되돌리기"',
+        mathLabel === '이 수식 지우기' && mathGone && /^수식을 지웠어요 · Ctrl\+Z 로 되돌리기$/.test(undoTip), JSON.stringify({ mathLabel, mathGone, undoTip }));
       nw.close();
     }
 
@@ -508,7 +510,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         copy.checked = true; copy.dispatchEvent(new Event('change'));
         const hint = d.querySelector('.hk-hint').textContent;
         const after = saveBtn.disabled;
-        return { keys, before, none, hint, after, fits: d.scrollHeight <= d.clientHeight + 1, size: [d.scrollHeight, d.clientHeight, innerHeight] };
+        const legend = Boolean(d.querySelector('.hk-legend')?.textContent.includes('다른 메모가 써요'));
+        return { keys, before, none, hint, legend, after, fits: d.scrollHeight <= d.clientHeight + 1, size: [d.scrollHeight, d.clientHeight, innerHeight] };
       })()`);
       await capture(nw, 'smoke-new-hotkey-dialog.png');
       await js(nw, `document.querySelector('.hotkey-dialog button[type="submit"]').click()`);
@@ -516,7 +519,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const saved = getSettings().memoHotkeys?.['3'];
       const label = await js(nw, `document.getElementById('hotkey-label').textContent`);
       check('메모 단축키 창: 1~9 · 복사/띄우기 중 하나는 꼭 · 저장하면 Ctrl+Alt+3 에 이 메모 (메뉴에 표시)',
-        dlg.keys === 9 && dlg.before && dlg.none.disabled && /하나는/.test(dlg.none.error) && !dlg.after && /Ctrl\+Alt\+3 를 누르면 내용을 복사해요/.test(dlg.hint) && dlg.fits
+        dlg.keys === 9 && dlg.before && dlg.none.disabled && /하나는/.test(dlg.none.error) && !dlg.after && /^Ctrl\+Alt\+3: 어느 앱에서든 누르면 내용을 복사해요$/.test(dlg.hint) && dlg.legend && dlg.fits
           && saved?.id === hid && saved.copy && !saved.show && label === 'Ctrl+Alt+3' && memoHotkeys.held.has('3'),
         JSON.stringify({ dlg, saved, label, held: [...memoHotkeys.held.keys()] }));
       const badge = await until(() => js(list, `document.querySelector('[data-id="${hid}"] .card-badge.hotkey')?.textContent`), '목록 카드 단축키 표시', 3000).catch(() => '');

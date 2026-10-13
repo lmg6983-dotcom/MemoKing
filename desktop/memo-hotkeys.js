@@ -107,7 +107,7 @@ export class MemoHotkeys {
 
   /** 칸 정하기 (slot 이 null 이면 풀기) → { ok, error?, state } */
   set(id, slot, { copy = true, show = false } = {}) {
-    if (slot != null && this.reservedBy(slot)) return { ok: false, error: `${hotkeyLabel(slot)} 는 ${this.reservedBy(slot)} 단축키라 쓸 수 없어요`, state: this.state(id) };
+    if (slot != null && this.reservedBy(slot)) return { ok: false, error: `${hotkeyLabel(slot)}: ${this.reservedBy(slot)} 단축키라 쓸 수 없어요`, state: this.state(id) };
     let next;
     try {
       next = assignHotkey(this.map, id, slot, { copy, show }).hotkeys;
@@ -124,7 +124,7 @@ export class MemoHotkeys {
         free = false;
       }
       if (free) globalShortcut.unregister(acc);
-      else return { ok: false, error: `${hotkeyLabel(slot)} 는 다른 앱이 이미 쓰고 있어요. 다른 숫자를 골라 주세요`, state: this.state(id) };
+      else return { ok: false, error: `${hotkeyLabel(slot)}: 다른 앱이 이미 쓰고 있어요. 다른 숫자를 골라 주세요`, state: this.state(id) };
     }
     const before = this.settings.memoHotkeys;
     this.settings.memoHotkeys = next;
@@ -133,7 +133,7 @@ export class MemoHotkeys {
       // 다른 앱이 이미 쓰는 키 — 예전대로 되돌린다
       this.settings.memoHotkeys = before;
       this.register();
-      return { ok: false, error: `${hotkeyLabel(slot)} 는 다른 앱이 이미 쓰고 있어요. 다른 숫자를 골라 주세요`, state: this.state(id) };
+      return { ok: false, error: `${hotkeyLabel(slot)}: 다른 앱이 이미 쓰고 있어요. 다른 숫자를 골라 주세요`, state: this.state(id) };
     }
     this.saveSettings();
     return { ok: true, state: this.state(id) };

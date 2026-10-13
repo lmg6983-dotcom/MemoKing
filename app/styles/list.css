@@ -106,6 +106,9 @@ body {
 .card-head { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
 .card-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; }
 .card-badge svg { width: 13px; height: 13px; }
+/* 메모 단축키: 키보드 키 모양 (링크 수 같은 다른 숫자 표시와 헷갈리지 않게) */
+.card-badge.hotkey { padding: 0 4px 0 2px; border: 1px solid currentColor; border-bottom-width: 2px; border-radius: 4px; line-height: 14px; }
+.card-badge.hotkey svg { width: 11px; height: 11px; }
 .card-badge.pin { flex: none; margin-top: 3px; color: var(--note-fg); }
 .card-badge.pin svg { width: 15px; height: 15px; }
 .card-title {

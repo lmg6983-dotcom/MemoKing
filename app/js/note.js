@@ -460,7 +460,7 @@ $('lock-btn').addEventListener('click', async () => {
   showLockState();
   setStatus('잠갔어요. 창을 닫으면 다시 비밀번호로 열려요');
 });
-// 단축키로 불러오기 (Ctrl+Alt+1~9): 어느 앱에서든 이 메모를 복사하거나 띄운다 (hotkey-dialog.js)
+// 단축키 정하기 (Ctrl+Alt+1~9): 어느 앱에서든 이 메모를 복사하거나 띄운다 (hotkey-dialog.js)
 function showHotkey(state) {
   $('hotkey-label').textContent = state?.slot ? hotkeyLabel(state.slot) : '';
 }
@@ -472,7 +472,7 @@ $('hotkey-btn').addEventListener('click', async () => {
   editor?.focus();
   if (!next) return;
   showHotkey(next);
-  setStatus(next.slot ? `${hotkeyLabel(next.slot)} 로 이 메모를 불러와요` : '단축키를 풀었어요');
+  setStatus(next.slot ? `단축키를 정했어요: ${hotkeyLabel(next.slot)}` : '단축키를 풀었어요');
 });
 // 바탕화면에 붙이기: 이 메모 창 자리에 바탕화면 위젯을 놓고 창은 닫는다 (이미 붙어 있으면 떼기)
 let onDesktop = false;

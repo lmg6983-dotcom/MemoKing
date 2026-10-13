@@ -1,4 +1,4 @@
-// 메모 단축키 창 (PC 메모 창 › 메뉴 › 단축키로 불러오기) — Ctrl+Alt+1~9 중 하나를 이 메모에 정하고,
+// 메모 단축키 창 (PC 메모 창 › 메뉴 › 단축키 정하기) — Ctrl+Alt+1~9 중 하나를 이 메모에 정하고,
 //   누르면 무엇을 할지 미리 고른다: 내용 복사 · 메모 띄우기 (둘 다도 됨, 하나는 꼭)
 //   다른 메모가 쓰는 숫자는 그 메모 제목이 보이고, 고르면 이 메모로 옮겨진다는 것을 알려 준다
 import { hotkeyLabel } from './core/memo-hotkeys.js';
@@ -27,10 +27,10 @@ export function hotkeyDialog({ state, onSave }) {
     const paintKeys = () => {
       for (const s of current.slots) {
         const btn = keyButtons.get(s.slot);
-        const busy = s.reserved || s.failed;
         btn.setAttribute('aria-checked', String(slot === s.slot));
         btn.classList.toggle('taken', Boolean(s.title));
-        btn.classList.toggle('blocked', Boolean(busy));
+        btn.classList.toggle('blocked', Boolean(s.reserved));
+        btn.classList.toggle('failed', Boolean(s.failed) && !s.reserved);
         btn.disabled = Boolean(s.reserved);
         btn.title = s.reserved ? `${s.label}: ${s.reserved} 단축키라 쓸 수 없어요` : s.failed ? `${s.label}: 다른 앱이 쓰고 있어요` : s.title && !s.mine ? `${s.label}: “${s.title}” 메모가 써요` : s.label;
         btn.setAttribute('aria-label', btn.title);
@@ -45,10 +45,22 @@ export function hotkeyDialog({ state, onSave }) {
         paintKeys();
         paintNote();
       });
+      // 다른 메모가 쓰는 숫자는 키보드로 옮겨 가기만 해도 누가 쓰는지 알려 준다
+      btn.addEventListener('focus', () => paintNote(s.slot));
       keyButtons.set(s.slot, btn);
       keys.append(btn);
     }
-
+    // 숫자 키 1~9 를 누르면 바로 그 숫자 (키보드 숫자 줄과 같게)
+    keys.addEventListener('keydown', (e) => {
+      const btn = /^[1-9]$/.test(e.key) && !e.ctrlKey && !e.altKey ? keyButtons.get(e.key) : null;
+      if (!btn || btn.disabled) return;
+      e.preventDefault();
+      btn.focus();
+      btn.click();
+    });
+    // 숫자 아래 표시 뜻 (늘 보이게)
+    const legend = make('p', { class: 'hk-legend', 'aria-hidden': 'true' });
+    legend.innerHTML = '<span><i></i>다른 메모가 써요</span><span><i class="dash"></i>쓸 수 없어요</span>';
     const option = (name, desc, checked) => {
       const row = make('label', { class: 'hk-opt' });
       const text = make('span');
@@ -65,19 +77,24 @@ export function hotkeyDialog({ state, onSave }) {
 
     const hint = make('p', { class: 'hk-hint' });
     const error = make('p', { class: 'lock-error', role: 'alert' });
-    const paintNote = () => {
-      const s = current.slots.find((x) => x.slot === slot);
-      hint.textContent = !slot ? '숫자를 하나 골라 주세요. 점이 있는 숫자는 다른 메모가 쓰고 있어요'
-        : s?.failed ? `${hotkeyLabel(slot)} 는 다른 앱이 쓰고 있어 지금은 눌러도 안 돼요. 다른 숫자를 골라 주세요`
-        : s?.title && !s.mine ? `지금 “${s.title}” 메모가 ${hotkeyLabel(slot)} 를 써요. 저장하면 이 메모로 바뀌어요`
-          : `어느 앱에서든 ${hotkeyLabel(slot)} 를 누르면 ${ACTION_TEXT[`${copy.input.checked}${show.input.checked}`]}`;
+    // 안내 한 줄 (look: 키보드로 옮겨 간 숫자 — 고르기 전에도 누가 쓰는지). 숫자 뒤 조사는 읽는 법(일 · 삼…)에 따라 달라 쓰지 않는다
+    const paintNote = (look = slot) => {
+      const s = current.slots.find((x) => x.slot === look);
+      const label = look ? hotkeyLabel(look) : '';
+      hint.textContent = !look ? '숫자를 하나 골라 주세요'
+        : s?.reserved ? `${label}: ${s.reserved} 단축키라 쓸 수 없어요`
+        : s?.failed ? `${label}: 다른 앱이 쓰고 있어 눌러도 안 돼요. 다른 숫자를 골라 주세요`
+        : s?.title && !s.mine ? `${label}: 지금 “${s.title}” 메모가 써요. 저장하면 이 메모로 바뀌어요`
+          : `${label}: 어느 앱에서든 누르면 ${ACTION_TEXT[`${copy.input.checked}${show.input.checked}`]}`;
       const none = !copy.input.checked && !show.input.checked;
       if (none) error.textContent = '내용 복사와 메모 띄우기 중 하나는 켜 주세요';
       else if (error.textContent.startsWith('내용 복사와')) error.textContent = '';
-      save.disabled = none || !slot;
+      const chosen = current.slots.find((x) => x.slot === slot);
+      save.disabled = none || !slot || Boolean(chosen?.failed) || Boolean(chosen?.reserved);
     };
-    copy.input.addEventListener('change', paintNote);
-    show.input.addEventListener('change', paintNote);
+    copy.input.addEventListener('change', () => paintNote());
+    show.input.addEventListener('change', () => paintNote());
+    keys.addEventListener('focusout', (e) => !keys.contains(e.relatedTarget) && paintNote());
 
     const actions = make('div', { class: 'dialog-actions' });
     const clear = make('button', { type: 'button', class: 'btn hk-clear' }, '단축키 풀기');
@@ -87,9 +104,8 @@ export function hotkeyDialog({ state, onSave }) {
     actions.append(clear, cancel, save);
 
     form.append(
-      make('h2', { id: 'hk-title' }, '단축키로 불러오기'),
-      make('p', { class: 'hk-lead' }, 'Ctrl + Alt + 숫자'),
-      keys, what, hint, error, actions,
+      make('h2', { id: 'hk-title' }, '단축키 정하기 · Ctrl+Alt+숫자'),
+      keys, legend, what, hint, error, actions,
     );
     dialog.append(form);
     document.body.append(dialog);

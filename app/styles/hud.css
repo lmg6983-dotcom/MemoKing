@@ -10,7 +10,7 @@ body { display: grid; place-items: center; font-family: var(--font-sans); }
   border-radius: 999px;
   background: var(--bubble-bg);
   color: var(--bubble-fg);
-  box-shadow: 0 2px 6px rgba(17, 17, 17, 0.14), inset 0 0 0 1px var(--bubble-line);
+  box-shadow: var(--bubble-shadow);
   opacity: 0;
   transform: translateY(4px) scale(0.98);
   transition: opacity 0.16s var(--ease-out), transform 0.2s var(--ease-out);

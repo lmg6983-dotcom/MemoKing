@@ -507,9 +507,17 @@ export function registerIpc(ctx) {
     if (!m) return { ok: false, error: '메모를 찾지 못했어요' };
     // 빈 메모는 창을 닫으면 저절로 정리(휴지통)되므로 붙이지 않는다
     if (!m.locked && isBlankBody(m.body)) return { ok: false, error: '빈 메모예요. 내용을 쓴 뒤에 바탕화면에 붙여 주세요' };
-    return { ok: wm.placeWidget(String(id), senderWindow(e)) };
+    const ok = wm.placeWidget(String(id), senderWindow(e));
+    // 메모 창이 사라지므로 메모가 없어진 것이 아니라는 것을 바로 알린다
+    if (ok) wm.showHud({ title: '바탕화면에 붙였어요', body: '고치려면 위젯의 연필 단추' });
+    return { ok };
   });
-  ipcMain.handle('widget:remove', (_e, id) => wm.removeWidget(String(id)));
+  ipcMain.handle('widget:remove', (e, id) => {
+    const fromWidget = wm.widgets.get(String(id))?.webContents === e.sender;
+    const ok = wm.removeWidget(String(id));
+    if (ok && fromWidget) wm.showHud({ title: '바탕화면에서 뗐어요', body: '메모는 그대로 있어요' });
+    return ok;
+  });
   ipcMain.handle('widget:has', (_e, id) => wm.hasWidget(String(id)));
   ipcMain.handle('widget:open-note', (_e, id) => Boolean(wm.revealNote(String(id))));
   // 본문 복사 (메모 단축키와 같은 글: 제목 줄 빼고, 서식 기호 없이, 줄 앞 띄어쓰기 그대로)
