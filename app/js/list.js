@@ -1,4 +1,5 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
+import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
 import { acceleratorFromKey, displayAccelerator } from './core/accelerators.js';
@@ -382,7 +383,7 @@ function renderCard(memo) {
   // 메모 단축키: Ctrl+Alt+숫자 로 어디서든 불러오는 메모 (메모 창 › 단축키로 불러오기)
   if (memo.hotkey) {
     const hk = badge('zap', memo.hotkey, 'hotkey');
-    hk.title = `Ctrl+Alt+${memo.hotkey} 로 불러와요`;
+    hk.title = `${hotkeyLabel(memo.hotkey)} 로 불러와요`;
     meta.append(hk);
   }
   const time = document.createElement('span');

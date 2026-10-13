@@ -42,28 +42,29 @@ export function inlineToText(line) {
 /** 마크다운 본문 → 보내기용 글 */
 export function shareText(markdown) {
   const out = [];
-  // 줄 끝의 \ 는 마크다운의 줄바꿈 표시 (Shift+Enter · 붙여넣은 여러 줄) — 글에는 넣지 않는다
-  const lines = String(markdown ?? '').replace(/\r\n?/g, '\n').split('\n').map((l) => l.replace(/(?<!\\)\\$/, ''));
+  const lines = String(markdown ?? '').replace(/\r\n?/g, '\n').split('\n');
   const counters = []; // 들여쓰기 단계마다 번호
   let fence = false;
   let mathBlock = false;
-  for (const raw of lines) {
-    if (/^\s*(```|~~~)/.test(raw)) {
+  for (const line of lines) {
+    if (/^\s*(```|~~~)/.test(line)) {
       fence = !fence;
       continue;
     }
     if (fence) {
-      out.push(raw);
+      out.push(line);
       continue;
     }
-    if (/^\s*\$\$\s*$/.test(raw)) {
+    if (/^\s*\$\$\s*$/.test(line)) {
       mathBlock = !mathBlock;
       continue;
     }
     if (mathBlock) {
-      out.push(raw.trim());
+      out.push(line.trim());
       continue;
     }
+    // 줄 끝의 \ 는 마크다운의 줄바꿈 표시 (Shift+Enter · 붙여넣은 여러 줄) — 글에는 넣지 않는다 (코드 블록 · 수식 안은 그대로)
+    const raw = line.replace(/(?<!\\)\\$/, '');
     // 표: 구분 줄은 빼고 칸 사이 " | "
     if (/^\s*\|.*\|\s*$/.test(raw)) {
       if (/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(raw)) continue;

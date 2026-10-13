@@ -39,9 +39,5 @@ export function hasLeadingSpaces(text) {
 /** 밖으로 복사하는 일반 글자: U+00A0 → 보통 빈칸 (메모장 · 메신저 · 입력 칸에서 그냥 띄어쓰기로) */
 export const plainSpaces = (s) => String(s ?? '').replace(/ /g, ' ');
 
-/** 서식(HTML)으로 복사하는 글: 이어진 빈칸 · 줄 앞 빈칸이 워드 · 메일에서 하나로 줄지 않게 U+00A0 로 */
-//   lineStart: 줄(문단)의 맨 앞 글이면 빈칸 하나도
-export function htmlSpaces(s, lineStart = false) {
-  const out = String(s ?? '').replace(/ {2,}/g, (m) => NBSP.repeat(m.length));
-  return lineStart ? out.replace(/^ /, NBSP) : out;
-}
+/** 서식(HTML)으로 복사하는 글: 이어진 빈칸이 워드 · 메일에서 하나로 줄지 않게 U+00A0 로 (줄 앞 빈칸은 이미 U+00A0) */
+export const htmlSpaces = (s) => String(s ?? '').replace(/ {2,}/g, (m) => NBSP.repeat(m.length));

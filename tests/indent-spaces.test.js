@@ -29,6 +29,5 @@ test('앞 빈칸이 있는가', () => {
 test('복사: 일반 글자는 보통 빈칸, 서식은 이어진 빈칸을 지킴', () => {
   assert.equal(plainSpaces(`${N}${N}국내`), '  국내');
   assert.equal(htmlSpaces('a   b c'), `a${N}${N}${N}b c`);
-  assert.equal(htmlSpaces(' a', true), `${N}a`);
   assert.equal(htmlSpaces(' a'), ' a');
 });

@@ -1,6 +1,8 @@
 // 메모 단축키 창 (PC 메모 창 › 메뉴 › 단축키로 불러오기) — Ctrl+Alt+1~9 중 하나를 이 메모에 정하고,
 //   누르면 무엇을 할지 미리 고른다: 내용 복사 · 메모 띄우기 (둘 다도 됨, 하나는 꼭)
 //   다른 메모가 쓰는 숫자는 그 메모 제목이 보이고, 고르면 이 메모로 옮겨진다는 것을 알려 준다
+import { hotkeyLabel } from './core/memo-hotkeys.js';
+
 const ACTION_TEXT = { truetrue: '내용을 복사하고 메모를 띄워요', truefalse: '내용을 복사해요', falsetrue: '메모를 띄워요', falsefalse: '…' };
 
 /**
@@ -66,9 +68,9 @@ export function hotkeyDialog({ state, onSave }) {
     const paintNote = () => {
       const s = current.slots.find((x) => x.slot === slot);
       hint.textContent = !slot ? '숫자를 하나 골라 주세요. 점이 있는 숫자는 다른 메모가 쓰고 있어요'
-        : s?.failed ? `Ctrl+Alt+${slot} 는 다른 앱이 쓰고 있어 지금은 눌러도 안 돼요. 다른 숫자를 골라 주세요`
-        : s?.title && !s.mine ? `지금 “${s.title}” 메모가 Ctrl+Alt+${slot} 를 써요. 저장하면 이 메모로 바뀌어요`
-          : `어느 앱에서든 Ctrl+Alt+${slot} 를 누르면 ${ACTION_TEXT[`${copy.input.checked}${show.input.checked}`]}`;
+        : s?.failed ? `${hotkeyLabel(slot)} 는 다른 앱이 쓰고 있어 지금은 눌러도 안 돼요. 다른 숫자를 골라 주세요`
+        : s?.title && !s.mine ? `지금 “${s.title}” 메모가 ${hotkeyLabel(slot)} 를 써요. 저장하면 이 메모로 바뀌어요`
+          : `어느 앱에서든 ${hotkeyLabel(slot)} 를 누르면 ${ACTION_TEXT[`${copy.input.checked}${show.input.checked}`]}`;
       const none = !copy.input.checked && !show.input.checked;
       if (none) error.textContent = '내용 복사와 메모 띄우기 중 하나는 켜 주세요';
       else if (error.textContent.startsWith('내용 복사와')) error.textContent = '';

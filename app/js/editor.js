@@ -25,8 +25,8 @@ import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from '.
 import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
-import { plainTextOf } from './clipboard-text.js';
-import { keepIndent, keepLeadingSpaces, hasLeadingSpaces, htmlSpaces } from './core/indent-spaces.js';
+import { keepIndent, keepLeadingSpaces, hasLeadingSpaces, NBSP } from './core/indent-spaces.js';
+import { plainTextOf, spacedHtml } from './clipboard-text.js';
 import { handleImageCopy } from './copy-content.js';
 import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable, tableToBlocks } from './table-extras.js';
@@ -561,20 +561,21 @@ const keepIndentPlugin = $prose(() => new Plugin({
   },
 }));
 
-// 복사(서식): 이어진 빈칸 · 줄 앞 빈칸을 U+00A0 로 — 워드 · 메일에 붙여도 하나로 줄지 않게 (일반 글자는 plainTextOf 가 다시 보통 빈칸으로)
-function copiedSpaces(fragment) {
+function plainSpacesIn(fragment) {
+  let changed = false;
   const out = [];
-  fragment.forEach((node, _offset, index) => {
+  fragment.forEach((node) => {
+    let next = node;
     if (node.isText) {
-      const prev = index > 0 ? fragment.child(index - 1) : null;
-      const lineStart = !prev || BREAKS.has(prev.type.name);
-      const code = node.marks.some((m) => m.type.spec.code);
-      const text = code ? node.text : htmlSpaces(node.text, lineStart);
-      out.push(text === node.text ? node : node.type.schema.text(text, node.marks));
-    } else if (node.type.spec.code || node.isLeaf) out.push(node);
-    else out.push(node.copy(copiedSpaces(node.content)));
+      if (node.text.includes(NBSP) && !node.marks.some((m) => m.type.spec.code)) next = node.type.schema.text(node.text.replaceAll(NBSP, ' '), node.marks);
+    } else if (!node.type.spec.code && !node.isLeaf) {
+      const inner = plainSpacesIn(node.content);
+      if (inner !== node.content) next = node.copy(inner);
+    }
+    if (next !== node) changed = true;
+    out.push(next);
   });
-  return fragment.constructor.fromArray(out);
+  return changed ? fragment.constructor.fromArray(out) : fragment;
 }
 
 const tagCapsule = $prose(() => new Plugin({
@@ -1408,10 +1409,29 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
 
   const pastePlugin = $prose(() => new Plugin({
     key: new PluginKey('memoking-paste'),
+    // 복사(서식): 편집기가 클립보드에 HTML 을 넣은 뒤 겹친 빈칸만 U+00A0 로 — 워드 · 메일에 붙여도 하나로 줄지 않게
+    //   (편집기 안에서 끌어 옮기는 내용은 그대로 두려고 transformCopied 가 아니라 클립보드 글만 바꾼다. 편집기가 먼저 듣는다)
+    view(v) {
+      const onCopy = (e) => {
+        if (!e.defaultPrevented || !e.clipboardData) return;
+        const html = e.clipboardData.getData('text/html');
+        if (html && / {2}/.test(html)) e.clipboardData.setData('text/html', spacedHtml(html));
+      };
+      v.dom.addEventListener('copy', onCopy);
+      v.dom.addEventListener('cut', onCopy);
+      return {
+        destroy() {
+          v.dom.removeEventListener('copy', onCopy);
+          v.dom.removeEventListener('cut', onCopy);
+        },
+      };
+    },
     props: {
       // 복사·끌기: 서식 없는 곳에 붙일 "일반 글자"는 마크다운(\ 이스케이프가 섞임)이 아니라 읽는 글로 (Milkdown 클립보드보다 먼저)
       clipboardTextSerializer: (slice) => plainTextOf(slice.content, { openStart: slice.openStart, openEnd: slice.openEnd }),
-      transformCopied: (slice) => new slice.constructor(copiedSpaces(slice.content), slice.openStart, slice.openEnd),
+      // 붙여 넣은 서식 글의 U+00A0 는 보통 띄어쓰기로 (웹 · 워드의 &nbsp; · 메모킹에서 복사한 겹친 빈칸) —
+      //   줄 앞 빈칸은 keepIndentPlugin 이 다시 U+00A0 로 지킨다
+      transformPasted: (slice) => new slice.constructor(plainSpacesIn(slice.content), slice.openStart, slice.openEnd),
       transformPastedHTML: (html) => revealLazyImages(normalizePastedTables(html)),
       handlePaste(v, event) {
         const data = event.clipboardData;

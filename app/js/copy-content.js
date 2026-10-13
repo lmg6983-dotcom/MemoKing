@@ -3,10 +3,9 @@
 //     실제로 클립보드에 넣는 일은 앱(PC: Electron clipboard, 휴대폰: 안드로이드 클립보드)이 — setCopyHost 로 받는다
 //   파일(PDF 등 파일 칩 · 소리 · 동영상 · 음성 카드의 소리): 그 파일 자체를 (탐색기 · 카톡 · 메일에 파일로 붙음 — PC)
 //   그 밖의 내용(줄 · 목록 · 표 · 수식 · 링크 카드): 서식(HTML)과 일반 글자를 함께
-import { plainTextOf } from './clipboard-text.js';
+import { plainTextOf, spacedHtml } from './clipboard-text.js';
 import { mediaKindOf } from './core/memo-file.js';
 import { voiceAudioOf } from './voice-card-view.js';
-import { htmlSpaces } from './core/indent-spaces.js';
 
 let host = {
   /** @param {string} pngBase64 */
@@ -114,10 +113,7 @@ function cleanHtml(dom) {
     e.removeAttribute('contenteditable');
     e.removeAttribute('draggable');
   }
-  // 이어진 빈칸이 워드 · 메일에서 하나로 줄지 않게
-  const walk = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
-  for (let t = walk.nextNode(); t; t = walk.nextNode()) if (/ {2}/.test(t.data)) t.data = htmlSpaces(t.data);
-  return copy.outerHTML;
+  return spacedHtml(copy.outerHTML); // 이어진 빈칸이 워드 · 메일에서 하나로 줄지 않게
 }
 
 /**

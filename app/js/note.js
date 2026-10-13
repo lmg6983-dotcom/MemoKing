@@ -26,6 +26,7 @@ import { renderVersions } from './versions-view.js';
 import { hintOnce } from './hints.js';
 import { toggleShortcutSheet } from './shortcut-sheet.js';
 import { hotkeyDialog } from './hotkey-dialog.js';
+import { hotkeyLabel } from './core/memo-hotkeys.js';
 
 const SAVE_DELAY = 600;
 
@@ -461,7 +462,7 @@ $('lock-btn').addEventListener('click', async () => {
 });
 // 단축키로 불러오기 (Ctrl+Alt+1~9): 어느 앱에서든 이 메모를 복사하거나 띄운다 (hotkey-dialog.js)
 function showHotkey(state) {
-  $('hotkey-label').textContent = state?.slot ? `Ctrl+Alt+${state.slot}` : '';
+  $('hotkey-label').textContent = state?.slot ? hotkeyLabel(state.slot) : '';
 }
 $('hotkey-btn').addEventListener('click', async () => {
   closeMenu();
@@ -471,7 +472,7 @@ $('hotkey-btn').addEventListener('click', async () => {
   editor?.focus();
   if (!next) return;
   showHotkey(next);
-  setStatus(next.slot ? `Ctrl+Alt+${next.slot} 로 이 메모를 불러와요` : '단축키를 풀었어요');
+  setStatus(next.slot ? `${hotkeyLabel(next.slot)} 로 이 메모를 불러와요` : '단축키를 풀었어요');
 });
 // 바탕화면에 붙이기: 이 메모 창 자리에 바탕화면 위젯을 놓고 창은 닫는다 (이미 붙어 있으면 떼기)
 let onDesktop = false;

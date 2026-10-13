@@ -345,6 +345,8 @@ export class WindowManager {
     const existing = this.widgets.get(id);
     if (existing && !existing.isDestroyed()) {
       existing.showInactive();
+      settings.widgets = { ...(settings.widgets ?? {}), [id]: existing.getBounds() };
+      saveSettings();
       return existing;
     }
     const bounds = this.widgetBounds(id, near);
@@ -381,7 +383,9 @@ export class WindowManager {
       this.desktopPin.send('pin', hwndOf(win));
     });
     win.on('closed', () => {
-      if (this.widgets.get(id) === win) this.widgets.delete(id);
+      if (this.widgets.get(id) !== win) return;
+      this.widgets.delete(id);
+      this.pushList(); // 목록 카드의 바탕화면 표시
     });
     win.loadFile(path.join(APP_DIR, 'widget.html'), { query: { id } });
     if (!settings.widgets?.[id]) {
@@ -395,7 +399,14 @@ export class WindowManager {
   /** 메모 창 메뉴 › 바탕화면에 위젯으로 놓기: 그 메모 창 자리에 위젯을 놓고 메모 창은 닫는다 */
   placeWidget(id, fromWin = null) {
     const near = fromWin && !fromWin.isDestroyed() ? fromWin.getBounds() : null;
-    if (near && settings.widgets?.[id]) delete settings.widgets[id]; // 메모 창이 있던 자리로 새로
+    const existing = this.widgets.get(id);
+    if (existing && !existing.isDestroyed()) {
+      // 이미 바탕화면에 있으면 그 위젯을 메모 창 자리로 옮긴다
+      if (near) existing.setBounds(near);
+    } else if (near && settings.widgets?.[id]) {
+      const { [id]: _old, ...rest } = settings.widgets; // 메모 창이 있던 자리로 새로
+      settings.widgets = rest;
+    }
     const win = this.openWidget(id, { near });
     if (!win) return false;
     if (fromWin && !fromWin.isDestroyed()) fromWin.close();
@@ -419,11 +430,19 @@ export class WindowManager {
     return Boolean(this.widgets.get(id)) || Boolean(settings.widgets?.[id]);
   }
 
-  /** 메모킹을 켤 때: 놓아 둔 위젯들을 그 자리에 (지워진 메모는 뺀다) */
+  /**
+   * 메모킹을 켤 때 · 메모 폴더를 열 때: 놓아 둔 위젯들을 그 자리에
+   *   지금 폴더에 없는 메모의 위젯은 창만 닫고 기억은 남긴다 (Google Drive 가 아직 안 붙었거나 다른 폴더로 바꾼 경우 —
+   *   그 폴더가 돌아오면 다시 뜬다). 메모를 지우면 refreshWidgets 가 기억까지 지운다
+   */
   restoreWidgets() {
+    const vault = this.getVault();
+    for (const [id, win] of this.widgets) {
+      if (!vault?.get(id) && !win.isDestroyed()) win.close();
+    }
+    if (!vault) return;
     for (const id of Object.keys(settings.widgets ?? {})) {
-      if (this.getVault()?.get(id)) this.openWidget(id);
-      else this.removeWidget(id);
+      if (vault.get(id)) this.openWidget(id);
     }
   }
 

@@ -53,10 +53,13 @@ async function render() {
   });
 }
 
+// 그리기는 한 번에 하나씩 (처음 편집기를 만드는 동안 바뀜이 와도 편집기가 둘 생기지 않게)
+let rendering = Promise.resolve();
+const queueRender = () => (rendering = rendering.then(render).catch((err) => console.warn('위젯 다시 그리기', err)));
 let renderTimer = 0;
 api.on('widget:changed', () => {
   clearTimeout(renderTimer);
-  renderTimer = setTimeout(render, 120); // 저장이 이어서 올 때 한 번만
+  renderTimer = setTimeout(queueRender, 120); // 저장이 이어서 올 때 한 번만
 });
 
 $('wg-copy').addEventListener('click', async () => {
@@ -79,5 +82,5 @@ root.addEventListener('click', (e) => {
   else if (/^https?:/i.test(href)) api.links.open(href);
 });
 
-await render();
+await queueRender();
 document.documentElement.dataset.ready = 'true';

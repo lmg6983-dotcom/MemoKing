@@ -5,7 +5,7 @@
 //   목록 항목을 일부만 끌어 골라 복사하면 체크 네모·글머리 없이 글만.
 //   줄 앞 띄어쓰기(편집기에서는 U+00A0 로 지킨다 — core/indent-spaces.js)는 보통 띄어쓰기로.
 // 서식 있는 곳(워드·메모킹)에는 함께 들어가는 HTML 이 쓰인다.
-import { plainSpaces } from './core/indent-spaces.js';
+import { plainSpaces, htmlSpaces } from './core/indent-spaces.js';
 
 const isBreak = (node) => node.type.name === 'hardbreak' || node.type.name === 'hard_break'
   || (node.type.name === 'html' && /^<br\s*\/?>$/i.test(String(node.attrs.value ?? '').trim()));
@@ -123,4 +123,15 @@ export function plainTextOf(fragment, { openStart = 0, openEnd = 0 } = {}) {
   });
   flush();
   return plainSpaces(lines.join('\n'));
+}
+
+/** 복사한 HTML: 글 속 겹친 빈칸을 U+00A0 로 (코드는 그대로) — 워드 · 메일이 빈칸을 하나로 줄이지 않게 */
+export function spacedHtml(html) {
+  const box = document.createElement('template');
+  box.innerHTML = html;
+  const walk = document.createTreeWalker(box.content, NodeFilter.SHOW_TEXT);
+  for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+    if (/ {2}/.test(t.data) && !t.parentElement?.closest('pre, code')) t.data = htmlSpaces(t.data);
+  }
+  return box.innerHTML;
 }

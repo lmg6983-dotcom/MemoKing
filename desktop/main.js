@@ -25,7 +25,7 @@ import { jumpListCategories, launchAction, pushRecent } from './jump-list.js';
 import { flushOpmsFiles } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { MemoHotkeys } from './memo-hotkeys.js';
-import { hotkeyCopyText, hotkeyLabel } from '../app/js/core/memo-hotkeys.js';
+import { hotkeyCopyText, hotkeyLabel, hotkeyAccelerator } from '../app/js/core/memo-hotkeys.js';
 import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { alarmText } from '../app/js/core/reminders.js';
@@ -192,6 +192,7 @@ function openVault(dir) {
     saveSettings();
     migrateV1();
     windowManager.loadStacks();
+    if (app.isReady()) windowManager.restoreWidgets(); // 바탕화면 위젯 (켤 때는 아래에서 한 번)
     purgeTrash(vault);
     configureDrive();
   } catch (err) {
@@ -597,7 +598,8 @@ function setShortcut(name, acc) {
   if (!isValidAccelerator(next)) return { ok: false, reason: 'invalid', status: shortcutStatus(name) };
   const other = name === 'quickMemo' ? 'magic' : 'quickMemo';
   if (next === shortcutKey(other)) return { ok: false, reason: 'same', other: SHORTCUT_NAMES[other], status: shortcutStatus(name) };
-  if ([...memoHotkeys.held.values()].includes(next)) return { ok: false, reason: 'same', other: '메모 단축키', status: shortcutStatus(name) };
+  // 메모 단축키(Ctrl+Alt+숫자)가 쓰는 키 — 단축키를 바꾸는 동안은 잠시 놓여 있으므로 잡은 키가 아니라 정해 둔 칸으로 본다
+  if (Object.keys(memoHotkeys.map).some((slot) => hotkeyAccelerator(slot) === next)) return { ok: false, reason: 'same', other: '메모 단축키', status: shortcutStatus(name) };
   const prev = shortcutKey(name);
   const enabled = shortcutStatus(name).enabled;
   if (enabled && next !== prev) {

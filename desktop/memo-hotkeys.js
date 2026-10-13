@@ -17,10 +17,17 @@ export class MemoHotkeys {
     this.held = new Map(); // 칸 → 잡은 단축키
     this.failed = new Set(); // 다른 앱이 쓰고 있어 잡지 못한 칸
     this.paused = false;
+    this.cachedFrom = Symbol('아직 없음'); // map 캐시: 이 설정 값으로 만든 것
   }
 
+  /** 정리한 칸들 (설정 값이 바뀔 때만 다시 — 목록을 그릴 때마다 메모 수만큼 불린다) */
   get map() {
-    return normalizeHotkeys(this.settings.memoHotkeys);
+    if (this.cachedFrom !== this.settings.memoHotkeys) {
+      this.cachedFrom = this.settings.memoHotkeys;
+      this.cached = normalizeHotkeys(this.cachedFrom);
+      this.slotById = new Map(Object.entries(this.cached).map(([slot, b]) => [b.id, slot]));
+    }
+    return this.cached;
   }
 
   /** 다른 메모킹 단축키가 쓰는 칸이면 그 이름 */
@@ -112,6 +119,7 @@ export class MemoHotkeys {
 
   /** 메모 id → 칸 (목록 카드에 표시) */
   slotOf(id) {
-    return slotOf(this.map, id);
+    void this.map;
+    return this.slotById.get(id) ?? null;
   }
 }

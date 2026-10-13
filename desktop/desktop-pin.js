@@ -58,6 +58,7 @@ export class DesktopPin {
     this.platform = platform;
     this.proc = null;
     this.failed = false;
+    this.quickExits = 0; // 띄우자마자 죽은 횟수 (Add-Type 이 막힌 PC 등) — 두 번이면 그만 띄운다
   }
 
   get available() {
@@ -82,11 +83,13 @@ export class DesktopPin {
       windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'],
     });
     this.proc = proc;
+    const started = Date.now();
     readline.createInterface({ input: proc.stdout }).on('line', (line) => {
       if (/^err /.test(line)) console.warn('바탕화면 위젯을 바탕화면 층에 붙이지 못했어요', line);
     });
     proc.on('exit', () => {
       if (this.proc === proc) this.proc = null; // 다음 명령 때 다시 띄운다
+      if (Date.now() - started < 10_000 && ++this.quickExits >= 2) this.failed = true; // 늘 죽으면 보통 창으로만
     });
     proc.on('error', () => {
       this.failed = true; // PowerShell 이 없으면 그냥 보통 창으로

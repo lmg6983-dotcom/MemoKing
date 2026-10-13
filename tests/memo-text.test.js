@@ -37,3 +37,7 @@ test('보내기 글: 줄 앞 들여쓰기(U+00A0)는 칸 수 그대로, 줄 끝 
   assert.equal(shareText(`${N}${N}첫 줄부터 들여쓰기`), '  첫 줄부터 들여쓰기');
   assert.equal(shareText('경로 C:\\\\'), '경로 C:\\');
 });
+
+test('보내기 글: 코드 블록 안 줄 끝 \\ 는 그대로 (명령 이어 쓰기)', () => {
+  assert.equal(shareText('```\ndocker run \\\n  -p 80:80 image\n```'), 'docker run \\\n  -p 80:80 image');
+});
