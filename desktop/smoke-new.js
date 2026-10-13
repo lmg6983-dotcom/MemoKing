@@ -194,6 +194,14 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     await wait(300);
     const kept = await js(magic, `(() => { const i = document.getElementById('magic-input'); return { v: i.value, s: i.selectionStart, e: i.selectionEnd, focus: document.activeElement === i }; })()`);
     check('매직키: 다시 띄우면 지난번 글이 남아 있고 통째로 골라짐', kept.v === 'FPD/2026-0271' && kept.s === 0 && kept.e === kept.v.length && kept.focus, JSON.stringify(kept));
+    // 남겨 둔 글을 손대지 않았으면 Esc 한 번에 닫힌다 · 첫 줄("메모로 저장")이 아니라 찾은 결과가 골라져 있다
+    const firstPick = await until(() => js(magic, `document.querySelector('.magic-row[aria-selected="true"]')?.className.match(/kind-(\\w+)/)?.[1]`), '골라진 줄', 4000).catch(() => '');
+    magic.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+    magic.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+    const closedOnce = await until(() => !magic.isVisible(), 'Esc 로 닫힘', 3000).catch(() => false);
+    check('매직키: 남겨 둔 글이면 Esc 한 번에 닫힘 · 골라진 줄은 "메모로 저장" 이 아님', closedOnce && firstPick && firstPick !== 'new', JSON.stringify({ closedOnce, firstPick }));
+    showMagic();
+    await wait(300);
     await js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = 'FPD/2026-0271'; i.dispatchEvent(new Event('input')); })()`);
     await until(() => js(magic, `!!document.querySelector('.magic-row.kind-opms')`), 'OPMS 줄');
     await js(magic, `document.querySelector('.magic-row.kind-opms').click()`);
@@ -294,6 +302,18 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           await capture(pw, 'smoke-new-copy-btn.png');
         }
       }
+      // 그림을 눌러 골라 둔 채 Ctrl+C → 그림 그대로 (주소가 아니라)
+      let ctrlC = false;
+      if (img) {
+        clipboard.writeText('비움');
+        for (const type of ['mouseDown', 'mouseUp']) pw.webContents.sendInputEvent({ type, x: img.x, y: img.y, button: 'left', clickCount: 1 });
+        await wait(200);
+        const picked = await js(pw, `document.querySelector('.mk-doc img.mk-image.ProseMirror-selectednode, .mk-doc .ProseMirror-selectednode img.mk-image') ? true : false`);
+        pw.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'C', modifiers: ['control'] });
+        pw.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'C', modifiers: ['control'] });
+        ctrlC = await until(async () => (await pngInClipboard()) > 1000, 'Ctrl+C 그림', 4000).catch(async () => `picked=${picked} ${JSON.stringify((await clipboard.read()).map((i) => i.types))}`);
+      }
+      check('그림 복사: 그림을 눌러 골라 Ctrl+C → 그림 그대로', ctrlC === true, String(ctrlC));
       check('그림 복사: 마우스를 올리면 × 옆에 복사 단추 · 누르면 클립보드에 그림 그대로', Boolean(img) && copyShown && still && copied === true, JSON.stringify({ img, copyShown, copied, file: vault.get(picId)?.file, doc: img ? '' : await js(pw, `document.querySelector('.mk-doc')?.innerHTML.slice(0, 300)`) }));
       pw.close();
       w.close();

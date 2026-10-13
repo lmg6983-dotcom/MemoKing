@@ -20,8 +20,10 @@ export function setCopyHost(h) {
 export function imageIn(el) {
   if (!el) return null;
   if (el instanceof HTMLImageElement) return el;
-  // 편집기가 커서 자리로 끼워 넣는 빈 <img class="ProseMirror-separator"> 는 빼고 — 그림 하나만 든 상자일 때만 (여럿이면 글로 복사)
-  const imgs = [...(el.querySelectorAll?.('img') ?? [])].filter((i) => !i.classList.contains('ProseMirror-separator'));
+  // 편집기가 커서 자리로 끼워 넣는 빈 <img class="ProseMirror-separator"> 는 빼고, 보이는 것만
+  //   (투명 바탕 손 메모는 밝은 화면용 · 어두운 화면용 두 장 중 하나만 보인다) — 그런 그림이 하나일 때만 (여럿이면 글로 복사)
+  const imgs = [...(el.querySelectorAll?.('img') ?? [])]
+    .filter((i) => !i.classList.contains('ProseMirror-separator') && getComputedStyle(i).display !== 'none');
   return imgs.length === 1 ? imgs[0] : null;
 }
 
@@ -81,15 +83,24 @@ const loneImage = (node) => node?.type.name === 'paragraph' && node.childCount =
  * @param {import('prosemirror-view').EditorView} view
  */
 export async function copyBlock(view, pos, node, target) {
-  if (isImageNode(node) || loneImage(node)) {
+  const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : null; // 그림 · 소리 · 동영상 · 손 메모 노드
+  if (media) {
     const img = imageIn(target) ?? imageIn(view.nodeDOM(pos));
     if (img) {
-      await copyImage(img);
-      return '그림';
+      try {
+        await copyImage(img);
+        return '그림';
+      } catch (err) {
+        // 다른 사이트 그림이 CORS 를 막아 그림으로는 못 읽으면 그 주소라도
+        if (err?.name !== 'SecurityError' && err?.name !== 'EncodingError') throw err;
+        await copyText({ text: img.currentSrc || img.src, html: `<img src="${(img.currentSrc || img.src).replace(/"/g, '&quot;')}">` });
+        return '주소';
+      }
     }
   }
   const slice = view.state.doc.slice(pos, pos + node.nodeSize);
-  const text = plainTextOf(slice.content).trim() || node.attrs?.href || node.attrs?.src || '';
+  // 소리 · 동영상처럼 글이 없는 줄은 그 파일 이름(주소)을 글로
+  const text = plainTextOf(slice.content).trim() || media?.attrs.title || media?.attrs.src || node.attrs?.href || node.attrs?.src || '';
   const dom = view.nodeDOM(pos);
   const html = dom instanceof Element ? dom.outerHTML : '';
   await copyText({ text, html });
@@ -109,8 +120,12 @@ export function handleImageCopy(view, event) {
   event.preventDefault();
   const cut = event.type === 'cut';
   const { from, to } = sel;
-  copyImage(img).then(() => {
-    if (cut && !view.isDestroyed && view.state.doc.nodeAt(from) === node) view.dispatch(view.state.tr.delete(from, to).scrollIntoView());
-  }).catch((err) => console.warn('그림 복사', err));
+  const src = img.currentSrc || img.src;
+  copyImage(img)
+    .catch(() => copyText({ text: src, html: `<img src="${src.replace(/"/g, '&quot;')}">` })) // 그림으로 못 읽으면 주소라도
+    .then(() => {
+      if (cut && !view.isDestroyed && view.state.doc.nodeAt(from) === node) view.dispatch(view.state.tr.delete(from, to).scrollIntoView());
+    })
+    .catch((err) => console.warn('그림 복사', err));
   return true;
 }

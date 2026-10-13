@@ -2612,11 +2612,7 @@ function registerIpc() {
   ipcMain.handle('history:block', (_e, appId, app, removeExisting) => blockHistoryApp(String(appId ?? ''), String(app ?? ''), Boolean(removeExisting)));
   ipcMain.handle('history:unblock', (_e, appId) => unblockHistoryApp(String(appId ?? '')));
   ipcMain.handle('clipboard:write-text', (_e, text) => clipboard.writeText(String(text ?? '')));
-  // 메모 안의 그림 복사: PNG(base64) → 그림 (다른 앱에 그림으로 붙음) · 그 밖의 내용은 서식(HTML) + 글
-  ipcMain.handle('clipboard:write-image', async (_e, b64) => {
-    await writeClipboard({ png: Buffer.from(String(b64 ?? ''), 'base64') });
-    return true;
-  });
+  // 메모 안의 내용 복사: 서식(HTML) + 글 (그림은 image:copy)
   ipcMain.handle('clipboard:write-rich', async (_e, { text, html } = {}) => {
     await writeClipboard({ text: String(text ?? ''), html: String(html ?? '') });
     return true;
@@ -3279,14 +3275,19 @@ function noteOpened(id) {
 }
 
 let jumpTimer = null;
+let lastJumpList = '';
 function updateJumpList() {
   if (process.platform !== 'win32' || SMOKE) return;
   clearTimeout(jumpTimer);
   jumpTimer = setTimeout(() => {
     const recent = (settings.recentOpened ?? []).map((id) => vault?.get(id)).filter(Boolean);
     const prefix = app.isPackaged ? [] : [app.getAppPath()]; // 개발 실행: electron.exe <앱 폴더> <인자>
+    const categories = jumpListCategories(recent, { program: process.execPath, prefix });
+    const sig = JSON.stringify(categories);
+    if (sig === lastJumpList) return; // 바뀐 것이 없으면 다시 만들지 않는다 (메모를 저장할 때마다 부르므로)
     try {
-      const res = app.setJumpList(jumpListCategories(recent, { program: process.execPath, prefix }));
+      const res = app.setJumpList(categories);
+      lastJumpList = sig;
       if (res && res !== 'ok') console.warn('점프 목록:', res);
     } catch (err) {
       console.error('점프 목록을 만들지 못했어요', err);

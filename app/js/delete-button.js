@@ -108,12 +108,15 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     if (copying) return; // mousedown 뒤 따라오는 click 은 한 번으로
     if (view.state.doc.nodeAt(pos) !== node) return hideDeleteButton();
     copying = true;
+    // 다시 누르면 다시 복사 (실패한 뒤 다시 해 보기 · 그사이 다른 것을 복사했을 때)
+    copyBtn.classList.remove('done', 'failed');
+    copyBtn.innerHTML = COPY_ICON;
     haptic(8);
     clearTimeout(del.timer); // 누른 뒤에는 ✓ 를 볼 만큼 더 둔다
     copyBlock(view, pos, node, target).then((what) => {
       copyBtn.classList.add('done');
       copyBtn.innerHTML = DONE_ICON;
-      copyBtn.title = what === '그림' ? '그림을 복사했어요' : '내용을 복사했어요';
+      copyBtn.title = what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요' : '내용을 복사했어요';
       announce(copyBtn.title);
     }, (err) => {
       copyBtn.classList.add('failed');
@@ -121,6 +124,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       copyBtn.title = `복사하지 못했어요: ${err?.message ?? err}`;
       announce(copyBtn.title);
     }).finally(() => {
+      setTimeout(() => (copying = false), 0); // 바로 뒤따르는 click 까지는 막고
       if (!hover && current === del) del.timer = setTimeout(() => hideDeleteButton(), 1600);
     });
   };

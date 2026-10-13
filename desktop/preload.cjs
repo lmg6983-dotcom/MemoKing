@@ -108,7 +108,6 @@ contextBridge.exposeInMainWorld('memoking', {
     empty: invoke('trash:empty'),
   },
   copyText: invoke('clipboard:write-text'),
-  copyImage: invoke('clipboard:write-image'), // PNG base64 → 그림으로
   copyRich: invoke('clipboard:write-rich'), // { text, html }
   // 목록 카드를 끌어 화면에 놓기 (좌표는 화면 기준)
   drag: {

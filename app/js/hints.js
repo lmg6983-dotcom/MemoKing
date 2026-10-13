@@ -73,6 +73,11 @@ export function hintOnce(name, text, { anchor = null, avoid = null } = {}) {
     const below = r.bottom + 8 + h < window.innerHeight - 8 && !coversAvoid;
     bubble.style.left = `${left}px`;
     bubble.style.top = `${below ? r.bottom + 8 : Math.max(8, r.top - h - 8)}px`;
+  } else if (avoid && !avoid.hidden && avoid.getBoundingClientRect().height) {
+    // 비출 것이 화면 밖이면 가리면 안 되는 막대 바로 위에
+    const a = avoid.getBoundingClientRect();
+    bubble.style.left = `${Math.max(8, (window.innerWidth - bubble.offsetWidth) / 2)}px`;
+    bubble.style.top = `${Math.max(8, a.top - bubble.offsetHeight - 8)}px`;
   } else bubble.classList.add('bottom');
   const onDown = (e) => {
     if (!bubble.contains(e.target)) close();

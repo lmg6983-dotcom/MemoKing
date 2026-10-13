@@ -30,7 +30,7 @@ const SAVE_DELAY = 600;
 
 const api = window.memoking;
 // 복사 단추 · 그림 Ctrl+C: 시스템 클립보드에 그림 그대로 / 서식 + 글
-setCopyHost({ image: (b64) => api.copyImage(b64), text: ({ text, html }) => api.copyRich({ text, html }) });
+setCopyHost({ image: (b64) => api.image.copy(b64), text: ({ text, html }) => api.copyRich({ text, html }) });
 const params = new URLSearchParams(location.search);
 const id = params.get('id');
 const $ = (x) => document.getElementById(x);
@@ -1168,7 +1168,7 @@ tableBar.addEventListener('click', (e) => {
 // (그림·파일 옮기기 안내는 block-move.js 가 따로)
 function firstTimeHints(active) {
   // 안내는 표에 붙인다 (표 막대에 붙이면 설명하는 막대를 풍선이 가린다)
-  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab 은 다음 칸, 마지막 칸에서 Tab 은 새 줄이에요', { anchor: el.editorRoot.querySelector('table') ?? tableBar, avoid: tableBar });
+  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab 은 다음 칸, 마지막 칸에서 Tab 은 새 줄이에요', { anchor: getSelection()?.anchorNode?.parentElement?.closest('table') ?? el.editorRoot.querySelector('table') ?? tableBar, avoid: tableBar });
   else if (active.task || active.bullet || active.ordered) hintOnce('list-move', '목록 항목은 글자를 꾹 누르면 들어 올려져 순서를 바꿀 수 있어요. 키보드는 Alt+↑ / Alt+↓', { anchor: el.editorRoot.querySelector('li') });
 }
 

@@ -1337,11 +1337,6 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     props: {
       // 복사·끌기: 서식 없는 곳에 붙일 "일반 글자"는 마크다운(\ 이스케이프가 섞임)이 아니라 읽는 글로 (Milkdown 클립보드보다 먼저)
       clipboardTextSerializer: (slice) => plainTextOf(slice.content, { openStart: slice.openStart, openEnd: slice.openEnd }),
-      // 그림을 골라(눌러) 둔 채 Ctrl+C / Ctrl+X: 주소(<img src>)가 아니라 그림 자체를 복사 — 다른 앱에 그림으로 붙는다
-      handleDOMEvents: {
-        copy: (v, event) => handleImageCopy(v, event),
-        cut: (v, event) => handleImageCopy(v, event),
-      },
       transformPastedHTML: (html) => revealLazyImages(normalizePastedTables(html)),
       handlePaste(v, event) {
         const data = event.clipboardData;
@@ -1382,6 +1377,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       },
       // DOM 이벤트 단계는 어떤 플러그인의 handlePaste·handleDrop 보다 먼저 불린다 (붙여넣기 전 상태를 찍을 수 있음).
       handleDOMEvents: {
+        // 그림을 골라(눌러) 둔 채 Ctrl+C / Ctrl+X: 주소(<img src>)가 아니라 그림 자체를 복사 — 다른 앱에 그림으로 붙는다
+        copy: (v, event) => handleImageCopy(v, event),
+        cut: (v, event) => handleImageCopy(v, event),
         paste: (v) => {
           watchForNewImages(v);
           return false;
