@@ -396,6 +396,68 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       nw.close();
     }
 
+    // ---------- v0.33 — 줄 앞 띄어쓰기 지키기 (붙여넣기 · 치기 · 저장 · 복사) ----------
+    {
+      const list = getList() ?? createListWindow();
+      const vault = getVault();
+      const sid = vault.import({ body: '# 띄어쓰기\n\n끝\n' });
+      await until(() => js(list, `!!document.querySelector('[data-id="${sid}"]')`), '띄어쓰기 메모 카드');
+      const before = new Set(noteWins.keys());
+      await js(list, `document.querySelector('[data-id="${sid}"]').click()`);
+      const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '띄어쓰기 메모 창');
+      let nw = noteWins.get(nid);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '띄어쓰기 메모 준비');
+      const caretAtEnd = `(() => { const p = [...document.querySelectorAll('.mk-doc p')].at(-1); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`;
+      await js(nw, caretAtEnd);
+      key(nw, 'Enter');
+      await wait(100);
+      // 메모장에서 복사한 글 (HTML 없음)
+      const pasted = '  국내사업부 대표 안내\n    네 칸 들여쓴 줄\n\t탭 줄\n\n- 목록은 목록\n\n마지막 줄';
+      await js(nw, `(() => { const dt = new DataTransfer(); dt.setData('text/plain', ${JSON.stringify(pasted)}); document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`);
+      await wait(300);
+      // 직접 친 줄 앞 띄어쓰기
+      await js(nw, caretAtEnd);
+      key(nw, 'Enter');
+      await wait(100);
+      for (const ch of ['  ', '직접 친 줄']) nw.webContents.insertText(ch);
+      await wait(300);
+      const shown = await js(nw, `[...document.querySelectorAll('.mk-doc p, .mk-doc li, .mk-doc pre')].map((e) => e.tagName + ':' + e.textContent)`);
+      const N = ' ';
+      const want = [`P:${N}${N}국내사업부 대표 안내`, `${N.repeat(4)}네 칸 들여쓴 줄`, `${N.repeat(4)}탭 줄`];
+      const lines = await js(nw, `(() => { const p = [...document.querySelectorAll('.mk-doc p')].find((e) => e.textContent.includes('국내사업부')); return p ? p.querySelectorAll('br:not(.ProseMirror-trailingBreak)').length : -1; })()`);
+      const inDoc = want.every((w) => shown.some((x) => x.includes(w))) && !shown.some((x) => x.startsWith('PRE:')) && shown.some((x) => x === 'LI:목록은 목록')
+        && shown.some((x) => x === `P:${N}${N}직접 친 줄`) && lines === 2;
+      check('줄 앞 띄어쓰기 · 줄바꿈: 메모장 글을 붙여도 · 직접 쳐도 그대로 (네 칸도 코드 블록이 되지 않음, 줄이 합쳐지지 않음)', inDoc, JSON.stringify({ shown, lines }));
+      // 복사: 일반 글자는 보통 띄어쓰기로, 서식은 줄지 않게
+      await js(nw, `(() => { const s = getSelection(); s.selectAllChildren(document.querySelector('.mk-doc')); })()`);
+      clipboard.writeText('비움');
+      key(nw, 'C', ['control']);
+      await wait(300);
+      const clipOf = async (type) => {
+        for (const item of await clipboard.read()) if (item.types.includes(type)) return (await item.getType(type)).text();
+        return '';
+      };
+      const copiedText = await clipOf('text/plain');
+      const copiedHtml = await clipOf('text/html');
+      check('줄 앞 띄어쓰기: 복사해 붙이면 메모장에는 보통 띄어쓰기 · 워드에는 빈칸 그대로',
+        /\n  국내사업부 대표 안내\n {4}네 칸 들여쓴 줄\n {4}탭 줄\n/.test(copiedText) && !copiedText.includes(N) && /(&nbsp;| ){2}국내사업부/.test(copiedHtml),
+        JSON.stringify({ copiedText, html: copiedHtml.replace(/ style="[^"]*"/g, '').slice(0, 600) }));
+      // 저장 → 다시 열기
+      nw.close();
+      await until(() => !noteWins.has(nid), '띄어쓰기 메모 닫힘');
+      const file = fs.readFileSync(path.join(vault.root, vault.get(sid).file), 'utf8');
+      const before2 = new Set(noteWins.keys());
+      await js(list, `document.querySelector('[data-id="${sid}"]').click()`);
+      const nid2 = await until(() => [...noteWins.keys()].find((k) => !before2.has(k)), '띄어쓰기 메모 다시');
+      nw = noteWins.get(nid2);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '다시 연 메모 준비');
+      const again = await js(nw, `[...document.querySelectorAll('.mk-doc p')].map((e) => e.textContent)`);
+      check('줄 앞 띄어쓰기: 저장했다 다시 열어도 그대로 (파일에도 빈칸으로)',
+        again.includes(`${N}${N}국내사업부 대표 안내${N.repeat(4)}네 칸 들여쓴 줄${N.repeat(4)}탭 줄`) && again.includes(`${N}${N}직접 친 줄`) && file.includes(`${N}${N}국내사업부`) && !/&#|&nbsp;/.test(file),
+        JSON.stringify({ again: again.map((x) => [...x.slice(0, 3)].map((c) => c.codePointAt(0).toString(16)).join(' ') + ' ' + x), file: file.replace(/\u00a0/g, '⍽') }));
+      nw.close();
+    }
+
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {

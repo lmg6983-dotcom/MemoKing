@@ -6,6 +6,7 @@
 import { plainTextOf } from './clipboard-text.js';
 import { mediaKindOf } from './core/memo-file.js';
 import { voiceAudioOf } from './voice-card-view.js';
+import { htmlSpaces } from './core/indent-spaces.js';
 
 let host = {
   /** @param {string} pngBase64 */
@@ -113,6 +114,9 @@ function cleanHtml(dom) {
     e.removeAttribute('contenteditable');
     e.removeAttribute('draggable');
   }
+  // 이어진 빈칸이 워드 · 메일에서 하나로 줄지 않게
+  const walk = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+  for (let t = walk.nextNode(); t; t = walk.nextNode()) if (/ {2}/.test(t.data)) t.data = htmlSpaces(t.data);
   return copy.outerHTML;
 }
 

@@ -3,7 +3,9 @@
 //   문단·제목은 한 줄씩, 칸 안 줄바꿈은 줄바꿈, 목록은 "• " · "1. " · "☐ "/"☑ ", 표는 칸 사이 탭(엑셀에 붙이면 칸이 나뉨),
 //   링크 카드는 주소, 사진·소리·동영상은 빼고, 가로줄은 "———".
 //   목록 항목을 일부만 끌어 골라 복사하면 체크 네모·글머리 없이 글만.
+//   줄 앞 띄어쓰기(편집기에서는 U+00A0 로 지킨다 — core/indent-spaces.js)는 보통 띄어쓰기로.
 // 서식 있는 곳(워드·메모킹)에는 함께 들어가는 HTML 이 쓰인다.
+import { plainSpaces } from './core/indent-spaces.js';
 
 const isBreak = (node) => node.type.name === 'hardbreak' || node.type.name === 'hard_break'
   || (node.type.name === 'html' && /^<br\s*\/?>$/i.test(String(node.attrs.value ?? '').trim()));
@@ -120,5 +122,5 @@ export function plainTextOf(fragment, { openStart = 0, openEnd = 0 } = {}) {
     block(node);
   });
   flush();
-  return lines.join('\n');
+  return plainSpaces(lines.join('\n'));
 }

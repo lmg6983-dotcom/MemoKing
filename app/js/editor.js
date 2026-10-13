@@ -26,6 +26,7 @@ import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { plainTextOf } from './clipboard-text.js';
+import { keepIndent, keepLeadingSpaces, hasLeadingSpaces, htmlSpaces } from './core/indent-spaces.js';
 import { handleImageCopy } from './copy-content.js';
 import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable, tableToBlocks } from './table-extras.js';
@@ -503,6 +504,79 @@ function doneTagAt(doc, pos, { lineEnd = false } = {}) {
   }
   return null;
 }
+// 줄 앞 띄어쓰기 지키기 (core/indent-spaces.js): 문단 · 제목 · 항목의 맨 앞이나 줄바꿈(Shift+Enter) 뒤에
+//   친 띄어쓰기 · 탭은 줄 바꿈 없는 빈칸(U+00A0)으로 바꿔 둔다 — 마크다운으로 저장했다 다시 열어도 그대로
+//   (바뀐 줄만 본다. 코드 블록 · 글 속 코드는 그대로). 붙여넣은 글의 줄바꿈도 그대로 줄바꿈으로
+const BREAKS = new Set(['hardbreak', 'hard_break']);
+let plainPasting = false; // 메모장 같은 일반 글자를 붙이는 중 (아래 붙여넣기에서 잠깐)
+function indentFixes(doc, from, to) {
+  const fixes = [];
+  doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isTextblock) return true;
+    if (node.type.spec.code) return false;
+    let lineStart = true;
+    node.forEach((child, offset) => {
+      if (child.isText && lineStart && !child.marks.some((m) => m.type.spec.code)) {
+        const ws = /^[ \t]+/.exec(child.text);
+        if (ws) fixes.push({ from: pos + 1 + offset, to: pos + 1 + offset + ws[0].length, text: keepIndent(ws[0]), marks: child.marks });
+      }
+      lineStart = BREAKS.has(child.type.name);
+    });
+    return false;
+  });
+  return fixes;
+}
+const keepIndentPlugin = $prose(() => new Plugin({
+  key: new PluginKey('memoking-keep-indent'),
+  appendTransaction(trs, _old, state) {
+    if (!trs.some((tr) => tr.docChanged)) return null;
+    // 바뀐 범위 (모든 트랜잭션 뒤 문서 기준)
+    let from = Infinity;
+    let to = -Infinity;
+    trs.forEach((tr, t) => tr.mapping.maps.forEach((map, i) => map.forEach((_a, _b, start, end) => {
+      let a = tr.mapping.slice(i + 1).map(start, -1);
+      let b = tr.mapping.slice(i + 1).map(end, 1);
+      for (const later of trs.slice(t + 1)) {
+        a = later.mapping.map(a, -1);
+        b = later.mapping.map(b, 1);
+      }
+      from = Math.min(from, a);
+      to = Math.max(to, b);
+    })));
+    if (from > to) return null;
+    from = Math.max(0, from);
+    to = Math.min(state.doc.content.size, to);
+    const tr = state.tr;
+    // 붙여넣은 글의 줄바꿈: 마크다운으로 읽으면 "부드러운 줄바꿈"(띄어쓰기로 보임)이 된다 → 진짜 줄바꿈으로 (메모장 글이 한 줄로 합쳐지지 않게)
+    if (plainPasting) {
+      state.doc.nodesBetween(from, to, (node, pos) => {
+        if (node.type.spec.code) return false;
+        if (BREAKS.has(node.type.name) && node.attrs.isInline) tr.setNodeMarkup(pos, null, { ...node.attrs, isInline: false });
+        return true;
+      });
+    }
+    const fixes = indentFixes(tr.doc, from, to);
+    for (const f of fixes.reverse()) tr.replaceWith(f.from, f.to, state.schema.text(f.text, f.marks));
+    return tr.docChanged ? tr : null;
+  },
+}));
+
+// 복사(서식): 이어진 빈칸 · 줄 앞 빈칸을 U+00A0 로 — 워드 · 메일에 붙여도 하나로 줄지 않게 (일반 글자는 plainTextOf 가 다시 보통 빈칸으로)
+function copiedSpaces(fragment) {
+  const out = [];
+  fragment.forEach((node, _offset, index) => {
+    if (node.isText) {
+      const prev = index > 0 ? fragment.child(index - 1) : null;
+      const lineStart = !prev || BREAKS.has(prev.type.name);
+      const code = node.marks.some((m) => m.type.spec.code);
+      const text = code ? node.text : htmlSpaces(node.text, lineStart);
+      out.push(text === node.text ? node : node.type.schema.text(text, node.marks));
+    } else if (node.type.spec.code || node.isLeaf) out.push(node);
+    else out.push(node.copy(copiedSpaces(node.content)));
+  });
+  return fragment.constructor.fromArray(out);
+}
+
 const tagCapsule = $prose(() => new Plugin({
   key: new PluginKey('memoking-tag-capsule'),
   appendTransaction(trs, old, state) {
@@ -1337,6 +1411,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     props: {
       // 복사·끌기: 서식 없는 곳에 붙일 "일반 글자"는 마크다운(\ 이스케이프가 섞임)이 아니라 읽는 글로 (Milkdown 클립보드보다 먼저)
       clipboardTextSerializer: (slice) => plainTextOf(slice.content, { openStart: slice.openStart, openEnd: slice.openEnd }),
+      transformCopied: (slice) => new slice.constructor(copiedSpaces(slice.content), slice.openStart, slice.openEnd),
       transformPastedHTML: (html) => revealLazyImages(normalizePastedTables(html)),
       handlePaste(v, event) {
         const data = event.clipboardData;
@@ -1357,6 +1432,21 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
           && !v.state.selection.$from.parent.type.spec.code && editor) {
           event.preventDefault();
           editor.action(insert(normalizeMath(plain.replace(/\r\n?/g, '\n'))));
+          return true;
+        }
+        // 메모장 등에서 복사한 일반 글자(HTML 없음): 마크다운으로 읽으면 줄 앞 띄어쓰기가 지워지므로, 줄마다 앞 빈칸을 지켜서
+        //   여러 줄이면 줄바꿈도 그대로 (마크다운의 "부드러운 줄바꿈" 은 띄어쓰기로 보여 줄들이 한 줄로 합쳐진다 — keepIndentPlugin)
+        //   고친 글로 붙여넣기를 한 번 더 하고, 그 뒤는 평소처럼 클립보드 플러그인이 서식대로
+        if (!plainPasting && !files.length && !html && (hasLeadingSpaces(plain) || plain.includes('\n')) && !v.state.selection.$from.parent.type.spec.code) {
+          event.preventDefault();
+          const dt = new DataTransfer();
+          dt.setData('text/plain', keepLeadingSpaces(plain.replace(/\r\n?/g, '\n')));
+          plainPasting = true;
+          try {
+            v.dom.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+          } finally {
+            plainPasting = false;
+          }
           return true;
         }
         const url = files.length ? null : loneUrl(data?.getData('text/plain'));
@@ -1607,6 +1697,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(tableExtras)
     .use(tagSuggest) // 자동완성 목록이 떠 있을 때 Enter·↑↓ 를 먼저 받는다
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
+    .use(keepIndentPlugin)
     .use(inlineHtmlMarks)
     .use(linkCards)
     .use(emptyTasks)
