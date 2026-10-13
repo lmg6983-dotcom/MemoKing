@@ -940,12 +940,20 @@ export function createContentLines() {
       // 휴대폰 글 고치기: 그림·링크 카드·파일·수식 같은 내용을 눌러도 골라지지(테두리) 않는다.
       //   눌러서 여는 동작(파일 열기·수식 고치기 등)은 각자의 click 으로 그대로 된다
       //   그림·카드처럼 줄을 차지하는 것은 누르면 커서를 그 아래 글 줄로 (바로 이어 쓸 수 있게)
-      //   손 메모는 고르는 대신 바로 이어 그리기 (휴대폰은 고른 뒤 단추를 누르던 것을 한 번에)
+      //   손 메모: 처음 누르면 복사·저장·지우기 단추와 아래 "이어 그리기"만 보이고(바로 넘어가면 단추를 누를 틈이 없다),
+      //   단추가 떠 있는 동안 한 번 더 누르면 (또는 "이어 그리기"를 누르면) 이어 그리기
       handleClickOn(view, _pos, node, nodePos, event, direct) {
         if (!direct || touchMode() !== 'edit' || !node.isAtom || node.isText) return false;
         const ink = event.target instanceof Element ? event.target.closest('.mk-ink') : null;
         if (ink) {
-          ink.querySelector('.mk-ink-edit')?.click();
+          if (ink.classList.contains('mk-ink-armed')) {
+            ink.classList.remove('mk-ink-armed');
+            ink.querySelector('.mk-ink-edit')?.click();
+          } else {
+            ink.classList.add('mk-ink-armed');
+            clearTimeout(ink.mkArmTimer);
+            ink.mkArmTimer = setTimeout(() => ink.classList.remove('mk-ink-armed'), TAP_SHOW_MS);
+          }
           return true;
         }
         const $n = view.state.doc.resolve(nodePos);

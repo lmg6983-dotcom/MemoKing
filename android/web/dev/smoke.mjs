@@ -1848,8 +1848,17 @@ try {
     check(`메모 안 투명 바탕 손 메모: ${process.env.MK_DARK ? '다크 모드는 검은 펜을 밝게 바꾼 그림' : '원래 그림'} 하나만 보임`, shownSrc, String(shownSrc));
     await shot('21-ink-in-memo');
     // 이어 그리기: 칸을 골라 "이어 그리기" → 같은 획이 보이고, 흰 바탕으로 바꿔 한 획 더
-    // 글 고치기에서는 손 메모를 톡 누르면 고르지 않고 바로 이어 그리기
+    // 글 고치기: 손 메모를 톡 누르면 먼저 복사·저장·지우기 단추와 "이어 그리기" (바로 넘어가지 않음) → "이어 그리기"로 이어 그리기
     await page.tap('.mk-doc .mk-ink img:visible');
+    await page.waitForTimeout(500);
+    const armed = await page.evaluate(() => {
+      const edit = document.querySelector('.mk-doc .mk-ink.mk-ink-armed .mk-ink-edit');
+      const r = edit?.getBoundingClientRect();
+      const del = document.querySelector('.mk-delete-btn')?.getBoundingClientRect();
+      return { sheet: !!document.querySelector('.ink-sheet'), copy: !!document.querySelector('.mk-copy-btn'), save: !!document.querySelector('.mk-save-btn'), del: !!del, edit: !!edit && getComputedStyle(edit).opacity === '1', apart: !!r && !!del && (r.top >= del.bottom || r.bottom <= del.top) };
+    });
+    check('손 메모 톡: 바로 넘어가지 않고 복사·저장·× 단추 + 아래 "이어 그리기" (겹치지 않음)', !armed.sheet && armed.copy && armed.save && armed.del && armed.edit && armed.apart, JSON.stringify(armed));
+    await page.tap('.mk-doc .mk-ink.mk-ink-armed .mk-ink-edit');
     await page.waitForSelector('.ink-sheet');
     await page.waitForTimeout(200);
     const again = await page.locator('.ink-sheet .ink-strokes path').count();
