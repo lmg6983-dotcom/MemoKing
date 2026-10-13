@@ -68,7 +68,7 @@ object Widgets {
     // 놓기·치우기도 위젯의 파일 일과 같은 줄에서 (내용 보내기·잠긴 메모 숨기기가 옛 표를 다시 써 넣지 않게)
     fun assign(ctx: Context, widgetId: Int, memoId: String) {
         val app = ctx.applicationContext
-        queued("위젯 정하기") {
+        queued(app, "위젯 정하기") {
             map(app).edit().putString(widgetId.toString(), memoId).apply()
             update(app, intArrayOf(widgetId))
         }
@@ -76,7 +76,7 @@ object Widgets {
 
     fun forget(ctx: Context, widgetIds: IntArray) {
         val app = ctx.applicationContext
-        queued("위젯 치우기") {
+        queued(app, "위젯 치우기") {
             map(app).edit().apply { widgetIds.forEach { remove(it.toString()) } }.apply()
             // 어느 위젯에도 없는 메모의 내용은 지운다
             val used = allIds(app).toList().mapNotNull { memoOf(app, it) }.toSet()
@@ -84,12 +84,8 @@ object Widgets {
         }
     }
 
-    private fun queued(what: String, block: () -> Unit) = io.execute {
-        try {
-            block()
-        } catch (e: Exception) {
-            android.util.Log.w("MemoKing", "$what 실패", e)
-        }
+    private fun queued(ctx: Context, what: String, block: () -> Unit) = io.execute {
+        CrashLog.guard(ctx, "$what 실패", Unit) { block() }
     }
 
     /** 화면이 보낸 내용: [{id, title, color, file, lines:[{t, kind, done?, i?}]}] — 지워진 메모는 {id, gone:true} */
@@ -274,14 +270,11 @@ object Widgets {
         val mgr = manager(ctx)
         for (id in ids) {
             // 한 위젯을 그리다 잘못돼도 빈(흰) 위젯으로 남지 않게: 누르면 메모킹이 열리는 기본 모양으로
-            val views = try {
-                views(ctx, id)
-            } catch (e: Exception) {
-                android.util.Log.w("MemoKing", "위젯 그리기 실패", e)
-                fallbackViews(ctx, id)
+            val views = CrashLog.guard(ctx, "위젯 그리기", null) { views(ctx, id) } ?: fallbackViews(ctx, id)
+            CrashLog.guard(ctx, "위젯 바꾸기", Unit) {
+                mgr.updateAppWidget(id, views)
+                mgr.notifyAppWidgetViewDataChanged(id, R.id.widget_list)
             }
-            mgr.updateAppWidget(id, views)
-            mgr.notifyAppWidgetViewDataChanged(id, R.id.widget_list)
         }
     }
 
@@ -309,6 +302,7 @@ object Widgets {
     fun onDark(color: String) = color == "charcoal"
     private val TEXT_ON_DARK = 0xFFF5F4EF.toInt()
     val textOnDark get() = TEXT_ON_DARK
+    val mutedOnDark get() = MUTED_ON_DARK
     private val MUTED_ON_DARK = 0x94F5F4EF.toInt()
 
     private fun activityIntent(ctx: Context, intent: Intent, code: Int, mutable: Boolean = false): PendingIntent =
@@ -372,9 +366,13 @@ object Widgets {
 
     // ---------- 체크 ----------
 
-    // (?U): \s 가 자바스크립트처럼 유니코드 공백(전각 공백 등)도, 숫자는 [0-9] 만 — widget-lines.js 와 같은 줄을 할 일로 센다
-    private val TASK = Regex("""(?U)^\s*(?:[-*+]|[0-9]+[.)])\s+\[([ xX])\](?:\s+|$)""")
-    private val FENCE = Regex("""(?U)^\s*(```|~~~)""")
+    // 빈칸은 자바스크립트의 \s 처럼 유니코드 공백(전각 공백 등)도, 숫자는 [0-9] 만 — widget-lines.js 와 같은 줄을 할 일로 센다.
+    //   (?U)(UNICODE_CHARACTER_CLASS) 는 쓰지 않는다: 자바(단위 테스트)에서는 되지만 안드로이드의 정규식(ICU)에는 없는 옵션이라
+    //   휴대폰에서 이 객체를 만드는 순간 오류가 나 위젯 전체가 멈췄다 (흰 위젯 · 홈 화면에 놓기 실패 · 앱 종료).
+    //   [\s\p{Z}\uFEFF] 는 두 곳에서 같은 뜻
+    private const val WS = """[\s\p{Z}\uFEFF]"""
+    private val TASK = Regex("""^$WS*(?:[-*+]|[0-9]+[.)])$WS+\[([ xX])\](?:$WS+|$)""")
+    private val FENCE = Regex("""^$WS*(```|~~~)""")
 
     /**
      * 메모 파일의 할 일을 체크/해제한 새 글 (머리말은 건드리지 않음). 찾지 못하면 null.
@@ -475,7 +473,8 @@ class MemoWidget : AppWidgetProvider() {
     override fun onUpdate(ctx: Context, mgr: AppWidgetManager, ids: IntArray) {
         // 파일 읽기는 화면 스레드가 아닌 곳에서 (메모 폴더를 뒤지는 동안 멈춘 것처럼 보이지 않게)
         val app = ctx.applicationContext
-        Widgets.update(app, ids) // 줄 서 기다리지 않고 지금 아는 내용으로 먼저 그린다
+        // 줄 서 기다리지 않고 지금 아는 내용으로 먼저 그린다 — 위젯 일의 오류로 앱이 멈추지 않게 (오류는 CrashLog 에)
+        if (!CrashLog.guard(app, "위젯 새로 그리기", false) { Widgets.update(app, ids); true }) return
         val pending = goAsync()
         val done = java.util.concurrent.atomic.AtomicBoolean(false)
         val finish = { if (done.compareAndSet(false, true)) pending.finish() }
@@ -483,21 +482,21 @@ class MemoWidget : AppWidgetProvider() {
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ finish() }, 8_000L)
         Widgets.io.execute {
             try {
-                Widgets.hideLocked(app)
-            } catch (e: Exception) {
-                android.util.Log.w("MemoKing", "위젯 확인 실패", e)
+                CrashLog.guard(app, "위젯 확인", Unit) { Widgets.hideLocked(app) }
             } finally {
                 finish()
             }
         }
     }
 
-    override fun onDeleted(ctx: Context, ids: IntArray) = Widgets.forget(ctx, ids)
+    override fun onDeleted(ctx: Context, ids: IntArray) = CrashLog.guard(ctx, "위젯 치우기", Unit) { Widgets.forget(ctx, ids) }
 
     override fun onAppWidgetOptionsChanged(ctx: Context, mgr: AppWidgetManager, id: Int, options: Bundle) =
-        Widgets.update(ctx, intArrayOf(id))
+        CrashLog.guard(ctx, "위젯 크기 바꾸기", Unit) { Widgets.update(ctx, intArrayOf(id)) }
 
-    override fun onReceive(ctx: Context, intent: Intent) {
+    override fun onReceive(ctx: Context, intent: Intent) = CrashLog.guard(ctx, "위젯 소식 받기", Unit) { receive(ctx, intent) }
+
+    private fun receive(ctx: Context, intent: Intent) {
         if (intent.action == Widgets.ACTION_PINNED) {
             val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             val memoId = intent.getStringExtra(Widgets.EXTRA_MEMO)
@@ -522,7 +521,9 @@ class MemoWidgetService : RemoteViewsService() {
         override fun onCreate() = Unit
         override fun onDestroy() = Unit
 
-        override fun onDataSetChanged() {
+        override fun onDataSetChanged() = CrashLog.guard(ctx, "위젯 줄 읽기", Unit) { load() }
+
+        private fun load() {
             memoId = Widgets.memoOf(ctx, widgetId)
             val memo = memoId?.let { Widgets.memo(ctx, it) }
             color = memo?.optString("color", "yellow") ?: "yellow"
@@ -535,7 +536,10 @@ class MemoWidgetService : RemoteViewsService() {
         override fun getItemId(position: Int) = position.toLong()
         override fun getLoadingView(): RemoteViews? = null
 
-        override fun getViewAt(position: Int): RemoteViews {
+        override fun getViewAt(position: Int): RemoteViews =
+            CrashLog.guard(ctx, "위젯 줄 그리기", RemoteViews(ctx.packageName, R.layout.widget_row)) { row(position) }
+
+        private fun row(position: Int): RemoteViews {
             val v = RemoteViews(ctx.packageName, R.layout.widget_row)
             val line = lines.optJSONObject(position) ?: return v
             val kind = line.optString("kind")
@@ -545,8 +549,11 @@ class MemoWidgetService : RemoteViewsService() {
             if (kind == "h") shown.setSpan(StyleSpan(Typeface.BOLD), 0, shown.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             if (kind == "task" && done) shown.setSpan(StrikethroughSpan(), 0, shown.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             v.setTextViewText(R.id.row_text, shown)
-            if (Widgets.onDark(color)) v.setTextColor(R.id.row_text, Widgets.textOnDark)
-            v.setFloat(R.id.row_text, "setAlpha", if (kind == "task" && done) 0.55f else 1f) // 끝낸 할 일은 흐리게
+            // 끝낸 할 일은 흐린 글자 (setAlpha 는 런처에 따라 RemoteViews 에서 막혀 글자색으로)
+            when {
+                Widgets.onDark(color) -> v.setTextColor(R.id.row_text, if (kind == "task" && done) Widgets.mutedOnDark else Widgets.textOnDark)
+                kind == "task" && done -> v.setTextColor(R.id.row_text, ctx.getColor(R.color.widget_muted))
+            }
             v.setTextViewTextSize(R.id.row_text, android.util.TypedValue.COMPLEX_UNIT_SP, if (kind == "h") 15f else 14f)
             if (kind == "task") {
                 v.setViewVisibility(R.id.row_check, View.VISIBLE)
@@ -583,12 +590,7 @@ class WidgetTapActivity : Activity() {
             // 파일 읽고 쓰기는 화면 스레드 밖에서, 차례대로 — 끝나면 이 (보이지 않는) 화면에서 필요하면 앱을 열고 닫는다
             val app = applicationContext
             Widgets.io.execute {
-                val ok = try {
-                    Widgets.toggleTask(app, memoId, task, taskText, shownDone)
-                } catch (e: Exception) {
-                    android.util.Log.w("MemoKing", "위젯 체크 실패", e)
-                    false
-                }
+                val ok = CrashLog.guard(app, "위젯 체크", false) { Widgets.toggleTask(app, memoId, task, taskText, shownDone) }
                 runOnUiThread {
                     if (!ok) openMemo(this, memoId) // 파일을 못 찾았으면(이름이 바뀌었는 등) 앱에서 열어 다시 맞추게
                     close()

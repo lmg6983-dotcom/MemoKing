@@ -47,12 +47,14 @@ export function publish(only = null) {
 export function pin(id, { toast }) {
   publish(id); // 놓이자마자 내용이 보이게 먼저
   let ok = false;
+  let reason = '';
   try {
     ok = native.pin(id);
-  } catch {
-    ok = false;
+  } catch (err) {
+    reason = err?.message ?? '';
   }
-  if (!ok) toast('이 홈 화면에서는 바로 놓을 수 없어요. 홈 화면을 길게 눌러 위젯 › 메모킹을 놓은 뒤 눌러 메모를 골라 주세요', true);
+  // 앱 쪽 오류면 그 이유도 (런처가 바로 놓기를 지원하지 않는 것과 구분해 알 수 있게)
+  if (!ok) toast(`${reason ? '홈 화면에 바로 놓지 못했어요' : '이 홈 화면에서는 바로 놓을 수 없어요'}. 홈 화면을 길게 눌러 위젯 › 메모킹을 놓은 뒤 눌러 메모를 골라 주세요${reason ? ` (${reason})` : ''}`, true);
 }
 
 /** 위젯 고르기 목록에서 놓은 위젯을 눌렀을 때: 다음에 누르는 메모를 그 위젯에 */

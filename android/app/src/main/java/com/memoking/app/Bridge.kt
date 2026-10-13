@@ -196,6 +196,10 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun widgetPin(memoId: String): String = reply { Widgets.requestPin(ctx, memoId) }
 
+    // 지난번 오류 기록 (CrashLog) — 있으면 꺼내 보여 준다 (꺼내면 지움)
+    @JavascriptInterface
+    fun lastError(): String = reply { CrashLog.take(ctx) }
+
     @JavascriptInterface
     fun ready(): String = reply { activity.runOnUiThread { activity.onPageReady() } }
 

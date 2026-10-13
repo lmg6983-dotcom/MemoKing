@@ -1352,6 +1352,21 @@ const info = native.info();
 if (info.vault?.ok) openVault();
 else showSetup(info.vault ? '메모 폴더에 더 이상 접근할 수 없어요. 폴더를 다시 골라 주세요.' : '');
 native.ready();
+// 지난번에 앱이 멈췄거나 위젯에서 오류가 났으면: 알리고 그 내용을 복사해 보낼 수 있게 (휴대폰에서만 나는 오류를 고치려고)
+try {
+  const lastError = native.lastError();
+  if (lastError) {
+    setTimeout(() => toast('지난번에 메모킹에 오류가 있었어요', true, {
+      label: '내용 복사',
+      run: () => {
+        native.copyText(lastError);
+        toast('오류 내용을 복사했어요. 개발자에게 붙여 넣어 보내 주세요');
+      },
+    }), 800);
+  }
+} catch (err) {
+  console.warn('오류 기록', err);
+}
 await handleIntent();
 // 업데이트로 Drive 연결 방식이 바뀐 경우: 한 번 알려 주고, 누르면 바로 다시 연결 (메모는 그대로)
 try {
