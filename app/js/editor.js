@@ -25,7 +25,8 @@ import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from '.
 import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
-import { plainTextOf } from './clipboard-text.js';
+import { keepIndent, keepLeadingSpaces, hasLeadingSpaces, NBSP } from './core/indent-spaces.js';
+import { plainTextOf, spacedHtml } from './clipboard-text.js';
 import { handleImageCopy } from './copy-content.js';
 import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable, tableToBlocks } from './table-extras.js';
@@ -503,6 +504,129 @@ function doneTagAt(doc, pos, { lineEnd = false } = {}) {
   }
   return null;
 }
+// 줄 앞 띄어쓰기 지키기 (core/indent-spaces.js): 문단 · 제목 · 항목의 맨 앞이나 줄바꿈(Shift+Enter) 뒤에
+//   친 띄어쓰기 · 탭은 줄 바꿈 없는 빈칸(U+00A0)으로 바꿔 둔다 — 마크다운으로 저장했다 다시 열어도 그대로
+//   일부러 넣은 것만: 줄 앞에서 친 띄어쓰기(handleTextInput)와 붙여 넣은 글의 들여쓰기(붙여넣기 트랜잭션의 바뀐 줄).
+//   줄을 나누다 앞에 남은 띄어쓰기는 보통 띄어쓰기로 두어 다듬기(tidy)가 지운다. 코드 블록 · 글 속 코드는 그대로.
+//   붙여넣은 글의 줄바꿈도 그대로 줄바꿈으로
+const BREAKS = new Set(['hardbreak', 'hard_break']);
+let plainPasting = false; // 메모장 같은 일반 글자를 붙이는 중 (아래 붙여넣기에서 잠깐)
+function indentFixes(doc, from, to) {
+  const fixes = [];
+  doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isTextblock) return true;
+    if (node.type.spec.code) return false;
+    let lineStart = true;
+    node.forEach((child, offset) => {
+      if (child.isText && lineStart && !child.marks.some((m) => m.type.spec.code)) {
+        const ws = /^[ \t]+/.exec(child.text);
+        if (ws) fixes.push({ from: pos + 1 + offset, to: pos + 1 + offset + ws[0].length, text: keepIndent(ws[0]), marks: child.marks });
+      }
+      lineStart = BREAKS.has(child.type.name);
+    });
+    return false;
+  });
+  return fixes;
+}
+/** 여러 트랜잭션이 바꾼 범위 (마지막 문서 기준) — 없으면 null */
+function changedRange(trs, doc) {
+  let from = Infinity;
+  let to = -Infinity;
+  trs.forEach((tr, t) => tr.mapping.maps.forEach((map, i) => map.forEach((_a, _b, start, end) => {
+    let a = tr.mapping.slice(i + 1).map(start, -1);
+    let b = tr.mapping.slice(i + 1).map(end, 1);
+    for (const later of trs.slice(t + 1)) {
+      a = later.mapping.map(a, -1);
+      b = later.mapping.map(b, 1);
+    }
+    from = Math.min(from, a);
+    to = Math.max(to, b);
+  })));
+  return from > to ? null : { from: Math.max(0, from), to: Math.min(doc.content.size, to) };
+}
+/** 커서가 줄 맨 앞(또는 줄 앞 들여쓰기 바로 뒤)인가 */
+function atLineIndent($pos) {
+  if (!$pos.parent.isTextblock || $pos.parent.type.spec.code) return false;
+  let start = $pos.start();
+  // 줄바꿈(Shift+Enter) 뒤라면 그 줄의 시작부터
+  $pos.parent.forEach((child, offset) => {
+    if (BREAKS.has(child.type.name) && $pos.start() + offset < $pos.pos) start = $pos.start() + offset + child.nodeSize;
+  });
+  return /^\u00a0*$/.test($pos.doc.textBetween(start, $pos.pos, '', ''));
+}
+const keepIndentPlugin = $prose(() => {
+  let composing = false; // 한글 조합 중에는 손대지 않는다 (조합이 끝난 뒤 그 줄이 다시 바뀔 때 고친다)
+  return new Plugin({
+    key: new PluginKey('memoking-keep-indent'),
+    props: {
+      // 줄 앞에서 친 띄어쓰기 · 탭 → U+00A0 (일부러 들여 쓰는 것)
+      handleTextInput(view, from, to, text) {
+        if (composing || !/^[ \t]+$/.test(text) || !atLineIndent(view.state.doc.resolve(from))) return false;
+        const $from = view.state.doc.resolve(from);
+        view.dispatch(view.state.tr.insertText(keepIndent(text), from, to).setStoredMarks($from.marks()).scrollIntoView());
+        return true;
+      },
+      handleDOMEvents: {
+        compositionstart: () => {
+          composing = true;
+          return false;
+        },
+        compositionend: () => {
+          composing = false;
+          return false;
+        },
+      },
+    },
+    appendTransaction(trs, _old, state) {
+      // 붙여넣기 · 끌어다 놓기만 (치는 띄어쓰기는 handleTextInput 이 바로)
+      const pasted = plainPasting || trs.some((tr) => /^(paste|drop)$/.test(tr.getMeta('uiEvent') ?? ''));
+      if (composing || !pasted || !trs.some((tr) => tr.docChanged)) return null;
+      const range = changedRange(trs, state.doc);
+      if (!range) return null;
+      const { from, to } = range;
+      const tr = state.tr;
+      // 붙여넣은 글의 줄바꿈: 마크다운으로 읽으면 "부드러운 줄바꿈"(띄어쓰기로 보임)이 된다 → 진짜 줄바꿈으로 (메모장 글이 한 줄로 합쳐지지 않게)
+      if (plainPasting) {
+        state.doc.nodesBetween(from, to, (node, pos) => {
+          if (node.type.spec.code) return false;
+          if (BREAKS.has(node.type.name) && node.attrs.isInline) tr.setNodeMarkup(pos, null, { ...node.attrs, isInline: false });
+          return true;
+        });
+      }
+      const fixes = indentFixes(tr.doc, from, to);
+      for (const f of fixes.reverse()) tr.replaceWith(f.from, f.to, state.schema.text(f.text, f.marks));
+      return tr.docChanged ? tr : null;
+    },
+  });
+});
+
+// 붙여 넣은 서식 글: 글 속 U+00A0 는 보통 띄어쓰기로, 줄 맨 앞(문단 처음 · 줄바꿈 뒤)의 U+00A0 는 들여쓰기라 그대로
+//   (메모킹 · 워드에서 복사한 들여쓴 줄이 붙여넣기에서도 들여 쓴 채로)
+function plainSpacesIn(fragment, lineStart = true) {
+  let changed = false;
+  let atLine = lineStart;
+  const out = [];
+  fragment.forEach((node) => {
+    let next = node;
+    if (node.isText) {
+      if (node.text.includes(NBSP) && !node.marks.some((m) => m.type.spec.code)) {
+        const lead = atLine ? /^\u00a0*/.exec(node.text)[0] : '';
+        const text = lead + node.text.slice(lead.length).replaceAll(NBSP, ' ');
+        if (text !== node.text) next = node.type.schema.text(text, node.marks);
+      }
+      atLine = false;
+    } else if (BREAKS.has(node.type.name)) atLine = true;
+    else if (!node.type.spec.code && !node.isLeaf) {
+      const inner = plainSpacesIn(node.content, true);
+      if (inner !== node.content) next = node.copy(inner);
+      atLine = node.isInline ? false : atLine;
+    } else if (node.isInline) atLine = false;
+    if (next !== node) changed = true;
+    out.push(next);
+  });
+  return changed ? fragment.constructor.fromArray(out) : fragment;
+}
+
 const tagCapsule = $prose(() => new Plugin({
   key: new PluginKey('memoking-tag-capsule'),
   appendTransaction(trs, old, state) {
@@ -1334,9 +1458,28 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
 
   const pastePlugin = $prose(() => new Plugin({
     key: new PluginKey('memoking-paste'),
+    // 복사(서식): 편집기가 클립보드에 HTML 을 넣은 뒤 겹친 빈칸만 U+00A0 로 — 워드 · 메일에 붙여도 하나로 줄지 않게
+    //   (편집기 안에서 끌어 옮기는 내용은 그대로 두려고 transformCopied 가 아니라 클립보드 글만 바꾼다. 편집기가 먼저 듣는다)
+    view(v) {
+      const onCopy = (e) => {
+        if (!e.defaultPrevented || !e.clipboardData) return;
+        const html = e.clipboardData.getData('text/html');
+        if (html && / {2}/.test(html)) e.clipboardData.setData('text/html', spacedHtml(html));
+      };
+      v.dom.addEventListener('copy', onCopy);
+      v.dom.addEventListener('cut', onCopy);
+      return {
+        destroy() {
+          v.dom.removeEventListener('copy', onCopy);
+          v.dom.removeEventListener('cut', onCopy);
+        },
+      };
+    },
     props: {
       // 복사·끌기: 서식 없는 곳에 붙일 "일반 글자"는 마크다운(\ 이스케이프가 섞임)이 아니라 읽는 글로 (Milkdown 클립보드보다 먼저)
       clipboardTextSerializer: (slice) => plainTextOf(slice.content, { openStart: slice.openStart, openEnd: slice.openEnd }),
+      // 붙여 넣은 서식 글의 글 속 U+00A0 는 보통 띄어쓰기로 (웹 · 워드의 &nbsp; · 메모킹에서 복사한 겹친 빈칸), 줄 앞은 들여쓰기라 그대로
+      transformPasted: (slice) => new slice.constructor(plainSpacesIn(slice.content), slice.openStart, slice.openEnd),
       transformPastedHTML: (html) => revealLazyImages(normalizePastedTables(html)),
       handlePaste(v, event) {
         const data = event.clipboardData;
@@ -1357,6 +1500,22 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
           && !v.state.selection.$from.parent.type.spec.code && editor) {
           event.preventDefault();
           editor.action(insert(normalizeMath(plain.replace(/\r\n?/g, '\n'))));
+          return true;
+        }
+        // 메모장 등에서 복사한 일반 글자(HTML 없음): 마크다운으로 읽으면 줄 앞 띄어쓰기가 지워지므로, 줄마다 앞 빈칸을 지켜서
+        //   여러 줄이면 줄바꿈도 그대로 (마크다운의 "부드러운 줄바꿈" 은 띄어쓰기로 보여 줄들이 한 줄로 합쳐진다 — keepIndentPlugin)
+        //   고친 글로 붙여넣기를 한 번 더 하고, 그 뒤는 평소처럼 클립보드 플러그인이 서식대로
+        //   (표 칸 안은 표 붙여넣기가 따로 — 칸 안 줄바꿈은 <br> 이라야 저장된다)
+        if (!plainPasting && !files.length && !html && (hasLeadingSpaces(plain) || plain.includes('\n')) && !v.state.selection.$from.parent.type.spec.code && !isInTable(v.state)) {
+          event.preventDefault();
+          const dt = new DataTransfer();
+          dt.setData('text/plain', keepLeadingSpaces(plain.replace(/\r\n?/g, '\n')));
+          plainPasting = true;
+          try {
+            v.dom.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+          } finally {
+            plainPasting = false;
+          }
           return true;
         }
         const url = files.length ? null : loneUrl(data?.getData('text/plain'));
@@ -1437,20 +1596,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     appendTransaction(trs, _old, state) {
       if (readOnly || !fitView || !pastedTablesAt || Date.now() - pastedTablesAt > 3000) return null;
       if (!trs.some((tr) => tr.docChanged)) return null;
-      // 바뀐 범위 (모든 트랜잭션 뒤 문서 기준)
-      let from = Infinity;
-      let to = -Infinity;
-      trs.forEach((tr, t) => tr.mapping.maps.forEach((map, i) => map.forEach((_a, _b, start, end) => {
-        let a = tr.mapping.slice(i + 1).map(start, -1);
-        let b = tr.mapping.slice(i + 1).map(end, 1);
-        for (const later of trs.slice(t + 1)) {
-          a = later.mapping.map(a, -1);
-          b = later.mapping.map(b, 1);
-        }
-        from = Math.min(from, a);
-        to = Math.max(to, b);
-      })));
-      if (!(to > from)) return null;
+      const range = changedRange(trs, state.doc);
+      if (!range || !(range.to > range.from)) return null;
+      const { from, to } = range;
       // 그 범위 안의, 아직 너비가 없는 표 = 방금 붙여넣은 표
       const tables = [];
       state.doc.nodesBetween(from, to, (node, pos) => {
@@ -1607,6 +1755,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(tableExtras)
     .use(tagSuggest) // 자동완성 목록이 떠 있을 때 Enter·↑↓ 를 먼저 받는다
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
+    .use(keepIndentPlugin)
     .use(inlineHtmlMarks)
     .use(linkCards)
     .use(emptyTasks)

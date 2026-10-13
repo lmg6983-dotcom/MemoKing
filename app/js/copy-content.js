@@ -1,17 +1,22 @@
 // 메모 안의 내용 복사 — 지우기(×) 옆 복사 단추 · 그림을 골라(눌러) Ctrl+C / Ctrl+X
 //   그림: 화면에 그려진 그림을 PNG 로 바꿔 "그림" 으로 복사 (다른 앱 · 카톡 · 워드에 그대로 붙음).
 //     실제로 클립보드에 넣는 일은 앱(PC: Electron clipboard, 휴대폰: 안드로이드 클립보드)이 — setCopyHost 로 받는다
-//   그 밖의 내용(줄 · 목록 · 표 · 파일 칩 · 링크 카드): 서식(HTML)과 일반 글자를 함께
-import { plainTextOf } from './clipboard-text.js';
+//   파일(PDF 등 파일 칩 · 소리 · 동영상 · 음성 카드의 소리): 그 파일 자체를 (탐색기 · 카톡 · 메일에 파일로 붙음 — PC)
+//   그 밖의 내용(줄 · 목록 · 표 · 수식 · 링크 카드): 서식(HTML)과 일반 글자를 함께
+import { plainTextOf, spacedHtml } from './clipboard-text.js';
+import { mediaKindOf } from './core/memo-file.js';
+import { voiceAudioOf } from './voice-card-view.js';
 
 let host = {
   /** @param {string} pngBase64 */
   image: null,
   /** @param {{ text: string, html: string }} c */
   text: null,
+  /** @param {string} href 메모 폴더 안의 첨부 (attachments/…) → 넣었으면 true */
+  file: null,
 };
 
-/** 앱마다 클립보드에 넣는 방법 — { image(pngBase64), text({ text, html }) } (빠지면 브라우저 Clipboard API) */
+/** 앱마다 클립보드에 넣는 방법 — { image(pngBase64), text({ text, html }), file(href) } (빠지면 브라우저 Clipboard API · 파일은 글로) */
 export function setCopyHost(h) {
   host = { ...host, ...h };
 }
@@ -78,8 +83,41 @@ const isImageNode = (node) => node?.type.name === 'image';
 /** 그림 하나만 든 줄 */
 const loneImage = (node) => node?.type.name === 'paragraph' && node.childCount === 1 && isImageNode(node.firstChild);
 
+const isAttachment = (href) => typeof href === 'string' && /^attachments\//.test(href);
+
+/** 파일로 복사할 첨부: 소리 · 동영상 줄, 음성 카드의 소리, 파일 칩(링크 하나만 든 줄) — 없으면 null */
+export function attachmentOf(node) {
+  const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : voiceAudioOf(node);
+  if (media) {
+    const { src, alt } = media.attrs;
+    return isAttachment(src) && mediaKindOf(src, alt) !== 'image' ? src : null;
+  }
+  if (node?.type.name !== 'paragraph') return null;
+  const hrefs = new Set();
+  let other = false;
+  node.forEach((child) => {
+    const link = child.marks?.find((m) => m.type.name === 'link');
+    if (link) hrefs.add(link.attrs.href);
+    else if (!(child.isText && !child.text.trim())) other = true;
+  });
+  const [href] = hrefs;
+  return !other && hrefs.size === 1 && isAttachment(href) ? href : null;
+}
+
+/** 화면의 상자를 복사용 HTML 로: 편집기 단추 · 손잡이 · 커서 자리 표시는 빼고 */
+function cleanHtml(dom) {
+  if (!(dom instanceof Element)) return '';
+  const copy = dom.cloneNode(true);
+  copy.querySelectorAll('button, input, .column-resize-handle, .ProseMirror-separator, .ProseMirror-trailingBreak, .plyr__controls').forEach((e) => e.remove());
+  for (const e of [copy, ...copy.querySelectorAll('[contenteditable], [draggable]')]) {
+    e.removeAttribute('contenteditable');
+    e.removeAttribute('draggable');
+  }
+  return spacedHtml(copy.outerHTML); // 이어진 빈칸이 워드 · 메일에서 하나로 줄지 않게
+}
+
 /**
- * 편집기 안의 한 덩어리(줄 · 목록 · 그림 줄)를 복사 → '그림' | '내용'
+ * 편집기 안의 한 덩어리(줄 · 목록 · 그림 줄 · 표 · 수식 · 파일)를 복사 → '그림' | '주소' | '파일' | '내용'
  * @param {import('prosemirror-view').EditorView} view
  */
 export async function copyBlock(view, pos, node, target) {
@@ -98,12 +136,13 @@ export async function copyBlock(view, pos, node, target) {
       }
     }
   }
+  // 파일: 그 파일 자체를 (못 넣으면 아래처럼 이름을 글로)
+  const file = attachmentOf(node);
+  if (file && host.file && (await host.file(file).catch(() => false))) return '파일';
   const slice = view.state.doc.slice(pos, pos + node.nodeSize);
   // 소리 · 동영상처럼 글이 없는 줄은 그 파일 이름(주소)을 글로
   const text = plainTextOf(slice.content).trim() || media?.attrs.title || media?.attrs.src || node.attrs?.href || node.attrs?.src || '';
-  const dom = view.nodeDOM(pos);
-  const html = dom instanceof Element ? dom.outerHTML : '';
-  await copyText({ text, html });
+  await copyText({ text, html: cleanHtml(view.nodeDOM(pos)) });
   return '내용';
 }
 

@@ -558,6 +558,7 @@ export class Vault extends EventEmitter {
     this.trashAttachments(this.attachmentsOf(entry)); // 열지 않은 잠긴 메모도 머리말의 표로
     this.closeLock(id); // 지운 잠긴 메모의 열쇠를 남기지 않는다 (되살리면 다시 비밀번호로)
     this.changed([id]);
+    this.emit('trashed', id); // 이 PC 에서 지움 (빈 메모 정리 포함) — 바탕화면 위젯 · 단축키도 거둔다
     return trashed ?? true; // 휴지통 파일 이름 (되돌리기에 씀)
   }
 

@@ -89,8 +89,9 @@ function blockInfo(doc, pos, inner) {
 // 누르는 사이 감긴 재생 위치는 들어 올릴 때 되돌린다
 export const MEDIA_SCRUB = '.plyr__menu__container';
 const GRAB_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card], a, .mk-math-block, hr';
-// PC 에서 마우스를 올리면 지우기 단추가 뜨는 "내용" (글자 링크·수식·가로줄은 빼고 — 글을 읽는 데 방해되지 않게)
-const HOVER_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card]';
+// PC 에서 마우스를 올리면 복사 · 지우기 단추가 뜨는 "내용": 그림 · 손 메모 · 소리 · 동영상 · 링크 카드 · 파일 칩(PDF 등) ·
+//   수식 블록 · 표 · 음성 카드 (글자 링크 · 글 속 수식 · 가로줄은 빼고 — 글을 읽는 데 방해되지 않게)
+const HOVER_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card], a[data-file], .mk-math-block, .mk-voice, .tableWrapper';
 const NO_GRAB = '.plyr__controls, .plyr__control, button, input, select, textarea, [contenteditable="true"] [contenteditable="true"]';
 
 /** 화면에서 누른 곳(target)이 옮길 수 있는 내용 줄이면 그 줄 */
@@ -126,6 +127,46 @@ export function blockFromTarget(view, target) {
     return blockInfo(doc, $p.before(d), isImage ? { kind: 'node', offset: pos - $p.start(d) } : { kind: 'text', offset: 0 });
   }
   return null;
+}
+
+// 마우스를 올린 내용 상자 → 그 줄 (음성 카드는 카드째, 표는 표째, 그 밖은 blockFromTarget)
+function hoverBlockOf(view, host) {
+  if (host.classList.contains('mk-voice')) return voiceCardOf(view, host);
+  if (host.classList.contains('tableWrapper')) {
+    const table = host.querySelector('table');
+    if (!table) return null;
+    let pos;
+    try {
+      pos = view.posAtDOM(table, 0);
+    } catch {
+      return null;
+    }
+    const $p = view.state.doc.resolve(Math.min(pos, view.state.doc.content.size));
+    for (let d = $p.depth; d > 0; d--) {
+      if ($p.node(d).type.name === 'table') return blockInfo(view.state.doc, $p.before(d), { kind: 'node', offset: -1 });
+    }
+    return null;
+  }
+  return blockFromTarget(view, host);
+}
+
+/** 지우기 · 복사 단추 이름에 쓰는 내용 이름: "이 표 지우기" · "이 파일 복사" */
+export function contentKindName(node, dom) {
+  const name = node.type.name;
+  if (/list/.test(name)) return '목록';
+  if (name === 'table') return '표';
+  if (name === 'math_block') return '수식';
+  if (name === 'mk_link_card') return '링크 카드';
+  if (name === 'hr') return '가로줄';
+  if (isVoiceCard(node)) return '음성';
+  if (!(dom instanceof Element)) return '내용';
+  if (dom.querySelector('.mk-ink')) return '손 메모';
+  if (dom.querySelector('.mk-video')) return '동영상';
+  if (dom.querySelector('.mk-media')) return '소리';
+  if (dom.querySelector('img.mk-image')) return '그림';
+  if (dom.querySelector('a[data-file]')) return '파일';
+  if (dom.querySelector('.mk-link-card, [data-link-card]')) return '링크 카드';
+  return '내용';
 }
 
 // 화면의 음성 카드 상자 → 그 카드 줄
@@ -317,8 +358,8 @@ class Mover {
         if (!host || !view.dom.contains(host)) return this.leaveHover();
         clearTimeout(this.hoverTimer);
         if (host === this.hoverHost && deleteShownFor(this.hoverTarget)) return;
-        const block = blockFromTarget(view, host);
-        if (!block || !isContentBlock(block.node)) return this.leaveHover();
+        const block = hoverBlockOf(view, host);
+        if (!block || !(isContentBlock(block.node) || block.node.type.name === 'table')) return this.leaveHover();
         this.hoverHost = host;
         this.showDelete(block, true);
       };
@@ -647,17 +688,18 @@ class Mover {
     const { view } = this;
     const dom = view.nodeDOM(block.pos);
     if (!(dom instanceof Element)) return;
-    const media = isContentParagraph(block.node) ? dom.querySelector('img.mk-image, .mk-ink, .mk-media, .mk-link-card') : null;
+    const media = isContentParagraph(block.node) ? dom.querySelector('img.mk-image, .mk-ink, .mk-media, .mk-link-card, a[data-file]') : null;
     const deco = (spec) => {
       if (spec) this.decorate([{ pos: block.pos, ...spec }]);
       else if (!this.drag && !this.pressing) this.decorate([]);
     };
-    const list = /list/.test(block.node.type.name);
-    const target = media ?? dom;
+    const kind = contentKindName(block.node, dom);
+    // 표는 편집기가 감싼 상자(.tableWrapper)에 단추를 붙인다 (표 막대 · 크기 손잡이와 같은 자리)
+    const target = media ?? (block.node.type.name === 'table' ? dom.closest('.tableWrapper') ?? dom.querySelector('.tableWrapper') ?? dom : dom);
     if (!hovering) this.hoverHost = null;
     this.hoverTarget = target;
     const hover = hovering ? { enter: () => clearTimeout(this.hoverTimer), leave: () => this.leaveHover() } : null;
-    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: list ? '이 목록 지우기' : '이 내용 지우기', hover });
+    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, hover });
   }
 
   hideDelete(now = false) {

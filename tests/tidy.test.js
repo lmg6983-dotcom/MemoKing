@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tidyText } from '../app/js/tidy-text.js';
 
-test('다듬기: 겹친 띄어쓰기·줄 앞뒤 띄어쓰기', () => {
-  assert.equal(tidyText('  가나  다라   마 '), '가나 다라 마');
+test('다듬기: 남은 줄 앞뒤 띄어쓰기만 — 들여쓰기(U+00A0) · 겹친 띄어쓰기는 그대로 (안내 문구 칸 맞춤)', () => {
+  assert.equal(tidyText('  가나  다라   마 '), '가나  다라   마');
   assert.equal(tidyText(' 가 ', { atStart: false, atEnd: false }), ' 가 ');
+  assert.equal(tidyText('\u00a0\u00a0국내사업부 대표'), '\u00a0\u00a0국내사업부 대표');
 });
 
 test('다듬기: 한글 뒤 문장부호 앞 띄어쓰기 (말줄임 쉼표·마침표는 그대로)', () => {
@@ -14,6 +15,6 @@ test('다듬기: 한글 뒤 문장부호 앞 띄어쓰기 (말줄임 쉼표·마
   assert.equal(tidyText('1 . 2'), '1 . 2');
 });
 
-test('다듬기: 보이지 않는 글자·NBSP', () => {
-  assert.equal(tidyText('가​나 다﻿'), '가나 다');
+test('다듬기: 보이지 않는 글자는 빼고 NBSP(줄 앞 들여쓰기)는 그대로', () => {
+  assert.equal(tidyText('가\u200b나\u00a0다\ufeff'), '가나\u00a0다');
 });

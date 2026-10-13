@@ -25,14 +25,51 @@ import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
 import { hintOnce } from './hints.js';
 import { toggleShortcutSheet } from './shortcut-sheet.js';
+import { hotkeyDialog } from './hotkey-dialog.js';
+import { hotkeyLabel } from './core/memo-hotkeys.js';
 
 const SAVE_DELAY = 600;
 
 const api = window.memoking;
 // 복사 단추 · 그림 Ctrl+C: 시스템 클립보드에 그림 그대로 / 서식 + 글
-setCopyHost({ image: (b64) => api.image.copy(b64), text: ({ text, html }) => api.copyRich({ text, html }) });
+setCopyHost({
+  image: (b64) => api.image.copy(b64),
+  text: ({ text, html }) => api.copyRich({ text, html }),
+  file: (href) => api.attachments.copy(href), // PDF · 소리 같은 첨부는 파일 그대로
+});
 const params = new URLSearchParams(location.search);
+// 미리 불러 둔 예비 창(window-manager.js makeSpare): 편집기 코드는 다 읽어 두고, 열 메모가 정해질 때까지 기다린다
+if (params.get('spare') === '1') {
+  const job = await api.win.spare();
+  if (!job?.id) {
+    window.close();
+    await new Promise(() => {});
+  }
+  params.delete('spare');
+  params.set('id', job.id);
+  if (job.record) params.set('record', '1');
+  if (job.ink) params.set('ink', '1');
+  try {
+    history.replaceState(null, '', `${location.pathname}?${params}`); // 새로 고쳐도 같은 메모
+  } catch {
+    // 주소를 못 바꿔도 이 창은 그대로
+  }
+}
 const id = params.get('id');
+// 메모를 그렸다 → 예비 창이면 이제 보여 달라고 (보통 창은 ready-to-show 로 이미 보임 — 메인이 무시)
+let paintedSent = false;
+function markPainted() {
+  if (paintedSent) return;
+  paintedSent = true;
+  let done = false;
+  const send = () => {
+    if (done) return;
+    done = true;
+    api.win.painted?.();
+  };
+  requestAnimationFrame(() => requestAnimationFrame(send));
+  setTimeout(send, 120); // 숨은 창이라 그리기가 멈춰 있어도
+}
 const $ = (x) => document.getElementById(x);
 const el = {
   status: $('status'),
@@ -423,6 +460,40 @@ $('lock-btn').addEventListener('click', async () => {
   showLockState();
   setStatus('잠갔어요. 창을 닫으면 다시 비밀번호로 열려요');
 });
+// 단축키 정하기 (Ctrl+Alt+1~9): 어느 앱에서든 이 메모를 복사하거나 띄운다 (hotkey-dialog.js)
+function showHotkey(state) {
+  $('hotkey-label').textContent = state?.slot ? hotkeyLabel(state.slot) : '';
+}
+$('hotkey-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  const state = await api.hotkeys.state(id);
+  const next = await hotkeyDialog({ state, onSave: (slot, opts) => api.hotkeys.set(id, slot, opts) });
+  editor?.focus();
+  if (!next) return;
+  showHotkey(next);
+  setStatus(next.slot ? `단축키를 정했어요: ${hotkeyLabel(next.slot)}` : '단축키를 풀었어요');
+});
+// 바탕화면에 붙이기: 이 메모 창 자리에 바탕화면 위젯을 놓고 창은 닫는다 (이미 붙어 있으면 떼기)
+let onDesktop = false;
+function showWidgetState(on) {
+  onDesktop = Boolean(on);
+  $('widget-btn').querySelector('span').textContent = onDesktop ? '바탕화면에서 떼기' : '바탕화면에 붙이기';
+}
+$('widget-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  if (onDesktop) {
+    await api.widget.remove(id);
+    showWidgetState(false);
+    setStatus('바탕화면에서 뗐어요');
+    return;
+  }
+  const r = await api.widget.place(id);
+  if (!r?.ok) setStatus(r?.error || '바탕화면에 붙이지 못했어요', true);
+});
+// 메모 단축키로 복사하기 직전: 막 고친 글까지 저장 (main.js memoHotkeyPressed)
+window.__memokingFlush = () => flush();
 $('image-save-btn').addEventListener('click', () => memoImage('save'));
 $('pdf-btn').addEventListener('click', async () => {
   closeMenu();
@@ -503,6 +574,11 @@ api.on('memo:meta', applyMeta);
 
 function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
+  // 다른 창(위젯의 떼기 · 다른 메모의 단축키)에서 바뀌었을 수 있어 열 때마다 다시 읽는다
+  if (!el.menu.hidden && memo) {
+    api.widget?.has(id).then(showWidgetState, () => {});
+    api.hotkeys?.state(id).then(showHotkey, () => {});
+  }
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
   if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
 }
@@ -1635,7 +1711,7 @@ if (memo?.needsPassword) {
   document.body.dataset.color = memo.color;
   document.title = memo.title;
   document.body.classList.add('memo-locked');
-  const opened = await lockScreen(el.editorRoot, {
+  const unlocking = lockScreen(el.editorRoot, {
     title: memo.title,
     onTry: async (password) => {
       const r = await api.memo.openLock(id, password);
@@ -1645,12 +1721,15 @@ if (memo?.needsPassword) {
     },
     onCancel: () => window.close(),
   });
+  markPainted();
+  const opened = await unlocking;
   // "닫기": 창이 닫히는 동안 암호문으로 편집기를 만들지 않는다 (여기서 멈춤)
   if (!opened) await new Promise(() => {});
   document.body.classList.remove('memo-locked');
 }
 if (!memo) {
   setStatus('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
+  markPainted();
 } else {
   applyMeta(memo);
   applyTop(memo.onTop === true);
@@ -1682,6 +1761,8 @@ if (!memo) {
   });
   reminderPanel.set(memo.reminders);
   showLockState();
+  api.hotkeys?.state(id).then(showHotkey, () => {});
+  api.widget?.has(id).then(showWidgetState, () => {});
   recorder = setupVoiceRecorder({
     panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
     buttons: () => document.querySelectorAll('[data-action="record"]'),
@@ -1698,6 +1779,7 @@ if (!memo) {
   });
   if (memo.alarm) showAlarm(memo.alarm);
   editor.focus();
+  markPainted();
   if (memo.capture) await applyCapture(memo.capture);
   if (params.get('record') === '1') recorder.start(); // 목록 + › 음성 메모
   if (params.get('ink') === '1') editor.insertInk(); // 목록 + › 손 메모

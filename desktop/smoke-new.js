@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { FileIndex } from './file-index.js';
+import { smokeOpened } from './utils.js';
 
 const SMOKE_DIR = path.join(os.tmpdir(), 'memoking-smoke');
 const VAULT = path.join(SMOKE_DIR, 'vault');
@@ -60,7 +61,7 @@ function fakeOpms() {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, host: `http://127.0.0.1:${server.address().port}` })));
 }
 
-export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow }) {
+export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow, memoHotkeys, smokeHud, windowManager }) {
   const checks = [];
   const errors = [];
   const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
@@ -317,6 +318,302 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('그림 복사: 마우스를 올리면 × 옆에 복사 단추 · 누르면 클립보드에 그림 그대로', Boolean(img) && copyShown && still && copied === true, JSON.stringify({ img, copyShown, copied, file: vault.get(picId)?.file, doc: img ? '' : await js(pw, `document.querySelector('.mk-doc')?.innerHTML.slice(0, 300)`) }));
       pw.close();
       w.close();
+    }
+
+    // ---------- v0.33 — 메모 창 바로 뜨기(예비 창) · PDF · 표 · 수식 등에 마우스를 올려 복사 · 지우기 ----------
+    {
+      const list = getList() ?? createListWindow();
+      await until(() => js(list, `document.readyState === 'complete'`), '목록 창');
+      const vault = getVault();
+      fs.mkdirSync(path.join(vault.root, 'attachments'), { recursive: true });
+      fs.writeFileSync(path.join(vault.root, 'attachments', '안내 자료.pdf'), '%PDF-1.4\n% smoke\n');
+      const body = '# 콘텐츠 복사\n\n[안내 자료.pdf](attachments/안내%20자료.pdf)\n\n| 이름 | 값 |\n| --- | --- |\n| 가 | 1 |\n\n$$\nx^2\n$$\n\n끝 문단\n';
+      const cid = vault.import({ body });
+      // 예비 창이 준비될 때까지 (목록이 뜨고 조금 뒤 만들어 둔다)
+      await wait(2500);
+      await until(() => js(list, `!!document.querySelector('[data-id="${cid}"]')`), '콘텐츠 메모 카드');
+      const before = new Set(noteWins.keys());
+      const winsBefore = new Set(electronApi.BrowserWindow.getAllWindows().map((x) => x.id)); // 예비 창은 누르기 전부터 있다
+      const t0 = Date.now();
+      await js(list, `document.querySelector('[data-id="${cid}"]').click()`);
+      const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '콘텐츠 메모 창');
+      const nw = noteWins.get(nid);
+      await until(() => nw.isVisible(), '메모 창 보임');
+      const openMs = Date.now() - t0;
+      const fromSpare = winsBefore.has(nw.id);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '콘텐츠 메모 준비');
+      const shownRight = await js(nw, `new URLSearchParams(location.search).get('id') === ${JSON.stringify(nid)} && document.querySelector('.mk-doc h1')?.textContent === '콘텐츠 복사'`);
+      check('메모 창 바로 뜨기: 미리 불러 둔 예비 창으로 (300ms 안), 그 메모 내용 그대로', fromSpare && openMs < 300 && shownRight, JSON.stringify({ fromSpare, openMs, shownRight }));
+
+      const hover = async (sel) => {
+        const r = await js(nw, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + Math.min(12, r.width / 2)), y: Math.round(r.top + Math.min(10, r.height / 2)) }; })()`);
+        if (!r) return null;
+        nw.webContents.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
+        return until(() => js(nw, `(() => { const b = document.querySelector('.mk-delete-btn.hover'); return b && b.getAttribute('aria-label'); })()`), `${sel} 단추`, 3000).catch(() => null);
+      };
+      const pressCopy = async () => {
+        const b = await js(nw, `(() => { const r = document.querySelector('.mk-copy-btn').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+        nw.webContents.sendInputEvent({ type: 'mouseMove', x: b.x, y: b.y });
+        await wait(100);
+        nw.webContents.sendInputEvent({ type: 'mouseDown', x: b.x, y: b.y, button: 'left', clickCount: 1 });
+        nw.webContents.sendInputEvent({ type: 'mouseUp', x: b.x, y: b.y, button: 'left', clickCount: 1 });
+        return until(() => js(nw, `document.querySelector('.mk-copy-btn.done')?.title`), '복사 ✓', 3000).catch(() => js(nw, `document.querySelector('.mk-copy-btn')?.title ?? '단추 없음'`));
+      };
+      const leave = async () => {
+        nw.webContents.sendInputEvent({ type: 'mouseMove', x: 2, y: 2 });
+        await until(() => js(nw, `!document.querySelector('.mk-delete-btn')`), '단추 거둠', 2000).catch(() => {});
+      };
+      // PDF 파일 칩: 마우스를 올리면 "이 파일 복사 · 지우기", 복사는 파일 그대로
+      const fileLabel = await hover('.mk-doc a[data-file]');
+      const copiesBefore = smokeOpened.filter((o) => o.kind === 'copy-file').length;
+      const fileDone = fileLabel ? await pressCopy() : '';
+      const fileCopy = smokeOpened.filter((o) => o.kind === 'copy-file').at(-1);
+      check('PDF 파일: 마우스를 올리면 복사 · 지우기, 복사하면 파일 그대로 클립보드에',
+        fileLabel === '이 파일 지우기' && /파일을 복사했어요/.test(fileDone) && smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1 && /안내 자료\.pdf$/.test(fileCopy?.target ?? ''),
+        JSON.stringify({ fileLabel, fileDone, fileCopy }));
+      await leave();
+      // 표: 표째로 복사 (엑셀에 붙도록 칸 사이 탭 · 서식은 표 그대로)
+      const tableLabel = await hover('.mk-doc .tableWrapper td');
+      clipboard.writeText('비움');
+      const tableDone = tableLabel ? await pressCopy() : '';
+      const clip = async (type) => {
+        for (const item of await clipboard.read()) if (item.types.includes(type)) return (await item.getType(type)).text();
+        return '';
+      };
+      const tableText = await clip('text/plain');
+      const tableHtml = await clip('text/html');
+      check('표: 마우스를 올리면 "이 표 복사 · 지우기", 복사하면 칸 사이 탭 + 표 서식',
+        tableLabel === '이 표 지우기' && /내용을 복사했어요/.test(tableDone) && /이름\t값\n가\t1/.test(tableText) && /<table/.test(tableHtml) && !/column-resize-handle|contenteditable/.test(tableHtml),
+        JSON.stringify({ tableLabel, tableDone, tableText, html: tableHtml.slice(0, 200) }));
+      await leave();
+      // 수식: 마우스를 올리면 단추, 지우면 수식만 사라짐
+      const mathLabel = await hover('.mk-doc .mk-math-block');
+      if (mathLabel) {
+        await js(nw, `document.querySelector('.mk-delete-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
+      }
+      const mathGone = await until(() => js(nw, `!document.querySelector('.mk-doc .mk-math-block') && document.querySelector('.mk-doc').textContent.includes('끝 문단')`), '수식 지움', 3000).catch(() => false);
+      const undoTip = await until(() => js(nw, `document.getElementById('mk-undo-hint')?.textContent`), '되돌리기 안내', 2000).catch(() => '');
+      check('수식: 마우스를 올리면 "이 수식 지우기", 누르면 수식만 지워지고 그 자리에 "수식을 지웠어요 · Ctrl+Z 로 되돌리기"',
+        mathLabel === '이 수식 지우기' && mathGone && /^수식을 지웠어요 · Ctrl\+Z 로 되돌리기$/.test(undoTip), JSON.stringify({ mathLabel, mathGone, undoTip }));
+      nw.close();
+    }
+
+    // ---------- v0.33 — 줄 앞 띄어쓰기 지키기 (붙여넣기 · 치기 · 저장 · 복사) ----------
+    {
+      const list = getList() ?? createListWindow();
+      const vault = getVault();
+      const sid = vault.import({ body: '# 띄어쓰기\n\n끝\n' });
+      await until(() => js(list, `!!document.querySelector('[data-id="${sid}"]')`), '띄어쓰기 메모 카드');
+      const before = new Set(noteWins.keys());
+      await js(list, `document.querySelector('[data-id="${sid}"]').click()`);
+      const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '띄어쓰기 메모 창');
+      let nw = noteWins.get(nid);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '띄어쓰기 메모 준비');
+      const caretAtEnd = `(() => { const p = [...document.querySelectorAll('.mk-doc p')].at(-1); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`;
+      await js(nw, caretAtEnd);
+      key(nw, 'Enter');
+      await wait(100);
+      // 메모장에서 복사한 글 (HTML 없음)
+      const pasted = '  국내사업부 대표 안내\n    네 칸 들여쓴 줄\n\t탭 줄\n\n- 목록은 목록\n\n마지막 줄';
+      await js(nw, `(() => { const dt = new DataTransfer(); dt.setData('text/plain', ${JSON.stringify(pasted)}); document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`);
+      await wait(300);
+      // 직접 친 줄 앞 띄어쓰기
+      await js(nw, caretAtEnd);
+      key(nw, 'Enter');
+      await wait(100);
+      for (const ch of ['  ', '직접 친 줄']) nw.webContents.insertText(ch);
+      await wait(300);
+      const shown = await js(nw, `[...document.querySelectorAll('.mk-doc p, .mk-doc li, .mk-doc pre')].map((e) => e.tagName + ':' + e.textContent)`);
+      const N = ' ';
+      const want = [`P:${N}${N}국내사업부 대표 안내`, `${N.repeat(4)}네 칸 들여쓴 줄`, `${N.repeat(4)}탭 줄`];
+      const lines = await js(nw, `(() => { const p = [...document.querySelectorAll('.mk-doc p')].find((e) => e.textContent.includes('국내사업부')); return p ? p.querySelectorAll('br:not(.ProseMirror-trailingBreak)').length : -1; })()`);
+      const inDoc = want.every((w) => shown.some((x) => x.includes(w))) && !shown.some((x) => x.startsWith('PRE:')) && shown.some((x) => x === 'LI:목록은 목록')
+        && shown.some((x) => x === `P:${N}${N}직접 친 줄`) && lines === 2;
+      check('줄 앞 띄어쓰기 · 줄바꿈: 메모장 글을 붙여도 · 직접 쳐도 그대로 (네 칸도 코드 블록이 되지 않음, 줄이 합쳐지지 않음)', inDoc, JSON.stringify({ shown, lines }));
+      // 워드 · 메모킹에서 복사한 서식 글(HTML)의 들여쓰기도 그대로
+      await js(nw, caretAtEnd);
+      key(nw, 'Enter');
+      await wait(80);
+      await js(nw, `(() => { const dt = new DataTransfer(); dt.setData('text/html', '<p>&nbsp;&nbsp;워드에서 들여 쓴 줄&nbsp;&nbsp;끝</p>'); dt.setData('text/plain', '  워드에서 들여 쓴 줄  끝'); document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`);
+      await wait(300);
+      const htmlLine = await js(nw, `[...document.querySelectorAll('.mk-doc p')].map((p) => p.textContent).find((t) => t.includes('워드에서')) ?? ''`);
+      check('서식 글(HTML)을 붙여도 줄 앞 들여쓰기 그대로 (글 속 겹친 빈칸은 보통 띄어쓰기)', htmlLine === `${N}${N}워드에서 들여 쓴 줄  끝`, JSON.stringify(htmlLine));
+      // 줄을 나누다 앞에 남은 띄어쓰기는 일부러 넣은 것이 아니므로 다듬기가 지운다 ("앞말| 뒷말" 에서 Enter)
+      await js(nw, caretAtEnd);
+      key(nw, 'Enter');
+      await wait(80);
+      nw.webContents.insertText('앞말 뒷말');
+      await wait(150);
+      await js(nw, `(() => { const p = [...document.querySelectorAll('.mk-doc p')].at(-1); const t = p.firstChild; const r = document.createRange(); r.setStart(t, 2); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+      await wait(80);
+      key(nw, 'Enter');
+      await wait(80);
+      await js(nw, `(() => { const h = document.querySelector('.mk-doc h1'); const r = document.createRange(); r.selectNodeContents(h); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+      await wait(300);
+      const split = await js(nw, `[...document.querySelectorAll('.mk-doc p')].slice(-2).map((p) => p.textContent)`);
+      check('줄을 나누다 남은 앞 띄어쓰기는 지움 (일부러 넣은 들여쓰기만 지킴)', split[0] === '앞말' && split[1] === '뒷말', JSON.stringify(split));
+      // 복사: 일반 글자는 보통 띄어쓰기로, 서식은 줄지 않게
+      await js(nw, `(() => { const s = getSelection(); s.selectAllChildren(document.querySelector('.mk-doc')); })()`);
+      clipboard.writeText('비움');
+      key(nw, 'C', ['control']);
+      await wait(300);
+      const clipOf = async (type) => {
+        for (const item of await clipboard.read()) if (item.types.includes(type)) return (await item.getType(type)).text();
+        return '';
+      };
+      const copiedText = await clipOf('text/plain');
+      const copiedHtml = await clipOf('text/html');
+      check('줄 앞 띄어쓰기: 복사해 붙이면 메모장에는 보통 띄어쓰기 · 워드에는 빈칸 그대로',
+        /\n  국내사업부 대표 안내\n {4}네 칸 들여쓴 줄\n {4}탭 줄\n/.test(copiedText) && !copiedText.includes(N) && /(&nbsp;| ){2}국내사업부/.test(copiedHtml),
+        JSON.stringify({ copiedText, html: copiedHtml.replace(/ style="[^"]*"/g, '').slice(0, 600) }));
+      // 저장 → 다시 열기
+      nw.close();
+      await until(() => !noteWins.has(nid), '띄어쓰기 메모 닫힘');
+      const file = fs.readFileSync(path.join(vault.root, vault.get(sid).file), 'utf8');
+      const before2 = new Set(noteWins.keys());
+      await js(list, `document.querySelector('[data-id="${sid}"]').click()`);
+      const nid2 = await until(() => [...noteWins.keys()].find((k) => !before2.has(k)), '띄어쓰기 메모 다시');
+      nw = noteWins.get(nid2);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '다시 연 메모 준비');
+      const again = await js(nw, `[...document.querySelectorAll('.mk-doc p')].map((e) => e.textContent)`);
+      check('줄 앞 띄어쓰기: 저장했다 다시 열어도 그대로 (파일에도 빈칸으로)',
+        again.includes(`${N}${N}국내사업부 대표 안내${N.repeat(4)}네 칸 들여쓴 줄${N.repeat(4)}탭 줄`) && again.includes(`${N}${N}직접 친 줄`) && file.includes(`${N}${N}국내사업부`) && !/&#|&nbsp;/.test(file),
+        JSON.stringify({ again: again.map((x) => [...x.slice(0, 3)].map((c) => c.codePointAt(0).toString(16)).join(' ') + ' ' + x), file: file.replace(/\u00a0/g, '⍽') }));
+      nw.close();
+    }
+
+    // ---------- v0.33 — 메모 단축키 Ctrl+Alt+1~9 (복사 · 띄우기를 미리 골라 둠) ----------
+    {
+      const list = getList() ?? createListWindow();
+      const vault = getVault();
+      const N = ' ';
+      const hid = vault.import({ body: `# 배송 안내\n\n안녕하세요, **고객님**.\n${N}${N}국내사업부 대표 번호로 연락 주세요\n` });
+      await until(() => js(list, `!!document.querySelector('[data-id="${hid}"]')`), '단축키 메모 카드');
+      const before = new Set(noteWins.keys());
+      await js(list, `document.querySelector('[data-id="${hid}"]').click()`);
+      const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '단축키 메모 창');
+      const nw = noteWins.get(nid);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '단축키 메모 준비');
+      // 메뉴 › 단축키로 불러오기 → 3 · 내용 복사만
+      await js(nw, `document.getElementById('menu-btn').click(); document.getElementById('hotkey-btn').click()`);
+      await until(() => js(nw, `!!document.querySelector('.hotkey-dialog[open] .hk-key')`), '단축키 창');
+      const dlg = await js(nw, `(() => {
+        const d = document.querySelector('.hotkey-dialog');
+        const keys = d.querySelectorAll('.hk-key').length;
+        const [copy, show] = d.querySelectorAll('.hk-opt .switch');
+        const saveBtn = d.querySelector('button[type="submit"]');
+        const before = saveBtn.disabled; // 숫자를 고르기 전
+        d.querySelectorAll('.hk-key')[2].click();
+        copy.checked = false; copy.dispatchEvent(new Event('change'));
+        show.checked = false; show.dispatchEvent(new Event('change'));
+        const none = { disabled: saveBtn.disabled, error: d.querySelector('.lock-error').textContent };
+        copy.checked = true; copy.dispatchEvent(new Event('change'));
+        const hint = d.querySelector('.hk-hint').textContent;
+        const after = saveBtn.disabled;
+        const legend = Boolean(d.querySelector('.hk-legend')?.textContent.includes('다른 메모가 써요'));
+        return { keys, before, none, hint, legend, after, fits: d.scrollHeight <= d.clientHeight + 1, size: [d.scrollHeight, d.clientHeight, innerHeight] };
+      })()`);
+      await capture(nw, 'smoke-new-hotkey-dialog.png');
+      await js(nw, `document.querySelector('.hotkey-dialog button[type="submit"]').click()`);
+      await until(() => js(nw, `!document.querySelector('.hotkey-dialog')`), '단축키 창 닫힘');
+      const saved = getSettings().memoHotkeys?.['3'];
+      const label = await js(nw, `document.getElementById('hotkey-label').textContent`);
+      check('메모 단축키 창: 1~9 · 복사/띄우기 중 하나는 꼭 · 저장하면 Ctrl+Alt+3 에 이 메모 (메뉴에 표시)',
+        dlg.keys === 9 && dlg.before && dlg.none.disabled && /하나는/.test(dlg.none.error) && !dlg.after && /^Ctrl\+Alt\+3: 어느 앱에서든 누르면 내용을 복사해요$/.test(dlg.hint) && dlg.legend && dlg.fits
+          && saved?.id === hid && saved.copy && !saved.show && label === 'Ctrl+Alt+3' && memoHotkeys.held.has('3'),
+        JSON.stringify({ dlg, saved, label, held: [...memoHotkeys.held.keys()] }));
+      const badge = await until(() => js(list, `document.querySelector('[data-id="${hid}"] .card-badge.hotkey')?.textContent`), '목록 카드 단축키 표시', 3000).catch(() => '');
+      check('목록 카드: 단축키 숫자 표시', badge === '3', badge);
+      // 누르면: 제목 줄은 빼고 본문만, 줄 앞 띄어쓰기 그대로 클립보드에 + 마우스 가까이 "복사했어요"
+      nw.close();
+      await until(() => !noteWins.has(nid), '메모 창 닫힘');
+      clipboard.writeText('비움');
+      const hudBefore = smokeHud.length;
+      await memoHotkeys.onPress('3');
+      const text = await clipboard.readText();
+      const hud = smokeHud.slice(hudBefore);
+      check('Ctrl+Alt+3 → 본문만 복사 (줄 앞 띄어쓰기 그대로) · 창은 띄우지 않고 "복사했어요" 잠깐',
+        text === '안녕하세요, 고객님.\n  국내사업부 대표 번호로 연락 주세요' && !noteWins.has(hid) && /배송 안내.*복사했어요/.test(hud[0]?.title ?? '') && /Ctrl\+V/.test(hud[0]?.body ?? ''),
+        JSON.stringify({ text, hud }));
+      // 띄우기만으로 바꾸면: 누르면 메모 창이 뜬다
+      const r = memoHotkeys.set(hid, '3', { copy: false, show: true });
+      clipboard.writeText('비움');
+      await memoHotkeys.onPress('3');
+      const shownWin = await until(() => noteWins.get(hid)?.isVisible() && noteWins.get(hid), '단축키로 메모 띄우기', 4000).catch(() => null);
+      check('띄우기로 바꾸면 Ctrl+Alt+3 → 메모 창이 뜸 (클립보드는 그대로)', r.ok && Boolean(shownWin) && (await clipboard.readText()) === '비움', JSON.stringify({ r: r.ok, shown: Boolean(shownWin) }));
+      shownWin?.close();
+      // 풀기
+      const off = memoHotkeys.set(hid, null);
+      check('단축키 풀기 → 키를 놓아 다른 앱이 쓸 수 있게', off.ok && !memoHotkeys.held.has('3') && !getSettings().memoHotkeys?.['3'], JSON.stringify(getSettings().memoHotkeys));
+    }
+
+    // ---------- v0.33 — 바탕화면 위젯 (메모 창 › 바탕화면에 붙이기) ----------
+    {
+      const list = getList() ?? createListWindow();
+      const vault = getVault();
+      // 빈 메모는 붙이지 않는다 (창을 닫으면 저절로 정리되므로)
+      const blank = vault.create();
+      const blankR = await (async () => {
+        const b0 = new Set(noteWins.keys());
+        windowManager.openNote(blank);
+        const bid = await until(() => [...noteWins.keys()].find((k) => !b0.has(k)), '빈 메모 창');
+        const bw = noteWins.get(bid);
+        await until(() => js(bw, `document.documentElement.dataset.ready === 'true'`), '빈 메모 준비');
+        await js(bw, `document.getElementById('menu-btn').click(); document.getElementById('widget-btn').click()`);
+        const status = await until(() => js(bw, `document.getElementById('status')?.textContent`), '빈 메모 안내', 3000).catch(() => '');
+        const r = { status, widget: windowManager.widgets.has(blank), open: !bw.isDestroyed() };
+        bw.close();
+        return r;
+      })();
+      check('빈 메모는 바탕화면에 붙이지 않고 알려 줌', /빈 메모/.test(blankR.status) && !blankR.widget && blankR.open, JSON.stringify(blankR));
+      const wid = vault.import({ body: '# 자주 쓰는 안내\n\n전화 상담: 평일 9시~6시\n\n- 주소: 서울시 어딘가\n' });
+      await until(() => js(list, `!!document.querySelector('[data-id="${wid}"]')`), '위젯 메모 카드');
+      const before = new Set(noteWins.keys());
+      await js(list, `document.querySelector('[data-id="${wid}"]').click()`);
+      const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '위젯 메모 창');
+      const nw = noteWins.get(nid);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '위젯 메모 준비');
+      const noteBounds = nw.getBounds();
+      await js(nw, `document.getElementById('menu-btn').click(); document.getElementById('widget-btn').click()`);
+      const ww = await until(() => windowManager.widgets.get(wid), '위젯 창', 4000).catch(() => null);
+      await until(() => ww && js(ww, `document.documentElement.dataset.ready === 'true'`), '위젯 준비', 6000).catch(() => {});
+      const noteClosed = await until(() => !noteWins.has(nid), '메모 창 닫힘', 3000).catch(() => false);
+      const look = ww ? await js(ww, `({ text: document.querySelector('.mk-doc')?.textContent ?? '', editable: document.querySelector('.mk-doc')?.getAttribute('contenteditable'), color: document.body.dataset.color, actions: document.querySelectorAll('.wg-actions button').length })`) : null;
+      const wb = ww?.getBounds();
+      check('바탕화면에 붙이기: 메모 창 자리에 위젯이 뜨고 메모 창은 닫힘 (읽기 전용 · 같은 색 · 복사/열기/떼기)',
+        Boolean(ww) && noteClosed && /전화 상담: 평일 9시~6시/.test(look?.text ?? '') && look?.editable === 'false' && look?.actions === 3
+          && wb && Math.abs(wb.x - noteBounds.x) <= 2 && Math.abs(wb.y - noteBounds.y) <= 2 && Boolean(getSettings().widgets?.[wid]),
+        JSON.stringify({ ww: Boolean(ww), noteClosed, look, wb, noteBounds }));
+      if (ww) await capture(ww, 'smoke-new-widget.png');
+      // 메모가 바뀌면 위젯도 바로
+      vault.save(wid, '# 자주 쓰는 안내\n\n전화 상담: 평일 10시~7시로 바뀜\n');
+      const updated = ww ? await until(() => js(ww, `document.querySelector('.mk-doc')?.textContent.includes('10시~7시')`), '위젯 다시 그림', 4000).catch(() => false) : false;
+      check('메모를 고치면 위젯도 바로 바뀜', updated);
+      // 본문 복사 단추: 제목 줄 빼고
+      clipboard.writeText('비움');
+      if (ww) await js(ww, `document.getElementById('wg-copy').click()`);
+      const copied = await until(async () => (await clipboard.readText()) === '전화 상담: 평일 10시~7시로 바뀜', '위젯 복사', 3000).catch(async () => clipboard.readText());
+      check('위젯 복사 단추: 본문만 클립보드에', copied === true, String(copied));
+      // 메모킹을 다시 켜면 그 자리에 (끌 때 닫힌 위젯은 기억)
+      windowManager.closeWidgetWindow(ww);
+      await until(() => !windowManager.widgets.has(wid), '위젯 창 닫힘', 3000).catch(() => {});
+      windowManager.restoreWidgets();
+      const again = await until(() => windowManager.widgets.get(wid), '위젯 다시', 3000).catch(() => null);
+      const againBounds = again?.getBounds();
+      check('다시 켜면 놓아 둔 자리에 위젯', Boolean(again) && Math.abs(againBounds.x - wb.x) <= 2 && Math.abs(againBounds.y - wb.y) <= 2, JSON.stringify({ againBounds, wb }));
+      // 떼기
+      if (again) {
+        await until(() => js(again, `document.documentElement.dataset.ready === 'true'`), '위젯 준비 2', 6000).catch(() => {});
+        await js(again, `document.getElementById('wg-remove').click()`);
+      }
+      const gone = await until(() => !windowManager.widgets.has(wid) && !getSettings().widgets?.[wid], '위젯 떼기', 3000).catch(() => false);
+      check('떼기 → 위젯이 사라지고 다시 켜도 안 뜸 (메모는 그대로)', gone && Boolean(vault.get(wid)));
+      // Alt+F4 로 닫아도 떼기와 같게
+      const w2 = windowManager.openWidget(wid);
+      await until(() => getSettings().widgets?.[wid], '위젯 다시 놓기', 2000).catch(() => {});
+      w2?.close();
+      const closedByUser = await until(() => !windowManager.widgets.has(wid) && !getSettings().widgets?.[wid], 'Alt+F4', 3000).catch(() => false);
+      check('위젯을 Alt+F4 로 닫으면 떼기와 같게 (다시 켜도 안 뜸)', closedByUser);
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

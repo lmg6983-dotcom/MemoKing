@@ -24,6 +24,8 @@ import { FileIndex } from './file-index.js';
 import { jumpListCategories, launchAction, pushRecent } from './jump-list.js';
 import { flushOpmsFiles } from './opms.js';
 import { createDoublePress } from './double-press.js';
+import { MemoHotkeys } from './memo-hotkeys.js';
+import { hotkeyCopyText, hotkeyLabel, hotkeyAccelerator } from '../app/js/core/memo-hotkeys.js';
 import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { alarmText } from '../app/js/core/reminders.js';
@@ -124,6 +126,56 @@ const windowManager = new WindowManager({
   getShortcutLabel: (name) => shortcutLabel(name),
 });
 
+// ---------- 메모 단축키 (Ctrl+Alt+1~9) ----------
+// 정해 둔 메모를 어디서든: 내용을 클립보드로 복사 · 메모 창 띄우기 (메모 창 메뉴 › 단축키로 불러오기)
+
+const memoHotkeys = new MemoHotkeys({
+  settings,
+  saveSettings,
+  getVault: () => vault,
+  onPress: (slot) => memoHotkeyPressed(slot),
+  reserved: () => [{ key: shortcutKey('quickMemo'), name: SHORTCUT_NAMES.quickMemo }, { key: shortcutKey('magic'), name: SHORTCUT_NAMES.magic }],
+});
+windowManager.hotkeySlotOf = (id) => memoHotkeys.slotOf(id); // 목록 카드에 단축키 표시
+
+async function memoHotkeyPressed(slot) {
+  const bound = memoHotkeys.map[slot];
+  const memo = bound && vault?.get(bound.id);
+  if (!memo) {
+    windowManager.showHud({ title: `${hotkeyLabel(slot)}: 메모를 찾지 못했어요`, body: '지웠거나 다른 메모 폴더의 메모예요', kind: 'warn' });
+    return;
+  }
+  const title = memo.title || '제목 없음';
+  let copied = false;
+  if (bound.copy && !memo.needsPassword) {
+    // 그 메모 창에서 막 고친 글까지 (저장 기다림 600ms 안에 눌러도)
+    const win = windowManager.noteWins.get(bound.id);
+    if (win && !win.isDestroyed()) {
+      const flushed = win.webContents.executeJavaScript('window.__memokingFlush?.()', true).catch(() => {});
+      await Promise.race([flushed, new Promise((r) => setTimeout(r, 800))]); // 저장이 막혀도 단축키는 바로
+    }
+    const text = hotkeyCopyText(vault.get(bound.id)?.body ?? memo.body);
+    try {
+      await writeClipboard({ text });
+      copied = true;
+    } catch (err) {
+      console.error('메모 단축키 복사', err);
+    }
+  }
+  // 잠긴 메모는 비밀번호를 넣어야 하니 복사 대신 창을 띄운다
+  const show = bound.show || (bound.copy && !copied);
+  if (show) windowManager.revealNote(bound.id);
+  // 붙여 넣는 법은 처음 몇 번만 (매일 수십 번 쓰는 사람에게는 군더더기)
+  const tip = !show && (settings.hotkeyTips ?? 0) < 3;
+  if (tip) {
+    settings.hotkeyTips = (settings.hotkeyTips ?? 0) + 1;
+    saveSettings();
+  }
+  if (copied) windowManager.showHud({ title: `“${title}” 내용을 복사했어요`, body: tip ? 'Ctrl+V 로 붙여 넣으세요' : '' });
+  else if (bound.copy && memo.needsPassword) windowManager.showHud({ title: '잠긴 메모라 복사하지 않았어요', body: '비밀번호를 넣고 열어 주세요', kind: 'warn' });
+  else if (bound.copy) windowManager.showHud({ title: '복사하지 못했어요', body: '다시 눌러 주세요', kind: 'warn' });
+}
+
 // ---------- 볼트(Vault) 연결 및 동기화 ----------
 
 function openVault(dir) {
@@ -136,7 +188,13 @@ function openVault(dir) {
       driveSync?.request(3000);
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
+      windowManager.refreshWidgets([...new Set([...ids, ...removed])]);
+      if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));
+    });
+    next.on('trashed', (id) => {
+      windowManager.removeWidget(id);
+      if (memoHotkeys.slotOf(id)) memoHotkeys.set(id, null); // 단축키는 놓아 다른 앱이 쓰게
     });
     next.on('indexed', (index) => windowManager.listWin?.webContents.send('vault:indexed', index.generatedAt));
     next.on('error', (err) => console.error('[vault]', err));
@@ -148,6 +206,10 @@ function openVault(dir) {
     saveSettings();
     migrateV1();
     windowManager.loadStacks();
+    if (app.isReady()) {
+      windowManager.restoreWidgets(); // 바탕화면 위젯 — 숨겨 시작해도(로그인 때 자동 실행) 그 자리에
+      memoHotkeys.refresh(); // 다른 폴더의 메모 단축키
+    }
     purgeTrash(vault);
     configureDrive();
   } catch (err) {
@@ -553,6 +615,8 @@ function setShortcut(name, acc) {
   if (!isValidAccelerator(next)) return { ok: false, reason: 'invalid', status: shortcutStatus(name) };
   const other = name === 'quickMemo' ? 'magic' : 'quickMemo';
   if (next === shortcutKey(other)) return { ok: false, reason: 'same', other: SHORTCUT_NAMES[other], status: shortcutStatus(name) };
+  // 메모 단축키(Ctrl+Alt+숫자)가 쓰는 키 — 단축키를 바꾸는 동안은 잠시 놓여 있으므로 잡은 키가 아니라 정해 둔 칸으로 본다
+  if (Object.entries(memoHotkeys.map).some(([slot, b]) => hotkeyAccelerator(slot) === next && (!vault || vault.get(b.id)))) return { ok: false, reason: 'same', other: '메모 단축키', status: shortcutStatus(name) };
   const prev = shortcutKey(name);
   const enabled = shortcutStatus(name).enabled;
   if (enabled && next !== prev) {
@@ -563,6 +627,7 @@ function setShortcut(name, acc) {
   saveSettings();
   if (name === 'quickMemo') registerQuickMemoKey();
   else registerMagicKey();
+  memoHotkeys.register(); // 놓아 준 Ctrl+Alt+숫자를 메모 단축키가 다시 쓰게
   updateTrayMenu();
   return { ok: true, status: shortcutStatus(name) };
 }
@@ -571,6 +636,7 @@ function pauseShortcuts(on) {
   shortcutsPaused = Boolean(on);
   registerQuickMemoKey();
   registerMagicKey();
+  memoHotkeys.pause(on);
 }
 
 function registerQuickMemoKey() {
@@ -637,6 +703,7 @@ setInterval(() => {
   const before = [shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered].join();
   if (shortcutStatus('quickMemo').enabled && !shortcutStatus('quickMemo').registered) registerQuickMemoKey();
   if (shortcutStatus('magic').enabled && !shortcutStatus('magic').registered) registerMagicKey();
+  if ([...memoHotkeys.failed].some((slot) => !memoHotkeys.reservedBy(slot))) memoHotkeys.register(); // 다른 앱이 쓰던 숫자를 놓았으면 이제 잡는다
   if ([shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered].join() !== before) {
     updateTrayMenu();
     windowManager.listWin?.webContents.send('shortcuts:changed');
@@ -791,6 +858,7 @@ app.whenReady().then(async () => {
 
   registerIpc({
     windowManager,
+    memoHotkeys,
     getVault: () => vault,
     openVault,
     vaultInfo,
@@ -923,6 +991,9 @@ app.whenReady().then(async () => {
       getFinder: () => windowManager.finderWin,
       useFileIndex: (idx) => { fileIndex = idx; },
       getOpms: () => windowManager.opmsWin,
+      memoHotkeys,
+      smokeHud: windowManager.smokeHud,
+      windowManager,
     });
     return;
   }
@@ -946,6 +1017,7 @@ app.whenReady().then(async () => {
   alarms.start();
   registerQuickMemoKey();
   registerMagicKey();
+  memoHotkeys.register();
   syncFileIndex();
   updateTrayMenu();
   if (vault && !settings.tutorialDone && !HIDDEN_START) startTutorial();
@@ -966,6 +1038,7 @@ app.on('will-quit', () => {
   windowManager.topWatch.stop();
   globalShortcut.unregisterAll();
   windowManager.captureHelper.stop();
+  windowManager.desktopPin.stop();
   alarms.stop();
   history?.stop();
   history?.save(true);

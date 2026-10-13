@@ -1,4 +1,5 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
+import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
 import { acceleratorFromKey, displayAccelerator } from './core/accelerators.js';
@@ -373,6 +374,18 @@ function renderCard(memo) {
   if (memo.hasFile) meta.append(badge('clip', ''));
   if (memo.linkCount) meta.append(badge('link', memo.linkCount));
   if (memo.stack) meta.append(badge('tabs', memo.stack, 'stack'));
+  // 바탕화면 위젯으로 붙어 있는 메모
+  if (memo.widget) {
+    const wg = badge('desktop', '', 'widget');
+    wg.title = '바탕화면에 붙어 있어요';
+    meta.append(wg);
+  }
+  // 메모 단축키: Ctrl+Alt+숫자 로 어디서든 불러오는 메모 (메모 창 › 단축키로 불러오기)
+  if (memo.hotkey) {
+    const hk = badge('zap', memo.hotkey, 'hotkey');
+    hk.title = `단축키 ${hotkeyLabel(memo.hotkey)}`;
+    meta.append(hk);
+  }
   const time = document.createElement('span');
   time.className = 'card-time';
   time.textContent = friendlyTime(memo.updated);

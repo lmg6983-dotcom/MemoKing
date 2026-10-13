@@ -28,6 +28,28 @@ function announce(text) {
   requestAnimationFrame(() => (live.textContent = text));
 }
 
+// 지운 자리에 "표를 지웠어요 · Ctrl+Z 로 되돌리기" 를 2.5초 (하나만)
+function undoHint(what, rect) {
+  document.getElementById('mk-undo-hint')?.remove();
+  const tip = document.createElement('div');
+  tip.id = 'mk-undo-hint';
+  tip.className = 'mk-undo-hint';
+  tip.setAttribute('role', 'status');
+  tip.innerHTML = '<span></span> · <kbd>Ctrl+Z</kbd> 로 되돌리기';
+  tip.firstChild.textContent = `${what}${/[가-힣]$/.test(what) && (what.charCodeAt(what.length - 1) - 0xac00) % 28 ? '을' : '를'} 지웠어요`;
+  document.body.append(tip);
+  const top = Math.max(8, Math.min(window.innerHeight - tip.offsetHeight - 8, rect.top));
+  const left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, rect.left + rect.width / 2 - tip.offsetWidth / 2));
+  tip.style.top = `${Math.round(top)}px`;
+  tip.style.left = `${Math.round(left)}px`;
+  const gone = () => tip.remove();
+  setTimeout(() => {
+    tip.classList.add('fading');
+    setTimeout(gone, 260);
+  }, 2500);
+  document.addEventListener('keydown', gone, { once: true });
+}
+
 /** 대상을 담고 스크롤되는 상자 (없으면 null = 창) */
 function scrollParent(el) {
   for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
@@ -116,12 +138,14 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     copyBlock(view, pos, node, target).then((what) => {
       copyBtn.classList.add('done');
       copyBtn.innerHTML = DONE_ICON;
-      copyBtn.title = what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요' : '내용을 복사했어요';
+      copyBtn.title = what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
+        : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : '내용을 복사했어요';
       announce(copyBtn.title);
     }, (err) => {
       copyBtn.classList.add('failed');
       copyBtn.innerHTML = FAIL_ICON;
-      copyBtn.title = `복사하지 못했어요: ${err?.message ?? err}`;
+      console.warn('내용 복사', err);
+      copyBtn.title = '복사하지 못했어요. 다시 눌러 주세요';
       announce(copyBtn.title);
     }).finally(() => {
       setTimeout(() => (copying = false), 0); // 바로 뒤따르는 click 까지는 막고
@@ -147,6 +171,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     if (markTarget) target.classList.remove('mk-delete-target');
     // 대상: 붉게 비쳤다가 작아지며 흐려지고 → 그 자리가 접힌다 (높이를 정해 두어야 접히는 모습이 보인다)
     const box = view.nodeDOM(pos);
+    const where = target.getBoundingClientRect();
     const h = box instanceof Element ? box.getBoundingClientRect().height : 0;
     const scale = box instanceof HTMLElement && box.offsetHeight ? h / box.offsetHeight : 1; // 본문 확대·축소
     const height = `height: ${(h / scale).toFixed(1)}px`;
@@ -158,6 +183,8 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       if (view.state.doc.nodeAt(pos) !== node) return;
       if (remove) remove(view, pos, node);
       else view.dispatch(view.state.tr.delete(pos, pos + node.nodeSize).scrollIntoView());
+      // PC: 표 · 수식처럼 공들인 것도 한 번에 지워지므로, 그 자리에 되돌리는 법을 잠깐 (휴대폰은 목록의 되돌리기 띠)
+      if (hover) undoHint(label.replace(/ 지우기$/, '').replace(/^이 /, ''), where);
     }, FADE_MS + COLLAPSE_MS);
   };
   btn.addEventListener('mousedown', press);

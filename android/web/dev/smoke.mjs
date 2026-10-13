@@ -1417,7 +1417,7 @@ try {
   await back();
   await page.waitForTimeout(300);
 
-  // 조용한 다듬기: 쓰던 줄을 떠나면 겹친 띄어쓰기·부호 앞 띄어쓰기, 갈라진 같은 목록은 하나로
+  // 조용한 다듬기: 쓰던 줄을 떠나면 부호 앞 띄어쓰기, 갈라진 같은 목록은 하나로 (겹친 띄어쓰기 · 줄 앞 들여쓰기는 일부러 쓴 것이라 그대로)
   write('다듬기.md', '---\nid: 00000000-0000-4000-8000-0000000000bb\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 다듬기\n\n- 사과\n- 배\n\n* 감\n* 귤\n\n둘째 문단\n');
   await page.evaluate(() => window.__mk.emit('app', 'resume'));
   await page.waitForTimeout(400);
@@ -1434,7 +1434,7 @@ try {
   await page.locator('.mk-doc h1').tap();
   await page.waitForTimeout(900);
   const tidied = read('다듬기.md');
-  check('다듬기: 줄을 떠나면 띄어쓰기 정리', tidied.includes('둘째 문단 끝이에요 정말.') && /- 사과\n- 배\n- 감\n- 귤/.test(tidied), tidied);
+  check('다듬기: 줄을 떠나면 부호 앞 띄어쓰기만 정리 (겹친 띄어쓰기는 그대로)', tidied.includes('둘째 문단  끝이에요  정말.') && /- 사과\n- 배\n- 감\n- 귤/.test(tidied), tidied);
   await back();
   await page.waitForTimeout(300);
 

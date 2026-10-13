@@ -3,16 +3,21 @@
 //   문단·제목은 한 줄씩, 칸 안 줄바꿈은 줄바꿈, 목록은 "• " · "1. " · "☐ "/"☑ ", 표는 칸 사이 탭(엑셀에 붙이면 칸이 나뉨),
 //   링크 카드는 주소, 사진·소리·동영상은 빼고, 가로줄은 "———".
 //   목록 항목을 일부만 끌어 골라 복사하면 체크 네모·글머리 없이 글만.
+//   줄 앞 띄어쓰기(편집기에서는 U+00A0 로 지킨다 — core/indent-spaces.js)는 보통 띄어쓰기로.
 // 서식 있는 곳(워드·메모킹)에는 함께 들어가는 HTML 이 쓰인다.
+import { plainSpaces, htmlSpaces } from './core/indent-spaces.js';
 
 const isBreak = (node) => node.type.name === 'hardbreak' || node.type.name === 'hard_break'
   || (node.type.name === 'html' && /^<br\s*\/?>$/i.test(String(node.attrs.value ?? '').trim()));
 
 // 한 줄(글 덩어리) 안의 글
+// 글 조각: 줄 앞 들여쓰기(U+00A0)는 보통 띄어쓰기로 (글 속 코드는 그대로)
+const textOf = (node) => (node.marks.some((m) => m.type.spec.code) ? node.text : plainSpaces(node.text));
+
 function inlineText(node, breakAs = '\n') {
   let s = '';
   node.forEach((child) => {
-    if (child.isText) s += child.text;
+    if (child.isText) s += textOf(child);
     else if (isBreak(child)) s += breakAs;
     else if (child.type.name === 'math_inline') s += `$${child.attrs.value}$`;
     else if (child.type.name === 'html') s += ''; // 그 밖의 HTML 조각(밑줄·색 표시 등)은 글이 아니다
@@ -109,7 +114,7 @@ export function plainTextOf(fragment, { openStart = 0, openEnd = 0 } = {}) {
 
   fragment.forEach((node) => {
     if (node.isInline) {
-      if (node.isText) run += node.text;
+      if (node.isText) run += textOf(node);
       else if (isBreak(node)) {
         lines.push(run);
         run = '';
@@ -121,4 +126,15 @@ export function plainTextOf(fragment, { openStart = 0, openEnd = 0 } = {}) {
   });
   flush();
   return lines.join('\n');
+}
+
+/** 복사한 HTML: 글 속 겹친 빈칸을 U+00A0 로 (코드는 그대로) — 워드 · 메일이 빈칸을 하나로 줄이지 않게 */
+export function spacedHtml(html) {
+  const box = document.createElement('template');
+  box.innerHTML = html;
+  const walk = document.createTreeWalker(box.content, NodeFilter.SHOW_TEXT);
+  for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+    if (/ {2}/.test(t.data) && !t.parentElement?.closest('pre, code')) t.data = htmlSpaces(t.data);
+  }
+  return box.innerHTML;
 }

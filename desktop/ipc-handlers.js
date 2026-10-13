@@ -17,7 +17,8 @@ import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront } from './window-utils.js';
-import { SMOKE, toast } from './utils.js';
+import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
+import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: Math.round(p.x), y: Math.round(p.y) } : null);
@@ -25,6 +26,7 @@ const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x:
 export function registerIpc(ctx) {
   const {
     windowManager: wm,
+    memoHotkeys,
     getVault,
     openVault,
     vaultInfo,
@@ -493,6 +495,48 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 창 크기 조정 ----------
+  // 바탕화면 위젯
+  ipcMain.handle('widget:memo', (_e, id) => {
+    const m = getVault()?.get(String(id));
+    if (!m) return null;
+    // 잠긴 메모는 메모 창에서 풀어 둔 동안에도 바탕화면에는 내용을 보이지 않는다 (창을 닫아도 남아 있게 되므로)
+    return { title: m.title, color: m.color, tables: m.tables, locked: m.locked, body: m.locked ? '' : m.body };
+  });
+  ipcMain.handle('widget:place', (e, id) => {
+    const m = getVault()?.get(String(id));
+    if (!m) return { ok: false, error: '메모를 찾지 못했어요' };
+    // 빈 메모는 창을 닫으면 저절로 정리(휴지통)되므로 붙이지 않는다
+    if (!m.locked && isBlankBody(m.body)) return { ok: false, error: '빈 메모예요. 내용을 쓴 뒤에 바탕화면에 붙여 주세요' };
+    const ok = wm.placeWidget(String(id), senderWindow(e));
+    // 메모 창이 사라지므로 메모가 없어진 것이 아니라는 것을 바로 알린다
+    if (ok) wm.showHud({ title: '바탕화면에 붙였어요', body: '고치려면 위젯의 연필 단추' });
+    return { ok };
+  });
+  ipcMain.handle('widget:remove', (e, id) => {
+    const fromWidget = wm.widgets.get(String(id))?.webContents === e.sender;
+    const ok = wm.removeWidget(String(id));
+    if (ok && fromWidget) wm.showHud({ title: '바탕화면에서 뗐어요', body: '메모는 그대로 있어요' });
+    return ok;
+  });
+  ipcMain.handle('widget:has', (_e, id) => wm.hasWidget(String(id)));
+  ipcMain.handle('widget:open-note', (_e, id) => Boolean(wm.revealNote(String(id))));
+  // 본문 복사 (메모 단축키와 같은 글: 제목 줄 빼고, 서식 기호 없이, 줄 앞 띄어쓰기 그대로)
+  ipcMain.handle('memo:copy-text', async (_e, id) => {
+    const m = getVault()?.get(String(id));
+    if (!m || m.locked) return false;
+    await writeClipboard({ text: hotkeyCopyText(m.body) });
+    return true;
+  });
+
+  // 메모 단축키 (Ctrl+Alt+1~9)
+  ipcMain.handle('hotkey:state', (_e, id) => memoHotkeys.state(String(id)));
+  ipcMain.handle('hotkey:set', (_e, id, slot, opts) => {
+    const r = memoHotkeys.set(String(id), slot == null ? null : String(slot), { copy: opts?.copy !== false, show: opts?.show === true });
+    if (r.ok) wm.pushList();
+    return r;
+  });
+  ipcMain.handle('win:spare', (e) => wm.spareWaiting(e.sender));
+  ipcMain.on('win:painted', (e) => wm.notePainted(e.sender));
   ipcMain.handle('win:grow-width', (event, extra) => {
     const win = senderWindow(event);
     const add = Math.ceil(Number(extra) || 0);
@@ -709,6 +753,21 @@ export function registerIpc(ctx) {
     if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요.';
     const result = await openVaultFile(file, BrowserWindow.fromWebContents(e.sender));
     return result && result !== 'cancelled' ? '파일을 열지 못했어요. 이 파일을 열 수 있는 프로그램이 있는지 확인해 주세요.' : result;
+  });
+  ipcMain.handle('attachment:copy', async (_e, rel) => {
+    let decoded = String(rel ?? '');
+    try {
+      decoded = decodeURI(decoded);
+    } catch {
+      // 이미 디코딩됨
+    }
+    const file = getVault()?.resolve(decoded);
+    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return false;
+    if (SMOKE) {
+      smokeOpened.push({ kind: 'copy-file', target: file });
+      return true;
+    }
+    return copyFileToClipboard(file);
   });
   ipcMain.handle('attachment:info', (_e, rel) => {
     let decoded = String(rel ?? '');

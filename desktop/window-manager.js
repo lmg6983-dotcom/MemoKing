@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { isInside, dropBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 import { StackStore } from './stacks.js';
+import { DesktopPin } from './desktop-pin.js';
 import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
 import { Opms, isOpenableFile, cleanDate, foreignSummary, caseMemoMarkdown, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
@@ -57,6 +58,15 @@ export class WindowManager {
     this.windowDrag = null;
     this.tabTear = null;
     this.inkingWins = new WeakSet();
+    this.spare = null; // 미리 불러 둔 메모 창 { win, assign }
+    this.spareTimer = 0;
+    this.paintMarks = new WeakMap(); // 예비 창: 화면이 "메모를 그렸다" 고 알려 오면 부를 함수
+    this.hotkeySlotOf = () => null; // 메모 단축키 칸 (main.js 가 채움)
+    this.widgets = new Map(); // 바탕화면 위젯: 메모 id → 창
+    this.desktopPin = new DesktopPin();
+    this.hudWin = null;
+    this.hudTimer = 0;
+    this.smokeHud = [];
 
     this.pdfWin = null;
     this.smokePdf = [];
@@ -150,9 +160,13 @@ export class WindowManager {
     };
     this.listWin.on('moved', remember);
     this.listWin.on('resized', remember);
-    this.listWin.once('ready-to-show', () => this.listWin?.show());
+    this.listWin.once('ready-to-show', () => {
+      this.listWin?.show();
+      this.scheduleSpare(1500);
+    });
     this.listWin.on('closed', () => {
       this.listWin = null;
+      this.dropSpareIfIdle();
       this.drag = null;
       this.ghostWin?.destroy();
       this.ghostWin = null;
@@ -193,19 +207,31 @@ export class WindowManager {
       ink || big ? { width: 560, height: 640 } : DEFAULT_NOTE_SIZE,
       { listWin: this.listWin, noteWinsCount: this.noteWins.size },
     );
-    const win = new BrowserWindow({
-      ...(bounds ?? (onScreen(saved) ? saved : defaultBounds)),
-      minWidth: 240,
-      minHeight: 200,
-      frame: false,
-      show: false,
-      title: memo.title,
-      alwaysOnTop: settings.onTop[id] === true,
-      backgroundColor: noteBg(memo.color),
-      ...windowIcon,
-      webPreferences,
-    });
-    guardWindow(win, { openWebPage });
+    const at = bounds ?? (onScreen(saved) ? saved : defaultBounds);
+    // 보여 줄 창이면 미리 불러 둔 예비 창을 쓴다 (편집기를 새로 읽지 않아 바로 뜬다)
+    const spare = show ? this.takeSpare() : null;
+    let win;
+    if (spare) {
+      win = spare.win;
+      win.setBounds(at);
+      win.setTitle(memo.title);
+      win.setBackgroundColor(noteBg(memo.color));
+      win.setAlwaysOnTop(settings.onTop[id] === true);
+    } else {
+      win = new BrowserWindow({
+        ...at,
+        minWidth: 240,
+        minHeight: 200,
+        frame: false,
+        show: false,
+        title: memo.title,
+        alwaysOnTop: settings.onTop[id] === true,
+        backgroundColor: noteBg(memo.color),
+        ...windowIcon,
+        webPreferences,
+      });
+      guardWindow(win, { openWebPage });
+    }
     if (settings.onTop[id] === true) {
       win.setAlwaysOnTop(true, 'floating');
       this.setSticker(win, true, { animate: false });
@@ -235,8 +261,20 @@ export class WindowManager {
       this.endWindowDrag(id);
     });
     win.on('resized', remember);
-    trackPaint(win);
-    if (show) win.once('ready-to-show', () => (inactive ? win.showInactive() : win.show()));
+    const reveal = () => (inactive ? win.showInactive() : win.show());
+    if (spare) {
+      // 이미 한 번 그린 창이라 ready-to-show 가 다시 오지 않는다 — 화면이 메모를 그렸다고 알려 오면(win:painted) 보인다
+      const mark = trackPaint(win, { manual: true });
+      const fallback = setTimeout(mark, 1500);
+      this.paintMarks.set(win.webContents, () => {
+        clearTimeout(fallback);
+        mark();
+      });
+      whenPainted(win, reveal);
+    } else {
+      trackPaint(win);
+      if (show) win.once('ready-to-show', reveal);
+    }
     this.pushList();
 
     win.on('close', () => {
@@ -252,6 +290,7 @@ export class WindowManager {
 
     win.on('closed', () => {
       this.noteWins.delete(id);
+      this.dropSpareIfIdle();
       const currentVault = this.getVault();
       const stt = this.getStt();
       if (currentVault?.locks.has(id) && stt?.pendingFor?.(id)) {
@@ -273,10 +312,292 @@ export class WindowManager {
       }
     });
 
-    win.loadFile(path.join(APP_DIR, 'note.html'), {
-      query: { id, ...(record ? { record: '1' } : {}), ...(ink ? { ink: '1' } : {}) },
-    });
+    if (spare) spare.assign({ id, record, ink });
+    else {
+      win.loadFile(path.join(APP_DIR, 'note.html'), {
+        query: { id, ...(record ? { record: '1' } : {}), ...(ink ? { ink: '1' } : {}) },
+      });
+    }
+    this.scheduleSpare();
     return win;
+  }
+
+  // ---------- 바탕화면 위젯 ----------
+  // 메모를 바탕화면에 위젯처럼 (스티커 메모 앱처럼 늘 그 자리에): 작업 표시줄 · Alt+Tab 에 없고, 다른 앱 창 뒤 바탕화면 층에
+  //   (Windows: desktop-pin.js 가 바탕화면 창에 붙임 — Win+D 에도 남음). 내용은 읽기 전용 메모 그대로, 고치면 바로 바뀜
+  //   자리 · 크기는 이 PC 설정(settings.widgets)에 — 메모킹을 다시 켜면(로그인 때 자동 실행 포함) 그 자리에 다시
+
+  saveWidgetBounds(id, bounds) {
+    settings.widgets = { ...(settings.widgets ?? {}), [id]: bounds };
+    saveSettings();
+  }
+
+  forgetWidgetBounds(id) {
+    if (!settings.widgets?.[id]) return;
+    const { [id]: _gone, ...rest } = settings.widgets;
+    settings.widgets = rest;
+    saveSettings();
+  }
+
+  widgetBounds(id, near = null) {
+    const saved = settings.widgets?.[id];
+    if (saved && onScreen(saved)) return saved;
+    if (near) return near;
+    // 처음: 주 화면 오른쪽 위부터 차례로
+    const area = screen.getPrimaryDisplay().workArea;
+    const n = this.widgets.size;
+    const width = 260;
+    const height = 220;
+    return { x: area.x + area.width - width - 24 - (n % 3) * 28, y: area.y + 24 + n * 28, width, height };
+  }
+
+  openWidget(id, { near = null } = {}) {
+    const memo = this.getVault()?.get(id);
+    if (!memo) return null;
+    const existing = this.widgets.get(id);
+    if (existing && !existing.isDestroyed()) {
+      if (!existing.webContents.isLoading()) existing.showInactive(); // 아직 불러오는 중이면 ready-to-show 가 보인다
+      this.saveWidgetBounds(id, existing.getBounds());
+      return existing;
+    }
+    const bounds = this.widgetBounds(id, near);
+    const win = new BrowserWindow({
+      ...bounds,
+      minWidth: 180,
+      minHeight: 110,
+      frame: false,
+      show: false,
+      skipTaskbar: true,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      ...(process.platform === 'win32' ? { type: 'toolbar' } : {}), // 작업 전환(Alt+Tab)에도 안 나오게
+      title: memo.title,
+      backgroundColor: noteBg(memo.color),
+      ...windowIcon,
+      webPreferences,
+    });
+    guardWindow(win, { openWebPage });
+    this.widgets.set(id, win);
+    const remember = () => !win.isDestroyed() && this.saveWidgetBounds(id, win.getBounds());
+    win.on('moved', remember);
+    win.on('resized', remember);
+    // 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로
+    win.on('blur', () => this.desktopPin.send('bottom', hwndOf(win)));
+    win.once('ready-to-show', () => {
+      if (win.isDestroyed()) return;
+      win.showInactive();
+      this.desktopPin.send('pin', hwndOf(win));
+    });
+    win.on('session-end', () => (win.mkKeep = true)); // Windows 를 끌 때 닫히는 것은 그대로 기억
+    // Alt+F4 처럼 사람이 직접 닫으면(close 가 먼저 옴) 떼기와 같게
+    win.on('close', () => {
+      if (!win.mkKeep && !this.isQuitting()) win.mkUserClose = true;
+    });
+    win.on('closed', () => {
+      if (this.widgets.get(id) !== win) return;
+      this.widgets.delete(id);
+      if (win.mkUserClose) return void this.removeWidget(id);
+      this.pushList(); // 목록 카드의 바탕화면 표시
+      // close 없이 사라짐 = 탐색기를 다시 시작해 바탕화면 창(주인)이 없어짐 — 조금 뒤 새 바탕화면에 다시 붙인다
+      if (!win.mkKeep && !this.isQuitting()) {
+        setTimeout(() => {
+          if (!this.isQuitting() && !this.widgets.has(id) && settings.widgets?.[id] && this.getVault()?.get(id)) this.openWidget(id);
+        }, 3000);
+      }
+    });
+    win.loadFile(path.join(APP_DIR, 'widget.html'), { query: { id } });
+    if (!settings.widgets?.[id]) this.saveWidgetBounds(id, bounds);
+    this.pushList();
+    return win;
+  }
+
+  /** 메모 창 메뉴 › 바탕화면에 위젯으로 놓기: 그 메모 창 자리에 위젯을 놓고 메모 창은 닫는다 */
+  placeWidget(id, fromWin = null) {
+    const near = fromWin && !fromWin.isDestroyed() ? fromWin.getBounds() : null;
+    const existing = this.widgets.get(id);
+    if (existing && !existing.isDestroyed()) {
+      // 이미 바탕화면에 있으면 그 위젯을 메모 창 자리로 옮긴다
+      if (near) existing.setBounds(near);
+    } else if (near) this.forgetWidgetBounds(id); // 메모 창이 있던 자리로 새로
+    const win = this.openWidget(id, { near });
+    if (!win) return false;
+    // 스택의 탭이면 그 탭만 빼서 닫는다 (창을 그냥 닫으면 스택의 다른 탭들도 함께 닫힘)
+    if (this.stacks?.stackOf(id)) this.removeFromStack(id, 'close');
+    else if (fromWin && !fromWin.isDestroyed()) fromWin.close();
+    return true;
+  }
+
+  /** 위젯 창만 닫는다 (기억은 그대로 — 다시 켜면 뜸) */
+  closeWidgetWindow(win) {
+    if (!win || win.isDestroyed()) return;
+    win.mkKeep = true;
+    win.close();
+  }
+
+  removeWidget(id) {
+    this.forgetWidgetBounds(id);
+    const win = this.widgets.get(id);
+    this.widgets.delete(id);
+    if (win && !win.isDestroyed()) win.close(); // closed 는 이미 목록에서 뺀 창이라 아무 일도 하지 않는다
+    this.pushList();
+    return true;
+  }
+
+  hasWidget(id) {
+    return Boolean(this.widgets.get(id)) || Boolean(settings.widgets?.[id]);
+  }
+
+  /**
+   * 메모킹을 켤 때 · 메모 폴더를 열 때: 놓아 둔 위젯들을 그 자리에
+   *   지금 폴더에 없는 메모의 위젯은 창만 닫고 기억은 남긴다 (Google Drive 가 아직 안 붙었거나 다른 폴더로 바꾼 경우 —
+   *   그 폴더가 돌아오면 다시 뜬다). 이 PC 에서 메모를 지우면(vault 'trashed') 기억까지 지운다
+   */
+  restoreWidgets() {
+    const vault = this.getVault();
+    for (const [id, win] of this.widgets) {
+      if (!vault?.get(id)) this.closeWidgetWindow(win);
+    }
+    if (!vault) return;
+    for (const id of Object.keys(settings.widgets ?? {})) {
+      if (vault.get(id)) this.openWidget(id);
+    }
+  }
+
+  /**
+   * 메모가 바뀌면 그 위젯을 다시 그린다. 파일이 없어지면(동기화 중 · 다른 기기 · 탐색기) 창만 닫고 기억은 남겨,
+   *   돌아오면(휴지통에서 되살림 포함) 다시 띄운다. 이 PC 에서 지웠을 때(vault 'trashed')만 removeWidget 으로 기억까지
+   */
+  refreshWidgets(ids) {
+    for (const id of ids) {
+      const win = this.widgets.get(id);
+      const memo = this.getVault()?.get(id);
+      if (!win || win.isDestroyed()) {
+        if (memo && settings.widgets?.[id]) this.openWidget(id);
+        continue;
+      }
+      if (!memo) this.closeWidgetWindow(win);
+      else {
+        win.setBackgroundColor(noteBg(memo.color));
+        win.setTitle(memo.title);
+        win.webContents.send('widget:changed');
+      }
+    }
+  }
+
+  // ---------- 잠깐 알림 (HUD) ----------
+  // 메모 단축키로 복사했을 때처럼 다른 앱을 쓰는 중에 "복사했어요" 만 잠깐 — 마우스 가까이, 포커스를 빼앗지 않고 1.6초 뒤 사라짐
+  //   (Windows 알림은 알림 센터에 쌓이고 소리가 나서, 자주 쓰는 단축키에는 무겁다)
+
+  showHud({ title, body = '', kind = 'ok' }) {
+    if (SMOKE) this.smokeHud.push({ title, body, kind });
+    const size = { width: 340, height: 64 };
+    if (!this.hudWin || this.hudWin.isDestroyed()) {
+      this.hudWin = new BrowserWindow({
+        ...size,
+        frame: false,
+        transparent: true,
+        resizable: false,
+        movable: false,
+        focusable: false,
+        skipTaskbar: true,
+        alwaysOnTop: true,
+        show: false,
+        hasShadow: false,
+        webPreferences,
+      });
+      this.hudWin.setAlwaysOnTop(true, 'screen-saver');
+      this.hudWin.setIgnoreMouseEvents(true);
+      this.hudLoaded = new Promise((resolve) => this.hudWin.webContents.once('did-finish-load', resolve));
+      this.hudWin.on('closed', () => (this.hudWin = null));
+      this.hudWin.loadFile(path.join(APP_DIR, 'hud.html'));
+    }
+    const win = this.hudWin;
+    const cursor = screen.getCursorScreenPoint();
+    const area = screen.getDisplayNearestPoint(cursor).workArea;
+    const x = Math.round(Math.min(Math.max(cursor.x - size.width / 2, area.x + 8), area.x + area.width - size.width - 8));
+    const below = cursor.y + 28 + size.height <= area.y + area.height;
+    const y = Math.round(below ? cursor.y + 28 : cursor.y - 28 - size.height);
+    const seq = (this.hudSeq = (this.hudSeq ?? 0) + 1); // 불러오는 사이 여러 번 불리면 마지막 것만
+    this.hudLoaded.then(() => {
+      if (win.isDestroyed() || seq !== this.hudSeq) return;
+      clearTimeout(this.hudTimer);
+      win.setBounds({ x, y, ...size });
+      win.webContents.send('hud:show', { title, body, kind });
+      win.showInactive();
+      this.hudTimer = setTimeout(() => {
+        if (win.isDestroyed()) return;
+        win.webContents.send('hud:hide');
+        this.hudTimer = setTimeout(() => !win.isDestroyed() && win.hide(), 220);
+      }, 1600);
+    });
+  }
+
+  // ---------- 예비 메모 창 ----------
+  // 메모 창을 열 때마다 편집기(milkdown·KaTeX 등)를 새로 읽고 컴파일하느라 한 박자 늦게 뜬다 →
+  //   숨은 창 하나에 note.html 을 미리 불러 두고(메모는 아직 없음), 메모를 열면 그 창에 메모를 넣고 그린 뒤 보여 준다.
+  //   쓰면 조금 뒤 새 예비 창을 다시 만든다. 목록 창도 메모 창도 없으면(알림 영역에만) 거둬 메모리를 쓰지 않는다
+
+  scheduleSpare(delay = 1200) {
+    clearTimeout(this.spareTimer);
+    this.spareTimer = setTimeout(() => this.makeSpare(), delay);
+  }
+
+  makeSpare() {
+    if (this.spare || this.isQuitting() || !this.getVault() || (!this.listWin && this.noteWins.size === 0)) return;
+    const win = new BrowserWindow({
+      ...DEFAULT_NOTE_SIZE,
+      minWidth: 240,
+      minHeight: 200,
+      frame: false,
+      show: false,
+      backgroundColor: noteBg('yellow'),
+      ...windowIcon,
+      webPreferences,
+    });
+    guardWindow(win, { openWebPage });
+    const spare = { win, assign: null };
+    this.spare = spare;
+    const forget = () => {
+      if (this.spare !== spare) return;
+      this.spare = null;
+      if (!win.isDestroyed()) win.destroy();
+    };
+    win.on('closed', forget);
+    win.webContents.once('render-process-gone', forget);
+    win.webContents.once('did-fail-load', forget);
+    win.loadFile(path.join(APP_DIR, 'note.html'), { query: { spare: '1' } });
+  }
+
+  dropSpareIfIdle() {
+    if (this.listWin || this.noteWins.size) return;
+    clearTimeout(this.spareTimer);
+    const s = this.spare;
+    this.spare = null;
+    if (s && !s.win.isDestroyed()) s.win.destroy();
+  }
+
+  /** 예비 창의 화면이 다 불러졌다 (ipc 'win:spare') → 메모가 정해질 때까지 기다리는 약속. 예비 창이 아니면 null */
+  spareWaiting(sender) {
+    const s = this.spare;
+    if (!s || s.win.isDestroyed() || s.win.webContents !== sender) return Promise.resolve(null);
+    return new Promise((resolve) => (s.assign = resolve));
+  }
+
+  /** 쓸 수 있는 예비 창 (화면이 메모를 기다리는 중일 때만) — 가져가면 다음 것은 새로 */
+  takeSpare() {
+    const s = this.spare;
+    if (!s?.assign || s.win.isDestroyed() || s.win.webContents.isCrashed()) return null;
+    this.spare = null;
+    return s;
+  }
+
+  /** 예비 창이 메모를 그렸다 (ipc 'win:painted') */
+  notePainted(sender) {
+    const mark = this.paintMarks.get(sender);
+    if (!mark) return;
+    this.paintMarks.delete(sender);
+    mark();
   }
 
   revealNote(id) {
@@ -321,6 +642,8 @@ export class WindowManager {
       ...m,
       open: Boolean(this.noteWins.get(m.id)?.isVisible()),
       stack: this.stacks?.stackOf(m.id)?.memos.length ?? 0,
+      hotkey: this.hotkeySlotOf(m.id),
+      widget: this.widgets.has(m.id),
     }));
   }
 
