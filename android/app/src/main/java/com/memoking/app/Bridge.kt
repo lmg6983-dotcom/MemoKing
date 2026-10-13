@@ -405,6 +405,26 @@ class Bridge(private val activity: MainActivity) {
                 val mime = a.optString("mime").ifBlank { VaultFileProvider.mimeOf(name) }
                 activity.runOnUiThread { activity.saveAs(id, file, name, mime) }
             }
+            // 내용 공유(공유 단추): 글이면 글로, 그 밖은 파일로 (메모 폴더의 파일 rel 그대로 · 만든 파일 base64) — 안드로이드 공유 창
+            "shareContent" -> pool.execute {
+                val name = a.optString("name", "메모 내용").replace(Regex("[\\\\/:*?\"<>|]+"), " ").trim().ifEmpty { "메모 내용" }
+                val text = a.optString("text")
+                if (text.isNotEmpty() && a.optString("rel").isEmpty() && a.optString("mime").startsWith("text/")) {
+                    activity.runOnUiThread { activity.shareText(id, name.substringBeforeLast('.'), text) }
+                    return@execute
+                }
+                val file = shareFile(name)
+                try {
+                    val rel = a.optString("rel")
+                    if (rel.isNotEmpty()) storage().openRead(rel).use { input -> file.outputStream().use { input.copyTo(it) } }
+                    else file.writeBytes(Base64.decode(a.getString("base64"), Base64.DEFAULT))
+                } catch (e: Exception) {
+                    resolve(id) { throw e }
+                    return@execute
+                }
+                val mime = a.optString("mime").ifBlank { VaultFileProvider.mimeOf(name) }
+                activity.runOnUiThread { activity.shareFile(id, file, mime, name) }
+            }
             // 보내기: 그림(base64) 같은 파일 · PDF
             "shareFile" -> pool.execute {
                 val file = shareFile(a.optString("name", "메모"))

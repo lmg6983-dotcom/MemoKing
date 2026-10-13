@@ -1317,6 +1317,54 @@ try {
     await page.waitForTimeout(800);
     check('복사한 그림 붙여 넣기: 클립보드의 그림이 첨부로 메모에 (주소 글이 아니라)', after === before + 1 && !read('그림 둘.md').includes('content://') && (read('그림 둘.md').match(/!\[[^\]]*\]\(attachments\//g) ?? []).length === 2, JSON.stringify({ before, after, file: read('그림 둘.md').split('---').pop() }));
   }
+  // 음성 카드 · 소리 이름 줄을 짧게 누르면, 파일 칩은 꾹 누르면(글 고치기 방식): 공유 · 저장 · 복사 · × 단추
+  {
+    fs.writeFileSync(path.join(vault, 'attachments/voice-btn.m4a'), Buffer.from('fake audio'));
+    fs.writeFileSync(path.join(vault, 'attachments/안내서.pdf'), Buffer.from('%PDF-1.4 fake'));
+    write('콘텐츠 단추.md', '---\nid: 00000000-0000-4000-8000-0000000000dd\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: purple\n---\n# 콘텐츠 단추\n\n> ![녹음 10월 14일](attachments/voice-btn.m4a)\n>\n> 도레미파솔라시도\n\n[안내서.pdf](attachments/안내서.pdf)\n\n끝\n');
+    await back();
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForTimeout(400);
+    await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000dd"]');
+    await page.waitForSelector('#note-screen:not([hidden]) .mk-media-label');
+    await page.waitForTimeout(400);
+    await setMode('edit');
+    const lab = await page.locator('.mk-media-label').first().boundingBox();
+    await touch('touchStart', lab.x + 20, lab.y + lab.height / 2);
+    await page.waitForTimeout(80);
+    await touch('touchEnd', lab.x + 20, lab.y + lab.height / 2);
+    await page.waitForTimeout(250);
+    const four = await page.evaluate(() => ['.mk-share-btn', '.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => { const e = document.querySelector(s); return e && e.style.visibility !== 'hidden' ? Math.round(e.getBoundingClientRect().left) : -1; }));
+    const voiceLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
+    check('음성 카드: 이름 줄을 짧게 누르면 공유 · 저장 · 복사 · × (왼쪽부터)', four.every((x) => x >= 0) && four[0] < four[1] && four[1] < four[2] && four[2] < four[3] && voiceLabel === '이 음성 지우기', JSON.stringify({ four, voiceLabel }));
+    await shot('18d-voice-buttons');
+    await page.tap('.mk-share-btn');
+    await page.waitForTimeout(500);
+    const shared = (await devLog()).log.filter((x) => x.shareContent).at(-1);
+    check('공유 단추: 음성은 소리 파일 그대로 공유 창으로', shared?.shareContent.rel === 'attachments/voice-btn.m4a' && await page.isVisible('.mk-share-btn.done'), JSON.stringify(shared));
+    await page.waitForTimeout(300);
+    // 파일 칩: 짧게 누르면 열기 그대로, 꾹 누르면 단추 (열지 않음)
+    const opensBefore = (await devLog()).log.filter((x) => x.openFile).length;
+    const chip = await page.locator('.mk-doc a[data-file]').boundingBox();
+    await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
+    await page.waitForTimeout(650);
+    await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
+    await page.waitForTimeout(300);
+    const chipLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
+    const opensAfter = (await devLog()).log.filter((x) => x.openFile).length;
+    check('파일 칩: 꾹 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 지우기' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
+    await page.tap('.mk-save-btn');
+    await page.waitForTimeout(500);
+    const saved = (await devLog()).log.filter((x) => x.saveAs).at(-1);
+    check('저장 단추: PDF 는 파일 그대로', saved?.saveAs.rel === 'attachments/안내서.pdf' && saved.saveAs.name === '안내서.pdf', JSON.stringify(saved));
+    // 다음 점검을 위해 '그림 둘' 로 돌아감
+    await back();
+    await page.waitForTimeout(300);
+    await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000cc"]');
+    await page.waitForSelector('#note-screen:not([hidden]) img.mk-image');
+    await page.waitForTimeout(400);
+  }
   // + › 표: 커서 자리에 표 (글을 고치는 일이니 다이얼을 글 고치기로)
   await setMode('edit');
   await page.locator('.mk-doc p', { hasText: '끝' }).tap();

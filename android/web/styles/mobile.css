@@ -681,7 +681,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .rec-wave i { display: block; width: 3px; height: 22px; border-radius: 2px; background: var(--rec); transform: scaleY(calc(0.12 + var(--lv, 0) * 0.88)); transition: transform 0.12s ease-out; }
 .rec-panel.paused .rec-wave i { background: var(--note-muted); transform: scaleY(0.12); }
 .rec-spk { display: inline-block; margin-right: 4px; padding: 0 7px; border-radius: 999px; font-size: 0.8em; font-weight: 700; line-height: 1.6; color: #fff; background: var(--spk, #2f6fdf); }
-.rec-btn { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: var(--tap); min-width: var(--tap); padding: 0 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font-weight: 700; font-size: 14px; }
+.rec-btn { flex: none; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--tap); min-width: var(--tap); padding: 0 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font-weight: 700; font-size: 14px; }
 .rec-btn svg { width: 18px; height: 18px; }
 .rec-btn.stop { background: var(--rec); color: var(--on-rec); }
 .rec-btn:active { transform: scale(0.96); }

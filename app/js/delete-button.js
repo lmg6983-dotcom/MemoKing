@@ -1,12 +1,13 @@
 import { haptic } from './dom.js';
-import { copyBlock, saveBlock } from './copy-content.js';
+import { copyBlock, saveBlock, shareBlock, canShare } from './copy-content.js';
 // 지우기 단추 (×) — 꾹 눌렀다 그 자리에 놓은 것의 오른쪽 위에 잠깐 (block-move.js 내용 줄·목록 전체 · list-drag.js 목록 항목 함께)
 //   흰 동그라미에 빨간 ×. 한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
 //   PC(마우스): 그림·손 메모·소리·파일·링크 카드에 마우스를 올려도 뜬다 (hover — 시간으로 사라지지 않고, 마우스가 떠나면 거둔다.
 //   빨갛게 비치는 표시는 × 위에 올렸을 때만)
 //   누르면: 대상이 붉게 비쳤다가 작아지며 흐려지고, 그 자리가 접히며 아래 줄들이 부드럽게 올라온 뒤 지운다.
 //   × 왼쪽에는 복사 단추 (그림은 그림으로, 그 밖의 내용은 서식 + 글로 — copy-content.js), 그 왼쪽에 저장 단추
-//   (그림 · 파일은 파일 그대로, 표는 CSV, 그 밖은 글 파일 — 어디에 저장할지 고르는 창). 누르면 잠깐 ✓
+//   (그림 · 파일은 파일 그대로, 표는 CSV, 그 밖은 글 파일 — 어디에 저장할지 고르는 창),
+//   휴대폰은 맨 왼쪽에 공유 단추 (카톡 · 메일 등으로 보내기 — 글은 글로, 그 밖은 파일로). 누르면 잠깐 ✓
 export const DELETE_SHOW_MS = 2500;
 const FADE_MS = 200; // 작아지며 흐려지기
 const COLLAPSE_MS = 200; // 그 자리 접기
@@ -15,6 +16,7 @@ let current = null;
 const COPY_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.6"/><path d="M10.5 3.5v-.4A1.6 1.6 0 0 0 8.9 1.5H4.1A1.6 1.6 0 0 0 2.5 3.1v4.8a1.6 1.6 0 0 0 1.6 1.6h.4"/></svg>';
 const DONE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
 const FAIL_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v5.5M8 12.2v.3"/></svg>';
+const SHARE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="11.5" cy="3.8" r="1.8"/><circle cx="4.5" cy="8" r="1.8"/><circle cx="11.5" cy="12.2" r="1.8"/><path d="M6.1 7.1l3.8-2.3M6.1 8.9l3.8 2.3"/></svg>';
 const SAVE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.8 7l3.2 3.2L11.2 7M3 12.8h10"/></svg>';
 // 화면 읽기 프로그램에 "복사했어요" 를 알려 주는 숨은 자리 (하나만)
 function announce(text) {
@@ -92,7 +94,9 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   };
   const copyBtn = actionBtn('mk-copy-btn', '복사', COPY_ICON);
   const saveBtn = actionBtn('mk-save-btn', '저장', SAVE_ICON);
-  document.body.append(copyBtn, saveBtn, btn);
+  const shareBtn = canShare() ? actionBtn('mk-share-btn', '공유', SHARE_ICON) : null;
+  const extras = [copyBtn, saveBtn, shareBtn].filter(Boolean); // × 에서 왼쪽으로 차례로
+  document.body.append(...extras, btn);
   // 단추는 화면에 고정(position: fixed)이라, 큰 그림을 스크롤하면 위 막대에 올라탈 수 있다 →
   //   편집기에서 보이는 칸 안으로만: 대상의 위가 가려지면 보이는 부분의 위에 붙고, 대상이 다 가려지면 숨는다
   const scroller = scrollParent(target);
@@ -106,7 +110,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     btn.style.left = `${left}px`;
     btn.style.top = `${Math.round(top)}px`;
     // × 와 손가락 닿는 범위가 겹치지 않게 36px 씩 (화면 왼쪽 밖으로 나가지 않게)
-    [copyBtn, saveBtn].forEach((b, i) => {
+    extras.forEach((b, i) => {
       b.style.visibility = visible ? '' : 'hidden';
       b.style.left = `${Math.max(4, left - 36 * (i + 1))}px`;
       b.style.top = `${Math.round(top)}px`;
@@ -119,7 +123,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     else setTimeout(() => !view.isDestroyed && deco(null), 0); // 편집기 갱신 중일 수 있어 한 박자 뒤에
   };
   if (!hover) setMark(true);
-  const del = { view, btn, extras: [copyBtn, saveBtn], pos, node, target, state: view.state, place, setMark: hover ? (on) => !on && setMark(false) : setMark };
+  const del = { view, btn, extras, pos, node, target, state: view.state, place, setMark: hover ? (on) => !on && setMark(false) : setMark };
   if (hover) {
     btn.addEventListener('mouseenter', () => {
       hover.enter();
@@ -130,7 +134,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       hover.leave();
     });
     // 복사 · 저장 단추 위에 있어도 단추들은 그대로 (붉은 표시는 × 위에서만)
-    for (const b of [copyBtn, saveBtn]) {
+    for (const b of extras) {
       b.addEventListener('mouseenter', () => hover.enter());
       b.addEventListener('mouseleave', () => hover.leave());
     }
@@ -158,7 +162,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
         b.classList.add('failed');
         b.innerHTML = FAIL_ICON;
         console.warn(b.className, err);
-        b.title = `${b.classList.contains('mk-save-btn') ? '저장' : '복사'}하지 못했어요. 다시 눌러 주세요`;
+        b.title = `${b.classList.contains('mk-save-btn') ? '저장' : b.classList.contains('mk-share-btn') ? '공유' : '복사'}하지 못했어요. 다시 눌러 주세요`;
         announce(b.title);
       }).finally(() => {
         setTimeout(() => (busy = false), 0); // 바로 뒤따르는 click 까지는 막고
@@ -172,6 +176,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   action(copyBtn, COPY_ICON, () => copyBlock(view, pos, node, target), (what) => (what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
     : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : '내용을 복사했어요'));
   action(saveBtn, SAVE_ICON, () => saveBlock(view, pos, node, target), (name) => `저장했어요: ${name}`);
+  if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, pos, node, target), () => '공유했어요');
   current = del;
   const press = (e) => {
     e.preventDefault();

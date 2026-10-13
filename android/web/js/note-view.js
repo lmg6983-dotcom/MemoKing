@@ -23,6 +23,8 @@ setCopyHost({
   text: ({ text }) => native.copyText(text),
   // 저장 단추: 안드로이드 저장 창 → 저장한 이름 | 'cancelled'
   save: async (f) => (await call('saveAs', f)) ?? 'cancelled',
+  // 공유 단추: 안드로이드 공유 창 (글은 글로, 그 밖은 파일로)
+  share: async (f) => ((await call('shareContent', f)) ? 'shared' : 'cancelled'),
 });
 import { fetchRemoteImage } from './web-fetch.js';
 import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';

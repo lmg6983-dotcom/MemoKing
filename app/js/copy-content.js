@@ -19,6 +19,8 @@ let host = {
    * @param {{ name: string, mime: string, rel?: string, base64?: string }} f rel: 메모 폴더의 첨부 그대로 · base64: 만든 내용
    */
   save: null,
+  /** 공유: { name, mime, rel? | base64?, text? } — 휴대폰 공유 창 (없으면 공유 단추를 보이지 않음) */
+  share: null,
 };
 
 /** 앱마다 클립보드에 넣는 방법 — { image(pngBase64), text({ text, html }), file(href) } (빠지면 브라우저 Clipboard API · 파일은 글로) */
@@ -227,17 +229,16 @@ const decodeRel = (src) => {
 const baseNameOf = (rel) => rel.split('/').pop().replace(/^[0-9a-f]{6,}-/i, '');
 
 /**
- * 편집기 안의 한 덩어리를 파일로 저장 → 저장한 파일 이름 | 'cancelled'
+ * 저장 · 공유할 것: { rel, name, mime } (메모 폴더의 파일 그대로) | { base64, name, mime } (만든 파일) — 글이면 text 도
  * @param {import('prosemirror-view').EditorView} view
  */
-export async function saveBlock(view, pos, node, target) {
-  const save = host.save ?? download;
+export async function blockPayload(view, pos, node, target) {
   const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : null;
   // 파일이 있는 것 (소리 · 동영상 · 파일 칩 · 음성 카드)
   const file = attachmentOf(node);
   if (file) {
     const rel = decodeRel(file);
-    return save({ rel, name: baseNameOf(rel), mime: '' });
+    return { rel, name: baseNameOf(rel), mime: '' };
   }
   if (media) {
     const { src, alt } = media.attrs;
@@ -245,16 +246,32 @@ export async function saveBlock(view, pos, node, target) {
     // 메모 폴더의 사진은 원본 그대로, 손 메모(그린 것) · 인터넷 사진은 화면 그대로 PNG
     if (isAttachment(src) && mediaKindOf(src, alt) === 'image' && !/\.svg$/i.test(src)) {
       const rel = decodeRel(src);
-      return save({ rel, name: baseNameOf(rel), mime: '' });
+      return { rel, name: baseNameOf(rel), mime: '' };
     }
-    if (img) return save({ base64: await pngBase64(img), name: `${fileNameOf(alt, '그림')}.png`, mime: 'image/png' });
+    if (img) return { base64: await pngBase64(img), name: `${fileNameOf(alt, '그림')}.png`, mime: 'image/png' };
   }
   if (node.type.name === 'table') {
     const first = node.firstChild?.firstChild?.textContent;
-    return save({ base64: base64Of(`\ufeff${tableCsv(node)}`), name: `${fileNameOf(first, '표')}.csv`, mime: 'text/csv' });
+    const csv = tableCsv(node);
+    return { base64: base64Of(`\ufeff${csv}`), name: `${fileNameOf(first, '표')}.csv`, mime: 'text/csv', text: plainTextOf(view.state.doc.slice(pos, pos + node.nodeSize).content) };
   }
   const slice = view.state.doc.slice(pos, pos + node.nodeSize);
   const text = plainTextOf(slice.content).trim() || node.attrs?.href || '';
   const name = node.type.name === 'math_block' ? '수식' : fileNameOf(text.split('\n')[0]);
-  return save({ base64: base64Of(text), name: `${name}.txt`, mime: 'text/plain' });
+  return { base64: base64Of(text), name: `${name}.txt`, mime: 'text/plain', text };
+}
+
+/** 편집기 안의 한 덩어리를 파일로 저장 → 저장한 파일 이름 | 'cancelled' */
+export async function saveBlock(view, pos, node, target) {
+  const { text: _text, ...f } = await blockPayload(view, pos, node, target);
+  return (host.save ?? download)(f);
+}
+
+/** 공유할 수 있는 앱인가 (휴대폰: 안드로이드 공유 창 — PC 에는 없음) */
+export const canShare = () => Boolean(host.share);
+
+/** 다른 앱으로 보내기 (글이면 글로, 그 밖은 파일로) → 'shared' | 'cancelled' */
+export async function shareBlock(view, pos, node, target) {
+  if (!host.share) throw new Error('이 앱에서는 공유할 수 없어요');
+  return host.share(await blockPayload(view, pos, node, target));
 }

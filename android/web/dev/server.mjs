@@ -371,6 +371,11 @@ const calls = {
   },
   // 클립보드의 그림 · 파일 → 임시 파일 (메모킹에서 복사한 그림을 붙여 넣기)
   clipboardFiles: async () => (clipboardImage ? [makeTemp('메모킹 그림.png', 'image/png', clipboardImage)] : []),
+  // 공유 단추: 안드로이드 공유 창 흉내
+  shareContent: async (a) => {
+    log.push({ shareContent: { name: a.name, mime: a.mime, rel: a.rel ?? null, text: a.text ?? null } });
+    return true;
+  },
   // 저장 단추: 안드로이드 저장 창 흉내 — 고른 이름 그대로 저장한 것으로
   saveAs: async (a) => {
     const bytes = a.rel ? fs.readFileSync(vaultPath(a.rel)).length : Math.round((a.base64?.length ?? 0) * 0.75);

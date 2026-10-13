@@ -277,14 +277,37 @@ function virtualY(d) {
 }
 
 /** @param {{ readOnly?: boolean }} options */
-// 휴대폰: 그림 · 손 메모를 짧게 누르면(탭) 단추를 띄운다 — 고를 시간을 넉넉히
-const TAP_TARGET = 'img.mk-image, .mk-ink';
+// 휴대폰: 내용에 공유 · 저장 · 복사 · 지우기 단추를 띄운다 — 고를 시간을 넉넉히
+//   짧게 누르기(탭): 그림 · 손 메모 · 소리/동영상/음성 카드의 이름 줄 (누르면 따로 하는 일이 없는 곳)
+//   꾹 누르기(글 고치기 방식): 파일 칩 · 링크 카드 · 수식 — 짧게 누르면 열기 · 고치기라서
+const TAP_TARGET = 'img.mk-image, .mk-ink, .mk-media-label';
+const HOLD_TARGET = 'a[data-file], .mk-link-card, [data-link-card], .mk-math-block';
 const TAP_MS = 400;
+const HOLD_SHOW_MS = 450;
 const TAP_SHOW_MS = 5000;
 
 export function createBlockMove({ readOnly = false } = {}) {
   let mover = null;
   let tap = null;
+  let hold = null; // 꾹 누르기 { timer }
+
+  // 꾹 눌러 단추를 띄웠으면 손을 뗄 때 오는 열기(click) · 길게 누르기 메뉴는 막는다
+  const swallowOpen = (view) => {
+    const stop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    view.dom.addEventListener('click', stop, { capture: true, once: true });
+    view.dom.addEventListener('contextmenu', stop, { capture: true, once: true });
+    setTimeout(() => {
+      view.dom.removeEventListener('click', stop, { capture: true });
+      view.dom.removeEventListener('contextmenu', stop, { capture: true });
+    }, 900);
+  };
+  const cancelHold = () => {
+    clearTimeout(hold?.timer);
+    hold = null;
+  };
   return new Plugin({
     key: blockMoveKey,
     state: {
@@ -311,12 +334,35 @@ export function createBlockMove({ readOnly = false } = {}) {
           // 짧게 눌렀다 떼면(탭) 그림 · 손 메모에 저장 · 복사 · 지우기 단추 — 글 고치기 방식에서도 (touchend)
           const t = event.touches[0];
           tap = event.touches.length === 1 && t ? { x: t.clientX, y: t.clientY, at: Date.now(), target: event.target } : null;
-          if (!canDrag()) return false;
+          cancelHold();
+          if (!canDrag()) {
+            // 글 고치기: 파일 칩 · 링크 카드 · 수식은 꾹 눌러 단추 (옮기기 방식에서는 꾹 누르면 들어 올림)
+            const host = tap && event.target instanceof Element ? event.target.closest(HOLD_TARGET) : null;
+            const block = host && view.dom.contains(host) ? blockFromTarget(view, host) : null;
+            if (block && isContentBlock(block.node) && touchMode() === 'edit') {
+              hold = { x: t.clientX, y: t.clientY };
+              hold.timer = setTimeout(() => {
+                hold = null;
+                tap = null;
+                if (view.isDestroyed || mover?.busy()) return;
+                haptic(12);
+                swallowOpen(view);
+                mover?.showDelete(block, false, { showMs: TAP_SHOW_MS });
+              }, HOLD_SHOW_MS);
+            }
+            return false;
+          }
           if (event.touches.length === 1) mover?.press(event, 'touch');
           else mover?.cancelPress();
           return false; // 그냥 누르면 고르기, 밀면 스크롤
         },
+        touchmove(_view, event) {
+          const t = event.touches[0];
+          if (hold && (!t || Math.hypot(t.clientX - hold.x, t.clientY - hold.y) > 10)) cancelHold(); // 밀면 스크롤
+          return false;
+        },
         touchend(view, event) {
+          cancelHold();
           const t0 = tap;
           tap = null;
           const t = event.changedTouches?.[0];
