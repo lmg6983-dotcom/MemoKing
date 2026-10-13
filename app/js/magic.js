@@ -407,8 +407,11 @@ input.addEventListener('keydown', (e) => {
 async function reset() {
   selected = 0;
   activeAct = 0;
-  results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
-  opms = { query: '', loading: false, cases: [], total: 0, error: '' };
+  // 지난 글이 남아 있으면 그 결과도 새 결과가 올 때까지 그대로 (비었다가 다시 채워지며 깜박이지 않게)
+  if (!input.value.trim()) {
+    results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
+    opms = { query: '', loading: false, cases: [], total: 0, error: '' };
+  }
   resizeInput();
   modules = await api.modules().catch(() => []);
   renderModules();

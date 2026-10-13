@@ -1145,8 +1145,13 @@ function showTableBar(table) {
   setBtn(merge, table.merged ? '병합 풀기' : '병합', table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요');
   tableBar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
   // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만 (머리글 아래 두 번째 행부터 · 바로 아래에 열 수가 같은 표)
-  tableBar.querySelector('[data-table="splitTable"]').hidden = !table.canSplit;
-  tableBar.querySelector('[data-table="joinTable"]').hidden = !table.canJoin;
+  //   숨기지 않고 흐리게 — 커서를 옮길 때마다 단추가 생겼다 사라지며 막대가 다시 접히지 않게 (이유는 풍선에)
+  const split = tableBar.querySelector('[data-table="splitTable"]');
+  const join = tableBar.querySelector('[data-table="joinTable"]');
+  split.disabled = !table.canSplit;
+  split.title = table.canSplit ? '커서가 있는 행부터 아래를 새 표로 (아래 표에도 머리글 행)' : '나눌 자리의 행(머리글 아래 두 번째 행부터)에 커서를 두세요';
+  join.disabled = !table.canJoin;
+  join.title = table.canJoin ? '바로 아래 표를 이 표에 이어 붙이기 (열 수가 같을 때)' : '바로 아래에 열 수가 같은 표가 있을 때 합칠 수 있어요';
   delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
   setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제');
 }
@@ -1162,7 +1167,8 @@ tableBar.addEventListener('click', (e) => {
 // 처음 그 상황이 됐을 때 한 번만: 눈에 안 보이는 동작(꾹 눌러 옮기기·테두리 끌기) 알려 주기
 // (그림·파일 옮기기 안내는 block-move.js 가 따로)
 function firstTimeHints(active) {
-  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab 은 다음 칸, 마지막 칸에서 Tab 은 새 줄이에요', { anchor: tableBar });
+  // 안내는 표에 붙인다 (표 막대에 붙이면 설명하는 막대를 풍선이 가린다)
+  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab 은 다음 칸, 마지막 칸에서 Tab 은 새 줄이에요', { anchor: el.editorRoot.querySelector('table') ?? tableBar, avoid: tableBar });
   else if (active.task || active.bullet || active.ordered) hintOnce('list-move', '목록 항목은 글자를 꾹 누르면 들어 올려져 순서를 바꿀 수 있어요. 키보드는 Alt+↑ / Alt+↓', { anchor: el.editorRoot.querySelector('li') });
 }
 
