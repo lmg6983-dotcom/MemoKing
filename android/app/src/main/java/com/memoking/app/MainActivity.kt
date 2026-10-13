@@ -484,8 +484,14 @@ class MainActivity : Activity() {
                 }
                 if (name.isEmpty()) name = uri.lastPathSegment?.substringAfterLast('/') ?: "파일"
                 val mime = contentResolver.getType(uri) ?: VaultFileProvider.mimeOf(name)
+                val input = contentResolver.openInputStream(uri) ?: continue
                 val (id, file) = Temp.create(this)
-                contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use { input.copyTo(it) } } ?: continue
+                try {
+                    input.use { i -> file.outputStream().use { i.copyTo(it) } }
+                } catch (e: Exception) {
+                    file.delete()
+                    throw e
+                }
                 out.put(JSONObject().put("temp", id).put("name", name).put("mime", mime).put("size", if (size >= 0) size else file.length()))
             } catch (e: Exception) {
                 android.util.Log.w("MemoKing", "공유받은 파일을 읽지 못했어요: $uri", e)
@@ -540,6 +546,10 @@ class MainActivity : Activity() {
             startActivityForResult(intent, req)
         } catch (e: ActivityNotFoundException) {
             waiting.remove(req)
+            if (req == REQ_SAVE) {
+                pendingSave?.delete()
+                pendingSave = null
+            }
             bridge.resolve(id) { throw IllegalStateException("이 휴대폰에서 열 수 있는 앱이 없어요") }
         }
     }

@@ -116,7 +116,8 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
     const top = Math.max(r.top - 9, box.top + 4);
     const visible = r.bottom - 12 > box.top + 4 && r.top < box.bottom - 12 && top + 24 <= Math.min(r.bottom + 9, box.bottom);
-    const left = Math.round(Math.min(window.innerWidth - 32, r.right - 22));
+    // 왼쪽 끝에 붙은 작은 대상(짧은 파일 칩 등)이면 단추들이 겹치지 않게 그만큼 오른쪽으로
+    const left = Math.round(Math.max(4 + 36 * extras.length, Math.min(window.innerWidth - 32, r.right - 22)));
     btn.style.visibility = visible ? '' : 'hidden';
     btn.style.left = `${left}px`;
     btn.style.top = `${Math.round(top)}px`;
@@ -131,10 +132,11 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   const setMark = (on) => {
     if (markTarget) target.classList.toggle('mk-delete-target', on);
     else if (on) deco({ cls: 'mk-delete-target' });
-    else setTimeout(() => !view.isDestroyed && deco(null), 0); // 편집기 갱신 중일 수 있어 한 박자 뒤에
+    // 편집기 갱신 중일 수 있어 한 박자 뒤에 — 그 사이 같은 편집기에 새 단추 줄이 표시를 달았으면 지우지 않는다
+    else setTimeout(() => !view.isDestroyed && !(current && current !== del && current.view === view && !current.markTarget) && deco(null), 0);
   };
   if (!hover) setMark(true);
-  const del = { view, btn, extras, pos, node, target, state: view.state, place, setMark: hover ? (on) => !on && setMark(false) : setMark };
+  const del = { view, btn, extras, pos, node, target, markTarget, state: view.state, place, setMark: hover ? (on) => !on && setMark(false) : setMark };
   if (hover) {
     btn.addEventListener('mouseenter', () => {
       hover.enter();
@@ -156,6 +158,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     const go = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (e.type === 'click' && e.detail > 0) return; // 마우스는 mousedown 으로 이미 — click 은 키보드(Enter · Space)만
       if (busy) return; // mousedown 뒤 따라오는 click 은 한 번으로
       if (view.state.doc.nodeAt(pos) !== node) return hideDeleteButton();
       busy = true;
@@ -254,6 +257,7 @@ export function hideDeleteButton(now = false) {
   clearTimeout(del.timer);
   window.removeEventListener('scroll', del.place, true);
   if (!del.view.isDestroyed) del.setMark(false);
+  del.target.classList?.remove('mk-ink-armed'); // 손 메모: 단추가 거둬지면 다시 처음 누르기부터
   if (now) {
     for (const b of del.extras) b.remove();
     return del.btn.remove();

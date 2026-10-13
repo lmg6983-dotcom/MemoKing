@@ -1387,6 +1387,19 @@ try {
     check('고치기 단추: 누르면 수식 고치기 창', (await page.locator('.mk-math-editor').count()) === 1);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
+    // 파일 칩 이름은 고칠 수 없다: 칩 글자 가운데에 커서를 두고 쳐도 · 지워도 그대로
+    const chipBefore = read('콘텐츠 단추.md');
+    await page.evaluate(() => {
+      const t = document.querySelector('.mk-doc a[data-file]').firstChild;
+      document.querySelector('#note-screen .ProseMirror').focus();
+      window.getSelection().collapse(t, 2);
+    });
+    await page.waitForTimeout(150);
+    await page.keyboard.type('XY');
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(1500);
+    const chipText = await page.textContent('.mk-doc a[data-file]');
+    check('파일 칩: 이름 가운데에 쳐도 · 지워도 바뀌지 않음', chipText === '안내서.pdf' && read('콘텐츠 단추.md').includes('[안내서.pdf](attachments/안내서.pdf)') && !read('콘텐츠 단추.md').includes('XY'), JSON.stringify({ chipText, same: chipBefore === read('콘텐츠 단추.md') }));
     // 다음 점검을 위해 '그림 둘' 로 돌아감
     await back();
     await page.waitForTimeout(300);

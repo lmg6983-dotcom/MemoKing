@@ -778,12 +778,21 @@ export async function runSmoke({
     const inline = await until(() => js(linkNote.win, `(() => { const a = document.querySelector('.mk-doc p a[href="${base}/euckr.html"]'); return a && { text: a.textContent, cards: document.querySelectorAll('.mk-link-card').length, line: a.closest('p').textContent }; })()`), '링크 글자').catch(() => null);
     check('글 가운데 주소 붙여넣기 → 링크 글자 (뒤에 친 글자는 링크 아님)', inline?.cards === 1 && inline.text === `${base}/euckr.html` && inline.line === `관련 글 ${base}/euckr.html 참고`, JSON.stringify(inline));
 
+    // 한 줄을 차지하는 카드 · 파일 칩 · 수식은 눌러도 바로 열지 않고 단추 줄 → 노란 "열기" 단추로 연다 (글 사이 링크는 바로)
+    const clickThenOpen = async (win, expr) => {
+      await js(win, `(${expr}).click()`);
+      await wait(150);
+      return js(win, `(() => { const b = document.querySelector('.mk-open-btn'); if (!b) return false; b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 })); return true; })()`);
+    };
     const openedBefore = smokeOpened.length;
     await js(linkNote.win, `document.querySelector('.mk-link-card .lc-main').click()`);
+    await wait(200);
+    check('링크 카드를 눌러도 바로 열지 않고 단추 줄 (노란 "열기")', !smokeOpened.slice(openedBefore).some((o) => o.kind === 'web') && await js(linkNote.win, `document.querySelector('.mk-open-btn')?.getAttribute('aria-label') === '이 링크 카드 열기'`));
+    await clickThenOpen(linkNote.win, `document.querySelector('.mk-link-card .lc-main')`);
     await js(linkNote.win, `document.querySelector('.mk-doc p a[href="${base}/euckr.html"]').click()`);
     await wait(300);
     const openedWeb = smokeOpened.slice(openedBefore).filter((o) => o.kind === 'web').map((o) => o.target);
-    check('카드·링크를 한 번 누르면 브라우저로 열기', openedWeb.includes(articleUrl) && openedWeb.includes(`${base}/euckr.html`), JSON.stringify(openedWeb));
+    check('카드는 열기 단추로 · 글 사이 링크는 한 번 누르면 브라우저로 열기', openedWeb.includes(articleUrl) && openedWeb.includes(`${base}/euckr.html`), JSON.stringify(openedWeb));
 
     // 엣지 주소창 복사: <a href="주소">페이지 제목</a> → 그 제목으로 카드
     const edgeUrl = `${base}/article.html?edge=1`;
@@ -808,11 +817,11 @@ export async function runSmoke({
     })()`);
     const chips = await until(() => js(linkNote.win, `(() => { const a = [...document.querySelectorAll('.mk-doc a[data-file]')]; return a.length === 2 && a.map((x) => ({ name: x.textContent, kind: x.dataset.file, ext: x.dataset.ext, href: x.getAttribute('href') })); })()`), '파일 칩 2개').catch(() => null);
     check('파일 칩: 종류·확장자 표시 (프로그램 파일 구분)', chips?.[0]?.kind === 'doc' && chips[0].ext === 'TXT' && chips[1]?.kind === 'program' && chips[1].ext === 'BAT', JSON.stringify(chips));
-    const clickChip = (i) => js(linkNote.win, `document.querySelectorAll('.mk-doc a[data-file]')[${i}].click()`);
+    const clickChip = (i) => clickThenOpen(linkNote.win, `document.querySelectorAll('.mk-doc a[data-file]')[${i}]`);
     let mark = smokeOpened.length;
     await clickChip(0);
     const txtOpened = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '파일 열기').catch(() => null);
-    check('파일 칩 한 번 누르기 → 메모 폴더의 복사본을 기본 앱으로', Boolean(txtOpened) && txtOpened.target.startsWith(path.join(VAULT, 'attachments')) && fs.readFileSync(txtOpened.target, 'utf8') === '메모킹 회의록', JSON.stringify(txtOpened));
+    check('파일 칩 → 열기 단추 → 메모 폴더의 복사본을 기본 앱으로', Boolean(txtOpened) && txtOpened.target.startsWith(path.join(VAULT, 'attachments')) && fs.readFileSync(txtOpened.target, 'utf8') === '메모킹 회의록', JSON.stringify(txtOpened));
     mark = smokeOpened.length;
     await clickChip(1); // 답: 취소
     await wait(400);
@@ -823,7 +832,7 @@ export async function runSmoke({
     const ran = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '프로그램 실행').catch(() => null);
     check('프로그램 파일(.bat) → 먼저 묻고, 취소하면 실행 안 함', cancelled.length === 1 && cancelled[0].kind === 'confirm' && Boolean(ran) && ran.target.endsWith('.bat'), JSON.stringify({ cancelled, ran }));
     const hintText = await js(linkNote.win, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return new Promise((r) => setTimeout(() => r(document.querySelector('.hover-hint')?.textContent ?? ''), 300)); })()`);
-    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 누르면 열려요/.test(hintText), hintText);
+    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 열기 단추로 열어요/.test(hintText), hintText);
 
     // 사진은 두 번 누르면 기본 사진 앱으로
     await key(linkNote.win, 'End', ['control']);

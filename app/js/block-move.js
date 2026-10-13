@@ -308,18 +308,14 @@ export function createBlockMove({ readOnly = false } = {}) {
   let hold = null; // 꾹 누르기 { timer }
 
   // 꾹 눌러 단추를 띄웠으면 손을 뗄 때 오는 열기(click) · 길게 누르기 메뉴는 막는다
+  //   (열기(click)는 Mover.onOpenClick 이 늘 막는다 — 단추가 떠 있으면 그대로 둔다)
   const swallowOpen = (view) => {
     const stop = (e) => {
-      if (e.mkOpen) return; // "열기" 단추가 보낸 것은 그대로
       e.preventDefault();
       e.stopPropagation();
     };
-    view.dom.addEventListener('click', stop, { capture: true, once: true });
     view.dom.addEventListener('contextmenu', stop, { capture: true, once: true });
-    setTimeout(() => {
-      view.dom.removeEventListener('click', stop, { capture: true });
-      view.dom.removeEventListener('contextmenu', stop, { capture: true });
-    }, 900);
+    setTimeout(() => view.dom.removeEventListener('contextmenu', stop, { capture: true }), 1500);
   };
   const cancelHold = () => {
     clearTimeout(hold?.timer);
@@ -390,8 +386,9 @@ export function createBlockMove({ readOnly = false } = {}) {
           if (!host || !view.dom.contains(host)) return false;
           const block = blockFromTarget(view, host);
           if (!block || !isContentBlock(block.node)) return false;
-          // 파일(PDF 등) · 링크 카드 · 수식: 누르자마자 열리지 않고 단추부터 — 여는 것은 단추 줄의 "열기"로
-          if (opens && host === opens) swallowOpen(view);
+          // 파일(PDF 등) · 링크 카드 · 수식: 누르자마자 열리지 않고 단추부터 — 여는 것은 단추 줄의 "열기"로 (click 은 onOpenClick 이 막는다)
+          // 한 번 누른 손 메모를 또 누르면 이어 그리기로 넘어가니 단추를 다시 띄우지 않는다
+          if (host.matches('.mk-ink.mk-ink-armed') || t0.target.closest?.('.mk-ink-edit')) return false;
           // 편집기가 누른 그림을 고르고 난 뒤에 (고르기가 바뀌면 단추가 거둬지므로)
           setTimeout(() => !view.isDestroyed && !mover.busy() && mover.showDelete(block, false, { showMs: TAP_SHOW_MS }), 60);
           return false;
@@ -437,6 +434,22 @@ class Mover {
       e.detail.ok = this.liftAt(pos, x, y, kind);
     };
     view.dom.addEventListener('mk-lift-block', this.onLiftRequest);
+    // 누르면 바로 열리던 내용(파일 칩 · 링크 카드 · 수식 — 한 줄을 차지하는 것)은 눌러도 열지 않고 단추 줄을 띄운다
+    //   여는 것은 단추 줄의 "열기"로 (PC 는 마우스를 올리면 단추가 뜬다 · 휴대폰은 짧게 누르면). 글 사이에 낀 파일 링크는 그대로 열린다
+    this.onOpenClick = (e) => {
+      if (e.mkOpen || e.button !== 0) return;
+      const host = e.target instanceof Element ? e.target.closest(OPEN_TARGET) : null;
+      if (!host || !view.dom.contains(host) || e.target.closest('.lc-remove')) return;
+      const block = blockFromTarget(view, host);
+      if (!block || !isContentBlock(block.node)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // 이미 이 내용의 단추가 떠 있으면(마우스를 올려 뜬 것 등) 그대로
+      const dom = view.nodeDOM(block.pos);
+      const shown = this.hoverTarget && deleteShownFor(this.hoverTarget) && (this.hoverTarget === dom || (dom instanceof Element && dom.contains(this.hoverTarget)));
+      if (!shown && !this.busy()) this.showDelete(block, false, { showMs: TAP_SHOW_MS });
+    };
+    view.dom.addEventListener('click', this.onOpenClick, true);
     // PC: 그림·손 메모·소리·파일·링크 카드에 마우스를 올리면 지우기 단추 (휴대폰은 꾹 눌렀다 놓기로)
     this.hoverHost = null;
     this.hoverTimer = 0;
@@ -788,7 +801,7 @@ class Mover {
     if (!hovering) this.hoverHost = null;
     this.hoverTarget = target;
     const hover = hovering ? { enter: () => clearTimeout(this.hoverTimer), leave: () => this.leaveHover() } : null;
-    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, hover, showMs, open: media || block.node.type.name === 'math_block' ? openerOf(dom, kind) : null });
+    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, hover, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null });
   }
 
   hideDelete(now = false) {
@@ -882,6 +895,7 @@ class Mover {
   destroy() {
     this.view.dom.removeEventListener('touchstart', this.onScrubTouch, true);
     this.view.dom.removeEventListener('mk-lift-block', this.onLiftRequest);
+    this.view.dom.removeEventListener('click', this.onOpenClick, true);
     if (this.onHover) {
       this.view.dom.removeEventListener('mousemove', this.onHover);
       this.view.dom.removeEventListener('mouseleave', this.onHoverOut);

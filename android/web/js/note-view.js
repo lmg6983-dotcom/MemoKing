@@ -598,6 +598,8 @@ async function pasteClipboardFiles(text) {
     return;
   }
   if (!text) return setStatus('클립보드에 붙여 넣을 그림이나 글이 없어요', true);
+  // 다른 앱의 파일 주소(content://)를 읽지 못했으면 주소 글을 메모에 넣지 않고 알린다
+  if (/^content:\/\//.test(text.trim())) return setStatus('복사한 파일을 읽지 못했어요. 그 앱에서 다시 복사하거나 + 로 넣어 주세요', true);
   // 그림을 읽지 못한 주소 글은 그대로 (평소 붙여넣기)
   pastingNative = true;
   try {
@@ -651,7 +653,7 @@ el.editorRoot.addEventListener('click', (e) => {
   const a = e.target.closest?.('a[href]');
   if (!a || !el.editorRoot.contains(a)) return;
   e.preventDefault();
-  if (!window.getSelection()?.isCollapsed) return;
+  if (!e.mkOpen && !window.getSelection()?.isCollapsed) return; // "열기" 단추로 연 것은 고른 글자와 상관없이
   openHref(a.getAttribute('href'));
 });
 

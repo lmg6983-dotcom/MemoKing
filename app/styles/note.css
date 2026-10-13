@@ -1611,6 +1611,7 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 @media (hover: hover) and (pointer: fine) { .mk-doc .mk-ink-edit:hover { background: var(--brand-yellow); color: var(--on-brand); } }
 .mk-doc .mk-ink-edit svg { width: 14px; height: 14px; }
 .mk-doc .mk-ink.ProseMirror-selectednode .mk-ink-edit { opacity: 1; }
+@media (hover: none) { .mk-doc .mk-ink:not(.mk-ink-armed) .mk-ink-edit { pointer-events: none; } } /* 안 보이는 단추를 눌러 바로 넘어가지 않게 */
 /* 휴대폰: 한 번 누른 손 메모 — 위 오른쪽은 복사·저장·지우기 단추 자리라 "이어 그리기"는 아래 오른쪽에 */
 .mk-doc .mk-ink.mk-ink-armed .mk-ink-edit { top: auto; bottom: 6px; height: 34px; padding: 0 12px; font-size: 13px; opacity: 1; }
 @media (hover: hover) and (pointer: fine) { .mk-doc .mk-ink:hover .mk-ink-edit { opacity: 1; } }
