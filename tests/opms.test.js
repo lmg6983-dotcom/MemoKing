@@ -196,11 +196,11 @@ test('OPMS 진행사항: 받은 서류·낸 서류를 한 줄씩 (최신이 위,
 test('OPMS 전자포대: 같은 파일 이름은 오래된 것부터 그대로 · 다음은 "(2)" · 요약 · 등록자', async () => {
   const items = attachmentItems([
     { FILE_NAME_UPLOAD: 'u/3', FILE_NAME_ORI: '의견제출통지서.pdf', registered_at: '2026-09-17', SUMMARY: '진보성 없음', REG_NAME: '홍길동' },
-    { FILE_NAME_UPLOAD: 'u/2', FILE_NAME_ORI: '의견제출통지서.PDF', registered_at: '2026-05-01', DOC_MEMO: '<p>기재불비</p>', MEMO: '본문 통째', REG_ID: 'mkl123' },
+    { FILE_NAME_UPLOAD: 'u/2', FILE_NAME_ORI: '의견제출통지서.PDF', registered_at: '2026-05-01', MEMO: '<p>기재불비</p>', MUNAME: '이민균', MUID: 'mkl123', REG_ID: 'mkl123' },
     { FILE_NAME_UPLOAD: 'u/1', FILE_NAME_ORI: '의견제출통지서.pdf', registered_at: '2026-01-02' },
   ]);
   assert.deepEqual(items.map((x) => `${x.n}:${x.name}`), ['3:의견제출통지서 (3).pdf', '2:의견제출통지서 (2).PDF', '1:의견제출통지서.pdf']);
-  assert.deepEqual([items[0].summary, items[0].writer, items[1].summary, items[1].writer], ['진보성 없음', '홍길동', '기재불비', '']);
+  assert.deepEqual([items[0].summary, items[0].writer, items[1].summary, items[1].writer], ['진보성 없음', '홍길동', '기재불비', '이민균']);
   assert.equal(attachmentItems([{ FILE_NAME_UPLOAD: 'u', SUMMARY: '가'.repeat(300) }])[0].summary.length, 120);
   // 받기: 이미 있는 이름은 그대로 쓰고, 없는 것만 받는다 · 열기용 한 파일
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opms-open-'));

@@ -224,6 +224,8 @@ function render() {
   resultsEl.replaceChildren(...nodes);
   box.classList.toggle('has-results', nodes.length > 0);
   clearBtn.hidden = !raw;
+  // 남겨 둔 지난 글로 다시 띄운 경우 첫 줄("메모로 저장")이 아니라 찾은 결과를 골라 둔다 (Enter 로 같은 메모를 또 만들지 않게)
+  if (retained && selected === 0 && rows[0]?.kind === 'new' && rows.length > 1) selected = 1;
   select(Math.min(selected, Math.max(0, rows.length - 1)), { scroll: false });
   fit();
 }
@@ -372,10 +374,12 @@ input.addEventListener('keydown', (e) => {
   if (e.isComposing) return; // 한글 조합 중
   if (e.key === 'Escape') {
     e.preventDefault();
-    if (input.value) clearText(); // 먼저 글을 지우고, 비어 있으면 닫는다
+    // 먼저 글을 지우고, 비어 있으면 닫는다 — 남겨 둔 지난 글을 그대로 둔 채면 한 번에 닫는다 (글은 다음에도 남음)
+    if (input.value && !retained) clearText();
     else api.close();
     return;
   }
+  if (e.key !== 'Enter' && e.key !== 'Tab') retained = false; // 고르거나 고치기 시작하면 이제 이번 글
   const oneLine = !input.value.includes('\n');
   if (oneLine && rows[selected]) {
     const k = actionKey(e, { row: rows[selected], active: activeAct, input });
@@ -402,21 +406,29 @@ input.addEventListener('keydown', (e) => {
   }
 });
 
-// 창이 다시 떠오를 때마다 비우고 포커스 (늘 떠 있다가 보였다 숨었다 한다)
+// 창이 다시 떠오를 때마다 포커스 (늘 떠 있다가 보였다 숨었다 한다) — 지난번에 친 글은 남겨 두고 통째로 골라 둔다:
+//   이어서 찾으려면 그대로 Enter · 방향키, 새로 찾으려면 바로 치면 바뀐다 (메모로 저장한 글은 그때 비움)
+let retained = false; // 다시 띄웠을 때 남겨 둔 지난 글 (아직 손대지 않음)
 async function reset() {
-  input.value = '';
   selected = 0;
+  retained = Boolean(input.value.trim());
   activeAct = 0;
-  results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
-  opms = { query: '', loading: false, cases: [], total: 0, error: '' };
+  // 지난 글이 남아 있으면 그 결과도 새 결과가 올 때까지 그대로 (비었다가 다시 채워지며 깜박이지 않게)
+  if (!input.value.trim()) {
+    results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
+    opms = { query: '', loading: false, cases: [], total: 0, error: '' };
+  }
   resizeInput();
   modules = await api.modules().catch(() => []);
   renderModules();
   updatePlaceholder();
   render();
-  search(); // 최근 메모
+  search(); // 지난 글로 다시 찾기 (비어 있으면 최근 메모)
   replayClass(box, 'enter');
-  setTimeout(() => input.focus(), 0);
+  setTimeout(() => {
+    input.focus();
+    input.select();
+  }, 0);
 }
 api.onShow(reset);
 api.onModules?.((list) => {

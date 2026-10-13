@@ -210,9 +210,10 @@ export function numberedName(name, k) {
 }
 
 // 전자포대 줄의 요약 · 등록자 (회사 DB 열 이름이 정해져 있지 않아 흔한 이름 중 먼저 있는 것)
-//   요약은 서류 요약 전용 열만 (MEMO · CONTENTS 처럼 본문이 통째로 든 열은 쓰지 않음), 등록자는 사람 이름 열만 (로그인 ID 열은 쓰지 않음)
-const SUMMARY_COLUMNS = ['SUMMARY', 'DOC_SUMMARY', 'SUMM', 'DOC_SUMM', 'ABSTRACT', 'DOC_MEMO'];
-const WRITER_COLUMNS = ['REG_NAME', 'REG_USER_NAME', 'REG_PER_NAME', 'USR_NAME', 'USER_NAME', 'WRITER', 'WRITER_NAME'];
+//   회사 OPMS 프로그램(OPMS_Desktop_Suite)이 전자포대 "메모" · "등록자" 로 보여 주는 열: opms_attach.MEMO · MUNAME
+//   (올릴 때 MEMO 에 요약, MUNAME 에 올린 사람 이름을 넣는다). 나머지는 다른 서버 구성을 위한 예비 — 로그인 ID 열(MUID)은 쓰지 않음
+const SUMMARY_COLUMNS = ['MEMO', 'SUMMARY', 'DOC_SUMMARY', 'SUMM', 'DOC_SUMM', 'ABSTRACT', 'DOC_MEMO'];
+const WRITER_COLUMNS = ['MUNAME', 'REG_NAME', 'REG_USER_NAME', 'REG_PER_NAME', 'USR_NAME', 'USER_NAME', 'WRITER', 'WRITER_NAME'];
 const SUMMARY_MAX = 120;
 const pickColumn = (r, names, max = 40) => {
   const keys = new Map(Object.keys(r).map((k) => [k.toUpperCase(), k]));

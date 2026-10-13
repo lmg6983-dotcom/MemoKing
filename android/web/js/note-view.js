@@ -2,6 +2,7 @@
 // 편집기(app/js/editor.js)·예약 알림 패널(app/js/reminder-panel.js)은 데스크탑과 같은 코드를 쓴다.
 import { icon } from '../../app/js/icons.js';
 import { createNoteEditor } from '../../app/js/editor.js';
+import { setCopyHost } from '../../app/js/copy-content.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from '../../app/js/core/html-marks.js';
 import { fileExtension, mediaKind, baseName, vaultUrl } from '../../app/js/media.js';
 import { isDataImage, decodeDataImage } from '../../app/js/core/remote-images.js';
@@ -15,6 +16,9 @@ import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
 import { app } from './state.js';
 import { tutEvent, textChanged, screenChanged } from './tutorial.js';
 import { call, native } from './native.js';
+
+// 복사 단추 · 그림 복사: 안드로이드 클립보드에 그림(content://) / 글
+setCopyHost({ image: (base64) => call('copyImage', { base64 }), text: ({ text }) => native.copyText(text) });
 import { fetchRemoteImage } from './web-fetch.js';
 import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';

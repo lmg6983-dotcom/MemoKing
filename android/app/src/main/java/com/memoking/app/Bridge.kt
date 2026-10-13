@@ -362,6 +362,17 @@ class Bridge(private val activity: MainActivity) {
                     }
                 }
             }
+            // 메모 안의 그림 복사: PNG(base64) → 보내기 자리(cache/share)에 두고 content:// 주소로 클립보드에 (다른 앱에 그림으로 붙음)
+            "copyImage" -> pool.execute {
+                resolve(id) {
+                    val file = shareFile("메모킹 그림.png")
+                    file.writeBytes(Base64.decode(a.getString("base64"), Base64.DEFAULT))
+                    val uri = VaultFileProvider.shareUriFor(file.name)
+                    val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newUri(ctx.contentResolver, "메모킹 그림", uri))
+                    true
+                }
+            }
             // 보내기: 그림(base64) 같은 파일 · PDF
             "shareFile" -> pool.execute {
                 val file = shareFile(a.optString("name", "메모"))

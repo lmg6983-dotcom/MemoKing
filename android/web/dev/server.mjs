@@ -368,6 +368,10 @@ const calls = {
     log.push({ transcribe: rel });
     return { text: '받아쓴 글이에요.\n두 번째 문장이에요.' };
   },
+  copyImage: async (a) => {
+    log.push({ copyImage: { bytes: Math.round((a.base64?.length ?? 0) * 0.75) } });
+    return true;
+  },
   shareFile: async (a) => {
     log.push({ shareFile: { name: a.name, mime: a.mime, bytes: Math.round((a.base64?.length ?? 0) * 0.75) } });
     if (a.mime === 'image/png' && process.env.MK_SHARE_OUT) fs.writeFileSync(process.env.MK_SHARE_OUT, Buffer.from(a.base64, 'base64'));
