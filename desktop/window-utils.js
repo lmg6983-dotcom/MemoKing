@@ -98,10 +98,15 @@ export function defaultNoteBounds(size = DEFAULT_NOTE_SIZE, { listWin = null, no
 // 창마다 "첫 화면을 그렸다" 약속
 const paintedOf = new WeakMap();
 
-export function trackPaint(win) {
+//   manual: 미리 불러 둔 예비 창처럼 이미 그린 창 — 돌려주는 함수를 부르면 그린 것으로 친다
+export function trackPaint(win, { manual = false } = {}) {
   let mark;
   paintedOf.set(win, new Promise((resolve) => { mark = resolve; }));
   const wc = win.webContents;
+  if (manual) {
+    wc.once('render-process-gone', mark);
+    return mark;
+  }
   const onShow = () => {
     if (!wc.isLoading()) mark();
     else wc.once('did-finish-load', mark);
@@ -113,6 +118,7 @@ export function trackPaint(win) {
   paintedOf.get(win).then(() => {
     if (!win.isDestroyed()) win.off('show', onShow);
   });
+  return mark;
 }
 
 export function whenPainted(win, fn) {

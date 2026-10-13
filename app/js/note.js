@@ -30,9 +30,44 @@ const SAVE_DELAY = 600;
 
 const api = window.memoking;
 // 복사 단추 · 그림 Ctrl+C: 시스템 클립보드에 그림 그대로 / 서식 + 글
-setCopyHost({ image: (b64) => api.image.copy(b64), text: ({ text, html }) => api.copyRich({ text, html }) });
+setCopyHost({
+  image: (b64) => api.image.copy(b64),
+  text: ({ text, html }) => api.copyRich({ text, html }),
+  file: (href) => api.attachments.copy(href), // PDF · 소리 같은 첨부는 파일 그대로
+});
 const params = new URLSearchParams(location.search);
+// 미리 불러 둔 예비 창(window-manager.js makeSpare): 편집기 코드는 다 읽어 두고, 열 메모가 정해질 때까지 기다린다
+if (params.get('spare') === '1') {
+  const job = await api.win.spare();
+  if (!job?.id) {
+    window.close();
+    await new Promise(() => {});
+  }
+  params.delete('spare');
+  params.set('id', job.id);
+  if (job.record) params.set('record', '1');
+  if (job.ink) params.set('ink', '1');
+  try {
+    history.replaceState(null, '', `${location.pathname}?${params}`); // 새로 고쳐도 같은 메모
+  } catch {
+    // 주소를 못 바꿔도 이 창은 그대로
+  }
+}
 const id = params.get('id');
+// 메모를 그렸다 → 예비 창이면 이제 보여 달라고 (보통 창은 ready-to-show 로 이미 보임 — 메인이 무시)
+let paintedSent = false;
+function markPainted() {
+  if (paintedSent) return;
+  paintedSent = true;
+  let done = false;
+  const send = () => {
+    if (done) return;
+    done = true;
+    api.win.painted?.();
+  };
+  requestAnimationFrame(() => requestAnimationFrame(send));
+  setTimeout(send, 120); // 숨은 창이라 그리기가 멈춰 있어도
+}
 const $ = (x) => document.getElementById(x);
 const el = {
   status: $('status'),
@@ -1635,7 +1670,7 @@ if (memo?.needsPassword) {
   document.body.dataset.color = memo.color;
   document.title = memo.title;
   document.body.classList.add('memo-locked');
-  const opened = await lockScreen(el.editorRoot, {
+  const unlocking = lockScreen(el.editorRoot, {
     title: memo.title,
     onTry: async (password) => {
       const r = await api.memo.openLock(id, password);
@@ -1645,12 +1680,15 @@ if (memo?.needsPassword) {
     },
     onCancel: () => window.close(),
   });
+  markPainted();
+  const opened = await unlocking;
   // "닫기": 창이 닫히는 동안 암호문으로 편집기를 만들지 않는다 (여기서 멈춤)
   if (!opened) await new Promise(() => {});
   document.body.classList.remove('memo-locked');
 }
 if (!memo) {
   setStatus('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
+  markPainted();
 } else {
   applyMeta(memo);
   applyTop(memo.onTop === true);
@@ -1698,6 +1736,7 @@ if (!memo) {
   });
   if (memo.alarm) showAlarm(memo.alarm);
   editor.focus();
+  markPainted();
   if (memo.capture) await applyCapture(memo.capture);
   if (params.get('record') === '1') recorder.start(); // 목록 + › 음성 메모
   if (params.get('ink') === '1') editor.insertInk(); // 목록 + › 손 메모

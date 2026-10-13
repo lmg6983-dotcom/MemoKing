@@ -245,7 +245,9 @@ export function copyFileToClipboard(p) {
     } else if (process.platform === 'darwin') {
       execFile('osascript', ['-e', 'on run argv', '-e', 'set the clipboard to (POSIX file (item 1 of argv))', '-e', 'end run', p], { timeout: 8000 }, (err) => resolve(!err));
     } else {
-      clipboard.writeBuffer('x-special/gnome-copied-files', Buffer.from(`copy\n${pathToFileURL(p).href}`));
+      // 리눅스: 파일 관리자용 형식이 없으면(일부 Electron) 경로라도 글로
+      if (typeof clipboard.writeBuffer === 'function') clipboard.writeBuffer('x-special/gnome-copied-files', Buffer.from(`copy\n${pathToFileURL(p).href}`));
+      else clipboard.writeText(p);
       resolve(true);
     }
   });

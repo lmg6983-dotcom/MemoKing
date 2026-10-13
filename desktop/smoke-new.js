@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { FileIndex } from './file-index.js';
+import { smokeOpened } from './utils.js';
 
 const SMOKE_DIR = path.join(os.tmpdir(), 'memoking-smoke');
 const VAULT = path.join(SMOKE_DIR, 'vault');
@@ -317,6 +318,82 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('그림 복사: 마우스를 올리면 × 옆에 복사 단추 · 누르면 클립보드에 그림 그대로', Boolean(img) && copyShown && still && copied === true, JSON.stringify({ img, copyShown, copied, file: vault.get(picId)?.file, doc: img ? '' : await js(pw, `document.querySelector('.mk-doc')?.innerHTML.slice(0, 300)`) }));
       pw.close();
       w.close();
+    }
+
+    // ---------- v0.33 — 메모 창 바로 뜨기(예비 창) · PDF · 표 · 수식 등에 마우스를 올려 복사 · 지우기 ----------
+    {
+      const list = getList() ?? createListWindow();
+      await until(() => js(list, `document.readyState === 'complete'`), '목록 창');
+      const vault = getVault();
+      fs.mkdirSync(path.join(vault.root, 'attachments'), { recursive: true });
+      fs.writeFileSync(path.join(vault.root, 'attachments', '안내 자료.pdf'), '%PDF-1.4\n% smoke\n');
+      const body = '# 콘텐츠 복사\n\n[안내 자료.pdf](attachments/안내%20자료.pdf)\n\n| 이름 | 값 |\n| --- | --- |\n| 가 | 1 |\n\n$$\nx^2\n$$\n\n끝 문단\n';
+      const cid = vault.import({ body });
+      // 예비 창이 준비될 때까지 (목록이 뜨고 조금 뒤 만들어 둔다)
+      await wait(2500);
+      await until(() => js(list, `!!document.querySelector('[data-id="${cid}"]')`), '콘텐츠 메모 카드');
+      const before = new Set(noteWins.keys());
+      const winsBefore = new Set(electronApi.BrowserWindow.getAllWindows().map((x) => x.id)); // 예비 창은 누르기 전부터 있다
+      const t0 = Date.now();
+      await js(list, `document.querySelector('[data-id="${cid}"]').click()`);
+      const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '콘텐츠 메모 창');
+      const nw = noteWins.get(nid);
+      await until(() => nw.isVisible(), '메모 창 보임');
+      const openMs = Date.now() - t0;
+      const fromSpare = winsBefore.has(nw.id);
+      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '콘텐츠 메모 준비');
+      const shownRight = await js(nw, `new URLSearchParams(location.search).get('id') === ${JSON.stringify(nid)} && document.querySelector('.mk-doc h1')?.textContent === '콘텐츠 복사'`);
+      check('메모 창 바로 뜨기: 미리 불러 둔 예비 창으로 (300ms 안), 그 메모 내용 그대로', fromSpare && openMs < 300 && shownRight, JSON.stringify({ fromSpare, openMs, shownRight }));
+
+      const hover = async (sel) => {
+        const r = await js(nw, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + Math.min(12, r.width / 2)), y: Math.round(r.top + Math.min(10, r.height / 2)) }; })()`);
+        if (!r) return null;
+        nw.webContents.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
+        return until(() => js(nw, `(() => { const b = document.querySelector('.mk-delete-btn.hover'); return b && b.getAttribute('aria-label'); })()`), `${sel} 단추`, 3000).catch(() => null);
+      };
+      const pressCopy = async () => {
+        const b = await js(nw, `(() => { const r = document.querySelector('.mk-copy-btn').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+        nw.webContents.sendInputEvent({ type: 'mouseMove', x: b.x, y: b.y });
+        await wait(100);
+        nw.webContents.sendInputEvent({ type: 'mouseDown', x: b.x, y: b.y, button: 'left', clickCount: 1 });
+        nw.webContents.sendInputEvent({ type: 'mouseUp', x: b.x, y: b.y, button: 'left', clickCount: 1 });
+        return until(() => js(nw, `document.querySelector('.mk-copy-btn.done')?.title`), '복사 ✓', 3000).catch(() => js(nw, `document.querySelector('.mk-copy-btn')?.title ?? '단추 없음'`));
+      };
+      const leave = async () => {
+        nw.webContents.sendInputEvent({ type: 'mouseMove', x: 2, y: 2 });
+        await until(() => js(nw, `!document.querySelector('.mk-delete-btn')`), '단추 거둠', 2000).catch(() => {});
+      };
+      // PDF 파일 칩: 마우스를 올리면 "이 파일 복사 · 지우기", 복사는 파일 그대로
+      const fileLabel = await hover('.mk-doc a[data-file]');
+      const copiesBefore = smokeOpened.filter((o) => o.kind === 'copy-file').length;
+      const fileDone = fileLabel ? await pressCopy() : '';
+      const fileCopy = smokeOpened.filter((o) => o.kind === 'copy-file').at(-1);
+      check('PDF 파일: 마우스를 올리면 복사 · 지우기, 복사하면 파일 그대로 클립보드에',
+        fileLabel === '이 파일 지우기' && /파일을 복사했어요/.test(fileDone) && smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1 && /안내 자료\.pdf$/.test(fileCopy?.target ?? ''),
+        JSON.stringify({ fileLabel, fileDone, fileCopy }));
+      await leave();
+      // 표: 표째로 복사 (엑셀에 붙도록 칸 사이 탭 · 서식은 표 그대로)
+      const tableLabel = await hover('.mk-doc .tableWrapper td');
+      clipboard.writeText('비움');
+      const tableDone = tableLabel ? await pressCopy() : '';
+      const clip = async (type) => {
+        for (const item of await clipboard.read()) if (item.types.includes(type)) return (await item.getType(type)).text();
+        return '';
+      };
+      const tableText = await clip('text/plain');
+      const tableHtml = await clip('text/html');
+      check('표: 마우스를 올리면 "이 표 복사 · 지우기", 복사하면 칸 사이 탭 + 표 서식',
+        tableLabel === '이 표 지우기' && /내용을 복사했어요/.test(tableDone) && /이름\t값\n가\t1/.test(tableText) && /<table/.test(tableHtml) && !/column-resize-handle|contenteditable/.test(tableHtml),
+        JSON.stringify({ tableLabel, tableDone, tableText, html: tableHtml.slice(0, 200) }));
+      await leave();
+      // 수식: 마우스를 올리면 단추, 지우면 수식만 사라짐
+      const mathLabel = await hover('.mk-doc .mk-math-block');
+      if (mathLabel) {
+        await js(nw, `document.querySelector('.mk-delete-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
+      }
+      const mathGone = await until(() => js(nw, `!document.querySelector('.mk-doc .mk-math-block') && document.querySelector('.mk-doc').textContent.includes('끝 문단')`), '수식 지움', 3000).catch(() => false);
+      check('수식: 마우스를 올리면 "이 수식 지우기", 누르면 수식만 지워짐', mathLabel === '이 수식 지우기' && mathGone, JSON.stringify({ mathLabel, mathGone }));
+      nw.close();
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

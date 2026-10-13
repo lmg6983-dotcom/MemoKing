@@ -17,7 +17,7 @@ import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront } from './window-utils.js';
-import { SMOKE, toast } from './utils.js';
+import { SMOKE, toast, copyFileToClipboard, smokeOpened } from './utils.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: Math.round(p.x), y: Math.round(p.y) } : null);
@@ -493,6 +493,8 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 창 크기 조정 ----------
+  ipcMain.handle('win:spare', (e) => wm.spareWaiting(e.sender));
+  ipcMain.on('win:painted', (e) => wm.notePainted(e.sender));
   ipcMain.handle('win:grow-width', (event, extra) => {
     const win = senderWindow(event);
     const add = Math.ceil(Number(extra) || 0);
@@ -709,6 +711,15 @@ export function registerIpc(ctx) {
     if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요.';
     const result = await openVaultFile(file, BrowserWindow.fromWebContents(e.sender));
     return result && result !== 'cancelled' ? '파일을 열지 못했어요. 이 파일을 열 수 있는 프로그램이 있는지 확인해 주세요.' : result;
+  });
+  ipcMain.handle('attachment:copy', async (_e, rel) => {
+    const file = getVault()?.resolve(String(rel ?? ''));
+    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return false;
+    if (SMOKE) {
+      smokeOpened.push({ kind: 'copy-file', target: file });
+      return true;
+    }
+    return copyFileToClipboard(file);
   });
   ipcMain.handle('attachment:info', (_e, rel) => {
     let decoded = String(rel ?? '');

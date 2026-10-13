@@ -132,6 +132,7 @@ contextBridge.exposeInMainWorld('memoking', {
     open: invoke('attachment:open'),
     fetch: invoke('attachment:fetch'),
     info: invoke('attachment:info'),
+    copy: invoke('attachment:copy'), // 메모 폴더의 첨부를 파일 그대로 클립보드에 → true | false
   },
   // 링크 미리보기 카드
   links: {
@@ -189,6 +190,9 @@ contextBridge.exposeInMainWorld('memoking', {
     inking: invoke('win:inking'),
     showList: invoke('list:show'),
     growWidth: invoke('win:grow-width'),
+    // 미리 불러 둔 예비 메모 창: 열 메모를 기다림 → { id, record, ink } | null · 그 메모를 그렸다고 알림
+    spare: invoke('win:spare'),
+    painted: () => ipcRenderer.send('win:painted'),
   },
   on(event, callback) {
     if (!EVENTS.includes(event)) throw new Error(`알 수 없는 이벤트: ${event}`);

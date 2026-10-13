@@ -57,6 +57,9 @@ export class WindowManager {
     this.windowDrag = null;
     this.tabTear = null;
     this.inkingWins = new WeakSet();
+    this.spare = null; // 미리 불러 둔 메모 창 { win, assign }
+    this.spareTimer = 0;
+    this.paintMarks = new WeakMap(); // 예비 창: 화면이 "메모를 그렸다" 고 알려 오면 부를 함수
 
     this.pdfWin = null;
     this.smokePdf = [];
@@ -150,9 +153,13 @@ export class WindowManager {
     };
     this.listWin.on('moved', remember);
     this.listWin.on('resized', remember);
-    this.listWin.once('ready-to-show', () => this.listWin?.show());
+    this.listWin.once('ready-to-show', () => {
+      this.listWin?.show();
+      this.scheduleSpare(1500);
+    });
     this.listWin.on('closed', () => {
       this.listWin = null;
+      this.dropSpareIfIdle();
       this.drag = null;
       this.ghostWin?.destroy();
       this.ghostWin = null;
@@ -193,19 +200,31 @@ export class WindowManager {
       ink || big ? { width: 560, height: 640 } : DEFAULT_NOTE_SIZE,
       { listWin: this.listWin, noteWinsCount: this.noteWins.size },
     );
-    const win = new BrowserWindow({
-      ...(bounds ?? (onScreen(saved) ? saved : defaultBounds)),
-      minWidth: 240,
-      minHeight: 200,
-      frame: false,
-      show: false,
-      title: memo.title,
-      alwaysOnTop: settings.onTop[id] === true,
-      backgroundColor: noteBg(memo.color),
-      ...windowIcon,
-      webPreferences,
-    });
-    guardWindow(win, { openWebPage });
+    const at = bounds ?? (onScreen(saved) ? saved : defaultBounds);
+    // 보여 줄 창이면 미리 불러 둔 예비 창을 쓴다 (편집기를 새로 읽지 않아 바로 뜬다)
+    const spare = show ? this.takeSpare() : null;
+    let win;
+    if (spare) {
+      win = spare.win;
+      win.setBounds(at);
+      win.setTitle(memo.title);
+      win.setBackgroundColor(noteBg(memo.color));
+      win.setAlwaysOnTop(settings.onTop[id] === true);
+    } else {
+      win = new BrowserWindow({
+        ...at,
+        minWidth: 240,
+        minHeight: 200,
+        frame: false,
+        show: false,
+        title: memo.title,
+        alwaysOnTop: settings.onTop[id] === true,
+        backgroundColor: noteBg(memo.color),
+        ...windowIcon,
+        webPreferences,
+      });
+      guardWindow(win, { openWebPage });
+    }
     if (settings.onTop[id] === true) {
       win.setAlwaysOnTop(true, 'floating');
       this.setSticker(win, true, { animate: false });
@@ -235,8 +254,20 @@ export class WindowManager {
       this.endWindowDrag(id);
     });
     win.on('resized', remember);
-    trackPaint(win);
-    if (show) win.once('ready-to-show', () => (inactive ? win.showInactive() : win.show()));
+    const reveal = () => (inactive ? win.showInactive() : win.show());
+    if (spare) {
+      // 이미 한 번 그린 창이라 ready-to-show 가 다시 오지 않는다 — 화면이 메모를 그렸다고 알려 오면(win:painted) 보인다
+      const mark = trackPaint(win, { manual: true });
+      const fallback = setTimeout(mark, 1500);
+      this.paintMarks.set(win.webContents, () => {
+        clearTimeout(fallback);
+        mark();
+      });
+      whenPainted(win, reveal);
+    } else {
+      trackPaint(win);
+      if (show) win.once('ready-to-show', reveal);
+    }
     this.pushList();
 
     win.on('close', () => {
@@ -252,6 +283,7 @@ export class WindowManager {
 
     win.on('closed', () => {
       this.noteWins.delete(id);
+      this.dropSpareIfIdle();
       const currentVault = this.getVault();
       const stt = this.getStt();
       if (currentVault?.locks.has(id) && stt?.pendingFor?.(id)) {
@@ -273,10 +305,81 @@ export class WindowManager {
       }
     });
 
-    win.loadFile(path.join(APP_DIR, 'note.html'), {
-      query: { id, ...(record ? { record: '1' } : {}), ...(ink ? { ink: '1' } : {}) },
-    });
+    if (spare) spare.assign({ id, record, ink });
+    else {
+      win.loadFile(path.join(APP_DIR, 'note.html'), {
+        query: { id, ...(record ? { record: '1' } : {}), ...(ink ? { ink: '1' } : {}) },
+      });
+    }
+    this.scheduleSpare();
     return win;
+  }
+
+  // ---------- 예비 메모 창 ----------
+  // 메모 창을 열 때마다 편집기(milkdown·KaTeX 등)를 새로 읽고 컴파일하느라 한 박자 늦게 뜬다 →
+  //   숨은 창 하나에 note.html 을 미리 불러 두고(메모는 아직 없음), 메모를 열면 그 창에 메모를 넣고 그린 뒤 보여 준다.
+  //   쓰면 조금 뒤 새 예비 창을 다시 만든다. 목록 창도 메모 창도 없으면(알림 영역에만) 거둬 메모리를 쓰지 않는다
+
+  scheduleSpare(delay = 1200) {
+    clearTimeout(this.spareTimer);
+    this.spareTimer = setTimeout(() => this.makeSpare(), delay);
+  }
+
+  makeSpare() {
+    if (this.spare || this.isQuitting() || !this.getVault() || (!this.listWin && this.noteWins.size === 0)) return;
+    const win = new BrowserWindow({
+      ...DEFAULT_NOTE_SIZE,
+      minWidth: 240,
+      minHeight: 200,
+      frame: false,
+      show: false,
+      backgroundColor: noteBg('yellow'),
+      ...windowIcon,
+      webPreferences,
+    });
+    guardWindow(win, { openWebPage });
+    const spare = { win, assign: null };
+    this.spare = spare;
+    const forget = () => {
+      if (this.spare !== spare) return;
+      this.spare = null;
+      if (!win.isDestroyed()) win.destroy();
+    };
+    win.on('closed', forget);
+    win.webContents.once('render-process-gone', forget);
+    win.webContents.once('did-fail-load', forget);
+    win.loadFile(path.join(APP_DIR, 'note.html'), { query: { spare: '1' } });
+  }
+
+  dropSpareIfIdle() {
+    if (this.listWin || this.noteWins.size) return;
+    clearTimeout(this.spareTimer);
+    const s = this.spare;
+    this.spare = null;
+    if (s && !s.win.isDestroyed()) s.win.destroy();
+  }
+
+  /** 예비 창의 화면이 다 불러졌다 (ipc 'win:spare') → 메모가 정해질 때까지 기다리는 약속. 예비 창이 아니면 null */
+  spareWaiting(sender) {
+    const s = this.spare;
+    if (!s || s.win.isDestroyed() || s.win.webContents !== sender) return Promise.resolve(null);
+    return new Promise((resolve) => (s.assign = resolve));
+  }
+
+  /** 쓸 수 있는 예비 창 (화면이 메모를 기다리는 중일 때만) — 가져가면 다음 것은 새로 */
+  takeSpare() {
+    const s = this.spare;
+    if (!s?.assign || s.win.isDestroyed() || s.win.webContents.isCrashed()) return null;
+    this.spare = null;
+    return s;
+  }
+
+  /** 예비 창이 메모를 그렸다 (ipc 'win:painted') */
+  notePainted(sender) {
+    const mark = this.paintMarks.get(sender);
+    if (!mark) return;
+    this.paintMarks.delete(sender);
+    mark();
   }
 
   revealNote(id) {

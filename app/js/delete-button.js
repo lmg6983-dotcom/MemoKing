@@ -116,7 +116,8 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     copyBlock(view, pos, node, target).then((what) => {
       copyBtn.classList.add('done');
       copyBtn.innerHTML = DONE_ICON;
-      copyBtn.title = what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요' : '내용을 복사했어요';
+      copyBtn.title = what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
+        : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : '내용을 복사했어요';
       announce(copyBtn.title);
     }, (err) => {
       copyBtn.classList.add('failed');
