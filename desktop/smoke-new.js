@@ -598,6 +598,12 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         JSON.stringify({ taped, sb, nb }));
       check('붙이면 두 버튼 모두 사라짐 (테이프 자리는 비고 왕관은 접힘) · 상태 줄 안내', b1.tape === 'peeled' && b1.top === 'folded' && /바탕화면에 붙였어요/.test(b1.status), JSON.stringify(b1));
       await capture(nw, 'smoke-new-taped.png');
+      // 스티커 창 안에 실제로 그려진 것이 테이프인지 (왕관이 아니라)
+      const sw = stickers.get(nw.id)?.win;
+      await until(() => sw && js(sw, `document.documentElement.dataset.ready === 'true'`), '테이프 창 준비', 4000).catch(() => {});
+      const drawn = sw ? await js(sw, `({ tape: getComputedStyle(document.getElementById('tape')).display, crown: getComputedStyle(document.getElementById('crown')).display, url: location.href })`) : null;
+      if (sw) await capture(sw, 'smoke-new-tape-sticker.png');
+      check('스티커 창에 그려진 것은 테이프 (왕관은 숨김)', drawn?.tape !== 'none' && drawn?.crown === 'none', JSON.stringify(drawn));
       const badge = await until(() => js(list, `!!document.querySelector('[data-id="${tid}"] .taped')`), '목록 테이프 표시', 3000).catch(() => false);
       check('목록 카드에 바탕화면 표시', badge);
       // 스티커에 마우스를 올리면 메모 창 상태 줄에 "누르면 떼어져요"
@@ -620,10 +626,11 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('다시 열어도 테이프 (버튼도 숨은 채 · 다시 열 때는 안내 없음)', kept && b2.tape === 'peeled' && b2.top === 'folded' && !/붙였어요/.test(b2.status), JSON.stringify(b2));
       // 테이프를 누르면 떼어져 보통 창 (메모 창은 그대로, 버튼 둘 다 돌아옴)
       await until(() => js(stickers.get(nw.id).win, `document.documentElement.dataset.ready === 'true'`), '테이프 준비', 4000).catch(() => {});
-      await js(stickers.get(nw.id).win, `document.querySelector('#tape .hit').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+      // 보이는 모양을 누른다: 창 가운데에 있는 것이 테이프여야 한다
+      const hitTape = await js(stickers.get(nw.id).win, `(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); const ok = Boolean(el?.closest('#tape .hit')); el?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return ok; })()`);
       const peeled = await until(() => !stickers.get(nw.id) && !getSettings().onBottom?.[tid], '테이프 떼기', 3000).catch(() => false);
       const b3 = await buttons(nw);
-      check('테이프를 누르면 떼어짐 → 메모 창은 그대로, 왕관 · 테이프 버튼이 돌아옴', peeled && !nw.isDestroyed() && nw.isVisible() && b3.top === 'shown' && b3.tape === 'shown' && /뗐어요/.test(b3.status), JSON.stringify(b3));
+      check('테이프를 누르면 떼어짐 → 메모 창은 그대로, 왕관 · 테이프 버튼이 돌아옴', hitTape && peeled && !nw.isDestroyed() && nw.isVisible() && b3.top === 'shown' && b3.tape === 'shown' && /뗐어요/.test(b3.status), JSON.stringify(b3));
       nw.close();
       await until(() => !noteWins.has(tid), '메모 닫힘 2', 3000).catch(() => {});
       // 예전 바탕화면 위젯 → 테이프 붙인 메모 창 (그 자리에)
