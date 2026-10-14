@@ -277,8 +277,50 @@ function virtualY(d) {
 }
 
 /** @param {{ readOnly?: boolean }} options */
+// 휴대폰: 내용에 공유 · 저장 · 복사 · 지우기 단추를 띄운다 — 고를 시간을 넉넉히
+//   짧게 누르기(탭): 그림 · 손 메모 · 소리/동영상/음성 카드의 이름 줄 (누르면 따로 하는 일이 없는 곳)
+//   꾹 누르기(글 고치기 방식): 파일 칩 · 링크 카드 · 수식 — 짧게 누르면 열기 · 고치기라서
+const TAP_TARGET = 'img.mk-image, .mk-ink, .mk-media-label';
+const HOLD_TARGET = 'a[data-file], .mk-link-card, [data-link-card], .mk-math-block';
+const TAP_MS = 400;
+// 누르면 바로 열리던 것 → 단추 줄의 "열기" 단추가 그것을 대신 눌러 준다 (링크 카드는 안쪽 글 상자가 받는다)
+const OPEN_TARGET = 'a[data-file], .mk-link-card, [data-link-card], .mk-math-block';
+function openerOf(dom, kind) {
+  const host = dom.matches(OPEN_TARGET) ? dom : dom.querySelector(OPEN_TARGET);
+  if (!host) return null;
+  const math = host.matches('.mk-math-block');
+  return {
+    label: math ? '이 수식 고치기' : host.matches('a[data-file]') && host.dataset.file === 'program' ? `이 ${kind} 실행` : `이 ${kind} 열기`,
+    run: () => {
+      const at = host.querySelector('.lc-main') ?? host;
+      const e = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+      e.mkOpen = true;
+      at.dispatchEvent(e);
+    },
+  };
+}
+const HOLD_SHOW_MS = 450;
+const TAP_SHOW_MS = 5000;
+
 export function createBlockMove({ readOnly = false } = {}) {
   let mover = null;
+  let tap = null;
+  let hold = null; // 꾹 누르기 { timer }
+
+  // 꾹 눌러 단추를 띄웠으면 손을 뗄 때 오는 열기(click) · 길게 누르기 메뉴는 막는다
+  //   (열기(click)는 Mover.onOpenClick 이 늘 막는다 — 단추가 떠 있으면 그대로 둔다)
+  const swallowOpen = (view) => {
+    const stop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    view.dom.addEventListener('contextmenu', stop, { capture: true, once: true });
+    setTimeout(() => view.dom.removeEventListener('contextmenu', stop, { capture: true }), 1500);
+  };
+  const cancelHold = () => {
+    clearTimeout(hold?.timer);
+    hold = null;
+  };
   return new Plugin({
     key: blockMoveKey,
     state: {
@@ -302,10 +344,54 @@ export function createBlockMove({ readOnly = false } = {}) {
         },
         touchstart(view, event) {
           keyboardFor(view, event.target);
-          if (!canDrag()) return false;
+          // 짧게 눌렀다 떼면(탭) 그림 · 손 메모에 저장 · 복사 · 지우기 단추 — 글 고치기 방식에서도 (touchend)
+          const t = event.touches[0];
+          tap = event.touches.length === 1 && t ? { x: t.clientX, y: t.clientY, at: Date.now(), target: event.target } : null;
+          cancelHold();
+          if (!canDrag()) {
+            // 글 고치기: 파일 칩 · 링크 카드 · 수식은 꾹 눌러 단추 (옮기기 방식에서는 꾹 누르면 들어 올림)
+            const host = tap && event.target instanceof Element ? event.target.closest(HOLD_TARGET) : null;
+            const block = host && view.dom.contains(host) ? blockFromTarget(view, host) : null;
+            if (block && isContentBlock(block.node) && touchMode() === 'edit') {
+              hold = { x: t.clientX, y: t.clientY };
+              hold.timer = setTimeout(() => {
+                hold = null;
+                tap = null;
+                if (view.isDestroyed || mover?.busy()) return;
+                haptic(12);
+                swallowOpen(view);
+                mover?.showDelete(block, false, { showMs: TAP_SHOW_MS });
+              }, HOLD_SHOW_MS);
+            }
+            return false;
+          }
           if (event.touches.length === 1) mover?.press(event, 'touch');
           else mover?.cancelPress();
           return false; // 그냥 누르면 고르기, 밀면 스크롤
+        },
+        touchmove(_view, event) {
+          const t = event.touches[0];
+          if (hold && (!t || Math.hypot(t.clientX - hold.x, t.clientY - hold.y) > 10)) cancelHold(); // 밀면 스크롤
+          return false;
+        },
+        touchend(view, event) {
+          cancelHold();
+          const t0 = tap;
+          tap = null;
+          const t = event.changedTouches?.[0];
+          if (!t0 || !t || !mover || mover.busy() || touchMode() === 'draw' || Date.now() - t0.at > TAP_MS) return false;
+          if (Math.hypot(t.clientX - t0.x, t.clientY - t0.y) > 10) return false;
+          const opens = t0.target instanceof Element ? t0.target.closest(HOLD_TARGET) : null;
+          const host = t0.target instanceof Element ? t0.target.closest(TAP_TARGET) ?? opens : null;
+          if (!host || !view.dom.contains(host)) return false;
+          const block = blockFromTarget(view, host);
+          if (!block || !isContentBlock(block.node)) return false;
+          // 파일(PDF 등) · 링크 카드 · 수식: 누르자마자 열리지 않고 단추부터 — 여는 것은 단추 줄의 "열기"로 (click 은 onOpenClick 이 막는다)
+          // 한 번 누른 손 메모를 또 누르면 이어 그리기로 넘어가니 단추를 다시 띄우지 않는다
+          if (host.matches('.mk-ink.mk-ink-armed') || t0.target.closest?.('.mk-ink-edit')) return false;
+          // 편집기가 누른 그림을 고르고 난 뒤에 (고르기가 바뀌면 단추가 거둬지므로)
+          setTimeout(() => !view.isDestroyed && !mover.busy() && mover.showDelete(block, false, { showMs: TAP_SHOW_MS }), 60);
+          return false;
         },
         dragstart(_view, event) {
           // 휴대폰 글 고치기: 그림·글을 브라우저 끌어 놓기로 옮기지 않는다 (옮기기는 다이얼의 옮기기 방식에서만)
@@ -348,6 +434,22 @@ class Mover {
       e.detail.ok = this.liftAt(pos, x, y, kind);
     };
     view.dom.addEventListener('mk-lift-block', this.onLiftRequest);
+    // 누르면 바로 열리던 내용(파일 칩 · 링크 카드 · 수식 — 한 줄을 차지하는 것)은 눌러도 열지 않고 단추 줄을 띄운다
+    //   여는 것은 단추 줄의 "열기"로 (PC 는 마우스를 올리면 단추가 뜬다 · 휴대폰은 짧게 누르면). 글 사이에 낀 파일 링크는 그대로 열린다
+    this.onOpenClick = (e) => {
+      if (e.mkOpen || e.button !== 0) return;
+      const host = e.target instanceof Element ? e.target.closest(OPEN_TARGET) : null;
+      if (!host || !view.dom.contains(host) || e.target.closest('.lc-remove')) return;
+      const block = blockFromTarget(view, host);
+      if (!block || !isContentBlock(block.node)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // 이미 이 내용의 단추가 떠 있으면(마우스를 올려 뜬 것 등) 그대로
+      const dom = view.nodeDOM(block.pos);
+      const shown = this.hoverTarget && deleteShownFor(this.hoverTarget) && (this.hoverTarget === dom || (dom instanceof Element && dom.contains(this.hoverTarget)));
+      if (!shown && !this.busy()) this.showDelete(block, false, { showMs: TAP_SHOW_MS });
+    };
+    view.dom.addEventListener('click', this.onOpenClick, true);
     // PC: 그림·손 메모·소리·파일·링크 카드에 마우스를 올리면 지우기 단추 (휴대폰은 꾹 눌렀다 놓기로)
     this.hoverHost = null;
     this.hoverTimer = 0;
@@ -684,7 +786,7 @@ class Mover {
 
   // ---------- 지우기 단추: 꾹 눌렀다 놓은 내용의 오른쪽 위 (delete-button.js) ----------
 
-  showDelete(block, hovering = false) {
+  showDelete(block, hovering = false, { showMs } = {}) {
     const { view } = this;
     const dom = view.nodeDOM(block.pos);
     if (!(dom instanceof Element)) return;
@@ -699,8 +801,8 @@ class Mover {
     if (!hovering) this.hoverHost = null;
     this.hoverTarget = target;
     const hover = hovering ? { enter: () => clearTimeout(this.hoverTimer), leave: () => this.leaveHover() } : null;
-    const copyLabel = block.node.type.name === 'mk_link_card' ? '링크 주소 복사' : undefined; // 카드 모양이 아니라 주소를
-    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, hover });
+    const copyLabel = block.node.type.name === 'mk_link_card' ? '링크 주소 복사' : null; // 카드 모양이 아니라 주소를
+    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, hover, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null });
   }
 
   hideDelete(now = false) {
@@ -794,6 +896,7 @@ class Mover {
   destroy() {
     this.view.dom.removeEventListener('touchstart', this.onScrubTouch, true);
     this.view.dom.removeEventListener('mk-lift-block', this.onLiftRequest);
+    this.view.dom.removeEventListener('click', this.onOpenClick, true);
     if (this.onHover) {
       this.view.dom.removeEventListener('mousemove', this.onHover);
       this.view.dom.removeEventListener('mouseleave', this.onHoverOut);
@@ -872,12 +975,20 @@ export function createContentLines() {
       // 휴대폰 글 고치기: 그림·링크 카드·파일·수식 같은 내용을 눌러도 골라지지(테두리) 않는다.
       //   눌러서 여는 동작(파일 열기·수식 고치기 등)은 각자의 click 으로 그대로 된다
       //   그림·카드처럼 줄을 차지하는 것은 누르면 커서를 그 아래 글 줄로 (바로 이어 쓸 수 있게)
-      //   손 메모는 고르는 대신 바로 이어 그리기 (휴대폰은 고른 뒤 단추를 누르던 것을 한 번에)
+      //   손 메모: 처음 누르면 복사·저장·지우기 단추와 아래 "이어 그리기"만 보이고(바로 넘어가면 단추를 누를 틈이 없다),
+      //   단추가 떠 있는 동안 한 번 더 누르면 (또는 "이어 그리기"를 누르면) 이어 그리기
       handleClickOn(view, _pos, node, nodePos, event, direct) {
         if (!direct || touchMode() !== 'edit' || !node.isAtom || node.isText) return false;
         const ink = event.target instanceof Element ? event.target.closest('.mk-ink') : null;
         if (ink) {
-          ink.querySelector('.mk-ink-edit')?.click();
+          if (ink.classList.contains('mk-ink-armed')) {
+            ink.classList.remove('mk-ink-armed');
+            ink.querySelector('.mk-ink-edit')?.click();
+          } else {
+            ink.classList.add('mk-ink-armed');
+            clearTimeout(ink.mkArmTimer);
+            ink.mkArmTimer = setTimeout(() => ink.classList.remove('mk-ink-armed'), TAP_SHOW_MS);
+          }
           return true;
         }
         const $n = view.state.doc.resolve(nodePos);

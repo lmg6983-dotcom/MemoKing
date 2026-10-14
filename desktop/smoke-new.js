@@ -64,7 +64,10 @@ function fakeOpms() {
 export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow, memoHotkeys, smokeHud, windowManager }) {
   const checks = [];
   const errors = [];
-  const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
+  const check = (name, ok, detail = '') => {
+    checks.push({ name, ok: Boolean(ok), detail: String(detail) });
+    if (process.env.MK_SMOKE_TRACE) console.log(`… ${ok ? '✔' : '✖'} ${name}`); // 어디서 멈췄는지 보려고 (점검 도중 바로)
+  };
   app.on('web-contents-created', (_e, wc) => {
     wc.on('console-message', (...args) => {
       const [event, legacyLevel, legacyMessage] = args;
@@ -75,6 +78,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const js = (win, code) => win.webContents.executeJavaScript(code, true);
   async function until(fn, label, timeout = 8000) {
+    if (process.env.MK_SMOKE_TRACE) console.log(`… 기다림: ${label}`);
     const end = Date.now() + timeout;
     while (Date.now() < end) {
       try {
@@ -343,7 +347,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const fromSpare = winsBefore.has(nw.id);
       await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '콘텐츠 메모 준비');
       const shownRight = await js(nw, `new URLSearchParams(location.search).get('id') === ${JSON.stringify(nid)} && document.querySelector('.mk-doc h1')?.textContent === '콘텐츠 복사'`);
-      check('메모 창 바로 뜨기: 미리 불러 둔 예비 창으로 (300ms 안), 그 메모 내용 그대로', fromSpare && openMs < 300 && shownRight, JSON.stringify({ fromSpare, openMs, shownRight }));
+      check('메모 창 바로 뜨기: 미리 불러 둔 예비 창으로 (확인 간격 포함 450ms 안), 그 메모 내용 그대로', fromSpare && openMs < 450 && shownRight, JSON.stringify({ fromSpare, openMs, shownRight }));
 
       const hover = async (sel) => {
         const r = await js(nw, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + Math.min(12, r.width / 2)), y: Math.round(r.top + Math.min(10, r.height / 2)) }; })()`);
@@ -371,25 +375,17 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('PDF 파일: 마우스를 올리면 복사 · 지우기, 복사하면 파일 그대로 클립보드에',
         fileLabel === '이 파일 지우기' && /파일을 복사했어요/.test(fileDone) && smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1 && /안내 자료\.pdf$/.test(fileCopy?.target ?? ''),
         JSON.stringify({ fileLabel, fileDone, fileCopy }));
-      // 저장 · 공유 단추 (PC · 메모 폴더의 파일): 복사 왼쪽에 공유 · 저장
+      // PDF 저장: 파일 그대로
       await hover('.mk-doc a[data-file]');
-      const fileBtns = await js(nw, `[...document.querySelectorAll('.mk-file-btn')].map((b) => b.getAttribute('aria-label'))`);
-      const press = async (sel) => {
-        const b = await js(nw, `(() => { const r = document.querySelector('${sel}').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
-        nw.webContents.sendInputEvent({ type: 'mouseMove', x: b.x, y: b.y });
-        await wait(100);
-        nw.webContents.sendInputEvent({ type: 'mouseDown', x: b.x, y: b.y, button: 'left', clickCount: 1 });
-        nw.webContents.sendInputEvent({ type: 'mouseUp', x: b.x, y: b.y, button: 'left', clickCount: 1 });
-      };
-      await press('.mk-save-btn');
-      const saved = await until(() => smokeOpened.find((o) => o.kind === 'save-as'), '저장', 3000).catch(() => null);
+      await js(nw, `document.querySelector('.mk-save-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
+      const savedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'save').find((o) => /안내 자료\.pdf$/.test(o.target)), 'PDF 저장', 3000).catch(() => null);
+      check('PDF 파일: 저장 단추 → 그 파일 그대로', Boolean(savedPdf) && fs.readFileSync(savedPdf.target, 'utf8').startsWith('%PDF'), JSON.stringify(savedPdf));
+      // PC 공유 단추: Windows 공유 창 (메모 폴더의 파일 그대로)
       await hover('.mk-doc a[data-file]');
-      await press('.mk-share-btn');
-      const shared = await until(() => smokeOpened.find((o) => o.kind === 'share'), '공유', 3000).catch(() => null);
-      const savedStatus = await js(nw, `document.getElementById('status').textContent`);
-      check('그림 · 소리 · 파일: 복사 왼쪽에 공유 · 저장 단추 → 다른 이름으로 저장 · Windows 공유 창 (상태 줄에 결과)',
-        JSON.stringify(fileBtns) === JSON.stringify(['이 파일 공유', '이 파일 저장…']) && /안내 자료\.pdf$/.test(saved?.target ?? '') && /안내 자료\.pdf$/.test(shared?.target ?? '') && /공유 창을 열었어요|저장했어요/.test(savedStatus),
-        JSON.stringify({ fileBtns, saved, shared, savedStatus }));
+      const shareShown = await js(nw, `!!document.querySelector('.mk-share-btn')`);
+      if (shareShown) await js(nw, `document.querySelector('.mk-share-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
+      const sharedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'share').find((o) => /안내 자료\.pdf$/.test(o.target)), 'PDF 공유', 3000).catch(() => null);
+      check('PDF 파일: 공유 단추 → Windows 공유 창에 그 파일', shareShown && Boolean(sharedPdf), JSON.stringify({ shareShown, sharedPdf }));
       await leave();
       // 표: 표째로 복사 (엑셀에 붙도록 칸 사이 탭 · 서식은 표 그대로)
       const tableLabel = await hover('.mk-doc .tableWrapper td');
@@ -404,6 +400,19 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('표: 마우스를 올리면 "이 표 복사 · 지우기", 복사하면 칸 사이 탭 + 표 서식',
         tableLabel === '이 표 지우기' && /내용을 복사했어요/.test(tableDone) && /이름\t값\n가\t1/.test(tableText) && /<table/.test(tableHtml) && !/column-resize-handle|contenteditable/.test(tableHtml),
         JSON.stringify({ tableLabel, tableDone, tableText, html: tableHtml.slice(0, 200) }));
+      // 표 저장: 엑셀에서 바로 열리는 CSV (한글이 깨지지 않게 BOM)
+      const tLabel2 = await hover('.mk-doc .tableWrapper td');
+      const savesBefore = smokeOpened.filter((o) => o.kind === 'save').length;
+      if (tLabel2) {
+        const sb = await js(nw, `(() => { const r = document.querySelector('.mk-save-btn').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+        nw.webContents.sendInputEvent({ type: 'mouseMove', x: sb.x, y: sb.y });
+        await wait(100);
+        nw.webContents.sendInputEvent({ type: 'mouseDown', x: sb.x, y: sb.y, button: 'left', clickCount: 1 });
+        nw.webContents.sendInputEvent({ type: 'mouseUp', x: sb.x, y: sb.y, button: 'left', clickCount: 1 });
+      }
+      const savedTable = await until(() => smokeOpened.filter((o) => o.kind === 'save').length > savesBefore && smokeOpened.filter((o) => o.kind === 'save').at(-1), '표 저장', 3000).catch(() => null);
+      const csv = savedTable ? fs.readFileSync(savedTable.target, 'utf8') : '';
+      check('표: 저장 단추 → CSV 파일 (머리 줄 · 칸 · BOM)', /\.csv$/.test(savedTable?.target ?? '') && csv === '\ufeff이름,값\r\n가,1', JSON.stringify({ target: savedTable?.target, csv }));
       await leave();
       // 수식: 마우스를 올리면 단추, 지우면 수식만 사라짐
       const mathLabel = await hover('.mk-doc .mk-math-block');
@@ -428,8 +437,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '띄어쓰기 메모 창');
       let nw = noteWins.get(nid);
       await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '띄어쓰기 메모 준비');
-      const caretAtEnd = `(() => { const p = [...document.querySelectorAll('.mk-doc p')].at(-1); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`;
+      // 마지막 문단 끝에 커서 — 편집기가 고른 자리를 받아들일 때까지(selectionchange) 기다린다 (바로 붙여 넣으면 맨 앞에 들어가는 일이 있어)
+      const caretAtEnd = `(() => { document.querySelector('.ProseMirror').focus(); const p = [...document.querySelectorAll('.mk-doc p')].at(-1); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`;
       await js(nw, caretAtEnd);
+      await wait(150);
       key(nw, 'Enter');
       await wait(100);
       // 메모장에서 복사한 글 (HTML 없음)
@@ -438,6 +449,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await wait(300);
       // 직접 친 줄 앞 띄어쓰기
       await js(nw, caretAtEnd);
+      await wait(150);
       key(nw, 'Enter');
       await wait(100);
       for (const ch of ['  ', '직접 친 줄']) nw.webContents.insertText(ch);
@@ -451,6 +463,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('줄 앞 띄어쓰기 · 줄바꿈: 메모장 글을 붙여도 · 직접 쳐도 그대로 (네 칸도 코드 블록이 되지 않음, 줄이 합쳐지지 않음)', inDoc, JSON.stringify({ shown, lines }));
       // 워드 · 메모킹에서 복사한 서식 글(HTML)의 들여쓰기도 그대로
       await js(nw, caretAtEnd);
+      await wait(150);
       key(nw, 'Enter');
       await wait(80);
       await js(nw, `(() => { const dt = new DataTransfer(); dt.setData('text/html', '<p>&nbsp;&nbsp;워드에서 들여 쓴 줄&nbsp;&nbsp;끝</p>'); dt.setData('text/plain', '  워드에서 들여 쓴 줄  끝'); document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`);
@@ -459,6 +472,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('서식 글(HTML)을 붙여도 줄 앞 들여쓰기 그대로 (글 속 겹친 빈칸은 보통 띄어쓰기)', htmlLine === `${N}${N}워드에서 들여 쓴 줄  끝`, JSON.stringify(htmlLine));
       // 줄을 나누다 앞에 남은 띄어쓰기는 일부러 넣은 것이 아니므로 다듬기가 지운다 ("앞말| 뒷말" 에서 Enter)
       await js(nw, caretAtEnd);
+      await wait(150);
       key(nw, 'Enter');
       await wait(80);
       nw.webContents.insertText('앞말 뒷말');

@@ -1284,6 +1284,129 @@ try {
   await page.tap('.mk-delete-btn');
   await page.waitForTimeout(1200);
   check('지우기 단추: 누르면 그 그림만 지움', (await page.locator('img.mk-image').count()) === 1 && !read('그림 둘.md').includes('two-a.png') && read('그림 둘.md').includes('two-b.png'), read('그림 둘.md'));
+  // 글 고치기 방식에서도 그림을 짧게 누르면(탭): 저장 · 복사 · 지우기 단추
+  await setMode('edit');
+  {
+    const ib2 = await page.locator('img.mk-image').first().boundingBox();
+    await touch('touchStart', ib2.x + 40, ib2.y + 40);
+    await page.waitForTimeout(80);
+    await touch('touchEnd', ib2.x + 40, ib2.y + 40);
+    await page.waitForTimeout(250);
+    const shown = await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn') && await page.isVisible('.mk-save-btn');
+    const order = await page.evaluate(() => ['.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
+    check('글 고치기 방식: 그림을 짧게 누르면 저장 · 복사 · × 단추 (왼쪽부터)', shown && order[0] < order[1] && order[1] < order[2], JSON.stringify({ shown, order }));
+    await shot('18c-tap-buttons');
+    // 저장 단추: 메모 폴더의 사진은 원본 파일 그대로 안드로이드 저장 창으로
+    await page.tap('.mk-save-btn');
+    await page.waitForTimeout(500);
+    const saves = (await devLog()).log.filter((x) => x.saveAs);
+    check('저장 단추: 사진은 원본 파일 그대로 저장 · ✓', saves.at(-1)?.saveAs.rel === 'attachments/two-b.png' && saves.at(-1).saveAs.name === 'two-b.png' && await page.isVisible('.mk-save-btn.done'), JSON.stringify(saves.at(-1)));
+    // 복사한 그림을 메모에 붙여 넣기 (WebView 는 클립보드의 그림을 주지 않고 주소 글만 — 앱이 클립보드에서 읽어 넣음)
+    await page.tap('.mk-copy-btn');
+    await page.waitForTimeout(500);
+    const before = await page.locator('img.mk-image').count();
+    await page.locator('.mk-doc p', { hasText: '끝' }).tap();
+    await page.waitForTimeout(150);
+    await page.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'content://com.memoking.app.files/share/%EB%A9%94%EB%AA%A8%ED%82%B9%20%EA%B7%B8%EB%A6%BC.png');
+      document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    await page.waitForTimeout(800);
+    const after = await page.locator('img.mk-image').count();
+    await page.waitForTimeout(800);
+    check('복사한 그림 붙여 넣기: 클립보드의 그림이 첨부로 메모에 (주소 글이 아니라)', after === before + 1 && !read('그림 둘.md').includes('content://') && (read('그림 둘.md').match(/!\[[^\]]*\]\(attachments\//g) ?? []).length === 2, JSON.stringify({ before, after, file: read('그림 둘.md').split('---').pop() }));
+  }
+  // 음성 카드 · 소리 이름 줄을 짧게 누르면, 파일 칩은 꾹 누르면(글 고치기 방식): 공유 · 저장 · 복사 · × 단추
+  {
+    fs.writeFileSync(path.join(vault, 'attachments/voice-btn.m4a'), Buffer.from('fake audio'));
+    fs.writeFileSync(path.join(vault, 'attachments/안내서.pdf'), Buffer.from('%PDF-1.4 fake'));
+    write('콘텐츠 단추.md', '---\nid: 00000000-0000-4000-8000-0000000000dd\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: purple\n---\n# 콘텐츠 단추\n\n> ![녹음 10월 14일](attachments/voice-btn.m4a)\n>\n> 도레미파솔라시도\n\n[안내서.pdf](attachments/안내서.pdf)\n\n$$\nx^2\n$$\n\n끝\n');
+    await back();
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForTimeout(400);
+    await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000dd"]');
+    await page.waitForSelector('#note-screen:not([hidden]) .mk-media-label');
+    await page.waitForTimeout(400);
+    await setMode('edit');
+    const lab = await page.locator('.mk-media-label').first().boundingBox();
+    await touch('touchStart', lab.x + 20, lab.y + lab.height / 2);
+    await page.waitForTimeout(80);
+    await touch('touchEnd', lab.x + 20, lab.y + lab.height / 2);
+    await page.waitForTimeout(250);
+    const four = await page.evaluate(() => ['.mk-share-btn', '.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => { const e = document.querySelector(s); return e && e.style.visibility !== 'hidden' ? Math.round(e.getBoundingClientRect().left) : -1; }));
+    const voiceLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
+    check('음성 카드: 이름 줄을 짧게 누르면 공유 · 저장 · 복사 · × (왼쪽부터)', four.every((x) => x >= 0) && four[0] < four[1] && four[1] < four[2] && four[2] < four[3] && voiceLabel === '이 음성 지우기', JSON.stringify({ four, voiceLabel }));
+    await shot('18d-voice-buttons');
+    await page.tap('.mk-share-btn');
+    await page.waitForTimeout(500);
+    const shared = (await devLog()).log.filter((x) => x.shareContent).at(-1);
+    check('공유 단추: 음성은 소리 파일 그대로 공유 창으로', shared?.shareContent.rel === 'attachments/voice-btn.m4a' && await page.isVisible('.mk-share-btn.done'), JSON.stringify(shared));
+    await page.waitForTimeout(300);
+    // 파일 칩: 짧게 누르면 열기 그대로, 꾹 누르면 단추 (열지 않음)
+    const opensBefore = (await devLog()).log.filter((x) => x.openFile).length;
+    const chip = await page.locator('.mk-doc a[data-file]').boundingBox();
+    await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
+    await page.waitForTimeout(650);
+    await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
+    await page.waitForTimeout(300);
+    const chipLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
+    const opensAfter = (await devLog()).log.filter((x) => x.openFile).length;
+    check('파일 칩: 꾹 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 지우기' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
+    await page.tap('.mk-save-btn');
+    await page.waitForTimeout(500);
+    const saved = (await devLog()).log.filter((x) => x.saveAs).at(-1);
+    check('저장 단추: PDF 는 파일 그대로', saved?.saveAs.rel === 'attachments/안내서.pdf' && saved.saveAs.name === '안내서.pdf', JSON.stringify(saved));
+    await page.waitForTimeout(1900);
+    // 파일 칩을 짧게 눌러도 바로 열지 않고 단추 + 노란 "열기" (맨 왼쪽) → "열기"를 누르면 그때 연다
+    const tapAt = async (sel) => {
+      const b = await page.locator(sel).first().boundingBox();
+      await touch('touchStart', b.x + 10, b.y + b.height / 2);
+      await page.waitForTimeout(80);
+      await touch('touchEnd', b.x + 10, b.y + b.height / 2);
+      await page.waitForTimeout(400);
+    };
+    const opens0 = (await devLog()).log.filter((x) => x.openFile).length;
+    await tapAt('.mk-doc a[data-file]');
+    const row = await page.evaluate(() => ['.mk-open-btn', '.mk-share-btn', '.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
+    const openLabel = await page.getAttribute('.mk-open-btn', 'aria-label').catch(() => null);
+    const opens1 = (await devLog()).log.filter((x) => x.openFile).length;
+    check('파일 칩: 짧게 눌러도 바로 열지 않고 열기 · 공유 · 저장 · 복사 · × (왼쪽부터)', opens1 === opens0 && row.every((x) => x >= 0) && row.every((x, i) => i === 0 || row[i - 1] < x) && openLabel === '이 파일 열기', JSON.stringify({ row, openLabel, opens0, opens1 }));
+    await shot('18e-file-open-button');
+    await page.tap('.mk-open-btn');
+    await page.waitForTimeout(500);
+    const opened = (await devLog()).log.filter((x) => x.openFile);
+    check('열기 단추: 누르면 그 파일을 연다 (단추는 거둠)', opened.length === opens0 + 1 && opened.at(-1).openFile === 'attachments/안내서.pdf' && !(await page.locator('.mk-open-btn').count()), JSON.stringify(opened.at(-1)));
+    // 수식: 눌러도 고치기 창이 바로 뜨지 않고 단추 + "고치기"
+    await tapAt('.mk-doc .mk-math-block');
+    const mathRow = { editor: await page.locator('.mk-math-editor').count(), label: await page.getAttribute('.mk-open-btn', 'aria-label').catch(() => null) };
+    check('수식: 눌러도 바로 고치기 창이 뜨지 않고 단추 + "이 수식 고치기"', mathRow.editor === 0 && mathRow.label === '이 수식 고치기', JSON.stringify(mathRow));
+    await page.tap('.mk-open-btn');
+    await page.waitForTimeout(400);
+    check('고치기 단추: 누르면 수식 고치기 창', (await page.locator('.mk-math-editor').count()) === 1);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    // 파일 칩 이름은 고칠 수 없다: 칩 글자 가운데에 커서를 두고 쳐도 · 지워도 그대로
+    const chipBefore = read('콘텐츠 단추.md');
+    await page.evaluate(() => {
+      const t = document.querySelector('.mk-doc a[data-file]').firstChild;
+      document.querySelector('#note-screen .ProseMirror').focus();
+      window.getSelection().collapse(t, 2);
+    });
+    await page.waitForTimeout(150);
+    await page.keyboard.type('XY');
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(1500);
+    const chipText = await page.textContent('.mk-doc a[data-file]');
+    check('파일 칩: 이름 가운데에 쳐도 · 지워도 바뀌지 않음', chipText === '안내서.pdf' && read('콘텐츠 단추.md').includes('[안내서.pdf](attachments/안내서.pdf)') && !read('콘텐츠 단추.md').includes('XY'), JSON.stringify({ chipText, same: chipBefore === read('콘텐츠 단추.md') }));
+    // 다음 점검을 위해 '그림 둘' 로 돌아감
+    await back();
+    await page.waitForTimeout(300);
+    await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000cc"]');
+    await page.waitForSelector('#note-screen:not([hidden]) img.mk-image');
+    await page.waitForTimeout(400);
+  }
   // + › 표: 커서 자리에 표 (글을 고치는 일이니 다이얼을 글 고치기로)
   await setMode('edit');
   await page.locator('.mk-doc p', { hasText: '끝' }).tap();
@@ -1589,10 +1712,24 @@ try {
     await settle();
     check('표 칸: 사진은 표 바로 아래에 (표 그대로)', /\| 사과 \| 1000 \|\n\n!\[칸\]\(attachments\//.test(body()), body());
     await intoCell('사과');
+    await page.waitForTimeout(300);
+    {
+      const bar = await page.locator('#table-bar').boundingBox();
+      const add = await page.locator('#add-btn').boundingBox();
+      const dial = await page.locator('.mode-knob').boundingBox();
+      check('표 막대: + · 다이얼이 표 막대를 가리지 않음 (그 위로)', bar && add.y + add.height <= bar.y + 1 && dial.y + dial.height <= bar.y + 1, JSON.stringify({ bar, add, dial }));
+    }
     await page.tap('#add-btn');
     await page.waitForTimeout(250);
     await page.tap('.add-sat[data-add="math"]');
     await page.waitForTimeout(400);
+    // 키보드가 올라와 보이는 칸이 줄어도 수식 창은 보이는 칸 안에 (예전에는 키보드 뒤로 숨어 '바로 닫힌' 것처럼 보였다)
+    await page.setViewportSize({ width: 390, height: 420 });
+    await page.waitForTimeout(300);
+    const mathBox = await page.locator('.mk-math-editor').boundingBox();
+    check('+ → 수식: 키보드가 올라와도 수식 창이 보이는 칸 안에', mathBox && mathBox.y >= 0 && mathBox.y + mathBox.height <= 420, JSON.stringify(mathBox));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(300);
     await page.keyboard.type('x^2');
     await page.keyboard.press('Enter');
     await settle();
@@ -1781,8 +1918,17 @@ try {
     check(`메모 안 투명 바탕 손 메모: ${process.env.MK_DARK ? '다크 모드는 검은 펜을 밝게 바꾼 그림' : '원래 그림'} 하나만 보임`, shownSrc, String(shownSrc));
     await shot('21-ink-in-memo');
     // 이어 그리기: 칸을 골라 "이어 그리기" → 같은 획이 보이고, 흰 바탕으로 바꿔 한 획 더
-    // 글 고치기에서는 손 메모를 톡 누르면 고르지 않고 바로 이어 그리기
+    // 글 고치기: 손 메모를 톡 누르면 먼저 복사·저장·지우기 단추와 "이어 그리기" (바로 넘어가지 않음) → "이어 그리기"로 이어 그리기
     await page.tap('.mk-doc .mk-ink img:visible');
+    await page.waitForTimeout(500);
+    const armed = await page.evaluate(() => {
+      const edit = document.querySelector('.mk-doc .mk-ink.mk-ink-armed .mk-ink-edit');
+      const r = edit?.getBoundingClientRect();
+      const del = document.querySelector('.mk-delete-btn')?.getBoundingClientRect();
+      return { sheet: !!document.querySelector('.ink-sheet'), copy: !!document.querySelector('.mk-copy-btn'), save: !!document.querySelector('.mk-save-btn'), del: !!del, edit: !!edit && getComputedStyle(edit).opacity === '1', apart: !!r && !!del && (r.top >= del.bottom || r.bottom <= del.top) };
+    });
+    check('손 메모 톡: 바로 넘어가지 않고 복사·저장·× 단추 + 아래 "이어 그리기" (겹치지 않음)', !armed.sheet && armed.copy && armed.save && armed.del && armed.edit && armed.apart, JSON.stringify(armed));
+    await page.tap('.mk-doc .mk-ink.mk-ink-armed .mk-ink-edit');
     await page.waitForSelector('.ink-sheet');
     await page.waitForTimeout(200);
     const again = await page.locator('.ink-sheet .ink-strokes path').count();
@@ -1886,6 +2032,23 @@ try {
   await page.tap('#drive-connect');
   await page.waitForSelector('.folder-item.suggest');
   check('Drive: 폴더 변경은 목록에서 (메모킹 동기화가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
+  await page.evaluate(() => window.__mk.back());
+  await page.waitForTimeout(300);
+  // 외부 앱 메모 연동 (전체 드라이브 권한): 연결된 뒤에만 보이고 기본은 꺼짐 → 켜면 다시 허용받고 폴더를 처음부터 · 취소하면 꺼진 채 · 끄기
+  if (!(await page.isVisible('#drive-full-row'))) await page.tap('#settings-btn');
+  await page.waitForTimeout(200);
+  check('외부 앱 메모 연동: 연결된 뒤 설정에 보이고 기본은 꺼짐', await page.isVisible('#drive-full-row') && !(await page.isChecked('#drive-full')));
+  const fullLog = async () => (await devLog()).log.filter((l) => l.driveFullScope).map((l) => l.driveFullScope.on);
+  await post('/dev/drive-deny', {});
+  await page.tap('#drive-full-row .switch');
+  await page.waitForTimeout(700);
+  check('외부 앱 메모 연동: 허용 화면에서 취소하면 다시 꺼짐 (지금 연결 그대로)', !(await page.isChecked('#drive-full')) && (await fullLog()).at(-1) === true && await page.isVisible('#drive-disconnect'));
+  await page.tap('#drive-full-row .switch');
+  await page.waitForTimeout(900);
+  check('외부 앱 메모 연동: 허용하면 켜짐', await page.isChecked('#drive-full') && (await page.evaluate(() => window.memoking?.driveStatus ? true : true)));
+  await page.tap('#drive-full-row .switch');
+  await page.waitForTimeout(700);
+  check('외부 앱 메모 연동: 끄면 drive.file 로 (꺼짐)', !(await page.isChecked('#drive-full')) && (await fullLog()).at(-1) === false);
   await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
   if (await page.isVisible('#settings-sheet')) await page.evaluate(() => window.__mk.back());

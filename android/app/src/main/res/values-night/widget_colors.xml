@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 홈 화면 위젯 색 — 어두운 화면 (values/widget_colors.xml 의 짝) -->
+<resources>
+    <color name="widget_yellow">#FF3A3317</color>
+    <color name="widget_green">#FF1E3322</color>
+    <color name="widget_pink">#FF3D2230</color>
+    <color name="widget_purple">#FF2C2440</color>
+    <color name="widget_blue">#FF1C2D42</color>
+    <color name="widget_gray">#FF262624</color>
+    <color name="widget_charcoal">#FF141413</color>
+    <color name="widget_text">#FFF5F4EF</color>
+    <color name="widget_muted">#94F5F4EF</color>
+</resources>

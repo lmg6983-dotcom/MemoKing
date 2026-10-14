@@ -36,8 +36,18 @@ setCopyHost({
   image: (b64) => api.image.copy(b64),
   text: ({ text, html }) => api.copyRich({ text, html }),
   file: (href) => api.attachments.copy(href), // PDF · 소리 같은 첨부는 파일 그대로
-  save: (href) => api.attachments.saveAs(href), // 그림 · 소리 · 파일 다른 이름으로 저장
-  share: (href) => api.attachments.share(href), // Windows 공유 창
+  // 저장 단추: 어디에 저장할지 고르는 창 → 저장한 파일 이름 | 'cancelled'
+  save: async (f) => {
+    const r = await api.attachments.saveAs(f);
+    if (r?.error) throw new Error(r.error);
+    return r?.cancelled ? 'cancelled' : r.name;
+  },
+  // 공유 단추: Windows 공유 창 (못 열면 탐색기에서 그 파일을 골라 둔다)
+  share: async (f) => {
+    const r = await api.attachments.share(f);
+    if (r?.error) throw new Error(r.error);
+    return r?.fallback ? 'fallback' : 'shared';
+  },
 });
 // 저장 · 공유 단추의 결과 (delete-button.js)
 window.addEventListener('mk:notice', (e) => setStatus(e.detail?.text ?? '', Boolean(e.detail?.error)));
@@ -865,7 +875,7 @@ el.editorRoot.addEventListener('click', (e) => {
   if (!a || !el.editorRoot.contains(a)) return;
   e.preventDefault();
   // 글자를 끌어서 고르던 중이면 열지 않는다
-  if (!window.getSelection()?.isCollapsed) return;
+  if (!e.mkOpen && !window.getSelection()?.isCollapsed) return; // "열기" 단추로 연 것은 고른 글자와 상관없이
   openHref(a.getAttribute('href'));
 });
 
@@ -890,7 +900,8 @@ el.editorRoot.addEventListener('dblclick', (e) => {
   openHref(target);
 });
 
-// 파일 칩에 마우스를 올리면 이름·크기 안내
+// 파일 칩에 마우스를 올리면 이름·크기 안내 (한 줄에 칩만 있으면 눌러도 열지 않고 단추 줄의 "열기"로 — block-move.js)
+const aloneChip = (a) => a.closest('p')?.textContent.trim() === a.textContent.trim();
 const hint = document.createElement('div');
 hint.className = 'hover-hint';
 hint.hidden = true;
@@ -906,7 +917,7 @@ el.editorRoot.addEventListener('mouseover', async (e) => {
   const program = a.dataset.file === 'program';
   hint.textContent = !info?.exists
     ? '이 PC의 메모 폴더에 파일이 아직 없어요'
-    : `${a.textContent} (${formatBytes(info.size)}). ${program ? '누르면 실행할지 물어볼게요' : '누르면 열려요'}`;
+    : `${a.textContent} (${formatBytes(info.size)}). ${aloneChip(a) ? (program ? '열기 단추를 누르면 실행할지 물어볼게요' : '열기 단추로 열어요') : program ? '누르면 실행할지 물어볼게요' : '누르면 열려요'}`;
   const r = a.getBoundingClientRect();
   hint.hidden = false;
   const left = Math.max(6, Math.min(r.left, window.innerWidth - hint.offsetWidth - 6));

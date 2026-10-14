@@ -39,6 +39,7 @@ import { createDateRemind, refreshDateRemind } from './date-remind.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
 import { create as createConfetti } from '../vendor/confetti.js';
 import { mathPlugins, insertMathBlock } from './math.js';
+import { fileChipGuard } from './file-chip-guard.js';
 import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
@@ -398,7 +399,7 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
     }
     if (!main.isConnected) dom.replaceChildren(main);
     if (!loaded) load();
-    main.title = `누르면 브라우저로 열려요\n${href}`;
+    main.title = `열기 단추로 브라우저에서 열어요\n${href}`;
     const state = preview ? (preview.ok ? 'ok' : 'plain') : 'loading';
     dom.dataset.state = state;
     dom.dataset.kind = preview?.kind === 'youtube' || preview?.site === 'YouTube' ? 'youtube' : '';
@@ -579,6 +580,8 @@ function atLineIndent($pos) {
   });
   return /^\u00a0*$/.test($pos.doc.textBetween(start, $pos.pos, '', ''));
 }
+const fileChips = $prose(() => fileChipGuard());
+
 const keepIndentPlugin = $prose(() => {
   let composing = false; // 한글 조합 중에는 손대지 않는다 (조합이 끝난 뒤 그 줄이 다시 바뀔 때 고친다)
   return new Plugin({
@@ -1799,6 +1802,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(tagSuggest) // 자동완성 목록이 떠 있을 때 Enter·↑↓ 를 먼저 받는다
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(keepIndentPlugin)
+    .use(fileChips) // 파일 칩 이름은 고칠 수 없게
     .use(inlineHtmlMarks)
     .use(linkCards)
     .use(emptyTasks)

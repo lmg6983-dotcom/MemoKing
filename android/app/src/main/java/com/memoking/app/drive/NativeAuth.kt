@@ -23,10 +23,17 @@ import java.util.concurrent.TimeUnit
  * 등록돼 있어야 권한을 준다. 개발자가 한 번만 등록하면 된다 (android/DRIVE-SETUP.md).
  */
 object NativeAuth {
-    private const val SCOPE = GoogleAuth.SCOPE
+    // 범위: 기본 drive.file, 외부 앱 메모 연동을 켰으면 Drive 전체 (GoogleAuth.scopeFor)
+    private fun request(scope: String): AuthorizationRequest =
+        AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(scope))).build()
 
-    private fun request(): AuthorizationRequest =
-        AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(SCOPE))).build()
+    /** 허용 결과에서 토큰 — 요청한 범위를 실제로 받았을 때만 (Drive 전체 칸을 빼고 허용했으면 오류) */
+    private fun tokenOf(result: AuthorizationResult, scope: String): String {
+        val token = result.accessToken ?: throw GoogleAuth.AuthError("Google이 권한을 주지 않았어요")
+        val granted = result.grantedScopes
+        if (scope == GoogleAuth.FULL_SCOPE && granted.isNotEmpty() && scope !in granted) throw GoogleAuth.AuthError("Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요")
+        return token
+    }
 
     fun available(ctx: Context): Boolean = try {
         GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(ctx) == ConnectionResult.SUCCESS
@@ -50,26 +57,32 @@ object NativeAuth {
      * 화면에서 로그인: 이미 허용했으면 바로 토큰, 처음이면 계정 고르기·허용 화면을 띄운다(startForResult).
      * onToken / onError 는 화면 스레드에서 불린다.
      */
-    fun begin(activity: Activity, startForResult: (android.content.IntentSender) -> Unit, onToken: (String) -> Unit, onError: (String) -> Unit) {
-        Identity.getAuthorizationClient(activity).authorize(request())
+    fun begin(activity: Activity, scope: String, startForResult: (android.content.IntentSender) -> Unit, onToken: (String) -> Unit, onError: (String) -> Unit) {
+        Identity.getAuthorizationClient(activity).authorize(request(scope))
             .addOnSuccessListener { result ->
                 val pending = result.pendingIntent
                 if (result.hasResolution() && pending != null) startForResult(pending.intentSender)
-                else result.accessToken?.let(onToken) ?: onError("Google이 권한을 주지 않았어요")
+                else {
+                    val token = try {
+                        tokenOf(result, scope)
+                    } catch (e: GoogleAuth.AuthError) {
+                        onError(e.message ?: "")
+                        return@addOnSuccessListener
+                    }
+                    onToken(token)
+                }
             }
             .addOnFailureListener { e -> onError(describe(e)) }
     }
 
     /** 계정 고르기·허용 화면에서 돌아왔을 때 */
-    fun finish(activity: Activity, data: Intent?): String {
-        val result: AuthorizationResult = Identity.getAuthorizationClient(activity).getAuthorizationResultFromIntent(data)
-        return result.accessToken ?: throw GoogleAuth.AuthError("Google이 권한을 주지 않았어요")
-    }
+    fun finish(activity: Activity, data: Intent?, scope: String): String =
+        tokenOf(Identity.getAuthorizationClient(activity).getAuthorizationResultFromIntent(data), scope)
 
     /** 배경에서 토큰 받기 (이미 허용한 뒤라면 화면 없이). 다시 허용이 필요하면 오류 */
-    fun token(ctx: Context): String {
+    fun token(ctx: Context, scope: String): String {
         val result = try {
-            Tasks.await(Identity.getAuthorizationClient(ctx).authorize(request()), 30, TimeUnit.SECONDS)
+            Tasks.await(Identity.getAuthorizationClient(ctx).authorize(request(scope)), 30, TimeUnit.SECONDS)
         } catch (e: Exception) {
             throw GoogleAuth.AuthError(describe(e.cause ?: e))
         }

@@ -25,6 +25,7 @@
     </queries>
 
     <application
+        android:name=".MemoKingApp"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"

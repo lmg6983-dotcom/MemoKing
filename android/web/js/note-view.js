@@ -18,7 +18,14 @@ import { tutEvent, textChanged, screenChanged } from './tutorial.js';
 import { call, native } from './native.js';
 
 // 복사 단추 · 그림 복사: 안드로이드 클립보드에 그림(content://) / 글
-setCopyHost({ image: (base64) => call('copyImage', { base64 }), text: ({ text }) => native.copyText(text) });
+setCopyHost({
+  image: (base64) => call('copyImage', { base64 }),
+  text: ({ text }) => native.copyText(text),
+  // 저장 단추: 안드로이드 저장 창 → 저장한 이름 | 'cancelled'
+  save: async (f) => (await call('saveAs', f)) ?? 'cancelled',
+  // 공유 단추: 안드로이드 공유 창 (글은 글로, 그 밖은 파일로)
+  share: async (f) => ((await call('shareContent', f)) ? 'shared' : 'cancelled'),
+});
 import { fetchRemoteImage } from './web-fetch.js';
 import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
@@ -580,6 +587,52 @@ export function tempsToItems(files) {
   return items;
 }
 
+// ---------- 클립보드의 그림 붙여넣기 ----------
+// WebView 의 붙여넣기는 클립보드에 든 그림(메모킹 · 갤러리 · 브라우저에서 복사)을 넘겨주지 않고 그 주소 글(content://…)만 준다 →
+//   글이 없거나 그런 주소뿐이면 앱에게 클립보드의 그림 · 파일을 받아 첨부로 넣는다
+let pastingNative = false;
+el.editorRoot.addEventListener('paste', (e) => {
+  const data = e.clipboardData;
+  if (pastingNative || !data || !editor) return;
+  if (data.files?.length || data.getData('text/html')) return;
+  const text = data.getData('text/plain');
+  if (text && !/^content:\/\//.test(text.trim())) return;
+  e.preventDefault();
+  e.stopPropagation();
+  pasteClipboardFiles(text);
+}, true);
+
+async function pasteClipboardFiles(text) {
+  let files = [];
+  try {
+    files = (await call('clipboardFiles')) ?? [];
+  } catch (err) {
+    console.warn('클립보드 파일', err);
+  }
+  if (!editor) return;
+  if (files.length) {
+    try {
+      editor.insertItems(tempsToItems(files), { atCursor: true });
+      flush();
+      setStatus(files.length > 1 ? `파일 ${files.length}개를 붙여 넣었어요` : '붙여 넣었어요');
+    } catch (err) {
+      console.error(err);
+      setStatus('붙여 넣지 못했어요. 다시 시도해 주세요', true);
+    }
+    return;
+  }
+  if (!text) return setStatus('클립보드에 붙여 넣을 그림이나 글이 없어요', true);
+  // 다른 앱의 파일 주소(content://)를 읽지 못했으면 주소 글을 메모에 넣지 않고 알린다
+  if (/^content:\/\//.test(text.trim())) return setStatus('복사한 파일을 읽지 못했어요. 그 앱에서 다시 복사하거나 + 로 넣어 주세요', true);
+  // 그림을 읽지 못한 주소 글은 그대로 (평소 붙여넣기)
+  pastingNative = true;
+  try {
+    editor.pasteData({ text });
+  } finally {
+    pastingNative = false;
+  }
+}
+
 async function pickAndInsert(accept) {
   let files;
   try {
@@ -624,7 +677,7 @@ el.editorRoot.addEventListener('click', (e) => {
   const a = e.target.closest?.('a[href]');
   if (!a || !el.editorRoot.contains(a)) return;
   e.preventDefault();
-  if (!window.getSelection()?.isCollapsed) return;
+  if (!e.mkOpen && !window.getSelection()?.isCollapsed) return; // "열기" 단추로 연 것은 고른 글자와 상관없이
   openHref(a.getAttribute('href'));
 });
 
@@ -918,7 +971,10 @@ for (const [btn, shift] of [[el.undoBtn, false], [el.redoBtn, true]]) {
 
 // 표 막대: 표 안에 커서가 있을 때만
 function showTableBar(table) {
-  el.tableBar.hidden = !table;
+  if (el.tableBar.hidden !== !table) {
+    el.tableBar.hidden = !table;
+    placeKnob(); // + · 다이얼을 표 막대 위로 (닫히면 제자리)
+  }
   for (const b of document.querySelectorAll('[data-action="table"]')) b.classList.toggle('active', Boolean(table));
   if (!table) return;
   el.tableBar.querySelector('[data-table="delRow"]').disabled = table.header;
@@ -1219,7 +1275,8 @@ function setupKnob() {
   //   키보드가 올라와 막대가 움직여도 따라간다
   //   도구막대 · 옮기기 막대 · 그리기 도구 막대는 같은 높이(52px)·같은 자리라 그만큼은 고정 — 방식을 바꿔도
   //   (막대가 올라오는 움직임 도중에 재더라도) 다이얼 · 안내가 제자리. 녹음 판 · 추천 태그 줄이 더 얹히면 그만큼 위로
-  const extras = [el.formatBar, $('rec-panel'), el.tagBar].filter(Boolean); // 도구막대도 — 두 줄로 접힐 때(좁은 화면) 위로
+  // 도구막대도 — 두 줄로 접힐 때(좁은 화면) 위로. 표 막대도 — 표 안에 있으면 + · 다이얼이 표 막대를 가리지 않게 그 위로
+  const extras = [el.formatBar, el.tableBar, $('rec-panel'), el.tagBar].filter(Boolean);
   placeKnob = () => {
     const bottom = el.screen.getBoundingClientRect().bottom;
     const base = DOCK_H + (parseFloat(getComputedStyle($('move-bar')).marginBottom) || 8);

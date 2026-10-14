@@ -11,6 +11,8 @@ function tree() {
   put('문서/2026 분기 보고서.docx');
   put('문서/회의록/9월 회의록.hwp');
   put('Downloads/setup_memoking.exe');
+  put('사건/P20261170KR01 의견서.docx');
+  put('사건/FPD-2026080118-E 보고.pdf');
   put('사진/제주 여행/IMG_0001.jpg');
   put('node_modules/pkg/index.js');
   put('.git/config');
@@ -28,6 +30,9 @@ test('파일 검색: 이름 목록을 만들고 철자가 조금 달라도 찾�
   assert.ok(!names.includes('index.js') && !names.includes('config'), '숨김·node_modules 제외');
   assert.equal(idx.search('분기 보고서')[0].name, '2026 분기 보고서.docx');
   assert.equal(idx.search('setupmemo')[0].name, 'setup_memoking.exe'); // 띄어 쓰지 않고 붙여 써도
+  // 관리번호: 기호를 넣어 찾아도 붙여 쓴 이름, 기호가 다른 이름도
+  assert.equal(idx.search('P2026-1170-KR01')[0]?.name, 'P20261170KR01 의견서.docx');
+  assert.equal(idx.search('FPD/202608-0118/E')[0]?.name, 'FPD-2026080118-E 보고.pdf');
   assert.ok(idx.search('회의록').some((r) => r.isDir && r.name === '회의록'));
   // 이름이 찾는 말로 시작하면 앞으로 (깊은 곳에 있어도), 둘 다 찾음
   const r = idx.search('보고서').map((x) => x.name);

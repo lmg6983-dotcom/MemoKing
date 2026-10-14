@@ -42,6 +42,8 @@ export const native = {
   wasFired: sync('wasFired'),
   notify: (item) => unwrap(raw.notify(JSON.stringify(item))),
   sttStatus: sync('sttStatus'), // 받아쓰기 모델·엔진 상태
+  // 지난번 오류 기록 (앱이 멈췄거나 위젯에서 오류) — 꺼내면 지워짐. 예전 앱에는 없음
+  lastError: () => (typeof raw.lastError === 'function' ? unwrap(raw.lastError()) : null),
 };
 
 // 홈 화면 위젯 (Widgets.kt)

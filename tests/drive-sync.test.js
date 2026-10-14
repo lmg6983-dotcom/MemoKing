@@ -138,6 +138,29 @@ test('처음: 모두 내려받기 (index.json 은 기기마다 따로)', async (
   assert.equal((await sync()).skipped, true);
 });
 
+test('"바뀐 것" 목록이 파일을 빠뜨려도: "지금 동기화" · 15분마다 폴더를 처음부터 훑어 내려받기', async () => {
+  let now = Date.parse('2026-10-14T09:00:00Z');
+  const engine = (opts) => new SyncEngine({ root: dir, remote: drive, rootId: 'ROOT', state, now: () => now }).run(opts);
+  drive.put('회의.md', '# 회의');
+  await engine();
+  drive.put('제미나이 메모.md', '# 제미나이가 쓴 메모');
+  drive.changed = false; // Drive 가 바뀐 것 목록에 넣지 않음
+  now += 60_000;
+  assert.equal((await engine()).skipped, true, '목록만 보면 놓친다');
+  assert.equal(lt('제미나이 메모.md'), null);
+  const r = await engine({ full: true });
+  assert.equal(r.downloaded, 1, '"지금 동기화" 는 폴더를 처음부터');
+  assert.equal(lt('제미나이 메모.md'), '# 제미나이가 쓴 메모');
+  // 단추를 누르지 않아도 15분이 지나면
+  drive.put('또 다른 메모.md', '# 또');
+  drive.changed = false;
+  now += 60_000;
+  assert.equal((await engine()).skipped, true);
+  now += 15 * 60_000;
+  assert.equal((await engine()).downloaded, 1);
+  assert.equal(lt('또 다른 메모.md'), '# 또');
+});
+
 test('이 PC 에서 고친 것·새 메모·새 폴더 올리기', async () => {
   await startFromPhone();
   await lw('PC.md', '# PC');
@@ -239,4 +262,33 @@ test('PC 메모 폴더 옮기기: Google Drive 앱 폴더의 메모·첨부를 �
   assert.equal(fs.statSync(path.join(to, '회의.md')).mtimeMs, old.getTime()); // 고친 시각 그대로
   assert.ok(fs.existsSync(path.join(from, '회의.md'))); // 원래 폴더는 그대로
   assert.equal(copyVault(from, from), 0);
+});
+
+test('메모 폴더가 Google Drive 데스크탑 앱 폴더면 메모킹 동기화를 멈춘다 (두 동기화가 메모를 끝없이 늘리지 않게)', async () => {
+  const { DriveSync, DOUBLE_SYNC } = await import('../desktop/drive/drive-sync.js');
+  let calls = 0;
+  const api = new Proxy({}, { get: () => async () => { calls++; return { changed: true, token: 't' }; } });
+  const sync = new DriveSync({ api, auth: { connected: true }, stateDir: dir });
+  sync.configure({ folderId: 'F', folderName: '메모킹 동기화', root: 'G:\\내 드라이브\\메모킹 동기화' });
+  assert.equal(sync.blocked, true);
+  assert.equal(sync.status.state, 'error');
+  assert.equal(sync.status.error, DOUBLE_SYNC);
+  await sync.run({ full: true });
+  assert.equal(calls, 0, 'Drive 에 아무것도 묻지 않음');
+  sync.configure({ folderId: 'F', folderName: '메모킹 동기화', root: path.join(dir, 'vault') });
+  assert.equal(sync.blocked, false);
+  sync.stop();
+});
+
+test('양쪽에서 엇갈린 메모가 한 번에 너무 많으면 사본을 더 만들지 않고 멈춘다', async () => {
+  for (let i = 0; i < 25; i++) drive.put(`m${i}.md`, 'a');
+  await sync();
+  await new Promise((r) => setTimeout(r, 15));
+  for (let i = 0; i < 25; i++) {
+    drive.put(`m${i}.md`, 'drive');
+    fs.writeFileSync(path.join(dir, `m${i}.md`), 'pc');
+  }
+  await assert.rejects(sync(), SafetyStop);
+  const copies = fs.readdirSync(dir).filter((n) => n.includes('PC 충돌'));
+  assert.equal(copies.length, 20);
 });

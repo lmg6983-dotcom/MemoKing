@@ -1301,31 +1301,33 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
   .mk-delete-btn.fading, .mk-delete-btn.pressed { opacity: 0; }
   .mk-doc .mk-deleting { animation: none; opacity: 0; transition: none; }
 }
-@media print { .mk-delete-btn, :is(.mk-copy-btn, .mk-file-btn) { display: none !important; } }
-/* 복사 단추: 지우기 단추 왼쪽, 같은 크기 · 동그라미에 글자색 아이콘 (누르면 ✓ 초록, 실패하면 !) — 메모 색 · 어두운 화면을 따라감 */
-:is(.mk-copy-btn, .mk-file-btn) {
+@media print { .mk-delete-btn, :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) { display: none !important; } }
+/* 복사 · 저장 단추: 지우기 단추 왼쪽에 차례로, 같은 크기 · 동그라미에 글자색 아이콘 (누르면 ✓ 초록, 실패하면 !) — 메모 색 · 어두운 화면을 따라감 */
+:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) {
   position: fixed; z-index: 70; display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
   border: 1px solid color-mix(in srgb, var(--text-strong, #111) 10%, transparent); border-radius: 50%; background: var(--surface-2); color: var(--text-strong, #222);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); cursor: pointer; animation: mk-del-in 0.22s var(--ease-out) both;
   -webkit-tap-highlight-color: transparent;
 }
 /* 손가락 닿는 범위: 바깥쪽은 넉넉히, × 쪽(오른쪽)은 좁게 — 복사하려다 지우지 않게 */
-:is(.mk-copy-btn, .mk-file-btn)::before { content: ""; position: absolute; inset: -8px -4px -8px -8px; border-radius: 50%; }
+:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn)::before { content: ""; position: absolute; inset: -8px -4px -8px -8px; border-radius: 50%; }
 .mk-delete-btn::before { inset: -10px -10px -10px -4px; }
-:is(.mk-copy-btn, .mk-file-btn) svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-:is(.mk-copy-btn, .mk-file-btn):active { transform: scale(0.88); }
-:is(.mk-copy-btn, .mk-file-btn).done { color: var(--ok-text); }
-:is(.mk-copy-btn, .mk-file-btn).failed { color: var(--danger); }
-:is(.mk-copy-btn, .mk-file-btn).failed svg { stroke-width: 2.4; }
-:is(.mk-copy-btn, .mk-file-btn).fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
-:is(.mk-copy-btn, .mk-file-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
+:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):active { transform: scale(0.88); }
+:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).done { color: var(--ok-text); }
+:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).failed { color: var(--danger); }
+:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).failed svg { stroke-width: 2.4; }
+:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
+:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
 .mk-delete-btn { background: var(--surface-2); }
 /* 어두운 숯색 메모 위에서도 또렷하게 */
-body[data-color="charcoal"] :is(.mk-copy-btn, .mk-file-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
-body[data-color="charcoal"] :is(.mk-copy-btn, .mk-file-btn) { color: #f1f1ef; }
-body[data-color="charcoal"] :is(.mk-copy-btn, .mk-file-btn).done { color: #69db7c; }
+body[data-color="charcoal"] :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
+body[data-color="charcoal"] :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) { color: #f1f1ef; }
+/* 열기: 이 단추들 중 하는 일이 가장 큰 것 — 노란 바탕으로 */
+.mk-open-btn, body[data-color="charcoal"] .mk-open-btn { background: var(--brand-yellow, #ffd43b); color: var(--on-brand, #111); border-color: transparent; }
+body[data-color="charcoal"] :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).done { color: #69db7c; }
 .mk-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { :is(.mk-copy-btn, .mk-file-btn), :is(.mk-copy-btn, .mk-file-btn).fading { animation: none; } :is(.mk-copy-btn, .mk-file-btn).fading { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: none; } :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { opacity: 0; } }
 
 /* 추천 태그 막대 (태그 없는 메모, 본문 아래) — PC. 휴대폰은 mobile.css 가 크기를 덮어쓴다 */
 .tag-suggest-bar { display: flex; align-items: center; gap: 6px; flex: none; padding: 3px 4px 3px 10px; border-top: 1px solid color-mix(in srgb, var(--note-text) 8%, transparent); animation: mk-pop-in 0.18s ease-out; }
@@ -1434,7 +1436,7 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .desk-rec .rec-wave { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 18px; }
 .desk-rec .rec-wave i { display: block; width: 3px; height: 18px; border-radius: 2px; background: var(--rec); transform: scaleY(calc(0.12 + var(--lv, 0) * 0.88)); transition: transform 0.12s ease-out; }
 .desk-rec.paused .rec-wave i { background: var(--note-muted); transform: scaleY(0.12); }
-.desk-rec .rec-btn { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 30px; min-width: 30px; padding: 0 8px; border: 0; border-radius: 9px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font: inherit; font-weight: 700; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
+.desk-rec .rec-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 30px; min-width: 30px; padding: 0 8px; border: 0; border-radius: 9px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font: inherit; font-weight: 700; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .desk-rec .rec-btn:hover { background: color-mix(in srgb, var(--note-text) 15%, transparent); } }
 .desk-rec .rec-btn svg { width: 16px; height: 16px; }
 .desk-rec .rec-btn.stop { background: var(--rec); color: var(--on-rec); }
@@ -1614,6 +1616,9 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 @media (hover: hover) and (pointer: fine) { .mk-doc .mk-ink-edit:hover { background: var(--brand-yellow); color: var(--on-brand); } }
 .mk-doc .mk-ink-edit svg { width: 14px; height: 14px; }
 .mk-doc .mk-ink.ProseMirror-selectednode .mk-ink-edit { opacity: 1; }
+@media (hover: none) { .mk-doc .mk-ink:not(.mk-ink-armed) .mk-ink-edit { pointer-events: none; } } /* 안 보이는 단추를 눌러 바로 넘어가지 않게 */
+/* 휴대폰: 한 번 누른 손 메모 — 위 오른쪽은 복사·저장·지우기 단추 자리라 "이어 그리기"는 아래 오른쪽에 */
+.mk-doc .mk-ink.mk-ink-armed .mk-ink-edit { top: auto; bottom: 6px; height: 34px; padding: 0 12px; font-size: 13px; opacity: 1; }
 @media (hover: hover) and (pointer: fine) { .mk-doc .mk-ink:hover .mk-ink-edit { opacity: 1; } }
 .mk-doc .mk-ink.ProseMirror-selectednode img { outline: 2px solid var(--note-text); outline-offset: 2px; }
 /* 어두운 화면(검은 메모 · 다크 모드의 모든 메모)에서 투명 바탕 잉크: 검은 펜 ↔ 흰 펜만 바꿔 보인다 (색 펜·형광펜은 그대로 — 원노트처럼).

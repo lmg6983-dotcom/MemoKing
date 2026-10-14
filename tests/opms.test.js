@@ -30,7 +30,14 @@ test('OPMS: 관리번호·출원번호로 찾는 SQL (하이픈 없이 · 앞자
   assert.match(buildLookupSql('20260173230'), /n_app LIKE '%-2026-0173230'/);
   assert.match(buildLookupSql('2026-0173230'), /n_app LIKE '%-2026-0173230'/);
   assert.match(buildLookupSql("x' OR '1'='1"), /ourref = 'x'' OR ''1''=''1'/);
-  assert.match(buildLookupSql('FPD/2026-0271/E'), /WHERE del_flag = 'N' AND \(ourref = 'FPD\/2026-0271\/E'/);
+  assert.match(buildLookupSql('FPD/2026-0271/E'), /WHERE del_flag = 'N' AND \(\(ourref = 'FPD\/2026-0271\/E'/);
+  // 관리번호는 기호를 빼고도: 하이픈 · 슬래시 있는 말로 찾아도 붙여 쓴 번호가, 붙여 쓴 말로 찾아도 하이픈 있는 번호가
+  const loose = buildLookupSql('P2026-1170-KR01');
+  assert.match(loose, /REPLACE\(REPLACE\(REPLACE\(REPLACE\(REPLACE\(ourref, '-', ''\), '\/', ''\), '\.', ''\), '_', ''\), ' ', ''\) = 'P20261170KR01'/);
+  assert.match(loose, /yourref, '-', ''.* = 'P20261170KR01'/);
+  assert.match(buildLookupSql('FPD/202608-0118/E'), /= 'FPD2026080118E'/);
+  assert.match(buildLookupSql('P20261170KR01'), /ourref, '-', ''.* = 'P20261170KR01'/);
+  assert.doesNotMatch(buildLookupSql('1020260012345'), /REPLACE/, '숫자뿐인 출원번호는 그대로');
   assert.ok(looksLikeRef('FPD/2026') && looksLikeRef('2026-0173230'));
   assert.ok(!looksLikeRef('회의') && !looksLikeRef('abc') && !looksLikeRef('12'));
 });

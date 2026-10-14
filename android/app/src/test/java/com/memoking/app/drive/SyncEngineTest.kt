@@ -86,6 +86,28 @@ class SyncEngineTest {
     }
 
     @Test
+    fun filesMissedByChangeFeedComeDownOnFullScan() {
+        // 다른 앱(제미나이 등)이 넣은 파일을 Drive 의 "바뀐 것" 목록이 빠뜨려도 "지금 동기화" · 15분마다 처음부터 훑어 내려받는다
+        var now = 1_800_000_000_000L
+        fun run(full: Boolean = false) = SyncEngine(local, drive, "ROOT", state) { now }.run(full)
+        drive.put("회의.md", "# 회의")
+        run()
+        drive.put("제미나이 메모.md", "# 제미나이")
+        drive.changed = false
+        now += 60_000
+        assertTrue("목록만 보면 놓친다", run().skipped)
+        assertNull(lt("제미나이 메모.md"))
+        assertEquals("지금 동기화", 1, run(full = true).downloaded)
+        assertEquals("# 제미나이", lt("제미나이 메모.md"))
+        drive.put("또.md", "# 또")
+        drive.changed = false
+        now += 60_000
+        assertTrue(run().skipped)
+        now += SyncEngine.FULL_SCAN_MS
+        assertEquals("15분마다", 1, run().downloaded)
+    }
+
+    @Test
     fun phoneChangesGoUp() {
         startFromPc()
         lw("휴대폰.md", "# 휴대폰")
