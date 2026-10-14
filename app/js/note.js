@@ -468,7 +468,7 @@ $('hotkey-btn').addEventListener('click', async () => {
   closeMenu();
   await flush();
   const state = await api.hotkeys.state(id);
-  const next = await hotkeyDialog({ state, onSave: (slot, opts) => api.hotkeys.set(id, slot, opts) });
+  const next = await hotkeyDialog({ state, locked: Boolean(memo?.locked), onSave: (slot, opts) => api.hotkeys.set(id, slot, opts) });
   editor?.focus();
   if (!next) return;
   showHotkey(next);
