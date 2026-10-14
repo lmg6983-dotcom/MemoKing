@@ -1769,7 +1769,7 @@ if (!memo) {
   document.title = memo.title;
   current = saved = memo.body;
   // 링크 미리보기 설정 (끄면 카드 대신 링크 글자) — 설정을 바꾸면 바로
-  const linkPreviews = await api.settings.get().then((s) => s?.linkPreviews !== false, () => true);
+  const linkPreviews = memo.linkPreviews !== false; // memo:get 이 함께 보낸다 (창을 열 때 설정을 따로 묻지 않게)
   editor = await createNoteEditor(el.editorRoot, {
     markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus, linkPreviews,
     tables: memo.tables ?? [], onTables: saveTables,

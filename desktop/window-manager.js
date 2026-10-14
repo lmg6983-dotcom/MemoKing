@@ -64,7 +64,9 @@ export class WindowManager {
     this.spareTimer = 0;
     this.paintMarks = new WeakMap(); // 예비 창: 화면이 "메모를 그렸다" 고 알려 오면 부를 함수
     this.hotkeySlotOf = () => null; // 메모 단축키 칸 (main.js 가 채움)
-    this.desktopPin = new DesktopPin(); // 테이프로 붙인 메모 창을 바탕화면 층에
+    // 테이프로 붙인 메모 창을 바탕화면 층에. 도우미가 막힌 PC(Add-Type 금지 등)로 드러나면 붙여 둔 창을 보통 창으로
+    //   (그러지 않으면 작업 표시줄 단추도 없고 바탕화면 층도 아닌 창이 테이프 스티커를 단 채 남는다)
+    this.desktopPin = new DesktopPin({ onFail: () => this.dropDesktopPins() });
     this.lostNotes = new Set(); // 탐색기가 다시 시작돼 함께 사라진 테이프 메모 (곧 다시 연다)
     this.hudWin = null;
     this.hudTimer = 0;
@@ -254,12 +256,17 @@ export class WindowManager {
       if (win.mkPinned) this.desktopPin.send('bottom', win.mkPinned);
     });
     // Windows 를 끄거나 다시 시작할 때 닫히는 메모는 "열려 있던 메모" 로 그대로 둔다 (켜면 다시 그 자리에)
-    const keepForShutdown = () => {
+    //   묻기(query-session-end)만 오고 끄기를 취소하면(다른 앱이 막는 등) 그 표시를 거둔다 — 나중에 직접 닫은 메모가 다시 열리지 않게
+    win.on('query-session-end', () => {
       win.mkKeep = true;
       saveSettings(true);
-    };
-    win.on('query-session-end', keepForShutdown);
-    win.on('session-end', keepForShutdown);
+      setTimeout(() => !win.isDestroyed() && !win.mkSessionEnd && (win.mkKeep = false), 15_000);
+    });
+    win.on('session-end', () => {
+      win.mkSessionEnd = true;
+      win.mkKeep = true;
+      saveSettings(true);
+    });
     win.on('hide', () => {
       setOpen(false);
       this.pushList();
@@ -302,7 +309,8 @@ export class WindowManager {
 
     win.on('closed', () => {
       // 테이프 메모는 주인(바탕화면 창)이 없어지면 함께 없어진다 — 열린 메모로 남겨 두고 새 바탕화면에 다시 연다
-      const lost = Boolean(win.mkPinned) && !win.mkClosing && !win.mkKeep && !this.isQuitting();
+      //   (휴지통으로 보내며 창을 없앤 메모는 사라진 것이 아니다 — 열린 메모 기억에서 보통대로 뺀다)
+      const lost = Boolean(win.mkPinned) && !win.mkClosing && !win.mkKeep && !this.isQuitting() && Boolean(this.getVault()?.get(id));
       if (win.mkPinned) this.desktopPin.send('unpin', win.mkPinned); // 같은 번호를 다른 앱 창이 받아도 건드리지 않게
       this.noteWins.delete(id);
       this.dropSpareIfIdle();
@@ -395,11 +403,21 @@ export class WindowManager {
     if (!win.mkPinned) return;
     const hwnd = win.mkPinned;
     win.mkPinned = 0;
+    win.setSkipTaskbar(false); // 도우미가 그사이 멈췄어도(available 아님) 작업 표시줄에서 사라진 채 남지 않게
     if (!this.desktopPin.available) return;
     this.desktopPin.send('unpin', hwnd);
     // 주인이 되돌려진 뒤에야 작업 표시줄 단추가 다시 붙는다 — 도우미가 답하기 전이었을 수 있어 조금 뒤 한 번 더
-    win.setSkipTaskbar(false);
     setTimeout(() => !win.isDestroyed() && !win.mkPinned && win.setSkipTaskbar(false), 400);
+  }
+
+  dropDesktopPins() {
+    if (this.isQuitting()) return;
+    for (const [id, w] of this.noteWins) {
+      if (w.isDestroyed() || !w.mkPinned) continue;
+      this.applyLayer(w, id);
+      w.webContents.send('memo:layer', this.layerState(id));
+    }
+    this.pushList();
   }
 
   /** 왕관 · 테이프 · 없음 — 스택이면 탭 모두. fromId 의 창만 붙고 떼어지는 모습을 보인다 */

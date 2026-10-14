@@ -79,7 +79,14 @@ export class DriveSync extends EventEmitter {
   /** 지금 바로 — 이미 도는 중이면 끝난 뒤 한 번 더. full: Drive 폴더를 처음부터 훑는다 ("지금 동기화" 단추) */
   async run({ full = false } = {}) {
     if (this.running) {
-      if (full) return this.running.catch(() => {}).then(() => this.run({ full: true })); // 지금 도는 것이 끝나면 처음부터
+      // 지금 도는 것이 끝나면 처음부터 — 그사이 여러 번 눌러도 한 번만
+      if (full) {
+        this.fullQueued ??= this.running.catch(() => {}).then(() => {
+          this.fullQueued = null;
+          return this.run({ full: true });
+        });
+        return this.fullQueued;
+      }
       this.again = true;
       return this.running;
     }
@@ -111,6 +118,11 @@ export class DriveSync extends EventEmitter {
     } catch {
       // 처음
     }
+    // 권한이 Drive 전체 → drive.file 로 줄었으면 다른 앱이 넣은 파일이 목록에서 사라져 보인다 —
+    //   "Drive 에서 지움" 으로 이 PC 의 메모를 지우지 않고 메모킹 파일로 다시 올린다 (한 번 다 끝낼 때까지)
+    const scope = this.auth.grantedFull ? 'full' : 'file';
+    if (state.scope === 'full' && scope === 'file') state.keepMissing = true;
+    state.scope = scope;
     this.publish({ state: 'syncing', changed: false, conflicts: [] });
     const save = () => {
       fs.mkdirSync(this.stateDir, { recursive: true });

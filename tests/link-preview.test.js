@@ -51,6 +51,8 @@ test('oEmbed 응답 → 제목 · 채널 · 정해진 썸네일', () => {
 test('예전 방식으로 받아 둔 유튜브 카드는 다시 받는다 (다른 사이트 · 새 방식은 그대로)', () => {
   assert.equal(staleYoutubeEntry('https://youtu.be/dQw4w9WgXcQ', { title: 'x' }), true);
   assert.equal(staleYoutubeEntry('https://youtu.be/dQw4w9WgXcQ', { kind: 'youtube', title: 'x' }), false);
+  // oEmbed 가 안 돼 페이지를 읽은 새 카드는 다시 받지 않는다 (그리기마다 다시 받는 일 없게)
+  assert.equal(staleYoutubeEntry('https://youtu.be/dQw4w9WgXcQ', { kind: 'page', title: 'x' }), false);
   assert.equal(staleYoutubeEntry('https://example.com/', { title: 'x' }), false);
   assert.equal(staleYoutubeEntry('https://youtu.be/dQw4w9WgXcQ', undefined), false);
 });

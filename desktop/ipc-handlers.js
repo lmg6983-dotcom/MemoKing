@@ -606,7 +606,7 @@ export function registerIpc(ctx) {
     const capture = wm.pendingCaptures.get(id) ?? null;
     wm.pendingAlarms.delete(id);
     wm.pendingCaptures.delete(id);
-    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, stack: wm.stackState(id) };
+    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, stack: wm.stackState(id), linkPreviews: settings.linkPreviews !== false };
   });
 
   // ---------- 잠금 메모 ----------
@@ -791,7 +791,7 @@ export function registerIpc(ctx) {
     const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
     let source = null;
     if (f.rel) {
-      source = getVault()?.resolve(String(f.rel)); // 화면(copy-content.js)이 이미 풀어 보낸 경로 — 다시 풀면 이름의 %XX 가 깨진다
+      source = /^attachments\//.test(String(f.rel)) ? getVault()?.resolve(String(f.rel)) : null; // 화면(copy-content.js)이 이미 풀어 보낸 경로 — 다시 풀면 이름의 %XX 가 깨진다
       if (!source || !fs.statSync(source, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
     } else if (typeof f.base64 !== 'string') return { error: '저장할 내용이 없어요' };
     const ext = path.extname(name).slice(1);
@@ -806,8 +806,13 @@ export function registerIpc(ctx) {
       if (r.canceled || !r.filePath) return { cancelled: true };
       file = r.filePath;
     }
-    if (source) fs.copyFileSync(source, file);
-    else fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+    try {
+      if (source) await fs.promises.copyFile(source, file);
+      else await fs.promises.writeFile(file, Buffer.from(f.base64, 'base64'));
+    } catch (err) {
+      console.warn('[save-as]', err);
+      return { error: '저장하지 못했어요. 다른 폴더를 골라 주세요' };
+    }
     if (SMOKE) smokeOpened.push({ kind: 'save', target: file });
     return { name: SMOKE ? name : path.basename(file) };
   });
@@ -816,13 +821,23 @@ export function registerIpc(ctx) {
     const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
     let file = null;
     if (f.rel) {
-      file = getVault()?.resolve(String(f.rel));
+      file = /^attachments\//.test(String(f.rel)) ? getVault()?.resolve(String(f.rel)) : null;
       if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
     } else if (typeof f.base64 === 'string') {
       const dir = path.join(app.getPath('temp'), 'memoking-share');
-      fs.mkdirSync(dir, { recursive: true });
-      file = path.join(dir, name);
-      fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        // 지난 공유 때 만든 임시 파일은 하루가 지나면 치운다 (공유 창이 넘겨받을 동안은 남겨 두고)
+        for (const old of fs.readdirSync(dir)) {
+          const p = path.join(dir, old);
+          if (Date.now() - (fs.statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 86_400_000) fs.rmSync(p, { force: true });
+        }
+        file = path.join(dir, name);
+        fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+      } catch (err) {
+        console.warn('[share]', err);
+        return { error: '공유할 파일을 만들지 못했어요. 다시 눌러 주세요' };
+      }
     } else return { error: '공유할 내용이 없어요' };
     if (SMOKE) {
       smokeOpened.push({ kind: 'share', target: file });
@@ -948,6 +963,8 @@ export function registerIpc(ctx) {
     if (!senderWindow(event)) return null;
     const key = String(id);
     const want = layer === 'bottom' ? 'bottom' : 'top';
+    // 바탕화면 층에 붙일 수 없는 PC 에서 테이프(Ctrl+Shift+G)는 아무 일도 하지 않는다 — 붙어 있던 왕관을 떼지 않게
+    if (want === 'bottom' && !wm.canTape) return wm.layerState(key);
     return wm.setNoteLayer(key, wm.layerOf(key) === want ? null : want);
   });
   ipcMain.handle('list:show', () => {

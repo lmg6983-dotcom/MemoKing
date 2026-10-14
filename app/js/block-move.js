@@ -292,7 +292,7 @@ function openerOf(dom, kind) {
   return {
     label: math ? '이 수식 고치기' : host.matches('a[data-file]') && host.dataset.file === 'program' ? `이 ${kind} 실행` : `이 ${kind} 열기`,
     run: () => {
-      const at = host.querySelector('.lc-main') ?? host;
+      const at = host.querySelector('.lc-main, .lc-plain') ?? host; // 미리보기를 끄면 카드 대신 링크 글자(.lc-plain)
       const e = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
       e.mkOpen = true;
       at.dispatchEvent(e);

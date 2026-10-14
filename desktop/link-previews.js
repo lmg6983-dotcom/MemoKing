@@ -145,7 +145,7 @@ export class LinkPreviews {
     if (youtube) return youtube;
     const { res, body, finalUrl } = await this.#request(target.href, 'text/html,application/xhtml+xml,*/*;q=0.8', MAX_HTML, true);
     const type = (res.headers.get('content-type') ?? '').toLowerCase();
-    const entry = { title: '', description: '', site: '', image: '', imageUrl: '', icon: '', fetchedAt: new Date().toISOString() };
+    const entry = { kind: 'page', title: '', description: '', site: '', image: '', imageUrl: '', icon: '', fetchedAt: new Date().toISOString() };
     const fileName = decodeURIComponent(new URL(finalUrl).pathname.split('/').pop() || '');
 
     if (type.startsWith('image/')) {

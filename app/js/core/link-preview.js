@@ -115,8 +115,12 @@ export function parseYoutubeOEmbed(json, url) {
   };
 }
 
-/** 받아 둔 미리보기가 예전 방식(페이지를 읽은 것)으로 만든 유튜브 카드라 다시 받아야 하는가 */
-export const staleYoutubeEntry = (url, entry) => Boolean(entry) && Boolean(youtubeVideoId(url)) && entry.kind !== 'youtube';
+/**
+ * 받아 둔 미리보기가 예전 방식(페이지를 읽은 것, kind 없음)으로 만든 유튜브 카드라 다시 받아야 하는가.
+ *   새로 받은 것은 oEmbed 가 안 돼(퍼가기 막힘 · 비공개) 페이지를 읽었어도 kind: 'page' 가 붙어 다시 받지 않는다
+ *   (그러지 않으면 메모를 그릴 때마다 페이지를 또 받고 link-previews.json 을 또 써 동기화가 계속 돈다)
+ */
+export const staleYoutubeEntry = (url, entry) => Boolean(entry) && Boolean(youtubeVideoId(url)) && !entry.kind;
 
 // ---------- 웹페이지에서 제목·설명·사진 읽기 ----------
 

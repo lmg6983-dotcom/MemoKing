@@ -66,6 +66,7 @@ class SyncEngine(
         private val LOCAL_ONLY = setOf("_memoking/index.json")
         private const val MERGE_JSON = "_memoking/link-previews.json"
         private const val MASS_DELETE_MIN = 20
+        private const val MASS_CONFLICT_MAX = 20 // 양쪽에서 엇갈린 파일이 이보다 많으면 사본을 만들기 전에 멈춘다 (PC sync-engine.js 와 같음)
 
         fun skipName(name: String) = name.startsWith(".") || name.startsWith("~$") || name.endsWith(".tmp") || name == "desktop.ini" || name == "Thumbs.db"
         fun skipPath(rel: String) = rel in LOCAL_ONLY || rel.split('/').any(::skipName)
@@ -165,11 +166,29 @@ class SyncEngine(
         // 한쪽에서 한꺼번에 많이 사라졌으면 멈춘다
         val goneRemote = paths.count { base(it) != null && it !in remoteFiles && it in localFiles }
         val goneLocal = paths.count { base(it) != null && it !in localFiles && it in remoteFiles }
-        if (goneRemote >= MASS_DELETE_MIN && goneRemote * 2 > known.size) {
+        val keepMissing = state.optBoolean("keepMissing") // 권한이 줄어 안 보이게 된 파일: 지우지 않고 다시 올린다 (DriveSync.kt)
+        if (!keepMissing && goneRemote >= MASS_DELETE_MIN && goneRemote * 2 > known.size) {
             throw SafetyStop("Google Drive 폴더에서 파일 ${goneRemote}개가 한꺼번에 사라져서 동기화를 멈췄어요. 고른 폴더가 맞는지 확인해 주세요.")
         }
         if (goneLocal >= MASS_DELETE_MIN && goneLocal * 2 > known.size) {
             throw SafetyStop("휴대폰 메모 폴더에서 파일 ${goneLocal}개가 한꺼번에 사라져서 동기화를 멈췄어요.")
+        }
+        // 양쪽에서 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
+        val clashes = paths.filter { p ->
+            val l = localFiles[p]
+            val r = remoteFiles[p]
+            val b = base(p)
+            p != MERGE_JSON && l != null && r != null &&
+                (b == null || b.lmtime != l.mtime || b.lsize != l.size) && (b == null || b.md5 != r.md5)
+        }
+        if (clashes.size > MASS_CONFLICT_MAX) {
+            val differ = clashes.count { p ->
+                val m = try { local.openRead(p).use(::md5) } catch (e: Exception) { null } // 둘러보는 사이 없어진 파일
+                m != remoteFiles[p]?.md5
+            }
+            if (differ > MASS_CONFLICT_MAX) {
+                throw SafetyStop("양쪽에서 엇갈린 메모가 ${MASS_CONFLICT_MAX}개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 다른 동기화 앱도 맞추고 있는지 확인해 주세요.")
+            }
         }
 
         var uploaded = 0
@@ -270,7 +289,7 @@ class SyncEngine(
                         }
                     }
                     l != null && r == null -> when {
-                        b == null || localChanged -> upload(rel, null) // 새 파일, 또는 Drive 에서 지웠지만 휴대폰에서 고침 → 되살림
+                        b == null || localChanged || keepMissing -> upload(rel, null) // 새 파일, 또는 Drive 에서 지웠지만 휴대폰에서 고침 → 되살림
                         else -> {
                             // Drive(PC)에서 지움 → 휴대폰에서도
                             if (local.delete(rel)) deletedLocal++
@@ -295,6 +314,7 @@ class SyncEngine(
         }
 
         state.put("pageToken", token)
+        state.remove("keepMissing") // 다 올렸으면 다음부터는 보통대로
         state.put("lastFullScan", now())
         state.put("folders", JSONObject(folderIds.toMap()))
         return Result(uploaded, downloaded, deletedLocal, deletedRemote, conflicts)

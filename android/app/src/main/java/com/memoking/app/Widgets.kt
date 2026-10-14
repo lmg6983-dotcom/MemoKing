@@ -305,6 +305,15 @@ object Widgets {
     val mutedOnDark get() = MUTED_ON_DARK
     private val MUTED_ON_DARK = 0x94F5F4EF.toInt()
 
+    /**
+     * 글자 · 아이콘 색을 리소스로 늘 정해 둔다 — 런처는 같은 모양의 위젯·줄을 다시 쓰며(reapply) 이번에 보낸 것만 바꾸므로,
+     * 검정 메모에서 칠한 밝은 글자 · 끝낸 할 일의 흐린 글자가 다른 메모 · 다른 줄에 남지 않게.
+     * 안드로이드 12+ 는 런처 쪽에서 색을 골라 다크 모드를 따른다
+     */
+    fun setColorRes(v: RemoteViews, ctx: Context, id: Int, method: String, res: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) v.setColor(id, method, res) else v.setInt(id, method, ctx.getColor(res))
+    }
+
     private fun activityIntent(ctx: Context, intent: Intent, code: Int, mutable: Boolean = false): PendingIntent =
         PendingIntent.getActivity(
             ctx, code, intent,
@@ -321,6 +330,10 @@ object Widgets {
             v.setTextColor(R.id.widget_title, TEXT_ON_DARK)
             v.setTextColor(R.id.widget_empty, MUTED_ON_DARK)
             v.setInt(R.id.widget_add, "setColorFilter", TEXT_ON_DARK)
+        } else {
+            setColorRes(v, ctx, R.id.widget_title, "setTextColor", R.color.widget_text)
+            setColorRes(v, ctx, R.id.widget_empty, "setTextColor", R.color.widget_muted)
+            setColorRes(v, ctx, R.id.widget_add, "setColorFilter", R.color.widget_text)
         }
         v.setOnClickPendingIntent(
             R.id.widget_add,
@@ -552,13 +565,14 @@ class MemoWidgetService : RemoteViewsService() {
             // 끝낸 할 일은 흐린 글자 (setAlpha 는 런처에 따라 RemoteViews 에서 막혀 글자색으로)
             when {
                 Widgets.onDark(color) -> v.setTextColor(R.id.row_text, if (kind == "task" && done) Widgets.mutedOnDark else Widgets.textOnDark)
-                kind == "task" && done -> v.setTextColor(R.id.row_text, ctx.getColor(R.color.widget_muted))
+                else -> Widgets.setColorRes(v, ctx, R.id.row_text, "setTextColor", if (kind == "task" && done) R.color.widget_muted else R.color.widget_text)
             }
             v.setTextViewTextSize(R.id.row_text, android.util.TypedValue.COMPLEX_UNIT_SP, if (kind == "h") 15f else 14f)
             if (kind == "task") {
                 v.setViewVisibility(R.id.row_check, View.VISIBLE)
                 v.setImageViewResource(R.id.row_check, if (done) R.drawable.ic_widget_checked else R.drawable.ic_widget_unchecked)
                 if (Widgets.onDark(color)) v.setInt(R.id.row_check, "setColorFilter", Widgets.textOnDark)
+                else Widgets.setColorRes(v, ctx, R.id.row_check, "setColorFilter", R.color.widget_text)
                 v.setContentDescription(R.id.row_check, if (done) "끝냄: $text" else "할 일: $text")
             } else {
                 v.setViewVisibility(R.id.row_check, View.GONE)

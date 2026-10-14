@@ -395,6 +395,8 @@ class Bridge(private val activity: MainActivity) {
                 val (_, file) = Temp.create(ctx)
                 try {
                     val rel = a.optString("rel")
+                    // 메모 폴더의 첨부만 (PC ipc-handlers.js 의 attachment:save-as · share 와 같게)
+                    if (rel.isNotEmpty() && !rel.startsWith("attachments/")) throw IllegalArgumentException("파일을 찾지 못했어요")
                     if (rel.isNotEmpty()) storage().openRead(rel).use { input -> file.outputStream().use { input.copyTo(it) } }
                     else file.writeBytes(Base64.decode(a.getString("base64"), Base64.DEFAULT))
                 } catch (e: Exception) {
@@ -417,6 +419,8 @@ class Bridge(private val activity: MainActivity) {
                 val file = shareFile(name)
                 try {
                     val rel = a.optString("rel")
+                    // 메모 폴더의 첨부만 (PC ipc-handlers.js 의 attachment:save-as · share 와 같게)
+                    if (rel.isNotEmpty() && !rel.startsWith("attachments/")) throw IllegalArgumentException("파일을 찾지 못했어요")
                     if (rel.isNotEmpty()) storage().openRead(rel).use { input -> file.outputStream().use { input.copyTo(it) } }
                     else file.writeBytes(Base64.decode(a.getString("base64"), Base64.DEFAULT))
                 } catch (e: Exception) {
@@ -453,7 +457,10 @@ class Bridge(private val activity: MainActivity) {
             "driveFullScope" -> {
                 val on = a.optBoolean("on")
                 if (!on) GoogleAuth.setFullScope(ctx, false)
-                if (GoogleAuth.native(ctx) && NativeAuth.available(ctx)) {
+                // 끄는데 지금 권한이 이미 drive.file 이면 다시 허용받을 것이 없다 (PC google-auth.js setFullScope 와 같게)
+                if (!on && GoogleAuth.grantedScope(ctx) != GoogleAuth.FULL_SCOPE) {
+                    resolve(id) { JSONObject().put("email", GoogleAuth.email(ctx)).put("full", false) }
+                } else if (GoogleAuth.native(ctx) && NativeAuth.available(ctx)) {
                     activity.runOnUiThread { activity.loginWithPhoneAccount(id, on) }
                 } else pool.execute {
                     resolve(id) {
