@@ -55,7 +55,7 @@ android {
         applicationId = "com.memoking.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 87
+        versionCode = 98 // 다른 브랜치 빌드(0.23.11 = 97)가 휴대폰에 깔려 있어 그보다 커야 업데이트로 설치된다
         versionName = "0.24.0"
 
         // 화자 구분 엔진(sherpa-onnx)은 휴대폰 CPU(ARM) 용만 넣는다 — x86 까지 넣으면 APK 가 30MB 더 커진다
