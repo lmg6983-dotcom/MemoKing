@@ -371,6 +371,25 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('PDF 파일: 마우스를 올리면 복사 · 지우기, 복사하면 파일 그대로 클립보드에',
         fileLabel === '이 파일 지우기' && /파일을 복사했어요/.test(fileDone) && smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1 && /안내 자료\.pdf$/.test(fileCopy?.target ?? ''),
         JSON.stringify({ fileLabel, fileDone, fileCopy }));
+      // 저장 · 공유 단추 (PC · 메모 폴더의 파일): 복사 왼쪽에 공유 · 저장
+      await hover('.mk-doc a[data-file]');
+      const fileBtns = await js(nw, `[...document.querySelectorAll('.mk-file-btn')].map((b) => b.getAttribute('aria-label'))`);
+      const press = async (sel) => {
+        const b = await js(nw, `(() => { const r = document.querySelector('${sel}').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+        nw.webContents.sendInputEvent({ type: 'mouseMove', x: b.x, y: b.y });
+        await wait(100);
+        nw.webContents.sendInputEvent({ type: 'mouseDown', x: b.x, y: b.y, button: 'left', clickCount: 1 });
+        nw.webContents.sendInputEvent({ type: 'mouseUp', x: b.x, y: b.y, button: 'left', clickCount: 1 });
+      };
+      await press('.mk-save-btn');
+      const saved = await until(() => smokeOpened.find((o) => o.kind === 'save-as'), '저장', 3000).catch(() => null);
+      await hover('.mk-doc a[data-file]');
+      await press('.mk-share-btn');
+      const shared = await until(() => smokeOpened.find((o) => o.kind === 'share'), '공유', 3000).catch(() => null);
+      const savedStatus = await js(nw, `document.getElementById('status').textContent`);
+      check('그림 · 소리 · 파일: 복사 왼쪽에 공유 · 저장 단추 → 다른 이름으로 저장 · Windows 공유 창 (상태 줄에 결과)',
+        JSON.stringify(fileBtns) === JSON.stringify(['이 파일 공유', '이 파일 저장…']) && /안내 자료\.pdf$/.test(saved?.target ?? '') && /안내 자료\.pdf$/.test(shared?.target ?? '') && /공유 창을 열었어요|저장했어요/.test(savedStatus),
+        JSON.stringify({ fileBtns, saved, shared, savedStatus }));
       await leave();
       // 표: 표째로 복사 (엑셀에 붙도록 칸 사이 탭 · 서식은 표 그대로)
       const tableLabel = await hover('.mk-doc .tableWrapper td');

@@ -19,6 +19,8 @@ import { HANDOFF_MS } from '../app/js/core/handoff.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront } from './window-utils.js';
 import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
+import { shareFile } from './share-file.js';
+import { hwndOf } from './foreground-watch.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: Math.round(p.x), y: Math.round(p.y) } : null);
@@ -663,7 +665,13 @@ export function registerIpc(ctx) {
     const title = vault?.get?.(id)?.title ?? '';
     const ok = vault?.trash(id) ?? false;
     win?.destroy();
-    if (typeof ok === 'string') wm.listWin?.webContents.send('memo:trashed', { name: ok, title });
+    if (typeof ok === 'string') {
+      wm.listWin?.webContents.send('memo:trashed', { name: ok, title });
+      // 목록 창이 없거나 숨어 있으면 되돌리기 띠가 보이지 않는다 — 어디로 갔는지만이라도 알린다
+      if (!wm.listWin || !wm.listWin.isVisible() || wm.listWin.isMinimized()) {
+        toast({ title: '휴지통으로 옮겼어요', body: `“${title || '제목 없음'}” 메모는 목록 › 설정 › 휴지통에서 되살릴 수 있어요` });
+      }
+    }
     return Boolean(ok);
   });
 
@@ -750,6 +758,53 @@ export function registerIpc(ctx) {
       return true;
     }
     return copyFileToClipboard(file);
+  });
+  // 메모 안의 그림 · 소리 · 파일: 다른 이름으로 저장 · Windows 공유 창
+  const attachmentFile = (rel) => {
+    let decoded = String(rel ?? '');
+    try {
+      decoded = decodeURI(decoded);
+    } catch {
+      // 이미 디코딩됨
+    }
+    const file = /^attachments\//.test(decoded) ? getVault()?.resolve(decoded) : null;
+    return file && fs.statSync(file, { throwIfNoEntry: false })?.isFile() ? file : null;
+  };
+  const MISSING = '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요';
+  ipcMain.handle('attachment:save-as', async (e, rel) => {
+    const file = attachmentFile(rel);
+    if (!file) return { error: MISSING };
+    const name = path.basename(file);
+    if (SMOKE) {
+      smokeOpened.push({ kind: 'save-as', target: file });
+      return { ok: true, name };
+    }
+    const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(e.sender), {
+      title: '다른 이름으로 저장',
+      defaultPath: path.join(app.getPath('downloads'), name),
+      buttonLabel: '저장',
+    });
+    if (r.canceled || !r.filePath) return { cancelled: true };
+    try {
+      await fs.promises.copyFile(file, r.filePath);
+      return { ok: true, name: path.basename(r.filePath) };
+    } catch (err) {
+      console.warn('[save-as]', err);
+      return { error: '저장하지 못했어요. 다른 폴더를 골라 주세요' };
+    }
+  });
+  ipcMain.handle('attachment:share', async (e, rel) => {
+    const file = attachmentFile(rel);
+    if (!file) return { error: MISSING };
+    if (SMOKE) {
+      smokeOpened.push({ kind: 'share', target: file });
+      return { ok: true };
+    }
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const r = await shareFile(file, win ? hwndOf(win) : 0);
+    if (r === 'ok') return { ok: true };
+    shell.showItemInFolder(file); // 공유 창을 열지 못하면 탐색기에서 골라 두어 오른쪽 클릭 › 공유 · 끌어다 보내기
+    return { fallback: true };
   });
   ipcMain.handle('attachment:info', (_e, rel) => {
     let decoded = String(rel ?? '');

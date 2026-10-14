@@ -143,6 +143,7 @@ export function setupHistoryTab({ api, els, confirm }) {
 
   function render() {
     els.consent.hidden = data.enabled || data.total > 0;
+    els.clear.disabled = !data.total; // 비울 것이 없으면
     els.body.hidden = !els.consent.hidden;
 
     const options = [['', `모든 앱 (${data.total})`], ...data.apps.map((a) => [a.name, `${a.name} (${a.count})`])];
@@ -179,7 +180,12 @@ export function setupHistoryTab({ api, els, confirm }) {
     refresh();
   });
   els.clear.addEventListener('click', async () => {
-    if (await confirm(`보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`, '모두 삭제')) api.history.clear();
+    // 앱으로 거르거나 찾는 중이어도 보관함 전체를 비운다 — 보이는 것만 지우는 줄 알지 않게 알린다
+    const narrowed = Boolean(query || app);
+    const msg = narrowed
+      ? `지금 보이는 알림만이 아니라, 보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`
+      : `보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`;
+    if (await confirm(msg, '모두 삭제')) api.history.clear();
   });
   els.app.addEventListener('change', () => {
     app = els.app.value;

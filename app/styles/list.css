@@ -264,6 +264,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .link-btn { border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 .link-btn:hover { background: var(--hover); color: var(--text); }
 .link-btn.danger:hover { color: var(--danger); }
+.link-btn:disabled { opacity: 0.45; cursor: default; background: none; color: var(--muted); }
 .grow { flex: 1; }
 
 /* 알림 예약 줄 */

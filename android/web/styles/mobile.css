@@ -500,6 +500,7 @@ h2.sheet-title { font-size: 20px; }
 .history-bar { display: flex; align-items: center; gap: 8px; padding: 0 16px 8px; }
 .history-bar select { height: 38px; max-width: 60%; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-1); color: var(--text); font-size: 14px; }
 .link-btn.danger { color: var(--danger); text-decoration-color: var(--danger); }
+.link-btn:disabled { opacity: 0.45; }
 .noti { align-items: flex-start; gap: 10px; padding: 12px; }
 .noti.self { background: color-mix(in srgb, var(--brand-yellow) 7%, var(--surface-1)); } /* 왼쪽 색 줄 대신 노란 아바타 + 옅은 바탕 */
 .avatar { width: 36px; height: 36px; flex: none; border-radius: 50%; object-fit: cover; }

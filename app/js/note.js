@@ -36,7 +36,11 @@ setCopyHost({
   image: (b64) => api.image.copy(b64),
   text: ({ text, html }) => api.copyRich({ text, html }),
   file: (href) => api.attachments.copy(href), // PDF · 소리 같은 첨부는 파일 그대로
+  save: (href) => api.attachments.saveAs(href), // 그림 · 소리 · 파일 다른 이름으로 저장
+  share: (href) => api.attachments.share(href), // Windows 공유 창
 });
+// 저장 · 공유 단추의 결과 (delete-button.js)
+window.addEventListener('mk:notice', (e) => setStatus(e.detail?.text ?? '', Boolean(e.detail?.error)));
 const params = new URLSearchParams(location.search);
 // 미리 불러 둔 예비 창(window-manager.js makeSpare): 편집기 코드는 다 읽어 두고, 열 메모가 정해질 때까지 기다린다
 if (params.get('spare') === '1') {
@@ -1269,6 +1273,7 @@ function showActive(active) {
   showStyle(active);
   for (const btn of document.querySelectorAll('[data-cmd]')) {
     btn.classList.toggle('active', Boolean(active[btn.dataset.cmd]));
+    if (btn.hasAttribute('aria-pressed')) btn.setAttribute('aria-pressed', String(Boolean(active[btn.dataset.cmd])));
   }
   for (const kind of ['color', 'highlight']) {
     for (const btn of document.querySelectorAll(`[data-action="${kind}"]`)) btn.classList.toggle('active', Boolean(active[kind]));

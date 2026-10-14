@@ -920,7 +920,7 @@ export async function runSmoke({
     await capture(getList(), 'smoke-tag-filter.png');
     await lj(`document.getElementById('filter-clear').click()`);
     const total = vault.list().length;
-    check('모두 지우기 → 전체 목록', (await shownIds()).length === total);
+    check('필터 해제 → 전체 목록', (await shownIds()).length === total);
 
     await lj(`document.getElementById('filter-btn').click()`);
     await lj(`document.querySelector('#color-filter [data-filter-color="yellow"]').click()`);
