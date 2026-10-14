@@ -303,6 +303,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 }
 @media (hover: hover) and (pointer: fine) { .lc-main:hover { box-shadow: 0 2px 4px rgba(17, 17, 17, 0.08), 0 8px 20px rgba(17, 17, 17, 0.1); } }
 .lc-main:active { transform: scale(0.99); }
+@media (prefers-reduced-motion: reduce) { .lc-main { transition: none; } .lc-main:active { transform: none; } }
 .mk-link-card.selected .lc-main { box-shadow: inset 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
 .lc-text { display: flex; flex-direction: column; justify-content: center; gap: 2px; flex: 1; min-width: 0; }
 .lc-site { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--text-muted); }
@@ -312,11 +313,30 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .lc-title { font-size: 14.5px; line-height: 21px; font-weight: 700; letter-spacing: -0.01em; }
 .lc-desc { font-size: 12.5px; line-height: 18px; color: var(--text-muted); }
 .mk-link-card[data-state="loading"] .lc-title { color: var(--text-muted); }
+/* 불러오는 중 · 못 불러옴 안내 (설명 자리에 흐리게, 한 줄) */
+.lc-desc.lc-note { -webkit-line-clamp: 1; font-style: italic; }
 .lc-thumb { width: 84px; height: 84px; flex: none; align-self: center; border-radius: var(--radius-sm); object-fit: cover; background: var(--fill-hover); }
-@media (max-width: 260px) { .lc-thumb { display: none; } }
+/* 유튜브: 16:9 썸네일 · 재생 표시. 썸네일(hqdefault 4:3)을 16:9 칸에 cover 로 넣으면 위아래 검은 띠가 딱 잘려 나간다 */
+.mk-link-card[data-kind="youtube"] .lc-main { position: relative; }
+.mk-link-card[data-kind="youtube"] .lc-thumb { width: 112px; height: 63px; }
+.lc-play {
+  position: absolute;
+  right: 54px; /* 썸네일 가운데: 안쪽 여백 12 + 썸네일 절반 56 - 표시 절반 14 */
+  top: 50%;
+  width: 28px;
+  height: 20px;
+  margin-top: -10px;
+  border-radius: 6px;
+  background: rgba(17, 17, 17, 0.72);
+  pointer-events: none;
+}
+.lc-play::after { content: ''; position: absolute; left: 11px; top: 5px; border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent #fff; }
+@media (max-width: 260px) { .lc-thumb, .lc-play { display: none; } }
 /* 링크 미리보기를 끈 설정: 카드 대신 보통 문단 같은 링크 글자 한 줄 (누르면 열림) */
 .mk-link-card.plain-link { width: fit-content; max-width: 100%; margin: 0 0 0.35em; user-select: auto; }
 .lc-plain { cursor: pointer; overflow-wrap: anywhere; }
+/* 고른 링크 한 줄 (화살표로 고르면 지우기 전에 무엇이 골라졌는지 보이게) */
+.mk-link-card.plain-link.selected { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
 
 /* 파일 칩 위에 뜨는 안내 (이름·크기) */
 .hover-hint {

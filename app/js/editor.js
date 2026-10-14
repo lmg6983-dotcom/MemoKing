@@ -313,7 +313,8 @@ const linkCardSchema = $nodeSchema('mk_link_card', () => ({
   attrs: { href: { default: '' }, title: { default: '' } },
   parseDOM: [{
     tag: 'div[data-link-card]',
-    getAttrs: (dom) => ({ href: dom.dataset.linkCard ?? '', title: dom.dataset.title ?? '' }),
+    // 인터넷 주소만 카드로 (붙여 넣은 javascript: · data: 같은 주소가 복사로 다른 앱에 링크로 나가지 않게)
+    getAttrs: (dom) => (/^https?:\/\//i.test(dom.dataset.linkCard ?? '') ? { href: dom.dataset.linkCard, title: dom.dataset.title ?? '' } : false),
   }],
   // 복사(Ctrl+C)할 때 다른 앱에도 링크로 붙도록 안에 <a> (편집기 화면은 linkCardView 가 그린다)
   toDOM: (node) => ['div', { 'data-link-card': node.attrs.href, 'data-title': node.attrs.title }, ['a', { href: node.attrs.href }, node.attrs.title || node.attrs.href]],
@@ -360,6 +361,8 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
   dom.contentEditable = 'false';
   const main = el('div', 'lc-main');
   main.setAttribute('role', 'link');
+  const play = el('span', 'lc-play'); // 유튜브: 썸네일 위 작은 재생 표시 (동영상인 줄 알게)
+  play.setAttribute('aria-hidden', 'true');
   const text = el('span', 'lc-text');
   const site = el('span', 'lc-site');
   const icon = el('img', 'lc-icon');
@@ -377,7 +380,6 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
   // 지우기 · 복사는 다른 내용(그림 · 파일)과 같은 단추로 (block-move.js · delete-button.js) — 카드에 따로 × 를 두면 두 개가 겹쳐 뜬다
   dom.append(main);
   const plain = el('a', 'lc-plain');
-  plain.title = '누르면 브라우저로 열려요';
 
   let current = node;
   let preview = null;
@@ -390,22 +392,35 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
     if (!on) {
       plain.href = href;
       plain.textContent = saved || href;
+      plain.title = `누르면 브라우저로 열려요\n${href}`; // 글자만 보이니 어디로 가는지 주소를
       if (!plain.isConnected) dom.replaceChildren(plain);
       return;
     }
     if (!main.isConnected) dom.replaceChildren(main);
     if (!loaded) load();
     main.title = `누르면 브라우저로 열려요\n${href}`;
-    dom.dataset.state = preview ? (preview.ok ? 'ok' : 'plain') : 'loading';
+    const state = preview ? (preview.ok ? 'ok' : 'plain') : 'loading';
+    dom.dataset.state = state;
+    dom.dataset.kind = preview?.kind === 'youtube' || preview?.site === 'YouTube' ? 'youtube' : '';
+    if (state === 'loading') main.setAttribute('aria-busy', 'true');
+    else main.removeAttribute('aria-busy');
     siteName.textContent = preview?.site || hostOf(href);
     title.textContent = saved && saved !== href ? saved : preview?.title || href;
-    desc.textContent = preview?.description ?? '';
+    // 불러오는 중과 못 불러온 카드가 같아 보이지 않게 (못 불러와도 누르면 열리는 링크 그대로)
+    desc.textContent = state === 'loading' ? '미리보기 불러오는 중…' : state === 'plain' ? '미리보기를 불러오지 못했어요' : preview?.description ?? '';
+    desc.classList.toggle('lc-note', state !== 'ok');
     desc.hidden = !desc.textContent;
+    main.setAttribute('aria-label', `${title.textContent}, ${siteName.textContent}`);
     const img = preview?.image ? vaultUrl(preview.image) : preview?.imageUrl ?? '';
     if (img) {
       if (thumb.getAttribute('src') !== img) thumb.src = img;
       if (!thumb.isConnected) main.append(thumb);
-    } else thumb.remove();
+      if (dom.dataset.kind === 'youtube') thumb.after(play);
+      else play.remove();
+    } else {
+      thumb.remove();
+      play.remove();
+    }
     const ico = preview?.icon ? vaultUrl(preview.icon) : '';
     if (ico) {
       if (icon.getAttribute('src') !== ico) icon.src = ico;
@@ -1584,6 +1599,20 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
   }));
 
+  // 고른 링크 카드(화살표로 고른 상태)에서 Enter: 브라우저로 열기 (마우스 없이도 열리게)
+  const linkCardKeys = $prose(() => new Plugin({
+    key: new PluginKey('memoking-link-card-keys'),
+    props: {
+      handleKeyDown(v, event) {
+        if (event.key !== 'Enter' || event.shiftKey || event.altKey || event.isComposing) return false;
+        const node = v.state.selection.node;
+        if (node?.type.name !== 'mk_link_card' || !node.attrs.href) return false;
+        openLink?.(node.attrs.href);
+        return true;
+      },
+    },
+  }));
+
   // 표 열 너비·행 높이·머리글 강조 (메모 머리말에 저장)
   let currentTables = tables;
   const extras = createTableExtras({
@@ -1763,6 +1792,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(cellPaste) // 표 칸에 여러 줄 붙이기 — 표 기능보다 먼저
     .use(gfm)
     .use(tableTab)
+    .use(linkCardKeys)
     .use(tableAutoFit)
     .use(tableResize) // 읽기 전용(PDF)에서도 열 너비가 보이게 (끌기는 편집할 때만)
     .use(tableExtras)

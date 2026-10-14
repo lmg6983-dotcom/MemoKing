@@ -791,7 +791,7 @@ export function registerIpc(ctx) {
   // ---------- 링크 카드 ----------
   ipcMain.handle('link:preview', (_e, url, options) => {
     const vault = getVault();
-    if (!vault) return null;
+    if (!vault || settings.linkPreviews === false) return null; // 미리보기를 끄면 사이트에 가지 않는다 (화면 쪽이 깜빡 묻더라도)
     return getLinkPreviews().get(vault, String(url ?? ''), { refresh: Boolean(options?.refresh) });
   });
   ipcMain.handle('link:open', (_e, url) => openWebPage(url));
