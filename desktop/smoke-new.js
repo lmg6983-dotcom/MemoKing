@@ -646,6 +646,29 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       delete getSettings().widgets;
       if (mw) windowManager.setNoteLayer(tid, null);
       mw?.close();
+      await until(() => !noteWins.has(tid), '메모 닫힘 3', 3000).catch(() => {});
+
+      // 테이프 메모끼리: 끌어 다른 테이프 메모 위에 머물렀다 놓으면 탭으로 합쳐지고 둘 다 테이프 그대로
+      const ta = vault.import({ body: '# 테이프 가\n\n가' });
+      const tb = vault.import({ body: '# 테이프 나\n\n나' });
+      const wa = windowManager.openNote(ta);
+      const wb2 = windowManager.openNote(tb);
+      await until(() => wa.isVisible() && wb2.isVisible(), '테이프 두 창', 6000).catch(() => {});
+      windowManager.setNoteLayer(ta, 'bottom');
+      windowManager.setNoteLayer(tb, 'bottom');
+      const ab = wa.getBounds();
+      const overA = { x: ab.x + Math.round(ab.width / 2), y: ab.y + Math.round(ab.height / 2) };
+      windowManager.trackWindowDrag(tb, overA);
+      await wait(500);
+      windowManager.endWindowDrag(tb);
+      const stackedTaped = await until(() => {
+        const st = windowManager.stacks?.stackOf(tb);
+        return st && st.memos.includes(ta) && st.memos.every((m) => getSettings().onBottom?.[m] === true) && st;
+      }, '테이프 메모 합치기', 4000).catch(() => null);
+      check('테이프 메모끼리 끌어 놓으면 스택(탭)으로 합쳐지고 둘 다 테이프 그대로', Boolean(stackedTaped), JSON.stringify(stackedTaped));
+      windowManager.setNoteLayer(tb, null);
+      noteWins.get(tb)?.close();
+      await until(() => !noteWins.has(ta) && !noteWins.has(tb), '테이프 스택 닫힘', 3000).catch(() => {});
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

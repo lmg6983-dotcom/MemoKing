@@ -898,9 +898,12 @@ export class WindowManager {
 
   stackTargetAt(point, excludeId) {
     const own = this.stacks?.stackOf(excludeId)?.memos ?? [excludeId];
+    // 끄는 메모도 테이프(바탕화면 층)면 같은 층의 테이프 메모끼리 합칠 수 있다.
+    //   보통 메모를 끌 때는 바탕화면 층의 메모를 건너뛴다 (다른 앱 창에 가려 안 보이는 메모에 합쳐지지 않게)
+    const moverTaped = Boolean(this.noteWins.get(excludeId)?.mkPinned);
     for (const [mid, w] of this.noteWins) {
       if (own.includes(mid) || w.isDestroyed() || !w.isVisible() || w.isMinimized() || this.inkingWins.has(w)) continue;
-      if (w.mkPinned && !w.isFocused()) continue; // 바탕화면 층의 메모는 다른 앱 창에 가려 있을 수 있다
+      if (w.mkPinned && !moverTaped && !w.isFocused()) continue;
       if (isInside(point, w.getBounds())) return mid;
     }
     return null;
