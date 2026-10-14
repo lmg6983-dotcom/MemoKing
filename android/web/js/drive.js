@@ -242,7 +242,7 @@ export function renderStatus(s = drive.status()) {
   }
   if (s.reconnect && !s.connected) {
     $('drive-title').textContent = '다시 연결해 주세요';
-    $('drive-sub').textContent = 'Google Drive 연결 방식이 바뀌었어요 (제미나이 등 다른 앱이 폴더에 넣은 메모도 보이게). 메모는 이 휴대폰에 그대로 있어요';
+    $('drive-sub').textContent = 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 휴대폰에 그대로 있어요';
   }
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;

@@ -102,7 +102,7 @@ export class DriveSync extends EventEmitter {
     };
     try {
       fs.mkdirSync(root, { recursive: true });
-      const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state }).run({ full });
+      const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state, adoptForeign: true }).run({ full });
       save();
       if (!this.auth.email) this.api.about().then((email) => email && this.auth.setEmail(email)).catch(() => {});
       this.publish({ state: 'idle', lastSync: Date.now(), error: '', changed: result.localChanged, conflicts: result.conflicts });

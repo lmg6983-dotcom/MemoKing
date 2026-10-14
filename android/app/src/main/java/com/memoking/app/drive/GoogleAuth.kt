@@ -27,8 +27,11 @@ import java.security.SecureRandom
  */
 object GoogleAuth {
     // 메모킹이 만든(또는 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님)
-    // Drive 전체 (drive.file 은 메모킹이 만든 파일만 보여 제미나이 등 다른 앱이 폴더에 넣은 메모가 보이지 않았다 — PC 와 같음)
-    const val SCOPE = "https://www.googleapis.com/auth/drive"
+    // 메모킹(같은 Google Cloud 프로젝트)이 만든 파일만 — Play 스토어 공개에 제한 범위 심사가 필요 없게.
+    //   제미나이 등 다른 앱이 폴더에 넣은 메모는 PC 메모킹(Drive 전체 권한)이 메모킹 파일로 다시 올려 주므로 휴대폰에도 보인다
+    const val SCOPE = "https://www.googleapis.com/auth/drive.file"
+    // 0.23.8 에서 잠깐 Drive 전체로 연결한 것 — drive.file 을 품으므로 끊지 않는다
+    private const val FULL_SCOPE = "https://www.googleapis.com/auth/drive"
     private const val AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
     private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
     private const val KEY_ID = "googleClientId"
@@ -68,7 +71,7 @@ object GoogleAuth {
      * 메모 폴더(휴대폰 안 사본)는 그대로라 메모는 계속 보인다 — 다시 연결해 새 폴더를 고르면 그리로 옮겨 맞춘다
      */
     fun upgradeScope(ctx: Context) {
-        if (!connected(ctx) || prefs(ctx).getString(KEY_SCOPE, null) == SCOPE) return
+        if (!connected(ctx) || prefs(ctx).getString(KEY_SCOPE, null) in setOf(SCOPE, FULL_SCOPE)) return
         signOut(ctx)
         prefs(ctx).edit().putBoolean(KEY_RECONNECT, true).apply()
     }

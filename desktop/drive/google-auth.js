@@ -11,7 +11,9 @@ import { createHash, randomBytes } from 'node:crypto';
 
 // 메모킹이 만든(또는 사용자가 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님).
 // PC 메모킹과 휴대폰 메모킹은 같은 Google Cloud 프로젝트의 클라이언트라 서로 만든 메모를 본다
-// Drive 전체 (drive.file 은 메모킹이 만든 파일만 보여 제미나이 등 다른 앱이 폴더에 넣은 메모가 보이지 않았다)
+// PC 는 Drive 전체 (drive.file 은 메모킹이 만든 파일만 보여 제미나이 등 다른 앱이 폴더에 넣은 메모가 보이지 않았다).
+//   휴대폰은 drive.file 그대로(Play 스토어) — 다른 앱이 넣은 파일은 PC 가 메모킹 파일로 다시 올려 휴대폰에도 보이게 한다 (sync-engine.js adoptForeign).
+//   Google Cloud 동의 화면에는 drive.file 만 적어 둔다 (PC 는 처음 허용할 때 '확인되지 않은 앱' 안내가 한 번 나온다)
 export const SCOPE = 'https://www.googleapis.com/auth/drive';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
