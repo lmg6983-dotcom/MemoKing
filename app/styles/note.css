@@ -313,28 +313,6 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .lc-desc { font-size: 12.5px; line-height: 18px; color: var(--text-muted); }
 .mk-link-card[data-state="loading"] .lc-title { color: var(--text-muted); }
 .lc-thumb { width: 84px; height: 84px; flex: none; align-self: center; border-radius: var(--radius-sm); object-fit: cover; background: var(--fill-hover); }
-.lc-remove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--text-strong);
-  box-shadow: 0 2px 6px rgba(17, 17, 17, 0.18), inset 0 0 0 1px var(--line);
-  opacity: 0;
-  cursor: pointer;
-  transition: opacity 0.15s ease-out, color 0.15s ease-out;
-}
-@media (hover: hover) and (pointer: fine) { .lc-remove:hover { color: var(--danger); } }
-.lc-remove svg { width: 14px; height: 14px; }
-.lc-remove:focus-visible { opacity: 1; }
-@media (hover: hover) and (pointer: fine) { .mk-link-card:hover .lc-remove { opacity: 1; } }
 @media (max-width: 260px) { .lc-thumb { display: none; } }
 
 /* 파일 칩 위에 뜨는 안내 (이름·크기) */

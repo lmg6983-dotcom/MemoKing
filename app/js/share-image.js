@@ -20,7 +20,7 @@ export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
   doc.style.setProperty('--note-zoom', '1');
   // 편집기의 min-height:100% · 스크롤이 그림 안에서는 종이 전체 높이가 되어 아래 날짜 줄을 밀어내므로 내용 높이만큼만
   Object.assign(doc.style, { minHeight: '0', height: 'auto', overflow: 'visible' });
-  for (const n of doc.querySelectorAll('.lc-remove, .ProseMirror-separator, .ProseMirror-trailingBreak, .mk-drag-badge, .ProseMirror-gapcursor')) n.remove();
+  for (const n of doc.querySelectorAll('.ProseMirror-separator, .ProseMirror-trailingBreak, .mk-drag-badge, .ProseMirror-gapcursor')) n.remove();
   for (const n of doc.querySelectorAll('.mk-caret-item, .mk-lift, .mk-swap-target, .mk-date')) n.classList.remove('mk-caret-item', 'mk-lift', 'mk-swap-target', 'mk-date', 'mk-date-set');
   for (const media of doc.querySelectorAll('.mk-media')) {
     const label = media.querySelector('.mk-media-label')?.textContent || '';

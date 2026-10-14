@@ -2,7 +2,7 @@
 //   <메모 폴더>/_memoking/link-previews.json   주소별 미리보기 정보
 //   <메모 폴더>/_memoking/link-previews/        사진·아이콘 (주소 SHA-1 앞 16자리 이름)
 // PC 에서 먼저 받아 둔 카드는 휴대폰에서 다시 받지 않고, 그 반대도 마찬가지.
-import { parseLinkPreview, detectCharset, hostOf } from '../../app/js/core/link-preview.js';
+import { parseLinkPreview, detectCharset, hostOf, youtubeOEmbedUrl, parseYoutubeOEmbed, staleYoutubeEntry } from '../../app/js/core/link-preview.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../../app/js/core/remote-images.js';
 import { fs, call } from './native.js';
 
@@ -85,7 +85,7 @@ export class LinkPreviews {
     this.#reloadIfMissing(url);
     const cached = this.cache[url];
     const failedAt = this.failed.get(url);
-    if (!refresh && (cached || (failedAt && Date.now() - failedAt < RETRY_FAILED_MS))) return this.#view(url, cached);
+    if (!refresh && ((cached && !staleYoutubeEntry(url, cached)) || (failedAt && Date.now() - failedAt < RETRY_FAILED_MS))) return this.#view(url, cached);
     if (!this.inflight.has(url)) {
       const job = this.#fetchPreview(url)
         .then((entry) => {
@@ -123,6 +123,8 @@ export class LinkPreviews {
   async #fetchPreview(url) {
     const target = new URL(url);
     if (!/^https?:$/.test(target.protocol)) throw new Error('인터넷 주소가 아니에요');
+    const youtube = await this.#fetchYoutube(url).catch(() => null);
+    if (youtube) return youtube;
     const res = await call('http', { url: target.href, accept: 'text/html,application/xhtml+xml,*/*;q=0.8', limit: MAX_HTML, headOnly: true });
     if (res.status < 200 || res.status > 299) throw new Error(`HTTP ${res.status}`);
     const type = (res.type ?? '').toLowerCase();
@@ -162,6 +164,21 @@ export class LinkPreviews {
     entry.image = image;
     entry.icon = icon;
     return entry;
+  }
+
+  // 유튜브 동영상: oEmbed(제목·채널) + 정해진 썸네일 — PC 와 같은 카드 (동영상 주소가 아니면 null)
+  async #fetchYoutube(url) {
+    const oembed = youtubeOEmbedUrl(url);
+    if (!oembed) return null;
+    const res = await call('http', { url: oembed, accept: 'application/json', limit: MAX_ICON });
+    if (res.status < 200 || res.status > 299) throw new Error(`HTTP ${res.status}`);
+    const p = parseYoutubeOEmbed(new TextDecoder('utf-8').decode(latin1Bytes(res.latin1 ?? '')), url);
+    if (!p.title) return null; // 비공개·삭제된 동영상 → 페이지를 읽어 본다
+    const [image, icon] = await Promise.all([
+      this.#saveImage(p.image, MAX_IMAGE).catch(() => ''),
+      this.#saveImage(p.icon, MAX_ICON).catch(() => ''),
+    ]);
+    return { kind: 'youtube', title: p.title, description: p.description, site: p.site, image, imageUrl: p.image, icon, fetchedAt: new Date().toISOString() };
   }
 
   async #saveImage(url, limit) {

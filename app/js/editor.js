@@ -315,7 +315,8 @@ const linkCardSchema = $nodeSchema('mk_link_card', () => ({
     tag: 'div[data-link-card]',
     getAttrs: (dom) => ({ href: dom.dataset.linkCard ?? '', title: dom.dataset.title ?? '' }),
   }],
-  toDOM: (node) => ['div', { 'data-link-card': node.attrs.href, 'data-title': node.attrs.title }],
+  // 복사(Ctrl+C)할 때 다른 앱에도 링크로 붙도록 안에 <a> (편집기 화면은 linkCardView 가 그린다)
+  toDOM: (node) => ['div', { 'data-link-card': node.attrs.href, 'data-title': node.attrs.title }, ['a', { href: node.attrs.href }, node.attrs.title || node.attrs.href]],
   parseMarkdown: {
     match: (node) => node.type === 'mkLinkCard',
     runner: (state, node, type) => {
@@ -368,15 +369,11 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink }) {
   const thumb = el('img', 'lc-thumb');
   thumb.alt = '';
   thumb.onerror = () => thumb.remove();
-  const remove = el('button', 'lc-remove');
-  remove.type = 'button';
-  remove.title = '카드 지우기';
-  remove.setAttribute('aria-label', '카드 지우기');
-  remove.innerHTML = '<svg><use href="#i-close"/></svg>';
   site.append(icon, siteName);
   text.append(site, title, desc);
   main.append(text, thumb);
-  dom.append(main, remove);
+  // 지우기 · 복사는 다른 내용(그림 · 파일)과 같은 단추로 (block-move.js · delete-button.js) — 카드에 따로 × 를 두면 두 개가 겹쳐 뜬다
+  dom.append(main);
 
   let current = node;
   let preview = null;
@@ -422,13 +419,6 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink }) {
   main.addEventListener('click', (e) => {
     e.preventDefault();
     openLink?.(current.attrs.href);
-  });
-  remove.addEventListener('click', (e) => {
-    e.preventDefault();
-    const pos = getPos?.();
-    if (pos == null) return;
-    view.dispatch(view.state.tr.delete(pos, pos + current.nodeSize));
-    view.focus();
   });
 
   render();
