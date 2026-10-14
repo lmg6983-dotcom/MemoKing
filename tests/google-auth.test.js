@@ -100,11 +100,11 @@ test('Drive 올리기: resumable 시작 → 주소로 내용 보내기, 401 이�
   assert.equal(calls[2].method, 'PUT');
 });
 
-test('권한: Drive 전체(drive)를 요청하고, 다른 범위로 저장된 예전 연결(drive.file 등)은 끊어 다시 연결하게', async () => {
+test('권한: 메모킹이 만든 파일만(drive.file) 요청하고, 다른 범위로 저장된 예전 연결(Drive 전체 등)은 끊어 다시 연결하게', async () => {
   const { auth, dir, opened } = setup();
   auth.setClient('id-1.apps.googleusercontent.com', 'GOCSPX-s');
   await auth.login();
-  assert.equal(opened().searchParams.get('scope'), 'https://www.googleapis.com/auth/drive');
+  assert.equal(opened().searchParams.get('scope'), 'https://www.googleapis.com/auth/drive.file');
   const file = path.join(dir, 'google-auth.json');
   // 같은 범위로 저장된 연결은 그대로
   assert.equal(new GoogleAuth({ file, openExternal: () => {}, fetch: async () => new Response('{}') }).connected, true);
@@ -118,8 +118,8 @@ test('권한: Drive 전체(drive)를 요청하고, 다른 범위로 저장된 �
   await new Promise((r) => setTimeout(r, 10));
   assert.ok(revoked.some(([url, body]) => url.includes('/revoke') && body.includes('OLD')));
   assert.equal(new GoogleAuth({ file, openExternal: () => {} }).scopeUpgraded, false); // 한 번만
-  // drive.file 로 연결해 둔 것(0.18.14 ~ 0.33.x)도 끊고 다시 연결하게 — 다른 앱이 넣은 메모가 보이도록
-  fs.writeFileSync(file, JSON.stringify({ plain: { clientId: 'id-1.apps.googleusercontent.com', refreshToken: 'NARROW', scope: 'https://www.googleapis.com/auth/drive.file' } }));
+  // 0.33.7~0.33.8 에서 Drive 전체로 연결해 둔 것도 끊고 다시 연결하게 (제한 범위 권한을 남기지 않게)
+  fs.writeFileSync(file, JSON.stringify({ plain: { clientId: 'id-1.apps.googleusercontent.com', refreshToken: 'NARROW', scope: 'https://www.googleapis.com/auth/drive' } }));
   const narrow = new GoogleAuth({ file, openExternal: () => {}, fetch: async () => new Response('{}') });
   assert.equal(narrow.connected, false);
   assert.equal(narrow.scopeUpgraded, true);

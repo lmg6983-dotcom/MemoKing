@@ -20,7 +20,7 @@ class FakeDrive {
   }
 
   item(f) {
-    return { id: f.id, name: f.name, folder: f.folder, md5: f.folder ? null : this.md5(f.data), modified: f.modified, size: f.data.length, foreign: Boolean(f.foreign) };
+    return { id: f.id, name: f.name, folder: f.folder, md5: f.folder ? null : this.md5(f.data), modified: f.modified, size: f.data.length };
   }
 
   find(parent, name) {
@@ -138,7 +138,7 @@ test('처음: 모두 내려받기 (index.json 은 기기마다 따로)', async (
   assert.equal((await sync()).skipped, true);
 });
 
-test('다른 앱(제미나이 등)이 넣은 파일을 "바뀐 것" 목록이 빠뜨려도: "지금 동기화" · 15분마다 폴더를 처음부터 훑어 내려받기', async () => {
+test('"바뀐 것" 목록이 파일을 빠뜨려도: "지금 동기화" · 15분마다 폴더를 처음부터 훑어 내려받기', async () => {
   let now = Date.parse('2026-10-14T09:00:00Z');
   const engine = (opts) => new SyncEngine({ root: dir, remote: drive, rootId: 'ROOT', state, now: () => now }).run(opts);
   drive.put('회의.md', '# 회의');
@@ -159,28 +159,6 @@ test('다른 앱(제미나이 등)이 넣은 파일을 "바뀐 것" 목록이 �
   now += 15 * 60_000;
   assert.equal((await engine()).downloaded, 1);
   assert.equal(lt('또 다른 메모.md'), '# 또');
-});
-
-test('다른 앱이 넣은 파일은 받은 뒤 메모킹 파일로 다시 올리고 원래 것은 휴지통으로 (휴대폰 drive.file 에도 보이게)', async () => {
-  const run = (adoptForeign) => new SyncEngine({ root: dir, remote: drive, rootId: 'ROOT', state, adoptForeign }).run({ full: true });
-  drive.put('회의.md', '# 회의');
-  drive.put('제미나이 메모.md', '# 날씨');
-  const original = drive.path('제미나이 메모.md');
-  original.foreign = true;
-  const off = await run(false);
-  assert.equal(off.adopted, 0, '휴대폰(끔)은 그대로');
-  assert.equal(drive.path('제미나이 메모.md').id, original.id);
-  const r = await run(true);
-  assert.equal(r.adopted, 1);
-  assert.equal(r.uploaded, 0, '다시 올린 것은 올린 수로 세지 않음');
-  const now = drive.path('제미나이 메모.md');
-  assert.notEqual(now.id, original.id);
-  assert.equal(now.foreign, undefined, '메모킹이 만든 파일');
-  assert.equal(drive.text('제미나이 메모.md'), '# 날씨');
-  assert.equal(original.trashed, true, '원래 것은 Drive 휴지통');
-  assert.equal(lt('제미나이 메모.md'), '# 날씨');
-  assert.equal(state.files['제미나이 메모.md'].id, now.id);
-  assert.equal((await run(true)).adopted, 0, '한 번만');
 });
 
 test('이 PC 에서 고친 것·새 메모·새 폴더 올리기', async () => {

@@ -4,7 +4,7 @@ import { FOLDER } from './sync-engine.js';
 
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-const FIELDS = 'id,name,mimeType,md5Checksum,modifiedTime,size,isAppAuthorized';
+const FIELDS = 'id,name,mimeType,md5Checksum,modifiedTime,size';
 
 export class DriveError extends Error {
   constructor(status, message) {
@@ -20,7 +20,6 @@ const item = (o) => ({
   md5: o.md5Checksum ?? null,
   modified: Date.parse(o.modifiedTime ?? '') || 0,
   size: Number(o.size ?? 0),
-  foreign: o.isAppAuthorized === false, // 메모킹(이 Google Cloud 프로젝트)이 만들거나 연 적 없는 파일 — 제미나이 등 다른 앱이 넣은 것
 });
 
 const quote = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");

@@ -1,7 +1,7 @@
 {
   "name": "memoking",
   "productName": "MemoKing",
-  "version": "0.33.8",
+  "version": "0.33.9",
   "description": "메모킹 — 폴더 기반 스티커 메모 앱 (데스크탑 · 안드로이드)",
   "type": "module",
   "main": "desktop/main.js",

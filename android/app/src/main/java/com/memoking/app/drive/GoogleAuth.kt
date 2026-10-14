@@ -27,8 +27,8 @@ import java.security.SecureRandom
  */
 object GoogleAuth {
     // 메모킹이 만든(또는 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님)
-    // 메모킹(같은 Google Cloud 프로젝트)이 만든 파일만 — Play 스토어 공개에 제한 범위 심사가 필요 없게.
-    //   제미나이 등 다른 앱이 폴더에 넣은 메모는 PC 메모킹(Drive 전체 권한)이 메모킹 파일로 다시 올려 주므로 휴대폰에도 보인다
+    // 메모킹(같은 Google Cloud 프로젝트)이 만든 파일만 — 제한 범위 심사·'확인되지 않은 앱' 안내 없이 (PC 와 같음).
+    //   제미나이 등 다른 앱은 메모킹 MCP(create_memo)로 메모를 남겨야 PC·휴대폰에 보인다
     const val SCOPE = "https://www.googleapis.com/auth/drive.file"
     // 0.23.8 에서 잠깐 Drive 전체로 연결한 것 — drive.file 을 품으므로 끊지 않는다
     private const val FULL_SCOPE = "https://www.googleapis.com/auth/drive"

@@ -13,8 +13,7 @@ export const FOLDER = 'application/vnd.google-apps.folder';
 const LOCAL_ONLY = new Set(['_memoking/index.json']);
 const MERGE_JSON = '_memoking/link-previews.json';
 const MASS_DELETE_MIN = 20;
-// Drive 의 "바뀐 것" 목록은 다른 앱(제미나이 등)이 폴더에 넣은 파일을 빠뜨릴 때가 있다 —
-//   그 목록만 믿으면 그런 파일은 이 PC 에서 고칠 때까지 영영 내려오지 않으므로, 이만큼마다 폴더를 처음부터 훑는다
+// Drive 의 "바뀐 것" 목록만 믿으면 거기서 빠진 파일은 이 PC 에서 고칠 때까지 영영 내려오지 않으므로, 이만큼마다 폴더를 처음부터 훑는다
 export const FULL_SCAN_MS = 15 * 60_000;
 
 export class SafetyStop extends Error {}
@@ -50,11 +49,8 @@ export class SyncEngine {
   /**
    * @param {{ root: string, remote: Remote, rootId: string, state: object, conflictTag?: string, now?: () => number }} options
    *   state: { pageToken, files: { 경로: { id, md5, lmtime, lsize } }, folders } — 동기화가 끝나면 바뀐 채로 저장한다
- *   adoptForeign: 다른 앱이 넣은 파일(remote item.foreign)을 메모킹 파일로 다시 올리고 원래 것은 Drive 휴지통으로 —
- *     휴대폰 메모킹(drive.file, 메모킹이 만든 파일만 봄)에도 보이게. Drive 전체 권한인 PC 만 켠다
    */
-  constructor({ root, remote, rootId, state, conflictTag = 'PC 충돌', now = Date.now, adoptForeign = false }) {
-    this.adoptForeign = adoptForeign;
+  constructor({ root, remote, rootId, state, conflictTag = 'PC 충돌', now = Date.now }) {
     this.root = root;
     this.remote = remote;
     this.rootId = rootId;
@@ -165,7 +161,7 @@ export class SyncEngine {
       throw new SafetyStop(`이 PC 메모 폴더에서 파일 ${goneLocal}개가 한꺼번에 사라져서 동기화를 멈췄어요.`);
     }
 
-    const result = { skipped: false, uploaded: 0, downloaded: 0, deletedLocal: 0, deletedRemote: 0, adopted: 0, conflicts: [] };
+    const result = { skipped: false, uploaded: 0, downloaded: 0, deletedLocal: 0, deletedRemote: 0, conflicts: [] };
 
     const upload = async (rel, existingId) => {
       const before = this.stat(rel);
@@ -272,20 +268,6 @@ export class SyncEngine {
         } else delete files[rel]; // 양쪽 다 지움
       } catch (err) {
         if (err.code !== 'ENOENT') throw err; // 둘러보는 사이 없어진 파일은 다음 차례에
-      }
-    }
-
-    // 다른 앱(제미나이 등)이 넣은 파일: 이 PC 에 같은 내용으로 받아 둔 것만, 메모킹 파일로 다시 올리고 원래 것은 휴지통으로
-    if (this.adoptForeign) {
-      for (const [rel, r] of remote) {
-        if (!r.foreign) continue;
-        const b = files[rel];
-        const l = this.stat(rel);
-        if (!b || b.id !== r.id || b.md5 !== r.md5 || !l || l.mtime !== b.lmtime || l.size !== b.lsize) continue;
-        await upload(rel, null);
-        result.uploaded--; // 올린 것으로 세지 않는다
-        await this.remote.trash(r.id);
-        result.adopted++;
       }
     }
 
