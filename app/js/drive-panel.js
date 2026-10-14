@@ -34,7 +34,7 @@ export function setupDrivePanel({ api, onVault, confirm }) {
     let sub = 'Google 계정으로 로그인하면 휴대폰 메모킹과 같은 메모를 써요';
     if (info.reconnect && !info.connected) {
       title = '다시 연결해 주세요';
-      sub = 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC 에 그대로 있어요';
+      sub = 'Google Drive 연결 방식이 바뀌었어요 (제미나이 등 다른 앱이 폴더에 넣은 메모도 보이게). 메모는 이 PC 에 그대로 있어요';
     } else if (info.connected && !info.active) {
       title = `${info.email || 'Google 계정'} 로그인됨`;
       sub = '맞출 Drive 폴더를 아직 고르지 않았어요';
@@ -285,7 +285,7 @@ export function setupDrivePanel({ api, onVault, confirm }) {
     } catch {
       // 이번에만 묻기
     }
-    if (await confirm('Google Drive 동기화를 다시 켜 주세요.\n연결 방식이 더 안전하게 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC 에 그대로 있어요.', '다시 연결')) connect();
+    if (await confirm('Google Drive 동기화를 다시 켜 주세요.\n제미나이 등 다른 앱이 Drive 폴더에 넣은 메모도 보이도록 연결 방식이 바뀌었어요. 메모는 이 PC 에 그대로 있어요.', '다시 연결')) connect();
   });
   return { refresh };
 }

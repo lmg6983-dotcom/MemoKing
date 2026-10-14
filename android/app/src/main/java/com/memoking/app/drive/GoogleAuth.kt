@@ -27,7 +27,8 @@ import java.security.SecureRandom
  */
 object GoogleAuth {
     // 메모킹이 만든(또는 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님)
-    const val SCOPE = "https://www.googleapis.com/auth/drive.file"
+    // Drive 전체 (drive.file 은 메모킹이 만든 파일만 보여 제미나이 등 다른 앱이 폴더에 넣은 메모가 보이지 않았다 — PC 와 같음)
+    const val SCOPE = "https://www.googleapis.com/auth/drive"
     private const val AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
     private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
     private const val KEY_ID = "googleClientId"
