@@ -189,12 +189,11 @@ function openVault(dir) {
       driveSync?.request(3000);
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
-      windowManager.refreshWidgets([...new Set([...ids, ...removed])]);
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));
     });
     next.on('trashed', (id) => {
-      windowManager.removeWidget(id);
+      windowManager.forgetLayer(id); // 테이프로 바탕화면에 붙여 둔 기억
       if (memoHotkeys.slotOf(id)) memoHotkeys.set(id, null); // 단축키는 놓아 다른 앱이 쓰게
     });
     next.on('indexed', (index) => windowManager.listWin?.webContents.send('vault:indexed', index.generatedAt));
@@ -208,7 +207,7 @@ function openVault(dir) {
     migrateV1();
     windowManager.loadStacks();
     if (app.isReady()) {
-      windowManager.restoreWidgets(); // 바탕화면 위젯 — 숨겨 시작해도(로그인 때 자동 실행) 그 자리에
+      windowManager.migrateWidgets(); // 예전 바탕화면 위젯 → 테이프 붙인 메모 창 (숨겨 시작해도 그 자리에)
       memoHotkeys.refresh(); // 다른 폴더의 메모 단축키
     }
     purgeTrash(vault);
@@ -1011,7 +1010,9 @@ app.whenReady().then(async () => {
     if (launched?.kind !== 'memo' || !vault?.get(launched.id)) windowManager.createListWindow();
   }
   for (const id of [...settings.openNotes]) {
-    if (!windowManager.openNote(id)) settings.openNotes = settings.openNotes.filter((x) => x !== id);
+    // 테이프 메모는 바탕화면 층에 조용히 (로그인 때 쓰던 앱의 포커스를 빼앗지 않게)
+    const inactive = windowManager.layerOf(id) === 'bottom';
+    if (!windowManager.openNote(id, { inactive })) settings.openNotes = settings.openNotes.filter((x) => x !== id);
   }
   if (launched && launched.kind !== 'list') handleLaunch(process.argv);
   alarms.startup();

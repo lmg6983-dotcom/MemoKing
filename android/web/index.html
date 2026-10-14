@@ -75,7 +75,7 @@
       <div id="tag-strip" class="tag-strip" role="group" aria-label="태그로 거르기" hidden></div>
       <div id="filter-summary" class="filter-summary" hidden>
         <span id="filter-summary-text"></span>
-        <button id="filter-clear" class="link-btn">모두 지우기</button>
+        <button id="filter-clear" class="link-btn">필터 풀기</button>
       </div>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
@@ -104,7 +104,7 @@
           <select id="history-app" aria-label="앱으로 거르기"></select>
           <span class="grow"></span>
           <button id="history-apps" class="link-btn">모을 앱</button>
-          <button id="history-clear" class="link-btn danger">모두 지우기</button>
+          <button id="history-clear" class="link-btn danger">보관함 비우기</button>
         </div>
         <div id="history-rows" class="rows"></div>
         <p id="history-empty" class="empty" hidden></p>
@@ -136,7 +136,7 @@
       <span id="status" class="status" role="status"></span>
       <button id="undo-btn" class="icon-btn" aria-label="되돌리기"><svg><use href="#i-undo"/></svg></button>
       <button id="redo-btn" class="icon-btn" aria-label="다시 하기"><svg><use href="#i-redo"/></svg></button>
-      <button id="bell-btn" class="icon-btn count-btn bell-btn" aria-label="예약 알림">
+      <button id="bell-btn" class="icon-btn count-btn bell-btn" aria-label="일정과 알림">
         <svg><use href="#i-bell"/></svg><span id="bell-count" class="count"></span>
       </button>
       <button id="links-btn" class="icon-btn links-btn" aria-label="메모 연결">
@@ -325,7 +325,7 @@
 
           <div class="rem-pane" data-pane="at">
             <input type="hidden" id="at-input">
-            <label class="rem-row rem-allday-row" id="rem-allday-row"><span>하루 종일</span><input type="checkbox" class="switch" id="rem-allday"></label>
+            <label class="rem-row rem-allday-row" id="rem-allday-row"><span>하루 종일</span><input type="checkbox" class="switch" role="switch" id="rem-allday"></label>
             <div id="at-picker" class="date-picker" aria-label="날짜와 시각"></div>
           </div>
 
@@ -452,7 +452,7 @@
     <h3 id="import-sheet-title" class="sheet-title">음성 파일로 메모 만들기</h3>
     <ul id="import-files" class="import-files"></ul>
     <label class="setting-row">
-      <input type="checkbox" id="import-stt" class="switch" checked>
+      <input type="checkbox" id="import-stt" class="switch" role="switch" checked>
       <span>받아쓰기 <small id="import-stt-note">음성을 글로 받아써 함께 넣어요. 긴 파일은 시간이 걸려요</small></span>
     </label>
     <div class="sheet-actions">
@@ -492,7 +492,7 @@
         <button id="folder-use" class="btn primary"></button>
       </div>
       <label class="setting-row" id="import-row" hidden>
-        <input type="checkbox" id="import-local" class="switch" checked>
+        <input type="checkbox" id="import-local" class="switch" role="switch" checked>
         <span>이 휴대폰의 메모도 함께 올리기 <small id="import-note"></small></span>
       </label>
     </div>
@@ -524,18 +524,18 @@
     <div class="path-box" id="vault-path"></div>
     <div class="sheet-actions">
       <button id="change-vault" class="btn">위치 변경</button>
-      <button id="use-internal-2" class="btn">이 휴대폰에만 저장</button>
+      <button id="use-internal-2" class="btn">이 휴대폰으로 바꾸기</button>
     </div>
     <p class="hint" id="vault-hint">PC와 함께 쓰려면 Google Drive를 연결해 주세요.</p>
 
     <p class="label">알림</p>
     <div class="setting-row" id="notify-row">
-      <span>예약 알림 <small id="notify-note"></small></span>
+      <span>일정 알림 <small id="notify-note"></small></span>
       <button id="notify-btn" class="btn small">허용</button>
     </div>
 
     <label class="setting-row">
-      <input type="checkbox" id="history-enabled" class="switch">
+      <input type="checkbox" id="history-enabled" class="switch" role="switch">
       <span>다른 앱 알림 모아두기 <small id="history-note"></small></span>
     </label>
     <div class="sheet-actions">
@@ -544,24 +544,24 @@
 
     <p class="label">링크 · 태그 · 녹음</p>
     <label class="setting-row">
-      <input type="checkbox" id="link-previews" class="switch" checked>
-      <span>링크 미리보기 <small>주소를 붙이면 제목 · 사진이 있는 카드로 보여요. 끄면 누르면 열리는 링크 글자로만</small></span>
+      <input type="checkbox" id="link-previews" class="switch" role="switch" checked>
+      <span>링크 미리보기 <small>주소를 붙이면 제목 · 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
     </label>
     <label class="setting-row">
-      <input type="checkbox" id="auto-tags" class="switch" checked>
+      <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
       <span>태그 자동 추가 <small>태그 없는 메모를 닫을 때 확실한 태그만 달아요</small></span>
     </label>
     <label class="setting-row">
-      <input type="checkbox" id="rec-stt" class="switch" checked>
+      <input type="checkbox" id="rec-stt" class="switch" role="switch" checked>
       <span>녹음하며 받아쓰기 <small id="rec-stt-note">말하는 내용을 바로 글로 받아써요</small></span>
     </label>
     <label class="setting-row" id="spk-row">
-      <input type="checkbox" id="spk-switch" class="switch">
+      <input type="checkbox" id="spk-switch" class="switch" role="switch">
       <span>말한 사람 나누기 <small id="spk-note"></small></span>
     </label>
     <p class="label">S펜</p>
     <label class="setting-row">
-      <input type="checkbox" id="pen-writing" class="switch" checked>
+      <input type="checkbox" id="pen-writing" class="switch" role="switch" checked>
       <span>손글씨를 글자로 <small>글 고치기에서 S펜으로 쓰면 글자로 바꿔요. 옮기기와 그리기에서는 늘 꺼져 있어요</small></span>
     </label>
     <p class="label">도움말</p>

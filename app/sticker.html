@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
-  <title>늘 위에 두기 — 누르면 떼어져요</title>
+  <title>왕관 · 테이프 스티커 — 누르면 떼어져요</title>
   <link rel="stylesheet" href="styles/sticker.css">
   <script type="module" src="js/sticker.js"></script>
 </head>
 <body>
   <!-- 늘 위에 두기 표시: 창 위 가장자리에 반쯤 걸쳐 붙은 반투명 왕관 스티커 (메모킹 로고의 왕관) -->
-  <svg id="crown" class="crown" viewBox="0 0 64 52" aria-hidden="true">
+  <svg id="crown" class="crown sticker" viewBox="0 0 64 52" aria-hidden="true">
     <defs>
       <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
@@ -32,6 +32,14 @@
       <!-- 은은한 광택 -->
       <path class="shine" d="M14 19 L22 30 L32 13 L42 30 L50 19 L48 39 L16 39 Z"/>
       <path class="glint" d="M19 24 L22 29"/>
+    </g>
+  </svg>
+  <!-- 바탕화면에 붙이기 표시: 창 위 가장자리 가운데에 반쯤 걸친(절반은 메모 밖) 셀로판 테이프 -->
+  <svg id="tape" class="tape sticker" viewBox="0 0 96 30" aria-hidden="true" hidden>
+    <g class="hit" transform="rotate(-4 48 15)">
+      <!-- 손으로 뜯은 양쪽 끝(톱니) -->
+      <path class="body" d="M6 3 L90 3 L92 6 L89 9 L92 12 L89 15 L92 18 L89 21 L92 24 L90 27 L6 27 L4 24 L7 21 L4 18 L7 15 L4 12 L7 9 L4 6 Z"/>
+      <path class="shine" d="M10 7 L86 7"/>
     </g>
   </svg>
 </body>

@@ -15,6 +15,10 @@ let host = {
   text: null,
   /** @param {string} href 메모 폴더 안의 첨부 (attachments/…) → 넣었으면 true */
   file: null,
+  /** PC: 첨부를 다른 이름으로 저장 → { ok, name } | { cancelled } | { error } (없으면 저장 단추를 두지 않는다) */
+  save: null,
+  /** PC: 첨부를 Windows 공유 창으로 → { ok } | { fallback } | { error } */
+  share: null,
 };
 
 /** 앱마다 클립보드에 넣는 방법 — { image(pngBase64), text({ text, html }), file(href) } (빠지면 브라우저 Clipboard API · 파일은 글로) */
@@ -104,6 +108,16 @@ export function attachmentOf(node) {
   const [href] = hrefs;
   return !other && hrefs.size === 1 && isAttachment(href) ? href : null;
 }
+
+/** 저장 · 공유할 메모 폴더의 파일: 그림 · 손 메모 · 소리 · 동영상 · 음성 카드의 소리 · 파일 칩 — 없으면 null */
+export function fileOf(node) {
+  const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : voiceAudioOf(node);
+  if (media) return isAttachment(media.attrs.src) ? media.attrs.src : null;
+  return attachmentOf(node);
+}
+
+/** 이 앱이 파일 저장 · 공유를 하는가 (PC) → { save, share } | null */
+export const fileActions = () => (host.save && host.share ? { save: host.save, share: host.share } : null);
 
 /** 화면의 상자를 복사용 HTML 로: 편집기 단추 · 손잡이 · 커서 자리 표시는 빼고 */
 function cleanHtml(dom) {

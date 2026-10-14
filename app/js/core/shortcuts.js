@@ -14,6 +14,7 @@ export const SHORTCUT_GROUPS = [
       ['새 메모 창', 'Ctrl+N'],
       ['닫기 (저장돼요)', 'Ctrl+W'],
       ['늘 위에 두기 (왕관) 켜고 끄기', 'Ctrl+Shift+T'],
+      ['바탕화면에 붙이기 (테이프) 켜고 끄기', 'Ctrl+Shift+G'],
       ['예약 알림', 'Ctrl+Shift+A'],
       ['메모 연결', 'Ctrl+K'],
       ['다음, 이전 탭 (스택)', 'Ctrl+Tab / Ctrl+Shift+Tab'],

@@ -8,7 +8,9 @@ const ICONS = {
   // 메모 단축키 (Ctrl+Alt+숫자로 바로 불러오기)
   // 바탕화면에서 떼기: 빗금 그은 압정 (✕ 는 '창 닫기' 로 읽혀서)
   unpin: `<path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5zM12 14v6" ${stroke}/><path d="M4 4l16 16" ${stroke}/>`,
-  // 바탕화면 위젯 (모니터)
+  // 바탕화면에 붙이기 버튼: 양 끝을 손으로 뜯은 셀로판 테이프 (누르면 이 테이프가 창 위 가장자리 스티커가 된다)
+  tape: `<path d="M5 8.5h14l-1.2 1.75L19 12l-1.2 1.75L19 15.5H5l1.2-1.75L5 12l1.2-1.75L5 8.5z" ${stroke} transform="rotate(-8 12 12)"/>`,
+  // 모니터
   desktop: `<rect x="3" y="4.5" width="18" height="12" rx="2" ${stroke}/><path d="M9 20h6M12 16.5V20" ${stroke}/>`,
   zap: `<path d="M13.5 2.5L5 13.5h6l-1 8 8.5-11h-6z" ${stroke}/>`,
   plus: `<path d="M12 5v14M5 12h14" ${stroke} stroke-width="2.2"/>`,

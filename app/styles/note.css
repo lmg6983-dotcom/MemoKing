@@ -303,6 +303,7 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 }
 @media (hover: hover) and (pointer: fine) { .lc-main:hover { box-shadow: 0 2px 4px rgba(17, 17, 17, 0.08), 0 8px 20px rgba(17, 17, 17, 0.1); } }
 .lc-main:active { transform: scale(0.99); }
+@media (prefers-reduced-motion: reduce) { .lc-main { transition: none; } .lc-main:active { transform: none; } }
 .mk-link-card.selected .lc-main { box-shadow: inset 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
 .lc-text { display: flex; flex-direction: column; justify-content: center; gap: 2px; flex: 1; min-width: 0; }
 .lc-site { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--text-muted); }
@@ -312,11 +313,30 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .lc-title { font-size: 14.5px; line-height: 21px; font-weight: 700; letter-spacing: -0.01em; }
 .lc-desc { font-size: 12.5px; line-height: 18px; color: var(--text-muted); }
 .mk-link-card[data-state="loading"] .lc-title { color: var(--text-muted); }
+/* 불러오는 중 · 못 불러옴 안내 (설명 자리에 흐리게, 한 줄) */
+.lc-desc.lc-note { -webkit-line-clamp: 1; font-style: italic; }
 .lc-thumb { width: 84px; height: 84px; flex: none; align-self: center; border-radius: var(--radius-sm); object-fit: cover; background: var(--fill-hover); }
-@media (max-width: 260px) { .lc-thumb { display: none; } }
+/* 유튜브: 16:9 썸네일 · 재생 표시. 썸네일(hqdefault 4:3)을 16:9 칸에 cover 로 넣으면 위아래 검은 띠가 딱 잘려 나간다 */
+.mk-link-card[data-kind="youtube"] .lc-main { position: relative; }
+.mk-link-card[data-kind="youtube"] .lc-thumb { width: 112px; height: 63px; }
+.lc-play {
+  position: absolute;
+  right: 54px; /* 썸네일 가운데: 안쪽 여백 12 + 썸네일 절반 56 - 표시 절반 14 */
+  top: 50%;
+  width: 28px;
+  height: 20px;
+  margin-top: -10px;
+  border-radius: 6px;
+  background: rgba(17, 17, 17, 0.72);
+  pointer-events: none;
+}
+.lc-play::after { content: ''; position: absolute; left: 11px; top: 5px; border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent #fff; }
+@media (max-width: 260px) { .lc-thumb, .lc-play { display: none; } }
 /* 링크 미리보기를 끈 설정: 카드 대신 보통 문단 같은 링크 글자 한 줄 (누르면 열림) */
 .mk-link-card.plain-link { width: fit-content; max-width: 100%; margin: 0 0 0.35em; user-select: auto; }
 .lc-plain { cursor: pointer; overflow-wrap: anywhere; }
+/* 고른 링크 한 줄 (화살표로 고르면 지우기 전에 무엇이 골라졌는지 보이게) */
+.mk-link-card.plain-link.selected { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
 
 /* 파일 칩 위에 뜨는 안내 (이름·크기) */
 .hover-hint {
@@ -869,8 +889,12 @@ body.tab-dragging, body.tab-dragging * { cursor: grabbing !important; }
 .crown-btn { position: relative; }
 .crown-btn.peeled svg { opacity: 0; }
 .crown-btn.peeled, .crown-btn.peeled:hover, .top-btn.crown-btn[aria-pressed="true"], .top-btn.crown-btn[aria-pressed="true"]:hover { background: none; }
-/* 붙은 동안 버튼 자리는 비어 있고 마우스·키보드 반응 없음 (왕관은 스티커를 눌러서만 뗀다) */
+/* 붙은 동안 버튼 자리는 비어 있고 마우스·키보드 반응 없음 (왕관 · 테이프는 스티커를 눌러서만 뗀다).
+   왕관과 테이프는 함께 붙지 않아서 하나가 붙으면 다른 버튼은 접힌다 (좁은 창에서 빈 자리 두 칸이 되지 않게) */
 .crown-btn.peeled { visibility: hidden; pointer-events: none; }
+.crown-btn.folded { display: none; }
+/* 잠금을 풀기 전에는 누를 수 없다 */
+body.memo-locked .crown-btn { pointer-events: none; opacity: 0.35; }
 
 /* ---------- v0.17.2: Ctrl+마우스 휠로 본문 확대·축소 (웹 브라우저처럼 글·사진·표가 함께) ---------- */
 #editor > * { zoom: var(--note-zoom, 1); } /* 본문 요소에도 .editor class 가 붙으므로 id 로 (두 번 확대되지 않게) */
@@ -1277,31 +1301,31 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
   .mk-delete-btn.fading, .mk-delete-btn.pressed { opacity: 0; }
   .mk-doc .mk-deleting { animation: none; opacity: 0; transition: none; }
 }
-@media print { .mk-delete-btn, .mk-copy-btn { display: none !important; } }
+@media print { .mk-delete-btn, :is(.mk-copy-btn, .mk-file-btn) { display: none !important; } }
 /* 복사 단추: 지우기 단추 왼쪽, 같은 크기 · 동그라미에 글자색 아이콘 (누르면 ✓ 초록, 실패하면 !) — 메모 색 · 어두운 화면을 따라감 */
-.mk-copy-btn {
+:is(.mk-copy-btn, .mk-file-btn) {
   position: fixed; z-index: 70; display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
   border: 1px solid color-mix(in srgb, var(--text-strong, #111) 10%, transparent); border-radius: 50%; background: var(--surface-2); color: var(--text-strong, #222);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); cursor: pointer; animation: mk-del-in 0.22s var(--ease-out) both;
   -webkit-tap-highlight-color: transparent;
 }
 /* 손가락 닿는 범위: 바깥쪽은 넉넉히, × 쪽(오른쪽)은 좁게 — 복사하려다 지우지 않게 */
-.mk-copy-btn::before { content: ""; position: absolute; inset: -8px -4px -8px -8px; border-radius: 50%; }
+:is(.mk-copy-btn, .mk-file-btn)::before { content: ""; position: absolute; inset: -8px -4px -8px -8px; border-radius: 50%; }
 .mk-delete-btn::before { inset: -10px -10px -10px -4px; }
-.mk-copy-btn svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-.mk-copy-btn:active { transform: scale(0.88); }
-.mk-copy-btn.done { color: var(--ok-text); }
-.mk-copy-btn.failed { color: var(--danger); }
-.mk-copy-btn.failed svg { stroke-width: 2.4; }
-.mk-copy-btn.fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
-.mk-copy-btn:focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
+:is(.mk-copy-btn, .mk-file-btn) svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+:is(.mk-copy-btn, .mk-file-btn):active { transform: scale(0.88); }
+:is(.mk-copy-btn, .mk-file-btn).done { color: var(--ok-text); }
+:is(.mk-copy-btn, .mk-file-btn).failed { color: var(--danger); }
+:is(.mk-copy-btn, .mk-file-btn).failed svg { stroke-width: 2.4; }
+:is(.mk-copy-btn, .mk-file-btn).fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
+:is(.mk-copy-btn, .mk-file-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
 .mk-delete-btn { background: var(--surface-2); }
 /* 어두운 숯색 메모 위에서도 또렷하게 */
-body[data-color="charcoal"] .mk-copy-btn, body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
-body[data-color="charcoal"] .mk-copy-btn { color: #f1f1ef; }
-body[data-color="charcoal"] .mk-copy-btn.done { color: #69db7c; }
+body[data-color="charcoal"] :is(.mk-copy-btn, .mk-file-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
+body[data-color="charcoal"] :is(.mk-copy-btn, .mk-file-btn) { color: #f1f1ef; }
+body[data-color="charcoal"] :is(.mk-copy-btn, .mk-file-btn).done { color: #69db7c; }
 .mk-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { .mk-copy-btn, .mk-copy-btn.fading { animation: none; } .mk-copy-btn.fading { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { :is(.mk-copy-btn, .mk-file-btn), :is(.mk-copy-btn, .mk-file-btn).fading { animation: none; } :is(.mk-copy-btn, .mk-file-btn).fading { opacity: 0; } }
 
 /* 추천 태그 막대 (태그 없는 메모, 본문 아래) — PC. 휴대폰은 mobile.css 가 크기를 덮어쓴다 */
 .tag-suggest-bar { display: flex; align-items: center; gap: 6px; flex: none; padding: 3px 4px 3px 10px; border-top: 1px solid color-mix(in srgb, var(--note-text) 8%, transparent); animation: mk-pop-in 0.18s ease-out; }

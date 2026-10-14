@@ -285,7 +285,7 @@ function renderEmpty(narrowed) {
   art.textContent = narrowed ? '🔍' : '📝';
   const text = document.createElement('span');
   text.textContent = narrowed
-    ? state.query ? `"${state.query}" 이(가) 든 메모가 없어요.` : '조건에 맞는 메모가 없어요.'
+    ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
     : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
   const b = document.createElement('button');
   b.type = 'button';
@@ -312,7 +312,7 @@ function renderCard(memo) {
   card.className = `card${memo.open ? ' open' : ''}${justDropped ? ' dropped' : ''}`;
   card.dataset.id = memo.id;
   card.dataset.color = memo.color; // 카드 바탕·글씨 = 실제 메모 창의 색
-  card.title = '눌러서 열어요. 목록 밖으로 끌어 놓으면 그 자리에 열려요';
+  if (memo.open) card.title = '메모 창이 열려 있어요';
 
   // 제목 줄: 제목(두 줄까지) (고정 압정) — 휴대폰과 같은 모양
   const head = document.createElement('div');
@@ -374,9 +374,9 @@ function renderCard(memo) {
   if (memo.hasFile) meta.append(badge('clip', ''));
   if (memo.linkCount) meta.append(badge('link', memo.linkCount));
   if (memo.stack) meta.append(badge('tabs', memo.stack, 'stack'));
-  // 바탕화면 위젯으로 붙어 있는 메모
-  if (memo.widget) {
-    const wg = badge('desktop', '', 'widget');
+  // 테이프로 바탕화면에 붙여 둔 메모 (창이 떠 있을 때)
+  if (memo.taped) {
+    const wg = badge('tape', '', 'taped');
     wg.title = '바탕화면에 붙어 있어요';
     meta.append(wg);
   }
@@ -458,7 +458,8 @@ function confirmDialog(message, okLabel = '삭제') {
   $('confirm-ok').textContent = okLabel;
   el.confirm.returnValue = '';
   el.confirm.showModal();
-  $('confirm-ok').focus();
+  // 처음 포커스는 취소에 (Enter · Space 한 번에 영구 삭제 · 휴지통 비우기가 되지 않게)
+  el.confirm.querySelector('button[value="cancel"]')?.focus();
   return new Promise((resolve) => {
     el.confirm.addEventListener('close', () => resolve(el.confirm.returnValue === 'ok'), { once: true });
   });
@@ -948,7 +949,7 @@ const remindersTab = setupRemindersTab({
 });
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockHistoryApp(appId, appName) {
-  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n설정 › 모을 앱 선택에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
+  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함 › 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const apps = await api.history.apps();
   const count = apps.find((a) => a.appId === appId)?.count ?? 0;
   const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제');
@@ -1042,6 +1043,14 @@ $('change-vault').addEventListener('click', async () => {
   applyInfo(await api.vault.choose());
 });
 
+// 카드에 포커스가 있을 때 Delete: 그 메모를 휴지통으로 (아래 되돌리기 띠로 되살림)
+el.cards.addEventListener('keydown', (e) => {
+  if (e.key !== 'Delete' || e.ctrlKey || e.altKey || e.metaKey) return;
+  const card = e.target.closest?.('.card');
+  if (!card || e.target !== card) return;
+  e.preventDefault();
+  deleteMemo(card.dataset.id);
+});
 el.cards.addEventListener('click', (e) => {
   if (suppressClick) {
     suppressClick = false; // 끌기가 끝난 직후의 클릭은 무시
@@ -1368,13 +1377,13 @@ api.win.listOnTop().then((on) => showListTop(on, false));
 // 대화 상자·튜토리얼이 떠 있으면 창 버튼 줄도 어둡게 (Windows 가 그리는 줄이라 화면의 막이 닿지 않는다)
 let dimLevel = false;
 function syncTitlebarDim() {
-  const level = el.settings.open || el.confirm.open || $('trash-dialog').open ? 'dialog' : document.body.classList.contains('coaching') ? 'coach' : false;
+  const level = el.settings.open || el.confirm.open || $('trash-dialog').open || $('apps-dialog').open || $('drive-dialog')?.open ? 'dialog' : document.body.classList.contains('coaching') ? 'coach' : false;
   if (level === dimLevel) return;
   dimLevel = level;
   api.win.dimTitlebar(level);
 }
 const dimWatcher = new MutationObserver(syncTitlebarDim);
-for (const d of [el.settings, el.confirm, $('trash-dialog')]) dimWatcher.observe(d, { attributes: true, attributeFilter: ['open'] });
+for (const d of [el.settings, el.confirm, $('trash-dialog'), $('apps-dialog'), $('drive-dialog')].filter(Boolean)) dimWatcher.observe(d, { attributes: true, attributeFilter: ['open'] });
 dimWatcher.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 // ---------- 휴지통 ----------
 const trashEl = {
@@ -1437,6 +1446,8 @@ $('trash-btn').addEventListener('click', async () => {
   el.settings.close();
   await renderTrash();
   openPanelDialog(trashEl.dialog);
+  // 설정에서 왔으면 휴지통을 닫을 때 설정으로 돌아간다 (막다른 길이 되지 않게)
+  trashEl.dialog.addEventListener('close', () => openPanelDialog(el.settings), { once: true });
 });
 $('trash-close').addEventListener('click', () => trashEl.dialog.close());
 trashEl.list.addEventListener('click', async (e) => {

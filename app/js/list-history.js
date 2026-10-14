@@ -58,12 +58,17 @@ export function setupHistoryTab({ api, els, confirm }) {
     return span;
   }
 
-  function actionButton(name, label, handler) {
+  // caption: 아이콘 밑 짧은 이름 (휴대폰은 마우스를 올려 볼 수 없어 보이게 — PC 는 숨기고 마우스 안내로)
+  function actionButton(name, label, handler, caption = label) {
     const b = document.createElement('button');
     b.className = 'icon-btn';
     b.title = label;
     b.setAttribute('aria-label', label);
-    b.append(icon(name));
+    const cap = document.createElement('span');
+    cap.className = 'cap';
+    cap.setAttribute('aria-hidden', 'true');
+    cap.textContent = caption;
+    b.append(icon(name), cap);
     b.addEventListener('click', (ev) => {
       ev.stopPropagation();
       handler();
@@ -116,12 +121,12 @@ export function setupHistoryTab({ api, els, confirm }) {
     const actions = document.createElement('div');
     actions.className = 'noti-actions';
     actions.append(
-      actionButton('note', '메모로 만들기', () => api.history.toMemo(e.id)),
+      actionButton('note', '메모로 만들기', () => api.history.toMemo(e.id), '메모로'),
       actionButton('copy', '복사', () => api.copyText([e.title, e.body].filter(Boolean).join('\n'))),
-      actionButton('trash', '삭제', () => api.history.remove(e.id)),
+      actionButton('trash', '삭제', () => removeWithUndo(e, div)),
     );
     // 이 앱 알림 그만 모으기 (안드로이드)
-    if (api.history.block && e.source !== 'memoking') actions.append(actionButton('block', `${e.app} 알림 그만 모으기`, () => api.history.block(e)));
+    if (api.history.block && e.source !== 'memoking') actions.append(actionButton('block', `${e.app} 알림 그만 모으기`, () => api.history.block(e), '그만 모으기'));
 
     div.append(avatar(e), text, actions);
     // 누르면 내용 펼치기 / 메모킹 알림은 그 메모 열기
@@ -141,8 +146,60 @@ export function setupHistoryTab({ api, els, confirm }) {
     return div;
   }
 
+  // 알림 하나 지우기: 바로 지우지 않고 그 자리에 "되돌리기" 를 5초 — 그동안 되돌리면 그대로 (메모 지우기처럼)
+  const pendingRemoval = new Map(); // 알림 id → 지울 시각까지의 타이머
+  function removeWithUndo(e, div) {
+    const strip = document.createElement('div');
+    strip.className = 'row noti-undo';
+    strip.setAttribute('role', 'status');
+    const text = document.createElement('span');
+    text.textContent = '알림을 삭제했어요';
+    const undo = document.createElement('button');
+    undo.type = 'button';
+    undo.className = 'link-btn';
+    undo.textContent = '되돌리기';
+    strip.append(text, undo);
+    div.replaceWith(strip);
+    undo.focus({ preventScroll: true });
+    const timer = setTimeout(() => {
+      pendingRemoval.delete(e.id);
+      strip.remove();
+      api.history.remove(e.id);
+    }, 5000);
+    pendingRemoval.set(e.id, timer);
+    undo.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      clearTimeout(timer);
+      pendingRemoval.delete(e.id);
+      if (strip.isConnected) strip.replaceWith(div);
+      else refresh();
+    });
+  }
+
   function render() {
     els.consent.hidden = data.enabled || data.total > 0;
+    els.clear.disabled = !data.total; // 비울 것이 없으면
+    // 꺼 둔 채 예전 알림만 남아 있으면 꺼져 있다는 것과 다시 켜는 단추를 맨 위에
+    let off = els.body.querySelector('.history-off');
+    if (!data.enabled && data.total > 0) {
+      if (!off) {
+        off = document.createElement('div');
+        off.className = 'history-off';
+        off.setAttribute('role', 'status');
+        const t = document.createElement('span');
+        t.textContent = '알림 보관이 꺼져 있어요. 새 알림은 모으지 않아요';
+        const on = document.createElement('button');
+        on.type = 'button';
+        on.className = 'link-btn';
+        on.textContent = '다시 켜기';
+        on.addEventListener('click', async () => {
+          await api.history.setEnabled(true);
+          refresh();
+        });
+        off.append(t, on);
+        els.rows.before(off);
+      }
+    } else off?.remove();
     els.body.hidden = !els.consent.hidden;
 
     const options = [['', `모든 앱 (${data.total})`], ...data.apps.map((a) => [a.name, `${a.name} (${a.count})`])];
@@ -157,6 +214,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     const nodes = [];
     let lastDay = '';
     for (const e of data.entries) {
+      if (pendingRemoval.has(e.id)) continue; // 되돌리기를 기다리는 중
       const day = dayLabel(new Date(e.time));
       if (day !== lastDay) {
         const h = document.createElement('h3');
@@ -171,7 +229,7 @@ export function setupHistoryTab({ api, els, confirm }) {
     els.empty.hidden = data.entries.length > 0;
     els.empty.textContent = query || app
       ? '찾는 알림이 없어요.'
-      : data.enabled ? '아직 모은 알림이 없어요.\n새 알림이 오면 여기에 모아둘게요.' : '알림 보관이 꺼져 있어요.\n설정에서 다시 켤 수 있어요.';
+      : data.enabled ? '아직 모은 알림이 없어요.\n새 알림이 오면 여기에 모아둘게요.' : '알림 보관이 꺼져 있어요.\n설정 › 알림 모아두기에서 다시 켤 수 있어요.';
   }
 
   els.enable.addEventListener('click', async () => {
@@ -179,7 +237,12 @@ export function setupHistoryTab({ api, els, confirm }) {
     refresh();
   });
   els.clear.addEventListener('click', async () => {
-    if (await confirm(`보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`, '모두 삭제')) api.history.clear();
+    // 앱으로 거르거나 찾는 중이어도 보관함 전체를 비운다 — 보이는 것만 지우는 줄 알지 않게 알린다
+    const narrowed = Boolean(query || app);
+    const msg = narrowed
+      ? `지금 보이는 알림만이 아니라, 보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`
+      : `보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`;
+    if (await confirm(msg, '모두 삭제')) api.history.clear();
   });
   els.app.addEventListener('change', () => {
     app = els.app.value;

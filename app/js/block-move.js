@@ -156,7 +156,7 @@ export function contentKindName(node, dom) {
   if (/list/.test(name)) return '목록';
   if (name === 'table') return '표';
   if (name === 'math_block') return '수식';
-  if (name === 'mk_link_card') return '링크 카드';
+  if (name === 'mk_link_card') return '링크'; // 미리보기를 끄면 카드 없이 링크 한 줄이라 "링크" 로
   if (name === 'hr') return '가로줄';
   if (isVoiceCard(node)) return '음성';
   if (!(dom instanceof Element)) return '내용';
@@ -165,7 +165,7 @@ export function contentKindName(node, dom) {
   if (dom.querySelector('.mk-media')) return '소리';
   if (dom.querySelector('img.mk-image')) return '그림';
   if (dom.querySelector('a[data-file]')) return '파일';
-  if (dom.querySelector('.mk-link-card, [data-link-card]')) return '링크 카드';
+  if (dom.querySelector('.mk-link-card, [data-link-card]')) return '링크';
   return '내용';
 }
 

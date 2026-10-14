@@ -68,7 +68,12 @@ function renderCard(memo) {
   title.className = 'card-title';
   title.textContent = memo.title;
   head.append(title);
-  if (memo.pinned) head.append(badge('pin-fill', '', 'pin'));
+  if (memo.pinned) {
+    const pin = badge('pin-fill', '', 'pin');
+    pin.setAttribute('role', 'img');
+    pin.setAttribute('aria-label', '고정됨');
+    head.append(pin);
+  }
   card.append(head);
 
   if (memo.preview) {
@@ -107,7 +112,12 @@ function renderCard(memo) {
   tags.textContent = (memo.tags ?? []).map((t) => `#${t}`).join(' ');
   const meta = document.createElement('div');
   meta.className = 'card-meta';
-  if (memo.reminderCount) meta.append(badge('bell', memo.reminderCount));
+  if (memo.reminderCount) {
+    const bell = badge('bell', memo.reminderCount);
+    bell.setAttribute('role', 'img');
+    bell.setAttribute('aria-label', `알림 ${memo.reminderCount}개`);
+    meta.append(bell);
+  }
   if (memo.hasAudio) meta.append(badge('audio', ''));
   if (memo.hasVideo) meta.append(badge('video', ''));
   if (memo.hasFile) meta.append(badge('clip', ''));
@@ -157,7 +167,7 @@ function renderEmpty(narrowed) {
   art.textContent = narrowed ? '🔍' : '📝';
   const text = document.createElement('span');
   text.textContent = narrowed
-    ? state.query ? `"${state.query}" 이(가) 든 메모가 없어요.` : '조건에 맞는 메모가 없어요.'
+    ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
     : '아직 메모가 없어요.\n떠오른 생각을 바로 적거나 말로 남겨 보세요.';
   const actions = document.createElement('span');
   actions.className = 'empty-actions';
@@ -203,7 +213,7 @@ export function render() {
 function hintCards() {
   const card = document.querySelector('.item .card');
   if (!card?.getClientRects().length) return; // 목록이 안 보이면 다음에
-  hintOnce('card-gestures', '카드를 옆으로 밀면 휴지통으로 가요(되돌리기 있어요). 꾹 누르면 색, 고정, 보내기 메뉴가 떠요', { anchor: card });
+  hintOnce('card-gestures', '카드를 옆으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 색, 고정, 공유 메뉴가 떠요', { anchor: card });
 }
 
 // ---------- 필터 ----------

@@ -264,6 +264,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .link-btn { border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 .link-btn:hover { background: var(--hover); color: var(--text); }
 .link-btn.danger:hover { color: var(--danger); }
+.link-btn:disabled { opacity: 0.45; cursor: default; background: none; color: var(--muted); }
 .grow { flex: 1; }
 
 /* 알림 예약 줄 */
@@ -297,6 +298,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .consent ul { margin: 0 0 18px; padding-left: 20px; text-align: left; line-height: 1.7; font-size: 13px; }
 #history-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .history-bar { display: flex; align-items: center; gap: 6px; padding: 0 12px 6px; }
+.history-off { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 12px 6px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--fill-hover, rgba(0,0,0,.05)); color: var(--muted); font-size: 12.5px; }
 .history-bar select {
   max-width: 60%;
   height: 28px;
@@ -344,6 +346,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   transition: opacity 0.1s;
 }
 .noti:hover .noti-actions, .noti:focus-within .noti-actions { opacity: 1; }
+.noti-actions .cap { display: none; } /* PC 는 마우스 안내(title)로 */
+/* 알림 하나 지운 자리: 되돌리기 5초 */
+.noti-undo { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; }
 
 /* 설정 */
 .setting-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13.5px; cursor: pointer; }

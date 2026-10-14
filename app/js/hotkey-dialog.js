@@ -133,7 +133,7 @@ export function hotkeyDialog({ state, locked = false, onSave }) {
     let busy = false;
 
     form.append(
-      make('h2', { id: 'hk-title' }, '단축키 정하기'),
+      make('h2', { id: 'hk-title' }, '불러오기 키 정하기'),
       keysLabel, keys, legend, whatLabel, seg, modeDesc, hint, error, actions,
     );
     dialog.append(form);

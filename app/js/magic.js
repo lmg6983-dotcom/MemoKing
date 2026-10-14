@@ -226,6 +226,12 @@ function render() {
   clearBtn.hidden = !raw;
   // 남겨 둔 지난 글로 다시 띄운 경우 첫 줄("메모로 저장")이 아니라 찾은 결과를 골라 둔다 (Enter 로 같은 메모를 또 만들지 않게)
   if (retained && selected === 0 && rows[0]?.kind === 'new' && rows.length > 1) selected = 1;
+  // 쓴 글이 이미 있는 메모 제목과 똑같으면 그 메모를 골라 둔다 (Enter 로 같은 이름의 메모를 또 만들지 않게 — 새로 만들려면 ↑)
+  const same = (t) => String(t ?? '').trim().toLowerCase() === query.trim().toLowerCase();
+  if (!retained && selected === 0 && rows[0]?.kind === 'new') {
+    const hit = rows.findIndex((r) => r.kind === 'note' && same(r.title));
+    if (hit > 0) selected = hit;
+  }
   select(Math.min(selected, Math.max(0, rows.length - 1)), { scroll: false });
   fit();
 }

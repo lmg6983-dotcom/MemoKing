@@ -377,10 +377,14 @@ function renderTagGroups() {
     more.className = 'link-tag-hint';
     more.textContent = g.memos.length ? '목록에서 모아 보기' : '같은 태그의 다른 메모가 없어요';
     head.append(more);
-    const ul = document.createElement('ul');
-    ul.className = 'link-list';
-    ul.append(...g.memos.slice(0, 6).map((m) => linkItem(m)));
-    box.append(head, ul);
+    box.append(head);
+    // 다른 메모가 없으면 위 안내 한 줄로 충분하다 (빈 목록의 "아직 없어요" 를 또 띄우지 않게)
+    if (g.memos.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'link-list';
+      ul.append(...g.memos.slice(0, 6).map((m) => linkItem(m)));
+      box.append(ul);
+    }
     return box;
   }));
   // 태그가 없으면 추천 태그를 여기서도 달 수 있게
@@ -393,6 +397,7 @@ function refreshLinks() {
   const { links, backlinks, suggestions } = app.vault.links(id);
   const total = relatedCount();
   el.linksCount.textContent = total ? String(total) : '';
+  el.linksBtn.setAttribute('aria-label', total ? `메모 연결 ${total}개` : '메모 연결');
   el.linksBtn.classList.toggle('has-links', total > 0);
   if (el.linksPanel.hidden) return;
   renderTagGroups();
