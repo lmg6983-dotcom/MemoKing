@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <title>바탕화면에 붙인 테이프 — 끌면 옮기고, 누르면 떼어져요</title>
+  <link rel="stylesheet" href="styles/tape.css">
+  <script type="module" src="js/tape.js"></script>
+</head>
+<body>
+  <!-- 바탕화면 위젯을 붙여 둔 셀로판 테이프: 위젯 위 가장자리에 반쯤 걸쳐(절반은 메모 밖) 메인 프로세스가 띄운다 -->
+  <svg id="tape" class="tape" viewBox="0 0 96 30" aria-hidden="true">
+    <g class="hit" transform="rotate(-4 48 15)">
+      <!-- 손으로 뜯은 양쪽 끝(톱니) -->
+      <path class="body" d="M6 3 L90 3 L92 6 L89 9 L92 12 L89 15 L92 18 L89 21 L92 24 L90 27 L6 27 L4 24 L7 21 L4 18 L7 15 L4 12 L7 9 L4 6 Z"/>
+      <path class="shine" d="M10 7 L86 7"/>
+    </g>
+  </svg>
+</body>
+</html>

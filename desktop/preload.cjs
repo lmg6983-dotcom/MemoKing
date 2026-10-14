@@ -7,7 +7,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:on-top', 'sticker:show', 'sticker:peel', 'list:on-top',
-  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'widget:changed',
+  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'widget:changed', 'settings:link-previews', 'tape:show', 'widget:peeling',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -88,6 +88,7 @@ contextBridge.exposeInMainWorld('memoking', {
     setQuickMemo: invoke('app:set-quick-memo'),
     setFitTables: invoke('app:set-fit-tables'),
     setAutoTags: invoke('app:set-auto-tags'),
+    setLinkPreviews: invoke('app:set-link-previews'),
     setMagic: invoke('app:set-magic'),
     setTrashDays: invoke('app:set-trash-days'),
     // 전역 단축키 바꾸기: set(이름, 단축키|null=기본값) · pause(true) 는 새 키를 누르는 동안 잠시 놓기
@@ -168,6 +169,13 @@ contextBridge.exposeInMainWorld('memoking', {
   sticker: {
     hover: (over) => ipcRenderer.send('sticker:hover', Boolean(over)),
     peel: invoke('sticker:peel'),
+  },
+  // 바탕화면 위젯의 셀로판 테이프: 끌면 위젯을 옮기고(dx·dy = 누른 곳에서 움직인 만큼), 누르면 떼기
+  tape: {
+    dragStart: () => ipcRenderer.send('tape:drag-start'),
+    drag: (dx, dy) => ipcRenderer.send('tape:drag', Number(dx) || 0, Number(dy) || 0),
+    dragEnd: () => ipcRenderer.send('tape:drag-end'),
+    peel: invoke('tape:peel'),
   },
   // 영역 캡처 오버레이 (Ctrl+Alt+C 두 번)
   capture: {

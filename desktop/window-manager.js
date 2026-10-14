@@ -27,6 +27,7 @@ import {
 } from './utils.js';
 
 const STICKER = { width: 64, height: 52 };
+const TAPE = { width: 96, height: 30 }; // 바탕화면 위젯의 셀로판 테이프 — 절반은 위젯 위, 절반은 밖
 const GHOST_MARGIN = 24;
 const STACK_DWELL_MS = 100;
 const TEAR_OPACITY = 0.9;
@@ -63,6 +64,7 @@ export class WindowManager {
     this.paintMarks = new WeakMap(); // 예비 창: 화면이 "메모를 그렸다" 고 알려 오면 부를 함수
     this.hotkeySlotOf = () => null; // 메모 단축키 칸 (main.js 가 채움)
     this.widgets = new Map(); // 바탕화면 위젯: 메모 id → 창
+    this.widgetTapes = new Map(); // 위젯 위 셀로판 테이프: 메모 id → 테이프 창
     this.desktopPin = new DesktopPin();
     this.hudWin = null;
     this.hudTimer = 0;
@@ -327,8 +329,10 @@ export class WindowManager {
   //   (Windows: desktop-pin.js 가 바탕화면 창에 붙임 — Win+D 에도 남음). 내용은 읽기 전용 메모 그대로, 고치면 바로 바뀜
   //   자리 · 크기는 이 PC 설정(settings.widgets)에 — 메모킹을 다시 켜면(로그인 때 자동 실행 포함) 그 자리에 다시
 
+  // bounds: { x, y, width, height } — 함께 둔 표시(taped: 테이프 붙는 모습을 보였음)는 그대로
   saveWidgetBounds(id, bounds) {
-    settings.widgets = { ...(settings.widgets ?? {}), [id]: bounds };
+    const { x, y, width, height } = bounds;
+    settings.widgets = { ...(settings.widgets ?? {}), [id]: { ...settings.widgets?.[id], x, y, width, height } };
     saveSettings();
   }
 
@@ -341,7 +345,7 @@ export class WindowManager {
 
   widgetBounds(id, near = null) {
     const saved = settings.widgets?.[id];
-    if (saved && onScreen(saved)) return saved;
+    if (saved && onScreen(saved)) return { x: saved.x, y: saved.y, width: saved.width, height: saved.height };
     if (near) return near;
     // 처음: 주 화면 오른쪽 위부터 차례로
     const area = screen.getPrimaryDisplay().workArea;
@@ -356,11 +360,15 @@ export class WindowManager {
     if (!memo) return null;
     const existing = this.widgets.get(id);
     if (existing && !existing.isDestroyed()) {
-      if (!existing.webContents.isLoading()) existing.showInactive(); // 아직 불러오는 중이면 ready-to-show 가 보인다
+      if (!existing.webContents.isLoading()) {
+        existing.showInactive(); // 아직 불러오는 중이면 ready-to-show 가 보인다
+        this.desktopPin.send('bottom', hwndOf(existing)); // 다시 보이며 앞으로 왔을 수 있다
+      }
       this.saveWidgetBounds(id, existing.getBounds());
       return existing;
     }
     const bounds = this.widgetBounds(id, near);
+    this.watchWidgetDisplays();
     const win = new BrowserWindow({
       ...bounds,
       minWidth: 180,
@@ -378,26 +386,35 @@ export class WindowManager {
       webPreferences,
     });
     guardWindow(win, { openWebPage });
+    const hwnd = hwndOf(win); // 닫힌 뒤에는 읽을 수 없다
     this.widgets.set(id, win);
     const remember = () => !win.isDestroyed() && this.saveWidgetBounds(id, win.getBounds());
     win.on('moved', remember);
     win.on('resized', remember);
-    // 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로
-    win.on('blur', () => this.desktopPin.send('bottom', hwndOf(win)));
+    // 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로 (그 밖에 앞으로 와 버리는 때는 desktop-pin.js 가 앞 창이 바뀔 때마다 내린다)
+    win.on('blur', () => this.desktopPin.send('bottom', hwnd));
     win.once('ready-to-show', () => {
       if (win.isDestroyed()) return;
       win.showInactive();
-      this.desktopPin.send('pin', hwndOf(win));
+      this.desktopPin.send('pin', hwnd);
+      this.openWidgetTape(id, win, { animate: !settings.widgets?.[id]?.taped });
     });
-    win.on('session-end', () => (win.mkKeep = true)); // Windows 를 끌 때 닫히는 것은 그대로 기억
-    // Alt+F4 처럼 사람이 직접 닫으면(close 가 먼저 옴) 떼기와 같게
-    win.on('close', () => {
-      if (!win.mkKeep && !this.isQuitting()) win.mkUserClose = true;
+    // Windows 를 끄거나 다시 시작할 때 닫히는 것은 그대로 기억 (자리도 바로 파일에 — 켜면 그 자리에)
+    const keepForShutdown = () => {
+      win.mkKeep = true;
+      saveSettings(true);
+    };
+    win.on('query-session-end', keepForShutdown);
+    win.on('session-end', keepForShutdown);
+    // 떼기는 테이프(또는 목록 메뉴)로만 — Alt+F4 · 그 밖의 닫기로는 사라지지 않는다 (끌 때 잘못 잊어버리지 않게)
+    win.on('close', (e) => {
+      if (win.mkKeep || win.mkRemove || this.isQuitting()) return;
+      e.preventDefault();
     });
     win.on('closed', () => {
+      this.desktopPin.send('unpin', hwnd);
       if (this.widgets.get(id) !== win) return;
       this.widgets.delete(id);
-      if (win.mkUserClose) return void this.removeWidget(id);
       this.pushList(); // 목록 카드의 바탕화면 표시
       // close 없이 사라짐 = 탐색기를 다시 시작해 바탕화면 창(주인)이 없어짐 — 조금 뒤 새 바탕화면에 다시 붙인다
       if (!win.mkKeep && !this.isQuitting()) {
@@ -410,6 +427,123 @@ export class WindowManager {
     if (!settings.widgets?.[id]) this.saveWidgetBounds(id, bounds);
     this.pushList();
     return win;
+  }
+
+  // ---------- 위젯의 셀로판 테이프 ----------
+  // 왕관 스티커처럼 따로 띄운 투명 창 (위젯이 주인 — 늘 위젯 바로 위에 있고, 위젯과 함께 바탕화면 층에).
+  //   위젯 위 가장자리 가운데에 절반만 걸친다. 테이프를 끌면 위젯을 옮기고, 누르기만 하면 떼기.
+
+  tapeBounds(widget) {
+    const b = widget.getBounds();
+    return { x: Math.round(b.x + b.width / 2 - TAPE.width / 2), y: Math.round(b.y - TAPE.height / 2), ...TAPE };
+  }
+
+  openWidgetTape(id, widget, { animate = false } = {}) {
+    const old = this.widgetTapes.get(id);
+    if (old && !old.isDestroyed()) return old;
+    const tape = new BrowserWindow({
+      ...this.tapeBounds(widget),
+      parent: widget,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      hasShadow: false,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      focusable: false,
+      skipTaskbar: true,
+      show: false,
+      webPreferences,
+    });
+    this.widgetTapes.set(id, tape);
+    tape.setIgnoreMouseEvents(true, { forward: true });
+    guardWindow(tape, { openWebPage });
+    const follow = () => !tape.isDestroyed() && !widget.isDestroyed() && tape.setBounds(this.tapeBounds(widget));
+    widget.on('move', follow);
+    widget.on('resize', follow);
+    tape.once('closed', () => {
+      if (!widget.isDestroyed()) {
+        widget.off('move', follow);
+        widget.off('resize', follow);
+      }
+      if (this.widgetTapes.get(id) === tape) this.widgetTapes.delete(id);
+    });
+    tape.once('ready-to-show', () => {
+      if (tape.isDestroyed() || widget.isDestroyed()) return;
+      tape.setBounds(this.tapeBounds(widget));
+      tape.showInactive();
+      tape.webContents.send('tape:show', { animate });
+      if (settings.widgets?.[id] && !settings.widgets[id].taped) { // 붙는 모습은 처음 한 번만
+        settings.widgets = { ...settings.widgets, [id]: { ...settings.widgets[id], taped: true } };
+        saveSettings();
+      }
+    });
+    tape.loadFile(path.join(APP_DIR, 'tape.html'));
+    return tape;
+  }
+
+  /** 테이프 창 → 그 위젯 { id, widget } */
+  tapeOwner(sender) {
+    for (const [id, tape] of this.widgetTapes) {
+      if (!tape.isDestroyed() && tape.webContents === sender) {
+        const widget = this.widgets.get(id);
+        return widget && !widget.isDestroyed() ? { id, widget } : null;
+      }
+    }
+    return null;
+  }
+
+  tapeDragStart(sender) {
+    const o = this.tapeOwner(sender);
+    if (o) o.widget.mkDragFrom = o.widget.getBounds();
+  }
+
+  tapeDrag(sender, dx, dy) {
+    const o = this.tapeOwner(sender);
+    const from = o?.widget.mkDragFrom;
+    if (!from) return;
+    o.widget.setBounds({ ...from, x: Math.round(from.x + dx), y: Math.round(from.y + dy) });
+  }
+
+  tapeDragEnd(sender) {
+    const o = this.tapeOwner(sender);
+    if (!o?.widget.mkDragFrom) return;
+    o.widget.mkDragFrom = null;
+    this.saveWidgetBounds(o.id, o.widget.getBounds());
+  }
+
+  /** 테이프를 누르면: 위젯이 흐려지며 사라지고 바탕화면에서 뗀다 (메모는 그대로) */
+  peelWidgetTape(sender) {
+    const o = this.tapeOwner(sender);
+    if (!o) return false;
+    o.widget.webContents.send('widget:peeling');
+    setTimeout(() => {
+      if (this.widgets.get(o.id) !== o.widget) return;
+      this.removeWidget(o.id);
+      this.showHud({ title: '바탕화면에서 뗐어요', body: '메모는 그대로 있어요' });
+    }, 240);
+    return true;
+  }
+
+  /**
+   * 로그인 직후처럼 모니터가 아직 다 잡히지 않아 기억한 자리가 화면 밖이면 임시 자리에 띄우고(기억은 그대로),
+   *   모니터가 잡히면(연결 · 해상도 · 배율 바뀜) 기억한 자리로 돌려놓는다
+   */
+  watchWidgetDisplays() {
+    if (this.widgetDisplayWatch) return;
+    this.widgetDisplayWatch = true;
+    const rehome = () => setTimeout(() => {
+      for (const [id, win] of this.widgets) {
+        const saved = settings.widgets?.[id];
+        if (!saved || win.isDestroyed() || !onScreen(saved)) continue;
+        const b = win.getBounds();
+        if (b.x !== saved.x || b.y !== saved.y || b.width !== saved.width || b.height !== saved.height) win.setBounds({ x: saved.x, y: saved.y, width: saved.width, height: saved.height });
+      }
+    }, 500);
+    screen.on('display-added', rehome);
+    screen.on('display-metrics-changed', rehome);
   }
 
   /** 메모 창 메뉴 › 바탕화면에 위젯으로 놓기: 그 메모 창 자리에 위젯을 놓고 메모 창은 닫는다 */
@@ -439,7 +573,10 @@ export class WindowManager {
     this.forgetWidgetBounds(id);
     const win = this.widgets.get(id);
     this.widgets.delete(id);
-    if (win && !win.isDestroyed()) win.close(); // closed 는 이미 목록에서 뺀 창이라 아무 일도 하지 않는다
+    if (win && !win.isDestroyed()) {
+      win.mkRemove = true;
+      win.close(); // closed 는 이미 목록에서 뺀 창이라 아무 일도 하지 않는다
+    }
     this.pushList();
     return true;
   }

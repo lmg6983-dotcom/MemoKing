@@ -1,5 +1,5 @@
 /* 바탕화면 위젯 (widget.html) — 메모 창과 같은 종이 · 글씨 (note.css), 막대 없이 내용만.
-   위 가장자리 띠를 끌어 옮기고, 마우스를 올리면 오른쪽 위에 복사 · 열기 · 떼기 */
+   위 가장자리 띠(또는 테이프)를 끌어 옮기고, 마우스를 올리면 오른쪽 위에 복사 · 열기. 테이프를 누르면 떼기 */
 body.widget { position: relative; }
 .wg-bar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 5;
@@ -7,14 +7,9 @@ body.widget { position: relative; }
   height: 30px; padding: 0 4px 0 10px;
   -webkit-app-region: drag; /* 끌어서 옮기기 */
 }
-/* 손잡이: 위 가운데 짧은 줄 — 마우스를 올리면 진해짐 */
-.wg-grip {
-  position: absolute; top: 6px; left: 50%;
-  width: 28px; height: 4px; margin-left: -14px; border-radius: 2px;
-  background: color-mix(in srgb, var(--note-text) 32%, transparent); /* 끌 수 있다는 유일한 표시 — 메모 바탕 위 3:1 이상 */
-  transition: background-color 0.16s var(--ease-out);
-}
-body.widget:hover .wg-grip { background: color-mix(in srgb, var(--note-text) 50%, transparent); }
+/* 위 가장자리 가운데 셀로판 테이프는 따로 띄운 창 (tape.html · tape.css). 테이프를 눌러 뗄 때 위젯도 작아지며 흐려진다 */
+body.wg-peeling { animation: wg-fade 0.26s ease-in forwards; }
+@keyframes wg-fade { to { opacity: 0; transform: scale(0.97); } }
 .wg-actions {
   display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--note-bg) 88%, transparent);
@@ -49,4 +44,4 @@ body.widget .mk-doc { cursor: text; }
   transition: opacity 0.16s var(--ease-out), transform 0.2s var(--ease-out);
 }
 .wg-toast.on { opacity: 1; transform: translate(-50%, 0); }
-@media (prefers-reduced-motion: reduce) { .wg-actions, .wg-toast { transition: none; } .wg-toast.on, .wg-toast { transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .wg-actions, .wg-toast { transition: none; } body.wg-peeling { animation: none; } .wg-toast.on, .wg-toast { transform: translate(-50%, 0); } }

@@ -616,7 +616,6 @@ h2.sheet-title { font-size: 20px; }
   .screen:not(.note-screen), .note-screen .bar, .note-screen .format-bar, .note-screen .table-bar, .banner, .sheet, .scrim, .toast, .palette { display: none !important; }
   .note-screen { position: static; display: block; background: #fff; color: #111; }
   .note-screen .editor { overflow: visible; padding: 0; }
-  .mk-link-card .lc-remove { display: none; }
 }
 
 /* 체크리스트를 모두 끝낸 메모 카드의 CLEAR 도장 (데스크탑 list.css 와 같은 모양) */

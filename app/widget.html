@@ -12,13 +12,12 @@
   <script type="module" src="js/widget.js"></script>
 </head>
 <body data-color="yellow" class="widget">
-  <!-- 바탕화면 위젯: 메모 한 장을 읽기 전용으로 (글은 골라 복사할 수 있음). 위 막대를 끌어 옮기고, 가장자리를 끌어 크기를 바꾼다 -->
+  <!-- 바탕화면 위젯: 메모 한 장을 읽기 전용으로 (글은 골라 복사할 수 있음). 위 막대를 끌어 옮기고, 가장자리를 끌어 크기를 바꾼다
+       위 가장자리 가운데에 반쯤 걸친 셀로판 테이프는 따로 띄운 창 (tape.html) — 끌면 옮기고, 누르면 떼어진다 -->
   <header class="wg-bar">
-    <span class="wg-grip" aria-hidden="true"></span>
     <div class="wg-actions">
       <button type="button" id="wg-copy" class="icon-btn wg-btn" title="본문 복사 (제목 줄 빼고)" aria-label="본문 복사"><svg><use href="#i-copy"/></svg></button>
       <button type="button" id="wg-open" class="icon-btn wg-btn" title="메모 열어서 고치기" aria-label="메모 열어서 고치기"><svg><use href="#i-pen"/></svg></button>
-      <button type="button" id="wg-remove" class="icon-btn wg-btn" title="바탕화면에서 떼기 (메모는 그대로)" aria-label="바탕화면에서 떼기"><svg><use href="#i-unpin"/></svg></button>
     </div>
   </header>
   <main id="editor" class="editor wg-doc"></main>

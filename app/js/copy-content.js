@@ -2,7 +2,8 @@
 //   그림: 화면에 그려진 그림을 PNG 로 바꿔 "그림" 으로 복사 (다른 앱 · 카톡 · 워드에 그대로 붙음).
 //     실제로 클립보드에 넣는 일은 앱(PC: Electron clipboard, 휴대폰: 안드로이드 클립보드)이 — setCopyHost 로 받는다
 //   파일(PDF 등 파일 칩 · 소리 · 동영상 · 음성 카드의 소리): 그 파일 자체를 (탐색기 · 카톡 · 메일에 파일로 붙음 — PC)
-//   그 밖의 내용(줄 · 목록 · 표 · 수식 · 링크 카드): 서식(HTML)과 일반 글자를 함께
+//   링크 카드: 주소 하나 (글자는 주소, 서식은 <a href="주소">제목</a> — 메모킹에 다시 붙이면 카드, 메신저 · 주소창에는 주소)
+//   그 밖의 내용(줄 · 목록 · 표 · 수식): 서식(HTML)과 일반 글자를 함께
 import { plainTextOf, spacedHtml } from './clipboard-text.js';
 import { mediaKindOf } from './core/memo-file.js';
 import { voiceAudioOf } from './voice-card-view.js';
@@ -116,11 +117,22 @@ function cleanHtml(dom) {
   return spacedHtml(copy.outerHTML); // 이어진 빈칸이 워드 · 메일에서 하나로 줄지 않게
 }
 
+const escapeHtml = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** 링크 카드 복사용 클립보드 내용 */
+export function linkCardClip({ href = '', title = '' }) {
+  return { text: href, html: `<a href="${escapeHtml(href)}">${escapeHtml(title || href)}</a>` };
+}
+
 /**
- * 편집기 안의 한 덩어리(줄 · 목록 · 그림 줄 · 표 · 수식 · 파일)를 복사 → '그림' | '주소' | '파일' | '내용'
+ * 편집기 안의 한 덩어리(줄 · 목록 · 그림 줄 · 표 · 수식 · 파일 · 링크 카드)를 복사 → '그림' | '주소' | '파일' | '링크' | '내용'
  * @param {import('prosemirror-view').EditorView} view
  */
 export async function copyBlock(view, pos, node, target) {
+  if (node.type.name === 'mk_link_card') {
+    await copyText(linkCardClip(node.attrs));
+    return '링크';
+  }
   const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : null; // 그림 · 소리 · 동영상 · 손 메모 노드
   if (media) {
     const img = imageIn(target) ?? imageIn(view.nodeDOM(pos));

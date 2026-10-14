@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { parseLinkPreview, detectCharset, hostOf } from '../app/js/core/link-preview.js';
+import { parseLinkPreview, detectCharset, hostOf, youtubeOEmbedUrl, parseYoutubeOEmbed, staleYoutubeEntry } from '../app/js/core/link-preview.js';
 import { imageExtFromType, imageExtFromUrl } from '../app/js/core/remote-images.js';
 
 const FILE = 'link-previews.json';
@@ -72,7 +72,7 @@ export class LinkPreviews {
     this.#reloadIfMissing(appDir, url);
     const cached = this.cache[url];
     const failedAt = this.failed.get(url);
-    if (!refresh && (cached || (failedAt && Date.now() - failedAt < RETRY_FAILED_MS))) {
+    if (!refresh && ((cached && !staleYoutubeEntry(url, cached)) || (failedAt && Date.now() - failedAt < RETRY_FAILED_MS))) {
       return this.#view(vault, url, cached);
     }
     if (!this.inflight.has(url)) {
@@ -141,6 +141,8 @@ export class LinkPreviews {
   async #fetchPreview(vault, url) {
     const target = new URL(url);
     if (!/^https?:$/.test(target.protocol)) throw new Error('인터넷 주소가 아니에요');
+    const youtube = await this.#fetchYoutube(vault, url).catch(() => null);
+    if (youtube) return youtube;
     const { res, body, finalUrl } = await this.#request(target.href, 'text/html,application/xhtml+xml,*/*;q=0.8', MAX_HTML, true);
     const type = (res.headers.get('content-type') ?? '').toLowerCase();
     const entry = { title: '', description: '', site: '', image: '', imageUrl: '', icon: '', fetchedAt: new Date().toISOString() };
@@ -173,6 +175,20 @@ export class LinkPreviews {
     entry.image = image;
     entry.icon = icon;
     return entry;
+  }
+
+  // 유튜브 동영상: oEmbed(제목·채널) + 정해진 썸네일 — 언제 받아도 같은 카드 (동영상 주소가 아니면 null)
+  async #fetchYoutube(vault, url) {
+    const oembed = youtubeOEmbedUrl(url);
+    if (!oembed) return null;
+    const { body } = await this.#request(oembed, 'application/json', MAX_ICON);
+    const p = parseYoutubeOEmbed(body.toString('utf8'), url);
+    if (!p.title) return null; // 비공개·삭제된 동영상 → 페이지를 읽어 본다
+    const [image, icon] = await Promise.all([
+      this.#saveImage(vault, p.image, MAX_IMAGE).catch(() => ''),
+      this.#saveImage(vault, p.icon, MAX_ICON).catch(() => ''),
+    ]);
+    return { kind: 'youtube', title: p.title, description: p.description, site: p.site, image, imageUrl: p.image, icon, fetchedAt: new Date().toISOString() };
   }
 
   // 사진을 _memoking/link-previews/<주소 해시>.<확장자> 로 저장하고 메모 폴더 기준 상대 경로를 돌려준다

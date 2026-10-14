@@ -1390,6 +1390,34 @@ try {
   await back();
   await page.waitForTimeout(300);
 
+  // 링크 미리보기 설정: 끄면 카드 대신 누르면 열리는 링크 글자 · 파일은 그대로 · 다시 켜면 열린 메모에서 바로 카드
+  write('링크 모음.md', '---\nid: 00000000-0000-4000-8000-0000000000a9\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 링크 모음\n\n[예제 페이지](https://example.com/page "미리보기")\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('#settings-btn');
+  await page.locator('#link-previews').scrollIntoViewIfNeeded();
+  check('설정: 링크 미리보기 (처음엔 켜짐)', await page.isChecked('#link-previews'));
+  await page.locator('label', { has: page.locator('#link-previews') }).tap();
+  await page.waitForTimeout(200);
+  check('설정: 링크 미리보기 끄기', !(await page.isChecked('#link-previews')));
+  await back();
+  await page.waitForTimeout(300);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000a9"]');
+  await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');
+  await page.waitForTimeout(300);
+  const plainLink = await page.evaluate(() => {
+    const a = document.querySelector('.mk-doc .mk-link-card.plain-link a.lc-plain');
+    return a && { text: a.textContent, href: a.getAttribute('href'), card: Boolean(document.querySelector('.mk-doc .lc-main')) };
+  });
+  check('링크 미리보기 끔: 카드 대신 링크 글자 (제목 · 주소)', plainLink?.text === '예제 페이지' && plainLink?.href === 'https://example.com/page' && !plainLink.card, JSON.stringify(plainLink));
+  // 설정 화면의 스위치와 같은 함수 (메모를 연 채로 — 같은 모듈이라 열린 편집기에 바로)
+  await page.evaluate(async () => (await import('/m/js/note-view.js')).setLinkPreviews(true));
+  await page.waitForTimeout(300);
+  check('다시 켜면 열린 메모에서 바로 카드', (await page.locator('.mk-doc .mk-link-card:not(.plain-link) .lc-main').count()) === 1);
+  check('링크 미리보기 설정은 파일을 바꾸지 않음', read('링크 모음.md').includes('[예제 페이지](https://example.com/page "미리보기")'), read('링크 모음.md'));
+  await back();
+  await page.waitForTimeout(300);
+
   // 큰 사진이 여럿 있어도: 손가락을 조금(약 3칸 × 40px)만 움직이면 세 칸 아래로
   for (const n of ['p1', 'p2', 'p3', 'p4', 'p5']) fs.copyFileSync(path.join(repo, 'assets/icons/icon-256.png'), path.join(vault, `attachments/${n}.png`));
   write('사진 다섯.md', '---\nid: 00000000-0000-4000-8000-0000000000ee\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: blue\n---\n# 사진 다섯\n\n![p1](attachments/p1.png)\n\n![p2](attachments/p2.png)\n\n![p3](attachments/p3.png)\n\n![p4](attachments/p4.png)\n\n![p5](attachments/p5.png)\n');

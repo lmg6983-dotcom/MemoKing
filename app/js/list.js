@@ -696,6 +696,7 @@ async function loadSettings() {
   showBlockedCount();
   $('fit-tables').checked = s.fitTables !== false;
   $('auto-tags').checked = s.autoTags !== false;
+  $('link-previews').checked = s.linkPreviews !== false;
   magicIndex = s.magicIndex ?? null;
   showMagic(s.magic);
   showQuickMemo(s.quickMemo);
@@ -879,6 +880,9 @@ $('auto-start').addEventListener('change', async (e) => {
 });
 $('fit-tables').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setFitTables(e.target.checked);
+});
+$('link-previews').addEventListener('change', async (e) => {
+  e.target.checked = await api.settings.setLinkPreviews(e.target.checked);
 });
 $('auto-tags').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setAutoTags(e.target.checked);

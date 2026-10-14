@@ -271,6 +271,13 @@ export function registerIpc(ctx) {
     saveSettings();
     return settings.fitTables;
   });
+  // 링크 미리보기 카드 켜고 끄기 — 열린 메모 · 위젯에도 바로
+  ipcMain.handle('app:set-link-previews', (_e, on) => {
+    settings.linkPreviews = Boolean(on);
+    saveSettings();
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('settings:link-previews', settings.linkPreviews);
+    return settings.linkPreviews;
+  });
   ipcMain.handle('app:set-auto-tags', (_e, on) => {
     settings.autoTags = Boolean(on);
     saveSettings();
@@ -861,6 +868,11 @@ export function registerIpc(ctx) {
     if (w && !w.isDestroyed()) w.setIgnoreMouseEvents(!over, { forward: true });
   });
   ipcMain.handle('sticker:peel', (event) => wm.peelSticker(event.sender));
+  // 바탕화면 위젯의 테이프: 끌어서 옮기기 · 눌러서 떼기
+  ipcMain.on('tape:drag-start', (event) => wm.tapeDragStart(event.sender));
+  ipcMain.on('tape:drag', (event, dx, dy) => wm.tapeDrag(event.sender, Number(dx) || 0, Number(dy) || 0));
+  ipcMain.on('tape:drag-end', (event) => wm.tapeDragEnd(event.sender));
+  ipcMain.handle('tape:peel', (event) => wm.peelWidgetTape(event.sender));
   ipcMain.handle('list:on-top', () => Boolean(wm.listWin?.isAlwaysOnTop()));
   ipcMain.handle('win:dim-titlebar', (event, level) => {
     if (!wm.listWin || senderWindow(event) !== wm.listWin) return;

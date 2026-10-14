@@ -840,7 +840,16 @@ export async function runSmoke({
     const reopenedLink = await newNote(() => js(getList(), `window.memoking.memo.open(${JSON.stringify(linkNote.id)})`));
     const again = await until(() => js(reopenedLink.win, `(() => { const c = document.querySelector('.mk-link-card[data-state="ok"]'); return c && c.querySelector('.lc-title').textContent; })()`), '다시 연 카드').catch(() => null);
     check('다시 열면 카드로 표시 (저장한 미리보기 사용)', again === '메모킹 기사 제목', again);
-    await js(reopenedLink.win, `document.querySelector('.mk-link-card .lc-remove').click()`);
+    // 카드에 마우스를 올리면 다른 내용과 같은 복사 · × 단추 한 벌만 (카드에 따로 × 가 겹치지 않음)
+    const cardButtons = await js(reopenedLink.win, `(async () => {
+      const card = document.querySelector('.mk-link-card');
+      const r = card.getBoundingClientRect();
+      card.querySelector('.lc-main').dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
+      await new Promise((ok) => setTimeout(ok, 50));
+      return { x: document.querySelectorAll('.mk-delete-btn').length + card.querySelectorAll('button').length, copy: document.querySelector('.mk-copy-btn')?.title ?? '' };
+    })()`);
+    check('링크 카드: 마우스를 올리면 × 하나 · "링크 주소 복사"', cardButtons?.x === 1 && cardButtons?.copy === '링크 주소 복사', JSON.stringify(cardButtons));
+    await js(reopenedLink.win, `document.querySelector('.mk-delete-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
     const removed = await until(() => readMemo(reopenedLink.id).split('"미리보기"').length === 2, '카드 지우기').catch(() => false);
     check('카드의 × → 카드 지우기', removed && readMemo(reopenedLink.id).includes('관련 글'));
     await closeNote(reopenedLink.id);

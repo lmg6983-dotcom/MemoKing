@@ -434,6 +434,25 @@ export function setAutoTags(on) {
   }
 }
 
+// ---------- 링크 미리보기 (끄면 카드 대신 누르면 열리는 링크 글자) ----------
+
+const LINK_PREVIEWS_KEY = 'memoking.linkPreviews';
+export const linkPreviewsOn = () => {
+  try {
+    return localStorage.getItem(LINK_PREVIEWS_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+};
+export function setLinkPreviews(on) {
+  try {
+    localStorage.setItem(LINK_PREVIEWS_KEY, on ? 'on' : 'off');
+  } catch {
+    // 이번에만
+  }
+  editor?.setLinkPreviews(on); // 열려 있는 메모에도 바로
+}
+
 let suggestCache = { body: null, list: [] };
 let suggestTimer = 0;
 const dismissed = new Set(); // 이번에 닫은 메모 (다시 열 때까지 추천 막대를 숨김)
@@ -1324,6 +1343,7 @@ export async function openNote(memoId, options = {}) {
       saveFile,
       fetchImage,
       onNotice: setStatus,
+      linkPreviews: linkPreviewsOn(),
       fetchPreview: (url) => app.previews.get(url),
       openLink: (url) => call('openUrl', { url }),
       getTags: async () => collectTags(app.vault.list()),

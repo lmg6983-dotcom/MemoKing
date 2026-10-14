@@ -34,7 +34,6 @@ html.print-page.with-bg body[data-color="charcoal"] { --note-text: #f5f4ef; --no
 .print-doc .plyr { display: none; }
 .print-doc .mk-media { display: block; padding: 6px 10px; border-radius: 8px; background: var(--note-hover); }
 .print-doc .mk-media-label::before { content: "▶ "; }
-.print-doc .mk-link-card .lc-remove { display: none; }
 .print-doc img, .print-doc table, .print-doc .mk-link-card { break-inside: avoid; }
 .print-date { margin-top: 18px; font-size: 9pt; color: var(--note-muted); text-align: right; }
 

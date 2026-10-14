@@ -23,7 +23,7 @@ export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = f
   }
   // 음성 카드는 펼친 채로, 접기 막대·지우기 단추 같은 조작은 빼고
   for (const v of doc.querySelectorAll('.mk-voice.folded')) v.classList.remove('folded');
-  for (const el of doc.querySelectorAll('.mk-voice-bar, .lc-remove, .mk-delete-btn, .ProseMirror-separator, .ProseMirror-trailingBreak, audio, video')) el.remove();
+  for (const el of doc.querySelectorAll('.mk-voice-bar, .mk-delete-btn, .ProseMirror-separator, .ProseMirror-trailingBreak, audio, video')) el.remove();
   // 그림 주소는 절대 주소로 (따로 띄운 페이지에서도 보이게)
   for (const img of doc.querySelectorAll('img')) if (img.src) img.setAttribute('src', img.src);
   for (const el of doc.querySelectorAll('[contenteditable]')) el.removeAttribute('contenteditable');

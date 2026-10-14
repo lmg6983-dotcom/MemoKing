@@ -699,7 +699,8 @@ class Mover {
     if (!hovering) this.hoverHost = null;
     this.hoverTarget = target;
     const hover = hovering ? { enter: () => clearTimeout(this.hoverTimer), leave: () => this.leaveHover() } : null;
-    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, hover });
+    const copyLabel = block.node.type.name === 'mk_link_card' ? '링크 주소 복사' : undefined; // 카드 모양이 아니라 주소를
+    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, hover });
   }
 
   hideDelete(now = false) {

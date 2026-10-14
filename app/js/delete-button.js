@@ -63,13 +63,14 @@ function scrollParent(el) {
  * @param {import('prosemirror-view').EditorView} view
  * @param {{ pos: number, node: import('prosemirror-model').Node, target: Element, label?: string,
  *           deco: (spec: { cls: string, style?: string } | null) => void, markTarget?: boolean,
- *           remove?: (view, pos: number, node) => void, hover?: { enter: () => void, leave: () => void } }} opts
+ *           copyLabel?: string, remove?: (view, pos: number, node) => void, hover?: { enter: () => void, leave: () => void } }} opts
+ *   copyLabel: 복사 단추 이름 (기본은 "이 목록 지우기" → "이 목록 복사")
  *   pos·node: 지울 노드 · target: 단추를 붙일 상자 (사진·소리면 그 상자, 아니면 그 줄)
  *   deco: 지울 노드에 표시(데코레이션)를 달고 떼기 — 편집기가 그리는 줄은 class 를 직접 바꾸면 되돌려지므로
  *   markTarget: 대상 표시를 target 의 class 로 (사진·소리처럼 편집기가 다시 그리지 않는 상자)
  *   remove: 지우기 (기본은 그 노드를 지움)
  */
-export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', deco, markTarget = false, remove, hover = null }) {
+export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', copyLabel = label.replace(/지우기$/, '복사'), deco, markTarget = false, remove, hover = null }) {
   hideDeleteButton(true);
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -81,7 +82,6 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   const copyBtn = document.createElement('button');
   copyBtn.type = 'button';
   copyBtn.className = `mk-copy-btn${hover ? ' hover' : ''}`;
-  const copyLabel = label.replace(/지우기$/, '복사'); // "이 목록 지우기" → "이 목록 복사"
   copyBtn.title = copyLabel;
   copyBtn.setAttribute('aria-label', copyLabel);
   copyBtn.innerHTML = COPY_ICON;
@@ -139,7 +139,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       copyBtn.classList.add('done');
       copyBtn.innerHTML = DONE_ICON;
       copyBtn.title = what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
-        : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : '내용을 복사했어요';
+        : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : what === '링크' ? '링크 주소를 복사했어요' : '내용을 복사했어요';
       announce(copyBtn.title);
     }, (err) => {
       copyBtn.classList.add('failed');
