@@ -1,4 +1,4 @@
-import { textMatcher } from './text-match.js';
+import { textMatcher, compactText, compactTermOf } from './text-match.js';
 
 // 매직키의 메모 검색 — 띄어 쓴 낱말이 모두 들어간 메모를, 제목에 있는 것·최근 것부터 (순수 함수, 단위 테스트 대상)
 
@@ -36,6 +36,7 @@ export function snippetOf(text, terms, title = '') {
   const lines = text.split('\n').map((l) => l.trim()).filter((l) => l && l !== title);
   const lower = lines.map((l) => l.toLowerCase());
   let i = lower.findIndex((l) => terms.some((t) => l.includes(t)));
+  if (i < 0) i = lower.findIndex((l) => terms.some((t) => compactTermOf(t) && compactText(l).includes(compactTermOf(t)))); // 기호를 빼고 찾은 관리번호
   if (i < 0) i = 0;
   const line = lines[i] ?? '';
   if (line.length <= 60) return line;

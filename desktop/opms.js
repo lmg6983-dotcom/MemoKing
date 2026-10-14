@@ -60,6 +60,9 @@ export function parseResultset(text) {
 
 // ---------- SQL ----------
 
+// 관리번호에서 흔한 기호(- / . _ 띄어쓰기)를 뺀 값 (SQL Server)
+const stripRefSql = (col) => ['-', '/', '.', '_', ' '].reduce((s, ch) => `REPLACE(${s}, '${ch}', '')`, col);
+
 /** 관리번호(사무소·출원인) 또는 출원번호(하이픈 있든 없든, 앞자리 생략)로 사건 찾기 */
 export function buildLookupSql(query, field = 'both') {
   const raw = String(query ?? '').trim();
@@ -71,10 +74,14 @@ export function buildLookupSql(query, field = 'both') {
   if (clean.length === 11 && /^\d+$/.test(clean)) appConds.push(`n_app LIKE '%-${sqlQuote(`${clean.slice(0, 4)}-${clean.slice(4)}`)}'`);
   else if (/^\d{4}-\d{7}$/.test(raw)) appConds.push(`n_app LIKE '%-${sqlQuote(raw)}'`);
   const app = appConds.join(' OR ');
-  const cond = field === 'our' ? `ourref = '${q}'`
-    : field === 'your' ? `yourref = '${q}'`
+  // 관리번호는 기호를 빼고도 같은 것으로 (P2026-1170-KR01 ↔ P20261170KR01, FPD/202608-0118/E ↔ FPD2026080118E)
+  const compact = raw.replace(/[^0-9A-Za-z]/g, '');
+  const loose = compact.length >= 4 && /\d/.test(compact) && /[A-Za-z]/.test(compact);
+  const refIs = (col) => (loose ? `(${col} = '${q}' OR ${stripRefSql(col)} = '${sqlQuote(compact)}')` : `${col} = '${q}'`);
+  const cond = field === 'our' ? refIs('ourref')
+    : field === 'your' ? refIs('yourref')
       : field === 'app' ? `(${app})`
-        : `(ourref = '${q}' OR yourref = '${q}' OR ${app})`;
+        : `(${refIs('ourref')} OR ${refIs('yourref')} OR ${app})`;
   return `SELECT ${CASE_COLUMNS.join(', ')}\nFROM opms_app\nWHERE del_flag = 'N' AND ${cond}\nORDER BY d_accept DESC, idx DESC`;
 }
 

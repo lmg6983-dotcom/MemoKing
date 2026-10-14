@@ -24,3 +24,17 @@ test('메모 검색: 긴 줄은 찾은 말 둘레만', () => {
   const s = snippetOf(`${'가'.repeat(80)} 핵심어 ${'나'.repeat(80)}`, ['핵심어']);
   assert.ok(s.startsWith('…') && s.endsWith('…') && s.includes('핵심어') && s.length <= 62);
 });
+
+test('메모 검색: 관리번호는 기호(- / 등)를 빼고도 찾는다', () => {
+  const memos = [
+    { id: 'a', title: '의견서', text: '사건 P20261170KR01 마감' },
+    { id: 'b', title: '보고', text: 'FPD2026080118E 보고서' },
+    { id: 'c', title: '하이픈', text: 'P2026-1170-KR01 원본' },
+    { id: 'd', title: '다른 것', text: 'P2026-1171-KR01' },
+  ];
+  assert.deepEqual(searchMemos(memos, 'P2026-1170-KR01').map((m) => m.id).sort(), ['a', 'c']);
+  assert.deepEqual(searchMemos(memos, 'FPD/202608-0118/E').map((m) => m.id), ['b']);
+  assert.deepEqual(searchMemos(memos, 'P20261170KR01').map((m) => m.id).sort(), ['a', 'c'], '붙여 써도 하이픈 있는 번호를');
+  assert.equal(searchMemos(memos, 'a-b').length, 0, '짧은 말은 기호를 빼지 않음');
+  assert.equal(snippetOf('첫 줄\n사건 P20261170KR01 마감', ['p2026-1170-kr01']), '사건 P20261170KR01 마감', '찾은 줄을 보여 준다');
+});
