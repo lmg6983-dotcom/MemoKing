@@ -285,7 +285,7 @@ function renderEmpty(narrowed) {
   art.textContent = narrowed ? '🔍' : '📝';
   const text = document.createElement('span');
   text.textContent = narrowed
-    ? state.query ? `"${state.query}" 이(가) 든 메모가 없어요.` : '조건에 맞는 메모가 없어요.'
+    ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
     : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
   const b = document.createElement('button');
   b.type = 'button';

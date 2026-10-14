@@ -1014,7 +1014,11 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   height: max(100%, 48px);
   transform: translate(-50%, -50%);
 }
-.color-filter { gap: 12px; } /* 30px 동그라미 사이를 넓혀 옆 동그라미와 누르는 자리가 덜 겹치게 */
+.color-filter { gap: 10px; } /* 30px 동그라미 사이를 넓혀 옆 동그라미와 누르는 자리가 덜 겹치게 (390px 폭에서도 7개가 한 줄) */
+.filter-group { align-items: flex-start; }
+.filter-label { line-height: 30px; }
+/* 튜토리얼 그만두기 · 안내 알겠어요 단추도 손가락 크기로 */
+.coach-skip, .hint-ok { min-height: var(--tap); }
 
 /* ---------- 다루기 방식 다이얼 (mode-knob.js) — 메모 화면 오른쪽 아래, 엄지 자리 ----------
    가운데 다이얼(지금 방식 아이콘 + 노란 눈금)과 둘레의 세 칸: 왼쪽 = 글 고치기 · 왼쪽 위 = 옮기기 · 위 = 그리기 */

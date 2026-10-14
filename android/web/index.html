@@ -75,7 +75,7 @@
       <div id="tag-strip" class="tag-strip" role="group" aria-label="태그로 거르기" hidden></div>
       <div id="filter-summary" class="filter-summary" hidden>
         <span id="filter-summary-text"></span>
-        <button id="filter-clear" class="link-btn">필터 해제</button>
+        <button id="filter-clear" class="link-btn">필터 풀기</button>
       </div>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
@@ -136,7 +136,7 @@
       <span id="status" class="status" role="status"></span>
       <button id="undo-btn" class="icon-btn" aria-label="되돌리기"><svg><use href="#i-undo"/></svg></button>
       <button id="redo-btn" class="icon-btn" aria-label="다시 하기"><svg><use href="#i-redo"/></svg></button>
-      <button id="bell-btn" class="icon-btn count-btn bell-btn" aria-label="예약 알림">
+      <button id="bell-btn" class="icon-btn count-btn bell-btn" aria-label="일정과 알림">
         <svg><use href="#i-bell"/></svg><span id="bell-count" class="count"></span>
       </button>
       <button id="links-btn" class="icon-btn links-btn" aria-label="메모 연결">
@@ -524,13 +524,13 @@
     <div class="path-box" id="vault-path"></div>
     <div class="sheet-actions">
       <button id="change-vault" class="btn">위치 변경</button>
-      <button id="use-internal-2" class="btn">이 휴대폰에만 저장</button>
+      <button id="use-internal-2" class="btn">이 휴대폰으로 바꾸기</button>
     </div>
     <p class="hint" id="vault-hint">PC와 함께 쓰려면 Google Drive를 연결해 주세요.</p>
 
     <p class="label">알림</p>
     <div class="setting-row" id="notify-row">
-      <span>예약 알림 <small id="notify-note"></small></span>
+      <span>일정 알림 <small id="notify-note"></small></span>
       <button id="notify-btn" class="btn small">허용</button>
     </div>
 

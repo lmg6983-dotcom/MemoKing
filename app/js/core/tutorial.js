@@ -199,7 +199,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'welcome', win: 'list', target: [], emoji: '👑',
     title: '반가워요! 메모킹이에요',
-    text: '직접 눌러 보며 2분이면 배워요. 언제든 그만둘 수 있어요.',
+    text: '직접 눌러 보며 배워요. 언제든 그만둘 수 있어요.',
     next: '시작할게요 🚀', skip: '나중에 볼게요',
   },
   {

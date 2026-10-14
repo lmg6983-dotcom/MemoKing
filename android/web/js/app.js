@@ -126,7 +126,7 @@ async function enableHistory(on) {
 async function blockApp(appId, appName) {
   if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함 › 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const count = history.all().entries.filter((x) => x.appId === appId && x.source !== 'memoking').length;
-  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제');
+  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제', { cancelLabel: '남겨 두기' });
   const removed = history.block(appId, appName, remove);
   toast(removed ? `${appName} 알림 보관을 멈추고 ${removed}개를 삭제했어요` : `${appName} 알림을 더 이상 보관하지 않아요`);
   return true;
@@ -200,6 +200,7 @@ function refreshHistoryRow() {
   $('history-enabled').checked = enabled && granted;
   const blockedCount = Object.keys(history.all().blocked ?? {}).length;
   $('blocked-count').textContent = blockedCount ? `${blockedCount}개 꺼짐` : '';
+  $('history-apps-2').disabled = !(enabled && granted); // 모으기가 꺼져 있으면 고를 것이 없다
   $('history-note').textContent = enabled && !granted
     ? '휴대폰 설정에서 "알림 접근"을 허용해 주세요'
     : '보관함 탭에 모아요. 이 휴대폰에만 저장해요'
@@ -882,7 +883,8 @@ $('change-vault').addEventListener('click', async () => {
   else if (error === '') toast('저장 위치를 바꿨어요');
 });
 $('use-internal-2').addEventListener('click', async () => {
-  const ok = await confirmDialog('이 휴대폰에만 저장할까요?\n기존 폴더의 메모는 그대로 남아요.', '바꾸기');
+  // 지금 폴더의 메모는 옮겨지지 않아 목록에서 사라져 보인다 — 지워진 줄 알지 않게 미리 알린다
+  const ok = await confirmDialog('저장 위치를 이 휴대폰으로 바꿀까요?\n지금 폴더의 메모는 옮겨지지 않아요. 바꾸면 목록에는 이 휴대폰에 새로 쓴 메모만 보여요.', '위치 바꾸기', { danger: false });
   if (!ok) return;
   note.flush();
   native.useInternalVault();

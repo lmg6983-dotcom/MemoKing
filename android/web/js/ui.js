@@ -113,6 +113,7 @@ export function toast(text, isError = false, action = null) {
     action.run();
   } : null;
   el.classList.toggle('error', isError);
+  el.setAttribute('role', isError ? 'alert' : 'status'); // 잘못된 것은 화면 읽기가 바로 읽게
   el.classList.toggle('has-action', Boolean(action));
   el.hidden = false;
   el.style.animation = 'none';
@@ -138,10 +139,14 @@ wide.addEventListener('change', () => {
 // ---------- 확인 ----------
 
 let confirmResolve = null;
-export function confirmDialog(message, okLabel = '지우기') {
+// danger: 지우기처럼 되돌릴 수 없는 일이면 빨간 단추 (아니면 보통 단추) · cancelLabel: "취소" 가 헷갈릴 때 (예: 남겨 두기)
+export function confirmDialog(message, okLabel = '지우기', { cancelLabel = '취소', danger = true } = {}) {
   const dialog = $('confirm-dialog');
   $('confirm-message').textContent = message;
   $('confirm-ok').textContent = okLabel;
+  $('confirm-ok').classList.toggle('danger', danger);
+  $('confirm-ok').classList.toggle('primary', !danger);
+  dialog.querySelector('button[value="cancel"]').textContent = cancelLabel;
   dialog.returnValue = '';
   dialog.showModal();
   return new Promise((resolve) => {
