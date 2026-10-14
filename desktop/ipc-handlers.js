@@ -606,7 +606,7 @@ export function registerIpc(ctx) {
     const capture = wm.pendingCaptures.get(id) ?? null;
     wm.pendingAlarms.delete(id);
     wm.pendingCaptures.delete(id);
-    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, stack: wm.stackState(id) };
+    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, stack: wm.stackState(id), linkPreviews: settings.linkPreviews !== false };
   });
 
   // ---------- 잠금 메모 ----------

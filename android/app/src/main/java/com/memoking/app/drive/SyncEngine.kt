@@ -66,6 +66,7 @@ class SyncEngine(
         private val LOCAL_ONLY = setOf("_memoking/index.json")
         private const val MERGE_JSON = "_memoking/link-previews.json"
         private const val MASS_DELETE_MIN = 20
+        private const val MASS_CONFLICT_MAX = 20 // 양쪽에서 엇갈린 파일이 이보다 많으면 사본을 만들기 전에 멈춘다 (PC sync-engine.js 와 같음)
 
         fun skipName(name: String) = name.startsWith(".") || name.startsWith("~$") || name.endsWith(".tmp") || name == "desktop.ini" || name == "Thumbs.db"
         fun skipPath(rel: String) = rel in LOCAL_ONLY || rel.split('/').any(::skipName)
@@ -171,6 +172,23 @@ class SyncEngine(
         }
         if (goneLocal >= MASS_DELETE_MIN && goneLocal * 2 > known.size) {
             throw SafetyStop("휴대폰 메모 폴더에서 파일 ${goneLocal}개가 한꺼번에 사라져서 동기화를 멈췄어요.")
+        }
+        // 양쪽에서 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
+        val clashes = paths.filter { p ->
+            val l = localFiles[p]
+            val r = remoteFiles[p]
+            val b = base(p)
+            p != MERGE_JSON && l != null && r != null &&
+                (b == null || b.lmtime != l.mtime || b.lsize != l.size) && (b == null || b.md5 != r.md5)
+        }
+        if (clashes.size > MASS_CONFLICT_MAX) {
+            val differ = clashes.count { p ->
+                val m = try { local.openRead(p).use(::md5) } catch (e: Exception) { null } // 둘러보는 사이 없어진 파일
+                m != remoteFiles[p]?.md5
+            }
+            if (differ > MASS_CONFLICT_MAX) {
+                throw SafetyStop("양쪽에서 엇갈린 메모가 ${MASS_CONFLICT_MAX}개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 다른 동기화 앱도 맞추고 있는지 확인해 주세요.")
+            }
         }
 
         var uploaded = 0

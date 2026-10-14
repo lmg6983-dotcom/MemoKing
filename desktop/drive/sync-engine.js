@@ -36,6 +36,15 @@ export function md5File(file) {
   return hash.digest('hex');
 }
 
+// 둘러본 뒤 사라진 파일은 null (그 파일은 아래 차례에서 ENOENT 로 건너뛴다)
+function md5OrNull(file) {
+  try {
+    return md5File(file);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * @typedef {{ id: string, name: string, folder: boolean, md5: string|null, modified: number, size: number }} RemoteItem
  * @typedef {{
@@ -171,7 +180,7 @@ export class SyncEngine {
       const b = files[p];
       return p !== MERGE_JSON && l && r && (!b || b.lmtime !== l.mtime || b.lsize !== l.size) && (!b || b.md5 !== r.md5);
     });
-    if (clashes.length > MASS_CONFLICT_MAX && clashes.filter((p) => md5File(this.abs(p)) !== remote.get(p).md5).length > MASS_CONFLICT_MAX) {
+    if (clashes.length > MASS_CONFLICT_MAX && clashes.filter((p) => md5OrNull(this.abs(p)) !== remote.get(p).md5).length > MASS_CONFLICT_MAX) {
       throw new SafetyStop(`양쪽에서 엇갈린 메모가 ${MASS_CONFLICT_MAX}개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요.`);
     }
 

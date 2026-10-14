@@ -147,7 +147,7 @@ export function setupHistoryTab({ api, els, confirm }) {
   }
 
   // 알림 하나 지우기: 바로 지우지 않고 그 자리에 "되돌리기" 를 5초 — 그동안 되돌리면 그대로 (메모 지우기처럼)
-  const pendingRemoval = new Map(); // 알림 id → 지울 시각까지의 타이머
+  const pendingRemoval = new Map(); // 알림 id → { timer, strip } (지울 시각까지 — 그사이 목록을 다시 그려도 되돌리기 띠는 그 자리에)
   function removeWithUndo(e, div) {
     const strip = document.createElement('div');
     strip.className = 'row noti-undo';
@@ -166,7 +166,7 @@ export function setupHistoryTab({ api, els, confirm }) {
       strip.remove();
       api.history.remove(e.id);
     }, 5000);
-    pendingRemoval.set(e.id, timer);
+    pendingRemoval.set(e.id, { timer, strip });
     undo.addEventListener('click', (ev) => {
       ev.stopPropagation();
       clearTimeout(timer);
@@ -214,7 +214,6 @@ export function setupHistoryTab({ api, els, confirm }) {
     const nodes = [];
     let lastDay = '';
     for (const e of data.entries) {
-      if (pendingRemoval.has(e.id)) continue; // 되돌리기를 기다리는 중
       const day = dayLabel(new Date(e.time));
       if (day !== lastDay) {
         const h = document.createElement('h3');
@@ -223,7 +222,7 @@ export function setupHistoryTab({ api, els, confirm }) {
         nodes.push(h);
         lastDay = day;
       }
-      nodes.push(row(e));
+      nodes.push(pendingRemoval.get(e.id)?.strip ?? row(e)); // 되돌리기를 기다리는 중이면 그 띠를 그대로
     }
     els.rows.replaceChildren(...nodes);
     els.empty.hidden = data.entries.length > 0;
