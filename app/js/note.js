@@ -81,6 +81,7 @@ const el = {
   swatches: $('swatches'),
   pinToggle: $('pin-toggle'),
   topBtn: $('top-btn'),
+  tapeBtn: $('tape-btn'),
   banner: $('banner'),
   bannerText: $('banner-text'),
   linksPanel: $('links-panel'),
@@ -367,41 +368,70 @@ el.pinToggle.addEventListener('click', async () => {
   applyMeta(await api.memo.set(id, { pinned: !memo.pinned }));
   closeMenu();
 });
-// ---------- 항상 위 고정 ----------
+// ---------- 왕관(늘 위) · 테이프(바탕화면에 붙이기) ----------
 
-// 스티커를 붙이고 떼는 느낌: 켜면 버튼의 왕관이 떨어져 나가 창 위 가장자리 스티커가 되고(버튼은 빈 자리),
-// 스티커를 누르면 떼어져 꺼지고 왕관이 버튼으로 돌아온다 (메인 프로세스가 따로 띄우는 스티커 창)
-let topOn = null;
-function applyTop(on) {
-  const changed = topOn !== null && topOn !== on;
-  topOn = on;
-  el.topBtn.classList.toggle('peeled', on);
-  el.topBtn.tabIndex = on ? -1 : 0;
-  el.topBtn.setAttribute('aria-hidden', String(on));
-  if (changed && !reduceMotion()) {
-    el.topBtn.querySelector('svg').animate(on
-      ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
-      : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
-    { duration: on ? 200 : 280, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+// 스티커를 붙이고 떼는 느낌: 왕관이나 테이프를 누르면 그것이 떨어져 나가 창 위 가장자리 스티커가 되고,
+// 스티커를 누르면 떼어져 꺼지고 버튼으로 돌아온다 (메인 프로세스가 따로 띄우는 스티커 창). 둘은 함께 붙지 않아서
+// 하나가 붙어 있는 동안 두 버튼 모두 사라진다 — 고른 버튼은 빈 자리로 남고(날아간 자리), 다른 하나는 접힌다.
+let layer = null; // { top, bottom, canTape }
+const stickerHint = { tape: '테이프를 누르면 떼어져요', crown: '왕관을 누르면 떼어져요' };
+function flyButton(btn, off) {
+  if (reduceMotion()) return;
+  btn.querySelector('svg').animate(off
+    ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
+    : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
+  { duration: off ? 200 : 280, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+}
+function applyLayer(next) {
+  const top = next?.top === true;
+  const bottom = next?.bottom === true;
+  const prev = layer;
+  layer = { top, bottom, canTape: next?.canTape === true };
+  const stuck = top || bottom;
+  const hadFocus = [el.topBtn, el.tapeBtn].includes(document.activeElement);
+  el.tapeBtn.hidden = !layer.canTape; // 바탕화면 층에 붙일 수 없는 PC (Windows 가 아님 등)
+  for (const [btn, mine] of [[el.topBtn, top], [el.tapeBtn, bottom]]) {
+    btn.classList.toggle('peeled', mine);
+    btn.classList.toggle('folded', stuck && !mine);
+    btn.tabIndex = stuck ? -1 : 0;
+    btn.setAttribute('aria-hidden', String(stuck));
+    btn.setAttribute('aria-pressed', String(mine));
+    if (prev && (prev.top || prev.bottom) !== stuck) flyButton(btn, stuck);
   }
-  el.topBtn.setAttribute('aria-pressed', String(on));
-  const label = on ? '늘 위에 두기 끄기' : '다른 창보다 늘 위에 두기';
-  el.topBtn.title = '왕관 스티커를 붙여 다른 창보다 늘 위에 두기 (Ctrl+Shift+T, 다시 누르면 떼기)';
-  el.topBtn.setAttribute('aria-label', label);
-  document.body.classList.toggle('on-top', on);
+  el.topBtn.setAttribute('aria-label', '다른 창보다 늘 위에 두기');
+  el.tapeBtn.setAttribute('aria-label', '바탕화면에 붙여 다른 창 뒤에 두기');
+  document.body.classList.toggle('on-top', top);
+  document.body.classList.toggle('on-desktop', bottom);
+  if (stuck && hadFocus) editor?.focus(); // 사라진 버튼에 포커스가 남지 않게
+  // 무엇이 바뀌었는지 (스크린 리더에도 — 상태 줄은 role=status). 처음 열 때는 말하지 않는다
+  if (!prev) return;
+  if (bottom && !prev.bottom) setStatus('바탕화면에 붙였어요');
+  else if (!bottom && prev.bottom) setStatus(top ? '' : '바탕화면에서 뗐어요');
+  if (top && !prev.top) setStatus('늘 위에 둬요');
+  else if (!top && prev.top && !bottom && el.status.textContent === '늘 위에 둬요') setStatus('');
 }
 
-// 버튼은 붙이기만 (붙으면 버튼이 숨고, 떼기는 창 위의 왕관 스티커를 눌러서). Ctrl+Shift+T 는 붙이고 떼기 둘 다
-async function toggleTop() {
-  if (topOn) return;
-  applyTop(await api.win.toggleTop(id));
-  if (topOn) tutEvent('crown-on');
+// 버튼은 붙이기만 (붙으면 두 버튼이 숨고, 떼기는 창 위의 스티커를 눌러서). 단축키는 붙이고 떼기 둘 다
+async function toggleLayer(which) {
+  if (!memo || document.body.classList.contains('memo-locked')) return; // 잠금을 풀기 전에는
+  const next = await api.win.toggleLayer(id, which);
+  if (!next) return;
+  applyLayer(next);
+  if (next.top) tutEvent('crown-on');
 }
-async function toggleTopKey() {
-  if (!topOn) return toggleTop();
-  applyTop(await api.win.toggleTop(id)); // 스티커가 떼어지는 모습은 스티커를 누를 때와 같다
-}
-el.topBtn.addEventListener('click', toggleTop);
+el.topBtn.addEventListener('click', () => !layer?.top && !layer?.bottom && toggleLayer('top'));
+el.tapeBtn.addEventListener('click', () => !layer?.top && !layer?.bottom && toggleLayer('bottom'));
+// 스티커에 마우스를 올리면 무엇을 누르는지 상태 줄에 (스티커 창은 글을 띄우지 못한다)
+api.on('sticker:hover', ({ kind, over } = {}) => {
+  const hint = stickerHint[kind];
+  if (!hint) return;
+  if (over) setStatus(hint);
+  else if (el.status.textContent === hint) setStatus('');
+});
+// 바탕화면에 붙인 메모는 탐색기가 다시 시작될 때 창이 함께 없어질 수 있어, 다른 데를 누르면 바로 저장해 둔다
+window.addEventListener('blur', () => {
+  if (layer?.bottom) flush();
+});
 // 메모를 그림 카드(PNG) 한 장으로 — 메모 색 종이에 본문 그대로 (휴대폰 "그림으로 공유" 와 같은 모양)
 async function memoImage(kind) {
   closeMenu();
@@ -475,24 +505,6 @@ $('hotkey-btn').addEventListener('click', async () => {
   if (!next) return;
   showHotkey(next);
   setStatus(next.slot ? `단축키를 정했어요: ${hotkeyLabel(next.slot)}` : '단축키를 풀었어요');
-});
-// 바탕화면에 붙이기: 이 메모 창 자리에 바탕화면 위젯을 놓고 창은 닫는다 (이미 붙어 있으면 떼기)
-let onDesktop = false;
-function showWidgetState(on) {
-  onDesktop = Boolean(on);
-  $('widget-btn').querySelector('span').textContent = onDesktop ? '바탕화면에서 떼기' : '바탕화면에 붙이기';
-}
-$('widget-btn').addEventListener('click', async () => {
-  closeMenu();
-  await flush();
-  if (onDesktop) {
-    await api.widget.remove(id);
-    showWidgetState(false);
-    setStatus('바탕화면에서 뗐어요');
-    return;
-  }
-  const r = await api.widget.place(id);
-  if (!r?.ok) setStatus(r?.error || '바탕화면에 붙이지 못했어요', true);
 });
 // 메모 단축키로 복사하기 직전: 막 고친 글까지 저장 (main.js memoHotkeyPressed)
 window.__memokingFlush = () => flush();
@@ -576,9 +588,8 @@ api.on('memo:meta', applyMeta);
 
 function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
-  // 다른 창(위젯의 떼기 · 다른 메모의 단축키)에서 바뀌었을 수 있어 열 때마다 다시 읽는다
+  // 다른 창(다른 메모의 단축키)에서 바뀌었을 수 있어 열 때마다 다시 읽는다
   if (!el.menu.hidden && memo) {
-    api.widget?.has(id).then(showWidgetState, () => {});
     api.hotkeys?.state(id).then(showHotkey, () => {});
   }
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
@@ -759,8 +770,8 @@ document.body.addEventListener('animationend', (e) => {
   if (e.animationName === 'note-highlight') document.body.classList.remove('highlight');
 });
 api.on('memo:reminders', (list) => reminderPanel?.set(list));
-// 스택의 다른 탭에서 늘 위에 두기를 바꾼 경우 (이 창은 숨어 있었음)
-api.on('memo:on-top', (on) => applyTop(on));
+// 스티커를 눌러 뗐을 때 · 스택의 다른 탭에서 왕관 · 테이프를 바꾼 경우 (이 창은 숨어 있었음)
+api.on('memo:layer', (state) => applyLayer(state));
 
 // ---------- 빠른 메모 (Ctrl+Alt+C) ----------
 // 메인 프로세스가 복사해 온 내용으로 새 메모를 채운다: 제목(파일·그림일 때) → 글(붙여넣기) → 파일·그림 → 출처
@@ -1287,6 +1298,7 @@ const SHORTCUTS = {
   'ctrl+shift+KeyD': ['action', 'ink'],
   'ctrl+shift+KeyE': ['action', 'annotate'],
   'ctrl+shift+KeyT': ['app', 'top'],
+  'ctrl+shift+KeyG': ['app', 'tape'],
   'ctrl+shift+KeyA': ['app', 'reminders'],
   'ctrl+KeyK': ['app', 'links'],
   'ctrl+Slash': ['app', 'shortcuts'],
@@ -1328,7 +1340,8 @@ window.addEventListener('keydown', (e) => {
     else editor.toggleHighlight(lastColor.highlight);
   } else if (kind === 'action') actions[name]();
   else if (name === 'links') toggleLinks();
-  else if (name === 'top') toggleTopKey();
+  else if (name === 'top') toggleLayer('top'); // 붙어 있으면 떼고, 테이프가 붙어 있으면 왕관으로 바꿔 붙임
+  else if (name === 'tape') toggleLayer('bottom');
   else if (name === 'reminders') reminderPanel?.toggle();
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
@@ -1713,6 +1726,7 @@ if (memo?.needsPassword) {
   document.body.dataset.color = memo.color;
   document.title = memo.title;
   document.body.classList.add('memo-locked');
+  applyLayer(memo); // 잠금 화면에서도 왕관 · 테이프 버튼이 지금 상태대로 (풀기 전에는 누를 수 없음)
   const unlocking = lockScreen(el.editorRoot, {
     title: memo.title,
     onTry: async (password) => {
@@ -1734,7 +1748,7 @@ if (!memo) {
   markPainted();
 } else {
   applyMeta(memo);
-  applyTop(memo.onTop === true);
+  applyLayer(memo);
   renderStack(memo.stack);
   document.title = memo.title;
   current = saved = memo.body;
@@ -1766,7 +1780,6 @@ if (!memo) {
   reminderPanel.set(memo.reminders);
   showLockState();
   api.hotkeys?.state(id).then(showHotkey, () => {});
-  api.widget?.has(id).then(showWidgetState, () => {});
   recorder = setupVoiceRecorder({
     panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
     buttons: () => document.querySelectorAll('[data-action="record"]'),

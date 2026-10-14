@@ -88,6 +88,7 @@
         <div class="history-bar">
           <select id="history-app" aria-label="앱으로 거르기"></select>
           <span class="grow"></span>
+          <button id="history-apps-btn" class="link-btn">모을 앱 <span id="blocked-count" class="trash-count"></span></button>
           <button id="history-clear" class="link-btn danger">모두 지우기</button>
         </div>
         <div id="history-rows" class="rows"></div>
@@ -144,11 +145,8 @@
     </div>
     <label class="setting-row">
       <input type="checkbox" id="history-enabled" class="switch" role="switch">
-      <span>Windows 알림 모아두기 <small>카카오톡 알림도 함께 모아 알림 보관함 탭에서 봐요</small></span>
+      <span>Windows 알림 모아두기 <small>카카오톡 알림도 함께 모아 알림 보관함 탭에서 봐요. 모을 앱은 보관함 위 “모을 앱” 단추에서</small></span>
     </label>
-    <div class="dialog-actions left sub-actions">
-      <button id="history-apps-btn" class="btn">모을 앱 선택 <span id="blocked-count" class="trash-count"></span></button>
-    </div>
     <p class="label">음성 녹음과 받아쓰기 <small>인터넷 없이 이 PC 안에서</small></p>
     <label class="setting-row">
       <input type="checkbox" id="stt-enabled" class="switch" role="switch">

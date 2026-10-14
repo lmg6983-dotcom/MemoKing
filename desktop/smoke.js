@@ -163,7 +163,7 @@ const PASTE_FILE = `(() => {
 export async function runSmoke({
   getList, noteWins, getVault, createListWindow, getGhost, getTray, getTrayMenu, alarms, smokeToasts, getHistory, appSettings,
   quickMemo, registerQuickMemoKey, getCapturePoint, smokeOpened = [], smokeConfirmAnswers = [],
-  getStacks, trackWindowDrag, endWindowDrag, startTutorial, getTutorial, stickers,
+  getStacks, trackWindowDrag, endWindowDrag, startTutorial, getTutorial, stickers, getSettings,
 }) {
   const errors = [];
   let imageServer = null;
@@ -1080,6 +1080,20 @@ export async function runSmoke({
         // 뒤 점검을 위해 늘 위에 두기를 끈다 (스티커 누르기)
         await stickerOf(newTab)?.webContents.executeJavaScript(`window.memoking.sticker.peel()`).catch(() => {});
         await until(() => !noteWins.get(newTab).isAlwaysOnTop(), '늘 위 끄기').catch(() => {});
+        // 테이프(바탕화면에 붙이기)도 스택의 탭 모두에 — 탭을 바꾸면 같은 테이프가 새 탭으로 옮겨 간다
+        await until(() => !stickerOf(newTab), '왕관 떼어짐').catch(() => {});
+        await js(noteWins.get(newTab), `document.getElementById('tape-btn').click()`);
+        const tapedAll = await until(() => stickerOf(newTab)?.isVisible() && stacks.stackOf(newTab).memos.every((m) => getSettings().onBottom?.[m] === true), '스택 테이프').catch(() => false);
+        const tape1 = stickerOf(newTab);
+        await key(noteWins.get(newTab), 'Tab', ['control']);
+        await until(() => tabShown(sC.id) && !tabShown(newTab), 'Ctrl+Tab (테이프)').catch(() => {});
+        await wait(400);
+        const moved = stickerOf(sC.id) === tape1 && stickers.get(noteWins.get(sC.id).id)?.kind === 'tape' && !noteWins.get(sC.id).isAlwaysOnTop();
+        check('테이프 붙인 스택: 탭 모두 바탕화면에, 탭을 바꿔도 같은 테이프가 옮겨 감', tapedAll && moved, JSON.stringify({ tapedAll: Boolean(tapedAll), moved }));
+        await stickerOf(sC.id)?.webContents.executeJavaScript(`window.memoking.sticker.peel()`).catch(() => {});
+        await until(() => stacks.stackOf(sC.id).memos.every((m) => !getSettings().onBottom?.[m]), '테이프 떼기').catch(() => {});
+        await key(noteWins.get(sC.id), 'Tab', ['control', 'shift']);
+        await until(() => tabShown(newTab), '되돌아가기 2').catch(() => {});
       }
       // 창을 옮기면 숨은 탭도 같은 자리
       const moved = { x: aBounds.x + 30, y: aBounds.y + 20, width: 340, height: 320 };

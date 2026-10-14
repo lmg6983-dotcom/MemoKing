@@ -124,7 +124,7 @@ async function enableHistory(on) {
 
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockApp(appId, appName) {
-  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n설정 › 모을 앱 선택에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
+  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함 › 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const count = history.all().entries.filter((x) => x.appId === appId && x.source !== 'memoking').length;
   const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제');
   const removed = history.block(appId, appName, remove);

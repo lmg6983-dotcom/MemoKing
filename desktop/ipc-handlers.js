@@ -502,31 +502,6 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 창 크기 조정 ----------
-  // 바탕화면 위젯
-  ipcMain.handle('widget:memo', (_e, id) => {
-    const m = getVault()?.get(String(id));
-    if (!m) return null;
-    // 잠긴 메모는 메모 창에서 풀어 둔 동안에도 바탕화면에는 내용을 보이지 않는다 (창을 닫아도 남아 있게 되므로)
-    return { title: m.title, color: m.color, tables: m.tables, locked: m.locked, body: m.locked ? '' : m.body };
-  });
-  ipcMain.handle('widget:place', (e, id) => {
-    const m = getVault()?.get(String(id));
-    if (!m) return { ok: false, error: '메모를 찾지 못했어요' };
-    // 빈 메모는 창을 닫으면 저절로 정리(휴지통)되므로 붙이지 않는다
-    if (!m.locked && isBlankBody(m.body)) return { ok: false, error: '빈 메모예요. 내용을 쓴 뒤에 바탕화면에 붙여 주세요' };
-    const ok = wm.placeWidget(String(id), senderWindow(e));
-    // 메모 창이 사라지므로 메모가 없어진 것이 아니라는 것을 바로 알린다
-    if (ok) wm.showHud({ title: '바탕화면에 붙였어요', body: '고치려면 위젯의 연필 단추' });
-    return { ok };
-  });
-  ipcMain.handle('widget:remove', (e, id) => {
-    const fromWidget = wm.widgets.get(String(id))?.webContents === e.sender;
-    const ok = wm.removeWidget(String(id));
-    if (ok && fromWidget) wm.showHud({ title: '바탕화면에서 뗐어요', body: '메모는 그대로 있어요' });
-    return ok;
-  });
-  ipcMain.handle('widget:has', (_e, id) => wm.hasWidget(String(id)));
-  ipcMain.handle('widget:open-note', (_e, id) => Boolean(wm.revealNote(String(id))));
   // 본문 복사 (메모 단축키와 같은 글: 제목 줄 빼고, 서식 기호 없이, 줄 앞 띄어쓰기 그대로)
   ipcMain.handle('memo:copy-text', async (_e, id) => {
     const m = getVault()?.get(String(id));
@@ -601,7 +576,7 @@ export function registerIpc(ctx) {
     const capture = wm.pendingCaptures.get(id) ?? null;
     wm.pendingAlarms.delete(id);
     wm.pendingCaptures.delete(id);
-    return { ...memo, onTop: settings.onTop[id] === true, alarm, capture, stack: wm.stackState(id) };
+    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, stack: wm.stackState(id) };
   });
 
   // ---------- 잠금 메모 ----------
@@ -866,13 +841,9 @@ export function registerIpc(ctx) {
   ipcMain.on('sticker:hover', (event, over) => {
     const w = BrowserWindow.fromWebContents(event.sender);
     if (w && !w.isDestroyed()) w.setIgnoreMouseEvents(!over, { forward: true });
+    wm.stickerHover(event.sender, over);
   });
   ipcMain.handle('sticker:peel', (event) => wm.peelSticker(event.sender));
-  // 바탕화면 위젯의 테이프: 끌어서 옮기기 · 눌러서 떼기
-  ipcMain.on('tape:drag-start', (event) => wm.tapeDragStart(event.sender));
-  ipcMain.on('tape:drag', (event, dx, dy) => wm.tapeDrag(event.sender, Number(dx) || 0, Number(dy) || 0));
-  ipcMain.on('tape:drag-end', (event) => wm.tapeDragEnd(event.sender));
-  ipcMain.handle('tape:peel', (event) => wm.peelWidgetTape(event.sender));
   ipcMain.handle('list:on-top', () => Boolean(wm.listWin?.isAlwaysOnTop()));
   ipcMain.handle('win:dim-titlebar', (event, level) => {
     if (!wm.listWin || senderWindow(event) !== wm.listWin) return;
@@ -889,9 +860,12 @@ export function registerIpc(ctx) {
       wm.windowDrag = null;
     }
   });
-  ipcMain.handle('win:toggle-top', (event, id) => {
-    const win = senderWindow(event);
-    return win ? wm.setNoteOnTop(String(id), !win.isAlwaysOnTop()) : false;
+  // 왕관(늘 위) · 테이프(바탕화면 층): 켜져 있으면 떼고, 아니면 붙인다 (다른 하나가 붙어 있으면 바꿔 붙임) → { top, bottom, canTape }
+  ipcMain.handle('win:toggle-layer', (event, id, layer) => {
+    if (!senderWindow(event)) return null;
+    const key = String(id);
+    const want = layer === 'bottom' ? 'bottom' : 'top';
+    return wm.setNoteLayer(key, wm.layerOf(key) === want ? null : want);
   });
   ipcMain.handle('list:show', () => {
     wm.createListWindow();

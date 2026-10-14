@@ -26,8 +26,9 @@ import {
   copyImageToClipboard, CLIPBOARD_HELPER, SMOKE,
 } from './utils.js';
 
-const STICKER = { width: 64, height: 52 };
-const TAPE = { width: 96, height: 30 }; // 바탕화면 위젯의 셀로판 테이프 — 절반은 위젯 위, 절반은 밖
+// 창 위 가장자리에 반쯤 걸쳐 붙는 스티커: 왕관(늘 위) · 셀로판 테이프(늘 아래, 바탕화면 층)
+const STICKERS = { crown: { width: 64, height: 52 }, tape: { width: 96, height: 30 } };
+const LOST_REOPEN_MS = 3000;
 const GHOST_MARGIN = 24;
 const STACK_DWELL_MS = 100;
 const TEAR_OPACITY = 0.9;
@@ -63,9 +64,8 @@ export class WindowManager {
     this.spareTimer = 0;
     this.paintMarks = new WeakMap(); // 예비 창: 화면이 "메모를 그렸다" 고 알려 오면 부를 함수
     this.hotkeySlotOf = () => null; // 메모 단축키 칸 (main.js 가 채움)
-    this.widgets = new Map(); // 바탕화면 위젯: 메모 id → 창
-    this.widgetTapes = new Map(); // 위젯 위 셀로판 테이프: 메모 id → 테이프 창
-    this.desktopPin = new DesktopPin();
+    this.desktopPin = new DesktopPin(); // 테이프로 붙인 메모 창을 바탕화면 층에
+    this.lostNotes = new Set(); // 탐색기가 다시 시작돼 함께 사라진 테이프 메모 (곧 다시 연다)
     this.hudWin = null;
     this.hudTimer = 0;
     this.smokeHud = [];
@@ -218,7 +218,6 @@ export class WindowManager {
       win.setBounds(at);
       win.setTitle(memo.title);
       win.setBackgroundColor(noteBg(memo.color));
-      win.setAlwaysOnTop(settings.onTop[id] === true);
     } else {
       win = new BrowserWindow({
         ...at,
@@ -234,10 +233,8 @@ export class WindowManager {
       });
       guardWindow(win, { openWebPage });
     }
-    if (settings.onTop[id] === true) {
-      win.setAlwaysOnTop(true, 'floating');
-      this.setSticker(win, true, { animate: false });
-    }
+    // 왕관(늘 위) · 테이프(바탕화면 층) — 보이기 전에 (작업 표시줄 단추가 번쩍이지 않게)
+    this.applyLayer(win, id);
     this.noteWins.set(id, win);
 
     const setOpen = (open) => {
@@ -250,7 +247,19 @@ export class WindowManager {
       setOpen(true);
       this.onNoteOpened(id);
       this.pushList();
+      if (win.mkPinned && !win.isFocused()) this.desktopPin.send('bottom', win.mkPinned); // 보이며 앞으로 왔을 수 있다
     });
+    // 테이프 메모: 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로 (그 밖에 앞으로 와 버리는 때는 desktop-pin.js 가 내린다)
+    win.on('blur', () => {
+      if (win.mkPinned) this.desktopPin.send('bottom', win.mkPinned);
+    });
+    // Windows 를 끄거나 다시 시작할 때 닫히는 메모는 "열려 있던 메모" 로 그대로 둔다 (켜면 다시 그 자리에)
+    const keepForShutdown = () => {
+      win.mkKeep = true;
+      saveSettings(true);
+    };
+    win.on('query-session-end', keepForShutdown);
+    win.on('session-end', keepForShutdown);
     win.on('hide', () => {
       setOpen(false);
       this.pushList();
@@ -280,6 +289,7 @@ export class WindowManager {
     this.pushList();
 
     win.on('close', () => {
+      win.mkClosing = true; // close 없이 사라지면(closed 만) 탐색기가 다시 시작돼 바탕화면과 함께 없어진 것
       if (this.isQuitting()) return;
       const stack = this.stacks?.stackOf(id);
       if (!stack || this.closingStacks.has(stack.id)) return;
@@ -291,6 +301,9 @@ export class WindowManager {
     });
 
     win.on('closed', () => {
+      // 테이프 메모는 주인(바탕화면 창)이 없어지면 함께 없어진다 — 열린 메모로 남겨 두고 새 바탕화면에 다시 연다
+      const lost = Boolean(win.mkPinned) && !win.mkClosing && !win.mkKeep && !this.isQuitting();
+      if (win.mkPinned) this.desktopPin.send('unpin', win.mkPinned); // 같은 번호를 다른 앱 창이 받아도 건드리지 않게
       this.noteWins.delete(id);
       this.dropSpareIfIdle();
       const currentVault = this.getVault();
@@ -307,7 +320,8 @@ export class WindowManager {
         this.pushStackTo(r.rest ?? []);
       }
       this.pushList();
-      if (!this.isQuitting()) {
+      if (lost) return this.reopenLost(id);
+      if (!this.isQuitting() && !win.mkKeep) {
         settings.openNotes = settings.openNotes.filter((x) => x !== id);
         if (!currentVault?.get(id)) delete settings.noteBounds[id];
         saveSettings();
@@ -324,302 +338,146 @@ export class WindowManager {
     return win;
   }
 
-  // ---------- 바탕화면 위젯 ----------
-  // 메모를 바탕화면에 위젯처럼 (스티커 메모 앱처럼 늘 그 자리에): 작업 표시줄 · Alt+Tab 에 없고, 다른 앱 창 뒤 바탕화면 층에
-  //   (Windows: desktop-pin.js 가 바탕화면 창에 붙임 — Win+D 에도 남음). 내용은 읽기 전용 메모 그대로, 고치면 바로 바뀜
-  //   자리 · 크기는 이 PC 설정(settings.widgets)에 — 메모킹을 다시 켜면(로그인 때 자동 실행 포함) 그 자리에 다시
+  // ---------- 늘 위(왕관) · 늘 아래(테이프) ----------
+  // 메모 창 윗막대의 왕관 · 테이프 단추로 고르고, 창 위 가장자리에 붙은 스티커를 누르면 뗀다. 둘은 함께 붙지 않는다
+  //   (settings.onTop / settings.onBottom — 스택은 탭 모두 같게, 재시작해도 그대로).
+  //   테이프: 메모 창 자체를 바탕화면 층에 (Windows: desktop-pin.js 가 주인을 바탕화면 창으로 — 다른 앱 창 뒤에 있고 Win+D 에도
+  //   남고, 작업 표시줄에는 없음). 쓰려고 누르면 잠깐 앞으로 오고, 다른 데를 누르면 다시 뒤로. 떼면 보통 창이 된다.
 
-  // bounds: { x, y, width, height } — 함께 둔 표시(taped: 테이프 붙는 모습을 보였음)는 그대로
-  saveWidgetBounds(id, bounds) {
-    const { x, y, width, height } = bounds;
-    settings.widgets = { ...(settings.widgets ?? {}), [id]: { ...settings.widgets?.[id], x, y, width, height } };
-    saveSettings();
-  }
-
-  forgetWidgetBounds(id) {
-    if (!settings.widgets?.[id]) return;
-    const { [id]: _gone, ...rest } = settings.widgets;
-    settings.widgets = rest;
-    saveSettings();
-  }
-
-  widgetBounds(id, near = null) {
-    const saved = settings.widgets?.[id];
-    if (saved && onScreen(saved)) return { x: saved.x, y: saved.y, width: saved.width, height: saved.height };
-    if (near) return near;
-    // 처음: 주 화면 오른쪽 위부터 차례로
-    const area = screen.getPrimaryDisplay().workArea;
-    const n = this.widgets.size;
-    const width = 260;
-    const height = 220;
-    return { x: area.x + area.width - width - 24 - (n % 3) * 28, y: area.y + 24 + n * 28, width, height };
-  }
-
-  openWidget(id, { near = null } = {}) {
-    const memo = this.getVault()?.get(id);
-    if (!memo) return null;
-    const existing = this.widgets.get(id);
-    if (existing && !existing.isDestroyed()) {
-      if (!existing.webContents.isLoading()) {
-        existing.showInactive(); // 아직 불러오는 중이면 ready-to-show 가 보인다
-        this.desktopPin.send('bottom', hwndOf(existing)); // 다시 보이며 앞으로 왔을 수 있다
-      }
-      this.saveWidgetBounds(id, existing.getBounds());
-      return existing;
-    }
-    const bounds = this.widgetBounds(id, near);
-    this.watchWidgetDisplays();
-    const win = new BrowserWindow({
-      ...bounds,
-      minWidth: 180,
-      minHeight: 110,
-      frame: false,
-      show: false,
-      skipTaskbar: true,
-      minimizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      ...(process.platform === 'win32' ? { type: 'toolbar' } : {}), // 작업 전환(Alt+Tab)에도 안 나오게
-      title: memo.title,
-      backgroundColor: noteBg(memo.color),
-      ...windowIcon,
-      webPreferences,
-    });
-    guardWindow(win, { openWebPage });
-    const hwnd = hwndOf(win); // 닫힌 뒤에는 읽을 수 없다
-    this.widgets.set(id, win);
-    const remember = () => !win.isDestroyed() && this.saveWidgetBounds(id, win.getBounds());
-    win.on('moved', remember);
-    win.on('resized', remember);
-    // 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로 (그 밖에 앞으로 와 버리는 때는 desktop-pin.js 가 앞 창이 바뀔 때마다 내린다)
-    win.on('blur', () => this.desktopPin.send('bottom', hwnd));
-    win.once('ready-to-show', () => {
-      if (win.isDestroyed()) return;
-      win.showInactive();
-      this.desktopPin.send('pin', hwnd);
-      this.openWidgetTape(id, win, { animate: !settings.widgets?.[id]?.taped });
-    });
-    // Windows 를 끄거나 다시 시작할 때 닫히는 것은 그대로 기억 (자리도 바로 파일에 — 켜면 그 자리에)
-    const keepForShutdown = () => {
-      win.mkKeep = true;
-      saveSettings(true);
-    };
-    win.on('query-session-end', keepForShutdown);
-    win.on('session-end', keepForShutdown);
-    // 떼기는 테이프(또는 목록 메뉴)로만 — Alt+F4 · 그 밖의 닫기로는 사라지지 않는다 (끌 때 잘못 잊어버리지 않게)
-    win.on('close', (e) => {
-      if (win.mkKeep || win.mkRemove || this.isQuitting()) return;
-      e.preventDefault();
-    });
-    win.on('closed', () => {
-      this.desktopPin.send('unpin', hwnd);
-      if (this.widgets.get(id) !== win) return;
-      this.widgets.delete(id);
-      this.pushList(); // 목록 카드의 바탕화면 표시
-      // close 없이 사라짐 = 탐색기를 다시 시작해 바탕화면 창(주인)이 없어짐 — 조금 뒤 새 바탕화면에 다시 붙인다
-      if (!win.mkKeep && !this.isQuitting()) {
-        setTimeout(() => {
-          if (!this.isQuitting() && !this.widgets.has(id) && settings.widgets?.[id] && this.getVault()?.get(id)) this.openWidget(id);
-        }, 3000);
-      }
-    });
-    win.loadFile(path.join(APP_DIR, 'widget.html'), { query: { id } });
-    if (!settings.widgets?.[id]) this.saveWidgetBounds(id, bounds);
-    this.pushList();
-    return win;
-  }
-
-  // ---------- 위젯의 셀로판 테이프 ----------
-  // 왕관 스티커처럼 따로 띄운 투명 창 (위젯이 주인 — 늘 위젯 바로 위에 있고, 위젯과 함께 바탕화면 층에).
-  //   위젯 위 가장자리 가운데에 절반만 걸친다. 테이프를 끌면 위젯을 옮기고, 누르기만 하면 떼기.
-
-  tapeBounds(widget) {
-    const b = widget.getBounds();
-    return { x: Math.round(b.x + b.width / 2 - TAPE.width / 2), y: Math.round(b.y - TAPE.height / 2), ...TAPE };
-  }
-
-  openWidgetTape(id, widget, { animate = false } = {}) {
-    const old = this.widgetTapes.get(id);
-    if (old && !old.isDestroyed()) return old;
-    const tape = new BrowserWindow({
-      ...this.tapeBounds(widget),
-      parent: widget,
-      frame: false,
-      transparent: true,
-      backgroundColor: '#00000000',
-      hasShadow: false,
-      resizable: false,
-      movable: false,
-      minimizable: false,
-      maximizable: false,
-      focusable: false,
-      skipTaskbar: true,
-      show: false,
-      webPreferences,
-    });
-    this.widgetTapes.set(id, tape);
-    tape.setIgnoreMouseEvents(true, { forward: true });
-    guardWindow(tape, { openWebPage });
-    const follow = () => !tape.isDestroyed() && !widget.isDestroyed() && tape.setBounds(this.tapeBounds(widget));
-    widget.on('move', follow);
-    widget.on('resize', follow);
-    tape.once('closed', () => {
-      if (!widget.isDestroyed()) {
-        widget.off('move', follow);
-        widget.off('resize', follow);
-      }
-      if (this.widgetTapes.get(id) === tape) this.widgetTapes.delete(id);
-    });
-    tape.once('ready-to-show', () => {
-      if (tape.isDestroyed() || widget.isDestroyed()) return;
-      tape.setBounds(this.tapeBounds(widget));
-      tape.showInactive();
-      tape.webContents.send('tape:show', { animate });
-      if (settings.widgets?.[id] && !settings.widgets[id].taped) { // 붙는 모습은 처음 한 번만
-        settings.widgets = { ...settings.widgets, [id]: { ...settings.widgets[id], taped: true } };
-        saveSettings();
-      }
-    });
-    tape.loadFile(path.join(APP_DIR, 'tape.html'));
-    return tape;
-  }
-
-  /** 테이프 창 → 그 위젯 { id, widget } */
-  tapeOwner(sender) {
-    for (const [id, tape] of this.widgetTapes) {
-      if (!tape.isDestroyed() && tape.webContents === sender) {
-        const widget = this.widgets.get(id);
-        return widget && !widget.isDestroyed() ? { id, widget } : null;
-      }
-    }
+  /** 이 메모의 층: 'top'(왕관) | 'bottom'(테이프) | null — 둘 다 적혀 있으면 왕관 */
+  layerOf(id) {
+    if (settings.onTop[id] === true) return 'top';
+    if (settings.onBottom?.[id] === true) return 'bottom';
     return null;
   }
 
-  tapeDragStart(sender) {
-    const o = this.tapeOwner(sender);
-    if (o) o.widget.mkDragFrom = o.widget.getBounds();
+  setLayerFlags(id, layer) {
+    settings.onBottom ??= {};
+    if (layer === 'top') settings.onTop[id] = true;
+    else delete settings.onTop[id];
+    if (layer === 'bottom') settings.onBottom[id] = true;
+    else delete settings.onBottom[id];
   }
 
-  tapeDrag(sender, dx, dy) {
-    const o = this.tapeOwner(sender);
-    const from = o?.widget.mkDragFrom;
-    if (!from) return;
-    o.widget.setBounds({ ...from, x: Math.round(from.x + dx), y: Math.round(from.y + dy) });
+  /** 바탕화면 층에 붙일 수 있는 PC 인가 (Windows · 도우미가 막히지 않음). 점검(smoke)은 붙이는 흉내만 */
+  get canTape() {
+    return this.desktopPin.available || Boolean(SMOKE);
   }
 
-  tapeDragEnd(sender) {
-    const o = this.tapeOwner(sender);
-    if (!o?.widget.mkDragFrom) return;
-    o.widget.mkDragFrom = null;
-    this.saveWidgetBounds(o.id, o.widget.getBounds());
+  layerState(id) {
+    const layer = this.layerOf(id);
+    return { top: layer === 'top', bottom: layer === 'bottom' && this.canTape, canTape: this.canTape };
   }
 
-  /** 테이프를 누르면: 위젯이 흐려지며 사라지고 바탕화면에서 뗀다 (메모는 그대로) */
-  peelWidgetTape(sender) {
-    const o = this.tapeOwner(sender);
-    if (!o) return false;
-    o.widget.webContents.send('widget:peeling');
-    setTimeout(() => {
-      if (this.widgets.get(o.id) !== o.widget) return;
-      this.removeWidget(o.id);
-      this.showHud({ title: '바탕화면에서 뗐어요', body: '메모는 그대로 있어요' });
-    }, 240);
-    return true;
-  }
-
-  /**
-   * 로그인 직후처럼 모니터가 아직 다 잡히지 않아 기억한 자리가 화면 밖이면 임시 자리에 띄우고(기억은 그대로),
-   *   모니터가 잡히면(연결 · 해상도 · 배율 바뀜) 기억한 자리로 돌려놓는다
-   */
-  watchWidgetDisplays() {
-    if (this.widgetDisplayWatch) return;
-    this.widgetDisplayWatch = true;
-    const rehome = () => setTimeout(() => {
-      for (const [id, win] of this.widgets) {
-        const saved = settings.widgets?.[id];
-        if (!saved || win.isDestroyed() || !onScreen(saved)) continue;
-        const b = win.getBounds();
-        if (b.x !== saved.x || b.y !== saved.y || b.width !== saved.width || b.height !== saved.height) win.setBounds({ x: saved.x, y: saved.y, width: saved.width, height: saved.height });
-      }
-    }, 500);
-    screen.on('display-added', rehome);
-    screen.on('display-metrics-changed', rehome);
-  }
-
-  /** 메모 창 메뉴 › 바탕화면에 위젯으로 놓기: 그 메모 창 자리에 위젯을 놓고 메모 창은 닫는다 */
-  placeWidget(id, fromWin = null) {
-    const near = fromWin && !fromWin.isDestroyed() ? fromWin.getBounds() : null;
-    const existing = this.widgets.get(id);
-    if (existing && !existing.isDestroyed()) {
-      // 이미 바탕화면에 있으면 그 위젯을 메모 창 자리로 옮긴다
-      if (near) existing.setBounds(near);
-    } else if (near) this.forgetWidgetBounds(id); // 메모 창이 있던 자리로 새로
-    const win = this.openWidget(id, { near });
-    if (!win) return false;
-    // 스택의 탭이면 그 탭만 빼서 닫는다 (창을 그냥 닫으면 스택의 다른 탭들도 함께 닫힘)
-    if (this.stacks?.stackOf(id)) this.removeFromStack(id, 'close');
-    else if (fromWin && !fromWin.isDestroyed()) fromWin.close();
-    return true;
-  }
-
-  /** 위젯 창만 닫는다 (기억은 그대로 — 다시 켜면 뜸) */
-  closeWidgetWindow(win) {
+  /** 창을 그 메모의 층에 맞춘다 (늘 위 · 바탕화면 층 · 스티커). sticker: false 면 스티커는 부르는 쪽이 (스택 탭 넘겨주기) */
+  applyLayer(win, id, { animate = false, sticker = true } = {}) {
     if (!win || win.isDestroyed()) return;
-    win.mkKeep = true;
-    win.close();
+    const layer = this.layerOf(id);
+    const bottom = layer === 'bottom' && this.canTape;
+    if (layer === 'top') this.setTopmost(win, true);
+    else if (win.isAlwaysOnTop()) this.setTopmost(win, false); // 늘 위가 아니던 창에 끄기를 부르면 다른 앱 위로 올라온다
+    this.pinToDesktop(win, bottom);
+    if (sticker) this.setSticker(win, layer === 'top' || bottom, { kind: bottom ? 'tape' : 'crown', animate });
   }
 
-  removeWidget(id) {
-    this.forgetWidgetBounds(id);
-    const win = this.widgets.get(id);
-    this.widgets.delete(id);
-    if (win && !win.isDestroyed()) {
-      win.mkRemove = true;
-      win.close(); // closed 는 이미 목록에서 뺀 창이라 아무 일도 하지 않는다
+  pinToDesktop(win, on) {
+    if (on) {
+      if (win.mkPinned) return;
+      const hwnd = hwndOf(win); // 닫힌 뒤에는 읽을 수 없어 적어 둔다 (떼기 · 닫힐 때)
+      if (!hwnd && !SMOKE) return;
+      win.mkPinned = hwnd || -1;
+      if (this.desktopPin.available) {
+        win.setSkipTaskbar(true); // 바탕화면의 일부처럼 — 작업 표시줄에는 없다
+        this.desktopPin.send('pin', hwnd);
+      }
+      return;
     }
-    this.pushList();
-    return true;
+    if (!win.mkPinned) return;
+    const hwnd = win.mkPinned;
+    win.mkPinned = 0;
+    if (!this.desktopPin.available) return;
+    this.desktopPin.send('unpin', hwnd);
+    // 주인이 되돌려진 뒤에야 작업 표시줄 단추가 다시 붙는다 — 도우미가 답하기 전이었을 수 있어 조금 뒤 한 번 더
+    win.setSkipTaskbar(false);
+    setTimeout(() => !win.isDestroyed() && !win.mkPinned && win.setSkipTaskbar(false), 400);
   }
 
-  hasWidget(id) {
-    return Boolean(this.widgets.get(id)) || Boolean(settings.widgets?.[id]);
+  /** 왕관 · 테이프 · 없음 — 스택이면 탭 모두. fromId 의 창만 붙고 떼어지는 모습을 보인다 */
+  setNoteLayer(id, layer, { fromId = id } = {}) {
+    if (layer === 'bottom' && !this.canTape) layer = null;
+    const members = this.stacks?.stackOf(id)?.memos ?? [id];
+    for (const m of members) {
+      this.setLayerFlags(m, layer);
+      const w = this.noteWins.get(m);
+      this.applyLayer(w, m, { animate: m === fromId });
+      w?.webContents.send('memo:layer', this.layerState(m));
+    }
+    saveSettings();
+    this.refreshTopWatch();
+    this.pushList(); // 목록 카드의 바탕화면 표시
+    return this.layerState(id);
+  }
+
+  setNoteOnTop(id, next, opts) {
+    return this.setNoteLayer(id, next ? 'top' : null, opts).top;
+  }
+
+  /** 스택의 층: 탭 하나라도 왕관이면 왕관, 아니면 테이프 */
+  stackLayer(stack) {
+    const layers = stack.memos.map((m) => this.layerOf(m));
+    return layers.includes('top') ? 'top' : layers.includes('bottom') ? 'bottom' : null;
+  }
+
+  /** 탐색기가 다시 시작돼 함께 사라진 테이프 메모: 새 바탕화면이 뜰 즈음 다시 연다 (스택이면 보던 탭) */
+  reopenLost(id) {
+    const target = this.stacks?.stackOf(id)?.active ?? id;
+    if (this.lostNotes.has(target)) return;
+    this.lostNotes.add(target);
+    setTimeout(() => {
+      this.lostNotes.delete(target);
+      if (this.isQuitting() || !this.getVault()?.get(target)) return;
+      const shown = (this.stacks?.stackOf(target)?.memos ?? [target]).some((m) => this.noteWins.get(m)?.isVisible());
+      if (!shown) this.openNote(target, { inactive: true });
+    }, LOST_REOPEN_MS);
+  }
+
+  /** 이 PC 에서 메모를 지우면 바탕화면 기억도 */
+  forgetLayer(id) {
+    if (!settings.onBottom?.[id]) return;
+    delete settings.onBottom[id];
+    saveSettings();
   }
 
   /**
-   * 메모킹을 켤 때 · 메모 폴더를 열 때: 놓아 둔 위젯들을 그 자리에
-   *   지금 폴더에 없는 메모의 위젯은 창만 닫고 기억은 남긴다 (Google Drive 가 아직 안 붙었거나 다른 폴더로 바꾼 경우 —
-   *   그 폴더가 돌아오면 다시 뜬다). 이 PC 에서 메모를 지우면(vault 'trashed') 기억까지 지운다
+   * 예전 바탕화면 위젯(settings.widgets) → 테이프 붙인 메모 창 (v0.35.0). 지금 폴더에 있는 메모만 옮기고
+   *   다른 폴더의 것은 그 폴더를 열 때까지 남겨 둔다. 스택의 탭이면 스택 모두를 그 자리 그대로 테이프로.
    */
-  restoreWidgets() {
+  migrateWidgets() {
     const vault = this.getVault();
-    for (const [id, win] of this.widgets) {
-      if (!vault?.get(id)) this.closeWidgetWindow(win);
-    }
-    if (!vault) return;
-    for (const id of Object.keys(settings.widgets ?? {})) {
-      if (vault.get(id)) this.openWidget(id);
-    }
-  }
-
-  /**
-   * 메모가 바뀌면 그 위젯을 다시 그린다. 파일이 없어지면(동기화 중 · 다른 기기 · 탐색기) 창만 닫고 기억은 남겨,
-   *   돌아오면(휴지통에서 되살림 포함) 다시 띄운다. 이 PC 에서 지웠을 때(vault 'trashed')만 removeWidget 으로 기억까지
-   */
-  refreshWidgets(ids) {
-    for (const id of ids) {
-      const win = this.widgets.get(id);
-      const memo = this.getVault()?.get(id);
-      if (!win || win.isDestroyed()) {
-        if (memo && settings.widgets?.[id]) this.openWidget(id);
+    const widgets = settings.widgets;
+    if (!vault || !widgets || typeof widgets !== 'object') return;
+    const rest = {};
+    for (const [id, saved] of Object.entries(widgets)) {
+      if (!vault.get(id)) {
+        rest[id] = saved;
         continue;
       }
-      if (!memo) this.closeWidgetWindow(win);
-      else {
-        win.setBackgroundColor(noteBg(memo.color));
-        win.setTitle(memo.title);
-        win.webContents.send('widget:changed');
+      const stack = this.stacks?.stackOf(id);
+      for (const m of stack ? stack.memos : [id]) this.setLayerFlags(m, 'bottom');
+      const open = this.noteWins.has(id) || settings.openNotes.includes(id) || Boolean(stack);
+      if (!open && saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+        settings.noteBounds[id] = {
+          x: saved.x, y: saved.y, width: Math.max(240, saved.width || 0), height: Math.max(200, saved.height || 0),
+        };
       }
+      if (!settings.openNotes.includes(id) && !stack) settings.openNotes.push(id);
+      const win = this.noteWins.get(id);
+      if (win) this.setNoteLayer(id, 'bottom');
+      else if (app.isReady()) this.openNote(id, { inactive: true });
     }
+    if (Object.keys(rest).length) settings.widgets = rest;
+    else delete settings.widgets;
+    saveSettings();
   }
 
   // ---------- 잠깐 알림 (HUD) ----------
@@ -758,19 +616,6 @@ export class WindowManager {
     }
   }
 
-  setNoteOnTop(id, next, { fromId = id } = {}) {
-    const members = this.stacks?.stackOf(id)?.memos ?? [id];
-    for (const m of members) {
-      this.setTopmost(this.noteWins.get(m), next);
-      this.setSticker(this.noteWins.get(m), next, { animate: m === fromId });
-      this.noteWins.get(m)?.webContents.send('memo:on-top', next);
-      if (next) settings.onTop[m] = true;
-      else delete settings.onTop[m];
-    }
-    saveSettings();
-    return next;
-  }
-
   sendToNote(id, channel, ...args) {
     this.noteWins.get(id)?.webContents.send(channel, ...args);
   }
@@ -781,7 +626,8 @@ export class WindowManager {
       open: Boolean(this.noteWins.get(m.id)?.isVisible()),
       stack: this.stacks?.stackOf(m.id)?.memos.length ?? 0,
       hotkey: this.hotkeySlotOf(m.id),
-      widget: this.widgets.has(m.id),
+      // 테이프로 바탕화면에 붙여 둔 메모 (창이 떠 있을 때만 — 닫으면 바탕화면에 없다)
+      taped: this.layerOf(m.id) === 'bottom' && (this.stacks?.stackOf(m.id)?.memos ?? [m.id]).some((x) => this.noteWins.get(x)?.isVisible()),
     }));
   }
 
@@ -917,10 +763,10 @@ export class WindowManager {
     const current = this.visibleStackWin(stack, id);
     const defaultBounds = defaultNoteBounds(DEFAULT_NOTE_SIZE, { listWin: this.listWin, noteWinsCount: this.noteWins.size });
     const bounds = at ?? current?.getNormalBounds() ?? (onScreen(settings.noteBounds[id]) ? settings.noteBounds[id] : defaultBounds);
-    const top = this.stackOnTop(stack);
-
-    if (top && stack.memos.some((m) => settings.onTop[m] !== true)) {
-      for (const m of stack.memos) settings.onTop[m] = true;
+    // 탭 모두 같은 층으로 (옮겨 온 탭 하나만 적혀 있던 때 등)
+    const layer = this.stackLayer(stack);
+    if (stack.memos.some((m) => this.layerOf(m) !== layer)) {
+      for (const m of stack.memos) this.setLayerFlags(m, layer);
       saveSettings();
     }
     let win = this.noteWins.get(id);
@@ -931,13 +777,15 @@ export class WindowManager {
       if (win.isMinimized()) win.restore();
       const shown = now ? this.visibleStackWin(now, id) : null;
       win.setBounds(shown?.getNormalBounds() ?? bounds);
-      this.setTopmost(win, top);
+      this.applyLayer(win, id, { sticker: false });
       const veiled = Boolean(shown) && !win.isVisible() && process.platform === 'win32';
-      this.setSticker(win, top, { animate: false });
-      const sticker = top ? this.stickers.get(win.id) : null;
+      const state = this.layerState(id);
+      const stuck = state.top || state.bottom;
+      this.setSticker(win, stuck, { kind: state.bottom ? 'tape' : 'crown', animate: false });
+      const sticker = stuck ? this.stickers.get(win.id) : null;
       if (sticker && veiled) sticker.hold = true;
-      else if (top) this.handOverSticker(shown, win);
-      win.webContents.send('memo:on-top', top);
+      else if (stuck) this.handOverSticker(shown, win);
+      win.webContents.send('memo:layer', state);
       if (veiled) win.setOpacity(0);
       if (inactive) win.showInactive();
       else {
@@ -979,11 +827,12 @@ export class WindowManager {
     const targetWin = this.noteWins.get(targetId);
     if (!targetWin || targetId === movingId || !this.getVault()?.get(movingId) || !this.stacks) return false;
     const bounds = targetWin.getNormalBounds();
-    const top = this.stackOnTop(this.stacks.stackOf(targetId) ?? { memos: [targetId] }) || settings.onTop[targetId] === true;
+    // 받는 쪽(창이 있던 쪽)의 층을 따른다 — 왕관 메모를 테이프 스택에 넣으면 테이프로
+    const layer = this.stackLayer(this.stacks.stackOf(targetId) ?? { memos: [targetId] });
     const stack = this.stacks.merge(targetId, [movingId], { activate: movingId });
     for (const m of stack.memos) {
       settings.noteBounds[m] = bounds;
-      if (top) settings.onTop[m] = true;
+      this.setLayerFlags(m, layer);
       const w = this.noteWins.get(m);
       if (w && m !== movingId && m !== targetId && w.isVisible()) w.hide();
     }
@@ -992,9 +841,9 @@ export class WindowManager {
     const hideTarget = () => setTimeout(() => !targetWin.isDestroyed() && targetWin.hide(), 30);
     if (win) {
       if (win.isMinimized()) win.restore();
-      win.setAlwaysOnTop(top, 'floating');
-      this.setSticker(win, top, { animate: false });
-      if (top) this.handOverSticker(targetWin, win);
+      this.applyLayer(win, movingId);
+      win.webContents.send('memo:layer', this.layerState(movingId));
+      if (layer) this.handOverSticker(targetWin, win);
       if (win.isVisible()) animateBounds(win, bounds);
       else win.setBounds(bounds);
       win.show();
@@ -1003,8 +852,7 @@ export class WindowManager {
     } else {
       win = this.createNoteWindow(movingId, { show: false, bounds });
       win?.once('ready-to-show', () => {
-        win.setAlwaysOnTop(top, 'floating');
-        this.setSticker(win, top, { animate: false });
+        this.applyLayer(win, movingId);
         win.show();
         win.focus();
         hideTarget();
@@ -1052,6 +900,7 @@ export class WindowManager {
     const own = this.stacks?.stackOf(excludeId)?.memos ?? [excludeId];
     for (const [mid, w] of this.noteWins) {
       if (own.includes(mid) || w.isDestroyed() || !w.isVisible() || w.isMinimized() || this.inkingWins.has(w)) continue;
+      if (w.mkPinned && !w.isFocused()) continue; // 바탕화면 층의 메모는 다른 앱 창에 가려 있을 수 있다
       if (isInside(point, w.getBounds())) return mid;
     }
     return null;
@@ -1184,9 +1033,10 @@ export class WindowManager {
     }, 300);
   }
 
-  stickerBounds(owner) {
+  stickerBounds(owner, kind = 'crown') {
+    const size = STICKERS[kind] ?? STICKERS.crown;
     const b = owner.getBounds();
-    return { x: Math.round(b.x + b.width / 2 - STICKER.width / 2), y: Math.round(b.y - STICKER.height / 2), ...STICKER };
+    return { x: Math.round(b.x + b.width / 2 - size.width / 2), y: Math.round(b.y - size.height / 2), ...size };
   }
 
   closeStickerWin(entry, { peel = false } = {}) {
@@ -1197,7 +1047,8 @@ export class WindowManager {
     const destroy = () => {
       if (win.isDestroyed()) return;
       win.destroy();
-      if (!owner.isDestroyed() && this.stickers.get(owner.id)) this.reassertTop(owner);
+      // 늘 위인 창은 스티커 창이 사라질 때 맨 위를 다시 (왕관에서 테이프로 바꾼 뒤라면 하지 않는다)
+      if (!owner.isDestroyed() && this.stickers.get(owner.id)?.kind === 'crown') this.reassertTop(owner);
     };
     if (peel && win.isVisible()) {
       win.webContents.send('sticker:peel');
@@ -1209,7 +1060,7 @@ export class WindowManager {
     const { owner } = entry;
     if (entry.win || owner.isDestroyed() || !owner.isVisible() || owner.isMinimized()) return;
     const win = new BrowserWindow({
-      ...this.stickerBounds(owner),
+      ...this.stickerBounds(owner, entry.kind),
       parent: owner,
       frame: false,
       transparent: true,
@@ -1229,50 +1080,49 @@ export class WindowManager {
     guardWindow(win, { openWebPage });
     win.once('ready-to-show', () => {
       if (win.isDestroyed() || entry.win !== win || owner.isDestroyed()) return;
-      win.setBounds(this.stickerBounds(owner));
+      win.setBounds(this.stickerBounds(owner, entry.kind));
       win.showInactive();
-      win.webContents.send('sticker:show', { animate });
+      win.webContents.send('sticker:show', { animate, kind: entry.kind });
     });
-    win.loadFile(path.join(APP_DIR, 'sticker.html'));
+    win.loadFile(path.join(APP_DIR, 'sticker.html'), { query: { kind: entry.kind } });
   }
 
   handOverSticker(from, to) {
     if (!from || !to || from === to || from.isDestroyed() || to.isDestroyed()) return false;
     const a = this.stickers.get(from.id);
     const b = this.stickers.get(to.id);
-    if (!a?.win || a.win.isDestroyed() || !b || b.win) return false;
+    if (!a?.win || a.win.isDestroyed() || !b || b.win || a.kind !== b.kind) return false;
     const win = a.win;
     a.win = null;
     b.win = win;
     win.setParentWindow(to);
-    win.setBounds(this.stickerBounds(to));
+    win.setBounds(this.stickerBounds(to, b.kind));
     return true;
   }
 
-  setSticker(owner, on, { animate = true } = {}) {
+  /** kind: 'crown'(늘 위) | 'tape'(바탕화면 층) — 다른 스티커가 붙어 있으면 그것을 떼고 붙인다 */
+  setSticker(owner, on, { animate = true, kind = 'crown' } = {}) {
     if (!owner || owner.isDestroyed()) return;
     const cur = this.stickers.get(owner.id);
-    if (!on) {
-      if (!cur) return;
+    if (cur && (!on || cur.kind !== kind)) {
       this.stickers.delete(owner.id);
       cur.off();
       this.closeStickerWin(cur, { peel: animate });
-      return;
-    }
-    if (cur) {
+    } else if (cur) {
       this.openStickerWin(cur, false);
       return;
     }
-    const entry = { owner, win: null, off: () => {}, hold: false };
+    if (!on) return;
+    const entry = { owner, kind, win: null, off: () => {}, hold: false };
     const sync = () => {
-      if (entry.win && !entry.win.isDestroyed() && !owner.isDestroyed()) entry.win.setBounds(this.stickerBounds(owner));
+      if (entry.win && !entry.win.isDestroyed() && !owner.isDestroyed()) entry.win.setBounds(this.stickerBounds(owner, entry.kind));
     };
     const visible = () => {
       if (owner.isDestroyed()) return;
       if (entry.hold) return;
       if (owner.isVisible() && !owner.isMinimized()) {
         this.openStickerWin(entry, false);
-        this.reassertTop(owner);
+        if (entry.kind === 'crown') this.reassertTop(owner);
       } else this.closeStickerWin(entry);
       this.refreshTopWatch();
     };
@@ -1298,9 +1148,26 @@ export class WindowManager {
       if (!s.win || s.win.isDestroyed() || s.win.webContents !== sender || s.owner.isDestroyed()) continue;
       if (s.owner === this.listWin) return this.setListOnTop(false) === false;
       const id = [...this.noteWins].find(([, w]) => w === s.owner)?.[0];
-      if (id) return this.setNoteOnTop(id, false) === false;
+      if (!id) return false;
+      const owner = s.owner;
+      const state = this.setNoteLayer(id, null);
+      // 테이프를 떼면 바탕화면 층에서 보통 창으로 — 앞으로 가져와 떨어졌다는 것이 보이게
+      if (s.kind === 'tape' && !owner.isDestroyed() && owner.isVisible()) {
+        owner.moveTop();
+        owner.focus();
+      }
+      return !state.top && !state.bottom;
     }
     return false;
+  }
+
+  /** 스티커에 마우스를 올리면 그 메모 창에 "누르면 떼어져요" 안내 (스티커 창은 글을 띄우지 못한다) */
+  stickerHover(sender, over) {
+    for (const [, s] of this.stickers) {
+      if (!s.win || s.win.isDestroyed() || s.win.webContents !== sender || s.owner.isDestroyed()) continue;
+      s.owner.webContents.send('sticker:hover', { kind: s.kind, over: Boolean(over) });
+      return;
+    }
   }
 
   // ---------- 드래그 미리보기 (Ghost) ----------

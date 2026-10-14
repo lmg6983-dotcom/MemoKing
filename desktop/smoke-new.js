@@ -500,14 +500,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const dlg = await js(nw, `(() => {
         const d = document.querySelector('.hotkey-dialog');
         const keys = d.querySelectorAll('.hk-key').length;
-        const [copy, show] = d.querySelectorAll('.hk-opt .switch');
+        // 누르면 할 일은 세 칸 중 하나 (v0.33.1 — 둘 다 끈 상태가 없다)
+        const modes = [...d.querySelectorAll('.hk-mode [role="radio"]')];
         const saveBtn = d.querySelector('button[type="submit"]');
         const before = saveBtn.disabled; // 숫자를 고르기 전
         d.querySelectorAll('.hk-key')[2].click();
-        copy.checked = false; copy.dispatchEvent(new Event('change'));
-        show.checked = false; show.dispatchEvent(new Event('change'));
-        const none = { disabled: saveBtn.disabled, error: d.querySelector('.lock-error').textContent };
-        copy.checked = true; copy.dispatchEvent(new Event('change'));
+        modes[0].click(); // 내용 복사
+        const none = { modes: modes.map((m) => m.textContent), picked: modes.filter((m) => m.getAttribute('aria-checked') === 'true').length };
         const hint = d.querySelector('.hk-hint').textContent;
         const after = saveBtn.disabled;
         const legend = Boolean(d.querySelector('.hk-legend')?.textContent.includes('다른 메모가 써요'));
@@ -518,8 +517,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await until(() => js(nw, `!document.querySelector('.hotkey-dialog')`), '단축키 창 닫힘');
       const saved = getSettings().memoHotkeys?.['3'];
       const label = await js(nw, `document.getElementById('hotkey-label').textContent`);
-      check('메모 단축키 창: 1~9 · 복사/띄우기 중 하나는 꼭 · 저장하면 Ctrl+Alt+3 에 이 메모 (메뉴에 표시)',
-        dlg.keys === 9 && dlg.before && dlg.none.disabled && /하나는/.test(dlg.none.error) && !dlg.after && /^Ctrl\+Alt\+3: 어느 앱에서든 누르면 내용을 복사해요$/.test(dlg.hint) && dlg.legend && dlg.fits
+      check('메모 단축키 창: 1~9 · 할 일 세 칸 중 하나 · 저장하면 Ctrl+Alt+3 에 이 메모 (메뉴에 표시)',
+        dlg.keys === 9 && dlg.before && dlg.none.modes.length === 3 && dlg.none.picked === 1 && !dlg.after && /^Ctrl\+Alt\+3: 어느 앱에서든 누르면 내용을 복사해요$/.test(dlg.hint) && dlg.legend && dlg.fits
           && saved?.id === hid && saved.copy && !saved.show && label === 'Ctrl+Alt+3' && memoHotkeys.held.has('3'),
         JSON.stringify({ dlg, saved, label, held: [...memoHotkeys.held.keys()] }));
       const badge = await until(() => js(list, `document.querySelector('[data-id="${hid}"] .card-badge.hotkey')?.textContent`), '목록 카드 단축키 표시', 3000).catch(() => '');
@@ -547,104 +546,80 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('단축키 풀기 → 키를 놓아 다른 앱이 쓸 수 있게', off.ok && !memoHotkeys.held.has('3') && !getSettings().memoHotkeys?.['3'], JSON.stringify(getSettings().memoHotkeys));
     }
 
-    // ---------- v0.33 — 바탕화면 위젯 (메모 창 › 바탕화면에 붙이기) ----------
+    // ---------- v0.35 — 테이프 (바탕화면에 붙이기 = 왕관의 반대, 메모 창 그대로) ----------
     {
       const list = getList() ?? createListWindow();
       const vault = getVault();
-      // 빈 메모는 붙이지 않는다 (창을 닫으면 저절로 정리되므로)
-      const blank = vault.create();
-      const blankR = await (async () => {
+      const stickers = windowManager.stickers;
+      const tid = vault.import({ body: '# 자주 쓰는 안내\n\n전화 상담: 평일 9시~6시\n' });
+      await until(() => js(list, `!!document.querySelector('[data-id="${tid}"]')`), '테이프 메모 카드');
+      const openTaped = async () => {
         const b0 = new Set(noteWins.keys());
-        windowManager.openNote(blank);
-        const bid = await until(() => [...noteWins.keys()].find((k) => !b0.has(k)), '빈 메모 창');
-        const bw = noteWins.get(bid);
-        await until(() => js(bw, `document.documentElement.dataset.ready === 'true'`), '빈 메모 준비');
-        await js(bw, `document.getElementById('menu-btn').click(); document.getElementById('widget-btn').click()`);
-        const status = await until(() => js(bw, `document.getElementById('status')?.textContent`), '빈 메모 안내', 3000).catch(() => '');
-        const r = { status, widget: windowManager.widgets.has(blank), open: !bw.isDestroyed() };
-        bw.close();
-        return r;
-      })();
-      check('빈 메모는 바탕화면에 붙이지 않고 알려 줌', /빈 메모/.test(blankR.status) && !blankR.widget && blankR.open, JSON.stringify(blankR));
-      const wid = vault.import({ body: '# 자주 쓰는 안내\n\n전화 상담: 평일 9시~6시\n\n- 주소: 서울시 어딘가\n' });
-      await until(() => js(list, `!!document.querySelector('[data-id="${wid}"]')`), '위젯 메모 카드');
-      const before = new Set(noteWins.keys());
-      await js(list, `document.querySelector('[data-id="${wid}"]').click()`);
-      const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '위젯 메모 창');
-      const nw = noteWins.get(nid);
-      await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '위젯 메모 준비');
-      const noteBounds = nw.getBounds();
-      await js(nw, `document.getElementById('menu-btn').click(); document.getElementById('widget-btn').click()`);
-      const ww = await until(() => windowManager.widgets.get(wid), '위젯 창', 4000).catch(() => null);
-      await until(() => ww && js(ww, `document.documentElement.dataset.ready === 'true'`), '위젯 준비', 6000).catch(() => {});
-      const noteClosed = await until(() => !noteWins.has(nid), '메모 창 닫힘', 3000).catch(() => false);
-      const look = ww ? await js(ww, `({ text: document.querySelector('.mk-doc')?.textContent ?? '', editable: document.querySelector('.mk-doc')?.getAttribute('contenteditable'), color: document.body.dataset.color, actions: document.querySelectorAll('.wg-actions button').length, unpinBtn: Boolean(document.getElementById('wg-remove')) })`) : null;
-      const wb = ww?.getBounds();
-      check('바탕화면에 붙이기: 메모 창 자리에 위젯이 뜨고 메모 창은 닫힘 (읽기 전용 · 같은 색 · 복사/열기 · 떼기는 테이프)',
-        Boolean(ww) && noteClosed && /전화 상담: 평일 9시~6시/.test(look?.text ?? '') && look?.editable === 'false' && look?.actions === 2 && !look?.unpinBtn
-          && wb && Math.abs(wb.x - noteBounds.x) <= 2 && Math.abs(wb.y - noteBounds.y) <= 2 && Boolean(getSettings().widgets?.[wid]),
-        JSON.stringify({ ww: Boolean(ww), noteClosed, look, wb, noteBounds }));
-      if (ww) await capture(ww, 'smoke-new-widget.png');
-      // 셀로판 테이프: 위젯 위 가장자리 가운데에 절반만 걸침 (따로 띄운 투명 창, 위젯이 주인)
-      const tape = await until(() => windowManager.widgetTapes.get(wid)?.isVisible() && windowManager.widgetTapes.get(wid), '테이프', 4000).catch(() => null);
-      const tb = tape?.getBounds();
-      check('위젯 위 가장자리 가운데에 테이프 (절반은 메모 밖)', Boolean(tape) && tape.getParentWindow() === ww
-        && Math.abs(tb.y + tb.height / 2 - wb.y) <= 1 && Math.abs(tb.x + tb.width / 2 - (wb.x + wb.width / 2)) <= 1, JSON.stringify({ tb, wb }));
-      // 테이프를 끌면 위젯이 따라 옮겨지고(떼어지지 않음), 테이프도 따라온다
-      if (tape) {
-        await until(() => js(tape, `document.documentElement.dataset.ready === 'true'`), '테이프 준비', 4000).catch(() => {});
-        await js(tape, `(async () => {
-          const t = document.getElementById('tape');
-          const at = (type, x, y) => t.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 7, button: 0, screenX: x, screenY: y }));
-          document.querySelector('.hit').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, button: 0, screenX: 100, screenY: 100 }));
-          for (let i = 1; i <= 5; i++) { at('pointermove', 100 + i * 8, 100 + i * 6); await new Promise((r) => setTimeout(r, 30)); }
-          at('pointerup', 140, 130);
-        })()`);
-        const moved = await until(() => {
-          const b = ww.getBounds();
-          return b.x === wb.x + 40 && b.y === wb.y + 30 && getSettings().widgets?.[wid]?.x === wb.x + 40 && b;
-        }, '테이프 끌기', 3000).catch(() => null);
-        const tb2 = tape.getBounds();
-        check('테이프를 끌면 위젯이 옮겨지고 자리도 기억 (떼어지지 않음)', Boolean(moved) && windowManager.widgets.get(wid) === ww
-          && Math.abs(tb2.y + tb2.height / 2 - moved.y) <= 1, JSON.stringify({ moved, tb2 }));
-        ww.setBounds(wb); // 아래 점검은 처음 자리로
-        windowManager.saveWidgetBounds(wid, wb);
-      }
-      // 메모가 바뀌면 위젯도 바로
-      vault.save(wid, '# 자주 쓰는 안내\n\n전화 상담: 평일 10시~7시로 바뀜\n');
-      const updated = ww ? await until(() => js(ww, `document.querySelector('.mk-doc')?.textContent.includes('10시~7시')`), '위젯 다시 그림', 4000).catch(() => false) : false;
-      check('메모를 고치면 위젯도 바로 바뀜', updated);
-      // 본문 복사 단추: 제목 줄 빼고
-      clipboard.writeText('비움');
-      if (ww) await js(ww, `document.getElementById('wg-copy').click()`);
-      const copied = await until(async () => (await clipboard.readText()) === '전화 상담: 평일 10시~7시로 바뀜', '위젯 복사', 3000).catch(async () => clipboard.readText());
-      check('위젯 복사 단추: 본문만 클립보드에', copied === true, String(copied));
-      // 메모킹을 다시 켜면 그 자리에 (끌 때 닫힌 위젯은 기억)
-      windowManager.closeWidgetWindow(ww);
-      await until(() => !windowManager.widgets.has(wid), '위젯 창 닫힘', 3000).catch(() => {});
-      windowManager.restoreWidgets();
-      const again = await until(() => windowManager.widgets.get(wid), '위젯 다시', 3000).catch(() => null);
-      const againBounds = again?.getBounds();
-      check('다시 켜면 놓아 둔 자리에 위젯', Boolean(again) && Math.abs(againBounds.x - wb.x) <= 2 && Math.abs(againBounds.y - wb.y) <= 2, JSON.stringify({ againBounds, wb }));
-      // Alt+F4 · 그 밖의 닫기로는 사라지지 않음 (Windows 를 끌 때 잘못 잊지 않게 — 떼기는 테이프로만)
-      again?.close();
-      await new Promise((ok) => setTimeout(ok, 600));
-      check('위젯은 Alt+F4 로 닫히지 않고 기억도 그대로', Boolean(again) && !again.isDestroyed() && windowManager.widgets.get(wid) === again && Boolean(getSettings().widgets?.[wid]));
-      // 떼기: 테이프를 누르면
-      if (again) {
-        await until(() => js(again, `document.documentElement.dataset.ready === 'true'`), '위젯 준비 2', 6000).catch(() => {});
-        const tape2 = await until(() => windowManager.widgetTapes.get(wid)?.isVisible() && windowManager.widgetTapes.get(wid), '테이프 2', 4000).catch(() => null);
-        if (tape2) {
-          await until(() => js(tape2, `document.documentElement.dataset.ready === 'true'`), '테이프 준비 2', 4000).catch(() => {});
-          await js(tape2, `(() => {
-            const hit = document.querySelector('.hit');
-            hit.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 8, button: 0, screenX: 50, screenY: 50 }));
-            hit.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 8, button: 0, screenX: 50, screenY: 50 }));
-          })()`);
-        }
-      }
-      const gone = await until(() => !windowManager.widgets.has(wid) && !getSettings().widgets?.[wid], '위젯 떼기', 3000).catch(() => false);
-      check('테이프를 누르면 떼어짐 → 위젯이 사라지고 다시 켜도 안 뜸 (메모는 그대로)', gone && Boolean(vault.get(wid)));
+        await js(list, `document.querySelector('[data-id="${tid}"]').click()`);
+        const nid = await until(() => noteWins.get(tid)?.isVisible() && tid, '테이프 메모 창').catch(() => [...noteWins.keys()].find((k) => !b0.has(k)));
+        const w = noteWins.get(nid);
+        await until(() => js(w, `document.documentElement.dataset.ready === 'true' && !!document.querySelector('.mk-doc')`), '테이프 메모 준비');
+        return w;
+      };
+      const buttons = (w) => js(w, `(() => {
+        const st = (b) => b.hidden ? 'hidden' : b.classList.contains('folded') ? 'folded' : b.classList.contains('peeled') ? 'peeled' : 'shown';
+        return { top: st(document.getElementById('top-btn')), tape: st(document.getElementById('tape-btn')), status: document.getElementById('status').textContent, menu: Boolean(document.getElementById('widget-btn')) };
+      })()`);
+      const kindOf = (w) => stickers.get(w.id)?.kind ?? null;
+      let nw = await openTaped();
+      const b0 = await buttons(nw);
+      check('메모 창 윗막대: 왕관 옆에 테이프 버튼, ⋯ 메뉴에는 바탕화면에 붙이기 없음', b0.top === 'shown' && b0.tape === 'shown' && !b0.menu, JSON.stringify(b0));
+      const nb = nw.getBounds();
+      await js(nw, `document.getElementById('tape-btn').click()`);
+      const taped = await until(() => kindOf(nw) === 'tape' && stickers.get(nw.id)?.win?.isVisible() && getSettings().onBottom?.[tid] === true, '테이프 붙이기', 4000).catch(() => false);
+      const b1 = await buttons(nw);
+      const sb = stickers.get(nw.id)?.win?.getBounds();
+      check('테이프 버튼 → 메모 창 위 가장자리 가운데에 테이프 (절반은 메모 밖), 창은 그대로 · 늘 위 아님',
+        taped && !nw.isDestroyed() && !nw.isAlwaysOnTop() && sb && Math.abs(sb.y + sb.height / 2 - nb.y) <= 1 && Math.abs(sb.x + sb.width / 2 - (nb.x + nb.width / 2)) <= 1,
+        JSON.stringify({ taped, sb, nb }));
+      check('붙이면 두 버튼 모두 사라짐 (테이프 자리는 비고 왕관은 접힘) · 상태 줄 안내', b1.tape === 'peeled' && b1.top === 'folded' && /바탕화면에 붙였어요/.test(b1.status), JSON.stringify(b1));
+      await capture(nw, 'smoke-new-taped.png');
+      const badge = await until(() => js(list, `!!document.querySelector('[data-id="${tid}"] .taped')`), '목록 테이프 표시', 3000).catch(() => false);
+      check('목록 카드에 바탕화면 표시', badge);
+      // 스티커에 마우스를 올리면 메모 창 상태 줄에 "누르면 떼어져요"
+      windowManager.stickerHover(stickers.get(nw.id).win.webContents, true);
+      const hint = await until(async () => /테이프를 누르면/.test((await buttons(nw)).status), '스티커 안내', 2000).catch(() => false);
+      windowManager.stickerHover(stickers.get(nw.id).win.webContents, false);
+      check('테이프에 마우스를 올리면 상태 줄에 "누르면 떼어져요"', hint);
+      // 왕관과 함께 붙지 않는다: 단축키로 바꿔 붙임
+      await key(nw, 'T', ['control', 'shift']);
+      const crowned = await until(() => nw.isAlwaysOnTop() && kindOf(nw) === 'crown' && !getSettings().onBottom?.[tid] && getSettings().onTop?.[tid] === true, 'Ctrl+Shift+T 로 바꿈', 3000).catch(() => false);
+      await key(nw, 'G', ['control', 'shift']);
+      const backTaped = await until(() => !nw.isAlwaysOnTop() && kindOf(nw) === 'tape' && getSettings().onBottom?.[tid] === true && !getSettings().onTop?.[tid], 'Ctrl+Shift+G 로 바꿈', 3000).catch(() => false);
+      check('왕관 · 테이프는 함께 붙지 않음 (Ctrl+Shift+T / G 로 바꿔 붙음)', crowned && backTaped, JSON.stringify({ crowned, backTaped }));
+      // 닫았다 다시 열어도 테이프
+      nw.close();
+      await until(() => !noteWins.has(tid), '테이프 메모 닫힘', 3000).catch(() => {});
+      nw = await openTaped();
+      const kept = await until(() => kindOf(nw) === 'tape', '다시 열어도 테이프', 3000).catch(() => false);
+      const b2 = await buttons(nw);
+      check('다시 열어도 테이프 (버튼도 숨은 채 · 다시 열 때는 안내 없음)', kept && b2.tape === 'peeled' && b2.top === 'folded' && !/붙였어요/.test(b2.status), JSON.stringify(b2));
+      // 테이프를 누르면 떼어져 보통 창 (메모 창은 그대로, 버튼 둘 다 돌아옴)
+      await until(() => js(stickers.get(nw.id).win, `document.documentElement.dataset.ready === 'true'`), '테이프 준비', 4000).catch(() => {});
+      await js(stickers.get(nw.id).win, `document.querySelector('#tape .hit').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+      const peeled = await until(() => !stickers.get(nw.id) && !getSettings().onBottom?.[tid], '테이프 떼기', 3000).catch(() => false);
+      const b3 = await buttons(nw);
+      check('테이프를 누르면 떼어짐 → 메모 창은 그대로, 왕관 · 테이프 버튼이 돌아옴', peeled && !nw.isDestroyed() && nw.isVisible() && b3.top === 'shown' && b3.tape === 'shown' && /뗐어요/.test(b3.status), JSON.stringify(b3));
+      nw.close();
+      await until(() => !noteWins.has(tid), '메모 닫힘 2', 3000).catch(() => {});
+      // 예전 바탕화면 위젯 → 테이프 붙인 메모 창 (그 자리에)
+      const at = { x: nb.x + 30, y: nb.y + 20, width: 200, height: 150 };
+      getSettings().widgets = { [tid]: { ...at, taped: true }, 'other-folder-memo': { x: 1, y: 1, width: 300, height: 300 } };
+      windowManager.migrateWidgets();
+      const mw = await until(() => noteWins.get(tid)?.isVisible() && noteWins.get(tid), '옮긴 위젯', 4000).catch(() => null);
+      const mb = mw?.getBounds();
+      check('예전 바탕화면 위젯 → 그 자리의 테이프 메모 창 (작으면 메모 창 최소 크기로, 다른 폴더의 위젯 기억은 남김)',
+        Boolean(mw) && getSettings().onBottom?.[tid] === true && mb && Math.abs(mb.x - at.x) <= 2 && Math.abs(mb.y - at.y) <= 2 && mb.width >= 240 && mb.height >= 200
+          && !getSettings().widgets?.[tid] && Boolean(getSettings().widgets?.['other-folder-memo']),
+        JSON.stringify({ mb, at, widgets: getSettings().widgets }));
+      delete getSettings().widgets;
+      if (mw) windowManager.setNoteLayer(tid, null);
+      mw?.close();
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
