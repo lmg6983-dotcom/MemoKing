@@ -1799,29 +1799,34 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 }
 .hk-key b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
 /* 다른 메모가 쓰는 숫자: 아래 작은 점 */
-.hk-key i { position: absolute; bottom: 4px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--text-muted); opacity: 0; }
+.hk-key i { position: absolute; bottom: 4px; left: 50%; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--text-muted); opacity: 0; }
 .hk-key.taken i { opacity: 1; }
-/* 쓸 수 없는 숫자: 다른 앱이 씀(고를 수는 있지만 저장 안 됨) · 메모킹 다른 단축키(고를 수 없음) — 점선 테두리 */
-.hk-key.failed, .hk-key.blocked { border-style: dashed; border-bottom-width: 1px; color: var(--text-muted); background: transparent; }
+/* 쓸 수 없는 숫자: 다른 앱이 씀(고를 수는 있지만 저장 안 됨) · 메모킹 다른 단축키(고를 수 없음) — 점선 테두리 (배경과 3:1 넘게) */
+.hk-key.failed, .hk-key.blocked { border-style: dashed; border-bottom-width: 1px; border-color: var(--text-faint); color: var(--text-muted); background: transparent; }
 .hk-key:disabled { cursor: not-allowed; }
 @media (hover: hover) and (pointer: fine) { .hk-key:not(:disabled):hover { background: var(--fill-hover); } }
 .hk-key:active:not(:disabled) { transform: translateY(1px); }
-.hk-key[aria-checked="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); box-shadow: inset 0 0 0 1px var(--brand-yellow); }
+/* 고른 숫자: 노랑만으로는 흰 바탕에서 안 보이므로 테두리는 진하게 (밝은 화면 4.5:1 안팎) */
+.hk-key[aria-checked="true"] {
+  --hk-on: color-mix(in srgb, var(--brand-yellow) 50%, var(--text-strong));
+  border-style: solid; border-color: var(--hk-on); background: var(--brand-yellow-soft); color: var(--text-strong);
+  box-shadow: inset 0 0 0 1px var(--hk-on);
+}
 .hk-key[aria-checked="true"] i { background: var(--text-strong); }
 .hk-key:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-/* 숫자 아래 표시 뜻 */
+.hotkey-dialog .label { margin-bottom: 4px; font-size: 12px; line-height: 16px; color: var(--muted); }
+/* 숫자 아래 표시 뜻 (그 표시가 붙은 숫자가 있을 때만) */
 .hk-legend { display: flex; gap: 12px; margin: -6px 0 10px; color: var(--muted); font-size: 11.5px; line-height: 16px; }
+.hk-legend[hidden], .hk-legend span[hidden] { display: none; }
 .hk-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.hk-legend i { width: 4px; height: 4px; border-radius: 50%; background: var(--text-muted); }
-.hk-legend i.dash { width: 12px; height: 8px; border: 1px dashed var(--text-muted); border-radius: 3px; background: transparent; }
-.hk-what { display: flex; flex-direction: column; margin-bottom: 6px; }
-.hk-what .label { margin-bottom: 2px; font-size: 12px; color: var(--muted); }
-.hk-opt { display: flex; align-items: center; gap: 12px; padding: 5px 0; cursor: pointer; }
-.hk-opt > span { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.hk-opt b { font-size: 14px; font-weight: 600; line-height: 20px; }
-.hk-opt small { color: var(--muted); font-size: 12px; line-height: 16px; }
-.hk-opt .switch { flex: none; }
-.hotkey-dialog .hk-hint { min-height: 36px; margin: 0 0 2px; color: var(--muted); font-size: 12.5px; line-height: 18px; }
+.hk-legend i { width: 5px; height: 5px; border-radius: 50%; background: var(--text-muted); }
+.hk-legend i.dash { width: 12px; height: 8px; border: 1px dashed var(--text-faint); border-radius: 3px; background: transparent; }
+/* 누르면: 내용 복사 · 메모 띄우기 · 둘 다 (.seg) — 고른 것의 설명은 아래 한 줄 (잠긴 메모는 안내가 두 줄이라 자리를 미리 잡아 창이 들썩이지 않게) */
+.hotkey-dialog .hk-mode { margin-bottom: 6px; }
+.hotkey-dialog .hk-mode button { height: 32px; font-size: 13px; }
+.hk-mode-desc { margin: 0 0 6px; color: var(--muted); font-size: 12px; line-height: 16px; }
+.hk-mode-desc.locked { min-height: 32px; }
+.hotkey-dialog .hk-hint { min-height: 36px; margin: 0 0 10px; color: var(--muted); font-size: 12.5px; line-height: 18px; }
 .hotkey-dialog .lock-error:empty { min-height: 0; margin: 0; }
 .hotkey-dialog .hk-clear { margin-right: auto; }
 

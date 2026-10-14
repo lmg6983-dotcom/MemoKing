@@ -600,11 +600,12 @@ export class WindowManager {
     mark();
   }
 
-  revealNote(id) {
-    const win = (this.stacks?.stackOf(id) ? this.openNote(id) : this.noteWins.get(id)) ?? this.openNote(id);
+  /** inactive: 앞으로만 가져오고 포커스는 쓰던 앱에 둔다 (단축키로 복사한 뒤 바로 붙여 넣게) */
+  revealNote(id, { inactive = false } = {}) {
+    const win = (this.stacks?.stackOf(id) ? this.openNote(id, { inactive }) : this.noteWins.get(id)) ?? this.openNote(id, { inactive });
     if (!win) return null;
     const bring = () => {
-      bringToFront(win, { raise: true });
+      bringToFront(win, { raise: true, inactive });
       win.webContents.send('memo:highlight');
     };
     whenPainted(win, bring);

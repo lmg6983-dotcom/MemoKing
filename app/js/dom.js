@@ -87,7 +87,7 @@ export function focusFirstIfKeyboard(event, menu, items) {
  * Tab 으로는 고른 칸 하나에만 들른다. 나중에 생긴 칸·바뀐 선택도 따라간다 (aria-checked 를 지켜봄)
  */
 export function radioGroups(root = document) {
-  const radios = (g) => [...g.children].filter((c) => c.matches('button[aria-checked], [role="radio"]') && !c.hidden);
+  const radios = (g) => [...g.children].filter((c) => c.matches('button[aria-checked], [role="radio"]') && !c.hidden && !c.disabled);
   const sync = (g) => {
     const list = radios(g);
     const on = list.find((r) => r.getAttribute('aria-checked') === 'true') ?? list[0];
