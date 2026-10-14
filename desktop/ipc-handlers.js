@@ -791,7 +791,7 @@ export function registerIpc(ctx) {
     const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
     let source = null;
     if (f.rel) {
-      source = getVault()?.resolve(String(f.rel)); // 화면(copy-content.js)이 이미 풀어 보낸 경로 — 다시 풀면 이름의 %XX 가 깨진다
+      source = /^attachments\//.test(String(f.rel)) ? getVault()?.resolve(String(f.rel)) : null; // 화면(copy-content.js)이 이미 풀어 보낸 경로 — 다시 풀면 이름의 %XX 가 깨진다
       if (!source || !fs.statSync(source, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
     } else if (typeof f.base64 !== 'string') return { error: '저장할 내용이 없어요' };
     const ext = path.extname(name).slice(1);
@@ -806,8 +806,13 @@ export function registerIpc(ctx) {
       if (r.canceled || !r.filePath) return { cancelled: true };
       file = r.filePath;
     }
-    if (source) fs.copyFileSync(source, file);
-    else fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+    try {
+      if (source) await fs.promises.copyFile(source, file);
+      else await fs.promises.writeFile(file, Buffer.from(f.base64, 'base64'));
+    } catch (err) {
+      console.warn('[save-as]', err);
+      return { error: '저장하지 못했어요. 다른 폴더를 골라 주세요' };
+    }
     if (SMOKE) smokeOpened.push({ kind: 'save', target: file });
     return { name: SMOKE ? name : path.basename(file) };
   });
@@ -816,7 +821,7 @@ export function registerIpc(ctx) {
     const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
     let file = null;
     if (f.rel) {
-      file = getVault()?.resolve(String(f.rel));
+      file = /^attachments\//.test(String(f.rel)) ? getVault()?.resolve(String(f.rel)) : null;
       if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
     } else if (typeof f.base64 === 'string') {
       const dir = path.join(app.getPath('temp'), 'memoking-share');

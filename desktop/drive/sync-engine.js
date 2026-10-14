@@ -156,11 +156,23 @@ export class SyncEngine {
 
     const goneRemote = paths.filter((p) => files[p] && !remote.has(p) && local.has(p)).length;
     const goneLocal = paths.filter((p) => files[p] && !local.has(p) && remote.has(p)).length;
-    if (goneRemote >= MASS_DELETE_MIN && goneRemote * 2 > known.length) {
+    const keepMissing = this.state.keepMissing === true; // 권한이 줄어 안 보이게 된 파일: 지우지 않고 다시 올린다 (drive-sync.js)
+    if (!keepMissing && goneRemote >= MASS_DELETE_MIN && goneRemote * 2 > known.length) {
       throw new SafetyStop(`Google Drive 폴더에서 파일 ${goneRemote}개가 한꺼번에 사라져서 동기화를 멈췄어요. 고른 폴더가 맞는지 확인해 주세요.`);
     }
     if (goneLocal >= MASS_DELETE_MIN && goneLocal * 2 > known.length) {
       throw new SafetyStop(`이 PC 메모 폴더에서 파일 ${goneLocal}개가 한꺼번에 사라져서 동기화를 멈췄어요.`);
+    }
+
+    // 양쪽에서 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
+    const clashes = paths.filter((p) => {
+      const l = local.get(p);
+      const r = remote.get(p);
+      const b = files[p];
+      return p !== MERGE_JSON && l && r && (!b || b.lmtime !== l.mtime || b.lsize !== l.size) && (!b || b.md5 !== r.md5);
+    });
+    if (clashes.length > MASS_CONFLICT_MAX && clashes.filter((p) => md5File(this.abs(p)) !== remote.get(p).md5).length > MASS_CONFLICT_MAX) {
+      throw new SafetyStop(`양쪽에서 엇갈린 메모가 ${MASS_CONFLICT_MAX}개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요.`);
     }
 
     const result = { skipped: false, uploaded: 0, downloaded: 0, deletedLocal: 0, deletedRemote: 0, conflicts: [] };
@@ -233,9 +245,6 @@ export class SyncEngine {
         await upload(rel, item.id);
         return;
       }
-      if (result.conflicts.length >= MASS_CONFLICT_MAX) {
-        throw new SafetyStop(`양쪽에서 엇갈린 메모가 ${MASS_CONFLICT_MAX}개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요.`);
-      }
       const copy = conflictName(rel);
       fs.renameSync(this.abs(rel), this.abs(copy));
       result.conflicts.push(copy);
@@ -257,7 +266,7 @@ export class SyncEngine {
           else if (md5File(this.abs(rel)) === r.md5) this.record(rel, r.id, r.md5, this.stat(rel)); // 양쪽 같은 내용
           else await conflict(rel, r);
         } else if (l && !r) {
-          if (!b || localChanged) await upload(rel, null); // 새 파일, 또는 Drive 에서 지웠지만 이 PC 에서 고침 → 되살림
+          if (!b || localChanged || keepMissing) await upload(rel, null); // 새 파일, 또는 Drive 에서 지웠지만 이 PC 에서 고침 → 되살림
           else {
             fs.rmSync(this.abs(rel), { force: true }); // 다른 기기에서 지움 → 이 PC 에서도
             result.deletedLocal++;
@@ -277,6 +286,7 @@ export class SyncEngine {
     }
 
     this.state.pageToken = token;
+    delete this.state.keepMissing; // 다 올렸으면 다음부터는 보통대로
     this.state.lastFullScan = this.now();
     this.state.folders = Object.fromEntries(this.folderIds);
     result.localChanged = result.downloaded > 0 || result.deletedLocal > 0 || result.conflicts.length > 0;

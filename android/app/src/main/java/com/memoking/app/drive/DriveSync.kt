@@ -86,6 +86,11 @@ object DriveSync {
         } catch (e: Exception) {
             JSONObject()
         }
+        // 권한이 Drive 전체 → drive.file 로 줄었으면 다른 앱이 넣은 파일이 목록에서 사라져 보인다 —
+        //   "Drive 에서 지움" 으로 휴대폰 메모를 지우지 않고 메모킹 파일로 다시 올린다 (한 번 다 끝낼 때까지)
+        val scope = if (GoogleAuth.grantedScope(ctx) == GoogleAuth.FULL_SCOPE) "full" else "file"
+        if (state.optString("scope") == "full" && scope == "file") state.put("keepMissing", true)
+        state.put("scope", scope)
         val result = try {
             SyncEngine(storage(ctx, folderId), DriveApi(ctx), folderId, state).run(full)
         } catch (e: Exception) {

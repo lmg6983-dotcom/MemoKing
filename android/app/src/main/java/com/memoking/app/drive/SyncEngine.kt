@@ -165,7 +165,8 @@ class SyncEngine(
         // 한쪽에서 한꺼번에 많이 사라졌으면 멈춘다
         val goneRemote = paths.count { base(it) != null && it !in remoteFiles && it in localFiles }
         val goneLocal = paths.count { base(it) != null && it !in localFiles && it in remoteFiles }
-        if (goneRemote >= MASS_DELETE_MIN && goneRemote * 2 > known.size) {
+        val keepMissing = state.optBoolean("keepMissing") // 권한이 줄어 안 보이게 된 파일: 지우지 않고 다시 올린다 (DriveSync.kt)
+        if (!keepMissing && goneRemote >= MASS_DELETE_MIN && goneRemote * 2 > known.size) {
             throw SafetyStop("Google Drive 폴더에서 파일 ${goneRemote}개가 한꺼번에 사라져서 동기화를 멈췄어요. 고른 폴더가 맞는지 확인해 주세요.")
         }
         if (goneLocal >= MASS_DELETE_MIN && goneLocal * 2 > known.size) {
@@ -270,7 +271,7 @@ class SyncEngine(
                         }
                     }
                     l != null && r == null -> when {
-                        b == null || localChanged -> upload(rel, null) // 새 파일, 또는 Drive 에서 지웠지만 휴대폰에서 고침 → 되살림
+                        b == null || localChanged || keepMissing -> upload(rel, null) // 새 파일, 또는 Drive 에서 지웠지만 휴대폰에서 고침 → 되살림
                         else -> {
                             // Drive(PC)에서 지움 → 휴대폰에서도
                             if (local.delete(rel)) deletedLocal++
@@ -295,6 +296,7 @@ class SyncEngine(
         }
 
         state.put("pageToken", token)
+        state.remove("keepMissing") // 다 올렸으면 다음부터는 보통대로
         state.put("lastFullScan", now())
         state.put("folders", JSONObject(folderIds.toMap()))
         return Result(uploaded, downloaded, deletedLocal, deletedRemote, conflicts)

@@ -183,7 +183,9 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
         b.classList.add('failed');
         b.innerHTML = FAIL_ICON;
         console.warn(b.className, err);
-        b.title = `${b.classList.contains('mk-save-btn') ? '저장' : b.classList.contains('mk-share-btn') ? '공유' : '복사'}하지 못했어요. 다시 눌러 주세요`;
+        const fileAct = b.classList.contains('mk-save-btn') ? '저장' : b.classList.contains('mk-share-btn') ? '공유' : null;
+        // 저장 · 공유는 앱이 알려 준 이유(파일을 찾지 못했어요 등)를 그대로
+        b.title = fileAct && err?.message && !/^Error invoking/.test(err.message) ? err.message : `${fileAct ?? '복사'}하지 못했어요. 다시 눌러 주세요`;
         announce(b.title);
         notice(b.title, true);
       }).finally(() => {

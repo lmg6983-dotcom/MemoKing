@@ -226,6 +226,23 @@ test('링크 미리보기 모음은 합친다', async () => {
   assert.ok(JSON.parse(drive.text('_memoking/link-previews.json')).pc);
 });
 
+test('외부 앱 연동을 꺼 권한이 줄면(keepMissing): 목록에서 안 보이게 된 다른 앱 메모를 지우지 않고 다시 올린다', async () => {
+  await startFromPhone();
+  for (let i = 1; i <= 12; i++) drive.put(`제미나이/${i}.md`, `g${i}`); // 다른 앱(Gemini)이 넣은 메모
+  drive.changed = true;
+  await sync();
+  assert.equal(lt('제미나이/1.md'), 'g1');
+  // drive.file 권한에는 다른 앱이 만든 파일이 보이지 않는다
+  for (const [id, f] of drive.files) if (/^\d+\.md$/.test(f.name)) drive.files.delete(id);
+  drive.changed = true;
+  state.keepMissing = true; // drive-sync.js 가 권한이 Drive 전체 → drive.file 로 준 것을 보고 켬
+  const r = await sync();
+  assert.equal(r.deletedLocal, 0);
+  assert.equal(lt('제미나이/12.md'), 'g12');
+  assert.equal(drive.text('제미나이/12.md'), 'g12'); // 메모킹 파일로 다시 올림
+  assert.equal(state.keepMissing, undefined); // 한 번 다 끝내면 보통대로
+});
+
 test('Drive 에서 한꺼번에 사라지면 멈추고 이 PC 파일은 그대로', async () => {
   await startFromPhone();
   for (let i = 1; i <= 30; i++) await lw(`많은/${i}.md`, `x${i}`);
@@ -290,5 +307,5 @@ test('양쪽에서 엇갈린 메모가 한 번에 너무 많으면 사본을 더
   }
   await assert.rejects(sync(), SafetyStop);
   const copies = fs.readdirSync(dir).filter((n) => n.includes('PC 충돌'));
-  assert.equal(copies.length, 20);
+  assert.equal(copies.length, 0); // 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 20개씩 또 생긴다)
 });
