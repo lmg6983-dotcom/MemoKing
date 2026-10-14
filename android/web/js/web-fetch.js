@@ -129,7 +129,7 @@ export class LinkPreviews {
     if (res.status < 200 || res.status > 299) throw new Error(`HTTP ${res.status}`);
     const type = (res.type ?? '').toLowerCase();
     const finalUrl = res.url || target.href;
-    const entry = { title: '', description: '', site: '', image: '', imageUrl: '', icon: '', fetchedAt: new Date().toISOString() };
+    const entry = { kind: 'page', title: '', description: '', site: '', image: '', imageUrl: '', icon: '', fetchedAt: new Date().toISOString() };
     let fileName = '';
     try {
       fileName = decodeURIComponent(new URL(finalUrl).pathname.split('/').pop() || '');

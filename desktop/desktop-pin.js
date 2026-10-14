@@ -129,9 +129,11 @@ export function pinCommand(kind, hwnd) {
 }
 
 export class DesktopPin {
-  constructor({ platform = process.platform, spawnHelper = spawn } = {}) {
+  /** onFail: 도우미를 더 띄우지 않기로 했을 때 (붙여 둔 창을 보통 창으로 되돌리게) */
+  constructor({ platform = process.platform, spawnHelper = spawn, onFail = null } = {}) {
     this.platform = platform;
     this.spawnHelper = spawnHelper;
+    this.onFail = onFail;
     this.proc = null;
     this.failed = false;
     this.quickExits = 0; // 띄우자마자 죽은 횟수 (Add-Type 이 막힌 PC 등) — 두 번이면 그만 띄운다
@@ -168,11 +170,11 @@ export class DesktopPin {
     });
     proc.on('exit', () => {
       if (this.proc === proc) this.proc = null; // 다음 명령 때 다시 띄운다
-      if (Date.now() - started < 10_000 && ++this.quickExits >= 2) this.failed = true; // 늘 죽으면 보통 창으로만
+      if (Date.now() - started < 10_000 && ++this.quickExits >= 2) this.fail(); // 늘 죽으면 보통 창으로만
     });
     proc.on('error', () => {
-      this.failed = true; // PowerShell 이 없으면 그냥 보통 창으로
       if (this.proc === proc) this.proc = null;
+      this.fail(); // PowerShell 이 없으면 그냥 보통 창으로
     });
     proc.stdin.on('error', () => {});
     // 다시 뜬 도우미는 아무것도 모른다 — 붙여 둔 창을 다시 붙인다 (지금 보내려던 명령은 send 가 이어서 보낸다)
@@ -182,6 +184,17 @@ export class DesktopPin {
       } catch {
         break;
       }
+    }
+  }
+
+  fail() {
+    if (this.failed) return;
+    this.failed = true;
+    this.pinned.clear();
+    try {
+      this.onFail?.();
+    } catch (err) {
+      console.warn('[desktop-pin]', err);
     }
   }
 

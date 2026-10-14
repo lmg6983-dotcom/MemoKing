@@ -787,7 +787,7 @@ export async function runSmoke({
     const openedBefore = smokeOpened.length;
     await js(linkNote.win, `document.querySelector('.mk-link-card .lc-main').click()`);
     await wait(200);
-    check('링크 카드를 눌러도 바로 열지 않고 단추 줄 (노란 "열기")', !smokeOpened.slice(openedBefore).some((o) => o.kind === 'web') && await js(linkNote.win, `document.querySelector('.mk-open-btn')?.getAttribute('aria-label') === '이 링크 카드 열기'`));
+    check('링크 카드를 눌러도 바로 열지 않고 단추 줄 (노란 "열기")', !smokeOpened.slice(openedBefore).some((o) => o.kind === 'web') && await js(linkNote.win, `document.querySelector('.mk-open-btn')?.getAttribute('aria-label') === '이 링크 열기'`));
     await clickThenOpen(linkNote.win, `document.querySelector('.mk-link-card .lc-main')`);
     await js(linkNote.win, `document.querySelector('.mk-doc p a[href="${base}/euckr.html"]').click()`);
     await wait(300);

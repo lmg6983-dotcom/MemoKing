@@ -457,7 +457,10 @@ class Bridge(private val activity: MainActivity) {
             "driveFullScope" -> {
                 val on = a.optBoolean("on")
                 if (!on) GoogleAuth.setFullScope(ctx, false)
-                if (GoogleAuth.native(ctx) && NativeAuth.available(ctx)) {
+                // 끄는데 지금 권한이 이미 drive.file 이면 다시 허용받을 것이 없다 (PC google-auth.js setFullScope 와 같게)
+                if (!on && GoogleAuth.grantedScope(ctx) != GoogleAuth.FULL_SCOPE) {
+                    resolve(id) { JSONObject().put("email", GoogleAuth.email(ctx)).put("full", false) }
+                } else if (GoogleAuth.native(ctx) && NativeAuth.available(ctx)) {
                     activity.runOnUiThread { activity.loginWithPhoneAccount(id, on) }
                 } else pool.execute {
                     resolve(id) {

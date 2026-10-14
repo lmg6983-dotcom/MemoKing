@@ -825,9 +825,19 @@ export function registerIpc(ctx) {
       if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
     } else if (typeof f.base64 === 'string') {
       const dir = path.join(app.getPath('temp'), 'memoking-share');
-      fs.mkdirSync(dir, { recursive: true });
-      file = path.join(dir, name);
-      fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        // 지난 공유 때 만든 임시 파일은 하루가 지나면 치운다 (공유 창이 넘겨받을 동안은 남겨 두고)
+        for (const old of fs.readdirSync(dir)) {
+          const p = path.join(dir, old);
+          if (Date.now() - (fs.statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 86_400_000) fs.rmSync(p, { force: true });
+        }
+        file = path.join(dir, name);
+        fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+      } catch (err) {
+        console.warn('[share]', err);
+        return { error: '공유할 파일을 만들지 못했어요. 다시 눌러 주세요' };
+      }
     } else return { error: '공유할 내용이 없어요' };
     if (SMOKE) {
       smokeOpened.push({ kind: 'share', target: file });
@@ -953,6 +963,8 @@ export function registerIpc(ctx) {
     if (!senderWindow(event)) return null;
     const key = String(id);
     const want = layer === 'bottom' ? 'bottom' : 'top';
+    // 바탕화면 층에 붙일 수 없는 PC 에서 테이프(Ctrl+Shift+G)는 아무 일도 하지 않는다 — 붙어 있던 왕관을 떼지 않게
+    if (want === 'bottom' && !wm.canTape) return wm.layerState(key);
     return wm.setNoteLayer(key, wm.layerOf(key) === want ? null : want);
   });
   ipcMain.handle('list:show', () => {

@@ -64,7 +64,9 @@ export class WindowManager {
     this.spareTimer = 0;
     this.paintMarks = new WeakMap(); // 예비 창: 화면이 "메모를 그렸다" 고 알려 오면 부를 함수
     this.hotkeySlotOf = () => null; // 메모 단축키 칸 (main.js 가 채움)
-    this.desktopPin = new DesktopPin(); // 테이프로 붙인 메모 창을 바탕화면 층에
+    // 테이프로 붙인 메모 창을 바탕화면 층에. 도우미가 막힌 PC(Add-Type 금지 등)로 드러나면 붙여 둔 창을 보통 창으로
+    //   (그러지 않으면 작업 표시줄 단추도 없고 바탕화면 층도 아닌 창이 테이프 스티커를 단 채 남는다)
+    this.desktopPin = new DesktopPin({ onFail: () => this.dropDesktopPins() });
     this.lostNotes = new Set(); // 탐색기가 다시 시작돼 함께 사라진 테이프 메모 (곧 다시 연다)
     this.hudWin = null;
     this.hudTimer = 0;
@@ -406,6 +408,16 @@ export class WindowManager {
     this.desktopPin.send('unpin', hwnd);
     // 주인이 되돌려진 뒤에야 작업 표시줄 단추가 다시 붙는다 — 도우미가 답하기 전이었을 수 있어 조금 뒤 한 번 더
     setTimeout(() => !win.isDestroyed() && !win.mkPinned && win.setSkipTaskbar(false), 400);
+  }
+
+  dropDesktopPins() {
+    if (this.isQuitting()) return;
+    for (const [id, w] of this.noteWins) {
+      if (w.isDestroyed() || !w.mkPinned) continue;
+      this.applyLayer(w, id);
+      w.webContents.send('memo:layer', this.layerState(id));
+    }
+    this.pushList();
   }
 
   /** 왕관 · 테이프 · 없음 — 스택이면 탭 모두. fromId 의 창만 붙고 떼어지는 모습을 보인다 */
