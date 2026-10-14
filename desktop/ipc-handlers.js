@@ -868,6 +868,11 @@ export function registerIpc(ctx) {
     if (w && !w.isDestroyed()) w.setIgnoreMouseEvents(!over, { forward: true });
   });
   ipcMain.handle('sticker:peel', (event) => wm.peelSticker(event.sender));
+  // 바탕화면 위젯의 테이프: 끌어서 옮기기 · 눌러서 떼기
+  ipcMain.on('tape:drag-start', (event) => wm.tapeDragStart(event.sender));
+  ipcMain.on('tape:drag', (event, dx, dy) => wm.tapeDrag(event.sender, Number(dx) || 0, Number(dy) || 0));
+  ipcMain.on('tape:drag-end', (event) => wm.tapeDragEnd(event.sender));
+  ipcMain.handle('tape:peel', (event) => wm.peelWidgetTape(event.sender));
   ipcMain.handle('list:on-top', () => Boolean(wm.listWin?.isAlwaysOnTop()));
   ipcMain.handle('win:dim-titlebar', (event, level) => {
     if (!wm.listWin || senderWindow(event) !== wm.listWin) return;

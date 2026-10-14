@@ -1,0 +1,31 @@
+/* 바탕화면 위젯의 셀로판 테이프 — 투명 창 안에 그린다 (위젯 위 가장자리에 반쯤 걸치게 하려고 따로 띄운 창) */
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+.tape {
+  display: block; width: 100%; height: 100%; overflow: visible;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.22));
+  pointer-events: none;
+  transition: transform 0.15s ease-out, filter 0.15s ease-out;
+  transform-origin: 50% 60%;
+}
+/* 마우스는 테이프 모양 위에서만 */
+.hit { pointer-events: visiblePainted; cursor: grab; }
+.tape.dragging .hit { cursor: grabbing; }
+.body { fill: rgba(255, 255, 255, 0.5); stroke: rgba(17, 17, 17, 0.18); stroke-width: 0.8; stroke-linejoin: round; transition: fill 0.15s ease-out; }
+.shine { stroke: rgba(255, 255, 255, 0.8); stroke-width: 1.4; stroke-linecap: round; fill: none; }
+@media (prefers-color-scheme: dark) { .body { fill: rgba(255, 255, 255, 0.34); stroke: rgba(255, 255, 255, 0.22); } }
+/* 마우스를 올리면 떼어질 듯 살짝 들린다 */
+.tape.hover { transform: translateY(-1px) rotate(-2deg); filter: drop-shadow(0 2px 2.5px rgba(0, 0, 0, 0.28)); }
+.tape.hover .body { fill: rgba(255, 255, 255, 0.62); }
+.tape.dragging { transform: none; }
+/* 켤 때: 위에서 내려와 눌러 붙음 / 누르면: 들리며 떨어진다 */
+.tape.sticking { animation: tape-stick 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.tape.peeling { animation: tape-peel 0.22s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+@keyframes tape-stick {
+  0% { opacity: 0; transform: translateY(-8px) rotate(-8deg) scale(1.12); }
+  60% { opacity: 1; }
+  100% { transform: none; }
+}
+@keyframes tape-peel { to { opacity: 0; transform: translateY(-10px) rotate(10deg) scale(1.06); } }
+@media (prefers-reduced-motion: reduce) {
+  .tape, .tape.sticking, .tape.peeling { animation: none; transition: none; }
+}

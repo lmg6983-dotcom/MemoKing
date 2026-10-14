@@ -83,18 +83,8 @@ $('wg-copy').addEventListener('click', async () => {
 });
 $('wg-open').addEventListener('click', () => api.widget.openNote(id));
 $('wg-unlock').addEventListener('click', () => api.widget.openNote(id));
-// 테이프를 누르면 떼어지며(들리고 사라짐) 바탕화면에서 떼기
-let peeling = false;
-$('wg-tape').addEventListener('click', () => {
-  if (peeling) return;
-  peeling = true;
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  document.body.classList.add('wg-peeling');
-  setTimeout(() => api.widget.remove(id).finally(() => {
-    peeling = false;
-    document.body.classList.remove('wg-peeling'); // 떼지 못했으면 그대로
-  }), reduced ? 0 : 260);
-});
+// 테이프(tape.html)를 눌러 뗄 때: 위젯도 살짝 작아지며 흐려진다 (곧 메인이 창을 닫는다)
+api.on('widget:peeling', () => document.body.classList.add('wg-peeling'));
 // 파일 칩 · 인터넷 링크는 메모 창에서처럼 한 번 누르면 열기
 root.addEventListener('click', (e) => {
   const a = e.target instanceof Element ? e.target.closest('a[href]') : null;

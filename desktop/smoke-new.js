@@ -578,13 +578,38 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const ww = await until(() => windowManager.widgets.get(wid), '위젯 창', 4000).catch(() => null);
       await until(() => ww && js(ww, `document.documentElement.dataset.ready === 'true'`), '위젯 준비', 6000).catch(() => {});
       const noteClosed = await until(() => !noteWins.has(nid), '메모 창 닫힘', 3000).catch(() => false);
-      const look = ww ? await js(ww, `({ text: document.querySelector('.mk-doc')?.textContent ?? '', editable: document.querySelector('.mk-doc')?.getAttribute('contenteditable'), color: document.body.dataset.color, actions: document.querySelectorAll('.wg-actions button').length, tape: Boolean(document.getElementById('wg-tape')), unpinBtn: Boolean(document.getElementById('wg-remove')) })`) : null;
+      const look = ww ? await js(ww, `({ text: document.querySelector('.mk-doc')?.textContent ?? '', editable: document.querySelector('.mk-doc')?.getAttribute('contenteditable'), color: document.body.dataset.color, actions: document.querySelectorAll('.wg-actions button').length, unpinBtn: Boolean(document.getElementById('wg-remove')) })`) : null;
       const wb = ww?.getBounds();
       check('바탕화면에 붙이기: 메모 창 자리에 위젯이 뜨고 메모 창은 닫힘 (읽기 전용 · 같은 색 · 복사/열기 · 떼기는 테이프)',
-        Boolean(ww) && noteClosed && /전화 상담: 평일 9시~6시/.test(look?.text ?? '') && look?.editable === 'false' && look?.actions === 2 && look?.tape && !look?.unpinBtn
+        Boolean(ww) && noteClosed && /전화 상담: 평일 9시~6시/.test(look?.text ?? '') && look?.editable === 'false' && look?.actions === 2 && !look?.unpinBtn
           && wb && Math.abs(wb.x - noteBounds.x) <= 2 && Math.abs(wb.y - noteBounds.y) <= 2 && Boolean(getSettings().widgets?.[wid]),
         JSON.stringify({ ww: Boolean(ww), noteClosed, look, wb, noteBounds }));
       if (ww) await capture(ww, 'smoke-new-widget.png');
+      // 셀로판 테이프: 위젯 위 가장자리 가운데에 절반만 걸침 (따로 띄운 투명 창, 위젯이 주인)
+      const tape = await until(() => windowManager.widgetTapes.get(wid)?.isVisible() && windowManager.widgetTapes.get(wid), '테이프', 4000).catch(() => null);
+      const tb = tape?.getBounds();
+      check('위젯 위 가장자리 가운데에 테이프 (절반은 메모 밖)', Boolean(tape) && tape.getParentWindow() === ww
+        && Math.abs(tb.y + tb.height / 2 - wb.y) <= 1 && Math.abs(tb.x + tb.width / 2 - (wb.x + wb.width / 2)) <= 1, JSON.stringify({ tb, wb }));
+      // 테이프를 끌면 위젯이 따라 옮겨지고(떼어지지 않음), 테이프도 따라온다
+      if (tape) {
+        await until(() => js(tape, `document.documentElement.dataset.ready === 'true'`), '테이프 준비', 4000).catch(() => {});
+        await js(tape, `(async () => {
+          const t = document.getElementById('tape');
+          const at = (type, x, y) => t.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 7, button: 0, screenX: x, screenY: y }));
+          document.querySelector('.hit').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, button: 0, screenX: 100, screenY: 100 }));
+          for (let i = 1; i <= 5; i++) { at('pointermove', 100 + i * 8, 100 + i * 6); await new Promise((r) => setTimeout(r, 30)); }
+          at('pointerup', 140, 130);
+        })()`);
+        const moved = await until(() => {
+          const b = ww.getBounds();
+          return b.x === wb.x + 40 && b.y === wb.y + 30 && getSettings().widgets?.[wid]?.x === wb.x + 40 && b;
+        }, '테이프 끌기', 3000).catch(() => null);
+        const tb2 = tape.getBounds();
+        check('테이프를 끌면 위젯이 옮겨지고 자리도 기억 (떼어지지 않음)', Boolean(moved) && windowManager.widgets.get(wid) === ww
+          && Math.abs(tb2.y + tb2.height / 2 - moved.y) <= 1, JSON.stringify({ moved, tb2 }));
+        ww.setBounds(wb); // 아래 점검은 처음 자리로
+        windowManager.saveWidgetBounds(wid, wb);
+      }
       // 메모가 바뀌면 위젯도 바로
       vault.save(wid, '# 자주 쓰는 안내\n\n전화 상담: 평일 10시~7시로 바뀜\n');
       const updated = ww ? await until(() => js(ww, `document.querySelector('.mk-doc')?.textContent.includes('10시~7시')`), '위젯 다시 그림', 4000).catch(() => false) : false;
@@ -608,7 +633,15 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       // 떼기: 테이프를 누르면
       if (again) {
         await until(() => js(again, `document.documentElement.dataset.ready === 'true'`), '위젯 준비 2', 6000).catch(() => {});
-        await js(again, `document.getElementById('wg-tape').click()`);
+        const tape2 = await until(() => windowManager.widgetTapes.get(wid)?.isVisible() && windowManager.widgetTapes.get(wid), '테이프 2', 4000).catch(() => null);
+        if (tape2) {
+          await until(() => js(tape2, `document.documentElement.dataset.ready === 'true'`), '테이프 준비 2', 4000).catch(() => {});
+          await js(tape2, `(() => {
+            const hit = document.querySelector('.hit');
+            hit.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 8, button: 0, screenX: 50, screenY: 50 }));
+            hit.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 8, button: 0, screenX: 50, screenY: 50 }));
+          })()`);
+        }
       }
       const gone = await until(() => !windowManager.widgets.has(wid) && !getSettings().widgets?.[wid], '위젯 떼기', 3000).catch(() => false);
       check('테이프를 누르면 떼어짐 → 위젯이 사라지고 다시 켜도 안 뜸 (메모는 그대로)', gone && Boolean(vault.get(wid)));
