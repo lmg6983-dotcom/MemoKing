@@ -18,6 +18,7 @@ import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront } from './window-utils.js';
 import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
+import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
@@ -147,6 +148,24 @@ export function registerIpc(ctx) {
       properties: ['openDirectory', 'createDirectory'],
     });
     if (result.canceled || !result.filePaths[0]) return vaultInfo();
+    // Google Drive 데스크탑 앱 폴더(G:\내 드라이브 …)를 고르면서 메모킹의 Google Drive 동기화도 켜져 있으면:
+    //   두 동기화가 같은 파일을 주고받아 메모가 끝없이 늘어날 수 있다 — 하나만 쓰게 묻는다
+    if (settings.drive?.folderId && insideDriveForDesktop(result.filePaths[0])) {
+      const { response } = await dialog.showMessageBox(senderWindow(event), {
+        type: 'warning',
+        title: '메모킹',
+        message: '이 폴더는 Google Drive 데스크탑 앱이 동기화하는 곳이에요',
+        detail: '메모킹의 Google Drive 동기화와 함께 쓰면 두 동기화가 같은 메모를 서로 올리고 받아, 메모가 계속 늘어날 수 있어요.\n\n'
+          + '이 폴더를 쓰려면 메모킹의 Google Drive 동기화를 끕니다 (Google Drive 데스크탑 앱만 동기화). 휴대폰과 맞추려면 Google Drive 밖의 폴더를 골라 주세요.',
+        buttons: ['다른 폴더 고르기', '이 폴더 쓰고 메모킹 동기화 끄기'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      if (response !== 1) return vaultInfo();
+      settings.drive = null;
+      saveSettings();
+    }
     for (const win of wm.noteWins.values()) win.close();
     const info = openVault(result.filePaths[0]);
     if (getVault() && !settings.tutorialDone && !SMOKE) startTutorial();
@@ -237,6 +256,15 @@ export function registerIpc(ctx) {
     return { email };
   });
   ipcMain.handle('drive:cancel-login', () => getDriveAuth()?.cancelLogin());
+  // 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 로그인 → 받았으면 폴더를 처음부터 훑어 다른 앱이 넣은 메모를 바로 받는다
+  ipcMain.handle('drive:full-scope', async (_e, on) => {
+    const auth = getDriveAuth();
+    if (!auth) return { full: false, error: 'Google Drive 를 쓸 수 없어요' };
+    const res = await auth.setFullScope(Boolean(on));
+    if (wm.listWin) bringToFront(wm.listWin);
+    if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
+    return { ...res, drive: driveInfo() };
+  });
   ipcMain.handle('drive:folders', async (_e, parent) => (await getDriveApi()?.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name })));
   ipcMain.handle('drive:create-folder', async (_e, parent, name) => {
     const f = await getDriveApi()?.createFolder(String(parent || 'root'), String(name));

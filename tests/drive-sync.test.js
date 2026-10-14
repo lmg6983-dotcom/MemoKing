@@ -263,3 +263,32 @@ test('PC 메모 폴더 옮기기: Google Drive 앱 폴더의 메모·첨부를 �
   assert.ok(fs.existsSync(path.join(from, '회의.md'))); // 원래 폴더는 그대로
   assert.equal(copyVault(from, from), 0);
 });
+
+test('메모 폴더가 Google Drive 데스크탑 앱 폴더면 메모킹 동기화를 멈춘다 (두 동기화가 메모를 끝없이 늘리지 않게)', async () => {
+  const { DriveSync, DOUBLE_SYNC } = await import('../desktop/drive/drive-sync.js');
+  let calls = 0;
+  const api = new Proxy({}, { get: () => async () => { calls++; return { changed: true, token: 't' }; } });
+  const sync = new DriveSync({ api, auth: { connected: true }, stateDir: dir });
+  sync.configure({ folderId: 'F', folderName: '메모킹 동기화', root: 'G:\\내 드라이브\\메모킹 동기화' });
+  assert.equal(sync.blocked, true);
+  assert.equal(sync.status.state, 'error');
+  assert.equal(sync.status.error, DOUBLE_SYNC);
+  await sync.run({ full: true });
+  assert.equal(calls, 0, 'Drive 에 아무것도 묻지 않음');
+  sync.configure({ folderId: 'F', folderName: '메모킹 동기화', root: path.join(dir, 'vault') });
+  assert.equal(sync.blocked, false);
+  sync.stop();
+});
+
+test('양쪽에서 엇갈린 메모가 한 번에 너무 많으면 사본을 더 만들지 않고 멈춘다', async () => {
+  for (let i = 0; i < 25; i++) drive.put(`m${i}.md`, 'a');
+  await sync();
+  await new Promise((r) => setTimeout(r, 15));
+  for (let i = 0; i < 25; i++) {
+    drive.put(`m${i}.md`, 'drive');
+    fs.writeFileSync(path.join(dir, `m${i}.md`), 'pc');
+  }
+  await assert.rejects(sync(), SafetyStop);
+  const copies = fs.readdirSync(dir).filter((n) => n.includes('PC 충돌'));
+  assert.equal(copies.length, 20);
+});

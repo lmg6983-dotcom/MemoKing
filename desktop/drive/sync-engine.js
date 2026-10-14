@@ -13,6 +13,8 @@ export const FOLDER = 'application/vnd.google-apps.folder';
 const LOCAL_ONLY = new Set(['_memoking/index.json']);
 const MERGE_JSON = '_memoking/link-previews.json';
 const MASS_DELETE_MIN = 20;
+// 한 번에 이만큼 넘게 양쪽에서 엇갈리면 무언가 같은 폴더를 함께 맞추는 것 — 사본을 더 만들지 않고 멈춘다
+const MASS_CONFLICT_MAX = 20;
 // Drive 의 "바뀐 것" 목록만 믿으면 거기서 빠진 파일은 이 PC 에서 고칠 때까지 영영 내려오지 않으므로, 이만큼마다 폴더를 처음부터 훑는다
 export const FULL_SCAN_MS = 15 * 60_000;
 
@@ -230,6 +232,9 @@ export class SyncEngine {
         fs.writeFileSync(this.abs(rel), JSON.stringify({ ...mine, ...theirs }, null, 1));
         await upload(rel, item.id);
         return;
+      }
+      if (result.conflicts.length >= MASS_CONFLICT_MAX) {
+        throw new SafetyStop(`양쪽에서 엇갈린 메모가 ${MASS_CONFLICT_MAX}개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요.`);
       }
       const copy = conflictName(rel);
       fs.renameSync(this.abs(rel), this.abs(copy));

@@ -2006,6 +2006,23 @@ try {
   check('Drive: 폴더 변경은 목록에서 (메모킹 동기화가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
   await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
+  // 외부 앱 메모 연동 (전체 드라이브 권한): 연결된 뒤에만 보이고 기본은 꺼짐 → 켜면 다시 허용받고 폴더를 처음부터 · 취소하면 꺼진 채 · 끄기
+  if (!(await page.isVisible('#drive-full-row'))) await page.tap('#settings-btn');
+  await page.waitForTimeout(200);
+  check('외부 앱 메모 연동: 연결된 뒤 설정에 보이고 기본은 꺼짐', await page.isVisible('#drive-full-row') && !(await page.isChecked('#drive-full')));
+  const fullLog = async () => (await devLog()).log.filter((l) => l.driveFullScope).map((l) => l.driveFullScope.on);
+  await post('/dev/drive-deny', {});
+  await page.tap('#drive-full-row .switch');
+  await page.waitForTimeout(700);
+  check('외부 앱 메모 연동: 허용 화면에서 취소하면 다시 꺼짐 (지금 연결 그대로)', !(await page.isChecked('#drive-full')) && (await fullLog()).at(-1) === true && await page.isVisible('#drive-disconnect'));
+  await page.tap('#drive-full-row .switch');
+  await page.waitForTimeout(900);
+  check('외부 앱 메모 연동: 허용하면 켜짐', await page.isChecked('#drive-full') && (await page.evaluate(() => window.memoking?.driveStatus ? true : true)));
+  await page.tap('#drive-full-row .switch');
+  await page.waitForTimeout(700);
+  check('외부 앱 메모 연동: 끄면 drive.file 로 (꺼짐)', !(await page.isChecked('#drive-full')) && (await fullLog()).at(-1) === false);
+  await page.evaluate(() => window.__mk.back());
+  await page.waitForTimeout(300);
   if (await page.isVisible('#settings-sheet')) await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
   check('Drive: 연결 뒤 메모 그대로 보임', (await page.locator('.card').count()) === count);

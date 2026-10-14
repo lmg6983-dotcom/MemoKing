@@ -9,11 +9,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 
-// 메모킹이 만든(또는 사용자가 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님).
-// PC 메모킹과 휴대폰 메모킹은 같은 Google Cloud 프로젝트의 클라이언트라 서로 만든 메모를 본다
-// 메모킹(같은 Google Cloud 프로젝트)이 만든 파일만 — 제한 범위가 아니라 '확인되지 않은 앱' 안내 없이 쓸 수 있다 (브랜드 확인만).
-//   0.33.7~0.33.8 에서 잠깐 Drive 전체로 연결한 것은 끊고 다시 연결하게 한다 (아래 범위 비교). 다른 앱(제미나이)은 MCP create_memo 로 메모를 남긴다
-export const SCOPE = 'https://www.googleapis.com/auth/drive.file';
+// 기본: 메모킹이 만든(또는 사용자가 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님).
+//   PC 메모킹과 휴대폰 메모킹은 같은 Google Cloud 프로젝트의 클라이언트라 서로 만든 메모를 본다
+export const FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+// 설정 "외부 앱 메모 연동"을 켠 사람만: Drive 전체 — 제미나이 등 다른 앱이 폴더에 직접 넣은 .md 도 보인다
+export const FULL_SCOPE = 'https://www.googleapis.com/auth/drive';
+export const SCOPE = FILE_SCOPE;
+const KNOWN_SCOPES = new Set([FILE_SCOPE, FULL_SCOPE]);
+/** 로그인할 때 요청할 범위 */
+export const scopeFor = (full) => (full ? FULL_SCOPE : FILE_SCOPE);
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const LOGIN_TIMEOUT = 5 * 60 * 1000;
@@ -34,9 +38,12 @@ export class GoogleAuth {
     this.openExternal = openExternal;
     this.safeStorage = safeStorage;
     this.data = this.load();
-    // 예전(Drive 전체 권한)으로 로그인해 둔 것: 다시 연결하게 하고, 구글 쪽 예전 권한은 돌려준다
+    // 범위 표시가 없는 아주 예전 연결만: 다시 연결하게 하고, 구글 쪽 예전 권한은 돌려준다.
+    //   drive.file · Drive 전체(외부 앱 메모 연동을 켠 것)는 그대로 — 켜 둔 설정을 앱을 켤 때마다 끊지 않는다
     this.scopeUpgraded = false;
-    if (this.data.refreshToken && this.data.scope !== SCOPE) {
+    // 0.33.7~0.33.8 에서 Drive 전체로 연결한 것(설정 값 없이)은 그 상태를 켠 것으로 이어 간다
+    if (this.data.refreshToken && this.data.scope === FULL_SCOPE && this.data.useFullDriveScope === undefined) this.data.useFullDriveScope = true;
+    if (this.data.refreshToken && !KNOWN_SCOPES.has(this.data.scope)) {
       const old = this.data.refreshToken;
       delete this.data.refreshToken;
       delete this.data.email;
@@ -113,6 +120,42 @@ export class GoogleAuth {
     return this.data.email ?? '';
   }
 
+  /** 설정 "외부 앱 메모 연동 (전체 드라이브 권한)" 을 켰는가 */
+  get fullScope() {
+    return this.data.useFullDriveScope === true;
+  }
+
+  /** 지금 받아 둔 권한이 Drive 전체인가 */
+  get grantedFull() {
+    return Boolean(this.data.refreshToken) && this.data.scope === FULL_SCOPE;
+  }
+
+  /**
+   * 외부 앱 메모 연동 켜기·끄기 — 그 범위로 다시 로그인한다.
+   * 켜기: 허용을 받아야만 켜진다 (취소·실패하면 꺼진 채, 지금 연결은 그대로).
+   * 끄기: 설정은 바로 끈다. 다시 로그인을 취소하면 지금 연결을 그대로 쓰고, 다음에 다시 연결할 때 drive.file 로.
+   * @returns {Promise<{ full: boolean, relogged: boolean, error?: string }>}
+   */
+  async setFullScope(on) {
+    if (on) {
+      try {
+        await this.login({ full: true });
+      } catch (err) {
+        return { full: this.fullScope, relogged: false, error: err.message };
+      }
+      return { full: true, relogged: true };
+    }
+    this.data.useFullDriveScope = false;
+    this.save();
+    if (!this.connected || !this.grantedFull) return { full: false, relogged: false };
+    try {
+      await this.login({ full: false });
+      return { full: false, relogged: true };
+    } catch (err) {
+      return { full: false, relogged: false, error: err.message };
+    }
+  }
+
   setEmail(email) {
     this.data.email = email;
     this.save();
@@ -120,8 +163,12 @@ export class GoogleAuth {
 
   // ---------- 로그인 ----------
 
-  /** 기본 브라우저로 로그인 → 허용하면 토큰을 받아 둔다 */
-  async login() {
+  /**
+   * 기본 브라우저로 로그인 → 허용하면 토큰을 받아 둔다. 취소·실패하면 지금 연결(토큰·설정)은 그대로.
+   * @param {{ full?: boolean }} [opts] full: Drive 전체 (기본은 지금 설정 — 외부 앱 메모 연동)
+   */
+  async login({ full = this.fullScope } = {}) {
+    const scope = scopeFor(full);
     const client = this.client();
     if (!client) throw new AuthError('Google 로그인 설정(OAuth 클라이언트 ID)이 아직 없어요');
     this.cancelLogin();
@@ -158,7 +205,7 @@ export class GoogleAuth {
       server.listen(0, '127.0.0.1', () => {
         redirectUri = `http://127.0.0.1:${server.address().port}`;
         const q = new URLSearchParams({
-          client_id: client.id, redirect_uri: redirectUri, response_type: 'code', scope: SCOPE,
+          client_id: client.id, redirect_uri: redirectUri, response_type: 'code', scope,
           code_challenge: challenge, code_challenge_method: 'S256', state, access_type: 'offline', prompt: 'consent',
         });
         this.openExternal(`${AUTH_URL}?${q}`);
@@ -169,8 +216,12 @@ export class GoogleAuth {
       code, client_id: client.id, client_secret: client.secret, redirect_uri: redirect, grant_type: 'authorization_code', code_verifier: verifier,
     });
     if (!token.refresh_token) throw new AuthError('구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 시도해 주세요');
+    // 허용 화면에서 Drive 전체 칸을 끄고 허용할 수도 있다 — 실제로 받은 범위로 정한다
+    const granted = String(token.scope ?? scope).split(/\s+/);
+    if (full && !granted.includes(FULL_SCOPE)) throw new AuthError('Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요');
     this.data.refreshToken = token.refresh_token;
-    this.data.scope = SCOPE;
+    this.data.scope = scope;
+    this.data.useFullDriveScope = full;
     this.scopeUpgraded = false;
     this.accessToken = token.access_token;
     this.expiresAt = Date.now() + (token.expires_in ?? 3600) * 1000;
