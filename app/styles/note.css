@@ -314,6 +314,9 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 .mk-link-card[data-state="loading"] .lc-title { color: var(--text-muted); }
 .lc-thumb { width: 84px; height: 84px; flex: none; align-self: center; border-radius: var(--radius-sm); object-fit: cover; background: var(--fill-hover); }
 @media (max-width: 260px) { .lc-thumb { display: none; } }
+/* 링크 미리보기를 끈 설정: 카드 대신 보통 문단 같은 링크 글자 한 줄 (누르면 열림) */
+.mk-link-card.plain-link { width: fit-content; max-width: 100%; margin: 0 0 0.35em; user-select: auto; }
+.lc-plain { cursor: pointer; overflow-wrap: anywhere; }
 
 /* 파일 칩 위에 뜨는 안내 (이름·크기) */
 .hover-hint {

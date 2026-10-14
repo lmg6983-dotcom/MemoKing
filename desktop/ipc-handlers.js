@@ -271,6 +271,13 @@ export function registerIpc(ctx) {
     saveSettings();
     return settings.fitTables;
   });
+  // 링크 미리보기 카드 켜고 끄기 — 열린 메모 · 위젯에도 바로
+  ipcMain.handle('app:set-link-previews', (_e, on) => {
+    settings.linkPreviews = Boolean(on);
+    saveSettings();
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('settings:link-previews', settings.linkPreviews);
+    return settings.linkPreviews;
+  });
   ipcMain.handle('app:set-auto-tags', (_e, on) => {
     settings.autoTags = Boolean(on);
     saveSettings();

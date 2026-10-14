@@ -319,6 +319,8 @@ api.on('memo:external', async (next) => {
   await flush();
   showBanner(conflictCopy ? '다른 기기에서도 이 메모를 고쳤어요. 그쪽 내용은 따로 저장해 뒀어요.' : '다른 기기에서도 이 메모를 고쳤어요.', { load: conflictCopy ? '그쪽 내용 보기' : null, keep: '확인' });
 });
+api.on('settings:link-previews', (on) => editor?.setLinkPreviews(on));
+
 api.on('memo:removed', () => {
   showBanner('이 메모가 메모 폴더에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
 });
@@ -1736,8 +1738,10 @@ if (!memo) {
   renderStack(memo.stack);
   document.title = memo.title;
   current = saved = memo.body;
+  // 링크 미리보기 설정 (끄면 카드 대신 링크 글자) — 설정을 바꾸면 바로
+  const linkPreviews = await api.settings.get().then((s) => s?.linkPreviews !== false, () => true);
   editor = await createNoteEditor(el.editorRoot, {
-    markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus,
+    markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus, linkPreviews,
     tables: memo.tables ?? [], onTables: saveTables,
     readAttachment: async (src) => new TextDecoder().decode(await api.attachments.read(decodePath(src))),
     fetchPreview: (url) => api.links.preview(url),

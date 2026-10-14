@@ -785,6 +785,7 @@ function openSettings() {
   refreshHistoryRow();
   renderDrive();
   $('auto-tags').checked = note.autoTagsOn();
+  $('link-previews').checked = note.linkPreviewsOn();
   $('pen-writing').checked = note.penWriting() !== 'off';
   $('rec-stt').checked = recorder.sttOn();
   $('rec-stt-note').textContent = recorder.sttReady()
@@ -827,6 +828,7 @@ on('speakerModel', ({ progress }) => {
 });
 
 $('auto-tags').addEventListener('change', () => note.setAutoTags($('auto-tags').checked));
+$('link-previews').addEventListener('change', () => note.setLinkPreviews($('link-previews').checked));
 $('pen-writing').addEventListener('change', () => note.setPenWriting($('pen-writing').checked ? 'edit' : 'off'));
 $('rec-stt').addEventListener('change', () => recorder.setStt($('rec-stt').checked));
 $('settings-btn').addEventListener('click', openSettings);

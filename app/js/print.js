@@ -60,6 +60,7 @@ if (memo) {
     markdown: memo.body,
     tables: memo.tables ?? [], // 표 열 너비·행 높이·머리글 강조도 PDF 에 그대로
     readOnly: true,
+    linkPreviews: await api.settings.get().then((s) => s?.linkPreviews !== false, () => true),
     onChange: () => {},
     fetchPreview: (url) => api.links.preview(url),
     openLink: () => {},

@@ -46,6 +46,7 @@ async function render() {
     markdown: memo.body,
     tables,
     readOnly: true,
+    linkPreviews: await api.settings.get().then((s) => s?.linkPreviews !== false, () => true),
     // 투명 바탕 손 메모를 어두운 화면에서 흰 펜으로 그리려면 획 자료(SVG)를 읽어야 한다 (메모 창과 같게)
     readAttachment: async (src) => {
       let rel = src;
@@ -67,6 +68,7 @@ async function render() {
 let rendering = Promise.resolve();
 const queueRender = () => (rendering = rendering.then(render).catch((err) => console.warn('위젯 다시 그리기', err)));
 let renderTimer = 0;
+api.on('settings:link-previews', (on) => editor?.setLinkPreviews(on));
 api.on('widget:changed', () => {
   clearTimeout(renderTimer);
   renderTimer = setTimeout(queueRender, 120); // 저장이 이어서 올 때 한 번만
