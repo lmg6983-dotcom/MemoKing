@@ -1490,9 +1490,16 @@ export async function runSmoke({
     const notiMd = readMemo(memoFromNoti.id);
     check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림, /.test(notiMd));
     await closeNote(memoFromNoti.id);
+    // 알림 하나 지우기: 그 자리에 되돌리기 5초 → 되돌리면 그대로, 기다리면 지워짐
     await listJs(`document.querySelector('#history-rows .noti [aria-label="삭제"]').click()`);
     await wait(300);
-    check('보관한 알림 지우기', history.list({ query: '회의' }).length === 0);
+    const undoShown = await listJs(`!!document.querySelector('#history-rows .noti-undo')`) && history.list({ query: '회의' }).length === 1;
+    await listJs(`document.querySelector('#history-rows .noti-undo button').click()`);
+    await wait(200);
+    const undone = await listJs(`!document.querySelector('#history-rows .noti-undo') && !!document.querySelector('#history-rows .noti')`);
+    await listJs(`document.querySelector('#history-rows .noti [aria-label="삭제"]').click()`);
+    const removed = await until(() => history.list({ query: '회의' }).length === 0, '알림 지움', 7000).then(() => true).catch(() => false);
+    check('보관한 알림 지우기 (그 자리에 되돌리기 5초, 되돌리면 그대로)', undoShown && undone && removed, JSON.stringify({ undoShown, undone, removed }));
     await listJs(`document.querySelector('.tabs [aria-selected="true"]').focus()`);
     await key(getList(), 'Left');
     const tabAfter = await listJs(`document.querySelector('.tabs [aria-selected="true"]').dataset.tab`);

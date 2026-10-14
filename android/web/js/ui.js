@@ -17,9 +17,24 @@ function syncScrim() {
   }
 }
 
+// 대화형 시트(설정 · 휴지통 · 모을 앱 · 메모 메뉴 …)에는 오른쪽 위 × — 손잡이 · 바깥 누르기 · 뒤로 가기 말고도 눈에 보이는 닫기
+//   (화면 읽기 사용자에게도 분명한 출구). 시트가 길어 내려도 위에 붙어 있다
+function addCloseButton(el) {
+  if (el.getAttribute('role') !== 'dialog' || el.querySelector(':scope > .sheet-x')) return;
+  el.setAttribute('aria-modal', 'true');
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'icon-btn sheet-x';
+  x.setAttribute('aria-label', '닫기');
+  x.innerHTML = '<svg><use href="#i-close"/></svg>';
+  x.addEventListener('click', () => closeSheet(el));
+  el.prepend(x);
+}
+
 /** 시트를 연다. close: 닫을 때 할 일 (기본은 숨기기) */
 export function openSheet(el, { onClose } = {}) {
   if (sheets.some((s) => s.el === el)) return;
+  addCloseButton(el);
   el.hidden = false;
   openedAt = performance.now();
   sheets.push({
