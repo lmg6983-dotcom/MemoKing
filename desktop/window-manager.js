@@ -356,11 +356,15 @@ export class WindowManager {
     if (!memo) return null;
     const existing = this.widgets.get(id);
     if (existing && !existing.isDestroyed()) {
-      if (!existing.webContents.isLoading()) existing.showInactive(); // 아직 불러오는 중이면 ready-to-show 가 보인다
+      if (!existing.webContents.isLoading()) {
+        existing.showInactive(); // 아직 불러오는 중이면 ready-to-show 가 보인다
+        this.desktopPin.send('bottom', hwndOf(existing)); // 다시 보이며 앞으로 왔을 수 있다
+      }
       this.saveWidgetBounds(id, existing.getBounds());
       return existing;
     }
     const bounds = this.widgetBounds(id, near);
+    this.watchWidgetDisplays();
     const win = new BrowserWindow({
       ...bounds,
       minWidth: 180,
@@ -378,26 +382,34 @@ export class WindowManager {
       webPreferences,
     });
     guardWindow(win, { openWebPage });
+    const hwnd = hwndOf(win); // 닫힌 뒤에는 읽을 수 없다
     this.widgets.set(id, win);
     const remember = () => !win.isDestroyed() && this.saveWidgetBounds(id, win.getBounds());
     win.on('moved', remember);
     win.on('resized', remember);
-    // 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로
-    win.on('blur', () => this.desktopPin.send('bottom', hwndOf(win)));
+    // 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로 (그 밖에 앞으로 와 버리는 때는 desktop-pin.js 가 앞 창이 바뀔 때마다 내린다)
+    win.on('blur', () => this.desktopPin.send('bottom', hwnd));
     win.once('ready-to-show', () => {
       if (win.isDestroyed()) return;
       win.showInactive();
-      this.desktopPin.send('pin', hwndOf(win));
+      this.desktopPin.send('pin', hwnd);
     });
-    win.on('session-end', () => (win.mkKeep = true)); // Windows 를 끌 때 닫히는 것은 그대로 기억
-    // Alt+F4 처럼 사람이 직접 닫으면(close 가 먼저 옴) 떼기와 같게
-    win.on('close', () => {
-      if (!win.mkKeep && !this.isQuitting()) win.mkUserClose = true;
+    // Windows 를 끄거나 다시 시작할 때 닫히는 것은 그대로 기억 (자리도 바로 파일에 — 켜면 그 자리에)
+    const keepForShutdown = () => {
+      win.mkKeep = true;
+      saveSettings(true);
+    };
+    win.on('query-session-end', keepForShutdown);
+    win.on('session-end', keepForShutdown);
+    // 떼기는 테이프(또는 목록 메뉴)로만 — Alt+F4 · 그 밖의 닫기로는 사라지지 않는다 (끌 때 잘못 잊어버리지 않게)
+    win.on('close', (e) => {
+      if (win.mkKeep || win.mkRemove || this.isQuitting()) return;
+      e.preventDefault();
     });
     win.on('closed', () => {
+      this.desktopPin.send('unpin', hwnd);
       if (this.widgets.get(id) !== win) return;
       this.widgets.delete(id);
-      if (win.mkUserClose) return void this.removeWidget(id);
       this.pushList(); // 목록 카드의 바탕화면 표시
       // close 없이 사라짐 = 탐색기를 다시 시작해 바탕화면 창(주인)이 없어짐 — 조금 뒤 새 바탕화면에 다시 붙인다
       if (!win.mkKeep && !this.isQuitting()) {
@@ -410,6 +422,25 @@ export class WindowManager {
     if (!settings.widgets?.[id]) this.saveWidgetBounds(id, bounds);
     this.pushList();
     return win;
+  }
+
+  /**
+   * 로그인 직후처럼 모니터가 아직 다 잡히지 않아 기억한 자리가 화면 밖이면 임시 자리에 띄우고(기억은 그대로),
+   *   모니터가 잡히면(연결 · 해상도 · 배율 바뀜) 기억한 자리로 돌려놓는다
+   */
+  watchWidgetDisplays() {
+    if (this.widgetDisplayWatch) return;
+    this.widgetDisplayWatch = true;
+    const rehome = () => setTimeout(() => {
+      for (const [id, win] of this.widgets) {
+        const saved = settings.widgets?.[id];
+        if (!saved || win.isDestroyed() || !onScreen(saved)) continue;
+        const b = win.getBounds();
+        if (b.x !== saved.x || b.y !== saved.y || b.width !== saved.width || b.height !== saved.height) win.setBounds(saved);
+      }
+    }, 500);
+    screen.on('display-added', rehome);
+    screen.on('display-metrics-changed', rehome);
   }
 
   /** 메모 창 메뉴 › 바탕화면에 위젯으로 놓기: 그 메모 창 자리에 위젯을 놓고 메모 창은 닫는다 */
@@ -439,7 +470,10 @@ export class WindowManager {
     this.forgetWidgetBounds(id);
     const win = this.widgets.get(id);
     this.widgets.delete(id);
-    if (win && !win.isDestroyed()) win.close(); // closed 는 이미 목록에서 뺀 창이라 아무 일도 하지 않는다
+    if (win && !win.isDestroyed()) {
+      win.mkRemove = true;
+      win.close(); // closed 는 이미 목록에서 뺀 창이라 아무 일도 하지 않는다
+    }
     this.pushList();
     return true;
   }

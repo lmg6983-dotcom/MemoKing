@@ -578,10 +578,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const ww = await until(() => windowManager.widgets.get(wid), '위젯 창', 4000).catch(() => null);
       await until(() => ww && js(ww, `document.documentElement.dataset.ready === 'true'`), '위젯 준비', 6000).catch(() => {});
       const noteClosed = await until(() => !noteWins.has(nid), '메모 창 닫힘', 3000).catch(() => false);
-      const look = ww ? await js(ww, `({ text: document.querySelector('.mk-doc')?.textContent ?? '', editable: document.querySelector('.mk-doc')?.getAttribute('contenteditable'), color: document.body.dataset.color, actions: document.querySelectorAll('.wg-actions button').length })`) : null;
+      const look = ww ? await js(ww, `({ text: document.querySelector('.mk-doc')?.textContent ?? '', editable: document.querySelector('.mk-doc')?.getAttribute('contenteditable'), color: document.body.dataset.color, actions: document.querySelectorAll('.wg-actions button').length, tape: Boolean(document.getElementById('wg-tape')), unpinBtn: Boolean(document.getElementById('wg-remove')) })`) : null;
       const wb = ww?.getBounds();
-      check('바탕화면에 붙이기: 메모 창 자리에 위젯이 뜨고 메모 창은 닫힘 (읽기 전용 · 같은 색 · 복사/열기/떼기)',
-        Boolean(ww) && noteClosed && /전화 상담: 평일 9시~6시/.test(look?.text ?? '') && look?.editable === 'false' && look?.actions === 3
+      check('바탕화면에 붙이기: 메모 창 자리에 위젯이 뜨고 메모 창은 닫힘 (읽기 전용 · 같은 색 · 복사/열기 · 떼기는 테이프)',
+        Boolean(ww) && noteClosed && /전화 상담: 평일 9시~6시/.test(look?.text ?? '') && look?.editable === 'false' && look?.actions === 2 && look?.tape && !look?.unpinBtn
           && wb && Math.abs(wb.x - noteBounds.x) <= 2 && Math.abs(wb.y - noteBounds.y) <= 2 && Boolean(getSettings().widgets?.[wid]),
         JSON.stringify({ ww: Boolean(ww), noteClosed, look, wb, noteBounds }));
       if (ww) await capture(ww, 'smoke-new-widget.png');
@@ -601,19 +601,17 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const again = await until(() => windowManager.widgets.get(wid), '위젯 다시', 3000).catch(() => null);
       const againBounds = again?.getBounds();
       check('다시 켜면 놓아 둔 자리에 위젯', Boolean(again) && Math.abs(againBounds.x - wb.x) <= 2 && Math.abs(againBounds.y - wb.y) <= 2, JSON.stringify({ againBounds, wb }));
-      // 떼기
+      // Alt+F4 · 그 밖의 닫기로는 사라지지 않음 (Windows 를 끌 때 잘못 잊지 않게 — 떼기는 테이프로만)
+      again?.close();
+      await new Promise((ok) => setTimeout(ok, 600));
+      check('위젯은 Alt+F4 로 닫히지 않고 기억도 그대로', Boolean(again) && !again.isDestroyed() && windowManager.widgets.get(wid) === again && Boolean(getSettings().widgets?.[wid]));
+      // 떼기: 테이프를 누르면
       if (again) {
         await until(() => js(again, `document.documentElement.dataset.ready === 'true'`), '위젯 준비 2', 6000).catch(() => {});
-        await js(again, `document.getElementById('wg-remove').click()`);
+        await js(again, `document.getElementById('wg-tape').click()`);
       }
       const gone = await until(() => !windowManager.widgets.has(wid) && !getSettings().widgets?.[wid], '위젯 떼기', 3000).catch(() => false);
-      check('떼기 → 위젯이 사라지고 다시 켜도 안 뜸 (메모는 그대로)', gone && Boolean(vault.get(wid)));
-      // Alt+F4 로 닫아도 떼기와 같게
-      const w2 = windowManager.openWidget(wid);
-      await until(() => getSettings().widgets?.[wid], '위젯 다시 놓기', 2000).catch(() => {});
-      w2?.close();
-      const closedByUser = await until(() => !windowManager.widgets.has(wid) && !getSettings().widgets?.[wid], 'Alt+F4', 3000).catch(() => false);
-      check('위젯을 Alt+F4 로 닫으면 떼기와 같게 (다시 켜도 안 뜸)', closedByUser);
+      check('테이프를 누르면 떼어짐 → 위젯이 사라지고 다시 켜도 안 뜸 (메모는 그대로)', gone && Boolean(vault.get(wid)));
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

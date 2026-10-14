@@ -1,5 +1,5 @@
 /* 바탕화면 위젯 (widget.html) — 메모 창과 같은 종이 · 글씨 (note.css), 막대 없이 내용만.
-   위 가장자리 띠를 끌어 옮기고, 마우스를 올리면 오른쪽 위에 복사 · 열기 · 떼기 */
+   위 가장자리 띠를 끌어 옮기고, 마우스를 올리면 오른쪽 위에 복사 · 열기. 위 가운데 셀로판 테이프를 누르면 떼기 */
 body.widget { position: relative; }
 .wg-bar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 5;
@@ -7,14 +7,36 @@ body.widget { position: relative; }
   height: 30px; padding: 0 4px 0 10px;
   -webkit-app-region: drag; /* 끌어서 옮기기 */
 }
-/* 손잡이: 위 가운데 짧은 줄 — 마우스를 올리면 진해짐 */
-.wg-grip {
-  position: absolute; top: 6px; left: 50%;
-  width: 28px; height: 4px; margin-left: -14px; border-radius: 2px;
-  background: color-mix(in srgb, var(--note-text) 32%, transparent); /* 끌 수 있다는 유일한 표시 — 메모 바탕 위 3:1 이상 */
-  transition: background-color 0.16s var(--ease-out);
+/* 셀로판 테이프: 위 가장자리에 걸쳐 붙인 반투명 테이프 (왕관 스티커처럼 "붙여 둠" 표시) — 누르면 떼기
+   창 밖으로는 그릴 수 없어 위 끝이 창 가장자리에 걸려 잘린 듯 보이게 (테이프가 종이 뒤로 넘어간 모양) */
+.wg-tape {
+  position: absolute; top: -5px; left: 50%;
+  width: 84px; height: 26px; margin-left: -42px; padding: 0; border: 0; background: none;
+  transform: rotate(-3deg); transform-origin: 50% 30%;
+  cursor: pointer; -webkit-app-region: no-drag;
+  filter: drop-shadow(0 1px 1px rgba(17, 17, 17, 0.14));
+  transition: transform 0.16s var(--ease-out), filter 0.16s var(--ease-out);
 }
-body.widget:hover .wg-grip { background: color-mix(in srgb, var(--note-text) 50%, transparent); }
+.wg-tape svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.tape-body {
+  fill: rgba(255, 255, 255, 0.5);
+  stroke: rgba(17, 17, 17, 0.16); stroke-width: 0.8; stroke-linejoin: round;
+  transition: fill 0.16s var(--ease-out);
+}
+.tape-shine { stroke: rgba(255, 255, 255, 0.75); stroke-width: 1.4; stroke-linecap: round; fill: none; }
+/* 어두운 색 메모 위에서도 테이프가 보이게 */
+@media (prefers-color-scheme: dark) { .tape-body { fill: rgba(255, 255, 255, 0.24); stroke: rgba(255, 255, 255, 0.18); } }
+/* 마우스를 올리면 떼어질 듯 한쪽이 살짝 들린다 */
+@media (hover: hover) {
+  .wg-tape:hover { transform: rotate(-6deg) translateY(-1px); filter: drop-shadow(0 2px 2px rgba(17, 17, 17, 0.22)); }
+  .wg-tape:hover .tape-body { fill: rgba(255, 255, 255, 0.58); }
+}
+.wg-tape:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 3px; }
+/* 누르면: 테이프가 들려 떨어지고 위젯이 살짝 작아지며 사라진다 */
+body.wg-peeling .wg-tape { animation: wg-tape-peel 0.24s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+body.wg-peeling { animation: wg-fade 0.26s ease-in forwards; }
+@keyframes wg-tape-peel { to { opacity: 0; transform: translateY(-10px) rotate(12deg) scale(1.06); } }
+@keyframes wg-fade { to { opacity: 0; transform: scale(0.97); } }
 .wg-actions {
   display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--note-bg) 88%, transparent);
@@ -49,4 +71,4 @@ body.widget .mk-doc { cursor: text; }
   transition: opacity 0.16s var(--ease-out), transform 0.2s var(--ease-out);
 }
 .wg-toast.on { opacity: 1; transform: translate(-50%, 0); }
-@media (prefers-reduced-motion: reduce) { .wg-actions, .wg-toast { transition: none; } .wg-toast.on, .wg-toast { transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .wg-actions, .wg-toast, .wg-tape { transition: none; } body.wg-peeling, body.wg-peeling .wg-tape { animation: none; } .wg-toast.on, .wg-toast { transform: translate(-50%, 0); } }

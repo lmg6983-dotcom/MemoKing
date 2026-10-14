@@ -12,13 +12,19 @@
   <script type="module" src="js/widget.js"></script>
 </head>
 <body data-color="yellow" class="widget">
-  <!-- 바탕화면 위젯: 메모 한 장을 읽기 전용으로 (글은 골라 복사할 수 있음). 위 막대를 끌어 옮기고, 가장자리를 끌어 크기를 바꾼다 -->
+  <!-- 바탕화면 위젯: 메모 한 장을 읽기 전용으로 (글은 골라 복사할 수 있음). 위 막대를 끌어 옮기고, 가장자리를 끌어 크기를 바꾼다
+       위 가운데 셀로판 테이프 = 바탕화면에 붙여 둔 표시 (왕관 스티커처럼) — 누르면 떼어진다 -->
   <header class="wg-bar">
-    <span class="wg-grip" aria-hidden="true"></span>
+    <button type="button" id="wg-tape" class="wg-tape" title="테이프를 누르면 바탕화면에서 떼어져요 (메모는 그대로)" aria-label="바탕화면에서 떼기 (메모는 그대로)">
+      <svg viewBox="0 0 96 30" aria-hidden="true" preserveAspectRatio="none">
+        <!-- 손으로 뜯은 양쪽 끝(톱니) -->
+        <path class="tape-body" d="M4 2 L92 2 L94 5 L91 8 L94 11 L91 14 L94 17 L91 20 L94 23 L92 28 L4 28 L2 25 L5 22 L2 19 L5 16 L2 13 L5 10 L2 7 Z"/>
+        <path class="tape-shine" d="M8 6 L88 6"/>
+      </svg>
+    </button>
     <div class="wg-actions">
       <button type="button" id="wg-copy" class="icon-btn wg-btn" title="본문 복사 (제목 줄 빼고)" aria-label="본문 복사"><svg><use href="#i-copy"/></svg></button>
       <button type="button" id="wg-open" class="icon-btn wg-btn" title="메모 열어서 고치기" aria-label="메모 열어서 고치기"><svg><use href="#i-pen"/></svg></button>
-      <button type="button" id="wg-remove" class="icon-btn wg-btn" title="바탕화면에서 떼기 (메모는 그대로)" aria-label="바탕화면에서 떼기"><svg><use href="#i-unpin"/></svg></button>
     </div>
   </header>
   <main id="editor" class="editor wg-doc"></main>
