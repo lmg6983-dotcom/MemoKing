@@ -5,8 +5,9 @@ import { reduceMotion } from './dom.js';
 const api = window.memoking;
 const kind = new URLSearchParams(location.search).get('kind') === 'tape' ? 'tape' : 'crown';
 const sticker = document.getElementById(kind);
-document.getElementById(kind === 'tape' ? 'crown' : 'tape').hidden = true;
-sticker.hidden = false;
+// SVG 에는 .hidden 속성이 없어(HTML 요소만) 속성으로 직접 — 그러지 않으면 테이프 창에 왕관이 그려지고 눌러도 떼어지지 않는다
+document.getElementById(kind === 'tape' ? 'crown' : 'tape').setAttribute('hidden', '');
+sticker.removeAttribute('hidden');
 let over = false;
 let peeled = false;
 
@@ -34,7 +35,7 @@ function setOver(next) {
 
 // 투명한 곳의 움직임도 전달받으므로(forward), 스티커 모양 위인지 보고 마우스를 받을지 정한다
 document.addEventListener('mousemove', (e) => {
-  if (!peeled) setOver(Boolean(e.target.closest?.('.hit')));
+  if (!peeled) setOver(Boolean(sticker.contains(e.target) && e.target.closest?.('.hit')));
 });
 document.addEventListener('mouseleave', () => setOver(false));
 sticker.addEventListener('click', (e) => {
