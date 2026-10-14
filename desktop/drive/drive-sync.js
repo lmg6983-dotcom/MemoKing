@@ -7,6 +7,8 @@ import path from 'node:path';
 import { SyncEngine, skipName, skipPath } from './sync-engine.js';
 
 const INTERVAL = 60_000;
+export const DOUBLE_SYNC = '메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). '
+  + '설정 › 폴더 변경에서 Google Drive 밖의 폴더(예: 문서\\메모킹)를 고르거나, 연결하기를 다시 눌러 주세요';
 
 export class DriveSync extends EventEmitter {
   /**
@@ -29,6 +31,11 @@ export class DriveSync extends EventEmitter {
     return Boolean(this.config?.folderId && this.config?.root);
   }
 
+  /** 메모 폴더를 Google Drive 데스크탑 앱도 맞추고 있어 메모킹 동기화를 멈춘 상태인가 */
+  get blocked() {
+    return this.active && insideDriveForDesktop(this.config.root);
+  }
+
   stateFile(folderId, root) {
     // 같은 Drive 폴더라도 이 PC 의 다른 폴더와 맞추면 기준이 달라진다
     const key = Buffer.from(path.resolve(root)).toString('base64url').slice(-40);
@@ -42,6 +49,12 @@ export class DriveSync extends EventEmitter {
     this.timer = null;
     if (!this.active) {
       this.publish({ state: 'off', error: '' });
+      return;
+    }
+    // 메모 폴더가 Google Drive 데스크탑 앱이 맞추는 폴더(G:\내 드라이브 …) 안이면 멈춘다 —
+    //   두 동기화가 같은 파일을 서로 올리고 받으며 "(PC 충돌 …)" · "(1)" 사본이 끝없이 늘 수 있다
+    if (this.blocked) {
+      this.publish({ state: 'error', error: DOUBLE_SYNC });
       return;
     }
     this.timer = setInterval(() => this.request(), INTERVAL);
@@ -63,13 +76,14 @@ export class DriveSync extends EventEmitter {
     }, delayMs);
   }
 
-  /** 지금 바로 — 이미 도는 중이면 끝난 뒤 한 번 더 */
-  async run() {
+  /** 지금 바로 — 이미 도는 중이면 끝난 뒤 한 번 더. full: Drive 폴더를 처음부터 훑는다 ("지금 동기화" 단추) */
+  async run({ full = false } = {}) {
     if (this.running) {
+      if (full) return this.running.catch(() => {}).then(() => this.run({ full: true })); // 지금 도는 것이 끝나면 처음부터
       this.again = true;
       return this.running;
     }
-    this.running = this.runOnce().finally(() => {
+    this.running = this.runOnce({ full }).finally(() => {
       this.running = null;
       if (this.again) {
         this.again = false;
@@ -79,7 +93,11 @@ export class DriveSync extends EventEmitter {
     return this.running;
   }
 
-  async runOnce() {
+  async runOnce({ full = false } = {}) {
+    if (this.blocked) {
+      this.publish({ state: 'error', error: DOUBLE_SYNC });
+      return this.status;
+    }
     if (!this.active) return this.status;
     if (!this.auth.connected) {
       this.publish({ state: 'error', error: 'Google Drive에 로그인해 주세요' });
@@ -101,7 +119,7 @@ export class DriveSync extends EventEmitter {
     };
     try {
       fs.mkdirSync(root, { recursive: true });
-      const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state }).run();
+      const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state }).run({ full });
       save();
       if (!this.auth.email) this.api.about().then((email) => email && this.auth.setEmail(email)).catch(() => {});
       this.publish({ state: 'idle', lastSync: Date.now(), error: '', changed: result.localChanged, conflicts: result.conflicts });

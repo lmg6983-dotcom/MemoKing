@@ -123,7 +123,9 @@ const server = new McpServer(
     instructions:
       '메모킹(MemoKing) 사용자의 메모(마크다운)를 찾고 읽고 남기는 도구입니다. 먼저 search_memos 로 찾고 read_memo 로 읽으세요. '
       + '새로 남길 때는 첫 줄을 "# 제목" 으로 쓰면 그 제목이 파일 이름이 됩니다. #태그 는 본문 어디에나 쓸 수 있습니다. '
-      + '잠긴 메모(locked)는 내용을 볼 수 없습니다.',
+      + '잠긴 메모(locked)는 내용을 볼 수 없습니다. '
+      + '메모를 새로 만들거나 덧붙일 때는 반드시 create_memo · append_to_memo 를 쓰세요 — Google Drive 의 메모킹 폴더에 파일을 직접 만들거나 올리면 '
+      + '메모킹(PC·휴대폰)은 자기가 만든 파일만 볼 수 있어 그 메모가 보이지 않습니다.',
   },
 );
 
@@ -191,7 +193,8 @@ server.registerTool('list_tags', {
 
 server.registerTool('create_memo', {
   title: '새 메모 남기기',
-  description: '새 메모를 만듭니다. content 는 마크다운 — 첫 줄을 "# 제목" 으로 쓰세요. 체크리스트는 "- [ ] 할 일".',
+  description: '새 메모를 만듭니다 (PC·휴대폰 메모킹에 함께 보임). 메모킹 메모는 반드시 이 도구로 만드세요 — Google Drive 메모킹 폴더에 파일을 직접 만들면 메모킹에 보이지 않습니다. '
+    + 'content 는 마크다운 — 첫 줄을 "# 제목" 으로 쓰세요. 체크리스트는 "- [ ] 할 일".',
   inputSchema: {
     content: z.string().min(1).describe('메모 내용 (마크다운)'),
     color: z.enum(['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal']).optional().describe('메모 색 (기본 노랑)'),

@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import fuzzysort from '../app/vendor/fuzzysort.js';
+import { compactTermOf } from '../app/js/core/text-match.js';
 
 export const MAX_ENTRIES = 400_000;
 const SKIP = new Set([
@@ -207,7 +208,8 @@ export class FileIndex {
     const none = { items: [], total: 0, folders: 0, files: 0 };
     const q = String(query ?? '').trim();
     if (!q || !this.snapshot) return none;
-    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    // 관리번호처럼 기호가 낀 말은 기호를 빼고 (P2026-1170-KR01 → 이름 P20261170KR01 도) — 글자 순서 비교라 기호 있는 이름도 그대로 맞는다
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean).map((t) => compactTermOf(t) ?? t);
     // 후보는 많아야 이만큼 점수를 매긴다 (전체 결과 창은 더 많이) — 개수는 끝까지 센다
     const cap = Math.max(4000, limit * 4);
     // 1) 빠른 거르기: 낱말마다 글자들이 이름에 순서대로 들어 있는가 (붙어 있으면 더 앞으로)
@@ -249,7 +251,7 @@ export class FileIndex {
     const scored = [];
     for (const i of [...contiguous, ...loose].slice(0, cap * 1.5)) {
       const e = this.entries[i];
-      const r = fuzzysort.single(q, e.n);
+      const r = fuzzysort.single(q, e.n) ?? fuzzysort.single(terms.join(' '), e.n);
       if (!r) continue;
       const bonus = (e.a ? 0.12 : 0) + (this.lower[i].startsWith(ql) ? 0.08 : 0) - Math.min(0.15, (e.depth ?? 0) * 0.012);
       scored.push({ e, score: r.score * (1 + bonus) });

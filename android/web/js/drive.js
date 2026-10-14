@@ -244,10 +244,39 @@ export function renderStatus(s = drive.status()) {
     $('drive-title').textContent = '다시 연결해 주세요';
     $('drive-sub').textContent = 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 휴대폰에 그대로 있어요';
   }
+  // 외부 앱 메모 연동: 연결돼 있을 때만 (켜는 중에는 그대로)
+  $('drive-full-row').hidden = !s.connected;
+  if (!fullBusy) $('drive-full').checked = Boolean(s.fullScope);
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;
   $('drive-connect').textContent = s.active && s.connected ? '폴더 변경' : '연결하기';
 }
+
+// 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 허용받는다 — 취소·실패하면 꺼진 채 (지금 연결은 그대로).
+//   켜지면 폴더를 처음부터 훑어 제미나이 등이 넣은 메모를 바로 받는다
+let fullBusy = false;
+const fullNote = $('drive-full-note').textContent;
+$('drive-full').addEventListener('change', async (e) => {
+  const on = e.target.checked;
+  fullBusy = true;
+  e.target.disabled = true;
+  $('drive-full-note').textContent = 'Google 계정을 고르고 허용해 주세요…';
+  let error = '';
+  try {
+    await call('driveFullScope', { on });
+  } catch (err) {
+    error = err.message || '';
+  } finally {
+    fullBusy = false;
+    e.target.disabled = false;
+    $('drive-full-note').textContent = fullNote;
+  }
+  renderStatus();
+  if (on && !error) {
+    toast('외부 앱 메모 연동을 켰어요. 드라이브 폴더를 확인할게요');
+    if (drive.status().active) syncNow();
+  } else if (on && !/취소/.test(error)) toast(`외부 앱 메모 연동을 켜지 못했어요. 지금 연결은 그대로예요. ${error}`, true);
+});
 
 export async function syncNow() {
   renderStatus({ ...drive.status(), status: { ...drive.status().status, state: 'syncing' } });

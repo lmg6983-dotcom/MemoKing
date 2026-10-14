@@ -81,4 +81,14 @@ class WidgetToggleTest {
         assertEquals(3, Widgets.headerEnd("---\n# synced\nid: a\n---\n# 제목".split("\n")))
         assertEquals("제목", Widgets.visibleTitle("\uFEFF---\nid: a\n---\n# 제목"))
     }
+
+    @Test
+    fun noJvmOnlyRegexFlags() {
+        // (?U) 는 자바에서만 되고 안드로이드(ICU)에서는 오류 — 이 테스트는 PC 자바에서 돌아 그 오류를 볼 수 없으니 글자로 막는다
+        val dir = java.io.File("src/main/java")
+        val bad = dir.walkTopDown().filter { it.isFile && it.extension == "kt" }
+            .filter { f -> f.readText().contains("(?U") || f.readText().contains("UNICODE_CHARACTER_CLASS") }
+            .map { it.name }.toList()
+        assertEquals(emptyList<String>(), bad)
+    }
 }

@@ -196,6 +196,10 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun widgetPin(memoId: String): String = reply { Widgets.requestPin(ctx, memoId) }
 
+    // 지난번 오류 기록 (CrashLog) — 있으면 꺼내 보여 준다 (꺼내면 지움)
+    @JavascriptInterface
+    fun lastError(): String = reply { CrashLog.take(ctx) }
+
     @JavascriptInterface
     fun ready(): String = reply { activity.runOnUiThread { activity.onPageReady() } }
 
@@ -223,6 +227,7 @@ class Bridge(private val activity: MainActivity) {
         .put("browserConfigured", GoogleAuth.clientId(ctx).isNotBlank())
         .put("connected", GoogleAuth.connected(ctx))
         .put("reconnect", GoogleAuth.reconnectNeeded(ctx))
+        .put("fullScope", GoogleAuth.fullScope(ctx)) // 외부 앱 메모 연동 (전체 드라이브 권한)
         .put("email", GoogleAuth.email(ctx))
         .put("active", DriveSync.active(ctx))
         .put("folderId", DriveSync.folderId(ctx) ?: "")
@@ -373,6 +378,54 @@ class Bridge(private val activity: MainActivity) {
                     true
                 }
             }
+            // 클립보드의 그림 · 파일(content://) → 임시 파일 [{ temp, name, mime, size }] — 메모킹이나 다른 앱에서 복사한 그림을 메모에 붙여 넣기
+            //   (WebView 의 붙여넣기는 클립보드의 그림을 넘겨주지 않고 주소 글만 준다)
+            "clipboardFiles" -> activity.runOnUiThread {
+                val uris = try {
+                    val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val clip = clipboard.primaryClip
+                    buildList { if (clip != null) for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let(::add) }
+                } catch (e: Exception) {
+                    emptyList()
+                }
+                pool.execute { resolve(id) { activity.copyToTemp(uris) } }
+            }
+            // 저장 단추: 안드로이드 저장 창(어디에 · 무슨 이름으로)을 띄워 파일로 — { name, mime, rel? | base64? } → 저장한 이름 | null(그만둠)
+            "saveAs" -> pool.execute {
+                val (_, file) = Temp.create(ctx)
+                try {
+                    val rel = a.optString("rel")
+                    if (rel.isNotEmpty()) storage().openRead(rel).use { input -> file.outputStream().use { input.copyTo(it) } }
+                    else file.writeBytes(Base64.decode(a.getString("base64"), Base64.DEFAULT))
+                } catch (e: Exception) {
+                    file.delete()
+                    resolve(id) { throw e }
+                    return@execute
+                }
+                val name = a.optString("name", "메모 내용").replace(Regex("[\\\\/:*?\"<>|]+"), " ").trim().ifEmpty { "메모 내용" }
+                val mime = a.optString("mime").ifBlank { VaultFileProvider.mimeOf(name) }
+                activity.runOnUiThread { activity.saveAs(id, file, name, mime) }
+            }
+            // 내용 공유(공유 단추): 글이면 글로, 그 밖은 파일로 (메모 폴더의 파일 rel 그대로 · 만든 파일 base64) — 안드로이드 공유 창
+            "shareContent" -> pool.execute {
+                val name = a.optString("name", "메모 내용").replace(Regex("[\\\\/:*?\"<>|]+"), " ").trim().ifEmpty { "메모 내용" }
+                val text = a.optString("text")
+                if (text.isNotEmpty() && a.optString("rel").isEmpty() && a.optString("mime").startsWith("text/")) {
+                    activity.runOnUiThread { activity.shareText(id, name.substringBeforeLast('.'), text) }
+                    return@execute
+                }
+                val file = shareFile(name)
+                try {
+                    val rel = a.optString("rel")
+                    if (rel.isNotEmpty()) storage().openRead(rel).use { input -> file.outputStream().use { input.copyTo(it) } }
+                    else file.writeBytes(Base64.decode(a.getString("base64"), Base64.DEFAULT))
+                } catch (e: Exception) {
+                    resolve(id) { throw e }
+                    return@execute
+                }
+                val mime = a.optString("mime").ifBlank { VaultFileProvider.mimeOf(name) }
+                activity.runOnUiThread { activity.shareFile(id, file, mime, name) }
+            }
             // 보내기: 그림(base64) 같은 파일 · PDF
             "shareFile" -> pool.execute {
                 val file = shareFile(a.optString("name", "메모"))
@@ -393,6 +446,21 @@ class Bridge(private val activity: MainActivity) {
                     val email = GoogleAuth.login(ctx) { url -> activity.runOnUiThread { activity.openBrowser(url) } }
                     activity.runOnUiThread { activity.bringToFront() }
                     JSONObject().put("email", email)
+                }
+            }
+            // 외부 앱 메모 연동 켜기·끄기: 그 범위로 다시 허용받는다. 켜기는 허용을 받아야만 켜지고(취소·실패하면 꺼진 채, 지금 연결 그대로),
+            //   끄기는 설정을 먼저 끈다 (다시 허용을 취소해도 다음 연결은 drive.file)
+            "driveFullScope" -> {
+                val on = a.optBoolean("on")
+                if (!on) GoogleAuth.setFullScope(ctx, false)
+                if (GoogleAuth.native(ctx) && NativeAuth.available(ctx)) {
+                    activity.runOnUiThread { activity.loginWithPhoneAccount(id, on) }
+                } else pool.execute {
+                    resolve(id) {
+                        val email = GoogleAuth.login(ctx, on) { url -> activity.runOnUiThread { activity.openBrowser(url) } }
+                        activity.runOnUiThread { activity.bringToFront() }
+                        JSONObject().put("email", email).put("full", on)
+                    }
                 }
             }
             "driveFolders" -> pool.execute {
@@ -427,7 +495,7 @@ class Bridge(private val activity: MainActivity) {
                     JSONObject().put("vault", vaultInfo()).put("status", status.json()).put("folderName", folder.name)
                 }
             }
-            "driveSync" -> pool.execute { resolve(id) { DriveSync.syncBlocking(ctx).json() } }
+            "driveSync" -> pool.execute { resolve(id) { DriveSync.syncBlocking(ctx, full = true).json() } } // 단추: 폴더를 처음부터
             else -> resolve(id) { throw IllegalArgumentException("알 수 없는 기능: $method") }
         }
     }

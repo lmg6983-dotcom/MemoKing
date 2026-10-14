@@ -244,7 +244,7 @@ const recordState = () => (fakeRec
 
 // 가짜 Google Drive (화면 점검용) — 진짜 동기화는 앱(DriveSync.kt)이 한다
 const fakeDrive = {
-  configured: false, connected: false, email: '', active: false, folderId: '', folderName: '',
+  configured: false, connected: false, email: '', active: false, folderId: '', folderName: '', fullScope: false,
   status: { state: 'off', lastSync: 0, error: '', changed: false, conflicts: [] },
   folders: { root: [{ id: 'f-memo', name: '메모킹 동기화' }, { id: 'f-work', name: '업무' }, { id: 'f-photo', name: '사진' }], 'f-work': [{ id: 'f-work-2026', name: '2026' }] },
 };
@@ -255,6 +255,7 @@ const widgetMemos = new Set();
 const widgetData = {};
 let scheduled = [];
 let pickQueue = []; // 점검용: 다음 pickFiles 가 돌려줄 파일들 [{ name, mime, base64 }]
+let clipboardImage = null; // 휴대폰 클립보드의 그림 흉내 (copyImage 가 넣고 clipboardFiles 가 꺼냄)
 
 function makeTemp(name, mime, bytes) {
   const id = randomUUID();
@@ -309,6 +310,18 @@ const calls = {
     await new Promise((r) => setTimeout(r, 300));
     Object.assign(fakeDrive, { connected: true, email: 'me@gmail.com' });
     return { email: fakeDrive.email };
+  },
+  // 외부 앱 메모 연동: 점검이 /dev/drive-deny 로 "허용 화면에서 취소" 를 흉내 낸다
+  driveFullScope: async ({ on }) => {
+    await new Promise((r) => setTimeout(r, 200));
+    log.push({ driveFullScope: { on } });
+    if (!on) fakeDrive.fullScope = false;
+    if (fakeDrive.denyNext) {
+      fakeDrive.denyNext = false;
+      throw new Error('로그인을 취소했어요');
+    }
+    fakeDrive.fullScope = Boolean(on);
+    return { email: fakeDrive.email, full: Boolean(on) };
   },
   driveFolders: async ({ parent }) => fakeDrive.folders[parent] ?? [],
   driveCreateFolder: async ({ parent, name }) => {
@@ -368,7 +381,21 @@ const calls = {
     log.push({ transcribe: rel });
     return { text: '받아쓴 글이에요.\n두 번째 문장이에요.' };
   },
+  // 클립보드의 그림 · 파일 → 임시 파일 (메모킹에서 복사한 그림을 붙여 넣기)
+  clipboardFiles: async () => (clipboardImage ? [makeTemp('메모킹 그림.png', 'image/png', clipboardImage)] : []),
+  // 공유 단추: 안드로이드 공유 창 흉내
+  shareContent: async (a) => {
+    log.push({ shareContent: { name: a.name, mime: a.mime, rel: a.rel ?? null, text: a.text ?? null } });
+    return true;
+  },
+  // 저장 단추: 안드로이드 저장 창 흉내 — 고른 이름 그대로 저장한 것으로
+  saveAs: async (a) => {
+    const bytes = a.rel ? fs.readFileSync(vaultPath(a.rel)).length : Math.round((a.base64?.length ?? 0) * 0.75);
+    log.push({ saveAs: { name: a.name, mime: a.mime, rel: a.rel ?? null, bytes, text: a.base64 && /^text\//.test(a.mime) ? Buffer.from(a.base64, 'base64').toString('utf8') : null } });
+    return a.name;
+  },
   copyImage: async (a) => {
+    clipboardImage = Buffer.from(a.base64 ?? '', 'base64');
     log.push({ copyImage: { bytes: Math.round((a.base64?.length ?? 0) * 0.75) } });
     return true;
   },
@@ -452,6 +479,11 @@ const server = http.createServer(async (req, res) => {
       const payload = JSON.parse(await readBody(req));
       payload.files = (payload.files ?? []).map((f) => makeTemp(f.name, f.mime, Buffer.from(f.base64, 'base64')));
       pendingIntent = payload;
+      res.writeHead(200).end('{}');
+      return;
+    }
+    if (req.method === 'POST' && p === '/dev/drive-deny') {
+      fakeDrive.denyNext = true; // 다음 허용 화면에서 취소
       res.writeHead(200).end('{}');
       return;
     }

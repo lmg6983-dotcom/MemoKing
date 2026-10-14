@@ -18,6 +18,7 @@ import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront } from './window-utils.js';
 import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
+import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
 import { shareFile } from './share-file.js';
 import { hwndOf } from './foreground-watch.js';
@@ -149,6 +150,24 @@ export function registerIpc(ctx) {
       properties: ['openDirectory', 'createDirectory'],
     });
     if (result.canceled || !result.filePaths[0]) return vaultInfo();
+    // Google Drive 데스크탑 앱 폴더(G:\내 드라이브 …)를 고르면서 메모킹의 Google Drive 동기화도 켜져 있으면:
+    //   두 동기화가 같은 파일을 주고받아 메모가 끝없이 늘어날 수 있다 — 하나만 쓰게 묻는다
+    if (settings.drive?.folderId && insideDriveForDesktop(result.filePaths[0])) {
+      const { response } = await dialog.showMessageBox(senderWindow(event), {
+        type: 'warning',
+        title: '메모킹',
+        message: '이 폴더는 Google Drive 데스크탑 앱이 동기화하는 곳이에요',
+        detail: '메모킹의 Google Drive 동기화와 함께 쓰면 두 동기화가 같은 메모를 서로 올리고 받아, 메모가 계속 늘어날 수 있어요.\n\n'
+          + '이 폴더를 쓰려면 메모킹의 Google Drive 동기화를 끕니다 (Google Drive 데스크탑 앱만 동기화). 휴대폰과 맞추려면 Google Drive 밖의 폴더를 골라 주세요.',
+        buttons: ['다른 폴더 고르기', '이 폴더 쓰고 메모킹 동기화 끄기'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      if (response !== 1) return vaultInfo();
+      settings.drive = null;
+      saveSettings();
+    }
     for (const win of wm.noteWins.values()) win.close();
     const info = openVault(result.filePaths[0]);
     if (getVault() && !settings.tutorialDone && !SMOKE) startTutorial();
@@ -239,6 +258,15 @@ export function registerIpc(ctx) {
     return { email };
   });
   ipcMain.handle('drive:cancel-login', () => getDriveAuth()?.cancelLogin());
+  // 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 로그인 → 받았으면 폴더를 처음부터 훑어 다른 앱이 넣은 메모를 바로 받는다
+  ipcMain.handle('drive:full-scope', async (_e, on) => {
+    const auth = getDriveAuth();
+    if (!auth) return { full: false, error: 'Google Drive 를 쓸 수 없어요' };
+    const res = await auth.setFullScope(Boolean(on));
+    if (wm.listWin) bringToFront(wm.listWin);
+    if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
+    return { ...res, drive: driveInfo() };
+  });
   ipcMain.handle('drive:folders', async (_e, parent) => (await getDriveApi()?.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name })));
   ipcMain.handle('drive:create-folder', async (_e, parent, name) => {
     const f = await getDriveApi()?.createFolder(String(parent || 'root'), String(name));
@@ -246,7 +274,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('drive:use', (_e, folderId, name) => useDriveFolder(String(folderId), String(name)));
   ipcMain.handle('drive:auto', () => autoDriveFolder());
-  ipcMain.handle('drive:sync', () => getDriveSync()?.run());
+  ipcMain.handle('drive:sync', () => getDriveSync()?.run({ full: true })); // 단추: 다른 앱이 넣은 파일까지 보이게 폴더를 처음부터
   ipcMain.handle('drive:disconnect', () => {
     getDriveAuth()?.signOut();
     settings.drive = null;
@@ -759,43 +787,43 @@ export function registerIpc(ctx) {
     }
     return copyFileToClipboard(file);
   });
-  // 메모 안의 그림 · 소리 · 파일: 다른 이름으로 저장 · Windows 공유 창
-  const attachmentFile = (rel) => {
-    let decoded = String(rel ?? '');
-    try {
-      decoded = decodeURI(decoded);
-    } catch {
-      // 이미 디코딩됨
+  ipcMain.handle('attachment:save-as', async (e, f = {}) => {
+    const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
+    let source = null;
+    if (f.rel) {
+      source = getVault()?.resolve(String(f.rel)); // 화면(copy-content.js)이 이미 풀어 보낸 경로 — 다시 풀면 이름의 %XX 가 깨진다
+      if (!source || !fs.statSync(source, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
+    } else if (typeof f.base64 !== 'string') return { error: '저장할 내용이 없어요' };
+    const ext = path.extname(name).slice(1);
+    let file = SMOKE ? path.join(app.getPath('temp'), `memoking-smoke-save-${Date.now()}-${name}`) : null;
+    if (!file) {
+      const dir = /^image\//.test(f.mime ?? '') || /^(png|jpe?g|gif|webp|bmp)$/i.test(ext) ? app.getPath('pictures') : app.getPath('downloads');
+      const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(e.sender) ?? undefined, {
+        title: '저장',
+        defaultPath: path.join(dir, name),
+        filters: ext ? [{ name: `${ext.toUpperCase()} 파일`, extensions: [ext] }, { name: '모든 파일', extensions: ['*'] }] : [],
+      });
+      if (r.canceled || !r.filePath) return { cancelled: true };
+      file = r.filePath;
     }
-    const file = /^attachments\//.test(decoded) ? getVault()?.resolve(decoded) : null;
-    return file && fs.statSync(file, { throwIfNoEntry: false })?.isFile() ? file : null;
-  };
-  const MISSING = '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요';
-  ipcMain.handle('attachment:save-as', async (e, rel) => {
-    const file = attachmentFile(rel);
-    if (!file) return { error: MISSING };
-    const name = path.basename(file);
-    if (SMOKE) {
-      smokeOpened.push({ kind: 'save-as', target: file });
-      return { ok: true, name };
-    }
-    const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(e.sender), {
-      title: '다른 이름으로 저장',
-      defaultPath: path.join(app.getPath('downloads'), name),
-      buttonLabel: '저장',
-    });
-    if (r.canceled || !r.filePath) return { cancelled: true };
-    try {
-      await fs.promises.copyFile(file, r.filePath);
-      return { ok: true, name: path.basename(r.filePath) };
-    } catch (err) {
-      console.warn('[save-as]', err);
-      return { error: '저장하지 못했어요. 다른 폴더를 골라 주세요' };
-    }
+    if (source) fs.copyFileSync(source, file);
+    else fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+    if (SMOKE) smokeOpened.push({ kind: 'save', target: file });
+    return { name: SMOKE ? name : path.basename(file) };
   });
-  ipcMain.handle('attachment:share', async (e, rel) => {
-    const file = attachmentFile(rel);
-    if (!file) return { error: MISSING };
+  // 공유 단추: Windows 공유 창 — 메모 폴더의 파일은 그대로, 만든 내용(표 CSV · 글 · 그림 PNG)은 임시 파일로 만들어 보낸다
+  ipcMain.handle('attachment:share', async (e, f = {}) => {
+    const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
+    let file = null;
+    if (f.rel) {
+      file = getVault()?.resolve(String(f.rel));
+      if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
+    } else if (typeof f.base64 === 'string') {
+      const dir = path.join(app.getPath('temp'), 'memoking-share');
+      fs.mkdirSync(dir, { recursive: true });
+      file = path.join(dir, name);
+      fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+    } else return { error: '공유할 내용이 없어요' };
     if (SMOKE) {
       smokeOpened.push({ kind: 'share', target: file });
       return { ok: true };

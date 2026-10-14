@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 위젯 바탕: 둥근 종이 (색은 Widgets.kt 가 메모 색으로 칠한다) -->
+<!-- 위젯 바탕 기본(처음 놓일 때 · 미리 보기): 노란 둥근 종이. 메모 색은 Widgets.kt 가 widget_bg_<색> 으로 바꾼다 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#FFFFFFFF" />
+    <solid android:color="@color/widget_yellow" />
     <corners android:radius="20dp" />
 </shape>

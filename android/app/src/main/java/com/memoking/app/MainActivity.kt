@@ -56,6 +56,7 @@ class MainActivity : Activity() {
         private const val REQ_NOTIFY = 3
         private const val REQ_AUTH = 4
         private const val REQ_MIC = 5
+        private const val REQ_SAVE = 6
         private const val PDF_TIMEOUT_MS = 15_000L // PDF 만들기를 이만큼 기다리고, 넘으면 인쇄 화면으로
 
         /** 지금 앞에 보이는 화면 (알림이 울렸을 때 바로 알리기 위해) */
@@ -332,12 +333,17 @@ class MainActivity : Activity() {
         super.onPause()
     }
 
-    /** 휴대폰에 로그인된 구글 계정으로 Drive 권한 받기 — 계정 고르기·허용 화면만 */
-    fun loginWithPhoneAccount(id: Int) {
+    // 지금 받는 허용이 Drive 전체(외부 앱 메모 연동)인가
+    private var authFull = false
+
+    /** 휴대폰에 로그인된 구글 계정으로 Drive 권한 받기 — 계정 고르기·허용 화면만. full: Drive 전체 (기본은 지금 설정) */
+    fun loginWithPhoneAccount(id: Int, full: Boolean = GoogleAuth.fullScope(this)) {
         waiting[REQ_AUTH]?.let { old -> bridge.resolve(old) { throw GoogleAuth.AuthError("로그인을 취소했어요") } }
         waiting[REQ_AUTH] = id
+        authFull = full
         NativeAuth.begin(
             this,
+            GoogleAuth.scopeFor(full),
             startForResult = { sender ->
                 try {
                     @Suppress("DEPRECATION")
@@ -357,7 +363,8 @@ class MainActivity : Activity() {
 
     private fun finishPhoneLogin(token: String) {
         val id = waiting.remove(REQ_AUTH) ?: return
-        io.execute { bridge.resolve(id) { JSONObject().put("email", GoogleAuth.completeNative(this, token)) } }
+        val full = authFull
+        io.execute { bridge.resolve(id) { JSONObject().put("email", GoogleAuth.completeNative(this, token, full)).put("full", full) } }
     }
 
     fun openBrowser(url: String) {
@@ -468,8 +475,8 @@ class MainActivity : Activity() {
         return out.toList()
     }
 
-    /** 다른 앱의 파일을 앱 임시 폴더로 복사: [{ temp, name, mime, size }] */
-    private fun copyToTemp(uris: List<Uri>): JSONArray {
+    /** 다른 앱의 파일을 앱 임시 폴더로 복사: [{ temp, name, mime, size }] (클립보드의 그림 붙여넣기도) */
+    fun copyToTemp(uris: List<Uri>): JSONArray {
         val out = JSONArray()
         for (uri in uris) {
             try {
@@ -483,8 +490,14 @@ class MainActivity : Activity() {
                 }
                 if (name.isEmpty()) name = uri.lastPathSegment?.substringAfterLast('/') ?: "파일"
                 val mime = contentResolver.getType(uri) ?: VaultFileProvider.mimeOf(name)
+                val input = contentResolver.openInputStream(uri) ?: continue
                 val (id, file) = Temp.create(this)
-                contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use { input.copyTo(it) } } ?: continue
+                try {
+                    input.use { i -> file.outputStream().use { i.copyTo(it) } }
+                } catch (e: Exception) {
+                    file.delete()
+                    throw e
+                }
                 out.put(JSONObject().put("temp", id).put("name", name).put("mime", mime).put("size", if (size >= 0) size else file.length()))
             } catch (e: Exception) {
                 android.util.Log.w("MemoKing", "공유받은 파일을 읽지 못했어요: $uri", e)
@@ -518,6 +531,19 @@ class MainActivity : Activity() {
         startForResult(intent, REQ_FILES, id)
     }
 
+    // 저장 단추: 저장 창에서 고른 곳에 쓸 파일 (창이 닫히면 지운다)
+    private var pendingSave: java.io.File? = null
+
+    fun saveAs(id: Int, file: java.io.File, name: String, mime: String) {
+        pendingSave?.delete()
+        pendingSave = file
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType(mime.ifBlank { "application/octet-stream" })
+            .putExtra(Intent.EXTRA_TITLE, name)
+        startForResult(intent, REQ_SAVE, id)
+    }
+
     private fun startForResult(intent: Intent, req: Int, id: Int) {
         waiting[req]?.let { old -> bridge.resolve(old) { null } } // 앞서 기다리던 요청은 취소로
         waiting[req] = id
@@ -526,6 +552,10 @@ class MainActivity : Activity() {
             startActivityForResult(intent, req)
         } catch (e: ActivityNotFoundException) {
             waiting.remove(req)
+            if (req == REQ_SAVE) {
+                pendingSave?.delete()
+                pendingSave = null
+            }
             bridge.resolve(id) { throw IllegalStateException("이 휴대폰에서 열 수 있는 앱이 없어요") }
         }
     }
@@ -536,7 +566,7 @@ class MainActivity : Activity() {
         if (requestCode == REQ_AUTH) {
             val token = try {
                 if (resultCode != RESULT_OK) throw GoogleAuth.AuthError("로그인을 취소했어요")
-                NativeAuth.finish(this, data)
+                NativeAuth.finish(this, data, GoogleAuth.scopeFor(authFull))
             } catch (e: Exception) {
                 val id = waiting.remove(REQ_AUTH) ?: return
                 bridge.resolve(id) { throw GoogleAuth.AuthError(if (e is GoogleAuth.AuthError) e.message ?: "" else NativeAuth.describe(e)) }
@@ -547,6 +577,7 @@ class MainActivity : Activity() {
         }
         val id = waiting.remove(requestCode) ?: return
         if (resultCode != RESULT_OK || data == null) {
+            if (requestCode == REQ_SAVE) pendingSave?.delete().also { pendingSave = null }
             bridge.resolve(id) { null }
             return
         }
@@ -560,6 +591,27 @@ class MainActivity : Activity() {
                         )
                         Vaults.use(this, uri.toString()) ?: throw IllegalStateException("이 폴더는 쓸 수 없어요. 다른 폴더를 선택해 주세요")
                         bridge.vaultInfo()
+                    }
+                }
+            }
+            REQ_SAVE -> {
+                val target = data.data
+                val file = pendingSave
+                pendingSave = null
+                io.execute {
+                    bridge.resolve(id) {
+                        try {
+                            if (target == null || file == null) throw IllegalStateException("저장하지 못했어요")
+                            contentResolver.openOutputStream(target)?.use { out -> file.inputStream().use { it.copyTo(out) } }
+                                ?: throw IllegalStateException("저장하지 못했어요")
+                            var name = file.name
+                            contentResolver.query(target, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                                if (c.moveToFirst()) name = c.getString(0) ?: name
+                            }
+                            name
+                        } finally {
+                            file?.delete()
+                        }
                     }
                 }
             }

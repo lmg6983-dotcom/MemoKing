@@ -130,16 +130,36 @@ function openEditor(view, getPos, node, anchor) {
   el.append(input, preview, actions);
   document.body.append(el);
 
+  // 자리: 수식 바로 아래(안 들어가면 위). 휴대폰은 키보드가 올라오며 보이는 칸이 줄고, 편집기가 수식을 다시 그리면
+  //   처음 받은 상자(anchor)가 문서에서 떨어져 나가므로 — 늘 지금 그 수식의 상자를 찾아 보이는 칸(visualViewport) 안에 둔다
+  //   (예전에는 키보드 뒤로 숨거나 화면 맨 위로 튀어 '바로 닫힌' 것처럼 보였다)
+  const currentAnchor = () => {
+    if (anchor.isConnected) return anchor;
+    const pos = getPos?.();
+    const dom = pos == null ? null : view.nodeDOM(pos);
+    return dom instanceof Element ? (anchor = dom) : anchor;
+  };
   const place = () => {
-    const r = anchor.getBoundingClientRect();
+    if (!el.isConnected) return;
+    const vv = window.visualViewport;
+    const top0 = vv?.offsetTop ?? 0;
+    const height = vv?.height ?? window.innerHeight;
+    const r = currentAnchor().getBoundingClientRect();
     const w = Math.min(360, window.innerWidth - 16);
     el.style.width = `${w}px`;
     el.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}px`;
-    const below = r.bottom + 6;
     const h = el.offsetHeight;
-    el.style.top = `${below + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 6) : below}px`;
+    const below = r.bottom + 6;
+    const bottomEdge = top0 + height - 8;
+    let top = below + h > bottomEdge ? r.top - h - 6 : below;
+    top = Math.max(top0 + 8, Math.min(top, bottomEdge - h)); // 수식이 화면 밖이어도 창은 보이는 칸 안에
+    el.style.top = `${top}px`;
   };
   const refresh = () => renderMath(preview, input.value, display).then(place);
+  const onViewport = () => requestAnimationFrame(place);
+  window.addEventListener('resize', onViewport);
+  window.visualViewport?.addEventListener('resize', onViewport);
+  window.visualViewport?.addEventListener('scroll', onViewport);
   input.addEventListener('input', refresh);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -163,6 +183,9 @@ function openEditor(view, getPos, node, anchor) {
     el,
     finish(commit) {
       document.removeEventListener('pointerdown', outside, true);
+      window.removeEventListener('resize', onViewport);
+      window.visualViewport?.removeEventListener('resize', onViewport);
+      window.visualViewport?.removeEventListener('scroll', onViewport);
       if (!commit || view.isDestroyed) return;
       const pos = getPos?.();
       const at = pos == null ? null : view.state.doc.nodeAt(pos);
