@@ -138,6 +138,29 @@ test('처음: 모두 내려받기 (index.json 은 기기마다 따로)', async (
   assert.equal((await sync()).skipped, true);
 });
 
+test('다른 앱(제미나이 등)이 넣은 파일을 "바뀐 것" 목록이 빠뜨려도: "지금 동기화" · 15분마다 폴더를 처음부터 훑어 내려받기', async () => {
+  let now = Date.parse('2026-10-14T09:00:00Z');
+  const engine = (opts) => new SyncEngine({ root: dir, remote: drive, rootId: 'ROOT', state, now: () => now }).run(opts);
+  drive.put('회의.md', '# 회의');
+  await engine();
+  drive.put('제미나이 메모.md', '# 제미나이가 쓴 메모');
+  drive.changed = false; // Drive 가 바뀐 것 목록에 넣지 않음
+  now += 60_000;
+  assert.equal((await engine()).skipped, true, '목록만 보면 놓친다');
+  assert.equal(lt('제미나이 메모.md'), null);
+  const r = await engine({ full: true });
+  assert.equal(r.downloaded, 1, '"지금 동기화" 는 폴더를 처음부터');
+  assert.equal(lt('제미나이 메모.md'), '# 제미나이가 쓴 메모');
+  // 단추를 누르지 않아도 15분이 지나면
+  drive.put('또 다른 메모.md', '# 또');
+  drive.changed = false;
+  now += 60_000;
+  assert.equal((await engine()).skipped, true);
+  now += 15 * 60_000;
+  assert.equal((await engine()).downloaded, 1);
+  assert.equal(lt('또 다른 메모.md'), '# 또');
+});
+
 test('이 PC 에서 고친 것·새 메모·새 폴더 올리기', async () => {
   await startFromPhone();
   await lw('PC.md', '# PC');

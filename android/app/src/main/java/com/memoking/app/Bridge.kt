@@ -479,7 +479,7 @@ class Bridge(private val activity: MainActivity) {
                     JSONObject().put("vault", vaultInfo()).put("status", status.json()).put("folderName", folder.name)
                 }
             }
-            "driveSync" -> pool.execute { resolve(id) { DriveSync.syncBlocking(ctx).json() } }
+            "driveSync" -> pool.execute { resolve(id) { DriveSync.syncBlocking(ctx, full = true).json() } } // 단추: 폴더를 처음부터
             else -> resolve(id) { throw IllegalArgumentException("알 수 없는 기능: $method") }
         }
     }

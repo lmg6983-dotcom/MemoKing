@@ -63,13 +63,14 @@ export class DriveSync extends EventEmitter {
     }, delayMs);
   }
 
-  /** 지금 바로 — 이미 도는 중이면 끝난 뒤 한 번 더 */
-  async run() {
+  /** 지금 바로 — 이미 도는 중이면 끝난 뒤 한 번 더. full: Drive 폴더를 처음부터 훑는다 ("지금 동기화" 단추) */
+  async run({ full = false } = {}) {
     if (this.running) {
+      if (full) return this.running.catch(() => {}).then(() => this.run({ full: true })); // 지금 도는 것이 끝나면 처음부터
       this.again = true;
       return this.running;
     }
-    this.running = this.runOnce().finally(() => {
+    this.running = this.runOnce({ full }).finally(() => {
       this.running = null;
       if (this.again) {
         this.again = false;
@@ -79,7 +80,7 @@ export class DriveSync extends EventEmitter {
     return this.running;
   }
 
-  async runOnce() {
+  async runOnce({ full = false } = {}) {
     if (!this.active) return this.status;
     if (!this.auth.connected) {
       this.publish({ state: 'error', error: 'Google Drive에 로그인해 주세요' });
@@ -101,7 +102,7 @@ export class DriveSync extends EventEmitter {
     };
     try {
       fs.mkdirSync(root, { recursive: true });
-      const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state }).run();
+      const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state }).run({ full });
       save();
       if (!this.auth.email) this.api.about().then((email) => email && this.auth.setEmail(email)).catch(() => {});
       this.publish({ state: 'idle', lastSync: Date.now(), error: '', changed: result.localChanged, conflicts: result.conflicts });

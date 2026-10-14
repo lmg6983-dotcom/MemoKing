@@ -13,6 +13,9 @@ export const FOLDER = 'application/vnd.google-apps.folder';
 const LOCAL_ONLY = new Set(['_memoking/index.json']);
 const MERGE_JSON = '_memoking/link-previews.json';
 const MASS_DELETE_MIN = 20;
+// Drive 의 "바뀐 것" 목록은 다른 앱(제미나이 등)이 폴더에 넣은 파일을 빠뜨릴 때가 있다 —
+//   그 목록만 믿으면 그런 파일은 이 PC 에서 고칠 때까지 영영 내려오지 않으므로, 이만큼마다 폴더를 처음부터 훑는다
+export const FULL_SCAN_MS = 15 * 60_000;
 
 export class SafetyStop extends Error {}
 
@@ -130,7 +133,8 @@ export class SyncEngine {
 
   // ---------- 동기화 ----------
 
-  async run() {
+  /** @param {{ full?: boolean }} [opts] full: "바뀐 것" 목록과 상관없이 Drive 폴더를 처음부터 훑는다 ("지금 동기화") */
+  async run({ full = false } = {}) {
     const files = this.state.files;
     const local = this.walkLocal();
     const known = Object.keys(files);
@@ -140,7 +144,8 @@ export class SyncEngine {
     });
     const knownIds = new Set([...known.map((k) => files[k].id), ...Object.values(this.state.folders ?? {}), this.rootId]);
     const { changed: remoteDirty, token } = await this.remote.changesSince(this.state.pageToken || null, knownIds);
-    if (!localDirty && !remoteDirty) {
+    const scanDue = full || this.now() - (this.state.lastFullScan ?? 0) >= FULL_SCAN_MS;
+    if (!localDirty && !remoteDirty && !scanDue) {
       this.state.pageToken = token;
       return { skipped: true, uploaded: 0, downloaded: 0, deletedLocal: 0, deletedRemote: 0, conflicts: [], localChanged: false };
     }
@@ -268,6 +273,7 @@ export class SyncEngine {
     }
 
     this.state.pageToken = token;
+    this.state.lastFullScan = this.now();
     this.state.folders = Object.fromEntries(this.folderIds);
     result.localChanged = result.downloaded > 0 || result.deletedLocal > 0 || result.conflicts.length > 0;
     return result;

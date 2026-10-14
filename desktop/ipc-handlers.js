@@ -244,7 +244,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('drive:use', (_e, folderId, name) => useDriveFolder(String(folderId), String(name)));
   ipcMain.handle('drive:auto', () => autoDriveFolder());
-  ipcMain.handle('drive:sync', () => getDriveSync()?.run());
+  ipcMain.handle('drive:sync', () => getDriveSync()?.run({ full: true })); // 단추: 다른 앱이 넣은 파일까지 보이게 폴더를 처음부터
   ipcMain.handle('drive:disconnect', () => {
     getDriveAuth()?.signOut();
     settings.drive = null;

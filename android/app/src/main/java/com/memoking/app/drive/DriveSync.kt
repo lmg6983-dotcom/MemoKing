@@ -73,9 +73,10 @@ object DriveSync {
     }
 
     /** 지금 바로 (작업 스레드에서 순서대로) — 끝날 때까지 기다린다 */
-    fun syncBlocking(ctx: Context): Status = worker.submit<Status> { runNow(ctx.applicationContext) }.get()
+    /** full: Drive 폴더를 처음부터 훑는다 ("지금 동기화" 단추 — 다른 앱이 넣은 파일까지) */
+    fun syncBlocking(ctx: Context, full: Boolean = false): Status = worker.submit<Status> { runNow(ctx.applicationContext, full) }.get()
 
-    private fun runNow(ctx: Context): Status {
+    private fun runNow(ctx: Context, full: Boolean = false): Status {
         val folderId = folderId(ctx) ?: return Status("off", 0, "").also(::publish)
         if (!GoogleAuth.connected(ctx)) return Status("error", status.lastSync, "Google Drive에 로그인해 주세요").also(::publish)
         publish(status.copy(state = "syncing", changed = false, conflicts = emptyList()))
@@ -86,7 +87,7 @@ object DriveSync {
             JSONObject()
         }
         val result = try {
-            SyncEngine(storage(ctx, folderId), DriveApi(ctx), folderId, state).run()
+            SyncEngine(storage(ctx, folderId), DriveApi(ctx), folderId, state).run(full)
         } catch (e: Exception) {
             android.util.Log.w("MemoKing", "Drive 동기화 실패", e)
             saveState(file, state)

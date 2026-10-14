@@ -58,6 +58,10 @@ class SyncEngine(
     companion object {
         const val FOLDER = "application/vnd.google-apps.folder"
 
+        // Drive 의 "바뀐 것" 목록은 다른 앱(제미나이 등)이 폴더에 넣은 파일을 빠뜨릴 때가 있다 —
+        //   그 목록만 믿으면 그런 파일은 영영 내려오지 않으므로 이만큼마다 폴더를 처음부터 훑는다 (PC sync-engine.js 와 같음)
+        const val FULL_SCAN_MS = 15 * 60_000L
+
         // 기기마다 따로 만드는 파일 — 서로 덮어쓰며 충돌하지 않게 동기화하지 않는다
         private val LOCAL_ONLY = setOf("_memoking/index.json")
         private const val MERGE_JSON = "_memoking/link-previews.json"
@@ -138,7 +142,8 @@ class SyncEngine(
 
     // ---------- 동기화 ----------
 
-    fun run(): Result {
+    /** full: "바뀐 것" 목록과 상관없이 Drive 폴더를 처음부터 훑는다 ("지금 동기화") */
+    fun run(full: Boolean = false): Result {
         val localFiles = walkLocal()
         val known = files.keys().asSequence().toList()
         val localDirty = localFiles.size != known.size || localFiles.any { (rel, l) ->
@@ -148,7 +153,8 @@ class SyncEngine(
         val knownIds = known.mapNotNull { files.optJSONObject(it)?.optString("id") }.toSet() +
             (state.optJSONObject("folders")?.let { f -> f.keys().asSequence().map { f.optString(it) }.toSet() } ?: emptySet()) + rootId
         val (remoteDirty, token) = remote.changesSince(state.optString("pageToken").ifEmpty { null }, knownIds)
-        if (!localDirty && !remoteDirty) {
+        val scanDue = full || now() - state.optLong("lastFullScan", 0L) >= FULL_SCAN_MS
+        if (!localDirty && !remoteDirty && !scanDue) {
             state.put("pageToken", token)
             return Result(skipped = true)
         }
@@ -289,6 +295,7 @@ class SyncEngine(
         }
 
         state.put("pageToken", token)
+        state.put("lastFullScan", now())
         state.put("folders", JSONObject(folderIds.toMap()))
         return Result(uploaded, downloaded, deletedLocal, deletedRemote, conflicts)
     }
