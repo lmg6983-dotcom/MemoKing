@@ -428,9 +428,21 @@ export function registerIpc(ctx) {
     });
     for (const u of gone) res.failed.push({ upload: u, name: path.basename(u), error: 'OPMS 목록에서 사라졌어요. 새로 고침 해 주세요' });
     wm.opmsLastDir = res.dir;
+    indexWrapper(res.dir);
     if (!SMOKE) shell.openPath(res.dir);
     return res;
   });
+  // 받은 전자포대는 곧바로 매직키 파일 찾기에 (색인 새로 고침을 기다리지 않게)
+  const indexWrapper = (dir, files = null) => {
+    try {
+      const index = getFileIndex();
+      if (!index) return;
+      files ??= fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => path.join(dir, d.name));
+      index.add([dir, ...files], { base: wm.opmsSettings().wrapperDir });
+    } catch {
+      // 찾기 목록에 못 넣어도 받기는 끝났다
+    }
+  };
   ipcMain.handle('opms:open-file', async (_e, { idx, upload } = {}) => {
     const c = wm.caseOf(idx);
     const find = (list) => list.find((x) => x.upload === String(upload ?? ''));
@@ -439,6 +451,7 @@ export function registerIpc(ctx) {
     const file = await wm.opmsClient().fileFor(c, it, wm.opmsSettings().wrapperDir);
     if (!file) throw new Error('파일 이름이 이상해 열 수 없어요');
     wm.opmsLastDir = path.dirname(file);
+    indexWrapper(path.dirname(file), [file]);
     if (!isOpenableFile(file)) {
       if (!SMOKE) shell.showItemInFolder(file);
       return { file, shown: true, message: '서류가 아닌 파일이라 열지 않고 폴더에서 보여 줘요' };
@@ -453,6 +466,7 @@ export function registerIpc(ctx) {
     const r = await dialog.showOpenDialog(senderWindow(event), { title: '전자포대를 저장할 폴더', defaultPath: wm.opmsSettings().wrapperDir, properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return wm.opmsSettings().wrapperDir;
     settings.opms = { ...settings.opms, wrapperDir: r.filePaths[0] };
+    getFileIndex()?.watch([r.filePaths[0]]);
     saveSettings();
     return r.filePaths[0];
   });
