@@ -431,7 +431,7 @@ async function toggleLayer(which) {
   const next = await api.win.toggleLayer(id, which);
   if (!next) return;
   applyLayer(next);
-  if (next.top) tutEvent('crown-on');
+  if (next.top) tutEvent('crown-on'); // 튜토리얼은 왕관으로만 (테이프는 메모를 다른 창 뒤로 보내 다음 말풍선이 가려진다)
 }
 el.topBtn.addEventListener('click', () => !layer?.top && !layer?.bottom && toggleLayer('top'));
 el.tapeBtn.addEventListener('click', () => !layer?.top && !layer?.bottom && toggleLayer('bottom'));
@@ -1584,6 +1584,8 @@ const tutCounts = (md) => tutorialCounts(md, extractTags(md));
 function tutEvent(name) {
   if (coach?.step?.advance === name) api.tutorial.event(name);
 }
+// 사진 · 손 메모 · 파일의 복사 · 저장 · 공유 단추를 눌러 해 내면 (delete-button.js 가 알린다)
+document.addEventListener('mk:content-tools', () => tutEvent('content-tools'));
 
 const TAB_CHARS = 7;
 function renderStack(state) {

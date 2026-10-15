@@ -550,7 +550,8 @@ function tutorialPayload() {
   const step = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
   if (!step) return null;
   const keys = (t) => (typeof t === 'string' ? withShortcuts(t, settings.shortcuts) : t);
-  return { ...step, title: keys(step.title), text: keys(step.text), index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise };
+  const text = step.noTape && !windowManager.canTape ? step.noTape : step.text; // 테이프를 못 쓰는 PC 에서는 왕관만
+  return { ...step, title: keys(step.title), text: keys(text), index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise };
 }
 
 function tutorialWin(step) {

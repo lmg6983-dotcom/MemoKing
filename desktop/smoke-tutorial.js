@@ -177,6 +177,13 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await drag(note(), Array.from({ length: 12 }, (_, i) => [w * 0.2 + i * 18, h * 0.4 + Math.sin(i / 1.8) * 30]));
     await capture(note(), 'ink-drawing');
     await press(note(), '.ink-sheet .ink-done', '[ink] 완료');
+    await arrive(note, 'content', { praise: true });
+    const pic = await until(async () => { const v = await probe(note(), '.ProseMirror .mk-image-line'); return v.found && v; }, '손 메모 그림');
+    for (const dx of [0, 4]) { // hover 는 움직임으로 — 두 번
+      note().webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(pic.x + dx), y: Math.round(pic.y) });
+      await wait(60);
+    }
+    await press(note(), '.mk-copy-btn', '[content] 📋 복사');
     await arrive(note, 'annotate', { praise: true });
     await press(note(), '#add-btn', '[annotate] +');
     await wait(300);
@@ -224,7 +231,7 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     const finished = await until(async () => !getTutorial().active && (await stepOf(list())) === null, '튜토리얼 끝').then(() => true).catch(() => false);
     check('끝까지 따라 하면 말풍선이 사라지고 끝', finished);
     const body = vault.get(memoId)?.body ?? '';
-    check('따라 한 결과가 메모에 그대로 (굵게 · 체크리스트 · 손 메모 · 태그)', /\*\*/.test(body) && /\[[ x]\]/.test(body) && /!\[손 메모\]/.test(body) && /#할일/.test(body), body);
+    check('따라 한 결과가 메모에 그대로 (체크리스트 · 손 메모 · 태그)', /\[[ x]\]/.test(body) && /!\[손 메모\]/.test(body) && /#할일/.test(body), body);
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;

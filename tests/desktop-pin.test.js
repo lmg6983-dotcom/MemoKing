@@ -6,6 +6,9 @@ test('바탕화면 붙이기 명령: pin · unpin · bottom 과 창 번호만', 
   assert.equal(pinCommand('pin', 1234), 'pin 1234');
   assert.equal(pinCommand('unpin', 1234), 'unpin 1234');
   assert.equal(pinCommand('bottom', 99), 'bottom 99');
+  assert.equal(pinCommand('pair', 5, 6), 'pair 5 6');
+  assert.equal(pinCommand('pair', 5, 0), 'pair 5 0');
+  assert.equal(pinCommand('pair', 5, -1), null);
   assert.equal(pinCommand('pin', 0), null);
   assert.equal(pinCommand('pin', -5), null);
   assert.equal(pinCommand('rm', 5), null);

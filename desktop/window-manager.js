@@ -16,6 +16,7 @@ import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
 import { activeModules, magicChips } from '../app/js/core/magic-modules.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
+import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
 import {
   APP_DIR, MAGIC_PRELOAD, FINDER_PRELOAD, OPMS_PRELOAD, OCR_PRELOAD,
   webPreferences, windowIcon, noteBg, titleBarOverlay, bringToFront,
@@ -397,6 +398,7 @@ export class WindowManager {
       if (this.desktopPin.available) {
         win.setSkipTaskbar(true); // 바탕화면의 일부처럼 — 작업 표시줄에는 없다
         this.desktopPin.send('pin', hwnd);
+        this.syncTapePair(win);
       }
       return;
     }
@@ -408,6 +410,15 @@ export class WindowManager {
     this.desktopPin.send('unpin', hwnd);
     // 주인이 되돌려진 뒤에야 작업 표시줄 단추가 다시 붙는다 — 도우미가 답하기 전이었을 수 있어 조금 뒤 한 번 더
     setTimeout(() => !win.isDestroyed() && !win.mkPinned && win.setSkipTaskbar(false), 400);
+  }
+
+  /** 바탕화면에 붙인 메모 창과 그 테이프 창을 도우미에 짝지어 둔다 (맨 아래로 보낼 때 테이프도 늘 메모 바로 위에) */
+  syncTapePair(owner) {
+    if (!owner || owner.isDestroyed() || !(owner.mkPinned > 0)) return;
+    const entry = this.stickers.get(owner.id);
+    const tape = (entry?.kind === 'tape' && entry.win && !entry.win.isDestroyed() ? hwndOf(entry.win) : 0) || 0;
+    if (!tape && !this.desktopPin.pairs.has(owner.mkPinned)) return; // 짝이 없던 메모에 '짝 없음' 을 또 보내지 않는다
+    this.desktopPin.send('pair', owner.mkPinned, tape);
   }
 
   dropDesktopPins() {
@@ -700,7 +711,7 @@ export class WindowManager {
     const { record = false, ink = false, ...rest } = options ?? {};
     const id = vault.create(rest);
     const tut = this.getTutorial();
-    const forTutorial = tut?.active && tut.advance === 'memo-created';
+    const forTutorial = Boolean(tut?.active) && TUTORIAL_STEPS[tut.index]?.advance === 'memo-created';
     this.openNote(id, { record: Boolean(record), ink: Boolean(ink), big: forTutorial });
     if (forTutorial) {
       tut.memoId = id;
@@ -1068,6 +1079,7 @@ export class WindowManager {
     const destroy = () => {
       if (win.isDestroyed()) return;
       win.destroy();
+      if (!owner.isDestroyed()) this.syncTapePair(owner);
       // 늘 위인 창은 스티커 창이 사라질 때 맨 위를 다시 (왕관에서 테이프로 바꾼 뒤라면 하지 않는다)
       if (!owner.isDestroyed() && this.stickers.get(owner.id)?.kind === 'crown') this.reassertTop(owner);
     };
@@ -1104,6 +1116,7 @@ export class WindowManager {
       win.setBounds(this.stickerBounds(owner, entry.kind));
       win.showInactive();
       win.webContents.send('sticker:show', { animate, kind: entry.kind });
+      this.syncTapePair(owner);
     });
     win.loadFile(path.join(APP_DIR, 'sticker.html'), { query: { kind: entry.kind } });
   }
@@ -1118,6 +1131,8 @@ export class WindowManager {
     b.win = win;
     win.setParentWindow(to);
     win.setBounds(this.stickerBounds(to, b.kind));
+    this.syncTapePair(from);
+    this.syncTapePair(to);
     return true;
   }
 
