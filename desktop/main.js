@@ -21,6 +21,7 @@ import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '..
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { FileIndex, defaultRoots } from './file-index.js';
+import { comboFromAccelerator, actionUsing } from '../app/js/core/keymap.js';
 import { jumpListCategories, launchAction, pushRecent } from './jump-list.js';
 import { flushOpmsFiles } from './opms.js';
 import { createDoublePress } from './double-press.js';
@@ -32,7 +33,7 @@ import { alarmText } from '../app/js/core/reminders.js';
 
 import {
   APP_DIR, APP_ICON, APP_ICON_PNG, ASSETS_DIR,
-  noteBg, titleBarOverlay, bringToFront,
+  noteBg, titleBarOverlay, bringToFront, broadcast,
 } from './window-utils.js';
 
 import {
@@ -619,6 +620,9 @@ function setShortcut(name, acc) {
   if (next === shortcutKey(other)) return { ok: false, reason: 'same', other: SHORTCUT_NAMES[other], status: shortcutStatus(name) };
   // 메모 단축키(Ctrl+Alt+숫자)가 쓰는 키 — 단축키를 바꾸는 동안은 잠시 놓여 있으므로 잡은 키가 아니라 정해 둔 칸으로 본다
   if (Object.entries(memoHotkeys.map).some(([slot, b]) => hotkeyAccelerator(slot) === next && (!vault || vault.get(b.id)))) return { ok: false, reason: 'same', other: '메모 단축키', status: shortcutStatus(name) };
+  // 메모 창 단축키가 쓰는 키를 전역으로 가져가면 그 기능이 모든 메모 창에서 멈춘다
+  const inMemo = actionUsing(settings.keymap, comboFromAccelerator(next));
+  if (inMemo) return { ok: false, reason: 'same', other: `메모 창의 '${inMemo.label}'`, status: shortcutStatus(name) };
   const prev = shortcutKey(name);
   const enabled = shortcutStatus(name).enabled;
   if (enabled && next !== prev) {
@@ -631,6 +635,8 @@ function setShortcut(name, acc) {
   else registerMagicKey();
   memoHotkeys.register(); // 놓아 준 Ctrl+Alt+숫자를 메모 단축키가 다시 쓰게
   updateTrayMenu();
+  // 설정 창 · 단축키 설정 창 어디서 바꿨든 둘 다 바로
+  broadcast('shortcuts:changed');
   return { ok: true, status: shortcutStatus(name) };
 }
 

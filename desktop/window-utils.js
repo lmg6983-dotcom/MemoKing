@@ -73,6 +73,11 @@ export function titleBarOverlay() {
   };
 }
 
+/** 열린 창 모두에 알림 (설정이 바뀌었을 때 등) */
+export function broadcast(channel, ...args) {
+  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, ...args);
+}
+
 // 창을 앞으로: 내려 둔 창은 되살리고, 보이게 한 뒤 (inactive 가 아니면) 포커스까지
 export function bringToFront(win, { inactive = false, raise = false } = {}) {
   if (win.isMinimized()) win.restore();

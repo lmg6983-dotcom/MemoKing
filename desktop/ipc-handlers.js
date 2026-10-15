@@ -15,8 +15,9 @@ import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown } from '
 import { isBlankBody, extractPreview } from '../app/js/core/memo-file.js';
 import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
+import { cleanOverrides, setActionKey } from '../app/js/core/keymap.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
-import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront } from './window-utils.js';
+import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront, broadcast } from './window-utils.js';
 import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
 import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
@@ -295,7 +296,42 @@ export function registerIpc(ctx) {
   ipcMain.handle('app:set-auto-start', (_e, on) => setAutoStart(on));
   ipcMain.handle('app:set-quick-memo', (_e, on) => setQuickMemo(on));
   ipcMain.handle('shortcuts:set', (_e, name, acc) => setShortcut(String(name), acc == null ? null : String(acc)));
-  ipcMain.handle('shortcuts:pause', (_e, on) => pauseShortcuts(on));
+  // 새 키를 받는 동안 전역 단축키를 잠시 놓기 — 놓은 창이 닫히거나 새로 고쳐지면(되살리기를 못 보냄) 여기서 되살린다
+  let pausedBy = null;
+  ipcMain.handle('shortcuts:pause', (event, on) => {
+    const wc = event.sender;
+    pausedBy = on ? wc : null;
+    if (on && !wc.mkPauseWatch) {
+      wc.mkPauseWatch = true;
+      const undo = () => {
+        if (pausedBy !== wc) return;
+        pausedBy = null;
+        pauseShortcuts(false);
+      };
+      wc.on('destroyed', undo);
+      wc.on('did-start-loading', undo);
+    }
+    return pauseShortcuts(on);
+  });
+  // 메모 창 단축키 (바꾼 것만 settings.keymap 에) — 바꾸면 열린 창 모두 바로
+  const keymapState = () => ({ overrides: cleanOverrides(settings.keymap), shortcuts: appSettings().shortcuts });
+  const keymapChanged = () => {
+    saveSettings();
+    broadcast('keymap:changed', cleanOverrides(settings.keymap));
+  };
+  ipcMain.handle('keymap:get', () => keymapState());
+  ipcMain.handle('keymap:set', (_e, id, combo) => {
+    const r = setActionKey(settings.keymap, String(id), combo == null ? null : String(combo));
+    settings.keymap = r.overrides;
+    keymapChanged();
+    return { ...keymapState(), moved: r.moved };
+  });
+  ipcMain.handle('keymap:reset', () => {
+    settings.keymap = {};
+    keymapChanged();
+    return keymapState();
+  });
+  ipcMain.handle('keymap:open-window', () => wm.openKeymapWindow());
   ipcMain.handle('app:set-fit-tables', (_e, on) => {
     settings.fitTables = Boolean(on);
     saveSettings();
@@ -305,7 +341,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('app:set-link-previews', (_e, on) => {
     settings.linkPreviews = Boolean(on);
     saveSettings();
-    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('settings:link-previews', settings.linkPreviews);
+    broadcast('settings:link-previews', settings.linkPreviews);
     return settings.linkPreviews;
   });
   ipcMain.handle('app:set-auto-tags', (_e, on) => {

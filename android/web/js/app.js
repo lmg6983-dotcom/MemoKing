@@ -1,5 +1,6 @@
 // 메모킹 안드로이드 — 시작, 화면 바꾸기, 설정·휴지통, 다른 앱에서 받은 것, 예약 알림
 import { daysAgoText } from '../../app/js/core/time.js';
+import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
@@ -572,7 +573,7 @@ const printSheet = $('print-sheet');
 const SCALE_KEY = 'memoking.printScale';
 const printJob = { id: null, mode: 'share', scale: 1 };
 try {
-  printJob.scale = Math.min(2, Math.max(0.5, Number(localStorage.getItem(SCALE_KEY)) || 1));
+  printJob.scale = clampPrintScale(localStorage.getItem(SCALE_KEY));
 } catch {
   // 기본 크기
 }
@@ -614,7 +615,7 @@ async function openPrint(id, mode) {
   drawPrintSize();
 }
 function setPrintScale(v) {
-  printJob.scale = Math.min(2, Math.max(0.5, v));
+  printJob.scale = clampPrintScale(v);
   try {
     localStorage.setItem(SCALE_KEY, String(printJob.scale));
   } catch {

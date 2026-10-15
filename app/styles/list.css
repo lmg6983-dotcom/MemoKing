@@ -354,6 +354,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .setting-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13.5px; cursor: pointer; }
 .setting-row small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); }
 .setting-row { margin-bottom: 14px; }
+.keymap-row { cursor: default; }
+.keymap-row > span { flex: 1; min-width: 0; }
+.keymap-row > .btn { flex: none; }
 .setting-row kbd { padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; font-size: 12px; }
 
 
@@ -761,6 +764,8 @@ body.is-dragging .card:hover { transform: none; }
 .undo-bar button:hover { background: var(--brand-yellow-hover); }
 
 /* 빈 목록: 그림 + 다음에 할 일 단추 (휴대폰과 같음) */
+/* 메모가 없을 때는 빈 카드 칸이 자리를 차지하지 않고, 안내가 목록 칸 한가운데에 */
+.cards.is-empty { flex: 0 0 auto; padding: 0; overflow: hidden; }
 #empty:not([hidden]) { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; animation: mk-pop-in 0.25s ease-out both; }
 .empty-art { font-size: 40px; line-height: 1; animation: empty-bob 2.6s ease-in-out infinite; }
 .empty-actions { display: flex; gap: 8px; margin-top: 4px; }

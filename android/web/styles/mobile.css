@@ -286,6 +286,10 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .cards .item { animation: mk-pop-in 0.16s ease-out both; }
 
 .empty { margin: 48px 24px; text-align: center; line-height: 1.7; color: var(--muted); white-space: pre-line; }
+/* 메모가 없으면 안내가 목록 칸 한가운데에 (아래는 + 단추 자리만큼 비움) */
+.view.is-empty { display: flex; flex-direction: column; }
+.view.is-empty > .cards { display: none; }
+.view.is-empty > #empty { flex: 1; justify-content: center; margin: 0; padding: 24px 24px 88px; }
 #empty:not([hidden]) { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: mk-pop-in 0.25s ease-out both; }
 .empty-art { font-size: 44px; line-height: 1; animation: empty-bob 2.6s ease-in-out infinite; }
 .empty-actions { display: flex; gap: 8px; margin-top: 6px; }

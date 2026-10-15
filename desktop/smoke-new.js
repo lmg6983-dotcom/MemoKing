@@ -685,6 +685,89 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await until(() => !noteWins.has(ta) && !noteWins.has(tb), '테이프 스택 닫힘', 3000).catch(() => {});
     }
 
+    // ---------- PDF로 저장 창: 작은 창에서도 취소 · 저장이 보이고, 글자 크기 · 단축키 ----------
+    {
+      const lines = Array.from({ length: 60 }, (_, i) => `줄 ${i + 1} 이 메모는 여러 쪽이 되도록 길게 적은 글이에요`).join('\n\n');
+      const pid = vault.import({ body: `# PDF 점검\n\n${lines}` });
+      const pw = windowManager.openNote(pid);
+      await until(() => pw.isVisible() && js(pw, 'document.documentElement.dataset.ready === "true"'), 'PDF 점검 메모', 8000);
+      await js(pw, `document.getElementById('menu-btn').click()`);
+      await capture(pw, 'note-menu.png');
+      await js(pw, `document.getElementById('menu-btn').click()`);
+      // 메모 창에서 Ctrl+Shift+P → PDF 창
+      pw.focus();
+      key(pw, 'P', ['control', 'shift']);
+      const pdfWin = await until(() => windowManager.pdfWin?.isVisible() && windowManager.pdfWin, 'Ctrl+Shift+P → PDF 창', 6000).catch(() => null);
+      check('메모 창에서 Ctrl+Shift+P → PDF로 저장 창', Boolean(pdfWin));
+      if (pdfWin) {
+        await until(() => js(pdfWin, 'document.documentElement.dataset.ready === "true"'), 'PDF 창 준비');
+        pdfWin.setSize(640, 480); // 가장 작은 창
+        await wait(300);
+        await capture(pdfWin, 'pdf-small.png');
+        const layout = await js(pdfWin, `(() => {
+          const vis = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= innerHeight + 0.5; };
+          return { save: vis('save'), cancel: vis('cancel'), openInActions: Boolean(document.querySelector('.actions #open-after')), zoom: Boolean(document.getElementById('zoom-range')) };
+        })()`);
+        check('PDF 창이 작아도 취소 · PDF로 저장 단추가 보이고, 저장한 뒤 열기는 단추 줄과 떨어짐 · 글자 크기 조절 있음', layout.save && layout.cancel && !layout.openInActions && layout.zoom, JSON.stringify(layout));
+        const pagesAt = async (z) => {
+          await js(pdfWin, `(() => { const r = document.getElementById('zoom-range'); r.value = '${z}'; r.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+          return until(async () => {
+            const src = await js(pdfWin, `document.getElementById('frame').getAttribute('src')`);
+            const n = await js(pdfWin, 'document.body.dataset.pages');
+            return src?.includes(`z=${z / 100}`) && Number(n) > 0 && Number(n);
+          }, `글자 크기 ${z}%`, 15000).catch(() => 0); // 미리보기를 다시 그리는 데 느린 점검 환경에서 몇 초
+        };
+        const small = await pagesAt(50);
+        const big = await pagesAt(200);
+        check('PDF 글자 크기를 키우면 미리보기 쪽 수가 늘어남', small > 0 && big > small, JSON.stringify({ small, big }));
+        await pagesAt(100);
+        pdfWin.close();
+      }
+      // 단축키 설정 창: 설정의 단추로 열리고, PDF 키를 바꾸면 메모 창에 바로
+      const listWin = getList() ?? createListWindow('memos');
+      await until(() => js(listWin, 'document.documentElement.dataset.ready === "true"'), '목록 준비');
+      await js(listWin, `document.getElementById('settings-btn').click()`);
+      await wait(300);
+      await js(listWin, `document.getElementById('keymap-open').scrollIntoView({ block: 'center' })`);
+      await capture(listWin, 'settings-keymap.png');
+      await js(listWin, `document.getElementById('keymap-open').click()`);
+      const kw = await until(() => windowManager.keymapWin?.isVisible() && windowManager.keymapWin, '단축키 설정 창', 6000).catch(() => null);
+      check('설정 › 단축키 설정하기 → 단축키 설정 창', Boolean(kw));
+      if (kw) {
+        await until(() => js(kw, 'document.documentElement.dataset.ready === "true"'), '단축키 창 준비');
+        const rows = await js(kw, `document.querySelectorAll('.row').length`);
+        await capture(kw, 'keymap.png');
+        // PDF로 저장 줄의 키 칸을 누르고 Ctrl+Alt+P
+        await js(kw, `[...document.querySelectorAll('.row')].find((r) => r.querySelector('.name').dataset.label === 'PDF로 저장').querySelector('.key').click()`);
+        kw.focus();
+        key(kw, 'P', ['control', 'alt']);
+        const changed = await until(() => js(kw, `[...document.querySelectorAll('.row')].find((r) => r.querySelector('.name').dataset.label === 'PDF로 저장').querySelector('.key').textContent === 'Ctrl+Alt+P'`), 'PDF 키 바뀜', 4000).catch(() => false);
+        // 마우스를 올리면 설명
+        await js(kw, `document.querySelector('.row .name').dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))`);
+        await wait(450); // 머물러야 뜬다
+        const tip = await js(kw, `!document.getElementById('tip').hidden && document.getElementById('tip').textContent`);
+        await capture(kw, 'keymap-tip.png');
+        check('단축키 창: 기능 목록 · 키 바꾸기 · 마우스를 올리면 하는 일 설명', rows > 25 && changed && /메모/.test(tip || ''), JSON.stringify({ rows, changed, tip }));
+        pw.focus();
+        key(pw, 'P', ['control', 'alt']);
+        const viaNew = await until(() => windowManager.pdfWin?.isVisible(), '바꾼 키로 PDF', 5000).catch(() => false);
+        windowManager.pdfWin?.close();
+        await wait(200);
+        key(pw, 'P', ['control', 'shift']);
+        await wait(700);
+        const oldKeyGone = !windowManager.pdfWin;
+        check('바꾼 키(Ctrl+Alt+P)로 PDF 창이 열리고, 예전 키는 더 이상 안 열림', viaNew && oldKeyGone, JSON.stringify({ viaNew, oldKeyGone }));
+        // 모두 초기화 (두 번 눌러야)
+        await js(kw, `document.getElementById('reset-all').click()`);
+        const once = getSettings().keymap?.pdf;
+        await js(kw, `document.getElementById('reset-all').click()`);
+        const reset = await until(() => !getSettings().keymap?.pdf, '초기화', 4000).then(() => true).catch(() => false);
+        check('모두 초기화: 한 번 더 눌러야 되고, 누르면 처음 키로', Boolean(once) && reset, JSON.stringify({ once, keymap: getSettings().keymap }));
+        kw.close();
+      }
+      pw.close();
+    }
+
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {
