@@ -40,6 +40,7 @@ function radios(container, attr, value) {
 const size = () => pageSize(opt);
 
 let frameTimer = 0;
+let shown = null; // 지금 미리보기가 알려 준 것 { src, pages, gap }
 let view = { pw: 0, ph: 0, scale: 1 }; // 지금 미리보기: 쪽 크기(px)와 줄인 비율
 function render() {
   radios($('kind'), 'kind', opt.kind);
@@ -80,23 +81,26 @@ function render() {
   document.body.dataset.pages = '';
   $('summary').textContent = `${s.width} × ${s.height}mm (${ratioLabel(s.width, s.height)})`;
   // 쪽 내용은 잠깐 멈춘 뒤에 다시 그린다 (입력하는 동안 깜빡이지 않게)
+  const src = `print.html?${new URLSearchParams({ id, w: s.width, h: s.height, m: MARGINS[opt.margin], bg: opt.bg ? 1 : 0, date: opt.date ? 1 : 0, z: opt.zoom / 100, preview: 1 })}`;
   clearTimeout(frameTimer);
-  frameTimer = setTimeout(() => {
-    const src = `print.html?${new URLSearchParams({ id, w: s.width, h: s.height, m: MARGINS[opt.margin], bg: opt.bg ? 1 : 0, date: opt.date ? 1 : 0, z: opt.zoom / 100, preview: 1 })}`;
-    if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
-  }, 150);
+  // 같은 미리보기를 그대로 두는 다시 그리기(창 · 미리보기 칸 크기만 바뀜)면 받아 둔 쪽 수를 다시 입힌다 — 미리보기는 다시 알려 주지 않으므로
+  if (shown && shown.src === src && frame.getAttribute('src') === src) showPages();
+  else {
+    frameTimer = setTimeout(() => {
+      if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
+    }, 150);
+  }
   remember();
   requestAnimationFrame(() => showMore()); // 고르기 칸이 바뀌어 길이가 달라졌을 수 있다
 }
 
-window.addEventListener('message', (e) => {
-  if (e.data?.type !== 'pdf-preview') return;
+// 여러 쪽이면 쪽을 모두 위아래로 이어 보이고, 미리보기 칸은 스크롤 (첫 쪽 크기는 그대로)
+function showPages() {
   const s = size();
-  const n = e.data.pages;
+  const { pages: n, gap } = shown;
   document.body.dataset.pages = String(n);
-  // 여러 쪽이면 쪽을 모두 위아래로 이어 보이고, 미리보기 칸은 스크롤 (첫 쪽 크기는 그대로)
   const { ph, scale } = view;
-  const total = n > 1 ? n * ph + (n - 1) * (Number(e.data.gap) || 0) : ph;
+  const total = n > 1 ? n * ph + (n - 1) * (Number(gap) || 0) : ph;
   const sheet = $('sheet');
   const frame = $('frame');
   sheet.classList.toggle('multi', n > 1);
@@ -104,6 +108,14 @@ window.addEventListener('message', (e) => {
   frame.style.height = `${total}px`;
   frame.title = n > 1 ? `미리보기 ${n}쪽` : '미리보기';
   $('summary').textContent = `${s.width} × ${s.height}mm (${ratioLabel(s.width, s.height)}), ${n}쪽`;
+}
+
+window.addEventListener('message', (e) => {
+  if (e.data?.type !== 'pdf-preview' || e.source !== $('frame').contentWindow) return;
+  const src = $('frame').getAttribute('src') ?? '';
+  if (e.data.query && !src.endsWith(e.data.query)) return; // 앞서 띄웠던 미리보기의 늦은 결과
+  shown = { src, pages: e.data.pages, gap: e.data.gap };
+  showPages();
 });
 
 $('kind').addEventListener('click', (e) => {
