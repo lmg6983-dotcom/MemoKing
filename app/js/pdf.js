@@ -9,7 +9,7 @@ const id = new URLSearchParams(location.search).get('id');
 const STORE = 'memoking.pdf';
 
 // 고른 것 (지난번 고른 것을 기억)
-let opt = { kind: 'paper', paper: 'a4', orientation: 'portrait', ratio: '4:3', long: 150, width: 100, height: 150, margin: 'normal', bg: false, date: true, open: true };
+let opt = { kind: 'paper', paper: 'a4', orientation: 'portrait', ratio: '4:3', long: 150, width: 100, height: 150, margin: 'normal', bg: false, date: true, open: true, zoom: 100 };
 try {
   opt = { ...opt, ...JSON.parse(localStorage.getItem(STORE) ?? '{}') };
 } catch {
@@ -48,6 +48,10 @@ function render() {
   $('ratios').replaceChildren(...RATIOS.map((r) => chip('ratio', r.id, r.label, r.id === opt.ratio)));
   radios($('orientation'), 'o', opt.orientation);
   radios($('margin'), 'm', opt.margin);
+  opt.zoom = Math.min(200, Math.max(50, Math.round(Number(opt.zoom) / 5) * 5 || 100));
+  radios($('zoom'), 'z', String(opt.zoom)); // 직접 맞춘 값이 단계와 다르면 단계는 모두 꺼진다
+  $('zoom-range').value = String(opt.zoom);
+  $('zoom-out').textContent = `${opt.zoom}%`;
   $('long').value = String(opt.long);
   $('long-out').textContent = `${opt.long}mm`;
   $('cw').value = String(opt.width);
@@ -77,10 +81,11 @@ function render() {
   // 쪽 내용은 잠깐 멈춘 뒤에 다시 그린다 (입력하는 동안 깜빡이지 않게)
   clearTimeout(frameTimer);
   frameTimer = setTimeout(() => {
-    const src = `print.html?${new URLSearchParams({ id, w: s.width, h: s.height, m: MARGINS[opt.margin], bg: opt.bg ? 1 : 0, date: opt.date ? 1 : 0, preview: 1 })}`;
+    const src = `print.html?${new URLSearchParams({ id, w: s.width, h: s.height, m: MARGINS[opt.margin], bg: opt.bg ? 1 : 0, date: opt.date ? 1 : 0, z: opt.zoom / 100, preview: 1 })}`;
     if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
   }, 150);
   remember();
+  requestAnimationFrame(() => showMore()); // 고르기 칸이 바뀌어 길이가 달라졌을 수 있다
 }
 
 window.addEventListener('message', (e) => {
@@ -130,6 +135,16 @@ $('margin').addEventListener('click', (e) => {
   opt.margin = b.dataset.m;
   render();
 });
+$('zoom').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-z]');
+  if (!b) return;
+  opt.zoom = Number(b.dataset.z);
+  render();
+});
+$('zoom-range').addEventListener('input', (e) => {
+  opt.zoom = Number(e.target.value);
+  render();
+});
 $('long').addEventListener('input', (e) => {
   opt.long = Number(e.target.value);
   render();
@@ -155,6 +170,15 @@ $('open-after').addEventListener('change', (e) => {
   remember();
 });
 $('cancel').addEventListener('click', () => window.close());
+// 창이 작아 고르기가 단추 줄 밑에 숨으면 알려 준다
+const form = $('form');
+function showMore() {
+  const more = form.scrollHeight - form.scrollTop - form.clientHeight > 4;
+  document.querySelector('.actions').classList.toggle('more', more);
+  $('more-hint').hidden = !more || form.scrollTop > 0;
+}
+form.addEventListener('scroll', showMore, { passive: true });
+new ResizeObserver(showMore).observe(form);
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') window.close();
 });
@@ -179,7 +203,7 @@ $('form').addEventListener('submit', async (e) => {
   $('save').disabled = true;
   $('status').textContent = 'PDF를 만드는 중…';
   $('status').classList.remove('error');
-  const r = await api.pdf.save(id, { width: s.width, height: s.height, margin: MARGINS[opt.margin], bg: opt.bg, date: opt.date, open: opt.open }).catch(() => null);
+  const r = await api.pdf.save(id, { width: s.width, height: s.height, margin: MARGINS[opt.margin], bg: opt.bg, date: opt.date, open: opt.open, zoom: opt.zoom / 100 }).catch(() => null);
   $('save').disabled = false;
   if (r?.file) {
     $('status').textContent = `${r.pages}쪽 PDF로 저장했어요`;

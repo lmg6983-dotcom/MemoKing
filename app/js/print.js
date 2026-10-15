@@ -11,6 +11,8 @@ const W = Number(q.get('w')) || 210;
 const H = Number(q.get('h')) || 297;
 const M = Number(q.get('m')) || 0;
 const preview = q.get('preview') === '1';
+// 글자 크기 (내용 전체를 확대 · 축소 — 휴대폰 PDF 와 같은 50~200%). 줄은 쪽 폭에 다시 맞춰진다
+const Z = Math.min(2, Math.max(0.5, Number(q.get('z')) || 1));
 const PAGE_GAP = 28; // 미리보기 쪽 사이 (실제 크기 px — 줄여 보이면 10px 쯤)
 const root = document.getElementById('editor');
 
@@ -32,10 +34,13 @@ if (!preview && M > 0) {
   table.querySelector('.page-cell').append(root, document.getElementById('print-date'));
 }
 
+if (Z !== 1) root.style.zoom = String(Z);
+
 function pages() {
   const mm = 96 / 25.4;
   const content = (H - 2 * M) * mm;
-  return Math.max(1, Math.ceil((root.scrollHeight - 1) / content));
+  // 확대한 만큼 높이가 늘어난다 (getBoundingClientRect 는 zoom 을 반영한 높이)
+  return Math.max(1, Math.ceil((root.getBoundingClientRect().height - 1) / content));
 }
 
 async function settled(timeout = 6000) {

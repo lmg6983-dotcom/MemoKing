@@ -25,6 +25,7 @@ import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
 import { hintOnce } from './hints.js';
 import { toggleShortcutSheet } from './shortcut-sheet.js';
+import { KEYMAP_ACTIONS, keymapTable, resolveKeymap, comboLabel } from './core/keymap.js';
 import { hotkeyDialog } from './hotkey-dialog.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
 
@@ -751,14 +752,17 @@ async function openShortcutSheet() {
   } catch {
     keys = undefined;
   }
-  toggleShortcutSheet(keys);
+  toggleShortcutSheet(keys, keymapOverrides);
 }
 $('shortcuts-btn').addEventListener('click', () => {
   closeMenu();
   openShortcutSheet();
 });
 // 메모 창을 몇 번 써 본 뒤 한 번: 단축키 모음이 있다는 것
-setTimeout(() => hintOnce('shortcuts', 'Ctrl+/ 를 누르면 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn }), 2500);
+setTimeout(() => {
+  const k = resolveKeymap(keymapOverrides).shortcuts[0];
+  hintOnce('shortcuts', k ? `${comboLabel(k)} 를 누르면 단축키를 한눈에 볼 수 있어요` : '메뉴 › 단축키 보기에서 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn });
+}, 2500);
 $('links-close').addEventListener('click', () => toggleLinks(false));
 api.on('memo:links-changed', refreshLinks);
 
@@ -1291,36 +1295,42 @@ function showActive(active) {
   }
 }
 
-// e.code 기준이라 한글 입력 상태에서도 동작한다.
-const SHORTCUTS = {
-  'ctrl+KeyB': ['cmd', 'bold'],
-  'ctrl+KeyI': ['cmd', 'italic'],
-  'ctrl+KeyU': ['cmd', 'underline'],
-  'ctrl+shift+KeyC': ['color', 'color'],
-  'ctrl+shift+KeyH': ['color', 'highlight'],
-  'ctrl+KeyT': ['cmd', 'strike'],
-  'ctrl+KeyE': ['cmd', 'code'],
-  'ctrl+Digit1': ['cmd', 'h1'],
-  'ctrl+Digit2': ['cmd', 'h2'],
-  'ctrl+Digit3': ['cmd', 'h3'],
-  'ctrl+Digit0': ['cmd', 'paragraph'],
-  'ctrl+shift+Digit8': ['cmd', 'bullet'],
-  'ctrl+shift+KeyL': ['cmd', 'bullet'],
-  'ctrl+shift+Digit7': ['cmd', 'ordered'],
-  'ctrl+shift+Digit9': ['cmd', 'task'],
-  'ctrl+shift+KeyB': ['cmd', 'quote'],
-  'ctrl+shift+KeyI': ['action', 'file'],
-  'ctrl+shift+KeyR': ['action', 'record'],
-  'ctrl+shift+KeyD': ['action', 'ink'],
-  'ctrl+shift+KeyE': ['action', 'annotate'],
-  'ctrl+shift+KeyT': ['app', 'top'],
-  'ctrl+shift+KeyG': ['app', 'tape'],
-  'ctrl+shift+KeyA': ['app', 'reminders'],
-  'ctrl+KeyK': ['app', 'links'],
-  'ctrl+Slash': ['app', 'shortcuts'],
-  'ctrl+KeyN': ['app', 'new'],
-  'ctrl+KeyW': ['app', 'close'],
-};
+// e.code 기준이라 한글 입력 상태에서도 동작한다. 키는 설정 › 단축키 설정에서 바꿀 수 있다 (core/keymap.js)
+let keymapOverrides = {};
+let SHORTCUTS = keymapTable(keymapOverrides);
+function useKeymap(overrides) {
+  keymapOverrides = overrides ?? {};
+  SHORTCUTS = keymapTable(keymapOverrides);
+  // 메뉴에 지금 키를 함께 보인다 (PDF로 저장 Ctrl+Shift+P 등)
+  const keys = resolveKeymap(keymapOverrides);
+  for (const a of KEYMAP_ACTIONS) {
+    const btnId = a.run[0] === 'menu' ? a.run[1] : a.id === 'shortcuts' ? 'shortcuts-btn' : null;
+    const btn = btnId && document.getElementById(btnId);
+    if (!btn) continue;
+    // 키 글자는 메뉴 글(잠그기 ↔ 잠금 풀기처럼 바뀜)과 따로, 단추 오른쪽 끝에
+    btn.querySelector(':scope > span > small:not([id])')?.remove(); // 예전에 글 안에 적어 둔 키 글자
+    let hint = btn.querySelector(':scope > .key-hint');
+    if (!hint) {
+      hint = document.createElement('kbd');
+      hint.className = 'key-hint';
+      btn.append(hint);
+    }
+    hint.textContent = keys[a.id].map(comboLabel).join(', ');
+    hint.hidden = !hint.textContent;
+  }
+  // 단추 풍선말(title) · 글자 모양 메뉴의 키 글자도 지금 키로 (처음 적힌 기본 키 글자를 바꿔 끼운다)
+  const swap = new Map(KEYMAP_ACTIONS.filter((a) => a.keys.length).map((a) => [comboLabel(a.keys[0]), keys[a.id].length ? comboLabel(keys[a.id][0]) : '키 없음']));
+  const re = new RegExp(`(?<![\\w+])(${[...swap.keys()].sort((x, y) => y.length - x.length).map((k) => k.replace(/[+]/g, '\\+')).join('|')})(?![\\w+])`, 'g');
+  for (const node of document.querySelectorAll('[title], #style-menu kbd')) {
+    const attr = node.matches('kbd') ? 'text' : 'title';
+    node.dataset.keyText0 ??= attr === 'text' ? node.textContent : node.getAttribute('title');
+    const next = node.dataset.keyText0.replace(re, (m) => swap.get(m) ?? m);
+    if (attr === 'text') node.textContent = next === '키 없음' ? '' : next;
+    else node.setAttribute('title', next);
+  }
+}
+useKeymap({});
+api.on('keymap:changed', (o) => useKeymap(o));
 
 window.addEventListener('keydown', (e) => {
   if (!editor || el.confirm.open) return;
@@ -1362,6 +1372,10 @@ window.addEventListener('keydown', (e) => {
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
   else if (name === 'shortcuts') openShortcutSheet();
+  else if (kind === 'menu') {
+    closeMenu();
+    document.getElementById(name)?.click(); // 메뉴의 그 단추와 똑같이
+  }
 }, true);
 
 // ---------- 본문 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 웹 브라우저처럼 글·사진·표가 함께 ----------
@@ -1841,7 +1855,9 @@ if (!memo) {
   annotation.load(Boolean(memo.ink));
   // 표가 넘치면 메모를 줄여 맞추기 (설정) — 열 때 한 번, 그리고 본문이 바뀔 때(표 붙여넣기·넣기)
   try {
-    fitTables = (await api.settings.get())?.fitTables !== false;
+    const st = await api.settings.get();
+    fitTables = st?.fitTables !== false;
+    useKeymap(st?.keymap);
   } catch {
     // 설정을 못 읽으면 기본(켜짐)
   }

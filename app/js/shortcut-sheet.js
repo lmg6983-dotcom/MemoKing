@@ -1,10 +1,25 @@
 // 단축키 한눈에 보기 (Ctrl+/ · 메뉴 › 단축키 보기)
 import { SHORTCUT_GROUPS } from './core/shortcuts.js';
 import { withShortcuts } from './core/accelerators.js';
+import { keymapGroups, comboLabel, FIXED_KEYS } from './core/keymap.js';
+
+/** 보일 무리: 어디서든(전역) + 메모 창 기능(바꾼 키로) + 바꿀 수 없는 키 */
+function groups(overrides) {
+  const global = SHORTCUT_GROUPS.find((g) => g.title === '어디서든');
+  const mine = keymapGroups(overrides).map((g) => ({
+    title: g.title,
+    items: g.items.filter((a) => a.current.length).map((a) => [a.label, a.current.map(comboLabel).join(' / ')]),
+  }));
+  const memo = mine.find((g) => g.title === '메모 창');
+  if (memo) memo.items.push(...FIXED_KEYS.slice(0, 2));
+  const lists = mine.find((g) => g.title === '목록');
+  if (lists) lists.items.push(...FIXED_KEYS.slice(2));
+  return [global, ...mine].filter(Boolean);
+}
 
 let dialog = null;
 
-function build(shortcuts) {
+function build(shortcuts, overrides) {
   dialog = document.createElement('dialog');
   dialog.className = 'dialog shortcut-sheet';
   dialog.setAttribute('aria-labelledby', 'shortcut-sheet-title');
@@ -20,7 +35,7 @@ function build(shortcuts) {
   close.addEventListener('click', () => dialog.close());
   head.append(h, close);
   dialog.append(head);
-  for (const g of SHORTCUT_GROUPS) {
+  for (const g of groups(overrides)) {
     const sec = document.createElement('section');
     const t = document.createElement('h4');
     t.textContent = g.title;
@@ -46,11 +61,11 @@ function build(shortcuts) {
   document.body.append(dialog);
 }
 
-/** @param {object} [shortcuts] 설정의 전역 단축키 (바꿨으면 그 키로 보인다) */
-export function toggleShortcutSheet(shortcuts) {
+/** @param {object} [shortcuts] 설정의 전역 단축키 · @param {object} [overrides] 바꾼 메모 창 단축키 (바꿨으면 그 키로 보인다) */
+export function toggleShortcutSheet(shortcuts, overrides) {
   if (dialog?.open) return dialog.close();
   dialog?.remove();
-  build(shortcuts);
+  build(shortcuts, overrides);
   if (dialog.open) dialog.close();
   else {
     dialog.showModal();

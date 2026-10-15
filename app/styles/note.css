@@ -68,7 +68,8 @@ body, .note-screen, .share-paper {
   top: calc(38px + var(--tabs-h, 0px));
   right: 6px;
   z-index: 20;
-  width: 220px;
+  width: 264px; /* 오른쪽에 단축키 글자가 붙어도 메뉴 글이 두 줄로 깨지지 않게 */
+  max-width: calc(100vw - 12px);
   /* 메모 창이 작아도 항목이 잘리지 않게: 창 아래 끝까지만, 넘치면 메뉴 안에서 스크롤 */
   max-height: calc(100vh - 38px - var(--tabs-h, 0px) - 8px);
   overflow-y: auto;
@@ -109,6 +110,9 @@ body, .note-screen, .share-paper {
 .menu-item[aria-checked="true"] svg { color: var(--text-strong); }
 .menu-item[aria-checked="true"] { background: var(--brand-yellow-soft); }
 .menu-item.danger { color: var(--danger); }
+.menu-item > span { flex: 1; min-width: 0; }
+.menu-item > .key-hint { flex: none; margin: 0; padding: 0 0 0 8px; border: 0; background: none; font: 600 11px/1 var(--font-sans); letter-spacing: -0.01em; color: var(--muted); white-space: nowrap; }
+.menu-item > .key-hint[hidden] { display: none; }
 .menu-item.danger svg { color: var(--danger); }
 
 /* ---------- 알림 띠 ---------- */

@@ -146,6 +146,12 @@ try {
   await page.fill('#search', '없는말쯤');
   await page.waitForTimeout(250);
   check('빈 결과: 안내와 풀기 단추', await page.isVisible('#empty .btn.primary'));
+  const emptyMid = await page.evaluate(() => {
+    const v = document.getElementById('view-memos').getBoundingClientRect();
+    const b = document.querySelector('#empty .btn.primary').getBoundingClientRect();
+    return { at: (b.top - v.top) / v.height };
+  });
+  check('빈 결과: 안내가 목록 칸 가운데쯤 (위 · 아래로 치우치지 않음)', emptyMid.at > 0.35 && emptyMid.at < 0.7, JSON.stringify(emptyMid));
   await page.tap('#empty .btn.primary');
   await page.waitForTimeout(250);
   check('빈 결과: 풀면 다시 모두', (await page.locator('.card').count()) === 4 && (await page.inputValue('#search')) === '');

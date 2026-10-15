@@ -354,6 +354,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .setting-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13.5px; cursor: pointer; }
 .setting-row small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); }
 .setting-row { margin-bottom: 14px; }
+.keymap-row { cursor: default; }
+.keymap-row > span { flex: 1; min-width: 0; }
+.keymap-row > .btn { flex: none; }
 .setting-row kbd { padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; font-size: 12px; }
 
 

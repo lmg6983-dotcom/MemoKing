@@ -7,7 +7,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:hover', 'list:on-top',
-  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews',
+  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -95,6 +95,13 @@ contextBridge.exposeInMainWorld('memoking', {
     // 전역 단축키 바꾸기: set(이름, 단축키|null=기본값) · pause(true) 는 새 키를 누르는 동안 잠시 놓기
     setShortcut: invoke('shortcuts:set'),
     pauseShortcuts: invoke('shortcuts:pause'),
+  },
+  // 메모 창 단축키: get() → { overrides, shortcuts } · set(기능, 키 | '' 없음 | null 기본값) · reset() 모두 처음대로 · openWindow() 설정 창
+  keymap: {
+    get: invoke('keymap:get'),
+    set: invoke('keymap:set'),
+    reset: invoke('keymap:reset'),
+    openWindow: invoke('keymap:open-window'),
   },
   // AI 비서 연결 (MCP): connect(true|false) · copy() 다른 AI 앱용 설정 글 복사 · setWrite(켜기)
   mcp: {

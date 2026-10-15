@@ -814,6 +814,7 @@ async function startCapture(name) {
   window.addEventListener('keydown', onKey, true);
   document.addEventListener('pointerdown', onDown, true);
 }
+$('keymap-open').addEventListener('click', () => api.keymap.openWindow());
 for (const name of ['quickMemo', 'magic']) {
   $(`sc-${name}`).addEventListener('click', () => (capturing?.name === name ? stopCapture() : startCapture(name)));
   $(`sc-${name}-reset`).addEventListener('click', async () => {
@@ -829,8 +830,11 @@ for (const name of ['quickMemo', 'magic']) {
 }
 // 다른 앱이 놓아 주어 1분마다 다시 잡기에 성공했을 때 등
 api.on('shortcuts:changed', async () => {
+  if (capturing) return; // 여기서 바꾸는 중이면 끝날 때 다시 그린다
   const s = await api.settings.get();
-  showShortcuts(s.shortcuts);
+  // 키도 상태도 그대로면(여기서 방금 바꾼 것) 다시 그리지 않는다 — 방금 띄운 "바꿨어요" 안내가 지워지지 않게
+  const same = ['quickMemo', 'magic'].every((n) => JSON.stringify(s.shortcuts?.[n]) === JSON.stringify(shortcutState[n]));
+  if (!same) showShortcuts(s.shortcuts);
   showQuickMemo(s.quickMemo);
 });
 // ---------- 음성 녹음 · 받아쓰기 (desktop/stt) ----------

@@ -1312,6 +1312,37 @@ export class WindowManager {
     return { opened: true, bounds };
   }
 
+  // ---------- 단축키 설정 창 ----------
+
+  openKeymapWindow(parent = BrowserWindow.getFocusedWindow()) {
+    if (this.keymapWin && !this.keymapWin.isDestroyed()) {
+      bringToFront(this.keymapWin);
+      return true;
+    }
+    const area = screen.getDisplayMatching(parent?.getBounds() ?? screen.getPrimaryDisplay().workArea).workArea;
+    const width = Math.min(640, area.width - 40);
+    const height = Math.min(720, area.height - 40);
+    const w = new BrowserWindow({
+      width, height, minWidth: 460, minHeight: 420,
+      x: Math.round(area.x + (area.width - width) / 2), y: Math.round(area.y + (area.height - height) / 2),
+      title: '단축키 설정',
+      show: false,
+      autoHideMenuBar: true,
+      backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e0e0d' : '#f6f5f1',
+      ...windowIcon,
+      webPreferences,
+    });
+    this.keymapWin = w;
+    guardWindow(w, { openWebPage });
+    w.setMenu(null);
+    w.once('ready-to-show', () => w.show());
+    w.on('closed', () => {
+      if (this.keymapWin === w) this.keymapWin = null;
+    });
+    w.loadFile(path.join(APP_DIR, 'shortcuts.html'));
+    return true;
+  }
+
   // ---------- PDF 변환 창 ----------
 
   openPdfWindow(id, parent = BrowserWindow.getFocusedWindow()) {
@@ -1368,6 +1399,7 @@ export class WindowManager {
         query: {
           id, w: String(width), h: String(height), m: String(margin),
           bg: o.bg ? '1' : '0', date: o.date ? '1' : '0',
+          z: String(Math.min(2, Math.max(0.5, Number(o.zoom) || 1))),
         },
       });
       const end = Date.now() + 15000;

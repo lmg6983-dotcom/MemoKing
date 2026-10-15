@@ -15,6 +15,7 @@ import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown } from '
 import { isBlankBody, extractPreview } from '../app/js/core/memo-file.js';
 import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
+import { cleanOverrides, setActionKey } from '../app/js/core/keymap.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront } from './window-utils.js';
 import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
@@ -296,6 +297,33 @@ export function registerIpc(ctx) {
   ipcMain.handle('app:set-quick-memo', (_e, on) => setQuickMemo(on));
   ipcMain.handle('shortcuts:set', (_e, name, acc) => setShortcut(String(name), acc == null ? null : String(acc)));
   ipcMain.handle('shortcuts:pause', (_e, on) => pauseShortcuts(on));
+  // 메모 창 단축키 (바꾼 것만 settings.keymap 에) — 바꾸면 열린 창 모두 바로
+  const keymapState = () => ({ overrides: cleanOverrides(settings.keymap), shortcuts: appSettings().shortcuts });
+  const keymapChanged = () => {
+    saveSettings();
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('keymap:changed', cleanOverrides(settings.keymap));
+  };
+  ipcMain.handle('keymap:get', () => keymapState());
+  ipcMain.handle('keymap:set', (_e, id, combo) => {
+    const r = setActionKey(settings.keymap, String(id), combo == null ? null : String(combo));
+    settings.keymap = r.overrides;
+    keymapChanged();
+    return { ...keymapState(), moved: r.moved };
+  });
+  ipcMain.handle('keymap:reset', () => {
+    settings.keymap = {};
+    keymapChanged();
+    return keymapState();
+  });
+  ipcMain.handle('keymap:open-window', () => {
+    const opened = wm.openKeymapWindow();
+    // 새 키를 기다리는 도중에 창을 닫아도(× · Alt+F4) 잠시 놓아 둔 전역 단축키를 되살린다
+    if (wm.keymapWin && !wm.keymapWin.mkUnpause) {
+      wm.keymapWin.mkUnpause = true;
+      wm.keymapWin.once('closed', () => pauseShortcuts(false));
+    }
+    return opened;
+  });
   ipcMain.handle('app:set-fit-tables', (_e, on) => {
     settings.fitTables = Boolean(on);
     saveSettings();

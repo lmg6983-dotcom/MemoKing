@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>단축키 설정</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/shortcuts.css">
+  <script type="module" src="js/shortcuts-window.js"></script>
+</head>
+<body>
+  <!-- 기능마다 지금 키 · 바꾸기 · 기본값으로. 위 머리와 아래 단추 줄은 늘 보이고, 목록만 스크롤 -->
+  <header class="head">
+    <div class="head-text">
+      <h1>단축키 설정</h1>
+      <p>키 칸을 누르고 새로 쓸 키를 함께 눌러 보세요. 기능 이름에 마우스를 올리면 무슨 일을 하는지 알려 드려요.</p>
+    </div>
+    <label class="find">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+      <input id="find" type="search" placeholder="기능이나 키 찾기" aria-label="기능이나 키 찾기" autocomplete="off">
+    </label>
+  </header>
+  <main id="groups" class="groups" aria-live="off"></main>
+  <footer class="foot">
+    <p id="status" class="status" role="status"></p>
+    <button type="button" id="reset-all" class="btn">모두 초기화</button>
+    <button type="button" id="done" class="btn primary">닫기</button>
+  </footer>
+  <div id="tip" class="tip" role="tooltip" hidden></div>
+</body>
+</html>

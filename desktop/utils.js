@@ -12,6 +12,7 @@ import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
 import { normalizeMagicSettings } from '../app/js/core/magic-modules.js';
 import { APP_DIR, APP_ICON_PNG } from './window-utils.js';
+import { cleanOverrides } from '../app/js/core/keymap.js';
 
 export const SMOKE = process.argv.includes('--smoke');
 export const APP_ID = 'com.memoking.desktop';
@@ -43,6 +44,7 @@ export const settings = {
   magic: undefined,
   magicPos: null,
   shortcuts: undefined,
+  keymap: {}, // 메모 창 단축키 중 바꾼 것 (app/js/core/keymap.js)
   mcp: undefined,
 };
 
@@ -139,6 +141,7 @@ export function appSettings(vault, fileIndex, shortcutStatus, shortcutLabel) {
     fitTables: settings.fitTables !== false,
     linkPreviews: settings.linkPreviews !== false,
     autoTags: settings.autoTags !== false,
+    keymap: cleanOverrides(settings.keymap),
     magic: normalizeMagicSettings(settings.magic),
     magicIndex: fileIndex?.status() ?? null,
     mcp: mcpStatus(),

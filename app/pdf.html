@@ -61,16 +61,30 @@
       <button type="button" data-m="wide" aria-checked="false">넓게</button>
     </div>
 
+    <p class="label">글자 크기</p>
+    <div class="seg" role="radiogroup" aria-label="글자 크기" id="zoom">
+      <button type="button" data-z="80" aria-checked="false">작게</button>
+      <button type="button" data-z="100" aria-checked="true">보통</button>
+      <button type="button" data-z="120" aria-checked="false">크게</button>
+      <button type="button" data-z="145" aria-checked="false">아주 크게</button>
+    </div>
+    <label class="slider-row" title="내용 전체를 키우거나 줄여요. 줄은 쪽 폭에 다시 맞춰져요">
+      <span>직접</span>
+      <input type="range" id="zoom-range" min="50" max="200" step="5" value="100" aria-label="글자 크기 (퍼센트)">
+      <output id="zoom-out">100%</output>
+    </label>
+
     <label class="setting-row"><input type="checkbox" id="bg" class="switch"><span>메모 색 바탕</span></label>
     <label class="setting-row"><input type="checkbox" id="date" class="switch" checked><span>날짜 표시</span></label>
+    <label class="setting-row"><input type="checkbox" id="open-after" class="switch" checked><span>저장한 뒤 열기</span></label>
 
+    <!-- 취소 · 저장은 창 크기와 상관없이 늘 아래에 보인다 (위 고르기만 스크롤) -->
     <div class="actions">
-      <label class="setting-row open-row"><input type="checkbox" id="open-after" class="switch" checked><span>저장한 뒤 열기</span></label>
-      <span class="grow"></span>
+      <span id="more-hint" class="more-hint" aria-hidden="true" hidden>아래에 고를 것이 더 있어요 ↓</span>
+      <p id="status" class="status" role="status"></p>
       <button type="button" id="cancel" class="btn">취소</button>
       <button type="submit" id="save" class="btn primary">PDF로 저장</button>
     </div>
-    <p id="status" class="status" role="status"></p>
   </form>
 </body>
 </html>
