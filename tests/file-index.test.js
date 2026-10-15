@@ -89,3 +89,41 @@ test('파일 검색: 몇 개만 보여 줘도 맞는 것 전체 개수를 센다
   assert.equal(all.items[0].name, '견적서 모음'); // 얕고 짧은 이름이 먼저
   assert.equal(idx.searchAll('없는말', 10).total, 0);
 });
+
+test('파일 검색: 받은 전자포대는 새로 고침을 기다리지 않고 곧바로 찾힌다 (새로 고침 뒤에도 남음)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-wrap-'));
+  const index = new FileIndex({ roots: () => [{ dir: root }] });
+  index.stopped = false;
+  await index.rebuild();
+  const dir = path.join(root, 'P2026-1170-KR01');
+  fs.mkdirSync(dir);
+  const file = path.join(dir, '의견제출통지서.pdf');
+  fs.writeFileSync(file, '');
+  assert.equal(index.search('의견제출통지서').length, 0, '새로 고침 전에는 없음');
+  assert.equal(index.add([dir, file], { base: root }), 2);
+  assert.equal(index.add([file], { base: root }), 0, '두 번 넣지 않음');
+  assert.equal(index.search('의견제출통지서')[0]?.path, file);
+  assert.equal(index.search('P20261170KR01')[0]?.path, dir, '사건 폴더도');
+  // 훑는 도중에 넣은 것도 새 목록에 이어 붙는다 (새 목록이 이미 본 것은 한 번만)
+  const crawl = index.crawl.bind(index);
+  index.crawl = async () => { const e = await crawl(); index.add([path.join(dir, 'late.pdf')]); return e; };
+  fs.writeFileSync(path.join(dir, 'late.pdf'), '');
+  await index.rebuild();
+  assert.equal(index.search('의견제출통지서').length, 1);
+  assert.equal(index.search('late.pdf').length, 1);
+  index.stop();
+});
+
+test('파일 검색: 지켜보는 폴더에 생긴 파일은 곧바로 목록에', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-watch-'));
+  const index = new FileIndex({ roots: () => [] });
+  index.watch([root]);
+  fs.mkdirSync(path.join(root, '사건'));
+  fs.writeFileSync(path.join(root, '사건', '거절결정서.pdf'), '');
+  fs.writeFileSync(path.join(root, '사건', '받는중.crdownload'), '');
+  const deadline = Date.now() + 5000;
+  while (!index.search('거절결정서').length && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+  index.stop();
+  assert.equal(index.search('거절결정서').length, 1);
+  assert.equal(index.search('받는중').length, 0, '받는 중인 파일은 빼고');
+});

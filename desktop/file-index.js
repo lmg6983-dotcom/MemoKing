@@ -46,12 +46,15 @@ export class FileIndex {
   /** @param {{ cacheFile?: string, roots?: () => ReturnType<typeof defaultRoots>, maxEntries?: number, refreshMs?: number }} options */
   constructor({ cacheFile = '', roots = defaultRoots, maxEntries = MAX_ENTRIES, refreshMs = 30 * 60_000 } = {}) {
     Object.assign(this, { cacheFile, rootsFn: roots, maxEntries, refreshMs });
+    this.lower = [];
     this.entries = []; // { n: 이름, p: 전체 경로, d: 폴더인가, a: 프로그램 바로 가기, depth }
     this.snapshot = null;
     this.builtAt = 0;
     this.building = null;
     this.timer = null;
     this.stopped = true;
+    this.extra = new Map(); // 새로 고침 사이에 곧바로 넣은 것 (소문자 경로 → 항목) — 새로 고침이 아직 못 본 것은 이어 붙인다
+    this.watchers = [];
   }
 
   get count() {
@@ -76,6 +79,89 @@ export class FileIndex {
     this.stopped = true;
     clearInterval(this.timer);
     this.timer = null;
+    this.unwatch();
+  }
+
+  /**
+   * 새로 생긴 파일·폴더를 곧바로 목록에 (전자포대를 받자마자 매직키로 찾을 수 있게 — 다음 새로 고침을 기다리지 않음)
+   *   base 를 주면 base 아래의 그 위 폴더들(사건 폴더 등)도 함께
+   * @param {string[]} paths @param {{ base?: string }} [opts]
+   */
+  add(paths, { base = '' } = {}) {
+    const want = [];
+    const baseKey = base ? path.resolve(base).toLowerCase() : '';
+    for (const raw of paths ?? []) {
+      if (!raw) continue;
+      let p = path.resolve(String(raw));
+      want.push(p);
+      // base 아래면 그 사이 폴더들도
+      while (baseKey && path.dirname(p) !== p && path.dirname(p).toLowerCase().startsWith(baseKey) && path.dirname(p).toLowerCase() !== baseKey) {
+        p = path.dirname(p);
+        want.push(p);
+      }
+    }
+    let added = 0;
+    for (const p of want) {
+      const n = path.basename(p);
+      if (!n || this.has(p)) continue;
+      let st;
+      try {
+        st = fs.statSync(p);
+      } catch {
+        continue; // 그새 사라짐
+      }
+      if (!st.isFile() && !st.isDirectory()) continue;
+      const e = { n, p, d: st.isDirectory(), a: false, depth: 2 };
+      this.entries.push(e);
+      this.lower.push(n.toLowerCase());
+      this.extra.set(p.toLowerCase(), e);
+      added++;
+    }
+    if (added) this.snapshot = true;
+    return added;
+  }
+
+  /** 목록에 이미 있는 경로인가 (이름부터 견주어 빠르게) */
+  has(p) {
+    const key = p.toLowerCase();
+    if (this.extra.has(key)) return true;
+    const name = path.basename(key);
+    const { lower = [] } = this;
+    for (let i = 0; i < lower.length; i++) {
+      if (lower[i] === name && this.entries[i].p.toLowerCase() === key) return true;
+    }
+    return false;
+  }
+
+  /** 이 폴더들 아래에 생기는 파일은 곧바로 목록에 (브라우저로 받아 넣은 전자포대 등). 못 지켜보는 곳이면 그냥 둔다 */
+  watch(dirs) {
+    this.unwatch();
+    for (const dir of dirs ?? []) {
+      if (!dir || !fs.existsSync(dir)) continue;
+      const pending = new Set();
+      let timer = null;
+      try {
+        const w = fs.watch(dir, { recursive: true }, (_ev, name) => {
+          if (!name) return;
+          pending.add(path.join(dir, String(name)));
+          clearTimeout(timer);
+          timer = setTimeout(() => { // 받는 중 · 이름 바꾸기가 끝난 뒤에
+            const list = [...pending];
+            pending.clear();
+            this.add(list.filter((p) => !/\.(part|tmp|crdownload)$/i.test(p) && !path.basename(p).startsWith('~$')), { base: dir });
+          }, 700);
+        });
+        w.on('error', () => w.close());
+        this.watchers.push(w);
+      } catch {
+        // 지켜볼 수 없는 드라이브 — 받기 직후 add · 주기 새로 고침으로
+      }
+    }
+  }
+
+  unwatch() {
+    for (const w of this.watchers) w.close();
+    this.watchers = [];
   }
 
   // 매직키를 열 때: 10분 넘게 지났으면 새로 고친다
@@ -137,6 +223,13 @@ export class FileIndex {
     this.building ??= this.crawl()
       .then((entries) => {
         if (entries) {
+          // 훑는 사이에 곧바로 넣은 것 중 새 목록에 없는 것은 이어 붙인다 (아직 있을 때만)
+          const found = new Set();
+          if (this.extra.size) for (const e of entries) if (this.extra.has(e.p.toLowerCase())) found.add(e.p.toLowerCase());
+          for (const [k, e] of this.extra) {
+            if (found.has(k) || !fs.existsSync(e.p)) this.extra.delete(k);
+            else entries.push(e);
+          }
           this.use(entries, Date.now());
           this.save();
         }

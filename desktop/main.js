@@ -20,7 +20,7 @@ import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
-import { FileIndex } from './file-index.js';
+import { FileIndex, defaultRoots } from './file-index.js';
 import { jumpListCategories, launchAction, pushRecent } from './jump-list.js';
 import { flushOpmsFiles } from './opms.js';
 import { createDoublePress } from './double-press.js';
@@ -695,8 +695,14 @@ const onQuickMemoKey = createDoublePress({
 function syncFileIndex() {
   const on = !SMOKE && activeModules(settings.magic).some((m) => m.id === 'files');
   if (on) {
-    fileIndex ??= new FileIndex({ cacheFile: path.join(app.getPath('userData'), 'file-index.json') });
+    // 전자포대 폴더는 맨 먼저 훑는다 (G: 같은 뒤쪽 드라이브는 목록이 차면 덜 들어가므로) · 생기는 파일은 곧바로 목록에
+    const wrapperDir = () => windowManager.opmsSettings().wrapperDir;
+    fileIndex ??= new FileIndex({
+      cacheFile: path.join(app.getPath('userData'), 'file-index.json'),
+      roots: () => [...(fs.existsSync(wrapperDir()) ? [{ dir: wrapperDir() }] : []), ...defaultRoots()],
+    });
     fileIndex.start();
+    fileIndex.watch([wrapperDir()]);
   } else fileIndex?.stop();
 }
 
