@@ -2,6 +2,7 @@
 body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-rows: minmax(0, 1fr); /* 미리보기가 여러 쪽으로 길어져도 창 높이 그대로 (안에서 스크롤) — 아래 단추 줄이 밀려나지 않게 */
   height: 100vh;
   overflow: hidden;
   background: var(--surface-0);

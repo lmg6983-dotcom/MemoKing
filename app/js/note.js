@@ -43,14 +43,9 @@ setCopyHost({
     if (r?.error) throw new Error(r.error);
     return r?.cancelled ? 'cancelled' : r.name;
   },
-  // 공유 단추: Windows 공유 창 (못 열면 탐색기에서 그 파일을 골라 둔다)
-  share: async (f) => {
-    const r = await api.attachments.share(f);
-    if (r?.error) throw new Error(r.error);
-    return r?.fallback ? 'fallback' : 'shared';
-  },
+  // 공유 단추는 PC 에 두지 않는다 (저장 단추와 겹침 — 저장한 파일을 보내면 됨). 휴대폰만 공유 창
 });
-// 저장 · 공유 단추의 결과 (delete-button.js)
+// 저장 단추의 결과 (delete-button.js)
 window.addEventListener('mk:notice', (e) => setStatus(e.detail?.text ?? '', Boolean(e.detail?.error)));
 const params = new URLSearchParams(location.search);
 // 미리 불러 둔 예비 창(window-manager.js makeSpare): 편집기 코드는 다 읽어 두고, 열 메모가 정해질 때까지 기다린다

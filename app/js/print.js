@@ -85,7 +85,7 @@ const count = pages();
 if (preview && count > 1) paginate(count);
 document.documentElement.dataset.pages = String(count);
 document.documentElement.dataset.ready = 'true';
-if (preview) window.parent.postMessage({ type: 'pdf-preview', pages: count, gap: PAGE_GAP }, '*');
+if (preview) window.parent.postMessage({ type: 'pdf-preview', pages: count, gap: PAGE_GAP, query: location.search }, '*'); // query: 어느 미리보기의 결과인지
 
 /**
  * 미리보기 쪽 나누기: 그린 본문을 쪽마다 복사해, 쪽의 글 칸 높이만큼씩 올려 보이게 한다

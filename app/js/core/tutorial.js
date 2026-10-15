@@ -82,9 +82,9 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'content', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-delete-btn', '.mk-copy-btn', '.mk-save-btn', '.mk-share-btn'], advance: 'content-tools', emoji: '💾',
+    id: 'content', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-delete-btn', '.mk-copy-btn', '.mk-save-btn'], advance: 'content-tools', emoji: '💾',
     title: '넣은 내용 저장 · 공유하기',
-    text: '사진, 손 메모, 녹음, 파일에 마우스를 올리면 오른쪽 위에 단추가 떠요. 📋 복사, 💾 파일로 저장, 📤 Windows 공유 창으로 보내기, × 지우기.',
+    text: '사진, 손 메모, 녹음, 파일에 마우스를 올리면 오른쪽 위에 단추가 떠요. 📋 복사, 💾 파일로 저장, × 지우기.',
     try: '방금 그린 손 메모에 마우스를 올리고 📋 복사를 눌러 보세요',
     next: LATER,
   },

@@ -201,7 +201,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   action(copyBtn, COPY_ICON, () => copyBlock(view, pos, node, target), (what) => (what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
     : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : what === '링크' ? '링크 주소를 복사했어요' : '내용을 복사했어요'));
   action(saveBtn, SAVE_ICON, () => saveBlock(view, pos, node, target), (name) => `저장했어요: ${name}`);
-  if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, pos, node, target), (what) => (what === 'fallback' ? '공유 창을 열지 못해 탐색기에서 파일을 골라 두었어요. 마우스 오른쪽 › 공유' : '공유했어요'));
+  if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, pos, node, target), () => '공유했어요'); // 휴대폰만 (PC 는 공유 단추 없음)
   if (openBtn) {
     let opened = false;
     const go = (e) => {

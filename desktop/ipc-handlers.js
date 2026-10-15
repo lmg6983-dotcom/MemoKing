@@ -21,8 +21,6 @@ import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront, broadcast } from
 import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
 import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
-import { shareFile } from './share-file.js';
-import { hwndOf } from './foreground-watch.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: Math.round(p.x), y: Math.round(p.y) } : null);
@@ -865,39 +863,6 @@ export function registerIpc(ctx) {
     }
     if (SMOKE) smokeOpened.push({ kind: 'save', target: file });
     return { name: SMOKE ? name : path.basename(file) };
-  });
-  // 공유 단추: Windows 공유 창 — 메모 폴더의 파일은 그대로, 만든 내용(표 CSV · 글 · 그림 PNG)은 임시 파일로 만들어 보낸다
-  ipcMain.handle('attachment:share', async (e, f = {}) => {
-    const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
-    let file = null;
-    if (f.rel) {
-      file = /^attachments\//.test(String(f.rel)) ? getVault()?.resolve(String(f.rel)) : null;
-      if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
-    } else if (typeof f.base64 === 'string') {
-      const dir = path.join(app.getPath('temp'), 'memoking-share');
-      try {
-        fs.mkdirSync(dir, { recursive: true });
-        // 지난 공유 때 만든 임시 파일은 하루가 지나면 치운다 (공유 창이 넘겨받을 동안은 남겨 두고)
-        for (const old of fs.readdirSync(dir)) {
-          const p = path.join(dir, old);
-          if (Date.now() - (fs.statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 86_400_000) fs.rmSync(p, { force: true });
-        }
-        file = path.join(dir, name);
-        fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
-      } catch (err) {
-        console.warn('[share]', err);
-        return { error: '공유할 파일을 만들지 못했어요. 다시 눌러 주세요' };
-      }
-    } else return { error: '공유할 내용이 없어요' };
-    if (SMOKE) {
-      smokeOpened.push({ kind: 'share', target: file });
-      return { ok: true };
-    }
-    const win = BrowserWindow.fromWebContents(e.sender);
-    const r = await shareFile(file, win ? hwndOf(win) : 0);
-    if (r === 'ok') return { ok: true };
-    shell.showItemInFolder(file); // 공유 창을 열지 못하면 탐색기에서 골라 두어 오른쪽 클릭 › 공유 · 끌어다 보내기
-    return { fallback: true };
   });
   ipcMain.handle('attachment:info', (_e, rel) => {
     let decoded = String(rel ?? '');

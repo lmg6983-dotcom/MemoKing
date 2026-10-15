@@ -380,12 +380,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await js(nw, `document.querySelector('.mk-save-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
       const savedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'save').find((o) => /안내 자료\.pdf$/.test(o.target)), 'PDF 저장', 3000).catch(() => null);
       check('PDF 파일: 저장 단추 → 그 파일 그대로', Boolean(savedPdf) && fs.readFileSync(savedPdf.target, 'utf8').startsWith('%PDF'), JSON.stringify(savedPdf));
-      // PC 공유 단추: Windows 공유 창 (메모 폴더의 파일 그대로)
+      // PC 에는 공유 단추가 없다 (저장과 겹침)
       await hover('.mk-doc a[data-file]');
       const shareShown = await js(nw, `!!document.querySelector('.mk-share-btn')`);
-      if (shareShown) await js(nw, `document.querySelector('.mk-share-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
-      const sharedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'share').find((o) => /안내 자료\.pdf$/.test(o.target)), 'PDF 공유', 3000).catch(() => null);
-      check('PDF 파일: 공유 단추 → Windows 공유 창에 그 파일', shareShown && Boolean(sharedPdf), JSON.stringify({ shareShown, sharedPdf }));
+      check('PC 내용 단추: 복사 · 저장 · 지우기만 (공유 단추 없음)', !shareShown);
       await leave();
       // 표: 표째로 복사 (엑셀에 붙도록 칸 사이 탭 · 서식은 표 그대로)
       const tableLabel = await hover('.mk-doc .tableWrapper td');
@@ -719,7 +717,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         };
         const small = await pagesAt(50);
         const big = await pagesAt(200);
-        check('PDF 글자 크기를 키우면 미리보기 쪽 수가 늘어남', small > 0 && big > small, JSON.stringify({ small, big }));
+        const pv = await js(pdfWin, `({ src: document.getElementById('frame').getAttribute('src'), pages: document.body.dataset.pages, sum: document.getElementById('summary').textContent, inner: (() => { try { const d = document.getElementById('frame').contentDocument; return d && { ready: d.documentElement.dataset.ready, pages: d.documentElement.dataset.pages, href: d.location.href.slice(-60) }; } catch (err) { return String(err); } })() })`);
+        check('PDF 글자 크기를 키우면 미리보기 쪽 수가 늘어남', small > 0 && big > small, JSON.stringify({ small, big, pv }));
         await pagesAt(100);
         pdfWin.close();
       }
