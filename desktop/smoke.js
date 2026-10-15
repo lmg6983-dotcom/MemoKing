@@ -376,6 +376,19 @@ export async function runSmoke({
     await until(() => js(list, `[...document.querySelectorAll('.card-title')].some((t) => t.textContent === '다른 PC에서 추가')`), '외부 파일 반영');
     check('폴더에 새로 생긴 파일이 목록에 반영', true);
 
+    // 찾는 것이 없을 때: 안내와 "검색과 필터 풀기" 가 목록 칸의 가운데쯤 (빈 카드 칸이 자리를 반 나눠 아래로 치우치지 않게)
+    await js(list, `(() => { const s = document.getElementById('search'); s.value = 'zzqq없는말zzqq'; s.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    const emptyAt = await until(() => js(list, `(() => {
+      const e = document.getElementById('empty');
+      if (e.hidden || !e.querySelector('button')) return null;
+      const box = document.getElementById('cards').parentElement.getBoundingClientRect();
+      const top = document.getElementById('cards').getBoundingClientRect().top;
+      const r = e.getBoundingClientRect();
+      return { mid: (r.top + r.bottom) / 2, areaMid: (top + box.bottom) / 2, areaH: box.bottom - top };
+    })()`), '빈 목록 안내').catch(() => null);
+    check('검색 결과가 없을 때 안내가 목록 칸 가운데쯤', emptyAt && Math.abs(emptyAt.mid - emptyAt.areaMid) < emptyAt.areaH * 0.12, JSON.stringify(emptyAt));
+    await js(list, `document.querySelector('#empty button').click()`);
+
     // 9) 다시 열면 서식이 렌더링되고, 체크박스 클릭이 동작
     const reopened = await newNote(() => js(list, `document.querySelector('.card[data-id="${n1.id}"]').click()`));
     const rendered = await js(reopened.win, `(() => ({

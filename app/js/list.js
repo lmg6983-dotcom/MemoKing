@@ -97,6 +97,7 @@ function render() {
   layoutCards(memos);
   if (before) animateCards(before);
   el.empty.hidden = memos.length > 0;
+  el.cards.classList.toggle('is-empty', !memos.length); // 빈 카드 칸이 자리를 반 나눠 가져 안내가 아래로 치우치지 않게
   if (!memos.length) renderEmpty(narrowed);
   // 검색·필터로 좁혔을 때만 "N개 중 M개" (평소 개수는 메모 탭에)
   el.count.textContent = `메모 ${state.memos.length}개 중 ${memos.length}개`;
