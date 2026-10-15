@@ -22,11 +22,10 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 
 /* 셀로판 테이프: 밝은 바탕화면 · 노란 메모 위에서도 보이게 테두리를 진하게(3:1 넘게) */
 .tape { filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3)); transform-origin: 50% 60%; }
-.tape .body { fill: rgba(255, 255, 255, 0.55); stroke: rgba(17, 17, 17, 0.55); stroke-width: 0.9; stroke-linejoin: round; transition: fill 0.15s ease-out; }
-.tape .shine { stroke: rgba(255, 255, 255, 0.85); stroke-width: 1.4; stroke-linecap: round; fill: none; }
-@media (prefers-color-scheme: dark) { .tape .body { fill: rgba(255, 255, 255, 0.4); stroke: rgba(255, 255, 255, 0.7); } }
+.tape .body { fill: rgba(255, 255, 255, 0.7); /* 투명도 30% */ stroke: rgba(17, 17, 17, 0.55); stroke-width: 0.9; stroke-linejoin: round; transition: fill 0.15s ease-out; }
+@media (prefers-color-scheme: dark) { .tape .body { fill: rgba(255, 255, 255, 0.55); stroke: rgba(255, 255, 255, 0.7); } }
 .tape.hover { transform: translateY(-1px) rotate(-2deg); filter: drop-shadow(0 2px 2.5px rgba(0, 0, 0, 0.32)); }
-.tape.hover .body { fill: rgba(255, 255, 255, 0.68); }
+.tape.hover .body { fill: rgba(255, 255, 255, 0.8); }
 
 /* 켤 때: 위에서 내려와 눌러 붙음 (튕기지 않고 부드럽게 멈춤) / 끌 때: 들리며 사라짐 */
 .sticker.sticking { animation: sticker-stick 0.32s cubic-bezier(0.23, 1, 0.32, 1); }

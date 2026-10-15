@@ -174,6 +174,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       clearTimeout(del.timer); // 누른 뒤에는 ✓ 를 볼 만큼 더 둔다 (저장은 고르는 창이 닫힐 때까지)
       run().then((what) => {
         if (what === 'cancelled') return;
+        if (markTarget) document.dispatchEvent(new CustomEvent('mk:content-tools')); // 튜토리얼: 넣은 내용(그림 · 파일 등)을 복사 · 저장 · 공유해 봤다
         b.classList.add('done');
         b.innerHTML = DONE_ICON;
         b.title = doneText(what);

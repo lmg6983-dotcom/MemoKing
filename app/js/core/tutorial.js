@@ -82,6 +82,13 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
+    id: 'content', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-delete-btn', '.mk-copy-btn', '.mk-save-btn', '.mk-share-btn'], advance: 'content-tools', emoji: '💾',
+    title: '넣은 내용 저장 · 공유하기',
+    text: '사진, 손 메모, 녹음, 파일에 마우스를 올리면 오른쪽 위에 단추가 떠요. 📋 복사, 💾 파일로 저장, 📤 Windows 공유 창으로 보내기, × 지우기.',
+    try: '방금 그린 손 메모에 마우스를 올리고 📋 복사를 눌러 보세요',
+    next: LATER,
+  },
+  {
     id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '.ProseMirror > *'], advance: 'annotate-done', emoji: '🖍️',
     image: 'annotate.jpg',
     title: '글 위에 바로 그리기',
@@ -104,10 +111,11 @@ export const TUTORIAL_STEPS = [
   },
   // ---------- 위 막대 ----------
   {
-    id: 'crown', win: 'note', target: ['#top-btn'], advance: 'crown-on', emoji: '👑',
-    title: '늘 위에 띄워 두기',
-    text: '왕관을 누르면 이 메모가 다른 창에 가려지지 않아요. 창 위에 붙은 왕관 스티커를 누르거나 Ctrl+Shift+T 를 다시 누르면 떼어져요.',
-    try: '왕관을 눌러 보세요',
+    id: 'crown', win: 'note', target: ['#top-btn'], keep: ['#tape-btn:not([hidden])'], advance: 'crown-on', emoji: '👑',
+    title: '늘 위에, 또는 바탕화면에',
+    text: '👑 왕관: 다른 창에 가려지지 않게 늘 위에. 🩹 테이프(옆 단추): 바탕화면에 붙여 다른 창 뒤에. 둘 중 하나만 붙고, 창 위의 스티커를 누르면 떼어져요.',
+    noTape: '왕관을 누르면 이 메모가 다른 창에 가려지지 않아요. 창 위에 붙은 왕관 스티커를 누르거나 Ctrl+Shift+T 를 다시 누르면 떼어져요.',
+    try: '지금은 왕관을 눌러 보세요',
     next: LATER,
   },
   {
@@ -321,7 +329,7 @@ export const MOBILE_TUTORIAL_STEPS = [
 export const TUTORIAL_SETTLE_MS = { typed: 1800, tagged: 1500, styled: 900, tasked: 700 };
 
 /** 사용자가 직접 해서 넘어가는 일들 (PC 메인 프로세스가 이 이름만 받는다) */
-export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'note-closed', 'layout-changed', 'tag-filtered', 'mode-moved'];
+export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'content-tools', 'note-closed', 'layout-changed', 'tag-filtered', 'mode-moved'];
 
 /**
  * 사용자가 한 일(event)로 몇 번째 단계가 되는지. 끝나면 -1.

@@ -40,6 +40,8 @@ public static class MkDeskPin {
   static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
   static readonly object gate = new object();
   static readonly HashSet<long> pinned = new HashSet<long>();
+  // 붙여 둔 창 → 그 창 위 가장자리의 테이프 창 (메모 창을 맨 아래로 보낼 때 테이프도 바로 위에 함께 — 다른 창 위에 남거나 메모 뒤로 가지 않게)
+  static readonly Dictionary<long, long> companions = new Dictionary<long, long>();
   static WinEventProc keep;
 
   static bool Own(IntPtr h) {
@@ -49,12 +51,24 @@ public static class MkDeskPin {
     return true;
   }
   static void Bottom(IntPtr h) {
+    long c = 0;
+    lock (gate) { companions.TryGetValue(h.ToInt64(), out c); }
+    IntPtr ch = new IntPtr(c);
+    // 테이프를 먼저 맨 아래로, 그다음 메모 창을 그 아래로 → 테이프는 늘 메모 창 바로 위
+    if (c != 0 && IsWindow(ch)) SetWindowPos(ch, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
     SetWindowPos(h, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+  }
+  public static string Pair(long w, long c) {
+    lock (gate) {
+      if (c == 0) companions.Remove(w);
+      else companions[w] = c;
+    }
+    return "ok";
   }
   public static string Command(string kind, long w) {
     IntPtr h = new IntPtr(w);
     if (kind == "unpin") {
-      lock (gate) { pinned.Remove(w); }
+      lock (gate) { pinned.Remove(w); companions.Remove(w); }
       // 보통 창으로: 주인이 바탕화면이면 없음으로 (메모 창은 원래 주인이 없다)
       if (IsWindow(h)) {
         IntPtr desk = FindWindow("Progman", null);
@@ -87,7 +101,7 @@ public static class MkDeskPin {
     IntPtr fg = GetForegroundWindow();
     foreach (long w in list) {
       IntPtr h = new IntPtr(w);
-      if (!IsWindow(h)) { lock (gate) { pinned.Remove(w); } continue; }
+      if (!IsWindow(h)) { lock (gate) { pinned.Remove(w); companions.Remove(w); } continue; }
       if (!down) { Own(h); continue; }
       if (!InUse(h, fg)) Bottom(h);
     }
@@ -96,9 +110,9 @@ public static class MkDeskPin {
     string line;
     while ((line = Console.In.ReadLine()) != null) {
       string[] p = line.Trim().Split(' ');
-      if (p.Length != 2) continue;
+      if (p.Length != 2 && !(p.Length == 3 && p[0] == "pair")) continue;
       string r = "err";
-      try { r = Command(p[0], long.Parse(p[1])); } catch { r = "err"; }
+      try { r = p.Length == 3 ? Pair(long.Parse(p[1]), long.Parse(p[2])) : Command(p[0], long.Parse(p[1])); } catch { r = "err"; }
       Console.Out.WriteLine(r + " " + p[1]);
       Console.Out.Flush();
     }
@@ -123,9 +137,11 @@ public static class MkDeskPin {
 [MkDeskPin]::Run()
 `;
 
-/** 보낼 명령 한 줄 (잘못된 값이면 null) */
-export function pinCommand(kind, hwnd) {
-  return (kind === 'pin' || kind === 'unpin' || kind === 'bottom') && Number.isSafeInteger(hwnd) && hwnd > 0 ? `${kind} ${hwnd}` : null;
+const validHwnd = (h) => Number.isSafeInteger(h) && h > 0;
+/** 보낼 명령 한 줄 (잘못된 값이면 null) — pair: 붙여 둔 창과 그 테이프 창 (companion 0 = 짝 풀기) */
+export function pinCommand(kind, hwnd, companion = 0) {
+  if (kind === 'pair') return validHwnd(hwnd) && (companion === 0 || validHwnd(companion)) ? `pair ${hwnd} ${companion}` : null;
+  return (kind === 'pin' || kind === 'unpin' || kind === 'bottom') && validHwnd(hwnd) ? `${kind} ${hwnd}` : null;
 }
 
 export class DesktopPin {
@@ -138,18 +154,25 @@ export class DesktopPin {
     this.failed = false;
     this.quickExits = 0; // 띄우자마자 죽은 횟수 (Add-Type 이 막힌 PC 등) — 두 번이면 그만 띄운다
     this.pinned = new Set(); // 붙여 둔 창 (도우미가 다시 뜨면 다시 알려 준다)
+    this.pairs = new Map(); // 붙여 둔 창 → 테이프 창
   }
 
   get available() {
     return this.platform === 'win32' && !this.failed;
   }
 
-  send(kind, hwnd) {
-    const line = pinCommand(kind, hwnd);
+  send(kind, hwnd, companion = 0) {
+    const line = pinCommand(kind, hwnd, companion);
     if (!line || !this.available) return false;
     this.start(); // 새로 뜬 도우미에는 그때까지 붙여 둔 창을 먼저 알려 준다
     if (kind === 'pin') this.pinned.add(hwnd);
-    else if (kind === 'unpin') this.pinned.delete(hwnd);
+    else if (kind === 'unpin') {
+      this.pinned.delete(hwnd);
+      this.pairs.delete(hwnd);
+    } else if (kind === 'pair') {
+      if (companion) this.pairs.set(hwnd, companion);
+      else this.pairs.delete(hwnd);
+    }
     try {
       this.proc?.stdin.write(`${line}\n`);
       return true;
@@ -178,12 +201,11 @@ export class DesktopPin {
     });
     proc.stdin.on('error', () => {});
     // 다시 뜬 도우미는 아무것도 모른다 — 붙여 둔 창을 다시 붙인다 (지금 보내려던 명령은 send 가 이어서 보낸다)
-    for (const h of this.pinned) {
-      try {
-        proc.stdin.write(`pin ${h}\n`);
-      } catch {
-        break;
-      }
+    try {
+      for (const h of this.pinned) proc.stdin.write(`pin ${h}\n`);
+      for (const [h, c] of this.pairs) proc.stdin.write(`pair ${h} ${c}\n`);
+    } catch {
+      // 도우미가 바로 죽음 — exit 가 처리
     }
   }
 
@@ -191,6 +213,7 @@ export class DesktopPin {
     if (this.failed) return;
     this.failed = true;
     this.pinned.clear();
+    this.pairs.clear();
     try {
       this.onFail?.();
     } catch (err) {
