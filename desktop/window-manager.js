@@ -12,7 +12,7 @@ import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
 import { Opms, isOpenableFile, cleanDate, foreignSummary, caseMemoMarkdown, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
 import { extractPreview, isBlankBody } from '../app/js/core/memo-file.js';
-import { pdfFileName, mmToPx } from '../app/js/core/pdf-page.js';
+import { pdfFileName, mmToPx, clampPrintScale } from '../app/js/core/pdf-page.js';
 import { activeModules, magicChips } from '../app/js/core/magic-modules.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
@@ -1399,7 +1399,7 @@ export class WindowManager {
         query: {
           id, w: String(width), h: String(height), m: String(margin),
           bg: o.bg ? '1' : '0', date: o.date ? '1' : '0',
-          z: String(Math.min(2, Math.max(0.5, Number(o.zoom) || 1))),
+          z: String(clampPrintScale(o.zoom)),
         },
       });
       const end = Date.now() + 15000;

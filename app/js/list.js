@@ -2,7 +2,7 @@
 import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
-import { acceleratorFromKey, displayAccelerator } from './core/accelerators.js';
+import { captureGlobalKey, stopKeyCapture, isCapturing, globalShortcutResult } from './key-capture.js';
 import { injectIcons, icon } from './icons.js';
 import { handoffText } from './core/handoff.js';
 import { friendlyTime } from './core/format.js';
@@ -762,80 +762,40 @@ function showShortcuts(sc) {
     $(name === 'quickMemo' ? 'quick-memo-kbd' : 'magic-kbd').textContent = st.label;
   }
 }
-let capturing = null; // { name, btn, onKey, onBlur }
-async function stopCapture(message = '', warn = false) {
-  if (!capturing) return;
-  const { name, onKey, onDown } = capturing;
-  capturing = null;
-  window.removeEventListener('keydown', onKey, true);
-  document.removeEventListener('pointerdown', onDown, true);
-  $(`sc-${name}`).classList.remove('capturing');
-  await api.settings.pauseShortcuts(false);
-  const s = await api.settings.get();
-  showShortcuts(s.shortcuts);
-  showQuickMemo(s.quickMemo);
-  if (message) {
-    $(`sc-${name}-note`).textContent = message;
-    $(`sc-${name}-note`).classList.toggle('warn', warn);
-  }
+function setScNote(name, text, warn = false) {
+  $(`sc-${name}-note`).textContent = text;
+  $(`sc-${name}-note`).classList.toggle('warn', warn);
 }
-async function startCapture(name) {
-  if (capturing) await stopCapture();
-  const btn = $(`sc-${name}`);
-  await api.settings.pauseShortcuts(true); // 지금 키를 눌러도 빠른 메모가 뜨지 않게 잠시 놓는다
-  btn.classList.add('capturing');
-  btn.textContent = '새 키 조합을 누르세요…';
-  $(`sc-${name}-note`).textContent = 'Ctrl, Alt, Win 중 하나와 함께 눌러요. Esc 는 그만';
-  $(`sc-${name}-note`).classList.remove('warn');
-  const onKey = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.metaKey) return stopCapture();
-    const r = acceleratorFromKey(e);
-    if (r.pending) {
-      btn.textContent = `${[e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Win'].filter(Boolean).join('+')}+…`;
-      return;
-    }
-    if (r.error) {
-      $(`sc-${name}-note`).textContent = r.error;
-      $(`sc-${name}-note`).classList.add('warn');
-      return; // 계속 기다린다
-    }
-    const res = await api.settings.setShortcut(name, r.acc);
-    if (res.ok) return stopCapture(`${displayAccelerator(r.acc)} 키로 바꿨어요`);
-    if (res.reason === 'taken') return stopCapture(`${res.label} 키는 다른 앱이 이미 쓰고 있어요. 다른 키를 골라 주세요`, true);
-    if (res.reason === 'same') return stopCapture(`${res.other}와 같은 키예요. 다른 키를 골라 주세요`, true);
-    return stopCapture('이 키는 쓸 수 없어요', true);
-  };
-  const onDown = (e) => {
-    if (e.target !== btn) stopCapture();
-  };
-  capturing = { name, onKey, onDown };
-  window.addEventListener('keydown', onKey, true);
-  document.addEventListener('pointerdown', onDown, true);
+/** onlyIfChanged: 키도 상태도 그대로면 칸은 다시 그리지 않는다 (방금 띄운 "바꿨어요" 안내가 지워지지 않게) */
+async function refreshShortcuts({ onlyIfChanged = false } = {}) {
+  const s = await api.settings.get();
+  const same = onlyIfChanged && ['quickMemo', 'magic'].every((n) => JSON.stringify(s.shortcuts?.[n]) === JSON.stringify(shortcutState[n]));
+  if (!same) showShortcuts(s.shortcuts);
+  showQuickMemo(s.quickMemo);
+}
+// 빠른 메모 · 매직키 칸: 새 키 받기 (key-capture.js — 단축키 설정 창과 같은 동작)
+function startCapture(name) {
+  captureGlobalKey($(`sc-${name}`), {
+    api,
+    name,
+    note: (text, warn) => setScNote(name, text, warn),
+    done: () => refreshShortcuts(),
+    stopped: (reason) => reason !== 'commit' && refreshShortcuts(),
+  });
 }
 $('keymap-open').addEventListener('click', () => api.keymap.openWindow());
 for (const name of ['quickMemo', 'magic']) {
-  $(`sc-${name}`).addEventListener('click', () => (capturing?.name === name ? stopCapture() : startCapture(name)));
+  $(`sc-${name}`).addEventListener('click', () => (isCapturing($(`sc-${name}`)) ? stopKeyCapture('cancel') : startCapture(name)));
   $(`sc-${name}-reset`).addEventListener('click', async () => {
     const res = await api.settings.setShortcut(name, null);
-    const s = await api.settings.get();
-    showShortcuts(s.shortcuts);
-    showQuickMemo(s.quickMemo);
-    if (!res.ok && res.reason === 'taken') {
-      $(`sc-${name}-note`).textContent = `기본 키 ${res.label} 키는 다른 앱이 쓰고 있어요`;
-      $(`sc-${name}-note`).classList.add('warn');
-    }
+    await refreshShortcuts();
+    if (!res.ok) setScNote(name, globalShortcutResult(res, '', { reset: true }).text, true);
   });
 }
 // 다른 앱이 놓아 주어 1분마다 다시 잡기에 성공했을 때 등
 api.on('shortcuts:changed', async () => {
-  if (capturing) return; // 여기서 바꾸는 중이면 끝날 때 다시 그린다
-  const s = await api.settings.get();
-  // 키도 상태도 그대로면(여기서 방금 바꾼 것) 다시 그리지 않는다 — 방금 띄운 "바꿨어요" 안내가 지워지지 않게
-  const same = ['quickMemo', 'magic'].every((n) => JSON.stringify(s.shortcuts?.[n]) === JSON.stringify(shortcutState[n]));
-  if (!same) showShortcuts(s.shortcuts);
-  showQuickMemo(s.quickMemo);
+  if (isCapturing()) return; // 여기서 바꾸는 중이면 끝날 때 다시 그린다
+  await refreshShortcuts({ onlyIfChanged: true });
 });
 // ---------- 음성 녹음 · 받아쓰기 (desktop/stt) ----------
 // 데이터는 처음 한 번 받는다 (받아쓰기 약 80MB, 말한 사람 나누기 약 30MB) — 이 PC 의 앱 데이터 폴더에, 메모 폴더에는 넣지 않음

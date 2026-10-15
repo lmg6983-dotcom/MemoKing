@@ -71,6 +71,9 @@ export function keepRatio(changed, value, { width, height }) {
 // 화면 미리보기용: mm → CSS px (96dpi)
 export const mmToPx = (mm) => (mm * 96) / 25.4;
 
+/** PDF · 인쇄 내용 크기(글자 크기) 배율: 0.5~2, 모르면 1 — PC PDF 창 · 휴대폰 인쇄가 함께 */
+export const clampPrintScale = (v) => Math.min(2, Math.max(0.5, Number(v) || 1));
+
 // 가장 가까운 간단한 비율 이름 ("4:3" 등, 없으면 소수)
 export function ratioLabel(width, height) {
   const r = width / height;

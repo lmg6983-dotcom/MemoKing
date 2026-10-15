@@ -33,7 +33,7 @@ import { alarmText } from '../app/js/core/reminders.js';
 
 import {
   APP_DIR, APP_ICON, APP_ICON_PNG, ASSETS_DIR,
-  noteBg, titleBarOverlay, bringToFront,
+  noteBg, titleBarOverlay, bringToFront, broadcast,
 } from './window-utils.js';
 
 import {
@@ -636,7 +636,7 @@ function setShortcut(name, acc) {
   memoHotkeys.register(); // 놓아 준 Ctrl+Alt+숫자를 메모 단축키가 다시 쓰게
   updateTrayMenu();
   // 설정 창 · 단축키 설정 창 어디서 바꿨든 둘 다 바로
-  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('shortcuts:changed');
+  broadcast('shortcuts:changed');
   return { ok: true, status: shortcutStatus(name) };
 }
 

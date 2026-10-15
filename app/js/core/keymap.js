@@ -94,7 +94,8 @@ export function isValidCombo(combo) {
 /** 누른 키(keydown) → { combo } · 조합 중이면 { pending } · 못 쓰면 { error } */
 export function comboFromEvent(e) {
   if (/^(Control|Alt|Shift|Meta|OS)(Left|Right)?$/.test(e.code)) return { pending: true };
-  const combo = `${e.ctrlKey || e.metaKey ? 'ctrl+' : ''}${e.shiftKey ? 'shift+' : ''}${e.altKey ? 'alt+' : ''}${e.code}`;
+  if (e.metaKey) return { error: 'Win 키는 Windows 가 쓰는 키라 메모 창 단축키에는 쓸 수 없어요. Ctrl 이나 Alt 와 함께 눌러 주세요' };
+  const combo = `${e.ctrlKey ? 'ctrl+' : ''}${e.shiftKey ? 'shift+' : ''}${e.altKey ? 'alt+' : ''}${e.code}`;
   if (!keyName(e.code)) return { error: '이 키는 쓸 수 없어요. 글자, 숫자, F1~F12 같은 키와 함께 눌러 주세요' };
   const why = reservedWhy(combo);
   if (why) return { error: why };

@@ -1,6 +1,7 @@
 // PDF 로 보내기용 문서: 지금 그려진 메모 본문을 복사해 인쇄 전용 페이지(PC 의 print.css 와 같은 모양)로
 //   화면 그대로 인쇄하면 앱 화면 틀(고정 높이·안쪽 스크롤·열린 시트)이 끼어 휴대폰에서 빈 쪽이 나올 수 있다 →
 //   앱이 이 HTML 을 보이지 않는 WebView 에 따로 띄워 PDF 로 쓴다 (글자는 글자 그대로, 고를 수 있게)
+import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -14,7 +15,7 @@ const SCREEN_ONLY = /^(ProseMirror-selectednode|ProseMirror-hideselection|mk-blo
  *   preview: 첫 쪽 미리보기용 (A4 한 장 크기, 여백 포함)
  */
 export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = false }) {
-  const zoom = Math.min(2, Math.max(0.5, Number(scale) || 1));
+  const zoom = clampPrintScale(scale);
   const doc = dom.cloneNode(true);
   doc.removeAttribute('contenteditable');
   doc.removeAttribute('inputmode');

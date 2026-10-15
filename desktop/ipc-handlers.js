@@ -17,7 +17,7 @@ import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { cleanOverrides, setActionKey } from '../app/js/core/keymap.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
-import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront } from './window-utils.js';
+import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront, broadcast } from './window-utils.js';
 import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
 import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
@@ -296,12 +296,28 @@ export function registerIpc(ctx) {
   ipcMain.handle('app:set-auto-start', (_e, on) => setAutoStart(on));
   ipcMain.handle('app:set-quick-memo', (_e, on) => setQuickMemo(on));
   ipcMain.handle('shortcuts:set', (_e, name, acc) => setShortcut(String(name), acc == null ? null : String(acc)));
-  ipcMain.handle('shortcuts:pause', (_e, on) => pauseShortcuts(on));
+  // 새 키를 받는 동안 전역 단축키를 잠시 놓기 — 놓은 창이 닫히거나 새로 고쳐지면(되살리기를 못 보냄) 여기서 되살린다
+  let pausedBy = null;
+  ipcMain.handle('shortcuts:pause', (event, on) => {
+    const wc = event.sender;
+    pausedBy = on ? wc : null;
+    if (on && !wc.mkPauseWatch) {
+      wc.mkPauseWatch = true;
+      const undo = () => {
+        if (pausedBy !== wc) return;
+        pausedBy = null;
+        pauseShortcuts(false);
+      };
+      wc.on('destroyed', undo);
+      wc.on('did-start-loading', undo);
+    }
+    return pauseShortcuts(on);
+  });
   // 메모 창 단축키 (바꾼 것만 settings.keymap 에) — 바꾸면 열린 창 모두 바로
   const keymapState = () => ({ overrides: cleanOverrides(settings.keymap), shortcuts: appSettings().shortcuts });
   const keymapChanged = () => {
     saveSettings();
-    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('keymap:changed', cleanOverrides(settings.keymap));
+    broadcast('keymap:changed', cleanOverrides(settings.keymap));
   };
   ipcMain.handle('keymap:get', () => keymapState());
   ipcMain.handle('keymap:set', (_e, id, combo) => {
@@ -315,15 +331,7 @@ export function registerIpc(ctx) {
     keymapChanged();
     return keymapState();
   });
-  ipcMain.handle('keymap:open-window', () => {
-    const opened = wm.openKeymapWindow();
-    // 새 키를 기다리는 도중에 창을 닫아도(× · Alt+F4) 잠시 놓아 둔 전역 단축키를 되살린다
-    if (wm.keymapWin && !wm.keymapWin.mkUnpause) {
-      wm.keymapWin.mkUnpause = true;
-      wm.keymapWin.once('closed', () => pauseShortcuts(false));
-    }
-    return opened;
-  });
+  ipcMain.handle('keymap:open-window', () => wm.openKeymapWindow());
   ipcMain.handle('app:set-fit-tables', (_e, on) => {
     settings.fitTables = Boolean(on);
     saveSettings();
@@ -333,7 +341,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('app:set-link-previews', (_e, on) => {
     settings.linkPreviews = Boolean(on);
     saveSettings();
-    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('settings:link-previews', settings.linkPreviews);
+    broadcast('settings:link-previews', settings.linkPreviews);
     return settings.linkPreviews;
   });
   ipcMain.handle('app:set-auto-tags', (_e, on) => {

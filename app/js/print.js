@@ -3,6 +3,7 @@
 //   &preview=1  미리보기: 쪽마다 쪽 모양으로 이어 보이고(내용을 쪽 높이로 잘라서), 몇 쪽인지 부모 창에 알린다
 import { createNoteEditor } from './editor.js';
 import { injectIcons } from './icons.js';
+import { clampPrintScale } from './core/pdf-page.js';
 
 const api = window.memoking;
 const q = new URLSearchParams(location.search);
@@ -12,7 +13,7 @@ const H = Number(q.get('h')) || 297;
 const M = Number(q.get('m')) || 0;
 const preview = q.get('preview') === '1';
 // 글자 크기 (내용 전체를 확대 · 축소 — 휴대폰 PDF 와 같은 50~200%). 줄은 쪽 폭에 다시 맞춰진다
-const Z = Math.min(2, Math.max(0.5, Number(q.get('z')) || 1));
+const Z = clampPrintScale(q.get('z'));
 const PAGE_GAP = 28; // 미리보기 쪽 사이 (실제 크기 px — 줄여 보이면 10px 쯤)
 const root = document.getElementById('editor');
 

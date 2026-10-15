@@ -52,3 +52,7 @@ test('단축키: 글 옮겨 다니는 키 · 메모 불러오기 키는 못 줌,
   assert.equal(actionUsing({}, 'ctrl+shift+KeyP')?.id, 'pdf');
   assert.equal(actionUsing({ pdf: [] }, 'ctrl+shift+KeyP'), null);
 });
+
+test('단축키: Win 키는 메모 창 단축키에 못 줌', () => {
+  assert.ok(comboFromEvent(ev('KeyB', { metaKey: true })).error);
+});

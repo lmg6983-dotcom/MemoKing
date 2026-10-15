@@ -1,5 +1,5 @@
 // PDF 만들기 창 — 크기·비율·방향·여백을 고르면 미리보기가 바로 바뀌고, 저장하면 메인 프로세스가 PDF 를 만든다.
-import { PAPERS, RATIOS, MARGINS, pageSize, keepRatio, ratioLabel, mmToPx } from './core/pdf-page.js';
+import { PAPERS, RATIOS, MARGINS, pageSize, keepRatio, ratioLabel, mmToPx, clampPrintScale } from './core/pdf-page.js';
 import { attachSliders } from './seg-slider.js';
 import { flipFrom, radioGroups } from './dom.js';
 
@@ -48,7 +48,8 @@ function render() {
   $('ratios').replaceChildren(...RATIOS.map((r) => chip('ratio', r.id, r.label, r.id === opt.ratio)));
   radios($('orientation'), 'o', opt.orientation);
   radios($('margin'), 'm', opt.margin);
-  opt.zoom = Math.min(200, Math.max(50, Math.round(Number(opt.zoom) / 5) * 5 || 100));
+  const z = Number(opt.zoom);
+  opt.zoom = z >= 50 && z <= 200 ? Math.round((clampPrintScale(z / 100) * 100) / 5) * 5 : 100; // 5% 단위 · 엉뚱한 값은 100%
   radios($('zoom'), 'z', String(opt.zoom)); // 직접 맞춘 값이 단계와 다르면 단계는 모두 꺼진다
   $('zoom-range').value = String(opt.zoom);
   $('zoom-out').textContent = `${opt.zoom}%`;
