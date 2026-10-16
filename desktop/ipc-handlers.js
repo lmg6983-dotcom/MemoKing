@@ -285,7 +285,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('drive:auto', () => autoDriveFolder());
   ipcMain.handle('drive:sync', () => getDriveSync()?.run({ full: true })); // 단추: 다른 앱이 넣은 파일까지 보이게 폴더를 처음부터
   ipcMain.handle('drive:disconnect', () => {
-    getDriveAuth()?.signOut();
+    getDriveAuth()?.signOut({ revoke: !getCalendarSync()?.connected }); // 캘린더 동기화가 같은 클라이언트의 허용을 쓰는 중이면 거두지 않는다
     settings.drive = null;
     saveSettings();
     configureDrive();

@@ -334,3 +334,99 @@ test('바뀐 것이 없으면 상태 파일을 쓰지 않음 (Drive 로 함께 �
   await pc.run();
   assert.equal(writes(), after);
 });
+
+test('오래된 상태 파일이 지운 캘린더를 가리키면: 이 기기가 만든 살아 있는 캘린더를 지우지 않고 다시 씀', async () => {
+  const { g, v, pc } = setup();
+  v.add('치과 메모', [at('2026-10-20T15:00:00+09:00')]);
+  await pc.run();
+  const firstCal = v.stateFile.calendarId;
+  g.calendars.delete(firstCal); // 사용자가 Google 에서 그 캘린더를 지움
+  await pc.run({ force: true }); // 새로 만듦 (이 기기가 만든 것으로 기억)
+  const second = v.stateFile.calendarId;
+  v.stateFile = { ...v.stateFile, calendarId: firstCal }; // Drive 가 예전 상태 파일을 되돌림
+  await pc.run({ force: true });
+  assert.equal(v.stateFile.calendarId, second);
+  assert.equal(g.calls.filter((c) => /^DELETE \/calendars\/[^/]+$/.test(c)).length, 0);
+  assert.equal(g.calendars.size, 1);
+});
+
+test('모두 다시 받아도 410 이면 오류로 그만 (메모의 일정을 지우지 않음)', async () => {
+  const { g, v, pc } = setup();
+  const id = v.add('치과 메모', [at('2026-10-20T15:00:00+09:00')]);
+  await pc.run();
+  const real = g.request.bind(g);
+  g.request = async (method, url, body) => (method === 'GET' && url.includes('/events?') ? { status: 410, json: {} } : real(method, url, body));
+  await assert.rejects(pc.run(), /410/);
+  assert.equal(v.memos.get(id).reminders.length, 1);
+});
+
+test('메모킹에서 지운 "나타낼 수 없는 반복" 일정은 Google 에 남기고, 나중에 Google 에서 고쳐도 지우지 않음', async () => {
+  const { g, v, pc } = setup();
+  const id = v.add('운동', [{ kind: 'repeat', title: '운동', repeat: { every: 'week', weekdays: [2], time: '07:00' } }]);
+  await pc.run();
+  const [ev] = ours(g);
+  g.edit(ev.id, { recurrence: ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU'] });
+  await pc.run();
+  v.adapter().setReminder(id, v.memos.get(id).reminders[0].id, null);
+  await pc.run();
+  g.edit(ev.id, { summary: '격주 운동' });
+  await pc.run();
+  assert.equal(g.events.get(ev.id).status, 'confirmed');
+});
+
+test('이름 없는 일정: 메모 제목을 나중에 바꿨으면 그것이 "나중에 고친 쪽"', async () => {
+  const { g, v, pc } = setup();
+  const id = v.add('옛 제목', [{ kind: 'at', at: '2026-10-20T15:00:00+09:00', changed: '2026-01-01T00:00:00Z' }], '2026-01-01T00:00:00Z');
+  await pc.run();
+  const [ev] = ours(g);
+  g.edit(ev.id, { start: { dateTime: '2026-10-21T15:00:00+09:00' }, end: { dateTime: '2026-10-21T16:00:00+09:00' } });
+  Object.assign(v.memos.get(id), { title: '새 제목', updated: '2099-01-01T00:00:00Z', touched: Date.now() + 1e12 });
+  await pc.run();
+  assert.equal(g.events.get(ev.id).summary, '새 제목');
+});
+
+test('때를 알 수 없는 일정은 가져오지 않음 ("# undefined" 메모를 만들지 않게)', async () => {
+  const { g, v, pc } = setup();
+  await pc.run();
+  g.create({ summary: '이상한 일정', start: {}, end: {} });
+  const res = await pc.run();
+  assert.equal(res.imported, 0);
+  assert.equal(v.memos.size, 0);
+});
+
+test('메모가 아예 없어진 지 며칠 지나면(휴지통까지 비움) Google 에서도 지운다', async () => {
+  const { g, v, pc, advance } = setup();
+  const id = v.add('치과 메모', [at('2026-10-20T15:00:00+09:00')]);
+  await pc.run();
+  v.memos.delete(id); // 이 기기에 메모가 없음 (지우고 휴지통도 비움)
+  await pc.run();
+  assert.equal(ours(g).length, 1, '바로는 지우지 않음 (아직 오지 않은 메모일 수 있다)');
+  advance(4 * 24 * 3600_000);
+  await pc.run();
+  assert.equal(ours(g).length, 0);
+});
+
+test('맞추는 사이 다른 기기가 맡으면: 새 일정을 가져오지 않고 상태(토큰 · 임대)도 덮어쓰지 않음', async () => {
+  const { g, v } = setup();
+  let reads = 0;
+  const phone = new GoogleCalendarSync({
+    request: (...a) => g.request(...a), device: 'phone', timeZone: 'Asia/Seoul', now: () => NOW,
+    store: {
+      read: () => {
+        reads++;
+        // 두 번째로 읽을 때(가져오기 직전)는 PC 가 맡은 뒤
+        return reads >= 2 ? { ...structuredClone(v.stateFile), lease: { device: 'pc', until: NOW + 10 * 60_000 } } : structuredClone(v.stateFile);
+      },
+      write: (s) => { v.stateFile = structuredClone(s); },
+    },
+    memos: v.adapter(),
+  });
+  await phone.run({ force: true });
+  reads = 0;
+  g.create({ summary: '새 회의', start: { dateTime: '2026-10-23T14:00:00+09:00' }, end: { dateTime: '2026-10-23T15:00:00+09:00' } });
+  const tokenBefore = v.stateFile.syncToken;
+  const res = await phone.run({ force: true });
+  assert.equal(res.skipped, 'lease');
+  assert.equal(res.imported, 0);
+  assert.equal(v.stateFile.syncToken, tokenBefore);
+});

@@ -73,7 +73,7 @@ const sync = new GoogleCalendarSync({
     // 없으면 null(처음), 읽지 못하면 오류 (엔진이 이번엔 건너뛴다)
     read: () => {
       const text = fs.readText(STATE_FILE);
-      return text ? JSON.parse(text) : null;
+      return text == null ? null : JSON.parse(text); // 빈 파일(Drive 가 쓰는 중)은 오류로 — 처음으로 보지 않는다
     },
     write: (state) => {
       fs.mkdirs('_memoking');

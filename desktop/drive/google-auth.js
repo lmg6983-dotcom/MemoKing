@@ -302,13 +302,17 @@ export class GoogleAuth {
     this.accessToken = null;
   }
 
-  signOut() {
+  /**
+   * 연결 끊기. revoke: 구글 쪽 허용도 거둘지 — 같은 OAuth 클라이언트로 받은 다른 연결(Drive ↔ 캘린더)이 남아 있으면
+   * 거두지 않는다 (구글은 클라이언트 · 계정의 허용을 통째로 거둬 다른 연결까지 끊긴다)
+   */
+  signOut({ revoke = true } = {}) {
     const refresh = this.data.refreshToken;
     delete this.data.refreshToken;
     delete this.data.email;
     this.accessToken = null;
     this.save();
-    if (refresh) this.post('https://oauth2.googleapis.com/revoke', { token: refresh }).catch(() => {});
+    if (refresh && revoke) this.post('https://oauth2.googleapis.com/revoke', { token: refresh }).catch(() => {});
   }
 
   async post(url, form) {

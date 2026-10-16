@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { GoogleAuth } from './drive/google-auth.js';
 import { GoogleCalendarSync, CAL_SCOPE, STATE_FILE } from '../app/js/core/gcal-sync.js';
 import { vaultMemos, createCalendarRunner } from '../app/js/core/gcal-runner.js';
@@ -58,7 +59,8 @@ export function createCalendarSync({ userData, bundledClient, driveAuth, fetch: 
   };
 
   const memos = vaultMemos({ getVault, saveReminders: (id, list) => getVault()?.setReminders(id, list), onChanged });
-  const localFile = path.join(userData, 'google-calendar-local.json');
+  // 메모 폴더마다 따로 (다른 메모 폴더를 열었을 때 그 폴더의 캘린더를 "진 쪽" 으로 지우지 않게)
+  const localFile = () => path.join(userData, `google-calendar-local-${createHash('sha1').update(getVault()?.root ?? '').digest('hex').slice(0, 12)}.json`);
   const sync = new GoogleCalendarSync({
     request,
     device: `pc:${os.hostname()}`,
@@ -67,12 +69,12 @@ export function createCalendarSync({ userData, bundledClient, driveAuth, fetch: 
     local: {
       get: () => {
         try {
-          return JSON.parse(fs.readFileSync(localFile, 'utf8'));
+          return JSON.parse(fs.readFileSync(localFile(), 'utf8'));
         } catch {
           return null;
         }
       },
-      set: (v) => (v ? fs.writeFileSync(localFile, JSON.stringify(v)) : fs.rmSync(localFile, { force: true })),
+      set: (v) => (v ? fs.writeFileSync(localFile(), JSON.stringify(v)) : fs.rmSync(localFile(), { force: true })),
     },
     store: {
       // 없으면 null(처음), 읽지 못하면 오류 (엔진이 이번엔 건너뛴다)
@@ -107,8 +109,13 @@ export function createCalendarSync({ userData, bundledClient, driveAuth, fetch: 
       return runner.run({ force: true });
     },
     cancelConnect: () => auth.cancelLogin(),
+    /** 지금 캘린더가 연결돼 있는가 (Drive 를 끊을 때 구글 허용을 거둘지 정하려고) */
+    get connected() {
+      return auth.connected;
+    },
     disconnect() {
-      auth.signOut();
+      // Drive 와 같은 클라이언트라 구글 쪽 허용을 거두면 Drive 연결도 끊긴다 — Drive 를 쓰는 동안은 이 PC 의 토큰만 지운다
+      auth.signOut({ revoke: !driveAuth()?.connected });
       return runner.forget();
     },
   };
