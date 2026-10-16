@@ -298,7 +298,9 @@ export function registerIpc(ctx) {
   // 자동 업데이트 (updater.js): 상태 · 확인(설정의 단추) · 받기 · 나중에 · 지금 재시작
   ipcMain.handle('update:state', () => updateState());
   ipcMain.handle('update:check', async () => {
-    await getUpdater()?.check({ manual: true });
+    const r = await getUpdater()?.check({ manual: true });
+    // 확인할 수 없는 때(개발 실행 · 준비 실패)는 그 결과를 그대로 — 상태는 바뀌지 않아 그냥 돌려주면 아무 안내도 없다
+    if (r && (r.status === 'dev' || (r.status === 'error' && r !== getUpdater()?.state))) return { ...updateState(), ...r };
     return updateState();
   });
   ipcMain.handle('update:download', async () => {

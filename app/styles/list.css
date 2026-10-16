@@ -912,13 +912,12 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .update-row > .btn { flex: none; }
 .update-row .warn { color: var(--danger); }
 .update-btn { min-width: 132px; transition: background-color 0.2s ease-out, color 0.2s ease-out, border-color 0.2s ease-out; }
-.update-btn[data-state="latest"] { border-color: transparent; background: #1f9d55; color: #fff; }
-.update-btn[data-state="available"], .update-btn[data-state="ready"] { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
+/* 최신: 초록 (밝은 · 어두운 화면 각각) — 새 버전 · 받아 둠은 .primary (노랑) */
+:root { --update-ok: #1f9d55; --update-ok-hover: #188a49; --update-ok-text: #fff; }
+@media (prefers-color-scheme: dark) { :root { --update-ok: #2fb36b; --update-ok-hover: #3cc479; --update-ok-text: #06210f; } }
+.update-btn[data-state="latest"] { border-color: transparent; background: var(--update-ok); color: var(--update-ok-text); }
 .update-btn[data-state="downloading"] { font-variant-numeric: tabular-nums; }
-@media (hover: hover) and (pointer: fine) {
-  .update-btn[data-state="latest"]:hover { background: #188a49; }
-  .update-btn[data-state="available"]:hover, .update-btn[data-state="ready"]:hover { background: var(--brand-yellow-hover, var(--brand-yellow)); }
-}
+@media (hover: hover) and (pointer: fine) { .update-btn[data-state="latest"]:hover { background: var(--update-ok-hover); } }
 @media (prefers-reduced-motion: reduce) { .update-btn { transition: none; } }
 .update-dialog { width: min(440px, calc(100vw - 32px)); }
 .update-dialog h2 { margin: 0 0 4px; }
