@@ -1006,7 +1006,7 @@ body.mk-row-resizing { user-select: none; }
 .mk-list-dragging ::selection { background: transparent !important; } /* 끄는 동안 글자 선택 표시는 숨김 */
 
 /* 체크 폭죽 (canvas-confetti) */
-.mk-confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 60; pointer-events: none; }
+.mk-confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; } /* 공유 완료 카드(95) 위로도 날린다 */
 
 /* 모든 체크리스트를 끝내면 CLEAR 도장 — 메모 본문 정중앙에 반투명 (글을 가리지 않게, 눌리지 않음) */
 .clear-stamp {
@@ -1860,7 +1860,7 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 
 /* 공유 방법 고르기 (share-menu.js) — 내용의 공유 단추 옆 */
 .mk-share-menu {
-  position: fixed; z-index: 60;
+  position: fixed; z-index: 90; /* 내용 단추(70)보다 위 */
   width: min(300px, calc(100vw - 16px));
   padding: 6px;
   border: 1px solid var(--line, var(--border));
@@ -1883,3 +1883,26 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 .mk-share-menu small { font-size: 11.5px; line-height: 1.35; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .mk-share-menu { animation: none; } }
 .mk-share-menu .mk-share-cancel { display: block; margin-top: 4px; padding: 8px; border-top: 1px solid var(--line, var(--border)); border-radius: 0 0 8px 8px; text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); }
+
+/* 공유를 마쳤을 때 (Drive 링크 복사) — 창 가운데 카드 + 폭죽 (share-menu.js showSharePop) */
+.mk-share-pop {
+  position: fixed; z-index: 95; left: 50%; top: 38%;
+  display: grid; justify-items: center; gap: 4px;
+  width: min(280px, calc(100vw - 32px));
+  padding: 20px 18px 16px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 16px;
+  background: var(--surface-1, var(--surface));
+  box-shadow: var(--shadow-pop, 0 12px 32px rgba(0, 0, 0, 0.18));
+  text-align: center; cursor: default;
+  transform: translate(-50%, -50%);
+  animation: mk-share-pop-in 0.22s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.mk-share-pop.leaving { pointer-events: none; opacity: 0; transform: translate(-50%, -50%) scale(0.97); transition: opacity 0.18s ease-out, transform 0.18s ease-out; }
+.mk-share-pop-icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 6px; border-radius: 50%; background: var(--brand-yellow, #ffcc00); color: #111; }
+.mk-share-pop-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.mk-share-pop b { font-size: 15px; font-weight: 800; color: var(--text-strong); }
+.mk-share-pop p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+.mk-share-pop small { max-width: 100%; margin-top: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11.5px; color: var(--muted); }
+@keyframes mk-share-pop-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); } }
+@media (prefers-reduced-motion: reduce) { .mk-share-pop { animation: none; } .mk-share-pop.leaving { transition: none; } }

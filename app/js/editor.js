@@ -38,7 +38,7 @@ import { createVoiceCards, isVoiceCard, voiceAudioOf } from './voice-card-view.j
 import { createTidy } from './tidy.js';
 import { createDateRemind, refreshDateRemind } from './date-remind.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
-import { create as createConfetti } from '../vendor/confetti.js';
+import { burstAt } from './confetti-burst.js';
 import { mathPlugins, insertMathBlock } from './math.js';
 import { fileChipGuard } from './file-chip-guard.js';
 import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
@@ -234,33 +234,7 @@ const inlineHtmlMarks = $remark('memoking-inline-html-marks', () => remarkInline
 
 // ---------- 체크리스트 ----------
 
-// 체크를 하면 체크 네모 자리에서 작은 폭죽 (canvas-confetti, 동작 줄이기 설정이면 생략)
-let confettiFire = null;
-function celebrateAt(clientX, clientY) {
-  try {
-    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
-    if (!confettiFire) {
-      const canvas = document.createElement('canvas');
-      canvas.className = 'mk-confetti';
-      document.body.append(canvas);
-      confettiFire = createConfetti(canvas, { resize: true, useWorker: false, disableForReducedMotion: true });
-    }
-    confettiFire({
-      particleCount: 28,
-      spread: 360, // 체크 네모를 중심으로 사방으로 (위 모서리 가까이에서도 화면 밖으로 날아가지 않게)
-      startVelocity: 11,
-      gravity: 0.7,
-      decay: 0.92,
-      ticks: 80,
-      scalar: 0.7,
-      origin: { x: clientX / window.innerWidth, y: clientY / window.innerHeight },
-      colors: ['#ffcd00', '#ff7a59', '#4fc3f7', '#7ed957', '#c18cff'],
-      shapes: ['circle', 'square'],
-    });
-  } catch {
-    // 폭죽은 꾸밈이라 안 되어도 그만
-  }
-}
+// 체크를 하면 체크 네모 자리에서 작은 폭죽 (confetti-burst.js)
 
 // 체크 네모의 화면 좌표 (ProseMirror 가 체크 뒤 li 를 다시 그려 참조가 끊기므로 누르기 전에 잰다)
 function checkboxPoint(li) {
@@ -282,7 +256,7 @@ function toggleTaskOnClick(view, event) {
       const point = checked ? checkboxPoint(li) : null; // 다시 그리기 전에 미리 잰다
       view.dispatch(view.state.tr.setNodeMarkup($pos.before(d), undefined, { ...node.attrs, checked }));
       event.preventDefault();
-      if (point) celebrateAt(point.x, point.y);
+      if (point) burstAt(point.x, point.y);
       return true;
     }
   }

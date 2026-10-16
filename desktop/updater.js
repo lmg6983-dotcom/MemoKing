@@ -2,13 +2,15 @@ import { decodeEntities } from '../app/js/core/entities.js';
 
 // 자동 업데이트 — electron-updater 로 공개 배포 저장소(lmg6983-dotcom/memoking-releases)의 Release 를 본다
 //   앱에는 토큰이 없다: 공개 저장소라 읽기에 토큰이 필요 없고, 저장소 주소는 빌드가 넣은 app-update.yml 에서 읽는다.
-//   흐름: 켤 때(30초 뒤) · 6시간마다 · 설정의 "업데이트 확인" → 새 버전이 있으면 화면(목록 창)에 알림(버전 · 바뀐 점)
+//   흐름: 켤 때(8초 뒤) · 4시간마다 · 절전에서 깨거나 잠금을 풀 때(1시간 넘게 안 봤으면) · 설정의 "업데이트 확인" → 새 버전이 있으면 화면(목록 창)에 알림(버전 · 바뀐 점)
 //         → 사용자가 받기를 고르면 받는 중 진행률 → 다 받으면 "지금 재시작" / "나중에 (끝낼 때 설치)"
 //   "나중에" 를 고른 그 버전은 24시간 동안 다시 묻지 않는다. 개발 중(app.isPackaged 가 아님)에는 확인하지 않는다.
 //   오류(네트워크 · 서명 · 파일)는 알리기만 하고 지금 버전은 그대로 쓴다.
-export const CHECK_EVERY_MS = 6 * 60 * 60_000;
+export const CHECK_EVERY_MS = 4 * 60 * 60_000;
+export const STALE_MS = 60 * 60_000; // 깨어날 때 이보다 오래 안 봤으면 다시 본다
+export const REMIND_MS = CHECK_EVERY_MS - 10 * 60_000; // 같은 버전을 저절로 다시 알리는 간격 (창을 그냥 닫아도 잠금 풀 때마다 뜨지 않게)
 export const SNOOZE_MS = 24 * 60 * 60_000;
-const FIRST_CHECK_MS = 30_000;
+const FIRST_CHECK_MS = 8_000; // 켜고 곧 (창들이 다 뜬 뒤)
 
 /** 오류 → 사용자에게 보일 말 (네트워크 · 서명 · 그 밖) */
 export function updateErrorText(err) {
@@ -45,6 +47,7 @@ export class Updater {
     this.state = { status: 'idle' }; // idle | checking | available | downloading | ready | latest | error
     this.updater = null;
     this.timer = null;
+    this.lastCheckAt = 0;
   }
 
   get enabled() {
@@ -71,6 +74,9 @@ export class Updater {
     u.on('update-available', (info) => {
       this.set({ status: 'available', version: info.version, notes: notesText(info.releaseNotes), date: info.releaseDate ?? '' });
       if (!this.manual && isSnoozed(this.settings.updateSnooze, info.version)) return; // "나중에" 고른 버전 — 24시간 조용히
+      const last = this.announced;
+      if (!this.manual && last?.version === info.version && Date.now() - last.at < REMIND_MS) return; // 방금 알린 버전
+      this.announced = { version: info.version, at: Date.now() };
       this.announce('update:available');
     });
     u.on('download-progress', (p) => this.set({ status: 'downloading', percent: Math.round(p.percent ?? 0), transferred: p.transferred ?? 0, total: p.total ?? 0, bytesPerSecond: p.bytesPerSecond ?? 0 }));
@@ -120,6 +126,7 @@ export class Updater {
     if (!this.updater) return { status: 'error', message: '업데이트 기능을 준비하지 못했어요' };
     if (['downloading', 'ready'].includes(this.state.status)) return this.state; // 이미 받는 중 · 받아 둠
     this.manual = manual;
+    this.lastCheckAt = Date.now();
     try {
       await this.updater.checkForUpdates();
     } catch (err) {
@@ -128,6 +135,12 @@ export class Updater {
       this.manual = false;
     }
     return this.state;
+  }
+
+  /** 절전에서 깨어남 · 잠금 풀림: 한동안 안 봤으면 다시 본다 (오래 켜 둔 PC 도 새 버전을 놓치지 않게) */
+  checkIfStale(now = Date.now()) {
+    if (!this.updater || now - this.lastCheckAt < STALE_MS) return null;
+    return this.check();
   }
 
   async download() {

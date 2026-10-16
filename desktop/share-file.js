@@ -1,96 +1,14 @@
 // 파일 공유 (Windows) — 내용 단추 › 공유 에서 고른 방법으로
-//   sheet: Windows 공유 창 (근처 공유 · Quick Share · 메일 · 카카오톡 등 공유를 받는 앱)
-//          데스크톱 앱용 공식 API(DataTransferManager · IDataTransferManagerInterop)로 띄운다. 공유 창은 그것을 부른
-//          프로세스의 창에만 붙으므로 도우미(PowerShell)가 화면 가운데에 보이지 않는 작은 창을 만들어 거기에 띄운다.
-//          (예전 방식 — 탐색기 오른쪽 클릭 메뉴의 공유 명령을 다른 프로세스에서 부르기 — 은 탐색기 밖에서 자주 실패했다)
+//   drive: Google Drive 에 올리고 링크 복사 (share-drive.js · ipc-handlers.js)
 //   mail:  기본 메일 앱(Outlook 등)의 새 메일에 첨부 (MAPI)
 //   localsend: LocalSend(오픈소스, 같은 와이파이의 휴대폰 · PC 로 바로 보내기)를 그 파일과 함께 연다
-//   도우미가 실패하면 그 까닭을 돌려준다 (부르는 쪽이 안내하고, 공유 창이면 탐색기에서 파일을 골라 둔다)
+//   (Windows 공유 창은 v0.39.5 에서 뺐다 — 데스크톱 앱에서 띄우는 길이 PC 마다 막혀 믿을 수 없었다)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-// ---------- Windows 공유 창 ----------
 // 도우미의 대답은 UTF-8 로 (Windows PowerShell 5.1 은 기본이 OEM 코드 페이지라 한국어 오류 문구가 깨진다)
 const UTF8_OUT = '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8';
-
-const SHEET_SCRIPT = `
-$ErrorActionPreference = 'Stop'
-${UTF8_OUT}
-try {
-  Add-Type -AssemblyName System.Windows.Forms
-  $fw = [System.Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
-  $wm = Join-Path $env:SystemRoot 'System32\\WinMetadata'
-  $refs = @(
-    (Join-Path $fw 'System.Runtime.WindowsRuntime.dll'), (Join-Path $fw 'System.Runtime.dll'),
-    (Join-Path $fw 'System.Runtime.InteropServices.WindowsRuntime.dll'), (Join-Path $fw 'System.Windows.Forms.dll'),
-    (Join-Path $fw 'System.Drawing.dll'), # Form 을 쓰려면 함께 있어야 컴파일된다 (없으면 매번 실패해 탐색기로 빠졌다)
-    (Join-Path $wm 'Windows.ApplicationModel.winmd'), (Join-Path $wm 'Windows.Foundation.winmd'), (Join-Path $wm 'Windows.Storage.winmd')
-  )
-  Add-Type -ReferencedAssemblies $refs -TypeDefinition @'
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.WindowsRuntime;
-using System.Windows.Forms;
-using Windows.ApplicationModel.DataTransfer;
-using Windows.Storage;
-
-public static class MkShareSheet {
-  [ComImport, Guid("3A3DCD6C-3EAB-43DC-BCDE-45671CE800C8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-  interface IDataTransferManagerInterop {
-    IntPtr GetForWindow([In] IntPtr appWindow, [In] ref Guid riid);
-    void ShowShareUIForWindow(IntPtr appWindow);
-  }
-  public static string Run(string file, string title) {
-    Form form = new Form();
-    form.FormBorderStyle = FormBorderStyle.None;
-    form.ShowInTaskbar = false;
-    form.StartPosition = FormStartPosition.CenterScreen;
-    form.Size = new System.Drawing.Size(1, 1);
-    form.Opacity = 0.01;
-    form.TopMost = true;
-    string result = "err show";
-    form.Shown += delegate {
-      try {
-        IDataTransferManagerInterop interop = (IDataTransferManagerInterop)WindowsRuntimeMarshal.GetActivationFactory(typeof(DataTransferManager));
-        Guid iid = new Guid("a5caee9b-8708-49d1-8d36-67d25a8da00c");
-        DataTransferManager dtm = (DataTransferManager)Marshal.GetObjectForIUnknown(interop.GetForWindow(form.Handle, ref iid));
-        dtm.DataRequested += delegate (DataTransferManager s, DataRequestedEventArgs e) {
-          DataRequestDeferral wait = e.Request.GetDeferral();
-          e.Request.Data.Properties.Title = title;
-          StorageFile.GetFileFromPathAsync(file).AsTask().ContinueWith(t => {
-            try {
-              if (t.Status == System.Threading.Tasks.TaskStatus.RanToCompletion) e.Request.Data.SetStorageItems(new List<IStorageItem> { t.Result });
-              else e.Request.FailWithDisplayText("파일을 열지 못했어요");
-            } finally { wait.Complete(); }
-          });
-        };
-        interop.ShowShareUIForWindow(form.Handle);
-        result = "ok";
-        Console.Out.WriteLine("ok");
-        Console.Out.Flush();
-      } catch (Exception ex) {
-        result = "err " + ex.GetType().Name + ": " + ex.Message;
-        form.Close();
-      }
-    };
-    // 공유 창이 파일을 넘겨받는 동안 이 창(과 도우미)이 살아 있어야 한다 — 2분 뒤 닫힘
-    Timer t2 = new Timer();
-    t2.Interval = 120000;
-    t2.Tick += delegate { t2.Stop(); form.Close(); };
-    t2.Start();
-    Application.Run(form);
-    return result;
-  }
-}
-'@
-  $r = [MkShareSheet]::Run($env:MK_SHARE_FILE, $env:MK_SHARE_TITLE)
-  if ($r -ne 'ok') { [Console]::Out.WriteLine($r) }
-} catch {
-  [Console]::Out.WriteLine('err ' + $_.Exception.Message)
-}
-`;
 
 // ---------- 메일에 첨부 (MAPI — 기본 메일 앱) ----------
 const MAIL_SCRIPT = `
@@ -138,7 +56,7 @@ public static class MkMail {
 
 /**
  * 도우미(PowerShell)를 띄워 첫 줄의 대답을 기다린다 → 'ok' | 'err …'
- *   공유 창 · 새 메일은 도우미가 떠 있는 동안만 유지되므로 대답 뒤에도 도우미는 그대로 둔다
+ *   새 메일은 도우미가 떠 있는 동안만 유지되므로 대답 뒤에도 도우미는 그대로 둔다
  */
 export function runHelper(script, env, { platform = process.platform, spawnHelper = spawn, timeoutMs = 20_000 } = {}) {
   if (platform !== 'win32') return Promise.resolve('err unavailable');
@@ -169,7 +87,7 @@ export function runHelper(script, env, { platform = process.platform, spawnHelpe
     });
     proc.on('error', (err) => finish(`err ${err.message}`));
     proc.on('exit', () => finish(/^ok\b/.test(text().trim()) ? 'ok' : (text().trim() || 'err exit')));
-    // 대답이 없으면 도우미를 끈다 (늦게라도 공유 창이 떠 탐색기 대신 보여 준 것과 겹치지 않게)
+    // 대답이 없으면 도우미를 끈다
     timer = setTimeout(() => {
       if (done) return;
       try {
@@ -180,11 +98,6 @@ export function runHelper(script, env, { platform = process.platform, spawnHelpe
       finish('err timeout');
     }, timeoutMs);
   });
-}
-
-/** Windows 공유 창 → 'ok' | 'err …' */
-export function shareSheet(file, title = '', opts) {
-  return runHelper(SHEET_SCRIPT, { MK_SHARE_FILE: file, MK_SHARE_TITLE: title || path.basename(file) }, opts);
 }
 
 /** 기본 메일 앱의 새 메일에 첨부 → 'ok' | 'err …' (메일 앱이 없으면 'err mapi …') */

@@ -2,6 +2,7 @@
 import { injectIcons, icon } from './icons.js';
 import { createNoteEditor } from './editor.js';
 import { setCopyHost } from './copy-content.js';
+import { hideDeleteButton } from './delete-button.js';
 import { COLORS, COLOR_NAMES, extractTitle, isBlankBody, conflictCopyBody, sameBody } from './core/memo-file.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from './core/html-marks.js';
 import { fileExtension } from './media.js';
@@ -25,7 +26,7 @@ import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
 import { hintOnce } from './hints.js';
 import { toggleShortcutSheet } from './shortcut-sheet.js';
-import { chooseShare } from './share-menu.js';
+import { chooseShare, showSharePop } from './share-menu.js';
 import { KEYMAP_ACTIONS, keymapTable, resolveKeymap, comboLabel } from './core/keymap.js';
 import { hotkeyDialog } from './hotkey-dialog.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
@@ -44,20 +45,20 @@ setCopyHost({
     if (r?.error) throw new Error(r.error);
     return r?.cancelled ? 'cancelled' : r.name;
   },
-  // 공유 단추: 방법을 고른다 (Windows 공유 · Google Drive 링크 · LocalSend · 메일) — share-menu.js
+  // 공유 단추: 방법을 고른다 (Google Drive 링크 · LocalSend · 메일) — share-menu.js
   share: async (f) => {
-    const anchor = document.querySelector('.mk-share-btn') ?? document.activeElement ?? document.body;
-    const via = await chooseShare(anchor, await api.attachments.shareTargets());
+    const targets = await api.attachments.shareTargets();
+    // 메뉴는 공유 단추 자리에 — 내용 위의 단추 4개(지우기 · 복사 · 저장 · 공유)는 먼저 거둬 메뉴 위에 남지 않게
+    const at = (document.querySelector('.mk-share-btn') ?? document.activeElement ?? document.body).getBoundingClientRect();
+    hideDeleteButton(true);
+    const via = await chooseShare({ getBoundingClientRect: () => at }, targets);
     if (!via) return 'cancelled';
+    if (via === 'drive') setStatus('Google Drive 에 올리는 중…');
     const r = await api.attachments.share({ ...f, via });
     if (r?.error) throw new Error(r.error);
-    if (r?.fallback) {
-      // 까닭을 함께 (설정 폴더의 share.log 에도 남음)
-      setStatus(`Windows 공유 창을 열지 못해 탐색기에서 파일을 골라 두었어요 (${String(r.reason ?? '').slice(0, 120)})`, true);
-      return 'cancelled'; // 위 안내를 그대로 둔다
-    }
     if (r?.missing) return 'localsend-missing';
-    return { sheet: 'shared', drive: 'link', localsend: 'localsend', mail: 'mail' }[via];
+    if (via === 'drive') showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요', detail: r?.link ?? '' });
+    return { drive: 'link', localsend: 'localsend', mail: 'mail' }[via];
   },
 });
 // 저장 단추의 결과 (delete-button.js)
@@ -434,7 +435,7 @@ function applyLayer(next) {
   // 무엇이 바뀌었는지 (스크린 리더에도 — 상태 줄은 role=status). 처음 열 때는 말하지 않는다
   if (!prev) return;
   if (bottom && !prev.bottom) setStatus('바탕화면에 붙였어요');
-  else if (!bottom && prev.bottom) setStatus(top ? '' : '바탕화면에서 뗐어요');
+  else if (!bottom && prev.bottom) setStatus(next.note || (top ? '' : '바탕화면에서 뗐어요')); // 목록에서 골라 떼어졌으면 그 까닭
   if (top && !prev.top) setStatus('늘 위에 둬요');
   else if (!top && prev.top && !bottom && el.status.textContent === '늘 위에 둬요') setStatus('');
 }

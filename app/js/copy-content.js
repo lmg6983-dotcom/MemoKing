@@ -20,7 +20,8 @@ let host = {
    * @param {{ name: string, mime: string, rel?: string, base64?: string }} f rel: 메모 폴더의 첨부 그대로 · base64: 만든 내용
    */
   save: null,
-  /** 공유: { name, mime, rel? | base64?, text? } — 휴대폰 공유 창 · PC 공유 방법 고르기(share-menu.js) (없으면 공유 단추를 보이지 않음) → 'shared' | 'fallback' | 'cancelled' */
+  /** 공유: { name, mime, rel? | base64?, text? } — 휴대폰 공유 창 · PC 공유 방법 고르기(share-menu.js) (없으면 공유 단추를 보이지 않음)
+   *  → 휴대폰 'shared' · PC 'link' | 'localsend' | 'localsend-missing' | 'mail' · 둘 다 'cancelled' (문구는 share-menu.js SHARE_DONE) */
   share: null,
 };
 
