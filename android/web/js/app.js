@@ -4,7 +4,8 @@ import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
-import { normalizeFeeds, feedResponseText, MAX_FEED_BYTES, FEED_FRESH_MS } from '../../app/js/core/calendar-feed-list.js';
+import { FeedStore, feedResponseText, MAX_FEED_BYTES } from '../../app/js/core/calendar-feed-list.js';
+import { textBase64 } from '../../app/js/core/base64.js';
 import { extractTitle, isBlankBody, COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
 import { shareText } from '../../app/js/core/share-text.js';
@@ -12,7 +13,7 @@ import { importText, isTextDocument, stripFrontMatter } from '../../app/js/core/
 import { mediaKind } from '../../app/js/media.js';
 import { vocabularyFrom, fixTranscript } from '../../app/js/core/transcript-fix.js';
 import { voiceCardMarkdown, attachTranscript, recordingWhen } from '../../app/js/core/voice-card.js';
-import { native, call, on, setBackHandler, drive, history, fs, toBase64 } from './native.js';
+import { native, call, on, setBackHandler, drive, history, fs } from './native.js';
 import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
@@ -69,59 +70,50 @@ const lsSet = (k, v) => {
 function calendarApi() {
   const mem = new Map(); // id → { url, text, at }
   const cacheKey = (id) => `memoking.calendarFeed.${id}`;
-  const feeds = () => {
-    try {
-      return normalizeFeeds(JSON.parse(lsGet(FEEDS_KEY) ?? '[]'));
-    } catch {
-      return [];
-    }
-  };
-  const cached = (f) => {
-    let c = mem.get(f.id);
-    if (!c) {
+  // 받는 규칙(15분 · 겹쳐 받지 않기 · 끊은 구독은 남기지 않기)은 PC 와 같은 FeedStore
+  const store = new FeedStore({
+    getList: () => {
       try {
-        c = JSON.parse(lsGet(cacheKey(f.id)) ?? 'null');
+        return JSON.parse(lsGet(FEEDS_KEY) ?? '[]');
       } catch {
-        c = null;
+        return [];
       }
-      if (c) mem.set(f.id, c);
-    }
-    return c?.url === f.url ? c : null;
-  };
-  return {
-    feeds: async () => feeds(),
-    setFeeds: async (list) => {
-      const next = normalizeFeeds(list);
-      for (const f of feeds()) {
-        if (next.some((n) => n.id === f.id && n.url === f.url)) continue;
-        mem.delete(f.id);
-        lsSet(cacheKey(f.id), null);
-      }
-      lsSet(FEEDS_KEY, JSON.stringify(next));
-      return next;
     },
-    fetch: async (id, force = false) => {
-      const f = feeds().find((x) => x.id === id);
-      if (!f) return { text: '', at: 0, error: '없는 캘린더예요' };
-      const old = cached(f);
-      if (!force && old && Date.now() - old.at < FEED_FRESH_MS) return { text: old.text, at: old.at };
-      try {
-        const res = await call('http', { url: f.url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
-        const text = feedResponseText(res.status, new TextDecoder().decode(Uint8Array.from(res.latin1 ?? '', (c) => c.charCodeAt(0) & 0xff)));
-        const entry = { url: f.url, text, at: Date.now() };
-        // 받는 사이 연결을 끊었거나 주소를 바꿨으면 남기지 않는다 (비공개 캘린더가 저장 공간에 남지 않게)
-        if (!feeds().some((x) => x.id === f.id && x.url === f.url)) return { text, at: entry.at };
+    setList: (list) => lsSet(FEEDS_KEY, JSON.stringify(list)),
+    download: async (url) => {
+      const res = await call('http', { url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
+      return feedResponseText(res.status, new TextDecoder().decode(Uint8Array.from(res.latin1 ?? '', (c) => c.charCodeAt(0) & 0xff)));
+    },
+    cache: {
+      read: (f) => {
+        if (!mem.has(f.id)) {
+          try {
+            const c = JSON.parse(lsGet(cacheKey(f.id)) ?? 'null');
+            if (c) mem.set(f.id, c);
+          } catch {
+            // 깨진 저장 — 다시 받는다
+          }
+        }
+        return mem.get(f.id) ?? null;
+      },
+      write: (f, entry) => {
         mem.set(f.id, entry);
         // 다시 켰을 때 · 인터넷이 없을 때 보이게 작은 캘린더만 저장 (localStorage 는 몇 MB 뿐 — 다른 설정을 밀어내지 않게)
-        lsSet(cacheKey(f.id), text.length <= FEED_CACHE_MAX ? JSON.stringify(entry) : null);
-        return { text, at: entry.at };
-      } catch (err) {
-        return { text: old?.text ?? '', at: old?.at ?? 0, error: err.message || '캘린더를 받지 못했어요' };
-      }
+        lsSet(cacheKey(f.id), entry.text.length <= FEED_CACHE_MAX ? JSON.stringify(entry) : null);
+      },
+      remove: (id) => {
+        mem.delete(id);
+        lsSet(cacheKey(id), null);
+      },
     },
+  });
+  return {
+    feeds: async () => store.list(),
+    setFeeds: async (list) => store.save(list),
+    fetch: (id, force = false) => store.get(id, { force }),
     openUrl: (url) => call('openUrl', { url }),
     exportIcs: async (text, name) => {
-      await call('shareFile', { base64: toBase64(new TextEncoder().encode(text)), name, mime: 'text/calendar', title: '캘린더로 보내기' });
+      await call('shareFile', { base64: textBase64(text), name, mime: 'text/calendar', title: '캘린더로 보내기' });
       return { ok: true };
     },
     // 휴대폰 캘린더 (삼성 캘린더 · Google 캘린더 등 — 안드로이드 CalendarContract)

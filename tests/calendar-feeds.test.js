@@ -198,7 +198,7 @@ test('Google 캘린더 새 일정 주소 · 휴대폰 캘린더 앱 값', () => 
   const rep = item({ kind: 'repeat', created: local(2026, 10, 14).toISOString(), title: '회의', repeat: { every: 'day', time: '08:30' } });
   assert.equal(new URL(googleCalendarUrl(rep)).searchParams.get('recur'), 'RRULE:FREQ=DAILY');
   const args = deviceInsertArgs(allDay);
-  assert.equal(args.start, Date.UTC(2026, 9, 22));
+  assert.equal(args.start, local(2026, 10, 22).getTime());
   assert.equal(args.allDay, true);
   assert.equal(deviceInsertArgs(rep).rrule, 'FREQ=DAILY');
 });

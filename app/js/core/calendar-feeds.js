@@ -251,12 +251,11 @@ export function deviceInsertArgs(item, now = new Date()) {
   const r = item.reminder;
   const span = eventSpan(r, now);
   if (!span) return null;
-  // 하루 종일은 안드로이드 캘린더 규칙대로 UTC 자정
-  const utcMidnight = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  // 캘린더 앱의 새 일정 화면은 시각을 이 기기 시각으로 읽는다 — 하루 종일도 이 기기 자정 (UTC 자정이면 서쪽 나라에서 하루 앞당겨짐)
   return {
     title: r.title || item.title || '일정',
-    start: span.allDay ? utcMidnight(span.start) : span.start.getTime(),
-    end: span.allDay ? utcMidnight(span.end) : span.end.getTime(),
+    start: span.start.getTime(),
+    end: span.end.getTime(),
     allDay: span.allDay,
     description: item.title && item.title !== r.title ? `메모킹 메모: ${item.title}` : '',
     rrule: rruleOf(r),

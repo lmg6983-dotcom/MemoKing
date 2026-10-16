@@ -718,9 +718,10 @@ class MainActivity : Activity() {
         requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), REQ_CALENDAR)
     }
 
-    /** 캘린더 앱 열기 (새 일정 · 그 일정) — 캘린더 앱이 없으면 false */
-    fun startCalendarIntent(id: Int, intent: Intent) {
+    /** 캘린더 앱 열기 (새 일정 · 그 일정) — 캘린더 앱이 없으면 false. 값이 잘못됐으면(빠진 시각 등) 화면에 오류로 */
+    fun startCalendarIntent(id: Int, build: () -> Intent) {
         bridge.resolve(id) {
+            val intent = build()
             try {
                 startActivity(intent)
                 true

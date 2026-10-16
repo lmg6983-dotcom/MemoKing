@@ -82,3 +82,66 @@ export function feedResponseText(status, text) {
   if (!looksLikeIcs(text)) throw new Error('캘린더(iCal) 주소가 아니에요. Google 캘린더는 "iCal 형식의 비공개 주소" 를 넣어 주세요');
   return text;
 }
+
+/**
+ * 구독 캘린더 받기 · 받아 둔 것 (PC 메인 · 휴대폰 같은 규칙): 15분 안이면 받아 둔 것, 아니면 새로 받고, 받지 못하면 받아 둔 것 + 오류.
+ * 같은 캘린더를 겹쳐 받지 않고, 받는 사이 연결을 끊었거나 주소를 바꿨으면 받은 것을 남기지 않는다.
+ * 어디에 두는지(파일 · localStorage)와 어떻게 받는지는 기기마다 넘긴다.
+ */
+export class FeedStore {
+  /**
+   * @param {{ getList: () => any[], setList: (list: any[]) => void, download: (url: string) => Promise<string>,
+   *           cache: { read: (feed: any) => ({ url: string, text: string, at: number } | null), write: (feed: any, entry: any) => (void | Promise<void>), remove: (id: string) => void },
+   *           now?: () => number }} options
+   */
+  constructor({ getList, setList, download, cache, now = Date.now }) {
+    this.getList = getList;
+    this.setList = setList;
+    this.download = download;
+    this.cache = cache;
+    this.now = now;
+    this.inflight = new Map(); // id → Promise
+  }
+
+  list() {
+    return normalizeFeeds(this.getList());
+  }
+
+  /** 구독 목록 저장 — 빠졌거나 주소가 바뀐 캘린더의 받아 둔 것은 지운다 */
+  save(list) {
+    const next = normalizeFeeds(list);
+    for (const f of this.list()) {
+      if (next.some((n) => n.id === f.id && n.url === f.url)) continue;
+      this.cache.remove(f.id);
+    }
+    this.setList(next);
+    return next;
+  }
+
+  cached(feed) {
+    const c = this.cache.read(feed);
+    return c?.url === feed.url ? c : null;
+  }
+
+  /** @returns {Promise<{ text: string, at: number, error?: string }>} */
+  async get(id, { force = false } = {}) {
+    const feed = this.list().find((f) => f.id === id);
+    if (!feed) return { text: '', at: 0, error: '없는 캘린더예요' };
+    const old = this.cached(feed);
+    if (!force && old && this.now() - old.at < FEED_FRESH_MS) return { text: old.text, at: old.at };
+    if (!this.inflight.has(id)) this.inflight.set(id, this.fetchFeed(feed).finally(() => this.inflight.delete(id)));
+    try {
+      return await this.inflight.get(id);
+    } catch (err) {
+      return { text: old?.text ?? '', at: old?.at ?? 0, error: err?.message || '캘린더를 받지 못했어요' };
+    }
+  }
+
+  async fetchFeed(feed) {
+    const text = await this.download(feed.url);
+    const entry = { url: feed.url, text, at: this.now() };
+    // 받는 사이 연결을 끊었거나 주소를 바꿨으면 남기지 않는다 (비공개 캘린더가 남지 않게)
+    if (this.list().some((f) => f.id === feed.id && f.url === feed.url)) await this.cache.write(feed, entry);
+    return { text, at: entry.at };
+  }
+}

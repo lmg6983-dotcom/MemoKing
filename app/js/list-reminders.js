@@ -103,6 +103,19 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     return query.trim() ? out.filter((e) => `${e.title} ${e.location ?? ''} ${e.source}`.toLowerCase().includes(query.trim().toLowerCase())) : out;
   }
 
+  /** 찾는 말과 맞는 다른 캘린더 일정이 하나라도 있는가 (기간 없이 — 범위를 펼치면 바쁜 캘린더는 잘린다) */
+  function externalMatches() {
+    const q = query.trim().toLowerCase();
+    const hit = (...texts) => texts.some((x) => String(x ?? '').toLowerCase().includes(q));
+    for (const f of feeds) {
+      if (!f.on) continue;
+      if (hit(f.name) && feedTexts.get(f.id)?.text) return true;
+      const prep = prepared.get(f.id)?.data;
+      if (prep?.masters.some(({ ev }) => hit(ev.summary, ev.location))) return true;
+    }
+    return device.on && device.events.some((e) => hit(e.title, e.location, e.calendar));
+  }
+
   async function loadFeeds({ force = false } = {}) {
     if (!calendars?.feeds) return;
     try {
@@ -137,8 +150,14 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     if (device.loading && device.loading.from <= range.from && device.loading.to >= range.to) return;
     device.loading = range;
     calendars.device.events(new Date(range.from), new Date(range.to)).then((res) => {
-      if (device.loading !== range || !calendars.device.enabled()) return;
-      device = { on: Boolean(res.granted), from: range.from, to: range.to, events: (res.events ?? []).map(fromDeviceEvent), loading: null };
+      if (device.loading !== range) return;
+      if (!res.granted || !calendars.device.enabled()) {
+        // 권한을 거둬 갔거나 그사이 껐다 — 끈 것으로
+        device = { on: false, from: 0, to: 0, events: [], loading: null };
+        render();
+        return;
+      }
+      device = { on: true, from: range.from, to: range.to, events: (res.events ?? []).map(fromDeviceEvent), loading: null };
       render();
     }).catch((err) => {
       console.warn('[calendar] device', err);
@@ -233,16 +252,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   const rowsEl = el('div', 'ev-rows');
   container.replaceChildren(card, rowsEl);
   attachSlider(views);
-  // 보기 고르기: ← → 로 옆 보기 (라디오 묶음 키보드 규칙)
-  views.addEventListener('keydown', (e) => {
-    const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
-    if (!step) return;
-    e.preventDefault();
-    const i = VIEWS.findIndex((v) => v.id === viewId);
-    const next = VIEWS[(i + step + VIEWS.length) % VIEWS.length].id;
-    setView(next);
-    views.querySelector(`[data-view="${next}"]`)?.focus();
-  });
+  // 보기 고르기의 ← → 는 목록 창 공통 라디오 묶음 규칙(radioGroups)이 맡는다
 
   const isMonth = () => viewId === 'dayGridMonth';
   // 낮은 창의 색 점: 보이는 6주를 한 번에 날짜별로 (칸마다 따로 찾지 않게) — 그릴 때마다 새로
@@ -680,7 +690,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
       // 다가오는 일정 (오늘을 고른 동안 · 앞으로 30일, 날짜별)
       if (sameDay(selected, t)) {
-        const upcoming = allBetween(addDays(t, 1), addDays(t, UPCOMING_DAYS + 1));
+        // 오늘 전에 시작해 이어지는 여러 날 일정은 위(오늘)에 이미 있다 — 내일부터 시작하는 것만
+        const upcoming = allBetween(addDays(t, 1), addDays(t, UPCOMING_DAYS + 1)).filter((o) => o.start >= addDays(t, 1));
         if (upcoming.length) {
           out.push(heading('다가오는 일정', 'ev-upcoming-title'));
           let lastDay = null;
@@ -712,7 +723,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
     // 일정이 하나도 없거나 찾는 일정이 없으면: 달력 아래에 짧은 한 줄로 (따로 큰 칸을 두면 달력이 그만큼 잘린다)
     const searching = Boolean(query.trim());
-    const found = searching && (items.some(matches) || externalBetween(addDays(t, -400), addDays(t, 400)).length > 0);
+    const found = searching && (items.some(matches) || externalMatches());
     if (searching ? !found : !items.length && !feeds.some((f) => f.on) && !device.on) {
       out.push(el('p', 'ev-hint', searching ? '찾는 일정이 없어요.'
         : '날짜를 고르고 "＋ 일정 추가"를 누르거나, 메모에 "내일 오후 3시 치과"처럼 쓰면 일정이 돼요. "다른 캘린더"로 Google 캘린더 · 삼성 캘린더 일정도 함께 볼 수 있어요.'));
