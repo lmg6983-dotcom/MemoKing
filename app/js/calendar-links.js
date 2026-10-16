@@ -4,7 +4,17 @@
 import { icon } from './icons.js';
 import { normalizeFeedUrl, icsName, feedLabel, buildIcs, MAX_FEEDS } from './core/calendar-feeds.js';
 import { isEvent } from './core/reminders.js';
-import { formatStamp } from './core/format.js';
+import { koClock, relativeDay, koMonthDay } from './core/time.js';
+
+/** 받은 때: "방금" · "12분 전" · "오늘 오후 3:20" · "10월 14일" */
+function receivedAt(ms, now = Date.now()) {
+  const min = Math.round((now - ms) / 60_000);
+  if (min < 1) return '방금';
+  if (min < 60) return `${min}분 전`;
+  const d = new Date(ms);
+  const rel = relativeDay(d, new Date(now));
+  return rel ? `${rel} ${koClock(d)}` : koMonthDay(d);
+}
 
 const GOOGLE_IMPORT = 'https://calendar.google.com/calendar/r/settings/export';
 
@@ -73,7 +83,7 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
       const dot = el('span', 'feed-dot');
       const text = el('span', 'feed-text');
       const got = feedTexts.get(f.id);
-      const sub = got?.error ? got.error : got?.at ? `${feedLabel(f.url)}, ${formatStamp(new Date(got.at).toISOString())} 받음` : feedLabel(f.url);
+      const sub = got?.error ? got.error : got?.at ? `${feedLabel(f.url)}, ${receivedAt(got.at)} 받음` : feedLabel(f.url);
       const small = el('small', got?.error ? 'err' : '', sub);
       text.append(el('b', '', f.name), small);
       const sw = switchInput(`${f.name} 함께 보기`, f.on);

@@ -221,6 +221,16 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   const rowsEl = el('div', 'ev-rows');
   container.replaceChildren(card, rowsEl);
   attachSlider(views);
+  // 보기 고르기: ← → 로 옆 보기 (라디오 묶음 키보드 규칙)
+  views.addEventListener('keydown', (e) => {
+    const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const i = VIEWS.findIndex((v) => v.id === viewId);
+    const next = VIEWS[(i + step + VIEWS.length) % VIEWS.length].id;
+    setView(next);
+    views.querySelector(`[data-view="${next}"]`)?.focus();
+  });
 
   const isMonth = () => viewId === 'dayGridMonth';
   // 월 보기 날 칸의 위: 날짜 (낮은 창이면 그 아래 일정 색 점 세 개까지 — 일정 막대 대신)
@@ -286,7 +296,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     headerToolbar: false,
     height: 'auto',
     fixedWeekCount: true,
-    dayMaxEvents: true, // 칸 높이에 들어가는 만큼, 나머지는 +n
+    dayMaxEvents: 2, // 두 개까지, 나머지는 +n (낮은 창은 막대 대신 색 점)
+    moreLinkClass: 'mk-more',
     moreLinkText: (n) => `+${n}`,
     nowIndicator: true,
     scrollTime: '08:00:00',
@@ -373,7 +384,10 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   new ResizeObserver(() => fitSize()).observe(container);
 
   function markView() {
-    for (const b of views.querySelectorAll('button')) b.setAttribute('aria-checked', String(b.dataset.view === viewId));
+    for (const b of views.querySelectorAll('button')) {
+      b.setAttribute('aria-checked', String(b.dataset.view === viewId));
+      b.tabIndex = b.dataset.view === viewId ? 0 : -1;
+    }
     card.dataset.view = viewId;
     container.dataset.view = viewId;
   }
