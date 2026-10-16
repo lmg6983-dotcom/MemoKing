@@ -10,6 +10,7 @@ import { vaultUrl, mediaKind, fileExtension } from './media.js';
 import { memoBodyFromFile } from './core/file-memo.js';
 import { isTextDocument } from './core/markdown-import.js';
 import { setupRemindersTab } from './list-reminders.js';
+import { textBase64 } from './core/base64.js';
 import { setupHistoryTab } from './list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
@@ -933,13 +934,6 @@ $('history-enabled').addEventListener('change', async (e) => {
 const TAB_PLACEHOLDER = { memos: '메모 검색 (Ctrl+F)', reminders: '일정 검색', history: '보관한 알림 검색' };
 let activeTab = 'memos';
 
-// 글 → base64 (한글 그대로, 큰 글도 스택이 넘치지 않게 나눠서)
-function textBase64(text) {
-  const bytes = new TextEncoder().encode(text);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
 const remindersTab = setupRemindersTab({
   api, container: $('reminder-groups'), countEl: $('count-reminders'),
   // 다른 캘린더: 구독은 메인이 받고, 보내기는 브라우저(Google 캘린더 새 일정) · 저장 창(.ics)

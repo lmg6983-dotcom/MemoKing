@@ -9,7 +9,7 @@ import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
 import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, DEFAULT_ALERTS } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocalIso } from './core/time.js';
-import { feedEvents, fromDeviceEvent, reminderFromExternal, googleCalendarUrl, deviceInsertArgs } from './core/calendar-feeds.js';
+import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, googleCalendarUrl, deviceInsertArgs } from './core/calendar-feeds.js';
 import { openQuickEvent } from './quick-event.js';
 import { openCalendarLinks } from './calendar-links.js';
 
@@ -61,11 +61,13 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   let viewId = storedView();
   let compact = false; // 낮은 창: 월 보기 칸에 일정 막대 대신 색 점 (fitSize)
   let lastFit = '';
+  let lastCellKey = 0; // 날 칸을 마지막으로 그린 때의 고른 날
 
   // ---------- 다른 캘린더 (읽기만) ----------
   let feeds = []; // [{ id, name, url, color, on }]
   const feedTexts = new Map(); // id → { text, at, error }
-  const parsed = new Map(); // `${id}|${at}|${from}|${to}` → 일정 (같은 범위를 다시 풀지 않게)
+  const prepared = new Map(); // id → { at, data } — 받은 .ics 를 한 번만 풀어 둔다
+  const parsed = new Map(); // `${id}|${at}|${from}|${to}` → 일정 (같은 범위를 다시 펼치지 않게)
   let device = { on: false, from: 0, to: 0, events: [], loading: null };
 
   /** [from, to) 사이의 다른 캘린더 일정 [{ ext: true, source, title, start, end, allDay, color, ... }] */
@@ -79,13 +81,18 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       let list = parsed.get(key);
       if (!list) {
         try {
-          list = feedEvents(got.text, from, to);
+          let prep = prepared.get(f.id);
+          if (prep?.at !== got.at) {
+            prep = { at: got.at, data: prepareFeed(got.text) };
+            prepared.set(f.id, prep);
+          }
+          list = feedEvents(prep.data, from, to);
         } catch (err) {
           console.warn('[calendar] .ics', f.name, err);
           list = [];
           got.error ||= '캘린더 내용을 읽지 못했어요';
         }
-        if (parsed.size > 24) parsed.delete(parsed.keys().next().value);
+        if (parsed.size > 48) parsed.delete(parsed.keys().next().value);
         parsed.set(key, list);
       }
       for (const e of list) out.push({ ...e, ext: true, source: f.name, color: f.color, feedId: f.id });
@@ -112,7 +119,11 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
         feedTexts.set(f.id, { text: feedTexts.get(f.id)?.text ?? '', at: feedTexts.get(f.id)?.at ?? 0, error: err.message });
       }
     }));
-    for (const id of [...feedTexts.keys()]) if (!feeds.some((f) => f.id === id)) feedTexts.delete(id);
+    for (const id of [...feedTexts.keys()]) {
+      if (feeds.some((f) => f.id === id)) continue;
+      feedTexts.delete(id);
+      prepared.delete(id);
+    }
     device = { ...device, from: 0, to: 0 }; // 휴대폰 캘린더도 새로
     render();
   }
@@ -233,12 +244,33 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   });
 
   const isMonth = () => viewId === 'dayGridMonth';
+  // 낮은 창의 색 점: 보이는 6주를 한 번에 날짜별로 (칸마다 따로 찾지 않게) — 그릴 때마다 새로
+  let dayIndexCache = null;
+  function dayIndex() {
+    if (dayIndexCache) return dayIndexCache;
+    const map = new Map();
+    const view = calendar?.view;
+    if (view) {
+      for (const o of allBetween(view.activeStart, view.activeEnd)) {
+        // 여러 날 일정은 걸친 날마다 (끝은 그 순간 직전까지)
+        const lastMs = o.ext ? Math.max(o.ext.end.getTime() - 1, o.start.getTime()) : o.start.getTime();
+        for (let d = dayStart(o.start); d.getTime() <= lastMs && d < view.activeEnd; d = addDays(d, 1)) {
+          const k = d.getTime();
+          if (!map.has(k)) map.set(k, []);
+          map.get(k).push(o);
+        }
+      }
+    }
+    dayIndexCache = map;
+    return map;
+  }
+
   // 월 보기 날 칸의 위: 날짜 (낮은 창이면 그 아래 일정 색 점 세 개까지 — 일정 막대 대신)
   function dayTop(date) {
     if (!compact) return String(date.getDate());
     const wrap = el('span', 'cal-daytop');
     wrap.append(el('span', 'cal-num', String(date.getDate())));
-    const list = allBetween(dayStart(date), addDays(dayStart(date), 1)).slice(0, 3);
+    const list = (dayIndex().get(dayStart(date).getTime()) ?? []).slice(0, 3);
     if (list.length) {
       const dots = el('span', 'cal-dots');
       for (const o of list) {
@@ -320,6 +352,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     },
     datesSet: (arg) => {
       title.textContent = arg.view.title;
+      dayIndexCache = null; // 보이는 날이 바뀜 — 낮은 창의 색 점도 새로
+      if (compact) queueMicrotask(() => render());
       // 달이 바뀌면 고른 날도 그 달로 (월 보기에서 옆 달로 넘겼을 때 아래 목록이 엉뚱한 달을 보이지 않게)
       const start = arg.view.currentStart;
       const end = arg.view.currentEnd;
@@ -429,8 +463,9 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       allDay: allDay || undefined,
       // 하루 종일 ↔ 시각 있는 일정이 바뀌면 미리 알림 뜻이 달라진다 (당일 오전 9시 ↔ 10분 전) — 기본값으로
       alerts: Boolean(r.allDay) === allDay ? r.alerts : [...(allDay ? DEFAULT_ALERTS.allDay : DEFAULT_ALERTS.timed)],
-      last: null, // 새 시각의 알림이 다시 울리게
-      enabled: occurrenceEnd(start, allDay) > now ? true : r.enabled,
+      // 앞으로 옮기면 새 시각의 알림이 다시 울리게, 지난 때로 옮기면 "놓친 알림" 이 울리지 않게 울린 것으로.
+      // 꺼 둔 알림은 꺼진 채 (끌어 옮긴다고 켜지지 않게)
+      last: occurrenceEnd(start, allDay) > now ? null : toLocalIso(now),
     };
     if (!moved.allDay) delete moved.allDay;
     try {
@@ -663,7 +698,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
     // 일정이 하나도 없거나 찾는 일정이 없으면: 달력 아래에 짧은 한 줄로 (따로 큰 칸을 두면 달력이 그만큼 잘린다)
     const searching = Boolean(query.trim());
-    const found = items.some(matches) || externalBetween(addDays(t, -400), addDays(t, 400)).length > 0;
+    const found = searching && (items.some(matches) || externalBetween(addDays(t, -400), addDays(t, 400)).length > 0);
     if (searching ? !found : !items.length && !feeds.some((f) => f.on) && !device.on) {
       out.push(el('p', 'ev-hint', searching ? '찾는 일정이 없어요.'
         : '날짜를 고르고 "＋ 일정 추가"를 누르거나, 메모에 "내일 오후 3시 치과"처럼 쓰면 일정이 돼요. "다른 캘린더"로 Google 캘린더 · 삼성 캘린더 일정도 함께 볼 수 있어요.'));
@@ -684,7 +719,12 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       }
       shownToday = t;
     }
-    calendar.setOption('dayCellClass', (arg) => dayClass(arg)); // 새 함수 → 고른 날 표시를 다시 그린다
+    dayIndexCache = null;
+    // 고른 날이 바뀌었거나 낮은 창(날 칸에 색 점)일 때만 날 칸을 다시 그린다 — 새 함수를 주면 다시 그린다
+    if (compact || selected.getTime() !== lastCellKey) {
+      lastCellKey = selected.getTime();
+      calendar.setOption('dayCellClass', (arg) => dayClass(arg));
+    }
     calendar.refetchEvents();
     renderRows();
     // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)

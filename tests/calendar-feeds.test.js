@@ -202,3 +202,16 @@ test('Google 캘린더 새 일정 주소 · 휴대폰 캘린더 앱 값', () => 
   assert.equal(args.allDay, true);
   assert.equal(deviceInsertArgs(rep).rrule, 'FREQ=DAILY');
 });
+
+test('오래된 매일 반복이 여럿 앞에 있어도 뒤의 한 번짜리 일정이 빠지지 않음 · 범위 밖에서 범위 안으로 옮긴 회차도 보임', () => {
+  const daily = Array.from({ length: 6 }, (_, i) => `BEGIN:VEVENT\nUID:d${i}\nDTSTART:2012010${i + 1}T000000Z\nRRULE:FREQ=DAILY\nSUMMARY:매일 ${i}\nEND:VEVENT`).join('\n');
+  const text = `BEGIN:VCALENDAR\nVERSION:2.0\n${daily}
+BEGIN:VEVENT\nUID:once\nDTSTART:20261020T010000Z\nDTEND:20261020T020000Z\nSUMMARY:한 번\nEND:VEVENT
+BEGIN:VEVENT\nUID:wk\nDTSTART:20261005T010000Z\nRRULE:FREQ=WEEKLY\nSUMMARY:주간\nEND:VEVENT
+BEGIN:VEVENT\nUID:wk\nRECURRENCE-ID:20261102T010000Z\nDTSTART:20261030T010000Z\nDTEND:20261030T020000Z\nSUMMARY:주간 (앞당김)\nEND:VEVENT
+END:VCALENDAR`;
+  const events = feedEvents(text, new Date(Date.UTC(2026, 9, 15)), new Date(Date.UTC(2026, 10, 1)));
+  assert.ok(events.some((e) => e.title === '한 번'), '뒤의 한 번짜리');
+  assert.ok(events.some((e) => e.title === '주간 (앞당김)'), '옮긴 회차');
+  assert.equal(events.filter((e) => e.title === '매일 0').length, 17);
+});

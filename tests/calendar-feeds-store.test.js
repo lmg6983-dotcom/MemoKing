@@ -75,3 +75,15 @@ test('목록 저장: 지운 캘린더의 받아 둔 파일도 지움 · 없는 �
   assert.equal(fs.existsSync(path.join(dir, 'g1.ics')), false);
   assert.ok((await store.get('g1')).error);
 });
+
+test('받는 사이 연결을 끊으면 받은 글을 파일로 남기지 않음', async () => {
+  let release;
+  const { store, dir } = setup(() => new Promise((r) => { release = () => r(new Response(ICS)); }));
+  const pending = store.get('g1');
+  await new Promise((r) => setTimeout(r, 10));
+  store.save([]);
+  release();
+  await pending;
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(fs.existsSync(path.join(dir, 'g1.ics')), false);
+});

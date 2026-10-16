@@ -117,6 +117,8 @@ export class CalendarFeeds {
     const text = await readLimited(res, MAX_FEED_BYTES);
     if (!looksLikeIcs(text)) throw new Error('캘린더(iCal) 주소가 아니에요. Google 캘린더는 "iCal 형식의 비공개 주소" 를 넣어 주세요');
     const entry = { url: feed.url, text, at: this.now() };
+    // 받는 사이 연결을 끊었거나 주소를 바꿨으면 남기지 않는다 (비공개 주소가 든 파일이 남지 않게)
+    if (!this.list().some((f) => f.id === feed.id && f.url === feed.url)) return { text, at: entry.at };
     this.cache.set(feed.id, entry);
     try {
       await fs.promises.mkdir(this.dir, { recursive: true });

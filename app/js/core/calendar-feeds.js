@@ -10,7 +10,7 @@ export const MAX_FEED_BYTES = 5 * 1024 * 1024;
 export const MAX_FEEDS = 10;
 // 구독 캘린더 색 (메모 색과 겹치지 않는 진한 색 — 달력에서 "다른 캘린더" 로 보이게)
 export const FEED_COLORS = ['#4285f4', '#0b8043', '#8e24aa', '#f4511e', '#039be5', '#616161'];
-const MAX_ITERATIONS = 20000; // 아주 오래된 매일 반복도 멈추지 않게
+const MAX_ITERATIONS = 20000; // 반복 일정 하나마다 — 아주 오래된 매일 반복도 멈추지 않게
 
 /**
  * 붙여 넣은 캘린더 주소 → 받을 수 있는 주소 (webcal:// 은 https:// 로). 아니면 null
@@ -74,10 +74,10 @@ export const looksLikeIcs = (text) => /BEGIN:VCALENDAR/i.test(String(text ?? '')
 const plainText = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 
 /**
- * .ics 글 → [from, to) 와 겹치는 일정 회차 [{ uid, title, start, end, allDay, location }] (시작 순)
- * 반복 일정은 회차마다, 취소된 일정은 빼고, 바뀐 회차(RECURRENCE-ID)는 바뀐 대로.
+ * .ics 글을 한 번만 풀어 둔다 (같은 캘린더를 범위마다 다시 풀지 않게) → feedEvents 에 넘긴다
+ * @returns {{ masters: any[] }}
  */
-export function feedEvents(text, from, to, limit = 1500) {
+export function prepareFeed(text) {
   const root = new ICAL.Component(ICAL.parse(String(text ?? '')));
   for (const tz of root.getAllSubcomponents('vtimezone')) {
     try {
@@ -94,16 +94,29 @@ export function feedEvents(text, from, to, limit = 1500) {
     if (!ev.startDate) continue;
     if (ev.isRecurrenceException()) exceptions.push(ev);
     else {
-      masters.push(ev);
-      if (!byUid.has(ev.uid)) byUid.set(ev.uid, ev);
+      masters.push({ ev, moved: [] });
+      if (!byUid.has(ev.uid)) byUid.set(ev.uid, masters.at(-1));
     }
   }
   for (const ex of exceptions) {
     const master = byUid.get(ex.uid);
-    if (master) master.relateException(ex);
-    else masters.push(ex); // 본 일정이 없는 바뀐 회차 — 한 번짜리로
+    if (master) {
+      master.ev.relateException(ex);
+      master.moved.push(ex); // 다른 때로 옮긴 회차 — 원래 자리가 범위 밖이어도 옮긴 자리가 범위 안이면 보이게
+    } else masters.push({ ev: ex, moved: [] }); // 본 일정이 없는 바뀐 회차 — 한 번짜리로
   }
+  return { masters };
+}
+
+/**
+ * .ics 글(또는 prepareFeed 결과) → [from, to) 와 겹치는 일정 회차 [{ uid, title, start, end, allDay, location }] (시작 순)
+ * 반복 일정은 회차마다, 취소된 일정은 빼고, 바뀐 회차(RECURRENCE-ID)는 바뀐 대로.
+ * 반복 하나마다 따로 셈을 두어(아주 오래된 매일 반복이 있어도) 뒤의 다른 일정이 빠지지 않게 하고, 다 모은 뒤 시작 순으로 limit 개
+ */
+export function feedEvents(source, from, to, limit = 1500) {
+  const { masters } = typeof source === 'string' ? prepareFeed(source) : source;
   const out = [];
+  const seen = new Set();
   const fromMs = from.getTime();
   const toMs = to.getTime();
   const push = (ev, startTime, endTime) => {
@@ -115,24 +128,27 @@ export function feedEvents(text, from, to, limit = 1500) {
     if (start.getTime() >= toMs) return;
     const status = String(ev.component.getFirstPropertyValue('status') ?? '').toUpperCase();
     if (status === 'CANCELLED') return;
+    const key = `${ev.uid}|${start.getTime()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
     out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || '(제목 없음)', start, end, allDay, location: plainText(ev.location) });
   };
-  let budget = MAX_ITERATIONS;
-  for (const ev of masters) {
-    if (out.length >= limit || budget <= 0) break;
+  for (const { ev, moved } of masters) {
     if (!ev.isRecurring()) {
       push(ev, ev.startDate, ev.endDate);
       continue;
     }
     const it = ev.iterator();
-    for (let next = it.next(); next && budget-- > 0 && out.length < limit; next = it.next()) {
+    let budget = MAX_ITERATIONS;
+    for (let next = it.next(); next && budget-- > 0; next = it.next()) {
       if (next.toJSDate().getTime() >= toMs) break;
       const d = ev.getOccurrenceDetails(next);
       // 바뀐 회차는 그 일정의 상태(취소 등)로 본다
       push(d.item, d.startDate, d.endDate);
     }
+    for (const ex of moved) push(ex, ex.startDate, ex.endDate);
   }
-  return out.sort((a, b) => a.start - b.start);
+  return out.sort((a, b) => a.start - b.start).slice(0, limit);
 }
 
 /**

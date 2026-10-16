@@ -50,6 +50,7 @@ injectMobileIcons();
 const FEEDS_KEY = 'memoking.calendarFeeds';
 const DEVICE_KEY = 'memoking.deviceCalendar';
 const FEED_FRESH_MS = 15 * 60 * 1000;
+const FEED_CACHE_MAX = 400 * 1024; // 이보다 큰 캘린더는 앱을 켤 때마다 다시 받는다
 const lsGet = (k) => {
   try {
     return localStorage.getItem(k);
@@ -113,7 +114,8 @@ function calendarApi() {
         if (!looksLikeIcs(text)) throw new Error('캘린더(iCal) 주소가 아니에요. Google 캘린더는 "iCal 형식의 비공개 주소" 를 넣어 주세요');
         const entry = { url: f.url, text, at: Date.now() };
         mem.set(f.id, entry);
-        lsSet(cacheKey(f.id), JSON.stringify(entry));
+        // 다시 켰을 때 · 인터넷이 없을 때 보이게 작은 캘린더만 저장 (localStorage 는 몇 MB 뿐 — 다른 설정을 밀어내지 않게)
+        lsSet(cacheKey(f.id), text.length <= FEED_CACHE_MAX ? JSON.stringify(entry) : null);
         return { text, at: entry.at };
       } catch (err) {
         return { text: old?.text ?? '', at: old?.at ?? 0, error: err.message || '캘린더를 받지 못했어요' };

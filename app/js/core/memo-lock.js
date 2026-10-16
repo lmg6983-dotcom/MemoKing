@@ -9,6 +9,7 @@
 //   암호는 noble(MIT, 감사받은 순수 JS) — 열쇠 만들기(느림)는 비동기, 열쇠로 잠그고 풀기(빠름)는 동기라
 //   자동 저장·창 닫기 저장이 늘 잠근 글만 쓴다. 한 번 연 메모는 "세션"(열쇠·소금)을 들고 있다가 저장마다 새 IV 로 잠근다.
 //   제목만 보인다 — 본문·태그·첨부 경로는 암호문 안에. (첨부 파일 자체는 암호화하지 않음: 화면에 그렇게 알린다)
+import { bytesBase64 } from './base64.js';
 import { gcm, pbkdf2Async, sha256 } from '../../vendor/noble-crypto.js';
 import { extractTitle, extractAttachments, UNTITLED } from './memo-file.js';
 
@@ -35,11 +36,7 @@ export function parseLocked(body) {
   return { version: m[1], iterations: Number(m[2]), salt: m[3], iv: m[4], data: m[5] };
 }
 
-const b64 = (bytes) => {
-  let s = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-};
+const b64 = bytesBase64;
 const unb64 = (text) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 const random = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n));
 

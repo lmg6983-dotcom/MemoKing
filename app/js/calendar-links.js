@@ -216,9 +216,17 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
       resolve();
     });
     document.body.append(dialog);
+    // 저장된 구독을 읽기 전에는 넣지 못하게 (빈 목록에 더해 저장하면 있던 구독이 사라진다)
+    addBtn.disabled = true;
+    url.disabled = true;
     calendars.feeds().then((list0) => {
       feeds = list0;
+      addBtn.disabled = false;
+      url.disabled = false;
       drawList();
+    }).catch((err) => {
+      addNote.textContent = `캘린더 목록을 읽지 못했어요. 창을 닫았다 다시 열어 주세요 (${err?.message ?? err})`;
+      addNote.classList.add('err');
     });
     drawList();
     dialog.showModal();

@@ -6,6 +6,7 @@
 //   그 밖의 내용(줄 · 목록 · 표 · 수식): 서식(HTML)과 일반 글자를 함께
 import { plainTextOf, spacedHtml } from './clipboard-text.js';
 import { mediaKindOf } from './core/memo-file.js';
+import { textBase64 } from './core/base64.js';
 import { voiceAudioOf } from './voice-card-view.js';
 
 let host = {
@@ -214,12 +215,7 @@ export function tableCsv(table) {
   return rows.join('\r\n');
 }
 
-function base64Of(text) {
-  const bytes = new TextEncoder().encode(text);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
+const base64Of = textBase64;
 
 /** 브라우저만 있을 때(앱 밖): 내려받기 */
 function download({ name, mime, base64, rel }) {
