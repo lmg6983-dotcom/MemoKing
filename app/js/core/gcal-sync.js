@@ -21,6 +21,8 @@ export const CALENDAR_NAME = '메모킹';
 const API = 'https://www.googleapis.com/calendar/v3';
 export const LEASE_MS = 20 * 60_000;
 const KEY_PROP = 'memoking'; // extendedProperties.private 의 "메모 id/알림 id"
+export const LOCKED_TITLE = '🔒 메모킹 일정'; // 잠긴 메모의 일정 이름 — Google 에 메모 제목을 보내지 않는다
+const ORPHAN_KEEP_MS = 24 * 3600_000; // 이 기기가 만든 캘린더를 하루 동안 기억 (두 기기가 동시에 만들었으면 진 쪽을 지운다)
 
 export class CalendarSyncError extends Error {}
 
@@ -183,12 +185,15 @@ export function applyShape(r, shape, now = new Date()) {
  * 메모킹 알림 → Google 일정 내용. 새로 만들 때(full)만 설명 · 알림을 넣고, 고칠 때는 메모킹이 정하는 것(이름 · 때 · 반복)만 —
  * 사용자가 Google 에서 넣은 장소 · 참석자 · 색 · 설명을 지우지 않게. 시각 있는 일정은 Google 에서 늘린 길이(durationMs)를 지킨다
  */
-export function eventBodyFor(r, { memoTitle = '', key, timeZone, extra = [], durationMs = null, full = true, now = new Date() }) {
+export function eventBodyFor(r, { memoTitle = '', key, timeZone, extra = [], durationMs = null, durationDays = null, full = true, now = new Date() }) {
   const span = eventSpan(r, now);
   if (!span) return null;
   const title = cleanTitle(r.title || memoTitle) || '일정';
   const time = (d) => (span.allDay ? { date: dayKey(d) } : { dateTime: toLocalIso(d), timeZone });
-  const end = span.allDay ? span.end : new Date(span.start.getTime() + (durationMs > 0 ? durationMs : DEFAULT_MINUTES * 60_000));
+  // 길이: Google 에서 늘린 것을 지킨다 (여러 날 하루 종일 · 시각 있는 일정의 끝)
+  const end = span.allDay
+    ? new Date(span.start.getFullYear(), span.start.getMonth(), span.start.getDate() + (durationDays > 1 ? durationDays : 1))
+    : new Date(span.start.getTime() + (durationMs > 0 ? durationMs : DEFAULT_MINUTES * 60_000));
   const rrule = rruleOf(r);
   return {
     summary: title,
@@ -222,9 +227,10 @@ export function eventBodyFor(r, { memoTitle = '', key, timeZone, extra = [], dur
  */
 export class GoogleCalendarSync {
   /** @param {SyncOptions} o */
-  constructor({ request, store, memos, device, timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone, now = Date.now }) {
+  constructor({ request, store, local = null, memos, device, timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone, now = Date.now }) {
     this.request = request;
     this.store = store;
+    this.local = local; // 이 기기에만 두는 것 { get(), set(v) } — 이 기기가 만든 캘린더
     this.memos = memos;
     this.device = device;
     this.timeZone = timeZone;
@@ -283,10 +289,22 @@ export class GoogleCalendarSync {
     const now = this.now();
     const st = await this.readState();
     if (!force && this.leasedElsewhere(st, now)) return { skipped: 'lease', holder: st.lease.device, lastSync: st.lastSync };
-    // 맡았다는 것을 먼저 적어 둔다 (끝에서만 적으면 다른 기기가 그사이 같이 돌 수 있다)
-    st.lease = { device: this.device, until: now + LEASE_MS };
-    await this.store.write(st);
+    // 맡았다는 것을 먼저 적어 둔다 (끝에서만 적으면 다른 기기가 그사이 같이 돌 수 있다).
+    // 이미 맡고 있고 임대가 반 넘게 남았으면 쓰지 않는다 (Drive 로 함께 쓰는 파일을 5분마다 바꾸지 않게)
+    const before = JSON.stringify({ ...st, lease: null, lastSync: 0 });
+    const renew = () => !st.lease || st.lease.device !== this.device || st.lease.until - this.now() < LEASE_MS / 2;
+    if (renew()) {
+      st.lease = { device: this.device, until: now + LEASE_MS };
+      await this.store.write(st);
+    }
     const summary = { pushed: 0, pulled: 0, imported: 0, removed: 0, notes: [] };
+
+    // 0) 두 기기가 처음에 동시에 캘린더를 만들었으면(상태 파일이 아직 오지 않아서): 함께 쓰는 파일에 남은 쪽을 쓰고 이 기기가 만든 것은 지운다
+    const mine = await this.local?.get?.();
+    if (mine?.id && st.calendarId && mine.id !== st.calendarId) {
+      const gone = await this.api('DELETE', `/calendars/${encodeURIComponent(mine.id)}`);
+      if (gone.status < 400 || gone.status === 404 || gone.status === 410) await this.local.set(null);
+    } else if (mine?.id && mine.id === st.calendarId && now - (mine.at ?? 0) > ORPHAN_KEEP_MS) await this.local.set(null);
 
     // 1) 메모킹 캘린더 (없거나 지웠으면 새로 — 그러면 처음부터 다시 맞춘다)
     if (st.calendarId) {
@@ -298,6 +316,7 @@ export class GoogleCalendarSync {
       const made = await this.api('POST', '/calendars', { summary: CALENDAR_NAME, description: '메모킹 일정 — 여기서 고치거나 만든 일정은 메모킹으로 와요', timeZone: this.timeZone });
       if (made.status >= 400 || !made.json?.id) throw new CalendarSyncError(`메모킹 캘린더를 만들지 못했어요 (${made.status})`);
       Object.assign(st, { calendarId: made.json.id, syncToken: null, items: {} });
+      await this.local?.set?.({ id: made.json.id, at: now });
       await this.store.write(st); // 만든 캘린더를 바로 적어 둔다 (중간에 멈춰도 또 만들지 않게)
     }
     const cal = `/calendars/${encodeURIComponent(st.calendarId)}`;
@@ -331,7 +350,11 @@ export class GoogleCalendarSync {
 
     // 3) 견주기
     const local = new Map();
-    for (const item of await this.memos.all()) {
+    for (const raw of await this.memos.all()) {
+      // 임시 id 의 메모(아직 id 를 파일에 쓰지 않은 사본 등)는 켤 때마다 id 가 바뀌어 일정이 쌓이므로 맞추지 않는다
+      if (raw.stable === false) continue;
+      // 잠긴 메모: 메모 제목 · 일정 이름을 Google 에 보내지 않는다 (이름은 늘 같은 글)
+      const item = raw.locked ? { ...raw, title: LOCKED_TITLE, reminder: { ...raw.reminder, title: undefined } } : raw;
       const shape = shapeOfReminder(item.reminder, item.title);
       if (shape) local.set(keyOf(item.memoId, item.reminder.id), { ...item, shape });
     }
@@ -354,24 +377,33 @@ export class GoogleCalendarSync {
       const ev = byKey.get(key);
       const memoState = L ? 'present' : this.memos.state(memoId);
       if (!L && memoState === 'missing') continue; // 이 기기에 아직 오지 않은 메모 — 건드리지 않는다
+      // 메모는 있는데 일정이 없다: 지난번 맞춘 뒤 이 기기의 메모 파일이 바뀌지 않았으면 다른 기기에서 넣은 일정이
+      // 아직 오지 않은 것 (Drive 가 늦음) — 지운 것으로 보지 않는다
+      if (!L && S && memoState === 'present' && (this.memos.touched?.(memoId) ?? Infinity) <= (S.at ?? 0)) continue;
       // 원격: 받은 목록에 있으면 그 모양, 모두 받았는데 없으면 지운 것, 바뀐 것만 받았는데 없으면 그대로
-      const R = ev ? shapeOfEvent(ev) : full && S ? 'deleted' : undefined;
+      let R = ev ? shapeOfEvent(ev) : full && S ? 'deleted' : undefined;
+      if ((L?.locked ?? S?.locked) && R && R !== 'deleted') R = { ...R, title: LOCKED_TITLE };
       const rHash = R && R !== 'deleted' && !R.unsupported ? shapeHash(R) : null;
       const lHash = L ? shapeHash(L.shape) : null;
-      if (S && ev && R !== 'deleted') Object.assign(S, seenOf(ev));
+      if (S && ev && R !== 'deleted') {
+        Object.assign(S, seenOf(ev));
+        // Google 에서 메모킹이 나타낼 수 없는 반복으로 바꿨으면 그 뒤로는 Google 을 덮지 않는다 (나타낼 수 있게 되돌리면 다시)
+        S.readOnly = Boolean(R.unsupported);
+      }
+      if (S && L) S.locked = Boolean(L.locked);
 
       if (!S) {
         if (L && (R === undefined || R === 'deleted')) {
           await this.push(st, cal, key, L, null);
           summary.pushed++;
         } else if (L && R && R !== 'deleted') {
-          if (R.unsupported) st.items[key] = { eventId: ev.id, hash: lHash, readOnly: true, ...seenOf(ev) };
-          else if (rHash === lHash) st.items[key] = { eventId: ev.id, hash: lHash, ...seenOf(ev) };
+          if (R.unsupported) st.items[key] = { eventId: ev.id, hash: lHash, readOnly: true, at: now, locked: Boolean(L.locked), ...seenOf(ev) };
+          else if (rHash === lHash) st.items[key] = { eventId: ev.id, hash: lHash, at: now, locked: Boolean(L.locked), ...seenOf(ev) };
           else if (newer(ev.updated, editedOf(L))) {
             await this.pull(st, key, L, R, ev);
             summary.pulled++;
           } else {
-            st.items[key] = { eventId: ev.id, hash: '', ...seenOf(ev) };
+            st.items[key] = { eventId: ev.id, hash: '', locked: Boolean(L.locked), ...seenOf(ev) };
             await this.push(st, cal, key, L, ev.id);
             summary.pushed++;
           }
@@ -446,7 +478,7 @@ export class GoogleCalendarSync {
       const memoId = await this.memos.create(R.title, reminder);
       if (!memoId) continue;
       const key = keyOf(memoId, reminder.id);
-      st.items[key] = { eventId: ev.id, hash: R.unsupported ? '' : shapeHash(R), readOnly: Boolean(R.unsupported), ...seenOf(ev) };
+      st.items[key] = { eventId: ev.id, hash: R.unsupported ? '' : shapeHash(R), readOnly: Boolean(R.unsupported), at: this.now(), ...seenOf(ev) };
       await this.store.write(st);
       // 다음부터 이 일정을 메모와 이어 보게 키를 붙인다 (이름 · 시각은 그대로). 못 붙여도 상태의 일정 id 로 이어진다
       const tagged = await this.api('PATCH', `${cal}/events/${encodeURIComponent(ev.id)}`, { extendedProperties: { private: { [KEY_PROP]: key } } });
@@ -457,15 +489,18 @@ export class GoogleCalendarSync {
 
     if (nextToken) st.syncToken = nextToken;
     st.lastSync = now;
-    st.lease = { device: this.device, until: this.now() + LEASE_MS };
-    await this.store.write(st);
+    // 바뀐 것이 있거나 임대가 반 넘게 지났을 때만 쓴다
+    if (JSON.stringify({ ...st, lease: null, lastSync: 0 }) !== before || renew()) {
+      st.lease = { device: this.device, until: this.now() + LEASE_MS };
+      await this.store.write(st);
+    }
     return { ...summary, lastSync: now, calendarId: st.calendarId };
   }
 
   // 메모 → Google: 있으면 메모킹이 정하는 것만 고치고(PATCH), 없으면 만든다. 같은 ID 가 이미 있으면(다른 기기가 먼저 만듦) 고친다
   async push(st, cal, key, L, eventId) {
     const S = st.items[key];
-    const opts = { memoTitle: L.title, key, timeZone: this.timeZone, extra: S?.extra ?? [], durationMs: S?.durationMs ?? null, now: new Date(this.now()) };
+    const opts = { memoTitle: L.title, key, timeZone: this.timeZone, extra: S?.extra ?? [], durationMs: S?.durationMs ?? null, durationDays: S?.durationDays ?? null, now: new Date(this.now()) };
     const id = eventIdFor(key);
     let res;
     if (eventId) res = await this.api('PATCH', `${cal}/events/${encodeURIComponent(eventId)}`, eventBodyFor(L.reminder, { ...opts, full: false }));
@@ -476,15 +511,17 @@ export class GoogleCalendarSync {
       if (res.status === 409) res = await this.api('PATCH', `${cal}/events/${encodeURIComponent(id)}`, eventBodyFor(L.reminder, { ...opts, full: false }));
     }
     if (!res || res.status >= 400) throw new CalendarSyncError(`Google 캘린더에 "${L.shape.title}" 를 넣지 못했어요 (${res?.status})`);
-    st.items[key] = { ...(S ?? {}), eventId: res.json?.id ?? eventId ?? id, hash: shapeHash(L.shape) };
+    st.items[key] = { ...(S ?? {}), eventId: res.json?.id ?? eventId ?? id, hash: shapeHash(L.shape), at: this.now(), locked: Boolean(L.locked) };
   }
 
   // Google → 메모
   async pull(st, key, L, R, ev, memoId = key.split('/')[0], reminderId = key.split('/')[1]) {
     const next = applyShape(L?.reminder ?? null, R, new Date(this.now()));
     if (!next) return;
-    await this.memos.setReminder(memoId, reminderId, { ...next, id: reminderId });
-    st.items[key] = { ...(st.items[key] ?? {}), eventId: ev.id, hash: shapeHash(R), ...seenOf(ev) };
+    // 바꾼 때는 Google 에서 고친 때로 (다음 충돌 때 견주게)
+    const changed = Number.isFinite(Date.parse(ev.updated ?? '')) ? toLocalIso(new Date(ev.updated)) : undefined;
+    await this.memos.setReminder(memoId, reminderId, { ...next, id: reminderId, ...(changed ? { changed } : {}) });
+    st.items[key] = { ...(st.items[key] ?? {}), eventId: ev.id, hash: shapeHash(R), at: this.now(), ...seenOf(ev) };
   }
 
   async remove(cal, eventId) {
@@ -500,17 +537,20 @@ function seenOf(ev) {
   const a = Date.parse(ev?.start?.dateTime ?? '');
   const b = Date.parse(ev?.end?.dateTime ?? '');
   if (Number.isFinite(a) && Number.isFinite(b) && b > a) out.durationMs = b - a;
+  const da = ev?.start?.date ? Date.parse(`${ev.start.date}T00:00:00Z`) : NaN;
+  const db = ev?.end?.date ? Date.parse(`${ev.end.date}T00:00:00Z`) : NaN;
+  if (Number.isFinite(da) && Number.isFinite(db) && db > da) out.durationDays = Math.round((db - da) / 86_400_000);
   return out;
 }
 
-// 메모 쪽을 마지막으로 고친 때: 파일을 쓴 때(알림만 바꿔도 바뀜) · 내용을 고친 때 중 나중
-const editedOf = (L) => L?.edited ?? L?.updated;
+// 메모 쪽 일정을 마지막으로 바꾼 때: 알림에 찍힌 때(이름 · 때 · 반복을 바꾼 때, reminders.js stampChanged), 없으면 메모 내용을 고친 때
+const editedOf = (L) => L?.reminder?.changed ?? L?.updated;
 
-// Google 이 더 나중에 고쳤는가 (메모 쪽 때를 모르면 메모킹 쪽을 따른다)
+// Google 이 더 나중에 고쳤는가 (어느 한쪽 때를 모르면 메모킹 쪽을 따른다)
 function newer(remoteIso, localIso) {
   const r = Date.parse(remoteIso ?? '');
   const l = Date.parse(localIso ?? '');
-  return Number.isFinite(r) && (!Number.isFinite(l) || r > l);
+  return Number.isFinite(r) && Number.isFinite(l) && r > l;
 }
 
 function atOf(ev) {

@@ -58,10 +58,22 @@ export function createCalendarSync({ userData, bundledClient, driveAuth, fetch: 
   };
 
   const memos = vaultMemos({ getVault, saveReminders: (id, list) => getVault()?.setReminders(id, list), onChanged });
+  const localFile = path.join(userData, 'google-calendar-local.json');
   const sync = new GoogleCalendarSync({
     request,
     device: `pc:${os.hostname()}`,
     memos,
+    // 이 PC 에만: 이 PC 가 만든 캘린더 (휴대폰과 동시에 만들었으면 진 쪽을 지운다)
+    local: {
+      get: () => {
+        try {
+          return JSON.parse(fs.readFileSync(localFile, 'utf8'));
+        } catch {
+          return null;
+        }
+      },
+      set: (v) => (v ? fs.writeFileSync(localFile, JSON.stringify(v)) : fs.rmSync(localFile, { force: true })),
+    },
     store: {
       // 없으면 null(처음), 읽지 못하면 오류 (엔진이 이번엔 건너뛴다)
       read: () => {

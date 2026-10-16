@@ -48,6 +48,17 @@ const memos = vaultMemos({ getVault: () => app.vault, saveReminders: (id, list) 
 const sync = new GoogleCalendarSync({
   device: deviceId(),
   memos,
+  // 이 휴대폰에만: 이 휴대폰이 만든 캘린더 (PC 와 동시에 만들었으면 진 쪽을 지운다)
+  local: {
+    get: () => {
+      try {
+        return JSON.parse(ls.get('memoking.gcalMine') ?? 'null');
+      } catch {
+        return null;
+      }
+    },
+    set: (v) => ls.set('memoking.gcalMine', v ? JSON.stringify(v) : null),
+  },
   request: async (method, url, body) => {
     const res = await call('googleCalendar', { method, url, body: body ?? null });
     let json = null;
@@ -73,7 +84,7 @@ const sync = new GoogleCalendarSync({
 const runner = createCalendarRunner({ sync, memos, connected, getVault: () => app.vault, onStatus: (info) => listeners.forEach((fn) => fn(info)) });
 
 export const runCalendarSync = (opts) => runner.run(opts);
-export const calendarSyncSoon = () => runner.soon();
+export const calendarSyncSoon = (ids) => runner.soon(ids);
 
 /** 일정 탭(list-reminders.js · calendar-links.js)이 쓰는 모양 — PC 의 api.calendars.google 과 같다 */
 export const googleCalendar = {

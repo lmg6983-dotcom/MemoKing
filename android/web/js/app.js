@@ -1342,7 +1342,7 @@ function openVault() {
     changeTimer = setTimeout(() => list.refresh(), 60);
     alarms.scheduleSoon();
     widgets.publishSoon();
-    calendarSyncSoon(); // 일정이 바뀌었으면 Google 캘린더에도
+    calendarSyncSoon(detail.ids); // 일정이 바뀌었으면 Google 캘린더에도 (바뀐 메모만 본다)
     // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (휴대폰에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
     showHandoff((detail.external ?? []).filter((id) => !detail.removed?.includes(id)));
   });

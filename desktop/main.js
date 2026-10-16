@@ -195,7 +195,7 @@ function openVault(dir) {
     next.on('changed', ({ ids, external, removed }) => {
       windowManager.pushList();
       driveSync?.request(3000);
-      calendarSync?.soon();
+      calendarSync?.soon(ids); // 일정이 바뀐 메모가 있으면 Google 캘린더에도
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();

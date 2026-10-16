@@ -20,6 +20,8 @@ export function vaultMemos({ getVault, saveReminders, onChanged }) {
       trashed = null;
     },
     all: () => getVault()?.allReminders() ?? [],
+    // 이 기기의 메모 파일을 마지막으로 쓴(받은) 때 — 다른 기기에서 넣은 일정이 아직 오지 않은 것인지 가린다
+    touched: (id) => getVault()?.editedAt?.(id) ?? Infinity,
     state: (id) => {
       const vault = getVault();
       if (vault?.get(id)) return 'present';
@@ -65,7 +67,7 @@ export function vaultMemos({ getVault, saveReminders, onChanged }) {
 export function createCalendarRunner({ sync, memos, connected, getVault, onStatus, afterChangeMs = 8_000 }) {
   let status = { lastSync: 0, error: '', running: false, holder: '', calendarId: '', last: null };
   let soonTimer = null;
-  let lastSig = null;
+  const sigs = new Map(); // 메모 id → 일정 모양 (바뀐 메모만 다시 본다)
   const info = () => ({ ...status, connected: connected(), configured: true });
   const emit = () => onStatus(info());
 
@@ -88,12 +90,26 @@ export function createCalendarRunner({ sync, memos, connected, getVault, onStatu
     return info();
   }
 
-  /** 일정(이름 · 때 · 반복)이 바뀌었을 때만 몇 초 뒤에 (메모 글을 쓸 때마다가 아니라) */
-  function soon() {
-    if (!connected() || !getVault()) return;
-    const sig = getVault().allReminders().map((i) => `${keyOf(i.memoId, i.reminder.id)}=${shapeHash(shapeOfReminder(i.reminder, i.title))}`).sort().join('\n');
-    if (sig === lastSig) return;
-    lastSig = sig;
+  // 한 메모의 일정 모양 (일정이 없으면 '')
+  const sigOf = (memo) => (memo?.reminders ?? []).map((r) => `${keyOf(memo.id, r.id)}=${shapeHash(shapeOfReminder(r, memo.title))}`).sort().join('\n');
+
+  /**
+   * 일정(이름 · 때 · 반복)이 바뀌었을 때만 몇 초 뒤에 (메모 글을 쓸 때마다가 아니라).
+   * ids: 바뀐 메모들 (메모 폴더의 'changed') — 그 메모만 다시 본다. 없으면 모두
+   */
+  function soon(ids = null) {
+    const vault = getVault();
+    if (!connected() || !vault) return;
+    let changed = false;
+    const check = (id) => {
+      const sig = sigOf(vault.get(id));
+      if ((sigs.get(id) ?? '') !== sig) changed = true;
+      if (sig) sigs.set(id, sig);
+      else sigs.delete(id);
+    };
+    if (ids) ids.forEach(check);
+    else new Set([...vault.allReminders().map((i) => i.memoId), ...sigs.keys()]).forEach(check);
+    if (!changed) return;
     clearTimeout(soonTimer);
     soonTimer = setTimeout(() => run(), afterChangeMs);
     soonTimer.unref?.();
