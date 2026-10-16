@@ -899,7 +899,7 @@ function showMagic(magic) {
 }
 // OPMS 연결: OPMS 검색을 켰을 때만 — 서버 주소(이 PC 에만 저장) · 전자포대 저장 폴더
 async function showOpmsSetup() {
-  const on = magicState.enabled && magicState.modules?.opms !== false && Boolean(magicState.modules?.opms);
+  const on = Boolean(magicState.enabled && magicState.modules?.opms);
   $('opms-setup').hidden = !on;
   if (!on) return;
   const o = await api.opms.settings();
@@ -1546,7 +1546,12 @@ updateEl.check.addEventListener('click', async () => {
 });
 updateEl.go.addEventListener('click', async () => {
   if (updateSt.status === 'ready') return api.update.install(); // 쓰던 메모를 저장하고 다시 시작
-  if (updateSt.status === 'error') return onUpdate(await api.update.check(), { open: true });
+  if (updateSt.status === 'error') {
+    const st = await api.update.check();
+    if (st.status === 'available' || st.status === 'ready' || st.status === 'error') return onUpdate(st, { open: true });
+    updateEl.dialog.close(); // 최신이거나 확인 중 — 받을 것이 없으니 대화 상자를 닫고 설정 칸에만
+    return onUpdate(st);
+  }
   onUpdate(await api.update.download());
 });
 updateEl.later.addEventListener('click', async () => {

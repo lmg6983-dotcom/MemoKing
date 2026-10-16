@@ -22,6 +22,7 @@ test('업데이트: 바뀐 점 글 — HTML 은 벗기고 여러 버전은 이�
   assert.equal(notesText('<p>공유 되살림</p>\n<ul><li>스택 빨라짐</li></ul>'), '공유 되살림\n스택 빨라짐');
   assert.equal(notesText([{ version: '1', note: 'A' }, { version: '2', note: 'B' }]), 'A\nB');
   assert.equal(notesText(null), '');
+  assert.equal(notesText('<p>표 &amp; 공유 &quot;메일&quot;</p>'), '표 & 공유 "메일"');
 });
 
 test('업데이트: 흐름 — 확인 → 새 버전 알림 → 받기 진행률 → 다 받음 → 재시작 전에 저장', async () => {

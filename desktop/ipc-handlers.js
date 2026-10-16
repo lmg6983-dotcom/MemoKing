@@ -420,7 +420,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('magic:opms-search', async (_e, query) => {
     const q = String(query ?? '').slice(0, 40);
     if (!activeModules(settings.magic).some((m) => m.id === 'opms') || !looksLikeRef(q)) return { cases: [], total: 0 };
-    if (!wm.opmsSettings().host) return { cases: [], total: 0 }; // 서버 주소를 넣기 전 — 매직키에서는 조용히 (설정 화면이 안내)
+    if (!wm.opmsSettings().host) return { cases: [], total: 0, error: '설정 › 매직키 › OPMS 연결에 서버 주소를 넣으면 OPMS 사건도 찾아요' }; // 주소를 넣기 전
     try {
       const rows = await wm.opmsClient().find(q, { timeoutMs: 5000, retries: 0 });
       wm.rememberCases(rows);

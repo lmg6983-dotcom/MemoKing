@@ -1064,3 +1064,50 @@ export class Opms {
     return { dir, saved, skipped, failed };
   }
 }
+
+// ---------- 0.39.0 이전 설치에서 옮겨 오기 ----------
+// 서버 주소 · 전자포대 폴더가 코드의 기본값이던 때 쓰던 PC: 이 PC 의 받은 전자포대 기록(opms-files.json)에
+//   "서버|사건 폴더" 로 적혀 있으므로 그것을 읽어 설정으로 옮긴다 (코드에는 주소를 두지 않고, 이 PC 의 기록에서만)
+
+/** 기록들(JSON 객체) → 가장 많이 쓴 { host, wrapperDir } (없으면 null) */
+export function opmsSettingsFromRecords(records, { dirname = path.dirname } = {}) {
+  const count = new Map();
+  for (const data of records) {
+    for (const key of Object.keys(data ?? {})) {
+      if (key.startsWith('#')) continue;
+      const bar = key.indexOf('|');
+      if (bar < 0) continue;
+      const host = normalizeOpmsHost(key.slice(0, bar));
+      const folder = key.slice(bar + 1);
+      if (!host || !folder) continue;
+      const k = `${host}\n${dirname(folder)}`;
+      count.set(k, (count.get(k) ?? 0) + 1);
+    }
+  }
+  const best = [...count.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (!best) return null;
+  const [host, wrapperDir] = best[0].split('\n');
+  return { host, wrapperDir };
+}
+
+/** 이 PC 의 기록 파일(평소 · 끌 때 남긴 것)을 읽어 옮길 설정 (없으면 null) */
+export function recoverOpmsSettings(indexFile) {
+  if (!indexFile) return null;
+  const dir = path.dirname(indexFile);
+  const base = path.basename(indexFile);
+  const records = [];
+  let names = [];
+  try {
+    names = fs.readdirSync(dir).filter((n) => n === base || (n.startsWith(`${base}.`) && !/\.(tmp|broken-\d+)$/.test(n)));
+  } catch {
+    return null;
+  }
+  for (const n of names) {
+    try {
+      records.push(JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8')));
+    } catch {
+      // 깨진 기록은 건너뜀
+    }
+  }
+  return opmsSettingsFromRecords(records);
+}

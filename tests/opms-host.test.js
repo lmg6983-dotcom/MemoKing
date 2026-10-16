@@ -14,3 +14,15 @@ test('OPMS: 서버 주소는 코드에 없고, 사용자가 넣은 주소를 다
   await assert.rejects(() => o.find('P2026-0001'), /서버 주소를 먼저 넣어/);
   assert.equal(called, false, '주소가 없으면 어디에도 묻지 않음');
 });
+
+test('OPMS: 예전 설치에서 옮겨 오기 — 이 PC 의 받은 기록에서 가장 많이 쓴 서버 · 전자포대 폴더', async () => {
+  const { opmsSettingsFromRecords } = await import('../desktop/opms.js');
+  const path = (await import('node:path')).win32;
+  const recs = [
+    { '#seq': 3, 'http://10.1.2.3:8181|g:\\drive\\포대\\p2026-0001': {}, 'http://10.1.2.3:8181|g:\\drive\\포대\\p2026-0002': {} },
+    { 'http://old:80|c:\\x\\p1': {} },
+  ];
+  assert.deepEqual(opmsSettingsFromRecords(recs, { dirname: path.dirname }), { host: 'http://10.1.2.3:8181', wrapperDir: 'g:\\drive\\포대' });
+  assert.equal(opmsSettingsFromRecords([{ '#seq': 1 }]), null);
+  assert.equal(opmsSettingsFromRecords([]), null);
+});

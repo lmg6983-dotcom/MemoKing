@@ -22,6 +22,7 @@ import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/cor
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { FileIndex, defaultRoots } from './file-index.js';
 import { Updater, isSnoozed } from './updater.js';
+import { recoverOpmsSettings, normalizeOpmsHost } from './opms.js';
 import { comboFromAccelerator, actionUsing } from '../app/js/core/keymap.js';
 import { jumpListCategories, launchAction, pushRecent } from './jump-list.js';
 import { flushOpmsFiles } from './opms.js';
@@ -1038,11 +1039,39 @@ app.whenReady().then(async () => {
   registerQuickMemoKey();
   registerMagicKey();
   memoHotkeys.register();
+  migrateOpmsSettings();
   syncFileIndex();
   updateTrayMenu();
   if (vault && !settings.tutorialDone && !HIDDEN_START) startTutorial();
   updater.start();
 });
+
+// ---------- OPMS 설정 옮기기 (0.39.0) ----------
+// 서버 주소 · 전자포대 폴더를 코드에서 뺐다 (설치 파일이 공개 저장소에 올라가므로). 예전부터 쓰던 PC 는
+//   이 PC 의 받은 전자포대 기록에서 그 값을 찾아 설정으로 옮기고, 찾지 못하면 한 번 알려 설정에서 넣게 한다
+function migrateOpmsSettings() {
+  if (settings.opmsMigrated) return;
+  settings.opmsMigrated = true;
+  if (!settings.opms?.host || !settings.opms?.wrapperDir) {
+    const found = recoverOpmsSettings(path.join(app.getPath('userData'), 'opms-files.json'));
+    if (found) {
+      settings.opms = {
+        ...settings.opms,
+        host: settings.opms?.host || found.host,
+        ...(settings.opms?.wrapperDir || !fs.existsSync(found.wrapperDir) ? {} : { wrapperDir: found.wrapperDir }),
+      };
+    }
+  }
+  saveSettings();
+  const opmsOn = activeModules(settings.magic).some((m) => m.id === 'opms');
+  if (!normalizeOpmsHost(settings.opms?.host) && settings.opmsIntroduced && opmsOn && !SMOKE) {
+    toast({
+      title: 'OPMS 서버 주소를 한 번 넣어 주세요',
+      body: '보안을 위해 서버 주소를 설치 파일에서 뺐어요. 설정 › 매직키 › OPMS 연결에서 넣으면 돼요',
+      onClick: () => windowManager.createListWindow('memos'),
+    });
+  }
+}
 
 // ---------- 자동 업데이트 ----------
 // 화면은 목록 창(설정 › 업데이트 · 새 버전 대화 상자). 목록 창이 없으면 Windows 알림 → 누르면 목록 창을 열어 보여 준다
@@ -1053,7 +1082,8 @@ function updateWin() {
 /** 목록 창이 물어볼 때: 지금 상태 + 대화 상자를 띄울지 (숨겨 둔 버전이면 띄우지 않음) */
 function updateState() {
   const st = updater?.state ?? { status: 'idle' };
-  const ask = st.status === 'ready' || (st.status === 'available' && !isSnoozed(settings.updateSnooze, st.version));
+  // "나중에" 를 고른 버전은 24시간 다시 띄우지 않는다 (받아 둔 뒤 "나중에 (끝낼 때 설치)" 도)
+  const ask = (st.status === 'ready' || st.status === 'available') && !isSnoozed(settings.updateSnooze, st.version);
   return { ...st, ask, current: app.getVersion(), enabled: Boolean(updater?.enabled) };
 }
 updater = new Updater({
@@ -1070,6 +1100,10 @@ updater = new Updater({
   // 재시작 전에: 열린 메모 창의 쓰던 글을 바로 저장하고 설정도 지금 쓴다
   beforeInstall: async () => {
     quitting = true;
+    // 설치를 시작하지 못해 앱이 그대로 남으면(설치 파일이 막힘 등) 다시 평소대로 (창을 닫으면 알림 영역으로)
+    setTimeout(() => {
+      quitting = false;
+    }, 20_000).unref?.();
     await Promise.all([...windowManager.noteWins.values()].filter((w) => !w.isDestroyed())
       .map((w) => w.webContents.executeJavaScript('window.mkFlushSync?.()', true).catch(() => {})));
     saveSettings(true);

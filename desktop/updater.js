@@ -1,3 +1,5 @@
+import { decodeEntities } from '../app/js/core/entities.js';
+
 // 자동 업데이트 — electron-updater 로 공개 배포 저장소(lmg6983-dotcom/memoking-releases)의 Release 를 본다
 //   앱에는 토큰이 없다: 공개 저장소라 읽기에 토큰이 필요 없고, 저장소 주소는 빌드가 넣은 app-update.yml 에서 읽는다.
 //   흐름: 켤 때(30초 뒤) · 6시간마다 · 설정의 "업데이트 확인" → 새 버전이 있으면 화면(목록 창)에 알림(버전 · 바뀐 점)
@@ -26,7 +28,8 @@ export function isSnoozed(snooze, version, now = Date.now()) {
 export function notesText(notes) {
   if (!notes) return '';
   const raw = Array.isArray(notes) ? notes.map((n) => n?.note ?? '').join('\n') : String(notes);
-  return raw.replace(/<[^>]+>/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 4000); // GitHub 이 HTML 로 줄 때가 있다
+  // GitHub 이 HTML 로 줄 때가 있다 — 태그는 벗기고 &amp; 같은 글자는 되돌린다
+  return decodeEntities(raw.replace(/<\/(p|li|h\d)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')).replace(/[ \t]*\n[\s]*\n/g, '\n').trim().slice(0, 4000);
 }
 
 export class Updater {
@@ -48,15 +51,19 @@ export class Updater {
     return this.packaged; // 개발 중에는 app-update.yml 이 없어 확인할 수 없다
   }
 
-  async start() {
-    if (!this.enabled || this.updater) return;
-    try {
-      this.updater = await this.loadUpdater();
-    } catch (err) {
+  /** 한 번만 (확인 단추가 준비 중에 눌려도 이벤트를 두 번 달지 않게) */
+  start() {
+    if (!this.enabled) return Promise.resolve();
+    this.starting ??= this.init().catch((err) => {
       console.warn('[update] electron-updater 를 불러오지 못했어요', err);
-      return;
-    }
-    const u = this.updater;
+      this.starting = null; // 다음 확인 때 다시
+    });
+    return this.starting;
+  }
+
+  async init() {
+    const u = await this.loadUpdater();
+    this.updater = u;
     u.autoDownload = false; // 사용자가 받기를 고른 뒤에
     u.autoInstallOnAppQuit = true; // 받아 둔 업데이트는 앱을 끝낼 때 설치 ("나중에")
     u.on('checking-for-update', () => this.set({ status: 'checking' }));
@@ -75,12 +82,14 @@ export class Updater {
       console.warn('[update]', err);
       this.set({ status: 'error', message: updateErrorText(err) });
     });
-    setTimeout(() => this.check(), FIRST_CHECK_MS).unref?.();
+    this.firstTimer = setTimeout(() => this.check(), FIRST_CHECK_MS);
+    this.firstTimer.unref?.();
     this.timer = setInterval(() => this.check(), CHECK_EVERY_MS);
     this.timer.unref?.();
   }
 
   stop() {
+    clearTimeout(this.firstTimer);
     clearInterval(this.timer);
     this.timer = null;
   }
@@ -134,7 +143,7 @@ export class Updater {
 
   /** "나중에": 받기 전이면 그 버전을 24시간 숨기고, 받아 둔 뒤면 끝낼 때 설치 (autoInstallOnAppQuit) */
   later() {
-    if (this.state.version) {
+    if (['available', 'ready'].includes(this.state.status) && this.state.version) { // 지금 제안 중인 버전만
       this.settings.updateSnooze = { version: this.state.version, until: Date.now() + SNOOZE_MS };
       this.saveSettings();
     }
