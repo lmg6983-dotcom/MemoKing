@@ -438,6 +438,23 @@ try {
   await page.waitForTimeout(300);
   const inserted = (await devLog()).log.find((l) => l.calendarInsert)?.calendarInsert;
   check('보내기: 일정 줄의 단추 → 휴대폰 캘린더 앱 새 일정 (이름 · 시각)', Boolean(inserted?.title) && inserted.start > 0, JSON.stringify(inserted));
+  // Google 캘린더 상호 동기화: 연결 → 메모킹 일정이 "메모킹" 캘린더로, 그 캘린더에서 만든 일정 → 새 메모
+  await page.tap('.cal-link');
+  await page.waitForSelector('.cal-links[open]');
+  await page.tap('.gsync .btn.primary');
+  await page.waitForFunction(() => /맞춘 때|맞추고 있어요/.test(document.querySelector('.gsync')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => {});
+  const gcal = await (await fetch(`${base}/dev/gcal`)).json();
+  const pushedTitles = gcal.events.filter((e) => e.status !== 'cancelled').map((e) => e.summary);
+  check('Google 캘린더 동기화: 연결하면 "메모킹" 캘린더를 만들고 메모킹 일정을 넣음', gcal.calendars.length === 1 && pushedTitles.includes('치과'), JSON.stringify(pushedTitles));
+  await shot('02l-google-sync');
+  await fetch(`${base}/dev/gcal`, { method: 'POST', body: JSON.stringify({ summary: '삼성 캘린더 회의', start: { dateTime: new Date(Date.now() + 3 * 86_400_000).toISOString() }, end: { dateTime: new Date(Date.now() + 3 * 86_400_000 + 3_600_000).toISOString() } }) });
+  await page.tap('.gsync .btn:not(.primary)');
+  await page.waitForTimeout(1500);
+  check('Google 캘린더 동기화: 그 캘린더에서 만든 일정 → 새 메모 (일정 포함)', fs.existsSync(path.join(vault, '삼성 캘린더 회의.md')) && /kind: at/.test(read('삼성 캘린더 회의.md')));
+  check('Google 캘린더 동기화: 상태 파일은 메모 폴더(_memoking, Drive 로 PC 와 함께)', fs.existsSync(path.join(vault, '_memoking', 'google-calendar.json')));
+  await page.tap('.cal-links .dialog-actions .btn');
+  await page.waitForTimeout(400);
+  check('Google 캘린더 동기화: 일정 탭 단추에 "Google 캘린더와 맞춤"', /Google 캘린더와 맞춤/.test(await page.textContent('.cal-link')));
   for (const [view, name] of [['timeGridWeek', '주'], ['listMonth', '목록']]) {
     await page.tap(`[data-view="${view}"]`);
     await page.waitForTimeout(500);

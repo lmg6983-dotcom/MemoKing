@@ -260,7 +260,7 @@ export class Vault extends EventTarget {
     const out = [];
     for (const e of this.entries.values()) {
       if (!e.file) continue;
-      for (const reminder of e.meta.reminders) out.push({ memoId: e.id, title: extractTitle(e.body), color: e.meta.color, reminder });
+      for (const reminder of e.meta.reminders) out.push({ memoId: e.id, title: extractTitle(e.body), color: e.meta.color, updated: e.meta.updated, reminder });
     }
     return out;
   }
@@ -572,6 +572,11 @@ export class Vault extends EventTarget {
         return null;
       }
     }).filter(Boolean);
+  }
+
+  /** 휴지통에 있는 메모 id 들 (캘린더 동기화: 지운 메모인지, 아직 이 휴대폰에 오지 않은 메모인지 가린다) */
+  trashedIds() {
+    return new Set(this.trashEntries().map((t) => t?.meta?.id).filter(Boolean));
   }
 
   trashList() {

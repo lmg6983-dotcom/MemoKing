@@ -6,7 +6,9 @@ import { ICAL } from '../../vendor/ical.js';
 import { toLocalIso, pad2 } from './time.js';
 
 export * from './calendar-feed-list.js';
-import { isEvent, alertsOf, nextOccurrence, occurrenceEnd, DEFAULT_ALERTS } from './reminders.js';
+export { rruleOf, eventSpan } from './calendar-events.js';
+import { ymd, rruleOf, eventSpan } from './calendar-events.js';
+import { alertsOf, occurrenceEnd, DEFAULT_ALERTS } from './reminders.js';
 
 const MAX_ITERATIONS = 100000; // 반복 일정 하나마다 — 아주 오래된 매일 반복도 멈추지 않게
 
@@ -138,43 +140,8 @@ export function reminderFromExternal(ev, now = new Date()) {
 
 // ---------- 메모킹 일정 → 다른 캘린더 ----------
 
-const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-const ymd = (d) => `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`;
 const localStamp = (d) => `${ymd(d)}T${pad2(d.getHours())}${pad2(d.getMinutes())}00`;
 const utcStamp = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-const DEFAULT_MINUTES = 60; // 메모킹 일정은 끝나는 때가 없다 — 다른 캘린더에는 1시간으로 (Google 캘린더 기본과 같음)
-
-/** 반복 일정 → RRULE (한 번짜리는 '') */
-export function rruleOf(r) {
-  if (r.kind !== 'repeat') return '';
-  const rep = r.repeat;
-  if (rep.every === 'day') return 'FREQ=DAILY';
-  if (rep.every === 'week') return `FREQ=WEEKLY;BYDAY=${rep.weekdays.map((d) => WEEKDAY_CODES[d]).join(',')}`;
-  // 메모킹은 31일이 없는 달에 그 달 마지막 날 — 다른 캘린더에는 29~31일이면 "그 달 마지막 날 무렵"을 맞추기 어려워 그날만
-  if (rep.every === 'month') return `FREQ=MONTHLY;BYMONTHDAY=${rep.day}`;
-  if (rep.every === 'year') return `FREQ=YEARLY;BYMONTH=${rep.month};BYMONTHDAY=${rep.day}`;
-  return '';
-}
-
-/**
- * 한 일정의 첫 회차 시작 · 끝 (반복은 만든 때 뒤의 첫 회차, 한 번짜리는 그 시각)
- * @returns {{ start: Date, end: Date, allDay: boolean } | null}
- */
-export function eventSpan(r, now = new Date()) {
-  if (!isEvent(r)) return null;
-  let start;
-  if (r.kind === 'at') start = new Date(r.at);
-  else {
-    const created = new Date(r.created);
-    const base = Number.isNaN(created.getTime()) ? now : created;
-    start = nextOccurrence(r, new Date(new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime() - 1));
-  }
-  if (!start || Number.isNaN(start.getTime())) return null;
-  const allDay = Boolean(r.allDay);
-  if (allDay) start = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  const end = allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) : new Date(start.getTime() + DEFAULT_MINUTES * 60_000);
-  return { start, end, allDay };
-}
 
 const escapeText = (s) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 

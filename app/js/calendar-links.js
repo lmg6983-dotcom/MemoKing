@@ -51,10 +51,91 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
     close.append(icon('close'));
     close.addEventListener('click', () => dialog.close());
     head.append(h, close);
-    const lead = el('p', 'cal-links-lead', '다른 캘린더의 일정은 달력에 함께 보여요 (메모킹에서는 보기만, 메모로 가져올 수 있어요). 메모킹 일정은 그 캘린더로 보낼 수 있어요.');
+    const lead = el('p', 'cal-links-lead', 'Google 캘린더 · 삼성 캘린더와 일정을 서로 맞추거나, 다른 캘린더를 달력에 함께 볼 수 있어요.');
+
+    // ---------- Google 캘린더와 서로 맞추기 ----------
+    const google = calendars.google;
+    const syncTitle = el('h3', 'cal-links-h3', 'Google 캘린더와 서로 맞추기');
+    const syncCard = el('div', 'gsync');
+    const syncText = el('span', 'feed-text');
+    const syncName = el('b');
+    const syncSub = el('small');
+    syncText.append(syncName, syncSub);
+    const syncDot = el('span', 'gsync-dot');
+    const syncBtns = el('div', 'gsync-btns');
+    const connectBtn = el('button', 'btn primary', '연결하기');
+    connectBtn.type = 'button';
+    const nowBtn = el('button', 'btn', '지금 맞추기');
+    nowBtn.type = 'button';
+    const offBtn = el('button', 'link-btn gsync-off', '연결 끊기');
+    offBtn.type = 'button';
+    syncBtns.append(connectBtn, nowBtn, offBtn);
+    syncCard.append(syncDot, syncText, syncBtns);
+    const syncHelp = el('details', 'cal-help');
+    syncHelp.append(el('summary', '', '어떻게 맞추나요?'));
+    const syncSteps = el('ul');
+    for (const t of [
+      'Google 계정에 "메모킹" 캘린더를 만들고, 메모킹 일정(날짜 · 반복 일정)을 거기에 넣어요. 타이머 · 앱 열 때 알림은 넣지 않아요',
+      'Google 캘린더나 삼성 캘린더에서 그 캘린더의 일정을 고치거나 지우면 메모에도 그대로 들어와요. 거기서 새로 만든 일정은 새 메모가 돼요',
+      '삼성 캘린더: 휴대폰 설정 › 계정에 Google 계정이 있으면 삼성 캘린더에 "메모킹" 캘린더가 보여요 (캘린더 › 관리에서 켜기)',
+      '양쪽에서 같은 일정을 고치면 나중에 고친 쪽을 따라요. 알림은 메모킹이 울려요 (Google 쪽 알림은 꺼 둬요)',
+      'PC 와 휴대폰이 둘 다 켜져 있으면 한쪽만 맞추고, 꺼져 있으면 다른 쪽이 이어받아요',
+      '권한은 "메모킹이 만든 캘린더만" — 다른 캘린더의 일정은 보지 않아요',
+    ]) syncSteps.append(el('li', '', t));
+    syncHelp.append(syncSteps);
+
+    let busy = false;
+    function drawSync(info) {
+      const on = Boolean(info?.connected);
+      syncCard.classList.toggle('on', on);
+      syncCard.classList.toggle('error', on && Boolean(info?.error));
+      connectBtn.hidden = on;
+      nowBtn.hidden = !on;
+      offBtn.hidden = !on;
+      nowBtn.disabled = busy || Boolean(info?.running);
+      connectBtn.disabled = busy;
+      if (!on) {
+        syncName.textContent = '연결 안 됨';
+        syncSub.textContent = '메모킹 일정 ⇄ Google 캘린더 · 삼성 캘린더 — 어느 쪽에서 고치거나 만들어도 서로 들어가요';
+        return;
+      }
+      syncName.textContent = 'Google 캘린더의 "메모킹" 캘린더와 맞춰요';
+      syncSub.classList.toggle('err', Boolean(info.error));
+      if (info.running) syncSub.textContent = '맞추는 중이에요…';
+      else if (info.error) syncSub.textContent = info.error;
+      else if (info.holder) syncSub.textContent = `${info.holder.startsWith('pc') ? 'PC' : '휴대폰'} 메모킹이 맞추고 있어요${info.lastSync ? `, 마지막 ${receivedAt(info.lastSync)}` : ''}`;
+      else if (info.lastSync) {
+        const l = info.last;
+        const did = l && (l.pushed || l.pulled || l.imported || l.removed)
+          ? ` (보냄 ${l.pushed} · 받음 ${l.pulled + l.imported} · 지움 ${l.removed})` : '';
+        syncSub.textContent = `마지막으로 맞춘 때 ${receivedAt(info.lastSync)}${did}${l?.notes?.length ? `\n${l.notes.join('\n')}` : ''}`;
+      } else syncSub.textContent = '곧 맞춰요';
+    }
+    let unsubscribe = null;
+    if (google) {
+      google.status().then(drawSync).catch(() => drawSync(null));
+      unsubscribe = google.onStatus?.(drawSync) ?? null;
+      const act = async (fn, failText) => {
+        busy = true;
+        drawSync({ connected: syncCard.classList.contains('on'), running: true });
+        try {
+          drawSync(await fn());
+        } catch (err) {
+          const msg = String(err?.message ?? err).replace(/^Error invoking remote method '[^']+':\s*/, '').replace(/^\w*Error:\s*/, '');
+          if (!/취소/.test(msg)) notify(`${failText}\n${msg}`, true);
+          drawSync(await google.status().catch(() => null));
+        } finally {
+          busy = false;
+          drawSync(await google.status().catch(() => null));
+        }
+      };
+      connectBtn.addEventListener('click', () => act(() => google.connect(), 'Google 캘린더와 연결하지 못했어요'));
+      nowBtn.addEventListener('click', () => act(() => google.sync(), 'Google 캘린더와 맞추지 못했어요'));
+      offBtn.addEventListener('click', () => act(() => google.disconnect(), '연결을 끊지 못했어요'));
+    }
 
     // ---------- 함께 보기 ----------
-    const seeTitle = el('h3', 'cal-links-h3', '함께 보기');
+    const seeTitle = el('h3', 'cal-links-h3', '함께 보기 (보기만)');
     const list = el('ul', 'feed-list');
     list.setAttribute('aria-label', '함께 보는 캘린더');
 
@@ -220,8 +301,9 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
     done.addEventListener('click', () => dialog.close());
     actions.append(done);
 
-    dialog.append(head, lead, seeTitle, list, addForm, addNote, help, sendTitle, exportBtn, sendNote, ...(calendars.openUrl ? [importLink] : []), actions);
+    dialog.append(head, lead, ...(google ? [syncTitle, syncCard, syncHelp] : []), seeTitle, list, addForm, addNote, help, sendTitle, exportBtn, sendNote, ...(calendars.openUrl ? [importLink] : []), actions);
     dialog.addEventListener('close', () => {
+      unsubscribe?.();
       dialog.remove();
       resolve();
     });

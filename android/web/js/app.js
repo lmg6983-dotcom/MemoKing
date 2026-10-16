@@ -19,6 +19,7 @@ import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
 import { LinkPreviews } from './web-fetch.js';
 import { createAlarms } from './alarms.js';
+import { googleCalendar, startCalendarSync, calendarSyncSoon } from './gcal.js';
 import { injectMobileIcons } from './m-icons.js';
 import { app } from './state.js';
 import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, matchChrome, isTwoPane } from './ui.js';
@@ -116,6 +117,8 @@ function calendarApi() {
       await call('shareFile', { base64: textBase64(text), name, mime: 'text/calendar', title: '캘린더로 보내기' });
       return { ok: true };
     },
+    // Google 캘린더 상호 동기화 (gcal.js) — PC 와 같은 모양
+    google: googleCalendar,
     // 휴대폰 캘린더 (삼성 캘린더 · Google 캘린더 등 — 안드로이드 CalendarContract)
     device: {
       enabled: () => lsGet(DEVICE_KEY) === '1',
@@ -306,6 +309,7 @@ function refreshHistoryRow() {
 }
 
 let notifyAsked = false;
+let calendarSyncStarted = false; // Google 캘린더 상호 동기화 (gcal.js) — 메모 폴더를 처음 연 뒤 한 번
 app.setReminders = (memoId, next) => {
   if (!app.vault || !memoId || !Array.isArray(next)) return null;
   note.flush(); // 아직 파일이 없는 새 메모면 먼저 저장
@@ -1338,10 +1342,15 @@ function openVault() {
     changeTimer = setTimeout(() => list.refresh(), 60);
     alarms.scheduleSoon();
     widgets.publishSoon();
+    calendarSyncSoon(); // 일정이 바뀌었으면 Google 캘린더에도
     // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (휴대폰에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
     showHandoff((detail.external ?? []).filter((id) => !detail.removed?.includes(id)));
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
+  if (!calendarSyncStarted) {
+    calendarSyncStarted = true;
+    startCalendarSync({ onChange: () => list.refresh() });
+  }
   $('setup').hidden = true;
   list.refresh();
   list.show();
