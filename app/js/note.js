@@ -436,6 +436,7 @@ function applyLayer(next) {
   if (stuck && hadFocus) editor?.focus(); // 사라진 버튼에 포커스가 남지 않게
   // 무엇이 바뀌었는지 (스크린 리더에도 — 상태 줄은 role=status). 처음 열 때는 말하지 않는다
   if (!prev) return;
+  if ((prev.top || prev.bottom) && (top !== prev.top || bottom !== prev.bottom)) clearStickerHint(); // 떼어진 스티커의 "누르면 떼어져요" 가 남지 않게
   if (bottom && !prev.bottom) setStatus('바탕화면에 붙였어요');
   else if (!bottom && prev.bottom) setStatus(next.note || (top ? '' : '바탕화면에서 뗐어요')); // 목록에서 골라 떼어졌으면 그 까닭
   if (top && !prev.top) setStatus('늘 위에 둬요');
@@ -453,11 +454,33 @@ async function toggleLayer(which) {
 el.topBtn.addEventListener('click', () => !layer?.top && !layer?.bottom && toggleLayer('top'));
 el.tapeBtn.addEventListener('click', () => !layer?.top && !layer?.bottom && toggleLayer('bottom'));
 // 스티커에 마우스를 올리면 무엇을 누르는지 상태 줄에 (스티커 창은 글을 띄우지 못한다)
+//   왕관 · 테이프마다 처음 한 번만 — 한 번 알면 그다음부터는 띄우지 않는다
+const STICKER_HINT_KEY = 'memoking.stickerHintSeen';
+const stickerHintSeen = (kind) => {
+  try {
+    return JSON.parse(localStorage.getItem(STICKER_HINT_KEY) ?? '[]').includes(kind);
+  } catch {
+    return false;
+  }
+};
+const rememberStickerHint = (kind) => {
+  try {
+    const seen = JSON.parse(localStorage.getItem(STICKER_HINT_KEY) ?? '[]');
+    if (!seen.includes(kind)) localStorage.setItem(STICKER_HINT_KEY, JSON.stringify([...seen, kind]));
+  } catch {
+    // 기억 못 하면 다음에 한 번 더 볼 뿐
+  }
+};
+function clearStickerHint() {
+  if (Object.values(stickerHint).includes(el.status.textContent)) setStatus('');
+}
 api.on('sticker:hover', ({ kind, over } = {}) => {
   const hint = stickerHint[kind];
   if (!hint) return;
-  if (over) setStatus(hint);
-  else if (el.status.textContent === hint) setStatus('');
+  if (!over) return el.status.textContent === hint && setStatus('');
+  if (stickerHintSeen(kind)) return;
+  rememberStickerHint(kind);
+  setStatus(hint);
 });
 // 바탕화면에 붙인 메모는 탐색기가 다시 시작될 때 창이 함께 없어질 수 있어, 다른 데를 누르면 바로 저장해 둔다
 window.addEventListener('blur', () => {

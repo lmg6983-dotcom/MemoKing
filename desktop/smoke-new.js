@@ -684,7 +684,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       windowManager.stickerHover(stickers.get(nw.id).win.webContents, true);
       const hint = await until(async () => /테이프를 누르면/.test((await buttons(nw)).status), '스티커 안내', 2000).catch(() => false);
       windowManager.stickerHover(stickers.get(nw.id).win.webContents, false);
-      check('테이프에 마우스를 올리면 상태 줄에 "누르면 떼어져요"', hint);
+      // 한 번 본 안내는 다시 띄우지 않는다
+      await js(nw, `window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text: '' } }))`);
+      windowManager.stickerHover(stickers.get(nw.id).win.webContents, true);
+      await wait(300);
+      const again = /테이프를 누르면/.test((await buttons(nw)).status);
+      windowManager.stickerHover(stickers.get(nw.id).win.webContents, false);
+      check('테이프에 마우스를 올리면 상태 줄에 "누르면 떼어져요" — 처음 한 번만', hint && !again, JSON.stringify({ hint, again }));
       // 왕관과 함께 붙지 않는다: 단축키로 바꿔 붙임
       await key(nw, 'T', ['control', 'shift']);
       const crowned = await until(() => nw.isAlwaysOnTop() && kindOf(nw) === 'crown' && !getSettings().onBottom?.[tid] && getSettings().onTop?.[tid] === true, 'Ctrl+Shift+T 로 바꿈', 3000).catch(() => false);
