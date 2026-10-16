@@ -8,7 +8,7 @@ const EVENTS = [
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:hover', 'list:on-top',
   'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'update:state', 'update:available', 'update:ready',
-  'bubble:show', 'bubble:hide',
+  'bubble:show', 'bubble:hide', 'status-bubble:gone',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 

@@ -396,32 +396,80 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await js(nw, `document.querySelector('.mk-share-pop')?.click()`);
       await wait(300); // 사라지는 0.2초 (그 사이에는 아래 내용을 가린다)
       check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V 로 붙여 넣으세요" + 폭죽 (주소는 보이지 않음)', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && !/https?:/.test(popped.text) && popped.confetti, JSON.stringify(popped));
-      // 상태 줄이 잘리면 메모 창 위 가장자리 바깥에 말풍선으로 전문 (내용을 가리지 않게) — 좁은 창
+      // 상태 줄이 잘리면 메모 창 바깥에 말풍선으로 전문 (내용을 가리지 않게) — 좁은 창
       const wide = nw.getBounds();
-      nw.setBounds({ ...wide, y: Math.max(wide.y, 320), width: 300 });
-      nw.focus();
-      await wait(250);
-      const longText = '공유 창을 열지 못했어요. 설정에서 Google Drive 를 먼저 연결하거나 메일 · LocalSend 를 골라 주세요';
-      await js(nw, `window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text: ${JSON.stringify(longText)} } }))`);
       const bubbleWin = () => windowManager.statusBubbles.byOwner.get(nw.id)?.win;
-      const bub = await until(async () => {
+      const notice = (text, error = false) => js(nw, `window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text: ${JSON.stringify(text)}, error: ${error} } }))`);
+      const readBubble = async () => {
         const bw = bubbleWin();
         if (!bw || bw.isDestroyed() || !bw.isVisible()) return null;
-        const text = await js(bw, `document.getElementById('bubble').hidden ? '' : document.getElementById('bubble').textContent`);
-        if (!text) return null;
-        const r = await js(bw, `(() => { const r = document.getElementById('bubble').getBoundingClientRect(); return { bottom: r.bottom, above: document.body.classList.contains('above') }; })()`);
-        const statusHidden = await js(nw, `getComputedStyle(document.getElementById('status')).color === 'rgba(0, 0, 0, 0)'`);
-        return { text, above: r.above, bubbleBottom: bw.getBounds().y + r.bottom, noteTop: nw.getBounds().y, statusHidden };
-      }, '상태 말풍선', 3000).catch(() => null);
-      if (bubbleWin()) await capture(bubbleWin(), 'smoke-new-status-bubble.png');
-      nw.setBounds(wide);
+        const r = await js(bw, `(() => { const b = document.getElementById('bubble'); if (b.hidden) return null; const r = b.getBoundingClientRect(); return { text: b.textContent, place: [...document.body.classList].find((c) => c.startsWith('p-')), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })()`);
+        if (!r) return null;
+        const o = bw.getBounds();
+        return { ...r, screen: { left: o.x + r.left, top: o.y + r.top, right: o.x + r.right, bottom: o.y + r.bottom } };
+      };
+      const longText = '공유 창을 열지 못했어요. 설정에서 Google Drive 를 먼저 연결하거나 메일 · LocalSend 를 골라 주세요';
+      nw.setBounds({ ...wide, x: 400, y: 320, width: 300 });
+      nw.focus();
       await wait(250);
-      const movedAway = !bubbleWin()?.isVisible();
-      await js(nw, `window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text: '저장했어요' } }))`);
+      await notice(longText);
+      const bub = await until(readBubble, '상태 말풍선', 3000).catch(() => null);
+      const statusHidden = await js(nw, `getComputedStyle(document.getElementById('status')).color === 'rgba(0, 0, 0, 0)'`);
+      const moreShown = await js(nw, `!document.getElementById('status-more').hidden`);
+      if (bubbleWin()) await capture(bubbleWin(), 'smoke-new-status-bubble.png');
+      nw.setBounds({ ...wide, x: 400, y: 320, width: 310 }); // 크기를 바꾸면 거두고 상태 줄 글은 다시 보임
+      await wait(250);
+      const movedAway = !bubbleWin()?.isVisible() && !(await js(nw, `document.getElementById('status').classList.contains('bubbled')`));
+      nw.setBounds({ ...wide, x: 400, y: 320, width: 460 }); // 짧은 말이 다 보이는 폭
+      await wait(250);
+      await notice('저장했어요');
       await wait(200);
-      const shortNone = !bubbleWin()?.isVisible();
-      check('상태 줄이 잘리면 메모 창 위 바깥에 말풍선으로 전문 (내용을 가리지 않음, 상태 줄은 감춰 중복 없음) · 창을 옮기면 거둠 · 다 보이면 없음',
-        bub?.text === longText && bub.above && bub.bubbleBottom <= bub.noteTop && bub.statusHidden && movedAway && shortNone, JSON.stringify({ bub, movedAway, shortNone }));
+      const shortNone = { bubble: Boolean(bubbleWin()?.isVisible()), more: await js(nw, `({ hidden: document.getElementById('status-more').hidden, sw: document.getElementById('status').scrollWidth, cw: document.getElementById('status').clientWidth, t: document.getElementById('status').textContent })`) };
+      check('상태 줄이 잘리면 메모 창 위 바깥에 말풍선으로 전문 (상태 줄은 감춰 중복 없음 · 💬 단추) · 크기를 바꾸면 거두고 글은 다시 · 다 보이면 없음',
+        bub?.text === longText && bub.place === 'p-above' && bub.screen.bottom <= nw.getBounds().y && statusHidden && moreShown && movedAway && !shortNone.bubble && shortNone.more.hidden,
+        JSON.stringify({ bub, statusHidden, moreShown, movedAway, shortNone }));
+      // 진행 안내("…중")는 말풍선 없이 · 💬 단추를 누르면 그때 보임
+      await notice('그림을 만드는 중… 메모가 길면 조금 걸려요. 잠시만 기다려 주세요');
+      await wait(400);
+      const progressNone = !bubbleWin()?.isVisible();
+      await js(nw, `document.getElementById('status-more').click()`);
+      const progressOnClick = await until(readBubble, '💬 로 부른 말풍선', 2000).catch(() => null);
+      await js(nw, `document.getElementById('status-more').click()`);
+      await wait(200);
+      check('진행 안내("…중")는 말풍선을 띄우지 않고, 💬 단추를 누르면 보이고 다시 누르면 닫힘', progressNone && Boolean(progressOnClick) && !bubbleWin()?.isVisible(), JSON.stringify({ progressNone, progressOnClick: Boolean(progressOnClick) }));
+      // 오류는 저절로 사라지지 않는다 (9초 뒤에도)
+      await notice(longText, true);
+      await until(readBubble, '오류 말풍선', 2000).catch(() => null);
+      await wait(9000);
+      const errorStays = Boolean(await readBubble());
+      await notice('');
+      check('오류 말풍선은 저절로 사라지지 않음 (놓치지 않게)', errorStays);
+      // 화면 맨 위에 붙은 창: 위에 자리가 없으면 옆에 (본문을 가리지 않게)
+      const area = electronApi.screen.getDisplayMatching(nw.getBounds()).workArea;
+      nw.setBounds({ x: area.x + 400, y: area.y, width: 300, height: wide.height });
+      nw.focus();
+      await wait(250);
+      await notice(longText);
+      const side = await until(readBubble, '옆 말풍선', 3000).catch(() => null);
+      const nb2 = nw.getBounds();
+      if (bubbleWin()) await capture(bubbleWin(), 'smoke-new-status-bubble-side.png');
+      check('화면 맨 위 창: 말풍선은 창 옆 바깥에 (본문을 가리지 않음)', Boolean(side) && ['p-right', 'p-left'].includes(side.place) && (side.screen.left >= nb2.x + nb2.width || side.screen.right <= nb2.x), JSON.stringify({ side, nb2 }));
+      // 왕관을 붙인 창: 말풍선이 왕관 스티커와 겹치지 않음
+      nw.setBounds({ ...wide, x: 400, y: 320, width: 300 });
+      await wait(200);
+      await js(nw, `document.getElementById('top-btn').click()`);
+      await until(() => windowManager.stickers.get(nw.id)?.win?.isVisible(), '왕관', 3000).catch(() => {});
+      await wait(400);
+      nw.focus();
+      await notice(longText);
+      const crowned = await until(readBubble, '왕관 창 말풍선', 3000).catch(() => null);
+      const sb = windowManager.stickers.get(nw.id)?.win?.getBounds();
+      const overlap = crowned && sb && crowned.screen.left < sb.x + sb.width && crowned.screen.right > sb.x && crowned.screen.top < sb.y + sb.height && crowned.screen.bottom > sb.y;
+      check('왕관을 붙인 창: 말풍선이 왕관 스티커와 겹치지 않음', Boolean(crowned) && Boolean(sb) && !overlap, JSON.stringify({ crowned, sb }));
+      await key(nw, 'T', ['control', 'shift']); // 왕관 떼기
+      await until(() => !windowManager.stickers.get(nw.id), '왕관 떼기', 3000).catch(() => {});
+      nw.setBounds(wide);
+      await wait(200);
       // 표 공유: 임시 CSV 를 만들어 보낸다 (Esc 로 메뉴를 닫으면 아무것도 안 함)
       await leave();
       await hover('.mk-doc .tableWrapper td');

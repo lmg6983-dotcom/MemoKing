@@ -1105,8 +1105,9 @@ export function registerIpc(ctx) {
   ipcMain.handle('win:status-bubble', (event, b) => {
     const owner = senderWindow(event);
     if (!owner || ![...wm.noteWins.values()].includes(owner)) return;
-    if (b?.text) wm.statusBubbles.show(owner, { text: String(b.text), error: Boolean(b.error), x: Number(b.x) || 0 });
-    else wm.statusBubbles.hide(owner);
+    if (b?.text) return wm.statusBubbles.show(owner, { text: String(b.text), error: Boolean(b.error), x: Number(b.x) || 0 }); // → 보였는지
+    wm.statusBubbles.hide(owner);
+    return false;
   });
   // 왕관(늘 위) · 테이프(바탕화면 층): 켜져 있으면 떼고, 아니면 붙인다 (다른 하나가 붙어 있으면 바꿔 붙임) → { top, bottom, canTape }
   ipcMain.handle('win:toggle-layer', (event, id, layer) => {

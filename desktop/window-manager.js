@@ -74,7 +74,10 @@ export class WindowManager {
       appDir: APP_DIR,
       webPreferences,
       guard: (w) => guardWindow(w, { openWebPage }),
-      stickerOf: (owner) => Boolean(this.stickers.get(owner.id)?.win),
+      stickerOf: (owner) => {
+        const w = this.stickers.get(owner.id)?.win;
+        return w && !w.isDestroyed() && w.isVisible() ? w.getBounds() : null;
+      },
     });
     this.lostNotes = new Set(); // 탐색기가 다시 시작돼 함께 사라진 테이프 메모 (곧 다시 연다)
     this.hudWin = null;
