@@ -393,6 +393,32 @@ try {
   check('일정 탭: 달력 42칸 · 다가오는 일정에 "치과 · 알림 30분 전, 2시간 전"', cal.days === 42 && cal.rows.some((t) => /치과/.test(t) && /알림 30분 전, 2시간 전/.test(t)), JSON.stringify(cal));
   await shot('02g-calendar');
   check('일정 탭: + 버튼 없음 (보관함처럼)', await page.isHidden('#fab'));
+  // 달력 크기가 가만히 있는가 (예전: 휴대폰에서 달력 높이 ↔ 남은 자리가 서로 맞물려 끝없이 깜빡임)
+  const calHeights = () => page.evaluate(() => new Promise((done) => {
+    const seen = new Set();
+    let n = 0;
+    const tick = () => {
+      seen.add(Math.round(document.querySelector('#reminder-groups .cal').getBoundingClientRect().height));
+      if (++n < 30) requestAnimationFrame(tick);
+      else done([...seen]);
+    };
+    tick();
+  }));
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const now0 = new Date();
+  const otherDay = ymd(new Date(now0.getFullYear(), now0.getMonth(), now0.getDate() === 10 ? 11 : 10));
+  const steady = [];
+  for (const size of [{ width: 412, height: 922 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    await page.waitForTimeout(300);
+    const before = await calHeights();
+    const tapped = await page.tap(`#reminder-groups [role="gridcell"][data-date="${otherDay}"]`, { timeout: 3000 }).then(() => true, () => false);
+    await page.waitForTimeout(300);
+    steady.push({ size: `${size.width}x${size.height}`, before, tapped, after: await calHeights() });
+  }
+  check('일정 탭: 달력이 깜빡이지 않음 (날을 눌러도 높이 그대로)', steady.every((s) => s.before.length === 1 && s.tapped && s.after.length === 1), JSON.stringify(steady));
+  await page.tap(`#reminder-groups [role="gridcell"][data-date="${ymd(now0)}"]`, { timeout: 3000 }).catch(() => {}); // 다시 오늘
+  await page.waitForTimeout(300);
   // 달력에서 바로 일정 만들기: 고른 날 › ＋ 일정 추가 → 이름·시각 → 미리 알림 → 새 메모 / 있는 메모
   await page.tap('.ev-add');
   await page.waitForSelector('.quick-event[open]');
@@ -422,6 +448,13 @@ try {
   // 다른 캘린더: 휴대폰 캘린더(삼성 캘린더) 켜기 → 달력 · 다가오는 일정에 함께, 일정 줄의 보내기 → 캘린더 앱 새 일정
   await page.tap('.cal-link');
   await page.waitForSelector('.cal-links[open]');
+  check('다른 캘린더: 주소 칸이 비면 "추가" 를 누를 수 없음 (빨간 꾸중 없음)', await page.isDisabled('.feed-add .btn') && !(await page.textContent('.feed-note')));
+  // 뒤로 가기: 창만 닫고 일정 탭 그대로 (예전: 창은 떠 있고 뒤 화면만 메모 탭으로)
+  await back();
+  await page.waitForTimeout(300);
+  check('다른 캘린더: 뒤로 가기는 창을 닫고 일정 탭 그대로', !(await page.isVisible('.cal-links[open]')) && await page.isVisible('#reminder-groups .cal'));
+  await page.tap('.cal-link');
+  await page.waitForSelector('.cal-links[open]');
   await page.tap('.feed-device .switch');
   await page.waitForTimeout(300);
   check('다른 캘린더: 휴대폰 캘린더 켜기 (권한 허용)', await page.isChecked('.feed-device .switch'));
@@ -432,7 +465,7 @@ try {
     bars: [...document.querySelectorAll('#reminder-groups .mk-ext')].map((e) => e.title),
     rows: [...document.querySelectorAll('#reminder-groups .ev-ext .row-title')].map((e) => e.textContent),
   }));
-  check('다른 캘린더: 삼성 캘린더 일정이 달력(점선) · 다가오는 일정에 함께', ext.bars.some((t) => /가족 저녁/.test(t)) && ext.rows.includes('가족 저녁'), JSON.stringify(ext));
+  check('다른 캘린더: 삼성 캘린더 일정이 달력(점선) · 다가오는 일정에 함께', ext.bars.some((t) => /삼성 캘린더/.test(t)) && ext.rows.includes('가족 저녁'), JSON.stringify(ext));
   await shot('02j-calendar-device');
   await page.tap('.ev-row:not(.ev-ext) .ev-send');
   await page.waitForTimeout(300);
@@ -442,7 +475,7 @@ try {
   await page.tap('.cal-link');
   await page.waitForSelector('.cal-links[open]');
   await page.tap('.gsync .btn.primary');
-  await page.waitForFunction(() => /맞춘 때|맞추고 있어요/.test(document.querySelector('.gsync')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => {});
+  await page.waitForFunction(() => /맞췄어요|맞추고 있어요/.test(document.querySelector('.gsync')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => {});
   const gcal = await (await fetch(`${base}/dev/gcal`)).json();
   const pushedTitles = gcal.events.filter((e) => e.status !== 'cancelled').map((e) => e.summary);
   check('Google 캘린더 동기화: 연결하면 "메모킹" 캘린더를 만들고 메모킹 일정을 넣음', gcal.calendars.length === 1 && pushedTitles.includes('치과'), JSON.stringify(pushedTitles));

@@ -180,6 +180,14 @@ export function closeConfirm() {
   return true;
 }
 
+/** 맨 위에 열린 창(<dialog>)을 Esc 처럼 닫기 — 각 창의 cancel 처리(저장 안 함 · 일하는 중이면 그대로)를 따른다 */
+export function cancelTopDialog() {
+  const dialog = [...document.querySelectorAll('dialog[open]')].at(-1);
+  if (!dialog) return false;
+  if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close();
+  return true;
+}
+
 // ---------- 시스템 막대(상태 막대·내비게이션 막대) 색 ----------
 
 function toHex(color) {

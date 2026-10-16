@@ -703,6 +703,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .gsync-btns .btn { height: 34px; }
 .gsync-btns [hidden] { display: none; }
 .gsync-off { margin-left: auto; font-size: 12.5px; }
+.gsync .gsync-off { color: var(--muted); text-decoration-color: currentColor; } /* 끊기는 조용히 (휴대폰 .link-btn 노랑 밑줄보다 앞서게) */
 .cal-help ul { margin: 4px 0 6px; padding-left: 18px; line-height: 1.6; }
 .cal-links { width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; }
 .dialog p.cal-links-lead { margin-bottom: 4px; font-size: 13px; color: var(--muted); }
@@ -734,6 +735,8 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 @media (hover: hover) and (pointer: fine) { .cal-export:not(:disabled):hover { background: var(--fill-hover); } }
 .feed-text small { white-space: normal; }
 .cal-google-import { margin: 2px 0 0 -6px; font-size: 12.5px; }
+.cal-send { margin-top: 14px; }
+.cal-send .cal-export { margin-top: 6px; }
 .cal-links .dialog-actions { margin-top: 16px; }
 .ev-row .ev-time { flex: none; width: 70px; font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .ev-row.off { opacity: 0.55; }

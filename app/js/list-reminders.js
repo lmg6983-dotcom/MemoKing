@@ -412,8 +412,10 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   // 창 높이에 맞춰: 월 보기는 한 달이 다 보이게 칸 높이를(낮은 창은 납작하게), 주 보기는 정한 높이 안에서 위아래로 밀기
   //   넓은 창(달력이 왼쪽에 붙음)은 보이는 높이만큼, 좁은 창은 아래 일정 목록이 조금 보이게 6할쯤 (아주 낮은 창은 달력만)
   function fitSize() {
-    // 보이는 높이 (휴대폰은 화면 전체가 밀리므로 창 높이로 자른다 — 달력이 커질수록 더 커지는 일이 없게)
-    const h = Math.min(container.clientHeight, window.innerHeight - Math.max(0, container.getBoundingClientRect().top + window.scrollY));
+    // 보이는 높이: PC 는 목록 칸(스스로 밀리는 칸)의 높이, 휴대폰은 화면 전체가 밀리므로 창 높이에서 목록 칸 위를 뺀 것.
+    //   휴대폰의 목록 칸 높이는 달력 + 아래 목록이라 그걸 재면 달력을 줄일수록 자리가 줄어 끝없이 커졌다 작아졌다 깜빡였다
+    const scrolls = /auto|scroll/.test(getComputedStyle(container).overflowY);
+    const h = scrolls ? container.clientHeight : window.innerHeight - Math.max(0, container.getBoundingClientRect().top + window.scrollY);
     const w = calEl.clientWidth;
     if (!h || !w) return;
     const side = container.clientWidth >= 640;
