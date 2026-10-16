@@ -832,6 +832,20 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       getSettings().opms = { ...getSettings().opms, host: keep }; // 점검의 가짜 OPMS 주소로 되돌림
       const update = await js(lw, `({ cur: document.getElementById('update-current').textContent, note: document.getElementById('update-note').textContent })`);
       check('설정: OPMS 서버 주소를 넣어 저장(잘못된 주소는 안내) · 업데이트 칸(지금 버전, 개발 중에는 확인 안 함)', setupShown && /알아보지 못했어요/.test(bad) && savedHost === 'http://10.0.0.7:8181' && /저장했어요/.test(good) && /^v\d/.test(update.cur), JSON.stringify({ setupShown, bad, good, savedHost, update }));
+      // 업데이트 단추: 최신이면 초록 "최신 버전", 새 버전이면 노랑 "업데이트 v…" (누르면 바뀐 점 대화 상자)
+      const btnAt = async (st) => {
+        lw.webContents.send('update:state', { current: '0.39.3', ...st });
+        await wait(150);
+        return js(lw, `(() => { const b = document.getElementById('update-check'); return { state: b.dataset.state, text: b.textContent, bg: getComputedStyle(b).backgroundColor }; })()`);
+      };
+      const latest = await btnAt({ status: 'latest' });
+      const avail = await btnAt({ status: 'available', version: '0.40.0', notes: '새 기능' });
+      await js(lw, `document.getElementById('update-check').click()`);
+      await wait(200);
+      const dialogOpen = await js(lw, `document.getElementById('update-dialog').open && document.getElementById('update-version').textContent`);
+      await js(lw, `document.getElementById('update-dialog').close()`);
+      check('설정 › 업데이트: 최신이면 초록 "최신 버전", 새 버전이면 노랑 "업데이트 v0.40.0" → 누르면 바뀐 점', latest.state === 'latest' && /최신 버전/.test(latest.text) && (([r, g, b]) => g > r && g > b)(latest.bg.match(/\d+/g).map(Number))
+        && avail.state === 'available' && avail.text === '업데이트 v0.40.0' && /v0\.39\.3 → v0\.40\.0/.test(dialogOpen || ''), JSON.stringify({ latest, avail, dialogOpen }));
       await js(lw, `document.getElementById('settings-dialog').close()`);
     }
 

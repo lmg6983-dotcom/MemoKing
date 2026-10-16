@@ -1499,16 +1499,24 @@ function showUpdateRow(st) {
   updateEl.current.textContent = st.current ? `v${st.current}` : '';
   const text = {
     dev: '개발 중에는 확인하지 않아요',
-    checking: '확인하는 중…',
-    latest: '최신 버전이에요',
-    available: `새 버전 v${st.version} 이 있어요`,
-    downloading: `받는 중 ${st.percent ?? 0}%`,
-    ready: `v${st.version} 을 받아 뒀어요. 끝낼 때 설치돼요`,
+    available: '새 버전이 나왔어요',
+    ready: `v${st.version} 을 받아 뒀어요. 끝낼 때도 설치돼요`,
     error: st.message ?? '',
   }[st.status] ?? '';
   updateEl.note.textContent = text;
   updateEl.note.classList.toggle('warn', st.status === 'error');
-  updateEl.check.disabled = st.status === 'checking' || st.status === 'downloading';
+  // 단추: 최신이면 초록 "최신 버전", 새 버전이 있으면 노랑 "업데이트" (누르면 바뀐 점 · 받기), 받는 중 · 받아 둠도 그 자리에서
+  const btn = {
+    checking: ['checking', '확인하는 중…'],
+    latest: ['latest', '✓ 최신 버전'],
+    available: ['available', `업데이트 v${st.version}`],
+    downloading: ['downloading', `받는 중 ${st.percent ?? 0}%`],
+    ready: ['ready', '재시작해서 설치'],
+  }[st.status] ?? ['idle', '업데이트 확인'];
+  updateEl.check.dataset.state = btn[0];
+  updateEl.check.textContent = btn[1];
+  updateEl.check.title = st.status === 'latest' ? '눌러서 다시 확인' : st.status === 'available' ? '바뀐 점을 보고 받아요' : '';
+  updateEl.check.disabled = st.status === 'checking';
 }
 
 function renderUpdateDialog(st) {
@@ -1540,6 +1548,8 @@ api.on('update:state', (st) => onUpdate(st));
 api.on('update:available', (st) => onUpdate(st, { open: true }));
 api.on('update:ready', (st) => onUpdate(st, { open: true }));
 updateEl.check.addEventListener('click', async () => {
+  // 새 버전 · 받는 중 · 받아 둠: 대화 상자에서 (바뀐 점 · 진행률 · 재시작)
+  if (['available', 'downloading', 'ready'].includes(updateSt.status)) return onUpdate(updateSt, { open: true });
   onUpdate({ ...updateSt, status: 'checking' });
   const st = await api.update.check();
   onUpdate(st, { open: st.status === 'available' || st.status === 'ready' });
