@@ -63,6 +63,8 @@ const ICONS = {
   note: `<path d="M5 4.5h14v10l-5 5H5z" ${stroke}/><path d="M14 19.5v-5h5M8.5 9h7M8.5 12.5h4" ${stroke}/>`,
   inbox: `<path d="M3.5 13.5l2.5-8h12l2.5 8v5a1.5 1.5 0 01-1.5 1.5h-14a1.5 1.5 0 01-1.5-1.5z" ${stroke}/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5" ${stroke}/>`,
   'chev-right': `<path d="M9 6l6 6-6 6" ${stroke} stroke-width="2"/>`,
+  // 잘린 상태 줄 전문 보기: 말줄임 세 점이 든 말풍선
+  talk: `<path d="M5.5 5.5h13a2 2 0 012 2v7a2 2 0 01-2 2h-6.5l-4 3.5v-3.5H5.5a2 2 0 01-2-2v-7a2 2 0 012-2z" ${stroke}/><circle cx="8.5" cy="11" r="1.1" fill="currentColor"/><circle cx="12" cy="11" r="1.1" fill="currentColor"/><circle cx="15.5" cy="11" r="1.1" fill="currentColor"/>`,
   chevrons: `<path d="M6 7l5 5-5 5M13 7l5 5-5 5" ${stroke} stroke-width="2"/>`,
   list: `<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" ${stroke} stroke-width="2.2"/>`,
   filter: `<path d="M4 5.5h16l-6.2 7.3V19l-3.6-1.8v-4.4L4 5.5z" ${stroke}/>`,

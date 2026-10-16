@@ -1,58 +1,71 @@
-// 메모 창 상태 줄이 잘렸을 때 전문을 보여 주는 말풍선 창 — 왕관 · 테이프 스티커처럼 메모 창 위 가장자리 바깥에 매달린다
-//   (메모 내용을 가리지 않게). 화면 위쪽에 자리가 없으면 창 안 윗막대 바로 밑에.
+// 메모 창 상태 줄이 잘렸을 때 전문을 보여 주는 말풍선 창 — 왕관 · 테이프 스티커처럼 메모 창 바깥에 매달린다
+//   (메모 내용을 가리지 않게). 자리는 차례로:
+//     above  창 위 가장자리 바깥 (꼬리가 상태 줄 글을 가리킴, 위 스티커와는 겹치지 않게 bubble.js 가 비켜 둠)
+//     right  창 오른쪽 바깥, 윗막대 높이 (창이 화면 맨 위에 붙어 위에 자리가 없을 때)
+//     left   창 왼쪽 바깥
+//     over   창 안 윗막대 위에 겹쳐 (사방에 자리가 없을 때만 — 본문은 되도록 가리지 않게 막대에 붙여)
 //   창은 메모 창마다 하나 (처음 쓸 때 만들고 그 뒤로는 숨겼다 보였다), 마우스는 통과, 입력은 뺏지 않는다.
 import { BrowserWindow, screen } from 'electron';
 import path from 'node:path';
 
-export const BUBBLE_SIZE = { width: 360, height: 180 }; // 투명한 곳은 보이지도 눌리지도 않는다
-const BAR_H = 36; // 메모 창 윗막대
+import { placeBubble, BUBBLE_SIZE, BAR_H } from './bubble-place.js';
 
 export class StatusBubbles {
-  /** @param {{ appDir: string, webPreferences: object, guard?: (w: BrowserWindow) => void, stickerOf?: (owner: BrowserWindow) => boolean }} o */
-  constructor({ appDir, webPreferences, guard = () => {}, stickerOf = () => false }) {
+  /** @param {{ appDir: string, webPreferences: object, guard?: (w: BrowserWindow) => void, stickerOf?: (owner: BrowserWindow) => object | null }} o */
+  constructor({ appDir, webPreferences, guard = () => {}, stickerOf = () => null }) {
     Object.assign(this, { appDir, webPreferences, guard, stickerOf });
-    this.byOwner = new Map(); // owner.id → { win, ready, pending }
+    this.byOwner = new Map(); // owner.id → { win, ready, pending, waiters }
   }
 
-  /** 자리: 위에 매달 수 있으면 above (창 아래쪽이 메모 창 위 가장자리에서 조금 떨어지게) */
-  bounds(owner, clientX) {
+  where(owner, clientX) {
     const b = owner.getContentBounds();
     const zoom = owner.webContents.getZoomFactor?.() ?? 1;
-    const area = screen.getDisplayMatching(b).workArea;
     const anchor = b.x + clientX * zoom; // 상태 줄 글이 시작하는 화면 좌표
-    const x = Math.round(Math.max(area.x, Math.min(anchor - 24, area.x + area.width - BUBBLE_SIZE.width)));
-    const lift = this.stickerOf(owner) ? 26 : 2; // 가운데 위 스티커(반쯤 밖으로 나온)와 겹치지 않게
-    const aboveY = b.y - lift - BUBBLE_SIZE.height;
-    const above = aboveY >= area.y;
-    const y = Math.round(above ? aboveY : b.y + BAR_H * zoom - 2);
-    // 꼬리 자리(창 안 좌표) — 말풍선을 어디에 둘지는 글 너비를 아는 bubble.js 가 정한다
-    return { bounds: { x, y, ...BUBBLE_SIZE }, above, anchor: anchor - x + 10 };
+    // 모니터가 여럿이면 상태 줄이 있는 화면 (창이 두 화면에 걸쳐도 글자 쪽 화면의 작업 영역 · 배율)
+    const area = screen.getDisplayNearestPoint({ x: Math.round(anchor), y: Math.round(b.y + 4) }).workArea;
+    return placeBubble(b, area, anchor, BAR_H * zoom, this.stickerOf(owner));
   }
 
-  /** 보이기 (text 가 비면 숨김) */
+  /** 보이기 (text 가 비면 숨김) → 보였는지 (상태 줄은 말풍선이 실제로 뜬 뒤에야 감춘다) */
   show(owner, { text = '', error = false, x = 0 } = {}) {
-    if (!owner || owner.isDestroyed()) return;
-    if (!text) return this.hide(owner);
+    if (!owner || owner.isDestroyed()) return Promise.resolve(false);
+    if (!text) return Promise.resolve(this.hide(owner) && false);
+    // 바탕화면 층(테이프) 메모는 앞에 나와 있을 때만 — 다른 창 뒤에 있으면 말풍선만 혼자 떠 보인다
+    if (owner.mkPinned && !owner.isFocused()) return Promise.resolve(false);
     let e = this.byOwner.get(owner.id);
     if (!e || e.win.isDestroyed()) e = this.create(owner);
-    const { bounds, above, anchor } = this.bounds(owner, x);
-    const payload = { text: String(text).slice(0, 600), error: Boolean(error), above, anchor };
-    e.win.setBounds(bounds);
-    if (!e.ready) {
-      e.pending = payload;
-      return;
-    }
-    e.win.webContents.send('bubble:show', payload);
-    // 숨겨 둔 창은 지난 글이 남은 그림으로 먼저 보일 수 있어 새 글을 그릴 틈을 준다
-    if (!e.win.isVisible()) setTimeout(() => !e.win.isDestroyed() && !owner.isDestroyed() && e.win.showInactive(), 40);
+    const spot = this.where(owner, x);
+    const payload = { text: String(text).slice(0, 600), error: Boolean(error), ...spot, bounds: undefined };
+    e.win.setBounds(spot.bounds);
+    return new Promise((resolve) => {
+      if (!e.ready) {
+        e.pending = payload;
+        e.waiters.push(resolve);
+        return;
+      }
+      e.win.webContents.send('bubble:show', payload);
+      if (e.win.isVisible()) return resolve(true);
+      // 숨겨 둔 창은 지난 글이 남은 그림으로 먼저 보일 수 있어 새 글을 그릴 틈을 준다 (그 사이 거뒀으면 띄우지 않는다)
+      const token = (e.token = (e.token ?? 0) + 1);
+      e.waiters.push(resolve);
+      setTimeout(() => {
+        if (e.token !== token || e.win.isDestroyed() || owner.isDestroyed()) return;
+        e.waiters = e.waiters.filter((w) => w !== resolve);
+        e.win.showInactive();
+        resolve(true);
+      }, 40);
+    });
   }
 
   hide(owner) {
     const e = owner && this.byOwner.get(owner.id);
-    if (!e || e.win.isDestroyed()) return;
+    if (!e || e.win.isDestroyed()) return true;
     e.pending = null;
+    e.token = (e.token ?? 0) + 1; // 띄우려고 기다리던 것도 그만
+    for (const w of e.waiters.splice(0)) w(false);
     e.win.webContents.send('bubble:hide'); // 먼저 비우고 숨긴다 (다음에 보일 때 지난 글이 비치지 않게)
     if (e.win.isVisible()) e.win.hide();
+    return true;
   }
 
   create(owner) {
@@ -74,19 +87,25 @@ export class StatusBubbles {
     });
     win.setIgnoreMouseEvents(true);
     this.guard(win);
-    const e = { win, ready: false, pending: null };
+    const e = { win, ready: false, pending: null, waiters: [] };
     this.byOwner.set(owner.id, e);
     win.webContents.once('did-finish-load', () => {
       e.ready = true;
-      if (e.pending && !owner.isDestroyed()) {
+      const ok = Boolean(e.pending) && !owner.isDestroyed();
+      if (ok) {
         win.webContents.send('bubble:show', e.pending);
         win.showInactive();
       }
       e.pending = null;
+      for (const w of e.waiters.splice(0)) w(ok);
     });
     // 메모 창이 움직이거나 사라지면 말풍선은 거둔다 (따라다니지 않는다 — 잠깐 보이는 안내라서)
-    const away = () => this.hide(owner);
-    for (const ev of ['move', 'resize', 'hide', 'minimize']) owner.on(ev, away);
+    const away = () => {
+      if (!win.isVisible() && !e.pending && !e.waiters.length) return;
+      this.hide(owner);
+      if (!owner.isDestroyed()) owner.webContents.send('status-bubble:gone'); // 메모 창은 감춰 둔 상태 줄 글을 다시 보인다
+    };
+    for (const ev of ['move', 'resize', 'hide', 'minimize', 'blur']) owner.on(ev, away);
     owner.once('closed', () => {
       this.byOwner.delete(owner.id);
       if (!win.isDestroyed()) win.destroy();

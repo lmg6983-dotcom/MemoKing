@@ -36,6 +36,10 @@ body, .note-screen, .share-paper {
 }
 .bar button { -webkit-app-region: no-drag; }
 .bar .status.bubbled { color: transparent; } /* 같은 말이 위 말풍선에 다 보이는 동안 (status-bubble.js) */
+.bar .status.clipped { text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; } /* 잘렸어요 — 옆 단추로 끝까지 */
+.status-more { width: 24px; height: 24px; flex: none; color: var(--note-muted); }
+.status-more svg { width: 16px; height: 16px; }
+.status-more[aria-pressed="true"] { color: var(--note-text); }
 .status {
   flex: 1;
   min-width: 0;

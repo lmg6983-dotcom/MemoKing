@@ -124,7 +124,7 @@ const el = {
   fileInput: $('file-input'),
   confirm: $('confirm-dialog'),
 };
-attachStatusBubble(el.status);
+attachStatusBubble(el.status, $('status-more'));
 
 let editor = null;
 let reminderPanel = null;

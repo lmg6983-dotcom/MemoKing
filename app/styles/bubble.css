@@ -1,6 +1,5 @@
-/* 상태 말풍선 — 투명 창 안에. 창 위에 매달릴 때는 아래쪽에 붙고 꼬리가 메모 창 상태 줄을 가리킨다 */
+/* 상태 말풍선 — 투명 창 안에. 자리(place)마다 말풍선이 창의 어느 쪽에 붙고 꼬리가 어디를 가리키는지 (bubble.js) */
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent !important; }
-/* 말풍선 자리(왼쪽)는 bubble.js 가 글 너비를 재서 정한다 */
 .bubble {
   position: absolute; top: 8px; left: 8px;
   width: max-content;
@@ -13,20 +12,36 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
   font: 600 12.5px/1.5 var(--font-sans);
   white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere;
 }
+/* 창(투명) 끝에서 잘리지 않게 — 아주 긴 글은 이 칸에서 끝을 줄인다 (꼬리는 말풍선 바깥이라 잘리지 않게 안쪽 칸만) */
+.bubble-text { display: block; max-height: calc(var(--max-h, calc(100vh - 16px)) - 16px); overflow: hidden; }
 .bubble[hidden] { display: none; }
-body.above .bubble { top: auto; bottom: 8px; }
 .bubble.error { color: var(--danger); }
-/* 꼬리: 말풍선과 같은 색 · 테두리의 작은 세모 (위에 매달리면 아래로, 아니면 위로) */
+/* 위에 매달림: 창 바닥에 붙고 꼬리는 아래로 */
+body.p-above .bubble { top: auto; bottom: 8px; }
+/* 창 옆: 왼쪽(right 자리) · 오른쪽(left 자리) 벽에 붙고 꼬리는 메모 창 쪽으로 */
+body.p-right .bubble { left: 8px; }
+body.p-left .bubble { left: auto; right: 8px; }
+/* 창 안 윗막대 위: 막대에 바로 붙여 (꼬리 없이) */
+body.p-over .bubble { top: 2px; }
+
+/* 꼬리: 말풍선과 같은 색 · 테두리의 작은 세모 */
 .bubble::after {
-  content: ''; position: absolute; left: calc(var(--tail-x, 18px) - 5px); top: -5px;
+  content: ''; position: absolute;
   width: 10px; height: 10px;
   background: inherit;
-  box-shadow: -1px -1px 0 0 var(--bubble-line);
   transform: rotate(45deg);
-  border-radius: 2px 0 0 0;
 }
-body.above .bubble::after { top: auto; bottom: -5px; box-shadow: 1px 1px 0 0 var(--bubble-line); border-radius: 0 0 2px 0; }
-.bubble.in { animation: bubble-in 0.18s cubic-bezier(0.23, 1, 0.32, 1) both; transform-origin: var(--tail-x, 18px) top; }
-body.above .bubble.in { transform-origin: var(--tail-x, 18px) bottom; animation-name: bubble-in-up; }
+body.p-above .bubble::after { left: calc(var(--tail-x, 18px) - 5px); bottom: -5px; box-shadow: 1px 1px 0 0 var(--bubble-line); border-radius: 0 0 2px 0; }
+body.p-right .bubble::after { left: -5px; top: calc(var(--tail-y, 18px) - 5px); box-shadow: -1px 1px 0 0 var(--bubble-line); border-radius: 0 0 0 2px; }
+body.p-left .bubble::after { right: -5px; top: calc(var(--tail-y, 18px) - 5px); box-shadow: 1px -1px 0 0 var(--bubble-line); border-radius: 0 2px 0 0; }
+body.p-over .bubble::after, .bubble.lifted::after { display: none; }
+
+.bubble.in { animation: bubble-in 0.18s cubic-bezier(0.23, 1, 0.32, 1) both; }
+body.p-above .bubble.in { animation-name: bubble-in-up; transform-origin: var(--tail-x, 18px) bottom; }
+body.p-right .bubble.in { animation-name: bubble-in-right; transform-origin: left var(--tail-y, 18px); }
+body.p-left .bubble.in { animation-name: bubble-in-left; transform-origin: right var(--tail-y, 18px); }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(-4px) scale(0.96); } }
 @keyframes bubble-in-up { from { opacity: 0; transform: translateY(4px) scale(0.96); } }
+@keyframes bubble-in-right { from { opacity: 0; transform: translateX(-4px) scale(0.96); } }
+@keyframes bubble-in-left { from { opacity: 0; transform: translateX(4px) scale(0.96); } }
+@media (prefers-reduced-motion: reduce) { .bubble.in { animation: none; } }
