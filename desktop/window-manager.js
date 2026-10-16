@@ -133,9 +133,13 @@ export class WindowManager {
 
   // ---------- 목록 창 ----------
 
-  createListWindow(tab) {
+  /** inactive: 다른 데서 쓰던 손을 뺏지 않고 띄운다 (새 버전 알림 등) */
+  createListWindow(tab, { inactive = false } = {}) {
     if (this.listWin) {
-      bringToFront(this.listWin);
+      if (inactive) {
+        this.listWin.showInactive(); // 최소화돼 있어도 펼친다 (restore 는 창을 활성화해 쓰던 앱의 입력을 뺏는다)
+        this.listWin.moveTop();
+      } else bringToFront(this.listWin);
       if (tab) this.listWin.webContents.send('list:tab', tab);
       return this.listWin;
     }
@@ -166,7 +170,8 @@ export class WindowManager {
     this.listWin.on('moved', remember);
     this.listWin.on('resized', remember);
     this.listWin.once('ready-to-show', () => {
-      this.listWin?.show();
+      if (inactive) this.listWin?.showInactive();
+      else this.listWin?.show();
       this.scheduleSpare(1500);
     });
     this.listWin.on('closed', () => {
@@ -432,20 +437,31 @@ export class WindowManager {
     this.pushList();
   }
 
-  /** 왕관 · 테이프 · 없음 — 스택이면 탭 모두. fromId 의 창만 붙고 떼어지는 모습을 보인다 */
-  setNoteLayer(id, layer, { fromId = id } = {}) {
+  /** 왕관 · 테이프 · 없음 — 스택이면 탭 모두. fromId 의 창만 붙고 떼어지는 모습을 보인다. note: 메모 창 상태 줄에 띄울 말 */
+  setNoteLayer(id, layer, { fromId = id, note = '' } = {}) {
     if (layer === 'bottom' && !this.canTape) layer = null;
     const members = this.stacks?.stackOf(id)?.memos ?? [id];
     for (const m of members) {
       this.setLayerFlags(m, layer);
       const w = this.noteWins.get(m);
       this.applyLayer(w, m, { animate: m === fromId });
-      w?.webContents.send('memo:layer', this.layerState(m));
+      w?.webContents.send('memo:layer', note ? { ...this.layerState(m), note } : this.layerState(m));
     }
     saveSettings();
     this.refreshTopWatch();
     this.pushList(); // 목록 카드의 바탕화면 표시
     return this.layerState(id);
+  }
+
+  /**
+   * 목록에서 고른 메모가 테이프로 바탕화면에 붙어 있으면 떼어 낸다 → 뗐는지
+   *   붙인 채로는 늘 다른 창 뒤(바탕화면 층)라 앞으로 불러도 보이지 않는다
+   */
+  untapeFromList(id) {
+    const stack = this.stacks?.stackOf(id);
+    if ((stack ? this.stackLayer(stack) : this.layerOf(id)) !== 'bottom' || !this.canTape) return false;
+    this.setNoteLayer(id, null, { note: '테이프가 떨어졌어요. 다시 붙이려면 위의 테이프 단추를 눌러 주세요' });
+    return true;
   }
 
   setNoteOnTop(id, next, opts) {

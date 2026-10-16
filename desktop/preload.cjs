@@ -165,7 +165,7 @@ contextBridge.exposeInMainWorld('memoking', {
     copy: invoke('attachment:copy'), // 메모 폴더의 첨부를 파일 그대로 클립보드에 → true | false
     // 내용 저장(저장 단추): { name, mime, rel? | base64? } → { name } | { cancelled } | { error }
     saveAs: invoke('attachment:save-as'),
-    // 공유: { name, mime, rel? | base64?, via: 'sheet' | 'drive' | 'localsend' | 'mail' } → { ok, link? } | { fallback } | { missing } | { error }
+    // 공유: { name, mime, rel? | base64?, via: 'drive' | 'localsend' | 'mail' } → { ok, link? } | { missing } | { error }
     share: invoke('attachment:share'),
     shareTargets: invoke('share:targets'),
   },

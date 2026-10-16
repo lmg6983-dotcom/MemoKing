@@ -55,3 +55,35 @@ test('업데이트: 흐름 — 확인 → 새 버전 알림 → 받기 진행률
   u.later();
   assert.equal(settings.updateSnooze.version, '0.39.0');
 });
+
+test('업데이트: 절전에서 깨어나면 1시간 넘게 안 봤을 때만 다시 확인', async () => {
+  const { EventEmitter } = await import('node:events');
+  const { Updater, STALE_MS } = await import('../desktop/updater.js');
+  const fake = new EventEmitter();
+  let checks = 0;
+  fake.checkForUpdates = async () => { checks++; fake.emit('update-not-available'); };
+  const u = new Updater({ packaged: true, settings: {}, saveSettings: () => {}, send: () => true, beforeInstall: () => {}, loadUpdater: async () => fake });
+  assert.equal(u.checkIfStale(), null); // 아직 준비 전
+  await u.check();
+  u.stop();
+  assert.equal(checks, 1);
+  assert.equal(u.checkIfStale(u.lastCheckAt + 1000), null);
+  await u.checkIfStale(u.lastCheckAt + STALE_MS + 1);
+  assert.equal(checks, 2);
+});
+
+test('업데이트: 같은 버전은 저절로는 몇 시간에 한 번만 알림 (설정에서 누르면 바로)', async () => {
+  const { EventEmitter } = await import('node:events');
+  const { Updater } = await import('../desktop/updater.js');
+  const fake = new EventEmitter();
+  fake.checkForUpdates = async () => fake.emit('update-available', { version: '0.40.0' });
+  const sent = [];
+  const u = new Updater({ packaged: true, settings: {}, saveSettings: () => {}, send: (c) => { sent.push(c); return true; }, beforeInstall: () => {}, loadUpdater: async () => fake });
+  await u.check();
+  u.stop();
+  await u.check(); // 잠금 풀림 · 깨어남 등으로 곧 다시
+  const auto = sent.filter((c) => c === 'update:available').length;
+  await u.check({ manual: true });
+  assert.equal(auto, 1);
+  assert.equal(sent.filter((c) => c === 'update:available').length, 2);
+});

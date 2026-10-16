@@ -945,8 +945,12 @@ app.whenReady().then(async () => {
   powerMonitor.on('resume', () => {
     alarms.tick();
     driveSync?.request(3000);
+    setTimeout(() => updater?.checkIfStale(), 10_000).unref?.(); // 인터넷이 다시 붙을 즈음
   });
-  powerMonitor.on('unlock-screen', () => alarms.tick());
+  powerMonitor.on('unlock-screen', () => {
+    alarms.tick();
+    updater?.checkIfStale();
+  });
 
   if (SMOKE) {
     const { prepareSmoke, runSmoke } = await import(
@@ -1091,7 +1095,13 @@ updater = new Updater({
   settings,
   saveSettings: () => saveSettings(),
   send: (channel, payload) => {
-    const w = updateWin();
+    let w = updateWin();
+    // 새 버전 · 받기 끝: 목록 창이 없거나 숨어(최소화) 있으면 띄워서 알린다 — 쓰던 창의 입력은 뺏지 않게
+    if ((channel === 'update:available' || channel === 'update:ready') && (!w || !w.isVisible() || w.isMinimized())) {
+      const fresh = !w;
+      w = windowManager.createListWindow(null, { inactive: true });
+      if (fresh) return Boolean(w); // 새 창은 열리며 상태를 물어 대화 상자를 띄운다 (updateState 의 ask)
+    }
     if (!w) return false;
     w.webContents.send(channel, { ...payload, current: app.getVersion() });
     return true;

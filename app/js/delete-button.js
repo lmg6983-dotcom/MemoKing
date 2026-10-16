@@ -1,6 +1,6 @@
 import { haptic } from './dom.js';
 import { copyBlock, saveBlock, shareBlock, canShare } from './copy-content.js';
-import { SHARE_DONE } from './share-menu.js';
+import { SHARE_DONE, isShareMenuOpen } from './share-menu.js';
 // 지우기 단추 (×) — 꾹 눌렀다 그 자리에 놓은 것의 오른쪽 위에 잠깐 (block-move.js 내용 줄·목록 전체 · list-drag.js 목록 항목 함께)
 //   흰 동그라미에 빨간 ×. 한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
 //   PC(마우스): 그림·손 메모·소리·파일·링크 카드에 마우스를 올려도 뜬다 (hover — 시간으로 사라지지 않고, 마우스가 떠나면 거둔다.
@@ -80,6 +80,7 @@ function scrollParent(el) {
  */
 export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', copyLabel = null, deco, markTarget = false, remove, hover = null, showMs = DELETE_SHOW_MS, open = null }) {
   hideDeleteButton(true);
+  if (isShareMenuOpen()) return; // 공유 방법을 고르는 동안은 메뉴만 (단추가 메뉴 위에 다시 뜨지 않게)
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = `mk-delete-btn${hover ? ' hover' : ''}`;

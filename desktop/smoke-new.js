@@ -380,14 +380,22 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await js(nw, `document.querySelector('.mk-save-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
       const savedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'save').find((o) => /안내 자료\.pdf$/.test(o.target)), 'PDF 저장', 3000).catch(() => null);
       check('PDF 파일: 저장 단추 → 그 파일 그대로', Boolean(savedPdf) && fs.readFileSync(savedPdf.target, 'utf8').startsWith('%PDF'), JSON.stringify(savedPdf));
-      // 공유 단추 → 방법 고르기 → Windows 공유 (메모 폴더의 파일 그대로)
+      // 공유 단추 → 방법 고르기 → 메일에 첨부 (메모 폴더의 파일 그대로). 메뉴가 뜨면 내용 단추 4개는 거둔다
       await hover('.mk-doc a[data-file]');
       const shareShown = await js(nw, `!!document.querySelector('.mk-share-btn')`);
       if (shareShown) await js(nw, `document.querySelector('.mk-share-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
       const menu = await until(() => js(nw, `(() => { const m = document.querySelector('.mk-share-menu'); return m && [...m.querySelectorAll('button')].map((b) => b.dataset.via + (b.disabled ? '-' : '')).join(','); })()`), '공유 방법 메뉴', 3000).catch(() => '');
-      await js(nw, `document.querySelector('.mk-share-menu [data-via="sheet"]')?.click()`);
-      const sharedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'share').find((o) => o.via === 'sheet' && /안내 자료\.pdf$/.test(o.target)), 'PDF 공유', 3000).catch(() => null);
-      check('공유 단추 → 방법 고르기(Windows 공유 · Drive 링크 · LocalSend · 메일, Drive 는 연결 전엔 못 고름) → 그 파일', shareShown && /sheet/.test(menu) && /drive-/.test(menu) && /localsend/.test(menu) && /mail/.test(menu) && Boolean(sharedPdf), JSON.stringify({ shareShown, menu, sharedPdf }));
+      const buttonsLeft = await js(nw, `document.querySelectorAll('.mk-delete-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn').length`);
+      await js(nw, `document.querySelector('.mk-share-menu [data-via="mail"]')?.click()`);
+      const sharedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'share').find((o) => o.via === 'mail' && /안내 자료\.pdf$/.test(o.target)), 'PDF 공유', 3000).catch(() => null);
+      check('공유 단추 → 방법 고르기(Drive 링크 · LocalSend · 메일, Windows 공유는 없음, Drive 는 연결 전엔 못 고름) · 메뉴 위에 내용 단추가 남지 않음 → 그 파일',
+        shareShown && !/sheet/.test(menu) && /drive-/.test(menu) && /localsend/.test(menu) && /mail/.test(menu) && buttonsLeft === 0 && Boolean(sharedPdf), JSON.stringify({ shareShown, menu, buttonsLeft, sharedPdf }));
+      // Drive 링크를 복사하면 가운데 알림 + 폭죽
+      const popped = await js(nw, `import('./js/share-menu.js').then(async (m) => { m.showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요', detail: 'https://drive.google.com/x' }); await new Promise((r) => setTimeout(r, 300)); const p = document.querySelector('.mk-share-pop'); return { text: p?.innerText ?? '', confetti: Boolean(document.querySelector('canvas.mk-confetti')), z: p ? getComputedStyle(p).zIndex : '' }; })`);
+      await capture(nw, 'smoke-new-share-pop.png');
+      await js(nw, `document.querySelector('.mk-share-pop')?.click()`);
+      await wait(300); // 사라지는 0.2초 (그 사이에는 아래 내용을 가린다)
+      check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V 로 붙여 넣으세요" + 폭죽', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && popped.confetti, JSON.stringify(popped));
       // 표 공유: 임시 CSV 를 만들어 보낸다 (Esc 로 메뉴를 닫으면 아무것도 안 함)
       await leave();
       await hover('.mk-doc .tableWrapper td');
@@ -399,6 +407,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await js(nw, `(document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); // 실제 키처럼 요소에서
       await wait(200);
       const escClosed = await js(nw, `!document.querySelector('.mk-share-menu')`) && smokeOpened.filter((o) => o.kind === 'share').length === sharesBefore;
+      await leave(); // 메뉴가 뜰 때 내용 단추는 거뒀으니 다시 올린다
+      await hover('.mk-doc .tableWrapper td');
       await js(nw, `document.querySelector('.mk-share-btn')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
       await until(() => js(nw, `!!document.querySelector('.mk-share-menu [data-via="mail"]')`), '표 공유 메뉴 2', 3000).catch(() => {});
       await js(nw, `document.querySelector('.mk-share-menu [data-via="mail"]')?.click()`);
@@ -606,7 +616,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await until(() => js(list, `!!document.querySelector('[data-id="${tid}"]')`), '테이프 메모 카드');
       const openTaped = async () => {
         const b0 = new Set(noteWins.keys());
-        await js(list, `document.querySelector('[data-id="${tid}"]').click()`);
+        windowManager.openNote(tid); // 다시 켤 때처럼 (목록에서 고르면 테이프가 떨어진다 — 아래에서 따로 본다)
         const nid = await until(() => noteWins.get(tid)?.isVisible() && tid, '테이프 메모 창').catch(() => [...noteWins.keys()].find((k) => !b0.has(k)));
         const w = noteWins.get(nid);
         await until(() => js(w, `document.documentElement.dataset.ready === 'true' && !!document.querySelector('.mk-doc')`), '테이프 메모 준비');
@@ -656,6 +666,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const kept = await until(() => kindOf(nw) === 'tape', '다시 열어도 테이프', 3000).catch(() => false);
       const b2 = await buttons(nw);
       check('다시 열어도 테이프 (버튼도 숨은 채 · 다시 열 때는 안내 없음)', kept && b2.tape === 'peeled' && b2.top === 'folded' && !/붙였어요/.test(b2.status), JSON.stringify(b2));
+      // 목록에서 테이프 메모를 고르면 테이프를 떼고 앞으로 (붙인 채로는 다른 창 뒤에 숨어 고를 수 없었다)
+      await js(list, `window.memoking.memo.open(${JSON.stringify(tid)})`);
+      const fell = await until(async () => !getSettings().onBottom?.[tid] && !stickers.get(nw.id) && /테이프가 떨어졌어요/.test((await buttons(nw)).status), '목록에서 고르면 테이프 떼기', 3000).catch(() => false);
+      const b4 = await buttons(nw);
+      check('목록에서 테이프 메모를 고르면 테이프가 떨어지고(상태 줄 안내) 창이 앞으로', fell && b4.tape === 'shown' && b4.top === 'shown' && nw.isVisible(), JSON.stringify(b4));
+      await js(nw, `document.getElementById('tape-btn').click()`); // 아래 "테이프를 누르면 떼어짐" 을 위해 다시 붙인다
+      await until(() => kindOf(nw) === 'tape' && getSettings().onBottom?.[tid] === true, '다시 테이프', 4000).catch(() => {});
       // 테이프를 누르면 떼어져 보통 창 (메모 창은 그대로, 버튼 둘 다 돌아옴)
       await until(() => js(stickers.get(nw.id).win, `document.documentElement.dataset.ready === 'true'`), '테이프 준비', 4000).catch(() => {});
       // 보이는 모양을 누른다: 창 가운데에 있는 것이 테이프여야 한다
