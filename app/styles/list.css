@@ -833,11 +833,11 @@ body:not([data-tab="memos"]) :is(.fab, .fab-menu, .fab-scrim) { display: none; }
 .undo-bar { bottom: 74px; }
 .drag-hint { bottom: 28px; }
 
-/* 지우는 카드: 옆으로 날아가고 그 자리가 접힌다 (휴대폰과 같음) */
-/* 지운 카드의 떠 있는 복사본 — 날아가는 동안 남은 카드는 빈자리로 미끄러진다 (list.js deleteMemo) */
-.card-ghost { position: fixed; z-index: 30; margin: 0; pointer-events: none; animation: card-fly 0.24s var(--ease-out) forwards; }
+/* 지우는 카드: 제자리에서 흐려지며 사라지고 그 자리가 접힌다 (PC — 휴대폰은 옆으로 밀어 지워 날아간다)
+   지운 카드의 떠 있는 복사본 — 흐려지는 동안 남은 카드는 빈자리로 미끄러진다 (list.js deleteMemo) */
+.card-ghost { position: fixed; z-index: 30; margin: 0; pointer-events: none; animation: card-fade 0.22s var(--ease-out) forwards; }
 .card-ghost .card-actions { display: none; }
-@keyframes card-fly { to { transform: translateX(110%) rotate(6deg); opacity: 0; } }
+@keyframes card-fade { to { opacity: 0; transform: scale(0.98); } }
 .fab-sat:nth-child(2) { animation-delay: 0.05s; }
 .fab-sat[data-new="ink"] .fab-sat-btn { background: var(--brand-yellow); color: var(--on-brand); }
 

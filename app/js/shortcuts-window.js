@@ -59,7 +59,7 @@ function resetButton(changed, label) {
   return r;
 }
 
-/** 한 줄: 이름(설명 말풍선) · 키 칸 · 기본값 — onCapture(키 칸), onReset(기본값) */
+/** 한 줄: 이름(설명 말풍선) · 기본값 · 키 칸 — 키 칸이 늘 줄 오른쪽 끝에 (기본값은 바꾼 줄에만 보인다). onCapture(키 칸), onReset(기본값) */
 function keyRow({ label, help, keys, changed, onCapture, onReset }) {
   const row = document.createElement('div');
   row.className = 'row';
@@ -69,7 +69,7 @@ function keyRow({ label, help, keys, changed, onCapture, onReset }) {
   btn.addEventListener('click', () => onCapture(btn));
   const reset = resetButton(changed, label);
   reset.addEventListener('click', onReset);
-  row.append(nameCell(label, help, changed), btn, reset);
+  row.append(nameCell(label, help, changed), reset, btn);
   return row;
 }
 

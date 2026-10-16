@@ -1,0 +1,32 @@
+/* 상태 말풍선 — 투명 창 안에. 창 위에 매달릴 때는 아래쪽에 붙고 꼬리가 메모 창 상태 줄을 가리킨다 */
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent !important; }
+/* 말풍선 자리(왼쪽)는 bubble.js 가 글 너비를 재서 정한다 */
+.bubble {
+  position: absolute; top: 8px; left: 8px;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--bubble-bg); color: var(--bubble-fg);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16), inset 0 0 0 1px var(--bubble-line);
+  font: 600 12.5px/1.5 var(--font-sans);
+  white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere;
+}
+.bubble[hidden] { display: none; }
+body.above .bubble { top: auto; bottom: 8px; }
+.bubble.error { color: var(--danger); }
+/* 꼬리: 말풍선과 같은 색 · 테두리의 작은 세모 (위에 매달리면 아래로, 아니면 위로) */
+.bubble::after {
+  content: ''; position: absolute; left: calc(var(--tail-x, 18px) - 5px); top: -5px;
+  width: 10px; height: 10px;
+  background: inherit;
+  box-shadow: -1px -1px 0 0 var(--bubble-line);
+  transform: rotate(45deg);
+  border-radius: 2px 0 0 0;
+}
+body.above .bubble::after { top: auto; bottom: -5px; box-shadow: 1px 1px 0 0 var(--bubble-line); border-radius: 0 0 2px 0; }
+.bubble.in { animation: bubble-in 0.18s cubic-bezier(0.23, 1, 0.32, 1) both; transform-origin: var(--tail-x, 18px) top; }
+body.above .bubble.in { transform-origin: var(--tail-x, 18px) bottom; animation-name: bubble-in-up; }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(-4px) scale(0.96); } }
+@keyframes bubble-in-up { from { opacity: 0; transform: translateY(4px) scale(0.96); } }

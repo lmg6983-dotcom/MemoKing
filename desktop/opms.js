@@ -59,6 +59,15 @@ export function cleanDate(d) {
   return s.length >= 10 && s[4] === '-' && s[7] === '-' ? s.slice(0, 10) : s;
 }
 
+/**
+ * 글로 적혀 온 줄바꿈 표시(\r\n · \n · \r — 비고 · 요약 등에 "데이터이관\r\n" 처럼)를 진짜 줄바꿈으로, 끝의 빈 줄은 뗀다
+ *   파일 경로 열은 건드리지 않는다 (C:\new 같은 경로의 \n 을 줄바꿈으로 바꾸지 않게)
+ */
+export function unescapeBreaks(value) {
+  return String(value ?? '').replace(/\\r\\n|\\n|\\r/g, '\n').replace(/\\t/g, ' ').replace(/[ \t]*\n[ \t]*/g, '\n').trim();
+}
+const PATH_COLUMN = /FILE|PATH|UPLOAD|URL/i;
+
 /** 응답 글 → [{열: 값}] */
 export function parseResultset(text) {
   const lines = String(text).split(/\r?\n/).map((l) => l.trim());
@@ -68,7 +77,10 @@ export function parseResultset(text) {
   for (const line of lines.slice(4)) {
     if (!line) continue;
     const values = line.split('\x01');
-    rows.push(Object.fromEntries(columns.map((c, i) => [c, normalize(values[i] ?? '')])));
+    rows.push(Object.fromEntries(columns.map((c, i) => {
+      const v = normalize(values[i] ?? '');
+      return [c, PATH_COLUMN.test(c) ? v : unescapeBreaks(v)];
+    })));
   }
   return rows;
 }
@@ -286,7 +298,7 @@ export function caseInfoText(c, { mywork = [], foreign = [], files = [], now = n
     ['사무소관리번호', c.ourref], ['출원인관리번호', c.yourref], ['구분', c.div], ['출원인', c.applicant], ['발명자', c.inventor],
     ['수임일', cleanDate(c.d_accept)], ['출원번호', c.n_app], ['출원일', cleanDate(c.d_app)], ['등록번호', c.n_issue],
     ['등록일', cleanDate(c.d_issue)], ['발명명칭', c.title_kor], ['비고', c.memo],
-  ]) L.push(`  ${k.padEnd(14)} : ${dash(v)}`);
+  ]) L.push(`  ${k.padEnd(14)} : ${dash(v).replace(/\n/g, `\n${' '.repeat(19)}`)}`); // 여러 줄(비고)은 값 자리에 맞춰 들여 쓴다
   L.push('', '[업무배분]');
   if (mywork.length) {
     mywork.forEach((r, i) => {

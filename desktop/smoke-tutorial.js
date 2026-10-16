@@ -207,9 +207,9 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await arrive(note, 'crown', { praise: true });
     await press(note(), '#top-btn', '[crown] 왕관');
     await arrive(note, 'bell', { praise: true });
-    for (const id of ['bell', 'links']) {
+    for (const id of ['bell', 'hotkey']) {
       await next(note, id);
-      await arrive(note, id === 'bell' ? 'links' : 'bar');
+      await arrive(note, id === 'bell' ? 'hotkey' : 'bar');
     }
     await next(note, 'bar');
     await arrive(note, 'close');

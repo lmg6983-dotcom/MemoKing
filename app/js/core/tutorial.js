@@ -125,9 +125,9 @@ export const TUTORIAL_STEPS = [
     next: '다음',
   },
   {
-    id: 'links', win: 'note', target: ['#links-btn', '.bar'], emoji: '🔗',
-    title: '메모끼리 이어 두기',
-    text: '고리 단추로 관련된 메모를 이어 둘 수 있어요. 같은 태그를 쓴 메모도 여기서 함께 보여요.',
+    id: 'hotkey', win: 'note', target: ['#hotkey-btn', '.bar'], emoji: '⚡',
+    title: '어디서든 불러오는 키',
+    text: '번개 단추로 Ctrl+Alt+숫자 키를 정해 두면 다른 앱을 쓰다가도 이 메모를 바로 불러와요. 정한 숫자가 번개 옆에 작게 보여요.',
     next: '다음',
   },
   {

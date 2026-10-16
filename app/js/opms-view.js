@@ -397,7 +397,7 @@ async function showWrapper(my) {
     ['등록일', (r) => r.date],
     ['문서명', (r) => r.doc],
     ...(attach.some((r) => r.summary) ? [['요약', (r) => r.summary, 'wide']] : []),
-    ...(attach.some((r) => r.writer) ? [['등록자', (r) => r.writer]] : []),
+    ...(attach.some((r) => r.writer) ? [['등록자', (r) => r.writer, 'nowrap']] : []), // 이름은 한 줄로
     ['파일명', (r) => r.name],
     ['크기', (r) => r.size, 'num'],
     ['', (r) => openButton(r), 'act'],

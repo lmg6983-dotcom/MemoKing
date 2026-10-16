@@ -391,11 +391,37 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('공유 단추 → 방법 고르기(Drive 링크 · LocalSend · 메일, Windows 공유는 없음, Drive 는 연결 전엔 못 고름) · 메뉴 위에 내용 단추가 남지 않음 → 그 파일',
         shareShown && !/sheet/.test(menu) && /drive-/.test(menu) && /localsend/.test(menu) && /mail/.test(menu) && buttonsLeft === 0 && Boolean(sharedPdf), JSON.stringify({ shareShown, menu, buttonsLeft, sharedPdf }));
       // Drive 링크를 복사하면 가운데 알림 + 폭죽
-      const popped = await js(nw, `import('./js/share-menu.js').then(async (m) => { m.showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요', detail: 'https://drive.google.com/x' }); await new Promise((r) => setTimeout(r, 300)); const p = document.querySelector('.mk-share-pop'); return { text: p?.innerText ?? '', confetti: Boolean(document.querySelector('canvas.mk-confetti')), z: p ? getComputedStyle(p).zIndex : '' }; })`);
+      const popped = await js(nw, `import('./js/share-menu.js').then(async (m) => { m.showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' }); await new Promise((r) => setTimeout(r, 300)); const p = document.querySelector('.mk-share-pop'); return { text: p?.innerText ?? '', confetti: Boolean(document.querySelector('canvas.mk-confetti')), z: p ? getComputedStyle(p).zIndex : '' }; })`);
       await capture(nw, 'smoke-new-share-pop.png');
       await js(nw, `document.querySelector('.mk-share-pop')?.click()`);
       await wait(300); // 사라지는 0.2초 (그 사이에는 아래 내용을 가린다)
-      check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V 로 붙여 넣으세요" + 폭죽', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && popped.confetti, JSON.stringify(popped));
+      check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V 로 붙여 넣으세요" + 폭죽 (주소는 보이지 않음)', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && !/https?:/.test(popped.text) && popped.confetti, JSON.stringify(popped));
+      // 상태 줄이 잘리면 메모 창 위 가장자리 바깥에 말풍선으로 전문 (내용을 가리지 않게) — 좁은 창
+      const wide = nw.getBounds();
+      nw.setBounds({ ...wide, y: Math.max(wide.y, 320), width: 300 });
+      nw.focus();
+      await wait(250);
+      const longText = '공유 창을 열지 못했어요. 설정에서 Google Drive 를 먼저 연결하거나 메일 · LocalSend 를 골라 주세요';
+      await js(nw, `window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text: ${JSON.stringify(longText)} } }))`);
+      const bubbleWin = () => windowManager.statusBubbles.byOwner.get(nw.id)?.win;
+      const bub = await until(async () => {
+        const bw = bubbleWin();
+        if (!bw || bw.isDestroyed() || !bw.isVisible()) return null;
+        const text = await js(bw, `document.getElementById('bubble').hidden ? '' : document.getElementById('bubble').textContent`);
+        if (!text) return null;
+        const r = await js(bw, `(() => { const r = document.getElementById('bubble').getBoundingClientRect(); return { bottom: r.bottom, above: document.body.classList.contains('above') }; })()`);
+        const statusHidden = await js(nw, `getComputedStyle(document.getElementById('status')).color === 'rgba(0, 0, 0, 0)'`);
+        return { text, above: r.above, bubbleBottom: bw.getBounds().y + r.bottom, noteTop: nw.getBounds().y, statusHidden };
+      }, '상태 말풍선', 3000).catch(() => null);
+      if (bubbleWin()) await capture(bubbleWin(), 'smoke-new-status-bubble.png');
+      nw.setBounds(wide);
+      await wait(250);
+      const movedAway = !bubbleWin()?.isVisible();
+      await js(nw, `window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text: '저장했어요' } }))`);
+      await wait(200);
+      const shortNone = !bubbleWin()?.isVisible();
+      check('상태 줄이 잘리면 메모 창 위 바깥에 말풍선으로 전문 (내용을 가리지 않음, 상태 줄은 감춰 중복 없음) · 창을 옮기면 거둠 · 다 보이면 없음',
+        bub?.text === longText && bub.above && bub.bubbleBottom <= bub.noteTop && bub.statusHidden && movedAway && shortNone, JSON.stringify({ bub, movedAway, shortNone }));
       // 표 공유: 임시 CSV 를 만들어 보낸다 (Esc 로 메뉴를 닫으면 아무것도 안 함)
       await leave();
       await hover('.mk-doc .tableWrapper td');
@@ -555,8 +581,9 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '단축키 메모 창');
       const nw = noteWins.get(nid);
       await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '단축키 메모 준비');
-      // 메뉴 › 단축키로 불러오기 → 3 · 내용 복사만
-      await js(nw, `document.getElementById('menu-btn').click(); document.getElementById('hotkey-btn').click()`);
+      // 윗막대 번개 단추(불러오기 키) → 3 · 내용 복사만. 정하기 전에는 사선 · 메뉴에는 메모 연결이 있고 소리 받아쓰기는 없다
+      const barBefore = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { inBar: Boolean(b.closest('.bar')), off: b.classList.contains('off'), slash: getComputedStyle(b, '::after').content !== 'none', links: Boolean(document.querySelector('#menu #links-btn')), linksInBar: Boolean(document.querySelector('.bar #links-btn')), transcribe: Boolean(document.getElementById('transcribe-btn')) }; })()`);
+      await js(nw, `document.getElementById('hotkey-btn').click()`);
       await until(() => js(nw, `!!document.querySelector('.hotkey-dialog[open] .hk-key')`), '단축키 창');
       const dlg = await js(nw, `(() => {
         const d = document.querySelector('.hotkey-dialog');
@@ -577,8 +604,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await js(nw, `document.querySelector('.hotkey-dialog button[type="submit"]').click()`);
       await until(() => js(nw, `!document.querySelector('.hotkey-dialog')`), '단축키 창 닫힘');
       const saved = getSettings().memoHotkeys?.['3'];
-      const label = await js(nw, `document.getElementById('hotkey-label').textContent`);
-      check('메모 단축키 창: 1~9 · 할 일 세 칸 중 하나 · 저장하면 Ctrl+Alt+3 에 이 메모 (메뉴에 표시)',
+      const barAfter = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { num: document.getElementById('hotkey-num').textContent, off: b.classList.contains('off'), numShown: getComputedStyle(document.getElementById('hotkey-num')).display !== 'none', title: b.title }; })()`);
+      const label = barAfter.num === '3' && /Ctrl\+Alt\+3/.test(barAfter.title) ? 'Ctrl+Alt+3' : '';
+      await capture(nw, 'smoke-new-hotkey-bar.png');
+      check('윗막대: 메모 연결 대신 불러오기 키 단추 (없으면 사선, 정하면 숫자 3) · 메모 연결은 ⋯ 메뉴로 · 소리 받아쓰기 메뉴 없음',
+        barBefore.inBar && barBefore.off && barBefore.slash && barBefore.links && !barBefore.linksInBar && !barBefore.transcribe && !barAfter.off && barAfter.numShown,
+        JSON.stringify({ barBefore, barAfter }));
+      check('메모 단축키 창: 1~9 · 할 일 세 칸 중 하나 · 저장하면 Ctrl+Alt+3 에 이 메모 (번개 단추에 표시)',
         dlg.keys === 9 && dlg.before && dlg.none.modes.length === 3 && dlg.none.picked === 1 && !dlg.after && /^Ctrl\+Alt\+3: 어느 앱에서든 누르면 내용을 복사해요$/.test(dlg.hint) && dlg.legend && dlg.fits
           && saved?.id === hid && saved.copy && !saved.show && label === 'Ctrl+Alt+3' && memoHotkeys.held.has('3'),
         JSON.stringify({ dlg, saved, label, held: [...memoHotkeys.held.keys()] }));
@@ -679,6 +711,11 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const hitTape = await js(stickers.get(nw.id).win, `(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); const ok = Boolean(el?.closest('#tape .hit')); el?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return ok; })()`);
       const peeled = await until(() => !stickers.get(nw.id) && !getSettings().onBottom?.[tid], '테이프 떼기', 3000).catch(() => false);
       const b3 = await buttons(nw);
+      // 목록에서 지우면 그 카드가 제자리에서 흐려지며 사라진다 (옆으로 날아가지 않게)
+      const did = vault.import({ body: '# 지울 메모\n\n흐려지며 사라져요\n' });
+      await until(() => js(list, `!!document.querySelector('[data-delete="${did}"]')`), '지울 메모 카드');
+      const ghostAnim = await js(list, `(() => { document.querySelector('[data-delete="${did}"]').click(); const g = document.querySelector('.card-ghost'); return g ? getComputedStyle(g).animationName : 'reduce'; })()`);
+      check('목록에서 지우기: 옆으로 날아가지 않고 제자리에서 흐려짐', ghostAnim === 'card-fade' || ghostAnim === 'reduce', ghostAnim);
       check('테이프를 누르면 떼어짐 → 메모 창은 그대로, 왕관 · 테이프 버튼이 돌아옴', hitTape && peeled && !nw.isDestroyed() && nw.isVisible() && b3.top === 'shown' && b3.tape === 'shown' && /뗐어요/.test(b3.status), JSON.stringify(b3));
       nw.close();
       await until(() => !noteWins.has(tid), '메모 닫힘 2', 3000).catch(() => {});
@@ -772,6 +809,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       if (kw) {
         await until(() => js(kw, 'document.documentElement.dataset.ready === "true"'), '단축키 창 준비');
         const rows = await js(kw, `document.querySelectorAll('.row').length`);
+        const keyRight = await js(kw, `(() => { const row = document.querySelector('.row'); const k = row.lastElementChild; const pad = parseFloat(getComputedStyle(row).paddingRight); return { last: k.className, gap: Math.round(row.getBoundingClientRect().right - pad - k.getBoundingClientRect().right) }; })()`);
+        check('단축키 설정: 키 칸이 줄 오른쪽 끝에 붙음 (기본값 단추는 키 칸 왼쪽)', /^key/.test(keyRight.last) && Math.abs(keyRight.gap) <= 1, JSON.stringify(keyRight));
         await capture(kw, 'keymap.png');
         // PDF로 저장 줄의 키 칸을 누르고 Ctrl+Alt+P
         await js(kw, `[...document.querySelectorAll('.row')].find((r) => r.querySelector('.name').dataset.label === 'PDF로 저장').querySelector('.key').click()`);

@@ -131,13 +131,6 @@ export function registerIpc(ctx) {
       return { text: '', error: err.message };
     }
   });
-  ipcMain.handle('stt:transcribe', async (_e, job) => {
-    try {
-      return await getStt()?.transcribe({ memoId: job?.memoId, src: job?.src, samples: job?.samples });
-    } catch (err) {
-      return { text: '', error: err.message };
-    }
-  });
 
   // ---------- Vault / 폴더 ----------
   ipcMain.handle('app:info', () => vaultInfo());
@@ -1107,6 +1100,13 @@ export function registerIpc(ctx) {
       wm.clearStackTarget(wm.windowDrag);
       wm.windowDrag = null;
     }
+  });
+  // 메모 창 상태 줄이 잘렸을 때 전문 말풍선 (null 이면 거둠) — 메모 창만
+  ipcMain.handle('win:status-bubble', (event, b) => {
+    const owner = senderWindow(event);
+    if (!owner || ![...wm.noteWins.values()].includes(owner)) return;
+    if (b?.text) wm.statusBubbles.show(owner, { text: String(b.text), error: Boolean(b.error), x: Number(b.x) || 0 });
+    else wm.statusBubbles.hide(owner);
   });
   // 왕관(늘 위) · 테이프(바탕화면 층): 켜져 있으면 떼고, 아니면 붙인다 (다른 하나가 붙어 있으면 바꿔 붙임) → { top, bottom, canTape }
   ipcMain.handle('win:toggle-layer', (event, id, layer) => {
