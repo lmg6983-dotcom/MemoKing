@@ -88,7 +88,12 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
       text.append(el('b', '', f.name), small);
       const sw = switchInput(`${f.name} 함께 보기`, f.on);
       sw.addEventListener('change', async () => {
-        feeds = await calendars.setFeeds(feeds.map((x) => (x.id === f.id ? { ...x, on: sw.checked } : x)));
+        try {
+          feeds = await calendars.setFeeds(feeds.map((x) => (x.id === f.id ? { ...x, on: sw.checked } : x)));
+        } catch (err) {
+          sw.checked = !sw.checked; // 저장하지 못했으면 되돌린다
+          notify(err.message || '저장하지 못했어요', true);
+        }
       });
       const del = el('button', 'icon-btn');
       del.type = 'button';
@@ -96,7 +101,12 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
       del.setAttribute('aria-label', `${f.name} 연결 끊기`);
       del.append(icon('trash'));
       del.addEventListener('click', async () => {
-        feeds = await calendars.setFeeds(feeds.filter((x) => x.id !== f.id));
+        try {
+          feeds = await calendars.setFeeds(feeds.filter((x) => x.id !== f.id));
+        } catch (err) {
+          notify(err.message || '연결을 끊지 못했어요', true);
+          return;
+        }
         feedTexts.delete(f.id);
         drawList();
       });

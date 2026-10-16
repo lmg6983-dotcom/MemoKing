@@ -4,9 +4,9 @@
 //   받은 글은 %APPDATA%\MemoKing\calendars\<id>.ics 에 두어 인터넷이 없을 때·다시 켰을 때 그대로 보인다.
 import fs from 'node:fs';
 import path from 'node:path';
-import { normalizeFeeds, looksLikeIcs, MAX_FEED_BYTES } from '../app/js/core/calendar-feeds.js';
+import { normalizeFeeds, checkFeedStatus, feedResponseText, MAX_FEED_BYTES, FEED_FRESH_MS } from '../app/js/core/calendar-feed-list.js';
 
-export const FRESH_MS = 15 * 60 * 1000; // 이보다 오래되면 다시 받는다
+export const FRESH_MS = FEED_FRESH_MS;
 const TIMEOUT_MS = 20_000;
 
 /** 응답 본문을 limit 바이트까지만 */
@@ -112,10 +112,8 @@ export class CalendarFeeds {
     } catch {
       throw new Error('캘린더 주소에 연결하지 못했어요 (인터넷 확인)');
     }
-    if (res.status === 404 || res.status === 403 || res.status === 401) throw new Error('캘린더를 볼 수 없어요. 주소가 바뀌었거나 비공개 주소를 다시 만들었는지 확인해 주세요');
-    if (!res.ok) throw new Error(`캘린더 서버 오류 (${res.status})`);
-    const text = await readLimited(res, MAX_FEED_BYTES);
-    if (!looksLikeIcs(text)) throw new Error('캘린더(iCal) 주소가 아니에요. Google 캘린더는 "iCal 형식의 비공개 주소" 를 넣어 주세요');
+    checkFeedStatus(res.status); // 본문을 받기 전에
+    const text = feedResponseText(res.status, await readLimited(res, MAX_FEED_BYTES));
     const entry = { url: feed.url, text, at: this.now() };
     // 받는 사이 연결을 끊었거나 주소를 바꿨으면 남기지 않는다 (비공개 주소가 든 파일이 남지 않게)
     if (!this.list().some((f) => f.id === feed.id && f.url === feed.url)) return { text, at: entry.at };

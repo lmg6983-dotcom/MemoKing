@@ -4,72 +4,11 @@
 //   보내기: 메모킹 일정 → .ics 파일(삼성 캘린더 · Google 캘린더 · Outlook 가져오기) · Google 캘린더 "새 일정" 주소 · 휴대폰 캘린더 앱 새 일정
 import { ICAL } from '../../vendor/ical.js';
 import { toLocalIso, pad2 } from './time.js';
-import { isEvent, alertsOf, nextOccurrence, DEFAULT_ALERTS } from './reminders.js';
 
-export const MAX_FEED_BYTES = 5 * 1024 * 1024;
-export const MAX_FEEDS = 10;
-// 구독 캘린더 색 (메모 색과 겹치지 않는 진한 색 — 달력에서 "다른 캘린더" 로 보이게)
-export const FEED_COLORS = ['#4285f4', '#0b8043', '#8e24aa', '#f4511e', '#039be5', '#616161'];
-const MAX_ITERATIONS = 20000; // 반복 일정 하나마다 — 아주 오래된 매일 반복도 멈추지 않게
+export * from './calendar-feed-list.js';
+import { isEvent, alertsOf, nextOccurrence, occurrenceEnd, DEFAULT_ALERTS } from './reminders.js';
 
-/**
- * 붙여 넣은 캘린더 주소 → 받을 수 있는 주소 (webcal:// 은 https:// 로). 아니면 null
- * @param {string} raw
- */
-export function normalizeFeedUrl(raw) {
-  const text = String(raw ?? '').trim().replace(/^webcals?:\/\//i, 'https://');
-  let url;
-  try {
-    url = new URL(text);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
-  return url.toString();
-}
-
-/** 주소로 짐작한 캘린더 이름 — 이름을 비워 두면 */
-export function feedLabel(url) {
-  try {
-    const u = new URL(url);
-    if (/(^|\.)google\.com$/.test(u.hostname)) return 'Google 캘린더';
-    if (/(^|\.)(icloud|me)\.com$/.test(u.hostname)) return 'iCloud 캘린더';
-    if (/outlook|office|live\.com/.test(u.hostname)) return 'Outlook 캘린더';
-    return u.hostname.replace(/^www\./, '');
-  } catch {
-    return '캘린더';
-  }
-}
-
-/** 저장해 둔 구독 목록을 안전한 모양으로 [{ id, name, url, color, on }] */
-export function normalizeFeeds(list) {
-  if (!Array.isArray(list)) return [];
-  const seen = new Set();
-  const out = [];
-  for (const f of list) {
-    const url = normalizeFeedUrl(f?.url);
-    if (!url || seen.has(url)) continue;
-    seen.add(url);
-    out.push({
-      id: typeof f.id === 'string' && /^[\w-]{1,40}$/.test(f.id) ? f.id : `c${Math.random().toString(36).slice(2, 8)}`,
-      name: String(f.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40) || feedLabel(url),
-      url,
-      color: /^#[0-9a-f]{6}$/i.test(f.color ?? '') ? f.color : FEED_COLORS[out.length % FEED_COLORS.length],
-      on: f.on !== false,
-    });
-    if (out.length >= MAX_FEEDS) break;
-  }
-  return out;
-}
-
-/** .ics 글의 캘린더 이름 (X-WR-CALNAME) */
-export function icsName(text) {
-  const m = /^X-WR-CALNAME:(.*)$/m.exec(String(text ?? '').replace(/\r?\n[ \t]/g, ''));
-  return m ? m[1].replace(/\\([,;\\])/g, '$1').trim().slice(0, 40) : '';
-}
-
-/** 받은 글이 iCal 인가 (로그인 화면 HTML 같은 것을 거르게) */
-export const looksLikeIcs = (text) => /BEGIN:VCALENDAR/i.test(String(text ?? '').slice(0, 2000));
+const MAX_ITERATIONS = 100000; // 반복 일정 하나마다 — 아주 오래된 매일 반복도 멈추지 않게
 
 const plainText = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 
@@ -140,8 +79,13 @@ export function feedEvents(source, from, to, limit = 1500) {
     }
     const it = ev.iterator();
     let budget = MAX_ITERATIONS;
+    // 범위 훨씬 앞의 회차는 시각만 보고 건너뛴다 (회차마다 자세히 풀면 오래된 반복이 느려진다).
+    //   일정 길이 + 하루만큼 여유 — 범위 앞에서 시작해 범위로 이어지는 회차는 놓치지 않게. 옮긴 회차는 아래에서 따로
+    const span = Math.max(0, (ev.endDate?.toJSDate().getTime() ?? 0) - ev.startDate.toJSDate().getTime()) + 86_400_000;
     for (let next = it.next(); next && budget-- > 0; next = it.next()) {
-      if (next.toJSDate().getTime() >= toMs) break;
+      const at = next.toJSDate().getTime();
+      if (at >= toMs) break;
+      if (at + span <= fromMs) continue;
       const d = ev.getOccurrenceDetails(next);
       // 바뀐 회차는 그 일정의 상태(취소 등)로 본다
       push(d.item, d.startDate, d.endDate);
@@ -187,7 +131,7 @@ export function reminderFromExternal(ev, now = new Date()) {
     alerts: [...(allDay ? DEFAULT_ALERTS.allDay : DEFAULT_ALERTS.timed)],
     ...(allDay ? { allDay: true } : {}),
     action: 'notify',
-    enabled: start > now,
+    enabled: occurrenceEnd(start, allDay) > now, // 오늘 하루 종일 일정도 켜 둔다 (당일 오전 9시 알림이 아직이면 울리게)
     created: toLocalIso(now),
   };
 }

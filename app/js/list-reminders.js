@@ -111,6 +111,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       feeds = [];
     }
     device.on = Boolean(calendars.device?.enabled());
+    device.loading = null; // 껐다 켰으면 받는 중이던 것은 버린다
     await Promise.all(feeds.filter((f) => f.on).map(async (f) => {
       try {
         const got = await calendars.fetch(f.id, force);
@@ -136,7 +137,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     if (device.loading && device.loading.from <= range.from && device.loading.to >= range.to) return;
     device.loading = range;
     calendars.device.events(new Date(range.from), new Date(range.to)).then((res) => {
-      if (device.loading !== range) return;
+      if (device.loading !== range || !calendars.device.enabled()) return;
       device = { on: Boolean(res.granted), from: range.from, to: range.to, events: (res.events ?? []).map(fromDeviceEvent), loading: null };
       render();
     }).catch((err) => {
@@ -353,15 +354,16 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     datesSet: (arg) => {
       title.textContent = arg.view.title;
       dayIndexCache = null; // 보이는 날이 바뀜 — 낮은 창의 색 점도 새로
-      if (compact) queueMicrotask(() => render());
+      let again = compact;
       // 달이 바뀌면 고른 날도 그 달로 (월 보기에서 옆 달로 넘겼을 때 아래 목록이 엉뚱한 달을 보이지 않게)
       const start = arg.view.currentStart;
       const end = arg.view.currentEnd;
       if (selected < start || selected >= end) {
         const t = today();
         selected = t >= start && t < end ? t : dayStart(start);
-        queueMicrotask(() => render()); // 그리는 중에 옵션을 바꾸지 않게
+        again = true;
       }
+      if (again) queueMicrotask(() => render()); // 한 번만 · 그리는 중에 옵션을 바꾸지 않게
     },
     dateClick: (arg) => pickDay(arg.date),
     eventClick: (arg) => {
@@ -466,6 +468,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       // 앞으로 옮기면 새 시각의 알림이 다시 울리게, 지난 때로 옮기면 "놓친 알림" 이 울리지 않게 울린 것으로.
       // 꺼 둔 알림은 꺼진 채 (끌어 옮긴다고 켜지지 않게)
       last: occurrenceEnd(start, allDay) > now ? null : toLocalIso(now),
+      // 다 울려 저절로 꺼진 일정을 앞으로 옮기면 다시 켠다 (사용자가 끈 것은 꺼진 채)
+      enabled: r.enabled || (isDone(r) && occurrenceEnd(start, allDay) > now),
     };
     if (!moved.allDay) delete moved.allDay;
     try {
@@ -559,8 +563,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       main.title = '캘린더 앱에서 열기';
       main.addEventListener('click', () => openExternal(e));
     } else {
-      main.title = `${e.source} 일정 (메모킹에서는 보기만)`;
-      main.addEventListener('click', () => importExternal(e));
+      main.title = `${e.source} 일정 (메모킹에서는 보기만 — 오른쪽 단추로 메모로 가져오기)`;
+      main.disabled = true;
     }
     const take = el('button', 'icon-btn ev-import');
     take.type = 'button';
@@ -572,20 +576,30 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     return div;
   }
 
+  // 다른 캘린더 일정 누르기: 휴대폰 캘린더는 캘린더 앱에서 열고, 구독 캘린더는 그날을 골라 아래 목록에 (가져오기는 단추로만)
   function openExternal(e) {
     if (e.device && calendars?.device) {
       calendars.device.view({ id: e.deviceId, start: e.start.getTime(), end: e.end.getTime() }).catch(() => {});
       return;
     }
-    importExternal(e);
+    pickDay(e.start, { add: false });
   }
 
   let importing = false;
   async function importExternal(e) {
     if (importing || !api.reminders.add) return;
+    // 이미 가져온 일정(같은 이름 · 같은 날 · 같은 시각)이면 또 만들지 않고 그 메모를 연다
+    const r0 = reminderFromExternal(e);
+    const same = items.find((i) => i.reminder.kind === 'at' && (i.reminder.title || i.title) === r0.title
+      && new Date(i.reminder.at).getTime() === new Date(r0.at).getTime());
+    if (same) {
+      notify(`"${e.title}" 은(는) 이미 메모킹 일정에 있어요`);
+      api.memo.open(same.memoId);
+      return;
+    }
     importing = true;
     try {
-      const id = await api.reminders.add(null, reminderFromExternal(e), e.title);
+      const id = await api.reminders.add(null, r0, e.title);
       await refresh();
       notify(`"${e.title}" 을(를) 메모킹 일정으로 가져왔어요`);
       if (id) api.memo.open(id);

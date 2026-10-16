@@ -724,6 +724,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .ev-row.off { opacity: 0.55; }
 .ev-ext .row-dot { border-radius: 99px; background: var(--ext-color); }
 .ev-ext .row-main { cursor: default; }
+.ev-ext .row-main:disabled { opacity: 1; color: inherit; }
 .ev-row .ev-send svg, .ev-row .ev-import svg { width: 17px; height: 17px; }
 .ev-feed-error { display: flex; align-items: flex-start; gap: 6px; color: var(--danger); }
 .ev-feed-error svg { width: 15px; height: 15px; flex: none; margin-top: 2px; }

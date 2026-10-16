@@ -215,3 +215,14 @@ END:VCALENDAR`;
   assert.ok(events.some((e) => e.title === '주간 (앞당김)'), '옮긴 회차');
   assert.equal(events.filter((e) => e.title === '매일 0').length, 17);
 });
+
+test('오늘 하루 종일 일정을 가져오면 켜 둠 · 아주 오래된 매시간 반복도 오늘 회차가 보임', () => {
+  const now = local(2026, 10, 16, 8);
+  const today = normalizeReminder(reminderFromExternal({ title: '생일', start: local(2026, 10, 16), allDay: true }, now));
+  assert.equal(today.enabled, true);
+  const hourly = 'BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nUID:h\nDTSTART:20200101T000000Z\nRRULE:FREQ=HOURLY\nSUMMARY:매시간\nEND:VEVENT\nEND:VCALENDAR';
+  const t = Date.now();
+  const got = feedEvents(hourly, new Date(Date.UTC(2026, 9, 16)), new Date(Date.UTC(2026, 9, 17)));
+  assert.equal(got.length, 24);
+  assert.ok(Date.now() - t < 8000);
+});

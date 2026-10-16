@@ -4,7 +4,7 @@ import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
-import { normalizeFeeds, looksLikeIcs, MAX_FEED_BYTES } from '../../app/js/core/calendar-feeds.js';
+import { normalizeFeeds, feedResponseText, MAX_FEED_BYTES, FEED_FRESH_MS } from '../../app/js/core/calendar-feed-list.js';
 import { extractTitle, isBlankBody, COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
 import { shareText } from '../../app/js/core/share-text.js';
@@ -49,7 +49,6 @@ injectMobileIcons();
 // 구독 주소는 비밀(누구나 그 캘린더를 볼 수 있음)이라 메모 폴더(Drive 동기화)가 아니라 이 휴대폰에만 둔다
 const FEEDS_KEY = 'memoking.calendarFeeds';
 const DEVICE_KEY = 'memoking.deviceCalendar';
-const FEED_FRESH_MS = 15 * 60 * 1000;
 const FEED_CACHE_MAX = 400 * 1024; // 이보다 큰 캘린더는 앱을 켤 때마다 다시 받는다
 const lsGet = (k) => {
   try {
@@ -108,11 +107,10 @@ function calendarApi() {
       if (!force && old && Date.now() - old.at < FEED_FRESH_MS) return { text: old.text, at: old.at };
       try {
         const res = await call('http', { url: f.url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
-        if ([401, 403, 404].includes(res.status)) throw new Error('캘린더를 볼 수 없어요. 주소가 바뀌었거나 비공개 주소를 다시 만들었는지 확인해 주세요');
-        if (res.status < 200 || res.status > 299) throw new Error(`캘린더 서버 오류 (${res.status})`);
-        const text = new TextDecoder().decode(Uint8Array.from(res.latin1 ?? '', (c) => c.charCodeAt(0) & 0xff));
-        if (!looksLikeIcs(text)) throw new Error('캘린더(iCal) 주소가 아니에요. Google 캘린더는 "iCal 형식의 비공개 주소" 를 넣어 주세요');
+        const text = feedResponseText(res.status, new TextDecoder().decode(Uint8Array.from(res.latin1 ?? '', (c) => c.charCodeAt(0) & 0xff)));
         const entry = { url: f.url, text, at: Date.now() };
+        // 받는 사이 연결을 끊었거나 주소를 바꿨으면 남기지 않는다 (비공개 캘린더가 저장 공간에 남지 않게)
+        if (!feeds().some((x) => x.id === f.id && x.url === f.url)) return { text, at: entry.at };
         mem.set(f.id, entry);
         // 다시 켰을 때 · 인터넷이 없을 때 보이게 작은 캘린더만 저장 (localStorage 는 몇 MB 뿐 — 다른 설정을 밀어내지 않게)
         lsSet(cacheKey(f.id), text.length <= FEED_CACHE_MAX ? JSON.stringify(entry) : null);
