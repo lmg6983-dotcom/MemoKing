@@ -1,5 +1,6 @@
 import { haptic } from './dom.js';
 import { copyBlock, saveBlock, shareBlock, canShare } from './copy-content.js';
+import { SHARE_DONE } from './share-menu.js';
 // 지우기 단추 (×) — 꾹 눌렀다 그 자리에 놓은 것의 오른쪽 위에 잠깐 (block-move.js 내용 줄·목록 전체 · list-drag.js 목록 항목 함께)
 //   흰 동그라미에 빨간 ×. 한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
 //   PC(마우스): 그림·손 메모·소리·파일·링크 카드에 마우스를 올려도 뜬다 (hover — 시간으로 사라지지 않고, 마우스가 떠나면 거둔다.
@@ -201,7 +202,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   action(copyBtn, COPY_ICON, () => copyBlock(view, pos, node, target), (what) => (what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
     : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : what === '링크' ? '링크 주소를 복사했어요' : '내용을 복사했어요'));
   action(saveBtn, SAVE_ICON, () => saveBlock(view, pos, node, target), (name) => `저장했어요: ${name}`);
-  if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, pos, node, target), () => '공유했어요'); // 휴대폰만 (PC 는 공유 단추 없음)
+  if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, pos, node, target), (what) => SHARE_DONE[what] ?? '공유했어요');
   if (openBtn) {
     let opened = false;
     const go = (e) => {

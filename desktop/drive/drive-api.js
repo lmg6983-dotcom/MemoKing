@@ -134,6 +134,12 @@ export class DriveApi {
     return item(await this.json('POST', `${API}/files?fields=${encodeURIComponent(FIELDS)}`, { name, mimeType: FOLDER, parents: [parentId] }));
   }
 
+  /** 링크가 있는 사람은 볼 수 있게 열고 그 링크 (공유) — 조직 설정이 막으면 DriveError 403 */
+  async shareLink(id) {
+    await this.json('POST', `${API}/files/${encodeURIComponent(id)}/permissions?fields=id`, { type: 'anyone', role: 'reader' });
+    return (await this.request('GET', `${API}/files/${encodeURIComponent(id)}?fields=webViewLink`)).webViewLink ?? `https://drive.google.com/file/d/${id}/view`;
+  }
+
   async trash(id) {
     await this.json('PATCH', `${API}/files/${encodeURIComponent(id)}?fields=id`, { trashed: true });
   }

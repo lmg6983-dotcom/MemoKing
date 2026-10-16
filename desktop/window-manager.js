@@ -202,7 +202,8 @@ export class WindowManager {
     return this.createNoteWindow(id, { inactive, record, ink, big });
   }
 
-  createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false, ink = false, big = false } = {}) {
+  /** onReady: 보이지 않게 만든 창(show: false)이 메모를 다 그렸을 때 (스택 탭 — 예비 창도 쓴다) */
+  createNoteWindow(id, { inactive = false, show = true, bounds = null, record = false, ink = false, big = false, onReady = null, useSpare = true } = {}) {
     const vault = this.getVault();
     const memo = vault?.get(id);
     if (!memo) return null;
@@ -214,7 +215,7 @@ export class WindowManager {
     );
     const at = bounds ?? (onScreen(saved) ? saved : defaultBounds);
     // 보여 줄 창이면 미리 불러 둔 예비 창을 쓴다 (편집기를 새로 읽지 않아 바로 뜬다)
-    const spare = show ? this.takeSpare() : null;
+    const spare = (show || onReady) && useSpare ? this.takeSpare() : null;
     let win;
     if (spare) {
       win = spare.win;
@@ -280,7 +281,7 @@ export class WindowManager {
       this.endWindowDrag(id);
     });
     win.on('resized', remember);
-    const reveal = () => (inactive ? win.showInactive() : win.show());
+    const ready = onReady ?? (show ? () => (inactive ? win.showInactive() : win.show()) : null);
     if (spare) {
       // 이미 한 번 그린 창이라 ready-to-show 가 다시 오지 않는다 — 화면이 메모를 그렸다고 알려 오면(win:painted) 보인다
       const mark = trackPaint(win, { manual: true });
@@ -289,10 +290,10 @@ export class WindowManager {
         clearTimeout(fallback);
         mark();
       });
-      whenPainted(win, reveal);
+      if (ready) whenPainted(win, ready);
     } else {
       trackPaint(win);
-      if (show) win.once('ready-to-show', reveal);
+      if (ready) win.once('ready-to-show', ready);
     }
     this.pushList();
 
@@ -805,7 +806,11 @@ export class WindowManager {
       if (now && now.active !== id) return;
       if (win.isMinimized()) win.restore();
       const shown = now ? this.visibleStackWin(now, id) : null;
-      win.setBounds(shown?.getNormalBounds() ?? bounds);
+      const target = shown?.getNormalBounds() ?? bounds;
+      const cur = win.getBounds();
+      // 같은 자리 · 크기면 그대로 (다시 맞추면 화면을 새로 그려 한 번 출렁인다)
+      if (cur.x !== target.x || cur.y !== target.y || cur.width !== target.width || cur.height !== target.height) win.setBounds(target);
+      win.webContents.send('stack:activating'); // 보이기 전에 서식 막대를 미리 펴 둔다 (포커스를 받으며 올라오느라 본문이 출렁이지 않게)
       this.applyLayer(win, id, { sticker: false });
       const veiled = Boolean(shown) && !win.isVisible() && process.platform === 'win32';
       const state = this.layerState(id);
@@ -843,13 +848,32 @@ export class WindowManager {
       });
     };
     if (!win) {
-      win = this.createNoteWindow(id, { show: false, bounds });
+      // 처음 여는 탭: 미리 불러 둔 예비 창을 쓴다 (편집기를 새로 읽지 않게)
+      win = this.createNoteWindow(id, { show: false, bounds, onReady: reveal });
       if (!win) return null;
-      win.once('ready-to-show', reveal);
     } else reveal();
     this.pushStackTo(stack.memos);
     this.pushList();
+    this.prewarmStack(stack);
     return win;
+  }
+
+  /**
+   * 스택의 다른 탭들도 숨긴 창으로 미리 만들어 둔다 — 처음 그 탭으로 바꿀 때 창을 새로 만들며 기다리지 않게.
+   *   한 번에 하나씩, 조금 쉬었다가 (지금 보이는 탭을 그리는 데 방해되지 않게)
+   */
+  prewarmStack(stack) {
+    clearTimeout(this.prewarmTimer);
+    this.prewarmTimer = setTimeout(() => {
+      if (this.isQuitting() || !this.stacks) return;
+      const now = stack.memos.map((m) => this.stacks.stackOf(m)).find(Boolean); // 그사이 탭이 빠지거나 합쳐졌을 수 있다
+      const missing = now?.memos.find((m) => !this.noteWins.has(m) && this.getVault()?.get(m));
+      if (!missing) return;
+      const shown = this.visibleStackWin(now);
+      const at = shown?.getNormalBounds() ?? (onScreen(settings.noteBounds[missing]) ? settings.noteBounds[missing] : null);
+      // 예비 창은 쓰지 않는다 (지금 열려는 다른 메모가 가져가게 남겨 둠) — 다 그린 뒤 다음 탭
+      this.createNoteWindow(missing, { show: false, bounds: at, useSpare: false, onReady: () => this.prewarmStack(now) });
+    }, 700);
   }
 
   stackInto(targetId, movingId) {

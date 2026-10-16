@@ -21,6 +21,8 @@ import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront, broadcast } from
 import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
 import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
+import { shareSheet, mailAttach, openLocalSend, findLocalSend, LOCALSEND_DOWNLOAD } from './share-file.js';
+import { driveShareLink } from './share-drive.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: Math.round(p.x), y: Math.round(p.y) } : null);
@@ -863,6 +865,88 @@ export function registerIpc(ctx) {
     }
     if (SMOKE) smokeOpened.push({ kind: 'save', target: file });
     return { name: SMOKE ? name : path.basename(file) };
+  });
+  // ---------- 공유 (내용 단추 › 공유 › 방법 고르기) ----------
+  // 공유할 파일: 메모 폴더의 첨부는 그대로, 만든 내용(표 CSV · 글 · 그림 PNG)은 임시 파일로
+  const shareSource = (f) => {
+    if (f.rel) {
+      const file = /^attachments\//.test(String(f.rel)) ? getVault()?.resolve(String(f.rel)) : null;
+      if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
+      return { file };
+    }
+    if (typeof f.base64 !== 'string') return { error: '공유할 내용이 없어요' };
+    const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
+    const dir = path.join(app.getPath('temp'), 'memoking-share');
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      // 지난 공유 때 만든 임시 파일은 하루가 지나면 치운다 (공유 창이 넘겨받을 동안은 남겨 두고)
+      for (const old of fs.readdirSync(dir)) {
+        const p = path.join(dir, old);
+        if (Date.now() - (fs.statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 86_400_000) fs.rmSync(p, { force: true });
+      }
+      const file = path.join(dir, name);
+      fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
+      return { file };
+    } catch (err) {
+      console.warn('[share]', err);
+      return { error: '공유할 파일을 만들지 못했어요. 다시 눌러 주세요' };
+    }
+  };
+  // 고를 수 있는 방법과 지금 쓸 수 있는지
+  ipcMain.handle('share:targets', () => {
+    const drive = getDriveAuth()?.connected ?? false;
+    const localSend = Boolean(findLocalSend());
+    return [
+      { id: 'sheet', label: 'Windows 공유', sub: '근처 공유 · Quick Share · 메일 · 카카오톡 등 공유를 받는 앱', ready: process.platform === 'win32' || SMOKE },
+      { id: 'drive', label: 'Google Drive 링크', sub: drive ? '올리고 링크를 복사해요 (링크가 있는 사람은 보기)' : '설정에서 Google Drive 를 연결하면 쓸 수 있어요', ready: drive },
+      { id: 'localsend', label: 'LocalSend', sub: localSend ? '같은 와이파이의 휴대폰 · PC 로 바로 (오픈소스)' : '무료 오픈소스 앱 — 누르면 내려받기 페이지를 열어요', ready: true },
+      { id: 'mail', label: '메일에 첨부', sub: '기본 메일 앱(Outlook 등)의 새 메일에', ready: process.platform === 'win32' || SMOKE },
+    ];
+  });
+  ipcMain.handle('attachment:share', async (e, f = {}) => {
+    const via = String(f.via ?? 'sheet');
+    const src = shareSource(f);
+    if (src.error) return src;
+    const { file } = src;
+    const title = path.basename(file);
+    if (SMOKE) {
+      smokeOpened.push({ kind: 'share', via, target: file });
+      return via === 'drive' ? { ok: true, link: 'https://drive.google.com/smoke' } : { ok: true };
+    }
+    if (via === 'drive') {
+      const api = getDriveApi();
+      if (!api || !getDriveAuth()?.connected) return { error: '설정에서 Google Drive 를 먼저 연결해 주세요' };
+      try {
+        const link = await driveShareLink(api, {
+          folderId: settings.drive?.shareFolderId,
+          saveFolderId: (id) => {
+            settings.drive = { ...settings.drive, shareFolderId: id };
+            saveSettings();
+          },
+        }, file, title);
+        clipboard.writeText(link);
+        return { ok: true, link };
+      } catch (err) {
+        return { error: err?.status === 403 ? '조직 설정 때문에 링크로 공유할 수 없어요. Windows 공유나 메일을 써 주세요' : `Google Drive 에 올리지 못했어요 (${err?.message ?? err})` };
+      }
+    }
+    if (via === 'localsend') {
+      const r = await openLocalSend(file);
+      if (r === 'missing') {
+        shell.openExternal(LOCALSEND_DOWNLOAD);
+        return { missing: true };
+      }
+      return r === 'ok' ? { ok: true } : { error: `LocalSend 를 열지 못했어요 (${r.replace(/^err /, '')})` };
+    }
+    if (via === 'mail') {
+      const r = await mailAttach(file, title);
+      return r === 'ok' ? { ok: true } : { error: /mapi/.test(r) ? '기본 메일 앱을 찾지 못했어요. Windows 공유를 써 보세요' : `새 메일을 만들지 못했어요 (${r.replace(/^err /, '')})` };
+    }
+    const r = await shareSheet(file, title);
+    if (r === 'ok') return { ok: true };
+    console.warn('[share] Windows 공유 창:', r);
+    shell.showItemInFolder(file); // 공유 창을 열지 못하면 탐색기에서 골라 두어 오른쪽 클릭 › 공유 · 끌어다 보내기
+    return { fallback: true, reason: r.replace(/^err /, '') };
   });
   ipcMain.handle('attachment:info', (_e, rel) => {
     let decoded = String(rel ?? '');

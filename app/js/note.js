@@ -25,6 +25,7 @@ import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
 import { hintOnce } from './hints.js';
 import { toggleShortcutSheet } from './shortcut-sheet.js';
+import { chooseShare } from './share-menu.js';
 import { KEYMAP_ACTIONS, keymapTable, resolveKeymap, comboLabel } from './core/keymap.js';
 import { hotkeyDialog } from './hotkey-dialog.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
@@ -43,7 +44,17 @@ setCopyHost({
     if (r?.error) throw new Error(r.error);
     return r?.cancelled ? 'cancelled' : r.name;
   },
-  // 공유 단추는 PC 에 두지 않는다 (저장 단추와 겹침 — 저장한 파일을 보내면 됨). 휴대폰만 공유 창
+  // 공유 단추: 방법을 고른다 (Windows 공유 · Google Drive 링크 · LocalSend · 메일) — share-menu.js
+  share: async (f) => {
+    const anchor = document.querySelector('.mk-share-btn') ?? document.activeElement ?? document.body;
+    const via = await chooseShare(anchor, await api.attachments.shareTargets());
+    if (!via) return 'cancelled';
+    const r = await api.attachments.share({ ...f, via });
+    if (r?.error) throw new Error(r.error);
+    if (r?.fallback) return 'fallback';
+    if (r?.missing) return 'localsend-missing';
+    return { sheet: 'shared', drive: 'link', localsend: 'localsend', mail: 'mail' }[via];
+  },
 });
 // 저장 단추의 결과 (delete-button.js)
 window.addEventListener('mk:notice', (e) => setStatus(e.detail?.text ?? '', Boolean(e.detail?.error)));
@@ -1344,7 +1355,8 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.code === 'Tab' && !tabsEl.hidden) {
     e.preventDefault();
     e.stopPropagation();
-    flush().then(() => api.stack.cycle(id, e.shiftKey ? -1 : 1));
+    flush(); // 저장을 기다리지 않고 바로 (위 탭 누르기와 같음)
+    api.stack.cycle(id, e.shiftKey ? -1 : 1);
     return;
   }
   const combo = `${e.ctrlKey || e.metaKey ? 'ctrl+' : ''}${e.shiftKey ? 'shift+' : ''}${e.altKey ? 'alt+' : ''}${e.code}`;
@@ -1500,13 +1512,28 @@ window.addEventListener('keydown', (e) => {
 
 // ---------- 아래 서식 도구막대: 메모 창이 활성일 때나 마우스가 창 아래쪽에 있을 때만 (미끄러져 올라옴, v0.17.16) ----------
 let barHover = false;
+let tabArriving = false; // 스택 탭으로 바뀌는 중 (아래 stack:activating)
+let tabArriveTimer = 0;
 const barHeight = () => el.formatBar.offsetHeight || 38;
 const popoverOpen = () => !el.palette.hidden || !el.morePanel.hidden || !document.getElementById('style-menu').hidden;
 function updateBar() {
   document.body.style.setProperty('--bar-h', `${barHeight()}px`);
   const coaching = document.body.classList.contains('coaching'); // 튜토리얼 말풍선이 도구막대를 가리킬 수 있게
-  document.body.classList.toggle('bar-hidden', !(document.hasFocus() || barHover || popoverOpen() || coaching));
+  document.body.classList.toggle('bar-hidden', !(document.hasFocus() || barHover || popoverOpen() || coaching || tabArriving));
 }
+// 스택에서 이 탭으로 바뀌려 할 때 (main 이 보이기 전에 알림): 서식 막대를 움직임 없이 미리 펴 둔다 —
+//   보인 뒤 포커스를 받으며 막대가 올라오면 본문 높이가 바뀌어 한 번 출렁이므로. 포커스가 오면(또는 잠시 뒤) 평소대로
+api.on('stack:activating', () => {
+  tabArriving = true;
+  document.body.classList.add('tab-arriving');
+  updateBar();
+  clearTimeout(tabArriveTimer);
+  tabArriveTimer = setTimeout(() => {
+    tabArriving = false;
+    document.body.classList.remove('tab-arriving');
+    updateBar();
+  }, 600);
+});
 let wasCoaching = false;
 new MutationObserver(() => {
   const now = document.body.classList.contains('coaching');
@@ -1597,7 +1624,12 @@ function tutEvent(name) {
 document.addEventListener('mk:content-tools', () => tutEvent('content-tools'));
 
 const TAB_CHARS = 7;
+let stackKey = '';
 function renderStack(state) {
+  // 같은 탭 줄이면 그대로 (탭을 바꿀 때 두 번씩 와서 탭 줄을 통째로 다시 그리면 깜빡인다)
+  const key = JSON.stringify(state?.members ?? []);
+  if (key === stackKey) return;
+  stackKey = key;
   const members = state?.members ?? [];
   const stacked = members.length >= 2;
   tabsEl.hidden = !stacked;
@@ -1645,7 +1677,8 @@ tabsEl.addEventListener('click', async (e) => {
   }
   const tab = e.target.closest('[data-tab-id]');
   if (tab && tab.dataset.tabId !== id) {
-    await flush();
+    // 저장을 기다리지 않고 바로 바꾼다 (저장은 함께 진행 — 다른 탭은 이 메모의 글이 필요 없다)
+    flush();
     api.stack.activate(tab.dataset.tabId);
   }
 });
@@ -1703,7 +1736,10 @@ function endTabPress(e, cancelled = false) {
   p.el.style.transform = '';
   document.body.classList.remove('tab-dragging');
   if (p.torn) api.stack.tearEnd(e.screenX, e.screenY);
-  else if (p.moved && !cancelled && p.tabId !== id) flush().then(() => api.stack.activate(p.tabId));
+  else if (p.moved && !cancelled && p.tabId !== id) {
+    flush(); // 저장을 기다리지 않고 바로 (탭 누르기와 같음)
+    api.stack.activate(p.tabId);
+  }
 }
 window.addEventListener('pointerup', (e) => endTabPress(e));
 window.addEventListener('pointercancel', (e) => endTabPress(e, true));
