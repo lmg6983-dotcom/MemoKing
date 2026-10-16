@@ -24,6 +24,7 @@ try {
   $refs = @(
     (Join-Path $fw 'System.Runtime.WindowsRuntime.dll'), (Join-Path $fw 'System.Runtime.dll'),
     (Join-Path $fw 'System.Runtime.InteropServices.WindowsRuntime.dll'), (Join-Path $fw 'System.Windows.Forms.dll'),
+    (Join-Path $fw 'System.Drawing.dll'), # Form 을 쓰려면 함께 있어야 컴파일된다 (없으면 매번 실패해 탐색기로 빠졌다)
     (Join-Path $wm 'Windows.ApplicationModel.winmd'), (Join-Path $wm 'Windows.Foundation.winmd'), (Join-Path $wm 'Windows.Storage.winmd')
   )
   Add-Type -ReferencedAssemblies $refs -TypeDefinition @'

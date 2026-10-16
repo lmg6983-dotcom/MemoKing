@@ -1882,3 +1882,4 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 .mk-share-menu b { font-size: 13px; font-weight: 700; }
 .mk-share-menu small { font-size: 11.5px; line-height: 1.35; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .mk-share-menu { animation: none; } }
+.mk-share-menu .mk-share-cancel { display: block; margin-top: 4px; padding: 8px; border-top: 1px solid var(--line, var(--border)); border-radius: 0 0 8px 8px; text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); }

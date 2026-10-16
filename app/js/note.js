@@ -51,7 +51,11 @@ setCopyHost({
     if (!via) return 'cancelled';
     const r = await api.attachments.share({ ...f, via });
     if (r?.error) throw new Error(r.error);
-    if (r?.fallback) return 'fallback';
+    if (r?.fallback) {
+      // 까닭을 함께 (설정 폴더의 share.log 에도 남음)
+      setStatus(`Windows 공유 창을 열지 못해 탐색기에서 파일을 골라 두었어요 (${String(r.reason ?? '').slice(0, 120)})`, true);
+      return 'cancelled'; // 위 안내를 그대로 둔다
+    }
     if (r?.missing) return 'localsend-missing';
     return { sheet: 'shared', drive: 'link', localsend: 'localsend', mail: 'mail' }[via];
   },

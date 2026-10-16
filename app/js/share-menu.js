@@ -60,6 +60,13 @@ export function chooseShare(anchor, targets) {
     });
     el.append(b);
   }
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'mk-share-cancel';
+  cancel.setAttribute('role', 'menuitem');
+  cancel.textContent = '취소';
+  cancel.addEventListener('click', () => close());
+  el.append(cancel);
   document.body.append(el);
   // 단추 아래(자리가 없으면 위), 화면 밖으로 나가지 않게
   const r = anchor.getBoundingClientRect();
