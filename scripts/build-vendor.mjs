@@ -23,6 +23,9 @@ const DEPS = {
   zod: '4.6.5',
   '@noble/ciphers': '2.4.0',
   '@noble/hashes': '2.4.0',
+  fullcalendar: '7.1.0',
+  'temporal-polyfill': '1.0.5',
+  'ical.js': '2.2.1',
   esbuild: '0.28.2',
 };
 
@@ -60,6 +63,8 @@ await esbuild.build({
     'es-hangul': join(ROOT, 'scripts', 'vendor', 'es-hangul.js'),
     chrono: join(ROOT, 'scripts', 'vendor', 'chrono.js'),
     'noble-crypto': join(ROOT, 'scripts', 'vendor', 'noble-crypto.js'),
+    fullcalendar: join(ROOT, 'scripts', 'vendor', 'fullcalendar.js'),
+    ical: join(ROOT, 'scripts', 'vendor', 'ical.js'),
   },
   outdir: OUT,
   bundle: true,
@@ -89,6 +94,9 @@ await esbuild.build({
 });
 copyFileSync(join(MODULES, '@milkdown', 'prose', 'lib', 'style', 'prosemirror.css'), join(OUT, 'prosemirror.css'));
 copyFileSync(join(MODULES, 'plyr', 'dist', 'plyr.css'), join(OUT, 'plyr.css'));
+// 달력(FullCalendar): 뼈대 · 테마 · 색 한 파일로 (색은 list.css 에서 메모킹 색으로 덮는다)
+writeFileSync(join(OUT, 'fullcalendar.css'), ['skeleton.css', join('themes', 'forma', 'theme.css'), join('themes', 'forma', 'palettes', 'blue.css')]
+  .map((f) => `/* fullcalendar/${f.replace(/\\/g, '/')} (MIT) */\n${readFileSync(join(MODULES, 'fullcalendar', f), 'utf8')}`).join('\n'));
 // 브랜드 글꼴 Pretendard (가변 글꼴 하나로 모든 굵기) — 인터넷 없이 쓰도록 앱에 넣는다
 mkdirSync(join(OUT, 'fonts'), { recursive: true });
 copyFileSync(join(MODULES, 'pretendard', 'dist', 'web', 'variable', 'woff2', 'PretendardVariable.woff2'), join(OUT, 'fonts', 'PretendardVariable.woff2'));

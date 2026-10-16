@@ -895,18 +895,21 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
   .cal { padding: 6px 6px 4px; }
   .cal-head { margin-bottom: 2px; }
   .cal-nav { width: 28px; height: 28px; }
-  .cal-day { min-height: 30px; padding: 2px 0; gap: 1px; }
-  .cal-num { min-width: 22px; height: 22px; font-size: 12.5px; }
-  .cal-dots { height: 4px; }
-  .cal-dots i { width: 4px; height: 4px; }
+  .cal-bar { margin-bottom: 4px; }
+  .cal-views button { height: 24px; }
+  .cal-body { font-size: 12px; }
 }
-@container evrows (max-height: 420px) {
-  .cal-day { min-height: 24px; padding: 1px 0; }
-  .cal-num { height: 20px; }
-  .cal-wd { padding: 0 0 2px; }
+@container evrows (max-height: 300px) {
+  .cal { padding: 4px 4px 2px; }
+  .cal-head { margin: 0; }
+  .cal-nav { width: 24px; height: 24px; }
+  .cal-title { font-size: 13.5px; }
+  .cal-bar { margin-bottom: 2px; }
+  .cal-views { padding: 2px; }
+  .cal-views button { height: 22px; }
 }
 @container evrows (min-width: 640px) {
-  #reminder-groups { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); column-gap: 16px; align-content: start; }
+  #reminder-groups { display: grid; grid-template-columns: minmax(300px, 1.15fr) minmax(280px, 1fr); column-gap: 16px; align-content: start; }
   #reminder-groups > * { grid-column: 2; }
   #reminder-groups > .cal { grid-column: 1; grid-row: 1 / span 999; align-self: start; position: sticky; top: 0; }
 }

@@ -10,6 +10,7 @@ import { vaultUrl, mediaKind, fileExtension } from './media.js';
 import { memoBodyFromFile } from './core/file-memo.js';
 import { isTextDocument } from './core/markdown-import.js';
 import { setupRemindersTab } from './list-reminders.js';
+import { textBase64 } from './core/base64.js';
 import { setupHistoryTab } from './list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
@@ -935,6 +936,12 @@ let activeTab = 'memos';
 
 const remindersTab = setupRemindersTab({
   api, container: $('reminder-groups'), countEl: $('count-reminders'),
+  // 다른 캘린더: 구독은 메인이 받고, 보내기는 브라우저(Google 캘린더 새 일정) · 저장 창(.ics)
+  calendars: api.calendars && {
+    ...api.calendars,
+    openUrl: (url) => api.links.open(url),
+    exportIcs: (text, name) => api.attachments.saveAs({ name, mime: 'text/calendar', base64: textBase64(text) }),
+  },
 });
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockHistoryApp(appId, appName) {

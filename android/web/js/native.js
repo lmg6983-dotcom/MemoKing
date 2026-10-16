@@ -136,9 +136,5 @@ window.__mk = {
   },
 };
 
-// Uint8Array → base64 (큰 파일도 스택이 넘치지 않게 나눠서)
-export function toBase64(bytes) {
-  let s = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-}
+// Uint8Array → base64 (큰 파일도 스택이 넘치지 않게 나눠서) — 공용 core/base64.js
+export { bytesBase64 as toBase64 } from '../../app/js/core/base64.js';

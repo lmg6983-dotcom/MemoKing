@@ -57,6 +57,8 @@ const ICONS = {
   bell: `<path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15L6 16z" ${stroke}/><path d="M10 20.5a2 2 0 004 0" ${stroke}/>`,
   timer: `<circle cx="12" cy="13" r="7.5" ${stroke}/><path d="M12 9v4l2.5 2M9.5 3h5" ${stroke}/>`,
   calendar: `<rect x="3.5" y="5" width="17" height="15" rx="2" ${stroke}/><path d="M3.5 10h17M8 3v4M16 3v4" ${stroke}/>`,
+  // 캘린더로 보내기 (Google 캘린더 · 휴대폰 캘린더 앱): 달력 + 밖으로 나가는 화살표
+  'cal-out': `<path d="M15 19H6a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v4M4 10h14M8 3v4M14 3v4" ${stroke}/><path d="M14.5 17.5h6.5M18 14.5l3 3-3 3" ${stroke}/>`,
   repeat: `<path d="M17 3l3 3-3 3M20 6H8a4 4 0 00-4 4v1M7 21l-3-3 3-3M4 18h12a4 4 0 004-4v-1" ${stroke}/>`,
   power: `<path d="M12 3v8M7.1 6.3a7.5 7.5 0 109.8 0" ${stroke}/>`,
   copy: `<rect x="8" y="8" width="12" height="12" rx="2" ${stroke}/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" ${stroke}/>`,

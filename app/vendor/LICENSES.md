@@ -15,6 +15,9 @@
 | zod | 4.6.5 | MIT | https://github.com/colinhacks/zod |
 | @noble/ciphers | 2.4.0 | MIT | https://github.com/paulmillr/noble-ciphers |
 | @noble/hashes | 2.4.0 | MIT | https://github.com/paulmillr/noble-hashes |
+| fullcalendar | 7.1.0 | MIT | https://github.com/fullcalendar/fullcalendar |
+| temporal-polyfill | 1.0.5 | MIT | https://github.com/fullcalendar/temporal-polyfill |
+| ical.js | 2.2.1 | MPL-2.0 | https://github.com/kewisch/ical.js |
 | canvas-confetti | 1.9.4 | ISC | https://github.com/catdad/canvas-confetti |
 | tesseract.js (+ tesseract.js-core, kor tessdata_best) | 7.0.0 | Apache-2.0 | https://github.com/naptha/tesseract.js |
 | fuzzysort | 4.0.2 | MIT | https://github.com/farzher/fuzzysort |

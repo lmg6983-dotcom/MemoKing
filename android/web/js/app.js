@@ -4,6 +4,8 @@ import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
+import { FeedStore, feedResponseText, MAX_FEED_BYTES } from '../../app/js/core/calendar-feed-list.js';
+import { textBase64 } from '../../app/js/core/base64.js';
 import { extractTitle, isBlankBody, COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
 import { shareText } from '../../app/js/core/share-text.js';
@@ -44,6 +46,100 @@ injectIcons();
 attachSliders(); // 탭·고르기 칸: 선택 표시가 미끄러진다
 injectMobileIcons();
 
+// ---------- 일정 탭의 다른 캘린더 (list-reminders.js 가 씀) ----------
+// 구독 주소는 비밀(누구나 그 캘린더를 볼 수 있음)이라 메모 폴더(Drive 동기화)가 아니라 이 휴대폰에만 둔다
+const FEEDS_KEY = 'memoking.calendarFeeds';
+const DEVICE_KEY = 'memoking.deviceCalendar';
+const FEED_CACHE_MAX = 400 * 1024; // 이보다 큰 캘린더는 앱을 켤 때마다 다시 받는다
+const lsGet = (k) => {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+};
+const lsSet = (k, v) => {
+  try {
+    if (v == null) localStorage.removeItem(k);
+    else localStorage.setItem(k, v);
+  } catch {
+    // 저장 공간이 꽉 참 — 다음에 다시 받는다
+  }
+};
+
+function calendarApi() {
+  const mem = new Map(); // id → { url, text, at }
+  const cacheKey = (id) => `memoking.calendarFeed.${id}`;
+  // 받는 규칙(15분 · 겹쳐 받지 않기 · 끊은 구독은 남기지 않기)은 PC 와 같은 FeedStore
+  const store = new FeedStore({
+    getList: () => {
+      try {
+        return JSON.parse(lsGet(FEEDS_KEY) ?? '[]');
+      } catch {
+        return [];
+      }
+    },
+    setList: (list) => lsSet(FEEDS_KEY, JSON.stringify(list)),
+    download: async (url) => {
+      const res = await call('http', { url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
+      return feedResponseText(res.status, new TextDecoder().decode(Uint8Array.from(res.latin1 ?? '', (c) => c.charCodeAt(0) & 0xff)));
+    },
+    cache: {
+      read: (f) => {
+        if (!mem.has(f.id)) {
+          try {
+            const c = JSON.parse(lsGet(cacheKey(f.id)) ?? 'null');
+            if (c) mem.set(f.id, c);
+          } catch {
+            // 깨진 저장 — 다시 받는다
+          }
+        }
+        return mem.get(f.id) ?? null;
+      },
+      write: (f, entry) => {
+        mem.set(f.id, entry);
+        // 다시 켰을 때 · 인터넷이 없을 때 보이게 작은 캘린더만 저장 (localStorage 는 몇 MB 뿐 — 다른 설정을 밀어내지 않게)
+        lsSet(cacheKey(f.id), entry.text.length <= FEED_CACHE_MAX ? JSON.stringify(entry) : null);
+      },
+      remove: (id) => {
+        mem.delete(id);
+        lsSet(cacheKey(id), null);
+      },
+    },
+  });
+  return {
+    feeds: async () => store.list(),
+    setFeeds: async (list) => store.save(list),
+    fetch: (id, force = false) => store.get(id, { force }),
+    openUrl: (url) => call('openUrl', { url }),
+    exportIcs: async (text, name) => {
+      await call('shareFile', { base64: textBase64(text), name, mime: 'text/calendar', title: '캘린더로 보내기' });
+      return { ok: true };
+    },
+    // 휴대폰 캘린더 (삼성 캘린더 · Google 캘린더 등 — 안드로이드 CalendarContract)
+    device: {
+      enabled: () => lsGet(DEVICE_KEY) === '1',
+      // 켜기: 권한을 물어 허용해야 켜짐 → 켜졌는가
+      setEnabled: async (on) => {
+        if (!on) {
+          lsSet(DEVICE_KEY, null);
+          return false;
+        }
+        const granted = await call('calendarPermission').catch(() => false);
+        lsSet(DEVICE_KEY, granted ? '1' : null);
+        return Boolean(granted);
+      },
+      events: async (from, to) => {
+        const res = await call('calendarEvents', { from: from.getTime(), to: to.getTime() });
+        if (!res.granted) lsSet(DEVICE_KEY, null); // 설정에서 권한을 거둬 갔다
+        return res;
+      },
+      insert: (args) => call('calendarInsert', args),
+      view: (args) => call('calendarView', args),
+    },
+  };
+}
+
 // ---------- 데스크탑 모양의 API (reminder-panel.js · list-reminders.js 가 씀) ----------
 
 app.api = {
@@ -66,6 +162,8 @@ app.api = {
     },
   },
   memos: { search: async (query) => app.vault?.search(String(query ?? '')) ?? [] },
+  // 일정 탭이 함께 보는 다른 캘린더 — .ics 구독(이 휴대폰에만 저장) · 휴대폰 캘린더(삼성 캘린더 · Google 캘린더)
+  calendars: calendarApi(),
   memo: { open: (id) => app.openMemo(id) },
   copyText: async (text) => {
     native.copyText(text);

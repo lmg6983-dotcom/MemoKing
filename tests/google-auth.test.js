@@ -195,3 +195,46 @@ test('외부 앱 메모 연동 끄기: 다시 로그인을 취소해도 설정�
   await auth.login();
   assert.equal(scopes.at(-1), FILE);
 });
+
+test('로그인한 클라이언트를 기억: 연결 정보 없이 빌드된 새 버전으로 업데이트돼도 연결 · 새 토큰 · 다시 로그인이 그대로', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-auth-'));
+  const bundled = path.join(dir, 'google-client.json');
+  fs.writeFileSync(bundled, JSON.stringify({ id: 'built-in.apps.googleusercontent.com', secret: 'GOCSPX-b' }));
+  const file = path.join(dir, 'google-auth.json');
+  const posts = [];
+  const fakeFetch = async (url, init) => {
+    posts.push(Object.fromEntries(new URLSearchParams(init.body)));
+    return new Response(JSON.stringify({ access_token: `AT${posts.length}`, refresh_token: 'RT1', expires_in: 3600 }), { status: 200 });
+  };
+  const openExternal = (url) => {
+    const o = new URL(url);
+    const back = new URL(o.searchParams.get('redirect_uri'));
+    back.searchParams.set('state', o.searchParams.get('state'));
+    back.searchParams.set('code', 'C');
+    setTimeout(() => fetch(back).catch(() => {}), 10);
+  };
+  const first = new GoogleAuth({ file, bundledClient: bundled, fetch: fakeFetch, openExternal });
+  await first.login();
+  // 새 버전: 함께 넣은 연결 정보가 없다
+  const updated = new GoogleAuth({ file, bundledClient: path.join(dir, 'none.json'), fetch: fakeFetch, openExternal });
+  assert.equal(updated.configured, true);
+  assert.equal(updated.connected, true);
+  await updated.token();
+  assert.equal(posts.at(-1).grant_type, 'refresh_token');
+  assert.equal(posts.at(-1).client_id, 'built-in.apps.googleusercontent.com');
+  updated.signOut();
+  assert.equal(updated.configured, true, '연결을 끊어도 다시 로그인할 수 있게');
+});
+
+test('예전 연결(클라이언트를 적어 두지 않음)도 켤 때 지금 클라이언트를 기억 · 연결 정보는 여러 곳 중 처음 찾은 것', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-auth-'));
+  const file = path.join(dir, 'google-auth.json');
+  fs.writeFileSync(file, JSON.stringify({ plain: { refreshToken: 'RT-old', scope: 'https://www.googleapis.com/auth/drive.file' } }));
+  const user = path.join(dir, 'user-client.json');
+  fs.writeFileSync(user, JSON.stringify({ id: 'user.apps.googleusercontent.com', secret: 's' }));
+  const old = new GoogleAuth({ file, bundledClient: [path.join(dir, 'missing.json'), user], openExternal: () => {} });
+  assert.equal(old.client().id, 'user.apps.googleusercontent.com');
+  const later = new GoogleAuth({ file, bundledClient: path.join(dir, 'missing.json'), openExternal: () => {} });
+  assert.equal(later.connected, true);
+  assert.equal(later.refreshClient().id, 'user.apps.googleusercontent.com');
+});

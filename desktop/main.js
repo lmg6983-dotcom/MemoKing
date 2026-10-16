@@ -49,6 +49,7 @@ import {
 
 import { WindowManager } from './window-manager.js';
 import { registerIpc } from './ipc-handlers.js';
+import { CalendarFeeds } from './calendar-feeds.js';
 
 // 점검 때는 가짜 마이크(삐 소리)로 녹음한다 — 실제 마이크·권한 창 없이
 if (SMOKE) {
@@ -104,6 +105,7 @@ const heldLocks = new Map();
 let fileIndex = null;
 let updater = null; // 자동 업데이트 (updater.js) — 앱이 준비된 뒤
 let linkPreviews = null;
+let calendarFeeds = null; // 일정 탭이 구독하는 다른 캘린더 (.ics 주소)
 
 let tutorial = { active: false, index: -1, memoId: null, praise: false };
 
@@ -435,7 +437,8 @@ function historyToMemo(entryId) {
 function initDrive() {
   driveAuth = new GoogleAuth({
     file: path.join(app.getPath('userData'), 'google-auth.json'),
-    bundledClient: path.join(import.meta.dirname, 'google-client.json'),
+    // 설치 파일에 넣은 것 → 이 PC 의 %APPDATA%\MemoKing 에 둔 것 (연결 정보 없이 빌드된 버전에서도 붙여 넣지 않게)
+    bundledClient: [path.join(import.meta.dirname, 'google-client.json'), path.join(app.getPath('userData'), 'google-client.json')],
     fetch: (...args) => net.fetch(...args),
     openExternal: (url) => shell.openExternal(url),
     safeStorage,
@@ -873,7 +876,17 @@ app.whenReady().then(async () => {
   registerVaultProtocol(() => vault, () => history);
   initStt();
 
+  calendarFeeds = new CalendarFeeds({
+    dir: path.join(app.getPath('userData'), 'calendars'),
+    fetch: (...args) => net.fetch(...args),
+    getList: () => settings.calendars ?? [],
+    setList: (list) => {
+      settings.calendars = list;
+      saveSettings();
+    },
+  });
   registerIpc({
+    calendarFeeds,
     windowManager,
     memoHotkeys,
     getVault: () => vault,

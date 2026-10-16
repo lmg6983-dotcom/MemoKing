@@ -10,6 +10,11 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch: # Actions 탭 › Run workflow — main 을 고르면 package.json 버전으로 (공개 저장소의 v<버전> 태그 · Release 는 electron-builder 가 만든다)
+    inputs:
+      allow_no_google:
+        description: 'Google 연결 정보 비밀값 없이도 배포 (사용자가 설정에서 OAuth 클라이언트를 붙여 넣어야 함)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read # 이 저장소는 읽기만 — 올리기는 공개 저장소 전용 토큰으로
@@ -64,18 +69,27 @@ jobs:
       - name: 단위 테스트
         run: npm test
 
-      # 구글 로그인 연결 정보(데스크톱 앱 유형 OAuth 클라이언트)를 설치 파일에 넣는다 (없으면 사용자가 처음 한 번 붙여 넣음)
+      # 구글 로그인 연결 정보(데스크톱 앱 유형 OAuth 클라이언트)를 설치 파일에 넣는다.
+      #   없으면 설정 › Google Drive 동기화 가 "연결 안 됨" 이 되고 클라이언트 ID 를 붙여 넣어야 해서 (v0.39.0~0.39.7 이 그랬다)
+      #   비밀값이 없으면 멈춘다 — 그래도 배포하려면 Run workflow 의 allow_no_google 을 켠다
       - name: Google 연결 정보 넣기
         shell: bash
         env:
           MEMOKING_GOOGLE_CLIENT_ID: ${{ secrets.MEMOKING_GOOGLE_CLIENT_ID }}
           MEMOKING_GOOGLE_CLIENT_SECRET: ${{ secrets.MEMOKING_GOOGLE_CLIENT_SECRET }}
+          ALLOW_NO_GOOGLE: ${{ inputs.allow_no_google }}
         run: |
           if [ -n "$MEMOKING_GOOGLE_CLIENT_ID" ]; then
-            node -e 'require("fs").writeFileSync("desktop/google-client.json", JSON.stringify({ id: process.env.MEMOKING_GOOGLE_CLIENT_ID, secret: process.env.MEMOKING_GOOGLE_CLIENT_SECRET || "" }))'
+            if [ -z "$MEMOKING_GOOGLE_CLIENT_SECRET" ]; then
+              echo "::warning::MEMOKING_GOOGLE_CLIENT_SECRET 이 비어 있어요. 데스크톱 앱 유형 클라이언트는 보안 비밀번호(GOCSPX-…)도 있어야 로그인돼요"
+            fi
+            node -e 'require("fs").writeFileSync("desktop/google-client.json", JSON.stringify({ id: process.env.MEMOKING_GOOGLE_CLIENT_ID.trim(), secret: (process.env.MEMOKING_GOOGLE_CLIENT_SECRET || "").trim() }))'
             echo "연결 정보를 넣었어요"
+          elif [ "$ALLOW_NO_GOOGLE" = "true" ]; then
+            echo "::warning::Google 연결 정보 없이 배포해요 — 새로 설치한 사람은 설정에서 OAuth 클라이언트를 붙여 넣어야 해요 (이미 로그인한 PC 는 기억해 둔 클라이언트로 계속)"
           else
-            echo "연결 정보 비밀값이 없어 사용자가 처음 한 번 붙여 넣어요"
+            echo "::error::Secrets 에 MEMOKING_GOOGLE_CLIENT_ID · MEMOKING_GOOGLE_CLIENT_SECRET 이 없어요. 없이 배포하면 Google Drive 동기화가 '연결 안 됨' 이 돼요 (README 의 '처음 한 번 준비' 3번). 그래도 배포하려면 Run workflow 에서 allow_no_google 을 켜 주세요"
+            exit 1
           fi
 
       # electron-builder 가 공개 저장소에 Release v<버전> 을 만들고 설치 파일 · .blockmap · latest.yml 을 올린다

@@ -2,7 +2,10 @@
 // "데스크톱 앱" 유형 OAuth 클라이언트 + PKCE. Google Drive 데스크탑 앱이 없어도 된다.
 //
 // OAuth 클라이언트 ID·보안 비밀번호는 (먼저 찾는 순서) 설정에서 붙여 넣은 값 → 환경 변수 MEMOKING_GOOGLE_CLIENT_ID /
-// MEMOKING_GOOGLE_CLIENT_SECRET → 앱에 함께 넣은 desktop/google-client.json ({ "id": "...", "secret": "..." }).
+// MEMOKING_GOOGLE_CLIENT_SECRET → 앱에 함께 넣은 desktop/google-client.json ({ "id": "...", "secret": "..." }) 또는 %APPDATA%\MemoKing\google-client.json
+// → 예전에 로그인했던 클라이언트.
+// 로그인에 쓴 클라이언트는 토큰과 함께 기억해 둔다 (tokenClient) — 연결 정보 없이 빌드된 새 버전으로 업데이트돼도
+// 연결이 끊기지 않고, 구글이 그 토큰을 준 클라이언트로만 새 토큰을 받는다.
 // 받은 토큰은 이 PC 에만 (%APPDATA%\MemoKing\google-auth.json), Windows 가 주는 암호화(safeStorage)로 감싸서 둔다.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -28,7 +31,7 @@ const b64url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g
 
 export class GoogleAuth {
   /**
-   * @param {{ file: string, bundledClient?: string, fetch?: typeof fetch, openExternal: (url: string) => void,
+   * @param {{ file: string, bundledClient?: string | string[], fetch?: typeof fetch, openExternal: (url: string) => void,
    *           safeStorage?: { isEncryptionAvailable(): boolean, encryptString(s: string): Buffer, decryptString(b: Buffer): string } }} options
    */
   constructor({ file, bundledClient, fetch: fetchImpl = fetch, openExternal, safeStorage }) {
@@ -54,6 +57,18 @@ export class GoogleAuth {
         // 다음에
       }
       this.post('https://oauth2.googleapis.com/revoke', { token: old }).catch(() => {});
+    }
+    // 예전 연결(로그인한 클라이언트를 적어 두지 않은 것): 지금 쓸 수 있는 클라이언트가 그 클라이언트 — 기억해 둔다
+    if (this.data.refreshToken && !this.data.tokenClient?.id) {
+      const c = this.client();
+      if (c) {
+        this.data.tokenClient = c;
+        try {
+          this.save();
+        } catch {
+          // 다음에
+        }
+      }
     }
     this.accessToken = null;
     this.expiresAt = 0;
@@ -87,19 +102,33 @@ export class GoogleAuth {
 
   // ---------- OAuth 클라이언트 ----------
 
+  /** 앱에 함께 넣은 연결 정보 — 여러 곳이면 처음 찾은 것 (설치 폴더 · %APPDATA%\MemoKing 에 둔 파일) */
   bundled() {
-    try {
-      return this.bundledClient ? JSON.parse(fs.readFileSync(this.bundledClient, 'utf8')) : null;
-    } catch {
-      return null;
+    for (const file of [this.bundledClient].flat().filter(Boolean)) {
+      try {
+        const b = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (b?.id) return b;
+      } catch {
+        // 없거나 깨짐 — 다음 곳
+      }
     }
+    return null;
   }
 
   client() {
     if (this.data.clientId) return { id: this.data.clientId, secret: this.data.clientSecret ?? '' };
     if (process.env.MEMOKING_GOOGLE_CLIENT_ID) return { id: process.env.MEMOKING_GOOGLE_CLIENT_ID, secret: process.env.MEMOKING_GOOGLE_CLIENT_SECRET ?? '' };
     const b = this.bundled();
-    return b?.id ? { id: b.id, secret: b.secret ?? '' } : null;
+    if (b?.id) return { id: b.id, secret: b.secret ?? '' };
+    // 연결 정보 없이 빌드된 버전: 예전에 로그인했던 클라이언트로 (다시 로그인도 같은 클라이언트로)
+    const t = this.data.tokenClient;
+    return t?.id ? { id: t.id, secret: t.secret ?? '' } : null;
+  }
+
+  /** 새 토큰을 받을 클라이언트 — 그 토큰을 준 클라이언트 (기억해 둔 게 없으면 지금 클라이언트) */
+  refreshClient() {
+    const t = this.data.tokenClient;
+    return t?.id ? { id: t.id, secret: t.secret ?? '' } : this.client();
   }
 
   get configured() {
@@ -222,6 +251,7 @@ export class GoogleAuth {
     this.data.refreshToken = token.refresh_token;
     this.data.scope = scope;
     this.data.useFullDriveScope = full;
+    this.data.tokenClient = { id: client.id, secret: client.secret };
     this.scopeUpgraded = false;
     this.accessToken = token.access_token;
     this.expiresAt = Date.now() + (token.expires_in ?? 3600) * 1000;
@@ -236,7 +266,7 @@ export class GoogleAuth {
   async token() {
     if (this.accessToken && Date.now() < this.expiresAt - 60_000) return this.accessToken;
     if (!this.data.refreshToken) throw new AuthError('Google Drive에 로그인해 주세요');
-    const client = this.client();
+    const client = this.refreshClient();
     if (!client) throw new AuthError('Google 로그인 설정(OAuth 클라이언트 ID)이 없어요');
     this.refreshing ??= this.post(TOKEN_URL, {
       refresh_token: this.data.refreshToken, client_id: client.id, client_secret: client.secret, grant_type: 'refresh_token',

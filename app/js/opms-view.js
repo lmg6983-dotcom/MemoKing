@@ -3,6 +3,7 @@
 //   탭: 정보(서지 + 업무배분 + 신규성 의제 · 진행사항 · 메모) · 전자포대(골라 받기 / 전체 받기 → 저장 폴더 열기) · 청구서 · 해외출원
 //   "메모로 만들기": 고른 사건의 서지 · 업무배분 · 해외출원을 새 메모 한 장으로
 //   글은 모두 textContent 로 넣는다 (서버 값을 HTML 로 읽지 않는다)
+import { searchingNode } from './searching.js';
 import { progressItems, dueState } from './core/opms-progress.js';
 
 const api = window.opms;
@@ -34,6 +35,12 @@ const day = (v) => {
 function message(text, kind = '') {
   main.replaceChildren(el('p', `op-msg ${kind}`, text));
 }
+
+// 찾는 중 · 불러오는 중: 빈 글 대신 흔들리는 돋보기 (searching.js)
+function loading(text) {
+  main.replaceChildren(searchingNode(text));
+}
+const loadingLine = (text) => searchingNode(text, { inline: true });
 
 /** 표: cols = [[머리, 값 꺼내기, 'num'?]] */
 function table(cols, rows, { empty = '없어요' } = {}) {
@@ -86,7 +93,7 @@ form.addEventListener('submit', async (e) => {
   const q = input.value.trim();
   if (!q) return;
   const my = ++seq;
-  message('찾는 중…');
+  loading('OPMS 에서 찾는 중이에요');
   let list;
   try {
     list = await api.search(q);
@@ -115,7 +122,7 @@ const errText = (err) => String(err?.message ?? err).replace(/^Error invoking re
 
 async function open(idx, which = 'info') {
   const my = ++seq;
-  message('사건을 불러오는 중…');
+  loading('사건을 불러오는 중이에요');
   try {
     current = await api.case(idx);
   } catch (err) {
@@ -172,9 +179,9 @@ async function show(which) {
   const c = current.case;
   try {
     if (tab === 'info') {
-      const work = el('p', 'op-msg', '불러오는 중…');
+      const work = loadingLine('업무배분을 불러오는 중');
       const more = el('div', 'op-more');
-      more.append(el('p', 'op-msg', '신규성 의제 · 진행사항 · 메모를 불러오는 중…'));
+      more.append(loadingLine('신규성 의제 · 진행사항 · 메모를 불러오는 중'));
       main.replaceChildren(infoGrid(c), el('h3', 'op-h', '업무배분'), work, more);
       showDetails(more, my); // 업무배분과 따로 (한쪽이 늦거나 실패해도 다른 쪽은 보이게)
       let rows;
@@ -195,7 +202,7 @@ async function show(which) {
         ['상세', (r) => String(r.detail || r.memo || '').replace(/[\r\n]+/g, ' ')],
       ], rows, { empty: '배분된 업무가 없어요' }));
     } else if (tab === 'bills') {
-      message('불러오는 중…');
+      loading('청구서를 불러오는 중이에요');
       const rows = await load('bills', api.bills);
       if (my !== seq) return;
       main.replaceChildren(table([
@@ -375,7 +382,7 @@ let attach = [];
 // 받는 중에 다른 탭에 다녀와도 진행 표시가 이어지고, 두 번 겹쳐 받지 않게 — { idx, text, cls, title, done }
 let dl = null;
 async function showWrapper(my) {
-  message('전자포대 목록을 불러오는 중…');
+  loading('전자포대 목록을 불러오는 중이에요');
   const list = await load('wrapper', api.attachments);
   if (my !== seq) return; // 그사이 다른 사건으로 옮겼으면 지금 화면의 목록을 덮지 않는다
   attach = list;

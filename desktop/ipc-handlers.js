@@ -29,6 +29,7 @@ const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x:
 
 export function registerIpc(ctx) {
   const {
+    calendarFeeds,
     windowManager: wm,
     memoHotkeys,
     getVault,
@@ -238,6 +239,11 @@ export function registerIpc(ctx) {
   ipcMain.handle('history:apps', () => historyApps());
   ipcMain.handle('history:block', (_e, appId, app, removeExisting) => blockHistoryApp(String(appId ?? ''), String(app ?? ''), Boolean(removeExisting)));
   ipcMain.handle('history:unblock', (_e, appId) => unblockHistoryApp(String(appId ?? '')));
+
+  // ---------- 일정 탭: 다른 캘린더 구독 (.ics 주소 — 이 PC 설정에만) ----------
+  ipcMain.handle('calendars:feeds', () => calendarFeeds.list());
+  ipcMain.handle('calendars:set-feeds', (_e, list) => calendarFeeds.save(Array.isArray(list) ? list : []));
+  ipcMain.handle('calendars:fetch', (_e, id, force) => calendarFeeds.get(String(id ?? ''), { force: force === true }));
 
   // ---------- Google Drive 동기화 ----------
   ipcMain.handle('drive:status', () => driveInfo());
