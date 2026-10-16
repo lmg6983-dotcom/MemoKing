@@ -302,10 +302,12 @@ export class Vault extends EventEmitter {
 
   // 모든 메모의 알림: [{ memoId, title, color, reminder }]
   allReminders() {
+    // 마지막으로 고친 때: 내용을 고친 때(updated) · 파일을 쓴 때(알림만 바꿔도) 중 나중 — 캘린더 동기화의 "나중에 고친 쪽"
+    const editedAt = (e) => new Date(Math.max(Date.parse(e.meta.updated ?? '') || 0, e.mtimeMs || 0)).toISOString();
     const out = [];
     for (const e of this.entries.values()) {
       if (!e.file) continue;
-      for (const reminder of e.meta.reminders) out.push({ memoId: e.id, title: extractTitle(e.body), color: e.meta.color, updated: e.meta.updated, reminder });
+      for (const reminder of e.meta.reminders) out.push({ memoId: e.id, title: extractTitle(e.body), color: e.meta.color, updated: e.meta.updated, edited: editedAt(e), reminder });
     }
     return out;
   }

@@ -20,7 +20,7 @@ class FakeVault {
   }
   adapter() {
     return {
-      all: () => [...this.memos.entries()].filter(([, m]) => !m.trashed).flatMap(([memoId, m]) => m.reminders.map((reminder) => ({ memoId, title: m.title, updated: m.updated, reminder }))),
+      all: () => [...this.memos.entries()].filter(([, m]) => !m.trashed).flatMap(([memoId, m]) => m.reminders.map((reminder) => ({ memoId, title: m.title, updated: m.updated, edited: m.edited, reminder }))),
       state: (id) => (!this.memos.has(id) ? 'missing' : this.memos.get(id).trashed ? 'trashed' : 'present'),
       setReminder: (id, rid, r) => {
         const m = this.memos.get(id);
@@ -183,4 +183,69 @@ test('반복 규칙 · 모양 변환', () => {
   assert.equal(shapeOfEvent({ status: 'cancelled' }), 'deleted');
   const r = normalizeReminder({ kind: 'repeat', title: '회의', repeat: { every: 'week', weekdays: [3, 1], time: '10:00' } });
   assert.deepEqual(shapeOfReminder(r).repeat, { every: 'week', weekdays: [1, 3], time: '10:00' });
+});
+
+test('매년 일정은 몇 번을 맞춰도 오가지 않음 (메모킹 · Google 모양이 같은 글)', async () => {
+  const { g, v, pc } = setup();
+  v.add('기념일', [{ kind: 'repeat', title: '결혼기념일', allDay: true, repeat: { every: 'year', month: 3, day: 5 } }]);
+  await pc.run();
+  const callsAfterFirst = g.calls.filter((c) => !c.startsWith('GET')).length;
+  for (let i = 0; i < 3; i++) {
+    const res = await pc.run();
+    assert.deepEqual([res.pushed, res.pulled], [0, 0], `회차 ${i}`);
+  }
+  assert.equal(g.calls.filter((c) => !c.startsWith('GET')).length, callsAfterFirst);
+});
+
+test('상태 파일을 읽지 못하면 이번엔 건너뜀 (캘린더를 하나 더 만들지 않음)', async () => {
+  const { g, v } = setup();
+  v.add('치과 메모', [at('2026-10-20T15:00:00+09:00')]);
+  const broken = new GoogleCalendarSync({
+    request: (...a) => g.request(...a), device: 'pc', timeZone: 'Asia/Seoul', now: () => NOW,
+    store: { read: () => { throw new SyntaxError('Unexpected end of JSON'); }, write: () => {} },
+    memos: v.adapter(),
+  });
+  await assert.rejects(broken.run(), /상태 파일/);
+  assert.equal(g.calendars.size, 0);
+});
+
+test('메모킹에서 고쳐 보낼 때 Google 에서 넣은 장소 · 설명 · 길이는 지킨다', async () => {
+  const { g, v, pc } = setup();
+  const id = v.add('치과 메모', [at('2026-10-20T15:00:00+09:00')]);
+  await pc.run();
+  const [ev] = ours(g);
+  g.edit(ev.id, { location: '강남역 치과', description: '보험증 챙기기', end: { dateTime: '2026-10-20T17:00:00+09:00' } });
+  await pc.run();
+  const r = v.memos.get(id).reminders[0];
+  v.adapter().setReminder(id, r.id, normalizeReminder({ ...r, title: '치과 (스케일링)' }));
+  v.memos.get(id).edited = '2027-01-01T00:00:00Z';
+  await pc.run();
+  const after = g.events.get(ev.id);
+  assert.equal(after.summary, '치과 (스케일링)');
+  assert.equal(after.location, '강남역 치과');
+  assert.equal(after.description, '보험증 챙기기');
+  assert.equal(Date.parse(after.end.dateTime) - Date.parse(after.start.dateTime), 2 * 3600_000);
+});
+
+test('양쪽 다 고쳤을 때 메모 쪽 때는 파일을 고친 때(edited) — 알림만 바꿔도 메모킹이 나중이면 메모킹', async () => {
+  const { g, v, pc } = setup();
+  const id = v.add('오래된 메모', [at('2026-10-20T15:00:00+09:00')], '2026-01-01T00:00:00Z');
+  await pc.run();
+  const [ev] = ours(g);
+  g.edit(ev.id, { summary: 'Google 이름' });
+  const r = v.memos.get(id).reminders[0];
+  v.adapter().setReminder(id, r.id, normalizeReminder({ ...r, at: '2026-10-21T15:00:00+09:00' }));
+  v.memos.get(id).edited = '2099-01-01T00:00:00Z';
+  await pc.run();
+  assert.equal(new Date(g.events.get(ev.id).start.dateTime).toISOString(), '2026-10-21T06:00:00.000Z');
+});
+
+test('다른 기기가 맡은 중에도 "지금 맞추기"(force)는 맞춘다', async () => {
+  const { v, pc, phone } = setup();
+  v.add('치과 메모', [at('2026-10-20T15:00:00+09:00')]);
+  await pc.run();
+  const background = phone.run();
+  const forced = phone.run({ force: true });
+  assert.equal((await background).skipped, 'lease');
+  assert.equal((await forced).skipped, undefined);
 });
