@@ -1499,16 +1499,25 @@ function showUpdateRow(st) {
   updateEl.current.textContent = st.current ? `v${st.current}` : '';
   const text = {
     dev: '개발 중에는 확인하지 않아요',
-    checking: '확인하는 중…',
-    latest: '최신 버전이에요',
-    available: `새 버전 v${st.version} 이 있어요`,
-    downloading: `받는 중 ${st.percent ?? 0}%`,
-    ready: `v${st.version} 을 받아 뒀어요. 끝낼 때 설치돼요`,
+    available: '새 버전이 나왔어요',
+    ready: `v${st.version} 을 받아 뒀어요. 끝낼 때도 설치돼요`,
     error: st.message ?? '',
   }[st.status] ?? '';
   updateEl.note.textContent = text;
   updateEl.note.classList.toggle('warn', st.status === 'error');
-  updateEl.check.disabled = st.status === 'checking' || st.status === 'downloading';
+  // 단추: 최신이면 초록 "최신 버전", 새 버전이 있으면 노랑 "업데이트" (누르면 바뀐 점 · 받기), 받는 중 · 받아 둠도 그 자리에서
+  const label = {
+    checking: '확인하는 중…',
+    latest: '✓ 최신 버전',
+    available: `업데이트 v${st.version}`,
+    downloading: `받는 중 ${st.percent ?? 0}%`,
+    ready: '재시작해서 설치',
+  }[st.status];
+  updateEl.check.dataset.state = label ? st.status : 'idle';
+  updateEl.check.textContent = label ?? '업데이트 확인';
+  updateEl.check.classList.toggle('primary', st.status === 'available' || st.status === 'ready'); // 노랑 (기본 단추 모양)
+  updateEl.check.title = { latest: '눌러서 다시 확인', available: '다시 확인한 뒤 바뀐 점을 보고 받아요', ready: '쓰던 메모를 저장하고 다시 시작해 설치해요' }[st.status] ?? '';
+  updateEl.check.disabled = st.status === 'checking';
 }
 
 function renderUpdateDialog(st) {
@@ -1540,8 +1549,17 @@ api.on('update:state', (st) => onUpdate(st));
 api.on('update:available', (st) => onUpdate(st, { open: true }));
 api.on('update:ready', (st) => onUpdate(st, { open: true }));
 updateEl.check.addEventListener('click', async () => {
+  if (updateSt.status === 'ready') return api.update.install(); // 받아 둔 것: 메모를 저장하고 바로 재시작
+  if (updateSt.status === 'downloading') return onUpdate(updateSt, { open: true }); // 진행률
+  // 그 밖(새 버전이 있어도): 다시 확인하고 — 더 새 버전이 나왔거나 내려갔을 수 있다 — 새 버전이면 바뀐 점
+  const before = updateSt;
   onUpdate({ ...updateSt, status: 'checking' });
-  const st = await api.update.check();
+  let st;
+  try {
+    st = await api.update.check();
+  } catch {
+    st = { ...before, status: 'error', message: '업데이트를 확인하지 못했어요. 잠시 뒤 다시 눌러 주세요' };
+  }
   onUpdate(st, { open: st.status === 'available' || st.status === 'ready' });
 });
 updateEl.go.addEventListener('click', async () => {
