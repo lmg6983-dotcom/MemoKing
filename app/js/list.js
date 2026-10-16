@@ -874,6 +874,7 @@ function renderMagicModules() {
       delete paused[m.id];
       magicState = await api.settings.setMagic({ enabled: magicState.enabled, modules: { ...magicState.modules, [m.id]: cb.checked }, paused });
       renderMagicModules();
+      showOpmsSetup();
     });
     const text = document.createElement('span');
     text.append(m.name);
@@ -894,7 +895,32 @@ function showMagic(magic) {
   $('magic-enabled').checked = magicState.enabled;
   $('magic-modules-row').hidden = !magicState.enabled;
   renderMagicModules();
+  showOpmsSetup();
 }
+// OPMS 연결: OPMS 검색을 켰을 때만 — 서버 주소(이 PC 에만 저장) · 전자포대 저장 폴더
+async function showOpmsSetup() {
+  const on = Boolean(magicState.enabled && magicState.modules?.opms);
+  $('opms-setup').hidden = !on;
+  if (!on) return;
+  const o = await api.opms.settings();
+  if (document.activeElement !== $('opms-host')) $('opms-host').value = o.host ?? '';
+  $('opms-dir').textContent = o.wrapperDir ?? '';
+  if (!o.hostSet && !$('opms-host-note').textContent) setOpmsNote('서버 주소를 넣어야 OPMS 사건을 찾을 수 있어요', true);
+}
+function setOpmsNote(text, warn = false) {
+  $('opms-host-note').textContent = text;
+  $('opms-host-note').classList.toggle('warn', warn);
+}
+$('opms-host-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const r = await api.opms.setHost($('opms-host').value);
+  if (r?.error) return setOpmsNote(r.error, true);
+  $('opms-host').value = r.host;
+  setOpmsNote(r.host ? `저장했어요: ${r.host}` : '서버 주소를 지웠어요');
+});
+$('opms-dir-btn').addEventListener('click', async () => {
+  $('opms-dir').textContent = await api.opms.chooseDir();
+});
 $('magic-enabled').addEventListener('change', async (e) => {
   magicState = await api.settings.setMagic({ enabled: e.target.checked, modules: magicState.modules, paused: magicState.paused });
   showMagic(magicState);
@@ -1457,3 +1483,80 @@ document.documentElement.dataset.ready = 'true';
 
 // 고르기 칸(role=radiogroup): 칸마다 radio, 화살표로 고르기 (dom.js)
 radioGroups();
+
+// ---------- 자동 업데이트 (desktop/updater.js) ----------
+// 새 버전: 바뀐 점을 보여 주고 받기 → 진행률 → 다 받으면 "지금 재시작" / "나중에 (끝낼 때 설치)".
+//   "나중에" 를 고른 버전은 24시간 다시 묻지 않는다 (main 이 기억). 설정 › 업데이트 확인 은 숨겨 둔 버전도 다시 보여 준다
+const updateEl = {
+  dialog: $('update-dialog'), title: $('update-title'), version: $('update-version'), notes: $('update-notes'),
+  progress: $('update-progress'), fill: $('update-bar-fill'), progressText: $('update-progress-text'), error: $('update-error'),
+  later: $('update-later'), go: $('update-go'), note: $('update-note'), current: $('update-current'), check: $('update-check'),
+};
+const mb = (n) => `${(n / 1048576).toFixed(1)}MB`;
+let updateSt = { status: 'idle' };
+
+function showUpdateRow(st) {
+  updateEl.current.textContent = st.current ? `v${st.current}` : '';
+  const text = {
+    dev: '개발 중에는 확인하지 않아요',
+    checking: '확인하는 중…',
+    latest: '최신 버전이에요',
+    available: `새 버전 v${st.version} 이 있어요`,
+    downloading: `받는 중 ${st.percent ?? 0}%`,
+    ready: `v${st.version} 을 받아 뒀어요. 끝낼 때 설치돼요`,
+    error: st.message ?? '',
+  }[st.status] ?? '';
+  updateEl.note.textContent = text;
+  updateEl.note.classList.toggle('warn', st.status === 'error');
+  updateEl.check.disabled = st.status === 'checking' || st.status === 'downloading';
+}
+
+function renderUpdateDialog(st) {
+  const ready = st.status === 'ready';
+  const downloading = st.status === 'downloading';
+  updateEl.title.textContent = ready ? '설치할 준비가 됐어요' : '새 버전이 나왔어요';
+  updateEl.version.textContent = `v${st.current ?? ''} → v${st.version ?? ''}`;
+  updateEl.notes.textContent = st.notes || '바뀐 점이 적혀 있지 않아요';
+  updateEl.progress.hidden = !downloading;
+  updateEl.fill.style.width = `${Math.max(0, Math.min(100, st.percent ?? 0))}%`;
+  updateEl.progressText.textContent = downloading
+    ? `${st.percent ?? 0}%${st.total ? ` · ${mb(st.transferred ?? 0)} / ${mb(st.total)}` : ''}${st.bytesPerSecond ? ` · 초당 ${mb(st.bytesPerSecond)}` : ''}`
+    : '';
+  updateEl.error.hidden = st.status !== 'error';
+  updateEl.error.textContent = st.status === 'error' ? st.message ?? '' : '';
+  updateEl.go.textContent = ready ? '지금 재시작' : downloading ? '받는 중…' : st.status === 'error' ? '다시 확인' : '받기';
+  updateEl.go.disabled = downloading;
+  updateEl.later.textContent = ready ? '나중에 (끝낼 때 설치)' : downloading ? '닫기 (계속 받아요)' : '나중에';
+}
+
+function onUpdate(st, { open = false } = {}) {
+  updateSt = st ?? updateSt;
+  showUpdateRow(updateSt);
+  if (updateEl.dialog.open || open) renderUpdateDialog(updateSt);
+  if (open && !updateEl.dialog.open) updateEl.dialog.showModal();
+}
+
+api.on('update:state', (st) => onUpdate(st));
+api.on('update:available', (st) => onUpdate(st, { open: true }));
+api.on('update:ready', (st) => onUpdate(st, { open: true }));
+updateEl.check.addEventListener('click', async () => {
+  onUpdate({ ...updateSt, status: 'checking' });
+  const st = await api.update.check();
+  onUpdate(st, { open: st.status === 'available' || st.status === 'ready' });
+});
+updateEl.go.addEventListener('click', async () => {
+  if (updateSt.status === 'ready') return api.update.install(); // 쓰던 메모를 저장하고 다시 시작
+  if (updateSt.status === 'error') {
+    const st = await api.update.check();
+    if (st.status === 'available' || st.status === 'ready' || st.status === 'error') return onUpdate(st, { open: true });
+    updateEl.dialog.close(); // 최신이거나 확인 중 — 받을 것이 없으니 대화 상자를 닫고 설정 칸에만
+    return onUpdate(st);
+  }
+  onUpdate(await api.update.download());
+});
+updateEl.later.addEventListener('click', async () => {
+  if (updateSt.status !== 'downloading') onUpdate(await api.update.later());
+  updateEl.dialog.close();
+});
+// 목록 창을 열 때: 숨기지 않은 새 버전 · 받아 둔 업데이트가 있으면 (알림을 눌러 열었을 때 등)
+api.update.state().then((st) => onUpdate(st, { open: st.ask }), () => {});

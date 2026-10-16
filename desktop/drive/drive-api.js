@@ -134,6 +134,28 @@ export class DriveApi {
     return item(await this.json('POST', `${API}/files?fields=${encodeURIComponent(FIELDS)}`, { name, mimeType: FOLDER, parents: [parentId] }));
   }
 
+  /** 이 폴더 · 파일을 아직 쓸 수 있는가 (지워졌거나 휴지통이면 false) */
+  async alive(id) {
+    try {
+      return !(await this.request('GET', `${API}/files/${encodeURIComponent(id)}?fields=id,trashed`)).trashed;
+    } catch (err) {
+      if (err?.status === 404) return false;
+      throw err;
+    }
+  }
+
+  /** 내 드라이브 맨 위의 이 이름 폴더 (메모킹이 만든 것 중 — 휴지통 제외) */
+  async findFolder(name) {
+    const q = `'root' in parents and name = '${quote(name)}' and mimeType = '${FOLDER}' and trashed = false`;
+    return (await this.query(q)).map(item)[0] ?? null;
+  }
+
+  /** 링크가 있는 사람은 볼 수 있게 열고 그 링크 (공유) — 조직 설정이 막으면 DriveError 403 */
+  async shareLink(id) {
+    await this.json('POST', `${API}/files/${encodeURIComponent(id)}/permissions?fields=id`, { type: 'anyone', role: 'reader' });
+    return (await this.request('GET', `${API}/files/${encodeURIComponent(id)}?fields=webViewLink`)).webViewLink ?? `https://drive.google.com/file/d/${id}/view`;
+  }
+
   async trash(id) {
     await this.json('PATCH', `${API}/files/${encodeURIComponent(id)}?fields=id`, { trashed: true });
   }

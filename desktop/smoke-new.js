@@ -380,10 +380,28 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await js(nw, `document.querySelector('.mk-save-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
       const savedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'save').find((o) => /안내 자료\.pdf$/.test(o.target)), 'PDF 저장', 3000).catch(() => null);
       check('PDF 파일: 저장 단추 → 그 파일 그대로', Boolean(savedPdf) && fs.readFileSync(savedPdf.target, 'utf8').startsWith('%PDF'), JSON.stringify(savedPdf));
-      // PC 에는 공유 단추가 없다 (저장과 겹침)
+      // 공유 단추 → 방법 고르기 → Windows 공유 (메모 폴더의 파일 그대로)
       await hover('.mk-doc a[data-file]');
       const shareShown = await js(nw, `!!document.querySelector('.mk-share-btn')`);
-      check('PC 내용 단추: 복사 · 저장 · 지우기만 (공유 단추 없음)', !shareShown);
+      if (shareShown) await js(nw, `document.querySelector('.mk-share-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
+      const menu = await until(() => js(nw, `(() => { const m = document.querySelector('.mk-share-menu'); return m && [...m.querySelectorAll('button')].map((b) => b.dataset.via + (b.disabled ? '-' : '')).join(','); })()`), '공유 방법 메뉴', 3000).catch(() => '');
+      await js(nw, `document.querySelector('.mk-share-menu [data-via="sheet"]')?.click()`);
+      const sharedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'share').find((o) => o.via === 'sheet' && /안내 자료\.pdf$/.test(o.target)), 'PDF 공유', 3000).catch(() => null);
+      check('공유 단추 → 방법 고르기(Windows 공유 · Drive 링크 · LocalSend · 메일, Drive 는 연결 전엔 못 고름) → 그 파일', shareShown && /sheet/.test(menu) && /drive-/.test(menu) && /localsend/.test(menu) && /mail/.test(menu) && Boolean(sharedPdf), JSON.stringify({ shareShown, menu, sharedPdf }));
+      // 표 공유: 임시 CSV 를 만들어 보낸다 (Esc 로 메뉴를 닫으면 아무것도 안 함)
+      await leave();
+      await hover('.mk-doc .tableWrapper td');
+      const sharesBefore = smokeOpened.filter((o) => o.kind === 'share').length;
+      await js(nw, `document.querySelector('.mk-share-btn')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
+      await until(() => js(nw, `!!document.querySelector('.mk-share-menu')`), '표 공유 메뉴', 3000).catch(() => {});
+      await js(nw, `(document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); // 실제 키처럼 요소에서
+      await wait(200);
+      const escClosed = await js(nw, `!document.querySelector('.mk-share-menu')`) && smokeOpened.filter((o) => o.kind === 'share').length === sharesBefore;
+      await js(nw, `document.querySelector('.mk-share-btn')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
+      await until(() => js(nw, `!!document.querySelector('.mk-share-menu [data-via="mail"]')`), '표 공유 메뉴 2', 3000).catch(() => {});
+      await js(nw, `document.querySelector('.mk-share-menu [data-via="mail"]')?.click()`);
+      const sharedCsv = await until(() => smokeOpened.filter((o) => o.kind === 'share').find((o) => o.via === 'mail' && /\.csv$/.test(o.target)), '표 공유', 3000).catch(() => null);
+      check('표 공유: Esc 는 그만두기, 메일에 첨부를 고르면 임시 CSV 파일로', escClosed && Boolean(sharedCsv) && fs.readFileSync(sharedCsv.target, 'utf8').includes('이름'), JSON.stringify({ escClosed, sharedCsv }));
       await leave();
       // 표: 표째로 복사 (엑셀에 붙도록 칸 사이 탭 · 서식은 표 그대로)
       const tableLabel = await hover('.mk-doc .tableWrapper td');
@@ -765,6 +783,50 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         kw.close();
       }
       pw.close();
+    }
+
+    // ---------- 설정: OPMS 서버 주소는 사용자가 넣고(코드에 없음), 업데이트 칸 ----------
+    {
+      const lw = getList() ?? createListWindow('memos');
+      await until(() => js(lw, 'document.documentElement.dataset.ready === "true"'), '목록 준비');
+      await js(lw, `document.getElementById('settings-btn').click()`);
+      const setupShown = await until(() => js(lw, `!document.getElementById('opms-setup').hidden`), 'OPMS 연결 칸', 4000).then(() => true).catch(() => false);
+      const bad = await js(lw, `(async () => { document.getElementById('opms-host').value = 'ftp://x'; document.getElementById('opms-host-form').requestSubmit(); await new Promise((r) => setTimeout(r, 300)); return document.getElementById('opms-host-note').textContent; })()`);
+      const keep = getSettings().opms?.host;
+      const good = await js(lw, `(async () => { document.getElementById('opms-host').value = '10.0.0.7:8181'; document.getElementById('opms-host-form').requestSubmit(); await new Promise((r) => setTimeout(r, 300)); return document.getElementById('opms-host-note').textContent; })()`);
+      const savedHost = getSettings().opms?.host;
+      getSettings().opms = { ...getSettings().opms, host: keep }; // 점검의 가짜 OPMS 주소로 되돌림
+      const update = await js(lw, `({ cur: document.getElementById('update-current').textContent, note: document.getElementById('update-note').textContent })`);
+      check('설정: OPMS 서버 주소를 넣어 저장(잘못된 주소는 안내) · 업데이트 칸(지금 버전, 개발 중에는 확인 안 함)', setupShown && /알아보지 못했어요/.test(bad) && savedHost === 'http://10.0.0.7:8181' && /저장했어요/.test(good) && /^v\d/.test(update.cur), JSON.stringify({ setupShown, bad, good, savedHost, update }));
+      await js(lw, `document.getElementById('settings-dialog').close()`);
+    }
+
+    // ---------- 스택 탭 전환 속도: 다른 탭 창을 미리 만들어 두고, 저장을 기다리지 않고 바로 ----------
+    //   앱을 다시 켠 뒤처럼 탭 창이 하나도 없는 스택(가 · 나 · 다)에서 시작
+    {
+      const [ta, tb, tc] = ['가', '나', '다'].map((t) => vault.import({ body: `# 탭 ${t}\n\n${t.repeat(40)}` }));
+      windowManager.stacks.merge(ta, [tb, tc], { activate: ta });
+      const wa = windowManager.showTab(ta);
+      await until(() => wa.isVisible() && js(wa, 'document.documentElement.dataset.ready === "true"'), '탭 가 창', 8000);
+      const warmed = await until(() => [tb, tc].every((m) => noteWins.get(m)), '다른 탭 미리 만들기', 8000).then(() => true).catch(() => false);
+      await until(async () => (await Promise.all([tb, tc].map((m) => js(noteWins.get(m), 'document.documentElement.dataset.ready === "true"').catch(() => false)))).every(Boolean), '탭 창 준비', 8000).catch(() => {});
+      const shown = () => [ta, tb, tc].filter((m) => noteWins.get(m)?.isVisible());
+      const switchTo = async (from, to) => {
+        const w = noteWins.get(from);
+        await js(w, `document.querySelector('.ProseMirror')?.focus(); document.execCommand('insertText', false, ' 고침')`); // 저장할 것이 있게
+        const t0 = Date.now();
+        await js(w, `document.querySelector('[data-tab-id="${to}"]').click()`);
+        while (Date.now() - t0 < 5000 && !(shown().length === 1 && shown()[0] === to)) await wait(5); // 5ms 간격으로 잰다
+        return Date.now() - t0;
+      };
+      const times = [await switchTo(ta, tb), await switchTo(tb, tc), await switchTo(tc, ta)];
+      console.log(`스택 탭 전환 시간(ms): ${times.join(', ')} · 미리 만든 탭 창: ${warmed}`);
+      const barShown = await js(noteWins.get(ta), `!document.body.classList.contains('bar-hidden')`);
+      await wait(900); // 저장(함께 진행)이 끝나게
+      const savedAll = [ta, tb, tc].every((m) => vault.get(m)?.body.includes('고침'));
+      check('스택 탭: 다른 탭 창을 미리 만들어 두고, 바꾸면 바로 보이며 서식 막대가 펴진 채 · 쓰던 글은 그대로 저장', warmed && times.every((t) => t < 600) && barShown && savedAll, JSON.stringify({ warmed, times, barShown, savedAll }));
+      noteWins.get(ta)?.close();
+      await until(() => ![ta, tb, tc].some((m) => noteWins.get(m)?.isVisible()), '스택 닫힘', 4000).catch(() => {});
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

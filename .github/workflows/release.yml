@@ -1,0 +1,106 @@
+# PC 정식 배포 — v*.*.* 태그를 올리면 Windows 설치 파일을 빌드해 공개 배포 저장소(memoking-releases)의 Release 에 올린다.
+#   올라가는 것: MemoKing-Setup-<버전>.exe · .blockmap · latest.yml (자동 업데이트용) + MemoKing-Setup.exe (늘 같은 이름의 최신 링크)
+#   소스는 이 비공개 저장소에만 있고, 공개 저장소에는 위 파일만 간다. 앱 안에는 토큰이 없다 (공개 저장소라 읽기에 필요 없음).
+#   올리기 토큰: Secrets 의 MEMOKING_RELEASES_TOKEN — memoking-releases 하나에만 Contents 쓰기 권한이 있는 fine-grained PAT
+#   최신 설치 파일: https://github.com/lmg6983-dotcom/memoking-releases/releases/latest/download/MemoKing-Setup.exe
+name: Release (PC)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch: # 손으로 다시 돌릴 때 (태그를 골라 실행)
+
+permissions:
+  contents: read # 이 저장소는 읽기만 — 올리기는 공개 저장소 전용 토큰으로
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      RELEASES_REPO: lmg6983-dotcom/memoking-releases
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # npm 캐시 — 저장소에 package-lock.json 이 없어(개발은 npx 로) setup-node 의 cache: npm 대신 직접 둔다
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\npm-cache
+            ~\AppData\Local\memoking-build\node_modules
+          key: npm-${{ runner.os }}-${{ hashFiles('scripts/build-dist.mjs', 'package.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - name: 태그와 package.json 버전이 같은지
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::태그 v$tag 와 package.json 버전 $version 이 달라요. package.json 을 고치고 태그를 다시 올려 주세요"
+            exit 1
+          fi
+          echo "버전 $version"
+
+      - name: 올리기 토큰이 있는지
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secrets 에 MEMOKING_RELEASES_TOKEN 이 없어요 (README 의 '자동 업데이트 배포' 참고)"
+            exit 1
+          fi
+
+      - name: 단위 테스트
+        run: npm test
+
+      # 구글 로그인 연결 정보(데스크톱 앱 유형 OAuth 클라이언트)를 설치 파일에 넣는다 (없으면 사용자가 처음 한 번 붙여 넣음)
+      - name: Google 연결 정보 넣기
+        shell: bash
+        env:
+          MEMOKING_GOOGLE_CLIENT_ID: ${{ secrets.MEMOKING_GOOGLE_CLIENT_ID }}
+          MEMOKING_GOOGLE_CLIENT_SECRET: ${{ secrets.MEMOKING_GOOGLE_CLIENT_SECRET }}
+        run: |
+          if [ -n "$MEMOKING_GOOGLE_CLIENT_ID" ]; then
+            node -e 'require("fs").writeFileSync("desktop/google-client.json", JSON.stringify({ id: process.env.MEMOKING_GOOGLE_CLIENT_ID, secret: process.env.MEMOKING_GOOGLE_CLIENT_SECRET || "" }))'
+            echo "연결 정보를 넣었어요"
+          else
+            echo "연결 정보 비밀값이 없어 사용자가 처음 한 번 붙여 넣어요"
+          fi
+
+      # electron-builder 가 공개 저장소에 Release v<버전> 을 만들고 설치 파일 · .blockmap · latest.yml 을 올린다
+      - name: 빌드 + 공개 저장소에 올리기
+        env:
+          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
+        run: node scripts/build-dist.mjs --no-smoke --publish always
+
+      # 늘 같은 이름의 최신 링크 (releases/latest/download/MemoKing-Setup.exe) — 처음 설치하는 사람용
+      - name: 최신 설치 파일 링크
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          cp "dist/MemoKing-Setup-${version}.exe" MemoKing-Setup.exe
+          gh release upload "v${version}" MemoKing-Setup.exe --repo "$RELEASES_REPO" --clobber
+          echo "https://github.com/${RELEASES_REPO}/releases/latest/download/MemoKing-Setup.exe"
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: memoking-desktop-${{ github.ref_name }}
+          retention-days: 7
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
