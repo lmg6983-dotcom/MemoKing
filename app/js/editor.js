@@ -26,6 +26,7 @@ import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
 import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { keepIndent, keepLeadingSpaces, hasLeadingSpaces, NBSP } from './core/indent-spaces.js';
+import { INVISIBLE } from './tidy-text.js';
 import { plainTextOf, spacedHtml } from './clipboard-text.js';
 import { handleImageCopy } from './copy-content.js';
 import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
@@ -581,6 +582,29 @@ function atLineIndent($pos) {
   return /^\u00a0*$/.test($pos.doc.textBetween(start, $pos.pos, '', ''));
 }
 const fileChips = $prose(() => fileChipGuard());
+
+// 서식이 있는 HTML 인가 (글자 모양 · 목록 · 표 · 그림 · 링크 등) — 없으면 글자만 있는 것 (메신저 · 채팅 복사)
+const RICH_TAGS = 'h1,h2,h3,h4,h5,h6,ul,ol,li,table,pre,code,blockquote,img,picture,video,audio,svg,hr,strong,b,em,i,u,s,del,strike,mark,sub,sup,a[href]';
+export function isPlainHtml(html) {
+  const doc = new window.DOMParser().parseFromString(html, 'text/html');
+  if (doc.body.querySelector(RICH_TAGS)) return false;
+  // 구글 문서 등은 굵게 · 기울임을 span 의 style 로 준다
+  for (const el of doc.body.querySelectorAll('[style]')) {
+    const st = el.getAttribute('style');
+    if (/font-weight\s*:\s*(bold|[6-9]00)|font-style\s*:\s*italic|text-decoration[^;]*(underline|line-through)/i.test(st)) return false;
+  }
+  return true;
+}
+
+/** 일반 글자를 줄마다 문단으로 (빈 줄은 빈 문단, 줄 앞 띄어쓰기는 들여쓰기, 보이지 않는 글자는 빼고) — 커서 자리에 */
+function pastePlainLines(v, plain) {
+  const { schema } = v.state;
+  const lines = keepLeadingSpaces(plain.replace(/\r\n?/g, '\n').replace(/\n+$/, '')).split('\n').map((l) => l.replace(INVISIBLE, ''));
+  const paras = lines.map((l) => schema.nodes.paragraph.create(null, l ? schema.text(l) : null));
+  // 문단들을 담은 문서에서 첫 문단 안 ~ 끝 문단 안을 잘라, 양 끝이 지금 줄에 이어 붙게 (열린 조각)
+  const doc = schema.topNodeType.create(null, paras);
+  v.dispatch(v.state.tr.replaceSelection(doc.slice(1, doc.content.size - 1)).setMeta('uiEvent', 'paste').scrollIntoView());
+}
 
 const keepIndentPlugin = $prose(() => {
   let composing = false; // 한글 조합 중에는 손대지 않는다 (조합이 끝난 뒤 그 줄이 다시 바뀔 때 고친다)
@@ -1531,6 +1555,14 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
           && !v.state.selection.$from.parent.type.spec.code && editor) {
           event.preventDefault();
           editor.action(insert(normalizeMath(plain.replace(/\r\n?/g, '\n'))));
+          return true;
+        }
+        // 메신저 · 채팅 · 웹의 글자만 있는 HTML(서식 · 목록 · 표 · 그림 · 링크 없음): 메모장에 붙인 것과 똑같이 —
+        //   일반 글자를 한 줄씩, 빈 줄은 빈 줄로 (HTML 의 div 를 문단으로 읽으면 빈 줄이 사라지고, 마크다운으로 읽으면 "1." 같은 줄이 목록이 된다)
+        if (!files.length && html && plain.includes('\n') && isPlainHtml(html)
+          && !v.state.selection.$from.parent.type.spec.code && !isInTable(v.state)) {
+          event.preventDefault();
+          pastePlainLines(v, plain);
           return true;
         }
         // 메모장 등에서 복사한 일반 글자(HTML 없음): 마크다운으로 읽으면 줄 앞 띄어쓰기가 지워지므로, 줄마다 앞 빈칸을 지켜서

@@ -1,6 +1,7 @@
 // 조용한 다듬기 (편집기 플러그인, 데스크탑·휴대폰 함께) — 타자 실수를 불쾌하지 않게 고친다
 //   원칙 (자동 고침이 거슬리지 않게):
 //     1) 쓰고 있는 줄은 건드리지 않는다 — 커서가 그 줄을 떠날 때 고친다 (쓰는 중에 글자가 움직이지 않게)
+//        그것도 그 줄에서 직접 타자를 쳤을 때만 — 붙여 넣은 글(메신저 · 메모장 복사)은 커서가 지나가도 원문 그대로
 //     2) 뜻이 바뀌지 않는 것만: 띄어쓰기·빈 줄·보이지 않는 글자. 낱말·맞춤법은 고치지 않는다
 //     3) 코드(코드 블록·인라인 코드)는 그대로, 한글 조합(IME) 중에는 아무것도 하지 않는다
 //     4) 되돌리기 기록에 남기지 않는다 (되돌리기를 누르면 내가 쓴 것이 돌아온다)
@@ -24,7 +25,7 @@ const hasCode = (node) => node.marks.some((m) => m.type.name === 'inlineCode' ||
 const isTaskList = (list) => list.firstChild?.attrs?.checked != null;
 
 /** 글 블록 하나를 다듬는 고침들 (뒤에서부터 적용할 수 있게 위치 큰 것부터) */
-function blockEdits(block, pos) {
+function blockEdits(block, pos, { invisibleOnly = false } = {}) {
   if (!block.isTextblock || isCodeBlock(block)) return [];
   const edits = [];
   const kids = [];
@@ -36,16 +37,16 @@ function blockEdits(block, pos) {
     const text = child.text;
     const atStart = i === 0 || Boolean(prev && !prev.isText && prev.type.name.includes('break'));
     const atEnd = i === kids.length - 1 || Boolean(next && !next.isText && next.type.name.includes('break'));
-    const fixed = tidyText(text, { atStart, atEnd });
+    const fixed = invisibleOnly ? text.replace(INVISIBLE, '') : tidyText(text, { atStart, atEnd });
     if (fixed !== text) edits.push({ from: at, to: at + child.nodeSize, text: fixed, marks: child.marks });
   });
   return edits.reverse();
 }
 
-function applyBlock(tr, pos) {
+function applyBlock(tr, pos, opts) {
   const block = tr.doc.nodeAt(pos);
   if (!block) return;
-  for (const e of blockEdits(block, pos)) {
+  for (const e of blockEdits(block, pos, opts)) {
     if (e.text) tr.replaceWith(e.from, e.to, tr.doc.type.schema.text(e.text, e.marks));
     else tr.delete(e.from, e.to);
   }
@@ -91,10 +92,26 @@ function structureFixes(tr, cursor) {
 
 export function createTidy({ readOnly = false } = {}) {
   let composing = false;
+  const ctx = { typed: null, keyed: false }; // typed: 직접 타자를 친 글 블록의 위치 (그 블록을 떠날 때만 다듬는다)
   return new Plugin({
     key: tidyKey,
     props: {
       handleDOMEvents: {
+        // Backspace · Delete 는 지금 줄을 고친 것, Enter 는 새로 생긴 줄(나눈 줄의 뒷부분)만 — 붙여 넣은 마지막 줄 끝에서
+        //   Enter 로 새 줄을 열어도 그 붙여 넣은 줄은 원문 그대로
+        keydown: (view, e) => {
+          if (!/^(Enter|Backspace|Delete)$/.test(e.key) || e.isComposing) return false;
+          const $from = view.state.selection.$from;
+          if (e.key !== 'Enter' && $from.depth >= 1 && $from.parent.isTextblock) ctx.typed = $from.before();
+          ctx.keyed = true;
+          return false;
+        },
+        // 글자를 치거나 지우면(한글 조합 포함) 그 줄을 "친 줄" 로
+        beforeinput: (view, e) => {
+          const $from = view.state.selection.$from;
+          if (/^(insert|delete)/.test(e.inputType ?? '') && !/FromPaste|FromDrop/.test(e.inputType) && $from.depth >= 1 && $from.parent.isTextblock) ctx.typed = $from.before();
+          return false;
+        },
         compositionstart: () => {
           composing = true;
           return false;
@@ -106,9 +123,24 @@ export function createTidy({ readOnly = false } = {}) {
       },
     },
     appendTransaction(trs, oldState, state) {
-      if (readOnly || composing) return null;
+      if (readOnly) return null;
+      // 친 줄의 자리를 바뀐 문서에 맞춰 옮긴다 (지워졌으면 잊음)
+      for (const t of trs) {
+        if (ctx.typed == null) break;
+        const r = t.mapping.mapResult(ctx.typed, 1);
+        ctx.typed = r.deleted ? null : r.pos;
+      }
+      if (composing) return null;
+      const keyed = ctx.keyed && trs.some((t) => t.docChanged);
+      ctx.keyed = false;
       try {
-        return tidyAfter(trs, oldState, state);
+        const out = tidyAfter(trs, oldState, state, ctx);
+        // 키로 옮겨 간 줄도 "친 줄" 로 (Enter 로 나눈 뒷줄에 남은 앞 띄어쓰기를 그 줄을 떠날 때 지우게)
+        if (keyed) {
+          const $now = (out ? state.apply(out) : state).selection.$from;
+          if ($now.depth >= 1 && $now.parent.isTextblock) ctx.typed = $now.before();
+        }
+        return out;
       } catch (err) {
         console.warn('다듬기 건너뜀', err); // 다듬기가 잘못돼도 글쓰기는 막지 않는다
         return null;
@@ -132,24 +164,27 @@ function leftBlock(trs, oldState, state) {
   return p !== nowBlock && state.doc.nodeAt(p)?.isTextblock ? p : null;
 }
 
-export function tidyAfter(trs, oldState, state) {
+/** ctx.typed: 직접 친 블록 — 떠난 블록이 그것일 때만 다듬는다 (ctx 를 주지 않으면 떠난 블록은 늘 다듬음) */
+export function tidyAfter(trs, oldState, state, ctx = null) {
   if (trs.some((t) => t.getMeta(tidyKey))) return null;
   const docChanged = trs.some((t) => t.docChanged);
-  const left = leftBlock(trs, oldState, state);
+  let left = leftBlock(trs, oldState, state);
+  if (left != null && ctx) {
+    if (ctx.typed !== left) left = null; // 붙여 넣기만 하고 지나간 줄은 원문 그대로
+    else ctx.typed = null;
+  }
   if (left == null && !docChanged) return null;
   const tr = state.tr;
   if (left != null) applyBlock(tr, left);
   if (trs.some((t) => t.getMeta('uiEvent') === 'paste')) {
-    // 붙여넣은 글의 보이지 않는 글자·NBSP (커서 줄 빼고 모두)
-    const $now = tr.selection.$from;
-    const cursorBlock = $now.depth >= 1 ? $now.before() : -1;
+    // 붙여넣은 글의 보이지 않는 글자만 지운다 (띄어쓰기 · 문장부호는 원문 그대로 — 커서 줄도 함께)
     const blocks = [];
     tr.doc.descendants((node, pos) => {
       if (!node.isTextblock) return true;
-      if (pos !== cursorBlock && ODD_SPACE.test(node.textContent)) blocks.push(pos);
+      if (ODD_SPACE.test(node.textContent)) blocks.push(pos);
       return false;
     });
-    for (const pos of blocks.reverse()) applyBlock(tr, pos);
+    for (const pos of blocks.reverse()) applyBlock(tr, pos, { invisibleOnly: true });
   }
   structureFixes(tr, tr.selection.from);
   if (!tr.docChanged) return null;
