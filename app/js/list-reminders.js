@@ -69,6 +69,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   const prepared = new Map(); // id → { at, data } — 받은 .ics 를 한 번만 풀어 둔다
   const parsed = new Map(); // `${id}|${at}|${from}|${to}` → 일정 (같은 범위를 다시 펼치지 않게)
   let device = { on: false, from: 0, to: 0, events: [], loading: null };
+  let googleOn = false; // Google 캘린더 상호 동기화를 켰는가
 
   /** [from, to) 사이의 다른 캘린더 일정 [{ ext: true, source, title, start, end, allDay, color, ... }] */
   function externalBetween(from, to) {
@@ -98,7 +99,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       for (const e of list) out.push({ ...e, ext: true, source: f.name, color: f.color, feedId: f.id });
     }
     if (device.on) {
-      for (const e of device.events) if (e.end > from && e.start < to) out.push({ ...e, ext: true, source: e.calendar || '휴대폰 캘린더', device: true });
+      // 휴대폰 캘린더에도 보이는 "메모킹" 캘린더(Google 상호 동기화)는 메모킹 일정 그대로라 빼고
+      for (const e of device.events) if (e.end > from && e.start < to && !(googleOn && e.calendar === '메모킹')) out.push({ ...e, ext: true, source: e.calendar || '휴대폰 캘린더', device: true });
     }
     return query.trim() ? out.filter((e) => `${e.title} ${e.location ?? ''} ${e.source}`.toLowerCase().includes(query.trim().toLowerCase())) : out;
   }
@@ -241,11 +243,24 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   }
   const linkBtn = el('button', 'link-btn cal-link');
   linkBtn.type = 'button';
-  linkBtn.append(icon('link'), el('span', '', '다른 캘린더'));
+  linkBtn.append(el('i', 'cal-sync-dot'), icon('link'), el('span', '', '다른 캘린더'));
   linkBtn.title = 'Google 캘린더 · 삼성 캘린더와 잇기';
   linkBtn.addEventListener('click', () => openLinks());
   linkBtn.hidden = !calendars?.feeds;
   bar.append(views, linkBtn);
+  // Google 캘린더와 서로 맞추는 중이면 단추에 그 상태 (초록 점 · 오류는 빨강)
+  const linkLabel = linkBtn.querySelector('span');
+  function drawGoogle(info) {
+    googleOn = Boolean(info?.connected);
+    linkBtn.classList.toggle('synced', googleOn);
+    linkBtn.classList.toggle('sync-error', googleOn && Boolean(info?.error));
+    linkLabel.textContent = googleOn ? 'Google 캘린더와 맞춤' : '다른 캘린더';
+    linkBtn.title = googleOn ? (info.error || 'Google 캘린더 · 삼성 캘린더와 서로 맞추는 중') : 'Google 캘린더 · 삼성 캘린더와 잇기';
+  }
+  if (calendars?.google) {
+    calendars.google.status().then(drawGoogle).catch(() => {});
+    calendars.google.onStatus?.(drawGoogle);
+  }
 
   const calEl = el('div', 'cal-body');
   card.append(head, bar, calEl);

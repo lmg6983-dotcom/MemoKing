@@ -62,6 +62,22 @@ PC 에 **Google Drive 데스크탑 앱(Google Drive for desktop)을 설치하지
 - 앱이 **테스트** 상태라면, 쓰는 구글 계정이 **테스트 사용자** 에 들어 있어야 해요 (안드로이드와 같음).
 - 붙여 넣는 대신 미리 넣어 두려면: 환경 변수 `MEMOKING_GOOGLE_CLIENT_ID` / `MEMOKING_GOOGLE_CLIENT_SECRET`, 또는 `desktop/google-client.json` (`{ "id": "…", "secret": "…" }`, git 에는 올라가지 않음).
 
+## 캘린더 동기화 (Google 캘린더 · 삼성 캘린더와 서로 맞추기)
+
+일정 탭 › **다른 캘린더 › Google 캘린더와 서로 맞추기 › 연결하기** 로 켭니다. 메모킹 일정이 Google 계정의 **"메모킹" 캘린더**에 들어가고, Google 캘린더 · 삼성 캘린더(휴대폰의 Google 계정으로 보임)에서 그 캘린더의 일정을 고치거나 지우거나 새로 만들면 메모로 돌아옵니다.
+
+앱 주인이 처음 한 번 (위 Drive 준비와 같은 Google Cloud 프로젝트에서):
+
+1. **API 및 서비스 › 라이브러리 › Google Calendar API › 사용**
+2. **OAuth 동의 화면 › 데이터 액세스(범위) › 범위 추가** 에서 `.../auth/calendar.app.created` ("메모킹이 만든 캘린더와 그 일정만") 를 넣기 — 다른 캘린더는 보지 않는 가장 좁은 권한
+3. 앱이 "테스트" 상태면 쓰는 사람을 테스트 사용자로 넣어 두기 (Drive 와 같음)
+
+- PC: Drive 연결과 따로 한 번 더 브라우저로 허용합니다 (같은 OAuth 클라이언트). 휴대폰: 계정을 고르고 "허용" (Play 서비스가 있는 휴대폰)
+- 두 기기가 다 켜져 있으면 한쪽만 맞춥니다: 메모 폴더의 `_memoking/google-calendar.json`(Drive 로 함께)에 맡은 기기를 적고, 20분 소식이 없으면 다른 기기가 이어받아요
+- 같은 일정을 양쪽에서 고치면 나중에 고친 쪽을 따릅니다. 알림은 메모킹이 울리고 Google 쪽 알림은 꺼 둡니다
+- 격주 · 횟수 · "둘째 월요일" 처럼 메모킹이 나타낼 수 없는 반복은 메모 쪽을 그대로 두고 Google 쪽도 덮지 않아요
+- "Google Calendar API 를 켜야 해요" 오류: 1번을 안 했거나 켠 지 몇 분이 안 됨
+
 ## 예비: Google Play 서비스가 없는 휴대폰
 
 구글 계정 연결을 쓸 수 없는 휴대폰(일부 중국판 등)에서는 연결 화면의 **다른 방법: 브라우저로 로그인** 으로 연결합니다. 이때는 같은 프로젝트에 **데스크톱 앱** 유형 OAuth 클라이언트를 하나 더 만들어, 그 클라이언트 ID·보안 비밀번호를 앱에 붙여 넣거나 GitHub Secrets(`MEMOKING_GOOGLE_CLIENT_ID`, `MEMOKING_GOOGLE_CLIENT_SECRET`)에 넣어 APK에 담습니다.

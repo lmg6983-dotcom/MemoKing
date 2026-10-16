@@ -34,8 +34,12 @@ export class GoogleAuth {
    * @param {{ file: string, bundledClient?: string | string[], fetch?: typeof fetch, openExternal: (url: string) => void,
    *           safeStorage?: { isEncryptionAvailable(): boolean, encryptString(s: string): Buffer, decryptString(b: Buffer): string } }} options
    */
-  constructor({ file, bundledClient, fetch: fetchImpl = fetch, openExternal, safeStorage }) {
+  constructor({ file, bundledClient, fetch: fetchImpl = fetch, openExternal, safeStorage, scope = null, fallbackClient = null }) {
     this.file = file;
+    // scope: 정해진 권한 하나만 (Google 캘린더 동기화 — Drive 연결과 따로 로그인). 없으면 Drive (drive.file / 전체)
+    this.fixedScope = scope;
+    this.fallbackClient = fallbackClient; // 붙여 넣은 · 함께 넣은 연결 정보가 없을 때 빌려 쓸 클라이언트 (Drive 연결의 것)
+    this.label = scope ? 'Google 캘린더' : 'Google Drive';
     this.bundledClient = bundledClient;
     this.fetch = fetchImpl;
     this.openExternal = openExternal;
@@ -45,8 +49,8 @@ export class GoogleAuth {
     //   drive.file · Drive 전체(외부 앱 메모 연동을 켠 것)는 그대로 — 켜 둔 설정을 앱을 켤 때마다 끊지 않는다
     this.scopeUpgraded = false;
     // 0.33.7~0.33.8 에서 Drive 전체로 연결한 것(설정 값 없이)은 그 상태를 켠 것으로 이어 간다
-    if (this.data.refreshToken && this.data.scope === FULL_SCOPE && this.data.useFullDriveScope === undefined) this.data.useFullDriveScope = true;
-    if (this.data.refreshToken && !KNOWN_SCOPES.has(this.data.scope)) {
+    if (!scope && this.data.refreshToken && this.data.scope === FULL_SCOPE && this.data.useFullDriveScope === undefined) this.data.useFullDriveScope = true;
+    if (!scope && this.data.refreshToken && !KNOWN_SCOPES.has(this.data.scope)) {
       const old = this.data.refreshToken;
       delete this.data.refreshToken;
       delete this.data.email;
@@ -122,7 +126,9 @@ export class GoogleAuth {
     if (b?.id) return { id: b.id, secret: b.secret ?? '' };
     // 연결 정보 없이 빌드된 버전: 예전에 로그인했던 클라이언트로 (다시 로그인도 같은 클라이언트로)
     const t = this.data.tokenClient;
-    return t?.id ? { id: t.id, secret: t.secret ?? '' } : null;
+    if (t?.id) return { id: t.id, secret: t.secret ?? '' };
+    const f = this.fallbackClient?.();
+    return f?.id ? f : null;
   }
 
   /** 새 토큰을 받을 클라이언트 — 그 토큰을 준 클라이언트 (기억해 둔 게 없으면 지금 클라이언트) */
@@ -197,7 +203,8 @@ export class GoogleAuth {
    * @param {{ full?: boolean }} [opts] full: Drive 전체 (기본은 지금 설정 — 외부 앱 메모 연동)
    */
   async login({ full = this.fullScope } = {}) {
-    const scope = scopeFor(full);
+    const scope = this.fixedScope ?? scopeFor(full);
+    if (this.fixedScope) full = false;
     const client = this.client();
     if (!client) throw new AuthError('Google 로그인 설정(OAuth 클라이언트 ID)이 아직 없어요');
     this.cancelLogin();
@@ -214,7 +221,7 @@ export class GoogleAuth {
           return;
         }
         const ok = url.searchParams.get('state') === state && url.searchParams.has('code');
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(page(ok));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(page(ok, this.label));
         finish(() => {
           const error = url.searchParams.get('error');
           if (url.searchParams.get('state') !== state) reject(new AuthError('로그인 확인 값이 맞지 않아요. 다시 시도해 주세요'));
@@ -248,6 +255,7 @@ export class GoogleAuth {
     // 허용 화면에서 Drive 전체 칸을 끄고 허용할 수도 있다 — 실제로 받은 범위로 정한다
     const granted = String(token.scope ?? scope).split(/\s+/);
     if (full && !granted.includes(FULL_SCOPE)) throw new AuthError('Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요');
+    if (this.fixedScope && token.scope && !granted.includes(this.fixedScope)) throw new AuthError(`${this.label} 권한을 허용하지 않았어요. 허용 화면에서 칸을 켜고 다시 해 주세요`);
     this.data.refreshToken = token.refresh_token;
     this.data.scope = scope;
     this.data.useFullDriveScope = full;
@@ -265,7 +273,7 @@ export class GoogleAuth {
   /** 지금 쓸 수 있는 접근 토큰 (만료됐으면 새로 받음) */
   async token() {
     if (this.accessToken && Date.now() < this.expiresAt - 60_000) return this.accessToken;
-    if (!this.data.refreshToken) throw new AuthError('Google Drive에 로그인해 주세요');
+    if (!this.data.refreshToken) throw new AuthError(`${this.label}에 로그인해 주세요`);
     const client = this.refreshClient();
     if (!client) throw new AuthError('Google 로그인 설정(OAuth 클라이언트 ID)이 없어요');
     this.refreshing ??= this.post(TOKEN_URL, {
@@ -281,7 +289,7 @@ export class GoogleAuth {
         // 권한을 거둬 갔거나 오래돼서 끊김 → 다시 로그인
         delete this.data.refreshToken;
         this.save();
-        throw new AuthError('Google Drive 로그인이 끊겼어요. 설정에서 다시 연결해 주세요');
+        throw new AuthError(`${this.label} 로그인이 끊겼어요. 다시 연결해 주세요`);
       }
       throw err;
     }
@@ -294,13 +302,17 @@ export class GoogleAuth {
     this.accessToken = null;
   }
 
-  signOut() {
+  /**
+   * 연결 끊기. revoke: 구글 쪽 허용도 거둘지 — 같은 OAuth 클라이언트로 받은 다른 연결(Drive ↔ 캘린더)이 남아 있으면
+   * 거두지 않는다 (구글은 클라이언트 · 계정의 허용을 통째로 거둬 다른 연결까지 끊긴다)
+   */
+  signOut({ revoke = true } = {}) {
     const refresh = this.data.refreshToken;
     delete this.data.refreshToken;
     delete this.data.email;
     this.accessToken = null;
     this.save();
-    if (refresh) this.post('https://oauth2.googleapis.com/revoke', { token: refresh }).catch(() => {});
+    if (refresh && revoke) this.post('https://oauth2.googleapis.com/revoke', { token: refresh }).catch(() => {});
   }
 
   async post(url, form) {
@@ -322,8 +334,8 @@ export class GoogleAuth {
   }
 }
 
-function page(ok) {
-  const title = ok ? '메모킹에 Google Drive를 연결했어요' : '연결하지 못했어요';
+function page(ok, label = 'Google Drive') {
+  const title = ok ? `메모킹에 ${label}를 연결했어요` : '연결하지 못했어요';
   const sub = ok ? '이 창을 닫고 메모킹으로 돌아가세요.' : '메모킹으로 돌아가 다시 시도해 주세요.';
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>메모킹</title>
 <style>body{font-family:system-ui,"Malgun Gothic",sans-serif;background:#f6f5f1;color:#111;display:grid;place-items:center;min-height:90vh;margin:0;text-align:center}

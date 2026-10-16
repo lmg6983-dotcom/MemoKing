@@ -50,6 +50,7 @@ import {
 import { WindowManager } from './window-manager.js';
 import { registerIpc } from './ipc-handlers.js';
 import { CalendarFeeds } from './calendar-feeds.js';
+import { createCalendarSync } from './calendar-sync.js';
 
 // 점검 때는 가짜 마이크(삐 소리)로 녹음한다 — 실제 마이크·권한 창 없이
 if (SMOKE) {
@@ -106,6 +107,7 @@ let fileIndex = null;
 let updater = null; // 자동 업데이트 (updater.js) — 앱이 준비된 뒤
 let linkPreviews = null;
 let calendarFeeds = null; // 일정 탭이 구독하는 다른 캘린더 (.ics 주소)
+let calendarSync = null; // Google 캘린더 상호 동기화
 
 let tutorial = { active: false, index: -1, memoId: null, praise: false };
 
@@ -193,6 +195,7 @@ function openVault(dir) {
     next.on('changed', ({ ids, external, removed }) => {
       windowManager.pushList();
       driveSync?.request(3000);
+      calendarSync?.soon(ids); // 일정이 바뀐 메모가 있으면 Google 캘린더에도
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
@@ -454,6 +457,23 @@ function initDrive() {
     saveSettings();
   }
   configureDrive();
+  calendarSync = createCalendarSync({
+    userData: app.getPath('userData'),
+    bundledClient: [path.join(import.meta.dirname, 'google-client.json'), path.join(app.getPath('userData'), 'google-client.json')],
+    driveAuth: () => driveAuth,
+    fetch: (...args) => net.fetch(...args),
+    openExternal: (url) => shell.openExternal(url),
+    safeStorage,
+    getVault: () => vault,
+    // 캘린더에서 바뀐 일정이 메모에 들어왔다 — 열린 메모 창 · 일정 탭 · 알림
+    onChanged: (ids) => {
+      for (const id of ids) windowManager.sendToNote(id, 'memo:reminders', vault?.get(id)?.reminders ?? []);
+      pushReminders();
+      alarms?.tick();
+    },
+    onStatus: (info) => windowManager.listWin?.webContents.send('gcal:status', info),
+  });
+  if (!SMOKE) calendarSync.start();
 }
 
 function configureDrive() {
@@ -887,6 +907,7 @@ app.whenReady().then(async () => {
   });
   registerIpc({
     calendarFeeds,
+    getCalendarSync: () => calendarSync,
     windowManager,
     memoHotkeys,
     getVault: () => vault,

@@ -642,13 +642,17 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 12.5px; white-space: nowrap; }
 .cal-link svg { width: 15px; height: 15px; flex: none; }
 .cal-link[hidden] { display: none; }
+.cal-sync-dot { display: none; width: 7px; height: 7px; flex: none; border-radius: 99px; background: #2fb36b; }
+.cal-link.synced .cal-sync-dot { display: inline-block; }
+.cal-link.sync-error .cal-sync-dot { background: var(--danger); }
 
 /* FullCalendar 색 · 글꼴을 메모킹 것으로 (어두운 화면도 메모킹 색을 따라감) */
 .cal-body {
-  --fc-forma-primary: var(--text-strong);
-  --fc-forma-primary-over: var(--text-strong);
-  --fc-forma-primary-down: var(--text-strong);
-  --fc-forma-primary-foreground: var(--surface-0);
+  /* 오늘 날짜 동그라미 · 주 보기 오늘 막대: 메모킹 노랑 (검정 대신) */
+  --fc-forma-primary: var(--brand-yellow);
+  --fc-forma-primary-over: var(--brand-yellow-hover, var(--brand-yellow));
+  --fc-forma-primary-down: var(--brand-yellow-hover, var(--brand-yellow));
+  --fc-forma-primary-foreground: var(--on-brand);
   --fc-forma-event: var(--blue-chip);
   --fc-forma-event-contrast: #fff;
   --fc-forma-highlight: color-mix(in srgb, var(--accent) 35%, transparent);
@@ -689,6 +693,17 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-body .mk-ext { outline: 1px dashed color-mix(in srgb, var(--fc-event-color) 70%, transparent); outline-offset: -1px; }
 .cal-body .mk-ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* 일정 탭 › 다른 캘린더 창 (calendar-links.js) */
+.gsync { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); }
+.gsync.on { border-color: color-mix(in srgb, var(--brand-yellow) 70%, var(--line)); }
+.gsync-dot { width: 10px; height: 10px; border-radius: 99px; background: var(--muted); opacity: 0.5; }
+.gsync.on .gsync-dot { background: #2fb36b; opacity: 1; }
+.gsync.on.error .gsync-dot { background: var(--danger); }
+.gsync .feed-text small { white-space: pre-line; }
+.gsync-btns { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.gsync-btns .btn { height: 34px; }
+.gsync-btns [hidden] { display: none; }
+.gsync-off { margin-left: auto; font-size: 12.5px; }
+.cal-help ul { margin: 4px 0 6px; padding-left: 18px; line-height: 1.6; }
 .cal-links { width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; }
 .dialog p.cal-links-lead { margin-bottom: 4px; font-size: 13px; color: var(--muted); }
 .cal-links-h3 { margin: 18px 0 8px; font-size: 13px; font-weight: 800; color: var(--text-strong); }

@@ -11,7 +11,7 @@ import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { taskProgress } from '../app/js/core/tasks.js';
 import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
-import { isLiveCached } from '../app/js/core/reminders.js';
+import { isLiveCached, stampChanged } from '../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles, diskCopy } from '../app/js/core/vault-locks.js';
 import { textMatcher } from '../app/js/core/text-match.js';
 import {
@@ -305,9 +305,15 @@ export class Vault extends EventEmitter {
     const out = [];
     for (const e of this.entries.values()) {
       if (!e.file) continue;
-      for (const reminder of e.meta.reminders) out.push({ memoId: e.id, title: extractTitle(e.body), color: e.meta.color, reminder });
+      for (const reminder of e.meta.reminders) out.push({ memoId: e.id, title: extractTitle(e.body), color: e.meta.color, updated: e.meta.updated, locked: isLockedBody(e.body), stable: e.idSaved !== false, reminder });
     }
     return out;
+  }
+
+  /** 이 메모 파일을 마지막으로 쓴(받은) 때 ms — 캘린더 동기화: 이 기기의 메모가 지난번 맞춘 뒤 바뀌었는가 */
+  editedAt(id) {
+    const e = this.entries.get(id);
+    return e ? Math.max(Date.parse(e.meta.updated ?? '') || 0, e.mtimeMs || 0) : 0;
   }
 
   // 알림 목록 통째로 바꾸기 (추가·삭제·켜기/끄기). 알림은 내용 수정이 아니므로 updated 는 그대로.
@@ -316,6 +322,7 @@ export class Vault extends EventEmitter {
     if (!entry) return null;
     // 잠긴 메모의 일정 이름은 머리말(풀린 글)에 남기지 않는다 — 글에서 짐작한 이름이 비밀일 수 있음 (알림엔 메모 제목)
     const prev = entry.meta.reminders;
+    reminders = stampChanged(prev, reminders); // 일정이 바뀐 때 (캘린더 동기화의 "나중에 고친 쪽")
     entry.meta.reminders = isLockedBody(entry.body) ? reminders.map(({ title: _t, ...r }) => r) : reminders;
     const wrote = entry.file || !isBlankBody(entry.body) ? this.write(entry) : true;
     if (wrote !== true) {
@@ -636,6 +643,11 @@ export class Vault extends EventEmitter {
   }
 
   /** 휴지통의 메모 (최근에 지운 것부터) */
+  /** 휴지통에 있는 메모 id 들 (캘린더 동기화: 지운 메모인지, 아직 이 기기에 오지 않은 메모인지 가린다) */
+  trashedIds() {
+    return new Set(this.#trashEntries().map((t) => t?.meta?.id).filter(Boolean));
+  }
+
   trashList() {
     return this.#trashEntries()
       .sort((a, b) => b.at - a.at)

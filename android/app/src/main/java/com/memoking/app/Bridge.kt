@@ -334,6 +334,9 @@ class Bridge(private val activity: MainActivity) {
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
             // 휴대폰 캘린더 (삼성 캘린더 · Google 캘린더): 권한 묻기 · 일정 읽기 · 캘린더 앱으로 넣기 · 그 일정 열기
             "calendarPermission" -> activity.runOnUiThread { activity.requestCalendarPermission(id) }
+            // Google 캘린더 상호 동기화: 권한 받기(계정 고르기 · 허용 화면) · 요청 대신 보내기
+            "googleCalendarAuth" -> activity.runOnUiThread { activity.authorizeCalendar(id) }
+            "googleCalendar" -> pool.execute { resolve(id) { GoogleCalendarApi.request(ctx, a) } }
             "calendarEvents" -> pool.execute { resolve(id) { DeviceCalendar.events(ctx, a.getLong("from"), a.getLong("to")) } }
             "calendarInsert" -> activity.runOnUiThread { activity.startCalendarIntent(id) { DeviceCalendar.insertIntent(a) } }
             "calendarView" -> activity.runOnUiThread { activity.startCalendarIntent(id) { DeviceCalendar.viewIntent(a) } }

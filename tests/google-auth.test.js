@@ -238,3 +238,14 @@ test('예전 연결(클라이언트를 적어 두지 않음)도 켤 때 지금 �
   assert.equal(later.connected, true);
   assert.equal(later.refreshClient().id, 'user.apps.googleusercontent.com');
 });
+
+test('연결 끊기: revoke: false 면 구글 쪽 허용은 거두지 않음 (같은 클라이언트의 다른 연결이 끊기지 않게)', async () => {
+  const { auth, posts } = setup();
+  auth.setClient('id-1.apps.googleusercontent.com', 'GOCSPX-s');
+  await auth.login();
+  const before = posts.length;
+  auth.signOut({ revoke: false });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(auth.connected, false);
+  assert.equal(posts.length, before);
+});
