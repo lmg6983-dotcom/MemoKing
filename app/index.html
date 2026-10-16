@@ -112,140 +112,158 @@
       <h2>설정</h2>
       <button type="button" class="icon-btn dialog-x" data-dialog-close title="닫기 (Esc)" aria-label="설정 닫기"><svg><use href="#i-close"/></svg></button>
     </header>
-    <p class="label">메모 폴더</p>
-    <div class="path-box" id="vault-path"></div>
-    <div class="dialog-actions left">
-      <button id="reveal-vault" class="btn">폴더 열기</button>
-      <button id="change-vault" class="btn">폴더 변경</button>
-    </div>
-    <p class="label">Google Drive 동기화 <small>구글 로그인만 하면 돼요</small></p>
-    <div class="drive-box" id="drive-box">
-      <svg class="drive-box-icon"><use href="#i-cloud"/></svg>
-      <div class="drive-box-text"><b id="drive-title"></b><small id="drive-sub"></small></div>
-    </div>
-    <div class="dialog-actions left">
-      <button id="drive-connect" class="btn">연결하기</button>
-      <button id="drive-sync-now" class="btn">지금 동기화</button>
-      <button id="drive-disconnect" class="btn">연결 끊기</button>
-    </div>
-    <label class="setting-row" id="drive-full-row" hidden>
-      <input type="checkbox" id="drive-full" class="switch">
-      <span>외부 앱 메모 연동 (전체 드라이브 권한) <small id="drive-full-note">제미나이 등 외부 도구가 드라이브 폴더에 직접 추가한 .md 메모도 동기화합니다. 활성화 시 전체 드라이브 접근 권한으로 다시 로그인합니다.</small></span>
-    </label>
-    <p class="label">편의 기능</p>
-    <label class="setting-row">
-      <input type="checkbox" id="auto-start" class="switch" role="switch">
-      <span>PC를 켜면 메모킹 자동 실행 <small id="auto-start-note"></small></span>
-    </label>
-    <label class="setting-row">
-      <input type="checkbox" id="quick-memo" class="switch" role="switch">
-      <span>빠른 메모 <kbd id="quick-memo-kbd">Ctrl+Alt+C</kbd> <small id="quick-memo-note">고른 내용을 바로 메모로, 두 번 누르면 화면 캡처</small></span>
-    </label>
-    <div class="shortcut-row" data-shortcut="quickMemo">
-      <span class="shortcut-label">단축키</span>
-      <button type="button" class="kbd-btn" id="sc-quickMemo" aria-describedby="sc-quickMemo-note">…</button>
-      <button type="button" class="link-btn sc-reset" id="sc-quickMemo-reset" hidden>기본값으로</button>
-      <small class="sc-note" id="sc-quickMemo-note" role="status"></small>
-    </div>
-    <label class="setting-row">
-      <input type="checkbox" id="history-enabled" class="switch" role="switch">
-      <span>Windows 알림 모아두기 <small>카카오톡 알림도 함께 모아 알림 보관함 탭에서 봐요. 모을 앱은 보관함 위 “모을 앱” 단추에서</small></span>
-    </label>
-    <p class="label">음성 녹음과 받아쓰기 <small>인터넷 없이 이 PC 안에서</small></p>
-    <label class="setting-row">
-      <input type="checkbox" id="stt-enabled" class="switch" role="switch">
-      <span>녹음하며 받아쓰기 <small id="stt-note"></small></span>
-    </label>
-    <div class="dialog-actions left sub-actions stt-actions">
-      <button id="stt-download" class="btn">받아쓰기 데이터 받기</button>
-      <button id="stt-remove" class="link-btn danger" hidden>지우기</button>
-    </div>
-    <label class="setting-row sub-row">
-      <input type="checkbox" id="stt-speaker" class="switch" role="switch">
-      <span>말한 사람 나누기 <small id="stt-speaker-note">녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요</small></span>
-    </label>
-    <p class="label">표 · 링크 · 태그</p>
-    <label class="setting-row">
-      <input type="checkbox" id="fit-tables" class="switch" role="switch">
-      <span>넓은 표 맞춤 <small>표가 잘리지 않게 글자를 줄이고, 그래도 넓으면 창을 넓혀요</small></span>
-    </label>
-    <label class="setting-row">
-      <input type="checkbox" id="link-previews" class="switch" role="switch" checked>
-      <span>링크 미리보기 <small>주소를 붙이면 제목 · 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
-    </label>
-    <label class="setting-row">
-      <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
-      <span>태그 자동 추가 <small>태그 없는 메모를 닫을 때 확실한 태그만 달아요</small></span>
-    </label>
-    <label class="setting-row">
-      <input type="checkbox" id="magic-enabled" class="switch" role="switch">
-      <span>매직키 <kbd id="magic-kbd">Ctrl+Alt+Space</kbd> <small>어디서든 입력창을 띄워 바로 메모하고 찾아요 (Spotlight 처럼)</small></span>
-    </label>
-    <div class="shortcut-row" data-shortcut="magic">
-      <span class="shortcut-label">단축키</span>
-      <button type="button" class="kbd-btn" id="sc-magic" aria-describedby="sc-magic-note">…</button>
-      <button type="button" class="link-btn sc-reset" id="sc-magic-reset" hidden>기본값으로</button>
-      <small class="sc-note" id="sc-magic-note" role="status"></small>
-    </div>
-    <div id="magic-modules-row" class="setting-sub" hidden>
-      <p class="label sub">매직키 기능</p>
-      <div id="magic-modules-list" class="magic-settings-modules"></div>
-    </div>
-    <div id="opms-setup" class="setting-sub opms-setup" hidden>
-      <p class="label sub">OPMS 연결 <small>사내 OPMS 서버 주소는 이 PC 에만 저장돼요</small></p>
-      <form id="opms-host-form" class="opms-host-row">
-        <input id="opms-host" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="서버 주소 (예: 192.168.0.10:8181)" aria-label="OPMS 서버 주소" aria-describedby="opms-host-note">
-        <button type="submit" class="btn" id="opms-host-save">저장</button>
-      </form>
-      <small class="sc-note" id="opms-host-note" role="status"></small>
-      <div class="opms-dir-row">
-        <span>전자포대 저장 폴더 <small id="opms-dir"></small></span>
-        <button type="button" class="btn" id="opms-dir-btn">바꾸기</button>
-      </div>
-    </div>
-    <div class="setting-row keymap-row">
-      <span>메모 창 단축키 <small>PDF로 저장, 서식, 왕관 같은 기능의 키를 바꿔요</small></span>
-      <button type="button" class="btn" id="keymap-open">단축키 설정하기</button>
-    </div>
-    <p class="label">AI 비서와 연결 <small>Claude 데스크톱 같은 AI 비서가 메모를 찾고 남겨요</small></p>
-    <div class="drive-box" id="mcp-box">
-      <svg class="drive-box-icon"><use href="#i-link"/></svg>
-      <div class="drive-box-text"><b id="mcp-title"></b><small id="mcp-sub" role="status"></small></div>
-    </div>
-    <div class="dialog-actions left">
-      <button id="mcp-connect" class="btn">Claude 데스크톱에 연결</button>
-      <button id="mcp-copy" class="btn">다른 AI 앱용 설정 복사</button>
-      <button id="mcp-disconnect" class="link-btn danger" hidden>연결 끊기</button>
-    </div>
-    <label class="setting-row sub-row">
-      <input type="checkbox" id="mcp-write" class="switch" role="switch" checked>
-      <span>AI가 메모를 남기도록 허용 <small>끄면 찾기와 읽기만 해요. 잠긴 메모는 언제나 볼 수 없어요</small></span>
-    </label>
-    <p class="label">휴지통</p>
-    <div class="dialog-actions left">
-      <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
-    </div>
-    <label class="setting-row select-row">
-      <span>휴지통 자동 비우기 <small>기간이 지난 메모를 영구 삭제해요</small></span>
-      <select id="trash-days" aria-label="휴지통 자동 비우기 기간">
-        <option value="7">7일 후</option>
-        <option value="30">30일 후</option>
-        <option value="90">90일 후</option>
-        <option value="365">1년 후</option>
-        <option value="0">안 함</option>
-      </select>
-    </label>
-    <p class="label">도움말</p>
-    <div class="dialog-actions left">
-      <button id="tutorial-btn" class="btn">사용법 보기</button>
-    </div>
-    <p class="label">업데이트</p>
-    <div class="setting-row update-row">
-      <span>지금 버전 <b id="update-current"></b> <small id="update-note" role="status"></small></span>
+    <!-- 자주 보는 것부터: 앱 상태(버전 · 업데이트) → 동기화 → 매일 쓰는 기능 … → 한 번 정하고 마는 것(폴더 · 휴지통) → 도움말 -->
+    <div class="drive-box app-box" id="app-box" aria-label="메모킹 버전과 업데이트">
+      <svg class="drive-box-icon"><use href="#i-crown"/></svg>
+      <div class="drive-box-text"><b>메모킹 <span id="update-current"></span></b><small id="update-note" role="status"></small></div>
       <button type="button" class="btn update-btn" id="update-check" data-state="idle">업데이트 확인</button>
     </div>
-    <p class="version" id="version"></p>
-    <p class="copyright">© 2026 메모킹 | 문의 lmg6983@gmail.com</p>
+    <section class="set-sec" aria-labelledby="set-drive">
+      <h3 class="set-title" id="set-drive">Google Drive 동기화</h3>
+      <div class="drive-box" id="drive-box">
+        <svg class="drive-box-icon"><use href="#i-cloud"/></svg>
+        <div class="drive-box-text"><b id="drive-title"></b><small id="drive-sub"></small></div>
+      </div>
+      <div class="dialog-actions left">
+        <button id="drive-connect" class="btn">연결하기</button>
+        <button id="drive-sync-now" class="btn">지금 동기화</button>
+        <button id="drive-disconnect" class="link-btn danger">연결 끊기</button>
+      </div>
+      <label class="setting-row" id="drive-full-row" hidden>
+        <input type="checkbox" id="drive-full" class="switch" role="switch">
+        <span>외부 앱 메모 연동 (전체 드라이브 권한) <small id="drive-full-note">제미나이 등 외부 도구가 드라이브 폴더에 직접 추가한 .md 메모도 동기화합니다. 활성화 시 전체 드라이브 접근 권한으로 다시 로그인합니다.</small></span>
+      </label>
+    </section>
+    <section class="set-sec" aria-labelledby="set-daily">
+      <h3 class="set-title" id="set-daily">자주 쓰는 기능</h3>
+      <label class="setting-row">
+        <input type="checkbox" id="quick-memo" class="switch" role="switch">
+        <span>빠른 메모 <kbd id="quick-memo-kbd">Ctrl+Alt+C</kbd> <small id="quick-memo-note">고른 내용을 바로 메모로, 두 번 누르면 화면 캡처</small></span>
+      </label>
+      <div class="shortcut-row" data-shortcut="quickMemo">
+        <span class="shortcut-label">단축키</span>
+        <button type="button" class="kbd-btn" id="sc-quickMemo" aria-describedby="sc-quickMemo-note">…</button>
+        <button type="button" class="link-btn sc-reset" id="sc-quickMemo-reset" hidden>기본값으로</button>
+        <small class="sc-note" id="sc-quickMemo-note" role="status"></small>
+      </div>
+      <label class="setting-row">
+        <input type="checkbox" id="history-enabled" class="switch" role="switch">
+        <span>Windows 알림 모아두기 <small>카카오톡 알림도 함께 모아 알림 보관함 탭에서 봐요. 모을 앱은 보관함 위 “모을 앱” 단추에서</small></span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="auto-start" class="switch" role="switch">
+        <span>PC를 켜면 메모킹 자동 실행 <small id="auto-start-note"></small></span>
+      </label>
+    </section>
+    <section class="set-sec" aria-labelledby="set-magic">
+      <h3 class="set-title" id="set-magic">매직키</h3>
+      <label class="setting-row">
+        <input type="checkbox" id="magic-enabled" class="switch" role="switch">
+        <span>매직키 <kbd id="magic-kbd">Ctrl+Alt+Space</kbd> <small>어디서든 입력창을 띄워 바로 메모하고 찾아요</small></span>
+      </label>
+      <div class="shortcut-row" data-shortcut="magic">
+        <span class="shortcut-label">단축키</span>
+        <button type="button" class="kbd-btn" id="sc-magic" aria-describedby="sc-magic-note">…</button>
+        <button type="button" class="link-btn sc-reset" id="sc-magic-reset" hidden>기본값으로</button>
+        <small class="sc-note" id="sc-magic-note" role="status"></small>
+      </div>
+      <div id="magic-modules-row" class="setting-sub" hidden>
+        <p class="label sub">매직키 기능</p>
+        <div id="magic-modules-list" class="magic-settings-modules"></div>
+      </div>
+      <div id="opms-setup" class="setting-sub opms-setup" hidden>
+        <p class="label sub">OPMS 연결 <small>사내 OPMS 서버 주소는 이 PC 에만 저장돼요</small></p>
+        <form id="opms-host-form" class="opms-host-row">
+          <input id="opms-host" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="서버 주소 (예: 192.168.0.10:8181)" aria-label="OPMS 서버 주소" aria-describedby="opms-host-note">
+          <button type="submit" class="btn" id="opms-host-save">저장</button>
+        </form>
+        <small class="sc-note" id="opms-host-note" role="status"></small>
+        <div class="opms-dir-row">
+          <span>전자포대 저장 폴더 <small id="opms-dir"></small></span>
+          <button type="button" class="btn" id="opms-dir-btn">바꾸기</button>
+        </div>
+      </div>
+    </section>
+    <section class="set-sec" aria-labelledby="set-view">
+      <h3 class="set-title" id="set-view">메모 보기</h3>
+      <label class="setting-row">
+        <input type="checkbox" id="fit-tables" class="switch" role="switch">
+        <span>넓은 표 맞춤 <small>표가 잘리지 않게 글자를 줄이고, 그래도 넓으면 창을 넓혀요</small></span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="link-previews" class="switch" role="switch" checked>
+        <span>링크 미리보기 <small>주소를 붙이면 제목 · 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
+        <span>태그 자동 추가 <small>태그 없는 메모를 닫을 때 확실한 태그만 달아요</small></span>
+      </label>
+    </section>
+    <section class="set-sec" aria-labelledby="set-stt">
+      <h3 class="set-title" id="set-stt">음성 녹음과 받아쓰기 <small>인터넷 없이 이 PC 안에서</small></h3>
+      <label class="setting-row">
+        <input type="checkbox" id="stt-enabled" class="switch" role="switch">
+        <span>녹음하며 받아쓰기 <small id="stt-note"></small></span>
+      </label>
+      <div class="dialog-actions left sub-actions stt-actions">
+        <button id="stt-download" class="btn">받아쓰기 데이터 받기</button>
+        <button id="stt-remove" class="link-btn danger" hidden>지우기</button>
+      </div>
+      <label class="setting-row sub-row">
+        <input type="checkbox" id="stt-speaker" class="switch" role="switch">
+        <span>말한 사람 나누기 <small id="stt-speaker-note">녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요</small></span>
+      </label>
+    </section>
+    <section class="set-sec" aria-labelledby="set-keys">
+      <h3 class="set-title" id="set-keys">단축키</h3>
+      <div class="setting-row keymap-row">
+        <span>메모 창 단축키 <small>PDF로 저장, 서식, 왕관 같은 기능의 키를 바꿔요</small></span>
+        <button type="button" class="btn" id="keymap-open">단축키 설정하기</button>
+      </div>
+    </section>
+    <section class="set-sec" aria-labelledby="set-ai">
+      <h3 class="set-title" id="set-ai">AI 비서와 연결 <small>Claude 데스크톱 같은 AI 비서가 메모를 찾고 남겨요</small></h3>
+      <div class="drive-box" id="mcp-box">
+        <svg class="drive-box-icon"><use href="#i-link"/></svg>
+        <div class="drive-box-text"><b id="mcp-title"></b><small id="mcp-sub" role="status"></small></div>
+      </div>
+      <div class="dialog-actions left">
+        <button id="mcp-connect" class="btn">Claude 데스크톱에 연결</button>
+        <button id="mcp-copy" class="link-btn">다른 AI 앱용 설정 복사</button>
+        <button id="mcp-disconnect" class="link-btn danger" hidden>연결 끊기</button>
+      </div>
+      <label class="setting-row sub-row">
+        <input type="checkbox" id="mcp-write" class="switch" role="switch" checked>
+        <span>AI가 메모를 남기도록 허용 <small>끄면 찾기와 읽기만 해요. 잠긴 메모는 언제나 볼 수 없어요</small></span>
+      </label>
+    </section>
+    <section class="set-sec" aria-labelledby="set-storage">
+      <h3 class="set-title" id="set-storage">저장 공간</h3>
+      <p class="label">메모 폴더</p>
+      <div class="path-box" id="vault-path"></div>
+      <div class="dialog-actions left">
+        <button id="reveal-vault" class="btn">폴더 열기</button>
+        <button id="change-vault" class="btn">폴더 변경</button>
+      </div>
+      <p class="label">휴지통</p>
+      <div class="dialog-actions left">
+        <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
+      </div>
+      <label class="setting-row select-row">
+        <span>휴지통 자동 비우기 <small>기간이 지난 메모를 영구 삭제해요</small></span>
+        <select id="trash-days" aria-label="휴지통 자동 비우기 기간">
+          <option value="7">7일 후</option>
+          <option value="30">30일 후</option>
+          <option value="90">90일 후</option>
+          <option value="365">1년 후</option>
+          <option value="0">안 함</option>
+        </select>
+      </label>
+    </section>
+    <footer class="set-foot">
+      <button id="tutorial-btn" class="link-btn">사용법 보기</button>
+      <span>© 2026 메모킹 · 문의 lmg6983@gmail.com</span>
+    </footer>
   </dialog>
 
   <!-- 새 버전: 바뀐 점 → 받기(진행률) → 지금 재시작 / 나중에 -->
