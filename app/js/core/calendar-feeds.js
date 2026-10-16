@@ -1,0 +1,304 @@
+// 다른 캘린더와 잇기 (순수 함수, 단위 테스트 대상) — 일정 탭(list-reminders.js)이 쓴다
+//   읽기: Google 캘린더 "iCal 형식의 비공개 주소" 같은 .ics 구독 → 달력에 함께 (반복 · 빠진 날 · 바뀐 회차까지, ical.js)
+//         휴대폰 캘린더(삼성 캘린더 · Google 캘린더, 안드로이드 CalendarContract) 일정 → 같은 모양으로
+//   보내기: 메모킹 일정 → .ics 파일(삼성 캘린더 · Google 캘린더 · Outlook 가져오기) · Google 캘린더 "새 일정" 주소 · 휴대폰 캘린더 앱 새 일정
+import { ICAL } from '../../vendor/ical.js';
+import { toLocalIso, pad2 } from './time.js';
+import { isEvent, alertsOf, nextOccurrence, DEFAULT_ALERTS } from './reminders.js';
+
+export const MAX_FEED_BYTES = 5 * 1024 * 1024;
+export const MAX_FEEDS = 10;
+// 구독 캘린더 색 (메모 색과 겹치지 않는 진한 색 — 달력에서 "다른 캘린더" 로 보이게)
+export const FEED_COLORS = ['#4285f4', '#0b8043', '#8e24aa', '#f4511e', '#039be5', '#616161'];
+const MAX_ITERATIONS = 20000; // 아주 오래된 매일 반복도 멈추지 않게
+
+/**
+ * 붙여 넣은 캘린더 주소 → 받을 수 있는 주소 (webcal:// 은 https:// 로). 아니면 null
+ * @param {string} raw
+ */
+export function normalizeFeedUrl(raw) {
+  const text = String(raw ?? '').trim().replace(/^webcals?:\/\//i, 'https://');
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  return url.toString();
+}
+
+/** 주소로 짐작한 캘린더 이름 — 이름을 비워 두면 */
+export function feedLabel(url) {
+  try {
+    const u = new URL(url);
+    if (/(^|\.)google\.com$/.test(u.hostname)) return 'Google 캘린더';
+    if (/(^|\.)(icloud|me)\.com$/.test(u.hostname)) return 'iCloud 캘린더';
+    if (/outlook|office|live\.com/.test(u.hostname)) return 'Outlook 캘린더';
+    return u.hostname.replace(/^www\./, '');
+  } catch {
+    return '캘린더';
+  }
+}
+
+/** 저장해 둔 구독 목록을 안전한 모양으로 [{ id, name, url, color, on }] */
+export function normalizeFeeds(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const f of list) {
+    const url = normalizeFeedUrl(f?.url);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push({
+      id: typeof f.id === 'string' && /^[\w-]{1,40}$/.test(f.id) ? f.id : `c${Math.random().toString(36).slice(2, 8)}`,
+      name: String(f.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40) || feedLabel(url),
+      url,
+      color: /^#[0-9a-f]{6}$/i.test(f.color ?? '') ? f.color : FEED_COLORS[out.length % FEED_COLORS.length],
+      on: f.on !== false,
+    });
+    if (out.length >= MAX_FEEDS) break;
+  }
+  return out;
+}
+
+/** .ics 글의 캘린더 이름 (X-WR-CALNAME) */
+export function icsName(text) {
+  const m = /^X-WR-CALNAME:(.*)$/m.exec(String(text ?? '').replace(/\r?\n[ \t]/g, ''));
+  return m ? m[1].replace(/\\([,;\\])/g, '$1').trim().slice(0, 40) : '';
+}
+
+/** 받은 글이 iCal 인가 (로그인 화면 HTML 같은 것을 거르게) */
+export const looksLikeIcs = (text) => /BEGIN:VCALENDAR/i.test(String(text ?? '').slice(0, 2000));
+
+const plainText = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+
+/**
+ * .ics 글 → [from, to) 와 겹치는 일정 회차 [{ uid, title, start, end, allDay, location }] (시작 순)
+ * 반복 일정은 회차마다, 취소된 일정은 빼고, 바뀐 회차(RECURRENCE-ID)는 바뀐 대로.
+ */
+export function feedEvents(text, from, to, limit = 1500) {
+  const root = new ICAL.Component(ICAL.parse(String(text ?? '')));
+  for (const tz of root.getAllSubcomponents('vtimezone')) {
+    try {
+      ICAL.TimezoneService.register(tz);
+    } catch {
+      // 모르는 시간대 — 그 일정은 이 기기 시각으로
+    }
+  }
+  const masters = [];
+  const byUid = new Map();
+  const exceptions = [];
+  for (const v of root.getAllSubcomponents('vevent')) {
+    const ev = new ICAL.Event(v);
+    if (!ev.startDate) continue;
+    if (ev.isRecurrenceException()) exceptions.push(ev);
+    else {
+      masters.push(ev);
+      if (!byUid.has(ev.uid)) byUid.set(ev.uid, ev);
+    }
+  }
+  for (const ex of exceptions) {
+    const master = byUid.get(ex.uid);
+    if (master) master.relateException(ex);
+    else masters.push(ex); // 본 일정이 없는 바뀐 회차 — 한 번짜리로
+  }
+  const out = [];
+  const fromMs = from.getTime();
+  const toMs = to.getTime();
+  const push = (ev, startTime, endTime) => {
+    const allDay = startTime.isDate;
+    const start = startTime.toJSDate();
+    let end = endTime ? endTime.toJSDate() : null;
+    if (!end || end <= start) end = allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) : new Date(start);
+    if (end.getTime() <= fromMs && !(end.getTime() === start.getTime() && start.getTime() >= fromMs)) return;
+    if (start.getTime() >= toMs) return;
+    const status = String(ev.component.getFirstPropertyValue('status') ?? '').toUpperCase();
+    if (status === 'CANCELLED') return;
+    out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || '(제목 없음)', start, end, allDay, location: plainText(ev.location) });
+  };
+  let budget = MAX_ITERATIONS;
+  for (const ev of masters) {
+    if (out.length >= limit || budget <= 0) break;
+    if (!ev.isRecurring()) {
+      push(ev, ev.startDate, ev.endDate);
+      continue;
+    }
+    const it = ev.iterator();
+    for (let next = it.next(); next && budget-- > 0 && out.length < limit; next = it.next()) {
+      if (next.toJSDate().getTime() >= toMs) break;
+      const d = ev.getOccurrenceDetails(next);
+      // 바뀐 회차는 그 일정의 상태(취소 등)로 본다
+      push(d.item, d.startDate, d.endDate);
+    }
+  }
+  return out.sort((a, b) => a.start - b.start);
+}
+
+/**
+ * 휴대폰 캘린더(안드로이드) 일정 → 같은 모양. 하루 종일 일정은 UTC 자정으로 오므로 그 날짜의 이 기기 자정으로
+ * @param {{ id: number, title: string, start: number, end: number, allDay: boolean, location?: string, calendar?: string, color?: string }} e
+ */
+export function fromDeviceEvent(e) {
+  const utcDay = (ms) => {
+    const d = new Date(ms);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  };
+  const start = e.allDay ? utcDay(e.start) : new Date(e.start);
+  let end = e.allDay ? utcDay(e.end) : new Date(e.end);
+  if (!(end > start)) end = e.allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) : new Date(start);
+  return {
+    uid: `device-${e.id}-${e.start}`,
+    deviceId: e.id,
+    title: plainText(e.title) || '(제목 없음)',
+    start,
+    end,
+    allDay: Boolean(e.allDay),
+    location: plainText(e.location),
+    calendar: plainText(e.calendar),
+    color: /^#[0-9a-f]{6}$/i.test(e.color ?? '') ? e.color : null,
+  };
+}
+
+/** 다른 캘린더의 일정 → 메모킹 일정 (메모로 가져오기) */
+export function reminderFromExternal(ev, now = new Date()) {
+  const allDay = Boolean(ev.allDay);
+  const start = allDay ? new Date(ev.start.getFullYear(), ev.start.getMonth(), ev.start.getDate()) : new Date(ev.start);
+  return {
+    kind: 'at',
+    at: toLocalIso(start),
+    title: plainText(ev.title).slice(0, 80),
+    alerts: [...(allDay ? DEFAULT_ALERTS.allDay : DEFAULT_ALERTS.timed)],
+    ...(allDay ? { allDay: true } : {}),
+    action: 'notify',
+    enabled: start > now,
+    created: toLocalIso(now),
+  };
+}
+
+// ---------- 메모킹 일정 → 다른 캘린더 ----------
+
+const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+const ymd = (d) => `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`;
+const localStamp = (d) => `${ymd(d)}T${pad2(d.getHours())}${pad2(d.getMinutes())}00`;
+const utcStamp = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+const DEFAULT_MINUTES = 60; // 메모킹 일정은 끝나는 때가 없다 — 다른 캘린더에는 1시간으로 (Google 캘린더 기본과 같음)
+
+/** 반복 일정 → RRULE (한 번짜리는 '') */
+export function rruleOf(r) {
+  if (r.kind !== 'repeat') return '';
+  const rep = r.repeat;
+  if (rep.every === 'day') return 'FREQ=DAILY';
+  if (rep.every === 'week') return `FREQ=WEEKLY;BYDAY=${rep.weekdays.map((d) => WEEKDAY_CODES[d]).join(',')}`;
+  // 메모킹은 31일이 없는 달에 그 달 마지막 날 — 다른 캘린더에는 29~31일이면 "그 달 마지막 날 무렵"을 맞추기 어려워 그날만
+  if (rep.every === 'month') return `FREQ=MONTHLY;BYMONTHDAY=${rep.day}`;
+  if (rep.every === 'year') return `FREQ=YEARLY;BYMONTH=${rep.month};BYMONTHDAY=${rep.day}`;
+  return '';
+}
+
+/**
+ * 한 일정의 첫 회차 시작 · 끝 (반복은 만든 때 뒤의 첫 회차, 한 번짜리는 그 시각)
+ * @returns {{ start: Date, end: Date, allDay: boolean } | null}
+ */
+export function eventSpan(r, now = new Date()) {
+  if (!isEvent(r)) return null;
+  let start;
+  if (r.kind === 'at') start = new Date(r.at);
+  else {
+    const created = new Date(r.created);
+    const base = Number.isNaN(created.getTime()) ? now : created;
+    start = nextOccurrence(r, new Date(new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime() - 1));
+  }
+  if (!start || Number.isNaN(start.getTime())) return null;
+  const allDay = Boolean(r.allDay);
+  if (allDay) start = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const end = allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) : new Date(start.getTime() + DEFAULT_MINUTES * 60_000);
+  return { start, end, allDay };
+}
+
+const escapeText = (s) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+
+// 75바이트마다 접기 (RFC 5545) — 한글이 잘리지 않게 글자 단위로
+function fold(line) {
+  const enc = new TextEncoder();
+  if (enc.encode(line).length <= 75) return line;
+  const parts = [];
+  let cur = '';
+  let bytes = 0;
+  for (const ch of line) {
+    const n = enc.encode(ch).length;
+    if (bytes + n > (parts.length ? 74 : 75)) {
+      parts.push(cur);
+      cur = '';
+      bytes = 0;
+    }
+    cur += ch;
+    bytes += n;
+  }
+  parts.push(cur);
+  return parts.join('\r\n ');
+}
+
+/** 미리 알림(분 전) → TRIGGER 값 */
+const trigger = (offset) => (offset >= 0 ? `-PT${offset}M` : `PT${-offset}M`);
+
+/**
+ * 메모킹 일정들 → .ics 글 (삼성 캘린더 · Google 캘린더 · Outlook 에서 가져오기)
+ * @param {{ memoId: string, title: string, reminder: any }[]} items  api.reminders.all() 결과
+ */
+export function buildIcs(items, { now = new Date(), name = '메모킹 일정' } = {}) {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//MemoKing//MemoKing//KO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', `X-WR-CALNAME:${escapeText(name)}`];
+  for (const item of items) {
+    const r = item.reminder;
+    const span = eventSpan(r, now);
+    if (!span) continue;
+    const repeat = r.kind === 'repeat';
+    lines.push('BEGIN:VEVENT', `UID:${item.memoId}-${r.id}@memoking`, `DTSTAMP:${utcStamp(now)}`);
+    if (span.allDay) lines.push(`DTSTART;VALUE=DATE:${ymd(span.start)}`, `DTEND;VALUE=DATE:${ymd(span.end)}`);
+    // 반복은 이 기기 시각 그대로(시간대 없음 — 받는 캘린더의 시간대로 매번 같은 시각), 한 번짜리는 정확한 순간(UTC)
+    else if (repeat) lines.push(`DTSTART:${localStamp(span.start)}`, `DTEND:${localStamp(span.end)}`);
+    else lines.push(`DTSTART:${utcStamp(span.start)}`, `DTEND:${utcStamp(span.end)}`);
+    const rrule = rruleOf(r);
+    if (rrule) lines.push(`RRULE:${rrule}`);
+    lines.push(`SUMMARY:${escapeText(r.title || item.title || '일정')}`);
+    if (item.title && item.title !== r.title) lines.push(`DESCRIPTION:${escapeText(`메모킹 메모: ${item.title}`)}`);
+    if (r.enabled) {
+      for (const offset of alertsOf(r)) lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${escapeText(r.title || item.title || '일정')}`, `TRIGGER:${trigger(offset)}`, 'END:VALARM');
+    }
+    lines.push('END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  return `${lines.map(fold).join('\r\n')}\r\n`;
+}
+
+/** Google 캘린더 "새 일정" 화면 주소 (PC 는 브라우저, 휴대폰은 Google 캘린더 앱이 받음) */
+export function googleCalendarUrl(item, now = new Date()) {
+  const r = item.reminder;
+  const span = eventSpan(r, now);
+  if (!span) return null;
+  const dates = span.allDay ? `${ymd(span.start)}/${ymd(span.end)}`
+    : r.kind === 'repeat' ? `${localStamp(span.start)}/${localStamp(span.end)}`
+    : `${utcStamp(span.start)}/${utcStamp(span.end)}`;
+  const q = new URLSearchParams({ action: 'TEMPLATE', text: r.title || item.title || '일정', dates });
+  if (item.title && item.title !== r.title) q.set('details', `메모킹 메모: ${item.title}`);
+  const rrule = rruleOf(r);
+  if (rrule) q.set('recur', `RRULE:${rrule}`);
+  return `https://calendar.google.com/calendar/render?${q}`;
+}
+
+/** 휴대폰 캘린더 앱(삼성 캘린더 등)의 새 일정 화면에 넘길 값 */
+export function deviceInsertArgs(item, now = new Date()) {
+  const r = item.reminder;
+  const span = eventSpan(r, now);
+  if (!span) return null;
+  // 하루 종일은 안드로이드 캘린더 규칙대로 UTC 자정
+  const utcMidnight = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return {
+    title: r.title || item.title || '일정',
+    start: span.allDay ? utcMidnight(span.start) : span.start.getTime(),
+    end: span.allDay ? utcMidnight(span.end) : span.end.getTime(),
+    allDay: span.allDay,
+    description: item.title && item.title !== r.title ? `메모킹 메모: ${item.title}` : '',
+    rrule: rruleOf(r),
+  };
+}

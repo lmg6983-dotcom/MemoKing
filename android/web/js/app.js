@@ -4,6 +4,7 @@ import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
+import { normalizeFeeds, looksLikeIcs, MAX_FEED_BYTES } from '../../app/js/core/calendar-feeds.js';
 import { extractTitle, isBlankBody, COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
 import { shareText } from '../../app/js/core/share-text.js';
@@ -11,7 +12,7 @@ import { importText, isTextDocument, stripFrontMatter } from '../../app/js/core/
 import { mediaKind } from '../../app/js/media.js';
 import { vocabularyFrom, fixTranscript } from '../../app/js/core/transcript-fix.js';
 import { voiceCardMarkdown, attachTranscript, recordingWhen } from '../../app/js/core/voice-card.js';
-import { native, call, on, setBackHandler, drive, history, fs } from './native.js';
+import { native, call, on, setBackHandler, drive, history, fs, toBase64 } from './native.js';
 import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
@@ -44,6 +45,109 @@ injectIcons();
 attachSliders(); // 탭·고르기 칸: 선택 표시가 미끄러진다
 injectMobileIcons();
 
+// ---------- 일정 탭의 다른 캘린더 (list-reminders.js 가 씀) ----------
+// 구독 주소는 비밀(누구나 그 캘린더를 볼 수 있음)이라 메모 폴더(Drive 동기화)가 아니라 이 휴대폰에만 둔다
+const FEEDS_KEY = 'memoking.calendarFeeds';
+const DEVICE_KEY = 'memoking.deviceCalendar';
+const FEED_FRESH_MS = 15 * 60 * 1000;
+const lsGet = (k) => {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+};
+const lsSet = (k, v) => {
+  try {
+    if (v == null) localStorage.removeItem(k);
+    else localStorage.setItem(k, v);
+  } catch {
+    // 저장 공간이 꽉 참 — 다음에 다시 받는다
+  }
+};
+
+function calendarApi() {
+  const mem = new Map(); // id → { url, text, at }
+  const cacheKey = (id) => `memoking.calendarFeed.${id}`;
+  const feeds = () => {
+    try {
+      return normalizeFeeds(JSON.parse(lsGet(FEEDS_KEY) ?? '[]'));
+    } catch {
+      return [];
+    }
+  };
+  const cached = (f) => {
+    let c = mem.get(f.id);
+    if (!c) {
+      try {
+        c = JSON.parse(lsGet(cacheKey(f.id)) ?? 'null');
+      } catch {
+        c = null;
+      }
+      if (c) mem.set(f.id, c);
+    }
+    return c?.url === f.url ? c : null;
+  };
+  return {
+    feeds: async () => feeds(),
+    setFeeds: async (list) => {
+      const next = normalizeFeeds(list);
+      for (const f of feeds()) {
+        if (next.some((n) => n.id === f.id && n.url === f.url)) continue;
+        mem.delete(f.id);
+        lsSet(cacheKey(f.id), null);
+      }
+      lsSet(FEEDS_KEY, JSON.stringify(next));
+      return next;
+    },
+    fetch: async (id, force = false) => {
+      const f = feeds().find((x) => x.id === id);
+      if (!f) return { text: '', at: 0, error: '없는 캘린더예요' };
+      const old = cached(f);
+      if (!force && old && Date.now() - old.at < FEED_FRESH_MS) return { text: old.text, at: old.at };
+      try {
+        const res = await call('http', { url: f.url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
+        if ([401, 403, 404].includes(res.status)) throw new Error('캘린더를 볼 수 없어요. 주소가 바뀌었거나 비공개 주소를 다시 만들었는지 확인해 주세요');
+        if (res.status < 200 || res.status > 299) throw new Error(`캘린더 서버 오류 (${res.status})`);
+        const text = new TextDecoder().decode(Uint8Array.from(res.latin1 ?? '', (c) => c.charCodeAt(0) & 0xff));
+        if (!looksLikeIcs(text)) throw new Error('캘린더(iCal) 주소가 아니에요. Google 캘린더는 "iCal 형식의 비공개 주소" 를 넣어 주세요');
+        const entry = { url: f.url, text, at: Date.now() };
+        mem.set(f.id, entry);
+        lsSet(cacheKey(f.id), JSON.stringify(entry));
+        return { text, at: entry.at };
+      } catch (err) {
+        return { text: old?.text ?? '', at: old?.at ?? 0, error: err.message || '캘린더를 받지 못했어요' };
+      }
+    },
+    openUrl: (url) => call('openUrl', { url }),
+    exportIcs: async (text, name) => {
+      await call('shareFile', { base64: toBase64(new TextEncoder().encode(text)), name, mime: 'text/calendar', title: '캘린더로 보내기' });
+      return { ok: true };
+    },
+    // 휴대폰 캘린더 (삼성 캘린더 · Google 캘린더 등 — 안드로이드 CalendarContract)
+    device: {
+      enabled: () => lsGet(DEVICE_KEY) === '1',
+      // 켜기: 권한을 물어 허용해야 켜짐 → 켜졌는가
+      setEnabled: async (on) => {
+        if (!on) {
+          lsSet(DEVICE_KEY, null);
+          return false;
+        }
+        const granted = await call('calendarPermission').catch(() => false);
+        lsSet(DEVICE_KEY, granted ? '1' : null);
+        return Boolean(granted);
+      },
+      events: async (from, to) => {
+        const res = await call('calendarEvents', { from: from.getTime(), to: to.getTime() });
+        if (!res.granted) lsSet(DEVICE_KEY, null); // 설정에서 권한을 거둬 갔다
+        return res;
+      },
+      insert: (args) => call('calendarInsert', args),
+      view: (args) => call('calendarView', args),
+    },
+  };
+}
+
 // ---------- 데스크탑 모양의 API (reminder-panel.js · list-reminders.js 가 씀) ----------
 
 app.api = {
@@ -66,6 +170,8 @@ app.api = {
     },
   },
   memos: { search: async (query) => app.vault?.search(String(query ?? '')) ?? [] },
+  // 일정 탭이 함께 보는 다른 캘린더 — .ics 구독(이 휴대폰에만 저장) · 휴대폰 캘린더(삼성 캘린더 · Google 캘린더)
+  calendars: calendarApi(),
   memo: { open: (id) => app.openMemo(id) },
   copyText: async (text) => {
     native.copyText(text);

@@ -12,6 +12,8 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- 녹음 · 받아쓰기: 화면을 꺼도 계속 녹음 (포그라운드 서비스 · 마이크) -->
+    <!-- 일정 탭에 휴대폰 캘린더(삼성 캘린더 · Google 캘린더) 일정도 함께 — 사용자가 켤 때만 묻는다 -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />

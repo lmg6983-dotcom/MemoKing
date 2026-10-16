@@ -284,6 +284,33 @@ const calls = {
     log.push({ openUrl: url });
     return true;
   },
+  // 휴대폰 캘린더 (DeviceCalendar.kt): 미리보기에서는 늘 허용, 삼성 캘린더에 있는 것 같은 일정 몇 개
+  calendarPermission: async () => true,
+  calendarEvents: async ({ from, to }) => {
+    const day = (offset, h = null, len = 1) => {
+      const d = new Date();
+      if (h == null) {
+        const start = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() + offset);
+        return { start, end: start + len * 86_400_000, allDay: true };
+      }
+      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset, h).getTime();
+      return { start, end: start + len * 3_600_000, allDay: false };
+    };
+    const events = [
+      { id: 101, title: '가족 저녁', ...day(1, 19, 2), location: '집', calendar: '삼성 캘린더', color: '#E67C73' },
+      { id: 102, title: '결혼식', ...day(8, 12), location: '강남', calendar: '삼성 캘린더', color: '#E67C73' },
+      { id: 103, title: '휴가', ...day(12, null, 3), location: '', calendar: 'Google 캘린더 (개인)', color: '#33B679' },
+    ].filter((e) => e.end > from && e.start < to);
+    return { granted: true, events };
+  },
+  calendarInsert: async (a) => {
+    log.push({ calendarInsert: a });
+    return true;
+  },
+  calendarView: async (a) => {
+    log.push({ calendarView: a });
+    return true;
+  },
   share: async (a) => {
     log.push({ share: a });
     return true;

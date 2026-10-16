@@ -61,6 +61,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-flash { color: var(--ok-text); font-weight: 700; }
 .magic-flash.err { color: var(--err-text); }
 .magic-note { padding: 8px 12px 10px; color: #6e6e6e; font-size: 12.5px; } /* 흰 바탕에서 4.5:1 넘게 */
+.magic-note.loading .mk-searching { padding: 0; color: inherit; font-size: inherit; }
 
 .magic-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px 10px 14px; border-top: 1px solid var(--mk-line); }
 .magic-modules { -webkit-app-region: no-drag; display: flex; flex: none; gap: 6px; }

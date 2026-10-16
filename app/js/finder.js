@@ -1,4 +1,5 @@
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
+import { searchingNode } from './searching.js';
 // 모두 찾기 창 — 매직키에서 "다른 n건 더 보기" 를 고르면 열린다 (Everything 처럼 한 줄씩 · 열 정렬)
 //   기본은 비슷한 것부터, 열 머리를 누르면 이름 · 경로 · 크기 · 고친 때로 (한 번 더 누르면 거꾸로, 세 번째는 다시 비슷한 순)
 //   ↑↓ PgUp PgDn Home End 고르기 · ← → 할 일(열기 · 경로 복사 · 폴더 열기 · 파일 복사) · Enter 실행 · 두 번 누르면 열기
@@ -25,6 +26,7 @@ let selected = 0;
 let activeAct = 0;
 let query = '';
 let seq = 0;
+let loading = false; // 찾는 중 (매직키에서 열 때 · 글을 바꿀 때) — 빈 목록 대신 돋보기
 const stats = new Map(); // path → { size, mtime } | null
 const asked = new Set();
 
@@ -114,7 +116,8 @@ function rebuild({ keep = false } = {}) {
   }
   countEl.textContent = !query.trim() ? '' : total > all.length ? `${total.toLocaleString()}건 중 비슷한 ${all.length.toLocaleString()}건` : `${all.length.toLocaleString()}건`;
   emptyEl.hidden = Boolean(view.length) || !query.trim();
-  emptyEl.textContent = `'${query.trim().slice(0, 40)}'와 맞는 것이 없어요`;
+  if (loading && !view.length) emptyEl.replaceChildren(searchingNode('찾는 중이에요'));
+  else emptyEl.textContent = `'${query.trim().slice(0, 40)}'와 맞는 것이 없어요`;
   draw();
   if (!keep) scroller.scrollTop = 0;
   status();
@@ -247,11 +250,38 @@ async function run(i, act = activeAct) {
 }
 
 // ---------- 찾기 ----------
+// 찾는 중 표시: 아직 보여 줄 것이 없으면(처음 열 때) 목록 자리에 바로 돋보기, 지난 결과가 있으면 잠깐 뒤 아래 줄에만 (깜빡이지 않게)
+let loadingTimer = 0;
+function setLoading(on) {
+  loading = on;
+  clearTimeout(loadingTimer);
+  document.body.classList.toggle('searching', on);
+  if (!on || !query.trim()) return;
+  if (!view.length) {
+    emptyEl.hidden = false;
+    emptyEl.replaceChildren(searchingNode('찾는 중이에요'));
+    countEl.textContent = '';
+  } else {
+    loadingTimer = setTimeout(() => {
+      if (loading) countEl.replaceChildren(searchingNode('찾는 중', { inline: true, tag: 'span' }));
+    }, 180);
+  }
+}
+
 async function search() {
   query = input.value;
   const my = ++seq;
+  setLoading(true);
   const res = await api.search(query).catch(() => null);
-  if (my !== seq || !res) return;
+  if (my !== seq) return;
+  setLoading(false);
+  if (!res) {
+    all = [];
+    total = 0;
+    rebuild();
+    emptyEl.textContent = '찾지 못했어요. 다시 써 보세요';
+    return;
+  }
   all = res.items ?? [];
   total = res.total ?? all.length;
   stats.clear();

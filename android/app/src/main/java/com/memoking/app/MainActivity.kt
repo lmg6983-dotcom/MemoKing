@@ -57,6 +57,7 @@ class MainActivity : Activity() {
         private const val REQ_AUTH = 4
         private const val REQ_MIC = 5
         private const val REQ_SAVE = 6
+        private const val REQ_CALENDAR = 7
         private const val PDF_TIMEOUT_MS = 15_000L // PDF 만들기를 이만큼 기다리고, 넘으면 인쇄 화면으로
 
         /** 지금 앞에 보이는 화면 (알림이 울렸을 때 바로 알리기 위해) */
@@ -704,6 +705,29 @@ class MainActivity : Activity() {
             perms.add(Manifest.permission.POST_NOTIFICATIONS)
         }
         requestPermissions(perms.toTypedArray(), REQ_MIC)
+    }
+
+    /** 휴대폰 캘린더 읽기 권한 (일정 탭의 "휴대폰 캘린더 함께 보기") → 허용했는가 */
+    fun requestCalendarPermission(id: Int) {
+        if (DeviceCalendar.granted(this)) {
+            bridge.resolve(id) { true }
+            return
+        }
+        waiting[REQ_CALENDAR]?.let { old -> bridge.resolve(old) { false } }
+        waiting[REQ_CALENDAR] = id
+        requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), REQ_CALENDAR)
+    }
+
+    /** 캘린더 앱 열기 (새 일정 · 그 일정) — 캘린더 앱이 없으면 false */
+    fun startCalendarIntent(id: Int, intent: Intent) {
+        bridge.resolve(id) {
+            try {
+                startActivity(intent)
+                true
+            } catch (e: ActivityNotFoundException) {
+                false
+            }
+        }
     }
 
     /** 앱 캐시의 파일(그림·PDF)을 다른 앱으로 보내기 */

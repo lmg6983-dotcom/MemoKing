@@ -1,6 +1,7 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
 import { looksLikeRef } from './core/magic-modules.js';
+import { searchingNode } from './searching.js';
 // 매직키 창 — 입력한 글을 바로 메모로(기본), 입력하는 대로 메모·폴더·파일을 찾아 바로 연다.
 //   비어 있으면 최근 메모 · 쓰면 맨 위 "새 메모로 저장" 그 아래 메모 / 폴더 / 파일 (비슷한 것부터 몇 개씩)
 //   다 못 보여 준 나머지는 맨 아래 "다른 n건 더 보기" — 고르면 전체 결과 창(모두 찾기)
@@ -198,7 +199,12 @@ function render() {
     if (opms.cases.length) {
       nodes.push(section('OPMS', opms.total));
       opms.cases.forEach((c) => add({ kind: 'opms', ...c }));
-    } else if (opms.loading) nodes.push(note('OPMS 에서 찾는 중…'));
+    } else if (opms.loading) {
+      const li = note('');
+      li.classList.add('loading');
+      li.append(searchingNode('OPMS 에서 찾는 중', { inline: true, tag: 'span' }));
+      nodes.push(li);
+    }
     else if (opms.error) nodes.push(note(opms.error));
   }
   if (results.notes.length) {

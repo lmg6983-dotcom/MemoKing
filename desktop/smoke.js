@@ -1399,14 +1399,18 @@ export async function runSmoke({
     await listJs(`document.querySelector('[data-tab="reminders"]').click()`);
     await wait(400);
     const tab = await listJs(`({
-      days: document.querySelectorAll('#reminder-groups .cal-day').length,
-      today: document.querySelector('#reminder-groups .cal-day.today[aria-pressed="true"]') !== null,
-      dots: document.querySelectorAll('#reminder-groups .cal-dots i').length,
+      days: document.querySelectorAll('#reminder-groups [role="gridcell"][data-date]').length,
+      today: (() => {
+        const d = new Date();
+        const key = \`\${d.getFullYear()}-\${String(d.getMonth() + 1).padStart(2, '0')}-\${String(d.getDate()).padStart(2, '0')}\`;
+        return document.querySelector('#reminder-groups [role="gridcell"].mk-selected')?.dataset.date === key;
+      })(),
+      dots: document.querySelectorAll('#reminder-groups .mk-ev, #reminder-groups .cal-dots i').length,
       events: [...document.querySelectorAll('#reminder-groups .ev-row')].map((r) => r.textContent),
       timer: document.querySelector('#reminder-groups .rem-row-item .row-sub')?.textContent,
       count: document.getElementById('count-reminders').textContent,
     })`);
-    check('일정 탭: 한 달 달력(오늘 선택) · 매주 월 일정이 날짜별로 점·목록 (미리 알림 표시) · 타이머는 따로',
+    check('일정 탭: 한 달 달력(FullCalendar, 오늘 선택) · 매주 월 일정이 날짜별로 막대·목록 (미리 알림 표시) · 타이머는 따로',
       tab.days === 42 && tab.today && tab.dots >= 4 && tab.events.some((t) => /09:30|9:30/.test(t) && /알림 10분 전/.test(t)) && /5분 타이머/.test(tab.timer) && tab.count === '2', JSON.stringify(tab));
     await capture(lw, 'smoke-reminders-tab.png');
     // 창을 줄이거나 넓혀도 달력이 잘리지 않는다 (가장 작은 창 300×380 · 낮고 넓은 창 · 넓은 창은 달력 왼쪽·목록 오른쪽)

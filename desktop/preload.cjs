@@ -58,6 +58,12 @@ contextBridge.exposeInMainWorld('memoking', {
     all: invoke('reminders:all'),
     add: invoke('reminders:add'),
   },
+  // 일정 탭이 함께 보는 다른 캘린더 (.ics 구독 — Google 캘린더 비공개 주소 등): feeds() · setFeeds(목록) · fetch(id, 새로) → { text, at, error? }
+  calendars: {
+    feeds: invoke('calendars:feeds'),
+    setFeeds: invoke('calendars:set-feeds'),
+    fetch: invoke('calendars:fetch'),
+  },
   // 알림 보관함 (Windows 알림 기록)
   history: {
     list: invoke('history:list'),

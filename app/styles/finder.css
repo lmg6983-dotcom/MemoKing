@@ -57,3 +57,5 @@ body {
 .finder-status { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .finder-status.flash { color: var(--ok-text); font-weight: 700; }
 .finder-status.flash.err { color: var(--err-text); }
+body.searching .finder-list { opacity: 0.55; transition: opacity 0.2s ease-out 0.15s; } /* 찾는 중: 지난 결과는 흐리게 */
+.finder-count .mk-searching { padding: 0; font-weight: 600; }

@@ -387,7 +387,7 @@ try {
   await page.tap('[data-tab="reminders"]');
   await page.waitForTimeout(500);
   const cal = await page.evaluate(() => ({
-    days: document.querySelectorAll('#reminder-groups .cal-day').length,
+    days: document.querySelectorAll('#reminder-groups [role="gridcell"][data-date]').length,
     rows: [...document.querySelectorAll('#reminder-groups .ev-row')].map((r) => r.textContent),
   }));
   check('일정 탭: 달력 42칸 · 다가오는 일정에 "치과 · 알림 30분 전, 2시간 전"', cal.days === 42 && cal.rows.some((t) => /치과/.test(t) && /알림 30분 전, 2시간 전/.test(t)), JSON.stringify(cal));
@@ -419,6 +419,34 @@ try {
   await page.tap(qeNext);
   await page.waitForTimeout(600);
   check('바로 일정 추가: 있는 메모를 고르면 그 메모에 일정', /title: 주간 보고/.test(read('회의 메모.md')), read('회의 메모.md').slice(0, 400));
+  // 다른 캘린더: 휴대폰 캘린더(삼성 캘린더) 켜기 → 달력 · 다가오는 일정에 함께, 일정 줄의 보내기 → 캘린더 앱 새 일정
+  await page.tap('.cal-link');
+  await page.waitForSelector('.cal-links[open]');
+  await page.tap('.feed-device .switch');
+  await page.waitForTimeout(300);
+  check('다른 캘린더: 휴대폰 캘린더 켜기 (권한 허용)', await page.isChecked('.feed-device .switch'));
+  await shot('02i-calendar-links');
+  await page.tap('.cal-links .dialog-actions .btn');
+  await page.waitForTimeout(800);
+  const ext = await page.evaluate(() => ({
+    bars: [...document.querySelectorAll('#reminder-groups .mk-ext')].map((e) => e.title),
+    rows: [...document.querySelectorAll('#reminder-groups .ev-ext .row-title')].map((e) => e.textContent),
+  }));
+  check('다른 캘린더: 삼성 캘린더 일정이 달력(점선) · 다가오는 일정에 함께', ext.bars.some((t) => /가족 저녁/.test(t)) && ext.rows.includes('가족 저녁'), JSON.stringify(ext));
+  await shot('02j-calendar-device');
+  await page.tap('.ev-row:not(.ev-ext) .ev-send');
+  await page.waitForTimeout(300);
+  const inserted = (await devLog()).log.find((l) => l.calendarInsert)?.calendarInsert;
+  check('보내기: 일정 줄의 단추 → 휴대폰 캘린더 앱 새 일정 (이름 · 시각)', Boolean(inserted?.title) && inserted.start > 0, JSON.stringify(inserted));
+  for (const [view, name] of [['timeGridWeek', '주'], ['listMonth', '목록']]) {
+    await page.tap(`[data-view="${view}"]`);
+    await page.waitForTimeout(500);
+    const shown = await page.evaluate(() => ({ h: document.querySelector('.cal-body').getBoundingClientRect().height, n: document.querySelectorAll('#reminder-groups .mk-ev').length }));
+    check(`달력 보기: ${name} (일정이 보임)`, shown.h > 200 && shown.n > 0, JSON.stringify(shown));
+    await shot(`02k-calendar-${view}`);
+  }
+  await page.tap('[data-view="dayGridMonth"]');
+  await page.waitForTimeout(300);
   await page.tap('[data-tab="memos"]');
   await page.waitForTimeout(300);
 
