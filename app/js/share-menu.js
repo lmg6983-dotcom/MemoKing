@@ -130,20 +130,19 @@ function closePop() {
 }
 
 /**
- * 잘 됐다는 알림 — 창 가운데 카드(✓ 제목 · 할 일 · 링크) + 폭죽. 4.5초 뒤, 누르거나 Esc 면 닫힘
- * @param {{ title: string, sub?: string, detail?: string }} o
+ * 잘 됐다는 알림 — 창 가운데 카드(✓ 제목 · 할 일) + 폭죽. 4.5초 뒤, 누르거나 Esc 면 닫힘
+ *   (링크 주소는 보이지 않는다 — 이미 복사돼 있는데 따로 복사해야 하는 것처럼 읽혀서)
+ * @param {{ title: string, sub?: string }} o
  */
-export function showSharePop({ title, sub = '', detail = '' }) {
+export function showSharePop({ title, sub = '' }) {
   closePop();
   const el = document.createElement('div');
   el.className = 'mk-share-pop';
   el.setAttribute('role', 'status');
-  el.innerHTML = '<span class="mk-share-pop-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b></b><p></p><small></small>';
+  el.innerHTML = '<span class="mk-share-pop-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b></b><p></p>';
   el.querySelector('b').textContent = title;
   el.querySelector('p').textContent = sub;
-  el.querySelector('small').textContent = detail;
   el.querySelector('p').hidden = !sub;
-  el.querySelector('small').hidden = !detail;
   el.addEventListener('click', closePop);
   document.body.append(el);
   const onKey = (e) => {

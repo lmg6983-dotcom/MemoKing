@@ -8,6 +8,7 @@ import path from 'node:path';
 import { isInside, dropBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 import { StackStore } from './stacks.js';
 import { DesktopPin } from './desktop-pin.js';
+import { StatusBubbles } from './status-bubble-window.js';
 import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
 import { Opms, isOpenableFile, cleanDate, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
@@ -68,6 +69,13 @@ export class WindowManager {
     // 테이프로 붙인 메모 창을 바탕화면 층에. 도우미가 막힌 PC(Add-Type 금지 등)로 드러나면 붙여 둔 창을 보통 창으로
     //   (그러지 않으면 작업 표시줄 단추도 없고 바탕화면 층도 아닌 창이 테이프 스티커를 단 채 남는다)
     this.desktopPin = new DesktopPin({ onFail: () => this.dropDesktopPins() });
+    // 잘린 상태 줄의 전문 — 메모 창 위 가장자리 바깥 말풍선 (status-bubble-window.js)
+    this.statusBubbles = new StatusBubbles({
+      appDir: APP_DIR,
+      webPreferences,
+      guard: (w) => guardWindow(w, { openWebPage }),
+      stickerOf: (owner) => Boolean(this.stickers.get(owner.id)?.win),
+    });
     this.lostNotes = new Set(); // 탐색기가 다시 시작돼 함께 사라진 테이프 메모 (곧 다시 연다)
     this.hudWin = null;
     this.hudTimer = 0;

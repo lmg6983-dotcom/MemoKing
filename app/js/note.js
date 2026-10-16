@@ -3,6 +3,7 @@ import { injectIcons, icon } from './icons.js';
 import { createNoteEditor } from './editor.js';
 import { setCopyHost } from './copy-content.js';
 import { hideDeleteButton } from './delete-button.js';
+import { attachStatusBubble, statusChanged } from './status-bubble.js';
 import { COLORS, COLOR_NAMES, extractTitle, isBlankBody, conflictCopyBody, sameBody } from './core/memo-file.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from './core/html-marks.js';
 import { fileExtension } from './media.js';
@@ -19,7 +20,6 @@ import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSliders } from './seg-slider.js';
 import { setupVoiceRecorder } from './voice-recorder.js';
 import { setupAnnotation } from './ink-annotate.js';
-import { audioNeedingTranscript } from './core/voice-card.js';
 import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups } from './dom.js';
 import { createClearStamp } from './clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
@@ -57,7 +57,7 @@ setCopyHost({
     const r = await api.attachments.share({ ...f, via });
     if (r?.error) throw new Error(r.error);
     if (r?.missing) return 'localsend-missing';
-    if (via === 'drive') showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요', detail: r?.link ?? '' });
+    if (via === 'drive') showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' });
     return { drive: 'link', localsend: 'localsend', mail: 'mail' }[via];
   },
 });
@@ -124,6 +124,7 @@ const el = {
   fileInput: $('file-input'),
   confirm: $('confirm-dialog'),
 };
+attachStatusBubble(el.status);
 
 let editor = null;
 let reminderPanel = null;
@@ -161,6 +162,7 @@ let pendingExternal = null;
 function setStatus(text, isError = false) {
   el.status.textContent = text;
   el.status.classList.toggle('error', isError);
+  statusChanged(); // 창이 좁아 잘리면 말풍선으로 전문 (status-bubble.js)
 }
 
 // 편집기의 변경 알림은 약간 늦게 오므로, 저장 직전에는 편집기에서 직접 읽는다.
@@ -522,9 +524,18 @@ $('lock-btn').addEventListener('click', async () => {
   setStatus('잠갔어요. 창을 닫으면 다시 비밀번호로 열려요');
 });
 // 단축키 정하기 (Ctrl+Alt+1~9): 어느 앱에서든 이 메모를 복사하거나 띄운다 (hotkey-dialog.js)
+//   윗막대 번개 단추: 정한 숫자를 작게, 없으면 사선 (다른 메모가 그 숫자를 가져갈 수 있어 창에 돌아올 때마다 다시 본다)
 function showHotkey(state) {
-  $('hotkey-label').textContent = state?.slot ? hotkeyLabel(state.slot) : '';
+  const btn = $('hotkey-btn');
+  const slot = state?.slot ?? null;
+  $('hotkey-num').textContent = slot ? String(slot) : '';
+  btn.classList.toggle('off', !slot);
+  const what = slot ? `${hotkeyLabel(slot)} 로 불러와요` : '아직 없어요';
+  btn.title = `불러오기 키 정하기: ${what} (Ctrl+Alt+숫자로 어디서든 이 메모를 불러와요)`;
+  btn.setAttribute('aria-label', `불러오기 키 정하기, ${slot ? hotkeyLabel(slot) : '아직 없음'}`);
 }
+const refreshHotkey = () => api.hotkeys?.state(id).then(showHotkey, () => {});
+window.addEventListener('focus', () => memo && refreshHotkey());
 $('hotkey-btn').addEventListener('click', async () => {
   closeMenu();
   await flush();
@@ -543,8 +554,7 @@ $('pdf-btn').addEventListener('click', async () => {
   await flush(); // 지금 적은 내용까지 PDF 에
   api.pdf.open(id);
 });
-// 소리 받아쓰기: 이 메모의 받아쓴 글이 없는 소리 파일들을 글로 (녹음할 때 받아쓰기 데이터가 없었거나, 넣은 소리 파일)
-//   소리를 16kHz 로 풀어(브라우저 디코더) 메인 프로세스의 받아쓰기로 → 그 소리의 음성 카드에. 말한 사람은 나눈 뒤 다시 고친다
+// 첨부 경로 (attachments/%EC… → 풀린 이름)
 function decodePath(src) {
   try {
     return decodeURI(src);
@@ -552,46 +562,6 @@ function decodePath(src) {
     return src; // 이미 풀린 경로
   }
 }
-async function decode16k(src) {
-  const bytes = await api.attachments.read(decodePath(src));
-  const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-  const ctx = new AudioContext({ sampleRate: 16000 });
-  try {
-    const audio = await ctx.decodeAudioData(buf);
-    const out = new Float32Array(audio.length);
-    for (let c = 0; c < audio.numberOfChannels; c++) {
-      const ch = audio.getChannelData(c);
-      for (let i = 0; i < ch.length; i++) out[i] += ch[i] / audio.numberOfChannels;
-    }
-    return out;
-  } finally {
-    ctx.close().catch(() => {});
-  }
-}
-async function transcribeAudio() {
-  closeMenu();
-  if (!editor) return;
-  const st = await api.stt.status();
-  if (st.asr.state !== 'ready') return setStatus('받아쓰기 데이터를 먼저 받아 주세요 (목록 창 설정 › 음성 녹음과 받아쓰기)', true);
-  const list = audioNeedingTranscript(editor.getMarkdown());
-  if (!list.length) return setStatus('받아쓸 소리가 없어요 (모두 받아썼어요)');
-  let done = 0;
-  for (const [i, src] of list.entries()) {
-    setStatus(list.length > 1 ? `받아쓰는 중… (${i + 1}/${list.length})` : '받아쓰는 중…');
-    try {
-      const r = await api.stt.transcribe({ memoId: id, src, samples: await decode16k(src) });
-      if (r.error) throw new Error(r.error);
-      if (r.text && editor.attachTranscript(src, r.text)) done++;
-    } catch (err) {
-      console.error(err);
-      setStatus(err.message || '받아쓰지 못했어요', true);
-      return;
-    }
-  }
-  await flush();
-  setStatus(done ? `받아쓴 글을 넣었어요${st.speakerOn && st.speaker.state === 'ready' ? '. 말한 사람을 나누는 중…' : ''}` : '알아들은 말이 없어요');
-}
-$('transcribe-btn').addEventListener('click', transcribeAudio);
 // 말한 사람을 나눈 뒤: 음성 카드의 받아쓴 글에 "화자 N:" 을 붙여 다시
 api.on('stt:speakers', async ({ src, text }) => {
   if (!editor?.replaceTranscript(src, text)) return;
@@ -617,10 +587,6 @@ api.on('memo:meta', applyMeta);
 
 function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
-  // 다른 창(다른 메모의 단축키)에서 바뀌었을 수 있어 열 때마다 다시 읽는다
-  if (!el.menu.hidden && memo) {
-    api.hotkeys?.state(id).then(showHotkey, () => {});
-  }
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
   if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
 }
@@ -717,7 +683,10 @@ async function toggleLinks(force) {
     el.linkSearch.focus();
   } else editor.focus();
 }
-el.linksBtn.addEventListener('click', () => toggleLinks());
+el.linksBtn.addEventListener('click', () => {
+  closeMenu(); // ⋯ 메뉴 안의 항목
+  toggleLinks();
+});
 
 // ---------- 이전 버전 ----------
 
@@ -1839,6 +1808,7 @@ if (!memo) {
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();
   refreshLinks();
+  refreshHotkey();
   scheduleTagBar();
   reminderPanel = setupReminderPanel({
     api,
@@ -1849,7 +1819,6 @@ if (!memo) {
   });
   reminderPanel.set(memo.reminders);
   showLockState();
-  api.hotkeys?.state(id).then(showHotkey, () => {});
   recorder = setupVoiceRecorder({
     panel: $('rec-panel'), time: $('rec-time'), state: $('rec-state'), wave: $('rec-wave'), pause: $('rec-pause'), stop: $('rec-stop'),
     buttons: () => document.querySelectorAll('[data-action="record"]'),

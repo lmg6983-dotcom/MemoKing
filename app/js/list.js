@@ -467,8 +467,8 @@ function confirmDialog(message, okLabel = '삭제') {
 async function deleteMemo(id) {
   const memo = state.memos.find((m) => m.id === id);
   if (!memo) return;
-  // 묻지 않고 바로 휴지통으로 — 카드의 떠 있는 복사본이 옆으로 날아가는 동안 목록은 곧바로 다시 그려져
-  //   남은 카드가 빈자리로 미끄러진다 (휴대폰과 같음), 아래에 "되돌리기"
+  // 묻지 않고 바로 휴지통으로 — 카드의 떠 있는 복사본이 제자리에서 흐려지는 동안 목록은 곧바로 다시 그려져
+  //   남은 카드가 빈자리로 미끄러진다, 아래에 "되돌리기"
   const card = el.cards.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
   if (card && !reduceMotion()) {
     const r = card.getBoundingClientRect();

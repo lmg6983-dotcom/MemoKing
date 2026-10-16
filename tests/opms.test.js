@@ -529,3 +529,14 @@ test('OPMS 전자포대: 응답을 받다 끊겨도 그 파일만 실패 · 업�
   assert.equal(again.skipped, 1);
   assert.equal(fs.readFileSync(path.join(res.dir, '사건정보.txt'), 'utf8'), '예전 내용');
 });
+
+test('OPMS: 글로 적혀 온 \\r\\n 은 줄바꿈으로 (끝의 빈 줄은 떼고), 파일 경로 열은 그대로', async () => {
+  const { unescapeBreaks, parseResultset, attachmentItems } = await import('../desktop/opms.js');
+  assert.equal(unescapeBreaks('1027 이관 선임\\r\\n데이터이관\\r\\n'), '1027 이관 선임\n데이터이관');
+  assert.equal(unescapeBreaks('데이터이관\\r\\n'), '데이터이관');
+  assert.equal(unescapeBreaks('가\\n나\\r다'), '가\n나\n다');
+  const rows = parseResultset(['MEMO\x01FILE_NAME_UPLOAD\x01FILE_NAME_ORI', 'm', 'm', 'm', '데이터이관\\r\\n\x01/OPMS/a\\new.pdf\x01출원서.pdf'].join('\n'));
+  assert.equal(rows[0].MEMO, '데이터이관');
+  assert.equal(rows[0].FILE_NAME_UPLOAD, '/OPMS/a\\new.pdf');
+  assert.equal(attachmentItems(rows)[0].summary, '데이터이관');
+});

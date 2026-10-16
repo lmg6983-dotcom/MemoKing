@@ -8,6 +8,7 @@ const EVENTS = [
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:hover', 'list:on-top',
   'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'update:state', 'update:available', 'update:ready',
+  'bubble:show', 'bubble:hide',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -154,7 +155,6 @@ contextBridge.exposeInMainWorld('memoking', {
     start: invoke('stt:start'),
     audio: (id, samples) => ipcRenderer.send('stt:audio', id, samples),
     stop: invoke('stt:stop'),
-    transcribe: invoke('stt:transcribe'),
   },
   attachments: {
     save: invoke('attachment:save'),
@@ -224,6 +224,7 @@ contextBridge.exposeInMainWorld('memoking', {
     listOnTop: invoke('list:on-top'),
     // 왕관(늘 위) · 테이프(바탕화면 층) 켜고 끄기 → { top, bottom, canTape }
     toggleLayer: invoke('win:toggle-layer'),
+    statusBubble: invoke('win:status-bubble'), // { text, error, x } | null — 잘린 상태 줄의 전문 말풍선
     inking: invoke('win:inking'),
     showList: invoke('list:show'),
     growWidth: invoke('win:grow-width'),
