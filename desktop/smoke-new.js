@@ -785,6 +785,22 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       pw.close();
     }
 
+    // ---------- 설정: OPMS 서버 주소는 사용자가 넣고(코드에 없음), 업데이트 칸 ----------
+    {
+      const lw = getList() ?? createListWindow('memos');
+      await until(() => js(lw, 'document.documentElement.dataset.ready === "true"'), '목록 준비');
+      await js(lw, `document.getElementById('settings-btn').click()`);
+      const setupShown = await until(() => js(lw, `!document.getElementById('opms-setup').hidden`), 'OPMS 연결 칸', 4000).then(() => true).catch(() => false);
+      const bad = await js(lw, `(async () => { document.getElementById('opms-host').value = 'ftp://x'; document.getElementById('opms-host-form').requestSubmit(); await new Promise((r) => setTimeout(r, 300)); return document.getElementById('opms-host-note').textContent; })()`);
+      const keep = getSettings().opms?.host;
+      const good = await js(lw, `(async () => { document.getElementById('opms-host').value = '10.0.0.7:8181'; document.getElementById('opms-host-form').requestSubmit(); await new Promise((r) => setTimeout(r, 300)); return document.getElementById('opms-host-note').textContent; })()`);
+      const savedHost = getSettings().opms?.host;
+      getSettings().opms = { ...getSettings().opms, host: keep }; // 점검의 가짜 OPMS 주소로 되돌림
+      const update = await js(lw, `({ cur: document.getElementById('update-current').textContent, note: document.getElementById('update-note').textContent })`);
+      check('설정: OPMS 서버 주소를 넣어 저장(잘못된 주소는 안내) · 업데이트 칸(지금 버전, 개발 중에는 확인 안 함)', setupShown && /알아보지 못했어요/.test(bad) && savedHost === 'http://10.0.0.7:8181' && /저장했어요/.test(good) && /^v\d/.test(update.cur), JSON.stringify({ setupShown, bad, good, savedHost, update }));
+      await js(lw, `document.getElementById('settings-dialog').close()`);
+    }
+
     // ---------- 스택 탭 전환 속도: 다른 탭 창을 미리 만들어 두고, 저장을 기다리지 않고 바로 ----------
     //   앱을 다시 켠 뒤처럼 탭 창이 하나도 없는 스택(가 · 나 · 다)에서 시작
     {

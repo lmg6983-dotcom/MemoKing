@@ -12,6 +12,57 @@ Windows 스티커 메모처럼 쓰는 메모 앱. 메모는 **지정한 폴더(�
 - 코드 서명 인증서가 없어서 처음 실행 때 Windows SmartScreen 경고가 뜰 수 있습니다 → **추가 정보 › 실행**
 - 지우기: Windows 설정 › 앱 › 메모킹 제거 (메모는 메모 폴더에 그대로 남음)
 
+### 자동 업데이트 배포 (비공개 소스 + 공개 배포 저장소)
+
+소스는 이 비공개 저장소에만 두고, 설치 파일만 공개 저장소 **`lmg6983-dotcom/memoking-releases`** 의 Release 에 올립니다. 앱은 공개 저장소의 Release 만 보며 **앱 · 설치 파일에 토큰이 없습니다** (공개 저장소라 읽기에 필요 없음).
+
+```
+[비공개 MemoKing]  git tag v0.39.0 && git push origin v0.39.0
+      │  .github/workflows/release.yml (windows-latest)
+      │  ① 태그 = package.json 버전 확인 ② npm test ③ scripts/build-dist.mjs --publish always (GH_TOKEN = 공개 저장소 전용 PAT)
+      ▼
+[공개 memoking-releases]  Release v0.39.0: MemoKing-Setup-0.39.0.exe · .blockmap · latest.yml · MemoKing-Setup.exe
+      ▲  latest.yml 확인 (켤 때 30초 뒤 · 6시간마다 · 설정 › 업데이트 확인)
+[설치된 메모킹 v0.38.0]  desktop/updater.js (electron-updater, autoDownload 끔)
+      → 새 버전 대화 상자(바뀐 점 = README 이 버전 줄) → 받기(진행률) → 지금 재시작(쓰던 메모 저장 후) / 나중에(끝낼 때 설치, 24시간 다시 묻지 않음)
+```
+
+- 최신 설치 파일 (로그인 필요 없음): `https://github.com/lmg6983-dotcom/memoking-releases/releases/latest/download/MemoKing-Setup.exe`
+- 설정: `scripts/build-dist.mjs` — nsis `perMachine: false` · `oneClick: false`, `publish: github (memoking-releases, releaseType: release)`. 빌드가 끝나면 `dist/` 에 `latest.yml` · `.blockmap` 이 있는지 스스로 확인하고 없으면 실패합니다.
+- 앱: `desktop/updater.js` (main) · `desktop/preload.cjs` 의 `update` · `app/js/list.js` (설정 › 업데이트, 새 버전 대화 상자). 개발 실행(`app.isPackaged` 아님)에서는 확인하지 않습니다.
+
+**처음 한 번 준비**
+
+1. 공개 저장소 만들기: GitHub › New repository › 이름 `memoking-releases` · **Public** · README 만 (소스는 올리지 않음)
+2. 토큰 만들기: GitHub › Settings › Developer settings › Personal access tokens › **Fine-grained tokens** › Generate new token
+   - Repository access: **Only select repositories › memoking-releases**
+   - Permissions › Repository permissions › **Contents: Read and write** (나머지는 없음) · 만료일은 1년 이하 권장
+3. 이 비공개 저장소 › Settings › Secrets and variables › Actions › New repository secret
+   - `MEMOKING_RELEASES_TOKEN` = 위 토큰 (필수)
+   - `MEMOKING_GOOGLE_CLIENT_ID` · `MEMOKING_GOOGLE_CLIENT_SECRET` (있던 것 그대로 — Google 로그인 연결 정보)
+
+**배포:** `package.json` 의 버전을 올리고 README 이력에 그 버전 줄을 쓴 뒤 → `git tag v0.39.0 && git push origin v0.39.0`
+
+**테스트 순서:** ① v0.38.0 을 위 링크로 설치 ② 버전을 0.38.1 로 올려 태그 푸시 → Actions 가 공개 저장소에 Release v0.38.1 을 만듦 ③ 설치된 앱에서 설정 › 업데이트 확인 → 대화 상자 → 받기(진행률) → 지금 재시작 → 설정의 지금 버전이 v0.38.1
+
+**자주 나는 문제**
+
+| 증상 | 까닭 · 해결 |
+|---|---|
+| "업데이트 정보를 찾지 못했어요" (latest.yml 404) | 공개 저장소에 Release 가 없거나 **초안(draft)** · 사전 배포(prerelease) 로 올라감 → Release 를 정식(Latest)으로. 설정이 `releaseType: 'release'` 인지 |
+| Actions 의 올리기 단계 403 · 404 | 토큰이 memoking-releases 를 고르지 않았거나 Contents 쓰기가 없음 · 만료 → 토큰 다시 만들어 Secret 바꾸기 |
+| "태그와 package.json 버전이 달라요" | 태그 `v0.39.0` 이면 package.json 도 `0.39.0` |
+| 개발 실행에서 업데이트 확인이 안 됨 | 정상 — 설치판(app-update.yml 이 있는 앱)에서만 확인 |
+| 설치 폴더 권한 오류 | 사용자별 설치(%LOCALAPPDATA%\Programs) 라 보통 없음. 예전에 관리자 권한으로 Program Files 에 설치했다면 지우고 새로 설치 |
+| "서명을 확인하지 못해…" | 서명이 바뀐(또는 생긴) 첫 업데이트에서 날 수 있음 — 아래 서명 참고 |
+
+**코드 서명 (지금은 없음)**
+
+- 없을 때: 처음 설치 · 실행 때 SmartScreen "Windows의 PC 보호" (추가 정보 › 실행). electron-updater 는 서명이 **없으면** 서명을 확인하지 않고 설치합니다. 대신 위변조를 서명으로 막지 못하므로 공개 저장소 · 토큰 관리가 더 중요합니다.
+- 도입 체크리스트: ☐ OV/EV 코드 서명 인증서 구입 (EV 는 SmartScreen 평판이 바로, 하드웨어 토큰 · 클라우드 서명 필요) ☐ 빌드에 서명 연결 (electron-builder `win.signtoolOptions` 또는 Azure Trusted Signing — **electron.build 의 Code Signing 문서 확인 필요**) ☐ 서명한 첫 버전을 배포하면 그 뒤 업데이트는 같은 게시자 이름(publisherName)인지 확인되므로, 인증서를 바꿀 때 게시자 이름이 같아야 함 ☐ 서명 비밀값은 Secrets 에만
+- 백신 오탐: 서명 없는 새 설치 파일 · PowerShell 도우미를 쓰는 앱은 오탐이 날 수 있음 → 같은 파일로 Microsoft Security Intelligence(제출 페이지)에 오탐 신고, 서명 도입이 가장 확실한 대책
+- electron-builder: 지금 v26.15.3(npm 정식 최신). v27 은 아직 알파(27.0.0-alpha.x) — 올릴 때 per-machine 설치 · 웹 설치기(nsis-web) 관련 바뀐 점을 **electron.build 의 v27 이전 안내(마이그레이션)에서 확인 필요** (이 앱은 perMachine: false · nsis(웹 설치기 아님)라 영향이 적을 것으로 보이나 확인 전)
+
 ## 안드로이드
 
 휴대폰 앱은 [`android/`](android/README.md) 에 있습니다. PC 와 같은 메모 폴더 형식(메모 파일·머리말·첨부·휴지통·LLM 인덱스)을 그대로 쓰고, **Google Drive 에 직접 연결해 PC 메모킹과 같은 메모를 동기화**합니다 (PC 쪽은 Google Drive for desktop 이 맞춰 주거나, **Drive 앱 없이 PC 메모킹 설정 › Google Drive 동기화 에서 구글 로그인**으로 직접 맞춤: [android/DRIVE-SETUP.md](android/DRIVE-SETUP.md#pc-메모킹-google-drive-앱-없이-로그인으로-동기화)).
@@ -172,6 +223,7 @@ backups/    단계별 zip 스냅샷 (git 제외)
 <!-- HISTORY:START -->
 | 태그 | 날짜 | 단계 | 내용 |
 |---|---|---|---|
+| `v0.39.0` | 2026-10-16 | 2. 생성 | 자동 업데이트: 설치 파일을 공개 배포 저장소(memoking-releases)의 Release 에 올리고(v*.*.* 태그 → GitHub Actions, 공개 저장소 전용 토큰), 앱이 켤 때 · 6시간마다 · 설정 › 업데이트 확인으로 새 버전을 찾아 바뀐 점을 보여 주고 받기(진행률) → 지금 재시작(쓰던 메모 저장 후) / 나중에(끝낼 때 설치, 24시간 다시 묻지 않음). 공개 설치 파일에 들어가면 안 되는 값 빼기: OPMS 서버 주소 · 전자포대 기본 폴더(사무소 경로)를 코드에서 지우고 설정 › 매직키 › OPMS 연결에서 사용자가 넣음(이 PC 에만 저장, 기본 폴더는 문서\전자포대) |
 | `v0.38.0` | 2026-10-16 | 2. 생성 | PC 내용 공유 되살림 + 방법 고르기 (고객 피드백: 표를 공유하면 임시 파일 폴더만 열림 · 공유 방법 선택지): 공유 단추를 누르면 Windows 공유(근처 공유 · Quick Share · 메일 · 카카오톡 등) · Google Drive 링크(메모킹 공유 폴더에 올리고 링크가 있는 사람 보기 링크를 복사) · LocalSend(오픈소스, 같은 와이파이의 휴대폰 · PC 로) · 메일에 첨부(기본 메일 앱, MAPI) 중에서. Windows 공유 창은 탐색기 메뉴 명령 대신 데스크톱 앱용 공식 API(DataTransferManager)로 다시 만듦. 스택 탭 전환 최적화 (고객 피드백: 느리고 몇 번 깜빡임): 저장을 기다리지 않고 바로 바꿈, 다른 탭 창을 미리 숨긴 창으로 만들어 둠(앱을 켠 뒤 처음 바꿀 때 356~391ms → 40ms, 점검 환경), 보이기 전에 서식 막대를 펴 두어 본문이 출렁이지 않게, 같은 탭 줄은 다시 그리지 않음, 같은 크기면 창 크기를 다시 맞추지 않음 |
 | `v0.37.1` | 2026-10-15 | 3. 개선 | PC 메모 속 내용(사진 · 손 메모 · 소리 · 파일 · 표 등)의 공유 단추를 없앰 (고객 피드백: 저장 단추와 겹침) — 복사 · 저장 · 지우기만, Windows 공유 창 도우미 코드도 함께 지움. 휴대폰의 공유 단추는 그대로. 또 PDF로 저장 창: 미리보기가 여러 쪽이라고 알려 준 뒤 창 · 미리보기 칸 크기가 바뀌면 쪽 수가 지워져 한 쪽처럼 보이던 것, 여러 쪽 미리보기가 창을 늘려 취소 · 저장 단추가 밀려나던 것 고침. 단위 336 · 바뀐 기능 점검 53(두 번 연속) · 휴대폰 점검 통과 |
 | `v0.37.0` | 2026-10-15 | 2. 생성 | 단축키 설정 창 · PDF 글자 크기 (휴대폰 0.25.2): 설정 › "단축키 설정하기" 를 누르면 따로 뜨는 창에서 메모 창 기능 33가지(서식 · 넣기 · 왕관 · 테이프 · PDF로 저장 · 이전 버전 · 목록 열기 · 그림으로 복사 등)와 빠른 메모 · 매직키의 키를 바꿈 — 키 칸을 누르고 새 키, Backspace 는 키 없애기, 같은 키를 쓰던 기능에서는 그 키를 빼고 그 줄을 칠해 보임, 기능마다 기본값 · 모두 초기화(두 번 눌러야), 기능 이름에 마우스를 올리면 하는 일 설명, 찾기. 새 기본 키: PDF로 저장 Ctrl+Shift+P · 이전 버전 Ctrl+Shift+Y · 메모 목록 열기 Ctrl+Shift+M, 메뉴에 지금 키가 보이고 단축키 보기(Ctrl+/)도 바꾼 키로. PDF로 저장 창: 창이 작아도 취소 · PDF로 저장이 늘 아래에 보이고(가려진 고르기가 있으면 알림), 저장한 뒤 열기는 다른 고르기와 함께, 휴대폰처럼 글자 크기(작게 · 보통 · 크게 · 아주 크게 · 50~200%). 목록: 찾는 메모가 없을 때 안내 · "검색과 필터 풀기" 를 목록 칸 가운데로(PC · 휴대폰). 단위 336 · 바뀐 기능 점검 53 · 자동 점검 166 · 휴대폰 점검 통과 (UI 비평 · 코드 리뷰 3회 반영, 키 받기 · 인쇄 배율 · 창 알림을 공통 모듈로) |

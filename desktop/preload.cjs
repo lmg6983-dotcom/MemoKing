@@ -7,7 +7,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:hover', 'list:on-top',
-  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating',
+  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'update:state', 'update:available', 'update:ready',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -95,6 +95,20 @@ contextBridge.exposeInMainWorld('memoking', {
     // 전역 단축키 바꾸기: set(이름, 단축키|null=기본값) · pause(true) 는 새 키를 누르는 동안 잠시 놓기
     setShortcut: invoke('shortcuts:set'),
     pauseShortcuts: invoke('shortcuts:pause'),
+  },
+  // 자동 업데이트: state() · check() 지금 확인 · download() 받기 · later() 나중에(24시간 숨김 · 받아 뒀으면 끝낼 때 설치) · install() 지금 재시작
+  update: {
+    state: invoke('update:state'),
+    check: invoke('update:check'),
+    download: invoke('update:download'),
+    later: invoke('update:later'),
+    install: invoke('update:install'),
+  },
+  // OPMS 연결 설정: settings() → { host, wrapperDir, hostSet } · setHost(주소 | '' 지우기) → { ok, host } | { error } · chooseDir() → 폴더
+  opms: {
+    settings: invoke('opms:settings'),
+    setHost: invoke('opms:set-host'),
+    chooseDir: invoke('opms:choose-dir'),
   },
   // 메모 창 단축키: get() → { overrides, shortcuts } · set(기능, 키 | '' 없음 | null 기본값) · reset() 모두 처음대로 · openWindow() 설정 창
   keymap: {

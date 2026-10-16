@@ -21,6 +21,7 @@ import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '..
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { FileIndex, defaultRoots } from './file-index.js';
+import { Updater, isSnoozed } from './updater.js';
 import { comboFromAccelerator, actionUsing } from '../app/js/core/keymap.js';
 import { jumpListCategories, launchAction, pushRecent } from './jump-list.js';
 import { flushOpmsFiles } from './opms.js';
@@ -100,6 +101,7 @@ let stt = null;
 const heldLocks = new Map();
 
 let fileIndex = null;
+let updater = null; // 자동 업데이트 (updater.js) — 앱이 준비된 뒤
 let linkPreviews = null;
 
 let tutorial = { active: false, index: -1, memoId: null, praise: false };
@@ -906,6 +908,8 @@ app.whenReady().then(async () => {
     getFileIndex: () => fileIndex,
     startTutorial,
     tutorialPayload,
+    getUpdater: () => updater,
+    updateState: () => updateState(),
     tutorialWin,
     tutorialEvent,
     purgeTrash,
@@ -1037,6 +1041,39 @@ app.whenReady().then(async () => {
   syncFileIndex();
   updateTrayMenu();
   if (vault && !settings.tutorialDone && !HIDDEN_START) startTutorial();
+  updater.start();
+});
+
+// ---------- 자동 업데이트 ----------
+// 화면은 목록 창(설정 › 업데이트 · 새 버전 대화 상자). 목록 창이 없으면 Windows 알림 → 누르면 목록 창을 열어 보여 준다
+function updateWin() {
+  const w = windowManager.listWin;
+  return w && !w.isDestroyed() ? w : null;
+}
+/** 목록 창이 물어볼 때: 지금 상태 + 대화 상자를 띄울지 (숨겨 둔 버전이면 띄우지 않음) */
+function updateState() {
+  const st = updater?.state ?? { status: 'idle' };
+  const ask = st.status === 'ready' || (st.status === 'available' && !isSnoozed(settings.updateSnooze, st.version));
+  return { ...st, ask, current: app.getVersion(), enabled: Boolean(updater?.enabled) };
+}
+updater = new Updater({
+  packaged: app.isPackaged && !SMOKE,
+  settings,
+  saveSettings: () => saveSettings(),
+  send: (channel, payload) => {
+    const w = updateWin();
+    if (!w) return false;
+    w.webContents.send(channel, { ...payload, current: app.getVersion() });
+    return true;
+  },
+  notify: (t) => toast({ title: t.title, body: t.body, onClick: () => windowManager.createListWindow('memos') }),
+  // 재시작 전에: 열린 메모 창의 쓰던 글을 바로 저장하고 설정도 지금 쓴다
+  beforeInstall: async () => {
+    quitting = true;
+    await Promise.all([...windowManager.noteWins.values()].filter((w) => !w.isDestroyed())
+      .map((w) => w.webContents.executeJavaScript('window.mkFlushSync?.()', true).catch(() => {})));
+    saveSettings(true);
+  },
 });
 
 app.on('before-quit', () => {
@@ -1049,6 +1086,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  updater?.stop();
   flushOpmsFiles();
   stt?.close();
   windowManager.topWatch.stop();

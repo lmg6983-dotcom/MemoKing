@@ -11,7 +11,7 @@ import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock
 import { normalizeReminder } from '../app/js/core/reminders.js';
 import { normalizeMagicSettings, activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
-import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown } from './opms.js';
+import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
 import { isBlankBody, extractPreview } from '../app/js/core/memo-file.js';
 import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
@@ -64,6 +64,8 @@ export function registerIpc(ctx) {
     getFileIndex,
     startTutorial,
     tutorialPayload,
+    getUpdater,
+    updateState,
     tutorialWin,
     tutorialEvent,
     purgeTrash,
@@ -293,6 +295,21 @@ export function registerIpc(ctx) {
 
   // ---------- 설정 & 단축키 & MCP ----------
   ipcMain.handle('app:settings', () => appSettings());
+  // 자동 업데이트 (updater.js): 상태 · 확인(설정의 단추) · 받기 · 나중에 · 지금 재시작
+  ipcMain.handle('update:state', () => updateState());
+  ipcMain.handle('update:check', async () => {
+    await getUpdater()?.check({ manual: true });
+    return updateState();
+  });
+  ipcMain.handle('update:download', async () => {
+    await getUpdater()?.download();
+    return updateState();
+  });
+  ipcMain.handle('update:later', () => {
+    getUpdater()?.later();
+    return updateState();
+  });
+  ipcMain.handle('update:install', () => getUpdater()?.installNow() ?? false);
   ipcMain.handle('app:set-auto-start', (_e, on) => setAutoStart(on));
   ipcMain.handle('app:set-quick-memo', (_e, on) => setQuickMemo(on));
   ipcMain.handle('shortcuts:set', (_e, name, acc) => setShortcut(String(name), acc == null ? null : String(acc)));
@@ -403,6 +420,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('magic:opms-search', async (_e, query) => {
     const q = String(query ?? '').slice(0, 40);
     if (!activeModules(settings.magic).some((m) => m.id === 'opms') || !looksLikeRef(q)) return { cases: [], total: 0 };
+    if (!wm.opmsSettings().host) return { cases: [], total: 0 }; // 서버 주소를 넣기 전 — 매직키에서는 조용히 (설정 화면이 안내)
     try {
       const rows = await wm.opmsClient().find(q, { timeoutMs: 5000, retries: 0 });
       wm.rememberCases(rows);
@@ -496,6 +514,16 @@ export function registerIpc(ctx) {
     const err = await shell.openPath(file);
     if (err) throw new Error(err);
     return { file };
+  });
+  // 설정 › 매직키 › OPMS: 서버 주소 · 전자포대 폴더 (코드에 두지 않고 사용자가 넣는다)
+  ipcMain.handle('opms:settings', () => ({ ...wm.opmsSettings(), hostSet: Boolean(wm.opmsSettings().host) }));
+  ipcMain.handle('opms:set-host', (_e, text) => {
+    const raw = String(text ?? '').trim();
+    const host = raw ? normalizeOpmsHost(raw) : '';
+    if (host == null) return { error: '주소를 알아보지 못했어요. 예: 192.168.0.10:8181 또는 http://서버이름:8181' };
+    settings.opms = { ...settings.opms, host };
+    saveSettings();
+    return { ok: true, host };
   });
   ipcMain.handle('opms:open-folder', () => (wm.opmsLastDir ? shell.openPath(wm.opmsLastDir) : ''));
   ipcMain.handle('opms:choose-dir', async (event) => {

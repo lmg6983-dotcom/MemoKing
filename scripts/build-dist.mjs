@@ -5,6 +5,7 @@
 // 완성된 설치 파일만 프로젝트의 dist\ 로 복사한다. 이어서 빌드된 실행 파일로 자동 점검을 한 번 돌린다.
 //   npm run dist               빌드 + 빌드된 앱으로 자동 점검
 //   npm run dist -- --no-smoke 빌드만
+//   npm run dist -- --no-smoke --publish always   빌드 + 공개 배포 저장소 Release 에 올리기 (GH_TOKEN 필요 — GitHub Actions 의 release.yml)
 import { execSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -19,6 +20,18 @@ const STAGE = join(BUILD, 'stage');
 const OUT = join(BUILD, 'dist');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const runSmoke = !process.argv.includes('--no-smoke');
+const publishArg = process.argv[process.argv.indexOf('--publish') + 1];
+const PUBLISH = process.argv.includes('--publish') && publishArg === 'always' ? 'always' : 'never';
+// 자동 업데이트가 보는 공개 배포 저장소 — 설치 파일 · .blockmap · latest.yml 만 올라간다 (소스 · 토큰은 없음)
+const RELEASES = { owner: 'lmg6983-dotcom', repo: 'memoking-releases' };
+
+/** README 이력 표에서 이 버전의 줄 → 릴리스 노트 (앱의 새 버전 대화 상자에 보임) */
+function releaseNotes(version) {
+  const row = readFileSync(join(ROOT, 'README.md'), 'utf8').split('\n').find((l) => l.startsWith(`| \`v${version}\` |`));
+  if (!row) return `메모킹 v${version}`;
+  const cells = row.split(' | ');
+  return cells.slice(3).join(' | ').replace(/\s*\|\s*$/, '').trim() || `메모킹 v${version}`;
+}
 
 // 1) electron-builder 준비 (프로젝트 밖에 설치)
 const builderPkg = join(BUILD, 'node_modules', 'electron-builder', 'package.json');
@@ -55,7 +68,13 @@ writeFileSync(join(STAGE, 'package.json'), JSON.stringify({
   license: pkg.license,
   type: 'module',
   main: 'desktop/main.js',
+  dependencies: pkg.dependencies ?? {}, // 앱 안에 들어가는 것 (electron-updater)
 }, null, 2));
+// 앱이 쓰는 의존성을 조립 폴더에 설치 (개발 중에는 node_modules 없이 npx 로 띄우므로 프로젝트에는 없다)
+if (Object.keys(pkg.dependencies ?? {}).length) {
+  console.log(`설치: ${Object.entries(pkg.dependencies).map(([n, v]) => `${n}@${v}`).join(', ')} → 조립 폴더`);
+  execSync('npm install --omit=dev --no-audit --no-fund --no-package-lock', { cwd: STAGE, stdio: 'inherit' });
+}
 
 // 3) 빌드
 const config = {
@@ -71,15 +90,19 @@ const config = {
   asarUnpack: ['scripts/clipboard-helper.ps1', 'scripts/popup-watch.ps1', 'app/vendor/tesseract/**', 'desktop/stt/**', 'desktop/vendor/**', 'app/js/core/transcript-lines.js'],
   npmRebuild: false,
   nodeGypRebuild: false,
-  publish: null, // 자동 업데이트·배포 안 함 (없으면 배포 대상을 찾다가 멈출 수 있다)
+  // 자동 업데이트: 공개 배포 저장소의 Release (releaseType 'release' — 기본값 draft 는 앱이 볼 수 없다).
+  //   이 설정으로 설치 파일 안에 app-update.yml(저장소 주소만, 토큰 없음)이 들어가고, 빌드 결과에 latest.yml · .blockmap 이 생긴다
+  publish: [{ provider: 'github', owner: RELEASES.owner, repo: RELEASES.repo, releaseType: 'release' }],
+  releaseInfo: { releaseName: `메모킹 v${pkg.version}`, releaseNotes: releaseNotes(pkg.version) },
   win: {
     target: [{ target: 'nsis', arch: ['x64'] }],
     icon: 'assets/icons/memoking.ico',
     artifactName: 'MemoKing-Setup-${version}.${ext}',
   },
   nsis: {
+    // oneClick: false — 설치 폴더를 고를 수 있게 (지금까지와 같음). 자동 업데이트는 설치 화면 없이(/S) 같은 폴더에 덮어쓴다
     oneClick: false,
-    perMachine: false, // 사용자별 설치 — 관리자 권한 불필요
+    perMachine: false, // 사용자별 설치(%LOCALAPPDATA%\Programs) — 관리자 권한 없이 업데이트도 바로
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
@@ -96,12 +119,22 @@ const config = {
 const builder = await import(pathToFileURL(join(BUILD, 'node_modules', 'electron-builder', 'out', 'index.js')).href);
 rmSync(OUT, { recursive: true, force: true });
 console.log(`빌드: 메모킹 v${pkg.version} (Electron ${ELECTRON_VERSION})`);
-await builder.build({ projectDir: STAGE, config, targets: builder.Platform.WINDOWS.createTarget() });
+console.log(PUBLISH === 'always' ? `배포: ${RELEASES.owner}/${RELEASES.repo} Release v${pkg.version}` : '배포 안 함 (--publish always 로 올림)');
+await builder.build({ projectDir: STAGE, config, targets: builder.Platform.WINDOWS.createTarget(), publish: PUBLISH });
 
 const setupName = `MemoKing-Setup-${pkg.version}.exe`;
 mkdirSync(join(ROOT, 'dist'), { recursive: true });
 copyFileSync(join(OUT, setupName), join(ROOT, 'dist', setupName));
 console.log(`✔ 설치 파일: dist/${setupName}`);
+// 자동 업데이트에 필요한 것: latest.yml (새 버전 정보) · .blockmap (바뀐 부분만 받기)
+for (const f of ['latest.yml', `${setupName}.blockmap`]) {
+  if (!existsSync(join(OUT, f))) {
+    console.error(`✖ ${f} 가 없어요 — 자동 업데이트가 새 버전을 찾지 못해요 (publish 설정 확인)`);
+    process.exit(1);
+  }
+  copyFileSync(join(OUT, f), join(ROOT, 'dist', f));
+  console.log(`✔ ${f}`);
+}
 
 // 4) 빌드된 실행 파일로 자동 점검 (설치 전 폴더의 MemoKing.exe)
 if (runSmoke) {

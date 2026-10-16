@@ -252,14 +252,17 @@ async function flush() {
   }
 }
 
-// 창을 닫는 순간 — 남은 내용을 동기 저장
-window.addEventListener('beforeunload', () => {
+// 창을 닫는 순간 — 남은 내용을 동기 저장 (업데이트 설치로 다시 시작하기 전에도 main 이 부른다: mkFlushSync)
+function flushSync() {
   clearTimeout(saveTimer);
   if (isDirty()) {
     api.memo.saveSync(id, current);
     saved = current;
   }
-});
+  flushTables();
+}
+window.mkFlushSync = flushSync;
+window.addEventListener('beforeunload', flushSync);
 
 // ---------- 다른 곳(다른 PC, 다른 앱)에서 바뀐 경우 ----------
 
@@ -1231,7 +1234,6 @@ function flushTables() {
   pendingTables = null;
   api.memo.set(id, { tables: t }).catch(() => setStatus('표 크기를 저장하지 못했어요', true));
 }
-window.addEventListener('beforeunload', flushTables);
 
 // 표 막대: 표 안에 커서가 있을 때만. 머리글 행과 마지막 남은 열은 지울 수 없으므로 막는다.
 const tableBar = $('table-bar');

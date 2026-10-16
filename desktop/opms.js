@@ -9,8 +9,23 @@ export { looksLikeRef } from '../app/js/core/magic-modules.js';
 import { progressItems } from '../app/js/core/opms-progress.js';
 import { decodeEntities } from '../app/js/core/entities.js';
 
-export const DEFAULT_HOST = 'http://121.254.172.35:8181';
-export const DEFAULT_WRAPPER_DIR = 'G:\\내 드라이브\\work(firstlaw)\\포대';
+// 서버 주소 · 전자포대 폴더는 코드에 두지 않는다 (설치 파일은 공개 저장소에 올라간다) — 설정 › 매직키 › OPMS 에서 사용자가 넣는다
+export const DEFAULT_HOST = '';
+export const NO_HOST = '설정 › 매직키 › OPMS 서버 주소를 먼저 넣어 주세요';
+
+/** 사용자가 넣은 서버 주소 → 'http://주소:포트' (끝의 / 없이) | null. http(s) 가 없으면 http:// 를 붙인다 */
+export function normalizeOpmsHost(text) {
+  let t = String(text ?? '').trim();
+  if (!t) return null;
+  if (!/^[a-z]+:\/\//i.test(t)) t = `http://${t}`;
+  try {
+    const u = new URL(t);
+    if (!/^https?:$/.test(u.protocol) || !u.hostname || u.username || u.password) return null;
+    return `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return null;
+  }
+}
 const JBORI_PATH = '/servlet/Jbori';
 const STATIC_PATH = '/OPMS';
 const CONNECTION = 'easypnp';
@@ -752,6 +767,7 @@ export class Opms {
    *   본문 받기도 다시 하기 안에서
    */
   async request(url, init, { timeoutMs = this.timeoutMs, retries = this.retries, bytes = false } = {}) {
+    if (!this.host) throw Object.assign(new Error(NO_HOST), { noHost: true });
     let last;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {

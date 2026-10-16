@@ -191,6 +191,18 @@
       <p class="label sub">매직키 기능</p>
       <div id="magic-modules-list" class="magic-settings-modules"></div>
     </div>
+    <div id="opms-setup" class="setting-sub opms-setup" hidden>
+      <p class="label sub">OPMS 연결 <small>사내 OPMS 서버 주소는 이 PC 에만 저장돼요</small></p>
+      <form id="opms-host-form" class="opms-host-row">
+        <input id="opms-host" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="서버 주소 (예: 192.168.0.10:8181)" aria-label="OPMS 서버 주소" aria-describedby="opms-host-note">
+        <button type="submit" class="btn" id="opms-host-save">저장</button>
+      </form>
+      <small class="sc-note" id="opms-host-note" role="status"></small>
+      <div class="opms-dir-row">
+        <span>전자포대 저장 폴더 <small id="opms-dir"></small></span>
+        <button type="button" class="btn" id="opms-dir-btn">바꾸기</button>
+      </div>
+    </div>
     <div class="setting-row keymap-row">
       <span>메모 창 단축키 <small>PDF로 저장, 서식, 왕관 같은 기능의 키를 바꿔요</small></span>
       <button type="button" class="btn" id="keymap-open">단축키 설정하기</button>
@@ -227,8 +239,29 @@
     <div class="dialog-actions left">
       <button id="tutorial-btn" class="btn">사용법 보기</button>
     </div>
+    <p class="label">업데이트</p>
+    <div class="setting-row update-row">
+      <span>지금 버전 <b id="update-current"></b> <small id="update-note" role="status"></small></span>
+      <button type="button" class="btn" id="update-check">업데이트 확인</button>
+    </div>
     <p class="version" id="version"></p>
     <p class="copyright">© 2026 메모킹 | 문의 lmg6983@gmail.com</p>
+  </dialog>
+
+  <!-- 새 버전: 바뀐 점 → 받기(진행률) → 지금 재시작 / 나중에 -->
+  <dialog id="update-dialog" class="dialog update-dialog" aria-labelledby="update-title">
+    <h2 id="update-title">새 버전이 나왔어요</h2>
+    <p class="update-version" id="update-version"></p>
+    <div class="update-notes" id="update-notes" tabindex="0" aria-label="바뀐 점"></div>
+    <div class="update-progress" id="update-progress" hidden>
+      <div class="update-bar"><span id="update-bar-fill"></span></div>
+      <small id="update-progress-text" role="status"></small>
+    </div>
+    <p class="update-error" id="update-error" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn" id="update-later">나중에</button>
+      <button type="button" class="btn primary" id="update-go">받기</button>
+    </div>
   </dialog>
 
   <!-- 휴지통: 지운 메모 되살리기·영구 삭제 -->

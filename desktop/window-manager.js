@@ -9,7 +9,7 @@ import { isInside, dropBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 import { StackStore } from './stacks.js';
 import { DesktopPin } from './desktop-pin.js';
 import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
-import { Opms, isOpenableFile, cleanDate, foreignSummary, caseMemoMarkdown, DEFAULT_HOST as OPMS_HOST, DEFAULT_WRAPPER_DIR } from './opms.js';
+import { Opms, isOpenableFile, cleanDate, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
 import { extractPreview, isBlankBody } from '../app/js/core/memo-file.js';
 import { pdfFileName, mmToPx, clampPrintScale } from '../app/js/core/pdf-page.js';
@@ -1634,8 +1634,9 @@ export class WindowManager {
 
   opmsSettings() {
     return {
-      host: process.env.MEMOKING_OPMS_HOST || settings.opms?.host || OPMS_HOST,
-      wrapperDir: settings.opms?.wrapperDir || DEFAULT_WRAPPER_DIR,
+      // 서버 주소는 사용자가 설정에서 넣은 것만 (없으면 '' — OPMS 를 쓰려 하면 넣으라고 안내)
+      host: normalizeOpmsHost(process.env.MEMOKING_OPMS_HOST) ?? normalizeOpmsHost(settings.opms?.host) ?? '',
+      wrapperDir: settings.opms?.wrapperDir || path.join(app.getPath('documents'), '전자포대'),
     };
   }
 
