@@ -41,7 +41,7 @@ Windows 스티커 메모처럼 쓰는 메모 앱. 메모는 **지정한 폴더(�
    - `MEMOKING_RELEASES_TOKEN` = 위 토큰 (필수)
    - `MEMOKING_GOOGLE_CLIENT_ID` · `MEMOKING_GOOGLE_CLIENT_SECRET` (있던 것 그대로 — Google 로그인 연결 정보)
 
-**배포:** `package.json` 의 버전을 올리고 README 이력에 그 버전 줄을 쓴 뒤 → `git tag v0.39.0 && git push origin v0.39.0`
+**배포:** `package.json` 의 버전을 올리고 README 이력에 그 버전 줄을 쓴 뒤 → `git tag v0.39.0 && git push origin v0.39.0` (또는 Actions › Release (PC) › Run workflow 에서 main — package.json 버전으로)
 
 **테스트 순서:** ① v0.38.0 을 위 링크로 설치 ② 버전을 0.38.1 로 올려 태그 푸시 → Actions 가 공개 저장소에 Release v0.38.1 을 만듦 ③ 설치된 앱에서 설정 › 업데이트 확인 → 대화 상자 → 받기(진행률) → 지금 재시작 → 설정의 지금 버전이 v0.38.1
 

@@ -9,7 +9,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_dispatch: # 손으로 다시 돌릴 때 (태그를 골라 실행)
+  workflow_dispatch: # Actions 탭 › Run workflow — main 을 고르면 package.json 버전으로 (공개 저장소의 v<버전> 태그 · Release 는 electron-builder 가 만든다)
 
 permissions:
   contents: read # 이 저장소는 읽기만 — 올리기는 공개 저장소 전용 토큰으로
@@ -40,12 +40,12 @@ jobs:
           key: npm-${{ runner.os }}-${{ hashFiles('scripts/build-dist.mjs', 'package.json') }}
           restore-keys: npm-${{ runner.os }}-
 
-      - name: 태그와 package.json 버전이 같은지
+      - name: 태그와 package.json 버전이 같은지 (손으로 돌리면 package.json 버전 그대로)
         shell: bash
         run: |
           version=$(node -p "require('./package.json').version")
           tag="${GITHUB_REF_NAME#v}"
-          if [ "$tag" != "$version" ]; then
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$tag" != "$version" ]; then
             echo "::error::태그 v$tag 와 package.json 버전 $version 이 달라요. package.json 을 고치고 태그를 다시 올려 주세요"
             exit 1
           fi
