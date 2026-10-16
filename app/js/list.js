@@ -43,7 +43,6 @@ const el = {
   count: $('count'),
   settings: $('settings-dialog'),
   vaultPath: $('vault-path'),
-  version: $('version'),
   confirm: $('confirm-dialog'),
   confirmMessage: $('confirm-message'),
   dragHint: $('drag-hint'),
@@ -76,7 +75,6 @@ function applyInfo(info) {
   el.setupError.hidden = !info.vaultError;
   el.setupError.textContent = info.vaultError ?? '';
   el.vaultPath.textContent = info.vaultPath ?? '';
-  el.version.textContent = `메모킹 ${info.version}`;
 }
 
 // ---------- 목록 ----------
@@ -905,7 +903,7 @@ async function showOpmsSetup() {
   const o = await api.opms.settings();
   if (document.activeElement !== $('opms-host')) $('opms-host').value = o.host ?? '';
   $('opms-dir').textContent = o.wrapperDir ?? '';
-  if (!o.hostSet && !$('opms-host-note').textContent) setOpmsNote('서버 주소를 넣어야 OPMS 사건을 찾을 수 있어요', true);
+  if (!o.hostSet && !$('opms-host-note').textContent) setOpmsNote('서버 주소를 넣으면 OPMS 사건을 찾을 수 있어요', false); // 아직 아무것도 안 했으니 빨간 글은 아님
 }
 function setOpmsNote(text, warn = false) {
   $('opms-host-note').textContent = text;
@@ -1498,8 +1496,12 @@ let updateSt = { status: 'idle' };
 function showUpdateRow(st) {
   updateEl.current.textContent = st.current ? `v${st.current}` : '';
   const text = {
+    idle: '새 버전이 나오면 알려 드려요',
+    checking: '새 버전을 찾고 있어요',
+    latest: '최신 버전을 쓰고 있어요',
     dev: '개발 중에는 확인하지 않아요',
-    available: '새 버전이 나왔어요',
+    available: `새 버전 v${st.version} 이 나왔어요`,
+    downloading: '새 버전을 받고 있어요',
     ready: `v${st.version} 을 받아 뒀어요. 끝낼 때도 설치돼요`,
     error: st.message ?? '',
   }[st.status] ?? '';
@@ -1527,7 +1529,7 @@ function renderUpdateDialog(st) {
   updateEl.version.textContent = `v${st.current ?? ''} → v${st.version ?? ''}`;
   updateEl.notes.textContent = st.notes || '바뀐 점이 적혀 있지 않아요';
   updateEl.progress.hidden = !downloading;
-  updateEl.fill.style.width = `${Math.max(0, Math.min(100, st.percent ?? 0))}%`;
+  updateEl.fill.style.transform = `scaleX(${Math.max(0, Math.min(100, st.percent ?? 0)) / 100})`;
   updateEl.progressText.textContent = downloading
     ? `${st.percent ?? 0}%${st.total ? ` · ${mb(st.transferred ?? 0)} / ${mb(st.total)}` : ''}${st.bytesPerSecond ? ` · 초당 ${mb(st.bytesPerSecond)}` : ''}`
     : '';
