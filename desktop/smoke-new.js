@@ -785,6 +785,38 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       pw.close();
     }
 
+    // ---------- 붙여넣기 · 빠른 메모: 메신저에서 복사한 글은 메모장처럼 (빈 줄 · 문장부호 앞 띄어쓰기 그대로) ----------
+    {
+      const plain = '시스템상에 출원지시 요청된 상태인가요?\r\n오전 09:52\r\n\r\n윤형선 (HS)\r\n이미 출원지시는 온 상태이군요.\r\n오전 09:53\r\n지재팀에서 컨펌 메일을 보내주길 기다리고 있었습니다 시스템 확인해보겠습니다 !\r\n앗\r\n\r\n윤형선 (HS)\r\n넵 ! 감사합니다 !';
+      // 메신저 HTML: 말풍선마다 div, 글자 사이에 폭 없는 공백이 섞여 있다 (서식은 없음)
+      const html = '<div class="chat"><div class="msg"><span style="color:#555">시스템상에 출원지시 요청된 상태인가요?</span></div><div class="time">오전 09:52</div></div>'
+        + '<div class="chat"><div class="name">윤형선 (HS)</div><div class="msg"><span>이미 출원지시는 온 상태이군요.\u200b</span></div><div class="time">오전 09:53</div>'
+        + '<div class="msg mine">지재팀에서 컨펌 메일을 보내주길 기다리고 있었습니다 시스템 확인해보겠습니다 !</div><div class="msg mine">앗</div></div>'
+        + '<div class="chat"><div class="name">윤형선 (HS)</div><div class="msg">넵 ! 감사합니다 !</div></div>';
+      const pid = vault.import({ body: '' });
+      const pw = windowManager.openNote(pid);
+      await until(() => pw.isVisible() && js(pw, 'document.documentElement.dataset.ready === "true"'), '붙여넣기 메모', 8000);
+      await js(pw, `(() => { document.querySelector('.ProseMirror').focus(); const d = new DataTransfer(); d.setData('text/html', ${JSON.stringify(html)}); d.setData('text/plain', ${JSON.stringify(plain)}); document.querySelector('.ProseMirror').dispatchEvent(new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true })); })()`);
+      await wait(400);
+      await js(pw, `document.querySelector('.ProseMirror').blur()`); // 다듬기는 커서가 떠날 때
+      await wait(1500); // 저장
+      const lines = await js(pw, `[...document.querySelector('.ProseMirror').children].map((p) => p.textContent)`);
+      const want = plain.split('\r\n');
+      check('메신저 글 붙여넣기: 줄 · 빈 줄 · "확인해보겠습니다 !" 띄어쓰기가 메모장과 같게', JSON.stringify(lines) === JSON.stringify(want), JSON.stringify(lines));
+      // 직접 친 줄은 여전히 다듬는다 ("합니다 ." → "합니다."), 붙여 넣은 줄은 커서가 지나가도 그대로
+      pw.focus();
+      await js(pw, `(() => { const pm = document.querySelector('.ProseMirror'); pm.focus(); const sel = getSelection(); sel.selectAllChildren(pm.lastElementChild); sel.collapseToEnd(); })()`);
+      key(pw, 'Enter');
+      await wait(100);
+      pw.webContents.insertText('직접 친 줄입니다 .');
+      await wait(100);
+      key(pw, 'Enter');
+      await wait(400);
+      const after = await js(pw, `[...document.querySelector('.ProseMirror').children].map((p) => p.textContent)`);
+      check('다듬기: 직접 친 줄은 "입니다 ." → "입니다.", 붙여 넣은 "감사합니다 !" 는 그대로', after.includes('직접 친 줄입니다.') && after.includes('넵 ! 감사합니다 !'), JSON.stringify(after));
+      pw.close();
+    }
+
     // ---------- 설정: OPMS 서버 주소는 사용자가 넣고(코드에 없음), 업데이트 칸 ----------
     {
       const lw = getList() ?? createListWindow('memos');
