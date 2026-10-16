@@ -937,7 +937,20 @@ export function registerIpc(ctx) {
       { id: 'mail', label: '메일에 첨부', sub: '기본 메일 앱(Outlook 등)의 새 메일에', ready: process.platform === 'win32' || SMOKE },
     ];
   });
+  // 공유가 안 될 때 까닭을 남긴다 (설정 폴더의 share.log — 사용자가 보내 주면 고칠 수 있게)
+  const shareLog = (via, what) => {
+    try {
+      fs.appendFileSync(path.join(app.getPath('userData'), 'share.log'), `${new Date().toISOString()} [${via}] ${String(what).slice(0, 2000)}\n`);
+    } catch {
+      // 못 남겨도 공유는 계속
+    }
+  };
   ipcMain.handle('attachment:share', async (e, f = {}) => {
+    const r = await shareOnce(f);
+    if (r?.error || r?.fallback) shareLog(String(f.via ?? 'sheet'), r.error ?? r.reason);
+    return r;
+  });
+  const shareOnce = async (f) => {
     const via = String(f.via ?? 'sheet');
     const src = shareSource(f);
     if (src.error) return src;
@@ -982,7 +995,7 @@ export function registerIpc(ctx) {
     console.warn('[share] Windows 공유 창:', r);
     shell.showItemInFolder(file); // 공유 창을 열지 못하면 탐색기에서 골라 두어 오른쪽 클릭 › 공유 · 끌어다 보내기
     return { fallback: true, reason: r.replace(/^err /, '') };
-  });
+  };
   ipcMain.handle('attachment:info', (_e, rel) => {
     let decoded = String(rel ?? '');
     try {

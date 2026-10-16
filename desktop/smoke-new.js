@@ -394,6 +394,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const sharesBefore = smokeOpened.filter((o) => o.kind === 'share').length;
       await js(nw, `document.querySelector('.mk-share-btn')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
       await until(() => js(nw, `!!document.querySelector('.mk-share-menu')`), '표 공유 메뉴', 3000).catch(() => {});
+      const hasCancel = await js(nw, `document.querySelector('.mk-share-menu .mk-share-cancel')?.textContent === '취소'`);
+      check('공유 방법 메뉴에 "취소" 단추', hasCancel);
       await js(nw, `(document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); // 실제 키처럼 요소에서
       await wait(200);
       const escClosed = await js(nw, `!document.querySelector('.mk-share-menu')`) && smokeOpened.filter((o) => o.kind === 'share').length === sharesBefore;
