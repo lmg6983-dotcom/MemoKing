@@ -859,17 +859,20 @@ export class WindowManager {
   }
 
   /**
-   * 스택의 다른 탭들도 숨긴 창으로 미리 만들어 둔다 — 처음 그 탭으로 바꿀 때 창을 새로 만들며 기다리지 않게.
-   *   한 번에 하나씩, 조금 쉬었다가 (지금 보이는 탭을 그리는 데 방해되지 않게)
+   * 지금 탭의 바로 앞 · 뒤 탭(Ctrl+Tab · Ctrl+Shift+Tab 으로 갈 곳)을 숨긴 창으로 미리 만들어 둔다 —
+   *   처음 그 탭으로 바꿀 때 창을 새로 만들며 기다리지 않게. 탭이 많아도 둘까지만 (창마다 메모리를 쓰므로),
+   *   스택이 화면에 열려 있을 때만, 한 번에 하나씩 조금 쉬었다가 (지금 보이는 탭을 그리는 데 방해되지 않게)
    */
   prewarmStack(stack) {
     clearTimeout(this.prewarmTimer);
     this.prewarmTimer = setTimeout(() => {
       if (this.isQuitting() || !this.stacks) return;
       const now = stack.memos.map((m) => this.stacks.stackOf(m)).find(Boolean); // 그사이 탭이 빠지거나 합쳐졌을 수 있다
-      const missing = now?.memos.find((m) => !this.noteWins.has(m) && this.getVault()?.get(m));
+      const shown = now && this.visibleStackWin(now);
+      if (!shown) return; // 스택을 닫았다
+      const near = [this.stacks.neighbor(now.active, 1), this.stacks.neighbor(now.active, -1)];
+      const missing = near.find((m) => m && !this.noteWins.has(m) && this.getVault()?.get(m));
       if (!missing) return;
-      const shown = this.visibleStackWin(now);
       const at = shown?.getNormalBounds() ?? (onScreen(settings.noteBounds[missing]) ? settings.noteBounds[missing] : null);
       // 예비 창은 쓰지 않는다 (지금 열려는 다른 메모가 가져가게 남겨 둠) — 다 그린 뒤 다음 탭
       this.createNoteWindow(missing, { show: false, bounds: at, useSpare: false, onReady: () => this.prewarmStack(now) });

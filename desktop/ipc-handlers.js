@@ -837,12 +837,21 @@ export function registerIpc(ctx) {
     }
     return copyFileToClipboard(file);
   });
+  // 저장 · 공유가 함께 쓰는 것: 파일 이름 다듬기 · 메모 폴더의 첨부 찾기
+  const safeName = (name) => path.basename(String(name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
+  /** 메모 폴더 attachments/ 안의 파일 → { file } | { error } (화면이 이미 풀어 보낸 경로 — 다시 풀면 이름의 %XX 가 깨진다) */
+  const attachmentFile = (rel) => {
+    const file = /^attachments\//.test(String(rel)) ? getVault()?.resolve(String(rel)) : null;
+    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
+    return { file };
+  };
   ipcMain.handle('attachment:save-as', async (e, f = {}) => {
-    const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
+    const name = safeName(f.name);
     let source = null;
     if (f.rel) {
-      source = /^attachments\//.test(String(f.rel)) ? getVault()?.resolve(String(f.rel)) : null; // 화면(copy-content.js)이 이미 풀어 보낸 경로 — 다시 풀면 이름의 %XX 가 깨진다
-      if (!source || !fs.statSync(source, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
+      const found = attachmentFile(f.rel);
+      if (found.error) return found;
+      source = found.file;
     } else if (typeof f.base64 !== 'string') return { error: '저장할 내용이 없어요' };
     const ext = path.extname(name).slice(1);
     let file = SMOKE ? path.join(app.getPath('temp'), `memoking-smoke-save-${Date.now()}-${name}`) : null;
@@ -869,22 +878,19 @@ export function registerIpc(ctx) {
   // ---------- 공유 (내용 단추 › 공유 › 방법 고르기) ----------
   // 공유할 파일: 메모 폴더의 첨부는 그대로, 만든 내용(표 CSV · 글 · 그림 PNG)은 임시 파일로
   const shareSource = (f) => {
-    if (f.rel) {
-      const file = /^attachments\//.test(String(f.rel)) ? getVault()?.resolve(String(f.rel)) : null;
-      if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
-      return { file };
-    }
+    if (f.rel) return attachmentFile(f.rel);
     if (typeof f.base64 !== 'string') return { error: '공유할 내용이 없어요' };
-    const name = path.basename(String(f.name ?? '메모 내용')).replace(/[\\/:*?"<>|]+/g, ' ').trim() || '메모 내용';
-    const dir = path.join(app.getPath('temp'), 'memoking-share');
+    const root = path.join(app.getPath('temp'), 'memoking-share');
     try {
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(root, { recursive: true });
       // 지난 공유 때 만든 임시 파일은 하루가 지나면 치운다 (공유 창이 넘겨받을 동안은 남겨 두고)
-      for (const old of fs.readdirSync(dir)) {
-        const p = path.join(dir, old);
-        if (Date.now() - (fs.statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 86_400_000) fs.rmSync(p, { force: true });
+      for (const old of fs.readdirSync(root)) {
+        const p = path.join(root, old);
+        if (Date.now() - (fs.statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 86_400_000) fs.rmSync(p, { recursive: true, force: true });
       }
-      const file = path.join(dir, name);
+      // 공유마다 제 폴더에 (같은 이름으로 잇따라 공유해도 앞의 파일을 덮어쓰지 않게 — 이름은 그대로 보이도록)
+      const dir = fs.mkdtempSync(path.join(root, 's-'));
+      const file = path.join(dir, safeName(f.name));
       fs.writeFileSync(file, Buffer.from(f.base64, 'base64'));
       return { file };
     } catch (err) {
@@ -917,10 +923,11 @@ export function registerIpc(ctx) {
       const api = getDriveApi();
       if (!api || !getDriveAuth()?.connected) return { error: '설정에서 Google Drive 를 먼저 연결해 주세요' };
       try {
+        // 공유 폴더 id 는 따로 (Drive 동기화 폴더를 바꿀 때 settings.drive 를 통째로 갈아 끼우므로)
         const link = await driveShareLink(api, {
-          folderId: settings.drive?.shareFolderId,
+          folderId: settings.driveShareFolderId,
           saveFolderId: (id) => {
-            settings.drive = { ...settings.drive, shareFolderId: id };
+            settings.driveShareFolderId = id;
             saveSettings();
           },
         }, file, title);

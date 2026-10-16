@@ -11,8 +11,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // ---------- Windows 공유 창 ----------
+// 도우미의 대답은 UTF-8 로 (Windows PowerShell 5.1 은 기본이 OEM 코드 페이지라 한국어 오류 문구가 깨진다)
+const UTF8_OUT = '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8';
+
 const SHEET_SCRIPT = `
 $ErrorActionPreference = 'Stop'
+${UTF8_OUT}
 try {
   Add-Type -AssemblyName System.Windows.Forms
   $fw = [System.Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
@@ -90,6 +94,7 @@ public static class MkShareSheet {
 // ---------- 메일에 첨부 (MAPI — 기본 메일 앱) ----------
 const MAIL_SCRIPT = `
 $ErrorActionPreference = 'Stop'
+${UTF8_OUT}
 try {
   Add-Type -TypeDefinition @'
 using System;
@@ -116,7 +121,8 @@ public static class MkMail {
       m.noteText = "";
       m.fileCount = 1;
       m.files = p;
-      return MAPISendMailW(IntPtr.Zero, IntPtr.Zero, m, 0x8 | 0x1, 0); // MAPI_DIALOG | MAPI_LOGON_UI
+      // MAPI_DIALOG | MAPI_DIALOG_MODELESS | MAPI_LOGON_UI — 새 메일 창을 띄우고 바로 돌아온다 (다 쓸 때까지 기다리지 않음)
+      return MAPISendMailW(IntPtr.Zero, IntPtr.Zero, m, 0x8 | 0x4 | 0x1, 0);
     } finally { Marshal.FreeHGlobal(p); }
   }
 }
@@ -137,12 +143,15 @@ export function runHelper(script, env, { platform = process.platform, spawnHelpe
   if (platform !== 'win32') return Promise.resolve('err unavailable');
   return new Promise((resolve) => {
     let done = false;
-    let out = '';
+    const chunks = [];
+    let timer = 0;
     const finish = (r) => {
       if (done) return;
       done = true;
+      clearTimeout(timer);
       resolve(r);
     };
+    const text = () => Buffer.concat(chunks).toString('utf8'); // 조각마다 바꾸면 한글이 반으로 잘릴 수 있다
     let proc;
     try {
       proc = spawnHelper('powershell.exe', ['-NoProfile', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass', '-Command', script], {
@@ -152,13 +161,23 @@ export function runHelper(script, env, { platform = process.platform, spawnHelpe
       return finish(`err ${err.message}`);
     }
     proc.stdout.on('data', (b) => {
-      out += b;
+      chunks.push(Buffer.isBuffer(b) ? b : Buffer.from(String(b)));
+      const out = text();
       const line = out.split(/\r?\n/).find((l) => l.trim());
       if (/\n/.test(out) && line) finish(/^ok\b/.test(line.trim()) ? 'ok' : line.trim());
     });
     proc.on('error', (err) => finish(`err ${err.message}`));
-    proc.on('exit', () => finish(/^ok\b/.test(out.trim()) ? 'ok' : (out.trim() || 'err exit')));
-    setTimeout(() => finish('err timeout'), timeoutMs);
+    proc.on('exit', () => finish(/^ok\b/.test(text().trim()) ? 'ok' : (text().trim() || 'err exit')));
+    // 대답이 없으면 도우미를 끈다 (늦게라도 공유 창이 떠 탐색기 대신 보여 준 것과 겹치지 않게)
+    timer = setTimeout(() => {
+      if (done) return;
+      try {
+        proc.kill();
+      } catch {
+        // 이미 끝남
+      }
+      finish('err timeout');
+    }, timeoutMs);
   });
 }
 
@@ -169,7 +188,7 @@ export function shareSheet(file, title = '', opts) {
 
 /** 기본 메일 앱의 새 메일에 첨부 → 'ok' | 'err …' (메일 앱이 없으면 'err mapi …') */
 export function mailAttach(file, title = '', opts) {
-  return runHelper(MAIL_SCRIPT, { MK_SHARE_FILE: file, MK_SHARE_TITLE: title || path.basename(file) }, { timeoutMs: 120_000, ...opts });
+  return runHelper(MAIL_SCRIPT, { MK_SHARE_FILE: file, MK_SHARE_TITLE: title || path.basename(file) }, { timeoutMs: 60_000, ...opts });
 }
 
 // ---------- LocalSend ----------

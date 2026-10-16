@@ -28,24 +28,29 @@ test('공유: Windows 가 아니면 도우미를 띄우지 않음 · 도우미 �
   assert.equal(await runHelper('x', {}, { platform: 'win32', spawnHelper: fake }), 'err COMException: 막힘');
 });
 
-test('공유: Google Drive 링크 — 공유 폴더를 한 번 만들어 기억, 지워졌으면 다시', async () => {
+test('공유: Google Drive 링크 — 기억한 공유 폴더가 살아 있으면 그대로, 휴지통이면 같은 이름 폴더를 찾고, 없으면 새로', async () => {
   const log = [];
   let saved = null;
-  let gone = true;
+  const folders = { F1: { trashed: false }, OLD: { trashed: true } };
+  let existing = null;
   const api = {
-    createFolder: async (parent, name) => { log.push(`folder ${parent} ${name}`); return { id: `F${log.length}` }; },
-    upload: async (folder, name) => {
-      log.push(`up ${folder} ${name}`);
-      if (folder === 'OLD' && gone) { gone = false; const e = new Error('없음'); e.status = 404; throw e; }
-      return { id: 'X' };
-    },
+    alive: async (id) => Boolean(folders[id]) && !folders[id].trashed,
+    findFolder: async () => existing,
+    createFolder: async (parent, name) => { log.push(`new ${parent} ${name}`); folders.N = { trashed: false }; return { id: 'N' }; },
+    upload: async (folder, name) => { log.push(`up ${folder} ${name}`); return { id: 'X' }; },
     shareLink: async (id) => `https://drive.google.com/file/d/${id}/view`,
   };
-  const link = await driveShareLink(api, { folderId: '', saveFolderId: (id) => { saved = id; } }, '/tmp/a.csv', 'a.csv');
-  assert.equal(link, 'https://drive.google.com/file/d/X/view');
+  const store = (folderId) => ({ folderId, saveFolderId: (id) => { saved = id; } });
+  assert.equal(await driveShareLink(api, store('F1'), '/tmp/a.csv', 'a.csv'), 'https://drive.google.com/file/d/X/view');
+  assert.deepEqual(log, ['up F1 a.csv']);
+  log.length = 0;
+  existing = { id: 'F1' }; // 휴지통 폴더 대신 같은 이름의 다른 폴더
+  await driveShareLink(api, store('OLD'), '/tmp/a.csv', 'a.csv');
+  assert.deepEqual(log, ['up F1 a.csv']);
   assert.equal(saved, 'F1');
   log.length = 0;
-  await driveShareLink(api, { folderId: 'OLD', saveFolderId: (id) => { saved = id; } }, '/tmp/a.csv', 'a.csv');
-  assert.deepEqual(log, ['up OLD a.csv', 'folder root 메모킹 공유', 'up F2 a.csv']);
-  assert.equal(saved, 'F2');
+  existing = null;
+  await driveShareLink(api, store(''), '/tmp/a.csv', 'a.csv');
+  assert.deepEqual(log, ['new root 메모킹 공유', 'up N a.csv']);
+  assert.equal(saved, 'N');
 });
