@@ -112,6 +112,7 @@ function calendarApi() {
     feeds: async () => store.list(),
     setFeeds: async (list) => store.save(list),
     fetch: (id, force = false) => store.get(id, { force }),
+    openUrl: (url) => call('openUrl', { url }), // 일정 속 주소 (회의 링크 등)
     // 휴대폰 캘린더 (삼성 캘린더 · Google 캘린더 등 — 안드로이드 CalendarContract)
     device: {
       enabled: () => lsGet(DEVICE_KEY) === '1',

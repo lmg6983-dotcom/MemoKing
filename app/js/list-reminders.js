@@ -621,6 +621,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       readOnly: true,
       lines: [{ icon: 'pin', text: e.location }],
       note: e.description,
+      url: e.url,
+      openUrl: calendars?.openUrl, // 회의 주소 등 — 다른 캘린더 앱이 아니라 그 주소만 연다
       actions: api.reminders.add ? [{ label: '메모로 가져오기', primary: true, run: () => importExternal(e) }] : [],
     });
   }

@@ -491,7 +491,15 @@ try {
   await shot('02j2-event-detail');
   check('일정 누르기: 다른 캘린더 일정 → 메모킹 안의 자세히 보기 (보기만 · 메모로 가져오기), 캘린더 앱은 안 열림',
     Boolean(detail.title) && detail.badge === '보기만' && detail.buttons.includes('메모로 가져오기'), JSON.stringify(detail));
-  if (detail.title === '가족 저녁') check('자세히 보기: 일정 설명을 줄 그대로 (HTML 줄바꿈)', detail.note === '엄마 아빠랑\n7시까지 도착', JSON.stringify(detail.note));
+  if (detail.title === '가족 저녁') {
+    check('자세히 보기: 일정 설명을 줄 그대로 (HTML 줄바꿈)', detail.note === '엄마 아빠랑\n7시까지 도착. 식당: https://example.com/restaurant.', JSON.stringify(detail.note));
+    // 설명 속 주소는 누를 수 있는 링크 (끝의 마침표는 빼고) — 누르면 그 주소만 연다 (캘린더 앱이 아니라)
+    const opensBefore = (await devLog()).log.filter((l) => l.openUrl).length;
+    await page.tap('.event-detail .ed-link');
+    await page.waitForTimeout(300);
+    const opened = (await devLog()).log.filter((l) => l.openUrl);
+    check('자세히 보기: 설명 속 주소 → 링크, 누르면 그 주소를 연다', opened.length === opensBefore + 1 && opened.at(-1).openUrl === 'https://example.com/restaurant', JSON.stringify(opened.at(-1)));
+  }
   await back();
   await page.waitForTimeout(200);
   await page.tap('.ev-row:not(.ev-ext) .row-main >> nth=0');

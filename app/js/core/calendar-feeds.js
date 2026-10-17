@@ -11,6 +11,9 @@ import { occurrenceEnd, DEFAULT_ALERTS } from './reminders.js';
 const MAX_ITERATIONS = 100000; // 반복 일정 하나마다 — 아주 오래된 매일 반복도 멈추지 않게
 
 const plainText = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+/** 일정에 붙은 주소(URL) — 인터넷 주소만 */
+const webUrl = (v) => (/^https?:\/\/\S+$/i.test(String(v ?? '').trim()) ? String(v).trim() : '');
+
 /** 일정 설명: 줄은 살리고(HTML 줄바꿈도) 태그는 빼고 2000자까지 — 화면에는 글자로만 넣는다 */
 //   태그는 HTML 태그 이름일 때만 뺀다 ("회의 <필참>" · "a < b > c" 같은 글은 그대로)
 const HTML_TAG = /<\/?(?:a|b|i|u|s|em|strong|span|font|p|div|ul|ol|li|br|hr|h[1-6]|small|sup|sub|blockquote|pre|code|table|tr|td|th|tbody|thead)\b[^<>]*>/gi;
@@ -54,7 +57,7 @@ export function prepareFeed(text) {
 }
 
 /**
- * .ics 글(또는 prepareFeed 결과) → [from, to) 와 겹치는 일정 회차 [{ uid, title, start, end, allDay, location, description }] (시작 순)
+ * .ics 글(또는 prepareFeed 결과) → [from, to) 와 겹치는 일정 회차 [{ uid, title, start, end, allDay, location, description, url }] (시작 순)
  * 반복 일정은 회차마다, 취소된 일정은 빼고, 바뀐 회차(RECURRENCE-ID)는 바뀐 대로.
  * 반복 하나마다 따로 셈을 두어(아주 오래된 매일 반복이 있어도) 뒤의 다른 일정이 빠지지 않게 하고, 다 모은 뒤 시작 순으로 limit 개
  */
@@ -76,7 +79,7 @@ export function feedEvents(source, from, to, limit = 1500) {
     const key = `${ev.uid}|${start.getTime()}`;
     if (seen.has(key)) return;
     seen.add(key);
-    out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || '(제목 없음)', start, end, allDay, location: plainText(ev.location), description: noteText(ev.description) });
+    out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || '(제목 없음)', start, end, allDay, location: plainText(ev.location), description: noteText(ev.description), url: webUrl(ev.component.getFirstPropertyValue('url')) });
   };
   for (const { ev, moved } of masters) {
     if (!ev.isRecurring()) {

@@ -935,8 +935,8 @@ let activeTab = 'memos';
 
 const remindersTab = setupRemindersTab({
   api, container: $('reminder-groups'), countEl: $('count-reminders'),
-  // 다른 캘린더 함께 보기 (읽기만): 구독은 메인이 받는다
-  calendars: api.calendars,
+  // 다른 캘린더 함께 보기 (읽기만): 구독은 메인이 받는다, 일정 속 주소는 브라우저로
+  calendars: api.calendars && { ...api.calendars, openUrl: (url) => api.links.open(url) },
 });
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockHistoryApp(appId, appName) {
