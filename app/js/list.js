@@ -77,6 +77,20 @@ function applyInfo(info) {
   el.vaultPath.textContent = info.vaultPath ?? '';
 }
 
+// 목록을 이 파일들만으로 좁히기 (동기화 충돌 사본) — 위에 "N개만 보는 중 · 모두 보기"
+function showOnlyFiles(files) {
+  const bar = $('conflict-bar');
+  state.onlyFiles = files?.length ? new Set(files.map((f) => String(f).replace(/\\/g, '/'))) : null;
+  if (state.onlyFiles) {
+    if (activeTab !== 'memos') showTab('memos');
+    const all = Object.assign(document.createElement('button'), { type: 'button', className: 'link-btn', textContent: '모두 보기' });
+    all.addEventListener('click', () => showOnlyFiles(null));
+    bar.replaceChildren(Object.assign(document.createElement('span'), { textContent: `동기화 충돌 사본 ${files.length}개만 보는 중 — 원래 메모와 견주어 보고 필요 없으면 지우세요` }), all);
+  }
+  bar.hidden = !state.onlyFiles;
+  render();
+}
+
 // ---------- 목록 ----------
 
 let renderPending = false;
@@ -90,7 +104,9 @@ function render() {
   }
   renderPending = false;
   const narrowed = Boolean(state.query) || filterCount() > 0;
-  const memos = filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
+  let memos = filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
+  // 동기화 충돌 사본만 보기 (위쪽 구름 단추 · 설정의 "충돌 사본 보기")
+  if (state.onlyFiles) memos = memos.filter((m) => state.onlyFiles.has(String(m.file ?? '').replace(/\\/g, '/')));
   const before = glide ? null : cardRects();
   layoutCards(memos);
   if (before) animateCards(before);
@@ -1474,7 +1490,7 @@ $('tutorial-btn').addEventListener('click', () => {
   api.tutorial.start();
 });
 applyInfo(await api.info());
-if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog });
+if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog, showFiles: (files) => showOnlyFiles(files) });
 await refresh();
 $('count-memos').textContent = String(state.memos.length);
 await remindersTab.refresh();

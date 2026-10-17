@@ -943,3 +943,42 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .update-progress small { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .update-error { margin: 12px 0 0; font-size: 13px; color: var(--danger); }
 @media (prefers-reduced-motion: reduce) { .update-bar span { transition: none; } }
+
+/* ---------- 동기화 상태 (drive-panel.js): 위쪽 구름 단추 · 작은 창 · 충돌 사본 막대 ---------- */
+.main { position: relative; }
+.sync-btn { position: relative; }
+.sync-btn[data-tone="off"] { color: var(--muted); }
+.sync-btn[data-tone="ok"] { color: var(--text); }
+.sync-mark { position: absolute; right: 3px; bottom: 3px; min-width: 9px; height: 9px; border: 2px solid var(--bg); border-radius: 99px; pointer-events: none; }
+.sync-btn[data-tone="ok"] .sync-mark { background: #2fb36b; }
+.sync-btn[data-tone="busy"] .sync-mark { background: var(--brand-yellow); animation: sync-pulse 1s ease-in-out infinite alternate; }
+.sync-btn[data-tone="error"] .sync-mark { background: var(--danger); }
+.sync-btn[data-tone="off"] .sync-mark { display: none; }
+.sync-btn.has-conflicts .sync-mark { right: -1px; bottom: auto; top: -1px; height: 16px; min-width: 16px; padding: 0 4px; background: var(--brand-yellow); color: var(--on-brand); font-size: 11px; font-weight: 800; line-height: 12px; text-align: center; }
+@keyframes sync-pulse { from { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .sync-btn[data-tone="busy"] .sync-mark { animation: none; } }
+.sync-pop { position: absolute; z-index: 40; top: 44px; right: 12px; width: min(320px, calc(100% - 24px)); padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2, var(--bg)); box-shadow: var(--shadow-pop); }
+.sync-pop-head { display: flex; flex-direction: column; gap: 3px; }
+.sync-pop-head b { font-size: 14.5px; color: var(--text-strong); }
+.sync-pop-head small { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.sync-pop-head.tone-error b, .sync-pop-head.tone-error small { color: var(--danger); }
+.sync-pop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.sync-pop-actions .link-btn { margin-left: auto; }
+.sync-pop-note { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.conflict-bar { display: flex; align-items: center; gap: 10px; margin: 0 12px 8px; padding: 8px 12px; border-radius: 10px; background: var(--brand-yellow-soft); color: var(--text-strong); font-size: 13px; }
+.conflict-bar[hidden] { display: none; }
+.conflict-bar span { flex: 1; }
+
+/* 설정 › Google Drive: 고급(외부 앱 연동 · 연결 정보) 접기, 폴더 줄의 "사용" */
+.drive-adv { margin-top: 8px; }
+.drive-adv > summary { padding: 4px 0; font-size: 12.5px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.drive-adv .link-btn { margin: 4px 0 0 -6px; }
+.folder-list li.folder-row { display: flex; align-items: center; gap: 6px; padding-right: 8px; }
+.folder-list li.folder-row .folder-open { flex: 1; min-width: 0; }
+.folder-list .folder-chev { margin-left: auto; font-style: normal; color: var(--muted); }
+.folder-list li.folder-row .folder-pick { flex: none; width: auto; height: 30px; padding: 0 12px; font-size: 12.5px; }
+
+/* 처음 화면: 휴대폰과 함께 쓰기(추천)가 먼저 */
+.setup .setup-where { margin: 16px 0 0; font-size: 12.5px; line-height: 1.6; }
+.setup .setup-where .path-box { display: inline; padding: 0; border: 0; background: none; font-family: inherit; }
+.setup .setup-where .link-btn { display: inline; margin-left: 4px; }
