@@ -642,9 +642,6 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 12.5px; white-space: nowrap; }
 .cal-link svg { width: 15px; height: 15px; flex: none; }
 .cal-link[hidden] { display: none; }
-.cal-sync-dot { display: none; width: 7px; height: 7px; flex: none; border-radius: 99px; background: #2fb36b; }
-.cal-link.synced .cal-sync-dot { display: inline-block; }
-.cal-link.sync-error .cal-sync-dot { background: var(--danger); }
 
 /* FullCalendar 색 · 글꼴을 메모킹 것으로 (어두운 화면도 메모킹 색을 따라감) */
 .cal-body {
@@ -714,24 +711,9 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   .cal-help summary, .feed-open-add { min-height: 44px; }
 }
 /* 일정 탭 › 다른 캘린더 창 (calendar-links.js) */
-.gsync { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); }
-.gsync.on { border-color: color-mix(in srgb, var(--brand-yellow) 70%, var(--line)); }
-.gsync-dot { width: 10px; height: 10px; border-radius: 99px; background: var(--muted); opacity: 0.5; }
-.gsync.on .gsync-dot { background: #2fb36b; opacity: 1; }
-.gsync.on.error .gsync-dot { background: var(--danger); }
-.gsync .feed-text small { white-space: pre-line; }
-.gsync-btns { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
-.gsync-btns .btn { height: 34px; }
-.gsync-btns [hidden] { display: none; }
-.gsync-off { margin-left: auto; font-size: 12.5px; }
-.gsync .gsync-off { color: var(--muted); text-decoration-color: currentColor; } /* 끊기는 조용히 (휴대폰 .link-btn 노랑 밑줄보다 앞서게) */
 .cal-help ul { margin: 4px 0 6px; padding-left: 18px; line-height: 1.6; }
 .cal-links { width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; }
 .dialog p.cal-links-lead { margin-bottom: 4px; font-size: 13px; color: var(--muted); }
-.cal-links-h3 { display: flex; align-items: center; gap: 8px; margin: 22px 0 2px; font-size: 14px; font-weight: 800; color: var(--text-strong); }
-.cal-perm { padding: 1px 8px; border: 1px solid var(--line); border-radius: 99px; font-size: 11.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
-.cal-perm-rw { border-color: color-mix(in srgb, var(--brand-yellow) 70%, var(--line)); background: color-mix(in srgb, var(--brand-yellow) 18%, transparent); color: var(--text-strong); }
-.dialog p.cal-sec-cap { margin: 0 0 8px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .feed-list { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
 .feed-list:empty { display: none; }
 .feed-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 6px 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); }
@@ -743,8 +725,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .feed-text small.err { color: var(--danger); }
 .feed-add { display: flex; gap: 6px; }
 .feed-open-add { display: block; margin: 2px 0 0 -6px; min-height: 40px; }
-.feed-open-add[hidden], .cal-help[hidden], .cal-twice[hidden] { display: none; }
-.dialog p.cal-twice { margin: 0 2px 6px; }
+.feed-open-add[hidden], .cal-help[hidden] { display: none; }
 .feed-add[hidden] { display: none; }
 .feed-url { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; }
 .feed-url:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
@@ -760,14 +741,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-help summary { list-style: none; }
 .cal-help ol { margin: 4px 0 6px; padding-left: 20px; line-height: 1.6; }
 .dialog .cal-help p { margin: 0; font-size: 12.5px; line-height: 1.6; }
-.cal-export { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); color: var(--text); font: inherit; cursor: pointer; }
-.cal-export > svg { flex: none; width: 22px; height: 22px; }
-.cal-export:disabled { opacity: 0.5; cursor: not-allowed; }
-@media (hover: hover) and (pointer: fine) { .cal-export:not(:disabled):hover { background: var(--fill-hover); } }
 .feed-text small { white-space: normal; }
-.cal-google-import { margin: 2px 0 0 -6px; font-size: 12.5px; }
-.cal-send { margin-top: 0; }
-.cal-send .cal-export { margin-top: 6px; }
 .cal-links .dialog-actions { margin-top: 16px; }
 /* 일정 자세히 보기 (event-detail.js) */
 .event-detail { width: min(400px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; }
@@ -787,7 +761,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .ev-ext .row-dot { border-radius: 99px; background: var(--ext-color); }
 .ev-ext .row-main { cursor: default; }
 .ev-ext .row-main:disabled { opacity: 1; color: inherit; }
-.ev-row .ev-send svg, .ev-row .ev-import svg { width: 17px; height: 17px; }
+.ev-row .ev-import svg { width: 17px; height: 17px; }
 .ev-feed-error { display: flex; align-items: flex-start; gap: 6px; color: var(--danger); }
 .ev-feed-error svg { width: 15px; height: 15px; flex: none; margin-top: 2px; }
 .ev-none { margin: 2px 6px 10px; font-size: 13px; color: var(--muted); }

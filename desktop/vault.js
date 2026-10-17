@@ -11,7 +11,7 @@ import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { taskProgress } from '../app/js/core/tasks.js';
 import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
-import { isLiveCached, stampChanged } from '../app/js/core/reminders.js';
+import { isLiveCached } from '../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles, diskCopy } from '../app/js/core/vault-locks.js';
 import { textMatcher } from '../app/js/core/text-match.js';
 import {
@@ -322,7 +322,6 @@ export class Vault extends EventEmitter {
     if (!entry) return null;
     // 잠긴 메모의 일정 이름은 머리말(풀린 글)에 남기지 않는다 — 글에서 짐작한 이름이 비밀일 수 있음 (알림엔 메모 제목)
     const prev = entry.meta.reminders;
-    reminders = stampChanged(prev, reminders); // 일정이 바뀐 때 (캘린더 동기화의 "나중에 고친 쪽")
     entry.meta.reminders = isLockedBody(entry.body) ? reminders.map(({ title: _t, ...r }) => r) : reminders;
     const wrote = entry.file || !isBlankBody(entry.body) ? this.write(entry) : true;
     if (wrote !== true) {

@@ -9,7 +9,6 @@ import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { FakeGoogle } from '../../../tests/fake-google.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(here, '..');
@@ -21,7 +20,6 @@ const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== 
 let vaultRoot = positional[0] ? path.resolve(positional[0]) : null; // 없으면 처음 화면(폴더 고르기)부터
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-dev-temp-'));
 const log = [];
-const fakeGoogle = new FakeGoogle({ realTime: true });
 
 const TYPES = {
   html: 'text/html; charset=utf-8', js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json',
@@ -302,22 +300,9 @@ const calls = {
       { id: 101, title: '가족 저녁', ...day(1, 19, 2), location: '집', description: '엄마 아빠랑<br>7시까지 도착', calendar: '삼성 캘린더', color: '#E67C73' },
       { id: 102, title: '결혼식', ...day(8, 12), location: '강남', calendar: '삼성 캘린더', color: '#E67C73' },
       { id: 103, title: '휴가', ...day(12, null, 3), location: '', calendar: 'Google 캘린더 (개인)', color: '#33B679' },
+      { id: 104, title: '메모킹 사본', ...day(1, 15), location: '', calendar: '메모킹', color: '#F6BF26' }, // 예전 상호 동기화가 만든 캘린더
     ].filter((e) => e.end > from && e.start < to);
     return { granted: true, events };
-  },
-  // Google 캘린더 상호 동기화 (GoogleCalendarApi.kt): 미리보기에서는 가짜 Google 캘린더 (/dev/gcal 로 들여다보기)
-  googleCalendarAuth: async () => true,
-  googleCalendar: async ({ method, url, body }) => {
-    const res = await fakeGoogle.request(method, url, body ?? undefined);
-    return { status: res.status, text: res.status === 204 ? '' : JSON.stringify(res.json ?? {}) };
-  },
-  calendarInsert: async (a) => {
-    log.push({ calendarInsert: a });
-    return true;
-  },
-  calendarView: async (a) => {
-    log.push({ calendarView: a });
-    return true;
   },
   share: async (a) => {
     log.push({ share: a });
@@ -530,16 +515,6 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && p === '/dev/stt') {
       Object.assign(fakeStt, JSON.parse(await readBody(req)));
       res.writeHead(200).end('{}');
-      return;
-    }
-    // 가짜 Google 캘린더: GET 으로 일정 보기, POST { summary, start, end, recurrence? } 로 "Google 캘린더에서 만든" 일정
-    if (p === '/dev/gcal') {
-      if (req.method === 'POST') {
-        const id = fakeGoogle.create(JSON.parse(await readBody(req)));
-        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ id }));
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ calendars: [...fakeGoogle.calendars.keys()], events: [...fakeGoogle.events.values()] }));
       return;
     }
     if (p === '/dev/log') {

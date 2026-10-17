@@ -464,8 +464,8 @@ try {
   check('다른 캘린더: 뒤로 가기는 창을 닫고 일정 탭 그대로', !(await page.isVisible('.cal-links[open]')) && await page.isVisible('#reminder-groups .cal'));
   await page.tap('.cal-link');
   await page.waitForSelector('.cal-links[open]');
-  check('다른 캘린더 창: 읽기 · 쓰기 꼬리표 (주고받기 읽기 + 쓰기 · 함께 보기 읽기만 · 보내기 쓰기만)',
-    JSON.stringify(await page.$$eval('.cal-links .cal-perm', (n) => n.map((x) => x.textContent))) === JSON.stringify(['읽기 + 쓰기', '읽기만', '쓰기만']));
+  check('다른 캘린더 창: 함께 보기만 (서로 맞추기 · 보내기 없음)',
+    (await page.textContent('.cal-links h2')) === '다른 캘린더 함께 보기' && (await page.locator('.cal-links :is(.gsync, .cal-export)').count()) === 0);
   await page.tap('.feed-device .switch');
   await page.waitForTimeout(300);
   check('다른 캘린더: 휴대폰 캘린더 켜기 (권한 허용)', await page.isChecked('.feed-device .switch'));
@@ -479,7 +479,6 @@ try {
   check('다른 캘린더: 삼성 캘린더 일정이 달력(점선) · 다가오는 일정에 함께', ext.bars.some((t) => /삼성 캘린더/.test(t)) && ext.rows.includes('가족 저녁'), JSON.stringify(ext));
   await shot('02j-calendar-device');
   // 일정을 누르면 다른 캘린더 앱으로 나가지 않고 메모킹 안에서 자세히 보기 (예전: 캘린더 앱 → "일정을 찾을 수 없습니다")
-  const viewsBefore = (await devLog()).log.filter((l) => l.calendarView).length;
   await page.tap('.ev-ext .row-main >> nth=0');
   await page.waitForSelector('.event-detail[open]');
   const detail = await page.evaluate(() => ({
@@ -490,9 +489,8 @@ try {
   }));
   await page.waitForTimeout(400);
   await shot('02j2-event-detail');
-  const viewsAfter = (await devLog()).log.filter((l) => l.calendarView).length;
   check('일정 누르기: 다른 캘린더 일정 → 메모킹 안의 자세히 보기 (보기만 · 메모로 가져오기), 캘린더 앱은 안 열림',
-    Boolean(detail.title) && detail.badge === '보기만' && detail.buttons.includes('메모로 가져오기') && viewsAfter === viewsBefore, JSON.stringify(detail));
+    Boolean(detail.title) && detail.badge === '보기만' && detail.buttons.includes('메모로 가져오기'), JSON.stringify(detail));
   if (detail.title === '가족 저녁') check('자세히 보기: 일정 설명을 줄 그대로 (HTML 줄바꿈)', detail.note === '엄마 아빠랑\n7시까지 도착', JSON.stringify(detail.note));
   await back();
   await page.waitForTimeout(200);
@@ -502,27 +500,8 @@ try {
   check('일정 누르기: 메모킹 일정 → 자세히 보기 (메모 열기 · 일정 지우기)', memoDetail.includes('메모 열기') && memoDetail.includes('일정 지우기'), JSON.stringify(memoDetail));
   await page.tap('.event-detail .dialog-x');
   await page.waitForTimeout(200);
-  await page.tap('.ev-row:not(.ev-ext) .ev-send');
-  await page.waitForTimeout(300);
-  const inserted = (await devLog()).log.find((l) => l.calendarInsert)?.calendarInsert;
-  check('보내기: 일정 줄의 단추 → 휴대폰 캘린더 앱 새 일정 (이름 · 시각)', Boolean(inserted?.title) && inserted.start > 0, JSON.stringify(inserted));
-  // Google 캘린더 상호 동기화: 연결 → 메모킹 일정이 "메모킹" 캘린더로, 그 캘린더에서 만든 일정 → 새 메모
-  await page.tap('.cal-link');
-  await page.waitForSelector('.cal-links[open]');
-  await page.tap('.gsync .btn.primary');
-  await page.waitForFunction(() => /맞췄어요|맞추고 있어요/.test(document.querySelector('.gsync')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => {});
-  const gcal = await (await fetch(`${base}/dev/gcal`)).json();
-  const pushedTitles = gcal.events.filter((e) => e.status !== 'cancelled').map((e) => e.summary);
-  check('Google 캘린더 동기화: 연결하면 "메모킹" 캘린더를 만들고 메모킹 일정을 넣음', gcal.calendars.length === 1 && pushedTitles.includes('치과'), JSON.stringify(pushedTitles));
-  await shot('02l-google-sync');
-  await fetch(`${base}/dev/gcal`, { method: 'POST', body: JSON.stringify({ summary: '삼성 캘린더 회의', start: { dateTime: new Date(Date.now() + 3 * 86_400_000).toISOString() }, end: { dateTime: new Date(Date.now() + 3 * 86_400_000 + 3_600_000).toISOString() } }) });
-  await page.tap('.gsync .btn:not(.primary)');
-  await page.waitForTimeout(1500);
-  check('Google 캘린더 동기화: 그 캘린더에서 만든 일정 → 새 메모 (일정 포함)', fs.existsSync(path.join(vault, '삼성 캘린더 회의.md')) && /kind: at/.test(read('삼성 캘린더 회의.md')));
-  check('Google 캘린더 동기화: 상태 파일은 메모 폴더(_memoking, Drive 로 PC 와 함께)', fs.existsSync(path.join(vault, '_memoking', 'google-calendar.json')));
-  await page.tap('.cal-links .dialog-actions .btn');
-  await page.waitForTimeout(400);
-  check('Google 캘린더 동기화: 일정 탭 단추에 "Google 캘린더와 맞춤"', /Google 캘린더와 맞춤/.test(await page.textContent('.cal-link')));
+  check('일정 줄: 다른 캘린더로 보내는 단추 없음 (읽기만)', (await page.locator('.ev-send').count()) === 0);
+  check('예전 상호 동기화가 만든 "메모킹" 캘린더 일정은 함께 보기에서 뺌 (메모킹 일정의 사본)', !(await page.evaluate(() => document.body.innerText.includes('메모킹 사본'))));
   for (const [view, name] of [['timeGridWeek', '주'], ['listMonth', '목록']]) {
     await page.tap(`[data-view="${view}"]`);
     await page.waitForTimeout(500);
