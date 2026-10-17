@@ -62,6 +62,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   let viewId = storedView();
   let compact = false; // 낮은 창: 월 보기 칸에 일정 막대 대신 색 점 (fitSize)
   let lastFit = '';
+  let maxEvents = 2; // 월 보기 한 칸에 보이는 일정 수 (fitSize)
   let lastCellKey = 0; // 날 칸을 마지막으로 그린 때의 고른 날
 
   // ---------- 다른 캘린더 (읽기만) ----------
@@ -355,7 +356,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     headerToolbar: false,
     height: 'auto',
     fixedWeekCount: true,
-    dayMaxEvents: true, // 칸 높이에 들어가는 만큼, 나머지는 +n (낮은 창은 막대 대신 색 점)
+    dayMaxEvents: maxEvents, // 칸 높이에 들어가는 만큼(fitSize 가 다시 정함), 나머지는 +n (낮은 창은 막대 대신 색 점)
     moreLinkClass: 'mk-more',
     moreLinkText: (n) => `+${n}`,
     nowIndicator: true,
@@ -453,7 +454,16 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       }
       // 비율은 요일 줄을 뺀 날 칸들의 것
       const weekdays = calEl.querySelector('[role="columnheader"]')?.getBoundingClientRect().height || 26;
-      if (viewId === 'dayGridMonth') calendar.setOption('aspectRatio', Math.min(8, Math.max(0.9, w / Math.max(100, room - weekdays))));
+      if (viewId === 'dayGridMonth') {
+        calendar.setOption('aspectRatio', Math.min(8, Math.max(0.9, w / Math.max(100, room - weekdays))));
+        // 한 주 줄 높이에서 날짜 숫자 줄(약 30px)을 빼고 칩 한 줄(약 24px)씩 — "+n" 줄 자리도 남긴다
+        const rowH = (room - weekdays) / 6;
+        const fit = Math.max(1, Math.floor((rowH - 30) / 24) - 1);
+        if (fit !== maxEvents) {
+          maxEvents = fit;
+          calendar.setOption('dayMaxEvents', fit);
+        }
+      }
     }
   }
   new ResizeObserver(() => fitSize()).observe(container);
@@ -550,6 +560,10 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     }
   }
 
+  /** 일정의 반복 · 알림 설명 (목록 줄과 자세히 보기 같은 글) */
+  const repeatText = (r) => (r.kind === 'repeat' ? describeReminder(r) : '');
+  const alertText = (r) => (r.enabled ? `알림 ${describeAlerts(r)}` : '알림 꺼짐');
+
   function eventRow({ item, start }) {
     const r = item.reminder;
     const past = occurrenceEnd(start, r.allDay) < new Date(); // core 의 "지난 일정" 규칙과 같게
@@ -567,8 +581,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const sub = el('span', 'row-sub');
     const parts = [];
     if (r.title && r.title !== item.title) parts.push(`메모: ${item.title}`);
-    if (r.kind === 'repeat') parts.push(describeReminder(r));
-    parts.push(r.enabled ? `알림 ${describeAlerts(r)}` : '알림 꺼짐');
+    if (repeatText(r)) parts.push(repeatText(r));
+    parts.push(alertText(r));
     sub.append(icon(KIND_ICON[r.kind]), el('span', '', parts.join(', ')));
     text.append(rowTitle, sub);
     main.append(time, dot, text);
@@ -623,11 +637,14 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       memoColor: item.color,
       source: r.title && r.title !== item.title ? `메모킹 · 메모 "${item.title}"` : '메모킹',
       lines: [
-        { icon: 'repeat', text: r.kind === 'repeat' ? describeReminder(r) : '' },
-        { icon: 'bell', text: r.enabled ? `알림 ${describeAlerts(r)}` : '알림 꺼짐' },
+        { icon: 'repeat', text: repeatText(r) },
+        { icon: 'bell', text: alertText(r) },
       ],
+      // 반복 일정은 한 회차만 지울 수 없어(지우면 모든 회차가 사라짐) 여기서는 지우지 않는다 — 메모에서 고치기
       actions: [
-        { label: '일정 지우기', danger: true, run: () => update(item, (list) => list.filter((x) => x.id !== r.id)) },
+        ...(r.kind === 'repeat' ? [] : [{ label: '일정 지우기', danger: true, run: () => update(item, (list) => list.filter((x) => x.id !== r.id))
+          .then(() => notify(`"${r.title || item.title}" 일정을 지웠어요`))
+          .catch((err) => notify(err.message || '일정을 지우지 못했어요', true)) }]),
         { label: '메모 열기', primary: true, run: () => api.memo.open(item.memoId) },
       ],
     });
@@ -644,7 +661,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       readOnly: true,
       lines: [{ icon: 'pin', text: e.location }],
       note: e.description,
-      actions: [{ label: '메모로 가져오기', primary: Boolean(api.reminders.add), run: () => importExternal(e) }],
+      actions: api.reminders.add ? [{ label: '메모로 가져오기', primary: true, run: () => importExternal(e) }] : [],
     });
   }
 

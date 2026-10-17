@@ -70,6 +70,11 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
 
     const twice = el('p', 'feed-note cal-twice', '주고받기의 "메모킹" 캘린더는 여기서 빼고 보여요 (같은 일정이 두 번 보이지 않게)');
     twice.hidden = true;
+    let googleOn = false;
+    // 휴대폰 캘린더를 함께 보는 중일 때만 (그때만 "메모킹" 캘린더를 빼고 보여 준다)
+    const drawTwice = () => {
+      twice.hidden = !googleOn || !calendars.device?.enabled();
+    };
     // ---------- Google 캘린더와 서로 맞추기 ----------
     const google = calendars.google;
     const syncTitle = section('Google 캘린더와 주고받기', '읽기 + 쓰기', 'rw', '메모킹 일정 ⇄ Google 캘린더의 "메모킹" 캘린더. 어느 쪽에서 고치거나 만들어도 서로 들어가요');
@@ -104,7 +109,8 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
     let busy = false;
     function drawSync(info) {
       const on = Boolean(info?.connected);
-      twice.hidden = !on || !calendars.device;
+      googleOn = on;
+      drawTwice();
       syncCard.classList.toggle('on', on);
       syncCard.classList.toggle('error', on && Boolean(info?.error));
       connectBtn.hidden = on;
@@ -175,6 +181,7 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
         const on = await calendars.device.setEnabled(want).catch(() => false);
         sw.checked = on;
         sw.disabled = false;
+        drawTwice();
         if (want && !on) notify('캘린더 권한을 허용해야 휴대폰 일정을 볼 수 있어요', true);
       });
       deviceRow.append(dot, text, sw);

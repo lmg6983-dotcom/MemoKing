@@ -14,7 +14,9 @@ const MAX_ITERATIONS = 100000; // 반복 일정 하나마다 — 아주 오래�
 
 const plainText = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 /** 일정 설명: 줄은 살리고(HTML 줄바꿈도) 태그는 빼고 2000자까지 — 화면에는 글자로만 넣는다 */
-const noteText = (v) => String(v ?? '').replace(/\r\n?/g, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li)>/gi, '\n').replace(/<[^>]+>/g, '')
+//   태그는 HTML 태그 이름일 때만 뺀다 ("회의 <필참>" · "a < b > c" 같은 글은 그대로)
+const HTML_TAG = /<\/?(?:a|b|i|u|s|em|strong|span|font|p|div|ul|ol|li|br|hr|h[1-6]|small|sup|sub|blockquote|pre|code|table|tr|td|th|tbody|thead)\b[^<>]*>/gi;
+const noteText = (v) => String(v ?? '').replace(/\r\n?/g, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li)>/gi, '\n').replace(HTML_TAG, '')
   .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
   .replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 2000);
 

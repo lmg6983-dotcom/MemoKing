@@ -180,9 +180,10 @@ export function closeConfirm() {
   return true;
 }
 
-/** 맨 위에 열린 창(<dialog>)을 Esc 처럼 닫기 — 각 창의 cancel 처리(저장 안 함 · 일하는 중이면 그대로)를 따른다 */
+/** 맨 위에 열린 창(showModal 한 <dialog>)을 Esc 처럼 닫기 — 각 창의 cancel 처리(저장 안 함 · 일하는 중이면 그대로)를 따른다
+ *  창은 열 때 body 끝에 붙이므로 DOM 순서의 마지막이 맨 위 (show() 로 연 비모달 창은 건드리지 않는다) */
 export function cancelTopDialog() {
-  const dialog = [...document.querySelectorAll('dialog[open]')].at(-1);
+  const dialog = [...document.querySelectorAll('dialog[open]')].filter((d) => d.matches(':modal')).at(-1);
   if (!dialog) return false;
   if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close();
   return true;

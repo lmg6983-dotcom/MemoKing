@@ -1,7 +1,9 @@
 // 일정 탭 › 일정 하나 자세히 보기 (PC·휴대폰 같음) — 일정을 누르면 다른 앱으로 나가지 않고 여기서 본다
-//   메모킹 일정: 메모 열기 · 지우기 / 다른 캘린더 일정: 메모로 가져오기 · (휴대폰 캘린더는) 캘린더 앱에서 열기
+//   메모킹 일정: 메모 열기 · (한 번짜리는) 지우기 / 다른 캘린더 일정: 메모로 가져오기
 import { icon } from './icons.js';
 import { koClock, koFullDate, relativeDay, sameDay, addDays } from './core/time.js';
+
+let seq = 0; // 창마다 다른 id (빨리 다시 열어도 겹치지 않게)
 
 function el(tag, className = '', text = '') {
   const node = document.createElement(tag);
@@ -36,13 +38,14 @@ export function whenText({ start, end, allDay }) {
 export function openEventDetail({ title, start, end = null, allDay = false, color, memoColor, source, readOnly = false, lines = [], note = '', actions }) {
   return new Promise((resolve) => {
     const dialog = el('dialog', 'dialog event-detail');
-    dialog.setAttribute('aria-labelledby', 'event-detail-h');
+    const hid = `event-detail-h-${++seq}`;
+    dialog.setAttribute('aria-labelledby', hid);
     if (color) dialog.style.setProperty('--ev-color', color);
     if (memoColor) dialog.dataset.color = memoColor;
 
     const head = el('div', 'dialog-head');
     const h = el('h2', '', title || '(제목 없음)');
-    h.id = 'event-detail-h';
+    h.id = hid;
     const close = el('button', 'icon-btn dialog-x');
     close.type = 'button';
     close.setAttribute('aria-label', '닫기');
@@ -67,12 +70,13 @@ export function openEventDetail({ title, start, end = null, allDay = false, colo
     if (note) body.push(el('p', 'ed-note', note));
 
     const bar = el('div', 'dialog-actions ed-actions');
+    bar.hidden = !actions.length;
     for (const a of actions) {
       const b = el('button', `btn${a.primary ? ' primary' : ''}${a.danger ? ' ed-danger' : ''}`, a.label);
       b.type = 'button';
       b.addEventListener('click', () => {
         dialog.close();
-        Promise.resolve().then(a.run).catch(() => {});
+        Promise.resolve().then(a.run).catch((err) => console.error('[event-detail]', a.label, err)); // 단추마다 알림은 run 이
       });
       bar.append(b);
     }
