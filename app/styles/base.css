@@ -689,9 +689,30 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-daytop { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .cal-daytop .cal-dots { display: flex; gap: 2px; height: 4px; }
 .cal-daytop .cal-dots i { width: 4px; height: 4px; border-radius: 99px; background: var(--note-chip); }
-/* 다른 캘린더 일정: 그 캘린더 색 · 점선 테두리 (메모킹 일정이 아님을 알 수 있게) */
-.cal-body .mk-ext { outline: 1px dashed color-mix(in srgb, var(--fc-event-color) 70%, transparent); outline-offset: -1px; }
+/* 무게: 내 메모 일정은 메모 색을 꽉 채운 칩, 다른 캘린더 일정은 바탕 없이 그 캘린더 색 띠 + 글자만 (보기만 하는 일정이라 덜 무겁게) */
+.cal-body .mk-ev:not(.mk-ext) { background: var(--fc-event-color) !important; color: #16161a; font-weight: 600; } /* 칩 색은 밝은 편이라 두 테마 모두 짙은 글자 */
+.cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: #f5f4ef; }
+.cal-body .mk-ev:not(.mk-ext) * { color: inherit !important; } /* 칩 안쪽 글자도 (FullCalendar 가 안쪽에 색을 따로 줌) */
+/* 목록 보기는 줄이 넓어 꽉 채우면 무거움 — 메모 일정은 진한 옅은 바탕, 다른 캘린더는 더 옅게 (무게 차이는 그대로) */
+.cal[data-view="listMonth"] .cal-body .mk-ev:not(.mk-ext) { background: color-mix(in srgb, var(--fc-event-color) 26%, transparent) !important; color: var(--text-strong); }
+.cal-body .mk-ext { background: color-mix(in srgb, var(--fc-event-color) 12%, transparent) !important; color: var(--text); }
 .cal-body .mk-ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* 목록 보기: 날짜 칸은 좁게, 일정은 시각(작게) 위 · 제목(두 줄까지) 아래 */
+.cal-body .mk-ldh { flex: none !important; width: 58px !important; min-width: 0 !important; }
+.cal-body .mk-ldh > :first-child { font-size: 18px; white-space: nowrap; }
+.cal-body .mk-li-in { flex-direction: column !important; align-items: stretch !important; gap: 2px; min-width: 0; }
+.cal-body .mk-li-time { width: auto !important; max-width: none !important; flex: none !important; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.cal-body .mk-li-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; white-space: normal !important; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.35; }
+/* 손가락으로 누르는 화면: 누르는 자리를 넉넉히 (보기 전환 · 앞뒤 달 · 오늘 · 달력 칩 · 다른 캘린더 창의 칸들) */
+@media (pointer: coarse) {
+  .cal-views button { height: 40px; padding: 0 16px; font-size: 14px; }
+  .cal-nav { width: 44px; height: 44px; }
+  .cal-today, .cal-link { min-height: 44px; }
+  .cal-body .mk-ev { min-height: 22px; }
+  .cal-body .mk-more { min-height: 22px; display: inline-flex; align-items: center; }
+  .feed-url, .feed-add .btn { height: 44px; }
+  .cal-help summary, .feed-open-add { min-height: 44px; }
+}
 /* 일정 탭 › 다른 캘린더 창 (calendar-links.js) */
 .gsync { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); }
 .gsync.on { border-color: color-mix(in srgb, var(--brand-yellow) 70%, var(--line)); }
@@ -703,10 +724,14 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .gsync-btns .btn { height: 34px; }
 .gsync-btns [hidden] { display: none; }
 .gsync-off { margin-left: auto; font-size: 12.5px; }
+.gsync .gsync-off { color: var(--muted); text-decoration-color: currentColor; } /* 끊기는 조용히 (휴대폰 .link-btn 노랑 밑줄보다 앞서게) */
 .cal-help ul { margin: 4px 0 6px; padding-left: 18px; line-height: 1.6; }
 .cal-links { width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; }
 .dialog p.cal-links-lead { margin-bottom: 4px; font-size: 13px; color: var(--muted); }
-.cal-links-h3 { margin: 18px 0 8px; font-size: 13px; font-weight: 800; color: var(--text-strong); }
+.cal-links-h3 { display: flex; align-items: center; gap: 8px; margin: 22px 0 2px; font-size: 14px; font-weight: 800; color: var(--text-strong); }
+.cal-perm { padding: 1px 8px; border: 1px solid var(--line); border-radius: 99px; font-size: 11.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.cal-perm-rw { border-color: color-mix(in srgb, var(--brand-yellow) 70%, var(--line)); background: color-mix(in srgb, var(--brand-yellow) 18%, transparent); color: var(--text-strong); }
+.dialog p.cal-sec-cap { margin: 0 0 8px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .feed-list { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
 .feed-list:empty { display: none; }
 .feed-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 6px 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); }
@@ -717,6 +742,9 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .feed-text small { overflow: hidden; font-size: 11.5px; color: var(--muted); text-overflow: ellipsis; }
 .feed-text small.err { color: var(--danger); }
 .feed-add { display: flex; gap: 6px; }
+.feed-open-add { display: block; margin: 2px 0 0 -6px; min-height: 40px; }
+.feed-open-add[hidden], .cal-help[hidden], .cal-twice[hidden] { display: none; }
+.dialog p.cal-twice { margin: 0 2px 6px; }
 .feed-add[hidden] { display: none; }
 .feed-url { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; }
 .feed-url:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
@@ -725,7 +753,11 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .dialog p.feed-note.err { color: var(--danger); }
 .feed-note svg { width: 14px; height: 14px; vertical-align: -2px; }
 .cal-help { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
-.cal-help summary { padding: 4px 0; font-weight: 700; color: var(--text); cursor: pointer; }
+.cal-help summary { display: flex; align-items: center; min-height: 40px; padding: 4px 0; font-weight: 700; color: var(--text); cursor: pointer; }
+.cal-help summary::before { content: '▸'; width: 1.1em; flex: none; font-size: 16px; color: var(--muted); transition: transform 0.15s; }
+.cal-help[open] > summary::before { transform: rotate(90deg); }
+.cal-help summary::-webkit-details-marker { display: none; }
+.cal-help summary { list-style: none; }
 .cal-help ol { margin: 4px 0 6px; padding-left: 20px; line-height: 1.6; }
 .dialog .cal-help p { margin: 0; font-size: 12.5px; line-height: 1.6; }
 .cal-export { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); color: var(--text); font: inherit; cursor: pointer; }
@@ -734,7 +766,22 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 @media (hover: hover) and (pointer: fine) { .cal-export:not(:disabled):hover { background: var(--fill-hover); } }
 .feed-text small { white-space: normal; }
 .cal-google-import { margin: 2px 0 0 -6px; font-size: 12.5px; }
+.cal-send { margin-top: 0; }
+.cal-send .cal-export { margin-top: 6px; }
 .cal-links .dialog-actions { margin-top: 16px; }
+/* 일정 자세히 보기 (event-detail.js) */
+.event-detail { width: min(400px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; }
+.event-detail h2 { overflow-wrap: anywhere; }
+.ed-lines { display: grid; gap: 10px; margin: 4px 0 0; padding: 0; list-style: none; }
+.ed-lines li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
+.ed-lines svg { flex: none; width: 18px; height: 18px; margin-top: 1px; color: var(--muted); }
+.ed-lines .ed-when { font-weight: 700; color: var(--text-strong); }
+.ed-dot { flex: none; width: 12px; height: 12px; margin: 4px 3px 0; border-radius: 99px; background: var(--ev-color, var(--note-chip, var(--brand-yellow))); }
+.ed-badge { flex: none; margin-left: auto; padding: 1px 8px; border: 1px solid var(--line); border-radius: 99px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.dialog p.ed-note { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-1); font-size: 13.5px; line-height: 1.6; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
+.ed-actions { margin-top: 18px; }
+.ed-actions .btn { min-height: 44px; }
+.ed-actions .ed-danger { margin-right: auto; color: var(--danger); }
 .ev-row .ev-time { flex: none; width: 70px; font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .ev-row.off { opacity: 0.55; }
 .ev-ext .row-dot { border-radius: 99px; background: var(--ext-color); }

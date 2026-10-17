@@ -36,6 +36,7 @@ object DeviceCalendar {
             CalendarContract.Instances.EVENT_LOCATION,
             CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
             CalendarContract.Instances.DISPLAY_COLOR,
+            CalendarContract.Instances.DESCRIPTION,
         )
         val list = JSONArray()
         ctx.contentResolver.query(uri, projection, "${CalendarContract.Instances.VISIBLE} = 1", null, "${CalendarContract.Instances.BEGIN} ASC")?.use { c ->
@@ -49,7 +50,8 @@ object DeviceCalendar {
                         .put("allDay", c.getInt(4) == 1)
                         .put("location", c.getString(5) ?: "")
                         .put("calendar", c.getString(6) ?: "")
-                        .put("color", String.format("#%06X", 0xFFFFFF and c.getInt(7))),
+                        .put("color", String.format("#%06X", 0xFFFFFF and c.getInt(7)))
+                        .put("description", (c.getString(8) ?: "").take(4000)),
                 )
             }
         }

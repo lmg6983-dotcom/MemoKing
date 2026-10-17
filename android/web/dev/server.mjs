@@ -299,7 +299,7 @@ const calls = {
       return { start, end: start + len * 3_600_000, allDay: false };
     };
     const events = [
-      { id: 101, title: '가족 저녁', ...day(1, 19, 2), location: '집', calendar: '삼성 캘린더', color: '#E67C73' },
+      { id: 101, title: '가족 저녁', ...day(1, 19, 2), location: '집', description: '엄마 아빠랑<br>7시까지 도착', calendar: '삼성 캘린더', color: '#E67C73' },
       { id: 102, title: '결혼식', ...day(8, 12), location: '강남', calendar: '삼성 캘린더', color: '#E67C73' },
       { id: 103, title: '휴가', ...day(12, null, 3), location: '', calendar: 'Google 캘린더 (개인)', color: '#33B679' },
     ].filter((e) => e.end > from && e.start < to);

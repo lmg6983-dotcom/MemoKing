@@ -22,7 +22,7 @@ import { createAlarms } from './alarms.js';
 import { googleCalendar, startCalendarSync, calendarSyncSoon } from './gcal.js';
 import { injectMobileIcons } from './m-icons.js';
 import { app } from './state.js';
-import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, matchChrome, isTwoPane } from './ui.js';
+import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, cancelTopDialog, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
 import { renderMemoImage } from '../../app/js/share-image.js';
 import * as widgets from './widgets.js';
@@ -1432,9 +1432,10 @@ document.addEventListener('visibilitychange', () => {
   widgets.cancelPick(); // 위젯 고르기 중에 앱을 떠나면 그만 (돌아와 연 메모가 위젯에 놓이지 않게)
 });
 
-// 뒤로 가기: 확인 창 → 색판 → 시트 → 메모 → 목록의 검색·필터 → (앱이 뒤로)
+// 뒤로 가기: 확인 창 → 열린 창(다른 캘린더 · 일정 만들기 등) → 색판 → 시트 → 메모 → 목록의 검색·필터 → (앱이 뒤로)
 setBackHandler(() => {
   if (closeConfirm()) return true;
+  if (cancelTopDialog()) return true;
   if (note.closePalette()) return true;
   if (note.closeStyleMenu()) return true;
   if (note.closeInk()) return true;
