@@ -4,7 +4,7 @@ import { FOLDER } from './sync-engine.js';
 
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-const FIELDS = 'id,name,mimeType,md5Checksum,modifiedTime,size';
+const FIELDS = 'id,name,mimeType,md5Checksum,modifiedTime,createdTime,size';
 
 export class DriveError extends Error {
   constructor(status, message) {
@@ -19,6 +19,7 @@ const item = (o) => ({
   folder: o.mimeType === FOLDER,
   md5: o.md5Checksum ?? null,
   modified: Date.parse(o.modifiedTime ?? '') || 0,
+  created: Date.parse(o.createdTime ?? '') || 0,
   size: Number(o.size ?? 0),
 });
 
@@ -96,7 +97,7 @@ export class DriveApi {
 
   /** 폴더 고르기 화면용: parent("root" = 내 드라이브) 안의 폴더들 */
   async folders(parent = 'root') {
-    return (await this.query(`'${quote(parent)}' in parents and mimeType = '${FOLDER}' and trashed = false`, 'name')).map(item);
+    return (await this.query(`'${quote(parent)}' in parents and mimeType = '${FOLDER}' and trashed = false`, 'name,createdTime')).map(item); // 같은 이름이면 먼저 만든 것부터
   }
 
   async download(id, file) {
@@ -144,10 +145,15 @@ export class DriveApi {
     }
   }
 
-  /** 내 드라이브 맨 위의 이 이름 폴더 (메모킹이 만든 것 중 — 휴지통 제외) */
+  /** parent 안의 이 이름 폴더들, 먼저 만든 것부터 (메모킹이 만든 것 중 — 휴지통 제외). Drive 는 같은 이름 폴더를 여럿 둘 수 있다 */
+  async findFolders(name, parent = 'root') {
+    const q = `'${quote(parent)}' in parents and name = '${quote(name)}' and mimeType = '${FOLDER}' and trashed = false`;
+    return (await this.query(q)).map(item).sort((a, b) => a.created - b.created || a.id.localeCompare(b.id));
+  }
+
+  /** 내 드라이브 맨 위의 이 이름 폴더 — 여럿이면 늘 같은 것(가장 먼저 만든 것) */
   async findFolder(name) {
-    const q = `'root' in parents and name = '${quote(name)}' and mimeType = '${FOLDER}' and trashed = false`;
-    return (await this.query(q)).map(item)[0] ?? null;
+    return (await this.findFolders(name))[0] ?? null;
   }
 
   /** 링크가 있는 사람은 볼 수 있게 열고 그 링크 (공유) — 조직 설정이 막으면 DriveError 403 */

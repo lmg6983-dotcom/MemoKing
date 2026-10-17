@@ -23,7 +23,8 @@ export function timeLabel(h, m) {
  * @param {HTMLElement} box 넣을 자리
  * @param {{ value: string, onChange: (hhmm: string) => void, quick?: string[] }} o value 'HH:MM'
  */
-export function timePicker(box, { value, onChange, quick = ['09:00', '12:00', '15:00', '18:00', '21:00'] }) {
+//   compact: 처음엔 자주 쓰는 시각 칩 + "다른 시각" 만, 누르면(또는 칩에 없는 시각이면) 시 · 분 목록 (한 가지 방식으로 보이게)
+export function timePicker(box, { value, onChange, quick = ['09:00', '12:00', '15:00', '18:00', '21:00'], compact = false }) {
   let [h, m] = String(value || '09:00').split(':').map(Number);
   const chips = el('div', 'chips dp-quick');
   chips.setAttribute('aria-label', '자주 쓰는 시각');
@@ -42,6 +43,18 @@ export function timePicker(box, { value, onChange, quick = ['09:00', '12:00', '1
     b.dataset.time = t;
     chips.append(b);
   }
+  let more = null;
+  if (compact) {
+    more = el('button', 'dp-more', '다른 시각…');
+    more.type = 'button';
+    more.addEventListener('click', () => {
+      row.hidden = false;
+      more.hidden = true;
+      hour.focus();
+    });
+    chips.append(more);
+    row.hidden = true;
+  }
   box.replaceChildren(chips, row);
 
   function sync() {
@@ -50,7 +63,12 @@ export function timePicker(box, { value, onChange, quick = ['09:00', '12:00', '1
     // 5분 단위가 아닌 값(예전 알림 등)은 목록에 잠깐 더해 둔다
     if (![...minute.options].some((o) => Number(o.value) === m)) minute.append(new Option(`${pad(m)}분`, String(m)));
     minute.value = String(m);
-    for (const b of chips.children) b.setAttribute('aria-pressed', String(b.dataset.time === hhmm));
+    for (const b of chips.querySelectorAll('[data-time]')) b.setAttribute('aria-pressed', String(b.dataset.time === hhmm));
+    // 칩에 없는 시각이면 목록을 보여 준다 (어느 시각인지 보이게)
+    if (more && !quick.includes(hhmm)) {
+      row.hidden = false;
+      more.hidden = true;
+    }
     onChange(hhmm);
   }
   chips.addEventListener('click', (e) => {

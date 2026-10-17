@@ -20,16 +20,15 @@
   <section id="setup" class="setup" hidden>
     <img class="setup-logo" src="assets/mark-256.png" alt="메모킹" draggable="false">
     <h1>반가워요, 메모킹이에요</h1>
-    <h2 class="setup-sub">메모를 어디에 보관할까요?</h2>
-    <p>메모는 폴더에 <b>파일</b>로 저장돼요.<br>
-      Google Drive 폴더를 고르면 다른 PC나 휴대폰과 함께 써요.</p>
-    <div class="path-box" id="suggested-path"></div>
+    <h2 class="setup-sub">휴대폰 메모킹과 함께 쓰나요?</h2>
+    <p>Google 계정으로 연결하면 휴대폰 · 다른 PC 의 메모킹과 <b>같은 메모</b>를 써요.<br>
+      Google Drive 데스크탑 앱은 없어도 돼요.</p>
     <div class="setup-actions">
-      <button id="use-suggested" class="btn primary">이 폴더에 저장</button>
-      <button id="choose-folder" class="btn">다른 폴더 선택</button>
+      <button id="setup-drive" class="btn primary drive-start"><svg><use href="#i-cloud"/></svg>Google 계정으로 동기화 (추천)</button>
+      <button id="use-suggested" class="btn">이 PC 에만 저장</button>
     </div>
-    <p class="setup-or">Google Drive 데스크탑 앱이 없어도 돼요</p>
-    <button id="setup-drive" class="btn drive-start"><svg><use href="#i-cloud"/></svg>Google 계정으로 동기화</button>
+    <p class="setup-where">이 PC 에 저장할 곳: <span class="path-box" id="suggested-path"></span>
+      <button id="choose-folder" class="link-btn">직접 폴더 고르기 ›</button></p>
     <p id="setup-error" class="setup-error" hidden></p>
   </section>
 
@@ -39,10 +38,14 @@
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
       </label>
+      <button id="sync-btn" class="icon-btn sync-btn" hidden aria-haspopup="dialog" aria-expanded="false" aria-controls="sync-pop"><svg><use href="#i-cloud"/></svg><span class="sync-mark" id="sync-mark" aria-hidden="true"></span><span class="sync-line" id="sync-line" aria-hidden="true" hidden><i></i></span></button>
       <button id="filter-btn" class="icon-btn filter-btn" title="필터 (색, 담긴 것)" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
       <button id="layout-btn" class="icon-btn layout-btn" title="한 줄씩 보기" aria-label="한 줄씩 보기"><svg><use href="#i-rows"/></svg></button>
       <button id="settings-btn" class="icon-btn" title="설정" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
     </div>
+
+    <div id="sync-pop" class="sync-pop" role="dialog" aria-label="Google Drive 동기화" hidden></div>
+    <div id="conflict-bar" class="conflict-bar" role="status" hidden></div>
 
     <nav class="tabs" role="tablist" aria-label="보기">
       <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
@@ -123,17 +126,23 @@
       <h3 class="set-title" id="set-drive">Google Drive 동기화</h3>
       <div class="drive-box" id="drive-box">
         <svg class="drive-box-icon"><use href="#i-cloud"/></svg>
-        <div class="drive-box-text"><b id="drive-title"></b><small id="drive-sub"></small></div>
+        <div class="drive-box-text"><b id="drive-title"></b><small id="drive-sub"></small><div class="sync-bar" id="drive-bar" hidden><i></i></div></div>
       </div>
       <div class="dialog-actions left">
-        <button id="drive-connect" class="btn">연결하기</button>
-        <button id="drive-sync-now" class="btn">지금 동기화</button>
+        <button id="drive-sync-now" class="btn primary">지금 동기화</button>
+        <button id="drive-connect" class="btn primary">연결하기</button>
+        <button id="drive-conflicts" class="btn" hidden></button>
+        <button id="drive-folder" class="link-btn">다른 폴더로 바꾸기</button>
         <button id="drive-disconnect" class="link-btn danger">연결 끊기</button>
       </div>
-      <label class="setting-row" id="drive-full-row" hidden>
-        <input type="checkbox" id="drive-full" class="switch" role="switch">
-        <span>외부 앱 메모 연동 (전체 드라이브 권한) <small id="drive-full-note">제미나이 등 외부 도구가 드라이브 폴더에 직접 추가한 .md 메모도 동기화합니다. 활성화 시 전체 드라이브 접근 권한으로 다시 로그인합니다.</small></span>
-      </label>
+      <details class="drive-adv" id="drive-adv">
+        <summary>고급</summary>
+        <label class="setting-row" id="drive-full-row" hidden>
+          <input type="checkbox" id="drive-full" class="switch" role="switch">
+          <span>외부 앱 메모 연동 (전체 드라이브 권한) <small id="drive-full-note">제미나이 등 외부 도구가 드라이브 폴더에 직접 추가한 .md 메모도 동기화합니다. 활성화 시 전체 드라이브 접근 권한으로 다시 로그인합니다.</small></span>
+        </label>
+        <button id="client-edit" class="link-btn">연결 정보(OAuth 클라이언트) 바꾸기</button>
+      </details>
     </section>
     <section class="set-sec" aria-labelledby="set-daily">
       <h3 class="set-title" id="set-daily">자주 쓰는 기능</h3>
@@ -298,9 +307,9 @@
     </div>
     <div class="drive-step" data-step="login" hidden>
       <p class="hint">브라우저에서 <b>휴대폰과 같은 구글 계정</b>으로 로그인하고 <b>허용</b>을 누르세요.</p>
-      <div class="wait"><span class="spinner"></span><span>브라우저에서 로그인해 주세요…</span></div>
+      <div class="wait"><span class="spinner"></span><span>브라우저에서 로그인해 주세요…<br><small>브라우저 창을 닫았거나 안 보이면 "브라우저 다시 열기"</small></span></div>
       <div class="dialog-actions">
-        <button id="client-edit" class="link-btn">연결 정보 바꾸기</button>
+        <button id="login-reopen" class="link-btn">브라우저 다시 열기</button>
         <span class="grow"></span>
         <button id="login-cancel" class="btn">취소</button>
       </div>
@@ -314,7 +323,9 @@
         <input id="new-folder-name" type="text" aria-label="새 폴더 이름" autocomplete="off" spellcheck="false" placeholder="새 폴더 이름">
         <button id="new-folder-ok" class="btn">만들기</button>
       </div>
+      <p class="hint small folder-msg" id="folder-msg" role="status" hidden></p>
       <p class="hint small" id="folder-local"></p>
+      <p class="hint small" id="folder-change-note" hidden>다른 폴더로 바꾸면 이 PC 의 메모와 그 폴더의 메모를 합쳐 맞춰요. 지금 Drive 폴더의 메모는 그대로 남아요.</p>
       <div class="dialog-actions">
         <button id="folder-new" class="btn">새 폴더</button>
         <span class="grow"></span>
@@ -323,7 +334,9 @@
       </div>
     </div>
     <div class="drive-step" data-step="syncing" hidden>
-      <div class="wait big"><span class="spinner"></span><span>메모를 동기화하는 중…<br><small>메모가 많으면 시간이 조금 걸려요</small></span></div>
+      <div class="wait big"><span class="spinner"></span><span><span id="sync-step-title">메모를 동기화하는 중…</span><br><small id="sync-step-sub">메모가 많으면 시간이 조금 걸려요. 창을 닫아도 뒤에서 계속해요</small></span></div>
+      <div class="sync-bar wide" id="sync-step-bar" hidden><i></i></div>
+      <div class="dialog-actions"><button id="sync-bg" class="btn">닫기</button></div>
     </div>
   </dialog>
 

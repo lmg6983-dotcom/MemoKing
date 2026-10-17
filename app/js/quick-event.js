@@ -1,11 +1,12 @@
-// 일정 탭 달력에서 바로 일정 만들기 (PC·휴대폰 같음) — 캘린더 앱처럼 날짜를 고르고 곧바로:
-//   한 번에 한 가지만 묻는다: 무슨 일정 · 몇 시 → 미리 알림 → 어느 메모에 (일정 이름으로 새 메모 / 있는 메모 고르기)
-//   아래 막대는 메모 창 알림 패널과 같다: 왼쪽 취소·이전, 오른쪽 다음 → 마지막에 "새 메모로 만들기" / "○○에 넣기".
+// 일정 탭 달력에서 바로 일정 만들기 (PC·휴대폰 같음) — 캘린더 앱처럼 한 화면에서:
+//   이름 → 날짜 · 시각 → 🔔 미리 알림 › → 📝 넣을 메모 › → [일정 저장]
+//   알림 · 메모는 알맞은 값(지난번 알림 · 일정 이름으로 새 메모)이 골라져 있어 그대로면 이름만 쓰고 저장 — 바꿀 때만 그 줄을 펼친다
 import { pendingAlerts, fallbackAlert, alertLabel, describeAlerts } from './core/reminders.js';
-import { toLocalIso, koClock, dayLabel } from './core/time.js';
+import { toLocalIso, relativeDay, koFullDate } from './core/time.js';
 import { remembered, remember } from './event-editor.js';
 import { alertPicker } from './alert-picker.js';
 import { timePicker } from './date-picker.js';
+import { icon } from './icons.js';
 
 function el(tag, attrs = {}, text = '') {
   const node = document.createElement(tag);
@@ -44,90 +45,120 @@ export function openQuickEvent({ day, search }) {
     const picked = { timed: new Set(remembered('timed')), allDay: new Set(remembered('allDay')) };
     const kind = () => (allDay ? 'allDay' : 'timed');
     const startAt = () => (allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate()) : start);
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     const dialog = el('dialog', { class: 'dialog event-dialog quick-event', 'aria-labelledby': 'qe-h' });
     const form = el('form', { method: 'dialog' });
-    const heading = el('h2', { id: 'qe-h' }, `${dayLabel(day)}에 일정 추가`);
-    const answers = el('ol', { class: 'rem-answers qe-answers' });
+    const head = el('div', { class: 'qe-head' });
+    const heading = el('h2', { id: 'qe-h' }, '새 일정');
+    const x = el('button', { type: 'button', class: 'icon-btn dialog-x', 'aria-label': '닫기' });
+    x.append(icon('close'));
+    head.append(heading, x);
 
-    // 1) 무슨 일정 · 몇 시
-    const s1 = el('section', { class: 'rem-step', 'data-step': 'what' });
-    const name = el('input', { type: 'text', class: 'qe-name', maxlength: '80', autocomplete: 'off', placeholder: '예: 치과, 회의', 'aria-label': '일정 이름' });
-    const allDayRow = el('label', { class: 'event-allday' });
+    // 이름
+    const name = el('input', { type: 'text', class: 'qe-name', maxlength: '80', autocomplete: 'off', placeholder: '무슨 일정이에요? (예: 치과, 회의)', 'aria-label': '일정 이름' });
+
+    // 날짜 (누르면 달력) · 하루 종일
+    const when = el('div', { class: 'qe-when' });
+    const dateWrap = el('label', { class: 'qe-date' });
+    const dateText = el('span', { class: 'qe-date-text' });
+    const date = el('input', { type: 'date', class: 'qe-date-input', 'aria-label': '날짜' });
+    date.value = ymd(start);
+    date.min = ymd(new Date());
+    dateWrap.append(el('span', { class: 'qe-ico', 'aria-hidden': 'true' }, '📅'), dateText, date);
+    const allDayRow = el('label', { class: 'event-allday qe-allday' });
     const allDaySwitch = el('input', { type: 'checkbox', class: 'switch' });
     allDayRow.append(el('span', {}, '하루 종일'), allDaySwitch);
+    when.append(dateWrap, allDayRow);
     const timeBox = el('div', { class: 'date-picker qe-time', 'aria-label': '시각' });
-    const err1 = el('p', { class: 'event-none', role: 'status' });
-    s1.append(el('p', { class: 'rem-q' }, '어떤 일정이에요?'), name, allDayRow, timeBox, err1);
+    const err = el('p', { class: 'event-none qe-err', role: 'status' });
 
-    // 2) 미리 알림
-    const s2 = el('section', { class: 'rem-step', 'data-step': 'alerts', hidden: '' });
+    // 미리 알림 · 넣을 메모: 한 줄 요약 (누르면 펼침)
+    const alertRow = el('button', { type: 'button', class: 'qe-row qe-alert-row', 'aria-expanded': 'false' });
+    const alertPane = el('section', { class: 'qe-pane', 'data-step': 'alerts', hidden: '' });
     const chips = el('div', { class: 'chips event-alerts', role: 'group', 'aria-label': '미리 알림' });
     const hint = el('p', { class: 'event-none', role: 'status' });
-    const q2 = el('p', { class: 'rem-q' }, '언제 미리 알려 드릴까요?');
-    q2.append(el('small', {}, '여러 개 고를 수 있어요'));
-    s2.append(q2, chips, hint);
+    alertPane.append(el('p', { class: 'qe-pane-q' }, '언제 미리 알려 드릴까요? (여러 개 고를 수 있어요)'), chips, hint);
 
-    // 3) 어느 메모에 — 고르고(처음엔 "새 메모") 아래 단추로 만든다
-    const s3 = el('section', { class: 'rem-step', 'data-step': 'memo', hidden: '' });
+    const memoRow = el('button', { type: 'button', class: 'qe-row qe-memo-row', 'aria-expanded': 'false' });
+    const memoPane = el('section', { class: 'qe-pane', 'data-step': 'memo', hidden: '' });
     const find = el('input', { type: 'search', class: 'link-search qe-search', placeholder: '메모 검색', 'aria-label': '일정을 넣을 메모 검색', autocomplete: 'off' });
     const fresh = el('button', { type: 'button', class: 'qe-memo qe-new', role: 'radio', 'aria-checked': 'true' });
     const results = el('div', { class: 'qe-memos', role: 'radiogroup', 'aria-label': '일정을 넣을 메모' });
-    s3.append(el('p', { class: 'rem-q' }, '어느 메모에 넣을까요?'), find, results);
+    memoPane.append(el('p', { class: 'qe-pane-q' }, '일정은 메모와 함께 저장돼요. 어느 메모에 넣을까요?'), find, results);
 
-    // 아래 막대: 왼쪽 취소·이전, 오른쪽 다음 → 마지막에 "새 메모로 만들기" / "○○에 넣기" (메모 창 알림 패널과 같은 자리)
-    const progress = el('p', { class: 'flow-progress', 'aria-live': 'polite' });
-    const back = el('button', { type: 'button', class: 'btn' }, '취소');
-    const next = el('button', { type: 'button', class: 'btn primary' }, '다음');
+    const cancel = el('button', { type: 'button', class: 'btn' }, '취소');
+    const save = el('button', { type: 'button', class: 'btn primary qe-save' }, '일정 저장');
     const footer = el('div', { class: 'flow-footer' });
-    footer.append(back, next);
-    form.append(heading, progress, answers, s1, s2, s3, footer);
+    footer.append(cancel, save);
+    form.append(head, name, when, timeBox, err, alertRow, alertPane, memoRow, memoPane, footer);
     dialog.append(form);
 
-    const steps = ['what', 'alerts', 'memo'];
-    let step = 'what';
     const title = () => name.value.replace(/\s+/g, ' ').trim();
-    const LABEL = { what: '일정', alerts: '미리 알림' };
-    const answer = (s) => (s === 'what'
-      ? `${title() || '이름 없음'}, ${allDay ? '하루 종일' : koClock(start)}`
-      : describeAlerts({ kind: 'at', alerts: [...picked[kind()]], allDay }));
+    let target = null; // 넣을 메모 { id, title } — null 이면 새 메모
 
-    function goto(next) {
-      step = next;
-      for (const sec of form.querySelectorAll('[data-step]')) sec.hidden = sec.dataset.step !== step;
-      answers.replaceChildren(...steps.slice(0, steps.indexOf(step)).map((s) => {
-        const li = el('li');
-        const b = el('button', { type: 'button', class: 'rem-answer', 'aria-label': `${LABEL[s]}: ${answer(s)}, 바꾸기` });
-        b.append(el('span', {}, LABEL[s]), el('b', {}, answer(s)), el('small', {}, '바꾸기'));
-        b.addEventListener('click', () => goto(s));
-        li.append(b);
-        return li;
-      }));
-      if (step === 'alerts') {
+    function rowContent(row, icon, label, value) {
+      row.replaceChildren(el('span', { class: 'qe-ico', 'aria-hidden': 'true' }, icon), el('span', { class: 'qe-row-label' }, label), el('b', { class: 'qe-row-value' }, value), el('span', { class: 'qe-chev', 'aria-hidden': 'true' }, '›'));
+    }
+    function draw() {
+      const rel = relativeDay(start);
+      dateText.textContent = rel ? `${rel}, ${koFullDate(start).replace(/ \((.)\)$/, ' $1')}` : koFullDate(start); // "오늘, 10월 17일 토" — 한 줄에
+      timeBox.hidden = allDay;
+      const set = [...picked[kind()]];
+      rowContent(alertRow, '🔔', '미리 알림', set.length ? describeAlerts({ kind: 'at', alerts: set, allDay }) : '없음');
+      rowContent(memoRow, '📝', '저장할 메모', target ? `"${target.title}"` : `새 메모 "${title() || '새 일정'}"`);
+    }
+    function toggle(row, pane, open = pane.hidden) {
+      pane.hidden = !open;
+      row.setAttribute('aria-expanded', String(open));
+      if (open && pane === alertPane) {
         alerts.render();
         showHint();
       }
-      if (step === 'memo') listMemos();
-      progress.textContent = `${steps.indexOf(step) + 1} / ${steps.length}`;
-      back.textContent = step === 'what' ? '취소' : '이전';
-      syncNext();
-      const focus = step === 'what' ? name : step === 'memo' ? find : form.querySelector(`[data-step="${step}"] .rem-q`);
-      if (focus?.matches('.rem-q')) focus.setAttribute('tabindex', '-1');
-      focus?.focus({ preventScroll: true });
+      if (open && pane === memoPane) listMemos();
     }
+    alertRow.addEventListener('click', () => toggle(alertRow, alertPane));
+    memoRow.addEventListener('click', () => toggle(memoRow, memoPane));
 
     timePicker(timeBox, {
+      compact: true,
       value: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
       onChange: (hhmm) => {
         const [h, m] = hhmm.split(':').map(Number);
         start = new Date(start.getFullYear(), start.getMonth(), start.getDate(), h, m);
+        err.textContent = '';
+        showHint();
       },
+    });
+    date.addEventListener('change', () => {
+      const [y, mo, d] = date.value.split('-').map(Number);
+      if (!y) return;
+      start = new Date(y, mo - 1, d, start.getHours(), start.getMinutes());
+      err.textContent = '';
+      draw();
+      showHint();
+    });
+    // 날짜 칸 어디를 눌러도 달력 (지원하는 곳에서)
+    dateWrap.addEventListener('click', (e) => {
+      if (e.target === date) return;
+      try {
+        date.showPicker?.();
+      } catch {
+        date.focus();
+      }
     });
     allDaySwitch.addEventListener('change', () => {
       allDay = allDaySwitch.checked;
-      timeBox.hidden = allDay;
+      err.textContent = '';
+      draw();
+      if (!alertPane.hidden) alerts.render();
+      showHint();
     });
-    const alerts = alertPicker(chips, { picked, kind, start: startAt, onChange: () => showHint(), onLimit: (t) => (hint.textContent = t) });
+    name.addEventListener('input', () => {
+      if (!target) draw();
+      if (!memoPane.hidden) fresh.lastChild.textContent = `새 메모 "${title() || '새 일정'}"`;
+    });
+    const alerts = alertPicker(chips, { picked, kind, start: startAt, onChange: () => { showHint(); draw(); }, onLimit: (t) => (hint.textContent = t) });
     function showHint() {
       const set = [...picked[kind()]];
       const live = pendingAlerts(set, startAt(), { allDay });
@@ -135,28 +166,22 @@ export function openQuickEvent({ day, search }) {
       hint.textContent = !set.length ? '알림 없이 달력에만 보여요' : live.length ? '' : fb.length ? `고른 시각이 모두 지나 ${alertLabel(fb[0], allDay)}에 알려요` : '';
     }
 
-    let target = null; // 넣을 메모 { id, title } — null 이면 새 메모
-    function syncNext() {
-      next.textContent = step !== 'memo' ? '다음' : target ? `'${target.title}'에 넣기` : '새 메모로 만들기';
-    }
-    next.addEventListener('click', () => {
-      if (step === 'what') {
-        if (!allDay && start <= new Date()) {
-          err1.textContent = '이미 지난 시각이에요. 앞으로의 시각을 골라 주세요';
-          timeBox.querySelector('select')?.focus();
-          return;
-        }
-        err1.textContent = '';
-        goto('alerts');
-      } else if (step === 'alerts') goto('memo');
-      else finish(target?.id ?? null);
+    save.addEventListener('click', () => {
+      const today = new Date();
+      const past = allDay ? startAt() < new Date(today.getFullYear(), today.getMonth(), today.getDate()) : start <= today;
+      if (past) {
+        err.textContent = '이미 지난 때예요. 날짜나 시각을 앞으로 바꿔 주세요';
+        return;
+      }
+      finish(target?.id ?? null);
     });
-    back.addEventListener('click', () => (step === 'what' ? close(null) : goto(steps[steps.indexOf(step) - 1])));
+    cancel.addEventListener('click', () => close(null));
+    x.addEventListener('click', () => close(null));
     form.addEventListener('keydown', (e) => {
-      // Enter = 아래 오른쪽 단추 (직접 정하기 칸의 Enter 는 그 칸이 먼저 받는다)
-      if (e.key !== 'Enter' || e.isComposing || e.defaultPrevented || !e.target.matches('input[type="text"], input[type="search"]')) return;
+      // 이름 칸에서 Enter = 저장 (메모 검색 칸의 Enter 는 그대로)
+      if (e.key !== 'Enter' || e.isComposing || e.defaultPrevented || e.target !== name) return;
       e.preventDefault();
-      next.click();
+      save.click();
     });
 
     let seq = 0;
@@ -166,8 +191,8 @@ export function openQuickEvent({ day, search }) {
       if (mine !== seq) return;
       const pick = (b, memo) => {
         target = memo;
-        for (const x of results.querySelectorAll('[role="radio"]')) x.setAttribute('aria-checked', String(x === b));
-        syncNext();
+        for (const r of results.querySelectorAll('[role="radio"]')) r.setAttribute('aria-checked', String(r === b));
+        draw();
       };
       fresh.replaceChildren(el('i', { class: 'qe-plus', 'aria-hidden': 'true' }, '＋'), el('span', {}, `새 메모 "${title() || '새 일정'}"`));
       fresh.setAttribute('aria-checked', String(!target));
@@ -177,7 +202,6 @@ export function openQuickEvent({ day, search }) {
         b.dataset.color = m.color ?? '';
         b.append(el('i', { class: 'row-dot', 'aria-hidden': 'true' }), el('span', {}, m.title || '제목 없음'));
         b.addEventListener('click', () => pick(b, { id: m.id, title: m.title || '제목 없음' }));
-        b.addEventListener('dblclick', () => finish(m.id)); // 두 번 누르면 바로
         return b;
       });
       results.replaceChildren(fresh, ...rows);
@@ -209,7 +233,8 @@ export function openQuickEvent({ day, search }) {
     form.addEventListener('submit', (e) => e.preventDefault());
 
     document.body.append(dialog);
+    draw();
     dialog.showModal();
-    goto('what');
+    name.focus({ preventScroll: true });
   });
 }

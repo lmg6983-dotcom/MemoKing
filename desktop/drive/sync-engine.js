@@ -17,6 +17,8 @@ const MASS_DELETE_MIN = 20;
 const MASS_CONFLICT_MAX = 20;
 // Drive 의 "바뀐 것" 목록만 믿으면 거기서 빠진 파일은 이 PC 에서 고칠 때까지 영영 내려오지 않으므로, 이만큼마다 폴더를 처음부터 훑는다
 export const FULL_SCAN_MS = 15 * 60_000;
+// 한꺼번에 주고받는 파일 수 — 하나씩이면 메모가 많을 때 너무 느리다 (Drive 는 429 면 잠깐 쉬고 다시: drive-api.js)
+export const CONCURRENCY = 4;
 
 export class SafetyStop extends Error {}
 
@@ -58,10 +60,12 @@ function md5OrNull(file) {
  */
 export class SyncEngine {
   /**
-   * @param {{ root: string, remote: Remote, rootId: string, state: object, conflictTag?: string, now?: () => number }} options
+   * @param {{ root: string, remote: Remote, rootId: string, state: object, conflictTag?: string, now?: () => number,
+   *           onProgress?: (p: { phase: 'scan'|'transfer', done: number, total: number }) => void, concurrency?: number }} options
    *   state: { pageToken, files: { 경로: { id, md5, lmtime, lsize } }, folders } — 동기화가 끝나면 바뀐 채로 저장한다
+   *   onProgress: 어디까지 했는지 (scan: Drive 폴더 살펴보는 중, transfer: 맞출 파일 total 개 중 done 개)
    */
-  constructor({ root, remote, rootId, state, conflictTag = 'PC 충돌', now = Date.now }) {
+  constructor({ root, remote, rootId, state, conflictTag = 'PC 충돌', now = Date.now, onProgress = () => {}, concurrency = CONCURRENCY }) {
     this.root = root;
     this.remote = remote;
     this.rootId = rootId;
@@ -70,6 +74,9 @@ export class SyncEngine {
     this.conflictTag = conflictTag;
     this.now = now;
     this.folderIds = new Map();
+    this.folderMaking = new Map(); // 만드는 중인 Drive 폴더 — 여러 파일이 한꺼번에 같은 폴더를 두 번 만들지 않게
+    this.onProgress = onProgress;
+    this.concurrency = Math.max(1, concurrency);
   }
 
   abs(rel) {
@@ -120,14 +127,16 @@ export class SyncEngine {
         const prev = byName.get(item.name);
         if (!prev || item.modified > prev.modified) byName.set(item.name, item);
       }
+      const subs = [];
       for (const item of byName.values()) {
         if (skipName(item.name)) continue;
         const rel = dir ? `${dir}/${item.name}` : item.name;
         if (item.folder) {
           this.folderIds.set(rel, item.id);
-          await walk(item.id, rel);
+          subs.push(walk(item.id, rel)); // 아래 폴더들은 한꺼번에 훑는다
         } else if (item.md5 && !skipPath(rel)) out.set(rel, item); // md5 가 없는 것은 구글 문서 같은 Drive 전용 파일
       }
+      await Promise.all(subs);
     };
     await walk(this.rootId, '');
     return out;
@@ -135,10 +144,17 @@ export class SyncEngine {
 
   async ensureRemoteFolder(dir) {
     if (this.folderIds.has(dir)) return this.folderIds.get(dir);
-    const parent = await this.ensureRemoteFolder(dir.includes('/') ? dir.slice(0, dir.lastIndexOf('/')) : '');
-    const created = await this.remote.createFolder(parent, dir.slice(dir.lastIndexOf('/') + 1));
-    this.folderIds.set(dir, created.id);
-    return created.id;
+    // 같은 폴더를 여러 파일이 한꺼번에 찾으면 처음 것이 만드는 것을 함께 기다린다 (같은 이름 폴더가 둘 생기지 않게)
+    if (!this.folderMaking.has(dir)) {
+      const making = (async () => {
+        const parent = await this.ensureRemoteFolder(dir.includes('/') ? dir.slice(0, dir.lastIndexOf('/')) : '');
+        const created = await this.remote.createFolder(parent, dir.slice(dir.lastIndexOf('/') + 1));
+        this.folderIds.set(dir, created.id);
+        return created.id;
+      })().finally(() => this.folderMaking.delete(dir));
+      this.folderMaking.set(dir, making);
+    }
+    return this.folderMaking.get(dir);
   }
 
   // ---------- 동기화 ----------
@@ -160,6 +176,7 @@ export class SyncEngine {
       return { skipped: true, uploaded: 0, downloaded: 0, deletedLocal: 0, deletedRemote: 0, conflicts: [], localChanged: false };
     }
 
+    this.onProgress({ phase: 'scan', done: 0, total: 0 });
     const remote = await this.walkRemote();
     const paths = [...new Set([...local.keys(), ...remote.keys(), ...known])].sort();
 
@@ -261,15 +278,25 @@ export class SyncEngine {
       await upload(copy, null);
     };
 
-    for (const rel of paths) {
+    // 할 일이 있는 파일만 골라 (그대로인 것 · 양쪽 다 지운 것은 바로) 몇 개씩 한꺼번에
+    const changes = (rel) => {
       const l = local.get(rel);
       const r = remote.get(rel);
       const b = files[rel];
-      const localChanged = Boolean(l) && (!b || b.lmtime !== l.mtime || b.lsize !== l.size);
-      const remoteChanged = Boolean(r) && (!b || b.md5 !== r.md5);
+      return { l, r, b, localChanged: Boolean(l) && (!b || b.lmtime !== l.mtime || b.lsize !== l.size), remoteChanged: Boolean(r) && (!b || b.md5 !== r.md5) };
+    };
+    const work = paths.filter((rel) => {
+      const { l, r, localChanged, remoteChanged } = changes(rel);
+      if (!l && !r) {
+        delete files[rel]; // 양쪽 다 지움
+        return false;
+      }
+      return !(l && r && !localChanged && !remoteChanged);
+    });
+    const one = async (rel) => {
+      const { l, r, b, localChanged, remoteChanged } = changes(rel);
       try {
         if (l && r) {
-          if (!localChanged && !remoteChanged) continue;
           if (localChanged && !remoteChanged) await upload(rel, r.id);
           else if (!localChanged && remoteChanged) await download(rel, r, l);
           else if (md5File(this.abs(rel)) === r.md5) this.record(rel, r.id, r.md5, this.stat(rel)); // 양쪽 같은 내용
@@ -288,11 +315,30 @@ export class SyncEngine {
             result.deletedRemote++;
             delete files[rel];
           }
-        } else delete files[rel]; // 양쪽 다 지움
+        }
       } catch (err) {
         if (err.code !== 'ENOENT') throw err; // 둘러보는 사이 없어진 파일은 다음 차례에
       }
-    }
+    };
+
+    let done = 0;
+    let next = 0;
+    let failed = null;
+    this.onProgress({ phase: 'transfer', done, total: work.length });
+    const lane = async () => {
+      while (!failed && next < work.length) {
+        const rel = work[next++];
+        try {
+          await one(rel);
+        } catch (err) {
+          failed ??= err; // 다른 줄은 지금 하는 것만 끝내고 멈춘다 (끝낸 파일의 기준은 남게)
+          return;
+        }
+        this.onProgress({ phase: 'transfer', done: ++done, total: work.length });
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(this.concurrency, work.length) }, lane));
+    if (failed) throw failed;
 
     this.state.pageToken = token;
     delete this.state.keepMissing; // 다 올렸으면 다음부터는 보통대로

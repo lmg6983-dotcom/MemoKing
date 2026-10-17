@@ -1138,3 +1138,5 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .ev-day-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ev-add { text-decoration: none; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--fill-tab, var(--hover)); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .ev-add svg { width: 16px; height: 16px; }
+/* 일정 탭에도 + 단추가 있으므로 마지막 줄이 단추 위로 올라올 만큼 아래 여백 */
+#reminder-groups { padding-bottom: 104px; }

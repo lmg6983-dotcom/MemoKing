@@ -8,7 +8,9 @@ import { SyncEngine, skipName, skipPath } from './sync-engine.js';
 
 const INTERVAL = 60_000;
 export const DOUBLE_SYNC = '메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). '
-  + '설정 › 폴더 변경에서 Google Drive 밖의 폴더(예: 문서\\메모킹)를 고르거나, 연결하기를 다시 눌러 주세요';
+  + '설정 › Google Drive 동기화 › "다른 폴더로 바꾸기" 에서 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요';
+// 진행 상황은 이만큼마다 한 번만 알린다 (파일마다 창에 보내면 목록이 바빠진다)
+const PROGRESS_MS = 300;
 
 export class DriveSync extends EventEmitter {
   /**
@@ -20,7 +22,8 @@ export class DriveSync extends EventEmitter {
     this.auth = auth;
     this.stateDir = stateDir;
     this.config = null; // { folderId, folderName, root }
-    this.status = { state: 'off', lastSync: 0, error: '', changed: false, conflicts: [] };
+    // progress: 동기화하는 중일 때만 { phase: 'scan'|'transfer', done, total, since } (since: 파일 맞추기를 시작한 때 — 남은 시간 어림)
+    this.status = { state: 'off', lastSync: 0, error: '', changed: false, conflicts: [], progress: null };
     this.timer = null;
     this.pending = null;
     this.running = null;
@@ -123,7 +126,18 @@ export class DriveSync extends EventEmitter {
     const scope = this.auth.grantedFull ? 'full' : 'file';
     if (state.scope === 'full' && scope === 'file') state.keepMissing = true;
     state.scope = scope;
-    this.publish({ state: 'syncing', changed: false, conflicts: [] });
+    this.publish({ state: 'syncing', changed: false, conflicts: [], progress: { phase: 'scan', done: 0, total: 0, since: Date.now() } });
+    let lastSent = 0;
+    const onProgress = ({ phase, done, total }) => {
+      const prev = this.status.progress;
+      const since = phase === 'transfer' && prev?.phase !== 'transfer' ? Date.now() : prev?.since ?? Date.now();
+      this.status = { ...this.status, progress: { phase, done, total, since } };
+      // 처음 · 마지막 · 단계가 바뀔 때는 바로, 그 사이는 가끔
+      if (done === 0 || done === total || prev?.phase !== phase || Date.now() - lastSent >= PROGRESS_MS) {
+        lastSent = Date.now();
+        this.emit('status', this.status);
+      }
+    };
     const save = () => {
       fs.mkdirSync(this.stateDir, { recursive: true });
       fs.writeFileSync(`${file}.tmp`, JSON.stringify(state));
@@ -131,15 +145,16 @@ export class DriveSync extends EventEmitter {
     };
     try {
       fs.mkdirSync(root, { recursive: true });
-      const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state }).run({ full });
+      const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state, onProgress }).run({ full });
       save();
       if (!this.auth.email) this.api.about().then((email) => email && this.auth.setEmail(email)).catch(() => {});
-      this.publish({ state: 'idle', lastSync: Date.now(), error: '', changed: result.localChanged, conflicts: result.conflicts });
+      this.publish({ state: 'idle', lastSync: Date.now(), error: '', changed: result.localChanged, conflicts: result.conflicts, progress: null,
+        moved: result.uploaded + result.downloaded + result.deletedLocal + result.deletedRemote }); // moved: 이번에 맞춘 파일 수
     } catch (err) {
       save(); // 끝낸 파일들의 기준은 남긴다 (다음 차례는 남은 것만)
       console.warn('[Google Drive 동기화]', err);
       const offline = /fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ERR_INTERNET|net::/i.test(`${err?.message} ${err?.cause?.code ?? ''}`);
-      this.publish({ state: 'error', error: offline ? '인터넷에 연결되지 않아 동기화하지 못했어요' : err.message || '동기화하지 못했어요' });
+      this.publish({ state: 'error', progress: null, error: offline ? '인터넷에 연결되지 않아 동기화하지 못했어요' : err.message || '동기화하지 못했어요' });
     }
     return this.status;
   }

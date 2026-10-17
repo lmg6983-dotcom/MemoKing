@@ -1300,7 +1300,15 @@ function setFabMenu(open) {
   return true;
 }
 app.closeFabMenu = () => setFabMenu(false);
-fab.addEventListener('click', () => setFabMenu(fabMenu.hidden));
+fab.addEventListener('click', () => {
+  // 일정 탭: 바로 새 일정 (메모 종류를 고르는 위성 버튼 없이)
+  if (!$('list-screen').hidden && list.currentTab() === 'reminders') {
+    haptic(8);
+    list.addEvent();
+    return;
+  }
+  setFabMenu(fabMenu.hidden);
+});
 $('fab-scrim').addEventListener('click', () => setFabMenu(false));
 fabMenu.addEventListener('click', (e) => {
   const b = e.target.closest('[data-new]');

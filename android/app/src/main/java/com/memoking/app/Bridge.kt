@@ -481,8 +481,13 @@ class Bridge(private val activity: MainActivity) {
             }
             "driveCreateFolder" -> pool.execute {
                 resolve(id) {
-                    val f = DriveApi(ctx).createFolder(a.optString("parent", "root").ifEmpty { "root" }, a.getString("name"))
-                    JSONObject().put("id", f.id).put("name", f.name)
+                    // 같은 이름 폴더가 이미 있으면 새로 만들지 않고 그것 (PC 와 같음)
+                    val api = DriveApi(ctx)
+                    val parent = a.optString("parent", "root").ifEmpty { "root" }
+                    val name = a.getString("name").trim()
+                    val found = api.folders(parent).firstOrNull { it.name == name }
+                    val f = found ?: api.createFolder(parent, name)
+                    JSONObject().put("id", f.id).put("name", f.name).put("existed", found != null)
                 }
             }
             "driveUse" -> pool.execute {
