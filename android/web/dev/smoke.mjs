@@ -419,6 +419,13 @@ try {
   check('일정 탭: 달력이 깜빡이지 않음 (날을 눌러도 높이 그대로)', steady.every((s) => s.before.length === 1 && s.tapped && s.after.length === 1), JSON.stringify(steady));
   await page.tap(`#reminder-groups [role="gridcell"][data-date="${ymd(now0)}"]`, { timeout: 3000, position: { x: 6, y: 6 } }).catch(() => {}); // 다시 오늘
   await page.waitForTimeout(300);
+  // 목록 보기: 시각은 제목 위 작은 줄 — 제목이 줄 폭을 거의 다 쓴다 (예전: 시각 칸이 절반, 제목 99px 에서 잘림)
+  await page.tap('.cal-views button[data-view="listMonth"]');
+  await page.waitForTimeout(400);
+  const listTitleW = await page.evaluate(() => Math.min(...[...document.querySelectorAll('#reminder-groups .mk-li-title')].map((t) => t.getBoundingClientRect().width)));
+  check('목록 보기: 일정 제목이 줄 폭을 다 씀 (200px 넘게)', listTitleW > 200 && Number.isFinite(listTitleW), String(listTitleW));
+  await page.tap('.cal-views button[data-view="dayGridMonth"]');
+  await page.waitForTimeout(400);
   // 달력에서 바로 일정 만들기: 고른 날 › ＋ 일정 추가 → 이름·시각 → 미리 알림 → 새 메모 / 있는 메모
   await page.tap('.ev-add');
   await page.waitForSelector('.quick-event[open]');

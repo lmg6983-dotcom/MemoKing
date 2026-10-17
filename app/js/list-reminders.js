@@ -355,7 +355,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     headerToolbar: false,
     height: 'auto',
     fixedWeekCount: true,
-    dayMaxEvents: 2, // 두 개까지, 나머지는 +n (낮은 창은 막대 대신 색 점)
+    dayMaxEvents: true, // 칸 높이에 들어가는 만큼, 나머지는 +n (낮은 창은 막대 대신 색 점)
     moreLinkClass: 'mk-more',
     moreLinkText: (n) => `+${n}`,
     nowIndicator: true,
@@ -405,14 +405,23 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       dayGridMonth: { dayHeaderFormat: { weekday: 'short' } }, // 넓은 창에서도 "일" (일요일 X)
       timeGridWeek: { slotHeaderFormat: { hour: 'numeric' } },
       // 목록: 달은 위 제목에 있으니 날짜 칸은 "16일 · 금" 만 (좁은 화면을 날짜가 다 차지하지 않게)
-      listMonth: { listDayFormat: { day: 'numeric' }, listDayAltFormat: { weekday: 'short' } },
+      //   일정은 시각을 제목 위 작은 줄로 쌓아 제목이 폭을 다 쓰게 (예전: 시각 칸이 절반을 차지해 제목이 잘림)
+      listMonth: {
+        listDayFormat: { day: 'numeric' },
+        listDayAltFormat: { weekday: 'short' },
+        listDayHeaderClass: 'mk-ldh',
+        listItemEventInnerClass: 'mk-li-in',
+        listItemEventTimeClass: 'mk-li-time',
+        listItemEventTitleClass: 'mk-li-title',
+      },
     },
   });
   calendar.render();
   markView();
 
   // 창 높이에 맞춰: 월 보기는 한 달이 다 보이게 칸 높이를(낮은 창은 납작하게), 주 보기는 정한 높이 안에서 위아래로 밀기
-  //   넓은 창(달력이 왼쪽에 붙음)은 보이는 높이만큼, 좁은 창은 아래 일정 목록이 조금 보이게 6할쯤 (아주 낮은 창은 달력만)
+  //   넓은 창(달력이 왼쪽에 붙음)은 보이는 높이만큼, 좁은 창(휴대폰)도 Google 캘린더처럼 달력이 화면을 채우고
+  //   아래 고른 날 목록은 제목 한 줄만 살짝 보이게 (밀어서 보기)
   function fitSize() {
     // 보이는 높이: PC 는 목록 칸(스스로 밀리는 칸)의 높이, 휴대폰은 화면 전체가 밀리므로 창 높이에서 목록 칸 위를 뺀 것.
     //   휴대폰의 목록 칸 높이는 달력 + 아래 목록이라 그걸 재면 달력을 줄일수록 자리가 줄어 끝없이 커졌다 작아졌다 깜빡였다
@@ -427,7 +436,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const above = bodyR.top - boxR.top + container.scrollTop;
     const below = card.getBoundingClientRect().bottom - bodyR.bottom + parseFloat(getComputedStyle(card).marginBottom || '0') + 2;
     const full = h - above - below;
-    const room = Math.max(120, side || h * 0.62 - above - below < 260 ? full : h * 0.62 - above - below);
+    const PEEK = 56; // 좁은 창: 아래 "오늘, 10월 17일" 줄이 보일 만큼
+    const room = Math.max(120, side ? full : full - PEEK);
     const key = `${viewId}|${Math.round(room / 8)}|${Math.round(w / 8)}`;
     if (key === lastFit) return;
     lastFit = key;
