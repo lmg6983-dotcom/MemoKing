@@ -2,14 +2,14 @@
 // 다가오는 일정. 일정마다 언제 미리 알리는지(30분 전, 하루 전 …)를 함께 보인다. 타이머·앱 열 때 알림은 맨 아래 따로.
 // 고른 날(오늘·앞으로)에는 "＋ 일정 추가" — 이름·시각 → 미리 알림 → 넣을 메모(새 메모 / 있는 메모)로 바로 만든다.
 // 이미 고른 날을 한 번 더 눌러도 같다. 한 번짜리 일정은 달력에서 끌어 다른 날·시각으로 옮긴다.
-// 다른 캘린더: Google 캘린더 등 .ics 구독 · 휴대폰 캘린더(삼성 캘린더) 일정도 함께 보이고(읽기만, "메모로 가져오기"),
-// 메모킹 일정은 Google 캘린더 · 휴대폰 캘린더 앱 · .ics 파일로 보낼 수 있다 (calendar-links.js · core/calendar-feeds.js).
+// 다른 캘린더: Google 캘린더 등 .ics 구독 · 휴대폰 캘린더(삼성 캘린더) 일정도 함께 보인다 — 읽기만 ("메모로 가져오기"는 메모킹 안에서)
+//   (calendar-links.js · core/calendar-feeds.js)
 import { Calendar, dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin, koLocale } from '../vendor/fullcalendar.js';
 import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
 import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, DEFAULT_ALERTS } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocalIso } from './core/time.js';
-import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, googleCalendarUrl, deviceInsertArgs } from './core/calendar-feeds.js';
+import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal } from './core/calendar-feeds.js';
 import { openQuickEvent } from './quick-event.js';
 import { openCalendarLinks } from './calendar-links.js';
 import { openEventDetail } from './event-detail.js';
@@ -71,7 +71,6 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   const prepared = new Map(); // id → { at, data } — 받은 .ics 를 한 번만 풀어 둔다
   const parsed = new Map(); // `${id}|${at}|${from}|${to}` → 일정 (같은 범위를 다시 펼치지 않게)
   let device = { on: false, from: 0, to: 0, events: [], loading: null };
-  let googleOn = false; // Google 캘린더 상호 동기화를 켰는가
 
   /** [from, to) 사이의 다른 캘린더 일정 [{ ext: true, source, title, start, end, allDay, color, ... }] */
   function externalBetween(from, to) {
@@ -101,8 +100,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       for (const e of list) out.push({ ...e, ext: true, source: f.name, color: f.color, feedId: f.id });
     }
     if (device.on) {
-      // 휴대폰 캘린더에도 보이는 "메모킹" 캘린더(Google 상호 동기화)는 메모킹 일정 그대로라 빼고
-      for (const e of device.events) if (e.end > from && e.start < to && !(googleOn && e.calendar === '메모킹')) out.push({ ...e, ext: true, source: e.calendar || '휴대폰 캘린더', device: true });
+      // "메모킹" 캘린더는 예전(v0.41) 상호 동기화가 Google 에 만든 메모킹 일정의 사본이라 빼고 (두 번 · 낡은 채로 보이지 않게)
+      for (const e of device.events) if (e.end > from && e.start < to && e.calendar !== '메모킹') out.push({ ...e, ext: true, source: e.calendar || '휴대폰 캘린더', device: true });
     }
     return query.trim() ? out.filter((e) => `${e.title} ${e.location ?? ''} ${e.source}`.toLowerCase().includes(query.trim().toLowerCase())) : out;
   }
@@ -245,24 +244,11 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   }
   const linkBtn = el('button', 'link-btn cal-link');
   linkBtn.type = 'button';
-  linkBtn.append(el('i', 'cal-sync-dot'), icon('link'), el('span', '', '다른 캘린더'));
-  linkBtn.title = 'Google 캘린더 · 삼성 캘린더와 잇기';
+  linkBtn.append(icon('link'), el('span', '', '다른 캘린더'));
+  linkBtn.title = 'Google 캘린더 · 삼성 캘린더 함께 보기';
   linkBtn.addEventListener('click', () => openLinks());
   linkBtn.hidden = !calendars?.feeds;
   bar.append(views, linkBtn);
-  // Google 캘린더와 서로 맞추는 중이면 단추에 그 상태 (초록 점 · 오류는 빨강)
-  const linkLabel = linkBtn.querySelector('span');
-  function drawGoogle(info) {
-    googleOn = Boolean(info?.connected);
-    linkBtn.classList.toggle('synced', googleOn);
-    linkBtn.classList.toggle('sync-error', googleOn && Boolean(info?.error));
-    linkLabel.textContent = googleOn ? 'Google 캘린더와 맞춤' : '다른 캘린더';
-    linkBtn.title = googleOn ? (info.error || 'Google 캘린더 · 삼성 캘린더와 서로 맞추는 중') : 'Google 캘린더 · 삼성 캘린더와 잇기';
-  }
-  if (calendars?.google) {
-    calendars.google.status().then(drawGoogle).catch(() => {});
-    calendars.google.onStatus?.(drawGoogle);
-  }
 
   const calEl = el('div', 'cal-body');
   card.append(head, bar, calEl);
@@ -534,32 +520,6 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   // ---------- 일정 한 줄 ----------
 
-  function sendButton(item) {
-    const b = el('button', 'icon-btn ev-send');
-    b.type = 'button';
-    const label = calendars?.device ? '휴대폰 캘린더에 넣기' : 'Google 캘린더에 넣기';
-    b.title = label;
-    b.setAttribute('aria-label', `${item.reminder.title || item.title} ${label}`);
-    b.append(icon('cal-out'));
-    b.addEventListener('click', () => sendToCalendar(item));
-    return b;
-  }
-
-  async function sendToCalendar(item) {
-    try {
-      if (calendars?.device) {
-        const args = deviceInsertArgs(item);
-        if (args && await calendars.device.insert(args)) return;
-      }
-      const url = googleCalendarUrl(item);
-      if (!url) return;
-      if (calendars?.openUrl) await calendars.openUrl(url);
-      else window.open(url, '_blank');
-    } catch (err) {
-      notify(err.message || '캘린더를 열지 못했어요', true);
-    }
-  }
-
   /** 일정의 반복 · 알림 설명 (목록 줄과 자세히 보기 같은 글) */
   const repeatText = (r) => (r.kind === 'repeat' ? describeReminder(r) : '');
   const alertText = (r) => (r.enabled ? `알림 ${describeAlerts(r)}` : '알림 꺼짐');
@@ -594,7 +554,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     del.append(icon('trash'));
     del.addEventListener('click', () => update(item, (list) => list.filter((x) => x.id !== r.id)));
 
-    div.append(main, ...(calendars ? [sendButton(item)] : []), del);
+    div.append(main, del);
     return div;
   }
 
@@ -848,7 +808,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   // 다른 캘린더 잇기 창 — 닫으면 바뀐 것을 다시 받아 그린다
   async function openLinks() {
-    await openCalendarLinks({ calendars, items, notify, feedTexts });
+    await openCalendarLinks({ calendars, notify, feedTexts });
     await loadFeeds();
   }
 

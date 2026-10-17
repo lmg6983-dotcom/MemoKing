@@ -30,7 +30,6 @@ const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x:
 export function registerIpc(ctx) {
   const {
     calendarFeeds,
-    getCalendarSync,
     windowManager: wm,
     memoHotkeys,
     getVault,
@@ -245,11 +244,6 @@ export function registerIpc(ctx) {
   ipcMain.handle('calendars:feeds', () => calendarFeeds.list());
   ipcMain.handle('calendars:set-feeds', (_e, list) => calendarFeeds.save(Array.isArray(list) ? list : []));
   // Google 캘린더 상호 동기화
-  ipcMain.handle('gcal:status', () => getCalendarSync()?.info() ?? null);
-  ipcMain.handle('gcal:connect', () => getCalendarSync()?.connect());
-  ipcMain.handle('gcal:cancel', () => getCalendarSync()?.cancelConnect());
-  ipcMain.handle('gcal:disconnect', () => getCalendarSync()?.disconnect());
-  ipcMain.handle('gcal:sync', () => getCalendarSync()?.run({ force: true }));
   ipcMain.handle('calendars:fetch', (_e, id, force) => calendarFeeds.get(String(id ?? ''), { force: force === true }));
 
   // ---------- Google Drive 동기화 ----------
@@ -285,7 +279,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('drive:auto', () => autoDriveFolder());
   ipcMain.handle('drive:sync', () => getDriveSync()?.run({ full: true })); // 단추: 다른 앱이 넣은 파일까지 보이게 폴더를 처음부터
   ipcMain.handle('drive:disconnect', () => {
-    getDriveAuth()?.signOut({ revoke: !getCalendarSync()?.connected }); // 캘린더 동기화가 같은 클라이언트의 허용을 쓰는 중이면 거두지 않는다
+    getDriveAuth()?.signOut();
     settings.drive = null;
     saveSettings();
     configureDrive();

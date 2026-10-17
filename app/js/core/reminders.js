@@ -124,7 +124,6 @@ export function normalizeReminder(raw, now = new Date()) {
     created: validDate(raw.created) ? String(raw.created) : toLocalIso(now),
     last: validDate(raw.last) ? String(raw.last) : null,
   };
-  if (validDate(raw.changed)) r.changed = String(raw.changed); // 일정(이름 · 때 · 반복)을 마지막으로 바꾼 때 — 캘린더 동기화
   if (isEvent(r)) {
     const title = typeof raw.title === 'string' ? raw.title.replace(/\s+/g, ' ').trim().slice(0, 80) : '';
     if (title) r.title = title;
@@ -167,26 +166,7 @@ export function serializeReminder(r) {
   if (!r.enabled) out.enabled = false;
   out.created = r.created;
   if (r.last) out.last = r.last;
-  if (r.changed) out.changed = r.changed;
   return out;
-}
-
-const eventSig = (r) => JSON.stringify([r.kind, r.at ?? null, Boolean(r.allDay), r.repeat ?? null, r.title ?? '']);
-
-/**
- * 저장할 때: 일정의 이름 · 때 · 반복이 바뀐(또는 새) 알림에 바꾼 때(changed)를 찍는다.
- * 알림 울림 · 켜고 끔 · Drive 로 받은 파일은 찍지 않는다 — Google 캘린더와 양쪽에서 고쳤을 때 "나중에 고친 쪽" 을 가리는 데 쓴다.
- * 부르는 쪽이 새 값을 정해 넘기면(동기화가 Google 에서 고친 때로) 그대로 둔다.
- */
-export function stampChanged(prev, next, now = new Date()) {
-  const before = new Map((prev ?? []).map((r) => [r.id, r]));
-  return next.map((r) => {
-    if (!isEvent(r)) return r;
-    const p = before.get(r.id);
-    if (p && eventSig(p) === eventSig(r)) return r;
-    if (r.changed && r.changed !== p?.changed) return r;
-    return { ...r, changed: toLocalIso(now) };
-  });
 }
 
 const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();

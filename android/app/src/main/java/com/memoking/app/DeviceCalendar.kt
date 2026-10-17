@@ -3,7 +3,6 @@ package com.memoking.app
 import android.Manifest
 import android.content.ContentUris
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import org.json.JSONArray
@@ -57,21 +56,4 @@ object DeviceCalendar {
         }
         return out.put("events", list)
     }
-
-    /** 캘린더 앱의 새 일정 화면 (삼성 캘린더 · Google 캘린더 중 사용자가 고른 앱) */
-    fun insertIntent(a: JSONObject): Intent = Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).apply {
-        putExtra(CalendarContract.Events.TITLE, a.optString("title"))
-        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, a.getLong("start"))
-        if (a.has("end")) putExtra(CalendarContract.EXTRA_EVENT_END_TIME, a.getLong("end"))
-        putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, a.optBoolean("allDay"))
-        a.optString("description").takeIf { it.isNotBlank() }?.let { putExtra(CalendarContract.Events.DESCRIPTION, it) }
-        a.optString("rrule").takeIf { it.isNotBlank() }?.let { putExtra(CalendarContract.Events.RRULE, it) }
-    }
-
-    /** 휴대폰 캘린더의 그 일정을 캘린더 앱에서 열기 */
-    fun viewIntent(a: JSONObject): Intent =
-        Intent(Intent.ACTION_VIEW, ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, a.getLong("id"))).apply {
-            if (a.has("start")) putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, a.getLong("start"))
-            if (a.has("end")) putExtra(CalendarContract.EXTRA_EVENT_END_TIME, a.getLong("end"))
-        }
 }

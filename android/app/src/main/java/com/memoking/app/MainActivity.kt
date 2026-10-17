@@ -58,7 +58,6 @@ class MainActivity : Activity() {
         private const val REQ_MIC = 5
         private const val REQ_SAVE = 6
         private const val REQ_CALENDAR = 7
-        private const val REQ_CAL_AUTH = 8
         private const val PDF_TIMEOUT_MS = 15_000L // PDF 만들기를 이만큼 기다리고, 넘으면 인쇄 화면으로
 
         /** 지금 앞에 보이는 화면 (알림이 울렸을 때 바로 알리기 위해) */
@@ -363,37 +362,6 @@ class MainActivity : Activity() {
         )
     }
 
-    /** Google 캘린더 권한 (메모킹이 만든 캘린더만) — 이미 허용했으면 바로 true */
-    fun authorizeCalendar(id: Int) {
-        if (!NativeAuth.available(this)) {
-            bridge.resolve(id) { throw GoogleAuth.AuthError("이 휴대폰에서는 Google 캘린더 동기화를 쓸 수 없어요. PC 메모킹에서 연결해 주세요") }
-            return
-        }
-        waiting[REQ_CAL_AUTH]?.let { old -> bridge.resolve(old) { false } }
-        waiting[REQ_CAL_AUTH] = id
-        NativeAuth.begin(
-            this,
-            GoogleCalendarApi.SCOPE,
-            startForResult = { sender ->
-                try {
-                    @Suppress("DEPRECATION")
-                    startIntentSenderForResult(sender, REQ_CAL_AUTH, null, 0, 0, 0)
-                } catch (e: Exception) {
-                    waiting.remove(REQ_CAL_AUTH)
-                    bridge.resolve(id) { throw GoogleAuth.AuthError(NativeAuth.describe(e)) }
-                }
-            },
-            onToken = {
-                val waitingId = waiting.remove(REQ_CAL_AUTH)
-                if (waitingId != null) bridge.resolve(waitingId) { true }
-            },
-            onError = { message ->
-                waiting.remove(REQ_CAL_AUTH)
-                bridge.resolve(id) { throw GoogleAuth.AuthError(message) }
-            },
-        )
-    }
-
     private fun finishPhoneLogin(token: String) {
         val id = waiting.remove(REQ_AUTH) ?: return
         val full = authFull
@@ -608,15 +576,6 @@ class MainActivity : Activity() {
             finishPhoneLogin(token)
             return
         }
-        if (requestCode == REQ_CAL_AUTH) {
-            val id = waiting.remove(REQ_CAL_AUTH) ?: return
-            bridge.resolve(id) {
-                if (resultCode != RESULT_OK) throw GoogleAuth.AuthError("캘린더 권한을 허용하지 않았어요")
-                NativeAuth.finish(this, data, GoogleCalendarApi.SCOPE)
-                true
-            }
-            return
-        }
         val id = waiting.remove(requestCode) ?: return
         if (resultCode != RESULT_OK || data == null) {
             if (requestCode == REQ_SAVE) pendingSave?.delete().also { pendingSave = null }
@@ -757,19 +716,6 @@ class MainActivity : Activity() {
         waiting[REQ_CALENDAR]?.let { old -> bridge.resolve(old) { false } }
         waiting[REQ_CALENDAR] = id
         requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), REQ_CALENDAR)
-    }
-
-    /** 캘린더 앱 열기 (새 일정 · 그 일정) — 캘린더 앱이 없으면 false. 값이 잘못됐으면(빠진 시각 등) 화면에 오류로 */
-    fun startCalendarIntent(id: Int, build: () -> Intent) {
-        bridge.resolve(id) {
-            val intent = build()
-            try {
-                startActivity(intent)
-                true
-            } catch (e: ActivityNotFoundException) {
-                false
-            }
-        }
     }
 
     /** 앱 캐시의 파일(그림·PDF)을 다른 앱으로 보내기 */

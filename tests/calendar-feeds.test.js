@@ -1,12 +1,11 @@
-// 다른 캘린더와 잇기 — .ics 구독 읽기 (반복 · 빠진 날 · 바뀐 회차 · 시간대), 휴대폰 캘린더, 내보내기(.ics · Google 주소)
+// 다른 캘린더 함께 보기 — .ics 구독 읽기 (반복 · 빠진 날 · 바뀐 회차 · 시간대), 휴대폰 캘린더
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeFeedUrl, normalizeFeeds, feedLabel, icsName, looksLikeIcs, feedEvents, fromDeviceEvent, reminderFromExternal,
-  rruleOf, eventSpan, buildIcs, googleCalendarUrl, deviceInsertArgs, MAX_FEEDS,
+  MAX_FEEDS,
 } from '../app/js/core/calendar-feeds.js';
 import { normalizeReminder } from '../app/js/core/reminders.js';
-import { ICAL } from '../app/vendor/ical.js';
 
 const SEOUL_TZ = `BEGIN:VTIMEZONE
 TZID:Asia/Seoul
@@ -137,70 +136,6 @@ test('다른 캘린더 일정 → 메모킹 일정 (알림 기본값, 지난 것
   const past = normalizeReminder(reminderFromExternal({ title: '지난 일', start: local(2026, 10, 1, 9), allDay: false }, now));
   assert.equal(past.enabled, false);
   assert.deepEqual(past.alerts, [10]);
-});
-
-const item = (reminder, title = '메모 제목') => ({ memoId: 'm1', title, reminder: normalizeReminder(reminder) });
-
-test('반복 → RRULE', () => {
-  assert.equal(rruleOf(item({ kind: 'repeat', repeat: { every: 'week', weekdays: [1, 3], time: '10:00' } }).reminder), 'FREQ=WEEKLY;BYDAY=MO,WE');
-  assert.equal(rruleOf(item({ kind: 'repeat', repeat: { every: 'year', month: 3, day: 9 } }).reminder), 'FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=9');
-  assert.equal(rruleOf(item({ kind: 'at', at: '2026-10-20T09:00:00+09:00' }).reminder), '');
-});
-
-test('일정 시작 · 끝: 한 번짜리는 1시간, 하루 종일은 다음 날까지, 반복은 만든 날 뒤 첫 회차', () => {
-  const at = eventSpan(item({ kind: 'at', at: local(2026, 10, 20, 9).toISOString() }).reminder);
-  assert.equal(at.end - at.start, 3600_000);
-  const day = eventSpan(item({ kind: 'at', at: local(2026, 10, 22).toISOString(), allDay: true }).reminder);
-  assert.equal(day.end.getDate(), 23);
-  const rep = eventSpan(item({ kind: 'repeat', created: local(2026, 10, 14, 12).toISOString(), repeat: { every: 'week', weekdays: [1], time: '10:00' } }).reminder);
-  assert.equal(rep.start.getDate(), 19);
-  assert.equal(rep.start.getHours(), 10);
-  assert.equal(eventSpan(item({ kind: 'timer', at: local(2026, 10, 22).toISOString(), minutes: 5 }).reminder), null);
-});
-
-test('.ics 내보내기: 다시 읽으면 같은 일정 · 알림 · 반복, 긴 한글 줄은 75바이트로 접기', () => {
-  const now = local(2026, 10, 16, 9);
-  const items = [
-    item({ kind: 'at', at: local(2026, 10, 17, 15).toISOString(), title: '치과, 스케일링; 예약', alerts: [30] }, '치과'),
-    item({ kind: 'at', at: local(2026, 10, 22).toISOString(), allDay: true, title: '분기 보고 마감' }),
-    item({ kind: 'repeat', created: local(2026, 10, 14).toISOString(), title: '주간 회의', repeat: { every: 'week', weekdays: [1, 3], time: '10:00' } }),
-    item({ kind: 'timer', at: local(2026, 10, 16, 18).toISOString(), minutes: 10 }),
-    item({ kind: 'at', at: local(2026, 10, 25, 9).toISOString(), title: '가'.repeat(60) }),
-  ];
-  const text = buildIcs(items, { now });
-  assert.ok(text.split('\r\n').every((l) => new TextEncoder().encode(l).length <= 75), '접기');
-  assert.match(text, /SUMMARY:치과\\, 스케일링\\; 예약/);
-  assert.match(text, /TRIGGER:-PT30M/);
-  assert.match(text, /TRIGGER:PT540M/); // 하루 종일: 당일 오전 9시
-  assert.doesNotMatch(text, /timer/);
-  const back = feedEvents(text, local(2026, 10, 16), local(2026, 10, 30));
-  const rows = back.map((e) => `${e.start.getMonth() + 1}/${e.start.getDate()} ${e.allDay ? '종일' : `${e.start.getHours()}시`} ${e.title}`);
-  assert.deepEqual(rows, [
-    '10/17 15시 치과, 스케일링; 예약',
-    '10/19 10시 주간 회의',
-    '10/21 10시 주간 회의',
-    '10/22 종일 분기 보고 마감',
-    '10/25 9시 ' + '가'.repeat(60),
-    '10/26 10시 주간 회의',
-    '10/28 10시 주간 회의',
-  ]);
-  const comp = new ICAL.Component(ICAL.parse(text));
-  assert.equal(comp.getFirstPropertyValue('x-wr-calname'), '메모킹 일정');
-});
-
-test('Google 캘린더 새 일정 주소 · 휴대폰 캘린더 앱 값', () => {
-  const allDay = item({ kind: 'at', at: local(2026, 10, 22).toISOString(), allDay: true, title: '마감' }, '보고서');
-  const url = new URL(googleCalendarUrl(allDay));
-  assert.equal(url.hostname, 'calendar.google.com');
-  assert.equal(url.searchParams.get('action'), 'TEMPLATE');
-  assert.equal(url.searchParams.get('dates'), '20261022/20261023');
-  assert.equal(url.searchParams.get('details'), '메모킹 메모: 보고서');
-  const rep = item({ kind: 'repeat', created: local(2026, 10, 14).toISOString(), title: '회의', repeat: { every: 'day', time: '08:30' } });
-  assert.equal(new URL(googleCalendarUrl(rep)).searchParams.get('recur'), 'RRULE:FREQ=DAILY');
-  const args = deviceInsertArgs(allDay);
-  assert.equal(args.start, local(2026, 10, 22).getTime());
-  assert.equal(args.allDay, true);
-  assert.equal(deviceInsertArgs(rep).rrule, 'FREQ=DAILY');
 });
 
 test('오래된 매일 반복이 여럿 앞에 있어도 뒤의 한 번짜리 일정이 빠지지 않음 · 범위 밖에서 범위 안으로 옮긴 회차도 보임', () => {

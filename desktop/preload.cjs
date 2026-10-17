@@ -8,7 +8,7 @@ const EVENTS = [
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:hover', 'list:on-top',
   'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'update:state', 'update:available', 'update:ready',
-  'bubble:show', 'bubble:hide', 'status-bubble:gone', 'gcal:status',
+  'bubble:show', 'bubble:hide', 'status-bubble:gone',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -63,14 +63,6 @@ contextBridge.exposeInMainWorld('memoking', {
     feeds: invoke('calendars:feeds'),
     setFeeds: invoke('calendars:set-feeds'),
     fetch: invoke('calendars:fetch'),
-    // Google 캘린더 상호 동기화: status() · connect() 로그인하고 맞추기 · cancel() · disconnect() · sync() 지금 맞추기 (바뀌면 'gcal:status')
-    google: {
-      status: invoke('gcal:status'),
-      connect: invoke('gcal:connect'),
-      cancel: invoke('gcal:cancel'),
-      disconnect: invoke('gcal:disconnect'),
-      sync: invoke('gcal:sync'),
-    },
   },
   // 알림 보관함 (Windows 알림 기록)
   history: {

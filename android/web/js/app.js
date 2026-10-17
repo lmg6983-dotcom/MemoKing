@@ -5,7 +5,6 @@ import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
 import { FeedStore, feedResponseText, MAX_FEED_BYTES } from '../../app/js/core/calendar-feed-list.js';
-import { textBase64 } from '../../app/js/core/base64.js';
 import { extractTitle, isBlankBody, COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
 import { shareText } from '../../app/js/core/share-text.js';
@@ -19,7 +18,6 @@ import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
 import { LinkPreviews } from './web-fetch.js';
 import { createAlarms } from './alarms.js';
-import { googleCalendar, startCalendarSync, calendarSyncSoon } from './gcal.js';
 import { injectMobileIcons } from './m-icons.js';
 import { app } from './state.js';
 import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, cancelTopDialog, matchChrome, isTwoPane } from './ui.js';
@@ -67,6 +65,8 @@ const lsSet = (k, v) => {
     // 저장 공간이 꽉 참 — 다음에 다시 받는다
   }
 };
+// 예전(0.27.0)의 Google 캘린더 상호 동기화는 없앴다 — 그 설정만 지운다 (Google 의 "메모킹" 캘린더는 그대로)
+for (const k of ['memoking.gcal', 'memoking.gcalDevice', 'memoking.gcalMine']) lsSet(k, null);
 
 function calendarApi() {
   const mem = new Map(); // id → { url, text, at }
@@ -112,13 +112,6 @@ function calendarApi() {
     feeds: async () => store.list(),
     setFeeds: async (list) => store.save(list),
     fetch: (id, force = false) => store.get(id, { force }),
-    openUrl: (url) => call('openUrl', { url }),
-    exportIcs: async (text, name) => {
-      await call('shareFile', { base64: textBase64(text), name, mime: 'text/calendar', title: '캘린더로 보내기' });
-      return { ok: true };
-    },
-    // Google 캘린더 상호 동기화 (gcal.js) — PC 와 같은 모양
-    google: googleCalendar,
     // 휴대폰 캘린더 (삼성 캘린더 · Google 캘린더 등 — 안드로이드 CalendarContract)
     device: {
       enabled: () => lsGet(DEVICE_KEY) === '1',
@@ -137,8 +130,6 @@ function calendarApi() {
         if (!res.granted) lsSet(DEVICE_KEY, null); // 설정에서 권한을 거둬 갔다
         return res;
       },
-      insert: (args) => call('calendarInsert', args),
-      view: (args) => call('calendarView', args),
     },
   };
 }
@@ -309,7 +300,6 @@ function refreshHistoryRow() {
 }
 
 let notifyAsked = false;
-let calendarSyncStarted = false; // Google 캘린더 상호 동기화 (gcal.js) — 메모 폴더를 처음 연 뒤 한 번
 app.setReminders = (memoId, next) => {
   if (!app.vault || !memoId || !Array.isArray(next)) return null;
   note.flush(); // 아직 파일이 없는 새 메모면 먼저 저장
@@ -1342,15 +1332,10 @@ function openVault() {
     changeTimer = setTimeout(() => list.refresh(), 60);
     alarms.scheduleSoon();
     widgets.publishSoon();
-    calendarSyncSoon(detail.ids); // 일정이 바뀌었으면 Google 캘린더에도 (바뀐 메모만 본다)
     // 이어 쓰기 안내는 다른 기기에서 내용이 바뀌어 들어온 것만 (휴대폰에서 고정·색·알림을 바꾼 것으로 뜨지 않게)
     showHandoff((detail.external ?? []).filter((id) => !detail.removed?.includes(id)));
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
-  if (!calendarSyncStarted) {
-    calendarSyncStarted = true;
-    startCalendarSync({ onChange: () => list.refresh() });
-  }
   $('setup').hidden = true;
   list.refresh();
   list.show();
