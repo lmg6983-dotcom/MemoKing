@@ -206,7 +206,8 @@ export function registerIpc(ctx) {
     return saved;
   });
   ipcMain.handle('reminders:all', () => getVault()?.allReminders() ?? []);
-  ipcMain.handle('reminders:add', (_e, id, reminder, newTitle) => {
+  // body: 새 메모를 만들 때 쓸 본문 (다른 캘린더 일정 가져오기 — 달력 그림 · 장소 · 설명). 없으면 "# 일정 이름" 만
+  ipcMain.handle('reminders:add', (_e, id, reminder, newTitle, body) => {
     const vault = getVault();
     if (!vault) return null;
     const r = normalizeReminder(reminder);
@@ -214,7 +215,7 @@ export function registerIpc(ctx) {
     let memoId = id ? String(id) : null;
     if (!memoId) {
       const title = String(newTitle ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || '새 일정';
-      memoId = vault.import({ body: `# ${title}\n` });
+      memoId = vault.import({ body: typeof body === 'string' && /^# \S/.test(body) ? body.slice(0, 20000) : `# ${title}\n` });
     }
     const memo = memoId ? vault.get(memoId) : null;
     if (!memo) throw new Error('메모를 찾지 못했어요');

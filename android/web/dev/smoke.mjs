@@ -509,6 +509,23 @@ try {
   await page.tap('.event-detail .dialog-x');
   await page.waitForTimeout(200);
   check('일정 줄: 다른 캘린더로 보내는 단추 없음 (읽기만)', (await page.locator('.ev-send').count()) === 0);
+  // 다른 캘린더 일정 → 메모로 가져오기: 그 달 달력 그림(그 날짜에 색연필 동그라미) · 장소 · 설명이 들어간 메모
+  await page.locator('.ev-ext', { hasText: '가족 저녁' }).first().locator('.ev-import').tap();
+  await page.waitForSelector('#note-screen:not([hidden])', { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(1200);
+  const importedMd = fs.existsSync(path.join(vault, '가족 저녁.md')) ? read('가족 저녁.md') : '';
+  const imgRel = decodeURI(/!\[[^\]]*\]\((attachments\/[^)]+\.png)\)/.exec(importedMd)?.[1] ?? '');
+  const sketch = imgRel && fs.existsSync(path.join(vault, imgRel)) ? fs.readFileSync(path.join(vault, imgRel)) : null;
+  check('가져온 일정 메모: 달력 그림(PNG) · 장소 · 설명 · 일정',
+    Boolean(sketch) && sketch.length > 5000 && sketch.subarray(1, 4).toString() === 'PNG' && /장소: 집/.test(importedMd) && /7시까지 도착/.test(importedMd) && /kind: at/.test(importedMd),
+    importedMd.slice(0, 600));
+  check('가져온 일정 메모: 그림은 첫 줄(제목) 바로 아래 · 그림 설명에 날짜', /# 가족 저녁\n\n!\[\d{4}년 \d+월 달력 — \d+월 \d+일/.test(importedMd.replace(/^---[\s\S]*?---\n/, '')), importedMd.slice(0, 300));
+  check('가져온 일정 메모: 메모 화면에 달력 그림이 보임', await page.locator('#note-screen img.mk-image').first().evaluate((img) => img.complete && img.naturalWidth >= 1000).catch(() => false));
+  await page.waitForTimeout(400);
+  await shot('02m-imported-memo');
+  if (sketch) fs.copyFileSync(path.join(vault, imgRel), path.join(outDir, '02m-month-sketch.png'));
+  await back();
+  await page.waitForTimeout(500);
   check('예전 상호 동기화가 만든 "메모킹" 캘린더 일정은 함께 보기에서 뺌 (메모킹 일정의 사본)', !(await page.evaluate(() => document.body.innerText.includes('메모킹 사본'))));
   for (const [view, name] of [['timeGridWeek', '주'], ['listMonth', '목록']]) {
     await page.tap(`[data-view="${view}"]`);
