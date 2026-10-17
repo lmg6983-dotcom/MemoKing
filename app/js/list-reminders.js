@@ -9,10 +9,11 @@ import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
 import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, DEFAULT_ALERTS } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocalIso } from './core/time.js';
-import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal } from './core/calendar-feeds.js';
+import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, importedEventBody } from './core/calendar-feeds.js';
 import { openQuickEvent } from './quick-event.js';
 import { openCalendarLinks } from './calendar-links.js';
-import { openEventDetail } from './event-detail.js';
+import { openEventDetail, whenText } from './event-detail.js';
+import { monthSketchPng } from './month-sketch.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
@@ -627,6 +628,23 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     });
   }
 
+  // 가져온 일정의 메모 본문: 그 달 달력 그림(그 날짜에 색연필 동그라미) · 장소 · 설명 · 주소
+  //   그림을 못 만들면(첨부를 못 쓰는 곳 등) 글만
+  async function importBody(e) {
+    let imageRel = '';
+    const when = whenText(e, { relative: false }); // 그림에 남으니 "내일" 대신 날짜
+    try {
+      if (api.attachments?.save) {
+        const png = await monthSketchPng({ start: e.start, end: e.end, allDay: e.allDay, title: e.title, when, color: e.color });
+        imageRel = (await api.attachments.save(png, 'png')) || '';
+      }
+    } catch (err) {
+      console.warn('[calendar] 달력 그림', err);
+    }
+    const alt = `${e.start.getFullYear()}년 ${e.start.getMonth() + 1}월 달력 — ${when}`;
+    return importedEventBody({ title: e.title, imageRel, imageAlt: alt, location: e.location, description: e.description, url: e.url });
+  }
+
   let importing = false;
   async function importExternal(e) {
     if (importing || !api.reminders.add) return;
@@ -641,7 +659,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     }
     importing = true;
     try {
-      const id = await api.reminders.add(null, r0, e.title);
+      const id = await api.reminders.add(null, r0, e.title, await importBody(e));
       await refresh();
       notify(`"${e.title}" 을(를) 메모킹 일정으로 가져왔어요`);
       if (id) api.memo.open(id);

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizeFeedUrl, normalizeFeeds, feedLabel, icsName, looksLikeIcs, feedEvents, fromDeviceEvent, reminderFromExternal,
+  normalizeFeedUrl, normalizeFeeds, feedLabel, icsName, looksLikeIcs, feedEvents, fromDeviceEvent, reminderFromExternal, importedEventBody,
   MAX_FEEDS,
 } from '../app/js/core/calendar-feeds.js';
 import { normalizeReminder } from '../app/js/core/reminders.js';
@@ -171,4 +171,15 @@ test('일정에 붙은 주소(URL) · 설명 속 주소: 인터넷 주소만 넘
   assert.equal(a.url, 'https://meet.example.com/abc');
   assert.equal(a.description, '자료: https://docs.example.com/x');
   assert.equal(b.url, '');
+});
+
+test('가져온 일정 메모 본문: 제목 · 달력 그림 · 장소 · 주소 · 설명 줄마다 문단, 줄 첫머리 마크다운은 글자로', () => {
+  const body = importedEventBody({
+    title: '가족  저녁', imageRel: 'attachments/2026 a.png', imageAlt: '2026년 10월 [달력]',
+    location: '집', url: 'https://meet.example.com/x', description: '# 준비물\n\n\n- 케이크\n자세히: https://x.example.com',
+  });
+  assert.equal(body, '# 가족 저녁\n\n![2026년 10월 달력](attachments/2026%20a.png)\n\n장소: 집\n\n링크: https://meet.example.com/x\n\n\\# 준비물\n\n\\- 케이크\n\n자세히: https://x.example.com\n');
+  // 그림 · 장소 · 설명이 없으면 제목만, 설명에 이미 있는 주소는 또 쓰지 않음
+  assert.equal(importedEventBody({ title: '' }), '# 새 일정\n');
+  assert.doesNotMatch(importedEventBody({ title: 'a', url: 'https://a.example.com', description: '여기 https://a.example.com' }), /링크:/);
 });

@@ -145,3 +145,22 @@ export function reminderFromExternal(ev, now = new Date()) {
     created: toLocalIso(now),
   };
 }
+
+// 줄 첫머리의 마크다운 표시(# - > 1. 등)는 글자로 — 일정 설명이 제목 · 목록으로 읽히지 않게
+const plainLine = (line) => line.replace(/^(\s*)([#>*+-]|\d+[.)])(\s)/, '$1\\$2$3');
+
+/**
+ * 메모로 가져온 일정의 본문: 제목 · 달력 그림(그 날짜에 동그라미) · 장소 · 설명 · 일정 주소
+ * @param {{ title: string, imageRel?: string, imageAlt?: string, location?: string, description?: string, url?: string }} o
+ */
+export function importedEventBody({ title, imageRel = '', imageAlt = '', location = '', description = '', url = '' }) {
+  const parts = [`# ${String(title ?? '').replace(/\s+/g, ' ').trim() || '새 일정'}`];
+  if (imageRel) parts.push(`![${imageAlt.replace(/[[\]]/g, '')}](${encodeURI(imageRel)})`);
+  const info = [];
+  if (location) info.push(`장소: ${plainLine(location)}`);
+  if (url && !description.includes(url)) info.push(`링크: ${url}`);
+  parts.push(...info);
+  // 설명의 줄은 줄대로 (메모에서 한 줄 바꿈은 이어 붙여 보이므로 문단으로), 빈 줄은 하나로
+  if (description) parts.push(...description.split(/\n+/).map((l) => plainLine(l.trim())).filter(Boolean));
+  return `${parts.join('\n\n')}\n`;
+}

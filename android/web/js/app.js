@@ -142,12 +142,13 @@ app.api = {
     set: async (memoId, next) => app.setReminders(memoId ?? note.currentId(), next),
     all: async () => app.vault?.allReminders() ?? [],
     // 일정 탭 달력에서 바로 만들기 (PC 의 reminders:add 와 같음): 고른 메모, 없으면 일정 이름으로 새 메모
-    add: async (memoId, reminder, newTitle) => {
+    //   body: 새 메모의 본문 (다른 캘린더 일정 가져오기 — 달력 그림 · 장소 · 설명). 없으면 "# 일정 이름" 만
+    add: async (memoId, reminder, newTitle, body) => {
       if (!app.vault) return null;
       let id = memoId;
       if (!id) {
         const title = String(newTitle ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || '새 일정';
-        id = app.vault.import({ body: `# ${title}\n` });
+        id = app.vault.import({ body: typeof body === 'string' && /^# \S/.test(body) ? body.slice(0, 20000) : `# ${title}\n` });
       }
       const memo = id ? app.vault.get(id) : null;
       if (!memo) throw new Error('메모를 찾지 못했어요');
@@ -157,6 +158,8 @@ app.api = {
     },
   },
   memos: { search: async (query) => app.vault?.search(String(query ?? '')) ?? [] },
+  // 첨부 저장 (PC 의 attachments.save 와 같음) — 가져온 일정의 달력 그림
+  attachments: { save: async (bytes, ext) => (app.vault ? app.vault.saveAttachment(bytes, ext) : null) },
   // 일정 탭이 함께 보는 다른 캘린더 — .ics 구독(이 휴대폰에만 저장) · 휴대폰 캘린더(삼성 캘린더 · Google 캘린더)
   calendars: calendarApi(),
   memo: { open: (id) => app.openMemo(id) },
