@@ -26,17 +26,19 @@ export function whenText({ start, end, allDay }) {
 }
 
 /**
- * @param {{ title: string, start: Date, end?: Date|null, allDay?: boolean, color?: string, source: string, readOnly?: boolean,
+ * @param {{ title: string, start: Date, end?: Date|null, allDay?: boolean, color?: string, memoColor?: string, source: string, readOnly?: boolean,
  *           lines?: { icon: string, text: string }[], note?: string,
  *           actions: { label: string, primary?: boolean, danger?: boolean, run: () => any }[] }} o
+ *   color: 다른 캘린더 색(#rrggbb), memoColor: 메모 색 이름(yellow 등) — 출처 줄의 점
  *   lines: 반복 · 알림 · 장소 같은 한 줄씩, note: 일정 설명(여러 줄), actions: 아래 단추 (누르면 창을 닫고 run)
  * @returns {Promise<void>} 창을 닫으면
  */
-export function openEventDetail({ title, start, end = null, allDay = false, color, source, readOnly = false, lines = [], note = '', actions }) {
+export function openEventDetail({ title, start, end = null, allDay = false, color, memoColor, source, readOnly = false, lines = [], note = '', actions }) {
   return new Promise((resolve) => {
     const dialog = el('dialog', 'dialog event-detail');
     dialog.setAttribute('aria-labelledby', 'event-detail-h');
     if (color) dialog.style.setProperty('--ev-color', color);
+    if (memoColor) dialog.dataset.color = memoColor;
 
     const head = el('div', 'dialog-head');
     const h = el('h2', '', title || '(제목 없음)');

@@ -12,6 +12,7 @@ import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocal
 import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, googleCalendarUrl, deviceInsertArgs } from './core/calendar-feeds.js';
 import { openQuickEvent } from './quick-event.js';
 import { openCalendarLinks } from './calendar-links.js';
+import { openEventDetail } from './event-detail.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
@@ -391,12 +392,13 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       if (again) queueMicrotask(() => render()); // 한 번만 · 그리는 중에 옵션을 바꾸지 않게
     },
     dateClick: (arg) => pickDay(arg.date),
+    // 일정을 누르면 다른 앱으로 나가지 않고 자세히 보기 (월 보기는 그날도 골라 아래 목록을 맞춘다)
     eventClick: (arg) => {
       arg.jsEvent.preventDefault();
       const { item, ext } = arg.event.extendedProps;
-      if (isMonth()) return pickDay(arg.event.start, { add: false }); // 월 보기: 칸이 작아 날 고르기 (아래 목록에서 열기)
-      if (item) api.memo.open(item.memoId);
-      else if (ext) openExternal(ext);
+      if (isMonth() && !sameDay(arg.event.start, selected)) pickDay(arg.event.start, { add: false });
+      if (item) showMemoEvent(item, arg.event.start);
+      else if (ext) showExternal(ext);
     },
     eventDrop: (arg) => moveEvent(arg),
     views: {
@@ -547,7 +549,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     div.dataset.reminder = r.id;
 
     const main = el('button', 'row-main');
-    main.title = '메모 열기';
+    main.title = '자세히 보기';
     const time = el('span', 'ev-time', r.allDay ? '하루 종일' : koClock(start));
     const dot = el('span', 'row-dot');
     const text = el('span', 'row-text');
@@ -560,7 +562,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     sub.append(icon(KIND_ICON[r.kind]), el('span', '', parts.join(', ')));
     text.append(rowTitle, sub);
     main.append(time, dot, text);
-    main.addEventListener('click', () => api.memo.open(item.memoId));
+    main.addEventListener('click', () => showMemoEvent(item, start));
 
     const del = el('button', 'icon-btn');
     del.title = '일정 삭제';
@@ -586,13 +588,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     sub.append(icon('calendar'), el('span', '', [e.source, e.location].filter(Boolean).join(', ')));
     text.append(sub);
     main.append(time, dot, text);
-    if (e.device && calendars?.device) {
-      main.title = '캘린더 앱에서 열기';
-      main.addEventListener('click', () => openExternal(e));
-    } else {
-      main.title = `${e.source} 일정 (메모킹에서는 보기만 — 오른쪽 단추로 메모로 가져오기)`;
-      main.disabled = true;
-    }
+    main.title = '자세히 보기';
+    main.addEventListener('click', () => showExternal(e));
     const take = el('button', 'icon-btn ev-import');
     take.type = 'button';
     take.title = '메모로 가져오기';
@@ -603,13 +600,42 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     return div;
   }
 
-  // 다른 캘린더 일정 누르기: 휴대폰 캘린더는 캘린더 앱에서 열고, 구독 캘린더는 그날을 골라 아래 목록에 (가져오기는 단추로만)
-  function openExternal(e) {
-    if (e.device && calendars?.device) {
-      calendars.device.view({ id: e.deviceId, start: e.start.getTime(), end: e.end.getTime() }).catch(() => {});
-      return;
-    }
-    pickDay(e.start, { add: false });
+  // ---------- 일정 자세히 보기 (누르면 다른 캘린더 앱으로 나가지 않고 여기서) ----------
+
+  function showMemoEvent(item, start) {
+    const r = item.reminder;
+    const span = occurrenceEnd(start, r.allDay);
+    openEventDetail({
+      title: r.title || item.title,
+      start,
+      end: r.allDay ? span : null, // 메모킹 일정은 끝나는 시각이 없다 — 하루 종일만 그날까지
+      allDay: Boolean(r.allDay),
+      memoColor: item.color,
+      source: r.title && r.title !== item.title ? `메모킹 · 메모 "${item.title}"` : '메모킹',
+      lines: [
+        { icon: 'repeat', text: r.kind === 'repeat' ? describeReminder(r) : '' },
+        { icon: 'bell', text: r.enabled ? `알림 ${describeAlerts(r)}` : '알림 꺼짐' },
+      ],
+      actions: [
+        { label: '일정 지우기', danger: true, run: () => update(item, (list) => list.filter((x) => x.id !== r.id)) },
+        { label: '메모 열기', primary: true, run: () => api.memo.open(item.memoId) },
+      ],
+    });
+  }
+
+  function showExternal(e) {
+    openEventDetail({
+      title: e.title,
+      start: e.start,
+      end: e.end,
+      allDay: e.allDay,
+      color: e.color || '#4285f4',
+      source: e.source,
+      readOnly: true,
+      lines: [{ icon: 'pin', text: e.location }],
+      note: e.description,
+      actions: [{ label: '메모로 가져오기', primary: Boolean(api.reminders.add), run: () => importExternal(e) }],
+    });
   }
 
   let importing = false;

@@ -31,6 +31,15 @@ function el(tag, className = '', text = '') {
   return node;
 }
 
+/** 칸 제목 + 메모킹이 그 캘린더에 무엇을 하는지(읽기 · 쓰기) 꼬리표 + 한 줄 설명 */
+function section(title, badge, kind, caption) {
+  const wrap = el('div', 'cal-sec');
+  const h = el('h3', 'cal-links-h3', title);
+  h.append(el('span', `cal-perm cal-perm-${kind}`, badge));
+  wrap.append(h, el('p', 'cal-sec-cap', caption));
+  return wrap;
+}
+
 function switchInput(label, checked) {
   const input = el('input', 'switch');
   input.type = 'checkbox';
@@ -57,11 +66,13 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
     close.append(icon('close'));
     close.addEventListener('click', () => dialog.close());
     head.append(h, close);
-    const lead = el('p', 'cal-links-lead', 'Google 캘린더 · 삼성 캘린더와 일정을 서로 맞추거나, 다른 캘린더를 달력에 함께 볼 수 있어요.');
+    const lead = el('p', 'cal-links-lead', '메모킹이 다른 캘린더에 쓰는지, 읽기만 하는지에 따라 나눴어요.');
 
+    const twice = el('p', 'feed-note cal-twice', '주고받기의 "메모킹" 캘린더는 여기서 빼고 보여요 (같은 일정이 두 번 보이지 않게)');
+    twice.hidden = true;
     // ---------- Google 캘린더와 서로 맞추기 ----------
     const google = calendars.google;
-    const syncTitle = el('h3', 'cal-links-h3', 'Google 캘린더와 서로 맞추기');
+    const syncTitle = section('Google 캘린더와 주고받기', '읽기 + 쓰기', 'rw', '메모킹 일정 ⇄ Google 캘린더의 "메모킹" 캘린더. 어느 쪽에서 고치거나 만들어도 서로 들어가요');
     const syncCard = el('div', 'gsync');
     const syncText = el('span', 'feed-text');
     const syncName = el('b');
@@ -93,6 +104,7 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
     let busy = false;
     function drawSync(info) {
       const on = Boolean(info?.connected);
+      twice.hidden = !on || !calendars.device;
       syncCard.classList.toggle('on', on);
       syncCard.classList.toggle('error', on && Boolean(info?.error));
       connectBtn.hidden = on;
@@ -102,7 +114,7 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
       connectBtn.disabled = busy;
       if (!on) {
         syncName.textContent = '연결 안 됨';
-        syncSub.textContent = '메모킹 일정 ⇄ Google 캘린더 · 삼성 캘린더 — 어느 쪽에서 고치거나 만들어도 서로 들어가요';
+        syncSub.textContent = 'Google 계정으로 연결하면 삼성 캘린더에서도 보이고 고칠 수 있어요';
         return;
       }
       syncName.textContent = 'Google 캘린더의 "메모킹" 캘린더와 맞춰요';
@@ -145,7 +157,7 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
     }
 
     // ---------- 함께 보기 ----------
-    const seeTitle = el('h3', 'cal-links-h3', '함께 보기 (보기만)');
+    const seeTitle = section('함께 보기', '읽기만', 'r', '그 캘린더의 일정을 메모킹 달력에 보여 주기만 해요. 그 캘린더는 바꾸지 않아요');
     const list = el('ul', 'feed-list');
     list.setAttribute('aria-label', '함께 보는 캘린더');
 
@@ -205,9 +217,21 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
       return li;
     }
 
+    // 주소로 더하기는 드물게 쓰니 접어 둔다 (누르면 칸이 열린다)
+    let addOpen = false;
+    const openAdd = el('button', 'link-btn feed-open-add', '＋ iCal 주소로 캘린더 더하기');
+    openAdd.type = 'button';
+    openAdd.addEventListener('click', () => {
+      addOpen = true;
+      drawList();
+      url.focus();
+    });
     function drawList() {
       list.replaceChildren(...(deviceRow ? [deviceRow] : []), ...feeds.map(feedRow));
-      addForm.hidden = feeds.length >= MAX_FEEDS;
+      const full = feeds.length >= MAX_FEEDS;
+      addForm.hidden = full || !addOpen;
+      help.hidden = full || !addOpen;
+      openAdd.hidden = full || addOpen;
     }
 
     // 주소 넣기
@@ -293,6 +317,7 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
 
     // ---------- 보내기 ----------
     // 한 번만 넣는 방법이라(서로 맞추기가 있으니) 접어 둔다
+    const sendTitle = section('보내기', '쓰기만', 'w', '메모킹 일정을 다른 캘린더에 한 번 넣어요. 그 뒤에 바뀐 건 따라가지 않아요');
     const send = el('details', 'cal-help cal-send');
     send.append(el('summary', '', '파일로 한 번에 보내기 (.ics)'));
     const events = items.filter((i) => isEvent(i.reminder));
@@ -325,7 +350,7 @@ export function openCalendarLinks({ calendars, items, notify, feedTexts }) {
     actions.append(done);
 
     send.append(exportBtn, sendNote, ...(calendars.openUrl ? [importLink] : []));
-    dialog.append(head, lead, ...(google ? [syncTitle, syncCard, syncHelp] : []), seeTitle, list, addForm, addNote, help, send, actions);
+    dialog.append(head, lead, ...(google ? [syncTitle, syncCard, syncHelp] : []), seeTitle, list, twice, openAdd, addForm, addNote, help, sendTitle, send, actions);
     dialog.addEventListener('close', () => {
       unsubscribe?.();
       dialog.remove();

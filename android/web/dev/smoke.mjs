@@ -412,12 +412,12 @@ try {
     await page.setViewportSize(size);
     await page.waitForTimeout(300);
     const before = await calHeights();
-    const tapped = await page.tap(`#reminder-groups [role="gridcell"][data-date="${otherDay}"]`, { timeout: 3000 }).then(() => true, () => false);
+    const tapped = await page.tap(`#reminder-groups [role="gridcell"][data-date="${otherDay}"]`, { timeout: 3000, position: { x: 6, y: 6 } }).then(() => true, () => false);
     await page.waitForTimeout(300);
     steady.push({ size: `${size.width}x${size.height}`, before, tapped, after: await calHeights() });
   }
   check('일정 탭: 달력이 깜빡이지 않음 (날을 눌러도 높이 그대로)', steady.every((s) => s.before.length === 1 && s.tapped && s.after.length === 1), JSON.stringify(steady));
-  await page.tap(`#reminder-groups [role="gridcell"][data-date="${ymd(now0)}"]`, { timeout: 3000 }).catch(() => {}); // 다시 오늘
+  await page.tap(`#reminder-groups [role="gridcell"][data-date="${ymd(now0)}"]`, { timeout: 3000, position: { x: 6, y: 6 } }).catch(() => {}); // 다시 오늘
   await page.waitForTimeout(300);
   // 달력에서 바로 일정 만들기: 고른 날 › ＋ 일정 추가 → 이름·시각 → 미리 알림 → 새 메모 / 있는 메모
   await page.tap('.ev-add');
@@ -448,13 +448,17 @@ try {
   // 다른 캘린더: 휴대폰 캘린더(삼성 캘린더) 켜기 → 달력 · 다가오는 일정에 함께, 일정 줄의 보내기 → 캘린더 앱 새 일정
   await page.tap('.cal-link');
   await page.waitForSelector('.cal-links[open]');
-  check('다른 캘린더: 주소 칸이 비면 "추가" 를 누를 수 없음 (빨간 꾸중 없음)', await page.isDisabled('.feed-add .btn') && !(await page.textContent('.feed-note')));
+  check('다른 캘린더: 주소 칸은 접혀 있다가 "＋ iCal 주소로" 를 누르면 열림', await page.isHidden('.feed-add') && await page.isVisible('.feed-open-add'));
+  await page.tap('.feed-open-add');
+  check('다른 캘린더: 주소 칸이 비면 "추가" 를 누를 수 없음 (빨간 꾸중 없음)', await page.isVisible('.feed-add') && await page.isDisabled('.feed-add .btn') && !(await page.textContent('.feed-add + .feed-note')));
   // 뒤로 가기: 창만 닫고 일정 탭 그대로 (예전: 창은 떠 있고 뒤 화면만 메모 탭으로)
   await back();
   await page.waitForTimeout(300);
   check('다른 캘린더: 뒤로 가기는 창을 닫고 일정 탭 그대로', !(await page.isVisible('.cal-links[open]')) && await page.isVisible('#reminder-groups .cal'));
   await page.tap('.cal-link');
   await page.waitForSelector('.cal-links[open]');
+  check('다른 캘린더 창: 읽기 · 쓰기 꼬리표 (주고받기 읽기 + 쓰기 · 함께 보기 읽기만 · 보내기 쓰기만)',
+    JSON.stringify(await page.$$eval('.cal-links .cal-perm', (n) => n.map((x) => x.textContent))) === JSON.stringify(['읽기 + 쓰기', '읽기만', '쓰기만']));
   await page.tap('.feed-device .switch');
   await page.waitForTimeout(300);
   check('다른 캘린더: 휴대폰 캘린더 켜기 (권한 허용)', await page.isChecked('.feed-device .switch'));
@@ -467,6 +471,30 @@ try {
   }));
   check('다른 캘린더: 삼성 캘린더 일정이 달력(점선) · 다가오는 일정에 함께', ext.bars.some((t) => /삼성 캘린더/.test(t)) && ext.rows.includes('가족 저녁'), JSON.stringify(ext));
   await shot('02j-calendar-device');
+  // 일정을 누르면 다른 캘린더 앱으로 나가지 않고 메모킹 안에서 자세히 보기 (예전: 캘린더 앱 → "일정을 찾을 수 없습니다")
+  const viewsBefore = (await devLog()).log.filter((l) => l.calendarView).length;
+  await page.tap('.ev-ext .row-main >> nth=0');
+  await page.waitForSelector('.event-detail[open]');
+  const detail = await page.evaluate(() => ({
+    title: document.querySelector('.event-detail h2')?.textContent,
+    badge: document.querySelector('.event-detail .ed-badge')?.textContent,
+    note: document.querySelector('.event-detail .ed-note')?.textContent ?? '',
+    buttons: [...document.querySelectorAll('.event-detail .ed-actions .btn')].map((b) => b.textContent),
+  }));
+  await page.waitForTimeout(400);
+  await shot('02j2-event-detail');
+  const viewsAfter = (await devLog()).log.filter((l) => l.calendarView).length;
+  check('일정 누르기: 다른 캘린더 일정 → 메모킹 안의 자세히 보기 (보기만 · 메모로 가져오기), 캘린더 앱은 안 열림',
+    Boolean(detail.title) && detail.badge === '보기만' && detail.buttons.includes('메모로 가져오기') && viewsAfter === viewsBefore, JSON.stringify(detail));
+  if (detail.title === '가족 저녁') check('자세히 보기: 일정 설명을 줄 그대로 (HTML 줄바꿈)', detail.note === '엄마 아빠랑\n7시까지 도착', JSON.stringify(detail.note));
+  await back();
+  await page.waitForTimeout(200);
+  await page.tap('.ev-row:not(.ev-ext) .row-main >> nth=0');
+  await page.waitForSelector('.event-detail[open]');
+  const memoDetail = await page.evaluate(() => [...document.querySelectorAll('.event-detail .ed-actions .btn')].map((b) => b.textContent));
+  check('일정 누르기: 메모킹 일정 → 자세히 보기 (메모 열기 · 일정 지우기)', memoDetail.includes('메모 열기') && memoDetail.includes('일정 지우기'), JSON.stringify(memoDetail));
+  await page.tap('.event-detail .dialog-x');
+  await page.waitForTimeout(200);
   await page.tap('.ev-row:not(.ev-ext) .ev-send');
   await page.waitForTimeout(300);
   const inserted = (await devLog()).log.find((l) => l.calendarInsert)?.calendarInsert;
