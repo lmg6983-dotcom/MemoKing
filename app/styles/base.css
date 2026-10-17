@@ -753,6 +753,8 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .ed-dot { flex: none; width: 12px; height: 12px; margin: 4px 3px 0; border-radius: 99px; background: var(--ev-color, var(--note-chip, var(--brand-yellow))); }
 .ed-badge { flex: none; margin-left: auto; padding: 1px 8px; border: 1px solid var(--line); border-radius: 99px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .dialog p.ed-note { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-1); font-size: 13.5px; line-height: 1.6; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
+.ed-link { color: var(--text-strong); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 2px; overflow-wrap: anywhere; cursor: pointer; }
+.ed-lines .ed-url { font-size: 13.5px; }
 .ed-actions { margin-top: 18px; }
 .ed-actions .btn { min-height: 44px; }
 .ed-actions .ed-danger { margin-right: auto; color: var(--danger); }

@@ -161,3 +161,14 @@ test('오늘 하루 종일 일정을 가져오면 켜 둠 · 아주 오래된 �
   assert.equal(got.length, 24);
   assert.ok(Date.now() - t < 8000);
 });
+
+test('일정에 붙은 주소(URL) · 설명 속 주소: 인터넷 주소만 넘김', () => {
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//t//t//KO',
+    'BEGIN:VEVENT', 'UID:a', 'DTSTART:20261020T010000Z', 'DTEND:20261020T020000Z', 'SUMMARY:회의', 'URL:https://meet.example.com/abc', 'DESCRIPTION:자료: https://docs.example.com/x', 'END:VEVENT',
+    'BEGIN:VEVENT', 'UID:b', 'DTSTART:20261021T010000Z', 'DTEND:20261021T020000Z', 'SUMMARY:이상한 주소', 'URL:javascript:alert(1)', 'END:VEVENT',
+    'END:VCALENDAR'].join('\r\n');
+  const [a, b] = feedEvents(ics, new Date(Date.UTC(2026, 9, 19)), new Date(Date.UTC(2026, 9, 23)));
+  assert.equal(a.url, 'https://meet.example.com/abc');
+  assert.equal(a.description, '자료: https://docs.example.com/x');
+  assert.equal(b.url, '');
+});
