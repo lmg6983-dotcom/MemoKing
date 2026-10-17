@@ -38,6 +38,11 @@ function close() {
   setTimeout(() => bubble.remove(), 160);
 }
 
+/** 떠 있는 힌트 닫기 (탭을 바꿨을 때 — 다른 화면의 안내가 남아 있지 않게) */
+export function closeHint() {
+  close();
+}
+
 /**
  * @param {string} name 힌트 이름 (한 번만)
  * @param {string} text

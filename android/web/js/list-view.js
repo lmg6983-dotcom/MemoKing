@@ -11,7 +11,7 @@ import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog, isTwoPane, toast } from './ui.js';
 import { tutEvent } from './tutorial.js';
 import { haptic, reduceMotion, tabKeys, syncTabStops } from '../../app/js/dom.js';
-import { hintOnce } from '../../app/js/hints.js';
+import { hintOnce, closeHint } from '../../app/js/hints.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -212,6 +212,7 @@ export function render() {
 
 // 카드가 두 개 이상 보일 때 한 번: 옆으로 밀기·꾹 누르기 (눈에 안 보이는 동작)
 function hintCards() {
+  if (state.tab !== 'memos') return; // 그사이 일정 · 보관함 탭으로 갔으면 다음에 (달력 위에 메모 카드 안내가 뜨지 않게)
   const card = document.querySelector('.item .card');
   if (!card?.getClientRects().length) return; // 목록이 안 보이면 다음에
   hintOnce('card-gestures', '카드를 옆으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 색, 고정, 공유 메뉴가 떠요', { anchor: card });
@@ -325,6 +326,7 @@ el.search.addEventListener('keydown', (e) => {
 
 function setTab(tab) {
   state.tab = tab;
+  closeHint(); // 앞 탭의 안내는 닫는다
   for (const b of document.querySelectorAll('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   syncTabStops(document.querySelector('.tabs'));
   $('view-memos').hidden = tab !== 'memos';
@@ -333,7 +335,10 @@ function setTab(tab) {
   el.filterBtn.hidden = tab !== 'memos';
   el.layoutBtn.hidden = tab !== 'memos'; // 한 줄씩 보기도 메모 탭에서만
   el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: '보관한 알림 검색' }[tab];
-  $('fab').hidden = tab === 'history' || tab === 'reminders'; // 보관함·일정 탭엔 + 없음 (일정은 달력의 "＋ 일정 추가" 로)
+  $('fab').hidden = tab === 'history'; // 보관함엔 + 없음. 일정 탭의 + 는 새 일정 (메모 탭과 같은 자리)
+  $('fab').setAttribute('aria-label', tab === 'reminders' ? '새 일정' : '새 메모');
+  if (tab === 'reminders') $('fab').removeAttribute('aria-haspopup');
+  else $('fab').setAttribute('aria-haspopup', 'menu');
   if (tab === 'reminders') remindersTab.refresh();
   runSearch();
 }
@@ -628,4 +633,12 @@ export function back() {
     return true;
   }
   return false;
+}
+
+/** 지금 보는 목록 탭 (memos · reminders · history) */
+export const currentTab = () => state.tab;
+
+/** 일정 탭의 + : 고른 날에 새 일정 */
+export function addEvent() {
+  return remindersTab?.addEvent();
 }

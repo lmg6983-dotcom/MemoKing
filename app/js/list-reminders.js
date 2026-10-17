@@ -478,12 +478,20 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     render();
   }
 
+  /** 그날 보이는 일정이 있는가 (메모킹 일정 · 다른 캘린더) */
+  function busyOn(d) {
+    const end = addDays(d, 1);
+    return occurrences(d, end).length > 0 || externalBetween(d, end).length > 0;
+  }
+
+  // 날 누르기: 일정이 없는 앞으로의 날이면 바로 새 일정 (캘린더 앱처럼), 일정이 있으면 골라 아래 목록에 — 고른 날을 다시 누르면 새 일정
   function pickDay(date, { add = true } = {}) {
     const d = dayStart(date);
-    if (add && sameDay(d, selected) && d >= today()) return quickAdd(d); // 고른 날을 다시 누르면 바로 일정 추가
+    const again = sameDay(d, selected);
     selected = d;
     if (isMonth() && (d < calendar.view.currentStart || d >= calendar.view.currentEnd)) calendar.gotoDate(d);
     render();
+    if (add && d >= today() && (again || !busyOn(d))) return quickAdd(d);
     if (!add) rowsEl.querySelector('.ev-day-title')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
@@ -815,7 +823,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       const out = await openQuickEvent({ day, search: (q) => api.memos.search(q) });
       if (!out) return;
       await api.reminders.add(out.memoId, out.reminder, out.newTitle);
-      selected = dayStart(day);
+      selected = dayStart(new Date(out.reminder.at)); // 일정 창에서 날짜를 바꿨으면 그날로
+      if (isMonth() && (selected < calendar.view.currentStart || selected >= calendar.view.currentEnd)) calendar.gotoDate(selected);
       await refresh();
       notify(out.memoId ? '메모에 일정을 넣었어요' : `새 메모 "${out.newTitle}"에 일정을 만들었어요`);
     } catch (err) {
@@ -838,6 +847,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   return {
     refresh,
+    // + 단추 (휴대폰 일정 탭): 고른 날에 새 일정 — 지난 날을 골라 두었으면 오늘
+    addEvent: () => quickAdd(selected >= today() ? selected : today()),
     setQuery(q) {
       query = q;
       render();

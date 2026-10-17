@@ -392,7 +392,6 @@ try {
   }));
   check('일정 탭: 달력 42칸 · 다가오는 일정에 "치과 · 알림 30분 전, 2시간 전"', cal.days === 42 && cal.rows.some((t) => /치과/.test(t) && /알림 30분 전, 2시간 전/.test(t)), JSON.stringify(cal));
   await shot('02g-calendar');
-  check('일정 탭: + 버튼 없음 (보관함처럼)', await page.isHidden('#fab'));
   // 달력 크기가 가만히 있는가 (예전: 휴대폰에서 달력 높이 ↔ 남은 자리가 서로 맞물려 끝없이 깜빡임)
   const calHeights = () => page.evaluate(() => new Promise((done) => {
     const seen = new Set();
@@ -414,11 +413,14 @@ try {
     const before = await calHeights();
     const tapped = await page.tap(`#reminder-groups [role="gridcell"][data-date="${otherDay}"]`, { timeout: 3000, position: { x: 6, y: 6 } }).then(() => true, () => false);
     await page.waitForTimeout(300);
+    if (await page.isVisible('.quick-event[open]')) await page.keyboard.press('Escape'); // 빈 앞날을 누르면 새 일정 창이 열린다
     steady.push({ size: `${size.width}x${size.height}`, before, tapped, after: await calHeights() });
   }
   check('일정 탭: 달력이 깜빡이지 않음 (날을 눌러도 높이 그대로)', steady.every((s) => s.before.length === 1 && s.tapped && s.after.length === 1), JSON.stringify(steady));
   await page.tap(`#reminder-groups [role="gridcell"][data-date="${ymd(now0)}"]`, { timeout: 3000, position: { x: 6, y: 6 } }).catch(() => {}); // 다시 오늘
   await page.waitForTimeout(300);
+  if (await page.isVisible('.quick-event[open]')) await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
   // 목록 보기: 시각은 제목 위 작은 줄 — 제목이 줄 폭을 거의 다 쓴다 (예전: 시각 칸이 절반, 제목 99px 에서 잘림)
   await page.tap('.cal-views button[data-view="listMonth"]');
   await page.waitForTimeout(400);
@@ -426,32 +428,56 @@ try {
   check('목록 보기: 일정 제목이 줄 폭을 다 씀 (200px 넘게)', listTitleW > 200 && Number.isFinite(listTitleW), String(listTitleW));
   await page.tap('.cal-views button[data-view="dayGridMonth"]');
   await page.waitForTimeout(400);
-  // 달력에서 바로 일정 만들기: 고른 날 › ＋ 일정 추가 → 이름·시각 → 미리 알림 → 새 메모 / 있는 메모
-  await page.tap('.ev-add');
+  // 새 일정: 한 화면 (이름 · 날짜 · 시각 · 🔔 · 📝 → 일정 저장). 입구: 일정 탭의 + · 빈 앞날 누르기 · "＋ 일정 추가"
+  check('일정 탭: + 단추 = 새 일정 (메모 탭과 같은 자리)', await page.isVisible('#fab') && (await page.getAttribute('#fab', 'aria-label')) === '새 일정');
+  await page.tap('#fab');
   await page.waitForSelector('.quick-event[open]');
-  check('바로 일정 추가: 처음엔 이름·시각만 (미리 알림·메모 고르기는 숨김)', await page.isVisible('.qe-name') && await page.isHidden('.quick-event [data-step="alerts"]') && await page.isHidden('.qe-new'));
+  const sheet = await page.evaluate(() => ({
+    name: Boolean(document.querySelector('.quick-event .qe-name')),
+    date: document.querySelector('.quick-event .qe-date-text')?.textContent ?? '',
+    alertsOpen: !document.querySelector('.quick-event [data-step="alerts"]').hidden,
+    memoOpen: !document.querySelector('.quick-event [data-step="memo"]').hidden,
+    rows: [...document.querySelectorAll('.quick-event .qe-row')].map((r) => r.textContent),
+    save: document.querySelector('.quick-event .qe-save')?.textContent,
+    focused: document.activeElement?.classList.contains('qe-name'),
+  }));
+  check('새 일정 창: 한 화면 (이름 · 날짜 · 🔔 미리 알림 · 📝 저장할 메모 줄, 알림 · 메모 칸은 접힘) · 단추 "일정 저장" · 이름 칸에 바로 입력',
+    sheet.name && /오늘|\d+월 \d+일/.test(sheet.date) && !sheet.alertsOpen && !sheet.memoOpen && sheet.rows.length === 2 && /미리 알림/.test(sheet.rows[0]) && /새 메모/.test(sheet.rows[1]) && sheet.save === '일정 저장' && sheet.focused, JSON.stringify(sheet));
   await page.fill('.qe-name', '팀 점심');
-  const qeNext = '.quick-event .flow-footer .btn.primary';
-  await page.tap(qeNext);
-  await page.tap(qeNext);
-  await shot('02h-quick-event-memo');
-  check('바로 일정 추가: 마지막엔 "새 메모"(처음 골라 둠) · 메모 목록 · 아래 단추 "새 메모로 만들기"', /팀 점심/.test(await page.textContent('.qe-new')) && (await page.getAttribute('.qe-new', 'aria-checked')) === 'true' && (await page.locator('.qe-memo').count()) > 1 && (await page.textContent(qeNext)) === '새 메모로 만들기');
-  await page.tap(qeNext);
+  check('새 일정 창: 이름을 쓰면 📝 줄이 새 메모 "팀 점심"', /새 메모 "팀 점심"/.test(await page.textContent('.qe-memo-row')));
+  await page.tap('.qe-time .dp-quick [data-time="21:00"]').catch(() => {}); // 오늘이라도 지나지 않게 (21시 이후 실행이면 아래에서 날짜를 바꾼다)
+  if (new Date().getHours() >= 21) await page.fill('.qe-date-input', ymd(new Date(Date.now() + 86_400_000)));
+  await shot('02h-quick-event');
+  await page.tap('.qe-save');
   await page.waitForTimeout(600);
   const lunch = fs.existsSync(path.join(vault, '팀 점심.md')) ? read('팀 점심.md') : '';
-  check('바로 일정 추가: 일정 이름으로 새 메모 + 일정', /^# 팀 점심/m.test(lunch) && /kind: at/.test(lunch), lunch.slice(0, 300));
-  await page.tap('.ev-add');
-  await page.waitForSelector('.quick-event[open]');
+  check('새 일정: 이름 쓰고 바로 "일정 저장" → 일정 이름으로 새 메모 + 일정 (+ → 저장, 두 번)', /^# 팀 점심/m.test(lunch) && /kind: at/.test(lunch), lunch.slice(0, 300));
+  // 빈 앞날을 누르면 바로 새 일정 창 (그 날짜로) — 날짜를 바꾸고 있는 메모에 넣기
+  const emptyDay = await page.evaluate(() => {
+    const t = new Date();
+    const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const cells = [...document.querySelectorAll('#reminder-groups [role="gridcell"][data-date]')];
+    return cells.find((c) => c.dataset.date > key(t) && !c.querySelector('.mk-ev, .mk-more'))?.dataset.date ?? null;
+  });
+  if (emptyDay) await page.tap(`#reminder-groups [role="gridcell"][data-date="${emptyDay}"]`, { position: { x: 6, y: 6 } });
+  else await page.tap('#fab');
+  await page.waitForSelector('.quick-event[open]', { timeout: 3000 }).catch(() => {});
+  check('빈 앞날을 누르면 바로 새 일정 창', !emptyDay || await page.isVisible('.quick-event[open]'), String(emptyDay));
   await page.fill('.qe-name', '주간 보고');
-  await page.tap(qeNext);
-  await page.tap(qeNext);
+  const moved = ymd(new Date(Date.now() + 2 * 86_400_000));
+  await page.fill('.qe-date-input', moved);
+  check('새 일정 창: 날짜를 바꿀 수 있음 (📅 칸)', (await page.textContent('.qe-date-text')).includes(`${new Date(Date.now() + 2 * 86_400_000).getDate()}일`), await page.textContent('.qe-date-text'));
+  await page.tap('.qe-memo-row');
   await page.fill('.qe-search', '회의');
   await page.waitForTimeout(200);
   await page.tap('.qe-memo:not(.qe-new)');
-  check('바로 일정 추가: 메모를 고르면 아래 단추가 "\'회의 메모\'에 넣기"', (await page.textContent(qeNext)) === "'회의 메모'에 넣기", await page.textContent(qeNext));
-  await page.tap(qeNext);
+  check('새 일정 창: 메모를 고르면 📝 줄이 그 메모 · 단추는 그대로 "일정 저장"', /회의 메모/.test(await page.textContent('.qe-memo-row')) && (await page.textContent('.qe-save')) === '일정 저장', await page.textContent('.qe-memo-row'));
+  await page.tap('.qe-save');
   await page.waitForTimeout(600);
-  check('바로 일정 추가: 있는 메모를 고르면 그 메모에 일정', /title: 주간 보고/.test(read('회의 메모.md')), read('회의 메모.md').slice(0, 400));
+  const meet = read('회의 메모.md');
+  check('새 일정: 있는 메모를 고르면 그 메모에 일정 · 바꾼 날짜로', /title: 주간 보고/.test(meet) && meet.includes(`at: "${moved}T`) || meet.includes(`at: ${moved}T`), meet.slice(0, 400));
+  await page.tap('.cal-today'); // 다시 오늘 (아래 "다가오는 일정" 점검이 오늘 기준)
+  await page.waitForTimeout(300);
   // 다른 캘린더: 휴대폰 캘린더(삼성 캘린더) 켜기 → 달력 · 다가오는 일정에 함께, 일정 줄의 보내기 → 캘린더 앱 새 일정
   await page.tap('.cal-link');
   await page.waitForSelector('.cal-links[open]');
