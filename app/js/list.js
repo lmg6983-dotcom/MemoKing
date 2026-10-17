@@ -67,6 +67,7 @@ let drivePanel = null; // Google Drive 직접 동기화 (설정 · 처음 화면
 // ---------- 화면 전환 ----------
 
 function applyInfo(info) {
+  if (state.onlyFiles && info.vaultPath !== state.info?.vaultPath) closeOnlyFiles(); // 다른 메모 폴더로 바뀌면 사본만 보기를 푼다
   state.info = info;
   const ready = Boolean(info.vaultPath);
   el.setup.hidden = ready;
@@ -85,10 +86,15 @@ function showOnlyFiles(files) {
     if (activeTab !== 'memos') showTab('memos');
     const all = Object.assign(document.createElement('button'), { type: 'button', className: 'link-btn', textContent: '모두 보기' });
     all.addEventListener('click', () => showOnlyFiles(null));
-    bar.replaceChildren(Object.assign(document.createElement('span'), { textContent: `동기화 충돌 사본 ${files.length}개만 보는 중 — 원래 메모와 견주어 보고 필요 없으면 지우세요` }), all);
+    bar.replaceChildren(Object.assign(document.createElement('span'), { id: 'conflict-bar-text' }), all);
   }
   bar.hidden = !state.onlyFiles;
   render();
+}
+
+function closeOnlyFiles() {
+  state.onlyFiles = null;
+  $('conflict-bar').hidden = true;
 }
 
 // ---------- 목록 ----------
@@ -103,10 +109,18 @@ function render() {
     return;
   }
   renderPending = false;
-  const narrowed = Boolean(state.query) || filterCount() > 0;
-  let memos = filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
-  // 동기화 충돌 사본만 보기 (위쪽 구름 단추 · 설정의 "충돌 사본 보기")
-  if (state.onlyFiles) memos = memos.filter((m) => state.onlyFiles.has(String(m.file ?? '').replace(/\\/g, '/')));
+  // 동기화 충돌 사본만 보기 (위쪽 구름 단추 · 설정의 "충돌 사본 보기") — 검색 · 필터와 겹치지 않게 따로, 다 지우면 저절로 풀린다
+  let only = null;
+  if (state.onlyFiles) {
+    only = state.memos.filter((m) => state.onlyFiles.has(String(m.file ?? '').replace(/\\/g, '/')));
+    if (only.length) $('conflict-bar-text').textContent = `동기화 충돌 사본 ${only.length}개만 보는 중 — 원래 메모와 견주어 보고 필요 없으면 지우세요`;
+    else {
+      closeOnlyFiles();
+      only = null;
+    }
+  }
+  const narrowed = !only && (Boolean(state.query) || filterCount() > 0);
+  const memos = only ?? filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
   const before = glide ? null : cardRects();
   layoutCards(memos);
   if (before) animateCards(before);
@@ -458,6 +472,7 @@ async function refresh() {
 async function runSearch() {
   if (activeTab === 'reminders') return remindersTab.setQuery(el.search.value);
   if (activeTab === 'history') return historyTab.setQuery(el.search.value);
+  if (state.onlyFiles) closeOnlyFiles(); // 검색하면 사본만 보기는 푼다
   state.query = el.search.value.trim();
   // 검색어의 #태그 는 태그 필터로, 나머지는 글자 검색으로
   const { text, tags } = parseQuery(state.query);
@@ -1490,7 +1505,8 @@ $('tutorial-btn').addEventListener('click', () => {
   api.tutorial.start();
 });
 applyInfo(await api.info());
-if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog, showFiles: (files) => showOnlyFiles(files) });
+if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog, showFiles: (files) => showOnlyFiles(files),
+  memoFiles: () => (state.memos.length ? new Set(state.memos.map((m) => String(m.file ?? '').replace(/\\/g, '/'))) : null) });
 await refresh();
 $('count-memos').textContent = String(state.memos.length);
 await remindersTab.refresh();

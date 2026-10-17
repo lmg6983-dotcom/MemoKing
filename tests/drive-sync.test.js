@@ -309,3 +309,71 @@ test('양쪽에서 엇갈린 메모가 한 번에 너무 많으면 사본을 더
   const copies = fs.readdirSync(dir).filter((n) => n.includes('PC 충돌'));
   assert.equal(copies.length, 0); // 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 20개씩 또 생긴다)
 });
+
+test('여러 파일을 한꺼번에 올려도 새 폴더는 하나만 만들고, 진행(살펴보기 → n/총)을 알린다', async () => {
+  for (let i = 0; i < 9; i++) await lw(`attachments/새폴더/${i}.png`, `P${i}`);
+  // 폴더 만들기가 느려 여러 파일이 같은 폴더를 함께 기다리게
+  const make = drive.createFolder.bind(drive);
+  let made = 0;
+  drive.createFolder = async (p, n) => {
+    made++;
+    await new Promise((r) => setTimeout(r, 20));
+    return make(p, n);
+  };
+  let inFlight = 0;
+  let peak = 0;
+  const up = drive.upload.bind(drive);
+  drive.upload = async (...a) => {
+    peak = Math.max(peak, ++inFlight);
+    await new Promise((r) => setTimeout(r, 5));
+    inFlight--;
+    return up(...a);
+  };
+  const seen = [];
+  const r = await new SyncEngine({ root: dir, remote: drive, rootId: 'ROOT', state, onProgress: (p) => seen.push(p) }).run();
+  assert.equal(r.uploaded, 9);
+  assert.equal(made, 2, 'attachments · 새폴더 한 번씩');
+  assert.equal([...drive.files.values()].filter((f) => f.folder && f.name === '새폴더').length, 1);
+  assert.ok(peak > 1 && peak <= 4, `한꺼번에 4개까지 (${peak})`);
+  assert.equal(seen[0].phase, 'scan');
+  assert.deepEqual(seen.at(-1), { phase: 'transfer', done: 9, total: 9 });
+  for (let i = 0; i < 9; i++) assert.equal(drive.text(`attachments/새폴더/${i}.png`), `P${i}`);
+});
+
+test('한 파일이 실패하면 나머지 줄은 하던 것만 끝내고 멈추고, 끝낸 파일의 기준은 남는다', async () => {
+  for (let i = 0; i < 6; i++) await lw(`${i}.md`, `m${i}`);
+  const up = drive.upload.bind(drive);
+  drive.upload = async (p, name, ...a) => {
+    if (name === '3.md') throw new Error('Drive 오류');
+    return up(p, name, ...a);
+  };
+  await assert.rejects(sync(), /Drive 오류/);
+  assert.ok(!state.files['3.md']);
+  assert.ok(Object.keys(state.files).length >= 1);
+  drive.upload = up;
+  const before = Object.keys(state.files).length;
+  const r = await sync();
+  assert.equal(r.uploaded, 6 - before, '남은 것만 올린다');
+  for (let i = 0; i < 6; i++) assert.equal(drive.text(`${i}.md`), `m${i}`);
+});
+
+test('DriveSync: 진행 상황을 상태로 알리고(맞춘 수 moved), 끝나면 지운다', async () => {
+  const { DriveSync } = await import('../desktop/drive/drive-sync.js');
+  for (let i = 0; i < 3; i++) await lw(`${i}.md`, `m${i}`);
+  const auth = { connected: true, grantedFull: false, email: 'a@b.c' };
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-drive-state-'));
+  const s = new DriveSync({ api: drive, auth, stateDir });
+  s.config = { folderId: 'ROOT', folderName: '메모킹 동기화', root: dir };
+  const events = [];
+  s.on('status', (st) => events.push(structuredClone(st)));
+  const st = await s.runOnce();
+  fs.rmSync(stateDir, { recursive: true, force: true });
+  assert.equal(st.state, 'idle');
+  assert.equal(st.progress, null);
+  assert.equal(st.moved, 3);
+  const prog = events.filter((e) => e.progress).map((e) => e.progress);
+  assert.equal(prog[0].phase, 'scan');
+  assert.equal(prog.at(-1).done, 3);
+  assert.equal(prog.at(-1).total, 3);
+  assert.ok(prog.at(-1).since > 0);
+});

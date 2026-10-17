@@ -38,7 +38,7 @@
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
       </label>
-      <button id="sync-btn" class="icon-btn sync-btn" hidden aria-haspopup="dialog" aria-expanded="false" aria-controls="sync-pop"><svg><use href="#i-cloud"/></svg><span class="sync-mark" id="sync-mark" aria-hidden="true"></span></button>
+      <button id="sync-btn" class="icon-btn sync-btn" hidden aria-haspopup="dialog" aria-expanded="false" aria-controls="sync-pop"><svg><use href="#i-cloud"/></svg><span class="sync-mark" id="sync-mark" aria-hidden="true"></span><span class="sync-line" id="sync-line" aria-hidden="true" hidden><i></i></span></button>
       <button id="filter-btn" class="icon-btn filter-btn" title="필터 (색, 담긴 것)" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
       <button id="layout-btn" class="icon-btn layout-btn" title="한 줄씩 보기" aria-label="한 줄씩 보기"><svg><use href="#i-rows"/></svg></button>
       <button id="settings-btn" class="icon-btn" title="설정" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
@@ -126,7 +126,7 @@
       <h3 class="set-title" id="set-drive">Google Drive 동기화</h3>
       <div class="drive-box" id="drive-box">
         <svg class="drive-box-icon"><use href="#i-cloud"/></svg>
-        <div class="drive-box-text"><b id="drive-title"></b><small id="drive-sub"></small></div>
+        <div class="drive-box-text"><b id="drive-title"></b><small id="drive-sub"></small><div class="sync-bar" id="drive-bar" hidden><i></i></div></div>
       </div>
       <div class="dialog-actions left">
         <button id="drive-sync-now" class="btn primary">지금 동기화</button>
@@ -323,6 +323,7 @@
         <input id="new-folder-name" type="text" aria-label="새 폴더 이름" autocomplete="off" spellcheck="false" placeholder="새 폴더 이름">
         <button id="new-folder-ok" class="btn">만들기</button>
       </div>
+      <p class="hint small folder-msg" id="folder-msg" role="status" hidden></p>
       <p class="hint small" id="folder-local"></p>
       <p class="hint small" id="folder-change-note" hidden>다른 폴더로 바꾸면 이 PC 의 메모와 그 폴더의 메모를 합쳐 맞춰요. 지금 Drive 폴더의 메모는 그대로 남아요.</p>
       <div class="dialog-actions">
@@ -333,7 +334,8 @@
       </div>
     </div>
     <div class="drive-step" data-step="syncing" hidden>
-      <div class="wait big"><span class="spinner"></span><span>메모를 동기화하는 중…<br><small>메모가 많으면 시간이 조금 걸려요. 창을 닫아도 뒤에서 계속해요</small></span></div>
+      <div class="wait big"><span class="spinner"></span><span><span id="sync-step-title">메모를 동기화하는 중…</span><br><small id="sync-step-sub">메모가 많으면 시간이 조금 걸려요. 창을 닫아도 뒤에서 계속해요</small></span></div>
+      <div class="sync-bar wide" id="sync-step-bar" hidden><i></i></div>
       <div class="dialog-actions"><button id="sync-bg" class="btn">닫기</button></div>
     </div>
   </dialog>

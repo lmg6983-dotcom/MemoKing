@@ -482,7 +482,21 @@ function driveInfo() {
   };
 }
 
-async function useDriveFolder(folderId, folderName) {
+// 폴더 고르기 · 자동 연결은 한 번에 하나만 — 두 번 눌러도 메모 폴더를 두 번 옮기거나 동기화가 겹치지 않게
+let driveFolderBusy = null;
+function oneAtATime(fn) {
+  if (driveFolderBusy) return driveFolderBusy;
+  driveFolderBusy = fn().finally(() => {
+    driveFolderBusy = null;
+  });
+  return driveFolderBusy;
+}
+
+function useDriveFolder(folderId, folderName) {
+  return oneAtATime(() => switchDriveFolder(folderId, folderName));
+}
+
+async function switchDriveFolder(folderId, folderName) {
   let root = vault?.root;
   if (!root || insideDriveForDesktop(root)) root = path.join(app.getPath('documents'), '메모킹');
   const moving = root !== vault?.root;
@@ -504,10 +518,25 @@ async function useDriveFolder(folderId, folderName) {
 }
 
 const SYNC_FOLDER = '메모킹 동기화';
-async function autoDriveFolder() {
-  const found = (await driveApi.folders('root')).find((f) => f.name === SYNC_FOLDER);
-  const folder = found ?? await driveApi.createFolder('root', SYNC_FOLDER);
-  return useDriveFolder(folder.id, folder.name);
+// 내 드라이브의 "메모킹 동기화" 를 찾거나 만들어 맞춘다 — 같은 이름이 여럿이면 늘 가장 먼저 만든 것 (PC · 휴대폰이 같은 폴더를 고르게)
+function autoDriveFolder() {
+  return oneAtATime(async () => {
+    const folder = await findOrCreateDriveFolder('root', SYNC_FOLDER);
+    return switchDriveFolder(folder.id, folder.name);
+  });
+}
+
+// 같은 이름 폴더가 이미 있으면 그것 (새로 만들지 않는다) — 만드는 중에 또 부탁해도 하나만
+const folderMaking = new Map();
+function findOrCreateDriveFolder(parent, name) {
+  const key = `${parent}\u0000${name}`;
+  if (!folderMaking.has(key)) {
+    folderMaking.set(key, (async () => {
+      const found = (await driveApi.findFolders(name, parent))[0];
+      return found ? { ...found, existed: true } : { ...(await driveApi.createFolder(parent, name)), existed: false };
+    })().finally(() => folderMaking.delete(key)));
+  }
+  return folderMaking.get(key);
 }
 
 // ---------- 받아쓰기 (STT) ----------
@@ -913,6 +942,7 @@ app.whenReady().then(async () => {
     driveInfo,
     useDriveFolder,
     autoDriveFolder,
+    findOrCreateDriveFolder,
     configureDrive,
     setAutoStart: (on) => setAutoStart(on, updateTrayMenu),
     setQuickMemo,

@@ -53,6 +53,7 @@ export function registerIpc(ctx) {
     driveInfo,
     useDriveFolder,
     autoDriveFolder,
+    findOrCreateDriveFolder,
     configureDrive,
     setAutoStart,
     setQuickMemo,
@@ -271,10 +272,11 @@ export function registerIpc(ctx) {
     if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
     return { ...res, drive: driveInfo() };
   });
-  ipcMain.handle('drive:folders', async (_e, parent) => (await getDriveApi()?.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name })));
+  ipcMain.handle('drive:folders', async (_e, parent) => (await getDriveApi()?.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name, created: f.created })));
+  // 같은 이름 폴더가 이미 있으면 새로 만들지 않고 그것을 돌려준다 (existed: true)
   ipcMain.handle('drive:create-folder', async (_e, parent, name) => {
-    const f = await getDriveApi()?.createFolder(String(parent || 'root'), String(name));
-    return { id: f.id, name: f.name };
+    const f = await findOrCreateDriveFolder(String(parent || 'root'), String(name).trim());
+    return { id: f.id, name: f.name, created: f.created, existed: f.existed };
   });
   ipcMain.handle('drive:use', (_e, folderId, name) => useDriveFolder(String(folderId), String(name)));
   ipcMain.handle('drive:auto', () => autoDriveFolder());

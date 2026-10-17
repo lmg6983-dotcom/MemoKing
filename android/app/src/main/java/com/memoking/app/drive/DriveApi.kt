@@ -128,9 +128,9 @@ class DriveApi(private val ctx: Context) : Remote {
     override fun listChildren(folderId: String): List<Remote.Item> =
         query("'${folderId.replace("'", "\\'")}' in parents and trashed = false").map(::item)
 
-    /** 폴더 고르기 화면용: parent("root" = 내 드라이브) 안의 폴더들 */
+    /** 폴더 고르기 화면용: parent("root" = 내 드라이브) 안의 폴더들 — 같은 이름이면 먼저 만든 것부터 (PC 와 같은 폴더를 고르게) */
     fun folders(parent: String): List<Remote.Item> =
-        query("'${parent.replace("'", "\\'")}' in parents and mimeType = '${SyncEngine.FOLDER}' and trashed = false", "name").map(::item)
+        query("'${parent.replace("'", "\\'")}' in parents and mimeType = '${SyncEngine.FOLDER}' and trashed = false", "name,createdTime").map(::item)
 
     fun folderName(id: String): String = get("$API/files/${enc(id)}?fields=name").optString("name")
 

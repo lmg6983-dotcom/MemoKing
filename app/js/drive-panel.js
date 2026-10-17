@@ -40,25 +40,52 @@ const saveList = (key, list) => {
     // 이번 창에서만
   }
 };
+// 충돌 사본은 어느 계정 · Drive 폴더의 것인지 함께 — 연결을 끊거나 다른 폴더로 바꾸면 지난 사본 알림은 지운다
+const OWNER_KEY = 'memoking.syncConflictsFor';
 const loadConflicts = () => loadList(CONFLICT_KEY);
 const saveConflicts = (list) => saveList(CONFLICT_KEY, list);
-/** 로그인을 다시 해야 고쳐지는 오류인가 */
-const needsLogin = (msg) => /로그인|인증|권한|401|invalid_grant/i.test(msg ?? '');
+/** 로그인을 다시 해야 고쳐지는 오류인가 ("권한" 같은 말은 Drive 폴더 권한 오류에도 있어 넣지 않는다) */
+export const needsLogin = (msg) => /로그인해 주세요|로그인이 끊겼|다시 로그인|invalid_grant/i.test(msg ?? '');
+
+/** 동기화 진행 한 줄: "Drive 폴더 살펴보는 중…" · "파일 12/40개 맞추는 중 · 약 2분 남음" */
+export function progressText(p, now = Date.now()) {
+  if (!p) return '';
+  if (p.phase === 'scan') return 'Drive 폴더 살펴보는 중…';
+  if (!p.total) return '바뀐 메모가 없어요 · 마무리하는 중';
+  const left = etaText(p, now);
+  return `파일 ${p.done}/${p.total}개 맞추는 중${left ? ` · ${left}` : ''}`;
+}
+
+/** 남은 시간 어림 — 처음 몇 개 · 몇 초는 들쭉날쭉하니 말하지 않는다 */
+export function etaText(p, now = Date.now()) {
+  if (!p?.total || p.done < 2 || p.done >= p.total || now - (p.since ?? now) < 2500) return '';
+  const sec = ((now - p.since) / p.done) * (p.total - p.done) / 1000;
+  if (sec < 15) return '곧 끝나요';
+  if (sec < 60) return '1분 안에 끝나요';
+  return `약 ${Math.round(sec / 60)}분 남음`;
+}
+
+/** 진행 막대 0~1 (살펴보는 중이면 null — 오가는 막대) */
+export const progressFraction = (p) => (!p || p.phase === 'scan' ? null : p.total ? p.done / p.total : 1);
 
 /**
  * @param {{ api: any, onVault: (info: any) => void, confirm: (msg: string, ok: string) => Promise<boolean>,
  *           showFiles?: (files: string[]|null) => void }} options
  *   showFiles: 목록을 이 파일들(충돌 사본)만으로 좁히기 (null 이면 풀기)
+ *   memoFiles: 지금 메모 폴더의 메모 파일들 (Set, 아직 모르면 null) — 이미 지운 사본은 알림에서 뺀다
  */
-export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} }) {
+export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, memoFiles = () => null }) {
   const dialog = $('drive-dialog');
   const box = $('drive-box');
   let info = null;
   let path = [{ id: 'root', name: '내 드라이브' }];
   let loginRun = 0;
   let fullBusy = false;
+  let connecting = false;
+  let creating = false; // 새 폴더 만들기를 두 번(Enter + 단추) 해도 한 번만
   let conflicts = loadConflicts();
   const seen = new Set(loadList(SEEN_KEY));
+  const addedAt = new Map(); // 이번 창에서 새로 알게 된 사본 → 언제 (목록에 아직 안 들어왔을 수 있어 잠깐은 지우지 않는다)
 
   // ---------- 설정 안 상태 ----------
 
@@ -70,9 +97,49 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
     if (!info.connected) return { tone: 'off', title: '동기화 꺼짐', sub: 'Google 계정으로 연결하면 휴대폰 메모킹과 같은 메모를 써요', on };
     if (!info.active) return { tone: 'off', title: `${info.email || 'Google 계정'} 로그인됨`, sub: '동기화할 Drive 폴더를 아직 고르지 않았어요', on };
     const where = `${info.email || 'Google 계정'} › ${info.folderName || '메모킹'}`;
-    if (st.state === 'syncing') return { tone: 'busy', title: '동기화하는 중…', sub: where, on };
+    if (st.state === 'syncing') {
+      const p = st.progress;
+      const count = p?.phase === 'transfer' && p.total ? ` · ${p.done}/${p.total}` : '';
+      return { tone: 'busy', title: `동기화하는 중${count}`, sub: progressText(p) || where, on, progress: p ?? { phase: 'scan' } };
+    }
     if (st.state === 'error') return { tone: 'error', title: needsLogin(st.error) ? '다시 로그인해 주세요' : '동기화하지 못했어요', sub: st.error || '잠시 뒤 다시 시도해 주세요', on, error: true };
-    return { tone: 'ok', title: st.lastSync ? `동기화됨 · ${syncedAgo(st.lastSync)}` : '곧 동기화해요', sub: where, on };
+    // 방금 끝났으면 몇 개를 맞췄는지 (되고 있었는지 알 수 있게)
+    const fresh = st.lastSync && Date.now() - st.lastSync < 60_000;
+    const moved = fresh && st.moved ? ` · 파일 ${st.moved}개 맞춤` : fresh ? ' · 바뀐 것 없음' : '';
+    return { tone: 'ok', title: st.lastSync ? `동기화됨 · ${syncedAgo(st.lastSync)}${moved}` : '곧 동기화해요', sub: where, on };
+  }
+
+  /** 진행 막대 하나 그리기 (bar: .sync-bar / .sync-line) */
+  function paintBar(bar, sum) {
+    if (!bar) return;
+    bar.hidden = sum.tone !== 'busy';
+    if (bar.hidden) return;
+    const f = progressFraction(sum.progress);
+    bar.classList.toggle('scan', f == null);
+    bar.style.setProperty('--p', String(f ?? 0));
+  }
+
+  // 충돌 사본 알림: 연결이 바뀌었으면 비우고, 이미 지운 사본(1분 넘게 목록에 없는 것)은 뺀다
+  function tidyConflicts() {
+    const owner = info.connected && info.active ? `${info.email}|${info.folderId}` : '';
+    let stored = '';
+    try {
+      stored = localStorage.getItem(OWNER_KEY) ?? '';
+    } catch {
+      // 기억 못 함
+    }
+    if (owner && stored !== owner) {
+      try {
+        localStorage.setItem(OWNER_KEY, owner);
+      } catch {
+        // 이번 창에서만
+      }
+      if (stored) conflicts = []; // 다른 계정 · 폴더의 사본 알림
+    }
+    if (!info.connected) conflicts = [];
+    const files = memoFiles();
+    if (files) conflicts = conflicts.filter((f) => files.has(f.replace(/\\/g, '/')) || Date.now() - (addedAt.get(f) ?? 0) < 60_000);
+    saveConflicts(conflicts);
   }
 
   function render(next) {
@@ -81,10 +148,9 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
     const st = info.status ?? { state: 'off' };
     // 새로 생긴 충돌 사본은 확인할 때까지 기억
     const fresh = (st.conflicts ?? []).filter((f) => !seen.has(f) && !conflicts.includes(f));
-    if (fresh.length) {
-      conflicts = [...conflicts, ...fresh];
-      saveConflicts(conflicts);
-    }
+    for (const f of fresh) addedAt.set(f, Date.now());
+    if (fresh.length) conflicts = [...conflicts, ...fresh];
+    tidyConflicts();
     const sum = summary();
     const on = sum.on;
     box.classList.toggle('on', on);
@@ -105,7 +171,17 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
     // 외부 앱 메모 연동: 연결돼 있을 때만 (켜는 중에는 누르지 못하게)
     $('drive-full-row').hidden = !info.connected;
     if (!fullBusy) $('drive-full').checked = Boolean(info.fullScope);
+    paintBar($('drive-bar'), sum);
+    renderSyncStep(sum);
     renderHeader(sum);
+  }
+
+  // 처음 연결 창의 "동기화하는 중" 칸: 몇 개 중 몇 개 · 남은 시간
+  function renderSyncStep(sum) {
+    if (sum.tone !== 'busy') return;
+    $('sync-step-title').textContent = sum.progress?.phase === 'transfer' && sum.progress.total ? `메모를 맞추는 중 · ${sum.progress.done}/${sum.progress.total}` : '메모를 동기화하는 중…';
+    $('sync-step-sub').textContent = `${progressText(sum.progress)} — 창을 닫아도 뒤에서 계속해요`;
+    paintBar($('sync-step-bar'), sum);
   }
 
   // ---------- 목록 창 위쪽: 구름 단추 + 작은 창 ----------
@@ -118,33 +194,42 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
     syncBtn.dataset.tone = sum.tone;
     $('sync-mark').textContent = conflicts.length && sum.tone !== 'error' ? String(conflicts.length) : '';
     syncBtn.classList.toggle('has-conflicts', Boolean(conflicts.length) && sum.tone !== 'error');
-    const label = `Google Drive 동기화: ${sum.title}${conflicts.length ? `, 충돌 사본 ${conflicts.length}개` : ''}`;
+    paintBar($('sync-line'), sum);
+    const label = `Google Drive 동기화: ${sum.title}${sum.tone === 'busy' && sum.sub ? ` — ${sum.sub}` : ''}${conflicts.length ? `, 충돌 사본 ${conflicts.length}개` : ''}`;
     syncBtn.title = label;
     syncBtn.setAttribute('aria-label', label);
     if (!pop.hidden) fillPop(sum);
   }
   function fillPop(sum = summary()) {
     const st = info.status ?? {};
+    const focused = pop.contains(document.activeElement) ? document.activeElement.dataset.act : null; // 다시 그려도 누르던 단추에 머물게
     const head = document.createElement('div');
     head.className = `sync-pop-head tone-${sum.tone}`;
     head.append(Object.assign(document.createElement('b'), { textContent: sum.title }), Object.assign(document.createElement('small'), { textContent: sum.sub }));
     const actions = document.createElement('div');
     actions.className = 'sync-pop-actions';
-    const btn = (text, cls, fn) => {
+    const btn = (text, cls, fn, act = cls) => {
       const b = Object.assign(document.createElement('button'), { type: 'button', className: cls, textContent: text });
+      b.dataset.act = act;
       b.addEventListener('click', fn);
       actions.append(b);
       return b;
     };
     const login = sum.error && needsLogin(st.error);
-    if (!sum.on || login) btn(login || info.reconnect ? '다시 로그인' : '연결하기', 'btn primary', () => { closePop(); connect(); });
+    if (!sum.on || login) btn(login || info.reconnect ? '다시 로그인' : '연결하기', 'btn primary', () => { closePop(); connect(); }, 'main');
     else {
-      const now = btn(sum.error ? '다시 시도' : '지금 동기화', 'btn primary', () => syncNow());
+      const now = btn(sum.error ? '다시 시도' : sum.tone === 'busy' ? '맞추는 중…' : '지금 동기화', 'btn primary', () => syncNow(), 'main');
       now.disabled = st.state === 'syncing';
     }
-    if (conflicts.length) btn(`충돌 사본 ${conflicts.length}개 보기`, 'btn', () => { closePop(); viewConflicts(); });
-    btn('설정', 'link-btn', () => { closePop(); openSettings(); });
-    pop.replaceChildren(head, actions);
+    if (conflicts.length) btn(`충돌 사본 ${conflicts.length}개 보기`, 'btn', () => { closePop(); viewConflicts(); }, 'conflicts');
+    btn('설정', 'link-btn', () => { closePop(); openSettings(); }, 'settings');
+    const bar = Object.assign(document.createElement('div'), { className: 'sync-bar' });
+    bar.append(document.createElement('i'));
+    paintBar(bar, sum);
+    pop.replaceChildren(head, bar, actions);
+    const again = focused && pop.querySelector(`[data-act="${focused}"]:not(:disabled)`);
+    if (again) again.focus();
+    else if (focused) pop.querySelector('button:not(:disabled)')?.focus();
     if (conflicts.length) {
       const note = document.createElement('p');
       note.className = 'sync-pop-note';
@@ -185,20 +270,25 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
     $('drive-sync-now').disabled = true;
     try {
       await api.drive.sync();
-    } finally {
-      refresh();
+    } catch (err) {
+      // 보통은 상태(오류)로 알려 오지만, 부탁 자체가 실패하면 여기서
+      render({ ...info, status: { ...(info.status ?? {}), state: 'error', progress: null, error: cleanError(err) } });
+      return;
     }
+    refresh();
   }
 
   // 충돌 사본: 목록을 그 메모들만으로 (확인하면 기억을 지운다)
   function viewConflicts() {
-    const files = conflicts.slice();
+    const known = memoFiles();
+    const files = known ? conflicts.filter((f) => known.has(f.replace(/\\/g, '/'))) : conflicts.slice(); // 이미 지운 사본은 빼고
     for (const f of files) seen.add(f);
     saveList(SEEN_KEY, [...seen]);
     conflicts = [];
     saveConflicts(conflicts);
     render();
-    showFiles(files);
+    if (files.length) showFiles(files);
+    else confirm('충돌 사본을 이미 모두 지웠거나 옮겼어요.', '확인');
   }
 
   async function refresh() {
@@ -215,8 +305,15 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
     for (const s of dialog.querySelectorAll('.drive-step')) s.hidden = s.dataset.step !== name;
   }
 
+  // 창이 뜨기 전에 단추를 여러 번 눌러도 한 번만 (창이 뜬 뒤 · 뒤에서 동기화하는 중에 다시 부르는 것은 괜찮다 — PC 쪽이 한 번에 하나만 한다)
   async function connect({ folder = false } = {}) {
-    info = await api.drive.status();
+    if (connecting) return;
+    connecting = true;
+    try {
+      info = await api.drive.status();
+    } finally {
+      connecting = false;
+    }
     if (!dialog.open) dialog.showModal();
     if (!info.configured) {
       step('client');
@@ -228,19 +325,33 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
     return info.active ? openFolders() : autoFolder(); // 연결된 뒤 "다른 폴더로 바꾸기" 만 폴더 목록
   }
 
+  // "동기화하는 중" 칸을 아직 보고 있는가 — 닫기로 뒤에 보냈거나 다른 칸으로 넘어갔으면 창을 닫거나 묻지 않는다
+  const watchingSync = () => dialog.open && !dialog.querySelector('[data-step="syncing"]').hidden;
+
+  // 첫 동기화가 끝나면: 보고 있으면 창을 닫고, 실패했을 때만 알린다 (뒤로 보냈으면 위쪽 구름 단추가 알린다)
+  async function finishSync(res, failMsg) {
+    onVault(res.info);
+    render(res.drive);
+    const here = watchingSync();
+    if (here) dialog.close();
+    const st = res.status ?? {};
+    if (here && st.state === 'error') await confirm(`${failMsg}\n${st.error}`, '확인');
+  }
+
+  async function syncFailed(err, msg) {
+    if (watchingSync()) dialog.close();
+    // 뒤로 보냈어도 알린다 — 연결 자체가 안 됐으면 구름 단추에는 오류가 남지 않는다
+    await confirm(`${msg}\n${cleanError(err)}`, '확인');
+  }
+
   // 로그인하면 바로: "메모킹 동기화" 폴더를 찾거나(휴대폰이 먼저 만들었을 수 있음) 만들어 맞춘다 — 폴더를 고를 일이 없게
   async function autoFolder() {
     step('syncing');
+    renderSyncStep({ tone: 'busy', progress: { phase: 'scan' } });
     try {
-      const res = await api.drive.auto();
-      onVault(res.info);
-      render(res.drive);
-      dialog.close();
-      const st = res.status ?? {};
-      if (st.state === 'error') await confirm(`Google Drive와 연결했지만 동기화하지 못했어요.\n${st.error}`, '확인');
+      await finishSync(await api.drive.auto(), 'Google Drive와 연결했지만 동기화하지 못했어요.');
     } catch (err) {
-      dialog.close();
-      await confirm(`Google Drive와 연결하지 못했어요.\n${cleanError(err)}`, '확인');
+      await syncFailed(err, 'Google Drive와 연결하지 못했어요.');
     }
     refresh();
   }
@@ -253,6 +364,12 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
       if (run !== loginRun) return;
       info = await api.drive.status();
       render();
+      // 이미 고른 폴더가 있으면(로그인만 풀렸던 것) 그 폴더 그대로 다시 맞춘다 — "메모킹 동기화" 로 바꾸지 않게
+      if (info.active) {
+        dialog.close();
+        await syncNow();
+        return;
+      }
       await autoFolder();
     } catch (err) {
       if (run !== loginRun) return;
@@ -270,12 +387,21 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
       : !info.root ? '이 PC 에서는 "문서\\메모킹" 폴더에 메모를 두고 맞춰요.'
       : `이 PC 의 메모 폴더: ${info.root} (처음 맞출 때 이 메모들을 새 폴더로 올려요)`;
     $('folder-change-note').hidden = !info.active;
+    folderMsg('');
     path = [{ id: 'root', name: '내 드라이브' }];
     await showFolder();
   }
 
+  function folderMsg(text) {
+    $('folder-msg').textContent = text;
+    $('folder-msg').hidden = !text;
+  }
+
+  let shown = []; // 지금 보이는 폴더들 (새 폴더 이름이 겹치는지 보려고)
+
   async function showFolder() {
     const cur = path.at(-1);
+    shown = [];
     $('new-folder-row').hidden = true;
     const crumbs = $('crumbs');
     crumbs.replaceChildren();
@@ -304,7 +430,13 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
       return;
     }
     if (path.at(-1) !== cur) return; // 그새 다른 폴더로 감
+    shown = folders;
     list.replaceChildren();
+    // 같은 이름 폴더가 여럿이면 (예전에 두 번 만들어진 것) 만든 날로 구별 — 자동 연결(PC · 휴대폰)은 먼저 만든 것을 쓴다
+    const dupCount = new Map();
+    for (const f of folders) dupCount.set(f.name, (dupCount.get(f.name) ?? 0) + 1);
+    const firstOf = new Map();
+    for (const f of folders) if (!firstOf.has(f.name)) firstOf.set(f.name, f.id);
     if (!folders.length) {
       const top = cur.id === 'root';
       list.append(Object.assign(document.createElement('li'), { className: 'empty', textContent: top ? '메모킹이 만든 폴더가 아직 없어요 — 새 폴더를 만들어 주세요' : '안에 폴더가 없어요' }));
@@ -319,7 +451,13 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
       b.className = 'folder-open';
       b.title = '안으로 들어가기';
       b.innerHTML = '<svg><use href="#i-folder"/></svg>';
-      b.append(Object.assign(document.createElement('span'), { textContent: f.name }), Object.assign(document.createElement('i'), { className: 'folder-chev', textContent: '›' }));
+      b.append(Object.assign(document.createElement('span'), { textContent: f.name }));
+      if (dupCount.get(f.name) > 1) {
+        const first = firstOf.get(f.name) === f.id;
+        const made = f.created ? `${koMonthDay(new Date(f.created))} 만듦` : '';
+        b.append(Object.assign(document.createElement('i'), { className: 'folder-dup', textContent: [made, first ? '기본 · 자동 연결이 쓰는 폴더' : '같은 이름'].filter(Boolean).join(' · ') }));
+      }
+      b.append(Object.assign(document.createElement('i'), { className: 'folder-chev', textContent: '›' }));
       b.addEventListener('click', () => {
         path.push(f);
         showFolder();
@@ -341,22 +479,40 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
     const row = $('new-folder-row');
     const input = $('new-folder-name');
     row.hidden = false;
-    input.value = path.length === 1 ? SYNC_FOLDER : '';
+    // 맨 위에 "메모킹 동기화" 가 이미 있으면 그 이름을 미리 넣지 않는다 (같은 폴더가 또 생기지 않게)
+    input.value = path.length === 1 && !shown.some((f) => f.name === SYNC_FOLDER) ? SYNC_FOLDER : '';
+    folderMsg('');
     input.focus();
     input.select();
   }
 
   async function createFolder() {
+    if (creating) return;
     const cur = path.at(-1);
     const name = $('new-folder-name').value.trim();
     if (!name) return;
-    $('new-folder-row').hidden = true;
+    // 이 폴더에 같은 이름이 이미 있으면 만들지 않고 그 폴더로 (Drive 는 같은 이름 폴더를 여럿 만들 수 있어 헷갈린다)
+    const same = shown.find((f) => f.name === name);
+    if (same) {
+      $('new-folder-row').hidden = true;
+      path.push(same);
+      await showFolder();
+      folderMsg(`"${name}" 폴더가 이미 있어서 새로 만들지 않고 그 폴더를 열었어요`);
+      return;
+    }
+    creating = true;
+    $('new-folder-ok').disabled = true;
     try {
       const f = await api.drive.createFolder(cur.id, name);
+      $('new-folder-row').hidden = true;
       path.push(f);
-      showFolder();
+      await showFolder();
+      folderMsg(f.existed ? `"${name}" 폴더가 이미 있어서 새로 만들지 않고 그 폴더를 열었어요` : `"${name}" 폴더를 만들었어요 — 아래 단추로 이 폴더를 쓰세요`);
     } catch (err) {
       await confirm(`폴더를 만들지 못했어요.\n${cleanError(err)}`, '확인');
+    } finally {
+      creating = false;
+      $('new-folder-ok').disabled = false;
     }
   }
 
@@ -364,16 +520,11 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
     const cur = path.at(-1);
     if (cur.id === 'root') return;
     step('syncing');
+    renderSyncStep({ tone: 'busy', progress: { phase: 'scan' } });
     try {
-      const res = await api.drive.use(cur.id, cur.name);
-      onVault(res.info);
-      render(res.drive);
-      dialog.close();
-      const st = res.status ?? {};
-      if (st.state === 'error') await confirm(`Drive 폴더를 골랐지만 동기화하지 못했어요.\n${st.error}`, '확인');
+      await finishSync(await api.drive.use(cur.id, cur.name), 'Drive 폴더를 골랐지만 동기화하지 못했어요.');
     } catch (err) {
-      dialog.close();
-      await confirm(`Drive 폴더를 쓰지 못했어요.\n${cleanError(err)}`, '확인');
+      await syncFailed(err, 'Drive 폴더를 쓰지 못했어요.');
     }
     refresh();
   }
@@ -450,7 +601,10 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {} })
   $('folder-use').addEventListener('click', () => useFolder());
   $('new-folder-ok').addEventListener('click', () => createFolder());
   $('new-folder-name').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') createFolder();
+    if (e.key === 'Enter' && !e.isComposing) { // 한글 조합을 끝내는 Enter 는 빼고
+      e.preventDefault();
+      createFolder();
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
