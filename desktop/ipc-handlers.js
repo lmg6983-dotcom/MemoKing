@@ -24,6 +24,8 @@ import { mailAttach, openLocalSend, findLocalSend, LOCALSEND_DOWNLOAD } from './
 import { driveShareLink } from './share-drive.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
+// 메뉴를 띄울 자리 (화면이 준 창 안 좌표 — 키보드로 연 메뉴는 마우스 자리가 아니라 그 카드 · 내용 자리에). 없으면 마우스 자리
+const popupAt = (at) => (Number.isFinite(at?.x) && Number.isFinite(at?.y) ? { x: Math.round(at.x), y: Math.round(at.y) } : {});
 const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: Math.round(p.x), y: Math.round(p.y) } : null);
 
 export function registerIpc(ctx) {
@@ -1039,14 +1041,15 @@ export function registerIpc(ctx) {
   // ---------- 스택 (탭) ----------
   ipcMain.handle('win:close', (event) => senderWindow(event)?.close());
   ipcMain.handle('stack:activate', (_e, id) => Boolean(wm.openNote(String(id))));
-  ipcMain.handle('stack:new-tab', (_e, fromId) => {
+  const newTabAfter = (fromId) => {
     const vault = getVault();
     if (!vault?.get(fromId)) return null;
     const id = vault.create({ color: vault.get(fromId).color });
     wm.stacks.addAfter(fromId, id);
     wm.showTab(id);
     return id;
-  });
+  };
+  ipcMain.handle('stack:new-tab', (_e, fromId) => newTabAfter(fromId));
   ipcMain.handle('stack:remove', (_e, id) => wm.removeFromStack(String(id), 'close'));
   ipcMain.handle('stack:detach', (_e, id) => wm.removeFromStack(String(id), 'detach'));
   ipcMain.handle('stack:tear-start', (_e, id, offset, point) => {
@@ -1062,8 +1065,8 @@ export function registerIpc(ctx) {
     const next = wm.stacks?.neighbor(String(id), dir < 0 ? -1 : 1);
     return next ? Boolean(wm.showTab(next)) : false;
   });
-  ipcMain.handle('stack:join-menu', (event, id) => {
-    const self = String(id);
+  // 이 창을 합칠 수 있는 다른 메모 창들 (탭 막대 › 합치기 · 탭 오른쪽 클릭 › 다른 창과 합치기)
+  const joinItems = (self) => {
     const mine = wm.stacks?.stackOf(self);
     const seen = new Set();
     const items = [];
@@ -1075,11 +1078,13 @@ export function registerIpc(ctx) {
       const count = wm.stacks?.stackOf(m)?.memos.length ?? 1;
       items.push({ label: `${getVault()?.get(m)?.title || '제목 없음'}${count > 1 ? ` (탭 ${count}개)` : ''}`, click: () => wm.stackInto(m, self) });
     }
-    Menu.buildFromTemplate(items.length ? items : [{ label: '합칠 수 있는 다른 메모 창이 없어요', enabled: false }])
-      .popup({ window: senderWindow(event) });
+    return items.length ? items : [{ label: '합칠 수 있는 다른 메모 창이 없어요', enabled: false }];
+  };
+  ipcMain.handle('stack:join-menu', (event, id) => {
+    Menu.buildFromTemplate(joinItems(String(id))).popup({ window: senderWindow(event) });
   });
   // 목록 카드 오른쪽 클릭 (휴대폰에서 카드를 꾹 누를 때와 같은 일들) — 잠그기 · 이전 버전은 메모 창을 열어 그 창에서
-  ipcMain.handle('card:menu', (event, rawId) => {
+  ipcMain.handle('card:menu', (event, rawId, at) => {
     const id = String(rawId);
     const m = getVault()?.get(id);
     if (!m) return;
@@ -1099,18 +1104,39 @@ export function registerIpc(ctx) {
       { type: 'separator' },
       { label: '목록 맨 위에 고정', type: 'checkbox', checked: m.pinned === true, click: () => setMemo(id, { pinned: !m.pinned }) },
       { label: '색', submenu: COLORS.map((c) => ({ label: COLOR_NAMES[c], type: 'radio', checked: m.color === c, click: () => setMemo(id, { color: c }) })) },
-      ...(m.locked ? [] : [{ label: '잠그기…', click: () => inNote('lock') }, { label: '이전 버전', click: () => inNote('versions') }]),
+      // 잠긴 메모: 비밀번호로 연 뒤 잠금 풀기를 묻는다 (이전 버전은 잠긴 동안 볼 수 없어 흐리게)
+      ...(m.locked ? [{ label: '잠금 풀기…', click: () => inNote('unlock') }, { label: '이전 버전…', enabled: false }]
+        : [{ label: '잠그기…', click: () => inNote('lock') }, { label: '이전 버전…', click: () => inNote('versions') }]),
       { type: 'separator' },
       { label: '글 복사', enabled: !m.locked, click: async () => wm.listWin?.webContents.send('card:copied', await writeClipboard({ text: hotkeyCopyText(m.body) }).then(() => true, () => false)) },
       { label: 'PDF로 저장…', click: () => wm.openPdfWindow(id) },
       { type: 'separator' },
       { label: '휴지통으로 옮기기', accelerator: 'Delete', registerAccelerator: false, click: () => event.sender.send('card:trash', id) },
-    ]).popup({ window: senderWindow(event) });
+    ]).popup({ window: senderWindow(event), ...popupAt(at) });
   });
+  // 화면이 정한 오른쪽 클릭 메뉴 (메모 창 내용 — block-move.js): [{ id, label, accelerator? } | { type: 'separator' }], 자리 { x, y }? → 고른 id | null
+  //   점검(SMOKE)에서는 띄우지 않고 globalThis.mkSmokeMenu 에 두어 점검이 고른다
+  ipcMain.handle('menu:choose', (event, raw, at) => new Promise((resolve) => {
+    const items = (Array.isArray(raw) ? raw : []).slice(0, 24).filter((it) => it && (it.type === 'separator' || (typeof it.id === 'string' && typeof it.label === 'string')));
+    if (!items.some((it) => it.type !== 'separator')) return resolve(null);
+    let chosen = null;
+    if (SMOKE) {
+      globalThis.mkSmokeMenu = { items, pick: (id) => resolve(items.some((it) => it.id === id) ? id : null) };
+      return;
+    }
+    Menu.buildFromTemplate(items.map((it) => (it.type === 'separator' ? { type: 'separator' }
+      : { label: it.label.slice(0, 80), enabled: it.enabled !== false, ...(typeof it.accelerator === 'string' ? { accelerator: it.accelerator, registerAccelerator: false } : {}), click: () => (chosen = it.id) })))
+      // 메뉴가 닫힌 뒤에 click 이 오는 경우가 있어 한 박자 기다렸다 알린다
+      .popup({ window: senderWindow(event), ...popupAt(at), callback: () => setTimeout(() => resolve(chosen), 50) });
+  }));
   ipcMain.handle('stack:menu', (event, id) => {
+    const self = String(id);
     Menu.buildFromTemplate([
-      { label: '따로 떼어 보기', click: () => wm.removeFromStack(String(id), 'detach') },
-      { label: '탭 닫기', click: () => wm.removeFromStack(String(id), 'close') },
+      { label: '오른쪽에 새 탭', click: () => newTabAfter(self) },
+      { label: '다른 창과 합치기', submenu: joinItems(self) },
+      { type: 'separator' },
+      { label: '따로 떼어 보기', click: () => wm.removeFromStack(self, 'detach') },
+      { label: '탭 닫기', click: () => wm.removeFromStack(self, 'close') },
     ]).popup({ window: senderWindow(event) });
   });
 

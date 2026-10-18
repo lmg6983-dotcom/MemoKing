@@ -1,8 +1,8 @@
 import { haptic } from './dom.js';
-import { copyBlock, saveBlock, shareBlock, canShare } from './copy-content.js';
+import { copyBlock, saveBlock, shareBlock, canShare, chooseMenu } from './copy-content.js';
 import { SHARE_DONE, isShareMenuOpen } from './share-menu.js';
 // 지우기 단추 (×) — 꾹 눌렀다 그 자리에 놓은 것의 오른쪽 위에 잠깐 (block-move.js 내용 줄·목록 전체 · list-drag.js 목록 항목 함께)
-//   흰 동그라미에 빨간 ×. 한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
+//   흰 동그라미에 빨간 × (PC 마우스는 빨간 휴지통). 한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
 //   PC(마우스): 그림·손 메모·소리·파일·링크 카드에 마우스를 올려도 뜬다 (hover — 시간으로 사라지지 않고, 마우스가 떠나면 거둔다.
 //   빨갛게 비치는 표시는 × 위에 올렸을 때만)
 //   누르면: 대상이 붉게 비쳤다가 작아지며 흐려지고, 그 자리가 접히며 아래 줄들이 부드럽게 올라온 뒤 지운다.
@@ -19,6 +19,7 @@ const DONE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5
 const FAIL_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v5.5M8 12.2v.3"/></svg>';
 const SHARE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="11.5" cy="3.8" r="1.8"/><circle cx="4.5" cy="8" r="1.8"/><circle cx="11.5" cy="12.2" r="1.8"/><path d="M6.1 7.1l3.8-2.3M6.1 8.9l3.8 2.3"/></svg>';
 const OPEN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5L7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></svg>';
+const TRASH_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" class="trash"><path d="M3 4.5h10M6.5 7v4.5M9.5 7v4.5M4.3 4.5l.7 9h6l.7-9M6 4.5V2.5h4v2"/></svg>';
 const SAVE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.8 7l3.2 3.2L11.2 7M3 12.8h10"/></svg>';
 // 저장 창을 다녀오면 단추는 이미 거둬졌을 수 있어 메모 창 상태 줄에도 (PC note.js)
 const notice = (text, error = false) => window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text, error } }));
@@ -36,26 +37,102 @@ function announce(text) {
   requestAnimationFrame(() => (live.textContent = text));
 }
 
-// 지운 자리에 "표를 지웠어요 · Ctrl+Z 로 되돌리기" 를 2.5초 (하나만)
-function undoHint(what, rect) {
+// 지운 자리에 "표를 지웠어요 [되돌리기] (Ctrl+Z)" 를 잠깐 (하나만) — 마우스로도 되돌릴 수 있게 (목록 카드의 되돌리기 띠처럼)
+function undoHint(what, rect, view) {
   document.getElementById('mk-undo-hint')?.remove();
   const tip = document.createElement('div');
   tip.id = 'mk-undo-hint';
   tip.className = 'mk-undo-hint';
   tip.setAttribute('role', 'status');
-  tip.innerHTML = '<span></span> · <kbd>Ctrl+Z</kbd> 로 되돌리기';
+  tip.innerHTML = '<span></span> <button type="button" class="mk-undo-btn">되돌리기</button> <kbd>Ctrl+Z</kbd>';
   tip.firstChild.textContent = `${what}${/[가-힣]$/.test(what) && (what.charCodeAt(what.length - 1) - 0xac00) % 28 ? '을' : '를'} 지웠어요`;
+  const undoBtn = tip.querySelector('.mk-undo-btn');
+  undoBtn.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서를 빼앗지 않게
+  undoBtn.addEventListener('click', () => {
+    tip.remove();
+    if (view.isDestroyed) return;
+    view.focus();
+    // 편집기의 Ctrl+Z 와 똑같이 (같은 되돌리기 기록)
+    view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true }));
+  });
   document.body.append(tip);
   const top = Math.max(8, Math.min(window.innerHeight - tip.offsetHeight - 8, rect.top));
   const left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, rect.left + rect.width / 2 - tip.offsetWidth / 2));
   tip.style.top = `${Math.round(top)}px`;
   tip.style.left = `${Math.round(left)}px`;
-  const gone = () => tip.remove();
-  setTimeout(() => {
-    tip.classList.add('fading');
-    setTimeout(gone, 260);
-  }, 2500);
-  document.addEventListener('keydown', gone, { once: true });
+  const gone = () => {
+    tip.remove();
+    document.removeEventListener('keydown', onKey, true);
+  };
+  // 글을 치거나 Esc 를 누르면 거둔다 — Ctrl · Shift 만 눌러도 사라지면 Ctrl+Z 를 누르는 사이 안내가 없어졌다
+  const onKey = (e) => {
+    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
+    gone();
+  };
+  let timer = 0;
+  const later = () => {
+    timer = setTimeout(() => {
+      tip.classList.add('fading');
+      setTimeout(gone, 260);
+    }, 5000); // 되돌리기 단추를 누를 틈
+  };
+  later();
+  tip.addEventListener('mouseenter', () => clearTimeout(timer)); // 단추로 가는 동안 사라지지 않게
+  tip.addEventListener('mouseleave', later);
+  document.addEventListener('keydown', onKey, true);
+}
+
+const COPY_DONE = (what) => (what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
+  : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : what === '링크' ? '링크 주소를 복사했어요' : '내용을 복사했어요');
+const SAVE_DONE = (name) => `저장했어요: ${name}`;
+const SHARE_DONE_TEXT = (what) => SHARE_DONE[what] ?? '공유했어요';
+// 저장 · 공유는 앱이 알려 준 이유(파일을 찾지 못했어요 등)를 그대로
+const failText = (fileAct, err) => (fileAct && err?.message && !/^Error invoking/.test(err.message) ? err.message : `${fileAct ?? '복사'}하지 못했어요. 다시 눌러 주세요`);
+
+/**
+ * PC 오른쪽 클릭 메뉴 — 마우스를 올리면 뜨는 단추 줄과 같은 일을 이름과 함께 (열기 · 복사 · 저장… · 공유… · 지우기)
+ *   opts 는 showDeleteButton 과 같다. 다 하면 메모 창 상태 줄에 알린다.
+ *   at: 메뉴를 띄울 자리 { x, y } (키보드로 열 때 — 없으면 마우스 자리)
+ * @returns {Promise<boolean>} 메뉴를 띄웠는가
+ */
+export async function showContentMenu(view, opts, at = null) {
+  const { pos, node, target, label = '이 내용 지우기', copyLabel = null, open = null } = opts;
+  hideDeleteButton(true);
+  const verb = (v) => label.replace(/지우기$/, v); // "이 표 지우기" → "이 표 복사"
+  const items = [
+    ...(open ? [{ id: 'open', label: open.label }, { type: 'separator' }] : []),
+    { id: 'copy', label: copyLabel ?? verb('복사') },
+    { id: 'save', label: `${verb('저장')}…` },
+    ...(canShare() ? [{ id: 'share', label: `${verb('공유')}…` }] : []),
+    { type: 'separator' },
+    { id: 'delete', label, accelerator: 'Delete' },
+  ];
+  const id = await chooseMenu(items, at);
+  if (!id || view.isDestroyed || view.state.doc.nodeAt(pos) !== node) return true;
+  if (id === 'open') return open.run(), true;
+  if (id === 'delete') {
+    // 단추 줄의 × 를 누른 것과 똑같이 (붉게 비쳤다 접히며 지우고, 되돌리기 안내)
+    showDeleteButton(view, { ...opts, hover: { enter() {}, leave() {} } });
+    current?.btn.click();
+    return true;
+  }
+  const [run, done, act] = {
+    copy: [() => copyBlock(view, pos, node, target), COPY_DONE, null],
+    save: [() => saveBlock(view, pos, node, target), SAVE_DONE, '저장'],
+    share: [() => shareBlock(view, pos, node, target), SHARE_DONE_TEXT, '공유'],
+  }[id];
+  try {
+    const what = await run();
+    if (what === 'cancelled') return true;
+    if (opts.markTarget) document.dispatchEvent(new CustomEvent('mk:content-tools'));
+    announce(done(what));
+    notice(done(what));
+  } catch (err) {
+    console.warn('content menu', id, err);
+    announce(failText(act, err));
+    notice(failText(act, err), true);
+  }
+  return true;
 }
 
 /** 대상을 담고 스크롤되는 상자 (없으면 null = 창) */
@@ -86,7 +163,8 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   btn.className = `mk-delete-btn${hover ? ' hover' : ''}`;
   btn.title = label;
   btn.setAttribute('aria-label', label);
-  btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6"/></svg>';
+  // PC(마우스)는 목록 카드 · 알림 보관함의 지우기와 같은 휴지통 모양 (× 는 창 닫기로 읽힌다), 휴대폰은 ×
+  btn.innerHTML = hover ? TRASH_ICON : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6"/></svg>';
   // 복사 단추 (× 왼쪽) · 저장 단추 (그 왼쪽)
   const actionBtn = (cls, verb, icon) => {
     const b = document.createElement('button');
@@ -186,9 +264,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
         b.classList.add('failed');
         b.innerHTML = FAIL_ICON;
         console.warn(b.className, err);
-        const fileAct = b.classList.contains('mk-save-btn') ? '저장' : b.classList.contains('mk-share-btn') ? '공유' : null;
-        // 저장 · 공유는 앱이 알려 준 이유(파일을 찾지 못했어요 등)를 그대로
-        b.title = fileAct && err?.message && !/^Error invoking/.test(err.message) ? err.message : `${fileAct ?? '복사'}하지 못했어요. 다시 눌러 주세요`;
+        b.title = failText(b.classList.contains('mk-save-btn') ? '저장' : b.classList.contains('mk-share-btn') ? '공유' : null, err);
         announce(b.title);
         notice(b.title, true);
       }).finally(() => {
@@ -200,10 +276,9 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     b.addEventListener('touchstart', go, { passive: false });
     b.addEventListener('click', go); // 키보드(Enter · Space)
   };
-  action(copyBtn, COPY_ICON, () => copyBlock(view, pos, node, target), (what) => (what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
-    : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : what === '링크' ? '링크 주소를 복사했어요' : '내용을 복사했어요'));
-  action(saveBtn, SAVE_ICON, () => saveBlock(view, pos, node, target), (name) => `저장했어요: ${name}`);
-  if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, pos, node, target), (what) => SHARE_DONE[what] ?? '공유했어요');
+  action(copyBtn, COPY_ICON, () => copyBlock(view, pos, node, target), COPY_DONE);
+  action(saveBtn, SAVE_ICON, () => saveBlock(view, pos, node, target), SAVE_DONE);
+  if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, pos, node, target), SHARE_DONE_TEXT);
   if (openBtn) {
     let opened = false;
     const go = (e) => {
@@ -249,13 +324,22 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       if (remove) remove(view, pos, node);
       else view.dispatch(view.state.tr.delete(pos, pos + node.nodeSize).scrollIntoView());
       // PC: 표 · 수식처럼 공들인 것도 한 번에 지워지므로, 그 자리에 되돌리는 법을 잠깐 (휴대폰은 목록의 되돌리기 띠)
-      if (hover) undoHint(label.replace(/ 지우기$/, '').replace(/^이 /, ''), where);
+      if (hover) undoHint(label.replace(/ 지우기$/, '').replace(/^이 /, ''), where, view);
     }, FADE_MS + COLLAPSE_MS);
   };
-  btn.addEventListener('mousedown', press);
+  if (hover) {
+    // PC 마우스: 눌렀다 뗄 때 지운다 (Windows 처럼 — 누른 채 단추 밖으로 빼면 그만). 누르는 순간은 편집기 커서만 지킨다
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    btn.addEventListener('click', (e) => { if (current === del) press(e); });
+  } else {
+    btn.addEventListener('mousedown', press);
+    // 키보드(Enter · Space)로 누른 것만 — 마우스 · 손가락은 위에서 이미 처리 (detail 0 = 키보드)
+    btn.addEventListener('click', (e) => { if (e.detail === 0 && current === del) press(e); });
+  }
   btn.addEventListener('touchstart', press, { passive: false });
-  // 키보드(Enter · Space)로 누른 것만 — 마우스 · 손가락은 위에서 이미 처리 (detail 0 = 키보드)
-  btn.addEventListener('click', (e) => { if (e.detail === 0 && current === del) press(e); });
   window.addEventListener('scroll', place, true);
   if (!hover) del.timer = setTimeout(() => hideDeleteButton(), showMs);
 }

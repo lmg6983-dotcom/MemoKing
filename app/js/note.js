@@ -46,10 +46,10 @@ setCopyHost({
     return r?.cancelled ? 'cancelled' : r.name;
   },
   // 공유 단추: 방법을 고른다 (Google Drive 링크 · LocalSend · 메일) — share-menu.js
-  share: async (f) => {
+  share: async (f, target) => {
     const targets = await api.attachments.shareTargets();
-    // 메뉴는 공유 단추 자리에 — 내용 위의 단추 4개(지우기 · 복사 · 저장 · 공유)는 먼저 거둬 메뉴 위에 남지 않게
-    const at = (document.querySelector('.mk-share-btn') ?? document.activeElement ?? document.body).getBoundingClientRect();
+    // 메뉴는 공유 단추 자리에 (오른쪽 클릭 메뉴로 고르면 그 내용 자리에) — 내용 위의 단추 4개(지우기 · 복사 · 저장 · 공유)는 먼저 거둬 메뉴 위에 남지 않게
+    const at = (document.querySelector('.mk-share-btn') ?? target ?? document.activeElement ?? document.body).getBoundingClientRect();
     hideDeleteButton(true);
     const via = await chooseShare({ getBoundingClientRect: () => at }, targets);
     if (!via) return 'cancelled';
@@ -60,6 +60,7 @@ setCopyHost({
     if (via === 'drive') showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' });
     return { drive: 'link', localsend: 'localsend', mail: 'mail' }[via];
   },
+  menu: (items, at) => api.menu.choose(items, at), // 내용 오른쪽 클릭 메뉴 (block-move.js)
 });
 // 저장 단추의 결과 (delete-button.js)
 window.addEventListener('mk:notice', (e) => setStatus(e.detail?.text ?? '', Boolean(e.detail?.error)));
@@ -787,7 +788,7 @@ $('alarm-ok').addEventListener('click', () => {
 api.on('memo:alarm', showAlarm);
 // 밖(목록 카드 오른쪽 클릭)에서 부탁한 일: 메뉴의 그 단추를 누른 것과 같게
 function runCommand(command) {
-  if (command === 'lock' && !memo?.locked) $('lock-btn').click();
+  if ((command === 'lock' && !memo?.locked) || (command === 'unlock' && memo?.locked)) $('lock-btn').click();
   else if (command === 'versions') $('versions-btn').click();
 }
 api.on('memo:command', runCommand);
@@ -1872,7 +1873,7 @@ if (!memo) {
   editor.focus();
   markPainted();
   if (memo.capture) await applyCapture(memo.capture);
-  if (memo.command) runCommand(memo.command); // 목록 카드 오른쪽 클릭 › 잠그기 · 이전 버전
+  if (memo.command) runCommand(memo.command); // 목록 카드 오른쪽 클릭 › 잠그기 · 잠금 풀기 · 이전 버전
   if (params.get('record') === '1') recorder.start(); // 목록 + › 음성 메모
   if (params.get('ink') === '1') editor.insertInk(); // 목록 + › 손 메모
   // 주석: 메모 위에 겹쳐 그린 손 메모 (머리말 ink: 의 파일)

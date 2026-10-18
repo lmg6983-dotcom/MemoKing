@@ -19,7 +19,8 @@ import { isVoiceCard } from './voice-card-view.js';
 import { mediaKindOf } from './core/memo-file.js';
 import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
-import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged, deleteShownFor } from './delete-button.js';
+import { showDeleteButton, showContentMenu, hideDeleteButton, hideDeleteIfChanged, deleteShownFor } from './delete-button.js';
+import { canMenu } from './copy-content.js';
 import { haptic } from './dom.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
@@ -469,6 +470,36 @@ class Mover {
       view.dom.addEventListener('mousemove', this.onHover);
       view.dom.addEventListener('mouseleave', this.onHoverOut);
     }
+    // PC: 그 내용을 오른쪽 클릭하면 단추 줄과 같은 일을 이름과 함께 (열기 · 복사 · 저장… · 공유… · 지우기)
+    //   그림 위 글자를 고른 채면 글 메뉴(잘라내기 · 복사 …)가 맞으므로 그대로 둔다
+    if (canMenu()) {
+      this.onContextMenu = (e) => {
+        if (this.busy() || e.defaultPrevented) return;
+        const { selection } = view.state;
+        let host = e.target instanceof Element ? e.target.closest(HOVER_TARGET) : null;
+        // 키보드(Shift+F10 · 메뉴 키): 고른(NodeSelection) 그림 · 파일 등
+        let at = null;
+        if (!host && selection instanceof NodeSelection) {
+          const dom = view.nodeDOM(selection.from);
+          host = dom instanceof Element ? (dom.matches(HOVER_TARGET) ? dom : dom.querySelector(HOVER_TARGET)) : null;
+          const r = host?.getBoundingClientRect();
+          if (r) at = { x: Math.round(r.left + 8), y: Math.round(r.top + 8) };
+        }
+        if (!host || !view.dom.contains(host)) return;
+        const block = hoverBlockOf(view, host);
+        if (!block || !(isContentBlock(block.node) || block.node.type.name === 'table')) return;
+        if (!selection.empty && !(selection instanceof NodeSelection) && selection.from < block.pos + block.node.nodeSize && selection.to > block.pos) return;
+        // 표는 칸 안에서 글을 고치므로 테두리 밖(감싼 상자)에서만
+        if (block.node.type.name === 'table' && e.target.closest('td, th')) return;
+        const opts = this.deleteOpts(block, false);
+        if (!opts) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.hoverHost = null;
+        showContentMenu(view, opts, at);
+      };
+      view.dom.addEventListener('contextmenu', this.onContextMenu, true);
+    }
   }
 
   /** 마우스가 내용에서 떠나면 조금 뒤 단추를 거둔다 (× 로 옮겨 가는 사이에는 그대로) */
@@ -787,9 +818,15 @@ class Mover {
   // ---------- 지우기 단추: 꾹 눌렀다 놓은 내용의 오른쪽 위 (delete-button.js) ----------
 
   showDelete(block, hovering = false, { showMs } = {}) {
+    const opts = this.deleteOpts(block, hovering, showMs);
+    if (opts) showDeleteButton(this.view, opts);
+  }
+
+  /** 내용 단추 줄 · 오른쪽 클릭 메뉴에 넘길 것 (showDeleteButton · showContentMenu) */
+  deleteOpts(block, hovering, showMs) {
     const { view } = this;
     const dom = view.nodeDOM(block.pos);
-    if (!(dom instanceof Element)) return;
+    if (!(dom instanceof Element)) return null;
     const media = isContentParagraph(block.node) ? dom.querySelector('img.mk-image, .mk-ink, .mk-media, .mk-link-card, a[data-file]') : null;
     const deco = (spec) => {
       if (spec) this.decorate([{ pos: block.pos, ...spec }]);
@@ -802,7 +839,7 @@ class Mover {
     this.hoverTarget = target;
     const hover = hovering ? { enter: () => clearTimeout(this.hoverTimer), leave: () => this.leaveHover() } : null;
     const copyLabel = block.node.type.name === 'mk_link_card' ? '링크 주소 복사' : null; // 카드 모양이 아니라 주소를
-    showDeleteButton(view, { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, hover, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null });
+    return { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, hover, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
   }
 
   hideDelete(now = false) {
@@ -901,6 +938,7 @@ class Mover {
       this.view.dom.removeEventListener('mousemove', this.onHover);
       this.view.dom.removeEventListener('mouseleave', this.onHoverOut);
     }
+    if (this.onContextMenu) this.view.dom.removeEventListener('contextmenu', this.onContextMenu, true);
     clearTimeout(this.hoverTimer);
     this.cancelPress();
     if (this.drag) this.finish(false);

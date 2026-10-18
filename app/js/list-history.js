@@ -22,7 +22,8 @@ function appHue(name) {
   return h;
 }
 
-export function setupHistoryTab({ api, els, confirm }) {
+// notify: 복사 등을 짧게 알리기 (PC 목록 창 안내 줄) · menu: 오른쪽 클릭 메뉴 띄우기 (PC — copy-content.js host.menu 와 같은 모양)
+export function setupHistoryTab({ api, els, confirm, notify = null, menu = null }) {
   let query = '';
   let app = '';
   let data = { enabled: false, total: 0, apps: [], entries: [] };
@@ -120,13 +121,47 @@ export function setupHistoryTab({ api, els, confirm }) {
 
     const actions = document.createElement('div');
     actions.className = 'noti-actions';
+    const toMemo = () => api.history.toMemo(e.id);
+    const copy = async () => {
+      try {
+        await api.copyText([e.title, e.body].filter(Boolean).join('\n'));
+        notify?.('알림 글을 복사했어요');
+      } catch {
+        notify?.('복사하지 못했어요');
+      }
+    };
+    const remove = () => removeWithUndo(e, div);
+    const block = api.history.block && e.source !== 'memoking' ? () => api.history.block(e) : null;
     actions.append(
-      actionButton('note', '메모로 만들기', () => api.history.toMemo(e.id), '메모로'),
-      actionButton('copy', '복사', () => api.copyText([e.title, e.body].filter(Boolean).join('\n'))),
-      actionButton('trash', '삭제', () => removeWithUndo(e, div)),
+      actionButton('note', '메모로 만들기', toMemo, '메모로'),
+      actionButton('copy', '복사', copy),
+      // 메모가 아니라 보관함의 이 알림 기록만 지운다
+      actionButton('trash', '보관함에서 삭제', remove, '삭제'),
     );
     // 이 앱 알림 그만 모으기 (안드로이드)
-    if (api.history.block && e.source !== 'memoking') actions.append(actionButton('block', `${e.app} 알림 그만 모으기`, () => api.history.block(e), '그만 모으기'));
+    if (block) actions.append(actionButton('block', `${e.app} 알림 그만 모으기`, block, '그만 모으기'));
+    // PC: 오른쪽 클릭(메뉴 키 · Shift+F10)으로 같은 일을 이름과 함께 · Delete 키로 지우기
+    if (menu) {
+      div.addEventListener('contextmenu', async (ev) => {
+        ev.preventDefault();
+        const r = div.getBoundingClientRect();
+        const at = ev.button !== 2 ? { x: Math.round(r.left + 16), y: Math.round(r.top + 16) } : null; // 키보드(button 0)로 열면 그 줄 자리에
+        const id = await menu([
+          { id: 'memo', label: '메모로 만들기' },
+          { id: 'copy', label: '복사' },
+          ...(block ? [{ id: 'block', label: `${e.app} 알림 그만 모으기` }] : []),
+          { type: 'separator' },
+          { id: 'remove', label: '보관함에서 삭제', accelerator: 'Delete' },
+        ], at);
+        ({ memo: toMemo, copy, block, remove })[id]?.();
+      });
+      text.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Delete' && !ev.ctrlKey && !ev.altKey && !ev.metaKey && !ev.shiftKey) {
+          ev.preventDefault();
+          remove();
+        }
+      });
+    }
 
     div.append(avatar(e), text, actions);
     // 누르면 내용 펼치기 / 메모킹 알림은 그 메모 열기

@@ -448,7 +448,7 @@ function renderCard(memo) {
   pin.dataset.pin = memo.id;
   pin.append(icon(memo.pinned ? 'pin-fill' : 'pin'));
 
-  // 마우스를 올리면 카드 오른쪽 위에 뜨는 버튼 묶음 (데스크탑만 — 휴대폰은 길게 눌러 메뉴)
+  // 마우스를 올리면(카드에 키보드 포커스가 있어도) 카드 오른쪽 아래에 뜨는 버튼 묶음 (데스크탑만 — 휴대폰은 길게 눌러 메뉴)
   const actions = document.createElement('div');
   actions.className = 'card-actions';
   // PDF 로 저장
@@ -459,6 +459,8 @@ function renderCard(memo) {
   pdf.dataset.pdf = memo.id;
   pdf.append(icon('pdf'));
   actions.append(pdf, pin, del);
+  // 키보드는 카드 하나에 Tab 한 번 — 단추 셋은 Delete 키 · 메뉴 키(오른쪽 클릭 메뉴)로 (카드마다 Tab 4번이던 것)
+  for (const b of actions.children) b.tabIndex = -1;
 
   li.append(card, actions);
   return li;
@@ -1037,6 +1039,8 @@ const historyTab = setupHistoryTab({
   // 보관함의 알림을 펼친 곳의 "이 앱 알림 그만 모으기"
   api: { ...api, history: { ...api.history, block: (e) => blockHistoryApp(e.appId, e.app) } },
   confirm: confirmDialog,
+  notify: (text) => flashStatus(text),
+  menu: (items, at) => api.menu.choose(items, at),
   els: {
     consent: $('history-consent'), body: $('history-body'), enable: $('history-enable'),
     clear: $('history-clear'), app: $('history-app'), rows: $('history-rows'), empty: $('history-empty'),
@@ -1078,7 +1082,9 @@ el.cards.addEventListener('contextmenu', (e) => {
   const card = e.target.closest('.card');
   if (!card || e.defaultPrevented || !api.memo.cardMenu) return;
   e.preventDefault();
-  api.memo.cardMenu(card.dataset.id);
+  // 키보드(메뉴 키 · Shift+F10 — button 0)로 열면 마우스 자리가 아니라 그 카드 자리에
+  const r = card.getBoundingClientRect();
+  api.memo.cardMenu(card.dataset.id, e.button !== 2 ? { x: Math.round(r.left + 16), y: Math.round(r.top + 16) } : null);
 });
 api.on('card:trash', (id) => deleteMemo(id));
 api.on('card:copied', (ok) => flashStatus(ok ? '글을 복사했어요' : '복사하지 못했어요'));
