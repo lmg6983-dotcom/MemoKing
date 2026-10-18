@@ -81,9 +81,15 @@ function applyInfo(info) {
 // 목록을 이 파일들만으로 좁히기 (동기화 충돌 사본) — 위에 "N개만 보는 중 · 모두 보기"
 function showOnlyFiles(files) {
   const bar = $('conflict-bar');
-  state.onlyFiles = files?.length ? new Set(files.map((f) => String(f).replace(/\\/g, '/'))) : null;
+  const only = files?.length ? new Set(files.map((f) => String(f).replace(/\\/g, '/'))) : null;
+  // 탭 바꾸기 · 검색 지우기를 먼저 (둘 다 검색을 다시 돌린다) — 사본만 보기를 정한 뒤에 하면 곧바로 풀린다
+  if (only && activeTab !== 'memos') showTab('memos');
+  else if (only && el.search.value) {
+    el.search.value = '';
+    runSearch();
+  }
+  state.onlyFiles = only;
   if (state.onlyFiles) {
-    if (activeTab !== 'memos') showTab('memos');
     const all = Object.assign(document.createElement('button'), { type: 'button', className: 'link-btn', textContent: '모두 보기' });
     all.addEventListener('click', () => showOnlyFiles(null));
     bar.replaceChildren(Object.assign(document.createElement('span'), { id: 'conflict-bar-text' }), all);
@@ -472,7 +478,6 @@ async function refresh() {
 async function runSearch() {
   if (activeTab === 'reminders') return remindersTab.setQuery(el.search.value);
   if (activeTab === 'history') return historyTab.setQuery(el.search.value);
-  if (state.onlyFiles) closeOnlyFiles(); // 검색하면 사본만 보기는 푼다
   state.query = el.search.value.trim();
   // 검색어의 #태그 는 태그 필터로, 나머지는 글자 검색으로
   const { text, tags } = parseQuery(state.query);
@@ -1212,6 +1217,7 @@ api.on('drag:state', ({ outside }) => {
 });
 
 el.search.addEventListener('input', () => {
+  if (state.onlyFiles) closeOnlyFiles(); // 검색하면 사본만 보기는 푼다 (메모가 바뀌어 검색을 다시 돌릴 때는 그대로)
   clearTimeout(searchTimer);
   searchTimer = setTimeout(runSearch, 150);
 });

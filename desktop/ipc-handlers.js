@@ -3,22 +3,21 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, screen, shell } f
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder } from '../app/js/core/reminders.js';
-import { normalizeMagicSettings, activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
+import { activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
-import { isBlankBody, extractPreview } from '../app/js/core/memo-file.js';
+import { isBlankBody } from '../app/js/core/memo-file.js';
 import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { cleanOverrides, setActionKey } from '../app/js/core/keymap.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront, broadcast } from './window-utils.js';
-import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
+import { SMOKE, toast, copyFileToClipboard, smokeOpened } from './utils.js';
 import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
 import { mailAttach, openLocalSend, findLocalSend, LOCALSEND_DOWNLOAD } from './share-file.js';
@@ -272,7 +271,11 @@ export function registerIpc(ctx) {
     if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
     return { ...res, drive: driveInfo() };
   });
-  ipcMain.handle('drive:folders', async (_e, parent) => (await getDriveApi()?.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name, created: f.created })));
+  ipcMain.handle('drive:folders', async (_e, parent) => {
+    const api = getDriveApi();
+    if (!api) throw new Error('Google Drive 를 쓸 수 없어요');
+    return (await api.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name, created: f.created }));
+  });
   // 같은 이름 폴더가 이미 있으면 새로 만들지 않고 그것을 돌려준다 (existed: true)
   ipcMain.handle('drive:create-folder', async (_e, parent, name) => {
     const f = await findOrCreateDriveFolder(String(parent || 'root'), String(name).trim());

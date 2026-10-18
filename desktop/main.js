@@ -34,12 +34,12 @@ import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { alarmText } from '../app/js/core/reminders.js';
 
 import {
-  APP_DIR, APP_ICON, APP_ICON_PNG, ASSETS_DIR,
+  APP_ICON, APP_ICON_PNG, ASSETS_DIR,
   noteBg, titleBarOverlay, bringToFront, broadcast,
 } from './window-utils.js';
 
 import {
-  SMOKE, APP_ID, LOGIN_ARGS, STT_WORKER, STT_VENDOR, POPUP_HELPER,
+  SMOKE, APP_ID, STT_WORKER, STT_VENDOR, POPUP_HELPER,
   settings, loadSettings, saveSettings, installMark, suggestedVaultPath,
   purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings,
   TRASH_DAYS, openWebPage, openVaultFile, toast, smokeToasts, smokeOpened,
@@ -529,6 +529,7 @@ function autoDriveFolder() {
 // 같은 이름 폴더가 이미 있으면 그것 (새로 만들지 않는다) — 만드는 중에 또 부탁해도 하나만
 const folderMaking = new Map();
 function findOrCreateDriveFolder(parent, name) {
+  if (!driveApi) return Promise.reject(new Error('Google Drive 를 쓸 수 없어요'));
   const key = `${parent}\u0000${name}`;
   if (!folderMaking.has(key)) {
     folderMaking.set(key, (async () => {
