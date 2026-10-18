@@ -1094,7 +1094,8 @@ export function registerIpc(ctx) {
       }
     };
     Menu.buildFromTemplate([
-      { label: '열기', click: () => wm.openNote(id) },
+      // accelerator 는 메뉴 오른쪽에 키 안내만 (registerAccelerator: false — 목록 카드에서 그 키가 이미 같은 일을 한다)
+      { label: '열기', accelerator: 'Enter', registerAccelerator: false, click: () => wm.openNote(id) },
       { type: 'separator' },
       { label: '목록 맨 위에 고정', type: 'checkbox', checked: m.pinned === true, click: () => setMemo(id, { pinned: !m.pinned }) },
       { label: '색', submenu: COLORS.map((c) => ({ label: COLOR_NAMES[c], type: 'radio', checked: m.color === c, click: () => setMemo(id, { color: c }) })) },
@@ -1103,7 +1104,7 @@ export function registerIpc(ctx) {
       { label: '글 복사', enabled: !m.locked, click: async () => wm.listWin?.webContents.send('card:copied', await writeClipboard({ text: hotkeyCopyText(m.body) }).then(() => true, () => false)) },
       { label: 'PDF로 저장…', click: () => wm.openPdfWindow(id) },
       { type: 'separator' },
-      { label: '휴지통으로', click: () => event.sender.send('card:trash', id) },
+      { label: '휴지통으로 옮기기', accelerator: 'Delete', registerAccelerator: false, click: () => event.sender.send('card:trash', id) },
     ]).popup({ window: senderWindow(event) });
   });
   ipcMain.handle('stack:menu', (event, id) => {

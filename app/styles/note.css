@@ -1364,7 +1364,9 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).failed svg { stroke-width: 2.4; }
 :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
 :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
-.mk-delete-btn { background: var(--surface-2); }
+.mk-delete-btn { background: var(--surface-2); color: #c4282e; } /* 흰 바탕 위 빨간 × 를 4.5:1 넘게 (--rec #e5484d 는 3.9) */
+@media (prefers-color-scheme: dark) { .mk-delete-btn { color: #ff6b70; } }
+body[data-color="charcoal"] .mk-delete-btn { color: #ff6b70; }
 /* 어두운 숯색 메모 위에서도 또렷하게 */
 body[data-color="charcoal"] :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
 body[data-color="charcoal"] :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) { color: #f1f1ef; }

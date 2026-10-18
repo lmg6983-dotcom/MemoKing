@@ -433,8 +433,9 @@ function renderCard(memo) {
 
   const del = document.createElement('button');
   del.className = 'icon-btn danger card-delete';
-  del.title = '삭제';
-  del.setAttribute('aria-label', `${memo.title} 지우기`);
+  // 이름은 오른쪽 클릭 메뉴 · 휴대폰과 같게 — 지우는 게 아니라 휴지통으로 (되돌릴 수 있다). 키는 Delete
+  del.title = '휴지통으로 옮기기 (Delete)';
+  del.setAttribute('aria-label', `${memo.title} 휴지통으로 옮기기`);
   del.dataset.delete = memo.id;
   del.append(icon('trash'));
 

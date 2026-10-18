@@ -18,6 +18,8 @@ test('오른쪽 클릭: 글 칸에서는 잘라내기 · 복사 · 붙여넣기 
   assert.deepEqual(labels(t), ['잘라내기', '복사', '붙여넣기', '서식 없이 붙여넣기', '—', '모두 선택']);
   assert.equal(t[0].enabled, false); // 고른 글이 없으면 잘라내기는 흐리게
   assert.equal(t[2].role, 'paste');
+  assert.equal(t[2].accelerator, 'CmdOrCtrl+V'); // 메뉴에 단축키 안내
+  assert.equal(t[2].registerAccelerator, false);
 });
 
 test('오른쪽 클릭: 링크 위면 링크 열기 · 주소 복사 (http · https 만)', () => {

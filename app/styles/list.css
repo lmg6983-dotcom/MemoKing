@@ -565,12 +565,12 @@ body:not([data-tab="memos"]) :is(.filter-btn, .layout-btn) { display: none; } /*
 body.is-dragging .card-actions { visibility: hidden; }
 .card-actions .card-delete, .card-actions .card-pin, .card-actions .card-pdf {
   position: static;
-  width: 24px;
-  height: 24px;
+  width: 28px; /* 마우스로 맞히기 쉽게 (24px 은 작았다) */
+  height: 28px;
   border-radius: 6px;
   opacity: 1;
 }
-.card-actions svg { width: 15px; height: 15px; }
+.card-actions svg { width: 16px; height: 16px; }
 
 .cards .item:hover .card-meta, .item:has(.card-actions:focus-within) .card-meta { visibility: hidden; }
 
