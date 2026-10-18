@@ -1,6 +1,6 @@
 // 메모 목록 화면 — 카드(실제 메모 색) · 검색 · 태그 줄 · 필터 · 알림 예약 탭
 import { icon } from '../../app/js/icons.js';
-import { formatStamp, friendlyTime } from '../../app/js/core/format.js';
+import { formatStamp, friendlyTime, shortUrls } from '../../app/js/core/format.js';
 import { vaultUrl } from '../../app/js/media.js';
 import { setupRemindersTab } from '../../app/js/list-reminders.js';
 import { setupHistoryTab } from '../../app/js/list-history.js';
@@ -81,7 +81,7 @@ function renderCard(memo) {
     preview.className = 'card-preview';
     // 태그는 아래 줄에 따로 보이므로 미리 보기 글에서는 뺀다
     const tagSet = new Set((memo.tags ?? []).map((t) => t.toLocaleLowerCase('ko')));
-    preview.textContent = memo.preview.replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
+    preview.textContent = shortUrls(memo.preview).replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
     if (preview.textContent) card.append(preview);
   }
   if (memo.thumb) {

@@ -1945,7 +1945,9 @@ try {
     await page.waitForTimeout(400);
     const lab = await page.locator('.mk-delete-btn').getAttribute('aria-label').catch(() => null);
     const look = await page.evaluate(() => { const e = document.querySelector('.mk-delete-btn'); if (!e) return null; const c = getComputedStyle(e); return { w: Math.round(e.getBoundingClientRect().width), bg: c.backgroundColor, color: c.color }; });
-    check('목록 전체: 놓으면 목록 전체 × (흰 바탕·빨간 ×·작게)', lab === '이 목록 지우기' && look?.bg === 'rgb(255, 255, 255)' && look?.color === 'rgb(229, 72, 77)' && look.w <= 26 && (await page.locator('.mk-doc ul.mk-delete-target').count()) === 1, JSON.stringify({ lab, look }));
+    // 바탕: 밝은 화면은 흰색, 어두운 화면은 시트와 같은 짙은 바탕(--surface-2) — 어느 쪽이든 빨간 × 가 또렷하게
+    const delBg = process.env.MK_DARK ? 'rgb(37, 37, 34)' : 'rgb(255, 255, 255)';
+    check('목록 전체: 놓으면 목록 전체 × (밝은 화면 흰 바탕 · 어두운 화면 짙은 바탕 · 빨간 × · 작게)', lab === '이 목록 지우기' && look?.bg === delBg && look?.color === 'rgb(229, 72, 77)' && look.w <= 26 && (await page.locator('.mk-doc ul.mk-delete-target').count()) === 1, JSON.stringify({ lab, look }));
     const xb = await page.locator('.mk-delete-btn').boundingBox();
     await touch('touchStart', xb.x + 12, xb.y + 12);
     await touch('touchEnd', 0, 0);

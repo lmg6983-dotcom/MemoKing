@@ -390,8 +390,9 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     },
     eventDrop: (arg) => moveEvent(arg),
     views: {
-      dayGridMonth: { dayHeaderFormat: { weekday: 'short' } }, // 넓은 창에서도 "일" (일요일 X)
-      timeGridWeek: { slotHeaderFormat: { hour: 'numeric' } },
+      // 달 · 주 보기의 일정 막대는 이름만 — 칸이 좁아 "오전 9:3…" 처럼 시각부터 잘렸다 (주 보기는 자리가 곧 시각, 시각은 누르면 · 아래 목록에)
+      dayGridMonth: { dayHeaderFormat: { weekday: 'short' }, displayEventTime: false }, // 넓은 창에서도 "일" (일요일 X)
+      timeGridWeek: { slotHeaderFormat: { hour: 'numeric' }, displayEventTime: false },
       // 목록: 달은 위 제목에 있으니 날짜 칸은 "16일 · 금" 만 (좁은 화면을 날짜가 다 차지하지 않게)
       //   일정은 시각을 제목 위 작은 줄로 쌓아 제목이 폭을 다 쓰게 (예전: 시각 칸이 절반을 차지해 제목이 잘림)
       listMonth: {

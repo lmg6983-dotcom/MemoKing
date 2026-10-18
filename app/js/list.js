@@ -5,7 +5,7 @@ import { trashedText } from './core/format.js';
 import { captureGlobalKey, stopKeyCapture, isCapturing, globalShortcutResult } from './key-capture.js';
 import { injectIcons, icon } from './icons.js';
 import { handoffText } from './core/handoff.js';
-import { friendlyTime } from './core/format.js';
+import { friendlyTime, shortUrls } from './core/format.js';
 import { vaultUrl, mediaKind, fileExtension } from './media.js';
 import { memoBodyFromFile } from './core/file-memo.js';
 import { isTextDocument } from './core/markdown-import.js';
@@ -364,7 +364,7 @@ function renderCard(memo) {
     preview.className = 'card-preview';
     // 태그는 카드 아래 줄에 따로 보이므로 미리 보기 글에서는 뺀다 (휴대폰과 같음)
     const tagSet = new Set((memo.tags ?? []).map((t) => t.toLocaleLowerCase('ko')));
-    preview.textContent = memo.preview.replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
+    preview.textContent = shortUrls(memo.preview).replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
     if (preview.textContent) card.append(preview);
   }
   if (memo.thumb) {

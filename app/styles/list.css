@@ -147,6 +147,8 @@ body {
   background: color-mix(in srgb, var(--note-fg) 7%, transparent);
 }
 .cards[data-layout="rows"] .card-thumb { aspect-ratio: 16 / 7; }
+/* 어두운 화면: 사진 · 흰 바탕 손 메모 미리 보기는 조금 어둡게 (검은 카드 사이에서 흰 칸이 튀지 않게) */
+@media (prefers-color-scheme: dark) { .card-thumb { filter: brightness(0.86); } }
 .card-foot { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: auto; font-size: 12px; }
 .card-meta { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; opacity: 0.7; }
 .card-time { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
@@ -264,6 +266,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .link-btn { border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 .link-btn:hover { background: var(--hover); color: var(--text); }
 .link-btn.danger:hover { color: var(--danger); }
+/* 누를 수 있는 글자는 그렇게 보이게 (휴대폰과 같은 노란 밑줄 · 지우는 일은 빨강) — 예전: 회색 보통 글자라 단추인 줄 몰랐다 */
+.link-btn:not(.ev-add) { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.link-btn.danger { color: var(--danger); text-decoration-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .link-btn:disabled { opacity: 0.45; cursor: default; background: none; color: var(--muted); }
 .grow { flex: 1; }
 
@@ -541,10 +546,11 @@ body:not([data-tab="memos"]) :is(.filter-btn, .layout-btn) { display: none; } /*
 .trash-remove svg { width: 16px; height: 16px; }
 .trash-empty { padding: 20px 0 !important; }
 
-/* ---------- v0.15.1: 카드 버튼 묶음 (오른쪽 위, 알림 보관함 카드와 같은 모양) ---------- */
+/* ---------- v0.15.1: 카드 버튼 묶음 (오른쪽 아래, 알림 보관함 카드와 같은 모양) ----------
+   예전에는 오른쪽 위라 제목 끝("튜토리얼 ㅁ…")을 가렸다 — 이제 아래 줄의 시각 · 표시 자리에 뜨고, 그동안 그 표시는 숨긴다 */
 .card-actions {
   position: absolute;
-  top: 6px;
+  bottom: 6px;
   right: 8px;
   display: flex;
   gap: 2px;
@@ -566,19 +572,7 @@ body.is-dragging .card-actions { visibility: hidden; }
 }
 .card-actions svg { width: 15px; height: 15px; }
 
-/* 마우스를 올리면 압정·지우기 묶음이 제목 줄 오른쪽 위에 겹쳐 뜬다 — 제목을 밀어 줄바꿈을 바꾸지 않고,
-   묶음 아래로 들어가는 첫 줄(.card-title 줄 높이 21px) 끝만 흐리게 (둘째 줄은 그대로 · 카드 높이·글자 자리는 그대로) */
-.cards .item:hover .card-head {
-  --fade: linear-gradient(to left, transparent 0, transparent 88px, #000 120px);
-  -webkit-mask-image: var(--fade), linear-gradient(#000, #000);
-  mask-image: var(--fade), linear-gradient(#000, #000);
-  -webkit-mask-size: 100% 21px, 100% calc(100% - 21px);
-  mask-size: 100% 21px, 100% calc(100% - 21px);
-  -webkit-mask-position: 0 0, 0 100%;
-  mask-position: 0 0, 0 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-}
+.cards .item:hover .card-meta, .item:has(.card-actions:focus-within) .card-meta { visibility: hidden; }
 
 /* 목록 창 늘 위에 두기: 창 제목 줄 오른쪽 끝 (Windows 최소화 버튼 바로 옆), 켜짐은 메모 창과 같은 은은한 바탕 */
 .titlebar-btn { margin-left: auto; width: 34px; height: 30px; -webkit-app-region: no-drag; }
@@ -597,7 +591,7 @@ body.is-dragging .card-actions { visibility: hidden; }
 .card:hover { transform: translateY(-1px); }
 .card:active { transform: translateY(0) scale(0.985); transition-duration: 0.08s; }
 body.is-dragging .card:hover { transform: none; }
-.card-actions { transform: translateY(-2px); transition: opacity 0.15s ease-out, transform 0.15s ease-out; }
+.card-actions { transform: translateY(2px); transition: opacity 0.15s ease-out, transform 0.15s ease-out; }
 .cards .item:hover .card-actions, .card-actions:focus-within { transform: none; }
 
 /* 탭: 흰 선택 표시가 다음 탭으로 미끄러진다 (움직임은 base.css 의 .mk-slider) */

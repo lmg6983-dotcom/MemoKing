@@ -1,5 +1,5 @@
 // 글 속 날짜로 일정 만들기 — "내일 오후 3시 치과" 같은 말에 점선 밑줄, 그 말을 누르면(또는 커서를 옮기면)
-// 바로 아래에 "📅 일정 추가: 내일 오후 3:00" 단추. 누르면 일정 창(event-editor.js)에서 이름(치과)과
+// 바로 아래에 "일정 추가: 내일 오후 3:00" 단추 (달력 아이콘). 누르면 일정 창(event-editor.js)에서 이름(치과)과
 // 미리 알림(30분 전 · 하루 전 …)을 고르고 저장 — 구글 캘린더처럼 일정 시각이 아니라 "미리" 알린다.
 //   치는 중에는 단추를 띄우지 않는다 (누르거나 화살표로 옮겼을 때만) · 이미 일정이 있으면 밑줄이 실선 + "일정 있어요"
 //   PC·휴대폰 같은 코드. 날짜 찾기는 core/date-detect.js (한국어) + chrono (영어, MIT)
@@ -9,6 +9,7 @@ import { findAllDates } from './core/date-detect.js';
 import { koClock, dayLabel, WEEKDAY, sameDay } from './core/time.js';
 import { hintOnce } from './hints.js';
 import { openEventEditor } from './event-editor.js';
+import { icon } from './icons.js';
 
 export const dateRemindKey = new PluginKey('memoking-date-remind');
 const SAME_MS = 60_000; // 알림이 이 안에 있으면 "이미 맞춤"
@@ -190,7 +191,7 @@ class DateChip {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = `mk-date-chip${set ? ' set' : ''}`;
-    chip.textContent = set ? `📅 일정 있어요: ${chipLabel(cur)}` : `📅 일정 추가: ${chipLabel(cur)}`;
+    chip.replaceChildren(icon('calendar'), set ? `일정 있어요: ${chipLabel(cur)}` : `일정 추가: ${chipLabel(cur)}`);
     chip.disabled = set;
     chip.setAttribute('aria-label', set ? `${chipLabel(cur)} 일정이 있어요` : `${chipLabel(cur)} 일정 추가`);
     // 편집기의 커서·초점을 빼앗지 않게 (누르는 순간 편집기가 흐려지면 단추가 사라짐)

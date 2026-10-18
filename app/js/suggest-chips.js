@@ -49,12 +49,16 @@ export function fillSuggestChips(box, list, addTags, makeChip = plainChip) {
     if (t.why) b.title = t.why;
     return b;
   }));
+  // "모두 달기"는 밀리는 칩 줄 밖(바로 옆)에 — 칩이 많으면 줄 끝에서 "모두 달" 처럼 잘려 보였다
+  const bar = box.classList.contains('tsb-chips') ? box.parentElement : null;
+  bar?.querySelector(':scope > .tsb-all')?.remove();
   if (list.length > 1) {
     const all = document.createElement('button');
     all.type = 'button';
-    all.className = 'link-btn';
+    all.className = 'link-btn tsb-all';
     all.textContent = '모두 달기';
     all.addEventListener('click', () => addTags(list.map((t) => t.name)));
-    box.append(all);
+    if (bar) box.after(all);
+    else box.append(all);
   }
 }

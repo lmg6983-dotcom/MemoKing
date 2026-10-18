@@ -277,6 +277,8 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 /* 사진 높이를 미리 정해 두어야 카드를 엇갈려 쌓을 때 자리가 맞는다 */
 .card-thumb { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: rgba(128, 128, 128, 0.12); }
 .cards[data-layout="rows"] .card-thumb { aspect-ratio: 16 / 7; }
+/* 어두운 화면: 사진 · 흰 바탕 손 메모 미리 보기는 조금 어둡게 (검은 카드 사이에서 흰 칸이 튀지 않게) */
+@media (prefers-color-scheme: dark) { .card-thumb { filter: brightness(0.86); } }
 .card-foot { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: auto; font-size: 12px; }
 .card-tags { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; opacity: 0.75; }
 .card-meta { display: flex; align-items: center; gap: 6px; flex: none; opacity: 0.7; }
@@ -344,6 +346,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   transform-origin: left center;
   transition: transform 0.2s var(--ease-out), background-color 0.15s;
 }
+@media (prefers-color-scheme: dark) { .switch:not(:checked) { background: #4d4b45; } } /* 꺼진 칸도 시트 바탕과 구별되게 */
 /* 누르는 동안 손잡이가 살짝 늘어난다 (움직일 쪽으로) — 폭 대신 scaleX 로 */
 .switch:active::after { transform: scaleX(1.22); }
 .switch:checked::after { transform-origin: right center; }
@@ -447,7 +450,10 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   animation: sheet-up 0.24s var(--ease-drawer);
 }
 @keyframes sheet-up { from { transform: translateY(40%); opacity: 0; } }
-.sheet > .sheet-x { position: sticky; top: 0; float: right; z-index: 1; margin: 0 -10px -44px 0; color: var(--muted); }
+/* 닫기 띠: 자리를 차지하지 않고 위에 붙어 있다. 내리면 바탕색 띠가 되어 그 아래로 내용이 지나간다 (× 가 단추 위에 겹치지 않게) */
+.sheet > .sheet-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: flex-end; height: 50px; margin: -6px -16px -44px; padding: 6px 6px 0; pointer-events: none; transition: background-color 0.15s, box-shadow 0.15s; }
+.sheet.scrolled > .sheet-bar { background: var(--surface-2); box-shadow: 0 1px 0 var(--line); }
+.sheet > .sheet-bar .sheet-x { pointer-events: auto; color: var(--muted); }
 .sheet-grip { width: 40px; height: 4px; margin: 4px auto 10px; border-radius: 2px; background: var(--line); }
 .sheet-title { margin: 4px 4px 12px; font-size: 18px; line-height: 26px; font-weight: 800; letter-spacing: -0.015em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 h2.sheet-title { font-size: 20px; }
@@ -471,7 +477,8 @@ h2.sheet-title { font-size: 20px; }
 .sheet .rem-answer { min-height: 46px; padding: 10px 4px; }
 .sheet .rem-answer b { font-size: 15px; }
 .sheet .rem-start { height: 50px; font-size: 16px; border-radius: 14px; }
-.sheet .flow-footer { padding-bottom: 0; }
+/* 아래 막대는 시트 아래 여백까지 덮는다 — 여백만큼 떠 있으면 그 틈으로 뒤 내용("…에 알려요")이 비쳐 보였다 */
+.sheet .flow-footer { bottom: calc(-20px - env(safe-area-inset-bottom)); margin-bottom: calc(-20px - env(safe-area-inset-bottom)); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 .sheet .flow-footer .btn { min-height: 52px; font-size: 16px; border-radius: 14px; }
 .sheet .alert-more { min-height: var(--tap); font-size: 14.5px; }
 /* 시트를 스크롤해도 제목·닫기는 위에 붙어 있게 */
@@ -957,7 +964,8 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 .add-sat:active .add-sat-btn { transform: scale(0.92); }
 @keyframes add-sat-out { from { opacity: 0; transform: translate(-6px, 30px) scale(0.5); } }
 @keyframes add-sat-in { to { opacity: 0; transform: translate(-6px, 30px) scale(0.5); } }
-@media print { .add-menu { display: none !important; } }
+.add-scrim { position: absolute; inset: 0; z-index: 24; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); animation: mk-fade-in 0.15s ease-out; }
+@media print { .add-menu, .add-scrim { display: none !important; } }
 
 /* ---------- 메모 도구막대 (글 고치기): 그리기 도구 막대와 같은 떠 있는 흰 막대 ----------
    둥근 모서리 · 가까운 그림자 · 켜진 서식은 옅은 노랑 + 노랑 테두리 (그리기의 고른 도구와 같음). 어두운 모드도 같은 모양(토큰) */

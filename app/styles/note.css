@@ -229,6 +229,14 @@ body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-bl
 /* 밑줄 · 글자 색 · 하이라이트 */
 .mk-doc u { text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
 .mk-doc mark { padding: 0.05em 0.1em; border-radius: 3px; color: #1f1f1f; } /* 배경색은 요소의 style 에서 */
+/* 어두운 화면: 형광펜 칠 · 흰 바탕 그림(흰 바탕 손 메모 · 가져온 일정의 달력 그림)은 조금 어둡게 — 검은 바탕에서 혼자 눈부시지 않게 (파일은 그대로) */
+[data-color="charcoal"] .mk-doc mark { filter: brightness(0.8); }
+[data-color="charcoal"] .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
+@media (prefers-color-scheme: dark) {
+  .mk-doc mark { filter: brightness(0.8); }
+  .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
+}
+@media print { .mk-doc :is(mark, img) { filter: none !important; } }
 
 /* 이미지 */
 .mk-image { display: block; max-width: 100%; margin: 6px 0; border-radius: 6px; }
@@ -1212,6 +1220,8 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-voice-body > p:first-child > br, .mk-voice-body > p:first-child > img.ProseMirror-separator { display: none; }
 .mk-voice-body > p:first-child .mk-media { margin: 0; border-radius: 0; background: transparent; line-height: normal; font-size: 13px; }
 .mk-voice-body > p:first-child .mk-media-label::after { content: "음성 메모"; margin-left: auto; padding: 0 8px; font-size: 12px; opacity: 0.6; }
+/* 복사 · 저장 · 공유 · × 단추가 떠 있는 동안은 오른쪽 위 "음성 메모" 글자를 숨긴다 (단추가 글자 위에 겹쳐 보였다) */
+:is(.mk-delete-target, body:has(.mk-delete-btn:not(.fading)) .mk-voice:hover) .mk-media-label::after { visibility: hidden; }
 .mk-voice.has-text .mk-voice-bar { margin: 0 12px; border-top: 1px dashed color-mix(in srgb, var(--note-text) 14%, transparent); }
 .mk-voice.has-text:not(.folded) .mk-voice-bar { margin-bottom: 2px; }
 .mk-voice.folded .mk-voice-bar { padding-bottom: 8px; }
@@ -1366,8 +1376,9 @@ body[data-color="charcoal"] :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-o
 @media (hover: hover) and (pointer: fine) { .tag-suggest-bar .tag-chip:hover { background: color-mix(in srgb, var(--note-text) 12%, transparent); } }
 .tag-suggest-bar .tag-chip.sure { box-shadow: inset 0 0 0 1.5px var(--note-text); }
 .tag-suggest-bar .tag-chip.new { outline: 1px dashed color-mix(in srgb, var(--note-text) 35%, transparent); outline-offset: -1px; }
-.tag-suggest-bar .tag-chip.new::after { content: '새'; margin-left: 4px; font-size: 0.75em; opacity: 0.7; }
-.tag-suggest-bar .link-btn { flex: none; border: 0; background: none; color: var(--note-muted); font-size: 12px; cursor: pointer; padding: 3px 6px; border-radius: 6px; }
+/* 아직 없는 태그: 작은 노란 "새" 딱지 (예전: 흐린 작은 글자라 잘 안 보였다) */
+.tag-suggest-bar .tag-chip.new::after { content: '새'; display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: 999px; background: var(--brand-yellow); color: var(--on-brand); font-size: 10.5px; font-weight: 800; line-height: 16px; vertical-align: 1px; }
+.tag-suggest-bar .link-btn { flex: none; white-space: nowrap; border: 0; background: none; color: var(--note-muted); font-size: 12px; cursor: pointer; padding: 3px 6px; border-radius: 6px; }
 .tag-suggest-bar .icon-btn { flex: none; width: 26px; height: 26px; }
 .tag-suggest-bar .icon-btn svg { width: 14px; height: 14px; }
 @media print { .tag-suggest-bar { display: none !important; } }
@@ -1737,11 +1748,13 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .mk-doc .mk-date-set { text-decoration-style: solid; text-decoration-color: var(--accent-strong); }
 .mk-date-chip {
   position: fixed; z-index: 60;
+  display: inline-flex; align-items: center; gap: 6px;
   min-height: 32px; padding: 6px 14px; border: 0; border-radius: 99px;
   background: var(--bubble-bg); color: var(--bubble-fg); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
   box-shadow: var(--bubble-shadow); cursor: pointer;
   animation: mk-date-chip 0.16s ease-out;
 }
+.mk-date-chip svg { flex: none; width: 15px; height: 15px; }
 .mk-date-chip:hover:not(:disabled) { filter: brightness(1.12); }
 .mk-date-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mk-date-chip.set { cursor: default; opacity: 0.92; }

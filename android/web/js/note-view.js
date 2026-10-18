@@ -401,7 +401,10 @@ function renderTagGroups() {
 
 function refreshLinks() {
   if (!id) return;
-  const { links, backlinks, suggestions } = app.vault.links(id);
+  const { links, backlinks, suggestions: similar } = app.vault.links(id);
+  // 위 "같은 태그의 메모"에 이미 보이는 메모는 비슷한 메모에서 뺀다 (같은 메모가 두 번 추천되지 않게)
+  const inTags = new Set(tagGroups().flatMap((g) => g.memos.slice(0, 6).map((m) => m.id)));
+  const suggestions = similar.filter((m) => !inTags.has(m.id));
   const total = relatedCount();
   el.linksCount.textContent = total ? String(total) : '';
   el.linksBtn.setAttribute('aria-label', total ? `메모 연결 ${total}개` : '메모 연결');
@@ -824,6 +827,9 @@ el.styleMenu.addEventListener('click', (e) => {
 // ---------- 콘텐츠 추가 (+): 사진 · 파일 · 음성 녹음 · 표 · 수식 위성 단추 ----------
 const addMenu = $('add-menu');
 const addBtn = $('add-btn');
+// 위성 단추 뒤를 옅게 덮는다 (목록의 + 메뉴처럼) — 이름표가 본문 글자 위에 겹쳐 읽히지 않게. 누르면 닫힘 (아래 pointerdown)
+const addScrim = Object.assign(document.createElement('div'), { className: 'add-scrim', hidden: true });
+addMenu.before(addScrim);
 let addCloseTimer = 0;
 let addFromCursor = false; // + 를 펼칠 때 글을 쓰던 중이었나 (사진·파일을 커서 자리에 넣을지)
 function openAddMenu() {
@@ -832,6 +838,7 @@ function openAddMenu() {
   clearTimeout(addCloseTimer);
   addMenu.classList.remove('closing');
   addMenu.hidden = false;
+  addScrim.hidden = false;
   // 키보드를 닫는다 — 위성 단추가 글자판에 가리지 않게 (커서 자리는 편집기가 기억해 넣을 곳은 그대로)
   addFromCursor = el.editorRoot.contains(document.activeElement);
   if (addFromCursor) document.activeElement.blur();
@@ -867,6 +874,7 @@ export function closeAddMenu() {
   addBtn.classList.remove('open');
   addBtn.setAttribute('aria-expanded', 'false');
   addMenu.classList.add('closing');
+  addScrim.hidden = true;
   addCloseTimer = setTimeout(() => {
     addMenu.hidden = true;
     addMenu.classList.remove('closing');
