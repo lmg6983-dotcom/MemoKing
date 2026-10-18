@@ -336,6 +336,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       // 예비 창이 준비될 때까지 (목록이 뜨고 조금 뒤 만들어 둔다)
       await wait(2500);
       await until(() => js(list, `!!document.querySelector('[data-id="${cid}"]')`), '콘텐츠 메모 카드');
+      // 카드 키보드: 카드마다 Tab 한 번 (단추 셋은 Tab 으로 가지 않음), 카드에 포커스가 오면 단추 묶음이 보임
+      const cardKeys = await js(list, `(() => { const item = document.querySelector('[data-id="${cid}"]').closest('li, .item') ?? document.querySelector('[data-id="${cid}"]').parentElement; const card = item.querySelector('.card') ?? document.querySelector('[data-id="${cid}"]'); const bs = [...item.querySelectorAll('.card-actions button')]; card.focus(); return new Promise((r) => setTimeout(() => r({ n: bs.length, skip: bs.every((b) => b.tabIndex === -1), focused: document.activeElement === card, visible: card.matches(':focus-visible'), shown: getComputedStyle(item.querySelector('.card-actions')).opacity }), 300)); })()`);
+      check('목록 카드 키보드: 단추 셋은 Tab 으로 가지 않고(카드마다 Tab 한 번) · 카드에 포커스가 오면 단추 묶음이 보임',
+        cardKeys.n === 3 && cardKeys.skip && cardKeys.focused && (!cardKeys.visible || cardKeys.shown === '1'), JSON.stringify(cardKeys));
       const before = new Set(noteWins.keys());
       const winsBefore = new Set(electronApi.BrowserWindow.getAllWindows().map((x) => x.id)); // 예비 창은 누르기 전부터 있다
       const t0 = Date.now();
@@ -519,12 +523,48 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       // 수식: 마우스를 올리면 단추, 지우면 수식만 사라짐
       const mathLabel = await hover('.mk-doc .mk-math-block');
       if (mathLabel) {
+        // 누르는 순간(mousedown)에는 아직 지우지 않는다 — 눌렀다 뗄 때(click) 지운다
         await js(nw, `document.querySelector('.mk-delete-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
+        await wait(500);
+        const stillThere = await js(nw, `Boolean(document.querySelector('.mk-doc .mk-math-block'))`);
+        check('내용 지우기 단추(PC 는 휴지통 모양): 누르는 순간이 아니라 뗄 때 지움 (누른 채 밖으로 빼면 그만)', stillThere);
+        await js(nw, `document.querySelector('.mk-delete-btn').click()`);
       }
       const mathGone = await until(() => js(nw, `!document.querySelector('.mk-doc .mk-math-block') && document.querySelector('.mk-doc').textContent.includes('끝 문단')`), '수식 지움', 3000).catch(() => false);
       const undoTip = await until(() => js(nw, `document.getElementById('mk-undo-hint')?.textContent`), '되돌리기 안내', 2000).catch(() => '');
-      check('수식: 마우스를 올리면 "이 수식 지우기", 누르면 수식만 지워지고 그 자리에 "수식을 지웠어요 · Ctrl+Z 로 되돌리기"',
-        mathLabel === '이 수식 지우기' && mathGone && /^수식을 지웠어요 · Ctrl\+Z 로 되돌리기$/.test(undoTip), JSON.stringify({ mathLabel, mathGone, undoTip }));
+      check('수식: 마우스를 올리면 "이 수식 지우기", 누르면 수식만 지워지고 그 자리에 "수식을 지웠어요 [되돌리기] Ctrl+Z"',
+        mathLabel === '이 수식 지우기' && mathGone && /^수식을 지웠어요 되돌리기 Ctrl\+Z$/.test(undoTip.replace(/\s+/g, ' ').trim()), JSON.stringify({ mathLabel, mathGone, undoTip }));
+      // 안내의 되돌리기 단추(마우스)로 되살리기 — Ctrl 만 눌러도 안내가 사라지지 않음
+      nw.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
+      nw.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });
+      await wait(150);
+      const tipAfterCtrl = await js(nw, `Boolean(document.getElementById('mk-undo-hint'))`);
+      await js(nw, `document.querySelector('#mk-undo-hint .mk-undo-btn')?.click()`);
+      const mathBack = await until(() => js(nw, `Boolean(document.querySelector('.mk-doc .mk-math-block'))`), '되돌리기 단추', 3000).catch(() => false);
+      check('지운 내용: 안내의 되돌리기 단추로 되살림 (Ctrl 만 눌러서는 안내가 사라지지 않음)', tipAfterCtrl && mathBack, JSON.stringify({ tipAfterCtrl, mathBack }));
+      // 오른쪽 클릭 메뉴: 단추 줄과 같은 일을 이름과 함께 (열기 · 복사 · 저장… · 공유… · 지우기)
+      const rightClick = async (sel) => {
+        globalThis.mkSmokeMenu = null;
+        const r = await js(nw, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + Math.min(12, r.width / 2)), y: Math.round(r.top + Math.min(10, r.height / 2)) }; })()`);
+        if (!r) return null;
+        nw.webContents.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
+        nw.webContents.sendInputEvent({ type: 'mouseDown', x: r.x, y: r.y, button: 'right', clickCount: 1 });
+        nw.webContents.sendInputEvent({ type: 'mouseUp', x: r.x, y: r.y, button: 'right', clickCount: 1 });
+        return until(() => globalThis.mkSmokeMenu, `${sel} 오른쪽 클릭 메뉴`, 3000).catch(() => null);
+      };
+      const labelsOf = (m) => (m?.items ?? []).map((it) => (it.type === 'separator' ? '─' : it.label + (it.accelerator ? `[${it.accelerator}]` : ''))).join(' | ');
+      const fileMenu = await rightClick('.mk-doc a[data-file]');
+      const copies0 = smokeOpened.filter((o) => o.kind === 'copy-file').length;
+      fileMenu?.pick('copy');
+      const menuCopied = await until(() => smokeOpened.filter((o) => o.kind === 'copy-file').length > copies0, '메뉴로 복사', 3000).catch(() => false);
+      const menuStatus = await until(() => js(nw, `/파일을 복사했어요/.test(document.getElementById('status')?.textContent ?? '') && document.getElementById('status').textContent`), '상태 줄', 2000).catch(() => '');
+      check('파일 오른쪽 클릭: 이 파일 열기 ─ 복사 · 저장… · 공유… ─ 지우기[Delete], 복사를 고르면 파일 그대로 + 상태 줄 알림',
+        labelsOf(fileMenu) === '이 파일 열기 | ─ | 이 파일 복사 | 이 파일 저장… | 이 파일 공유… | ─ | 이 파일 지우기[Delete]' && menuCopied && Boolean(menuStatus), JSON.stringify({ menu: labelsOf(fileMenu), menuCopied, menuStatus }));
+      const mathMenu = await rightClick('.mk-doc .mk-math-block');
+      mathMenu?.pick('delete');
+      const mathMenuGone = await until(() => js(nw, `!document.querySelector('.mk-doc .mk-math-block')`), '메뉴로 지움', 3000).catch(() => false);
+      const menuTip = await until(() => js(nw, `document.getElementById('mk-undo-hint')?.textContent`), '되돌리기 안내', 2000).catch(() => '');
+      check('수식 오른쪽 클릭 → 이 수식 지우기: 단추와 똑같이 지우고 되돌리기 안내', /^이 수식 고치기/.test(labelsOf(mathMenu)) && mathMenuGone && /수식을 지웠어요/.test(menuTip ?? ''), JSON.stringify({ menu: labelsOf(mathMenu), mathMenuGone, menuTip }));
       nw.close();
     }
 

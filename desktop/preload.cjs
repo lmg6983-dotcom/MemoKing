@@ -223,6 +223,10 @@ contextBridge.exposeInMainWorld('memoking', {
     joinMenu: invoke('stack:join-menu'),
     menu: invoke('stack:menu'),
   },
+  // 화면이 정한 오른쪽 클릭 메뉴 (메모 창 내용) → 고른 id | null
+  menu: {
+    choose: invoke('menu:choose'),
+  },
   win: {
     close: invoke('win:close'),
     minimize: invoke('win:minimize'),

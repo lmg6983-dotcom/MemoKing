@@ -24,6 +24,8 @@ let host = {
   /** 공유: { name, mime, rel? | base64?, text? } — 휴대폰 공유 창 · PC 공유 방법 고르기(share-menu.js) (없으면 공유 단추를 보이지 않음)
    *  → 휴대폰 'shared' · PC 'link' | 'localsend' | 'localsend-missing' | 'mail' · 둘 다 'cancelled' (문구는 share-menu.js SHARE_DONE) */
   share: null,
+  /** PC 오른쪽 클릭 메뉴: ([{ id, label, accelerator? } | { type: 'separator' }], { x, y } | null) → 고른 id | null (없으면 앱 기본 메뉴) */
+  menu: null,
 };
 
 /** 앱마다 클립보드에 넣는 방법 — { image(pngBase64), text({ text, html }), file(href) } (빠지면 브라우저 Clipboard API · 파일은 글로) */
@@ -282,5 +284,9 @@ export const canShare = () => Boolean(host.share);
 /** 다른 앱으로 보내기 (글이면 글로, 그 밖은 파일로) → 'shared' | 'cancelled' */
 export async function shareBlock(view, pos, node, target) {
   if (!host.share) throw new Error('이 앱에서는 공유할 수 없어요');
-  return host.share(await blockPayload(view, pos, node, target));
+  return host.share(await blockPayload(view, pos, node, target), target);
 }
+
+/** 내용 오른쪽 클릭 메뉴를 띄울 수 있는 앱인가 (PC) */
+export const canMenu = () => Boolean(host.menu);
+export const chooseMenu = (items, at = null) => (host.menu ? host.menu(items, at) : Promise.resolve(null));

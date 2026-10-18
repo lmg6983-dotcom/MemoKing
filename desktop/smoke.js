@@ -610,7 +610,7 @@ export async function runSmoke({
     await closeNote(n2.id);
 
     // 12) 알림 영역(트레이) 아이콘 (v0.5.0)
-    const labels = () => getTrayMenu().map((item) => item.label?.trim()).filter(Boolean);
+    const labels = () => getTrayMenu().flatMap((item) => [item, ...(item.submenu ?? [])]).map((item) => item.label?.trim()).filter(Boolean);
     await wait(300);
     const menu = labels();
     check('트레이 아이콘·메뉴 (목록 열기, 새 메모, 최근 메모, 종료)',
@@ -712,10 +712,10 @@ export async function runSmoke({
       const img = document.querySelector('.mk-doc img.mk-image');
       const r = img.getBoundingClientRect();
       img.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
-      document.querySelector('.mk-delete-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      document.querySelector('.mk-delete-btn').click(); // PC 마우스: 눌렀다 뗄 때 지운다
     })()`);
     const deleted = await until(async () => (await imgCount()) === beforeDel - 1, '그림 지우기').catch(() => false);
-    check('PC: 마우스를 올려 뜬 × 를 누르면 그 그림이 지워짐', deleted, `${beforeDel} → ${await imgCount()}`);
+    check('PC: 마우스를 올려 뜬 지우기 단추를 누르면 그 그림이 지워짐', deleted, `${beforeDel} → ${await imgCount()}`);
     await closeNote(webNote.id);
 
     // 13-0) 목록 창에 파일을 끌어다 놓으면 메모로 (.md 는 글 그대로, 그림은 메모 안에)
@@ -871,9 +871,9 @@ export async function runSmoke({
       return { x: document.querySelectorAll('.mk-delete-btn').length + card.querySelectorAll('button').length, copy: document.querySelector('.mk-copy-btn')?.title ?? '' };
     })()`);
     check('링크 카드: 마우스를 올리면 × 하나 · "링크 주소 복사"', cardButtons?.x === 1 && cardButtons?.copy === '링크 주소 복사', JSON.stringify(cardButtons));
-    await js(reopenedLink.win, `document.querySelector('.mk-delete-btn').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))`);
+    await js(reopenedLink.win, `document.querySelector('.mk-delete-btn').click()`);
     const removed = await until(() => readMemo(reopenedLink.id).split('"미리보기"').length === 2, '카드 지우기').catch(() => false);
-    check('카드의 × → 카드 지우기', removed && readMemo(reopenedLink.id).includes('관련 글'));
+    check('카드의 지우기 단추 → 카드 지우기', removed && readMemo(reopenedLink.id).includes('관련 글'));
     await closeNote(reopenedLink.id);
 
     // 13-2) 태그 · # 자동완성 · 목록 필터 (v0.11.0)
@@ -1517,13 +1517,13 @@ export async function runSmoke({
     check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림, /.test(notiMd));
     await closeNote(memoFromNoti.id);
     // 알림 하나 지우기: 그 자리에 되돌리기 5초 → 되돌리면 그대로, 기다리면 지워짐
-    await listJs(`document.querySelector('#history-rows .noti [aria-label="삭제"]').click()`);
+    await listJs(`document.querySelector('#history-rows .noti [aria-label="보관함에서 삭제"]').click()`);
     await wait(300);
     const notiUndoShown = await listJs(`!!document.querySelector('#history-rows .noti-undo')`) && history.list({ query: '회의' }).length === 1;
     await listJs(`document.querySelector('#history-rows .noti-undo button').click()`);
     await wait(200);
     const notiBack = await listJs(`!document.querySelector('#history-rows .noti-undo') && !!document.querySelector('#history-rows .noti')`);
-    await listJs(`document.querySelector('#history-rows .noti [aria-label="삭제"]').click()`);
+    await listJs(`document.querySelector('#history-rows .noti [aria-label="보관함에서 삭제"]').click()`);
     const notiRemoved = await until(() => history.list({ query: '회의' }).length === 0, '알림 지움', 7000).then(() => true).catch(() => false);
     check('보관한 알림 지우기 (그 자리에 되돌리기 5초, 되돌리면 그대로)', notiUndoShown && notiBack && notiRemoved, JSON.stringify({ notiUndoShown, notiBack, notiRemoved }));
     await listJs(`document.querySelector('.tabs [aria-selected="true"]').focus()`);

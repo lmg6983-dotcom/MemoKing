@@ -823,10 +823,13 @@ function updateTrayMenu() {
     { label: '화면 캡처로 새 메모', enabled: Boolean(vault), click: () => windowManager.startAreaCapture() },
     { label: '복사해 둔 내용으로 새 메모', enabled: Boolean(vault), click: () => windowManager.quickMemo({ copy: false }) },
     { type: 'separator' },
-    { label: '최근 메모', enabled: false },
-    ...(recent.length
-      ? recent.map((m) => ({ label: `   ${shorten(m.title)}`, click: () => windowManager.openNote(m.id) }))
-      : [{ label: '   없음', enabled: false }]),
+    // 들여 쓴 흐린 머리말 대신 하위 메뉴 (Windows 메뉴의 "최근 항목" 처럼)
+    {
+      label: '최근 메모',
+      submenu: recent.length
+        ? recent.map((m) => ({ label: shorten(m.title), click: () => windowManager.openNote(m.id) }))
+        : [{ label: '없음', enabled: false }],
+    },
     { type: 'separator' },
     { label: '일정', click: () => windowManager.createListWindow('reminders') }, // 목록 창의 탭 이름과 같게
     { label: '알림 보관함', click: () => windowManager.createListWindow('history') },
