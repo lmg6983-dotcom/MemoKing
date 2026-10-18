@@ -38,3 +38,14 @@ export function trashedText(title) {
   if (!t) return '메모를 휴지통으로 옮겼어요';
   return `‘${t.length > 18 ? `${t.slice(0, 18)}…` : t}’ 메모를 휴지통으로 옮겼어요`;
 }
+
+// 카드 미리 보기 글의 웹 주소는 짧게: "https://www.example.com/restaurant." → "example.com/restaurant."
+//   (긴 주소가 카드 폭에서 "…/rest" · "aurant" 처럼 낱말 중간에 끊겨 보였다) — 너무 길면 앞부분 + …
+export function shortUrls(text, max = 28) {
+  return String(text ?? '').replace(/\bhttps?:\/\/[^\s<>"']+/gi, (url) => {
+    const tail = url.match(/[.,;:!?)\]]+$/)?.[0] ?? ''; // 문장 끝 마침표 · 괄호는 주소가 아니다
+    let s = url.slice(0, url.length - tail.length).replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '');
+    if (s.length > max) s = `${s.slice(0, max - 1)}…`;
+    return s + tail;
+  });
+}

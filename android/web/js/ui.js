@@ -19,16 +19,26 @@ function syncScrim() {
 
 // 대화형 시트(설정 · 휴지통 · 모을 앱 · 메모 메뉴 …)에는 오른쪽 위 × — 손잡이 · 바깥 누르기 · 뒤로 가기 말고도 눈에 보이는 닫기
 //   (화면 읽기 사용자에게도 분명한 출구). 시트가 길어 내려도 위에 붙어 있다
+//   × 는 위쪽 띠(.sheet-bar)에 — 내려서 보면 띠가 바탕색으로 채워져 아래 줄의 단추(허용 등) 위에 × 가 겹쳐 보이지 않는다
 function addCloseButton(el) {
-  if (el.getAttribute('role') !== 'dialog' || el.querySelector(':scope > .sheet-x')) return;
+  if (el.getAttribute('role') !== 'dialog' || el.querySelector(':scope > .sheet-bar')) return;
   el.setAttribute('aria-modal', 'true');
+  const bar = document.createElement('div');
+  bar.className = 'sheet-bar';
   const x = document.createElement('button');
   x.type = 'button';
   x.className = 'icon-btn sheet-x';
   x.setAttribute('aria-label', '닫기');
   x.innerHTML = '<svg><use href="#i-close"/></svg>';
   x.addEventListener('click', () => closeSheet(el));
-  el.prepend(x);
+  // 내려서 보면 띠에 시트 제목을 (빈 흰 줄처럼 보이지 않게, 지금 어느 시트인지)
+  const name = document.createElement('b');
+  name.className = 'sheet-bar-title';
+  name.setAttribute('aria-hidden', 'true');
+  name.textContent = el.querySelector('.sheet-title')?.textContent.trim() || el.getAttribute('aria-label') || '';
+  bar.append(name, x);
+  el.prepend(bar);
+  el.addEventListener('scroll', () => el.classList.toggle('scrolled', el.scrollTop > 4), { passive: true });
 }
 
 /** 시트를 연다. close: 닫을 때 할 일 (기본은 숨기기) */

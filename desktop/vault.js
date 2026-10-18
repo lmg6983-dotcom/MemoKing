@@ -6,7 +6,7 @@ import { EventEmitter } from 'node:events';
 import { randomUUID, randomBytes } from 'node:crypto';
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
-  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS } from '../app/js/core/memo-file.js';
+  extractMedia, isBlankBody, titleToFileName, COLORS } from '../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { taskProgress } from '../app/js/core/tasks.js';
@@ -41,7 +41,6 @@ function writeAtomic(file, data) {
   }
 }
 
-const toPosix = (p) => p.split(path.sep).join('/');
 const sameName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'accent' }) === 0;
 
 function stamp(date = new Date()) {

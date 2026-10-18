@@ -191,7 +191,7 @@ function showMore() {
   $('more-hint').hidden = !more || form.scrollTop > 0;
 }
 form.addEventListener('scroll', showMore, { passive: true });
-new ResizeObserver(showMore).observe(form);
+new ResizeObserver(() => requestAnimationFrame(showMore)).observe(form); // 다음 화면에서 (안내를 켜고 끄며 생기는 고리 경고 없이)
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') window.close();
 });

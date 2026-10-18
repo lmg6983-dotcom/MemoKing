@@ -3,7 +3,7 @@
 // 그래서 PC 와 휴대폰이 같은 폴더를 동기화해 써도 서로의 메모를 그대로 읽는다.
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
-  extractMedia, extractAttachments, isBlankBody, titleToFileName, COLORS } from '../../app/js/core/memo-file.js';
+  extractMedia, isBlankBody, titleToFileName, COLORS } from '../../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { taskProgress } from '../../app/js/core/tasks.js';

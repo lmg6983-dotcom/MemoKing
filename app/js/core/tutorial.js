@@ -254,7 +254,7 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'annotate', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.mode-knob', '.mk-annot-bar'], advance: 'annotate-done', emoji: '🖍️',
+    id: 'annotate', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.mode-knob', '.mode-knob.open .mk-stop', '.mk-annot-bar'], advance: 'annotate-done', emoji: '🖍️', // 펼친 다이얼 칸(그리기)도 가리지 않게
     title: '글 위에 바로 그리기',
     text: '다이얼을 글 위에 그리기로 돌리면 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요. 다 그렸으면 다이얼을 한 번 더 눌러 글 고치기로 돌리면 저장돼요.',
     try: '다이얼을 누르면 둘레에 칸이 펼쳐져요 — 맨 위 그리기를 눌러 글 위에 쓱 긋고, 다이얼을 다시 눌러 끝내요',

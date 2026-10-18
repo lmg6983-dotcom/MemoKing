@@ -290,7 +290,7 @@ svg { width: 20px; height: 20px; flex: none; }
 /* 실제 화면 사진 — 누르면 말풍선이 넓어지며 크게 */
 .coach-shot {
   display: block; width: 100%; max-height: 150px; margin: 0 0 10px; border-radius: 12px;
-  object-fit: cover; object-position: top center; cursor: zoom-in;
+  object-fit: contain; object-position: center; cursor: zoom-in; /* 사진 전체가 보이게 (예전: 위쪽만 잘라 보여 "옮기기" 사진의 표가 잘렸다) */
   box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card); background: var(--fill-tab);
 }
 .coach-bubble.wide .coach-shot { max-height: 320px; object-fit: contain; cursor: zoom-out; }
@@ -343,7 +343,7 @@ svg { width: 20px; height: 20px; flex: none; }
   .coach-bubble h3 { margin: 0 0 4px; font-size: 15.5px; line-height: 21px; }
   .coach-bubble p { margin: 0 0 8px; font-size: 13px; line-height: 19px; }
   .coach-try { margin: 0 0 8px; padding: 7px 10px; font-size: 12.5px; line-height: 18px; }
-  .coach-shot { height: 128px; max-height: none; object-fit: cover; object-position: center; }
+  .coach-shot { height: 128px; max-height: none; object-fit: contain; object-position: center; } /* 좁은 창도 사진 전체가 보이게 */
 }
 @media (max-height: 620px) and (max-width: 560px) { .coach-shot { display: none; } }
 /* 손 메모 그리기·주석·녹음 중에는 말풍선을 잠시 숨긴다 (그리기를 가리지 않게) — 끝나면 다음 단계로 */
@@ -418,6 +418,8 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .switch:checked { background: var(--brand-yellow); }
 .switch:checked::after { transform: translateX(16px); background: var(--brand-black); }
 .switch:disabled { opacity: 0.4; cursor: not-allowed; }
+/* 어두운 화면: 꺼진 스위치의 손잡이는 밝게 (어두운 바탕 · 어두운 손잡이면 스위치가 있는지도 안 보였다) */
+@media (prefers-color-scheme: dark) { .switch:not(:checked)::after { background: #d9d6ce; } }
 
 /* Ctrl+휠 확대 배지 (메모 창 · 목록 창) */
 .zoom-badge {
@@ -493,9 +495,10 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .shortcut-sheet header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .shortcut-sheet h3 { margin: 0; font-size: 16px; }
 .shortcut-sheet h4 { margin: 14px 0 6px; font-size: 12px; color: var(--muted); }
-.shortcut-sheet dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; margin: 0; font-size: 13px; }
-.shortcut-sheet dt { color: var(--text); }
-.shortcut-sheet dd { margin: 0; text-align: right; white-space: nowrap; }
+.shortcut-sheet dl { display: flex; flex-direction: column; gap: 6px; margin: 0; font-size: 13px; }
+.shortcut-sheet .sc-row { display: flex; align-items: baseline; gap: 12px; }
+.shortcut-sheet dt { flex: 1; min-width: 0; color: var(--text); }
+.shortcut-sheet dd { flex: none; margin: 0; text-align: right; white-space: nowrap; }
 .shortcut-sheet kbd {
   padding: 1px 6px;
   border: 1px solid var(--border);
@@ -618,7 +621,8 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .quick-event .qe-row-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 14px; }
 .quick-event .qe-chev { flex: none; color: var(--muted); font-weight: 800; transition: transform 0.15s; }
 .quick-event .qe-row[aria-expanded="true"] .qe-chev { transform: rotate(90deg); }
-.quick-event .qe-ico { flex: none; width: 1.3em; text-align: center; }
+.quick-event .qe-ico { flex: none; width: 18px; height: 18px; color: var(--muted); }
+.quick-event .qe-date .qe-ico { color: var(--text-strong); }
 .quick-event .qe-pane { padding: 4px 2px 8px; }
 .quick-event .qe-pane-q { margin: 2px 0 8px; font-size: 12.5px; color: var(--muted); }
 .quick-event .flow-footer { margin-top: 14px; }
@@ -693,7 +697,9 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   font-variant-numeric: tabular-nums;
 }
 .cal-body [role="grid"] { border-radius: 10px; overflow: hidden; }
-.cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: var(--danger); }
+/* 일요일 빨강: 다른 달 날의 옅은 회색 칸 위 작은 숫자에서도 4.5:1 이 되게 밝은 화면은 조금 진하게 (#d93036 은 4.46 이었다) */
+.cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: #c4282e; }
+@media (prefers-color-scheme: dark) { .cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: var(--danger); } }
 .cal-body [role="gridcell"] { cursor: pointer; }
 .cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); box-shadow: inset 0 0 0 2px var(--accent); }
 .cal-body .mk-ev { cursor: pointer; }
@@ -802,6 +808,12 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   .event-field input { min-height: 34px; }
   .event-allday { min-height: 32px; margin-bottom: 2px; }
   .event-dialog .event-none { margin: 4px 0 8px; }
+  /* 작은 메모 창(약 340×380) 안의 창(일정 추가 · 메모 잠그기 …): 여백을 줄이고, 아래 단추 줄은 늘 아래에 붙여 보이게
+     (예전: 창이 메모 창보다 길어 [저장] · [잠그기] 가 밀어 내려야 보였다) */
+  .dialog { max-height: calc(100vh - 16px); padding: 16px 18px 12px; }
+  .dialog h2 { margin-bottom: 8px; font-size: 17px; line-height: 24px; }
+  .dialog p { margin-bottom: 10px; line-height: 1.5; }
+  .dialog .dialog-actions { position: sticky; bottom: -12px; z-index: 2; margin: 0 -18px -12px; padding: 10px 18px 12px; background: var(--surface-2); box-shadow: 0 -1px 0 var(--line); }
 }
 
 /* 찾는 중 · 불러오는 중 (searching.js): 흔들리며 살피는 돋보기 + 차례로 뜨는 점 — 빈 화면 대신 */

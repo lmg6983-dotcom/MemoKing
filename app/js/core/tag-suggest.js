@@ -64,9 +64,11 @@ const mentions = (word, stems, lower) => {
   for (const t of stems) if (t.startsWith(w) && t.length - w.length <= 2) return true;
   return w.length >= 3 && lower.includes(w);
 };
+// 웹 주소는 태그 거리에서 뺀다 (example.com → "#com" 처럼 엉뚱한 추천이 나왔다)
+const noUrls = (text) => text.replace(/\b(?:https?:\/\/|www\.)\S+/gi, ' ');
 const textOf = (body) => {
   const title = extractTitle(body);
-  return `${title} ${title} ${plainLines(body).join(' ')}`;
+  return noUrls(`${title} ${title} ${plainLines(body).join(' ')}`);
 };
 
 /** 기존 태그 중 이 말과 사실상 같은 것 (없으면 null) */
@@ -92,7 +94,7 @@ export function matchExisting(word, existing) {
  * @param {{ limit?: number, excludeId?: string }} [options]
  */
 export function suggestTagsFor(body, memos, { limit = 3, excludeId } = {}) {
-  const plain = plainLines(body).join(' ');
+  const plain = noUrls(plainLines(body).join(' '));
   if (plain.replace(/\s/g, '').length < MIN_TEXT) return [];
   const own = new Set(extractTags(body).map(keyOf));
   const others = memos.filter((m) => m.id !== excludeId && m.body !== body);

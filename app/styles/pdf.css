@@ -93,7 +93,9 @@ body {
 .actions .btn { flex: none; }
 /* 고르기가 단추 줄 밑으로 더 있으면 줄 위에 옅은 그림자 + 안내 (아래로 더 있다는 것) */
 .actions.more { box-shadow: 0 -10px 16px -10px rgba(0, 0, 0, 0.18); }
-.more-hint { position: absolute; left: 50%; top: -26px; transform: translateX(-50%); padding: 3px 10px; border-radius: 999px; background: var(--surface-1); box-shadow: var(--shadow-card); font-size: 11.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; pointer-events: none; }
+/* 안내는 단추 줄 안 왼쪽에 (예전: 줄 위에 떠서 "메모 색 바탕" 줄 글자 · 스위치를 가렸다) */
+.more-hint { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; margin-right: auto; font-size: 11.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; pointer-events: none; }
+.more-hint:not([hidden]) + .status:empty { display: none; }
 .more-hint[hidden] { display: none; }
 .status { flex: 1; min-width: 0; margin: 0; font-size: 12.5px; line-height: 1.35; color: var(--text-muted); }
 .status.error { color: var(--danger); }

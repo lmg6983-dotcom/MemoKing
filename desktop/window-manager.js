@@ -10,12 +10,10 @@ import { StackStore } from './stacks.js';
 import { DesktopPin } from './desktop-pin.js';
 import { StatusBubbles } from './status-bubble-window.js';
 import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
-import { Opms, isOpenableFile, cleanDate, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
+import { Opms, cleanDate, normalizeOpmsHost } from './opms.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
-import { extractPreview, isBlankBody } from '../app/js/core/memo-file.js';
+import { extractPreview } from '../app/js/core/memo-file.js';
 import { pdfFileName, mmToPx, clampPrintScale } from '../app/js/core/pdf-page.js';
-import { activeModules, magicChips } from '../app/js/core/magic-modules.js';
-import { searchMemos } from '../app/js/core/memo-search.js';
 import { shareText } from '../app/js/core/share-text.js';
 import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
 import {
@@ -107,6 +105,7 @@ export class WindowManager {
     this.captureHelper = new CaptureHelper(CLIPBOARD_HELPER);
     this.pendingCaptures = new Map();
     this.pendingAlarms = new Map();
+    this.pendingCommands = new Map(); // 메모 창이 열리면 할 일 (목록 카드 오른쪽 클릭 › 잠그기 · 이전 버전)
     this.unseenCaptures = new Set();
     this.capturing = false;
     this.lastCapturePoint = null;

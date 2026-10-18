@@ -5,7 +5,7 @@ import { trashedText } from './core/format.js';
 import { captureGlobalKey, stopKeyCapture, isCapturing, globalShortcutResult } from './key-capture.js';
 import { injectIcons, icon } from './icons.js';
 import { handoffText } from './core/handoff.js';
-import { friendlyTime } from './core/format.js';
+import { friendlyTime, shortUrls } from './core/format.js';
 import { vaultUrl, mediaKind, fileExtension } from './media.js';
 import { memoBodyFromFile } from './core/file-memo.js';
 import { isTextDocument } from './core/markdown-import.js';
@@ -19,7 +19,7 @@ import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops, radioGroups } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards } from './dom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -81,9 +81,15 @@ function applyInfo(info) {
 // 목록을 이 파일들만으로 좁히기 (동기화 충돌 사본) — 위에 "N개만 보는 중 · 모두 보기"
 function showOnlyFiles(files) {
   const bar = $('conflict-bar');
-  state.onlyFiles = files?.length ? new Set(files.map((f) => String(f).replace(/\\/g, '/'))) : null;
+  const only = files?.length ? new Set(files.map((f) => String(f).replace(/\\/g, '/'))) : null;
+  // 탭 바꾸기 · 검색 지우기를 먼저 (둘 다 검색을 다시 돌린다) — 사본만 보기를 정한 뒤에 하면 곧바로 풀린다
+  if (only && activeTab !== 'memos') showTab('memos');
+  else if (only && el.search.value) {
+    el.search.value = '';
+    runSearch();
+  }
+  state.onlyFiles = only;
   if (state.onlyFiles) {
-    if (activeTab !== 'memos') showTab('memos');
     const all = Object.assign(document.createElement('button'), { type: 'button', className: 'link-btn', textContent: '모두 보기' });
     all.addEventListener('click', () => showOnlyFiles(null));
     bar.replaceChildren(Object.assign(document.createElement('span'), { id: 'conflict-bar-text' }), all);
@@ -156,10 +162,7 @@ function layoutCards(memos) {
     return c;
   });
   el.cards.replaceChildren(...columns);
-  for (const memo of memos) {
-    const shortest = columns.reduce((a, b) => (b.offsetHeight < a.offsetHeight ? b : a));
-    shortest.append(renderCard(memo));
-  }
+  stackCards(columns, memos.map(renderCard)); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다)
   if (top) el.cards.scrollTop = top;
 }
 
@@ -193,11 +196,16 @@ function animateCards(before) {
   const first = firstCards;
   firstCards = false;
   if (reduceMotion() || document.hidden) return;
-  [...cardItems()].forEach((li, i) => {
-    const id = li.querySelector('.card')?.dataset.id;
-    const old = before.get(id);
+  // 먼저 모두 재고 나서 움직인다 (재기 · 움직이기를 번갈아 하면 카드마다 화면 배치를 다시 계산했다). 화면 근처 카드만
+  const vh = window.innerHeight;
+  const near = (r) => r.bottom > -vh && r.top < vh * 2;
+  const items = [...cardItems()].map((li) => {
+    const old = before.get(li.querySelector('.card')?.dataset.id);
+    return { li, old, now: old && near(old) ? li.getBoundingClientRect() : null };
+  });
+  items.forEach(({ li, old, now }, i) => {
     if (old) {
-      const now = li.getBoundingClientRect();
+      if (!now) return;
       const dx = old.left - now.left;
       const dy = old.top - now.top;
       if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
@@ -358,7 +366,7 @@ function renderCard(memo) {
     preview.className = 'card-preview';
     // 태그는 카드 아래 줄에 따로 보이므로 미리 보기 글에서는 뺀다 (휴대폰과 같음)
     const tagSet = new Set((memo.tags ?? []).map((t) => t.toLocaleLowerCase('ko')));
-    preview.textContent = memo.preview.replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
+    preview.textContent = shortUrls(memo.preview).replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
     if (preview.textContent) card.append(preview);
   }
   if (memo.thumb) {
@@ -425,8 +433,9 @@ function renderCard(memo) {
 
   const del = document.createElement('button');
   del.className = 'icon-btn danger card-delete';
-  del.title = '삭제';
-  del.setAttribute('aria-label', `${memo.title} 지우기`);
+  // 이름은 오른쪽 클릭 메뉴 · 휴대폰과 같게 — 지우는 게 아니라 휴지통으로 (되돌릴 수 있다). 키는 Delete
+  del.title = '휴지통으로 옮기기 (Delete)';
+  del.setAttribute('aria-label', `${memo.title} 휴지통으로 옮기기`);
   del.dataset.delete = memo.id;
   del.append(icon('trash'));
 
@@ -472,7 +481,6 @@ async function refresh() {
 async function runSearch() {
   if (activeTab === 'reminders') return remindersTab.setQuery(el.search.value);
   if (activeTab === 'history') return historyTab.setQuery(el.search.value);
-  if (state.onlyFiles) closeOnlyFiles(); // 검색하면 사본만 보기는 푼다
   state.query = el.search.value.trim();
   // 검색어의 #태그 는 태그 필터로, 나머지는 글자 검색으로
   const { text, tags } = parseQuery(state.query);
@@ -1065,6 +1073,16 @@ $('change-vault').addEventListener('click', async () => {
   applyInfo(await api.vault.choose());
 });
 
+// 카드 오른쪽 클릭(또는 메뉴 키 · Shift+F10): 열기 · 고정 · 색 · 잠그기 · 이전 버전 · 글 복사 · PDF · 휴지통 (휴대폰의 꾹 누르기 메뉴와 같은 일)
+el.cards.addEventListener('contextmenu', (e) => {
+  const card = e.target.closest('.card');
+  if (!card || e.defaultPrevented || !api.memo.cardMenu) return;
+  e.preventDefault();
+  api.memo.cardMenu(card.dataset.id);
+});
+api.on('card:trash', (id) => deleteMemo(id));
+api.on('card:copied', (ok) => flashStatus(ok ? '글을 복사했어요' : '복사하지 못했어요'));
+
 // 카드에 포커스가 있을 때 Delete: 그 메모를 휴지통으로 (아래 되돌리기 띠로 되살림)
 el.cards.addEventListener('keydown', (e) => {
   if (e.key !== 'Delete' || e.ctrlKey || e.altKey || e.metaKey) return;
@@ -1212,6 +1230,7 @@ api.on('drag:state', ({ outside }) => {
 });
 
 el.search.addEventListener('input', () => {
+  if (state.onlyFiles) closeOnlyFiles(); // 검색하면 사본만 보기는 푼다 (메모가 바뀌어 검색을 다시 돌릴 때는 그대로)
   clearTimeout(searchTimer);
   searchTimer = setTimeout(runSearch, 150);
 });

@@ -1,5 +1,5 @@
 // Electron 창 관련 기본 유틸리티 — 창 모양, 크기 계산, 애니메이션, 안전 가드.
-import { BrowserWindow, nativeTheme, screen } from 'electron';
+import { app, BrowserWindow, nativeTheme, screen } from 'electron';
 import path from 'node:path';
 import { tweenBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 
@@ -38,7 +38,8 @@ export function guardWindow(win, { openWebPage } = {}) {
     return { action: 'deny' };
   });
   win.webContents.on('before-input-event', (_event, input) => {
-    if (input.type === 'keyDown' && input.key === 'F12') win.webContents.toggleDevTools();
+    // 개발자 도구는 개발할 때만 (설치한 메모킹에서 실수로 F12 를 눌러 알 수 없는 창이 뜨지 않게)
+    if (!app.isPackaged && input.type === 'keyDown' && input.key === 'F12') win.webContents.toggleDevTools();
   });
 }
 

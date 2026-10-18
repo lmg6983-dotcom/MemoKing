@@ -1,7 +1,7 @@
 {
   "name": "memoking",
   "productName": "MemoKing",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "description": "메모킹 — 폴더 기반 스티커 메모 앱 (데스크탑 · 안드로이드)",
   "type": "module",
   "main": "desktop/main.js",
@@ -22,7 +22,8 @@
     "dist": "node scripts/build-dist.mjs",
     "stage": "node scripts/stage.mjs",
     "android:preview": "node android/web/dev/server.mjs",
-    "android:smoke": "node android/web/dev/smoke.mjs"
+    "android:smoke": "node android/web/dev/smoke.mjs",
+    "android:smoke:tutorial": "node android/web/dev/smoke-tutorial.mjs"
   },
   "author": {
     "name": "lmg6983",

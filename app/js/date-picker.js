@@ -75,6 +75,11 @@ export function timePicker(box, { value, onChange, quick = ['09:00', '12:00', '1
     const b = e.target.closest('[data-time]');
     if (!b) return;
     [h, m] = b.dataset.time.split(':').map(Number);
+    // 칩으로 골랐으면 시 · 분 목록은 다시 접는다 (칩 · 목록 두 가지가 한꺼번에 보이지 않게)
+    if (more) {
+      row.hidden = true;
+      more.hidden = false;
+    }
     sync();
   });
   hour.addEventListener('change', () => {

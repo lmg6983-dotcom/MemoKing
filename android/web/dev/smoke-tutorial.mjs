@@ -168,7 +168,9 @@ await wait(300);
 const items = await page.$$eval('.ProseMirror li', (lis) => lis.map((li) => li.textContent.trim()));
 check('[move] 옮겨 볼 예시 목록(우유·달걀·사과·식빵)이 저절로 들어감', ['우유', '달걀', '사과', '식빵'].every((w) => items.includes(w)), JSON.stringify(items));
 await shot('move-sample');
-await nextBtn();
+// 다이얼을 한 번 누르면 글 고치기 → 옮기기 (그러면 다음 단계)
+await tapOn('.mode-knob .mk-dial', '다이얼 (옮기기로)');
+await wait(400);
 
 // 6) + 펼치기
 await atStep('add');
@@ -187,19 +189,20 @@ await wait(200);
 await tapOn('.ink-done', '손 메모 완료');
 await wait(500);
 
-// 8) 주석
+// 8) 주석: 다이얼을 펼쳐 맨 위 "그리기" → 글 위에 긋고 → 다이얼을 다시 눌러 끝 (저장)
 await atStep('annotate');
-await tapOn('#add-btn', '도구막대 +');
-await tapOn('#add-menu:not([hidden]) [data-add="annotate"]', '주석');
+await page.evaluate(() => document.querySelector('.mode-knob').classList.add('open'));
+await wait(900); // 말풍선이 펼친 칸을 피해 자리를 옮길 틈
+await tapOn('.mode-knob .mk-stop-draw', '다이얼 › 그리기');
 await wait(500);
-const area = await page.locator('.mk-annot-scroller, .ink-annot, .mk-annot').first().boundingBox().catch(() => null);
+const area = await page.locator('.mk-annot, .ProseMirror').first().boundingBox().catch(() => null);
 if (area) {
   await touch('touchStart', area.x + 40, area.y + 40);
   for (let i = 1; i <= 10; i++) { await touch('touchMove', area.x + 40 + i * 15, area.y + 40); await wait(16); }
   await touch('touchEnd', 0, 0);
 }
 await wait(200);
-await tapOn('.ink-done', '주석 완료');
+await tapOn('.mode-knob .mk-dial', '다이얼 (그리기 끝)');
 await wait(500);
 
 // 9) 음성 (안내)

@@ -3,22 +3,21 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, screen, shell } f
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder } from '../app/js/core/reminders.js';
-import { normalizeMagicSettings, activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
+import { activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
-import { isBlankBody, extractPreview } from '../app/js/core/memo-file.js';
+import { isBlankBody, COLORS, COLOR_NAMES } from '../app/js/core/memo-file.js';
 import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { cleanOverrides, setActionKey } from '../app/js/core/keymap.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront, broadcast } from './window-utils.js';
-import { SMOKE, toast, copyFileToClipboard, smokeOpened, writeClipboard } from './utils.js';
+import { SMOKE, toast, copyFileToClipboard, smokeOpened } from './utils.js';
 import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
 import { mailAttach, openLocalSend, findLocalSend, LOCALSEND_DOWNLOAD } from './share-file.js';
@@ -272,7 +271,11 @@ export function registerIpc(ctx) {
     if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
     return { ...res, drive: driveInfo() };
   });
-  ipcMain.handle('drive:folders', async (_e, parent) => (await getDriveApi()?.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name, created: f.created })));
+  ipcMain.handle('drive:folders', async (_e, parent) => {
+    const api = getDriveApi();
+    if (!api) throw new Error('Google Drive 를 쓸 수 없어요');
+    return (await api.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name, created: f.created }));
+  });
   // 같은 이름 폴더가 이미 있으면 새로 만들지 않고 그것을 돌려준다 (existed: true)
   ipcMain.handle('drive:create-folder', async (_e, parent, name) => {
     const f = await findOrCreateDriveFolder(String(parent || 'root'), String(name).trim());
@@ -694,9 +697,11 @@ export function registerIpc(ctx) {
     if (!memo) return null;
     const alarm = wm.pendingAlarms.get(id) ?? null;
     const capture = wm.pendingCaptures.get(id) ?? null;
+    const command = wm.pendingCommands.get(id) ?? null;
     wm.pendingAlarms.delete(id);
     wm.pendingCaptures.delete(id);
-    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, stack: wm.stackState(id), linkPreviews: settings.linkPreviews !== false };
+    wm.pendingCommands.delete(id);
+    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, command, stack: wm.stackState(id), linkPreviews: settings.linkPreviews !== false };
   });
 
   // ---------- 잠금 메모 ----------
@@ -767,7 +772,7 @@ export function registerIpc(ctx) {
       event.returnValue = false;
     }
   });
-  ipcMain.handle('memo:set', (_e, id, patch) => {
+  const setMemo = (id, patch) => {
     const memo = getVault()?.setMeta(id, patch ?? {});
     const win = wm.noteWins.get(id);
     if (memo && win) {
@@ -775,7 +780,8 @@ export function registerIpc(ctx) {
       win.webContents.send('memo:meta', memo);
     }
     return memo;
-  });
+  };
+  ipcMain.handle('memo:set', (_e, id, patch) => setMemo(id, patch));
   ipcMain.handle('memo:remove', (_e, id) => {
     wm.removeFromStack(id, 'none');
     const win = wm.noteWins.get(id);
@@ -1071,6 +1077,35 @@ export function registerIpc(ctx) {
     }
     Menu.buildFromTemplate(items.length ? items : [{ label: '합칠 수 있는 다른 메모 창이 없어요', enabled: false }])
       .popup({ window: senderWindow(event) });
+  });
+  // 목록 카드 오른쪽 클릭 (휴대폰에서 카드를 꾹 누를 때와 같은 일들) — 잠그기 · 이전 버전은 메모 창을 열어 그 창에서
+  ipcMain.handle('card:menu', (event, rawId) => {
+    const id = String(rawId);
+    const m = getVault()?.get(id);
+    if (!m) return;
+    const inNote = (command) => {
+      const win = wm.noteWins.get(id);
+      if (win && !win.webContents.isLoading()) {
+        wm.openNote(id);
+        win.webContents.send('memo:command', command);
+      } else {
+        wm.pendingCommands.set(id, command);
+        wm.openNote(id);
+      }
+    };
+    Menu.buildFromTemplate([
+      // accelerator 는 메뉴 오른쪽에 키 안내만 (registerAccelerator: false — 목록 카드에서 그 키가 이미 같은 일을 한다)
+      { label: '열기', accelerator: 'Enter', registerAccelerator: false, click: () => wm.openNote(id) },
+      { type: 'separator' },
+      { label: '목록 맨 위에 고정', type: 'checkbox', checked: m.pinned === true, click: () => setMemo(id, { pinned: !m.pinned }) },
+      { label: '색', submenu: COLORS.map((c) => ({ label: COLOR_NAMES[c], type: 'radio', checked: m.color === c, click: () => setMemo(id, { color: c }) })) },
+      ...(m.locked ? [] : [{ label: '잠그기…', click: () => inNote('lock') }, { label: '이전 버전', click: () => inNote('versions') }]),
+      { type: 'separator' },
+      { label: '글 복사', enabled: !m.locked, click: async () => wm.listWin?.webContents.send('card:copied', await writeClipboard({ text: hotkeyCopyText(m.body) }).then(() => true, () => false)) },
+      { label: 'PDF로 저장…', click: () => wm.openPdfWindow(id) },
+      { type: 'separator' },
+      { label: '휴지통으로 옮기기', accelerator: 'Delete', registerAccelerator: false, click: () => event.sender.send('card:trash', id) },
+    ]).popup({ window: senderWindow(event) });
   });
   ipcMain.handle('stack:menu', (event, id) => {
     Menu.buildFromTemplate([

@@ -2,6 +2,7 @@
 import { SHORTCUT_GROUPS } from './core/shortcuts.js';
 import { withShortcuts } from './core/accelerators.js';
 import { keymapGroups, comboLabel, FIXED_KEYS } from './core/keymap.js';
+import { icon } from './icons.js';
 
 /** 보일 무리: 어디서든(전역) + 메모 창 기능(바꾼 키로) + 바꿀 수 없는 키 */
 function groups(overrides) {
@@ -28,10 +29,12 @@ function build(shortcuts, overrides) {
   const h = document.createElement('h3');
   h.id = 'shortcut-sheet-title';
   h.textContent = '단축키';
+  // 닫기는 다른 창들처럼 오른쪽 위 × (예전: 이 창만 큰 [닫기] 단추)
   const close = document.createElement('button');
   close.type = 'button';
-  close.className = 'btn';
-  close.textContent = '닫기';
+  close.className = 'icon-btn dialog-x';
+  close.setAttribute('aria-label', '단축키 닫기');
+  close.append(icon('close'));
   close.addEventListener('click', () => dialog.close());
   head.append(h, close);
   dialog.append(head);
@@ -50,7 +53,11 @@ function build(shortcuts, overrides) {
         k.textContent = part;
         dd.append(k);
       }
-      dl.append(dt, dd);
+      // 줄마다 따로: 긴 키(Ctrl+Alt+C 두 번)가 다른 줄의 설명 폭까지 줄이지 않게
+      const row = document.createElement('div');
+      row.className = 'sc-row';
+      row.append(dt, dd);
+      dl.append(row);
     }
     sec.append(t, dl);
     dialog.append(sec);

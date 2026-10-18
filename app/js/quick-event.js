@@ -1,5 +1,5 @@
 // 일정 탭 달력에서 바로 일정 만들기 (PC·휴대폰 같음) — 캘린더 앱처럼 한 화면에서:
-//   이름 → 날짜 · 시각 → 🔔 미리 알림 › → 📝 넣을 메모 › → [일정 저장]
+//   이름 → 날짜 · 시각 → 미리 알림 › → 넣을 메모 › → [일정 저장]
 //   알림 · 메모는 알맞은 값(지난번 알림 · 일정 이름으로 새 메모)이 골라져 있어 그대로면 이름만 쓰고 저장 — 바꿀 때만 그 줄을 펼친다
 import { pendingAlerts, fallbackAlert, alertLabel, describeAlerts } from './core/reminders.js';
 import { toLocalIso, relativeDay, koFullDate } from './core/time.js';
@@ -65,7 +65,7 @@ export function openQuickEvent({ day, search }) {
     const date = el('input', { type: 'date', class: 'qe-date-input', 'aria-label': '날짜' });
     date.value = ymd(start);
     date.min = ymd(new Date());
-    dateWrap.append(el('span', { class: 'qe-ico', 'aria-hidden': 'true' }, '📅'), dateText, date);
+    dateWrap.append(icon('calendar', 'qe-ico'), dateText, date);
     const allDayRow = el('label', { class: 'event-allday qe-allday' });
     const allDaySwitch = el('input', { type: 'checkbox', class: 'switch' });
     allDayRow.append(el('span', {}, '하루 종일'), allDaySwitch);
@@ -97,16 +97,16 @@ export function openQuickEvent({ day, search }) {
     const title = () => name.value.replace(/\s+/g, ' ').trim();
     let target = null; // 넣을 메모 { id, title } — null 이면 새 메모
 
-    function rowContent(row, icon, label, value) {
-      row.replaceChildren(el('span', { class: 'qe-ico', 'aria-hidden': 'true' }, icon), el('span', { class: 'qe-row-label' }, label), el('b', { class: 'qe-row-value' }, value), el('span', { class: 'qe-chev', 'aria-hidden': 'true' }, '›'));
+    function rowContent(row, ico, label, value) {
+      row.replaceChildren(icon(ico, 'qe-ico'), el('span', { class: 'qe-row-label' }, label), el('b', { class: 'qe-row-value' }, value), el('span', { class: 'qe-chev', 'aria-hidden': 'true' }, '›'));
     }
     function draw() {
       const rel = relativeDay(start);
       dateText.textContent = rel ? `${rel}, ${koFullDate(start).replace(/ \((.)\)$/, ' $1')}` : koFullDate(start); // "오늘, 10월 17일 토" — 한 줄에
       timeBox.hidden = allDay;
       const set = [...picked[kind()]];
-      rowContent(alertRow, '🔔', '미리 알림', set.length ? describeAlerts({ kind: 'at', alerts: set, allDay }) : '없음');
-      rowContent(memoRow, '📝', '저장할 메모', target ? `"${target.title}"` : `새 메모 "${title() || '새 일정'}"`);
+      rowContent(alertRow, 'bell', '미리 알림', set.length ? describeAlerts({ kind: 'at', alerts: set, allDay }) : '없음');
+      rowContent(memoRow, 'note', '저장할 메모', target ? `"${target.title}"` : `새 메모 "${title() || '새 일정'}"`);
     }
     function toggle(row, pane, open = pane.hidden) {
       pane.hidden = !open;

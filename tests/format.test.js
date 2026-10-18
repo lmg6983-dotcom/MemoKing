@@ -13,3 +13,12 @@ test('friendlyTime: 사람이 말하듯', async () => {
   assert.equal(friendlyTime(new Date(2026, 1, 2), now), '2월 2일');
   assert.equal(friendlyTime(new Date(2025, 11, 31), now), '25.12.31');
 });
+
+test('shortUrls: 카드 미리 보기의 웹 주소는 짧게 (문장 끝 마침표는 그대로)', async () => {
+  const { shortUrls } = await import('../app/js/core/format.js');
+  assert.equal(shortUrls('식당: https://example.com/restaurant.'), '식당: example.com/restaurant.');
+  assert.equal(shortUrls('https://www.example.com/'), 'example.com');
+  assert.equal(shortUrls('(http://a.kr/b)'), '(a.kr/b)');
+  assert.equal(shortUrls('https://example.com/very/long/path/that/goes/on'), 'example.com/very/long/path/…');
+  assert.equal(shortUrls('주소 없음'), '주소 없음');
+});

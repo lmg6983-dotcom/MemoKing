@@ -8,7 +8,7 @@ const EVENTS = [
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:hover', 'list:on-top',
   'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'update:state', 'update:available', 'update:ready',
-  'bubble:show', 'bubble:hide', 'status-bubble:gone',
+  'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'card:trash', 'card:copied',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   memo: {
     open: invoke('memo:open'),
+    cardMenu: invoke('card:menu'), // 목록 카드 오른쪽 클릭 메뉴
     handoff: invoke('memo:handoff'), // 다른 기기에서 방금 고친 메모 { id, title, from } | null
     // 잠금 메모: lock(id, 비밀번호) · openLock(id, 비밀번호) → 메모 | { error } · unlock(id) 잠금 풀기
     lock: invoke('memo:lock'),
