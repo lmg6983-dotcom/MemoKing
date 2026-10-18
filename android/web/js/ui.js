@@ -31,7 +31,12 @@ function addCloseButton(el) {
   x.setAttribute('aria-label', '닫기');
   x.innerHTML = '<svg><use href="#i-close"/></svg>';
   x.addEventListener('click', () => closeSheet(el));
-  bar.append(x);
+  // 내려서 보면 띠에 시트 제목을 (빈 흰 줄처럼 보이지 않게, 지금 어느 시트인지)
+  const name = document.createElement('b');
+  name.className = 'sheet-bar-title';
+  name.setAttribute('aria-hidden', 'true');
+  name.textContent = el.querySelector('.sheet-title')?.textContent.trim() || el.getAttribute('aria-label') || '';
+  bar.append(name, x);
   el.prepend(bar);
   el.addEventListener('scroll', () => el.classList.toggle('scrolled', el.scrollTop > 4), { passive: true });
 }

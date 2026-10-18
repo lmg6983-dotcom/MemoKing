@@ -100,3 +100,9 @@ test('새 태그 핵심어에 움직임·꾸밈 말과 조사 붙은 말은 안 
   }
   assert.deepEqual(names('# 출장\n\n부산으로 출장 가서 거래처를 만났다. 서울에서 기차 타고').slice(0, 2), ['출장', '거래처']);
 });
+
+test('태그 추천: 웹 주소 속 낱말(example.com 의 com 등)은 추천하지 않음', () => {
+  const body = '# 긴 낱말\n\nhttps://example.com/aaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbb 와 https://www.example.com/menu 가나다라마바사아자차카타파하';
+  const got = suggestTagsFor(body, memos).map((t) => t.name);
+  for (const bad of ['com', 'example', 'www', 'restaurant', 'menu', 'https']) assert.ok(!got.includes(bad), `${bad} 가 추천됨: ${got}`);
+});

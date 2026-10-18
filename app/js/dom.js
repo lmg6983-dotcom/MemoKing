@@ -127,3 +127,22 @@ export function radioGroups(root = document) {
     });
   }).observe(root.body ?? root, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-checked', 'hidden'] });
 }
+
+// 가장 짧은 줄에 차례로 쌓기. 카드를 하나 넣을 때마다 줄 높이를 재면 카드 수만큼 화면 배치를 다시 계산해
+//   메모가 많으면 검색 한 번에 몇 초씩 걸렸다 (1,500개에 1초 넘게) — 첫 줄에 모두 넣어 높이를 한 번에 재고 나눈다 (줄 폭은 모두 같다)
+/** 카드 목록(PC · 휴대폰)의 엇갈려 쌓기 */
+export function stackCards(columns, items) {
+  columns[0].append(...items);
+  if (columns.length < 2) return;
+  const heights = items.map((it) => it.offsetHeight);
+  const gap = parseFloat(getComputedStyle(columns[0]).rowGap) || 0;
+  const sums = columns.map(() => 0);
+  const buckets = columns.map(() => []);
+  items.forEach((it, i) => {
+    let k = 0;
+    for (let c = 1; c < columns.length; c++) if (sums[c] < sums[k]) k = c;
+    buckets[k].push(it);
+    sums[k] += heights[i] + gap;
+  });
+  columns.forEach((c, i) => c.replaceChildren(...buckets[i]));
+}

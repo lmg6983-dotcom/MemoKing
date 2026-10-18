@@ -152,15 +152,25 @@ export function plainText(body) {
   return plainLines(body).join('\n');
 }
 
+// 읽지 못한(깨진) 머리말이 본문 맨 앞에 남아 있으면 제목 · 미리보기에서는 건너뛴다 — 파일 내용은 그대로 둔다
+//   (parseMemoFile 은 내용을 잃지 않으려고 깨진 머리말을 본문으로 남긴다. 그때 목록에 "id: [깨짐" 이 제목으로 보였다)
+//   머리말처럼 보일 때만: 모든 줄이 "영문키: 값" · 들여 쓴 줄 · "- " 목록 (한글로 쓴 "주의: …" 같은 글은 그대로)
+function withoutBrokenHeader(body) {
+  const m = FRONTMATTER.exec(body);
+  if (!m) return body;
+  const lines = m[1].split(/\r?\n/).filter((l) => l.trim());
+  return lines.length && lines.every((l) => /^([A-Za-z_][\w-]*\s*:|\s+\S|-\s)/.test(l)) ? body.slice(m[0].length) : body;
+}
+
 export function extractTitle(body) {
-  const first = plainLines(body)[0];
+  const first = plainLines(withoutBrokenHeader(body))[0];
   return first ? first.slice(0, 80) : UNTITLED;
 }
 
 // 제목(첫 줄)을 뺀 나머지로 만든 미리보기
 //   카드에서 읽기 좋게: 공유하기로 붙은 "출처: …" 줄은 빼고, 수식 표시($)는 걷어낸다
 export function extractPreview(body, maxLength = 160) {
-  return plainLines(body)
+  return plainLines(withoutBrokenHeader(body))
     .slice(1)
     .filter((l) => !/^출처\s*[:：]/.test(l))
     .join(' ')

@@ -785,6 +785,12 @@ $('alarm-ok').addEventListener('click', () => {
   editor?.focus();
 });
 api.on('memo:alarm', showAlarm);
+// 밖(목록 카드 오른쪽 클릭)에서 부탁한 일: 메뉴의 그 단추를 누른 것과 같게
+function runCommand(command) {
+  if (command === 'lock' && !memo?.locked) $('lock-btn').click();
+  else if (command === 'versions') $('versions-btn').click();
+}
+api.on('memo:command', runCommand);
 
 // 빠른 메모 알림을 눌러 이 메모로 왔을 때 등: 창 테두리가 두 번 반짝여 "이 메모" 임을 알린다
 api.on('memo:highlight', () => {
@@ -1234,6 +1240,12 @@ function flushTables() {
 
 // 표 막대: 표 안에 커서가 있을 때만. 머리글 행과 마지막 남은 열은 지울 수 없으므로 막는다.
 const tableBar = $('table-bar');
+// 낮은 창에서 한 줄로 밀리는 표 막대: 마우스 바퀴(위·아래)로도 옆으로 (note.css)
+tableBar?.addEventListener('wheel', (e) => {
+  if (tableBar.scrollWidth <= tableBar.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+  e.preventDefault();
+  tableBar.scrollLeft += e.deltaY;
+}, { passive: false });
 function showTableBar(table) {
   tableBar.hidden = !table;
   document.body.classList.toggle('in-table', Boolean(table));
@@ -1860,6 +1872,7 @@ if (!memo) {
   editor.focus();
   markPainted();
   if (memo.capture) await applyCapture(memo.capture);
+  if (memo.command) runCommand(memo.command); // 목록 카드 오른쪽 클릭 › 잠그기 · 이전 버전
   if (params.get('record') === '1') recorder.start(); // 목록 + › 음성 메모
   if (params.get('ink') === '1') editor.insertInk(); // 목록 + › 손 메모
   // 주석: 메모 위에 겹쳐 그린 손 메모 (머리말 ink: 의 파일)

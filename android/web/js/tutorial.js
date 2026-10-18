@@ -49,8 +49,9 @@ export function setupTutorial(o) {
       base = step ? counts(markdown()) : null;
       // 옮기기를 배우기 전: 옮겨 볼 예시 목록을 메모 끝에
       if (step?.sample && screen() === 'note' && !hasTutorialSample(markdown())) append(TUTORIAL_SAMPLE);
-      // 글을 써 보는 단계: 다이얼이 옮기기·그리기여도 키보드가 뜨게 글 고치기로
-      if (step?.write && screen() === 'note') edit();
+      // 글을 써 보는 단계 · + 를 눌러 보는 단계: 다이얼이 옮기기·그리기여도 글 고치기로
+      //   (+ 는 옮기기에서 숨는다 — 바로 앞 "다이얼로 옮기기" 단계에서 옮기기로 돌린 채 + 를 누르라고 해 막혔다)
+      if ((step?.write || [step?.target].flat().includes('#add-btn')) && screen() === 'note') edit();
     },
   });
 }

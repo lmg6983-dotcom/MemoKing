@@ -19,7 +19,7 @@ import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops, radioGroups } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards } from './dom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -162,10 +162,7 @@ function layoutCards(memos) {
     return c;
   });
   el.cards.replaceChildren(...columns);
-  for (const memo of memos) {
-    const shortest = columns.reduce((a, b) => (b.offsetHeight < a.offsetHeight ? b : a));
-    shortest.append(renderCard(memo));
-  }
+  stackCards(columns, memos.map(renderCard)); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다)
   if (top) el.cards.scrollTop = top;
 }
 
@@ -199,11 +196,16 @@ function animateCards(before) {
   const first = firstCards;
   firstCards = false;
   if (reduceMotion() || document.hidden) return;
-  [...cardItems()].forEach((li, i) => {
-    const id = li.querySelector('.card')?.dataset.id;
-    const old = before.get(id);
+  // 먼저 모두 재고 나서 움직인다 (재기 · 움직이기를 번갈아 하면 카드마다 화면 배치를 다시 계산했다). 화면 근처 카드만
+  const vh = window.innerHeight;
+  const near = (r) => r.bottom > -vh && r.top < vh * 2;
+  const items = [...cardItems()].map((li) => {
+    const old = before.get(li.querySelector('.card')?.dataset.id);
+    return { li, old, now: old && near(old) ? li.getBoundingClientRect() : null };
+  });
+  items.forEach(({ li, old, now }, i) => {
     if (old) {
-      const now = li.getBoundingClientRect();
+      if (!now) return;
       const dx = old.left - now.left;
       const dy = old.top - now.top;
       if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
@@ -1069,6 +1071,16 @@ $('change-vault').addEventListener('click', async () => {
   el.settings.close();
   applyInfo(await api.vault.choose());
 });
+
+// 카드 오른쪽 클릭(또는 메뉴 키 · Shift+F10): 열기 · 고정 · 색 · 잠그기 · 이전 버전 · 글 복사 · PDF · 휴지통 (휴대폰의 꾹 누르기 메뉴와 같은 일)
+el.cards.addEventListener('contextmenu', (e) => {
+  const card = e.target.closest('.card');
+  if (!card || e.defaultPrevented || !api.memo.cardMenu) return;
+  e.preventDefault();
+  api.memo.cardMenu(card.dataset.id);
+});
+api.on('card:trash', (id) => deleteMemo(id));
+api.on('card:copied', (ok) => flashStatus(ok ? '글을 복사했어요' : '복사하지 못했어요'));
 
 // 카드에 포커스가 있을 때 Delete: 그 메모를 휴지통으로 (아래 되돌리기 띠로 되살림)
 el.cards.addEventListener('keydown', (e) => {

@@ -454,6 +454,8 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .sheet > .sheet-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: flex-end; height: 50px; margin: -6px -16px -44px; padding: 6px 6px 0; pointer-events: none; transition: background-color 0.15s, box-shadow 0.15s; }
 .sheet.scrolled > .sheet-bar { background: var(--surface-2); box-shadow: 0 1px 0 var(--line); }
 .sheet > .sheet-bar .sheet-x { pointer-events: auto; color: var(--muted); }
+.sheet-bar-title { flex: 1; min-width: 0; align-self: center; padding: 0 8px 0 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 16px; font-weight: 800; opacity: 0; transition: opacity 0.15s; }
+.sheet.scrolled > .sheet-bar .sheet-bar-title { opacity: 1; }
 .sheet-grip { width: 40px; height: 4px; margin: 4px auto 10px; border-radius: 2px; background: var(--line); }
 .sheet-title { margin: 4px 4px 12px; font-size: 18px; line-height: 26px; font-weight: 800; letter-spacing: -0.015em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 h2.sheet-title { font-size: 20px; }

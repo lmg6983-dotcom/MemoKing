@@ -105,6 +105,7 @@ export class WindowManager {
     this.captureHelper = new CaptureHelper(CLIPBOARD_HELPER);
     this.pendingCaptures = new Map();
     this.pendingAlarms = new Map();
+    this.pendingCommands = new Map(); // 메모 창이 열리면 할 일 (목록 카드 오른쪽 클릭 › 잠그기 · 이전 버전)
     this.unseenCaptures = new Set();
     this.capturing = false;
     this.lastCapturePoint = null;

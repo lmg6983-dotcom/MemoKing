@@ -10,7 +10,7 @@ import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog, isTwoPane, toast } from './ui.js';
 import { tutEvent } from './tutorial.js';
-import { haptic, reduceMotion, tabKeys, syncTabStops } from '../../app/js/dom.js';
+import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 
 const $ = (x) => document.getElementById(x);
@@ -150,11 +150,9 @@ function layoutCards(memos) {
     return c;
   });
   el.cards.replaceChildren(...columns);
-  for (const memo of memos) {
-    const shortest = columns.reduce((a, b) => (b.offsetHeight < a.offsetHeight ? b : a));
-    shortest.append(renderCard(memo));
-  }
+  stackCards(columns, memos.map(renderCard));
 }
+
 
 new ResizeObserver(() => {
   if (!el.screen.hidden && columnsFor(el.cards.clientWidth) !== lastCols) render();
@@ -503,15 +501,24 @@ try {
 }
 applyLayout(layout);
 // 카드들이 새 자리로 미끄러져 간다 (FLIP: 옛 자리 → 새 자리) — 모양이 바뀐 것을 눈으로 따라갈 수 있게
+//   재기 → 쓰기를 나눈다: 카드마다 재고 바로 고치면 그때마다 화면 배치를 다시 계산했다 (메모 1,500개에 3초 넘게).
+//   미끄러짐은 화면 근처 카드만 (보이지 않는 카드는 움직여도 보이지 않는다)
 function glideCards(change) {
+  const vh = window.innerHeight;
+  const near = (r) => r.bottom > -vh && r.top < vh * 2;
   const before = new Map([...el.cards.querySelectorAll('.card')].map((c) => [c.dataset.id, c.getBoundingClientRect()]).filter(([, r]) => r.width));
   change();
+  const still = [];
+  const moves = [];
+  const animate = !reduceMotion();
   for (const c of el.cards.querySelectorAll('.card')) {
     const a = before.get(c.dataset.id);
     if (!a) continue;
-    c.closest('.item').style.animation = 'none'; // 이미 있던 카드는 다시 튀어나오지 않는다 (새 카드만 등장 움직임)
-    if (reduceMotion()) continue;
-    const b = c.getBoundingClientRect();
+    still.push(c);
+    if (animate && near(a)) moves.push([c, a, c.getBoundingClientRect()]);
+  }
+  for (const c of still) c.closest('.item').style.animation = 'none'; // 이미 있던 카드는 다시 튀어나오지 않는다 (새 카드만 등장 움직임)
+  for (const [c, a, b] of moves) {
     const dx = a.left - b.left;
     const dy = a.top - b.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;

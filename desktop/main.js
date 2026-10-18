@@ -1,8 +1,9 @@
 // Electron 메인 프로세스 — 앱 초기화, 시스템 트레이, 전역 단축키, 백그라운드 서비스 오케스트레이션.
 import {
-  app, BrowserWindow, globalShortcut, nativeImage, nativeTheme, net,
+  app, BrowserWindow, clipboard, dialog, globalShortcut, nativeImage, nativeTheme, net,
   powerMonitor, protocol, safeStorage, session, shell, Tray, Menu,
 } from 'electron';
+import { contextMenuTemplate } from './context-menu.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -827,7 +828,7 @@ function updateTrayMenu() {
       ? recent.map((m) => ({ label: `   ${shorten(m.title)}`, click: () => windowManager.openNote(m.id) }))
       : [{ label: '   없음', enabled: false }]),
     { type: 'separator' },
-    { label: '알림 예약', click: () => windowManager.createListWindow('reminders') },
+    { label: '일정', click: () => windowManager.createListWindow('reminders') }, // 목록 창의 탭 이름과 같게
     { label: '알림 보관함', click: () => windowManager.createListWindow('history') },
     { label: '열린 메모 모두 앞으로', enabled: windowManager.noteWins.size > 0, click: () => windowManager.showAllNotes() },
     { label: '메모 폴더 열기', enabled: Boolean(vault), click: () => shell.openPath(vault.root) },
@@ -875,6 +876,27 @@ setInterval(() => purgeTrash(vault), 6 * 60 * 60 * 1000).unref?.();
 
 app.on('second-instance', (_e, argv) => {
   if (!handleLaunch(argv)) windowManager.createListWindow();
+});
+
+// 오른쪽 클릭 메뉴 (모든 창 — 메모 글 · 글 칸 · 링크 · 그림 · 맞춤법). 무엇을 넣는지는 context-menu.js
+app.on('web-contents-created', (_e, wc) => {
+  wc.on('context-menu', (_event, params) => {
+    const win = BrowserWindow.fromWebContents(wc);
+    // 메모 폴더 안 그림(memoking://vault/…)만 파일로 저장할 수 있다 (웹 그림은 복사만)
+    const src = /^memoking:\/\/vault\//.test(params.srcURL ?? '') ? vault?.resolve(decodeURIComponent(new URL(params.srcURL).pathname.replace(/^\/+/, ''))) : null;
+    const template = contextMenuTemplate(params, {
+      openLink: (url) => openWebPage(url),
+      copyText: (text) => clipboard.writeText(text),
+      copyImage: () => wc.copyImageAt(params.x, params.y),
+      saveImage: src && fs.existsSync(src) ? async () => {
+        const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), path.basename(src)) });
+        if (!r.canceled && r.filePath) fs.copyFileSync(src, r.filePath);
+      } : null,
+      replaceMisspelling: (word) => wc.replaceMisspelling(word),
+      addToDictionary: (word) => wc.session.addWordToSpellCheckerDictionary(word),
+    });
+    if (template.length) Menu.buildFromTemplate(template).popup({ window: win ?? undefined });
+  });
 });
 
 app.whenReady().then(async () => {

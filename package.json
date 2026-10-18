@@ -22,7 +22,8 @@
     "dist": "node scripts/build-dist.mjs",
     "stage": "node scripts/stage.mjs",
     "android:preview": "node android/web/dev/server.mjs",
-    "android:smoke": "node android/web/dev/smoke.mjs"
+    "android:smoke": "node android/web/dev/smoke.mjs",
+    "android:smoke:tutorial": "node android/web/dev/smoke-tutorial.mjs"
   },
   "author": {
     "name": "lmg6983",
