@@ -1432,7 +1432,7 @@ try {
   await page.waitForTimeout(150);
   await page.tap('.mk-delete-btn');
   await page.waitForFunction(() => document.querySelectorAll('img.mk-image').length === 1, null, { timeout: 4000 }).catch(() => {}); // 접히는 움직임 뒤 (느린 환경에서도)
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1500); // 그리고 파일에 저장될 때까지
   check('지우기 단추: 누르면 그 그림만 지움', (await page.locator('img.mk-image').count()) === 1 && !read('그림 둘.md').includes('two-a.png') && read('그림 둘.md').includes('two-b.png'), read('그림 둘.md'));
   // 글 고치기 방식에서도 그림을 짧게 누르면(탭): 저장 · 복사 · 지우기 단추
   await setMode('edit');
