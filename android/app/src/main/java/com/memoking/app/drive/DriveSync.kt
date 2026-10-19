@@ -9,6 +9,7 @@ import android.content.Context
 import com.memoking.app.FileStorage
 import com.memoking.app.Storage
 import com.memoking.app.Vaults
+import com.memoking.app.VaultFileProvider
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executors
