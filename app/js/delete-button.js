@@ -1,26 +1,22 @@
 import { haptic } from './dom.js';
-import { copyBlock, saveBlock, shareBlock, canShare, chooseMenu } from './copy-content.js';
+import { copyBlock, saveBlock, shareBlock, canShare } from './copy-content.js';
 import { SHARE_DONE, isShareMenuOpen } from './share-menu.js';
-// 지우기 단추 (×) — 꾹 눌렀다 그 자리에 놓은 것의 오른쪽 위에 잠깐 (block-move.js 내용 줄·목록 전체 · list-drag.js 목록 항목 함께)
-//   흰 동그라미에 빨간 × (PC 마우스는 빨간 휴지통). 한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
-//   PC(마우스): 그림·손 메모·소리·파일·링크 카드에 마우스를 올려도 뜬다 (hover — 시간으로 사라지지 않고, 마우스가 떠나면 거둔다.
-//   빨갛게 비치는 표시는 × 위에 올렸을 때만)
-//   누르면: 대상이 붉게 비쳤다가 작아지며 흐려지고, 그 자리가 접히며 아래 줄들이 부드럽게 올라온 뒤 지운다.
-//   × 왼쪽에는 복사 단추 (그림은 그림으로, 그 밖의 내용은 서식 + 글로 — copy-content.js), 그 왼쪽에 저장 단추
-//   (그림 · 파일은 파일 그대로, 표는 CSV, 그 밖은 글 파일 — 어디에 저장할지 고르는 창),
-//   휴대폰은 맨 왼쪽에 공유 단추 (카톡 · 메일 등으로 보내기 — 글은 글로, 그 밖은 파일로). 누르면 잠깐 ✓
+import { openContextMenu } from './ctx-menu.js';
+import { COPY_ICON, DONE_ICON, FAIL_ICON, SHARE_ICON, OPEN_ICON, SAVE_ICON, TRASH_ICON, CLOSE_ICON } from './content-icons.js';
+// 내용(그림 · 파일 · 표 …)의 복사 · 저장 · 공유 · 지우기 — 두 가지 모양
+//   휴대폰(손가락): 꾹 눌렀다 놓거나 짧게 누른 내용의 오른쪽 위에 단추 줄이 잠깐 (showDeleteButton) — 흰 동그라미에 빨간 ×.
+//     한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
+//     표는 고치는 동안 표 위 오른쪽 밖(표를 가리지 않는 자리)에 계속 떠 있다 (placement 'above' + persist).
+//     × 왼쪽에는 복사 단추 (그림은 그림으로, 그 밖의 내용은 서식 + 글로 — copy-content.js), 그 왼쪽에 저장 단추
+//     (그림 · 파일은 파일 그대로, 표는 CSV, 그 밖은 글 파일 — 어디에 저장할지 고르는 창), 맨 왼쪽에 공유 단추. 누르면 잠깐 ✓
+//   PC(마우스): 단추를 띄우지 않는다 — 셀 · 글을 가려 고치기 어려웠다. 내용을 오른쪽 클릭하면 Windows 11 메뉴처럼 맨 위 한 줄에
+//     아이콘(복사 · 저장 · 공유 · 지우기)이 있는 메뉴 (showContentMenu).
+//   지우기: 대상이 붉게 비쳤다가 작아지며 흐려지고, 그 자리가 접히며 아래 줄들이 부드럽게 올라온 뒤 지운다 (PC 는 그 자리에 "되돌리기" 안내)
 export const DELETE_SHOW_MS = 2500;
 const FADE_MS = 200; // 작아지며 흐려지기
 const COLLAPSE_MS = 200; // 그 자리 접기
 
 let current = null;
-const COPY_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.6"/><path d="M10.5 3.5v-.4A1.6 1.6 0 0 0 8.9 1.5H4.1A1.6 1.6 0 0 0 2.5 3.1v4.8a1.6 1.6 0 0 0 1.6 1.6h.4"/></svg>';
-const DONE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
-const FAIL_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v5.5M8 12.2v.3"/></svg>';
-const SHARE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="11.5" cy="3.8" r="1.8"/><circle cx="4.5" cy="8" r="1.8"/><circle cx="11.5" cy="12.2" r="1.8"/><path d="M6.1 7.1l3.8-2.3M6.1 8.9l3.8 2.3"/></svg>';
-const OPEN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5L7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></svg>';
-const TRASH_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" class="trash"><path d="M3 4.5h10M6.5 7v4.5M9.5 7v4.5M4.3 4.5l.7 9h6l.7-9M6 4.5V2.5h4v2"/></svg>';
-const SAVE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.8 7l3.2 3.2L11.2 7M3 12.8h10"/></svg>';
 // 저장 창을 다녀오면 단추는 이미 거둬졌을 수 있어 메모 창 상태 줄에도 (PC note.js)
 const notice = (text, error = false) => window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text, error } }));
 // 화면 읽기 프로그램에 "복사했어요" 를 알려 주는 숨은 자리 (하나만)
@@ -89,33 +85,66 @@ const SHARE_DONE_TEXT = (what) => SHARE_DONE[what] ?? '공유했어요';
 // 저장 · 공유는 앱이 알려 준 이유(파일을 찾지 못했어요 등)를 그대로
 const failText = (fileAct, err) => (fileAct && err?.message && !/^Error invoking/.test(err.message) ? err.message : `${fileAct ?? '복사'}하지 못했어요. 다시 눌러 주세요`);
 
+/** 대상을 담고 스크롤되는 상자 (없으면 null = 창) */
+function scrollParent(el) {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const oy = getComputedStyle(p).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p;
+  }
+  return null;
+}
+
 /**
- * PC 오른쪽 클릭 메뉴 — 마우스를 올리면 뜨는 단추 줄과 같은 일을 이름과 함께 (열기 · 복사 · 저장… · 공유… · 지우기)
- *   opts 는 showDeleteButton 과 같다. 다 하면 메모 창 상태 줄에 알린다.
- *   at: 메뉴를 띄울 자리 { x, y } (키보드로 열 때 — 없으면 마우스 자리)
+ * 지우기 (붉게 비침 → 작아지며 흐려짐 → 그 자리가 접힘 → 지움). 단추(휴대폰)와 오른쪽 클릭 메뉴(PC)가 함께 쓴다
+ * @param {{ pos: number, node: object, target: Element, markTarget?: boolean, deco: Function, label?: string, remove?: Function }} o
+ * @param {{ undo?: boolean }} how undo: 지운 자리에 되돌리기 안내 (PC)
+ */
+export function deleteContent(view, { pos, node, target, markTarget = false, deco, label = '이 내용 지우기', remove }, { undo = false } = {}) {
+  if (view.state.doc.nodeAt(pos) !== node) return false;
+  if (markTarget) target.classList.remove('mk-delete-target');
+  // 대상: 붉게 비쳤다가 작아지며 흐려지고 → 그 자리가 접힌다 (높이를 정해 두어야 접히는 모습이 보인다)
+  const box = view.nodeDOM(pos);
+  const where = target.getBoundingClientRect();
+  const h = box instanceof Element ? box.getBoundingClientRect().height : 0;
+  const scale = box instanceof HTMLElement && box.offsetHeight ? h / box.offsetHeight : 1; // 본문 확대·축소
+  const height = `height: ${(h / scale).toFixed(1)}px`;
+  deco({ cls: 'mk-deleting', style: height });
+  setTimeout(() => !view.isDestroyed && deco({ cls: 'mk-deleting mk-collapsing', style: 'height: 0px' }), FADE_MS);
+  setTimeout(() => {
+    if (view.isDestroyed) return;
+    deco(null);
+    if (view.state.doc.nodeAt(pos) !== node) return;
+    if (remove) remove(view, pos, node);
+    else view.dispatch(view.state.tr.delete(pos, pos + node.nodeSize).scrollIntoView());
+    if (undo) undoHint(label.replace(/ 지우기$/, '').replace(/^이 /, ''), where, view);
+  }, FADE_MS + COLLAPSE_MS);
+  return true;
+}
+
+/**
+ * PC: 내용을 오른쪽 클릭했을 때의 메뉴 — 맨 위 한 줄에 아이콘(복사 · 저장 · 공유 · 지우기), 아래에 글 항목 (열기 · 표 바꾸기 …)
+ *   opts 는 showDeleteButton 과 같다 + extraItems(메뉴 글 항목 더) · onExtra(id) (그 항목을 골랐을 때). 다 하면 메모 창 상태 줄에 알린다.
+ * @param {{ x: number, y: number } | null} at 메뉴를 띄울 자리 (창 안 좌표)
  * @returns {Promise<boolean>} 메뉴를 띄웠는가
  */
-export async function showContentMenu(view, opts, at = null) {
-  const { pos, node, target, label = '이 내용 지우기', copyLabel = null, open = null } = opts;
+export async function showContentMenu(view, opts, at) {
+  const { pos, node, target, label = '이 내용 지우기', copyLabel = null, open = null, extraItems = [], onExtra = null } = opts;
   hideDeleteButton(true);
   const verb = (v) => label.replace(/지우기$/, v); // "이 표 지우기" → "이 표 복사"
-  const items = [
-    ...(open ? [{ id: 'open', label: open.label }, { type: 'separator' }] : []),
-    { id: 'copy', label: copyLabel ?? verb('복사') },
-    { id: 'save', label: `${verb('저장')}…` },
-    ...(canShare() ? [{ id: 'share', label: `${verb('공유')}…` }] : []),
-    { type: 'separator' },
-    { id: 'delete', label, accelerator: 'Delete' },
+  const icons = [
+    { id: 'copy', icon: COPY_ICON, label: copyLabel ?? verb('복사') },
+    { id: 'save', icon: SAVE_ICON, label: `${verb('저장')}…` },
+    ...(canShare() ? [{ id: 'share', icon: SHARE_ICON, label: `${verb('공유')}…` }] : []),
+    { id: 'delete', icon: TRASH_ICON, label, danger: true },
   ];
-  const id = await chooseMenu(items, at);
-  if (!id || view.isDestroyed || view.state.doc.nodeAt(pos) !== node) return true;
+  const items = [...(open ? [{ id: 'open', label: open.label, hint: 'Enter' }] : []), ...extraItems];
+  const id = await openContextMenu({ x: at?.x ?? 0, y: at?.y ?? 0, icons, items, label: verb('메뉴').replace(/^이 /, '') });
+  if (!view.isDestroyed) view.focus(); // 메뉴가 가져간 포커스를 편집기로 (고른 자리는 그대로)
+  if (!id || view.isDestroyed) return true;
+  if (extraItems.some((it) => it.id === id)) return onExtra?.(id), true;
+  if (view.state.doc.nodeAt(pos) !== node) return true;
   if (id === 'open') return open.run(), true;
-  if (id === 'delete') {
-    // 단추 줄의 × 를 누른 것과 똑같이 (붉게 비쳤다 접히며 지우고, 되돌리기 안내)
-    showDeleteButton(view, { ...opts, hover: { enter() {}, leave() {} } });
-    current?.btn.click();
-    return true;
-  }
+  if (id === 'delete') return deleteContent(view, opts, { undo: true }), true;
   const [run, done, act] = {
     copy: [() => copyBlock(view, pos, node, target), COPY_DONE, null],
     save: [() => saveBlock(view, pos, node, target), SAVE_DONE, '저장'],
@@ -135,41 +164,35 @@ export async function showContentMenu(view, opts, at = null) {
   return true;
 }
 
-/** 대상을 담고 스크롤되는 상자 (없으면 null = 창) */
-function scrollParent(el) {
-  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
-    const oy = getComputedStyle(p).overflowY;
-    if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p;
-  }
-  return null;
-}
-
 /**
+ * 휴대폰: 내용 곁에 단추 줄을 띄운다
  * @param {import('prosemirror-view').EditorView} view
  * @param {{ pos: number, node: import('prosemirror-model').Node, target: Element, label?: string,
  *           deco: (spec: { cls: string, style?: string } | null) => void, markTarget?: boolean,
- *           remove?: (view, pos: number, node) => void, hover?: { enter: () => void, leave: () => void }, showMs?: number }} opts
+ *           remove?: (view, pos: number, node) => void, showMs?: number, placement?: 'corner' | 'above', persist?: boolean,
+ *           follow?: (view) => ({ pos: number, node: object, target: Element } | null) }} opts
  *   pos·node: 지울 노드 · target: 단추를 붙일 상자 (사진·소리면 그 상자, 아니면 그 줄)
  *   deco: 지울 노드에 표시(데코레이션)를 달고 떼기 — 편집기가 그리는 줄은 class 를 직접 바꾸면 되돌려지므로
  *   markTarget: 대상 표시를 target 의 class 로 (사진·소리처럼 편집기가 다시 그리지 않는 상자)
  *   remove: 지우기 (기본은 그 노드를 지움)
  *   open: { label, run } — 누르면 바로 열리던 것(파일·링크 카드·수식)은 누르면 단추만, 여는 것은 이 "열기" 단추로
+ *   placement: 'corner'(기본) 대상의 오른쪽 위 모서리 · 'above' 대상 위 오른쪽 밖 — 표를 가리지 않게
+ *   persist: 시간으로 사라지지 않고 follow 가 찾는 동안 계속 (표를 고치는 동안). 글을 쳐서 노드가 바뀌어도 follow 가 같은 표를 찾으면 그대로
  */
-export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', copyLabel = null, deco, markTarget = false, remove, hover = null, showMs = DELETE_SHOW_MS, open = null }) {
+export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', copyLabel = null, deco, markTarget = false, remove, showMs = DELETE_SHOW_MS, open = null, placement = 'corner', persist = false, follow = null }) {
   hideDeleteButton(true);
   if (isShareMenuOpen()) return; // 공유 방법을 고르는 동안은 메뉴만 (단추가 메뉴 위에 다시 뜨지 않게)
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = `mk-delete-btn${hover ? ' hover' : ''}`;
+  btn.className = 'mk-delete-btn';
   btn.title = label;
   btn.setAttribute('aria-label', label);
-  // PC(마우스)는 목록 카드 · 알림 보관함의 지우기와 같은 휴지통 모양 (× 는 창 닫기로 읽힌다), 휴대폰은 ×
-  btn.innerHTML = hover ? TRASH_ICON : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6"/></svg>';
+  btn.innerHTML = CLOSE_ICON;
   // 복사 단추 (× 왼쪽) · 저장 단추 (그 왼쪽)
   const actionBtn = (cls, verb, icon) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = `${cls}${hover ? ' hover' : ''}`;
+    b.className = cls;
     const text = label.replace(/지우기$/, verb); // "이 표 지우기" → "이 표 복사" · "이 표 저장"
     b.title = text;
     b.setAttribute('aria-label', text);
@@ -187,7 +210,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   if (open) {
     openBtn = document.createElement('button');
     openBtn.type = 'button';
-    openBtn.className = `mk-open-btn${hover ? ' hover' : ''}`;
+    openBtn.className = 'mk-open-btn';
     openBtn.title = open.label;
     openBtn.setAttribute('aria-label', open.label);
     openBtn.innerHTML = OPEN_ICON;
@@ -196,14 +219,24 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   document.body.append(...extras, btn);
   // 단추는 화면에 고정(position: fixed)이라, 큰 그림을 스크롤하면 위 막대에 올라탈 수 있다 →
   //   편집기에서 보이는 칸 안으로만: 대상의 위가 가려지면 보이는 부분의 위에 붙고, 대상이 다 가려지면 숨는다
-  const scroller = scrollParent(target);
+  let scroller = scrollParent(target);
   const place = () => {
-    const r = target.getBoundingClientRect();
+    const r = del.target.getBoundingClientRect();
     const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
-    const top = Math.max(r.top - 9, box.top + 4);
-    const visible = r.bottom - 12 > box.top + 4 && r.top < box.bottom - 12 && top + 24 <= Math.min(r.bottom + 9, box.bottom);
-    // 왼쪽 끝에 붙은 작은 대상(짧은 파일 칩 등)이면 단추들이 겹치지 않게 그만큼 오른쪽으로
-    const left = Math.round(Math.max(4 + 36 * extras.length, Math.min(window.innerWidth - 32, r.right - 22)));
+    let top;
+    let visible;
+    let left;
+    if (placement === 'above') {
+      // 표 위 오른쪽 밖: 단추 아래 끝이 표 위 끝에서 4px 위 (표를 가리지 않는다). 위가 모자라면 보이는 칸의 맨 위에 붙는다
+      top = Math.max(r.top - 30, box.top + 2);
+      visible = r.bottom - 12 > box.top + 4 && r.top < box.bottom - 12;
+      left = Math.round(Math.max(4 + 36 * extras.length, Math.min(window.innerWidth - 32, r.right - 4 - 24)));
+    } else {
+      top = Math.max(r.top - 9, box.top + 4);
+      visible = r.bottom - 12 > box.top + 4 && r.top < box.bottom - 12 && top + 24 <= Math.min(r.bottom + 9, box.bottom);
+      // 왼쪽 끝에 붙은 작은 대상(짧은 파일 칩 등)이면 단추들이 겹치지 않게 그만큼 오른쪽으로
+      left = Math.round(Math.max(4 + 36 * extras.length, Math.min(window.innerWidth - 32, r.right - 22)));
+    }
     btn.style.visibility = visible ? '' : 'hidden';
     btn.style.left = `${left}px`;
     btn.style.top = `${Math.round(top)}px`;
@@ -214,30 +247,16 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       b.style.top = `${Math.round(top)}px`;
     });
   };
-  place();
   const setMark = (on) => {
-    if (markTarget) target.classList.toggle('mk-delete-target', on);
+    if (markTarget) del.target.classList.toggle('mk-delete-target', on);
     else if (on) deco({ cls: 'mk-delete-target' });
     // 편집기 갱신 중일 수 있어 한 박자 뒤에 — 그 사이 같은 편집기에 새 단추 줄이 표시를 달았으면 지우지 않는다
     else setTimeout(() => !view.isDestroyed && !(current && current !== del && current.view === view && !current.markTarget) && deco(null), 0);
   };
-  if (!hover) setMark(true);
-  const del = { view, btn, extras, pos, node, target, markTarget, state: view.state, place, setMark: hover ? (on) => !on && setMark(false) : setMark };
-  if (hover) {
-    btn.addEventListener('mouseenter', () => {
-      hover.enter();
-      setMark(true);
-    });
-    btn.addEventListener('mouseleave', () => {
-      setMark(false);
-      hover.leave();
-    });
-    // 복사 · 저장 단추 위에 있어도 단추들은 그대로 (붉은 표시는 × 위에서만)
-    for (const b of extras) {
-      b.addEventListener('mouseenter', () => hover.enter());
-      b.addEventListener('mouseleave', () => hover.leave());
-    }
-  }
+  // 표(persist)는 고치는 동안 계속 떠 있으므로 표 전체를 붉게 칠해 두지 않는다 (붉은 표시는 지우기를 누를 때만)
+  const del = { view, btn, extras, pos, node, target, markTarget, state: view.state, place, setMark: persist ? (on) => !on && setMark(false) : setMark, persist, follow, rescroll: () => { scroller = scrollParent(del.target); } };
+  place();
+  if (!persist) setMark(true);
   // 누르면 그 일을 하고 ✓ (실패하면 !, 저장을 그만두면 그대로) — 다시 누르면 다시 (실패한 뒤 다시 해 보기 등)
   const action = (b, icon, run, doneText) => {
     let busy = false;
@@ -246,7 +265,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       e.stopPropagation();
       if (e.type === 'click' && e.detail > 0) return; // 마우스는 mousedown 으로 이미 — click 은 키보드(Enter · Space)만
       if (busy) return; // mousedown 뒤 따라오는 click 은 한 번으로
-      if (view.state.doc.nodeAt(pos) !== node) return hideDeleteButton();
+      if (view.state.doc.nodeAt(del.pos) !== del.node) return hideDeleteButton();
       busy = true;
       b.classList.remove('done', 'failed');
       b.innerHTML = icon;
@@ -254,7 +273,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       clearTimeout(del.timer); // 누른 뒤에는 ✓ 를 볼 만큼 더 둔다 (저장은 고르는 창이 닫힐 때까지)
       run().then((what) => {
         if (what === 'cancelled') return;
-        if (markTarget) document.dispatchEvent(new CustomEvent('mk:content-tools')); // 튜토리얼: 넣은 내용(그림 · 파일 등)을 복사 · 저장 · 공유해 봤다
+        if (del.markTarget || persist) document.dispatchEvent(new CustomEvent('mk:content-tools')); // 튜토리얼: 넣은 내용(그림 · 파일 등)을 복사 · 저장 · 공유해 봤다
         b.classList.add('done');
         b.innerHTML = DONE_ICON;
         b.title = doneText(what);
@@ -269,16 +288,16 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
         notice(b.title, true);
       }).finally(() => {
         setTimeout(() => (busy = false), 0); // 바로 뒤따르는 click 까지는 막고
-        if (!hover && current === del) del.timer = setTimeout(() => hideDeleteButton(), 1600);
+        if (!persist && current === del) del.timer = setTimeout(() => hideDeleteButton(), 1600);
       });
     };
     b.addEventListener('mousedown', go);
     b.addEventListener('touchstart', go, { passive: false });
     b.addEventListener('click', go); // 키보드(Enter · Space)
   };
-  action(copyBtn, COPY_ICON, () => copyBlock(view, pos, node, target), COPY_DONE);
-  action(saveBtn, SAVE_ICON, () => saveBlock(view, pos, node, target), SAVE_DONE);
-  if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, pos, node, target), SHARE_DONE_TEXT);
+  action(copyBtn, COPY_ICON, () => copyBlock(view, del.pos, del.node, del.target), COPY_DONE);
+  action(saveBtn, SAVE_ICON, () => saveBlock(view, del.pos, del.node, del.target), SAVE_DONE);
+  if (shareBtn) action(shareBtn, SHARE_ICON, () => shareBlock(view, del.pos, del.node, del.target), SHARE_DONE_TEXT);
   if (openBtn) {
     let opened = false;
     const go = (e) => {
@@ -286,7 +305,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       e.stopPropagation();
       if (opened) return; // touchstart 뒤 따라오는 mousedown · click 은 한 번으로
       opened = true;
-      if (view.state.doc.nodeAt(pos) !== node) return hideDeleteButton();
+      if (view.state.doc.nodeAt(del.pos) !== del.node) return hideDeleteButton();
       haptic(8);
       hideDeleteButton(true);
       open.run();
@@ -299,7 +318,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   const press = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (view.state.doc.nodeAt(pos) !== node) return hideDeleteButton();
+    if (view.state.doc.nodeAt(del.pos) !== del.node) return hideDeleteButton();
     haptic(15);
     // 단추는 눌린 듯 작아지며 사라지고
     clearTimeout(del.timer);
@@ -308,41 +327,18 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     btn.classList.add('pressed');
     for (const b of del.extras) b.remove();
     setTimeout(() => btn.remove(), 180);
-    if (markTarget) target.classList.remove('mk-delete-target');
-    // 대상: 붉게 비쳤다가 작아지며 흐려지고 → 그 자리가 접힌다 (높이를 정해 두어야 접히는 모습이 보인다)
-    const box = view.nodeDOM(pos);
-    const where = target.getBoundingClientRect();
-    const h = box instanceof Element ? box.getBoundingClientRect().height : 0;
-    const scale = box instanceof HTMLElement && box.offsetHeight ? h / box.offsetHeight : 1; // 본문 확대·축소
-    const height = `height: ${(h / scale).toFixed(1)}px`;
-    deco({ cls: 'mk-deleting', style: height });
-    setTimeout(() => !view.isDestroyed && deco({ cls: 'mk-deleting mk-collapsing', style: 'height: 0px' }), FADE_MS);
-    setTimeout(() => {
-      if (view.isDestroyed) return;
-      deco(null);
-      if (view.state.doc.nodeAt(pos) !== node) return;
-      if (remove) remove(view, pos, node);
-      else view.dispatch(view.state.tr.delete(pos, pos + node.nodeSize).scrollIntoView());
-      // PC: 표 · 수식처럼 공들인 것도 한 번에 지워지므로, 그 자리에 되돌리는 법을 잠깐 (휴대폰은 목록의 되돌리기 띠)
-      if (hover) undoHint(label.replace(/ 지우기$/, '').replace(/^이 /, ''), where, view);
-    }, FADE_MS + COLLAPSE_MS);
+    deleteContent(view, { pos: del.pos, node: del.node, target: del.target, markTarget, deco, label, remove });
   };
-  if (hover) {
-    // PC 마우스: 눌렀다 뗄 때 지운다 (Windows 처럼 — 누른 채 단추 밖으로 빼면 그만). 누르는 순간은 편집기 커서만 지킨다
-    btn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
-    btn.addEventListener('click', (e) => { if (current === del) press(e); });
-  } else {
-    btn.addEventListener('mousedown', press);
-    // 키보드(Enter · Space)로 누른 것만 — 마우스 · 손가락은 위에서 이미 처리 (detail 0 = 키보드)
-    btn.addEventListener('click', (e) => { if (e.detail === 0 && current === del) press(e); });
-  }
+  btn.addEventListener('mousedown', press);
+  // 키보드(Enter · Space)로 누른 것만 — 마우스 · 손가락은 위에서 이미 처리 (detail 0 = 키보드)
+  btn.addEventListener('click', (e) => { if (e.detail === 0 && current === del) press(e); });
   btn.addEventListener('touchstart', press, { passive: false });
   window.addEventListener('scroll', place, true);
-  if (!hover) del.timer = setTimeout(() => hideDeleteButton(), showMs);
+  if (!persist) del.timer = setTimeout(() => hideDeleteButton(), showMs);
 }
+
+/** 표를 고치는 동안 계속 떠 있는 단추(persist)가 있는가 */
+export const persistentShown = () => Boolean(current?.persist);
 
 /** 지금 이 상자에 지우기 단추가 떠 있는가 */
 export const deleteShownFor = (target) => Boolean(current && current.target === target);
@@ -365,8 +361,17 @@ export function hideDeleteButton(now = false) {
   }, 260);
 }
 
-/** 그 편집기의 글이나 커서가 바뀌었으면 단추를 거둔다 (플러그인 view.update 에서) */
+/** 그 편집기의 글이나 커서가 바뀌었으면 단추를 거둔다 (플러그인 view.update 에서) — 표를 고치는 동안(persist)은 같은 표를 따라간다 */
 export function hideDeleteIfChanged(view) {
   const del = current;
-  if (del && del.view === view && (view.state.doc !== del.state.doc || !view.state.selection.eq(del.state.selection))) hideDeleteButton();
+  if (!del || del.view !== view) return;
+  if (del.persist) {
+    const found = del.follow?.(view);
+    if (!found) return hideDeleteButton();
+    Object.assign(del, found, { state: view.state });
+    del.rescroll();
+    del.place();
+    return;
+  }
+  if (view.state.doc !== del.state.doc || !view.state.selection.eq(del.state.selection)) hideDeleteButton();
 }

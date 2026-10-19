@@ -179,11 +179,11 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await press(note(), '.ink-sheet .ink-done', '[ink] 완료');
     await arrive(note, 'content', { praise: true });
     const pic = await until(async () => { const v = await probe(note(), '.ProseMirror .mk-image-line'); return v.found && v; }, '손 메모 그림');
-    for (const dx of [0, 4]) { // hover 는 움직임으로 — 두 번
-      note().webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(pic.x + dx), y: Math.round(pic.y) });
-      await wait(60);
-    }
-    await press(note(), '.mk-copy-btn', '[content] 📋 복사');
+    // 오른쪽 클릭 → 메뉴 맨 위 아이콘 줄의 📋 복사
+    note().webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(pic.x), y: Math.round(pic.y) });
+    note().webContents.sendInputEvent({ type: 'mouseDown', x: Math.round(pic.x), y: Math.round(pic.y), button: 'right', clickCount: 1 });
+    note().webContents.sendInputEvent({ type: 'mouseUp', x: Math.round(pic.x), y: Math.round(pic.y), button: 'right', clickCount: 1 });
+    await press(note(), '.mk-ctx-ic[data-id="copy"]', '[content] 📋 복사');
     await arrive(note, 'annotate', { praise: true });
     await press(note(), '#add-btn', '[annotate] +');
     await wait(300);

@@ -1,0 +1,99 @@
+/* ---------- 오른쪽 클릭 메뉴 (PC, 내용 · 목록 카드 — ctx-menu.js): Windows 11 메뉴처럼 맨 위 한 줄에 아이콘, 아래에 글 항목 ---------- */
+.mk-ctx {
+  --ctx-bg: #fff; --ctx-text: #1b1b1b; --ctx-muted: #6b6b6b; --ctx-line: rgba(0, 0, 0, 0.09); --ctx-hover: rgba(0, 0, 0, 0.06); --ctx-danger: #c4282e;
+  position: fixed; z-index: 100000;
+  min-width: 232px; max-width: 340px; padding: 4px;
+  border-radius: 10px; background: var(--ctx-bg); color: var(--ctx-text);
+  box-shadow: 0 0 0 1px var(--ctx-line), 0 10px 32px rgba(0, 0, 0, 0.22);
+  font: 13.5px/1.35 var(--font-sans, system-ui, sans-serif); user-select: none;
+  outline: none;
+  animation: mk-ctx-in 0.12s var(--ease-out, ease-out) both; transform-origin: top left;
+}
+@media (prefers-color-scheme: dark) {
+  .mk-ctx { --ctx-bg: #2b2b2b; --ctx-text: #f1f1f1; --ctx-muted: #a6a6a6; --ctx-line: rgba(255, 255, 255, 0.12); --ctx-hover: rgba(255, 255, 255, 0.1); --ctx-danger: #ff6b70; }
+}
+.mk-ctx.closing { opacity: 0; transition: opacity 0.09s; pointer-events: none; animation: none; }
+@keyframes mk-ctx-in { from { opacity: 0; transform: scale(0.97) translateY(-2px); } }
+.mk-ctx-icons { display: flex; gap: 2px; padding: 2px 2px 6px; margin-bottom: 4px; border-bottom: 1px solid var(--ctx-line); }
+.mk-ctx-ic {
+  flex: 1 1 0; display: grid; place-items: center; min-width: 40px; height: 38px; padding: 0;
+  border: 0; border-radius: 6px; background: transparent; color: var(--ctx-text); cursor: pointer;
+}
+.mk-ctx-ic svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.mk-ctx-ic.danger { color: var(--ctx-danger); }
+.mk-ctx-list { display: flex; flex-direction: column; }
+.mk-ctx-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px; height: 34px; padding: 0 10px;
+  border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.mk-ctx-hint { color: var(--ctx-muted); font-size: 12px; }
+.mk-ctx-sep { height: 1px; margin: 4px 6px; background: var(--ctx-line); }
+.mk-ctx button:disabled { opacity: 0.4; cursor: default; }
+@media (hover: hover) and (pointer: fine) { .mk-ctx button:not(:disabled):hover { background: var(--ctx-hover); } }
+.mk-ctx button:not(:disabled):focus-visible { background: var(--ctx-hover); outline: 2px solid color-mix(in srgb, var(--ctx-text) 55%, transparent); outline-offset: -2px; }
+.mk-ctx button:not(:disabled):active { background: var(--ctx-line); }
+@media (prefers-reduced-motion: reduce) { .mk-ctx { animation: none; } .mk-ctx.closing { transition: none; } }
+@media print { .mk-ctx { display: none !important; } }
+
+/* 색 고르기 줄 (목록 카드 메뉴): 이름 + 색 점들 — 하나를 누르면 바로 바뀌고 닫힌다 */
+.mk-ctx-colors { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 34px; padding: 0 10px; }
+.mk-ctx-colors .mk-ctx-text { color: var(--ctx-text); }
+.mk-ctx-swatches { display: flex; gap: 4px; }
+.mk-ctx-sw {
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--note-chip, #ddd); cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.4);
+}
+.mk-ctx-sw[aria-checked="true"] { box-shadow: 0 0 0 2px var(--ctx-bg), 0 0 0 4px var(--ctx-text); }
+.mk-ctx .mk-ctx-sw:not(:disabled):hover, .mk-ctx .mk-ctx-sw:not(:disabled):focus-visible { background: var(--note-chip, #ddd); transform: scale(1.12); }
+.mk-ctx-item[aria-checked="true"] .mk-ctx-text::before { content: "✓"; display: inline-block; width: 18px; margin-left: -4px; color: var(--ctx-text); }
+
+/* 공유 방법 고르기 (share-menu.js) — 내용의 공유 단추 옆 */
+.mk-share-menu {
+  position: fixed; z-index: 90; /* 내용 단추(70)보다 위 */
+  width: min(300px, calc(100vw - 16px));
+  padding: 6px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 12px;
+  background: var(--surface-1, var(--surface));
+  box-shadow: var(--shadow-pop, 0 12px 32px rgba(0, 0, 0, 0.18));
+  animation: mk-pop-in 0.14s ease-out both;
+}
+.mk-share-head { margin: 4px 8px 6px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.mk-share-menu button {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%;
+  padding: 8px; border: 0; border-radius: 8px; background: none;
+  color: var(--text-strong); text-align: left; cursor: pointer;
+}
+.mk-share-menu button:disabled { opacity: 0.55; cursor: default; }
+.mk-share-menu button:not(:disabled):is(:hover, :focus-visible) { background: var(--fill-hover, var(--hover)); }
+.mk-share-menu svg { flex: none; width: 18px; height: 18px; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.mk-share-menu span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mk-share-menu b { font-size: 13px; font-weight: 700; }
+.mk-share-menu small { font-size: 11.5px; line-height: 1.35; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .mk-share-menu { animation: none; } }
+.mk-share-menu .mk-share-cancel { display: block; margin-top: 4px; padding: 8px; border-top: 1px solid var(--line, var(--border)); border-radius: 0 0 8px 8px; text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); }
+
+/* 공유를 마쳤을 때 (Drive 링크 복사) — 창 가운데 카드 + 폭죽 (share-menu.js showSharePop) */
+.mk-share-pop {
+  position: fixed; z-index: 95; left: 50%; top: 38%;
+  display: grid; justify-items: center; gap: 4px;
+  width: min(280px, calc(100vw - 32px));
+  padding: 20px 18px 16px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 16px;
+  background: var(--surface-1, var(--surface));
+  box-shadow: var(--shadow-pop, 0 12px 32px rgba(0, 0, 0, 0.18));
+  text-align: center; cursor: default;
+  transform: translate(-50%, -50%);
+  animation: mk-share-pop-in 0.22s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.mk-share-pop.leaving { pointer-events: none; opacity: 0; transform: translate(-50%, -50%) scale(0.97); transition: opacity 0.18s ease-out, transform 0.18s ease-out; }
+.mk-share-pop-icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 6px; border-radius: 50%; background: var(--brand-yellow, #ffcc00); color: #111; }
+.mk-share-pop-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.mk-share-pop b { font-size: 15px; font-weight: 800; color: var(--text-strong); }
+.mk-share-pop p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+@keyframes mk-share-pop-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); } }
+@media (prefers-reduced-motion: reduce) { .mk-share-pop { animation: none; } .mk-share-pop.leaving { transition: none; } }
+
+/* 체크 폭죽 (canvas-confetti) */
+.mk-confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; } /* 공유 완료 카드(95) 위로도 날린다 */

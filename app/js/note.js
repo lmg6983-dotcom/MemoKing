@@ -62,7 +62,7 @@ setCopyHost({
   },
   dragOut: (payload) => api.attachments.dragOut(payload), // 메모 안 내용을 탐색기 · 카카오톡으로 끌어내기 (block-move.js)
   pathOf: (file) => api.attachments.pathOf(file),
-  menu: (items, at) => api.menu.choose(items, at), // 내용 오른쪽 클릭 메뉴 (block-move.js)
+  contentMenu: true, // 내용을 오른쪽 클릭하면 아이콘 줄이 있는 메뉴 (block-move.js · ctx-menu.js) — 마우스를 올려도 단추가 뜨지 않는다
 });
 // 저장 단추의 결과 (delete-button.js)
 window.addEventListener('mk:notice', (e) => setStatus(e.detail?.text ?? '', Boolean(e.detail?.error)));
@@ -800,6 +800,15 @@ api.on('edit:paste-plain', (text) => {
   if (text && document.activeElement?.matches('input, textarea')) document.execCommand('insertText', false, text); // 편집기가 아닌 글 칸(찾기 등)
 });
 api.on('edit:clear-format', () => editor?.run('clearFormat'));
+// 표 오른쪽 클릭 메뉴(block-move.js)의 글 항목 · 표 바꾸기 — 메뉴가 닫히며 편집기에 포커스를 돌려준 뒤에 온다
+window.addEventListener('mk:edit', (e) => {
+  const name = e.detail?.name;
+  if (name === 'clear-format') editor?.run('clearFormat');
+  else if (name === 'paste-plain') api.edit.run('pastePlain');
+  else if (name === 'copy-text') api.edit.run('copy');
+  else if (['cut', 'paste'].includes(name)) api.edit.run(name);
+});
+window.addEventListener('mk:table-command', (e) => editor?.tableCommand(e.detail?.name));
 
 // 빠른 메모 알림을 눌러 이 메모로 왔을 때 등: 창 테두리가 두 번 반짝여 "이 메모" 임을 알린다
 api.on('memo:highlight', () => {

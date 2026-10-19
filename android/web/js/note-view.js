@@ -977,7 +977,8 @@ for (const [btn, shift] of [[el.undoBtn, false], [el.redoBtn, true]]) {
   });
 }
 
-// 표 막대: 표 안에 커서가 있을 때만
+// 표 막대: 표 안에 커서가 있을 때만 (PC 와 같은 묶음 · 같은 규칙 — app/js/note.js showTableBar). 표 지우기 단추는 따로 없다:
+//   머리글 행만 남았을 때 "표 삭제" · 열이 하나뿐일 때 "표 삭제" 가 표를 지우고, 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽에 떠 있다 (block-move.js)
 function showTableBar(table) {
   if (el.tableBar.hidden !== !table) {
     el.tableBar.hidden = !table;
@@ -985,21 +986,41 @@ function showTableBar(table) {
   }
   for (const b of document.querySelectorAll('[data-action="table"]')) b.classList.toggle('active', Boolean(table));
   if (!table) return;
-  el.tableBar.querySelector('[data-table="delRow"]').disabled = table.header;
-  el.tableBar.querySelector('[data-table="delCol"]').disabled = table.cols <= 1;
-  // 셀 병합: 여러 칸을 골랐으면 "셀 병합", 병합한 칸 안이면 "병합 풀기"
-  const merge = el.tableBar.querySelector('[data-table="merge"]');
-  merge.textContent = table.merged ? '병합 풀기' : '셀 병합';
+  const bar = el.tableBar;
+  const delRow = bar.querySelector('[data-table="delRow"]');
+  const delCol = bar.querySelector('[data-table="delCol"]');
+  const setBtn = (b, label, title) => {
+    b.querySelector('.lbl').textContent = label;
+    b.title = title;
+    b.setAttribute('aria-label', `${b.closest('.tb-group')?.getAttribute('aria-label') ?? ''} ${label}`.trim());
+  };
+  // 머리글 아래 행은 마지막 하나까지 지울 수 있다. 머리글 행만 남았을 때 머리글에서 누르면, 열이 하나뿐일 때 누르면 표 전체를 지운다
+  const lastRow = table.header && table.rows <= 1;
+  delRow.disabled = table.header && !lastRow;
+  delRow.dataset.wholeTable = lastRow ? '1' : '';
+  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : '이 행 삭제');
+  delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
+  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제');
+  // 셀 병합: 여러 칸을 골랐으면 "병합", 병합한 칸 안이면 "병합 풀기"
+  const merge = bar.querySelector('[data-table="merge"]');
   merge.disabled = !table.canMerge && !table.merged;
-  el.tableBar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
-  // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만
-  el.tableBar.querySelector('[data-table="splitTable"]').hidden = !table.canSplit;
-  el.tableBar.querySelector('[data-table="joinTable"]').hidden = !table.canJoin;
+  setBtn(merge, table.merged ? '병합 풀기' : '병합', table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요');
+  bar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
+  // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만 (숨기지 않고 흐리게 — 커서를 옮길 때마다 단추가 생겼다 사라지지 않게)
+  const split = bar.querySelector('[data-table="splitTable"]');
+  const join = bar.querySelector('[data-table="joinTable"]');
+  split.disabled = !table.canSplit;
+  split.title = table.canSplit ? '커서가 있는 행부터 아래를 새 표로 (아래 표에도 머리글 행)' : '나눌 자리의 행(머리글 아래 두 번째 행부터)에 커서를 두세요';
+  join.disabled = !table.canJoin;
+  join.title = table.canJoin ? '바로 아래 표를 이 표에 이어 붙이기 (열 수가 같을 때)' : '바로 아래에 열 수가 같은 표가 있을 때 합칠 수 있어요';
 }
 el.tableBar.addEventListener('mousedown', (e) => e.preventDefault());
 el.tableBar.addEventListener('click', (e) => {
   const b = e.target.closest('[data-table]');
-  if (b && !b.disabled) editor.tableCommand(b.dataset.table);
+  if (!b || b.disabled) return;
+  // 마지막 남은 머리글 행 · 열을 지우면 표 전체를 지운다
+  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.dataset.wholeTable === '1';
+  editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
 });
 
 function showActive(active) {

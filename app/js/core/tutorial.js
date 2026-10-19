@@ -82,10 +82,10 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'content', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-delete-btn', '.mk-copy-btn', '.mk-save-btn'], advance: 'content-tools', emoji: '💾',
+    id: 'content', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-ctx'], advance: 'content-tools', emoji: '💾',
     title: '넣은 내용 저장 · 공유하기',
-    text: '사진, 손 메모, 녹음, 파일에 마우스를 올리면 오른쪽 위에 단추가 떠요. 📋 복사, 💾 파일로 저장, 📤 공유(Windows 공유 · Drive 링크 · LocalSend · 메일), × 지우기.',
-    try: '방금 그린 손 메모에 마우스를 올리고 📋 복사를 눌러 보세요',
+    text: '사진, 손 메모, 녹음, 파일, 표를 오른쪽 클릭하면 메뉴 맨 위 한 줄에 아이콘이 떠요. 📋 복사, 💾 파일로 저장, 📤 공유(Drive 링크 · LocalSend · 메일), 🗑 지우기.',
+    try: '방금 그린 손 메모를 오른쪽 클릭하고 📋 복사 아이콘을 눌러 보세요',
     next: LATER,
   },
   {

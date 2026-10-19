@@ -414,7 +414,11 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .note-screen .format-bar button:disabled { opacity: 0.32; }
 .note-screen .format-bar button.active { background: color-mix(in srgb, var(--note-text) 14%, transparent); color: var(--note-text); }
 .note-screen .table-bar { overflow-x: auto; }
-.note-screen .table-bar button { height: var(--tap); padding: 0 12px; font-size: 13.5px; }
+/* 표 막대: PC 와 같은 묶음(note.css .table-bar.grouped), 손가락 크기로 */
+.note-screen .table-bar.grouped { gap: 6px; padding: 6px 10px; }
+.note-screen .table-bar.grouped .tb-name { font-size: 12px; padding: 0 6px 0 8px; }
+.note-screen .table-bar.grouped button { height: var(--tap); padding: 0 12px 0 10px; font-size: 13.5px; gap: 6px; }
+.note-screen .table-bar.grouped button svg { width: 18px; height: 18px; }
 .note-screen .palette { width: min(300px, calc(100vw - 24px)); }
 .note-screen .palette-swatch { min-height: 36px; }
 .note-screen .tag-suggest-item { min-height: var(--tap); font-size: 15px; }

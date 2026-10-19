@@ -1579,14 +1579,31 @@ try {
   await setMode('edit');
   await page.locator('.mk-doc td', { hasText: '배' }).tap();
   await page.waitForTimeout(300);
-  check('표 막대: 두 번째 본문 행이면 "표 나누기" · 아래에 표가 없으면 "아래 표와 합치기" 없음', await page.isVisible('#table-bar [data-table="splitTable"]') && await page.isHidden('#table-bar [data-table="joinTable"]'));
+  check('표 막대: 두 번째 본문 행이면 "표 나누기" 를 누를 수 있고 · 아래에 표가 없으면 "아래 표와 합치기" 는 흐림', await page.isEnabled('#table-bar [data-table="splitTable"]') && await page.isDisabled('#table-bar [data-table="joinTable"]'));
+  // 표 막대: PC 와 같은 묶음 (행 · 열 · 칸 · 표 · 바꾸기), "표 지우기" 단추는 없음
+  const tbGroups = await page.evaluate(() => [...document.querySelectorAll('#table-bar .tb-group')].map((g) => g.querySelector('.tb-name').textContent + ':' + [...g.querySelectorAll('button')].map((b) => b.dataset.table).join('/')));
+  check('표 막대: 행 · 열 · 칸 · 표 · 바꾸기 묶음 (PC 와 같음), 표 지우기 단추는 없음',
+    tbGroups.join(' ') === '행:addRow/delRow 열:addCol/delCol 칸:merge/accent 표:autoFit/splitTable/joinTable 바꾸기:toList/toTask/toText' && (await page.locator('#table-bar [data-table="delTable"]').count()) === 0, JSON.stringify(tbGroups));
+  // 표를 고치는 동안 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽 밖에 (표를 가리지 않는 자리)
+  {
+    const geo = await page.evaluate(() => {
+      const w = document.querySelector('.mk-doc .tableWrapper');
+      const tr = w.getBoundingClientRect();
+      const btns = [...document.querySelectorAll('.mk-delete-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn')].map((b) => ({ cls: b.className.split(' ')[0], r: b.getBoundingClientRect().toJSON(), vis: getComputedStyle(b).visibility }));
+      return { tr: tr.toJSON(), btns };
+    });
+    const coverTable = geo.btns.some((b) => b.r.bottom > geo.tr.top + 1 && b.r.top < geo.tr.bottom && b.r.right > geo.tr.left && b.r.left < geo.tr.right);
+    const rightSide = geo.btns.length >= 3 && geo.btns.every((b) => b.r.right <= geo.tr.right + 1 && b.r.left > geo.tr.left + geo.tr.width / 3);
+    check('표 편집 중: 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽에 (표를 가리지 않음)', geo.btns.length >= 3 && !coverTable && rightSide && geo.btns.every((b) => b.vis !== 'hidden'), JSON.stringify(geo));
+    await shot('10-table-buttons');
+  }
   await page.tap('#table-bar [data-table="splitTable"]');
   await page.waitForTimeout(900);
   const split = read('표 나누기.md');
   check('표 나누기: 이 행부터 새 표 (머리글 행도 함께)', /\| 이름 \| 수량 \|\n\| -+ \| -+ \|\n\| 사과 \| 1 +\|\n\n+\| 이름 \| 수량 \|\n\| -+ \| -+ \|\n\| 배 +\| 2 +\|\n\| 감 +\| 3 +\|/.test(split), split);
   await page.locator('.mk-doc td', { hasText: '사과' }).tap();
   await page.waitForTimeout(300);
-  check('표 막대: 아래에 열 수가 같은 표가 있으면 "아래 표와 합치기"', await page.isVisible('#table-bar [data-table="joinTable"]'));
+  check('표 막대: 아래에 열 수가 같은 표가 있으면 "아래 표와 합치기" 를 누를 수 있음', await page.isEnabled('#table-bar [data-table="joinTable"]'));
   await page.tap('#table-bar [data-table="joinTable"]');
   await page.waitForTimeout(900);
   const joined = read('표 나누기.md');
