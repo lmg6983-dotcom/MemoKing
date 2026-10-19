@@ -34,14 +34,18 @@ function announce(text) {
 }
 
 // 지운 자리에 "표를 지웠어요 [되돌리기] (Ctrl+Z)" 를 잠깐 (하나만) — 마우스로도 되돌릴 수 있게 (목록 카드의 되돌리기 띠처럼)
-function undoHint(what, rect, view) {
+/**
+ * PC: 한 일을 알리며 "되돌리기" 단추 (지우기 · 잘라내기 · 이름 변경 …)
+ * @param {string} what 대상 이름("이 표" 의 "표" 처럼, 조사는 알아서) · @param {string} [verb] 한 일 (기본 "지웠어요")
+ */
+export function undoHint(what, rect, view, verb = '지웠어요') {
   document.getElementById('mk-undo-hint')?.remove();
   const tip = document.createElement('div');
   tip.id = 'mk-undo-hint';
   tip.className = 'mk-undo-hint';
   tip.setAttribute('role', 'status');
   tip.innerHTML = '<span></span> <button type="button" class="mk-undo-btn">되돌리기</button> <kbd>Ctrl+Z</kbd>';
-  tip.firstChild.textContent = `${what}${/[가-힣]$/.test(what) && (what.charCodeAt(what.length - 1) - 0xac00) % 28 ? '을' : '를'} 지웠어요`;
+  tip.firstChild.textContent = `${what}${/[가-힣]$/.test(what) && (what.charCodeAt(what.length - 1) - 0xac00) % 28 ? '을' : '를'} ${verb}`;
   const undoBtn = tip.querySelector('.mk-undo-btn');
   undoBtn.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서를 빼앗지 않게
   undoBtn.addEventListener('click', () => {
@@ -218,6 +222,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     copyBtn.title = copyLabel;
     copyBtn.setAttribute('aria-label', copyLabel);
   }
+  const cutBtn = actionBtn('mk-cut-btn', '잘라내기', CUT_ICON); // 복사한 뒤 지움 (되돌리기는 위의 ↶)
   const saveBtn = actionBtn('mk-save-btn', '저장', SAVE_ICON);
   const shareBtn = canShare() ? actionBtn('mk-share-btn', '공유', SHARE_ICON) : null;
   let openBtn = null;
@@ -229,7 +234,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     openBtn.setAttribute('aria-label', open.label);
     openBtn.innerHTML = OPEN_ICON;
   }
-  const extras = [copyBtn, saveBtn, shareBtn, openBtn].filter(Boolean); // × 에서 왼쪽으로 차례로 (열기는 ×에서 가장 먼 맨 왼쪽)
+  const extras = [copyBtn, cutBtn, saveBtn, shareBtn, openBtn].filter(Boolean); // × 에서 왼쪽으로 차례로 (복사 · 잘라내기는 가까이, 열기는 ×에서 가장 먼 맨 왼쪽)
   document.body.append(...extras, btn);
   // 단추는 화면에 고정(position: fixed)이라, 큰 그림을 스크롤하면 위 막대에 올라탈 수 있다 →
   //   편집기에서 보이는 칸 안으로만: 대상의 위가 가려지면 보이는 부분의 위에 붙고, 대상이 다 가려지면 숨는다
@@ -329,12 +334,10 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     openBtn.addEventListener('click', go);
   }
   current = del;
-  const press = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (view.state.doc.nodeAt(del.pos) !== del.node) return hideDeleteButton();
+  // 지우기 몸통 (× 를 눌렀을 때 · 잘라내기가 복사를 마친 뒤): 단추는 눌린 듯 작아지며 사라지고, 대상이 붉게 비쳤다 접힌다
+  let cutDone = false; // 잘라내기로 지우는 중인가 (알림 문구가 다르다)
+  const removeNow = () => {
     haptic(15);
-    // 단추는 눌린 듯 작아지며 사라지고
     clearTimeout(del.timer);
     window.removeEventListener('scroll', place, true);
     current = null;
@@ -342,7 +345,47 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     for (const b of del.extras) b.remove();
     setTimeout(() => btn.remove(), 180);
     deleteContent(view, { pos: del.pos, node: del.node, target: del.target, markTarget, deco, label, remove });
+    // 휴대폰: 지운 뒤 되돌리기 단추가 있는 안내를 띄우도록 알린다 (android/web/js/note-view.js) — PC 는 deleteContent 의 undo 안내
+    window.dispatchEvent(new CustomEvent('mk:removed', { detail: { what: label.replace(/ 지우기$/, '').replace(/^이 /, ''), verb: cutDone ? '잘라냈어요' : '지웠어요' } }));
   };
+  const press = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (view.state.doc.nodeAt(del.pos) !== del.node) return hideDeleteButton();
+    removeNow();
+  };
+  // 잘라내기: 복사가 끝난 뒤에만 지운다 (복사하지 못했으면 그대로 두고 알린다)
+  let cutting = false;
+  const cut = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'click' && e.detail > 0) return; // 마우스는 mousedown 으로 이미 — click 은 키보드만
+    if (cutting) return;
+    if (view.state.doc.nodeAt(del.pos) !== del.node) return hideDeleteButton();
+    cutting = true;
+    haptic(8);
+    clearTimeout(del.timer);
+    copyBlock(view, del.pos, del.node, del.target).then((what) => {
+      if (what === 'cancelled' || current !== del || view.state.doc.nodeAt(del.pos) !== del.node) return;
+      document.dispatchEvent(new CustomEvent('mk:content-tools'));
+      announce('잘라냈어요');
+      cutDone = true;
+      removeNow();
+    }, (err) => {
+      console.warn('cut', err);
+      cutBtn.classList.add('failed');
+      cutBtn.innerHTML = FAIL_ICON;
+      cutBtn.title = '복사하지 못해 잘라내지 않았어요';
+      announce(cutBtn.title);
+      notice(cutBtn.title, true);
+    }).finally(() => {
+      cutting = false;
+      if (!persist && current === del) del.timer = setTimeout(() => hideDeleteButton(), 1600);
+    });
+  };
+  cutBtn.addEventListener('mousedown', cut);
+  cutBtn.addEventListener('touchstart', cut, { passive: false });
+  cutBtn.addEventListener('click', cut);
   btn.addEventListener('mousedown', press);
   // 키보드(Enter · Space)로 누른 것만 — 마우스 · 손가락은 위에서 이미 처리 (detail 0 = 키보드)
   btn.addEventListener('click', (e) => { if (e.detail === 0 && current === del) press(e); });

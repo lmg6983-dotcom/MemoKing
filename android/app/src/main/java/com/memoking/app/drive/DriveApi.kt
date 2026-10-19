@@ -144,7 +144,7 @@ class DriveApi(private val ctx: Context) : Remote {
         val start = if (existingId == null) "$UPLOAD/files?uploadType=resumable&fields=${enc(FIELDS)}"
         else "$UPLOAD/files/${enc(existingId)}?uploadType=resumable&fields=${enc(FIELDS)}"
         val location = request(if (existingId == null) "POST" else "PATCH", start, body = meta.toString().toByteArray()) { conn ->
-            conn.getHeaderField("Location") ?: throw IOException("Google Drive가 올릴 주소를 주지 않았어요")
+            conn.getHeaderField("Location") ?: throw IOException("Google Drive가 올릴 주소를 주지 않았어요. 잠시 뒤 다시 시도해 주세요")
         }
         var attempt = 0
         while (true) {

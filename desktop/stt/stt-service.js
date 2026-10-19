@@ -96,7 +96,7 @@ export function createSttService(opts) {
 
   async function fetchTo(url, file, onBytes) {
     const res = await opts.fetch(url);
-    if (!res.ok || !res.body) throw new Error(`받지 못했어요 (${res.status})`);
+    if (!res.ok || !res.body) throw new Error(`받지 못했어요 (${res.status}). 인터넷을 확인하고 다시 눌러 주세요`);
     const out = fs.createWriteStream(file);
     try {
       const reader = res.body.getReader();
@@ -136,7 +136,7 @@ export function createSttService(opts) {
           await call({ type: 'extract', archive, dest, files: src.pick });
         }
         if (partReady(part)) return;
-        throw new Error('받은 파일이 맞지 않아요');
+        throw new Error('받은 파일이 맞지 않아요. 다시 받아 주세요');
       } catch (err) {
         lastErr = err;
         onFraction(0); // 다음 곳에서 처음부터
@@ -144,7 +144,7 @@ export function createSttService(opts) {
         fs.rmSync(tmp, { recursive: true, force: true });
       }
     }
-    throw lastErr ?? new Error('받지 못했어요');
+    throw lastErr ?? new Error('받지 못했어요. 인터넷을 확인하고 다시 눌러 주세요');
   }
 
   async function download(pack) {

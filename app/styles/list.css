@@ -33,6 +33,7 @@ body {
 .setup p { margin: 0 0 18px; line-height: 1.7; color: var(--muted); }
 .setup .path-box { text-align: left; }
 .setup-actions { display: flex; flex-direction: column; gap: 8px; }
+.setup .setup-later { margin: 12px 0 0; font-size: 12.5px; line-height: 1.6; }
 .setup-error { margin-top: 16px !important; color: var(--danger) !important; font-weight: 600; }
 
 /* ---------- 목록 ---------- */

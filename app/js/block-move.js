@@ -19,11 +19,12 @@ import { isVoiceCard } from './voice-card-view.js';
 import { mediaKindOf } from './core/memo-file.js';
 import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
-import { showDeleteButton, showContentMenu, hideDeleteButton, hideDeleteIfChanged, deleteShownFor, persistentShown } from './delete-button.js';
+import { showDeleteButton, showContentMenu, hideDeleteButton, hideDeleteIfChanged, deleteShownFor, persistentShown, undoHint } from './delete-button.js';
 import { canContentMenu, canDragOut, dragOutBlock } from './copy-content.js';
 import { tableAt } from './table-extras.js';
 import { isContextMenuOpen } from './ctx-menu.js';
 import { haptic } from './dom.js';
+import { hintOnce } from './hints.js';
 import { renameTarget, renameContent, cleanName, promptName } from './rename-content.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
@@ -93,7 +94,7 @@ function blockInfo(doc, pos, inner) {
 // 누르는 사이 감긴 재생 위치는 들어 올릴 때 되돌린다
 export const MEDIA_SCRUB = '.plyr__menu__container';
 const GRAB_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card], a, .mk-math-block, hr';
-// PC 에서 마우스를 올리면 복사 · 지우기 단추가 뜨는 "내용": 그림 · 손 메모 · 소리 · 동영상 · 링크 카드 · 파일 칩(PDF 등) ·
+// PC 에서 오른쪽 클릭 메뉴(맨 위 아이콘 줄 — 잘라내기 · 복사 · 저장 · 공유 · 지우기)를 띄우는 "내용": 그림 · 손 메모 · 소리 · 동영상 · 링크 카드 · 파일 칩(PDF 등) ·
 //   수식 블록 · 표 · 음성 카드 (글자 링크 · 글 속 수식 · 가로줄은 빼고 — 글을 읽는 데 방해되지 않게)
 const HOVER_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card], a[data-file], .mk-math-block, .mk-voice, .tableWrapper';
 const NO_GRAB = '.plyr__controls, .plyr__control, button, input, select, textarea, [contenteditable="true"] [contenteditable="true"]';
@@ -497,6 +498,20 @@ class Mover {
       };
       view.dom.addEventListener('mousedown', this.onOpenDown, true);
       view.dom.addEventListener('click', this.onLongClick, true);
+    }
+    // PC: 내용 위에 마우스를 잠깐 두면(처음 한 번) 오른쪽 클릭 메뉴가 있다고 알려 준다 — 마우스를 올려도 단추가 뜨지 않으니 숨은 기능이 되지 않게
+    if (canContentMenu()) {
+      let hoverTimer = 0;
+      this.onHoverHint = (e) => {
+        clearTimeout(hoverTimer);
+        const host = e.target instanceof Element ? e.target.closest(HOVER_TARGET) : null;
+        if (!host || !view.dom.contains(host) || this.busy() || isContextMenuOpen()) return;
+        hoverTimer = setTimeout(() => {
+          if (host.isConnected && host.matches(':hover') && !this.busy()) hintOnce('content-menu', '오른쪽 클릭하면 잘라내기 · 복사 · 저장 · 공유 · 지우기 메뉴가 떠요', { anchor: host });
+        }, 1200);
+      };
+      view.dom.addEventListener('mouseover', this.onHoverHint);
+      view.dom.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
     }
     // PC: 내용(그림 · 손 메모 · 소리 · 동영상 · 파일 · 링크 카드 · 수식 · 표)을 오른쪽 클릭하면 Windows 11 메뉴처럼 맨 위 한 줄에
     //   아이콘(복사 · 저장 · 공유 · 지우기)이 있는 메뉴 (ctx-menu.js). 예전에는 마우스를 올리면 단추가 떠서 표 칸을 가렸다.
@@ -927,7 +942,13 @@ class Mover {
     const fresh = view.state.doc.nodeAt(pos) === node ? renameTarget(view.state.doc, pos, node) : null; // 입력 창이 떠 있는 동안 문서가 바뀌었을 수 있다
     const done = name && fresh ? renameContent(view, fresh, name) : false;
     const say = (text, error = false) => window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text, error } }));
-    if (done === true) say(`이름을 "${name}" 으로 바꿨어요`);
+    if (done === true) {
+      say(`이름을 "${name}" 으로 바꿨어요`);
+      // 지우기처럼 "되돌리기" 안내 (Ctrl+Z 와 같은 기록) — 바뀐 내용 자리에
+      const dom = view.nodeDOM(pos);
+      const at = (dom instanceof Element ? dom : view.dom).getBoundingClientRect();
+      undoHint('이름', at, view, '바꿨어요');
+    }
     else if (done === 'kind') say('이 이름으로는 바꿀 수 없어요 — 영상 파일은 이름에 "영상" 이 있어야 하고, 소리 파일에는 "영상" · "동영상" · "video" 를 쓸 수 없어요', true);
     view.focus();
   }
@@ -1089,6 +1110,7 @@ class Mover {
       this.view.dom.removeEventListener('mousedown', this.onOpenDown, true);
       this.view.dom.removeEventListener('click', this.onLongClick, true);
     }
+    if (this.onHoverHint) this.view.dom.removeEventListener('mouseover', this.onHoverHint);
     if (this.onContextMenu) this.view.dom.removeEventListener('contextmenu', this.onContextMenu, true);
     if (this.onDragStart) this.view.dom.removeEventListener('dragstart', this.onDragStart, true);
     this.cancelPress();

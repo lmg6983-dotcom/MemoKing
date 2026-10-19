@@ -530,7 +530,7 @@ function autoDriveFolder() {
 // 같은 이름 폴더가 이미 있으면 그것 (새로 만들지 않는다) — 만드는 중에 또 부탁해도 하나만
 const folderMaking = new Map();
 function findOrCreateDriveFolder(parent, name) {
-  if (!driveApi) return Promise.reject(new Error('Google Drive 를 쓸 수 없어요'));
+  if (!driveApi) return Promise.reject(new Error('Google Drive 를 쓸 수 없어요. 설정 › Google Drive 동기화에서 먼저 연결해 주세요'));
   const key = `${parent}\u0000${name}`;
   if (!folderMaking.has(key)) {
     folderMaking.set(key, (async () => {

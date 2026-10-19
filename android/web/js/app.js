@@ -152,7 +152,7 @@ app.api = {
         id = app.vault.import({ body: typeof body === 'string' && /^# \S/.test(body) ? body.slice(0, 20000) : `# ${title}\n` });
       }
       const memo = id ? app.vault.get(id) : null;
-      if (!memo) throw new Error('메모를 찾지 못했어요');
+      if (!memo) throw new Error('메모를 찾지 못했어요. 목록에서 다시 골라 주세요');
       app.setReminders(id, [...(memo.reminders ?? []), reminder]);
       list.refresh();
       return id;

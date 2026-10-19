@@ -866,7 +866,7 @@ async function saveFile(file) {
 async function fetchImage(src) {
   if (isDataImage(src)) {
     const image = decodeDataImage(src);
-    if (!image) throw new Error('지원하지 않는 그림 형식');
+    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG · JPG · GIF · WebP 그림을 써 주세요');
     return api.attachments.save(image.bytes, image.ext);
   }
   return api.attachments.fetch(src);
@@ -934,7 +934,7 @@ el.editorRoot.addEventListener('dblclick', (e) => {
   openHref(target);
 });
 
-// 파일 칩에 마우스를 올리면 이름·크기 안내 (한 줄에 칩만 있으면 눌러도 열지 않고 단추 줄의 "열기"로 — block-move.js)
+// 파일 칩에 마우스를 올리면 이름·크기 안내 (PC 는 누르면 바로 열리고, 휴대폰은 눌러서 나오는 단추 줄의 "열기" — block-move.js)
 const hint = document.createElement('div');
 hint.className = 'hover-hint';
 hint.hidden = true;
@@ -1669,6 +1669,7 @@ function renderStack(state) {
   const stacked = members.length >= 2;
   tabsEl.hidden = !stacked;
   document.body.classList.toggle('stacked', stacked);
+  if (stacked) setTimeout(() => hintOnce('stack-reorder', '탭을 위아래로 끌어 순서를 바꾸고, 옆으로 끌어내면 따로 떼어져요', { anchor: tabsEl }), 800);
   if (!stacked) return tabsEl.replaceChildren();
   const tabs = members.map((m) => {
     const tab = document.createElement('div');

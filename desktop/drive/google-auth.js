@@ -215,7 +215,7 @@ export class GoogleAuth {
     const scope = this.fixedScope ?? scopeFor(full);
     if (this.fixedScope) full = false;
     const client = this.client();
-    if (!client) throw new AuthError('Google 로그인 설정(OAuth 클라이언트 ID)이 아직 없어요');
+    if (!client) throw new AuthError('Google 로그인 설정(연결 ID · 비밀번호)이 아직 없어요. 설정 › Google Drive 동기화 › 연결하기에서 안내서(DRIVE-SETUP)대로 만든 값을 넣어 주세요');
     this.cancelLogin();
     const verifier = b64url(randomBytes(48));
     const challenge = b64url(createHash('sha256').update(verifier).digest());
@@ -287,7 +287,7 @@ export class GoogleAuth {
     if (this.accessToken && Date.now() < this.expiresAt - 60_000) return this.accessToken;
     if (!this.data.refreshToken) throw new AuthError(`${this.label}에 로그인해 주세요`);
     const client = this.refreshClient();
-    if (!client) throw new AuthError('Google 로그인 설정(OAuth 클라이언트 ID)이 없어요');
+    if (!client) throw new AuthError('Google 로그인 설정(연결 ID · 비밀번호)이 없어요. 설정 › Google Drive 동기화 › 연결하기에서 다시 넣어 주세요');
     this.refreshing ??= this.post(TOKEN_URL, {
       refresh_token: this.data.refreshToken, client_id: client.id, client_secret: client.secret, grant_type: 'refresh_token',
     }).finally(() => {
@@ -341,7 +341,7 @@ export class GoogleAuth {
       // 글자 응답
     }
     if (res.status >= 400 && res.status < 500) throw new AuthError(`Google 로그인 오류: ${json.error_description || json.error || text}`);
-    if (!res.ok) throw new Error(`Google 서버 오류 (${res.status})`);
+    if (!res.ok) throw new Error(`Google 서버에 문제가 있어요 (${res.status}). 잠시 뒤 다시 시도해 주세요`);
     return json;
   }
 }

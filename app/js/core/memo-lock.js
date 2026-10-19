@@ -67,7 +67,7 @@ export async function openLock(lockedBody, password) {
   if (!p) throw new Error('잠긴 메모가 아니에요');
   if (p.version !== LOCK_VERSION) throw new Error('이 메모킹보다 새 버전에서 잠근 메모예요. 메모킹을 업데이트해 주세요');
   // 파일에 적힌 반복 횟수를 그대로 믿지 않는다 (망가지거나 고쳐진 값으로 몇 시간씩 멈추거나 영영 못 열지 않게)
-  if (!(p.iterations >= MIN_ITERATIONS && p.iterations <= MAX_ITERATIONS)) throw new Error('잠금 정보가 망가진 메모예요. 열 수 없어요');
+  if (!(p.iterations >= MIN_ITERATIONS && p.iterations <= MAX_ITERATIONS)) throw new Error('잠금 정보가 망가진 메모예요. 열 수 없어요. 다른 기기의 같은 메모나 이전 버전에서 되살려 보세요');
   const session = { key: await deriveKey(password, unb64(p.salt), p.iterations), salt: p.salt, iterations: p.iterations };
   const plain = unsealBody(lockedBody, session);
   if (plain == null) throw new Error('비밀번호가 달라요');
