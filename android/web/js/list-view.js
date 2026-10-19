@@ -603,7 +603,7 @@ el.layoutBtn.addEventListener('click', () => {
   }
 });
 
-// ---------- 정렬 (최근 수정순 · 오래된 순 · 최근 만든 순 · 많이 본 순 · 이름순) — PC 와 같은 규칙(core/memo-sort.js), 이 휴대폰에 기억 ----------
+// ---------- 정렬 (최신순 · 오래된순 · 많이 본 순 · 이름순) — PC 와 같은 규칙(core/memo-sort.js), 이 휴대폰에 기억 ----------
 //   고정한 메모는 늘 맨 앞. 많이 본 순은 이 휴대폰에서 메모를 연 횟수 (countView — 메모 파일에는 쓰지 않는다: 열 때마다 동기화되지 않게)
 function applySortLabel() {
   el.sortBtn.setAttribute('aria-label', `정렬: ${sortLabel(sort)}`);
