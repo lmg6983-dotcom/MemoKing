@@ -278,9 +278,15 @@
 
   <!-- 새 버전: 바뀐 점 → 받기(진행률) → 지금 재시작 / 나중에 -->
   <dialog id="update-dialog" class="dialog update-dialog" aria-labelledby="update-title">
-    <h2 id="update-title">새 버전이 나왔어요</h2>
-    <p class="update-version" id="update-version"></p>
-    <div class="update-notes" id="update-notes" tabindex="0" aria-label="바뀐 점"></div>
+    <header class="update-head">
+      <span class="update-badge" aria-hidden="true"><svg><use href="#i-crown"/></svg></span>
+      <div class="update-head-text">
+        <h2 id="update-title">새 버전이 나왔어요</h2>
+        <p class="update-version" id="update-version"></p>
+      </div>
+    </header>
+    <h3 class="update-notes-title" id="update-notes-title">바뀐 점</h3>
+    <div class="update-notes" id="update-notes" tabindex="0" role="region" aria-labelledby="update-notes-title"></div>
     <div class="update-progress" id="update-progress" hidden>
       <div class="update-bar"><span id="update-bar-fill"></span></div>
       <small id="update-progress-text" role="status"></small>
@@ -288,7 +294,7 @@
     <p class="update-error" id="update-error" role="alert" hidden></p>
     <div class="dialog-actions">
       <button type="button" class="btn" id="update-later">나중에</button>
-      <button type="button" class="btn primary" id="update-go">받기</button>
+      <button type="button" class="btn primary" id="update-go" autofocus>받기</button>
     </div>
   </dialog>
 

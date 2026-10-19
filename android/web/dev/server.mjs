@@ -265,7 +265,16 @@ function makeTemp(name, mime, bytes) {
 
 // ---------- 오래 걸리는 일 ----------
 
+// 앱 안 업데이트 흉내 (AppUpdate.kt): /dev/update 로 새 버전이 있는 척 · 설치 결과를 정한다
+const devUpdate = { info: { available: false, current: '0.1.0-dev', version: '0.1.0-dev', notes: '', size: 0, sha256: '', apk: '' }, install: 'started', downloads: 0 };
 const calls = {
+  updateCheck: async () => devUpdate.info,
+  updateDownload: async () => {
+    await new Promise((r) => setTimeout(r, 700)); // 받는 모습(진행률)을 볼 틈
+    devUpdate.downloads++;
+    return true;
+  },
+  updateInstall: async () => devUpdate.install,
   pickFolder: async () => {
     vaultRoot = path.join(os.tmpdir(), 'memoking-dev-vault');
     fs.mkdirSync(vaultRoot, { recursive: true });
@@ -512,13 +521,18 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200).end('{}');
       return;
     }
+    if (req.method === 'POST' && p === '/dev/update') {
+      Object.assign(devUpdate, JSON.parse(await readBody(req)));
+      res.writeHead(200).end('{}');
+      return;
+    }
     if (req.method === 'POST' && p === '/dev/stt') {
       Object.assign(fakeStt, JSON.parse(await readBody(req)));
       res.writeHead(200).end('{}');
       return;
     }
     if (p === '/dev/log') {
-      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ log, scheduled, vaultRoot, widgetData }));
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ log, scheduled, vaultRoot, widgetData, update: devUpdate }));
       return;
     }
     if (p.startsWith('/vault/')) return serveFile(res, vaultPath(p.slice('/vault/'.length)), req);

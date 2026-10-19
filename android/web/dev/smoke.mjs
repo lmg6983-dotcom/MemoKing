@@ -2207,6 +2207,53 @@ try {
   check('Drive: 연결 뒤 메모 그대로 보임', (await page.locator('.card').count()) === count);
   check('Drive: 목록 위 동기화 버튼', await page.isVisible('#sync-btn'));
 
+  // 앱 안 업데이트 (updates.js · AppUpdate.kt): 새 버전 알림 → 바뀐 점(제목 + 항목) → 받기(진행률) → 설치 화면 / 허용 안내
+  await post('/dev/update', {
+    info: { available: true, current: '0.1.0-dev', version: '0.2.0', size: 1000, sha256: 'x', apk: 'https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk',
+      notes: '**앱 안 업데이트**: 새 버전이 나오면 알려 줘요. **설치는** 안드로이드 설치 화면에서 업데이트만 누르면 돼요. 서식 지우기 (휴대폰 0.2.0)' },
+    install: 'permission',
+  });
+  await page.tap('#settings-btn');
+  await page.waitForTimeout(500);
+  const row0 = await page.evaluate(() => ({ cur: document.getElementById('update-current')?.textContent, note: document.getElementById('update-note')?.textContent, btn: document.getElementById('update-check')?.textContent }));
+  check('설정 맨 위: 메모킹 버전 · 업데이트 줄 (조용히 확인한 뒤 새 버전 알림은 아직 없음)', /^v/.test(row0.cur) && /알려 드려요/.test(row0.note) && row0.btn === '업데이트 확인' && !(await page.isVisible('#update-sheet')), JSON.stringify(row0));
+  await page.tap('#update-check');
+  await page.waitForSelector('#update-sheet:not([hidden])', { timeout: 4000 });
+  const upSheet = await page.evaluate(() => ({
+    title: document.getElementById('update-title').textContent,
+    ver: [...document.querySelectorAll('#update-version span')].map((e) => e.textContent).join(' '),
+    heads: document.querySelectorAll('#update-notes .notes-head').length,
+    items: [...document.querySelectorAll('#update-notes .notes-list li')].map((e) => e.textContent),
+    bold: document.querySelectorAll('#update-notes strong').length,
+    raw: document.getElementById('update-notes').textContent.includes('**'),
+    go: document.getElementById('update-go').textContent,
+    badge: Boolean(document.querySelector('#update-sheet .update-badge svg')),
+  }));
+  check('새 버전 시트: 제목 · 지금 → 새 버전 · 바뀐 점은 제목 줄 + 항목 줄 (** 표시 없이 굵게) · 받아서 설치',
+    upSheet.title === '새 버전이 나왔어요' && /^v0\.1\.0-dev → v0\.2\.0$/.test(upSheet.ver) && upSheet.heads === 1 && upSheet.items.length === 3 && upSheet.bold >= 1 && !upSheet.raw && upSheet.go === '받아서 설치' && upSheet.badge, JSON.stringify(upSheet));
+  await shot('09-update-sheet');
+  await page.tap('#update-go');
+  await page.waitForTimeout(150);
+  await page.evaluate(() => window.__mk.emit('update', { done: 500, total: 1000 }));
+  await page.waitForTimeout(150);
+  const prog = await page.evaluate(() => ({ shown: !document.getElementById('update-progress').hidden, text: document.getElementById('update-progress-text').textContent, go: document.getElementById('update-go').disabled, bar: document.getElementById('update-bar-fill').style.transform }));
+  check('받는 중: 진행률 막대 · "50% · …" · 단추는 잠깐 눌리지 않음', prog.shown && /^50%/.test(prog.text) && prog.go && prog.bar === 'scaleX(0.5)', JSON.stringify(prog));
+  await page.waitForFunction(() => !document.getElementById('update-hint').hidden, null, { timeout: 4000 });
+  const perm = await page.evaluate(() => ({ hint: document.getElementById('update-hint').textContent, go: document.getElementById('update-go').textContent, title: document.getElementById('update-title').textContent }));
+  check('설치 허용이 꺼져 있으면: 허용 화면을 열었다고 알리고 "설치하기" 로 다시', /출처 허용/.test(perm.hint) && perm.go === '설치하기' && perm.title === '설치할 준비가 됐어요', JSON.stringify(perm));
+  await post('/dev/update', { install: 'started' });
+  await page.tap('#update-go');
+  await page.waitForTimeout(400);
+  const started = await page.evaluate(() => ({ note: document.getElementById('update-note').textContent, go: document.getElementById('update-go').textContent, hintHidden: document.getElementById('update-hint').hidden }));
+  check('허용한 뒤 누르면 안드로이드 설치 화면으로 (받은 것을 다시 받지 않음)', /설치 화면/.test(started.note) && started.hintHidden && (await devLog()).update.downloads === 1, JSON.stringify(started));
+  await page.tap('#update-later');
+  await page.waitForTimeout(300);
+  check('"나중에" 로 시트를 닫으면 설정으로 돌아옴', !(await page.isVisible('#update-sheet')) && await page.isVisible('#settings-sheet'));
+  await page.evaluate(() => window.__mk.back());
+  await page.waitForTimeout(300);
+  if (await page.isVisible('#settings-sheet')) await page.evaluate(() => window.__mk.back());
+  await page.waitForTimeout(300);
+
   // 다크 모드
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.waitForTimeout(200);

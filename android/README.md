@@ -10,6 +10,9 @@ PC 메모킹과 **같은 메모 폴더 형식**을 그대로 쓰는 휴대폰 �
 2. 휴대폰으로 APK를 옮겨 열면 설치됩니다. 처음에는 "출처를 알 수 없는 앱 설치"를 허용해야 해요.
 3. 직접 빌드하려면 아래 [개발](#개발) 참고.
 
+4. **0.32.0 부터는 앱이 알아서 새 버전을 알려 줘요.** 켤 때 조용히(6시간에 한 번) 공개 배포 저장소 `memoking-releases` 의 `android-latest.json` 을 보고, 새 버전이 있으면 "바뀐 점 · 받아서 설치" 시트가 떠요 → 받고(크기 · SHA-256 확인) → 안드로이드 설치 화면에서 **업데이트** 한 번. 설정 맨 위의 **업데이트 확인** 으로 직접 볼 수도 있어요. 처음 한 번 "이 출처 허용"(메모킹이 앱을 설치하도록)을 켜야 하고, 메모는 그대로예요. (0.31.0 이하는 이 기능이 없어서 이번만 직접 설치)
+   - 배포: `.github/workflows/android.yml` 이 **main** 에서 APK 를 만들면 `memoking-releases` 의 사전 배포 `android` 에 `MemoKing-android.apk` · `android-latest.json` 을 올려요 (PC 와 같은 Secret `MEMOKING_RELEASES_TOKEN`). 새 버전으로 알려지려면 `app/build.gradle.kts` 의 **versionCode 를 올려야** 해요.
+
 > APK는 저장소에 고정한 디버그 키로 서명돼서, 새로 빌드한 APK를 지우지 않고 업데이트로 설치할 수 있어요. (0.1.0 을 설치했었다면 서명이 달라 한 번은 지우고 설치해야 해요.) Play 스토어에 올릴 때는 릴리스 서명 키를 따로 만드세요.
 
 ## 처음 실행: 메모 폴더 고르기
@@ -94,6 +97,7 @@ android/
     Alarms.kt            예약 알림을 시스템 알람에 맡기기 · 알림 띄우기 · 재부팅 뒤 다시 걸기
     NotiService.kt       알림 보관함: 다른 앱 알림 모으기 (NotificationListenerService) · 앱 아이콘
     Http.kt              링크 미리보기·인터넷 사진 받기
+    AppUpdate.kt         앱 안 업데이트: 새 버전 확인 · APK 받기(SHA-256) · 설치 화면 넘기기 (PackageInstaller)
     RecorderService.kt   녹음 (포그라운드 서비스 · AudioRecord → AAC .m4a · 끝난 녹음 보관)
     Stt.kt               받아쓰기: 휴대폰 Google 음성 인식 · 소리 파일 받아쓰기
   app/src/main/java/android/print/PdfPrint.kt  인쇄 화면 없이 메모를 PDF 파일로

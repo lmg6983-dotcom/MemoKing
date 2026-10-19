@@ -11,6 +11,7 @@ import { memoBodyFromFile } from './core/file-memo.js';
 import { isTextDocument } from './core/markdown-import.js';
 import { setupRemindersTab } from './list-reminders.js';
 import { setupHistoryTab } from './list-history.js';
+import { renderReleaseNotes } from './release-notes-view.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
@@ -1585,8 +1586,21 @@ function renderUpdateDialog(st) {
   const ready = st.status === 'ready';
   const downloading = st.status === 'downloading';
   updateEl.title.textContent = ready ? '설치할 준비가 됐어요' : '새 버전이 나왔어요';
-  updateEl.version.textContent = `v${st.current ?? ''} → v${st.version ?? ''}`;
-  updateEl.notes.textContent = st.notes || '바뀐 점이 적혀 있지 않아요';
+  // "v0.44.0 → v0.45.0": 지금 버전은 흐리게, 새 버전은 또렷하게 (화면 읽기 프로그램에는 "에서 로" 로 읽힌다)
+  const from = document.createElement('span');
+  from.className = 'from';
+  from.textContent = `v${st.current ?? ''}`;
+  const arrow = document.createElement('span');
+  arrow.className = 'arrow';
+  arrow.setAttribute('aria-hidden', 'true');
+  arrow.textContent = '→';
+  const to = document.createElement('span');
+  to.className = 'to';
+  to.textContent = `v${st.version ?? ''}`;
+  updateEl.version.replaceChildren(from, arrow, to);
+  updateEl.version.setAttribute('aria-label', `지금 ${from.textContent} 에서 ${to.textContent} 으로`);
+  renderReleaseNotes(updateEl.notes, st.notes);
+  updateEl.notes.scrollTop = 0;
   updateEl.progress.hidden = !downloading;
   updateEl.fill.style.transform = `scaleX(${Math.max(0, Math.min(100, st.percent ?? 0)) / 100})`;
   updateEl.progressText.textContent = downloading

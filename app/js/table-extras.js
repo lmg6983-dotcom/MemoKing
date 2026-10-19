@@ -552,8 +552,19 @@ function rowInline(row, schema) {
   return parts;
 }
 
+/** 표의 행마다 한 줄(칸은 · 로 이어서) 문단들 — 내용이 하나도 없으면 빈 문단 하나 */
+export function tableLines(table, schema) {
+  const lines = [];
+  table.forEach((row) => {
+    const inline = rowInline(row, schema);
+    if (inline.length) lines.push(schema.nodes.paragraph.create(null, inline));
+  });
+  if (!lines.length) lines.push(schema.nodes.paragraph.create());
+  return lines;
+}
+
 /**
- * 커서가 든 표를 점 목록(kind 'list') 또는 글 줄(kind 'text')로 바꾼다 — 행마다 한 줄
+ * 커서가 든 표를 점 목록(kind 'list') · 체크리스트(kind 'task', 모두 체크 안 한 채) 또는 글 줄(kind 'text')로 바꾼다 — 행마다 한 줄
  * @returns {true|string}
  */
 export function tableToBlocks(state, dispatch, kind) {
@@ -561,14 +572,9 @@ export function tableToBlocks(state, dispatch, kind) {
   if (!t) return '표 안에 커서를 두세요';
   if (!dispatch) return true;
   const { schema } = state;
-  const lines = [];
-  t.node.forEach((row) => {
-    const inline = rowInline(row, schema);
-    if (inline.length) lines.push(schema.nodes.paragraph.create(null, inline));
-  });
-  if (!lines.length) lines.push(schema.nodes.paragraph.create());
-  const blocks = kind === 'list'
-    ? [schema.nodes.bullet_list.create(null, lines.map((p) => schema.nodes.list_item.create({ listType: 'bullet' }, p)))]
+  const lines = tableLines(t.node, schema);
+  const blocks = kind === 'list' || kind === 'task'
+    ? [schema.nodes.bullet_list.create(null, lines.map((p) => schema.nodes.list_item.create(kind === 'task' ? { listType: 'bullet', checked: false } : { listType: 'bullet' }, p)))]
     : lines;
   const tr = state.tr.replaceWith(t.pos, t.pos + t.node.nodeSize, blocks);
   tr.setSelection(TextSelection.near(tr.doc.resolve(t.pos + 1)));

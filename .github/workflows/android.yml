@@ -67,3 +67,34 @@ jobs:
           else
             gh release create android MemoKing-android.apk --title "메모킹 안드로이드 (최신)" --notes "$notes" --prerelease --target "$GITHUB_SHA"
           fi
+
+      # 앱 안 업데이트(휴대폰의 "새 버전이 있어요")가 보는 곳 — 공개 배포 저장소(memoking-releases)의 릴리스 "android" 에
+      #   MemoKing-android.apk 와 android-latest.json(버전 · 크기 · SHA-256 · 바뀐 점)을 올린다. PC 설치 파일과 같은 저장소 · 같은 토큰
+      #   (Secrets 의 MEMOKING_RELEASES_TOKEN — memoking-releases 하나에만 Contents 쓰기). "prerelease" 라서 PC 의 "최신 릴리스" 링크 · 자동 업데이트를 건드리지 않는다
+      #   main 에서 만든 것만 (다른 가지의 시험 빌드가 모두의 업데이트로 나가지 않게), 이미 올라간 것보다 낮은 버전이면 올리지 않는다 (예전 실행을 다시 돌려도 되돌아가지 않게)
+      - name: 앱 안 업데이트용으로 공개 배포 저장소에 올리기
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
+          RELEASES_REPO: lmg6983-dotcom/memoking-releases
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::Secrets 에 MEMOKING_RELEASES_TOKEN 이 없어 앱 안 업데이트용 파일은 올리지 않았어요 (README 의 '자동 업데이트 배포' 참고)"
+            exit 0
+          fi
+          cp android/app/build/outputs/apk/debug/app-debug.apk MemoKing-android.apk
+          node scripts/android-update-info.mjs MemoKing-android.apk android-latest.json
+          new_code=$(node -p "require('./android-latest.json').versionCode")
+          old_code=$(curl -fsSL "https://github.com/${RELEASES_REPO}/releases/download/android/android-latest.json" 2>/dev/null | node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{try{console.log(JSON.parse(t).versionCode||0)}catch{console.log(0)}})' || echo 0)
+          if [ "${old_code:-0}" -gt "$new_code" ]; then
+            echo "::warning::이미 올라간 버전(versionCode ${old_code})이 이번 빌드(${new_code})보다 높아 올리지 않아요"
+            exit 0
+          fi
+          notes="메모킹 안드로이드 앱 안 업데이트용 (versionCode ${new_code}). 휴대폰은 앱이 알아서 확인해요 — 직접 설치하려면 MemoKing-android.apk 를 눌러요."
+          if ! gh release view android --repo "$RELEASES_REPO" >/dev/null 2>&1; then
+            gh release create android --repo "$RELEASES_REPO" --title "메모킹 안드로이드 (최신)" --notes "$notes" --prerelease --latest=false
+          fi
+          gh release upload android MemoKing-android.apk android-latest.json --repo "$RELEASES_REPO" --clobber
+          gh release edit android --repo "$RELEASES_REPO" --notes "$notes" --prerelease --latest=false
+          echo "올렸어요: https://github.com/${RELEASES_REPO}/releases/tag/android"

@@ -20,7 +20,7 @@ import { mediaKindOf } from './core/memo-file.js';
 import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
 import { showDeleteButton, showContentMenu, hideDeleteButton, hideDeleteIfChanged, deleteShownFor } from './delete-button.js';
-import { canMenu } from './copy-content.js';
+import { canMenu, canDragOut, dragOutBlock } from './copy-content.js';
 import { haptic } from './dom.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
@@ -300,6 +300,17 @@ function openerOf(dom, kind) {
     },
   };
 }
+// 메모 밖으로 끌어낼 수 있는 내용(파일이 있는 것): 그림 · 손 메모 · 파일 칩 · 소리/동영상 · 음성 카드
+const DRAG_OUT_HOST = 'img.mk-image, .mk-ink img, a[data-file], .mk-media-label';
+/** 끌어낼 내용이면 받는 쪽에 보일 이름과 함께 { name } (아니면 null) — 칩은 칩에 적힌 이름 그대로, 그림 · 영상은 설명 글(alt) */
+function dragOutInfo(dom, from = null) {
+  if (!(dom instanceof Element)) return null;
+  const host = from ?? (dom.matches(DRAG_OUT_HOST) ? dom : dom.querySelector(DRAG_OUT_HOST));
+  if (!host && !dom.matches('.mk-voice')) return null;
+  const chip = host?.closest('a[data-file]');
+  const alt = host?.getAttribute?.('alt') || host?.closest?.('.mk-media')?.querySelector('.mk-media-label')?.textContent || '';
+  return { name: (chip ? chip.textContent : alt).replace(/^동영상\s+/, '').trim() };
+}
 const HOLD_SHOW_MS = 450;
 const TAP_SHOW_MS = 5000;
 
@@ -500,6 +511,23 @@ class Mover {
       };
       view.dom.addEventListener('contextmenu', this.onContextMenu, true);
     }
+    // PC: 그림 · 파일 칩 · 소리 · 동영상을 잡고 메모 밖(탐색기 · 바탕화면 · 카카오톡)으로 끌면 그 파일이 복사돼 간다
+    //   (메모 안에서 순서를 바꾸는 것은 꾹 눌러 들어 올리기 — block-move 가 따로 한다. 이 끌기는 창 밖 프로그램용)
+    if (canDragOut()) {
+      this.onDragStart = (e) => {
+        if (this.busy() || e.defaultPrevented) return;
+        const host = e.target instanceof Element ? e.target.closest('img.mk-image, .mk-ink img, a[data-file], .mk-media-label') : null;
+        if (!host || !view.dom.contains(host)) return;
+        const block = blockFromTarget(view, host);
+        if (!block || !isContentBlock(block.node)) return;
+        const dom = view.nodeDOM(block.pos);
+        e.preventDefault(); // 편집기 안에서 옮기는 기본 끌기 대신 (옮기기는 꾹 누르기)
+        e.stopPropagation();
+        hideDeleteButton(true);
+        dragOutBlock(view, block.pos, block.node, dom instanceof Element ? dom : host, dragOutInfo(dom, host)?.name ?? '').catch((err) => console.warn('끌어내기', err));
+      };
+      view.dom.addEventListener('dragstart', this.onDragStart, true);
+    }
   }
 
   /** 마우스가 내용에서 떠나면 조금 뒤 단추를 거둔다 (× 로 옮겨 가는 사이에는 그대로) */
@@ -661,6 +689,7 @@ class Mover {
       e.preventDefault(); // 터치: 스크롤 대신 끌기
       e.stopPropagation(); // 편집기의 글자 고르기 늘리기를 막는다
       const pt = pointOf(e);
+      if (this.tryDragOut(d, pt)) return;
       d.x = pt.clientX;
       d.y = pt.clientY;
       if (!d.raf) {
@@ -703,6 +732,25 @@ class Mover {
         this.judge();
       }
     }, 30);
+  }
+
+  /**
+   * PC: 들어 올린 내용을 잡은 채 마우스가 창 밖으로 나가면 순서 바꾸기는 접고, 그 파일을 탐색기 · 바탕화면 · 카카오톡 같은
+   * 다른 프로그램으로 끌어낸다 (복사본이 간다 — 메모의 것은 그대로). 파일이 없는 내용(글 · 수식 · 링크 카드)은 해당 없음
+   */
+  tryDragOut(d, pt) {
+    if (d.kind !== 'mouse' || !canDragOut() || d !== this.drag) return false;
+    const m = 2;
+    if (pt.clientX > -m && pt.clientY > -m && pt.clientX < window.innerWidth + m && pt.clientY < window.innerHeight + m) return false;
+    const { view } = this;
+    const block = blockInfo(view.state.doc, d.block.pos, d.block.inner);
+    const dom = block ? view.nodeDOM(block.pos) : null;
+    const info = block && isContentBlock(block.node) ? dragOutInfo(dom) : null;
+    if (!info) return false;
+    this.finish(false); // 들어 올린 것을 제자리에 내려놓고
+    hideDeleteButton(true);
+    dragOutBlock(view, block.pos, block.node, dom, info.name).catch((err) => console.warn('끌어내기', err));
+    return true;
   }
 
   // ---------- 끄는 동안: 어디에 놓일지 판정 · 미리 보기 ----------
@@ -939,6 +987,7 @@ class Mover {
       this.view.dom.removeEventListener('mouseleave', this.onHoverOut);
     }
     if (this.onContextMenu) this.view.dom.removeEventListener('contextmenu', this.onContextMenu, true);
+    if (this.onDragStart) this.view.dom.removeEventListener('dragstart', this.onDragStart, true);
     clearTimeout(this.hoverTimer);
     this.cancelPress();
     if (this.drag) this.finish(false);

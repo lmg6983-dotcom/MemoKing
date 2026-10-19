@@ -36,10 +36,7 @@ body, .note-screen, .share-paper {
 }
 .bar button { -webkit-app-region: no-drag; }
 .bar .status.bubbled { color: transparent; } /* 같은 말이 위 말풍선에 다 보이는 동안 (status-bubble.js) */
-.bar .status.clipped { text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; } /* 잘렸어요 — 옆 단추로 끝까지 */
-.status-more { width: 24px; height: 24px; flex: none; color: var(--note-muted); }
-.status-more svg { width: 16px; height: 16px; }
-.status-more[aria-pressed="true"] { color: var(--note-text); }
+.bar .status.clipped { text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; -webkit-app-region: no-drag; cursor: default; } /* 잘렸어요 — 마우스를 올려 두면 전문(title). drag 영역은 마우스가 닿지 않아 이때만 no-drag */
 .status {
   flex: 1;
   min-width: 0;
@@ -200,6 +197,8 @@ body, .note-screen, .share-paper {
 body[data-color="yellow"] .mk-doc a { text-decoration-color: rgba(17, 17, 17, 0.45); }
 body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-black); }
 .mk-doc .ProseMirror-selectednode { outline: 2px solid var(--note-accent); outline-offset: 2px; border-radius: 4px; }
+/* 메모 창이 비활성(다른 창으로 감)이면 고른 내용의 테두리는 없다 — 활성 창의 선택과 헷갈리지 않게 */
+body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .mk-ink.ProseMirror-selectednode img { outline: none; }
 
 /* 빈 메모 안내 문구 */
 .editor.is-empty .mk-doc > p:first-child::before {
