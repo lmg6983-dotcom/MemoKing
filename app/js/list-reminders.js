@@ -856,9 +856,10 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     refresh,
     // + 단추 (휴대폰 일정 탭): 고른 날에 새 일정 — 지난 날을 골라 두었으면 오늘
     addEvent: () => quickAdd(selected >= today() ? selected : today()),
-    setQuery(q) {
+    /** @param {{ quiet?: boolean }} [o] quiet: 그리지 않고 검색어만 (곧 refresh 가 그릴 때 — 달력을 두 번 그리지 않게) */
+    setQuery(q, { quiet = false } = {}) {
       query = q;
-      render();
+      if (!quiet) render();
     },
   };
 }

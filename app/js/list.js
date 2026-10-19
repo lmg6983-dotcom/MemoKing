@@ -109,6 +109,7 @@ function closeOnlyFiles() {
 // ---------- 목록 ----------
 
 let renderPending = false;
+let memosStale = false; // 메모 탭이 덮인 동안 메모가 바뀌었다 (돌아오면 다시 그린다)
 let glide = false; // 카드 모양을 바꿀 때는 glideCards 가 움직임을 맡는다
 
 function render() {
@@ -118,6 +119,7 @@ function render() {
     return;
   }
   renderPending = false;
+  memosStale = false;
   // 동기화 충돌 사본만 보기 (위쪽 구름 단추 · 설정의 "충돌 사본 보기") — 검색 · 필터와 겹치지 않게 따로, 다 지우면 저절로 풀린다
   let only = null;
   if (state.onlyFiles) {
@@ -1054,16 +1056,26 @@ attachSlider(document.querySelector('.tabs'), { className: 'tab-indicator' });
 
 function showTab(tab) {
   if (!TAB_PLACEHOLDER[tab]) return;
+  // 메모 탭을 떠날 때: 일정 · 보관함이 메모 칸과 같은 자리 · 크기로 그 위를 덮는다 (list.css) — 돌아올 때 카드 배치를 처음부터 다시 계산하지 않게
+  const memosView = $('view-memos');
+  if (tab !== 'memos' && !memosView.hidden) {
+    el.main.style.setProperty('--park-top', `${memosView.offsetTop}px`);
+  }
   activeTab = tab;
   for (const b of document.querySelectorAll('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   syncTabStops(document.querySelector('.tabs'));
-  for (const name of Object.keys(TAB_PLACEHOLDER)) $(`view-${name}`).hidden = name !== tab;
+  for (const name of Object.keys(TAB_PLACEHOLDER)) if (name !== 'memos') $(`view-${name}`).hidden = name !== tab;
+  // 메모 칸은 숨기지 않고 덮는다 (누르기 · Tab · 화면 읽기 프로그램에서는 빠짐)
+  memosView.inert = tab !== 'memos';
+  memosView.classList.toggle('covered', tab !== 'memos');
   document.body.dataset.tab = tab;
   el.search.placeholder = TAB_PLACEHOLDER[tab];
   el.search.value = '';
-  if (tab === 'memos') runSearch();
+  // 메모 탭으로 돌아올 때: 그사이 바뀐 것이 없으면 다시 그리지 않는다 (숨겨 둔 카드는 그대로 남아 있다)
+  //   — 늘 모든 카드를 다시 쌓아(배치 계산) 탭의 표시가 미끄러지는 동안 화면이 멈칫했다
+  if (tab === 'memos' && (memosStale || state.query || lastCols !== columnsFor(el.cards.clientWidth || window.innerWidth))) runSearch();
   if (tab === 'reminders') {
-    remindersTab.setQuery('');
+    remindersTab.setQuery('', { quiet: true });
     remindersTab.refresh();
   }
   if (tab === 'history') historyTab.setQuery('');
@@ -1290,7 +1302,10 @@ api.on('memos:changed', (memos) => {
   const hb = $('handoff-bar');
   if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;
   $('count-memos').textContent = String(memos.length);
-  if (activeTab !== 'memos') return remindersTab.refresh(); // 메모 제목이 바뀌면 알림 탭에도
+  if (activeTab !== 'memos') {
+    memosStale = true; // 메모 탭으로 돌아오면 다시 그린다
+    return remindersTab.refresh(); // 메모 제목이 바뀌면 알림 탭에도
+  }
   if (state.query) runSearch();
   else render();
 });

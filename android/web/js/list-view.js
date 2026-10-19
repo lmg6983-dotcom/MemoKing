@@ -360,8 +360,10 @@ function setTab(tab) {
   $('fab').setAttribute('aria-label', tab === 'reminders' ? '새 일정' : '새 메모');
   if (tab === 'reminders') $('fab').removeAttribute('aria-haspopup');
   else $('fab').setAttribute('aria-haspopup', 'menu');
-  if (tab === 'reminders') remindersTab.refresh();
-  runSearch();
+  if (tab === 'reminders') {
+    remindersTab.setQuery(el.search.value, { quiet: true }); // 달력은 refresh 가 한 번만 그린다
+    remindersTab.refresh();
+  } else runSearch();
 }
 tabKeys(document.querySelector('.tabs'));
 document.querySelector('.tabs').addEventListener('click', (e) => {
