@@ -414,11 +414,25 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .note-screen .format-bar button:disabled { opacity: 0.32; }
 .note-screen .format-bar button.active { background: color-mix(in srgb, var(--note-text) 14%, transparent); color: var(--note-text); }
 .note-screen .table-bar { overflow-x: auto; }
-/* 표 막대: PC 와 같은 묶음(note.css .table-bar.grouped), 손가락 크기로 */
-.note-screen .table-bar.grouped { gap: 6px; padding: 6px 10px; }
-.note-screen .table-bar.grouped .tb-name { font-size: 12px; padding: 0 6px 0 8px; }
-.note-screen .table-bar.grouped button { height: var(--tap); padding: 0 12px 0 10px; font-size: 13.5px; gap: 6px; }
-.note-screen .table-bar.grouped button svg { width: 18px; height: 18px; }
+/* 표 막대 (UX 비평 반영): 예전엔 이름 + 글자 단추가 4줄로 감겨 화면 아래 ¼ 가까이를 차지했다 →
+   ① 자주 쓰는 행 · 열 · 칸(머리글/병합)은 아이콘만으로 한 줄 ② 덜 쓰는 표 · 바꾸기는 "⋯" 로 위로 펼치는 작은 판 (글자 이름 그대로). 이름은 title · aria-label 로 */
+.note-screen .table-bar.grouped { position: relative; display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; padding: 6px 10px; overflow: visible; }
+.note-screen .table-bar.grouped > .tb-group { flex: 1 1 0; min-width: 0; }
+.note-screen .table-bar.grouped > .tb-group .tb-name, .note-screen .table-bar.grouped > .tb-group .lbl { display: none; }
+.note-screen .table-bar.grouped > .tb-group button { flex: 1 1 0; min-width: 0; justify-content: center; height: var(--tap); padding: 0; gap: 0; }
+.note-screen .table-bar.grouped button svg { width: 20px; height: 20px; }
+.note-screen .table-bar.grouped .tb-more-btn { flex: none; width: var(--tap); height: var(--tap); padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; }
+.note-screen .table-bar.grouped .tb-more-btn svg { fill: currentColor; stroke: none; }
+.note-screen .table-bar.grouped .tb-more-btn[aria-expanded="true"] { background: var(--note-hover); }
+.note-screen .table-bar.grouped .tb-more { display: none; }
+.note-screen .table-bar.grouped.more-open .tb-more {
+  display: flex; flex-direction: column; gap: 4px; position: absolute; left: 10px; right: 10px; bottom: calc(100% + 6px); z-index: 80;
+  padding: 6px; border-radius: 12px; background: var(--note-bg, var(--bg)); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
+}
+.note-screen .table-bar.grouped.more-open .tb-more .tb-group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.note-screen .table-bar.grouped.more-open .tb-more .tb-name { display: inline; }
+.note-screen .table-bar.grouped.more-open .tb-more .lbl { display: inline; }
+.note-screen .table-bar.grouped.more-open .tb-more button { flex: 1 1 auto; height: var(--tap); padding: 0 10px; font-size: 13.5px; gap: 6px; justify-content: center; }
 .note-screen .palette { width: min(300px, calc(100vw - 24px)); }
 .note-screen .palette-swatch { min-height: 36px; }
 .note-screen .tag-suggest-item { min-height: var(--tap); font-size: 15px; }

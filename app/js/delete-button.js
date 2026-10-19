@@ -2,7 +2,7 @@ import { haptic } from './dom.js';
 import { copyBlock, saveBlock, shareBlock, canShare } from './copy-content.js';
 import { SHARE_DONE, isShareMenuOpen } from './share-menu.js';
 import { openContextMenu } from './ctx-menu.js';
-import { COPY_ICON, DONE_ICON, FAIL_ICON, SHARE_ICON, OPEN_ICON, SAVE_ICON, TRASH_ICON, CLOSE_ICON } from './content-icons.js';
+import { CUT_ICON, COPY_ICON, DONE_ICON, FAIL_ICON, SHARE_ICON, OPEN_ICON, SAVE_ICON, TRASH_ICON, CLOSE_ICON } from './content-icons.js';
 // 내용(그림 · 파일 · 표 …)의 복사 · 저장 · 공유 · 지우기 — 두 가지 모양
 //   휴대폰(손가락): 꾹 눌렀다 놓거나 짧게 누른 내용의 오른쪽 위에 단추 줄이 잠깐 (showDeleteButton) — 흰 동그라미에 빨간 ×.
 //     한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
@@ -132,6 +132,7 @@ export async function showContentMenu(view, opts, at) {
   hideDeleteButton(true);
   const verb = (v) => label.replace(/지우기$/, v); // "이 표 지우기" → "이 표 복사"
   const icons = [
+    { id: 'cut', icon: CUT_ICON, label: verb('잘라내기') }, // 복사한 뒤 지움 (Ctrl+Z 로 되돌림)
     { id: 'copy', icon: COPY_ICON, label: copyLabel ?? verb('복사') },
     { id: 'save', icon: SAVE_ICON, label: `${verb('저장')}…` },
     ...(canShare() ? [{ id: 'share', icon: SHARE_ICON, label: `${verb('공유')}…` }] : []),
@@ -145,6 +146,19 @@ export async function showContentMenu(view, opts, at) {
   if (view.state.doc.nodeAt(pos) !== node) return true;
   if (id === 'open') return open.run(), true;
   if (id === 'delete') return deleteContent(view, opts, { undo: true }), true;
+  if (id === 'cut') {
+    // 복사가 끝난 뒤에만 지운다 (복사하지 못했으면 지우지 않는다)
+    try {
+      if (await copyBlock(view, pos, node, target) === 'cancelled') return true;
+    } catch (err) {
+      console.warn('content cut', err);
+      announce(failText(null, err));
+      notice('복사하지 못해 잘라내지 않았어요', true);
+      return true;
+    }
+    if (view.isDestroyed || view.state.doc.nodeAt(pos) !== node) return true;
+    return deleteContent(view, opts, { undo: true }), true;
+  }
   const [run, done, act] = {
     copy: [() => copyBlock(view, pos, node, target), COPY_DONE, null],
     save: [() => saveBlock(view, pos, node, target), SAVE_DONE, '저장'],

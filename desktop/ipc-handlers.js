@@ -984,7 +984,7 @@ export function registerIpc(ctx) {
     const drive = getDriveAuth()?.connected ?? false;
     const localSend = Boolean(findLocalSend());
     return [
-      { id: 'drive', label: 'Google Drive 링크', sub: drive ? '올리고 링크를 복사해요 (링크가 있는 사람은 보기)' : '설정에서 Google Drive 를 연결하면 쓸 수 있어요', ready: drive },
+      { id: 'drive', label: 'Google Drive 링크', sub: drive ? '올리고 링크를 복사해요 (링크가 있는 사람은 보기)' : '아직 연결 전이에요 — 눌러서 설정에서 연결하기', ready: drive, connect: !drive },
       { id: 'localsend', label: 'LocalSend', sub: localSend ? '같은 와이파이의 휴대폰 · PC 로 바로 (오픈소스)' : '무료 오픈소스 앱 — 누르면 내려받기 페이지를 열어요', ready: true },
       { id: 'mail', label: '메일에 첨부', sub: '기본 메일 앱(Outlook 등)의 새 메일에', ready: process.platform === 'win32' || SMOKE },
     ];
@@ -1073,6 +1073,12 @@ export function registerIpc(ctx) {
 
   // ---------- 스택 (탭) ----------
   ipcMain.handle('win:close', (event) => senderWindow(event)?.close());
+  // 탭 줄 안에서 끌어 순서 바꾸기
+  ipcMain.handle('stack:reorder', (_e, id, index) => {
+    const stack = wm.stacks?.reorder(String(id), index);
+    if (stack) wm.pushStackTo(stack.memos);
+    return Boolean(stack);
+  });
   ipcMain.handle('stack:activate', (_e, id) => Boolean(wm.openNote(String(id))));
   const newTabAfter = (fromId) => {
     const vault = getVault();

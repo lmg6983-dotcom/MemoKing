@@ -351,7 +351,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         list.webContents.sendInputEvent({ type: 'mouseUp', x: at.x, y: at.y, button: 'right', clickCount: 1 });
         const shape = await until(() => js(list, `(() => { const m = document.querySelector('.mk-ctx'); return m && { icons: [...m.querySelectorAll('.mk-ctx-ic')].map((b) => b.dataset.id), items: [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.dataset.id), dots: m.querySelectorAll('.mk-ctx-sw').length, native: false }; })()`), '목록 카드 메뉴').catch(() => null);
         check('목록 카드 오른쪽 클릭: 맨 위 아이콘 줄(복사 · 공유 · PDF · 휴지통) + 열기 · 고정 · 색 점 7개 · 잠그기 · 이전 버전',
-          shape && shape.icons.join() === 'copy,share,pdf,trash' && shape.items.join() === 'open,pin,lock,versions' && shape.dots === 7, JSON.stringify(shape));
+          shape && shape.icons.join() === 'cut,copy,share,pdf,trash' && shape.items.join() === 'open,pin,lock,versions' && shape.dots === 7, JSON.stringify(shape));
         await capture(list, 'list-card-menu.png');
         const pickList = async (selector) => {
           const b = await js(list, `(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(${JSON.stringify(selector)}) !== null }; })()`);
@@ -476,9 +476,44 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const fileDone = fileMenu0 ? await pressCopy() : '';
       const fileCopy = smokeOpened.filter((o) => o.kind === 'copy-file').at(-1);
       check('PDF 파일: 오른쪽 클릭 → 메뉴 맨 위에 복사 · 저장 · 공유 · 지우기 아이콘 + "이 파일 열기", 복사 아이콘은 파일 그대로 클립보드에',
-        fileMenu0?.icons.join('|') === 'copy:이 파일 복사|save:이 파일 저장…|share:이 파일 공유…|delete:이 파일 지우기' && fileMenu0.items.join('|') === '이 파일 열기' && /파일을 복사했어요/.test(fileDone)
+        fileMenu0?.icons.join('|') === 'cut:이 파일 잘라내기|copy:이 파일 복사|save:이 파일 저장…|share:이 파일 공유…|delete:이 파일 지우기' && fileMenu0.items.join('|') === '이 파일 열기|이름 변경…' && /파일을 복사했어요/.test(fileDone)
           && smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1 && /안내 자료\.pdf$/.test(fileCopy?.target ?? ''),
         JSON.stringify({ fileMenu0, fileDone, fileCopy }));
+      // 파일 이름 변경: 메뉴 › 이름 변경… → 입력 창 → 칩 글자가 바뀜 (확장자는 지키고 · 쓸 수 없는 글자는 뺌) → 되돌려 둔다
+      {
+        const renameVia = async (typed) => {
+          if (!(await openMenu('.mk-doc a[data-file]'))) return false;
+          await clickMenu('.mk-ctx-item[data-id="rename"]');
+          await until(() => js(nw, `!!document.querySelector('.mk-prompt input')`), '이름 입력 창', 3000);
+          await js(nw, `(() => { const i = document.querySelector('.mk-prompt input'); i.value = ${JSON.stringify(typed)}; i.form.requestSubmit(); })()`);
+          return true;
+        };
+        const ok = await renameVia('새:안내*자료').catch(() => false);
+        const renamed = await until(() => js(nw, `document.querySelector('.mk-doc a[data-file]')?.textContent`).then((t) => t === '새 안내 자료.pdf' && t), '바뀐 칩 이름', 3000).catch(() => null);
+        const dialogGone = await js(nw, `!document.querySelector('.mk-prompt')`);
+        check('파일 이름 변경: 오른쪽 클릭 › 이름 변경… → 칩 이름이 바뀜 (확장자 유지 · 쓸 수 없는 글자는 공백으로)', ok && renamed === '새 안내 자료.pdf' && dialogGone, JSON.stringify({ ok, renamed, dialogGone }));
+        await renameVia('안내 자료.pdf').catch(() => {});
+        await until(() => js(nw, `document.querySelector('.mk-doc a[data-file]')?.textContent === '안내 자료.pdf'`), '칩 이름 되돌림', 3000).catch(() => {});
+      }
+      // 서식 막대: 파일 칩에 커서가 있으면 글 서식 단추는 쓸 수 없다 (content-fixed)
+      {
+        await js(nw, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); const r = document.createRange(); r.setStart(a.firstChild, 1); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new Event('selectionchange')); })()`);
+        const fixed = await until(() => js(nw, `document.body.classList.contains('content-fixed') && getComputedStyle(document.querySelector('[data-cmd="bold"]')).pointerEvents === 'none'`), '서식 막대 비활성', 3000).catch(() => false);
+        check('파일 칩을 고르면 글 서식 막대(굵게 · 기울임 …)는 쓸 수 없음', fixed);
+      }
+      // 잘라내기 아이콘: 복사한 뒤 지움 → Ctrl+Z 로 되돌림
+      {
+        const before = await js(nw, `document.querySelectorAll('.mk-doc a[data-file]').length`);
+        await openMenu('.mk-doc a[data-file]');
+        const copiesBefore = smokeOpened.filter((o) => o.kind === 'copy-file').length;
+        await clickMenu('.mk-ctx-ic[data-id="cut"]');
+        const gone = await until(() => js(nw, `document.querySelectorAll('.mk-doc a[data-file]').length === ${before - 1}`), '잘라낸 칩 사라짐', 3000).catch(() => false);
+        const copied = smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1;
+        await js(nw, `document.querySelector('.mk-doc').focus()`);
+        key(nw, 'Z', ['control']);
+        const back = await until(() => js(nw, `document.querySelectorAll('.mk-doc a[data-file]').length === ${before}`), 'Ctrl+Z 로 되살림', 3000).catch(() => false);
+        check('잘라내기 아이콘: 파일을 복사한 뒤 지우고, Ctrl+Z 로 되돌아옴', gone && copied && back, JSON.stringify({ before, gone, copied, back }));
+      }
       // PDF 저장: 파일 그대로
       await openMenu('.mk-doc a[data-file]');
       await clickMenu('.mk-ctx-ic[data-id="save"]');
@@ -491,8 +526,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const buttonsLeft = await js(nw, `document.querySelectorAll('.mk-ctx, .mk-delete-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn').length`);
       await js(nw, `document.querySelector('.mk-share-menu [data-via="mail"]')?.click()`);
       const sharedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'share').find((o) => o.via === 'mail' && /안내 자료\.pdf$/.test(o.target)), 'PDF 공유', 3000).catch(() => null);
-      check('공유 아이콘 → 방법 고르기(Drive 링크 · LocalSend · 메일, Windows 공유는 없음, Drive 는 연결 전엔 못 고름) · 그때 오른쪽 클릭 메뉴는 닫혀 남지 않음 → 그 파일',
-        shareShown && !/sheet/.test(menu) && /drive-/.test(menu) && /localsend/.test(menu) && /mail/.test(menu) && buttonsLeft === 0 && Boolean(sharedPdf), JSON.stringify({ shareShown, menu, buttonsLeft, sharedPdf }));
+      check('공유 아이콘 → 방법 고르기(Drive 링크 · LocalSend · 메일, Windows 공유는 없음, Drive 는 연결 전이면 흐리게 — 눌러서 연결하러 감) · 그때 오른쪽 클릭 메뉴는 닫혀 남지 않음 → 그 파일',
+        shareShown && !/sheet/.test(menu) && /drive(,|$)/.test(menu) && /localsend/.test(menu) && /mail/.test(menu) && buttonsLeft === 0 && Boolean(sharedPdf), JSON.stringify({ shareShown, menu, buttonsLeft, sharedPdf }));
       // Drive 링크를 복사하면 가운데 알림 + 폭죽
       const popped = await js(nw, `import('./js/share-menu.js').then(async (m) => { m.showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' }); await new Promise((r) => setTimeout(r, 300)); const p = document.querySelector('.mk-share-pop'); return { text: p?.innerText ?? '', confetti: Boolean(document.querySelector('canvas.mk-confetti')), z: p ? getComputedStyle(p).zIndex : '' }; })`);
       await capture(nw, 'smoke-new-share-pop.png');
@@ -603,7 +638,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const tableText = await clip('text/plain');
       const tableHtml = await clip('text/html');
       check('표: 오른쪽 클릭 → 맨 위 아이콘 줄 + 칸의 글 항목(잘라내기 · 복사 · 붙여넣기 …) + 표 바꾸기, 복사 아이콘은 칸 사이 탭 + 표 서식',
-        tableMenu?.icons.join('|') === 'copy:이 표 복사|save:이 표 저장…|share:이 표 공유…|delete:이 표 지우기' && /내용을 복사했어요/.test(tableDone) && /이름\t값\n가\t1/.test(tableText) && /<table/.test(tableHtml) && !/column-resize-handle|contenteditable/.test(tableHtml)
+        tableMenu?.icons.join('|') === 'cut:이 표 잘라내기|copy:이 표 복사|save:이 표 저장…|share:이 표 공유…|delete:이 표 지우기' && /내용을 복사했어요/.test(tableDone) && /이름\t값\n가\t1/.test(tableText) && /<table/.test(tableHtml) && !/column-resize-handle|contenteditable/.test(tableHtml)
           && ['잘라내기', '복사', '붙여넣기', '서식 없이 붙여넣기', '표를 목록으로', '표를 체크리스트로', '표를 글로', '열 너비 맞춤'].every((t) => tableMenu.items.includes(t)),
         JSON.stringify({ tableMenu, tableDone, tableText, html: tableHtml.slice(0, 200) }));
       // 표 저장: 엑셀에서 바로 열리는 CSV (한글이 깨지지 않게 BOM)
@@ -637,8 +672,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const focusId = () => js(nw, `document.activeElement?.dataset?.id ?? ''`);
       await key(nw, 'Right');
       await key(nw, 'Right');
+      await wait(60);
       const afterRight = await focusId();
       await key(nw, 'Down');
+      await wait(60);
       const afterDown = await focusId();
       await key(nw, 'Escape');
       await wait(200);

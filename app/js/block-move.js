@@ -24,6 +24,7 @@ import { canContentMenu, canDragOut, dragOutBlock } from './copy-content.js';
 import { tableAt } from './table-extras.js';
 import { isContextMenuOpen } from './ctx-menu.js';
 import { haptic } from './dom.js';
+import { renameTarget, renameContent, cleanName, promptName } from './rename-content.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
 
@@ -314,7 +315,19 @@ function dragOutInfo(dom, from = null) {
   return { name: (chip ? chip.textContent : alt).replace(/^동영상\s+/, '').trim() };
 }
 const HOLD_SHOW_MS = 450;
+const CLICK_MAX_MS = 350; // PC: 이보다 오래 누른 채면 "클릭" 이 아니라 옮기기 · 고르기 — 열지 않는다
 const TAP_SHOW_MS = 5000;
+
+/** 누른 곳이 스크롤 상자(표를 감싼 상자 등)의 스크롤바인가 — 스크롤바를 잡아 끄는 동안 줄 옮기기가 시작되지 않게 */
+function onScrollbar(event) {
+  const el = event.target;
+  if (!(el instanceof Element)) return false;
+  const r = el.getBoundingClientRect();
+  const x = event.clientX - r.left;
+  const y = event.clientY - r.top;
+  return (el.scrollHeight > el.clientHeight && el.offsetHeight - el.clientHeight - 2 * el.clientTop > 4 && y >= el.clientTop + el.clientHeight && y < el.offsetHeight)
+    || (el.scrollWidth > el.clientWidth && el.offsetWidth - el.clientWidth - 2 * el.clientLeft > 4 && x >= el.clientLeft + el.clientWidth && x < el.offsetWidth);
+}
 
 export function createBlockMove({ readOnly = false } = {}) {
   let mover = null;
@@ -353,6 +366,7 @@ export function createBlockMove({ readOnly = false } = {}) {
       handleDOMEvents: readOnly ? {} : {
         mousedown(view, event) {
           if (!canDrag()) return false; // 글 고치기 방식: 내용을 눌러도 옮기지 않는다
+          if (onScrollbar(event)) return false; // 표의 가로 스크롤바를 잡는 중에는 옮기지 않는다
           if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) mover?.press(event, 'mouse');
           return false; // 그냥 누르면 지금처럼 (고르기·열기)
         },
@@ -466,6 +480,23 @@ class Mover {
         if (!shown && !this.busy()) this.showDelete(block, { showMs: TAP_SHOW_MS });
       };
       view.dom.addEventListener('click', this.onOpenClick, true);
+    }
+    // PC: 열리는 내용(파일 칩 · 링크 카드 · 수식)은 짧게 눌렀다 뗄 때만 연다 — 오래 누르고 있다 떼면(옮기려다 만 것 등) 열지 않는다
+    if (canContentMenu()) {
+      let downAt = 0;
+      this.onOpenDown = (e) => {
+        downAt = e.button === 0 && e.target instanceof Element && e.target.closest(OPEN_TARGET) ? Date.now() : 0;
+      };
+      this.onLongClick = (e) => {
+        if (e.mkOpen || e.button !== 0 || !downAt) return;
+        const held = Date.now() - downAt;
+        downAt = 0;
+        if (held <= CLICK_MAX_MS || !(e.target instanceof Element) || !e.target.closest(OPEN_TARGET)) return;
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      view.dom.addEventListener('mousedown', this.onOpenDown, true);
+      view.dom.addEventListener('click', this.onLongClick, true);
     }
     // PC: 내용(그림 · 손 메모 · 소리 · 동영상 · 파일 · 링크 카드 · 수식 · 표)을 오른쪽 클릭하면 Windows 11 메뉴처럼 맨 위 한 줄에
     //   아이콘(복사 · 저장 · 공유 · 지우기)이 있는 메뉴 (ctx-menu.js). 예전에는 마우스를 올리면 단추가 떠서 표 칸을 가렸다.
@@ -876,7 +907,26 @@ class Mover {
     const target = media ?? (block.node.type.name === 'table' ? dom.closest('.tableWrapper') ?? dom.querySelector('.tableWrapper') ?? dom : dom);
     this.shownTarget = target;
     const copyLabel = block.node.type.name === 'mk_link_card' ? '링크 주소 복사' : null; // 카드 모양이 아니라 주소를
-    return { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
+    const opts = { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
+    // PC 메뉴: 파일 · 소리 · 그림 · 음성 카드는 보이는 이름을 바꿀 수 있다 (rename-content.js)
+    if (canContentMenu() && renameTarget(view.state.doc, block.pos, block.node)) {
+      opts.extraItems = [{ id: 'rename', label: '이름 변경…' }];
+      opts.onExtra = (id) => id === 'rename' && this.renameAt(block.pos, block.node);
+    }
+    return opts;
+  }
+
+  /** PC 메뉴 › 이름 변경…: 이름 입력 창 → 칩 글자 · 그림 설명을 새 이름으로 */
+  async renameAt(pos, node) {
+    const { view } = this;
+    const target = view.state.doc.nodeAt(pos) === node ? renameTarget(view.state.doc, pos, node) : null;
+    if (!target) return;
+    const input = await promptName({ title: target.kind === 'chip' ? '파일 이름 변경' : '이름 변경', value: target.name });
+    if (input == null || view.isDestroyed) return;
+    const name = cleanName(input, target.name, target.kind === 'chip');
+    const fresh = view.state.doc.nodeAt(pos) === node ? renameTarget(view.state.doc, pos, node) : null; // 입력 창이 떠 있는 동안 문서가 바뀌었을 수 있다
+    if (name && fresh && renameContent(view, fresh, name)) window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text: `이름을 "${name}" 으로 바꿨어요` } }));
+    view.focus();
   }
 
   /** PC: 표를 오른쪽 클릭했을 때 — 커서가 그 표 밖이면 누른 칸으로 옮긴다 (아래 메뉴의 표 바꾸기 · 칸 글 항목이 그 표에 듣도록). 키보드로 연 것은 커서가 이미 표 안 */
@@ -1032,6 +1082,10 @@ class Mover {
     this.view.dom.removeEventListener('touchstart', this.onScrubTouch, true);
     this.view.dom.removeEventListener('mk-lift-block', this.onLiftRequest);
     if (this.onOpenClick) this.view.dom.removeEventListener('click', this.onOpenClick, true);
+    if (this.onOpenDown) {
+      this.view.dom.removeEventListener('mousedown', this.onOpenDown, true);
+      this.view.dom.removeEventListener('click', this.onLongClick, true);
+    }
     if (this.onContextMenu) this.view.dom.removeEventListener('contextmenu', this.onContextMenu, true);
     if (this.onDragStart) this.view.dom.removeEventListener('dragstart', this.onDragStart, true);
     this.cancelPress();

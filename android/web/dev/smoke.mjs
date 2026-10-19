@@ -1584,6 +1584,17 @@ try {
   const tbGroups = await page.evaluate(() => [...document.querySelectorAll('#table-bar .tb-group')].map((g) => g.querySelector('.tb-name').textContent + ':' + [...g.querySelectorAll('button')].map((b) => b.dataset.table).join('/')));
   check('표 막대: 행 · 열 · 칸 · 표 · 바꾸기 묶음 (PC 와 같음), 표 지우기 단추는 없음',
     tbGroups.join(' ') === '행:addRow/delRow 열:addCol/delCol 칸:merge/accent 표:autoFit/splitTable/joinTable 바꾸기:toList/toTask/toText' && (await page.locator('#table-bar [data-table="delTable"]').count()) === 0, JSON.stringify(tbGroups));
+  // 표 막대는 한 줄 (예전엔 4줄로 감겨 화면 ¼ 가까이) — 덜 쓰는 도구는 "⋯" 로 위에 펼침
+  {
+    const h = await page.evaluate(() => Math.round(document.getElementById('table-bar').getBoundingClientRect().height));
+    const iconOnly = await page.evaluate(() => [...document.querySelectorAll('#table-bar > .tb-group button')].every((b) => b.getBoundingClientRect().width > 0 && !b.querySelector('.lbl')?.offsetParent));
+    const hiddenBefore = !(await page.isVisible('#table-bar [data-table="toList"]'));
+    await page.tap('#table-more-btn');
+    const open = await page.evaluate(() => { const m = document.getElementById('table-more').getBoundingClientRect(); const b = document.getElementById('table-bar').getBoundingClientRect(); return { above: m.bottom <= b.top + 1, h: Math.round(b.height), shown: m.height > 0 }; });
+    await shot('10-table-more');
+    await page.tap('#table-more-btn');
+    check('휴대폰 표 막대: 한 줄(80px 안) · 행 · 열 · 칸은 아이콘만 · 표 · 바꾸기는 "⋯" 로 막대 위에 펼쳐지고 막대 높이는 그대로', h > 0 && h <= 80 && iconOnly && hiddenBefore && open.shown && open.above && open.h === h, JSON.stringify({ h, iconOnly, hiddenBefore, open }));
+  }
   // 표를 고치는 동안 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽 밖에 (표를 가리지 않는 자리)
   {
     const geo = await page.evaluate(() => {
@@ -1597,6 +1608,7 @@ try {
     check('표 편집 중: 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽에 (표를 가리지 않음)', geo.btns.length >= 3 && !coverTable && rightSide && geo.btns.every((b) => b.vis !== 'hidden'), JSON.stringify(geo));
     await shot('10-table-buttons');
   }
+  await page.tap('#table-more-btn');
   await page.tap('#table-bar [data-table="splitTable"]');
   await page.waitForTimeout(900);
   const split = read('표 나누기.md');
@@ -1604,6 +1616,7 @@ try {
   await page.locator('.mk-doc td', { hasText: '사과' }).tap();
   await page.waitForTimeout(300);
   check('표 막대: 아래에 열 수가 같은 표가 있으면 "아래 표와 합치기" 를 누를 수 있음', await page.isEnabled('#table-bar [data-table="joinTable"]'));
+  await page.tap('#table-more-btn');
   await page.tap('#table-bar [data-table="joinTable"]');
   await page.waitForTimeout(900);
   const joined = read('표 나누기.md');
@@ -1614,6 +1627,7 @@ try {
   // 표 → 목록
   await page.locator('.mk-doc td', { hasText: '배' }).tap();
   await page.waitForTimeout(300);
+  await page.tap('#table-more-btn');
   await page.tap('#table-bar [data-table="toList"]');
   await page.waitForTimeout(900);
   const listed = read('표 나누기.md');

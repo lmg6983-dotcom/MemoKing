@@ -723,7 +723,7 @@ export async function runSmoke({
     const imgCount = () => js(webNote.win, `document.querySelectorAll('.mk-doc img.mk-image').length`);
     const beforeDel = await imgCount();
     const imgIcons = await ctxOf(webNote.win, '.mk-doc img.mk-image');
-    check('PC: 그림을 오른쪽 클릭 → 맨 위 아이콘 줄 (복사 · 저장 · 공유 · 지우기)', imgIcons?.length === 4 && imgIcons[3].startsWith('delete:'), JSON.stringify(imgIcons));
+    check('PC: 그림을 오른쪽 클릭 → 맨 위 아이콘 줄 (잘라내기 · 복사 · 저장 · 공유 · 지우기)', imgIcons?.length === 5 && imgIcons[4].startsWith('delete:'), JSON.stringify(imgIcons));
     await clickIcon(webNote.win, 'delete');
     const deleted = await until(async () => (await imgCount()) === beforeDel - 1, '그림 지우기').catch(() => false);
     check('PC: 메뉴의 지우기 아이콘을 누르면 그 그림이 지워짐', deleted, `${beforeDel} → ${await imgCount()}`);
@@ -875,7 +875,7 @@ export async function runSmoke({
     // 카드를 오른쪽 클릭하면 다른 내용과 같은 아이콘 줄 한 벌만 (카드에 따로 × 가 겹치지 않음) · 복사는 "링크 주소 복사"
     const cardIcons = await ctxOf(reopenedLink.win, '.mk-link-card .lc-main');
     const cardExtra = await js(reopenedLink.win, `document.querySelectorAll('.mk-link-card .lc-remove, .mk-delete-btn').length`);
-    check('링크 카드: 오른쪽 클릭 → 아이콘 줄 한 벌 · "링크 주소 복사"', cardIcons?.[0] === 'copy:링크 주소 복사' && cardIcons.at(-1).startsWith('delete:') && cardExtra <= 1, JSON.stringify({ cardIcons, cardExtra }));
+    check('링크 카드: 오른쪽 클릭 → 아이콘 줄 한 벌 · "링크 주소 복사"', cardIcons?.[1] === 'copy:링크 주소 복사' && cardIcons.at(-1).startsWith('delete:') && cardExtra <= 1, JSON.stringify({ cardIcons, cardExtra }));
     await clickIcon(reopenedLink.win, 'delete');
     const removed = await until(() => readMemo(reopenedLink.id).split('"미리보기"').length === 2, '카드 지우기').catch(() => false);
     check('메뉴의 지우기 아이콘 → 카드 지우기', removed && readMemo(reopenedLink.id).includes('관련 글'));

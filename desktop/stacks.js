@@ -85,6 +85,19 @@ export class StackStore {
     return stack;
   }
 
+  /** 탭을 끌어 순서 바꾸기: id 를 index 번째(0 부터, 빼고 난 줄 기준)로. 바뀌었으면 스택 */
+  reorder(id, index) {
+    const stack = this.stackOf(id);
+    if (!stack) return null;
+    const from = stack.memos.indexOf(id);
+    const to = Math.max(0, Math.min(stack.memos.length - 1, Math.trunc(Number(index))));
+    if (!Number.isFinite(to) || from === to) return null;
+    stack.memos.splice(from, 1);
+    stack.memos.splice(to, 0, id);
+    this.save();
+    return stack;
+  }
+
   setActive(id) {
     const stack = this.stackOf(id);
     if (!stack || stack.active === id) return stack;
