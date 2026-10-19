@@ -925,7 +925,10 @@ class Mover {
     if (input == null || view.isDestroyed) return;
     const name = cleanName(input, target.name, target.kind === 'chip');
     const fresh = view.state.doc.nodeAt(pos) === node ? renameTarget(view.state.doc, pos, node) : null; // 입력 창이 떠 있는 동안 문서가 바뀌었을 수 있다
-    if (name && fresh && renameContent(view, fresh, name)) window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text: `이름을 "${name}" 으로 바꿨어요` } }));
+    const done = name && fresh ? renameContent(view, fresh, name) : false;
+    const say = (text, error = false) => window.dispatchEvent(new CustomEvent('mk:notice', { detail: { text, error } }));
+    if (done === true) say(`이름을 "${name}" 으로 바꿨어요`);
+    else if (done === 'kind') say('이 이름으로는 바꿀 수 없어요 — 영상 파일은 이름에 "영상" 이 있어야 하고, 소리 파일에는 "영상" · "동영상" · "video" 를 쓸 수 없어요', true);
     view.focus();
   }
 

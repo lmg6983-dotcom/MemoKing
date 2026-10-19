@@ -3,6 +3,7 @@
 //   — 저장 · 공유 · 끌어내기에서 이 이름으로 나간다
 import { isVoiceCard } from './voice-card-view.js';
 import { chipRanges } from './file-chip-guard.js';
+import { mediaKindOf } from './core/memo-file.js';
 
 const BAD = /[\\/:*?"<>|\u0000-\u001f]+/g;
 const extOf = (name) => /\.[A-Za-z0-9]{1,8}$/.exec(name)?.[0] ?? '';
@@ -30,7 +31,7 @@ export function cleanName(input, old, keepExt) {
   return name;
 }
 
-/** 이름을 바꾸는 트랜잭션을 보낸다 → 바뀌었는가 */
+/** 이름을 바꾸는 트랜잭션을 보낸다 → true(바뀜) | false(바꾸지 않음) | 'kind'(.webm 은 설명에 동영상 · 영상 · video 가 있느냐로 영상/소리를 가르므로 그 구분이 바뀌는 이름은 받지 않는다) */
 export function renameContent(view, target, newName) {
   if (!target || !newName || newName === target.name) return false;
   const { state } = view;
@@ -41,6 +42,7 @@ export function renameContent(view, target, newName) {
   } else {
     const node = state.doc.nodeAt(target.pos);
     if (node?.type.name !== 'image') return false;
+    if (mediaKindOf(node.attrs.src, node.attrs.alt ?? '') !== mediaKindOf(node.attrs.src, newName)) return 'kind';
     tr = tr.setNodeMarkup(target.pos, undefined, { ...node.attrs, alt: newName });
   }
   view.dispatch(tr.scrollIntoView());
