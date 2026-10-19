@@ -51,8 +51,11 @@ interface Storage {
     }
 }
 
-/** 앱 안 저장 공간 (이 휴대폰에만 보관) */
-class FileStorage(private val root: File, override val label: String) : Storage {
+/**
+ * 앱 안 저장 공간 (이 휴대폰에만 보관 · Google Drive 폴더의 휴대폰 쪽 사본)
+ * @param shareRoot 다른 앱에 내어 줄 주소의 앞부분 (VaultFileProvider — 빈 글이면 "이 휴대폰에만" 폴더)
+ */
+class FileStorage(private val root: File, override val label: String, private val shareRoot: String = "") : Storage {
     init {
         root.mkdirs()
     }
@@ -100,7 +103,7 @@ class FileStorage(private val root: File, override val label: String) : Storage 
         return if (f.isDirectory) f.deleteRecursively() else f.delete()
     }
 
-    override fun shareUri(rel: String): Uri? = stat(rel)?.let { VaultFileProvider.uriFor(rel) }
+    override fun shareUri(rel: String): Uri? = stat(rel)?.let { VaultFileProvider.uriFor(rel, shareRoot) }
 }
 
 /**

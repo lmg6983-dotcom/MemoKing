@@ -9,6 +9,7 @@ import android.content.Context
 import com.memoking.app.FileStorage
 import com.memoking.app.Storage
 import com.memoking.app.Vaults
+import com.memoking.app.VaultFileProvider
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executors
@@ -56,7 +57,7 @@ object DriveSync {
     private fun stateFile(ctx: Context, folderId: String) = File(File(ctx.filesDir, "drive"), "$folderId.state.json")
 
     fun storage(ctx: Context, folderId: String): Storage =
-        FileStorage(mirrorDir(ctx, folderId), "Google Drive › ${folderName(ctx).ifEmpty { "메모 폴더" }}")
+        FileStorage(mirrorDir(ctx, folderId), "Google Drive › ${folderName(ctx).ifEmpty { "메모 폴더" }}", VaultFileProvider.driveRoot(folderId))
 
     private fun publish(next: Status) {
         status = next
