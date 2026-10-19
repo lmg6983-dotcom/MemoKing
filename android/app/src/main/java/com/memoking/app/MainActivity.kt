@@ -58,6 +58,7 @@ class MainActivity : Activity() {
         private const val REQ_MIC = 5
         private const val REQ_SAVE = 6
         private const val REQ_CALENDAR = 7
+        private const val REQ_INSTALL = 8
         private const val PDF_TIMEOUT_MS = 15_000L // PDF 만들기를 이만큼 기다리고, 넘으면 인쇄 화면으로
 
         /** 지금 앞에 보이는 화면 (알림이 울렸을 때 바로 알리기 위해) */
@@ -561,9 +562,27 @@ class MainActivity : Activity() {
         }
     }
 
+    /** 받은 업데이트 APK 를 안드로이드 설치 화면으로 (브라우저로 받은 APK 를 열 때와 같은 화면) */
+    fun installUpdate(file: java.io.File) {
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(AppUpdate.installIntent(file), REQ_INSTALL)
+        } catch (e: Exception) {
+            android.util.Log.w("MemoKing", "설치 화면을 열지 못했어요", e)
+            emit("updateResult", JSONObject().put("status", 1).put("why", "설치 화면을 열지 못했어요"))
+        }
+    }
+
     @Deprecated("Activity Result API 대신 단순한 방식을 쓴다 (androidx 없이)")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_INSTALL) {
+            // 성공이면 곧 새 버전으로 바뀌고, 취소 · 실패면 화면에 까닭과 함께 다시 누르게
+            val code = data?.getIntExtra("android.intent.extra.INSTALL_RESULT", 0) ?: 0
+            val status = AppUpdate.failStatus(resultCode == RESULT_OK, resultCode == RESULT_CANCELED, code) ?: return
+            emit("updateResult", JSONObject().put("status", status).put("why", if (code != 0) "오류 $code" else ""))
+            return
+        }
         if (requestCode == REQ_AUTH) {
             val token = try {
                 if (resultCode != RESULT_OK) throw GoogleAuth.AuthError("로그인을 취소했어요")
