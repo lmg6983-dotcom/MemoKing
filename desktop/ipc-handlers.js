@@ -220,7 +220,7 @@ export function registerIpc(ctx) {
       memoId = vault.import({ body: typeof body === 'string' && /^# \S/.test(body) ? body.slice(0, 20000) : `# ${title}\n` });
     }
     const memo = memoId ? vault.get(memoId) : null;
-    if (!memo) throw new Error('메모를 찾지 못했어요');
+    if (!memo) throw new Error('메모를 찾지 못했어요. 목록에서 다시 골라 주세요');
     const saved = vault.setReminders(memoId, [...(memo.reminders ?? []), r]);
     if (!saved) throw new Error('그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요');
     wm.sendToNote(memoId, 'memo:reminders', saved);
@@ -267,7 +267,7 @@ export function registerIpc(ctx) {
   // 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 로그인 → 받았으면 폴더를 처음부터 훑어 다른 앱이 넣은 메모를 바로 받는다
   ipcMain.handle('drive:full-scope', async (_e, on) => {
     const auth = getDriveAuth();
-    if (!auth) return { full: false, error: 'Google Drive 를 쓸 수 없어요' };
+    if (!auth) return { full: false, error: 'Google Drive 를 쓸 수 없어요. 설정 › Google Drive 동기화에서 먼저 연결해 주세요' };
     const res = await auth.setFullScope(Boolean(on));
     if (wm.listWin) bringToFront(wm.listWin);
     if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
@@ -275,7 +275,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('drive:folders', async (_e, parent) => {
     const api = getDriveApi();
-    if (!api) throw new Error('Google Drive 를 쓸 수 없어요');
+    if (!api) throw new Error('Google Drive 를 쓸 수 없어요. 설정 › Google Drive 동기화에서 먼저 연결해 주세요');
     return (await api.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name, created: f.created }));
   });
   // 같은 이름 폴더가 이미 있으면 새로 만들지 않고 그것을 돌려준다 (existed: true)
@@ -547,13 +547,13 @@ export function registerIpc(ctx) {
   ipcMain.handle('opms:copy', (_e, text) => clipboard.writeText(String(text ?? '').slice(0, 2000)));
   ipcMain.handle('opms:to-memo', async (_e, idx) => {
     const vault = getVault();
-    if (!vault) throw new Error('메모 폴더가 아직 없어요');
+    if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
     const known = wm.caseOf(idx);
     const client = wm.opmsClient();
     const c = (await client.caseByIdx(known.idx).catch(() => null)) ?? known;
     const [foreign, mywork, details] = await Promise.all([client.foreign(c).catch(() => []), client.mywork(c.idx).catch(() => []), client.details(c).catch(() => null)]);
     const id = vault.import({ body: caseMemoMarkdown(c, { mywork, foreign, summary: foreignSummary(c, foreign), details }) });
-    if (!id) throw new Error('메모를 만들지 못했어요');
+    if (!id) throw new Error('메모를 만들지 못했어요. 메모 폴더의 쓰기 권한과 빈 공간을 확인하고 다시 해 주세요');
     wm.openNote(id);
     return id;
   });
@@ -688,9 +688,9 @@ export function registerIpc(ctx) {
   ipcMain.handle('memo:create', (_e, options) => wm.createNote(options ?? {}));
   ipcMain.handle('memo:import', (_e, body, opts) => {
     const vault = getVault();
-    if (!vault) throw new Error('메모 폴더가 아직 없어요');
+    if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
     const id = vault.import({ body: String(body ?? '').slice(0, 5_000_000) });
-    if (!id) throw new Error('이 파일로는 메모를 만들 수 없어요');
+    if (!id) throw new Error('이 파일로는 메모를 만들 수 없어요. 글 파일(.txt · .md 등)을 골라 주세요');
     if (opts?.open) wm.openNote(id);
     return id;
   });
@@ -847,14 +847,14 @@ export function registerIpc(ctx) {
   // ---------- 첨부 파일 ----------
   ipcMain.handle('attachment:read', (_e, rel) => {
     const file = getVault()?.resolve(String(rel ?? ''));
-    if (!file || !fs.existsSync(file)) throw new Error('파일을 찾지 못했어요');
-    if (fs.statSync(file).size > 500 * 1024 * 1024) throw new Error('파일이 너무 커요 (500MB 넘음)');
+    if (!file || !fs.existsSync(file)) throw new Error('파일을 찾지 못했어요. 메모 폴더에서 지워졌거나 옮겨졌는지 확인해 주세요');
+    if (fs.statSync(file).size > 500 * 1024 * 1024) throw new Error('파일이 너무 커요 (500MB 넘음). 더 작은 파일로 해 주세요');
     return new Uint8Array(fs.readFileSync(file));
   });
   ipcMain.handle('attachment:save', (_e, bytes, ext) => {
     const vault = getVault();
-    if (!vault) throw new Error('메모 폴더가 아직 없어요.');
-    if (!(bytes instanceof Uint8Array)) throw new TypeError('넣으려는 파일을 읽지 못했어요.');
+    if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
+    if (!(bytes instanceof Uint8Array)) throw new TypeError('넣으려는 파일을 읽지 못했어요. 파일을 다시 골라 주세요');
     return vault.saveAttachment(bytes, ext);
   });
   ipcMain.handle('attachment:fetch', (_e, url) => fetchRemoteImage(getVault(), String(url ?? '')));
@@ -866,7 +866,7 @@ export function registerIpc(ctx) {
       // 이미 디코딩됨
     }
     const file = getVault()?.resolve(decoded);
-    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요.';
+    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌는지 확인해 주세요.';
     const result = await openVaultFile(file, BrowserWindow.fromWebContents(e.sender));
     return result && result !== 'cancelled' ? '파일을 열지 못했어요. 이 파일을 열 수 있는 프로그램이 있는지 확인해 주세요.' : result;
   });
@@ -890,7 +890,7 @@ export function registerIpc(ctx) {
   /** 메모 폴더 attachments/ 안의 파일 → { file } | { error } (화면이 이미 풀어 보낸 경로 — 다시 풀면 이름의 %XX 가 깨진다) */
   const attachmentFile = (rel) => {
     const file = /^attachments\//.test(String(rel)) ? getVault()?.resolve(String(rel)) : null;
-    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌을 수 있어요' };
+    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌는지 확인해 주세요' };
     return { file };
   };
   ipcMain.handle('attachment:save-as', async (e, f = {}) => {
@@ -1146,7 +1146,7 @@ export function registerIpc(ctx) {
   // 메모 공유: 글을 "제목.txt" 파일로 (Drive 링크 · LocalSend · 메일은 파일을 보낸다) — share:targets · attachment:share 가 이어서
   ipcMain.handle('card:share-file', (_e, rawId) => {
     const m = getVault()?.get(String(rawId));
-    if (!m) return { error: '메모를 찾지 못했어요' };
+    if (!m) return { error: '메모를 찾지 못했어요. 목록에서 다시 골라 주세요' };
     if (m.locked) return { error: '잠긴 메모는 잠금을 풀어야 공유할 수 있어요' };
     const text = hotkeyCopyText(m.body);
     if (!text.trim()) return { error: '공유할 글이 없어요' };

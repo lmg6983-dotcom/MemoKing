@@ -557,7 +557,7 @@ class MainActivity : Activity() {
                 pendingSave?.delete()
                 pendingSave = null
             }
-            bridge.resolve(id) { throw IllegalStateException("이 휴대폰에서 열 수 있는 앱이 없어요") }
+            bridge.resolve(id) { throw IllegalStateException("이 휴대폰에서 열 수 있는 앱이 없어요. 파일을 열 앱을 설치해 주세요") }
         }
     }
 
@@ -602,9 +602,9 @@ class MainActivity : Activity() {
                 io.execute {
                     bridge.resolve(id) {
                         try {
-                            if (target == null || file == null) throw IllegalStateException("저장하지 못했어요")
+                            if (target == null || file == null) throw IllegalStateException("저장하지 못했어요. 저장 공간과 폴더 권한을 확인하고 다시 해 주세요")
                             contentResolver.openOutputStream(target)?.use { out -> file.inputStream().use { it.copyTo(out) } }
-                                ?: throw IllegalStateException("저장하지 못했어요")
+                                ?: throw IllegalStateException("저장하지 못했어요. 저장 공간과 폴더 권한을 확인하고 다시 해 주세요")
                             var name = file.name
                             contentResolver.query(target, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                                 if (c.moveToFirst()) name = c.getString(0) ?: name
@@ -628,7 +628,7 @@ class MainActivity : Activity() {
 
     fun openVaultFile(id: Int, rel: String) {
         bridge.resolve(id) {
-            val storage = Vaults.current(this) ?: throw IllegalStateException("저장 위치가 설정되지 않았어요")
+            val storage = Vaults.current(this) ?: throw IllegalStateException("저장 위치가 설정되지 않았어요. 설정에서 메모 폴더를 골라 주세요")
             val uri = storage.shareUri(rel) ?: return@resolve "이 휴대폰의 메모 폴더에 파일이 아직 없어요"
             val intent = Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, VaultFileProvider.mimeOf(rel))

@@ -29,7 +29,7 @@ async function downloadImage(url, limit, relWithoutExt) {
   const ext = imageExtFromType(type) ?? (/icon/.test(type) || /\.ico(\?|$)/i.test(url) ? 'ico' : imageExtFromUrl(url));
   if (!ext || !res.size) {
     fs.dropTemp(res.temp);
-    throw new Error('그림이 아니에요');
+    throw new Error('그림이 아니에요. 그림 주소(PNG · JPG · GIF · WebP)를 넣어 주세요');
   }
   const rel = typeof relWithoutExt === 'function' ? relWithoutExt(ext) : `${relWithoutExt}.${ext}`;
   fs.commitTemp(res.temp, rel);

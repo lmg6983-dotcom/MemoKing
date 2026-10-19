@@ -280,7 +280,7 @@ a{display:inline-block;margin-top:20px;padding:14px 28px;border-radius:14px;back
             }
             throw AuthError("Google 로그인 오류: $err")
         }
-        if (code !in 200..299) throw IOException("Google 서버 오류 ($code)")
+        if (code !in 200..299) throw IOException("Google 서버에 문제가 있어요 ($code). 잠시 뒤 다시 시도해 주세요")
         return if (text.isBlank()) JSONObject() else JSONObject(text)
     }
 }

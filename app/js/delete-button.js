@@ -34,14 +34,18 @@ function announce(text) {
 }
 
 // 지운 자리에 "표를 지웠어요 [되돌리기] (Ctrl+Z)" 를 잠깐 (하나만) — 마우스로도 되돌릴 수 있게 (목록 카드의 되돌리기 띠처럼)
-function undoHint(what, rect, view) {
+/**
+ * PC: 한 일을 알리며 "되돌리기" 단추 (지우기 · 잘라내기 · 이름 변경 …)
+ * @param {string} what 대상 이름("이 표" 의 "표" 처럼, 조사는 알아서) · @param {string} [verb] 한 일 (기본 "지웠어요")
+ */
+export function undoHint(what, rect, view, verb = '지웠어요') {
   document.getElementById('mk-undo-hint')?.remove();
   const tip = document.createElement('div');
   tip.id = 'mk-undo-hint';
   tip.className = 'mk-undo-hint';
   tip.setAttribute('role', 'status');
   tip.innerHTML = '<span></span> <button type="button" class="mk-undo-btn">되돌리기</button> <kbd>Ctrl+Z</kbd>';
-  tip.firstChild.textContent = `${what}${/[가-힣]$/.test(what) && (what.charCodeAt(what.length - 1) - 0xac00) % 28 ? '을' : '를'} 지웠어요`;
+  tip.firstChild.textContent = `${what}${/[가-힣]$/.test(what) && (what.charCodeAt(what.length - 1) - 0xac00) % 28 ? '을' : '를'} ${verb}`;
   const undoBtn = tip.querySelector('.mk-undo-btn');
   undoBtn.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서를 빼앗지 않게
   undoBtn.addEventListener('click', () => {
@@ -331,6 +335,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   }
   current = del;
   // 지우기 몸통 (× 를 눌렀을 때 · 잘라내기가 복사를 마친 뒤): 단추는 눌린 듯 작아지며 사라지고, 대상이 붉게 비쳤다 접힌다
+  let cutDone = false; // 잘라내기로 지우는 중인가 (알림 문구가 다르다)
   const removeNow = () => {
     haptic(15);
     clearTimeout(del.timer);
@@ -340,6 +345,8 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     for (const b of del.extras) b.remove();
     setTimeout(() => btn.remove(), 180);
     deleteContent(view, { pos: del.pos, node: del.node, target: del.target, markTarget, deco, label, remove });
+    // 휴대폰: 지운 뒤 되돌리기 단추가 있는 안내를 띄우도록 알린다 (android/web/js/note-view.js) — PC 는 deleteContent 의 undo 안내
+    window.dispatchEvent(new CustomEvent('mk:removed', { detail: { what: label.replace(/ 지우기$/, '').replace(/^이 /, ''), verb: cutDone ? '잘라냈어요' : '지웠어요' } }));
   };
   const press = (e) => {
     e.preventDefault();
@@ -361,9 +368,8 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     copyBlock(view, del.pos, del.node, del.target).then((what) => {
       if (what === 'cancelled' || current !== del || view.state.doc.nodeAt(del.pos) !== del.node) return;
       document.dispatchEvent(new CustomEvent('mk:content-tools'));
-      const text = '잘라냈어요. 되돌리려면 실행 취소를 누르세요';
-      announce(text);
-      notice(text);
+      announce('잘라냈어요');
+      cutDone = true;
       removeNow();
     }, (err) => {
       console.warn('cut', err);

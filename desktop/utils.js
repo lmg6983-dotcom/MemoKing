@@ -220,7 +220,7 @@ export function toast(t) {
 export async function writeClipboard({ png = null, text = null, html = null }) {
   if (png) {
     const image = nativeImage.createFromBuffer(png);
-    if (image.isEmpty()) throw new Error('그림을 읽지 못했어요');
+    if (image.isEmpty()) throw new Error('그림을 읽지 못했어요. 다른 그림으로 다시 해 주세요');
     png = image.toPNG();
   }
   const Item = electronApi.ClipboardItem;
@@ -274,7 +274,7 @@ export function copyImageToClipboard(file) {
 
 // ---------- 원격 그림 다운로드 ----------
 export async function fetchRemoteImage(vault, url) {
-  if (!vault) throw new Error('메모 폴더가 아직 없어요.');
+  if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
   const target = new URL(url);
   if (!/^https?:$/.test(target.protocol)) throw new Error('인터넷 주소(http, https)만 받을 수 있어요.');
   const controller = new AbortController();
@@ -290,15 +290,15 @@ export async function fetchRemoteImage(vault, url) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const type = res.headers.get('content-type') ?? '';
     const ext = imageExtFromType(type) ?? (type.startsWith('image/') || !type ? imageExtFromUrl(target.href) : null);
-    if (!ext) throw new Error(`그림이 아니에요 (${type || '형식 모름'})`);
-    if (Number(res.headers.get('content-length') ?? 0) > MAX_REMOTE_IMAGE_BYTES) throw new Error('50MB보다 커요.');
+    if (!ext) throw new Error(`그림이 아니에요 (${type || '형식 모름'}). 그림 주소(PNG · JPG · GIF · WebP)를 넣어 주세요`);
+    if (Number(res.headers.get('content-length') ?? 0) > MAX_REMOTE_IMAGE_BYTES) throw new Error('50MB보다 커서 넣을 수 없어요. 더 작은 그림으로 해 주세요');
     const chunks = [];
     let total = 0;
     for await (const chunk of res.body) {
       total += chunk.byteLength;
       if (total > MAX_REMOTE_IMAGE_BYTES) {
         controller.abort();
-        throw new Error('50MB보다 커요.');
+        throw new Error('50MB보다 커서 넣을 수 없어요. 더 작은 그림으로 해 주세요');
       }
       chunks.push(chunk);
     }

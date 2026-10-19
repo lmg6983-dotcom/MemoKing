@@ -234,7 +234,7 @@ function keepTheirsAsCopy(next) {
       if (!kept || (kept.refused && !kept.copied)) {
         conflictCopy = app.vault.importCopyOf(id, body, { color: next.color });
       }
-      if (!conflictCopy) throw new Error('잠긴 메모의 사본을 만들 수 없어요');
+      if (!conflictCopy) throw new Error('잠긴 메모의 사본을 만들 수 없어요. 잠금을 풀고 다시 해 주세요');
       copied = true;
     } catch (err) {
       console.error(err);
@@ -570,7 +570,7 @@ async function saveFile(file) {
 async function fetchImage(src) {
   if (isDataImage(src)) {
     const image = decodeDataImage(src);
-    if (!image) throw new Error('지원하지 않는 그림 형식');
+    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG · JPG · GIF · WebP 그림을 써 주세요');
     return app.vault.saveAttachment(image.bytes, image.ext);
   }
   return fetchRemoteImage(app.vault, src);
@@ -976,6 +976,23 @@ for (const [btn, shift] of [[el.undoBtn, false], [el.redoBtn, true]]) {
     if (!typing) document.activeElement?.blur();
   });
 }
+
+// 소리 · 동영상을 재생하지 못할 때 (파일이 없거나 형식을 못 읽음): 안내 + 다른 앱으로 열기 (같은 일을 몇 번 눌러도 안내는 한 번만 — 같은 파일 3초 안)
+let lastMediaErr = { src: '', at: 0 };
+window.addEventListener('mk:media-error', (e) => {
+  const { src, kind = 'audio' } = e.detail ?? {};
+  if (!src || (lastMediaErr.src === src && Date.now() - lastMediaErr.at < 3000)) return;
+  lastMediaErr = { src, at: Date.now() };
+  const what = kind === 'video' ? '동영상' : '소리';
+  toast(`${what}를 재생하지 못했어요`, true, String(src).startsWith('attachments/') ? { label: '다른 앱으로 열기', run: () => openAttachment(String(src)) } : null);
+});
+
+// 내용을 지우거나 잘라냈으면: 되돌리기 단추가 있는 안내 (↶ 와 같은 기록으로 되돌림)
+window.addEventListener('mk:removed', (e) => {
+  const { what = '내용', verb = '지웠어요' } = e.detail ?? {};
+  const josa = /[가-힣]$/.test(what) && (what.charCodeAt(what.length - 1) - 0xac00) % 28 ? '을' : '를';
+  toast(`${what}${josa} ${verb}`, false, { label: '되돌리기', run: () => editor && pressKey('z', false) });
+});
 
 // 표 막대: 표 안에 커서가 있을 때만 (PC 와 같은 묶음 · 같은 규칙 — app/js/note.js showTableBar). 표 지우기 단추는 따로 없다:
 //   머리글 행만 남았을 때 "표 삭제" · 열이 하나뿐일 때 "표 삭제" 가 표를 지우고, 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽에 떠 있다 (block-move.js)

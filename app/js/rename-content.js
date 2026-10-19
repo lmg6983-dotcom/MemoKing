@@ -91,6 +91,14 @@ export function promptName({ title = '이름 변경', value = '', label = '새 �
       resolve(result);
     };
     const onKey = (e) => {
+      if (e.key === 'Tab') {
+        // 창 안에서만 포커스가 돈다 (뒤의 메모로 빠져나가지 않게)
+        const stops = [input, cancel, ok];
+        const i = stops.indexOf(document.activeElement);
+        e.preventDefault();
+        stops[(i + (e.shiftKey ? stops.length - 1 : 1)) % stops.length].focus();
+        return;
+      }
       if (e.key !== 'Escape') return;
       e.preventDefault();
       e.stopPropagation();

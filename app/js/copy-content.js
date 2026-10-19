@@ -51,7 +51,7 @@ export function imageIn(el) {
 function toPng(img) {
   const w = img.naturalWidth || img.width;
   const h = img.naturalHeight || img.height;
-  if (!w || !h) throw new Error('그림을 아직 불러오지 못했어요');
+  if (!w || !h) throw new Error('그림을 아직 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요');
   const canvas = document.createElement('canvas');
   // 너무 큰 그림은 줄여서 (클립보드 · 메모리 한도) — 긴 변 8000px
   const k = Math.min(1, 8000 / Math.max(w, h));

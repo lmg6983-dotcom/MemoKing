@@ -75,7 +75,7 @@ function playerOptions(kind) {
     // 스티커 창은 좁으므로 음량 막대는 빼고 음소거 버튼만 (시간 표시가 줄바꿈되지 않게)
     controls: kind === 'video'
       ? ['play-large', 'play', 'progress', 'current-time', 'mute', 'settings', 'fullscreen']
-      : ['play', 'progress', 'current-time', 'duration', 'mute'],
+      : ['play', 'progress', 'current-time', 'duration'], // 소리: 음소거 단추는 두지 않는다 (소리는 기기 음량 키로)
     keyboard: { focused: true, global: false },
     tooltips: { controls: true, seek: true },
   };
@@ -157,6 +157,18 @@ function mediaView(node, view, getPos) {
     if (kind === 'video') el.setAttribute('playsinline', '');
     dom.append(el);
     const player = new Plyr(el, playerOptions(kind));
+    // 재생할 수 없을 때(파일이 없거나 읽지 못함 · 형식을 못 읽음) 조용히 멈춰 있지 않고 알린다 — 휴대폰은 다른 앱으로 열기 안내 (note-view.js).
+    //   메모를 열기만 해도 뜨면 귀찮으니 재생 단추를 누른 뒤에만 (이미 오류 상태면 누르는 즉시)
+    let tried = 0;
+    const fail = () => window.dispatchEvent(new CustomEvent('mk:media-error', { detail: { src, kind, code: el.error?.code ?? 0 } }));
+    dom.addEventListener('click', (e) => {
+      if (!(e.target instanceof Element) || !e.target.closest('.plyr__control[data-plyr="play"], .plyr__poster')) return;
+      tried = Date.now();
+      if (el.error) fail();
+    }, true);
+    el.addEventListener('error', () => {
+      if (el.isConnected && Date.now() - tried < 10_000) fail();
+    });
     return {
       dom,
       // 상자 어디를 꾹 눌러도 줄을 옮긴다 (이름 줄·시간·빈 곳·동영상 화면은 편집기로).

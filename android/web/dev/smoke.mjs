@@ -1454,9 +1454,13 @@ try {
       const imgsAfter = await page.locator('img.mk-image').count();
       const copied = (await devLog()).log.filter((x) => x.copyImage).length > copyLog;
       check('잘라내기 단추: 저장 · 잘라내기 · 복사 · × 순서, 누르면 그림을 복사한 뒤 지움', cutOrder.every((x) => x >= 0) && cutOrder[0] < cutOrder[1] && cutOrder[1] < cutOrder[2] && cutOrder[2] < cutOrder[3] && copied && imgsAfter === imgsBefore - 1, JSON.stringify({ cutOrder, copied, imgsBefore, imgsAfter }));
-      await page.tap('#undo-btn').catch(async () => page.keyboard.press('Control+z'));
+      const cutToast = await page.evaluate(() => ({ text: document.getElementById('toast-text')?.textContent, action: !document.getElementById('toast-action')?.hidden && document.getElementById('toast-action')?.textContent }));
+      check('잘라낸 뒤: "그림을 잘라냈어요" 안내에 되돌리기 단추', /잘라냈어요/.test(cutToast.text ?? '') && cutToast.action === '되돌리기', JSON.stringify(cutToast));
+      await page.tap('#toast-action');
       await page.waitForTimeout(600);
-      check('잘라낸 그림은 실행 취소로 되살아남', (await page.locator('img.mk-image').count()) === imgsBefore, String(await page.locator('img.mk-image').count()));
+      const backByToast = (await page.locator('img.mk-image').count()) === imgsBefore;
+      check('안내의 되돌리기 단추를 누르면 잘라낸 그림이 되살아남', backByToast, String(await page.locator('img.mk-image').count()));
+      if (!backByToast) await page.tap('#undo-btn').catch(() => {});
       const ib3 = await page.locator('img.mk-image').first().boundingBox();
       await touch('touchStart', ib3.x + 40, ib3.y + 40);
       await page.waitForTimeout(80);
@@ -1506,6 +1510,18 @@ try {
     const four = await page.evaluate(() => ['.mk-share-btn', '.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => { const e = document.querySelector(s); return e && e.style.visibility !== 'hidden' ? Math.round(e.getBoundingClientRect().left) : -1; }));
     const voiceLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
     check('음성 카드: 이름 줄을 짧게 누르면 공유 · 저장 · 복사 · × (왼쪽부터)', four.every((x) => x >= 0) && four[0] < four[1] && four[1] < four[2] && four[2] < four[3] && voiceLabel === '이 음성 지우기', JSON.stringify({ four, voiceLabel }));
+    // 소리 상자: 음소거 단추 없음 · 이름 줄은 손가락이 닿을 만큼(44px) · 재생하지 못하면(여기서는 가짜 소리 파일) 재생 단추를 누른 뒤 안내 + 다른 앱으로 열기
+    {
+      const props = await page.evaluate(() => ({ mute: document.querySelectorAll('.mk-audio [data-plyr="mute"]').length, labelH: Math.round(document.querySelector('.mk-media-label').getBoundingClientRect().height) }));
+      const quiet = await page.evaluate(() => document.getElementById('toast')?.hidden !== false);
+      check('소리 상자: 음소거 단추는 없고 이름 줄은 44px 이상 (4종 단추를 누르기 쉽게)', props.mute === 0 && props.labelH >= 44, JSON.stringify(props));
+      check('메모를 열기만 해서는 "재생하지 못했어요" 안내가 뜨지 않음', quiet || !/재생하지 못했어요/.test(await page.textContent('#toast-text')), String(quiet));
+      await page.waitForTimeout(2600);
+      await page.tap('.mk-audio .plyr__control[data-plyr="play"]').catch(() => {});
+      await page.waitForTimeout(900);
+      const err = await page.evaluate(() => ({ text: document.getElementById('toast-text')?.textContent, action: document.getElementById('toast-action')?.textContent, shown: !document.getElementById('toast')?.hidden }));
+      check('재생하지 못하면 단추를 누른 뒤 안내 + "다른 앱으로 열기"', err.shown && /재생하지 못했어요/.test(err.text ?? '') && err.action === '다른 앱으로 열기', JSON.stringify(err));
+    }
     await shot('18d-voice-buttons');
     await page.tap('.mk-share-btn');
     await page.waitForTimeout(500);

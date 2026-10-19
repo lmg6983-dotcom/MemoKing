@@ -506,7 +506,7 @@ export class Vault extends EventTarget {
       trashed = baseName(dest);
       if (!fs.move(entry.file, dest)) {
         this.entries.set(id, entry);
-        throw new Error('메모를 휴지통으로 옮기지 못했어요');
+        throw new Error('메모를 휴지통으로 옮기지 못했어요. 저장 폴더 권한을 확인하고 다시 해 주세요');
       }
     }
     this.orphans.delete(id);

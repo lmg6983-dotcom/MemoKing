@@ -15,6 +15,7 @@ import { renderReleaseNotes } from './release-notes-view.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
+import { hintOnce } from './hints.js';
 import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
@@ -569,7 +570,7 @@ window.addEventListener('drop', async (e) => {
     try {
       let body;
       if (isTextDocument(file.name, file.type)) {
-        if (file.size > MAX_TEXT_BYTES) throw new Error('너무 큰 글 파일');
+        if (file.size > MAX_TEXT_BYTES) throw new Error('글 파일이 너무 커요. 더 작게 나눠서 다시 해 주세요');
         body = memoBodyFromFile({ name: file.name, kind: 'text', text: await file.text() });
       } else {
         const rel = await api.attachments.save(new Uint8Array(await file.arrayBuffer()), fileExtension(file));
@@ -1090,6 +1091,17 @@ async function togglePin(m) {
     m.pinned = !want;
     render();
   }
+}
+// 카드 위에 마우스를 잠깐 두면(처음 한 번) 오른쪽 클릭 메뉴가 있다고 알려 준다
+{
+  let hoverTimer = 0;
+  el.cards.addEventListener('mouseover', (e) => {
+    clearTimeout(hoverTimer);
+    const card = e.target.closest?.('.card');
+    if (!card || !api.memo.cardCommand) return;
+    hoverTimer = setTimeout(() => card.isConnected && card.matches(':hover') && hintOnce('card-menu', '카드를 오른쪽 클릭하면 복사 · 공유 · 색 · 고정 같은 메뉴가 떠요', { anchor: card }), 1500);
+  });
+  el.cards.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
 }
 el.cards.addEventListener('contextmenu', (e) => {
   const card = e.target.closest('.card');

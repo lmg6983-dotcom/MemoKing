@@ -866,7 +866,7 @@ async function saveFile(file) {
 async function fetchImage(src) {
   if (isDataImage(src)) {
     const image = decodeDataImage(src);
-    if (!image) throw new Error('지원하지 않는 그림 형식');
+    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG · JPG · GIF · WebP 그림을 써 주세요');
     return api.attachments.save(image.bytes, image.ext);
   }
   return api.attachments.fetch(src);
@@ -1669,6 +1669,7 @@ function renderStack(state) {
   const stacked = members.length >= 2;
   tabsEl.hidden = !stacked;
   document.body.classList.toggle('stacked', stacked);
+  if (stacked) setTimeout(() => hintOnce('stack-reorder', '탭을 위아래로 끌어 순서를 바꾸고, 옆으로 끌어내면 따로 떼어져요', { anchor: tabsEl }), 800);
   if (!stacked) return tabsEl.replaceChildren();
   const tabs = members.map((m) => {
     const tab = document.createElement('div');

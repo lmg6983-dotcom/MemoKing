@@ -60,7 +60,7 @@ object Http {
             val result = JSONObject().put("status", status).put("url", url.toString()).put("type", type)
             if (status !in 200..299) return result
             val declared = conn.contentLengthLong
-            if (declared > limit && !headOnly) throw IOException("너무 큰 파일")
+            if (declared > limit && !headOnly) throw IOException("너무 큰 파일이에요. 더 작은 파일로 해 주세요")
             val input = conn.inputStream
             if (save) {
                 val (id, file) = Temp.create(ctx)
@@ -74,7 +74,7 @@ object Http {
                         if (total > limit) {
                             out.close()
                             file.delete()
-                            throw IOException("너무 큰 파일")
+                            throw IOException("너무 큰 파일이에요. 더 작은 파일로 해 주세요")
                         }
                         out.write(buf, 0, n)
                     }
@@ -88,7 +88,7 @@ object Http {
                 if (n < 0) break
                 out.write(buf, 0, n)
                 if (out.size() > limit) {
-                    if (!headOnly) throw IOException("너무 큰 파일")
+                    if (!headOnly) throw IOException("너무 큰 파일이에요. 더 작은 파일로 해 주세요")
                     break
                 }
                 // 미리보기 정보는 <head> 안에 있으므로 </head> 를 보면 그만 받는다

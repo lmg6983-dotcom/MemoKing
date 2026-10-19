@@ -80,7 +80,7 @@ object AppUpdate {
     fun check(): JSONObject {
         val conn = connect(INFO_URL, 15_000)
         try {
-            if (conn.responseCode != 200) throw IOException("업데이트 정보를 받지 못했어요 (${conn.responseCode})")
+            if (conn.responseCode != 200) throw IOException("업데이트 정보를 받지 못했어요 (${conn.responseCode}). 인터넷을 확인하고 다시 눌러 주세요")
             val text = conn.inputStream.use { it.readBytes() }.toString(Charsets.UTF_8)
             if (text.length > 200_000) throw IOException("업데이트 정보가 너무 커요")
             val info = JSONObject(text)
@@ -120,7 +120,7 @@ object AppUpdate {
         val file = File(dir(ctx), "MemoKing-${info.optString("version", "new")}.apk")
         val conn = connect(apk, 20_000)
         try {
-            if (conn.responseCode != 200) throw IOException("새 버전을 받지 못했어요 (${conn.responseCode})")
+            if (conn.responseCode != 200) throw IOException("새 버전을 받지 못했어요 (${conn.responseCode}). 인터넷을 확인하고 다시 눌러 주세요")
             val total = conn.contentLengthLong.takeIf { it > 0 } ?: info.optLong("size")
             var done = 0L
             var last = 0L

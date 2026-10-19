@@ -1205,3 +1205,8 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .ev-add svg { width: 16px; height: 16px; }
 /* 일정 탭에도 + 단추가 있으므로 마지막 줄이 단추 위로 올라올 만큼 아래 여백 */
 #reminder-groups { padding-bottom: 104px; }
+
+/* 소리 · 음성 카드의 이름 줄: 짧게 누르면 복사 · 잘라내기 · 저장 · 공유 · 지우기 단추가 뜬다 — 손가락이 닿을 만큼 크게(44px) + "⋯" 로 눌러 볼 수 있음을 보여 준다 */
+.note-screen .mk-media .mk-media-label { min-height: 44px; padding: 10px 10px 6px; font-size: 13px; }
+.note-screen .mk-audio .mk-media-label::after,
+.note-screen .mk-voice-body > p:first-child .mk-media-label::after { content: "\22EF"; margin-left: auto; padding: 0 8px; font-size: 22px; line-height: 1; opacity: 0.7; }
