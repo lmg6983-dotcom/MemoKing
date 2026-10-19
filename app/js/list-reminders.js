@@ -447,6 +447,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const h = scrolls ? container.clientHeight : window.innerHeight - Math.max(0, container.getBoundingClientRect().top + window.scrollY);
     const w = calEl.clientWidth;
     if (!h || !w) return;
+    card.style.setProperty('--cal-col', `${w / 7}px`); // 달 보기 칩 글자 크기 (base.css — 칸 폭에 맞춰 한글 8자쯤)
     const side = container.clientWidth >= 640;
     // 달력 몸통 위(제목 · 보기 줄 · 여백)와 아래(카드 여백)를 실제로 재서 뺀다
     const boxR = container.getBoundingClientRect();
@@ -472,15 +473,15 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       // 비율은 요일 줄을 뺀 날 칸들의 것
       const weekdays = calEl.querySelector('[role="columnheader"]')?.getBoundingClientRect().height || 26;
       if (viewId === 'dayGridMonth') {
-        calendar.setOption('aspectRatio', Math.min(8, Math.max(0.9, w / Math.max(100, room - weekdays))));
-        // 한 주 줄 높이에서 날짜 숫자 줄과 "+n" 줄을 빼고 칩 한 개씩 — 높이는 지금 그려진 것을 잰다 (글자 크기 · 칩 모양을 바꿔도
-        //   계산이 어긋나지 않게: 칸보다 많이 넣으면 칸이 늘어나며 달력이 크기를 다시 재는 고리를 돌았다)
-        const rowH = (room - weekdays) / 6;
+        // 칸 높이: 보이는 높이에 맞추되 칩이 4개 이상 들어가게는 (휴대폰은 달력이 화면보다 길어져 밀어서 봄) —
+        //   높이는 지금 그려진 칩 · 날짜 줄 · "+n" 을 잰다 (칸보다 많이 넣으면 칸이 늘어나며 달력이 크기를 다시 재는 고리를 돌았다)
         const chip = calEl.querySelector('.mk-ev');
-        const chipH = chip ? chip.offsetHeight + (parseFloat(getComputedStyle(chip).marginBottom) || 0) : 19; // 아직 일정이 없으면 base.css 의 칩 높이
+        const chipH = Math.max(12, chip ? chip.offsetHeight + (parseFloat(getComputedStyle(chip).marginBottom) || 0) : 14); // 아직 일정이 없으면 base.css 의 칩 높이쯤
         const topH = calEl.querySelector('[role="gridcell"] > :first-child')?.offsetHeight || 24;
-        const moreH = calEl.querySelector('.mk-more')?.offsetHeight || 14;
-        const fit = Math.max(1, Math.floor((rowH - topH - moreH - 1) / Math.max(14, chipH)));
+        const moreH = calEl.querySelector('.mk-more')?.offsetHeight || 13;
+        const rowH = Math.max((room - weekdays) / 6, topH + 4 * chipH + moreH + 2);
+        calendar.setOption('aspectRatio', Math.min(8, Math.max(0.5, w / Math.max(100, rowH * 6))));
+        const fit = Math.max(1, Math.floor((rowH - topH - moreH - 1) / chipH));
         if (fit !== maxEvents) {
           maxEvents = fit;
           calendar.setOption('dayMaxEvents', fit);
