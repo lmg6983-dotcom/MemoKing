@@ -9,13 +9,15 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import com.memoking.app.drive.DriveSync
 import java.io.File
 import java.io.FileNotFoundException
 
 /**
- * "이 휴대폰에만 보관" 메모 폴더의 첨부를 다른 앱(사진·PDF 보기 등)이 열 수 있게 내어 주는 제공자.
+ * 앱 안 메모 폴더의 첨부를 다른 앱(사진·동영상·PDF 보기 등)이 열 수 있게 내어 주는 제공자.
  * 사용자가 고른 폴더(SAF)는 그 폴더의 문서 주소를 그대로 쓰므로 여기를 거치지 않는다.
- * content://com.memoking.app.files/<메모 폴더 기준 경로>
+ *   content://com.memoking.app.files/<메모 폴더 기준 경로>                  "이 휴대폰에만 보관"
+ *   content://com.memoking.app.files/~drive/<Drive 폴더 id>/<경로>         Google Drive 폴더의 휴대폰 쪽 사본
  */
 class VaultFileProvider : ContentProvider() {
     companion object {
@@ -23,12 +25,16 @@ class VaultFileProvider : ContentProvider() {
         /** 보내기용 파일(그림·PDF): cache/share/ → content://com.memoking.app.files/~share/<이름> */
         const val SHARE_DIR = "share"
         private const val SHARE_PREFIX = "~share"
+        private const val DRIVE_PREFIX = "~drive"
+
+        /** Google Drive 폴더 사본의 주소 앞부분 (FileStorage 의 shareRoot) */
+        fun driveRoot(folderId: String) = "$DRIVE_PREFIX/" + Uri.encode(folderId)
 
         fun shareUriFor(name: String): Uri = Uri.Builder().scheme("content").authority(AUTHORITY)
             .encodedPath("/$SHARE_PREFIX/" + Uri.encode(name)).build()
 
-        fun uriFor(rel: String): Uri = Uri.Builder().scheme("content").authority(AUTHORITY)
-            .encodedPath("/" + Storage.clean(rel).split('/').joinToString("/") { Uri.encode(it) })
+        fun uriFor(rel: String, root: String = ""): Uri = Uri.Builder().scheme("content").authority(AUTHORITY)
+            .encodedPath("/" + (if (root.isEmpty()) "" else "$root/") + Storage.clean(rel).split('/').joinToString("/") { Uri.encode(it) })
             .build()
 
         fun mimeOf(name: String): String =
@@ -44,8 +50,12 @@ class VaultFileProvider : ContentProvider() {
             if (file.parentFile != dir) throw FileNotFoundException()
             return file
         }
-        val root = Vaults.internalRoot(ctx).canonicalFile
-        val rel = Storage.clean(uri.pathSegments.joinToString("/"))
+        val segments = uri.pathSegments
+        // Drive 폴더 사본: 예전엔 늘 "이 휴대폰에만" 폴더에서 찾아서, Drive 를 쓰면 다른 앱으로 열기가 늘 실패했다
+        val drive = segments.firstOrNull() == DRIVE_PREFIX && segments.size >= 3
+        val root = (if (drive) DriveSync.mirrorDir(ctx, segments[1]) else Vaults.internalRoot(ctx)).canonicalFile
+        if (drive && root.parentFile != File(ctx.filesDir, "drive").canonicalFile) throw FileNotFoundException()
+        val rel = Storage.clean((if (drive) segments.drop(2) else segments).joinToString("/"))
         val file = File(root, rel).canonicalFile
         if (!file.path.startsWith(root.path + File.separator)) throw FileNotFoundException()
         return file

@@ -983,8 +983,8 @@ window.addEventListener('mk:media-error', (e) => {
   const { src, kind = 'audio' } = e.detail ?? {};
   if (!src || (lastMediaErr.src === src && Date.now() - lastMediaErr.at < 3000)) return;
   lastMediaErr = { src, at: Date.now() };
-  const what = kind === 'video' ? '동영상' : '소리';
-  toast(`${what}를 재생하지 못했어요`, true, String(src).startsWith('attachments/') ? { label: '다른 앱으로 열기', run: () => openAttachment(String(src)) } : null);
+  const what = kind === 'video' ? '동영상을' : '소리를';
+  toast(`${what} 재생하지 못했어요`, true, String(src).startsWith('attachments/') ? { label: '다른 앱으로 열기', run: () => openAttachment(String(src)) } : null);
 });
 
 // 내용을 지우거나 잘라냈으면: 되돌리기 단추가 있는 안내 (↶ 와 같은 기록으로 되돌림)

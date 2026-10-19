@@ -5,8 +5,6 @@ import android.net.Uri
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import java.io.ByteArrayInputStream
-import java.io.FilterInputStream
-import java.io.InputStream
 
 /**
  * WebView 가 읽는 주소를 앱 안 파일로 이어 준다 (네트워크를 거치지 않음).
@@ -64,37 +62,26 @@ class WebServer(private val context: Context) {
         return WebResourceResponse(type, if (type.startsWith("text/") || type.endsWith("json")) "utf-8" else null, 200, "OK", headers(type), stream)
     }
 
-    // 소리·동영상은 앞뒤로 옮겨 가며 재생하므로 Range(일부분) 요청에 답한다
+    // 소리·동영상은 앞뒤로 옮겨 가며 재생하므로 Range(일부분) 요청에 답한다 (건너뛰기는 RangeStream 이 — WebView 도 건너뛰므로)
     private fun vault(rel: String, requestHeaders: Map<String, String>): WebResourceResponse {
         val storage = Vaults.current(context) ?: return notFound()
         val stat = storage.stat(rel) ?: return notFound()
         if (stat.dir) return notFound()
         val type = typeOf(rel)
         val size = stat.size
-        val range = requestHeaders.entries.firstOrNull { it.key.equals("Range", true) }?.value
-        val match = range?.let { Regex("""bytes=(\d*)-(\d*)""").find(it) }
+        val range = RangeStream.parse(requestHeaders.entries.firstOrNull { it.key.equals("Range", true) }?.value, size)
         val head = headers(type).apply { put("Accept-Ranges", "bytes") }
-        if (match == null || size <= 0) {
+        if (range == null || size <= 0) {
             head["Content-Length"] = size.toString()
             return WebResourceResponse(type, null, 200, "OK", head, storage.openRead(rel))
         }
-        val (a, b) = match.destructured
-        val start = if (a.isEmpty()) maxOf(0, size - (b.toLongOrNull() ?: 0)) else a.toLong()
-        val end = if (a.isEmpty() || b.isEmpty()) size - 1 else minOf(b.toLong(), size - 1)
-        if (start >= size || start > end) {
+        if (range.first >= size || range.first > range.last) {
             head["Content-Range"] = "bytes */$size"
             return WebResourceResponse(type, null, 416, "Range Not Satisfiable", head, ByteArrayInputStream(ByteArray(0)))
         }
-        val stream = storage.openRead(rel)
-        var skipped = 0L
-        while (skipped < start) {
-            val n = stream.skip(start - skipped)
-            if (n <= 0) break
-            skipped += n
-        }
-        head["Content-Range"] = "bytes $start-$end/$size"
-        head["Content-Length"] = (end - start + 1).toString()
-        return WebResourceResponse(type, null, 206, "Partial Content", head, Limited(stream, end - start + 1))
+        head["Content-Range"] = "bytes ${range.first}-${range.last}/$size"
+        head["Content-Length"] = (range.last - range.first + 1).toString()
+        return WebResourceResponse(type, null, 206, "Partial Content", head, RangeStream(storage.openRead(rel), range.first, range.last))
     }
 
     // 알림 보관함의 앱 아이콘
@@ -105,23 +92,4 @@ class WebServer(private val context: Context) {
     }
 
     private fun notFound() = WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers("text/plain"), ByteArrayInputStream(ByteArray(0)))
-
-    /** 앞에서 n 바이트까지만 읽히는 스트림 */
-    private class Limited(input: InputStream, private var left: Long) : FilterInputStream(input) {
-        override fun read(): Int {
-            if (left <= 0) return -1
-            val b = super.read()
-            if (b >= 0) left--
-            return b
-        }
-
-        override fun read(b: ByteArray, off: Int, len: Int): Int {
-            if (left <= 0) return -1
-            val n = super.read(b, off, minOf(len.toLong(), left).toInt())
-            if (n > 0) left -= n
-            return n
-        }
-
-        override fun available(): Int = minOf(super.available().toLong(), left).toInt()
-    }
 }
