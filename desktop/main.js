@@ -844,6 +844,8 @@ app.on('second-instance', (_e, argv) => {
 app.whenReady().then(async () => {
   if (!gotLock) return;
   app.setAppUserModelId(APP_ID);
+  // 작업 폴더가 설치 폴더면 거기서 띄운 도우미 프로세스가 폴더를 붙잡아 업데이트(이전 파일 제거)가 실패한다
+  if (app.isPackaged) try { process.chdir(os.tmpdir()); } catch {}
 
   if (app.isPackaged) {
     try {
@@ -1110,6 +1112,11 @@ updater = new Updater({
   // 재시작 전에: 열린 메모 창의 쓰던 글을 바로 저장하고 설정도 지금 쓴다
   beforeInstall: async () => {
     quitting = true;
+    // 숨은 도우미(PowerShell)가 설치 폴더를 붙잡고 있으면 설치 프로그램이 이전 파일을 지우지 못한다 — 재시작 전에 끈다
+    popupWatcher?.stop();
+    windowManager.captureHelper.stop();
+    windowManager.desktopPin.stop();
+    windowManager.topWatch.stop();
     // 설치를 시작하지 못해 앱이 그대로 남으면(설치 파일이 막힘 등) 다시 평소대로 (창을 닫으면 알림 영역으로)
     setTimeout(() => {
       quitting = false;
@@ -1131,6 +1138,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   updater?.stop();
+  popupWatcher?.stop(); // 빠져 있어서 끝난 뒤에도 PowerShell 이 남아 설치 폴더를 붙잡았다 (업데이트 때 "이전 파일 제거 실패")
   flushOpmsFiles();
   stt?.close();
   windowManager.topWatch.stop();
