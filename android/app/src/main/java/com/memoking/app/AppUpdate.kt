@@ -33,6 +33,9 @@ object AppUpdate {
     /** 설치가 끝나지 않았을 때 (status: PackageInstaller.STATUS_*, why: 시스템 메시지) — 화면에 알리려고 */
     @Volatile var listener: ((Int, String) -> Unit)? = null
 
+    /** 지금 확인 화면을 기다리는 설치 세션 — 이 세션이 아닌 (앞서 닫은) 세션의 결과는 무시한다 (낡은 "취소됨" 이 지금 설치를 취소한 것처럼 보이지 않게) */
+    @Volatile var currentSession: Int = -1
+
     /** 새 버전인가 (versionCode 가 더 크면) */
     fun isNewer(currentCode: Int, latestCode: Int): Boolean = latestCode > currentCode
 
@@ -175,6 +178,7 @@ object AppUpdate {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
         }
         val id = installer.createSession(params)
+        currentSession = id
         installer.openSession(id).use { session ->
             FileInputStream(file).use { input ->
                 session.openWrite("memoking.apk", 0, file.length()).use { out ->
@@ -194,6 +198,9 @@ object AppUpdate {
 class UpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+        // 앞서 닫은(다시 눌러 정리한) 세션이 뒤늦게 보내는 결과는 지금 설치와 상관없다
+        val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
+        if (sessionId != -1 && sessionId != AppUpdate.currentSession) return
         when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 @Suppress("DEPRECATION")
