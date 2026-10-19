@@ -934,7 +934,7 @@ el.editorRoot.addEventListener('dblclick', (e) => {
   openHref(target);
 });
 
-// 파일 칩에 마우스를 올리면 이름·크기 안내 (한 줄에 칩만 있으면 눌러도 열지 않고 단추 줄의 "열기"로 — block-move.js)
+// 파일 칩에 마우스를 올리면 이름·크기 안내 (PC 는 누르면 바로 열리고, 휴대폰은 눌러서 나오는 단추 줄의 "열기" — block-move.js)
 const hint = document.createElement('div');
 hint.className = 'hover-hint';
 hint.hidden = true;

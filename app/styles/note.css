@@ -1357,35 +1357,35 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
   .mk-delete-btn.fading, .mk-delete-btn.pressed { opacity: 0; }
   .mk-doc .mk-deleting { animation: none; opacity: 0; transition: none; }
 }
-@media print { .mk-delete-btn, :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) { display: none !important; } }
+@media print { .mk-delete-btn, :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) { display: none !important; } }
 /* 복사 · 저장 단추: 지우기 단추 왼쪽에 차례로, 같은 크기 · 동그라미에 글자색 아이콘 (누르면 ✓ 초록, 실패하면 !) — 메모 색 · 어두운 화면을 따라감 */
-:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) {
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) {
   position: fixed; z-index: 70; display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
   border: 1px solid color-mix(in srgb, var(--text-strong, #111) 10%, transparent); border-radius: 50%; background: var(--surface-2); color: var(--text-strong, #222);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); cursor: pointer; animation: mk-del-in 0.22s var(--ease-out) both;
   -webkit-tap-highlight-color: transparent;
 }
 /* 손가락 닿는 범위: 바깥쪽은 넉넉히, × 쪽(오른쪽)은 좁게 — 복사하려다 지우지 않게 */
-:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn)::before { content: ""; position: absolute; inset: -8px -4px -8px -8px; border-radius: 50%; }
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn)::before { content: ""; position: absolute; inset: -8px -4px -8px -8px; border-radius: 50%; }
 .mk-delete-btn::before { inset: -10px -10px -10px -4px; }
-:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):active { transform: scale(0.88); }
-:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).done { color: var(--ok-text); }
-:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).failed { color: var(--danger); }
-:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).failed svg { stroke-width: 2.4; }
-:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
-:is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):active { transform: scale(0.88); }
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).done { color: var(--ok-text); }
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).failed { color: var(--danger); }
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).failed svg { stroke-width: 2.4; }
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
 .mk-delete-btn { background: var(--surface-2); color: #c4282e; } /* 흰 바탕 위 빨간 × 를 4.5:1 넘게 (--rec #e5484d 는 3.9) */
 @media (prefers-color-scheme: dark) { .mk-delete-btn { color: #ff6b70; } }
 body[data-color="charcoal"] .mk-delete-btn { color: #ff6b70; }
 /* 어두운 숯색 메모 위에서도 또렷하게 */
-body[data-color="charcoal"] :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
-body[data-color="charcoal"] :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) { color: #f1f1ef; }
+body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
+body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) { color: #f1f1ef; }
 /* 열기: 이 단추들 중 하는 일이 가장 큰 것 — 노란 바탕으로 */
 .mk-open-btn, body[data-color="charcoal"] .mk-open-btn { background: var(--brand-yellow, #ffd43b); color: var(--on-brand, #111); border-color: transparent; }
-body[data-color="charcoal"] :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).done { color: #69db7c; }
+body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).done { color: #69db7c; }
 .mk-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: none; } :is(.mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: none; } :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { opacity: 0; } }
 
 /* 추천 태그 막대 (태그 없는 메모, 본문 아래) — PC. 휴대폰은 mobile.css 가 크기를 덮어쓴다 */
 .tag-suggest-bar { display: flex; align-items: center; gap: 6px; flex: none; padding: 3px 4px 3px 10px; border-top: 1px solid color-mix(in srgb, var(--note-text) 8%, transparent); animation: mk-pop-in 0.18s ease-out; }

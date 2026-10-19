@@ -93,7 +93,7 @@ function blockInfo(doc, pos, inner) {
 // 누르는 사이 감긴 재생 위치는 들어 올릴 때 되돌린다
 export const MEDIA_SCRUB = '.plyr__menu__container';
 const GRAB_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card], a, .mk-math-block, hr';
-// PC 에서 마우스를 올리면 복사 · 지우기 단추가 뜨는 "내용": 그림 · 손 메모 · 소리 · 동영상 · 링크 카드 · 파일 칩(PDF 등) ·
+// PC 에서 오른쪽 클릭 메뉴(맨 위 아이콘 줄 — 잘라내기 · 복사 · 저장 · 공유 · 지우기)를 띄우는 "내용": 그림 · 손 메모 · 소리 · 동영상 · 링크 카드 · 파일 칩(PDF 등) ·
 //   수식 블록 · 표 · 음성 카드 (글자 링크 · 글 속 수식 · 가로줄은 빼고 — 글을 읽는 데 방해되지 않게)
 const HOVER_TARGET = 'img.mk-image, .mk-ink, .mk-media, .mk-link-card, [data-link-card], a[data-file], .mk-math-block, .mk-voice, .tableWrapper';
 const NO_GRAB = '.plyr__controls, .plyr__control, button, input, select, textarea, [contenteditable="true"] [contenteditable="true"]';

@@ -981,6 +981,7 @@ for (const [btn, shift] of [[el.undoBtn, false], [el.redoBtn, true]]) {
 //   머리글 행만 남았을 때 "표 삭제" · 열이 하나뿐일 때 "표 삭제" 가 표를 지우고, 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽에 떠 있다 (block-move.js)
 function showTableBar(table) {
   if (!table) closeTableMore();
+  el.screen.classList.toggle('in-table', Boolean(table)); // 표를 고치는 동안 추천 태그 줄은 접어 세로 자리를 아낀다 (표 막대 · 서식 막대가 그만큼 더 쓰도록)
   if (el.tableBar.hidden !== !table) {
     el.tableBar.hidden = !table;
     placeKnob(); // + · 다이얼을 표 막대 위로 (닫히면 제자리)

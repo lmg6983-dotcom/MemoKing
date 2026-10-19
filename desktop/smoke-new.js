@@ -1323,6 +1323,36 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       }
     }
 
+    // 음성 카드 · 소리: 오른쪽 클릭 메뉴(잘라내기 · 복사 · 저장 · 공유 · 지우기 + 이름 변경), 소리 줄을 골라도 글 서식 막대는 쓸 수 없음, 이름 변경이 설명(alt)에 반영
+    {
+      const vault2 = getVault();
+      fs.writeFileSync(path.join(vault2.root, 'attachments', 'voice-smoke.m4a'), 'smoke');
+      const vid = vault2.import({ body: '# 음성 점검\n\n> ![녹음 · 00:12](attachments/voice-smoke.m4a)\n>\n> **화자 1:** 안녕하세요.\n\n끝\n' });
+      windowManager.openNote(vid);
+      const vw = await until(() => noteWins.get(vid), '음성 메모 창', 6000).catch(() => null);
+      if (vw) await until(() => js(vw, `document.documentElement.dataset.ready === 'true' && !!document.querySelector('.mk-voice')`), '음성 카드 보임', 8000).catch(() => {});
+      const rc = async (sel) => {
+        const r = await js(vw, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + Math.min(40, r.width / 2)), y: Math.round(r.top + Math.min(14, r.height / 2)) }; })()`);
+        if (!r) return null;
+        vw.webContents.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
+        vw.webContents.sendInputEvent({ type: 'mouseDown', x: r.x, y: r.y, button: 'right', clickCount: 1 });
+        vw.webContents.sendInputEvent({ type: 'mouseUp', x: r.x, y: r.y, button: 'right', clickCount: 1 });
+        return until(() => js(vw, `(() => { const m = document.querySelector('.mk-ctx'); return m && { icons: [...m.querySelectorAll('.mk-ctx-ic')].map((b) => b.dataset.id), items: [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.dataset.id) }; })()`), '음성 카드 메뉴', 3000).catch(() => null);
+      };
+      const menu = vw ? await rc('.mk-voice') : null;
+      check('음성 카드: 오른쪽 클릭 → 잘라내기 · 복사 · 저장 · 공유 · 지우기 아이콘 + 이름 변경', menu?.icons.join() === 'cut,copy,save,share,delete' && menu.items.includes('rename'), JSON.stringify(menu));
+      if (menu) {
+        const pos = await js(vw, `(() => { const e = document.querySelector('.mk-ctx-item[data-id="rename"]'); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+        vw.webContents.sendInputEvent({ type: 'mouseMove', x: pos.x, y: pos.y });
+        await wait(80);
+        vw.webContents.sendInputEvent({ type: 'mouseDown', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
+        vw.webContents.sendInputEvent({ type: 'mouseUp', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
+        await until(() => js(vw, `!!document.querySelector('.mk-prompt input')`), '이름 입력 창', 3000);
+        await js(vw, `(() => { const i = document.querySelector('.mk-prompt input'); i.value = '회의 녹음'; i.form.requestSubmit(); })()`);
+        const saved = await until(() => /!\[회의 녹음\]\(attachments\/voice-smoke\.m4a\)/.test(vault2.get(vid)?.body ?? ''), '바뀐 이름 저장', 5000).catch(() => false);
+        check('음성 카드 이름 변경: 소리의 설명(alt)이 새 이름으로 저장됨', saved, vault2.get(vid)?.body);
+      }
+    }
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {

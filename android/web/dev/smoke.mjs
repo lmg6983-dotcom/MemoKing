@@ -1444,6 +1444,25 @@ try {
     const shown = await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn') && await page.isVisible('.mk-save-btn');
     const order = await page.evaluate(() => ['.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
     check('글 고치기 방식: 그림을 짧게 누르면 저장 · 복사 · × 단추 (왼쪽부터)', shown && order[0] < order[1] && order[1] < order[2], JSON.stringify({ shown, order }));
+    // 잘라내기 단추: 복사(그림 그대로)와 지우기가 함께 — 복사 단추와 저장 단추 사이, 누르면 그 그림이 사라지고 복사 기록이 남으며 되돌릴 수 있다
+    {
+      const cutOrder = await page.evaluate(() => ['.mk-save-btn', '.mk-cut-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
+      const imgsBefore = await page.locator('img.mk-image').count();
+      const copyLog = (await devLog()).log.filter((x) => x.copyImage).length;
+      await page.tap('.mk-cut-btn');
+      await page.waitForTimeout(1400);
+      const imgsAfter = await page.locator('img.mk-image').count();
+      const copied = (await devLog()).log.filter((x) => x.copyImage).length > copyLog;
+      check('잘라내기 단추: 저장 · 잘라내기 · 복사 · × 순서, 누르면 그림을 복사한 뒤 지움', cutOrder.every((x) => x >= 0) && cutOrder[0] < cutOrder[1] && cutOrder[1] < cutOrder[2] && cutOrder[2] < cutOrder[3] && copied && imgsAfter === imgsBefore - 1, JSON.stringify({ cutOrder, copied, imgsBefore, imgsAfter }));
+      await page.tap('#undo-btn').catch(async () => page.keyboard.press('Control+z'));
+      await page.waitForTimeout(600);
+      check('잘라낸 그림은 실행 취소로 되살아남', (await page.locator('img.mk-image').count()) === imgsBefore, String(await page.locator('img.mk-image').count()));
+      const ib3 = await page.locator('img.mk-image').first().boundingBox();
+      await touch('touchStart', ib3.x + 40, ib3.y + 40);
+      await page.waitForTimeout(80);
+      await touch('touchEnd', ib3.x + 40, ib3.y + 40);
+      await page.waitForTimeout(250);
+    }
     await shot('18c-tap-buttons');
     // 저장 단추: 메모 폴더의 사진은 원본 파일 그대로 안드로이드 저장 창으로
     await page.tap('.mk-save-btn');
@@ -1594,6 +1613,11 @@ try {
     await shot('10-table-more');
     await page.tap('#table-more-btn');
     check('휴대폰 표 막대: 한 줄(80px 안) · 행 · 열 · 칸은 아이콘만 · 표 · 바꾸기는 "⋯" 로 막대 위에 펼쳐지고 막대 높이는 그대로', h > 0 && h <= 80 && iconOnly && hiddenBefore && open.shown && open.above && open.h === h, JSON.stringify({ h, iconOnly, hiddenBefore, open }));
+  }
+  // 표를 고치는 동안은 추천 태그 줄을 접어 세로 자리를 아낀다
+  {
+    const tagHidden = await page.evaluate(() => getComputedStyle(document.getElementById('tag-suggest-bar')).display === 'none');
+    check('휴대폰 표 편집 중: 추천 태그 줄은 접힘 (세로 자리 절약)', tagHidden);
   }
   // 표를 고치는 동안 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽 밖에 (표를 가리지 않는 자리)
   {
@@ -1881,7 +1905,7 @@ try {
       document.querySelector('#note-screen .ProseMirror').dispatchEvent(new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true }));
     }, [text, html]);
     const settle = async () => {
-      await page.locator('.mk-doc h1').first().tap();
+      await page.locator('.mk-doc h1').first().tap({ position: { x: 24, y: 8 } }); // 제목의 왼쪽 (표 위 단추 줄이 오른쪽에 걸쳐 있을 수 있다)
       await page.waitForTimeout(1200);
     };
     await fetch(`${base}/dev/pick`, { method: 'POST', body: JSON.stringify([{ name: '칸.png', mime: 'image/png', base64: fs.readFileSync(path.join(repo, 'assets/icons/icon-256.png')).toString('base64') }]) });

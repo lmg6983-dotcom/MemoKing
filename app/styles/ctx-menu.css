@@ -2,7 +2,7 @@
 .mk-ctx {
   --ctx-bg: #fff; --ctx-text: #1b1b1b; --ctx-muted: #6b6b6b; --ctx-line: rgba(0, 0, 0, 0.09); --ctx-hover: rgba(0, 0, 0, 0.06); --ctx-danger: #c4282e;
   position: fixed; z-index: 100000;
-  min-width: 232px; max-width: 340px; padding: 4px;
+  min-width: 232px; max-width: 340px; max-height: calc(100vh - 12px); overflow-y: auto; padding: 4px;
   border-radius: 10px; background: var(--ctx-bg); color: var(--ctx-text);
   box-shadow: 0 0 0 1px var(--ctx-line), 0 10px 32px rgba(0, 0, 0, 0.22);
   font: 13.5px/1.35 var(--font-sans, system-ui, sans-serif); user-select: none;
