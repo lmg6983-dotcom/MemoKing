@@ -1074,6 +1074,55 @@ export async function runSmoke({
     await js(noteWins.get(sB.id), `document.querySelector('.stack-add').click()`);
     const newTab = await until(() => stacks.stackOf(sA.id)?.memos.find((m) => ![sA.id, sB.id, sC.id].includes(m) && tabShown(m)), '+ 새 탭').catch(() => null);
     check('+ → 새 메모가 보이는 탭 바로 뒤에 새 탭으로', Boolean(newTab) && stacks.stackOf(sA.id).memos.join() === [sA.id, sB.id, newTab, sC.id].join());
+    // 탭 끌어 순서 바꾸기 (크롬 탭처럼): 끄는 동안 다른 탭이 미리 비켜 서고, 놓으면 그 순서
+    if (newTab) {
+      const vis = () => [sA.id, sB.id, newTab, sC.id].find((m) => tabShown(m));
+      const w1 = noteWins.get(vis());
+      await ready(w1);
+      await until(() => js(w1, `document.querySelectorAll('#stack-tabs .stack-tab').length === 4 && !document.body.classList.contains('tab-arriving')`), '탭 4개가 그려짐', 8000).catch(() => {});
+      const counts = await Promise.all([sA.id, sB.id, newTab, sC.id].map(async (m) => `${tabShown(m) ? '*' : ''}${await js(noteWins.get(m), `document.querySelectorAll('#stack-tabs .stack-tab').length`)}`));
+      // 탭이 다 보이도록 창을 키운다 (작은 창에서는 아래 탭이 줄 밖)
+      for (const m of [sA.id, sB.id, newTab, sC.id]) noteWins.get(m).setSize(320, 560);
+      await wait(400);
+      const geo = (w, id) => js(w, `(() => { const r = document.querySelector('.stack-tab[data-tab-id="${id}"]').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+      const ga = await geo(w1, sA.id);
+      const gc = await geo(w1, sC.id);
+      // 탭 줄은 창 끌기 영역이라 가짜 마우스 입력이 닿지 않는다 — 포인터 이벤트를 직접 (창 안 좌표 = 화면 좌표 − 창 위치 …) 보낸다
+      const tabPtr = (w, id, type, x, y) => js(w, `(() => {
+        const target = ${type === 'pointerdown' ? `document.querySelector('.stack-tab[data-tab-id="${id}"]')` : 'window'};
+        target.dispatchEvent(new PointerEvent('${type}', { bubbles: true, cancelable: true, pointerId: 9, pointerType: 'mouse', isPrimary: true, button: 0, buttons: ${type === 'pointerup' ? 0 : 1}, clientX: ${x}, clientY: ${y}, screenX: ${x + 100}, screenY: ${y + 100} }));
+      })()`);
+      const mouse = (type, x, y) => (type === 'mouseDown' ? tabPtr(w1, sA.id, 'pointerdown', x, y) : type === 'mouseUp' ? tabPtr(w1, sA.id, 'pointerup', x, y) : tabPtr(w1, sA.id, 'pointermove', x, y));
+      await mouse('mouseMove', ga.x, ga.y);
+      await mouse('mouseDown', ga.x, ga.y);
+      const endY = gc.y + 4; // 탭 줄 밖으로 나가면 창으로 떼어지므로 줄 안에서
+      for (let i = 1; i <= 10; i++) {
+        await mouse('mouseMove', ga.x + 2, Math.round(ga.y + ((endY - ga.y) * i) / 10));
+        await wait(40);
+      }
+      const live = await js(w1, `(() => { const moved = [...document.querySelectorAll('.stack-tab')].filter((t) => t.style.transform && !t.classList.contains('lifting')).map((t) => t.dataset.tabId); const lifted = document.querySelector('.stack-tab.lifting')?.dataset.tabId; return { moved, lifted, n: document.querySelectorAll('#stack-tabs .stack-tab').length }; })()`);
+      await mouse('mouseUp', ga.x + 2, endY);
+      const reordered = await until(() => stacks.stackOf(sA.id)?.memos.join() === [sB.id, newTab, sC.id, sA.id].join(), '탭 순서 바뀜', 3000).catch(() => false);
+      check('탭을 끌면 다른 탭이 미리 비켜 서고(끄는 동안), 놓으면 그 자리로 순서가 바뀜', live.lifted === sA.id && live.moved.length === 3 && reordered, JSON.stringify({ live, counts, order: stacks.stackOf(sA.id)?.memos }));
+      // 이번엔 위로 끌어 되돌린다 (뒤 점검은 A · B · 새 탭 · C 순서) — 끌면 그 탭이 보이는 탭이 된다
+      const wA = noteWins.get(sA.id);
+      await until(() => tabShown(sA.id), 'A 탭이 보임', 3000).catch(() => {});
+      const g1 = await geo(wA, sA.id);
+      const g0 = await geo(wA, sB.id);
+      const mouseA = (type, x, y) => (type === 'mouseDown' ? tabPtr(wA, sA.id, 'pointerdown', x, y) : type === 'mouseUp' ? tabPtr(wA, sA.id, 'pointerup', x, y) : tabPtr(wA, sA.id, 'pointermove', x, y));
+      await mouseA('mouseMove', g1.x, g1.y);
+      await mouseA('mouseDown', g1.x, g1.y);
+      for (let i = 1; i <= 10; i++) {
+        await mouseA('mouseMove', g1.x + 2, Math.round(g1.y + ((g0.y - 4 - g1.y) * i) / 10));
+        await wait(40);
+      }
+      await mouseA('mouseUp', g1.x + 2, g0.y - 4);
+      const restored = await until(() => stacks.stackOf(sA.id)?.memos.join() === [sA.id, sB.id, newTab, sC.id].join(), '탭 순서 되돌림', 3000).catch(() => false);
+      check('탭을 위로 끌어도 같은 방식으로 순서가 바뀜', restored, JSON.stringify(stacks.stackOf(sA.id)?.memos));
+      const visible = [sA.id, sB.id, newTab, sC.id].find((m) => tabShown(m));
+      if (visible && visible !== newTab) await js(noteWins.get(visible), `document.querySelector('.stack-tab[data-tab-id="${newTab}"]').click()`);
+      await until(() => tabShown(newTab), '새 탭으로').catch(() => {});
+    }
     if (newTab) {
       await ready(noteWins.get(newTab));
       noteWins.get(newTab).webContents.focus();

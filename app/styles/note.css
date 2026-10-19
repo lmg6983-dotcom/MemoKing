@@ -894,6 +894,7 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
 
 /* 탭 끌기 (v0.14.0): 탭 줄 안에서는 탭이 들려 커서를 따라온다 */
 .stack-tab.lifting {
+  transition: none; /* 커서를 그대로 따라온다 */
   z-index: 2;
   box-shadow: var(--shadow-pop);
   cursor: grabbing;
@@ -1926,9 +1927,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 /* 누르면 열리는 내용(파일 칩 · 소리 이름 줄 · 링크 카드 · 수식)은 글 커서(I)가 아니라 손가락 커서 — 짧게 눌렀다 떼면 열고, 누른 채 움직이면 옮긴다 */
 .mk-doc a[data-file], .mk-doc .mk-media .mk-media-label, .mk-doc .mk-link-card .lc-main, .mk-doc .mk-math-block { cursor: pointer; }
 
-/* 탭 순서 바꾸기: 놓을 자리에 줄 (끌고 있는 탭 위에서 위/아래) */
-.stack-tab.drop-before::before, .stack-tab.drop-after::before {
-  content: ""; position: absolute; left: 4px; right: 4px; height: 3px; border-radius: 3px; background: var(--note-fg, #111); z-index: 3; pointer-events: none;
-}
-.stack-tab.drop-before::before { top: -2px; }
-.stack-tab.drop-after::before { bottom: -2px; }
+
+/* 탭 순서 바꾸기(크롬 탭처럼): 끄는 동안 비켜 서는 탭들이 부드럽게 자리를 바꾼다 */
+.stack-tab.shifting { transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1); }
+@media (prefers-reduced-motion: reduce) { .stack-tab.shifting { transition: none; } }
