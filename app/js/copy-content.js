@@ -24,6 +24,10 @@ let host = {
   /** 공유: { name, mime, rel? | base64?, text? } — 휴대폰 공유 창 · PC 공유 방법 고르기(share-menu.js) (없으면 공유 단추를 보이지 않음)
    *  → 휴대폰 'shared' · PC 'link' | 'localsend' | 'localsend-missing' | 'mail' · 둘 다 'cancelled' (문구는 share-menu.js SHARE_DONE) */
   share: null,
+  /** PC 끌어내기: 메모 안 내용을 탐색기 · 바탕화면 · 카카오톡 같은 다른 프로그램으로 — ({ name, rel? | base64? }) 끌기를 시작 */
+  dragOut: null,
+  /** PC: 끌어다 놓은 File 의 원래 경로 ('' = 알 수 없음) — 메모킹이 끌어낸 임시 파일이 도로 떨어졌는지 알아보는 데 */
+  pathOf: null,
   /** PC 오른쪽 클릭 메뉴: ([{ id, label, accelerator? } | { type: 'separator' }], { x, y } | null) → 고른 id | null (없으면 앱 기본 메뉴) */
   menu: null,
 };
@@ -290,3 +294,24 @@ export async function shareBlock(view, pos, node, target) {
 /** 내용 오른쪽 클릭 메뉴를 띄울 수 있는 앱인가 (PC) */
 export const canMenu = () => Boolean(host.menu);
 export const chooseMenu = (items, at = null) => (host.menu ? host.menu(items, at) : Promise.resolve(null));
+
+/** 내용을 다른 프로그램으로 끌어낼 수 있는 앱인가 (PC) */
+export const canDragOut = () => Boolean(host.dragOut);
+
+/**
+ * 편집기 안의 한 덩어리를 파일로 다른 프로그램에 끌어내기 시작 — 메모 폴더의 파일은 복사본으로, 만든 내용(손 메모 PNG · 표 CSV)은 새 파일로.
+ * 글뿐인 것(수식 · 링크 카드)은 파일로 만들 이유가 없어 끌어내지 않는다 → 시작했는가
+ */
+export async function dragOutBlock(view, pos, node, target, name = '') {
+  if (!host.dragOut) return false;
+  const { text: _text, mime: _mime, ...f } = await blockPayload(view, pos, node, target);
+  if (!f.rel && /\.txt$/i.test(f.name ?? '')) return false;
+  host.dragOut({ ...f, name: name || f.name });
+  return true;
+}
+
+/** 방금 끌어낸 임시 파일이 메모에 도로 떨어졌는가 (그러면 파일이 하나 더 생기지 않게 무시) */
+export function isOwnDragOut(dataTransfer) {
+  if (!host.pathOf || !dataTransfer?.files?.length) return false;
+  return [...dataTransfer.files].some((file) => /[\\/]memoking-drag[\\/]/.test(host.pathOf(file)));
+}

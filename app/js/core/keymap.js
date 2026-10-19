@@ -31,6 +31,7 @@ export const KEYMAP_ACTIONS = [
   { id: 'code', group: '글자', label: '코드', help: '고른 글자를 코드 모양(고정 폭 글꼴)으로 바꿔요.', keys: ['ctrl+KeyE'], run: ['cmd', 'code'] },
   { id: 'color', group: '글자', label: '글자 색 (마지막 색)', help: '마지막으로 쓴 글자 색을 고른 글자에 칠해요.', keys: ['ctrl+shift+KeyC'], run: ['color', 'color'] },
   { id: 'highlight', group: '글자', label: '형광펜 (마지막 색)', help: '마지막으로 쓴 형광펜 색으로 고른 글자를 칠해요.', keys: ['ctrl+shift+KeyH'], run: ['color', 'highlight'] },
+  { id: 'clearFormat', group: '글자', label: '서식 지우기', help: '고른 글자의 굵게 · 색 같은 모양을 지워요. 고른 것이 없으면 커서가 있는 문단을 보통 글로 되돌려요 (표는 글로, 목록은 풀어서).', keys: ['ctrl+Backslash'], run: ['cmd', 'clearFormat'] },
   { id: 'h1', group: '글자', label: '제목 1', help: '지금 줄을 가장 큰 제목으로 바꿔요.', keys: ['ctrl+Digit1'], run: ['cmd', 'h1'] },
   { id: 'h2', group: '글자', label: '제목 2', help: '지금 줄을 중간 제목으로 바꿔요.', keys: ['ctrl+Digit2'], run: ['cmd', 'h2'] },
   { id: 'h3', group: '글자', label: '제목 3', help: '지금 줄을 작은 제목으로 바꿔요.', keys: ['ctrl+Digit3'], run: ['cmd', 'h3'] },
@@ -53,6 +54,7 @@ export const FIXED_KEYS = [
   ['본문 확대, 축소', 'Ctrl+휠 / Ctrl+= / Ctrl+-'],
   ['항목, 줄 순서 바꾸기', 'Alt+↑ / Alt+↓'],
   ['표: 다음, 이전 칸', 'Tab / Shift+Tab'],
+  ['서식 없이 붙여넣기', 'Ctrl+Shift+V'],
 ];
 
 // 편집 · 창이 늘 쓰는 키 — 다른 기능에 줄 수 없다

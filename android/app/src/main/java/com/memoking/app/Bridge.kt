@@ -332,6 +332,33 @@ class Bridge(private val activity: MainActivity) {
             "exactAlarmSettings" -> activity.runOnUiThread { activity.openExactAlarmSettings(id) }
             "historyPermission" -> activity.runOnUiThread { activity.openNotificationAccess(id) }
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
+            // 앱 안 업데이트 (AppUpdate.kt): 확인 → 받기(진행은 'update' 소식) → 설치 화면 열기
+            "updateCheck" -> pool.execute { resolve(id) { AppUpdate.check() } }
+            "updateDownload" -> pool.execute {
+                resolve(id) {
+                    AppUpdate.download(ctx, a) { done, total ->
+                        activity.runOnUiThread { activity.emit("update", JSONObject().put("done", done).put("total", total)) }
+                    }
+                    true
+                }
+            }
+            // → "started"(설치 화면으로 넘김) | "permission"(출처를 알 수 없는 앱 설치 허용 화면을 열었음 — 허용 뒤 다시) | "missing"(받은 파일이 없음)
+            "updateInstall" -> activity.runOnUiThread {
+                resolve(id) {
+                    val file = AppUpdate.downloaded(ctx)
+                    when {
+                        file == null -> "missing"
+                        !AppUpdate.canInstall(ctx) -> {
+                            AppUpdate.openInstallSettings(activity)
+                            "permission"
+                        }
+                        else -> {
+                            AppUpdate.install(ctx, file)
+                            "started"
+                        }
+                    }
+                }
+            }
             // 휴대폰 캘린더 (삼성 캘린더 · Google 캘린더) 함께 보기: 권한 묻기 · 일정 읽기
             "calendarPermission" -> activity.runOnUiThread { activity.requestCalendarPermission(id) }
             "calendarEvents" -> pool.execute { resolve(id) { DeviceCalendar.events(ctx, a.getLong("from"), a.getLong("to")) } }

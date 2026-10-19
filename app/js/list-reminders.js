@@ -454,7 +454,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       }
     }
   }
-  new ResizeObserver(() => fitSize()).observe(container);
+  new ResizeObserver(() => requestAnimationFrame(fitSize)).observe(container); // 다음 화면에서 (달력 크기를 바꾸며 생기는 고리 경고 없이 — 오늘 날짜에 따라 칩 수가 달라져 나던 오류)
 
   function markView() {
     for (const b of views.querySelectorAll('button')) {

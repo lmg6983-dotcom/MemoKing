@@ -174,6 +174,7 @@
       <button type="button" data-table="joinTable">아래 표와 합치기</button>
       <span class="table-bar-sep"></span>
       <button type="button" data-table="toList">목록으로</button>
+      <button type="button" data-table="toTask">체크리스트로</button>
       <button type="button" data-table="toText">글로</button>
       <button type="button" data-table="autoFit">크기 맞춤</button>
     </div>
@@ -507,6 +508,12 @@
   <section id="settings-sheet" class="sheet settings-sheet" role="dialog" aria-label="설정" hidden>
     <div class="sheet-grip"></div>
     <h2 class="sheet-title">설정</h2>
+    <!-- 앱 버전 · 업데이트 (android/web/js/updates.js) -->
+    <div class="drive-box app-box" id="app-box" aria-label="메모킹 버전과 업데이트">
+      <svg class="drive-box-icon"><use href="#i-crown"/></svg>
+      <div class="drive-box-text"><b>메모킹 <span id="update-current"></span></b><small id="update-note" role="status"></small></div>
+      <button type="button" class="btn small update-btn" id="update-check" data-state="idle">업데이트 확인</button>
+    </div>
     <p class="label">Google Drive 동기화</p>
     <div class="drive-box" id="drive-box">
       <svg class="drive-box-icon"><use href="#i-cloud"/></svg>
@@ -590,6 +597,30 @@
     </label>
     <p class="version" id="version"></p>
     <p class="copyright">© 2026 메모킹 | 문의 lmg6983@gmail.com</p>
+  </section>
+
+  <!-- 새 버전: 바뀐 점 → 받아서 설치(진행률) → 안드로이드 설치 화면 (android/web/js/updates.js) -->
+  <section id="update-sheet" class="sheet update-sheet" role="dialog" aria-labelledby="update-title" hidden>
+    <div class="sheet-grip"></div>
+    <header class="update-head">
+      <span class="update-badge" aria-hidden="true"><svg><use href="#i-crown"/></svg></span>
+      <div class="update-head-text">
+        <h2 id="update-title">새 버전이 나왔어요</h2>
+        <p class="update-version" id="update-version"></p>
+      </div>
+    </header>
+    <h3 class="update-notes-title" id="update-notes-title">바뀐 점</h3>
+    <div class="update-notes" id="update-notes" tabindex="0" role="region" aria-labelledby="update-notes-title"></div>
+    <div class="update-progress" id="update-progress" hidden>
+      <div class="update-bar"><span id="update-bar-fill"></span></div>
+      <small id="update-progress-text" role="status"></small>
+    </div>
+    <p class="update-hint" id="update-hint" role="status" hidden></p>
+    <p class="update-error" id="update-error" role="alert" hidden></p>
+    <div class="sheet-actions update-actions">
+      <button type="button" class="btn" id="update-later">나중에</button>
+      <button type="button" class="btn primary" id="update-go">받아서 설치</button>
+    </div>
   </section>
 
   <!-- 알림 보관함: 앱마다 모을지 고르기 -->

@@ -28,9 +28,9 @@ import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { keepIndent, keepLeadingSpaces, hasLeadingSpaces, NBSP } from './core/indent-spaces.js';
 import { INVISIBLE } from './tidy-text.js';
 import { plainTextOf, spacedHtml } from './clipboard-text.js';
-import { handleImageCopy } from './copy-content.js';
+import { isOwnDragOut, handleImageCopy } from './copy-content.js';
 import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
-import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable, tableToBlocks } from './table-extras.js';
+import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable, tableToBlocks, tableLines } from './table-extras.js';
 import { createListDrag, moveItemBy, currentItem } from './list-drag.js';
 import { createBlockMove, createContentLines, MEDIA_SCRUB, moveBlockBy } from './block-move.js';
 import { createTapList } from './tap-list.js';
@@ -578,6 +578,19 @@ function pastePlainLines(v, plain) {
   // 문단들을 담은 문서에서 첫 문단 안 ~ 끝 문단 안을 잘라, 양 끝이 지금 줄에 이어 붙게 (열린 조각)
   const doc = schema.topNodeType.create(null, paras);
   v.dispatch(v.state.tr.replaceSelection(doc.slice(1, doc.content.size - 1)).setMeta('uiEvent', 'paste').scrollIntoView());
+}
+
+/**
+ * 서식 없이 붙여넣기 (Ctrl+Shift+V · 오른쪽 클릭 › 서식 없이 붙여넣기) — 복사해 온 글자 모양 · 링크 · 목록 · 표를 버리고 글자만.
+ * 코드 블록은 줄바꿈 그대로, 표 칸은 한 줄로(칸 안 줄바꿈은 <br> 이라야 저장된다), 그 밖은 줄마다 문단.
+ */
+function pasteAsText(v, text) {
+  const plain = String(text ?? '').replace(/\r\n?/g, '\n').replace(INVISIBLE, '');
+  if (!plain) return false;
+  if (v.state.selection.$from.parent.type.spec.code) v.dispatch(v.state.tr.insertText(plain).setMeta('uiEvent', 'paste').scrollIntoView());
+  else if (isInTable(v.state)) v.dispatch(v.state.tr.insertText(plain.replace(/\n+/g, ' ').trim()).setMeta('uiEvent', 'paste').scrollIntoView());
+  else pastePlainLines(v, plain);
+  return true;
 }
 
 const keepIndentPlugin = $prose(() => {
@@ -1191,14 +1204,28 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }
   if (!readOnly) inkEditHandler = (v, pos) => editInk(v, pos); // 보기만 하는 편집기(PDF·옆 메모)는 이어 그리기 없음
 
+  // 파일들을 메모 폴더에 저장 → 넣을 줄들. 하나가 안 읽혀도(폴더 · 잠긴 파일 · 너무 큰 파일) 나머지는 그대로 넣고 알린다
+  //   (예전에는 하나만 실패해도 여러 파일을 한꺼번에 놓은 것이 통째로 사라졌다)
   async function filesToItems(files) {
     const items = [];
+    const failed = [];
     for (const file of files) {
-      const kind = mediaKind(file);
-      const src = await saveFile(file);
-      if (kind === 'file') items.push({ kind, src, name: file.name });
-      else items.push({ kind, src, alt: kind === 'video' ? `동영상 ${baseName(file.name)}` : baseName(file.name) });
+      try {
+        const kind = mediaKind(file);
+        const src = await saveFile(file);
+        if (kind === 'file') items.push({ kind, src, name: file.name });
+        else items.push({ kind, src, alt: kind === 'video' ? `동영상 ${baseName(file.name)}` : baseName(file.name) });
+      } catch (err) {
+        console.warn('파일을 넣지 못했습니다', file.name, err);
+        failed.push(file.name || '이름 없는 파일');
+      }
     }
+    if (failed.length) {
+      const names = `${failed.slice(0, 2).join(', ')}${failed.length > 2 ? ' 등' : ''}`;
+      onNotice?.(items.length
+        ? `파일 ${items.length}개를 넣었어요. ${failed.length}개(${names})는 읽지 못해 넣지 못했어요`
+        : `파일을 넣지 못했어요 (${names}). 폴더는 넣을 수 없어요`, true);
+    } else if (items.length > 1) onNotice?.(`파일 ${items.length}개를 넣었어요`);
     return items;
   }
 
@@ -1485,6 +1512,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     },
   }));
 
+  let plainPasteKey = 0; // Ctrl+Shift+V 를 누른 때 (performance.now)
   const pastePlugin = $prose(() => new Plugin({
     key: new PluginKey('memoking-paste'),
     // 복사(서식): 편집기가 클립보드에 HTML 을 넣은 뒤 겹친 빈칸만 U+00A0 로 — 워드 · 메일에 붙여도 하나로 줄지 않게
@@ -1514,6 +1542,12 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         const data = event.clipboardData;
         const files = data ? Array.from(data.files) : [];
         const html = data?.getData('text/html') ?? '';
+        // Ctrl+Shift+V: 서식 없이 글자만 (파일 · 그림만 복사한 경우는 평소처럼 넣는다)
+        if (!readOnly && plainPasteKey && performance.now() - plainPasteKey < 1500 && !files.length && data?.getData('text/plain')) {
+          plainPasteKey = 0;
+          event.preventDefault();
+          return pasteAsText(v, data.getData('text/plain'));
+        }
         // 엑셀·시트의 글자만 복사(HTML 없음)된 경우: 탭으로 나뉜 글 → 표
         if (!files.length && !html && !v.state.selection.$from.parent.type.spec.code && !isInTable(v.state)) {
           const grid = parseTsv(data?.getData('text/plain'));
@@ -1571,8 +1605,19 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
           .catch((err) => console.error('붙여넣은 파일을 넣지 못했습니다', err));
         return true;
       },
+      // 메모에서 끌어낸 파일이 도로 이 메모에 떨어지면 무시 (같은 파일이 한 번 더 들어가지 않게 — block-move.js 끌어내기)
+      handleDrop(v, event) {
+        if (!isOwnDragOut(event.dataTransfer)) return false;
+        event.preventDefault();
+        return true;
+      },
       // DOM 이벤트 단계는 어떤 플러그인의 handlePaste·handleDrop 보다 먼저 불린다 (붙여넣기 전 상태를 찍을 수 있음).
       handleDOMEvents: {
+        // Ctrl+Shift+V 를 눌렀다 (곧 오는 붙여넣기를 서식 없이)
+        keydown: (v, event) => {
+          plainPasteKey = (event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey && event.code === 'KeyV' ? performance.now() : 0;
+          return false;
+        },
         // 그림을 골라(눌러) 둔 채 Ctrl+C / Ctrl+X: 주소(<img src>)가 아니라 그림 자체를 복사 — 다른 앱에 그림으로 붙는다
         copy: (v, event) => handleImageCopy(v, event),
         cut: (v, event) => handleImageCopy(v, event),
@@ -1607,6 +1652,39 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       },
     },
   }));
+
+  // 체크한 항목에서 Enter: 새 항목은 체크를 풀고 시작 (그대로 두면 다음 할 일이 이미 끝난 것으로 이어진다)
+  //   쪼개기는 항목의 속성을 그대로 물려주므로, Enter 직후 커서가 놓인 새 항목만 풀어 준다. 위 항목은 체크한 채 그대로
+  const uncheckedNext = $prose(() => {
+    let armed = null; // 방금 누른 Enter 가 체크한 항목에서 시작됐다 { pos }
+    const itemAt = ($pos) => {
+      for (let d = $pos.depth; d > 0; d--) if ($pos.node(d).type.name === 'list_item') return { node: $pos.node(d), pos: $pos.before(d) };
+      return null;
+    };
+    return new Plugin({
+      key: new PluginKey('memoking-unchecked-next'),
+      props: {
+        handleKeyDown(v, event) {
+          armed = null;
+          if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return false;
+          const item = itemAt(v.state.selection.$from);
+          if (item?.node.attrs.checked === true) {
+            armed = { pos: item.pos };
+            setTimeout(() => (armed = null), 0); // 이 키 하나에만 (Enter 가 아무것도 쪼개지 않았으면 남지 않게)
+          }
+          return false;
+        },
+      },
+      appendTransaction(trs, _old, state) {
+        if (!armed || !trs.some((t) => t.docChanged)) return null;
+        const from = trs.reduce((pos, t) => t.mapping.map(pos, -1), armed.pos);
+        const item = itemAt(state.selection.$from);
+        if (!item || item.node.attrs.checked !== true || item.pos <= from) return null; // 쪼개지지 않았거나, 위 항목에 그대로 있음
+        armed = null;
+        return state.tr.setNodeMarkup(item.pos, undefined, { ...item.node.attrs, checked: false }).setMeta('addToHistory', true);
+      },
+    });
+  });
 
   // 고른 링크 카드(화살표로 고른 상태)에서 Enter: 브라우저로 열기 (마우스 없이도 열리게)
   const linkCardKeys = $prose(() => new Plugin({
@@ -1801,6 +1879,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(cellPaste) // 표 칸에 여러 줄 붙이기 — 표 기능보다 먼저
     .use(gfm)
     .use(tableTab)
+    .use(uncheckedNext)
     .use(linkCardKeys)
     .use(tableAutoFit)
     .use(tableResize) // 읽기 전용(PDF)에서도 열 너비가 보이게 (끌기는 편집할 때만)
@@ -2123,7 +2202,95 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     }
   }
 
+  // ---------- 서식 지우기 (Ctrl+\ · 오른쪽 클릭 › 서식 지우기) ----------
+  //   글을 골랐으면: 고른 글자의 모양(굵게 · 기울임 · 밑줄 · 취소선 · 코드 · 글자 색 · 형광펜)만 지운다 — 링크는 글의 내용이라 남긴다
+  //   커서만 있으면: 그 자리의 문단을 보통 글로 — 표는 글 줄로, 목록은 풀어 문단으로, 인용은 벗기고, 제목 · 코드 블록은 본문으로, 글자 모양도 모두
+  const clearMarksIn = (tr, from, to) => {
+    if (from >= to) return;
+    for (const type of Object.values(tr.doc.type.schema.marks)) if (type.name !== 'link') tr.removeMark(from, to, type);
+  };
+  // 목록 하나를 문단들로 (겹친 목록은 펴서 글이 나온 순서대로)
+  const listToParagraphs = (list, schema) => {
+    const out = [];
+    const walk = (node) => node.forEach((item) => item.forEach((child) => {
+      if (child.type.name === 'bullet_list' || child.type.name === 'ordered_list') walk(child);
+      else if (child.isTextblock) out.push(schema.nodes.paragraph.create(null, child.content));
+      else out.push(child);
+    }));
+    walk(list);
+    return out.length ? out : [schema.nodes.paragraph.create()];
+  };
+  function clearFormat() {
+    const v = view();
+    const { state } = v;
+    const { selection, schema } = state;
+    const tr = state.tr;
+    if (selection instanceof CellSelection) selection.forEachCell((cell, pos) => clearMarksIn(tr, pos + 1, pos + cell.nodeSize - 1));
+    else if (selection.node) return false; // 그림 · 파일 같은 것을 골랐다 — 지울 글자 모양이 없다
+    else if (!selection.empty) for (const r of selection.ranges) clearMarksIn(tr, r.$from.pos, r.$to.pos);
+    else {
+      let blocks = null; // 바꾼 덩어리 { from, to, step } — 글자 모양도 이 전체에서
+      for (let i = 0; i < 6; i++) {
+        const $f = tr.selection.$from;
+        let hit = null;
+        for (let d = 1; d <= $f.depth && !hit; d++) if (/^(table|bullet_list|ordered_list|blockquote)$/.test($f.node(d).type.name)) hit = d;
+        if (!hit) break;
+        const node = $f.node(hit);
+        const before = $f.before(hit);
+        const after = $f.after(hit);
+        const step = tr.steps.length;
+        if (node.type.name === 'blockquote') {
+          tr.replaceWith(before, after, node.content);
+          tr.setSelection(TextSelection.near(tr.doc.resolve(Math.max(before, $f.pos - 1))));
+          blocks = { from: before, to: before + node.content.size, step };
+        } else if (node.type.name === 'table') {
+          const lines = tableLines(node, schema);
+          tr.replaceWith(before, after, lines);
+          tr.setSelection(TextSelection.near(tr.doc.resolve(before + 1)));
+          blocks = { from: before, to: before + lines.reduce((n, l) => n + l.nodeSize, 0), step };
+        } else {
+          // 커서가 있던 글줄이 새 문단들 중 몇 번째인지 (목록이 풀려도 커서는 그 글에 그대로)
+          let nth = 0;
+          let found = -1;
+          node.descendants((n, pos) => {
+            if (!n.isTextblock) return true;
+            if (before + 1 + pos === $f.before()) found = nth;
+            nth++;
+            return false;
+          });
+          const paras = listToParagraphs(node, schema);
+          tr.replaceWith(before, after, paras);
+          let at = before;
+          let seen = 0;
+          let caret = before + 1;
+          for (const p of paras) {
+            if (p.isTextblock && seen++ === found) caret = at + 1 + Math.min($f.parentOffset, p.content.size);
+            at += p.nodeSize;
+          }
+          tr.setSelection(TextSelection.near(tr.doc.resolve(caret)));
+          blocks = { from: before, to: at, step };
+        }
+      }
+      const $f = tr.selection.$from;
+      if ($f.parent.isTextblock && $f.parent.type.name !== 'paragraph') tr.setBlockType($f.before(), $f.after(), schema.nodes.paragraph); // 제목 · 코드 블록 → 본문
+      const $c = tr.selection.$from;
+      if ($c.parent.isTextblock) clearMarksIn(tr, $c.start(), $c.end());
+      if (blocks) {
+        const m = tr.mapping.slice(blocks.step + 1);
+        clearMarksIn(tr, m.map(blocks.from, -1), m.map(blocks.to, 1));
+      }
+      tr.setStoredMarks([]);
+    }
+    if (!tr.docChanged) return false;
+    v.dispatch(tr.scrollIntoView());
+    return true;
+  }
+
   const commands = {
+    clearFormat: () => {
+      if (readOnly) return;
+      onNotice?.(clearFormat() ? '서식을 지웠어요 (되돌리기 Ctrl+Z)' : '지울 서식이 없어요');
+    },
     // 끌지 않고 한 줄 위·아래로 (Alt+↑/↓ 와 같음 — 목록 안에서는 그 항목, 아니면 그 줄)
     moveUp: () => moveLineBy(view().state, view().dispatch, -1),
     moveDown: () => moveLineBy(view().state, view().dispatch, 1),
@@ -2195,10 +2362,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         mergeOrSplit(v);
         return v.focus();
       }
-      if (name === 'toList' || name === 'toText') {
-        const result = tableToBlocks(v.state, v.dispatch, name === 'toList' ? 'list' : 'text');
+      if (name === 'toList' || name === 'toTask' || name === 'toText') {
+        const result = tableToBlocks(v.state, v.dispatch, { toList: 'list', toTask: 'task', toText: 'text' }[name]);
         if (result !== true) onNotice?.(result, true);
-        else onNotice?.(name === 'toList' ? '표를 목록으로 바꿨어요 (행마다 한 줄, 되돌리기 Ctrl+Z)' : '표를 글로 바꿨어요 (행마다 한 줄, 되돌리기 Ctrl+Z)');
+        else onNotice?.(`표를 ${{ toList: '목록', toTask: '체크리스트', toText: '글' }[name]}${name === 'toTask' ? '로' : name === 'toList' ? '으로' : '로'} 바꿨어요 (행마다 한 줄, 되돌리기 Ctrl+Z)`);
         return v.focus();
       }
       if (name === 'splitTable' || name === 'joinTable') {
@@ -2379,6 +2546,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       if (items.length) insertBlocks(pos, items);
     },
     focus: () => view().focus(),
+    /** 서식 없이 붙여넣기 (오른쪽 클릭 메뉴 › 서식 없이 붙여넣기 — 클립보드의 글자) → 편집기에 넣었는가 */
+    pastePlain: (text) => {
+      const v = view();
+      return !readOnly && v.hasFocus() ? pasteAsText(v, text) : false;
+    },
     /** 커서가 보이게 스크롤 (키보드가 올라와 화면이 줄었을 때 등) */
     revealCaret: () => {
       const v = view();

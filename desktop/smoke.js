@@ -1410,8 +1410,9 @@ export async function runSmoke({
       timer: document.querySelector('#reminder-groups .rem-row-item .row-sub')?.textContent,
       count: document.getElementById('count-reminders').textContent,
     })`);
+    // 매주 월 일정은 만든 날(오늘)부터라 달 끝 가까이에는 달력에 보이는 월요일이 한두 번뿐이다 — 점이 하나 이상이면 된다
     check('일정 탭: 한 달 달력(FullCalendar, 오늘 선택) · 매주 월 일정이 날짜별로 막대·목록 (미리 알림 표시) · 타이머는 따로',
-      tab.days === 42 && tab.today && tab.dots >= 4 && tab.events.some((t) => /09:30|9:30/.test(t) && /알림 10분 전/.test(t)) && /5분 타이머/.test(tab.timer) && tab.count === '2', JSON.stringify(tab));
+      tab.days === 42 && tab.today && tab.dots >= 1 && tab.events.some((t) => /09:30|9:30/.test(t) && /알림 10분 전/.test(t)) && /5분 타이머/.test(tab.timer) && tab.count === '2', JSON.stringify(tab));
     await capture(lw, 'smoke-reminders-tab.png');
     // 창을 줄이거나 넓혀도 달력이 잘리지 않는다 (가장 작은 창 300×380 · 낮고 넓은 창 · 넓은 창은 달력 왼쪽·목록 오른쪽)
     {

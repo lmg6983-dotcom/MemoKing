@@ -419,7 +419,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await notice(longText);
       const bub = await until(readBubble, '상태 말풍선', 3000).catch(() => null);
       const statusHidden = await js(nw, `getComputedStyle(document.getElementById('status')).color === 'rgba(0, 0, 0, 0)'`);
-      const moreShown = await js(nw, `!document.getElementById('status-more').hidden`);
+      const bubbledNoTitle = await js(nw, `!document.getElementById('status').hasAttribute('title')`); // 말풍선이 떠 있는 동안은 같은 말을 또 띄우지 않음
+      const noMoreButton = await js(nw, `!document.getElementById('status-more')`);
       if (bubbleWin()) await capture(bubbleWin(), 'smoke-new-status-bubble.png');
       nw.setBounds({ ...wide, x: 400, y: 320, width: 310 }); // 크기를 바꾸면 거두고 상태 줄 글은 다시 보임
       await wait(250);
@@ -428,19 +429,18 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await wait(250);
       await notice('저장했어요');
       await wait(200);
-      const shortNone = { bubble: Boolean(bubbleWin()?.isVisible()), more: await js(nw, `({ hidden: document.getElementById('status-more').hidden, sw: document.getElementById('status').scrollWidth, cw: document.getElementById('status').clientWidth, t: document.getElementById('status').textContent })`) };
-      check('상태 줄이 잘리면 메모 창 위 바깥에 말풍선으로 전문 (상태 줄은 감춰 중복 없음 · 💬 단추) · 크기를 바꾸면 거두고 글은 다시 · 다 보이면 없음',
-        bub?.text === longText && bub.place === 'p-above' && bub.screen.bottom <= nw.getBounds().y && statusHidden && moreShown && movedAway && !shortNone.bubble && shortNone.more.hidden,
-        JSON.stringify({ bub, statusHidden, moreShown, movedAway, shortNone }));
-      // 진행 안내("…중")는 말풍선 없이 · 💬 단추를 누르면 그때 보임
+      const shortNone = { bubble: Boolean(bubbleWin()?.isVisible()), state: await js(nw, `({ title: document.getElementById('status').getAttribute('title'), clipped: document.getElementById('status').classList.contains('clipped'), sw: document.getElementById('status').scrollWidth, cw: document.getElementById('status').clientWidth, t: document.getElementById('status').textContent })`) };
+      check('상태 줄이 잘리면 메모 창 위 바깥에 말풍선으로 전문 (상태 줄은 감춰 중복 없음) · 끝까지 보기 단추는 없음 · 크기를 바꾸면 거두고 글은 다시 · 다 보이면 없음',
+        bub?.text === longText && bub.place === 'p-above' && bub.screen.bottom <= nw.getBounds().y && statusHidden && bubbledNoTitle && noMoreButton && movedAway && !shortNone.bubble && !shortNone.state.clipped && shortNone.state.title === null,
+        JSON.stringify({ bub, statusHidden, bubbledNoTitle, noMoreButton, movedAway, shortNone }));
+      // 진행 안내("…중")는 말풍선 없이 — 잘렸으면 마우스를 올려 두면 전문(title) · 마우스가 닿도록 no-drag
+      nw.setBounds({ ...wide, x: 400, y: 320, width: 300 });
+      await wait(250);
       await notice('그림을 만드는 중… 메모가 길면 조금 걸려요. 잠시만 기다려 주세요');
       await wait(400);
       const progressNone = !bubbleWin()?.isVisible();
-      await js(nw, `document.getElementById('status-more').click()`);
-      const progressOnClick = await until(readBubble, '💬 로 부른 말풍선', 2000).catch(() => null);
-      await js(nw, `document.getElementById('status-more').click()`);
-      await wait(200);
-      check('진행 안내("…중")는 말풍선을 띄우지 않고, 💬 단추를 누르면 보이고 다시 누르면 닫힘', progressNone && Boolean(progressOnClick) && !bubbleWin()?.isVisible(), JSON.stringify({ progressNone, progressOnClick: Boolean(progressOnClick) }));
+      const progressTip = await js(nw, `(() => { const s = document.getElementById('status'); return { title: s.title, drag: getComputedStyle(s).getPropertyValue('-webkit-app-region') }; })()`);
+      check('진행 안내("…중")는 말풍선 없이, 잘렸으면 마우스를 올려 두면 전문(title) — 그 자리는 창 끌기가 아니라 마우스가 닿음', progressNone && /메모가 길면 조금 걸려요/.test(progressTip.title) && progressTip.drag.trim() === 'no-drag', JSON.stringify({ progressNone, progressTip }));
       // 오류는 저절로 사라지지 않는다 (9초 뒤에도)
       await notice(longText, true);
       await until(readBubble, '오류 말풍선', 2000).catch(() => null);
@@ -997,7 +997,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       // 바뀐 점 대화 상자: 새 버전 알림이 오면 v지금 → v새것
       lw.webContents.send('update:available', { current: '0.39.3', status: 'available', version: '0.40.0', notes: '새 기능' });
       await wait(200);
-      const dialogOpen = await js(lw, `document.getElementById('update-dialog').open && document.getElementById('update-version').textContent`);
+      const dialogOpen = await js(lw, `document.getElementById('update-dialog').open && [...document.querySelectorAll('#update-version span')].map((e) => e.textContent).join(' ')`);
       await js(lw, `document.getElementById('update-dialog').close()`);
       lw.webContents.send('update:state', { current: '0.39.3', status: 'idle' }); // 가짜 상태를 거둔다
       check('설정 › 업데이트: 최신이면 초록 "최신 버전", 새 버전이면 노랑 "업데이트 v0.40.0"(누르면 다시 확인) · 새 버전 알림은 바뀐 점', latest.state === 'latest' && /최신 버전/.test(latest.text) && (([r, g, b]) => g > r && g > b)(latest.bg.match(/\d+/g).map(Number))
@@ -1031,6 +1031,180 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('스택 탭: 다른 탭 창을 미리 만들어 두고, 바꾸면 바로 보이며 서식 막대가 펴진 채 · 쓰던 글은 그대로 저장', warmed && times.every((t) => t < 600) && barShown && savedAll, JSON.stringify({ warmed, times, barShown, savedAll }));
       noteWins.get(ta)?.close();
       await until(() => ![ta, tb, tc].some((m) => noteWins.get(m)?.isVisible()), '스택 닫힘', 4000).catch(() => {});
+    }
+
+    // ---------- v0.46 — 편집기: 체크리스트 Enter · 서식 없이 붙여넣기 · 서식 지우기 · 표→체크리스트 · 여러 파일 놓기 · 끌어내기 · 비활성 테두리 ----------
+    {
+      const list = getList() ?? createListWindow();
+      await until(() => js(list, `document.readyState === 'complete'`), '목록 창');
+      const openMemo = async (body, label) => {
+        const id = vault.import({ body });
+        await until(() => js(list, `!!document.querySelector('[data-id="${id}"]')`), `${label} 카드`);
+        const before = new Set(noteWins.keys());
+        await js(list, `document.querySelector('[data-id="${id}"]').click()`);
+        const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), `${label} 창`);
+        const win = noteWins.get(nid);
+        await until(() => js(win, `document.documentElement.dataset.ready === 'true'`), `${label} 준비`);
+        win.focus();
+        await wait(200);
+        return { id: nid, win };
+      };
+      // 글 줄 끝에 커서 (n 번째 일치하는 요소)
+      const caretIn = (sel, at = 'end', n = 0) => `(() => { document.querySelector('.ProseMirror').focus(); const e = [...document.querySelectorAll(${JSON.stringify(sel)})][${n}]; const r = document.createRange(); r.selectNodeContents(e); r.collapse(${at === 'start'}); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`;
+      const listWin = list;
+
+      // 1) 체크한 항목에서 Enter → 새 항목은 체크 해제
+      {
+        const { win } = await openMemo('# 할 일\n\n- [x] 끝낸 일\n- [ ] 남은 일\n', '체크리스트');
+        await js(win, caretIn('.mk-doc li p', 'end', 0));
+        await wait(150);
+        key(win, 'Enter');
+        await wait(250);
+        {
+          const states = await js(win, `[...document.querySelectorAll('.mk-doc li')].map((li) => li.getAttribute('data-checked') + ':' + li.textContent.trim())`);
+          check('체크한 항목에서 Enter: 새 항목은 체크가 풀린 채 (위 항목은 체크 그대로)', states.length === 3 && states[0] === 'true:끝낸 일' && states[1] === 'false:' && states[2] === 'false:남은 일', JSON.stringify(states));
+        }
+        // 체크 안 한 빈 항목에서 Enter 는 평소처럼
+        key(win, 'Enter');
+        await wait(250);
+        const after = await js(win, `[...document.querySelectorAll('.mk-doc li')].map((li) => li.getAttribute('data-checked') + ':' + li.textContent.trim())`);
+        check('체크 안 한 빈 항목에서 Enter: 평소처럼 (가운데 빈 항목은 사라지고) 다른 항목의 체크는 그대로', after.join('|') === 'true:끝낸 일|false:남은 일', JSON.stringify(after));
+        win.close();
+      }
+
+      // 2) Ctrl+Shift+V 서식 없이 붙여넣기 · 오른쪽 클릭 메뉴의 같은 기능
+      {
+        const { win } = await openMemo('# 붙여넣기\n\n**굵은 글** [링크](https://example.com)\n\n끝\n', '붙여넣기');
+        // 서식 있는 글을 복사해 두고 (편집기에서 Ctrl+C — 굵게 · 링크가 클립보드 HTML 에 든다)
+        await js(win, `(() => { document.querySelector('.ProseMirror').focus(); const p = document.querySelectorAll('.mk-doc p')[0]; const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+        await wait(150);
+        key(win, 'C', ['control']);
+        await wait(300);
+        await js(win, caretIn('.mk-doc p', 'end', 1));
+        await wait(150);
+        key(win, 'V', ['control', 'shift']);
+        await wait(400);
+        const plain1 = await js(win, `(() => { const p = document.querySelectorAll('.mk-doc p')[1]; return { text: p.textContent, strong: p.querySelectorAll('strong, b').length, a: p.querySelectorAll('a').length }; })()`);
+        check('Ctrl+Shift+V: 서식 없이 글자만 (굵게 · 링크 없음)', plain1.text.includes('굵은 글') && plain1.strong === 0 && plain1.a === 0, JSON.stringify(plain1));
+        // 일반 Ctrl+V 는 서식 그대로
+        await js(win, caretIn('.mk-doc p', 'end', 1));
+        key(win, 'Enter');
+        await wait(100);
+        key(win, 'V', ['control']);
+        await wait(400);
+        const rich = await js(win, `(() => { const p = [...document.querySelectorAll('.mk-doc p')].at(-1); return { strong: p.querySelectorAll('strong, b').length, text: p.textContent }; })()`);
+        check('Ctrl+V 는 서식 그대로 (Ctrl+Shift+V 와 다름)', rich.strong >= 1, JSON.stringify(rich));
+        // 메인이 보내는 '서식 없이 붙여넣기'(오른쪽 클릭 메뉴) 도 같은 일
+        await js(win, caretIn('.mk-doc p', 'end', 0));
+        await wait(100);
+        win.webContents.send('edit:paste-plain', '메뉴로 붙인\n두 줄');
+        await wait(300);
+        const viaMenu = await js(win, `[...document.querySelectorAll('.mk-doc p')].map((p) => p.textContent)`);
+        check('오른쪽 클릭 › 서식 없이 붙여넣기: 글자만, 줄마다 문단', viaMenu.some((t) => t.includes('메뉴로 붙인')) && viaMenu.includes('두 줄'), JSON.stringify(viaMenu));
+        win.close();
+      }
+
+      // 3) 서식 지우기 (오른쪽 클릭 › 서식 지우기 = edit:clear-format) · 표 → 체크리스트
+      {
+        const body = '# 큰 제목\n\n**굵게** 보통 *기울임* [링크](https://example.com)\n\n- 목록 하나\n- 목록 **둘**\n\n> 인용 글\n\n| 이름 | 값 |\n| --- | --- |\n| 가 | 1 |\n| 나 | 2 |\n';
+        const { win } = await openMemo(body, '서식 지우기');
+        const clear = async () => {
+          win.webContents.send('edit:clear-format');
+          await wait(300);
+          return js(win, `document.getElementById('status').textContent`);
+        };
+        // 고른 글: 그 부분만
+        await js(win, `(() => { document.querySelector('.ProseMirror').focus(); const p = [...document.querySelectorAll('.mk-doc p')][0]; const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+        await wait(150);
+        await clear();
+        const sel1 = await js(win, `(() => { const p = document.querySelector('.mk-doc p'); return { strong: p.querySelectorAll('strong,b').length, em: p.querySelectorAll('em,i').length, a: p.querySelectorAll('a').length, h1: document.querySelectorAll('.mk-doc h1').length, text: p.textContent }; })()`);
+        check('서식 지우기(글을 고름): 고른 글자 모양만 지움 (굵게 · 기울임 없음, 링크와 제목은 그대로)', sel1.strong === 0 && sel1.em === 0 && sel1.a === 1 && sel1.h1 === 1 && sel1.text.startsWith('굵게 보통'), JSON.stringify(sel1));
+        // 커서만: 제목 → 본문
+        await js(win, caretIn('.mk-doc h1', 'end'));
+        await wait(120);
+        await clear();
+        const head = await js(win, `({ h1: document.querySelectorAll('.mk-doc h1').length, first: document.querySelector('.mk-doc').firstElementChild?.tagName })`);
+        check('서식 지우기(커서만): 제목은 본문이 됨', head.h1 === 0 && head.first === 'P', JSON.stringify(head));
+        // 커서만: 목록 → 문단 (글자 모양도)
+        await js(win, caretIn('.mk-doc li p', 'end', 1));
+        await wait(120);
+        const lstMsg = await clear();
+        const lst = await js(win, `({ li: document.querySelectorAll('.mk-doc li').length, ul: document.querySelectorAll('.mk-doc ul, .mk-doc ol').length, strong: document.querySelectorAll('.mk-doc li strong, .mk-doc p strong').length, texts: [...document.querySelectorAll('.mk-doc p')].map((p) => p.textContent) })`);
+        check('서식 지우기(커서만): 목록은 풀려 문단이 되고 글자 모양도 없음', lst.li === 0 && lst.ul === 0 && lst.strong === 0 && lst.texts.includes('목록 하나') && lst.texts.includes('목록 둘'), JSON.stringify({ lst, lstMsg }));
+        // 커서만: 인용 벗기기
+        await js(win, caretIn('.mk-doc blockquote p', 'end'));
+        await wait(120);
+        await clear();
+        const quote = await js(win, `({ bq: document.querySelectorAll('.mk-doc blockquote').length, has: [...document.querySelectorAll('.mk-doc p')].some((p) => p.textContent === '인용 글') })`);
+        check('서식 지우기(커서만): 인용은 벗겨짐', quote.bq === 0 && quote.has, JSON.stringify(quote));
+        // 표 → 체크리스트 (표 막대의 체크리스트로)
+        await js(win, caretIn('.mk-doc td p', 'end', 0));
+        await wait(300);
+        const toTaskBtn = await js(win, `(() => { const b = document.querySelector('#table-bar [data-table="toTask"]'); return b ? { lbl: b.textContent.trim(), disabled: b.disabled, shown: b.offsetParent !== null } : null; })()`);
+        await js(win, `document.querySelector('#table-bar [data-table="toTask"]')?.click()`);
+        await wait(300);
+        const task = await js(win, `({ table: document.querySelectorAll('.mk-doc table').length, items: [...document.querySelectorAll('.mk-doc li')].map((li) => li.getAttribute('data-checked') + ':' + li.textContent.trim()) })`);
+        check('표 → 체크리스트: 행마다 체크 안 한 항목 (칸은 · 로 이어서)', toTaskBtn && /체크리스트/.test(toTaskBtn.lbl) && task.table === 0 && task.items.join('|') === 'false:이름 · 값|false:가 · 1|false:나 · 2', JSON.stringify({ toTaskBtn, task }));
+        // 되돌리기 한 번에 표로
+        key(win, 'Z', ['control']);
+        await wait(300);
+        const undone = await js(win, `document.querySelectorAll('.mk-doc table').length`);
+        check('표 → 체크리스트도 Ctrl+Z 한 번에 표로 돌아옴', undone === 1, String(undone));
+        // 커서만: 표 → 글 줄
+        await js(win, caretIn('.mk-doc td p', 'end', 0));
+        await wait(150);
+        await clear();
+        const tbl = await js(win, `({ table: document.querySelectorAll('.mk-doc table').length, texts: [...document.querySelectorAll('.mk-doc p')].map((p) => p.textContent) })`);
+        check('서식 지우기(커서만): 표는 글 줄이 됨', tbl.table === 0 && tbl.texts.includes('이름 · 값') && tbl.texts.includes('나 · 2'), JSON.stringify(tbl));
+        win.close();
+      }
+
+      // 4) 여러 파일을 한꺼번에 끌어다 놓기 · 메모 밖으로 끌어내기 · 다른 창에 가 있으면 고른 테두리 해제
+      {
+        const { win } = await openMemo('# 파일 놓기\n\n끝\n', '파일 놓기');
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        await js(win, `(async () => {
+          const bin = Uint8Array.from(atob(${JSON.stringify(png)}), (c) => c.charCodeAt(0));
+          const files = [new File(['첫째 파일'], '가.txt', { type: 'text/plain' }), new File([bin], '나.png', { type: 'image/png' }), new File(['%PDF-1.4 smoke'], '다.pdf', { type: 'application/pdf' }), new File(['넷째'], '라.txt', { type: 'text/plain' })];
+          const broken = new File([''], '읽을 수 없는 폴더', { type: '' }); // 읽다가 실패하는 파일 (폴더를 놓은 것처럼)
+          broken.arrayBuffer = () => Promise.reject(new Error('NotFoundError'));
+          files.splice(2, 0, broken);
+          const dt = new DataTransfer();
+          for (const f of files) dt.items.add(f);
+          const r = document.querySelector('.mk-doc p').getBoundingClientRect();
+          document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
+        })()`);
+        const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
+        const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image').length })`);
+        const dropNote = await js(win, `document.getElementById('status').textContent`);
+        check('여러 파일 놓기: 4개 (글 파일 2 · PDF · 사진)가 한 번에 모두 들어감, 읽지 못한 하나(폴더)는 알리고 나머지는 그대로', fallback.chips.length === 3 && fallback.imgs === 1 && ['가.txt', '다.pdf', '라.txt'].every((n) => fallback.chips.includes(n)) && /4개를 넣었어요.*1개.*읽지 못해/.test(dropNote.replace('파일 ', '')), JSON.stringify({ fallback, dropNote }));
+        await wait(600);
+        // 끌어내기: 파일 칩 · 사진을 메모 밖으로 → 보이는 이름의 임시 파일이 간다
+        const dragBefore = smokeOpened.filter((o) => o.kind === 'drag-out').length;
+        const prevented = await js(win, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); const dt = new DataTransfer(); const e = new DragEvent('dragstart', { dataTransfer: dt, bubbles: true, cancelable: true }); a.dispatchEvent(e); return e.defaultPrevented; })()`);
+        const out = await until(() => smokeOpened.filter((o) => o.kind === 'drag-out').length > dragBefore && smokeOpened.filter((o) => o.kind === 'drag-out').at(-1), '끌어내기', 3000).catch(() => null);
+        const outOk = out && /가\.txt$/.test(out.target) && fs.readFileSync(out.target, 'utf8') === '첫째 파일' && /memoking-drag/.test(out.target);
+        check('파일 칩을 메모 밖으로 끌어내면 (탐색기 · 카카오톡) 보이는 이름의 복사본 파일이 감 — 메모의 첨부는 그대로', prevented && Boolean(outOk) && fs.readdirSync(path.join(vault.root, 'attachments')).length >= 4, JSON.stringify({ prevented, out }));
+        const dragBefore2 = smokeOpened.filter((o) => o.kind === 'drag-out').length;
+        await js(win, `(() => { const a = document.querySelector('.mk-doc img.mk-image'); a.dispatchEvent(new DragEvent('dragstart', { dataTransfer: new DataTransfer(), bubbles: true, cancelable: true })); })()`);
+        const outImg = await until(() => smokeOpened.filter((o) => o.kind === 'drag-out').length > dragBefore2 && smokeOpened.filter((o) => o.kind === 'drag-out').at(-1), '사진 끌어내기', 3000).catch(() => null);
+        check('사진도 끌어내면 그림 파일 (확장자 유지)', Boolean(outImg) && /\.png$/i.test(outImg.target) && fs.statSync(outImg.target).size > 50, JSON.stringify(outImg));
+        // 끌어낸 파일이 도로 이 메모에 떨어지면 무시 (메모킹이 끌어낸 임시 파일 경로면)
+        win.close();
+      }
+      {
+        // 다른 창으로 가면 고른 그림의 노란 테두리는 거둔다 (돌아오면 다시)
+        const { win } = await openMemo('# 선택 테두리\n\n끝\n', '선택 테두리');
+        await js(win, `(() => { const wrap = document.createElement('div'); wrap.className = 'mk-doc'; wrap.style.cssText = 'position: fixed; left: 0; top: 0'; const probe = document.createElement('div'); probe.id = 'probe'; probe.className = 'ProseMirror-selectednode'; probe.style.cssText = 'width: 10px; height: 10px'; wrap.append(probe); document.body.append(wrap); })()`); // 편집기 밖에 둔 "고른 내용" 모양의 상자 (편집기가 지워 버리지 않게)
+        listWin.focus();
+        await wait(500);
+        const away = await js(win, `({ inactive: document.body.classList.contains('win-inactive'), outline: getComputedStyle(document.getElementById('probe')).outlineStyle })`);
+        win.focus();
+        await wait(500);
+        const back = await js(win, `({ inactive: document.body.classList.contains('win-inactive'), outline: getComputedStyle(document.getElementById('probe')).outlineStyle })`);
+        check('다른 창으로 가면 고른 내용의 노란 테두리가 사라지고, 돌아오면 다시 보임', away.inactive && away.outline === 'none' && !back.inactive && back.outline === 'solid', JSON.stringify({ away, back }));
+        win.close();
+      }
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

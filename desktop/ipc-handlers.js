@@ -1,5 +1,5 @@
 // IPC 라우팅 및 핸들러 등록 — 렌더러와 메인 프로세스 간 통신 채널 바인딩.
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, screen, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, screen, shell } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,7 +16,7 @@ import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { cleanOverrides, setActionKey } from '../app/js/core/keymap.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
-import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront, broadcast } from './window-utils.js';
+import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront, broadcast, APP_ICON_PNG } from './window-utils.js';
 import { SMOKE, toast, copyFileToClipboard, smokeOpened } from './utils.js';
 import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
@@ -946,6 +946,39 @@ export function registerIpc(ctx) {
       return { error: '공유할 파일을 만들지 못했어요. 다시 눌러 주세요' };
     }
   };
+  // ---------- 끌어내기 (메모 안 내용 → 탐색기 · 바탕화면 · 카카오톡 같은 다른 프로그램) ----------
+  //   메모 폴더의 첨부 그대로 끌면 받는 쪽이 "이동" 으로 가져가 첨부가 사라질 수 있고 이름도 날짜 이름이라, 보이는 이름의 임시 복사본을 끈다.
+  //   임시 복사본은 memoking-drag 폴더에 (화면이 이 폴더에서 온 파일이 도로 떨어지면 무시한다), 한 시간이 지나면 치운다
+  const DRAG_ROOT = path.join(app.getPath('temp'), 'memoking-drag');
+  const dragIcon = () => nativeImage.createFromPath(APP_ICON_PNG).resize({ width: 40, height: 40 });
+  ipcMain.on('attachment:drag-out', (event, f = {}) => {
+    try {
+      let bytes = null;
+      let source = null;
+      if (f.rel) {
+        const found = attachmentFile(f.rel);
+        if (found.error) return;
+        source = found.file;
+      } else if (typeof f.base64 === 'string') bytes = Buffer.from(f.base64, 'base64');
+      else return;
+      fs.mkdirSync(DRAG_ROOT, { recursive: true });
+      for (const old of fs.readdirSync(DRAG_ROOT)) {
+        const p = path.join(DRAG_ROOT, old);
+        if (Date.now() - (fs.statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 3_600_000) fs.rmSync(p, { recursive: true, force: true });
+      }
+      let name = safeName(f.name).slice(0, 120);
+      const ext = source ? path.extname(source) : '';
+      if (ext && !path.extname(name)) name += ext; // 이름에 확장자가 없으면 원래 파일의 것을 (받는 쪽이 파일 종류를 알도록)
+      const dir = fs.mkdtempSync(path.join(DRAG_ROOT, 'd-'));
+      const file = path.join(dir, name);
+      if (source) fs.copyFileSync(source, file);
+      else fs.writeFileSync(file, bytes);
+      if (SMOKE) return void smokeOpened.push({ kind: 'drag-out', target: file });
+      event.sender.startDrag({ file, icon: dragIcon() });
+    } catch (err) {
+      console.warn('[drag-out]', err);
+    }
+  });
   // 고를 수 있는 방법과 지금 쓸 수 있는지
   ipcMain.handle('share:targets', () => {
     const drive = getDriveAuth()?.connected ?? false;

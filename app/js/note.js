@@ -60,6 +60,8 @@ setCopyHost({
     if (via === 'drive') showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' });
     return { drive: 'link', localsend: 'localsend', mail: 'mail' }[via];
   },
+  dragOut: (payload) => api.attachments.dragOut(payload), // 메모 안 내용을 탐색기 · 카카오톡으로 끌어내기 (block-move.js)
+  pathOf: (file) => api.attachments.pathOf(file),
   menu: (items, at) => api.menu.choose(items, at), // 내용 오른쪽 클릭 메뉴 (block-move.js)
 });
 // 저장 단추의 결과 (delete-button.js)
@@ -125,7 +127,7 @@ const el = {
   fileInput: $('file-input'),
   confirm: $('confirm-dialog'),
 };
-attachStatusBubble(el.status, $('status-more'));
+attachStatusBubble(el.status);
 
 let editor = null;
 let reminderPanel = null;
@@ -792,6 +794,12 @@ function runCommand(command) {
   else if (command === 'versions') $('versions-btn').click();
 }
 api.on('memo:command', runCommand);
+// 오른쪽 클릭 메뉴(메인) › 서식 없이 붙여넣기 · 서식 지우기 — 편집기가 맡는다 (Ctrl+Shift+V · Ctrl+\\ 와 같은 일)
+api.on('edit:paste-plain', (text) => {
+  if (editor?.pastePlain(text)) return;
+  if (text && document.activeElement?.matches('input, textarea')) document.execCommand('insertText', false, text); // 편집기가 아닌 글 칸(찾기 등)
+});
+api.on('edit:clear-format', () => editor?.run('clearFormat'));
 
 // 빠른 메모 알림을 눌러 이 메모로 왔을 때 등: 창 테두리가 두 번 반짝여 "이 메모" 임을 알린다
 api.on('memo:highlight', () => {
@@ -1532,6 +1540,11 @@ function updateBar() {
   document.body.style.setProperty('--bar-h', `${barHeight()}px`);
   const coaching = document.body.classList.contains('coaching'); // 튜토리얼 말풍선이 도구막대를 가리킬 수 있게
   document.body.classList.toggle('bar-hidden', !(document.hasFocus() || barHover || popoverOpen() || coaching || tabArriving));
+  markInactive();
+}
+// 다른 창에 가 있는 동안은 고른 그림 · 손 메모의 노란 테두리를 거둔다 (note.css .win-inactive) — 돌아오면 그대로 되살아남
+function markInactive() {
+  document.body.classList.toggle('win-inactive', !document.hasFocus());
 }
 // 스택에서 이 탭으로 바뀌려 할 때 (main 이 보이기 전에 알림): 서식 막대를 움직임 없이 미리 펴 둔다 —
 //   보인 뒤 포커스를 받으며 막대가 올라오면 본문 높이가 바뀌어 한 번 출렁이므로. 포커스가 오면(또는 잠시 뒤) 평소대로
@@ -1554,6 +1567,7 @@ new MutationObserver(() => {
     updateBar();
   }
 }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+markInactive(); // 처음에도 (포커스 없이 열린 창은 선택 테두리를 거둔 채로 — 막대는 건드리지 않는다)
 window.addEventListener('focus', updateBar);
 window.addEventListener('blur', updateBar); // 창을 떠나거나 마우스가 아래쪽을 벗어나면 바로 내려간다 (v0.17.19)
 document.addEventListener('mousemove', (e) => {

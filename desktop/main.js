@@ -887,6 +887,7 @@ app.on('web-contents-created', (_e, wc) => {
     const win = BrowserWindow.fromWebContents(wc);
     // 메모 폴더 안 그림(memoking://vault/…)만 파일로 저장할 수 있다 (웹 그림은 복사만)
     const src = /^memoking:\/\/vault\//.test(params.srcURL ?? '') ? vault?.resolve(decodeURIComponent(new URL(params.srcURL).pathname.replace(/^\/+/, ''))) : null;
+    const isNote = [...windowManager.noteWins.values()].some((w) => !w.isDestroyed() && w.webContents === wc);
     const template = contextMenuTemplate(params, {
       openLink: (url) => openWebPage(url),
       copyText: (text) => clipboard.writeText(text),
@@ -895,6 +896,9 @@ app.on('web-contents-created', (_e, wc) => {
         const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), path.basename(src)) });
         if (!r.canceled && r.filePath) fs.copyFileSync(src, r.filePath);
       } : null,
+      // 메모 창의 편집기는 서식 없이 붙여넣기 · 서식 지우기를 직접 한다 (note.js 가 'edit:*' 를 받는다). 그 밖의 칸은 창의 기본 동작
+      pastePlain: isNote ? async () => wc.send('edit:paste-plain', await clipboard.readText()) : null, // readText 는 약속(Promise)을 돌려준다
+      clearFormat: isNote && !/^(input-|text-area)/.test(params.formControlType ?? '') ? () => wc.send('edit:clear-format') : null,
       replaceMisspelling: (word) => wc.replaceMisspelling(word),
       addToDictionary: (word) => wc.session.addWordToSpellCheckerDictionary(word),
     });

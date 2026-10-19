@@ -28,6 +28,7 @@ import { lockDialog } from '../../app/js/lock-ui.js';
 import { newLockSession } from '../../app/js/core/memo-lock.js';
 import { pickHandoff, recentlyUpdated, handoffText } from '../../app/js/core/handoff.js';
 import * as list from './list-view.js';
+import { setupUpdates, checkForUpdate, refreshUpdateRow } from './updates.js';
 import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
 import * as panes from './panes.js';
@@ -877,6 +878,7 @@ function openSettings() {
   $('vault-hint').hidden = Boolean(info.vault?.drive);
   $('trash-days').value = String(trashDays());
   $('version').textContent = `메모킹 ${info.version}`;
+  refreshUpdateRow(info.version);
   const n = app.vault?.trashList().length ?? 0;
   $('trash-count').textContent = n ? String(n) : '';
   refreshNotifyRow();
@@ -1462,6 +1464,9 @@ const info = native.info();
 if (info.vault?.ok) openVault();
 else showSetup(info.vault ? '메모 폴더에 더 이상 접근할 수 없어요. 폴더를 다시 골라 주세요.' : '');
 native.ready();
+// 앱 안 업데이트: 설정의 줄을 맡기고, 켠 뒤 조금 있다 조용히 새 버전 확인 (목록이 먼저 뜨게. 새 버전이 있을 때만 시트가 뜬다)
+setupUpdates({ currentVersion: info.version });
+setTimeout(() => checkForUpdate({ silent: true }), 4000);
 // 지난번에 앱이 멈췄거나 위젯에서 오류가 났으면: 알리고 그 내용을 복사해 보낼 수 있게 (휴대폰에서만 나는 오류를 고치려고)
 try {
   const lastError = native.lastError();
