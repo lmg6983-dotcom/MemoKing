@@ -1726,7 +1726,7 @@ tabsEl.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 || e.target.closest('[data-close-tab]')) return;
   const tab = e.target.closest('[data-tab-id]');
   if (!tab) return;
-  tabPress = { tabId: tab.dataset.tabId, pointerId: e.pointerId, sx: e.screenX, sy: e.screenY, cx: e.clientX - tab.getBoundingClientRect().left + 10, el: tab, moved: false, torn: false };
+  tabPress = { tabId: tab.dataset.tabId, pointerId: e.pointerId, sx: e.screenX, sy: e.screenY, cy: e.clientY, cx: e.clientX - tab.getBoundingClientRect().left + 10, el: tab, moved: false, torn: false };
 });
 window.addEventListener('pointermove', (e) => {
   const p = tabPress;
@@ -1753,6 +1753,7 @@ window.addEventListener('pointermove', (e) => {
     p.torn = true;
     p.el.classList.remove('lifting');
     p.el.style.transform = '';
+    clearTabDrop(); // 끌어내면 비켜 섰던 탭들은 제자리로
     document.body.classList.remove('tab-dragging');
     if (p.tabId === id) flush();
     // 끌어낸 창은 커서가 창 왼쪽 위(윗막대)를 잡은 모양으로 따라온다
@@ -1761,33 +1762,72 @@ window.addEventListener('pointermove', (e) => {
   }
   p.el.classList.add('lifting');
   document.body.classList.add('tab-dragging');
-  p.el.style.transform = `translate(${Math.max(-6, Math.min(6, dx))}px, ${dy}px)`;
-  markTabDrop(p, e.clientY);
+  liveReorderTabs(p, e.clientY - p.cy, dx); // 누른 자리에서 움직인 만큼 탭이 따라온다
 });
-// 탭 줄 안에서 끌면 놓을 자리(순서)를 줄 표시로 — 다른 탭의 가운데보다 위로 간 개수가 새 자리
-function markTabDrop(p, clientY) {
-  const others = [...tabsEl.querySelectorAll('[data-tab-id]')].filter((t) => t !== p.el);
-  p.index = others.filter((t) => { const r = t.getBoundingClientRect(); return clientY > r.top + r.height / 2; }).length;
-  clearTabDrop();
-  const before = others[p.index];
-  (before ?? others.at(-1))?.classList.add(before ? 'drop-before' : 'drop-after');
+// 탭 순서 바꾸기 (크롬 탭처럼): 끄는 동안 탭이 커서를 따라오고, 그 탭이 넘어간 자리의 다른 탭들은 미리 한 칸씩 비켜 서로 자리를 바꾼다.
+//   놓으면 그 순서로 확정 (새 순서는 메인이 알려 줘 탭 줄이 다시 그려진다)
+function liveReorderTabs(p, dy, dx) {
+  const tabs = [...tabsEl.querySelectorAll('[data-tab-id]')];
+  if (!p.slots) {
+    // 끌기 시작 때의 자리(위아래)를 기억 — 끄는 동안 transform 이 바뀌어도 기준은 그대로
+    p.slots = tabs.map((t) => ({ el: t, top: t.offsetTop, h: t.offsetHeight }));
+    p.from = tabs.indexOf(p.el);
+    p.to = p.from;
+  }
+  const slots = p.slots;
+  const me = slots[p.from];
+  const last = slots.at(-1);
+  // 한 칸 = 내 자리에서 이웃 자리까지 (탭끼리 살짝 겹쳐 있어 높이와 다르다)
+  const stride = slots.length < 2 ? me.h : slots[1].top - slots[0].top || me.h;
+  // 줄의 맨 위 · 맨 아래 탭 가운데까지 (1px 더 — 끝 탭의 가운데를 넘은 것으로 쳐 맨 끝으로 놓을 수 있게)
+  const mid = (sl) => sl.top + sl.h / 2;
+  const min = mid(slots[0]) - mid(me) - 1;
+  const max = mid(last) - mid(me) + 1;
+  const move = Math.max(min, Math.min(max, dy));
+  p.el.style.transform = `translate(${Math.max(-6, Math.min(6, dx))}px, ${move}px)`;
+  // 내 가운데가 어느 자리에 있나 → 새 순서 자리
+  const center = me.top + me.h / 2 + move;
+  let to = 0;
+  slots.forEach((sl, i) => {
+    if (i !== p.from && sl.top + sl.h / 2 < center) to += 1;
+  });
+  p.to = to;
+  p.index = to;
+  slots.forEach((sl, i) => {
+    if (i === p.from) return;
+    let shift = 0;
+    if (to > p.from && i > p.from && i <= to) shift = -stride; // 내가 아래로 가면 사이의 탭들은 한 칸 위로
+    else if (to < p.from && i >= to && i < p.from) shift = stride; // 위로 가면 한 칸 아래로
+    sl.el.classList.add('shifting');
+    sl.el.style.transform = shift ? `translateY(${shift}px)` : '';
+  });
+  p.stride = stride;
 }
 function clearTabDrop() {
-  for (const t of tabsEl.querySelectorAll('.drop-before, .drop-after')) t.classList.remove('drop-before', 'drop-after');
+  for (const t of tabsEl.querySelectorAll('.shifting')) {
+    t.classList.remove('shifting');
+    t.style.transform = '';
+  }
 }
 function endTabPress(e, cancelled = false) {
   const p = tabPress;
   if (!p || e.pointerId !== p.pointerId) return;
   tabPress = null;
   p.el.classList.remove('lifting');
-  p.el.style.transform = '';
   document.body.classList.remove('tab-dragging');
-  clearTabDrop();
+  const reorder = !p.torn && p.moved && !cancelled && p.slots && p.to !== p.from;
+  if (reorder) {
+    // 놓은 자리로 스르르 앉힌다 — 비켜 선 탭들은 이미 새 자리라 그대로 두고, 새 순서가 오면 탭 줄이 다시 그려진다 (안 와도 잠시 뒤 정리)
+    p.el.classList.add('shifting');
+    p.el.style.transform = `translateY(${(p.to - p.from) * p.stride}px)`;
+    setTimeout(clearTabDrop, 700);
+  } else {
+    p.el.style.transform = '';
+    clearTabDrop();
+  }
   if (p.torn) api.stack.tearEnd(e.screenX, e.screenY);
   else if (p.moved && !cancelled) {
-    // 탭 줄 안에서 끌어 놓으면 그 자리로 순서 바꾸기 (현재 자리와 같으면 그대로)
-    const at = [...tabsEl.querySelectorAll('[data-tab-id]')].indexOf(p.el);
-    if (p.index != null && p.index !== at) api.stack.reorder(p.tabId, p.index);
+    if (reorder) api.stack.reorder(p.tabId, p.to);
     if (p.tabId !== id) {
       flush(); // 저장을 기다리지 않고 바로 (탭 누르기와 같음)
       api.stack.activate(p.tabId);

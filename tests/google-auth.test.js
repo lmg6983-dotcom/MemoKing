@@ -249,3 +249,13 @@ test('연결 끊기: revoke: false 면 구글 쪽 허용은 거두지 않음 (�
   assert.equal(auth.connected, false);
   assert.equal(posts.length, before);
 });
+
+test('클라이언트 보안 비밀번호 오류: 어디를 고쳐야 하는지 알려 준다', async () => {
+  const { invalidClientHelp, AuthError } = await import('../desktop/drive/google-auth.js');
+  const raw = new AuthError('Google 로그인 오류: The provided client secret is invalid.');
+  assert.match(invalidClientHelp(raw, 'manual').message, /설정에 붙여 넣은/);
+  assert.match(invalidClientHelp(raw, 'bundled').message, /MEMOKING_GOOGLE_CLIENT_SECRET/);
+  assert.match(invalidClientHelp(raw, 'manual').message, /The provided client secret is invalid/, '원문도 남김');
+  assert.equal(invalidClientHelp(new AuthError('Google 로그인 오류: 로그인을 취소했어요'), 'manual'), null, '다른 오류는 그대로');
+  assert.equal(invalidClientHelp(new Error('x'), 'manual'), null);
+});

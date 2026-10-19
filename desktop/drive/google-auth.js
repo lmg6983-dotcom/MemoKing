@@ -131,6 +131,15 @@ export class GoogleAuth {
     return f?.id ? f : null;
   }
 
+  /** 지금 클라이언트가 어디서 왔나 — 'manual'(설정에 붙여 넣음) | 'env' | 'bundled'(앱에 넣어 둔 것) | 'remembered'(예전 로그인) | 'fallback' */
+  clientSource() {
+    if (this.data.clientId) return 'manual';
+    if (process.env.MEMOKING_GOOGLE_CLIENT_ID) return 'env';
+    if (this.bundled()?.id) return 'bundled';
+    if (this.data.tokenClient?.id) return 'remembered';
+    return 'fallback';
+  }
+
   /** 새 토큰을 받을 클라이언트 — 그 토큰을 준 클라이언트 (기억해 둔 게 없으면 지금 클라이언트) */
   refreshClient() {
     const t = this.data.tokenClient;
@@ -248,8 +257,11 @@ export class GoogleAuth {
       });
     });
 
+    const source = this.clientSource();
     const token = await this.post(TOKEN_URL, {
       code, client_id: client.id, client_secret: client.secret, redirect_uri: redirect, grant_type: 'authorization_code', code_verifier: verifier,
+    }).catch((err) => {
+      throw invalidClientHelp(err, source) ?? err;
     });
     if (!token.refresh_token) throw new AuthError('구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 시도해 주세요');
     // 허용 화면에서 Drive 전체 칸을 끄고 허용할 수도 있다 — 실제로 받은 범위로 정한다
@@ -332,6 +344,18 @@ export class GoogleAuth {
     if (!res.ok) throw new Error(`Google 서버 오류 (${res.status})`);
     return json;
   }
+}
+
+/** "client secret is invalid" 같은 클라이언트 오류 → 어디를 고쳐야 하는지 알려 주는 안내 (아니면 null) */
+export function invalidClientHelp(err, source) {
+  if (!(err instanceof AuthError) || !/invalid_client|client secret is invalid|client_secret|Unauthorized|The OAuth client was not found/i.test(err.message)) return null;
+  const where = {
+    manual: '설정에 붙여 넣은 클라이언트 ID · 보안 비밀번호가 서로 맞지 않아요. 설정 › Google Drive 의 클라이언트를 지우거나 같은 클라이언트의 값으로 다시 붙여 넣어 주세요 (지우면 앱에 들어 있는 연결 정보를 써요)',
+    bundled: '이 앱에 들어 있는 Google 연결 정보(보안 비밀번호)가 맞지 않아요. 배포할 때 넣는 MEMOKING_GOOGLE_CLIENT_ID · MEMOKING_GOOGLE_CLIENT_SECRET 이 같은 클라이언트의 값인지 확인하고 다시 배포해야 해요',
+    env: '환경 변수 MEMOKING_GOOGLE_CLIENT_ID · MEMOKING_GOOGLE_CLIENT_SECRET 이 서로 맞지 않아요',
+    remembered: '예전에 로그인했던 클라이언트의 보안 비밀번호가 더 이상 맞지 않아요. 설정에서 클라이언트를 새로 붙여 넣어 주세요',
+  }[source] ?? 'Google 클라이언트(ID · 보안 비밀번호)를 확인해 주세요';
+  return new AuthError(`Google 로그인 오류: 클라이언트 보안 비밀번호가 올바르지 않아요. ${where}. (원문: ${err.message.replace(/^Google 로그인 오류: /, '')})`);
 }
 
 function page(ok, label = 'Google Drive') {

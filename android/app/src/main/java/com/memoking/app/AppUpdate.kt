@@ -30,6 +30,9 @@ object AppUpdate {
     const val APK_PREFIX = "https://github.com/$REPO/releases/download/"
     const val ACTION_RESULT = "com.memoking.app.UPDATE_RESULT"
 
+    /** 설치가 끝나지 않았을 때 (status: PackageInstaller.STATUS_*, why: 시스템 메시지) — 화면에 알리려고 */
+    @Volatile var listener: ((Int, String) -> Unit)? = null
+
     /** 새 버전인가 (versionCode 가 더 크면) */
     fun isNewer(currentCode: Int, latestCode: Int): Boolean = latestCode > currentCode
 
@@ -165,6 +168,8 @@ object AppUpdate {
     /** 받은 APK 를 설치 세션으로 넘긴다 — 안드로이드가 "업데이트할까요?" 를 묻는다. 결과는 UpdateReceiver 가 받는다 */
     fun install(ctx: Context, file: File) {
         val installer = ctx.packageManager.packageInstaller
+        // 앞서 열어 두고 끝내지 못한 설치 세션은 정리 (다시 눌렀을 때 낡은 확인 화면 · 세션이 쌓여 설치가 꼬이지 않게)
+        installer.mySessions.forEach { runCatching { installer.abandonSession(it.sessionId) } }
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(ctx.packageName)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
@@ -188,16 +193,24 @@ object AppUpdate {
 /** 설치 세션의 결과: 확인이 필요하면 안드로이드 설치 화면을 띄운다. 성공하면 앱이 새 버전으로 다시 시작된다 */
 class UpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+        when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 @Suppress("DEPRECATION")
                 val confirm = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java) else intent.getParcelableExtra(Intent.EXTRA_INTENT)
-                confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let { context.startActivity(it) }
+                try {
+                    confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let { context.startActivity(it) }
+                } catch (e: Exception) {
+                    // 앱이 앞에 없을 때 등으로 설치 화면을 띄우지 못함 → 화면에 알려 다시 누르게
+                    android.util.Log.w("MemoKing", "설치 화면을 띄우지 못했어요", e)
+                    AppUpdate.listener?.invoke(PackageInstaller.STATUS_FAILURE, e.message ?: "")
+                }
             }
             PackageInstaller.STATUS_SUCCESS -> AppUpdate.cleanup(context)
             else -> {
                 val why = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""
-                android.util.Log.w("MemoKing", "업데이트 설치가 끝나지 않았어요: $why")
+                android.util.Log.w("MemoKing", "업데이트 설치가 끝나지 않았어요: $status $why")
+                AppUpdate.listener?.invoke(status, why)
             }
         }
     }
