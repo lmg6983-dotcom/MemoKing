@@ -49,6 +49,7 @@ export class Vault extends EventTarget {
     this.orphanTimer = null;
     /** @type {Map<string, {id, file: string|null, meta, body, mtimeMs, size, idSaved: boolean}>} */
     this.entries = new Map();
+    this.partsCache = new Map(); // 본문 → 목록 카드에 쓰는 것 (summary)
     this.locks = new Map(); // 연 잠금 메모: id → 세션 (메모를 닫으면 잊는다)
     this.device = 'phone'; // 내용을 고친 곳으로 머리말에 남김
     this.lockCopies = new Map(); // 잠긴 메모 id → 그 메모를 연 동안 만든 사본 id 들 (같은 열쇠)
@@ -178,29 +179,44 @@ export class Vault extends EventTarget {
 
   // ---------- 조회 ----------
 
-  summary(entry) {
-    const media = extractMedia(entry.body);
+  // 본문에서 읽어 내는 것(제목 · 미리 보기 · 태그 · 첨부 …)은 본문이 같으면 다시 읽지 않는다
+  //   — 목록을 다시 그릴 때마다 모든 메모 본문을 다시 훑어, 지우기 · 되돌리기 때 화면이 잠깐 멈췄다
+  bodyParts(body) {
+    const hit = this.partsCache.get(body);
+    if (hit) return hit;
+    const media = extractMedia(body);
     const has = (kind) => media.some((m) => m.kind === kind);
+    const parts = {
+      title: extractTitle(body),
+      preview: extractPreview(body),
+      thumb: media.find((m) => m.kind === 'image')?.src ?? null,
+      tags: extractTags(body),
+      hasImage: has('image'),
+      hasWebLink: /\]\(https?:\/\/|<https?:\/\//i.test(body),
+      hasAudio: has('audio'),
+      hasVideo: has('video'),
+      hasFile: has('file'),
+      tasks: taskProgress(body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
+      locked: isLockedBody(body),
+    };
+    if (this.partsCache.size > 5000) this.partsCache.clear();
+    this.partsCache.set(body, parts);
+    return parts;
+  }
+
+  summary(entry) {
+    const parts = this.bodyParts(entry.body);
     return {
       id: entry.id,
       file: entry.file,
-      title: extractTitle(entry.body),
-      preview: extractPreview(entry.body),
+      ...parts,
+      tags: [...parts.tags],
       color: entry.meta.color,
       pinned: entry.meta.pinned,
       created: entry.meta.created,
       updated: entry.meta.updated,
-      thumb: media.find((m) => m.kind === 'image')?.src ?? null,
-      tags: extractTags(entry.body),
-      hasImage: has('image'),
-      hasWebLink: /\]\(https?:\/\/|<https?:\/\//i.test(entry.body),
-      hasAudio: has('audio'),
-      hasVideo: has('video'),
-      hasFile: has('file'),
       reminderCount: entry.meta.reminders.filter((r) => isLiveCached(r)).length, // 종 버튼·일정 탭과 같은 규칙 (앞으로 울릴 것만)
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
-      tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
-      locked: isLockedBody(entry.body),
     };
   }
 
@@ -703,7 +719,12 @@ export class Vault extends EventTarget {
 
   scheduleIndex() {
     clearTimeout(this.indexTimer);
-    this.indexTimer = setTimeout(() => this.writeIndex(), INDEX_DELAY);
+    // 검색 색인은 무거워서(메모 전부를 훑음) 손을 쉬는 틈에 — 화면 움직임 · 글쓰기 중간에 끼면 걸렸다
+    this.indexTimer = setTimeout(() => {
+      const idle = globalThis.requestIdleCallback;
+      if (idle) idle(() => this.indexTimer && this.writeIndex(), { timeout: 4000 });
+      else this.writeIndex();
+    }, INDEX_DELAY);
   }
 
   writeIndex() {

@@ -865,12 +865,16 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 @keyframes card-fly { to { transform: translateX(var(--fly, 110%)) rotate(6deg); opacity: 0; } }
 .card { touch-action: pan-y; } /* 가로 움직임은 카드 밀기로 (브라우저가 화면을 옆으로 끌지 않음) */
 .card.swiping { transition: none; z-index: 2; will-change: transform, opacity; }
+.card.flying { z-index: 2; will-change: transform, opacity; pointer-events: none; } /* 밀어 지운 카드가 날아가는 동안 (따로 그리는 층) */
 .list-screen.swipe-lock .view { overflow-y: hidden; } /* 미는 동안 목록이 위아래로 같이 흔들리지 않게 */
 .card.swipe-ready { box-shadow: 0 0 0 2px var(--rec), var(--shadow-card); }
-.card.swipe-ready::before {
+/* "지우기" 딱지는 밀기 시작할 때 미리 만들어 두고 문턱에서 보이기만 — 문턱을 넘는 순간 새로 그리느라 걸리지 않게 */
+.card.swiping::before {
   content: "지우기"; position: absolute; top: 10px; right: 10px; z-index: 3;
   padding: 2px 8px; border-radius: 999px; background: var(--rec); color: var(--on-rec); font-size: 12px; font-weight: 800;
+  opacity: 0; transform: scale(0.85); transition: opacity 0.12s, transform 0.12s var(--ease-out);
 }
+.card.swiping.swipe-ready::before { opacity: 1; transform: none; }
 /* 태블릿: 오른쪽으로 밀면 열기 (지우기는 왼쪽으로만) — 안내는 카드 왼쪽 안에 (옆 메모 칸에 가리지 않게) */
 .card.swipe-open.swipe-ready { box-shadow: 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
 .card.swipe-open.swipe-ready::before { content: attr(data-open-label); right: auto; left: 10px; background: var(--brand-yellow); color: var(--on-brand); }

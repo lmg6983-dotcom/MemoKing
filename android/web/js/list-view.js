@@ -150,7 +150,28 @@ function layoutCards(memos) {
     return c;
   });
   el.cards.replaceChildren(...columns);
-  stackCards(columns, memos.map(renderCard));
+  stackCards(columns, memos.map(cardFor));
+  if (cardCache.size > memos.length + 200) for (const id of cardCache.keys()) if (!memos.some((m) => m.id === id)) cardCache.delete(id);
+}
+
+// 바뀌지 않은 메모의 카드는 다시 만들지 않고 그대로 옮겨 쌓는다
+//   — 지우기 · 되돌리기 · 저장 때마다 모든 카드를 새로 만들어, 남은 카드가 미끄러지는 중에 화면이 잠깐 멈췄다
+const cardCache = new Map(); // 메모 id → { key, li }
+const cardKey = (memo) => JSON.stringify(memo) + friendlyTime(memo.updated);
+function cardFor(memo) {
+  const key = cardKey(memo);
+  const hit = cardCache.get(memo.id);
+  if (hit?.key === key) {
+    const card = hit.li.querySelector('.card');
+    card.removeAttribute('style'); // 밀다 만 자리 · 숨김(animateRemove)이 남지 않게
+    card.classList.remove('swiping', 'swipe-ready', 'swipe-open', 'flying');
+    delete card.dataset.swiped;
+    hit.li.style.animation = ''; // 다시 나타난 카드는 등장 움직임 (이미 있던 카드는 glideCards 가 끈다)
+    return hit.li;
+  }
+  const li = renderCard(memo);
+  cardCache.set(memo.id, { key, li });
+  return li;
 }
 
 
@@ -196,6 +217,8 @@ function filterCount() {
 }
 
 export function render() {
+  stale = false;
+  clearTimeout(staleTimer);
   const narrowed = Boolean(state.query) || filterCount() > 0;
   const memos = filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
   // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)
@@ -452,11 +475,22 @@ function endSwipe(e) {
   // 멀리 밀었거나, 같은 방향으로 휙 튕겼으면 (빠르기 0.11px/ms 넘음 · 너무 짧은 건 빼고) 지운다
   const flick = Math.abs(vx) > 0.11 && Math.sign(vx) === Math.sign(dx) && Math.abs(dx) > w * 0.12;
   if (Math.abs(dx) > w * 0.38 || flick) {
-    card.style.transition = 'transform 0.18s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.18s cubic-bezier(0.23, 1, 0.32, 1)';
-    card.style.transform = `translateX(${Math.sign(dx) * w * 1.3}px) rotate(${Math.sign(dx) * 8}deg)`;
+    // 카드가 끝까지 날아간 뒤에 지운다 — 날아가는 중에 목록을 다시 그리면(무거운 일) 카드가 중간에 멈칫했다.
+    //   날아가는 동안도 따로 그리는 층(flying: will-change)에 둬 화면 스레드가 바빠도 매끄럽게
+    card.classList.add('flying');
+    card.style.transition = 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s cubic-bezier(0.23, 1, 0.32, 1)';
+    card.style.transform = `translate3d(${Math.sign(dx) * w * 1.3}px, 0, 0) rotate(${Math.sign(dx) * 8}deg)`;
     card.style.opacity = '0';
     card.dataset.swiped = '1';
-    setTimeout(() => app.deleteMemo(card.dataset.id), 120);
+    let done = false;
+    const remove = () => {
+      if (done) return;
+      done = true;
+      card.style.visibility = 'hidden'; // 다시 그리기 전까지 제자리에 다시 보이지 않게
+      app.deleteMemo(card.dataset.id, { flown: true });
+    };
+    card.addEventListener('transitionend', (ev) => ev.propertyName === 'transform' && remove());
+    setTimeout(remove, 260); // transitionend 가 오지 않을 때(움직임 줄이기 등)
     return;
   }
   card.style.transition = 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s';
@@ -601,6 +635,7 @@ export function refreshHistory() {
   if (state.tab === 'history') historyTab?.refresh();
 }
 
+let shownKey = ''; // 지금 목록에 그린 메모들 (같으면 다시 그리지 않는다 — 지운 뒤 폴더 변경 소식으로 또 그려 끊겼다)
 export function refresh() {
   if (!app.vault) return;
   state.memos = app.vault.list();
@@ -608,14 +643,33 @@ export function refresh() {
     const { text } = parseQuery(state.query);
     state.results = text ? app.vault.search(text) : null;
   }
+  const key = (state.results ?? state.memos).map(cardKey).join('\n') + (state.results ? '' : '|all') + state.memos.length;
+  remindersTab?.refresh({ quiet: state.tab !== 'reminders' }); // 일정 탭으로 가면 setTab 이 다시 그린다
+  if (key === shownKey && el.cards.querySelector('.col')) return;
+  shownKey = key;
+  // 휴대폰에서 메모를 쓰는 동안 목록은 메모 화면 뒤에 가려 있다 — 저장할 때마다 바로 다시 그리면 글자를 치다 걸렸다.
+  //   손을 쉴 때(잠깐 뒤 · 한가할 때) 그리고, 그 전에 목록으로 돌아오면 show() 가 바로 그린다
+  if (covered()) {
+    stale = true;
+    clearTimeout(staleTimer);
+    staleTimer = setTimeout(() => (window.requestIdleCallback ?? setTimeout)(() => stale && render(), { timeout: 3000 }), 1200);
+    return;
+  }
   render();
-  remindersTab?.refresh();
 }
+let stale = false;
+let staleTimer = null;
+const covered = () => !isTwoPane() && !$('note-screen').hidden;
 
 export function show() {
   const wasHidden = el.screen.hidden;
   el.screen.hidden = false;
   if (wasHidden) render(); // 숨어 있던 동안에는 카드 높이를 잴 수 없어 다시 쌓는다
+  else if (stale) {
+    // 메모 화면이 내려가는 동안(0.16초)은 그대로 두고, 다 내려간 뒤에 카드들이 새 자리로 미끄러진다 — 닫는 움직임이 걸리지 않게
+    clearTimeout(staleTimer);
+    staleTimer = setTimeout(() => stale && render(), 200);
+  }
   matchChrome(el.screen);
 }
 

@@ -169,9 +169,17 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     });
   }
 
-  async function refresh() {
+  /** @param {{ quiet?: boolean }} [o] quiet: 탭이 안 보일 때 — 탭 숫자만 (달력은 다음에 보일 때 그린다. 메모를 지울 때마다 안 보이는 달력을 다시 그려 목록이 끊겼다) */
+  async function refresh({ quiet = false } = {}) {
     items = await api.reminders.all();
-    render();
+    if (quiet) updateCount(new Date());
+    else render();
+  }
+
+  // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)
+  function updateCount(now) {
+    const live = items.filter((i) => isLive(i.reminder, now)).length;
+    countEl.textContent = live ? String(live) : '';
   }
 
   // 한 메모의 알림 목록을 바꿔서 저장
@@ -811,9 +819,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     }
     calendar.refetchEvents();
     renderRows();
-    // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)
-    const live = items.filter((i) => isLive(i.reminder, now)).length;
-    countEl.textContent = live ? String(live) : '';
+    updateCount(now);
   }
 
   let adding = false;

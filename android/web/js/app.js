@@ -560,7 +560,8 @@ const titleOf = (body) => (isBlankBody(body) ? '새 메모' : extractTitle(body)
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** 메모를 지운다. 열려 있으면 메모 화면이 휴지통으로 빨려 들어가듯, 목록이면 카드가 접히며 사라진다 */
-async function deleteMemo(id) {
+/** @param {{ flown?: boolean }} [o] flown: 카드가 이미 밀려 날아갔다 (목록 밀어 지우기) — 따로 날리지 않는다 */
+async function deleteMemo(id, { flown = false } = {}) {
   if (!app.vault?.get(id)) return;
   const inNote = note.currentId() === id;
   const body = inNote ? note.editorMarkdown() : app.vault.get(id)?.body ?? '';
@@ -573,7 +574,11 @@ async function deleteMemo(id) {
     }
     note.discardAndClose();
     $('note-screen').classList.remove('trashing');
-  } else if (motion) list.animateRemove(id);
+  } else if (motion && !flown) {
+    list.animateRemove(id);
+    // 날아가는 카드를 먼저 화면에 올린 뒤 (그다음부터는 따로 움직여 안 끊김) 무거운 일(지우기 · 다시 그리기)
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }
   haptic(10);
   let name;
   try {
