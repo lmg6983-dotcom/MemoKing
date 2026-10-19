@@ -17,8 +17,7 @@ import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
 import { hintOnce } from './hints.js';
 import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
-import { openContextMenu } from './ctx-menu.js';
-import { SORTS, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
+import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
@@ -40,8 +39,8 @@ const el = {
   fab: $('fab'),
   fabMenu: $('fab-menu'),
   fabScrim: $('fab-scrim'),
-  layoutBtn: $('layout-btn'),
-  sortBtn: $('sort-btn'),
+  sortGroup: $('sort-group'),
+  layoutGroup: $('layout-group'),
   search: $('search'),
   settingsBtn: $('settings-btn'),
   cards: $('cards'),
@@ -282,7 +281,7 @@ function renderFilters() {
   el.kindFilter.replaceChildren(...KIND_FILTERS.map((k) => chip('filter-chip', k.label, state.filter.kinds.includes(k.id), { kind: k.id })));
   const n = filterCount();
   el.filterCount.textContent = n ? String(n) : '';
-  el.filterBtn.classList.toggle('active', n > 0);
+  el.filterBtn.classList.toggle('active', n > 0 || sort !== DEFAULT_SORT); // 기본 보기가 아니면 단추에 표시
   el.filterSummary.hidden = n === 0;
   const parts = [
     ...state.filter.tags.map((t) => `#${t}`),
@@ -1400,22 +1399,32 @@ window.addEventListener('keydown', (e) => {
 
 new ResizeObserver(scheduleRelayout).observe(el.cards);
 
-// ---------- 정렬 (최신순 · 오래된순 · 많이 본 순 · 이름순) — 휴대폰과 같은 규칙(core/memo-sort.js), 이 PC 에 기억 ----------
+// ---------- 정렬 (최신순 · 오래된순 · 많이 본 순 · 이름순) — "보기" 패널, 휴대폰과 같은 규칙(core/memo-sort.js), 이 PC 에 기억 ----------
 //   고정한 메모는 늘 맨 앞. 많이 본 순은 이 PC 에서 메모 창을 연 횟수 (main.js noteOpened)
 const SORT_KEY = 'memoking.sort';
+// 보기 패널의 고르기 칩 (정렬 · 카드 모양): 하나만 켜짐
+function radioChips(box, options, current) {
+  box.replaceChildren(...options.map((o) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'filter-chip';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(o.id === current));
+    b.tabIndex = o.id === current ? 0 : -1;
+    b.dataset.value = o.id;
+    b.textContent = o.label;
+    return b;
+  }));
+}
 function applySortLabel() {
-  const label = `정렬: ${sortLabel(sort)}`;
-  el.sortBtn.title = label;
-  el.sortBtn.setAttribute('aria-label', label);
-  el.sortBtn.classList.toggle('active', sort !== 'updated'); // 기본(최신순)이 아니면 단추에 표시 (필터처럼)
+  radioChips(el.sortGroup, SORTS, sort);
+  el.sortGroup.setAttribute('aria-label', `정렬: ${sortLabel(sort)}`);
 }
 applySortLabel();
-el.sortBtn.addEventListener('click', async () => {
-  const r = el.sortBtn.getBoundingClientRect();
-  const pick = await openContextMenu({ x: r.left, y: r.bottom + 4, label: '정렬', items: SORTS.map((o) => ({ id: o.id, label: o.label, checked: o.id === sort })) });
-  el.sortBtn.focus({ preventScroll: true });
-  if (!pick || pick === sort) return;
-  sort = validSort(pick);
+el.sortGroup.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-value]');
+  if (!b || b.dataset.value === sort) return;
+  sort = validSort(b.dataset.value);
   applySortLabel();
   try {
     localStorage.setItem(SORT_KEY, sort);
@@ -1423,15 +1432,14 @@ el.sortBtn.addEventListener('click', async () => {
     // 지금 창에서만
   }
   render(); // 카드들이 새 순서로 미끄러져 간다 (animateCards)
+  el.sortGroup.querySelector('[aria-checked="true"]')?.focus({ preventScroll: true });
 });
 
 // ---------- 카드 모양 (격자 / 한 줄씩) — 휴대폰과 같은 단추, 이 PC 에 기억 ----------
+const LAYOUTS = [{ id: 'grid', label: '격자' }, { id: 'rows', label: '한 줄씩' }];
 function applyLayout() {
   el.cards.dataset.layout = layout;
-  el.layoutBtn.replaceChildren(icon(layout === 'rows' ? 'grid' : 'rows'));
-  const label = layout === 'rows' ? '격자로 보기 (여러 줄)' : '한 줄씩 보기';
-  el.layoutBtn.title = label;
-  el.layoutBtn.setAttribute('aria-label', label);
+  radioChips(el.layoutGroup, LAYOUTS, layout);
 }
 try {
   layout = localStorage.getItem(LAYOUT_KEY) === 'rows' ? 'rows' : 'grid';
@@ -1454,14 +1462,16 @@ function glideCards(change) {
     c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' });
   }
 }
-el.layoutBtn.addEventListener('click', () => {
-  layout = layout === 'rows' ? 'grid' : 'rows';
+el.layoutGroup.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-value]');
+  if (!b || b.dataset.value === layout) return;
+  layout = b.dataset.value === 'rows' ? 'rows' : 'grid';
   tutEvent('layout-changed');
-  if (!reduceMotion()) el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   glideCards(() => {
     applyLayout();
     renderNow();
   });
+  el.layoutGroup.querySelector('[aria-checked="true"]')?.focus({ preventScroll: true });
   try {
     localStorage.setItem(LAYOUT_KEY, layout);
   } catch {

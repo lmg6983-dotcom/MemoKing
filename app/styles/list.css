@@ -447,7 +447,7 @@ body:not([data-tab="memos"]) .filter-btn, body:not([data-tab="memos"]) .layout-b
   cursor: pointer;
 }
 .filter-chip:hover, .tag-chip:hover { background: var(--hover); }
-.filter-chip[aria-pressed="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
+.filter-chip[aria-pressed="true"], .filter-chip[aria-checked="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
 .tag-chip small { font-size: 12px; font-weight: 500; color: var(--muted); }
 .tag-chip[aria-pressed="true"] small { color: var(--on-brand); }
 

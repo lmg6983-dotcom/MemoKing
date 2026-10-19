@@ -4,6 +4,7 @@
 :root {
   --tap: 44px; /* 손가락으로 누르기 좋은 최소 크기 */
   --top-h: 56px;
+  --tabbar-h: 56px; /* 아래 탭바 (탭 42px + 위아래 여백) */
 }
 
 html, body {
@@ -94,7 +95,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .brand-icon { width: 28px; height: 28px; }
 .brand { margin-left: 8px; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 
-.searchbar { display: flex; align-items: center; gap: 4px; padding: 0 10px 8px 16px; flex: none; }
+.searchbar { display: flex; align-items: center; gap: 2px; padding: 10px 6px 8px 12px; flex: none; } /* 맨 위 줄 (앱 이름 줄 없이) */
 .search {
   display: flex;
   align-items: center;
@@ -128,11 +129,12 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 }
 .filter-count:empty { display: none; }
 
+/* 아래 탭바 (메모 · 일정 · 보관함): 엄지가 닿는 곳 — + 단추는 그 위 */
 .tabs {
   position: relative;
   display: flex;
   gap: 4px;
-  margin: 0 16px 6px;
+  margin: 6px 12px calc(8px + env(safe-area-inset-bottom));
   padding: 3px;
   flex: none;
   border-radius: var(--radius-md);
@@ -162,7 +164,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   overflow-x: hidden; /* 밀어 지우는 카드가 기울어 삐져나와도 화면이 옆으로 끌리지 않게 */
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 2px 0 calc(96px + env(safe-area-inset-bottom));
+  padding: 2px 0 88px; /* + 단추 자리 (아래 탭바는 목록 밖) */
 }
 
 /* 필터 */
@@ -198,7 +200,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   white-space: nowrap;
 }
 .chip svg { width: 15px; height: 15px; }
-.chip[aria-pressed="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; } /* PC 목록과 같음 */
+.chip[aria-pressed="true"], .chip[aria-checked="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; } /* PC 목록과 같음 (보기 패널의 정렬 · 카드 모양은 aria-checked) */
 @media (prefers-color-scheme: dark) {
   .chip[aria-pressed="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
 }
@@ -301,7 +303,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .fab {
   position: absolute;
   right: 20px;
-  bottom: calc(20px + env(safe-area-inset-bottom));
+  bottom: calc(20px + var(--tabbar-h) + env(safe-area-inset-bottom)); /* 아래 탭바 위 */
   display: grid;
   place-items: center;
   width: 60px;
@@ -847,7 +849,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .fab.open { background: var(--surface-2); color: var(--text-strong); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
 .fab.open svg { transform: rotate(45deg); }
 .fab-scrim { position: absolute; inset: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); animation: mk-fade-in 0.15s ease-out; }
-.fab-menu { position: absolute; right: 20px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 21; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+.fab-menu { position: absolute; right: 20px; bottom: calc(92px + var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 21; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
 .fab-sat { display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none; color: var(--text-strong); animation: sat-out 0.26s var(--ease-out) both; }
 .fab-sat:nth-child(1) { animation-delay: 0.03s; }
 .fab-menu.closing .fab-sat { animation: sat-in 0.14s var(--ease-out) both; }
@@ -959,7 +961,6 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   .note-screen .format-bar button { min-width: 38px; height: 40px; }
   .tabs button { font-size: 12.5px; }
   .tabs button svg { display: none; }
-  .brand { font-size: 18px; }
   .share-choice small { display: none; }
 }
 /* 가로로 눕힌 휴대폰 (높이가 낮음): 막대를 얇게 */

@@ -12,8 +12,7 @@ import { matchChrome, confirmDialog, isTwoPane, toast } from './ui.js';
 import { tutEvent } from './tutorial.js';
 import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
-import { openContextMenu } from '../../app/js/ctx-menu.js';
-import { SORTS, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
+import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -29,8 +28,8 @@ const el = {
   kindFilter: $('kind-filter'),
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
-  layoutBtn: $('layout-btn'),
-  sortBtn: $('sort-btn'),
+  sortGroup: $('sort-group'),
+  layoutGroup: $('layout-group'),
 };
 
 let layout = 'grid';
@@ -297,7 +296,7 @@ function renderFilters() {
   el.kindFilter.replaceChildren(...KIND_FILTERS.map((k) => chip('chip', k.label, state.filter.kinds.includes(k.id), { kind: k.id })));
   const n = filterCount();
   el.filterCount.textContent = n ? String(n) : '';
-  el.filterBtn.classList.toggle('on', n > 0);
+  el.filterBtn.classList.toggle('on', n > 0 || sort !== DEFAULT_SORT); // 기본 보기가 아니면 단추에 표시
   el.filterSummary.hidden = n === 0;
   const parts = [
     ...state.filter.tags.map((t) => `#${t}`),
@@ -379,8 +378,6 @@ function setTab(tab) {
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
   el.filterBtn.hidden = tab !== 'memos';
-  el.layoutBtn.hidden = tab !== 'memos'; // 한 줄씩 보기도 메모 탭에서만
-  el.sortBtn.hidden = tab !== 'memos'; // 정렬도
   el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: '보관한 알림 검색' }[tab];
   $('fab').hidden = tab === 'history'; // 보관함엔 + 없음. 일정 탭의 + 는 새 일정 (메모 탭과 같은 자리)
   $('fab').setAttribute('aria-label', tab === 'reminders' ? '새 일정' : '새 메모');
@@ -551,10 +548,24 @@ el.cards.addEventListener('contextmenu', (e) => {
 
 // ---------- 카드 모양 (격자 / 한 줄씩) ----------
 
+// 보기 패널의 고르기 칩 (정렬 · 카드 모양): 하나만 켜짐
+function radioChips(box, options, current) {
+  box.replaceChildren(...options.map((o) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(o.id === current));
+    b.tabIndex = o.id === current ? 0 : -1;
+    b.dataset.value = o.id;
+    b.textContent = o.label;
+    return b;
+  }));
+}
+const LAYOUTS = [{ id: 'grid', label: '두 줄' }, { id: 'rows', label: '한 줄씩' }];
 function applyLayout(layout) {
   el.cards.dataset.layout = layout;
-  el.layoutBtn.replaceChildren(icon(layout === 'rows' ? 'grid' : 'rows'));
-  el.layoutBtn.setAttribute('aria-label', layout === 'rows' ? '두 줄 격자로 보기' : '한 줄씩 보기');
+  radioChips(el.layoutGroup, LAYOUTS, layout);
 }
 try {
   layout = localStorage.getItem('memoking.layout') ?? 'grid';
@@ -588,10 +599,11 @@ function glideCards(change) {
   }
 }
 
-el.layoutBtn.addEventListener('click', () => {
-  layout = layout === 'rows' ? 'grid' : 'rows';
+el.layoutGroup.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-value]');
+  if (!b || b.dataset.value === layout) return;
+  layout = b.dataset.value === 'rows' ? 'rows' : 'grid';
   tutEvent('layout-changed');
-  el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   glideCards(() => {
     applyLayout(layout);
     render();
@@ -603,18 +615,17 @@ el.layoutBtn.addEventListener('click', () => {
   }
 });
 
-// ---------- 정렬 (최신순 · 오래된순 · 많이 본 순 · 이름순) — PC 와 같은 규칙(core/memo-sort.js), 이 휴대폰에 기억 ----------
+// ---------- 정렬 (최신순 · 오래된순 · 많이 본 순 · 이름순) — "보기" 패널, PC 와 같은 규칙(core/memo-sort.js), 이 휴대폰에 기억 ----------
 //   고정한 메모는 늘 맨 앞. 많이 본 순은 이 휴대폰에서 메모를 연 횟수 (countView — 메모 파일에는 쓰지 않는다: 열 때마다 동기화되지 않게)
 function applySortLabel() {
-  el.sortBtn.setAttribute('aria-label', `정렬: ${sortLabel(sort)}`);
-  el.sortBtn.classList.toggle('active', sort !== 'updated');
+  radioChips(el.sortGroup, SORTS, sort);
+  el.sortGroup.setAttribute('aria-label', `정렬: ${sortLabel(sort)}`);
 }
 applySortLabel();
-el.sortBtn.addEventListener('click', async () => {
-  const r = el.sortBtn.getBoundingClientRect();
-  const pick = await openContextMenu({ x: Math.max(8, r.right - 200), y: r.bottom + 4, label: '정렬', items: SORTS.map((o) => ({ id: o.id, label: o.label, checked: o.id === sort })) });
-  if (!pick || pick === sort) return;
-  sort = validSort(pick);
+el.sortGroup.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-value]');
+  if (!b || b.dataset.value === sort) return;
+  sort = validSort(b.dataset.value);
   applySortLabel();
   try {
     localStorage.setItem('memoking.sort', sort);

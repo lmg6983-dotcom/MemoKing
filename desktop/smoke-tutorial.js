@@ -219,7 +219,9 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await arrive(list, 'cards', { praise: true });
     await next(list, 'cards');
     await arrive(list, 'layout');
-    await press(list(), '#layout-btn', '[layout] 보기 바꾸기');
+    await press(list(), '#filter-btn', '[layout] 보기 단추');
+    await new Promise((r) => setTimeout(r, 400));
+    await press(list(), '#layout-group [data-value="rows"]', '[layout] 한 줄씩');
     await arrive(list, 'filters', { praise: true });
     await press(list(), '#tag-strip .tag-chip[data-tag="할일"]', '[filters] #할일');
     await arrive(list, 'tabs', { praise: true });
