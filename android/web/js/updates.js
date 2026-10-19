@@ -140,7 +140,14 @@ async function download() {
       await call('updateDownload', { apk: info.apk, size: info.size, sha256: info.sha256, version: info.version });
       set({ status: 'ready' });
     }
-    const result = await call('updateInstall');
+    $('update-go').disabled = true;
+    $('update-go').textContent = '설치 화면 준비 중…'; // 설치 파일을 넘기는 동안(몇 초) 다시 눌러 설치가 꼬이지 않게
+    let result;
+    try {
+      result = await call('updateInstall');
+    } finally {
+      $('update-go').disabled = false;
+    }
     if (result === 'permission') {
       // 안드로이드의 "이 출처 허용" 화면을 열었다 — 켜고 돌아오면 다시 누르게
       set({ status: 'ready', message: '' });
@@ -152,6 +159,7 @@ async function download() {
       return download();
     } else {
       $('update-hint').hidden = true;
+      $('update-alt').hidden = true;
       set({ status: 'installing' });
     }
   } catch (err) {
@@ -172,6 +180,7 @@ export function setupUpdates({ currentVersion }) {
     set({ status: 'ready' });
     $('update-hint').textContent = text;
     $('update-hint').hidden = false;
+    $('update-alt').hidden = false; // 안 되면 브라우저로 내려받아 설치하는 다른 방법
   });
   $('update-check').addEventListener('click', () => {
     if (['available', 'ready', 'installing', 'downloading'].includes(state.status)) {
@@ -183,6 +192,10 @@ export function setupUpdates({ currentVersion }) {
     checkForUpdate();
   });
   $('update-go').addEventListener('click', download);
+  // 다른 방법: 브라우저로 APK 를 내려받아 안드로이드 설치 화면으로 (앱 안 설치가 안 되는 휴대폰용)
+  $('update-alt').addEventListener('click', () => {
+    if (info.apk) call('openUrl', { url: info.apk }).catch(() => {});
+  });
   $('update-later').addEventListener('click', () => {
     if (state.status !== 'downloading' && info.version) {
       store.snooze = { version: info.version, until: Date.now() + SNOOZE_MS };

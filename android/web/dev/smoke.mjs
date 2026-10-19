@@ -2318,6 +2318,13 @@ try {
   await page.waitForTimeout(400);
   const started = await page.evaluate(() => ({ note: document.getElementById('update-note').textContent, go: document.getElementById('update-go').textContent, hintHidden: document.getElementById('update-hint').hidden }));
   check('허용한 뒤 누르면 안드로이드 설치 화면으로 (받은 것을 다시 받지 않음)', /설치 화면/.test(started.note) && started.hintHidden && (await devLog()).update.downloads === 1, JSON.stringify(started));
+  // 설치가 끝나지 않으면(취소 · 실패) 까닭과 함께 다시 누르게 + 다른 방법(브라우저로 내려받기) — 앞서 닫은 세션의 낡은 결과는 앱이 걸러 낸다(AppUpdate.kt)
+  await page.evaluate(() => window.__mk.emit('updateResult', { status: 7, why: '' }));
+  await page.waitForTimeout(200);
+  const failShown = await page.evaluate(() => ({ hint: document.getElementById('update-hint').textContent, alt: !document.getElementById('update-alt').hidden, go: document.getElementById('update-go').textContent }));
+  check('설치가 끝나지 않으면: 까닭 안내 + "다시" + 브라우저로 내려받아 설치하는 다른 방법', /서명이 달라/.test(failShown.hint) && failShown.alt && failShown.go === '설치하기', JSON.stringify(failShown));
+  await page.tap('#update-alt');
+  await page.waitForTimeout(200);
   await page.tap('#update-later');
   await page.waitForTimeout(300);
   check('"나중에" 로 시트를 닫으면 설정으로 돌아옴', !(await page.isVisible('#update-sheet')) && await page.isVisible('#settings-sheet'));
