@@ -165,8 +165,8 @@ object AppUpdate {
     }
 
     /** 받은 APK 를 안드로이드 설치 화면으로 — 결과(취소 · 실패)는 startActivityForResult 로 돌아온다 (성공하면 앱이 새 버전으로 바뀐다) */
+    @Suppress("DEPRECATION")
     fun installIntent(file: File): Intent {
-        @Suppress("DEPRECATION")
         return Intent(Intent.ACTION_INSTALL_PACKAGE)
             .setDataAndType(VaultFileProvider.updateUriFor(file.name), APK_MIME)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
