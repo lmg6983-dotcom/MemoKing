@@ -685,6 +685,7 @@ export class WindowManager {
       open: Boolean(this.noteWins.get(m.id)?.isVisible()),
       stack: this.stacks?.stackOf(m.id)?.memos.length ?? 0,
       hotkey: this.hotkeySlotOf(m.id),
+      views: settings.viewCounts?.[m.id] ?? 0, // 목록 "많이 본 순" (main.js noteOpened)
       // 테이프로 바탕화면에 붙여 둔 메모 (창이 떠 있을 때만 — 닫으면 바탕화면에 없다)
       taped: this.layerOf(m.id) === 'bottom' && (this.stacks?.stackOf(m.id)?.memos ?? [m.id]).some((x) => this.noteWins.get(x)?.isVisible()),
     }));

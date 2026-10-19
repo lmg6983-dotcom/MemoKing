@@ -30,6 +30,7 @@ export const settingsFile = () => path.join(app.getPath('userData'), 'settings.j
 
 export const settings = {
   vaultPath: null, openNotes: [], noteBounds: {}, onTop: {}, listBounds: null, migratedV1: false,
+  viewCounts: {}, // 메모 id → 이 PC 에서 메모 창이 보인 횟수 (목록 "많이 본 순")
   historyEnabled: false,
   autoStartSet: false,
   quickMemo: true,

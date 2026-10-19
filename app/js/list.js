@@ -17,6 +17,8 @@ import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
 import { hintOnce } from './hints.js';
 import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
+import { openContextMenu } from './ctx-menu.js';
+import { SORTS, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
@@ -39,6 +41,7 @@ const el = {
   fabMenu: $('fab-menu'),
   fabScrim: $('fab-scrim'),
   layoutBtn: $('layout-btn'),
+  sortBtn: $('sort-btn'),
   search: $('search'),
   settingsBtn: $('settings-btn'),
   cards: $('cards'),
@@ -108,6 +111,12 @@ function closeOnlyFiles() {
 
 // ---------- 목록 ----------
 
+let sort = 'updated'; // 목록 정렬 (아래 "정렬")
+try {
+  sort = validSort(localStorage.getItem('memoking.sort'));
+} catch {
+  // 기본
+}
 let renderPending = false;
 let memosStale = false; // 메모 탭이 덮인 동안 메모가 바뀌었다 (돌아오면 다시 그린다)
 let glide = false; // 카드 모양을 바꿀 때는 glideCards 가 움직임을 맡는다
@@ -131,7 +140,7 @@ function render() {
     }
   }
   const narrowed = !only && (Boolean(state.query) || filterCount() > 0);
-  const memos = only ?? filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
+  const memos = only ?? sortMemos(filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }), sort);
   const before = glide ? null : cardRects();
   layoutCards(memos);
   if (before) animateCards(before);
@@ -1390,6 +1399,31 @@ window.addEventListener('keydown', (e) => {
 });
 
 new ResizeObserver(scheduleRelayout).observe(el.cards);
+
+// ---------- 정렬 (최근 수정순 · 오래된 순 · 최근 만든 순 · 많이 본 순 · 이름순) — 휴대폰과 같은 규칙(core/memo-sort.js), 이 PC 에 기억 ----------
+//   고정한 메모는 늘 맨 앞. 많이 본 순은 이 PC 에서 메모 창을 연 횟수 (main.js noteOpened)
+const SORT_KEY = 'memoking.sort';
+function applySortLabel() {
+  const label = `정렬: ${sortLabel(sort)}`;
+  el.sortBtn.title = label;
+  el.sortBtn.setAttribute('aria-label', label);
+  el.sortBtn.classList.toggle('active', sort !== 'updated'); // 기본이 아니면 단추에 표시 (필터처럼)
+}
+applySortLabel();
+el.sortBtn.addEventListener('click', async () => {
+  const r = el.sortBtn.getBoundingClientRect();
+  const pick = await openContextMenu({ x: r.left, y: r.bottom + 4, label: '정렬', items: SORTS.map((o) => ({ id: o.id, label: o.label, checked: o.id === sort })) });
+  el.sortBtn.focus({ preventScroll: true });
+  if (!pick || pick === sort) return;
+  sort = validSort(pick);
+  applySortLabel();
+  try {
+    localStorage.setItem(SORT_KEY, sort);
+  } catch {
+    // 지금 창에서만
+  }
+  render(); // 카드들이 새 순서로 미끄러져 간다 (animateCards)
+});
 
 // ---------- 카드 모양 (격자 / 한 줄씩) — 휴대폰과 같은 단추, 이 PC 에 기억 ----------
 function applyLayout() {

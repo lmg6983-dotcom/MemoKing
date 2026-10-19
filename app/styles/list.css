@@ -387,7 +387,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 
 /* ---------- 필터 (v0.11.0): 태그 줄 · 색 · 담긴 것 ---------- */
 .filter-btn { position: relative; }
-.filter-btn.active { background: var(--brand-yellow-soft); color: var(--text-strong); }
+.filter-btn.active, .sort-btn.active { background: var(--brand-yellow-soft); color: var(--text-strong); }
 .filter-btn[aria-expanded="true"] { background: var(--hover); color: var(--text); }
 .filter-count:not(:empty) {
   position: absolute;
@@ -402,7 +402,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   font-weight: 700;
   line-height: 15px;
 }
-body:not([data-tab="memos"]) .filter-btn, body:not([data-tab="memos"]) .layout-btn { display: none; } /* 거르기·한 줄씩 보기는 메모 탭에서만 */
+body:not([data-tab="memos"]) .filter-btn, body:not([data-tab="memos"]) .layout-btn, body:not([data-tab="memos"]) .sort-btn { display: none; } /* 거르기·정렬·한 줄씩 보기는 메모 탭에서만 */
 
 .filter-panel {
   display: flex;

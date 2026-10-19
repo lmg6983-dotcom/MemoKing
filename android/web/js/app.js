@@ -388,6 +388,7 @@ app.openMemo = async (id, options = {}) => {
   // 태블릿: 새로 열면 목록은 숨기고 메모를 가득
   if (isTwoPane()) panes.hideListForMemo();
   $('list-screen').hidden = false; // 메모 뒤에 목록이 있어야 닫을 때 바로 보인다
+  list.countView(id); // 목록 "많이 본 순"
   await note.openNote(id, options);
   syncPane();
 };

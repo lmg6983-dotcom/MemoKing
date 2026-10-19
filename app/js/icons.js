@@ -43,6 +43,8 @@ const ICONS = {
   redo: `<path d="M15 14l5-5-5-5" ${stroke}/><path d="M20 9H9.5a5.5 5.5 0 000 11H13" ${stroke}/>`,
   eraser: `<path d="M8.5 19.5h11" ${stroke}/><path d="M4.6 14.6l9.2-9.2a2 2 0 012.8 0l3 3a2 2 0 010 2.8l-7.8 7.8a2 2 0 01-1.4.5H8.3a2 2 0 01-1.4-.6l-2.3-2.3a1.4 1.4 0 010-2z" ${stroke}/><path d="M9.5 9.7l4.8 4.8" ${stroke}/>`,
   ink: `<path d="M3.5 17c2.2-4.4 4.1-9.5 6.3-9.5 2.6 0-1.6 9.8 1.4 9.8 2.3 0 3.3-6.1 5.6-6.1 1.7 0 .9 4.3 3.7 4.3" ${stroke}/>`,
+  // 목록 정렬: 길이가 줄어드는 세 줄 + 아래 화살표
+  sort: `<path d="M4 6h10M4 12h7M4 18h4" ${stroke}/><path d="M18 5v14M15 16l3 3 3-3" ${stroke}/>`,
   rows: `<rect x="3.5" y="4.5" width="17" height="6" rx="1.8" ${stroke}/><rect x="3.5" y="13.5" width="17" height="6" rx="1.8" ${stroke}/>`,
   grid: `<rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.8" ${stroke}/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.8" ${stroke}/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.8" ${stroke}/><rect x="13" y="13" width="7.5" height="7.5" rx="1.8" ${stroke}/>`,
   pen: `<path d="M4 20h4L19 9a2.83 2.83 0 00-4-4L4 16v4z" ${stroke}/><path d="M13.5 6.5l4 4" ${stroke}/>`,

@@ -12,6 +12,8 @@ import { matchChrome, confirmDialog, isTwoPane, toast } from './ui.js';
 import { tutEvent } from './tutorial.js';
 import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
+import { openContextMenu } from '../../app/js/ctx-menu.js';
+import { SORTS, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -28,9 +30,32 @@ const el = {
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
   layoutBtn: $('layout-btn'),
+  sortBtn: $('sort-btn'),
 };
 
 let layout = 'grid';
+let sort = 'updated'; // 목록 정렬 (아래 "정렬")
+try {
+  sort = validSort(localStorage.getItem('memoking.sort'));
+} catch {
+  // 기본
+}
+let viewCounts = {}; // 메모 id → 이 휴대폰에서 연 횟수
+try {
+  viewCounts = JSON.parse(localStorage.getItem('memoking.views') ?? '{}') ?? {};
+} catch {
+  viewCounts = {};
+}
+const withViews = (memos) => (sort === 'views' ? memos.map((m) => ({ ...m, views: viewCounts[m.id] ?? 0 })) : memos);
+/** 메모를 열었다 (많이 본 순 정렬) */
+export function countView(id) {
+  viewCounts[id] = (viewCounts[id] ?? 0) + 1;
+  try {
+    localStorage.setItem('memoking.views', JSON.stringify(viewCounts));
+  } catch {
+    // 이번 실행 동안만
+  }
+}
 const state = {
   memos: [],
   results: null, // 글자 검색 결과 (없으면 전체)
@@ -220,7 +245,7 @@ export function render() {
   stale = false;
   clearTimeout(staleTimer);
   const narrowed = Boolean(state.query) || filterCount() > 0;
-  const memos = filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
+  const memos = sortMemos(withViews(filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] })), sort);
   // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)
   glideCards(() => layoutCards(memos));
   el.empty.hidden = memos.length > 0;
@@ -355,6 +380,7 @@ function setTab(tab) {
   $('view-history').hidden = tab !== 'history';
   el.filterBtn.hidden = tab !== 'memos';
   el.layoutBtn.hidden = tab !== 'memos'; // 한 줄씩 보기도 메모 탭에서만
+  el.sortBtn.hidden = tab !== 'memos'; // 정렬도
   el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: '보관한 알림 검색' }[tab];
   $('fab').hidden = tab === 'history'; // 보관함엔 + 없음. 일정 탭의 + 는 새 일정 (메모 탭과 같은 자리)
   $('fab').setAttribute('aria-label', tab === 'reminders' ? '새 일정' : '새 메모');
@@ -575,6 +601,27 @@ el.layoutBtn.addEventListener('click', () => {
   } catch {
     // 무시
   }
+});
+
+// ---------- 정렬 (최근 수정순 · 오래된 순 · 최근 만든 순 · 많이 본 순 · 이름순) — PC 와 같은 규칙(core/memo-sort.js), 이 휴대폰에 기억 ----------
+//   고정한 메모는 늘 맨 앞. 많이 본 순은 이 휴대폰에서 메모를 연 횟수 (countView — 메모 파일에는 쓰지 않는다: 열 때마다 동기화되지 않게)
+function applySortLabel() {
+  el.sortBtn.setAttribute('aria-label', `정렬: ${sortLabel(sort)}`);
+  el.sortBtn.classList.toggle('active', sort !== 'updated');
+}
+applySortLabel();
+el.sortBtn.addEventListener('click', async () => {
+  const r = el.sortBtn.getBoundingClientRect();
+  const pick = await openContextMenu({ x: Math.max(8, r.right - 200), y: r.bottom + 4, label: '정렬', items: SORTS.map((o) => ({ id: o.id, label: o.label, checked: o.id === sort })) });
+  if (!pick || pick === sort) return;
+  sort = validSort(pick);
+  applySortLabel();
+  try {
+    localStorage.setItem('memoking.sort', sort);
+  } catch {
+    // 이번 실행 동안만
+  }
+  render(); // 카드들이 새 순서로 미끄러져 간다 (glideCards)
 });
 
 // ---------- 밖에서 쓰는 것 ----------

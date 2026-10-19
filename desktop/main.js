@@ -776,6 +776,8 @@ function createTray() {
 
 function noteOpened(id) {
   settings.recentOpened = pushRecent(settings.recentOpened, id);
+  // 목록의 "많이 본 순" 정렬: 이 PC 에서 메모 창이 보인 횟수 (메모 파일에는 쓰지 않는다 — 열 때마다 동기화되지 않게)
+  settings.viewCounts = { ...(settings.viewCounts ?? {}), [id]: (settings.viewCounts?.[id] ?? 0) + 1 };
   saveSettings();
   updateJumpList();
 }

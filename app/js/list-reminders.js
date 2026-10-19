@@ -479,7 +479,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
         const chipH = Math.max(12, chip ? chip.offsetHeight + (parseFloat(getComputedStyle(chip).marginBottom) || 0) : 14); // 아직 일정이 없으면 base.css 의 칩 높이쯤
         const topH = calEl.querySelector('[role="gridcell"] > :first-child')?.offsetHeight || 24;
         const moreH = calEl.querySelector('.mk-more')?.offsetHeight || 13;
-        const rowH = Math.max((room - weekdays) / 6, topH + 4 * chipH + moreH + 2);
+        const rowH = compact ? (room - weekdays) / 6 : Math.max((room - weekdays) / 6, topH + 4 * chipH + moreH + 2); // 낮은 창(색 점)은 한 달이 다 보이게
         calendar.setOption('aspectRatio', Math.min(8, Math.max(0.5, w / Math.max(100, rowH * 6))));
         const fit = Math.max(1, Math.floor((rowH - topH - moreH - 1) / chipH));
         if (fit !== maxEvents) {
