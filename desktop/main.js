@@ -1186,13 +1186,17 @@ updater = new Updater({
   // 재시작 전에: 열린 메모 창의 쓰던 글을 바로 저장하고 설정도 지금 쓴다
   beforeInstall: async () => {
     quitting = true;
-    // 설치를 시작하지 못해 앱이 그대로 남으면(설치 파일이 막힘 등) 다시 평소대로 (창을 닫으면 알림 영역으로)
+    // 설치를 시작하지 못해 앱이 그대로 남으면(설치 파일이 막힘 등) 다시 평소대로 (창을 닫으면 알림 영역으로, 알림 도우미도 다시)
     setTimeout(() => {
       quitting = false;
+      syncPopupWatch();
     }, 20_000).unref?.();
     await Promise.all([...windowManager.noteWins.values()].filter((w) => !w.isDestroyed())
       .map((w) => w.webContents.executeJavaScript('window.mkFlushSync?.()', true).catch(() => {})));
     saveSettings(true);
+    // 설치 파일이 이전 설치 폴더를 지우려면 메모킹이 띄운 PowerShell 도우미(알림 · 창 층 · 클립보드)가 다 꺼져 있어야 한다 —
+    //   남아 있으면 "이전 설치 파일을 지우지 못했어요(Failed to uninstall old application files)" 로 업데이트가 멈춘다
+    await stopHelpers();
   },
 });
 
@@ -1205,7 +1209,17 @@ app.on('window-all-closed', () => {
   showTrayNoticeOnce();
 });
 
+// 메모킹이 띄운 PowerShell 도우미를 모두 끈다 (끝날 때 · 업데이트 설치 직전). 꺼질 시간을 조금 준다
+async function stopHelpers() {
+  popupWatcher?.stop();
+  windowManager.topWatch.stop();
+  windowManager.captureHelper.stop();
+  windowManager.desktopPin.stop();
+  await new Promise((resolve) => setTimeout(resolve, 700));
+}
+
 app.on('will-quit', () => {
+  popupWatcher?.stop(); // 예전에는 이것만 빠져 알림 도우미가 앱이 끝난 뒤에도 남아 설치 폴더를 붙잡았다
   updater?.stop();
   flushOpmsFiles();
   stt?.close();

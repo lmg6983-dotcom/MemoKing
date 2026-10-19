@@ -180,7 +180,7 @@ export class NotificationHistory extends EventEmitter {
     if (process.platform !== 'win32' || this.appNamesLoaded) return;
     this.appNamesLoaded = true;
     const script = '[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-StartApps | ForEach-Object { "$($_.AppID)`t$($_.Name)" }';
-    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 30_000 }, (err, out) => {
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', cwd: os.tmpdir(), windowsHide: true, timeout: 30_000 }, (err, out) => {
       if (err) return;
       for (const line of out.split(/\r?\n/)) {
         const [id, name] = line.split('\t');

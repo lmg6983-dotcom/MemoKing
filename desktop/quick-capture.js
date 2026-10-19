@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { parseCfHtml, htmlHasText } from '../app/js/core/clipboard-html.js';
 import { mediaKindOf } from '../app/js/core/memo-file.js';
 
@@ -24,7 +25,7 @@ export class CaptureHelper {
     if (this.proc) return this.ready;
     const proc = spawn('powershell.exe', [
       '-STA', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', this.scriptPath, '-Action', 'serve',
-    ], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    ], { cwd: os.tmpdir(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] }); // cwd: 설치 폴더를 붙잡지 않게 (업데이트)
     this.proc = proc;
     let markReady;
     this.ready = new Promise((resolve) => (markReady = resolve));

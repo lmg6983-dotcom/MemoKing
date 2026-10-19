@@ -242,7 +242,7 @@ export function copyFileToClipboard(p) {
       const list = path.join(os.tmpdir(), `memoking-copy-${process.pid}-${Date.now()}.txt`);
       fs.writeFileSync(list, `${p}\r\n`, 'utf8');
       execFile('powershell.exe', ['-STA', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', CLIPBOARD_HELPER, '-Action', 'files', '-ListFile', list],
-        { windowsHide: true, timeout: 15000 }, (err) => {
+        { cwd: os.tmpdir(), windowsHide: true, timeout: 15000 }, (err) => {
           if (err) console.error('파일을 클립보드에 넣지 못했어요', err.message);
           fs.rmSync(list, { force: true });
           resolve(!err);
@@ -266,7 +266,7 @@ export function copyImageToClipboard(file) {
     return;
   }
   execFile('powershell.exe', ['-STA', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', CLIPBOARD_HELPER, '-Action', 'image', '-ImageFile', file],
-    { windowsHide: true }, (err) => {
+    { cwd: os.tmpdir(), windowsHide: true }, (err) => {
       if (err) console.error('캡처한 그림을 클립보드에 넣지 못했어요', err.message);
       setTimeout(() => fs.rmSync(file, { force: true }), 5000);
     });
