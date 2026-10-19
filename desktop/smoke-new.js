@@ -394,6 +394,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         key(list, 'Down');
         key(list, 'Down');
         key(list, 'Down');
+        key(list, 'Down');
         const onColors = await js(list, `document.activeElement?.classList.contains('mk-ctx-sw')`);
         key(list, 'Right');
         key(list, 'Escape');

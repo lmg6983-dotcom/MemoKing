@@ -695,7 +695,7 @@ export async function runSmoke({
     check('Ctrl+Z 한 번 → 붙여넣기 전체 취소 (사진 주소 교체는 따로 남지 않음)', undone && readMemo(webNote.id).includes('기사 본문 첫 문단'));
     // PC: 그림에 마우스를 올려도 단추는 없다 · 오른쪽 클릭하면 메뉴 맨 위 아이콘 줄 — 지우기 아이콘을 누르면 그 그림 줄이 지워진다
     const ctxOf = async (win, sel) => {
-      const r = await js(win, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.left + Math.min(8, r.width / 2)), y: Math.round(r.top + Math.min(8, r.height / 2)) }; })()`);
+      const r = await js(win, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + Math.min(8, r.width / 2)), y: Math.round(r.top + Math.min(8, r.height / 2)) }; })()`);
       if (!r) return null;
       win.webContents.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
       win.webContents.sendInputEvent({ type: 'mouseDown', x: r.x, y: r.y, button: 'right', clickCount: 1 });
@@ -803,16 +803,15 @@ export async function runSmoke({
     check('글 가운데 주소 붙여넣기 → 링크 글자 (뒤에 친 글자는 링크 아님)', inline?.cards === 1 && inline.text === `${base}/euckr.html` && inline.line === `관련 글 ${base}/euckr.html 참고`, JSON.stringify(inline));
 
     // 한 줄을 차지하는 카드 · 파일 칩 · 수식은 눌러도 바로 열지 않고 단추 줄 → 노란 "열기" 단추로 연다 (글 사이 링크는 바로)
-    const clickThenOpen = async (win, expr) => {
+    // PC: 단추 줄이 없다 — 누르면 바로 열리고(.bat 같은 프로그램은 먼저 묻는다), 오른쪽 클릭 메뉴에도 "열기"
+    const openViaMenu = async (win, expr) => {
       await js(win, `(${expr}).click()`);
-      await wait(150);
-      return js(win, `(() => { const b = document.querySelector('.mk-open-btn'); if (!b) return false; b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 })); return true; })()`);
+      await wait(250);
     };
     const openedBefore = smokeOpened.length;
     await js(linkNote.win, `document.querySelector('.mk-link-card .lc-main').click()`);
     await wait(200);
-    check('링크 카드를 눌러도 바로 열지 않고 단추 줄 (노란 "열기")', !smokeOpened.slice(openedBefore).some((o) => o.kind === 'web') && await js(linkNote.win, `document.querySelector('.mk-open-btn')?.getAttribute('aria-label') === '이 링크 열기'`));
-    await clickThenOpen(linkNote.win, `document.querySelector('.mk-link-card .lc-main')`);
+    check('PC: 링크 카드를 누르면 바로 열리고 단추 줄은 뜨지 않음', smokeOpened.slice(openedBefore).some((o) => o.kind === 'web') && await js(linkNote.win, `!document.querySelector('.mk-open-btn')`));
     await js(linkNote.win, `document.querySelector('.mk-doc p a[href="${base}/euckr.html"]').click()`);
     await wait(300);
     const openedWeb = smokeOpened.slice(openedBefore).filter((o) => o.kind === 'web').map((o) => o.target);
@@ -841,11 +840,11 @@ export async function runSmoke({
     })()`);
     const chips = await until(() => js(linkNote.win, `(() => { const a = [...document.querySelectorAll('.mk-doc a[data-file]')]; return a.length === 2 && a.map((x) => ({ name: x.textContent, kind: x.dataset.file, ext: x.dataset.ext, href: x.getAttribute('href') })); })()`), '파일 칩 2개').catch(() => null);
     check('파일 칩: 종류·확장자 표시 (프로그램 파일 구분)', chips?.[0]?.kind === 'doc' && chips[0].ext === 'TXT' && chips[1]?.kind === 'program' && chips[1].ext === 'BAT', JSON.stringify(chips));
-    const clickChip = (i) => clickThenOpen(linkNote.win, `document.querySelectorAll('.mk-doc a[data-file]')[${i}]`);
+    const clickChip = (i) => openViaMenu(linkNote.win, `document.querySelectorAll('.mk-doc a[data-file]')[${i}]`);
     let mark = smokeOpened.length;
     await clickChip(0);
     const txtOpened = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '파일 열기').catch(() => null);
-    check('파일 칩 → 열기 단추 → 메모 폴더의 복사본을 기본 앱으로', Boolean(txtOpened) && txtOpened.target.startsWith(path.join(VAULT, 'attachments')) && fs.readFileSync(txtOpened.target, 'utf8') === '메모킹 회의록', JSON.stringify(txtOpened));
+    check('파일 칩 → 누르면 메모 폴더의 복사본을 기본 앱으로', Boolean(txtOpened) && txtOpened.target.startsWith(path.join(VAULT, 'attachments')) && fs.readFileSync(txtOpened.target, 'utf8') === '메모킹 회의록', JSON.stringify(txtOpened));
     mark = smokeOpened.length;
     await clickChip(1); // 답: 취소
     await wait(400);
@@ -856,7 +855,7 @@ export async function runSmoke({
     const ran = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '프로그램 실행').catch(() => null);
     check('프로그램 파일(.bat) → 먼저 묻고, 취소하면 실행 안 함', cancelled.length === 1 && cancelled[0].kind === 'confirm' && Boolean(ran) && ran.target.endsWith('.bat'), JSON.stringify({ cancelled, ran }));
     const hintText = await js(linkNote.win, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return new Promise((r) => setTimeout(() => r(document.querySelector('.hover-hint')?.textContent ?? ''), 300)); })()`);
-    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 열기 단추로 열어요/.test(hintText), hintText);
+    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 누르면 열려요/.test(hintText), hintText);
 
     // 사진은 두 번 누르면 기본 사진 앱으로
     await key(linkNote.win, 'End', ['control']);
