@@ -15,6 +15,7 @@ import { renderReleaseNotes } from './release-notes-view.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
+import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
@@ -222,7 +223,6 @@ function animateCards(before) {
 
 // ---------- 필터: 태그 줄 · 색 · 담긴 것 ----------
 
-const COLOR_LABEL = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 const filterCount = () => state.filter.tags.length + state.filter.colors.length + state.filter.kinds.length;
 
 function toggleIn(list, value, same = (a, b) => a === b) {
@@ -1078,17 +1078,39 @@ $('change-vault').addEventListener('click', async () => {
   applyInfo(await api.vault.choose());
 });
 
-// 카드 오른쪽 클릭(또는 메뉴 키 · Shift+F10): 열기 · 고정 · 색 · 잠그기 · 이전 버전 · 글 복사 · PDF · 휴지통 (휴대폰의 꾹 누르기 메뉴와 같은 일)
+// 카드 오른쪽 클릭(또는 메뉴 키 · Shift+F10): 맨 위 아이콘 줄(복사 · 공유 · PDF · 휴지통) + 열기 · 고정 · 색 · 잠그기 · 이전 버전 (list-card-menu.js)
+async function togglePin(m) {
+  // 목록이 새로 오기 전에 한 번 더 눌러도 맞게 되도록 바로 바꿔 보여 준다
+  m.pinned = !m.pinned;
+  render();
+  const want = m.pinned;
+  const memo = await api.memo.set(m.id, { pinned: want });
+  // 저장하지 못했다(파일이 잠깐 없는 등) — 바꿔 보여 준 것을 되돌린다
+  if (!memo && m.pinned === want) {
+    m.pinned = !want;
+    render();
+  }
+}
 el.cards.addEventListener('contextmenu', (e) => {
   const card = e.target.closest('.card');
-  if (!card || e.defaultPrevented || !api.memo.cardMenu) return;
+  if (!card || e.defaultPrevented || !api.memo.cardCommand) return;
   e.preventDefault();
+  const memo = state.memos.find((m) => m.id === card.dataset.id);
+  if (!memo) return;
   // 키보드(메뉴 키 · Shift+F10 — button 0)로 열면 마우스 자리가 아니라 그 카드 자리에
   const r = card.getBoundingClientRect();
-  api.memo.cardMenu(card.dataset.id, e.button !== 2 ? { x: Math.round(r.left + 16), y: Math.round(r.top + 16) } : null);
+  const at = e.button !== 2 ? { x: Math.round(r.left + 16), y: Math.round(r.top + 16) } : { x: e.clientX, y: e.clientY };
+  openCardMenu({
+    memo, at, api,
+    run: {
+      open: (id) => api.memo.open(id),
+      pin: togglePin,
+      color: (m, color) => api.memo.set(m.id, { color }),
+      trash: (id) => deleteMemo(id),
+      flash: flashStatus,
+    },
+  }).then(() => card.isConnected && document.activeElement === document.body && card.focus({ preventScroll: true }));
 });
-api.on('card:trash', (id) => deleteMemo(id));
-api.on('card:copied', (ok) => flashStatus(ok ? '글을 복사했어요' : '복사하지 못했어요'));
 
 // 카드에 포커스가 있을 때 Delete: 그 메모를 휴지통으로 (아래 되돌리기 띠로 되살림)
 el.cards.addEventListener('keydown', (e) => {
@@ -1110,18 +1132,7 @@ el.cards.addEventListener('click', (e) => {
   const pinBtn = e.target.closest('[data-pin]');
   if (pinBtn) {
     const m = state.memos.find((x) => x.id === pinBtn.dataset.pin);
-    if (!m) return;
-    // 목록이 새로 오기 전에 한 번 더 눌러도 맞게 되도록 바로 바꿔 보여 준다
-    m.pinned = !m.pinned;
-    render();
-    const want = m.pinned;
-    return api.memo.set(m.id, { pinned: want }).then((memo) => {
-      // 저장하지 못했다(파일이 잠깐 없는 등) — 바꿔 보여 준 것을 되돌린다
-      if (!memo && m.pinned === want) {
-        m.pinned = !want;
-        render();
-      }
-    });
+    return m ? togglePin(m) : undefined;
   }
   const cardTag = e.target.closest('[data-card-tag]');
   if (cardTag) return toggleTagFilter(cardTag.dataset.cardTag, { only: true });

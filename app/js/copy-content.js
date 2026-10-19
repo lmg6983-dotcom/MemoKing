@@ -28,8 +28,8 @@ let host = {
   dragOut: null,
   /** PC: 끌어다 놓은 File 의 원래 경로 ('' = 알 수 없음) — 메모킹이 끌어낸 임시 파일이 도로 떨어졌는지 알아보는 데 */
   pathOf: null,
-  /** PC 오른쪽 클릭 메뉴: ([{ id, label, accelerator? } | { type: 'separator' }], { x, y } | null) → 고른 id | null (없으면 앱 기본 메뉴) */
-  menu: null,
+  /** PC: 내용을 오른쪽 클릭하면 아이콘 줄이 있는 메뉴(ctx-menu.js)를 쓴다 — 휴대폰은 단추 줄 (delete-button.js) */
+  contentMenu: false,
 };
 
 /** 앱마다 클립보드에 넣는 방법 — { image(pngBase64), text({ text, html }), file(href) } (빠지면 브라우저 Clipboard API · 파일은 글로) */
@@ -291,9 +291,8 @@ export async function shareBlock(view, pos, node, target) {
   return host.share(await blockPayload(view, pos, node, target), target);
 }
 
-/** 내용 오른쪽 클릭 메뉴를 띄울 수 있는 앱인가 (PC) */
-export const canMenu = () => Boolean(host.menu);
-export const chooseMenu = (items, at = null) => (host.menu ? host.menu(items, at) : Promise.resolve(null));
+/** 내용을 오른쪽 클릭 메뉴로 다루는 앱인가 (PC — 휴대폰은 단추 줄) */
+export const canContentMenu = () => host.contentMenu === true;
 
 /** 내용을 다른 프로그램으로 끌어낼 수 있는 앱인가 (PC) */
 export const canDragOut = () => Boolean(host.dragOut);

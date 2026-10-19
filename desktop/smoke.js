@@ -693,29 +693,40 @@ export async function runSmoke({
     await key(webNote.win, 'Z', ['control']);
     const undone = await until(() => !readMemo(webNote.id).includes('마크다운 사진'), 'Ctrl+Z').catch(() => false);
     check('Ctrl+Z 한 번 → 붙여넣기 전체 취소 (사진 주소 교체는 따로 남지 않음)', undone && readMemo(webNote.id).includes('기사 본문 첫 문단'));
-    // PC: 그림에 마우스를 올리면 지우기 단추(×), 떠나면 거둠 — 누르면 그 그림 줄이 지워진다
+    // PC: 그림에 마우스를 올려도 단추는 없다 · 오른쪽 클릭하면 메뉴 맨 위 아이콘 줄 — 지우기 아이콘을 누르면 그 그림 줄이 지워진다
+    const ctxOf = async (win, sel) => {
+      const r = await js(win, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + Math.min(8, r.width / 2)), y: Math.round(r.top + Math.min(8, r.height / 2)) }; })()`);
+      if (!r) return null;
+      win.webContents.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
+      win.webContents.sendInputEvent({ type: 'mouseDown', x: r.x, y: r.y, button: 'right', clickCount: 1 });
+      win.webContents.sendInputEvent({ type: 'mouseUp', x: r.x, y: r.y, button: 'right', clickCount: 1 });
+      return until(() => js(win, `(() => { const m = document.querySelector('.mk-ctx'); return m && [...m.querySelectorAll('.mk-ctx-ic')].map((b) => b.dataset.id + ':' + b.getAttribute('aria-label')); })()`), `${sel} 오른쪽 클릭 메뉴`, 3000).catch(() => null);
+    };
+    const clickIcon = async (win, id) => {
+      const b = await js(win, `(() => { const e = document.querySelector('.mk-ctx-ic[data-id="${id}"]'); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+      if (!b) return false;
+      win.webContents.sendInputEvent({ type: 'mouseMove', x: b.x, y: b.y });
+      await wait(80);
+      win.webContents.sendInputEvent({ type: 'mouseDown', x: b.x, y: b.y, button: 'left', clickCount: 1 });
+      win.webContents.sendInputEvent({ type: 'mouseUp', x: b.x, y: b.y, button: 'left', clickCount: 1 });
+      return true;
+    };
     const hoverDel = await js(webNote.win, `(async () => {
       const img = document.querySelector('.mk-doc img.mk-image');
       if (!img) return 'no image';
       const r = img.getBoundingClientRect();
       img.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
-      await new Promise((ok) => setTimeout(ok, 50));
-      const shown = Boolean(document.querySelector('.mk-delete-btn.hover'));
-      document.querySelector('.mk-doc').dispatchEvent(new MouseEvent('mouseleave'));
-      await new Promise((ok) => setTimeout(ok, 600));
-      return { shown, gone: !document.querySelector('.mk-delete-btn') };
+      await new Promise((ok) => setTimeout(ok, 700));
+      return { buttons: document.querySelectorAll('.mk-delete-btn, .mk-copy-btn').length };
     })()`);
-    check('PC: 그림에 마우스를 올리면 지우기 단추 · 마우스가 떠나면 사라짐', hoverDel?.shown && hoverDel?.gone, JSON.stringify(hoverDel));
+    check('PC: 그림에 마우스를 올려도 복사 · 지우기 단추는 뜨지 않음', hoverDel?.buttons === 0, JSON.stringify(hoverDel));
     const imgCount = () => js(webNote.win, `document.querySelectorAll('.mk-doc img.mk-image').length`);
     const beforeDel = await imgCount();
-    await js(webNote.win, `(() => {
-      const img = document.querySelector('.mk-doc img.mk-image');
-      const r = img.getBoundingClientRect();
-      img.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
-      document.querySelector('.mk-delete-btn').click(); // PC 마우스: 눌렀다 뗄 때 지운다
-    })()`);
+    const imgIcons = await ctxOf(webNote.win, '.mk-doc img.mk-image');
+    check('PC: 그림을 오른쪽 클릭 → 맨 위 아이콘 줄 (복사 · 저장 · 공유 · 지우기)', imgIcons?.length === 4 && imgIcons[3].startsWith('delete:'), JSON.stringify(imgIcons));
+    await clickIcon(webNote.win, 'delete');
     const deleted = await until(async () => (await imgCount()) === beforeDel - 1, '그림 지우기').catch(() => false);
-    check('PC: 마우스를 올려 뜬 지우기 단추를 누르면 그 그림이 지워짐', deleted, `${beforeDel} → ${await imgCount()}`);
+    check('PC: 메뉴의 지우기 아이콘을 누르면 그 그림이 지워짐', deleted, `${beforeDel} → ${await imgCount()}`);
     await closeNote(webNote.id);
 
     // 13-0) 목록 창에 파일을 끌어다 놓으면 메모로 (.md 는 글 그대로, 그림은 메모 안에)
@@ -792,16 +803,15 @@ export async function runSmoke({
     check('글 가운데 주소 붙여넣기 → 링크 글자 (뒤에 친 글자는 링크 아님)', inline?.cards === 1 && inline.text === `${base}/euckr.html` && inline.line === `관련 글 ${base}/euckr.html 참고`, JSON.stringify(inline));
 
     // 한 줄을 차지하는 카드 · 파일 칩 · 수식은 눌러도 바로 열지 않고 단추 줄 → 노란 "열기" 단추로 연다 (글 사이 링크는 바로)
-    const clickThenOpen = async (win, expr) => {
+    // PC: 단추 줄이 없다 — 누르면 바로 열리고(.bat 같은 프로그램은 먼저 묻는다), 오른쪽 클릭 메뉴에도 "열기"
+    const openViaMenu = async (win, expr) => {
       await js(win, `(${expr}).click()`);
-      await wait(150);
-      return js(win, `(() => { const b = document.querySelector('.mk-open-btn'); if (!b) return false; b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 })); return true; })()`);
+      await wait(250);
     };
     const openedBefore = smokeOpened.length;
     await js(linkNote.win, `document.querySelector('.mk-link-card .lc-main').click()`);
     await wait(200);
-    check('링크 카드를 눌러도 바로 열지 않고 단추 줄 (노란 "열기")', !smokeOpened.slice(openedBefore).some((o) => o.kind === 'web') && await js(linkNote.win, `document.querySelector('.mk-open-btn')?.getAttribute('aria-label') === '이 링크 열기'`));
-    await clickThenOpen(linkNote.win, `document.querySelector('.mk-link-card .lc-main')`);
+    check('PC: 링크 카드를 누르면 바로 열리고 단추 줄은 뜨지 않음', smokeOpened.slice(openedBefore).some((o) => o.kind === 'web') && await js(linkNote.win, `!document.querySelector('.mk-open-btn')`));
     await js(linkNote.win, `document.querySelector('.mk-doc p a[href="${base}/euckr.html"]').click()`);
     await wait(300);
     const openedWeb = smokeOpened.slice(openedBefore).filter((o) => o.kind === 'web').map((o) => o.target);
@@ -830,11 +840,11 @@ export async function runSmoke({
     })()`);
     const chips = await until(() => js(linkNote.win, `(() => { const a = [...document.querySelectorAll('.mk-doc a[data-file]')]; return a.length === 2 && a.map((x) => ({ name: x.textContent, kind: x.dataset.file, ext: x.dataset.ext, href: x.getAttribute('href') })); })()`), '파일 칩 2개').catch(() => null);
     check('파일 칩: 종류·확장자 표시 (프로그램 파일 구분)', chips?.[0]?.kind === 'doc' && chips[0].ext === 'TXT' && chips[1]?.kind === 'program' && chips[1].ext === 'BAT', JSON.stringify(chips));
-    const clickChip = (i) => clickThenOpen(linkNote.win, `document.querySelectorAll('.mk-doc a[data-file]')[${i}]`);
+    const clickChip = (i) => openViaMenu(linkNote.win, `document.querySelectorAll('.mk-doc a[data-file]')[${i}]`);
     let mark = smokeOpened.length;
     await clickChip(0);
     const txtOpened = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '파일 열기').catch(() => null);
-    check('파일 칩 → 열기 단추 → 메모 폴더의 복사본을 기본 앱으로', Boolean(txtOpened) && txtOpened.target.startsWith(path.join(VAULT, 'attachments')) && fs.readFileSync(txtOpened.target, 'utf8') === '메모킹 회의록', JSON.stringify(txtOpened));
+    check('파일 칩 → 누르면 메모 폴더의 복사본을 기본 앱으로', Boolean(txtOpened) && txtOpened.target.startsWith(path.join(VAULT, 'attachments')) && fs.readFileSync(txtOpened.target, 'utf8') === '메모킹 회의록', JSON.stringify(txtOpened));
     mark = smokeOpened.length;
     await clickChip(1); // 답: 취소
     await wait(400);
@@ -845,7 +855,7 @@ export async function runSmoke({
     const ran = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '프로그램 실행').catch(() => null);
     check('프로그램 파일(.bat) → 먼저 묻고, 취소하면 실행 안 함', cancelled.length === 1 && cancelled[0].kind === 'confirm' && Boolean(ran) && ran.target.endsWith('.bat'), JSON.stringify({ cancelled, ran }));
     const hintText = await js(linkNote.win, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return new Promise((r) => setTimeout(() => r(document.querySelector('.hover-hint')?.textContent ?? ''), 300)); })()`);
-    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 열기 단추로 열어요/.test(hintText), hintText);
+    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 누르면 열려요/.test(hintText), hintText);
 
     // 사진은 두 번 누르면 기본 사진 앱으로
     await key(linkNote.win, 'End', ['control']);
@@ -862,18 +872,13 @@ export async function runSmoke({
     const reopenedLink = await newNote(() => js(getList(), `window.memoking.memo.open(${JSON.stringify(linkNote.id)})`));
     const again = await until(() => js(reopenedLink.win, `(() => { const c = document.querySelector('.mk-link-card[data-state="ok"]'); return c && c.querySelector('.lc-title').textContent; })()`), '다시 연 카드').catch(() => null);
     check('다시 열면 카드로 표시 (저장한 미리보기 사용)', again === '메모킹 기사 제목', again);
-    // 카드에 마우스를 올리면 다른 내용과 같은 복사 · × 단추 한 벌만 (카드에 따로 × 가 겹치지 않음)
-    const cardButtons = await js(reopenedLink.win, `(async () => {
-      const card = document.querySelector('.mk-link-card');
-      const r = card.getBoundingClientRect();
-      card.querySelector('.lc-main').dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
-      await new Promise((ok) => setTimeout(ok, 50));
-      return { x: document.querySelectorAll('.mk-delete-btn').length + card.querySelectorAll('button').length, copy: document.querySelector('.mk-copy-btn')?.title ?? '' };
-    })()`);
-    check('링크 카드: 마우스를 올리면 × 하나 · "링크 주소 복사"', cardButtons?.x === 1 && cardButtons?.copy === '링크 주소 복사', JSON.stringify(cardButtons));
-    await js(reopenedLink.win, `document.querySelector('.mk-delete-btn').click()`);
+    // 카드를 오른쪽 클릭하면 다른 내용과 같은 아이콘 줄 한 벌만 (카드에 따로 × 가 겹치지 않음) · 복사는 "링크 주소 복사"
+    const cardIcons = await ctxOf(reopenedLink.win, '.mk-link-card .lc-main');
+    const cardExtra = await js(reopenedLink.win, `document.querySelectorAll('.mk-link-card .lc-remove, .mk-delete-btn').length`);
+    check('링크 카드: 오른쪽 클릭 → 아이콘 줄 한 벌 · "링크 주소 복사"', cardIcons?.[0] === 'copy:링크 주소 복사' && cardIcons.at(-1).startsWith('delete:') && cardExtra <= 1, JSON.stringify({ cardIcons, cardExtra }));
+    await clickIcon(reopenedLink.win, 'delete');
     const removed = await until(() => readMemo(reopenedLink.id).split('"미리보기"').length === 2, '카드 지우기').catch(() => false);
-    check('카드의 지우기 단추 → 카드 지우기', removed && readMemo(reopenedLink.id).includes('관련 글'));
+    check('메뉴의 지우기 아이콘 → 카드 지우기', removed && readMemo(reopenedLink.id).includes('관련 글'));
     await closeNote(reopenedLink.id);
 
     // 13-2) 태그 · # 자동완성 · 목록 필터 (v0.11.0)

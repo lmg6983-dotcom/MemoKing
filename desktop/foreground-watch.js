@@ -6,6 +6,7 @@
 //   PowerShell 도우미가 알린다 (한 줄씩):  "fg <hwnd> <늘 위 0|1> <프로그램 이름>"  /  "lost <hwnd>"
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
+import os from 'node:os';
 
 // 앞으로 와도 메모킹 창을 올리지 않는 프로그램 — 캡처·시작 메뉴·검색·작업 전환·화상 키보드·작업 관리자 등
 export const LEAVE_ON_TOP = new Set([
@@ -110,7 +111,7 @@ export class ForegroundWatch {
   start() {
     if (this.proc || process.platform !== 'win32' || !this.watch.length) return;
     const proc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script(this.watch)], {
-      windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
+      cwd: os.tmpdir(), windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], // cwd: 설치 폴더를 붙잡지 않게 (업데이트)
     });
     this.proc = proc;
     readline.createInterface({ input: proc.stdout }).on('line', (line) => {

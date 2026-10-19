@@ -27,6 +27,9 @@ import {
 } from './utils.js';
 
 // 창 위 가장자리에 반쯤 걸쳐 붙는 스티커: 왕관(늘 위) · 셀로판 테이프(늘 아래, 바탕화면 층)
+// 목록 창 제목 줄: 스티커 가운데가 상표(아이콘+글자) 오른쪽보다 안쪽, 단추 묶음(동기화·설정 76px + 창 버튼 142px + 여백 38px) 왼쪽보다 바깥이어야 한다
+const LIST_STICKER_MIN_X = 132;
+const LIST_STICKER_RIGHT_GAP = 256;
 const STICKERS = { crown: { width: 64, height: 52 }, tape: { width: 96, height: 30 } };
 const LOST_REOPEN_MS = 3000;
 const GHOST_MARGIN = 24;
@@ -156,7 +159,7 @@ export class WindowManager {
     const bounds = onScreen(settings.listBounds) ? settings.listBounds : { width: 400, height: 680 };
     this.listWin = new BrowserWindow({
       ...bounds,
-      minWidth: 300,
+      minWidth: 390, // 제목 줄 단추 · 왕관 스티커가 겹치지 않는 폭
       minHeight: 380,
       title: '메모킹',
       show: false,
@@ -1121,7 +1124,10 @@ export class WindowManager {
   stickerBounds(owner, kind = 'crown') {
     const size = STICKERS[kind] ?? STICKERS.crown;
     const b = owner.getBounds();
-    return { x: Math.round(b.x + b.width / 2 - size.width / 2), y: Math.round(b.y - size.height / 2), ...size };
+    let cx = b.width / 2;
+    // 목록 창: 오른쪽 위 단추(왕관 자리 · 동기화 · 설정)와 창 버튼을 가리지 않게, 좁으면 스티커를 왼쪽(상표 오른쪽)으로 비켜 붙인다
+    if (owner === this.listWin) cx = Math.max(LIST_STICKER_MIN_X, Math.min(cx, b.width - LIST_STICKER_RIGHT_GAP));
+    return { x: Math.round(b.x + cx - size.width / 2), y: Math.round(b.y - size.height / 2), ...size };
   }
 
   closeStickerWin(entry, { peel = false } = {}) {

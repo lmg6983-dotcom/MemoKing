@@ -4,6 +4,7 @@
 //   localsend: LocalSend(오픈소스, 같은 와이파이의 휴대폰 · PC 로 바로 보내기)를 그 파일과 함께 연다
 //   (Windows 공유 창은 v0.39.5 에서 뺐다 — 데스크톱 앱에서 띄우는 길이 PC 마다 막혀 믿을 수 없었다)
 import { spawn } from 'node:child_process';
+import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -74,7 +75,7 @@ export function runHelper(script, env, { platform = process.platform, spawnHelpe
     let proc;
     try {
       proc = spawnHelper('powershell.exe', ['-NoProfile', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass', '-Command', script], {
-        windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ...env },
+        cwd: os.tmpdir(), windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ...env }, // cwd: 설치 폴더를 붙잡지 않게 (업데이트)
       });
     } catch (err) {
       return finish(`err ${err.message}`);
@@ -128,7 +129,7 @@ export function openLocalSend(file, { exe = findLocalSend(), spawnApp = spawn } 
   if (!exe) return Promise.resolve('missing');
   return new Promise((resolve) => {
     try {
-      const child = spawnApp(exe, [file], { detached: true, stdio: 'ignore', windowsHide: false });
+      const child = spawnApp(exe, [file], { cwd: os.tmpdir(), detached: true, stdio: 'ignore', windowsHide: false });
       child.on('error', (err) => resolve(`err ${err.message}`));
       child.unref();
       setTimeout(() => resolve('ok'), 300); // 바로 실패하지 않으면 열린 것

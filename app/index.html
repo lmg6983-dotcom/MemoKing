@@ -8,13 +8,19 @@
   <link rel="stylesheet" href="vendor/fullcalendar.css">
   <link rel="stylesheet" href="styles/base.css">
   <link rel="stylesheet" href="styles/list.css">
+  <link rel="stylesheet" href="styles/ctx-menu.css">
   <script type="module" src="js/list.js"></script>
 </head>
 <body>
   <header class="titlebar">
     <img class="brand-icon" src="assets/mark-64.png" alt="" draggable="false">
     <span class="brand">메모킹</span>
-    <button id="list-top-btn" class="icon-btn titlebar-btn crown-btn" title="왕관 스티커를 붙여 목록을 다른 창보다 늘 위에 두기" aria-label="목록을 다른 창보다 늘 위에 두기" aria-pressed="false"><svg><use href="#i-crown-line"/></svg></button>
+    <!-- 오른쪽 위 단추 묶음: 왕관(늘 위) · 동기화 · 설정 — 왕관 스티커는 이 묶음 왼쪽으로 비켜 붙어 가리지 않는다 -->
+    <div class="titlebar-actions">
+      <button id="list-top-btn" class="icon-btn titlebar-btn crown-btn" title="왕관 스티커를 붙여 목록을 다른 창보다 늘 위에 두기" aria-label="목록을 다른 창보다 늘 위에 두기" aria-pressed="false"><svg><use href="#i-crown-line"/></svg></button>
+      <button id="sync-btn" class="icon-btn titlebar-btn sync-btn" hidden aria-haspopup="dialog" aria-expanded="false" aria-controls="sync-pop"><svg><use href="#i-cloud"/></svg><span class="sync-mark" id="sync-mark" aria-hidden="true"></span><span class="sync-line" id="sync-line" aria-hidden="true" hidden><i></i></span></button>
+      <button id="settings-btn" class="icon-btn titlebar-btn" title="설정" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
+    </div>
   </header>
 
   <section id="setup" class="setup" hidden>
@@ -38,10 +44,8 @@
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
       </label>
-      <button id="sync-btn" class="icon-btn sync-btn" hidden aria-haspopup="dialog" aria-expanded="false" aria-controls="sync-pop"><svg><use href="#i-cloud"/></svg><span class="sync-mark" id="sync-mark" aria-hidden="true"></span><span class="sync-line" id="sync-line" aria-hidden="true" hidden><i></i></span></button>
       <button id="filter-btn" class="icon-btn filter-btn" title="필터 (색, 담긴 것)" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
       <button id="layout-btn" class="icon-btn layout-btn" title="한 줄씩 보기" aria-label="한 줄씩 보기"><svg><use href="#i-rows"/></svg></button>
-      <button id="settings-btn" class="icon-btn" title="설정" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
     </div>
 
     <div id="sync-pop" class="sync-pop" role="dialog" aria-label="Google Drive 동기화" hidden></div>

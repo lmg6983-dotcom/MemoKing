@@ -19,8 +19,10 @@ import { isVoiceCard } from './voice-card-view.js';
 import { mediaKindOf } from './core/memo-file.js';
 import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
-import { showDeleteButton, showContentMenu, hideDeleteButton, hideDeleteIfChanged, deleteShownFor } from './delete-button.js';
-import { canMenu, canDragOut, dragOutBlock } from './copy-content.js';
+import { showDeleteButton, showContentMenu, hideDeleteButton, hideDeleteIfChanged, deleteShownFor, persistentShown } from './delete-button.js';
+import { canContentMenu, canDragOut, dragOutBlock } from './copy-content.js';
+import { tableAt } from './table-extras.js';
+import { isContextMenuOpen } from './ctx-menu.js';
 import { haptic } from './dom.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
@@ -372,7 +374,7 @@ export function createBlockMove({ readOnly = false } = {}) {
                 if (view.isDestroyed || mover?.busy()) return;
                 haptic(12);
                 swallowOpen(view);
-                mover?.showDelete(block, false, { showMs: TAP_SHOW_MS });
+                mover?.showDelete(block, { showMs: TAP_SHOW_MS });
               }, HOLD_SHOW_MS);
             }
             return false;
@@ -402,7 +404,7 @@ export function createBlockMove({ readOnly = false } = {}) {
           // 한 번 누른 손 메모를 또 누르면 이어 그리기로 넘어가니 단추를 다시 띄우지 않는다
           if (host.matches('.mk-ink.mk-ink-armed') || t0.target.closest?.('.mk-ink-edit')) return false;
           // 편집기가 누른 그림을 고르고 난 뒤에 (고르기가 바뀌면 단추가 거둬지므로)
-          setTimeout(() => !view.isDestroyed && !mover.busy() && mover.showDelete(block, false, { showMs: TAP_SHOW_MS }), 60);
+          setTimeout(() => !view.isDestroyed && !mover.busy() && mover.showDelete(block, { showMs: TAP_SHOW_MS }), 60);
           return false;
         },
         dragstart(_view, event) {
@@ -446,68 +448,67 @@ class Mover {
       e.detail.ok = this.liftAt(pos, x, y, kind);
     };
     view.dom.addEventListener('mk-lift-block', this.onLiftRequest);
-    // 누르면 바로 열리던 내용(파일 칩 · 링크 카드 · 수식 — 한 줄을 차지하는 것)은 눌러도 열지 않고 단추 줄을 띄운다
-    //   여는 것은 단추 줄의 "열기"로 (PC 는 마우스를 올리면 단추가 뜬다 · 휴대폰은 짧게 누르면). 글 사이에 낀 파일 링크는 그대로 열린다
-    this.onOpenClick = (e) => {
-      if (e.mkOpen || e.button !== 0) return;
-      const host = e.target instanceof Element ? e.target.closest(OPEN_TARGET) : null;
-      if (!host || !view.dom.contains(host) || e.target.closest('.lc-remove')) return;
-      const block = blockFromTarget(view, host);
-      if (!block || !isContentBlock(block.node)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      // 이미 이 내용의 단추가 떠 있으면(마우스를 올려 뜬 것 등) 그대로
-      const dom = view.nodeDOM(block.pos);
-      const shown = this.hoverTarget && deleteShownFor(this.hoverTarget) && (this.hoverTarget === dom || (dom instanceof Element && dom.contains(this.hoverTarget)));
-      if (!shown && !this.busy()) this.showDelete(block, false, { showMs: TAP_SHOW_MS });
-    };
-    view.dom.addEventListener('click', this.onOpenClick, true);
-    // PC: 그림·손 메모·소리·파일·링크 카드에 마우스를 올리면 지우기 단추 (휴대폰은 꾹 눌렀다 놓기로)
-    this.hoverHost = null;
-    this.hoverTimer = 0;
-    if (window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) {
-      this.onHover = (e) => {
-        if (this.busy() || e.buttons) return;
-        const host = e.target instanceof Element ? e.target.closest(HOVER_TARGET) : null;
-        if (!host || !view.dom.contains(host)) return this.leaveHover();
-        clearTimeout(this.hoverTimer);
-        if (host === this.hoverHost && deleteShownFor(this.hoverTarget)) return;
-        const block = hoverBlockOf(view, host);
-        if (!block || !(isContentBlock(block.node) || block.node.type.name === 'table')) return this.leaveHover();
-        this.hoverHost = host;
-        this.showDelete(block, true);
+    // 휴대폰: 누르면 바로 열리던 내용(파일 칩 · 링크 카드 · 수식 — 한 줄을 차지하는 것)은 눌러도 열지 않고 단추 줄을 띄운다
+    //   여는 것은 단추 줄의 "열기"로 (짧게 누르면). 글 사이에 낀 파일 링크는 그대로 열린다.
+    //   PC 는 단추 줄이 없으니(오른쪽 클릭 메뉴) 눌러서 바로 열린다 — 메뉴에도 "열기"
+    if (!canContentMenu()) {
+      this.onOpenClick = (e) => {
+        if (e.mkOpen || e.button !== 0) return;
+        const host = e.target instanceof Element ? e.target.closest(OPEN_TARGET) : null;
+        if (!host || !view.dom.contains(host) || e.target.closest('.lc-remove')) return;
+        const block = blockFromTarget(view, host);
+        if (!block || !isContentBlock(block.node)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        // 이미 이 내용의 단추가 떠 있으면 그대로
+        const dom = view.nodeDOM(block.pos);
+        const shown = this.shownTarget && deleteShownFor(this.shownTarget) && (this.shownTarget === dom || (dom instanceof Element && dom.contains(this.shownTarget)));
+        if (!shown && !this.busy()) this.showDelete(block, { showMs: TAP_SHOW_MS });
       };
-      this.onHoverOut = () => this.leaveHover();
-      view.dom.addEventListener('mousemove', this.onHover);
-      view.dom.addEventListener('mouseleave', this.onHoverOut);
+      view.dom.addEventListener('click', this.onOpenClick, true);
     }
-    // PC: 그 내용을 오른쪽 클릭하면 단추 줄과 같은 일을 이름과 함께 (열기 · 복사 · 저장… · 공유… · 지우기)
-    //   그림 위 글자를 고른 채면 글 메뉴(잘라내기 · 복사 …)가 맞으므로 그대로 둔다
-    if (canMenu()) {
+    // PC: 내용(그림 · 손 메모 · 소리 · 동영상 · 파일 · 링크 카드 · 수식 · 표)을 오른쪽 클릭하면 Windows 11 메뉴처럼 맨 위 한 줄에
+    //   아이콘(복사 · 저장 · 공유 · 지우기)이 있는 메뉴 (ctx-menu.js). 예전에는 마우스를 올리면 단추가 떠서 표 칸을 가렸다.
+    //   표는 칸 안에서 글을 고치므로 메뉴 아래에 글 항목(잘라내기 · 복사 · 붙여넣기 …)과 표 바꾸기도 함께.
+    //   글을 고른 채 그림 위를 누르면 글 메뉴가 맞으므로 그대로 둔다 (네이티브 메뉴)
+    if (canContentMenu()) {
       this.onContextMenu = (e) => {
-        if (this.busy() || e.defaultPrevented) return;
+        if (this.busy() || e.defaultPrevented || isContextMenuOpen()) return;
         const { selection } = view.state;
         let host = e.target instanceof Element ? e.target.closest(HOVER_TARGET) : null;
-        // 키보드(Shift+F10 · 메뉴 키): 고른(NodeSelection) 그림 · 파일 등
+        // 키보드(Shift+F10 · 메뉴 키): 고른(NodeSelection) 그림 · 파일 등, 또는 커서가 있는 표
         let at = null;
-        if (!host && selection instanceof NodeSelection) {
-          const dom = view.nodeDOM(selection.from);
+        if (!host) {
+          let dom = null;
+          if (selection instanceof NodeSelection) dom = view.nodeDOM(selection.from);
+          else {
+            const t = tableAt(view.state);
+            dom = t ? view.nodeDOM(t.pos) : null;
+          }
           host = dom instanceof Element ? (dom.matches(HOVER_TARGET) ? dom : dom.querySelector(HOVER_TARGET)) : null;
-          const r = host?.getBoundingClientRect();
-          if (r) at = { x: Math.round(r.left + 8), y: Math.round(r.top + 8) };
+          if (host) {
+            let c = null;
+            try {
+              c = view.coordsAtPos(selection.head);
+            } catch {
+              c = null;
+            }
+            const r = host.getBoundingClientRect();
+            at = c ? { x: Math.round(c.left), y: Math.round(c.bottom + 4) } : { x: Math.round(r.left + 8), y: Math.round(r.top + 8) };
+          }
         }
         if (!host || !view.dom.contains(host)) return;
         const block = hoverBlockOf(view, host);
-        if (!block || !(isContentBlock(block.node) || block.node.type.name === 'table')) return;
-        if (!selection.empty && !(selection instanceof NodeSelection) && selection.from < block.pos + block.node.nodeSize && selection.to > block.pos) return;
-        // 표는 칸 안에서 글을 고치므로 테두리 밖(감싼 상자)에서만
-        if (block.node.type.name === 'table' && e.target.closest('td, th')) return;
-        const opts = this.deleteOpts(block, false);
+        const isTable = block?.node.type.name === 'table';
+        if (!block || !(isContentBlock(block.node) || isTable)) return;
+        // 그림 · 파일 위에서 글을 고른 채면 글 메뉴 (표는 칸의 글을 고른 채여도 이 메뉴가 글 항목을 함께 가진다)
+        if (!isTable && !selection.empty && !(selection instanceof NodeSelection) && selection.from < block.pos + block.node.nodeSize && selection.to > block.pos) return;
+        const opts = this.deleteOpts(block);
         if (!opts) return;
         e.preventDefault();
         e.stopPropagation();
-        this.hoverHost = null;
-        showContentMenu(view, opts, at);
+        if (isTable) this.prepareTableMenu(block, e, Boolean(at));
+        showContentMenu(view, { ...opts, ...(isTable ? this.tableMenuItems() : {}) }, at ?? { x: e.clientX, y: e.clientY });
       };
       view.dom.addEventListener('contextmenu', this.onContextMenu, true);
     }
@@ -528,17 +529,6 @@ class Mover {
       };
       view.dom.addEventListener('dragstart', this.onDragStart, true);
     }
-  }
-
-  /** 마우스가 내용에서 떠나면 조금 뒤 단추를 거둔다 (× 로 옮겨 가는 사이에는 그대로) */
-  leaveHover() {
-    if (!this.hoverHost) return;
-    clearTimeout(this.hoverTimer);
-    this.hoverTimer = setTimeout(() => {
-      if (deleteShownFor(this.hoverTarget)) hideDeleteButton();
-      this.hoverHost = null;
-      this.hoverTarget = null;
-    }, 220);
   }
 
   /** 그 자리의 맨 바깥 줄을 바로 들어 올린다 (누르고 있는 손가락·마우스 그대로 이어서 끈다) */
@@ -562,7 +552,7 @@ class Mover {
   press(event, kind) {
     const { view } = this;
     if (this.drag) return;
-    this.hideDelete();
+    if (!persistentShown()) this.hideDelete(); // 표를 고치는 동안 표 위 단추는 눌러도 그대로 (휴대폰)
     let block = blockFromTarget(view, event.target);
     // 내용 줄이 아니면 글 줄(문단·제목·표·코드·인용·음성 카드): 꾹 눌러야 들어 올린다
     const text = !block;
@@ -629,6 +619,7 @@ class Mover {
 
   lift(p) {
     holdKeyboard(this.view); // 옮기는 동안 키보드는 절대 뜨지 않게
+    hideDeleteButton(true); // (표를 고치는 동안 떠 있던 단추도 옮기는 동안은 거둔다 — 놓으면 update 가 다시 띄운다)
     const { view } = this;
     // 누른 사이 문서가 바뀌었을 수 있으니 같은 자리의 줄을 다시 찾는다
     const block = blockInfo(view.state.doc, p.block.pos, p.block.inner);
@@ -865,13 +856,13 @@ class Mover {
 
   // ---------- 지우기 단추: 꾹 눌렀다 놓은 내용의 오른쪽 위 (delete-button.js) ----------
 
-  showDelete(block, hovering = false, { showMs } = {}) {
-    const opts = this.deleteOpts(block, hovering, showMs);
+  showDelete(block, { showMs } = {}) {
+    const opts = this.deleteOpts(block, showMs);
     if (opts) showDeleteButton(this.view, opts);
   }
 
-  /** 내용 단추 줄 · 오른쪽 클릭 메뉴에 넘길 것 (showDeleteButton · showContentMenu) */
-  deleteOpts(block, hovering, showMs) {
+  /** 내용 단추 줄(휴대폰) · 오른쪽 클릭 메뉴(PC)에 넘길 것 (showDeleteButton · showContentMenu) */
+  deleteOpts(block, showMs) {
     const { view } = this;
     const dom = view.nodeDOM(block.pos);
     if (!(dom instanceof Element)) return null;
@@ -883,11 +874,65 @@ class Mover {
     const kind = contentKindName(block.node, dom);
     // 표는 편집기가 감싼 상자(.tableWrapper)에 단추를 붙인다 (표 막대 · 크기 손잡이와 같은 자리)
     const target = media ?? (block.node.type.name === 'table' ? dom.closest('.tableWrapper') ?? dom.querySelector('.tableWrapper') ?? dom : dom);
-    if (!hovering) this.hoverHost = null;
-    this.hoverTarget = target;
-    const hover = hovering ? { enter: () => clearTimeout(this.hoverTimer), leave: () => this.leaveHover() } : null;
+    this.shownTarget = target;
     const copyLabel = block.node.type.name === 'mk_link_card' ? '링크 주소 복사' : null; // 카드 모양이 아니라 주소를
-    return { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, hover, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
+    return { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
+  }
+
+  /** PC: 표를 오른쪽 클릭했을 때 — 커서가 그 표 밖이면 누른 칸으로 옮긴다 (아래 메뉴의 표 바꾸기 · 칸 글 항목이 그 표에 듣도록). 키보드로 연 것은 커서가 이미 표 안 */
+  prepareTableMenu(block, e, byKey) {
+    const { view } = this;
+    const { selection, doc } = view.state;
+    if (byKey || (selection.from > block.pos && selection.to < block.pos + block.node.nodeSize)) return;
+    const hit = view.posAtCoords({ left: e.clientX, top: e.clientY });
+    if (hit) view.dispatch(view.state.tr.setSelection(TextSelection.near(doc.resolve(hit.pos))));
+  }
+
+  /** PC: 표 메뉴의 글 항목(칸의 글 — 잘라내기 · 복사 · 붙여넣기 …)과 표 바꾸기 */
+  tableMenuItems() {
+    const sel = this.view.state.selection;
+    return {
+      extraItems: [
+        { id: 'cut', label: '잘라내기', hint: 'Ctrl+X', disabled: sel.empty },
+        { id: 'copy-text', label: '복사', hint: 'Ctrl+C', disabled: sel.empty },
+        { id: 'paste', label: '붙여넣기', hint: 'Ctrl+V' },
+        { id: 'paste-plain', label: '서식 없이 붙여넣기', hint: 'Ctrl+Shift+V' },
+        ...(sel.empty ? [] : [{ id: 'clear-format', label: '서식 지우기', hint: 'Ctrl+\\' }]),
+        { type: 'separator' },
+        { id: 'toList', label: '표를 목록으로' },
+        { id: 'toTask', label: '표를 체크리스트로' },
+        { id: 'toText', label: '표를 글로' },
+        { id: 'autoFit', label: '열 너비 맞춤' },
+      ],
+      // 글 항목은 메모 창(note.js)이 받아 편집기 · 메인에 넘기고, 표 바꾸기는 편집기의 표 명령으로
+      onExtra: (id) => {
+        const edit = ['cut', 'copy-text', 'paste', 'paste-plain', 'clear-format'].includes(id);
+        window.dispatchEvent(new CustomEvent(edit ? 'mk:edit' : 'mk:table-command', { detail: { name: id } }));
+      },
+    };
+  }
+
+  /** 지금 커서가 든 표 → { pos, node, target } (표 위 단추가 같은 표를 따라가게) */
+  followTable(view) {
+    const t = tableAt(view.state);
+    const dom = t ? view.nodeDOM(t.pos) : null;
+    const target = dom instanceof Element ? dom.closest('.tableWrapper') ?? dom.querySelector('.tableWrapper') ?? dom : null;
+    return target ? { pos: t.pos, node: t.node, target } : null;
+  }
+
+  /**
+   * 휴대폰: 표를 고치는 동안(커서가 표 안) 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽 밖에 계속 떠 있다 —
+   * 그림과 같은 단추를 표를 가리지 않는 자리에. PC 는 오른쪽 클릭 메뉴라 해당 없음
+   */
+  syncTableButtons() {
+    const { view } = this;
+    if (canContentMenu() || !view.editable || this.drag || this.pressing) return;
+    const t = tableAt(view.state);
+    if (!t) return;
+    if (persistentShown()) return; // 이미 떠 있다 (hideDeleteIfChanged 가 같은 표를 따라간다)
+    const block = blockInfo(view.state.doc, t.pos, { kind: 'node', offset: -1 });
+    const opts = block ? this.deleteOpts(block) : null;
+    if (opts) showDeleteButton(view, { ...opts, placement: 'above', persist: true, follow: (v) => this.followTable(v) });
   }
 
   hideDelete(now = false) {
@@ -907,6 +952,10 @@ class Mover {
   }
 
   decorate(specs) {
+    // 표시가 없던 채로 "표시 없음" 을 또 알리면 아무것도 하지 않는다 — 내용이 그대로인 트랜잭션도 표를 통째로 다시 그려
+    //   (누르는 순간 보낸 것이면 표 칸의 첫 클릭이 사라졌다: 눌렀던 자리의 요소가 바뀌면 click · 글 고르기가 일어나지 않는다)
+    if (!specs.length && !this.decorated) return;
+    this.decorated = specs.length > 0;
     const { view } = this;
     const { doc } = view.state;
     const decos = [];
@@ -926,6 +975,7 @@ class Mover {
   update(view, prev) {
     this.view = view;
     hideDeleteIfChanged(view);
+    this.syncTableButtons();
     this.hintIfNew();
   }
 
@@ -981,14 +1031,9 @@ class Mover {
   destroy() {
     this.view.dom.removeEventListener('touchstart', this.onScrubTouch, true);
     this.view.dom.removeEventListener('mk-lift-block', this.onLiftRequest);
-    this.view.dom.removeEventListener('click', this.onOpenClick, true);
-    if (this.onHover) {
-      this.view.dom.removeEventListener('mousemove', this.onHover);
-      this.view.dom.removeEventListener('mouseleave', this.onHoverOut);
-    }
+    if (this.onOpenClick) this.view.dom.removeEventListener('click', this.onOpenClick, true);
     if (this.onContextMenu) this.view.dom.removeEventListener('contextmenu', this.onContextMenu, true);
     if (this.onDragStart) this.view.dom.removeEventListener('dragstart', this.onDragStart, true);
-    clearTimeout(this.hoverTimer);
     this.cancelPress();
     if (this.drag) this.finish(false);
     clearTimeout(this.flashTimer);

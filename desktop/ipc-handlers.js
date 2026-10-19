@@ -11,7 +11,7 @@ import { normalizeReminder } from '../app/js/core/reminders.js';
 import { activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
-import { isBlankBody, COLORS, COLOR_NAMES } from '../app/js/core/memo-file.js';
+import { isBlankBody } from '../app/js/core/memo-file.js';
 import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { cleanOverrides, setActionKey } from '../app/js/core/keymap.js';
@@ -1116,36 +1116,44 @@ export function registerIpc(ctx) {
   ipcMain.handle('stack:join-menu', (event, id) => {
     Menu.buildFromTemplate(joinItems(String(id))).popup({ window: senderWindow(event) });
   });
-  // 목록 카드 오른쪽 클릭 (휴대폰에서 카드를 꾹 누를 때와 같은 일들) — 잠그기 · 이전 버전은 메모 창을 열어 그 창에서
-  ipcMain.handle('card:menu', (event, rawId, at) => {
+  // 목록 카드 오른쪽 클릭 메뉴는 화면이 그린다 (app/js/list.js · ctx-menu.js — 아이콘 줄을 네이티브 메뉴는 못 그린다). 여기는 그 메뉴가 부르는 일들
+  //   잠그기 · 이전 버전은 메모 창을 열어 그 창에서
+  const CARD_COMMANDS = new Set(['lock', 'unlock', 'versions']);
+  ipcMain.handle('card:command', (_e, rawId, command) => {
     const id = String(rawId);
-    const m = getVault()?.get(id);
-    if (!m) return;
-    const inNote = (command) => {
-      const win = wm.noteWins.get(id);
-      if (win && !win.webContents.isLoading()) {
-        wm.openNote(id);
-        win.webContents.send('memo:command', command);
-      } else {
-        wm.pendingCommands.set(id, command);
-        wm.openNote(id);
-      }
-    };
-    Menu.buildFromTemplate([
-      // accelerator 는 메뉴 오른쪽에 키 안내만 (registerAccelerator: false — 목록 카드에서 그 키가 이미 같은 일을 한다)
-      { label: '열기', accelerator: 'Enter', registerAccelerator: false, click: () => wm.openNote(id) },
-      { type: 'separator' },
-      { label: '목록 맨 위에 고정', type: 'checkbox', checked: m.pinned === true, click: () => setMemo(id, { pinned: !m.pinned }) },
-      { label: '색', submenu: COLORS.map((c) => ({ label: COLOR_NAMES[c], type: 'radio', checked: m.color === c, click: () => setMemo(id, { color: c }) })) },
-      // 잠긴 메모: 비밀번호로 연 뒤 잠금 풀기를 묻는다 (이전 버전은 잠긴 동안 볼 수 없어 흐리게)
-      ...(m.locked ? [{ label: '잠금 풀기…', click: () => inNote('unlock') }, { label: '이전 버전…', enabled: false }]
-        : [{ label: '잠그기…', click: () => inNote('lock') }, { label: '이전 버전…', click: () => inNote('versions') }]),
-      { type: 'separator' },
-      { label: '글 복사', enabled: !m.locked, click: async () => wm.listWin?.webContents.send('card:copied', await writeClipboard({ text: hotkeyCopyText(m.body) }).then(() => true, () => false)) },
-      { label: 'PDF로 저장…', click: () => wm.openPdfWindow(id) },
-      { type: 'separator' },
-      { label: '휴지통으로 옮기기', accelerator: 'Delete', registerAccelerator: false, click: () => event.sender.send('card:trash', id) },
-    ]).popup({ window: senderWindow(event), ...popupAt(at) });
+    if (!getVault()?.get(id) || !CARD_COMMANDS.has(command)) return false;
+    const win = wm.noteWins.get(id);
+    if (win && !win.webContents.isLoading()) {
+      wm.openNote(id);
+      win.webContents.send('memo:command', command);
+    } else {
+      wm.pendingCommands.set(id, command);
+      wm.openNote(id);
+    }
+    return true;
+  });
+  ipcMain.handle('card:copy', async (_e, rawId) => {
+    const m = getVault()?.get(String(rawId));
+    if (!m || m.locked) return false;
+    return writeClipboard({ text: hotkeyCopyText(m.body) }).then(() => true, () => false);
+  });
+  // 메모 공유: 글을 "제목.txt" 파일로 (Drive 링크 · LocalSend · 메일은 파일을 보낸다) — share:targets · attachment:share 가 이어서
+  ipcMain.handle('card:share-file', (_e, rawId) => {
+    const m = getVault()?.get(String(rawId));
+    if (!m) return { error: '메모를 찾지 못했어요' };
+    if (m.locked) return { error: '잠긴 메모는 잠금을 풀어야 공유할 수 있어요' };
+    const text = hotkeyCopyText(m.body);
+    if (!text.trim()) return { error: '공유할 글이 없어요' };
+    return { base64: Buffer.from(text, 'utf8').toString('base64'), name: `${safeName(m.title || '메모').slice(0, 60)}.txt`, mime: 'text/plain' };
+  });
+  // 화면이 그린 메뉴(표 오른쪽 클릭)의 편집 명령 — 그 창의 포커스가 있는 글 칸에 (네이티브 메뉴의 role 과 같은 일)
+  ipcMain.handle('edit:run', async (event, name) => {
+    const wc = event.sender;
+    if (name === 'cut') wc.cut();
+    else if (name === 'copy') wc.copy();
+    else if (name === 'paste') wc.paste();
+    else if (name === 'pastePlain') wc.send('edit:paste-plain', await clipboard.readText());
+    return true;
   });
   // 화면이 정한 오른쪽 클릭 메뉴 (메모 창 내용 — block-move.js): [{ id, label, accelerator? } | { type: 'separator' }], 자리 { x, y }? → 고른 id | null
   //   점검(SMOKE)에서는 띄우지 않고 globalThis.mkSmokeMenu 에 두어 점검이 고른다

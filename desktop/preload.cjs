@@ -32,7 +32,9 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   memo: {
     open: invoke('memo:open'),
-    cardMenu: invoke('card:menu'), // 목록 카드 오른쪽 클릭 메뉴
+    cardCommand: invoke('card:command'), // 목록 카드 메뉴: 메모 창에서 하는 일 (lock · unlock · versions)
+    copyText: invoke('card:copy'), // 목록 카드 메뉴: 글 복사
+    shareFile: invoke('card:share-file'), // 목록 카드 메뉴: 공유할 파일 { base64, name, mime } | { error }
     handoff: invoke('memo:handoff'), // 다른 기기에서 방금 고친 메모 { id, title, from } | null
     // 잠금 메모: lock(id, 비밀번호) · openLock(id, 비밀번호) → 메모 | { error } · unlock(id) 잠금 풀기
     lock: invoke('memo:lock'),
@@ -233,7 +235,11 @@ contextBridge.exposeInMainWorld('memoking', {
     joinMenu: invoke('stack:join-menu'),
     menu: invoke('stack:menu'),
   },
-  // 화면이 정한 오른쪽 클릭 메뉴 (메모 창 내용) → 고른 id | null
+  // 편집 명령을 이 창의 글 칸에 (잘라내기 · 복사 · 붙여넣기 · 서식 없이 붙여넣기) — 화면이 그린 메뉴(표 오른쪽 클릭)에서
+  edit: {
+    run: invoke('edit:run'),
+  },
+  // 화면이 정한 오른쪽 클릭 메뉴 (알림 보관함 줄) → 고른 id | null
   menu: {
     choose: invoke('menu:choose'),
   },

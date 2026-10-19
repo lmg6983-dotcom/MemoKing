@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="../app/vendor/fullcalendar.css">
   <link rel="stylesheet" href="../app/styles/base.css">
   <link rel="stylesheet" href="../app/styles/note.css">
+  <link rel="stylesheet" href="../app/styles/ctx-menu.css">
   <link rel="stylesheet" href="styles/mobile.css">
   <script type="module" src="js/app.js"></script>
 </head>
@@ -160,24 +161,31 @@
 
     <main id="editor" class="editor"></main>
 
-    <div id="table-bar" class="table-bar" role="toolbar" aria-label="표" hidden>
-      <button type="button" data-table="addRow">행 추가</button>
-      <button type="button" data-table="addCol">열 추가</button>
-      <span class="table-bar-sep"></span>
-      <button type="button" data-table="delRow">행 지우기</button>
-      <button type="button" data-table="delCol">열 지우기</button>
-      <button type="button" data-table="delTable" class="danger">표 지우기</button>
-      <span class="table-bar-sep"></span>
-      <button type="button" data-table="accent" aria-pressed="false">첫 행 강조</button>
-      <button type="button" data-table="merge">셀 병합</button>
-      <button type="button" data-table="splitTable">표 나누기</button>
-      <button type="button" data-table="joinTable">아래 표와 합치기</button>
-      <span class="table-bar-sep"></span>
-      <button type="button" data-table="toList">목록으로</button>
-      <button type="button" data-table="toTask">체크리스트로</button>
-      <button type="button" data-table="toText">글로</button>
-      <button type="button" data-table="autoFit">크기 맞춤</button>
+    <!-- 표 막대: 표 안에 커서가 있을 때만 — 묶음(행 · 열 · 칸 · 표 · 바꾸기)마다 둥근 칸, 아이콘 + 짧은 이름 (PC 와 같은 모양 — app/note.html). 표 지우기는 여기에 없다: 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽에 떠 있다 -->
+    <div id="table-bar" class="table-bar grouped" role="toolbar" aria-label="표" hidden>
+    <div class="tb-group" role="group" aria-label="행"><span class="tb-name">행</span>
+      <button type="button" data-table="addRow" title="아래에 행 추가 (마지막 칸에서 Tab)"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="6" rx="1.2"/><path d="M8 10.5v4M6 12.5h4"/></svg><span class="lbl">추가</span></button>
+      <button type="button" data-table="delRow" title="이 행 삭제" class="danger"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="6" rx="1.2"/><path d="M6 12.5h4"/></svg><span class="lbl">삭제</span></button>
     </div>
+    <div class="tb-group" role="group" aria-label="열"><span class="tb-name">열</span>
+      <button type="button" data-table="addCol" title="오른쪽에 열 추가"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="6" height="12" rx="1.2"/><path d="M12.5 6v4M10.5 8h4"/></svg><span class="lbl">추가</span></button>
+      <button type="button" data-table="delCol" title="이 열 삭제" class="danger"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="6" height="12" rx="1.2"/><path d="M10.5 8h4"/></svg><span class="lbl">삭제</span></button>
+    </div>
+    <div class="tb-group" role="group" aria-label="칸"><span class="tb-name">칸</span>
+      <button type="button" data-table="merge" title="끌어서 고른 칸들을 하나로 합치기"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.2"/><path d="M5 8h6M9 6l2 2-2 2M7 6 5 8l2 2"/></svg><span class="lbl">병합</span></button>
+      <button type="button" data-table="accent" title="첫 행을 머리글처럼 굵게, 바탕색으로 (머리글이 있는 표에만)" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.2"/><path d="M2 6.5h12" /><rect x="2.6" y="3.6" width="10.8" height="2.6" fill="currentColor" stroke="none" opacity=".45"/></svg><span class="lbl">머리글</span></button>
+    </div>
+    <div class="tb-group" role="group" aria-label="표"><span class="tb-name">표</span>
+      <button type="button" data-table="autoFit" title="내용과 본문 폭에 맞춰 열 너비와 정렬을 자동으로 (번호, 날짜는 좁게, 긴 설명 열에 공간). 칸 오른쪽이나 아래 테두리를 끌면 직접 조절"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.2"/><path d="M6.5 3v10M4.5 8H2.8M11.5 8h1.7M3.6 7l-.8 1 .8 1M12.4 7l.8 1-.8 1"/></svg><span class="lbl">맞춤</span></button>
+      <button type="button" data-table="splitTable" title="커서가 있는 행부터 아래를 새 표로 (아래 표에도 머리글 행)"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="4.5" rx="1"/><rect x="2" y="9.5" width="12" height="4.5" rx="1"/><path d="M1 8h2M5 8h2M9 8h2M13 8h2"/></svg><span class="lbl">나누기</span></button>
+      <button type="button" data-table="joinTable" title="바로 아래 표를 이 표에 이어 붙이기 (열 수가 같을 때)"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="1.2"/><path d="M2 8h12M8 5.5v5M6.5 7l1.5-1.5L9.5 7"/></svg><span class="lbl">합치기</span></button>
+    </div>
+    <div class="tb-group" role="group" aria-label="바꾸기"><span class="tb-name">바꾸기</span>
+      <button type="button" data-table="toList" title="표를 점 목록으로 (행마다 한 항목, 칸은 · 로 이어서)"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="4.5" r="1" fill="currentColor" stroke="none"/><circle cx="3.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor" stroke="none"/><path d="M6.5 4.5H14M6.5 8H14M6.5 11.5H14"/></svg><span class="lbl">목록으로</span></button>
+      <button type="button" data-table="toTask" title="표를 체크리스트로 (행마다 체크 항목 하나, 칸은 · 로 이어서)"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.2" y="3" width="3" height="3" rx=".7"/><rect x="2.2" y="9.5" width="3" height="3" rx=".7"/><path d="M3 4.6l.6.6L4.7 4M7.5 4.5H14M7.5 11H14"/></svg><span class="lbl">체크리스트로</span></button>
+      <button type="button" data-table="toText" title="표를 글 줄로 (행마다 한 줄, 칸은 · 로 이어서)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h7"/></svg><span class="lbl">글로</span></button>
+    </div>
+  </div>
     <!-- 녹음 중: 시간·받아쓰기가 보이고, 멈추면 소리 파일과 받아쓴 글이 메모에 들어간다 -->
     <div id="rec-panel" class="rec-panel" role="region" aria-label="녹음" hidden>
       <div class="rec-head">
