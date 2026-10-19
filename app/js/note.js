@@ -1318,6 +1318,7 @@ function showActive(active) {
   appliedColor.color = active.color ?? null;
   appliedColor.highlight = active.highlight ?? null;
   showTableBar(active.table);
+  document.body.classList.toggle('content-fixed', Boolean(active.fixed)); // 파일 · 소리 같은 내용: 글 서식 막대는 쓸 수 없다
   firstTimeHints(active);
   showStyle(active);
   for (const btn of document.querySelectorAll('[data-cmd]')) {
@@ -1761,7 +1762,19 @@ window.addEventListener('pointermove', (e) => {
   p.el.classList.add('lifting');
   document.body.classList.add('tab-dragging');
   p.el.style.transform = `translate(${Math.max(-6, Math.min(6, dx))}px, ${dy}px)`;
+  markTabDrop(p, e.clientY);
 });
+// 탭 줄 안에서 끌면 놓을 자리(순서)를 줄 표시로 — 다른 탭의 가운데보다 위로 간 개수가 새 자리
+function markTabDrop(p, clientY) {
+  const others = [...tabsEl.querySelectorAll('[data-tab-id]')].filter((t) => t !== p.el);
+  p.index = others.filter((t) => { const r = t.getBoundingClientRect(); return clientY > r.top + r.height / 2; }).length;
+  clearTabDrop();
+  const before = others[p.index];
+  (before ?? others.at(-1))?.classList.add(before ? 'drop-before' : 'drop-after');
+}
+function clearTabDrop() {
+  for (const t of tabsEl.querySelectorAll('.drop-before, .drop-after')) t.classList.remove('drop-before', 'drop-after');
+}
 function endTabPress(e, cancelled = false) {
   const p = tabPress;
   if (!p || e.pointerId !== p.pointerId) return;
@@ -1769,10 +1782,16 @@ function endTabPress(e, cancelled = false) {
   p.el.classList.remove('lifting');
   p.el.style.transform = '';
   document.body.classList.remove('tab-dragging');
+  clearTabDrop();
   if (p.torn) api.stack.tearEnd(e.screenX, e.screenY);
-  else if (p.moved && !cancelled && p.tabId !== id) {
-    flush(); // 저장을 기다리지 않고 바로 (탭 누르기와 같음)
-    api.stack.activate(p.tabId);
+  else if (p.moved && !cancelled) {
+    // 탭 줄 안에서 끌어 놓으면 그 자리로 순서 바꾸기 (현재 자리와 같으면 그대로)
+    const at = [...tabsEl.querySelectorAll('[data-tab-id]')].indexOf(p.el);
+    if (p.index != null && p.index !== at) api.stack.reorder(p.tabId, p.index);
+    if (p.tabId !== id) {
+      flush(); // 저장을 기다리지 않고 바로 (탭 누르기와 같음)
+      api.stack.activate(p.tabId);
+    }
   }
 }
 window.addEventListener('pointerup', (e) => endTabPress(e));

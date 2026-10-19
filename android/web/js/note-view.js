@@ -980,6 +980,7 @@ for (const [btn, shift] of [[el.undoBtn, false], [el.redoBtn, true]]) {
 // 표 막대: 표 안에 커서가 있을 때만 (PC 와 같은 묶음 · 같은 규칙 — app/js/note.js showTableBar). 표 지우기 단추는 따로 없다:
 //   머리글 행만 남았을 때 "표 삭제" · 열이 하나뿐일 때 "표 삭제" 가 표를 지우고, 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽에 떠 있다 (block-move.js)
 function showTableBar(table) {
+  if (!table) closeTableMore();
   if (el.tableBar.hidden !== !table) {
     el.tableBar.hidden = !table;
     placeKnob(); // + · 다이얼을 표 막대 위로 (닫히면 제자리)
@@ -1014,6 +1015,20 @@ function showTableBar(table) {
   join.disabled = !table.canJoin;
   join.title = table.canJoin ? '바로 아래 표를 이 표에 이어 붙이기 (열 수가 같을 때)' : '바로 아래에 열 수가 같은 표가 있을 때 합칠 수 있어요';
 }
+// 덜 쓰는 표 도구(표 · 바꾸기)는 "⋯" 로 막대 위에 펼친다 — 막대가 한 줄만 차지하게. 하나를 고르거나 바깥을 누르면 접힌다
+const tableMoreBtn = $('table-more-btn');
+function closeTableMore() {
+  el.tableBar.classList.remove('more-open');
+  tableMoreBtn?.setAttribute('aria-expanded', 'false');
+}
+tableMoreBtn?.addEventListener('click', () => {
+  const open = !el.tableBar.classList.contains('more-open');
+  el.tableBar.classList.toggle('more-open', open);
+  tableMoreBtn.setAttribute('aria-expanded', String(open));
+});
+document.addEventListener('pointerdown', (e) => {
+  if (el.tableBar.classList.contains('more-open') && !el.tableBar.contains(e.target)) closeTableMore();
+}, true);
 el.tableBar.addEventListener('mousedown', (e) => e.preventDefault());
 el.tableBar.addEventListener('click', (e) => {
   const b = e.target.closest('[data-table]');
@@ -1021,6 +1036,7 @@ el.tableBar.addEventListener('click', (e) => {
   // 마지막 남은 머리글 행 · 열을 지우면 표 전체를 지운다
   const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.dataset.wholeTable === '1';
   editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
+  if (b.closest('.tb-more')) closeTableMore();
 });
 
 function showActive(active) {

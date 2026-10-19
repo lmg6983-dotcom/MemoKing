@@ -1108,6 +1108,7 @@ el.cards.addEventListener('contextmenu', (e) => {
       color: (m, color) => api.memo.set(m.id, { color }),
       trash: (id) => deleteMemo(id),
       flash: flashStatus,
+      openSettings: () => el.settingsBtn.click(),
     },
   }).then(() => card.isConnected && document.activeElement === document.body && card.focus({ preventScroll: true }));
 });

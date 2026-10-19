@@ -3,6 +3,8 @@
 //   Electron 의 기본(네이티브) 메뉴는 아이콘 줄을 못 그려서 화면(HTML)에서 직접 그린다 — 글 칸의 메뉴(잘라내기 · 붙여넣기 …)는 그대로 네이티브.
 //   키보드: ←→(아이콘 줄) · ↑↓ · Home · End · Tab · Enter · Space · Esc. 바깥을 누르거나 창이 바뀌거나 스크롤하면 닫힌다.
 //   메뉴가 뜬 동안 편집기의 고른 자리는 그대로, 닫으면 편집기로 포커스를 돌려준다 (onClose).
+import { clearOfSticker } from './sticker-zone.js';
+
 let current = null; // { el, done, cleanup }
 
 /** 메뉴가 떠 있는가 (다른 곳에서 단추 · 호버를 띄우지 않게) */
@@ -122,7 +124,8 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
   const w = el.offsetWidth;
   const h = el.offsetHeight;
   const left = x + w + 6 > window.innerWidth ? Math.max(6, x - w) : x;
-  const top = y + h + 6 > window.innerHeight ? Math.max(6, y - h) : y;
+  const below = y + h + 6 > window.innerHeight ? Math.max(6, y - h) : y;
+  const top = clearOfSticker({ left, top: below, width: w }); // 왕관 · 테이프 스티커 아래로
   el.style.left = `${Math.round(left)}px`;
   el.style.top = `${Math.round(top)}px`;
 

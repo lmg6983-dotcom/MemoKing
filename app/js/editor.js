@@ -5,7 +5,7 @@ import {
   wrapInHeadingCommand, turnIntoTextCommand, wrapInBulletListCommand, wrapInOrderedListCommand,
   wrapInBlockquoteCommand, createCodeBlockCommand, insertHrCommand, liftListItemCommand, htmlSchema,
   gfm, toggleStrikethroughCommand, history, listener, listenerCtx, clipboard, trailing, upload, uploadConfig,
-  callCommand, getMarkdown, replaceAll, insert, $view, $prose, $markSchema, $nodeSchema, $remark, Plugin, PluginKey, TextSelection,
+  callCommand, getMarkdown, replaceAll, insert, $view, $prose, $markSchema, $nodeSchema, $remark, Plugin, PluginKey, TextSelection, NodeSelection,
   toggleMark, Decoration, DecorationSet, insertTableCommand, tableSchema,
   addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, goToNextCell, columnResizing,
   splitCell, CellSelection, TableMap, selectedRect, undoDepth, redoDepth,
@@ -2583,6 +2583,19 @@ function moveLineBy(state, dispatch, dir) {
   }
 }
 
+/** 글을 고치는 것이 아닌 내용(파일 칩 · 음성 카드의 소리 줄 · 그림 · 소리 · 링크 카드 …)을 골랐는가 — 서식 막대를 쓸 수 없게 */
+function onFixedContent(state) {
+  const { selection } = state;
+  const { $from, from, to } = selection;
+  if (selection instanceof NodeSelection) return selection.node.type.name !== 'table';
+  const isFileLink = (m) => m.type.name === 'link' && typeof m.attrs.href === 'string' && m.attrs.href.startsWith('attachments/');
+  let chip = selection.empty ? $from.marks().some(isFileLink) : false;
+  if (!selection.empty) state.doc.nodesBetween(from, to, (node) => { chip ||= node.marks.some(isFileLink); });
+  if (chip) return true;
+  for (let d = $from.depth; d > 0; d--) if (isVoiceCard($from.node(d)) && $from.index(d) === 0) return true;
+  return false;
+}
+
 function activeFormats(state) {
   const { $from, from, to, empty } = state.selection;
   const marks = state.schema.marks;
@@ -2607,6 +2620,7 @@ function activeFormats(state) {
     canUndo: safeDepth(undoDepth, state) > 0,
     canRedo: safeDepth(redoDepth, state) > 0,
   };
+  active.fixed = onFixedContent(state);
   active.canMoveUp = moveLineBy(state, null, -1);
   active.canMoveDown = moveLineBy(state, null, 1);
   for (let d = $from.depth; d > 0; d--) {

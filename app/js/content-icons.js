@@ -7,3 +7,4 @@ export const OPEN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M
 export const SAVE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.8 7l3.2 3.2L11.2 7M3 12.8h10"/></svg>';
 export const TRASH_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" class="trash"><path d="M3 4.5h10M6.5 7v4.5M9.5 7v4.5M4.3 4.5l.7 9h6l.7-9M6 4.5V2.5h4v2"/></svg>';
 export const CLOSE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6"/></svg>';
+export const CUT_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4.5" cy="11.5" r="2"/><circle cx="11.5" cy="11.5" r="2"/><path d="M5.6 9.8 12.5 2M10.4 9.8 3.5 2"/></svg>';

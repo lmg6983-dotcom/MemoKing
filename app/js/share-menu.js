@@ -2,6 +2,7 @@
 //   방법: Google Drive 링크 · LocalSend · 메일에 첨부 (main 의 share:targets 가 지금 쓸 수 있는지 알려 줌)
 //   Drive 링크를 복사하면 가운데에 "복사했어요 · 붙여 넣으세요" 알림 + 폭죽 (showSharePop)
 import { burstAt } from './confetti-burst.js';
+import { clearOfSticker } from './sticker-zone.js';
 
 //   지난번에 고른 방법이 맨 위. Esc · 바깥을 누르면 그만 (null)
 const ICONS = {
@@ -28,7 +29,7 @@ function close(result = null) {
 
 /**
  * 공유 방법을 고른다 → 고른 id | null
- * @param {HTMLElement} anchor 메뉴를 붙일 단추 · @param {{ id: string, label: string, sub: string, ready: boolean }[]} targets
+ * @param {HTMLElement} anchor 메뉴를 붙일 단추 · @param {{ id: string, label: string, sub: string, ready: boolean, connect?: boolean }[]} targets
  */
 export function chooseShare(anchor, targets) {
   close();
@@ -52,7 +53,8 @@ export function chooseShare(anchor, targets) {
     b.type = 'button';
     b.setAttribute('role', 'menuitem');
     b.dataset.via = t.id;
-    b.disabled = !t.ready;
+    b.disabled = !t.ready && !t.connect; // 연결 전인 방법은 눌러서 연결하러 갈 수 있다 (t.connect)
+    if (!t.ready) b.classList.add('unready');
     b.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true">${ICONS[t.id] ?? ICONS.share}</svg><span><b></b><small></small></span>`;
     b.querySelector('b').textContent = t.label;
     b.querySelector('small').textContent = t.sub;
@@ -79,7 +81,8 @@ export function chooseShare(anchor, targets) {
   const m = el.getBoundingClientRect();
   const below = r.bottom + 6 + m.height <= window.innerHeight - 8;
   el.style.left = `${Math.round(Math.max(8, Math.min(r.left, window.innerWidth - m.width - 8)))}px`;
-  el.style.top = `${Math.round(below ? r.bottom + 6 : Math.max(8, r.top - m.height - 6))}px`;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - m.width - 8));
+  el.style.top = `${Math.round(clearOfSticker({ left, top: below ? r.bottom + 6 : Math.max(8, r.top - m.height - 6), width: m.width }))}px`;
   el.querySelector('button:not(:disabled)')?.focus();
   return new Promise((done) => {
     const onDown = (e) => !el.contains(e.target) && close();

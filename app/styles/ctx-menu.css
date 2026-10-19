@@ -97,3 +97,18 @@
 
 /* 체크 폭죽 (canvas-confetti) */
 .mk-confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; } /* 공유 완료 카드(95) 위로도 날린다 */
+
+/* 이름 입력 창 (rename-content.js) */
+.mk-prompt-back { position: fixed; inset: 0; z-index: 100001; display: grid; place-items: center; background: rgba(0, 0, 0, 0.25); }
+.mk-prompt {
+  display: flex; flex-direction: column; gap: 10px; width: min(340px, calc(100vw - 32px)); padding: 16px;
+  border-radius: 12px; background: var(--surface, #fff); color: var(--text, #1b1b1b); box-shadow: var(--shadow-pop, 0 12px 32px rgba(0, 0, 0, 0.25));
+  font: 13.5px/1.4 var(--font-sans, system-ui, sans-serif);
+}
+.mk-prompt b { font-size: 14.5px; color: var(--text-strong, inherit); }
+.mk-prompt input { height: 36px; padding: 0 10px; border: 1px solid var(--border, #ccc); border-radius: 8px; background: var(--surface, #fff); color: inherit; font: inherit; outline: none; }
+.mk-prompt input:focus { border-color: var(--text-strong, #111); }
+.mk-prompt-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.mk-prompt-actions button { height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--hover, rgba(0, 0, 0, 0.07)); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.mk-prompt-actions .primary { background: var(--brand-yellow, #ffcc00); color: var(--on-brand, #111); }
+.mk-share-menu button.unready:not(:disabled) { opacity: 0.7; }

@@ -55,8 +55,8 @@ android {
         applicationId = "com.memoking.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 111
-        versionName = "0.33.0"
+        versionCode = 112
+        versionName = "0.34.0"
 
         // 화자 구분 엔진(sherpa-onnx)은 휴대폰 CPU(ARM) 용만 넣는다 — x86 까지 넣으면 APK 가 30MB 더 커진다
         ndk {

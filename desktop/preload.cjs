@@ -225,6 +225,7 @@ contextBridge.exposeInMainWorld('memoking', {
   // 메모 스택 (한 창의 탭)
   stack: {
     activate: invoke('stack:activate'),
+    reorder: invoke('stack:reorder'), // 탭을 끌어 순서 바꾸기 (id, 새 자리)
     newTab: invoke('stack:new-tab'),
     remove: invoke('stack:remove'),
     detach: invoke('stack:detach'),
