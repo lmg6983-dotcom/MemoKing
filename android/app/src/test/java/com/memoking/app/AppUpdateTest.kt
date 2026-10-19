@@ -27,7 +27,7 @@ class AppUpdateTest {
 
     @Test
     fun sha256OfAFile() {
-        val file = File.createTempFile("mk", ".apk")
+        val file = File.createTempFile("mkup", ".apk")
         try {
             file.writeText("abc")
             assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", AppUpdate.sha256(file))
