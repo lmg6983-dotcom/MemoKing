@@ -722,6 +722,9 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal[data-view="dayGridMonth"] .cal-body [role="columnheader"] { font-size: 13px; font-weight: 800; color: var(--text-strong); }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { display: flex; justify-content: center; padding-top: 2px; font-size: 12px; line-height: 17px; font-weight: 500; color: var(--muted); }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child { font-weight: 800; }
+/* 날짜 숫자 칸: 22px 정사각 → 오늘의 노란 동그라미가 납작한 타원(22.7×20)이 아닌 원으로, 칸 가운데에 (달력이 붙이던 왼쪽 여백 1px 없이) */
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { padding-inline: 0 !important; }
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: 22px; min-width: 22px; height: 22px; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; line-height: 1; }
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: #c4282e; } /* 일요일 빨강은 그대로 */
 @media (prefers-color-scheme: dark) { .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 3px !important; }
