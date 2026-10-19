@@ -343,16 +343,19 @@ class Bridge(private val activity: MainActivity) {
                 }
             }
             // → "started"(설치 화면으로 넘김) | "permission"(출처를 알 수 없는 앱 설치 허용 화면을 열었음 — 허용 뒤 다시) | "missing"(받은 파일이 없음)
-            "updateInstall" -> activity.runOnUiThread {
+            //   (APK 를 설치 세션에 쓰는 일은 수십 MB 라 화면 스레드에서 하면 앱이 멈춘다 — 일꾼 스레드에서, 허용 화면만 화면 스레드에서)
+            "updateInstall" -> pool.execute {
                 resolve(id) {
                     val file = AppUpdate.downloaded(ctx)
                     when {
                         file == null -> "missing"
                         !AppUpdate.canInstall(ctx) -> {
-                            AppUpdate.openInstallSettings(activity)
+                            activity.runOnUiThread { AppUpdate.openInstallSettings(activity) }
                             "permission"
                         }
                         else -> {
+                            // 설치가 끝나지 않았을 때(취소 · 실패) 화면에 알린다 — 설치 화면 안내만 남아 먹통처럼 보이지 않게
+                            AppUpdate.listener = { status, why -> activity.runOnUiThread { activity.emit("updateResult", JSONObject().put("status", status).put("why", why)) } }
                             AppUpdate.install(ctx, file)
                             "started"
                         }

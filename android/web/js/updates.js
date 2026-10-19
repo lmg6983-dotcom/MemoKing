@@ -24,6 +24,15 @@ const save = () => {
   }
 };
 
+// PackageInstaller.STATUS_FAILURE_* → 안내
+const INSTALL_FAIL = {
+  3: '설치를 취소했어요. 준비는 되어 있으니 "설치하기" 를 다시 눌러 주세요',
+  4: '설치 파일에 문제가 있어요. 다시 받아 주세요',
+  5: '이미 설치 중인 것과 겹쳤어요. 잠시 뒤 다시 눌러 주세요',
+  6: '휴대폰 저장 공간이 모자라요. 공간을 비우고 다시 눌러 주세요',
+  7: '지금 설치된 앱과 서명이 달라 덮어 설치할 수 없어요. 앱을 지우고 새로 설치해야 해요 (메모는 폴더에 남아 있어요)',
+};
+
 let info = normalizeInfo(null);
 let state = { status: 'idle', current: '', done: 0, total: 0, message: '' }; // idle | checking | latest | available | downloading | ready | installing | error
 let busy = false;
@@ -156,6 +165,14 @@ async function download() {
 export function setupUpdates({ currentVersion }) {
   state.current = currentVersion ?? '';
   on('update', ({ done, total }) => set({ done, total: total || state.total }));
+  // 설치가 끝나지 않았다(취소 · 실패) → "설치 화면에서…" 안내에 머물지 않고 다시 누를 수 있게 + 까닭
+  on('updateResult', ({ status, why }) => {
+    if (state.status !== 'installing') return;
+    const text = INSTALL_FAIL[status] ?? `설치가 끝나지 않았어요${why ? ` (${why})` : ''}. 다시 눌러 주세요`;
+    set({ status: 'ready' });
+    $('update-hint').textContent = text;
+    $('update-hint').hidden = false;
+  });
   $('update-check').addEventListener('click', () => {
     if (['available', 'ready', 'installing', 'downloading'].includes(state.status)) {
       closeSheetsThenOpen();
