@@ -1083,7 +1083,7 @@ function showTab(tab) {
 for (const b of document.querySelectorAll('.tabs [data-tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
 tabKeys(document.querySelector('.tabs'));
 api.on('list:tab', showTab);
-api.on('reminders:changed', () => remindersTab.refresh());
+api.on('reminders:changed', () => remindersTab.refresh({ quiet: activeTab !== 'reminders' })); // 안 보이는 달력은 탭으로 갈 때 그린다
 api.on('history:changed', () => activeTab === 'history' && historyTab.refresh());
 $('reveal-vault').addEventListener('click', () => api.vault.reveal());
 $('change-vault').addEventListener('click', async () => {
@@ -1304,7 +1304,7 @@ api.on('memos:changed', (memos) => {
   $('count-memos').textContent = String(memos.length);
   if (activeTab !== 'memos') {
     memosStale = true; // 메모 탭으로 돌아오면 다시 그린다
-    return remindersTab.refresh(); // 메모 제목이 바뀌면 알림 탭에도
+    return remindersTab.refresh({ quiet: activeTab !== 'reminders' }); // 메모 제목이 바뀌면 알림 탭에도
   }
   if (state.query) runSearch();
   else render();

@@ -344,6 +344,17 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     return out;
   }
 
+  // 달 보기 칩 모양(base.css)을 바꾼 뒤로 FullCalendar 가 일정을 다시 그릴 때 칩 높이를 한 번 더 재며
+  //   "ResizeObserver loop completed with undelivered notifications" 를 남긴다 — 다음 화면에서 맞춰지는 무해한 경고라 이것만 콘솔에 남기지 않는다
+  if (!window.mkRoLoopQuiet) {
+    window.mkRoLoopQuiet = true;
+    window.addEventListener('error', (e) => {
+      if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
+  }
   const calendar = new Calendar(calEl, {
     plugins: [dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin],
     locale: koLocale,
@@ -399,7 +410,17 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     eventDrop: (arg) => moveEvent(arg),
     views: {
       // 달 · 주 보기의 일정 막대는 이름만 — 칸이 좁아 "오전 9:3…" 처럼 시각부터 잘렸다 (주 보기는 자리가 곧 시각, 시각은 누르면 · 아래 목록에)
-      dayGridMonth: { dayHeaderFormat: { weekday: 'short' }, displayEventTime: false }, // 넓은 창에서도 "일" (일요일 X)
+      // 달 보기 칩: 제목만 (글자 크기 · 잘림 표시는 base.css .mk-mt)
+      dayGridMonth: {
+        dayHeaderFormat: { weekday: 'short' }, // 넓은 창에서도 "일" (일요일 X)
+        displayEventTime: false,
+        eventContent: (arg) => {
+          const t = document.createElement('span');
+          t.className = 'mk-mt';
+          t.textContent = arg.event.title;
+          return { domNodes: [t] };
+        },
+      },
       timeGridWeek: { slotHeaderFormat: { hour: 'numeric' }, displayEventTime: false },
       // 목록: 달은 위 제목에 있으니 날짜 칸은 "16일 · 금" 만 (좁은 화면을 날짜가 다 차지하지 않게)
       //   일정은 시각을 제목 위 작은 줄로 쌓아 제목이 폭을 다 쓰게 (예전: 시각 칸이 절반을 차지해 제목이 잘림)
@@ -452,9 +473,14 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       const weekdays = calEl.querySelector('[role="columnheader"]')?.getBoundingClientRect().height || 26;
       if (viewId === 'dayGridMonth') {
         calendar.setOption('aspectRatio', Math.min(8, Math.max(0.9, w / Math.max(100, room - weekdays))));
-        // 한 주 줄 높이에서 날짜 숫자 줄(약 30px)을 빼고 칩 한 줄(약 24px)씩 — "+n" 줄 자리도 남긴다
+        // 한 주 줄 높이에서 날짜 숫자 줄과 "+n" 줄을 빼고 칩 한 개씩 — 높이는 지금 그려진 것을 잰다 (글자 크기 · 칩 모양을 바꿔도
+        //   계산이 어긋나지 않게: 칸보다 많이 넣으면 칸이 늘어나며 달력이 크기를 다시 재는 고리를 돌았다)
         const rowH = (room - weekdays) / 6;
-        const fit = Math.max(1, Math.floor((rowH - 30) / 24) - 1);
+        const chip = calEl.querySelector('.mk-ev');
+        const chipH = chip ? chip.offsetHeight + (parseFloat(getComputedStyle(chip).marginBottom) || 0) : 19; // 아직 일정이 없으면 base.css 의 칩 높이
+        const topH = calEl.querySelector('[role="gridcell"] > :first-child')?.offsetHeight || 24;
+        const moreH = calEl.querySelector('.mk-more')?.offsetHeight || 14;
+        const fit = Math.max(1, Math.floor((rowH - topH - moreH - 1) / Math.max(14, chipH)));
         if (fit !== maxEvents) {
           maxEvents = fit;
           calendar.setOption('dayMaxEvents', fit);

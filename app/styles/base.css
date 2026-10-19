@@ -707,6 +707,34 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-body .mk-more { border: 0 !important; background: none !important; box-shadow: none !important; color: var(--muted); font-weight: 700; }
 @media (hover: hover) and (pointer: fine) { .cal-body .mk-more:hover { color: var(--text-strong); } }
 .cal-body .mk-ev.off { opacity: 0.5; }
+/* 지난 내 일정: 반투명 대신 옅은 바탕 + 읽히는 글자 (반투명이면 글자 대비가 너무 낮았다) */
+.cal-body .mk-ev.off:not(.mk-ext) { opacity: 1; background: color-mix(in srgb, var(--fc-event-color) 32%, var(--surface-1)) !important; color: color-mix(in srgb, var(--text) 72%, transparent); }
+/* 달 보기 칩 제목: 날짜 숫자보다 작지 않게(12px · 손가락 화면 13px), 칩 폭을 다 쓰고 넘치면 … (높이는 한 줄 그대로 —
+   두 줄로 키우면 달력이 칸 높이를 다시 재며 고리를 돌았다) */
+.cal-body .mk-mt { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; font-weight: 600; line-height: 1.3; padding: 1px 3px; }
+@media (pointer: coarse) { .cal-body .mk-mt { font-size: 13px; } }
+/* 좁은 칸(휴대폰 · 좁힌 창): "…" 가 한 글자 자리를 먹으므로 대신 끝을 흐리게 — 잘렸다는 것은 보이고 글자는 하나 더 */
+@media (max-width: 700px) {
+  .cal-body .mk-mt { text-overflow: clip; padding: 1px 2px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 8px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 8px), transparent); }
+}
+/* 달 보기 — 휴대폰 달력 위젯(삼성 캘린더)처럼: 칸 가운데 작은 날짜 숫자, 칸 폭을 꽉 채운 촘촘한 굵은 칩(모서리 4px · 칩 사이 2px),
+   테두리 상자 없이 옅은 선만 — 같은 칸에 일정이 더 많이 보이고 제목이 날짜보다 먼저 눈에 들어온다 */
+.cal[data-view="dayGridMonth"] .cal-body { --fc-forma-border: color-mix(in srgb, var(--text) 9%, transparent); --fc-forma-muted-border: color-mix(in srgb, var(--text) 9%, transparent); }
+.cal[data-view="dayGridMonth"] .cal-body [role="grid"] { border-radius: 0; }
+.cal[data-view="dayGridMonth"] .cal-body [role="columnheader"] { font-size: 13px; font-weight: 800; color: var(--text-strong); }
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { display: flex; justify-content: center; padding-top: 2px; font-size: 12px; line-height: 17px; font-weight: 500; color: var(--muted); }
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child { font-weight: 800; }
+.cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: #c4282e; } /* 일요일 빨강은 그대로 */
+@media (prefers-color-scheme: dark) { .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
+.cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 17px; margin: 0 2px 1.5px !important; border-radius: 4px !important; }
+.cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext), .cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext) > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
+.cal[data-view="dayGridMonth"] .cal-body .mk-mt { font-weight: 700; line-height: 15px; padding-top: 1px; padding-bottom: 1px; }
+@media (pointer: coarse) { .cal[data-view="dayGridMonth"] .cal-body .mk-mt { font-size: 12.5px; } }
+.cal[data-view="dayGridMonth"] .cal-body .mk-more { min-height: 0 !important; margin: 0 2px; padding: 0 2px; font-size: 11.5px; line-height: 13px; }
+/* 지난 · 끝난 내 일정: 테두리만 있는 옅은 칩 (채운 칩보다 한발 물러나 보이게) */
+.cal[data-view="dayGridMonth"] .cal-body .mk-ev.off:not(.mk-ext) { background: color-mix(in srgb, var(--fc-event-color) 12%, var(--surface-1)) !important; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--fc-event-color) 75%, transparent); color: color-mix(in srgb, var(--text) 62%, transparent); }
+/* 내 일정 칩 왼쪽의 색 점 자리: 칩이 이미 그 색이라 보이지 않고 좁은 칸만 차지했다 (다른 캘린더 일정은 점이 그 캘린더 표시라 둔다) */
+.cal-body .mk-ev:not(.mk-ext) > div:first-child:empty { display: none; }
 /* 낮은 창: 일정 막대 대신 날짜 + 색 점 (list-reminders.js fitSize) */
 .cal.compact .cal-body { font-size: 11.5px; }
 .cal.compact .cal-body [role="gridcell"] > :first-child { min-height: 0; padding: 1px 2px 0; }
