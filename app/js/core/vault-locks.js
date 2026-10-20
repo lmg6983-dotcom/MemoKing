@@ -6,7 +6,7 @@
 //   저장(save)·버전 되돌리기·덮어쓰기 전 확인(keepChangedOnDisk)도 여기 — PC·휴대폰이 같은 규칙으로
 
 import { isLockedBody, parseLocked, sealBody, unsealBody, lockRefs, lockRefKey } from './memo-lock.js';
-import { isBlankBody, sameBody, conflictCopyBody, extractAttachments, COLORS, normalizeInkPath } from './memo-file.js';
+import { isBlankBody, sameBody, conflictCopyBody, extractAttachments, COLORS, normalizeInkPath, normalizeDay } from './memo-file.js';
 import { normalizeTables } from './table-sizes.js';
 import { toLocalIso } from './time.js';
 import { versionTime } from './versions.js';
@@ -110,6 +110,7 @@ class LockMethods {
     if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
     if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
     if (typeof patch.ink === 'string') entry.meta.ink = normalizeInkPath(patch.ink);
+    if (patch.day !== undefined) entry.meta.day = normalizeDay(patch.day ?? ''); // 추억 달력의 날 ("" · null 이면 만든 날로)
     if (entry.file && this.write(entry) !== true) {
       entry.meta = prev; // 쓰지 못했다 — 바뀐 것처럼 보이지 않게
       return null;

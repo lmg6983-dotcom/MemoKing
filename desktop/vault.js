@@ -231,6 +231,8 @@ export class Vault extends EventEmitter {
       created: entry.meta.created,
       updated: entry.meta.updated,
       thumb: media.find((m) => m.kind === 'image')?.src ?? null,
+      images: media.filter((m) => m.kind === 'image').slice(0, 24).map((m) => m.src), // 추억 달력 (그날의 사진)
+      day: entry.meta.day || '', // 추억 달력: "이 날의 기록으로" 정한 날
       tags: extractTags(entry.body),
       hasImage: has('image'),
       hasWebLink: /\]\(https?:\/\/|<https?:\/\//i.test(entry.body),
@@ -294,6 +296,7 @@ export class Vault extends EventEmitter {
       created: entry.meta.created,
       updated: entry.meta.updated,
       device: entry.meta.device ?? null,
+      day: entry.meta.day || '',
     };
   }
 
