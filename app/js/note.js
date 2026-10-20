@@ -55,7 +55,7 @@ setCopyHost({
     hideDeleteButton(true);
     const via = await chooseShare({ getBoundingClientRect: () => at }, targets);
     if (!via) return 'cancelled';
-    if (via === 'drive') setStatus('Google Drive 에 올리는 중…');
+    if (via === 'drive') setStatus('Google Drive 에 올리는 중');
     const r = await api.attachments.share({ ...f, via });
     if (r?.error) throw new Error(r.error);
     if (r?.missing) return 'localsend-missing';
@@ -424,7 +424,7 @@ el.pinToggle.addEventListener('click', async () => {
 async function moveMode(to) {
   await flush();
   const next = await api.memo.set(id, { mode: to });
-  if (!next) return setStatus('옮기지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+  if (!next) return setStatus('옮기지 못했어요. 잠시 뒤 다시 해 주세요', true);
   applyMeta(next);
   setStatus(`${MODE_LABEL[to]}로 옮겼어요`);
 }
@@ -531,7 +531,7 @@ window.addEventListener('blur', () => {
 async function memoImage(kind) {
   closeMenu();
   await flush();
-  setStatus('그림을 만드는 중…');
+  setStatus('그림을 만드는 중');
   try {
     const base64 = await renderMemoImage(editor, { color: memo?.color ?? document.body.dataset.color });
     const r = kind === 'copy' ? await api.image.copy(base64) : await api.image.save(id, base64);
@@ -707,7 +707,7 @@ function linkItem(target, { onRemove, onAdd, score } = {}) {
 
 async function setLink(targetId, on) {
   await flush();
-  if (!(await api.memo.link(id, targetId, on))) setStatus('연결을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+  if (!(await api.memo.link(id, targetId, on))) setStatus('연결을 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
   el.linkSearch.value = '';
   el.linkResults.replaceChildren();
   await refreshLinks();
@@ -808,7 +808,7 @@ $('shortcuts-btn').addEventListener('click', () => {
 // 메모 창을 몇 번 써 본 뒤 한 번: 단축키 모음이 있다는 것
 setTimeout(() => {
   const k = resolveKeymap(keymapOverrides).shortcuts[0];
-  hintOnce('shortcuts', k ? `${comboLabel(k)} 를 누르면 단축키를 한눈에 볼 수 있어요` : '메뉴 › 단축키 보기에서 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn });
+  hintOnce('shortcuts', k ? `${comboLabel(k)} 를 누르면 단축키를 한눈에 볼 수 있어요` : '메뉴의 단축키 보기에서 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn });
 }, 2500);
 $('links-close').addEventListener('click', () => toggleLinks(false));
 api.on('memo:links-changed', refreshLinks);
@@ -874,7 +874,7 @@ async function applyCapture(c) {
   editor.focusEnd();
   // 웹 사진을 받는 중에 저장하면 주소 교체와 엇갈릴 수 있어, 받기가 끝난 뒤 한 번에 저장
   if (c.html) {
-    setStatus('사진을 저장하는 중…');
+    setStatus('사진을 저장하는 중');
     await editor.imagesSettled();
   }
   // 태그를 저절로: 화면 캡처는 #캡처, 웹에서 가져온 것은 링크, 그 밖은 공유 (+ 내용에 맞는 기존 태그)
@@ -904,7 +904,7 @@ async function saveFile(file) {
 async function fetchImage(src) {
   if (isDataImage(src)) {
     const image = decodeDataImage(src);
-    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG · JPG · GIF · WebP 그림을 써 주세요');
+    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG, JPG, GIF, WebP 그림을 써 주세요');
     return api.attachments.save(image.bytes, image.ext);
   }
   return api.attachments.fetch(src);

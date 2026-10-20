@@ -62,7 +62,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
     const head = el('div', 'mem-head');
     const words = el('div', 'mem-words');
     words.append(el('b', 'mem-title', `${month.getMonth() + 1}월의 기록`));
-    words.append(el('span', 'mem-sub', sum.days ? `${sum.days}일 · 사진 ${sum.photos}장` : '아직 남긴 기록이 없어요'));
+    words.append(el('span', 'mem-sub', sum.days ? `${sum.days}일, 사진 ${sum.photos}장` : '아직 남긴 기록이 없어요'));
     head.append(words);
     if (sum.cover.length) {
       const strip = el('div', 'mem-cover');
@@ -85,10 +85,10 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       const share = el('button', 'mem-share');
       share.type = 'button';
       share.append(icon('share'), el('span', '', '한 장으로'));
-      share.title = '이 달의 기록을 그림 한 장으로 (공유 · 저장)';
+      share.title = '이 달의 기록을 그림 한 장으로 (공유, 저장)';
       share.addEventListener('click', () => makeCollage(share, {
         title: `${month.getFullYear()}년 ${month.getMonth() + 1}월의 기록`,
-        sub: `${sum.days}일 · 사진 ${sum.photos}장`,
+        sub: `${sum.days}일, 사진 ${sum.photos}장`,
         photos: [...days.values()].flatMap((d) => d.photos.slice(0, 1).map((p) => ({ ...p, day: d.day }))),
         memos: [...days.values()].filter((d) => !d.photos.length).map((d) => ({ ...d.memos[0], day: d.day })),
         kind: 'month',
@@ -129,7 +129,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       row.append(dayCell(d, key, rec, { inMonth, today: key === todayKey }));
     }
     root.replaceChildren(head, chips, grid);
-    if (loaded && !memos.length) root.append(el('p', 'mem-empty', '메모에 사진을 넣거나 글을 쓰면 그날 칸에 모여요. 여행 · 데이트 기록을 남겨 보세요.'));
+    if (loaded && !memos.length) root.append(el('p', 'mem-empty', '메모에 사진을 넣거나 글을 쓰면 그날 칸에 모여요. 여행, 데이트 기록을 남겨 보세요.'));
   }
 
   function dayCell(d, key, rec, { inMonth, today }) {
@@ -199,11 +199,11 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       const share = el('button', 'icon-btn mem-page-share');
       share.type = 'button';
       share.setAttribute('aria-label', '이 날을 그림 한 장으로');
-      share.title = '이 날을 그림 한 장으로 (공유 · 저장)';
+      share.title = '이 날을 그림 한 장으로 (공유, 저장)';
       share.append(icon('share'));
       share.addEventListener('click', () => makeCollage(share, {
         title: `${date.getMonth() + 1}월 ${date.getDate()}일 ${'일월화수목금토'[date.getDay()]}요일`,
-        sub: rec.memos.map((m) => m.title).filter(Boolean).slice(0, 3).join(' · '),
+        sub: rec.memos.map((m) => m.title).filter(Boolean).slice(0, 3).join(', '),
         photos: rec.photos.map((p) => ({ ...p, day: key })),
         memos: rec.memos.filter((m) => !m.images?.length || m.preview).map((m) => ({ ...m, day: key })),
         kind: 'day',
@@ -284,7 +284,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
     const label = button.querySelector('span');
     const was = label?.textContent;
     button.setAttribute('aria-busy', 'true');
-    if (label) label.textContent = '만드는 중…';
+    if (label) label.textContent = '만드는 중';
     try {
       await collage(data);
     } finally {

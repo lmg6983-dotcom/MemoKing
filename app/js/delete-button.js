@@ -83,7 +83,7 @@ export function undoHint(what, rect, view, verb = '지웠어요') {
 }
 
 const COPY_DONE = (what) => (what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
-  : what === '파일' ? '파일을 복사했어요. 탐색기 · 메신저에 붙여 넣으세요' : what === '링크' ? '링크 주소를 복사했어요' : '내용을 복사했어요');
+  : what === '파일' ? '파일을 복사했어요. 탐색기, 메신저에 붙여 넣으세요' : what === '링크' ? '링크 주소를 복사했어요' : '내용을 복사했어요');
 const SAVE_DONE = (name) => `저장했어요: ${name}`;
 const SHARE_DONE_TEXT = (what) => SHARE_DONE[what] ?? '공유했어요';
 // 저장 · 공유는 앱이 알려 준 이유(파일을 찾지 못했어요 등)를 그대로
@@ -138,8 +138,8 @@ export async function showContentMenu(view, opts, at) {
   const icons = [
     { id: 'cut', icon: CUT_ICON, label: verb('잘라내기') }, // 복사한 뒤 지움 (Ctrl+Z 로 되돌림)
     { id: 'copy', icon: COPY_ICON, label: copyLabel ?? verb('복사') },
-    { id: 'save', icon: SAVE_ICON, label: `${verb('저장')}…` },
-    ...(canShare() ? [{ id: 'share', icon: SHARE_ICON, label: `${verb('공유')}…` }] : []),
+    { id: 'save', icon: SAVE_ICON, label: `${verb('저장')}` },
+    ...(canShare() ? [{ id: 'share', icon: SHARE_ICON, label: `${verb('공유')}` }] : []),
     { id: 'delete', icon: TRASH_ICON, label, danger: true },
   ];
   const items = [...(open ? [{ id: 'open', label: open.label, hint: 'Enter' }] : []), ...extraItems];

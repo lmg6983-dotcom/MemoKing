@@ -545,7 +545,7 @@ try {
   check('가져온 일정 메모: 달력 그림(PNG) · 장소 · 설명 · 일정',
     Boolean(sketch) && sketch.length > 5000 && sketch.subarray(1, 4).toString() === 'PNG' && /장소: 집/.test(importedMd) && /7시까지 도착/.test(importedMd) && /kind: at/.test(importedMd),
     importedMd.slice(0, 600));
-  check('가져온 일정 메모: 그림은 첫 줄(제목) 바로 아래 · 그림 설명에 날짜', /# 가족 저녁\n\n!\[\d{4}년 \d+월 달력 — \d+월 \d+일/.test(importedMd.replace(/^---[\s\S]*?---\n/, '')), importedMd.slice(0, 300));
+  check('가져온 일정 메모: 그림은 첫 줄(제목) 바로 아래 · 그림 설명에 날짜', /# 가족 저녁\n\n!\[\d{4}년 \d+월 달력, \d+월 \d+일/.test(importedMd.replace(/^---[\s\S]*?---\n/, '')), importedMd.slice(0, 300));
   check('가져온 일정 메모: 메모 화면에 달력 그림이 보임', await page.locator('#note-screen img.mk-image').first().evaluate((img) => img.complete && img.naturalWidth >= 1000).catch(() => false));
   await page.waitForTimeout(400);
   await shot('02m-imported-memo');

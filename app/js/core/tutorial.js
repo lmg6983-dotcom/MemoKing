@@ -83,8 +83,8 @@ export const TUTORIAL_STEPS = [
   },
   {
     id: 'content', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-ctx'], advance: 'content-tools', emoji: '💾',
-    title: '넣은 내용 저장 · 공유하기',
-    text: '사진, 손 메모, 녹음, 파일, 표를 오른쪽 클릭하면 메뉴 맨 위 한 줄에 아이콘이 떠요. ✂ 잘라내기, 📋 복사, 💾 파일로 저장, 📤 공유(Drive 링크 · LocalSend · 메일), 🗑 지우기.',
+    title: '넣은 내용 저장, 공유하기',
+    text: '사진, 손 메모, 녹음, 파일, 표를 오른쪽 클릭하면 메뉴 맨 위 한 줄에 아이콘이 떠요. ✂ 잘라내기, 📋 복사, 💾 파일로 저장, 📤 공유(Drive 링크, LocalSend, 메일), 🗑 지우기.',
     try: '방금 그린 손 메모를 오른쪽 클릭하고 📋 복사 아이콘을 눌러 보세요',
     next: LATER,
   },
@@ -93,7 +93,7 @@ export const TUTORIAL_STEPS = [
     image: 'annotate.jpg',
     title: '글 위에 바로 그리기',
     text: '"글 위에 그리기"로 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요.',
-    try: '+ › "글 위에 그리기"를 눌러 글 위에 쓱 긋고 ✓ 완료',
+    try: '+ 단추에서 "글 위에 그리기"를 눌러 글 위에 쓱 긋고 ✓ 완료',
     next: LATER,
   },
   {
@@ -152,7 +152,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'layout', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
-    text: '"보기" 단추에서 카드를 바둑판처럼 볼지, 한 줄씩 볼지와 정렬(최신순 · 많이 본 순 …)을 고를 수 있어요.',
+    text: '"보기" 단추에서 카드를 바둑판처럼 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 고를 수 있어요.',
     try: '"보기"를 누르고 "한 줄씩"을 골라 보세요',
     next: LATER,
   },
@@ -173,7 +173,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'quick', win: 'list', target: [], emoji: '⚡',
     title: '어디서든 바로 메모 (Ctrl+Alt+C)',
-    text: '웹 페이지나 문서에서 글을 고르고 Ctrl+Alt+C — 곧바로 메모가 돼요. 파일을 고르고 눌러도 돼요.',
+    text: '웹 페이지나 문서에서 글을 고르고 Ctrl+Alt+C, 곧바로 메모가 돼요. 파일을 고르고 눌러도 돼요.',
     next: '다음',
   },
   {
@@ -185,7 +185,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'magic', win: 'list', target: [], emoji: '🔮',
     title: '무엇이든 찾기 (Ctrl+Alt+Space)',
-    text: '메모와 파일을 몇 글자로 찾아요. 찾는 게 없으면 Enter — 적은 말이 바로 메모가 돼요.',
+    text: '메모와 파일을 몇 글자로 찾아요. 찾는 게 없으면 Enter, 적은 말이 바로 메모가 돼요.',
     next: '다음',
   },
   {
@@ -221,7 +221,7 @@ export const MOBILE_TUTORIAL_STEPS = [
     id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], write: true, advance: 'typed', emoji: '📝',
     title: '떠오르는 생각을 적어 보세요',
     text: '첫 줄은 제목이 되고, 적는 대로 저절로 저장돼요.',
-    try: '한 줄 적어 보세요 — 다 쓰고 손을 떼면 다음으로',
+    try: '한 줄 적어 보세요. 다 쓰고 손을 떼면 다음으로',
     next: '다음',
   },
   {
@@ -257,13 +257,13 @@ export const MOBILE_TUTORIAL_STEPS = [
     id: 'annotate', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.mode-knob', '.mode-knob.open .mk-stop', '.mk-annot-bar'], advance: 'annotate-done', emoji: '🖍️', // 펼친 다이얼 칸(그리기)도 가리지 않게
     title: '글 위에 바로 그리기',
     text: '다이얼을 글 위에 그리기로 돌리면 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요. 다 그렸으면 다이얼을 한 번 더 눌러 글 고치기로 돌리면 저장돼요.',
-    try: '다이얼을 누르면 둘레에 칸이 펼쳐져요 — 맨 위 그리기를 눌러 글 위에 쓱 긋고, 다이얼을 다시 눌러 끝내요',
+    try: '다이얼을 누르면 둘레에 칸이 펼쳐져요. 맨 위 그리기를 눌러 글 위에 쓱 긋고, 다이얼을 다시 눌러 끝내요',
     next: LATER,
   },
   {
     id: 'voice', win: 'note', target: ['#add-btn', '#format-bar'], emoji: '🎙️', image: 'm-voice.jpg',
     title: '말로 메모하기',
-    text: '+ › "음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
+    text: '+ 단추에서 "음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
     next: '다음',
   },
   {
@@ -294,7 +294,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'layout', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
-    text: '"보기" 단추에서 카드를 두 줄로 볼지, 한 줄씩 볼지와 정렬(최신순 · 많이 본 순 …)을 골라요.',
+    text: '"보기" 단추에서 카드를 두 줄로 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 골라요.',
     try: '"보기"를 누르고 "한 줄씩"을 골라 보세요',
     next: LATER,
   },
@@ -308,7 +308,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'share', win: 'list', target: [], emoji: '📤',
     title: '다른 앱에서 바로 담기',
-    text: '인터넷, 사진, 녹음 앱에서 "공유 › 메모킹"을 누르면 바로 메모가 돼요.',
+    text: '인터넷, 사진, 녹음 앱에서 "공유"에서 "메모킹"을 누르면 바로 메모가 돼요.',
     next: '다음',
   },
   {

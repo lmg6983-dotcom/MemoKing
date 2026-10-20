@@ -8,7 +8,7 @@ import { SyncEngine, skipName, skipPath } from './sync-engine.js';
 
 const INTERVAL = 60_000;
 export const DOUBLE_SYNC = '메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). '
-  + '설정 › Google Drive 동기화 › "다른 폴더로 바꾸기" 에서 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요';
+  + '설정의 Google Drive 동기화에서 "다른 폴더로 바꾸기"로 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요';
 // 진행 상황은 이만큼마다 한 번만 알린다 (파일마다 창에 보내면 목록이 바빠진다)
 const PROGRESS_MS = 300;
 

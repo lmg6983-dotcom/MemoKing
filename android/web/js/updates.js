@@ -52,7 +52,7 @@ function render() {
     error: state.message,
   }[st] ?? '';
   const label = {
-    checking: '확인하는 중…',
+    checking: '확인하는 중',
     latest: '✓ 최신 버전',
     available: `업데이트 ${v}`,
     downloading: `받는 중 ${Math.floor(state.total ? (state.done / state.total) * 100 : 0)}%`,
@@ -86,7 +86,7 @@ function render() {
   $('update-progress-text').textContent = progressLabel(state.done, state.total);
   $('update-error').hidden = st !== 'error';
   $('update-error').textContent = st === 'error' ? state.message : '';
-  $('update-go').textContent = st === 'installing' ? '다시 열기' : ready ? '설치하기' : downloading ? '받는 중…' : st === 'error' ? '다시 시도' : '받아서 설치';
+  $('update-go').textContent = st === 'installing' ? '다시 열기' : ready ? '설치하기' : downloading ? '받는 중' : st === 'error' ? '다시 시도' : '받아서 설치';
   $('update-go').disabled = downloading;
   $('update-later').textContent = downloading ? '닫기 (계속 받아요)' : '나중에';
 }
@@ -141,7 +141,7 @@ async function download() {
       set({ status: 'ready' });
     }
     $('update-go').disabled = true;
-    $('update-go').textContent = '설치 화면 준비 중…'; // 설치 파일을 넘기는 동안(몇 초) 다시 눌러 설치가 꼬이지 않게
+    $('update-go').textContent = '설치 화면 준비 중'; // 설치 파일을 넘기는 동안(몇 초) 다시 눌러 설치가 꼬이지 않게
     let result;
     try {
       result = await call('updateInstall');

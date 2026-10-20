@@ -144,7 +144,7 @@ function render() {
   let only = null;
   if (state.onlyFiles) {
     only = state.memos.filter((m) => state.onlyFiles.has(String(m.file ?? '').replace(/\\/g, '/')));
-    if (only.length) $('conflict-bar-text').textContent = `동기화 충돌 사본 ${only.length}개만 보는 중 — 원래 메모와 견주어 보고 필요 없으면 지우세요`;
+    if (only.length) $('conflict-bar-text').textContent = `동기화 충돌 사본 ${only.length}개만 보는 중, 원래 메모와 견주어 보고 필요 없으면 지우세요`;
     else {
       closeOnlyFiles();
       only = null;
@@ -163,7 +163,7 @@ function render() {
   if (!memos.length) renderEmpty(narrowed, elsewhere);
   // 검색·필터로 좁혔을 때만 "N개 중 M개" (평소 개수는 메모 탭에)
   el.count.replaceChildren(`메모 ${modeMemos().length}개 중 ${memos.length}개`);
-  if (elsewhere) el.count.append(' · ', otherModeLink(elsewhere));
+  if (elsewhere) el.count.append(', ', otherModeLink(elsewhere));
   el.count.hidden = !narrowed || !memos.length; // 하나도 없으면 빈 화면 안내가 "다른 모드에서 보기" 를 맡는다
   renderFilters();
 }
@@ -332,7 +332,7 @@ async function setMode(mode) {
     render();
     remindersTab.modeChanged();
   });
-  if (mode === 'work' && state.workLife) hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 카드 메뉴의 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
+  if (mode === 'work' && state.workLife) hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요. 카드 메뉴의 "Work로 옮기기"나 설정의 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
   const saved = await api.mode?.set(mode);
   if (saved && saved !== state.mode) {
     state.mode = saved;
@@ -637,7 +637,7 @@ const MAX_TEXT_BYTES = 5 * 1024 * 1024;
 const dropShade = document.createElement('div');
 dropShade.className = 'file-drop';
 dropShade.hidden = true;
-dropShade.innerHTML = '<div class="file-drop-box"><b>놓으면 메모로 만들어요</b><span>.md · .txt 는 글 그대로, 그림·파일은 메모 안에</span></div>';
+dropShade.innerHTML = '<div class="file-drop-box"><b>놓으면 메모로 만들어요</b><span>.md, .txt 는 글 그대로, 그림과 파일은 메모 안에</span></div>';
 document.body.append(dropShade);
 const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
 let dragDepth = 0;
@@ -957,18 +957,18 @@ function renderStt(st) {
   const pct = (p) => `${Math.round((p ?? 0) * 100)}%`;
   $('stt-enabled').checked = st.enabled;
   $('stt-note').textContent = asr.state === 'ready' ? '말하면 문장마다 글로 나타나고, 끝내면 소리와 함께 음성 카드로'
-    : asr.state === 'downloading' ? `받아쓰기 데이터를 받는 중… ${pct(asr.progress)}`
-      : asr.error ? `받지 못했어요: ${asr.error}` : `받아쓰기 데이터(${asr.size})가 필요해요 — 한 번만 받으면 돼요`;
+    : asr.state === 'downloading' ? `받아쓰기 데이터를 받는 중 ${pct(asr.progress)}`
+      : asr.error ? `받지 못했어요: ${asr.error}` : `받아쓰기 데이터(${asr.size})가 필요해요. 한 번만 받으면 돼요`;
   const dl = $('stt-download');
   dl.hidden = asr.state === 'ready';
   dl.disabled = asr.state === 'downloading';
-  dl.textContent = asr.state === 'downloading' ? `받는 중… ${pct(asr.progress)}` : `받아쓰기 데이터 받기 (${asr.size})`;
+  dl.textContent = asr.state === 'downloading' ? `받는 중 ${pct(asr.progress)}` : `받아쓰기 데이터 받기 (${asr.size})`;
   $('stt-remove').hidden = asr.state !== 'ready';
   const spk = st.speaker;
   const sw = $('stt-speaker');
   sw.checked = st.speakerOn;
   sw.disabled = !st.enabled;
-  $('stt-speaker-note').textContent = spk.state === 'downloading' ? `말한 사람 나누기 데이터를 받는 중… ${pct(spk.progress)}`
+  $('stt-speaker-note').textContent = spk.state === 'downloading' ? `말한 사람 나누기 데이터를 받는 중 ${pct(spk.progress)}`
     : spk.error && st.speakerOn ? `받지 못했어요: ${spk.error}`
       : st.speakerOn && spk.state !== 'ready' ? `데이터(${spk.size})를 받으면 켜져요`
         : '녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요 (긴 녹음은 몇 분 걸려요)';
@@ -1009,7 +1009,7 @@ $('auto-tags').addEventListener('change', async (e) => {
 // 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)
 let magicState = { enabled: true, modules: {}, paused: {} };
 let magicIndex = null; // 파일 검색 목록 상태 { count, builtAt, building }
-const indexNote = (st) => (!st ? '' : st.building && !st.count ? ', 파일 목록을 만드는 중…' : st.count ? `, 파일 ${st.count.toLocaleString('ko-KR')}개${st.building ? ' (새로 고치는 중)' : ''}` : '');
+const indexNote = (st) => (!st ? '' : st.building && !st.count ? ', 파일 목록을 만드는 중' : st.count ? `, 파일 ${st.count.toLocaleString('ko-KR')}개${st.building ? ' (새로 고치는 중)' : ''}` : '');
 function renderMagicModules() {
   const list = $('magic-modules-list');
   list.replaceChildren(...MAGIC_MODULES.filter((m) => m.ready).map((m) => { // 준비 중인 기능은 설정에도 보이지 않게
@@ -1036,7 +1036,7 @@ function renderMagicModules() {
       text.append(em);
     }
     const small = document.createElement('small');
-    small.textContent = m.description + (m.id === 'files' && cb.checked ? indexNote(magicIndex) : '') + (cb.checked && magicState.paused?.[m.id] ? ' · 지금은 매직키 창에서 잠깐 꺼 둠' : '');
+    small.textContent = m.description + (m.id === 'files' && cb.checked ? indexNote(magicIndex) : '') + (cb.checked && magicState.paused?.[m.id] ? ', 지금은 매직키 창에서 잠깐 꺼 둠' : '');
     text.append(' ', small);
     row.append(cb, text);
     return row;
@@ -1100,12 +1100,12 @@ const remindersTab = setupRemindersTab({
   memories: {
     on: () => !state.workLife || state.mode === 'life', // 추억 달력은 Life 에서만 (나눠 쓰지 않으면 늘)
     collage: async (o) => {
-      flashStatus('그림을 만드는 중…');
+      flashStatus('그림을 만드는 중');
       try {
         const base64 = await renderCollage(o);
         await api.image.copy(base64);
         const r = await api.image.save(null, base64, collageName(o));
-        flashStatus(r?.file ? `${r.name}로 저장했어요 (복사도 해 두었어요)` : '그림을 복사했어요 — 붙여 넣어 보낼 수 있어요');
+        flashStatus(r?.file ? `${r.name}로 저장했어요 (복사도 해 두었어요)` : '그림을 복사했어요. 붙여 넣어 보낼 수 있어요');
       } catch (err) {
         console.error(err);
         flashStatus(err.message || '그림을 만들지 못했어요');
@@ -1115,7 +1115,7 @@ const remindersTab = setupRemindersTab({
 });
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockHistoryApp(appId, appName) {
-  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함 › 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
+  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함의 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const apps = await api.history.apps();
   const count = apps.find((a) => a.appId === appId)?.count ?? 0;
   const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제');
@@ -1241,7 +1241,7 @@ async function togglePin(m) {
     clearTimeout(hoverTimer);
     const card = e.target.closest?.('.card');
     if (!card || !api.memo.cardCommand) return;
-    hoverTimer = setTimeout(() => card.isConnected && card.matches(':hover') && hintOnce('card-menu', '카드를 오른쪽 클릭하면 복사 · 공유 · 색 · 고정 같은 메뉴가 떠요', { anchor: card }), 1500);
+    hoverTimer = setTimeout(() => card.isConnected && card.matches(':hover') && hintOnce('card-menu', '카드를 오른쪽 클릭하면 복사, 공유, 색, 고정 같은 메뉴가 떠요', { anchor: card }), 1500);
   });
   el.cards.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
 }
@@ -1269,8 +1269,8 @@ el.cards.addEventListener('contextmenu', (e) => {
       // Work ↔ Life로 옮기기: 카드는 지금 목록에서 빠진다
       mode: async (m) => {
         const to = otherMode(memoMode(m));
-        if (await api.memo.set(m.id, { mode: to })) flashStatus(`${MODE_LABEL[to]}로 옮겼어요 — 위의 ${MODE_LABEL[to]}에서 보여요`);
-        else flashStatus('옮기지 못했어요 — 잠시 뒤 다시 해 주세요');
+        if (await api.memo.set(m.id, { mode: to })) flashStatus(`${MODE_LABEL[to]}로 옮겼어요. 위의 ${MODE_LABEL[to]}에서 보여요`);
+        else flashStatus('옮기지 못했어요. 잠시 뒤 다시 해 주세요');
       },
       trash: (id) => deleteMemo(id),
       flash: flashStatus,
@@ -1805,7 +1805,7 @@ function showUpdateRow(st) {
   updateEl.note.classList.toggle('warn', st.status === 'error');
   // 단추: 최신이면 초록 "최신 버전", 새 버전이 있으면 노랑 "업데이트" (누르면 바뀐 점 · 받기), 받는 중 · 받아 둠도 그 자리에서
   const label = {
-    checking: '확인하는 중…',
+    checking: '확인하는 중',
     latest: '✓ 최신 버전',
     available: `업데이트 v${st.version}`,
     downloading: `받는 중 ${st.percent ?? 0}%`,
@@ -1844,7 +1844,7 @@ function renderUpdateDialog(st) {
     : '';
   updateEl.error.hidden = st.status !== 'error';
   updateEl.error.textContent = st.status === 'error' ? st.message ?? '' : '';
-  updateEl.go.textContent = ready ? '지금 재시작' : downloading ? '받는 중…' : st.status === 'error' ? '다시 확인' : '받기';
+  updateEl.go.textContent = ready ? '지금 재시작' : downloading ? '받는 중' : st.status === 'error' ? '다시 확인' : '받기';
   updateEl.go.disabled = downloading;
   updateEl.later.textContent = ready ? '나중에 (끝낼 때 설치)' : downloading ? '닫기 (계속 받아요)' : '나중에';
 }

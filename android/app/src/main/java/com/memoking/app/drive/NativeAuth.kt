@@ -86,8 +86,8 @@ object NativeAuth {
         } catch (e: Exception) {
             throw GoogleAuth.AuthError(describe(e.cause ?: e))
         }
-        if (result.hasResolution()) throw GoogleAuth.AuthError("Google Drive 권한을 다시 허용해 주세요. 설정 › 연결하기")
-        return result.accessToken ?: throw GoogleAuth.AuthError("Google Drive 권한을 다시 허용해 주세요. 설정 › 연결하기")
+        if (result.hasResolution()) throw GoogleAuth.AuthError("Google Drive 권한을 다시 허용해 주세요. 설정에서 연결하기를 눌러 주세요")
+        return result.accessToken ?: throw GoogleAuth.AuthError("Google Drive 권한을 다시 허용해 주세요. 설정에서 연결하기를 눌러 주세요")
     }
 
     /** 만료된 토큰을 Play 서비스 저장소에서 지운다 (다음 요청 때 새로 받게) */

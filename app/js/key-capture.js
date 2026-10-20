@@ -65,7 +65,7 @@ function onPointerDown(e) {
 export function captureGlobalKey(btn, { api, name, note, done, stopped }) {
   note('Ctrl, Alt, Win 중 하나와 함께 눌러요. Esc 는 그만');
   return startKeyCapture(btn, {
-    prompt: '새 키 조합을 누르세요…',
+    prompt: '새 키 조합을 누르세요',
     pause: (on) => api.settings.pauseShortcuts(on),
     onStop: (reason) => {
       if (reason === 'cancel' || reason === 'away') note('');
@@ -100,7 +100,7 @@ export function stopKeyCapture(reason = 'cancel') {
  *   onKey 안에서 다 됐으면 cap.stop() 을 부른다 (못 쓰는 키면 부르지 않고 계속 기다림).
  *   cap.stop 은 그 칸만 그만둔다 — 그사이 다른 칸을 받기 시작했으면 그 칸은 그대로
  */
-export function startKeyCapture(btn, { prompt = '새 키를 누르세요…', onKey, onStop, pause } = {}) {
+export function startKeyCapture(btn, { prompt = '새 키를 누르세요', onKey, onStop, pause } = {}) {
   active?.stop('replaced');
   const label = btn.textContent;
   const cap = {

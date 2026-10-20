@@ -8,7 +8,7 @@ const api = window.memoking;
 const $ = (id) => document.getElementById(id);
 
 const GLOBAL = [
-  { id: 'quickMemo', label: '빠른 메모 · 화면 캡처', help: '어느 앱에서든 고른 글, 파일, 그림을 바로 메모로 만들어요. 빠르게 두 번 누르면 화면의 원하는 부분을 잘라 담아요.' },
+  { id: 'quickMemo', label: '빠른 메모, 화면 캡처', help: '어느 앱에서든 고른 글, 파일, 그림을 바로 메모로 만들어요. 빠르게 두 번 누르면 화면의 원하는 부분을 잘라 담아요.' },
   { id: 'magic', label: '매직키', help: '어디서든 입력창을 띄워 메모와 파일을 몇 글자로 찾고, 찾는 게 없으면 바로 메모해요.' },
 ];
 
@@ -263,7 +263,7 @@ $('reset-all').addEventListener('click', async () => {
   if (!b.classList.contains('confirm')) {
     b.classList.add('confirm');
     b.textContent = '한 번 더 누르면 초기화';
-    setStatus('메모 창 단축키와 빠른 메모 · 매직키 키를 모두 처음대로 되돌려요');
+    setStatus('메모 창 단축키와 빠른 메모, 매직키 키를 모두 처음대로 되돌려요');
     clearTimeout(confirmTimer);
     confirmTimer = setTimeout(() => {
       b.classList.remove('confirm');

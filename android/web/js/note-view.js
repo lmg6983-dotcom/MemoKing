@@ -338,7 +338,7 @@ function linkItem(target, { onRemove, onAdd, score } = {}) {
 
 function setLink(targetId, on) {
   flush();
-  if (!app.vault.link(id, targetId, on)) toast('연결을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+  if (!app.vault.link(id, targetId, on)) toast('연결을 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
   el.linkSearch.value = '';
   el.linkResults.replaceChildren();
   refreshLinks();
@@ -572,7 +572,7 @@ async function saveFile(file) {
 async function fetchImage(src) {
   if (isDataImage(src)) {
     const image = decodeDataImage(src);
-    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG · JPG · GIF · WebP 그림을 써 주세요');
+    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG, JPG, GIF, WebP 그림을 써 주세요');
     return app.vault.saveAttachment(image.bytes, image.ext);
   }
   return fetchRemoteImage(app.vault, src);
@@ -648,7 +648,7 @@ async function pickAndInsert(accept) {
   }
   if (!files?.length || !editor) return;
   try {
-    setStatus(`파일 ${files.length}개 추가 중…`);
+    setStatus(`파일 ${files.length}개 추가 중`);
     const items = tempsToItems(files);
     // 쓰던 자리가 있으면 그 자리에, 아니면(키보드를 내리고 버튼만 누름) 메모 끝에
     //   (+ 를 펼치면 키보드를 닫으므로, 펼칠 때 쓰던 중이었는지를 본다)
@@ -1506,7 +1506,7 @@ export async function openNote(memoId, options = {}) {
         const memoId = id; // 닫으면서 저장할 때도 그 메모에
         const rel = data ? await saveFile(new File([JSON.stringify(data)], '글 위에 그리기.json', { type: 'application/json' })) : '';
         if (memoId && app.vault.get(memoId) && !app.vault.setMeta(memoId, { ink: rel })) {
-          toast('그린 것을 메모에 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true); // 파일이 잠깐 없는 등
+          toast('그린 것을 메모에 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true); // 파일이 잠깐 없는 등
           return;
         }
         if (memoId === id && memo) memo = { ...memo, ink: rel };

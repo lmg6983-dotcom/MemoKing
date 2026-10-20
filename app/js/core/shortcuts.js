@@ -7,7 +7,7 @@ export const SHORTCUT_GROUPS = [
       ['빠른 메모 (고른 글, 파일, 그림)', 'Ctrl+Alt+C'],
       ['화면 영역 캡처', 'Ctrl+Alt+C 두 번'],
       ['매직키 (메모, 파일 찾기)', 'Ctrl+Alt+Space'],
-      ['메모 불러오기 (메뉴 › 불러오기 키 정하기)', 'Ctrl+Alt+1~9'],
+      ['메모 불러오기 (메뉴의 불러오기 키 정하기)', 'Ctrl+Alt+1~9'],
     ],
   },
 ];

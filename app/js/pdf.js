@@ -214,7 +214,7 @@ $('form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const s = size();
   $('save').disabled = true;
-  $('status').textContent = 'PDF를 만드는 중…';
+  $('status').textContent = 'PDF를 만드는 중';
   $('status').classList.remove('error');
   const r = await api.pdf.save(id, { width: s.width, height: s.height, margin: MARGINS[opt.margin], bg: opt.bg, date: opt.date, open: opt.open, zoom: opt.zoom / 100 }).catch(() => null);
   $('save').disabled = false;

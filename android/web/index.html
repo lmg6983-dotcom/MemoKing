@@ -39,7 +39,7 @@
     </div>
     <details class="setup-help">
       <summary>PC와 같은 메모를 쓰려면?</summary>
-      <p>PC 메모킹은 Google Drive 폴더(예: <code>내 드라이브 › 메모킹</code>)에 메모를 저장해요.
+      <p>PC 메모킹은 Google Drive 폴더(예: <code>내 드라이브의 메모킹</code>)에 메모를 저장해요.
         <b>Google Drive와 동기화</b>를 고르고 PC와 같은 계정과 폴더를 선택하면 두 기기의 메모가 같아져요.</p>
     </details>
     <p id="setup-error" class="setup-error" hidden></p>
@@ -47,12 +47,13 @@
 
   <!-- ========== 메모 목록 ========== -->
   <section id="list-screen" class="screen list-screen" hidden>
-    <!-- 맨 위: 검색 + 보기(정렬 · 카드 모양 · 필터) · 동기화 · 설정 (앱 이름 줄 없이 — 메모가 한 줄 더 위에서 시작) -->
+    <!-- 맨 위: 로고 · Life | Work · 동기화 · 설정 / 그 아래 줄에 검색 + 보기(정렬 · 카드 모양 · 필터) -->
     <div class="searchbar">
       <!-- 메모킹 표시 (PC 제목 줄과 같은 작은 로고) -->
       <span class="brand-mark"><img class="brand-icon" src="../app/assets/mark-64.png" alt="메모킹" draggable="false"></span>
       <!-- 메모킹 Work / Life (core/modes.js) — 목록 · 검색 · 일정이 그 모드의 메모만 -->
       <div id="mode-switch" class="mode-switch" role="radiogroup" aria-label="메모킹 모드">
+        <span class="ms-scene" aria-hidden="true"></span>
         <button type="button" role="radio" data-mode="life" aria-checked="true">Life</button>
         <button type="button" role="radio" data-mode="work" aria-checked="false" tabindex="-1">Work</button>
       </div>
@@ -60,7 +61,7 @@
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모나 #태그 검색" aria-label="메모 검색" autocomplete="off" enterkeyhint="search">
       </label>
-      <button id="filter-btn" class="icon-btn filter-btn" aria-label="보기: 정렬 · 카드 모양 · 필터" aria-expanded="false" aria-controls="filter-panel"><svg><use href="#i-tune"/></svg><span class="filter-count" id="filter-count"></span></button>
+      <button id="filter-btn" class="icon-btn filter-btn" aria-label="보기: 정렬, 카드 모양, 필터" aria-expanded="false" aria-controls="filter-panel"><svg><use href="#i-tune"/></svg><span class="filter-count" id="filter-count"></span></button>
       <button id="sync-btn" class="icon-btn sync-btn" aria-label="Google Drive와 지금 동기화" hidden><svg><use href="#i-cloud"/></svg></button>
       <button id="settings-btn" class="icon-btn" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
     </div>
@@ -114,7 +115,7 @@
     </div>
 
     <!-- 아래 탭바: 엄지가 닿는 곳 (메모 · 일정 · 보관함) -->
-    <nav class="tabs" role="tablist" aria-label="메모 · 일정 · 보관함">
+    <nav class="tabs" role="tablist" aria-label="메모, 일정, 보관함">
       <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
       <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-calendar"/></svg>일정 <span class="tab-count" id="count-reminders"></span></button>
       <button role="tab" data-tab="history" aria-selected="false"><svg><use href="#i-inbox"/></svg>보관함</button>
@@ -194,7 +195,7 @@
       <button type="button" data-table="toText" title="표를 글 줄로 (행마다 한 줄, 칸은 · 로 이어서)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h7"/></svg><span class="lbl">글로</span></button>
     </div>
     </div>
-    <button type="button" id="table-more-btn" class="tb-more-btn" aria-expanded="false" aria-controls="table-bar" title="표 도구 더보기 (맞춤 · 나누기 · 합치기 · 목록으로 · 체크리스트로 · 글로)" aria-label="표 도구 더보기"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/></svg></button>
+    <button type="button" id="table-more-btn" class="tb-more-btn" aria-expanded="false" aria-controls="table-bar" title="표 도구 더보기 (맞춤, 나누기, 합치기, 목록으로, 체크리스트로, 글로)" aria-label="표 도구 더보기"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/></svg></button>
   </div>
     <!-- 녹음 중: 시간·받아쓰기가 보이고, 멈추면 소리 파일과 받아쓴 글이 메모에 들어간다 -->
     <div id="rec-panel" class="rec-panel" role="region" aria-label="녹음" hidden>
@@ -294,7 +295,7 @@
     <div class="swatches" id="swatches" role="radiogroup" aria-label="메모 색"></div>
     <button class="menu-item" data-memo-action="open"><svg><use href="#i-note"/></svg><span>열기</span></button>
     <button class="menu-item" data-memo-action="pin"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
-    <button class="menu-item" data-memo-action="day"><svg><use href="#i-calendar"/></svg><span>이 날의 기록으로… <small></small></span></button>
+    <button class="menu-item" data-memo-action="day"><svg><use href="#i-calendar"/></svg><span>이 날의 기록으로 <small></small></span></button>
     <button class="menu-item" data-memo-action="mode"><svg><use href="#i-swap"/></svg><span>Work로 옮기기</span></button>
     <button class="menu-item" data-memo-action="lock"><svg><use href="#i-lock"/></svg><span>잠그기</span></button>
     <button class="menu-item" data-memo-action="versions"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
@@ -316,7 +317,7 @@
 
     <form id="reminder-form" class="reminder-form rem-flow">
       <!-- 토스처럼 한 번에 하나씩: 무엇을 → 언제 → 미리 알림 → 확인. 답한 단계는 위에 한 줄로 접히고, 누르면 다시 고친다 (reminder-panel.js) -->
-      <button type="button" class="btn rem-start" id="rem-start"><svg><use href="#i-plus"/></svg><span>새 일정·알림 만들기</span></button>
+      <button type="button" class="btn rem-start" id="rem-start"><svg><use href="#i-plus"/></svg><span>새 일정과 알림 만들기</span></button>
       <div class="rem-steps" id="rem-steps" hidden>
         <p class="flow-progress" id="rem-progress" aria-live="polite"></p>
         <ol class="rem-answers" id="rem-answers"></ol>
@@ -325,7 +326,7 @@
           <p class="rem-q">무엇을 만들까요?</p>
           <div class="rem-kinds" id="rem-kind" role="radiogroup" aria-label="만들 것">
             <button type="button" data-kind="at" aria-checked="true"><svg><use href="#i-calendar"/></svg><b>일정</b><small>날짜와 시각을 정하고 미리 알려요</small></button>
-            <button type="button" data-kind="repeat" aria-checked="false"><svg><use href="#i-repeat"/></svg><b>반복 일정</b><small>매일 · 매주 · 매월 · 매년</small></button>
+            <button type="button" data-kind="repeat" aria-checked="false"><svg><use href="#i-repeat"/></svg><b>반복 일정</b><small>매일, 매주, 매월, 매년</small></button>
             <button type="button" data-kind="timer" aria-checked="false"><svg><use href="#i-timer"/></svg><b>타이머</b><small>몇 분 뒤에 알려요</small></button>
             <button type="button" data-kind="startup" aria-checked="false"><svg><use href="#i-power"/></svg><b>앱 열 때</b><small>메모킹을 열면 알려요</small></button>
           </div>
@@ -447,7 +448,7 @@
       <button class="share-choice" data-share="image"><svg><use href="#i-image"/></svg><b>그림</b><small>메모 그대로 한 장</small></button>
       <button class="share-choice" data-share="pdf"><svg><use href="#i-pdf"/></svg><b>PDF</b><small>문서, 인쇄용</small></button>
     </div>
-    <p id="share-busy" class="wait" hidden><span class="spinner"></span><span id="share-busy-text">만드는 중…</span></p>
+    <p id="share-busy" class="wait" hidden><span class="spinner"></span><span id="share-busy-text">만드는 중</span></p>
   </section>
 
   <!-- PDF·인쇄: 종이에 담을 내용 크기 고르기 (첫 쪽 미리보기) -->
@@ -464,7 +465,7 @@
       </div>
       <label class="print-range"><span>직접</span><input type="range" id="print-scale" min="50" max="200" step="5" value="100" aria-label="내용 크기 (퍼센트)"><output id="print-scale-out">100%</output></label>
     </div>
-    <p id="print-busy" class="wait" hidden><span class="spinner"></span><span>PDF를 만드는 중…</span></p>
+    <p id="print-busy" class="wait" hidden><span class="spinner"></span><span>PDF를 만드는 중</span></p>
     <button type="button" class="btn primary print-go" id="print-go">PDF로 공유</button>
   </section>
 
@@ -499,7 +500,7 @@
     <div class="drive-step" data-step="login" hidden>
       <p class="hint">PC 메모킹과 같은 <b>구글 계정</b>을 고르고 <b>허용</b>을 누르세요.</p>
       <button id="drive-login" class="btn primary wide"><svg><use href="#i-google"/></svg>구글 계정으로 연결</button>
-      <div id="login-wait" class="wait" hidden><span class="spinner"></span><span id="login-wait-text">구글 계정을 확인하는 중…</span><button id="login-cancel" class="link-btn" hidden>취소</button></div>
+      <div id="login-wait" class="wait" hidden><span class="spinner"></span><span id="login-wait-text">구글 계정을 확인하는 중</span><button id="login-cancel" class="link-btn" hidden>취소</button></div>
       <button id="client-edit" class="link-btn">브라우저로 로그인</button>
     </div>
 
@@ -520,7 +521,7 @@
     </div>
 
     <div class="drive-step" data-step="syncing" hidden>
-      <div class="wait big"><span class="spinner"></span><span>Google Drive 폴더를 준비하는 중…<br><small>곧 메모 목록으로 넘어가요. 메모는 뒤에서 받아 와요</small></span></div>
+      <div class="wait big"><span class="spinner"></span><span>Google Drive 폴더를 준비하는 중<br><small>곧 메모 목록으로 넘어가요. 메모는 뒤에서 받아 와요</small></span></div>
     </div>
   </section>
 
@@ -577,10 +578,10 @@
     <p class="label">Work / Life</p>
     <div id="work-settings"></div>
 
-    <p class="label">링크 · 태그 · 녹음</p>
+    <p class="label">링크, 태그, 녹음</p>
     <label class="setting-row">
       <input type="checkbox" id="link-previews" class="switch" role="switch" checked>
-      <span>링크 미리보기 <small>주소를 붙이면 제목 · 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
+      <span>링크 미리보기 <small>주소를 붙이면 제목, 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
     </label>
     <label class="setting-row">
       <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>

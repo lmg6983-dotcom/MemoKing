@@ -365,7 +365,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         // 색 점을 진짜 마우스로 → 그 색으로 바뀌고 메뉴가 닫힌다
         const hitDot = await pickList('.mk-ctx-sw[data-id="color:blue"]');
         const recolored = await until(() => getVault().get(cid)?.color === 'blue', '메모 색 바뀜', 3000).catch(() => false);
-        const closed = await js(list, `!document.querySelector('.mk-ctx')`);
+        const closed = await until(() => js(list, `!document.querySelector('.mk-ctx')`), '색을 고르면 메뉴 닫힘', 2000).catch(() => false); // 닫히는 움직임을 기다림
         check('목록 카드 메뉴 › 색 점을 누르면 바로 그 색으로 바뀌고 메뉴가 닫힘 (가려지지 않음)', hitDot && recolored && closed, JSON.stringify({ hitDot, recolored, closed }));
         // 고정: 눌러 켜고, 다시 열면 체크 표시, 한 번 더 눌러 푼다
         const reopen = async () => {
@@ -377,7 +377,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await pickList('.mk-ctx-item[data-id="pin"]');
         const pinned = await until(() => getVault().get(cid)?.pinned === true, '고정', 3000).catch(() => false);
         await reopen();
-        const checked = await js(list, `document.querySelector('.mk-ctx-item[data-id="pin"]')?.getAttribute('aria-checked')`);
+        const checked = await until(async () => (await js(list, `document.querySelector('.mk-ctx-item[data-id="pin"]')?.getAttribute('aria-checked')`)) === 'true' && 'true', '고정 체크 표시', 2000).catch(() => 'false');
         await pickList('.mk-ctx-item[data-id="pin"]');
         const unpinned = await until(() => getVault().get(cid)?.pinned !== true, '고정 풀림', 3000).catch(() => false);
         check('목록 카드 메뉴 › 고정: 누르면 고정, 다시 열면 체크 표시, 한 번 더 누르면 풀림', pinned && checked === 'true' && unpinned, JSON.stringify({ pinned, checked, unpinned }));
@@ -395,7 +395,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         key(list, 'Down');
         key(list, 'Down');
         key(list, 'Down');
-        const onColors = await js(list, `document.activeElement?.classList.contains('mk-ctx-sw')`);
+        const onColors = await until(() => js(list, `document.activeElement?.classList.contains('mk-ctx-sw')`), '색 줄로 옮김', 2000).catch(() => false);
         key(list, 'Right');
         key(list, 'Escape');
         const gone = await until(() => js(list, `!document.querySelector('.mk-ctx')`), '메뉴 닫힘', 2000).catch(() => false);
@@ -476,7 +476,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const fileDone = fileMenu0 ? await pressCopy() : '';
       const fileCopy = smokeOpened.filter((o) => o.kind === 'copy-file').at(-1);
       check('PDF 파일: 오른쪽 클릭 → 메뉴 맨 위에 복사 · 저장 · 공유 · 지우기 아이콘 + "이 파일 열기", 복사 아이콘은 파일 그대로 클립보드에',
-        fileMenu0?.icons.join('|') === 'cut:이 파일 잘라내기|copy:이 파일 복사|save:이 파일 저장…|share:이 파일 공유…|delete:이 파일 지우기' && fileMenu0.items.join('|') === '이 파일 열기|이름 변경…' && /파일을 복사했어요/.test(fileDone)
+        fileMenu0?.icons.join('|') === 'cut:이 파일 잘라내기|copy:이 파일 복사|save:이 파일 저장|share:이 파일 공유|delete:이 파일 지우기' && fileMenu0.items.join('|') === '이 파일 열기|이름 변경' && /파일을 복사했어요/.test(fileDone)
           && smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1 && /안내 자료\.pdf$/.test(fileCopy?.target ?? ''),
         JSON.stringify({ fileMenu0, fileDone, fileCopy }));
       // 파일 이름 변경: 메뉴 › 이름 변경… → 입력 창 → 칩 글자가 바뀜 (확장자는 지키고 · 쓸 수 없는 글자는 뺌) → 되돌려 둔다
@@ -638,7 +638,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const tableText = await clip('text/plain');
       const tableHtml = await clip('text/html');
       check('표: 오른쪽 클릭 → 맨 위 아이콘 줄 + 칸의 글 항목(잘라내기 · 복사 · 붙여넣기 …) + 표 바꾸기, 복사 아이콘은 칸 사이 탭 + 표 서식',
-        tableMenu?.icons.join('|') === 'cut:이 표 잘라내기|copy:이 표 복사|save:이 표 저장…|share:이 표 공유…|delete:이 표 지우기' && /내용을 복사했어요/.test(tableDone) && /이름\t값\n가\t1/.test(tableText) && /<table/.test(tableHtml) && !/column-resize-handle|contenteditable/.test(tableHtml)
+        tableMenu?.icons.join('|') === 'cut:이 표 잘라내기|copy:이 표 복사|save:이 표 저장|share:이 표 공유|delete:이 표 지우기' && /내용을 복사했어요/.test(tableDone) && /이름\t값\n가\t1/.test(tableText) && /<table/.test(tableHtml) && !/column-resize-handle|contenteditable/.test(tableHtml)
           && ['잘라내기', '복사', '붙여넣기', '서식 없이 붙여넣기', '표를 목록으로', '표를 체크리스트로', '표를 글로', '열 너비 맞춤'].every((t) => tableMenu.items.includes(t)),
         JSON.stringify({ tableMenu, tableDone, tableText, html: tableHtml.slice(0, 200) }));
       // 표 저장: 엑셀에서 바로 열리는 CSV (한글이 깨지지 않게 BOM)

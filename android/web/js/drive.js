@@ -72,7 +72,7 @@ async function login(browser) {
   $('drive-login').disabled = true;
   $('login-wait').hidden = false;
   $('login-cancel').hidden = !browser;
-  $('login-wait-text').textContent = browser ? '브라우저에서 로그인해 주세요…' : '구글 계정을 확인하는 중…';
+  $('login-wait-text').textContent = browser ? '브라우저에서 로그인해 주세요' : '구글 계정을 확인하는 중';
   try {
     const { email } = await call('driveLogin', { browser });
     toast(email ? `${email} 계정으로 연결했어요` : '구글 계정으로 연결했어요');
@@ -240,10 +240,10 @@ export function renderStatus(s = drive.status()) {
   box.classList.toggle('on', s.active && s.connected);
   box.classList.toggle('error', s.active && (st.state === 'error' || !s.connected));
   if (s.active) {
-    $('drive-title').textContent = `내 드라이브 › ${s.folderName || '메모 폴더'}`;
+    $('drive-title').textContent = `내 드라이브의 ${s.folderName || '메모 폴더'}`;
     $('drive-sub').textContent = !s.connected
       ? '로그인이 끊겼어요. 연결하기를 눌러 다시 로그인해 주세요'
-      : st.state === 'syncing' ? [s.email, '동기화하는 중…'].filter(Boolean).join(', ')
+      : st.state === 'syncing' ? [s.email, '동기화하는 중'].filter(Boolean).join(', ')
       : st.state === 'error' ? st.error
       : [s.email, st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'].filter(Boolean).join(', ');
   } else {
@@ -271,7 +271,7 @@ $('drive-full').addEventListener('change', async (e) => {
   const on = e.target.checked;
   fullBusy = true;
   e.target.disabled = true;
-  $('drive-full-note').textContent = 'Google 계정을 고르고 허용해 주세요…';
+  $('drive-full-note').textContent = 'Google 계정을 고르고 허용해 주세요';
   let error = '';
   try {
     await call('driveFullScope', { on });

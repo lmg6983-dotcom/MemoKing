@@ -5,10 +5,10 @@ import { progressText, etaText, progressFraction, needsLogin } from '../app/js/d
 
 test('진행 글: 살펴보기 → n/총 · 남은 시간', () => {
   assert.equal(progressText(null), '');
-  assert.equal(progressText({ phase: 'scan' }), 'Drive 폴더 살펴보는 중…');
+  assert.equal(progressText({ phase: 'scan' }), 'Drive 폴더 살펴보는 중');
   const since = 1_000_000;
   assert.equal(progressText({ phase: 'transfer', done: 1, total: 40, since }, since + 1000), '파일 1/40개 맞추는 중', '처음에는 남은 시간을 말하지 않는다');
-  assert.equal(progressText({ phase: 'transfer', done: 10, total: 40, since }, since + 30_000), '파일 10/40개 맞추는 중 · 약 2분 남음');
+  assert.equal(progressText({ phase: 'transfer', done: 10, total: 40, since }, since + 30_000), '파일 10/40개 맞추는 중, 약 2분 남음');
   assert.equal(etaText({ phase: 'transfer', done: 30, total: 40, since }, since + 30_000), '곧 끝나요');
   assert.equal(etaText({ phase: 'transfer', done: 20, total: 40, since }, since + 40_000), '1분 안에 끝나요');
   assert.equal(etaText({ phase: 'transfer', done: 40, total: 40, since }, since + 40_000), '');

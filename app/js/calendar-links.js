@@ -47,7 +47,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
     close.append(icon('close'));
     close.addEventListener('click', () => dialog.close());
     head.append(h, close);
-    const lead = el('p', 'cal-links-lead', 'Google 캘린더 · 삼성 캘린더의 일정을 메모킹 달력에 함께 보여 줘요. 보기만 하고, 그 캘린더는 바꾸지 않아요.');
+    const lead = el('p', 'cal-links-lead', 'Google 캘린더, 삼성 캘린더의 일정을 메모킹 달력에 함께 보여 줘요. 보기만 하고, 그 캘린더는 바꾸지 않아요.');
 
     // ---------- 함께 보기 ----------
     const list = el('ul', 'feed-list');
@@ -59,7 +59,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
       deviceRow = el('li', 'feed-row feed-device');
       const dot = el('span', 'feed-dot');
       const text = el('span', 'feed-text');
-      text.append(el('b', '', '이 휴대폰의 캘린더'), el('small', '', '삼성 캘린더 · Google 캘린더 등'));
+      text.append(el('b', '', '이 휴대폰의 캘린더'), el('small', '', '삼성 캘린더, Google 캘린더 등'));
       const sw = switchInput('이 휴대폰의 캘린더 함께 보기', calendars.device.enabled());
       sw.addEventListener('change', async () => {
         const want = sw.checked;
@@ -165,7 +165,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
       }
       addBtn.disabled = true;
       url.disabled = true;
-      addNote.textContent = '캘린더를 받는 중이에요…';
+      addNote.textContent = '캘린더를 받는 중이에요';
       addNote.classList.add('searching');
       try {
         const before = new Set(feeds.map((f) => f.id));
@@ -196,10 +196,10 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
     });
 
     const help = el('details', 'cal-help');
-    help.append(el('summary', '', 'Google 캘린더 · 삼성 캘린더 주소는 어디서 찾나요?'));
+    help.append(el('summary', '', 'Google 캘린더, 삼성 캘린더 주소는 어디서 찾나요?'));
     const steps = el('ol');
     for (const s of [
-      'PC 브라우저에서 Google 캘린더(calendar.google.com)를 열고 오른쪽 위 톱니 › 설정',
+      'PC 브라우저에서 Google 캘린더(calendar.google.com)를 열고 오른쪽 위 톱니의 설정',
       '왼쪽 "내 캘린더의 설정"에서 볼 캘린더를 고르기',
       '"캘린더 통합" 의 "iCal 형식의 비공개 주소" 를 복사해 위에 붙여 넣기',
     ]) steps.append(el('li', '', s));

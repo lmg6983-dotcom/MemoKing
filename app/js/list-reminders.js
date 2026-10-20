@@ -267,7 +267,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   const linkBtn = el('button', 'link-btn cal-link');
   linkBtn.type = 'button';
   linkBtn.append(icon('link'), el('span', '', '다른 캘린더'));
-  linkBtn.title = 'Google 캘린더 · 삼성 캘린더 함께 보기';
+  linkBtn.title = 'Google 캘린더, 삼성 캘린더 함께 보기';
   linkBtn.addEventListener('click', () => openLinks());
   linkBtn.hidden = !calendars?.feeds;
   bar.append(views, linkBtn);
@@ -322,7 +322,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     return { domNodes: [wrap] };
   }
   // 날 칸: 고른 날 · 지나간 날 · 일요일(빨강) · 토요일
-  const dayClass = (arg) => [sameDay(arg.date, selected) && 'mk-selected', arg.date < today() && 'mk-past', arg.date.getDay() === 0 && 'mk-sun', arg.date.getDay() === 6 && 'mk-sat'].filter(Boolean).join(' '); // mk-past: 지나간 날 (날짜 위 색연필 X)
+  const dayClass = (arg) => [sameDay(arg.date, selected) && 'mk-selected', arg.date.getDay() === 0 && 'mk-sun', arg.date.getDay() === 6 && 'mk-sat'].filter(Boolean).join(' ');
 
   /** 달력에 줄 일정들 (FullCalendar 의 일정 모양) */
   function calendarEvents(from, to) {
@@ -673,7 +673,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       end: r.allDay ? span : null, // 메모킹 일정은 끝나는 시각이 없다 — 하루 종일만 그날까지
       allDay: Boolean(r.allDay),
       memoColor: item.color,
-      source: r.title && r.title !== item.title ? `메모킹 · 메모 "${item.title}"` : '메모킹',
+      source: r.title && r.title !== item.title ? `메모킹 메모 "${item.title}"` : '메모킹',
       lines: [
         { icon: 'repeat', text: repeatText(r) },
         { icon: 'bell', text: alertText(r) },
@@ -718,7 +718,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     } catch (err) {
       console.warn('[calendar] 달력 그림', err);
     }
-    const alt = `${e.start.getFullYear()}년 ${e.start.getMonth() + 1}월 달력 — ${when}`;
+    const alt = `${e.start.getFullYear()}년 ${e.start.getMonth() + 1}월 달력, ${when}`;
     return importedEventBody({ title: e.title, imageRel, imageAlt: alt, location: e.location, description: e.description, url: e.url });
   }
 
@@ -844,7 +844,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const failed = feeds.filter((f) => f.on && feedTexts.get(f.id)?.error);
     if (failed.length) {
       const p = el('p', 'ev-hint ev-feed-error');
-      p.append(icon('cloud'), ` ${failed.map((f) => `${f.name}: ${feedTexts.get(f.id).error}`).join(' · ')}`);
+      p.append(icon('cloud'), ` ${failed.map((f) => `${f.name}: ${feedTexts.get(f.id).error}`).join(', ')}`);
       out.push(p);
     }
 
@@ -853,7 +853,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const found = searching && (items.some(matches) || externalMatches());
     if (searching ? !found : !items.length && !feeds.some((f) => f.on) && !device.on) {
       out.push(el('p', 'ev-hint', searching ? '찾는 일정이 없어요.'
-        : '날짜를 고르고 "＋ 일정 추가"를 누르거나, 메모에 "내일 오후 3시 치과"처럼 쓰면 일정이 돼요. "다른 캘린더"로 Google 캘린더 · 삼성 캘린더 일정도 함께 볼 수 있어요.'));
+        : '날짜를 고르고 "＋ 일정 추가"를 누르거나, 메모에 "내일 오후 3시 치과"처럼 쓰면 일정이 돼요. "다른 캘린더"로 Google 캘린더, 삼성 캘린더 일정도 함께 볼 수 있어요.'));
     }
     const top = container.scrollTop; // 다시 그려도 보던 자리 그대로 (1분마다 새로 그릴 때·켜고 끌 때)
     rowsEl.replaceChildren(...out);

@@ -17,6 +17,7 @@
     <span class="brand-mark"><img class="brand-icon" src="assets/mark-64.png" alt="메모킹" title="메모킹" draggable="false"></span>
     <!-- 메모킹 Work / Life: 일할 때 메모와 일상 메모를 나눠 보기 (core/modes.js) -->
     <div id="mode-switch" class="mode-switch" role="radiogroup" aria-label="메모킹 모드">
+      <span class="ms-scene" aria-hidden="true"></span>
       <button type="button" role="radio" data-mode="life" aria-checked="true" title="Life: 일상 메모 (추억 달력은 여기에)">Life</button>
       <button type="button" role="radio" data-mode="work" aria-checked="false" tabindex="-1" title="Work: 일할 때 쓰는 메모">Work</button>
     </div>
@@ -32,20 +33,20 @@
     <img class="setup-logo" src="assets/mark-256.png" alt="메모킹" draggable="false">
     <h1>반가워요, 메모킹이에요</h1>
     <h2 class="setup-sub">휴대폰 메모킹과 함께 쓰나요?</h2>
-    <p>Google 계정으로 연결하면 휴대폰 · 다른 PC 의 메모킹과 <b>같은 메모</b>를 써요.<br>
+    <p>Google 계정으로 연결하면 휴대폰, 다른 PC 의 메모킹과 <b>같은 메모</b>를 써요.<br>
       Google Drive 데스크탑 앱은 없어도 돼요.</p>
     <div class="setup-actions">
       <button id="setup-drive" class="btn primary drive-start"><svg><use href="#i-cloud"/></svg>Google 계정으로 동기화 (추천)</button>
       <button id="use-suggested" class="btn">이 PC 에만 저장</button>
     </div>
-    <p class="setup-later">지금 연결하지 않아도 돼요 — 나중에 설정 › Google Drive 동기화에서 언제든 연결할 수 있고, 메모는 그대로 이어져요.</p>
+    <p class="setup-later">지금 연결하지 않아도 돼요. 나중에 설정의 Google Drive 동기화에서 언제든 연결할 수 있고, 메모는 그대로 이어져요.</p>
     <p class="setup-where">이 PC 에 저장할 곳: <span class="path-box" id="suggested-path"></span>
-      <button id="choose-folder" class="link-btn">직접 폴더 고르기 ›</button></p>
+      <button id="choose-folder" class="link-btn">직접 폴더 고르기</button></p>
     <p id="setup-error" class="setup-error" hidden></p>
   </section>
 
   <section id="main" class="main" hidden>
-    <nav class="tabs" role="tablist" aria-label="메모 · 일정 · 알림 보관함">
+    <nav class="tabs" role="tablist" aria-label="메모, 일정, 알림 보관함">
       <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
       <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-calendar"/></svg>일정 <span class="tab-count" id="count-reminders"></span></button>
       <button role="tab" data-tab="history" aria-selected="false"><svg><use href="#i-inbox"/></svg>알림 보관함</button>
@@ -56,7 +57,7 @@
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
       </label>
-      <button id="filter-btn" class="icon-btn filter-btn" title="보기 (정렬 · 카드 모양 · 필터)" aria-label="보기: 정렬 · 카드 모양 · 필터" aria-expanded="false" aria-controls="filter-panel"><svg><use href="#i-tune"/></svg><span class="filter-count" id="filter-count"></span></button>
+      <button id="filter-btn" class="icon-btn filter-btn" title="보기 (정렬, 카드 모양, 필터)" aria-label="보기: 정렬, 카드 모양, 필터" aria-expanded="false" aria-controls="filter-panel"><svg><use href="#i-tune"/></svg><span class="filter-count" id="filter-count"></span></button>
     </div>
 
     <div id="sync-pop" class="sync-pop" role="dialog" aria-label="Google Drive 동기화" hidden></div>
@@ -215,7 +216,7 @@
       </label>
       <label class="setting-row">
         <input type="checkbox" id="link-previews" class="switch" role="switch" checked>
-        <span>링크 미리보기 <small>주소를 붙이면 제목 · 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
+        <span>링크 미리보기 <small>주소를 붙이면 제목, 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
       </label>
       <label class="setting-row">
         <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
@@ -289,7 +290,7 @@
     </section>
     <footer class="set-foot">
       <button id="tutorial-btn" class="link-btn">사용법 보기</button>
-      <span>© 2026 메모킹 · 문의 lmg6983@gmail.com</span>
+      <span>© 2026 메모킹, 문의 lmg6983@gmail.com</span>
     </footer>
   </dialog>
 
@@ -330,7 +331,7 @@
     </div>
     <div class="drive-step" data-step="login" hidden>
       <p class="hint">브라우저에서 <b>휴대폰과 같은 구글 계정</b>으로 로그인하고 <b>허용</b>을 누르세요.</p>
-      <div class="wait"><span class="spinner"></span><span>브라우저에서 로그인해 주세요…<br><small>브라우저 창을 닫았거나 안 보이면 "브라우저 다시 열기"</small></span></div>
+      <div class="wait"><span class="spinner"></span><span>브라우저에서 로그인해 주세요<br><small>브라우저 창을 닫았거나 안 보이면 "브라우저 다시 열기"</small></span></div>
       <div class="dialog-actions">
         <button id="login-reopen" class="link-btn">브라우저 다시 열기</button>
         <span class="grow"></span>
@@ -357,7 +358,7 @@
       </div>
     </div>
     <div class="drive-step" data-step="syncing" hidden>
-      <div class="wait big"><span class="spinner"></span><span><span id="sync-step-title">메모를 동기화하는 중…</span><br><small id="sync-step-sub">메모가 많으면 시간이 조금 걸려요. 창을 닫아도 뒤에서 계속해요</small></span></div>
+      <div class="wait big"><span class="spinner"></span><span><span id="sync-step-title">메모를 동기화하는 중</span><br><small id="sync-step-sub">메모가 많으면 시간이 조금 걸려요. 창을 닫아도 뒤에서 계속해요</small></span></div>
       <div class="sync-bar wide" id="sync-step-bar" hidden><i></i></div>
       <div class="dialog-actions"><button id="sync-bg" class="btn">닫기</button></div>
     </div>

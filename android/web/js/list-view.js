@@ -135,7 +135,7 @@ export function setMode(mode) {
     render();
     remindersTab?.modeChanged();
   });
-  if (mode === 'work' && workLifeOn()) hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 메모를 꾹 눌러 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
+  if (mode === 'work' && workLifeOn()) hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요. 메모를 꾹 눌러 "Work로 옮기기"나 설정의 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
 }
 for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
 
@@ -353,7 +353,7 @@ export function render() {
   // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
   const elsewhere = state.query && workLifeOn() ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, pick).length : 0;
   $('other-mode').hidden = !elsewhere || !memos.length; // 하나도 없으면 빈 화면 안내가 대신
-  $('other-mode').textContent = elsewhere ? `${MODE_LABEL[otherMode(state.mode)]}에서 ${elsewhere}개 더 찾았어요 ›` : '';
+  $('other-mode').textContent = elsewhere ? `${MODE_LABEL[otherMode(state.mode)]}에서 ${elsewhere}개 더 찾았어요` : '';
   // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)
   glideCards(() => layoutCards(memos));
   el.empty.hidden = memos.length > 0;
@@ -766,7 +766,7 @@ export function setup() {
       },
       // 한 장으로: 휴대폰 공유 창 (카카오톡 · 갤러리에 저장 …)
       collage: async (o) => {
-        toast('그림을 만드는 중…');
+        toast('그림을 만드는 중');
         try {
           const base64 = await renderCollage(o);
           await call('shareFile', { base64, name: collageName(o), mime: 'image/png', title: o.title });

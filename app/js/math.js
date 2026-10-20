@@ -31,7 +31,7 @@ export async function renderMath(target, value, displayMode) {
   const tex = String(value ?? '').trim();
   target.classList.toggle('empty', !tex);
   if (!tex) {
-    target.textContent = displayMode ? '수식 블록 — 눌러서 쓰기' : '수식';
+    target.textContent = displayMode ? '수식 블록, 눌러서 쓰기' : '수식';
     return;
   }
   target.textContent = tex; // 불러오는 동안은 글자 그대로

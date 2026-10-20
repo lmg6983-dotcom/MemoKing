@@ -25,7 +25,7 @@ test('업무 시간: 이상한 값은 기본값으로', () => {
   const h = normalizeHours({ days: [9, 'x', 3, 3], start: '25:00', end: 'x' });
   assert.deepEqual(h, { auto: false, quiet: false, days: [3], start: '09:00', end: '18:00' });
   assert.equal(hoursLabel(hours), '평일 09:00–18:00');
-  assert.equal(hoursLabel({ days: [0, 6] }), '일·토 09:00–18:00');
+  assert.equal(hoursLabel({ days: [0, 6] }), '일, 토 09:00–18:00');
 });
 
 test('퇴근 뒤 Work 알림은 조용히 — 고정한 메모 · Life 메모는 울린다', () => {

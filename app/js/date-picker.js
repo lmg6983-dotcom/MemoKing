@@ -45,7 +45,7 @@ export function timePicker(box, { value, onChange, quick = ['09:00', '12:00', '1
   }
   let more = null;
   if (compact) {
-    more = el('button', 'dp-more', '다른 시각…');
+    more = el('button', 'dp-more', '다른 시각');
     more.type = 'button';
     more.addEventListener('click', () => {
       row.hidden = false;
@@ -132,7 +132,7 @@ export function dateTimePicker(box, { input }) {
     const today = now();
     summary.textContent = `${dayLabel(d, today)} ${timeLabel(d.getHours(), d.getMinutes())}에 알려요`;
     summary.classList.toggle('past', d <= today);
-    if (d <= today) summary.textContent = '이미 지난 시각이에요 — 앞으로의 시각을 골라 주세요';
+    if (d <= today) summary.textContent = '이미 지난 시각이에요. 앞으로의 시각을 골라 주세요';
     input.dispatchEvent(new Event('input')); // 알림 패널이 이미 지난 미리 알림을 다시 가리게
   };
 

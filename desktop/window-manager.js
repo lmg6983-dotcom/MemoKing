@@ -1645,7 +1645,7 @@ export class WindowManager {
     }
     if (action === 'copyFile') {
       const ok = await copyFileToClipboard(p);
-      return ok ? { ok, message: fs.statSync(p).isDirectory() ? '폴더를 복사했어요 — 붙여 넣으면 돼요' : '파일을 복사했어요 — 붙여 넣으면 돼요', close: true } : { ok, message: '복사하지 못했어요' };
+      return ok ? { ok, message: fs.statSync(p).isDirectory() ? '폴더를 복사했어요. 붙여 넣으면 돼요' : '파일을 복사했어요. 붙여 넣으면 돼요', close: true } : { ok, message: '복사하지 못했어요' };
     }
     if (action === 'reveal') {
       shell.showItemInFolder(p);
@@ -1664,7 +1664,7 @@ export class WindowManager {
         minWidth: 560,
         minHeight: 360,
         show: false,
-        title: '메모킹 — 모두 찾기',
+        title: '메모킹 모두 찾기',
         autoHideMenuBar: true,
         ...windowIcon,
         webPreferences: { preload: FINDER_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
@@ -1718,7 +1718,7 @@ export class WindowManager {
         minWidth: 620,
         minHeight: 420,
         show: false,
-        title: '메모킹 — OPMS',
+        title: '메모킹 OPMS',
         autoHideMenuBar: true,
         ...windowIcon,
         webPreferences: { preload: OPMS_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
@@ -1737,7 +1737,7 @@ export class WindowManager {
 
   caseOf(idx) {
     const c = this.opmsCases.get(String(idx ?? ''));
-    if (!c) throw new Error('찾아본 사건이 아니에요 — 다시 찾아 주세요');
+    if (!c) throw new Error('찾아본 사건이 아니에요. 다시 찾아 주세요');
     return c;
   }
 

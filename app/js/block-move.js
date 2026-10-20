@@ -507,7 +507,7 @@ class Mover {
         const host = e.target instanceof Element ? e.target.closest(HOVER_TARGET) : null;
         if (!host || !view.dom.contains(host) || this.busy() || isContextMenuOpen()) return;
         hoverTimer = setTimeout(() => {
-          if (host.isConnected && host.matches(':hover') && !this.busy()) hintOnce('content-menu', '오른쪽 클릭하면 잘라내기 · 복사 · 저장 · 공유 · 지우기 메뉴가 떠요', { anchor: host });
+          if (host.isConnected && host.matches(':hover') && !this.busy()) hintOnce('content-menu', '오른쪽 클릭하면 잘라내기, 복사, 저장, 공유, 지우기 메뉴가 떠요', { anchor: host });
         }, 1200);
       };
       view.dom.addEventListener('mouseover', this.onHoverHint);
@@ -925,7 +925,7 @@ class Mover {
     const opts = { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
     // PC 메뉴: 파일 · 소리 · 그림 · 음성 카드는 보이는 이름을 바꿀 수 있다 (rename-content.js)
     if (canContentMenu() && renameTarget(view.state.doc, block.pos, block.node)) {
-      opts.extraItems = [{ id: 'rename', label: '이름 변경…' }];
+      opts.extraItems = [{ id: 'rename', label: '이름 변경' }];
       opts.onExtra = (id) => id === 'rename' && this.renameAt(block.pos, block.node);
     }
     return opts;
@@ -949,7 +949,7 @@ class Mover {
       const at = (dom instanceof Element ? dom : view.dom).getBoundingClientRect();
       undoHint('이름', at, view, '바꿨어요');
     }
-    else if (done === 'kind') say('이 이름으로는 바꿀 수 없어요 — 영상 파일은 이름에 "영상" 이 있어야 하고, 소리 파일에는 "영상" · "동영상" · "video" 를 쓸 수 없어요', true);
+    else if (done === 'kind') say('이 이름으로는 바꿀 수 없어요. 영상 파일은 이름에 "영상" 이 있어야 하고, 소리 파일에는 "영상", "동영상", "video" 를 쓸 수 없어요', true);
     view.focus();
   }
 

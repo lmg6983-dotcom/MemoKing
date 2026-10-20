@@ -760,28 +760,20 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal[data-view="dayGridMonth"] .cal-body [role="columnheader"] { font-size: 13px; font-weight: 800; color: var(--text-strong); }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { display: flex; justify-content: center; padding-top: 2px; font-size: 12px; line-height: 17px; font-weight: 500; color: var(--muted); }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child { font-weight: 800; }
-/* 오늘: 노란 동그라미 대신 날짜 위에 색연필로 쓱 그은 체크 (숫자는 진한 글자 그대로 비쳐 보이게 — 읽기 쉽고 메모지 느낌) */
+:root { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23d93a30' stroke-linecap='round' stroke-linejoin='round' opacity='0.8'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } /* 오늘 표시 (달력 · 추억 달력 같이) */
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff6f61' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } }
+:root:where([data-theme="dark"]) { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff6f61' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); }
+/* 오늘: 날짜를 빨간 색연필로 쓱 두른 동그라미 (숫자는 진한 글자 그대로 비쳐 보이게 — 읽기 쉽고 메모지 느낌) */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div { position: relative; background: transparent !important; color: var(--text-strong) !important; }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after {
-  content: ""; position: absolute; left: 0.5px; top: -6px; width: 32px; height: 28px; pointer-events: none; /* 꺾인 곳(그림의 x 10.5)이 숫자 칸(22px) 가운데에 */
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.6' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23f0a400' stroke-linecap='round' stroke-linejoin='round' opacity='0.85'%3E%3Cpath d='M4.5 15.5c2.2 1 4.1 3.1 6 6.6 3.4-7.6 8.5-13.6 16.5-18.6' stroke-width='3.2'/%3E%3Cpath d='M6 16.6c1.8 1 3.4 2.6 4.8 5 3.9-7 8.6-12.4 15.4-16.9' stroke-width='1.6' opacity='.55'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; mix-blend-mode: multiply;
+  content: ""; position: absolute; left: -6px; top: -4px; width: 34px; height: 30px; pointer-events: none; /* 동그라미 가운데가 숫자 칸(22px) 가운데에 */
+  background: var(--mk-today-ring) center / contain no-repeat; mix-blend-mode: multiply;
 }
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.6' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ffd43b' stroke-linecap='round' stroke-linejoin='round' opacity='0.8'%3E%3Cpath d='M4.5 15.5c2.2 1 4.1 3.1 6 6.6 3.4-7.6 8.5-13.6 16.5-18.6' stroke-width='3.2'/%3E%3Cpath d='M6 16.6c1.8 1 3.4 2.6 4.8 5 3.9-7 8.6-12.4 15.4-16.9' stroke-width='1.6' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); mix-blend-mode: screen; }
+  :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after { background-image: var(--mk-today-ring); mix-blend-mode: screen; }
 }
 /* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.6' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ffd43b' stroke-linecap='round' stroke-linejoin='round' opacity='0.8'%3E%3Cpath d='M4.5 15.5c2.2 1 4.1 3.1 6 6.6 3.4-7.6 8.5-13.6 16.5-18.6' stroke-width='3.2'/%3E%3Cpath d='M6 16.6c1.8 1 3.4 2.6 4.8 5 3.9-7 8.6-12.4 15.4-16.9' stroke-width='1.6' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); mix-blend-mode: screen; }
-/* 지나간 날: 날짜 위에 색연필로 그은 X (지운 날처럼 — 숫자는 비쳐 보이게) */
-.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div { position: relative; }
-.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div::after {
-  content: ""; position: absolute; left: -3px; top: -3px; width: 28px; height: 28px; pointer-events: none;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='5' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.4' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='9' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23d9480f' stroke-linecap='round' opacity='0.55'%3E%3Cpath d='M6.5 6.8c4.6 4.4 9.6 9.5 15.2 14.6' stroke-width='2.4'/%3E%3Cpath d='M21.6 6.2C16.9 11 12 16.1 6.4 21.7' stroke-width='2.4'/%3E%3Cpath d='M7.8 7.6c4.2 4 8.6 8.6 13.3 13' stroke-width='1.1' opacity='.5'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; mix-blend-mode: multiply;
-}
-@media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='5' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.4' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='9' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff8a65' stroke-linecap='round' opacity='0.5'%3E%3Cpath d='M6.5 6.8c4.6 4.4 9.6 9.5 15.2 14.6' stroke-width='2.4'/%3E%3Cpath d='M21.6 6.2C16.9 11 12 16.1 6.4 21.7' stroke-width='2.4'/%3E%3Cpath d='M7.8 7.6c4.2 4 8.6 8.6 13.3 13' stroke-width='1.1' opacity='.5'/%3E%3C/g%3E%3C/svg%3E"); mix-blend-mode: screen; }
-}
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='5' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.4' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='9' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff8a65' stroke-linecap='round' opacity='0.5'%3E%3Cpath d='M6.5 6.8c4.6 4.4 9.6 9.5 15.2 14.6' stroke-width='2.4'/%3E%3Cpath d='M21.6 6.2C16.9 11 12 16.1 6.4 21.7' stroke-width='2.4'/%3E%3Cpath d='M7.8 7.6c4.2 4 8.6 8.6 13.3 13' stroke-width='1.1' opacity='.5'/%3E%3C/g%3E%3C/svg%3E"); mix-blend-mode: screen; }
+  :where(:root[data-theme="dark"]) .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after { background-image: var(--mk-today-ring); mix-blend-mode: screen; }
 /* 날짜 숫자 칸: 22px 정사각 → 오늘의 노란 동그라미가 납작한 타원(22.7×20)이 아닌 원으로, 칸 가운데에 (달력이 붙이던 왼쪽 여백 1px 없이) */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { padding-inline: 0 !important; }
 .cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: 22px; min-width: 22px; height: 22px; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; line-height: 1; }
@@ -982,27 +974,75 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 /* 메모킹 로고 (PC 제목 줄 · 휴대폰 검색 줄) */
 .brand-mark { position: relative; display: inline-flex; flex: none; }
 
-/* Work | Life 고르기 (PC 제목 줄 · 휴대폰 검색 왼쪽) — 고른 쪽 바탕(썸)이 옆 칸으로 미끄러진다 */
+/* Work | Life 고르기 (PC 제목 줄 · 휴대폰 검색 왼쪽) — 낮과 밤이 바뀌는 스위치
+   Life 는 낮: 하늘 바탕 · 왼쪽 끝에 해 · 오른쪽 빈 자리에 구름 / Work 는 밤: 남색 하늘 · 오른쪽 끝에 달 · 왼쪽 빈 자리에 별.
+   바꾸면 해가 통통 굴러가며 달로 이지러지고(안쪽 그림자), 구름은 흘러가고 별이 하나씩 돋는다 */
 .mode-switch {
-  --ms-pad: 2px;
-  position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; flex: none; padding: var(--ms-pad); border-radius: 999px;
-  background: var(--fill-tab, rgba(0, 0, 0, 0.05)); -webkit-app-region: no-drag; view-transition-name: mk-mode-switch;
+  --ms-pad: 2px; --ms-h: 26px; --orb: calc(var(--ms-h) - 6px);
+  --ms-swing: cubic-bezier(0.5, -0.32, 0.3, 1.36); /* 살짝 뒤로 물러섰다 넘어가 통 하고 멈춤 */
+  position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; flex: none; padding: var(--ms-pad); border-radius: 999px; overflow: hidden; isolation: isolate;
+  background: linear-gradient(180deg, #a9dcff 0%, #e2f4ff 100%); box-shadow: inset 0 1px 2px rgba(20, 60, 110, 0.18);
+  -webkit-app-region: no-drag; view-transition-name: mk-mode-switch;
 }
+/* 밤하늘: 위에 겹쳐 두고 Work 에서 서서히 짙어짐 */
+.ms-scene { position: absolute; inset: 0; z-index: 0; border-radius: inherit; background: linear-gradient(180deg, #111a33 0%, #2a3d6b 100%); opacity: 0; transition: opacity 0.5s ease-out; pointer-events: none; }
+/* 별: 왼쪽(Life 글자 뒤) 빈 하늘에 작은 점 다섯 */
+.ms-scene::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 6%; width: 44%;
+  background:
+    radial-gradient(circle at 12% 30%, #fff 0 1px, transparent 1.6px),
+    radial-gradient(circle at 38% 68%, #fff 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 60% 24%, #fff 0 1.1px, transparent 1.7px),
+    radial-gradient(circle at 82% 62%, #fff 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 96% 34%, #fff 0 0.7px, transparent 1.2px);
+  opacity: 0; transform: translateY(-5px) scale(0.6); transition: opacity 0.3s ease-out, transform 0.5s var(--ease-out);
+}
+/* 구름: 오른쪽(Work 글자 뒤) 빈 하늘에 뭉게구름 둘 */
+.mode-switch::after {
+  content: ""; position: absolute; z-index: 1; right: 4px; bottom: -3px; width: calc(var(--orb) * 1.9); height: calc(var(--orb) * 0.9); pointer-events: none;
+  background:
+    radial-gradient(circle at 30% 70%, #fff 0 28%, transparent 30%),
+    radial-gradient(circle at 52% 52%, #fff 0 30%, transparent 32%),
+    radial-gradient(circle at 74% 72%, #fff 0 24%, transparent 26%);
+  opacity: 0.95; transition: transform 0.55s var(--ease-out), opacity 0.35s ease-out;
+}
+/* 해 / 달: 안쪽 그림자가 밀려 들어오면서 둥근 해가 초승달로 이지러짐 (그림자 값끼리 부드럽게 이어짐) */
 .mode-switch::before {
-  content: ""; position: absolute; top: var(--ms-pad); bottom: var(--ms-pad); left: var(--ms-pad); width: calc(50% - var(--ms-pad));
-  border-radius: 999px; background: var(--brand-yellow); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-  transition: transform 0.34s var(--ease-out), background-color 0.34s var(--ease-out);
+  content: ""; position: absolute; z-index: 2; top: 3px; left: 3px; width: var(--orb); height: var(--orb); border-radius: 50%;
+  background-color: #ffcc00;
+  box-shadow: inset 0 0 0 0 #fff3c4, 0 0 0 3px rgba(255, 204, 0, 0.28), 0 0 10px 2px rgba(255, 170, 0, 0.5);
+  transition: left 0.6s var(--ms-swing), background-color 0.45s ease-out, box-shadow 0.5s ease-out;
+  animation: ms-day 0.6s var(--ease-out);
 }
-:root[data-mode="work"] .mode-switch::before { transform: translateX(100%); }
+:root[data-mode="work"] .mode-switch::before {
+  left: calc(100% - var(--orb) - 3px);
+  background-color: rgba(42, 61, 107, 0);
+  box-shadow: inset calc(var(--orb) * -0.32) calc(var(--orb) * -0.08) 0 0 #f4f0e2, 0 0 0 3px rgba(244, 240, 226, 0.1), 0 0 10px 2px rgba(190, 210, 255, 0.35);
+  animation: ms-night 0.6s var(--ease-out);
+}
+:root[data-mode="work"] .ms-scene { opacity: 1; }
+:root[data-mode="work"] .ms-scene::after { opacity: 1; transform: none; transition-delay: 0.22s; }
+:root[data-mode="work"] .mode-switch::after { opacity: 0; transform: translate(14px, 4px) scale(0.8); }
+/* 굴러가는 동안 살짝 늘어났다 통 (두 이름을 번갈아 써야 바꿀 때마다 다시 움직임) */
+@keyframes ms-night { 0% { transform: none; } 35% { transform: scale(1.18, 0.86); } 70% { transform: scale(0.94, 1.06) rotate(-12deg); } 100% { transform: none; } }
+@keyframes ms-day { 0% { transform: none; } 35% { transform: scale(1.18, 0.86); } 70% { transform: scale(0.94, 1.06) rotate(12deg); } 100% { transform: none; } }
 .mode-switch button {
-  position: relative; min-width: 46px; height: 26px; padding: 0 10px; border: 0; border-radius: 999px; background: none;
-  color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
-  transition: color 0.26s var(--ease-out);
+  position: relative; z-index: 3; min-width: 46px; height: calc(var(--ms-h) - 2 * var(--ms-pad)); padding: 0 8px; border: 0; border-radius: 999px; background: none;
+  color: rgba(20, 45, 80, 0.5); font: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
+  transition: color 0.3s var(--ease-out);
 }
-.mode-switch button:hover:not([aria-checked="true"]) { color: var(--text); }
+.mode-switch button[data-mode="life"] { padding-left: calc(var(--orb) + 7px); } /* 해 자리 */
+.mode-switch button[data-mode="work"] { padding-right: calc(var(--orb) + 7px); } /* 달 자리 */
+.mode-switch button[aria-checked="true"] { color: #10294d; }
+:root[data-mode="work"] .mode-switch button { color: rgba(255, 255, 255, 0.5); }
+:root[data-mode="work"] .mode-switch button[aria-checked="true"] { color: #fff; }
+.mode-switch button:hover:not([aria-checked="true"]) { color: #10294d; }
+:root[data-mode="work"] .mode-switch button:hover:not([aria-checked="true"]) { color: #fff; }
 .mode-switch button:active { transform: scale(0.96); }
-.mode-switch button[aria-checked="true"] { color: var(--on-brand); }
-@media (prefers-reduced-motion: reduce) { .mode-switch::before { transition: background-color 0.2s ease-out; } }
+@media (prefers-reduced-motion: reduce) {
+  .mode-switch::before, :root[data-mode="work"] .mode-switch::before { animation: none; transition: left 0.2s ease-out, background-color 0.2s ease-out, box-shadow 0.2s ease-out; }
+  .mode-switch::after, .ms-scene, .ms-scene::after { transition-duration: 0.2s; transition-delay: 0s; }
+}
 
 /* 모드 바꾸기 화면 전환 (startViewTransition): 화면은 부드럽게 바뀌고, 스위치는 화면 위에서 그대로 미끄러진다 */
 ::view-transition-old(root) { animation: mk-vt-out 0.18s ease-in both; }

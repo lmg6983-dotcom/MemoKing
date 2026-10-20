@@ -311,7 +311,7 @@ export function createInkToolbar(o) {
   const tools = group('ink-tools');
   const toolBtns = {};
   for (const [t, label, key] of [['pen', '펜', 'P'], ['highlighter', '형광펜', 'H'], ['eraser', '지우개 (획 지우기)', 'E']]) {
-    const b = btn(`ink-tool ink-tool-${t}`, `${label} (${key}) — 한 번 더 누르면 ${t === 'eraser' ? '굵기, 모두 지우기' : '색과 굵기'}`, t, () => {
+    const b = btn(`ink-tool ink-tool-${t}`, `${label} (${key}), 한 번 더 누르면 ${t === 'eraser' ? '굵기, 모두 지우기' : '색과 굵기'}`, t, () => {
       if (o.tools.tool === t) togglePop('style');
       else setTool(t);
     });
@@ -549,7 +549,7 @@ export function openInkEditor({ doc = null, onSave, onClose, title = '손 메모
   const name = el('b', 'ink-title');
   name.append(icon('ink'), document.createTextNode(title));
   const hint = el('span', 'ink-hint', { 'aria-live': 'polite' });
-  const done = el('button', 'ink-done', { type: 'button', title: '완료 — 메모에 넣기 (Esc)' });
+  const done = el('button', 'ink-done', { type: 'button', title: '완료, 메모에 넣기 (Esc)' });
   done.append(icon('check'), document.createTextNode('완료'));
   head.append(name, hint, done);
   const scroller = el('div', 'ink-scroll');
