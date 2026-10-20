@@ -479,6 +479,20 @@ export class WindowManager {
     return true;
   }
 
+  /**
+   * 메모 단축키(Ctrl+Alt+숫자)로 불러올 때: 왕관 · 테이프가 붙어 있으면 뗀다 → 뗐는지
+   *   테이프는 바탕화면 층이라 앞으로 불러도 다른 창 뒤에 남고, 왕관은 늘 위라 불러온 뒤 다른 창을 가린 채 남아
+   *   (스티커 창 · 층이 엉켜) 오류가 나기 쉬웠다 — 불러온 메모는 보통 창으로
+   */
+  unstickForHotkey(id) {
+    const stack = this.stacks?.stackOf(id);
+    const layer = stack ? this.stackLayer(stack) : this.layerOf(id);
+    if (!layer) return false;
+    const [what, obj] = layer === 'top' ? ['왕관', '왕관을'] : ['테이프', '테이프를'];
+    this.setNoteLayer(id, null, { note: `단축키로 불러와 ${obj} 뗐어요. 다시 붙이려면 위의 ${what} 단추를 눌러 주세요` });
+    return true;
+  }
+
   setNoteOnTop(id, next, opts) {
     return this.setNoteLayer(id, next ? 'top' : null, opts).top;
   }

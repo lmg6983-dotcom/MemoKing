@@ -350,8 +350,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         list.webContents.sendInputEvent({ type: 'mouseDown', x: at.x, y: at.y, button: 'right', clickCount: 1 });
         list.webContents.sendInputEvent({ type: 'mouseUp', x: at.x, y: at.y, button: 'right', clickCount: 1 });
         const shape = await until(() => js(list, `(() => { const m = document.querySelector('.mk-ctx'); return m && { icons: [...m.querySelectorAll('.mk-ctx-ic')].map((b) => b.dataset.id), items: [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.dataset.id), dots: m.querySelectorAll('.mk-ctx-sw').length, native: false }; })()`), '목록 카드 메뉴').catch(() => null);
-        check('목록 카드 오른쪽 클릭: 맨 위 아이콘 줄(복사 · 공유 · PDF · 휴지통) + 열기 · 고정 · 색 점 7개 · 잠그기 · 이전 버전',
-          shape && shape.icons.join() === 'cut,copy,share,pdf,trash' && shape.items.join() === 'open,pin,lock,versions' && shape.dots === 7, JSON.stringify(shape));
+        check('목록 카드 오른쪽 클릭: 맨 위 아이콘 줄(복사 · 공유 · PDF · 휴지통) + 열기 · 고정 · 색 점 7개 · 이 날의 기록 · 잠그기 · 이전 버전',
+          shape && shape.icons.join() === 'cut,copy,share,pdf,trash' && shape.items.join() === 'open,pin,day,lock,versions' && shape.dots === 7, JSON.stringify(shape));
         await capture(list, 'list-card-menu.png');
         const pickList = async (selector) => {
           const b = await js(list, `(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(${JSON.stringify(selector)}) !== null }; })()`);
@@ -567,14 +567,14 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('상태 줄이 잘리면 메모 창 위 바깥에 말풍선으로 전문 (상태 줄은 감춰 중복 없음) · 끝까지 보기 단추는 없음 · 크기를 바꾸면 거두고 글은 다시 · 다 보이면 없음',
         bub?.text === longText && bub.place === 'p-above' && bub.screen.bottom <= nw.getBounds().y && statusHidden && bubbledNoTitle && noMoreButton && movedAway && !shortNone.bubble && !shortNone.state.clipped && shortNone.state.title === null,
         JSON.stringify({ bub, statusHidden, bubbledNoTitle, noMoreButton, movedAway, shortNone }));
-      // 진행 안내("…중")는 말풍선 없이 — 잘렸으면 마우스를 올려 두면 전문(title) · 마우스가 닿도록 no-drag
+      // 진행 안내("…중")는 말풍선 없이 — 잘려도 상태 줄은 그대로 창을 끄는 자리 (글자 위를 잡고 창을 옮길 수 있게)
       nw.setBounds({ ...wide, x: 400, y: 320, width: 300 });
       await wait(250);
       await notice('그림을 만드는 중… 메모가 길면 조금 걸려요. 잠시만 기다려 주세요');
       await wait(400);
       const progressNone = !bubbleWin()?.isVisible();
       const progressTip = await js(nw, `(() => { const s = document.getElementById('status'); return { title: s.title, drag: getComputedStyle(s).getPropertyValue('-webkit-app-region') }; })()`);
-      check('진행 안내("…중")는 말풍선 없이, 잘렸으면 마우스를 올려 두면 전문(title) — 그 자리는 창 끌기가 아니라 마우스가 닿음', progressNone && /메모가 길면 조금 걸려요/.test(progressTip.title) && progressTip.drag.trim() === 'no-drag', JSON.stringify({ progressNone, progressTip }));
+      check('진행 안내("…중")는 말풍선 없이, 잘린 상태 줄도 창을 끄는 자리 (전문은 title)', progressNone && /메모가 길면 조금 걸려요/.test(progressTip.title) && progressTip.drag.trim() === 'drag', JSON.stringify({ progressNone, progressTip }));
       // 오류는 저절로 사라지지 않는다 (9초 뒤에도)
       await notice(longText, true);
       await until(readBubble, '오류 말풍선', 2000).catch(() => null);
@@ -837,7 +837,15 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await memoHotkeys.onPress('3');
       const shownWin = await until(() => noteWins.get(hid)?.isVisible() && noteWins.get(hid), '단축키로 메모 띄우기', 4000).catch(() => null);
       check('띄우기로 바꾸면 Ctrl+Alt+3 → 메모 창이 뜸 (클립보드는 그대로)', r.ok && Boolean(shownWin) && (await clipboard.readText()) === '비움', JSON.stringify({ r: r.ok, shown: Boolean(shownWin) }));
+      // 왕관(늘 위)이 붙은 메모를 단축키로 부르면: 왕관을 떼고 보통 창으로 (테이프도 같은 길 — 붙은 채로는 층이 엉켜 오류)
+      windowManager.setNoteLayer(hid, 'top');
       shownWin?.close();
+      await until(() => !noteWins.has(hid), '메모 창 닫힘 (왕관)');
+      await memoHotkeys.onPress('3');
+      const crownWin = await until(() => noteWins.get(hid)?.isVisible() && noteWins.get(hid), '왕관 메모 단축키로 띄우기', 4000).catch(() => null);
+      check('왕관이 붙은 메모를 단축키로 부르면 왕관을 떼고 띄움', Boolean(crownWin) && windowManager.layerOf(hid) === null && !crownWin.isAlwaysOnTop(),
+        JSON.stringify({ shown: Boolean(crownWin), layer: windowManager.layerOf(hid), onTop: crownWin?.isAlwaysOnTop() }));
+      crownWin?.close();
       // 풀기
       const off = memoHotkeys.set(hid, null);
       check('단축키 풀기 → 키를 놓아 다른 앱이 쓸 수 있게', off.ok && !memoHotkeys.held.has('3') && !getSettings().memoHotkeys?.['3'], JSON.stringify(getSettings().memoHotkeys));

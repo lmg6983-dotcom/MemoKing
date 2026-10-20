@@ -868,6 +868,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .fab-sat-label { padding: 6px 12px; border-radius: 10px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14.5px; }
 .fab-sat-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-right: 4px; border-radius: 18px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.2); }
 .fab-sat[data-new="voice"] .fab-sat-btn { background: var(--rec); color: var(--on-rec); }
+.fab-sat[data-new="ink"] .fab-sat-btn { background: var(--brand-yellow); color: var(--on-brand); } /* PC · 메모 안 + 메뉴와 같은 색 */
 .fab-sat-btn svg { width: 24px; height: 24px; }
 .fab-sat:active .fab-sat-btn { transform: scale(0.94); }
 @keyframes sat-out { from { opacity: 0; transform: translate(18px, 34px) scale(0.5); } }
@@ -930,7 +931,8 @@ body.two-pane .pane-empty:not([hidden]) {
 }
 .pane-empty img { width: 72px; height: 72px; opacity: 0.5; filter: grayscale(0.4); }
 /* 메모 본문은 읽기 좋은 폭으로 가운데 */
-body.two-pane .note-screen .editor { padding-left: max(28px, calc((100% - 760px) / 2)); padding-right: max(28px, calc((100% - 760px) / 2)); }
+/* 넓은 화면: 글은 왼쪽부터 (가운데 760px 칸에 두면 짧은 메모가 오른쪽으로 쏠려 보였다) — 한 줄이 너무 길지 않게 오른쪽만 비운다 */
+body.two-pane .note-screen .editor { padding-left: clamp(28px, 4vw, 56px); padding-right: max(28px, calc(100% - 820px)); }
 body.two-pane .note-screen .format-items { justify-content: safe center; } /* 넘치면 왼쪽부터 (가운데 정렬로 잘리지 않게) */
 .search { min-width: 0; }
 .search input { width: 100%; }
@@ -1237,3 +1239,11 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 @media (max-width: 370px) { .searchbar .brand-mark { margin: 0 6px 0 0; } .searchbar .brand-icon { width: 22px; height: 22px; } }
 .searchbar .mode-switch button { position: relative; min-width: 42px; height: 38px; padding: 0 8px; font-size: 13px; }
 .other-mode { display: block; margin: 0 16px 8px auto; padding: 6px 0; font-size: 13.5px; }
+
+/* 동기화 단추 아래 진행 줄 (받는 중) — PC 목록 창의 구름 단추와 같은 모양 */
+.sync-btn { position: relative; }
+.sync-btn .sync-line { position: absolute; left: 10px; right: 10px; bottom: 6px; height: 2px; overflow: hidden; border-radius: 99px; background: var(--line); pointer-events: none; }
+.sync-btn .sync-line i { position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: inherit; background: var(--brand-yellow); animation: m-sync-scan 1.2s ease-in-out infinite; }
+@keyframes m-sync-scan { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+.sync-btn.syncing svg { animation: none; } /* 깜빡이던 구름 대신 진행 줄 */
+@media (prefers-reduced-motion: reduce) { .sync-btn .sync-line i { animation: none; width: 100%; opacity: 0.5; } }

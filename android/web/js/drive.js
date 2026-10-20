@@ -90,14 +90,15 @@ $('login-cancel').addEventListener('click', () => drive.cancelLogin());
 
 // ---------- ③ 폴더: 로그인하면 바로 "메모킹 동기화" 폴더를 찾거나 만들어 맞춘다 (고를 일 없게) ----------
 
+// 폴더만 정하면 바로 메모 목록으로 — 메모를 받는 일은 뒤에서 계속한다 (background · 위 구름 단추에 진행 줄, PC 와 같이)
 async function autoConnect() {
   showStep('syncing');
   try {
-    const { status, folderName } = await call('driveAuto', {});
+    const { status, folderName } = await call('driveAuto', { background: true });
     closeSheet(sheet);
     onConnected();
     if (status.state === 'error') toast(status.error, true);
-    else toast(`Google Drive "${folderName}" 폴더와 동기화했어요`);
+    else toast(`Google Drive "${folderName}" 폴더와 연결했어요. 메모를 받는 동안에도 바로 쓸 수 있어요`);
   } catch (err) {
     toast(err.message, true);
     closeSheet(sheet);
@@ -194,11 +195,11 @@ $('folder-use').addEventListener('click', async () => {
   if (here.id === 'root') return;
   showStep('syncing');
   try {
-    const { status } = await call('driveUse', { folderId: here.id, name: here.name, import: !$('import-row').hidden && $('import-local').checked });
+    const { status } = await call('driveUse', { folderId: here.id, name: here.name, import: !$('import-row').hidden && $('import-local').checked, background: true });
     closeSheet(sheet);
     onConnected();
     if (status.state === 'error') toast(status.error, true);
-    else toast(`"${here.name}" 폴더와 동기화했어요`);
+    else toast(`"${here.name}" 폴더와 연결했어요. 메모를 받는 동안에도 바로 쓸 수 있어요`);
   } catch (err) {
     toast(err.message, true);
     showStep('folder');
@@ -224,6 +225,15 @@ export function renderStatus(s = drive.status()) {
   btn.classList.toggle('syncing', st.state === 'syncing');
   btn.classList.toggle('error', st.state === 'error' || (s.active && !s.connected));
   btn.replaceChildren(icon(st.state === 'error' || !s.connected ? 'cloud-alert' : 'cloud'));
+  // 받는 중: 단추 아래 가는 진행 줄 (PC 목록 창의 구름 단추와 같은 모양)
+  if (st.state === 'syncing') {
+    const line = document.createElement('span');
+    line.className = 'sync-line scan';
+    line.setAttribute('aria-hidden', 'true');
+    line.append(document.createElement('i'));
+    btn.append(line);
+  }
+  document.body.dataset.sync = s.active ? st.state ?? '' : ''; // 목록이 비어 있을 때 "받는 중" 안내 (list-view)
   btn.setAttribute('aria-label', st.state === 'error' ? `동기화 오류: ${st.error}` : 'Google Drive와 지금 동기화');
 
   const box = $('drive-box');
@@ -250,6 +260,7 @@ export function renderStatus(s = drive.status()) {
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;
   $('drive-connect').textContent = s.active && s.connected ? '폴더 변경' : '연결하기';
+  $('drive-connect').classList.toggle('primary', !(s.active && s.connected)); // 연결 전에는 PC처럼 주 단추
 }
 
 // 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 허용받는다 — 취소·실패하면 꺼진 채 (지금 연결은 그대로).

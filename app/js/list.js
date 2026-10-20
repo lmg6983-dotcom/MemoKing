@@ -1642,14 +1642,14 @@ api.win.listOnTop().then((on) => showListTop(on, false));
 // 대화 상자·튜토리얼이 떠 있으면 창 버튼 줄도 어둡게 (Windows 가 그리는 줄이라 화면의 막이 닿지 않는다)
 let dimLevel = false;
 function syncTitlebarDim() {
-  const level = el.settings.open || el.confirm.open || $('trash-dialog').open || $('apps-dialog').open || $('drive-dialog')?.open ? 'dialog' : document.body.classList.contains('coaching') ? 'coach' : false;
+  const level = el.settings.open || el.confirm.open || $('trash-dialog').open || $('apps-dialog').open || $('drive-dialog')?.open || document.querySelector('body > .mem-album:not(.closing)') ? 'dialog' : document.body.classList.contains('coaching') ? 'coach' : false;
   if (level === dimLevel) return;
   dimLevel = level;
   api.win.dimTitlebar(level);
 }
 const dimWatcher = new MutationObserver(syncTitlebarDim);
 for (const d of [el.settings, el.confirm, $('trash-dialog'), $('apps-dialog'), $('drive-dialog')].filter(Boolean)) dimWatcher.observe(d, { attributes: true, attributeFilter: ['open'] });
-dimWatcher.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+dimWatcher.observe(document.body, { attributes: true, attributeFilter: ['class'], childList: true }); // 추억 달력의 그날의 기록도 (body 에 붙었다 떨어짐)
 // ---------- 휴지통 ----------
 const trashEl = {
   dialog: $('trash-dialog'), list: $('trash-list'), empty: $('trash-empty'), note: $('trash-note'), clear: $('trash-clear'),

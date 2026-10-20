@@ -1444,6 +1444,7 @@ on('history', () => list.refreshHistory());
 on('sync', (st) => {
   renderDrive();
   if (st.changed) app.vault?.scan();
+  else if (app.vault && !app.vault.list().length) list.render(); // 빈 목록의 "받는 중" 안내를 맞춘다
   if (st.conflicts?.length) toast(`두 기기에서 동시에 고친 메모 ${st.conflicts.length}개는 사본으로 남겼어요`);
 });
 on('alarm', () => alarms.tick());
