@@ -476,7 +476,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const fileDone = fileMenu0 ? await pressCopy() : '';
       const fileCopy = smokeOpened.filter((o) => o.kind === 'copy-file').at(-1);
       check('PDF 파일: 오른쪽 클릭 → 메뉴 맨 위에 복사 · 저장 · 공유 · 지우기 아이콘 + "이 파일 열기", 복사 아이콘은 파일 그대로 클립보드에',
-        fileMenu0?.icons.join('|') === 'cut:이 파일 잘라내기|copy:이 파일 복사|save:이 파일 저장…|share:이 파일 공유…|delete:이 파일 지우기' && fileMenu0.items.join('|') === '이 파일 열기|이름 변경…' && /파일을 복사했어요/.test(fileDone)
+        fileMenu0?.icons.join('|') === 'cut:이 파일 잘라내기|copy:이 파일 복사|save:이 파일 저장|share:이 파일 공유|delete:이 파일 지우기' && fileMenu0.items.join('|') === '이 파일 열기|이름 변경' && /파일을 복사했어요/.test(fileDone)
           && smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1 && /안내 자료\.pdf$/.test(fileCopy?.target ?? ''),
         JSON.stringify({ fileMenu0, fileDone, fileCopy }));
       // 파일 이름 변경: 메뉴 › 이름 변경… → 입력 창 → 칩 글자가 바뀜 (확장자는 지키고 · 쓸 수 없는 글자는 뺌) → 되돌려 둔다
@@ -638,7 +638,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const tableText = await clip('text/plain');
       const tableHtml = await clip('text/html');
       check('표: 오른쪽 클릭 → 맨 위 아이콘 줄 + 칸의 글 항목(잘라내기 · 복사 · 붙여넣기 …) + 표 바꾸기, 복사 아이콘은 칸 사이 탭 + 표 서식',
-        tableMenu?.icons.join('|') === 'cut:이 표 잘라내기|copy:이 표 복사|save:이 표 저장…|share:이 표 공유…|delete:이 표 지우기' && /내용을 복사했어요/.test(tableDone) && /이름\t값\n가\t1/.test(tableText) && /<table/.test(tableHtml) && !/column-resize-handle|contenteditable/.test(tableHtml)
+        tableMenu?.icons.join('|') === 'cut:이 표 잘라내기|copy:이 표 복사|save:이 표 저장|share:이 표 공유|delete:이 표 지우기' && /내용을 복사했어요/.test(tableDone) && /이름\t값\n가\t1/.test(tableText) && /<table/.test(tableHtml) && !/column-resize-handle|contenteditable/.test(tableHtml)
           && ['잘라내기', '복사', '붙여넣기', '서식 없이 붙여넣기', '표를 목록으로', '표를 체크리스트로', '표를 글로', '열 너비 맞춤'].every((t) => tableMenu.items.includes(t)),
         JSON.stringify({ tableMenu, tableDone, tableText, html: tableHtml.slice(0, 200) }));
       // 표 저장: 엑셀에서 바로 열리는 CSV (한글이 깨지지 않게 BOM)

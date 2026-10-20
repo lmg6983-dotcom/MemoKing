@@ -11,7 +11,7 @@ let timer = 0;
 let seq = 0; // 마지막으로 띄우려던 것 (늦게 온 대답이 지난 말에 상태 줄을 감추지 않게)
 let shown = false;
 
-const PROGRESS = /중(이에요)?\s*(…|\.\.\.)?(\s*[\d(]|$)/; // "그림을 만드는 중" · "받아쓰는 중 (1/3)" · "받는 중 40%" (예전 글처럼 끝에 … 가 붙어도)
+const PROGRESS = /중(이에요)?(\s*(…|\.\.\.)|\s*[\d(]|[.,]\s|$)/; // "그림을 만드는 중" · "받아쓰는 중 (1/3)" · "받는 중 40%" · "맞추는 중, 약 2분" (예전 글처럼 … 가 붙어도)
 const isClipped = (el) => el.scrollWidth > el.clientWidth + 1;
 
 function hide() {
