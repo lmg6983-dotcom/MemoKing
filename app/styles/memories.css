@@ -1,0 +1,181 @@
+/* 추억 달력 (일정 탭 › 추억 — app/js/memories-view.js) · PC 목록 창 · 휴대폰 같이 씀
+   ① 사진 달력 ② 표지 띠 · 태그 ③ 그날의 기록 (스크랩북 한 쪽: 테이프 붙인 폴라로이드 · 메모지 조각) */
+
+.mem { --mem-paper: #fbf8f1; --mem-pol: #fffefb; --mem-ink: #3b352a; --mem-tape: rgba(255, 230, 128, 0.72); --mem-shadow: 0 1px 2px rgba(60, 45, 20, 0.18), 0 4px 10px rgba(60, 45, 20, 0.12); }
+@media (prefers-color-scheme: dark) {
+  .mem, .mem-album { --mem-paper: #1d1c19; --mem-pol: #2a2925; --mem-ink: #ece8dd; --mem-tape: rgba(255, 214, 51, 0.38); --mem-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.45); }
+}
+.mem[hidden] { display: none; }
+.mem { padding: 2px 0 6px; }
+
+/* ② 표지 띠 */
+.mem-head { position: relative; display: flex; align-items: center; gap: 12px; min-height: 64px; margin: 2px 2px 8px; }
+.mem-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mem-title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+.mem-sub { font-size: 12.5px; color: var(--muted); }
+.mem-cover { display: flex; align-items: center; flex: 1; min-width: 0; height: 64px; padding-left: 6px; overflow: hidden; }
+.mem-cover-pol {
+  flex: none; width: 46px; height: 54px; margin-left: -10px; padding: 3px 3px 9px; border-radius: 2px;
+  background: var(--mem-pol); box-shadow: var(--mem-shadow); transform: rotate(var(--r, 0deg));
+  animation: mem-drop 0.42s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 50ms);
+}
+.mem-cover-pol:first-child { margin-left: 0; }
+.mem-cover-pol img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 1px; }
+@keyframes mem-drop { from { opacity: 0; transform: translateY(-6px) rotate(calc(var(--r, 0deg) * 2)); } }
+.mem-share {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; margin-left: auto;
+  border: 1px solid var(--line); border-radius: 99px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.mem-share:hover { background: var(--hover); }
+.mem-share svg { width: 15px; height: 15px; }
+
+.mem-tags { display: flex; gap: 6px; margin: 0 2px 8px; overflow-x: auto; scrollbar-width: none; }
+.mem-tags::-webkit-scrollbar { display: none; }
+.mem-tag {
+  flex: none; height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 99px;
+  background: var(--surface-1); color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out, transform 0.1s ease-out;
+}
+.mem-tag:hover { background: var(--hover); }
+.mem-tag:active { transform: scale(0.95); }
+.mem-tag[aria-pressed="true"] { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 600; }
+
+/* ① 사진 달력 */
+.mem-grid { display: flex; flex-direction: column; gap: 4px; }
+.mem-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.mem-weekdays { gap: 4px; }
+.mem-wd { padding: 2px 0; font-size: 11.5px; text-align: center; color: var(--muted); }
+.mem-wd.mem-sun { color: var(--danger); }
+.mem-day {
+  position: relative; display: block; aspect-ratio: 1 / 1.08; min-width: 0; padding: 0; overflow: visible;
+  border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; text-align: left;
+}
+button.mem-day { cursor: pointer; transition: transform 0.18s var(--ease-out); }
+button.mem-day:hover { transform: translateY(-1px) rotate(-0.6deg); }
+button.mem-day:active { transform: scale(0.96); }
+.mem-num { position: absolute; top: 3px; left: 5px; z-index: 2; font-size: 12px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.mem-day.mem-sun .mem-num { color: var(--danger); }
+.mem-day.mem-out { opacity: 0.32; }
+.mem-day.mem-today .mem-num {
+  padding: 0 4px; border-radius: 99px; background: var(--brand-yellow); color: var(--on-brand);
+}
+.mem-day:not(.has-photo):not(.has-note) { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); }
+
+/* 사진 있는 날: 하얀 테두리 사진 한 장 (여러 장이면 뒤에 기운 사진 한 장 더) */
+.mem-day.has-photo { padding: 2px; border-radius: 3px; background: var(--mem-pol); box-shadow: var(--mem-shadow); }
+.mem-day.has-photo.many::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 3px;
+  background: var(--mem-pol); box-shadow: var(--mem-shadow); transform: rotate(5deg) translate(2px, 1px);
+}
+.mem-photo { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 2px; animation: mem-fade 0.3s ease-out both; }
+.mem-day.broken .mem-photo { visibility: hidden; }
+@keyframes mem-fade { from { opacity: 0; } }
+.mem-day.has-photo .mem-num {
+  top: 4px; left: 4px; padding: 0 4px; border-radius: 4px;
+  background: rgba(255, 255, 255, 0.86); color: #1f1f1c; font-size: 11px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.mem-day.has-photo.mem-sun .mem-num { color: #d33a40; }
+.mem-day.has-photo.mem-today .mem-num { background: var(--brand-yellow); color: var(--on-brand); }
+.mem-count {
+  position: absolute; right: 4px; bottom: 4px; z-index: 2; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px;
+  background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 10.5px; font-weight: 600; line-height: 16px; text-align: center;
+}
+
+/* 글만 있는 날: 그 메모 색 메모지 조각 */
+.mem-day.has-note .mem-num { top: 3px; }
+.mem-paper {
+  position: absolute; inset: 20px 3px 4px; display: -webkit-box; padding: 3px 4px; overflow: hidden;
+  -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
+  border-radius: 1px 1px 6px 1px; background: var(--note-bg); color: var(--note-fg);
+  box-shadow: 0 1px 2px rgba(60, 45, 20, 0.16); font-size: clamp(9px, 1.5vw, 11px); line-height: 1.3; word-break: keep-all; overflow-wrap: anywhere;
+  transform: rotate(-1.2deg);
+}
+
+.mem-empty { margin: 14px 8px 4px; font-size: 13px; line-height: 1.55; text-align: center; color: var(--muted); }
+
+/* ③ 그날의 기록 */
+.mem-album {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(20, 16, 8, 0.42); animation: mem-fade 0.2s ease-out both;
+  --mem-paper: #fbf8f1; --mem-pol: #fffefb; --mem-ink: #3b352a; --mem-tape: rgba(255, 230, 128, 0.72); --mem-shadow: 0 1px 2px rgba(60, 45, 20, 0.18), 0 4px 10px rgba(60, 45, 20, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  .mem-album { --mem-paper: #1d1c19; --mem-pol: #2a2925; --mem-ink: #ece8dd; --mem-tape: rgba(255, 214, 51, 0.38); --mem-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.45); background: rgba(0, 0, 0, 0.6); }
+}
+.mem-album.closing { animation: mem-out 0.16s ease-in both; }
+.mem-album.closing .mem-page { animation: mem-page-out 0.16s ease-in both; }
+@keyframes mem-out { to { opacity: 0; } }
+@keyframes mem-page-out { to { opacity: 0; transform: translateY(8px) scale(0.98); } }
+.mem-page {
+  position: relative; display: flex; flex-direction: column; width: min(720px, 100%); max-height: 100%; overflow: hidden;
+  border-radius: 6px; background: var(--mem-paper); color: var(--mem-ink); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+  /* 종이 결: 옅은 가로줄 */
+  background-image: repeating-linear-gradient(to bottom, transparent 0 27px, color-mix(in srgb, var(--mem-ink) 6%, transparent) 27px 28px);
+  animation: mem-page-in 0.32s var(--ease-out) both;
+}
+@keyframes mem-page-in { from { opacity: 0; transform: translateY(14px) rotate(-0.6deg) scale(0.98); } }
+.mem-page-top { display: flex; align-items: center; gap: 8px; padding: 14px 12px 6px 20px; }
+.mem-page-date { flex: 1; min-width: 0; margin: 0; font-size: 22px; font-weight: 400; letter-spacing: -0.01em; }
+.mem-page-date b { font-weight: 800; }
+.mem-page-date span { font-size: 15px; color: color-mix(in srgb, var(--mem-ink) 60%, transparent); }
+.mem-page-tools { display: flex; align-items: center; gap: 2px; }
+.mem-page-tools .icon-btn { color: var(--mem-ink); }
+.mem-prev svg { transform: rotate(180deg); }
+.mem-nav:disabled { opacity: 0.3; cursor: default; }
+
+.mem-board {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 26px 20px; align-items: start;
+  padding: 20px 24px 30px; overflow-y: auto; overscroll-behavior: contain;
+}
+.mem-pol {
+  position: relative; margin: 0; padding: 8px 8px 0; border-radius: 2px; background: var(--mem-pol); box-shadow: var(--mem-shadow);
+  transform: rotate(var(--r, 0deg)); animation: mem-place 0.4s var(--ease-out) both;
+}
+.mem-pol:nth-child(2n) { animation-delay: 40ms; }
+.mem-pol:nth-child(3n) { animation-delay: 80ms; }
+@keyframes mem-place { from { opacity: 0; transform: translateY(-10px) rotate(calc(var(--r, 0deg) * 2.5)) scale(1.03); } }
+.mem-tape {
+  position: absolute; top: -9px; left: 50%; width: 64px; height: 20px; margin-left: -32px;
+  background: var(--mem-tape); transform: rotate(var(--tape, 0deg)); box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
+  /* 찢은 테이프 끝 */
+  clip-path: polygon(3% 0, 97% 4%, 100% 30%, 96% 55%, 100% 100%, 4% 96%, 0 70%, 3% 40%);
+}
+.mem-pol-img { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.mem-pol-img img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: color-mix(in srgb, var(--mem-ink) 8%, transparent); }
+.mem-cap {
+  min-height: 34px; padding: 8px 2px 9px; overflow: hidden; font-size: 13px; line-height: 1.35;
+  text-align: center; text-overflow: ellipsis; white-space: nowrap; color: var(--mem-ink);
+}
+.mem-note {
+  display: flex; flex-direction: column; gap: 5px; min-height: 84px; padding: 14px 14px 16px; border: 0;
+  border-radius: 2px 2px 14px 2px; background: var(--note-bg); color: var(--note-fg); font: inherit; text-align: left; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(60, 45, 20, 0.16); transform: rotate(var(--r, 0deg)); animation: mem-place 0.4s var(--ease-out) both;
+  transition: box-shadow 0.15s ease-out;
+}
+.mem-note:hover { box-shadow: 0 4px 12px rgba(60, 45, 20, 0.22); }
+.mem-note-title { font-size: 14.5px; font-weight: 700; }
+.mem-note-text { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; font-size: 13px; line-height: 1.5; white-space: pre-line; opacity: 0.85; }
+
+.mem-zoom {
+  position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px;
+  background: rgba(0, 0, 0, 0.82); cursor: zoom-out; animation: mem-fade 0.18s ease-out both;
+}
+.mem-zoom img { max-width: 100%; max-height: calc(100% - 64px); object-fit: contain; border-radius: 3px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
+.mem-zoom-open { cursor: pointer; }
+
+@media (max-width: 560px) {
+  .mem-head { flex-wrap: wrap; gap: 8px; }
+  .mem-cover { order: 3; flex-basis: 100%; height: 60px; padding-left: 4px; }
+  .mem-share { height: 30px; padding: 0 10px; }
+  .mem-week, .mem-weekdays { gap: 3px; }
+  .mem-album { padding: 0; align-items: stretch; }
+  .mem-page { width: 100%; border-radius: 0; }
+  .mem-page-top { padding: max(10px, env(safe-area-inset-top)) 6px 4px 16px; }
+  .mem-board { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 14px; padding: 16px 14px max(28px, env(safe-area-inset-bottom)); }
+  .mem-cap { font-size: 12px; min-height: 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mem-cover-pol, .mem-photo, .mem-album, .mem-page, .mem-pol, .mem-note, .mem-zoom, .mem-album.closing, .mem-album.closing .mem-page { animation: none; }
+  button.mem-day { transition: none; }
+}

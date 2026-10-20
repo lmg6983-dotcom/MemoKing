@@ -6,6 +6,8 @@ import { openContextMenu } from './ctx-menu.js';
 import { CUT_ICON, COPY_ICON, SHARE_ICON, SAVE_ICON, TRASH_ICON } from './content-icons.js';
 import { chooseShare, showSharePop, SHARE_DONE } from './share-menu.js';
 import { COLORS } from './core/memo-file.js';
+import { dayText } from './memory-day.js';
+import { moveLabel } from './core/modes.js';
 
 export const COLOR_LABEL = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 
@@ -25,6 +27,8 @@ export function cardMenuSpec(memo) {
       { type: 'separator' },
       { id: 'pin', label: '목록 맨 위에 고정', checked: memo.pinned === true },
       { type: 'colors', label: '색', colors: COLORS.map((c) => ({ id: `color:${c}`, label: COLOR_LABEL[c] ?? c, color: c, checked: memo.color === c })) },
+      { id: 'day', label: '이 날의 기록으로…', hint: memo.day ? dayText(memo.day) : '' },
+      { id: 'mode', label: moveLabel(memo) },
       { type: 'separator' },
       locked ? { id: 'unlock', label: '잠금 풀기…' } : { id: 'lock', label: '잠그기…' },
       { id: 'versions', label: '이전 버전…', disabled: locked },
@@ -33,7 +37,7 @@ export function cardMenuSpec(memo) {
 }
 
 /**
- * @param {{ memo: object, at: { x: number, y: number }, api: object, run: { openSettings?(), open(id), pin(memo), color(memo, color), trash(id), flash(text), setStatus?(text) } }} o
+ * @param {{ memo: object, at: { x: number, y: number }, api: object, run: { openSettings?(), open(id), pin(memo), color(memo, color), day?(memo), mode?(memo), trash(id), flash(text), setStatus?(text) } }} o
  */
 export async function openCardMenu({ memo, at, api, run }) {
   const { icons, items } = cardMenuSpec(memo);
@@ -43,6 +47,8 @@ export async function openCardMenu({ memo, at, api, run }) {
   switch (id) {
     case 'open': run.open(memo.id); break;
     case 'pin': run.pin(memo); break;
+    case 'day': await run.day?.(memo); break;
+    case 'mode': await run.mode?.(memo); break;
     case 'trash': run.trash(memo.id); break;
     case 'pdf': api.pdf.open(memo.id); break;
     case 'lock':

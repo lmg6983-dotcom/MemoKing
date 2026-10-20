@@ -768,6 +768,28 @@ try {
     }))));
     await back();
     await page.waitForTimeout(400);
+    // 밀어 지우기: 카드가 끝까지 날아간 뒤에 지우고, 목록은 한 번만 다시 그린다 (폴더 변경 소식으로 또 그리면 남은 카드가 미끄러지다 멈칫했다)
+    //   — 날아가는 동안 카드는 제자리 DOM 그대로 · 되돌리기로 같은 파일 이름으로 돌아옴
+    {
+      const fileName = fs.readdirSync(vault).find((f) => f.endsWith('.md') && read(f).includes('id: 00000000-0000-4000-8000-000000000001'));
+      await page.evaluate(() => {
+        window.__colsBuilt = 0;
+        new MutationObserver((l) => { for (const m of l) if ([...m.addedNodes].some((n) => n.classList?.contains('col'))) window.__colsBuilt++; }).observe(document.getElementById('cards'), { childList: true });
+      });
+      await touch('touchStart', cx, cy);
+      for (const mx of [-15, -50, -100, -160, -220, -260]) await touch('touchMove', cx + mx, cy);
+      await page.waitForTimeout(40);
+      await touch('touchEnd', 0, 0);
+      await page.waitForTimeout(120);
+      const midFlight = await page.evaluate((sel) => ({ inDom: Boolean(document.querySelector(sel)), flying: document.querySelector(sel)?.classList.contains('flying') }), cardSel);
+      await page.waitForTimeout(800);
+      const rebuilt = await page.evaluate(() => window.__colsBuilt);
+      check('밀어 지우기: 날아가는 동안은 그대로 · 다 날아간 뒤 지우고 목록은 한 번만 다시 그림', midFlight.inDom && midFlight.flying && rebuilt === 1
+        && !fs.existsSync(path.join(vault, fileName)) && await page.isHidden(cardSel), JSON.stringify({ midFlight, rebuilt }));
+      await page.tap('.toast-action');
+      await page.waitForTimeout(500);
+      check('밀어 지우기 → 되돌리기: 같은 파일 · 카드 다시 보임', fs.existsSync(path.join(vault, fileName)) && await page.isVisible(cardSel));
+    }
   }
   await page.tap('.card[data-id="00000000-0000-4000-8000-000000000001"]');
   await page.waitForSelector('#note-screen:not([hidden]) .ProseMirror');

@@ -138,10 +138,6 @@
             </intent-filter>
         </service>
 
-        <!-- 업데이트 설치 세션의 결과를 받는다 (설치 확인 화면 띄우기) -->
-        <receiver
-            android:name=".UpdateReceiver"
-            android:exported="false" />
         <provider
             android:name=".VaultFileProvider"
             android:authorities="com.memoking.app.files"

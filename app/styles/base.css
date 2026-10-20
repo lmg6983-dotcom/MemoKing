@@ -701,12 +701,62 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: #c4282e; }
 @media (prefers-color-scheme: dark) { .cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: var(--danger); } }
 .cal-body [role="gridcell"] { cursor: pointer; }
-.cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+/* 고른 날: 노란 테두리 없이 옅은 노랑 바탕이 스르르 (고를 때마다 페이드 인) */
+.cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); animation: mk-day-pick 0.24s ease-out; }
+@keyframes mk-day-pick { from { background-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .cal-body [role="gridcell"].mk-selected { animation: none; } }
 .cal-body .mk-ev { cursor: pointer; }
 /* "+2" 더 보기: 테두리 상자 대신 글자만 (일정 막대보다 눈에 덜 띄게) */
 .cal-body .mk-more { border: 0 !important; background: none !important; box-shadow: none !important; color: var(--muted); font-weight: 700; }
 @media (hover: hover) and (pointer: fine) { .cal-body .mk-more:hover { color: var(--text-strong); } }
 .cal-body .mk-ev.off { opacity: 0.5; }
+/* 달 보기 칩 제목: 날짜 숫자보다 작지 않게(12px · 손가락 화면 13px), 칩 폭을 다 쓰고 넘치면 … (높이는 한 줄 그대로 —
+   두 줄로 키우면 달력이 칸 높이를 다시 재며 고리를 돌았다) */
+.cal-body .mk-mt { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; font-weight: 600; line-height: 1.3; padding: 1px 3px; }
+@media (pointer: coarse) { .cal-body .mk-mt { font-size: 13px; } }
+/* 좁은 칸(휴대폰 · 좁힌 창): "…" 가 한 글자 자리를 먹으므로 그냥 칸 끝에서 자른다 (끝을 흐리게 하지 않음) */
+@media (max-width: 700px) {
+  .cal-body .mk-mt { text-overflow: clip; padding: 1px 2px; }
+}
+/* 달 보기 — 휴대폰 달력 위젯(삼성 캘린더)처럼: 칸 가운데 작은 날짜 숫자, 칸 폭을 꽉 채운 촘촘한 굵은 칩(모서리 4px · 칩 사이 2px),
+   테두리 상자 없이 옅은 선만 — 같은 칸에 일정이 더 많이 보이고 제목이 날짜보다 먼저 눈에 들어온다 */
+.cal[data-view="dayGridMonth"] .cal-body { --fc-forma-border: color-mix(in srgb, var(--text) 9%, transparent); --fc-forma-muted-border: color-mix(in srgb, var(--text) 9%, transparent); }
+.cal[data-view="dayGridMonth"] .cal-body [role="grid"] { border-radius: 0; }
+.cal[data-view="dayGridMonth"] .cal-body [role="columnheader"] { font-size: 13px; font-weight: 800; color: var(--text-strong); }
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { display: flex; justify-content: center; padding-top: 2px; font-size: 12px; line-height: 17px; font-weight: 500; color: var(--muted); }
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child { font-weight: 800; }
+/* 오늘: 노란 동그라미 대신 날짜 위에 색연필로 쓱 그은 체크 (숫자는 진한 글자 그대로 비쳐 보이게 — 읽기 쉽고 메모지 느낌) */
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div { position: relative; background: transparent !important; color: var(--text-strong) !important; }
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after {
+  content: ""; position: absolute; left: 0.5px; top: -6px; width: 32px; height: 28px; pointer-events: none; /* 꺾인 곳(그림의 x 10.5)이 숫자 칸(22px) 가운데에 */
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.6' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23f0a400' stroke-linecap='round' stroke-linejoin='round' opacity='0.85'%3E%3Cpath d='M4.5 15.5c2.2 1 4.1 3.1 6 6.6 3.4-7.6 8.5-13.6 16.5-18.6' stroke-width='3.2'/%3E%3Cpath d='M6 16.6c1.8 1 3.4 2.6 4.8 5 3.9-7 8.6-12.4 15.4-16.9' stroke-width='1.6' opacity='.55'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; mix-blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+  .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.6' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ffd43b' stroke-linecap='round' stroke-linejoin='round' opacity='0.8'%3E%3Cpath d='M4.5 15.5c2.2 1 4.1 3.1 6 6.6 3.4-7.6 8.5-13.6 16.5-18.6' stroke-width='3.2'/%3E%3Cpath d='M6 16.6c1.8 1 3.4 2.6 4.8 5 3.9-7 8.6-12.4 15.4-16.9' stroke-width='1.6' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); mix-blend-mode: screen; }
+}
+/* 지나간 날: 날짜 위에 색연필로 그은 X (지운 날처럼 — 숫자는 비쳐 보이게) */
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div { position: relative; }
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div::after {
+  content: ""; position: absolute; left: -3px; top: -3px; width: 28px; height: 28px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='5' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.4' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='9' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23d9480f' stroke-linecap='round' opacity='0.55'%3E%3Cpath d='M6.5 6.8c4.6 4.4 9.6 9.5 15.2 14.6' stroke-width='2.4'/%3E%3Cpath d='M21.6 6.2C16.9 11 12 16.1 6.4 21.7' stroke-width='2.4'/%3E%3Cpath d='M7.8 7.6c4.2 4 8.6 8.6 13.3 13' stroke-width='1.1' opacity='.5'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; mix-blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+  .cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='5' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.4' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='9' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff8a65' stroke-linecap='round' opacity='0.5'%3E%3Cpath d='M6.5 6.8c4.6 4.4 9.6 9.5 15.2 14.6' stroke-width='2.4'/%3E%3Cpath d='M21.6 6.2C16.9 11 12 16.1 6.4 21.7' stroke-width='2.4'/%3E%3Cpath d='M7.8 7.6c4.2 4 8.6 8.6 13.3 13' stroke-width='1.1' opacity='.5'/%3E%3C/g%3E%3C/svg%3E"); mix-blend-mode: screen; }
+}
+/* 날짜 숫자 칸: 22px 정사각 → 오늘의 노란 동그라미가 납작한 타원(22.7×20)이 아닌 원으로, 칸 가운데에 (달력이 붙이던 왼쪽 여백 1px 없이) */
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { padding-inline: 0 !important; }
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: 22px; min-width: 22px; height: 22px; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; line-height: 1; }
+.cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: #c4282e; } /* 일요일 빨강은 그대로 */
+@media (prefers-color-scheme: dark) { .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
+.cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 3px !important; }
+.cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext), .cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext) > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
+/* 좁은 창(휴대폰): 달력을 화면 폭 가까이 넓혀 칸마다 글자가 더 들어가게 */
+@media (max-width: 700px) { .cal[data-view="dayGridMonth"] { margin-inline: -9px; padding-inline: 2px; } }
+/* 칩 제목: 칸 폭에 맞춘 크기(공백 포함 한글 8자쯤 — 휴대폰 약 8~9px, 넓은 창은 11px 까지) · 보통 굵기 · 살짝 좁은 자간 */
+.cal[data-view="dayGridMonth"] .cal-body .mk-mt { font-size: clamp(8px, calc((var(--cal-col, 56px) - 5px) / 6.3), 11px) !important; font-weight: 500; letter-spacing: -0.03em; line-height: 1.3; padding: 1px 1.5px; }
+.cal[data-view="dayGridMonth"] .cal-body .mk-more { min-height: 0 !important; margin: 0 2px; padding: 0 2px; font-size: 11.5px; line-height: 13px; }
+/* 내 일정 칩 왼쪽의 색 점 자리: 칩이 이미 그 색이라 보이지 않고 좁은 칸만 차지했다 (다른 캘린더 일정은 점이 그 캘린더 표시라 둔다) */
+.cal-body .mk-ev:not(.mk-ext) > div:first-child:empty { display: none; }
 /* 낮은 창: 일정 막대 대신 날짜 + 색 점 (list-reminders.js fitSize) */
 .cal.compact .cal-body { font-size: 11.5px; }
 .cal.compact .cal-body [role="gridcell"] > :first-child { min-height: 0; padding: 1px 2px 0; }
@@ -715,8 +765,22 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-daytop .cal-dots { display: flex; gap: 2px; height: 4px; }
 .cal-daytop .cal-dots i { width: 4px; height: 4px; border-radius: 99px; background: var(--note-chip); }
 /* 무게: 내 메모 일정은 메모 색을 꽉 채운 칩, 다른 캘린더 일정은 바탕 없이 그 캘린더 색 띠 + 글자만 (보기만 하는 일정이라 덜 무겁게) */
-.cal-body .mk-ev:not(.mk-ext) { background: var(--fc-event-color) !important; color: #16161a; font-weight: 600; } /* 칩 색은 밝은 편이라 두 테마 모두 짙은 글자 */
-.cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: #f5f4ef; }
+/* 칩 색: 메모 카드와 같은 메모지 색 — 연한 메모 바탕 + 메모 줄 색 얇은 테두리 + 같은 색 계열의 진한 글자 (목록 카드와 한 벌로 보이게) */
+.cal-body .mk-ev:not(.mk-ext) {
+  background: var(--note-bg, var(--yellow-bg)) !important;
+  box-shadow: inset 0 0 0 1px var(--note-bar, var(--yellow-bar));
+  color: color-mix(in srgb, var(--note-chip, var(--yellow-chip)) 38%, #1b1b1f);
+  font-weight: 600;
+}
+.cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: #5a4600; } /* 노랑은 섞으면 탁해져 따로 (갈색 글자) */
+.cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: #f5f4ef; box-shadow: none; }
+@media (prefers-color-scheme: dark) {
+  .cal-body .mk-ev:not(.mk-ext) { color: color-mix(in srgb, var(--note-chip, var(--yellow-chip)) 55%, #fff); }
+  .cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: #ffe680; }
+  .cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: #f5f4ef; box-shadow: inset 0 0 0 1px var(--line); }
+}
+/* 지난 · 끝난 내 일정: 바탕 없이 메모 줄 색 테두리 + 흐린 글자 (채운 칩보다 한발 물러나 보이게) */
+.cal-body .mk-ev.off:not(.mk-ext) { opacity: 1; background: var(--surface-1) !important; box-shadow: inset 0 0 0 1px var(--note-bar, var(--line)); color: var(--muted); }
 .cal-body .mk-ev:not(.mk-ext) * { color: inherit !important; } /* 칩 안쪽 글자도 (FullCalendar 가 안쪽에 색을 따로 줌) */
 /* 목록 보기는 줄이 넓어 꽉 채우면 무거움 — 메모 일정은 진한 옅은 바탕, 다른 캘린더는 더 옅게 (무게 차이는 그대로) */
 .cal[data-view="listMonth"] .cal-body .mk-ev:not(.mk-ext) { background: color-mix(in srgb, var(--fc-event-color) 26%, transparent) !important; color: var(--text-strong); }
@@ -839,3 +903,82 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   .mk-dots i { animation: none; opacity: 0.6; }
 }
 @keyframes mk-glass-breathe { 50% { opacity: 0.45; } }
+
+/* "이 날의 기록으로" (memory-day.js) — PC 메모 창 · 목록 · 휴대폰 */
+.memory-day .md-lead { margin: 0 0 14px; font-size: 13.5px; color: var(--muted); }
+.memory-day .md-title { display: block; margin-bottom: 4px; overflow: hidden; font-size: 15px; color: var(--text-strong); text-overflow: ellipsis; white-space: nowrap; }
+.memory-day .md-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.memory-day .md-chip { min-height: 34px; padding: 0 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; transition: background-color 0.15s ease-out, transform 0.1s ease-out; }
+.memory-day .md-chip:active { transform: scale(0.95); }
+.memory-day .md-chip[aria-checked="true"] { border-color: transparent; background: var(--accent); color: var(--on-brand); font-weight: 700; }
+.memory-day .md-date { position: relative; display: flex; align-items: center; gap: 8px; min-height: 44px; margin-bottom: 18px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); color: var(--text-strong); font-weight: 700; cursor: pointer; }
+.memory-day .md-date svg { flex: none; width: 18px; height: 18px; }
+.memory-day .md-date::after { content: '›'; margin-left: auto; color: var(--muted); font-weight: 800; }
+.memory-day .md-date-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+@media (pointer: coarse) { .memory-day .md-chip { min-height: 44px; font-size: 14px; } }
+
+/* ---------- 메모킹 Work / Life (core/modes.js) ----------
+   Life 는 지금 그대로(노랑). Work 는 남색 — 목록 · 단추 · 고른 칩이 차분한 남색으로. 메모 안의 강조(체크 · 선택 막대)는 메모지 그대로 노랑 */
+:root[data-mode="work"] {
+  --brand-yellow: #2f4a7a;
+  --brand-yellow-hover: #263d66;
+  --brand-yellow-soft: #e3e9f4;
+  --on-brand: #ffffff;
+  --focus-ring: #2f4a7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-mode="work"] {
+    --brand-yellow: #7f9fdc;
+    --brand-yellow-hover: #93b0e6;
+    --brand-yellow-soft: #1c2638;
+    --on-brand: #0b1220;
+    --focus-ring: #7f9fdc;
+  }
+}
+:root[data-mode="work"] [data-color] { --note-accent: #ffcc00; }
+
+/* 왕관 옆 작은 표시: Life 는 꽃, Work 는 넥타이 */
+.mode-badge {
+  position: absolute; right: -5px; bottom: -3px; width: 13px; height: 13px; pointer-events: none;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg fill='%23ff8fb1' stroke='%23fff' stroke-width='.8'%3E%3Ccircle cx='8' cy='3.6' r='3'/%3E%3Ccircle cx='12.2' cy='6.6' r='3'/%3E%3Ccircle cx='10.6' cy='11.6' r='3'/%3E%3Ccircle cx='5.4' cy='11.6' r='3'/%3E%3Ccircle cx='3.8' cy='6.6' r='3'/%3E%3C/g%3E%3Ccircle cx='8' cy='8' r='2.4' fill='%23ffcc00'/%3E%3C/svg%3E");
+  transition: transform 0.25s var(--ease-pop);
+}
+:root[data-mode="work"] .mode-badge {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.6 1h4.8L9.2 4 11 12.4 8 15.4 5 12.4 6.8 4z' fill='%232f4a7a' stroke='%23fff' stroke-width='.9' stroke-linejoin='round'/%3E%3Cpath d='M6.8 4h2.4' stroke='%23fff' stroke-width='.8'/%3E%3C/svg%3E");
+}
+@media (prefers-reduced-motion: reduce) { .mode-badge { transition: none; } }
+
+/* Work | Life 고르기 (PC 제목 줄 · 휴대폰 검색 왼쪽) */
+.mode-switch { position: relative; display: inline-flex; flex: none; padding: 2px; border-radius: 999px; background: var(--fill-tab, rgba(0, 0, 0, 0.05)); -webkit-app-region: no-drag; }
+.mode-switch button {
+  min-width: 46px; height: 26px; padding: 0 10px; border: 0; border-radius: 999px; background: none;
+  color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
+  transition: background-color 0.18s var(--ease-out), color 0.18s var(--ease-out);
+}
+.mode-switch button:hover:not([aria-checked="true"]) { color: var(--text); }
+.mode-switch button[aria-checked="true"] { background: var(--brand-yellow); color: var(--on-brand); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.mode-switch button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.other-mode { font-weight: 700; }
+
+/* 정리 도우미 (mode-helper-dialog.js) */
+.mode-helper { width: min(440px, calc(100vw - 32px)); }
+.mode-helper .mh-lead { margin: 0 0 12px; font-size: 13.5px; color: var(--muted); }
+.mode-helper .mh-list { max-height: min(52vh, 380px); margin: 0 -8px 16px; overflow-y: auto; overscroll-behavior: contain; }
+.mode-helper .mh-row { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 8px; border-radius: 10px; cursor: pointer; }
+.mode-helper .mh-row:hover { background: var(--hover); }
+.mode-helper .mh-row input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: #2f4a7a; }
+.mode-helper .mh-dot { flex: none; width: 12px; height: 12px; border-radius: 4px; background: var(--note-chip); }
+.mode-helper .mh-words { display: flex; flex-direction: column; min-width: 0; }
+.mode-helper .mh-title { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.mode-helper .mh-why { font-size: 12px; color: var(--muted); }
+@media (pointer: coarse) { .mode-helper .mh-row { min-height: 52px; } .mode-helper .mh-row input { width: 22px; height: 22px; } }
+
+/* 설정 › Work / Life (work-settings.js) */
+.work-hours .wh-days { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
+.work-hours .wh-day { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.work-hours .wh-day.sun { color: var(--danger); }
+.work-hours .wh-day[aria-pressed="true"] { border-color: transparent; background: #2f4a7a; color: #fff; }
+.work-hours .wh-time { display: flex; align-items: center; gap: 8px; }
+.work-hours .wh-time input { height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
+.work-hours .wh-sum { font-weight: 500; color: var(--muted); }
+@media (pointer: coarse) { .work-hours .wh-day { width: 44px; height: 44px; } .work-hours .wh-time input { height: 44px; } }

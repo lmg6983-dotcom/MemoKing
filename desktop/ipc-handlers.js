@@ -30,6 +30,8 @@ const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x:
 
 export function registerIpc(ctx) {
   const {
+    setAppMode,
+    setWorkHours,
     calendarFeeds,
     windowManager: wm,
     memoHotkeys,
@@ -364,6 +366,9 @@ export function registerIpc(ctx) {
     saveSettings();
     return settings.fitTables;
   });
+  // 메모킹 Work / Life 바꾸기 — 목록이 그 모드의 메모만 보이고, 새 메모(빠른 메모 · 캡처 포함)도 그 모드로
+  ipcMain.handle('mode:set', (_e, mode) => setAppMode(mode));
+  ipcMain.handle('mode:hours', (_e, hours) => setWorkHours(hours));
   // 링크 미리보기 카드 켜고 끄기 — 열린 메모 · 위젯에도 바로
   ipcMain.handle('app:set-link-previews', (_e, on) => {
     settings.linkPreviews = Boolean(on);
@@ -806,9 +811,10 @@ export function registerIpc(ctx) {
     await writeClipboard({ png: Buffer.from(String(base64), 'base64') });
     return { ok: true };
   });
-  ipcMain.handle('image:save', async (event, id, base64) => {
-    const memo = getVault()?.get(String(id));
-    const name = `${pdfFileName(memo?.title ?? '메모').replace(/\.pdf$/i, '')}.png`;
+  // fileName: 메모가 아닌 그림(추억 한 장으로)의 이름
+  ipcMain.handle('image:save', async (event, id, base64, fileName) => {
+    const memo = id ? getVault()?.get(String(id)) : null;
+    const name = typeof fileName === 'string' && /^[^\\/:*?"<>|]{1,120}\.png$/i.test(fileName) ? fileName : `${pdfFileName(memo?.title ?? '메모').replace(/\.pdf$/i, '')}.png`;
     let file = SMOKE ? path.join(app.getPath('temp'), `memoking-smoke-${Date.now()}.png`) : null;
     if (!file) {
       const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender) ?? undefined, {

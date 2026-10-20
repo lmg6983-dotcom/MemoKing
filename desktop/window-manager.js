@@ -19,7 +19,7 @@ import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
 import {
   APP_DIR, MAGIC_PRELOAD, FINDER_PRELOAD, OPMS_PRELOAD, OCR_PRELOAD,
   webPreferences, windowIcon, noteBg, titleBarOverlay, bringToFront,
-  guardWindow, onScreen, defaultNoteBounds, painted, trackPaint, whenPainted, animateBounds,
+  guardWindow, onScreen, defaultNoteBounds, painted, trackPaint, whenPainted, animateBounds, fadeIn,
 } from './window-utils.js';
 import {
   settings, saveSettings, openWebPage, toast, copyFileToClipboard,
@@ -685,6 +685,7 @@ export class WindowManager {
       open: Boolean(this.noteWins.get(m.id)?.isVisible()),
       stack: this.stacks?.stackOf(m.id)?.memos.length ?? 0,
       hotkey: this.hotkeySlotOf(m.id),
+      views: settings.viewCounts?.[m.id] ?? 0, // 목록 "많이 본 순" (main.js noteOpened)
       // 테이프로 바탕화면에 붙여 둔 메모 (창이 떠 있을 때만 — 닫으면 바탕화면에 없다)
       taped: this.layerOf(m.id) === 'bottom' && (this.stacks?.stackOf(m.id)?.memos ?? [m.id]).some((x) => this.noteWins.get(x)?.isVisible()),
     }));
@@ -849,6 +850,8 @@ export class WindowManager {
       if (sticker && veiled) sticker.hold = true;
       else if (stuck) this.handOverSticker(shown, win);
       win.webContents.send('memo:layer', state);
+      // 지금 보이는 탭 창: 곧 포커스를 잃지만 덮일 때까지 그대로 (서식 막대가 내려가거나 선택 테두리가 사라지는 움직임이 보이지 않게)
+      if (shown && shown !== win) shown.webContents.send('stack:leaving');
       if (veiled) win.setOpacity(0);
       if (inactive) win.showInactive();
       else {
@@ -872,8 +875,11 @@ export class WindowManager {
             this.openStickerWin(sticker, false);
           }
         }
-        win.setOpacity(1);
-        setTimeout(hideOthers, 16);
+        // 색이 다른 메모로 바뀌면 짧게 겹쳐 바뀐다 (툭 바뀌면 번쩍여 보였다). 같은 색이면 바로
+        const vault = this.getVault();
+        const shownId = now?.memos.find((m) => this.noteWins.get(m) === shown);
+        const recolor = vault && shownId && (vault.get(shownId)?.color ?? '') !== (vault.get(id)?.color ?? '');
+        (recolor ? fadeIn(win) : Promise.resolve(win.setOpacity(1))).then(() => setTimeout(hideOthers, 16));
       });
     };
     if (!win) {

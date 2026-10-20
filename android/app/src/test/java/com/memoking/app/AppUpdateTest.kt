@@ -35,4 +35,13 @@ class AppUpdateTest {
             file.delete()
         }
     }
+
+    @Test
+    fun installerResultToHint() {
+        assertEquals(null, AppUpdate.failStatus(ok = true, canceled = false, installResult = 1))
+        assertEquals("취소", 3, AppUpdate.failStatus(ok = false, canceled = true, installResult = 0))
+        assertEquals("서명 다름", 7, AppUpdate.failStatus(ok = false, canceled = false, installResult = -7))
+        assertEquals("공간 부족", 6, AppUpdate.failStatus(ok = false, canceled = false, installResult = -4))
+        assertEquals("그 밖", 1, AppUpdate.failStatus(ok = false, canceled = false, installResult = -110))
+    }
 }

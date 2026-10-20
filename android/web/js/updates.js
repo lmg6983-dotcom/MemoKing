@@ -24,7 +24,7 @@ const save = () => {
   }
 };
 
-// PackageInstaller.STATUS_FAILURE_* → 안내
+// 안드로이드 설치기가 돌려준 결과(AppUpdate.failStatus) → 안내
 const INSTALL_FAIL = {
   3: '설치를 취소했어요. 준비는 되어 있으니 "설치하기" 를 다시 눌러 주세요',
   4: '설치 파일에 문제가 있어요. 다시 받아 주세요',

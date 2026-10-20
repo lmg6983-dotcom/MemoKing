@@ -36,6 +36,10 @@ import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml } from './print-html.js';
 import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
+import { openMemoryDay, dayText } from '../../app/js/memory-day.js';
+import { memoMode, otherMode, moveLabel, MODE_LABEL } from '../../app/js/core/modes.js';
+import { renderWorkSettings } from '../../app/js/work-settings.js';
+import { workHours, saveWorkHours } from './work-mode.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -158,7 +162,10 @@ app.api = {
       return id;
     },
   },
-  memos: { search: async (query) => app.vault?.search(String(query ?? '')) ?? [] },
+  memos: {
+    list: async () => app.vault?.list() ?? [],
+    search: async (query) => app.vault?.search(String(query ?? '')) ?? [],
+  },
   // 첨부 저장 (PC 의 attachments.save 와 같음) — 가져온 일정의 달력 그림
   attachments: { save: async (bytes, ext) => (app.vault ? app.vault.saveAttachment(bytes, ext) : null) },
   // 일정 탭이 함께 보는 다른 캘린더 — .ics 구독(이 휴대폰에만 저장) · 휴대폰 캘린더(삼성 캘린더 · Google 캘린더)
@@ -327,11 +334,14 @@ app.setReminders = (memoId, next) => {
 
 const alarms = createAlarms({
   getVault: () => app.vault,
+  getHours: workHours, // 퇴근 뒤 Work 알림은 조용히
   onFire: (memoId, reminder, alarm) => {
     // "메모 띄우기" 알림: 앱이 보이고 있으면 바로 그 메모를 연다
     if (reminder.action === 'open' && !document.hidden) app.openMemo(memoId, { alarm, highlight: true });
   },
 });
+
+app.rescheduleAlarms = () => alarms.schedule(); // 업무 시간 설정이 바뀌면 (list-view.js)
 
 // ---------- 화면 바꾸기 ----------
 
@@ -388,6 +398,7 @@ app.openMemo = async (id, options = {}) => {
   // 태블릿: 새로 열면 목록은 숨기고 메모를 가득
   if (isTwoPane()) panes.hideListForMemo();
   $('list-screen').hidden = false; // 메모 뒤에 목록이 있어야 닫을 때 바로 보인다
+  list.countView(id); // 목록 "많이 본 순"
   await note.openNote(id, options);
   syncPane();
 };
@@ -435,6 +446,8 @@ app.memoMenu = (id) => {
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
   pin.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
   memoSheet.querySelector('[data-memo-action="lock"] span').textContent = memo.locked ? '잠금 풀기' : '잠그기';
+  memoSheet.querySelector('[data-memo-action="day"] small').textContent = memo.day ? dayText(memo.day) : '';
+  memoSheet.querySelector('[data-memo-action="mode"] span').textContent = moveLabel(memo);
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -473,6 +486,25 @@ memoSheet.addEventListener('click', async (e) => {
       if (!app.vault.setMeta(id, { pinned: !memo.pinned })) toast('고정을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
       else toast(memo.pinned ? '목록 고정을 풀었어요' : '목록 맨 위에 고정했어요');
       break;
+    case 'day': {
+      // 추억 달력에서 이 메모를 둘 날 (memory-day.js)
+      note.flush();
+      closeSheet(memoSheet);
+      const day = await openMemoryDay({ created: memo?.created, day: memo?.day });
+      if (day === null) break;
+      if (!app.vault.setMeta(id, { day })) toast('날짜를 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+      else toast(day ? `추억 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
+      break;
+    }
+    case 'mode': {
+      // Work ↔ Life로 옮기기 (목록에서는 그 모드에서 보인다)
+      note.flush();
+      closeSheet(memoSheet);
+      const to = otherMode(memoMode(memo));
+      if (!app.vault.setMeta(id, { mode: to })) toast('옮기지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+      else toast(`${MODE_LABEL[to]}로 옮겼어요`);
+      break;
+    }
     case 'share':
       closeSheet(memoSheet);
       openShare(id);
@@ -560,7 +592,8 @@ const titleOf = (body) => (isBlankBody(body) ? '새 메모' : extractTitle(body)
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** 메모를 지운다. 열려 있으면 메모 화면이 휴지통으로 빨려 들어가듯, 목록이면 카드가 접히며 사라진다 */
-async function deleteMemo(id) {
+/** @param {{ flown?: boolean }} [o] flown: 카드가 이미 밀려 날아갔다 (목록 밀어 지우기) — 따로 날리지 않는다 */
+async function deleteMemo(id, { flown = false } = {}) {
   if (!app.vault?.get(id)) return;
   const inNote = note.currentId() === id;
   const body = inNote ? note.editorMarkdown() : app.vault.get(id)?.body ?? '';
@@ -573,7 +606,11 @@ async function deleteMemo(id) {
     }
     note.discardAndClose();
     $('note-screen').classList.remove('trashing');
-  } else if (motion) list.animateRemove(id);
+  } else if (motion && !flown) {
+    list.animateRemove(id);
+    // 날아가는 카드를 먼저 화면에 올린 뒤 (그다음부터는 따로 움직여 안 끊김) 무거운 일(지우기 · 다시 그리기)
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }
   haptic(10);
   let name;
   try {
@@ -893,6 +930,15 @@ function openSettings() {
     : '이 휴대폰은 Google 음성 인식(안드로이드 13 이상)을 쓸 수 없어 녹음만 해요';
   $('rec-stt').disabled = !recorder.sttReady();
   refreshSpeakerRow();
+  renderWorkSettings($('work-settings'), {
+    hours: workHours(),
+    save: saveWorkHours,
+    openHelper: () => {
+      closeSheet($('settings-sheet'));
+      list.openHelper();
+    },
+    quietNote: '업무 시간 밖에는 Work 메모의 알림을 울리지 않아요. 고정한 메모의 알림은 늘 울려요',
+  });
   openSheet($('settings-sheet'));
 }
 

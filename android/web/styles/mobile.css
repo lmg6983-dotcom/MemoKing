@@ -4,6 +4,7 @@
 :root {
   --tap: 44px; /* 손가락으로 누르기 좋은 최소 크기 */
   --top-h: 56px;
+  --tabbar-h: 56px; /* 아래 탭바 (탭 42px + 위아래 여백) */
 }
 
 html, body {
@@ -94,7 +95,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .brand-icon { width: 28px; height: 28px; }
 .brand { margin-left: 8px; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 
-.searchbar { display: flex; align-items: center; gap: 4px; padding: 0 10px 8px 16px; flex: none; }
+.searchbar { display: flex; align-items: center; gap: 2px; padding: 10px 6px 8px 12px; flex: none; } /* 맨 위 줄 (앱 이름 줄 없이) */
 .search {
   display: flex;
   align-items: center;
@@ -128,11 +129,12 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 }
 .filter-count:empty { display: none; }
 
+/* 아래 탭바 (메모 · 일정 · 보관함): 엄지가 닿는 곳 — + 단추는 그 위 */
 .tabs {
   position: relative;
   display: flex;
   gap: 4px;
-  margin: 0 16px 6px;
+  margin: 6px 12px calc(8px + env(safe-area-inset-bottom));
   padding: 3px;
   flex: none;
   border-radius: var(--radius-md);
@@ -162,7 +164,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   overflow-x: hidden; /* 밀어 지우는 카드가 기울어 삐져나와도 화면이 옆으로 끌리지 않게 */
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 2px 0 calc(96px + env(safe-area-inset-bottom));
+  padding: 2px 0 88px; /* + 단추 자리 (아래 탭바는 목록 밖) */
 }
 
 /* 필터 */
@@ -198,7 +200,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   white-space: nowrap;
 }
 .chip svg { width: 15px; height: 15px; }
-.chip[aria-pressed="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; } /* PC 목록과 같음 */
+.chip[aria-pressed="true"], .chip[aria-checked="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; } /* PC 목록과 같음 (보기 패널의 정렬 · 카드 모양은 aria-checked) */
 @media (prefers-color-scheme: dark) {
   .chip[aria-pressed="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
 }
@@ -301,7 +303,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .fab {
   position: absolute;
   right: 20px;
-  bottom: calc(20px + env(safe-area-inset-bottom));
+  bottom: calc(20px + var(--tabbar-h) + env(safe-area-inset-bottom)); /* 아래 탭바 위 */
   display: grid;
   place-items: center;
   width: 60px;
@@ -767,11 +769,12 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .rec-text { max-height: 22vh; margin-top: 8px; overflow-y: auto; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .rec-partial { color: var(--note-muted); }
 .rec-hint { color: var(--note-muted); font-size: 13px; }
-/* 목록 화면: 녹음 중 알약 (+ 버튼 위) */
+/* 목록 화면: 녹음 중 알약 (+ 버튼 위 — + 버튼 아래 끝 20px + 높이 60px + 사이 12px, 아래 탭바 위) */
 .rec-pill {
   position: absolute;
   right: 20px;
-  bottom: calc(92px + env(safe-area-inset-bottom));
+  bottom: calc(92px + var(--tabbar-h) + env(safe-area-inset-bottom));
+  z-index: 19;
   display: inline-flex; align-items: center; gap: 8px;
   height: 40px; padding: 0 14px;
   border: 0; border-radius: 999px;
@@ -780,6 +783,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
   box-shadow: 0 6px 18px color-mix(in srgb, var(--rec) 35%, transparent);
 }
 .rec-pill .rec-dot { background: #fff; box-shadow: none; }
+.fab-menu:not([hidden]) ~ .rec-pill { visibility: hidden; } /* + 메뉴를 펼친 동안은 메뉴와 겹치지 않게 */
 
 /* ---------- 추천 태그 (태그 없는 메모) — 모양은 note.css, 여기는 손가락 크기만 ---------- */
 .tag-suggest-bar { gap: 8px; padding: 4px 4px 4px 14px; animation-name: mk-drop-in; }
@@ -847,7 +851,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .fab.open { background: var(--surface-2); color: var(--text-strong); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
 .fab.open svg { transform: rotate(45deg); }
 .fab-scrim { position: absolute; inset: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); animation: mk-fade-in 0.15s ease-out; }
-.fab-menu { position: absolute; right: 20px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 21; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+.fab-menu { position: absolute; right: 20px; bottom: calc(92px + var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 21; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
 .fab-sat { display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none; color: var(--text-strong); animation: sat-out 0.26s var(--ease-out) both; }
 .fab-sat:nth-child(1) { animation-delay: 0.03s; }
 .fab-menu.closing .fab-sat { animation: sat-in 0.14s var(--ease-out) both; }
@@ -865,12 +869,16 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 @keyframes card-fly { to { transform: translateX(var(--fly, 110%)) rotate(6deg); opacity: 0; } }
 .card { touch-action: pan-y; } /* 가로 움직임은 카드 밀기로 (브라우저가 화면을 옆으로 끌지 않음) */
 .card.swiping { transition: none; z-index: 2; will-change: transform, opacity; }
+.card.flying { z-index: 2; will-change: transform, opacity; pointer-events: none; } /* 밀어 지운 카드가 날아가는 동안 (따로 그리는 층) */
 .list-screen.swipe-lock .view { overflow-y: hidden; } /* 미는 동안 목록이 위아래로 같이 흔들리지 않게 */
 .card.swipe-ready { box-shadow: 0 0 0 2px var(--rec), var(--shadow-card); }
-.card.swipe-ready::before {
+/* "지우기" 딱지는 밀기 시작할 때 미리 만들어 두고 문턱에서 보이기만 — 문턱을 넘는 순간 새로 그리느라 걸리지 않게 */
+.card.swiping::before {
   content: "지우기"; position: absolute; top: 10px; right: 10px; z-index: 3;
   padding: 2px 8px; border-radius: 999px; background: var(--rec); color: var(--on-rec); font-size: 12px; font-weight: 800;
+  opacity: 0; transform: scale(0.85); transition: opacity 0.12s, transform 0.12s var(--ease-out);
 }
+.card.swiping.swipe-ready::before { opacity: 1; transform: none; }
 /* 태블릿: 오른쪽으로 밀면 열기 (지우기는 왼쪽으로만) — 안내는 카드 왼쪽 안에 (옆 메모 칸에 가리지 않게) */
 .card.swipe-open.swipe-ready { box-shadow: 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
 .card.swipe-open.swipe-ready::before { content: attr(data-open-label); right: auto; left: 10px; background: var(--brand-yellow); color: var(--on-brand); }
@@ -955,7 +963,6 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   .note-screen .format-bar button { min-width: 38px; height: 40px; }
   .tabs button { font-size: 12.5px; }
   .tabs button svg { display: none; }
-  .brand { font-size: 18px; }
   .share-choice small { display: none; }
 }
 /* 가로로 눕힌 휴대폰 (높이가 낮음): 막대를 얇게 */
@@ -1210,3 +1217,10 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .note-screen .mk-media .mk-media-label { min-height: 44px; padding: 10px 10px 6px; font-size: 13px; }
 .note-screen .mk-audio .mk-media-label::after,
 .note-screen .mk-voice-body > p:first-child .mk-media-label::after { content: "\22EF"; margin-left: auto; padding: 0 8px; font-size: 22px; line-height: 1; opacity: 0.7; }
+/* 정렬: 기본(최신순)이 아니면 단추에 표시 (필터처럼) */
+.sort-btn.active { background: var(--brand-yellow-soft); color: var(--text-strong); }
+
+/* 메모킹 Work / Life 고르기: 검색 왼쪽에 작게 (손가락 높이 44px 은 둘레 칸으로) */
+.searchbar .mode-switch { margin-right: 6px; padding: 3px; }
+.searchbar .mode-switch button { position: relative; min-width: 42px; height: 38px; padding: 0 8px; font-size: 13px; }
+.other-mode { display: block; margin: 0 16px 8px auto; padding: 6px 0; font-size: 13.5px; }

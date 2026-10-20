@@ -333,7 +333,12 @@ class Bridge(private val activity: MainActivity) {
             "historyPermission" -> activity.runOnUiThread { activity.openNotificationAccess(id) }
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
             // 앱 안 업데이트 (AppUpdate.kt): 확인 → 받기(진행은 'update' 소식) → 설치 화면 열기
-            "updateCheck" -> pool.execute { resolve(id) { AppUpdate.check() } }
+            "updateCheck" -> pool.execute {
+                resolve(id) {
+                    // 최신이면 예전에 받아 둔 APK(설치를 마친 것)는 지운다
+                    AppUpdate.check().also { if (!it.optBoolean("available")) AppUpdate.cleanup(ctx) }
+                }
+            }
             "updateDownload" -> pool.execute {
                 resolve(id) {
                     AppUpdate.download(ctx, a) { done, total ->
@@ -343,7 +348,7 @@ class Bridge(private val activity: MainActivity) {
                 }
             }
             // → "started"(설치 화면으로 넘김) | "permission"(출처를 알 수 없는 앱 설치 허용 화면을 열었음 — 허용 뒤 다시) | "missing"(받은 파일이 없음)
-            //   (APK 를 설치 세션에 쓰는 일은 수십 MB 라 화면 스레드에서 하면 앱이 멈춘다 — 일꾼 스레드에서, 허용 화면만 화면 스레드에서)
+            //   설치 화면은 안드로이드 기본 설치기 — 취소 · 실패하면 'updateResult' 소식 (MainActivity.installUpdate)
             "updateInstall" -> pool.execute {
                 resolve(id) {
                     val file = AppUpdate.downloaded(ctx)
@@ -354,9 +359,7 @@ class Bridge(private val activity: MainActivity) {
                             "permission"
                         }
                         else -> {
-                            // 설치가 끝나지 않았을 때(취소 · 실패) 화면에 알린다 — 설치 화면 안내만 남아 먹통처럼 보이지 않게
-                            AppUpdate.listener = { status, why -> activity.runOnUiThread { activity.emit("updateResult", JSONObject().put("status", status).put("why", why)) } }
-                            AppUpdate.install(ctx, file)
+                            activity.runOnUiThread { activity.installUpdate(file) }
                             "started"
                         }
                     }

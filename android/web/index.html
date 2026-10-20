@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="../app/styles/base.css">
   <link rel="stylesheet" href="../app/styles/note.css">
   <link rel="stylesheet" href="../app/styles/ctx-menu.css">
+  <link rel="stylesheet" href="../app/styles/memories.css">
   <link rel="stylesheet" href="styles/mobile.css">
   <script type="module" src="js/app.js"></script>
 </head>
@@ -46,31 +47,27 @@
 
   <!-- ========== 메모 목록 ========== -->
   <section id="list-screen" class="screen list-screen" hidden>
-    <header class="top">
-      <img class="brand-icon" src="../app/assets/mark-64.png" alt="" draggable="false">
-      <span class="brand">메모킹</span>
-      <span class="grow"></span>
-      <button id="sync-btn" class="icon-btn sync-btn" aria-label="Google Drive와 지금 동기화" hidden><svg><use href="#i-cloud"/></svg></button>
-      <button id="layout-btn" class="icon-btn" aria-label="카드 모양 바꾸기"><svg><use href="#i-rows"/></svg></button>
-      <button id="settings-btn" class="icon-btn" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
-    </header>
-
+    <!-- 맨 위: 검색 + 보기(정렬 · 카드 모양 · 필터) · 동기화 · 설정 (앱 이름 줄 없이 — 메모가 한 줄 더 위에서 시작) -->
     <div class="searchbar">
+      <!-- 메모킹 Work / Life (core/modes.js) — 목록 · 검색 · 일정이 그 모드의 메모만 -->
+      <div id="mode-switch" class="mode-switch" role="radiogroup" aria-label="메모킹 모드">
+        <button type="button" role="radio" data-mode="life" aria-checked="true">Life</button>
+        <button type="button" role="radio" data-mode="work" aria-checked="false" tabindex="-1">Work</button>
+      </div>
       <label class="search">
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모나 #태그 검색" aria-label="메모 검색" autocomplete="off" enterkeyhint="search">
       </label>
-      <button id="filter-btn" class="icon-btn filter-btn" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
+      <button id="filter-btn" class="icon-btn filter-btn" aria-label="보기: 정렬 · 카드 모양 · 필터" aria-expanded="false" aria-controls="filter-panel"><svg><use href="#i-tune"/></svg><span class="filter-count" id="filter-count"></span></button>
+      <button id="sync-btn" class="icon-btn sync-btn" aria-label="Google Drive와 지금 동기화" hidden><svg><use href="#i-cloud"/></svg></button>
+      <button id="settings-btn" class="icon-btn" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
     </div>
 
-    <nav class="tabs" role="tablist" aria-label="보기">
-      <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
-      <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-calendar"/></svg>일정 <span class="tab-count" id="count-reminders"></span></button>
-      <button role="tab" data-tab="history" aria-selected="false"><svg><use href="#i-inbox"/></svg>보관함</button>
-    </nav>
-
     <div class="view" id="view-memos" role="tabpanel">
+      <!-- 보기 (위 "보기" 단추): 정렬 · 카드 모양 · 필터(색 · 담긴 것) -->
       <div id="filter-panel" class="filter-panel" hidden>
+        <div class="filter-group"><span class="filter-label">정렬</span><div id="sort-group" class="chip-row" role="radiogroup" aria-label="정렬"></div></div>
+        <div class="filter-group"><span class="filter-label">모양</span><div id="layout-group" class="chip-row" role="radiogroup" aria-label="카드 모양"></div></div>
         <div class="filter-group"><span class="filter-label">색</span><div id="color-filter" class="color-filter" role="group" aria-label="색으로 거르기"></div></div>
         <div class="filter-group"><span class="filter-label">담긴 것</span><div id="kind-filter" class="chip-row" role="group" aria-label="담긴 것으로 거르기"></div></div>
       </div>
@@ -79,6 +76,7 @@
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>
       </div>
+      <button id="other-mode" class="link-btn other-mode" type="button" hidden></button>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
     </div>
@@ -112,6 +110,13 @@
         <p id="history-empty" class="empty" hidden></p>
       </div>
     </div>
+
+    <!-- 아래 탭바: 엄지가 닿는 곳 (메모 · 일정 · 보관함) -->
+    <nav class="tabs" role="tablist" aria-label="메모 · 일정 · 보관함">
+      <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
+      <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-calendar"/></svg>일정 <span class="tab-count" id="count-reminders"></span></button>
+      <button role="tab" data-tab="history" aria-selected="false"><svg><use href="#i-inbox"/></svg>보관함</button>
+    </nav>
 
     <!-- 새 메모: + 를 누르면 위로 위성 버튼 두 개 (음성 메모 · 글 메모) -->
     <div id="fab-scrim" class="fab-scrim" hidden></div>
@@ -287,6 +292,8 @@
     <div class="swatches" id="swatches" role="radiogroup" aria-label="메모 색"></div>
     <button class="menu-item" data-memo-action="open"><svg><use href="#i-note"/></svg><span>열기</span></button>
     <button class="menu-item" data-memo-action="pin"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
+    <button class="menu-item" data-memo-action="day"><svg><use href="#i-calendar"/></svg><span>이 날의 기록으로… <small></small></span></button>
+    <button class="menu-item" data-memo-action="mode"><svg><use href="#i-swap"/></svg><span>Work로 옮기기</span></button>
     <button class="menu-item" data-memo-action="lock"><svg><use href="#i-lock"/></svg><span>잠그기</span></button>
     <button class="menu-item" data-memo-action="versions"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
     <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>공유</span></button>
@@ -564,6 +571,9 @@
     <div class="sheet-actions">
       <button id="history-apps-2" class="btn">모을 앱 선택 <span id="blocked-count" class="trash-count"></span></button>
     </div>
+
+    <p class="label">Work / Life</p>
+    <div id="work-settings"></div>
 
     <p class="label">링크 · 태그 · 녹음</p>
     <label class="setting-row">

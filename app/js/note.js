@@ -30,6 +30,8 @@ import { chooseShare, showSharePop } from './share-menu.js';
 import { KEYMAP_ACTIONS, keymapTable, resolveKeymap, comboLabel } from './core/keymap.js';
 import { hotkeyDialog } from './hotkey-dialog.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
+import { openMemoryDay, dayText } from './memory-day.js';
+import { memoMode, otherMode, moveLabel } from './core/modes.js';
 
 const SAVE_DELAY = 600;
 
@@ -109,6 +111,7 @@ const el = {
   menuBtn: $('menu-btn'),
   swatches: $('swatches'),
   pinToggle: $('pin-toggle'),
+  dayBtn: $('day-btn'),
   topBtn: $('top-btn'),
   tapeBtn: $('tape-btn'),
   banner: $('banner'),
@@ -385,6 +388,8 @@ function applyMeta(next) {
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
   el.pinToggle.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
+  $('day-label').textContent = memo.day ? dayText(memo.day) : '';
+  $('mode-btn').querySelector('span').textContent = moveLabel(memo);
 }
 
 for (const color of COLORS) {
@@ -401,6 +406,19 @@ el.pinToggle.addEventListener('click', async () => {
   await flush();
   applyMeta(await api.memo.set(id, { pinned: !memo.pinned }));
   closeMenu();
+});
+// Work ↔ Life 로 옮기기 (목록에서는 그 모드에서 보인다)
+$('mode-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  applyMeta(await api.memo.set(id, { mode: otherMode(memoMode(memo)) }));
+});
+// 추억 달력에서 이 메모를 둘 날 (memory-day.js)
+el.dayBtn.addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  const day = await openMemoryDay({ created: memo.created, day: memo.day });
+  if (day !== null) applyMeta(await api.memo.set(id, { day }));
 });
 // ---------- 왕관(늘 위) · 테이프(바탕화면에 붙이기) ----------
 
@@ -1543,16 +1561,20 @@ window.addEventListener('keydown', (e) => {
 let barHover = false;
 let tabArriving = false; // 스택 탭으로 바뀌는 중 (아래 stack:activating)
 let tabArriveTimer = 0;
+let tabLeaving = false; // 스택의 다른 탭이 이 창을 덮는 중 (아래 stack:leaving)
+let tabLeaveTimer = 0;
 const barHeight = () => el.formatBar.offsetHeight || 38;
 const popoverOpen = () => !el.palette.hidden || !el.morePanel.hidden || !document.getElementById('style-menu').hidden;
 function updateBar() {
   document.body.style.setProperty('--bar-h', `${barHeight()}px`);
   const coaching = document.body.classList.contains('coaching'); // 튜토리얼 말풍선이 도구막대를 가리킬 수 있게
+  if (tabLeaving) return; // 다른 탭이 덮을 때까지 지금 모습 그대로
   document.body.classList.toggle('bar-hidden', !(document.hasFocus() || barHover || popoverOpen() || coaching || tabArriving));
   markInactive();
 }
 // 다른 창에 가 있는 동안은 고른 그림 · 손 메모의 노란 테두리를 거둔다 (note.css .win-inactive) — 돌아오면 그대로 되살아남
 function markInactive() {
+  if (tabLeaving) return;
   document.body.classList.toggle('win-inactive', !document.hasFocus());
 }
 // 스택에서 이 탭으로 바뀌려 할 때 (main 이 보이기 전에 알림): 서식 막대를 움직임 없이 미리 펴 둔다 —
@@ -1567,6 +1589,29 @@ api.on('stack:activating', () => {
     document.body.classList.remove('tab-arriving');
     updateBar();
   }, 600);
+});
+// 스택에서 다른 탭으로 바뀌는 중 (그 탭 창이 이 창 위에 뜨고 이 창은 곧 숨는다): 포커스를 잃어도 서식 막대 · 테두리를 그대로 —
+//   덮이기 전에 막대가 내려가는 움직임이 비쳐 탭을 바꿀 때 출렁였다. 숨으면(또는 잠시 뒤) 평소대로
+api.on('stack:leaving', () => {
+  tabLeaving = true;
+  clearTimeout(tabLeaveTimer);
+  tabLeaveTimer = setTimeout(() => {
+    tabLeaving = false;
+    updateBar();
+  }, 700);
+});
+window.addEventListener('focus', () => {
+  // 바꾸다 말고 이 탭으로 돌아왔다
+  if (!tabLeaving) return;
+  clearTimeout(tabLeaveTimer);
+  tabLeaving = false;
+  updateBar();
+}, true);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden || !tabLeaving) return;
+  clearTimeout(tabLeaveTimer);
+  tabLeaving = false;
+  updateBar(); // 숨은 뒤라 보이지 않는다 — 다시 보일 때는 평소 모습으로
 });
 let wasCoaching = false;
 new MutationObserver(() => {

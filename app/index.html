@@ -9,12 +9,17 @@
   <link rel="stylesheet" href="styles/base.css">
   <link rel="stylesheet" href="styles/list.css">
   <link rel="stylesheet" href="styles/ctx-menu.css">
+  <link rel="stylesheet" href="styles/memories.css">
   <script type="module" src="js/list.js"></script>
 </head>
 <body>
   <header class="titlebar">
-    <img class="brand-icon" src="assets/mark-64.png" alt="" draggable="false">
-    <span class="brand">메모킹</span>
+    <span class="brand-mark"><img class="brand-icon" src="assets/mark-64.png" alt="메모킹" title="메모킹" draggable="false"><i class="mode-badge" aria-hidden="true"></i></span>
+    <!-- 메모킹 Work / Life: 일할 때 메모와 일상 메모를 나눠 보기 (core/modes.js) -->
+    <div id="mode-switch" class="mode-switch" role="radiogroup" aria-label="메모킹 모드">
+      <button type="button" role="radio" data-mode="life" aria-checked="true" title="Life: 일상 메모 (추억 달력은 여기에)">Life</button>
+      <button type="button" role="radio" data-mode="work" aria-checked="false" tabindex="-1" title="Work: 일할 때 쓰는 메모">Work</button>
+    </div>
     <!-- 오른쪽 위 단추 묶음: 왕관(늘 위) · 동기화 · 설정 — 왕관 스티커는 이 묶음 왼쪽으로 비켜 붙어 가리지 않는다 -->
     <div class="titlebar-actions">
       <button id="list-top-btn" class="icon-btn titlebar-btn crown-btn" title="왕관 스티커를 붙여 목록을 다른 창보다 늘 위에 두기" aria-label="목록을 다른 창보다 늘 위에 두기" aria-pressed="false"><svg><use href="#i-crown-line"/></svg></button>
@@ -40,28 +45,31 @@
   </section>
 
   <section id="main" class="main" hidden>
-    <div class="toolbar">
-      <label class="search">
-        <svg class="search-icon"><use href="#i-search"/></svg>
-        <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
-      </label>
-      <button id="filter-btn" class="icon-btn filter-btn" title="필터 (색, 담긴 것)" aria-label="필터" aria-expanded="false"><svg><use href="#i-filter"/></svg><span class="filter-count" id="filter-count"></span></button>
-      <button id="layout-btn" class="icon-btn layout-btn" title="한 줄씩 보기" aria-label="한 줄씩 보기"><svg><use href="#i-rows"/></svg></button>
-    </div>
-
-    <div id="sync-pop" class="sync-pop" role="dialog" aria-label="Google Drive 동기화" hidden></div>
-    <div id="conflict-bar" class="conflict-bar" role="status" hidden></div>
-
-    <nav class="tabs" role="tablist" aria-label="보기">
+    <nav class="tabs" role="tablist" aria-label="메모 · 일정 · 알림 보관함">
       <button role="tab" data-tab="memos" aria-selected="true">메모 <span class="tab-count" id="count-memos"></span></button>
       <button role="tab" data-tab="reminders" aria-selected="false"><svg><use href="#i-calendar"/></svg>일정 <span class="tab-count" id="count-reminders"></span></button>
       <button role="tab" data-tab="history" aria-selected="false"><svg><use href="#i-inbox"/></svg>알림 보관함</button>
     </nav>
 
+    <div class="toolbar">
+      <label class="search">
+        <svg class="search-icon"><use href="#i-search"/></svg>
+        <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
+      </label>
+      <button id="filter-btn" class="icon-btn filter-btn" title="보기 (정렬 · 카드 모양 · 필터)" aria-label="보기: 정렬 · 카드 모양 · 필터" aria-expanded="false" aria-controls="filter-panel"><svg><use href="#i-tune"/></svg><span class="filter-count" id="filter-count"></span></button>
+    </div>
+
+    <div id="sync-pop" class="sync-pop" role="dialog" aria-label="Google Drive 동기화" hidden></div>
+    <div id="conflict-bar" class="conflict-bar" role="status" hidden></div>
+
+
     <!-- 메모 -->
     <div class="view" id="view-memos" role="tabpanel">
       <!-- 필터: 태그 줄(늘 보임) + 색·담긴 것(필터 버튼) -->
+      <!-- 보기 (위 "보기" 단추): 정렬 · 카드 모양 · 필터(색 · 담긴 것) -->
       <div id="filter-panel" class="filter-panel" hidden>
+        <div class="filter-group"><span class="filter-label">정렬</span><div id="sort-group" class="chip-row" role="radiogroup" aria-label="정렬"></div></div>
+        <div class="filter-group"><span class="filter-label">모양</span><div id="layout-group" class="chip-row" role="radiogroup" aria-label="카드 모양"></div></div>
         <div class="filter-group"><span class="filter-label">색</span><div id="color-filter" class="color-filter" role="group" aria-label="색으로 거르기"></div></div>
         <div class="filter-group"><span class="filter-label">담긴 것</span><div id="kind-filter" class="chip-row" role="group" aria-label="담긴 것으로 거르기"></div></div>
       </div>
@@ -213,6 +221,10 @@
         <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
         <span>태그 자동 추가 <small>태그 없는 메모를 닫을 때 확실한 태그만 달아요</small></span>
       </label>
+    </section>
+    <section class="set-sec" aria-labelledby="set-mode">
+      <h3 class="set-title" id="set-mode">Work / Life <small>일할 때 메모와 일상 메모를 나눠 봐요</small></h3>
+      <div id="work-settings"></div>
     </section>
     <section class="set-sec" aria-labelledby="set-stt">
       <h3 class="set-title" id="set-stt">음성 녹음과 받아쓰기 <small>인터넷 없이 이 PC 안에서</small></h3>

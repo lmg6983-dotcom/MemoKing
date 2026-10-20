@@ -17,6 +17,12 @@ import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
 import { hintOnce } from './hints.js';
 import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
+import { openMemoryDay, dayText } from './memory-day.js';
+import { renderCollage, collageName } from './memories-collage.js';
+import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL } from './core/modes.js';
+import { openModeHelper } from './mode-helper-dialog.js';
+import { renderWorkSettings } from './work-settings.js';
+import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
@@ -38,7 +44,8 @@ const el = {
   fab: $('fab'),
   fabMenu: $('fab-menu'),
   fabScrim: $('fab-scrim'),
-  layoutBtn: $('layout-btn'),
+  sortGroup: $('sort-group'),
+  layoutGroup: $('layout-group'),
   search: $('search'),
   settingsBtn: $('settings-btn'),
   cards: $('cards'),
@@ -61,6 +68,7 @@ const el = {
 
 const state = {
   info: null, memos: [], results: null, query: '', queryTags: [], droppedId: null, droppedUntil: 0,
+  mode: 'life', // 메모킹 Work / Life — 목록 · 검색 · 일정은 이 모드의 메모만 (core/modes.js)
   // 필터 (창을 닫으면 잊는다): 태그는 모두 가진 메모, 색은 그중 하나, 담긴 것은 모두 해당
   filter: { tags: [], colors: [], kinds: [] },
 };
@@ -108,7 +116,14 @@ function closeOnlyFiles() {
 
 // ---------- 목록 ----------
 
+let sort = 'updated'; // 목록 정렬 (아래 "정렬")
+try {
+  sort = validSort(localStorage.getItem('memoking.sort'));
+} catch {
+  // 기본
+}
 let renderPending = false;
+let memosStale = false; // 메모 탭이 덮인 동안 메모가 바뀌었다 (돌아오면 다시 그린다)
 let glide = false; // 카드 모양을 바꿀 때는 glideCards 가 움직임을 맡는다
 
 function render() {
@@ -118,6 +133,7 @@ function render() {
     return;
   }
   renderPending = false;
+  memosStale = false;
   // 동기화 충돌 사본만 보기 (위쪽 구름 단추 · 설정의 "충돌 사본 보기") — 검색 · 필터와 겹치지 않게 따로, 다 지우면 저절로 풀린다
   let only = null;
   if (state.onlyFiles) {
@@ -129,16 +145,20 @@ function render() {
     }
   }
   const narrowed = !only && (Boolean(state.query) || filterCount() > 0);
-  const memos = only ?? filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] });
+  const { mine } = splitByMode(state.results ?? state.memos, state.mode);
+  const memos = only ?? sortMemos(filterMemos(mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }), sort);
+  // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
+  const elsewhere = !only && state.query ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }).length : 0;
   const before = glide ? null : cardRects();
   layoutCards(memos);
   if (before) animateCards(before);
   el.empty.hidden = memos.length > 0;
   el.cards.classList.toggle('is-empty', !memos.length); // 빈 카드 칸이 자리를 반 나눠 가져 안내가 아래로 치우치지 않게
-  if (!memos.length) renderEmpty(narrowed);
+  if (!memos.length) renderEmpty(narrowed, elsewhere);
   // 검색·필터로 좁혔을 때만 "N개 중 M개" (평소 개수는 메모 탭에)
-  el.count.textContent = `메모 ${state.memos.length}개 중 ${memos.length}개`;
-  el.count.hidden = !narrowed || !memos.length;
+  el.count.replaceChildren(`메모 ${modeMemos().length}개 중 ${memos.length}개`);
+  if (elsewhere) el.count.append(' · ', otherModeLink(elsewhere));
+  el.count.hidden = !narrowed || !memos.length; // 하나도 없으면 빈 화면 안내가 "다른 모드에서 보기" 를 맡는다
   renderFilters();
 }
 
@@ -251,8 +271,61 @@ function chip(className, label, pressed, data) {
   return b;
 }
 
+/** 지금 모드의 메모 */
+const modeMemos = () => splitByMode(state.memos, state.mode).mine;
+
+function otherModeLink(n) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'link-btn other-mode';
+  b.textContent = `${MODE_LABEL[otherMode(state.mode)]}에서 ${n}개 더`;
+  b.title = `${MODE_LABEL[otherMode(state.mode)]}로 바꿔 보기`;
+  b.addEventListener('click', () => setMode(otherMode(state.mode)));
+  return b;
+}
+
+// ---------- Work / Life 바꾸기 (제목 줄 왼쪽) ----------
+function showMode() {
+  document.documentElement.dataset.mode = state.mode;
+  for (const b of document.querySelectorAll('#mode-switch [data-mode]')) {
+    b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));
+    b.tabIndex = b.dataset.mode === state.mode ? 0 : -1;
+  }
+  $('count-memos').textContent = String(modeMemos().length);
+}
+
+// 정리 도우미: Life 메모 중 일 이야기 같은 것을 골라 Work 로
+async function openHelper() {
+  const n = await openModeHelper({
+    memos: state.memos,
+    move: async (ids) => {
+      let moved = 0;
+      for (const id of ids) if (await api.memo.set(id, { mode: 'work' })) moved += 1;
+      return moved;
+    },
+  });
+  if (n) flashStatus(`메모 ${n}개를 Work로 옮겼어요`);
+}
+
+async function setMode(mode) {
+  mode = validMode(mode);
+  if (mode === state.mode) return;
+  state.mode = mode;
+  showMode();
+  state.filter.tags = []; // 다른 모드에는 없는 태그일 수 있다
+  render();
+  remindersTab.modeChanged();
+  if (mode === 'work') hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 카드 메뉴의 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
+  const saved = await api.mode?.set(mode);
+  if (saved && saved !== state.mode) {
+    state.mode = saved;
+    showMode();
+    render();
+  }
+}
+
 function renderFilters() {
-  const tags = collectTags(state.memos);
+  const tags = collectTags(modeMemos());
   // 골라 둔 태그가 지금은 없더라도 줄에 남겨 풀 수 있게
   for (const t of state.filter.tags) if (!tags.some((x) => sameTag(x.name, t))) tags.unshift({ name: t, count: 0 });
   const picked = (name) => state.filter.tags.some((t) => sameTag(t, name));
@@ -271,7 +344,7 @@ function renderFilters() {
   el.kindFilter.replaceChildren(...KIND_FILTERS.map((k) => chip('filter-chip', k.label, state.filter.kinds.includes(k.id), { kind: k.id })));
   const n = filterCount();
   el.filterCount.textContent = n ? String(n) : '';
-  el.filterBtn.classList.toggle('active', n > 0);
+  el.filterBtn.classList.toggle('active', n > 0 || sort !== DEFAULT_SORT); // 기본 보기가 아니면 단추에 표시
   el.filterSummary.hidden = n === 0;
   const parts = [
     ...state.filter.tags.map((t) => `#${t}`),
@@ -318,19 +391,24 @@ $('filter-clear').addEventListener('click', () => {
 });
 
 // 빈 목록: 그림 + 다음에 할 일 단추 (휴대폰과 같음) — 검색·필터로 비었으면 풀기, 메모가 없으면 새 메모
-function renderEmpty(narrowed) {
+function renderEmpty(narrowed, elsewhere = 0) {
   const art = document.createElement('span');
   art.className = 'empty-art';
   art.textContent = narrowed ? '🔍' : '📝';
   const text = document.createElement('span');
-  text.textContent = narrowed
+  const other = MODE_LABEL[otherMode(state.mode)];
+  text.textContent = narrowed && elsewhere
+    ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
+    : narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
-    : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
+    : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 카드 메뉴의 "Work로 옮기기"로 옮겨 보세요.'
+      : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'btn primary';
-  b.textContent = narrowed ? '검색과 필터 풀기' : '새 메모 (Ctrl+N)';
+  b.textContent = narrowed && elsewhere ? `${other}에서 보기` : narrowed ? '검색과 필터 풀기' : '새 메모 (Ctrl+N)';
   b.addEventListener('click', () => {
+    if (narrowed && elsewhere) return setMode(otherMode(state.mode));
     if (!narrowed) return api.memo.create();
     state.filter = { tags: [], colors: [], kinds: [] };
     el.search.value = '';
@@ -339,6 +417,14 @@ function renderEmpty(narrowed) {
   const actions = document.createElement('span');
   actions.className = 'empty-actions';
   actions.append(b);
+  if (!narrowed && state.mode === 'work') {
+    const help = document.createElement('button');
+    help.type = 'button';
+    help.className = 'btn';
+    help.textContent = '정리 도우미로 찾기';
+    help.addEventListener('click', () => openHelper());
+    actions.append(help);
+  }
   el.empty.replaceChildren(art, text, actions);
 }
 
@@ -746,6 +832,12 @@ async function loadSettings() {
   showShortcuts(s.shortcuts);
   showMcp(s.mcp);
   $('trash-days').value = String(s.trashDays);
+  renderWorkSettings($('work-settings'), {
+    hours: s.workHours,
+    save: (h) => api.mode?.setHours(h),
+    openHelper: () => openHelper(),
+    quietNote: '업무 시간 밖에는 Work 메모의 알림을 띄우지 않고 알림 보관함에 모아요. 고정한 메모의 알림은 늘 울려요',
+  });
   if (api.stt) renderStt(await api.stt.status());
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
 }
@@ -980,6 +1072,27 @@ const remindersTab = setupRemindersTab({
   api, container: $('reminder-groups'), countEl: $('count-reminders'),
   // 다른 캘린더 함께 보기 (읽기만): 구독은 메인이 받는다, 일정 속 주소는 브라우저로
   calendars: api.calendars && { ...api.calendars, openUrl: (url) => api.links.open(url) },
+  // 추억 "한 장으로": 그림을 복사해 두고 저장할 곳을 묻는다 (안 고르면 붙여넣기로 보낼 수 있게 복사만)
+  // 지금 모드의 메모 일정만 (목록에 아직 없는 새 메모의 일정은 우선 보인다)
+  visible: (item) => {
+    const memo = state.memos.find((m) => m.id === item.memoId);
+    return !memo || memoMode(memo) === state.mode;
+  },
+  memories: {
+    on: () => state.mode === 'life', // 추억 달력은 Life 에서만
+    collage: async (o) => {
+      flashStatus('그림을 만드는 중…');
+      try {
+        const base64 = await renderCollage(o);
+        await api.image.copy(base64);
+        const r = await api.image.save(null, base64, collageName(o));
+        flashStatus(r?.file ? `${r.name}로 저장했어요 (복사도 해 두었어요)` : '그림을 복사했어요 — 붙여 넣어 보낼 수 있어요');
+      } catch (err) {
+        console.error(err);
+        flashStatus(err.message || '그림을 만들지 못했어요');
+      }
+    },
+  },
 });
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockHistoryApp(appId, appName) {
@@ -1054,16 +1167,26 @@ attachSlider(document.querySelector('.tabs'), { className: 'tab-indicator' });
 
 function showTab(tab) {
   if (!TAB_PLACEHOLDER[tab]) return;
+  // 메모 탭을 떠날 때: 일정 · 보관함이 메모 칸과 같은 자리 · 크기로 그 위를 덮는다 (list.css) — 돌아올 때 카드 배치를 처음부터 다시 계산하지 않게
+  const memosView = $('view-memos');
+  if (tab !== 'memos' && !memosView.hidden) {
+    el.main.style.setProperty('--park-top', `${memosView.offsetTop}px`);
+  }
   activeTab = tab;
   for (const b of document.querySelectorAll('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   syncTabStops(document.querySelector('.tabs'));
-  for (const name of Object.keys(TAB_PLACEHOLDER)) $(`view-${name}`).hidden = name !== tab;
+  for (const name of Object.keys(TAB_PLACEHOLDER)) if (name !== 'memos') $(`view-${name}`).hidden = name !== tab;
+  // 메모 칸은 숨기지 않고 덮는다 (누르기 · Tab · 화면 읽기 프로그램에서는 빠짐)
+  memosView.inert = tab !== 'memos';
+  memosView.classList.toggle('covered', tab !== 'memos');
   document.body.dataset.tab = tab;
   el.search.placeholder = TAB_PLACEHOLDER[tab];
   el.search.value = '';
-  if (tab === 'memos') runSearch();
+  // 메모 탭으로 돌아올 때: 그사이 바뀐 것이 없으면 다시 그리지 않는다 (숨겨 둔 카드는 그대로 남아 있다)
+  //   — 늘 모든 카드를 다시 쌓아(배치 계산) 탭의 표시가 미끄러지는 동안 화면이 멈칫했다
+  if (tab === 'memos' && (memosStale || state.query || lastCols !== columnsFor(el.cards.clientWidth || window.innerWidth))) runSearch();
   if (tab === 'reminders') {
-    remindersTab.setQuery('');
+    remindersTab.setQuery('', { quiet: true });
     remindersTab.refresh();
   }
   if (tab === 'history') historyTab.setQuery('');
@@ -1071,7 +1194,7 @@ function showTab(tab) {
 for (const b of document.querySelectorAll('.tabs [data-tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
 tabKeys(document.querySelector('.tabs'));
 api.on('list:tab', showTab);
-api.on('reminders:changed', () => remindersTab.refresh());
+api.on('reminders:changed', () => remindersTab.refresh({ quiet: activeTab !== 'reminders' })); // 안 보이는 달력은 탭으로 갈 때 그린다
 api.on('history:changed', () => activeTab === 'history' && historyTab.refresh());
 $('reveal-vault').addEventListener('click', () => api.vault.reveal());
 $('change-vault').addEventListener('click', async () => {
@@ -1118,6 +1241,18 @@ el.cards.addEventListener('contextmenu', (e) => {
       open: (id) => api.memo.open(id),
       pin: togglePin,
       color: (m, color) => api.memo.set(m.id, { color }),
+      day: async (m) => {
+        const day = await openMemoryDay({ created: m.created, day: m.day });
+        if (day === null) return;
+        await api.memo.set(m.id, { day });
+        flashStatus(day ? `추억 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
+      },
+      // Work ↔ Life로 옮기기: 카드는 지금 목록에서 빠진다
+      mode: async (m) => {
+        const to = otherMode(memoMode(m));
+        if (await api.memo.set(m.id, { mode: to })) flashStatus(`${MODE_LABEL[to]}로 옮겼어요 — 위의 ${MODE_LABEL[to]}에서 보여요`);
+        else flashStatus('옮기지 못했어요 — 잠시 뒤 다시 해 주세요');
+      },
       trash: (id) => deleteMemo(id),
       flash: flashStatus,
       openSettings: () => el.settingsBtn.click(),
@@ -1289,8 +1424,11 @@ api.on('memos:changed', (memos) => {
   // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
   const hb = $('handoff-bar');
   if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;
-  $('count-memos').textContent = String(memos.length);
-  if (activeTab !== 'memos') return remindersTab.refresh(); // 메모 제목이 바뀌면 알림 탭에도
+  $('count-memos').textContent = String(modeMemos().length);
+  if (activeTab !== 'memos') {
+    memosStale = true; // 메모 탭으로 돌아오면 다시 그린다
+    return remindersTab.refresh({ quiet: activeTab !== 'reminders' }); // 메모 제목이 바뀌면 알림 탭에도
+  }
   if (state.query) runSearch();
   else render();
 });
@@ -1376,13 +1514,47 @@ window.addEventListener('keydown', (e) => {
 
 new ResizeObserver(scheduleRelayout).observe(el.cards);
 
+// ---------- 정렬 (최신순 · 오래된순 · 많이 본 순 · 이름순) — "보기" 패널, 휴대폰과 같은 규칙(core/memo-sort.js), 이 PC 에 기억 ----------
+//   고정한 메모는 늘 맨 앞. 많이 본 순은 이 PC 에서 메모 창을 연 횟수 (main.js noteOpened)
+const SORT_KEY = 'memoking.sort';
+// 보기 패널의 고르기 칩 (정렬 · 카드 모양): 하나만 켜짐
+function radioChips(box, options, current) {
+  box.replaceChildren(...options.map((o) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'filter-chip';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(o.id === current));
+    b.tabIndex = o.id === current ? 0 : -1;
+    b.dataset.value = o.id;
+    b.textContent = o.label;
+    return b;
+  }));
+}
+function applySortLabel() {
+  radioChips(el.sortGroup, SORTS, sort);
+  el.sortGroup.setAttribute('aria-label', `정렬: ${sortLabel(sort)}`);
+}
+applySortLabel();
+el.sortGroup.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-value]');
+  if (!b || b.dataset.value === sort) return;
+  sort = validSort(b.dataset.value);
+  applySortLabel();
+  try {
+    localStorage.setItem(SORT_KEY, sort);
+  } catch {
+    // 지금 창에서만
+  }
+  render(); // 카드들이 새 순서로 미끄러져 간다 (animateCards)
+  el.sortGroup.querySelector('[aria-checked="true"]')?.focus({ preventScroll: true });
+});
+
 // ---------- 카드 모양 (격자 / 한 줄씩) — 휴대폰과 같은 단추, 이 PC 에 기억 ----------
+const LAYOUTS = [{ id: 'grid', label: '격자' }, { id: 'rows', label: '한 줄씩' }];
 function applyLayout() {
   el.cards.dataset.layout = layout;
-  el.layoutBtn.replaceChildren(icon(layout === 'rows' ? 'grid' : 'rows'));
-  const label = layout === 'rows' ? '격자로 보기 (여러 줄)' : '한 줄씩 보기';
-  el.layoutBtn.title = label;
-  el.layoutBtn.setAttribute('aria-label', label);
+  radioChips(el.layoutGroup, LAYOUTS, layout);
 }
 try {
   layout = localStorage.getItem(LAYOUT_KEY) === 'rows' ? 'rows' : 'grid';
@@ -1405,14 +1577,16 @@ function glideCards(change) {
     c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' });
   }
 }
-el.layoutBtn.addEventListener('click', () => {
-  layout = layout === 'rows' ? 'grid' : 'rows';
+el.layoutGroup.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-value]');
+  if (!b || b.dataset.value === layout) return;
+  layout = b.dataset.value === 'rows' ? 'rows' : 'grid';
   tutEvent('layout-changed');
-  if (!reduceMotion()) el.layoutBtn.animate([{ transform: 'rotate(-90deg) scale(0.6)', opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   glideCards(() => {
     applyLayout();
     renderNow();
   });
+  el.layoutGroup.querySelector('[aria-checked="true"]')?.focus({ preventScroll: true });
   try {
     localStorage.setItem(LAYOUT_KEY, layout);
   } catch {
@@ -1557,8 +1731,18 @@ $('tutorial-btn').addEventListener('click', () => {
 applyInfo(await api.info());
 if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog, showFiles: (files) => showOnlyFiles(files),
   memoFiles: () => (state.memos.length ? new Set(state.memos.map((m) => String(m.file ?? '').replace(/\\/g, '/'))) : null) });
+state.mode = validMode((await api.settings.get().catch(() => null))?.mode);
+showMode();
+for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
+api.on('mode:changed', (mode) => {
+  if (validMode(mode) === state.mode) return;
+  state.mode = validMode(mode);
+  showMode();
+  render();
+  remindersTab.modeChanged();
+});
 await refresh();
-$('count-memos').textContent = String(state.memos.length);
+showMode();
 await remindersTab.refresh();
 showTab(new URLSearchParams(location.search).get('tab') ?? 'memos');
 document.documentElement.dataset.ready = 'true';
@@ -1622,7 +1806,7 @@ function renderUpdateDialog(st) {
   to.className = 'to';
   to.textContent = `v${st.version ?? ''}`;
   updateEl.version.replaceChildren(from, arrow, to);
-  updateEl.version.setAttribute('aria-label', `지금 ${from.textContent} 에서 ${to.textContent} 으로`);
+  updateEl.version.setAttribute('aria-label', `지금 ${from.textContent}에서 ${to.textContent} 으로`);
   renderReleaseNotes(updateEl.notes, st.notes);
   updateEl.notes.scrollTop = 0;
   updateEl.progress.hidden = !downloading;

@@ -14,6 +14,7 @@ import { openQuickEvent } from './quick-event.js';
 import { openCalendarLinks } from './calendar-links.js';
 import { openEventDetail, whenText } from './event-detail.js';
 import { monthSketchPng } from './month-sketch.js';
+import { setupMemoriesView } from './memories-view.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
@@ -21,7 +22,11 @@ const VIEWS = [
   { id: 'dayGridMonth', label: '월' },
   { id: 'timeGridWeek', label: '주' },
   { id: 'listMonth', label: '목록' },
+  { id: 'memories', label: '추억' }, // 사진 달력 (memories-view.js) — 달력은 월 보기로 둔 채 가리고 넘기기만 함께
 ];
+const MEMORIES = 'memories';
+/** FullCalendar 가 쓰는 보기 (추억은 월 보기 위에 따로 그린다) */
+const fcView = (id) => (id === MEMORIES ? 'dayGridMonth' : id);
 const VIEW_KEY = 'memoking.calendarView';
 
 const dayStart = startOfDay;
@@ -33,10 +38,10 @@ export function dayHeading(d, now = new Date()) {
 }
 
 
-const storedView = () => {
+const storedView = (views) => {
   try {
     const v = localStorage.getItem(VIEW_KEY);
-    return VIEWS.some((x) => x.id === v) ? v : VIEWS[0].id;
+    return views.some((x) => x.id === v) ? v : VIEWS[0].id;
   } catch {
     return VIEWS[0].id;
   }
@@ -53,14 +58,20 @@ function el(tag, className = '', text = '') {
  * @param {{ api: any, container: HTMLElement, countEl: HTMLElement, notify?: (text: string, isError?: boolean) => void,
  *           calendars?: { feeds, setFeeds, fetch, openUrl, exportIcs, device? } }} options
  *   calendars: 다른 캘린더 (없으면 그 기능은 숨김)
+ *   memories: 추억 보기를 켠다 — { onOverlay?, collage?, on?: () => boolean } (on: 지금 보여도 되는가 — Work 에서는 숨김)
+ *   visible: 이 일정을 보일까 (Work / Life — 지금 모드의 메모 것만)
  */
-export function setupRemindersTab({ api, container, countEl, notify = (text, isError) => isError && window.alert(text), calendars = api.calendars }) {
-  let items = []; // [{ memoId, title, color, reminder }]
+export function setupRemindersTab({ api, container, countEl, notify = (text, isError) => isError && window.alert(text), calendars = api.calendars, memories = null, visible = null }) {
+  let allItems = []; // 모든 모드
+  let items = []; // [{ memoId, title, color, reminder }] — 지금 모드의 것
+  const memoriesOn = () => memories?.on?.() ?? true;
   let query = '';
   const today = () => dayStart(new Date());
   let selected = today();
   let shownToday = today();
-  let viewId = storedView();
+  const viewList = VIEWS.filter((v) => v.id !== MEMORIES || (memories && api.memos?.list));
+  let viewId = storedView(viewList);
+  if (viewId === MEMORIES && !memoriesOn()) viewId = VIEWS[0].id;
   let compact = false; // 낮은 창: 월 보기 칸에 일정 막대 대신 색 점 (fitSize)
   let lastFit = '';
   let maxEvents = 2; // 월 보기 한 칸에 보이는 일정 수 (fitSize)
@@ -169,9 +180,19 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     });
   }
 
-  async function refresh() {
-    items = await api.reminders.all();
-    render();
+  /** @param {{ quiet?: boolean }} [o] quiet: 탭이 안 보일 때 — 탭 숫자만 (달력은 다음에 보일 때 그린다. 메모를 지울 때마다 안 보이는 달력을 다시 그려 목록이 끊겼다) */
+  async function refresh({ quiet = false } = {}) {
+    allItems = await api.reminders.all();
+    items = visible ? allItems.filter(visible) : allItems;
+    if (quiet) updateCount(new Date());
+    else render();
+    if (!quiet && memView && viewId === MEMORIES) memView.refresh(); // 탭으로 올 때도 여기로 — 새 사진 · 메모를 다시 모은다
+  }
+
+  // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)
+  function updateCount(now) {
+    const live = items.filter((i) => isLive(i.reminder, now)).length;
+    countEl.textContent = live ? String(live) : '';
   }
 
   // 한 메모의 알림 목록을 바꿔서 저장
@@ -235,7 +256,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   const views = el('div', 'cal-views');
   views.setAttribute('role', 'radiogroup');
   views.setAttribute('aria-label', '보기');
-  for (const v of VIEWS) {
+  for (const v of viewList) {
     const b = el('button', '', v.label);
     b.type = 'button';
     b.dataset.view = v.id;
@@ -253,6 +274,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   const calEl = el('div', 'cal-body');
   card.append(head, bar, calEl);
+  const memView = viewList.some((v) => v.id === MEMORIES) ? setupMemoriesView({ api, notify, ...memories }) : null;
+  if (memView) card.append(memView.el);
   const rowsEl = el('div', 'ev-rows');
   container.replaceChildren(card, rowsEl);
   attachSlider(views);
@@ -298,8 +321,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     }
     return { domNodes: [wrap] };
   }
-  // 날 칸: 고른 날 · 일요일(빨강) · 토요일
-  const dayClass = (arg) => [sameDay(arg.date, selected) && 'mk-selected', arg.date.getDay() === 0 && 'mk-sun', arg.date.getDay() === 6 && 'mk-sat'].filter(Boolean).join(' ');
+  // 날 칸: 고른 날 · 지나간 날 · 일요일(빨강) · 토요일
+  const dayClass = (arg) => [sameDay(arg.date, selected) && 'mk-selected', arg.date < today() && 'mk-past', arg.date.getDay() === 0 && 'mk-sun', arg.date.getDay() === 6 && 'mk-sat'].filter(Boolean).join(' '); // mk-past: 지나간 날 (날짜 위 색연필 X)
 
   /** 달력에 줄 일정들 (FullCalendar 의 일정 모양) */
   function calendarEvents(from, to) {
@@ -336,10 +359,21 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     return out;
   }
 
+  // 달 보기 칩 모양(base.css)을 바꾼 뒤로 FullCalendar 가 일정을 다시 그릴 때 칩 높이를 한 번 더 재며
+  //   "ResizeObserver loop completed with undelivered notifications" 를 남긴다 — 다음 화면에서 맞춰지는 무해한 경고라 이것만 콘솔에 남기지 않는다
+  if (!window.mkRoLoopQuiet) {
+    window.mkRoLoopQuiet = true;
+    window.addEventListener('error', (e) => {
+      if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
+  }
   const calendar = new Calendar(calEl, {
     plugins: [dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin],
     locale: koLocale,
-    initialView: viewId,
+    initialView: fcView(viewId),
     headerToolbar: false,
     height: 'auto',
     fixedWeekCount: true,
@@ -378,6 +412,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
         again = true;
       }
       if (again) queueMicrotask(() => render()); // 한 번만 · 그리는 중에 옵션을 바꾸지 않게
+      if (viewId === MEMORIES) showMemories();
     },
     dateClick: (arg) => pickDay(arg.date),
     // 일정을 누르면 다른 앱으로 나가지 않고 자세히 보기 (월 보기는 그날도 골라 아래 목록을 맞춘다)
@@ -391,7 +426,17 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     eventDrop: (arg) => moveEvent(arg),
     views: {
       // 달 · 주 보기의 일정 막대는 이름만 — 칸이 좁아 "오전 9:3…" 처럼 시각부터 잘렸다 (주 보기는 자리가 곧 시각, 시각은 누르면 · 아래 목록에)
-      dayGridMonth: { dayHeaderFormat: { weekday: 'short' }, displayEventTime: false }, // 넓은 창에서도 "일" (일요일 X)
+      // 달 보기 칩: 제목만 (글자 크기 · 잘림 표시는 base.css .mk-mt)
+      dayGridMonth: {
+        dayHeaderFormat: { weekday: 'short' }, // 넓은 창에서도 "일" (일요일 X)
+        displayEventTime: false,
+        eventContent: (arg) => {
+          const t = document.createElement('span');
+          t.className = 'mk-mt';
+          t.textContent = arg.event.title;
+          return { domNodes: [t] };
+        },
+      },
       timeGridWeek: { slotHeaderFormat: { hour: 'numeric' }, displayEventTime: false },
       // 목록: 달은 위 제목에 있으니 날짜 칸은 "16일 · 금" 만 (좁은 화면을 날짜가 다 차지하지 않게)
       //   일정은 시각을 제목 위 작은 줄로 쌓아 제목이 폭을 다 쓰게 (예전: 시각 칸이 절반을 차지해 제목이 잘림)
@@ -418,6 +463,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const h = scrolls ? container.clientHeight : window.innerHeight - Math.max(0, container.getBoundingClientRect().top + window.scrollY);
     const w = calEl.clientWidth;
     if (!h || !w) return;
+    card.style.setProperty('--cal-col', `${w / 7}px`); // 달 보기 칩 글자 크기 (base.css — 칸 폭에 맞춰 한글 8자쯤)
     const side = container.clientWidth >= 640;
     // 달력 몸통 위(제목 · 보기 줄 · 여백)와 아래(카드 여백)를 실제로 재서 뺀다
     const boxR = container.getBoundingClientRect();
@@ -443,10 +489,15 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       // 비율은 요일 줄을 뺀 날 칸들의 것
       const weekdays = calEl.querySelector('[role="columnheader"]')?.getBoundingClientRect().height || 26;
       if (viewId === 'dayGridMonth') {
-        calendar.setOption('aspectRatio', Math.min(8, Math.max(0.9, w / Math.max(100, room - weekdays))));
-        // 한 주 줄 높이에서 날짜 숫자 줄(약 30px)을 빼고 칩 한 줄(약 24px)씩 — "+n" 줄 자리도 남긴다
-        const rowH = (room - weekdays) / 6;
-        const fit = Math.max(1, Math.floor((rowH - 30) / 24) - 1);
+        // 칸 높이: 보이는 높이에 맞추되 칩이 4개 이상 들어가게는 (휴대폰은 달력이 화면보다 길어져 밀어서 봄) —
+        //   높이는 지금 그려진 칩 · 날짜 줄 · "+n" 을 잰다 (칸보다 많이 넣으면 칸이 늘어나며 달력이 크기를 다시 재는 고리를 돌았다)
+        const chip = calEl.querySelector('.mk-ev');
+        const chipH = Math.max(12, chip ? chip.offsetHeight + (parseFloat(getComputedStyle(chip).marginBottom) || 0) : 14); // 아직 일정이 없으면 base.css 의 칩 높이쯤
+        const topH = calEl.querySelector('[role="gridcell"] > :first-child')?.offsetHeight || 24;
+        const moreH = calEl.querySelector('.mk-more')?.offsetHeight || 13;
+        const rowH = compact ? (room - weekdays) / 6 : Math.max((room - weekdays) / 6, topH + 4 * chipH + moreH + 2); // 낮은 창(색 점)은 한 달이 다 보이게
+        calendar.setOption('aspectRatio', Math.min(8, Math.max(0.5, w / Math.max(100, rowH * 6))));
+        const fit = Math.max(1, Math.floor((rowH - topH - moreH - 1) / chipH));
         if (fit !== maxEvents) {
           maxEvents = fit;
           calendar.setOption('dayMaxEvents', fit);
@@ -463,19 +514,36 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     }
     card.dataset.view = viewId;
     container.dataset.view = viewId;
+    const mem = viewId === MEMORIES;
+    const memBtn = views.querySelector(`[data-view="${MEMORIES}"]`);
+    if (memBtn) memBtn.hidden = !memoriesOn();
+    calEl.hidden = mem;
+    rowsEl.hidden = mem;
+    if (memView) memView.el.hidden = !mem;
   }
 
-  function setView(id) {
+  function showMemories() {
+    memView.show(calendar.view.currentStart);
+  }
+
+  function setView(id, { remember = true } = {}) {
     if (id === viewId) return;
+    const was = viewId;
     viewId = id;
     try {
-      localStorage.setItem(VIEW_KEY, id);
+      if (remember) localStorage.setItem(VIEW_KEY, id);
     } catch {
       // 저장 못 함 — 이번만
     }
-    calendar.changeView(id, selected);
-    fitSize();
     markView();
+    if (id === MEMORIES) {
+      if (was !== 'dayGridMonth') calendar.changeView('dayGridMonth', selected);
+      memView.closeDay();
+      showMemories();
+      return;
+    }
+    if (fcView(was) !== id) calendar.changeView(id, selected); // 추억 → 월 은 같은 보기를 다시 보이기만 (크기는 달력이 스스로 다시 잰다)
+    fitSize();
     render();
   }
 
@@ -811,9 +879,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     }
     calendar.refetchEvents();
     renderRows();
-    // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)
-    const live = items.filter((i) => isLive(i.reminder, now)).length;
-    countEl.textContent = live ? String(live) : '';
+    updateCount(now);
   }
 
   let adding = false;
@@ -848,11 +914,21 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   return {
     refresh,
+    /** Work / Life 를 바꿨다: 그 모드의 일정만 다시 · 추억은 Life 에서만 (Work 로 가면 월 보기로, 돌아오면 다시 추억) */
+    modeChanged() {
+      items = visible ? allItems.filter(visible) : allItems;
+      if (viewId === MEMORIES && !memoriesOn()) setView(VIEWS[0].id, { remember: false });
+      else if (memoriesOn() && storedView(viewList) === MEMORIES && viewId !== MEMORIES) setView(MEMORIES, { remember: false });
+      else render();
+      markView();
+      updateCount(new Date()); // 탭 숫자도 그 모드의 것으로 (추억 보기로 가면 render 를 거치지 않는다)
+    },
     // + 단추 (휴대폰 일정 탭): 고른 날에 새 일정 — 지난 날을 골라 두었으면 오늘
     addEvent: () => quickAdd(selected >= today() ? selected : today()),
-    setQuery(q) {
+    /** @param {{ quiet?: boolean }} [o] quiet: 그리지 않고 검색어만 (곧 refresh 가 그릴 때 — 달력을 두 번 그리지 않게) */
+    setQuery(q, { quiet = false } = {}) {
       query = q;
-      render();
+      if (!quiet) render();
     },
   };
 }

@@ -7,7 +7,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:hover', 'list:on-top',
-  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'update:state', 'update:available', 'update:ready',
+  'stt:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'card:trash', 'card:copied', 'edit:paste-plain', 'edit:clear-format',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
@@ -195,6 +195,8 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   // 메모를 PDF 로
   // 메모를 그림 카드로: copy(base64) · save(메모 id, base64) → { file, name } | { cancelled }
+  // 메모킹 Work / Life: 지금 모드 정하기 (읽기는 settings.get().mode)
+  mode: { set: invoke('mode:set'), setHours: invoke('mode:hours') },
   image: {
     copy: invoke('image:copy'),
     save: invoke('image:save'),

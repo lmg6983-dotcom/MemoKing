@@ -26,12 +26,17 @@ class VaultFileProvider : ContentProvider() {
         const val SHARE_DIR = "share"
         private const val SHARE_PREFIX = "~share"
         private const val DRIVE_PREFIX = "~drive"
+        /** 받은 업데이트 APK: cache/updates/ → content://com.memoking.app.files/~update/<이름> (안드로이드 설치기가 읽는다) */
+        private const val UPDATE_PREFIX = "~update"
 
         /** Google Drive 폴더 사본의 주소 앞부분 (FileStorage 의 shareRoot) */
         fun driveRoot(folderId: String) = "$DRIVE_PREFIX/" + Uri.encode(folderId)
 
         fun shareUriFor(name: String): Uri = Uri.Builder().scheme("content").authority(AUTHORITY)
             .encodedPath("/$SHARE_PREFIX/" + Uri.encode(name)).build()
+
+        fun updateUriFor(name: String): Uri = Uri.Builder().scheme("content").authority(AUTHORITY)
+            .encodedPath("/$UPDATE_PREFIX/" + Uri.encode(name)).build()
 
         fun uriFor(rel: String, root: String = ""): Uri = Uri.Builder().scheme("content").authority(AUTHORITY)
             .encodedPath("/" + (if (root.isEmpty()) "" else "$root/") + Storage.clean(rel).split('/').joinToString("/") { Uri.encode(it) })
@@ -44,8 +49,9 @@ class VaultFileProvider : ContentProvider() {
 
     private fun fileFor(uri: Uri): File {
         val ctx: Context = context ?: throw FileNotFoundException()
-        if (uri.pathSegments.firstOrNull() == SHARE_PREFIX && uri.pathSegments.size == 2) {
-            val dir = File(ctx.cacheDir, SHARE_DIR).canonicalFile
+        val flat = mapOf(SHARE_PREFIX to SHARE_DIR, UPDATE_PREFIX to AppUpdate.DIR)[uri.pathSegments.firstOrNull()]
+        if (flat != null && uri.pathSegments.size == 2) {
+            val dir = File(ctx.cacheDir, flat).canonicalFile
             val file = File(dir, uri.pathSegments[1]).canonicalFile
             if (file.parentFile != dir) throw FileNotFoundException()
             return file

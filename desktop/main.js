@@ -33,6 +33,7 @@ import { hotkeyCopyText, hotkeyLabel, hotkeyAccelerator } from '../app/js/core/m
 import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { alarmText } from '../app/js/core/reminders.js';
+import { quietAlarm, modeClock, normalizeHours } from '../app/js/core/work-hours.js';
 
 import {
   APP_ICON, APP_ICON_PNG, ASSETS_DIR,
@@ -191,6 +192,7 @@ function openVault(dir) {
   vault = null;
   try {
     const next = new Vault(dir);
+    next.defaultMode = settings.mode === 'work' ? 'work' : 'life'; // 새 메모는 지금 고른 Work / Life 로
     next.on('changed', ({ ids, external, removed }) => {
       windowManager.pushList();
       driveSync?.request(3000);
@@ -289,6 +291,12 @@ function fireReminder(memoId, reminder, info) {
   const { title, label, full } = alarmText(reminder, memo.title, info);
   const alarm = { reminderId: reminder.id, label: full, missed: Boolean(info.missed) };
   history?.add({ source: 'memoking', appId: APP_ID, app: '메모킹', title, body: label, memoId });
+  // 퇴근 뒤 · 쉬는 날의 Work 알림: 띄우지 않고 알림 보관함에만 (업무 시간이 되면 모아서 한 번 알린다)
+  if (quietAlarm(memo, new Date(), settings.workHours)) {
+    quietCount += 1;
+    pushReminders();
+    return;
+  }
 
   if (reminder.action === 'open') {
     const existing = windowManager.noteWins.get(memoId);
@@ -319,6 +327,37 @@ function showToast(memoId, memo, alarm) {
 }
 
 const alarms = createAlarmRunner({ getVault: () => vault, fire: fireReminder });
+
+// ---------- 메모킹 Work / Life ----------
+let quietCount = 0; // 퇴근 뒤 조용히 넘긴 Work 알림
+
+/** 모드 바꾸기 (목록의 Work | Life · 업무 시간 시계) — 새 메모도 이 모드로 */
+function setAppMode(mode) {
+  settings.mode = mode === 'work' ? 'work' : 'life';
+  saveSettings();
+  if (vault) vault.defaultMode = settings.mode;
+  broadcast('mode:changed', settings.mode);
+  return settings.mode;
+}
+// 업무 시간이 시작되면 Work, 끝나면 Life (저절로 바꾸기를 켰을 때만 · 경계를 넘을 때만)
+const workClock = modeClock({
+  getHours: () => settings.workHours,
+  onChange: (mode) => {
+    if (mode !== settings.mode) setAppMode(mode);
+    if (mode === 'work' && quietCount > 0) {
+      toast({ title: '메모킹 Work', body: `업무 시간 밖에 온 Work 알림 ${quietCount}개를 알림 보관함에 모아 뒀어요`, onClick: () => windowManager.createListWindow('history') });
+      quietCount = 0;
+    }
+  },
+});
+setInterval(() => workClock(), 30_000);
+/** 설정 › 업무 시간 */
+function setWorkHours(hours) {
+  settings.workHours = normalizeHours(hours);
+  saveSettings();
+  workClock();
+  return settings.workHours;
+}
 
 // ---------- 알림 보관함 & 팝업 지켜보기 ----------
 
@@ -776,6 +815,8 @@ function createTray() {
 
 function noteOpened(id) {
   settings.recentOpened = pushRecent(settings.recentOpened, id);
+  // 목록의 "많이 본 순" 정렬: 이 PC 에서 메모 창이 보인 횟수 (메모 파일에는 쓰지 않는다 — 열 때마다 동기화되지 않게)
+  settings.viewCounts = { ...(settings.viewCounts ?? {}), [id]: (settings.viewCounts?.[id] ?? 0) + 1 };
   saveSettings();
   updateJumpList();
 }
@@ -948,6 +989,8 @@ app.whenReady().then(async () => {
     },
   });
   registerIpc({
+    setAppMode,
+    setWorkHours,
     calendarFeeds,
     windowManager,
     memoHotkeys,
@@ -1114,6 +1157,7 @@ app.whenReady().then(async () => {
     if (!windowManager.openNote(id, { inactive })) settings.openNotes = settings.openNotes.filter((x) => x !== id);
   }
   if (launched && launched.kind !== 'list') handleLaunch(process.argv);
+  workClock(); // 켤 때 업무 시간이면 Work로 시작 (저절로 바꾸기를 켰을 때)
   alarms.startup();
   alarms.start();
   registerQuickMemoKey();

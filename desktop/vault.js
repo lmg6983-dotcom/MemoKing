@@ -53,6 +53,7 @@ export class Vault extends EventEmitter {
     super();
     this.root = path.resolve(root);
     this.device = device; // 내용을 고친 곳으로 머리말에 남김 (pc · ai)
+    this.defaultMode = 'life'; // 새 메모가 들어갈 Work / Life (main.js 가 설정에서)
     this.orphanDelay = orphanDelay;
     this.orphans = new Map(); // 없어진 메모 id → 그 메모가 쓰던 첨부 (확인 대기)
     this.orphanTimer = null;
@@ -231,6 +232,9 @@ export class Vault extends EventEmitter {
       created: entry.meta.created,
       updated: entry.meta.updated,
       thumb: media.find((m) => m.kind === 'image')?.src ?? null,
+      images: media.filter((m) => m.kind === 'image').slice(0, 24).map((m) => m.src), // 추억 달력 (그날의 사진)
+      day: entry.meta.day || '', // 추억 달력: "이 날의 기록으로" 정한 날
+      mode: entry.meta.mode ?? 'life', // Work / Life
       tags: extractTags(entry.body),
       hasImage: has('image'),
       hasWebLink: /\]\(https?:\/\/|<https?:\/\//i.test(entry.body),
@@ -294,6 +298,8 @@ export class Vault extends EventEmitter {
       created: entry.meta.created,
       updated: entry.meta.updated,
       device: entry.meta.device ?? null,
+      day: entry.meta.day || '',
+      mode: entry.meta.mode ?? 'life',
     };
   }
 
@@ -355,15 +361,16 @@ export class Vault extends EventEmitter {
   // ---------- 쓰기 ----------
 
   // 새 메모는 내용이 생길 때 파일로 만든다 (빈 파일이 쌓이지 않도록).
-  create({ color } = {}) {
+  // mode: Work / Life (없으면 지금 고른 모드 — defaultMode)
+  create({ color, mode } = {}) {
     const id = randomUUID();
-    this.entries.set(id, this.newEntry(id, color));
+    this.entries.set(id, this.newEntry(id, color, mode ?? this.defaultMode));
     return id;
   }
 
-  newEntry(id, color) {
+  newEntry(id, color, mode) {
     const now = toLocalIso();
-    const meta = normalizeMeta({ id, created: now, updated: now, color: COLORS.includes(color) ? color : undefined });
+    const meta = normalizeMeta({ id, created: now, updated: now, color: COLORS.includes(color) ? color : undefined, mode });
     return { id, file: null, meta, body: '', mtimeMs: 0, size: 0, idSaved: true };
   }
 

@@ -1,10 +1,7 @@
 package com.memoking.app
 
-import android.app.PendingIntent
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -18,7 +15,9 @@ import java.security.MessageDigest
 
 /**
  * 앱 안 업데이트 — PC 의 자동 업데이트에 해당. 공개 배포 저장소(memoking-releases)의 android-latest.json 을 보고,
- * 새 버전이 있으면 APK 를 받아 안드로이드 설치 화면으로 넘긴다 (사용자가 "설치" 를 한 번 누른다 — 무음 설치는 스토어 앱만 가능).
+ * 새 버전이 있으면 APK 를 받아 안드로이드 설치 화면으로 넘긴다 (사용자가 "업데이트" 를 한 번 누른다 — 무음 설치는 스토어 앱만 가능).
+ * 설치 화면은 브라우저로 받은 APK 를 열 때와 같은 안드로이드 기본 설치기(ACTION_INSTALL_PACKAGE) — 설치 중 · 완료(열기)까지 그 화면이 보여 준다.
+ *   (예전의 설치 세션(PackageInstaller) 방식은 일부 휴대폰에서 "업데이트" 를 눌러도 아무 일도 일어나지 않았다)
  *
  * 정보 파일(CI 가 android.yml 에서 만든다): { versionCode, versionName, apk(주소), size, sha256, notes }
  * 안전: 받는 주소는 우리 배포 저장소(APK_PREFIX)만, 받은 파일은 크기 · SHA-256 이 같아야 설치로 넘긴다
@@ -28,13 +27,7 @@ object AppUpdate {
     private const val REPO = "lmg6983-dotcom/memoking-releases"
     const val INFO_URL = "https://github.com/$REPO/releases/download/android/android-latest.json"
     const val APK_PREFIX = "https://github.com/$REPO/releases/download/"
-    const val ACTION_RESULT = "com.memoking.app.UPDATE_RESULT"
-
-    /** 설치가 끝나지 않았을 때 (status: PackageInstaller.STATUS_*, why: 시스템 메시지) — 화면에 알리려고 */
-    @Volatile var listener: ((Int, String) -> Unit)? = null
-
-    /** 지금 확인 화면을 기다리는 설치 세션 — 이 세션이 아닌 (앞서 닫은) 세션의 결과는 무시한다 (낡은 "취소됨" 이 지금 설치를 취소한 것처럼 보이지 않게) */
-    @Volatile var currentSession: Int = -1
+    const val APK_MIME = "application/vnd.android.package-archive"
 
     /** 새 버전인가 (versionCode 가 더 크면) */
     fun isNewer(currentCode: Int, latestCode: Int): Boolean = latestCode > currentCode
@@ -105,7 +98,10 @@ object AppUpdate {
         }
     }
 
-    private fun dir(ctx: Context): File = File(ctx.cacheDir, "updates").also { it.mkdirs() }
+    /** 받은 APK 를 두는 곳 (VaultFileProvider 가 설치기에 ~update/<이름> 으로 내어 준다) */
+    const val DIR = "updates"
+
+    private fun dir(ctx: Context): File = File(ctx.cacheDir, DIR).also { it.mkdirs() }
 
     /** 받아 둔 APK 들 지우기 (설치를 마쳤거나 새로 받기 전) */
     fun cleanup(ctx: Context) {
@@ -168,57 +164,21 @@ object AppUpdate {
         ctx.startActivity(intent)
     }
 
-    /** 받은 APK 를 설치 세션으로 넘긴다 — 안드로이드가 "업데이트할까요?" 를 묻는다. 결과는 UpdateReceiver 가 받는다 */
-    fun install(ctx: Context, file: File) {
-        val installer = ctx.packageManager.packageInstaller
-        // 앞서 열어 두고 끝내지 못한 설치 세션은 정리 (다시 눌렀을 때 낡은 확인 화면 · 세션이 쌓여 설치가 꼬이지 않게)
-        installer.mySessions.forEach { runCatching { installer.abandonSession(it.sessionId) } }
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
-            setAppPackageName(ctx.packageName)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
-        }
-        val id = installer.createSession(params)
-        currentSession = id
-        installer.openSession(id).use { session ->
-            FileInputStream(file).use { input ->
-                session.openWrite("memoking.apk", 0, file.length()).use { out ->
-                    input.copyTo(out)
-                    session.fsync(out)
-                }
-            }
-            val intent = Intent(ctx, UpdateReceiver::class.java).setAction(ACTION_RESULT).setPackage(ctx.packageName)
-            // 시스템이 결과(설치 확인 화면 · 성공 · 실패)를 채워 넣으므로 바꿀 수 있는(mutable) 것이어야 한다
-            val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
-            session.commit(PendingIntent.getBroadcast(ctx, id, intent, flags).intentSender)
-        }
+    /** 받은 APK 를 안드로이드 설치 화면으로 — 결과(취소 · 실패)는 startActivityForResult 로 돌아온다 (성공하면 앱이 새 버전으로 바뀐다) */
+    @Suppress("DEPRECATION")
+    fun installIntent(file: File): Intent {
+        return Intent(Intent.ACTION_INSTALL_PACKAGE)
+            .setDataAndType(VaultFileProvider.updateUriFor(file.name), APK_MIME)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            .putExtra(Intent.EXTRA_RETURN_RESULT, true)
     }
-}
 
-/** 설치 세션의 결과: 확인이 필요하면 안드로이드 설치 화면을 띄운다. 성공하면 앱이 새 버전으로 다시 시작된다 */
-class UpdateReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
-        // 앞서 닫은(다시 눌러 정리한) 세션이 뒤늦게 보내는 결과는 지금 설치와 상관없다
-        val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
-        if (sessionId != -1 && sessionId != AppUpdate.currentSession) return
-        when (status) {
-            PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                @Suppress("DEPRECATION")
-                val confirm = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java) else intent.getParcelableExtra(Intent.EXTRA_INTENT)
-                try {
-                    confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let { context.startActivity(it) }
-                } catch (e: Exception) {
-                    // 앱이 앞에 없을 때 등으로 설치 화면을 띄우지 못함 → 화면에 알려 다시 누르게
-                    android.util.Log.w("MemoKing", "설치 화면을 띄우지 못했어요", e)
-                    AppUpdate.listener?.invoke(PackageInstaller.STATUS_FAILURE, e.message ?: "")
-                }
-            }
-            PackageInstaller.STATUS_SUCCESS -> AppUpdate.cleanup(context)
-            else -> {
-                val why = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""
-                android.util.Log.w("MemoKing", "업데이트 설치가 끝나지 않았어요: $status $why")
-                AppUpdate.listener?.invoke(status, why)
-            }
-        }
+    /** 설치기가 돌려준 결과 → 화면의 안내 번호 (updates.js 의 INSTALL_FAIL: 3 취소 · 6 공간 · 7 서명 · 1 그 밖) — 성공이면 null */
+    fun failStatus(ok: Boolean, canceled: Boolean, installResult: Int): Int? = when {
+        ok -> null
+        canceled -> 3
+        installResult == -7 -> 7 // INSTALL_FAILED_UPDATE_INCOMPATIBLE (서명 다름)
+        installResult == -4 -> 6 // INSTALL_FAILED_INSUFFICIENT_STORAGE
+        else -> 1
     }
 }

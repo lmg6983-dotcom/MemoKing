@@ -509,7 +509,7 @@ export async function runSmoke({
     await press(v1.win, 'Enter', '\r');
     const firstFocused = await js(v1.win, `document.activeElement?.id === 'pin-toggle' && document.getElementById('menu-btn').getAttribute('aria-expanded') === 'true'`);
     await press(v1.win, 'Down');
-    const secondFocused = await js(v1.win, `document.activeElement?.id === 'show-list'`);
+    const secondFocused = await js(v1.win, `document.activeElement?.id === 'day-btn'`);
     await press(v1.win, 'Escape');
     const backToBtn = await js(v1.win, `document.getElementById('menu').hidden && document.activeElement?.id === 'menu-btn'`);
     check('메뉴: 키보드로 열기(첫 항목) · ↓ 다음 · Esc 닫고 ⋯ 로', firstFocused && secondFocused && backToBtn, JSON.stringify([firstFocused, secondFocused, backToBtn]));
@@ -1481,13 +1481,18 @@ export async function runSmoke({
           const cal = box.querySelector('.cal').getBoundingClientRect();
           const view = box.getBoundingClientRect();
           const list = box.querySelector('.ev-day-title').getBoundingClientRect();
-          return { size: '${w}x${h}', fits: cal.bottom <= view.bottom + 1 && cal.right <= view.right + 1, side: list.left >= cal.right };
+          // 낮은 창(색 점)은 한 달이 다 보이고, 칩이 보이는 크기는 칸에 칩 4개가 들어가게 달력이 길어져 밀어서 본다 (옆으로는 늘 맞게)
+          const compact = box.querySelector('.cal').classList.contains('compact');
+          const cell = box.querySelector('.cal [role="gridcell"]').getBoundingClientRect().height;
+          const chip = box.querySelector('.cal .mk-ev')?.getBoundingClientRect().height ?? 13;
+          const tall = compact ? cal.bottom <= view.bottom + 1 : cell >= 4 * chip + 30;
+          return { size: '${w}x${h}', compact, cell: Math.round(cell), fits: tall && cal.right <= view.right + 1, side: list.left >= cal.right };
         })()`));
       }
       await capture(lw, 'smoke-reminders-wide.png');
       lw.setBounds(keep);
       await wait(200);
-      check('일정 탭: 창을 줄여도 달력 한 달이 다 보임 · 넓은 창은 달력 옆에 일정 목록',
+      check('일정 탭: 낮은 창은 한 달이 다 보임(색 점) · 칩이 보이면 칸에 4개 이상 · 넓은 창은 달력 옆에 일정 목록',
         fits.every((f) => f.fits) && fits.at(-1).side && fits.at(-2).side, JSON.stringify(fits));
     }
 

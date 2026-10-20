@@ -141,6 +141,21 @@ export function painted(win) {
   return Promise.race([frame, new Promise((r) => setTimeout(r, 150))]);
 }
 
+/** 창을 투명 → 불투명으로 부드럽게 (스택 탭: 색이 다른 메모로 바뀔 때 색이 툭 바뀌지 않게) — 끝나면 resolve */
+export function fadeIn(win, duration = 120) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const step = () => {
+      if (win.isDestroyed()) return resolve();
+      const t = Math.min(1, (Date.now() - start) / duration);
+      win.setOpacity(1 - (1 - t) ** 2); // 처음엔 빨리, 끝은 천천히
+      if (t < 1) setTimeout(step, 16);
+      else resolve();
+    };
+    step();
+  });
+}
+
 // 이미 열린 창은 180ms 동안 부드럽게 이동
 export function animateBounds(win, to, duration = 180) {
   const from = win.getBounds();
