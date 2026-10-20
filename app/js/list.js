@@ -19,6 +19,7 @@ import { hintOnce } from './hints.js';
 import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { renderCollage, collageName } from './memories-collage.js';
+import { validMode, splitByMode, memoMode, otherMode, moveLabel, MODE_LABEL } from './core/modes.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
@@ -65,6 +66,7 @@ const el = {
 
 const state = {
   info: null, memos: [], results: null, query: '', queryTags: [], droppedId: null, droppedUntil: 0,
+  mode: 'life', // 메모킹 Work / Life — 목록 · 검색 · 일정은 이 모드의 메모만 (core/modes.js)
   // 필터 (창을 닫으면 잊는다): 태그는 모두 가진 메모, 색은 그중 하나, 담긴 것은 모두 해당
   filter: { tags: [], colors: [], kinds: [] },
 };
@@ -141,7 +143,10 @@ function render() {
     }
   }
   const narrowed = !only && (Boolean(state.query) || filterCount() > 0);
-  const memos = only ?? sortMemos(filterMemos(state.results ?? state.memos, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }), sort);
+  const { mine } = splitByMode(state.results ?? state.memos, state.mode);
+  const memos = only ?? sortMemos(filterMemos(mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }), sort);
+  // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
+  const elsewhere = !only && state.query ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }).length : 0;
   const before = glide ? null : cardRects();
   layoutCards(memos);
   if (before) animateCards(before);
@@ -149,8 +154,9 @@ function render() {
   el.cards.classList.toggle('is-empty', !memos.length); // 빈 카드 칸이 자리를 반 나눠 가져 안내가 아래로 치우치지 않게
   if (!memos.length) renderEmpty(narrowed);
   // 검색·필터로 좁혔을 때만 "N개 중 M개" (평소 개수는 메모 탭에)
-  el.count.textContent = `메모 ${state.memos.length}개 중 ${memos.length}개`;
-  el.count.hidden = !narrowed || !memos.length;
+  el.count.replaceChildren(`메모 ${modeMemos().length}개 중 ${memos.length}개`);
+  if (elsewhere) el.count.append(' · ', otherModeLink(elsewhere));
+  el.count.hidden = !narrowed || (!memos.length && !elsewhere);
   renderFilters();
 }
 
@@ -263,8 +269,47 @@ function chip(className, label, pressed, data) {
   return b;
 }
 
+/** 지금 모드의 메모 */
+const modeMemos = () => splitByMode(state.memos, state.mode).mine;
+
+function otherModeLink(n) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'link-btn other-mode';
+  b.textContent = `${MODE_LABEL[otherMode(state.mode)]}에서 ${n}개 더`;
+  b.title = `${MODE_LABEL[otherMode(state.mode)]} 로 바꿔 보기`;
+  b.addEventListener('click', () => setMode(otherMode(state.mode)));
+  return b;
+}
+
+// ---------- Work / Life 바꾸기 (제목 줄 왼쪽) ----------
+function showMode() {
+  document.documentElement.dataset.mode = state.mode;
+  for (const b of document.querySelectorAll('#mode-switch [data-mode]')) {
+    b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));
+    b.tabIndex = b.dataset.mode === state.mode ? 0 : -1;
+  }
+  $('count-memos').textContent = String(modeMemos().length);
+}
+
+async function setMode(mode) {
+  mode = validMode(mode);
+  if (mode === state.mode) return;
+  state.mode = mode;
+  showMode();
+  state.filter.tags = []; // 다른 모드에는 없는 태그일 수 있다
+  render();
+  remindersTab.modeChanged();
+  const saved = await api.mode?.set(mode);
+  if (saved && saved !== state.mode) {
+    state.mode = saved;
+    showMode();
+    render();
+  }
+}
+
 function renderFilters() {
-  const tags = collectTags(state.memos);
+  const tags = collectTags(modeMemos());
   // 골라 둔 태그가 지금은 없더라도 줄에 남겨 풀 수 있게
   for (const t of state.filter.tags) if (!tags.some((x) => sameTag(x.name, t))) tags.unshift({ name: t, count: 0 });
   const picked = (name) => state.filter.tags.some((t) => sameTag(t, name));
@@ -337,7 +382,8 @@ function renderEmpty(narrowed) {
   const text = document.createElement('span');
   text.textContent = narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
-    : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
+    : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 카드 메뉴의 "Work로 옮기기"로 옮겨 보세요.'
+      : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'btn primary';
@@ -993,7 +1039,13 @@ const remindersTab = setupRemindersTab({
   // 다른 캘린더 함께 보기 (읽기만): 구독은 메인이 받는다, 일정 속 주소는 브라우저로
   calendars: api.calendars && { ...api.calendars, openUrl: (url) => api.links.open(url) },
   // 추억 "한 장으로": 그림을 복사해 두고 저장할 곳을 묻는다 (안 고르면 붙여넣기로 보낼 수 있게 복사만)
+  // 지금 모드의 메모 일정만 (목록에 아직 없는 새 메모의 일정은 우선 보인다)
+  visible: (item) => {
+    const memo = state.memos.find((m) => m.id === item.memoId);
+    return !memo || memoMode(memo) === state.mode;
+  },
   memories: {
+    on: () => state.mode === 'life', // 추억 달력은 Life 에서만
     collage: async (o) => {
       flashStatus('그림을 만드는 중…');
       try {
@@ -1160,6 +1212,12 @@ el.cards.addEventListener('contextmenu', (e) => {
         if (day === null) return;
         await api.memo.set(m.id, { day });
         flashStatus(day ? `추억 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
+      },
+      // Work ↔ Life 로 옮기기: 카드는 지금 목록에서 빠진다
+      mode: async (m) => {
+        const to = otherMode(memoMode(m));
+        if (await api.memo.set(m.id, { mode: to })) flashStatus(`${MODE_LABEL[to]}로 옮겼어요 — 위의 ${MODE_LABEL[to]} 에서 보여요`);
+        else flashStatus('옮기지 못했어요 — 잠시 뒤 다시 해 주세요');
       },
       trash: (id) => deleteMemo(id),
       flash: flashStatus,
@@ -1332,7 +1390,7 @@ api.on('memos:changed', (memos) => {
   // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
   const hb = $('handoff-bar');
   if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;
-  $('count-memos').textContent = String(memos.length);
+  $('count-memos').textContent = String(modeMemos().length);
   if (activeTab !== 'memos') {
     memosStale = true; // 메모 탭으로 돌아오면 다시 그린다
     return remindersTab.refresh({ quiet: activeTab !== 'reminders' }); // 메모 제목이 바뀌면 알림 탭에도
@@ -1639,8 +1697,18 @@ $('tutorial-btn').addEventListener('click', () => {
 applyInfo(await api.info());
 if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog, showFiles: (files) => showOnlyFiles(files),
   memoFiles: () => (state.memos.length ? new Set(state.memos.map((m) => String(m.file ?? '').replace(/\\/g, '/'))) : null) });
+state.mode = validMode((await api.settings.get().catch(() => null))?.mode);
+showMode();
+for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
+api.on('mode:changed', (mode) => {
+  if (validMode(mode) === state.mode) return;
+  state.mode = validMode(mode);
+  showMode();
+  render();
+  remindersTab.modeChanged();
+});
 await refresh();
-$('count-memos').textContent = String(state.memos.length);
+showMode();
 await remindersTab.refresh();
 showTab(new URLSearchParams(location.search).get('tab') ?? 'memos');
 document.documentElement.dataset.ready = 'true';

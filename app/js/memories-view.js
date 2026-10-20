@@ -37,7 +37,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
 
   async function load() {
     try {
-      memos = (await api.memos.list()) ?? [];
+      memos = ((await api.memos.list()) ?? []).filter((m) => m.mode !== 'work'); // 추억은 Life 의 메모로
       loaded = true;
     } catch (err) {
       console.warn('[추억]', err);

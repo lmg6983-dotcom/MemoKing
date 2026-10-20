@@ -916,3 +916,46 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .memory-day .md-date::after { content: '›'; margin-left: auto; color: var(--muted); font-weight: 800; }
 .memory-day .md-date-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 @media (pointer: coarse) { .memory-day .md-chip { min-height: 44px; font-size: 14px; } }
+
+/* ---------- 메모킹 Work / Life (core/modes.js) ----------
+   Life 는 지금 그대로(노랑). Work 는 남색 — 목록 · 단추 · 고른 칩이 차분한 남색으로. 메모 안의 강조(체크 · 선택 막대)는 메모지 그대로 노랑 */
+:root[data-mode="work"] {
+  --brand-yellow: #2f4a7a;
+  --brand-yellow-hover: #263d66;
+  --brand-yellow-soft: #e3e9f4;
+  --on-brand: #ffffff;
+  --focus-ring: #2f4a7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-mode="work"] {
+    --brand-yellow: #7f9fdc;
+    --brand-yellow-hover: #93b0e6;
+    --brand-yellow-soft: #1c2638;
+    --on-brand: #0b1220;
+    --focus-ring: #7f9fdc;
+  }
+}
+:root[data-mode="work"] [data-color] { --note-accent: #ffcc00; }
+
+/* 왕관 옆 작은 표시: Life 는 꽃, Work 는 넥타이 */
+.mode-badge {
+  position: absolute; right: -5px; bottom: -3px; width: 13px; height: 13px; pointer-events: none;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg fill='%23ff8fb1' stroke='%23fff' stroke-width='.8'%3E%3Ccircle cx='8' cy='3.6' r='3'/%3E%3Ccircle cx='12.2' cy='6.6' r='3'/%3E%3Ccircle cx='10.6' cy='11.6' r='3'/%3E%3Ccircle cx='5.4' cy='11.6' r='3'/%3E%3Ccircle cx='3.8' cy='6.6' r='3'/%3E%3C/g%3E%3Ccircle cx='8' cy='8' r='2.4' fill='%23ffcc00'/%3E%3C/svg%3E");
+  transition: transform 0.25s var(--ease-pop);
+}
+:root[data-mode="work"] .mode-badge {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.6 1h4.8L9.2 4 11 12.4 8 15.4 5 12.4 6.8 4z' fill='%232f4a7a' stroke='%23fff' stroke-width='.9' stroke-linejoin='round'/%3E%3Cpath d='M6.8 4h2.4' stroke='%23fff' stroke-width='.8'/%3E%3C/svg%3E");
+}
+@media (prefers-reduced-motion: reduce) { .mode-badge { transition: none; } }
+
+/* Work | Life 고르기 (PC 제목 줄 · 휴대폰 검색 왼쪽) */
+.mode-switch { position: relative; display: inline-flex; flex: none; padding: 2px; border-radius: 999px; background: var(--fill-tab, rgba(0, 0, 0, 0.05)); -webkit-app-region: no-drag; }
+.mode-switch button {
+  min-width: 46px; height: 26px; padding: 0 10px; border: 0; border-radius: 999px; background: none;
+  color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
+  transition: background-color 0.18s var(--ease-out), color 0.18s var(--ease-out);
+}
+.mode-switch button:hover:not([aria-checked="true"]) { color: var(--text); }
+.mode-switch button[aria-checked="true"] { background: var(--brand-yellow); color: var(--on-brand); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.mode-switch button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.other-mode { font-weight: 700; }

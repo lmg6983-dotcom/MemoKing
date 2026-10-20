@@ -111,6 +111,7 @@ class LockMethods {
     if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
     if (typeof patch.ink === 'string') entry.meta.ink = normalizeInkPath(patch.ink);
     if (patch.day !== undefined) entry.meta.day = normalizeDay(patch.day ?? ''); // 추억 달력의 날 ("" · null 이면 만든 날로)
+    if (patch.mode === 'work' || patch.mode === 'life') entry.meta.mode = patch.mode; // Work / Life 로 옮기기
     if (entry.file && this.write(entry) !== true) {
       entry.meta = prev; // 쓰지 못했다 — 바뀐 것처럼 보이지 않게
       return null;
@@ -498,7 +499,7 @@ class LockMethods {
    * @returns {string} 새 메모 id
    */
   newCopy(source, body, plain = null, color = source?.meta.color) {
-    const id = this.create({ color });
+    const id = this.create({ color, mode: source?.meta.mode }); // 사본도 원래 메모와 같은 Work / Life 에
     const c = this.entries.get(id);
     c.body = body;
     if (isLockedBody(body)) {

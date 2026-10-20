@@ -46,6 +46,7 @@ export const settings = {
   magicPos: null,
   shortcuts: undefined,
   keymap: {}, // 메모 창 단축키 중 바꾼 것 (app/js/core/keymap.js)
+  mode: 'life', // 메모킹 Work / Life — 지금 보는 모드 (새 메모도 이 모드로)
   mcp: undefined,
 };
 
@@ -142,6 +143,7 @@ export function appSettings(vault, fileIndex, shortcutStatus, shortcutLabel) {
     fitTables: settings.fitTables !== false,
     linkPreviews: settings.linkPreviews !== false,
     autoTags: settings.autoTags !== false,
+    mode: settings.mode === 'work' ? 'work' : 'life',
     keymap: cleanOverrides(settings.keymap),
     magic: normalizeMagicSettings(settings.magic),
     magicIndex: fileIndex?.status() ?? null,

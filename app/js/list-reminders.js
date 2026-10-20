@@ -58,16 +58,20 @@ function el(tag, className = '', text = '') {
  * @param {{ api: any, container: HTMLElement, countEl: HTMLElement, notify?: (text: string, isError?: boolean) => void,
  *           calendars?: { feeds, setFeeds, fetch, openUrl, exportIcs, device? } }} options
  *   calendars: 다른 캘린더 (없으면 그 기능은 숨김)
- *   memories: 추억 보기를 켠다 — { onOverlay?, collage? } (memories-view.js 에 그대로)
+ *   memories: 추억 보기를 켠다 — { onOverlay?, collage?, on?: () => boolean } (on: 지금 보여도 되는가 — Work 에서는 숨김)
+ *   visible: 이 일정을 보일까 (Work / Life — 지금 모드의 메모 것만)
  */
-export function setupRemindersTab({ api, container, countEl, notify = (text, isError) => isError && window.alert(text), calendars = api.calendars, memories = null }) {
-  let items = []; // [{ memoId, title, color, reminder }]
+export function setupRemindersTab({ api, container, countEl, notify = (text, isError) => isError && window.alert(text), calendars = api.calendars, memories = null, visible = null }) {
+  let allItems = []; // 모든 모드
+  let items = []; // [{ memoId, title, color, reminder }] — 지금 모드의 것
+  const memoriesOn = () => memories?.on?.() ?? true;
   let query = '';
   const today = () => dayStart(new Date());
   let selected = today();
   let shownToday = today();
   const viewList = VIEWS.filter((v) => v.id !== MEMORIES || (memories && api.memos?.list));
   let viewId = storedView(viewList);
+  if (viewId === MEMORIES && !memoriesOn()) viewId = VIEWS[0].id;
   let compact = false; // 낮은 창: 월 보기 칸에 일정 막대 대신 색 점 (fitSize)
   let lastFit = '';
   let maxEvents = 2; // 월 보기 한 칸에 보이는 일정 수 (fitSize)
@@ -178,7 +182,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   /** @param {{ quiet?: boolean }} [o] quiet: 탭이 안 보일 때 — 탭 숫자만 (달력은 다음에 보일 때 그린다. 메모를 지울 때마다 안 보이는 달력을 다시 그려 목록이 끊겼다) */
   async function refresh({ quiet = false } = {}) {
-    items = await api.reminders.all();
+    allItems = await api.reminders.all();
+    items = visible ? allItems.filter(visible) : allItems;
     if (quiet) updateCount(new Date());
     else render();
     if (!quiet && memView && viewId === MEMORIES) memView.refresh(); // 탭으로 올 때도 여기로 — 새 사진 · 메모를 다시 모은다
@@ -510,6 +515,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     card.dataset.view = viewId;
     container.dataset.view = viewId;
     const mem = viewId === MEMORIES;
+    const memBtn = views.querySelector(`[data-view="${MEMORIES}"]`);
+    if (memBtn) memBtn.hidden = !memoriesOn();
     calEl.hidden = mem;
     rowsEl.hidden = mem;
     if (memView) memView.el.hidden = !mem;
@@ -519,12 +526,12 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     memView.show(calendar.view.currentStart);
   }
 
-  function setView(id) {
+  function setView(id, { remember = true } = {}) {
     if (id === viewId) return;
     const was = viewId;
     viewId = id;
     try {
-      localStorage.setItem(VIEW_KEY, id);
+      if (remember) localStorage.setItem(VIEW_KEY, id);
     } catch {
       // 저장 못 함 — 이번만
     }
@@ -908,6 +915,15 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   return {
     refresh,
+    /** Work / Life 를 바꿨다: 그 모드의 일정만 다시 · 추억은 Life 에서만 (Work 로 가면 월 보기로, 돌아오면 다시 추억) */
+    modeChanged() {
+      items = visible ? allItems.filter(visible) : allItems;
+      if (viewId === MEMORIES && !memoriesOn()) setView(VIEWS[0].id, { remember: false });
+      else if (memoriesOn() && storedView(viewList) === MEMORIES && viewId !== MEMORIES) setView(MEMORIES, { remember: false });
+      else render();
+      markView();
+      updateCount(new Date()); // 탭 숫자도 그 모드의 것으로 (추억 보기로 가면 render 를 거치지 않는다)
+    },
     // + 단추 (휴대폰 일정 탭): 고른 날에 새 일정 — 지난 날을 골라 두었으면 오늘
     addEvent: () => quickAdd(selected >= today() ? selected : today()),
     /** @param {{ quiet?: boolean }} [o] quiet: 그리지 않고 검색어만 (곧 refresh 가 그릴 때 — 달력을 두 번 그리지 않게) */

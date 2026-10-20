@@ -45,6 +45,7 @@ export class Vault extends EventTarget {
   constructor({ orphanDelay = ORPHAN_DELAY } = {}) {
     super();
     this.orphanDelay = orphanDelay;
+    this.defaultMode = 'life'; // 새 메모가 들어갈 Work / Life (app.js 가 이 휴대폰에서 고른 것으로)
     this.orphans = new Map();
     this.orphanTimer = null;
     /** @type {Map<string, {id, file: string|null, meta, body, mtimeMs, size, idSaved: boolean}>} */
@@ -217,6 +218,7 @@ export class Vault extends EventTarget {
       created: entry.meta.created,
       updated: entry.meta.updated,
       day: entry.meta.day || '', // 추억 달력: "이 날의 기록으로" 정한 날
+      mode: entry.meta.mode ?? 'life', // Work / Life
       reminderCount: entry.meta.reminders.filter((r) => isLiveCached(r)).length, // 종 버튼·일정 탭과 같은 규칙 (앞으로 울릴 것만)
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
     };
@@ -270,6 +272,7 @@ export class Vault extends EventTarget {
       updated: entry.meta.updated,
       device: entry.meta.device ?? null,
       day: entry.meta.day || '',
+      mode: entry.meta.mode ?? 'life',
     };
   }
 
@@ -330,15 +333,16 @@ export class Vault extends EventTarget {
   // ---------- 쓰기 ----------
 
   // 새 메모는 내용이 생길 때 파일로 만든다 (빈 파일이 쌓이지 않도록).
-  create({ color } = {}) {
+  // mode: Work / Life (없으면 지금 고른 모드 — defaultMode)
+  create({ color, mode } = {}) {
     const id = uuid();
-    this.entries.set(id, this.newEntry(id, color));
+    this.entries.set(id, this.newEntry(id, color, mode ?? this.defaultMode));
     return id;
   }
 
-  newEntry(id, color) {
+  newEntry(id, color, mode) {
     const now = toLocalIso();
-    const meta = normalizeMeta({ id, created: now, updated: now, color: COLORS.includes(color) ? color : undefined });
+    const meta = normalizeMeta({ id, created: now, updated: now, color: COLORS.includes(color) ? color : undefined, mode });
     return { id, file: null, meta, body: '', mtimeMs: 0, size: 0, idSaved: true };
   }
 

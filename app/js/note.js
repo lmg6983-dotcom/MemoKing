@@ -31,6 +31,7 @@ import { KEYMAP_ACTIONS, keymapTable, resolveKeymap, comboLabel } from './core/k
 import { hotkeyDialog } from './hotkey-dialog.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { openMemoryDay, dayText } from './memory-day.js';
+import { memoMode, otherMode, moveLabel } from './core/modes.js';
 
 const SAVE_DELAY = 600;
 
@@ -388,6 +389,7 @@ function applyMeta(next) {
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
   el.pinToggle.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
   $('day-label').textContent = memo.day ? dayText(memo.day) : '';
+  $('mode-btn').querySelector('span').textContent = moveLabel(memo);
 }
 
 for (const color of COLORS) {
@@ -404,6 +406,12 @@ el.pinToggle.addEventListener('click', async () => {
   await flush();
   applyMeta(await api.memo.set(id, { pinned: !memo.pinned }));
   closeMenu();
+});
+// Work ↔ Life 로 옮기기 (목록에서는 그 모드에서 보인다)
+$('mode-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  applyMeta(await api.memo.set(id, { mode: otherMode(memoMode(memo)) }));
 });
 // 추억 달력에서 이 메모를 둘 날 (memory-day.js)
 el.dayBtn.addEventListener('click', async () => {

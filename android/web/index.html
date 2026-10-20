@@ -49,6 +49,11 @@
   <section id="list-screen" class="screen list-screen" hidden>
     <!-- 맨 위: 검색 + 보기(정렬 · 카드 모양 · 필터) · 동기화 · 설정 (앱 이름 줄 없이 — 메모가 한 줄 더 위에서 시작) -->
     <div class="searchbar">
+      <!-- 메모킹 Work / Life (core/modes.js) — 목록 · 검색 · 일정이 그 모드의 메모만 -->
+      <div id="mode-switch" class="mode-switch" role="radiogroup" aria-label="메모킹 모드">
+        <button type="button" role="radio" data-mode="life" aria-checked="true">Life</button>
+        <button type="button" role="radio" data-mode="work" aria-checked="false" tabindex="-1">Work</button>
+      </div>
       <label class="search">
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모나 #태그 검색" aria-label="메모 검색" autocomplete="off" enterkeyhint="search">
@@ -71,6 +76,7 @@
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>
       </div>
+      <button id="other-mode" class="link-btn other-mode" type="button" hidden></button>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
     </div>
@@ -287,6 +293,7 @@
     <button class="menu-item" data-memo-action="open"><svg><use href="#i-note"/></svg><span>열기</span></button>
     <button class="menu-item" data-memo-action="pin"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
     <button class="menu-item" data-memo-action="day"><svg><use href="#i-calendar"/></svg><span>이 날의 기록으로… <small></small></span></button>
+    <button class="menu-item" data-memo-action="mode"><svg><use href="#i-swap"/></svg><span>Work로 옮기기</span></button>
     <button class="menu-item" data-memo-action="lock"><svg><use href="#i-lock"/></svg><span>잠그기</span></button>
     <button class="menu-item" data-memo-action="versions"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
     <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>공유</span></button>

@@ -191,6 +191,7 @@ function openVault(dir) {
   vault = null;
   try {
     const next = new Vault(dir);
+    next.defaultMode = settings.mode === 'work' ? 'work' : 'life'; // 새 메모는 지금 고른 Work / Life 로
     next.on('changed', ({ ids, external, removed }) => {
       windowManager.pushList();
       driveSync?.request(3000);

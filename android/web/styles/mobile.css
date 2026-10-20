@@ -1219,3 +1219,8 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .note-screen .mk-voice-body > p:first-child .mk-media-label::after { content: "\22EF"; margin-left: auto; padding: 0 8px; font-size: 22px; line-height: 1; opacity: 0.7; }
 /* 정렬: 기본(최신순)이 아니면 단추에 표시 (필터처럼) */
 .sort-btn.active { background: var(--brand-yellow-soft); color: var(--text-strong); }
+
+/* 메모킹 Work / Life 고르기: 검색 왼쪽에 작게 (손가락 높이 44px 은 둘레 칸으로) */
+.searchbar .mode-switch { margin-right: 6px; padding: 3px; }
+.searchbar .mode-switch button { position: relative; min-width: 42px; height: 38px; padding: 0 8px; font-size: 13px; }
+.other-mode { display: block; margin: 0 16px 8px auto; padding: 6px 0; font-size: 13.5px; }

@@ -12,7 +12,7 @@ export const DEFAULT_COLOR = 'yellow';
 export const UNTITLED = '제목 없음';
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders', 'tables', 'ink', 'device', 'day'];
+const KNOWN_KEYS = ['id', 'created', 'updated', 'color', 'pinned', 'links', 'reminders', 'tables', 'ink', 'device', 'day', 'mode'];
 // 마지막으로 내용을 고친 곳 (이어 쓰기 안내: "휴대폰에서 방금 고친 메모")
 export const DEVICES = ['pc', 'phone', 'ai'];
 const AUDIO_EXT = /\.(weba|ogg|oga|opus|mp3|m4a|aac|wav|flac)$/i;
@@ -59,8 +59,14 @@ export function normalizeMeta(data) {
     ink: normalizeInkPath(data.ink), // 주석(메모 위에 그린 손 메모)이 든 파일
     device: DEVICES.includes(data.device) ? data.device : null,
     day: normalizeDay(data.day), // 추억 달력: "이 날의 기록으로" 정한 날 (YYYY-MM-DD, 없으면 만든 날)
+    mode: normalizeMode(data.mode), // 메모킹 Work / Life (core/modes.js) — 적지 않았으면 Life
     extra,
   };
+}
+
+/** Work / Life — 'work' 가 아니면 모두 Life (예전 메모 · 다른 앱이 만든 메모) */
+export function normalizeMode(value) {
+  return String(value ?? '').trim().toLowerCase() === 'work' ? 'work' : 'life';
 }
 
 /** 추억 달력의 날 (YYYY-MM-DD) — 머리말에 날짜(Date)로 읽혀도 그 날로, 아니면 "" */
@@ -96,6 +102,7 @@ export function serializeMemoFile(meta, body) {
   if (normalizeInkPath(meta.ink)) data.ink = normalizeInkPath(meta.ink);
   if (DEVICES.includes(meta.device)) data.device = meta.device;
   if (normalizeDay(meta.day)) data.day = normalizeDay(meta.day);
+  if (normalizeMode(meta.mode) === 'work') data.mode = 'work'; // Life 는 적지 않는다 (예전 파일과 같게)
   Object.assign(data, meta.extra);
   const yaml = stringifyYaml(data, { lineWidth: 0 }).trimEnd();
   const text = body.replace(/\r\n/g, '\n').replace(/\s+$/, '');
