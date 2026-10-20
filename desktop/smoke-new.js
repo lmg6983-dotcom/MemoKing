@@ -365,7 +365,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         // 색 점을 진짜 마우스로 → 그 색으로 바뀌고 메뉴가 닫힌다
         const hitDot = await pickList('.mk-ctx-sw[data-id="color:blue"]');
         const recolored = await until(() => getVault().get(cid)?.color === 'blue', '메모 색 바뀜', 3000).catch(() => false);
-        const closed = await js(list, `!document.querySelector('.mk-ctx')`);
+        const closed = await until(() => js(list, `!document.querySelector('.mk-ctx')`), '색을 고르면 메뉴 닫힘', 2000).catch(() => false); // 닫히는 움직임을 기다림
         check('목록 카드 메뉴 › 색 점을 누르면 바로 그 색으로 바뀌고 메뉴가 닫힘 (가려지지 않음)', hitDot && recolored && closed, JSON.stringify({ hitDot, recolored, closed }));
         // 고정: 눌러 켜고, 다시 열면 체크 표시, 한 번 더 눌러 푼다
         const reopen = async () => {
@@ -377,7 +377,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await pickList('.mk-ctx-item[data-id="pin"]');
         const pinned = await until(() => getVault().get(cid)?.pinned === true, '고정', 3000).catch(() => false);
         await reopen();
-        const checked = await js(list, `document.querySelector('.mk-ctx-item[data-id="pin"]')?.getAttribute('aria-checked')`);
+        const checked = await until(async () => (await js(list, `document.querySelector('.mk-ctx-item[data-id="pin"]')?.getAttribute('aria-checked')`)) === 'true' && 'true', '고정 체크 표시', 2000).catch(() => 'false');
         await pickList('.mk-ctx-item[data-id="pin"]');
         const unpinned = await until(() => getVault().get(cid)?.pinned !== true, '고정 풀림', 3000).catch(() => false);
         check('목록 카드 메뉴 › 고정: 누르면 고정, 다시 열면 체크 표시, 한 번 더 누르면 풀림', pinned && checked === 'true' && unpinned, JSON.stringify({ pinned, checked, unpinned }));
@@ -395,7 +395,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         key(list, 'Down');
         key(list, 'Down');
         key(list, 'Down');
-        const onColors = await js(list, `document.activeElement?.classList.contains('mk-ctx-sw')`);
+        const onColors = await until(() => js(list, `document.activeElement?.classList.contains('mk-ctx-sw')`), '색 줄로 옮김', 2000).catch(() => false);
         key(list, 'Right');
         key(list, 'Escape');
         const gone = await until(() => js(list, `!document.querySelector('.mk-ctx')`), '메뉴 닫힘', 2000).catch(() => false);
