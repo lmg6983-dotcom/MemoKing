@@ -192,7 +192,12 @@ function openVault(dir) {
   vault = null;
   try {
     const next = new Vault(dir);
-    next.defaultMode = settings.mode === 'work' ? 'work' : 'life'; // 새 메모는 지금 고른 Work / Life 로
+    // Work / Life 나누기: 정한 적이 없으면 이미 Work 로 옮긴 메모가 있을 때만 켠 채로 (처음 쓰는 사람은 꺼짐)
+    if (typeof settings.workLife !== 'boolean') {
+      settings.workLife = next.list().some((m) => m.mode === 'work');
+      saveSettings();
+    }
+    next.defaultMode = viewMode(); // 새 메모는 지금 고른 Work / Life 로 (나눠 쓰지 않으면 Life)
     next.on('changed', ({ ids, external, removed }) => {
       windowManager.pushList();
       driveSync?.request(3000);
@@ -292,7 +297,7 @@ function fireReminder(memoId, reminder, info) {
   const alarm = { reminderId: reminder.id, label: full, missed: Boolean(info.missed) };
   history?.add({ source: 'memoking', appId: APP_ID, app: '메모킹', title, body: label, memoId });
   // 퇴근 뒤 · 쉬는 날의 Work 알림: 띄우지 않고 알림 보관함에만 (업무 시간이 되면 모아서 한 번 알린다)
-  if (quietAlarm(memo, new Date(), settings.workHours)) {
+  if (workLifeOn() && quietAlarm(memo, new Date(), settings.workHours)) {
     quietCount += 1;
     pushReminders();
     return;
@@ -331,20 +336,61 @@ const alarms = createAlarmRunner({ getVault: () => vault, fire: fireReminder });
 // ---------- 메모킹 Work / Life ----------
 let quietCount = 0; // 퇴근 뒤 조용히 넘긴 Work 알림
 
+/** 설정 › Work / Life 나누기 (꺼 두면 모든 메모가 한 목록 · 화면 밝기는 시스템 설정) */
+const workLifeOn = () => settings.workLife === true;
+/** 지금 보는 모드 (나눠 쓰지 않으면 늘 Life) */
+const viewMode = () => (workLifeOn() && settings.mode === 'work' ? 'work' : 'life');
+/** 화면 밝기를 정할 모드 — 나눠 쓰지 않으면 null (시스템 설정) */
+const themeMode = (mode = viewMode()) => (workLifeOn() ? mode : null);
+
+/** 모드 · 나누기가 바뀌었을 때: 새 메모 · 목록 창 · 작은 창 · 열린 메모 창의 밝기 */
+function applyAppMode() {
+  if (vault) vault.defaultMode = viewMode();
+  setListTheme(themeMode()); // Work 는 어두운 화면 — 창 버튼 줄 · 창 바탕도 함께
+  windowManager.listWin?.setTitleBarOverlay(titleBarOverlay());
+  windowManager.listWin?.setBackgroundColor(listBg());
+  for (const w of BrowserWindow.getAllWindows()) themeWindow(w);
+  for (const [id, win] of windowManager.noteWins) {
+    const m = vault?.get(id);
+    if (!win.isDestroyed()) win.setBackgroundColor(noteBg(m?.color, themeMode(m?.mode ?? 'life')));
+  }
+  broadcast('mode:changed', { mode: viewMode(), enabled: workLifeOn() });
+}
+
 /** 모드 바꾸기 (목록의 Work | Life · 업무 시간 시계) — 새 메모도 이 모드로 */
 function setAppMode(mode) {
   settings.mode = mode === 'work' ? 'work' : 'life';
   saveSettings();
-  if (vault) vault.defaultMode = settings.mode;
-  setListTheme(settings.mode); // Work 는 어두운 화면 — 창 버튼 줄 · 창 바탕도 함께
-  windowManager.listWin?.setTitleBarOverlay(titleBarOverlay());
-  windowManager.listWin?.setBackgroundColor(listBg());
-  broadcast('mode:changed', settings.mode);
+  applyAppMode();
   return settings.mode;
 }
+
+/** 설정 › Work / Life 나누기 켜고 끄기 — 끄면 Life 로 돌아가고 업무 시간 시계 · 퇴근 뒤 조용히도 쉰다 */
+function setWorkLife(on) {
+  settings.workLife = Boolean(on);
+  if (!settings.workLife) settings.mode = 'life';
+  saveSettings();
+  applyAppMode();
+  if (settings.workLife) workClock();
+  return settings.workLife;
+}
+// 작은 창들(매직키 · 스티커 · 말풍선 · 단축키 설정 · PDF …)도 지금 모드의 밝기로 — Work 는 어둡게, Life 는 밝게.
+//   목록 창 · 메모 창은 스스로 정하고(메모 창은 그 메모의 모드), 인쇄할 종이(print.html)는 늘 밝게
+const SELF_THEMED = /\/(index|note|print)\.html/;
+function themeWindow(w) {
+  const wc = w?.webContents;
+  if (!wc || wc.isDestroyed()) return;
+  const url = wc.getURL();
+  if (!url.startsWith('file:') || SELF_THEMED.test(url)) return;
+  const mode = themeMode();
+  const js = mode ? `document.documentElement.dataset.theme = ${JSON.stringify(mode === 'work' ? 'dark' : 'light')}` : 'delete document.documentElement.dataset.theme';
+  wc.executeJavaScript(js).catch(() => {});
+}
+app.on('browser-window-created', (_e, w) => w.webContents.on('dom-ready', () => themeWindow(w)));
+
 // 업무 시간이 시작되면 Work, 끝나면 Life (저절로 바꾸기를 켰을 때만 · 경계를 넘을 때만)
 const workClock = modeClock({
-  getHours: () => settings.workHours,
+  getHours: () => (workLifeOn() ? settings.workHours : null), // 나눠 쓰지 않으면 쉰다
   onChange: (mode) => {
     if (mode !== settings.mode) setAppMode(mode);
     if (mode === 'work' && quietCount > 0) {
@@ -993,6 +1039,7 @@ app.whenReady().then(async () => {
   });
   registerIpc({
     setAppMode,
+    setWorkLife,
     setWorkHours,
     calendarFeeds,
     windowManager,
@@ -1055,10 +1102,7 @@ app.whenReady().then(async () => {
 
   nativeTheme.on('updated', () => {
     windowManager.listWin?.setTitleBarOverlay(titleBarOverlay());
-    for (const [id, win] of windowManager.noteWins) {
-      const m = vault?.get(id);
-      win.setBackgroundColor(noteBg(m?.color, m?.mode));
-    }
+    applyAppMode(); // 나눠 쓰지 않으면 시스템 설정을 따르므로 다시
   });
 
   for (const w of BrowserWindow.getAllWindows()) w.on('session-end', flushOpmsFiles);
@@ -1090,7 +1134,7 @@ app.whenReady().then(async () => {
     if (!runSmoke) return;
     prepareSmoke(app.getPath('userData'));
     loadSettings();
-    setListTheme(settings.mode);
+    setListTheme(themeMode());
     initHistory();
     openVault(settings.vaultPath);
     runSmoke({
@@ -1146,7 +1190,7 @@ app.whenReady().then(async () => {
   }
 
   loadSettings();
-  setListTheme(settings.mode); // 목록 창은 지금 모드의 화면 (Work 는 어둡게)
+  setListTheme(themeMode()); // 목록 창은 지금 모드의 화면 (Work 는 어둡게 · 나눠 쓰지 않으면 시스템 설정)
   initHistory();
   initDrive();
 

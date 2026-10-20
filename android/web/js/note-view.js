@@ -277,7 +277,7 @@ $('banner-keep').addEventListener('click', () => {
 
 function applyMeta(next) {
   memo = { ...memo, ...next };
-  if (id) setTheme(memo.mode); // Work 메모는 어두운 화면 (메모를 닫으면 목록의 모드로 — list-view)
+  if (id) setTheme(app.workLifeOn?.() ? memo.mode ?? 'life' : null); // Work 메모는 어두운 화면 · 나눠 쓰지 않으면 시스템 설정 (닫으면 목록의 모드로 — list-view)
   el.screen.dataset.color = memo.color;
   document.body.dataset.noteColor = memo.color;
   if (!isTwoPane()) matchChrome(el.bar); // 넓은 화면은 목록과 메모가 함께 보이므로 위 막대는 목록 색

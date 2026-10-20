@@ -358,6 +358,18 @@ api.on('memo:external', async (next) => {
   showBanner(conflictCopy ? '다른 기기에서도 이 메모를 고쳤어요. 그쪽 내용은 따로 저장해 뒀어요.' : '다른 기기에서도 이 메모를 고쳤어요.', { load: conflictCopy ? '그쪽 내용 보기' : null, keep: '확인' });
 });
 api.on('settings:link-previews', (on) => editor?.setLinkPreviews(on));
+// Work / Life 나누기: Work 메모는 어두운 화면 · Life 는 밝은 화면, 나눠 쓰지 않으면 시스템 설정 (메뉴의 "Work로 옮기기"도 그때만)
+function showModeTheme() {
+  const root = document.documentElement;
+  if (memo?.workLife) root.dataset.theme = memo.mode === 'work' ? 'dark' : 'light';
+  else delete root.dataset.theme;
+  $('mode-btn').hidden = !memo?.workLife;
+}
+api.on('mode:changed', ({ enabled } = {}) => {
+  if (!memo) return;
+  memo = { ...memo, workLife: Boolean(enabled) };
+  showModeTheme();
+});
 
 api.on('memo:removed', () => {
   showBanner('이 메모가 메모 폴더에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
@@ -390,7 +402,7 @@ function applyMeta(next) {
   el.pinToggle.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
   $('day-label').textContent = memo.day ? dayText(memo.day) : '';
   $('mode-btn').querySelector('span').textContent = moveLabel(memo);
-  document.documentElement.dataset.theme = memo.mode === 'work' ? 'dark' : 'light'; // Work 메모는 어두운 화면
+  showModeTheme();
 }
 
 for (const color of COLORS) {

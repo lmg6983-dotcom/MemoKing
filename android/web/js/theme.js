@@ -2,12 +2,15 @@
 //   목록은 지금 고른 모드, 메모를 열면 그 메모의 모드 — 닫으면 다시 목록의 모드 (CSS 는 :root[data-theme])
 import { matchChrome } from './ui.js';
 
-let listMode = 'life';
+let listMode = null;
 
+/** @param {'work'|'life'|null} mode null: Work / Life 를 나눠 쓰지 않음 — 시스템 설정 */
 export function setTheme(mode) {
-  const theme = mode === 'work' ? 'dark' : 'light';
-  if (document.documentElement.dataset.theme === theme) return;
-  document.documentElement.dataset.theme = theme;
+  const root = document.documentElement;
+  const theme = mode ? (mode === 'work' ? 'dark' : 'light') : undefined;
+  if (root.dataset.theme === theme) return;
+  if (theme) root.dataset.theme = theme;
+  else delete root.dataset.theme;
   requestAnimationFrame(() => matchChrome?.(document.querySelector('.screen:not([hidden]) .bar, .screen:not([hidden]) .searchbar') ?? document.body));
 }
 

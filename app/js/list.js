@@ -69,11 +69,15 @@ const el = {
 const state = {
   info: null, memos: [], results: null, query: '', queryTags: [], droppedId: null, droppedUntil: 0,
   mode: 'life', // 메모킹 Work / Life — 목록 · 검색 · 일정은 이 모드의 메모만 (core/modes.js)
+  workLife: false, // 설정 › Work / Life 나누기 (꺼져 있으면 모든 메모가 한 목록 · 밝기는 시스템 설정)
   // 필터 (창을 닫으면 잊는다): 태그는 모두 가진 메모, 색은 그중 하나, 담긴 것은 모두 해당
   filter: { tags: [], colors: [], kinds: [] },
 };
 // 처음 그릴 때부터 그 모드의 밝기로 (창을 연 쪽이 ?mode= 로 알려 준다)
-document.documentElement.dataset.theme = new URLSearchParams(location.search).get('mode') === 'work' ? 'dark' : 'light';
+{
+  const m = new URLSearchParams(location.search).get('mode'); // system: Work / Life 를 나눠 쓰지 않음 → 시스템 설정
+  if (m === 'work' || m === 'life') document.documentElement.dataset.theme = m === 'work' ? 'dark' : 'light';
+}
 let searchTimer = null;
 let drivePanel = null; // Google Drive 직접 동기화 (설정 · 처음 화면)
 
@@ -147,10 +151,10 @@ function render() {
     }
   }
   const narrowed = !only && (Boolean(state.query) || filterCount() > 0);
-  const { mine } = splitByMode(state.results ?? state.memos, state.mode);
+  const { mine } = split(state.results ?? state.memos, state.mode);
   const memos = only ?? sortMemos(filterMemos(mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }), sort);
   // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
-  const elsewhere = !only && state.query ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }).length : 0;
+  const elsewhere = !only && state.query && state.workLife ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }).length : 0;
   const before = glide ? null : cardRects();
   layoutCards(memos);
   if (before) animateCards(before);
@@ -274,7 +278,11 @@ function chip(className, label, pressed, data) {
 }
 
 /** 지금 모드의 메모 */
-const modeMemos = () => splitByMode(state.memos, state.mode).mine;
+const modeMemos = () => split(state.memos, state.mode).mine;
+/** 지금 모드의 메모 (Work / Life 를 나눠 쓰지 않으면 모두) */
+function split(memos, mode) {
+  return state.workLife ? splitByMode(memos, mode) : { mine: memos ?? [], other: 0 };
+}
 
 function otherModeLink(n) {
   const b = document.createElement('button');
@@ -288,8 +296,12 @@ function otherModeLink(n) {
 
 // ---------- Work / Life 바꾸기 (제목 줄 왼쪽) ----------
 function showMode() {
-  document.documentElement.dataset.mode = state.mode;
-  document.documentElement.dataset.theme = state.mode === 'work' ? 'dark' : 'light'; // Work 는 어두운 화면 · Life 는 밝은 화면
+  const root = document.documentElement;
+  root.dataset.mode = state.mode;
+  // Work 는 어두운 화면 · Life 는 밝은 화면 — 나눠 쓰지 않으면 시스템 설정
+  if (state.workLife) root.dataset.theme = state.mode === 'work' ? 'dark' : 'light';
+  else delete root.dataset.theme;
+  $('mode-switch').hidden = !state.workLife;
   for (const b of document.querySelectorAll('#mode-switch [data-mode]')) {
     b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));
     b.tabIndex = b.dataset.mode === state.mode ? 0 : -1;
@@ -320,7 +332,7 @@ async function setMode(mode) {
     render();
     remindersTab.modeChanged();
   });
-  if (mode === 'work') hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 카드 메뉴의 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
+  if (mode === 'work' && state.workLife) hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 카드 메뉴의 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
   const saved = await api.mode?.set(mode);
   if (saved && saved !== state.mode) {
     state.mode = saved;
@@ -422,7 +434,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
   const actions = document.createElement('span');
   actions.className = 'empty-actions';
   actions.append(b);
-  if (!narrowed && state.mode === 'work') {
+  if (!narrowed && state.workLife && state.mode === 'work') {
     const help = document.createElement('button');
     help.type = 'button';
     help.className = 'btn';
@@ -838,6 +850,8 @@ async function loadSettings() {
   showMcp(s.mcp);
   $('trash-days').value = String(s.trashDays);
   renderWorkSettings($('work-settings'), {
+    enabled: s.workLife === true,
+    setEnabled: (on) => api.mode?.setWorkLife(on), // 목록은 mode:changed 로 따라간다
     hours: s.workHours,
     save: (h) => api.mode?.setHours(h),
     openHelper: () => openHelper(),
@@ -1081,10 +1095,10 @@ const remindersTab = setupRemindersTab({
   // 지금 모드의 메모 일정만 (목록에 아직 없는 새 메모의 일정은 우선 보인다)
   visible: (item) => {
     const memo = state.memos.find((m) => m.id === item.memoId);
-    return !memo || memoMode(memo) === state.mode;
+    return !state.workLife || !memo || memoMode(memo) === state.mode;
   },
   memories: {
-    on: () => state.mode === 'life', // 추억 달력은 Life 에서만
+    on: () => !state.workLife || state.mode === 'life', // 추억 달력은 Life 에서만 (나눠 쓰지 않으면 늘)
     collage: async (o) => {
       flashStatus('그림을 만드는 중…');
       try {
@@ -1241,7 +1255,7 @@ el.cards.addEventListener('contextmenu', (e) => {
   const r = card.getBoundingClientRect();
   const at = e.button !== 2 ? { x: Math.round(r.left + 16), y: Math.round(r.top + 16) } : { x: e.clientX, y: e.clientY };
   openCardMenu({
-    memo, at, api,
+    memo, at, api, workLife: state.workLife,
     run: {
       open: (id) => api.memo.open(id),
       pin: togglePin,
@@ -1736,15 +1750,24 @@ $('tutorial-btn').addEventListener('click', () => {
 applyInfo(await api.info());
 if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog, showFiles: (files) => showOnlyFiles(files),
   memoFiles: () => (state.memos.length ? new Set(state.memos.map((m) => String(m.file ?? '').replace(/\\/g, '/'))) : null) });
-state.mode = validMode((await api.settings.get().catch(() => null))?.mode);
+{
+  const s = await api.settings.get().catch(() => null);
+  state.workLife = s?.workLife === true;
+  state.mode = state.workLife ? validMode(s?.mode) : 'life';
+}
 showMode();
 for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
-api.on('mode:changed', (mode) => {
-  if (validMode(mode) === state.mode) return;
-  state.mode = validMode(mode);
-  showMode();
-  render();
-  remindersTab.modeChanged();
+// 다른 곳에서 모드 · 나누기가 바뀜 (업무 시간 시계 · 설정)
+api.on('mode:changed', ({ mode, enabled } = {}) => {
+  const next = enabled ? validMode(mode) : 'life';
+  if (next === state.mode && Boolean(enabled) === state.workLife) return;
+  state.workLife = Boolean(enabled);
+  state.mode = next;
+  withViewTransition(() => {
+    showMode();
+    render();
+    remindersTab.modeChanged();
+  });
 });
 await refresh();
 showMode();

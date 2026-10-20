@@ -31,6 +31,7 @@ const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x:
 export function registerIpc(ctx) {
   const {
     setAppMode,
+    setWorkLife,
     setWorkHours,
     calendarFeeds,
     windowManager: wm,
@@ -369,6 +370,7 @@ export function registerIpc(ctx) {
   // 메모킹 Work / Life 바꾸기 — 목록이 그 모드의 메모만 보이고, 새 메모(빠른 메모 · 캡처 포함)도 그 모드로
   ipcMain.handle('mode:set', (_e, mode) => setAppMode(mode));
   ipcMain.handle('mode:hours', (_e, hours) => setWorkHours(hours));
+  ipcMain.handle('mode:work-life', (_e, on) => setWorkLife(on)); // 설정 › Work / Life 나누기
   // 링크 미리보기 카드 켜고 끄기 — 열린 메모 · 위젯에도 바로
   ipcMain.handle('app:set-link-previews', (_e, on) => {
     settings.linkPreviews = Boolean(on);
@@ -708,7 +710,7 @@ export function registerIpc(ctx) {
     wm.pendingAlarms.delete(id);
     wm.pendingCaptures.delete(id);
     wm.pendingCommands.delete(id);
-    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, command, stack: wm.stackState(id), linkPreviews: settings.linkPreviews !== false };
+    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, command, stack: wm.stackState(id), linkPreviews: settings.linkPreviews !== false, workLife: settings.workLife === true };
   });
 
   // ---------- 잠금 메모 ----------
@@ -783,7 +785,7 @@ export function registerIpc(ctx) {
     const memo = getVault()?.setMeta(id, patch ?? {});
     const win = wm.noteWins.get(id);
     if (memo && win) {
-      win.setBackgroundColor(noteBg(memo.color, memo.mode));
+      win.setBackgroundColor(noteBg(memo.color, settings.workLife === true ? memo.mode ?? 'life' : null));
       win.webContents.send('memo:meta', memo);
     }
     return memo;

@@ -12,7 +12,8 @@ import { moveLabel } from './core/modes.js';
 export const COLOR_LABEL = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 
 /** 메뉴의 모양 (창 없이도 확인할 수 있게 따로) */
-export function cardMenuSpec(memo) {
+/** @param {{ workLife?: boolean }} [o] workLife: Work / Life 를 나눠 쓸 때만 "Work로 옮기기" */
+export function cardMenuSpec(memo, { workLife = true } = {}) {
   const locked = memo.locked === true;
   return {
     icons: [
@@ -28,7 +29,7 @@ export function cardMenuSpec(memo) {
       { id: 'pin', label: '목록 맨 위에 고정', checked: memo.pinned === true },
       { type: 'colors', label: '색', colors: COLORS.map((c) => ({ id: `color:${c}`, label: COLOR_LABEL[c] ?? c, color: c, checked: memo.color === c })) },
       { id: 'day', label: '이 날의 기록으로…', hint: memo.day ? dayText(memo.day) : '' },
-      { id: 'mode', label: moveLabel(memo) },
+      ...(workLife ? [{ id: 'mode', label: moveLabel(memo) }] : []),
       { type: 'separator' },
       locked ? { id: 'unlock', label: '잠금 풀기…' } : { id: 'lock', label: '잠그기…' },
       { id: 'versions', label: '이전 버전…', disabled: locked },
@@ -39,8 +40,8 @@ export function cardMenuSpec(memo) {
 /**
  * @param {{ memo: object, at: { x: number, y: number }, api: object, run: { openSettings?(), open(id), pin(memo), color(memo, color), day?(memo), mode?(memo), trash(id), flash(text), setStatus?(text) } }} o
  */
-export async function openCardMenu({ memo, at, api, run }) {
-  const { icons, items } = cardMenuSpec(memo);
+export async function openCardMenu({ memo, at, api, run, workLife = true }) {
+  const { icons, items } = cardMenuSpec(memo, { workLife });
   const id = await openContextMenu({ x: at.x, y: at.y, icons, items, label: '메모 메뉴' });
   if (!id) return null;
   if (id.startsWith('color:')) return run.color(memo, id.slice(6)), id;

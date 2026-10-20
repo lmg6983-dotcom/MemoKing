@@ -29,12 +29,13 @@ export const NOTE_BG = {
   dark: { yellow: '#3a3317', green: '#1e3322', pink: '#3d2230', purple: '#2c2440', blue: '#1c2d42', gray: '#262624', charcoal: '#141413' },
 };
 
-// 메모킹 Work / Life: Work 는 어두운 화면 · Life 는 밝은 화면 (시스템 설정과 상관없이) — 목록 창은 지금 모드, 메모 창은 그 메모의 모드
-let listDark = false;
-export const setListTheme = (mode) => (listDark = mode === 'work');
-export const listBg = () => (listDark ? '#0e0e0d' : '#f6f5f1');
-export const noteBg = (color, mode = 'life') => NOTE_BG[mode === 'work' ? 'dark' : 'light'][color] ?? NOTE_BG.light.yellow;
-void nativeTheme; // 다른 창(매직키 · 스티커 …)은 여전히 시스템 설정을 따른다
+// 메모킹 Work / Life 를 나눠 쓰면: Work 는 어두운 화면 · Life 는 밝은 화면 (시스템 설정과 상관없이) — 목록 창은 지금 모드, 메모 창은 그 메모의 모드.
+//   나눠 쓰지 않으면 mode 는 null — 예전처럼 시스템 설정을 따른다
+let listMode = null;
+const darkFor = (mode) => (mode ? mode === 'work' : nativeTheme.shouldUseDarkColors);
+export const setListTheme = (mode) => (listMode = mode ?? null);
+export const listBg = () => (darkFor(listMode) ? '#0e0e0d' : '#f6f5f1');
+export const noteBg = (color, mode = null) => NOTE_BG[darkFor(mode) ? 'dark' : 'light'][color] ?? NOTE_BG.light.yellow;
 
 export function guardWindow(win, { openWebPage } = {}) {
   win.webContents.on('will-navigate', (event) => event.preventDefault());
@@ -70,7 +71,7 @@ export function getTitleBarDim() {
 }
 
 export function titleBarOverlay() {
-  const dark = listDark;
+  const dark = darkFor(listMode);
   const base = dark ? '#0e0e0d' : '#f6f5f1';
   return {
     color: currentTitleBarDim ? TITLEBAR_DIM[dark ? 'dark' : 'light'][currentTitleBarDim] : base,

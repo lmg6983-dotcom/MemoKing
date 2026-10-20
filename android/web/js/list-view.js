@@ -70,20 +70,48 @@ const state = {
   filter: { tags: [], colors: [], kinds: [] },
   tab: 'memos',
   mode: 'life', // 메모킹 Work / Life — 이 휴대폰에서 고른 것 (메모 파일에는 메모마다 mode)
+  workLife: null, // 설정 › Work / Life 나누기 (null: 정한 적 없음 — 처음 목록을 읽을 때 Work 메모가 있으면 켬)
 };
+const WORK_LIFE_KEY = 'memoking.workLife';
 try {
   state.mode = validMode(localStorage.getItem(MODE_KEY));
+  const v = localStorage.getItem(WORK_LIFE_KEY);
+  state.workLife = v === '1' ? true : v === '0' ? false : null;
 } catch {
   // Life
 }
+if (!state.workLife) state.mode = 'life';
+export const workLifeOn = () => state.workLife === true;
 
-/** 지금 모드의 메모 */
-const modeMemos = () => splitByMode(state.memos, state.mode).mine;
+/** 지금 모드의 메모 (Work / Life 를 나눠 쓰지 않으면 모두) */
+function split(memos, mode) {
+  return workLifeOn() ? splitByMode(memos, mode) : { mine: memos ?? [], other: 0 };
+}
+const modeMemos = () => split(state.memos, state.mode).mine;
+
+/** 설정 › Work / Life 나누기 켜고 끄기 (끄면 Life · 모든 메모가 한 목록 · 밝기는 시스템 설정) */
+export function setWorkLife(on) {
+  state.workLife = Boolean(on);
+  try {
+    localStorage.setItem(WORK_LIFE_KEY, on ? '1' : '0');
+  } catch {
+    // 이번 실행 동안만
+  }
+  if (!on) setMode('life');
+  withViewTransition(() => {
+    showMode();
+    render();
+    remindersTab?.modeChanged();
+  });
+  if (on) workClock();
+  app.rescheduleAlarms?.(); // 퇴근 뒤 조용히가 켜지거나 꺼진다
+}
 export const currentMode = () => state.mode;
 
 function showMode() {
   document.documentElement.dataset.mode = state.mode;
-  setListTheme(state.mode, { noteOpen: app.isNoteOpen?.() ?? false }); // Work 는 어두운 화면 · Life 는 밝은 화면
+  setListTheme(workLifeOn() ? state.mode : null, { noteOpen: app.isNoteOpen?.() ?? false }); // Work 는 어두운 화면 · Life 는 밝은 화면 (나눠 쓰지 않으면 시스템 설정)
+  $('mode-switch').hidden = !workLifeOn();
   if (app.vault) app.vault.defaultMode = state.mode; // 새 메모도 이 모드로
   for (const b of document.querySelectorAll('#mode-switch [data-mode]')) {
     b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));
@@ -93,7 +121,7 @@ function showMode() {
 
 export function setMode(mode) {
   mode = validMode(mode);
-  if (mode === state.mode) return;
+  if (mode === state.mode || (mode === 'work' && !workLifeOn())) return; // 나눠 쓰지 않으면 늘 Life
   state.mode = mode;
   try {
     localStorage.setItem(MODE_KEY, mode);
@@ -107,12 +135,12 @@ export function setMode(mode) {
     render();
     remindersTab?.modeChanged();
   });
-  if (mode === 'work') hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 메모를 꾹 눌러 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
+  if (mode === 'work' && workLifeOn()) hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 메모를 꾹 눌러 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
 }
 for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
 
 // 업무 시간이 시작되면 Work, 끝나면 Life (설정 › Work / Life에서 켰을 때 · 경계를 넘을 때만)
-const workClock = modeClock({ getHours: workHours, onChange: (mode) => setMode(mode) });
+const workClock = modeClock({ getHours: () => (workLifeOn() ? workHours() : null), onChange: (mode) => setMode(mode) });
 setInterval(() => workClock(), 30_000);
 document.addEventListener('visibilitychange', () => !document.hidden && workClock());
 onWorkHours(() => {
@@ -304,7 +332,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
   } else {
     button('글 메모', () => app.newMemo(), true);
     button('🎙 음성 메모', () => app.newMemo({ voice: true }));
-    if (state.mode === 'work') button('정리 도우미로 찾기', () => openHelper());
+    if (workLifeOn() && state.mode === 'work') button('정리 도우미로 찾기', () => openHelper());
   }
   el.empty.replaceChildren(art, text, actions);
 }
@@ -318,9 +346,9 @@ export function render() {
   clearTimeout(staleTimer);
   const narrowed = Boolean(state.query) || filterCount() > 0;
   const pick = { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] };
-  const memos = sortMemos(withViews(filterMemos(splitByMode(state.results ?? state.memos, state.mode).mine, pick)), sort);
+  const memos = sortMemos(withViews(filterMemos(split(state.results ?? state.memos, state.mode).mine, pick)), sort);
   // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
-  const elsewhere = state.query ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, pick).length : 0;
+  const elsewhere = state.query && workLifeOn() ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, pick).length : 0;
   $('other-mode').hidden = !elsewhere || !memos.length; // 하나도 없으면 빈 화면 안내가 대신
   $('other-mode').textContent = elsewhere ? `${MODE_LABEL[otherMode(state.mode)]}에서 ${elsewhere}개 더 찾았어요 ›` : '';
   // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)
@@ -724,11 +752,11 @@ export function setup() {
     // 지금 모드의 메모 일정만 (목록에 아직 없는 새 메모의 일정은 우선 보인다)
     visible: (item) => {
       const memo = state.memos.find((m) => m.id === item.memoId);
-      return !memo || memoMode(memo) === state.mode;
+      return !workLifeOn() || !memo || memoMode(memo) === state.mode;
     },
     // 추억 보기 (Life 에서만): 그날의 기록은 뒤로 가기로 닫힌다
     memories: {
-      on: () => state.mode === 'life',
+      on: () => !workLifeOn() || state.mode === 'life',
       onOverlay: (el, close) => {
         adoptSheet(el, close);
         return () => releaseSheet(el);
@@ -803,6 +831,16 @@ export function refresh() {
   if (!app.vault) return;
   app.vault.defaultMode = state.mode; // 폴더를 다시 열어 새 저장소가 됐어도 지금 모드로
   state.memos = app.vault.list();
+  // Work / Life 나누기를 정한 적이 없으면: 이미 Work 메모가 있을 때만 켠다 (PC 에서 옮겨 둔 것 등)
+  if (state.workLife === null && state.memos.length) {
+    state.workLife = state.memos.some((m) => m.mode === 'work');
+    try {
+      localStorage.setItem(WORK_LIFE_KEY, state.workLife ? '1' : '0');
+    } catch {
+      // 다음에 다시
+    }
+    showMode();
+  }
   if (state.query) {
     const { text } = parseQuery(state.query);
     state.results = text ? app.vault.search(text) : null;
