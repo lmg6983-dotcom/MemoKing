@@ -17,6 +17,7 @@ import { COLORS } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
 import { hintOnce } from './hints.js';
 import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
+import { openMemoryDay, dayText } from './memory-day.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
@@ -1139,6 +1140,12 @@ el.cards.addEventListener('contextmenu', (e) => {
       open: (id) => api.memo.open(id),
       pin: togglePin,
       color: (m, color) => api.memo.set(m.id, { color }),
+      day: async (m) => {
+        const day = await openMemoryDay({ created: m.created, day: m.day });
+        if (day === null) return;
+        await api.memo.set(m.id, { day });
+        flashStatus(day ? `추억 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
+      },
       trash: (id) => deleteMemo(id),
       flash: flashStatus,
       openSettings: () => el.settingsBtn.click(),

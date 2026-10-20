@@ -30,6 +30,7 @@ import { chooseShare, showSharePop } from './share-menu.js';
 import { KEYMAP_ACTIONS, keymapTable, resolveKeymap, comboLabel } from './core/keymap.js';
 import { hotkeyDialog } from './hotkey-dialog.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
+import { openMemoryDay, dayText } from './memory-day.js';
 
 const SAVE_DELAY = 600;
 
@@ -109,6 +110,7 @@ const el = {
   menuBtn: $('menu-btn'),
   swatches: $('swatches'),
   pinToggle: $('pin-toggle'),
+  dayBtn: $('day-btn'),
   topBtn: $('top-btn'),
   tapeBtn: $('tape-btn'),
   banner: $('banner'),
@@ -385,6 +387,7 @@ function applyMeta(next) {
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
   el.pinToggle.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
+  $('day-label').textContent = memo.day ? dayText(memo.day) : '';
 }
 
 for (const color of COLORS) {
@@ -401,6 +404,13 @@ el.pinToggle.addEventListener('click', async () => {
   await flush();
   applyMeta(await api.memo.set(id, { pinned: !memo.pinned }));
   closeMenu();
+});
+// 추억 달력에서 이 메모를 둘 날 (memory-day.js)
+el.dayBtn.addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  const day = await openMemoryDay({ created: memo.created, day: memo.day });
+  if (day !== null) applyMeta(await api.memo.set(id, { day }));
 });
 // ---------- 왕관(늘 위) · 테이프(바탕화면에 붙이기) ----------
 

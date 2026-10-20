@@ -36,6 +36,7 @@ import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml } from './print-html.js';
 import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
+import { openMemoryDay, dayText } from '../../app/js/memory-day.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -439,6 +440,7 @@ app.memoMenu = (id) => {
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
   pin.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
   memoSheet.querySelector('[data-memo-action="lock"] span').textContent = memo.locked ? '잠금 풀기' : '잠그기';
+  memoSheet.querySelector('[data-memo-action="day"] small').textContent = memo.day ? dayText(memo.day) : '';
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -477,6 +479,16 @@ memoSheet.addEventListener('click', async (e) => {
       if (!app.vault.setMeta(id, { pinned: !memo.pinned })) toast('고정을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
       else toast(memo.pinned ? '목록 고정을 풀었어요' : '목록 맨 위에 고정했어요');
       break;
+    case 'day': {
+      // 추억 달력에서 이 메모를 둘 날 (memory-day.js)
+      note.flush();
+      closeSheet(memoSheet);
+      const day = await openMemoryDay({ created: memo?.created, day: memo?.day });
+      if (day === null) break;
+      if (!app.vault.setMeta(id, { day })) toast('날짜를 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+      else toast(day ? `추억 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
+      break;
+    }
     case 'share':
       closeSheet(memoSheet);
       openShare(id);
