@@ -974,8 +974,8 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 @media (pointer: coarse) { .mode-helper .mh-row { min-height: 52px; } .mode-helper .mh-row input { width: 22px; height: 22px; } }
 
 /* 설정 › Work / Life (work-settings.js) */
-.work-hours .wh-days { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
-.work-hours .wh-day { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.work-hours .wh-days { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
+.work-hours .wh-day { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .work-hours .wh-day.sun { color: var(--danger); }
 .work-hours .wh-day[aria-pressed="true"] { border-color: transparent; background: #2f4a7a; color: #fff; }
 .work-hours .wh-time { display: flex; align-items: center; gap: 8px; }

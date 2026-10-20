@@ -103,10 +103,11 @@ export function setMode(mode) {
   state.filter.tags = [];
   render();
   remindersTab?.modeChanged();
+  if (mode === 'work') hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 메모를 꾹 눌러 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
 }
 for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
 
-// 업무 시간이 시작되면 Work, 끝나면 Life (설정 › Work / Life 에서 켰을 때 · 경계를 넘을 때만)
+// 업무 시간이 시작되면 Work, 끝나면 Life (설정 › Work / Life에서 켰을 때 · 경계를 넘을 때만)
 const workClock = modeClock({ getHours: workHours, onChange: (mode) => setMode(mode) });
 setInterval(() => workClock(), 30_000);
 document.addEventListener('visibilitychange', () => !document.hidden && workClock());
@@ -115,13 +116,13 @@ onWorkHours(() => {
   app.rescheduleAlarms?.(); // 조용히 둘 알림이 바뀐다
 });
 
-/** 정리 도우미: Life 메모 중 일 이야기 같은 것을 골라 Work 로 */
+/** 정리 도우미: Life 메모 중 일 이야기 같은 것을 골라 Work로 */
 export async function openHelper() {
   const n = await openModeHelper({
     memos: state.memos,
     move: (ids) => ids.filter((id) => app.vault?.setMeta(id, { mode: 'work' })).length,
   });
-  if (n) toast(`메모 ${n}개를 Work 로 옮겼어요`);
+  if (n) toast(`메모 ${n}개를 Work로 옮겼어요`);
 }
 $('other-mode').addEventListener('click', () => setMode(otherMode(state.mode)));
 showMode();
@@ -266,12 +267,15 @@ new ResizeObserver(() => {
 }).observe(el.cards);
 
 // 빈 목록: 그림 + 다음에 할 일 단추 (검색·필터로 비었으면 풀기, 메모가 없으면 첫 메모 만들기)
-function renderEmpty(narrowed) {
+function renderEmpty(narrowed, elsewhere = 0) {
   const art = document.createElement('span');
   art.className = 'empty-art';
   art.textContent = narrowed ? '🔍' : '📝';
   const text = document.createElement('span');
-  text.textContent = narrowed
+  const other = MODE_LABEL[otherMode(state.mode)];
+  text.textContent = narrowed && elsewhere
+    ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
+    : narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
     : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 메모를 꾹 눌러 "Work로 옮기기" 해 보세요.'
       : '아직 메모가 없어요.\n떠오른 생각을 바로 적거나 말로 남겨 보세요.';
@@ -285,7 +289,8 @@ function renderEmpty(narrowed) {
     b.addEventListener('click', run);
     actions.append(b);
   };
-  if (narrowed) {
+  if (narrowed && elsewhere) button(`${other}에서 보기`, () => setMode(otherMode(state.mode)), true);
+  else if (narrowed) {
     button('검색과 필터 풀기', () => {
       state.filter = { tags: [], colors: [], kinds: [] };
       el.search.value = '';
@@ -312,13 +317,13 @@ export function render() {
   const memos = sortMemos(withViews(filterMemos(splitByMode(state.results ?? state.memos, state.mode).mine, pick)), sort);
   // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
   const elsewhere = state.query ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, pick).length : 0;
-  $('other-mode').hidden = !elsewhere;
+  $('other-mode').hidden = !elsewhere || !memos.length; // 하나도 없으면 빈 화면 안내가 대신
   $('other-mode').textContent = elsewhere ? `${MODE_LABEL[otherMode(state.mode)]}에서 ${elsewhere}개 더 찾았어요 ›` : '';
   // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)
   glideCards(() => layoutCards(memos));
   el.empty.hidden = memos.length > 0;
   el.empty.parentElement.classList.toggle('is-empty', !memos.length); // 안내 · 단추를 목록 칸 가운데에 (PC 와 같이)
-  if (!memos.length) renderEmpty(narrowed);
+  if (!memos.length) renderEmpty(narrowed, elsewhere);
   $('count-memos').textContent = modeMemos().length ? String(modeMemos().length) : '';
   renderFilters();
   if (memos.length >= 2) setTimeout(hintCards, 800);
@@ -750,7 +755,7 @@ export function setup() {
     },
     confirm: confirmDialog,
   });
-  workClock(); // 켤 때 업무 시간이면 Work 로 시작 (저절로 바꾸기를 켰을 때)
+  workClock(); // 켤 때 업무 시간이면 Work로 시작 (저절로 바꾸기를 켰을 때)
 }
 
 /** 태그 하나로 거르기 (연결 패널의 태그를 눌렀을 때) */

@@ -1,5 +1,5 @@
 // 메모킹 Work / Life 2단계 — 업무 시간 (PC · 휴대폰 같은 규칙)
-//   auto: 업무 시간이 시작되면 Work, 끝나면 Life 로 저절로 (경계를 넘을 때만 — 그 사이 손으로 바꾼 건 그대로 둔다)
+//   auto: 업무 시간이 시작되면 Work, 끝나면 Life로 저절로 (경계를 넘을 때만 — 그 사이 손으로 바꾼 건 그대로 둔다)
 //   quiet: 업무 시간 밖(퇴근 뒤 · 쉬는 날)에는 Work 메모의 알림을 띄우지 않고 조용히 (고정한 메모 = 중요한 메모는 늘 울린다)
 import { memoMode } from './modes.js';
 
@@ -60,7 +60,7 @@ export function hoursLabel(hours) {
 }
 
 /**
- * 모드 시계: 업무 시간의 경계를 넘을 때 onChange(mode) — 처음 부를 때도 한 번 (켤 때 업무 시간이면 Work 로 시작)
+ * 모드 시계: 업무 시간의 경계를 넘을 때 onChange(mode) — 처음 부를 때도 한 번 (켤 때 업무 시간이면 Work로 시작)
  * @returns {(now?: Date) => void} 1분쯤마다 부른다
  */
 export function modeClock({ getHours, onChange }) {

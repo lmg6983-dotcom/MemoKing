@@ -30,14 +30,14 @@ export function renderWorkSettings(box, { hours, save, openHelper, quietNote }) 
 
   const helper = el('div', 'setting-row');
   const hw = el('span', '', '정리 도우미');
-  hw.append(' ', el('small', '', 'Life 메모 중 일 이야기 같은 메모를 골라 Work 로 옮겨요'));
+  hw.append(' ', el('small', '', 'Life 메모 중 일 이야기 같은 메모를 골라 Work로 옮겨요'));
   const open = el('button', 'btn small', '열기');
   open.type = 'button';
   open.id = 'mode-helper-btn';
   open.addEventListener('click', openHelper);
   helper.append(hw, open);
 
-  const auto = switchRow('work-auto', '업무 시간에는 Work 로', '업무 시간이 시작되면 Work, 끝나면 Life 로 저절로 바뀌어요. 그 사이 손으로 바꾼 건 그대로예요', h.auto);
+  const auto = switchRow('work-auto', '업무 시간에는 Work로', '업무 시간이 시작되면 Work, 끝나면 Life로 저절로 바뀌어요. 그 사이 손으로 바꾼 건 그대로예요', h.auto);
   const quiet = switchRow('work-quiet', '퇴근 뒤 Work 알림은 조용히', quietNote, h.quiet);
 
   const wh = el('div', 'setting-sub work-hours');

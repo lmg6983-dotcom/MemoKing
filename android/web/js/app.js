@@ -497,7 +497,7 @@ memoSheet.addEventListener('click', async (e) => {
       break;
     }
     case 'mode': {
-      // Work ↔ Life 로 옮기기 (목록에서는 그 모드에서 보인다)
+      // Work ↔ Life로 옮기기 (목록에서는 그 모드에서 보인다)
       note.flush();
       closeSheet(memoSheet);
       const to = otherMode(memoMode(memo));

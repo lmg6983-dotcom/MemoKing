@@ -154,11 +154,11 @@ function render() {
   if (before) animateCards(before);
   el.empty.hidden = memos.length > 0;
   el.cards.classList.toggle('is-empty', !memos.length); // 빈 카드 칸이 자리를 반 나눠 가져 안내가 아래로 치우치지 않게
-  if (!memos.length) renderEmpty(narrowed);
+  if (!memos.length) renderEmpty(narrowed, elsewhere);
   // 검색·필터로 좁혔을 때만 "N개 중 M개" (평소 개수는 메모 탭에)
   el.count.replaceChildren(`메모 ${modeMemos().length}개 중 ${memos.length}개`);
   if (elsewhere) el.count.append(' · ', otherModeLink(elsewhere));
-  el.count.hidden = !narrowed || (!memos.length && !elsewhere);
+  el.count.hidden = !narrowed || !memos.length; // 하나도 없으면 빈 화면 안내가 "다른 모드에서 보기" 를 맡는다
   renderFilters();
 }
 
@@ -279,7 +279,7 @@ function otherModeLink(n) {
   b.type = 'button';
   b.className = 'link-btn other-mode';
   b.textContent = `${MODE_LABEL[otherMode(state.mode)]}에서 ${n}개 더`;
-  b.title = `${MODE_LABEL[otherMode(state.mode)]} 로 바꿔 보기`;
+  b.title = `${MODE_LABEL[otherMode(state.mode)]}로 바꿔 보기`;
   b.addEventListener('click', () => setMode(otherMode(state.mode)));
   return b;
 }
@@ -304,7 +304,7 @@ async function openHelper() {
       return moved;
     },
   });
-  if (n) flashStatus(`메모 ${n}개를 Work 로 옮겼어요`);
+  if (n) flashStatus(`메모 ${n}개를 Work로 옮겼어요`);
 }
 
 async function setMode(mode) {
@@ -315,6 +315,7 @@ async function setMode(mode) {
   state.filter.tags = []; // 다른 모드에는 없는 태그일 수 있다
   render();
   remindersTab.modeChanged();
+  if (mode === 'work') hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 카드 메뉴의 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
   const saved = await api.mode?.set(mode);
   if (saved && saved !== state.mode) {
     state.mode = saved;
@@ -390,20 +391,24 @@ $('filter-clear').addEventListener('click', () => {
 });
 
 // 빈 목록: 그림 + 다음에 할 일 단추 (휴대폰과 같음) — 검색·필터로 비었으면 풀기, 메모가 없으면 새 메모
-function renderEmpty(narrowed) {
+function renderEmpty(narrowed, elsewhere = 0) {
   const art = document.createElement('span');
   art.className = 'empty-art';
   art.textContent = narrowed ? '🔍' : '📝';
   const text = document.createElement('span');
-  text.textContent = narrowed
+  const other = MODE_LABEL[otherMode(state.mode)];
+  text.textContent = narrowed && elsewhere
+    ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
+    : narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
     : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 카드 메뉴의 "Work로 옮기기"로 옮겨 보세요.'
       : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'btn primary';
-  b.textContent = narrowed ? '검색과 필터 풀기' : '새 메모 (Ctrl+N)';
+  b.textContent = narrowed && elsewhere ? `${other}에서 보기` : narrowed ? '검색과 필터 풀기' : '새 메모 (Ctrl+N)';
   b.addEventListener('click', () => {
+    if (narrowed && elsewhere) return setMode(otherMode(state.mode));
     if (!narrowed) return api.memo.create();
     state.filter = { tags: [], colors: [], kinds: [] };
     el.search.value = '';
@@ -1081,7 +1086,7 @@ const remindersTab = setupRemindersTab({
         const base64 = await renderCollage(o);
         await api.image.copy(base64);
         const r = await api.image.save(null, base64, collageName(o));
-        flashStatus(r?.file ? `${r.name} 로 저장했어요 (복사도 해 두었어요)` : '그림을 복사했어요 — 붙여 넣어 보낼 수 있어요');
+        flashStatus(r?.file ? `${r.name}로 저장했어요 (복사도 해 두었어요)` : '그림을 복사했어요 — 붙여 넣어 보낼 수 있어요');
       } catch (err) {
         console.error(err);
         flashStatus(err.message || '그림을 만들지 못했어요');
@@ -1242,10 +1247,10 @@ el.cards.addEventListener('contextmenu', (e) => {
         await api.memo.set(m.id, { day });
         flashStatus(day ? `추억 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
       },
-      // Work ↔ Life 로 옮기기: 카드는 지금 목록에서 빠진다
+      // Work ↔ Life로 옮기기: 카드는 지금 목록에서 빠진다
       mode: async (m) => {
         const to = otherMode(memoMode(m));
-        if (await api.memo.set(m.id, { mode: to })) flashStatus(`${MODE_LABEL[to]}로 옮겼어요 — 위의 ${MODE_LABEL[to]} 에서 보여요`);
+        if (await api.memo.set(m.id, { mode: to })) flashStatus(`${MODE_LABEL[to]}로 옮겼어요 — 위의 ${MODE_LABEL[to]}에서 보여요`);
         else flashStatus('옮기지 못했어요 — 잠시 뒤 다시 해 주세요');
       },
       trash: (id) => deleteMemo(id),
@@ -1801,7 +1806,7 @@ function renderUpdateDialog(st) {
   to.className = 'to';
   to.textContent = `v${st.version ?? ''}`;
   updateEl.version.replaceChildren(from, arrow, to);
-  updateEl.version.setAttribute('aria-label', `지금 ${from.textContent} 에서 ${to.textContent} 으로`);
+  updateEl.version.setAttribute('aria-label', `지금 ${from.textContent}에서 ${to.textContent} 으로`);
   renderReleaseNotes(updateEl.notes, st.notes);
   updateEl.notes.scrollTop = 0;
   updateEl.progress.hidden = !downloading;

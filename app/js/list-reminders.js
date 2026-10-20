@@ -542,8 +542,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       showMemories();
       return;
     }
-    if (fcView(was) !== id) calendar.changeView(id, selected);
-    else calendar.updateSize(); // 가려 두었던 월 보기 — 크기를 다시
+    if (fcView(was) !== id) calendar.changeView(id, selected); // 추억 → 월 은 같은 보기를 다시 보이기만 (크기는 달력이 스스로 다시 잰다)
     fitSize();
     render();
   }

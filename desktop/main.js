@@ -1157,7 +1157,7 @@ app.whenReady().then(async () => {
     if (!windowManager.openNote(id, { inactive })) settings.openNotes = settings.openNotes.filter((x) => x !== id);
   }
   if (launched && launched.kind !== 'list') handleLaunch(process.argv);
-  workClock(); // 켤 때 업무 시간이면 Work 로 시작 (저절로 바꾸기를 켰을 때)
+  workClock(); // 켤 때 업무 시간이면 Work로 시작 (저절로 바꾸기를 켰을 때)
   alarms.startup();
   alarms.start();
   registerQuickMemoKey();

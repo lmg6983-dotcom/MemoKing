@@ -1,4 +1,4 @@
-// 정리 도우미 창 — Life 메모 중 일 이야기 같은 것을 보여 주고, 고른 것만 Work 로 옮긴다 (PC 목록 · 휴대폰 같이 씀)
+// 정리 도우미 창 — Life 메모 중 일 이야기 같은 것을 보여 주고, 고른 것만 Work로 옮긴다 (PC 목록 · 휴대폰 같이 씀)
 //   권하는 규칙은 core/mode-helper.js. 점수가 높은 것(태그 · 제목에 일 낱말)은 미리 골라 둔다.
 import { suggestWork } from './core/mode-helper.js';
 import { icon } from './icons.js';
@@ -30,12 +30,12 @@ export function openModeHelper({ memos, move }) {
     x.append(icon('close'));
     head.append(h, x);
     const lead = el('p', 'mh-lead', found.length
-      ? `Life 메모 중에 일 이야기 같은 메모 ${found.length}개를 찾았어요.\nWork 로 옮길 메모를 고르세요. 나중에 메모 메뉴에서 언제든 되돌릴 수 있어요.`
-      : 'Work 로 옮길 만한 메모를 찾지 못했어요.\n일할 때 쓰는 메모는 메모 메뉴의 "Work로 옮기기"로 하나씩 옮길 수 있어요.');
+      ? `Life 메모 중에 일 이야기 같은 메모 ${found.length}개를 찾았어요.\nWork로 옮길 메모를 고르세요. 나중에 메모 메뉴에서 언제든 되돌릴 수 있어요.`
+      : 'Work로 옮길 만한 메모를 찾지 못했어요.\n일할 때 쓰는 메모는 메모 메뉴의 "Work로 옮기기"로 하나씩 옮길 수 있어요.');
 
     const list = el('div', 'mh-list');
     list.setAttribute('role', 'group');
-    list.setAttribute('aria-label', 'Work 로 옮길 메모');
+    list.setAttribute('aria-label', 'Work로 옮길 메모');
     for (const f of found) {
       const row = el('label', 'mh-row');
       const box = el('input');
