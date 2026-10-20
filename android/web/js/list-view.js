@@ -8,7 +8,7 @@ import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../
 import { COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
-import { matchChrome, confirmDialog, isTwoPane, toast } from './ui.js';
+import { matchChrome, confirmDialog, isTwoPane, toast, adoptSheet, releaseSheet } from './ui.js';
 import { tutEvent } from './tutorial.js';
 import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
@@ -643,6 +643,13 @@ export function setup() {
     container: $('reminder-groups'),
     countEl: $('count-reminders'),
     notify: (text, isError) => toast(text, isError),
+    // 추억 보기: 그날의 기록은 뒤로 가기로 닫힌다
+    memories: {
+      onOverlay: (el, close) => {
+        adoptSheet(el, close);
+        return () => releaseSheet(el);
+      },
+    },
   });
   historyTab = setupHistoryTab({
     api: app.api,

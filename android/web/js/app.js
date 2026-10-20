@@ -158,7 +158,10 @@ app.api = {
       return id;
     },
   },
-  memos: { search: async (query) => app.vault?.search(String(query ?? '')) ?? [] },
+  memos: {
+    list: async () => app.vault?.list() ?? [],
+    search: async (query) => app.vault?.search(String(query ?? '')) ?? [],
+  },
   // 첨부 저장 (PC 의 attachments.save 와 같음) — 가져온 일정의 달력 그림
   attachments: { save: async (bytes, ext) => (app.vault ? app.vault.saveAttachment(bytes, ext) : null) },
   // 일정 탭이 함께 보는 다른 캘린더 — .ics 구독(이 휴대폰에만 저장) · 휴대폰 캘린더(삼성 캘린더 · Google 캘린더)

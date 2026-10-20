@@ -14,6 +14,7 @@ import { openQuickEvent } from './quick-event.js';
 import { openCalendarLinks } from './calendar-links.js';
 import { openEventDetail, whenText } from './event-detail.js';
 import { monthSketchPng } from './month-sketch.js';
+import { setupMemoriesView } from './memories-view.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
@@ -21,7 +22,11 @@ const VIEWS = [
   { id: 'dayGridMonth', label: '월' },
   { id: 'timeGridWeek', label: '주' },
   { id: 'listMonth', label: '목록' },
+  { id: 'memories', label: '추억' }, // 사진 달력 (memories-view.js) — 달력은 월 보기로 둔 채 가리고 넘기기만 함께
 ];
+const MEMORIES = 'memories';
+/** FullCalendar 가 쓰는 보기 (추억은 월 보기 위에 따로 그린다) */
+const fcView = (id) => (id === MEMORIES ? 'dayGridMonth' : id);
 const VIEW_KEY = 'memoking.calendarView';
 
 const dayStart = startOfDay;
@@ -33,10 +38,10 @@ export function dayHeading(d, now = new Date()) {
 }
 
 
-const storedView = () => {
+const storedView = (views) => {
   try {
     const v = localStorage.getItem(VIEW_KEY);
-    return VIEWS.some((x) => x.id === v) ? v : VIEWS[0].id;
+    return views.some((x) => x.id === v) ? v : VIEWS[0].id;
   } catch {
     return VIEWS[0].id;
   }
@@ -53,14 +58,16 @@ function el(tag, className = '', text = '') {
  * @param {{ api: any, container: HTMLElement, countEl: HTMLElement, notify?: (text: string, isError?: boolean) => void,
  *           calendars?: { feeds, setFeeds, fetch, openUrl, exportIcs, device? } }} options
  *   calendars: 다른 캘린더 (없으면 그 기능은 숨김)
+ *   memories: 추억 보기를 켠다 — { onOverlay?, collage? } (memories-view.js 에 그대로)
  */
-export function setupRemindersTab({ api, container, countEl, notify = (text, isError) => isError && window.alert(text), calendars = api.calendars }) {
+export function setupRemindersTab({ api, container, countEl, notify = (text, isError) => isError && window.alert(text), calendars = api.calendars, memories = null }) {
   let items = []; // [{ memoId, title, color, reminder }]
   let query = '';
   const today = () => dayStart(new Date());
   let selected = today();
   let shownToday = today();
-  let viewId = storedView();
+  const viewList = VIEWS.filter((v) => v.id !== MEMORIES || (memories && api.memos?.list));
+  let viewId = storedView(viewList);
   let compact = false; // 낮은 창: 월 보기 칸에 일정 막대 대신 색 점 (fitSize)
   let lastFit = '';
   let maxEvents = 2; // 월 보기 한 칸에 보이는 일정 수 (fitSize)
@@ -174,6 +181,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     items = await api.reminders.all();
     if (quiet) updateCount(new Date());
     else render();
+    if (!quiet && memView && viewId === MEMORIES) memView.refresh(); // 탭으로 올 때도 여기로 — 새 사진 · 메모를 다시 모은다
   }
 
   // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)
@@ -243,7 +251,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   const views = el('div', 'cal-views');
   views.setAttribute('role', 'radiogroup');
   views.setAttribute('aria-label', '보기');
-  for (const v of VIEWS) {
+  for (const v of viewList) {
     const b = el('button', '', v.label);
     b.type = 'button';
     b.dataset.view = v.id;
@@ -261,6 +269,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   const calEl = el('div', 'cal-body');
   card.append(head, bar, calEl);
+  const memView = viewList.some((v) => v.id === MEMORIES) ? setupMemoriesView({ api, notify, ...memories }) : null;
+  if (memView) card.append(memView.el);
   const rowsEl = el('div', 'ev-rows');
   container.replaceChildren(card, rowsEl);
   attachSlider(views);
@@ -358,7 +368,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   const calendar = new Calendar(calEl, {
     plugins: [dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin],
     locale: koLocale,
-    initialView: viewId,
+    initialView: fcView(viewId),
     headerToolbar: false,
     height: 'auto',
     fixedWeekCount: true,
@@ -397,6 +407,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
         again = true;
       }
       if (again) queueMicrotask(() => render()); // 한 번만 · 그리는 중에 옵션을 바꾸지 않게
+      if (viewId === MEMORIES) showMemories();
     },
     dateClick: (arg) => pickDay(arg.date),
     // 일정을 누르면 다른 앱으로 나가지 않고 자세히 보기 (월 보기는 그날도 골라 아래 목록을 맞춘다)
@@ -498,19 +509,35 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     }
     card.dataset.view = viewId;
     container.dataset.view = viewId;
+    const mem = viewId === MEMORIES;
+    calEl.hidden = mem;
+    rowsEl.hidden = mem;
+    if (memView) memView.el.hidden = !mem;
+  }
+
+  function showMemories() {
+    memView.show(calendar.view.currentStart);
   }
 
   function setView(id) {
     if (id === viewId) return;
+    const was = viewId;
     viewId = id;
     try {
       localStorage.setItem(VIEW_KEY, id);
     } catch {
       // 저장 못 함 — 이번만
     }
-    calendar.changeView(id, selected);
-    fitSize();
     markView();
+    if (id === MEMORIES) {
+      if (was !== 'dayGridMonth') calendar.changeView('dayGridMonth', selected);
+      memView.closeDay();
+      showMemories();
+      return;
+    }
+    if (fcView(was) !== id) calendar.changeView(id, selected);
+    else calendar.updateSize(); // 가려 두었던 월 보기 — 크기를 다시
+    fitSize();
     render();
   }
 

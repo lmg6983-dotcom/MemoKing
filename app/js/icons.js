@@ -43,6 +43,8 @@ const ICONS = {
   redo: `<path d="M15 14l5-5-5-5" ${stroke}/><path d="M20 9H9.5a5.5 5.5 0 000 11H13" ${stroke}/>`,
   eraser: `<path d="M8.5 19.5h11" ${stroke}/><path d="M4.6 14.6l9.2-9.2a2 2 0 012.8 0l3 3a2 2 0 010 2.8l-7.8 7.8a2 2 0 01-1.4.5H8.3a2 2 0 01-1.4-.6l-2.3-2.3a1.4 1.4 0 010-2z" ${stroke}/><path d="M9.5 9.7l4.8 4.8" ${stroke}/>`,
   ink: `<path d="M3.5 17c2.2-4.4 4.1-9.5 6.3-9.5 2.6 0-1.6 9.8 1.4 9.8 2.3 0 3.3-6.1 5.6-6.1 1.7 0 .9 4.3 3.7 4.3" ${stroke}/>`,
+  // 공유 (휴대폰 m-icons.js 와 같은 모양)
+  share: `<circle cx="18" cy="5.5" r="2.5" ${stroke}/><circle cx="6" cy="12" r="2.5" ${stroke}/><circle cx="18" cy="18.5" r="2.5" ${stroke}/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1" ${stroke}/>`,
   // 목록 "보기" (정렬 · 카드 모양 · 필터): 조절 막대 셋
   tune: `<path d="M4 6h8M16 6h4M4 12h2M10 12h10M4 18h10M18 18h2" ${stroke}/><circle cx="14" cy="6" r="2" ${stroke}/><circle cx="8" cy="12" r="2" ${stroke}/><circle cx="16" cy="18" r="2" ${stroke}/>`,
   // 목록 정렬: 길이가 줄어드는 세 줄 + 아래 화살표
