@@ -19,7 +19,9 @@ import { hintOnce } from './hints.js';
 import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { renderCollage, collageName } from './memories-collage.js';
-import { validMode, splitByMode, memoMode, otherMode, moveLabel, MODE_LABEL } from './core/modes.js';
+import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL } from './core/modes.js';
+import { openModeHelper } from './mode-helper-dialog.js';
+import { renderWorkSettings } from './work-settings.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
@@ -292,6 +294,19 @@ function showMode() {
   $('count-memos').textContent = String(modeMemos().length);
 }
 
+// 정리 도우미: Life 메모 중 일 이야기 같은 것을 골라 Work 로
+async function openHelper() {
+  const n = await openModeHelper({
+    memos: state.memos,
+    move: async (ids) => {
+      let moved = 0;
+      for (const id of ids) if (await api.memo.set(id, { mode: 'work' })) moved += 1;
+      return moved;
+    },
+  });
+  if (n) flashStatus(`메모 ${n}개를 Work 로 옮겼어요`);
+}
+
 async function setMode(mode) {
   mode = validMode(mode);
   if (mode === state.mode) return;
@@ -397,6 +412,14 @@ function renderEmpty(narrowed) {
   const actions = document.createElement('span');
   actions.className = 'empty-actions';
   actions.append(b);
+  if (!narrowed && state.mode === 'work') {
+    const help = document.createElement('button');
+    help.type = 'button';
+    help.className = 'btn';
+    help.textContent = '정리 도우미로 찾기';
+    help.addEventListener('click', () => openHelper());
+    actions.append(help);
+  }
   el.empty.replaceChildren(art, text, actions);
 }
 
@@ -804,6 +827,12 @@ async function loadSettings() {
   showShortcuts(s.shortcuts);
   showMcp(s.mcp);
   $('trash-days').value = String(s.trashDays);
+  renderWorkSettings($('work-settings'), {
+    hours: s.workHours,
+    save: (h) => api.mode?.setHours(h),
+    openHelper: () => openHelper(),
+    quietNote: '업무 시간 밖에는 Work 메모의 알림을 띄우지 않고 알림 보관함에 모아요. 고정한 메모의 알림은 늘 울려요',
+  });
   if (api.stt) renderStt(await api.stt.status());
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
 }

@@ -32,3 +32,19 @@ test('Work / Life: 지금 모드의 메모와 다른 모드 수', () => {
   assert.equal(moveLabel({ mode: 'work' }), 'Life로 옮기기');
   assert.equal(moveLabel({}), 'Work로 옮기기');
 });
+
+test('정리 도우미: 일 이야기 같은 Life 메모를 점수 순으로', async () => {
+  const { suggestWork } = await import('../app/js/core/mode-helper.js');
+  const memos = [
+    { id: 'a', title: '팀 회의록', preview: '다음 분기 예산', tags: ['업무'] },
+    { id: 'b', title: '장보기', preview: '우유, 계란', tags: [] },
+    { id: 'c', title: '여행 계획', preview: '출장 겸 부산', tags: [] },
+    { id: 'd', title: '회의', preview: '', tags: [], mode: 'work' },
+    { id: 'e', title: '일기', preview: '오늘 회의가 길었다', tags: [] },
+  ];
+  const s = suggestWork(memos);
+  assert.deepEqual(s.map((x) => x.memo.id), ['a'], '본문 낱말 하나(1점)만으로는 권하지 않는다');
+  assert.ok(s[0].reasons.includes('#업무'));
+  const more = suggestWork([...memos, { id: 'f', title: '견적서', preview: '거래처 납품', tags: [] }]);
+  assert.deepEqual(more.map((x) => x.memo.id), ['a', 'f']);
+});

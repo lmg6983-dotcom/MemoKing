@@ -16,6 +16,9 @@ import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards } from '../../a
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
 import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode } from '../../app/js/core/modes.js';
+import { modeClock } from '../../app/js/core/work-hours.js';
+import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
+import { workHours, onWorkHours } from './work-mode.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -102,6 +105,24 @@ export function setMode(mode) {
   remindersTab?.modeChanged();
 }
 for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
+
+// 업무 시간이 시작되면 Work, 끝나면 Life (설정 › Work / Life 에서 켰을 때 · 경계를 넘을 때만)
+const workClock = modeClock({ getHours: workHours, onChange: (mode) => setMode(mode) });
+setInterval(() => workClock(), 30_000);
+document.addEventListener('visibilitychange', () => !document.hidden && workClock());
+onWorkHours(() => {
+  workClock();
+  app.rescheduleAlarms?.(); // 조용히 둘 알림이 바뀐다
+});
+
+/** 정리 도우미: Life 메모 중 일 이야기 같은 것을 골라 Work 로 */
+export async function openHelper() {
+  const n = await openModeHelper({
+    memos: state.memos,
+    move: (ids) => ids.filter((id) => app.vault?.setMeta(id, { mode: 'work' })).length,
+  });
+  if (n) toast(`메모 ${n}개를 Work 로 옮겼어요`);
+}
 $('other-mode').addEventListener('click', () => setMode(otherMode(state.mode)));
 showMode();
 
@@ -274,6 +295,7 @@ function renderEmpty(narrowed) {
   } else {
     button('글 메모', () => app.newMemo(), true);
     button('🎙 음성 메모', () => app.newMemo({ voice: true }));
+    if (state.mode === 'work') button('정리 도우미로 찾기', () => openHelper());
   }
   el.empty.replaceChildren(art, text, actions);
 }
@@ -728,6 +750,7 @@ export function setup() {
     },
     confirm: confirmDialog,
   });
+  workClock(); // 켤 때 업무 시간이면 Work 로 시작 (저절로 바꾸기를 켰을 때)
 }
 
 /** 태그 하나로 거르기 (연결 패널의 태그를 눌렀을 때) */

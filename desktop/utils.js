@@ -13,6 +13,7 @@ import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../ap
 import { normalizeMagicSettings } from '../app/js/core/magic-modules.js';
 import { APP_DIR, APP_ICON_PNG } from './window-utils.js';
 import { cleanOverrides } from '../app/js/core/keymap.js';
+import { normalizeHours } from '../app/js/core/work-hours.js';
 
 export const SMOKE = process.argv.includes('--smoke');
 export const APP_ID = 'com.memoking.desktop';
@@ -47,6 +48,7 @@ export const settings = {
   shortcuts: undefined,
   keymap: {}, // 메모 창 단축키 중 바꾼 것 (app/js/core/keymap.js)
   mode: 'life', // 메모킹 Work / Life — 지금 보는 모드 (새 메모도 이 모드로)
+  workHours: undefined, // 업무 시간 · 저절로 바꾸기 · 퇴근 뒤 조용히 (core/work-hours.js)
   mcp: undefined,
 };
 
@@ -144,6 +146,7 @@ export function appSettings(vault, fileIndex, shortcutStatus, shortcutLabel) {
     linkPreviews: settings.linkPreviews !== false,
     autoTags: settings.autoTags !== false,
     mode: settings.mode === 'work' ? 'work' : 'life',
+    workHours: normalizeHours(settings.workHours),
     keymap: cleanOverrides(settings.keymap),
     magic: normalizeMagicSettings(settings.magic),
     magicIndex: fileIndex?.status() ?? null,

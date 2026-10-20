@@ -5,6 +5,7 @@
 import { dueOccurrence, dueAtStartup, markFired, upcomingAlerts, alarmLabel, alarmText, alarmTitle } from '../../app/js/core/reminders.js';
 import { extractPreview } from '../../app/js/core/memo-file.js';
 import { native } from './native.js';
+import { quietAlarm } from '../../app/js/core/work-hours.js';
 
 // 일정의 미리 알림마다 따로 (같은 일정의 "하루 전" 과 "30분 전" 이 서로를 지우지 않게)
 const keyOf = (memoId, reminder, offset = 0) => `${memoId}/${reminder.id}${offset ? `/${offset}` : ''}`;
@@ -15,9 +16,10 @@ export { alarmLabel };
 /**
  * @param {{ getVault: () => import('./vault.js').Vault | null,
  *           onFire: (memoId: string, reminder: object, alarm: { label: string, missed: boolean }) => void,
- *           interval?: number }} options
+ *           getHours?: () => object, interval?: number }} options
+ *   getHours: 업무 시간 (퇴근 뒤 Work 알림은 조용히 — core/work-hours.js)
  */
-export function createAlarms({ getVault, onFire, interval = 15_000 }) {
+export function createAlarms({ getVault, onFire, getHours = () => null, interval = 15_000 }) {
   let timer = null;
   let scheduleTimer = null;
 
@@ -27,6 +29,7 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
     if (!memo) return;
     const { title, label, full } = alarmText(reminder, memo.title, info);
     const alarm = { reminderId: reminder.id, label: full, missed: Boolean(info.missed) };
+    if (quietAlarm(memo, new Date(), getHours())) return; // 퇴근 뒤 · 쉬는 날의 Work 알림: 울림 표시만 (띄우지도 열지도 않는다)
     if (!silent) {
       try {
         native.notify({
@@ -98,6 +101,7 @@ export function createAlarms({ getVault, onFire, interval = 15_000 }) {
       const lastFired = r.last ? new Date(r.last) : null;
       const from = lastFired && lastFired > now ? lastFired : now;
       for (const next of upcomingAlerts(r, from, r.kind === 'repeat' ? AHEAD : 1)) {
+        if (quietAlarm(memo, next.at, getHours())) continue; // 업무 시간 밖에 울릴 Work 알림은 시스템에 맡기지 않는다
         const { label, full } = alarmText(r, memoTitle, { start: next.start, offset: next.offset, also: next.also }, next.at);
         items.push({
           key: keyOf(memoId, r, next.offset), at: next.at.getTime(), title,

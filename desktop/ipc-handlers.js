@@ -30,6 +30,8 @@ const asPoint = (p) => (p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x:
 
 export function registerIpc(ctx) {
   const {
+    setAppMode,
+    setWorkHours,
     calendarFeeds,
     windowManager: wm,
     memoHotkeys,
@@ -365,14 +367,8 @@ export function registerIpc(ctx) {
     return settings.fitTables;
   });
   // 메모킹 Work / Life 바꾸기 — 목록이 그 모드의 메모만 보이고, 새 메모(빠른 메모 · 캡처 포함)도 그 모드로
-  ipcMain.handle('mode:set', (_e, mode) => {
-    settings.mode = mode === 'work' ? 'work' : 'life';
-    saveSettings();
-    const vault = getVault();
-    if (vault) vault.defaultMode = settings.mode;
-    broadcast('mode:changed', settings.mode);
-    return settings.mode;
-  });
+  ipcMain.handle('mode:set', (_e, mode) => setAppMode(mode));
+  ipcMain.handle('mode:hours', (_e, hours) => setWorkHours(hours));
   // 링크 미리보기 카드 켜고 끄기 — 열린 메모 · 위젯에도 바로
   ipcMain.handle('app:set-link-previews', (_e, on) => {
     settings.linkPreviews = Boolean(on);

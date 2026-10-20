@@ -38,6 +38,8 @@ import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
 import { openMemoryDay, dayText } from '../../app/js/memory-day.js';
 import { memoMode, otherMode, moveLabel, MODE_LABEL } from '../../app/js/core/modes.js';
+import { renderWorkSettings } from '../../app/js/work-settings.js';
+import { workHours, saveWorkHours } from './work-mode.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -332,11 +334,14 @@ app.setReminders = (memoId, next) => {
 
 const alarms = createAlarms({
   getVault: () => app.vault,
+  getHours: workHours, // 퇴근 뒤 Work 알림은 조용히
   onFire: (memoId, reminder, alarm) => {
     // "메모 띄우기" 알림: 앱이 보이고 있으면 바로 그 메모를 연다
     if (reminder.action === 'open' && !document.hidden) app.openMemo(memoId, { alarm, highlight: true });
   },
 });
+
+app.rescheduleAlarms = () => alarms.schedule(); // 업무 시간 설정이 바뀌면 (list-view.js)
 
 // ---------- 화면 바꾸기 ----------
 
@@ -925,6 +930,15 @@ function openSettings() {
     : '이 휴대폰은 Google 음성 인식(안드로이드 13 이상)을 쓸 수 없어 녹음만 해요';
   $('rec-stt').disabled = !recorder.sttReady();
   refreshSpeakerRow();
+  renderWorkSettings($('work-settings'), {
+    hours: workHours(),
+    save: saveWorkHours,
+    openHelper: () => {
+      closeSheet($('settings-sheet'));
+      list.openHelper();
+    },
+    quietNote: '업무 시간 밖에는 Work 메모의 알림을 울리지 않아요. 고정한 메모의 알림은 늘 울려요',
+  });
   openSheet($('settings-sheet'));
 }
 
