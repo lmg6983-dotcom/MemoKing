@@ -1,6 +1,6 @@
 // 창 관리자 (WindowManager) — 목록 창, 메모 스티커 창, 탭 스택, 드래그 미리보기, 캡처 오버레이, PDF 및 보조 창 생명주기 관리.
 import {
-  app, BrowserWindow, desktopCapturer, dialog, nativeTheme, screen, shell,
+  app, BrowserWindow, desktopCapturer, dialog, screen, shell,
 } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +18,7 @@ import { shareText } from '../app/js/core/share-text.js';
 import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
 import {
   APP_DIR, MAGIC_PRELOAD, FINDER_PRELOAD, OPMS_PRELOAD, OCR_PRELOAD,
-  webPreferences, windowIcon, noteBg, titleBarOverlay, bringToFront,
+  webPreferences, windowIcon, noteBg, listBg, titleBarOverlay, bringToFront,
   guardWindow, onScreen, defaultNoteBounds, painted, trackPaint, whenPainted, animateBounds, fadeIn,
 } from './window-utils.js';
 import {
@@ -165,7 +165,7 @@ export class WindowManager {
       show: false,
       titleBarStyle: 'hidden',
       titleBarOverlay: titleBarOverlay(),
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e0e0d' : '#f6f5f1',
+      backgroundColor: listBg(),
       ...windowIcon,
       webPreferences,
     });
@@ -194,7 +194,9 @@ export class WindowManager {
       this.ghostWin?.destroy();
       this.ghostWin = null;
     });
-    this.listWin.loadFile(path.join(APP_DIR, 'index.html'), tab ? { query: { tab } } : undefined);
+    // mode: 처음 그릴 때부터 그 모드의 밝기로 (Work 는 어둡게 — 설정을 읽기 전에 밝게 번쩍이지 않게)
+    const mode = settings.workLife !== true ? 'system' : settings.mode === 'work' ? 'work' : 'life'; // system: Work / Life 를 나눠 쓰지 않음
+    this.listWin.loadFile(path.join(APP_DIR, 'index.html'), { query: { ...(tab ? { tab } : {}), mode } });
     return this.listWin;
   }
 
@@ -239,7 +241,7 @@ export class WindowManager {
       win = spare.win;
       win.setBounds(at);
       win.setTitle(memo.title);
-      win.setBackgroundColor(noteBg(memo.color));
+      win.setBackgroundColor(noteBg(memo.color, settings.workLife === true ? memo.mode ?? 'life' : null));
     } else {
       win = new BrowserWindow({
         ...at,
@@ -249,7 +251,7 @@ export class WindowManager {
         show: false,
         title: memo.title,
         alwaysOnTop: settings.onTop[id] === true,
-        backgroundColor: noteBg(memo.color),
+        backgroundColor: noteBg(memo.color, settings.workLife === true ? memo.mode ?? 'life' : null),
         ...windowIcon,
         webPreferences,
       });
@@ -1393,7 +1395,7 @@ export class WindowManager {
       title: '단축키 설정',
       show: false,
       autoHideMenuBar: true,
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e0e0d' : '#f6f5f1',
+      backgroundColor: listBg(), // 지금 모드의 밝기 (Work 는 어둡게)
       ...windowIcon,
       webPreferences,
     });
@@ -1422,7 +1424,7 @@ export class WindowManager {
       title: 'PDF로 저장',
       show: false,
       autoHideMenuBar: true,
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e0e0d' : '#f6f5f1',
+      backgroundColor: listBg(), // 지금 모드의 밝기 (Work 는 어둡게)
       ...windowIcon,
       webPreferences: { ...webPreferences, nodeIntegrationInSubFrames: true },
     });

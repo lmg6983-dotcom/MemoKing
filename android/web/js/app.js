@@ -334,7 +334,7 @@ app.setReminders = (memoId, next) => {
 
 const alarms = createAlarms({
   getVault: () => app.vault,
-  getHours: workHours, // 퇴근 뒤 Work 알림은 조용히
+  getHours: () => (list.workLifeOn() ? workHours() : null), // 퇴근 뒤 Work 알림은 조용히 (나눠 쓸 때만)
   onFire: (memoId, reminder, alarm) => {
     // "메모 띄우기" 알림: 앱이 보이고 있으면 바로 그 메모를 연다
     if (reminder.action === 'open' && !document.hidden) app.openMemo(memoId, { alarm, highlight: true });
@@ -368,6 +368,7 @@ app.noteBack = () => {
   else app.showList();
 };
 app.isNoteOpen = () => note.isOpen();
+app.workLifeOn = () => list.workLifeOn(); // Work / Life 나누기 (note-view: 메모 화면 밝기)
 
 // 넓은 화면: 메모를 고르지 않았으면 오른쪽에 안내
 function syncPane() {
@@ -448,6 +449,7 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="lock"] span').textContent = memo.locked ? '잠금 풀기' : '잠그기';
   memoSheet.querySelector('[data-memo-action="day"] small').textContent = memo.day ? dayText(memo.day) : '';
   memoSheet.querySelector('[data-memo-action="mode"] span').textContent = moveLabel(memo);
+  memoSheet.querySelector('[data-memo-action="mode"]').hidden = !list.workLifeOn(); // Work / Life 를 나눠 쓸 때만
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -931,6 +933,8 @@ function openSettings() {
   $('rec-stt').disabled = !recorder.sttReady();
   refreshSpeakerRow();
   renderWorkSettings($('work-settings'), {
+    enabled: list.workLifeOn(),
+    setEnabled: (on) => list.setWorkLife(on),
     hours: workHours(),
     save: saveWorkHours,
     openHelper: () => {

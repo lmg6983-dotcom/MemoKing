@@ -196,7 +196,7 @@ contextBridge.exposeInMainWorld('memoking', {
   // 메모를 PDF 로
   // 메모를 그림 카드로: copy(base64) · save(메모 id, base64) → { file, name } | { cancelled }
   // 메모킹 Work / Life: 지금 모드 정하기 (읽기는 settings.get().mode)
-  mode: { set: invoke('mode:set'), setHours: invoke('mode:hours') },
+  mode: { set: invoke('mode:set'), setHours: invoke('mode:hours'), setWorkLife: invoke('mode:work-life') },
   image: {
     copy: invoke('image:copy'),
     save: invoke('image:save'),

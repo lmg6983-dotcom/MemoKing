@@ -23,10 +23,18 @@ function switchRow(id, title, note, checked) {
 
 /**
  * @param {HTMLElement} box
- * @param {{ hours: object, save: (hours: object) => void, openHelper: () => void, quietNote: string }} o
+ * @param {{ enabled: boolean, setEnabled: (on: boolean) => void, hours: object, save: (hours: object) => void, openHelper: () => void, quietNote: string }} o
+ *   enabled: Work / Life 나누기 — 꺼져 있으면 아래 설정은 숨긴다
  */
-export function renderWorkSettings(box, { hours, save, openHelper, quietNote }) {
+export function renderWorkSettings(box, { enabled, setEnabled, hours, save, openHelper, quietNote }) {
   let h = normalizeHours(hours);
+  const main = switchRow('work-life', 'Work / Life 나누기', '일할 때 쓰는 메모와 일상 메모를 나눠 봐요. Work 는 어두운 화면, Life 는 밝은 화면이에요. 끄면 모든 메모가 한 목록에 보여요', enabled);
+  const rest = el('div', 'work-life-more');
+  rest.hidden = !enabled;
+  main.input.addEventListener('change', () => {
+    rest.hidden = !main.input.checked;
+    setEnabled(main.input.checked);
+  });
 
   const helper = el('div', 'setting-row');
   const hw = el('span', '', '정리 도우미');
@@ -88,6 +96,7 @@ export function renderWorkSettings(box, { hours, save, openHelper, quietNote }) 
     save(h);
   }
   draw();
-  box.replaceChildren(helper, auto.row, quiet.row, wh);
+  rest.replaceChildren(helper, auto.row, quiet.row, wh);
+  box.replaceChildren(main.row, rest);
   return { set(next) { h = normalizeHours(next); draw(); } };
 }
