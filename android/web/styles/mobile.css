@@ -868,6 +868,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .fab-sat-label { padding: 6px 12px; border-radius: 10px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14.5px; }
 .fab-sat-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-right: 4px; border-radius: 18px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.2); }
 .fab-sat[data-new="voice"] .fab-sat-btn { background: var(--rec); color: var(--on-rec); }
+.fab-sat[data-new="ink"] .fab-sat-btn { background: var(--brand-yellow); color: var(--on-brand); } /* PC · 메모 안 + 메뉴와 같은 색 */
 .fab-sat-btn svg { width: 24px; height: 24px; }
 .fab-sat:active .fab-sat-btn { transform: scale(0.94); }
 @keyframes sat-out { from { opacity: 0; transform: translate(18px, 34px) scale(0.5); } }

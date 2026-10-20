@@ -260,6 +260,7 @@ export function renderStatus(s = drive.status()) {
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;
   $('drive-connect').textContent = s.active && s.connected ? '폴더 변경' : '연결하기';
+  $('drive-connect').classList.toggle('primary', !(s.active && s.connected)); // 연결 전에는 PC처럼 주 단추
 }
 
 // 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 허용받는다 — 취소·실패하면 꺼진 채 (지금 연결은 그대로).
