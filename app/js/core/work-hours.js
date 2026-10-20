@@ -55,7 +55,7 @@ export function hoursLabel(hours) {
   if (d.join() === '1,2,3,4,5') days = '평일';
   else if (d.length === 7) days = '매일';
   else if (!d.length) days = '쉬는 날만';
-  else days = d.map((x) => WEEKDAY_LABEL[x]).join('·');
+  else days = d.map((x) => WEEKDAY_LABEL[x]).join(', ');
   return `${days} ${h.start}–${h.end}`;
 }
 

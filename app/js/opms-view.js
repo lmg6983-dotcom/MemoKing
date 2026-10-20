@@ -115,7 +115,7 @@ form.addEventListener('submit', async (e) => {
     b.addEventListener('click', () => open(r.idx, 'info'));
     return b;
   };
-  main.replaceChildren(el('p', 'op-msg', `${list.length}건이 찾아졌어요 — 사건을 고르세요`), ...list.map(pick));
+  main.replaceChildren(el('p', 'op-msg', `${list.length}건이 찾아졌어요. 사건을 고르세요`), ...list.map(pick));
 });
 
 const errText = (err) => String(err?.message ?? err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
@@ -181,7 +181,7 @@ async function show(which) {
     if (tab === 'info') {
       const work = loadingLine('업무배분을 불러오는 중');
       const more = el('div', 'op-more');
-      more.append(loadingLine('신규성 의제 · 진행사항 · 메모를 불러오는 중'));
+      more.append(loadingLine('신규성 의제, 진행사항, 메모를 불러오는 중'));
       main.replaceChildren(infoGrid(c), el('h3', 'op-h', '업무배분'), work, more);
       showDetails(more, my); // 업무배분과 따로 (한쪽이 늦거나 실패해도 다른 쪽은 보이게)
       let rows;
@@ -189,7 +189,7 @@ async function show(which) {
         rows = await load('mywork', api.mywork);
       } catch (err) {
         // 업무배분만 못 불러와도 위의 서지정보는 그대로 둔다
-        if (my === seq) work.replaceWith(el('p', 'op-msg err', `업무배분을 불러오지 못했어요 — ${errText(err)}`));
+        if (my === seq) work.replaceWith(el('p', 'op-msg err', `업무배분을 불러오지 못했어요. ${errText(err)}`));
         return;
       }
       if (my !== seq) return;
@@ -242,7 +242,7 @@ async function showDetails(box, my) {
   try {
     d = await load('details', api.details);
   } catch (err) {
-    if (my === seq) box.replaceChildren(el('p', 'op-msg err', `신규성 의제 · 진행사항 · 메모를 불러오지 못했어요 — ${errText(err)}`));
+    if (my === seq) box.replaceChildren(el('p', 'op-msg err', `신규성 의제, 진행사항, 메모를 불러오지 못했어요. ${errText(err)}`));
     return;
   }
   if (my !== seq) return;
@@ -260,22 +260,22 @@ async function showDetails(box, my) {
   for (const sec of d.sections) {
     if (!sec.table) continue;
     out.push(el('h3', 'op-h', sec.label));
-    if (sec.error) out.push(el('p', 'op-msg err', `불러오지 못했어요 — ${sec.error}`));
+    if (sec.error) out.push(el('p', 'op-msg err', `불러오지 못했어요. ${sec.error}`));
     else if (sec.id === 'progress') out.push(progressTimeline(sec.rows));
     else out.push(table(sec.columns.map((x) => [x.label, (r) => r[x.key]]), sec.rows, { empty: `${sec.label}이(가) 없어요` }));
   }
   const missing = d.missing.filter((m) => !(m === '신규성 의제' && d.novelty.length));
   if (missing.length) {
-    const p = el('p', 'op-msg op-missing', `OPMS 에서 ${missing.join(' · ')} 표를 찾지 못했어요. `);
+    const p = el('p', 'op-msg op-missing', `OPMS 에서 ${missing.join(', ')} 표를 찾지 못했어요. `);
     const copy = el('button', 'op-link', '표 목록 복사');
     copy.type = 'button';
-    copy.title = 'OPMS 의 표 이름과 열을 복사해요 — 메모킹 개발자에게 보내 주면 맞춰 드려요';
+    copy.title = 'OPMS 의 표 이름과 열을 복사해요. 메모킹 개발자에게 보내 주면 맞춰 드려요';
     copy.addEventListener('click', async () => {
       try {
         const n = await api.copySchema();
         copy.textContent = `✓ 표 ${n}개 복사했어요`;
       } catch (err) {
-        copy.textContent = `복사하지 못했어요 — ${errText(err)}`;
+        copy.textContent = `복사하지 못했어요. ${errText(err)}`;
       }
     });
     p.append(copy);
@@ -306,7 +306,7 @@ function progressTimeline(rows) {
     if (it.meta.length) {
       const meta = el('p', 'op-tl-meta');
       it.meta.forEach(([k, v], i) => {
-        if (i) meta.append(' · ');
+        if (i) meta.append(', ');
         meta.append(`${k} `);
         meta.append(el('span', 'op-tl-v', v));
       });
@@ -349,7 +349,7 @@ function infoGrid(c) {
 function openButton(r) {
   const b = el('button', 'op-link op-open-file', '열기');
   b.type = 'button';
-  const hint = `${r.name} — 저장 폴더에 받아 두고 열어요 (전에 받은 그 파일이면 그대로)`;
+  const hint = `${r.name}, 저장 폴더에 받아 두고 열어요 (전에 받은 그 파일이면 그대로)`;
   b.title = hint;
   // 아래 막대의 상태 글: 그사이 다른 사건 · 다른 탭으로 옮겼거나, 받는 중(전체 · 고른 것 받기)이면 쓰지 않는다
   const say = (idx, cls, text) => {
@@ -362,7 +362,7 @@ function openButton(r) {
   b.addEventListener('click', async () => {
     const idx = current.case.idx;
     b.disabled = true;
-    b.textContent = '여는 중…';
+    b.textContent = '여는 중';
     try {
       const res = await api.openFile({ idx, upload: r.upload });
       b.title = hint;
@@ -476,7 +476,7 @@ async function showWrapper(my) {
     const uploads = boxes.filter((b) => b.checked).map((b) => b.value);
     const idx = current.case.idx;
     const names = new Map(attach.map((a) => [a.upload, a.name])); // 받는 사이 다른 사건을 열어도 이 사건의 이름으로 알리게
-    dl = { idx, text: '받는 중…', cls: '', done: false };
+    dl = { idx, text: '받는 중', cls: '', done: false };
     sync();
     paint();
     try {
@@ -506,7 +506,7 @@ async function showWrapper(my) {
 
 api.onProgress((p) => {
   if (!dl || dl.done || !p.total || p.i >= p.total) return;
-  dl.text = `받는 중… ${p.i + 1}/${p.total} ${p.name}`;
+  dl.text = `받는 중 ${p.i + 1}/${p.total} ${p.name}`;
   const s = foot.querySelector('.op-status');
   if (s && tab === 'wrapper' && current?.case.idx === dl.idx) s.textContent = dl.text;
 });
@@ -523,7 +523,7 @@ $('op-memo').addEventListener('click', async () => {
   if (!current) return;
   const b = $('op-memo');
   b.disabled = true;
-  b.textContent = '만드는 중…';
+  b.textContent = '만드는 중';
   try {
     await api.toMemo(current.case.idx);
     b.textContent = '✓ 메모로 만들었어요';

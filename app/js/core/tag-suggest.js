@@ -164,7 +164,7 @@ export function suggestTagsFor(body, memos, { limit = 3, excludeId } = {}) {
     if (score < 0.16) continue;
     const reason = mention ? (via ? 'consistent' : 'mention') : vote ? 'similar' : 'centroid';
     const why = mention
-      ? via ? `본문의 "${via}" — 같은 뜻으로 이미 쓰는 태그` : '본문에 나오는 기존 태그'
+      ? via ? `본문의 "${via}", 같은 뜻으로 이미 쓰는 태그` : '본문에 나오는 기존 태그'
       : vote ? `내용이 닮은 메모 ${vote.n}개에 달린 태그` : '이 태그를 단 메모들과 내용이 닮음';
     put({ name: g.name, score: Math.round(score * 100) / 100, rank: raw, reason, existing: true, sure: mention || (vote && vote.share >= 0.45 && vote.n >= 2), why });
   }

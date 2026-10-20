@@ -56,9 +56,9 @@ function renderModules() {
 function updatePlaceholder() {
   const memo = isOn('memo');
   // 찾는 것: 켜진 기능만 이름에 (파일 검색을 껐으면 "파일" 이라고 하지 않게)
-  const what = [isOn('notes') && '메모', isOn('files') && '파일', isOn('opms') && 'OPMS'].filter(Boolean).join('·');
+  const what = [isOn('notes') && '메모', isOn('files') && '파일', isOn('opms') && 'OPMS'].filter(Boolean).join(', ');
   input.placeholder = memo && what ? `메모를 쓰거나, ${what} 찾기` : memo ? '메모를 쓰고 Enter' : what ? `${what} 찾기`
-    : modules.length ? '아래 캡슐을 눌러 기능을 켜 주세요' : '설정 › 매직키에서 기능을 켜 주세요';
+    : modules.length ? '아래 캡슐을 눌러 기능을 켜 주세요' : '설정의 매직키에서 기능을 켜 주세요';
 }
 
 // ---------- 결과 ----------
@@ -225,7 +225,7 @@ function render() {
     nodes.push(note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요. Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`));
   }
   if (query && isOn('files') && results.index && !results.index.count) {
-    nodes.push(note(results.index.building ? '파일 목록을 만드는 중이에요 — 처음 한 번만, 잠시 뒤 파일도 찾아져요' : '파일 목록이 아직 없어요'));
+    nodes.push(note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : '파일 목록이 아직 없어요'));
   }
   resultsEl.replaceChildren(...nodes);
   box.classList.toggle('has-results', nodes.length > 0);

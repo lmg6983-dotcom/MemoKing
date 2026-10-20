@@ -57,7 +57,7 @@ class RecorderService : Service() {
         /** 녹음 시작 → { stt: 받아쓰는지, reason: 못 받아쓰는 이유 } */
         fun start(ctx: Context, memoId: String, stt: Boolean, terms: List<String> = emptyList()): JSONObject {
             if (session != null) throw IllegalStateException("이미 녹음하고 있어요. 지금 녹음을 마친 뒤 다시 시작해 주세요")
-            if (!hasMic(ctx)) throw IllegalStateException("마이크 권한이 없어요. 설정 › 앱 › 메모킹 › 권한에서 마이크를 허용해 주세요")
+            if (!hasMic(ctx)) throw IllegalStateException("마이크 권한이 없어요. 휴대폰 설정의 앱, 메모킹, 권한에서 마이크를 허용해 주세요")
             val reason = if (stt) Stt.unavailableReason(ctx) else null
             val s = Session(ctx.applicationContext, memoId, stt && reason == null, wantedStt = stt, terms = terms)
             session = s

@@ -44,14 +44,14 @@ export function openMemoryDay({ created, day, title } = {}) {
     x.setAttribute('aria-label', '닫기');
     x.append(icon('close'));
     head.append(h, x);
-    const lead = el('p', 'md-lead', '추억 달력의 어느 날 칸에 둘까요?\n다녀와서 정리한 여행 · 데이트 기록을 그날로 옮길 때 좋아요.');
+    const lead = el('p', 'md-lead', '추억 달력의 어느 날 칸에 둘까요?\n다녀와서 정리한 여행, 데이트 기록을 그날로 옮길 때 좋아요.');
     if (title) lead.prepend(el('b', 'md-title', title));
 
     const chips = el('div', 'md-chips');
     chips.setAttribute('role', 'radiogroup');
     chips.setAttribute('aria-label', '자주 고르는 날');
     const quick = [
-      { key: made, text: `만든 날 · ${short(made)}` },
+      { key: made, text: `만든 날, ${short(made)}` },
       ...(today !== made ? [{ key: today, text: '오늘' }] : []),
       ...(yesterday !== made ? [{ key: yesterday, text: '어제' }] : []),
     ];

@@ -270,7 +270,7 @@ export function registerIpc(ctx) {
   // 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 로그인 → 받았으면 폴더를 처음부터 훑어 다른 앱이 넣은 메모를 바로 받는다
   ipcMain.handle('drive:full-scope', async (_e, on) => {
     const auth = getDriveAuth();
-    if (!auth) return { full: false, error: 'Google Drive 를 쓸 수 없어요. 설정 › Google Drive 동기화에서 먼저 연결해 주세요' };
+    if (!auth) return { full: false, error: 'Google Drive 를 쓸 수 없어요. 설정의 Google Drive 동기화에서 먼저 연결해 주세요' };
     const res = await auth.setFullScope(Boolean(on));
     if (wm.listWin) bringToFront(wm.listWin);
     if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
@@ -278,7 +278,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('drive:folders', async (_e, parent) => {
     const api = getDriveApi();
-    if (!api) throw new Error('Google Drive 를 쓸 수 없어요. 설정 › Google Drive 동기화에서 먼저 연결해 주세요');
+    if (!api) throw new Error('Google Drive 를 쓸 수 없어요. 설정의 Google Drive 동기화에서 먼저 연결해 주세요');
     return (await api.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name, created: f.created }));
   });
   // 같은 이름 폴더가 이미 있으면 새로 만들지 않고 그것을 돌려준다 (existed: true)
@@ -437,7 +437,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('magic:opms-search', async (_e, query) => {
     const q = String(query ?? '').slice(0, 40);
     if (!activeModules(settings.magic).some((m) => m.id === 'opms') || !looksLikeRef(q)) return { cases: [], total: 0 };
-    if (!wm.opmsSettings().host) return { cases: [], total: 0, error: '설정 › 매직키 › OPMS 연결에 서버 주소를 넣으면 OPMS 사건도 찾아요' }; // 주소를 넣기 전
+    if (!wm.opmsSettings().host) return { cases: [], total: 0, error: '설정 매직키의 OPMS 연결에 서버 주소를 넣으면 OPMS 사건도 찾아요' }; // 주소를 넣기 전
     try {
       const rows = await wm.opmsClient().find(q, { timeoutMs: 5000, retries: 0 });
       wm.rememberCases(rows);
@@ -697,7 +697,7 @@ export function registerIpc(ctx) {
     const vault = getVault();
     if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
     const id = vault.import({ body: String(body ?? '').slice(0, 5_000_000) });
-    if (!id) throw new Error('이 파일로는 메모를 만들 수 없어요. 글 파일(.txt · .md 등)을 골라 주세요');
+    if (!id) throw new Error('이 파일로는 메모를 만들 수 없어요. 글 파일(.txt, .md 등)을 골라 주세요');
     if (opts?.open) wm.openNote(id);
     return id;
   });
@@ -802,7 +802,7 @@ export function registerIpc(ctx) {
       wm.listWin?.webContents.send('memo:trashed', { name: ok, title });
       // 목록 창이 없거나 숨어 있으면 되돌리기 띠가 보이지 않는다 — 어디로 갔는지만이라도 알린다
       if (!wm.listWin || !wm.listWin.isVisible() || wm.listWin.isMinimized()) {
-        toast({ title: '휴지통으로 옮겼어요', body: `“${title || '제목 없음'}” 메모는 목록 › 설정 › 휴지통에서 되살릴 수 있어요` });
+        toast({ title: '휴지통으로 옮겼어요', body: `“${title || '제목 없음'}” 메모는 목록 설정의 휴지통에서 되살릴 수 있어요` });
       }
     }
     return Boolean(ok);
@@ -992,8 +992,8 @@ export function registerIpc(ctx) {
     const drive = getDriveAuth()?.connected ?? false;
     const localSend = Boolean(findLocalSend());
     return [
-      { id: 'drive', label: 'Google Drive 링크', sub: drive ? '올리고 링크를 복사해요 (링크가 있는 사람은 보기)' : '아직 연결 전이에요 — 눌러서 설정에서 연결하기', ready: drive, connect: !drive },
-      { id: 'localsend', label: 'LocalSend', sub: localSend ? '같은 와이파이의 휴대폰 · PC 로 바로 (오픈소스)' : '무료 오픈소스 앱 — 누르면 내려받기 페이지를 열어요', ready: true },
+      { id: 'drive', label: 'Google Drive 링크', sub: drive ? '올리고 링크를 복사해요 (링크가 있는 사람은 보기)' : '아직 연결 전이에요. 눌러서 설정에서 연결하기', ready: drive, connect: !drive },
+      { id: 'localsend', label: 'LocalSend', sub: localSend ? '같은 와이파이의 휴대폰, PC 로 바로 (오픈소스)' : '무료 오픈소스 앱, 누르면 내려받기 페이지를 열어요', ready: true },
       { id: 'mail', label: '메일에 첨부', sub: '기본 메일 앱(Outlook 등)의 새 메일에', ready: process.platform === 'win32' || SMOKE },
     ];
   });

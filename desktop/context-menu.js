@@ -35,7 +35,7 @@ export function contextMenuTemplate(p, act) {
   if (p.mediaType === 'image' && p.srcURL) {
     groups.push([
       { label: '그림 복사', click: () => act.copyImage() },
-      ...(act.saveImage ? [{ label: '그림 저장…', click: () => act.saveImage() }] : []),
+      ...(act.saveImage ? [{ label: '그림 저장', click: () => act.saveImage() }] : []),
     ]);
   }
 

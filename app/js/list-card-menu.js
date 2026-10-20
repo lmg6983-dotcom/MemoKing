@@ -19,8 +19,8 @@ export function cardMenuSpec(memo, { workLife = true } = {}) {
     icons: [
       { id: 'cut', icon: CUT_ICON, label: locked ? '잘라내기 (잠긴 메모는 풀어야 해요)' : '잘라내기 (글을 복사하고 휴지통으로)', disabled: locked },
       { id: 'copy', icon: COPY_ICON, label: locked ? '글 복사 (잠긴 메모는 풀어야 해요)' : '글 복사', disabled: locked },
-      { id: 'share', icon: SHARE_ICON, label: locked ? '공유 (잠긴 메모는 풀어야 해요)' : '공유…', disabled: locked },
-      { id: 'pdf', icon: SAVE_ICON, label: 'PDF로 저장…' },
+      { id: 'share', icon: SHARE_ICON, label: locked ? '공유 (잠긴 메모는 풀어야 해요)' : '공유', disabled: locked },
+      { id: 'pdf', icon: SAVE_ICON, label: 'PDF로 저장' },
       { id: 'trash', icon: TRASH_ICON, label: '휴지통으로 옮기기 (Delete)', danger: true },
     ],
     items: [
@@ -28,11 +28,11 @@ export function cardMenuSpec(memo, { workLife = true } = {}) {
       { type: 'separator' },
       { id: 'pin', label: '목록 맨 위에 고정', checked: memo.pinned === true },
       { type: 'colors', label: '색', colors: COLORS.map((c) => ({ id: `color:${c}`, label: COLOR_LABEL[c] ?? c, color: c, checked: memo.color === c })) },
-      { id: 'day', label: '이 날의 기록으로…', hint: memo.day ? dayText(memo.day) : '' },
+      { id: 'day', label: '이 날의 기록으로', hint: memo.day ? dayText(memo.day) : '' },
       ...(workLife ? [{ id: 'mode', label: moveLabel(memo) }] : []),
       { type: 'separator' },
-      locked ? { id: 'unlock', label: '잠금 풀기…' } : { id: 'lock', label: '잠그기…' },
-      { id: 'versions', label: '이전 버전…', disabled: locked },
+      locked ? { id: 'unlock', label: '잠금 풀기' } : { id: 'lock', label: '잠그기' },
+      { id: 'versions', label: '이전 버전', disabled: locked },
     ],
   };
 }
@@ -82,7 +82,7 @@ async function shareMemo(memo, at, api, run) {
       run.openSettings?.();
       return undefined;
     }
-    if (via === 'drive') run.flash('Google Drive 에 올리는 중…');
+    if (via === 'drive') run.flash('Google Drive 에 올리는 중');
     const r = await api.attachments.share({ ...file, via });
     if (r?.error) return run.flash(r.error);
     if (r?.missing) return run.flash(SHARE_DONE['localsend-missing']);

@@ -49,7 +49,7 @@ export function openModeHelper({ memos, move }) {
       const dot = el('span', 'mh-dot');
       dot.dataset.color = f.memo.color ?? 'yellow';
       const words = el('span', 'mh-words');
-      words.append(el('b', 'mh-title', f.memo.title || '제목 없음'), el('small', 'mh-why', f.reasons.join(' · ')));
+      words.append(el('b', 'mh-title', f.memo.title || '제목 없음'), el('small', 'mh-why', f.reasons.join(', ')));
       row.append(box, dot, words);
       list.append(row);
     }

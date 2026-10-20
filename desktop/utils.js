@@ -298,7 +298,7 @@ export async function fetchRemoteImage(vault, url) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const type = res.headers.get('content-type') ?? '';
     const ext = imageExtFromType(type) ?? (type.startsWith('image/') || !type ? imageExtFromUrl(target.href) : null);
-    if (!ext) throw new Error(`그림이 아니에요 (${type || '형식 모름'}). 그림 주소(PNG · JPG · GIF · WebP)를 넣어 주세요`);
+    if (!ext) throw new Error(`그림이 아니에요 (${type || '형식 모름'}). 그림 주소(PNG, JPG, GIF, WebP)를 넣어 주세요`);
     if (Number(res.headers.get('content-length') ?? 0) > MAX_REMOTE_IMAGE_BYTES) throw new Error('50MB보다 커서 넣을 수 없어요. 더 작은 그림으로 해 주세요');
     const chunks = [];
     let total = 0;

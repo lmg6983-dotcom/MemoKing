@@ -263,7 +263,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
     els.empty.hidden = data.entries.length > 0;
     els.empty.textContent = query || app
       ? '찾는 알림이 없어요.'
-      : data.enabled ? '아직 모은 알림이 없어요.\n새 알림이 오면 여기에 모아둘게요.' : '알림 보관이 꺼져 있어요.\n설정 › 알림 모아두기에서 다시 켤 수 있어요.';
+      : data.enabled ? '아직 모은 알림이 없어요.\n새 알림이 오면 여기에 모아둘게요.' : '알림 보관이 꺼져 있어요.\n설정의 알림 모아두기에서 다시 켤 수 있어요.';
   }
 
   els.enable.addEventListener('click', async () => {

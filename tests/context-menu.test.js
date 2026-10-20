@@ -32,7 +32,7 @@ test('오른쪽 클릭: 링크 위면 링크 열기 · 주소 복사 (http · ht
 });
 
 test('오른쪽 클릭: 그림 위면 그림 복사 · 저장 (저장할 수 없으면 복사만)', () => {
-  assert.deepEqual(labels(contextMenuTemplate({ mediaType: 'image', srcURL: 'memoking://vault/a.png' }, act)), ['그림 복사', '그림 저장…']);
+  assert.deepEqual(labels(contextMenuTemplate({ mediaType: 'image', srcURL: 'memoking://vault/a.png' }, act)), ['그림 복사', '그림 저장']);
   assert.deepEqual(labels(contextMenuTemplate({ mediaType: 'image', srcURL: 'https://x/a.png' }, { ...act, saveImage: null })), ['그림 복사']);
 });
 

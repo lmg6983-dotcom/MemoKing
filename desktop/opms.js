@@ -11,7 +11,7 @@ import { decodeEntities } from '../app/js/core/entities.js';
 
 // 서버 주소 · 전자포대 폴더는 코드에 두지 않는다 (설치 파일은 공개 저장소에 올라간다) — 설정 › 매직키 › OPMS 에서 사용자가 넣는다
 export const DEFAULT_HOST = '';
-export const NO_HOST = '설정 › 매직키 › OPMS 서버 주소를 먼저 넣어 주세요';
+export const NO_HOST = '설정 매직키의 OPMS 서버 주소를 먼저 넣어 주세요';
 
 /** 사용자가 넣은 서버 주소 → 'http://주소:포트' (끝의 / 없이) | null. http(s) 가 없으면 http:// 를 붙인다 */
 export function normalizeOpmsHost(text) {
@@ -356,7 +356,7 @@ export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '', d
       // 진행사항은 한 줄씩: "- 2026-07-13 **제출** 우선심사신청서 (기한 …) — 메모 · 접수번호 …"
       L.push('', `## ${sec.label}`, '');
       for (const it of progressItems(sec.rows)) {
-        const extra = [it.memo, ...it.meta.map(([k, v]) => `${k} ${v}`)].filter(Boolean).join(' · ');
+        const extra = [it.memo, ...it.meta.map(([k, v]) => `${k} ${v}`)].filter(Boolean).join(', ');
         L.push(`- ${it.date || '날짜 없음'} **${it.kind}** ${oneLine(it.title)}${it.due ? ` (기한 ${it.due})` : ''}${extra ? ` — ${oneLine(extra)}` : ''}`);
       }
       continue;
@@ -796,7 +796,7 @@ export class Opms {
     const answered = Boolean(last?.answered);
     const e = new Error(answered
       ? `OPMS 서버가 요청을 처리하지 못했어요 (${last?.message ?? last})`
-      : `OPMS 서버(${this.host})에 접속하지 못했어요 — 사내망에 연결돼 있는지 확인해 주세요 (${last?.message ?? last})`);
+      : `OPMS 서버(${this.host})에 접속하지 못했어요. 사내망에 연결돼 있는지 확인해 주세요 (${last?.message ?? last})`);
     e.offline = !answered;
     throw e;
   }

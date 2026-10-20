@@ -229,7 +229,7 @@ async function enableHistory(on) {
 
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockApp(appId, appName) {
-  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함 › 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
+  if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함의 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const count = history.all().entries.filter((x) => x.appId === appId && x.source !== 'memoking').length;
   const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제', { cancelLabel: '남겨 두기' });
   const removed = history.block(appId, appName, remove);
@@ -459,7 +459,7 @@ swatches.addEventListener('click', (e) => {
   if (!s || !swatches.contains(s) || !menuFor) return; // 칩 사이 빈 곳을 눌러 바깥의 [data-color] 를 잡지 않게
   note.flush();
   if (!app.vault.setMeta(menuFor, { color: s.dataset.color })) {
-    toast('색을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+    toast('색을 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
     return;
   }
   try {
@@ -485,7 +485,7 @@ memoSheet.addEventListener('click', async (e) => {
     case 'pin':
       note.flush();
       closeSheet(memoSheet);
-      if (!app.vault.setMeta(id, { pinned: !memo.pinned })) toast('고정을 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+      if (!app.vault.setMeta(id, { pinned: !memo.pinned })) toast('고정을 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
       else toast(memo.pinned ? '목록 고정을 풀었어요' : '목록 맨 위에 고정했어요');
       break;
     case 'day': {
@@ -494,7 +494,7 @@ memoSheet.addEventListener('click', async (e) => {
       closeSheet(memoSheet);
       const day = await openMemoryDay({ created: memo?.created, day: memo?.day });
       if (day === null) break;
-      if (!app.vault.setMeta(id, { day })) toast('날짜를 저장하지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+      if (!app.vault.setMeta(id, { day })) toast('날짜를 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
       else toast(day ? `추억 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
       break;
     }
@@ -503,7 +503,7 @@ memoSheet.addEventListener('click', async (e) => {
       note.flush();
       closeSheet(memoSheet);
       const to = otherMode(memoMode(memo));
-      if (!app.vault.setMeta(id, { mode: to })) toast('옮기지 못했어요 — 잠시 뒤 다시 해 주세요', true);
+      if (!app.vault.setMeta(id, { mode: to })) toast('옮기지 못했어요. 잠시 뒤 다시 해 주세요', true);
       else toast(`${MODE_LABEL[to]}로 옮겼어요`);
       break;
     }
@@ -541,7 +541,7 @@ memoSheet.addEventListener('click', async (e) => {
         if (app.vault.unlock(id)) {
           note.lockChanged(false);
           toast('잠금을 풀었어요');
-        } else toast('잠금을 풀지 못했어요. 그사이 다른 기기에서 다시 잠갔을 수 있어요 — 메모를 다시 열어 주세요', true);
+        } else toast('잠금을 풀지 못했어요. 그사이 다른 기기에서 다시 잠갔을 수 있어요. 메모를 다시 열어 주세요', true);
         break;
       }
       if (await lockDialog({
@@ -682,7 +682,7 @@ shareSheet.addEventListener('click', async (e) => {
   // 그림은 메모 화면에 그려진 모습으로 만든다 (닫혀 있으면 연다)
   for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = true;
   $('share-busy').hidden = false;
-  $('share-busy-text').textContent = '이미지를 만드는 중…';
+  $('share-busy-text').textContent = '이미지를 만드는 중';
   try {
     if (note.currentId() !== id) {
       closeSheet(shareSheet);
@@ -953,7 +953,7 @@ function refreshSpeakerRow(progress) {
   const busy = progress != null || st.speaker === 'downloading';
   const ready = st.speaker === 'ready';
   $('spk-note').textContent = busy
-    ? `데이터를 받는 중… ${progress ?? 0}%`
+    ? `데이터를 받는 중 ${progress ?? 0}%`
     : `녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요${ready ? '' : ` (켜면 데이터 ${(st.speakerSize ?? '약 28MB').replace('약 ', '')}를 받아요)`}`;
   $('spk-switch').checked = busy || (ready && st.speakerOn);
   $('spk-switch').disabled = busy;
@@ -1195,7 +1195,7 @@ async function transcribeInto(memoId, items) {
 async function transcribeEach(memoId, items) {
   for (const item of items) {
     try {
-      toast('받아쓰는 중…');
+      toast('받아쓰는 중');
       const res = await call('transcribe', { rel: item.src, terms: app.sttTerms() });
       const text = polish(String(res?.text ?? '').trim());
       if (!text) {

@@ -307,7 +307,7 @@ export function createSttService(opts) {
 
   /** 소리 파일 받아쓰기 (16kHz Float32 로 풀어 옴) */
   function transcribe({ memoId, src, samples, onProgress }) {
-    if (!ready('asr')) return Promise.reject(new Error('받아쓰기 데이터를 먼저 받아 주세요 (설정 › 음성 녹음)'));
+    if (!ready('asr')) return Promise.reject(new Error('받아쓰기 데이터를 먼저 받아 주세요 (설정의 음성 녹음)'));
     const id = `f${seq++}`;
     const sd = speakerDir();
     return new Promise((resolve, reject) => {

@@ -23,7 +23,7 @@ export function pickFormat(isSupported = (m) => globalThis.MediaRecorder?.isType
 /** 마이크를 못 쓸 때 사람이 알아듣는 말로 */
 export function micErrorText(err) {
   const name = err?.name ?? '';
-  if (name === 'NotAllowedError' || name === 'SecurityError') return '마이크를 쓸 수 없어요. Windows 설정 › 개인 정보 › 마이크에서 앱의 마이크 사용을 켜 주세요';
+  if (name === 'NotAllowedError' || name === 'SecurityError') return '마이크를 쓸 수 없어요. Windows 설정 개인 정보의 마이크에서 앱의 마이크 사용을 켜 주세요';
   if (name === 'NotFoundError' || name === 'OverconstrainedError') return '마이크를 찾지 못했어요. 마이크가 연결돼 있는지 확인해 주세요';
   if (name === 'NotReadableError') return '다른 프로그램이 마이크를 쓰고 있어요. 그 프로그램을 끄고 다시 해 주세요';
   return '녹음을 시작하지 못했어요';
@@ -58,7 +58,7 @@ export function setupVoiceRecorder(opts) {
     if (rec.speaking && !rec.paused) {
       const div = document.createElement('div');
       div.className = 'rec-listening';
-      div.textContent = '듣는 중…';
+      div.textContent = '듣는 중';
       textBox.append(div);
     } else if (!rec.lines.length) {
       const div = document.createElement('div');
@@ -175,7 +175,7 @@ export function setupVoiceRecorder(opts) {
         } else if (st?.stt) {
           opts.stt.stop({ src: '' }).catch(() => {}); // 받아쓰기가 시작되기 전에 녹음을 끝냄 — 메인 쪽 작업도 거둔다
         } else if (st?.reason === 'missing') {
-          opts.notice('받아쓰기 데이터가 없어 녹음만 해요. 목록 창 설정 › 음성 녹음에서 받을 수 있어요');
+          opts.notice('받아쓰기 데이터가 없어 녹음만 해요. 목록 창 설정의 음성 녹음에서 받을 수 있어요');
         }
       } catch (err) {
         console.error(err);
@@ -232,7 +232,7 @@ export function setupVoiceRecorder(opts) {
       let text = '';
       let speakers = false;
       if (r.stt) {
-        opts.notice('받아쓴 글을 마무리하는 중…');
+        opts.notice('받아쓴 글을 마무리하는 중');
         const t = await opts.stt.stop({ src });
         text = t?.text ?? '';
         speakers = Boolean(t?.speakers);
@@ -241,7 +241,7 @@ export function setupVoiceRecorder(opts) {
       const card = voiceCardMarkdown({ alt: `녹음 ${when} (${duration})`, src }, text);
       await opts.insert(card, `음성 메모 ${when}`);
       opts.notice(text
-        ? `녹음(${duration})과 받아쓴 글을 저장했어요${speakers ? '. 말한 사람을 나누는 중…' : ''}`
+        ? `녹음(${duration})과 받아쓴 글을 저장했어요${speakers ? '. 말한 사람을 나누는 중' : ''}`
         : `녹음(${duration})을 저장했어요${r.stt ? '. 알아들은 말이 없어요' : ''}`);
       return src;
     })().catch((err) => {

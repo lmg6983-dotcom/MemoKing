@@ -95,7 +95,12 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .brand-icon { width: 28px; height: 28px; }
 .brand { margin-left: 8px; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 
-.searchbar { display: flex; align-items: center; gap: 2px; padding: 10px 6px 8px 12px; flex: none; } /* 맨 위 줄 (앱 이름 줄 없이) */
+/* 맨 위: 첫 줄은 로고 · Life | Work · 동기화 · 설정, 둘째 줄은 검색칸 + 보기 단추 (검색칸이 넓게) */
+.searchbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px; padding: 8px 6px 8px 12px; flex: none; }
+.searchbar .mode-switch { margin-right: auto !important; }
+.searchbar .search { order: 10; flex: 1 1 0; min-width: 0; }
+.searchbar .filter-btn { order: 11; }
+.searchbar::after { content: ""; order: 9; flex-basis: 100%; height: 0; } /* 줄 바꿈 */
 .search {
   display: flex;
   align-items: center;
@@ -1235,9 +1240,9 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 메모킹 Work / Life 고르기: 검색 왼쪽에 작게 (손가락 높이 44px 은 둘레 칸으로) */
 .searchbar .brand-mark { margin: 0 8px 0 4px; }
 .searchbar .brand-icon { width: 26px; height: 26px; }
-.searchbar .mode-switch { --ms-pad: 3px; margin-right: 6px; }
+.searchbar .mode-switch { --ms-pad: 3px; --ms-h: 40px; margin-right: 6px; }
 @media (max-width: 370px) { .searchbar .brand-mark { margin: 0 6px 0 0; } .searchbar .brand-icon { width: 22px; height: 22px; } }
-.searchbar .mode-switch button { position: relative; min-width: 42px; height: 38px; padding: 0 8px; font-size: 13px; }
+.searchbar .mode-switch button { min-width: 42px; font-size: 13.5px; }
 .other-mode { display: block; margin: 0 16px 8px auto; padding: 6px 0; font-size: 13.5px; }
 
 /* 동기화 단추 아래 진행 줄 (받는 중) — PC 목록 창의 구름 단추와 같은 모양 */

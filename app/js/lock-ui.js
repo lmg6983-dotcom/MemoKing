@@ -69,7 +69,7 @@ export function lockDialog({ onLock, title = '' }) {
       busy = true;
       ok.disabled = true;
       cancel.disabled = true;
-      ok.textContent = '잠그는 중…';
+      ok.textContent = '잠그는 중';
       let fail;
       try {
         fail = await onLock(pw, { hideTitle: hide.checked });
@@ -118,7 +118,7 @@ export function lockScreen(container, { title, onTry, onCancel }) {
       cancel.addEventListener('click', () => {
         if (!busy) return close();
         cancelLater = true;
-        cancel.textContent = '닫는 중…';
+        cancel.textContent = '닫는 중';
       });
       actions.append(cancel);
     }
@@ -134,7 +134,7 @@ export function lockScreen(container, { title, onTry, onCancel }) {
       if (!field.input.value) return field.input.focus();
       open.disabled = true;
       busy = true;
-      open.textContent = '여는 중…';
+      open.textContent = '여는 중';
       let fail;
       try {
         fail = await onTry(field.input.value);

@@ -47,13 +47,13 @@ const saveConflicts = (list) => saveList(CONFLICT_KEY, list);
 /** 로그인을 다시 해야 고쳐지는 오류인가 ("권한" 같은 말은 Drive 폴더 권한 오류에도 있어 넣지 않는다) */
 export const needsLogin = (msg) => /로그인해 주세요|로그인이 끊겼|다시 로그인|invalid_grant/i.test(msg ?? '');
 
-/** 동기화 진행 한 줄: "Drive 폴더 살펴보는 중…" · "파일 12/40개 맞추는 중 · 약 2분 남음" */
+/** 동기화 진행 한 줄: "Drive 폴더 살펴보는 중" · "파일 12/40개 맞추는 중, 약 2분 남음" */
 export function progressText(p, now = Date.now()) {
   if (!p) return '';
-  if (p.phase === 'scan') return 'Drive 폴더 살펴보는 중…';
-  if (!p.total) return '바뀐 메모가 없어요 · 마무리하는 중';
+  if (p.phase === 'scan') return 'Drive 폴더 살펴보는 중';
+  if (!p.total) return '바뀐 메모가 없어요, 마무리하는 중';
   const left = etaText(p, now);
-  return `파일 ${p.done}/${p.total}개 맞추는 중${left ? ` · ${left}` : ''}`;
+  return `파일 ${p.done}/${p.total}개 맞추는 중${left ? `, ${left}` : ''}`;
 }
 
 /** 남은 시간 어림 — 처음 몇 개 · 몇 초는 들쭉날쭉하니 말하지 않는다 */
@@ -105,8 +105,8 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     if (st.state === 'error') return { tone: 'error', title: needsLogin(st.error) ? '다시 로그인해 주세요' : '동기화하지 못했어요', sub: st.error || '잠시 뒤 다시 시도해 주세요', on, error: true };
     // 방금 끝났으면 몇 개를 맞췄는지 (되고 있었는지 알 수 있게)
     const fresh = st.lastSync && Date.now() - st.lastSync < 60_000;
-    const moved = fresh && st.moved ? ` · 파일 ${st.moved}개 맞춤` : fresh ? ' · 바뀐 것 없음' : '';
-    return { tone: 'ok', title: st.lastSync ? `동기화됨 · ${syncedAgo(st.lastSync)}${moved}` : '곧 동기화해요', sub: where, on };
+    const moved = fresh && st.moved ? `, 파일 ${st.moved}개 맞춤` : fresh ? ', 바뀐 것 없음' : '';
+    return { tone: 'ok', title: st.lastSync ? `동기화됨, ${syncedAgo(st.lastSync)}${moved}` : '곧 동기화해요', sub: where, on };
   }
 
   /** 진행 막대 하나 그리기 (bar: .sync-bar / .sync-line) */
@@ -179,8 +179,8 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
   // 처음 연결 창의 "동기화하는 중" 칸: 몇 개 중 몇 개 · 남은 시간
   function renderSyncStep(sum) {
     if (sum.tone !== 'busy') return;
-    $('sync-step-title').textContent = sum.progress?.phase === 'transfer' && sum.progress.total ? `메모를 맞추는 중 · ${sum.progress.done}/${sum.progress.total}` : '메모를 동기화하는 중…';
-    $('sync-step-sub').textContent = `${progressText(sum.progress)} — 창을 닫아도 뒤에서 계속해요`;
+    $('sync-step-title').textContent = sum.progress?.phase === 'transfer' && sum.progress.total ? `메모를 맞추는 중, ${sum.progress.done}/${sum.progress.total}` : '메모를 동기화하는 중';
+    $('sync-step-sub').textContent = `${progressText(sum.progress)}, 창을 닫아도 뒤에서 계속해요`;
     paintBar($('sync-step-bar'), sum);
   }
 
@@ -218,7 +218,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     const login = sum.error && needsLogin(st.error);
     if (!sum.on || login) btn(login || info.reconnect ? '다시 로그인' : '연결하기', 'btn primary', () => { closePop(); connect(); }, 'main');
     else {
-      const now = btn(sum.error ? '다시 시도' : sum.tone === 'busy' ? '맞추는 중…' : '지금 동기화', 'btn primary', () => syncNow(), 'main');
+      const now = btn(sum.error ? '다시 시도' : sum.tone === 'busy' ? '맞추는 중' : '지금 동기화', 'btn primary', () => syncNow(), 'main');
       now.disabled = st.state === 'syncing';
     }
     if (conflicts.length) btn(`충돌 사본 ${conflicts.length}개 보기`, 'btn', () => { closePop(); viewConflicts(); }, 'conflicts');
@@ -420,7 +420,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     use.disabled = info.active && cur.id === info.folderId;
     use.textContent = `"${cur.name}" 폴더 사용`;
     const list = $('folder-list');
-    list.innerHTML = '<li class="loading">불러오는 중…</li>';
+    list.innerHTML = '<li class="loading">불러오는 중</li>';
     let folders;
     try {
       folders = await api.drive.folders(cur.id);
@@ -439,7 +439,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     for (const f of folders) if (!firstOf.has(f.name)) firstOf.set(f.name, f.id);
     if (!folders.length) {
       const top = cur.id === 'root';
-      list.append(Object.assign(document.createElement('li'), { className: 'empty', textContent: top ? '메모킹이 만든 폴더가 아직 없어요 — 새 폴더를 만들어 주세요' : '안에 폴더가 없어요' }));
+      list.append(Object.assign(document.createElement('li'), { className: 'empty', textContent: top ? '메모킹이 만든 폴더가 아직 없어요. 새 폴더를 만들어 주세요' : '안에 폴더가 없어요' }));
       if (top) newFolder();
     }
     // 줄 누르기 = 그 안으로, 오른쪽 "사용" = 이 폴더로 동기화 (예전: 들어간 뒤 아래 단추로만 고를 수 있어 헷갈림)
@@ -455,7 +455,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
       if (dupCount.get(f.name) > 1) {
         const first = firstOf.get(f.name) === f.id;
         const made = f.created ? `${koMonthDay(new Date(f.created))} 만듦` : '';
-        b.append(Object.assign(document.createElement('i'), { className: 'folder-dup', textContent: [made, first ? '기본 · 자동 연결이 쓰는 폴더' : '같은 이름'].filter(Boolean).join(' · ') }));
+        b.append(Object.assign(document.createElement('i'), { className: 'folder-dup', textContent: [made, first ? '기본, 자동 연결이 쓰는 폴더' : '같은 이름'].filter(Boolean).join(', ') }));
       }
       b.append(Object.assign(document.createElement('i'), { className: 'folder-chev', textContent: '›' }));
       b.addEventListener('click', () => {
@@ -507,7 +507,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
       $('new-folder-row').hidden = true;
       path.push(f);
       await showFolder();
-      folderMsg(f.existed ? `"${name}" 폴더가 이미 있어서 새로 만들지 않고 그 폴더를 열었어요` : `"${name}" 폴더를 만들었어요 — 아래 단추로 이 폴더를 쓰세요`);
+      folderMsg(f.existed ? `"${name}" 폴더가 이미 있어서 새로 만들지 않고 그 폴더를 열었어요` : `"${name}" 폴더를 만들었어요. 아래 단추로 이 폴더를 쓰세요`);
     } catch (err) {
       await confirm(`폴더를 만들지 못했어요.\n${cleanError(err)}`, '확인');
     } finally {
@@ -552,7 +552,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     const on = e.target.checked;
     fullBusy = true;
     e.target.disabled = true;
-    $('drive-full-note').textContent = '브라우저에서 Google 계정을 고르고 허용해 주세요…';
+    $('drive-full-note').textContent = '브라우저에서 Google 계정을 고르고 허용해 주세요';
     let res;
     try {
       res = await api.drive.setFullScope(on);
@@ -577,7 +577,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     const id = $('client-id').value.trim();
     if (!/\.apps\.googleusercontent\.com$/.test(id)) {
       $('client-id').focus();
-      $('client-id').setCustomValidity?.('…apps.googleusercontent.com 으로 끝나는 클라이언트 ID 를 넣어 주세요');
+      $('client-id').setCustomValidity?.('apps.googleusercontent.com 으로 끝나는 클라이언트 ID 를 넣어 주세요');
       $('client-id').reportValidity?.();
       return;
     }

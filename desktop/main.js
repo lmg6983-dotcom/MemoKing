@@ -621,7 +621,7 @@ function autoDriveFolder() {
 // 같은 이름 폴더가 이미 있으면 그것 (새로 만들지 않는다) — 만드는 중에 또 부탁해도 하나만
 const folderMaking = new Map();
 function findOrCreateDriveFolder(parent, name) {
-  if (!driveApi) return Promise.reject(new Error('Google Drive 를 쓸 수 없어요. 설정 › Google Drive 동기화에서 먼저 연결해 주세요'));
+  if (!driveApi) return Promise.reject(new Error('Google Drive 를 쓸 수 없어요. 설정의 Google Drive 동기화에서 먼저 연결해 주세요'));
   const key = `${parent}\u0000${name}`;
   if (!folderMaking.has(key)) {
     folderMaking.set(key, (async () => {
@@ -930,7 +930,7 @@ function updateTrayMenu() {
     { label: '메모 폴더 열기', enabled: Boolean(vault), click: () => shell.openPath(vault.root) },
     { type: 'separator' },
     {
-      label: `빠른 메모 ${shortcutLabel('quickMemo')} (두 번: 화면 캡처)${settings.quickMemo && !shortcutStatus('quickMemo').registered ? ' — 다른 앱이 쓰는 중' : ''}`,
+      label: `빠른 메모 ${shortcutLabel('quickMemo')} (두 번: 화면 캡처)${settings.quickMemo && !shortcutStatus('quickMemo').registered ? ', 다른 앱이 쓰는 중' : ''}`,
       type: 'checkbox',
       checked: settings.quickMemo && shortcutStatus('quickMemo').registered,
       click: (item) => setQuickMemo(item.checked),
@@ -1244,7 +1244,7 @@ function migrateOpmsSettings() {
   if (!normalizeOpmsHost(settings.opms?.host) && settings.opmsIntroduced && opmsOn && !SMOKE) {
     toast({
       title: 'OPMS 서버 주소를 한 번 넣어 주세요',
-      body: '보안을 위해 서버 주소를 설치 파일에서 뺐어요. 설정 › 매직키 › OPMS 연결에서 넣으면 돼요',
+      body: '보안을 위해 서버 주소를 설치 파일에서 뺐어요. 설정 매직키의 OPMS 연결에서 넣으면 돼요',
       onClick: () => windowManager.createListWindow('memos'),
     });
   }

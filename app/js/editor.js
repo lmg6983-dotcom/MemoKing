@@ -395,7 +395,7 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
     siteName.textContent = preview?.site || hostOf(href);
     title.textContent = saved && saved !== href ? saved : preview?.title || href;
     // 불러오는 중과 못 불러온 카드가 같아 보이지 않게 (못 불러와도 누르면 열리는 링크 그대로)
-    desc.textContent = state === 'loading' ? '미리보기 불러오는 중…' : state === 'plain' ? '미리보기를 불러오지 못했어요' : preview?.description ?? '';
+    desc.textContent = state === 'loading' ? '미리보기 불러오는 중' : state === 'plain' ? '미리보기를 불러오지 못했어요' : preview?.description ?? '';
     desc.classList.toggle('lc-note', state !== 'ok');
     desc.hidden = !desc.textContent;
     main.setAttribute('aria-label', `${title.textContent}, ${siteName.textContent}`);

@@ -51,7 +51,7 @@ const dayText = (d, relative = true) => {
 export function whenText({ start, end, allDay }, { relative = true } = {}) {  // relative: false 면 "내일" 없이 (그림 · 메모에 남길 글)
   if (allDay) {
     const last = end && end > start ? addDays(end, -1) : start; // 하루 종일의 끝은 다음 날 0시
-    return sameDay(start, last) ? `${dayText(start, relative)} · 하루 종일` : `${dayText(start, relative)} ~ ${koFullDate(last)} · 하루 종일`;
+    return sameDay(start, last) ? `${dayText(start, relative)}, 하루 종일` : `${dayText(start, relative)} ~ ${koFullDate(last)}, 하루 종일`;
   }
   if (!end || end <= start) return `${dayText(start, relative)} · ${koClock(start)}`;
   return sameDay(start, end) ? `${dayText(start, relative)} · ${koClock(start)}~${koClock(end)}` : `${dayText(start, relative)} ${koClock(start)} ~ ${koFullDate(end)} ${koClock(end)}`;

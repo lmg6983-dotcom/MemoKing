@@ -287,7 +287,7 @@ async function search() {
   stats.clear();
   asked.clear();
   if (!all.length && query.trim() && res.index && !res.index.count) {
-    emptyEl.textContent = res.index.building ? '파일 목록을 만드는 중이에요 — 잠시 뒤 다시 찾아 보세요' : '파일 목록이 아직 없어요';
+    emptyEl.textContent = res.index.building ? '파일 목록을 만드는 중이에요. 잠시 뒤 다시 찾아 보세요' : '파일 목록이 아직 없어요';
   }
   rebuild();
 }
