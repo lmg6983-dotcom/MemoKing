@@ -1079,3 +1079,22 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .work-hours .wh-sum { font-weight: 500; color: var(--muted); }
 @media (pointer: coarse) { .work-hours .wh-day { width: 44px; height: 44px; } .work-hours .wh-time input { height: 44px; } }
 
+
+/* Gemini, ChatGPT 에서 메모 다루기 (ai-drive-guide.js) — 설정 창 위에 뜨는 안내 */
+.ai-guide { width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 48px); overflow-y: auto; }
+.ai-guide .dialog-head h2 { font-size: 17px; line-height: 24px; }
+.ai-guide .ai-guide-lead { margin: 0 0 12px; color: var(--muted); font-size: 13.5px; white-space: normal; }
+.ai-guide-steps { display: grid; gap: 12px; margin: 0 0 12px; padding-left: 20px; font-size: 13.5px; line-height: 1.55; }
+.ai-guide-steps > li::marker { font-weight: 800; color: var(--text-strong); }
+.ai-guide-steps small { display: block; margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+.ai-guide-ok { color: var(--success, #2f8a4a); font-weight: 700; }
+.ai-guide-warn { color: var(--danger); font-weight: 700; }
+.ai-guide-prompt {
+  display: block; box-sizing: border-box; width: 100%; margin: 8px 0; padding: 10px 12px; resize: vertical;
+  border: 1px solid var(--line); border-radius: var(--radius-sm, 8px); background: var(--surface-1); color: var(--text);
+  font: 12.5px/1.55 var(--font-sans); white-space: pre-wrap;
+}
+.ai-guide-copy { min-width: 120px; }
+.ai-guide-examples { margin: 6px 0 0; padding-left: 18px; color: var(--text); }
+.ai-guide-examples li + li { margin-top: 2px; }
+.ai-guide .ai-guide-note { margin: 0; color: var(--muted); font-size: 12.5px; white-space: normal; }

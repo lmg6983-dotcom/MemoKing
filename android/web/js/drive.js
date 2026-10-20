@@ -1,8 +1,9 @@
 // Google Drive 연결 화면 (① OAuth 클라이언트 ② 로그인 ③ 폴더 고르기) 과 동기화 상태 표시
 import { drive, call } from './native.js';
 import { app } from './state.js';
-import { openSheet, closeSheet, toast } from './ui.js';
+import { openSheet, closeSheet, toast, adoptSheet, releaseSheet } from './ui.js';
 import { icon } from '../../app/js/icons.js';
+import { openAiDriveGuide } from '../../app/js/ai-drive-guide.js';
 
 const $ = (x) => document.getElementById(x);
 const sheet = $('drive-sheet');
@@ -300,3 +301,18 @@ export async function syncNow() {
   }
   renderStatus();
 }
+
+// Gemini, ChatGPT 의 Google Drive 연결로 메모 폴더를 직접 다룰 때 붙여 넣을 안내문 (app/js/ai-drive-guide.js)
+$('ai-drive-guide')?.addEventListener('click', () => {
+  const s = drive.status();
+  openAiDriveGuide({
+    folder: s.folderName || '메모킹',
+    linked: s.connected && s.active ? Boolean(s.fullScope) : null,
+    copy: (text) => app.api.copyText(text), // "복사했어요" 는 copyText 가 알린다
+    notify: (text, isError) => isError && toast(text, true),
+    onOverlay: (el, close) => {
+      adoptSheet(el, close); // 뒤로 가기로 닫히게
+      return () => releaseSheet(el);
+    },
+  });
+});

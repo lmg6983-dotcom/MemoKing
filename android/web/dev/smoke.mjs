@@ -421,13 +421,9 @@ try {
   await page.waitForTimeout(300);
   if (await page.isVisible('.quick-event[open]')) await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
-  // 목록 보기: 시각은 제목 위 작은 줄 — 제목이 줄 폭을 거의 다 쓴다 (예전: 시각 칸이 절반, 제목 99px 에서 잘림)
-  await page.tap('.cal-views button[data-view="listMonth"]');
-  await page.waitForTimeout(400);
-  const listTitleW = await page.evaluate(() => Math.min(...[...document.querySelectorAll('#reminder-groups .mk-li-title')].map((t) => t.getBoundingClientRect().width)));
-  check('목록 보기: 일정 제목이 줄 폭을 다 씀 (200px 넘게)', listTitleW > 200 && Number.isFinite(listTitleW), String(listTitleW));
-  await page.tap('.cal-views button[data-view="dayGridMonth"]');
-  await page.waitForTimeout(400);
+  // 보기는 캘린더 · 회상 둘 (주 · 목록 보기는 없앰)
+  const viewNames = await page.evaluate(() => [...document.querySelectorAll('.cal-views button')].map((b) => b.textContent));
+  check('일정 보기: 캘린더 · 회상 둘', viewNames.join() === '캘린더,회상', JSON.stringify(viewNames));
   // 새 일정: 한 화면 (이름 · 날짜 · 시각 · 🔔 · 📝 → 일정 저장). 입구: 일정 탭의 + · 빈 앞날 누르기 · "＋ 일정 추가"
   check('일정 탭: + 단추 = 새 일정 (메모 탭과 같은 자리)', await page.isVisible('#fab') && (await page.getAttribute('#fab', 'aria-label')) === '새 일정');
   await page.tap('#fab');
@@ -553,15 +549,6 @@ try {
   await back();
   await page.waitForTimeout(500);
   check('예전 상호 동기화가 만든 "메모킹" 캘린더 일정은 함께 보기에서 뺌 (메모킹 일정의 사본)', !(await page.evaluate(() => document.body.innerText.includes('메모킹 사본'))));
-  for (const [view, name] of [['timeGridWeek', '주'], ['listMonth', '목록']]) {
-    await page.tap(`[data-view="${view}"]`);
-    await page.waitForTimeout(500);
-    const shown = await page.evaluate(() => ({ h: document.querySelector('.cal-body').getBoundingClientRect().height, n: document.querySelectorAll('#reminder-groups .mk-ev').length }));
-    check(`달력 보기: ${name} (일정이 보임)`, shown.h > 200 && shown.n > 0, JSON.stringify(shown));
-    await shot(`02k-calendar-${view}`);
-  }
-  await page.tap('[data-view="dayGridMonth"]');
-  await page.waitForTimeout(300);
   await page.tap('[data-tab="memos"]');
   await page.waitForTimeout(300);
 

@@ -20,6 +20,7 @@ import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { renderCollage, collageName } from './memories-collage.js';
 import { base64Bytes, collageMemoBody } from './collage-preview.js';
+import { openAiDriveGuide } from './ai-drive-guide.js';
 import { chooseShare, showSharePop, SHARE_DONE } from './share-menu.js';
 import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL } from './core/modes.js';
 import { openModeHelper } from './mode-helper-dialog.js';
@@ -902,6 +903,16 @@ $('mcp-copy').addEventListener('click', async () => {
   showMcp((await api.settings.get()).mcp, '설정을 복사했어요. AI 앱의 MCP 설정(mcpServers)에 붙여 넣어 주세요');
 });
 $('mcp-write').addEventListener('change', async (e) => showMcp(await api.mcp.setWrite(e.target.checked)));
+// Gemini, ChatGPT 의 Google Drive 연결로 메모 폴더를 직접 다룰 때 붙여 넣을 안내문 (ai-drive-guide.js)
+$('ai-drive-guide').addEventListener('click', async () => {
+  const d = await api.drive.status().catch(() => null);
+  openAiDriveGuide({
+    folder: d?.folderName || '메모킹',
+    linked: d?.connected && d?.active ? Boolean(d.fullScope) : null,
+    copy: (text) => api.copyText(text),
+    notify: (text) => flashStatus(text),
+  });
+});
 
 // ---------- 전역 단축키 바꾸기 (빠른 메모·매직키) ----------
 // 키 단추를 누르고 새 조합을 누르면 바뀐다. 다른 앱이 이미 쓰는 키면 바꾸지 않고 알려 준다 (Esc·다른 곳 누르기 = 그만)

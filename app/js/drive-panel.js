@@ -96,7 +96,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     if (info.reconnect && !info.connected) return { tone: 'error', title: '다시 연결해 주세요', sub: 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC 에 그대로 있어요', on };
     if (!info.connected) return { tone: 'off', title: '동기화 꺼짐', sub: 'Google 계정으로 연결하면 휴대폰 메모킹과 같은 메모를 써요', on };
     if (!info.active) return { tone: 'off', title: `${info.email || 'Google 계정'} 로그인됨`, sub: '동기화할 Drive 폴더를 아직 고르지 않았어요', on };
-    const where = `${info.email || 'Google 계정'} › ${info.folderName || '메모킹'}`;
+    const where = `${info.email || 'Google 계정'}의 ${info.folderName || '메모킹'} 폴더`;
     if (st.state === 'syncing') {
       const p = st.progress;
       const count = p?.phase === 'transfer' && p.total ? ` · ${p.done}/${p.total}` : '';
@@ -155,7 +155,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     const on = sum.on;
     box.classList.toggle('on', on);
     box.classList.toggle('error', sum.tone === 'error');
-    $('drive-title').textContent = on ? (sum.tone === 'ok' ? `${info.email || 'Google 계정'} › ${info.folderName || '메모킹'}` : sum.title) : sum.title;
+    $('drive-title').textContent = on ? (sum.tone === 'ok' ? `${info.email || 'Google 계정'}의 ${info.folderName || '메모킹'} 폴더` : sum.title) : sum.title;
     $('drive-sub').textContent = on ? (sum.tone === 'ok' ? sum.title : sum.sub) : sum.sub;
     const login = sum.error && needsLogin(st.error);
     // 단추: 연결 전 [연결하기] / 연결 뒤 [지금 동기화] (오류면 [다시 시도], 로그인이 풀렸으면 [다시 로그인]) · 충돌 · 다른 폴더 · 끊기
