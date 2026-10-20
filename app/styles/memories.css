@@ -87,7 +87,7 @@ button.mem-day:active { transform: scale(0.96); }
   position: absolute; inset: 20px 3px 4px; display: -webkit-box; padding: 3px 4px; overflow: hidden;
   -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
   border-radius: 1px 1px 6px 1px; background: var(--note-bg); color: var(--note-fg);
-  box-shadow: 0 1px 2px rgba(60, 45, 20, 0.16); font-size: clamp(9px, 1.5vw, 11px); line-height: 1.3; word-break: keep-all; overflow-wrap: anywhere;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--mem-ink) 18%, transparent); font-size: clamp(9px, 1.5vw, 11px); line-height: 1.3; word-break: keep-all; overflow-wrap: anywhere;
   transform: rotate(-1.2deg);
 }
 
@@ -149,10 +149,10 @@ button.mem-day:active { transform: scale(0.96); }
 .mem-note {
   display: flex; flex-direction: column; gap: 5px; min-height: 84px; padding: 14px 14px 16px; border: 0;
   border-radius: 2px 2px 14px 2px; background: var(--note-bg); color: var(--note-fg); font: inherit; text-align: left; cursor: pointer;
-  box-shadow: 0 2px 6px rgba(60, 45, 20, 0.16); transform: rotate(var(--r, 0deg)); animation: mem-place 0.4s var(--ease-out) both;
+  box-shadow: var(--mem-shadow); transform: rotate(var(--r, 0deg)); animation: mem-place 0.4s var(--ease-out) both;
   transition: box-shadow 0.15s ease-out;
 }
-.mem-note:hover { box-shadow: 0 4px 12px rgba(60, 45, 20, 0.22); }
+.mem-note:hover { box-shadow: var(--mem-shadow), 0 6px 16px color-mix(in srgb, var(--mem-ink) 10%, transparent); }
 .mem-note-title { font-size: 14.5px; font-weight: 700; }
 .mem-note-text { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; font-size: 13px; line-height: 1.5; white-space: pre-line; opacity: 0.85; }
 
@@ -162,6 +162,20 @@ button.mem-day:active { transform: scale(0.96); }
 }
 .mem-zoom img { max-width: 100%; max-height: calc(100% - 64px); object-fit: contain; border-radius: 3px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
 .mem-zoom-open { cursor: pointer; }
+
+/* 다른 날로 넘길 때: 책장 넘기듯 — 지금 쪽은 반대로 밀려 나가고 새 쪽이 넘긴 쪽에서 들어온다 (--dir: 다음 1 · 이전 -1) */
+.mem-album.turn { animation: none; }
+.mem-album.turn .mem-page { animation: mem-turn-in 0.36s var(--ease-out) both; }
+.mem-album.turn .mem-pol, .mem-album.turn .mem-note { animation: none; }
+.mem-album.turning { background: transparent; animation: none; pointer-events: none; }
+.mem-album.turning .mem-page { animation: mem-turn-out 0.2s ease-in both; }
+@keyframes mem-turn-in { from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 56px)) rotate(calc(var(--dir, 1) * 1.5deg)); } }
+@keyframes mem-turn-out { to { opacity: 0; transform: translateX(calc(var(--dir, 1) * -56px)) rotate(calc(var(--dir, 1) * -1.5deg)); } }
+
+/* 한 장으로 만드는 중 */
+.mem-share[aria-busy="true"], .mem-page-share[aria-busy="true"] { cursor: progress; opacity: 0.7; }
+.mem-share[aria-busy="true"] svg, .mem-page-share[aria-busy="true"] svg { animation: mem-busy 0.9s ease-in-out infinite alternate; }
+@keyframes mem-busy { to { transform: scale(0.82); opacity: 0.5; } }
 
 @media (max-width: 560px) {
   .mem-head { flex-wrap: wrap; gap: 8px; }
@@ -176,6 +190,8 @@ button.mem-day:active { transform: scale(0.96); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mem-cover-pol, .mem-photo, .mem-album, .mem-page, .mem-pol, .mem-note, .mem-zoom, .mem-album.closing, .mem-album.closing .mem-page { animation: none; }
+  .mem-cover-pol, .mem-photo, .mem-album, .mem-page, .mem-pol, .mem-note, .mem-zoom, .mem-album.closing, .mem-album.closing .mem-page, .mem-album.turn .mem-page { animation: none; }
+  .mem-album.turning { display: none; }
+  .mem-share[aria-busy="true"] svg, .mem-page-share[aria-busy="true"] svg { animation: none; }
   button.mem-day { transition: none; }
 }

@@ -8,6 +8,17 @@ export function haptic(pattern) {
 // 움직임 줄이기를 켠 사람에게는 날아다니는 효과를 쉬게
 export const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/** 화면이 크게 바뀌는 일(Work ↔ Life)을 부드럽게: 바꾸기 전후를 겹쳐 보인다 (base.css ::view-transition-*) — 안 되면 바로 */
+export function withViewTransition(update) {
+  if (reduceMotion() || typeof document.startViewTransition !== 'function' || document.hidden) return update();
+  try {
+    document.startViewTransition(update).ready.catch(() => {});
+  } catch {
+    update();
+  }
+  return undefined;
+}
+
 // 같은 애니메이션 클래스를 다시 붙여 처음부터 다시 돌린다
 export function replayClass(el, cls) {
   el.classList.remove(cls);
