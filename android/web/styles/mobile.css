@@ -930,7 +930,8 @@ body.two-pane .pane-empty:not([hidden]) {
 }
 .pane-empty img { width: 72px; height: 72px; opacity: 0.5; filter: grayscale(0.4); }
 /* 메모 본문은 읽기 좋은 폭으로 가운데 */
-body.two-pane .note-screen .editor { padding-left: max(28px, calc((100% - 760px) / 2)); padding-right: max(28px, calc((100% - 760px) / 2)); }
+/* 넓은 화면: 글은 왼쪽부터 (가운데 760px 칸에 두면 짧은 메모가 오른쪽으로 쏠려 보였다) — 한 줄이 너무 길지 않게 오른쪽만 비운다 */
+body.two-pane .note-screen .editor { padding-left: clamp(28px, 4vw, 56px); padding-right: max(28px, calc(100% - 820px)); }
 body.two-pane .note-screen .format-items { justify-content: safe center; } /* 넘치면 왼쪽부터 (가운데 정렬로 잘리지 않게) */
 .search { min-width: 0; }
 .search input { width: 100%; }

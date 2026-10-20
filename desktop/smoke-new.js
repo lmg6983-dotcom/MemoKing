@@ -837,7 +837,15 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await memoHotkeys.onPress('3');
       const shownWin = await until(() => noteWins.get(hid)?.isVisible() && noteWins.get(hid), '단축키로 메모 띄우기', 4000).catch(() => null);
       check('띄우기로 바꾸면 Ctrl+Alt+3 → 메모 창이 뜸 (클립보드는 그대로)', r.ok && Boolean(shownWin) && (await clipboard.readText()) === '비움', JSON.stringify({ r: r.ok, shown: Boolean(shownWin) }));
+      // 왕관(늘 위)이 붙은 메모를 단축키로 부르면: 왕관을 떼고 보통 창으로 (테이프도 같은 길 — 붙은 채로는 층이 엉켜 오류)
+      windowManager.setNoteLayer(hid, 'top');
       shownWin?.close();
+      await until(() => !noteWins.has(hid), '메모 창 닫힘 (왕관)');
+      await memoHotkeys.onPress('3');
+      const crownWin = await until(() => noteWins.get(hid)?.isVisible() && noteWins.get(hid), '왕관 메모 단축키로 띄우기', 4000).catch(() => null);
+      check('왕관이 붙은 메모를 단축키로 부르면 왕관을 떼고 띄움', Boolean(crownWin) && windowManager.layerOf(hid) === null && !crownWin.isAlwaysOnTop(),
+        JSON.stringify({ shown: Boolean(crownWin), layer: windowManager.layerOf(hid), onTop: crownWin?.isAlwaysOnTop() }));
+      crownWin?.close();
       // 풀기
       const off = memoHotkeys.set(hid, null);
       check('단축키 풀기 → 키를 놓아 다른 앱이 쓸 수 있게', off.ok && !memoHotkeys.held.has('3') && !getSettings().memoHotkeys?.['3'], JSON.stringify(getSettings().memoHotkeys));

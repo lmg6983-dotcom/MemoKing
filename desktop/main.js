@@ -173,7 +173,10 @@ async function memoHotkeyPressed(slot) {
   // 잠긴 메모는 비밀번호를 넣어야 하니 복사 대신 창을 띄운다
   const show = bound.show || (bound.copy && !copied);
   // 복사도 했으면 창은 띄우되 포커스는 쓰던 앱에 — 바로 Ctrl+V 가 거기에 들어가게
-  if (show) windowManager.revealNote(bound.id, { inactive: copied });
+  if (show) {
+    windowManager.unstickForHotkey(bound.id); // 왕관 · 테이프가 붙어 있으면 떼고 보통 창으로 (window-manager.js)
+    windowManager.revealNote(bound.id, { inactive: copied });
+  }
   // 붙여 넣는 법은 처음 몇 번만 (매일 수십 번 쓰는 사람에게는 군더더기)
   const tip = copied && (settings.hotkeyTips ?? 0) < 3;
   if (tip) {
