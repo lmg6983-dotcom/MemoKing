@@ -1221,6 +1221,9 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .sort-btn.active { background: var(--brand-yellow-soft); color: var(--text-strong); }
 
 /* 메모킹 Work / Life 고르기: 검색 왼쪽에 작게 (손가락 높이 44px 은 둘레 칸으로) */
-.searchbar .mode-switch { margin-right: 6px; padding: 3px; }
+.searchbar .brand-mark { margin: 0 8px 0 4px; }
+.searchbar .brand-icon { width: 26px; height: 26px; }
+.searchbar .mode-switch { --ms-pad: 3px; margin-right: 6px; }
+@media (max-width: 370px) { .searchbar .brand-mark { margin: 0 6px 0 0; } .searchbar .brand-icon { width: 22px; height: 22px; } }
 .searchbar .mode-switch button { position: relative; min-width: 42px; height: 38px; padding: 0 8px; font-size: 13px; }
 .other-mode { display: block; margin: 0 16px 8px auto; padding: 6px 0; font-size: 13.5px; }

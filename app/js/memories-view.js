@@ -86,7 +86,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       share.type = 'button';
       share.append(icon('share'), el('span', '', '한 장으로'));
       share.title = '이 달의 기록을 그림 한 장으로 (공유 · 저장)';
-      share.addEventListener('click', () => collage({
+      share.addEventListener('click', () => makeCollage(share, {
         title: `${month.getFullYear()}년 ${month.getMonth() + 1}월의 기록`,
         sub: `${sum.days}일 · 사진 ${sum.photos}장`,
         photos: [...days.values()].flatMap((d) => d.photos.slice(0, 1).map((p) => ({ ...p, day: d.day }))),
@@ -167,11 +167,14 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
 
   // ---------- ③ 그날의 기록 (스크랩북 한 쪽) ----------
   let album = null;
-  function openDay(key) {
-    closeDay();
+  /** @param {number} [dir] 옆 날로 넘길 때 1(다음) · -1(이전) — 책장 넘기듯 */
+  function openDay(key, dir = 0) {
     const rec = days.get(key);
     if (!rec) return;
-    const overlay = el('div', 'mem-album');
+    const turning = Boolean(dir && album);
+    closeDay({ dir: turning ? dir : 0 });
+    const overlay = el('div', turning ? 'mem-album turn' : 'mem-album');
+    if (turning) overlay.style.setProperty('--dir', String(dir));
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', `${koFullDate(keyDate(key))}의 기록`);
@@ -188,7 +191,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       b.setAttribute('aria-label', label);
       b.append(icon('chev-right'));
       b.disabled = !to;
-      b.addEventListener('click', () => to && openDay(to));
+      b.addEventListener('click', () => to && openDay(to, cls === 'mem-next' ? 1 : -1));
       return b;
     };
     tools.append(navBtn(prev, '이전 기록', 'mem-prev'), navBtn(next, '다음 기록', 'mem-next'));
@@ -198,7 +201,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       share.setAttribute('aria-label', '이 날을 그림 한 장으로');
       share.title = '이 날을 그림 한 장으로 (공유 · 저장)';
       share.append(icon('share'));
-      share.addEventListener('click', () => collage({
+      share.addEventListener('click', () => makeCollage(share, {
         title: `${date.getMonth() + 1}월 ${date.getDate()}일 ${'일월화수목금토'[date.getDay()]}요일`,
         sub: rec.memos.map((m) => m.title).filter(Boolean).slice(0, 3).join(' · '),
         photos: rec.photos.map((p) => ({ ...p, day: key })),
@@ -238,15 +241,15 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       sx = null;
       if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
         const to = dx < 0 ? next : prev;
-        if (to) openDay(to);
+        if (to) openDay(to, dx < 0 ? 1 : -1);
       }
     });
     const onKey = (e) => {
       if (e.key === 'Escape') {
         if (overlay.querySelector('.mem-zoom')) overlay.querySelector('.mem-zoom').remove();
         else closeDay();
-      } else if (e.key === 'ArrowLeft' && prev) openDay(prev);
-      else if (e.key === 'ArrowRight' && next) openDay(next);
+      } else if (e.key === 'ArrowLeft' && prev) openDay(prev, -1);
+      else if (e.key === 'ArrowRight' && next) openDay(next, 1);
       else return;
       e.preventDefault();
       e.stopPropagation();
@@ -258,14 +261,36 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
     close.focus({ preventScroll: true });
   }
 
-  function closeDay() {
+  /** @param {{ dir?: number }} [o] dir: 옆 날로 넘기며 닫을 때 (반대쪽으로 밀려 나감) */
+  function closeDay({ dir = 0 } = {}) {
     if (!album) return;
     const { overlay, cleanup, release } = album;
     album = null;
     cleanup();
     release?.();
+    if (dir) {
+      overlay.style.setProperty('--dir', String(dir));
+      overlay.classList.add('turning');
+      setTimeout(() => overlay.remove(), 220);
+      return;
+    }
     overlay.classList.add('closing');
     setTimeout(() => overlay.remove(), 160);
+  }
+
+  // 한 장으로: 만드는 동안 단추를 잠그고 "만드는 중" (큰 달은 1~2초 걸린다)
+  async function makeCollage(button, data) {
+    if (button.getAttribute('aria-busy') === 'true') return;
+    const label = button.querySelector('span');
+    const was = label?.textContent;
+    button.setAttribute('aria-busy', 'true');
+    if (label) label.textContent = '만드는 중…';
+    try {
+      await collage(data);
+    } finally {
+      button.removeAttribute('aria-busy');
+      if (label) label.textContent = was;
+    }
   }
 
   function polaroid(src, memo, named = true) {

@@ -28,7 +28,7 @@ import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition } from './dom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -311,10 +311,12 @@ async function setMode(mode) {
   mode = validMode(mode);
   if (mode === state.mode) return;
   state.mode = mode;
-  showMode();
-  state.filter.tags = []; // 다른 모드에는 없는 태그일 수 있다
-  render();
-  remindersTab.modeChanged();
+  withViewTransition(() => {
+    showMode();
+    state.filter.tags = []; // 다른 모드에는 없는 태그일 수 있다
+    render();
+    remindersTab.modeChanged();
+  });
   if (mode === 'work') hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 카드 메뉴의 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
   const saved = await api.mode?.set(mode);
   if (saved && saved !== state.mode) {

@@ -20,3 +20,4 @@ android/.kotlin/
 desktop/google-client.json
 
 *.exe
+.impeccable/critique/

@@ -12,7 +12,7 @@ import { matchChrome, confirmDialog, isTwoPane, toast, adoptSheet, releaseSheet 
 import { call } from './native.js';
 import { renderCollage, collageName } from '../../app/js/memories-collage.js';
 import { tutEvent } from './tutorial.js';
-import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards } from '../../app/js/dom.js';
+import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
 import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode } from '../../app/js/core/modes.js';
@@ -99,10 +99,12 @@ export function setMode(mode) {
     // 이번 실행 동안만
   }
   haptic(8);
-  showMode();
-  state.filter.tags = [];
-  render();
-  remindersTab?.modeChanged();
+  withViewTransition(() => {
+    showMode();
+    state.filter.tags = [];
+    render();
+    remindersTab?.modeChanged();
+  });
   if (mode === 'work') hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요 — 메모를 꾹 눌러 "Work로 옮기기"나 설정 › 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
 }
 for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
