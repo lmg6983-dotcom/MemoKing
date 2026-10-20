@@ -232,8 +232,8 @@ export class Vault extends EventEmitter {
       created: entry.meta.created,
       updated: entry.meta.updated,
       thumb: media.find((m) => m.kind === 'image')?.src ?? null,
-      images: media.filter((m) => m.kind === 'image').slice(0, 24).map((m) => m.src), // 추억 달력 (그날의 사진)
-      day: entry.meta.day || '', // 추억 달력: "이 날의 기록으로" 정한 날
+      images: media.filter((m) => m.kind === 'image').slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진)
+      day: entry.meta.day || '', // 회상 달력: "이 날의 기록으로" 정한 날
       mode: entry.meta.mode ?? 'life', // Work / Life
       tags: extractTags(entry.body),
       hasImage: has('image'),

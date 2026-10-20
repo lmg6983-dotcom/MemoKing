@@ -11,8 +11,9 @@ import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog, isTwoPane, toast, adoptSheet, releaseSheet } from './ui.js';
 import { call } from './native.js';
 import { renderCollage, collageName } from '../../app/js/memories-collage.js';
+import { base64Bytes, collageMemoBody } from '../../app/js/collage-preview.js';
 import { tutEvent } from './tutorial.js';
-import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition } from '../../app/js/dom.js';
+import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition, setModeSwitch } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
 import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode } from '../../app/js/core/modes.js';
@@ -99,16 +100,20 @@ export function setWorkLife(on) {
   }
   if (!on) setMode('life');
   withViewTransition(() => {
-    showMode();
+    showMode({ later: true });
     render();
     remindersTab?.modeChanged();
-  });
+  }).then(syncSwitch);
   if (on) workClock();
   app.rescheduleAlarms?.(); // 퇴근 뒤 조용히가 켜지거나 꺼진다
 }
 export const currentMode = () => state.mode;
 
-function showMode() {
+// 해 · 달 스위치 (화면 전환 속에서 바꿀 때는 전환이 끝난 뒤에 — dom.js setModeSwitch)
+const syncSwitch = () => setModeSwitch($('mode-switch'), state.mode);
+/** @param {{ later?: boolean }} [o] later: 스위치는 부른 쪽이 나중에 (syncSwitch) */
+function showMode({ later = false } = {}) {
+  if (!later) syncSwitch();
   document.documentElement.dataset.mode = state.mode;
   setListTheme(workLifeOn() ? state.mode : null, { noteOpen: app.isNoteOpen?.() ?? false }); // Work 는 어두운 화면 · Life 는 밝은 화면 (나눠 쓰지 않으면 시스템 설정)
   $('mode-switch').hidden = !workLifeOn();
@@ -130,11 +135,11 @@ export function setMode(mode) {
   }
   haptic(8);
   withViewTransition(() => {
-    showMode();
+    showMode({ later: true });
     state.filter.tags = [];
     render();
     remindersTab?.modeChanged();
-  });
+  }).then(syncSwitch);
   if (mode === 'work' && workLifeOn()) hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요. 메모를 꾹 눌러 "Work로 옮기기"나 설정의 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
 }
 for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
@@ -757,23 +762,39 @@ export function setup() {
       const memo = state.memos.find((m) => m.id === item.memoId);
       return !workLifeOn() || !memo || memoMode(memo) === state.mode;
     },
-    // 추억 보기 (Life 에서만): 그날의 기록은 뒤로 가기로 닫힌다
+    // 회상 보기: 그날의 기록은 뒤로 가기로 닫힌다
     memories: {
-      on: () => !workLifeOn() || state.mode === 'life',
+      mode: () => (workLifeOn() ? state.mode : null), // 회상도 지금 모드의 메모로
       onOverlay: (el, close) => {
         adoptSheet(el, close);
         return () => releaseSheet(el);
       },
-      // 한 장으로: 휴대폰 공유 창 (카카오톡 · 갤러리에 저장 …)
-      collage: async (o) => {
-        toast('그림을 만드는 중');
-        try {
-          const base64 = await renderCollage(o);
-          await call('shareFile', { base64, name: collageName(o), mime: 'image/png', title: o.title });
-        } catch (err) {
-          console.error(err);
-          toast(err.message || '그림을 만들지 못했어요', true);
-        }
+      // 한 장으로: 미리보기에서 공유(안드로이드 공유 창) · 복사 · 저장(저장 창) · 메모로 만들기
+      collage: {
+        render: (o) => renderCollage(o),
+        actions: (base64, o) => [
+          { id: 'share', label: '공유', icon: 'share', run: async () => {
+            await call('shareFile', { base64, name: collageName(o), mime: 'image/png', title: o.title });
+            return '';
+          } },
+          { id: 'copy', label: '복사', icon: 'copy', run: async () => {
+            await call('copyImage', { base64 });
+            return '그림을 복사했어요. 붙여 넣어 보낼 수 있어요';
+          } },
+          { id: 'save', label: '저장', icon: 'folder', run: async () => {
+            const name = await call('saveAs', { name: collageName(o), mime: 'image/png', base64 });
+            return name ? `${name}로 저장했어요` : '';
+          } },
+          { id: 'memo', label: '메모로 만들기', icon: 'note', close: true, run: async () => {
+            if (!app.vault) throw new Error('메모 폴더가 아직 없어요');
+            const rel = app.vault.saveAttachment(base64Bytes(base64), 'png');
+            const id = app.vault.import({ body: collageMemoBody(o.title, rel) });
+            if (!id) throw new Error('메모를 만들지 못했어요');
+            refresh();
+            app.api.memo.open(id);
+            return '새 메모로 만들었어요';
+          } },
+        ],
       },
     },
   });

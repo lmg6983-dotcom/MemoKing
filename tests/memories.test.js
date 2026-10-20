@@ -13,14 +13,14 @@ const memos = [
   { id: 'g', title: '다음 달', created: local(2026, 11, 1), images: ['attachments/g.jpg'] },
 ];
 
-test('추억: 정한 날이 있으면 그날, 없으면 만든 날 (현지 날짜)', () => {
+test('회상: 정한 날이 있으면 그날, 없으면 만든 날 (현지 날짜)', () => {
   assert.equal(memoryDay(memos[0]), '2026-10-03');
   assert.equal(memoryDay(memos[2]), '2026-10-04');
   assert.equal(memoryDay({ id: 'x' }), null);
   assert.equal(dayKey(new Date(2026, 0, 5)), '2026-01-05');
 });
 
-test('추억: 날마다 메모(쓴 순서) · 사진 모음, 잠긴 · 빈 메모와 범위 밖은 빼고', () => {
+test('회상: 날마다 메모(쓴 순서) · 사진 모음, 잠긴 · 빈 메모와 범위 밖은 빼고', () => {
   const days = collectMemories(memos, { from: '2026-10-01', to: '2026-10-31' });
   assert.deepEqual([...days.keys()], ['2026-10-03', '2026-10-04', '2026-10-05']);
   const d3 = days.get('2026-10-03');
@@ -29,13 +29,13 @@ test('추억: 날마다 메모(쓴 순서) · 사진 모음, 잠긴 · 빈 메�
   assert.deepEqual(days.get('2026-10-05').memos.map((m) => m.id), ['d'], '잠긴 메모는 빼고');
 });
 
-test('추억: 태그를 고르면 그 태그가 붙은 메모만 (대소문자 무시)', () => {
+test('회상: 태그를 고르면 그 태그가 붙은 메모만 (대소문자 무시)', () => {
   const days = collectMemories(memos, { tags: ['데이트'] });
   assert.deepEqual([...days.keys()], ['2026-10-03']);
   assert.deepEqual(days.get('2026-10-03').memos.map((m) => m.id), ['b']);
 });
 
-test('추억: 한 달 요약 · 앞뒤 날', () => {
+test('회상: 한 달 요약 · 앞뒤 날', () => {
   const days = collectMemories(memos, { from: '2026-10-01', to: '2026-10-31' });
   const s = monthSummary(days);
   assert.equal(s.days, 3);
@@ -46,13 +46,13 @@ test('추억: 한 달 요약 · 앞뒤 날', () => {
   assert.deepEqual(neighborDays(days, '2026-10-03'), { prev: null, next: '2026-10-04' });
 });
 
-test('추억: 표지 사진은 많으면 고르게 max 장', () => {
+test('회상: 표지 사진은 많으면 고르게 max 장', () => {
   const many = Array.from({ length: 20 }, (_, i) => ({ id: `m${i}`, title: `t${i}`, created: local(2026, 10, i + 1), images: [`attachments/${i}.jpg`] }));
   const s = monthSummary(collectMemories(many), 5);
   assert.deepEqual(s.cover.map((p) => p.src), ['attachments/0.jpg', 'attachments/4.jpg', 'attachments/8.jpg', 'attachments/12.jpg', 'attachments/16.jpg']);
 });
 
-test('추억: 머리말 day — 읽고 쓰기 · 잘못된 날짜는 버림', async () => {
+test('회상: 머리말 day — 읽고 쓰기 · 잘못된 날짜는 버림', async () => {
   const { parseMemoFile, serializeMemoFile, normalizeDay } = await import('../app/js/core/memo-file.js');
   const { meta, body } = parseMemoFile('---\nid: a\ncolor: blue\nday: 2026-10-03\n---\n# 일기\n');
   assert.equal(meta.day, '2026-10-03');

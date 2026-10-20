@@ -2089,9 +2089,15 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   //   checked: null = 체크리스트 풀기, 'task' = 체크리스트로(이미 체크한 항목은 그대로)
   function convertList(list, typeName, checked) {
     const v = view();
-    const target = v.state.schema.nodes[typeName];
-    if (!target) return;
     const tr = v.state.tr;
+    convertInto(tr, list, typeName, checked);
+    if (tr.docChanged) v.dispatch(tr);
+  }
+
+  // 목록 하나를 tr 안에서 바꾼다 (항목 자리는 그대로라 여러 목록을 한 tr 로 바꿔도 위치가 어긋나지 않는다)
+  function convertInto(tr, list, typeName, checked) {
+    const target = tr.doc.type.schema.nodes[typeName];
+    if (!target) return;
     if (list.node.type !== target) {
       const attrs = { ...list.node.attrs };
       if (typeName === 'ordered_list') attrs.order = list.node.attrs.order ?? 1;
@@ -2106,12 +2112,75 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       }
       pos += item.nodeSize;
     });
+  }
+
+  // 고른 범위의 목록을 모두 풀어 보통 글로 — 겹친 목록까지 (항목 안의 글 · 목록을 그 자리에 꺼내 놓기를 바깥부터 되풀이)
+  //   liftListItem 은 고른 범위가 목록 하나 안이어야 해서, 한 겹 풀고 나면 글 줄과 목록이 섞여 더 풀리지 않았다
+  function liftAllInSelection() {
+    const v = view();
+    let { from, to } = v.state.selection;
+    let tr = v.state.tr;
+    for (let i = 0; i < 32; i++) {
+      let found = null;
+      tr.doc.nodesBetween(from, to, (node, pos) => {
+        if (found) return false;
+        if (node.type.name === 'bullet_list' || node.type.name === 'ordered_list') {
+          found = { node, pos };
+          return false;
+        }
+        return true;
+      });
+      if (!found) break;
+      const content = [];
+      found.node.forEach((item) => item.forEach((child) => content.push(child)));
+      const step = tr.steps.length;
+      tr = tr.replaceWith(found.pos, found.pos + found.node.nodeSize, content);
+      const map = tr.mapping.slice(step);
+      from = map.map(from, -1);
+      to = map.map(to, 1);
+    }
+    if (!tr.docChanged) return;
+    tr.setSelection(TextSelection.between(tr.doc.resolve(Math.min(from, tr.doc.content.size)), tr.doc.resolve(Math.min(to, tr.doc.content.size))));
+    v.dispatch(tr.scrollIntoView());
+  }
+
+  // 고른 범위에 든 목록 — 항목 안에 든(겹친) 목록까지 모두
+  function listsInSelection() {
+    const { state } = view();
+    const { from, to } = state.selection;
+    const lists = [];
+    state.doc.nodesBetween(from, to, (node, pos) => {
+      if (node.type.name === 'bullet_list' || node.type.name === 'ordered_list') lists.push({ node, pos });
+    });
+    return lists;
+  }
+
+  // 겹친 목록이 든 선택: 든 목록마다 통째로 같은 종류로 — 예전에는 바깥 목록만 바뀌거나
+  //   (바깥이 이미 그 종류면) 목록이 아예 풀려 버려, 섞인 목록을 끌어 골라 한 서식으로 바꿀 수 없었다
+  //   → true 바꿈 · false 이미 모두 그 종류(부른 쪽이 풀기로) · null 겹친 목록이 아님
+  function convertNested(typeName, checked) {
+    const lists = listsInSelection();
+    const nested = lists.some((l) => lists.some((o) => o !== l && l.pos > o.pos && l.pos < o.pos + o.node.nodeSize));
+    if (!nested) return null;
+    const v = view();
+    const target = v.state.schema.nodes[typeName];
+    const fits = (item) => item.type.name !== 'list_item' || (checked === 'task' ? item.attrs.checked != null : item.attrs.checked == null);
+    if (lists.every((l) => l.node.type === target && Array.from({ length: l.node.childCount }, (_, i) => l.node.child(i)).every(fits))) return false;
+    const tr = v.state.tr;
+    for (const l of lists) convertInto(tr, l, typeName, checked);
     if (tr.docChanged) v.dispatch(tr);
+    return true;
   }
 
   function toggleList(type) {
     trimLineSelection();
     leaveHeading();
+    const nested = convertNested(type, null);
+    if (nested === true) return;
+    if (nested === false) {
+      liftAllInSelection(); // 이미 모두 그 목록 → 겹친 것까지 모두 풀기
+      return;
+    }
     const list = parentOfType(['bullet_list', 'ordered_list']);
     const items = itemsInSelection();
     const anyTask = items.some((i) => i.node.attrs.checked != null);
@@ -2138,6 +2207,12 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
 
   function toggleTask() {
     trimLineSelection();
+    const nested = convertNested('bullet_list', 'task'); // 겹친 목록까지 모두 체크리스트로
+    if (nested === true) return;
+    if (nested === false) {
+      liftAllInSelection();
+      return;
+    }
     const items = itemsInSelection();
     // 고른 항목이 모두 체크리스트면 체크리스트를 푼다
     if (items.length && items.every((i) => i.node.attrs.checked != null)) {

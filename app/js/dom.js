@@ -8,15 +8,44 @@ export function haptic(pattern) {
 // 움직임 줄이기를 켠 사람에게는 날아다니는 효과를 쉬게
 export const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** 화면이 크게 바뀌는 일(Work ↔ Life)을 부드럽게: 바꾸기 전후를 겹쳐 보인다 (base.css ::view-transition-*) — 안 되면 바로 */
+/** 화면이 크게 바뀌는 일(Work ↔ Life)을 부드럽게: 바꾸기 전후를 겹쳐 보인다 (base.css ::view-transition-*) — 안 되면 바로
+ *  @returns {Promise<void>} 바뀐 화면이 그려지기 시작할 때 (겹쳐 보이기를 못 쓰면 곧바로) */
 export function withViewTransition(update) {
-  if (reduceMotion() || typeof document.startViewTransition !== 'function' || document.hidden) return update();
+  if (reduceMotion() || typeof document.startViewTransition !== 'function' || document.hidden) {
+    update();
+    return Promise.resolve();
+  }
   try {
-    document.startViewTransition(update).ready.catch(() => {});
+    const t = document.startViewTransition(update);
+    t.ready.catch(() => {});
+    return t.updateCallbackDone.catch(() => {});
   } catch {
     update();
+    return Promise.resolve();
   }
-  return undefined;
+}
+
+/**
+ * 해 · 달 스위치 (base.css .mode-switch): 해가 달 자리까지 갈 거리(--ms-travel)를 재고 지금 모드를 보인다.
+ *   처음(아직 모드를 보인 적 없음)에는 움직이지 않고 그 자리에 둔다.
+ *   모드를 바꿀 때는 withViewTransition 이 바뀐 화면을 그리기 시작한 뒤에 부른다 — 바꾸는 동안 목록을 새로 그리느라
+ *   화면이 멈춘 사이에 움직임이 먼저 흘러가 버려, 처음 바꿀 때 해가 뚝 건너뛰어 보였다
+ */
+export function setModeSwitch(sw, mode) {
+  if (!sw) return;
+  const fit = () => {
+    const orb = parseFloat(getComputedStyle(sw, '::before').width) || 0;
+    if (sw.clientWidth && orb) sw.style.setProperty('--ms-travel', `${Math.max(0, sw.clientWidth - orb - 6)}px`);
+  };
+  if (!sw.msFit) {
+    sw.msFit = new ResizeObserver(fit);
+    sw.msFit.observe(sw);
+  }
+  fit();
+  const first = !sw.dataset.on;
+  if (first) sw.classList.add('ms-still');
+  sw.dataset.on = mode;
+  if (first) requestAnimationFrame(() => requestAnimationFrame(() => sw.classList.remove('ms-still')));
 }
 
 // 같은 애니메이션 클래스를 다시 붙여 처음부터 다시 돌린다

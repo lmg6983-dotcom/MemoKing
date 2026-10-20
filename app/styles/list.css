@@ -1025,7 +1025,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .setup .setup-where .path-box { display: inline; padding: 0; border: 0; background: none; font-family: inherit; }
 .setup .setup-where .link-btn { display: inline; margin-left: 4px; }
 
-/* 추억 달력 › 그날의 기록: 창 전체를 덮지만 맨 위 줄(Windows 창 버튼 자리)은 비운다 — 닫기 ✕ · 넘기기 단추가 창 버튼 밑에 깔리지 않게.
+/* 회상 달력 › 그날의 기록: 창 전체를 덮지만 맨 위 줄(Windows 창 버튼 자리)은 비운다 — 닫기 ✕ · 넘기기 단추가 창 버튼 밑에 깔리지 않게.
    그 줄은 그대로 잡고 창을 옮길 수 있음 */
-body > .mem-album { padding-top: 52px; } /* memories.css 보다 늦게 와도 이기게 */
-body > .mem-album::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 44px; -webkit-app-region: drag; }
+body > :is(.mem-album, .mem-preview) { padding-top: 52px; } /* memories.css 보다 늦게 와도 이기게 · 한 장으로 미리보기도 */
+body > :is(.mem-album, .mem-preview)::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 44px; -webkit-app-region: drag; }

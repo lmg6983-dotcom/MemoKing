@@ -1,6 +1,6 @@
 // 메모킹 Work / Life — 일할 때 쓰는 메모와 나머지 일상 메모를 나눠 본다 (PC · 휴대폰 같은 규칙)
 //   메모 파일 머리말의 mode: work (없으면 Life — 예전 메모는 모두 Life). 지금 보는 모드는 기기마다 따로 고른다.
-//   목록 · 검색 · 일정은 지금 모드의 메모만, 검색은 다른 모드에서 찾은 수를 함께 알려 준다. 추억 달력은 Life 에만.
+//   목록 · 검색 · 일정은 지금 모드의 메모만, 검색은 다른 모드에서 찾은 수를 함께 알려 준다. 회상 달력도 지금 모드의 메모로.
 export const MODES = ['life', 'work'];
 export const MODE_LABEL = { life: 'Life', work: 'Work' };
 export const MODE_KEY = 'memoking.mode';

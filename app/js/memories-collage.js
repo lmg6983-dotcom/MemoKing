@@ -1,4 +1,4 @@
-// 추억 "한 장으로" — 그날(또는 그 달)의 사진 · 메모를 스크랩북 한 쪽 그림(PNG)으로 (PC 복사·저장 · 휴대폰 공유)
+// 회상 "한 장으로" — 그날(또는 그 달)의 사진 · 메모를 스크랩북 한 쪽 그림(PNG)으로 (PC 복사·저장 · 휴대폰 공유)
 //   화면의 그날의 기록과 같은 모양: 줄 노트 종이 위에 테이프 붙인 폴라로이드 · 메모지 조각, 맨 아래 날짜와 "메모킹".
 //   사진은 fetch 로 받아 그린다 (img 를 바로 그리면 다른 출처 그림이라 캔버스를 내보낼 수 없다)
 import { vaultUrl } from './media.js';
@@ -214,9 +214,9 @@ function dayLabel(key) {
   return m ? `${Number(m[2])}월 ${Number(m[3])}일` : '';
 }
 
-/** 저장할 파일 이름 (예: "추억 2026-10-08.png") */
+/** 저장할 파일 이름 (예: "회상 2026-10-08.png") */
 export function collageName({ kind, photos = [], memos = [], title = '' }) {
   const key = photos[0]?.day ?? memos[0]?.day ?? '';
   const stamp = kind === 'month' ? key.slice(0, 7) : key;
-  return `추억 ${stamp || title}.png`.replace(/[\\/:*?"<>|]/g, '');
+  return `회상 ${stamp || title}.png`.replace(/[\\/:*?"<>|]/g, '');
 }

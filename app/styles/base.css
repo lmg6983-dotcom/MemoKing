@@ -760,7 +760,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal[data-view="dayGridMonth"] .cal-body [role="columnheader"] { font-size: 13px; font-weight: 800; color: var(--text-strong); }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { display: flex; justify-content: center; padding-top: 2px; font-size: 12px; line-height: 17px; font-weight: 500; color: var(--muted); }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child { font-weight: 800; }
-:root { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23d93a30' stroke-linecap='round' stroke-linejoin='round' opacity='0.8'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } /* 오늘 표시 (달력 · 추억 달력 같이) */
+:root { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23d93a30' stroke-linecap='round' stroke-linejoin='round' opacity='0.8'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } /* 오늘 표시 (달력 · 회상 달력 같이) */
 @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff6f61' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } }
 :root:where([data-theme="dark"]) { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff6f61' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); }
 /* 오늘: 날짜를 빨간 색연필로 쓱 두른 동그라미 (숫자는 진한 글자 그대로 비쳐 보이게 — 읽기 쉽고 메모지 느낌) */
@@ -1011,18 +1011,20 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   content: ""; position: absolute; z-index: 2; top: 3px; left: 3px; width: var(--orb); height: var(--orb); border-radius: 50%;
   background-color: #ffcc00;
   box-shadow: inset 0 0 0 0 #fff3c4, 0 0 0 3px rgba(255, 204, 0, 0.28), 0 0 10px 2px rgba(255, 170, 0, 0.5);
-  transition: left 0.6s var(--ms-swing), background-color 0.45s ease-out, box-shadow 0.5s ease-out;
+  /* 옮기기는 translate (화면 그리기와 따로 돌아 목록을 새로 그리는 동안에도 끊기지 않게) — 거리 --ms-travel 은 JS 가 잰다 (dom.js setModeSwitch) */
+  transition: translate 0.6s var(--ms-swing), background-color 0.45s ease-out, box-shadow 0.5s ease-out;
   animation: ms-day 0.6s var(--ease-out);
 }
-:root[data-mode="work"] .mode-switch::before {
-  left: calc(100% - var(--orb) - 3px);
+.mode-switch.ms-still::before, .mode-switch.ms-still::after, .mode-switch.ms-still .ms-scene, .mode-switch.ms-still .ms-scene::after { transition: none !important; animation: none !important; } /* 처음 그릴 때는 움직이지 않고 그 자리에 */
+.mode-switch[data-on="work"]::before {
+  translate: var(--ms-travel, 0px) 0;
   background-color: rgba(42, 61, 107, 0);
   box-shadow: inset calc(var(--orb) * -0.32) calc(var(--orb) * -0.08) 0 0 #f4f0e2, 0 0 0 3px rgba(244, 240, 226, 0.1), 0 0 10px 2px rgba(190, 210, 255, 0.35);
   animation: ms-night 0.6s var(--ease-out);
 }
-:root[data-mode="work"] .ms-scene { opacity: 1; }
-:root[data-mode="work"] .ms-scene::after { opacity: 1; transform: none; transition-delay: 0.22s; }
-:root[data-mode="work"] .mode-switch::after { opacity: 0; transform: translate(14px, 4px) scale(0.8); }
+.mode-switch[data-on="work"] .ms-scene { opacity: 1; }
+.mode-switch[data-on="work"] .ms-scene::after { opacity: 1; transform: none; transition-delay: 0.22s; }
+.mode-switch[data-on="work"]::after { opacity: 0; transform: translate(14px, 4px) scale(0.8); }
 /* 굴러가는 동안 살짝 늘어났다 통 (두 이름을 번갈아 써야 바꿀 때마다 다시 움직임) */
 @keyframes ms-night { 0% { transform: none; } 35% { transform: scale(1.18, 0.86); } 70% { transform: scale(0.94, 1.06) rotate(-12deg); } 100% { transform: none; } }
 @keyframes ms-day { 0% { transform: none; } 35% { transform: scale(1.18, 0.86); } 70% { transform: scale(0.94, 1.06) rotate(12deg); } 100% { transform: none; } }
@@ -1034,13 +1036,13 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .mode-switch button[data-mode="life"] { padding-left: calc(var(--orb) + 7px); } /* 해 자리 */
 .mode-switch button[data-mode="work"] { padding-right: calc(var(--orb) + 7px); } /* 달 자리 */
 .mode-switch button[aria-checked="true"] { color: #10294d; }
-:root[data-mode="work"] .mode-switch button { color: rgba(255, 255, 255, 0.5); }
-:root[data-mode="work"] .mode-switch button[aria-checked="true"] { color: #fff; }
+.mode-switch[data-on="work"] button { color: rgba(255, 255, 255, 0.5); }
+.mode-switch[data-on="work"] button[aria-checked="true"] { color: #fff; }
 .mode-switch button:hover:not([aria-checked="true"]) { color: #10294d; }
-:root[data-mode="work"] .mode-switch button:hover:not([aria-checked="true"]) { color: #fff; }
+.mode-switch[data-on="work"] button:hover:not([aria-checked="true"]) { color: #fff; }
 .mode-switch button:active { transform: scale(0.96); }
 @media (prefers-reduced-motion: reduce) {
-  .mode-switch::before, :root[data-mode="work"] .mode-switch::before { animation: none; transition: left 0.2s ease-out, background-color 0.2s ease-out, box-shadow 0.2s ease-out; }
+  .mode-switch::before, .mode-switch[data-on="work"]::before { animation: none; transition: translate 0.2s ease-out, background-color 0.2s ease-out, box-shadow 0.2s ease-out; }
   .mode-switch::after, .ms-scene, .ms-scene::after { transition-duration: 0.2s; transition-delay: 0s; }
 }
 

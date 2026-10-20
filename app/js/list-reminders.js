@@ -18,14 +18,13 @@ import { setupMemoriesView } from './memories-view.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
+// 보기는 둘: 캘린더(달 달력) · 회상(사진 달력). 예전의 주 · 목록 보기는 없앴다 (저장된 값이면 캘린더로)
 const VIEWS = [
-  { id: 'dayGridMonth', label: '월' },
-  { id: 'timeGridWeek', label: '주' },
-  { id: 'listMonth', label: '목록' },
-  { id: 'memories', label: '추억' }, // 사진 달력 (memories-view.js) — 달력은 월 보기로 둔 채 가리고 넘기기만 함께
+  { id: 'dayGridMonth', label: '캘린더' },
+  { id: 'memories', label: '회상' }, // 사진 달력 (memories-view.js) — 달력은 월 보기로 둔 채 가리고 넘기기만 함께
 ];
 const MEMORIES = 'memories';
-/** FullCalendar 가 쓰는 보기 (추억은 월 보기 위에 따로 그린다) */
+/** FullCalendar 가 쓰는 보기 (회상은 월 보기 위에 따로 그린다) */
 const fcView = (id) => (id === MEMORIES ? 'dayGridMonth' : id);
 const VIEW_KEY = 'memoking.calendarView';
 
@@ -58,7 +57,7 @@ function el(tag, className = '', text = '') {
  * @param {{ api: any, container: HTMLElement, countEl: HTMLElement, notify?: (text: string, isError?: boolean) => void,
  *           calendars?: { feeds, setFeeds, fetch, openUrl, exportIcs, device? } }} options
  *   calendars: 다른 캘린더 (없으면 그 기능은 숨김)
- *   memories: 추억 보기를 켠다 — { onOverlay?, collage?, on?: () => boolean } (on: 지금 보여도 되는가 — Work 에서는 숨김)
+ *   memories: 회상 보기를 켠다 — { onOverlay?, collage?, mode?: () => 'life'|'work'|null, on?: () => boolean } (mode: 그 모드의 메모로 · on: 지금 보여도 되는가)
  *   visible: 이 일정을 보일까 (Work / Life — 지금 모드의 메모 것만)
  */
 export function setupRemindersTab({ api, container, countEl, notify = (text, isError) => isError && window.alert(text), calendars = api.calendars, memories = null, visible = null }) {
@@ -437,17 +436,6 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
           return { domNodes: [t] };
         },
       },
-      timeGridWeek: { slotHeaderFormat: { hour: 'numeric' }, displayEventTime: false },
-      // 목록: 달은 위 제목에 있으니 날짜 칸은 "16일 · 금" 만 (좁은 화면을 날짜가 다 차지하지 않게)
-      //   일정은 시각을 제목 위 작은 줄로 쌓아 제목이 폭을 다 쓰게 (예전: 시각 칸이 절반을 차지해 제목이 잘림)
-      listMonth: {
-        listDayFormat: { day: 'numeric' },
-        listDayAltFormat: { weekday: 'short' },
-        listDayHeaderClass: 'mk-ldh',
-        listItemEventInnerClass: 'mk-li-in',
-        listItemEventTimeClass: 'mk-li-time',
-        listItemEventTitleClass: 'mk-li-title',
-      },
     },
   });
   calendar.render();
@@ -476,8 +464,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const key = `${viewId}|${Math.round(room / 8)}|${Math.round(w / 8)}`;
     if (key === lastFit) return;
     lastFit = key;
-    if (viewId === 'timeGridWeek') calendar.setOption('height', Math.round(Math.min(640, Math.max(260, room))));
-    else {
+    {
       calendar.setOption('height', 'auto');
       // 6주 + 요일 줄. 칸이 일정 한 줄도 못 담을 만큼 낮으면 예전처럼 날짜 + 색 점만 (compact)
       const nextCompact = viewId === 'dayGridMonth' && room / 7 < 40;
@@ -542,7 +529,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       showMemories();
       return;
     }
-    if (fcView(was) !== id) calendar.changeView(id, selected); // 추억 → 월 은 같은 보기를 다시 보이기만 (크기는 달력이 스스로 다시 잰다)
+    if (fcView(was) !== id) calendar.changeView(id, selected); // 회상 → 월 은 같은 보기를 다시 보이기만 (크기는 달력이 스스로 다시 잰다)
     fitSize();
     render();
   }
@@ -914,14 +901,15 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   return {
     refresh,
-    /** Work / Life 를 바꿨다: 그 모드의 일정만 다시 · 추억은 Life 에서만 (Work 로 가면 월 보기로, 돌아오면 다시 추억) */
+    /** Work / Life 를 바꿨다: 그 모드의 일정만 다시 · 회상도 그 모드의 메모로 다시 */
     modeChanged() {
       items = visible ? allItems.filter(visible) : allItems;
       if (viewId === MEMORIES && !memoriesOn()) setView(VIEWS[0].id, { remember: false });
       else if (memoriesOn() && storedView(viewList) === MEMORIES && viewId !== MEMORIES) setView(MEMORIES, { remember: false });
+      else if (viewId === MEMORIES) memView.refresh();
       else render();
       markView();
-      updateCount(new Date()); // 탭 숫자도 그 모드의 것으로 (추억 보기로 가면 render 를 거치지 않는다)
+      updateCount(new Date()); // 탭 숫자도 그 모드의 것으로 (회상 보기로 가면 render 를 거치지 않는다)
     },
     // + 단추 (휴대폰 일정 탭): 고른 날에 새 일정 — 지난 날을 골라 두었으면 오늘
     addEvent: () => quickAdd(selected >= today() ? selected : today()),

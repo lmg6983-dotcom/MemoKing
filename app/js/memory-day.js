@@ -1,4 +1,4 @@
-// "이 날의 기록으로" — 추억 달력에서 이 메모를 어느 날 칸에 둘지 (메모 파일의 day). 정하지 않으면 만든 날.
+// "이 날의 기록으로" — 회상 달력에서 이 메모를 어느 날 칸에 둘지 (메모 파일의 day). 정하지 않으면 만든 날.
 //   여행 기록을 다녀와서 정리할 때처럼 만든 날과 그날이 다를 때 쓴다. PC 메모 창 · 목록 카드 메뉴 · 휴대폰 메모 메뉴가 같이 쓴다.
 import { dayKey, keyDate } from './core/memories.js';
 import { icon } from './icons.js';
@@ -44,7 +44,7 @@ export function openMemoryDay({ created, day, title } = {}) {
     x.setAttribute('aria-label', '닫기');
     x.append(icon('close'));
     head.append(h, x);
-    const lead = el('p', 'md-lead', '추억 달력의 어느 날 칸에 둘까요?\n다녀와서 정리한 여행, 데이트 기록을 그날로 옮길 때 좋아요.');
+    const lead = el('p', 'md-lead', '회상 달력의 어느 날 칸에 둘까요?\n다녀와서 정리한 여행, 데이트 기록을 그날로 옮길 때 좋아요.');
     if (title) lead.prepend(el('b', 'md-title', title));
 
     const chips = el('div', 'md-chips');

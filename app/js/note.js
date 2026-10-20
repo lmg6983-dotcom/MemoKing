@@ -433,7 +433,7 @@ $('mode-btn').addEventListener('click', () => {
   closeMenu();
   moveMode(otherMode(memoMode(memo)));
 });
-// 추억 달력에서 이 메모를 둘 날 (memory-day.js)
+// 회상 달력에서 이 메모를 둘 날 (memory-day.js)
 el.dayBtn.addEventListener('click', async () => {
   closeMenu();
   await flush();
