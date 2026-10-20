@@ -13,7 +13,9 @@ body {
   gap: 8px;
   height: 44px;
   flex: none;
-  padding: 0 142px 0 16px; /* 오른쪽 142px 는 Windows 창 버튼 자리 */
+  /* 오른쪽은 창 버튼(최소화 · 최대화 · 닫기) 자리만큼만 비운다 — 창 버튼이 실제로 차지하는 폭(titlebar-area)을 쓰고, 모르면 142px.
+     오른쪽 위 단추 묶음(왕관 · 동기화 · 설정)이 창 버튼 바로 옆, 오른쪽 끝에 붙게 */
+  padding: 0 calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 142px)) + 4px) 0 16px;
   -webkit-app-region: drag;
   user-select: none;
 }

@@ -701,7 +701,10 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: #c4282e; }
 @media (prefers-color-scheme: dark) { .cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: var(--danger); } }
 .cal-body [role="gridcell"] { cursor: pointer; }
-.cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+/* 고른 날: 노란 테두리 없이 옅은 노랑 바탕이 스르르 (고를 때마다 페이드 인) */
+.cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); animation: mk-day-pick 0.24s ease-out; }
+@keyframes mk-day-pick { from { background-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .cal-body [role="gridcell"].mk-selected { animation: none; } }
 .cal-body .mk-ev { cursor: pointer; }
 /* "+2" 더 보기: 테두리 상자 대신 글자만 (일정 막대보다 눈에 덜 띄게) */
 .cal-body .mk-more { border: 0 !important; background: none !important; box-shadow: none !important; color: var(--muted); font-weight: 700; }
@@ -730,6 +733,15 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 }
 @media (prefers-color-scheme: dark) {
   .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.6' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ffd43b' stroke-linecap='round' stroke-linejoin='round' opacity='0.8'%3E%3Cpath d='M4.5 15.5c2.2 1 4.1 3.1 6 6.6 3.4-7.6 8.5-13.6 16.5-18.6' stroke-width='3.2'/%3E%3Cpath d='M6 16.6c1.8 1 3.4 2.6 4.8 5 3.9-7 8.6-12.4 15.4-16.9' stroke-width='1.6' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); mix-blend-mode: screen; }
+}
+/* 지나간 날: 날짜 위에 색연필로 그은 X (지운 날처럼 — 숫자는 비쳐 보이게) */
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div { position: relative; }
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div::after {
+  content: ""; position: absolute; left: -3px; top: -3px; width: 28px; height: 28px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='5' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.4' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='9' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23d9480f' stroke-linecap='round' opacity='0.55'%3E%3Cpath d='M6.5 6.8c4.6 4.4 9.6 9.5 15.2 14.6' stroke-width='2.4'/%3E%3Cpath d='M21.6 6.2C16.9 11 12 16.1 6.4 21.7' stroke-width='2.4'/%3E%3Cpath d='M7.8 7.6c4.2 4 8.6 8.6 13.3 13' stroke-width='1.1' opacity='.5'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; mix-blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+  .cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"].mk-past > :first-child > div::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='5' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.4' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='9' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff8a65' stroke-linecap='round' opacity='0.5'%3E%3Cpath d='M6.5 6.8c4.6 4.4 9.6 9.5 15.2 14.6' stroke-width='2.4'/%3E%3Cpath d='M21.6 6.2C16.9 11 12 16.1 6.4 21.7' stroke-width='2.4'/%3E%3Cpath d='M7.8 7.6c4.2 4 8.6 8.6 13.3 13' stroke-width='1.1' opacity='.5'/%3E%3C/g%3E%3C/svg%3E"); mix-blend-mode: screen; }
 }
 /* 날짜 숫자 칸: 22px 정사각 → 오늘의 노란 동그라미가 납작한 타원(22.7×20)이 아닌 원으로, 칸 가운데에 (달력이 붙이던 왼쪽 여백 1px 없이) */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { padding-inline: 0 !important; }
