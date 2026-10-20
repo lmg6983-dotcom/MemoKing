@@ -509,7 +509,7 @@ export async function runSmoke({
     await press(v1.win, 'Enter', '\r');
     const firstFocused = await js(v1.win, `document.activeElement?.id === 'pin-toggle' && document.getElementById('menu-btn').getAttribute('aria-expanded') === 'true'`);
     await press(v1.win, 'Down');
-    const secondFocused = await js(v1.win, `document.activeElement?.id === 'show-list'`);
+    const secondFocused = await js(v1.win, `document.activeElement?.id === 'day-btn'`);
     await press(v1.win, 'Escape');
     const backToBtn = await js(v1.win, `document.getElementById('menu').hidden && document.activeElement?.id === 'menu-btn'`);
     check('메뉴: 키보드로 열기(첫 항목) · ↓ 다음 · Esc 닫고 ⋯ 로', firstFocused && secondFocused && backToBtn, JSON.stringify([firstFocused, secondFocused, backToBtn]));
