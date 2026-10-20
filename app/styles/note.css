@@ -38,7 +38,7 @@ body, .note-screen, .share-paper {
 }
 .bar button { -webkit-app-region: no-drag; }
 .bar .status.bubbled { color: transparent; } /* 같은 말이 위 말풍선에 다 보이는 동안 (status-bubble.js) */
-.bar .status.clipped { text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; -webkit-app-region: no-drag; cursor: default; } /* 잘렸어요 — 마우스를 올려 두면 전문(title). drag 영역은 마우스가 닿지 않아 이때만 no-drag */
+.bar .status.clipped { text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; } /* 잘렸어요 — 전문은 새 말이 올 때 창 위 말풍선으로 (상태 줄은 글자가 있어도 늘 창을 끄는 자리) */
 .status {
   flex: 1;
   min-width: 0;
