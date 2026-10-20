@@ -1238,3 +1238,11 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 @media (max-width: 370px) { .searchbar .brand-mark { margin: 0 6px 0 0; } .searchbar .brand-icon { width: 22px; height: 22px; } }
 .searchbar .mode-switch button { position: relative; min-width: 42px; height: 38px; padding: 0 8px; font-size: 13px; }
 .other-mode { display: block; margin: 0 16px 8px auto; padding: 6px 0; font-size: 13.5px; }
+
+/* 동기화 단추 아래 진행 줄 (받는 중) — PC 목록 창의 구름 단추와 같은 모양 */
+.sync-btn { position: relative; }
+.sync-btn .sync-line { position: absolute; left: 10px; right: 10px; bottom: 6px; height: 2px; overflow: hidden; border-radius: 99px; background: var(--line); pointer-events: none; }
+.sync-btn .sync-line i { position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: inherit; background: var(--brand-yellow); animation: m-sync-scan 1.2s ease-in-out infinite; }
+@keyframes m-sync-scan { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+.sync-btn.syncing svg { animation: none; } /* 깜빡이던 구름 대신 진행 줄 */
+@media (prefers-reduced-motion: reduce) { .sync-btn .sync-line i { animation: none; width: 100%; opacity: 0.5; } }

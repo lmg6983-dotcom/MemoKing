@@ -528,7 +528,7 @@ class Bridge(private val activity: MainActivity) {
                     // 지금까지의 메모(휴대폰 폴더, 또는 예전 Drive 폴더의 휴대폰 사본)를 새 폴더로 함께 옮긴다
                     val target = a.getString("folderId")
                     val from = if (a.optBoolean("import")) Vaults.current(ctx)?.takeIf { DriveSync.folderId(ctx) != target } else null
-                    val status = DriveSync.use(ctx, a.getString("folderId"), a.getString("name"), from)
+                    val status = DriveSync.use(ctx, a.getString("folderId"), a.getString("name"), from, wait = !a.optBoolean("background"))
                     JSONObject().put("vault", vaultInfo()).put("status", status.json())
                 }
             }
@@ -539,7 +539,7 @@ class Bridge(private val activity: MainActivity) {
                     val api = DriveApi(ctx)
                     val folder = api.folders("root").firstOrNull { it.name == DriveSync.SYNC_FOLDER } ?: api.createFolder("root", DriveSync.SYNC_FOLDER)
                     val from = Vaults.current(ctx)?.takeIf { DriveSync.folderId(ctx) != folder.id }
-                    val status = DriveSync.use(ctx, folder.id, folder.name, from)
+                    val status = DriveSync.use(ctx, folder.id, folder.name, from, wait = !a.optBoolean("background")) // background: 처음 화면 — 바로 목록으로
                     JSONObject().put("vault", vaultInfo()).put("status", status.json()).put("folderName", folder.name)
                 }
             }

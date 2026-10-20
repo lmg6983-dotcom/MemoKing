@@ -126,17 +126,24 @@ object DriveSync {
 
     /**
      * 이 Drive 폴더를 메모 폴더로 쓴다. importFrom 을 주면 지금까지의 휴대폰 메모를 함께 올린다.
-     * 첫 동기화가 끝날 때까지 기다린다.
+     * wait: 첫 동기화가 끝날 때까지 기다린다. false 면 폴더만 정하고 바로 돌아오며 동기화는 뒤에서 (처음 화면 —
+     *   메모가 많아도 목록에 바로 들어가 쓰고, 받은 메모는 "sync" 소식으로 화면이 다시 읽는다)
      */
-    fun use(ctx: Context, folderId: String, name: String, importFrom: Storage?): Status {
+    fun use(ctx: Context, folderId: String, name: String, importFrom: Storage?, wait: Boolean = true): Status {
         val mirror = mirrorDir(ctx, folderId)
         mirror.mkdirs()
         Vaults.prefs(ctx).edit().putString(KEY_FOLDER_NAME, name).apply()
         if (importFrom != null) copyAll(importFrom, FileStorage(mirror, ""))
         Vaults.use(ctx, PREFIX + folderId)
-        val status = syncBlocking(ctx)
+        if (!wait) {
+            schedule(ctx)
+            publish(status.copy(state = "syncing", changed = false, conflicts = emptyList()))
+            request(ctx)
+            return status
+        }
+        val first = syncBlocking(ctx)
         schedule(ctx)
-        return status
+        return first
     }
 
     // 예전 메모 폴더의 파일을 새 폴더로 (같은 이름이 이미 있으면 두기)

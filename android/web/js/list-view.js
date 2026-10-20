@@ -305,7 +305,10 @@ function renderEmpty(narrowed, elsewhere = 0) {
   art.textContent = narrowed ? '🔍' : '📝';
   const text = document.createElement('span');
   const other = MODE_LABEL[otherMode(state.mode)];
-  text.textContent = narrowed && elsewhere
+  const receiving = !narrowed && document.body.dataset.sync === 'syncing'; // 첫 동기화: Drive 에서 메모를 받는 중
+  if (receiving) art.textContent = '☁️';
+  text.textContent = receiving ? 'Google Drive에서 메모를 받아 오는 중이에요.\n그동안 새 메모를 바로 써도 돼요.'
+    : narrowed && elsewhere
     ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
     : narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
