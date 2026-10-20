@@ -18,6 +18,7 @@ import { setupCoach } from './coach.js';
 import { hintOnce } from './hints.js';
 import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
 import { openMemoryDay, dayText } from './memory-day.js';
+import { renderCollage, collageName } from './memories-collage.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
@@ -991,7 +992,21 @@ const remindersTab = setupRemindersTab({
   api, container: $('reminder-groups'), countEl: $('count-reminders'),
   // 다른 캘린더 함께 보기 (읽기만): 구독은 메인이 받는다, 일정 속 주소는 브라우저로
   calendars: api.calendars && { ...api.calendars, openUrl: (url) => api.links.open(url) },
-  memories: {},
+  // 추억 "한 장으로": 그림을 복사해 두고 저장할 곳을 묻는다 (안 고르면 붙여넣기로 보낼 수 있게 복사만)
+  memories: {
+    collage: async (o) => {
+      flashStatus('그림을 만드는 중…');
+      try {
+        const base64 = await renderCollage(o);
+        await api.image.copy(base64);
+        const r = await api.image.save(null, base64, collageName(o));
+        flashStatus(r?.file ? `${r.name} 로 저장했어요 (복사도 해 두었어요)` : '그림을 복사했어요 — 붙여 넣어 보낼 수 있어요');
+      } catch (err) {
+        console.error(err);
+        flashStatus(err.message || '그림을 만들지 못했어요');
+      }
+    },
+  },
 });
 // 앱 하나를 더 모으지 않기: 이미 모은 것도 지울지 묻는다
 async function blockHistoryApp(appId, appName) {

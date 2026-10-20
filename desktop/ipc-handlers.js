@@ -806,9 +806,10 @@ export function registerIpc(ctx) {
     await writeClipboard({ png: Buffer.from(String(base64), 'base64') });
     return { ok: true };
   });
-  ipcMain.handle('image:save', async (event, id, base64) => {
-    const memo = getVault()?.get(String(id));
-    const name = `${pdfFileName(memo?.title ?? '메모').replace(/\.pdf$/i, '')}.png`;
+  // fileName: 메모가 아닌 그림(추억 한 장으로)의 이름
+  ipcMain.handle('image:save', async (event, id, base64, fileName) => {
+    const memo = id ? getVault()?.get(String(id)) : null;
+    const name = typeof fileName === 'string' && /^[^\\/:*?"<>|]{1,120}\.png$/i.test(fileName) ? fileName : `${pdfFileName(memo?.title ?? '메모').replace(/\.pdf$/i, '')}.png`;
     let file = SMOKE ? path.join(app.getPath('temp'), `memoking-smoke-${Date.now()}.png`) : null;
     if (!file) {
       const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender) ?? undefined, {

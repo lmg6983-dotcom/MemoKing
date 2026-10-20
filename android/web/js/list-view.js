@@ -9,6 +9,8 @@ import { COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog, isTwoPane, toast, adoptSheet, releaseSheet } from './ui.js';
+import { call } from './native.js';
+import { renderCollage, collageName } from '../../app/js/memories-collage.js';
 import { tutEvent } from './tutorial.js';
 import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
@@ -648,6 +650,17 @@ export function setup() {
       onOverlay: (el, close) => {
         adoptSheet(el, close);
         return () => releaseSheet(el);
+      },
+      // 한 장으로: 휴대폰 공유 창 (카카오톡 · 갤러리에 저장 …)
+      collage: async (o) => {
+        toast('그림을 만드는 중…');
+        try {
+          const base64 = await renderCollage(o);
+          await call('shareFile', { base64, name: collageName(o), mime: 'image/png', title: o.title });
+        } catch (err) {
+          console.error(err);
+          toast(err.message || '그림을 만들지 못했어요', true);
+        }
       },
     },
   });

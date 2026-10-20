@@ -202,7 +202,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
         title: `${date.getMonth() + 1}월 ${date.getDate()}일 ${'일월화수목금토'[date.getDay()]}요일`,
         sub: rec.memos.map((m) => m.title).filter(Boolean).slice(0, 3).join(' · '),
         photos: rec.photos.map((p) => ({ ...p, day: key })),
-        memos: rec.memos.filter((m) => !m.images?.length).map((m) => ({ ...m, day: key })),
+        memos: rec.memos.filter((m) => !m.images?.length || m.preview).map((m) => ({ ...m, day: key })),
         kind: 'day',
       }));
       tools.append(share);
