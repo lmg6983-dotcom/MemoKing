@@ -7,7 +7,9 @@ body {
   --cols: minmax(220px, 2.2fr) minmax(160px, 2fr) 84px 132px;
   --sel: #fff1b8;
 }
-@media (prefers-color-scheme: dark) { body { --sel: rgba(255, 205, 0, 0.18); } }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) body { --sel: rgba(255, 205, 0, 0.18); } }
+/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
+ :where(:root[data-theme="dark"]) body { --sel: rgba(255, 205, 0, 0.18); } 
 
 .finder-top { display: flex; align-items: center; gap: 12px; padding: 12px 14px 10px; border-bottom: 1px solid var(--line); }
 .finder-input {

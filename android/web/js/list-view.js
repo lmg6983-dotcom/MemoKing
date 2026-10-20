@@ -19,6 +19,7 @@ import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode } fro
 import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
+import { setListTheme } from './theme.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -82,6 +83,7 @@ export const currentMode = () => state.mode;
 
 function showMode() {
   document.documentElement.dataset.mode = state.mode;
+  setListTheme(state.mode, { noteOpen: app.isNoteOpen?.() ?? false }); // Work 는 어두운 화면 · Life 는 밝은 화면
   if (app.vault) app.vault.defaultMode = state.mode; // 새 메모도 이 모드로
   for (const b of document.querySelectorAll('#mode-switch [data-mode]')) {
     b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));

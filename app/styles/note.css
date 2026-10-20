@@ -14,8 +14,10 @@ body, .note-screen, .share-paper {
   --note-hover: rgba(17, 17, 17, 0.07);
 }
 @media (prefers-color-scheme: dark) {
-  body, .note-screen, .share-paper { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
+  :where(:root:not([data-theme="light"])) body, :where(:root:not([data-theme="light"])) .note-screen, :where(:root:not([data-theme="light"])) .share-paper { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
 }
+/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
+  :where(:root[data-theme="dark"]) body, :where(:root[data-theme="dark"]) .note-screen, :where(:root[data-theme="dark"]) .share-paper { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
 :is(body, .note-screen, .share-paper)[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.1); }
 
 .icon-btn { width: 30px; height: 30px; color: var(--note-muted); }
@@ -235,9 +237,12 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 [data-color="charcoal"] .mk-doc mark { filter: brightness(0.8); }
 [data-color="charcoal"] .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
 @media (prefers-color-scheme: dark) {
-  .mk-doc mark { filter: brightness(0.8); }
-  .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
+  :where(:root:not([data-theme="light"])) .mk-doc mark { filter: brightness(0.8); }
+  :where(:root:not([data-theme="light"])) .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
 }
+/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
+  :where(:root[data-theme="dark"]) .mk-doc mark { filter: brightness(0.8); }
+  :where(:root[data-theme="dark"]) .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
 @media print { .mk-doc :is(mark, img) { filter: none !important; } }
 
 /* 이미지 */
@@ -1376,7 +1381,9 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
 :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
 .mk-delete-btn { background: var(--surface-2); color: #c4282e; } /* 흰 바탕 위 빨간 × 를 4.5:1 넘게 (--rec #e5484d 는 3.9) */
-@media (prefers-color-scheme: dark) { .mk-delete-btn { color: #ff6b70; } }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .mk-delete-btn { color: #ff6b70; } }
+/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
+ :where(:root[data-theme="dark"]) .mk-delete-btn { color: #ff6b70; } 
 body[data-color="charcoal"] .mk-delete-btn { color: #ff6b70; }
 /* 어두운 숯색 메모 위에서도 또렷하게 */
 body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
@@ -1686,11 +1693,16 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 :is([data-color="charcoal"] .mk-annot, .mk-annot-bar[data-color="charcoal"], .ink-sheet[data-color="charcoal"][data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
 :is([data-color="charcoal"] .mk-annot, .mk-annot-bar[data-color="charcoal"], .ink-sheet[data-color="charcoal"][data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
 @media (prefers-color-scheme: dark) {
-  .mk-doc .mk-ink.bg-none:has(.ink-dark-src) .ink-light-src { display: none; }
-  .mk-doc .mk-ink.bg-none .ink-dark-src { display: block; }
-  :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
-  :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
+  :where(:root:not([data-theme="light"])) .mk-doc .mk-ink.bg-none:has(.ink-dark-src) .ink-light-src { display: none; }
+  :where(:root:not([data-theme="light"])) .mk-doc .mk-ink.bg-none .ink-dark-src { display: block; }
+  :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
+  :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
 }
+/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
+  :where(:root[data-theme="dark"]) .mk-doc .mk-ink.bg-none:has(.ink-dark-src) .ink-light-src { display: none; }
+  :where(:root[data-theme="dark"]) .mk-doc .mk-ink.bg-none .ink-dark-src { display: block; }
+  :where(:root[data-theme="dark"]) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
+  :where(:root[data-theme="dark"]) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
 @media print {
   .mk-doc .mk-ink .ink-light-src { display: block !important; }
   .mk-doc .mk-ink .ink-dark-src { display: none !important; }

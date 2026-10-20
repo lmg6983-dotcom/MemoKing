@@ -14,6 +14,7 @@ import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
 import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
 import { app } from './state.js';
+import { setTheme, restoreListTheme } from './theme.js';
 import { tutEvent, textChanged, screenChanged } from './tutorial.js';
 import { call, native } from './native.js';
 
@@ -276,6 +277,7 @@ $('banner-keep').addEventListener('click', () => {
 
 function applyMeta(next) {
   memo = { ...memo, ...next };
+  if (id) setTheme(memo.mode); // Work 메모는 어두운 화면 (메모를 닫으면 목록의 모드로 — list-view)
   el.screen.dataset.color = memo.color;
   document.body.dataset.noteColor = memo.color;
   if (!isTwoPane()) matchChrome(el.bar); // 넓은 화면은 목록과 메모가 함께 보이므로 위 막대는 목록 색
@@ -1587,6 +1589,7 @@ export function closeNote({ quiet = false } = {}) {
   editor?.destroy();
   editor = null;
   id = null;
+  restoreListTheme(); // 목록의 모드 밝기로
   screenChanged(); // 튜토리얼: 메모 단계는 끝 → 목록 단계로
   memo = null;
   pendingExternal = null;
@@ -1624,6 +1627,7 @@ export function discardAndClose() {
   editor?.destroy();
   editor = null;
   id = null;
+  restoreListTheme();
   memo = null;
   el.screen.hidden = true;
   delete document.body.dataset.noteColor;

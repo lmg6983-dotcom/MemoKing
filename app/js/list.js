@@ -72,6 +72,8 @@ const state = {
   // 필터 (창을 닫으면 잊는다): 태그는 모두 가진 메모, 색은 그중 하나, 담긴 것은 모두 해당
   filter: { tags: [], colors: [], kinds: [] },
 };
+// 처음 그릴 때부터 그 모드의 밝기로 (창을 연 쪽이 ?mode= 로 알려 준다)
+document.documentElement.dataset.theme = new URLSearchParams(location.search).get('mode') === 'work' ? 'dark' : 'light';
 let searchTimer = null;
 let drivePanel = null; // Google Drive 직접 동기화 (설정 · 처음 화면)
 
@@ -287,6 +289,7 @@ function otherModeLink(n) {
 // ---------- Work / Life 바꾸기 (제목 줄 왼쪽) ----------
 function showMode() {
   document.documentElement.dataset.mode = state.mode;
+  document.documentElement.dataset.theme = state.mode === 'work' ? 'dark' : 'light'; // Work 는 어두운 화면 · Life 는 밝은 화면
   for (const b of document.querySelectorAll('#mode-switch [data-mode]')) {
     b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));
     b.tabIndex = b.dataset.mode === state.mode ? 0 : -1;

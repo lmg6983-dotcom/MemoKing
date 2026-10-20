@@ -18,7 +18,7 @@ import { shareText } from '../app/js/core/share-text.js';
 import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
 import {
   APP_DIR, MAGIC_PRELOAD, FINDER_PRELOAD, OPMS_PRELOAD, OCR_PRELOAD,
-  webPreferences, windowIcon, noteBg, titleBarOverlay, bringToFront,
+  webPreferences, windowIcon, noteBg, listBg, titleBarOverlay, bringToFront,
   guardWindow, onScreen, defaultNoteBounds, painted, trackPaint, whenPainted, animateBounds, fadeIn,
 } from './window-utils.js';
 import {
@@ -165,7 +165,7 @@ export class WindowManager {
       show: false,
       titleBarStyle: 'hidden',
       titleBarOverlay: titleBarOverlay(),
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e0e0d' : '#f6f5f1',
+      backgroundColor: listBg(),
       ...windowIcon,
       webPreferences,
     });
@@ -194,7 +194,8 @@ export class WindowManager {
       this.ghostWin?.destroy();
       this.ghostWin = null;
     });
-    this.listWin.loadFile(path.join(APP_DIR, 'index.html'), tab ? { query: { tab } } : undefined);
+    // mode: 처음 그릴 때부터 그 모드의 밝기로 (Work 는 어둡게 — 설정을 읽기 전에 밝게 번쩍이지 않게)
+    this.listWin.loadFile(path.join(APP_DIR, 'index.html'), { query: { ...(tab ? { tab } : {}), mode: settings.mode === 'work' ? 'work' : 'life' } });
     return this.listWin;
   }
 
@@ -239,7 +240,7 @@ export class WindowManager {
       win = spare.win;
       win.setBounds(at);
       win.setTitle(memo.title);
-      win.setBackgroundColor(noteBg(memo.color));
+      win.setBackgroundColor(noteBg(memo.color, memo.mode));
     } else {
       win = new BrowserWindow({
         ...at,
@@ -249,7 +250,7 @@ export class WindowManager {
         show: false,
         title: memo.title,
         alwaysOnTop: settings.onTop[id] === true,
-        backgroundColor: noteBg(memo.color),
+        backgroundColor: noteBg(memo.color, memo.mode),
         ...windowIcon,
         webPreferences,
       });

@@ -37,7 +37,7 @@ import { quietAlarm, modeClock, normalizeHours } from '../app/js/core/work-hours
 
 import {
   APP_ICON, APP_ICON_PNG, ASSETS_DIR,
-  noteBg, titleBarOverlay, bringToFront, broadcast,
+  noteBg, titleBarOverlay, bringToFront, broadcast, setListTheme, listBg,
 } from './window-utils.js';
 
 import {
@@ -336,6 +336,9 @@ function setAppMode(mode) {
   settings.mode = mode === 'work' ? 'work' : 'life';
   saveSettings();
   if (vault) vault.defaultMode = settings.mode;
+  setListTheme(settings.mode); // Work 는 어두운 화면 — 창 버튼 줄 · 창 바탕도 함께
+  windowManager.listWin?.setTitleBarOverlay(titleBarOverlay());
+  windowManager.listWin?.setBackgroundColor(listBg());
   broadcast('mode:changed', settings.mode);
   return settings.mode;
 }
@@ -1053,7 +1056,8 @@ app.whenReady().then(async () => {
   nativeTheme.on('updated', () => {
     windowManager.listWin?.setTitleBarOverlay(titleBarOverlay());
     for (const [id, win] of windowManager.noteWins) {
-      win.setBackgroundColor(noteBg(vault?.get(id)?.color));
+      const m = vault?.get(id);
+      win.setBackgroundColor(noteBg(m?.color, m?.mode));
     }
   });
 
@@ -1086,6 +1090,7 @@ app.whenReady().then(async () => {
     if (!runSmoke) return;
     prepareSmoke(app.getPath('userData'));
     loadSettings();
+    setListTheme(settings.mode);
     initHistory();
     openVault(settings.vaultPath);
     runSmoke({
@@ -1141,6 +1146,7 @@ app.whenReady().then(async () => {
   }
 
   loadSettings();
+  setListTheme(settings.mode); // 목록 창은 지금 모드의 화면 (Work 는 어둡게)
   initHistory();
   initDrive();
 
