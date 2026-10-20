@@ -769,11 +769,12 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .rec-text { max-height: 22vh; margin-top: 8px; overflow-y: auto; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .rec-partial { color: var(--note-muted); }
 .rec-hint { color: var(--note-muted); font-size: 13px; }
-/* 목록 화면: 녹음 중 알약 (+ 버튼 위) */
+/* 목록 화면: 녹음 중 알약 (+ 버튼 위 — + 버튼 아래 끝 20px + 높이 60px + 사이 12px, 아래 탭바 위) */
 .rec-pill {
   position: absolute;
   right: 20px;
-  bottom: calc(92px + env(safe-area-inset-bottom));
+  bottom: calc(92px + var(--tabbar-h) + env(safe-area-inset-bottom));
+  z-index: 19;
   display: inline-flex; align-items: center; gap: 8px;
   height: 40px; padding: 0 14px;
   border: 0; border-radius: 999px;
@@ -782,6 +783,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
   box-shadow: 0 6px 18px color-mix(in srgb, var(--rec) 35%, transparent);
 }
 .rec-pill .rec-dot { background: #fff; box-shadow: none; }
+.fab-menu:not([hidden]) ~ .rec-pill { visibility: hidden; } /* + 메뉴를 펼친 동안은 메뉴와 겹치지 않게 */
 
 /* ---------- 추천 태그 (태그 없는 메모) — 모양은 note.css, 여기는 손가락 크기만 ---------- */
 .tag-suggest-bar { gap: 8px; padding: 4px 4px 4px 14px; animation-name: mk-drop-in; }
