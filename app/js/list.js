@@ -1087,6 +1087,7 @@ $('opms-host-form').addEventListener('submit', async (e) => {
   $('opms-host').value = r.host;
   setOpmsNote(r.host ? `저장했어요: ${r.host}` : '서버 주소를 지웠어요');
 });
+$('opms-dir-open').addEventListener('click', () => api.opms.openFolder());
 $('opms-dir-btn').addEventListener('click', async () => {
   $('opms-dir').textContent = await api.opms.chooseDir();
 });

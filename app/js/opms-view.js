@@ -354,7 +354,7 @@ function openButton(r) {
   // 아래 막대의 상태 글: 그사이 다른 사건 · 다른 탭으로 옮겼거나, 받는 중(전체 · 고른 것 받기)이면 쓰지 않는다
   const say = (idx, cls, text) => {
     const s = foot.querySelector('.op-status');
-    if (!s || tab !== 'wrapper' || current?.case.idx !== idx || (dl && !dl.done && dl.idx === idx)) return;
+    if (!s || tab !== 'wrapper' || current?.case.idx !== idx || (dls.get(idx) && !dls.get(idx).done)) return;
     s.className = `op-status ${cls}`;
     s.textContent = text;
     s.title = '';
@@ -379,8 +379,9 @@ function openButton(r) {
 }
 
 let attach = [];
-// 받는 중에 다른 탭에 다녀와도 진행 표시가 이어지고, 두 번 겹쳐 받지 않게 — { idx, text, cls, title, done }
-let dl = null;
+// 받는 중에 다른 탭 · 다른 사건에 다녀와도 진행 표시가 이어지고, 한 사건을 두 번 겹쳐 받지 않게 — 사건 idx → { text, cls, title, done, dir }
+//   (사건마다 따로: 한 사건을 받는 동안 다른 사건을 찾아 그 전자포대도 함께 받을 수 있게)
+const dls = new Map();
 async function showWrapper(my) {
   loading('전자포대 목록을 불러오는 중이에요');
   const list = await load('wrapper', api.attachments);
@@ -436,19 +437,26 @@ async function showWrapper(my) {
     dir.textContent = current.wrapperDir;
     dir.title = current.wrapperDir;
   });
+  const reveal = el('button', 'op-link', '폴더 열기');
+  reveal.type = 'button';
+  reveal.title = '전자포대 저장 폴더를 탐색기로 열기';
+  reveal.addEventListener('click', () => api.openFolder());
   const status = el('span', 'op-status');
   status.setAttribute('role', 'status');
-  const busy = () => Boolean(dl && !dl.done);
+  const caseIdx = current.case.idx;
+  const busy = () => Boolean(dls.get(caseIdx) && !dls.get(caseIdx).done);
   const paint = () => {
-    if (!dl || dl.idx !== current.case.idx) return;
+    const dl = dls.get(caseIdx);
+    if (!dl || current.case.idx !== caseIdx) return;
     status.className = `op-status ${dl.cls ?? ''}`;
     status.textContent = dl.text;
     status.title = dl.title ?? '';
     if (dl.done && dl.saved != null) {
       foot.querySelector('.op-open')?.remove();
-      const openBtn = el('button', 'op-link op-open', '폴더 열기');
+      const openBtn = el('button', 'op-link op-open', '받은 폴더 열기');
       openBtn.type = 'button';
-      openBtn.addEventListener('click', () => api.openFolder());
+      openBtn.title = dl.dir ?? '';
+      openBtn.addEventListener('click', () => api.openFolder(dl.dir));
       status.after(openBtn);
     }
   };
@@ -457,7 +465,7 @@ async function showWrapper(my) {
   const getAll = el('button', 'op-btn primary', `전체 받기 (${attach.length})`);
   getAll.type = 'button';
   getAll.disabled = !attach.length;
-  foot.replaceChildren(el('span', 'op-label', '저장 위치'), dir, change, status, getSome, getAll);
+  foot.replaceChildren(el('span', 'op-label', '저장 위치'), dir, change, reveal, status, getSome, getAll);
   paint();
 
   function sync() {
@@ -474,9 +482,9 @@ async function showWrapper(my) {
   async function run(isAll) {
     if (busy()) return;
     const uploads = boxes.filter((b) => b.checked).map((b) => b.value);
-    const idx = current.case.idx;
+    const idx = caseIdx;
     const names = new Map(attach.map((a) => [a.upload, a.name])); // 받는 사이 다른 사건을 열어도 이 사건의 이름으로 알리게
-    dl = { idx, text: '받는 중', cls: '', done: false };
+    dls.set(idx, { text: '받는 중', cls: '', done: false });
     sync();
     paint();
     try {
@@ -484,13 +492,13 @@ async function showWrapper(my) {
       const parts = [`${res.saved}개 저장`];
       if (res.skipped) parts.push(`${res.skipped}개는 이미 있음`);
       if (res.failed.length) parts.push(`${res.failed.length}개 실패`);
-      dl = {
-        idx, done: true, saved: res.saved, cls: res.failed.length ? 'err' : 'ok',
+      dls.set(idx, {
+        done: true, saved: res.saved, dir: res.dir, cls: res.failed.length ? 'err' : 'ok',
         text: `${res.failed.length ? '' : '✓ '}${parts.join(', ')}${isAll ? ', 사건정보.txt 포함' : ''}`,
         title: res.failed.map((f) => `${(f.upload && names.get(f.upload)) || f.name}: ${f.error}`).join('\n'),
-      };
+      });
     } catch (err) {
-      dl = { idx, done: true, cls: 'err', text: errText(err) };
+      dls.set(idx, { done: true, cls: 'err', text: errText(err) });
     }
     // 그사이 탭을 옮겼다 왔으면 새로 그린 막대에 (지금 보이는 것이 이 사건의 전자포대일 때만)
     if (tab === 'wrapper' && current.case.idx === idx) {
@@ -505,10 +513,11 @@ async function showWrapper(my) {
 }
 
 api.onProgress((p) => {
+  const dl = dls.get(p.idx);
   if (!dl || dl.done || !p.total || p.i >= p.total) return;
   dl.text = `받는 중 ${p.i + 1}/${p.total} ${p.name}`;
   const s = foot.querySelector('.op-status');
-  if (s && tab === 'wrapper' && current?.case.idx === dl.idx) s.textContent = dl.text;
+  if (s && tab === 'wrapper' && current?.case.idx === p.idx) s.textContent = dl.text;
 });
 
 // 새로 고침: 이 사건의 업무배분 · 청구서 · 전자포대 · 해외출원을 서버에서 다시

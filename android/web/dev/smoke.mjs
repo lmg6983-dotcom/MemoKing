@@ -2259,11 +2259,11 @@ try {
   const used = (await devLog()).log.find((l) => l.driveUse)?.driveUse;
   check('Drive: 연결하기 한 번으로 "메모킹 동기화" 폴더에 연결 (폴더 고르기 없음)', auto?.name === '메모킹 동기화' && used?.folderId === auto.folderId);
   check('Drive: 지금 휴대폰 메모를 함께 옮김', used?.importLocal === true);
-  // 고급: 연결된 뒤 "폴더 변경" 은 폴더 목록 (메모킹이 만든 폴더만)
+  // 고급: 연결된 뒤 "폴더 바꾸기" 는 폴더 목록 (메모킹이 만든 폴더만)
   if (!(await page.isVisible('#drive-connect'))) await page.tap('#settings-btn');
   await page.tap('#drive-connect');
   await page.waitForSelector('.folder-item.suggest');
-  check('Drive: 폴더 변경은 목록에서 (메모킹 동기화가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
+  check('Drive: 폴더 바꾸기는 목록에서 (메모킹 동기화가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
   await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
   // 외부 앱 메모 연동 (전체 드라이브 권한): 연결된 뒤에만 보이고 기본은 꺼짐 → 켜면 다시 허용받고 폴더를 처음부터 · 취소하면 꺼진 채 · 끄기

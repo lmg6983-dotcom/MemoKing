@@ -495,10 +495,11 @@ export function registerIpc(ctx) {
     const res = await client.download(c, items, {
       baseDir: wm.opmsSettings().wrapperDir,
       all: Boolean(all),
-      onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', p); },
+      onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', { ...p, idx: c.idx }); }, // 여러 사건을 함께 받아도 어느 사건의 진행인지 알게
     });
     for (const u of gone) res.failed.push({ upload: u, name: path.basename(u), error: 'OPMS 목록에서 사라졌어요. 새로 고침 해 주세요' });
     wm.opmsLastDir = res.dir;
+    wm.opmsDirs.add(res.dir);
     indexWrapper(res.dir);
     if (!SMOKE) shell.openPath(res.dir);
     return res;
@@ -542,7 +543,12 @@ export function registerIpc(ctx) {
     saveSettings();
     return { ok: true, host };
   });
-  ipcMain.handle('opms:open-folder', () => (wm.opmsLastDir ? shell.openPath(wm.opmsLastDir) : ''));
+  // 폴더 열기: dir 이 이번에 받은 사건 폴더면 그 폴더, 아니면 전자포대 저장 폴더 (화면이 아무 경로나 열게 하지 않는다)
+  ipcMain.handle('opms:open-folder', async (_e, dir) => {
+    const target = typeof dir === 'string' && wm.opmsDirs.has(dir) ? dir : wm.opmsSettings().wrapperDir;
+    await fs.promises.mkdir(target, { recursive: true }).catch(() => {});
+    return SMOKE ? target : shell.openPath(target);
+  });
   ipcMain.handle('opms:choose-dir', async (event) => {
     const r = await dialog.showOpenDialog(senderWindow(event), { title: '전자포대를 저장할 폴더', defaultPath: wm.opmsSettings().wrapperDir, properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return wm.opmsSettings().wrapperDir;

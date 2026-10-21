@@ -28,7 +28,7 @@ export function startConnect(done) {
     },
   });
   if (s.connected) {
-    if (s.active) openFolders(); // "폴더 변경"
+    if (s.active) openFolders(); // "폴더 바꾸기"
     else autoConnect();
   } else if (s.nativeAvailable) {
     // 휴대폰 구글 계정: 바로 계정 고르기·허용 화면으로
@@ -106,7 +106,7 @@ async function autoConnect() {
   }
 }
 
-// ---------- ③-1 폴더 바꾸기 (고급: 연결된 뒤 "폴더 변경") ----------
+// ---------- ③-1 폴더 바꾸기 (고급: 연결된 뒤 "폴더 바꾸기") ----------
 
 function openFolders() {
   path = [{ id: 'root', name: '내 드라이브' }];
@@ -260,7 +260,7 @@ export function renderStatus(s = drive.status()) {
   if (!fullBusy) $('drive-full').checked = Boolean(s.fullScope);
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;
-  $('drive-connect').textContent = s.active && s.connected ? '폴더 변경' : '연결하기';
+  $('drive-connect').textContent = s.active && s.connected ? '폴더 바꾸기' : '연결하기';
   $('drive-connect').classList.toggle('primary', !(s.active && s.connected)); // 연결 전에는 PC처럼 주 단추
 }
 

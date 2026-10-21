@@ -28,8 +28,10 @@ import {
 
 // 창 위 가장자리에 반쯤 걸쳐 붙는 스티커: 왕관(늘 위) · 셀로판 테이프(늘 아래, 바탕화면 층)
 // 목록 창 제목 줄: 스티커 가운데가 상표(아이콘+글자) 오른쪽보다 안쪽, 단추 묶음(동기화·설정 76px + 창 버튼 142px + 여백 38px) 왼쪽보다 바깥이어야 한다
-const LIST_STICKER_MIN_X = 132;
-const LIST_STICKER_RIGHT_GAP = 256;
+// 목록 창 제목 줄: 왼쪽은 로고 · Life/Work 스위치(~196px), 오른쪽은 단추 묶음 + Windows 창 버튼(~242px) — 스티커는 그 사이 빈 줄에
+const LIST_STICKER_LEFT = 200;
+const LIST_STICKER_RIGHT = 250;
+const LIST_STICKER_LOGO_X = 26; // 빈 줄이 스티커보다 좁으면 로고 위에 (메모킹 로고에 왕관 — 누를 단추를 가리지 않게)
 const STICKERS = { crown: { width: 64, height: 52 }, tape: { width: 96, height: 30 } };
 const LOST_REOPEN_MS = 3000;
 const GHOST_MARGIN = 24;
@@ -100,6 +102,7 @@ export class WindowManager {
 
     this.opmsWin = null;
     this.opmsLastDir = '';
+    this.opmsDirs = new Set(); // 이번 실행에서 받은 사건 폴더 — 이 폴더들만 '폴더 열기' 로 연다
     this.opmsCases = new Map();
     this.attachCache = new Map();
 
@@ -1147,8 +1150,12 @@ export class WindowManager {
     const size = STICKERS[kind] ?? STICKERS.crown;
     const b = owner.getBounds();
     let cx = b.width / 2;
-    // 목록 창: 오른쪽 위 단추(왕관 자리 · 동기화 · 설정)와 창 버튼을 가리지 않게, 좁으면 스티커를 왼쪽(상표 오른쪽)으로 비켜 붙인다
-    if (owner === this.listWin) cx = Math.max(LIST_STICKER_MIN_X, Math.min(cx, b.width - LIST_STICKER_RIGHT_GAP));
+    // 목록 창: Life/Work 스위치 · 오른쪽 위 단추(왕관 자리 · 동기화 · 설정) · 창 버튼을 가리지 않게 가운데 빈 줄에, 좁아서 빈 줄이 모자라면 로고 위에
+    if (owner === this.listWin) {
+      const lo = LIST_STICKER_LEFT + size.width / 2;
+      const hi = b.width - LIST_STICKER_RIGHT - size.width / 2;
+      cx = lo <= hi ? Math.max(lo, Math.min(cx, hi)) : LIST_STICKER_LOGO_X;
+    }
     return { x: Math.round(b.x + cx - size.width / 2), y: Math.round(b.y - size.height / 2), ...size };
   }
 
