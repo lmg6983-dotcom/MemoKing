@@ -239,8 +239,14 @@ for (const s of STEPS.filter((s) => s.win === 'list' && STEPS.indexOf(s) > STEPS
     await tapOn('#layout-group [data-value="rows"]', '한 줄씩');
   }
   else if (s.id === 'filters') await tapOn('#tag-strip .tag-chip[data-tag="할일"]', '#할일 태그');
-  else if (s.id === 'mode' && await page.evaluate(() => !document.getElementById('mode-switch')?.hidden)) {
-    // Work 로 바꿔 보고 다시 Life 로 (Work / Life 나누기가 켜져 있을 때)
+  else if (s.id === 'mode') {
+    // 꺼져 있으면 말풍선의 "Work / Life 나누기 켜기" 로 바로 켜고, 그 자리에서 Work 로 바꿔 보고 다시 Life 로
+    if (await page.evaluate(() => document.getElementById('mode-switch')?.hidden)) {
+      await tapOn('.coach-bubble .coach-enable', 'Work / Life 켜기');
+      await wait(500);
+      const ready = await page.evaluate(() => ({ sw: !document.getElementById('mode-switch').hidden, trying: !!document.querySelector('.coach-bubble .coach-try'), enable: !!document.querySelector('.coach-bubble .coach-enable') }));
+      check('[mode] 켜기를 누르면 스위치가 생기고 같은 단계가 직접 해 보기로', ready.sw && ready.trying && !ready.enable, JSON.stringify(ready));
+    }
     await tapOn('#mode-switch [data-mode="work"]', 'Work');
     await wait(700);
     await tapOn('#mode-switch [data-mode="life"]', 'Life');
@@ -248,6 +254,8 @@ for (const s of STEPS.filter((s) => s.win === 'list' && STEPS.indexOf(s) > STEPS
 }
 await wait(400);
 check('튜토리얼 끝: 말풍선이 사라짐', !(await stepId()));
+const after = await page.evaluate(() => ({ layout: document.getElementById('cards').dataset.layout, tags: document.querySelectorAll('#tag-strip .tag-chip[aria-pressed="true"]').length, panel: document.getElementById('filter-panel').hidden }));
+check('끝나면 연습으로 바꾼 카드 모양 · 태그 고르기 · 열어 둔 보기 칸은 처음대로', after.layout === 'grid' && after.tags === 0 && after.panel, JSON.stringify(after));
 const saved = fs.readdirSync(vault).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(vault, f), 'utf8')).find((t) => t.includes('주말 장보기 목록'));
 check('따라 하며 쓴 메모가 그대로 저장 (제목 · 체크리스트 · 예시 목록 · 태그)', saved && /- \[ \]/.test(saved) && saved.includes('- [ ] 식빵') && saved.includes('#할일'), saved);
 check('화면 오류 없음', errors.length === 0, errors.join(' | '));

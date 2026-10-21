@@ -1509,7 +1509,34 @@ api.on('vault:opened', (info) => {
 // ---------- 시작 ----------
 
 injectIcons();
-const coach = setupCoach(api);
+// 튜토리얼 뒷정리: 연습하라고 바꾸게 한 것(카드 모양 · 확대 · 태그 고르기 · Work/Life · 목록 늘 위에)은 끝나면 처음대로
+//   첫 말풍선이 이 창에 뜰 때 지금 모습을 적어 두고, 끝나거나 그만두면(tutorial:finished) 되돌린다
+let tutBefore = null;
+const coach = setupCoach(api, {
+  onStep: (step) => {
+    if (step && !tutBefore) tutBefore = { layout, zoom: listZoom, tags: [...state.filter.tags], mode: state.mode, top: Boolean(listTop), panel: !el.filterPanel.hidden };
+  },
+});
+api.on('tutorial:finished', () => {
+  const b = tutBefore;
+  tutBefore = null;
+  if (!b) return;
+  if (layout !== b.layout) {
+    layout = b.layout;
+    applyLayout();
+    try {
+      localStorage.setItem(LAYOUT_KEY, layout);
+    } catch {
+      // 지금 창에서만
+    }
+  }
+  if (listZoom !== b.zoom) setListZoom(b.zoom, { show: false });
+  state.filter.tags = b.tags;
+  if (state.workLife && state.mode !== b.mode) setMode(b.mode);
+  if (!b.top && listTop) api.win.toggleListTop();
+  if (!b.panel && !el.filterPanel.hidden) el.filterBtn.click(); // "보기"를 열어 보라고 했던 칸도 닫는다
+  render();
+});
 /** 튜토리얼 직접 해 보기: 지금 단계가 이 일을 기다리면 알린다 */
 const tutEvent = (name) => {
   if (coach.step?.advance === name) api.tutorial.event(name);

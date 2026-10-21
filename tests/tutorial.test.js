@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS, TUTORIAL_EVENTS, TUTORIAL_SAMPLE, hasTutorialSample, advanceTutorial, tutorialCounts, tutorialDone, tutorialStepFor } from '../app/js/core/tutorial.js';
+import { TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS, TUTORIAL_EVENTS, TUTORIAL_SAMPLE, hasTutorialSample, advanceTutorial, tutorialCounts, tutorialDone, tutorialStepFor, tutorialChapter, tutorialJumps } from '../app/js/core/tutorial.js';
 
 for (const [name, steps] of [['PC', TUTORIAL_STEPS], ['휴대폰', MOBILE_TUTORIAL_STEPS]]) {
   test(`${name} 튜토리얼: 단계마다 이모지 · 갈 길이 있음 · 사진 파일이 있음`, () => {
@@ -62,7 +62,9 @@ test('기능이 꺼져 있으면(needs) 직접 해 보기 없이 안내(offText)
       assert.equal(off.try, undefined);
       assert.equal(off.text, s.offText);
       assert.equal(off.next, '다음');
-      assert.equal(tutorialStepFor(s, () => true), s, '켜져 있으면 그대로');
+      const { enable, ...on } = s;
+      assert.deepEqual(tutorialStepFor(s, () => true), on, '켜져 있으면 그대로 (켜기 단추만 빠짐)');
+      if (enable) assert.deepEqual(off.enable, { need: s.needs, label: enable }, `${s.id}: 꺼져 있으면 바로 켜는 단추`);
     }
   }
   const plain = TUTORIAL_STEPS.find((s) => s.id === 'welcome');
@@ -77,4 +79,44 @@ test('PC: 매직키 · 카드 확대 · Life/Work · 목록 왕관 · 빠른 메
   assert.equal(m.mode?.advance, 'mode-switched', '휴대폰 Life/Work');
   assert.ok(m.tabs, '휴대폰 아래 탭 안내');
   for (const s of [...TUTORIAL_STEPS, ...MOBILE_TUTORIAL_STEPS]) assert.doesNotMatch(`${s.text} ${s.offText ?? ''}`, /추억|(?<!알림 )보관함/, `${s.id}: 지금 이름(회상 · 알림 보관함)으로`);
+});
+
+test('묶음(chapter): 모든 단계에 있고 같은 묶음은 붙어 있음 · 말풍선 머리에 "목록 2/7"', () => {
+  for (const steps of [TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS]) {
+    const seen = [];
+    for (const [i, s] of steps.entries()) {
+      assert.ok(s.chapter, `${s.id} 묶음`);
+      if (steps[i - 1]?.chapter !== s.chapter) {
+        assert.ok(!seen.includes(s.chapter), `${s.chapter} 가 떨어져 있음`);
+        seen.push(s.chapter);
+      }
+    }
+    assert.equal(steps[0].chapter, '시작');
+    assert.equal(steps.at(-1).chapter, '마무리');
+  }
+  const i = TUTORIAL_STEPS.findIndex((s) => s.id === 'zoom');
+  const c = tutorialChapter(TUTORIAL_STEPS, i);
+  assert.equal(c.name, '목록');
+  assert.equal(c.at, 2);
+  assert.equal(c.of, TUTORIAL_STEPS.filter((s) => s.chapter === '목록').length);
+});
+
+test('다시 볼 때 바로 가기: 목록 화면에서 시작하는 묶음만, "시작할게요"와 같은 첫 묶음은 빼고', () => {
+  for (const steps of [TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS]) {
+    const jumps = tutorialJumps(steps);
+    assert.ok(jumps.length >= 2);
+    for (const j of jumps) {
+      assert.equal(steps[j.index].chapter, j.name);
+      assert.equal(steps[j.index].win, 'list', `${j.name}: 메모 없이 시작할 수 있는 곳`);
+      assert.notEqual(steps[j.index - 1].chapter, j.name, '묶음의 첫 단계');
+      assert.ok(j.index > 1);
+    }
+  }
+  assert.deepEqual(tutorialJumps(TUTORIAL_STEPS).map((j) => j.name), ['목록', '어디서든']);
+});
+
+test('처음 말풍선 안내가 실제 단계와 맞음 (몇 분 같은 약속 없이 묶음 이름으로)', () => {
+  const pc = TUTORIAL_STEPS[0].text;
+  for (const name of new Set(TUTORIAL_STEPS.map((s) => s.chapter).filter((n) => !['시작', '마무리'].includes(n)))) assert.ok(pc.includes(name), `PC 처음 안내에 ${name}`);
+  assert.doesNotMatch(pc, /\d+분/);
 });

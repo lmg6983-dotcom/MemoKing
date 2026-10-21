@@ -213,7 +213,12 @@ export function setupCoach(api, o = {}) {
     const fill = el('i');
     fill.style.transform = `scaleX(${(step.index + 1) / step.total})`;
     bar.append(fill);
-    head.append(emoji, bar, el('span', 'coach-count', `${step.index + 1} / ${step.total}`));
+    // 몇 번째: 묶음 안에서 ("목록 2/7") — 전체는 막대와 풀이 글로
+    //   한 단계뿐인 묶음(처음 · 마무리)은 숫자 없이: 처음에는 모두 몇 단계인지, 끝에는 묶음 이름만
+    const c = step.chapter;
+    const count = el('span', 'coach-count', !c ? `${step.index + 1} / ${step.total}` : c.of > 1 ? `${c.name} ${c.at}/${c.of}` : step.index === 0 ? `모두 ${step.total}단계` : c.name);
+    count.title = `전체 ${step.total}단계 중 ${step.index + 1}번째`;
+    head.append(emoji, bar, count);
     if (step.advance) {
       // 접기·펴기 (직접 해 볼 때 가리지 않게)
       const fold = button('', 'coach-fold', 'fold');
@@ -237,12 +242,21 @@ export function setupCoach(api, o = {}) {
       parts.push(img);
     }
     if (step.advance) parts.push(el('div', 'coach-try', step.try ?? '직접 해 보세요'));
+    // 꺼진 기능은 여기서 바로 켜고 그 자리에서 해 본다 (본문 바로 아래 한 줄 — 단추 줄은 그만하기 · 다음 그대로)
+    if (step.enable) parts.push(button(step.enable.label, 'btn primary coach-enable', `enable:${step.enable.need}`));
+    // 다시 볼 때: 어디부터 볼지 (처음부터는 아래 "시작할게요")
+    if (step.jumps?.length) {
+      const row = el('div', 'coach-jumps');
+      row.append(el('span', 'coach-jumps-label', '바로 가기'));
+      for (const j of step.jumps) row.append(button(j.name, 'coach-jump', `jump:${j.index}`));
+      parts.push(row);
+    }
     // 접힌 알약에서도 이 단계만 건너뛸 수 있게 (펼치지 않아도)
     if (step.advance && step.next) parts.push(button('건너뛰기', 'coach-mini-skip', 'next'));
     const actions = el('div', 'coach-actions');
     actions.append(button(step.skip ?? '튜토리얼 그만하기', 'coach-skip', 'skip'));
     // 직접 해 보는 단계의 "다음"은 이 단계만 건너뛰기 (옅은 단추) — 안내만 하는 단계는 노란 다음
-    if (step.next) actions.append(button(step.next, step.advance ? 'btn coach-next coach-later' : 'btn primary coach-next', 'next'));
+    if (step.next) actions.append(button(step.next, step.advance || step.enable ? 'btn coach-next coach-later' : 'btn primary coach-next', 'next'));
     parts.push(actions);
     bubble.replaceChildren(...parts);
     bubble.dataset.step = step.id;
@@ -261,7 +275,7 @@ export function setupCoach(api, o = {}) {
     place();
     // 창 크기·목록 내용이 바뀌어도 따라가게
     timer = setInterval(place, 400);
-    if (!step.advance) bubble.querySelector('.coach-next')?.focus({ preventScroll: true });
+    if (!step.advance) bubble.querySelector('.coach-enable, .coach-next')?.focus({ preventScroll: true });
     if (step.id !== prevId) o.onStep?.(step);
   }
 

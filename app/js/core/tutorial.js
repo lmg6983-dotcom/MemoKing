@@ -9,6 +9,8 @@
 //   sample: 이 단계가 뜨면 메모 끝에 예시 목록(TUTORIAL_SAMPLE)을 저절로 넣는다 (옮겨 볼 줄이 있게)
 //   next: "다음" 버튼 글자. advance 와 함께 있으면 "다음에 해 볼게요" 처럼 이 단계만 건너뛰기
 //         (없으면 직접 해 봐야 넘어감 — 튜토리얼 끝내기는 언제나 있음)
+//   chapter: 묶음 이름 (말풍선 머리에 "목록 2/7" 처럼 · 다시 볼 때 어디부터 볼지 고르기) — 같은 묶음은 붙어 있다
+//   enable: 꺼져 있을 때(needs) 말풍선에서 바로 켜는 단추 글자 (켜면 그 자리에서 직접 해 보기로)
 //   needs: 이 기능이 켜져 있어야 직접 해 볼 수 있다 ('workLife' Work / Life 나누기 · 'quickMemo' Ctrl+Alt+C · 'magic' 매직키)
 //          꺼져 있으면 offText 로 안내만 하고 "다음"으로 (tutorialStepFor)
 
@@ -26,34 +28,34 @@ export function hasTutorialSample(md) {
 export const TUTORIAL_STEPS = [
   // ---------- 시작 (목록 창) ----------
   {
-    id: 'welcome', win: 'list', target: [], emoji: '👑',
+    id: 'welcome', chapter: '시작', win: 'list', target: [], emoji: '👑',
     title: '반가워요! 메모킹이에요',
-    text: '하나씩 직접 눌러 보면서 배워 볼게요. 3분이면 끝나요. 언제든 그만둘 수 있어요.',
+    text: '하나씩 직접 눌러 보면서 배워 볼게요. 쓰기, 넣기, 메모 창, 목록, 어디서든 다섯 묶음이에요. 해 보는 단계는 건너뛸 수 있고, 언제든 그만둘 수 있어요.',
     next: '시작할게요 🚀', skip: '나중에 볼게요',
   },
   {
-    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]'], advance: 'memo-created', emoji: '✨',
+    id: 'new-memo', chapter: '쓰기', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]'], advance: 'memo-created', emoji: '✨',
     title: '첫 메모를 만들어 볼까요?',
     text: '오른쪽 아래 노란 + 를 누르면 🎙️ 음성, 🎨 손, ✏️ 글 메모가 펼쳐져요.',
     try: '+ 를 누르고 "글 메모"를 골라 보세요',
   },
   // ---------- 쓰기 (메모 창) ----------
   {
-    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], advance: 'typed', emoji: '📝',
+    id: 'write', chapter: '쓰기', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], advance: 'typed', emoji: '📝',
     title: '떠오르는 생각을 적어 보세요',
     text: '첫 줄은 메모 제목이 되고, 적는 대로 저절로 저장돼요. 💾 저장 단추는 없어요!',
     try: '아무 말이나 한 줄 적어 보세요',
     next: '다음',
   },
   {
-    id: 'style', win: 'note', target: ['.format-bar .style-btn', '#format-bar'], keep: ['.ProseMirror > *', '#style-menu:not([hidden])'], advance: 'styled', emoji: '🔠',
+    id: 'style', chapter: '쓰기', win: 'note', target: ['.format-bar .style-btn', '#format-bar'], keep: ['.ProseMirror > *', '#style-menu:not([hidden])'], advance: 'styled', emoji: '🔠',
     title: '제목이나 인용으로 바꾸기',
     text: '"본문" 단추를 누르면 그 줄이 제목, 인용, 코드 모양으로 바뀌어요.',
     try: '"본문"을 누르고 "제목 2"를 골라 보세요',
     next: LATER,
   },
   {
-    id: 'lists', win: 'note', target: ['[data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *'], advance: 'tasked', emoji: '✅',
+    id: 'lists', chapter: '쓰기', win: 'note', target: ['[data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *'], advance: 'tasked', emoji: '✅',
     image: 'clear.jpg',
     title: '할 일 목록 만들기',
     text: '체크리스트 단추를 누르면 줄 앞에 네모 칸이 생겨요. 모두 끝내면 CLEAR 도장이 쾅! 🎊',
@@ -61,14 +63,14 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['.ProseMirror > ul:last-of-type', '.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], sample: true, emoji: '↕️', image: 'move.jpg',
+    id: 'move', chapter: '쓰기', win: 'note', target: ['.ProseMirror > ul:last-of-type', '.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], sample: true, emoji: '↕️', image: 'move.jpg',
     title: '줄을 옮기고 싶을 때',
     text: '연습하라고 장보기 목록을 넣어 뒀어요. 줄을 꾹 누르면 살짝 들려요. 끌어서 원하는 자리에 놓으면 끝! 키보드로는 Alt+↑↓ 예요.',
     next: '다음',
   },
   // ---------- + 로 넣기 ----------
   {
-    id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
+    id: 'add', chapter: '넣기', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     image: 'add.jpg',
     title: '+ 로 더 많은 것 넣기',
     text: '도구막대 맨 왼쪽 + 에 녹음, 손 메모, 글 위에 그리기, 사진, 파일, 표, 수식이 모여 있어요.',
@@ -76,7 +78,7 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'ink-done', emoji: '🎨',
+    id: 'ink', chapter: '넣기', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'ink-done', emoji: '🎨',
     image: 'ink.jpg',
     title: '손으로 그리기',
     text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색과 굵기, 잘못 그리면 ↩️ 되돌리기.',
@@ -84,14 +86,14 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'content', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-ctx'], advance: 'content-tools', emoji: '💾',
+    id: 'content', chapter: '넣기', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-ctx'], advance: 'content-tools', emoji: '💾',
     title: '넣은 내용 저장, 공유하기',
     text: '사진, 손 메모, 녹음, 파일, 표를 오른쪽 클릭하면 메뉴 맨 위 한 줄에 아이콘이 떠요. ✂ 잘라내기, 📋 복사, 💾 파일로 저장, 📤 공유(Drive 링크, LocalSend, 메일), 🗑 지우기.',
     try: '방금 그린 손 메모를 오른쪽 클릭하고 📋 복사 아이콘을 눌러 보세요',
     next: LATER,
   },
   {
-    id: 'annotate', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '.ProseMirror > *'], advance: 'annotate-done', emoji: '🖍️',
+    id: 'annotate', chapter: '넣기', win: 'note', target: ['#add-menu:not([hidden]) [data-add="annotate"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '.ProseMirror > *'], advance: 'annotate-done', emoji: '🖍️',
     image: 'annotate.jpg',
     title: '글 위에 바로 그리기',
     text: '"글 위에 그리기"로 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요.',
@@ -99,13 +101,13 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'voice', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], emoji: '🎙️', image: 'voice.jpg',
+    id: 'voice', chapter: '넣기', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], emoji: '🎙️', image: 'voice.jpg',
     title: '말로 메모하기',
     text: '"음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. (Ctrl+Shift+R)',
     next: '다음',
   },
   {
-    id: 'tag', win: 'note', target: ['.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror > *', '.tag-suggest', '.tag-suggest-bar:not([hidden])'], advance: 'tagged', emoji: '🏷️',
+    id: 'tag', chapter: '넣기', win: 'note', target: ['.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror > *', '.tag-suggest', '.tag-suggest-bar:not([hidden])'], advance: 'tagged', emoji: '🏷️',
     title: '#으로 태그 달기',
     text: '같은 태그가 붙은 메모끼리 모아 볼 수 있어요. #을 치면 전에 쓴 태그도 골라 쓸 수 있어요.',
     try: '#할일 처럼 적어 보세요',
@@ -113,7 +115,7 @@ export const TUTORIAL_STEPS = [
   },
   // ---------- 위 막대 ----------
   {
-    id: 'crown', win: 'note', target: ['#top-btn'], keep: ['#tape-btn:not([hidden])'], advance: 'crown-on', emoji: '👑',
+    id: 'crown', chapter: '메모 창', win: 'note', target: ['#top-btn'], keep: ['#tape-btn:not([hidden])'], advance: 'crown-on', emoji: '👑',
     title: '늘 위에, 또는 바탕화면에',
     text: '👑 왕관: 다른 창에 가려지지 않게 늘 위에. 🩹 테이프(옆 단추): 바탕화면에 붙여 다른 창 뒤에. 둘 중 하나만 붙고, 창 위의 스티커를 누르면 떼어져요.',
     noTape: '왕관을 누르면 이 메모가 다른 창에 가려지지 않아요. 창 위에 붙은 왕관 스티커를 누르거나 Ctrl+Shift+T 를 다시 누르면 떼어져요.',
@@ -121,73 +123,74 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'bell', win: 'note', target: ['#bell-btn', '.bar'], emoji: '⏰',
+    id: 'bell', chapter: '메모 창', win: 'note', target: ['#bell-btn', '.bar'], emoji: '⏰',
     title: '잊지 않게 알림 맞추기',
     text: '종 단추로 원하는 날짜와 시간에 이 메모를 알려 드려요. 매일, 매주 되풀이도 돼요.',
     next: '다음',
   },
   {
-    id: 'hotkey', win: 'note', target: ['#hotkey-btn', '.bar'], emoji: '⚡',
+    id: 'hotkey', chapter: '메모 창', win: 'note', target: ['#hotkey-btn', '.bar'], emoji: '⚡',
     title: '어디서든 불러오는 키',
     text: '번개 단추로 Ctrl+Alt+숫자 키를 정해 두면 다른 앱을 쓰다가도 이 메모를 바로 불러와요. 정한 숫자가 번개 옆에 작게 보여요.',
     next: '다음',
   },
   {
-    id: 'bar', win: 'note', target: ['#new-btn', '.bar'], emoji: '🗂️', image: 'stack.jpg',
+    id: 'bar', chapter: '메모 창', win: 'note', target: ['#new-btn', '.bar'], emoji: '🗂️', image: 'stack.jpg',
     title: '한 창에 여러 메모',
     text: '왼쪽 위 + 를 누르면 새 메모가 이 창의 탭으로 열려요. 탭은 창 왼쪽에 색인처럼 붙어요.',
     next: '다음',
   },
   {
-    id: 'close', win: 'note', target: ['#close-btn'], advance: 'note-closed', emoji: '↩️',
+    id: 'close', chapter: '메모 창', win: 'note', target: ['#close-btn'], advance: 'note-closed', emoji: '↩️',
     title: '다 적었으면 닫아 볼까요',
     text: '적은 내용은 이미 저장되어 있으니 걱정하지 않아도 돼요.',
     try: '오른쪽 위 × 를 눌러 닫아 보세요',
   },
   // ---------- 목록 ----------
   {
-    id: 'cards', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
+    id: 'cards', chapter: '목록', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
     title: '메모는 모두 여기에',
     text: '방금 쓴 메모가 카드로 보여요. 카드를 누르면 다시 열리고, 목록 밖으로 끌어다 놓으면 그 자리에 열려요.',
     next: '다음',
   },
   {
-    id: 'zoom', win: 'list', target: ['#cards .card', '#cards'], keep: ['#cards', '.zoom-badge'], advance: 'list-zoomed', emoji: '🔍',
+    id: 'zoom', chapter: '목록', win: 'list', target: ['#cards .card', '#cards'], keep: ['#cards', '.zoom-badge'], advance: 'list-zoomed', emoji: '🔍',
     title: '카드를 크게, 작게',
     text: 'Ctrl 을 누른 채 마우스 휠을 굴리면 메모 카드가 커지고 작아져요. Ctrl 과 + − 키도 돼요. 글씨가 작게 느껴질 때 써 보세요.',
     try: 'Ctrl 을 누른 채 휠을 위로 굴려 보세요',
     next: LATER,
   },
   {
-    id: 'layout', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
+    id: 'layout', chapter: '목록', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
     text: '"보기" 단추에서 카드를 바둑판처럼 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 고를 수 있어요.',
     try: '"보기"를 누르고 "한 줄씩"을 골라 보세요',
     next: LATER,
   },
   {
-    id: 'filters', win: 'list', target: ['#tag-strip:not([hidden])', '#filter-btn'], keep: ['#tag-strip:not([hidden]) .tag-chip'], advance: 'tag-filtered', emoji: '🔎',
+    id: 'filters', chapter: '목록', win: 'list', target: ['#tag-strip:not([hidden])', '#filter-btn'], keep: ['#tag-strip:not([hidden]) .tag-chip'], advance: 'tag-filtered', emoji: '🔎',
     title: '원하는 메모만 보기',
     text: '태그를 누르면 그 태그가 붙은 메모만 보여요. "보기" 단추로 색이나 사진으로도 골라요.',
     try: '방금 만든 #태그를 눌러 보세요',
     next: LATER,
   },
   {
-    id: 'mode', win: 'list', target: ['#mode-switch:not([hidden])'], keep: ['#mode-switch'], needs: 'workLife', advance: 'mode-switched', emoji: '🌗',
+    id: 'mode', chapter: '목록', win: 'list', target: ['#mode-switch:not([hidden])'], keep: ['#mode-switch'], needs: 'workLife', advance: 'mode-switched', emoji: '🌗',
     title: '일할 때는 Work, 쉴 때는 Life',
     text: '왼쪽 위 해와 달 스위치로 일할 때 쓰는 메모(Work)와 일상 메모(Life)를 나눠 봐요. Work 는 밤처럼 어두운 화면이고, 새 메모도 지금 모드로 들어가요.',
     try: '스위치를 눌러 Work 로 바꿔 보고, 다시 눌러 Life 로 돌아와 보세요',
-    offText: '설정의 "Work / Life 나누기"를 켜면 왼쪽 위에 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 보고, 업무 시간에 저절로 Work 로 바꿀 수도 있어요.',
+    enable: 'Work / Life 나누기 켜기',
+    offText: '"Work / Life 나누기"를 켜면 왼쪽 위에 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 보고, 업무 시간에 저절로 Work 로 바꿀 수도 있어요.',
     next: LATER,
   },
   {
-    id: 'tabs', win: 'list', target: ['.tabs'], emoji: '🔔',
+    id: 'tabs', chapter: '목록', win: 'list', target: ['.tabs'], emoji: '🔔',
     title: '일정과 알림은 한곳에서',
     text: '"일정"에서는 캘린더로 일정과 미리 알림을, 회상으로 그날의 사진과 메모를 봐요. "알림 보관함"에는 지나간 Windows 알림이 모여요.',
     next: '다음',
   },
   {
-    id: 'list-crown', win: 'list', target: ['#list-top-btn'], advance: 'list-crown-on', emoji: '👑',
+    id: 'list-crown', chapter: '목록', win: 'list', target: ['#list-top-btn'], advance: 'list-crown-on', emoji: '👑',
     title: '목록도 늘 위에',
     text: '목록 창도 왕관을 누르면 다른 창에 가려지지 않아요. 창 위에 왕관 스티커가 붙고, 창이 좁거나 화면 끝이면 작아져서 이 자리에 들어가요. 스티커나 작은 왕관을 누르면 떼어져요.',
     try: '오른쪽 위 왕관을 눌러 보세요',
@@ -195,7 +198,7 @@ export const TUTORIAL_STEPS = [
   },
   // ---------- 어디서든 ----------
   {
-    id: 'quick', win: 'list', target: [], needs: 'quickMemo', advance: 'quick-memo', emoji: '⚡',
+    id: 'quick', chapter: '어디서든', win: 'list', target: [], needs: 'quickMemo', advance: 'quick-memo', emoji: '⚡',
     title: '어디서든 바로 메모 (Ctrl+Alt+C)',
     text: '웹 페이지나 문서에서 글을 고르고 Ctrl+Alt+C, 곧바로 메모가 돼요. 파일이나 그림을 고르고 눌러도 돼요.',
     try: '웹 브라우저나 메모장에서 글을 조금 끌어 고르고 Ctrl+Alt+C 를 눌러 보세요',
@@ -203,7 +206,7 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'capture', win: 'list', target: [], needs: 'quickMemo', advance: 'capture-done', emoji: '✂️',
+    id: 'capture', chapter: '어디서든', win: 'list', target: [], needs: 'quickMemo', advance: 'capture-done', emoji: '✂️',
     title: '화면을 잘라 메모하기',
     text: 'Ctrl+Alt+C 를 빠르게 두 번! 화면이 멈추면 담고 싶은 곳을 끌어서 잘라요. 자른 그림이 바로 메모가 돼요.',
     try: 'Ctrl+Alt+C 를 빠르게 두 번 누르고, 아무 곳이나 네모로 끌어 보세요',
@@ -211,7 +214,7 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'magic', win: 'list', target: [], needs: 'magic', advance: 'magic-tried', emoji: '🔮',
+    id: 'magic', chapter: '어디서든', win: 'list', target: [], needs: 'magic', advance: 'magic-tried', emoji: '🔮',
     title: '무엇이든 찾기, 매직키 (Ctrl+Alt+Space)',
     text: '어느 앱을 쓰다가도 Ctrl+Alt+Space! 메모와 파일을 몇 글자로 찾아요. 찾는 게 없으면 Enter, 적은 말이 바로 메모가 돼요.',
     try: 'Ctrl+Alt+Space 를 누르고 "튜토리얼"을 쳐 보세요. 방금 쓴 메모가 보이면 Esc 로 닫아요',
@@ -219,15 +222,15 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'settings', win: 'list', target: ['#settings-btn'], emoji: '⚙️',
+    id: 'settings', chapter: '어디서든', win: 'list', target: ['#settings-btn'], emoji: '⚙️',
     title: '내게 맞게 바꾸기',
     text: '휴지통, 음성 받아쓰기, 알림 보관, Work / Life 나누기, 단축키는 설정에 있어요. 이 안내도 설정에서 언제든 다시 볼 수 있어요.',
     next: '다음',
   },
   {
-    id: 'done', win: 'list', target: [], emoji: '🎉',
+    id: 'done', chapter: '마무리', win: 'list', target: [], emoji: '🎉',
     title: '준비 끝!',
-    text: '이제 마음껏 적어 보세요. 창을 닫아도 메모킹은 작업 표시줄 오른쪽 아래(^)에서 기다리고 있어요.',
+    text: '연습하며 바꾼 보기, 카드 크기, 태그 고르기, 목록 늘 위에 두기는 처음대로 돌려 놓을게요. 창을 닫아도 메모킹은 작업 표시줄 오른쪽 아래(^)에서 기다리고 있어요.',
     next: '메모 쓰러 가기 ✏️',
   },
 ];
@@ -235,27 +238,27 @@ export const TUTORIAL_STEPS = [
 // 휴대폰: 같은 말풍선, 휴대폰 화면에 맞춘 단계 (목록 화면 ↔ 메모 화면)
 export const MOBILE_TUTORIAL_STEPS = [
   {
-    id: 'welcome', win: 'list', target: [], emoji: '👑',
+    id: 'welcome', chapter: '시작', win: 'list', target: [], emoji: '👑',
     title: '반가워요! 메모킹이에요',
-    text: '직접 눌러 보며 배워요. 언제든 그만둘 수 있어요.',
+    text: '직접 눌러 보며 배워요. 쓰기, 넣기, 목록 같은 묶음으로 나뉘어 있고, 언제든 그만둘 수 있어요.',
     next: '시작할게요 🚀', skip: '나중에 볼게요',
   },
   {
-    id: 'new-memo', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]', '#fab'], advance: 'memo-created', emoji: '✨',
+    id: 'new-memo', chapter: '쓰기', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]', '#fab'], advance: 'memo-created', emoji: '✨',
     title: '첫 메모를 만들어 볼까요?',
     text: '노란 + 를 누르면 🎙️ 음성, 🎨 손, ✏️ 글 메모가 펼쳐져요.',
     try: '+ 를 누르고 "글 메모"를 골라 보세요',
   },
   // 글 쓰는 단계: 쓰는 줄과 그 아래(write) · 도구막대는 비워 두고, 다 쓰고 손을 멈추면 넘어간다 (치는 도중엔 그대로)
   {
-    id: 'write', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], write: true, advance: 'typed', emoji: '📝',
+    id: 'write', chapter: '쓰기', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], write: true, advance: 'typed', emoji: '📝',
     title: '떠오르는 생각을 적어 보세요',
     text: '첫 줄은 제목이 되고, 적는 대로 저절로 저장돼요.',
     try: '한 줄 적어 보세요. 다 쓰고 손을 떼면 다음으로',
     next: '다음',
   },
   {
-    id: 'lists', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], write: true, advance: 'tasked', emoji: '✅',
+    id: 'lists', chapter: '쓰기', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], write: true, advance: 'tasked', emoji: '✅',
     image: 'm-clear.jpg',
     title: '할 일 목록 만들기',
     text: '체크리스트 단추를 누르면 네모 칸이 생겨요. 줄바꿈이나 쓰던 줄 아래를 누르면 다음 칸이 이어지고, 모두 끝내면 CLEAR 도장! 🎊',
@@ -263,108 +266,109 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
-    id: 'move', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.ProseMirror > *', '.mode-knob'], sample: true, advance: 'mode-moved', emoji: '↕️', image: 'm-move.jpg',
+    id: 'move', chapter: '쓰기', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.ProseMirror > *', '.mode-knob'], sample: true, advance: 'mode-moved', emoji: '↕️', image: 'm-move.jpg',
     title: '다이얼로 옮기기',
     text: '오른쪽 아래 다이얼로 글 고치기, 옮기기, 글 위에 그리기를 골라요. 옮기기에서는 줄, 사진, 표를 짧게 눌러 끌면 돼요 (연습용 장보기 목록을 넣어 뒀어요). 글을 복사하거나 고칠 땐 글 고치기로.',
     try: '오른쪽 아래 다이얼을 한 번 눌러 옮기기로 돌려 보세요',
     next: LATER,
   },
   {
-    id: 'add', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
+    id: 'add', chapter: '넣기', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     title: '+ 로 더 많은 것 넣기',
     text: '왼쪽 아래 둥근 + 에 녹음, 손 메모, 사진, 파일, 표, 수식이 모여 있어요. 펼치면 키보드는 잠깐 닫혀요.',
     try: '왼쪽 아래 + 를 눌러 펼쳐 보세요',
     next: LATER,
   },
   {
-    id: 'ink', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'ink-done', emoji: '🎨',
+    id: 'ink', chapter: '넣기', win: 'note', target: ['#add-menu:not([hidden]) [data-add="ink"]', '#add-btn'], keep: ['#add-menu:not([hidden]) .add-sat', '#add-btn'], advance: 'ink-done', emoji: '🎨',
     title: '손으로 그리기',
     text: '그린 만큼의 그림이 메모에 들어가요. 펜을 한 번 더 누르면 색과 굵기를 골라요.',
     try: '"손 메모"를 눌러 쓱 그리고 ✓ 완료',
     next: LATER,
   },
   {
-    id: 'annotate', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.mode-knob', '.mode-knob.open .mk-stop', '.mk-annot-bar'], advance: 'annotate-done', emoji: '🖍️', // 펼친 다이얼 칸(그리기)도 가리지 않게
+    id: 'annotate', chapter: '넣기', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.mode-knob', '.mode-knob.open .mk-stop', '.mk-annot-bar'], advance: 'annotate-done', emoji: '🖍️', // 펼친 다이얼 칸(그리기)도 가리지 않게
     title: '글 위에 바로 그리기',
     text: '다이얼을 글 위에 그리기로 돌리면 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요. 다 그렸으면 다이얼을 한 번 더 눌러 글 고치기로 돌리면 저장돼요.',
     try: '다이얼을 누르면 둘레에 칸이 펼쳐져요. 맨 위 그리기를 눌러 글 위에 쓱 긋고, 다이얼을 다시 눌러 끝내요',
     next: LATER,
   },
   {
-    id: 'voice', win: 'note', target: ['#add-btn', '#format-bar'], emoji: '🎙️', image: 'm-voice.jpg',
+    id: 'voice', chapter: '넣기', win: 'note', target: ['#add-btn', '#format-bar'], emoji: '🎙️', image: 'm-voice.jpg',
     title: '말로 메모하기',
     text: '+ 단추에서 "음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
     next: '다음',
   },
   {
-    id: 'tag', win: 'note', target: ['.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror > *', '.tag-suggest', '.tag-suggest-bar:not([hidden])'], write: true, advance: 'tagged', emoji: '🏷️',
+    id: 'tag', chapter: '넣기', win: 'note', target: ['.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror > *', '.tag-suggest', '.tag-suggest-bar:not([hidden])'], write: true, advance: 'tagged', emoji: '🏷️',
     title: '#으로 태그 달기',
     text: '같은 태그가 붙은 메모끼리 모아 볼 수 있어요. 아래에 추천 태그도 떠요.',
     try: '#할일 처럼 적어 보세요',
     next: LATER,
   },
   {
-    id: 'bell', win: 'note', target: ['#bell-btn'], keep: ['#links-btn'], emoji: '⏰',
+    id: 'bell', chapter: '메모 화면', win: 'note', target: ['#bell-btn'], keep: ['#links-btn'], emoji: '⏰',
     title: '알림과 이어 두기',
     text: '⏰ 종: 원하는 날짜와 시간에 이 메모를 알려 줘요 (매일, 매주도). 🔗 고리: 관련 메모를 이어 둬요.',
     next: '다음',
   },
   {
-    id: 'back', win: 'note', target: ['#back-btn'], advance: 'note-closed', emoji: '↩️',
+    id: 'back', chapter: '메모 화면', win: 'note', target: ['#back-btn'], advance: 'note-closed', emoji: '↩️',
     title: '목록으로 돌아가요',
     text: '적은 내용은 이미 저장되어 있어요. 휴대폰의 뒤로 가기를 눌러도 돼요.',
     try: '왼쪽 위 단추를 눌러 보세요',
   },
   {
-    id: 'cards', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
+    id: 'cards', chapter: '목록', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
     title: '메모는 모두 여기에',
     text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유, 색, 지우기)가 떠요. 왼쪽으로 밀면 지우기예요.',
     next: '다음',
   },
   {
-    id: 'layout', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
+    id: 'layout', chapter: '목록', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
     text: '"보기" 단추에서 카드를 두 줄로 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 골라요.',
     try: '"보기"를 누르고 "한 줄씩"을 골라 보세요',
     next: LATER,
   },
   {
-    id: 'filters', win: 'list', target: ['#tag-strip:not([hidden])'], keep: ['#tag-strip:not([hidden]) .tag-chip'], advance: 'tag-filtered', emoji: '🔎',
+    id: 'filters', chapter: '목록', win: 'list', target: ['#tag-strip:not([hidden])'], keep: ['#tag-strip:not([hidden]) .tag-chip'], advance: 'tag-filtered', emoji: '🔎',
     title: '원하는 메모만 보기',
     text: '태그를 누르면 그 태그가 붙은 메모만 보여요. 한 번 더 누르면 다시 모두 보여요.',
     try: '방금 만든 #태그를 눌러 보세요',
     next: LATER,
   },
   {
-    id: 'mode', win: 'list', target: ['#mode-switch:not([hidden])'], keep: ['#mode-switch'], needs: 'workLife', advance: 'mode-switched', emoji: '🌗',
+    id: 'mode', chapter: '목록', win: 'list', target: ['#mode-switch:not([hidden])'], keep: ['#mode-switch'], needs: 'workLife', advance: 'mode-switched', emoji: '🌗',
     title: '일할 때는 Work, 쉴 때는 Life',
     text: '검색 줄 옆 해와 달 스위치로 일할 때 쓰는 메모(Work)와 일상 메모(Life)를 나눠 봐요. Work 는 밤처럼 어두운 화면이에요.',
     try: '스위치를 눌러 Work 로 바꿔 보고, 다시 눌러 Life 로 돌아와 보세요',
-    offText: '설정의 "Work / Life 나누기"를 켜면 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 볼 수 있어요.',
+    enable: 'Work / Life 나누기 켜기',
+    offText: '"Work / Life 나누기"를 켜면 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 볼 수 있어요.',
     next: LATER,
   },
   {
-    id: 'tabs', win: 'list', target: ['.tabs'], emoji: '🔔',
+    id: 'tabs', chapter: '목록', win: 'list', target: ['.tabs'], emoji: '🔔',
     title: '아래 탭으로 오가기',
     text: '메모, 일정, 알림 보관함 탭이 아래에 있어요. 일정에서는 캘린더와 회상(그날의 사진과 메모)을, 알림 보관함에서는 지나간 알림을 봐요.',
     next: '다음',
   },
   {
-    id: 'share', win: 'list', target: [], emoji: '📤',
+    id: 'share', chapter: '함께 쓰기', win: 'list', target: [], emoji: '📤',
     title: '다른 앱에서 바로 담기',
     text: '인터넷, 사진, 녹음 앱에서 "공유"에서 "메모킹"을 누르면 바로 메모가 돼요.',
     next: '다음',
   },
   {
-    id: 'settings', win: 'list', target: ['#settings-btn'], emoji: '☁️',
+    id: 'settings', chapter: '함께 쓰기', win: 'list', target: ['#settings-btn'], emoji: '☁️',
     title: 'PC와 함께 쓰기',
     text: '설정에서 Google Drive를 연결하면 PC 메모킹과 메모가 맞춰져요. 이 안내도 설정에서 다시 볼 수 있어요.',
     next: '다음',
   },
   {
-    id: 'done', win: 'list', target: [], emoji: '🎉',
+    id: 'done', chapter: '마무리', win: 'list', target: [], emoji: '🎉',
     title: '준비 끝!',
-    text: '이제 마음껏 적어 보세요. 떠오를 때 바로, 메모킹과 함께 👑',
+    text: '연습하며 바꾼 보기와 태그 고르기는 처음대로 돌려 놓을게요. 떠오를 때 바로, 메모킹과 함께 👑',
     next: '메모 쓰러 가기 ✏️',
   },
 ];
@@ -382,9 +386,35 @@ export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'ad
  * @param {(need: string) => boolean} has 그 기능이 켜져 있는가
  */
 export function tutorialStepFor(step, has) {
-  if (!step?.needs || has(step.needs)) return step;
-  const { advance, try: _try, offText, ...rest } = step;
-  return { ...rest, text: offText ?? step.text, next: '다음' };
+  if (!step?.needs || has(step.needs)) {
+    if (!step?.enable) return step;
+    const { enable, ...on } = step; // 켜져 있으면 켜기 단추는 없다
+    return on;
+  }
+  const { advance, try: _try, offText, enable, ...rest } = step;
+  return { ...rest, text: offText ?? step.text, next: '다음', ...(enable ? { enable: { need: step.needs, label: enable } } : {}) };
+}
+
+/** 지금 단계의 묶음: 이름 · 묶음 안에서 몇 번째(at) · 묶음의 단계 수(of) */
+export function tutorialChapter(steps, index) {
+  const name = steps[index]?.chapter;
+  if (!name) return null;
+  const same = steps.map((s, i) => [s, i]).filter(([s]) => s.chapter === name);
+  return { name, at: same.findIndex(([, i]) => i === index) + 1, of: same.length };
+}
+
+/**
+ * 다시 볼 때 어디부터 볼지: 목록 화면에서 시작하는 묶음만 (메모 화면 묶음은 메모를 만드는 "쓰기"부터)
+ * @returns {{ name: string, index: number }[]}
+ */
+export function tutorialJumps(steps) {
+  const out = [];
+  for (const [i, s] of steps.entries()) {
+    if (!s.chapter || s.chapter === '시작' || s.chapter === '마무리' || out.some((j) => j.name === s.chapter)) continue;
+    if (steps[i - 1]?.chapter === s.chapter) continue; // 묶음의 첫 단계만
+    if (s.win === 'list' && i > 1) out.push({ name: s.chapter, index: i }); // 바로 다음 묶음은 "시작할게요"와 같다
+  }
+  return out;
 }
 
 /**

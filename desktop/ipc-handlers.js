@@ -74,6 +74,7 @@ export function registerIpc(ctx) {
     updateState,
     tutorialWin,
     tutorialEvent,
+    tutorialAction,
     purgeTrash,
     TRASH_DAYS,
     getStt,
@@ -186,6 +187,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('tutorial:action', (_e, action) => {
     if (action === 'next' || action === 'skip') tutorialEvent(action);
+    else tutorialAction(action); // jump:<번호> · enable:workLife
   });
   ipcMain.handle('tutorial:event', (_e, name) => {
     if (TUTORIAL_EVENTS.includes(name) && name !== 'memo-created' && name !== 'note-closed') tutorialEvent(name);

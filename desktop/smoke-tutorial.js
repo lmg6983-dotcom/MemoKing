@@ -249,6 +249,12 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await next(list, 'done');
     const finished = await until(async () => !getTutorial().active && (await stepOf(list())) === null, '튜토리얼 끝').then(() => true).catch(() => false);
     check('끝까지 따라 하면 말풍선이 사라지고 끝', finished);
+    // 뒷정리: 연습하며 바꾼 카드 모양 · 확대 · 태그 고르기 · 목록 늘 위에는 처음대로
+    const after = await until(() => js(list(), `(() => {
+      const r = { layout: document.getElementById('cards').dataset.layout, zoom: document.body.dataset.listZoom, tags: [...document.querySelectorAll('#tag-strip .tag-chip[aria-pressed="true"]')].length, top: document.getElementById('list-top-btn').getAttribute('aria-pressed'), mode: document.documentElement.dataset.mode, panel: document.getElementById('filter-panel').hidden };
+      return r.layout === 'grid' && r.tags === 0 && r.top === 'false' && r.panel ? r : null;
+    })()`), '뒷정리', 3000).catch(() => null);
+    check('끝나면 연습으로 바꾼 것은 처음대로 (격자 · 태그 고르기 없음 · 늘 위 아님 · Life)', after && after.zoom === '1' && after.mode === 'life' && !list().isAlwaysOnTop(), JSON.stringify(after));
     const body = vault.get(memoId)?.body ?? '';
     check('따라 한 결과가 메모에 그대로 (체크리스트 · 손 메모 · 태그)', /\[[ x]\]/.test(body) && /!\[손 메모\]/.test(body) && /#할일/.test(body), body);
 
