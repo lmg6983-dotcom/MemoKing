@@ -497,11 +497,19 @@ function setTab(tab) {
   $('fab').setAttribute('aria-label', tab === 'reminders' ? '새 일정' : '새 메모');
   if (tab === 'reminders') $('fab').removeAttribute('aria-haspopup');
   else $('fab').setAttribute('aria-haspopup', 'menu');
-  if (tab === 'reminders') {
-    remindersTab.setQuery(el.search.value, { quiet: true }); // 달력은 refresh 가 한 번만 그린다
-    remindersTab.refresh();
-  } else runSearch();
+  // 무거운 일(달력 · 카드 다시 그리기)은 탭 표시가 먼저 바뀐 다음 프레임에 — 누른 손가락 아래에서 탭이 바로 바뀌게
+  //   (예전: 누르는 순간 목록 카드 전체를 다시 그려 150ms 넘게 멈춘 뒤에야 탭이 바뀌어 끊겨 보였다)
+  const my = ++tabSeq;
+  requestAnimationFrame(() => setTimeout(() => {
+    if (my !== tabSeq || state.tab !== tab) return; // 그사이 다른 탭을 눌렀다
+    if (tab === 'reminders') {
+      remindersTab.setQuery(el.search.value, { quiet: true }); // 달력은 refresh 가 한 번만 그린다
+      remindersTab.refresh({ ifChanged: true });
+    } else if (tab === 'history' || stale || el.search.value.trim() !== state.query || !el.cards.querySelector('.col')) runSearch();
+    // 메모 탭: 검색어도 메모도 그대로면 그려 둔 카드를 그대로 보인다 (바뀐 메모는 refresh 가 이미 그려 둠)
+  }, 0));
 }
+let tabSeq = 0;
 tabKeys(document.querySelector('.tabs'));
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');

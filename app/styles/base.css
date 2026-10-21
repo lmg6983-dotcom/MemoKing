@@ -212,10 +212,10 @@ svg { width: 20px; height: 20px; flex: none; }
   box-shadow: inset 0 0 0 1px var(--line);
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s ease-out, transform 0.1s ease-out;
+  transition: background-color 0.15s ease-out, transform 0.16s var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) { .btn:hover { background: var(--fill-hover); } }
-.btn:active { transform: scale(0.98); }
+.btn:active { transform: scale(0.97); }
 .btn.primary { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; }
 @media (hover: hover) and (pointer: fine) { .btn.primary:hover { background: var(--brand-yellow-hover); } }
 .btn.danger { background: var(--danger); color: var(--on-danger); box-shadow: none; }
@@ -407,7 +407,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 
 /* 여럿 중 하나 고르기: 선택 표시(흰 칸)가 다음 칸으로 미끄러진다 (seg-slider.js) */
 .mk-slider { position: relative; isolation: isolate; }
-.mk-slider > button { position: relative; z-index: 1; transition: color 0.18s ease-out; }
+.mk-slider > button { position: relative; z-index: 1; transition: color 0.18s ease-out, transform 0.16s var(--ease-out); } /* 누르면 살짝 눌렸다 돌아오게 (줄어드는 것도 부드럽게) */
 .mk-slider > button:active { transform: scale(0.96); }
 .mk-slider > [aria-selected="true"], .mk-slider > [aria-checked="true"] { background: none !important; box-shadow: none !important; }
 .seg-thumb, .mk-slider > .tab-indicator {
@@ -1047,7 +1047,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 }
 
 /* 모드 바꾸기 화면 전환 (startViewTransition): 화면은 부드럽게 바뀌고, 스위치는 화면 위에서 그대로 미끄러진다 */
-::view-transition-old(root) { animation: mk-vt-out 0.18s ease-in both; }
+::view-transition-old(root) { animation: mk-vt-out 0.16s var(--ease-out) both; } /* ease-in 은 처음이 느려 굼떠 보인다 (Emil) */
 ::view-transition-new(root) { animation: mk-vt-in 0.3s var(--ease-out) both; }
 ::view-transition-old(mk-mode-switch) { display: none; }
 ::view-transition-new(mk-mode-switch) { animation: none; }

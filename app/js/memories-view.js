@@ -36,11 +36,13 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
   let picked = []; // 고른 태그
   let days = new Map(); // 보이는 달의 기록
   let loaded = false;
+  let memosKey = ''; // 모은 메모 (바뀌었는지 보려고)
 
   async function load() {
     try {
       const now = mode(); // Work / Life 를 나눠 쓰면 지금 모드의 메모로 (나눠 쓰지 않으면 모두)
       memos = ((await api.memos.list()) ?? []).filter((m) => !now || (m.mode === 'work' ? 'work' : 'life') === now);
+      memosKey = memos.map((m) => `${m.id}:${m.updated}:${m.day ?? ''}`).join('|');
       loaded = true;
     } catch (err) {
       console.warn('[회상]', err);
@@ -362,9 +364,11 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       await load();
       render();
     },
-    /** 메모가 바뀌었을 때 (보이는 중이면) */
-    async refresh() {
+    /** 메모가 바뀌었을 때 (보이는 중이면) — ifChanged: 모은 메모가 그대로면 다시 그리지 않는다 (탭으로 돌아올 때) */
+    async refresh({ ifChanged = false } = {}) {
+      const before = memosKey;
       await load();
+      if (ifChanged && memosKey === before && root.childElementCount) return;
       render();
       if (album) closeDay();
     },

@@ -301,6 +301,10 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .empty { margin: 48px 24px; text-align: center; line-height: 1.7; color: var(--muted); white-space: pre-line; }
 /* 메모가 없으면 안내가 목록 칸 한가운데에 (아래는 + 단추 자리만큼 비움) */
 .view.is-empty { display: flex; flex-direction: column; }
+/* 탭을 바꾸면 새 칸이 아주 짧게 스며든다 (하루에 수십 번 누르는 곳이라 움직임 없이 투명도만, 120ms) — 툭 바뀌는 느낌만 덜게 */
+.list-screen > .view:not([hidden]) { animation: m-view-in 0.12s var(--ease-out); }
+@keyframes m-view-in { from { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .list-screen > .view:not([hidden]) { animation: none; } }
 .view.is-empty > .cards { display: none; }
 .view.is-empty > #empty { flex: 1; justify-content: center; margin: 0; padding: 24px 24px 88px; }
 #empty:not([hidden]) { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: mk-pop-in 0.25s ease-out both; }

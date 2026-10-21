@@ -180,12 +180,18 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   }
 
   /** @param {{ quiet?: boolean }} [o] quiet: 탭이 안 보일 때 — 탭 숫자만 (달력은 다음에 보일 때 그린다. 메모를 지울 때마다 안 보이는 달력을 다시 그려 목록이 끊겼다) */
-  async function refresh({ quiet = false } = {}) {
+  // ifChanged: 탭으로 돌아올 때 — 일정 · 검색어 · 날짜가 지난번 그린 것과 같으면 달력을 다시 그리지 않는다 (달력 그리기가 탭 전환을 붙잡았다)
+  let drawnKey = '';
+  async function refresh({ quiet = false, ifChanged = false } = {}) {
     allItems = await api.reminders.all();
     items = visible ? allItems.filter(visible) : allItems;
-    if (quiet) updateCount(new Date());
-    else render();
-    if (!quiet && memView && viewId === MEMORIES) memView.refresh(); // 탭으로 올 때도 여기로 — 새 사진 · 메모를 다시 모은다
+    if (quiet) return updateCount(new Date());
+    const key = `${JSON.stringify(items)}|${query}|${today().getTime()}`;
+    if (!(ifChanged && key === drawnKey)) {
+      drawnKey = key;
+      render();
+    }
+    if (memView && viewId === MEMORIES) memView.refresh({ ifChanged }); // 탭으로 올 때도 여기로 — 새 사진 · 메모를 다시 모은다 (바뀐 것이 있을 때만)
   }
 
   // 탭 숫자: 앞으로 울릴 알림이 있는 것 (메모 창의 종 버튼과 같은 규칙)
