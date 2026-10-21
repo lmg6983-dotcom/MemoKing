@@ -374,9 +374,9 @@ export class Vault extends EventEmitter {
     return { id, file: null, meta, body: '', mtimeMs: 0, size: 0, idSaved: true };
   }
 
-  import({ body, created, updated, pinned = false, color }) {
+  import({ body, created, updated, pinned = false, color, mode }) {
     if (isLockedBody(body)) return null; // 잠금 형식 글은 아무도 열 수 없는 메모가 되므로 새 메모로 만들지 않는다
-    const id = this.create({ color });
+    const id = this.create({ color, mode });
     const entry = this.entries.get(id);
     Object.assign(entry.meta, { created: created ?? entry.meta.created, updated: updated ?? entry.meta.updated, pinned });
     entry.body = body;

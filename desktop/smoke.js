@@ -1254,11 +1254,11 @@ export async function runSmoke({
       await waitStep(tutWin, 'close');
       await js(tutWin(), `document.getElementById('close-btn').click()`);
       const cardsStep = await waitStep(getList, 'cards');
-      check('메모를 닫으면 → 목록 창으로 돌아와 다음 단계', cardsStep && !noteWins.has(tutMemo) && vault.get(tutMemo)?.title.startsWith('튜토리얼 메모'), JSON.stringify({ cardsStep, open: noteWins.has(tutMemo), title: vault.get(tutMemo)?.title }));
+      check('메모를 닫으면 → 목록 창으로 돌아와 다음 단계 (메모는 연습 공간에)', cardsStep && !noteWins.has(tutMemo) && getVault() !== vault && getVault().get(tutMemo)?.title.startsWith('튜토리얼 메모') && !vault.get(tutMemo), JSON.stringify({ cardsStep, open: noteWins.has(tutMemo), title: getVault().get(tutMemo)?.title }));
       await walk(getList, 'cards', 'done');
       await coachNext(getList());
       const finished = await until(async () => !getTutorial().active && (await bubbleStep(getList())) === null, '튜토리얼 끝').catch(() => false);
-      check('마지막 단계까지 → 말풍선이 사라지고 끝', finished);
+      check('마지막 단계까지 → 말풍선이 사라지고 끝 · 내 메모 폴더로 돌아옴 (연습 메모는 남지 않음)', finished && getVault() === vault && !vault.get(tutMemo));
     }
     // 설정에서 언제든 다시, 건너뛰기
     await lj(`document.getElementById('settings-btn').click()`);

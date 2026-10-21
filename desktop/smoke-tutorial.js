@@ -19,7 +19,7 @@ export function prepareSmoke(userData) {
   fs.writeFileSync(path.join(userData, 'settings.json'), JSON.stringify({ vaultPath: VAULT, tutorialDone: true, workLife: true })); // Work / Life 단계도 직접 해 보게
 }
 
-export async function runSmoke({ noteWins, getVault, getList, createListWindow, startTutorial, getTutorial }) {
+export async function runSmoke({ noteWins, getVault, getList, createListWindow, startTutorial, getTutorial, openNote, getSettings }) {
   const checks = [];
   const errors = [];
   const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
@@ -137,7 +137,14 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     getList().setSize(420, 700);
     const list = () => getList();
     await until(() => js(list(), 'document.documentElement.dataset.ready === "true"'), '목록 준비', 12000);
-    startTutorial();
+    // 연습 공간: 열어 둔 실제 메모 창은 튜토리얼 동안 닫히고, 화면은 예시 메모가 든 다른 폴더를 쓴다
+    openNote(keep);
+    await until(() => noteWins.get(keep)?.isVisible(), '실제 메모 창', 6000);
+    await startTutorial();
+    const box = getVault();
+    const boxTitles = box.list().map((m) => m.title);
+    check('연습 공간: 실제 메모 폴더가 아닌 다른 폴더에 예시 메모 · 내 메모는 안 보임 · 내 메모 창은 닫힘',
+      box !== vault && box.root !== vault.root && boxTitles.includes('연습 공간이에요') && !boxTitles.includes('회의 메모') && !noteWins.has(keep), `${box.root} ${JSON.stringify(boxTitles)}`);
     await arrive(list, 'welcome');
     await next(list, 'welcome');
     await arrive(list, 'new-memo');
@@ -200,10 +207,10 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await drag(note(), [[line.left, line.bottom + 2], [line.left + 60, line.bottom + 4], [line.right, line.bottom + 2]]);
     await press(note(), '.mk-annot-bar .ink-done', '[annotate] 완료');
     const annot = await until(() => {
-      const m = vault.get(memoId);
-      return m?.ink && JSON.parse(fs.readFileSync(path.join(VAULT, m.ink), 'utf8')).strokes.length;
+      const m = box.get(memoId);
+      return m?.ink && JSON.parse(fs.readFileSync(path.join(box.root, m.ink), 'utf8')).strokes.length;
     }, '주석 저장', 5000).catch(() => 0);
-    check('[annotate] 글 위에 그은 주석이 저장됨', annot >= 1, JSON.stringify(vault.get(memoId)?.ink));
+    check('[annotate] 글 위에 그은 주석이 (연습 공간에) 저장됨', annot >= 1, JSON.stringify(box.get(memoId)?.ink));
     await arrive(note, 'voice', { praise: true });
     await next(note, 'voice');
     await arrive(note, 'tag');
@@ -253,6 +260,8 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
       await next(list, id);
       await arrive(list, to);
     }
+    const tutBody = box.get(memoId)?.body ?? '';
+    check('따라 한 결과가 연습 메모에 그대로 (체크리스트 · 손 메모 · 태그)', /\[[ x]\]/.test(tutBody) && /!\[손 메모\]/.test(tutBody) && /#할일/.test(tutBody), tutBody);
     await next(list, 'done');
     const finished = await until(async () => !getTutorial().active && (await stepOf(list())) === null, '튜토리얼 끝').then(() => true).catch(() => false);
     check('끝까지 따라 하면 말풍선이 사라지고 끝', finished);
@@ -262,8 +271,12 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
       return r.layout === 'grid' && r.tags === 0 && r.top === 'false' && r.panel ? r : null;
     })()`), '뒷정리', 3000).catch(() => null);
     check('끝나면 연습으로 바꾼 것은 처음대로 (격자 · 태그 고르기 없음 · 늘 위 아님 · Life)', after && after.zoom === '1' && after.mode === 'life' && !list().isAlwaysOnTop(), JSON.stringify(after));
-    const body = vault.get(memoId)?.body ?? '';
-    check('따라 한 결과가 메모에 그대로 (체크리스트 · 손 메모 · 태그)', /\[[ x]\]/.test(body) && /!\[손 메모\]/.test(body) && /#할일/.test(body), body);
+    // 끝나면 실제 메모 폴더로: 연습 메모는 남지 않고, 닫아 두었던 내 메모 창은 다시 열린다
+    const back = await until(() => getVault() === vault && noteWins.get(keep)?.isVisible(), '내 메모로 돌아옴', 6000).then(() => true).catch(() => false);
+    const s = getSettings();
+    check('끝나면 내 메모로: 실제 폴더에는 내 메모 하나뿐 · 연습 폴더는 지워짐 · 내 메모 창이 다시 열림 · 연습 메모의 창 기억 없음',
+      back && vault.list().length === 1 && vault.list()[0].id === keep && !fs.existsSync(box.root) && !noteWins.has(memoId) && !(memoId in (s.noteBounds ?? {})) && !(s.openNotes ?? []).includes(memoId),
+      JSON.stringify({ back, list: vault.list().map((m) => m.title), boxLeft: fs.existsSync(box.root), open: s.openNotes }));
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
