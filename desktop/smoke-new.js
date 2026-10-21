@@ -424,32 +424,50 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         // 제목 줄 오른쪽 위: 왕관 · 동기화 · 설정이 검색 줄이 아니라 맨 위에, 창 버튼 영역을 침범하지 않음
         const bar = await js(list, `(() => { const q = (s) => document.querySelector(s)?.getBoundingClientRect(); const c = q('#list-top-btn'), g = q('#settings-btn'), t = q('.titlebar'), s = q('#search'); return { crown: c && [c.left, c.top], gearInTitle: g.top >= t.top && g.bottom <= t.bottom, gearRight: g.right <= (navigator.windowControlsOverlay?.visible ? navigator.windowControlsOverlay.getTitlebarAreaRect().right : innerWidth - 142) + 1, order: c.left < g.left, searchBelow: s.top >= t.bottom - 1, inToolbar: !!document.querySelector('.toolbar #settings-btn, .toolbar #sync-btn') }; })()`);
         check('목록 제목 줄: 왕관 · 동기화 · 설정이 맨 위(창 버튼 왼쪽)에 있고 검색 줄에는 없음', bar.gearInTitle && bar.gearRight && bar.order && bar.searchBelow && !bar.inToolbar, JSON.stringify(bar));
-        // 왕관 스티커: 붙이면 스티커가 단추(설정 · 동기화)와 창 버튼을 가리지 않는다 — 좁은 폭(440)에서도
+        // 왕관 스티커: 넓은 창에서는 제목 줄 가운데 빈 곳에 (단추를 가리지 않게), 좁거나 화면 위 끝이라 잘리면 왕관 단추 자리의 작은 왕관으로
         const sizeBefore = list.getBounds();
-        list.setBounds({ ...sizeBefore, width: 440 });
+        const wa = electronApi.screen.getDisplayMatching(sizeBefore).workArea;
+        const place = (width, y = wa.y + 80) => list.setBounds({ x: wa.x + 40, y, width, height: sizeBefore.height });
+        const stickerWin = () => { const w = windowManager.stickers.get(list.id)?.win; return w && !w.isDestroyed() && w.isVisible() ? w : null; };
+        const btnState = () => js(list, `(() => { const b = document.getElementById('list-top-btn'); return { docked: b.classList.contains('docked'), peeled: b.classList.contains('peeled'), mini: getComputedStyle(b.querySelector('.crown-mini')).display !== 'none', pressed: b.getAttribute('aria-pressed') }; })()`);
+        const dockedNow = async () => windowManager.listCrownDocked() && !stickerWin() && (await btnState()).docked;
+        const stuckNow = async () => { const w = stickerWin(); return w && !windowManager.listCrownDocked() && (await btnState()).peeled && w.getBounds(); };
+        const hitRects = async () => js(list, `['#mode-switch button', '#sync-btn:not([hidden])', '#settings-btn'].flatMap((s) => [...document.querySelectorAll(s)]).map((e) => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; })`);
+        const covers = (sb, lb, rects) => rects.some((r) => sb.x - lb.x < r.right - 6 && sb.x + sb.width - lb.x > r.left + 6 && sb.y + sb.height - lb.y > r.top + 2);
+        // 좁은 창(440)에서 붙이면: 스티커 창 없이 작은 왕관
+        place(440);
         await wait(150);
         await js(list, `document.getElementById('list-top-btn').click()`);
-        const stuck = await until(() => windowManager.stickers.get(list.id)?.win, '왕관 스티커', 4000).catch(() => null);
-        if (stuck) await until(() => stuck.isVisible(), '스티커 보임', 3000).catch(() => {});
-        const sb = stuck && !stuck.isDestroyed() ? stuck.getBounds() : null;
-        const lb = list.getBounds();
-        // 가리면 안 되는 것: Life/Work 스위치 · 오른쪽 위 단추 (좁은 창에서는 로고 위에 붙는다)
-        const hitRects = async () => js(list, `['#mode-switch button', '#sync-btn:not([hidden])', '#settings-btn'].flatMap((s) => [...document.querySelectorAll(s)]).map((e) => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; })`);
-        // 스위치 끝 몇 px 은 봐준다 (해 그림의 왼쪽 가장자리)
-        const covers = (sb, lb, rects) => rects.some((r) => sb.x - lb.x < r.right - 6 && sb.x + sb.width - lb.x > r.left + 6 && sb.y + sb.height - lb.y > r.top + 2);
-        const rects = await hitRects();
-        const overlap = sb ? covers(sb, lb, rects) : null;
-        check('왕관 스티커를 붙여도 (440px 폭) Life/Work 스위치 · 동기화 · 설정 단추를 가리지 않음 (로고 위에)', Boolean(sb) && overlap === false && sb.x - lb.x < 40, JSON.stringify({ sb, lb, rects }));
-        // 넓은 창에서는 가운데 빈 줄에
-        list.setBounds({ ...lb, width: 900 });
-        const wide = await until(() => { const w = windowManager.stickers.get(list.id)?.win; const b = w && !w.isDestroyed() && w.getBounds(); return b && b.x - list.getBounds().x > 300 && b; }, '넓은 창 스티커', 3000).catch(() => null);
+        const narrow = await until(dockedNow, '작은 왕관', 4000).catch(() => false);
+        const nb = await btnState();
+        await capture(list, 'list-crown-docked.png');
+        check('왕관: 좁은 창(440px)에서 붙이면 스티커 대신 동기화 왼쪽 단추 자리에 작은 왕관 (늘 위에 두기는 켜짐)', narrow && nb.mini && nb.pressed === 'true' && list.isAlwaysOnTop(), JSON.stringify({ nb, docked: windowManager.listCrownDocked() }));
+        // 넓히면 작은 왕관이 나가고 가운데 빈 곳에 스티커
+        place(900);
+        const wide = await until(stuckNow, '넓은 창 스티커', 4000).catch(() => null);
         const wideOverlap = wide ? covers(wide, list.getBounds(), await hitRects()) : null;
-        check('왕관 스티커: 넓은 창(900px)에서는 제목 줄 가운데 빈 곳에, 단추를 가리지 않음', Boolean(wide) && wideOverlap === false, JSON.stringify({ wide, lb: list.getBounds() }));
-        list.setBounds({ ...lb, width: 440 });
-        await wait(150);
-        await capture(list, 'list-sticker-narrow.png');
+        check('왕관: 넓히면 다시 창 위 가운데 빈 곳의 스티커 (단추를 가리지 않음)', Boolean(wide) && wideOverlap === false && wide.x - list.getBounds().x > 300, JSON.stringify({ wide, lb: list.getBounds() }));
+        // 다시 좁히면 바로 작은 왕관, 조금만 넓혀서는 스티커로 돌아가지 않는다 (깜빡이지 않게)
+        place(500);
+        const back = await until(dockedNow, '다시 작은 왕관', 3000).catch(() => false);
+        place(520);
+        await wait(500);
+        const held = await dockedNow();
+        check('왕관: 다시 좁히면 작은 왕관, 경계 근처(520px)에서는 그대로 (스티커와 작은 왕관을 오가며 깜빡이지 않게)', back && held, JSON.stringify({ back, held }));
+        // 화면 맨 위에 붙이면(스티커가 화면 밖으로 잘림) 작은 왕관, 내리면 스티커
+        place(900, wa.y);
+        const top = await until(dockedNow, '화면 위 끝 작은 왕관', 3000).catch(() => false);
+        place(900);
+        const down = await until(stuckNow, '내리면 스티커', 4000).catch(() => null);
+        check('왕관: 창을 화면 맨 위에 붙이면 작은 왕관, 내리면 다시 스티커', top && Boolean(down), JSON.stringify({ top, down }));
+        // 작은 왕관을 누르면 떼어진다 (늘 위에 두기 꺼짐, 줄 그림 왕관으로)
+        place(440);
+        await until(dockedNow, '작은 왕관', 3000).catch(() => false);
+        await js(list, `document.getElementById('list-top-btn').click()`);
+        const off = await until(async () => !list.isAlwaysOnTop() && !windowManager.stickers.get(list.id) && (await btnState()).pressed === 'false', '작은 왕관 떼기', 3000).catch(() => false);
+        const ob = await btnState();
+        check('왕관: 작은 왕관을 누르면 늘 위에 두기가 꺼지고 단추는 원래 왕관으로', off && !ob.docked && !ob.peeled && !ob.mini, JSON.stringify(ob));
         await windowManager.setListOnTop(false);
-        await until(() => !windowManager.stickers.get(list.id), '왕관 떼기', 3000).catch(() => {});
         list.setBounds(sizeBefore);
       }
       const before = new Set(noteWins.keys());

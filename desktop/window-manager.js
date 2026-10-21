@@ -30,7 +30,10 @@ import {
 // 목록 창 제목 줄: 왼쪽은 로고 · Life/Work 스위치(~196px), 오른쪽은 단추 묶음 + Windows 창 버튼(~242px) — 스티커는 그 사이 빈 줄에
 const LIST_STICKER_LEFT = 200;
 const LIST_STICKER_RIGHT = 250;
-const LIST_STICKER_LOGO_X = 26; // 빈 줄이 스티커보다 좁으면 로고 위에 (메모킹 로고에 왕관 — 누를 단추를 가리지 않게)
+// 스티커가 잘리는 때(빈 줄이 모자람 · 최대화 · 전체 화면 · 화면 위나 옆 끝)에는 스티커를 접어 제목 줄 왕관 단추 자리에 작은 왕관으로 (list:crown-docked)
+//   다시 붙일 때는 빈 줄이 16px 더 넉넉해야 — 창 폭을 조금씩 바꾸는 동안 스티커와 작은 왕관을 오가며 깜빡이지 않게
+const LIST_STICKER_SLACK = 16;
+const LIST_UNDOCK_MS = 220; // 창을 옮기거나 늘이는 손을 멈춘 뒤 스티커로 (접기는 바로 — 잘린 스티커가 보이지 않게)
 const STICKERS = { crown: { width: 64, height: 52 }, tape: { width: 96, height: 30 } };
 const LOST_REOPEN_MS = 3000;
 const GHOST_MARGIN = 24;
@@ -1152,12 +1155,32 @@ export class WindowManager {
     if (owner === this.listWin) {
       const lo = LIST_STICKER_LEFT + size.width / 2;
       const hi = b.width - LIST_STICKER_RIGHT - size.width / 2;
-      cx = lo <= hi ? Math.max(lo, Math.min(cx, hi)) : LIST_STICKER_LOGO_X;
+      cx = Math.max(lo, Math.min(cx, Math.max(lo, hi))); // 모자라면 스티커 대신 작은 왕관 (listStickerFits)
     }
     return { x: Math.round(b.x + cx - size.width / 2), y: Math.round(b.y - size.height / 2), ...size };
   }
 
-  closeStickerWin(entry, { peel = false } = {}) {
+  /**
+   * 목록 창 왕관 스티커가 잘리지 않고 붙을 수 있는가 — 아니면 제목 줄의 작은 왕관으로 (docked)
+   * @param {boolean} docked 지금 작은 왕관이면 다시 붙일 때 여유(LIST_STICKER_SLACK)를 더 본다
+   */
+  listStickerFits(owner, kind, docked) {
+    if (owner.isMaximized() || owner.isFullScreen()) return false;
+    const b = owner.getBounds();
+    const size = STICKERS[kind] ?? STICKERS.crown;
+    const room = b.width - LIST_STICKER_LEFT - LIST_STICKER_RIGHT - size.width; // 가운데 빈 줄에서 스티커를 놓고 남는 폭
+    if (room < (docked ? LIST_STICKER_SLACK : 0)) return false;
+    const s = this.stickerBounds(owner, kind);
+    const wa = screen.getDisplayMatching(b).workArea; // 작업 표시줄을 뺀 화면 — 창 위 가장자리 밖으로 반쯤 나가는 스티커가 화면 밖에 걸리면 잘린다
+    return s.y >= wa.y && s.x >= wa.x && s.x + s.width <= wa.x + wa.width;
+  }
+
+  /** 목록 창 왕관이 작은 왕관(제목 줄)으로 들어가 있는가 */
+  listCrownDocked() {
+    return Boolean(this.listWin && this.stickers.get(this.listWin.id)?.docked);
+  }
+
+  closeStickerWin(entry, { peel = false, dock = false } = {}) {
     const win = entry.win;
     entry.win = null;
     if (!win || win.isDestroyed()) return;
@@ -1169,15 +1192,15 @@ export class WindowManager {
       // 늘 위인 창은 스티커 창이 사라질 때 맨 위를 다시 (왕관에서 테이프로 바꾼 뒤라면 하지 않는다)
       if (!owner.isDestroyed() && this.stickers.get(owner.id)?.kind === 'crown') this.reassertTop(owner);
     };
-    if (peel && win.isVisible()) {
-      win.webContents.send('sticker:peel');
-      setTimeout(destroy, 220);
+    if ((peel || dock) && win.isVisible()) {
+      win.webContents.send(dock ? 'sticker:dock' : 'sticker:peel'); // dock: 작아지며 사라짐 (제목 줄 작은 왕관으로 들어간다)
+      setTimeout(destroy, dock ? 160 : 220);
     } else destroy();
   }
 
   openStickerWin(entry, animate) {
     const { owner } = entry;
-    if (entry.win || owner.isDestroyed() || !owner.isVisible() || owner.isMinimized()) return;
+    if (entry.win || entry.docked || owner.isDestroyed() || !owner.isVisible() || owner.isMinimized()) return;
     const win = new BrowserWindow({
       ...this.stickerBounds(owner, entry.kind),
       parent: owner,
@@ -1235,22 +1258,51 @@ export class WindowManager {
       return;
     }
     if (!on) return;
-    const entry = { owner, kind, win: null, off: () => {}, hold: false };
+    // dockable: 목록 창 왕관 — 잘리면 제목 줄 작은 왕관으로 들어갔다(docked) 자리가 나면 다시 스티커로
+    const dockable = owner === this.listWin && kind === 'crown';
+    const entry = { owner, kind, win: null, off: () => {}, hold: false, docked: false, undockTimer: null };
+    const setDocked = (docked, animate) => {
+      clearTimeout(entry.undockTimer);
+      entry.undockTimer = null;
+      if (entry.docked === docked) return;
+      entry.docked = docked;
+      if (docked) this.closeStickerWin(entry, { dock: animate });
+      if (!owner.isDestroyed()) owner.webContents.send('list:crown-docked', { docked, animate });
+      if (!docked) this.openStickerWin(entry, animate);
+    };
+    // 접기는 바로, 다시 붙이기는 창을 옮기거나 늘이는 손이 멈춘 뒤에
+    const place = () => {
+      if (!dockable || owner.isDestroyed()) return;
+      const fits = this.listStickerFits(owner, entry.kind, entry.docked);
+      if (!fits) return setDocked(true, true);
+      if (!entry.docked) return;
+      clearTimeout(entry.undockTimer);
+      entry.undockTimer = setTimeout(() => {
+        entry.undockTimer = null;
+        if (this.stickers.get(owner.id) === entry && !owner.isDestroyed() && this.listStickerFits(owner, entry.kind, true)) setDocked(false, true);
+      }, LIST_UNDOCK_MS);
+    };
     const sync = () => {
+      place();
       if (entry.win && !entry.win.isDestroyed() && !owner.isDestroyed()) entry.win.setBounds(this.stickerBounds(owner, entry.kind));
     };
     const visible = () => {
       if (owner.isDestroyed()) return;
       if (entry.hold) return;
       if (owner.isVisible() && !owner.isMinimized()) {
+        place(); // 최소화한 사이 크기 · 화면이 바뀌었을 수 있다
         this.openStickerWin(entry, false);
         if (entry.kind === 'crown') this.reassertTop(owner);
       } else this.closeStickerWin(entry);
       this.refreshTopWatch();
     };
-    const events = { move: sync, resize: sync, show: visible, hide: visible, minimize: visible, restore: visible };
+    const events = { move: sync, resize: sync, show: visible, hide: visible, minimize: visible, restore: visible,
+      ...(dockable ? { maximize: sync, unmaximize: sync, 'enter-full-screen': sync, 'leave-full-screen': sync } : {}) };
     for (const [name, fn] of Object.entries(events)) owner.on(name, fn);
+    if (dockable) screen.on('display-metrics-changed', sync); // 화면 배율 · 작업 표시줄 자리가 바뀌어도
     entry.off = () => {
+      clearTimeout(entry.undockTimer);
+      if (dockable) screen.off('display-metrics-changed', sync);
       if (!owner.isDestroyed()) {
         for (const [name, fn] of Object.entries(events)) owner.off(name, fn);
       }
@@ -1262,7 +1314,10 @@ export class WindowManager {
       if (this.stickers.get(owner.id) === entry) this.stickers.delete(owner.id);
       this.refreshTopWatch();
     });
-    this.openStickerWin(entry, animate);
+    if (dockable && !this.listStickerFits(owner, kind, false)) {
+      entry.docked = true; // 처음부터 잘릴 자리면 스티커 창 없이 작은 왕관으로
+      owner.webContents.send('list:crown-docked', { docked: true, animate });
+    } else this.openStickerWin(entry, animate);
   }
 
   peelSticker(sender) {

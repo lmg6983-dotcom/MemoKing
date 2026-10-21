@@ -1216,6 +1216,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('sticker:peel', (event) => wm.peelSticker(event.sender));
   ipcMain.handle('list:on-top', () => Boolean(wm.listWin?.isAlwaysOnTop()));
+  ipcMain.handle('list:crown-docked', () => wm.listCrownDocked());
   ipcMain.handle('win:dim-titlebar', (event, level) => {
     if (!wm.listWin || senderWindow(event) !== wm.listWin) return;
     setTitleBarDim(level === 'dialog' || level === 'coach' ? level : false);

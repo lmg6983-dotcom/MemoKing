@@ -1661,30 +1661,77 @@ el.layoutGroup.addEventListener('click', (e) => {
 // 목록 창 늘 위에 두기 (창 제목 줄, 최소화 버튼 옆)
 const listTopBtn = $('list-top-btn');
 // 스티커를 붙이고 떼는 느낌: 누르면 버튼의 왕관이 떨어져 나가 창 위 가장자리 스티커가 되고(버튼은 빈 자리),
-// 스티커를 누르면 떼어져 늘 위에 두기가 꺼지고 왕관이 버튼으로 돌아온다
+// 스티커를 누르면 떼어져 늘 위에 두기가 꺼지고 왕관이 버튼으로 돌아온다.
+// 창이 좁아지거나 최대화 · 화면 끝이라 스티커가 잘릴 때는 스티커가 작아져 이 단추 자리에 작은 왕관으로 들어온다 (docked — 누르면 떼어짐).
+//   자리가 나면 작은 왕관이 들려 나가고 다시 스티커가 붙는다 (window-manager listStickerFits)
 let listTop = null;
-const showListTop = (on, animate = true) => {
-  const changed = listTop !== null && listTop !== on;
-  listTop = on;
+let crownDocked = false;
+const crownMini = listTopBtn.querySelector('.crown-mini');
+const crownLine = listTopBtn.querySelector('.crown-line');
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+function paintListTop() {
+  const on = Boolean(listTop);
+  const docked = on && crownDocked;
   listTopBtn.setAttribute('aria-pressed', String(on));
-  listTopBtn.classList.toggle('peeled', on);
-  listTopBtn.tabIndex = on ? -1 : 0;
-  listTopBtn.setAttribute('aria-hidden', String(on));
-  listTopBtn.title = on ? '창 위의 왕관 스티커를 누르면 늘 위에 두기가 꺼져요' : '왕관 스티커를 붙여 목록을 다른 창보다 늘 위에 두기';
+  listTopBtn.classList.toggle('peeled', on && !docked);
+  listTopBtn.classList.toggle('docked', docked);
+  listTopBtn.tabIndex = on && !docked ? -1 : 0;
+  listTopBtn.setAttribute('aria-hidden', String(on && !docked));
+  listTopBtn.title = docked ? '늘 위에 두는 중이에요. 창이 좁아 왕관 스티커를 여기에 넣어 두었어요. 누르면 늘 위에 두기가 꺼져요'
+    : on ? '창 위의 왕관 스티커를 누르면 늘 위에 두기가 꺼져요' : '왕관 스티커를 붙여 목록을 다른 창보다 늘 위에 두기';
   listTopBtn.setAttribute('aria-label', on ? '목록 늘 위에 두기 끄기' : '목록을 다른 창보다 늘 위에 두기');
-  if (!changed || !animate || reduceMotion()) return;
-  const icon = listTopBtn.querySelector('svg');
-  icon.animate(on
+}
+const showListTop = (on, animate = true) => {
+  const was = { top: Boolean(listTop), docked: Boolean(listTop) && crownDocked };
+  const first = listTop === null;
+  listTop = on;
+  if (!on) crownDocked = false; // 떼면 다음에 붙일 때는 메인이 다시 알려 준다 (처음부터 잘릴 자리면 list:crown-docked 가 먼저 온다)
+  paintListTop();
+  if (first || !animate || reduceMotion() || was.top === on) return;
+  if (on && crownDocked) {
+    // 좁은 창에서 붙임: 스티커 대신 줄 그림 왕관이 작은 왕관으로 바뀌며 통 하고 들어앉는다
+    crownMini.animate([{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 280, easing: EASE_OUT });
+    return;
+  }
+  if (was.docked && !on) {
+    // 작은 왕관을 눌러 뗌: 작은 왕관은 들리며 사라지고 줄 그림 왕관이 돌아온다
+    crownMini.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px) rotate(10deg) scale(1.2)' }], { duration: 180, easing: EASE_OUT });
+  }
+  crownLine.animate(on
     ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
     : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
-  { duration: on ? 200 : 280, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+  { duration: on ? 200 : 280, easing: EASE_OUT });
 };
-// 버튼은 붙이기만 (떼기는 창 위의 왕관 스티커를 눌러서). 상태는 list:on-top 으로 돌아온다
+// 스티커 ↔ 작은 왕관 (늘 위에 두는 동안 창 크기 · 자리에 따라)
+function setCrownDocked(docked, animate = true) {
+  if (docked === crownDocked) return;
+  crownDocked = docked;
+  const shown = Boolean(listTop);
+  if (!shown || !animate || reduceMotion()) return paintListTop();
+  if (docked) {
+    paintListTop();
+    // 스티커가 작아지며 사라지는 사이(0.15초) 작은 왕관이 위에서 내려와 들어앉는다
+    crownMini.animate([{ opacity: 0, transform: 'translateY(-10px) scale(1.6) rotate(-10deg)' }, { opacity: 1, transform: 'none' }], { duration: 240, delay: 60, easing: EASE_OUT, fill: 'backwards' });
+  } else {
+    // 작은 왕관이 들려 나간 뒤 단추는 빈 자리 (곧 창 위에 스티커가 붙는다)
+    listTopBtn.classList.add('undocking');
+    crownMini.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-10px) scale(1.3)' }], { duration: 160, easing: EASE_OUT })
+      .finished.catch(() => {}).finally(() => {
+        listTopBtn.classList.remove('undocking');
+        paintListTop();
+      });
+  }
+}
+// 버튼: 붙이기 · 작은 왕관이면 떼기 (스티커는 창 위의 스티커를 눌러서). 상태는 list:on-top 으로 돌아온다
 listTopBtn.addEventListener('click', () => {
-  if (!listTop) api.win.toggleListTop();
+  if (!listTop || crownDocked) api.win.toggleListTop();
 });
 api.on('list:on-top', (on) => showListTop(on));
-api.win.listOnTop().then((on) => showListTop(on, false));
+api.on('list:crown-docked', ({ docked, animate } = {}) => setCrownDocked(Boolean(docked), animate !== false));
+Promise.all([api.win.listOnTop(), api.win.listCrownDocked?.() ?? false]).then(([on, docked]) => {
+  crownDocked = Boolean(docked);
+  showListTop(on, false);
+});
 // 대화 상자·튜토리얼이 떠 있으면 창 버튼 줄도 어둡게 (Windows 가 그리는 줄이라 화면의 막이 닿지 않는다)
 let dimLevel = false;
 function syncTitlebarDim() {
