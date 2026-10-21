@@ -68,6 +68,14 @@ export const TUTORIAL_STEPS = [
     text: '연습하라고 장보기 목록을 넣어 뒀어요. 줄을 꾹 누르면 살짝 들려요. 끌어서 원하는 자리에 놓으면 끝! 키보드로는 Alt+↑↓ 예요.',
     next: '다음',
   },
+  // 매직 줌: 본문 전체를 비추거나 피하게 하면 자리가 없어 말풍선이 접힌다 — 첫 줄만 비추고 배율 표시만 피한다
+  {
+    id: 'note-zoom', chapter: '쓰기', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.zoom-badge'], advance: 'note-zoomed', emoji: '🔍',
+    title: '글을 크게, 작게 (매직 줌)',
+    text: '메모 안에서 Ctrl 을 누른 채 휠을 굴리면 글과 그림이 함께 커지고 작아져요. Ctrl 과 + − 키도 돼요. 위에 뜨는 "원래대로"를 누르면 처음 크기로 돌아와요.',
+    try: 'Ctrl 을 누른 채 휠을 위로 굴려 보세요',
+    next: LATER,
+  },
   // ---------- + 로 넣기 ----------
   {
     id: 'add', chapter: '넣기', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
@@ -274,6 +282,13 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
+    id: 'note-zoom', chapter: '쓰기', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], advance: 'note-zoomed', emoji: '🔍',
+    title: '글을 크게, 작게 (매직 줌)',
+    text: '두 손가락을 벌리면 글과 그림이 함께 커지고, 오므리면 글자가 작아져 한 화면에 더 많이 보여요. 100% 가까이 오므리면 처음 크기로 돌아와요.',
+    try: '두 손가락을 벌려 글을 키워 보세요',
+    next: LATER,
+  },
+  {
     id: 'add', chapter: '넣기', win: 'note', target: ['#add-btn', '#format-bar'], keep: ['#add-menu:not([hidden]) .add-sat'], advance: 'add-opened', emoji: '➕',
     title: '+ 로 더 많은 것 넣기',
     text: '왼쪽 아래 둥근 + 에 녹음, 손 메모, 사진, 파일, 표, 수식이 모여 있어요. 펼치면 키보드는 잠깐 닫혀요.',
@@ -379,7 +394,7 @@ export const TUTORIAL_SETTLE_MS = { typed: 1800, tagged: 1500, styled: 900, task
 
 /** 사용자가 직접 해서 넘어가는 일들 (PC 메인 프로세스가 이 이름만 받는다) */
 export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'content-tools', 'note-closed', 'layout-changed', 'tag-filtered', 'mode-moved',
-  'list-zoomed', 'mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried'];
+  'list-zoomed', 'mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried', 'note-zoomed'];
 
 /**
  * 이 기기에서 보일 단계: 필요한 기능(needs)이 꺼져 있으면 직접 해 보기 없이 안내(offText)만 하고 "다음"으로

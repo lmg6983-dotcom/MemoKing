@@ -166,7 +166,14 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     const items = await js(note(), `[...document.querySelectorAll('.ProseMirror li')].map((li) => li.textContent.trim())`);
     check('[move] 옮겨 볼 예시 목록(우유·달걀·사과·식빵)이 저절로 들어감', ['우유', '달걀', '사과', '식빵'].every((w) => items.includes(w)), JSON.stringify(items));
     await next(note, 'move');
-    await arrive(note, 'add');
+    // 매직 줌: 메모 안에서 Ctrl 을 누른 채 휠 → 다음 단계, 지나면 배율은 처음대로
+    await arrive(note, 'note-zoom');
+    {
+      const c = await probe(note(), '#editor');
+      note().webContents.sendInputEvent({ type: 'mouseWheel', x: c.x ?? 100, y: c.y ?? 200, deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
+    }
+    await arrive(note, 'add', { praise: true });
+    check('[note-zoom] Ctrl+휠로 다음 단계 · 지나면 배율은 처음대로', await js(note(), `document.body.dataset.zoom === '1'`));
     await press(note(), '#add-btn', '[add] 왼쪽 아래 +');
     await arrive(note, 'ink', { praise: true });
     await press(note(), '#add-menu [data-add="ink"]', '[ink] 손 메모');

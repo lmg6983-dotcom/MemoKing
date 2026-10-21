@@ -55,7 +55,9 @@ const api = {
 };
 
 /** @param {{ screen: () => 'list'|'note', markdown: () => string, append: (md: string) => void, edit?: () => void, has?: (need: string) => boolean,
- *            onStart?: () => void, onFinish?: () => void, enable?: (need: string) => void }} o */
+ *            onStart?: () => void, onFinish?: () => void, enable?: (need: string) => void,
+ *            zoom?: { get: () => number, set: (z: number) => void } }} o  zoom: 매직 줌 연습 단계를 지나면 배율을 처음대로 */
+let zoomBefore = null; // 매직 줌 연습 전 배율
 export function setupTutorial(o) {
   screen = o.screen;
   markdown = o.markdown;
@@ -66,6 +68,11 @@ export function setupTutorial(o) {
   coach = setupCoach(api, {
     onStep: (step) => {
       base = step ? counts(markdown()) : null;
+      if (step?.id === 'note-zoom') zoomBefore ??= o.zoom?.get() ?? null;
+      else if (zoomBefore !== null) {
+        if (o.zoom?.get() !== zoomBefore) o.zoom?.set(zoomBefore);
+        zoomBefore = null;
+      }
       // 옮기기를 배우기 전: 옮겨 볼 예시 목록을 메모 끝에
       if (step?.sample && screen() === 'note' && !hasTutorialSample(markdown())) append(TUTORIAL_SAMPLE);
       // 글을 써 보는 단계 · + 를 눌러 보는 단계: 다이얼이 옮기기·그리기여도 글 고치기로

@@ -1585,13 +1585,16 @@ const scheduleFit = () => {
 window.addEventListener('wheel', (e) => {
   if (!e.ctrlKey) return;
   e.preventDefault();
-  if (e.deltaY) setZoom(stepZoom(zoom, e.deltaY < 0 ? 1 : -1));
+  if (!e.deltaY) return;
+  setZoom(stepZoom(zoom, e.deltaY < 0 ? 1 : -1));
+  tutEvent('note-zoomed'); // 튜토리얼: 글을 크게, 작게
 }, { passive: false });
 window.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey && e.code !== 'Equal') return;
   if (e.code === 'Equal' || e.code === 'NumpadAdd') setZoom(stepZoom(zoom, 1));
   else if (e.code === 'Minus' || e.code === 'NumpadSubtract') setZoom(stepZoom(zoom, -1));
   else return;
+  tutEvent('note-zoomed');
   e.preventDefault();
   e.stopPropagation();
 }, true);
@@ -1951,9 +1954,15 @@ document.addEventListener('visibilitychange', () => {
 
 injectIcons();
 paintSwatchBars();
+let tutZoomBefore = null; // 매직 줌 연습 전 배율 — 단계를 지나면 처음대로 (배율은 메모마다 기억되므로 연습한 크기가 남지 않게)
 coach = setupCoach(api, {
   onStep: (step) => {
     tutBase = step ? tutCounts(current ?? '') : null;
+    if (step?.id === 'note-zoom') tutZoomBefore ??= zoom;
+    else if (tutZoomBefore !== null) {
+      if (zoom !== tutZoomBefore) setZoom(tutZoomBefore, { show: false });
+      tutZoomBefore = null;
+    }
     // 옮기기를 배우기 전: 옮겨 볼 예시 목록을 메모 끝에
     if (step?.sample && editor && !hasTutorialSample(editor.getMarkdown())) {
       editor.appendMarkdown(TUTORIAL_SAMPLE);

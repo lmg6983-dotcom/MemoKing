@@ -1773,8 +1773,21 @@ el.editorRoot.addEventListener('touchmove', (e) => {
   applyZoom(middle(e.touches));
   setStatus(zoom >= 1 ? `매직 줌: 확대 ${zoomLabel(zoom)}` : `매직 줌: 글자 ${zoomLabel(zoom)}`);
 }, { passive: false });
+/** 매직 줌 배율 (튜토리얼: 연습 전 배율을 적어 두고 단계를 지나면 처음대로) */
+export const noteZoom = () => zoom;
+export function setNoteZoom(z) {
+  zoom = clampZoom(z);
+  applyZoom();
+  try {
+    if (zoom === 1) localStorage.removeItem(ZOOM_KEY);
+    else localStorage.setItem(ZOOM_KEY, String(zoom));
+  } catch {
+    // 이번에만
+  }
+}
 el.editorRoot.addEventListener('touchend', (e) => {
   if (!pinch || e.touches.length >= 2) return;
+  if (zoom !== pinch.z) tutEvent('note-zoomed'); // 튜토리얼: 글을 크게, 작게
   pinch = null;
   // 100% 가까이면 딱 100% 로 (가로로 조금 밀리는 일 없게)
   if (Math.abs(zoom - 1) < 0.08) {

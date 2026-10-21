@@ -172,8 +172,21 @@ await shot('move-sample');
 await tapOn('.mode-knob .mk-dial', '다이얼 (옮기기로)');
 await wait(400);
 
+// 5-2) 매직 줌: 두 손가락으로 벌리기 (CDP 터치 두 점) → 다음 단계, 지나면 배율은 처음대로
+await atStep('note-zoom');
+{
+  const r = await page.$eval('#editor', (e) => { const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + 90 }; }); // 위쪽에서 (아래쪽은 말풍선)
+  const cdp = await page.context().newCDPSession(page);
+  const pts = (d) => [{ x: r.x - d, y: r.y, id: 1 }, { x: r.x + d, y: r.y, id: 2 }];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pts(30) });
+  for (let d = 40; d <= 120; d += 10) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pts(d) });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+
 // 6) + 펼치기
 await atStep('add');
+check('[note-zoom] 두 손가락으로 벌리면 다음 단계 · 지나면 배율은 처음대로', await page.evaluate(() => !localStorage.getItem('memoking.noteZoom') && !document.querySelector('#editor.zoomed')));
 await tapOn('#add-btn', '도구막대 +');
 
 // 7) 손 메모
