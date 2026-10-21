@@ -33,7 +33,8 @@ import * as recorder from './recorder.js';
 import { setupAnnotation } from '../../app/js/ink-annotate.js';
 import { autoTagsFor } from '../../app/js/core/auto-tags.js';
 import { conflictCopyBody, isBlankBody, sameBody } from '../../app/js/core/memo-file.js';
-import { haptic, reduceMotion, replayClass } from '../../app/js/dom.js';
+import { haptic, reduceMotion, replayClass, swipeDismiss } from '../../app/js/dom.js';
+import { createFindBar } from '../../app/js/find-bar.js';
 import { createClearStamp } from '../../app/js/clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from '../../app/js/suggest-chips.js';
 import { setTouchMode, penJustTouched } from '../../app/js/keyboard-guard.js';
@@ -86,6 +87,18 @@ let retrySave = false; // 파일이 잠깐 없어 저장을 미뤘다 (다시 �
 let closingSave = false; // closeNote 가 저장을 마무리하는 중
 
 export const currentId = () => id;
+
+// ---------- 메모 안 찾기 · 바꾸기 (메모 메뉴 › 찾기, 바꾸기 · 키보드를 붙인 태블릿은 Ctrl+F · Ctrl+H) ----------
+const findBar = createFindBar({ host: document.getElementById('note-screen'), after: document.querySelector('#note-screen > .bar'), find: () => editor?.find, notify: (text) => toast(text) });
+export const openFind = (o) => editor && findBar.open(o);
+/** 열려 있으면 닫는다 → 닫았으면 true (뒤로 가기) */
+export const closeFind = () => findBar.close({ focus: false });
+window.addEventListener('keydown', (e) => {
+  if (!editor || id === null || e.isComposing || !(e.ctrlKey || e.metaKey) || e.altKey) return;
+  if (e.code !== 'KeyF' && e.code !== 'KeyH') return;
+  e.preventDefault();
+  findBar.open({ replace: e.code === 'KeyH' });
+}, true);
 export const isOpen = () => id !== null;
 
 // ---------- 저장 ----------
@@ -257,6 +270,9 @@ function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
   $('banner-keep').textContent = keep;
   el.banner.hidden = false;
 }
+
+// 고를 것이 없는 안내("다른 기기에서도 고쳤어요 · 확인")는 옆으로 밀어 닫는다 — 바뀐 내용을 볼지 고르는 중이면 제자리로
+swipeDismiss(el.banner, () => $('banner-keep').click(), { can: () => !pendingExternal });
 
 el.bannerLoad.addEventListener('click', () => {
   if (pendingExternal) return applyExternal(pendingExternal);
@@ -1387,6 +1403,7 @@ function setupPanels() {
  * @param {{ fresh?: boolean, alarm?: object, highlight?: boolean, capture?: (editor) => Promise<void> }} options
  */
 export async function openNote(memoId, options = {}) {
+  findBar.close(); // 다른 메모를 열면 찾기는 새로
   setupPanels();
   if (opening) {
     // 잠긴 메모의 비밀번호 화면이 떠 있는 채로 다른 메모를 고르면: 그 화면을 닫고 고른 메모로 (뒤로 가기를 기다리지 않게)
@@ -1562,6 +1579,7 @@ function cardMorph(rect, opening, done = () => {}) {
 }
 
 export function closeNote({ quiet = false } = {}) {
+  findBar.close(); // 메모를 닫으면 찾기도 끝
   if (!id) return;
   el.editorRoot.querySelector('.lock-screen [data-lock-cancel]')?.click(); // 비밀번호 화면에서 뒤로 가기 = 닫기
   flush();

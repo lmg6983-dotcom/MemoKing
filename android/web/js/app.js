@@ -448,6 +448,7 @@ app.memoMenu = (id) => {
   for (const s of swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   memoSheet.querySelector('[data-memo-action="open"]').hidden = inNote;
   memoSheet.querySelector('[data-memo-action="print"]').hidden = !inNote;
+  memoSheet.querySelector('[data-memo-action="find"]').hidden = !inNote; // 열어 둔 메모에서만
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
   pin.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
   memoSheet.querySelector('[data-memo-action="lock"] span').textContent = memo.locked ? '잠금 풀기' : '잠그기';
@@ -482,6 +483,10 @@ memoSheet.addEventListener('click', async (e) => {
   const body = note.currentId() === id ? note.editorMarkdown() : memo?.body ?? '';
   const title = isBlankBody(body) ? '새 메모' : extractTitle(body);
   switch (b.dataset.memoAction) {
+    case 'find':
+      closeSheet(memoSheet);
+      note.openFind();
+      break;
     case 'open':
       closeSheet(memoSheet);
       app.openMemo(id);
@@ -1489,6 +1494,7 @@ document.addEventListener('visibilitychange', () => {
 // 뒤로 가기: 확인 창 → 열린 창(다른 캘린더 · 일정 만들기 등) → 색판 → 시트 → 메모 → 목록의 검색·필터 → (앱이 뒤로)
 setBackHandler(() => {
   if (closeConfirm()) return true;
+  if (note.closeFind()) return true; // 메모 안 찾기 막대
   if (cancelTopDialog()) return true;
   if (note.closePalette()) return true;
   if (note.closeStyleMenu()) return true;

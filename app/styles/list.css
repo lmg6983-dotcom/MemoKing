@@ -796,6 +796,8 @@ body.is-dragging .card:hover { transform: none; }
   animation: mk-drop-in 0.18s ease-out;
 }
 .undo-bar span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.undo-bar { touch-action: pan-y; user-select: none; cursor: grab; } /* 옆으로 끌어 밀면 닫힘 (dom.js swipeDismiss) */
+.undo-bar:active { cursor: grabbing; }
 .undo-bar button { flex: none; padding: 6px 12px; border: 0; border-radius: 8px; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; cursor: pointer; }
 .undo-bar button:hover { background: var(--brand-yellow-hover); }
 

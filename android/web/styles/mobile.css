@@ -699,6 +699,8 @@ h2.sheet-title { font-size: 20px; }
   box-shadow: var(--bubble-shadow);
   transform: translateX(-50%);
   animation: toast-in 0.2s ease-out;
+  touch-action: none; /* 옆 · 위로 밀어 닫기 (ui.js swipeDismiss) — 화면 스크롤로 넘기지 않게 */
+  user-select: none;
 }
 .toast.error { background: var(--danger); color: var(--on-danger); }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } }
@@ -1257,3 +1259,9 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 @keyframes m-sync-scan { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 .sync-btn.syncing svg { animation: none; } /* 깜빡이던 구름 대신 진행 줄 */
 @media (prefers-reduced-motion: reduce) { .sync-btn .sync-line i { animation: none; width: 100%; opacity: 0.5; } }
+
+/* 메모 안 찾기 · 바꾸기 막대: 메모 화면 위 막대 바로 아래 (note.css .mk-find-bar) — 손가락 크기 */
+.mk-find-btn { width: var(--tap); height: var(--tap); }
+.mk-find-field { height: 40px; }
+.mk-find-act { height: 40px; }
+.mk-find-opt { height: 32px; }

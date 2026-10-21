@@ -22,6 +22,8 @@ export const KEYMAP_ACTIONS = [
   { id: 'imageSave', group: '메모 창', label: '그림으로 저장', help: '메모를 보이는 그대로 그림 파일(PNG)로 저장해요.', keys: [], run: ['menu', 'image-save-btn'] },
   { id: 'pin', group: '메모 창', label: '목록 맨 위에 고정', help: '이 메모를 메모 목록의 맨 위에 붙여 두거나 풀어요.', keys: [], run: ['menu', 'pin-toggle'] },
   { id: 'lock', group: '메모 창', label: '잠그기', help: '비밀번호로 이 메모를 잠가요. 잠근 메모는 비밀번호를 넣어야 볼 수 있어요.', keys: [], run: ['menu', 'lock-btn'] },
+  { id: 'find', group: '메모 창', label: '찾기', help: '이 메모 안에서 낱말을 찾아요. Enter 는 다음, Shift+Enter 는 이전이에요.', keys: ['ctrl+KeyF'], run: ['app', 'find'] },
+  { id: 'replace', group: '메모 창', label: '바꾸기', help: '이 메모 안에서 낱말을 찾아 다른 말로 하나씩, 또는 모두 바꿔요.', keys: ['ctrl+KeyH'], run: ['app', 'replace'] },
   { id: 'shortcuts', group: '메모 창', label: '단축키 보기', help: '지금 쓸 수 있는 단축키를 한눈에 보여 줘요.', keys: ['ctrl+Slash'], run: ['app', 'shortcuts'] },
   // ---------- 글자 ----------
   { id: 'bold', group: '글자', label: '굵게', help: '고른 글자를 굵게 하거나 되돌려요.', keys: ['ctrl+KeyB'], run: ['cmd', 'bold'] },
@@ -55,6 +57,7 @@ export const FIXED_KEYS = [
   ['항목, 줄 순서 바꾸기', 'Alt+↑ / Alt+↓'],
   ['표: 다음, 이전 칸', 'Tab / Shift+Tab'],
   ['서식 없이 붙여넣기', 'Ctrl+Shift+V'],
+  ['찾기: 다음, 이전 · 바꾸기: 하나, 모두', 'Enter, F3 / Shift+Enter · Enter / Ctrl+Enter'],
 ];
 
 // 편집 · 창이 늘 쓰는 키 — 다른 기능에 줄 수 없다

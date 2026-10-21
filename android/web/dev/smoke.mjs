@@ -663,6 +663,23 @@ try {
       await back();
       await page.waitForTimeout(400);
     }
+    // 알림은 옆으로 밀면 바로 닫힌다 (5초를 기다리지 않게) — 조금만 밀면 제자리로
+    write('PC에서 쓴 메모 2.md', `---\nid: 00000000-0000-4000-8000-0000000000p2\ncreated: ${nowIso}\nupdated: ${new Date().toISOString().replace(/\.\d+Z$/, '+00:00')}\ncolor: blue\ndevice: pc\n---\n# PC에서 쓴 메모 2\n\n두 번째\n`);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForSelector('#toast:not([hidden])', { timeout: 3000 }).catch(() => {});
+    const tb = await page.locator('#toast-text').boundingBox();
+    const drag = async (dx, dy = 0) => {
+      await page.mouse.move(tb.x + 10, tb.y + tb.height / 2);
+      await page.mouse.down();
+      for (let k = 1; k <= 6; k++) await page.mouse.move(tb.x + 10 + (dx * k) / 6, tb.y + tb.height / 2 + (dy * k) / 6);
+      await page.mouse.up();
+      await page.waitForTimeout(350);
+    };
+    await drag(30);
+    const stayed = await page.isVisible('#toast');
+    await drag(160);
+    const gone = !(await page.isVisible('#toast'));
+    check('알림: 조금 밀면 제자리, 옆으로 밀면 바로 닫힘', tb && stayed && gone, JSON.stringify({ stayed, gone }));
   }
 
   // 다른 앱에서 공유하기
@@ -2264,6 +2281,46 @@ try {
     }
     await back();
     await page.waitForTimeout(400);
+  }
+
+  // 메모 안 찾기 · 바꾸기 · 모두 바꾸기: 메뉴 › 찾기, 바꾸기 → 찾은 곳 표시 · 개수 · 낱말 단위 · 모두 바꾸기(한 번에) · Esc
+  {
+    const iso = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
+    write('찾기 연습.md', `---\nid: 00000000-0000-4000-8000-0000000f1d00\ncreated: ${iso}\nupdated: ${iso}\ncolor: yellow\n---\n# 찾기 연습\n\n사과 한 개, 사과 두 개, 배 한 개\n\nApple apple 사과즙\n`);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForTimeout(600);
+    await page.locator('.card', { hasText: '찾기 연습' }).first().tap();
+    await page.waitForSelector('#note-screen:not([hidden]) .mk-doc');
+    await page.waitForTimeout(400);
+    await page.tap('#menu-btn');
+    await page.tap('[data-memo-action="find"]');
+    await page.waitForSelector('.mk-find-bar:not([hidden])');
+    await page.locator('.mk-find-bar .mk-find-input').first().fill('사과');
+    await page.waitForTimeout(300);
+    const st = () => page.evaluate(() => ({ hits: document.querySelectorAll('.mk-doc .mk-find-hit').length, cur: document.querySelectorAll('.mk-doc .mk-find-current').length, count: document.querySelector('.mk-find-count').textContent }));
+    const s1 = await st();
+    await page.tap('.mk-find-bar .mk-find-opt:nth-child(2)'); // 낱말 단위
+    await page.waitForTimeout(200);
+    const s2 = await st();
+    await page.tap('.mk-find-bar .mk-find-btn[aria-label="다음"]');
+    await page.waitForTimeout(150);
+    const s3 = await st();
+    await shot('29-find');
+    check('찾기: 찾은 곳 표시 · 개수(1/3) · 낱말 단위면 "사과즙" 빼고(1/2) · 다음(2/2)', s1.hits === 3 && s1.cur === 1 && s1.count === '1/3' && s2.hits === 2 && s2.count === '1/2' && s3.count === '2/2', JSON.stringify({ s1, s2, s3 }));
+    await page.tap('.mk-find-bar .mk-find-more');
+    await page.locator('.mk-find-replace .mk-find-input').fill('포도');
+    await page.tap('.mk-find-replace .btn.primary'); // 모두 바꾸기
+    await page.waitForTimeout(900);
+    const body = read('찾기 연습.md');
+    check('모두 바꾸기: 낱말 단위로 찾은 두 곳만 "포도"로 (사과즙은 그대로)', /포도 한 개, 포도 두 개/.test(body) && /사과즙/.test(body) && !/사과 한/.test(body), body);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    const closed = await page.evaluate(() => document.querySelector('.mk-find-bar').hidden && !document.querySelector('.mk-doc .mk-find-hit'));
+    check('찾기 막대: Esc 로 닫으면 표시도 사라짐', closed);
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
   }
 
   // 튜토리얼: 설정 › 사용법 둘러보기 → 직접 해 보면 칭찬과 함께 다음 단계 (휴대폰도 PC 와 같은 말풍선)

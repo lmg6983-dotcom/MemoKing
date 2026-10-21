@@ -1,5 +1,6 @@
 // 시트(아래에서 올라오는 창)·잠깐 알림·확인 대화 상자·시스템 막대 색
 import { native } from './native.js';
+import { swipeDismiss } from '../../app/js/dom.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -145,8 +146,21 @@ export function toast(text, isError = false, action = null) {
   void el.offsetWidth;
   el.style.animation = '';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), action ? 5000 : isError ? 4500 : 2600);
+  toastLife = action ? 5000 : isError ? 4500 : 2600;
+  toastTimer = setTimeout(() => (el.hidden = true), toastLife);
+  // 옆이나 위로 밀면 바로 닫힌다 (다 읽었는데 5초 기다리지 않게) · 손을 대고 있는 동안은 사라지지 않음
+  swipeDismiss(el, () => {
+    clearTimeout(toastTimer);
+    el.hidden = true;
+  }, {
+    up: true,
+    onHold: (holding) => {
+      clearTimeout(toastTimer);
+      if (!holding && !el.hidden) toastTimer = setTimeout(() => (el.hidden = true), Math.min(toastLife, 2400));
+    },
+  });
 }
+let toastLife = 2600;
 
 // ---------- 넓은 화면 (펼친 폴더블 · 태블릿): 목록과 메모를 나란히 ----------
 

@@ -139,6 +139,7 @@ body, .note-screen, .share-paper {
 
 /* ---------- 알림 띠 ---------- */
 .banner {
+  touch-action: pan-y; /* 고를 것이 없는 안내는 옆으로 밀어 닫기 (dom.js swipeDismiss) */
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1943,3 +1944,41 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 /* 탭 순서 바꾸기(크롬 탭처럼): 끄는 동안 비켜 서는 탭들이 부드럽게 자리를 바꾼다 */
 .stack-tab.shifting { transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1); }
 @media (prefers-reduced-motion: reduce) { .stack-tab.shifting { transition: none; } }
+
+/* ---------- 메모 안 찾기 · 바꾸기 (find-bar.js · find-replace.js) ---------- */
+/* 찾은 곳: 옅은 주황, 지금 자리: 진한 주황 테두리 — 형광펜(노랑)과 헷갈리지 않게 */
+.mk-doc .mk-find-hit { background: rgba(255, 150, 0, 0.28); border-radius: 2px; box-shadow: 0 0 0 1px rgba(255, 150, 0, 0.35); }
+.mk-doc .mk-find-current { background: rgba(255, 120, 0, 0.55); box-shadow: 0 0 0 2px #ff7a00; }
+.mk-find-bar {
+  /* 위 막대 바로 아래에 끼워 들어가 글을 아래로 민다 (글 위에 떠서 찾은 곳을 가리지 않게) */
+  position: relative; z-index: 5; flex: none;
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 4px 8px 6px; padding: 8px;
+  border-radius: 14px; background: var(--surface); color: var(--text-strong);
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card);
+  -webkit-app-region: no-drag;
+  animation: mk-find-in 0.16s var(--ease-out);
+}
+.mk-find-prev svg { transform: rotate(-90deg); }
+.mk-find-next svg { transform: rotate(90deg); }
+.mk-find-bar[hidden] { display: none; }
+@keyframes mk-find-in { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .mk-find-bar { animation: none; } }
+.mk-find-row { display: flex; align-items: center; gap: 4px; }
+.mk-find-row[hidden] { display: none; }
+.mk-find-field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 8px; border-radius: 10px; background: var(--fill-tab); box-shadow: inset 0 0 0 1px var(--line); }
+.mk-find-field:focus-within { box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.mk-find-field svg { flex: none; width: 16px; height: 16px; color: var(--text-muted); }
+.mk-find-input { flex: 1; min-width: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 14px; outline: none; }
+.mk-find-input::-webkit-search-cancel-button { display: none; }
+.mk-find-count { flex: none; font-size: 12px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.mk-find-bar.none .mk-find-count { color: var(--danger); }
+.mk-find-btn { flex: none; width: 32px; height: 32px; }
+.mk-find-btn:disabled { opacity: 0.35; }
+.mk-find-more.active { background: color-mix(in srgb, var(--text-strong) 11%, transparent); }
+.mk-find-act { flex: none; height: 34px; padding: 0 12px; font-size: 13px; }
+.mk-find-opts { gap: 6px; }
+.mk-find-opt { height: 26px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--fill-tab); color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.16s var(--ease-out), background-color 0.15s ease-out; }
+.mk-find-opt:active { transform: scale(0.97); }
+.mk-find-opt[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
+.mk-find-opt:focus-visible, .mk-find-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
