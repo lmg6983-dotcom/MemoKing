@@ -128,6 +128,8 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
   const top = clearOfSticker({ left, top: below, width: w }); // 왕관 · 테이프 스티커 아래로
   el.style.left = `${Math.round(left)}px`;
   el.style.top = `${Math.round(top)}px`;
+  // 메뉴는 마우스가 누른 모서리에서 펼쳐진다 (화면 끝이라 왼쪽 · 위로 뒤집혀 떴으면 그쪽 모서리에서)
+  el.style.transformOrigin = `${left < x ? 'right' : 'left'} ${top < y ? 'bottom' : 'top'}`;
 
   const enabled = () => focusables.filter((b) => !b.disabled);
   const step = (dir) => {

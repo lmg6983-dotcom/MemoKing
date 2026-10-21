@@ -495,10 +495,10 @@ export function registerIpc(ctx) {
     const res = await client.download(c, items, {
       baseDir: wm.opmsSettings().wrapperDir,
       all: Boolean(all),
-      onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', p); },
+      onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', { ...p, idx: c.idx }); }, // 여러 사건을 함께 받아도 어느 사건의 진행인지 알게
     });
     for (const u of gone) res.failed.push({ upload: u, name: path.basename(u), error: 'OPMS 목록에서 사라졌어요. 새로 고침 해 주세요' });
-    wm.opmsLastDir = res.dir;
+    wm.opmsDirs.add(res.dir);
     indexWrapper(res.dir);
     if (!SMOKE) shell.openPath(res.dir);
     return res;
@@ -521,7 +521,6 @@ export function registerIpc(ctx) {
     if (!it) throw new Error('그 파일을 찾지 못했어요. 새로 고침 뒤 다시 해 주세요');
     const file = await wm.opmsClient().fileFor(c, it, wm.opmsSettings().wrapperDir);
     if (!file) throw new Error('파일 이름이 이상해 열 수 없어요');
-    wm.opmsLastDir = path.dirname(file);
     indexWrapper(path.dirname(file), [file]);
     if (!isOpenableFile(file)) {
       if (!SMOKE) shell.showItemInFolder(file);
@@ -542,7 +541,12 @@ export function registerIpc(ctx) {
     saveSettings();
     return { ok: true, host };
   });
-  ipcMain.handle('opms:open-folder', () => (wm.opmsLastDir ? shell.openPath(wm.opmsLastDir) : ''));
+  // 폴더 열기: dir 이 이번에 받은 사건 폴더면 그 폴더, 아니면 전자포대 저장 폴더 (화면이 아무 경로나 열게 하지 않는다)
+  ipcMain.handle('opms:open-folder', async (_e, dir) => {
+    const target = typeof dir === 'string' && wm.opmsDirs.has(dir) ? dir : wm.opmsSettings().wrapperDir;
+    await fs.promises.mkdir(target, { recursive: true }).catch(() => {});
+    return SMOKE ? target : shell.openPath(target);
+  });
   ipcMain.handle('opms:choose-dir', async (event) => {
     const r = await dialog.showOpenDialog(senderWindow(event), { title: '전자포대를 저장할 폴더', defaultPath: wm.opmsSettings().wrapperDir, properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return wm.opmsSettings().wrapperDir;
@@ -813,7 +817,7 @@ export function registerIpc(ctx) {
     await writeClipboard({ png: Buffer.from(String(base64), 'base64') });
     return { ok: true };
   });
-  // fileName: 메모가 아닌 그림(추억 한 장으로)의 이름
+  // fileName: 메모가 아닌 그림(회상 한 장으로)의 이름
   ipcMain.handle('image:save', async (event, id, base64, fileName) => {
     const memo = id ? getVault()?.get(String(id)) : null;
     const name = typeof fileName === 'string' && /^[^\\/:*?"<>|]{1,120}\.png$/i.test(fileName) ? fileName : `${pdfFileName(memo?.title ?? '메모').replace(/\.pdf$/i, '')}.png`;

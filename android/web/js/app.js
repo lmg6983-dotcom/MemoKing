@@ -48,6 +48,10 @@ window.memoking = { platform: 'android', vaultBase: `${location.origin}/vault/`,
 
 injectIcons();
 attachSliders(); // 탭·고르기 칸: 선택 표시가 미끄러진다
+// 켜기 · 끄기 스위치를 바꾸면 손끝에 짧게 (화면만 바뀌면 눌렸는지 손으로 알기 어렵다)
+document.addEventListener('change', (e) => {
+  if (e.target instanceof HTMLInputElement && e.target.classList.contains('switch')) haptic(6);
+});
 injectMobileIcons();
 
 // ---------- 일정 탭의 다른 캘린더 (list-reminders.js 가 씀) ----------
@@ -308,7 +312,7 @@ function refreshHistoryRow() {
   $('history-apps-2').disabled = !(enabled && granted); // 모으기가 꺼져 있으면 고를 것이 없다
   $('history-note').textContent = enabled && !granted
     ? '휴대폰 설정에서 "알림 접근"을 허용해 주세요'
-    : '보관함 탭에 모아요. 이 휴대폰에만 저장해요'
+    : '알림 보관함 탭에 모아요. 이 휴대폰에만 저장해요'
 }
 
 let notifyAsked = false;
@@ -489,13 +493,13 @@ memoSheet.addEventListener('click', async (e) => {
       else toast(memo.pinned ? '목록 고정을 풀었어요' : '목록 맨 위에 고정했어요');
       break;
     case 'day': {
-      // 추억 달력에서 이 메모를 둘 날 (memory-day.js)
+      // 회상 달력에서 이 메모를 둘 날 (memory-day.js)
       note.flush();
       closeSheet(memoSheet);
       const day = await openMemoryDay({ created: memo?.created, day: memo?.day });
       if (day === null) break;
       if (!app.vault.setMeta(id, { day })) toast('날짜를 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
-      else toast(day ? `추억 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
+      else toast(day ? `회상 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
       break;
     }
     case 'mode': {

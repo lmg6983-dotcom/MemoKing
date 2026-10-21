@@ -136,7 +136,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
       actionButton('note', '메모로 만들기', toMemo, '메모로'),
       actionButton('copy', '복사', copy),
       // 메모가 아니라 보관함의 이 알림 기록만 지운다
-      actionButton('trash', '보관함에서 삭제', remove, '삭제'),
+      actionButton('trash', '알림 보관함에서 삭제', remove, '삭제'),
     );
     // 이 앱 알림 그만 모으기 (안드로이드)
     if (block) actions.append(actionButton('block', `${e.app} 알림 그만 모으기`, block, '그만 모으기'));
@@ -151,7 +151,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
           { id: 'copy', label: '복사' },
           ...(block ? [{ id: 'block', label: `${e.app} 알림 그만 모으기` }] : []),
           { type: 'separator' },
-          { id: 'remove', label: '보관함에서 삭제', accelerator: 'Delete' },
+          { id: 'remove', label: '알림 보관함에서 삭제', accelerator: 'Delete' },
         ], at);
         ({ memo: toMemo, copy, block, remove })[id]?.();
       });

@@ -1577,13 +1577,13 @@ export async function runSmoke({
     check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림, /.test(notiMd));
     await closeNote(memoFromNoti.id);
     // 알림 하나 지우기: 그 자리에 되돌리기 5초 → 되돌리면 그대로, 기다리면 지워짐
-    await listJs(`document.querySelector('#history-rows .noti [aria-label="보관함에서 삭제"]').click()`);
+    await listJs(`document.querySelector('#history-rows .noti [aria-label="알림 보관함에서 삭제"]').click()`);
     await wait(300);
     const notiUndoShown = await listJs(`!!document.querySelector('#history-rows .noti-undo')`) && history.list({ query: '회의' }).length === 1;
     await listJs(`document.querySelector('#history-rows .noti-undo button').click()`);
     await wait(200);
     const notiBack = await listJs(`!document.querySelector('#history-rows .noti-undo') && !!document.querySelector('#history-rows .noti')`);
-    await listJs(`document.querySelector('#history-rows .noti [aria-label="보관함에서 삭제"]').click()`);
+    await listJs(`document.querySelector('#history-rows .noti [aria-label="알림 보관함에서 삭제"]').click()`);
     const notiRemoved = await until(() => history.list({ query: '회의' }).length === 0, '알림 지움', 7000).then(() => true).catch(() => false);
     check('보관한 알림 지우기 (그 자리에 되돌리기 5초, 되돌리면 그대로)', notiUndoShown && notiBack && notiRemoved, JSON.stringify({ notiUndoShown, notiBack, notiRemoved }));
     await listJs(`document.querySelector('.tabs [aria-selected="true"]').focus()`);

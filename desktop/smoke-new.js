@@ -31,19 +31,22 @@ export function prepareSmoke(userData) {
 
 // 가짜 OPMS 서버: 받은 SELECT 글을 보고 표를 돌려준다 (1줄 열 이름 · 2~4줄 정보 · 5줄부터 자료, \x01 로 나눔)
 function fakeOpms() {
+  const gate = { held: null, release: () => {} }; // gate.hold() 동안 파일 받기는 기다린다 (받는 중에 다른 사건을 보는 점검)
+  gate.hold = () => { gate.held = new Promise((r) => { gate.release = r; }); };
   const table = (cols, rows) => [cols.join('\x01'), 'm', 'm', 'm', ...rows.map((r) => r.join('\x01'))].join('\n');
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', (d) => { body += d; });
     req.on('end', () => {
-      if (req.url.startsWith('/OPMS/')) return res.end(`FILE ${decodeURIComponent(req.url)}`);
+      if (req.url.startsWith('/OPMS/')) return Promise.resolve(gate.held).then(() => res.end(`FILE ${decodeURIComponent(req.url)}`));
       const sql = new URLSearchParams(body).get('sql') ?? '';
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       if (/FROM opms_app/.test(sql)) {
+        const one = sql.match(/\bidx = '(\d+)'/)?.[1]; // 사건 하나 (idx 로) — 회사 서버처럼 그 사건만
         return res.end(table(['idx', 'div', 'ourref', 'yourref', 'n_app', 'd_app', 'applicant', 'inventor', 'title_kor', 'd_accept', 'ck_out'], [
           ['101', '특허', 'FPD/2026-0271/E', 'Y-77', '10-2026-0012345', '2026-02-03 00:00:00.0', '메모킹 주식회사', '홍길동', '메모를 쉽게 쓰는 장치', '2026-01-10 00:00:00.0', 'N'],
           ['102', '특허', 'FPD/2026-0271/D', 'Y-78', '10-2026-0099999', '', '메모킹 주식회사', '', '두 번째 사건', '2026-01-09 00:00:00.0', 'N'],
-        ]));
+        ].filter((r) => !one || r[0] === one)));
       }
       if (/FROM opms_attach/.test(sql)) {
         // 회사 서버와 같은 열: 요약은 MEMO, 올린 사람은 MUNAME (로그인 ID MUID 는 보이지 않아야)
@@ -58,7 +61,7 @@ function fakeOpms() {
       return res.end(table(['idx'], []));
     });
   });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, host: `http://127.0.0.1:${server.address().port}` })));
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, gate, host: `http://127.0.0.1:${server.address().port}` })));
 }
 
 export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow, memoHotkeys, smokeHud, windowManager }) {
@@ -229,11 +232,29 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     const wrapCols = await js(ow, `({ head: [...document.querySelectorAll('.op-table thead th')].map((t) => t.textContent), rows: [...document.querySelectorAll('.op-table tbody tr')].map((r) => r.textContent) })`);
     check('전자포대: 요약(MEMO) · 등록자(MUNAME) 열 — 로그인 ID 는 안 보임', wrapCols.head.includes('요약') && wrapCols.head.includes('등록자')
       && wrapCols.rows.some((t) => t.includes('최초 출원 서류') && t.includes('김변리')) && !wrapCols.rows.some((t) => t.includes('kim01')), JSON.stringify(wrapCols));
+    const footLinks = await js(ow, `[...document.querySelectorAll('#op-foot .op-link')].map((b) => b.textContent).join(',')`);
+    check('전자포대 저장 위치: 폴더 바꾸기 옆에 폴더 열기', footLinks.startsWith('폴더 바꾸기,폴더 열기'), footLinks);
+    // 받는 중에 다른 사건(102)을 열어도 그 사건의 전자포대는 막히지 않는다 (예전: 받는 중 하나가 모든 사건의 받기 단추를 막음)
+    fake.gate.hold();
     await js(ow, `[...document.querySelectorAll('#op-foot .op-btn')].find((b) => b.textContent.startsWith('전체 받기')).click()`);
+    await until(() => js(ow, `/받는 중/.test(document.querySelector('#op-foot .op-status')?.textContent ?? '')`), '받는 중');
+    ow.webContents.send('opms:show', { idx: '102', tab: 'wrapper' });
+    const other = await until(() => js(ow, `(() => {
+      if (document.getElementById('op-our').textContent !== 'FPD/2026-0271/D' || document.querySelectorAll('.op-table tbody tr').length !== 2) return null;
+      const all = [...document.querySelectorAll('#op-foot .op-btn')].find((b) => b.textContent.startsWith('전체 받기'));
+      return { allOn: !all.disabled, status: document.querySelector('#op-foot .op-status').textContent };
+    })()`), '다른 사건 전자포대').catch(() => null);
+    check('전자포대: 한 사건을 받는 동안 다른 사건을 열면 그 사건은 받을 수 있고 "받는 중" 도 아님', other?.allOn && !/받는 중/.test(other.status), JSON.stringify(other));
+    fake.gate.release();
+    fake.gate.held = null;
+    ow.webContents.send('opms:show', { idx: '101', tab: 'wrapper' });
     const st = await until(() => js(ow, `(() => { const s = document.querySelector('#op-foot .op-status'); return s && /저장/.test(s.textContent) && s.textContent; })()`), '전자포대 받기', 10000).catch(() => '');
     const folder = path.join(wrapperDir, 'FPD20260271E_Y77');
     const saved = fs.existsSync(folder) ? fs.readdirSync(folder).sort() : [];
     await capture(ow, 'smoke-new-opms.png');
+    const opened = await js(ow, `Promise.all([opms.openFolder(${JSON.stringify(folder)}), opms.openFolder('C:/Windows'), opms.openFolder()])`);
+    const gotLabel = await js(ow, `document.querySelector('#op-foot .op-open')?.textContent`);
+    check('폴더 열기: 받은 사건 폴더는 그 폴더, 그 밖의 경로는 전자포대 저장 폴더로', opened[0] === folder && opened[1] === wrapperDir && opened[2] === wrapperDir && gotLabel === '받은 폴더 열기', JSON.stringify({ opened, gotLabel }));
     check('전자포대 전체 받기 → 관리번호 폴더에 파일들 + 사건정보.txt', saved.join(',') === '명세서.docx,사건정보.txt,출원서.pdf' && fs.readFileSync(path.join(folder, '출원서.pdf'), 'utf8') === 'FILE /OPMS/up/a1.pdf' && /2개 저장/.test(st), JSON.stringify({ st, saved }));
     ow.close();
     fake.server.close();
@@ -403,18 +424,29 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         // 제목 줄 오른쪽 위: 왕관 · 동기화 · 설정이 검색 줄이 아니라 맨 위에, 창 버튼 영역을 침범하지 않음
         const bar = await js(list, `(() => { const q = (s) => document.querySelector(s)?.getBoundingClientRect(); const c = q('#list-top-btn'), g = q('#settings-btn'), t = q('.titlebar'), s = q('#search'); return { crown: c && [c.left, c.top], gearInTitle: g.top >= t.top && g.bottom <= t.bottom, gearRight: g.right <= (navigator.windowControlsOverlay?.visible ? navigator.windowControlsOverlay.getTitlebarAreaRect().right : innerWidth - 142) + 1, order: c.left < g.left, searchBelow: s.top >= t.bottom - 1, inToolbar: !!document.querySelector('.toolbar #settings-btn, .toolbar #sync-btn') }; })()`);
         check('목록 제목 줄: 왕관 · 동기화 · 설정이 맨 위(창 버튼 왼쪽)에 있고 검색 줄에는 없음', bar.gearInTitle && bar.gearRight && bar.order && bar.searchBelow && !bar.inToolbar, JSON.stringify(bar));
-        // 왕관 스티커: 붙이면 스티커가 단추(설정 · 동기화)와 창 버튼을 가리지 않는다 — 좁은 폭(390)에서도
+        // 왕관 스티커: 붙이면 스티커가 단추(설정 · 동기화)와 창 버튼을 가리지 않는다 — 좁은 폭(440)에서도
         const sizeBefore = list.getBounds();
-        list.setBounds({ ...sizeBefore, width: 390 });
+        list.setBounds({ ...sizeBefore, width: 440 });
         await wait(150);
         await js(list, `document.getElementById('list-top-btn').click()`);
         const stuck = await until(() => windowManager.stickers.get(list.id)?.win, '왕관 스티커', 4000).catch(() => null);
         if (stuck) await until(() => stuck.isVisible(), '스티커 보임', 3000).catch(() => {});
         const sb = stuck && !stuck.isDestroyed() ? stuck.getBounds() : null;
         const lb = list.getBounds();
-        const gearRect = await js(list, `(() => { const r = document.getElementById('settings-btn').getBoundingClientRect(); return { left: r.left, right: r.right }; })()`);
-        const overlap = sb ? sb.x + sb.width > lb.x + gearRect.left - 6 || sb.x < lb.x + 90 : null;
-        check('왕관 스티커를 붙여도 (390px 폭) 설정 · 동기화 단추와 상표를 가리지 않음', Boolean(sb) && overlap === false, JSON.stringify({ sb, lb, gearRect }));
+        // 가리면 안 되는 것: Life/Work 스위치 · 오른쪽 위 단추 (좁은 창에서는 로고 위에 붙는다)
+        const hitRects = async () => js(list, `['#mode-switch button', '#sync-btn:not([hidden])', '#settings-btn'].flatMap((s) => [...document.querySelectorAll(s)]).map((e) => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; })`);
+        // 스위치 끝 몇 px 은 봐준다 (해 그림의 왼쪽 가장자리)
+        const covers = (sb, lb, rects) => rects.some((r) => sb.x - lb.x < r.right - 6 && sb.x + sb.width - lb.x > r.left + 6 && sb.y + sb.height - lb.y > r.top + 2);
+        const rects = await hitRects();
+        const overlap = sb ? covers(sb, lb, rects) : null;
+        check('왕관 스티커를 붙여도 (440px 폭) Life/Work 스위치 · 동기화 · 설정 단추를 가리지 않음 (로고 위에)', Boolean(sb) && overlap === false && sb.x - lb.x < 40, JSON.stringify({ sb, lb, rects }));
+        // 넓은 창에서는 가운데 빈 줄에
+        list.setBounds({ ...lb, width: 900 });
+        const wide = await until(() => { const w = windowManager.stickers.get(list.id)?.win; const b = w && !w.isDestroyed() && w.getBounds(); return b && b.x - list.getBounds().x > 300 && b; }, '넓은 창 스티커', 3000).catch(() => null);
+        const wideOverlap = wide ? covers(wide, list.getBounds(), await hitRects()) : null;
+        check('왕관 스티커: 넓은 창(900px)에서는 제목 줄 가운데 빈 곳에, 단추를 가리지 않음', Boolean(wide) && wideOverlap === false, JSON.stringify({ wide, lb: list.getBounds() }));
+        list.setBounds({ ...lb, width: 440 });
+        await wait(150);
         await capture(list, 'list-sticker-narrow.png');
         await windowManager.setListOnTop(false);
         await until(() => !windowManager.stickers.get(list.id), '왕관 떼기', 3000).catch(() => {});

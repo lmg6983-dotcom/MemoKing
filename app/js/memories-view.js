@@ -1,4 +1,4 @@
-// 추억 달력 (일정 탭 › 추억) — PC 목록 창 · 휴대폰이 같이 쓴다. 모으는 규칙은 core/memories.js
+// 회상 달력 (일정 탭 › 회상) — PC 목록 창 · 휴대폰이 같이 쓴다. 모으는 규칙은 core/memories.js
 //   ① 사진 달력: 칸마다 그날의 대표 사진(여러 장이면 뒤에 살짝 기운 사진 더미), 글만 있는 날은 그 메모 색 메모지 조각
 //   ② 맨 위 표지 띠: "10월의 기록 · 12일 · 사진 48장" + 그 달의 사진 몇 장(폴라로이드) + 태그로 고르기
 //   ③ 날을 누르면 그날의 기록: 스크랩북 한 쪽 — 사진은 테이프 붙인 폴라로이드, 메모는 메모지 조각 · 좌우로 다른 날
@@ -6,6 +6,7 @@ import { collectMemories, monthSummary, neighborDays, dayKey, keyDate } from './
 import { vaultUrl } from './media.js';
 import { koFullDate } from './core/time.js';
 import { icon } from './icons.js';
+import { openCollagePreview } from './collage-preview.js';
 
 const el = (tag, className = '', text = '') => {
   const e = document.createElement(tag);
@@ -23,24 +24,28 @@ const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 
 /**
  * @param {{ api: any, notify?: (text: string, isError?: boolean) => void, onOverlay?: (el: HTMLElement, close: () => void) => (() => void),
- *           collage?: (o: { title: string, sub: string, photos: object[], memos: object[] }) => void }} o
- *   onOverlay: 그날의 기록을 열 때 (휴대폰: 뒤로 가기로 닫히게 등록 — 돌려준 함수는 닫을 때 부른다)
- *   collage: 한 장으로 남기기 (memories-collage.js)
+ *           collage?: { render: (o: object) => Promise<string>, actions: (base64: string, o: object) => object[] } }} o
+ *   onOverlay: 그날의 기록 · 미리보기를 열 때 (휴대폰: 뒤로 가기로 닫히게 등록 — 돌려준 함수는 닫을 때 부른다)
+ *   collage: 한 장으로 남기기 — render 로 그림을 만들고(memories-collage.js) 미리보기에서 actions 중에 고른다 (collage-preview.js)
+ *   mode: 지금 모드 ('life' · 'work', 나눠 쓰지 않으면 null) — 그 모드의 메모만 모은다
  */
-export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, collage = null }) {
+export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, collage = null, mode = () => null }) {
   const root = el('div', 'mem');
   let memos = [];
   let month = new Date(); // 보이는 달 (1일)
   let picked = []; // 고른 태그
   let days = new Map(); // 보이는 달의 기록
   let loaded = false;
+  let memosKey = ''; // 모은 메모 (바뀌었는지 보려고)
 
   async function load() {
     try {
-      memos = ((await api.memos.list()) ?? []).filter((m) => m.mode !== 'work'); // 추억은 Life 의 메모로
+      const now = mode(); // Work / Life 를 나눠 쓰면 지금 모드의 메모로 (나눠 쓰지 않으면 모두)
+      memos = ((await api.memos.list()) ?? []).filter((m) => !now || (m.mode === 'work' ? 'work' : 'life') === now);
+      memosKey = memos.map((m) => `${m.id}:${m.updated}:${m.day ?? ''}`).join('|');
       loaded = true;
     } catch (err) {
-      console.warn('[추억]', err);
+      console.warn('[회상]', err);
       memos = [];
     }
   }
@@ -85,7 +90,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       const share = el('button', 'mem-share');
       share.type = 'button';
       share.append(icon('share'), el('span', '', '한 장으로'));
-      share.title = '이 달의 기록을 그림 한 장으로 (공유, 저장)';
+      share.title = '이 달의 기록을 그림 한 장으로 (미리 보고 공유, 복사, 저장, 메모로 만들기)';
       share.addEventListener('click', () => makeCollage(share, {
         title: `${month.getFullYear()}년 ${month.getMonth() + 1}월의 기록`,
         sub: `${sum.days}일, 사진 ${sum.photos}장`,
@@ -113,7 +118,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
 
     const grid = el('div', 'mem-grid');
     grid.setAttribute('role', 'grid');
-    grid.setAttribute('aria-label', `${month.getMonth() + 1}월 추억 달력`);
+    grid.setAttribute('aria-label', `${month.getMonth() + 1}월 회상 달력`);
     const week = el('div', 'mem-week mem-weekdays');
     WEEK.forEach((w, i) => week.append(el('span', i === 0 ? 'mem-wd mem-sun' : 'mem-wd', w)));
     grid.append(week);
@@ -199,7 +204,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       const share = el('button', 'icon-btn mem-page-share');
       share.type = 'button';
       share.setAttribute('aria-label', '이 날을 그림 한 장으로');
-      share.title = '이 날을 그림 한 장으로 (공유, 저장)';
+      share.title = '이 날을 그림 한 장으로 (미리 보고 공유, 복사, 저장, 메모로 만들기)';
       share.append(icon('share'));
       share.addEventListener('click', () => makeCollage(share, {
         title: `${date.getMonth() + 1}월 ${date.getDate()}일 ${'일월화수목금토'[date.getDay()]}요일`,
@@ -245,6 +250,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       }
     });
     const onKey = (e) => {
+      if (document.querySelector('.mem-preview')) return; // 한 장으로 미리보기가 떠 있으면 그쪽이 먼저
       if (e.key === 'Escape') {
         if (overlay.querySelector('.mem-zoom')) overlay.querySelector('.mem-zoom').remove();
         else closeDay();
@@ -278,7 +284,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
     setTimeout(() => overlay.remove(), 160);
   }
 
-  // 한 장으로: 만드는 동안 단추를 잠그고 "만드는 중" (큰 달은 1~2초 걸린다)
+  // 한 장으로: 만드는 동안 단추를 잠그고 "만드는 중" (큰 달은 1~2초 걸린다) → 미리보기에서 공유 · 복사 · 저장 · 메모로 만들기
   async function makeCollage(button, data) {
     if (button.getAttribute('aria-busy') === 'true') return;
     const label = button.querySelector('span');
@@ -286,7 +292,11 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
     button.setAttribute('aria-busy', 'true');
     if (label) label.textContent = '만드는 중';
     try {
-      await collage(data);
+      const base64 = await collage.render(data);
+      openCollagePreview({ title: data.title, base64, actions: collage.actions(base64, data), notify, onOverlay });
+    } catch (err) {
+      console.error(err);
+      notify(err?.message || '그림을 만들지 못했어요', true);
     } finally {
       button.removeAttribute('aria-busy');
       if (label) label.textContent = was;
@@ -354,9 +364,11 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       await load();
       render();
     },
-    /** 메모가 바뀌었을 때 (보이는 중이면) */
-    async refresh() {
+    /** 메모가 바뀌었을 때 (보이는 중이면) — ifChanged: 모은 메모가 그대로면 다시 그리지 않는다 (탭으로 돌아올 때) */
+    async refresh({ ifChanged = false } = {}) {
+      const before = memosKey;
       await load();
+      if (ifChanged && memosKey === before && root.childElementCount) return;
       render();
       if (album) closeDay();
     },

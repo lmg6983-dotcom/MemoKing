@@ -1,8 +1,9 @@
 // Google Drive 연결 화면 (① OAuth 클라이언트 ② 로그인 ③ 폴더 고르기) 과 동기화 상태 표시
 import { drive, call } from './native.js';
 import { app } from './state.js';
-import { openSheet, closeSheet, toast } from './ui.js';
+import { openSheet, closeSheet, toast, adoptSheet, releaseSheet } from './ui.js';
 import { icon } from '../../app/js/icons.js';
+import { openAiDriveGuide } from '../../app/js/ai-drive-guide.js';
 
 const $ = (x) => document.getElementById(x);
 const sheet = $('drive-sheet');
@@ -27,7 +28,7 @@ export function startConnect(done) {
     },
   });
   if (s.connected) {
-    if (s.active) openFolders(); // "폴더 변경"
+    if (s.active) openFolders(); // "폴더 바꾸기"
     else autoConnect();
   } else if (s.nativeAvailable) {
     // 휴대폰 구글 계정: 바로 계정 고르기·허용 화면으로
@@ -105,7 +106,7 @@ async function autoConnect() {
   }
 }
 
-// ---------- ③-1 폴더 바꾸기 (고급: 연결된 뒤 "폴더 변경") ----------
+// ---------- ③-1 폴더 바꾸기 (고급: 연결된 뒤 "폴더 바꾸기") ----------
 
 function openFolders() {
   path = [{ id: 'root', name: '내 드라이브' }];
@@ -259,7 +260,7 @@ export function renderStatus(s = drive.status()) {
   if (!fullBusy) $('drive-full').checked = Boolean(s.fullScope);
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;
-  $('drive-connect').textContent = s.active && s.connected ? '폴더 변경' : '연결하기';
+  $('drive-connect').textContent = s.active && s.connected ? '폴더 바꾸기' : '연결하기';
   $('drive-connect').classList.toggle('primary', !(s.active && s.connected)); // 연결 전에는 PC처럼 주 단추
 }
 
@@ -300,3 +301,18 @@ export async function syncNow() {
   }
   renderStatus();
 }
+
+// Gemini, ChatGPT 의 Google Drive 연결로 메모 폴더를 직접 다룰 때 붙여 넣을 안내문 (app/js/ai-drive-guide.js)
+$('ai-drive-guide')?.addEventListener('click', () => {
+  const s = drive.status();
+  openAiDriveGuide({
+    folder: s.folderName || '메모킹',
+    linked: s.connected && s.active ? Boolean(s.fullScope) : null,
+    copy: (text) => app.api.copyText(text), // "복사했어요" 는 copyText 가 알린다
+    notify: (text, isError) => isError && toast(text, true),
+    onOverlay: (el, close) => {
+      adoptSheet(el, close); // 뒤로 가기로 닫히게
+      return () => releaseSheet(el);
+    },
+  });
+});

@@ -11,8 +11,9 @@ import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog, isTwoPane, toast, adoptSheet, releaseSheet } from './ui.js';
 import { call } from './native.js';
 import { renderCollage, collageName } from '../../app/js/memories-collage.js';
+import { base64Bytes, collageMemoBody } from '../../app/js/collage-preview.js';
 import { tutEvent } from './tutorial.js';
-import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition } from '../../app/js/dom.js';
+import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition, setModeSwitch } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
 import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode } from '../../app/js/core/modes.js';
@@ -99,16 +100,20 @@ export function setWorkLife(on) {
   }
   if (!on) setMode('life');
   withViewTransition(() => {
-    showMode();
+    showMode({ later: true });
     render();
     remindersTab?.modeChanged();
-  });
+  }).then(syncSwitch);
   if (on) workClock();
   app.rescheduleAlarms?.(); // 퇴근 뒤 조용히가 켜지거나 꺼진다
 }
 export const currentMode = () => state.mode;
 
-function showMode() {
+// 해 · 달 스위치 (화면 전환 속에서 바꿀 때는 전환이 끝난 뒤에 — dom.js setModeSwitch)
+const syncSwitch = () => setModeSwitch($('mode-switch'), state.mode);
+/** @param {{ later?: boolean }} [o] later: 스위치는 부른 쪽이 나중에 (syncSwitch) */
+function showMode({ later = false } = {}) {
+  if (!later) syncSwitch();
   document.documentElement.dataset.mode = state.mode;
   setListTheme(workLifeOn() ? state.mode : null, { noteOpen: app.isNoteOpen?.() ?? false }); // Work 는 어두운 화면 · Life 는 밝은 화면 (나눠 쓰지 않으면 시스템 설정)
   $('mode-switch').hidden = !workLifeOn();
@@ -130,11 +135,11 @@ export function setMode(mode) {
   }
   haptic(8);
   withViewTransition(() => {
-    showMode();
+    showMode({ later: true });
     state.filter.tags = [];
     render();
     remindersTab?.modeChanged();
-  });
+  }).then(syncSwitch);
   if (mode === 'work' && workLifeOn()) hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요. 메모를 꾹 눌러 "Work로 옮기기"나 설정의 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
 }
 for (const b of document.querySelectorAll('#mode-switch [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
@@ -470,8 +475,16 @@ function runSearch() {
 }
 el.search.addEventListener('input', () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(runSearch, 120);
+  searchTimer = setTimeout(() => {
+    calmRender = true; // 글자를 칠 때마다 카드가 전부 튀어나오고 미끄러지면 정신없다 — 바로 바뀌게
+    try {
+      runSearch();
+    } finally {
+      calmRender = false;
+    }
+  }, 120);
 });
+let calmRender = false;
 el.search.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') el.search.blur(); // 키보드 내리기
 });
@@ -492,22 +505,32 @@ function setTab(tab) {
   $('fab').setAttribute('aria-label', tab === 'reminders' ? '새 일정' : '새 메모');
   if (tab === 'reminders') $('fab').removeAttribute('aria-haspopup');
   else $('fab').setAttribute('aria-haspopup', 'menu');
-  if (tab === 'reminders') {
-    remindersTab.setQuery(el.search.value, { quiet: true }); // 달력은 refresh 가 한 번만 그린다
-    remindersTab.refresh();
-  } else runSearch();
+  // 무거운 일(달력 · 카드 다시 그리기)은 탭 표시가 먼저 바뀐 다음 프레임에 — 누른 손가락 아래에서 탭이 바로 바뀌게
+  //   (예전: 누르는 순간 목록 카드 전체를 다시 그려 150ms 넘게 멈춘 뒤에야 탭이 바뀌어 끊겨 보였다)
+  const my = ++tabSeq;
+  requestAnimationFrame(() => setTimeout(() => {
+    if (my !== tabSeq || state.tab !== tab) return; // 그사이 다른 탭을 눌렀다
+    if (tab === 'reminders') {
+      remindersTab.setQuery(el.search.value, { quiet: true }); // 달력은 refresh 가 한 번만 그린다
+      remindersTab.refresh({ ifChanged: true });
+    } else if (tab === 'history' || stale || el.search.value.trim() !== state.query || !el.cards.querySelector('.col')) runSearch();
+    // 메모 탭: 검색어도 메모도 그대로면 그려 둔 카드를 그대로 보인다 (바뀐 메모는 refresh 가 이미 그려 둠)
+  }, 0));
 }
+let tabSeq = 0;
 tabKeys(document.querySelector('.tabs'));
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');
-  if (b) setTab(b.dataset.tab);
+  if (!b) return;
+  if (b.dataset.tab !== state.tab) haptic(5); // 손끝에 짧게 (바뀔 때만)
+  setTab(b.dataset.tab);
 });
 
 // ---------- 카드 누르기 · 길게 누르기 ----------
 
 el.cards.addEventListener('click', (e) => {
   const card = e.target.closest('.card');
-  if (card) app.openMemo(card.dataset.id, { fromList: true });
+  if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect() }); // 그 카드가 커지며 메모 화면이 된다
 });
 // 카드를 옆으로 밀어 지우기 (여러 개를 빨리 지울 때) — 묻지 않고 휴지통으로, 되돌리기 가능
 //   카드는 손가락을 프레임마다 한 번만(requestAnimationFrame) 따라가고, 미는 동안은 compositor 층(will-change)이라
@@ -692,7 +715,8 @@ function glideCards(change) {
   change();
   const still = [];
   const moves = [];
-  const animate = !reduceMotion();
+  const animate = !reduceMotion() && !calmRender;
+  if (calmRender) for (const item of el.cards.querySelectorAll('.item')) item.style.animation = 'none'; // 검색 중: 다시 보인 카드도 튀어나오지 않게
   for (const c of el.cards.querySelectorAll('.card')) {
     const a = before.get(c.dataset.id);
     if (!a) continue;
@@ -704,7 +728,7 @@ function glideCards(change) {
     const dx = a.left - b.left;
     const dy = a.top - b.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 300, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   }
 }
 
@@ -757,23 +781,39 @@ export function setup() {
       const memo = state.memos.find((m) => m.id === item.memoId);
       return !workLifeOn() || !memo || memoMode(memo) === state.mode;
     },
-    // 추억 보기 (Life 에서만): 그날의 기록은 뒤로 가기로 닫힌다
+    // 회상 보기: 그날의 기록은 뒤로 가기로 닫힌다
     memories: {
-      on: () => !workLifeOn() || state.mode === 'life',
+      mode: () => (workLifeOn() ? state.mode : null), // 회상도 지금 모드의 메모로
       onOverlay: (el, close) => {
         adoptSheet(el, close);
         return () => releaseSheet(el);
       },
-      // 한 장으로: 휴대폰 공유 창 (카카오톡 · 갤러리에 저장 …)
-      collage: async (o) => {
-        toast('그림을 만드는 중');
-        try {
-          const base64 = await renderCollage(o);
-          await call('shareFile', { base64, name: collageName(o), mime: 'image/png', title: o.title });
-        } catch (err) {
-          console.error(err);
-          toast(err.message || '그림을 만들지 못했어요', true);
-        }
+      // 한 장으로: 미리보기에서 공유(안드로이드 공유 창) · 복사 · 저장(저장 창) · 메모로 만들기
+      collage: {
+        render: (o) => renderCollage(o),
+        actions: (base64, o) => [
+          { id: 'share', label: '공유', icon: 'share', run: async () => {
+            await call('shareFile', { base64, name: collageName(o), mime: 'image/png', title: o.title });
+            return '';
+          } },
+          { id: 'copy', label: '복사', icon: 'copy', run: async () => {
+            await call('copyImage', { base64 });
+            return '그림을 복사했어요. 붙여 넣어 보낼 수 있어요';
+          } },
+          { id: 'save', label: '저장', icon: 'folder', run: async () => {
+            const name = await call('saveAs', { name: collageName(o), mime: 'image/png', base64 });
+            return name ? `${name}로 저장했어요` : '';
+          } },
+          { id: 'memo', label: '메모로 만들기', icon: 'note', close: true, run: async () => {
+            if (!app.vault) throw new Error('메모 폴더가 아직 없어요');
+            const rel = app.vault.saveAttachment(base64Bytes(base64), 'png');
+            const id = app.vault.import({ body: collageMemoBody(o.title, rel) });
+            if (!id) throw new Error('메모를 만들지 못했어요');
+            refresh();
+            app.api.memo.open(id);
+            return '새 메모로 만들었어요';
+          } },
+        ],
       },
     },
   });

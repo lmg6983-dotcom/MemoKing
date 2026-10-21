@@ -19,6 +19,9 @@ import { hintOnce } from './hints.js';
 import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { renderCollage, collageName } from './memories-collage.js';
+import { base64Bytes, collageMemoBody } from './collage-preview.js';
+import { openAiDriveGuide } from './ai-drive-guide.js';
+import { chooseShare, showSharePop, SHARE_DONE } from './share-menu.js';
 import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL } from './core/modes.js';
 import { openModeHelper } from './mode-helper-dialog.js';
 import { renderWorkSettings } from './work-settings.js';
@@ -28,7 +31,7 @@ import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch } from './dom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -295,7 +298,11 @@ function otherModeLink(n) {
 }
 
 // ---------- Work / Life 바꾸기 (제목 줄 왼쪽) ----------
-function showMode() {
+// 해 · 달 스위치 (화면 전환 속에서 바꿀 때는 전환이 끝난 뒤에 — dom.js setModeSwitch)
+const syncSwitch = () => setModeSwitch($('mode-switch'), state.mode);
+/** @param {{ later?: boolean }} [o] later: 스위치는 부른 쪽이 나중에 (syncSwitch) */
+function showMode({ later = false } = {}) {
+  if (!later) syncSwitch();
   const root = document.documentElement;
   root.dataset.mode = state.mode;
   // Work 는 어두운 화면 · Life 는 밝은 화면 — 나눠 쓰지 않으면 시스템 설정
@@ -327,11 +334,11 @@ async function setMode(mode) {
   if (mode === state.mode) return;
   state.mode = mode;
   withViewTransition(() => {
-    showMode();
+    showMode({ later: true });
     state.filter.tags = []; // 다른 모드에는 없는 태그일 수 있다
     render();
     remindersTab.modeChanged();
-  });
+  }).then(syncSwitch);
   if (mode === 'work' && state.workLife) hintOnce('mode-work', 'Work에서는 일할 때 쓰는 메모와 일정만 보여요. 새 메모도 Work로 들어가요. 카드 메뉴의 "Work로 옮기기"나 설정의 정리 도우미로 옮길 수 있어요', { anchor: $('mode-switch') });
   const saved = await api.mode?.set(mode);
   if (saved && saved !== state.mode) {
@@ -896,6 +903,16 @@ $('mcp-copy').addEventListener('click', async () => {
   showMcp((await api.settings.get()).mcp, '설정을 복사했어요. AI 앱의 MCP 설정(mcpServers)에 붙여 넣어 주세요');
 });
 $('mcp-write').addEventListener('change', async (e) => showMcp(await api.mcp.setWrite(e.target.checked)));
+// Gemini, ChatGPT 의 Google Drive 연결로 메모 폴더를 직접 다룰 때 붙여 넣을 안내문 (ai-drive-guide.js)
+$('ai-drive-guide').addEventListener('click', async () => {
+  const d = await api.drive.status().catch(() => null);
+  openAiDriveGuide({
+    folder: d?.folderName || '메모킹',
+    linked: d?.connected && d?.active ? Boolean(d.fullScope) : null,
+    copy: (text) => api.copyText(text),
+    notify: (text) => flashStatus(text),
+  });
+});
 
 // ---------- 전역 단축키 바꾸기 (빠른 메모·매직키) ----------
 // 키 단추를 누르고 새 조합을 누르면 바뀐다. 다른 앱이 이미 쓰는 키면 바꾸지 않고 알려 준다 (Esc·다른 곳 누르기 = 그만)
@@ -1070,6 +1087,7 @@ $('opms-host-form').addEventListener('submit', async (e) => {
   $('opms-host').value = r.host;
   setOpmsNote(r.host ? `저장했어요: ${r.host}` : '서버 주소를 지웠어요');
 });
+$('opms-dir-open').addEventListener('click', () => api.opms.openFolder());
 $('opms-dir-btn').addEventListener('click', async () => {
   $('opms-dir').textContent = await api.opms.chooseDir();
 });
@@ -1091,25 +1109,50 @@ const remindersTab = setupRemindersTab({
   api, container: $('reminder-groups'), countEl: $('count-reminders'),
   // 다른 캘린더 함께 보기 (읽기만): 구독은 메인이 받는다, 일정 속 주소는 브라우저로
   calendars: api.calendars && { ...api.calendars, openUrl: (url) => api.links.open(url) },
-  // 추억 "한 장으로": 그림을 복사해 두고 저장할 곳을 묻는다 (안 고르면 붙여넣기로 보낼 수 있게 복사만)
+  // 회상 "한 장으로": 미리보기에서 공유(Drive · LocalSend · 메일) · 복사 · 저장 · 메모로 만들기
   // 지금 모드의 메모 일정만 (목록에 아직 없는 새 메모의 일정은 우선 보인다)
   visible: (item) => {
     const memo = state.memos.find((m) => m.id === item.memoId);
     return !state.workLife || !memo || memoMode(memo) === state.mode;
   },
   memories: {
-    on: () => !state.workLife || state.mode === 'life', // 추억 달력은 Life 에서만 (나눠 쓰지 않으면 늘)
-    collage: async (o) => {
-      flashStatus('그림을 만드는 중');
-      try {
-        const base64 = await renderCollage(o);
-        await api.image.copy(base64);
-        const r = await api.image.save(null, base64, collageName(o));
-        flashStatus(r?.file ? `${r.name}로 저장했어요 (복사도 해 두었어요)` : '그림을 복사했어요. 붙여 넣어 보낼 수 있어요');
-      } catch (err) {
-        console.error(err);
-        flashStatus(err.message || '그림을 만들지 못했어요');
-      }
+    mode: () => (state.workLife ? state.mode : null), // 회상도 지금 모드의 메모로 (나눠 쓰지 않으면 모두)
+    notify: (text) => flashStatus(text),
+    collage: {
+      render: (o) => renderCollage(o),
+      actions: (base64, o) => [
+        { id: 'share', label: '공유', icon: 'share', run: async (button) => {
+          const targets = await api.attachments.shareTargets();
+          const via = await chooseShare(button, targets);
+          if (!via) return '';
+          if (!targets.find((t) => t.id === via)?.ready) {
+            el.settingsBtn.click();
+            return 'Google Drive 를 먼저 연결해 주세요';
+          }
+          if (via === 'drive') flashStatus('Google Drive 에 올리는 중');
+          const r = await api.attachments.share({ name: collageName(o), mime: 'image/png', base64, via });
+          if (r?.error) throw new Error(r.error);
+          if (r?.missing) return SHARE_DONE['localsend-missing'];
+          if (via === 'drive') {
+            showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' });
+            return '';
+          }
+          return SHARE_DONE[via] ?? '보냈어요';
+        } },
+        { id: 'copy', label: '복사', icon: 'copy', run: async () => {
+          await api.image.copy(base64);
+          return '그림을 복사했어요. 붙여 넣어 보낼 수 있어요';
+        } },
+        { id: 'save', label: '저장', icon: 'folder', run: async () => {
+          const r = await api.image.save(null, base64, collageName(o));
+          return r?.file ? `${r.name}로 저장했어요` : '';
+        } },
+        { id: 'memo', label: '메모로 만들기', icon: 'note', close: true, run: async () => {
+          const rel = await api.attachments.save(base64Bytes(base64), 'png');
+          await api.memo.import(collageMemoBody(o.title, rel), { open: true });
+          return '새 메모로 만들었어요';
+        } },
+      ],
     },
   },
 });
@@ -1205,11 +1248,14 @@ function showTab(tab) {
   //   — 늘 모든 카드를 다시 쌓아(배치 계산) 탭의 표시가 미끄러지는 동안 화면이 멈칫했다
   if (tab === 'memos' && (memosStale || state.query || lastCols !== columnsFor(el.cards.clientWidth || window.innerWidth))) runSearch();
   if (tab === 'reminders') {
+    // 달력은 탭 표시가 먼저 바뀐 다음 프레임에, 바뀐 일정이 없으면 다시 그리지 않고 (달력 그리기가 탭 전환을 붙잡았다)
     remindersTab.setQuery('', { quiet: true });
-    remindersTab.refresh();
+    const my = ++tabSeq;
+    requestAnimationFrame(() => setTimeout(() => my === tabSeq && activeTab === 'reminders' && remindersTab.refresh({ ifChanged: true }), 0));
   }
   if (tab === 'history') historyTab.setQuery('');
 }
+let tabSeq = 0;
 for (const b of document.querySelectorAll('.tabs [data-tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
 tabKeys(document.querySelector('.tabs'));
 api.on('list:tab', showTab);
@@ -1264,7 +1310,7 @@ el.cards.addEventListener('contextmenu', (e) => {
         const day = await openMemoryDay({ created: m.created, day: m.day });
         if (day === null) return;
         await api.memo.set(m.id, { day });
-        flashStatus(day ? `추억 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
+        flashStatus(day ? `회상 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
       },
       // Work ↔ Life로 옮기기: 카드는 지금 목록에서 빠진다
       mode: async (m) => {
@@ -1642,14 +1688,14 @@ api.win.listOnTop().then((on) => showListTop(on, false));
 // 대화 상자·튜토리얼이 떠 있으면 창 버튼 줄도 어둡게 (Windows 가 그리는 줄이라 화면의 막이 닿지 않는다)
 let dimLevel = false;
 function syncTitlebarDim() {
-  const level = el.settings.open || el.confirm.open || $('trash-dialog').open || $('apps-dialog').open || $('drive-dialog')?.open || document.querySelector('body > .mem-album:not(.closing)') ? 'dialog' : document.body.classList.contains('coaching') ? 'coach' : false;
+  const level = el.settings.open || el.confirm.open || $('trash-dialog').open || $('apps-dialog').open || $('drive-dialog')?.open || document.querySelector('body > :is(.mem-album, .mem-preview):not(.closing)') ? 'dialog' : document.body.classList.contains('coaching') ? 'coach' : false;
   if (level === dimLevel) return;
   dimLevel = level;
   api.win.dimTitlebar(level);
 }
 const dimWatcher = new MutationObserver(syncTitlebarDim);
 for (const d of [el.settings, el.confirm, $('trash-dialog'), $('apps-dialog'), $('drive-dialog')].filter(Boolean)) dimWatcher.observe(d, { attributes: true, attributeFilter: ['open'] });
-dimWatcher.observe(document.body, { attributes: true, attributeFilter: ['class'], childList: true }); // 추억 달력의 그날의 기록도 (body 에 붙었다 떨어짐)
+dimWatcher.observe(document.body, { attributes: true, attributeFilter: ['class'], childList: true }); // 회상 달력의 그날의 기록도 (body 에 붙었다 떨어짐)
 // ---------- 휴지통 ----------
 const trashEl = {
   dialog: $('trash-dialog'), list: $('trash-list'), empty: $('trash-empty'), note: $('trash-note'), clear: $('trash-clear'),
@@ -1764,10 +1810,10 @@ api.on('mode:changed', ({ mode, enabled } = {}) => {
   state.workLife = Boolean(enabled);
   state.mode = next;
   withViewTransition(() => {
-    showMode();
+    showMode({ later: true });
     render();
     remindersTab.modeChanged();
-  });
+  }).then(syncSwitch);
 });
 await refresh();
 showMode();

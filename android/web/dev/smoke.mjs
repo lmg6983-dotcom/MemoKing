@@ -421,13 +421,9 @@ try {
   await page.waitForTimeout(300);
   if (await page.isVisible('.quick-event[open]')) await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
-  // 목록 보기: 시각은 제목 위 작은 줄 — 제목이 줄 폭을 거의 다 쓴다 (예전: 시각 칸이 절반, 제목 99px 에서 잘림)
-  await page.tap('.cal-views button[data-view="listMonth"]');
-  await page.waitForTimeout(400);
-  const listTitleW = await page.evaluate(() => Math.min(...[...document.querySelectorAll('#reminder-groups .mk-li-title')].map((t) => t.getBoundingClientRect().width)));
-  check('목록 보기: 일정 제목이 줄 폭을 다 씀 (200px 넘게)', listTitleW > 200 && Number.isFinite(listTitleW), String(listTitleW));
-  await page.tap('.cal-views button[data-view="dayGridMonth"]');
-  await page.waitForTimeout(400);
+  // 보기는 캘린더 · 회상 둘 (주 · 목록 보기는 없앰)
+  const viewNames = await page.evaluate(() => [...document.querySelectorAll('.cal-views button')].map((b) => b.textContent));
+  check('일정 보기: 캘린더 · 회상 둘', viewNames.join() === '캘린더,회상', JSON.stringify(viewNames));
   // 새 일정: 한 화면 (이름 · 날짜 · 시각 · 🔔 · 📝 → 일정 저장). 입구: 일정 탭의 + · 빈 앞날 누르기 · "＋ 일정 추가"
   check('일정 탭: + 단추 = 새 일정 (메모 탭과 같은 자리)', await page.isVisible('#fab') && (await page.getAttribute('#fab', 'aria-label')) === '새 일정');
   await page.tap('#fab');
@@ -553,15 +549,6 @@ try {
   await back();
   await page.waitForTimeout(500);
   check('예전 상호 동기화가 만든 "메모킹" 캘린더 일정은 함께 보기에서 뺌 (메모킹 일정의 사본)', !(await page.evaluate(() => document.body.innerText.includes('메모킹 사본'))));
-  for (const [view, name] of [['timeGridWeek', '주'], ['listMonth', '목록']]) {
-    await page.tap(`[data-view="${view}"]`);
-    await page.waitForTimeout(500);
-    const shown = await page.evaluate(() => ({ h: document.querySelector('.cal-body').getBoundingClientRect().height, n: document.querySelectorAll('#reminder-groups .mk-ev').length }));
-    check(`달력 보기: ${name} (일정이 보임)`, shown.h > 200 && shown.n > 0, JSON.stringify(shown));
-    await shot(`02k-calendar-${view}`);
-  }
-  await page.tap('[data-view="dayGridMonth"]');
-  await page.waitForTimeout(300);
   await page.tap('[data-tab="memos"]');
   await page.waitForTimeout(300);
 
@@ -2272,11 +2259,11 @@ try {
   const used = (await devLog()).log.find((l) => l.driveUse)?.driveUse;
   check('Drive: 연결하기 한 번으로 "메모킹 동기화" 폴더에 연결 (폴더 고르기 없음)', auto?.name === '메모킹 동기화' && used?.folderId === auto.folderId);
   check('Drive: 지금 휴대폰 메모를 함께 옮김', used?.importLocal === true);
-  // 고급: 연결된 뒤 "폴더 변경" 은 폴더 목록 (메모킹이 만든 폴더만)
+  // 고급: 연결된 뒤 "폴더 바꾸기" 는 폴더 목록 (메모킹이 만든 폴더만)
   if (!(await page.isVisible('#drive-connect'))) await page.tap('#settings-btn');
   await page.tap('#drive-connect');
   await page.waitForSelector('.folder-item.suggest');
-  check('Drive: 폴더 변경은 목록에서 (메모킹 동기화가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
+  check('Drive: 폴더 바꾸기는 목록에서 (메모킹 동기화가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
   await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
   // 외부 앱 메모 연동 (전체 드라이브 권한): 연결된 뒤에만 보이고 기본은 꺼짐 → 켜면 다시 허용받고 폴더를 처음부터 · 취소하면 꺼진 채 · 끄기

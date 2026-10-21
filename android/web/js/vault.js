@@ -191,7 +191,7 @@ export class Vault extends EventTarget {
       title: extractTitle(body),
       preview: extractPreview(body),
       thumb: media.find((m) => m.kind === 'image')?.src ?? null,
-      images: media.filter((m) => m.kind === 'image').slice(0, 24).map((m) => m.src), // 추억 달력 (그날의 사진)
+      images: media.filter((m) => m.kind === 'image').slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진)
       tags: extractTags(body),
       hasImage: has('image'),
       hasWebLink: /\]\(https?:\/\/|<https?:\/\//i.test(body),
@@ -217,7 +217,7 @@ export class Vault extends EventTarget {
       pinned: entry.meta.pinned,
       created: entry.meta.created,
       updated: entry.meta.updated,
-      day: entry.meta.day || '', // 추억 달력: "이 날의 기록으로" 정한 날
+      day: entry.meta.day || '', // 회상 달력: "이 날의 기록으로" 정한 날
       mode: entry.meta.mode ?? 'life', // Work / Life
       reminderCount: entry.meta.reminders.filter((r) => isLiveCached(r)).length, // 종 버튼·일정 탭과 같은 규칙 (앞으로 울릴 것만)
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,

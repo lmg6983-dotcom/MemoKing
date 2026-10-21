@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('opms', {
   attachments: (idx) => ipcRenderer.invoke('opms:attachments', idx),
   download: (req) => ipcRenderer.invoke('opms:download', req), // { idx, uploads: [서버 파일 경로], all }
   openFile: (req) => ipcRenderer.invoke('opms:open-file', req), // { idx, upload } — 받아 두고 바로 열기
-  openFolder: () => ipcRenderer.invoke('opms:open-folder'),
+  openFolder: (dir) => ipcRenderer.invoke('opms:open-folder', dir), // 받은 사건 폴더, 없으면 전자포대 저장 폴더
   chooseDir: () => ipcRenderer.invoke('opms:choose-dir'),
   copy: (text) => ipcRenderer.invoke('opms:copy', text),
   toMemo: (idx) => ipcRenderer.invoke('opms:to-memo', idx), // 사건 정보 → 새 메모

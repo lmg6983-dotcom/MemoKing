@@ -119,6 +119,7 @@ contextBridge.exposeInMainWorld('memoking', {
     settings: invoke('opms:settings'),
     setHost: invoke('opms:set-host'),
     chooseDir: invoke('opms:choose-dir'),
+    openFolder: invoke('opms:open-folder'),
   },
   // 메모 창 단축키: get() → { overrides, shortcuts } · set(기능, 키 | '' 없음 | null 기본값) · reset() 모두 처음대로 · openWindow() 설정 창
   keymap: {

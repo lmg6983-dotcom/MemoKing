@@ -5,6 +5,7 @@ import { tableLineText } from './tables.js';
 import { toLocalIso, hhmm, koMonthDay } from './time.js';
 import { normalizeReminder, serializeReminder } from './reminders.js';
 import { normalizeTables } from './table-sizes.js';
+import { decodeEntities } from './entities.js';
 
 export const COLORS = ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal'];
 export const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
@@ -58,7 +59,7 @@ export function normalizeMeta(data) {
     tables: normalizeTables(data.tables), // 표 열 너비·행 높이·머리글 강조 (표 순서대로)
     ink: normalizeInkPath(data.ink), // 주석(메모 위에 그린 손 메모)이 든 파일
     device: DEVICES.includes(data.device) ? data.device : null,
-    day: normalizeDay(data.day), // 추억 달력: "이 날의 기록으로" 정한 날 (YYYY-MM-DD, 없으면 만든 날)
+    day: normalizeDay(data.day), // 회상 달력: "이 날의 기록으로" 정한 날 (YYYY-MM-DD, 없으면 만든 날)
     mode: normalizeMode(data.mode), // 메모킹 Work / Life (core/modes.js) — 적지 않았으면 Life
     extra,
   };
@@ -69,7 +70,7 @@ export function normalizeMode(value) {
   return String(value ?? '').trim().toLowerCase() === 'work' ? 'work' : 'life';
 }
 
-/** 추억 달력의 날 (YYYY-MM-DD) — 머리말에 날짜(Date)로 읽혀도 그 날로, 아니면 "" */
+/** 회상 달력의 날 (YYYY-MM-DD) — 머리말에 날짜(Date)로 읽혀도 그 날로, 아니면 "" */
 export function normalizeDay(value) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
   const v = typeof value === 'string' ? value.trim() : '';
@@ -137,6 +138,8 @@ function stripInline(line) {
     .replace(/(^|[^\\*_])[*_](?=\S)(.+?)(?<=\S)[*_]/g, '$1$2')
     .replace(/`([^`]*)`/g, '$1')
     .replace(/\\([\\`*_{}[\]()#+\-.!~|>])/g, '$1')
+    // 글자 참조: 줄 앞 띄어쓰기를 지키려고 쓴 &#x20; · &nbsp; 같은 것 (목록 미리보기에 "&#x20;" 이 그대로 보였다)
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m) => decodeEntities(m))
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -145,7 +148,7 @@ function stripBlock(line) {
   return line
     .replace(/^\s{0,3}#{1,6}\s+/, '')
     .replace(/^\s*>\s?/, '')
-    .replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:\\?\[[ xX]\](?:\s+|$))?/, ''); // 빈 체크리스트 항목("- [ ]")도
+    .replace(/^\s*(?:[-*+]|\d+[.)])(?:\s+|$)(?:\\?\[[ xX]\](?:\s+|$))?/, ''); // 빈 항목("- [ ]" · 글을 지운 "2." · "-")도
 }
 
 // 코드 블록 울타리(```)는 빼고, 각 줄을 읽는 글자로 바꾼다.
