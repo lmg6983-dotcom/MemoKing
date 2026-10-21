@@ -39,6 +39,7 @@ import { createTidy } from './tidy.js';
 import { createDateRemind, refreshDateRemind } from './date-remind.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
 import { burstAt } from './confetti-burst.js';
+import { haptic } from './dom.js';
 import { mathPlugins, insertMathBlock } from './math.js';
 import { fileChipGuard } from './file-chip-guard.js';
 import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
@@ -268,6 +269,7 @@ function toggleTaskOnClick(view, event) {
       const point = checked ? checkboxPoint(li) : null; // 다시 그리기 전에 미리 잰다
       view.dispatch(view.state.tr.setNodeMarkup($pos.before(d), undefined, { ...node.attrs, checked }));
       event.preventDefault();
+      haptic(checked ? 10 : 4); // 휴대폰: 체크는 또렷하게, 풀기는 살짝
       if (point) burstAt(point.x, point.y);
       return true;
     }

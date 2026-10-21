@@ -1418,8 +1418,11 @@ export async function openNote(memoId, options = {}) {
     el.screen.hidden = false;
     el.screen.classList.remove('leaving');
     if (!reduceMotion()) {
-      el.screen.classList.add('entering');
-      setTimeout(() => el.screen.classList.remove('entering'), 260);
+      // 목록 카드를 눌러 열면 그 카드가 커지며 메모 화면이 된다 (닫으면 그 카드 자리로 접혀 들어감 — cardMorph)
+      if (!(options.from && cardMorph(options.from, true))) {
+        el.screen.classList.add('entering');
+        setTimeout(() => el.screen.classList.remove('entering'), 260);
+      }
     }
     current = saved = memo.body;
     el.editorRoot.replaceChildren();
@@ -1538,6 +1541,26 @@ export async function openNote(memoId, options = {}) {
 }
 
 /** 목록으로: 저장하고, 빈 메모는 치우고, 제목이 바뀌었으면 파일 이름을 맞춘다 */
+// 카드 ↔ 메모 화면: 메모 화면을 카드 모양으로 오려 냈다가(clip-path) 화면 가득 펼친다 — 같은 메모지 색이라 카드가 커지는 것처럼 보인다.
+//   여는 쪽은 서랍처럼(iOS 곡선) 280ms, 닫는 쪽은 200ms (시스템이 답할 때는 빠르게). 태블릿 두 칸에서는 쓰지 않는다
+//   → 움직였는가 (false 면 부른 쪽이 예전 움직임으로)
+function cardMorph(rect, opening, done = () => {}) {
+  if (isTwoPane() || typeof el.screen.animate !== 'function') return false;
+  const s = el.screen.getBoundingClientRect();
+  if (!s.width || !s.height) return false;
+  const card = `inset(${Math.max(0, rect.top - s.top)}px ${Math.max(0, s.right - rect.right)}px ${Math.max(0, s.bottom - rect.bottom)}px ${Math.max(0, rect.left - s.left)}px round 16px)`;
+  const full = 'inset(0px 0px 0px 0px round 0px)';
+  const frames = [{ clipPath: card, opacity: 0.55 }, { clipPath: full, opacity: 1 }];
+  const anim = el.screen.animate(opening ? frames : frames.reverse(), opening
+    ? { duration: 280, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' }
+    : { duration: 200, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'forwards' });
+  anim.finished.then(() => {
+    done();
+    if (!opening) anim.cancel(); // 다음에 열 때 오려 낸 모양이 남지 않게
+  }).catch(() => {});
+  return true;
+}
+
 export function closeNote({ quiet = false } = {}) {
   if (!id) return;
   el.editorRoot.querySelector('.lock-screen [data-lock-cancel]')?.click(); // 비밀번호 화면에서 뒤로 가기 = 닫기
@@ -1608,6 +1631,12 @@ export function closeNote({ quiet = false } = {}) {
     el.screen.hidden = true;
     return;
   }
+  // 목록에 그 메모의 카드가 보이면 그 자리로 접혀 들어간다 (열 때보다 빠르게)
+  const card = document.querySelector(`#cards .card[data-id="${CSS.escape(closing)}"]`);
+  const at = card?.getBoundingClientRect();
+  if (at?.width && at.bottom > 0 && at.top < window.innerHeight && cardMorph(at, false, () => {
+    if (!id) el.screen.hidden = true;
+  })) return;
   el.screen.classList.add('leaving');
   setTimeout(() => {
     if (!id) el.screen.hidden = true;

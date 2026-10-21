@@ -48,6 +48,10 @@ window.memoking = { platform: 'android', vaultBase: `${location.origin}/vault/`,
 
 injectIcons();
 attachSliders(); // 탭·고르기 칸: 선택 표시가 미끄러진다
+// 켜기 · 끄기 스위치를 바꾸면 손끝에 짧게 (화면만 바뀌면 눌렸는지 손으로 알기 어렵다)
+document.addEventListener('change', (e) => {
+  if (e.target instanceof HTMLInputElement && e.target.classList.contains('switch')) haptic(6);
+});
 injectMobileIcons();
 
 // ---------- 일정 탭의 다른 캘린더 (list-reminders.js 가 씀) ----------

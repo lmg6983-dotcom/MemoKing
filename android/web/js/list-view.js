@@ -475,8 +475,16 @@ function runSearch() {
 }
 el.search.addEventListener('input', () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(runSearch, 120);
+  searchTimer = setTimeout(() => {
+    calmRender = true; // 글자를 칠 때마다 카드가 전부 튀어나오고 미끄러지면 정신없다 — 바로 바뀌게
+    try {
+      runSearch();
+    } finally {
+      calmRender = false;
+    }
+  }, 120);
 });
+let calmRender = false;
 el.search.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') el.search.blur(); // 키보드 내리기
 });
@@ -513,14 +521,16 @@ let tabSeq = 0;
 tabKeys(document.querySelector('.tabs'));
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');
-  if (b) setTab(b.dataset.tab);
+  if (!b) return;
+  if (b.dataset.tab !== state.tab) haptic(5); // 손끝에 짧게 (바뀔 때만)
+  setTab(b.dataset.tab);
 });
 
 // ---------- 카드 누르기 · 길게 누르기 ----------
 
 el.cards.addEventListener('click', (e) => {
   const card = e.target.closest('.card');
-  if (card) app.openMemo(card.dataset.id, { fromList: true });
+  if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect() }); // 그 카드가 커지며 메모 화면이 된다
 });
 // 카드를 옆으로 밀어 지우기 (여러 개를 빨리 지울 때) — 묻지 않고 휴지통으로, 되돌리기 가능
 //   카드는 손가락을 프레임마다 한 번만(requestAnimationFrame) 따라가고, 미는 동안은 compositor 층(will-change)이라
@@ -705,7 +715,8 @@ function glideCards(change) {
   change();
   const still = [];
   const moves = [];
-  const animate = !reduceMotion();
+  const animate = !reduceMotion() && !calmRender;
+  if (calmRender) for (const item of el.cards.querySelectorAll('.item')) item.style.animation = 'none'; // 검색 중: 다시 보인 카드도 튀어나오지 않게
   for (const c of el.cards.querySelectorAll('.card')) {
     const a = before.get(c.dataset.id);
     if (!a) continue;
@@ -717,7 +728,7 @@ function glideCards(change) {
     const dx = a.left - b.left;
     const dy = a.top - b.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 300, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
   }
 }
 
