@@ -118,10 +118,11 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .search input::-webkit-search-cancel-button { display: none; }
 .filter-btn { position: relative; }
 .filter-btn[aria-expanded="true"], .filter-btn.on { color: var(--text-strong); }
-.filter-count {
+.filter-count { /* 보기 단추의 숫자: 아이콘 오른쪽 위 바깥에 (바탕색 테두리로 아이콘을 덮지 않게) */
   position: absolute;
-  top: 6px;
-  right: 4px;
+  top: 3px;
+  right: 1px;
+  box-shadow: 0 0 0 2px var(--bg);
   min-width: 16px;
   height: 16px;
   padding: 0 4px;

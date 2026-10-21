@@ -312,7 +312,7 @@ function refreshHistoryRow() {
   $('history-apps-2').disabled = !(enabled && granted); // 모으기가 꺼져 있으면 고를 것이 없다
   $('history-note').textContent = enabled && !granted
     ? '휴대폰 설정에서 "알림 접근"을 허용해 주세요'
-    : '보관함 탭에 모아요. 이 휴대폰에만 저장해요'
+    : '알림 보관함 탭에 모아요. 이 휴대폰에만 저장해요'
 }
 
 let notifyAsked = false;

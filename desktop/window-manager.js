@@ -156,10 +156,10 @@ export class WindowManager {
       if (tab) this.listWin.webContents.send('list:tab', tab);
       return this.listWin;
     }
-    const bounds = onScreen(settings.listBounds) ? settings.listBounds : { width: 400, height: 680 };
+    const bounds = onScreen(settings.listBounds) ? settings.listBounds : { width: 440, height: 680 };
     this.listWin = new BrowserWindow({
       ...bounds,
-      minWidth: 390, // 제목 줄 단추 · 왕관 스티커가 겹치지 않는 폭
+      minWidth: 440, // 로고 · Life/Work 스위치 · 단추 셋이 Windows 창 버튼(46px × 3)과 겹치지 않는 폭
       minHeight: 380,
       title: '메모킹',
       show: false,

@@ -403,9 +403,9 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         // 제목 줄 오른쪽 위: 왕관 · 동기화 · 설정이 검색 줄이 아니라 맨 위에, 창 버튼 영역을 침범하지 않음
         const bar = await js(list, `(() => { const q = (s) => document.querySelector(s)?.getBoundingClientRect(); const c = q('#list-top-btn'), g = q('#settings-btn'), t = q('.titlebar'), s = q('#search'); return { crown: c && [c.left, c.top], gearInTitle: g.top >= t.top && g.bottom <= t.bottom, gearRight: g.right <= (navigator.windowControlsOverlay?.visible ? navigator.windowControlsOverlay.getTitlebarAreaRect().right : innerWidth - 142) + 1, order: c.left < g.left, searchBelow: s.top >= t.bottom - 1, inToolbar: !!document.querySelector('.toolbar #settings-btn, .toolbar #sync-btn') }; })()`);
         check('목록 제목 줄: 왕관 · 동기화 · 설정이 맨 위(창 버튼 왼쪽)에 있고 검색 줄에는 없음', bar.gearInTitle && bar.gearRight && bar.order && bar.searchBelow && !bar.inToolbar, JSON.stringify(bar));
-        // 왕관 스티커: 붙이면 스티커가 단추(설정 · 동기화)와 창 버튼을 가리지 않는다 — 좁은 폭(390)에서도
+        // 왕관 스티커: 붙이면 스티커가 단추(설정 · 동기화)와 창 버튼을 가리지 않는다 — 좁은 폭(440)에서도
         const sizeBefore = list.getBounds();
-        list.setBounds({ ...sizeBefore, width: 390 });
+        list.setBounds({ ...sizeBefore, width: 440 });
         await wait(150);
         await js(list, `document.getElementById('list-top-btn').click()`);
         const stuck = await until(() => windowManager.stickers.get(list.id)?.win, '왕관 스티커', 4000).catch(() => null);
@@ -414,7 +414,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         const lb = list.getBounds();
         const gearRect = await js(list, `(() => { const r = document.getElementById('settings-btn').getBoundingClientRect(); return { left: r.left, right: r.right }; })()`);
         const overlap = sb ? sb.x + sb.width > lb.x + gearRect.left - 6 || sb.x < lb.x + 90 : null;
-        check('왕관 스티커를 붙여도 (390px 폭) 설정 · 동기화 단추와 상표를 가리지 않음', Boolean(sb) && overlap === false, JSON.stringify({ sb, lb, gearRect }));
+        check('왕관 스티커를 붙여도 (440px 폭) 설정 · 동기화 단추와 상표를 가리지 않음', Boolean(sb) && overlap === false, JSON.stringify({ sb, lb, gearRect }));
         await capture(list, 'list-sticker-narrow.png');
         await windowManager.setListOnTop(false);
         await until(() => !windowManager.stickers.get(list.id), '왕관 떼기', 3000).catch(() => {});
