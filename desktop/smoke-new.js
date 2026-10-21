@@ -323,6 +323,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           dbg.detach();
         }
         const replaced = await until(() => { const b = v0.get(fid)?.body ?? ''; return /포도 하나, 포도 둘, 포도즙/.test(b) && b; }, '모두 바꾸기 저장', 4000).catch(() => '');
+        if (process.env.MK_SMOKE_TRACE) console.log(`… 바꾸기 상태: ${JSON.stringify(await js(fw, `({ rep: document.querySelector('.mk-find-rep input').value, q: document.querySelector('.mk-find-grid input').value, count: document.querySelector('.mk-find-count').textContent, mode: document.querySelector('.mk-find-bar').dataset.mode, active: document.activeElement?.placeholder, doc: document.querySelector('.ProseMirror').textContent })`))}`);
         key(fw, 'Escape');
         const closedF = await until(() => js(fw, `document.querySelector('.mk-find-bar').hidden && !document.querySelector('.mk-find-hit')`), 'Esc 닫기', 2000).catch(() => false);
         await js(fw, `document.querySelector('.ProseMirror').focus()`);
