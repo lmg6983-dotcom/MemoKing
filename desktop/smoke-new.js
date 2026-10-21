@@ -313,7 +313,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await capture(fw, 'smoke-new-find.png');
         check('찾기(Ctrl+F): 막대가 뜨고 찾을 말로 바로 · 찾은 곳 3곳 · Enter 로 다음(2/3) · 글을 가리지 않음', opened && fs1?.hits === 3 && fs2 && noCover, JSON.stringify({ opened, fs1, fs2, noCover }));
         key(fw, 'H', ['control']);
-        const repFocus = await until(() => js(fw, `!document.querySelector('.mk-find-replace').hidden && document.activeElement === document.querySelector('.mk-find-replace .mk-find-input')`), 'Ctrl+H 바꾸기 줄', 2000).catch(() => false);
+        const repFocus = await until(() => js(fw, `(() => { const f = [...document.querySelectorAll('.mk-find-grid .mk-find-field')].map((x) => Math.round(x.getBoundingClientRect().width)); return document.querySelector('.mk-find-bar').dataset.mode === 'replace' && document.activeElement === document.querySelector('.mk-find-rep .mk-find-input') && f[0] === f[1]; })()`), 'Ctrl+H 바꾸기 줄', 2000).catch(() => false);
         fw.webContents.insertText('포도');
         // Ctrl+Enter: sendInputEvent 로는 Ctrl 을 붙인 Enter 가 실제 키보드처럼 오지 않아, 크롬 개발 도구 입력(실제 키보드와 같은 길)으로
         {
@@ -328,7 +328,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await js(fw, `document.querySelector('.ProseMirror').focus()`);
         key(fw, 'Z', ['control']);
         const undone = await until(() => /사과 하나, 사과 둘, 사과즙/.test(v0.get(fid)?.body ?? ''), '되돌리기', 4000).catch(() => false);
-        check('바꾸기(Ctrl+H): 바꿀 말 칸으로 · Ctrl+Enter 모두 바꾸기 · Esc 로 닫기 · Ctrl+Z 한 번에 되돌림', repFocus && replaced && closedF && undone, JSON.stringify({ repFocus, replaced: Boolean(replaced), closedF, undone, body: v0.get(fid)?.body }));
+        check('바꾸기(Ctrl+H): 찾을 말과 같은 폭의 바꿀 말 칸으로 · Ctrl+Enter 모두 바꾸기 · Esc 로 닫기 · Ctrl+Z 한 번에 되돌림', repFocus && replaced && closedF && undone, JSON.stringify({ repFocus, replaced: Boolean(replaced), closedF, undone, body: v0.get(fid)?.body }));
         fw.close();
       }
 

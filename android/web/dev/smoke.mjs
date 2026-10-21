@@ -2286,7 +2286,7 @@ try {
   // 메모 안 찾기 · 바꾸기 · 모두 바꾸기: 메뉴 › 찾기, 바꾸기 → 찾은 곳 표시 · 개수 · 낱말 단위 · 모두 바꾸기(한 번에) · Esc
   {
     const iso = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
-    write('찾기 연습.md', `---\nid: 00000000-0000-4000-8000-0000000f1d00\ncreated: ${iso}\nupdated: ${iso}\ncolor: yellow\n---\n# 찾기 연습\n\n사과 한 개, 사과 두 개, 배 한 개\n\nApple apple 사과즙\n`);
+    write('찾기 연습.md', `---\nid: 00000000-0000-4000-8000-0000000f1d00\ncreated: ${iso}\nupdated: ${iso}\ncolor: yellow\n---\n# 찾기 연습\n\n사과 한 개, 사과 두 개, 배 한 개\n\nApple apple 사과즙\n\n**배** 세 개\n`);
     await page.evaluate(() => window.__mk.emit('app', 'resume'));
     await page.waitForTimeout(600);
     await page.locator('.card', { hasText: '찾기 연습' }).first().tap();
@@ -2299,15 +2299,15 @@ try {
     await page.waitForTimeout(300);
     const st = () => page.evaluate(() => ({ hits: document.querySelectorAll('.mk-doc .mk-find-hit').length, cur: document.querySelectorAll('.mk-doc .mk-find-current').length, count: document.querySelector('.mk-find-count').textContent }));
     const s1 = await st();
-    const oneRow = await page.evaluate(() => ({ h: Math.round(document.querySelector('.mk-find-bar').getBoundingClientRect().height), opts: !document.querySelector('.mk-find-opts').hidden }));
+    const oneRow = await page.evaluate(() => ({ h: Math.round(document.querySelector('.mk-find-bar').getBoundingClientRect().height), opts: getComputedStyle(document.querySelector('.mk-find-foot')).display !== 'none' }));
     await page.tap('.mk-find-bar .mk-find-more'); // 바꾸기 펼치기 → 바꾸기 줄 + 찾는 방법 줄
-    await page.tap('.mk-find-bar .mk-find-opt:nth-child(2)'); // 낱말 단위
+    await page.tap('.mk-find-opts .mk-find-opt:nth-child(2)'); // 낱말 단위
     await page.waitForTimeout(200);
     const s2 = await st();
     await page.tap('.mk-find-bar .mk-find-btn[aria-label="다음"]');
     await page.waitForTimeout(150);
     const s3 = await st();
-    await page.locator('.mk-find-replace .mk-find-input').fill('포도');
+    await page.locator('.mk-find-rep .mk-find-input').fill('포도');
     await page.waitForTimeout(100);
     const allLabel = await page.textContent('.mk-find-all');
     await shot('29-find');
@@ -2320,10 +2320,42 @@ try {
     await page.tap('#toast-action');
     await page.waitForTimeout(900);
     check('모두 바꾸기 되돌리기: 알림의 되돌리기로 한 번에 처음대로', /사과 한 개, 사과 두 개/.test(read('찾기 연습.md')), read('찾기 연습.md'));
+    // 엑셀처럼: 찾을 말 · 바꿀 말 칸이 같은 폭 · 서식 찾기(굵은 "배"만) · 모두 찾기 목록 · 서식만 바꾸기(바꿀 말 비우고 형광펜)
+    const widths = await page.evaluate(() => [...document.querySelectorAll('.mk-find-grid .mk-find-field')].map((f) => Math.round(f.getBoundingClientRect().width)));
+    await page.locator('.mk-find-bar .mk-find-input').first().fill('배');
+    await page.waitForTimeout(250);
+    const plain = await page.textContent('.mk-find-count');
+    await page.tap('.mk-find-grid .mk-find-fmt >> nth=0');
+    await page.tap('.mk-find-pop .mk-find-flag.is-bold');
+    await page.waitForTimeout(150);
+    await shot('29a-find-pop');
+    await page.tap('.mk-find-pop .mk-find-pop-foot .primary');
+    const boldOnly = await page.textContent('.mk-find-count');
+    const fmtSet = await page.evaluate(() => document.querySelector('.mk-find-grid .mk-find-fmt').classList.contains('set'));
+    await page.tap('.mk-find-acts .mk-find-act >> text=모두 찾기');
+    await page.waitForTimeout(150);
+    const items = await page.evaluate(() => [...document.querySelectorAll('.mk-find-list .mk-find-item')].map((b) => b.textContent));
+    await shot('29b-find-format');
+    check('찾기 막대(엑셀처럼): 찾을 말 · 바꿀 말 칸이 같은 폭 · 서식 찾기로 굵은 "배"만(2 → 1) · 모두 찾기 목록에 그 한 곳',
+      widths.length === 2 && widths[0] === widths[1] && widths[0] > 120 && plain === '1/2' && boldOnly === '1/1' && fmtSet && items.length === 1 && /배/.test(items[0]), JSON.stringify({ widths, plain, boldOnly, fmtSet, items }));
+    await page.tap('.mk-find-grid .mk-find-fmt >> nth=1');
+    await page.tap('.mk-find-pop [role="radio"][aria-label="노랑"]');
+    await page.tap('.mk-find-pop .mk-find-pop-foot .primary');
+    await page.locator('.mk-find-rep .mk-find-input').fill('');
+    await page.waitForTimeout(100);
+    const repHint = await page.getAttribute('.mk-find-rep .mk-find-input', 'placeholder');
+    await page.tap('.mk-find-all');
+    await page.waitForTimeout(900);
+    const fmtBody = read('찾기 연습.md');
+    check('서식 바꾸기: 바꿀 말을 비우고 형광펜을 고르면 글은 그대로 서식만 (굵은 배에만 형광펜 · 보통 배는 그대로)',
+      /<mark[^>]*>(\*\*)?배(\*\*)?<\/mark>|\*\*<mark[^>]*>배<\/mark>\*\*/.test(fmtBody) && /배 한 개/.test(fmtBody) && !/<mark[^>]*>배 한/.test(fmtBody) && /비우면 서식만 바꿔요/.test(repHint ?? ''), JSON.stringify({ fmtBody, repHint }));
+    await page.keyboard.press('Escape'); // 열린 목록부터
+    await page.waitForTimeout(150);
+    const listClosed = await page.evaluate(() => document.querySelector('.mk-find-results').hidden && !document.querySelector('.mk-find-bar').hidden);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
     const closed = await page.evaluate(() => document.querySelector('.mk-find-bar').hidden && !document.querySelector('.mk-doc .mk-find-hit'));
-    check('찾기 막대: Esc 로 닫으면 표시도 사라짐', closed);
+    check('찾기 막대: Esc 는 열린 모두 찾기 목록부터 · 한 번 더 누르면 막대를 닫고 표시도 사라짐', listClosed && closed, JSON.stringify({ listClosed, closed }));
     for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
       await back();
       await page.waitForTimeout(400);

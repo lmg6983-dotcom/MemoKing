@@ -1965,14 +1965,39 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-find-bar[hidden] { display: none; }
 @keyframes mk-find-in { from { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .mk-find-bar { animation: none; } }
-.mk-find-row { display: flex; align-items: center; gap: 4px; }
-.mk-find-row[hidden] { display: none; }
-.mk-find-field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 8px; border-radius: 10px; background: var(--fill-tab); box-shadow: inset 0 0 0 1px var(--line); }
+.mk-find-bar { --mk-find-any-hl: repeating-linear-gradient(135deg, #ffec99 0 4px, #b2f2bb 4px 8px, #a5d8ff 8px 12px); }
+/* 칸 격자: 찾을 말 · 바꿀 말이 같은 열이라 폭이 늘 같다 (엑셀처럼)
+   찾기만: 찾을 말 | 이전 | 다음 | 바꾸기 | 닫기
+   바꾸기: 찾을 말 | 서식 | 이전 | 다음
+           바꿀 말 | 서식 | 접기 | 닫기 */
+.mk-find-grid {
+  display: grid; align-items: center; gap: 6px 4px;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  grid-template-areas: "q prev next more close";
+}
+.mk-find-bar[data-mode="replace"] .mk-find-grid {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "q qf prev next" "r rf more close";
+}
+.mk-find-bar[data-mode="find"] :is(.mk-find-rep, .mk-find-fmt, .mk-find-foot) { display: none; }
+.mk-find-bar[data-mode="replace"] .mk-find-more { justify-content: center; min-width: 32px; padding: 0 6px; color: var(--text-muted); font-size: 12px; }
+.mk-find-bar[data-mode="replace"] .mk-find-more svg { display: none; }
+.mk-find-field { min-width: 0; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 4px 0 8px; border-radius: 10px; background: var(--fill-tab); box-shadow: inset 0 0 0 1px var(--line); }
 .mk-find-field:focus-within { box-shadow: inset 0 0 0 2px var(--focus-ring); }
-.mk-find-field svg { flex: none; width: 16px; height: 16px; color: var(--text-muted); }
+.mk-find-field > svg { flex: none; width: 16px; height: 16px; color: var(--text-muted); }
 .mk-find-input { flex: 1; min-width: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 14px; outline: none; }
+.mk-find-input::placeholder { color: var(--text-muted); }
+.mk-find-input:disabled { cursor: not-allowed; }
 .mk-find-input::-webkit-search-cancel-button { display: none; }
-.mk-find-count { flex: none; font-size: 12px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* 몇 번째/모두: 누르면 모두 찾기 목록 */
+.mk-find-count {
+  flex: none; min-width: 0; height: 24px; padding: 0 6px; border: 0; border-radius: 6px; background: none;
+  color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.mk-find-count:empty { display: none; }
+.mk-find-count:disabled { cursor: default; }
+.mk-find-count[aria-expanded="true"] { background: color-mix(in srgb, var(--text-strong) 9%, transparent); color: var(--text-strong); }
+@media (hover: hover) and (pointer: fine) { .mk-find-count:not(:disabled):hover { background: var(--fill-hover); color: var(--text-strong); } }
 .mk-find-bar.none .mk-find-count { color: var(--danger); }
 .mk-find-btn { flex: none; width: 32px; height: 32px; }
 .mk-find-btn:disabled { opacity: 0.35; }
@@ -1982,14 +2007,81 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
   transition: transform 0.16s var(--ease-out), background-color 0.15s ease-out;
 }
 .mk-find-more svg { width: 14px; height: 14px; transform: rotate(90deg); transition: transform 0.18s var(--ease-out); }
-.mk-find-more[aria-expanded="true"] { background: color-mix(in srgb, var(--text-strong) 9%, transparent); }
 .mk-find-more[aria-expanded="true"] svg { transform: rotate(-90deg); }
 .mk-find-more:active { transform: scale(0.97); }
 @media (hover: hover) and (pointer: fine) { .mk-find-more:hover { background: var(--fill-hover); } }
-.mk-find-more:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+/* 서식 단추: "가" 에 고른 서식을 입혀 미리 보기 */
+.mk-find-fmt {
+  display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 10px 0 6px;
+  border: 0; border-radius: 10px; background: var(--fill-tab); box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  transition: transform 0.16s var(--ease-out), background-color 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.mk-find-glyph { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 2px; border-radius: 5px; font-size: 14px; font-weight: 400; line-height: 1; color: var(--text-muted); }
+.mk-find-fmt.set .mk-find-glyph { color: var(--text-strong); }
+.mk-find-fmt.set { color: var(--text-strong); box-shadow: inset 0 0 0 2px var(--brand-yellow); background: color-mix(in srgb, var(--brand-yellow) 14%, var(--fill-tab)); }
+.mk-find-fmt[aria-expanded="true"] { box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.mk-find-fmt:active { transform: scale(0.97); }
+.mk-find-fmt:disabled { opacity: 0.4; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .mk-find-fmt:not(:disabled):hover { background: var(--fill-hover); } }
+/* 아래: 찾는 방법 · 할 일 (찾기 둘은 왼쪽, 바꾸기 둘은 오른쪽) */
+.mk-find-foot { display: flex; flex-direction: column; gap: 6px; padding-top: 2px; }
+.mk-find-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.mk-find-acts { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
+.mk-find-pair { display: flex; gap: 6px; }
 .mk-find-act { flex: none; height: 34px; padding: 0 12px; font-size: 13px; }
-.mk-find-opts { gap: 6px; }
+.mk-find-act.active { background: color-mix(in srgb, var(--brand-yellow) 18%, var(--surface)); box-shadow: inset 0 0 0 2px var(--brand-yellow); }
 .mk-find-opt { height: 26px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--fill-tab); color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.16s var(--ease-out), background-color 0.15s ease-out; }
 .mk-find-opt:active { transform: scale(0.97); }
-.mk-find-opt[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
-.mk-find-opt:focus-visible, .mk-find-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.mk-find-opt[aria-pressed="true"], .mk-find-opt[aria-checked="true"] { background: var(--brand-yellow); color: var(--on-brand); }
+:is(.mk-find-opt, .mk-find-btn, .mk-find-more, .mk-find-fmt, .mk-find-count, .mk-find-item, .mk-find-swatch):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+/* 모두 찾기 목록: 줄마다 찾은 말 앞뒤 — 누르면 그곳으로 */
+.mk-find-results { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--line); padding-top: 6px; }
+.mk-find-results[hidden] { display: none; }
+.mk-find-results-head { padding: 0 4px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.mk-find-list { margin: 0; padding: 0; list-style: none; max-height: min(40vh, 240px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.mk-find-item {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; min-height: 30px; padding: 5px 8px;
+  border: 0; border-radius: 8px; background: none; color: var(--text-strong); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.mk-find-item[aria-current="true"] { background: color-mix(in srgb, #ff7a00 14%, transparent); }
+@media (hover: hover) and (pointer: fine) { .mk-find-item:hover { background: var(--fill-hover); } }
+.mk-find-num { flex: none; min-width: 1.6em; font-size: 11px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.mk-find-line { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mk-find-ctx { color: var(--text-muted); }
+.mk-find-mark { padding: 0 1px; border-radius: 3px; background: rgba(255, 150, 0, 0.32); color: var(--text-strong); font-weight: 700; }
+/* 서식 고르기: 누른 서식 단추 아래에 */
+.mk-find-pop {
+  position: absolute; z-index: 2; width: min(300px, calc(100% - 16px)); box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 10px; padding: 12px;
+  border-radius: 14px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), 0 10px 28px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08);
+  animation: mk-find-in 0.14s var(--ease-out);
+}
+.mk-find-pop[hidden] { display: none; }
+.mk-find-pop:focus { outline: none; }
+@media (prefers-reduced-motion: reduce) { .mk-find-pop { animation: none; } }
+.mk-find-pop-title { font-size: 13px; font-weight: 800; color: var(--text-strong); }
+.mk-find-pop-flags { display: flex; flex-wrap: wrap; gap: 6px; }
+.mk-find-flag { color: var(--text-strong); }
+.mk-find-flag.is-bold span { font-weight: 900; }
+.mk-find-flag.is-italic span { font-style: italic; }
+.mk-find-flag.is-underline span { text-decoration: underline; text-underline-offset: 2px; }
+.mk-find-flag.is-strike span { text-decoration: line-through; }
+.mk-find-flag code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; }
+.mk-find-pop-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mk-find-pop-label { flex: 0 0 100%; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.mk-find-choice { height: 26px; }
+.mk-find-choice[hidden] { display: none; }
+.mk-find-swatch {
+  width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  transition: transform 0.16s var(--ease-out), box-shadow 0.15s ease-out;
+}
+/* 글자 색은 동그라미 대신 그 색의 "가" 로 (형광펜 바탕색과 헷갈리지 않게) */
+.mk-find-swatch.ink { display: inline-grid; place-items: center; background: var(--fill-tab); color: var(--sw); font-size: 14px; font-weight: 800; }
+.mk-find-swatch.ink::before { content: '가'; }
+.mk-find-swatch[aria-checked="true"] { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 0 0 2px var(--surface), 0 0 0 4px var(--text-strong); }
+.mk-find-swatch:active { transform: scale(0.94); }
+.mk-find-clear { align-self: flex-start; }
+.mk-find-clear[hidden] { display: none; }
+.mk-find-pop-foot { display: flex; justify-content: space-between; gap: 6px; padding-top: 2px; }

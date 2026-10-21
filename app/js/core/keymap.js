@@ -57,7 +57,7 @@ export const FIXED_KEYS = [
   ['항목, 줄 순서 바꾸기', 'Alt+↑ / Alt+↓'],
   ['표: 다음, 이전 칸', 'Tab / Shift+Tab'],
   ['서식 없이 붙여넣기', 'Ctrl+Shift+V'],
-  ['찾기: 다음, 이전 · 바꾸기: 하나, 모두', 'Enter, F3 / Shift+Enter · Enter / Ctrl+Enter'],
+  ['찾기: 다음, 이전, 모두 찾기 · 바꾸기: 하나, 모두', 'Enter, F3 / Shift+Enter / Alt+Enter · Enter / Ctrl+Enter'],
 ];
 
 // 편집 · 창이 늘 쓰는 키 — 다른 기능에 줄 수 없다
