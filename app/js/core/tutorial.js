@@ -153,8 +153,9 @@ export const TUTORIAL_STEPS = [
     text: '방금 쓴 메모가 카드로 보여요. 카드를 누르면 다시 열리고, 목록 밖으로 끌어다 놓으면 그 자리에 열려요.',
     next: '다음',
   },
+  // 카드 확대: 카드 전체를 피하게 하면(keep) 자리가 없어 말풍선이 처음부터 접힌다 — 확대 표시만 피한다
   {
-    id: 'zoom', chapter: '목록', win: 'list', target: ['#cards .card', '#cards'], keep: ['#cards', '.zoom-badge'], advance: 'list-zoomed', emoji: '🔍',
+    id: 'zoom', chapter: '목록', win: 'list', target: ['#cards .card', '#cards'], keep: ['.zoom-badge'], advance: 'list-zoomed', emoji: '🔍',
     title: '카드를 크게, 작게',
     text: 'Ctrl 을 누른 채 마우스 휠을 굴리면 메모 카드가 커지고 작아져요. Ctrl 과 + − 키도 돼요. 글씨가 작게 느껴질 때 써 보세요.',
     try: 'Ctrl 을 누른 채 휠을 위로 굴려 보세요',
