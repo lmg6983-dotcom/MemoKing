@@ -109,8 +109,8 @@ export function setWorkLife(on) {
 }
 export const currentMode = () => state.mode;
 
-/** 튜토리얼 뒷정리 (tutorial.js): 시작할 때 모습을 적어 두고, 끝나면 연습으로 바꾼 카드 모양 · 태그 고르기 · 모드를 처음대로 */
-export const tutorialSnapshot = () => ({ layout, tags: [...state.filter.tags], mode: state.mode, panel: !el.filterPanel.hidden });
+/** 튜토리얼 뒷정리 (tutorial.js): 시작할 때 모습을 적어 두고, 끝나면 연습으로 바꾼 카드 모양 · 태그 고르기 · 모드 · Work/Life 켜기를 처음대로 */
+export const tutorialSnapshot = () => ({ layout, tags: [...state.filter.tags], mode: state.mode, panel: !el.filterPanel.hidden, workLife: workLifeOn() });
 export function tutorialRestore(b) {
   if (!b) return;
   if (layout !== b.layout) {
@@ -123,6 +123,7 @@ export function tutorialRestore(b) {
     }
   }
   state.filter.tags = b.tags;
+  if (workLifeOn() !== b.workLife) setWorkLife(b.workLife);
   if (state.mode !== b.mode) setMode(b.mode);
   if (!b.panel && !el.filterPanel.hidden) toggleFilterPanel(false); // "보기"를 열어 보라고 했던 칸도 닫는다
   render();

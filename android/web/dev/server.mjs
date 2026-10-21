@@ -33,7 +33,9 @@ function inside(root, rel) {
   if (parts.includes('..')) throw new Error(`메모 폴더 밖 경로: ${rel}`);
   return path.join(root, ...parts);
 }
+let sandboxRoot = null; // 튜토리얼 연습 공간 (Bridge.kt sandbox)
 const vaultPath = (rel) => {
+  if (sandboxRoot) return inside(sandboxRoot, rel);
   if (!vaultRoot) throw new Error('메모 폴더가 연결돼 있지 않아요');
   return inside(vaultRoot, rel);
 };
@@ -49,6 +51,11 @@ const sync = {
     exactAlarms: true,
     record: { system: true },
   }),
+  sandbox: (on) => {
+    if (sandboxRoot) fs.rmSync(sandboxRoot, { recursive: true, force: true });
+    sandboxRoot = on ? fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-dev-sandbox-')) : null;
+    return null;
+  },
   useInternalVault: () => {
     vaultRoot = path.join(os.tmpdir(), 'memoking-dev-internal');
     fs.mkdirSync(vaultRoot, { recursive: true });

@@ -59,9 +59,10 @@ class VaultFileProvider : ContentProvider() {
         val segments = uri.pathSegments
         // Drive 폴더 사본: 예전엔 늘 "이 휴대폰에만" 폴더에서 찾아서, Drive 를 쓰면 다른 앱으로 열기가 늘 실패했다
         val drive = segments.firstOrNull() == DRIVE_PREFIX && segments.size >= 3
-        val root = (if (drive) DriveSync.mirrorDir(ctx, segments[1]) else Vaults.internalRoot(ctx)).canonicalFile
+        val sandbox = segments.firstOrNull() == Vaults.SANDBOX_SHARE && segments.size >= 2 // 튜토리얼 연습 공간
+        val root = (if (drive) DriveSync.mirrorDir(ctx, segments[1]) else if (sandbox) Vaults.sandboxRoot(ctx) else Vaults.internalRoot(ctx)).canonicalFile
         if (drive && root.parentFile != File(ctx.filesDir, "drive").canonicalFile) throw FileNotFoundException()
-        val rel = Storage.clean((if (drive) segments.drop(2) else segments).joinToString("/"))
+        val rel = Storage.clean((if (drive) segments.drop(2) else if (sandbox) segments.drop(1) else segments).joinToString("/"))
         val file = File(root, rel).canonicalFile
         if (!file.path.startsWith(root.path + File.separator)) throw FileNotFoundException()
         return file

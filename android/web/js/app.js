@@ -5,14 +5,15 @@ import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
 import { FeedStore, feedResponseText, MAX_FEED_BYTES } from '../../app/js/core/calendar-feed-list.js';
-import { extractTitle, isBlankBody, COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
+import { extractTitle, isBlankBody, COLORS, COLOR_NAMES, toLocalIso } from '../../app/js/core/memo-file.js';
+import { seedTutorialSandbox } from '../../app/js/core/tutorial.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
 import { shareText } from '../../app/js/core/share-text.js';
 import { importText, isTextDocument, stripFrontMatter } from '../../app/js/core/markdown-import.js';
 import { mediaKind } from '../../app/js/media.js';
 import { vocabularyFrom, fixTranscript } from '../../app/js/core/transcript-fix.js';
 import { voiceCardMarkdown, attachTranscript, recordingWhen } from '../../app/js/core/voice-card.js';
-import { native, call, on, setBackHandler, drive, history, fs } from './native.js';
+import { native, call, on, setBackHandler, drive, history, fs, setSandbox } from './native.js';
 import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
@@ -1412,6 +1413,7 @@ function openVault() {
   $('setup').hidden = true;
   list.refresh();
   list.show();
+  if (app.sandbox) return; // 연습 공간: 알림 · 위젯 · 동기화 · 이어 쓰기 안내 · 휴지통 비우기는 실제 폴더 것 그대로
   purgeOldTrash();
   if (!started) {
     started = true;
@@ -1434,6 +1436,34 @@ function openVault() {
     else if (p.type === 'widget-pick') widgets.startPick(p.widgetId, { toast });
     else if (p.type === 'share') memoFromShare(p);
   }
+}
+
+// ---------- 튜토리얼 연습 공간: 내 메모는 그대로 두고 앱 안의 빈 폴더(예시 메모)에서 연습, 끝나면 폴더째 지운다 ----------
+function enterSandbox() {
+  if (app.sandbox || !app.vault) return;
+  try {
+    setSandbox(true);
+  } catch (err) {
+    console.warn('연습 공간을 열지 못해 내 메모 폴더에서 해요', err);
+    return;
+  }
+  app.sandbox = true;
+  openVault();
+  seedTutorialSandbox(app.vault, toLocalIso);
+  list.refresh();
+}
+function leaveSandbox() {
+  if (!app.sandbox) return;
+  note.closeNote({ quiet: true });
+  app.vault?.close();
+  app.vault = null;
+  try {
+    setSandbox(false);
+  } catch (err) {
+    console.warn('연습 공간을 닫지 못했어요', err);
+  }
+  app.sandbox = false;
+  openVault();
 }
 
 // ---------- 이어 쓰기: PC·AI 비서에서 방금 고친 메모 → "PC에서 방금 고친 메모: 장보기 [열기]" ----------
@@ -1525,11 +1555,16 @@ setupTutorial({
   has: (need) => need !== 'workLife' || list.workLifeOn(), // Work / Life 나누기가 꺼져 있으면 그 단계는 안내만 (켜기 단추로 바로 켤 수 있음)
   enable: (need) => need === 'workLife' && list.setWorkLife(true),
   // 연습하며 바꾼 카드 모양 · 태그 고르기 · 모드는 끝나면 처음대로
-  onStart: () => { tutBefore = list.tutorialSnapshot(); },
+  onStart: () => {
+    tutBefore = list.tutorialSnapshot();
+    enterSandbox();
+  },
   onFinish: () => {
     list.tutorialRestore(tutBefore);
     tutBefore = null;
+    leaveSandbox();
   },
+  sandbox: () => app.sandbox === true,
 });
 const info = native.info();
 if (info.vault?.ok) openVault();

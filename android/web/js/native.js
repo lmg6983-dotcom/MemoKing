@@ -14,6 +14,23 @@ function unwrap(json) {
 
 const sync = (name) => (...args) => unwrap(raw[name](...args));
 
+// 튜토리얼 연습 공간: 화면은 앱 안의 빈 폴더(예시 메모)를 쓰고, 실제 메모 폴더는 그대로 둔다 (Bridge.kt sandbox)
+//   그동안 알림 예약 · 홈 화면 위젯 · Drive 동기화는 실제 메모 것 그대로 (연습 메모로 덮어쓰지 않게)
+let sandboxOn = false;
+export function setSandbox(on) {
+  if (typeof raw.sandbox !== 'function') throw new Error('연습 공간을 쓸 수 없는 앱이에요');
+  unwrap(raw.sandbox(Boolean(on)));
+  sandboxOn = Boolean(on);
+}
+export const inSandbox = () => sandboxOn;
+// 화면을 새로 띄우면(앱이 화면만 다시 만든 때 등) 연습 공간은 늘 꺼진 채로 — 실제 메모를 연습 폴더에 쓰지 않게
+try {
+  if (typeof raw.sandbox === 'function') unwrap(raw.sandbox(false));
+} catch {
+  // 다음에 켤 때 비운다
+}
+const outside = (fn) => (...args) => (sandboxOn ? null : fn(...args));
+
 export const fs = {
   scan: sync('scan'),
   list: sync('list'),
@@ -38,7 +55,7 @@ export const native = {
   showKeyboard: sync('showKeyboard'),
   takeIntent: sync('takeIntent'),
   ready: sync('ready'),
-  scheduleAlarms: (items) => unwrap(raw.scheduleAlarms(JSON.stringify(items))),
+  scheduleAlarms: outside((items) => unwrap(raw.scheduleAlarms(JSON.stringify(items)))),
   wasFired: sync('wasFired'),
   notify: (item) => unwrap(raw.notify(JSON.stringify(item))),
   sttStatus: sync('sttStatus'), // 받아쓰기 모델·엔진 상태
@@ -49,9 +66,9 @@ export const native = {
 // 홈 화면 위젯 (Widgets.kt)
 export const widget = {
   memoIds: sync('widgetMemoIds'),
-  publish: sync('widgetPublish'),
-  assign: sync('widgetAssign'),
-  pin: sync('widgetPin'),
+  publish: outside(sync('widgetPublish')),
+  assign: outside(sync('widgetAssign')),
+  pin: outside(sync('widgetPin')),
 };
 
 // 알림 보관함 (NotiService.kt)
@@ -79,7 +96,7 @@ export const drive = {
   setClient: sync('driveSetClient'),
   disconnect: sync('driveDisconnect'),
   cancelLogin: sync('driveCancelLogin'),
-  syncSoon: sync('driveSyncSoon'),
+  syncSoon: outside(sync('driveSyncSoon')),
 };
 
 const pending = new Map();

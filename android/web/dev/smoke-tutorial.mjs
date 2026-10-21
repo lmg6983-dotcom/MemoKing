@@ -136,6 +136,12 @@ await wait(700);
 
 // 1) 처음 열면 저절로
 await atStep('welcome');
+// 연습 공간: 내 메모(회의 · 장보기) 대신 예시 메모 · 말풍선 머리에 "연습 공간"
+{
+  const box = await page.evaluate(() => ({ cards: [...document.querySelectorAll('#cards .card')].map((c) => c.textContent), chip: document.querySelector('.coach-bubble .coach-sandbox')?.textContent ?? '' }));
+  check('연습 공간: 예시 메모만 보이고 내 메모는 안 보임 · 말풍선에 "연습 공간"',
+    box.cards.some((t) => t.includes('연습 공간이에요')) && !box.cards.some((t) => t.includes('출시 일정') || t.includes('우유, 계란')) && box.chip === '연습 공간', JSON.stringify(box));
+}
 await tapOn('.coach-bubble .coach-next', '시작');
 
 // 2) + › 글 메모
@@ -263,14 +269,27 @@ for (const s of STEPS.filter((s) => s.win === 'list' && STEPS.indexOf(s) > STEPS
     await tapOn('#mode-switch [data-mode="work"]', 'Work');
     await wait(700);
     await tapOn('#mode-switch [data-mode="life"]', 'Life');
-  } else await nextBtn();
+  } else {
+    if (s.id === 'done') {
+      // 끝내기 전에: 따라 하며 쓴 메모는 연습 공간에 저장돼 있다
+      const box = await page.evaluate(() => {
+        const n = window.MemoKingNative;
+        const files = JSON.parse(n.scan()).v ?? [];
+        return files.map((f) => JSON.parse(n.readText(f.file)).v ?? '').find((t) => t.includes('주말 장보기 목록')) ?? '';
+      });
+      check('따라 하며 쓴 메모가 연습 공간에 그대로 (제목 · 체크리스트 · 예시 목록 · 태그)', /- \[ \]/.test(box) && box.includes('- [ ] 식빵') && box.includes('#할일'), box);
+    }
+    await nextBtn();
+  }
 }
 await wait(400);
 check('튜토리얼 끝: 말풍선이 사라짐', !(await stepId()));
 const after = await page.evaluate(() => ({ layout: document.getElementById('cards').dataset.layout, tags: document.querySelectorAll('#tag-strip .tag-chip[aria-pressed="true"]').length, panel: document.getElementById('filter-panel').hidden }));
 check('끝나면 연습으로 바꾼 카드 모양 · 태그 고르기 · 열어 둔 보기 칸은 처음대로', after.layout === 'grid' && after.tags === 0 && after.panel, JSON.stringify(after));
-const saved = fs.readdirSync(vault).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(vault, f), 'utf8')).find((t) => t.includes('주말 장보기 목록'));
-check('따라 하며 쓴 메모가 그대로 저장 (제목 · 체크리스트 · 예시 목록 · 태그)', saved && /- \[ \]/.test(saved) && saved.includes('- [ ] 식빵') && saved.includes('#할일'), saved);
+const realFiles = fs.readdirSync(vault).filter((f) => f.endsWith('.md')).sort();
+const backCards = await page.evaluate(() => [...document.querySelectorAll('#cards .card')].map((c) => c.textContent));
+check('끝나면 내 메모로: 실제 폴더에는 내 메모 둘뿐 · 목록에 내 메모 · 연습 메모는 없음',
+  realFiles.join(',') === '장보기.md,회의.md' && backCards.some((t) => t.includes('출시 일정')) && !backCards.some((t) => t.includes('연습 공간이에요') || t.includes('주말 장보기')), JSON.stringify({ realFiles, backCards }));
 check('화면 오류 없음', errors.length === 0, errors.join(' | '));
 await browser.close();
 console.log(failed ? `튜토리얼 점검 실패 ${failed}개` : '휴대폰 튜토리얼 점검 모두 통과');

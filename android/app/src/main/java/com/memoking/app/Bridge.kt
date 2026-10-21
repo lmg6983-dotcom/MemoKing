@@ -28,7 +28,7 @@ class Bridge(private val activity: MainActivity) {
     private val ctx: Context = activity.applicationContext
     private val pool = Executors.newCachedThreadPool()
 
-    private fun storage(): Storage = Vaults.current(ctx) ?: throw IllegalStateException("저장 위치가 설정되지 않았어요. 설정에서 메모 폴더를 골라 주세요")
+    private fun storage(): Storage = Vaults.forScreen(ctx) ?: throw IllegalStateException("저장 위치가 설정되지 않았어요. 설정에서 메모 폴더를 골라 주세요")
 
     private inline fun reply(block: () -> Any?): String = try {
         val v = block()
@@ -68,6 +68,13 @@ class Bridge(private val activity: MainActivity) {
         vaultInfo()
     }
 
+    // 튜토리얼 연습 공간 켜기 · 끄기 (켜면 빈 폴더, 끄면 지운다)
+    @JavascriptInterface
+    fun sandbox(on: Boolean): String = reply {
+        Vaults.setSandbox(ctx, on)
+        null
+    }
+
     // 메모 파일(.md) 목록 — 데스크탑 Vault.listFiles 와 같은 규칙: 숨김·임시 파일, 맨 위의 _memoking·attachments 는 뺀다
     @JavascriptInterface
     fun scan(): String = reply {
@@ -100,7 +107,7 @@ class Bridge(private val activity: MainActivity) {
 
     // 메모 폴더를 고쳤으면 잠시 뒤 Google Drive 와 맞춘다 (Drive 폴더를 쓸 때만)
     private fun <T> changed(value: T): T {
-        DriveSync.request(ctx, 3000)
+        if (Vaults.sandbox == null) DriveSync.request(ctx, 3000) // 연습 공간은 동기화하지 않는다
         return value
     }
 
