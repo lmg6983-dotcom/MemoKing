@@ -102,6 +102,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (!editor || id === null || e.isComposing || !(e.ctrlKey || e.metaKey) || e.altKey) return;
   if (e.code !== 'KeyF' && e.code !== 'KeyH') return;
+  if (findBar.el.contains(e.target)) return; // 막대 안에서는 막대가 받는다 (Ctrl+H 는 바꾸기 줄 펼치기 · 접기)
   e.preventDefault();
   findBar.open({ replace: e.code === 'KeyH' });
 }, true);

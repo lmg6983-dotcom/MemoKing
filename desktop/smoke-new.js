@@ -315,7 +315,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         key(fw, 'H', ['control']);
         const repFocus = await until(() => js(fw, `!document.querySelector('.mk-find-replace').hidden && document.activeElement === document.querySelector('.mk-find-replace .mk-find-input')`), 'Ctrl+H 바꾸기 줄', 2000).catch(() => false);
         fw.webContents.insertText('포도');
-        key(fw, 'Return', ['control']);
+        // Ctrl+Enter: sendInputEvent 로는 Ctrl 을 붙인 Enter 가 실제 키보드처럼 오지 않아, 크롬 개발 도구 입력(실제 키보드와 같은 길)으로
+        {
+          const dbg = fw.webContents.debugger;
+          if (!dbg.isAttached()) dbg.attach('1.3');
+          for (const type of ['keyDown', 'keyUp']) await dbg.sendCommand('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, modifiers: 2 });
+          dbg.detach();
+        }
         const replaced = await until(() => { const b = v0.get(fid)?.body ?? ''; return /포도 하나, 포도 둘, 포도즙/.test(b) && b; }, '모두 바꾸기 저장', 4000).catch(() => '');
         key(fw, 'Escape');
         const closedF = await until(() => js(fw, `document.querySelector('.mk-find-bar').hidden && !document.querySelector('.mk-find-hit')`), 'Esc 닫기', 2000).catch(() => false);
