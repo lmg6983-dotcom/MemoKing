@@ -1247,11 +1247,14 @@ function showTab(tab) {
   //   — 늘 모든 카드를 다시 쌓아(배치 계산) 탭의 표시가 미끄러지는 동안 화면이 멈칫했다
   if (tab === 'memos' && (memosStale || state.query || lastCols !== columnsFor(el.cards.clientWidth || window.innerWidth))) runSearch();
   if (tab === 'reminders') {
+    // 달력은 탭 표시가 먼저 바뀐 다음 프레임에, 바뀐 일정이 없으면 다시 그리지 않고 (달력 그리기가 탭 전환을 붙잡았다)
     remindersTab.setQuery('', { quiet: true });
-    remindersTab.refresh();
+    const my = ++tabSeq;
+    requestAnimationFrame(() => setTimeout(() => my === tabSeq && activeTab === 'reminders' && remindersTab.refresh({ ifChanged: true }), 0));
   }
   if (tab === 'history') historyTab.setQuery('');
 }
+let tabSeq = 0;
 for (const b of document.querySelectorAll('.tabs [data-tab]')) b.addEventListener('click', () => showTab(b.dataset.tab));
 tabKeys(document.querySelector('.tabs'));
 api.on('list:tab', showTab);
