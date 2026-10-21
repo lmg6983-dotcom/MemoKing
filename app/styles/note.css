@@ -896,7 +896,6 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
 @media (hover: hover) and (pointer: fine) { .table-bar button:hover:not(:disabled) { background: var(--note-hover); } }
 .table-bar button:disabled { opacity: 0.35; cursor: default; }
 @media (hover: hover) and (pointer: fine) { .table-bar button.danger:hover { color: var(--danger); } }
-.table-bar-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--note-muted); opacity: 0.4; flex: none; }
 
 /* 탭 끌기 (v0.14.0): 탭 줄 안에서는 탭이 들려 커서를 따라온다 */
 .stack-tab.lifting {

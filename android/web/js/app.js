@@ -482,7 +482,6 @@ memoSheet.addEventListener('click', async (e) => {
   const id = menuFor;
   const memo = app.vault.get(id);
   const body = note.currentId() === id ? note.editorMarkdown() : memo?.body ?? '';
-  const title = isBlankBody(body) ? '새 메모' : extractTitle(body);
   switch (b.dataset.memoAction) {
     case 'find':
       closeSheet(memoSheet);
@@ -655,8 +654,6 @@ let shareFor = null;
 const shareSheet = $('share-sheet');
 function openShare(id) {
   shareFor = id;
-  const memo = app.vault.get(id);
-  const body = note.currentId() === id ? note.editorMarkdown() : memo?.body ?? '';
   $('share-sheet-title').textContent = '공유';
   $('share-busy').hidden = true;
   for (const b of shareSheet.querySelectorAll('[data-share]')) b.disabled = false;

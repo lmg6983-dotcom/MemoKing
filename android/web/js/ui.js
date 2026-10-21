@@ -189,7 +189,6 @@ wide.addEventListener('change', () => {
 
 // ---------- 확인 ----------
 
-let confirmResolve = null;
 // danger: 지우기처럼 되돌릴 수 없는 일이면 빨간 단추 (아니면 보통 단추) · cancelLabel: "취소" 가 헷갈릴 때 (예: 남겨 두기)
 export function confirmDialog(message, okLabel = '지우기', { cancelLabel = '취소', danger = true } = {}) {
   const dialog = $('confirm-dialog');
@@ -201,9 +200,7 @@ export function confirmDialog(message, okLabel = '지우기', { cancelLabel = '�
   dialog.returnValue = '';
   dialog.showModal();
   return new Promise((resolve) => {
-    confirmResolve = resolve;
     dialog.addEventListener('close', () => {
-      confirmResolve = null;
       resolve(dialog.returnValue === 'ok');
     }, { once: true });
   });

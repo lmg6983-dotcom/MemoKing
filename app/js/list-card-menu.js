@@ -5,11 +5,9 @@
 import { openContextMenu } from './ctx-menu.js';
 import { CUT_ICON, COPY_ICON, SHARE_ICON, SAVE_ICON, TRASH_ICON } from './content-icons.js';
 import { chooseShare, showSharePop, SHARE_DONE } from './share-menu.js';
-import { COLORS } from './core/memo-file.js';
+import { COLORS, COLOR_NAMES } from './core/memo-file.js';
 import { dayText } from './memory-day.js';
 import { moveLabel } from './core/modes.js';
-
-export const COLOR_LABEL = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 
 /** 메뉴의 모양 (창 없이도 확인할 수 있게 따로) */
 /** @param {{ workLife?: boolean }} [o] workLife: Work / Life 를 나눠 쓸 때만 "Work로 옮기기" */
@@ -27,7 +25,7 @@ export function cardMenuSpec(memo, { workLife = true } = {}) {
       { id: 'open', label: '열기', hint: 'Enter' },
       { type: 'separator' },
       { id: 'pin', label: '목록 맨 위에 고정', checked: memo.pinned === true },
-      { type: 'colors', label: '색', colors: COLORS.map((c) => ({ id: `color:${c}`, label: COLOR_LABEL[c] ?? c, color: c, checked: memo.color === c })) },
+      { type: 'colors', label: '색', colors: COLORS.map((c) => ({ id: `color:${c}`, label: COLOR_NAMES[c] ?? c, color: c, checked: memo.color === c })) },
       { id: 'day', label: '이 날의 기록으로', hint: memo.day ? dayText(memo.day) : '' },
       ...(workLife ? [{ id: 'mode', label: moveLabel(memo) }] : []),
       { type: 'separator' },

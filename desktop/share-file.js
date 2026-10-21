@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
+import { POWERSHELL, psArgs, psOptions } from './powershell.js';
 
 // 도우미의 대답은 UTF-8 로 (Windows PowerShell 5.1 은 기본이 OEM 코드 페이지라 한국어 오류 문구가 깨진다)
 const UTF8_OUT = '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8';
@@ -74,9 +75,7 @@ export function runHelper(script, env, { platform = process.platform, spawnHelpe
     const text = () => Buffer.concat(chunks).toString('utf8'); // 조각마다 바꾸면 한글이 반으로 잘릴 수 있다
     let proc;
     try {
-      proc = spawnHelper('powershell.exe', ['-NoProfile', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass', '-Command', script], {
-        cwd: os.tmpdir(), windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ...env }, // cwd: 설치 폴더를 붙잡지 않게 (업데이트)
-      });
+      proc = spawnHelper(POWERSHELL, psArgs(['-Command', script], { sta: true }), psOptions({ stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ...env } }));
     } catch (err) {
       return finish(`err ${err.message}`);
     }

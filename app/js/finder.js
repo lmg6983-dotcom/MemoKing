@@ -1,5 +1,6 @@
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
 import { searchingNode } from './searching.js';
+import { COLOR_DOTS } from './core/memo-file.js';
 // 모두 찾기 창 — 매직키에서 "다른 n건 더 보기" 를 고르면 열린다 (Everything 처럼 한 줄씩 · 열 정렬)
 //   기본은 비슷한 것부터, 열 머리를 누르면 이름 · 경로 · 크기 · 고친 때로 (한 번 더 누르면 거꾸로, 세 번째는 다시 비슷한 순)
 //   ↑↓ PgUp PgDn Home End 고르기 · ← → 할 일(열기 · 경로 복사 · 폴더 열기 · 파일 복사) · Enter 실행 · 두 번 누르면 열기
@@ -15,7 +16,6 @@ const countEl = document.getElementById('finder-count');
 const statusEl = document.getElementById('finder-status');
 
 const ROW_H = 34;
-const COLORS = { yellow: '#ffe58a', green: '#c8ecb4', pink: '#ffc9d6', purple: '#dccbff', blue: '#bfe0ff', gray: '#e3e3e3', charcoal: '#3b3b3b' };
 
 let all = []; // 찾은 것 (비슷한 순)
 let total = 0; // 맞는 것 전체 (파일은 2000개까지만 받아 온다)
@@ -152,7 +152,7 @@ function rowEl(r, i) {
   if (r.kind === 'note') {
     const dot = document.createElement('span');
     dot.className = 'dot';
-    dot.style.background = COLORS[r.color] ?? COLORS.yellow;
+    dot.style.background = COLOR_DOTS[r.color] ?? COLOR_DOTS.yellow;
     ico.append(dot);
   } else if (r.icon) {
     const img = document.createElement('img');

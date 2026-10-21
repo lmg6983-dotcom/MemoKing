@@ -839,12 +839,6 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal[data-view="listMonth"] .cal-body .mk-ev:not(.mk-ext) { background: color-mix(in srgb, var(--fc-event-color) 26%, transparent) !important; color: var(--text-strong); }
 .cal-body .mk-ext { background: color-mix(in srgb, var(--fc-event-color) 12%, transparent) !important; color: var(--text); }
 .cal-body .mk-ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-/* 목록 보기: 날짜 칸은 좁게, 일정은 시각(작게) 위 · 제목(두 줄까지) 아래 */
-.cal-body .mk-ldh { flex: none !important; width: 58px !important; min-width: 0 !important; }
-.cal-body .mk-ldh > :first-child { font-size: 18px; white-space: nowrap; }
-.cal-body .mk-li-in { flex-direction: column !important; align-items: stretch !important; gap: 2px; min-width: 0; }
-.cal-body .mk-li-time { width: auto !important; max-width: none !important; flex: none !important; font-size: 12px; color: var(--muted); white-space: nowrap; }
-.cal-body .mk-li-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; white-space: normal !important; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.35; }
 /* 손가락으로 누르는 화면: 누르는 자리를 넉넉히 (보기 전환 · 앞뒤 달 · 오늘 · 달력 칩 · 다른 캘린더 창의 칸들) */
 @media (pointer: coarse) {
   .cal-views button { height: 40px; padding: 0 16px; font-size: 14px; }

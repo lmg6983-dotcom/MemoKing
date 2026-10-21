@@ -2,8 +2,8 @@
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 import fs from 'node:fs';
-import os from 'node:os';
 import { EventEmitter } from 'node:events';
+import { POWERSHELL, psArgs, psOptions } from './powershell.js';
 
 export class PopupWatcher extends EventEmitter {
   /**
@@ -26,12 +26,11 @@ export class PopupWatcher extends EventEmitter {
     if (this.proc || process.platform !== 'win32') return;
     this.stopping = false;
     fs.mkdirSync(this.dir, { recursive: true });
-    const args = ['-STA', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', this.script,
-      '-Dir', this.dir, '-Processes', this.processes.join(',')];
+    const args = psArgs(['-File', this.script, '-Dir', this.dir, '-Processes', this.processes.join(',')], { sta: true });
     if (this.onlyPid) args.push('-OnlyPid', String(this.onlyPid));
     if (this.forceOcr) args.push('-ForceOcr');
     if (this.log) args.push('-Log', this.log);
-    const proc = spawn('powershell.exe', args, { cwd: os.tmpdir(), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); // cwd: 설치 폴더를 작업 폴더로 물려받으면 업데이트 때 그 폴더를 지우지 못한다
+    const proc = spawn(POWERSHELL, args, psOptions({ stdio: ['ignore', 'pipe', 'pipe'] }));
     this.proc = proc;
     readline.createInterface({ input: proc.stdout }).on('line', (line) => {
       let msg;

@@ -2,11 +2,11 @@
 //   화면의 그날의 기록과 같은 모양: 줄 노트 종이 위에 테이프 붙인 폴라로이드 · 메모지 조각, 맨 아래 날짜와 "메모킹".
 //   사진은 fetch 로 받아 그린다 (img 를 바로 그리면 다른 출처 그림이라 캔버스를 내보낼 수 없다)
 import { vaultUrl } from './media.js';
+import { NOTE_BG } from './core/memo-file.js';
 
 const W = 1080;
 const PAD = 64;
 const FONT = '"Pretendard Variable", Pretendard, "Malgun Gothic", system-ui, sans-serif';
-const NOTE_BG = { yellow: '#fff4b8', green: '#ddf5df', pink: '#ffe0ec', purple: '#ede3ff', blue: '#ddeeff', gray: '#f1f0ec', charcoal: '#1c1c1b' };
 const INK = '#3b352a';
 
 const hash = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7);
@@ -163,7 +163,7 @@ export async function renderCollage({ title, sub = '', photos = [], memos = [], 
       const h = Math.min(polH, cell * 0.95);
       ctx.save();
       shadow(ctx, 12, 4, 0.14);
-      ctx.fillStyle = NOTE_BG[n.color] ?? NOTE_BG.yellow;
+      ctx.fillStyle = NOTE_BG.light[n.color] ?? NOTE_BG.light.yellow;
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(0, 0, cell, h, [3, 3, 26, 3]);
       else ctx.rect(0, 0, cell, h);

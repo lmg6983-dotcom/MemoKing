@@ -107,7 +107,6 @@ export function setWorkLife(on) {
   if (on) workClock();
   app.rescheduleAlarms?.(); // 퇴근 뒤 조용히가 켜지거나 꺼진다
 }
-export const currentMode = () => state.mode;
 
 /** 튜토리얼 뒷정리 (tutorial.js): 시작할 때 모습을 적어 두고, 끝나면 연습으로 바꾼 카드 모양 · 태그 고르기 · 모드 · Work/Life 켜기를 처음대로 */
 export const tutorialSnapshot = () => ({ layout, tags: [...state.filter.tags], mode: state.mode, panel: !el.filterPanel.hidden, workLife: workLifeOn() });

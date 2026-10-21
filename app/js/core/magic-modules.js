@@ -1,8 +1,6 @@
 // 매직키 (Ctrl+Alt+Space) — 어디서든 빠르게 입력하는 창. 여러 기능 모듈로 이루어지고, 설정에서 모듈마다 끄고 켠다.
 // (순수 함수, 단위 테스트 대상) 모듈을 더할 때는 여기에 한 줄 + magic.js 의 처리기(HANDLERS)에 한 개.
 
-export const MAGIC_KEY = 'Ctrl+Alt+Space';
-
 // ready: 지금 쓸 수 있는가 (false = 준비 중, 설정에서 켤 수 없음)
 export const MAGIC_MODULES = [
   { id: 'memo', name: '메모 만들기', description: '입력한 글을 새 메모로 바로 저장해요 (Enter 저장, Ctrl+Enter 저장하고 열기)', ready: true, defaultOn: true },

@@ -13,10 +13,10 @@ import { setupRemindersTab } from './list-reminders.js';
 import { setupHistoryTab } from './list-history.js';
 import { renderReleaseNotes } from './release-notes-view.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
-import { COLORS } from './core/memo-file.js';
+import { COLORS, COLOR_NAMES } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
 import { hintOnce } from './hints.js';
-import { openCardMenu, COLOR_LABEL } from './list-card-menu.js';
+import { openCardMenu } from './list-card-menu.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { renderCollage, collageName } from './memories-collage.js';
 import { base64Bytes, collageMemoBody } from './collage-preview.js';
@@ -365,8 +365,8 @@ function renderFilters() {
   }));
   el.colorFilter.replaceChildren(...COLORS.map((c) => {
     const b = chip('color-dot', '', state.filter.colors.includes(c), { filterColor: c, color: c });
-    b.title = COLOR_LABEL[c] ?? c;
-    b.setAttribute('aria-label', `${COLOR_LABEL[c] ?? c} 메모`);
+    b.title = COLOR_NAMES[c] ?? c;
+    b.setAttribute('aria-label', `${COLOR_NAMES[c] ?? c} 메모`);
     return b;
   }));
   el.kindFilter.replaceChildren(...KIND_FILTERS.map((k) => chip('filter-chip', k.label, state.filter.kinds.includes(k.id), { kind: k.id })));
@@ -376,7 +376,7 @@ function renderFilters() {
   el.filterSummary.hidden = n === 0;
   const parts = [
     ...state.filter.tags.map((t) => `#${t}`),
-    ...state.filter.colors.map((c) => COLOR_LABEL[c] ?? c),
+    ...state.filter.colors.map((c) => COLOR_NAMES[c] ?? c),
     ...state.filter.kinds.map((id) => KIND_FILTERS.find((k) => k.id === id)?.label ?? id),
   ];
   el.filterSummaryText.textContent = `필터 ${n}개: ${parts.join(', ')}`;
