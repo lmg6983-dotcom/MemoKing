@@ -1439,7 +1439,7 @@ function openVault() {
 }
 
 // ---------- 튜토리얼 연습 공간: 내 메모는 그대로 두고 앱 안의 빈 폴더(예시 메모)에서 연습, 끝나면 폴더째 지운다 ----------
-function enterSandbox() {
+async function enterSandbox() {
   if (app.sandbox || !app.vault) return;
   try {
     setSandbox(true);
@@ -1449,8 +1449,14 @@ function enterSandbox() {
   }
   app.sandbox = true;
   openVault();
-  seedTutorialSandbox(app.vault, toLocalIso);
-  list.refresh();
+  const vault = app.vault;
+  // 예시 사진: 앱에 든 사진을 연습 폴더 첨부로
+  const photo = async (name) => {
+    const r = await fetch(new URL(`../../app/assets/tutorial/sample/${name}.jpg`, import.meta.url));
+    return r.ok ? vault.saveAttachment(new Uint8Array(await r.arrayBuffer()), 'jpg') : null;
+  };
+  await seedTutorialSandbox(vault, toLocalIso, { photo });
+  if (app.vault === vault) list.refresh();
 }
 function leaveSandbox() {
   if (!app.sandbox) return;

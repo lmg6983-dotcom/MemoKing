@@ -25,6 +25,7 @@ export const TUTORIAL_SAMPLE = '- [ ] 우유\n- [ ] 달걀\n- [ ] 사과\n- [ ] 
  *   그 폴더에 미리 넣어 두는 예시 메모 — 목록 · 보기 · 태그 · 검색 · Work/Life · 일정 · 회상을 해 볼 거리.
  *   메모킹으로 쓸 수 있는 것(할 일 · 표 · 인용 · 굵게 · 형광펜 · 글자 색 · 코드 · 링크 · 일정)을 골고루. 끝나면 폴더째 사라진다
  *   daysAgo: 며칠 전에 쓴 메모로 (목록 · 회상 달력이 실제처럼) · events: 며칠 뒤(inDays) 몇 시(time)의 일정
+ *   photos: 사진 (app/assets/tutorial/sample/이름.jpg — 회상 달력 · 사진 모아 보기가 비지 않게)
  *   예시 장보기 목록(TUTORIAL_SAMPLE)의 낱말은 쓰지 않는다 (옮기기 단계에서 헷갈리지 않게)
  *   Life 태그는 #여행 · #생활 둘만 — 휴대폰 태그 줄에서 튜토리얼 중 만든 #태그가 밀려나지 않게
  */
@@ -62,28 +63,65 @@ export const TUTORIAL_SANDBOX_MEMOS = [
     color: 'charcoal', mode: 'work', daysAgo: 5,
   },
   {
-    body: '# 떠오른 생각\n\n점심시간 산책길에 본 노을이 예뻤다. 다음엔 <span style="color: #1971c2">사진</span>을 꼭 찍어 두자.',
-    color: 'green', daysAgo: 15,
+    body: '# 춘천 닭갈비\n\n치즈 추가는 **꼭**. 남은 양념에 볶음밥까지 먹어야 끝\n\n#여행',
+    color: 'pink', daysAgo: 8, photos: ['dakgalbi-cheese', 'dakgalbi-rice'],
+  },
+  {
+    body: '# 라멘 한 그릇\n\n흑마늘 기름이 진하다. 반숙 달걀은 하나 더 시키기\n\n#생활',
+    color: 'gray', daysAgo: 6, photos: ['ramen'],
+  },
+  {
+    body: '# 레몬 파스타\n\n구운 레몬을 짜서 먹으니 산뜻했다. <span style="color: #e03131">고추가 은근 매움</span>\n\n#생활',
+    color: 'blue', daysAgo: 3, photos: ['pasta'],
+  },
+  {
+    body: '# 기념일 저녁\n\n스테이크와 피시앤칩스, 맥주 한 잔\n\n> 내년에도 여기서\n\n#생활',
+    color: 'purple', daysAgo: 10, photos: ['steak', 'fish-and-chips'],
+  },
+  {
+    body: '# 인절미 토스트\n\n콩고물이 산처럼 쌓여 나온다. <mark>둘이서 하나면 충분</mark>\n\n#생활',
+    color: 'yellow', daysAgo: 12, photos: ['injeolmi-toast'],
+  },
+  {
+    body: '# 캠핑 불멍\n\n장작 두 묶음이면 밤새 충분했다.\n\n다음 캠핑 준비물\n- [ ] 장갑\n- [ ] 접이식 의자\n\n#여행',
+    color: 'charcoal', daysAgo: 13, photos: ['campfire'],
+  },
+  {
+    body: '# 파르페와 라자냐\n\n창가 자리 그네 의자가 귀엽다\n\n#생활',
+    color: 'pink', daysAgo: 17, photos: ['parfait'],
+  },
+  {
+    body: '# 미국식 한 접시\n\n칠리 감자튀김, 나초, 소시지. 셋이 먹어도 남았다\n\n#생활',
+    color: 'yellow', daysAgo: 19, photos: ['chili-platter'],
   },
 ];
 
-/** 연습 공간 예시 메모를 볼트에 넣는다 (PC · 휴대폰 볼트 모두 import · setReminders 가 같다) */
-export function seedTutorialSandbox(vault, toIso, now = new Date()) {
+/**
+ * 연습 공간 예시 메모를 볼트에 넣는다 (PC · 휴대폰 볼트 모두 import · setReminders 가 같다)
+ * @param {(name: string) => Promise<string|null>|string|null} [photo] 예시 사진 하나를 볼트 첨부로 넣고 그 경로 (못 넣으면 null — 그 사진은 빼고)
+ */
+export async function seedTutorialSandbox(vault, toIso, { now = new Date(), photo = () => null } = {}) {
   const day = (n, time = '09:00') => {
     const [h, m] = time.split(':').map(Number);
     return new Date(now.getFullYear(), now.getMonth(), now.getDate() + n, h, m);
   };
-  TUTORIAL_SANDBOX_MEMOS.forEach((m, i) => {
+  for (const [i, m] of TUTORIAL_SANDBOX_MEMOS.entries()) {
     // 같은 날 쓴 메모도 순서가 늘 같게 (뒤의 것일수록 조금 앞선 시각)
     const at = toIso(new Date(now.getTime() - m.daysAgo * 86_400_000 - i * 60_000));
-    const id = vault.import({ body: m.body, color: m.color, mode: m.mode, pinned: m.pinned === true, created: at, updated: at });
+    const pics = [];
+    for (const name of m.photos ?? []) {
+      const rel = await Promise.resolve(photo(name)).catch(() => null);
+      if (rel) pics.push(`![](${rel})`);
+    }
+    const body = pics.length ? `${m.body}\n\n${pics.join('\n\n')}` : m.body;
+    const id = vault.import({ body, color: m.color, mode: m.mode, pinned: m.pinned === true, created: at, updated: at });
     if (id && m.events?.length) {
       vault.setReminders(id, m.events.map((e, k) => normalizeReminder({
         id: `tut-${i}-${k}`, kind: 'at', action: 'notify', title: e.title, created: at,
         at: toIso(day(e.inDays, e.allDay ? '00:00' : e.time)), allDay: e.allDay === true, alerts: e.alerts, // 하루 종일은 그날 00:00
       }, now)));
     }
-  });
+  }
 }
 
 /** 예시 목록이 이미 들어 있는지 (단계가 다시 떠도 두 번 넣지 않게) */

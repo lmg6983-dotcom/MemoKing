@@ -731,7 +731,8 @@ async function enterSandbox() {
   next.on('changed', () => windowManager.pushList());
   next.on('error', (err) => console.error('[연습 공간]', err));
   next.open();
-  seedTutorialSandbox(next, toLocalIso);
+  // 예시 사진: 앱에 든 사진을 연습 폴더 첨부로 복사
+  await seedTutorialSandbox(next, toLocalIso, { photo: (name) => next.saveAttachment(fs.readFileSync(path.join(import.meta.dirname, '..', 'app', 'assets', 'tutorial', 'sample', `${name}.jpg`)), 'jpg') }); // 설치본(asar) 안의 사진도 readFileSync 로 읽힌다
   sandbox = { real, dir, openNotes, workLife: settings.workLife };
   vault = next;
   windowManager.loadStacks();
