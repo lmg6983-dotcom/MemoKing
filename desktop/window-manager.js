@@ -27,7 +27,6 @@ import {
 } from './utils.js';
 
 // 창 위 가장자리에 반쯤 걸쳐 붙는 스티커: 왕관(늘 위) · 셀로판 테이프(늘 아래, 바탕화면 층)
-// 목록 창 제목 줄: 스티커 가운데가 상표(아이콘+글자) 오른쪽보다 안쪽, 단추 묶음(동기화·설정 76px + 창 버튼 142px + 여백 38px) 왼쪽보다 바깥이어야 한다
 // 목록 창 제목 줄: 왼쪽은 로고 · Life/Work 스위치(~196px), 오른쪽은 단추 묶음 + Windows 창 버튼(~242px) — 스티커는 그 사이 빈 줄에
 const LIST_STICKER_LEFT = 200;
 const LIST_STICKER_RIGHT = 250;
@@ -101,7 +100,6 @@ export class WindowManager {
     this.iconCache = new Map();
 
     this.opmsWin = null;
-    this.opmsLastDir = '';
     this.opmsDirs = new Set(); // 이번 실행에서 받은 사건 폴더 — 이 폴더들만 '폴더 열기' 로 연다
     this.opmsCases = new Map();
     this.attachCache = new Map();

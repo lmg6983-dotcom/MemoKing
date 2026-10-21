@@ -498,7 +498,6 @@ export function registerIpc(ctx) {
       onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', { ...p, idx: c.idx }); }, // 여러 사건을 함께 받아도 어느 사건의 진행인지 알게
     });
     for (const u of gone) res.failed.push({ upload: u, name: path.basename(u), error: 'OPMS 목록에서 사라졌어요. 새로 고침 해 주세요' });
-    wm.opmsLastDir = res.dir;
     wm.opmsDirs.add(res.dir);
     indexWrapper(res.dir);
     if (!SMOKE) shell.openPath(res.dir);
@@ -522,7 +521,6 @@ export function registerIpc(ctx) {
     if (!it) throw new Error('그 파일을 찾지 못했어요. 새로 고침 뒤 다시 해 주세요');
     const file = await wm.opmsClient().fileFor(c, it, wm.opmsSettings().wrapperDir);
     if (!file) throw new Error('파일 이름이 이상해 열 수 없어요');
-    wm.opmsLastDir = path.dirname(file);
     indexWrapper(path.dirname(file), [file]);
     if (!isOpenableFile(file)) {
       if (!SMOKE) shell.showItemInFolder(file);

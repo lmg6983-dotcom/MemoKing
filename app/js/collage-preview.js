@@ -71,6 +71,7 @@ export function openCollagePreview({ title, base64, actions, notify = () => {}, 
   overlay.append(card);
 
   let release = null;
+  const back = document.activeElement; // 닫으면 누른 단추(한 장으로)로 돌아간다
   const onKey = (e) => {
     if (e.key !== 'Escape' || document.querySelector('.mk-share-menu')) return; // 공유 방법 메뉴가 떠 있으면 그것부터 닫힌다
     e.preventDefault();
@@ -83,6 +84,7 @@ export function openCollagePreview({ title, base64, actions, notify = () => {}, 
     release?.();
     overlay.classList.add('closing');
     setTimeout(() => overlay.remove(), 160);
+    if (back?.isConnected) back.focus({ preventScroll: true });
   }
   closeBtn.addEventListener('click', close);
   overlay.addEventListener('click', (e) => {
