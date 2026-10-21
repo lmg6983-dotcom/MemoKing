@@ -24,7 +24,7 @@ function payload() {
   const step = state.active ? tutorialStepFor(STEPS[state.index], has) : null;
   if (!step || step.win !== screen()) return null;
   const jumps = state.index === 0 && state.again ? tutorialJumps(STEPS) : undefined; // 다시 볼 때 어디부터
-  return { ...step, index: state.index, total: STEPS.length, praise: state.praise, chapter: tutorialChapter(STEPS, state.index), jumps };
+  return { ...step, index: state.index, total: STEPS.length, praise: state.praise, chapter: tutorialChapter(STEPS, state.index), jumps, sandbox: hooks.sandbox?.() === true };
 }
 function send() {
   const p = payload();
@@ -55,17 +55,25 @@ const api = {
 };
 
 /** @param {{ screen: () => 'list'|'note', markdown: () => string, append: (md: string) => void, edit?: () => void, has?: (need: string) => boolean,
- *            onStart?: () => void, onFinish?: () => void, enable?: (need: string) => void }} o */
+ *            onStart?: () => void, onFinish?: () => void, enable?: (need: string) => void,
+ *            zoom?: { get: () => number, set: (z: number) => void }, sandbox?: () => boolean }} o
+ *   zoom: 매직 줌 연습 단계를 지나면 배율을 처음대로 · sandbox: 연습 공간에서 하는 중인지 (말풍선 머리에 표시) */
+let zoomBefore = null; // 매직 줌 연습 전 배율
 export function setupTutorial(o) {
   screen = o.screen;
   markdown = o.markdown;
   append = o.append;
   edit = o.edit ?? edit;
   has = o.has ?? has;
-  hooks = { onStart: o.onStart, onFinish: o.onFinish, enable: o.enable };
+  hooks = { onStart: o.onStart, onFinish: o.onFinish, enable: o.enable, sandbox: o.sandbox };
   coach = setupCoach(api, {
     onStep: (step) => {
       base = step ? counts(markdown()) : null;
+      if (step?.id === 'note-zoom') zoomBefore ??= o.zoom?.get() ?? null;
+      else if (zoomBefore !== null) {
+        if (o.zoom?.get() !== zoomBefore) o.zoom?.set(zoomBefore);
+        zoomBefore = null;
+      }
       // 옮기기를 배우기 전: 옮겨 볼 예시 목록을 메모 끝에
       if (step?.sample && screen() === 'note' && !hasTutorialSample(markdown())) append(TUTORIAL_SAMPLE);
       // 글을 써 보는 단계 · + 를 눌러 보는 단계: 다이얼이 옮기기·그리기여도 글 고치기로

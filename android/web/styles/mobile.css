@@ -699,9 +699,15 @@ h2.sheet-title { font-size: 20px; }
   box-shadow: var(--bubble-shadow);
   transform: translateX(-50%);
   animation: toast-in 0.2s ease-out;
+  touch-action: none; /* 옆 · 위로 밀어 닫기 (ui.js swipeDismiss) — 화면 스크롤로 넘기지 않게 */
+  user-select: none;
 }
 .toast.error { background: var(--danger); color: var(--on-danger); }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+/* 처음 두 번: 나타난 뒤 살짝 옆으로 밀렸다 돌아옴 — 밀어서 닫을 수 있다는 몸짓 (translate 는 밀기와 따로 쓰는 속성) */
+.toast.swipe-teach { animation: toast-in 0.2s ease-out, toast-nudge 0.7s 0.9s cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes toast-nudge { 0%, 100% { translate: 0 0; } 35% { translate: 18px 0; } }
+@media (prefers-reduced-motion: reduce) { .toast.swipe-teach { animation: none; } }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .toast { background: var(--surface-2); color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-pop); }
 }
@@ -1257,3 +1263,13 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 @keyframes m-sync-scan { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 .sync-btn.syncing svg { animation: none; } /* 깜빡이던 구름 대신 진행 줄 */
 @media (prefers-reduced-motion: reduce) { .sync-btn .sync-line i { animation: none; width: 100%; opacity: 0.5; } }
+
+/* 메모 안 찾기 · 바꾸기 막대: 메모 화면 위 막대 바로 아래 (note.css .mk-find-bar) — 손가락 크기 */
+/* 배치는 PC 와 같고 손가락 크기만 (단추 · 칸 높이) */
+.mk-find-btn { width: var(--tap); height: var(--tap); }
+.mk-find-case { width: 34px; height: 34px; }
+.mk-find-field, .mk-find-fmt { height: 40px; }
+.mk-find-act { height: 40px; }
+.mk-find-opt, .mk-find-choice { height: 32px; }
+.mk-find-swatch { width: 34px; height: 34px; }
+.mk-find-item { min-height: 40px; }

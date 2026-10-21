@@ -40,6 +40,7 @@ import { createDateRemind, refreshDateRemind } from './date-remind.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
 import { burstAt } from './confetti-burst.js';
 import { haptic } from './dom.js';
+import { createFindPlugin, findController } from './find-replace.js';
 import { mathPlugins, insertMathBlock } from './math.js';
 import { fileChipGuard } from './file-chip-guard.js';
 import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
@@ -1782,6 +1783,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   const voiceCards = $prose(() => createVoiceCards());
   const contentLines = $prose(() => createContentLines());
   const tidy = $prose(() => createTidy({ readOnly }));
+  const findPlugin = $prose(() => createFindPlugin()); // 메모 안 찾기 · 바꾸기 표시 (find-replace.js)
   const dateRemind = $prose(() => createDateRemind({ readOnly, onAdd: onDateReminder, hasReminderAt }));
   const taskToggle = $prose(() => new Plugin({
     key: new PluginKey('memoking-task-toggle'),
@@ -1923,6 +1925,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(tapList)
     .use(voiceCards)
     .use(contentLines)
+    .use(findPlugin)
     .use(tidy)
     .use(tagHighlight)
     .use(tagCapsule)
@@ -2408,6 +2411,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       commands[name]?.();
       view().focus();
     },
+    /** 메모 안 찾기 · 바꾸기 (find-bar.js 가 쓴다) */
+    find: findController(view),
     /** 링크 미리보기 설정을 바꾸면 그려진 카드를 바로 카드 ↔ 링크 글자로 */
     setLinkPreviews(on) {
       previewsOn = on !== false;

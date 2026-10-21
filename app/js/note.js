@@ -20,7 +20,7 @@ import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSliders } from './seg-slider.js';
 import { setupVoiceRecorder } from './voice-recorder.js';
 import { setupAnnotation } from './ink-annotate.js';
-import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups } from './dom.js';
+import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups, swipeDismiss } from './dom.js';
 import { createClearStamp } from './clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
@@ -32,6 +32,7 @@ import { hotkeyDialog } from './hotkey-dialog.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { memoMode, otherMode, moveLabel, MODE_LABEL } from './core/modes.js';
+import { createFindBar } from './find-bar.js';
 
 const SAVE_DELAY = 600;
 
@@ -296,6 +297,9 @@ function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
   $('banner-keep').textContent = keep;
   el.banner.hidden = false;
 }
+
+// 고를 것이 없는 안내("다른 기기에서도 고쳤어요 · 확인")는 옆으로 밀어 닫는다 — 바뀐 내용을 볼지 고르는 중이면 제자리로
+swipeDismiss(el.banner, () => $('banner-keep').click(), { can: () => !pendingExternal });
 
 api.on('memo:external', async (next) => {
   // 아직 편집기가 없다(잠긴 메모의 비밀번호 화면) — 비밀번호 화면은 열 때 지금 파일로 푸므로 할 일이 없다
@@ -804,6 +808,12 @@ async function openShortcutSheet() {
 $('shortcuts-btn').addEventListener('click', () => {
   closeMenu();
   openShortcutSheet();
+});
+// 메모 안 찾기 · 바꾸기 (Ctrl+F · Ctrl+H, 메뉴 › 찾기, 바꾸기) — 워드처럼 한 막대에서 찾기 · 바꾸기 · 모두 바꾸기
+const findBar = createFindBar({ host: document.body, after: document.querySelector('body > .bar'), find: () => editor?.find, notify: (text, o) => setStatus(o?.undo ? `${text}. 되돌리려면 Ctrl+Z` : text) });
+$('find-btn').addEventListener('click', () => {
+  closeMenu();
+  findBar.open();
 });
 // 메모 창을 몇 번 써 본 뒤 한 번: 단축키 모음이 있다는 것
 setTimeout(() => {
@@ -1377,7 +1387,7 @@ function useKeymap(overrides) {
   // 메뉴에 지금 키를 함께 보인다 (PDF로 저장 Ctrl+Shift+P 등)
   const keys = resolveKeymap(keymapOverrides);
   for (const a of KEYMAP_ACTIONS) {
-    const btnId = a.run[0] === 'menu' ? a.run[1] : a.id === 'shortcuts' ? 'shortcuts-btn' : null;
+    const btnId = a.run[0] === 'menu' ? a.run[1] : a.id === 'shortcuts' ? 'shortcuts-btn' : a.id === 'find' ? 'find-btn' : null;
     const btn = btnId && document.getElementById(btnId);
     if (!btn) continue;
     // 키 글자는 메뉴 글(잠그기 ↔ 잠금 풀기처럼 바뀜)과 따로, 단추 오른쪽 끝에
@@ -1416,6 +1426,13 @@ window.addEventListener('keydown', (e) => {
     else if (!el.linksPanel.hidden) toggleLinks(false);
     else if (!versionsPanel.hidden) toggleVersions(false);
     else if (reminderPanel?.open) reminderPanel.toggle(false);
+    else if (findBar.isOpen) findBar.close({ focus: true }); // 글을 고치다가 Esc: 찾기 막대를 닫고 찾은 곳을 고른 채
+    return;
+  }
+  // F3 · Shift+F3: 찾기 막대가 열려 있으면 글에서도 다음 · 이전 찾은 곳으로 (워드처럼)
+  if (e.key === 'F3' && findBar.isOpen && !findBar.el.contains(document.activeElement)) { // 막대 안에서는 막대가 받는다
+    e.preventDefault();
+    findBar.step(e.shiftKey ? -1 : 1);
     return;
   }
   // Ctrl+Tab / Ctrl+Shift+Tab: 스택의 다음·이전 탭
@@ -1446,6 +1463,8 @@ window.addEventListener('keydown', (e) => {
   else if (name === 'new') api.memo.create({ color: memo.color });
   else if (name === 'close') closeTabOrWindow();
   else if (name === 'shortcuts') openShortcutSheet();
+  else if (name === 'find') findBar.open();
+  else if (name === 'replace') findBar.open({ replace: true });
   else if (kind === 'menu') {
     closeMenu();
     document.getElementById(name)?.click(); // 메뉴의 그 단추와 똑같이
@@ -1566,13 +1585,16 @@ const scheduleFit = () => {
 window.addEventListener('wheel', (e) => {
   if (!e.ctrlKey) return;
   e.preventDefault();
-  if (e.deltaY) setZoom(stepZoom(zoom, e.deltaY < 0 ? 1 : -1));
+  if (!e.deltaY) return;
+  setZoom(stepZoom(zoom, e.deltaY < 0 ? 1 : -1));
+  tutEvent('note-zoomed'); // 튜토리얼: 글을 크게, 작게
 }, { passive: false });
 window.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey && e.code !== 'Equal') return;
   if (e.code === 'Equal' || e.code === 'NumpadAdd') setZoom(stepZoom(zoom, 1));
   else if (e.code === 'Minus' || e.code === 'NumpadSubtract') setZoom(stepZoom(zoom, -1));
   else return;
+  tutEvent('note-zoomed');
   e.preventDefault();
   e.stopPropagation();
 }, true);
@@ -1932,9 +1954,15 @@ document.addEventListener('visibilitychange', () => {
 
 injectIcons();
 paintSwatchBars();
+let tutZoomBefore = null; // 매직 줌 연습 전 배율 — 단계를 지나면 처음대로 (배율은 메모마다 기억되므로 연습한 크기가 남지 않게)
 coach = setupCoach(api, {
   onStep: (step) => {
     tutBase = step ? tutCounts(current ?? '') : null;
+    if (step?.id === 'note-zoom') tutZoomBefore ??= zoom;
+    else if (tutZoomBefore !== null) {
+      if (zoom !== tutZoomBefore) setZoom(tutZoomBefore, { show: false });
+      tutZoomBefore = null;
+    }
     // 옮기기를 배우기 전: 옮겨 볼 예시 목록을 메모 끝에
     if (step?.sample && editor && !hasTutorialSample(editor.getMarkdown())) {
       editor.appendMarkdown(TUTORIAL_SAMPLE);

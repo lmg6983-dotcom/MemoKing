@@ -64,7 +64,7 @@ class WebServer(private val context: Context) {
 
     // 소리·동영상은 앞뒤로 옮겨 가며 재생하므로 Range(일부분) 요청에 답한다 (건너뛰기는 RangeStream 이 — WebView 도 건너뛰므로)
     private fun vault(rel: String, requestHeaders: Map<String, String>): WebResourceResponse {
-        val storage = Vaults.current(context) ?: return notFound()
+        val storage = Vaults.forScreen(context) ?: return notFound()
         val stat = storage.stat(rel) ?: return notFound()
         if (stat.dir) return notFound()
         val type = typeOf(rel)

@@ -1,5 +1,6 @@
 // 시트(아래에서 올라오는 창)·잠깐 알림·확인 대화 상자·시스템 막대 색
 import { native } from './native.js';
+import { swipeDismiss } from '../../app/js/dom.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -144,9 +145,34 @@ export function toast(text, isError = false, action = null) {
   el.style.animation = 'none';
   void el.offsetWidth;
   el.style.animation = '';
+  // 처음 몇 번: 살짝 옆으로 밀렸다 돌아와 "밀면 닫혀요"를 몸짓으로 알린다 (글로 쓰지 않고)
+  el.classList.remove('swipe-teach');
+  try {
+    const taught = Number(localStorage.getItem('memoking.toastSwipeTaught') ?? 0);
+    if (taught < 2 && !isError) {
+      void el.offsetWidth;
+      el.classList.add('swipe-teach');
+      localStorage.setItem('memoking.toastSwipeTaught', String(taught + 1));
+    }
+  } catch {
+    // 기억 못 하면 알리지 않음
+  }
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), action ? 5000 : isError ? 4500 : 2600);
+  toastLife = action ? 5000 : isError ? 4500 : 2600;
+  toastTimer = setTimeout(() => (el.hidden = true), toastLife);
+  // 옆이나 위로 밀면 바로 닫힌다 (다 읽었는데 5초 기다리지 않게) · 손을 대고 있는 동안은 사라지지 않음
+  swipeDismiss(el, () => {
+    clearTimeout(toastTimer);
+    el.hidden = true;
+  }, {
+    up: true,
+    onHold: (holding) => {
+      clearTimeout(toastTimer);
+      if (!holding && !el.hidden) toastTimer = setTimeout(() => (el.hidden = true), Math.min(toastLife, 2400));
+    },
+  });
 }
+let toastLife = 2600;
 
 // ---------- 넓은 화면 (펼친 폴더블 · 태블릿): 목록과 메모를 나란히 ----------
 

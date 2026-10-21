@@ -647,7 +647,7 @@ class MainActivity : Activity() {
 
     fun openVaultFile(id: Int, rel: String) {
         bridge.resolve(id) {
-            val storage = Vaults.current(this) ?: throw IllegalStateException("저장 위치가 설정되지 않았어요. 설정에서 메모 폴더를 골라 주세요")
+            val storage = Vaults.forScreen(this) ?: throw IllegalStateException("저장 위치가 설정되지 않았어요. 설정에서 메모 폴더를 골라 주세요")
             val uri = storage.shareUri(rel) ?: return@resolve "이 휴대폰의 메모 폴더에 파일이 아직 없어요"
             val intent = Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, VaultFileProvider.mimeOf(rel))

@@ -186,3 +186,71 @@ export function stackCards(columns, items) {
   });
   columns.forEach((c, i) => c.replaceChildren(...buckets[i]));
 }
+
+/**
+ * 밀어서 닫기 (잠깐 뜨는 알림 · 막대): 옆으로(up 이면 위로도) 밀면 손을 따라오다가, 놓으면 날아가며 닫힌다.
+ *   조금만 밀었으면 제자리로 돌아온다. 단추 위에서 시작한 것은 그 단추 누르기로 둔다.
+ *   onHold(true/false): 손을 대고 있는 동안 저절로 사라지지 않게 (부른 쪽의 시간 재기를 멈추고 다시)
+ * @param {HTMLElement} el
+ * @param {() => void} onDismiss 다 날아간 뒤에
+ *   can(): 지금 닫아도 되는가 (골라야 할 것이 남은 안내는 밀어도 제자리로)
+ * @param {{ up?: boolean, onHold?: (holding: boolean) => void, can?: () => boolean }} [o]
+ */
+export function swipeDismiss(el, onDismiss, { up = false, onHold = () => {}, can = () => true } = {}) {
+  if (el.dataset.swipe) return;
+  el.dataset.swipe = '1';
+  let s = null;
+  const reset = () => {
+    el.style.transition = '';
+    el.style.translate = '';
+    el.style.opacity = '';
+  };
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button > 0 || e.target.closest('button, a, input, textarea')) return;
+    s = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, axis: null, d: 0 };
+    onHold(true);
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!s || e.pointerId !== s.id) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (!s.axis) {
+      if (Math.hypot(dx, dy) < 6) return;
+      s.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : up && dy < 0 ? 'y' : 'none';
+      if (s.axis === 'none') return;
+      el.setPointerCapture?.(e.pointerId);
+      el.style.transition = 'none';
+    }
+    if (s.axis === 'none') return;
+    s.d = s.axis === 'x' ? dx : Math.min(0, dy);
+    const span = s.axis === 'x' ? el.offsetWidth : el.offsetHeight * 1.5;
+    el.style.translate = s.axis === 'x' ? `${s.d}px 0` : `0 ${s.d}px`;
+    el.style.opacity = String(Math.max(0.15, 1 - Math.abs(s.d) / Math.max(1, span)));
+  });
+  const end = (e) => {
+    if (!s || e.pointerId !== s.id) return;
+    const g = s;
+    s = null;
+    if (!g.axis || g.axis === 'none') return onHold(false);
+    const speed = Math.abs(g.d) / Math.max(1, performance.now() - g.t); // px/ms
+    const far = g.axis === 'x' ? Math.abs(g.d) > Math.min(90, el.offsetWidth * 0.3) : -g.d > 28;
+    if (e.type !== 'pointercancel' && can() && (far || (speed > 0.6 && Math.abs(g.d) > 16))) {
+      // 민 쪽으로 날아가며 사라짐 (나가는 움직임은 짧게)
+      el.style.transition = 'translate 0.18s ease-out, opacity 0.18s ease-out';
+      el.style.translate = g.axis === 'x' ? `${Math.sign(g.d) * (el.offsetWidth + 48)}px 0` : `0 ${-(el.offsetHeight + 48)}px`;
+      el.style.opacity = '0';
+      setTimeout(() => {
+        reset();
+        onDismiss();
+      }, 180);
+      return;
+    }
+    el.style.transition = 'translate 0.22s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.22s ease-out';
+    el.style.translate = '';
+    el.style.opacity = '';
+    setTimeout(() => (el.style.transition = ''), 240);
+    onHold(false);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}

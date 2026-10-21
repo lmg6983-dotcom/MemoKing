@@ -16,6 +16,24 @@ object Vaults {
 
     fun internalRoot(ctx: Context) = File(ctx.filesDir, "메모킹")
 
+    // ---------- 튜토리얼 연습 공간 ----------
+    // 튜토리얼 동안 화면(웹)은 앱 안의 빈 폴더를 쓴다. 실제 메모 폴더 · 위젯 · 알림 · Drive 동기화는 그대로 (current)
+    const val SANDBOX_SHARE = "sandbox"
+    @Volatile
+    var sandbox: Storage? = null
+        private set
+
+    fun sandboxRoot(ctx: Context) = File(ctx.filesDir, "연습 공간")
+
+    @Synchronized
+    fun setSandbox(ctx: Context, on: Boolean) {
+        sandboxRoot(ctx).deleteRecursively() // 켤 때는 빈 폴더로, 끌 때는 남기지 않게
+        sandbox = if (on) FileStorage(sandboxRoot(ctx), "연습 공간", SANDBOX_SHARE) else null
+    }
+
+    /** 화면(웹)이 읽고 쓰는 폴더: 연습 중이면 연습 공간 */
+    fun forScreen(ctx: Context): Storage? = sandbox ?: current(ctx)
+
     fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun spec(ctx: Context): String? = prefs(ctx).getString(KEY, null)

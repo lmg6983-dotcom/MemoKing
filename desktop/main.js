@@ -30,7 +30,7 @@ import { flushOpmsFiles } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { MemoHotkeys } from './memo-hotkeys.js';
 import { hotkeyCopyText, hotkeyLabel, hotkeyAccelerator } from '../app/js/core/memo-hotkeys.js';
-import { TUTORIAL_STEPS, advanceTutorial, tutorialStepFor, tutorialChapter, tutorialJumps } from '../app/js/core/tutorial.js';
+import { TUTORIAL_STEPS, advanceTutorial, tutorialStepFor, tutorialChapter, tutorialJumps, seedTutorialSandbox } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { alarmText } from '../app/js/core/reminders.js';
 import { quietAlarm, modeClock, normalizeHours } from '../app/js/core/work-hours.js';
@@ -110,6 +110,9 @@ let linkPreviews = null;
 let calendarFeeds = null; // 일정 탭이 구독하는 다른 캘린더 (.ics 주소)
 
 let tutorial = { active: false, index: -1, memoId: null, praise: false };
+// 튜토리얼 연습 공간: 그동안 화면은 잠깐 만든 폴더(예시 메모)를 쓰고, 실제 폴더(real)는 알림 · 동기화만 계속한다
+let sandbox = null; // { real: Vault, dir, openNotes, workLife }
+const realVault = () => sandbox?.real ?? vault;
 
 // 단축키 관리 상태
 const heldKeys = { quickMemo: null, magic: null };
@@ -191,6 +194,7 @@ async function memoHotkeyPressed(slot) {
 // ---------- 볼트(Vault) 연결 및 동기화 ----------
 
 function openVault(dir) {
+  dropSandbox(); // 연습 중에 폴더를 바꾸면 연습 공간은 치운다
   vault?.close();
   vault = null;
   try {
@@ -202,8 +206,9 @@ function openVault(dir) {
     }
     next.defaultMode = viewMode(); // 새 메모는 지금 고른 Work / Life 로 (나눠 쓰지 않으면 Life)
     next.on('changed', ({ ids, external, removed }) => {
-      windowManager.pushList();
       driveSync?.request(3000);
+      if (sandbox?.real === next) return; // 연습 중: 화면은 연습 공간 것 (돌아올 때 목록을 다시 그린다)
+      windowManager.pushList();
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
@@ -239,7 +244,8 @@ function openVault(dir) {
 }
 
 function vaultInfo() {
-  return { vaultPath: vault?.root ?? null, vaultError, suggestedPath: suggestedVaultPath(), version: app.getVersion() };
+  const root = realVault()?.root ?? null;
+  return { vaultPath: root, vaultError, suggestedPath: suggestedVaultPath(), version: app.getVersion(), sandbox: Boolean(sandbox) };
 }
 
 function showHandoff(memos) {
@@ -294,7 +300,7 @@ function pushReminders() {
 }
 
 function fireReminder(memoId, reminder, info) {
-  const memo = vault?.get(memoId);
+  const memo = realVault()?.get(memoId);
   if (!memo) return;
   const { title, label, full } = alarmText(reminder, memo.title, info);
   const alarm = { reminderId: reminder.id, label: full, missed: Boolean(info.missed) };
@@ -334,7 +340,7 @@ function showToast(memoId, memo, alarm) {
   });
 }
 
-const alarms = createAlarmRunner({ getVault: () => vault, fire: fireReminder });
+const alarms = createAlarmRunner({ getVault: realVault, fire: fireReminder }); // 튜토리얼 연습 중에도 실제 메모의 알림은 울린다
 
 // ---------- 메모킹 Work / Life ----------
 let quietCount = 0; // 퇴근 뒤 조용히 넘긴 Work 알림
@@ -538,7 +544,7 @@ function initDrive() {
   driveApi = new DriveApi({ auth: driveAuth, fetch: (...args) => net.fetch(...args) });
   driveSync = new DriveSync({ api: driveApi, auth: driveAuth, stateDir: path.join(app.getPath('userData'), 'drive') });
   driveSync.on('status', (st) => {
-    if (st.changed) vault?.scan();
+    if (st.changed) realVault()?.scan();
     windowManager.listWin?.webContents.send('drive:status', driveInfo());
   });
   if (driveAuth.scopeUpgraded && settings.drive) {
@@ -687,7 +693,7 @@ function tutorialPayload() {
   const text = step.noTape && !windowManager.canTape ? step.noTape : step.text; // 테이프를 못 쓰는 PC 에서는 왕관만
   // 다시 보는 사람(설정 › 사용법 둘러보기)에게는 첫 말풍선에서 어디부터 볼지 고르게
   const jumps = tutorial.index === 0 && tutorial.again ? tutorialJumps(TUTORIAL_STEPS) : undefined;
-  return { ...step, title: keys(step.title), text: keys(text), try: keys(step.try), index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise, chapter: tutorialChapter(TUTORIAL_STEPS, tutorial.index), jumps };
+  return { ...step, title: keys(step.title), text: keys(text), try: keys(step.try), index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise, chapter: tutorialChapter(TUTORIAL_STEPS, tutorial.index), jumps, sandbox: Boolean(sandbox) };
 }
 
 function tutorialWin(step) {
@@ -703,21 +709,86 @@ function sendTutorial() {
   }
 }
 
-function startTutorial() {
+/** 열린 메모 창을 모두 닫고 다 닫힐 때까지 (keep: 열려 있던 메모로 기억해 두기) */
+async function closeNoteWindows({ keep }) {
+  for (const w of windowManager.noteWins.values()) {
+    if (w.isDestroyed()) continue;
+    if (keep) w.mkKeep = true;
+    w.close();
+  }
+  for (let i = 0; i < 60 && windowManager.noteWins.size; i++) await new Promise((r) => setTimeout(r, 50));
+}
+
+/** 연습 공간으로: 실제 메모 창은 닫아 두고(끝나면 다시 연다) 빈 폴더에 예시 메모를 넣어 화면이 그 폴더를 쓰게 */
+async function enterSandbox() {
+  if (sandbox || !vault) return;
+  const real = vault;
+  const openNotes = [...settings.openNotes];
+  await closeNoteWindows({ keep: true });
+  const dir = fs.mkdtempSync(path.join(app.getPath('temp'), 'memoking-tutorial-'));
+  const next = new Vault(dir);
+  next.defaultMode = viewMode();
+  next.on('changed', () => windowManager.pushList());
+  next.on('error', (err) => console.error('[연습 공간]', err));
+  next.open();
+  seedTutorialSandbox(next, toLocalIso);
+  sandbox = { real, dir, openNotes, workLife: settings.workLife };
+  vault = next;
+  windowManager.loadStacks();
+  windowManager.listWin?.webContents.send('vault:opened', vaultInfo());
+  windowManager.pushList();
+}
+
+/** 연습 공간을 치우고 실제 메모 폴더로: 연습 창을 닫고, 연습 메모의 창 기억(자리 · 왕관 · 테이프 · 단축키)도 지우고, 닫아 둔 메모 창을 다시 연다 */
+async function leaveSandbox() {
+  if (!sandbox) return;
+  await closeNoteWindows({ keep: false });
+  dropSandbox();
+  windowManager.loadStacks();
+  windowManager.listWin?.webContents.send('vault:opened', vaultInfo());
+  windowManager.pushList();
+  for (const id of [...settings.openNotes]) windowManager.openNote(id, { inactive: true });
+  memoHotkeys.refresh();
+}
+
+/** 연습 폴더를 지우고 실제 폴더로 되돌린다 (창은 건드리지 않음 — 끝낼 때도 부른다) */
+function dropSandbox() {
+  const box = sandbox;
+  if (!box) return;
+  const ids = new Set(vault.entries.keys());
+  vault.close();
+  vault = box.real;
+  sandbox = null;
+  fs.rmSync(box.dir, { recursive: true, force: true });
+  for (const id of ids) {
+    delete settings.noteBounds[id];
+    delete settings.onTop?.[id];
+    delete settings.onBottom?.[id];
+    if (memoHotkeys.slotOf(id)) memoHotkeys.set(id, null);
+  }
+  settings.recentOpened = (settings.recentOpened ?? []).filter((id) => !ids.has(id));
+  if (settings.workLife !== box.workLife) setWorkLife(box.workLife); // 연습하며 켠 Work / Life 나누기도 처음대로
+  settings.openNotes = box.openNotes.filter((id) => vault.get(id));
+  saveSettings();
+}
+
+async function startTutorial() {
   if (!vault) return false;
+  await enterSandbox();
   tutorial = { active: true, index: 0, memoId: null, praise: false, again: settings.tutorialDone === true };
   windowManager.createListWindow('memos');
   sendTutorial();
   return true;
 }
 
-function finishTutorial() {
+async function finishTutorial() {
   tutorial = { active: false, index: -1, memoId: null, praise: false };
   settings.tutorialDone = true;
   settings.tutorialInstall = installMark();
   saveSettings();
   sendTutorial();
   windowManager.listWin?.webContents.send('tutorial:finished'); // 목록 창: 연습하며 바꾼 보기 · 확대 · 태그 고르기 · 늘 위에를 처음대로
+  await leaveSandbox();
 }
 
 /** 말풍선 단추: 'jump:<번호>' 다시 볼 때 그 묶음부터 · 'enable:workLife' 꺼진 기능을 켜고 그 자리에서 직접 해 보기 */
@@ -1169,6 +1240,7 @@ app.whenReady().then(async () => {
       noteWins: windowManager.noteWins,
       getVault: () => vault,
       createListWindow: (tab) => windowManager.createListWindow(tab),
+      openNote: (id) => windowManager.openNote(id),
       getGhost: () => windowManager.ghostWin,
       getTray: () => tray,
       getTrayMenu: () => trayMenuTemplate,
@@ -1352,6 +1424,7 @@ app.on('will-quit', () => {
   history?.stop();
   history?.save(true);
   tray?.destroy();
+  dropSandbox(); // 연습 중에 끄면: 연습 폴더를 지우고 열려 있던 실제 메모를 다음에 다시 열게
   vault?.close();
   saveSettings(true);
 });

@@ -219,6 +219,12 @@ export function setupCoach(api, o = {}) {
     const count = el('span', 'coach-count', !c ? `${step.index + 1} / ${step.total}` : c.of > 1 ? `${c.name} ${c.at}/${c.of}` : step.index === 0 ? `모두 ${step.total}단계` : c.name);
     count.title = `전체 ${step.total}단계 중 ${step.index + 1}번째`;
     head.append(emoji, bar, count);
+    if (step.sandbox) {
+      // 연습 공간: 여기서 만든 메모는 끝나면 사라진다 (내 메모는 그대로)
+      const box = el('span', 'coach-sandbox', '연습 공간');
+      box.title = '내 메모는 그대로 두고 예시 메모로 연습해요. 튜토리얼을 마치면 원래 메모로 돌아가요';
+      head.append(box);
+    }
     if (step.advance) {
       // 접기·펴기 (직접 해 볼 때 가리지 않게)
       const fold = button('', 'coach-fold', 'fold');

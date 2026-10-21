@@ -19,6 +19,26 @@ const LATER = '다음에 해 볼게요';
 /** 옮기기를 배우기 전에 메모 끝에 저절로 넣는 예시 목록 */
 export const TUTORIAL_SAMPLE = '- [ ] 우유\n- [ ] 달걀\n- [ ] 사과\n- [ ] 식빵';
 
+/**
+ * 튜토리얼 연습 공간: 튜토리얼은 실제 메모 폴더 대신 잠깐 만든 빈 폴더에서 한다 (실제 메모 · 동기화 · 알림은 그대로)
+ *   그 폴더에 미리 넣어 두는 예시 메모 — 목록 · 보기 · 태그 · Work/Life 를 해 볼 거리. 끝나면 폴더째 사라진다
+ *   daysAgo: 며칠 전에 쓴 메모로 (목록이 실제처럼 보이게)
+ */
+export const TUTORIAL_SANDBOX_MEMOS = [
+  { body: '# 연습 공간이에요\n\n여기서 만들고 고친 메모는 튜토리얼을 마치면 사라지고, 원래 메모로 돌아가요. 마음껏 눌러 보세요.', color: 'yellow', pinned: true, daysAgo: 0 },
+  { body: '# 여행 준비\n\n- [x] 숙소 예약\n- [ ] 기차표\n- [ ] 우산 챙기기\n\n#여행', color: 'green', daysAgo: 1 },
+  { body: '# 읽고 싶은 책\n\n데미안\n\n어린 왕자\n\n#책', color: 'purple', daysAgo: 3 },
+  { body: '# 주간 회의\n\n- 지난주 정리\n- 이번 주 할 일 나누기\n\n#회의', color: 'blue', mode: 'work', daysAgo: 2 },
+];
+
+/** 연습 공간 예시 메모를 볼트에 넣는다 (PC · 휴대폰 볼트 모두 import 가 같다) */
+export function seedTutorialSandbox(vault, toIso, now = new Date()) {
+  for (const m of TUTORIAL_SANDBOX_MEMOS) {
+    const at = toIso(new Date(now.getTime() - m.daysAgo * 86_400_000));
+    vault.import({ body: m.body, color: m.color, mode: m.mode, pinned: m.pinned === true, created: at, updated: at });
+  }
+}
+
 /** 예시 목록이 이미 들어 있는지 (단계가 다시 떠도 두 번 넣지 않게) */
 export function hasTutorialSample(md) {
   const text = String(md ?? '');
@@ -30,7 +50,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'welcome', chapter: '시작', win: 'list', target: [], emoji: '👑',
     title: '반가워요! 메모킹이에요',
-    text: '하나씩 직접 눌러 보면서 배워 볼게요. 쓰기, 넣기, 메모 창, 목록, 어디서든 다섯 묶음이에요. 해 보는 단계는 건너뛸 수 있고, 언제든 그만둘 수 있어요.',
+    text: '하나씩 직접 눌러 보면서 배워 볼게요. 내 메모는 그대로 두고 예시 메모가 든 연습 공간에서 해요. 쓰기, 넣기, 메모 창, 목록, 어디서든 다섯 묶음이고, 언제든 그만둘 수 있어요.',
     next: '시작할게요 🚀', skip: '나중에 볼게요',
   },
   {
@@ -67,6 +87,14 @@ export const TUTORIAL_STEPS = [
     title: '줄을 옮기고 싶을 때',
     text: '연습하라고 장보기 목록을 넣어 뒀어요. 줄을 꾹 누르면 살짝 들려요. 끌어서 원하는 자리에 놓으면 끝! 키보드로는 Alt+↑↓ 예요.',
     next: '다음',
+  },
+  // 매직 줌: 본문 전체를 비추거나 피하게 하면 자리가 없어 말풍선이 접힌다 — 첫 줄만 비추고 배율 표시만 피한다
+  {
+    id: 'note-zoom', chapter: '쓰기', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.zoom-badge'], advance: 'note-zoomed', emoji: '🔍',
+    title: '글을 크게, 작게 (매직 줌)',
+    text: '메모 안에서 Ctrl 을 누른 채 휠을 굴리면 글과 그림이 함께 커지고 작아져요. Ctrl 과 + − 키도 돼요. 위에 뜨는 "원래대로"를 누르면 처음 크기로 돌아와요.',
+    try: 'Ctrl 을 누른 채 휠을 위로 굴려 보세요',
+    next: LATER,
   },
   // ---------- + 로 넣기 ----------
   {
@@ -231,7 +259,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'done', chapter: '마무리', win: 'list', target: [], emoji: '🎉',
     title: '준비 끝!',
-    text: '연습하며 바꾼 보기, 카드 크기, 태그 고르기, 목록 늘 위에 두기는 처음대로 돌려 놓을게요. 창을 닫아도 메모킹은 작업 표시줄 오른쪽 아래(^)에서 기다리고 있어요.',
+    text: '연습 공간의 메모는 치우고 내 메모로 돌아갈게요. 바꿔 본 보기, 카드 크기, 목록 늘 위에 두기도 처음대로예요. 창을 닫아도 메모킹은 작업 표시줄 오른쪽 아래(^)에서 기다리고 있어요.',
     next: '메모 쓰러 가기 ✏️',
   },
 ];
@@ -241,7 +269,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'welcome', chapter: '시작', win: 'list', target: [], emoji: '👑',
     title: '반가워요! 메모킹이에요',
-    text: '직접 눌러 보며 배워요. 쓰기, 넣기, 목록 같은 묶음으로 나뉘어 있고, 언제든 그만둘 수 있어요.',
+    text: '직접 눌러 보며 배워요. 내 메모는 그대로 두고 예시 메모가 든 연습 공간에서 해요. 언제든 그만둘 수 있어요.',
     next: '시작할게요 🚀', skip: '나중에 볼게요',
   },
   {
@@ -271,6 +299,13 @@ export const MOBILE_TUTORIAL_STEPS = [
     title: '다이얼로 옮기기',
     text: '오른쪽 아래 다이얼로 글 고치기, 옮기기, 글 위에 그리기를 골라요. 옮기기에서는 줄, 사진, 표를 짧게 눌러 끌면 돼요 (연습용 장보기 목록을 넣어 뒀어요). 글을 복사하거나 고칠 땐 글 고치기로.',
     try: '오른쪽 아래 다이얼을 한 번 눌러 옮기기로 돌려 보세요',
+    next: LATER,
+  },
+  {
+    id: 'note-zoom', chapter: '쓰기', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], advance: 'note-zoomed', emoji: '🔍',
+    title: '글을 크게, 작게 (매직 줌)',
+    text: '두 손가락을 벌리면 글과 그림이 함께 커지고, 오므리면 글자가 작아져 한 화면에 더 많이 보여요. 100% 가까이 오므리면 처음 크기로 돌아와요.',
+    try: '두 손가락을 벌려 글을 키워 보세요',
     next: LATER,
   },
   {
@@ -369,7 +404,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'done', chapter: '마무리', win: 'list', target: [], emoji: '🎉',
     title: '준비 끝!',
-    text: '연습하며 바꾼 보기와 태그 고르기는 처음대로 돌려 놓을게요. 떠오를 때 바로, 메모킹과 함께 👑',
+    text: '연습 공간의 메모는 치우고 내 메모로 돌아갈게요. 바꿔 본 보기도 처음대로예요. 떠오를 때 바로, 메모킹과 함께 👑',
     next: '메모 쓰러 가기 ✏️',
   },
 ];
@@ -379,7 +414,7 @@ export const TUTORIAL_SETTLE_MS = { typed: 1800, tagged: 1500, styled: 900, task
 
 /** 사용자가 직접 해서 넘어가는 일들 (PC 메인 프로세스가 이 이름만 받는다) */
 export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'content-tools', 'note-closed', 'layout-changed', 'tag-filtered', 'mode-moved',
-  'list-zoomed', 'mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried'];
+  'list-zoomed', 'mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried', 'note-zoomed'];
 
 /**
  * 이 기기에서 보일 단계: 필요한 기능(needs)이 꺼져 있으면 직접 해 보기 없이 안내(offText)만 하고 "다음"으로

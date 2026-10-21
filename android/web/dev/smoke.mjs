@@ -663,6 +663,23 @@ try {
       await back();
       await page.waitForTimeout(400);
     }
+    // 알림은 옆으로 밀면 바로 닫힌다 (5초를 기다리지 않게) — 조금만 밀면 제자리로
+    write('PC에서 쓴 메모 2.md', `---\nid: 00000000-0000-4000-8000-0000000000p2\ncreated: ${nowIso}\nupdated: ${new Date().toISOString().replace(/\.\d+Z$/, '+00:00')}\ncolor: blue\ndevice: pc\n---\n# PC에서 쓴 메모 2\n\n두 번째\n`);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForSelector('#toast:not([hidden])', { timeout: 3000 }).catch(() => {});
+    const tb = await page.locator('#toast-text').boundingBox();
+    const drag = async (dx, dy = 0) => {
+      await page.mouse.move(tb.x + 10, tb.y + tb.height / 2);
+      await page.mouse.down();
+      for (let k = 1; k <= 6; k++) await page.mouse.move(tb.x + 10 + (dx * k) / 6, tb.y + tb.height / 2 + (dy * k) / 6);
+      await page.mouse.up();
+      await page.waitForTimeout(350);
+    };
+    await drag(30);
+    const stayed = await page.isVisible('#toast');
+    await drag(160);
+    const gone = !(await page.isVisible('#toast'));
+    check('알림: 조금 밀면 제자리, 옆으로 밀면 바로 닫힘', tb && stayed && gone, JSON.stringify({ stayed, gone }));
   }
 
   // 다른 앱에서 공유하기
@@ -2264,6 +2281,100 @@ try {
     }
     await back();
     await page.waitForTimeout(400);
+  }
+
+  // 메모 안 찾기 · 바꾸기 · 모두 바꾸기: 메뉴 › 찾기, 바꾸기 → 찾은 곳 표시 · 개수 · 낱말 단위 · 모두 바꾸기(한 번에) · Esc
+  {
+    const iso = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
+    write('찾기 연습.md', `---\nid: 00000000-0000-4000-8000-0000000f1d00\ncreated: ${iso}\nupdated: ${iso}\ncolor: yellow\n---\n# 찾기 연습\n\n사과 한 개, 사과 두 개, 배 한 개\n\nApple apple 사과즙\n\n**배** 세 개\n`);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.waitForTimeout(600);
+    await page.locator('.card', { hasText: '찾기 연습' }).first().tap();
+    await page.waitForSelector('#note-screen:not([hidden]) .mk-doc');
+    await page.waitForTimeout(400);
+    await page.tap('#menu-btn');
+    await page.tap('[data-memo-action="find"]');
+    await page.waitForSelector('.mk-find-bar:not([hidden])');
+    await page.locator('.mk-find-bar .mk-find-input').first().fill('사과');
+    await page.waitForTimeout(300);
+    const st = () => page.evaluate(() => ({ hits: document.querySelectorAll('.mk-doc .mk-find-hit').length, cur: document.querySelectorAll('.mk-doc .mk-find-current').length, count: document.querySelector('.mk-find-count').textContent }));
+    const s1 = await st();
+    const oneRow = await page.evaluate(() => ({ h: Math.round(document.querySelector('.mk-find-bar').getBoundingClientRect().height), opts: getComputedStyle(document.querySelector('.mk-find-foot')).display !== 'none' }));
+    // 대소문자 구분(칸 안의 아이콘): "apple" 은 Apple · apple 둘 → 켜면 apple 하나
+    await page.locator('.mk-find-bar .mk-find-input').first().fill('apple');
+    await page.waitForTimeout(250);
+    const c1 = await page.textContent('.mk-find-count');
+    await page.tap('.mk-find-case');
+    await page.waitForTimeout(200);
+    const c2 = await page.textContent('.mk-find-count');
+    await page.tap('.mk-find-case');
+    await page.locator('.mk-find-bar .mk-find-input').first().fill('사과');
+    await page.waitForTimeout(250);
+    await page.tap('.mk-find-bar .mk-find-more'); // 바꾸기 펼치기 → 바꿀 말 줄 + 할 일 줄
+    await page.waitForTimeout(200);
+    const s2 = await st();
+    await page.tap('.mk-find-acts .mk-find-act >> text=다음 찾기');
+    await page.waitForTimeout(150);
+    const s3 = await st();
+    const layout = await page.evaluate(() => {
+      const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
+      const q = box('.mk-find-grid .mk-find-field'), close = box('.mk-find-close'), more = box('.mk-find-more'), r = box('.mk-find-rep');
+      return { closeTop: Math.abs(close.top - q.top) < 8, moreBottom: Math.abs(more.top - r.top) < 8, arrows: document.querySelectorAll('.mk-find-prev, .mk-find-next').length, word: [...document.querySelectorAll('.mk-find-bar button')].some((b) => /낱말/.test(b.textContent)), primary: document.querySelectorAll('.mk-find-acts .primary').length };
+    });
+    await page.locator('.mk-find-rep .mk-find-input').fill('포도');
+    await page.waitForTimeout(100);
+    const allLabel = await page.textContent('.mk-find-all');
+    await shot('29-find');
+    check('찾기: 찾기만 할 때는 한 줄 막대 · 찾은 곳 표시 · 개수(1/3) · 대소문자 아이콘(2 → 1) · 다음 찾기로 한 칸 다음 · "모두 바꾸기 (3)"', !oneRow.opts && oneRow.h < 80 && s1.hits === 3 && s1.cur === 1 && s1.count === '1/3' && c1 === '1/2' && c2 === '1/1' && s2.hits === 3 && s3.count === `${(Number(s2.count.split('/')[0]) % 3) + 1}/3` && allLabel === '모두 바꾸기 (3)', JSON.stringify({ oneRow, s1, c1, c2, s2, s3, allLabel }));
+    check('찾기 막대 배치(PC 와 같게): 닫기는 위 줄 · 접기는 아래 줄 · 위아래 화살표와 낱말 단위 없음 · 바꾸기도 다른 단추와 같은 모양', layout.closeTop && layout.moreBottom && !layout.arrows && !layout.word && layout.primary === 0, JSON.stringify(layout));
+    await page.tap('.mk-find-all');
+    await page.waitForTimeout(900);
+    const body = read('찾기 연습.md');
+    const undoBtn = await page.isVisible('#toast-action') && (await page.textContent('#toast-action'));
+    check('모두 바꾸기: 찾은 세 곳 모두 "포도"로 (사과즙은 포도즙) · 알림에 되돌리기 단추', /포도 한 개, 포도 두 개/.test(body) && /포도즙/.test(body) && !/사과/.test(body) && undoBtn === '되돌리기', JSON.stringify({ body, undoBtn }));
+    await page.tap('#toast-action');
+    await page.waitForTimeout(900);
+    check('모두 바꾸기 되돌리기: 알림의 되돌리기로 한 번에 처음대로', /사과 한 개, 사과 두 개/.test(read('찾기 연습.md')), read('찾기 연습.md'));
+    // 엑셀처럼: 찾을 말 · 바꿀 말 칸이 같은 폭 · 서식 찾기(굵은 "배"만) · 모두 찾기 목록 · 서식만 바꾸기(바꿀 말 비우고 형광펜)
+    const widths = await page.evaluate(() => [...document.querySelectorAll('.mk-find-grid .mk-find-field')].map((f) => Math.round(f.getBoundingClientRect().width)));
+    await page.locator('.mk-find-bar .mk-find-input').first().fill('배');
+    await page.waitForTimeout(250);
+    const plain = await page.textContent('.mk-find-count');
+    await page.tap('.mk-find-grid .mk-find-fmt >> nth=0');
+    await page.tap('.mk-find-pop .mk-find-flag.is-bold');
+    await page.waitForTimeout(150);
+    await shot('29a-find-pop');
+    await page.tap('.mk-find-pop .mk-find-pop-foot .primary');
+    const boldOnly = await page.textContent('.mk-find-count');
+    const fmtSet = await page.evaluate(() => document.querySelector('.mk-find-grid .mk-find-fmt').classList.contains('set'));
+    await page.tap('.mk-find-acts .mk-find-act >> text=모두 찾기');
+    await page.waitForTimeout(150);
+    const items = await page.evaluate(() => [...document.querySelectorAll('.mk-find-list .mk-find-item')].map((b) => b.textContent));
+    await shot('29b-find-format');
+    check('찾기 막대(엑셀처럼): 찾을 말 · 바꿀 말 칸이 같은 폭 · 서식 찾기로 굵은 "배"만(2 → 1) · 모두 찾기 목록에 그 한 곳',
+      widths.length === 2 && widths[0] === widths[1] && widths[0] > 120 && plain === '1/2' && boldOnly === '1/1' && fmtSet && items.length === 1 && /배/.test(items[0]), JSON.stringify({ widths, plain, boldOnly, fmtSet, items }));
+    await page.tap('.mk-find-grid .mk-find-fmt >> nth=1');
+    await page.tap('.mk-find-pop [role="radio"][aria-label="노랑"]');
+    await page.tap('.mk-find-pop .mk-find-pop-foot .primary');
+    await page.locator('.mk-find-rep .mk-find-input').fill('');
+    await page.waitForTimeout(100);
+    const repHint = await page.getAttribute('.mk-find-rep .mk-find-input', 'placeholder');
+    await page.tap('.mk-find-all');
+    await page.waitForTimeout(900);
+    const fmtBody = read('찾기 연습.md');
+    check('서식 바꾸기: 바꿀 말을 비우고 형광펜을 고르면 글은 그대로 서식만 (굵은 배에만 형광펜 · 보통 배는 그대로)',
+      /<mark[^>]*>(\*\*)?배(\*\*)?<\/mark>|\*\*<mark[^>]*>배<\/mark>\*\*/.test(fmtBody) && /배 한 개/.test(fmtBody) && !/<mark[^>]*>배 한/.test(fmtBody) && /비우면 서식만 바꿔요/.test(repHint ?? ''), JSON.stringify({ fmtBody, repHint }));
+    await page.keyboard.press('Escape'); // 열린 목록부터
+    await page.waitForTimeout(150);
+    const listClosed = await page.evaluate(() => document.querySelector('.mk-find-results').hidden && !document.querySelector('.mk-find-bar').hidden);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    const closed = await page.evaluate(() => document.querySelector('.mk-find-bar').hidden && !document.querySelector('.mk-doc .mk-find-hit'));
+    check('찾기 막대: Esc 는 열린 모두 찾기 목록부터 · 한 번 더 누르면 막대를 닫고 표시도 사라짐', listClosed && closed, JSON.stringify({ listClosed, closed }));
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
   }
 
   // 튜토리얼: 설정 › 사용법 둘러보기 → 직접 해 보면 칭찬과 함께 다음 단계 (휴대폰도 PC 와 같은 말풍선)

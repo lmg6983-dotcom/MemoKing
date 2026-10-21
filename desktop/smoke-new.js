@@ -289,6 +289,50 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         JSON.stringify({ shownBar, groups, doc: await js(w, `document.querySelector('.ProseMirror').innerHTML.slice(0, 200)`) }));
       check('표 막대: 아래 서식 도구막대가 숨어도 제자리 (단추가 커서를 피하지 않음)', Math.abs(shown - hiddenTop) < 1, JSON.stringify({ shown, hiddenTop }));
 
+      // 메모 안 찾기 · 바꾸기 (워드처럼 한 막대): Ctrl+F → 찾은 곳 · 개수, Enter 다음, Ctrl+H 바꾸기 줄, Ctrl+Enter 모두 바꾸기, Esc 닫기
+      {
+        const v0 = getVault();
+        const fid = v0.import({ body: '# 찾기 점검\n\n사과 하나, 사과 둘, 사과즙\n\n배 하나\n' });
+        const beforeF = new Set(noteWins.keys());
+        await until(() => js(list, `!!document.querySelector('[data-id="${fid}"]')`), '찾기 메모 카드');
+        await js(list, `document.querySelector('[data-id="${fid}"]').click()`);
+        const fkey = await until(() => [...noteWins.keys()].find((k) => !beforeF.has(k)), '찾기 메모 창');
+        const fw = noteWins.get(fkey);
+        await until(() => js(fw, `document.documentElement.dataset.ready === 'true'`), '찾기 메모 준비');
+        fw.focus();
+        fw.webContents.focus();
+        await js(fw, `document.querySelector('.ProseMirror').focus()`);
+        key(fw, 'F', ['control']);
+        const opened = await until(() => js(fw, `!document.querySelector('.mk-find-bar').hidden && document.activeElement?.classList.contains('mk-find-input')`), 'Ctrl+F 찾기 막대', 3000).catch(() => false);
+        fw.webContents.insertText('사과');
+        const fs1 = await until(() => js(fw, `(() => { const c = document.querySelector('.mk-find-count').textContent; return c === '1/3' && { c, hits: document.querySelectorAll('.mk-find-hit').length }; })()`), '찾은 곳', 3000).catch(() => null);
+        key(fw, 'Return');
+        const fs2 = await until(() => js(fw, `document.querySelector('.mk-find-count').textContent === '2/3'`), 'Enter 다음', 2000).catch(() => false);
+        // 찾기 막대는 글을 가리지 않고 위 막대 아래에 끼워져 글을 민다
+        const noCover = await js(fw, `(() => { const b = document.querySelector('.mk-find-bar').getBoundingClientRect(); const d = document.querySelector('.ProseMirror').getBoundingClientRect(); return d.top >= b.bottom - 1; })()`);
+        await capture(fw, 'smoke-new-find.png');
+        check('찾기(Ctrl+F): 막대가 뜨고 찾을 말로 바로 · 찾은 곳 3곳 · Enter 로 다음(2/3) · 글을 가리지 않음', opened && fs1?.hits === 3 && fs2 && noCover, JSON.stringify({ opened, fs1, fs2, noCover }));
+        key(fw, 'H', ['control']);
+        const repFocus = await until(() => js(fw, `(() => { const f = [...document.querySelectorAll('.mk-find-grid .mk-find-field')].map((x) => Math.round(x.getBoundingClientRect().width)); return document.querySelector('.mk-find-bar').dataset.mode === 'replace' && document.activeElement === document.querySelector('.mk-find-rep .mk-find-input') && f[0] === f[1]; })()`), 'Ctrl+H 바꾸기 줄', 2000).catch(() => false);
+        fw.webContents.insertText('포도');
+        // Ctrl+Enter: sendInputEvent 로는 Ctrl 을 붙인 Enter 가 실제 키보드처럼 오지 않아, 크롬 개발 도구 입력(실제 키보드와 같은 길)으로
+        {
+          const dbg = fw.webContents.debugger;
+          if (!dbg.isAttached()) dbg.attach('1.3');
+          for (const type of ['keyDown', 'keyUp']) await dbg.sendCommand('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, modifiers: 2 });
+          dbg.detach();
+        }
+        const replaced = await until(() => { const b = v0.get(fid)?.body ?? ''; return /포도 하나, 포도 둘, 포도즙/.test(b) && b; }, '모두 바꾸기 저장', 8000).catch(() => '');
+        if (process.env.MK_SMOKE_TRACE) console.log(`… 바꾸기 상태: ${JSON.stringify(await js(fw, `({ rep: document.querySelector('.mk-find-rep input').value, q: document.querySelector('.mk-find-grid input').value, count: document.querySelector('.mk-find-count').textContent, mode: document.querySelector('.mk-find-bar').dataset.mode, active: document.activeElement?.placeholder, doc: document.querySelector('.ProseMirror').textContent })`))}`);
+        key(fw, 'Escape');
+        const closedF = await until(() => js(fw, `document.querySelector('.mk-find-bar').hidden && !document.querySelector('.mk-find-hit')`), 'Esc 닫기', 2000).catch(() => false);
+        await js(fw, `document.querySelector('.ProseMirror').focus()`);
+        key(fw, 'Z', ['control']);
+        const undone = await until(() => /사과 하나, 사과 둘, 사과즙/.test(v0.get(fid)?.body ?? ''), '되돌리기', 4000).catch(() => false);
+        check('바꾸기(Ctrl+H): 찾을 말과 같은 폭의 바꿀 말 칸으로 · Ctrl+Enter 모두 바꾸기 · Esc 로 닫기 · Ctrl+Z 한 번에 되돌림', repFocus && replaced && closedF && undone, JSON.stringify({ repFocus, replaced: Boolean(replaced), closedF, undone, body: v0.get(fid)?.body }));
+        fw.close();
+      }
+
       // 그림 복사: 그림이 든 메모를 열어 그림에 마우스를 올리면 × 옆에 복사 단추 → 누르면 시스템 클립보드에 그림 그대로
       const iconPng = nativeImage.createFromPath(path.join(import.meta.dirname, '..', 'assets', 'icons', 'icon-256.png')).toPNG();
       // Electron 44 클립보드: write([ClipboardItem]) · read() (옛 writeImage · readImage 없음)
@@ -976,7 +1020,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       // 테이프를 누르면 떼어져 보통 창 (메모 창은 그대로, 버튼 둘 다 돌아옴)
       await until(() => js(stickers.get(nw.id).win, `document.documentElement.dataset.ready === 'true'`), '테이프 준비', 4000).catch(() => {});
       // 보이는 모양을 누른다: 창 가운데에 있는 것이 테이프여야 한다
-      const hitTape = await js(stickers.get(nw.id).win, `(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); const ok = Boolean(el?.closest('#tape .hit')); el?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return ok; })()`);
+      // 테이프 창이 아직 안 떴으면 기다리다 멈추지 않게 (멈추면 뒤의 점검이 모두 안 돈다)
+      const tapeWin = stickers.get(nw.id)?.win;
+      if (process.env.MK_SMOKE_TRACE) console.log(`… 테이프 창: ${JSON.stringify({ kind: kindOf(nw), onBottom: getSettings().onBottom?.[tid], has: Boolean(tapeWin), loading: tapeWin?.webContents.isLoading(), url: tapeWin?.webContents.getURL() })}`);
+      const hitTape = tapeWin ? await Promise.race([
+        js(tapeWin, `(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); const ok = Boolean(el?.closest('#tape .hit')); el?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return ok; })()`),
+        wait(4000).then(() => false),
+      ]) : false;
       const peeled = await until(() => !stickers.get(nw.id) && !getSettings().onBottom?.[tid], '테이프 떼기', 3000).catch(() => false);
       const b3 = await buttons(nw);
       // 목록에서 지우면 그 카드가 제자리에서 흐려지며 사라진다 (옆으로 날아가지 않게)

@@ -77,6 +77,8 @@ test('PC: 매직키 · 카드 확대 · Life/Work · 목록 왕관 · 빠른 메
     ['list-zoomed', 'mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried']);
   const m = Object.fromEntries(MOBILE_TUTORIAL_STEPS.map((s) => [s.id, s]));
   assert.equal(m.mode?.advance, 'mode-switched', '휴대폰 Life/Work');
+  assert.equal(by['note-zoom']?.advance, 'note-zoomed', 'PC 메모 창 매직 줌 (Ctrl+휠)');
+  assert.equal(m['note-zoom']?.advance, 'note-zoomed', '휴대폰 매직 줌 (두 손가락)');
   assert.ok(m.tabs, '휴대폰 아래 탭 안내');
   for (const s of [...TUTORIAL_STEPS, ...MOBILE_TUTORIAL_STEPS]) assert.doesNotMatch(`${s.text} ${s.offText ?? ''}`, /추억|(?<!알림 )보관함/, `${s.id}: 지금 이름(회상 · 알림 보관함)으로`);
 });

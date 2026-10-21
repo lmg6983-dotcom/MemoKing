@@ -31,7 +31,7 @@ import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss } from './dom.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -739,6 +739,11 @@ function showUndo({ name, title }) {
     bar.addEventListener('focusin', hold);
     bar.addEventListener('pointerleave', resume);
     bar.addEventListener('focusout', () => setTimeout(resume, 0));
+    // 옆으로 끌어 밀면 바로 닫힌다 (터치 화면 PC 도)
+    swipeDismiss(bar, () => {
+      clearTimeout(undoTimer);
+      bar.hidden = true;
+    });
     document.body.append(bar);
   }
   const text = document.createElement('span');
@@ -771,6 +776,11 @@ function showHandoff(h) {
     bar.addEventListener('pointerleave', () => {
       clearTimeout(handoffTimer);
       handoffTimer = setTimeout(() => (bar.hidden = true), 20_000);
+    });
+    // × 말고도 옆으로 끌어 밀면 닫힌다 (터치 화면 PC 도) · Esc 는 아래 keydown
+    swipeDismiss(bar, () => {
+      clearTimeout(handoffTimer);
+      bar.hidden = true;
     });
     document.body.append(bar);
   }
