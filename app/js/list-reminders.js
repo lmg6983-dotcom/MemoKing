@@ -602,6 +602,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     div.dataset.color = item.color;
     div.dataset.memo = item.memoId;
     div.dataset.reminder = r.id;
+    div.dataset.kind = r.kind; // 반복 일정은 자세히 보기에서 지우지 않는다 (점검이 고를 때도)
 
     const main = el('button', 'row-main');
     main.title = '자세히 보기';

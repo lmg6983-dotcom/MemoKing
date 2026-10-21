@@ -89,7 +89,7 @@ let closingSave = false; // closeNote 가 저장을 마무리하는 중
 export const currentId = () => id;
 
 // ---------- 메모 안 찾기 · 바꾸기 (메모 메뉴 › 찾기, 바꾸기 · 키보드를 붙인 태블릿은 Ctrl+F · Ctrl+H) ----------
-const findBar = createFindBar({ host: document.getElementById('note-screen'), after: document.querySelector('#note-screen > .bar'), find: () => editor?.find, notify: (text, o) => toast(text, false, o?.undo ? { label: '되돌리기', run: o.undo } : null) });
+const findBar = createFindBar({ host: document.getElementById('note-screen'), after: document.querySelector('#note-screen > .bar'), find: () => editor?.find, notify: (text, o) => toast(text, false, o?.undo ? { label: '되돌리기', run: o.undo } : null), onReplace: () => useEditMode() }); // 바꾸기를 펼치면 글 고치기로
 export const openFind = (o) => editor && findBar.open(o);
 /** 열려 있으면 닫는다 → 닫았으면 true (뒤로 가기) */
 export const closeFind = () => findBar.close({ focus: false });

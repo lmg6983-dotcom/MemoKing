@@ -524,7 +524,7 @@ try {
   }
   await back();
   await page.waitForTimeout(200);
-  await page.tap('.ev-row:not(.ev-ext) .row-main >> nth=0');
+  await page.tap('.ev-row:not(.ev-ext):not([data-kind="repeat"]) .row-main >> nth=0'); // 반복 일정은 지우기가 없어 (날짜에 따라 첫 줄이 반복일 수 있음)
   await page.waitForSelector('.event-detail[open]');
   const memoDetail = await page.evaluate(() => [...document.querySelectorAll('.event-detail .ed-actions .btn')].map((b) => b.textContent));
   check('일정 누르기: 메모킹 일정 → 자세히 보기 (메모 열기 · 일정 지우기)', memoDetail.includes('메모 열기') && memoDetail.includes('일정 지우기'), JSON.stringify(memoDetail));
@@ -2310,8 +2310,12 @@ try {
     await page.tap('.mk-find-case');
     await page.locator('.mk-find-bar .mk-find-input').first().fill('사과');
     await page.waitForTimeout(250);
+    await pickMode(page, 'move'); // 옮기기로 돌려 둔 채 바꾸기를 펼치면 → 저절로 글 고치기로
+    await page.waitForTimeout(200);
     await page.tap('.mk-find-bar .mk-find-more'); // 바꾸기 펼치기 → 바꿀 말 줄 + 할 일 줄
     await page.waitForTimeout(200);
+    const editMode = await page.evaluate(() => ({ mode: document.querySelector('.mode-knob').dataset.mode, rep: !document.querySelector('.mk-find-rep input').disabled }));
+    check('바꾸기를 펼치면 다이얼이 저절로 글 고치기로 (옮기기에서도 바로 바꿀 수 있게)', editMode.mode === 'edit' && editMode.rep, JSON.stringify(editMode));
     const s2 = await st();
     await page.tap('.mk-find-acts .mk-find-act >> text=다음 찾기');
     await page.waitForTimeout(150);
