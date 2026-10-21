@@ -13,6 +13,7 @@
 //   enable: 꺼져 있을 때(needs) 말풍선에서 바로 켜는 단추 글자 (켜면 그 자리에서 직접 해 보기로)
 //   needs: 이 기능이 켜져 있어야 직접 해 볼 수 있다 ('workLife' Work / Life 나누기 · 'quickMemo' Ctrl+Alt+C · 'magic' 매직키)
 //          꺼져 있으면 offText 로 안내만 하고 "다음"으로 (tutorialStepFor)
+import { normalizeReminder } from './reminders.js';
 
 const LATER = '다음에 해 볼게요';
 
@@ -21,22 +22,68 @@ export const TUTORIAL_SAMPLE = '- [ ] 우유\n- [ ] 달걀\n- [ ] 사과\n- [ ] 
 
 /**
  * 튜토리얼 연습 공간: 튜토리얼은 실제 메모 폴더 대신 잠깐 만든 빈 폴더에서 한다 (실제 메모 · 동기화 · 알림은 그대로)
- *   그 폴더에 미리 넣어 두는 예시 메모 — 목록 · 보기 · 태그 · Work/Life 를 해 볼 거리. 끝나면 폴더째 사라진다
- *   daysAgo: 며칠 전에 쓴 메모로 (목록이 실제처럼 보이게)
+ *   그 폴더에 미리 넣어 두는 예시 메모 — 목록 · 보기 · 태그 · 검색 · Work/Life · 일정 · 회상을 해 볼 거리.
+ *   메모킹으로 쓸 수 있는 것(할 일 · 표 · 인용 · 굵게 · 형광펜 · 글자 색 · 코드 · 링크 · 일정)을 골고루. 끝나면 폴더째 사라진다
+ *   daysAgo: 며칠 전에 쓴 메모로 (목록 · 회상 달력이 실제처럼) · events: 며칠 뒤(inDays) 몇 시(time)의 일정
+ *   예시 장보기 목록(TUTORIAL_SAMPLE)의 낱말은 쓰지 않는다 (옮기기 단계에서 헷갈리지 않게)
+ *   Life 태그는 #여행 · #생활 둘만 — 휴대폰 태그 줄에서 튜토리얼 중 만든 #태그가 밀려나지 않게
  */
 export const TUTORIAL_SANDBOX_MEMOS = [
-  { body: '# 연습 공간이에요\n\n여기서 만들고 고친 메모는 튜토리얼을 마치면 사라지고, 원래 메모로 돌아가요. 마음껏 눌러 보세요.', color: 'yellow', pinned: true, daysAgo: 0 },
-  { body: '# 여행 준비\n\n- [x] 숙소 예약\n- [ ] 기차표\n- [ ] 우산 챙기기\n\n#여행', color: 'green', daysAgo: 1 },
-  { body: '# 읽고 싶은 책\n\n데미안\n\n어린 왕자\n\n#책', color: 'purple', daysAgo: 3 },
-  { body: '# 주간 회의\n\n- 지난주 정리\n- 이번 주 할 일 나누기\n\n#회의', color: 'blue', mode: 'work', daysAgo: 2 },
+  {
+    body: '# 연습 공간이에요\n\n여기서 만들고 고친 메모는 튜토리얼을 마치면 **사라지고**, 내 메모로 돌아가요. 마음껏 눌러 보세요.\n\n- 카드를 누르면 열려요\n- 위쪽 <mark>태그</mark>를 누르면 그 태그가 붙은 메모만\n- 위의 검색칸에 **회의**를 쳐 보세요',
+    color: 'yellow', pinned: true, daysAgo: 0,
+  },
+  {
+    body: '# 제주 여행 준비\n\n- [x] 숙소 예약\n- [x] 렌터카\n- [ ] 비행기 표 확인\n- [ ] 선크림 챙기기\n\n> 첫날은 바다가 보이는 카페에서 쉬기\n\n#여행',
+    color: 'green', daysAgo: 1, events: [{ inDays: 9, allDay: true, title: '제주 여행' }],
+  },
+  {
+    body: '# 이번 달 생활비\n\n| 항목 | 금액 | 메모 |\n| --- | --- | --- |\n| 식비 | 320,000 | 외식 줄이기 |\n| 교통 | 68,000 | |\n| 구독 | 24,900 | 하나 해지 |\n\n<span style="color: #e03131">예산까지 87,100원</span> 남았어요\n\n#생활',
+    color: 'pink', daysAgo: 4,
+  },
+  {
+    body: '# 읽고 싶은 책\n\n1. 데미안\n2. 어린 왕자\n3. 아몬드\n\n> 새는 알에서 나오려고 투쟁한다.\n\n#생활',
+    color: 'purple', daysAgo: 6,
+  },
+  {
+    body: '# 된장찌개\n\n**재료**: 된장 2숟갈, 애호박, 두부, 양파, 청양고추\n\n1. 멸치 육수를 끓인다\n2. 된장을 풀고 채소를 넣는다\n3. <mark>두부는 마지막에</mark> 넣고 5분 더\n\n#생활',
+    color: 'yellow', daysAgo: 11,
+  },
+  {
+    body: '# 운동 기록\n\n- [x] 월 걷기 40분\n- [x] 수 수영 30분\n- [ ] 금 요가\n\n이번 주 목표: **세 번**\n\n#생활',
+    color: 'gray', daysAgo: 2, events: [{ inDays: 3, time: '07:00', title: '아침 요가', alerts: [10] }],
+  },
+  {
+    body: '# 주간 회의\n\n## 지난주\n- 시안 두 개 완성\n- 고객 피드백 정리\n\n## 이번 주\n- [ ] 최종안 고르기\n- [ ] 일정표 공유\n\n#회의',
+    color: 'blue', mode: 'work', daysAgo: 3, events: [{ inDays: 2, time: '10:00', title: '주간 회의', alerts: [10] }],
+  },
+  {
+    body: '# 출시 준비\n\n| 할 일 | 맡은 사람 | 마감 |\n| --- | --- | --- |\n| 소개 글 | 지민 | 금요일 |\n| 화면 사진 | 현우 | 목요일 |\n\n점검 명령은 `npm test` 로 돌려요. 자료는 [예시 문서](https://example.com) 에\n\n#업무',
+    color: 'charcoal', mode: 'work', daysAgo: 5,
+  },
+  {
+    body: '# 떠오른 생각\n\n점심시간 산책길에 본 노을이 예뻤다. 다음엔 <span style="color: #1971c2">사진</span>을 꼭 찍어 두자.',
+    color: 'green', daysAgo: 15,
+  },
 ];
 
-/** 연습 공간 예시 메모를 볼트에 넣는다 (PC · 휴대폰 볼트 모두 import 가 같다) */
+/** 연습 공간 예시 메모를 볼트에 넣는다 (PC · 휴대폰 볼트 모두 import · setReminders 가 같다) */
 export function seedTutorialSandbox(vault, toIso, now = new Date()) {
-  for (const m of TUTORIAL_SANDBOX_MEMOS) {
-    const at = toIso(new Date(now.getTime() - m.daysAgo * 86_400_000));
-    vault.import({ body: m.body, color: m.color, mode: m.mode, pinned: m.pinned === true, created: at, updated: at });
-  }
+  const day = (n, time = '09:00') => {
+    const [h, m] = time.split(':').map(Number);
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + n, h, m);
+  };
+  TUTORIAL_SANDBOX_MEMOS.forEach((m, i) => {
+    // 같은 날 쓴 메모도 순서가 늘 같게 (뒤의 것일수록 조금 앞선 시각)
+    const at = toIso(new Date(now.getTime() - m.daysAgo * 86_400_000 - i * 60_000));
+    const id = vault.import({ body: m.body, color: m.color, mode: m.mode, pinned: m.pinned === true, created: at, updated: at });
+    if (id && m.events?.length) {
+      vault.setReminders(id, m.events.map((e, k) => normalizeReminder({
+        id: `tut-${i}-${k}`, kind: 'at', action: 'notify', title: e.title, created: at,
+        at: toIso(day(e.inDays, e.allDay ? '00:00' : e.time)), allDay: e.allDay === true, alerts: e.alerts, // 하루 종일은 그날 00:00
+      }, now)));
+    }
+  });
 }
 
 /** 예시 목록이 이미 들어 있는지 (단계가 다시 떠도 두 번 넣지 않게) */
