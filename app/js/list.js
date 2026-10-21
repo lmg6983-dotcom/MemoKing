@@ -609,7 +609,7 @@ async function runSearch() {
 
 // ---------- 동작 ----------
 
-function confirmDialog(message, okLabel = '삭제') {
+function confirmDialog(message, okLabel = '지우기') {
   el.confirmMessage.textContent = message;
   $('confirm-ok').textContent = okLabel;
   el.confirm.returnValue = '';
@@ -1175,7 +1175,7 @@ async function blockHistoryApp(appId, appName) {
   if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함의 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const apps = await api.history.apps();
   const count = apps.find((a) => a.appId === appId)?.count ?? 0;
-  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제');
+  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 지울까요?`, '지우기');
   await api.history.blockApp(appId, appName, remove);
   historyTab.refresh();
   return true;

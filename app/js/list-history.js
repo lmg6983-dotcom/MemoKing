@@ -137,7 +137,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
       actionButton('note', UI.makeMemo, toMemo, '메모로'),
       actionButton('copy', '복사', copy),
       // 메모가 아니라 보관함의 이 알림 기록만 지운다
-      actionButton('trash', '알림 보관함에서 삭제', remove, '삭제'),
+      actionButton('trash', '알림 보관함에서 지우기', remove, '지우기'),
     );
     // 이 앱 알림 그만 모으기 (안드로이드)
     if (block) actions.append(actionButton('block', `${e.app} 알림 그만 모으기`, block, '그만 모으기'));
@@ -152,7 +152,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
           { id: 'copy', label: '복사' },
           ...(block ? [{ id: 'block', label: `${e.app} 알림 그만 모으기` }] : []),
           { type: 'separator' },
-          { id: 'remove', label: '알림 보관함에서 삭제', accelerator: 'Delete' },
+          { id: 'remove', label: '알림 보관함에서 지우기', accelerator: 'Delete' },
         ], at);
         ({ memo: toMemo, copy, block, remove })[id]?.();
       });
@@ -189,7 +189,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
     strip.className = 'row noti-undo';
     strip.setAttribute('role', 'status');
     const text = document.createElement('span');
-    text.textContent = '알림을 삭제했어요';
+    text.textContent = '알림을 지웠어요';
     const undo = document.createElement('button');
     undo.type = 'button';
     undo.className = 'link-btn';
@@ -275,9 +275,9 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
     // 앱으로 거르거나 찾는 중이어도 보관함 전체를 비운다 — 보이는 것만 지우는 줄 알지 않게 알린다
     const narrowed = Boolean(query || app);
     const msg = narrowed
-      ? `지금 보이는 알림만이 아니라, 보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`
-      : `보관한 알림 ${data.total}개를 모두 삭제할까요?\n되돌릴 수 없어요.`;
-    if (await confirm(msg, '모두 삭제')) api.history.clear();
+      ? `지금 보이는 알림만이 아니라, 보관한 알림 ${data.total}개를 모두 지울까요?\n되돌릴 수 없어요.`
+      : `보관한 알림 ${data.total}개를 모두 지울까요?\n되돌릴 수 없어요.`;
+    if (await confirm(msg, '모두 지우기')) api.history.clear();
   });
   els.app.addEventListener('change', () => {
     app = els.app.value;

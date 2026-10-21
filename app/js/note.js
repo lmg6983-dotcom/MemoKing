@@ -1329,7 +1329,7 @@ function showTableBar(table) {
   };
   delRow.disabled = table.header && !lastRow;
   delRow.dataset.wholeTable = lastRow ? '1' : '';
-  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : UI.rowDelete);
+  setBtn(delRow, lastRow ? '표 지우기' : '지우기', lastRow ? '머리글 행만 남았어요. 누르면 표를 지워요' : table.header ? '머리글 행은 지울 수 없어요 (아래 행을 모두 지우면 표를 지울 수 있어요)' : UI.rowDelete);
   // 셀 병합: 여러 칸을 골랐으면 "병합", 병합한 칸 안이면 "병합 풀기"
   const merge = tableBar.querySelector('[data-table="merge"]');
   merge.disabled = !table.canMerge && !table.merged;
@@ -1344,7 +1344,7 @@ function showTableBar(table) {
   join.disabled = !table.canJoin;
   join.title = table.canJoin ? UI.joinBelow : UI.joinWhen;
   delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
-  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : UI.colDelete);
+  setBtn(delCol, table.cols <= 1 ? '표 지우기' : '지우기', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 지워요' : UI.colDelete);
 }
 tableBar.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서가 표 안에 남게
 tableBar.addEventListener('click', (e) => {

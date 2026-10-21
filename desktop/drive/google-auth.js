@@ -234,12 +234,12 @@ export class GoogleAuth {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(page(ok, this.label));
         finish(() => {
           const error = url.searchParams.get('error');
-          if (url.searchParams.get('state') !== state) reject(new AuthError('로그인 확인 값이 맞지 않아요. 다시 시도해 주세요'));
+          if (url.searchParams.get('state') !== state) reject(new AuthError('로그인 확인 값이 맞지 않아요. 다시 해 주세요'));
           else if (!ok) reject(new AuthError(error === 'access_denied' ? '로그인을 취소했어요' : `로그인하지 못했어요 (${error})`));
           else resolve({ code: url.searchParams.get('code'), redirect: redirectUri });
         });
       });
-      const timer = setTimeout(() => finish(() => reject(new AuthError('로그인을 기다리다 시간이 지났어요. 다시 시도해 주세요'))), LOGIN_TIMEOUT);
+      const timer = setTimeout(() => finish(() => reject(new AuthError('로그인을 기다리다 시간이 지났어요. 다시 해 주세요'))), LOGIN_TIMEOUT);
       const finish = (then) => {
         clearTimeout(timer);
         server.close();
@@ -264,7 +264,7 @@ export class GoogleAuth {
     }).catch((err) => {
       throw invalidClientHelp(err, source) ?? err;
     });
-    if (!token.refresh_token) throw new AuthError('구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 시도해 주세요');
+    if (!token.refresh_token) throw new AuthError('구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 해 주세요');
     // 허용 화면에서 Drive 전체 칸을 끄고 허용할 수도 있다 — 실제로 받은 범위로 정한다
     const granted = String(token.scope ?? scope).split(/\s+/);
     if (full && !granted.includes(FULL_SCOPE)) throw new AuthError('Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요');
@@ -342,7 +342,7 @@ export class GoogleAuth {
       // 글자 응답
     }
     if (res.status >= 400 && res.status < 500) throw new AuthError(`Google 로그인 오류: ${json.error_description || json.error || text}`);
-    if (!res.ok) throw new Error(`Google 서버에 문제가 있어요 (${res.status}). 잠시 뒤 다시 시도해 주세요`);
+    if (!res.ok) throw new Error(`Google 서버에 문제가 있어요 (${res.status}). 잠시 뒤 다시 해 주세요`);
     return json;
   }
 }
@@ -361,7 +361,7 @@ export function invalidClientHelp(err, source) {
 
 function page(ok, label = 'Google Drive') {
   const title = ok ? `메모킹에 ${label}를 연결했어요` : '연결하지 못했어요';
-  const sub = ok ? '이 창을 닫고 메모킹으로 돌아가세요.' : '메모킹으로 돌아가 다시 시도해 주세요.';
+  const sub = ok ? '이 창을 닫고 메모킹으로 돌아가세요.' : '메모킹으로 돌아가 다시 해 주세요.';
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>메모킹</title>
 <style>body{font-family:system-ui,"Malgun Gothic",sans-serif;background:#f6f5f1;color:#111;display:grid;place-items:center;min-height:90vh;margin:0;text-align:center}
 h1{font-size:22px}p{color:#6b6860}</style></head><body><div><h1>${title}</h1><p>${sub}</p></div></body></html>`;

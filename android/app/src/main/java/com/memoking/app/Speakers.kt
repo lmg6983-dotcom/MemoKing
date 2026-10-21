@@ -66,7 +66,7 @@ object SpeakerModel {
                     conn = URL(URL(URL_MODEL), next).openConnection() as HttpURLConnection
                     continue
                 }
-                if (code != 200) throw IOException("다운로드하지 못했어요. 잠시 후 다시 시도해 주세요")
+                if (code != 200) throw IOException("다운로드하지 못했어요. 잠시 후 다시 해 주세요")
                 break
             }
             val total = conn.contentLengthLong
@@ -93,7 +93,7 @@ object SpeakerModel {
             }
             conn.disconnect()
             val got = sha.digest().joinToString("") { "%02x".format(it) }
-            if (got != SHA256) throw IOException("받은 파일이 깨졌어요. 다시 시도해 주세요")
+            if (got != SHA256) throw IOException("받은 파일이 깨졌어요. 다시 해 주세요")
             if (!part.renameTo(dest)) throw IOException("저장하지 못했어요. 저장 공간을 확인하고 다시 해 주세요")
             onProgress(100)
         } finally {

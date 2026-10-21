@@ -692,7 +692,7 @@ function tutorialPayload() {
   const step = tutorialStepFor(raw, (need) => (need === 'workLife' ? settings.workLife === true : need === 'quickMemo' || need === 'magic' ? shortcutStatus(need).registered : true));
   const keys = (t) => (typeof t === 'string' ? withShortcuts(t, settings.shortcuts) : t);
   const text = step.noTape && !windowManager.canTape ? step.noTape : step.text; // 테이프를 못 쓰는 PC 에서는 왕관만
-  // 다시 보는 사람(설정 › 사용법 둘러보기)에게는 첫 말풍선에서 어디부터 볼지 고르게
+  // 다시 보는 사람(설정 › 튜토리얼 보기)에게는 첫 말풍선에서 어디부터 볼지 고르게
   const jumps = tutorial.index === 0 && tutorial.again ? tutorialJumps(TUTORIAL_STEPS) : undefined;
   return { ...step, title: keys(step.title), text: keys(text), try: keys(step.try), index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise, chapter: tutorialChapter(TUTORIAL_STEPS, tutorial.index), jumps, sandbox: Boolean(sandbox) };
 }
@@ -880,7 +880,7 @@ function registerQuickMemoKey() {
   if (!settings.quickMemo || process.platform !== 'win32' || shortcutsPaused) return false;
   const key = shortcutKey('quickMemo');
   const ok = globalShortcut.register(key, () => onQuickMemoKey());
-  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다`);
+  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else {
     heldKeys.quickMemo = key;
     windowManager.captureHelper.start();
@@ -894,7 +894,7 @@ function registerMagicKey() {
   if (!normalizeMagicSettings(settings.magic).enabled || shortcutsPaused) return false;
   const key = shortcutKey('magic');
   const ok = globalShortcut.register(key, () => windowManager.showMagic());
-  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다`);
+  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else heldKeys.magic = key;
   return ok;
 }
@@ -1039,7 +1039,7 @@ function updateTrayMenu() {
       click: (item) => setAutoStart(item.checked, updateTrayMenu),
     },
     { type: 'separator' },
-    { label: '사용법 보기', enabled: Boolean(vault), click: startTutorial },
+    { label: '튜토리얼 보기', enabled: Boolean(vault), click: startTutorial },
     { label: '메모킹 종료', click: quitApp },
   ];
   tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate));

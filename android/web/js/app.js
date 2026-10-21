@@ -237,9 +237,9 @@ async function enableHistory(on) {
 async function blockApp(appId, appName) {
   if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함의 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const count = history.all().entries.filter((x) => x.appId === appId && x.source !== 'memoking').length;
-  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제', { cancelLabel: '남겨 두기' });
+  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 지울까요?`, '지우기', { cancelLabel: '남겨 두기' });
   const removed = history.block(appId, appName, remove);
-  toast(removed ? `${appName} 알림 보관을 멈추고 ${removed}개를 삭제했어요` : `${appName} 알림을 더 이상 보관하지 않아요`);
+  toast(removed ? `${appName} 알림 보관을 멈추고 ${removed}개를 지웠어요` : `${appName} 알림을 더 이상 보관하지 않아요`);
   return true;
 }
 
@@ -635,7 +635,7 @@ async function deleteMemo(id, { flown = false } = {}) {
   if (inNote) app.showList();
   else list.refresh();
   if (isBlankBody(body) || typeof name !== 'string') {
-    toast('메모를 삭제했어요');
+    toast('메모를 지웠어요');
     return;
   }
   toast(trashedText(titleOf(body)), false, {
@@ -690,7 +690,7 @@ shareSheet.addEventListener('click', async (e) => {
   // 그림은 메모 화면에 그려진 모습으로 만든다 (닫혀 있으면 연다)
   for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = true;
   $('share-busy').hidden = false;
-  $('share-busy-text').textContent = '이미지를 만드는 중';
+  $('share-busy-text').textContent = '그림을 만드는 중';
   try {
     if (note.currentId() !== id) {
       closeSheet(shareSheet);
@@ -1037,11 +1037,11 @@ $('change-vault').addEventListener('click', async () => {
   note.flush();
   const error = await chooseFolder();
   if (error) toast(error, true);
-  else if (error === '') toast('저장 위치를 바꿨어요');
+  else if (error === '') toast('메모 폴더를 바꿨어요');
 });
 $('use-internal-2').addEventListener('click', async () => {
   // 지금 폴더의 메모는 옮겨지지 않아 목록에서 사라져 보인다 — 지워진 줄 알지 않게 미리 알린다
-  const ok = await confirmDialog('저장 위치를 이 휴대폰으로 바꿀까요?\n지금 폴더의 메모는 옮겨지지 않아요. 바꾸면 목록에는 이 휴대폰에 새로 쓴 메모만 보여요.', '위치 바꾸기', { danger: false });
+  const ok = await confirmDialog('메모 폴더를 이 휴대폰 안으로 바꿀까요?\n지금 폴더의 메모는 옮겨지지 않아요. 바꾸면 목록에는 이 휴대폰에 새로 쓴 메모만 보여요.', '위치 바꾸기', { danger: false });
   if (!ok) return;
   note.flush();
   native.useInternalVault();
@@ -1106,7 +1106,7 @@ $('trash-btn').addEventListener('click', () => {
   openSheet($('trash-sheet'));
 });
 $('trash-clear').addEventListener('click', async () => {
-  if (!(await confirmDialog('휴지통의 메모를 모두 영구 삭제할까요?\n되돌릴 수 없어요.', '모두 삭제'))) return;
+  if (!(await confirmDialog('휴지통의 메모를 모두 영구 삭제할까요?\n되돌릴 수 없어요.', '휴지통 비우기'))) return;
   const { memos } = app.vault.emptyTrash();
   renderTrash();
   toast(`메모 ${memos}개를 영구 삭제했어요`);
@@ -1420,7 +1420,7 @@ function openVault() {
   alarms.start();
   alarms.schedule();
   renderDrive();
-  setTimeout(maybeStartTutorial, 700); // 처음이면 사용법 둘러보기 (메모 폴더를 연 뒤 한 번)
+  setTimeout(maybeStartTutorial, 700); // 처음이면 튜토리얼 (메모 폴더를 연 뒤 한 번)
   if (app.vaultInfo?.drive) drive.syncSoon();
   recorder.resume(); // 녹음이 도는 중인지, 꺼져 있는 동안 끝난 녹음이 있는지
   widgets.publishSoon(0); // 앱이 꺼져 있는 동안 바뀐 메모(동기화 등)를 위젯에도

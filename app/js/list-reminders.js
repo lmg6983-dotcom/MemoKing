@@ -622,7 +622,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     main.addEventListener('click', () => showMemoEvent(item, start));
 
     const del = el('button', 'icon-btn');
-    del.title = '일정 삭제';
+    del.title = '일정 지우기';
     del.setAttribute('aria-label', `${rowTitle.textContent} 일정 지우기`);
     del.append(icon('trash'));
     del.addEventListener('click', () => update(item, (list) => list.filter((x) => x.id !== r.id)));
@@ -773,7 +773,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       : x))));
 
     const del = el('button', 'icon-btn');
-    del.title = '알림 삭제';
+    del.title = '알림 지우기';
     del.setAttribute('aria-label', `${item.title} 알림 지우기`);
     del.append(icon('trash'));
     del.addEventListener('click', () => update(item, (list) => list.filter((x) => x.id !== r.id)));

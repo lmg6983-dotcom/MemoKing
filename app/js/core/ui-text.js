@@ -2,7 +2,7 @@
 //   한 파일에서만 쓰는 문구는 그 파일에 둔다. 새로 같은 말을 두 곳에 쓰게 되면 여기로 옮긴다
 export const UI = Object.freeze({
   // 메모 · 목록
-  memoMissing: '메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요',
+  memoMissing: '메모를 찾을 수 없어요. 옮겨졌거나 지워졌을 수 있어요',
   memoPickAgain: '메모를 찾지 못했어요. 목록에서 다시 골라 주세요',
   memoOpenFail: '메모를 열지 못했어요',
   memoCreated: '메모를 만들었어요',
@@ -43,9 +43,9 @@ export const UI = Object.freeze({
   // 넣기 · 표 · 그림
   linkSaveFail: '연결을 저장하지 못했어요. 잠시 뒤 다시 해 주세요',
   imageType: '지원하지 않는 그림 형식이에요. PNG, JPG, GIF, WebP 그림을 써 주세요',
-  fileAddFail: '파일을 추가하지 못했어요. 다시 시도해 주세요',
-  rowDelete: '이 행 삭제',
-  colDelete: '이 열 삭제',
+  fileAddFail: '파일을 추가하지 못했어요. 다시 해 주세요',
+  rowDelete: '이 행 지우기',
+  colDelete: '이 열 지우기',
   mergePick: '합칠 칸들을 끌어서 골라 주세요',
   splitHere: '커서가 있는 행부터 아래를 새 표로 (아래 표에도 머리글 행)',
   splitWhere: '나눌 자리의 행(머리글 아래 두 번째 행부터)에 커서를 두세요',

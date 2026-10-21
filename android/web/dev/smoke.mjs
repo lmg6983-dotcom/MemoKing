@@ -108,7 +108,7 @@ const errors = [];
 try {
   // MK_DARK=1: 다크 모드로 같은 점검 (화면 사진은 out/android-dark)
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'ko-KR', colorScheme: process.env.MK_DARK ? 'dark' : 'light' });
-  // 처음 실행 튜토리얼은 저절로 뜨지 않게 (아래에서 설정 › 사용법 둘러보기로 따로 점검)
+  // 처음 실행 튜토리얼은 저절로 뜨지 않게 (아래에서 설정 › 튜토리얼 보기로 따로 점검)
   await ctx.addInitScript(() => {
     try {
       localStorage.setItem('memoking.tutorialDone', '1');
@@ -2381,7 +2381,7 @@ try {
     }
   }
 
-  // 튜토리얼: 설정 › 사용법 둘러보기 → 직접 해 보면 칭찬과 함께 다음 단계 (휴대폰도 PC 와 같은 말풍선)
+  // 튜토리얼: 설정 › 튜토리얼 보기 → 직접 해 보면 칭찬과 함께 다음 단계 (휴대폰도 PC 와 같은 말풍선)
   {
     const stepIs = (id) => page.waitForSelector(`.coach-bubble:not([hidden])[data-step="${id}"]`, { timeout: 5000 }).then(() => true).catch(() => false);
     await page.tap('#settings-btn');
@@ -2393,7 +2393,7 @@ try {
     await page.tap('.coach-bubble .coach-next');
     const newMemo = await stepIs('new-memo');
     const trying = await page.evaluate(() => !!document.querySelector('.coach-try') && document.querySelector('.coach-spot').classList.contains('pulse'));
-    check('튜토리얼: 설정 › 사용법 둘러보기 → 이모지·진행 막대 · 직접 해 보기 단계는 누를 곳만 노란 테두리 + 해 보기 안내 (손가락 이모지 없음)', welcome && head.emoji === '👑' && head.bar && newMemo && trying, JSON.stringify({ welcome, head, newMemo, trying }));
+    check('튜토리얼: 설정 › 튜토리얼 보기 → 이모지·진행 막대 · 직접 해 보기 단계는 누를 곳만 노란 테두리 + 해 보기 안내 (손가락 이모지 없음)', welcome && head.emoji === '👑' && head.bar && newMemo && trying, JSON.stringify({ welcome, head, newMemo, trying }));
     await page.tap('#fab');
     await page.waitForTimeout(300);
     await page.tap('#fab-menu [data-new="text"]');

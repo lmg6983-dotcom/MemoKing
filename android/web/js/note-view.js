@@ -172,7 +172,7 @@ export function flush() {
   } catch (err) {
     console.error(err);
     refusedSave = true; // 이대로 닫으면 사본 메모로라도 남긴다 (closeNote)
-    setStatus('저장하지 못했어요. 저장 위치를 확인해 주세요', true);
+    setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
   }
 }
 
@@ -201,7 +201,7 @@ export function lockChanged(locked) {
 export function onVaultChanged({ ids, external, removed }) {
   if (!id || !editor || closingSave) return; // 닫는 중 다시 읽은 것은 closeNote 가 맡는다 (사본·닫기를 두 번 하지 않게)
   if (removed.includes(id)) {
-    showBanner('이 메모가 저장 위치에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
+    showBanner('이 메모가 메모 폴더에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
     return;
   }
   if (external.includes(id)) {
@@ -646,7 +646,7 @@ async function pasteClipboardFiles(text) {
       setStatus(files.length > 1 ? `파일 ${files.length}개를 붙여 넣었어요` : '붙여 넣었어요');
     } catch (err) {
       console.error(err);
-      setStatus('붙여 넣지 못했어요. 다시 시도해 주세요', true);
+      setStatus('붙여 넣지 못했어요. 다시 해 주세요', true);
     }
     return;
   }
@@ -1043,9 +1043,9 @@ function showTableBar(table) {
   const lastRow = table.header && table.rows <= 1;
   delRow.disabled = table.header && !lastRow;
   delRow.dataset.wholeTable = lastRow ? '1' : '';
-  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : UI.rowDelete);
+  setBtn(delRow, lastRow ? '표 지우기' : '지우기', lastRow ? '머리글 행만 남았어요. 누르면 표를 지워요' : table.header ? '머리글 행은 지울 수 없어요 (아래 행을 모두 지우면 표를 지울 수 있어요)' : UI.rowDelete);
   delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
-  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : UI.colDelete);
+  setBtn(delCol, table.cols <= 1 ? '표 지우기' : '지우기', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 지워요' : UI.colDelete);
   // 셀 병합: 여러 칸을 골랐으면 "병합", 병합한 칸 안이면 "병합 풀기"
   const merge = bar.querySelector('[data-table="merge"]');
   merge.disabled = !table.canMerge && !table.merged;
@@ -1617,9 +1617,9 @@ export function closeNote({ quiet = false } = {}) {
       // 사본도 남기지 못했다(저장 위치에 쓸 수 없음) — 쓰던 글을 잃지 않게 클립보드로
       try {
         native.copyText(current);
-        toast('저장하지 못해 쓰던 내용을 클립보드에 복사해 두었어요. 저장 위치를 확인해 주세요', true);
+        toast('저장하지 못해 쓰던 내용을 클립보드에 복사해 두었어요. 메모 폴더를 확인해 주세요', true);
       } catch {
-        toast('저장하지 못했어요. 저장 위치를 확인해 주세요', true);
+        toast('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
       }
     }
   }

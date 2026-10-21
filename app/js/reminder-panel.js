@@ -151,7 +151,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'icon-btn';
-    del.title = '삭제';
+    del.title = '지우기';
     del.setAttribute('aria-label', `${title.textContent} 지우기`);
     del.append(icon('trash'));
     del.addEventListener('click', () => save(reminders.filter((x) => x.id !== r.id)));
@@ -168,7 +168,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
       return true;
     } catch (err) {
       console.error(err);
-      setStatus('알림을 저장하지 못했어요. 다시 시도해 주세요.', true);
+      setStatus('알림을 저장하지 못했어요. 다시 해 주세요.', true);
       return false;
     }
   }

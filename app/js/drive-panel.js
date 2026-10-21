@@ -103,7 +103,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
       const count = p?.phase === 'transfer' && p.total ? ` · ${p.done}/${p.total}` : '';
       return { tone: 'busy', title: `동기화하는 중${count}`, sub: progressText(p) || where, on, progress: p ?? { phase: 'scan' } };
     }
-    if (st.state === 'error') return { tone: 'error', title: needsLogin(st.error) ? '다시 로그인해 주세요' : UI.syncFail, sub: st.error || '잠시 뒤 다시 시도해 주세요', on, error: true };
+    if (st.state === 'error') return { tone: 'error', title: needsLogin(st.error) ? '다시 로그인해 주세요' : UI.syncFail, sub: st.error || '잠시 뒤 다시 해 주세요', on, error: true };
     // 방금 끝났으면 몇 개를 맞췄는지 (되고 있었는지 알 수 있게)
     const fresh = st.lastSync && Date.now() - st.lastSync < 60_000;
     const moved = fresh && st.moved ? `, 파일 ${st.moved}개 맞춤` : fresh ? ', 바뀐 것 없음' : '';

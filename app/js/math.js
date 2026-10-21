@@ -121,7 +121,7 @@ function openEditor(view, getPos, node, anchor) {
   hint.textContent = 'LaTeX (Enter 로 완료)';
   const remove = document.createElement('button');
   remove.type = 'button';
-  remove.textContent = '삭제';
+  remove.textContent = '지우기';
   const done = document.createElement('button');
   done.type = 'button';
   done.className = 'primary';

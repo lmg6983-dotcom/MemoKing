@@ -162,7 +162,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'lists', chapter: '쓰기', win: 'note', target: ['[data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *'], advance: 'tasked', emoji: '✅',
     image: 'clear.jpg',
-    title: '할 일 목록 만들기',
+    title: '체크리스트 만들기',
     text: '체크리스트 단추를 누르면 줄 앞에 네모 칸이 생겨요. 모두 끝내면 CLEAR 도장이 쾅! 🎊',
     try: '체크리스트 단추를 눌러 보세요',
     next: LATER,
@@ -374,7 +374,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'lists', chapter: '쓰기', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], write: true, advance: 'tasked', emoji: '✅',
     image: 'm-clear.jpg',
-    title: '할 일 목록 만들기',
+    title: '체크리스트 만들기',
     text: '체크리스트 단추를 누르면 네모 칸이 생겨요. 줄바꿈이나 쓰던 줄 아래를 누르면 다음 칸이 이어지고, 모두 끝내면 CLEAR 도장! 🎊',
     try: '체크리스트 단추를 눌러 보세요',
     next: LATER,

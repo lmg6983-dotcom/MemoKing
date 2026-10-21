@@ -165,7 +165,7 @@ async function download() {
     }
   } catch (err) {
     console.warn('[update]', err);
-    set({ status: 'error', message: err?.message && !/^Error invoking/.test(err.message) ? err.message : '새 버전을 받지 못했어요. 다시 시도해 주세요' });
+    set({ status: 'error', message: err?.message && !/^Error invoking/.test(err.message) ? err.message : '새 버전을 받지 못했어요. 다시 해 주세요' });
   } finally {
     busy = false;
   }

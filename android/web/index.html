@@ -98,7 +98,7 @@
           <li>메신저, 메일 등 다른 앱 알림의 <b>제목과 내용</b>을 보관해요.</li>
           <li>휴대폰 설정에서 <b>알림 접근</b>을 허용해 주세요.</li>
           <li>보관한 알림은 <b>이 휴대폰에만</b> 저장돼요.</li>
-          <li>언제든 끄거나 삭제할 수 있어요.</li>
+          <li>언제든 끄거나 지울 수 있어요.</li>
         </ul>
         <button id="history-enable" class="btn primary">보관 시작하기</button>
       </div>
@@ -173,11 +173,11 @@
     <div id="table-bar" class="table-bar grouped" role="toolbar" aria-label="표" hidden>
     <div class="tb-group" role="group" aria-label="행"><span class="tb-name">행</span>
       <button type="button" data-table="addRow" title="아래에 행 추가 (마지막 칸에서 Tab)"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="6" rx="1.2"/><path d="M8 10.5v4M6 12.5h4"/></svg><span class="lbl">추가</span></button>
-      <button type="button" data-table="delRow" title="이 행 삭제" class="danger"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="6" rx="1.2"/><path d="M6 12.5h4"/></svg><span class="lbl">삭제</span></button>
+      <button type="button" data-table="delRow" title="이 행 지우기" class="danger"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="6" rx="1.2"/><path d="M6 12.5h4"/></svg><span class="lbl">지우기</span></button>
     </div>
     <div class="tb-group" role="group" aria-label="열"><span class="tb-name">열</span>
       <button type="button" data-table="addCol" title="오른쪽에 열 추가"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="6" height="12" rx="1.2"/><path d="M12.5 6v4M10.5 8h4"/></svg><span class="lbl">추가</span></button>
-      <button type="button" data-table="delCol" title="이 열 삭제" class="danger"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="6" height="12" rx="1.2"/><path d="M10.5 8h4"/></svg><span class="lbl">삭제</span></button>
+      <button type="button" data-table="delCol" title="이 열 지우기" class="danger"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2" width="6" height="12" rx="1.2"/><path d="M10.5 8h4"/></svg><span class="lbl">지우기</span></button>
     </div>
     <div class="tb-group" role="group" aria-label="칸"><span class="tb-name">칸</span>
       <button type="button" data-table="merge" title="끌어서 고른 칸들을 하나로 합치기"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.2"/><path d="M5 8h6M9 6l2 2-2 2M7 6 5 8l2 2"/></svg><span class="lbl">병합</span></button>
@@ -304,7 +304,7 @@
     <button class="menu-item" data-memo-action="widget"><svg><use href="#i-widget"/></svg><span>홈 화면에 놓기</span></button>
     <button class="menu-item" data-memo-action="copy"><svg><use href="#i-copy"/></svg><span>글 복사</span></button>
     <button class="menu-item" data-memo-action="print"><svg><use href="#i-pdf"/></svg><span>인쇄</span></button>
-    <button class="menu-item danger" data-memo-action="delete"><svg><use href="#i-trash"/></svg><span>삭제</span></button>
+    <button class="menu-item danger" data-memo-action="delete"><svg><use href="#i-trash"/></svg><span>지우기</span></button>
   </section>
 
   <!-- 예약 알림 (app/js/reminder-panel.js 가 다루는 요소들 — 데스크탑 note.html 과 같은 id) -->
@@ -558,7 +558,7 @@
       <button type="button" id="ai-drive-guide" class="btn small">안내 보기</button>
     </div>
 
-    <p class="label">저장 위치</p>
+    <p class="label">메모 폴더</p>
     <div class="path-box" id="vault-path"></div>
     <div class="sheet-actions">
       <button id="change-vault" class="btn">위치 변경</button>
@@ -607,7 +607,7 @@
     </label>
     <p class="label">도움말</p>
     <div class="sheet-actions">
-      <button id="tutorial-btn" class="btn">🎓 사용법 둘러보기</button>
+      <button id="tutorial-btn" class="btn">🎓 튜토리얼 보기</button>
     </div>
 
     <p class="label">휴지통</p>
@@ -679,7 +679,7 @@
       <p id="confirm-message"></p>
       <div class="dialog-actions">
         <button value="cancel" class="btn">취소</button>
-        <button value="ok" class="btn danger" id="confirm-ok">삭제</button>
+        <button value="ok" class="btn danger" id="confirm-ok">지우기</button>
       </div>
     </form>
   </dialog>

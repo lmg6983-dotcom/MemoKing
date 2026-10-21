@@ -49,7 +49,7 @@ export class CaptureHelper {
 
   async request(line, timeout = 10_000) {
     if (!this.proc) this.start();
-    if (!(await this.ready)) throw new Error('도우미를 시작하지 못했습니다');
+    if (!(await this.ready)) throw new Error('도우미를 시작하지 못했어요');
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         const i = this.waiting.indexOf(entry);

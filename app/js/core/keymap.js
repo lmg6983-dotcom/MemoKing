@@ -43,7 +43,7 @@ export const KEYMAP_ACTIONS = [
   // ---------- 목록 ----------
   { id: 'bullet', group: '목록', label: '글머리 목록', help: '줄 앞에 점(•)을 붙여 목록으로 만들어요.', keys: ['ctrl+shift+Digit8', 'ctrl+shift+KeyL'], run: ['cmd', 'bullet'] },
   { id: 'ordered', group: '목록', label: '번호 목록', help: '줄 앞에 1, 2, 3 번호를 붙여 목록으로 만들어요.', keys: ['ctrl+shift+Digit7'], run: ['cmd', 'ordered'] },
-  { id: 'task', group: '목록', label: '체크리스트', help: '줄 앞에 네모 칸을 붙여 할 일 목록으로 만들어요. 모두 끝내면 CLEAR 도장!', keys: ['ctrl+shift+Digit9'], run: ['cmd', 'task'] },
+  { id: 'task', group: '목록', label: '체크리스트', help: '줄 앞에 네모 칸을 붙여 체크리스트로 만들어요. 모두 끝내면 CLEAR 도장!', keys: ['ctrl+shift+Digit9'], run: ['cmd', 'task'] },
   // ---------- 넣기 ----------
   { id: 'file', group: '넣기', label: '파일 넣기', help: '사진이나 문서 같은 파일을 골라 메모에 넣어요.', keys: ['ctrl+shift+KeyI'], run: ['action', 'file'] },
   { id: 'record', group: '넣기', label: '음성 녹음 시작, 끝내기', help: '말을 녹음하고, 말한 내용을 글로 받아 적어 함께 넣어요.', keys: ['ctrl+shift+KeyR'], run: ['action', 'record'] },
