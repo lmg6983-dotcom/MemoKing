@@ -239,7 +239,12 @@ for (const s of STEPS.filter((s) => s.win === 'list' && STEPS.indexOf(s) > STEPS
     await tapOn('#layout-group [data-value="rows"]', '한 줄씩');
   }
   else if (s.id === 'filters') await tapOn('#tag-strip .tag-chip[data-tag="할일"]', '#할일 태그');
-  else await nextBtn();
+  else if (s.id === 'mode' && await page.evaluate(() => !document.getElementById('mode-switch')?.hidden)) {
+    // Work 로 바꿔 보고 다시 Life 로 (Work / Life 나누기가 켜져 있을 때)
+    await tapOn('#mode-switch [data-mode="work"]', 'Work');
+    await wait(700);
+    await tapOn('#mode-switch [data-mode="life"]', 'Life');
+  } else await nextBtn();
 }
 await wait(400);
 check('튜토리얼 끝: 말풍선이 사라짐', !(await stepId()));

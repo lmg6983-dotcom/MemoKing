@@ -16,7 +16,7 @@ export function prepareSmoke(userData) {
   fs.rmSync(VAULT, { recursive: true, force: true });
   fs.rmSync(path.join(userData, 'Local Storage'), { recursive: true, force: true });
   fs.mkdirSync(VAULT, { recursive: true });
-  fs.writeFileSync(path.join(userData, 'settings.json'), JSON.stringify({ vaultPath: VAULT, tutorialDone: true }));
+  fs.writeFileSync(path.join(userData, 'settings.json'), JSON.stringify({ vaultPath: VAULT, tutorialDone: true, workLife: true })); // Work / Life 단계도 직접 해 보게
 }
 
 export async function runSmoke({ noteWins, getVault, getList, createListWindow, startTutorial, getTutorial }) {
@@ -218,14 +218,31 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     // ---------- 목록 ----------
     await arrive(list, 'cards', { praise: true });
     await next(list, 'cards');
-    await arrive(list, 'layout');
+    // 카드를 크게: Ctrl 을 누른 채 휠
+    await arrive(list, 'zoom');
+    {
+      const c = await probe(list(), '#cards .card');
+      list().webContents.sendInputEvent({ type: 'mouseWheel', x: c.x ?? 100, y: c.y ?? 200, deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
+    }
+    await arrive(list, 'layout', { praise: true });
     await press(list(), '#filter-btn', '[layout] 보기 단추');
     await new Promise((r) => setTimeout(r, 400));
     await press(list(), '#layout-group [data-value="rows"]', '[layout] 한 줄씩');
     await arrive(list, 'filters', { praise: true });
     await press(list(), '#tag-strip .tag-chip[data-tag="할일"]', '[filters] #할일');
+    // Work 로 바꿔 보고 다시 Life 로
+    await arrive(list, 'mode', { praise: true });
+    await press(list(), '#mode-switch [data-mode="work"]', '[mode] Work');
+    await wait(700);
+    await press(list(), '#mode-switch [data-mode="life"]', '[mode] Life');
     await arrive(list, 'tabs', { praise: true });
-    for (const [id, to] of [['tabs', 'quick'], ['quick', 'capture'], ['capture', 'magic'], ['magic', 'settings'], ['settings', 'done']]) {
+    await next(list, 'tabs');
+    // 목록도 늘 위에: 왕관 (좁은 창이라 작은 왕관으로 들어간다)
+    await arrive(list, 'list-crown');
+    await press(list(), '#list-top-btn', '[list-crown] 왕관');
+    await arrive(list, 'quick', { praise: true });
+    // 빠른 메모 · 화면 자르기 · 매직키는 Windows 단축키라 여기서는 "다음에 해 볼게요" 로
+    for (const [id, to] of [['quick', 'capture'], ['capture', 'magic'], ['magic', 'settings'], ['settings', 'done']]) {
       await next(list, id);
       await arrive(list, to);
     }

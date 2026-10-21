@@ -298,6 +298,7 @@ function otherModeLink(n) {
 }
 
 // ---------- Work / Life 바꾸기 (제목 줄 왼쪽) ----------
+let tutModeStep = null; // 튜토리얼: Work 로 바꾼 단계 (그 단계에서 Life 로 돌아오면 다음으로)
 // 해 · 달 스위치 (화면 전환 속에서 바꿀 때는 전환이 끝난 뒤에 — dom.js setModeSwitch)
 const syncSwitch = () => setModeSwitch($('mode-switch'), state.mode);
 /** @param {{ later?: boolean }} [o] later: 스위치는 부른 쪽이 나중에 (syncSwitch) */
@@ -333,6 +334,9 @@ async function setMode(mode) {
   mode = validMode(mode);
   if (mode === state.mode) return;
   state.mode = mode;
+  // 튜토리얼 "Work 로 바꿔 보고 다시 Life 로": 이 단계에서 Work 에 다녀오면 해 낸 것
+  if (mode === 'work') tutModeStep = coach.step?.id ?? null;
+  else if (tutModeStep && tutModeStep === coach.step?.id) tutEvent('mode-switched');
   withViewTransition(() => {
     showMode({ later: true });
     state.filter.tags = []; // 다른 모드에는 없는 태그일 수 있다
@@ -1552,6 +1556,7 @@ function setListZoom(z, { show = true } = {}) {
   }
   scheduleRelayout();
   if (!show) return;
+  tutEvent('list-zoomed'); // 튜토리얼: 카드를 크게, 작게
   listZoomText.textContent = `메모 ${zoomLabel(listZoom)}`;
   listZoomReset.hidden = listZoom === 1;
   listZoomBadge.classList.add('show');
@@ -1730,7 +1735,10 @@ function setCrownDocked(docked, animate = true) {
 listTopBtn.addEventListener('click', () => {
   if (!listTop || crownDocked) api.win.toggleListTop();
 });
-api.on('list:on-top', (on) => showListTop(on));
+api.on('list:on-top', (on) => {
+  showListTop(on);
+  if (on) tutEvent('list-crown-on'); // 튜토리얼: 목록도 늘 위에
+});
 api.on('list:crown-docked', ({ docked, animate } = {}) => setCrownDocked(Boolean(docked), animate !== false));
 Promise.all([api.win.listOnTop(), api.win.listCrownDocked?.() ?? false]).then(([on, docked]) => {
   crownDocked = Boolean(docked);

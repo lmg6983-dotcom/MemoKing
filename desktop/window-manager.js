@@ -1627,6 +1627,7 @@ export class WindowManager {
     win.setAlwaysOnTop(true, 'screen-saver');
     win.loadFile(path.join(APP_DIR, 'magic.html'));
     win.on('blur', () => win.hide());
+    win.on('hide', () => this.onTutorialEvent('magic-tried')); // 튜토리얼: 매직키를 열어 보고 닫으면 다음 단계로 (열자마자 넘기면 목록 창이 앞으로 와 매직키가 닫힌다)
     win.on('moved', () => {
       if (!win.isVisible()) return;
       const [x, y] = win.getPosition();
@@ -1843,6 +1844,7 @@ export class WindowManager {
       return null;
     }
     const where = captureWhere(capture.source);
+    this.onTutorialEvent('quick-memo'); // 튜토리얼 "어디서든 바로 메모" 를 직접 해 냄
     return this.openCaptureMemo(capture, point, {
       title: '메모를 만들었어요',
       body: `${captureTitle(capture)}${where ? `\n${where}에서 가져왔어요` : ''}\n눌러서 열기`,
@@ -1979,6 +1981,7 @@ export class WindowManager {
       skipped: [],
       source: { window: '화면 캡처', process: '', url: null, time: new Date().toISOString(), copied: false },
     };
+    this.onTutorialEvent('capture-done'); // 튜토리얼 "화면을 잘라 메모하기" 를 직접 해 냄
     return this.openCaptureMemo(capture, c.point, {
       title: '화면 캡처로 메모를 만들었어요',
       body: `${crop.width} × ${crop.height} 그림을 클립보드에도 복사했어요. 눌러서 열기`,

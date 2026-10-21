@@ -30,7 +30,7 @@ import { flushOpmsFiles } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { MemoHotkeys } from './memo-hotkeys.js';
 import { hotkeyCopyText, hotkeyLabel, hotkeyAccelerator } from '../app/js/core/memo-hotkeys.js';
-import { TUTORIAL_STEPS, advanceTutorial } from '../app/js/core/tutorial.js';
+import { TUTORIAL_STEPS, advanceTutorial, tutorialStepFor } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { alarmText } from '../app/js/core/reminders.js';
 import { quietAlarm, modeClock, normalizeHours } from '../app/js/core/work-hours.js';
@@ -679,11 +679,13 @@ function initStt() {
 // ---------- 처음 실행 튜토리얼 ----------
 
 function tutorialPayload() {
-  const step = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
-  if (!step) return null;
+  const raw = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
+  if (!raw) return null;
+  // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 빠른 메모 키 · 매직키)
+  const step = tutorialStepFor(raw, (need) => (need === 'workLife' ? settings.workLife === true : need === 'quickMemo' || need === 'magic' ? shortcutStatus(need).registered : true));
   const keys = (t) => (typeof t === 'string' ? withShortcuts(t, settings.shortcuts) : t);
   const text = step.noTape && !windowManager.canTape ? step.noTape : step.text; // 테이프를 못 쓰는 PC 에서는 왕관만
-  return { ...step, title: keys(step.title), text: keys(text), index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise };
+  return { ...step, title: keys(step.title), text: keys(text), try: keys(step.try), index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise };
 }
 
 function tutorialWin(step) {

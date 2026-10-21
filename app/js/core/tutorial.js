@@ -9,6 +9,8 @@
 //   sample: 이 단계가 뜨면 메모 끝에 예시 목록(TUTORIAL_SAMPLE)을 저절로 넣는다 (옮겨 볼 줄이 있게)
 //   next: "다음" 버튼 글자. advance 와 함께 있으면 "다음에 해 볼게요" 처럼 이 단계만 건너뛰기
 //         (없으면 직접 해 봐야 넘어감 — 튜토리얼 끝내기는 언제나 있음)
+//   needs: 이 기능이 켜져 있어야 직접 해 볼 수 있다 ('workLife' Work / Life 나누기 · 'quickMemo' Ctrl+Alt+C · 'magic' 매직키)
+//          꺼져 있으면 offText 로 안내만 하고 "다음"으로 (tutorialStepFor)
 
 const LATER = '다음에 해 볼게요';
 
@@ -150,6 +152,13 @@ export const TUTORIAL_STEPS = [
     next: '다음',
   },
   {
+    id: 'zoom', win: 'list', target: ['#cards .card', '#cards'], keep: ['#cards', '.zoom-badge'], advance: 'list-zoomed', emoji: '🔍',
+    title: '카드를 크게, 작게',
+    text: 'Ctrl 을 누른 채 마우스 휠을 굴리면 메모 카드가 커지고 작아져요. Ctrl 과 + − 키도 돼요. 글씨가 작게 느껴질 때 써 보세요.',
+    try: 'Ctrl 을 누른 채 휠을 위로 굴려 보세요',
+    next: LATER,
+  },
+  {
     id: 'layout', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
     text: '"보기" 단추에서 카드를 바둑판처럼 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 고를 수 있어요.',
@@ -164,34 +173,55 @@ export const TUTORIAL_STEPS = [
     next: LATER,
   },
   {
+    id: 'mode', win: 'list', target: ['#mode-switch:not([hidden])'], keep: ['#mode-switch'], needs: 'workLife', advance: 'mode-switched', emoji: '🌗',
+    title: '일할 때는 Work, 쉴 때는 Life',
+    text: '왼쪽 위 해와 달 스위치로 일할 때 쓰는 메모(Work)와 일상 메모(Life)를 나눠 봐요. Work 는 밤처럼 어두운 화면이고, 새 메모도 지금 모드로 들어가요.',
+    try: '스위치를 눌러 Work 로 바꿔 보고, 다시 눌러 Life 로 돌아와 보세요',
+    offText: '설정의 "Work / Life 나누기"를 켜면 왼쪽 위에 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 보고, 업무 시간에 저절로 Work 로 바꿀 수도 있어요.',
+    next: LATER,
+  },
+  {
     id: 'tabs', win: 'list', target: ['.tabs'], emoji: '🔔',
-    title: '알림은 한곳에서',
-    text: '"일정"에서는 달력으로 일정과 미리 알림을, "알림 보관함"에서는 지나간 Windows 알림을 다시 볼 수 있어요.',
+    title: '일정과 알림은 한곳에서',
+    text: '"일정"에서는 캘린더로 일정과 미리 알림을, 회상으로 그날의 사진과 메모를 봐요. "알림 보관함"에는 지나간 Windows 알림이 모여요.',
     next: '다음',
+  },
+  {
+    id: 'list-crown', win: 'list', target: ['#list-top-btn'], advance: 'list-crown-on', emoji: '👑',
+    title: '목록도 늘 위에',
+    text: '목록 창도 왕관을 누르면 다른 창에 가려지지 않아요. 창 위에 왕관 스티커가 붙고, 창이 좁거나 화면 끝이면 작아져서 이 자리에 들어가요. 스티커나 작은 왕관을 누르면 떼어져요.',
+    try: '오른쪽 위 왕관을 눌러 보세요',
+    next: LATER,
   },
   // ---------- 어디서든 ----------
   {
-    id: 'quick', win: 'list', target: [], emoji: '⚡',
+    id: 'quick', win: 'list', target: [], needs: 'quickMemo', advance: 'quick-memo', emoji: '⚡',
     title: '어디서든 바로 메모 (Ctrl+Alt+C)',
-    text: '웹 페이지나 문서에서 글을 고르고 Ctrl+Alt+C, 곧바로 메모가 돼요. 파일을 고르고 눌러도 돼요.',
-    next: '다음',
+    text: '웹 페이지나 문서에서 글을 고르고 Ctrl+Alt+C, 곧바로 메모가 돼요. 파일이나 그림을 고르고 눌러도 돼요.',
+    try: '웹 브라우저나 메모장에서 글을 조금 끌어 고르고 Ctrl+Alt+C 를 눌러 보세요',
+    offText: '설정에서 빠른 메모 키를 켜면, 다른 앱에서 글이나 파일을 고르고 Ctrl+Alt+C 를 눌러 바로 메모로 담아요.',
+    next: LATER,
   },
   {
-    id: 'capture', win: 'list', target: [], emoji: '✂️',
+    id: 'capture', win: 'list', target: [], needs: 'quickMemo', advance: 'capture-done', emoji: '✂️',
     title: '화면을 잘라 메모하기',
-    text: 'Ctrl+Alt+C를 빠르게 두 번! 화면에서 원하는 부분을 끌어서 잘라 담아요.',
-    next: '다음',
+    text: 'Ctrl+Alt+C 를 빠르게 두 번! 화면이 멈추면 담고 싶은 곳을 끌어서 잘라요. 자른 그림이 바로 메모가 돼요.',
+    try: 'Ctrl+Alt+C 를 빠르게 두 번 누르고, 아무 곳이나 네모로 끌어 보세요',
+    offText: '설정에서 빠른 메모 키를 켜면 Ctrl+Alt+C 를 빠르게 두 번 눌러 화면의 원하는 곳을 잘라 메모로 담아요.',
+    next: LATER,
   },
   {
-    id: 'magic', win: 'list', target: [], emoji: '🔮',
-    title: '무엇이든 찾기 (Ctrl+Alt+Space)',
-    text: '메모와 파일을 몇 글자로 찾아요. 찾는 게 없으면 Enter, 적은 말이 바로 메모가 돼요.',
-    next: '다음',
+    id: 'magic', win: 'list', target: [], needs: 'magic', advance: 'magic-tried', emoji: '🔮',
+    title: '무엇이든 찾기, 매직키 (Ctrl+Alt+Space)',
+    text: '어느 앱을 쓰다가도 Ctrl+Alt+Space! 메모와 파일을 몇 글자로 찾아요. 찾는 게 없으면 Enter, 적은 말이 바로 메모가 돼요.',
+    try: 'Ctrl+Alt+Space 를 누르고 "튜토리얼"을 쳐 보세요. 방금 쓴 메모가 보이면 Esc 로 닫아요',
+    offText: '설정에서 매직키를 켜면 Ctrl+Alt+Space 로 어디서든 메모와 파일을 찾고, 떠오른 말을 바로 메모로 남겨요.',
+    next: LATER,
   },
   {
     id: 'settings', win: 'list', target: ['#settings-btn'], emoji: '⚙️',
     title: '내게 맞게 바꾸기',
-    text: '휴지통, 음성 받아쓰기, 알림 보관은 설정에 있어요. 이 안내도 설정에서 언제든 다시 볼 수 있어요.',
+    text: '휴지통, 음성 받아쓰기, 알림 보관, Work / Life 나누기, 단축키는 설정에 있어요. 이 안내도 설정에서 언제든 다시 볼 수 있어요.',
     next: '다음',
   },
   {
@@ -306,6 +336,20 @@ export const MOBILE_TUTORIAL_STEPS = [
     next: LATER,
   },
   {
+    id: 'mode', win: 'list', target: ['#mode-switch:not([hidden])'], keep: ['#mode-switch'], needs: 'workLife', advance: 'mode-switched', emoji: '🌗',
+    title: '일할 때는 Work, 쉴 때는 Life',
+    text: '검색 줄 옆 해와 달 스위치로 일할 때 쓰는 메모(Work)와 일상 메모(Life)를 나눠 봐요. Work 는 밤처럼 어두운 화면이에요.',
+    try: '스위치를 눌러 Work 로 바꿔 보고, 다시 눌러 Life 로 돌아와 보세요',
+    offText: '설정의 "Work / Life 나누기"를 켜면 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 볼 수 있어요.',
+    next: LATER,
+  },
+  {
+    id: 'tabs', win: 'list', target: ['.tabs'], emoji: '🔔',
+    title: '아래 탭으로 오가기',
+    text: '메모, 일정, 알림 보관함 탭이 아래에 있어요. 일정에서는 캘린더와 회상(그날의 사진과 메모)을, 알림 보관함에서는 지나간 알림을 봐요.',
+    next: '다음',
+  },
+  {
     id: 'share', win: 'list', target: [], emoji: '📤',
     title: '다른 앱에서 바로 담기',
     text: '인터넷, 사진, 녹음 앱에서 "공유"에서 "메모킹"을 누르면 바로 메모가 돼요.',
@@ -329,7 +373,19 @@ export const MOBILE_TUTORIAL_STEPS = [
 export const TUTORIAL_SETTLE_MS = { typed: 1800, tagged: 1500, styled: 900, tasked: 700 };
 
 /** 사용자가 직접 해서 넘어가는 일들 (PC 메인 프로세스가 이 이름만 받는다) */
-export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'content-tools', 'note-closed', 'layout-changed', 'tag-filtered', 'mode-moved'];
+export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'content-tools', 'note-closed', 'layout-changed', 'tag-filtered', 'mode-moved',
+  'list-zoomed', 'mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried'];
+
+/**
+ * 이 기기에서 보일 단계: 필요한 기능(needs)이 꺼져 있으면 직접 해 보기 없이 안내(offText)만 하고 "다음"으로
+ * @param {object} step
+ * @param {(need: string) => boolean} has 그 기능이 켜져 있는가
+ */
+export function tutorialStepFor(step, has) {
+  if (!step?.needs || has(step.needs)) return step;
+  const { advance, try: _try, offText, ...rest } = step;
+  return { ...rest, text: offText ?? step.text, next: '다음' };
+}
 
 /**
  * 사용자가 한 일(event)로 몇 번째 단계가 되는지. 끝나면 -1.

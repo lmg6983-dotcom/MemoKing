@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS, TUTORIAL_EVENTS, TUTORIAL_SAMPLE, hasTutorialSample, advanceTutorial, tutorialCounts, tutorialDone } from '../app/js/core/tutorial.js';
+import { TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS, TUTORIAL_EVENTS, TUTORIAL_SAMPLE, hasTutorialSample, advanceTutorial, tutorialCounts, tutorialDone, tutorialStepFor } from '../app/js/core/tutorial.js';
 
 for (const [name, steps] of [['PC', TUTORIAL_STEPS], ['휴대폰', MOBILE_TUTORIAL_STEPS]]) {
   test(`${name} 튜토리얼: 단계마다 이모지 · 갈 길이 있음 · 사진 파일이 있음`, () => {
@@ -50,4 +50,31 @@ test('옮기기 전 예시 목록: PC·휴대폰 모두 옮기기 단계에서 �
   assert.equal(hasTutorialSample('제목\n\n- [ ] 글'), false);
   assert.equal(hasTutorialSample(`제목\n\n${TUTORIAL_SAMPLE}`), true);
   assert.equal(hasTutorialSample(`제목\n\n${TUTORIAL_SAMPLE.replace(/\[ \]/g, '[x]')}`), true, '체크해도 다시 넣지 않음');
+});
+
+test('기능이 꺼져 있으면(needs) 직접 해 보기 없이 안내(offText)만, 켜져 있으면 그대로', () => {
+  for (const steps of [TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS]) {
+    for (const s of steps.filter((x) => x.needs)) {
+      assert.ok(['workLife', 'quickMemo', 'magic'].includes(s.needs), s.id);
+      assert.ok(s.offText, `${s.id} 꺼져 있을 때 안내`);
+      const off = tutorialStepFor(s, () => false);
+      assert.equal(off.advance, undefined, `${s.id}: 꺼져 있으면 기다리지 않음`);
+      assert.equal(off.try, undefined);
+      assert.equal(off.text, s.offText);
+      assert.equal(off.next, '다음');
+      assert.equal(tutorialStepFor(s, () => true), s, '켜져 있으면 그대로');
+    }
+  }
+  const plain = TUTORIAL_STEPS.find((s) => s.id === 'welcome');
+  assert.equal(tutorialStepFor(plain, () => false), plain, 'needs 가 없으면 늘 그대로');
+});
+
+test('PC: 매직키 · 카드 확대 · Life/Work · 목록 왕관 · 빠른 메모 · 화면 자르기는 직접 해 보기', () => {
+  const by = Object.fromEntries(TUTORIAL_STEPS.map((s) => [s.id, s]));
+  assert.deepEqual(['zoom', 'mode', 'list-crown', 'quick', 'capture', 'magic'].map((id) => by[id]?.advance),
+    ['list-zoomed', 'mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried']);
+  const m = Object.fromEntries(MOBILE_TUTORIAL_STEPS.map((s) => [s.id, s]));
+  assert.equal(m.mode?.advance, 'mode-switched', '휴대폰 Life/Work');
+  assert.ok(m.tabs, '휴대폰 아래 탭 안내');
+  for (const s of [...TUTORIAL_STEPS, ...MOBILE_TUTORIAL_STEPS]) assert.doesNotMatch(`${s.text} ${s.offText ?? ''}`, /추억|(?<!알림 )보관함/, `${s.id}: 지금 이름(회상 · 알림 보관함)으로`);
 });

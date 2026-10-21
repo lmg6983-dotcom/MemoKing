@@ -1514,6 +1514,7 @@ setupTutorial({
   markdown: () => (note.isOpen() ? note.editorMarkdown() : ''),
   append: (md) => note.appendText(md),
   edit: () => note.useEditMode(),
+  has: (need) => need !== 'workLife' || list.workLifeOn(), // Work / Life 나누기가 꺼져 있으면 그 단계는 안내만
 });
 const info = native.info();
 if (info.vault?.ok) openVault();
