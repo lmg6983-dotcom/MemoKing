@@ -1265,14 +1265,11 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 @media (prefers-reduced-motion: reduce) { .sync-btn .sync-line i { animation: none; width: 100%; opacity: 0.5; } }
 
 /* 메모 안 찾기 · 바꾸기 막대: 메모 화면 위 막대 바로 아래 (note.css .mk-find-bar) — 손가락 크기 */
+/* 배치는 PC 와 같고 손가락 크기만 (단추 · 칸 높이) */
 .mk-find-btn { width: var(--tap); height: var(--tap); }
-.mk-find-more { height: var(--tap); padding: 0 8px 0 12px; }
-.mk-find-bar[data-mode="replace"] .mk-find-more { width: var(--tap); }
+.mk-find-case { width: 34px; height: 34px; }
 .mk-find-field, .mk-find-fmt { height: 40px; }
 .mk-find-act { height: 40px; }
 .mk-find-opt, .mk-find-choice { height: 32px; }
 .mk-find-swatch { width: 34px; height: 34px; }
 .mk-find-item { min-height: 40px; }
-/* 좁은 화면: 할 일 넷은 찾기 둘 · 바꾸기 둘이 각각 한 줄을 반씩 */
-.mk-find-acts { flex-direction: column; }
-.mk-find-pair > .mk-find-act { flex: 1 1 0; }

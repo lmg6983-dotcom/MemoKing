@@ -1960,28 +1960,24 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
   -webkit-app-region: no-drag;
   animation: mk-find-in 0.16s var(--ease-out);
 }
-.mk-find-prev svg { transform: rotate(-90deg); }
-.mk-find-next svg { transform: rotate(90deg); }
 .mk-find-bar[hidden] { display: none; }
 @keyframes mk-find-in { from { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .mk-find-bar { animation: none; } }
 .mk-find-bar { --mk-find-any-hl: repeating-linear-gradient(135deg, #ffec99 0 4px, #b2f2bb 4px 8px, #a5d8ff 8px 12px); }
 /* 칸 격자: 찾을 말 · 바꿀 말이 같은 열이라 폭이 늘 같다 (엑셀처럼)
-   찾기만: 찾을 말 | 이전 | 다음 | 바꾸기 | 닫기
-   바꾸기: 찾을 말 | 서식 | 이전 | 다음
-           바꿀 말 | 서식 | 접기 | 닫기 */
+   찾기만: 찾을 말 | 서식 | 펼치기 | 닫기
+   바꾸기: 찾을 말 | 서식 | 닫기
+           바꿀 말 | 서식 | 접기 */
 .mk-find-grid {
   display: grid; align-items: center; gap: 6px 4px;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
-  grid-template-areas: "q prev next more close";
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "q qf more close";
 }
 .mk-find-bar[data-mode="replace"] .mk-find-grid {
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  grid-template-areas: "q qf prev next" "r rf more close";
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "q qf close" "r rf more";
 }
-.mk-find-bar[data-mode="find"] :is(.mk-find-rep, .mk-find-fmt, .mk-find-foot) { display: none; }
-.mk-find-bar[data-mode="replace"] .mk-find-more { justify-content: center; min-width: 32px; padding: 0 6px; color: var(--text-muted); font-size: 12px; }
-.mk-find-bar[data-mode="replace"] .mk-find-more svg { display: none; }
+.mk-find-bar[data-mode="find"] :is(.mk-find-rep, .mk-find-rfmt, .mk-find-foot) { display: none; }
 .mk-find-field { min-width: 0; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 4px 0 8px; border-radius: 10px; background: var(--fill-tab); box-shadow: inset 0 0 0 1px var(--line); }
 .mk-find-field:focus-within { box-shadow: inset 0 0 0 2px var(--focus-ring); }
 .mk-find-field > svg { flex: none; width: 16px; height: 16px; color: var(--text-muted); }
@@ -2001,15 +1997,12 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-find-bar.none .mk-find-count { color: var(--danger); }
 .mk-find-btn { flex: none; width: 32px; height: 32px; }
 .mk-find-btn:disabled { opacity: 0.35; }
-.mk-find-more {
-  flex: none; display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 6px 0 10px;
-  border: 0; border-radius: 999px; background: none; color: var(--text-strong); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
-  transition: transform 0.16s var(--ease-out), background-color 0.15s ease-out;
-}
-.mk-find-more svg { width: 14px; height: 14px; transform: rotate(90deg); transition: transform 0.18s var(--ease-out); }
+.mk-find-more svg { transform: rotate(90deg); transition: transform 0.18s var(--ease-out); }
 .mk-find-more[aria-expanded="true"] svg { transform: rotate(-90deg); }
-.mk-find-more:active { transform: scale(0.97); }
-@media (hover: hover) and (pointer: fine) { .mk-find-more:hover { background: var(--fill-hover); } }
+/* 대소문자 구분: 찾을 말 칸 안의 작은 아이콘 단추 (켜면 노랗게) */
+.mk-find-case { width: 28px; height: 28px; border-radius: 7px; color: var(--text-muted); }
+.mk-find-case svg { width: 18px; height: 18px; }
+.mk-find-case[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
 /* 서식 단추: "가" 에 고른 서식을 입혀 미리 보기 */
 .mk-find-fmt {
   display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 10px 0 6px;
@@ -2026,7 +2019,6 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 @media (hover: hover) and (pointer: fine) { .mk-find-fmt:not(:disabled):hover { background: var(--fill-hover); } }
 /* 아래: 찾는 방법 · 할 일 (찾기 둘은 왼쪽, 바꾸기 둘은 오른쪽) */
 .mk-find-foot { display: flex; flex-direction: column; gap: 6px; padding-top: 2px; }
-.mk-find-opts { display: flex; flex-wrap: wrap; gap: 6px; }
 .mk-find-acts { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
 .mk-find-pair { display: flex; gap: 6px; }
 .mk-find-act { flex: none; height: 34px; padding: 0 12px; font-size: 13px; }

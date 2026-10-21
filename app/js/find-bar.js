@@ -1,7 +1,7 @@
 // 메모 안 찾기 · 바꾸기 막대 (엑셀 · 워드의 "찾기 및 바꾸기"를 한 막대로) — PC 메모 창 · 휴대폰 메모 화면 공용
-//   찾기만(Ctrl+F): 한 줄 — 찾을 말 · 몇 번째/모두(누르면 모두 찾기) · 이전 · 다음 · 바꾸기 펼치기 · 닫기
+//   찾기만(Ctrl+F): 한 줄 — 찾을 말(대소문자 구분 · 몇 번째/모두) · 서식 · 바꾸기 펼치기 · 닫기
 //   바꾸기(Ctrl+H): 엑셀처럼 찾을 말 · 바꿀 말 칸이 같은 폭으로 위아래, 칸마다 서식 단추
-//     아래: 대소문자 구분 · 낱말 단위 / 모두 찾기 · 다음 찾기 · 모두 바꾸기 · 바꾸기
+//     위 줄 끝은 닫기, 아래 줄 끝은 접기 · 그 아래: 모두 찾기 · 다음 찾기 · 모두 바꾸기 · 바꾸기 (모두 같은 모양)
 //   서식: 찾을 서식(그 서식인 글만 · 찾을 말 없이 서식만도) · 바꿀 서식(바꾼 글에 붙임 · 바꿀 말이 비면 서식만 바꿈)
 //   키: Enter 다음 · Shift+Enter 이전 (F3 · Shift+F3 도) · Alt+Enter 모두 찾기 · 바꿀 말에서 Enter 바꾸기 · Ctrl+Enter 모두 바꾸기
 //       Esc 닫기(서식 칸 · 목록이 열려 있으면 그것부터) — 닫으면 찾은 곳을 고른 채 글로
@@ -73,10 +73,13 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
   const query = q.input;
   query.type = 'search';
   query.enterKeyHint = 'search';
+  // 대소문자 구분: 칸 안의 아이콘 (켜면 노랗게)
+  const caseOpt = iconBtn('case', '대소문자 구분: 영어 대문자와 소문자를 다르게 찾기', 'mk-find-case');
+  caseOpt.setAttribute('aria-pressed', 'false');
   // 몇 번째/모두 — 누르면 모두 찾기 목록
   const count = btn('mk-find-count', '', '모두 찾기: 찾은 곳을 목록으로 (Alt+Enter)');
   count.setAttribute('aria-live', 'polite');
-  q.f.append(count);
+  q.f.append(count, caseOpt);
   const r = field('pen', '바꿀 말', 'r');
   const rep = r.input;
   rep.type = 'text';
@@ -95,39 +98,30 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
   };
   const qFmtBtn = fmtBtn('qf', '찾을 서식: 이 서식인 글만 찾기');
   const rFmtBtn = fmtBtn('rf', '바꿀 서식: 바꾼 글에 붙일 서식');
+  rFmtBtn.classList.add('mk-find-rfmt');
 
-  const prev = iconBtn('chev-right', '이전 (Shift+Enter)', 'mk-find-prev');
-  const next = iconBtn('chev-right', '다음 (Enter)', 'mk-find-next');
-  prev.style.gridArea = 'prev';
-  next.style.gridArea = 'next';
-  // 바꾸기 펼치기: 그림(⇄)만으로는 "맞바꾸기"로 읽혀 글자로 — 펼친 뒤엔 "접기" (이전 · 다음 화살표와 헷갈리지 않게 글자로)
-  const more = btn('mk-find-more', '', '바꾸기 펼치기 (Ctrl+H)');
+  // 바꾸기 펼치기 · 접기: 아래 · 위 꺾쇠 (펼치면 바꿀 말 줄 끝으로 내려간다) — 이전 · 다음은 Enter · Shift+Enter, 다음 찾기 단추
+  const more = iconBtn('chev-right', '바꾸기 펼치기 (Ctrl+H)', 'mk-find-more');
   more.style.gridArea = 'more';
-  const moreLabel = el('span', 'mk-find-more-label', '바꾸기');
-  more.append(moreLabel, icon('chev-right'));
   more.setAttribute('aria-expanded', 'false');
   const close = iconBtn('close', '닫기 (Esc)', 'mk-find-close');
   close.style.gridArea = 'close';
-  grid.append(q.f, qFmtBtn, prev, next, more, close, r.f, rFmtBtn);
+  grid.append(q.f, qFmtBtn, more, close, r.f, rFmtBtn);
 
   // ---------- 바꾸기 펼쳤을 때 아래: 찾는 방법 · 할 일 ----------
   const foot = el('div', 'mk-find-foot');
-  const opts = el('div', 'mk-find-opts');
-  const caseOpt = toggle('Aa 대소문자 구분', '영어 대문자와 소문자를 다르게 찾기');
-  const wordOpt = toggle('낱말 단위', '낱말 전체가 같을 때만 (예: "메모"를 찾을 때 "메모킹"은 빼고)');
-  opts.append(caseOpt, wordOpt);
   const acts = el('div', 'mk-find-acts');
-  // 찾기 둘(왼쪽) · 바꾸기 둘(오른쪽) — 하나씩 바꾸기가 주 단추 (보면서 바꾸는 안전한 쪽)
+  // 찾기 둘(왼쪽) · 바꾸기 둘(오른쪽) — 넷 다 같은 모양 (하나만 튀지 않게)
   const findAll = btn('btn mk-find-act', '모두 찾기', '찾은 곳을 모두 목록으로 (Alt+Enter)');
   const findNext = btn('btn mk-find-act', '다음 찾기', '다음 찾은 곳으로 (Enter)');
   const all = btn('btn mk-find-act mk-find-all', '모두 바꾸기', '찾은 곳을 모두 한 번에 바꾸기 (Ctrl+Enter), 되돌리기는 Ctrl+Z 한 번');
-  const one = btn('btn primary mk-find-act', '바꾸기', '지금 찾은 곳 하나를 바꾸고 다음으로 (Enter)');
+  const one = btn('btn mk-find-act', '바꾸기', '지금 찾은 곳 하나를 바꾸고 다음으로 (Enter)');
   const findPair = el('div', 'mk-find-pair');
   findPair.append(findAll, findNext);
   const repPair = el('div', 'mk-find-pair');
   repPair.append(all, one);
   acts.append(findPair, repPair);
-  foot.append(opts, acts);
+  foot.append(acts);
 
   // ---------- 모두 찾기 목록 ----------
   const results = el('div', 'mk-find-results');
@@ -188,7 +182,7 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
   // ---------- 상태 ----------
   const formats = { find: {}, rep: {} }; // 찾을 서식 · 바꿀 서식
   let popFor = null; // 'find' | 'rep'
-  const findOpts = () => ({ caseSensitive: pressed(caseOpt), wholeWord: pressed(wordOpt), format: formats.find });
+  const findOpts = () => ({ caseSensitive: pressed(caseOpt), format: formats.find });
   const searching = () => Boolean(query.value) || hasFormat(formats.find);
 
   function paintFmtBtn(b, f, empty) {
@@ -206,7 +200,7 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
     count.textContent = findCountText(f?.current ?? -1, n, label);
     count.disabled = n === 0;
     bar.classList.toggle('none', searching() && !n);
-    prev.disabled = next.disabled = findNext.disabled = findAll.disabled = n === 0;
+    findNext.disabled = findAll.disabled = n === 0;
     const editable = find()?.editable !== false;
     one.disabled = all.disabled = n === 0 || !editable;
     all.textContent = n > 1 ? `모두 바꾸기 (${n})` : '모두 바꾸기';
@@ -258,12 +252,10 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
     timer = setTimeout(search, 90);
   });
   rep.addEventListener('input', () => paint());
-  for (const b of [caseOpt, wordOpt]) {
-    b.addEventListener('click', () => {
-      b.setAttribute('aria-pressed', String(!pressed(b)));
-      search();
-    });
-  }
+  caseOpt.addEventListener('click', () => {
+    caseOpt.setAttribute('aria-pressed', String(!pressed(caseOpt)));
+    search();
+  });
   const ensure = (f) => {
     if (!f.state().query && searching()) search();
   };
@@ -273,8 +265,6 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
     ensure(f);
     paint(f.step(dir));
   };
-  prev.addEventListener('click', () => step(-1));
-  next.addEventListener('click', () => step(1));
   findNext.addEventListener('click', () => step(1));
   const replaceOne = () => {
     const f = find();
@@ -427,7 +417,6 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
     more.setAttribute('aria-expanded', String(on));
     more.title = on ? '바꾸기 접기 (Ctrl+H)' : '바꾸기 펼치기 (Ctrl+H)';
     more.setAttribute('aria-label', on ? '바꾸기 접기' : '바꾸기 펼치기');
-    moreLabel.textContent = on ? '접기' : '바꾸기';
     if (!on) closePop({ focus: false });
     if (on) (query.value || hasFormat(formats.find) ? rep : query).focus();
   }
