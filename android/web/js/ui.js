@@ -145,6 +145,18 @@ export function toast(text, isError = false, action = null) {
   el.style.animation = 'none';
   void el.offsetWidth;
   el.style.animation = '';
+  // 처음 몇 번: 살짝 옆으로 밀렸다 돌아와 "밀면 닫혀요"를 몸짓으로 알린다 (글로 쓰지 않고)
+  el.classList.remove('swipe-teach');
+  try {
+    const taught = Number(localStorage.getItem('memoking.toastSwipeTaught') ?? 0);
+    if (taught < 2 && !isError) {
+      void el.offsetWidth;
+      el.classList.add('swipe-teach');
+      localStorage.setItem('memoking.toastSwipeTaught', String(taught + 1));
+    }
+  } catch {
+    // 기억 못 하면 알리지 않음
+  }
   clearTimeout(toastTimer);
   toastLife = action ? 5000 : isError ? 4500 : 2600;
   toastTimer = setTimeout(() => (el.hidden = true), toastLife);

@@ -1948,10 +1948,11 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 /* ---------- 메모 안 찾기 · 바꾸기 (find-bar.js · find-replace.js) ---------- */
 /* 찾은 곳: 옅은 주황, 지금 자리: 진한 주황 테두리 — 형광펜(노랑)과 헷갈리지 않게 */
 .mk-doc .mk-find-hit { background: rgba(255, 150, 0, 0.28); border-radius: 2px; box-shadow: 0 0 0 1px rgba(255, 150, 0, 0.35); }
-.mk-doc .mk-find-current { background: rgba(255, 120, 0, 0.55); box-shadow: 0 0 0 2px #ff7a00; }
+.mk-doc .mk-find-current { background: rgba(255, 120, 0, 0.55); outline: 2px solid #ff7a00; outline-offset: 0; }
 .mk-find-bar {
-  /* 위 막대 바로 아래에 끼워 들어가 글을 아래로 민다 (글 위에 떠서 찾은 곳을 가리지 않게) */
-  position: relative; z-index: 5; flex: none;
+  /* 위 막대 바로 아래에 끼워 들어가 글을 아래로 민다 (글 위에 떠서 찾은 곳을 가리지 않게)
+     넓은 화면(태블릿 · 넓힌 PC 창)에서는 오른쪽에 560px 까지만 — 단추가 멀어지지 않게 */
+  position: relative; z-index: 5; flex: none; align-self: flex-end; width: calc(100% - 16px); max-width: 560px; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 6px;
   margin: 4px 8px 6px; padding: 8px;
   border-radius: 14px; background: var(--surface); color: var(--text-strong);
@@ -1975,7 +1976,17 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-find-bar.none .mk-find-count { color: var(--danger); }
 .mk-find-btn { flex: none; width: 32px; height: 32px; }
 .mk-find-btn:disabled { opacity: 0.35; }
-.mk-find-more.active { background: color-mix(in srgb, var(--text-strong) 11%, transparent); }
+.mk-find-more {
+  flex: none; display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 6px 0 10px;
+  border: 0; border-radius: 999px; background: none; color: var(--text-strong); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: transform 0.16s var(--ease-out), background-color 0.15s ease-out;
+}
+.mk-find-more svg { width: 14px; height: 14px; transform: rotate(90deg); transition: transform 0.18s var(--ease-out); }
+.mk-find-more[aria-expanded="true"] { background: color-mix(in srgb, var(--text-strong) 9%, transparent); }
+.mk-find-more[aria-expanded="true"] svg { transform: rotate(-90deg); }
+.mk-find-more:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .mk-find-more:hover { background: var(--fill-hover); } }
+.mk-find-more:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .mk-find-act { flex: none; height: 34px; padding: 0 12px; font-size: 13px; }
 .mk-find-opts { gap: 6px; }
 .mk-find-opt { height: 26px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--fill-tab); color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.16s var(--ease-out), background-color 0.15s ease-out; }

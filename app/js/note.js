@@ -810,7 +810,7 @@ $('shortcuts-btn').addEventListener('click', () => {
   openShortcutSheet();
 });
 // 메모 안 찾기 · 바꾸기 (Ctrl+F · Ctrl+H, 메뉴 › 찾기, 바꾸기) — 워드처럼 한 막대에서 찾기 · 바꾸기 · 모두 바꾸기
-const findBar = createFindBar({ host: document.body, after: document.querySelector('body > .bar'), find: () => editor?.find, notify: (text) => setStatus(text) });
+const findBar = createFindBar({ host: document.body, after: document.querySelector('body > .bar'), find: () => editor?.find, notify: (text, o) => setStatus(o?.undo ? `${text}. 되돌리려면 Ctrl+Z` : text) });
 $('find-btn').addEventListener('click', () => {
   closeMenu();
   findBar.open();

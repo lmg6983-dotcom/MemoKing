@@ -30,7 +30,7 @@ function toggle(label, title) {
 }
 
 /**
- * @param {{ host: HTMLElement, after?: HTMLElement|null, find: () => any, notify?: (text: string, isError?: boolean) => void, onToggle?: (open: boolean) => void }} o
+ * @param {{ host: HTMLElement, after?: HTMLElement|null, find: () => any, notify?: (text: string, o?: { undo?: () => void }) => void, onToggle?: (open: boolean) => void }} o
  *   host · after: 막대를 둘 곳 — 화면 위 막대(after) 바로 아래에 끼워 글을 아래로 밀어낸다 (글을 가리지 않게)
  *   find: 지금 편집기의 editor.find (메모를 바꿔 열면 새 편집기) · notify: "3개 바꿨어요" 같은 알림
  */
@@ -53,7 +53,11 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
   field.append(query, count);
   const prev = iconBtn('chev-right', '이전 (Shift+Enter)', 'mk-find-prev');
   const next = iconBtn('chev-right', '다음 (Enter)', 'mk-find-next');
-  const more = iconBtn('swap', '바꾸기 (Ctrl+H)', 'mk-find-more');
+  // 바꾸기 줄 펼치기: 그림(⇄)만으로는 "맞바꾸기"로 읽혀 글자로 — 펼치면 아래로 꺾인 화살표
+  const more = el('button', 'mk-find-more');
+  more.type = 'button';
+  more.title = '바꾸기 줄 펼치기 (Ctrl+H)';
+  more.append(el('span', '', '바꾸기'), icon('chev-right'));
   more.setAttribute('aria-expanded', 'false');
   const close = iconBtn('close', '닫기 (Esc)');
   row1.append(field, prev, next, more, close);
@@ -66,15 +70,18 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
   rep.placeholder = '바꿀 말';
   rep.setAttribute('aria-label', '바꿀 말');
   repField.append(rep);
-  const one = el('button', 'btn mk-find-act', '바꾸기');
+  // 하나씩 바꾸기가 주 단추 (보면서 바꾸는 안전한 쪽) · 모두 바꾸기는 몇 곳인지 보이는 보통 단추
+  const one = el('button', 'btn primary mk-find-act', '바꾸기');
   one.type = 'button';
   one.title = '지금 찾은 곳 하나를 바꾸고 다음으로 (Enter)';
-  const all = el('button', 'btn primary mk-find-act', '모두 바꾸기');
+  const all = el('button', 'btn mk-find-act mk-find-all', '모두 바꾸기');
   all.type = 'button';
   all.title = '찾은 곳을 모두 한 번에 바꾸기 (Ctrl+Enter) · 되돌리기 Ctrl+Z 한 번';
   row2.append(repField, one, all);
 
+  // 찾는 방법은 바꿀 때나 쓰므로 바꾸기 줄과 함께만 (찾기만 할 때는 막대가 한 줄)
   const row3 = el('div', 'mk-find-row mk-find-opts');
+  row3.hidden = true;
   const caseOpt = toggle('Aa 대소문자 구분', '영어 대문자와 소문자를 다르게 찾기');
   const wordOpt = toggle('낱말 단위', '낱말 전체가 같을 때만 (예: "메모"를 찾을 때 "메모킹"은 빼고)');
   row3.append(caseOpt, wordOpt);
@@ -91,6 +98,7 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
     prev.disabled = next.disabled = n === 0;
     const editable = find()?.editable !== false;
     one.disabled = all.disabled = n === 0 || !editable;
+    all.textContent = n > 1 ? `모두 바꾸기 (${n})` : '모두 바꾸기';
     rep.disabled = !editable;
     if (!editable) rep.placeholder = '읽기 전용이라 바꿀 수 없어요';
   }
@@ -131,7 +139,8 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
     if (!f.state().query && query.value) search();
     const n = f.replaceAll(rep.value);
     paint();
-    if (n) notify(`${n}개를 바꿨어요. 되돌리려면 Ctrl+Z`);
+    // 되돌리기: PC 는 Ctrl+Z, 휴대폰은 알림의 되돌리기 단추 (undo)
+    if (n) notify(`${n}곳을 바꿨어요`, { undo: () => f.undoAll() && (f.set(query.value, opts()), paint()) });
   };
   one.addEventListener('click', replaceOne);
   all.addEventListener('click', replaceAll);
@@ -168,6 +177,7 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
 
   function setReplace(on) {
     row2.hidden = !on;
+    row3.hidden = !on;
     more.setAttribute('aria-expanded', String(on));
     more.classList.toggle('active', on);
     if (on) (query.value ? rep : query).focus();

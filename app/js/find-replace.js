@@ -57,6 +57,7 @@ export function createFindPlugin() {
 /** 편집기(view)로 찾기 · 바꾸기 — find-bar.js 가 쓴다 */
 export function findController(view) {
   const state = () => findKey.getState(view().state) ?? { query: '', matches: [], current: -1 };
+  let lastAll = null; // 마지막 모두 바꾸기 (되돌리기 단추)
   // 지금 자리를 보이게: 고른 글로 두고(편집기에 포커스를 주지 않아도) 화면을 그곳으로
   const reveal = (tr, m) => {
     if (m) tr.setSelection(TextSelection.create(tr.doc, m.from, m.to)).scrollIntoView();
@@ -107,7 +108,20 @@ export function findController(view) {
       let tr = v.state.tr;
       for (const m of [...f.matches].reverse()) tr = text ? tr.insertText(text, m.from, m.to) : tr.delete(m.from, m.to);
       v.dispatch(tr);
+      lastAll = tr;
       return f.matches.length;
+    },
+    /** 방금 한 모두 바꾸기 되돌리기 (휴대폰 알림의 되돌리기 단추 — Ctrl+Z 가 없으니) → 되돌렸으면 true
+     *  그 뒤로 글을 고쳤으면 되돌리지 않는다 (고친 것까지 엉키지 않게) */
+    undoAll() {
+      const v = view();
+      const done = lastAll;
+      lastAll = null;
+      if (!done || !v.state.doc.eq(done.doc)) return false;
+      const tr = v.state.tr;
+      for (let i = done.steps.length - 1; i >= 0; i--) tr.step(done.steps[i].invert(done.docs[i]));
+      v.dispatch(tr);
+      return true;
     },
     /** 찾기를 끝낸다: 표시를 지우고, 지금 자리를 고른 채 편집기로 (focus 면) */
     clear({ focus = false } = {}) {
