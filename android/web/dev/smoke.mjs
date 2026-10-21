@@ -2208,6 +2208,60 @@ try {
     const after = await page.evaluate(() => document.querySelector('.mk-annot path').getBoundingClientRect().top);
     check('글이 늘어 문단이 밀리면 주석도 그 문단을 따라감', after - before > 15, JSON.stringify({ before, after }));
     await shot('23-annotate-follow');
+    // 화면 비율이 바뀌어도(태블릿 ↔ 휴대폰) 그린 낱말 위에: 긴 문단의 한 낱말에 동그라미 → 폭을 바꿔 줄바꿈이 달라져도 그 낱말을 따라감
+    {
+      const last = page.locator('.ProseMirror > *').last();
+      await last.tap();
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+      await page.keyboard.insertText('메모킹은 떠오르는 생각을 바로 적는 메모 앱이에요. 손으로 그리고 녹음도 해요. 오늘 회의에서 정한 과녁 낱말을 여기 적어 두고 나중에 다시 봐요. 글이 길어지면 줄이 여러 번 바뀌어요.');
+      await page.waitForTimeout(400);
+      const word = () => page.evaluate(() => {
+        const p = [...document.querySelectorAll('.ProseMirror > p')].find((x) => x.textContent.includes('과녁 낱말'));
+        const w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+        for (let n = w.nextNode(); n; n = w.nextNode()) {
+          const i = n.data.indexOf('과녁');
+          if (i < 0) continue;
+          const r = document.createRange();
+          r.setStart(n, i);
+          r.setEnd(n, i + 2);
+          const b = r.getBoundingClientRect();
+          return { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height };
+        }
+        return null;
+      });
+      await page.evaluate(() => [...document.querySelectorAll('.ProseMirror > p')].find((x) => x.textContent.includes('과녁 낱말')).scrollIntoView({ block: 'center' }));
+      await page.waitForTimeout(200);
+      await pickMode(page, 'draw');
+      await page.waitForSelector('.mk-annot.drawing');
+      await page.waitForTimeout(300);
+      const w0 = await word();
+      const ring = Array.from({ length: 13 }, (_, i) => [w0.x + Math.cos((i / 12) * Math.PI * 2) * (w0.w / 2 + 8), w0.y + Math.sin((i / 12) * Math.PI * 2) * (w0.h / 2 + 6)]);
+      await draw(ring);
+      await page.waitForTimeout(150);
+      await pickMode(page, 'edit');
+      await page.waitForTimeout(600);
+      const ringAt = () => page.evaluate(() => {
+        const paths = [...document.querySelectorAll('.mk-annot path')];
+        const b = paths[paths.length - 1].getBoundingClientRect();
+        return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      });
+      const off = async () => {
+        const [r, w] = [await ringAt(), await word()];
+        return { dx: Math.round(r.x - w.x), dy: Math.round(r.y - w.y) };
+      };
+      const atStart = await off();
+      const sizes = [];
+      for (const width of [320, 700, 390]) {
+        await page.setViewportSize({ width, height: 844 });
+        await page.waitForTimeout(700);
+        sizes.push({ width, ...(await off()) });
+      }
+      const ok = sizes.every((v) => Math.abs(v.dx - atStart.dx) <= 6 && Math.abs(v.dy - atStart.dy) <= 6);
+      const saved = JSON.parse(read((await waitFile((b) => /^ink: /m.test(b))).match(/^ink: (attachments\/\S+\.json)$/m)[1]));
+      check('주석 동그라미: 화면 폭이 바뀌어 줄바꿈이 달라져도 그 낱말 위에 (글자에 붙여 저장)', ok && saved.strokes.at(-1)?.anchor?.t === 'c', JSON.stringify({ atStart, sizes, anchor: saved.strokes.at(-1)?.anchor }));
+      await shot('23b-annotate-reflow');
+    }
     await back();
     await page.waitForTimeout(400);
   }

@@ -103,6 +103,13 @@ export function inkBounds(strokes) {
 
 const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
 
+/** 주석 획이 붙은 곳: b 문단 번호 · f 문단 글(앞 40자) — 글자에 붙인 획(t: 'c')은 c 글자 자리 · w 그 자리부터의 글 몇 자 */
+function normalizeAnchor(a) {
+  const out = { b: Math.max(0, Math.floor(Number(a.b) || 0)), f: String(a.f ?? '').slice(0, 40) };
+  if (a.t === 'c') Object.assign(out, { t: 'c', c: Math.max(0, Math.floor(Number(a.c) || 0)), w: String(a.w ?? '').slice(0, CHAR_SNIP) });
+  return out;
+}
+
 /** 받은 자료를 안전한 모양으로 (파일을 손으로 고쳤거나 다른 버전이 만든 것도) */
 export function normalizeInk(doc) {
   const bg = Object.hasOwn(INK_BG, doc?.bg) ? doc.bg : 'none';
@@ -113,7 +120,7 @@ export function normalizeInk(doc) {
     pen: Boolean(s?.pen),
     pts: (Array.isArray(s?.pts) ? s.pts : []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]))
       .map((p) => point(p[0], p[1], Number.isFinite(p[2]) ? p[2] : 0.5)),
-    ...(s?.anchor ? { anchor: { b: Math.max(0, Math.floor(Number(s.anchor.b) || 0)), f: String(s.anchor.f ?? '').slice(0, 40) } } : {}),
+    ...(s?.anchor ? { anchor: normalizeAnchor(s.anchor) } : {}),
   })).filter((s) => s.pts.length);
   return { v: 1, bg, strokes };
 }
@@ -216,7 +223,51 @@ export function findAnchor(blocks, anchor) {
   return Math.min(Math.max(0, anchor?.b ?? 0), blocks.length - 1);
 }
 
-/** 주석 획 → 지금 화면 좌표 (본문 왼쪽 위 기준, px) */
+// ---------- 주석: 획을 글자에 붙이기 (v0.55) ----------
+//   문단 폭 비율로 두면 화면 비율이 다른 기기(태블릿 ↔ 휴대폰 ↔ PC)에서 줄바꿈이 달라져 다른 낱말 위에 그려졌다.
+//   그래서 획 가운데 아래의 글자에 붙이고, 모양은 그 글자 왼쪽 위에서 "글자 크기(16px 기준)" 단위로 둔다 —
+//   줄바꿈 · 화면 폭 · 글자 크기가 바뀌어도 그 낱말을 따라간다. 글이 조금 고쳐져도 그 자리 글(w)로 다시 찾는다.
+export const CHAR_SNIP = 12;
+
+/**
+ * 그린 획 → 글자에 붙인 주석 획
+ * @param stroke 화면 좌표 (본문 왼쪽 위 기준, px)
+ * @param at { b 문단 번호, text 문단 글, c 글자 자리, left/top 그 글자 왼쪽 위(같은 기준, px), font 그 글자 크기(px) }
+ */
+export function anchorStrokeToChar(stroke, at) {
+  const u = 16 / Math.max(1, at.font);
+  return {
+    ...stroke,
+    size: round(stroke.size * u),
+    pts: stroke.pts.map(([x, y, p]) => point((x - at.left) * u, (y - at.top) * u, p)),
+    anchor: { b: at.b, f: fingerprint(at.text), t: 'c', c: at.c, w: String(at.text ?? '').slice(at.c, at.c + CHAR_SNIP) },
+  };
+}
+
+/** 글자에 붙인 획의 글자 자리 다시 찾기: 그 자리 글이 그대로면 그대로, 고쳐졌으면 같은 글(w)의 가장 가까운 곳, 없으면 끝에 맞춤 */
+export function findChar(text, anchor) {
+  const s = String(text ?? '');
+  if (!s.length) return -1;
+  const c = Math.max(0, anchor?.c ?? 0);
+  const w = anchor?.w ?? '';
+  if (w && s.slice(c, c + w.length) === w) return c;
+  // 앞쪽 글이 고쳐져 밀렸으면: 같은 글을 찾되 원래 자리에서 가장 가까운 곳 (짧게 잘라 가며 — 뒤쪽이 고쳐졌어도)
+  for (let n = w.length; n >= Math.min(3, w.length) && n > 0; n--) {
+    const piece = w.slice(0, n);
+    let best = -1;
+    for (let i = s.indexOf(piece); i >= 0; i = s.indexOf(piece, i + 1)) if (best < 0 || Math.abs(i - c) < Math.abs(best - c)) best = i;
+    if (best >= 0) return best;
+  }
+  return Math.min(c, s.length - 1);
+}
+
+/** 글자에 붙인 주석 획 → 지금 화면 좌표 (origin: 그 글자의 지금 왼쪽 위 · 글자 크기) */
+export function placeStrokeAtChar(stroke, origin) {
+  const k = Math.max(1, origin.font) / 16;
+  return { ...stroke, size: stroke.size * k, pts: stroke.pts.map(([x, y, p]) => [x * k + origin.left, y * k + origin.top, p]) };
+}
+
+/** 주석 획 → 지금 화면 좌표 (본문 왼쪽 위 기준, px) — 문단 폭 비율로 둔 예전 획 (글자를 못 찾은 그림 위 획도) */
 export function placeStroke(stroke, blocks, width) {
   const i = findAnchor(blocks, stroke.anchor);
   const k = Math.max(1, width) / 1000;

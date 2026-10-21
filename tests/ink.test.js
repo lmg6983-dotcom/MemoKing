@@ -76,3 +76,34 @@ test('어두운 화면용: 검은 펜 ↔ 흰 펜만 바꾸고 색 펜·형광�
   // 둘레는 그대로 → 어두운 그림도 같은 크기
   assert.equal(inkToSvg(dark, getStroke).match(/viewBox="[^"]+"/)[0], inkToSvg(doc, getStroke).match(/viewBox="[^"]+"/)[0]);
 });
+
+test('주석 획을 글자에 붙이기: 글자 왼쪽 위에서 글자 크기 단위 → 화면 폭 · 글자 크기가 바뀌어도 그 글자를 따라감', async () => {
+  const { anchorStrokeToChar, placeStrokeAtChar, findChar } = await import('../app/js/core/ink.js');
+  const text = '오늘 회의에서 정한 과녁 낱말을 적어요';
+  const c = text.indexOf('과녁');
+  const ring = { tool: 'pen', color: '#1f1f1c', size: 3, pts: [[300, 40, 0.5], [340, 44, 0.5], [300, 52, 0.5]] };
+  const a = anchorStrokeToChar(ring, { b: 2, text, c, left: 290, top: 36, font: 16 });
+  assert.equal(a.anchor.t, 'c');
+  assert.equal(a.anchor.c, c);
+  assert.equal(a.anchor.w, text.slice(c, c + 12));
+  assert.deepEqual(a.pts[0].slice(0, 2), [10, 4], '글자 왼쪽 위에서 (16px 기준 단위)');
+  // 다른 기기: 같은 글자가 다른 줄 · 다른 자리 (줄바꿈이 다름), 글자 크기 20px
+  const p = placeStrokeAtChar(a, { left: 40, top: 120, font: 20 });
+  assert.deepEqual(p.pts[0].slice(0, 2), [52.5, 125], '그 글자 자리에서 같은 모양 (글자 크기만큼 커짐)');
+  assert.equal(p.size, 3.75);
+  // 글을 조금 고쳐도 그 낱말을 다시 찾는다
+  assert.equal(findChar(text, a.anchor), c);
+  assert.equal(findChar(`아침에 ${text}`, a.anchor), c + 4, '앞에 글이 생겨 밀려도');
+  assert.equal(findChar(text.replace('적어요', '적어 둬요'), a.anchor), c, '뒤가 고쳐져도');
+  assert.equal(findChar('짧은 글', a.anchor), 3, '그 낱말이 사라지면 끝에 맞춤');
+  assert.equal(findChar('', a.anchor), -1);
+});
+
+test('주석 자료: 글자에 붙인 획(t: c)의 자리는 저장 · 불러오기에서 그대로, 예전 획은 그대로 문단에', () => {
+  const doc = normalizeInk({ strokes: [
+    { pts: [[1, 2]], anchor: { b: 1, f: 'abc', t: 'c', c: 7, w: 'x'.repeat(40) } },
+    { pts: [[1, 2]], anchor: { b: 0, f: 'old' } },
+  ] });
+  assert.deepEqual(doc.strokes[0].anchor, { b: 1, f: 'abc', t: 'c', c: 7, w: 'x'.repeat(12) });
+  assert.deepEqual(doc.strokes[1].anchor, { b: 0, f: 'old' });
+});
