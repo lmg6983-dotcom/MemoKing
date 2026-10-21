@@ -15,6 +15,7 @@ import { openCalendarLinks } from './calendar-links.js';
 import { openEventDetail, whenText } from './event-detail.js';
 import { monthSketchPng } from './month-sketch.js';
 import { setupMemoriesView } from './memories-view.js';
+import { UI } from './core/ui-text.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
@@ -755,9 +756,9 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const rowTitle = el('span', 'row-title', item.title);
     const sub = el('span', 'row-sub');
     const words = el('span');
-    const when = isDone(r) ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : nextLabel(r);
+    const when = isDone(r) ? '끝났어요' : !r.enabled ? UI.off : r.kind === 'startup' ? '' : nextLabel(r);
     if (when) words.append(el('b', '', when), ', ');
-    words.append(`${describeReminder(r)}, ${r.action === 'open' ? '메모 띄우기' : '알림만 보내기'}`);
+    words.append(`${describeReminder(r)}, ${r.action === 'open' ? UI.showMemo : '알림만 보내기'}`);
     sub.append(icon(KIND_ICON[r.kind]), words);
     text.append(rowTitle, sub);
     main.append(dot, text);

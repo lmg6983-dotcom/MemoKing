@@ -7,6 +7,7 @@ import { toast } from './ui.js';
 import { recordingClock as formatDuration } from '../../app/js/core/voice-card.js';
 import { haptic } from '../../app/js/dom.js';
 import { icon as svg } from '../../app/js/icons.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -74,10 +75,10 @@ function render() {
   renderPill();
   if (!show) return;
   el.time.textContent = formatDuration(elapsed());
-  el.state.textContent = status.paused ? '일시 정지' : status.stt ? '받아쓰는 중' : '녹음 중'; // 짧게 (빨간 점·시간이 녹음 중임을 알린다)
+  el.state.textContent = status.paused ? '일시 정지' : status.stt ? UI.transcribing : '녹음 중'; // 짧게 (빨간 점·시간이 녹음 중임을 알린다)
   el.panel.classList.toggle('paused', status.paused);
   el.pause.replaceChildren(svg(status.paused ? 'play' : 'pause'));
-  el.pause.setAttribute('aria-label', status.paused ? '이어서 녹음' : '일시 정지');
+  el.pause.setAttribute('aria-label', status.paused ? UI.recordMore : '일시 정지');
   const text = status.text || '';
   el.text.hidden = !status.stt && !text;
   el.text.replaceChildren();
@@ -91,7 +92,7 @@ function render() {
   if (!text && !status.partial) {
     const span = document.createElement('span');
     span.className = 'rec-hint';
-    span.textContent = status.stt ? '말하면 여기에 글로 나타나요' : '녹음만 하고 있어요';
+    span.textContent = status.stt ? UI.speakHint : '녹음만 하고 있어요';
     el.text.append(span);
   }
   el.text.scrollTop = el.text.scrollHeight;
@@ -177,7 +178,7 @@ export async function start(memoId) {
     if (sttOn() && !res?.stt) toast(res?.reason || '받아쓰기를 쓸 수 없어 녹음만 해요');
     document.activeElement?.blur();
   } catch (err) {
-    toast(err.message || '녹음을 시작하지 못했어요', true);
+    toast(err.message || UI.recordFail, true);
   }
 }
 

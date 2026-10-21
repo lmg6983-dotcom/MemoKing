@@ -6,6 +6,7 @@ import { call, on } from './native.js';
 import { openSheet, closeSheet } from './ui.js';
 import { renderReleaseNotes } from '../../app/js/release-notes-view.js';
 import { dueForCheck, isSnoozed, progressLabel, normalizeInfo, SNOOZE_MS } from '../../app/js/core/app-update.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 const KEY = 'memoking.update';
 const $ = (id) => document.getElementById(id);
@@ -42,23 +43,23 @@ function render() {
   const st = state.status;
   const v = info.version ? `v${info.version.replace(/^v/, '')}` : '';
   const note = {
-    idle: '새 버전이 나오면 알려 드려요',
-    checking: '새 버전을 찾고 있어요',
-    latest: '최신 버전을 쓰고 있어요',
+    idle: UI.updWait,
+    checking: UI.updChecking,
+    latest: UI.updLatest,
     available: `새 버전 ${v} 이 나왔어요`,
-    downloading: '새 버전을 받고 있어요',
+    downloading: UI.updDownloading,
     ready: `${v} 을 받아 뒀어요. 설치 화면에서 "업데이트" 를 눌러 주세요`,
     installing: '설치 화면에서 "업데이트" 를 눌러 주세요',
     error: state.message,
   }[st] ?? '';
   const label = {
-    checking: '확인하는 중',
-    latest: '✓ 최신 버전',
+    checking: UI.updCheckingShort,
+    latest: UI.updLatestShort,
     available: `업데이트 ${v}`,
     downloading: `받는 중 ${Math.floor(state.total ? (state.done / state.total) * 100 : 0)}%`,
     ready: '설치하기',
     installing: '설치하기',
-  }[st] ?? '업데이트 확인';
+  }[st] ?? UI.updCheck;
   const row = $('update-check');
   if (!row) return;
   $('update-current').textContent = state.current ? `v${state.current}` : '';
@@ -80,7 +81,7 @@ function render() {
   })());
   const downloading = st === 'downloading';
   const ready = st === 'ready' || st === 'installing';
-  $('update-title').textContent = ready ? '설치할 준비가 됐어요' : '새 버전이 나왔어요';
+  $('update-title').textContent = ready ? UI.updReady : UI.updNew;
   $('update-progress').hidden = !downloading;
   $('update-bar-fill').style.transform = `scaleX(${state.total ? Math.min(1, state.done / state.total) : 0})`;
   $('update-progress-text').textContent = progressLabel(state.done, state.total);
@@ -88,7 +89,7 @@ function render() {
   $('update-error').textContent = st === 'error' ? state.message : '';
   $('update-go').textContent = st === 'installing' ? '다시 열기' : ready ? '설치하기' : downloading ? '받는 중' : st === 'error' ? '다시 시도' : '받아서 설치';
   $('update-go').disabled = downloading;
-  $('update-later').textContent = downloading ? '닫기 (계속 받아요)' : '나중에';
+  $('update-later').textContent = downloading ? UI.updCloseKeep : '나중에';
 }
 
 function set(patch) {

@@ -3,6 +3,7 @@ import { copyBlock, saveBlock, shareBlock, canShare } from './copy-content.js';
 import { SHARE_DONE, isShareMenuOpen } from './share-menu.js';
 import { openContextMenu } from './ctx-menu.js';
 import { CUT_ICON, COPY_ICON, DONE_ICON, FAIL_ICON, SHARE_ICON, OPEN_ICON, SAVE_ICON, TRASH_ICON, CLOSE_ICON } from './content-icons.js';
+import { UI } from './core/ui-text.js';
 // 내용(그림 · 파일 · 표 …)의 복사 · 저장 · 공유 · 지우기 — 두 가지 모양
 //   휴대폰(손가락): 꾹 눌렀다 놓거나 짧게 누른 내용의 오른쪽 위에 단추 줄이 잠깐 (showDeleteButton) — 흰 동그라미에 빨간 ×.
 //     한 번에 하나만, DELETE_SHOW_MS 뒤에(또는 글을 고치거나 커서를 옮기면) 흐려지며 사라진다.
@@ -157,7 +158,7 @@ export async function showContentMenu(view, opts, at) {
     } catch (err) {
       console.warn('content cut', err);
       announce(failText(null, err));
-      notice('복사하지 못해 잘라내지 않았어요', true);
+      notice(UI.cutCopyFail, true);
       return true;
     }
     if (view.isDestroyed || view.state.doc.nodeAt(pos) !== node) return true;
@@ -375,7 +376,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
       console.warn('cut', err);
       cutBtn.classList.add('failed');
       cutBtn.innerHTML = FAIL_ICON;
-      cutBtn.title = '복사하지 못해 잘라내지 않았어요';
+      cutBtn.title = UI.cutCopyFail;
       announce(cutBtn.title);
       notice(cutBtn.title, true);
     }).finally(() => {

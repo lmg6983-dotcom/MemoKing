@@ -8,6 +8,7 @@ import { chooseShare, showSharePop, SHARE_DONE } from './share-menu.js';
 import { COLORS, COLOR_NAMES } from './core/memo-file.js';
 import { dayText } from './memory-day.js';
 import { moveLabel } from './core/modes.js';
+import { UI } from './core/ui-text.js';
 
 /** 메뉴의 모양 (창 없이도 확인할 수 있게 따로) */
 /** @param {{ workLife?: boolean }} [o] workLife: Work / Life 를 나눠 쓸 때만 "Work로 옮기기" */
@@ -18,13 +19,13 @@ export function cardMenuSpec(memo, { workLife = true } = {}) {
       { id: 'cut', icon: CUT_ICON, label: locked ? '잘라내기 (잠긴 메모는 풀어야 해요)' : '잘라내기 (글을 복사하고 휴지통으로)', disabled: locked },
       { id: 'copy', icon: COPY_ICON, label: locked ? '글 복사 (잠긴 메모는 풀어야 해요)' : '글 복사', disabled: locked },
       { id: 'share', icon: SHARE_ICON, label: locked ? '공유 (잠긴 메모는 풀어야 해요)' : '공유', disabled: locked },
-      { id: 'pdf', icon: SAVE_ICON, label: 'PDF로 저장' },
-      { id: 'trash', icon: TRASH_ICON, label: '휴지통으로 옮기기 (Delete)', danger: true },
+      { id: 'pdf', icon: SAVE_ICON, label: UI.saveAsPdf },
+      { id: 'trash', icon: TRASH_ICON, label: UI.toTrash, danger: true },
     ],
     items: [
       { id: 'open', label: '열기', hint: 'Enter' },
       { type: 'separator' },
-      { id: 'pin', label: '목록 맨 위에 고정', checked: memo.pinned === true },
+      { id: 'pin', label: UI.pin, checked: memo.pinned === true },
       { type: 'colors', label: '색', colors: COLORS.map((c) => ({ id: `color:${c}`, label: COLOR_NAMES[c] ?? c, color: c, checked: memo.color === c })) },
       { id: 'day', label: '이 날의 기록으로', hint: memo.day ? dayText(memo.day) : '' },
       ...(workLife ? [{ id: 'mode', label: moveLabel(memo) }] : []),
@@ -56,9 +57,9 @@ export async function openCardMenu({ memo, at, api, run, workLife = true }) {
     case 'cut':
       // 복사가 된 뒤에만 휴지통으로 (복사하지 못했으면 메모를 그대로 둔다) — 휴지통으로 가면 되돌리기 띠가 뜬다
       if (await api.memo.copyText(memo.id)) run.trash(memo.id);
-      else run.flash('복사하지 못해 잘라내지 않았어요');
+      else run.flash(UI.cutCopyFail);
       break;
-    case 'copy': run.flash((await api.memo.copyText(memo.id)) ? '글을 복사했어요' : '복사하지 못했어요'); break;
+    case 'copy': run.flash((await api.memo.copyText(memo.id)) ? UI.textCopied : UI.copyFail); break;
     case 'share': await shareMemo(memo, at, api, run); break;
     default: break;
   }
@@ -76,19 +77,19 @@ async function shareMemo(memo, at, api, run) {
     if (!via) return undefined;
     if (!targets.find((t) => t.id === via)?.ready) {
       // Google Drive 를 아직 연결하지 않았다 → 설정으로 (연결하면 링크로 공유할 수 있다)
-      run.flash('Google Drive 를 먼저 연결해 주세요');
+      run.flash(UI.driveFirst);
       run.openSettings?.();
       return undefined;
     }
-    if (via === 'drive') run.flash('Google Drive 에 올리는 중');
+    if (via === 'drive') run.flash(UI.driveUploading);
     const r = await api.attachments.share({ ...file, via });
     if (r?.error) return run.flash(r.error);
     if (r?.missing) return run.flash(SHARE_DONE['localsend-missing']);
-    if (via === 'drive') showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' });
+    if (via === 'drive') showSharePop({ title: UI.linkCopied, sub: UI.pasteHint });
     else run.flash(SHARE_DONE[{ localsend: 'localsend', mail: 'mail' }[via]]);
   } catch (err) {
     console.warn('card share', err);
-    run.flash('공유하지 못했어요');
+    run.flash(UI.shareFail);
   }
   return undefined;
 }

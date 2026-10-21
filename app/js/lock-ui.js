@@ -1,6 +1,7 @@
 // 잠금 메모 화면 (PC 메모 창·휴대폰 같음): 잠글 때 비밀번호 정하기 창, 잠긴 메모를 열 때 비밀번호 화면
 //   잊으면 아무도(메모킹도) 열 수 없다는 것과, 제목은 목록에 보이고 사진·파일은 잠기지 않는다는 것을 미리 알린다
 import { passwordProblem } from './core/memo-lock.js';
+import { UI } from './core/ui-text.js';
 
 function el(tag, attrs = {}, text = '') {
   const node = document.createElement(tag);
@@ -139,7 +140,7 @@ export function lockScreen(container, { title, onTry, onCancel }) {
       try {
         fail = await onTry(field.input.value);
       } catch (err) {
-        fail = err?.message || '열지 못했어요';
+        fail = err?.message || UI.openFail;
       }
       busy = false;
       if (cancelLater) return close();

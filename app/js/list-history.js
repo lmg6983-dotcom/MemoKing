@@ -1,6 +1,7 @@
 // 목록 창 "알림 보관함" 탭 — Windows 알림 기록 (갤럭시 NotiStar 처럼)
 import { icon } from './icons.js';
 import { hhmm } from './core/time.js';
+import { UI } from './core/ui-text.js';
 
 // 알림 그림 주소 (안드로이드는 window.memoking.historyBase 로 자기 주소를 알려 준다)
 const historyUrl = (name) => `${globalThis.memoking?.historyBase ?? 'memoking://history/'}${encodeURIComponent(name)}`;
@@ -127,13 +128,13 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
         await api.copyText([e.title, e.body].filter(Boolean).join('\n'));
         notify?.('알림 글을 복사했어요');
       } catch {
-        notify?.('복사하지 못했어요');
+        notify?.(UI.copyFail);
       }
     };
     const remove = () => removeWithUndo(e, div);
     const block = api.history.block && e.source !== 'memoking' ? () => api.history.block(e) : null;
     actions.append(
-      actionButton('note', '메모로 만들기', toMemo, '메모로'),
+      actionButton('note', UI.makeMemo, toMemo, '메모로'),
       actionButton('copy', '복사', copy),
       // 메모가 아니라 보관함의 이 알림 기록만 지운다
       actionButton('trash', '알림 보관함에서 삭제', remove, '삭제'),
@@ -147,7 +148,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
         const r = div.getBoundingClientRect();
         const at = ev.button !== 2 ? { x: Math.round(r.left + 16), y: Math.round(r.top + 16) } : null; // 키보드(button 0)로 열면 그 줄 자리에
         const id = await menu([
-          { id: 'memo', label: '메모로 만들기' },
+          { id: 'memo', label: UI.makeMemo },
           { id: 'copy', label: '복사' },
           ...(block ? [{ id: 'block', label: `${e.app} 알림 그만 모으기` }] : []),
           { type: 'separator' },

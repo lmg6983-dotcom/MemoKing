@@ -25,6 +25,7 @@ import {
   settings, saveSettings, openWebPage, toast, copyFileToClipboard,
   copyImageToClipboard, CLIPBOARD_HELPER, SMOKE,
 } from './utils.js';
+import { UI } from '../app/js/core/ui-text.js';
 
 // 창 위 가장자리에 반쯤 걸쳐 붙는 스티커: 왕관(늘 위) · 셀로판 테이프(늘 아래, 바탕화면 층)
 // 목록 창 제목 줄: 왼쪽은 로고 · Life/Work 스위치(~196px), 오른쪽은 단추 묶음 + Windows 창 버튼(~242px) — 스티커는 그 사이 빈 줄에
@@ -1495,7 +1496,7 @@ export class WindowManager {
     this.pdfWin = new BrowserWindow({
       width, height, minWidth: 640, minHeight: 480,
       x: Math.round(area.x + (area.width - width) / 2), y: Math.round(area.y + (area.height - height) / 2),
-      title: 'PDF로 저장',
+      title: UI.saveAsPdf,
       show: false,
       autoHideMenuBar: true,
       backgroundColor: listBg(), // 지금 모드의 밝기 (Work 는 어둡게)
@@ -1519,7 +1520,7 @@ export class WindowManager {
     let file = SMOKE ? this.smokePdf.shift() : null;
     if (!file) {
       const r = await dialog.showSaveDialog(parent ?? undefined, {
-        title: 'PDF로 저장',
+        title: UI.saveAsPdf,
         defaultPath: path.join(app.getPath('documents'), pdfFileName(memo.title)),
         filters: [{ name: 'PDF', extensions: ['pdf'] }],
       });
@@ -1706,14 +1707,14 @@ export class WindowManager {
     }
     if (action === 'copyFile') {
       const ok = await copyFileToClipboard(p);
-      return ok ? { ok, message: fs.statSync(p).isDirectory() ? '폴더를 복사했어요. 붙여 넣으면 돼요' : '파일을 복사했어요. 붙여 넣으면 돼요', close: true } : { ok, message: '복사하지 못했어요' };
+      return ok ? { ok, message: fs.statSync(p).isDirectory() ? '폴더를 복사했어요. 붙여 넣으면 돼요' : '파일을 복사했어요. 붙여 넣으면 돼요', close: true } : { ok, message: UI.copyFail };
     }
     if (action === 'reveal') {
       shell.showItemInFolder(p);
       return { ok: true, close: true };
     }
     const err = await shell.openPath(p);
-    if (err) toast({ title: '열지 못했어요', body: err });
+    if (err) toast({ title: UI.openFail, body: err });
     return { ok: !err, close: true };
   }
 
@@ -1846,7 +1847,7 @@ export class WindowManager {
     const where = captureWhere(capture.source);
     this.onTutorialEvent('quick-memo'); // 튜토리얼 "어디서든 바로 메모" 를 직접 해 냄
     return this.openCaptureMemo(capture, point, {
-      title: '메모를 만들었어요',
+      title: UI.memoCreated,
       body: `${captureTitle(capture)}${where ? `\n${where}에서 가져왔어요` : ''}\n눌러서 열기`,
     });
   }
@@ -1869,7 +1870,7 @@ export class WindowManager {
     } catch (err) {
       console.error('빠른 메모 실패', err);
       toast({
-        title: '메모를 만들지 못했어요',
+        title: UI.memoCreateFail,
         body: `${this.getShortcutLabel('quickMemo')}를 한 번 더 눌러 주세요.`,
       });
       return null;

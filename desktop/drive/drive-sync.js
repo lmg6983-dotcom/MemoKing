@@ -5,6 +5,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { SyncEngine, skipName, skipPath } from './sync-engine.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 const INTERVAL = 60_000;
 export const DOUBLE_SYNC = '메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). '
@@ -154,7 +155,7 @@ export class DriveSync extends EventEmitter {
       save(); // 끝낸 파일들의 기준은 남긴다 (다음 차례는 남은 것만)
       console.warn('[Google Drive 동기화]', err);
       const offline = /fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ERR_INTERNET|net::/i.test(`${err?.message} ${err?.cause?.code ?? ''}`);
-      this.publish({ state: 'error', progress: null, error: offline ? '인터넷에 연결되지 않아 동기화하지 못했어요' : err.message || '동기화하지 못했어요' });
+      this.publish({ state: 'error', progress: null, error: offline ? '인터넷에 연결되지 않아 동기화하지 못했어요' : err.message || UI.syncFail });
     }
     return this.status;
   }

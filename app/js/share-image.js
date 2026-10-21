@@ -1,5 +1,6 @@
 // 메모를 그림(PNG) 한 장으로 (PC·휴대폰 함께) — 메모 화면에 그려진 본문을 메모 색 종이 위에 옮겨 담아 html-to-image(MIT)로 찍는다.
 //   소리·동영상 플레이어는 "🎙 녹음 이름" 같은 글로, 링크 카드의 ✕ 같은 버튼은 빼고, 아래에 날짜·메모킹 표시.
+import { UI } from './core/ui-text.js';
 const WIDTH = 640; // 그림의 본문 폭 (CSS px) — 휴대폰·PC 어디서 열어도 읽기 좋게
 const MAX_PIXELS = 7900; // 캔버스 한 변의 한계(약 8192)를 넘지 않게 배율을 줄인다
 
@@ -56,7 +57,7 @@ export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
       style: { position: 'static', left: '0', top: '0' },
     });
     const base64 = canvas.toDataURL('image/png').split(',')[1];
-    if (!base64) throw new Error('그림을 만들지 못했어요');
+    if (!base64) throw new Error(UI.imageMakeFail);
     return base64;
   } finally {
     paper.remove();

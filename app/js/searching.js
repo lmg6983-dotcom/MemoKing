@@ -1,5 +1,6 @@
 // 찾는 중 · 불러오는 중 표시 — 돋보기가 이리저리 흔들리며 살피고, 점 세 개가 차례로 (모두 찾기 · 매직키 OPMS · OPMS 창)
 //   빈 화면 대신 "찾고 있다" 는 것을 보여 준다. 움직임 줄이기 설정이면 흔들지 않고 숨 쉬듯 흐려졌다 밝아진다 (base.css)
+import { UI } from './core/ui-text.js';
 const SVG = 'http://www.w3.org/2000/svg';
 
 function glass() {
@@ -25,7 +26,7 @@ function glass() {
  * @param {string} [text] 예: '찾는 중이에요' (끝의 … 는 움직이는 점으로)
  * @param {{ inline?: boolean, tag?: string }} [options] inline: 한 줄 (목록 안) · 아니면 가운데 크게
  */
-export function searchingNode(text = '찾는 중이에요', { inline = false, tag = 'div' } = {}) {
+export function searchingNode(text = UI.searchingNow, { inline = false, tag = 'div' } = {}) {
   const box = document.createElement(tag);
   box.className = `mk-searching${inline ? ' inline' : ''}`;
   box.setAttribute('role', 'status');

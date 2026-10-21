@@ -15,6 +15,7 @@ import { APP_DIR, APP_ICON_PNG } from './window-utils.js';
 import { cleanOverrides } from '../app/js/core/keymap.js';
 import { normalizeHours } from '../app/js/core/work-hours.js';
 import { POWERSHELL, psArgs, psOptions } from './powershell.js';
+import { UI } from '../app/js/core/ui-text.js';
 
 export const SMOKE = process.argv.includes('--smoke');
 export const APP_ID = 'com.memoking.desktop';
@@ -283,7 +284,7 @@ export function copyImageToClipboard(file) {
 
 // ---------- 원격 그림 다운로드 ----------
 export async function fetchRemoteImage(vault, url) {
-  if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
+  if (!vault) throw new Error(UI.noVault);
   const target = new URL(url);
   if (!/^https?:$/.test(target.protocol)) throw new Error('인터넷 주소(http, https)만 받을 수 있어요.');
   const controller = new AbortController();

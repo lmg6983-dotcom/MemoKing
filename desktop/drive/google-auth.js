@@ -11,6 +11,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+import { UI } from '../../app/js/core/ui-text.js';
 
 // 기본: 메모킹이 만든(또는 사용자가 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님).
 //   PC 메모킹과 휴대폰 메모킹은 같은 Google Cloud 프로젝트의 클라이언트라 서로 만든 메모를 본다
@@ -39,7 +40,7 @@ export class GoogleAuth {
     // scope: 정해진 권한 하나만 (Google 캘린더 동기화 — Drive 연결과 따로 로그인). 없으면 Drive (drive.file / 전체)
     this.fixedScope = scope;
     this.fallbackClient = fallbackClient; // 붙여 넣은 · 함께 넣은 연결 정보가 없을 때 빌려 쓸 클라이언트 (Drive 연결의 것)
-    this.label = scope ? 'Google 캘린더' : 'Google Drive';
+    this.label = scope ? UI.googleCalendar : 'Google Drive';
     this.bundledClient = bundledClient;
     this.fetch = fetchImpl;
     this.openExternal = openExternal;

@@ -3,6 +3,7 @@
 //   사진은 fetch 로 받아 그린다 (img 를 바로 그리면 다른 출처 그림이라 캔버스를 내보낼 수 없다)
 import { vaultUrl } from './media.js';
 import { NOTE_BG } from './core/memo-file.js';
+import { UI } from './core/ui-text.js';
 
 const W = 1080;
 const PAD = 64;
@@ -205,7 +206,7 @@ export async function renderCollage({ title, sub = '', photos = [], memos = [], 
   for (const img of imgs) img?.close?.();
 
   const base64 = canvas.toDataURL('image/png').split(',')[1];
-  if (!base64) throw new Error('그림을 만들지 못했어요');
+  if (!base64) throw new Error(UI.imageMakeFail);
   return base64;
 }
 

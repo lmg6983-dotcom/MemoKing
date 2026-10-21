@@ -1,5 +1,6 @@
 // Windows 알림 보관함 — 알림 DB(wpndatabase.db) 의 값 해석 (순수 함수, 단위 테스트 대상)
 import { decodeEntities, XML_ENTITIES } from './entities.js';
+import { UI } from './ui-text.js';
 
 // Windows FILETIME(1601년부터 100나노초 단위, BigInt) → 밀리초 시각
 export function fileTimeToMs(ticks) {
@@ -34,7 +35,7 @@ export function fallbackAppName(appId) {
   const afterBang = id.includes('!') ? id.slice(id.lastIndexOf('!') + 1) : id;
   const tail = afterBang.split(/[\\/]/).pop();
   const name = tail.includes('.') && !/\.exe$/i.test(tail) ? tail.split('.').pop() : tail.replace(/\.exe$/i, '');
-  return name || id || '알 수 없는 앱';
+  return name || id || UI.unknownApp;
 }
 
 // 검색: 앱 이름·제목·내용, 공백으로 나눈 모든 낱말 포함

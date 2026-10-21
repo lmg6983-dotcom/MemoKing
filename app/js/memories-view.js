@@ -4,9 +4,10 @@
 //   ③ 날을 누르면 그날의 기록: 스크랩북 한 쪽 — 사진은 테이프 붙인 폴라로이드, 메모는 메모지 조각 · 좌우로 다른 날
 import { collectMemories, monthSummary, neighborDays, dayKey, keyDate } from './core/memories.js';
 import { vaultUrl } from './media.js';
-import { koFullDate } from './core/time.js';
+import { koFullDate, WEEKDAY } from './core/time.js';
 import { icon } from './icons.js';
 import { openCollagePreview } from './collage-preview.js';
+import { UI } from './core/ui-text.js';
 
 const el = (tag, className = '', text = '') => {
   const e = document.createElement(tag);
@@ -187,7 +188,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
     const top = el('div', 'mem-page-top');
     const date = keyDate(key);
     const h = el('h2', 'mem-page-date');
-    h.append(el('b', '', `${date.getMonth() + 1}월 ${date.getDate()}일`), el('span', '', ` ${'일월화수목금토'[date.getDay()]}요일`));
+    h.append(el('b', '', `${date.getMonth() + 1}월 ${date.getDate()}일`), el('span', '', ` ${WEEKDAY[date.getDay()]}요일`));
     const tools = el('div', 'mem-page-tools');
     const { prev, next } = neighborDays(days, key);
     const navBtn = (to, label, cls) => {
@@ -207,7 +208,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       share.title = '이 날을 그림 한 장으로 (미리 보고 공유, 복사, 저장, 메모로 만들기)';
       share.append(icon('share'));
       share.addEventListener('click', () => makeCollage(share, {
-        title: `${date.getMonth() + 1}월 ${date.getDate()}일 ${'일월화수목금토'[date.getDay()]}요일`,
+        title: `${date.getMonth() + 1}월 ${date.getDate()}일 ${WEEKDAY[date.getDay()]}요일`,
         sub: rec.memos.map((m) => m.title).filter(Boolean).slice(0, 3).join(', '),
         photos: rec.photos.map((p) => ({ ...p, day: key })),
         memos: rec.memos.filter((m) => !m.images?.length || m.preview).map((m) => ({ ...m, day: key })),
@@ -296,7 +297,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
       openCollagePreview({ title: data.title, base64, actions: collage.actions(base64, data), notify, onOverlay });
     } catch (err) {
       console.error(err);
-      notify(err?.message || '그림을 만들지 못했어요', true);
+      notify(err?.message || UI.imageMakeFail, true);
     } finally {
       button.removeAttribute('aria-busy');
       if (label) label.textContent = was;
@@ -353,7 +354,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
 
   function openMemo(id) {
     closeDay();
-    Promise.resolve(api.memo?.open?.(id)).catch((err) => notify(err?.message ?? '메모를 열지 못했어요', true));
+    Promise.resolve(api.memo?.open?.(id)).catch((err) => notify(err?.message ?? UI.memoOpenFail, true));
   }
 
   return {

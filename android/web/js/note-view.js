@@ -33,12 +33,13 @@ import * as recorder from './recorder.js';
 import { setupAnnotation } from '../../app/js/ink-annotate.js';
 import { autoTagsFor } from '../../app/js/core/auto-tags.js';
 import { conflictCopyBody, isBlankBody, sameBody } from '../../app/js/core/memo-file.js';
-import { haptic, reduceMotion, replayClass, swipeDismiss } from '../../app/js/dom.js';
+import { haptic, reduceMotion, replayClass, swipeDismiss, EASE_OUT } from '../../app/js/dom.js';
 import { createFindBar } from '../../app/js/find-bar.js';
 import { createClearStamp } from '../../app/js/clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from '../../app/js/suggest-chips.js';
 import { setTouchMode, penJustTouched } from '../../app/js/keyboard-guard.js';
 import { setupModeKnob, MODES } from './mode-knob.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -158,7 +159,7 @@ export function flush() {
       // 다른 기기가 이 메모를 잠갔다 — 사본으로 남겼으면 쓴 글은 안전, 아니면 닫을 때 사본으로 (closeNote)
       if (r.copied) {
         saved = body;
-        setStatus('다른 기기에서 이 메모를 잠가, 쓰던 내용은 사본 메모로 남겼어요', true);
+        setStatus(UI.lockedElsewhereCopy, true);
       } else {
         refusedSave = true;
         setStatus('잠긴 메모라 저장하지 못했어요', true);
@@ -182,7 +183,7 @@ function applyExternal(next) {
   current = saved = editor.getMarkdown();
   el.banner.hidden = true;
   pendingExternal = null;
-  setStatus('바뀐 내용을 불러왔어요');
+  setStatus(UI.reloaded);
 }
 
 /** 이전 버전으로 되돌린 내용을 지금 화면에 */
@@ -210,12 +211,12 @@ export function onVaultChanged({ ids, external, removed }) {
       // 다른 기기에서 이 메모를 잠갔거나(여기선 안 잠긴 메모) 다른 비밀번호로 다시 잠갔다 — 덮어쓰지 않는다.
       // 아직 저장 못 한 쓰던 글은 사본 메모로 먼저 남기고 닫는다 (PC 와 같게, 쓰던 글이 사라지지 않게)
       const wasLocked = Boolean(memo?.locked);
-      const what = wasLocked ? '다른 기기에서 이 메모의 비밀번호를 바꿨어요.' : '다른 기기에서 이 메모를 잠갔어요.';
+      const what = wasLocked ? UI.passwordChangedElsewhere : UI.lockedElsewhere;
       let kept = '';
       if (isDirty() && !isBlankBody(current)) {
         try {
           const copy = wasLocked ? app.vault.importCopyOf(id, current, { color: next.color }) : app.vault.import({ body: current, color: next.color });
-          if (copy) kept = wasLocked ? ' 쓰던 내용은 예전 비밀번호로 잠근 사본 메모로 남겼어요.' : ' 쓰던 내용은 사본 메모로 따로 남겼어요.';
+          if (copy) kept = wasLocked ? UI.copyOldPassword : UI.copyKept;
         } catch (err) {
           console.error(err);
         }
@@ -263,14 +264,14 @@ function keepTheirsAsCopy(next) {
   }
   if (!copied) {
     pendingExternal = next;
-    showBanner('다른 기기에서 이 메모가 바뀌었어요.', { load: '바뀐 내용 보기', keep: '지금 내용 두기' });
+    showBanner(UI.changedElsewhere, { load: UI.showChanges, keep: UI.keepMine });
     return;
   }
   flush(); // 들어온 내용으로 바뀐 파일을 지금 쓰는 글로
-  showBanner(conflictCopy ? '다른 기기에서도 이 메모를 고쳤어요. 그쪽 내용은 따로 저장해 뒀어요.' : '다른 기기에서도 이 메모를 고쳤어요.', { load: conflictCopy ? '그쪽 내용 보기' : null, keep: '확인' });
+  showBanner(conflictCopy ? UI.conflictSaved : UI.conflict, { load: conflictCopy ? UI.showTheirs : null, keep: '확인' });
 }
 
-function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
+function showBanner(text, { load = null, keep = UI.keepMine } = {}) {
   el.bannerText.textContent = text;
   el.bannerLoad.hidden = !load;
   if (load) el.bannerLoad.textContent = load;
@@ -361,7 +362,7 @@ function linkItem(target, { onRemove, onAdd, score } = {}) {
 
 function setLink(targetId, on) {
   flush();
-  if (!app.vault.link(id, targetId, on)) toast('연결을 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
+  if (!app.vault.link(id, targetId, on)) toast(UI.linkSaveFail, true);
   el.linkSearch.value = '';
   el.linkResults.replaceChildren();
   refreshLinks();
@@ -595,7 +596,7 @@ async function saveFile(file) {
 async function fetchImage(src) {
   if (isDataImage(src)) {
     const image = decodeDataImage(src);
-    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG, JPG, GIF, WebP 그림을 써 주세요');
+    if (!image) throw new Error(UI.imageType);
     return app.vault.saveAttachment(image.bytes, image.ext);
   }
   return fetchRemoteImage(app.vault, src);
@@ -681,7 +682,7 @@ async function pickAndInsert(accept) {
     setStatus(`파일 ${items.length}개를 추가했어요`);
   } catch (err) {
     console.error(err);
-    setStatus('파일을 추가하지 못했어요. 다시 시도해 주세요', true);
+    setStatus(UI.fileAddFail, true);
   }
 }
 
@@ -1042,21 +1043,21 @@ function showTableBar(table) {
   const lastRow = table.header && table.rows <= 1;
   delRow.disabled = table.header && !lastRow;
   delRow.dataset.wholeTable = lastRow ? '1' : '';
-  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : '이 행 삭제');
+  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : UI.rowDelete);
   delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
-  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제');
+  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : UI.colDelete);
   // 셀 병합: 여러 칸을 골랐으면 "병합", 병합한 칸 안이면 "병합 풀기"
   const merge = bar.querySelector('[data-table="merge"]');
   merge.disabled = !table.canMerge && !table.merged;
-  setBtn(merge, table.merged ? '병합 풀기' : '병합', table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요');
+  setBtn(merge, table.merged ? '병합 풀기' : '병합', table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : UI.mergePick);
   bar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
   // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만 (숨기지 않고 흐리게 — 커서를 옮길 때마다 단추가 생겼다 사라지지 않게)
   const split = bar.querySelector('[data-table="splitTable"]');
   const join = bar.querySelector('[data-table="joinTable"]');
   split.disabled = !table.canSplit;
-  split.title = table.canSplit ? '커서가 있는 행부터 아래를 새 표로 (아래 표에도 머리글 행)' : '나눌 자리의 행(머리글 아래 두 번째 행부터)에 커서를 두세요';
+  split.title = table.canSplit ? UI.splitHere : UI.splitWhere;
   join.disabled = !table.canJoin;
-  join.title = table.canJoin ? '바로 아래 표를 이 표에 이어 붙이기 (열 수가 같을 때)' : '바로 아래에 열 수가 같은 표가 있을 때 합칠 수 있어요';
+  join.title = table.canJoin ? UI.joinBelow : UI.joinWhen;
 }
 // 덜 쓰는 표 도구(표 · 바꾸기)는 "⋯" 로 막대 위에 펼친다 — 막대가 한 줄만 차지하게. 하나를 고르거나 바깥을 누르면 접힌다
 const tableMoreBtn = $('table-more-btn');
@@ -1427,7 +1428,7 @@ export async function openNote(memoId, options = {}) {
   if (id) closeNote({ quiet: true });
   const next = app.vault.get(memoId);
   if (!next) {
-    toast('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
+    toast(UI.memoMissing, true);
     return;
   }
   opening = (async () => {
@@ -1463,13 +1464,13 @@ export async function openNote(memoId, options = {}) {
             const now = app.vault.entries.get(memoId)?.body ?? memo.body;
             if (!isLockedBody(now)) {
               const opened = app.vault.get(memoId); // 그사이 다른 기기에서 잠금을 풀었다 — 그대로 연다
-              if (!opened) return '메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요';
+              if (!opened) return UI.memoMissing;
               memo = opened;
               return null;
             }
             const { session } = await openLock(now, password);
             const r = app.vault.openLock(memoId, session);
-            if (!r) return '메모를 열지 못했어요';
+            if (!r) return UI.memoOpenFail;
             memo = r;
             return null;
           } catch (err) {
@@ -1531,7 +1532,7 @@ export async function openNote(memoId, options = {}) {
       read: async () => (memo?.ink ? (await fetch(vaultUrl(memo.ink))).json() : null),
       save: async (data) => {
         const memoId = id; // 닫으면서 저장할 때도 그 메모에
-        const rel = data ? await saveFile(new File([JSON.stringify(data)], '글 위에 그리기.json', { type: 'application/json' })) : '';
+        const rel = data ? await saveFile(new File([JSON.stringify(data)], UI.annotateFile, { type: 'application/json' })) : '';
         if (memoId && app.vault.get(memoId) && !app.vault.setMeta(memoId, { ink: rel })) {
           toast('그린 것을 메모에 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true); // 파일이 잠깐 없는 등
           return;
@@ -1577,7 +1578,7 @@ function cardMorph(rect, opening, done = () => {}) {
   const frames = [{ clipPath: card, opacity: 0.55 }, { clipPath: full, opacity: 1 }];
   const anim = el.screen.animate(opening ? frames : frames.reverse(), opening
     ? { duration: 280, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' }
-    : { duration: 200, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'forwards' });
+    : { duration: 200, easing: EASE_OUT, fill: 'forwards' });
   anim.finished.then(() => {
     done();
     if (!opening) anim.cancel(); // 다음에 열 때 오려 낸 모양이 남지 않게
@@ -1703,7 +1704,7 @@ function flushTables() {
   try {
     app.vault.setMeta(p.id, { tables: p.tables });
   } catch {
-    setStatus('표 크기를 저장하지 못했어요', true);
+    setStatus(UI.tableSizeFail, true);
   }
 }
 

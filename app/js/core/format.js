@@ -1,5 +1,5 @@
 // 화면 표시용 시각 형식
-import { pad2 as pad, hhmm, koClock, koMonthDay } from './time.js';
+import { pad2 as pad, hhmm, koClock, koMonthDay, WEEKDAY } from './time.js';
 
 // 녹음 시간: 1:05
 export function formatDuration(ms) {
@@ -27,7 +27,7 @@ export function friendlyTime(value, now = Date.now()) {
   const clock = koClock(d);
   if (days === 0) return clock;
   if (days === 1) return `어제 ${clock}`;
-  if (days > 1 && days < 7) return `${'일월화수목금토'[d.getDay()]}요일`;
+  if (days > 1 && days < 7) return `${WEEKDAY[d.getDay()]}요일`;
   if (d.getFullYear() === n.getFullYear()) return koMonthDay(d);
   return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
 }

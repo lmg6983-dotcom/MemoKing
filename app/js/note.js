@@ -20,7 +20,7 @@ import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSliders } from './seg-slider.js';
 import { setupVoiceRecorder } from './voice-recorder.js';
 import { setupAnnotation } from './ink-annotate.js';
-import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups, swipeDismiss } from './dom.js';
+import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups, swipeDismiss, EASE_OUT } from './dom.js';
 import { createClearStamp } from './clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
@@ -33,6 +33,7 @@ import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { memoMode, otherMode, moveLabel, MODE_LABEL } from './core/modes.js';
 import { createFindBar } from './find-bar.js';
+import { UI } from './core/ui-text.js';
 
 const SAVE_DELAY = 600;
 
@@ -56,11 +57,11 @@ setCopyHost({
     hideDeleteButton(true);
     const via = await chooseShare({ getBoundingClientRect: () => at }, targets);
     if (!via) return 'cancelled';
-    if (via === 'drive') setStatus('Google Drive 에 올리는 중');
+    if (via === 'drive') setStatus(UI.driveUploading);
     const r = await api.attachments.share({ ...f, via });
     if (r?.error) throw new Error(r.error);
     if (r?.missing) return 'localsend-missing';
-    if (via === 'drive') showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' });
+    if (via === 'drive') showSharePop({ title: UI.linkCopied, sub: UI.pasteHint });
     return { drive: 'link', localsend: 'localsend', mail: 'mail' }[via];
   },
   dragOut: (payload) => api.attachments.dragOut(payload), // 메모 안 내용을 탐색기 · 카카오톡으로 끌어내기 (block-move.js)
@@ -254,7 +255,7 @@ async function flush() {
       // 다른 기기가 이 메모를 잠갔다 — 파일은 그쪽 것 그대로. 사본으로 남겼으면 쓴 글은 안전, 아니면 아직 저장 안 된 글로 둔다
       if (r.copied) {
         saved = body;
-        setStatus('다른 기기에서 이 메모를 잠가, 쓰던 내용은 사본 메모로 남겼어요', true);
+        setStatus(UI.lockedElsewhereCopy, true);
       } else setStatus('잠긴 메모라 저장하지 못했어요. 쓰던 글을 복사해 두세요', true);
       return;
     }
@@ -285,12 +286,12 @@ function applyExternal(next) {
   current = saved = editor.getMarkdown();
   el.banner.hidden = true;
   pendingExternal = null;
-  setStatus('바뀐 내용을 불러왔어요');
+  setStatus(UI.reloaded);
 }
 
 let conflictCopy = null; // 쓰는 중에 다른 기기에서도 고쳐 들어온 내용을 따로 남긴 사본 메모 (창이 열린 동안 한 사본만)
 
-function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
+function showBanner(text, { load = null, keep = UI.keepMine } = {}) {
   el.bannerText.textContent = text;
   $('banner-load').hidden = !load;
   if (load) $('banner-load').textContent = load;
@@ -310,13 +311,13 @@ api.on('memo:external', async (next) => {
     // 메모를 덮어쓰지 않는다. 다만 아직 저장 못 한 쓰던 글은 사본 메모로 먼저 남긴 뒤 닫는다 (쓰던 글이 사라지지 않게)
     clearTimeout(saveTimer);
     const wasLocked = Boolean(memo?.locked);
-    const what = wasLocked ? '다른 기기에서 이 메모의 비밀번호를 바꿨어요.' : '다른 기기에서 이 메모를 잠갔어요.';
+    const what = wasLocked ? UI.passwordChangedElsewhere : UI.lockedElsewhere;
     let kept = '';
     const snapshot = isDirty() ? current : null; // 사본으로 남길 글 (기다리는 동안 더 친 글은 창을 닫을 때 다시 사본으로)
     if (snapshot !== null && !isBlankBody(snapshot)) {
       try {
         const copy = await api.memo.keepCopy(id, snapshot, null, { unlocked: !wasLocked });
-        if (copy) kept = wasLocked ? ' 쓰던 내용은 예전 비밀번호로 잠근 사본 메모로 남겼어요.' : ' 쓰던 내용은 사본 메모로 따로 남겼어요.';
+        if (copy) kept = wasLocked ? UI.copyOldPassword : UI.copyKept;
       } catch (err) {
         console.error(err);
       }
@@ -354,12 +355,12 @@ api.on('memo:external', async (next) => {
   }
   if (!copied) {
     pendingExternal = next;
-    showBanner('다른 기기에서 이 메모가 바뀌었어요.', { load: '바뀐 내용 보기', keep: '지금 내용 두기' });
+    showBanner(UI.changedElsewhere, { load: UI.showChanges, keep: UI.keepMine });
     return;
   }
   pendingExternal = null;
   await flush();
-  showBanner(conflictCopy ? '다른 기기에서도 이 메모를 고쳤어요. 그쪽 내용은 따로 저장해 뒀어요.' : '다른 기기에서도 이 메모를 고쳤어요.', { load: conflictCopy ? '그쪽 내용 보기' : null, keep: '확인' });
+  showBanner(conflictCopy ? UI.conflictSaved : UI.conflict, { load: conflictCopy ? UI.showTheirs : null, keep: '확인' });
 });
 api.on('settings:link-previews', (on) => editor?.setLinkPreviews(on));
 // Work / Life 나누기: Work 메모는 어두운 화면 · Life 는 밝은 화면, 나눠 쓰지 않으면 시스템 설정 (메뉴의 "Work로 옮기기"도 그때만)
@@ -403,7 +404,7 @@ function applyMeta(next) {
   document.body.dataset.color = memo.color;
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
-  el.pinToggle.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
+  el.pinToggle.querySelector('span').textContent = memo.pinned ? UI.unpin : UI.pin;
   $('day-label').textContent = memo.day ? dayText(memo.day) : '';
   $('mode-btn').querySelector('span').textContent = moveLabel(memo);
   showModeTheme();
@@ -428,7 +429,7 @@ el.pinToggle.addEventListener('click', async () => {
 async function moveMode(to) {
   await flush();
   const next = await api.memo.set(id, { mode: to });
-  if (!next) return setStatus('옮기지 못했어요. 잠시 뒤 다시 해 주세요', true);
+  if (!next) return setStatus(UI.moveFail, true);
   applyMeta(next);
   setStatus(`${MODE_LABEL[to]}로 옮겼어요`);
 }
@@ -456,7 +457,7 @@ function flyButton(btn, off) {
   btn.querySelector('svg').animate(off
     ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
     : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
-  { duration: off ? 200 : 280, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+  { duration: off ? 200 : 280, easing: EASE_OUT });
 }
 function applyLayer(next) {
   const top = next?.top === true;
@@ -567,13 +568,13 @@ $('lock-btn').addEventListener('click', async () => {
   closeMenu();
   await flush();
   if (memo?.locked) {
-    const ok = await confirmDialog('잠금을 풀까요? 내용이 그대로 파일에 저장되고, 비밀번호 없이 열려요.', '잠금 풀기');
+    const ok = await confirmDialog(UI.unlockAsk, '잠금 풀기');
     if (!ok) return;
     const r = await api.memo.unlock(id);
     if (r?.error) return setStatus(r.error, true);
     memo = { ...memo, ...r };
     showLockState();
-    setStatus('잠금을 풀었어요');
+    setStatus(UI.unlocked);
     return;
   }
   const locked = await lockDialog({
@@ -646,7 +647,7 @@ $('delete-btn').addEventListener('click', async () => {
   // 묻지 않고 바로 휴지통으로 (목록 창에 되돌리기) — 창이 휴지통으로 빨려 들어가듯 사라진다
   saved = current; // 삭제하는 메모는 저장하지 않는다
   if (!reduceMotion()) {
-    await document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'forwards' }).finished.catch(() => {});
+    await document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: EASE_OUT, fill: 'forwards' }).finished.catch(() => {});
   }
   await api.memo.remove(id);
 });
@@ -711,7 +712,7 @@ function linkItem(target, { onRemove, onAdd, score } = {}) {
 
 async function setLink(targetId, on) {
   await flush();
-  if (!(await api.memo.link(id, targetId, on))) setStatus('연결을 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
+  if (!(await api.memo.link(id, targetId, on))) setStatus(UI.linkSaveFail, true);
   el.linkSearch.value = '';
   el.linkResults.replaceChildren();
   await refreshLinks();
@@ -766,7 +767,7 @@ async function refreshVersions() {
 async function restoreVersion(name) {
   await flush(); // 지금 내용이 버전으로 남도록 먼저 저장
   const restored = await api.memo.restoreVersion(id, name);
-  if (!restored) return setStatus('그 버전을 찾지 못했어요', true);
+  if (!restored) return setStatus(UI.versionMissing, true);
   if (restored.error) return setStatus(restored.error, true);
   editor.setMarkdown(restored.body, restored.tables ?? []);
   current = saved = editor.getMarkdown();
@@ -914,7 +915,7 @@ async function saveFile(file) {
 async function fetchImage(src) {
   if (isDataImage(src)) {
     const image = decodeDataImage(src);
-    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG, JPG, GIF, WebP 그림을 써 주세요');
+    if (!image) throw new Error(UI.imageType);
     return api.attachments.save(image.bytes, image.ext);
   }
   return api.attachments.fetch(src);
@@ -925,7 +926,7 @@ async function insertFiles(files) {
     await editor.insertFiles(files);
   } catch (err) {
     console.error(err);
-    setStatus('파일을 추가하지 못했어요. 다시 시도해 주세요', true);
+    setStatus(UI.fileAddFail, true);
   }
 }
 
@@ -1300,7 +1301,7 @@ function flushTables() {
   if (!pendingTables) return;
   const t = pendingTables;
   pendingTables = null;
-  api.memo.set(id, { tables: t }).catch(() => setStatus('표 크기를 저장하지 못했어요', true));
+  api.memo.set(id, { tables: t }).catch(() => setStatus(UI.tableSizeFail, true));
 }
 
 // 표 막대: 표 안에 커서가 있을 때만. 머리글 행과 마지막 남은 열은 지울 수 없으므로 막는다.
@@ -1328,22 +1329,22 @@ function showTableBar(table) {
   };
   delRow.disabled = table.header && !lastRow;
   delRow.dataset.wholeTable = lastRow ? '1' : '';
-  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : '이 행 삭제');
+  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : UI.rowDelete);
   // 셀 병합: 여러 칸을 골랐으면 "병합", 병합한 칸 안이면 "병합 풀기"
   const merge = tableBar.querySelector('[data-table="merge"]');
   merge.disabled = !table.canMerge && !table.merged;
-  setBtn(merge, table.merged ? '병합 풀기' : '병합', table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요');
+  setBtn(merge, table.merged ? '병합 풀기' : '병합', table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : UI.mergePick);
   tableBar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
   // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만 (머리글 아래 두 번째 행부터 · 바로 아래에 열 수가 같은 표)
   //   숨기지 않고 흐리게 — 커서를 옮길 때마다 단추가 생겼다 사라지며 막대가 다시 접히지 않게 (이유는 풍선에)
   const split = tableBar.querySelector('[data-table="splitTable"]');
   const join = tableBar.querySelector('[data-table="joinTable"]');
   split.disabled = !table.canSplit;
-  split.title = table.canSplit ? '커서가 있는 행부터 아래를 새 표로 (아래 표에도 머리글 행)' : '나눌 자리의 행(머리글 아래 두 번째 행부터)에 커서를 두세요';
+  split.title = table.canSplit ? UI.splitHere : UI.splitWhere;
   join.disabled = !table.canJoin;
-  join.title = table.canJoin ? '바로 아래 표를 이 표에 이어 붙이기 (열 수가 같을 때)' : '바로 아래에 열 수가 같은 표가 있을 때 합칠 수 있어요';
+  join.title = table.canJoin ? UI.joinBelow : UI.joinWhen;
   delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
-  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제');
+  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : UI.colDelete);
 }
 tableBar.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서가 표 안에 남게
 tableBar.addEventListener('click', (e) => {
@@ -1994,7 +1995,7 @@ if (memo?.needsPassword) {
   document.body.classList.remove('memo-locked');
 }
 if (!memo) {
-  setStatus('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
+  setStatus(UI.memoMissing, true);
   markPainted();
 } else {
   applyMeta(memo);
@@ -2057,7 +2058,7 @@ if (!memo) {
     docEl: () => el.editorRoot.querySelector('.ProseMirror'),
     read: async () => (memo.ink ? JSON.parse(new TextDecoder().decode(await api.attachments.read(memo.ink))) : null),
     save: async (data) => {
-      const rel = data ? await saveFile(new File([JSON.stringify(data)], '글 위에 그리기.json', { type: 'application/json' })) : '';
+      const rel = data ? await saveFile(new File([JSON.stringify(data)], UI.annotateFile, { type: 'application/json' })) : '';
       const next = await api.memo.set(id, { ink: rel });
       if (next) memo = { ...memo, ...next };
     },

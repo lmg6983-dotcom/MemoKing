@@ -41,6 +41,7 @@ import { openMemoryDay, dayText } from '../../app/js/memory-day.js';
 import { memoMode, otherMode, moveLabel, MODE_LABEL } from '../../app/js/core/modes.js';
 import { renderWorkSettings } from '../../app/js/work-settings.js';
 import { workHours, saveWorkHours } from './work-mode.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -161,7 +162,7 @@ app.api = {
         id = app.vault.import({ body: typeof body === 'string' && /^# \S/.test(body) ? body.slice(0, 20000) : `# ${title}\n` });
       }
       const memo = id ? app.vault.get(id) : null;
-      if (!memo) throw new Error('메모를 찾지 못했어요. 목록에서 다시 골라 주세요');
+      if (!memo) throw new Error(UI.memoPickAgain);
       app.setReminders(id, [...(memo.reminders ?? []), reminder]);
       list.refresh();
       return id;
@@ -277,7 +278,7 @@ function renderApps() {
     const b = document.createElement('b');
     b.textContent = a.app;
     const small = document.createElement('small');
-    small.textContent = off ? '보관 안 함' : `알림 ${a.count}개 보관 중`;
+    small.textContent = off ? UI.noHistory : `알림 ${a.count}개 보관 중`;
     name.append(b, small);
     const sw = document.createElement('input');
     sw.type = 'checkbox';
@@ -322,7 +323,7 @@ app.setReminders = (memoId, next) => {
   note.flush(); // 아직 파일이 없는 새 메모면 먼저 저장
   const reminders = next.map((r) => normalizeReminder(r)).filter(Boolean);
   const saved = app.vault.setReminders(memoId, reminders);
-  if (!saved) throw new Error('그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요');
+  if (!saved) throw new Error(UI.savedElsewhere);
   alarms.schedule();
   alarms.tick(); // 방금 만든 알림이 이미 울릴 때면 바로
   if (!notifyAsked && reminders.some((r) => r.enabled)) {
@@ -451,7 +452,7 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="print"]').hidden = !inNote;
   memoSheet.querySelector('[data-memo-action="find"]').hidden = !inNote; // 열어 둔 메모에서만
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
-  pin.querySelector('span').textContent = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
+  pin.querySelector('span').textContent = memo.pinned ? UI.unpin : UI.pin;
   memoSheet.querySelector('[data-memo-action="lock"] span').textContent = memo.locked ? '잠금 풀기' : '잠그기';
   memoSheet.querySelector('[data-memo-action="day"] small').textContent = memo.day ? dayText(memo.day) : '';
   memoSheet.querySelector('[data-memo-action="mode"] span').textContent = moveLabel(memo);
@@ -504,7 +505,7 @@ memoSheet.addEventListener('click', async (e) => {
       const day = await openMemoryDay({ created: memo?.created, day: memo?.day });
       if (day === null) break;
       if (!app.vault.setMeta(id, { day })) toast('날짜를 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
-      else toast(day ? `회상 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
+      else toast(day ? `회상 달력의 ${dayText(day)}에 두었어요` : UI.dateReset);
       break;
     }
     case 'mode': {
@@ -512,7 +513,7 @@ memoSheet.addEventListener('click', async (e) => {
       note.flush();
       closeSheet(memoSheet);
       const to = otherMode(memoMode(memo));
-      if (!app.vault.setMeta(id, { mode: to })) toast('옮기지 못했어요. 잠시 뒤 다시 해 주세요', true);
+      if (!app.vault.setMeta(id, { mode: to })) toast(UI.moveFail, true);
       else toast(`${MODE_LABEL[to]}로 옮겼어요`);
       break;
     }
@@ -523,7 +524,7 @@ memoSheet.addEventListener('click', async (e) => {
     case 'copy':
       closeSheet(memoSheet);
       native.copyText(shareText(body)); // 마크다운 원문(<br /> · \* · - [ ]) 대신 보이는 글 그대로
-      toast('글을 복사했어요');
+      toast(UI.textCopied);
       break;
     case 'print':
       closeSheet(memoSheet);
@@ -546,10 +547,10 @@ memoSheet.addEventListener('click', async (e) => {
           app.openMemo(id);
           break;
         }
-        if (!(await confirmDialog('잠금을 풀까요? 내용이 그대로 파일에 저장되고, 비밀번호 없이 열려요.', '잠금 풀기'))) break;
+        if (!(await confirmDialog(UI.unlockAsk, '잠금 풀기'))) break;
         if (app.vault.unlock(id)) {
           note.lockChanged(false);
-          toast('잠금을 풀었어요');
+          toast(UI.unlocked);
         } else toast('잠금을 풀지 못했어요. 그사이 다른 기기에서 다시 잠갔을 수 있어요. 메모를 다시 열어 주세요', true);
         break;
       }
@@ -586,7 +587,7 @@ function openVersions(id) {
   const show = () => renderVersions($('versions-list'), app.vault.versions(id), (name) => {
     if (note.currentId() === id) note.flush();
     const restored = app.vault.restoreVersion(id, name);
-    if (!restored) return toast('그 버전을 찾지 못했어요', true);
+    if (!restored) return toast(UI.versionMissing, true);
     if (restored.error) return toast(restored.error, true);
     if (note.currentId() === id) note.showRestored(restored);
     toast('되돌렸어요');
@@ -703,7 +704,7 @@ shareSheet.addEventListener('click', async (e) => {
     closeSheet(shareSheet);
   } catch (err) {
     console.error(err);
-    toast(err.message || '공유하지 못했어요', true);
+    toast(err.message || UI.shareFail, true);
   } finally {
     $('share-busy').hidden = true;
     for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = false;
@@ -976,7 +977,7 @@ $('spk-switch').addEventListener('change', async () => {
       toast('말한 사람 나누기를 켰어요. 다음 녹음부터 붙어요');
     }
   } catch (err) {
-    toast(err.message || '받지 못했어요. 인터넷 연결을 확인해 주세요', true);
+    toast(err.message || UI.downloadFail, true);
   }
   refreshSpeakerRow();
 });
@@ -1202,7 +1203,7 @@ async function transcribeInto(memoId, items) {
 async function transcribeEach(memoId, items) {
   for (const item of items) {
     try {
-      toast('받아쓰는 중');
+      toast(UI.transcribing);
       const res = await call('transcribe', { rel: item.src, terms: app.sttTerms() });
       const text = polish(String(res?.text ?? '').trim());
       if (!text) {
@@ -1293,7 +1294,7 @@ async function memoFromShare(payload) {
       const tags = note.autoTagIncoming(source);
       note.flush();
       document.activeElement?.blur(); // 키보드는 올리지 않는다 (이어 쓰려면 누르기)
-      toast(tags.length ? `메모를 만들었어요, ${tags.map((t) => `#${t}`).join(' ')}` : '메모를 만들었어요');
+      toast(tags.length ? `메모를 만들었어요, ${tags.map((t) => `#${t}`).join(' ')}` : UI.memoCreated);
     },
   });
   if (stt && audioItems.length && recorder.sttReady()) transcribeInto(id, audioItems);

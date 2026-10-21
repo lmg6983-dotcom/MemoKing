@@ -7,6 +7,7 @@ import { remembered, remember } from './event-editor.js';
 import { alertPicker } from './alert-picker.js';
 import { timePicker } from './date-picker.js';
 import { icon } from './icons.js';
+import { UI } from './core/ui-text.js';
 
 function el(tag, attrs = {}, text = '') {
   const node = document.createElement(tag);
@@ -163,7 +164,7 @@ export function openQuickEvent({ day, search }) {
       const set = [...picked[kind()]];
       const live = pendingAlerts(set, startAt(), { allDay });
       const fb = pendingAlerts(set, startAt(), { fallback: fallbackAlert(allDay), allDay });
-      hint.textContent = !set.length ? '알림 없이 달력에만 보여요' : live.length ? '' : fb.length ? `고른 시각이 모두 지나 ${alertLabel(fb[0], allDay)}에 알려요` : '';
+      hint.textContent = !set.length ? UI.calendarOnly : live.length ? '' : fb.length ? `고른 시각이 모두 지나 ${alertLabel(fb[0], allDay)}에 알려요` : '';
     }
 
     save.addEventListener('click', () => {

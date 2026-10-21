@@ -22,6 +22,7 @@ import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
 import { mailAttach, openLocalSend, findLocalSend, LOCALSEND_DOWNLOAD } from './share-file.js';
 import { driveShareLink } from './share-drive.js';
+import { UI } from '../app/js/core/ui-text.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 // 메뉴를 띄울 자리 (화면이 준 창 안 좌표 — 키보드로 연 메뉴는 마우스 자리가 아니라 그 카드 · 내용 자리에). 없으면 마우스 자리
@@ -206,7 +207,7 @@ export function registerIpc(ctx) {
     if (!vault || !Array.isArray(list)) return null;
     const reminders = list.map((r) => normalizeReminder(r)).filter(Boolean);
     const saved = vault.setReminders(id, reminders);
-    if (!saved) throw new Error('그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요');
+    if (!saved) throw new Error(UI.savedElsewhere);
     wm.sendToNote(id, 'memo:reminders', saved);
     pushReminders();
     alarms.tick();
@@ -225,9 +226,9 @@ export function registerIpc(ctx) {
       memoId = vault.import({ body: typeof body === 'string' && /^# \S/.test(body) ? body.slice(0, 20000) : `# ${title}\n` });
     }
     const memo = memoId ? vault.get(memoId) : null;
-    if (!memo) throw new Error('메모를 찾지 못했어요. 목록에서 다시 골라 주세요');
+    if (!memo) throw new Error(UI.memoPickAgain);
     const saved = vault.setReminders(memoId, [...(memo.reminders ?? []), r]);
-    if (!saved) throw new Error('그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요');
+    if (!saved) throw new Error(UI.savedElsewhere);
     wm.sendToNote(memoId, 'memo:reminders', saved);
     pushReminders();
     alarms.tick();
@@ -272,7 +273,7 @@ export function registerIpc(ctx) {
   // 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 로그인 → 받았으면 폴더를 처음부터 훑어 다른 앱이 넣은 메모를 바로 받는다
   ipcMain.handle('drive:full-scope', async (_e, on) => {
     const auth = getDriveAuth();
-    if (!auth) return { full: false, error: 'Google Drive 를 쓸 수 없어요. 설정의 Google Drive 동기화에서 먼저 연결해 주세요' };
+    if (!auth) return { full: false, error: UI.driveUnavailable };
     const res = await auth.setFullScope(Boolean(on));
     if (wm.listWin) bringToFront(wm.listWin);
     if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
@@ -280,7 +281,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('drive:folders', async (_e, parent) => {
     const api = getDriveApi();
-    if (!api) throw new Error('Google Drive 를 쓸 수 없어요. 설정의 Google Drive 동기화에서 먼저 연결해 주세요');
+    if (!api) throw new Error(UI.driveUnavailable);
     return (await api.folders(String(parent || 'root'))).map((f) => ({ id: f.id, name: f.name, created: f.created }));
   });
   // 같은 이름 폴더가 이미 있으면 새로 만들지 않고 그것을 돌려준다 (existed: true)
@@ -560,7 +561,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('opms:copy', (_e, text) => clipboard.writeText(String(text ?? '').slice(0, 2000)));
   ipcMain.handle('opms:to-memo', async (_e, idx) => {
     const vault = getVault();
-    if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
+    if (!vault) throw new Error(UI.noVault);
     const known = wm.caseOf(idx);
     const client = wm.opmsClient();
     const c = (await client.caseByIdx(known.idx).catch(() => null)) ?? known;
@@ -627,7 +628,7 @@ export function registerIpc(ctx) {
     if (payload.open) wm.openNote(id);
     else {
       const showNow = () => wm.openNote(id, { inactive: true });
-      if (!toast({ memoId: id, kind: 'magic-memo', title: '메모를 만들었어요', body: `${body.split('\n')[0].slice(0, 40)}\n눌러서 열기`, onClick: () => wm.revealNote(id), onFail: showNow })) showNow();
+      if (!toast({ memoId: id, kind: 'magic-memo', title: UI.memoCreated, body: `${body.split('\n')[0].slice(0, 40)}\n눌러서 열기`, onClick: () => wm.revealNote(id), onFail: showNow })) showNow();
     }
     return { ok: true, id };
   });
@@ -701,7 +702,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('memo:create', (_e, options) => wm.createNote(options ?? {}));
   ipcMain.handle('memo:import', (_e, body, opts) => {
     const vault = getVault();
-    if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
+    if (!vault) throw new Error(UI.noVault);
     const id = vault.import({ body: String(body ?? '').slice(0, 5_000_000) });
     if (!id) throw new Error('이 파일로는 메모를 만들 수 없어요. 글 파일(.txt, .md 등)을 골라 주세요');
     if (opts?.open) wm.openNote(id);
@@ -736,7 +737,7 @@ export function registerIpc(ctx) {
     try {
       const { session } = await openLock(sealed, String(password ?? ''));
       if (!wm.noteWins.has(String(id))) return { error: '메모 창이 닫혔어요' };
-      return vault?.openLock(String(id), session) ?? { error: '메모를 열지 못했어요' };
+      return vault?.openLock(String(id), session) ?? { error: UI.memoOpenFail };
     } catch (err) {
       return { error: err.message };
     }
@@ -745,7 +746,7 @@ export function registerIpc(ctx) {
     const vault = getVault();
     if (!vault) return { error: '메모 폴더가 열려 있지 않아요' };
     const m = vault.get(String(id));
-    if (!m) return { error: '메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요' };
+    if (!m) return { error: UI.memoMissing };
     if (!m.locked) return m;
     if (m.needsPassword) return { error: '먼저 비밀번호로 열어 주세요' };
     return vault.unlock(String(id)) ?? { error: '그사이 다른 기기에서 이 메모가 바뀌어 풀지 못했어요. 다시 해 주세요' };
@@ -826,7 +827,7 @@ export function registerIpc(ctx) {
     let file = SMOKE ? path.join(app.getPath('temp'), `memoking-smoke-${Date.now()}.png`) : null;
     if (!file) {
       const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender) ?? undefined, {
-        title: '그림으로 저장',
+        title: UI.saveAsImage,
         defaultPath: path.join(app.getPath('pictures'), name),
         filters: [{ name: 'PNG 그림', extensions: ['png'] }],
       });
@@ -867,7 +868,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('attachment:save', (_e, bytes, ext) => {
     const vault = getVault();
-    if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
+    if (!vault) throw new Error(UI.noVault);
     if (!(bytes instanceof Uint8Array)) throw new TypeError('넣으려는 파일을 읽지 못했어요. 파일을 다시 골라 주세요');
     return vault.saveAttachment(bytes, ext);
   });
@@ -1160,7 +1161,7 @@ export function registerIpc(ctx) {
   // 메모 공유: 글을 "제목.txt" 파일로 (Drive 링크 · LocalSend · 메일은 파일을 보낸다) — share:targets · attachment:share 가 이어서
   ipcMain.handle('card:share-file', (_e, rawId) => {
     const m = getVault()?.get(String(rawId));
-    if (!m) return { error: '메모를 찾지 못했어요. 목록에서 다시 골라 주세요' };
+    if (!m) return { error: UI.memoPickAgain };
     if (m.locked) return { error: '잠긴 메모는 잠금을 풀어야 공유할 수 있어요' };
     const text = hotkeyCopyText(m.body);
     if (!text.trim()) return { error: '공유할 글이 없어요' };

@@ -31,7 +31,8 @@ import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
+import { UI } from './core/ui-text.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -211,7 +212,6 @@ function renderNow() {
 
 // ---------- 움직임 (디자인 시스템: 짧고 조용하게, 움직임 줄이기 존중) ----------
 
-const EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
 let firstCards = true;
 
 function cardRects() {
@@ -241,12 +241,12 @@ function animateCards(before) {
       const dx = old.left - now.left;
       const dy = old.top - now.top;
       if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-        li.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 240, easing: EASE });
+        li.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 240, easing: EASE_OUT });
       }
     } else if (first || before.size) {
       // 처음 열 때는 위에서부터 차례로, 그 뒤엔 새로 생긴 카드만
       li.animate([{ opacity: 0, transform: 'translateY(6px) scale(0.98)' }, { opacity: 1, transform: 'none' }],
-        { duration: 200, easing: EASE, delay: first ? Math.min(i, 10) * 18 : 0, fill: 'backwards' });
+        { duration: 200, easing: EASE_OUT, delay: first ? Math.min(i, 10) * 18 : 0, fill: 'backwards' });
     }
   });
 }
@@ -409,7 +409,7 @@ el.filterBtn.addEventListener('click', async () => {
   if (!reduceMotion()) {
     const h = p.scrollHeight;
     const frames = [{ height: '0px', opacity: 0, marginBottom: '0px', paddingTop: '0px', paddingBottom: '0px' }, { height: `${h}px`, opacity: 1 }];
-    await p.animate(open ? frames : frames.slice().reverse(), { duration: 200, easing: EASE }).finished.catch(() => {});
+    await p.animate(open ? frames : frames.slice().reverse(), { duration: 200, easing: EASE_OUT }).finished.catch(() => {});
   }
   if (!open) p.hidden = true;
 });
@@ -428,13 +428,13 @@ function renderEmpty(narrowed, elsewhere = 0) {
   text.textContent = narrowed && elsewhere
     ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
     : narrowed
-    ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
+    ? state.query ? `'${state.query}' 검색 결과가 없어요.` : UI.noMatch
     : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 카드 메뉴의 "Work로 옮기기"로 옮겨 보세요.'
       : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'btn primary';
-  b.textContent = narrowed && elsewhere ? `${other}에서 보기` : narrowed ? '검색과 필터 풀기' : '새 메모 (Ctrl+N)';
+  b.textContent = narrowed && elsewhere ? `${other}에서 보기` : narrowed ? UI.clearFilters : '새 메모 (Ctrl+N)';
   b.addEventListener('click', () => {
     if (narrowed && elsewhere) return setMode(otherMode(state.mode));
     if (!narrowed) return api.memo.create();
@@ -449,7 +449,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
     const help = document.createElement('button');
     help.type = 'button';
     help.className = 'btn';
-    help.textContent = '정리 도우미로 찾기';
+    help.textContent = UI.findWithHelper;
     help.addEventListener('click', () => openHelper());
     actions.append(help);
   }
@@ -550,7 +550,7 @@ function renderCard(memo) {
   const del = document.createElement('button');
   del.className = 'icon-btn danger card-delete';
   // 이름은 오른쪽 클릭 메뉴 · 휴대폰과 같게 — 지우는 게 아니라 휴지통으로 (되돌릴 수 있다). 키는 Delete
-  del.title = '휴지통으로 옮기기 (Delete)';
+  del.title = UI.toTrash;
   del.setAttribute('aria-label', `${memo.title} 휴지통으로 옮기기`);
   del.dataset.delete = memo.id;
   del.append(icon('trash'));
@@ -558,7 +558,7 @@ function renderCard(memo) {
   // 목록 맨 위에 고정 (압정)
   const pin = document.createElement('button');
   pin.className = `icon-btn card-pin${memo.pinned ? ' on' : ''}`;
-  pin.title = memo.pinned ? '목록 고정 풀기' : '목록 맨 위에 고정';
+  pin.title = memo.pinned ? UI.unpin : UI.pin;
   pin.setAttribute('aria-label', `${memo.title} ${pin.title}`);
   pin.setAttribute('aria-pressed', String(Boolean(memo.pinned)));
   pin.dataset.pin = memo.id;
@@ -570,7 +570,7 @@ function renderCard(memo) {
   // PDF 로 저장
   const pdf = document.createElement('button');
   pdf.className = 'icon-btn card-pdf';
-  pdf.title = 'PDF로 저장';
+  pdf.title = UI.saveAsPdf;
   pdf.setAttribute('aria-label', `${memo.title} PDF로 저장`);
   pdf.dataset.pdf = memo.id;
   pdf.append(icon('pdf'));
@@ -891,7 +891,7 @@ function showQuickMemo(q) {
 // ---------- AI 비서 연결 (MCP) ----------
 function showMcp(m, message = '') {
   if (!m) return;
-  $('mcp-title').textContent = m.connected && !m.stale ? 'Claude 데스크톱에 연결됨' : m.stale ? '다시 연결이 필요해요' : '연결 안 됨';
+  $('mcp-title').textContent = m.connected && !m.stale ? 'Claude 데스크톱에 연결됨' : m.stale ? '다시 연결이 필요해요' : UI.notConnected;
   $('mcp-sub').textContent = message || (m.broken
     ? 'Claude 데스크톱 설정 파일을 읽지 못했어요. 설정 복사로 직접 넣어 주세요'
     : m.stale ? '메모킹을 다른 곳에 다시 설치했어요. 연결을 눌러 새 위치로 맞춰 주세요'
@@ -1116,7 +1116,7 @@ $('history-enabled').addEventListener('change', async (e) => {
 
 // ---------- 탭: 메모 · 알림 예약 · 알림 보관함 ----------
 
-const TAB_PLACEHOLDER = { memos: '메모 검색 (Ctrl+F)', reminders: '일정 검색', history: '보관한 알림 검색' };
+const TAB_PLACEHOLDER = { memos: '메모 검색 (Ctrl+F)', reminders: '일정 검색', history: UI.searchHistory };
 let activeTab = 'memos';
 
 const remindersTab = setupRemindersTab({
@@ -1141,30 +1141,30 @@ const remindersTab = setupRemindersTab({
           if (!via) return '';
           if (!targets.find((t) => t.id === via)?.ready) {
             el.settingsBtn.click();
-            return 'Google Drive 를 먼저 연결해 주세요';
+            return UI.driveFirst;
           }
-          if (via === 'drive') flashStatus('Google Drive 에 올리는 중');
+          if (via === 'drive') flashStatus(UI.driveUploading);
           const r = await api.attachments.share({ name: collageName(o), mime: 'image/png', base64, via });
           if (r?.error) throw new Error(r.error);
           if (r?.missing) return SHARE_DONE['localsend-missing'];
           if (via === 'drive') {
-            showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' });
+            showSharePop({ title: UI.linkCopied, sub: UI.pasteHint });
             return '';
           }
           return SHARE_DONE[via] ?? '보냈어요';
         } },
         { id: 'copy', label: '복사', icon: 'copy', run: async () => {
           await api.image.copy(base64);
-          return '그림을 복사했어요. 붙여 넣어 보낼 수 있어요';
+          return UI.imageCopied;
         } },
         { id: 'save', label: '저장', icon: 'folder', run: async () => {
           const r = await api.image.save(null, base64, collageName(o));
           return r?.file ? `${r.name}로 저장했어요` : '';
         } },
-        { id: 'memo', label: '메모로 만들기', icon: 'note', close: true, run: async () => {
+        { id: 'memo', label: UI.makeMemo, icon: 'note', close: true, run: async () => {
           const rel = await api.attachments.save(base64Bytes(base64), 'png');
           await api.memo.import(collageMemoBody(o.title, rel), { open: true });
-          return '새 메모로 만들었어요';
+          return UI.madeNewMemo;
         } },
       ],
     },
@@ -1199,7 +1199,7 @@ async function renderApps() {
     const b = document.createElement('b');
     b.textContent = a.app;
     const small = document.createElement('small');
-    small.textContent = a.blocked ? '보관 안 함' : `알림 ${a.count}개 보관 중`;
+    small.textContent = a.blocked ? UI.noHistory : `알림 ${a.count}개 보관 중`;
     name.append(b, small);
     const sw = document.createElement('input');
     sw.type = 'checkbox';
@@ -1324,13 +1324,13 @@ el.cards.addEventListener('contextmenu', (e) => {
         const day = await openMemoryDay({ created: m.created, day: m.day });
         if (day === null) return;
         await api.memo.set(m.id, { day });
-        flashStatus(day ? `회상 달력의 ${dayText(day)}에 두었어요` : '만든 날로 되돌렸어요');
+        flashStatus(day ? `회상 달력의 ${dayText(day)}에 두었어요` : UI.dateReset);
       },
       // Work ↔ Life로 옮기기: 카드는 지금 목록에서 빠진다
       mode: async (m) => {
         const to = otherMode(memoMode(m));
         if (await api.memo.set(m.id, { mode: to })) flashStatus(`${MODE_LABEL[to]}로 옮겼어요. 위의 ${MODE_LABEL[to]}에서 보여요`);
-        else flashStatus('옮기지 못했어요. 잠시 뒤 다시 해 주세요');
+        else flashStatus(UI.moveFail);
       },
       trash: (id) => deleteMemo(id),
       flash: flashStatus,
@@ -1710,7 +1710,6 @@ let listTop = null;
 let crownDocked = false;
 const crownMini = listTopBtn.querySelector('.crown-mini');
 const crownLine = listTopBtn.querySelector('.crown-line');
-const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
 function paintListTop() {
   const on = Boolean(listTop);
   const docked = on && crownDocked;
@@ -1934,12 +1933,12 @@ let updateSt = { status: 'idle' };
 function showUpdateRow(st) {
   updateEl.current.textContent = st.current ? `v${st.current}` : '';
   const text = {
-    idle: '새 버전이 나오면 알려 드려요',
-    checking: '새 버전을 찾고 있어요',
-    latest: '최신 버전을 쓰고 있어요',
+    idle: UI.updWait,
+    checking: UI.updChecking,
+    latest: UI.updLatest,
     dev: '개발 중에는 확인하지 않아요',
     available: `새 버전 v${st.version} 이 나왔어요`,
-    downloading: '새 버전을 받고 있어요',
+    downloading: UI.updDownloading,
     ready: `v${st.version} 을 받아 뒀어요. 끝낼 때도 설치돼요`,
     error: st.message ?? '',
   }[st.status] ?? '';
@@ -1947,14 +1946,14 @@ function showUpdateRow(st) {
   updateEl.note.classList.toggle('warn', st.status === 'error');
   // 단추: 최신이면 초록 "최신 버전", 새 버전이 있으면 노랑 "업데이트" (누르면 바뀐 점 · 받기), 받는 중 · 받아 둠도 그 자리에서
   const label = {
-    checking: '확인하는 중',
-    latest: '✓ 최신 버전',
+    checking: UI.updCheckingShort,
+    latest: UI.updLatestShort,
     available: `업데이트 v${st.version}`,
     downloading: `받는 중 ${st.percent ?? 0}%`,
     ready: '재시작해서 설치',
   }[st.status];
   updateEl.check.dataset.state = label ? st.status : 'idle';
-  updateEl.check.textContent = label ?? '업데이트 확인';
+  updateEl.check.textContent = label ?? UI.updCheck;
   updateEl.check.classList.toggle('primary', st.status === 'available' || st.status === 'ready'); // 노랑 (기본 단추 모양)
   updateEl.check.title = { latest: '눌러서 다시 확인', available: '다시 확인한 뒤 바뀐 점을 보고 받아요', ready: '쓰던 메모를 저장하고 다시 시작해 설치해요' }[st.status] ?? '';
   updateEl.check.disabled = st.status === 'checking';
@@ -1963,7 +1962,7 @@ function showUpdateRow(st) {
 function renderUpdateDialog(st) {
   const ready = st.status === 'ready';
   const downloading = st.status === 'downloading';
-  updateEl.title.textContent = ready ? '설치할 준비가 됐어요' : '새 버전이 나왔어요';
+  updateEl.title.textContent = ready ? UI.updReady : UI.updNew;
   // "v0.44.0 → v0.45.0": 지금 버전은 흐리게, 새 버전은 또렷하게 (화면 읽기 프로그램에는 "에서 로" 로 읽힌다)
   const from = document.createElement('span');
   from.className = 'from';
@@ -1988,7 +1987,7 @@ function renderUpdateDialog(st) {
   updateEl.error.textContent = st.status === 'error' ? st.message ?? '' : '';
   updateEl.go.textContent = ready ? '지금 재시작' : downloading ? '받는 중' : st.status === 'error' ? '다시 확인' : '받기';
   updateEl.go.disabled = downloading;
-  updateEl.later.textContent = ready ? '나중에 (끝낼 때 설치)' : downloading ? '닫기 (계속 받아요)' : '나중에';
+  updateEl.later.textContent = ready ? '나중에 (끝낼 때 설치)' : downloading ? UI.updCloseKeep : '나중에';
 }
 
 function onUpdate(st, { open = false } = {}) {

@@ -1,10 +1,11 @@
 // 설정의 "Google Drive 동기화" — Google Drive 데스크탑 앱 없이 구글 로그인으로 메모 폴더를 Drive 폴더와 맞춘다.
 // 연결: ① (처음 한 번) OAuth 클라이언트 붙여 넣기 ② 브라우저 로그인 ③ Drive 폴더 고르기 ④ 첫 동기화
 import { koClock, relativeDay, koMonthDay } from './core/time.js';
+import { UI } from './core/ui-text.js';
 
 const $ = (id) => document.getElementById(id);
 // 메모킹이 Drive 에 만드는 폴더 이름 (예전 "메모킹" 폴더는 Google Drive 데스크탑 앱이 만든 것이라 메모킹이 볼 수 없다)
-export const SYNC_FOLDER = '메모킹 동기화';
+export const SYNC_FOLDER = UI.driveFolder;
 
 // Electron 이 붙이는 "Error invoking remote method 'drive:login': AuthError: …" 를 걷어낸다
 export const cleanError = (err) => String(err?.message ?? err ?? '')
@@ -78,7 +79,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
   const dialog = $('drive-dialog');
   const box = $('drive-box');
   let info = null;
-  let path = [{ id: 'root', name: '내 드라이브' }];
+  let path = [{ id: 'root', name: UI.myDrive }];
   let loginRun = 0;
   let fullBusy = false;
   let connecting = false;
@@ -93,7 +94,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
   function summary() {
     const st = info.status ?? { state: 'off' };
     const on = info.connected && info.active;
-    if (info.reconnect && !info.connected) return { tone: 'error', title: '다시 연결해 주세요', sub: 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC 에 그대로 있어요', on };
+    if (info.reconnect && !info.connected) return { tone: 'error', title: UI.reconnect, sub: 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC 에 그대로 있어요', on };
     if (!info.connected) return { tone: 'off', title: '동기화 꺼짐', sub: 'Google 계정으로 연결하면 휴대폰 메모킹과 같은 메모를 써요', on };
     if (!info.active) return { tone: 'off', title: `${info.email || 'Google 계정'} 로그인됨`, sub: '동기화할 Drive 폴더를 아직 고르지 않았어요', on };
     const where = `${info.email || 'Google 계정'}의 ${info.folderName || '메모킹'} 폴더`;
@@ -102,7 +103,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
       const count = p?.phase === 'transfer' && p.total ? ` · ${p.done}/${p.total}` : '';
       return { tone: 'busy', title: `동기화하는 중${count}`, sub: progressText(p) || where, on, progress: p ?? { phase: 'scan' } };
     }
-    if (st.state === 'error') return { tone: 'error', title: needsLogin(st.error) ? '다시 로그인해 주세요' : '동기화하지 못했어요', sub: st.error || '잠시 뒤 다시 시도해 주세요', on, error: true };
+    if (st.state === 'error') return { tone: 'error', title: needsLogin(st.error) ? '다시 로그인해 주세요' : UI.syncFail, sub: st.error || '잠시 뒤 다시 시도해 주세요', on, error: true };
     // 방금 끝났으면 몇 개를 맞췄는지 (되고 있었는지 알 수 있게)
     const fresh = st.lastSync && Date.now() - st.lastSync < 60_000;
     const moved = fresh && st.moved ? `, 파일 ${st.moved}개 맞춤` : fresh ? ', 바뀐 것 없음' : '';
@@ -388,7 +389,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
       : `이 PC 의 메모 폴더: ${info.root} (처음 맞출 때 이 메모들을 새 폴더로 올려요)`;
     $('folder-change-note').hidden = !info.active;
     folderMsg('');
-    path = [{ id: 'root', name: '내 드라이브' }];
+    path = [{ id: 'root', name: UI.myDrive }];
     await showFolder();
   }
 

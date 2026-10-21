@@ -1,6 +1,7 @@
 // 오른쪽 클릭 메뉴 (모든 창) — Electron 은 직접 만들지 않으면 오른쪽 클릭에 아무것도 뜨지 않는다.
 //   누른 곳에 맞는 것만: 맞춤법 후보 · 링크 · 그림 · 글 칸(잘라내기 · 복사 · 붙여넣기 …) · 고른 글 복사
 //   목록 카드처럼 화면이 따로 메뉴를 띄우는 곳은 화면이 오른쪽 클릭을 막아(preventDefault) 여기까지 오지 않는다.
+import { UI } from '../app/js/core/ui-text.js';
 
 // 메뉴 오른쪽에 단축키 안내 (Windows 처럼) — 키는 이미 창이 받으므로 메뉴가 따로 붙잡지 않는다
 const key = (item, accelerator) => ({ ...item, accelerator, registerAccelerator: false });
@@ -28,7 +29,7 @@ export function contextMenuTemplate(p, act) {
   if (/^https?:\/\//i.test(p.linkURL ?? '')) {
     groups.push([
       { label: '링크 열기', click: () => act.openLink(p.linkURL) },
-      { label: '링크 주소 복사', click: () => act.copyText(p.linkURL) },
+      { label: UI.copyLink, click: () => act.copyText(p.linkURL) },
     ]);
   }
 
@@ -45,11 +46,11 @@ export function contextMenuTemplate(p, act) {
       key({ label: '복사', role: 'copy', enabled: flags.canCopy !== false }, 'CmdOrCtrl+C'),
       key({ label: '붙여넣기', role: 'paste', enabled: flags.canPaste !== false }, 'CmdOrCtrl+V'),
       key(act.pastePlain
-        ? { label: '서식 없이 붙여넣기', enabled: flags.canPaste !== false, click: () => act.pastePlain() }
-        : { label: '서식 없이 붙여넣기', role: 'pasteAndMatchStyle', enabled: flags.canPaste !== false }, 'CmdOrCtrl+Shift+V'),
+        ? { label: UI.pastePlain, enabled: flags.canPaste !== false, click: () => act.pastePlain() }
+        : { label: UI.pastePlain, role: 'pasteAndMatchStyle', enabled: flags.canPaste !== false }, 'CmdOrCtrl+Shift+V'),
     ]);
     // 고른 글자의 모양을 지운다 (고른 것이 없으면 커서가 있는 문단을 보통 글로 — 표 · 목록 · 제목 · 인용도)
-    if (act.clearFormat) groups.push([key({ label: '서식 지우기', click: () => act.clearFormat() }, 'CmdOrCtrl+\\')]);
+    if (act.clearFormat) groups.push([key({ label: UI.clearFormat, click: () => act.clearFormat() }, 'CmdOrCtrl+\\')]);
     groups.push([key({ label: '모두 선택', role: 'selectAll', enabled: flags.canSelectAll !== false }, 'CmdOrCtrl+A')]);
   } else if (String(p.selectionText ?? '').trim()) {
     groups.push([key({ label: '복사', role: 'copy' }, 'CmdOrCtrl+C')]);

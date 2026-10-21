@@ -3,10 +3,11 @@
 //   다른 메모가 쓰는 숫자는 그 메모 제목이 보이고, 고르면 이 메모로 옮겨진다는 것을 알려 준다
 import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { attachSlider } from './seg-slider.js';
+import { UI } from './core/ui-text.js';
 
 const MODES = [
   { key: 'copy', name: '내용 복사', copy: true, show: false, does: '내용을 복사해요', desc: '제목 줄은 빼고 본문만 복사해요. 붙여 넣을 곳에서 Ctrl+V' },
-  { key: 'show', name: '메모 띄우기', copy: false, show: true, does: '메모를 띄워요', desc: '이 메모 창을 화면 앞으로 가져와요' },
+  { key: 'show', name: UI.showMemo, copy: false, show: true, does: '메모를 띄워요', desc: '이 메모 창을 화면 앞으로 가져와요' },
   { key: 'both', name: '둘 다', copy: true, show: true, does: '내용을 복사하고 메모를 띄워요', desc: '복사하고 띄워요. 쓰던 앱에서 바로 Ctrl+V' },
 ];
 // 잠긴 메모는 비밀번호를 넣어야 하니 복사 대신 창을 띄운다 (main.js memoHotkeyPressed)

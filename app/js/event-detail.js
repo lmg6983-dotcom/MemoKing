@@ -2,6 +2,7 @@
 //   메모킹 일정: 메모 열기 · (한 번짜리는) 지우기 / 다른 캘린더 일정: 메모로 가져오기
 import { icon } from './icons.js';
 import { koClock, koFullDate, relativeDay, sameDay, addDays } from './core/time.js';
+import { UI } from './core/ui-text.js';
 
 let seq = 0; // 창마다 다른 id (빨리 다시 열어도 겹치지 않게)
 
@@ -75,7 +76,7 @@ export function openEventDetail({ title, start, end = null, allDay = false, colo
     if (memoColor) dialog.dataset.color = memoColor;
 
     const head = el('div', 'dialog-head');
-    const h = el('h2', '', title || '(제목 없음)');
+    const h = el('h2', '', title || UI.untitledParen);
     h.id = hid;
     const close = el('button', 'icon-btn dialog-x');
     close.type = 'button';

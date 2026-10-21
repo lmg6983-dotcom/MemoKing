@@ -4,6 +4,7 @@
 import { DEFAULT_ALERTS, MAX_ALERTS, alertLabel, pendingAlerts, fallbackAlert, validAlert } from './core/reminders.js';
 import { alertPicker } from './alert-picker.js';
 import { koClock, dayLabel } from './core/time.js';
+import { UI } from './core/ui-text.js';
 
 const KEY = 'memoking.eventAlerts';
 
@@ -93,7 +94,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
       const set = picked[kind()];
       const active = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), allDay: isAllDay });
       const fb = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay), allDay: isAllDay });
-      none.textContent = active.length ? '' : fb.length ? `고른 알림 시각이 지나 ${alertLabel(fb[0], isAllDay)}에 알려요` : '알림 없이 달력에만 보여요';
+      none.textContent = active.length ? '' : fb.length ? `고른 알림 시각이 지나 ${alertLabel(fb[0], isAllDay)}에 알려요` : UI.calendarOnly;
     }
     allDaySwitch.addEventListener('change', () => {
       isAllDay = allDaySwitch.checked;

@@ -7,6 +7,7 @@ import { toLocalIso } from './time.js';
 
 export * from './calendar-feed-list.js';
 import { occurrenceEnd, DEFAULT_ALERTS } from './reminders.js';
+import { UI } from './ui-text.js';
 
 const MAX_ITERATIONS = 100000; // 반복 일정 하나마다 — 아주 오래된 매일 반복도 멈추지 않게
 
@@ -79,7 +80,7 @@ export function feedEvents(source, from, to, limit = 1500) {
     const key = `${ev.uid}|${start.getTime()}`;
     if (seen.has(key)) return;
     seen.add(key);
-    out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || '(제목 없음)', start, end, allDay, location: plainText(ev.location), description: noteText(ev.description), url: webUrl(ev.component.getFirstPropertyValue('url')) });
+    out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || UI.untitledParen, start, end, allDay, location: plainText(ev.location), description: noteText(ev.description), url: webUrl(ev.component.getFirstPropertyValue('url')) });
   };
   for (const { ev, moved } of masters) {
     if (!ev.isRecurring()) {
@@ -119,7 +120,7 @@ export function fromDeviceEvent(e) {
   return {
     uid: `device-${e.id}-${e.start}`,
     deviceId: e.id,
-    title: plainText(e.title) || '(제목 없음)',
+    title: plainText(e.title) || UI.untitledParen,
     start,
     end,
     allDay: Boolean(e.allDay),

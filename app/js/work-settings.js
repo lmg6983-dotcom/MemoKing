@@ -1,5 +1,6 @@
 // 설정 › Work / Life (PC 설정 창 · 휴대폰 설정 시트 같이 씀) — 정리 도우미 · 업무 시간 · 퇴근 뒤 조용히 (core/work-hours.js)
 import { normalizeHours, WEEKDAY_LABEL, hoursLabel } from './core/work-hours.js';
+import { UI } from './core/ui-text.js';
 
 function el(tag, className = '', text = '') {
   const e = document.createElement(tag);
@@ -37,7 +38,7 @@ export function renderWorkSettings(box, { enabled, setEnabled, hours, save, open
   });
 
   const helper = el('div', 'setting-row');
-  const hw = el('span', '', '정리 도우미');
+  const hw = el('span', '', UI.modeHelper);
   hw.append(' ', el('small', '', 'Life 메모 중 일 이야기 같은 메모를 골라 Work로 옮겨요'));
   const open = el('button', 'btn small', '열기');
   open.type = 'button';
