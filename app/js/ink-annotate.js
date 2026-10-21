@@ -2,9 +2,10 @@
 //   - 평소: 글 위에 그린 획이 보이기만 (누르면 글을 고친다)
 //   - 주석 모드(+ › 주석, PC 는 Ctrl+Shift+E): 위에 그리기 · 아래에 떠 있는 도구 막대(펜·형광펜·지우개·색·굵기·되돌리기 · 완료)
 //     완료 · Esc · 뒤로 가기 = 저장하고 끝내기 (취소는 없다 — 되돌리기·모두 지우기로)
-//   - 획은 그 아래 문단을 따라간다 (core/ink.js anchorStroke·placeStroke): 글이 늘어 문단이 밀려도, 창 폭이 바뀌어도 같은 자리
+//   - 획은 그 가운데 아래의 글자를 따라간다 (core/ink.js anchorStrokeToChar·placeStrokeAtChar): 글이 늘어 문단이 밀려도,
+//     화면 비율이 다른 기기에서 줄바꿈이 달라져도 그 낱말 위에. 글자가 없는 곳(그림 위 등)은 문단 폭 비율로 (anchorStroke·placeStroke)
 //   - 저장: 완료할 때 JSON 파일 하나 → 메모 머리말 ink: (자료가 없으면 머리말에서 뺀다)
-import { anchorStroke, placeStroke, normalizeInk } from './core/ink.js';
+import { anchorStroke, placeStroke, anchorStrokeToChar, placeStrokeAtChar, findAnchor, findChar, inkBounds, normalizeInk } from './core/ink.js';
 import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys, inkMode, strokeEl } from './ink-editor.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -36,7 +37,67 @@ export function setupAnnotation(o) {
     const doc = o.docEl();
     if (!doc) return [];
     const base = doc.getBoundingClientRect();
-    return [...doc.children].map((el) => ({ top: el.getBoundingClientRect().top - base.top, text: el.textContent ?? '' }));
+    return [...doc.children].map((el) => ({ top: el.getBoundingClientRect().top - base.top, text: el.textContent ?? '', el }));
+  }
+
+  // ---------- 글자 자리 (문단 안 글자 번호 ↔ 글 마디 · 화면 자리) ----------
+  const MEDIA = 'img, video, canvas, svg, iframe, .mk-image-line, .mk-file, .mk-voice';
+  function textAt(blockEl, c) {
+    const walker = document.createTreeWalker(blockEl, NodeFilter.SHOW_TEXT);
+    let left = c;
+    let last = null;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      last = n;
+      if (left < n.data.length) return { node: n, offset: left };
+      left -= n.data.length;
+    }
+    return last ? { node: last, offset: Math.max(0, last.data.length - 1) } : null;
+  }
+  /** 문단의 c 번째 글자 왼쪽 위 (본문 왼쪽 위 기준) · 글자 크기 */
+  function charOrigin(blockEl, c, base) {
+    const t = textAt(blockEl, c);
+    if (!t) return null;
+    const r = document.createRange();
+    r.setStart(t.node, t.offset);
+    r.setEnd(t.node, Math.min(t.node.data.length, t.offset + 1));
+    const rect = [...r.getClientRects()].find((x) => x.width || x.height) ?? r.getBoundingClientRect();
+    if (!rect || (!rect.width && !rect.height)) return null;
+    return { left: rect.left - base.left, top: rect.top - base.top, font: parseFloat(getComputedStyle(t.node.parentElement).fontSize) || 16 };
+  }
+  /** 화면 자리(본문 기준 x, y) 아래 글자: 문단 번호 · 글자 번호 — 글자가 없는 곳(그림 · 파일 위)이면 null */
+  function charAtPoint(x, y, b) {
+    const doc = o.docEl();
+    const base = doc.getBoundingClientRect();
+    const vx = base.left + x;
+    const vy = base.top + y;
+    const keep = layer.style.pointerEvents;
+    layer.style.pointerEvents = 'none'; // 그리기판에 가려 글자를 못 찾지 않게
+    let node = null;
+    let offset = 0;
+    let hit = null;
+    try {
+      hit = document.elementFromPoint(vx, vy);
+      const pos = document.caretPositionFromPoint?.(vx, vy);
+      if (pos) ({ offsetNode: node, offset } = pos);
+      else {
+        const r = document.caretRangeFromPoint?.(vx, vy);
+        if (r) ({ startContainer: node, startOffset: offset } = r);
+      }
+    } finally {
+      layer.style.pointerEvents = keep;
+    }
+    if (!node || node.nodeType !== Node.TEXT_NODE || !doc.contains(node)) return null;
+    const bi = b.findIndex((x) => x.el.contains(node));
+    if (bi < 0) return null;
+    if (hit?.closest?.(MEDIA) && b[bi].el.contains(hit)) return null; // 그림 위에 그린 것은 그림을 따라 (폭 비율)
+    if (hit && doc.contains(hit) && !b[bi].el.contains(hit) && b.some((x) => x.el !== b[bi].el && x.el.contains(hit) && x.el.querySelector(MEDIA))) return null;
+    const walker = document.createTreeWalker(b[bi].el, NodeFilter.SHOW_TEXT);
+    let c = 0;
+    for (let n = walker.nextNode(); n && n !== node; n = walker.nextNode()) c += n.data.length;
+    c += offset;
+    const len = b[bi].text.length;
+    if (!len) return null;
+    return { b: bi, c: Math.min(c, len - 1) };
   }
 
   // 주석 층을 본문 자리·크기에 맞추고 획을 다시 놓는다 (글이 바뀌거나 창 크기가 바뀌면)
@@ -69,8 +130,17 @@ export function setupAnnotation(o) {
   function screenStrokes() {
     const b = blocks();
     placed = new Map();
+    const doc = o.docEl();
+    const base = doc?.getBoundingClientRect();
     return (hist ? hist.get() : anchored).map((a) => {
-      const s = placeStroke(a, b, width);
+      let s = null;
+      if (a.anchor?.t === 'c' && base) {
+        const i = findAnchor(b, a.anchor);
+        const c = i >= 0 ? findChar(b[i].text, a.anchor) : -1;
+        const origin = c >= 0 ? charOrigin(b[i].el, c, base) : null;
+        if (origin) s = placeStrokeAtChar(a, origin);
+      }
+      s ??= placeStroke(a, b, width);
       placed.set(s, a);
       return s;
     });
@@ -87,7 +157,17 @@ export function setupAnnotation(o) {
   // 화면 좌표 획 목록(그리기판이 준 것) → 저장 모양: 원래 있던 것은 짝을, 새로 그린 것은 그 아래 문단에 붙여서
   function toAnchored(list) {
     const b = blocks();
-    return list.map((s) => placed.get(s) ?? anchorStroke(s, b, width));
+    const doc = o.docEl();
+    const base = doc?.getBoundingClientRect();
+    return list.map((s) => {
+      const had = placed.get(s);
+      if (had) return had;
+      // 새로 그린 획: 가운데 아래 글자에 붙인다 (글자가 없는 곳이면 예전처럼 문단 폭 비율)
+      const box = inkBounds([s]);
+      const at = box && base ? charAtPoint(box.x + box.w / 2, box.y + box.h / 2, b) : null;
+      const origin = at ? charOrigin(b[at.b].el, at.c, base) : null;
+      return origin ? anchorStrokeToChar(s, { ...at, text: b[at.b].text, ...origin }) : anchorStroke(s, b, width);
+    });
   }
 
   async function ensureLoaded() {

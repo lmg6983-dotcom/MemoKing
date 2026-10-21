@@ -1509,11 +1509,20 @@ setBackHandler(() => {
 
 list.setup();
 panes.setupPanes({ note });
+let tutBefore = null;
 setupTutorial({
   screen: () => (note.isOpen() ? 'note' : 'list'),
   markdown: () => (note.isOpen() ? note.editorMarkdown() : ''),
   append: (md) => note.appendText(md),
   edit: () => note.useEditMode(),
+  has: (need) => need !== 'workLife' || list.workLifeOn(), // Work / Life 나누기가 꺼져 있으면 그 단계는 안내만 (켜기 단추로 바로 켤 수 있음)
+  enable: (need) => need === 'workLife' && list.setWorkLife(true),
+  // 연습하며 바꾼 카드 모양 · 태그 고르기 · 모드는 끝나면 처음대로
+  onStart: () => { tutBefore = list.tutorialSnapshot(); },
+  onFinish: () => {
+    list.tutorialRestore(tutBefore);
+    tutBefore = null;
+  },
 });
 const info = native.info();
 if (info.vault?.ok) openVault();

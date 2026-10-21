@@ -331,7 +331,15 @@ svg { width: 20px; height: 20px; flex: none; }
   background: var(--fill-tab);
   font-size: 13px; font-weight: 700; line-height: 19px;
 }
-.coach-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.coach-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.coach-enable { display: block; width: 100%; margin: 0 0 10px; }
+/* 다시 볼 때 바로 가기: 묶음 이름 알약 */
+.coach-jumps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 12px; }
+.coach-jumps-label { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-right: 2px; }
+.coach-jump { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text-strong); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: transform 0.16s var(--ease-out), background-color 0.15s ease-out; }
+.coach-jump:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .coach-jump:hover { background: var(--fill-hover); } }
+.coach-jump:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .coach-skip { padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .coach-skip:hover { background: var(--fill-hover); color: var(--text-strong); } }
 .coach-next { height: 34px; padding: 0 14px; font-size: 13px; }

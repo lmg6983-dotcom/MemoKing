@@ -1266,6 +1266,12 @@ export async function runSmoke({
     await lj(`document.getElementById('tutorial-btn').click()`);
     const tutorialAgain = await waitStep(getList, 'welcome');
     const settingsClosed = await lj(`!document.getElementById('settings-dialog').open`);
+    // 다시 볼 때: 첫 말풍선에 바로 가기(목록 · 어디서든) — 누르면 그 묶음 첫 단계로, 머리에는 "목록 1/7"
+    const jumps = await lj(`[...document.querySelectorAll('.coach-bubble .coach-jump')].map((b) => b.textContent)`);
+    await lj(`[...document.querySelectorAll('.coach-bubble .coach-jump')].find((b) => b.textContent === '목록')?.click()`);
+    const jumped = await waitStep(getList, 'cards');
+    const head = await lj(`document.querySelector('.coach-bubble .coach-count')?.textContent`);
+    check('다시 볼 때: 바로 가기(목록 · 어디서든) → 그 묶음 첫 단계, 머리에 "목록 1/…"', jumps.join(',') === '목록,어디서든' && jumped && /^목록 1\/\d+$/.test(head), JSON.stringify({ jumps, head }));
     await lj(`document.querySelector('.coach-bubble .coach-skip').click()`);
     const skipped = await until(async () => !getTutorial().active && (await bubbleStep(getList())) === null, '건너뛰기').catch(() => false);
     check('설정 › 사용법 둘러보기 → 처음부터 다시, "다음에 할게요" → 끝', tutorialAgain && settingsClosed && skipped);

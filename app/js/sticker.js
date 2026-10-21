@@ -26,6 +26,14 @@ api.on('sticker:peel', () => {
   sticker.classList.add('peeling'); // 움직임을 줄이면 들리지 않고 흐려지기만 (sticker.css)
 });
 
+// 목록 창이 좁아지거나 최대화돼 스티커가 잘릴 때: 작아지며 사라진다 (제목 줄 작은 왕관으로 들어감 — window-manager listStickerFits)
+api.on('sticker:dock', () => {
+  peeled = true;
+  setOver(false);
+  sticker.classList.remove('sticking');
+  sticker.classList.add('docking');
+});
+
 function setOver(next) {
   if (next === over) return;
   over = next;

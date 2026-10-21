@@ -298,6 +298,7 @@ function otherModeLink(n) {
 }
 
 // ---------- Work / Life 바꾸기 (제목 줄 왼쪽) ----------
+let tutModeStep = null; // 튜토리얼: Work 로 바꾼 단계 (그 단계에서 Life 로 돌아오면 다음으로)
 // 해 · 달 스위치 (화면 전환 속에서 바꿀 때는 전환이 끝난 뒤에 — dom.js setModeSwitch)
 const syncSwitch = () => setModeSwitch($('mode-switch'), state.mode);
 /** @param {{ later?: boolean }} [o] later: 스위치는 부른 쪽이 나중에 (syncSwitch) */
@@ -333,6 +334,9 @@ async function setMode(mode) {
   mode = validMode(mode);
   if (mode === state.mode) return;
   state.mode = mode;
+  // 튜토리얼 "Work 로 바꿔 보고 다시 Life 로": 이 단계에서 Work 에 다녀오면 해 낸 것
+  if (mode === 'work') tutModeStep = coach.step?.id ?? null;
+  else if (tutModeStep && tutModeStep === coach.step?.id) tutEvent('mode-switched');
   withViewTransition(() => {
     showMode({ later: true });
     state.filter.tags = []; // 다른 모드에는 없는 태그일 수 있다
@@ -1505,7 +1509,34 @@ api.on('vault:opened', (info) => {
 // ---------- 시작 ----------
 
 injectIcons();
-const coach = setupCoach(api);
+// 튜토리얼 뒷정리: 연습하라고 바꾸게 한 것(카드 모양 · 확대 · 태그 고르기 · Work/Life · 목록 늘 위에)은 끝나면 처음대로
+//   첫 말풍선이 이 창에 뜰 때 지금 모습을 적어 두고, 끝나거나 그만두면(tutorial:finished) 되돌린다
+let tutBefore = null;
+const coach = setupCoach(api, {
+  onStep: (step) => {
+    if (step && !tutBefore) tutBefore = { layout, zoom: listZoom, tags: [...state.filter.tags], mode: state.mode, top: Boolean(listTop), panel: !el.filterPanel.hidden };
+  },
+});
+api.on('tutorial:finished', () => {
+  const b = tutBefore;
+  tutBefore = null;
+  if (!b) return;
+  if (layout !== b.layout) {
+    layout = b.layout;
+    applyLayout();
+    try {
+      localStorage.setItem(LAYOUT_KEY, layout);
+    } catch {
+      // 지금 창에서만
+    }
+  }
+  if (listZoom !== b.zoom) setListZoom(b.zoom, { show: false });
+  state.filter.tags = b.tags;
+  if (state.workLife && state.mode !== b.mode) setMode(b.mode);
+  if (!b.top && listTop) api.win.toggleListTop();
+  if (!b.panel && !el.filterPanel.hidden) el.filterBtn.click(); // "보기"를 열어 보라고 했던 칸도 닫는다
+  render();
+});
 /** 튜토리얼 직접 해 보기: 지금 단계가 이 일을 기다리면 알린다 */
 const tutEvent = (name) => {
   if (coach.step?.advance === name) api.tutorial.event(name);
@@ -1552,6 +1583,7 @@ function setListZoom(z, { show = true } = {}) {
   }
   scheduleRelayout();
   if (!show) return;
+  tutEvent('list-zoomed'); // 튜토리얼: 카드를 크게, 작게
   listZoomText.textContent = `메모 ${zoomLabel(listZoom)}`;
   listZoomReset.hidden = listZoom === 1;
   listZoomBadge.classList.add('show');
@@ -1661,30 +1693,84 @@ el.layoutGroup.addEventListener('click', (e) => {
 // 목록 창 늘 위에 두기 (창 제목 줄, 최소화 버튼 옆)
 const listTopBtn = $('list-top-btn');
 // 스티커를 붙이고 떼는 느낌: 누르면 버튼의 왕관이 떨어져 나가 창 위 가장자리 스티커가 되고(버튼은 빈 자리),
-// 스티커를 누르면 떼어져 늘 위에 두기가 꺼지고 왕관이 버튼으로 돌아온다
+// 스티커를 누르면 떼어져 늘 위에 두기가 꺼지고 왕관이 버튼으로 돌아온다.
+// 창이 좁아지거나 최대화 · 화면 끝이라 스티커가 잘릴 때는 스티커가 작아져 이 단추 자리에 작은 왕관으로 들어온다 (docked — 누르면 떼어짐).
+//   자리가 나면 작은 왕관이 들려 나가고 다시 스티커가 붙는다 (window-manager listStickerFits)
 let listTop = null;
-const showListTop = (on, animate = true) => {
-  const changed = listTop !== null && listTop !== on;
-  listTop = on;
+let crownDocked = false;
+const crownMini = listTopBtn.querySelector('.crown-mini');
+const crownLine = listTopBtn.querySelector('.crown-line');
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+function paintListTop() {
+  const on = Boolean(listTop);
+  const docked = on && crownDocked;
   listTopBtn.setAttribute('aria-pressed', String(on));
-  listTopBtn.classList.toggle('peeled', on);
-  listTopBtn.tabIndex = on ? -1 : 0;
-  listTopBtn.setAttribute('aria-hidden', String(on));
-  listTopBtn.title = on ? '창 위의 왕관 스티커를 누르면 늘 위에 두기가 꺼져요' : '왕관 스티커를 붙여 목록을 다른 창보다 늘 위에 두기';
+  listTopBtn.classList.toggle('peeled', on && !docked);
+  listTopBtn.classList.toggle('docked', docked);
+  listTopBtn.tabIndex = on && !docked ? -1 : 0;
+  listTopBtn.setAttribute('aria-hidden', String(on && !docked));
+  listTopBtn.title = docked ? '늘 위에 두는 중이에요. 창이 좁아 왕관 스티커를 여기에 넣어 두었어요. 누르면 늘 위에 두기가 꺼져요'
+    : on ? '창 위의 왕관 스티커를 누르면 늘 위에 두기가 꺼져요' : '왕관 스티커를 붙여 목록을 다른 창보다 늘 위에 두기';
   listTopBtn.setAttribute('aria-label', on ? '목록 늘 위에 두기 끄기' : '목록을 다른 창보다 늘 위에 두기');
-  if (!changed || !animate || reduceMotion()) return;
-  const icon = listTopBtn.querySelector('svg');
-  icon.animate(on
+}
+const showListTop = (on, animate = true) => {
+  const was = { top: Boolean(listTop), docked: Boolean(listTop) && crownDocked };
+  const first = listTop === null;
+  listTop = on;
+  if (!on) crownDocked = false; // 떼면 다음에 붙일 때는 메인이 다시 알려 준다 (처음부터 잘릴 자리면 list:crown-docked 가 먼저 온다)
+  paintListTop();
+  if (first || !animate || reduceMotion() || was.top === on) return;
+  if (on && crownDocked) {
+    // 좁은 창에서 붙임: 스티커 대신 줄 그림 왕관이 작은 왕관으로 바뀌며 통 하고 들어앉는다
+    crownMini.animate([{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 280, easing: EASE_OUT });
+    return;
+  }
+  const lineAnim = () => crownLine.animate(on
     ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
     : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
-  { duration: on ? 200 : 280, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+  { duration: on ? 200 : 280, easing: EASE_OUT });
+  if (!(was.docked && !on)) return lineAnim();
+  // 작은 왕관을 눌러 뗌: 작은 왕관이 들리며 사라진 뒤(그동안은 작은 왕관을 보인 채로) 줄 그림 왕관이 돌아온다
+  listTopBtn.classList.add('undocking');
+  crownMini.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px) rotate(10deg) scale(1.2)' }], { duration: 160, easing: EASE_OUT })
+    .finished.catch(() => {}).finally(() => {
+      listTopBtn.classList.remove('undocking');
+      if (!listTop) lineAnim(); // 그사이 다시 붙였으면 그 상태 그대로
+    });
 };
-// 버튼은 붙이기만 (떼기는 창 위의 왕관 스티커를 눌러서). 상태는 list:on-top 으로 돌아온다
+// 스티커 ↔ 작은 왕관 (늘 위에 두는 동안 창 크기 · 자리에 따라)
+function setCrownDocked(docked, animate = true) {
+  if (docked === crownDocked) return;
+  crownDocked = docked;
+  const shown = Boolean(listTop);
+  if (!shown || !animate || reduceMotion()) return paintListTop();
+  if (docked) {
+    paintListTop();
+    // 스티커가 작아지며 사라지는 사이(0.15초) 작은 왕관이 위에서 내려와 들어앉는다
+    crownMini.animate([{ opacity: 0, transform: 'translateY(-10px) scale(1.6) rotate(-10deg)' }, { opacity: 1, transform: 'none' }], { duration: 240, delay: 60, easing: EASE_OUT, fill: 'backwards' });
+  } else {
+    // 작은 왕관이 들려 나간 뒤 단추는 빈 자리 (곧 창 위에 스티커가 붙는다)
+    listTopBtn.classList.add('undocking');
+    crownMini.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-10px) scale(1.3)' }], { duration: 160, easing: EASE_OUT })
+      .finished.catch(() => {}).finally(() => {
+        listTopBtn.classList.remove('undocking');
+        paintListTop();
+      });
+  }
+}
+// 버튼: 붙이기 · 작은 왕관이면 떼기 (스티커는 창 위의 스티커를 눌러서). 상태는 list:on-top 으로 돌아온다
 listTopBtn.addEventListener('click', () => {
-  if (!listTop) api.win.toggleListTop();
+  if (!listTop || crownDocked) api.win.toggleListTop();
 });
-api.on('list:on-top', (on) => showListTop(on));
-api.win.listOnTop().then((on) => showListTop(on, false));
+api.on('list:on-top', (on) => {
+  showListTop(on);
+  if (on) tutEvent('list-crown-on'); // 튜토리얼: 목록도 늘 위에
+});
+api.on('list:crown-docked', ({ docked, animate } = {}) => setCrownDocked(Boolean(docked), animate !== false));
+Promise.all([api.win.listOnTop(), api.win.listCrownDocked?.() ?? false]).then(([on, docked]) => {
+  crownDocked = Boolean(docked);
+  showListTop(on, false);
+});
 // 대화 상자·튜토리얼이 떠 있으면 창 버튼 줄도 어둡게 (Windows 가 그리는 줄이라 화면의 막이 닿지 않는다)
 let dimLevel = false;
 function syncTitlebarDim() {

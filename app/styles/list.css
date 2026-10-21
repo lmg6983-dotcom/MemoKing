@@ -628,6 +628,15 @@ body.is-dragging .card:hover { transform: none; }
 /* 붙은 동안 버튼 자리는 비어 있고 마우스·키보드 반응 없음 (왕관은 스티커를 눌러서만 뗀다) */
 .crown-btn.peeled { visibility: hidden; pointer-events: none; }
 .crown-btn { position: relative; }
+/* 작은 왕관: 스티커가 잘릴 때 이 단추 자리에 들어온 스티커 (스티커와 같은 그림 — 흰 가장자리 · 반투명 노랑) */
+.crown-btn .crown-mini { display: none; width: 24px; height: 20px; overflow: visible; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25)); }
+.crown-btn.docked .crown-line, .crown-btn.undocking .crown-line { display: none; }
+.crown-btn.docked .crown-mini, .crown-btn.undocking .crown-mini { display: block; }
+.crown-btn.docked, .crown-btn.docked:hover { background: none; }
+@media (hover: hover) and (pointer: fine) { .crown-btn.docked:hover .crown-mini { transform: translateY(-1px) rotate(-4deg); } }
+.crown-btn .crown-mini { transition: transform 0.15s ease-out; }
+.cm-edge { fill: rgba(255, 255, 255, 0.9); stroke: rgba(255, 255, 255, 0.9); stroke-width: 5; stroke-linejoin: round; }
+.cm-body { fill: rgba(255, 204, 0, 0.85); stroke: rgba(17, 17, 17, 0.4); stroke-width: 1.4; stroke-linejoin: round; }
 
 /* 설정: 위 항목에 딸린 줄 (켜져 있을 때만 쓸 수 있음) */
 .setting-row.sub-row { margin-left: 20px; }

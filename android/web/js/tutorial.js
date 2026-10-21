@@ -3,24 +3,28 @@
 //   - 처음 메모 폴더를 연 뒤 한 번 저절로 · 설정 › "사용법 둘러보기"로 언제든 다시
 //   - 단계의 화면(목록 · 메모)이 보일 때만 말풍선 — 화면이 바뀌면 screenChanged()
 //   - 직접 해 보기: 화면들이 tutEvent('add-opened') 처럼 알리고, 본문 변화는 textChanged(md) 로 판정
-import { MOBILE_TUTORIAL_STEPS as STEPS, TUTORIAL_SETTLE_MS, TUTORIAL_SAMPLE, advanceTutorial, hasTutorialSample, tutorialCounts, tutorialDone } from '../../app/js/core/tutorial.js';
+import { MOBILE_TUTORIAL_STEPS as STEPS, TUTORIAL_SETTLE_MS, TUTORIAL_SAMPLE, advanceTutorial, hasTutorialSample, tutorialCounts, tutorialDone, tutorialStepFor, tutorialChapter, tutorialJumps } from '../../app/js/core/tutorial.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { setupCoach } from '../../app/js/coach.js';
 
 const DONE_KEY = 'memoking.tutorialDone';
-let state = { active: false, index: -1, praise: false };
+let state = { active: false, index: -1, praise: false, again: false };
 const listeners = [];
 let screen = () => 'list';
 let markdown = () => '';
 let append = () => {};
 let edit = () => {};
+let has = () => true; // 직접 해 볼 기능이 켜져 있는가 (needs — core/tutorial.js tutorialStepFor)
+let hooks = {}; // onStart · onFinish (연습하며 바꾼 보기를 처음대로) · enable (꺼진 기능 켜기)
 let coach = null;
 let base = null;
 const counts = (md) => tutorialCounts(md, extractTags(md));
 
 function payload() {
-  const step = state.active ? STEPS[state.index] : null;
-  return step && step.win === screen() ? { ...step, index: state.index, total: STEPS.length, praise: state.praise } : null;
+  const step = state.active ? tutorialStepFor(STEPS[state.index], has) : null;
+  if (!step || step.win !== screen()) return null;
+  const jumps = state.index === 0 && state.again ? tutorialJumps(STEPS) : undefined; // 다시 볼 때 어디부터
+  return { ...step, index: state.index, total: STEPS.length, praise: state.praise, chapter: tutorialChapter(STEPS, state.index), jumps };
 }
 function send() {
   const p = payload();
@@ -33,17 +37,32 @@ const api = {
     if (event === 'tutorial:step') listeners.push(cb);
   },
   tutorial: {
-    action: (action) => (action === 'next' || action === 'skip') && event(action),
+    action: (action) => {
+      if (action === 'next' || action === 'skip') return event(action);
+      const jump = /^jump:(\d+)$/.exec(String(action));
+      if (jump && state.active && tutorialJumps(STEPS).some((j) => j.index === Number(jump[1]))) {
+        state.index = Number(jump[1]);
+        state.praise = false;
+        return send();
+      }
+      if (action === 'enable:workLife' && state.active && STEPS[state.index]?.needs === 'workLife') {
+        hooks.enable?.('workLife');
+        send();
+      }
+    },
     current: async () => payload(),
   },
 };
 
-/** @param {{ screen: () => 'list'|'note', markdown: () => string, append: (md: string) => void, edit?: () => void }} o */
+/** @param {{ screen: () => 'list'|'note', markdown: () => string, append: (md: string) => void, edit?: () => void, has?: (need: string) => boolean,
+ *            onStart?: () => void, onFinish?: () => void, enable?: (need: string) => void }} o */
 export function setupTutorial(o) {
   screen = o.screen;
   markdown = o.markdown;
   append = o.append;
   edit = o.edit ?? edit;
+  has = o.has ?? has;
+  hooks = { onStart: o.onStart, onFinish: o.onFinish, enable: o.enable };
   coach = setupCoach(api, {
     onStep: (step) => {
       base = step ? counts(markdown()) : null;
@@ -57,7 +76,14 @@ export function setupTutorial(o) {
 }
 
 export function startTutorial() {
-  state = { active: true, index: 0, praise: false };
+  let again = false;
+  try {
+    again = Boolean(localStorage.getItem(DONE_KEY)); // 다시 보는 사람에게는 어디부터 볼지 고르게
+  } catch {
+    // 처음처럼
+  }
+  if (!state.active) hooks.onStart?.();
+  state = { active: true, index: 0, praise: false, again };
   send();
 }
 
@@ -73,7 +99,8 @@ export function maybeStartTutorial() {
 }
 
 function finish() {
-  state = { active: false, index: -1, praise: false };
+  state = { active: false, index: -1, praise: false, again: false };
+  hooks.onFinish?.();
   try {
     localStorage.setItem(DONE_KEY, '1');
   } catch {
@@ -101,6 +128,9 @@ export const tutorialWaitsFor = (name) => state.active && STEPS[state.index]?.ad
 export function tutEvent(name) {
   if (state.active && STEPS[state.index]?.advance === name) event(name);
 }
+
+/** 지금 단계 id (튜토리얼 중이 아니면 null) — "Work 로 바꿔 보고 다시 Life 로" 처럼 두 번에 걸쳐 해 내는 일을 단계 안에서만 세려고 */
+export const tutorialStepId = () => (state.active ? STEPS[state.index]?.id ?? null : null);
 
 /**
  * 메모 글이 바뀔 때 — 쓰기 · 꾸미기 · 체크리스트 · 태그 판정

@@ -74,6 +74,7 @@ export function registerIpc(ctx) {
     updateState,
     tutorialWin,
     tutorialEvent,
+    tutorialAction,
     purgeTrash,
     TRASH_DAYS,
     getStt,
@@ -186,6 +187,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('tutorial:action', (_e, action) => {
     if (action === 'next' || action === 'skip') tutorialEvent(action);
+    else tutorialAction(action); // jump:<번호> · enable:workLife
   });
   ipcMain.handle('tutorial:event', (_e, name) => {
     if (TUTORIAL_EVENTS.includes(name) && name !== 'memo-created' && name !== 'note-closed') tutorialEvent(name);
@@ -1216,6 +1218,7 @@ export function registerIpc(ctx) {
   });
   ipcMain.handle('sticker:peel', (event) => wm.peelSticker(event.sender));
   ipcMain.handle('list:on-top', () => Boolean(wm.listWin?.isAlwaysOnTop()));
+  ipcMain.handle('list:crown-docked', () => wm.listCrownDocked());
   ipcMain.handle('win:dim-titlebar', (event, level) => {
     if (!wm.listWin || senderWindow(event) !== wm.listWin) return;
     setTitleBarDim(level === 'dialog' || level === 'coach' ? level : false);

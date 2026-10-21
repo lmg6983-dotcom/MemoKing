@@ -12,7 +12,7 @@ import { matchChrome, confirmDialog, isTwoPane, toast, adoptSheet, releaseSheet 
 import { call } from './native.js';
 import { renderCollage, collageName } from '../../app/js/memories-collage.js';
 import { base64Bytes, collageMemoBody } from '../../app/js/collage-preview.js';
-import { tutEvent } from './tutorial.js';
+import { tutEvent, tutorialStepId } from './tutorial.js';
 import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition, setModeSwitch } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
@@ -109,6 +109,25 @@ export function setWorkLife(on) {
 }
 export const currentMode = () => state.mode;
 
+/** 튜토리얼 뒷정리 (tutorial.js): 시작할 때 모습을 적어 두고, 끝나면 연습으로 바꾼 카드 모양 · 태그 고르기 · 모드를 처음대로 */
+export const tutorialSnapshot = () => ({ layout, tags: [...state.filter.tags], mode: state.mode, panel: !el.filterPanel.hidden });
+export function tutorialRestore(b) {
+  if (!b) return;
+  if (layout !== b.layout) {
+    layout = b.layout;
+    applyLayout(layout);
+    try {
+      localStorage.setItem('memoking.layout', layout);
+    } catch {
+      // 무시
+    }
+  }
+  state.filter.tags = b.tags;
+  if (state.mode !== b.mode) setMode(b.mode);
+  if (!b.panel && !el.filterPanel.hidden) toggleFilterPanel(false); // "보기"를 열어 보라고 했던 칸도 닫는다
+  render();
+}
+
 // 해 · 달 스위치 (화면 전환 속에서 바꿀 때는 전환이 끝난 뒤에 — dom.js setModeSwitch)
 const syncSwitch = () => setModeSwitch($('mode-switch'), state.mode);
 /** @param {{ later?: boolean }} [o] later: 스위치는 부른 쪽이 나중에 (syncSwitch) */
@@ -124,10 +143,14 @@ function showMode({ later = false } = {}) {
   }
 }
 
+let tutModeStep = null; // 튜토리얼: Work 로 바꾼 단계
 export function setMode(mode) {
   mode = validMode(mode);
   if (mode === state.mode || (mode === 'work' && !workLifeOn())) return; // 나눠 쓰지 않으면 늘 Life
   state.mode = mode;
+  // 튜토리얼 "Work 로 바꿔 보고 다시 Life 로": 이 단계에서 Work 에 다녀오면 해 낸 것
+  if (mode === 'work') tutModeStep = tutorialStepId();
+  else if (tutModeStep && tutModeStep === tutorialStepId()) tutEvent('mode-switched');
   try {
     localStorage.setItem(MODE_KEY, mode);
   } catch {
