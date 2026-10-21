@@ -464,7 +464,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         place(440);
         await until(dockedNow, '작은 왕관', 3000).catch(() => false);
         await js(list, `document.getElementById('list-top-btn').click()`);
-        const off = await until(async () => !list.isAlwaysOnTop() && !windowManager.stickers.get(list.id) && (await btnState()).pressed === 'false', '작은 왕관 떼기', 3000).catch(() => false);
+        const off = await until(async () => !list.isAlwaysOnTop() && !windowManager.stickers.get(list.id) && (await btnState()).pressed === 'false' && !(await btnState()).mini, '작은 왕관 떼기', 3000).catch(() => false);
         const ob = await btnState();
         check('왕관: 작은 왕관을 누르면 늘 위에 두기가 꺼지고 단추는 원래 왕관으로', off && !ob.docked && !ob.peeled && !ob.mini, JSON.stringify(ob));
         await windowManager.setListOnTop(false);

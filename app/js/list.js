@@ -1693,14 +1693,18 @@ const showListTop = (on, animate = true) => {
     crownMini.animate([{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 280, easing: EASE_OUT });
     return;
   }
-  if (was.docked && !on) {
-    // 작은 왕관을 눌러 뗌: 작은 왕관은 들리며 사라지고 줄 그림 왕관이 돌아온다
-    crownMini.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px) rotate(10deg) scale(1.2)' }], { duration: 180, easing: EASE_OUT });
-  }
-  crownLine.animate(on
+  const lineAnim = () => crownLine.animate(on
     ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) rotate(-12deg) scale(0.7)' }]
     : [{ opacity: 0, transform: 'scale(0.4) rotate(12deg)' }, { opacity: 1, transform: 'scale(1.15)', offset: 0.7 }, { opacity: 1, transform: 'none' }],
   { duration: on ? 200 : 280, easing: EASE_OUT });
+  if (!(was.docked && !on)) return lineAnim();
+  // 작은 왕관을 눌러 뗌: 작은 왕관이 들리며 사라진 뒤(그동안은 작은 왕관을 보인 채로) 줄 그림 왕관이 돌아온다
+  listTopBtn.classList.add('undocking');
+  crownMini.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px) rotate(10deg) scale(1.2)' }], { duration: 160, easing: EASE_OUT })
+    .finished.catch(() => {}).finally(() => {
+      listTopBtn.classList.remove('undocking');
+      if (!listTop) lineAnim(); // 그사이 다시 붙였으면 그 상태 그대로
+    });
 };
 // 스티커 ↔ 작은 왕관 (늘 위에 두는 동안 창 크기 · 자리에 따라)
 function setCrownDocked(docked, animate = true) {
