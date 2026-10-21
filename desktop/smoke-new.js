@@ -1019,7 +1019,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       // 테이프를 누르면 떼어져 보통 창 (메모 창은 그대로, 버튼 둘 다 돌아옴)
       await until(() => js(stickers.get(nw.id).win, `document.documentElement.dataset.ready === 'true'`), '테이프 준비', 4000).catch(() => {});
       // 보이는 모양을 누른다: 창 가운데에 있는 것이 테이프여야 한다
-      const hitTape = await js(stickers.get(nw.id).win, `(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); const ok = Boolean(el?.closest('#tape .hit')); el?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return ok; })()`);
+      // 테이프 창이 아직 안 떴으면 기다리다 멈추지 않게 (멈추면 뒤의 점검이 모두 안 돈다)
+      const tapeWin = stickers.get(nw.id)?.win;
+      if (process.env.MK_SMOKE_TRACE) console.log(`… 테이프 창: ${JSON.stringify({ kind: kindOf(nw), onBottom: getSettings().onBottom?.[tid], has: Boolean(tapeWin), loading: tapeWin?.webContents.isLoading(), url: tapeWin?.webContents.getURL() })}`);
+      const hitTape = tapeWin ? await Promise.race([
+        js(tapeWin, `(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); const ok = Boolean(el?.closest('#tape .hit')); el?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return ok; })()`),
+        wait(4000).then(() => false),
+      ]) : false;
       const peeled = await until(() => !stickers.get(nw.id) && !getSettings().onBottom?.[tid], '테이프 떼기', 3000).catch(() => false);
       const b3 = await buttons(nw);
       // 목록에서 지우면 그 카드가 제자리에서 흐려지며 사라진다 (옆으로 날아가지 않게)
