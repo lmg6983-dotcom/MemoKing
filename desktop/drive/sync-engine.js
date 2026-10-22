@@ -55,7 +55,7 @@ function md5OrNull(file) {
  *   upload(parentId: string, name: string, existingId: string|null, file: string): Promise<RemoteItem>,
  *   createFolder(parentId: string, name: string): Promise<RemoteItem>,
  *   trash(id: string): Promise<void>,
- *   changesSince(token: string|null, knownIds: Set<string>): Promise<{ changed: boolean, token: string }>,
+ *   changesSince(token: string|null, knownIds: Set<string>): Promise<{ changed: boolean, token: string, items?: ({ id: string, removed: boolean, parents: string[], item: RemoteItem|null }[])|null }>,
  * }} Remote
  */
 export class SyncEngine {
@@ -142,6 +142,61 @@ export class SyncEngine {
     return out;
   }
 
+  /**
+   * Drive 폴더를 다 훑지 않고: 지난번 동기화 때의 모습(기준) + 그 뒤 바뀐 것(changes)으로 지금 Drive 모습을 만든다.
+   *   바뀐 것이 없으면 기준 그대로 (이 기기에서만 고쳤을 때 — Drive 에 물을 것이 없다).
+   *   이름 바꾸기 · 옮기기 · 폴더 지우기처럼 기준만으로 어디인지 알 수 없는 것이 섞이면 null (다 훑는다)
+   */
+  remoteFromChanges(items) {
+    const folders = new Map(Object.entries(this.state.folders ?? {}));
+    folders.set('', this.rootId);
+    const relOfFolder = new Map([...folders].map(([rel, id]) => [id, rel]));
+    const remote = new Map(Object.entries(this.state.files).map(([rel, b]) => [rel, { id: b.id, md5: b.md5 }]));
+    const relOfFile = new Map([...remote].map(([rel, r]) => [r.id, rel]));
+    const placed = (c) => {
+      const parent = c.parents.find((p) => relOfFolder.has(p));
+      if (parent === undefined) return null;
+      const dir = relOfFolder.get(parent);
+      return dir ? `${dir}/${c.item.name}` : c.item.name;
+    };
+    // 폴더 먼저 — 새 폴더 안에 새 폴더가 들 수 있어, 놓을 수 있는 것이 없어질 때까지 되풀이
+    let pending = items.filter((c) => c.item?.folder || relOfFolder.has(c.id));
+    while (pending.length) {
+      const left = [];
+      for (const c of pending) {
+        const was = relOfFolder.get(c.id);
+        if (c.removed) {
+          if (was !== undefined) return null; // 알던 폴더를 지움 — 그 안의 파일을 다 따지려면 훑는다
+          continue;
+        }
+        const rel = placed(c);
+        if (rel === null) left.push(c);
+        else if (was !== undefined && was !== rel) return null; // 폴더 이름 바꾸기 · 옮기기
+        else {
+          folders.set(rel, c.id);
+          relOfFolder.set(c.id, rel);
+        }
+      }
+      if (left.length === pending.length) return null; // 어디에 놓을지 모르는 폴더
+      pending = left;
+    }
+    for (const c of items) {
+      if (c.item?.folder || relOfFolder.has(c.id)) continue;
+      const was = relOfFile.get(c.id);
+      if (c.removed) {
+        if (was !== undefined && remote.get(was)?.id === c.id) remote.delete(was);
+        continue;
+      }
+      const rel = placed(c);
+      if (rel === null || (was !== undefined && was !== rel)) return null; // 기준에 없는 곳 · 이름 바꾸기 · 옮기기
+      if (skipPath(rel) || !c.item.md5) continue; // md5 가 없는 것은 구글 문서 같은 Drive 전용 파일
+      remote.set(rel, c.item);
+      relOfFile.set(c.id, rel);
+    }
+    this.folderIds = folders;
+    return remote;
+  }
+
   async ensureRemoteFolder(dir) {
     if (this.folderIds.has(dir)) return this.folderIds.get(dir);
     // 같은 폴더를 여러 파일이 한꺼번에 찾으면 처음 것이 만드는 것을 함께 기다린다 (같은 이름 폴더가 둘 생기지 않게)
@@ -169,7 +224,7 @@ export class SyncEngine {
       return !b || b.lmtime !== l.mtime || b.lsize !== l.size;
     });
     const knownIds = new Set([...known.map((k) => files[k].id), ...Object.values(this.state.folders ?? {}), this.rootId]);
-    const { changed: remoteDirty, token } = await this.remote.changesSince(this.state.pageToken || null, knownIds);
+    const { changed: remoteDirty, token, items } = await this.remote.changesSince(this.state.pageToken || null, knownIds);
     const scanDue = full || this.now() - (this.state.lastFullScan ?? 0) >= FULL_SCAN_MS;
     if (!localDirty && !remoteDirty && !scanDue) {
       this.state.pageToken = token;
@@ -177,7 +232,9 @@ export class SyncEngine {
     }
 
     this.onProgress({ phase: 'scan', done: 0, total: 0 });
-    const remote = await this.walkRemote();
+    // Drive 폴더를 다 훑는 것은 15분에 한 번 · "지금 동기화" 때만 — 평소에는 기준 + 바뀐 것 (메모마다 이전 버전 폴더가 있어 다 훑으면 요청이 수백 번)
+    const quick = scanDue ? null : remoteDirty ? (items ? this.remoteFromChanges(items) : null) : this.remoteFromChanges([]);
+    const remote = quick ?? await this.walkRemote();
     const paths = [...new Set([...local.keys(), ...remote.keys(), ...known])].sort();
 
     const goneRemote = paths.filter((p) => files[p] && !remote.has(p) && local.has(p)).length;
@@ -342,7 +399,7 @@ export class SyncEngine {
 
     this.state.pageToken = token;
     delete this.state.keepMissing; // 다 올렸으면 다음부터는 보통대로
-    this.state.lastFullScan = this.now();
+    if (!quick) this.state.lastFullScan = this.now();
     this.state.folders = Object.fromEntries(this.folderIds);
     result.localChanged = result.downloaded > 0 || result.deletedLocal > 0 || result.conflicts.length > 0;
     return result;

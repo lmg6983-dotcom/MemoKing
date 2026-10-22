@@ -98,6 +98,60 @@ class FakeDrive {
   }
 }
 
+// 실제 Drive 처럼 "바뀐 것" 목록(items)을 주는 가짜 — 동기화가 폴더를 다 훑지 않고 바뀐 것만 반영하는지 본다
+class ChangesDrive extends FakeDrive {
+  constructor() {
+    super();
+    this.log = [];
+    this.lists = 0;
+  }
+
+  note(id) {
+    this.log.push(id);
+  }
+
+  put(rel, text) {
+    super.put(rel, text);
+    let cur = 'ROOT';
+    for (const p of rel.split('/')) {
+      cur = this.find(cur, p).id;
+      this.note(cur);
+    }
+  }
+
+  async listChildren(folderId) {
+    this.lists++;
+    return super.listChildren(folderId);
+  }
+
+  async upload(...args) {
+    const r = await super.upload(...args);
+    this.note(r.id);
+    return r;
+  }
+
+  async createFolder(...args) {
+    const r = await super.createFolder(...args);
+    this.note(r.id);
+    return r;
+  }
+
+  async trash(id) {
+    await super.trash(id);
+    this.note(id);
+  }
+
+  async changesSince(token) {
+    if (!token) return { changed: true, token: 't', items: null };
+    const ids = [...new Set(this.log.splice(0))];
+    const items = ids.map((id) => {
+      const f = this.files.get(id);
+      return { id, removed: f.trashed, parents: [f.parent], item: this.item(f) };
+    });
+    return { changed: items.length > 0, token: 't', items };
+  }
+}
+
 let dir;
 let drive;
 let state;
@@ -376,4 +430,46 @@ test('DriveSync: 진행 상황을 상태로 알리고(맞춘 수 moved), 끝나�
   assert.equal(prog.at(-1).done, 3);
   assert.equal(prog.at(-1).total, 3);
   assert.ok(prog.at(-1).since > 0);
+});
+
+test('평소 동기화는 Drive 폴더를 다 훑지 않고 바뀐 것만 (이 기기에서 고친 것 · 다른 기기에서 고친 것 · 새 폴더 · 지움)', async () => {
+  drive = new ChangesDrive();
+  drive.put('회의.md', '# 회의');
+  drive.put('_memoking/versions/m1/1.md', 'v1');
+  await sync(); // 처음은 다 훑는다
+  drive.log.length = 0;
+  drive.lists = 0;
+  // 이 기기에서만 고침 → Drive 에 물을 것 없이 올리기만
+  await lw('회의.md', '# 회의\nPC');
+  assert.equal((await sync()).uploaded, 1);
+  assert.equal(drive.text('회의.md'), '# 회의\nPC');
+  // 다른 기기에서 고치고 새 메모의 이전 버전 폴더(새 폴더 안 새 파일)도 생김
+  drive.put('회의.md', '# 회의\n휴대폰');
+  drive.put('_memoking/versions/m2/1.md', 'v2');
+  const r = await sync();
+  assert.equal(r.downloaded, 2);
+  assert.equal(lt('회의.md'), '# 회의\n휴대폰');
+  assert.equal(lt('_memoking/versions/m2/1.md'), 'v2');
+  // 다른 기기에서 지움 → 이 기기에서도
+  await drive.trash(drive.path('회의.md').id);
+  assert.equal((await sync()).deletedLocal, 1);
+  assert.equal(lt('회의.md'), null);
+  assert.equal(drive.lists, 0, '폴더 목록을 한 번도 묻지 않음');
+  // 다시 올린 것도 다음 차례에 그대로 (자기가 올린 것은 할 일 없음)
+  assert.equal((await sync()).skipped, true);
+});
+
+test('이름 바꾸기 · 옮기기처럼 기준만으로 모르는 것은 폴더를 다 훑어 맞춘다', async () => {
+  drive = new ChangesDrive();
+  drive.put('메모.md', '# 메모');
+  await sync();
+  drive.log.length = 0;
+  drive.lists = 0;
+  const f = drive.path('메모.md');
+  f.name = '새 이름.md';
+  drive.note(f.id);
+  await sync();
+  assert.ok(drive.lists > 0);
+  assert.equal(lt('새 이름.md'), '# 메모');
+  assert.equal(lt('메모.md'), null);
 });
