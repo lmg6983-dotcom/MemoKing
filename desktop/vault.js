@@ -260,11 +260,21 @@ export class Vault extends EventEmitter {
     return [...this.entries.values()].filter((e) => e.file).map((e) => ({ id: e.id, body: e.body }));
   }
 
-  // 매직키 메모 검색용: 메모마다 제목·본문 글
+  // 매직키 메모 검색용: 메모마다 제목·본문 글 — 다듬은 글(서식 뺀 줄)은 본문이 같으면 다시 만들지 않는다
+  //   (매직키는 글자마다 찾으므로, 메모 2,000개를 매번 다듬으면 키 한 번에 0.9초 걸렸다)
   searchable() {
-    return [...this.entries.values()]
-      .filter((e) => e.file)
-      .map((e) => ({ id: e.id, title: extractTitle(e.body), text: plainLines(e.body).join('\n'), updated: e.meta.updated, color: e.meta.color }));
+    const prev = this.searchCache ?? new Map();
+    const next = new Map();
+    const out = [];
+    for (const e of this.entries.values()) {
+      if (!e.file) continue;
+      let c = prev.get(e.id);
+      if (!c || c.body !== e.body) c = { body: e.body, title: extractTitle(e.body), text: plainLines(e.body).join('\n') };
+      next.set(e.id, c);
+      out.push({ id: e.id, title: c.title, text: c.text, updated: e.meta.updated, color: e.meta.color });
+    }
+    this.searchCache = next; // 지운 메모는 여기서 빠진다
+    return out;
   }
 
   search(query, excludeId = null) {

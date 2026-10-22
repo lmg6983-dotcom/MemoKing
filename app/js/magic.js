@@ -447,9 +447,11 @@ function note(text) {
 function render() {
   const raw = input.value;
   const query = raw.trim();
-  const before = introFresh ? new Map() : positions();
-  const beforeHeight = resultsEl.getBoundingClientRect().height;
-  resultsEl.getAnimations().forEach((a) => a.cancel()); // 높이가 바뀌던 중이면 지금 높이에서 다시
+  // 움직일 때만 지금 자리를 잰다 (재는 것만으로도 화면 배치를 한 번 더 계산한다 — 평소 글자 칠 때는 재지 않음)
+  const moving = !calm.matches && (introFresh || Date.now() - shownAt < 400 || Date.now() < glideUntil);
+  const before = !moving || introFresh ? new Map() : positions();
+  const beforeHeight = moving ? resultsEl.getBoundingClientRect().height : 0;
+  if (moving) resultsEl.getAnimations().forEach((a) => a.cancel()); // 높이가 바뀌던 중이면 지금 높이에서 다시
   rows = [];
   // 기능 id → 묶음 [{ head: [이름, 개수] } | { row } | { node }] — 계산 · 사이트 주소는 늘 맨 위 (식 · 주소면 Enter 로 바로), 나머지는 캡슐 순서
   const groups = new Map();
@@ -576,7 +578,7 @@ function render() {
     if (hit > 0) selected = hit;
   }
   select(Math.min(selected, Math.max(0, rows.length - 1)), { scroll: false, glide: gliding() });
-  animateResults(before, beforeHeight);
+  if (moving) animateResults(before, beforeHeight);
   fit();
 }
 
@@ -589,6 +591,7 @@ function fit() {
     const h = Math.ceil(box.getBoundingClientRect().height - list + (listTarget || list)) + 16;
     clearTimeout(shrinkTimer);
     const apply = () => {
+      if (h === winHeight) return; // 높이가 그대로면 창에 묻지 않는다
       winHeight = h;
       api.resize(h);
     };

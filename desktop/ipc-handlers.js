@@ -422,10 +422,12 @@ export function registerIpc(ctx) {
       const recent = mods.has('notes') && vault ? vault.list().slice(0, 4).map((m) => ({ id: m.id, title: m.title, snippet: (m.preview ?? '').split('\n')[0], color: m.color, updated: m.updated })) : [];
       return { notes: recent, recent: true, folders: [], files: [], index: getFileIndex()?.status() ?? null };
     }
-    const updatedOf = new Map((vault?.list() ?? []).map((m) => [m.id, m.updated]));
     const memos = mods.has('notes') && vault ? vault.searchable() : [];
-    const notes = searchMemos(memos, q, 5).map((n) => ({ ...n, updated: updatedOf.get(n.id) }));
-    const notesTotal = notes.length < 5 ? notes.length : searchMemos(memos, q, Infinity).length;
+    const updatedOf = new Map(memos.map((m) => [m.id, m.updated]));
+    // 한 번에 앞 5건 + 맞는 것 전부의 개수 — 예전에는 개수를 세려고 한 번 더 찾았다
+    const found = searchMemos(memos, q, 5);
+    const notes = found.map((n) => ({ ...n, updated: updatedOf.get(n.id) }));
+    const notesTotal = found.total;
     let folders = [];
     let files = [];
     let totalFolders = 0;
@@ -639,8 +641,9 @@ export function registerIpc(ctx) {
     }
     const vault = getVault();
     const mods = new Set(activeModules(settings.magic).map((m) => m.id));
-    const updatedOf = new Map((vault?.list() ?? []).map((m) => [m.id, m.updated]));
-    const notes = mods.has('notes') && vault ? searchMemos(vault.searchable(), q, 300).map((n) => ({ kind: 'note', ...n, updated: updatedOf.get(n.id) })) : [];
+    const searchable = mods.has('notes') && vault ? vault.searchable() : [];
+    const updatedOf = new Map(searchable.map((m) => [m.id, m.updated]));
+    const notes = searchable.length ? searchMemos(searchable, q, 300).map((n) => ({ kind: 'note', ...n, updated: updatedOf.get(n.id) })) : [];
     const found = mods.has('files') && fileIndex ? fileIndex.searchAll(q, 2000) : { items: [], total: 0 };
     wm.lastFinderResults = new Set(found.items.map((f) => f.path));
     const home = os.homedir();

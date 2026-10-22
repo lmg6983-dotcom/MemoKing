@@ -6,7 +6,7 @@ import { textMatcher, compactText, compactTermOf, isChoseongQuery, choseongRange
  * @param {{ id: string, title: string, text: string, updated?: string, color?: string }[]} memos text = 본문 글(제목 줄 포함 가능)
  * @param {string} query
  * @param {number} [limit]
- * @returns {{ id: string, title: string, snippet: string, color?: string }[]}
+ * @returns {{ id: string, title: string, snippet: string, color?: string }[] & { total: number }}
  */
 export function searchMemos(memos, query, limit = 5) {
   const q = String(query ?? '').trim().toLowerCase();
@@ -34,7 +34,8 @@ export function searchMemos(memos, query, limit = 5) {
     found.push({ m, score, at: Date.parse(m.updated ?? '') || 0 });
   }
   found.sort((a, b) => b.score - a.score || b.at - a.at);
-  return found.slice(0, limit).map(({ m }) => ({ id: m.id, title: m.title, color: m.color, snippet: snippetOf(String(m.text ?? ''), terms, m.title) }));
+  const out = found.slice(0, limit).map(({ m }) => ({ id: m.id, title: m.title, color: m.color, snippet: snippetOf(String(m.text ?? ''), terms, m.title) }));
+  return Object.defineProperty(out, 'total', { value: found.length }); // 맞는 것 전부의 개수 (미리 보기는 limit 건만 만든다)
 }
 
 // 본문에서 찾은 말 둘레 한 줄 (없으면 첫 줄)

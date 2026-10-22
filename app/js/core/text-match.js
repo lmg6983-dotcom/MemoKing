@@ -1,6 +1,4 @@
 // 검색어가 글에 들어 있나 — 대소문자 무시, 띄어 쓴 낱말은 모두 들어 있어야, 자음만 쓰면 초성 검색 (ㅈㅂㄱ → 장보기)
-// 초성 뽑기는 es-hangul(토스, MIT)
-import { getChoseong } from '../../vendor/es-hangul.js';
 
 const CHOSEONG_ONLY = /^[ㄱ-ㅎ]+$/;
 
@@ -78,7 +76,6 @@ export function textMatcher(query) {
   const compactTerms = terms.map(compactTermOf);
   return (...texts) => {
     const lower = texts.map((t) => String(t ?? '').toLowerCase());
-    let initials = null; // 필요할 때만 한 번 (긴 메모가 많아도 가볍게)
     let compact = null;
     return terms.every((term, i) => {
       if (lower.some((t) => t.includes(term))) return true;
@@ -87,8 +84,7 @@ export function textMatcher(query) {
         if (compact.some((t) => t.includes(compactTerms[i]))) return true;
       }
       if (!needChoseong || !isChoseongQuery(term)) return false;
-      initials ??= lower.map((t) => { const c = getChoseong(t); return [c, c.replace(/\s+/g, '')]; }).flat();
-      return initials.some((c) => c.includes(term));
+      return lower.some((t) => choseongIndex(t, term) >= 0); // 초성 글을 만들지 않고 글자 코드로 (메모가 많아도 가볍게)
     });
   };
 }

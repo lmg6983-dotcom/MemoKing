@@ -9,7 +9,6 @@
 | katex | 0.16.22 | MIT | https://github.com/KaTeX/KaTeX |
 | remark-math | 6.0.0 | MIT | https://github.com/remarkjs/remark-math/tree/main/packages/remark-math |
 | html-to-image | 1.11.13 | MIT | https://github.com/bubkoo/html-to-image |
-| es-hangul | 2.4.0 | MIT | https://github.com/toss/es-hangul |
 | chrono-node | 2.10.1 | MIT | https://github.com/wanasit/chrono |
 | @modelcontextprotocol/sdk | 1.30.1 | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
 | zod | 4.6.5 | MIT | https://github.com/colinhacks/zod |

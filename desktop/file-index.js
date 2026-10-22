@@ -215,6 +215,7 @@ export class FileIndex {
   use(entries, at) {
     this.entries = entries;
     this.lower = entries.map((e) => e.n.toLowerCase());
+    this.last = null; // 바로 앞 찾기의 맞은 이름들 (이어 친 글은 그 안에서만)
     this.hangul = null; // 이름에 한글이 있나 (1바이트씩 — 초성은 찾을 때 그 이름만 바꿔 본다, 처음 초성으로 찾을 때 만듦)
     this.snapshot = entries.length ? true : null;
     this.builtAt = at;
@@ -321,7 +322,15 @@ export class FileIndex {
       for (let i = 0; i < lower.length; i++) if (/[가-힣]/.test(lower[i])) this.hangul[i] = 1;
     }
     const choHit = new Map(); // 초성으로 맞은 이름 → 모든 초성 낱말이 이름 첫머리에서 맞았나 (점수용)
-    for (let i = 0; i < lower.length; i++) {
+    // 글자를 이어 쳤으면(견적 → 견적서) 바로 앞에 맞았던 이름 안에서만 — 이어 친 글에 맞는 이름은 앞 글에도 늘 맞아 결과가 같다.
+    //   기호를 빼고 견주는 말(관리번호)은 그렇지 않을 수 있어 글자 · 숫자 · 띄어쓰기만인 글일 때만
+    const ql0 = q.toLowerCase();
+    const simple = /^[\p{L}\p{N}\s]+$/u.test(ql0);
+    const pool = simple && this.last && this.last.entries === this.entries && ql0.startsWith(this.last.q) ? this.last.hits : null;
+    const hits = [];
+    const count = pool ? pool.length : lower.length;
+    for (let k = 0; k < count; k++) {
+      const i = pool ? pool[k] : k;
       const name = lower[i];
       let all = true;
       let whole = true;
@@ -351,12 +360,14 @@ export class FileIndex {
         }
       }
       if (!all) continue;
+      hits.push(i);
       if (this.entries[i].d) folders++;
       else files++;
       if (whole) {
         if (contiguous.length < cap) contiguous.push(i);
       } else if (loose.length < cap) loose.push(i);
     }
+    this.last = simple && hits.length <= 200_000 ? { q: ql0, entries: this.entries, hits } : null;
     // 2) 후보만 fuzzysort 로 점수 (프로그램 바로 가기·이름이 찾는 말로 시작·얕은 곳을 조금 앞으로)
     const ql = q.toLowerCase();
     const scored = [];

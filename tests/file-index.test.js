@@ -142,3 +142,14 @@ test('초성으로도 찾음 (ㅎㅇㄹ → 회의록, 띄어쓰기 건너뜀) �
   assert.deepEqual(idx.search('ㅎㅇㄹㅁㅇ').map((r) => r.name), ['회의록 모음'], '띄어쓰기 건너뜀');
   assert.deepEqual(idx.search('ㅋㅋ'), []);
 });
+
+test('이어 친 글은 앞에서 맞은 이름 안에서만 찾아도 처음부터 찾은 것과 같음 (지우거나 바꾸면 처음부터)', () => {
+  const names = ['견적서 01.txt', '견적 메모.hwp', '견본 사진.jpg', '회의록 견적.docx', 'estimate-2026.xlsx', 'P2026-1170-KR01.pdf', '견적서 모음'];
+  const entries = names.map((n, k) => ({ n, p: `C:/a/${k}/${n}`, d: !n.includes('.'), a: false, depth: 1 }));
+  const fresh = (q) => { const x = new FileIndex({ roots: () => [] }); x.use(entries, Date.now()); return x.searchAll(q, 20); };
+  const idx = new FileIndex({ roots: () => [] });
+  idx.use(entries, Date.now());
+  for (const q of ['견', '견적', '견적서', '견적서 0', 'ㄱ', 'ㄱㅈ', 'ㄱㅈㅅ', 'e', 'est', '견', '견본', 'p2026', 'p2026-1170']) {
+    assert.deepEqual(idx.searchAll(q, 20), fresh(q), q);
+  }
+});

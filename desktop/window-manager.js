@@ -1651,6 +1651,8 @@ export class WindowManager {
       return;
     }
     this.magicWin ??= this.createMagicWindow();
+    // 메모 찾기용 글을 미리 다듬어 둔다 (처음 한 번만 오래 걸리고 그 뒤로는 바뀐 메모만) — 첫 글자를 칠 때 기다리지 않게
+    setTimeout(() => this.getVault()?.searchable(), 0);
     const [w] = this.magicWin.getSize();
     const saved = settings.magicPos;
     const isSavedOnScreen = saved && screen.getAllDisplays().some((d) => {
