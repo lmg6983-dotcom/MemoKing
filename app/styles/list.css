@@ -374,6 +374,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .set-title small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .set-sec > .setting-row:last-child, .set-sec > .dialog-actions:last-child { margin-bottom: 0; }
 .set-sec .label { margin-top: 4px; }
+.set-sec .label + .set-note { margin-top: -2px; }
+.set-note { margin: 0 0 10px; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.set-sec .phone-how + .label { margin-top: 16px; }
 .app-box { margin: 2px 0 0; padding: 12px 12px 12px 14px; }
 .app-box .drive-box-icon { color: var(--text-strong); }
 .app-box .drive-box-text { flex: 1; }
