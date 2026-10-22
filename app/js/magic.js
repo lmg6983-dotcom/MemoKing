@@ -1,7 +1,7 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
 import { looksLikeRef } from './core/magic-modules.js';
-import { calcInput, calcOutput, siteUrl, sitesInOrder, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
+import { calcInput, calcOutput, siteUrl, sitesInOrder, looksLikeQuestion, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { searchingNode } from './searching.js';
 import { COLOR_DOTS } from './core/memo-file.js';
 import { UI } from './core/ui-text.js';
@@ -163,6 +163,9 @@ function renderModules() {
     chip.append(dot, m.chip ?? m.name);
     chip.addEventListener('mousedown', (e) => e.preventDefault()); // 입력 칸 포커스 유지
     chip.addEventListener('pointerdown', (e) => dragChip(e, chip));
+    // 끌 수 있다는 것을 마우스를 올렸을 때 아래 안내 자리에
+    chip.addEventListener('mouseenter', () => showHint([['누르기', m.on ? '끄기' : '켜기'], ['끌기', '순서 바꾸기']]));
+    chip.addEventListener('mouseleave', () => updateHint());
     chip.addEventListener('click', async () => {
       if (chip.dataset.dragged) return; // 끌어 놓은 것은 누른 것이 아님
       modules = await api.toggleModule(m.id).catch(() => modules);
@@ -262,11 +265,10 @@ function dragChip(e, chip) {
 
 function updatePlaceholder() {
   const memo = isOn('memo');
-  // 찾는 것: 켜진 기능만 이름에 (파일 검색을 껐으면 "파일" 이라고 하지 않게)
-  const what = [isOn('notes') && '메모', isOn('files') && '파일', isOn('opms') && 'OPMS', isOn('web') && '웹'].filter(Boolean).join(', ');
-  const extra = [isOn('calc') && '계산', isOn('ai') && 'AI 에게 묻기'].filter(Boolean).join(', ');
-  const main = memo && what ? `메모를 쓰거나, ${what} 찾기` : memo ? '메모를 쓰고 Enter' : what ? `${what} 찾기` : '';
-  input.placeholder = main && extra ? `${main}, ${extra}` : main || extra
+  const find = ['notes', 'files', 'opms', 'web'].some(isOn);
+  // 짧게: 켜진 기능을 하나하나 늘어놓지 않는다 (무엇을 찾는지는 아래 캡슐이 보여 준다)
+  const parts = [memo && '메모 쓰기', find && '찾기', isOn('calc') && '계산', isOn('ai') && 'AI 에게 묻기'].filter(Boolean);
+  input.placeholder = parts.join(', ')
     || (modules.length ? '아래 캡슐을 눌러 기능을 켜 주세요' : '설정의 매직키에서 기능을 켜 주세요');
 }
 
@@ -410,9 +412,6 @@ function note(text) {
   return li;
 }
 
-// 묶음 머리말 (기능 이름 그대로 — 메모 · 폴더 · 파일 · OPMS 처럼 따로 붙이는 묶음은 그 이름)
-const GROUP_LABEL = { calc: '계산기', site: '사이트', memo: '새 메모', web: '웹 검색', ai: 'AI 에게 묻기' };
-
 function render() {
   const raw = input.value;
   const query = raw.trim();
@@ -478,11 +477,17 @@ function render() {
   pill.hidden = true;
   const nodes = [pill];
   let first = true;
-  for (const mod of ['calc', 'site', ...modules.map((m) => m.id)]) {
+  // 묻는 글이면 AI 에게 묻기를 새 메모 바로 아래로 (맨 아래 화면 밖에 묻히지 않게)
+  const order = ['calc', 'site', ...modules.map((m) => m.id)];
+  if (groups.has('ai') && looksLikeQuestion(query)) {
+    order.splice(order.indexOf('ai'), 1);
+    order.splice(order.indexOf('memo') + 1 || 2, 0, 'ai');
+  }
+  // 머리말은 여러 줄 묶음(메모 · 폴더 · 파일 · OPMS)에만 — 한 줄 묶음은 아이콘 칸의 기능 색으로 구분
+  for (const mod of order) {
     const items = groups.get(mod);
     if (!items) continue;
     let heads = 0;
-    if (!items[0].head && items.some((it) => it.row)) items.unshift({ head: [GROUP_LABEL[mod] ?? modules.find((m) => m.id === mod)?.name ?? '', 0] });
     for (const it of items) {
       if (it.head) {
         const li = section(it.head[0], it.head[1], mod, heads++ > 0);
@@ -587,6 +592,9 @@ function updateHint() {
   parts.push(['Esc', input.value ? '지우기' : '닫기']);
   if (rows.length > 1) parts.push(['↑↓', '고르기']);
   if (r?.kind === 'new') parts.push(['Shift ↵', '줄바꿈']);
+  showHint(parts);
+}
+function showHint(parts) {
   hintEl.replaceChildren(...parts.map(([k, label]) => {
     const span = document.createElement('span');
     const kbd = document.createElement('kbd');

@@ -85,3 +85,15 @@ export function calcOutput(result, format) {
   }
   return null;
 }
+
+/**
+ * 묻는 글인가 (AI 에게 묻기 줄을 위로 올릴지) — "?" · 묻는 말로 시작 · 부탁하는 끝말
+ *   "환율 뭐야", "이 메일 정리해줘", "how to ..." 는 맞음 · "내일 3시 회의", "견적서" 는 아님
+ */
+export function looksLikeQuestion(text) {
+  const s = String(text ?? '').trim();
+  if (s.length < 2 || s.includes('\n')) return false;
+  if (/[?？]$/.test(s)) return true;
+  if (/^(뭐|왜|어떻게|어떤|언제|어디|누가|누구|무엇|몇|얼마|how|what|why|when|where|who|which|can|should|is|are|do|does)(\s|$)/i.test(s)) return true;
+  return /(해\s?줘|알려\s?줘|해\s?주세요|알려\s?주세요|뭐야|뭐지|뭔가요|인가요|까|까요|나요|는지|어때|explain|summarize|translate)$/i.test(s);
+}

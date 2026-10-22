@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluate, format } from '../app/vendor/mathjs.js';
-import { calcInput, calcOutput, siteUrl, siteLink, sitesInOrder, WEB_ENGINES, AI_SITES } from '../app/js/core/magic-tools.js';
+import { calcInput, calcOutput, siteUrl, siteLink, sitesInOrder, WEB_ENGINES, AI_SITES, looksLikeQuestion } from '../app/js/core/magic-tools.js';
 
 const calc = (text) => {
   const expr = calcInput(text);
@@ -47,4 +47,13 @@ test('매직키 사이트 열기: 주소처럼 보일 때만 (파일 이름 · �
   assert.equal(siteUrl('https://example.org/a b'), null);
   assert.equal(siteUrl('http://localhost.test/x'), 'http://localhost.test/x');
   for (const t of ['report.pdf', 'memo.md', '1.5', 'naver com', '회의.com 메모']) assert.equal(siteUrl(t), null, t);
+});
+
+test('묻는 글이면 AI 에게 묻기 줄을 위로: "?" · 묻는 말로 시작 · 부탁하는 끝말', () => {
+  for (const q of ['환율 뭐야', '이 메일 정리해줘', '회의록 요약해 주세요', '파이썬 리스트 정렬은?', '왜 하늘은 파란가', 'how to center a div', '내일 비 올까', '이거 맞는지']) {
+    assert.ok(looksLikeQuestion(q), q);
+  }
+  for (const q of ['내일 3시 회의', '견적서', '1,200 × 3', 'naver.com', '장보기: 우유, 계란', '', '첫 줄\n둘째 줄?']) {
+    assert.ok(!looksLikeQuestion(q), q);
+  }
 });
