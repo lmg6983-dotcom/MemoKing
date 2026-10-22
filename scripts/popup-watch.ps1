@@ -7,7 +7,8 @@
 #   4) captures the window (PrintWindow) and reads it with the OCR built into Windows (Windows.Media.Ocr).
 #      OCR always runs; text from 1)~3) is used only when it covers what OCR sees (some apps expose only junk names).
 #      For OCR the capture is made opaque (layered/GDI windows leave alpha at 0 and OCR then sees an empty canvas)
-#      the profile picture on the left is painted over (OCR reads it as stray letters glued to the sender name),
+#      the profile picture on the left is painted over (OCR reads it as stray letters glued to the sender name) and its top
+#      is reported (lines above it are the chat room name), emoji are painted over (OCR reads them as symbols),
 #      the image is turned gray with stretched contrast (dark popups inverted to dark-on-white),
 #      and enlarged (small UI text reads much better), and each line keeps its place (x, y, w, h in 100%-scale px).
 # One JSON line per new popup text on stdout:
@@ -102,10 +103,10 @@ public static class MkPopup {
   // 글자 인식용 그림: 알파를 무시해 불투명하게 (GDI 로 그린 글자는 알파가 0 이라 그대로면 빈 그림으로 보인다),
   // 왼쪽 프로필 사진은 바탕색으로 지우고 (글자 인식이 사진을 '렐' · '반' 같은 글자로 읽어 이름에 붙인다),
   // factor 배로 키운 뒤 흑백 · 대비를 늘린다 (작은 글자는 키우면 훨씬 잘 읽히고, 가는 획이 흐려지지 않게)
-  // 마지막 OcrImage 에서 맨 위 줄(채팅방 이름)을 지웠는가 — 그러면 남은 첫 줄이 보낸 사람
-  public static bool LastRoomCut;
+  // 마지막 OcrImage 에서 찾은 프로필 사진의 윗변 (원래 그림 px, 못 찾으면 -1) — 그 위 줄이 채팅방 이름
+  public static int LastProfileTop = -1;
   public static Bitmap OcrImage(Bitmap src, double factor, double scale = 1) {
-    LastRoomCut = false;
+    LastProfileTop = -1;
     var opaque = new Bitmap(src.Width, src.Height, PixelFormat.Format32bppArgb);
     var rect = new Rectangle(0, 0, src.Width, src.Height);
     var from = src.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
@@ -118,10 +119,8 @@ public static class MkPopup {
       int stride = Math.Abs(from.Stride), bin = BackgroundBin(buf, stride, src.Width, src.Height);
       var bgc = BackgroundColor(buf, stride, src.Width, src.Height, bin);
       int top = HideProfile(buf, stride, src.Width, src.Height, scale, bin, bgc);
-      // 맨 위 작은 줄(채팅방 이름)은 아래 보낸 사람 줄과 겹치므로 읽지 않는다: 프로필 사진 윗변보다 위는 지운다
-      int cut = top - (int)Math.Round(3 * scale);
-      LastRoomCut = top > 0 && cut > 2 && top < src.Height * 0.6;
-      if (LastRoomCut) Paint(buf, stride, 0, 0, src.Width, cut, bgc);
+      // 프로필 사진 윗변: 그보다 위의 작은 줄은 채팅방 이름 (메모킹이 보낸 사람과 같으면 1:1 대화로 보고 뺀다)
+      if (top > 2 && top < src.Height * 0.6) LastProfileTop = top;
       HideEmoji(buf, stride, src.Width, src.Height, scale, bin, bgc);
       Marshal.Copy(buf, 0, to.Scan0, bytes);
     } finally { src.UnlockBits(from); opaque.UnlockBits(to); }
@@ -631,7 +630,7 @@ while ($true) {
           $s.sent = $dedupeKey
           $proc = (Get-Process -Id $w.Pid -ErrorAction SilentlyContinue).ProcessName
           $msg = [ordered]@{ process = $proc; pid = $w.Pid; hwnd = $w.Hwnd; windowTitle = $w.Title; lines = @($lines); via = $via; image = $png; size = $size }
-          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes); $msg['ocrImage'] = $ocrPng; $msg['ocrUnit'] = [Math]::Round($ocrUnit, 4); $msg['verifyImage'] = $verifyPng; $msg['scale'] = $w.Scale; $msg['roomCut'] = [MkPopup]::LastRoomCut }
+          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes); $msg['ocrImage'] = $ocrPng; $msg['ocrUnit'] = [Math]::Round($ocrUnit, 4); $msg['verifyImage'] = $verifyPng; $msg['scale'] = $w.Scale; $msg['profileTop'] = $(if ([MkPopup]::LastProfileTop -gt 0) { [Math]::Round([MkPopup]::LastProfileTop / $w.Scale, 1) } else { 0 }) }
           else { @($ocrPng, $verifyPng) | Where-Object { $_ } | Remove-Item -ErrorAction SilentlyContinue }
           [Console]::Out.WriteLine(($msg | ConvertTo-Json -Compress -Depth 4))
           [Console]::Out.Flush()

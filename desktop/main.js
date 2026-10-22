@@ -459,7 +459,7 @@ async function addPopupToHistory(p) {
       }
     }
     const byLayout = p.process === 'KakaoTalk' && p.via === 'ocr' && Array.isArray(p.boxes)
-      ? kakaoEntry(p.boxes, { width: p.size?.w, height: p.size?.h, appName, roomCut: p.roomCut === true })
+      ? kakaoEntry(p.boxes, { width: p.size?.w, height: p.size?.h, appName, profileTop: Number(p.profileTop) || 0 })
       : null;
     const entry = byLayout ?? popupToEntry(p.lines, { appName });
     if (!entry || !history) return;

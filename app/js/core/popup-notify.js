@@ -69,14 +69,34 @@ function usable(text) {
   return !CONTROL.test(t) && !t.includes('메시지입력') && !t.includes('아이콘표시');
 }
 
+// 채팅방 이름과 보낸 사람이 같은 이름인가 (1:1 대화) — 작은 글씨 · 굵은 글씨를 따로 읽어 한두 글자 다를 수 있다
+function sameName(a, b) {
+  const x = a.replace(/[^\p{L}\p{N}]/gu, '');
+  const y = b.replace(/[^\p{L}\p{N}]/gu, '');
+  if (!x || !y) return true;
+  if (x === y || x.includes(y) || y.includes(x)) return true;
+  // 한 글자만 다르면 같은 이름으로 (글자 인식이 한 글자를 잘못 읽은 경우)
+  if (Math.abs(x.length - y.length) > 1) return false;
+  let diff = 0;
+  for (let i = 0, j = 0; i < x.length || j < y.length; i++, j++) {
+    if (x[i] === y[j]) continue;
+    diff++;
+    if (x.length > y.length) j--;
+    else if (y.length > x.length) i--;
+    if (diff > 1) return false;
+  }
+  return true;
+}
+
 /**
  * 글자 인식 결과(줄마다 글과 자리) → { title, body }
  * @param {{ text: string, x: number, y: number, w?: number, h?: number }[]} boxes 알림 창 왼쪽 위 기준 (100% 배율 px)
- * @param {{ width?: number, height?: number, appName?: string, roomCut?: boolean }} [size] 알림 창 크기 (100% 배율 px).
- *   roomCut: 글자 인식 전에 맨 위 작은 줄(채팅방 이름)을 지웠다 → 남은 첫 줄이 보낸 사람, 나머지는 메시지
+ * @param {{ width?: number, height?: number, appName?: string, profileTop?: number }} [size] 알림 창 크기 (100% 배율 px).
+ *   profileTop: 프로필 사진 윗변(100% 배율 px). 그보다 위의 줄은 채팅방 이름, 아래 첫 줄이 보낸 사람, 나머지는 메시지.
+ *   채팅방 이름이 보낸 사람과 같으면(1:1 대화) 보낸 사람만, 다르면(단체방) "보낸 사람 (채팅방)
  * @returns {{ title: string, body: string } | null}
  */
-export function kakaoEntry(boxes, { width = 0, height = 0, appName = '', roomCut = false } = {}) {
+export function kakaoEntry(boxes, { width = 0, height = 0, appName = '', profileTop = 0 } = {}) {
   const items = [];
   for (const b of [].concat(boxes ?? [])) {
     const text = String(b?.text ?? '').replace(/\s+/g, ' ').trim();
@@ -101,8 +121,15 @@ export function kakaoEntry(boxes, { width = 0, height = 0, appName = '', roomCut
   let room;
   let sender;
   let body;
-  if (roomCut) {
-    [room, sender, body] = [lines[0].text, lines[0].text, lines.slice(1).map((l) => l.text)];
+  const below = profileTop > 0 ? lines.filter((l) => l.y >= profileTop - 4) : [];
+  if (below.length) {
+    // 프로필 사진 윗변을 안다: 그 위 = 채팅방 이름, 아래 첫 줄 = 보낸 사람
+    // 오른쪽 위 종 · 닫기 단추가 채팅방 줄 끝에 '×' · 'x' · '0' 같은 한 글자로 붙어 읽히면 뗀다
+    const roomLine = lines.filter((l) => l.y < profileTop - 4).map((l) => l.text).join(' ')
+      .replace(/(\s+(?:[^\p{L}\p{N}\s]{1,2}|[xXoO0]))+$/u, '').trim();
+    sender = below[0].text;
+    room = roomLine && !sameName(roomLine, sender) ? roomLine : sender;
+    body = below.slice(1).map((l) => l.text);
   } else if (lines.length === 1) {
     [room, sender, body] = [lines[0].text, lines[0].text, []];
   } else if (lines[1].y >= KAKAO_BODY_Y || lines[0].text === lines[1].text) {

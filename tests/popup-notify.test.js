@@ -96,9 +96,17 @@ test('카카오톡: 읽은 것이 없으면 null', () => {
   assert.equal(kakaoEntry(undefined), null);
 });
 
-test('카카오톡: 맨 위 채팅방 줄을 지우고 읽었으면(roomCut) 첫 줄이 보낸 사람, 나머지가 메시지', () => {
-  const boxes = [box('우리 여보', 64, 32, 13), box('혹시 오늘 저녁도 괜찮겠니', 64, 54, 12), box('메시지 입력', 20, 104, 12)];
-  assert.deepEqual(kakaoEntry(boxes, { width: 330, height: 140, appName: '카카오톡', roomCut: true }), { title: '우리 여보', body: '혹시 오늘 저녁도 괜찮겠니' });
-  // 지우지 못했으면(프로필을 못 찾음) 예전처럼 맨 위 줄을 채팅방으로
-  assert.equal(kakaoEntry(boxes, { width: 330, height: 140, appName: '카카오톡' }).title, '혹시 오늘 저녁도 괜찮겠니 (우리 여보)');
+test('카카오톡: 프로필 사진 윗변을 알면 그 위는 채팅방, 아래 첫 줄이 보낸 사람 (1:1 이면 보낸 사람만, 단체방이면 채팅방도)', () => {
+  const one = [box('우리 여보', 14, 8, 11), box('우리 여보', 64, 32, 13), box('혹시 오늘 저녁도 괜찮겠니', 64, 54, 12), box('메시지 입력', 20, 104, 12)];
+  assert.deepEqual(kakaoEntry(one, { width: 330, height: 140, appName: '카카오톡', profileTop: 30 }), { title: '우리 여보', body: '혹시 오늘 저녁도 괜찮겠니' });
+  // 작은 글씨를 한 글자 잘못 읽어도 같은 이름 (1:1)
+  const typo = [box('우리 여부', 14, 8, 11), ...one.slice(1)];
+  assert.equal(kakaoEntry(typo, { width: 330, height: 140, appName: '카카오톡', profileTop: 30 }).title, '우리 여보');
+  const group = [box('회사 동기방 ×', 14, 8, 11), box('김대리', 64, 32, 13), box('회의 자료 보냈어요', 64, 54, 12)];
+  assert.deepEqual(kakaoEntry(group, { width: 330, height: 140, appName: '카카오톡', profileTop: 30 }), { title: '김대리 (회사 동기방)', body: '회의 자료 보냈어요' });
+  // 채팅방 이름 끝의 짧은 영문 낱말은 남긴다 (단추 기호만 뗀다)
+  const latin = [box('Team AB', 14, 8, 11), ...group.slice(1)];
+  assert.equal(kakaoEntry(latin, { width: 330, height: 140, appName: '카카오톡', profileTop: 30 }).title, '김대리 (Team AB)');
+  const xBtn = [box('우리 가족 x', 14, 8, 11), ...group.slice(1)];
+  assert.equal(kakaoEntry(xBtn, { width: 330, height: 140, appName: '카카오톡', profileTop: 30 }).title, '김대리 (우리 가족)');
 });

@@ -1614,6 +1614,19 @@ export async function runSmoke({
     const expected = appSettings().autoStart.available;
     check('설정: Windows 시작 시 자동 실행 (설치판에서만 켤 수 있음)', auto.disabled === !expected && (expected || /설치한 메모킹/.test(auto.note)), JSON.stringify(auto));
     await capture(lw, 'smoke-settings.png');
+    // 휴대폰 앱(안드로이드) 설치: QR 코드 · 링크 복사 · 설치 방법
+    {
+      const qr = await until(() => listJs(`document.querySelector('#phone-qr svg path, #phone-qr svg rect') ? document.querySelectorAll('#phone-qr svg *').length : 0`), '휴대폰 앱 QR', 3000).catch(() => 0);
+      // 실제 클립보드는 바꾸지 않는다 (smoke:clipboard 에서만) — 복사했다는 안내와 링크 주소만 본다
+      await listJs(`document.getElementById('phone-copy').click()`);
+      const copied = await listJs(`document.querySelector('#phone-qr').getAttribute('aria-label')`) && await listJs(`(document.getElementById('phone-open').dataset.url || '')`);
+      const how = await listJs(`(() => { const d = document.querySelector('.phone-how'); d.open = true; d.closest('.set-sec').scrollIntoView({ block: 'start' }); return d.querySelectorAll('li').length; })()`);
+      await wait(150);
+      await capture(lw, 'smoke-settings-phone.png');
+      await listJs(`document.querySelector('.phone-how').open = false`);
+      const note = await until(() => listJs(`document.getElementById('phone-note').textContent`), '복사 안내', 2000).catch(() => '');
+      check('설정: 휴대폰 앱(안드로이드) 설치 QR 코드 · 링크 복사 안내 · 설치 방법', qr > 0 && /releases\/download\/android\/MemoKing-android\.apk$/.test(copied) && how === 5 && /복사했어요/.test(note), JSON.stringify({ qr, copied, how, note }));
+    }
     // 전역 단축키 바꾸기: 키 단추 → 새 조합을 누르면 저장(다른 앱이 쓰는 키면 그대로 두고 알림) · 같은 키는 거절 · 기본값으로
     {
       const press = async (keyCode, modifiers = []) => {
