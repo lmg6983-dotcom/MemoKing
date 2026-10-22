@@ -34,9 +34,21 @@ export function popupToEntry(lines, { appName = '' } = {}) {
   return { title: title.slice(0, 200), body: rest.join('\n').slice(0, 2000) };
 }
 
-// 같은 앱의 같은 알림을 짧은 시간 안에 두 번 넣지 않는다 (알림 창이 다시 그려지는 경우)
+// 글자만 (띄어쓰기 · 기호 · 읽는 방법마다 다른 줄 나눔은 빼고)
+const letters = (text) => String(text ?? '').replace(/[^\p{L}\p{N}]/gu, '');
+const overlaps = (a, b) => a === b || (Boolean(a && b) && (a.includes(b) || b.includes(a)));
+export const SAME_WINDOW_MS = 15_000;
+
+// 같은 앱의 같은 알림을 짧은 시간 안에 두 번 넣지 않는다 (알림 창이 다시 그려지는 경우).
+//   같은 알림 창(hwnd)을 방금 읽었으면 글이 조금 달라도 같은 알림 — 바로 읽은 글과 글자 인식 결과처럼
+//   제목 · 내용이 각각 한쪽이 다른 쪽을 담으면 ("김대리" · "김대리 (영업팀)")
 export function isRepeat(recent, entry, now = Date.now(), windowMs = 2 * 60 * 1000) {
-  return recent.some((r) => r.app === entry.app && r.title === entry.title && r.body === entry.body && now - r.at < windowMs);
+  return recent.some((r) => {
+    if (r.app !== entry.app) return false;
+    if (r.title === entry.title && r.body === entry.body && now - r.at < windowMs) return true;
+    if (!entry.hwnd || r.hwnd !== entry.hwnd || now - r.at >= SAME_WINDOW_MS) return false;
+    return overlaps(letters(r.title), letters(entry.title)) && overlaps(letters(r.body), letters(entry.body)) && Boolean(letters(r.title + r.body));
+  });
 }
 
 // ---------- 카카오톡 PC 알림 창: 글자 인식 결과를 자리로 나누기 ----------

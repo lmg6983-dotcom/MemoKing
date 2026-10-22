@@ -126,6 +126,18 @@ public static class MkPopup {
     opaque.Dispose();
     return big;
   }
+  // 아직 그려지지 않은 창(나타나는 중의 검은 · 한 색 그림)인가 — 글자가 하나도 없는 한 색이면 읽지 않고 다음 차례에
+  public static bool IsBlank(Bitmap b) {
+    int lo = int.MaxValue, hi = int.MinValue;
+    for (int y = 1; y < b.Height; y += Math.Max(1, b.Height / 24))
+      for (int x = 1; x < b.Width; x += Math.Max(1, b.Width / 32)) {
+        Color c = b.GetPixel(x, y);
+        int v = c.R + c.G + c.B;
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+    return hi - lo < 30;
+  }
   public static string Fingerprint(Bitmap b) {
     long sum = 0; int n = 0;
     for (int y = 2; y < b.Height; y += Math.Max(1, b.Height / 16))
@@ -339,9 +351,10 @@ while ($true) {
         $bmp = [MkPopup]::Capture($w.Hwnd, $w.W, $w.H)
         if (-not $bmp) { continue }
         try {
-          $fp = [MkPopup]::Fingerprint($bmp)
           $s = $state[$w.Hwnd]
           if (-not $s) { $s = @{ fp = ''; stable = 0; sent = '' }; $state[$w.Hwnd] = $s }
+          if ([MkPopup]::IsBlank($bmp)) { $s.fp = ''; $s.stable = 0; continue }   # 나타나는 중(검은 그림) → 그려진 뒤에
+          $fp = [MkPopup]::Fingerprint($bmp)
           if ($s.fp -ne $fp) { $s.fp = $fp; $s.stable = 0; continue }   # 그려지는 중 → 다음 차례에
           $s.stable++
           if ($s.stable -ne 1) { continue }                                # 모양이 그대로면 한 번만 읽는다

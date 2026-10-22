@@ -464,8 +464,8 @@ async function addPopupToHistory(p) {
     if (!entry || !history) return;
     const now = Date.now();
     while (recentPopups.length && now - recentPopups[0].at > 5 * 60 * 1000) recentPopups.shift();
-    if (isRepeat(recentPopups, { app: appName, ...entry }, now)) return;
-    recentPopups.push({ app: appName, ...entry, at: now });
+    if (isRepeat(recentPopups, { app: appName, hwnd: p.hwnd, ...entry }, now)) return;
+    recentPopups.push({ app: appName, hwnd: p.hwnd, ...entry, at: now });
     const image = p.image ? history.keepImage(p.image) : null;
     history.add({ source: 'popup', appId: p.process, app: appName, ...entry, image, via: p.via ?? '' });
   } finally {
