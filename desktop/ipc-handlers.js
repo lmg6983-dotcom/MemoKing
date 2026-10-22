@@ -8,7 +8,7 @@ import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
-import { looksLikeOpmsQuery } from '../app/js/core/opms-search.js';
+import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
 import { activeModules, memoBodyFromText, magicChips, toggleMagicChip, reorderMagicChips, normalizeMagicSettings } from '../app/js/core/magic-modules.js';
 import { WEB_ENGINES, AI_SITES, siteLink, siteUrl } from '../app/js/core/magic-tools.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
@@ -446,7 +446,7 @@ export function registerIpc(ctx) {
   // 웹 검색 · AI 에게 묻기 기본 사이트 (매직키 창의 할 일 단추 순서)
   ipcMain.handle('magic:prefs', () => {
     const m = normalizeMagicSettings(settings.magic);
-    return { engine: m.engine, ai: m.ai, opms: Boolean(wm.opmsSettings().host) }; // opms: 서버 주소를 넣었나 (없으면 "OPMS 에서 찾기" 줄도 없음)
+    return { engine: m.engine, ai: m.ai, opms: Boolean(wm.opmsSettings().host), opmsShapes: settings.opmsShapes ?? [] }; // opms: 서버 주소를 넣었나 (없으면 "OPMS 에서 찾기" 줄도 없음)
   });
   // 계산 결과 복사 · 웹 검색 · AI 에게 묻기 · 사이트 열기 — 고른 줄을 실행할 때만 브라우저로 (주소는 여기서 만든다)
   ipcMain.handle('magic:tool', (_e, req) => {
@@ -470,6 +470,15 @@ export function registerIpc(ctx) {
     if (link.paste) toast({ title: `${link.name} 를 열었어요`, body: '질문을 복사해 두었어요. 입력 칸에 붙여 넣기(Ctrl+V)만 하면 돼요' });
     return { ok: true };
   });
+  // 사용자가 골라 찾은 사건의 번호 양식을 배워 둔다 — 같은 양식의 번호는 앞으로 매직키가 저절로 찾는다 (설정에서 지우기)
+  const learnOpms = (rows) => {
+    const next = learnShapes(settings.opmsShapes, rows);
+    if (next !== settings.opmsShapes) {
+      settings.opmsShapes = next;
+      saveSettings();
+    }
+    return next;
+  };
   ipcMain.handle('magic:opms-search', async (_e, query) => {
     const q = String(query ?? '').slice(0, 40);
     if (!activeModules(settings.magic).some((m) => m.id === 'opms') || !looksLikeOpmsQuery(q)) return { cases: [], total: 0 };
@@ -479,7 +488,7 @@ export function registerIpc(ctx) {
       const { rows, total } = await wm.opmsClient().search(q, { timeoutMs: 5000, retries: 0, limit: 60 });
       const top = rows.slice(0, 6);
       wm.rememberCases(top);
-      return { cases: top.map((r) => wm.opmsBrief(r, q)), total };
+      return { cases: top.map((r) => wm.opmsBrief(r, q)), total, shapes: learnOpms(rows) };
     } catch (err) {
       return { cases: [], total: 0, error: err.offline ? '사내망에 연결돼 있지 않아 OPMS 를 찾지 못했어요' : err.message };
     }
@@ -491,6 +500,7 @@ export function registerIpc(ctx) {
     const q = String(query ?? '').slice(0, 60);
     const { rows, total } = await wm.opmsClient().search(q, { retries: 1 });
     wm.rememberCases(rows);
+    learnOpms(rows);
     return { list: rows.map((r) => wm.opmsBrief(r, q)), total };
   });
   ipcMain.handle('opms:case', async (_e, idx) => {
@@ -572,7 +582,12 @@ export function registerIpc(ctx) {
     return { file };
   });
   // 설정 › 매직키 › OPMS: 서버 주소 · 전자포대 폴더 (코드에 두지 않고 사용자가 넣는다)
-  ipcMain.handle('opms:settings', () => ({ ...wm.opmsSettings(), hostSet: Boolean(wm.opmsSettings().host) }));
+  ipcMain.handle('opms:settings', () => ({ ...wm.opmsSettings(), hostSet: Boolean(wm.opmsSettings().host), shapes: settings.opmsShapes ?? [] }));
+  ipcMain.handle('opms:clear-shapes', () => {
+    settings.opmsShapes = [];
+    saveSettings();
+    return [];
+  });
   ipcMain.handle('opms:set-host', (_e, text) => {
     const raw = String(text ?? '').trim();
     const host = raw ? normalizeOpmsHost(raw) : '';

@@ -1135,8 +1135,15 @@ async function showOpmsSetup() {
   const o = await api.opms.settings();
   if (document.activeElement !== $('opms-host')) $('opms-host').value = o.host ?? '';
   $('opms-dir').textContent = o.wrapperDir ?? '';
+  showOpmsShapes(o.shapes ?? []);
   if (!o.hostSet && !$('opms-host-note').textContent) setOpmsNote('서버 주소를 넣으면 OPMS 사건을 찾을 수 있어요', false); // 아직 아무것도 안 했으니 빨간 글은 아님
 }
+// OPMS 에서 골라 찾은 번호로 배운 양식 (A 영문 · 9 숫자 · 가 한글) — 이 양식의 번호는 매직키가 저절로 찾는다
+function showOpmsShapes(shapes) {
+  $('opms-shapes-row').hidden = !shapes.length;
+  $('opms-shapes').textContent = shapes.length ? `${shapes.slice(0, 6).join(', ')}${shapes.length > 6 ? ` 외 ${shapes.length - 6}개` : ''} (A 영문, 9 숫자, 가 한글)` : '';
+}
+$('opms-shapes-clear').addEventListener('click', async () => showOpmsShapes(await api.opms.clearShapes()));
 function setOpmsNote(text, warn = false) {
   $('opms-host-note').textContent = text;
   $('opms-host-note').classList.toggle('warn', warn);

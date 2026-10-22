@@ -1,6 +1,6 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
-import { opmsQueryKind, isExactCaseRef } from './core/opms-search.js';
+import { opmsQueryKind, isExactCaseRef, isKnownRefShape } from './core/opms-search.js';
 import { calcInput, calcOutput, siteUrl, sitesInOrder, looksLikeQuestion, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { dateCalc } from './core/date-calc.js';
 import { findDates, guessTitle } from './core/date-detect.js';
@@ -107,7 +107,9 @@ function animateResults(before, beforeHeight) {
 }
 
 // 웹 검색 · AI 기본 사이트 (설정 매직키에서 고름)
-let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id, opms: false };
+let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id, opms: false, opmsShapes: [] };
+// 저절로 OPMS 에 묻는 번호: 온전한 출원번호 · 관리번호 꼴, 또는 예전에 OPMS 에서 찾은 번호와 같은 양식
+const autoOpms = (q) => isExactCaseRef(q) || isKnownRefShape(q, prefs.opmsShapes);
 async function loadPrefs() {
   prefs = { ...prefs, ...(await api.prefs?.().catch(() => null)) };
 }
@@ -557,7 +559,7 @@ function render() {
   // 남겨 둔 지난 글로 다시 띄운 경우 첫 줄("메모로 저장")이 아니라 찾은 결과를 골라 둔다 (Enter 로 같은 메모를 또 만들지 않게)
   if (retained && selected === 0 && rows[0]?.kind === 'new' && rows.length > 1) selected = 1;
   // 관리번호 · 출원번호처럼 보이는 글은 메모로 저장하기보다 OPMS 에서 찾으려는 것 — "OPMS 에서 찾기" 를 골라 둔다 (아직 묻지는 않음)
-  if (!retained && selected === 0 && rows[0]?.kind === 'new' && opmsKind === 'ref' && !isExactCaseRef(query)) {
+  if (!retained && selected === 0 && rows[0]?.kind === 'new' && opmsKind === 'ref' && !autoOpms(query)) {
     const ask = rows.findIndex((r) => r.kind === 'opmsAsk');
     if (ask > 0) selected = ask;
   }
@@ -684,7 +686,7 @@ function searchOpms() {
     opmsSeq++; // 묻는 중이던 것은 버린다
     opms = { query: '', loading: false, cases: [], total: 0, error: '' };
   }
-  if (isOn('opms') && prefs.opms && opms.query !== query && isExactCaseRef(query)) {
+  if (isOn('opms') && prefs.opms && opms.query !== query && autoOpms(query)) {
     opmsTimer = setTimeout(() => {
       if (input.value.trim() === query) askOpms();
     }, 350);
@@ -699,6 +701,7 @@ async function askOpms() {
   const res = await api.opmsSearch(query).catch((err) => ({ cases: [], total: 0, error: err.message }));
   if (my !== opmsSeq) return;
   opms = { query, loading: false, cases: res.cases ?? [], total: res.total ?? 0, error: res.error ?? '' };
+  if (Array.isArray(res.shapes)) prefs.opmsShapes = res.shapes; // 방금 배운 번호 양식도 바로
   render();
   const first = rows.findIndex((r) => r.kind === 'opms'); // 찾은 첫 사건을 골라 둔다 (Enter 로 바로 사건 보기)
   if (first >= 0) select(first);

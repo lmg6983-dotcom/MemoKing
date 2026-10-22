@@ -139,3 +139,48 @@ export function isExactCaseRef(text) {
   if (!/[A-Za-z]/.test(s) || (s.match(/\d/g) ?? []).length < 4) return false;
   return /^[A-Za-z0-9]+(?:[-/._][A-Za-z0-9]+)+$/.test(s) || /^[A-Za-z]{1,5}\d{4,}[A-Za-z0-9]*$/.test(s);
 }
+
+// ---------- 번호 양식 배우기 ----------
+// 사용자가 골라서 찾은 사건의 번호(관리번호 · 의뢰인 관리번호 · 출원번호 · 등록번호)를 양식으로 바꿔 두고,
+//   같은 양식의 글을 쓰면 앞으로는 저절로 찾는다. 기호는 그대로, 영문 → A · 숫자 → 9 · 한글 → 가 (자리 수도 그대로)
+//   FPD/2026-0271/E → AAA/9999-9999/A · 특-2026-001 → 가-9999-999
+export const SHAPE_FIELDS = ['ourref', 'yourref', 'n_app', 'n_issue'];
+export const MAX_SHAPES = 40;
+const SHAPE_SYMBOLS = /^[-/._#()]$/;
+// 번호가 아닌 흔한 꼴은 배우지 않는다 (전화번호 · 날짜)
+const NOT_REF_SHAPES = new Set(['999-9999-9999', '999-999-9999', '99-999-9999', '99-9999-9999', '9999-9999', '9999-99-99', '9999.99.99', '9999/99/99', '99-99-99', '99.99.99', '99/99/99', '99/99/9999']);
+
+/** 번호 → 양식 (번호로 쓸 만하지 않으면 null: 5~30자, 띄어쓰기 없이, 숫자 4개 넘게, 기호나 글자가 섞여야) */
+export function refShape(text) {
+  const s = String(text ?? '').trim();
+  if (s.length < 5 || s.length > 30 || /\s/.test(s)) return null;
+  let shape = '';
+  for (const ch of s) {
+    if (/[0-9]/.test(ch)) shape += '9';
+    else if (/[A-Za-z]/.test(ch)) shape += 'A';
+    else if (/[가-힣]/.test(ch)) shape += '가';
+    else if (SHAPE_SYMBOLS.test(ch)) shape += ch;
+    else return null;
+  }
+  if ((shape.match(/9/g) ?? []).length < 4 || /^9+$/.test(shape) || NOT_REF_SHAPES.has(shape)) return null;
+  return shape;
+}
+
+/** 찾은 사건들의 번호 양식을 배운 목록에 더한 새 목록 (새로 본 것이 앞, 많아야 MAX_SHAPES) — 바뀐 게 없으면 같은 배열 */
+export function learnShapes(known, rows) {
+  const list = Array.isArray(known) ? known.filter((x) => typeof x === 'string') : [];
+  const fresh = [];
+  for (const r of rows ?? []) {
+    for (const f of SHAPE_FIELDS) {
+      const shape = refShape(r?.[f]);
+      if (shape && !list.includes(shape) && !fresh.includes(shape)) fresh.push(shape);
+    }
+  }
+  return fresh.length ? [...fresh, ...list].slice(0, MAX_SHAPES) : Array.isArray(known) ? known : list;
+}
+
+/** 배운 양식과 같은 꼴의 번호인가 — 이것도 저절로 찾는다 */
+export const isKnownRefShape = (text, shapes) => {
+  const shape = refShape(text);
+  return Boolean(shape && Array.isArray(shapes) && shapes.includes(shape));
+};

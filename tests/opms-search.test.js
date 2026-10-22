@@ -63,3 +63,20 @@ test('저절로 묻는 것은 온전한 사건번호뿐: 출원번호 전체 · 
   for (const q of ['10-2026-0012345', '1020260012345', '2026-0012345', 'FPD/2026-0271/E', 'P2026-1170-KR01', 'P20261170KR01', 'P-12345']) assert.ok(isExactCaseRef(q), q);
   for (const q of ['010-1234-5678', '2026-10-22', '0271', '0012345', '2026년 회의록', 'FPD', 'P-12', '홍길동', 'abc', 'FPD 2026-0271', '12345678']) assert.ok(!isExactCaseRef(q), q);
 });
+
+test('번호 양식 배우기: 기호는 그대로 · 영문 A · 숫자 9 · 한글 가, 전화번호 · 날짜 · 숫자만은 배우지 않음', async () => {
+  const { refShape, learnShapes, isKnownRefShape, MAX_SHAPES } = await import('../app/js/core/opms-search.js');
+  assert.equal(refShape('FPD/2026-0271/E'), 'AAA/9999-9999/A');
+  assert.equal(refShape('특-2026-001'), '가-9999-999');
+  assert.equal(refShape('Y-77'), null, '숫자가 4개보다 적으면');
+  for (const v of ['010-1234-5678', '2026-10-22', '1234567', '12 34', 'a@b.com12345']) assert.equal(refShape(v), null, v);
+  const shapes = learnShapes([], [{ ourref: 'FPD/2026-0271/E', yourref: 'CL-2025-0017', n_app: '10-2026-0012345' }, { ourref: 'FPD/2026-1111/D' }]);
+  assert.deepEqual(shapes, ['AAA/9999-9999/A', 'AA-9999-9999', '99-9999-9999999']);
+  assert.equal(learnShapes(shapes, [{ ourref: 'FPD/2027-0001/E' }]), shapes, '이미 아는 양식이면 그대로');
+  assert.ok(isKnownRefShape('ABC/2027-0105/K', shapes), '같은 양식의 다른 번호');
+  assert.ok(isKnownRefShape('XY-2024-1234', shapes));
+  assert.ok(!isKnownRefShape('FPD/2026-0271', shapes), '양식이 다르면 (끝이 빠짐)');
+  assert.ok(!isKnownRefShape('010-1234-5678', ['999-9999-9999']), '전화번호 꼴은 목록에 있어도');
+  const many = learnShapes([], Array.from({ length: 60 }, (_, k) => ({ ourref: `P${'9'.repeat(k % 30)}-${k}0000` })));
+  assert.ok(many.length <= MAX_SHAPES);
+});

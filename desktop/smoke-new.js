@@ -51,7 +51,7 @@ function fakeOpms() {
           ['101', '특허', 'FPD/2026-0271/E', 'Y-77', '10-2026-0012345', '2026-02-03 00:00:00.0', '메모킹 주식회사', '홍길동', '메모를 쉽게 쓰는 장치', '2026-01-10 00:00:00.0', 'N'],
           ['102', '특허', 'FPD/2026-0271/D', 'Y-78', '10-2026-0099999', '', '메모킹 주식회사', '', '두 번째 사건', '2026-01-09 00:00:00.0', 'N'],
           // 출원인 이름으로 찾기 · "다른 n건 더 보기" 용 (관리번호는 FPD 와 겹치지 않게)
-          ...Array.from({ length: 8 }, (_, k) => [String(201 + k), '상표', `HGD-${k + 1}`, '', `40-2025-00${k + 10}000`, '', '홍길동', '', `길동 상표 ${k + 1}`, `2025-0${k + 1}-01 00:00:00.0`, 'N']),
+          ...Array.from({ length: 8 }, (_, k) => [String(201 + k), '상표', `HGD-${k + 1}`, `특허-2025-00${k + 40}`, `40-2025-00${k + 10}000`, '', '홍길동', '', `길동 상표 ${k + 1}`, `2025-0${k + 1}-01 00:00:00.0`, 'N']),
         ];
         if (/DISTINCT applicant AS name/.test(sql)) return res.end(table(['name'], [...new Set(cases.flatMap((c) => [c[6], c[7]]).filter(Boolean))].map((n) => [n])));
         // 회사 서버처럼 조건대로: idx 하나 · LIKE '%글%' (기호를 뺀 것도) · 그 밖은 전부
@@ -309,6 +309,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     };
     showMagic();
     await typeMagic('홍길동');
+    await typeMagic('특허-2025-0099'); // 아직 모르는 양식 (한글이 든 의뢰인 번호) — 저절로 묻지 않는다
+    await wait(500);
     await typeMagic('0271');
     await wait(900);
     const beforeAsk = { hits: fake.hits.cases, ask: await js(magic, `document.querySelector('.magic-row.kind-opmsAsk')?.getAttribute('aria-selected')`), cases: await js(magic, `document.querySelectorAll('.magic-row.kind-opms').length`) };
@@ -319,6 +321,15 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     await typeMagic('홍길동');
     await askOpms();
     const byName = await until(() => js(magic, `(() => { const r = [...document.querySelectorAll('.magic-row.kind-opms')]; const more = document.querySelector('.magic-row.kind-opmsMore'); return r.length && more && { n: r.length, first: r[0].querySelector('.s').textContent, more: more.querySelector('.t').textContent, inv: r.map((e) => e.querySelector('.s').textContent).find((t) => t.includes('발명자')) }; })()`), 'OPMS 이름 결과', 8000).catch(() => null);
+    // 골라 찾은 사건에서 새 번호 양식(가가-9999-9999)을 배웠으니, 같은 양식의 다른 번호는 이제 저절로
+    const hitsBefore = fake.hits.cases;
+    await typeMagic('특허-2025-0099');
+    await until(() => fake.hits.cases > hitsBefore, '배운 양식 저절로', 4000).catch(() => null);
+    const learned = await js(magic, 'document.querySelector(".magic-row.kind-opmsAsk") ? "ask" : "auto"');
+    check('매직키 OPMS: 골라 찾은 사건의 번호 양식(특허-2025-0042 → 가가-9999-9999)을 배워, 같은 양식(특허-2025-0099)은 앞으로 저절로 찾음', fake.hits.cases === hitsBefore + 1 && learned === 'auto' && getSettings().opmsShapes?.includes('가가-9999-9999'), JSON.stringify({ hitsBefore, hits: fake.hits.cases, learned, shapes: getSettings().opmsShapes }));
+    await typeMagic('홍길동');
+    await askOpms();
+    await until(() => js(magic, `document.querySelectorAll('.magic-row.kind-opms').length === 6`), '이름 결과 다시', 8000);
     check('매직키 OPMS: 출원인 · 발명자 이름으로 → 정확한 것(출원인이 그대로 홍길동)부터 6건 + 발명자로 맞은 사건은 "발명자 홍길동" + "OPMS 다른 3건 더 보기"', byName?.n === 6 && byName.first.startsWith('홍길동') && byName.more === 'OPMS 다른 3건 더 보기', JSON.stringify(byName));
     await typeMagic('ㅎㄱㄷ');
     await askOpms();
