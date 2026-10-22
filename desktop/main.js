@@ -463,6 +463,8 @@ async function addPopupToHistory(p) {
       : null;
     const entry = byLayout ?? popupToEntry(p.lines, { appName });
     if (!entry || !history) return;
+    // 글자 인식으로 읽었는데 보낸 사람에 글자가 하나도 없으면(검은 그림을 '222' 처럼 읽음) 알림이 아니다
+    if (p.via === 'ocr' && !/\p{L}/u.test(entry.title)) return;
     // 글자 인식으로 읽은 이름은 이미 받은 이름과 한 글자만 다르면 그 이름으로 (작은 글씨의 채팅방 이름 등)
     if (p.via === 'ocr') entry.title = correctTitle(entry.title, knownNames(history.list({ app: appName }).filter((e) => e.source === 'popup').slice(0, 500).map((e) => e.title)));
     const now = Date.now();
