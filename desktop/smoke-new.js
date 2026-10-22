@@ -751,7 +751,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const mathGone = await until(() => js(nw, `!document.querySelector('.mk-doc .mk-math-block') && document.querySelector('.mk-doc').textContent.includes('끝 문단')`), '수식 지움', 3000).catch(() => false);
       const undoTip = await until(() => js(nw, `document.getElementById('mk-undo-hint')?.textContent`), '되돌리기 안내', 2000).catch(() => '');
       check('수식: 오른쪽 클릭 → "이 수식 고치기" + 삭제 아이콘 (눌리는 자리에 있음), 누르면 수식만 지워지고 그 자리에 "수식을 삭제했어요 [되돌리기] Ctrl+Z"',
-        mathMenu?.items.join('|') === '이 수식 고치기' && mathMenu.icons.at(-1) === 'delete:이 수식 삭제' && mathHit && mathGone && /^수식을 지웠어요 되돌리기 Ctrl\+Z$/.test(undoTip.replace(/\s+/g, ' ').trim()), JSON.stringify({ mathMenu, mathHit, mathGone, undoTip }));
+        mathMenu?.items.join('|') === '이 수식 고치기' && mathMenu.icons.at(-1) === 'delete:이 수식 삭제' && mathHit && mathGone && /^수식을 삭제했어요 되돌리기 Ctrl\+Z$/.test(undoTip.replace(/\s+/g, ' ').trim()), JSON.stringify({ mathMenu, mathHit, mathGone, undoTip }));
       // 안내의 되돌리기 단추(마우스)로 되살리기 — Ctrl 만 눌러도 안내가 사라지지 않음
       nw.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
       nw.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });

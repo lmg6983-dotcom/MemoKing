@@ -34,10 +34,10 @@ function announce(text) {
   requestAnimationFrame(() => (live.textContent = text));
 }
 
-// 지운 자리에 "표를 지웠어요 [되돌리기] (Ctrl+Z)" 를 잠깐 (하나만) — 마우스로도 되돌릴 수 있게 (목록 카드의 되돌리기 띠처럼)
+// 지운 자리에 "표를 삭제했어요 [되돌리기] (Ctrl+Z)" 를 잠깐 (하나만) — 마우스로도 되돌릴 수 있게 (목록 카드의 되돌리기 띠처럼)
 /**
  * PC: 한 일을 알리며 "되돌리기" 단추 (지우기 · 잘라내기 · 이름 변경 …)
- * @param {string} what 대상 이름("이 표" 의 "표" 처럼, 조사는 알아서) · @param {string} [verb] 한 일 (기본 "지웠어요")
+ * @param {string} what 대상 이름("이 표" 의 "표" 처럼, 조사는 알아서) · @param {string} [verb] 한 일 (기본 "삭제했어요")
  */
 export function undoHint(what, rect, view, verb = '삭제했어요') {
   document.getElementById('mk-undo-hint')?.remove();
@@ -121,7 +121,7 @@ export function deleteContent(view, { pos, node, target, markTarget = false, dec
     if (view.state.doc.nodeAt(pos) !== node) return;
     if (remove) remove(view, pos, node);
     else view.dispatch(view.state.tr.delete(pos, pos + node.nodeSize).scrollIntoView());
-    if (undo) undoHint(label.replace(/ 지우기$/, '').replace(/^이 /, ''), where, view);
+    if (undo) undoHint(label.replace(/ 삭제$/, '').replace(/^이 /, ''), where, view);
   }, FADE_MS + COLLAPSE_MS);
   return true;
 }
@@ -135,7 +135,7 @@ export function deleteContent(view, { pos, node, target, markTarget = false, dec
 export async function showContentMenu(view, opts, at) {
   const { pos, node, target, label = '이 내용 삭제', copyLabel = null, open = null, extraItems = [], onExtra = null } = opts;
   hideDeleteButton(true);
-  const verb = (v) => label.replace(/지우기$/, v); // "이 표 삭제" → "이 표 복사"
+  const verb = (v) => label.replace(/삭제$/, v); // "이 표 삭제" → "이 표 복사"
   const icons = [
     { id: 'cut', icon: CUT_ICON, label: verb('잘라내기') }, // 복사한 뒤 지움 (Ctrl+Z 로 되돌림)
     { id: 'copy', icon: COPY_ICON, label: copyLabel ?? verb('복사') },
@@ -212,7 +212,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     const b = document.createElement('button');
     b.type = 'button';
     b.className = cls;
-    const text = label.replace(/지우기$/, verb); // "이 표 삭제" → "이 표 복사" · "이 표 저장"
+    const text = label.replace(/삭제$/, verb); // "이 표 삭제" → "이 표 복사" · "이 표 저장"
     b.title = text;
     b.setAttribute('aria-label', text);
     b.innerHTML = icon;
@@ -347,7 +347,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     setTimeout(() => btn.remove(), 180);
     deleteContent(view, { pos: del.pos, node: del.node, target: del.target, markTarget, deco, label, remove });
     // 휴대폰: 지운 뒤 되돌리기 단추가 있는 안내를 띄우도록 알린다 (android/web/js/note-view.js) — PC 는 deleteContent 의 undo 안내
-    window.dispatchEvent(new CustomEvent('mk:removed', { detail: { what: label.replace(/ 지우기$/, '').replace(/^이 /, ''), verb: cutDone ? '잘라냈어요' : '삭제했어요' } }));
+    window.dispatchEvent(new CustomEvent('mk:removed', { detail: { what: label.replace(/ 삭제$/, '').replace(/^이 /, ''), verb: cutDone ? '잘라냈어요' : '삭제했어요' } }));
   };
   const press = (e) => {
     e.preventDefault();
