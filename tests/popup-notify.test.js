@@ -46,6 +46,18 @@ test('같은 알림: 같은 앱·제목·내용을 짧은 시간 안에 다시 �
   assert.equal(isRepeat(recent, { app: '카카오톡', title: '김대리', body: '안녕' }, now + 3 * 60 * 1000), false);
 });
 
+test('같은 알림 창을 방금 읽었으면 바로 읽은 글과 글자 인식 결과가 조금 달라도 한 번만', () => {
+  const now = Date.now();
+  const recent = [{ app: '카카오톡', hwnd: 7, title: '김대리', body: '회의 자료 보냈어요', at: now - 2000 }];
+  // 글자 인식이 채팅방 이름까지 읽거나 띄어쓰기가 다르게
+  assert.equal(isRepeat(recent, { app: '카카오톡', hwnd: 7, title: '김대리 (영업팀)', body: '회의 자료 보냈어요' }, now), true);
+  assert.equal(isRepeat(recent, { app: '카카오톡', hwnd: 7, title: '김대리', body: '회의자료 보냈어요.' }, now), true);
+  // 다른 창 · 시간이 지난 뒤 · 다른 글이면 새 알림
+  assert.equal(isRepeat(recent, { app: '카카오톡', hwnd: 8, title: '김대리 (영업팀)', body: '회의 자료 보냈어요' }, now), false);
+  assert.equal(isRepeat(recent, { app: '카카오톡', hwnd: 7, title: '김대리 (영업팀)', body: '회의 자료 보냈어요' }, now + 20_000), false);
+  assert.equal(isRepeat(recent, { app: '카카오톡', hwnd: 7, title: '김대리', body: '내일 봬요' }, now), false);
+});
+
 // 카카오톡 알림 창 (폭 340 · 높이 110, 100% 배율 px)
 const SIZE = { width: 340, height: 110, appName: '카카오톡' };
 const box = (text, x, y, h = 14) => ({ text, x, y, w: text.length * 12, h });

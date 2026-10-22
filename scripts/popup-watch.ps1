@@ -7,6 +7,8 @@
 #   4) captures the window (PrintWindow) and reads it with the OCR built into Windows (Windows.Media.Ocr).
 #      OCR always runs; text from 1)~3) is used only when it covers what OCR sees (some apps expose only junk names).
 #      For OCR the capture is made opaque (layered/GDI windows leave alpha at 0 and OCR then sees an empty canvas)
+#      the profile picture on the left is painted over (OCR reads it as stray letters glued to the sender name),
+#      the image is turned gray with stretched contrast (dark popups inverted to dark-on-white),
 #      and enlarged (small UI text reads much better), and each line keeps its place (x, y, w, h in 100%-scale px).
 # One JSON line per new popup text on stdout:
 #   {"process","pid","hwnd","windowTitle","lines":[...],"via":"uia|msaa|win32|ocr","image":"<png>","boxes":[{text,x,y,w,h}],"size":{w,h}}
@@ -97,9 +99,43 @@ public static class MkPopup {
     return bmp;
   }
 
-  // 글자 인식용 그림: 알파를 무시해 불투명하게 (GDI 로 그린 글자는 알파가 0 이라 그대로면 빈 그림으로 보인다)
-  // 그리고 factor 배로 키운다 (작은 글자는 키우면 훨씬 잘 읽힌다)
-  public static Bitmap OcrImage(Bitmap src, double factor) {
+  // 글자 인식용 그림: 알파를 무시해 불투명하게 (GDI 로 그린 글자는 알파가 0 이라 그대로면 빈 그림으로 보인다),
+  // 왼쪽 프로필 사진은 바탕색으로 지우고 (글자 인식이 사진을 '렐' · '반' 같은 글자로 읽어 이름에 붙인다),
+  // factor 배로 키운 뒤 흑백 · 대비를 늘린다 (작은 글자는 키우면 훨씬 잘 읽히고, 가는 획이 흐려지지 않게)
+  public static Bitmap OcrImage(Bitmap src, double factor, double scale = 1) {
+    var opaque = new Bitmap(src.Width, src.Height, PixelFormat.Format32bppArgb);
+    var rect = new Rectangle(0, 0, src.Width, src.Height);
+    var from = src.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+    var to = opaque.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+    try {
+      int bytes = Math.Abs(from.Stride) * src.Height;
+      var buf = new byte[bytes];
+      Marshal.Copy(from.Scan0, buf, 0, bytes);
+      for (int i = 3; i < bytes; i += 4) buf[i] = 255;
+      HideProfile(buf, Math.Abs(from.Stride), src.Width, src.Height, scale);
+      Marshal.Copy(buf, 0, to.Scan0, bytes);
+    } finally { src.UnlockBits(from); opaque.UnlockBits(to); }
+    Bitmap big = opaque;
+    if (factor > 1.01) {
+      int w = (int)Math.Round(src.Width * factor), h = (int)Math.Round(src.Height * factor);
+      big = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+      using (var g = Graphics.FromImage(big)) {
+        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+        using (var attrs = new ImageAttributes()) {
+          attrs.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY); // 가장자리 번짐 없이
+          g.DrawImage(opaque, new Rectangle(0, 0, w, h), 0, 0, opaque.Width, opaque.Height, GraphicsUnit.Pixel, attrs);
+        }
+      }
+      opaque.Dispose();
+    }
+    Enhance(big, 1.3);
+    return big;
+  }
+
+  // 원래 크기 그대로 불투명하게만 (글자 다듬기에서 같은 글꼴로 그린 글과 견줄 그림)
+  public static Bitmap Opaque(Bitmap src) {
     var opaque = new Bitmap(src.Width, src.Height, PixelFormat.Format32bppArgb);
     var rect = new Rectangle(0, 0, src.Width, src.Height);
     var from = src.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
@@ -111,20 +147,99 @@ public static class MkPopup {
       for (int i = 3; i < bytes; i += 4) buf[i] = 255;
       Marshal.Copy(buf, 0, to.Scan0, bytes);
     } finally { src.UnlockBits(from); opaque.UnlockBits(to); }
-    if (factor <= 1.01) return opaque;
-    int w = (int)Math.Round(src.Width * factor), h = (int)Math.Round(src.Height * factor);
-    var big = new Bitmap(w, h, PixelFormat.Format32bppArgb);
-    using (var g = Graphics.FromImage(big)) {
-      g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-      g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-      g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-      using (var attrs = new ImageAttributes()) {
-        attrs.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY); // 가장자리 번짐 없이
-        g.DrawImage(opaque, new Rectangle(0, 0, w, h), 0, 0, opaque.Width, opaque.Height, GraphicsUnit.Pixel, attrs);
-      }
+    return opaque;
+  }
+
+  static int Lum(byte[] buf, int o) { return (buf[o + 2] * 299 + buf[o + 1] * 587 + buf[o] * 114) / 1000; } // BGRA
+
+  // 가장 많은 밝기 = 바탕 (4 단계씩 묶어서)
+  static int BackgroundBin(byte[] buf, int stride, int w, int h) {
+    var hist = new int[64];
+    for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) hist[Lum(buf, y * stride + x * 4) >> 2]++;
+    int bin = 0;
+    for (int v = 1; v < 64; v++) if (hist[v] > hist[bin]) bin = v;
+    return bin;
+  }
+
+  // 왼쪽 프로필 사진: 왼쪽 1/4 안에서 시작해 100% 배율로 16px 넘게 이어지는, 세로로 빽빽한(높이의 25% 넘게 바탕과 다른) 열들.
+  // 글자는 그렇게 넓게 빽빽하지 않다. 찾으면 그 덩어리(옅은 가장자리까지)를 바탕색으로 칠한다
+  static void HideProfile(byte[] buf, int stride, int w, int h, double scale) {
+    if (w < 40 || h < 20) return;
+    int bin = BackgroundBin(buf, stride, w, h), bg = bin * 4 + 2;
+    int lim = (int)(w * 0.35);
+    var ink = new double[lim];
+    for (int x = 0; x < lim; x++) {
+      int n = 0;
+      for (int y = 0; y < h; y++) if (Math.Abs(Lum(buf, y * stride + x * 4) - bg) > 40) n++;
+      ink[x] = (double)n / h;
     }
-    opaque.Dispose();
-    return big;
+    int need = Math.Max(8, (int)Math.Round(16 * scale)), start = -1;
+    for (int x = 0, run = 0; x < lim; x++) {
+      run = ink[x] > 0.25 ? run + 1 : 0;
+      if (run >= need) { start = x - run + 1; break; }
+    }
+    if (start < 0 || start > w * 0.25) return;
+    int a = start, b = start;
+    while (a > 0 && ink[a - 1] > 0.02) a--;
+    while (b < lim - 1 && ink[b + 1] > 0.02) b++;
+    long r = 0, g = 0, bl = 0, cnt = 0;
+    for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+      int o = y * stride + x * 4;
+      if ((Lum(buf, o) >> 2) == bin) { bl += buf[o]; g += buf[o + 1]; r += buf[o + 2]; cnt++; }
+    }
+    if (cnt == 0) return;
+    byte cb = (byte)(bl / cnt), cg = (byte)(g / cnt), cr = (byte)(r / cnt);
+    int x1 = Math.Min(w, b + 3);
+    for (int y = 0; y < h; y++) for (int x = a; x < x1; x++) {
+      int o = y * stride + x * 4;
+      buf[o] = cb; buf[o + 1] = cg; buf[o + 2] = cr;
+    }
+  }
+
+  // 흑백 · 대비 늘리기: 바탕은 흰색, 가장 진한 글자는 검정으로 펴고 감마로 가는 획을 진하게.
+  // 어두운 바탕(다크 모드 알림)은 뒤집어 흰 바탕에 검은 글자로 (글자 인식이 가장 잘 읽는 모양)
+  static void Enhance(Bitmap bmp, double gamma) {
+    var rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
+    var data = bmp.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+    try {
+      int stride = Math.Abs(data.Stride), w = bmp.Width, h = bmp.Height, bytes = stride * h;
+      var buf = new byte[bytes];
+      Marshal.Copy(data.Scan0, buf, 0, bytes);
+      bool inv = BackgroundBin(buf, stride, w, h) * 4 + 2 < 128;
+      var hist = new int[256];
+      for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+        int v = Lum(buf, y * stride + x * 4);
+        hist[inv ? 255 - v : v]++;
+      }
+      int bgv = 0;
+      for (int v = 1; v < 256; v++) if (hist[v] > hist[bgv]) bgv = v;
+      long acc = 0, total = (long)w * h; int lo = 0;
+      for (int v = 0; v < 256; v++) { acc += hist[v]; if (acc >= total * 0.005) { lo = v; break; } }
+      double span = Math.Max(16, bgv - lo);
+      var lut = new byte[256];
+      for (int v = 0; v < 256; v++) {
+        double t = Math.Min(1, Math.Max(0, ((inv ? 255 - v : v) - lo) / span));
+        lut[v] = (byte)Math.Round(255 * Math.Pow(t, gamma));
+      }
+      for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+        int o = y * stride + x * 4;
+        byte g = lut[Lum(buf, o)];
+        buf[o] = g; buf[o + 1] = g; buf[o + 2] = g; buf[o + 3] = 255;
+      }
+      Marshal.Copy(buf, 0, data.Scan0, bytes);
+    } finally { bmp.UnlockBits(data); }
+  }
+  // 아직 그려지지 않은 창(나타나는 중의 검은 · 한 색 그림)인가 — 글자가 하나도 없는 한 색이면 읽지 않고 다음 차례에
+  public static bool IsBlank(Bitmap b) {
+    int lo = int.MaxValue, hi = int.MinValue;
+    for (int y = 1; y < b.Height; y += Math.Max(1, b.Height / 24))
+      for (int x = 1; x < b.Width; x += Math.Max(1, b.Width / 32)) {
+        Color c = b.GetPixel(x, y);
+        int v = c.R + c.G + c.B;
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+    return hi - lo < 30;
   }
   public static string Fingerprint(Bitmap b) {
     long sum = 0; int n = 0;
@@ -339,9 +454,10 @@ while ($true) {
         $bmp = [MkPopup]::Capture($w.Hwnd, $w.W, $w.H)
         if (-not $bmp) { continue }
         try {
-          $fp = [MkPopup]::Fingerprint($bmp)
           $s = $state[$w.Hwnd]
           if (-not $s) { $s = @{ fp = ''; stable = 0; sent = '' }; $state[$w.Hwnd] = $s }
+          if ([MkPopup]::IsBlank($bmp)) { $s.fp = ''; $s.stable = 0; continue }   # 나타나는 중(검은 그림) → 그려진 뒤에
+          $fp = [MkPopup]::Fingerprint($bmp)
           if ($s.fp -ne $fp) { $s.fp = $fp; $s.stable = 0; continue }   # 그려지는 중 → 다음 차례에
           $s.stable++
           if ($s.stable -ne 1) { continue }                                # 모양이 그대로면 한 번만 읽는다
@@ -362,14 +478,19 @@ while ($true) {
           #    이 그림은 메모킹(Node)이 한글에 강한 tesseract.js 로 다시 읽는 데 쓴다. Windows 기본 OCR 은 보조로만.
           $boxes = @()
           $ocrPng = ''
+          $verifyPng = ''
           $ocrUnit = 1.0
           $factor = [Math]::Max(1.0, [Math]::Min(3.0 / $w.Scale, 2200.0 / [Math]::Max($w.W, $w.H)))
           try {
-            $big = [MkPopup]::OcrImage($bmp, $factor)
+            $big = [MkPopup]::OcrImage($bmp, $factor, $w.Scale)
             $ocrPng = "$png.ocr.png"
             $big.Save($ocrPng, [System.Drawing.Imaging.ImageFormat]::Png)
             $ocrUnit = $factor * $w.Scale
             $big.Dispose()
+            $verifyPng = "$png.raw.png"
+            $raw = [MkPopup]::Opaque($bmp)
+            $raw.Save($verifyPng, [System.Drawing.Imaging.ImageFormat]::Png)
+            $raw.Dispose()
             if ($ocr) {
               $capped = [Math]::Min($factor, ([Windows.Media.Ocr.OcrEngine]::MaxImageDimension - 1) / [Math]::Max($w.W, $w.H))
               if ([Math]::Abs($capped - $factor) -lt 0.01) { $boxes = @(Read-Ocr $ocrPng $ocrUnit) }
@@ -385,12 +506,12 @@ while ($true) {
           $key = ($lines -join "`n")
           # via 가 'ocr' 이면 Node 가 ocrImage 를 한글 OCR 로 다시 읽으므로, 바로 읽은 글만으로 중복 판단하지 않는다
           $dedupeKey = $(if ($via -eq 'ocr') { "ocr:$($w.Hwnd):$fp" } else { $key })
-          if ((-not $key -and $via -ne 'ocr') -or $dedupeKey -eq $s.sent) { Remove-Item $png, $ocrPng -ErrorAction SilentlyContinue; continue }
+          if ((-not $key -and $via -ne 'ocr') -or $dedupeKey -eq $s.sent) { @($png, $ocrPng, $verifyPng) | Where-Object { $_ } | Remove-Item -ErrorAction SilentlyContinue; continue }
           $s.sent = $dedupeKey
           $proc = (Get-Process -Id $w.Pid -ErrorAction SilentlyContinue).ProcessName
           $msg = [ordered]@{ process = $proc; pid = $w.Pid; hwnd = $w.Hwnd; windowTitle = $w.Title; lines = @($lines); via = $via; image = $png; size = $size }
-          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes); $msg['ocrImage'] = $ocrPng; $msg['ocrUnit'] = [Math]::Round($ocrUnit, 4) }
-          else { Remove-Item $ocrPng -ErrorAction SilentlyContinue }
+          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes); $msg['ocrImage'] = $ocrPng; $msg['ocrUnit'] = [Math]::Round($ocrUnit, 4); $msg['verifyImage'] = $verifyPng; $msg['scale'] = $w.Scale }
+          else { @($ocrPng, $verifyPng) | Where-Object { $_ } | Remove-Item -ErrorAction SilentlyContinue }
           [Console]::Out.WriteLine(($msg | ConvertTo-Json -Compress -Depth 4))
           [Console]::Out.Flush()
         } finally { $bmp.Dispose() }
