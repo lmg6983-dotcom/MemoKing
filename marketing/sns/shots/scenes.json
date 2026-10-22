@@ -1,0 +1,212 @@
+{
+  "worklife": [
+    {
+      "file": "list-life.png",
+      "bounds": {
+        "x": 40,
+        "y": 40,
+        "width": 460,
+        "height": 760
+      }
+    },
+    {
+      "file": "list-work.png",
+      "bounds": {
+        "x": 40,
+        "y": 40,
+        "width": 460,
+        "height": 760
+      }
+    }
+  ],
+  "recall": [
+    {
+      "file": "recall-month.png",
+      "bounds": {
+        "x": 40,
+        "y": 40,
+        "width": 620,
+        "height": 800
+      }
+    },
+    {
+      "file": "recall-day.png",
+      "bounds": {
+        "x": 40,
+        "y": 40,
+        "width": 620,
+        "height": 800
+      }
+    }
+  ],
+  "history": [
+    {
+      "file": "history.png",
+      "bounds": {
+        "x": 40,
+        "y": 40,
+        "width": 460,
+        "height": 760
+      }
+    }
+  ],
+  "magic": [
+    {
+      "file": "magic-search.png",
+      "bounds": {
+        "x": 340,
+        "y": 176,
+        "width": 600,
+        "height": 547
+      }
+    },
+    {
+      "file": "magic-calc.png",
+      "bounds": {
+        "x": 340,
+        "y": 176,
+        "width": 600,
+        "height": 573
+      }
+    },
+    {
+      "file": "magic-ai.png",
+      "bounds": {
+        "x": 340,
+        "y": 176,
+        "width": 600,
+        "height": 573
+      }
+    }
+  ],
+  "hotkey": [
+    {
+      "file": "hotkey-note.png",
+      "bounds": {
+        "x": 560,
+        "y": 120,
+        "width": 360,
+        "height": 300
+      }
+    },
+    {
+      "file": "hotkey-hud.png",
+      "bounds": {
+        "x": 470,
+        "y": 428,
+        "width": 340,
+        "height": 64
+      }
+    }
+  ],
+  "quick": [
+    {
+      "file": "quick-memo.png",
+      "bounds": {
+        "x": 600,
+        "y": 140,
+        "width": 380,
+        "height": 400
+      }
+    }
+  ],
+  "stack": [
+    {
+      "file": "stack.png",
+      "bounds": {
+        "x": 560,
+        "y": 100,
+        "width": 400,
+        "height": 420
+      }
+    }
+  ],
+  "crown": [
+    {
+      "file": "crown-note.png",
+      "bounds": {
+        "x": 560,
+        "y": 140,
+        "width": 340,
+        "height": 380
+      }
+    },
+    {
+      "file": "crown-sticker.png",
+      "bounds": {
+        "x": 698,
+        "y": 114,
+        "width": 64,
+        "height": 52
+      }
+    }
+  ],
+  "tape": [
+    {
+      "file": "tape-note.png",
+      "bounds": {
+        "x": 960,
+        "y": 200,
+        "width": 320,
+        "height": 340
+      }
+    },
+    {
+      "file": "tape-sticker.png",
+      "bounds": {
+        "x": 1072,
+        "y": 185,
+        "width": 96,
+        "height": 30
+      }
+    }
+  ],
+  "areaTarget": {
+    "x": 560,
+    "y": 140,
+    "width": 340,
+    "height": 380
+  },
+  "area": [
+    {
+      "file": "area-capture.png",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800
+      }
+    }
+  ],
+  "ink": [
+    {
+      "file": "annotate.png",
+      "bounds": {
+        "x": 560,
+        "y": 100,
+        "width": 420,
+        "height": 440
+      }
+    }
+  ],
+  "ai": [
+    {
+      "file": "ai-settings.png",
+      "bounds": {
+        "x": 40,
+        "y": 40,
+        "width": 460,
+        "height": 760
+      }
+    },
+    {
+      "file": "ai-drive-guide.png",
+      "bounds": {
+        "x": 40,
+        "y": 40,
+        "width": 460,
+        "height": 760
+      }
+    }
+  ]
+}

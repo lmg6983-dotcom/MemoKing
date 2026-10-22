@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>메모킹 SNS 카드</title>
+<!-- 인스타그램 카드 12장 (1080x1350). render.mjs 가 .slide 마다 PNG 로 찍는다. 화면은 out/sns 를 복사한 shots/ (npm run shots:sns) -->
+<style>
+  @font-face { font-family: 'Pretendard'; src: url('../../app/vendor/fonts/PretendardVariable.woff2') format('woff2'); font-weight: 100 900; }
+  :root {
+    --paper: #f6f2e9; --ink: #1c1a15; --muted: #6b655a; --yellow: #ffcd00; --yellow-soft: #fff1b3; --line: rgba(28, 26, 21, 0.1);
+    --shadow: 0 2px 6px rgba(40, 30, 10, 0.08), 0 24px 60px rgba(40, 30, 10, 0.18);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #d9d4c8; font-family: 'Pretendard', sans-serif; color: var(--ink); display: grid; gap: 40px; padding: 40px; justify-content: center; }
+  .slide { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: var(--paper); padding: 92px 84px 0; }
+  .eyebrow { display: flex; align-items: center; gap: 14px; font-size: 26px; font-weight: 700; color: var(--muted); letter-spacing: -0.01em; }
+  .eyebrow .num { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .eyebrow .chip { padding: 6px 16px; border-radius: 99px; background: var(--ink); color: var(--yellow); font-size: 22px; }
+  h2 { margin-top: 30px; font-size: 76px; line-height: 1.16; font-weight: 820; letter-spacing: -0.035em; text-wrap: balance; }
+  h2 mark { background: linear-gradient(transparent 58%, var(--yellow) 58%, var(--yellow) 92%, transparent 92%); color: inherit; padding: 0 4px; }
+  .lede { margin-top: 26px; max-width: 880px; font-size: 33px; line-height: 1.5; color: #3d3a33; letter-spacing: -0.015em; text-wrap: pretty; }
+  kbd { display: inline-block; min-width: 1.6em; padding: 2px 14px 4px; border-radius: 12px; background: #fff; border: 2px solid var(--ink); box-shadow: 0 5px 0 var(--ink); font: 750 0.62em/1.3 'Pretendard', sans-serif; text-align: center; vertical-align: 0.18em; letter-spacing: 0; }
+  .plus { font-size: 0.5em; font-weight: 700; color: var(--muted); vertical-align: 0.3em; margin: 0 4px; }
+  .stage { position: absolute; left: 0; right: 0; bottom: 0; }
+  .shot { position: absolute; border-radius: 18px; box-shadow: var(--shadow); display: block; }
+  .shot.flat { border-radius: 0; box-shadow: none; }
+  .caption { position: absolute; font-size: 24px; font-weight: 700; color: var(--muted); }
+  .tag { position: absolute; padding: 10px 20px; border-radius: 99px; background: var(--ink); color: #fff; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2); }
+  .tag.yellow { background: var(--yellow); color: var(--ink); }
+
+  /* 1 표지 */
+  .cover { background: var(--yellow); }
+  .cover .brand { display: flex; align-items: center; gap: 18px; font-size: 34px; font-weight: 800; }
+  .cover .brand img { width: 76px; height: 76px; }
+  .cover h1 { margin-top: 70px; font-size: 112px; line-height: 1.08; font-weight: 860; letter-spacing: -0.045em; }
+  .cover .lede { color: #2c2716; font-size: 36px; }
+  .cover .swipe { position: absolute; right: 84px; top: 104px; font-size: 26px; font-weight: 750; }
+
+  /* 파일 목록 (내 드라이브) */
+  .drive { position: absolute; width: 470px; border-radius: 18px; background: #fff; box-shadow: var(--shadow); padding: 26px 28px; }
+  .drive .path { font-size: 22px; font-weight: 700; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+  .drive .path b { color: var(--ink); }
+  .drive ul { list-style: none; padding: 0; margin-top: 16px; display: grid; gap: 4px; }
+  .drive li { display: flex; align-items: center; gap: 14px; padding: 9px 6px; border-top: 1px solid var(--line); font-size: 24px; }
+  .drive li::before { content: 'MD'; flex: none; width: 40px; height: 40px; border-radius: 9px; background: #eef3ff; color: #3561d6; font-size: 14px; font-weight: 800; display: grid; place-items: center; }
+  .drive li span { margin-left: auto; color: var(--muted); font-size: 20px; }
+
+  /* 마지막 */
+  .end { background: var(--ink); color: #fff; }
+  .end .eyebrow, .end .lede { color: #d8d2c2; }
+  .end h2 { color: #fff; }
+  .end h2 mark { background: linear-gradient(transparent 58%, #8a6d00 58%, #8a6d00 92%, transparent 92%); }
+  .end .install { position: absolute; left: 84px; right: 84px; bottom: 110px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .end .card { border-radius: 26px; background: #2b2924; padding: 34px 34px 38px; }
+  .end .card b { display: block; font-size: 38px; font-weight: 800; color: var(--yellow); }
+  .end .card span { display: block; margin-top: 12px; font-size: 26px; line-height: 1.45; color: #d8d2c2; }
+  .end .icon { position: absolute; right: 84px; top: 84px; width: 120px; }
+</style>
+</head>
+<body>
+
+<!-- 1 표지 -->
+<section class="slide cover" id="s01">
+  <div class="brand"><img src="../../assets/icons/icon-256.png" alt="">메모킹</div>
+  <div class="swipe">넘겨 보세요</div>
+  <h1>메모 앱인데,<br>이것까지 해요</h1>
+  <p class="lede">흔한 메모 기능 말고, 메모킹에만 있는 10가지</p>
+  <div class="stage">
+    <img class="shot" src="shots/list-life.png" style="width:460px; left:84px; bottom:-120px">
+    <img class="shot" src="shots/magic-calc.png" style="width:600px; left:396px; bottom:330px">
+    <img class="shot" src="shots/quick-memo.png" style="width:380px; left:640px; bottom:-90px">
+  </div>
+</section>
+
+<!-- 2 매직키 -->
+<section class="slide" id="s02">
+  <div class="eyebrow"><span class="chip">어디서든</span>매직키<span class="num">01 / 10</span></div>
+  <h2><kbd>Ctrl</kbd><span class="plus">+</span><kbd>Alt</kbd><span class="plus">+</span><kbd>Space</kbd><br>창 하나로 다 해요</h2>
+  <p class="lede">메모 쓰기, 내 메모와 PC 파일 찾기, 계산, 웹 검색, AI에게 묻기까지. 어느 앱을 쓰다가도 바로 떠요.</p>
+  <div class="stage">
+    <img class="shot" src="shots/magic-search.png" style="width:600px; left:84px; bottom:250px">
+    <img class="shot" src="shots/magic-calc.png" style="width:600px; left:396px; bottom:40px">
+    <span class="tag yellow" style="left:560px; bottom:620px">회의 메모와 회의록 파일이 한 번에</span>
+    <span class="tag" style="left:84px; bottom:90px">식을 쓰면 바로 계산, Enter로 복사</span>
+  </div>
+</section>
+
+<!-- 3 메모 단축키 -->
+<section class="slide" id="s03">
+  <div class="eyebrow"><span class="chip">어디서든</span>메모 단축키<span class="num">02 / 10</span></div>
+  <h2>자주 쓰는 문구는<br><mark>숫자 키 하나</mark>로</h2>
+  <p class="lede">메모에 <b>Ctrl+Alt+1~9</b>를 정해 두면, 메일이나 메신저를 쓰다가 눌러 바로 복사. 붙여 넣기만 하면 돼요.</p>
+  <div class="stage">
+    <img class="shot" src="shots/hotkey-note.png" style="width:620px; left:84px; bottom:170px">
+    <img class="shot flat" src="shots/hotkey-hud.png" style="width:486px; left:470px; bottom:110px; filter:drop-shadow(0 18px 30px rgba(0,0,0,.22))">
+    <span class="tag yellow" style="left:690px; bottom:560px">Ctrl + Alt + 3</span>
+  </div>
+</section>
+
+<!-- 4 빠른 메모 · 영역 캡처 -->
+<section class="slide" id="s04">
+  <div class="eyebrow"><span class="chip">어디서든</span>빠른 메모, 영역 캡처<span class="num">03 / 10</span></div>
+  <h2>보던 글을<br><mark>출처까지</mark> 그대로</h2>
+  <p class="lede">아무 앱에서나 글을 고르고 <b>Ctrl+Alt+C</b>. 서식과 출처가 붙은 메모가 돼요. 두 번 누르면 화면을 잘라 메모로.</p>
+  <div class="stage">
+    <div class="shot" style="width:640px; height:520px; left:84px; bottom:70px; overflow:hidden; background:url(shots/area-capture.png) -360px -40px / 1280px 800px no-repeat"></div>
+    <img class="shot" src="shots/quick-memo.png" style="width:380px; left:616px; bottom:150px">
+    <span class="tag" style="left:110px; bottom:610px">두 번 누르면 영역 캡처</span>
+    <span class="tag yellow" style="left:640px; bottom:90px">워드에서 고른 글 + 출처</span>
+  </div>
+</section>
+
+<!-- 5 메모 스택 -->
+<section class="slide" id="s05">
+  <div class="eyebrow"><span class="chip">메모 창</span>메모 스택<span class="num">04 / 10</span></div>
+  <h2>메모 여러 장을<br><mark>서류철</mark>처럼</h2>
+  <p class="lede">메모 창을 다른 메모 위에 끌어 놓으면 왼쪽에 색인 탭이 달린 한 창이 돼요. 탭을 눌러 넘겨 보세요.</p>
+  <div class="stage">
+    <img class="shot" src="shots/stack.png" style="width:640px; left:300px; bottom:60px">
+    <span class="tag yellow" style="left:84px; bottom:560px">탭마다 그 메모의 색</span>
+  </div>
+</section>
+
+<!-- 6 왕관과 테이프 -->
+<section class="slide" id="s06">
+  <div class="eyebrow"><span class="chip">메모 창</span>왕관과 테이프<span class="num">05 / 10</span></div>
+  <h2>늘 위에 둘지,<br><mark>바탕화면에 붙일지</mark></h2>
+  <p class="lede">왕관을 누르면 다른 창에 가려지지 않고, 테이프를 누르면 바탕화면에 붙어 Win+D를 눌러도 남아요.</p>
+  <div class="stage">
+    <!-- 메모 창과 스티커의 화면 위치는 shots/scenes.json 그대로 (투명 테두리를 잘라 낸 만큼 옮김 — 왕관: +142.5, -22 / 테이프: +114, -15) -->
+    <div style="position:absolute; left:84px; bottom:150px; width:340px; height:380px; transform:scale(1.42); transform-origin:left bottom">
+      <img class="shot" src="shots/crown-note.png" style="width:340px; left:0; top:0">
+      <img src="shots/crown-sticker.png" style="position:absolute; width:52.5px; left:142.5px; top:-22px">
+    </div>
+    <div style="position:absolute; left:590px; bottom:120px; width:320px; height:340px; transform:scale(1.26); transform-origin:left bottom">
+      <img class="shot" src="shots/tape-note.png" style="width:320px; left:0; top:0">
+      <img src="shots/tape-sticker.png" style="position:absolute; width:92px; left:114px; top:-15px">
+    </div>
+    <span class="tag yellow" style="left:120px; bottom:70px">왕관: 늘 위에</span>
+    <span class="tag" style="left:640px; bottom:40px">테이프: 바탕화면에</span>
+  </div>
+</section>
+
+<!-- 7 손 메모 · 주석 -->
+<section class="slide" id="s07">
+  <div class="eyebrow"><span class="chip">메모 창</span>손 메모와 주석<span class="num">06 / 10</span></div>
+  <h2>글 위에<br><mark>펜으로 바로</mark></h2>
+  <p class="lede">표와 글 위에 동그라미, 밑줄, 화살표를 그어요. 글이 늘어나 줄이 밀려도 그림이 그 자리를 따라가요.</p>
+  <div class="stage">
+    <img class="shot" src="shots/annotate.png" style="width:720px; left:180px; bottom:56px">
+  </div>
+</section>
+
+<!-- 8 Work / Life -->
+<section class="slide" id="s08">
+  <div class="eyebrow"><span class="chip">기록</span>Work / Life<span class="num">07 / 10</span></div>
+  <h2>일과 일상을<br><mark>스위치 하나</mark>로</h2>
+  <p class="lede">업무 메모와 일상 메모가 따로 보이고, 퇴근 뒤에는 업무 알림이 조용해져요.</p>
+  <div class="stage">
+    <img class="shot" src="shots/list-life.png" style="width:440px; left:84px; bottom:-150px">
+    <img class="shot" src="shots/list-work.png" style="width:440px; left:556px; bottom:-110px">
+  </div>
+</section>
+
+<!-- 9 알림 보관함 -->
+<section class="slide" id="s09">
+  <div class="eyebrow"><span class="chip">기록</span>알림 보관함<span class="num">08 / 10</span></div>
+  <h2>지운 알림도,<br><mark>카톡 알림</mark>도 남아요</h2>
+  <p class="lede">알림 센터에서 지운 알림과 카카오톡 알림 창까지 모아 두고, 누르면 바로 메모로. 이 PC에만 저장돼요.</p>
+  <div class="stage">
+    <div class="shot" style="width:620px; height:600px; left:230px; bottom:60px; overflow:hidden; background:url(shots/history.png) 0 -20px / 620px auto no-repeat #fff"></div>
+  </div>
+</section>
+
+<!-- 10 회상 -->
+<section class="slide" id="s10">
+  <div class="eyebrow"><span class="chip">기록</span>회상<span class="num">09 / 10</span></div>
+  <h2>사진을 넣으면<br><mark>달력이 앨범</mark>이 돼요</h2>
+  <p class="lede">메모에 넣은 사진이 그날 칸에 모이고, 누르면 그날의 스크랩북. 한 달을 그림 한 장으로 남길 수도 있어요.</p>
+  <div class="stage">
+    <div class="shot" style="width:560px; height:640px; left:84px; bottom:-40px; overflow:hidden; background:url(shots/recall-month.png) 0 -70px / 620px auto no-repeat #fff"></div>
+    <div class="shot" style="width:470px; height:560px; left:526px; bottom:30px; overflow:hidden; background:url(shots/recall-day.png) -6px -100px / 520px auto no-repeat #fff"></div>
+  </div>
+</section>
+
+<!-- 11 드라이브 + AI -->
+<section class="slide" id="s11">
+  <div class="eyebrow"><span class="chip">내 데이터</span>내 드라이브의 파일, AI 연결<span class="num">10 / 10</span></div>
+  <h2>내 메모는<br><mark>내 드라이브의 파일</mark></h2>
+  <p class="lede">메모 하나가 파일 하나라 앱에 갇히지 않아요. Claude, ChatGPT, Gemini가 내 메모를 찾고 정리하고 남겨요.</p>
+  <div class="stage">
+    <div class="drive" style="left:84px; bottom:90px">
+      <div class="path">내 드라이브 <b>메모킹</b></div>
+      <ul>
+        <li>제주 여행 준비.md<span>여행</span></li>
+        <li>주간 회의.md<span>회의</span></li>
+        <li>출시 준비.md<span>업무</span></li>
+        <li>이번 달 생활비.md<span>생활</span></li>
+        <li>하반기 마케팅 핵심.md<span>회의</span></li>
+        <li>춘천 닭갈비.md<span>여행</span></li>
+      </ul>
+    </div>
+    <div class="shot" style="width:440px; height:300px; left:556px; bottom:160px; overflow:hidden; background:url(shots/ai-settings.png) 0 -116px / 460px auto no-repeat #fff"></div>
+    <span class="tag yellow" style="left:600px; bottom:96px">Claude 데스크톱에 연결됨</span>
+  </div>
+</section>
+
+<!-- 12 마무리 -->
+<section class="slide end" id="s12">
+  <img class="icon" src="../../assets/icons/icon-256.png" alt="">
+  <div class="eyebrow">메모킹</div>
+  <h2>PC와 휴대폰에서<br><mark>같은 메모</mark>를</h2>
+  <p class="lede">Windows PC와 안드로이드 휴대폰이 같은 메모 폴더를 써요. 설치 링크는 프로필에 있어요. 저장해 두고 하나씩 써 보세요.</p>
+  <div class="install">
+    <div class="card"><b>Windows PC</b><span>설치하면 알아서 업데이트,<br>알림 영역에서 늘 대기</span></div>
+    <div class="card"><b>안드로이드</b><span>Google Drive로 PC와 같은 메모,<br>녹음하면 바로 받아쓰기</span></div>
+  </div>
+</section>
+
+</body>
+</html>
