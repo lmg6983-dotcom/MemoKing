@@ -147,6 +147,31 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
 
     // 2-1) 계산기 · 웹 검색 · AI 에게 묻기
     const typeMagic = (text) => js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input')); })()`);
+
+    // 1-1) 결과 묶음은 캡슐 순서 · 같은 색 머리말, 캡슐을 끌어 놓으면 묶음 순서도 바뀌고 다음에도 그대로
+    showMagic();
+    await typeMagic('견적서');
+    const groupOrder = () => js(magic, `[...document.querySelectorAll('.magic-section:not(.sub)')].map((e) => e.dataset.mod).join()`);
+    const chipOrder = () => js(magic, `[...document.querySelectorAll('.magic-chip')].map((e) => e.dataset.mod).join()`);
+    const groups0 = await until(async () => (await groupOrder()).includes('files') && groupOrder(), '결과 묶음');
+    const dotColor = await js(magic, `getComputedStyle(document.querySelector('.magic-chip[data-mod="files"] .chip-dot')).backgroundColor === getComputedStyle(document.querySelector('.magic-section[data-mod="files"]'), '::before').backgroundColor`);
+    check('매직키: 결과 묶음마다 머리말, 캡슐 순서대로 · 캡슐 점과 같은 색', groups0 === 'memo,notes,files,web,ai' && dotColor, groups0);
+    const at = (mod) => js(magic, `(() => { const r = document.querySelector('.magic-chip[data-mod="${mod}"]').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: r.width }; })()`);
+    const from = await at('ai');
+    const to = await at('memo');
+    magic.webContents.sendInputEvent({ type: 'mouseDown', x: from.x, y: from.y, button: 'left', clickCount: 1 });
+    for (let k = 1; k <= 12; k++) {
+      magic.webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(from.x + (to.x - to.w / 2 + 2 - from.x) * k / 12), y: to.y, button: 'left', modifiers: ['leftButtonDown'] });
+      await wait(30);
+    }
+    magic.webContents.sendInputEvent({ type: 'mouseUp', x: to.x - to.w / 2 + 2, y: to.y, button: 'left', clickCount: 1 });
+    await wait(300);
+    const afterDrag = { chips: await chipOrder(), groups: await groupOrder(), aiOn: await js(magic, `document.querySelector('.magic-chip[data-mod="ai"]').classList.contains('on')`) };
+    showMagic();
+    await wait(300);
+    const reopened = await chipOrder();
+    check('캡슐을 끌어 맨 앞으로 → 캡슐 · 결과 묶음 순서가 바뀌고 (켜고 끄지는 않음), 다시 열어도 그대로', afterDrag.chips.startsWith('ai,memo') && afterDrag.groups.startsWith('ai,memo') && afterDrag.aiOn && reopened.startsWith('ai,memo'), JSON.stringify({ afterDrag, reopened }));
+    await js(magic, `window.magic.reorderModules(${JSON.stringify(['memo', 'opms', 'notes', 'files', 'calc', 'web', 'ai'])})`);
     showMagic();
     await wait(300);
     await typeMagic('1,200 × 3');

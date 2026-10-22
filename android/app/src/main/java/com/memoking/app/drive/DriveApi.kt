@@ -181,31 +181,36 @@ class DriveApi(private val ctx: Context) : Remote {
         request("PATCH", "$API/files/${enc(id)}?fields=id", body = JSONObject().put("trashed", true).toString().toByteArray()) { }
     }
 
-    override fun changesSince(token: String?, knownIds: Set<String>): Pair<Boolean, String> {
+    override fun changesSince(token: String?, knownIds: Set<String>): Remote.Changes {
         if (token == null) {
-            return true to get("$API/changes/startPageToken").getString("startPageToken")
+            return Remote.Changes(true, get("$API/changes/startPageToken").getString("startPageToken"))
         }
+        val known = HashSet(knownIds)
+        val items = ArrayList<Remote.Change>()
         var page: String = token
-        var changed = false
         while (true) {
             val res = get(
                 "$API/changes?pageToken=${enc(page)}&pageSize=1000&spaces=drive&includeRemoved=true&restrictToMyDrive=true" +
-                    "&fields=${enc("nextPageToken,newStartPageToken,changes(fileId,removed,file(parents,trashed))")}",
+                    "&fields=${enc("nextPageToken,newStartPageToken,changes(fileId,removed,file($FIELDS,parents,trashed))")}",
             )
             val changes = res.optJSONArray("changes") ?: JSONArray()
             for (i in 0 until changes.length()) {
                 val c = changes.getJSONObject(i)
-                val parents = c.optJSONObject("file")?.optJSONArray("parents")
-                // 이 메모 폴더 안의 것(알고 있는 파일, 또는 알고 있는 폴더에 든 것)만 따진다
-                if (c.optString("fileId") in knownIds) changed = true
-                if (parents != null) for (j in 0 until parents.length()) if (parents.getString(j) in knownIds) changed = true
+                val id = c.optString("fileId")
+                val file = c.optJSONObject("file")
+                val parents = file?.optJSONArray("parents")?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList()
+                // 이 메모 폴더 안의 것(알고 있는 파일, 또는 알고 있는 폴더에 든 것)만 — 새로 든 폴더는 바로 아는 것으로 (그 안의 새 파일도 담기게)
+                if (id !in known && parents.none { it in known }) continue
+                val entry = file?.let { f -> item(f.put("id", id)) }
+                if (entry?.folder == true) known.add(id)
+                items.add(Remote.Change(id, c.optBoolean("removed") || file?.optBoolean("trashed") == true, parents, entry))
             }
             val next = res.optString("nextPageToken")
             if (next.isNotEmpty()) {
                 page = next
                 continue
             }
-            return changed to res.optString("newStartPageToken").ifEmpty { page }
+            return Remote.Changes(items.isNotEmpty(), res.optString("newStartPageToken").ifEmpty { page }, items)
         }
     }
 }

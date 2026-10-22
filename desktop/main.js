@@ -18,7 +18,7 @@ import { pickHandoff, recentlyUpdated } from '../app/js/core/handoff.js';
 import { PopupWatcher } from './popup-watch.js';
 import { createSttService } from './stt/stt-service.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
-import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
+import { popupToEntry, kakaoEntry, popupAppName, findRepeat, betterReading, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { FileIndex, defaultRoots } from './file-index.js';
@@ -207,7 +207,7 @@ function openVault(dir) {
     }
     next.defaultMode = viewMode(); // 새 메모는 지금 고른 Work / Life 로 (나눠 쓰지 않으면 Life)
     next.on('changed', ({ ids, external, removed }) => {
-      driveSync?.request(3000);
+      driveSync?.request(1000); // 메모 저장은 이미 0.6초 모아서 오므로 1초면 충분
       if (sandbox?.real === next) return; // 연습 중: 화면은 연습 공간 것 (돌아올 때 목록을 다시 그린다)
       windowManager.pushList();
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
@@ -469,10 +469,19 @@ async function addPopupToHistory(p) {
     if (p.via === 'ocr') entry.title = correctTitle(entry.title, knownNames(history.list({ app: appName }).filter((e) => e.source === 'popup').slice(0, 500).map((e) => e.title)));
     const now = Date.now();
     while (recentPopups.length && now - recentPopups[0].at > 5 * 60 * 1000) recentPopups.shift();
-    if (isRepeat(recentPopups, { app: appName, hwnd: p.hwnd, ...entry }, now)) return;
-    recentPopups.push({ app: appName, hwnd: p.hwnd, ...entry, at: now });
+    const via = p.via ?? '';
+    // 같은 앱이 Windows 알림 센터에도 같은 알림을 남겼으면(그쪽 글이 정확하다) 알림 창 것은 넣지 않는다
+    const toasts = history.list().filter((e) => e.source === 'windows' && now - Date.parse(e.time) < 2 * 60 * 1000 && (e.app === appName || (p.process && String(e.appId).toLowerCase().includes(String(p.process).toLowerCase()))))
+      .map((e) => ({ app: appName, title: e.title, body: e.body, at: Date.parse(e.time) }));
+    if (findRepeat(toasts, { app: appName, ...entry }, now)) return;
+    const prev = findRepeat(recentPopups, { app: appName, hwnd: p.hwnd, ...entry }, now);
+    // 같은 알림을 또 읽었으면 넣지 않는다 — 다만 앞의 것은 그림 글자 인식, 이번 것은 글 그대로 읽었으면 이번 것으로 바꾼다
+    if (prev && !betterReading(prev, { via })) return;
+    if (prev?.id) history.remove(prev.id);
+    if (prev) recentPopups.splice(recentPopups.indexOf(prev), 1);
     const image = p.image ? history.keepImage(p.image) : null;
-    history.add({ source: 'popup', appId: p.process, app: appName, ...entry, image, via: p.via ?? '' });
+    const item = history.add({ source: 'popup', appId: p.process, app: appName, ...entry, image, via });
+    recentPopups.push({ app: appName, hwnd: p.hwnd, ...entry, via, id: item?.id, at: now });
   } finally {
     if (p.image) fs.rm(p.image, { force: true }, () => {});
     if (p.ocrImage) fs.rm(p.ocrImage, { force: true }, () => {});
@@ -571,6 +580,9 @@ function initDrive() {
   });
   driveApi = new DriveApi({ auth: driveAuth, fetch: (...args) => net.fetch(...args) });
   driveSync = new DriveSync({ api: driveApi, auth: driveAuth, stateDir: path.join(app.getPath('userData'), 'drive') });
+  // 메모킹 창을 쓰는 중이면 10초마다, 창을 다시 볼 때 바로 (휴대폰에서 고친 것이 빨리 보이게)
+  driveSync.isActive = () => Boolean(BrowserWindow.getFocusedWindow());
+  app.on('browser-window-focus', () => driveSync?.focused());
   driveSync.on('status', (st) => {
     if (st.changed) realVault()?.scan();
     windowManager.listWin?.webContents.send('drive:status', driveInfo());

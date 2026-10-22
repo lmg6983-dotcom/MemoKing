@@ -10,7 +10,7 @@ import { UI } from './core/ui-text.js';
 //   다 못 보여 준 나머지는 맨 아래 "다른 n건 더 보기" — 고르면 전체 결과 창(모두 찾기)
 //   ↑↓ 고르기 · ← → 할 일 고르기(열기 · 경로 복사 · 폴더 열기 · 파일 복사, 고른 줄 오른쪽 단추) · Enter 실행
 //   Ctrl+Enter 다른 실행 · Ctrl+Shift+C 경로 복사 · Ctrl+Shift+E 폴더 열기 · Esc 글 지우기 → 닫기
-//   아래 캡슐 = 기능 모듈, 누르면 켜고 끈다
+//   아래 캡슐 = 기능 모듈, 누르면 켜고 끈다 · 끌면 순서를 바꾼다 (결과 묶음도 그 순서, 캡슐과 같은 색 머리말)
 //   계산기: 식이면 맨 위에 결과 (Enter 복사) · 웹 검색 · AI 에게 묻기: 맨 아래 줄, 사이트 단추로 골라 브라우저로 연다
 const api = window.magic;
 const box = document.getElementById('magic');
@@ -31,6 +31,35 @@ let results = { notes: [], folders: [], files: [], more: 0, recent: false, index
 let opms = { query: '', loading: false, cases: [], total: 0, error: '' };
 
 const isOn = (id) => modules.some((m) => m.id === id && m.on);
+
+// 움직임 (Windows 에서 애니메이션 효과를 끄면 모두 없음) — 입력 · Enter 를 늦추지 않는 짧은 것만
+const calm = matchMedia('(prefers-reduced-motion: reduce)');
+let shownAt = 0; // 창을 연 때: 그 뒤 잠깐 처음 나오는 줄은 차례로 나타난다
+let introFresh = false; // 연 뒤 아직 결과를 그리지 않았다 (지난번과 같은 줄도 처음처럼)
+let glideUntil = 0; // 캡슐을 끌거나 끄고 켠 뒤: 자리를 옮긴 줄은 미끄러지고, 새 줄은 나타난다
+const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+
+function slide(el, dx, dy) {
+  if (dx || dy) el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 200, easing: EASE });
+}
+const positions = () => new Map([...resultsEl.children].filter((el) => el.dataset.key).map((el) => [el.dataset.key, el.offsetTop]));
+function animateResults(before) {
+  const now = Date.now();
+  const intro = now - shownAt < 400;
+  const glide = now < glideUntil;
+  if (calm.matches || (!intro && !glide)) return;
+  let k = 0;
+  for (const el of resultsEl.children) {
+    if (!el.dataset.key) continue;
+    const old = before.get(el.dataset.key);
+    if (old !== undefined) {
+      if (glide) slide(el, 0, old - el.offsetTop);
+    } else {
+      el.animate([{ opacity: 0, transform: 'translateY(-3px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 160, delay: intro ? Math.min(k++, 8) * 18 : 0, easing: 'ease-out', fill: 'backwards' });
+    }
+  }
+}
 
 // 웹 검색 · AI 기본 사이트 (설정 매직키에서 고름)
 let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id };
@@ -85,21 +114,90 @@ function renderModules() {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = `magic-chip${m.on ? ' on' : ''}`;
+    chip.dataset.mod = m.id;
     chip.setAttribute('aria-pressed', String(m.on));
-    chip.title = `${m.name}: ${m.description}\n누르면 ${m.on ? '꺼요' : '켜요'}`;
+    chip.title = `${m.name}: ${m.description}\n누르면 ${m.on ? '꺼요' : '켜요'}, 끌면 순서를 바꿔요`;
     const dot = document.createElement('span');
     dot.className = 'chip-dot';
     chip.append(dot, m.chip ?? m.name);
     chip.addEventListener('mousedown', (e) => e.preventDefault()); // 입력 칸 포커스 유지
+    chip.addEventListener('pointerdown', (e) => dragChip(e, chip));
     chip.addEventListener('click', async () => {
+      if (chip.dataset.dragged) return; // 끌어 놓은 것은 누른 것이 아님
       modules = await api.toggleModule(m.id).catch(() => modules);
+      glideUntil = Date.now() + 400;
       renderModules();
       updatePlaceholder();
       searchOpms();
+      render();
       search();
     });
     return chip;
   }));
+}
+
+// 캡슐 끌기: 끄는 캡슐은 들리고, 가리킨 캡슐을 반 넘게 지나면 자리를 바꾼다 (다른 캡슐은 비켜 미끄러짐)
+function dragChip(e, chip) {
+  if (e.button !== 0 || modules.length < 2) return;
+  const x0 = e.clientX;
+  const y0 = e.clientY;
+  let moving = false;
+  const chips = () => [...modulesEl.children];
+  const glideChips = (mutate) => {
+    const before = new Map(chips().map((c) => [c, c.getBoundingClientRect()]));
+    mutate();
+    if (calm.matches) return;
+    for (const c of chips()) {
+      if (c === chip) continue;
+      const a = before.get(c);
+      const b = c.getBoundingClientRect();
+      slide(c, a.left - b.left, a.top - b.top);
+    }
+  };
+  const move = (ev) => {
+    if (!moving) {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+      moving = true;
+      try {
+        chip.setPointerCapture(e.pointerId); // 창 밖으로 나가도 놓을 때까지
+      } catch {
+        // 붙잡지 못해도 창 안에서는 window 로 받는다
+      }
+      chip.classList.add('dragging');
+      modulesEl.classList.add('sorting');
+    }
+    const list = chips();
+    const over = list.find((c) => {
+      const r = c.getBoundingClientRect();
+      return c !== chip && ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top - 3 && ev.clientY <= r.bottom + 3;
+    });
+    if (!over) return;
+    const r = over.getBoundingClientRect();
+    const after = list.indexOf(over) > list.indexOf(chip);
+    // 반을 넘어야 바꾼다 (폭이 다른 캡슐끼리 왔다 갔다 하지 않게)
+    if (after ? ev.clientX > r.left + r.width / 2 : ev.clientX < r.left + r.width / 2) {
+      glideChips(() => modulesEl.insertBefore(chip, after ? over.nextSibling : over));
+    }
+  };
+  const end = () => {
+    removeEventListener('pointermove', move);
+    removeEventListener('pointerup', end);
+    removeEventListener('pointercancel', end);
+    if (!moving) return;
+    chip.classList.remove('dragging');
+    modulesEl.classList.remove('sorting');
+    chip.dataset.dragged = '1';
+    setTimeout(() => delete chip.dataset.dragged, 0); // 놓을 때 따라오는 click 만 넘긴다
+    const ids = chips().map((c) => c.dataset.mod);
+    if (ids.join() === modules.map((m) => m.id).join()) return;
+    modules = ids.map((id) => modules.find((m) => m.id === id));
+    glideUntil = Date.now() + 400;
+    render(); // 결과 묶음도 새 순서로 미끄러져 간다
+    api.reorderModules?.(ids).catch(() => {});
+  };
+  addEventListener('pointermove', move);
+  addEventListener('pointerup', end);
+  addEventListener('pointercancel', end);
 }
 
 function updatePlaceholder() {
@@ -228,9 +326,11 @@ function row(r, index, query) {
   return li;
 }
 
-function section(label, count) {
+function section(label, count, mod, sub) {
   const li = document.createElement('li');
-  li.className = 'magic-section';
+  li.className = `magic-section${sub ? ' sub' : ''}`;
+  li.dataset.mod = mod;
+  li.dataset.key = `s:${mod}:${label}`;
   li.setAttribute('role', 'presentation');
   li.textContent = label;
   if (count) {
@@ -250,58 +350,97 @@ function note(text) {
   return li;
 }
 
+// 묶음 머리말 (기능 이름 그대로 — 메모 · 폴더 · 파일 · OPMS 처럼 따로 붙이는 묶음은 그 이름)
+const GROUP_LABEL = { calc: '계산기', site: '사이트', memo: '새 메모', web: '웹 검색', ai: 'AI 에게 묻기' };
+
 function render() {
   const raw = input.value;
   const query = raw.trim();
+  const before = introFresh ? new Map() : positions();
   rows = [];
-  const nodes = [];
-  const add = (r) => nodes.push(row(r, rows.push(r) - 1, query || raw));
-  // 식이면 계산 결과, 사이트 주소면 열기가 맨 위 (Enter 로 바로)
+  // 기능 id → 묶음 [{ head: [이름, 개수] } | { row } | { node }] — 계산 · 사이트 주소는 늘 맨 위 (식 · 주소면 Enter 로 바로), 나머지는 캡슐 순서
+  const groups = new Map();
+  const put = (mod, item) => {
+    if (!groups.has(mod)) groups.set(mod, []);
+    groups.get(mod).push(item);
+  };
   const calc = query ? calcFor(query) : null;
-  if (calc) add({ kind: 'calc', ...calc, text: query });
+  if (calc) put('calc', { row: { kind: 'calc', ...calc, text: query } });
   const url = query && isOn('web') ? siteUrl(query) : null;
-  if (url) add({ kind: 'site', url });
-  if (query && isOn('memo')) add({ kind: 'new' });
-  // 관리번호·출원번호를 쓰면 OPMS 사건이 맨 위 (찾는 중 · 사내망이 아님도 이 자리에)
+  if (url) put('site', { row: { kind: 'site', url } });
+  if (query && isOn('memo')) put('memo', { row: { kind: 'new' } });
+  // 관리번호·출원번호를 쓰면 OPMS 사건 (찾는 중 · 사내망이 아님도 이 자리에)
   if (query && isOn('opms') && opms.query === query && !(calc && opms.error)) { // 식에는 "OPMS 주소를 넣으면" 안내를 안 띄운다
     if (opms.cases.length) {
-      nodes.push(section('OPMS', opms.total));
-      opms.cases.forEach((c) => add({ kind: 'opms', ...c }));
+      put('opms', { head: ['OPMS', opms.total] });
+      opms.cases.forEach((c) => put('opms', { row: { kind: 'opms', ...c } }));
     } else if (opms.loading) {
       const li = note('');
       li.classList.add('loading');
       li.append(searchingNode('OPMS 에서 찾는 중', { inline: true, tag: 'span' }));
-      nodes.push(li);
+      put('opms', { node: li });
     }
-    else if (opms.error) nodes.push(note(opms.error));
+    else if (opms.error) put('opms', { node: note(opms.error) });
   }
-  if (results.notes.length) {
-    nodes.push(section(results.recent ? '최근 메모' : '메모', results.recent ? 0 : results.notes.length));
-    results.notes.forEach((n) => add({ kind: 'note', ...n }));
+  // 캡슐로 끈 기능은 새 결과를 기다리지 않고 바로 뺀다
+  const notes = isOn('notes') ? results.notes : [];
+  const folders = query && isOn('files') ? results.folders : [];
+  const files = query && isOn('files') ? results.files : [];
+  if (notes.length) {
+    put('notes', { head: [results.recent ? '최근 메모' : '메모', results.recent ? 0 : notes.length] });
+    notes.forEach((n) => put('notes', { row: { kind: 'note', ...n } }));
   }
-  if (query && results.folders.length) {
-    nodes.push(section('폴더', results.folders.length));
-    results.folders.forEach((f) => add({ kind: 'folder', ...f }));
+  if (folders.length) {
+    put('files', { head: ['폴더', folders.length] });
+    folders.forEach((f) => put('files', { row: { kind: 'folder', ...f } }));
   }
-  if (query && results.files.length) {
-    nodes.push(section('파일', results.files.length));
-    results.files.forEach((f) => add({ kind: 'file', ...f }));
+  if (files.length) {
+    put('files', { head: ['파일', files.length] });
+    files.forEach((f) => put('files', { row: { kind: 'file', ...f } }));
   }
-  if (query && results.more > 0) add({ kind: 'more', count: results.more });
-  // 웹 검색 · AI 에게 묻기: 늘 맨 아래 (고를 때만 브라우저로 연다)
-  const tail = [];
-  if (query && isOn('web')) tail.push({ kind: 'web', sites: sitesInOrder(WEB_ENGINES, prefs.engine) });
-  if (query && isOn('ai')) tail.push({ kind: 'ai', sites: sitesInOrder(AI_SITES, prefs.ai) });
+  if (query && results.more > 0) put(groups.has('files') || !groups.has('notes') ? 'files' : 'notes', { row: { kind: 'more', count: results.more } });
   const searched = isOn('notes') || isOn('files');
-  if (query && searched && !calc && !url && !results.notes.length && !results.folders.length && !results.files.length && !opms.cases.length && !opms.loading) {
-    nodes.push(note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요. Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`));
+  if (query && searched && !calc && !url && !notes.length && !folders.length && !files.length && !opms.cases.length && !opms.loading) {
+    put(isOn('notes') ? 'notes' : 'files', { node: note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요. Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`) });
   }
   if (query && isOn('files') && results.index && !results.index.count) {
-    nodes.push(note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : UI.noFileIndex));
+    put('files', { node: note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : UI.noFileIndex) });
   }
-  tail.forEach(add);
+  // 웹 검색 · AI 에게 묻기: 고를 때만 브라우저로 연다
+  if (query && isOn('web')) put('web', { row: { kind: 'web', sites: sitesInOrder(WEB_ENGINES, prefs.engine) } });
+  if (query && isOn('ai')) put('ai', { row: { kind: 'ai', sites: sitesInOrder(AI_SITES, prefs.ai) } });
+
+  const pill = document.createElement('li'); // 고른 줄 표시 (줄 사이를 미끄러져 따라간다)
+  pill.className = 'magic-pill';
+  pill.setAttribute('role', 'presentation');
+  pill.hidden = true;
+  const nodes = [pill];
+  let first = true;
+  for (const mod of ['calc', 'site', ...modules.map((m) => m.id)]) {
+    const items = groups.get(mod);
+    if (!items) continue;
+    let heads = 0;
+    if (!items[0].head && items.some((it) => it.row)) items.unshift({ head: [GROUP_LABEL[mod] ?? modules.find((m) => m.id === mod)?.name ?? '', 0] });
+    for (const it of items) {
+      if (it.head) {
+        const li = section(it.head[0], it.head[1], mod, heads++ > 0);
+        if (!first && heads === 1) li.classList.add('gap');
+        nodes.push(li);
+      } else if (it.row) {
+        const li = row(it.row, rows.push(it.row) - 1, query || raw);
+        li.dataset.mod = mod;
+        li.dataset.key = `r:${it.row.kind}:${it.row.id ?? it.row.path ?? it.row.idx ?? ''}`;
+        nodes.push(li);
+      } else {
+        it.node.dataset.key = `n:${mod}:${it.node.textContent}`;
+        nodes.push(it.node);
+      }
+    }
+    first = false;
+  }
   resultsEl.replaceChildren(...nodes);
-  box.classList.toggle('has-results', nodes.length > 0);
+  box.classList.toggle('has-results', nodes.length > 1);
+  if (nodes.length > 1) introFresh = false;
   clearBtn.hidden = !raw;
   // 남겨 둔 지난 글로 다시 띄운 경우 첫 줄("메모로 저장")이 아니라 찾은 결과를 골라 둔다 (Enter 로 같은 메모를 또 만들지 않게)
   if (retained && selected === 0 && rows[0]?.kind === 'new' && rows.length > 1) selected = 1;
@@ -311,7 +450,8 @@ function render() {
     const hit = rows.findIndex((r) => r.kind === 'note' && same(r.title));
     if (hit > 0) selected = hit;
   }
-  select(Math.min(selected, Math.max(0, rows.length - 1)), { scroll: false });
+  select(Math.min(selected, Math.max(0, rows.length - 1)), { scroll: false, glide: false });
+  animateResults(before);
   fit();
 }
 
@@ -319,10 +459,20 @@ function fit() {
   requestAnimationFrame(() => api.resize(Math.ceil(box.getBoundingClientRect().height) + 16));
 }
 
-function select(i, { scroll = true } = {}) {
+function select(i, { scroll = true, glide = true } = {}) {
   if (i !== selected) activeAct = 0;
   selected = i;
   for (const el of resultsEl.querySelectorAll('.magic-row')) el.setAttribute('aria-selected', String(Number(el.dataset.index) === i));
+  const pill = resultsEl.querySelector('.magic-pill');
+  const li = resultsEl.querySelector(`.magic-row[data-index="${i}"]`);
+  if (pill) {
+    pill.hidden = !li;
+    pill.classList.toggle('instant', !glide || calm.matches);
+    if (li) {
+      pill.style.transform = `translateY(${li.offsetTop}px)`;
+      pill.style.height = `${li.offsetHeight}px`;
+    }
+  }
   markAct();
   input.setAttribute('aria-activedescendant', rows[i] ? `magic-row-${i}` : '');
   if (scroll) resultsEl.querySelector(`.magic-row[data-index="${i}"]`)?.scrollIntoView({ block: 'nearest' });
@@ -519,6 +669,8 @@ async function reset() {
     opms = { query: '', loading: false, cases: [], total: 0, error: '' };
   }
   resizeInput();
+  shownAt = Date.now();
+  introFresh = true;
   [modules] = await Promise.all([api.modules().catch(() => []), loadPrefs()]);
   if (isOn('calc')) loadMath();
   renderModules();
@@ -533,8 +685,13 @@ async function reset() {
 }
 api.onShow(reset);
 api.onModules?.(async (list) => {
+  const same = JSON.stringify(list ?? []) === JSON.stringify(modules); // 이 창에서 누르거나 끌어 바꾼 것 (이미 그렸다)
   modules = list ?? [];
   await loadPrefs(); // 설정에서 기본 사이트를 바꿨을 수도
+  if (same) {
+    render();
+    return;
+  }
   renderModules();
   updatePlaceholder();
   search();

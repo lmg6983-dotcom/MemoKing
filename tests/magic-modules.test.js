@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { looksLikeRef, MAGIC_MODULES, normalizeMagicSettings, activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
+import { looksLikeRef, MAGIC_MODULES, normalizeMagicSettings, activeModules, memoBodyFromText, magicChips, toggleMagicChip, reorderMagicChips, DEFAULT_ORDER } from '../app/js/core/magic-modules.js';
 
 test('매직키 설정: 기본은 켜짐 · 모든 기능 켜짐, 모르는 기능은 버림 · 기본 사이트는 네이버 · ChatGPT', () => {
   const s = normalizeMagicSettings(undefined);
@@ -10,7 +10,7 @@ test('매직키 설정: 기본은 켜짐 · 모든 기능 켜짐, 모르는 기�
   assert.equal(s.ai, 'chatgpt');
   const known = ['memo', 'notes', 'files', 'calc', 'web', 'ai', 'opms'];
   const forced = normalizeMagicSettings({ enabled: false, modules: { memo: false, files: false, calc: false, opms: true, everything: true }, engine: 'google', ai: 'nope', known });
-  assert.deepEqual(forced, { enabled: false, modules: { memo: false, notes: true, files: false, calc: false, web: true, ai: true, opms: true }, paused: {}, engine: 'google', ai: 'chatgpt', known });
+  assert.deepEqual(forced, { enabled: false, modules: { memo: false, notes: true, files: false, calc: false, web: true, ai: true, opms: true }, paused: {}, engine: 'google', ai: 'chatgpt', known, order: DEFAULT_ORDER });
   // 예전 설정: 계산기는 "준비 중"이라 false 로 저장돼 있었다 → 고른 값이 아니니 기본(켜짐)으로, 다른 기능은 고른 그대로
   const old = normalizeMagicSettings({ modules: { memo: true, notes: false, files: true, calc: false, opms: false } });
   assert.deepEqual(old.modules, { memo: true, notes: false, files: true, calc: true, web: true, ai: true, opms: false });
@@ -19,7 +19,7 @@ test('매직키 설정: 기본은 켜짐 · 모든 기능 켜짐, 모르는 기�
 });
 
 test('매직키: 켜진 모듈만, 매직키를 끄면 없음', () => {
-  assert.deepEqual(activeModules({}).map((m) => m.id), ['memo', 'notes', 'files', 'calc', 'web', 'ai', 'opms']);
+  assert.deepEqual(activeModules({}).map((m) => m.id), DEFAULT_ORDER);
   assert.deepEqual(activeModules({ modules: { memo: false, notes: false, files: false, calc: false, web: false, ai: false, opms: false }, known: ['memo', 'notes', 'files', 'calc', 'web', 'ai', 'opms'] }), []);
   assert.deepEqual(activeModules({ enabled: false }), []);
   assert.ok(MAGIC_MODULES.every((m) => m.id && m.name && m.description));
@@ -45,4 +45,17 @@ test('매직키 창 캡슐: 설정에서 켠 기능만 보이고, 누르면 잠�
   assert.deepEqual(toggleMagicChip(settings, 'opms').modules.opms, false); // 설정에서 끈 것은 매직키 창에서 켜지지 않음
   assert.deepEqual(normalizeMagicSettings({ modules: { opms: false }, paused: { opms: true } }).paused, {}); // 끈 기능의 잠깐 끔은 남기지 않음
   assert.deepEqual(magicChips({ enabled: false }), []);
+});
+
+test('매직키 캡슐 순서: 끌어 놓은 순서대로 캡슐 · 결과 묶음, 안 보이는 기능과 처음 보는 기능은 뒤에', () => {
+  const ids = (list) => list.map((m) => m.id);
+  assert.deepEqual(normalizeMagicSettings({}).order, DEFAULT_ORDER);
+  assert.deepEqual([...normalizeMagicSettings({}).order].sort(), MAGIC_MODULES.map((m) => m.id).sort(), '모든 기능이 한 번씩');
+  assert.deepEqual(normalizeMagicSettings({ order: ['ai', 'zzz', 'ai', 'memo'] }).order.slice(0, 3), ['ai', 'memo', 'opms'], '모르는 것 · 겹친 것은 버림');
+  const settings = { modules: { opms: false }, known: ['opms'] };
+  const moved = reorderMagicChips(settings, ['web', 'memo', 'notes', 'files', 'calc', 'ai']);
+  assert.deepEqual(ids(magicChips(moved)), ['web', 'memo', 'notes', 'files', 'calc', 'ai']);
+  assert.deepEqual(ids(activeModules(toggleMagicChip(moved, 'memo'))), ['web', 'notes', 'files', 'calc', 'ai'], '잠깐 꺼도 순서는 그대로');
+  assert.deepEqual(moved.order.at(-1), 'opms');
+  assert.deepEqual(ids(magicChips({ ...moved, modules: { ...moved.modules, opms: true } })).at(-1), 'opms', '설정에서 다시 켜면 맨 뒤');
 });

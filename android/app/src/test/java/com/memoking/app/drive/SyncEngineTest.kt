@@ -35,6 +35,7 @@ class SyncEngineTest {
             for (p in parts.dropLast(1)) cur = (files.values.firstOrNull { it.parent == cur && it.name == p && !it.trashed } ?: createFolder(cur, p).let { files[it.id]!! }).id
             val f = path(rel) ?: F("f${++seq}", parts.last(), cur, false).also { files[it.id] = it }
             f.data = text.toByteArray(); f.modified = System.currentTimeMillis(); changed = true
+            note(f.id)
         }
         fun text(rel: String) = path(rel)?.data?.toString(Charsets.UTF_8)
         override fun listChildren(folderId: String) = files.values.filter { it.parent == folderId && !it.trashed }.map(::item).also { calls++ }
@@ -42,11 +43,21 @@ class SyncEngineTest {
         override fun upload(parentId: String, name: String, existingId: String?, size: Long, open: () -> InputStream): Remote.Item {
             val f = existingId?.let { files[it] } ?: F("f${++seq}", name, parentId, false).also { files[it.id] = it }
             f.data = open().use { it.readBytes() }; f.modified = System.currentTimeMillis()
+            note(f.id)
             return item(f)
         }
-        override fun createFolder(parentId: String, name: String): Remote.Item { val f = F("d${++seq}", name, parentId, true); files[f.id] = f; return item(f) }
-        override fun trash(id: String) { files[id]!!.trashed = true }
-        override fun changesSince(token: String?, knownIds: Set<String>): Pair<Boolean, String> { val c = changed || token == null; changed = false; return c to "t" }
+        override fun createFolder(parentId: String, name: String): Remote.Item { val f = F("d${++seq}", name, parentId, true); files[f.id] = f; note(f.id); return item(f) }
+        override fun trash(id: String) { files[id]!!.trashed = true; note(id) }
+        // log 를 켜면 실제 Drive 처럼 바뀐 것 목록(items)을 준다
+        var log: MutableList<String>? = null
+        fun note(id: String) { log?.add(id) }
+        override fun changesSince(token: String?, knownIds: Set<String>): Remote.Changes {
+            val l = log
+            if (l == null || token == null) { val c = changed || token == null; changed = false; return Remote.Changes(c, "t") }
+            val items = l.distinct().map { id -> files[id]!!.let { Remote.Change(id, it.trashed, listOf(it.parent), item(it)) } }
+            l.clear()
+            return Remote.Changes(items.isNotEmpty(), "t", items)
+        }
     }
 
     private val dir = File(System.getProperty("java.io.tmpdir"), "synctest-${System.nanoTime()}")
@@ -197,5 +208,30 @@ class SyncEngineTest {
         }
         assertTrue(stopped)
         assertEquals("휴대폰 파일은 그대로", "x1", lt("많은/1.md"))
+    }
+
+    @Test
+    fun `평소 동기화는 Drive 폴더를 다 훑지 않고 바뀐 것만 (PC 와 같음)`() {
+        drive.log = ArrayList()
+        drive.put("회의.md", "# 회의")
+        drive.put("_memoking/versions/m1/1.md", "v1")
+        sync() // 처음은 다 훑는다
+        drive.log!!.clear()
+        drive.calls = 0
+        lw("회의.md", "# 회의\n휴대폰")
+        assertEquals(1, sync().uploaded) // 이 휴대폰에서만 고침 → 올리기만
+        drive.put("회의.md", "# 회의\nPC")
+        drive.put("_memoking/versions/m2/1.md", "v2") // 새 폴더 안 새 파일
+        assertEquals(2, sync().downloaded)
+        assertEquals("# 회의\nPC", lt("회의.md"))
+        assertEquals("v2", lt("_memoking/versions/m2/1.md"))
+        drive.trash(drive.path("회의.md")!!.id)
+        assertEquals(1, sync().deletedLocal)
+        assertEquals(0, drive.calls) // 폴더 목록을 한 번도 묻지 않음
+        val f = drive.path("_memoking/versions/m1/1.md")!!
+        f.name = "2.md"; drive.note(f.id) // 이름 바꾸기 → 다 훑어 맞춤
+        sync()
+        assertTrue(drive.calls > 0)
+        assertEquals("v1", lt("_memoking/versions/m1/2.md"))
     }
 }

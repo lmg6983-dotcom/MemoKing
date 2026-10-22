@@ -8,7 +8,7 @@ import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder } from '../app/js/core/reminders.js';
-import { activeModules, memoBodyFromText, magicChips, toggleMagicChip, normalizeMagicSettings } from '../app/js/core/magic-modules.js';
+import { activeModules, memoBodyFromText, magicChips, toggleMagicChip, reorderMagicChips, normalizeMagicSettings } from '../app/js/core/magic-modules.js';
 import { WEB_ENGINES, AI_SITES, siteLink, siteUrl } from '../app/js/core/magic-tools.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
@@ -387,7 +387,7 @@ export function registerIpc(ctx) {
     saveSettings();
     return settings.autoTags;
   });
-  ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings(next));
+  ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings({ ...next, order: settings.magic?.order })); // 순서는 매직키 창에서만 바꾼다 (열어 둔 설정 창의 지난 순서로 덮지 않게)
   ipcMain.handle('mcp:connect', (_e, on) => mcpConnect(on !== false));
   ipcMain.handle('mcp:copy', () => {
     clipboard.writeText(mcpSnippet());
@@ -404,6 +404,10 @@ export function registerIpc(ctx) {
   ipcMain.handle('magic:modules', () => magicModuleList());
   ipcMain.handle('magic:toggle-module', (_e, id) => {
     setMagicSettings(toggleMagicChip(settings.magic, String(id)));
+    return magicModuleList();
+  });
+  ipcMain.handle('magic:reorder-modules', (_e, ids) => {
+    setMagicSettings(reorderMagicChips(settings.magic, Array.isArray(ids) ? ids.map(String) : []));
     return magicModuleList();
   });
   ipcMain.on('magic:close', () => {

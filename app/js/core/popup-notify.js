@@ -39,17 +39,46 @@ const letters = (text) => String(text ?? '').replace(/[^\p{L}\p{N}]/gu, '');
 const overlaps = (a, b) => a === b || (Boolean(a && b) && (a.includes(b) || b.includes(a)));
 export const SAME_WINDOW_MS = 15_000;
 
-// 같은 앱의 같은 알림을 짧은 시간 안에 두 번 넣지 않는다 (알림 창이 다시 그려지는 경우).
-//   같은 알림 창(hwnd)을 방금 읽었으면 글이 조금 달라도 같은 알림 — 바로 읽은 글과 글자 인식 결과처럼
-//   제목 · 내용이 각각 한쪽이 다른 쪽을 담으면 ("김대리" · "김대리 (영업팀)")
-export function isRepeat(recent, entry, now = Date.now(), windowMs = 2 * 60 * 1000) {
-  return recent.some((r) => {
-    if (r.app !== entry.app) return false;
-    if (r.title === entry.title && r.body === entry.body && now - r.at < windowMs) return true;
-    if (!entry.hwnd || r.hwnd !== entry.hwnd || now - r.at >= SAME_WINDOW_MS) return false;
-    return overlaps(letters(r.title), letters(entry.title)) && overlaps(letters(r.body), letters(entry.body)) && Boolean(letters(r.title + r.body));
-  });
+// 두 글이 얼마나 같은가 (0~1): 글자 두 개씩 묶음의 겹침(다이스 계수) — 글자 인식이 한두 글자 틀려도 높게,
+//   contain: 한쪽이 다른 쪽을 담으면("김대리" · "김대리 (영업팀)") 1 — 같은 알림 창을 다르게 읽었을 때만 쓴다
+export function similarity(a, b, { contain = false } = {}) {
+  const x = letters(a);
+  const y = letters(b);
+  if (x === y) return 1;
+  if (contain && overlaps(x, y)) return 1;
+  if (x.length < 2 || y.length < 2) return 0;
+  const grams = (t) => {
+    const m = new Map();
+    for (let i = 0; i < t.length - 1; i++) m.set(t.slice(i, i + 2), (m.get(t.slice(i, i + 2)) ?? 0) + 1);
+    return m;
+  };
+  const gx = grams(x);
+  const gy = grams(y);
+  let hit = 0;
+  for (const [g, n] of gx) hit += Math.min(n, gy.get(g) ?? 0);
+  return (2 * hit) / (x.length - 1 + y.length - 1);
 }
+
+// 같은 앱의 같은 알림을 짧은 시간 안에 두 번 넣지 않는다 — 알림 창이 다시 그려지거나(나타나는 움직임 · 사진이 늦게 뜸),
+//   한 번은 글 그대로(UI 자동화) · 한 번은 그림 글자 인식으로 읽혀 글이 조금 다르게 두 번 들어오는 경우.
+//   같은 알림 창(hwnd)을 15초 안에 다시 읽었으면 글이 절반쯤만 같아도 같은 알림,
+//   다른 창이어도 2분 안에 제목 · 내용이 거의(80%) 같으면 같은 알림.
+// @returns 같은 알림으로 본 앞의 기록 (없으면 null)
+export function findRepeat(recent, entry, now = Date.now(), windowMs = 2 * 60 * 1000) {
+  for (let i = recent.length - 1; i >= 0; i--) {
+    const r = recent[i];
+    if (r.app !== entry.app || now - r.at >= windowMs) continue;
+    if (similarity(r.title, entry.title) >= 0.8 && similarity(r.body, entry.body) >= 0.8) return r;
+    if (entry.hwnd && r.hwnd === entry.hwnd && now - r.at < SAME_WINDOW_MS
+      && Boolean(letters(r.title + r.body)) && similarity(`${r.title}${r.body}`, `${entry.title}${entry.body}`, { contain: true }) >= 0.5) return r;
+  }
+  return null;
+}
+
+export const isRepeat = (recent, entry, now = Date.now(), windowMs) => Boolean(findRepeat(recent, entry, now, windowMs));
+
+/** 같은 알림을 두 번 읽었을 때 나중 것으로 바꿀까: 앞의 것은 그림 글자 인식, 나중 것은 글 그대로 읽은 것이면 (틀린 글자가 없다) */
+export const betterReading = (prev, next) => prev?.via === 'ocr' && Boolean(next?.via) && next.via !== 'ocr';
 
 // ---------- 카카오톡 PC 알림 창: 글자 인식 결과를 자리로 나누기 ----------
 // 알림 창 모양 (위에서부터, 단위 = 100% 배율 화면 px):

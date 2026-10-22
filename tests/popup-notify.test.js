@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { popupToEntry, popupAppName, isRepeat, kakaoEntry, correctTitle, knownNames, splitTitle } from '../app/js/core/popup-notify.js';
+import { popupToEntry, popupAppName, isRepeat, findRepeat, betterReading, similarity, kakaoEntry, correctTitle, knownNames, splitTitle } from '../app/js/core/popup-notify.js';
 
 test('팝업 글: 첫 줄은 보낸 사람(제목), 나머지는 내용', () => {
   assert.deepEqual(popupToEntry(['김대리', '회의 자료 보냈어요', '내일 봬요']), { title: '김대리', body: '회의 자료 보냈어요\n내일 봬요' });
@@ -56,6 +56,26 @@ test('같은 알림 창을 방금 읽었으면 바로 읽은 글과 글자 인�
   assert.equal(isRepeat(recent, { app: '카카오톡', hwnd: 8, title: '김대리 (영업팀)', body: '회의 자료 보냈어요' }, now), false);
   assert.equal(isRepeat(recent, { app: '카카오톡', hwnd: 7, title: '김대리 (영업팀)', body: '회의 자료 보냈어요' }, now + 20_000), false);
   assert.equal(isRepeat(recent, { app: '카카오톡', hwnd: 7, title: '김대리', body: '내일 봬요' }, now), false);
+});
+
+test('같은 알림을 두 길로 읽어 글자가 몇 개 틀려도 한 번만 (글자 인식 오타 · 다시 그려진 창)', () => {
+  const now = Date.now();
+  // 같은 창: 글 그대로 읽은 것 → 몇 초 뒤 글자 인식으로 한두 글자 틀리게
+  const recent = [{ app: '카카오톡', hwnd: 7, title: '박지민', body: '혹시 오늘 저녁도 어제와 같아도 괜찮겠니', via: 'uia', at: now - 3000 }];
+  assert.ok(findRepeat(recent, { app: '카카오톡', hwnd: 7, title: '박지민', body: '흑시 오늘 저녁도 어제와 같아도 괜찮겠나' }, now));
+  // 창이 새로 떠도(다른 hwnd) 2분 안에 제목 · 내용이 거의 같으면
+  assert.ok(findRepeat(recent, { app: '카카오톡', hwnd: 9, title: '박지민', body: '혹시 오늘 저녁도 어제와 같아도 괜잖겠니' }, now));
+  // 같은 사람의 다른 메시지는 새 알림
+  assert.equal(findRepeat(recent, { app: '카카오톡', hwnd: 9, title: '박지민', body: '내일 회의 10시로 바뀌었어요' }, now), null);
+  assert.equal(findRepeat(recent, { app: '카카오톡', hwnd: 7, title: '박지민', body: '사진을 보냈습니다' }, now), null);
+  assert.ok(similarity('괜찮겠니', '괜찮겠니') === 1 && similarity('김대리', '김대리 (영업팀)') < 0.8 && similarity('김대리', '김대리 (영업팀)', { contain: true }) === 1);
+});
+
+test('같은 알림을 다시 읽었을 때: 앞의 것이 글자 인식이고 이번이 글 그대로면 이번 것으로 바꾼다', () => {
+  assert.equal(betterReading({ via: 'ocr' }, { via: 'uia' }), true);
+  assert.equal(betterReading({ via: 'uia' }, { via: 'ocr' }), false);
+  assert.equal(betterReading({ via: 'ocr' }, { via: 'ocr' }), false);
+  assert.equal(betterReading({ via: 'msaa' }, { via: 'uia' }), false);
 });
 
 // 카카오톡 알림 창 (폭 340 · 높이 110, 100% 배율 px)

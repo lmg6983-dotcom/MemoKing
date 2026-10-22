@@ -1,5 +1,5 @@
 // Google Drive 동기화 관리 (데스크탑) — 메모 폴더(이 PC)를 고른 Drive 폴더와 맞춘다.
-// 언제: 켤 때, 메모를 고친 뒤 몇 초, 1분마다, 절전에서 깨어났을 때, "지금 동기화".
+// 언제: 켤 때, 메모를 고친 뒤 1초, 창을 다시 볼 때, 주기적으로 (pollDelay), 절전에서 깨어났을 때, "지금 동기화".
 // 기준 기록(state)은 이 PC 에만: %APPDATA%\MemoKing\drive\<Drive 폴더 id>.json
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -7,7 +7,9 @@ import path from 'node:path';
 import { SyncEngine, skipName, skipPath } from './sync-engine.js';
 import { UI } from '../../app/js/core/ui-text.js';
 
-const INTERVAL = 60_000;
+// 주기: 쉬는 중 1분 · 메모킹 창을 쓰는 중 10초 · 파일이 오간 뒤 2분은 5초 (휴대폰과 주고받는 중일 때 빨리)
+export const POLL = { idle: 60_000, active: 10_000, burst: 5_000, burstFor: 120_000, focusGap: 5_000 };
+export const pollDelay = ({ now, active, burstUntil }) => (now < burstUntil ? POLL.burst : active ? POLL.active : POLL.idle);
 export const DOUBLE_SYNC = '메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). '
   + '설정의 Google Drive 동기화에서 "다른 폴더로 바꾸기"로 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요';
 // 진행 상황은 이만큼마다 한 번만 알린다 (파일마다 창에 보내면 목록이 바빠진다)
@@ -29,6 +31,9 @@ export class DriveSync extends EventEmitter {
     this.pending = null;
     this.running = null;
     this.again = false;
+    this.isActive = () => false; // 메모킹 창을 쓰고 있나 (main.js 가 채운다)
+    this.burstUntil = 0;
+    this.lastFocus = 0;
   }
 
   get active() {
@@ -49,7 +54,7 @@ export class DriveSync extends EventEmitter {
   /** 맞출 Drive 폴더와 이 PC 의 메모 폴더 (null 이면 끔) */
   configure(config) {
     this.config = config?.folderId && config?.root ? config : null;
-    clearInterval(this.timer);
+    clearTimeout(this.timer);
     this.timer = null;
     if (!this.active) {
       this.publish({ state: 'off', error: '' });
@@ -61,8 +66,27 @@ export class DriveSync extends EventEmitter {
       this.publish({ state: 'error', error: DOUBLE_SYNC });
       return;
     }
-    this.timer = setInterval(() => this.request(), INTERVAL);
+    this.schedule();
+  }
+
+  /** 다음 주기 동기화를 다시 잡는다 (지금 상태에 맞는 간격으로) */
+  schedule() {
+    clearTimeout(this.timer);
+    if (!this.active || this.blocked) return;
+    this.timer = setTimeout(() => {
+      this.schedule();
+      this.request();
+    }, pollDelay({ now: Date.now(), active: this.isActive(), burstUntil: this.burstUntil }));
     this.timer.unref?.();
+  }
+
+  /** 메모킹 창을 다시 볼 때 — 바로 맞춘다 (창을 오가며 여러 번 눌러도 5초에 한 번) */
+  focused() {
+    const now = Date.now();
+    if (now - this.lastFocus < POLL.focusGap) return;
+    this.lastFocus = now;
+    this.request(300);
+    this.schedule();
   }
 
   publish(patch) {
@@ -96,6 +120,7 @@ export class DriveSync extends EventEmitter {
     }
     this.running = this.runOnce({ full }).finally(() => {
       this.running = null;
+      this.schedule();
       if (this.again) {
         this.again = false;
         this.request(500);
@@ -148,6 +173,7 @@ export class DriveSync extends EventEmitter {
       fs.mkdirSync(root, { recursive: true });
       const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state, onProgress }).run({ full });
       save();
+      if (result.uploaded + result.downloaded + result.deletedLocal + result.deletedRemote > 0) this.burstUntil = Date.now() + POLL.burstFor;
       if (!this.auth.email) this.api.about().then((email) => email && this.auth.setEmail(email)).catch(() => {});
       this.publish({ state: 'idle', lastSync: Date.now(), error: '', changed: result.localChanged, conflicts: result.conflicts, progress: null,
         moved: result.uploaded + result.downloaded + result.deletedLocal + result.deletedRemote }); // moved: 이번에 맞춘 파일 수
@@ -161,7 +187,7 @@ export class DriveSync extends EventEmitter {
   }
 
   stop() {
-    clearInterval(this.timer);
+    clearTimeout(this.timer);
     clearTimeout(this.pending);
     this.timer = null;
   }

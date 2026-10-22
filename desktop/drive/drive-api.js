@@ -166,25 +166,33 @@ export class DriveApi {
     await this.json('PATCH', `${API}/files/${encodeURIComponent(id)}?fields=id`, { trashed: true });
   }
 
+  /**
+   * 지난 토큰 이후 이 메모 폴더 안에서 바뀐 것 — items: 바뀐 파일 · 폴더 (동기화가 Drive 폴더를 다 훑지 않고 이것만 반영)
+   *   새로 생긴 폴더 안의 것도 담기게, 알고 있는 폴더에 새로 든 폴더는 바로 아는 것으로 친다
+   */
   async changesSince(token, knownIds) {
-    if (!token) return { changed: true, token: (await this.request('GET', `${API}/changes/startPageToken`)).startPageToken };
+    if (!token) return { changed: true, token: (await this.request('GET', `${API}/changes/startPageToken`)).startPageToken, items: null };
+    const known = new Set(knownIds);
+    const items = [];
     let page = token;
-    let changed = false;
     for (;;) {
       const params = new URLSearchParams({
         pageToken: page, pageSize: '1000', spaces: 'drive', includeRemoved: 'true', restrictToMyDrive: 'true',
-        fields: 'nextPageToken,newStartPageToken,changes(fileId,removed,file(parents,trashed))',
+        fields: `nextPageToken,newStartPageToken,changes(fileId,removed,file(${FIELDS},parents,trashed))`,
       });
       const res = await this.request('GET', `${API}/changes?${params}`);
       // 이 메모 폴더 안의 것(알고 있는 파일, 또는 알고 있는 폴더에 든 것)만 따진다
       for (const c of res.changes ?? []) {
-        if (knownIds.has(c.fileId) || (c.file?.parents ?? []).some((p) => knownIds.has(p))) changed = true;
+        const parents = c.file?.parents ?? [];
+        if (!known.has(c.fileId) && !parents.some((p) => known.has(p))) continue;
+        if (c.file?.mimeType === FOLDER) known.add(c.fileId);
+        items.push({ id: c.fileId, removed: Boolean(c.removed || c.file?.trashed), parents, item: c.file ? item({ ...c.file, id: c.fileId }) : null });
       }
       if (res.nextPageToken) {
         page = res.nextPageToken;
         continue;
       }
-      return { changed, token: res.newStartPageToken ?? page };
+      return { changed: items.length > 0, token: res.newStartPageToken ?? page, items };
     }
   }
 }

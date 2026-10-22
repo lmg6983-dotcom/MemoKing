@@ -13,13 +13,17 @@ export const MAGIC_MODULES = [
   { id: 'opms', name: 'OPMS 검색', chip: 'OPMS', description: '관리번호나 출원번호를 쓰면 회사 OPMS 사건을 찾아 서지정보, 전자포대, 청구서를 봐요 (사내망에서만)', ready: true, defaultOn: true },
 ];
 
+// 처음 캡슐 · 결과 묶음 순서 — 관리번호를 쓰면 OPMS 사건이 새 메모 바로 아래 (전에 늘 그랬듯)
+export const DEFAULT_ORDER = ['memo', 'opms', 'notes', 'files', 'calc', 'web', 'ai'];
+
 /**
  * 저장된 설정 → 쓸 수 있는 설정. 모르는 모듈은 버리고, 준비 중인 모듈은 늘 꺼 둔다.
  *   modules: 설정 창에서 켠 기능 (꺼 두면 매직키 창에 아예 나오지 않음)
  *   paused: 매직키 창 아래 캡슐로 잠깐 끈 기능 (설정에서 켠 것만, 다시 누르면 켜짐)
  *   engine: 웹 검색 기본 사이트, ai: AI 에게 묻기 기본 사이트 (Enter 로 열리는 것)
+ *   order: 캡슐 · 결과 묶음 순서 (매직키 창에서 캡슐을 끌어 바꿈, 처음 보는 기능은 뒤에)
  * @param {any} raw
- * @returns {{ enabled: boolean, modules: Record<string, boolean>, paused: Record<string, boolean>, engine: string, ai: string, known: string[] }}
+ * @returns {{ enabled: boolean, modules: Record<string, boolean>, paused: Record<string, boolean>, engine: string, ai: string, known: string[], order: string[] }}
  */
 export function normalizeMagicSettings(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
@@ -38,13 +42,22 @@ export function normalizeMagicSettings(raw) {
     enabled: typeof src.enabled === 'boolean' ? src.enabled : true, modules, paused,
     engine: pickId(WEB_ENGINES, src.engine), ai: pickId(AI_SITES, src.ai),
     known: MAGIC_MODULES.filter((m) => m.ready).map((m) => m.id),
+    order: [...new Set([...(Array.isArray(src.order) ? src.order : []), ...DEFAULT_ORDER, ...MAGIC_MODULES.map((m) => m.id)])].filter((id) => MAGIC_MODULES.some((m) => m.id === id)),
   };
+}
+
+const inOrder = (s) => s.order.map((id) => MAGIC_MODULES.find((m) => m.id === id));
+
+/** 캡슐을 끌어 놓은 순서 ids (보이는 캡슐만) — 안 보이는 기능은 그 뒤에 원래 순서대로 */
+export function reorderMagicChips(settings, ids) {
+  const s = normalizeMagicSettings(settings);
+  return normalizeMagicSettings({ ...s, order: [...(Array.isArray(ids) ? ids : []), ...s.order] });
 }
 
 /** 매직키 창 아래 캡슐에 보일 기능: 설정에서 켠 것만 (켜짐 = 잠깐 끄지 않았음) */
 export const magicChips = (settings) => {
   const s = normalizeMagicSettings(settings);
-  return s.enabled ? MAGIC_MODULES.filter((m) => m.ready && s.modules[m.id]).map((m) => ({ ...m, on: !s.paused[m.id] })) : [];
+  return s.enabled ? inOrder(s).filter((m) => m.ready && s.modules[m.id]).map((m) => ({ ...m, on: !s.paused[m.id] })) : [];
 };
 
 /** 매직키 창에서 잠깐 끄고 켜기 — 설정에서 꺼 둔 기능은 그대로(켜지지 않음) */
@@ -60,7 +73,7 @@ export function toggleMagicChip(settings, id) {
 // 지금 쓰는 모듈들: 설정에서 켜고, 매직키 창에서 잠깐 끄지 않은 것 (표시 순서대로)
 export const activeModules = (settings) => {
   const s = normalizeMagicSettings(settings);
-  return s.enabled ? MAGIC_MODULES.filter((m) => m.ready && s.modules[m.id] && !s.paused[m.id]) : [];
+  return s.enabled ? inOrder(s).filter((m) => m.ready && s.modules[m.id] && !s.paused[m.id]) : [];
 };
 
 // 매직키 입력 → 메모 본문. 앞뒤 빈 줄은 빼고, 줄바꿈은 그대로 (첫 줄이 메모 제목이 된다)

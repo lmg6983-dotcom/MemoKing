@@ -21,8 +21,14 @@ interface Remote {
     fun createFolder(parentId: String, name: String): Item
     fun trash(id: String)
 
-    /** 지난 토큰 이후 바뀐 것이 있는가 (knownIds 에 든 파일·폴더만 따진다). 새 토큰을 돌려준다 */
-    fun changesSince(token: String?, knownIds: Set<String>): Pair<Boolean, String>
+    /** 바뀐 파일 · 폴더 하나 (removed: 지웠거나 휴지통) */
+    data class Change(val id: String, val removed: Boolean, val parents: List<String>, val item: Item?)
+
+    /** items: 바뀐 것 (null 이면 모름 — 동기화가 Drive 폴더를 다 훑는다) */
+    data class Changes(val changed: Boolean, val token: String, val items: List<Change>? = null)
+
+    /** 지난 토큰 이후 이 메모 폴더 안에서 바뀐 것 (knownIds 에 든 파일 · 폴더와 그 안의 것만). 새 토큰도 돌려준다 */
+    fun changesSince(token: String?, knownIds: Set<String>): Changes
 }
 
 /**
@@ -133,6 +139,65 @@ class SyncEngine(
         return out
     }
 
+    /**
+     * Drive 폴더를 다 훑지 않고: 지난번 동기화 때의 모습(기준) + 그 뒤 바뀐 것으로 지금 Drive 모습을 만든다 (PC sync-engine.js 와 같음).
+     *   이름 바꾸기 · 옮기기 · 폴더 지우기처럼 기준만으로 어디인지 모르는 것이 섞이면 null (다 훑는다)
+     */
+    private fun remoteFromChanges(items: List<Remote.Change>): Map<String, Remote.Item>? {
+        val folders = HashMap<String, String>()
+        state.optJSONObject("folders")?.let { f -> for (k in f.keys()) folders[k] = f.optString(k) }
+        folders[""] = rootId
+        val relOfFolder = HashMap<String, String>().apply { for ((rel, id) in folders) put(id, rel) }
+        val out = HashMap<String, Remote.Item>()
+        val relOfFile = HashMap<String, String>()
+        for (rel in files.keys()) {
+            val b = base(rel) ?: continue
+            out[rel] = Remote.Item(b.id, rel.substringAfterLast('/'), false, b.md5, 0, 0)
+            relOfFile[b.id] = rel
+        }
+        fun placed(c: Remote.Change): String? {
+            val dir = c.parents.firstNotNullOfOrNull { relOfFolder[it] } ?: return null
+            return if (dir.isEmpty()) c.item!!.name else "$dir/${c.item!!.name}"
+        }
+        // 폴더 먼저 — 새 폴더 안에 새 폴더가 들 수 있어, 놓을 수 있는 것이 없어질 때까지 되풀이
+        var pending = items.filter { it.item?.folder == true || it.id in relOfFolder }
+        while (pending.isNotEmpty()) {
+            val left = ArrayList<Remote.Change>()
+            for (c in pending) {
+                val was = relOfFolder[c.id]
+                if (c.removed) {
+                    if (was != null) return null // 알던 폴더를 지움 — 그 안의 파일을 다 따지려면 훑는다
+                    continue
+                }
+                val rel = placed(c)
+                when {
+                    rel == null -> left.add(c)
+                    was != null && was != rel -> return null // 폴더 이름 바꾸기 · 옮기기
+                    else -> { folders[rel] = c.id; relOfFolder[c.id] = rel }
+                }
+            }
+            if (left.size == pending.size) return null // 어디에 놓을지 모르는 폴더
+            pending = left
+        }
+        for (c in items) {
+            if (c.item?.folder == true || c.id in relOfFolder) continue
+            val was = relOfFile[c.id]
+            if (c.removed) {
+                if (was != null && out[was]?.id == c.id) out.remove(was)
+                continue
+            }
+            val rel = placed(c) ?: return null // 기준에 없는 곳
+            if (was != null && was != rel) return null // 이름 바꾸기 · 옮기기
+            val item = c.item ?: continue
+            if (skipPath(rel) || item.md5 == null) continue // md5 가 없는 것은 구글 문서 같은 Drive 전용 파일
+            out[rel] = item
+            relOfFile[c.id] = rel
+        }
+        folderIds.clear()
+        folderIds.putAll(folders)
+        return out
+    }
+
     private fun ensureRemoteFolder(dir: String): String {
         folderIds[dir]?.let { return it }
         val parent = ensureRemoteFolder(dir.substringBeforeLast('/', ""))
@@ -153,14 +218,20 @@ class SyncEngine(
         }
         val knownIds = known.mapNotNull { files.optJSONObject(it)?.optString("id") }.toSet() +
             (state.optJSONObject("folders")?.let { f -> f.keys().asSequence().map { f.optString(it) }.toSet() } ?: emptySet()) + rootId
-        val (remoteDirty, token) = remote.changesSince(state.optString("pageToken").ifEmpty { null }, knownIds)
+        val (remoteDirty, token, items) = remote.changesSince(state.optString("pageToken").ifEmpty { null }, knownIds)
         val scanDue = full || now() - state.optLong("lastFullScan", 0L) >= FULL_SCAN_MS
         if (!localDirty && !remoteDirty && !scanDue) {
             state.put("pageToken", token)
             return Result(skipped = true)
         }
 
-        val remoteFiles = walkRemote()
+        // Drive 폴더를 다 훑는 것은 15분에 한 번 · "지금 동기화" 때만 — 평소에는 기준 + 바뀐 것 (메모마다 이전 버전 폴더가 있어 다 훑으면 요청이 수백 번)
+        val quick = when {
+            scanDue -> null
+            !remoteDirty -> remoteFromChanges(emptyList())
+            else -> items?.let(::remoteFromChanges)
+        }
+        val remoteFiles = quick ?: walkRemote()
         val paths = (localFiles.keys + remoteFiles.keys + known).toSortedSet()
 
         // 한쪽에서 한꺼번에 많이 사라졌으면 멈춘다
@@ -315,7 +386,7 @@ class SyncEngine(
 
         state.put("pageToken", token)
         state.remove("keepMissing") // 다 올렸으면 다음부터는 보통대로
-        state.put("lastFullScan", now())
+        if (quick == null) state.put("lastFullScan", now())
         state.put("folders", JSONObject(folderIds.toMap()))
         return Result(uploaded, downloaded, deletedLocal, deletedRemote, conflicts)
     }

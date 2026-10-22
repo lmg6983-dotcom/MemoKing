@@ -458,7 +458,7 @@ object Widgets {
             val stamped = stampEdit(next, nowIso())
             storage.write(file) { it.write(stamped.toByteArray(Charsets.UTF_8)) }
         }
-        DriveSync.request(ctx, 3000)
+        DriveSync.request(ctx, 1000)
         // 위젯도 바로 그 모양으로 — 파일에서 글로 찾아 고쳤으면 위젯에서도 같은 글의 줄을 (번호가 아니라)
         val lines = memo.optJSONArray("lines") ?: JSONArray()
         val shown = taskText?.trim()

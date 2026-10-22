@@ -107,7 +107,7 @@ class Bridge(private val activity: MainActivity) {
 
     // 메모 폴더를 고쳤으면 잠시 뒤 Google Drive 와 맞춘다 (Drive 폴더를 쓸 때만)
     private fun <T> changed(value: T): T {
-        if (Vaults.sandbox == null) DriveSync.request(ctx, 3000) // 연습 공간은 동기화하지 않는다
+        if (Vaults.sandbox == null) DriveSync.request(ctx, 1000) // 연습 공간은 동기화하지 않는다
         return value
     }
 
