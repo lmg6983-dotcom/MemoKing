@@ -1591,9 +1591,11 @@ export class WindowManager {
     return this.ocrReady;
   }
 
-  async runOcr(imagePath, unit) {
+  /** @param {{ raw?: string, scale?: number }} [o] raw: 원래 크기(불투명) 그림 — 있으면 헷갈리는 한글을 같은 글꼴로 견줘 다듬는다 */
+  async runOcr(imagePath, unit, { raw = '', scale = 1 } = {}) {
     await this.ensureOcrWindow();
     const dataUrl = `data:image/png;base64,${fs.readFileSync(imagePath).toString('base64')}`;
+    const rawUrl = raw && fs.existsSync(raw) ? `data:image/png;base64,${fs.readFileSync(raw).toString('base64')}` : '';
     const id = ++this.ocrSeq;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -1601,7 +1603,7 @@ export class WindowManager {
         reject(new Error('OCR 시간 초과'));
       }, 30000);
       this.ocrPending.set(id, { resolve, timer });
-      this.ocrWin.webContents.send('ocr:request', { id, dataUrl, unit: unit || 1 });
+      this.ocrWin.webContents.send('ocr:request', { id, dataUrl, unit: unit || 1, rawUrl, scale });
     }).then((data) => {
       if (data.error) throw new Error(data.error);
       return data;

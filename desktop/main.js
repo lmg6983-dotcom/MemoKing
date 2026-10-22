@@ -437,7 +437,7 @@ function createPopupWatcher(options = {}) {
   const watcher = new PopupWatcher({
     script: POPUP_HELPER,
     dir: path.join(os.tmpdir(), 'memoking-popups'),
-    log: path.join(app.getPath('userData'), 'popup-debug.log'),
+    log: POPUP_LOG(),
     processes: Object.keys(POPUP_APPS),
     ...options,
   });
@@ -451,8 +451,9 @@ async function addPopupToHistory(p) {
     const appName = popupAppName(p.process);
     if (p.via === 'ocr' && p.ocrImage && fs.existsSync(p.ocrImage)) {
       try {
-        const r = await windowManager.runOcr(p.ocrImage, p.ocrUnit);
+        const r = await windowManager.runOcr(p.ocrImage, p.ocrUnit, { raw: p.verifyImage, scale: p.scale });
         if (r.boxes?.length) { p.boxes = r.boxes; p.lines = r.lines; }
+        if (r.refine) logPopup({ time: new Date().toISOString(), refine: r.refine, lines: r.lines });
       } catch (err) {
         console.warn('[한글 OCR]', err.message);
       }
@@ -471,7 +472,14 @@ async function addPopupToHistory(p) {
   } finally {
     if (p.image) fs.rm(p.image, { force: true }, () => {});
     if (p.ocrImage) fs.rm(p.ocrImage, { force: true }, () => {});
+    if (p.verifyImage) fs.rm(p.verifyImage, { force: true }, () => {});
   }
+}
+
+// 알림 창을 어떻게 읽었는지 적는 진단 기록 (팝업 도우미와 같은 파일, 한 줄에 하나)
+const POPUP_LOG = () => path.join(app.getPath('userData'), 'popup-debug.log');
+function logPopup(entry) {
+  fs.appendFile(POPUP_LOG(), `${JSON.stringify(entry)}\n`, () => {});
 }
 
 function syncPopupWatch() {

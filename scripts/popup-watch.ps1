@@ -134,6 +134,22 @@ public static class MkPopup {
     return big;
   }
 
+  // 원래 크기 그대로 불투명하게만 (글자 다듬기에서 같은 글꼴로 그린 글과 견줄 그림)
+  public static Bitmap Opaque(Bitmap src) {
+    var opaque = new Bitmap(src.Width, src.Height, PixelFormat.Format32bppArgb);
+    var rect = new Rectangle(0, 0, src.Width, src.Height);
+    var from = src.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+    var to = opaque.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+    try {
+      int bytes = Math.Abs(from.Stride) * src.Height;
+      var buf = new byte[bytes];
+      Marshal.Copy(from.Scan0, buf, 0, bytes);
+      for (int i = 3; i < bytes; i += 4) buf[i] = 255;
+      Marshal.Copy(buf, 0, to.Scan0, bytes);
+    } finally { src.UnlockBits(from); opaque.UnlockBits(to); }
+    return opaque;
+  }
+
   static int Lum(byte[] buf, int o) { return (buf[o + 2] * 299 + buf[o + 1] * 587 + buf[o] * 114) / 1000; } // BGRA
 
   // 가장 많은 밝기 = 바탕 (4 단계씩 묶어서)
@@ -462,6 +478,7 @@ while ($true) {
           #    이 그림은 메모킹(Node)이 한글에 강한 tesseract.js 로 다시 읽는 데 쓴다. Windows 기본 OCR 은 보조로만.
           $boxes = @()
           $ocrPng = ''
+          $verifyPng = ''
           $ocrUnit = 1.0
           $factor = [Math]::Max(1.0, [Math]::Min(3.0 / $w.Scale, 2200.0 / [Math]::Max($w.W, $w.H)))
           try {
@@ -470,6 +487,10 @@ while ($true) {
             $big.Save($ocrPng, [System.Drawing.Imaging.ImageFormat]::Png)
             $ocrUnit = $factor * $w.Scale
             $big.Dispose()
+            $verifyPng = "$png.raw.png"
+            $raw = [MkPopup]::Opaque($bmp)
+            $raw.Save($verifyPng, [System.Drawing.Imaging.ImageFormat]::Png)
+            $raw.Dispose()
             if ($ocr) {
               $capped = [Math]::Min($factor, ([Windows.Media.Ocr.OcrEngine]::MaxImageDimension - 1) / [Math]::Max($w.W, $w.H))
               if ([Math]::Abs($capped - $factor) -lt 0.01) { $boxes = @(Read-Ocr $ocrPng $ocrUnit) }
@@ -485,12 +506,12 @@ while ($true) {
           $key = ($lines -join "`n")
           # via 가 'ocr' 이면 Node 가 ocrImage 를 한글 OCR 로 다시 읽으므로, 바로 읽은 글만으로 중복 판단하지 않는다
           $dedupeKey = $(if ($via -eq 'ocr') { "ocr:$($w.Hwnd):$fp" } else { $key })
-          if ((-not $key -and $via -ne 'ocr') -or $dedupeKey -eq $s.sent) { Remove-Item $png, $ocrPng -ErrorAction SilentlyContinue; continue }
+          if ((-not $key -and $via -ne 'ocr') -or $dedupeKey -eq $s.sent) { @($png, $ocrPng, $verifyPng) | Where-Object { $_ } | Remove-Item -ErrorAction SilentlyContinue; continue }
           $s.sent = $dedupeKey
           $proc = (Get-Process -Id $w.Pid -ErrorAction SilentlyContinue).ProcessName
           $msg = [ordered]@{ process = $proc; pid = $w.Pid; hwnd = $w.Hwnd; windowTitle = $w.Title; lines = @($lines); via = $via; image = $png; size = $size }
-          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes); $msg['ocrImage'] = $ocrPng; $msg['ocrUnit'] = [Math]::Round($ocrUnit, 4) }
-          else { Remove-Item $ocrPng -ErrorAction SilentlyContinue }
+          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes); $msg['ocrImage'] = $ocrPng; $msg['ocrUnit'] = [Math]::Round($ocrUnit, 4); $msg['verifyImage'] = $verifyPng; $msg['scale'] = $w.Scale }
+          else { @($ocrPng, $verifyPng) | Where-Object { $_ } | Remove-Item -ErrorAction SilentlyContinue }
           [Console]::Out.WriteLine(($msg | ConvertTo-Json -Compress -Depth 4))
           [Console]::Out.Flush()
         } finally { $bmp.Dispose() }
