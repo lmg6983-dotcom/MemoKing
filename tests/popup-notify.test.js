@@ -95,3 +95,10 @@ test('카카오톡: 읽은 것이 없으면 null', () => {
   assert.equal(kakaoEntry([box('0', 290, 10), box('카카오톡', 70, 12)], SIZE), null);
   assert.equal(kakaoEntry(undefined), null);
 });
+
+test('카카오톡: 맨 위 채팅방 줄을 지우고 읽었으면(roomCut) 첫 줄이 보낸 사람, 나머지가 메시지', () => {
+  const boxes = [box('우리 여보', 64, 32, 13), box('혹시 오늘 저녁도 괜찮겠니', 64, 54, 12), box('메시지 입력', 20, 104, 12)];
+  assert.deepEqual(kakaoEntry(boxes, { width: 330, height: 140, appName: '카카오톡', roomCut: true }), { title: '우리 여보', body: '혹시 오늘 저녁도 괜찮겠니' });
+  // 지우지 못했으면(프로필을 못 찾음) 예전처럼 맨 위 줄을 채팅방으로
+  assert.equal(kakaoEntry(boxes, { width: 330, height: 140, appName: '카카오톡' }).title, '혹시 오늘 저녁도 괜찮겠니 (우리 여보)');
+});

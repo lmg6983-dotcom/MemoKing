@@ -72,10 +72,11 @@ function usable(text) {
 /**
  * 글자 인식 결과(줄마다 글과 자리) → { title, body }
  * @param {{ text: string, x: number, y: number, w?: number, h?: number }[]} boxes 알림 창 왼쪽 위 기준 (100% 배율 px)
- * @param {{ width?: number, height?: number, appName?: string }} [size] 알림 창 크기 (100% 배율 px)
+ * @param {{ width?: number, height?: number, appName?: string, roomCut?: boolean }} [size] 알림 창 크기 (100% 배율 px).
+ *   roomCut: 글자 인식 전에 맨 위 작은 줄(채팅방 이름)을 지웠다 → 남은 첫 줄이 보낸 사람, 나머지는 메시지
  * @returns {{ title: string, body: string } | null}
  */
-export function kakaoEntry(boxes, { width = 0, height = 0, appName = '' } = {}) {
+export function kakaoEntry(boxes, { width = 0, height = 0, appName = '', roomCut = false } = {}) {
   const items = [];
   for (const b of [].concat(boxes ?? [])) {
     const text = String(b?.text ?? '').replace(/\s+/g, ' ').trim();
@@ -100,7 +101,9 @@ export function kakaoEntry(boxes, { width = 0, height = 0, appName = '' } = {}) 
   let room;
   let sender;
   let body;
-  if (lines.length === 1) {
+  if (roomCut) {
+    [room, sender, body] = [lines[0].text, lines[0].text, lines.slice(1).map((l) => l.text)];
+  } else if (lines.length === 1) {
     [room, sender, body] = [lines[0].text, lines[0].text, []];
   } else if (lines[1].y >= KAKAO_BODY_Y || lines[0].text === lines[1].text) {
     // 윗줄 하나 + 메시지 (1:1 대화에서 보낸 사람 줄이 따로 없거나 같은 글로 두 번 읽힌 경우)

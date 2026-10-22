@@ -161,7 +161,7 @@ const PASTE_FILE = `(() => {
 })()`;
 
 export async function runSmoke({
-  getList, noteWins, getVault, createListWindow, getGhost, getTray, getTrayMenu, alarms, smokeToasts, getHistory, appSettings,
+  getList, noteWins, getVault, createListWindow, getGhost, getTray, getTrayMenu, alarms, smokeToasts, getHistory, historyToMemo, appSettings,
   quickMemo, registerQuickMemoKey, getCapturePoint, smokeOpened = [], smokeConfirmAnswers = [],
   getStacks, trackWindowDrag, endWindowDrag, startTutorial, getTutorial, stickers, getSettings,
 }) {
@@ -1582,6 +1582,14 @@ export async function runSmoke({
     const notiMd = readMemo(memoFromNoti.id);
     check('보관한 알림 → 메모로 만들기', notiMd.includes('# 김대리') && notiMd.includes('회의 자료 보냈어요') && /알림, /.test(notiMd));
     await closeNote(memoFromNoti.id);
+    // 그림이 있는 알림(카카오톡 알림 창 사진)으로 만든 메모에는 그 그림도 첨부로
+    const picEntry = history.add({ source: 'popup', appId: 'KakaoTalk', app: '카카오톡', title: '우리 여보', body: '저녁 같이 먹자', image: history.keepImage(ICON_PNG), via: 'ocr' });
+    const picMemo = await newNote(() => historyToMemo(picEntry.id));
+    const picMd = readMemo(picMemo.id);
+    const picRel = /!\[\]\((attachments\/[^)]+)\)/.exec(picMd)?.[1];
+    check('그림이 있는 알림 → 메모로 만들기: 그림도 첨부로', Boolean(picRel) && fs.existsSync(path.join(VAULT, picRel)) && picMd.includes('저녁 같이 먹자'), picMd);
+    await closeNote(picMemo.id);
+    history.remove(picEntry.id);
     // 알림 하나 지우기: 그 자리에 되돌리기 5초 → 되돌리면 그대로, 기다리면 지워짐
     await listJs(`document.querySelector('#history-rows .noti [aria-label="알림 보관함에서 삭제"]').click()`);
     await wait(300);

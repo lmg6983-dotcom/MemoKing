@@ -459,7 +459,7 @@ async function addPopupToHistory(p) {
       }
     }
     const byLayout = p.process === 'KakaoTalk' && p.via === 'ocr' && Array.isArray(p.boxes)
-      ? kakaoEntry(p.boxes, { width: p.size?.w, height: p.size?.h, appName })
+      ? kakaoEntry(p.boxes, { width: p.size?.w, height: p.size?.h, appName, roomCut: p.roomCut === true })
       : null;
     const entry = byLayout ?? popupToEntry(p.lines, { appName });
     if (!entry || !history) return;
@@ -533,10 +533,25 @@ function historyToMemo(entryId) {
   const e = history?.get(entryId);
   if (!e || !vault) return null;
   const when = new Date(e.time).toLocaleString('ko-KR');
-  const body = `# ${e.title || e.app}\n\n${e.body ? `${e.body}\n\n` : ''}> ${e.app} 알림, ${when}`;
+  const pic = historyPicture(e);
+  const body = `# ${e.title || e.app}\n\n${e.body ? `${e.body}\n\n` : ''}${pic ? `![](${pic})\n\n` : ''}> ${e.app} 알림, ${when}`;
   const id = vault.import({ body });
   windowManager.openNote(id);
   return id;
+}
+
+// 알림의 그림을 메모 첨부로: 팝업 알림(카카오톡 등)은 알림 창 사진, Windows 알림은 들어 있는 그림.
+//   Windows 알림의 작은 앱 아이콘(100px 아래)은 넣지 않는다
+function historyPicture(e) {
+  const file = e.image ? history.resolveImage(e.image) : null;
+  if (!file) return null;
+  try {
+    if (e.source !== 'popup' && nativeImage.createFromPath(file).getSize().width < 100) return null;
+    return vault.saveAttachment(fs.readFileSync(file), path.extname(file).slice(1) || 'png');
+  } catch (err) {
+    console.warn('[알림 → 메모] 그림', err.message);
+    return null;
+  }
 }
 
 // ---------- Google Drive 직접 동기화 ----------
@@ -1257,6 +1272,7 @@ app.whenReady().then(async () => {
       alarms,
       smokeToasts,
       getHistory: () => history,
+      historyToMemo,
       appSettings: () => appSettings(vault, fileIndex, shortcutStatus, shortcutLabel),
       quickMemo: (opts) => windowManager.quickMemo(opts),
       registerQuickMemoKey,

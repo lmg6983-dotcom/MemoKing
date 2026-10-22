@@ -16,6 +16,7 @@ export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
   // 화면 밖에 그려 둔다 (글꼴·크기 계산은 실제 화면과 같게)
   paper.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${WIDTH}px;`;
   const doc = source.cloneNode(true);
+  inlineShownImages(source, doc);
   doc.removeAttribute('contenteditable');
   doc.classList.remove('ProseMirror-focused');
   doc.style.setProperty('--note-zoom', '1');
@@ -54,12 +55,42 @@ export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
       fontEmbedCSS: fontCss,
       cacheBust: false,
       skipAutoScale: true,
+      // 그림 하나를 못 그려도 메모 전체를 실패로 하지 않는다 (그 그림만 빈칸)
+      onImageErrorHandler: () => {},
       style: { position: 'static', left: '0', top: '0' },
     });
     const base64 = canvas.toDataURL('image/png').split(',')[1];
     if (!base64) throw new Error(UI.imageMakeFail);
     return base64;
+  } catch (err) {
+    // 그림 그리기 도구는 Error 가 아닌 것(불러오기 실패 Event 등)으로 거절하기도 한다 → 알아들을 수 있는 말로
+    if (err instanceof Error) throw err;
+    console.error('[그림으로 공유]', err);
+    throw new Error(UI.imageMakeFail);
   } finally {
     paper.remove();
   }
+}
+
+// 메모에 이미 보이는 그림은 그 모습 그대로 data: 로 바꿔 둔다 — 그림 그리기 도구가 주소로 다시 받아 오다
+//   실패하는 일이 없게 (휴대폰은 앱 안 주소라 다시 받기가 막히기도 한다). 못 바꾸면 원래 주소 그대로
+function inlineShownImages(source, clone) {
+  const shown = [...source.querySelectorAll('img')];
+  const copies = [...clone.querySelectorAll('img')];
+  shown.forEach((img, i) => {
+    const copy = copies[i];
+    if (!copy || !img.complete || !img.naturalWidth || img.src.startsWith('data:')) return;
+    try {
+      // 그림은 폭 640 × 2배로 찍히므로 큰 사진은 1600px 로 줄여 옮긴다 (휴대폰 메모리 · 시간)
+      const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * k);
+      c.height = Math.round(img.naturalHeight * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      copy.src = c.toDataURL(/\.jpe?g($|\?)/i.test(img.src) ? 'image/jpeg' : 'image/png', 0.92);
+      copy.removeAttribute('srcset');
+    } catch {
+      // 다른 곳 그림(인터넷 사진)은 캔버스에 옮길 수 없다 → 도구가 주소로 받아 본다
+    }
+  });
 }
