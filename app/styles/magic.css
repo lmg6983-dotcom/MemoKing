@@ -53,8 +53,10 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-section .count { padding: 0 6px; border-radius: 99px; background: rgba(0, 0, 0, 0.06); font-weight: 600; }
 .magic-row { position: relative; display: flex; align-items: center; gap: 11px; min-height: 38px; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
 /* 고른 줄 표시 하나가 줄 사이를 미끄러져 따라간다 (다시 그릴 때는 바로 그 자리에) */
-.magic-pill { position: absolute; top: 0; left: 8px; right: 8px; border-radius: 10px; background: var(--mk-sel); pointer-events: none; transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.12s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.magic-pill { position: absolute; top: 0; left: 8px; right: 8px; border-radius: 10px; background: var(--mk-sel); pointer-events: none; transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), height 0.18s cubic-bezier(0.22, 1, 0.36, 1); }
 .magic-pill.instant { transition: none; }
+/* 빠지는 줄: 그 자리에 잠깐 남아 흐려진다 */
+.magic-results > .ghost { position: absolute; left: 8px; right: 8px; margin: 0; pointer-events: none; z-index: 0; }
 .magic-row .ico { flex: none; width: 24px; height: 24px; display: grid; place-items: center; font-size: 15px; color: #555; }
 .magic-row .ico img { width: 22px; height: 22px; }
 .magic-row .dot { width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16); }
@@ -95,7 +97,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-chip:hover { border-color: rgba(0, 0, 0, 0.25); color: #333; }
 .magic-chip:active:not(.dragging) { transform: scale(0.95); }
 /* 끄는 캡슐은 살짝 들린다 */
-.magic-chip.dragging { position: relative; z-index: 1; transform: translateY(-2px) scale(1.07); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2); cursor: grabbing; }
+.magic-chip.dragging { position: relative; z-index: 2; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12); cursor: grabbing; transition: box-shadow 0.15s, background 0.15s; } /* 자리는 JS 가 손을 따라 옮긴다 */
 .magic-modules.sorting, .magic-modules.sorting .magic-chip { cursor: grabbing; }
 .magic-chip .chip-dot { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #b5b5b5; transition: background 0.15s, box-shadow 0.15s; }
 .magic-chip.on { border-color: transparent; background: #fff1b8; color: #111; }
