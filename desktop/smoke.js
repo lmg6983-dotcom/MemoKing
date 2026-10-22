@@ -1625,7 +1625,7 @@ export async function runSmoke({
       await capture(lw, 'smoke-settings-phone.png');
       await listJs(`document.querySelector('.phone-how').open = false`);
       const note = await until(() => listJs(`document.getElementById('phone-note').textContent`), '복사 안내', 2000).catch(() => '');
-      check('설정: 휴대폰 앱(안드로이드) 설치 QR 코드 · 링크 복사 안내 · 설치 방법', qr > 0 && /releases\/download\/android\/MemoKing-android\.apk$/.test(copied) && how === 5 && /복사했어요/.test(note), JSON.stringify({ qr, copied, how, note }));
+      check('설정: 휴대폰 앱(안드로이드) 설치 QR 코드 · 링크 복사 안내 · 설치 방법', qr > 0 && /releases\/download\/android\/MemoKing-android\.apk$/.test(copied) && how === 6 && /복사했어요/.test(note), JSON.stringify({ qr, copied, how, note }));
     }
     // 전역 단축키 바꾸기: 키 단추 → 새 조합을 누르면 저장(다른 앱이 쓰는 키면 그대로 두고 알림) · 같은 키는 거절 · 기본값으로
     {
