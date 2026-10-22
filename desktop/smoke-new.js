@@ -271,6 +271,14 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       extra?.pri?.head.join() === '우선국,우선권주장일,우선권번호,접근코드,접수일,제출마감일,제출일,비고' && extra.pri.row.slice(0, 3).join() === 'KR,2026-09-23,10-2026-0182644'
       && extra.memo?.head.join() === '구분,필독,고객명,작성일,말머리,메모' && extra.memo.row.slice(0, 4).join() === '고객,필독,메모킹 주식회사,2026-03-11' && extra.lines,
       JSON.stringify(extra));
+    // 서지사항 전체 복사 (메모로 만들기 옆)
+    clipboard.writeText('');
+    await js(ow, `document.getElementById('op-copy-biblio').click()`);
+    const biblio = await until(() => clipboard.readText(), '서지사항 복사').catch(() => '');
+    const biblioBtn = await js(ow, `(() => { const b = document.getElementById('op-copy-biblio'); return { text: b.textContent, nextIsMemo: b.nextElementSibling?.id === 'op-memo' }; })()`);
+    check('OPMS: 메모로 만들기 옆 "서지사항 전체 복사" → 서지사항이 한 줄씩 클립보드에',
+      biblioBtn.nextIsMemo && /복사했어요/.test(biblioBtn.text) && /^사무소관리번호 : FPD\/2026-0271\/E/.test(biblio) && /출원번호 +: 10-2026-0012345/.test(biblio) && /발명명칭 +: 메모를 쉽게 쓰는 장치/.test(biblio),
+      JSON.stringify({ biblioBtn, biblio }));
     check('OPMS 창 정보: 서지 · 업무배분 · 해외출원 배지', info.our === 'FPD/2026-0271/E' && info.app.includes('10-2026-0012345') && info.app.includes('2026-02-03') && info.work === '명세서 작성' && /해외 1건 \(US\)/.test(info.badge), JSON.stringify(info));
     // 청구서 · 해외출원
     await js(ow, `document.querySelector('[data-tab="bills"]').click()`);

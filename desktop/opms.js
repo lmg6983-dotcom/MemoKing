@@ -8,6 +8,7 @@ import path from 'node:path';
 export { looksLikeRef } from '../app/js/core/magic-modules.js';
 import { progressItems } from '../app/js/core/opms-progress.js';
 import { decodeEntities } from '../app/js/core/entities.js';
+import { biblioFields } from '../app/js/core/opms-biblio.js';
 
 // 서버 주소 · 전자포대 폴더는 코드에 두지 않는다 (설치 파일은 공개 저장소에 올라간다) — 설정 › 매직키 › OPMS 에서 사용자가 넣는다
 export const DEFAULT_HOST = '';
@@ -294,11 +295,7 @@ export function caseInfoText(c, { mywork = [], foreign = [], files = [], now = n
   const L = [];
   const bar = '='.repeat(80);
   L.push(bar, `[OPMS 사건 정보] ${dash(c.ourref)} / ${dash(c.yourref)}`, bar, '', '[기본 서지정보]');
-  for (const [k, v] of [
-    ['사무소관리번호', c.ourref], ['출원인관리번호', c.yourref], ['구분', c.div], ['출원인', c.applicant], ['발명자', c.inventor],
-    ['수임일', cleanDate(c.d_accept)], ['출원번호', c.n_app], ['출원일', cleanDate(c.d_app)], ['등록번호', c.n_issue],
-    ['등록일', cleanDate(c.d_issue)], ['발명명칭', c.title_kor], ['비고', c.memo],
-  ]) L.push(`  ${k.padEnd(14)} : ${dash(v).replace(/\n/g, `\n${' '.repeat(19)}`)}`); // 여러 줄(비고)은 값 자리에 맞춰 들여 쓴다
+  for (const [k, v] of biblioFields({ ...c, memo: c.memo || '-' })) L.push(`  ${k.padEnd(14)} : ${dash(v).replace(/\n/g, `\n${' '.repeat(19)}`)}`); // 여러 줄(비고)은 값 자리에 맞춰 들여 쓴다
   L.push('', '[업무배분]');
   if (mywork.length) {
     mywork.forEach((r, i) => {
@@ -333,11 +330,7 @@ export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '', d
   const L = [`# ${title}`, ''];
   if (summary) L.push(`해외출원: ${summary}`, '');
   L.push('| 항목 | 내용 |', '| --- | --- |');
-  for (const [k, v] of [
-    ['사무소관리번호', c.ourref], ['출원인관리번호', c.yourref], ['구분', c.div], ['출원인', c.applicant], ['발명자', c.inventor],
-    ['수임일', cleanDate(c.d_accept)], ['출원번호', c.n_app], ['출원일', cleanDate(c.d_app)], ['등록번호', c.n_issue],
-    ['등록일', cleanDate(c.d_issue)], ['발명명칭', c.title_kor], ['비고', c.memo],
-  ]) if (String(v ?? '').trim() || k !== '비고') L.push(`| ${k} | ${cell(v)} |`);
+  for (const [k, v] of biblioFields(c)) L.push(`| ${k} | ${cell(v)} |`);
   if (mywork.length) {
     L.push('', '## 업무배분', '', '| 업무 | 담당 | 접수 | 기한 | 완료 | 상세 |', '| --- | --- | --- | --- | --- | --- |');
     for (const r of mywork) {
@@ -910,7 +903,8 @@ export class Opms {
    * @returns {Promise<{ sections: { id, label, table, columns, rows, error? }[], novelty: { label, value }[], missing: string[] }>}
    */
   async details(c) {
-    const schema = await this.schema();
+    // 표 목록을 못 받아도(권한 등) 표를 아는 우선권 · 메모는 보이게 — 신규성 의제 · 진행사항만 "찾지 못함"
+    const schema = await this.schema().catch(() => new Map());
     const picks = pickDetailTables(schema);
     const guessed = DETAIL_KINDS.map(async (kind) => {
       const pick = picks[kind.id];

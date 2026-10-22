@@ -6,6 +6,7 @@
 import { searchingNode } from './searching.js';
 import { progressItems, dueState } from './core/opms-progress.js';
 import { UI } from './core/ui-text.js';
+import { biblioText } from './core/opms-biblio.js';
 
 const api = window.opms;
 const $ = (id) => document.getElementById(id);
@@ -526,6 +527,19 @@ $('op-refresh').addEventListener('click', () => {
   if (!current) return;
   for (const k of [...cache.keys()]) if (k.startsWith(`${current.case.idx}:`)) cache.delete(k);
   open(current.case.idx, tab);
+});
+
+// 서지사항 전체 복사: "이름 : 값" 한 줄씩 (메일 · 메신저에 바로 붙여 넣게)
+$('op-copy-biblio').addEventListener('click', async () => {
+  if (!current) return;
+  const b = $('op-copy-biblio');
+  try {
+    await api.copy(biblioText(current.case));
+    b.textContent = '✓ 복사했어요';
+  } catch (err) {
+    message(errText(err), 'err');
+  }
+  setTimeout(() => (b.textContent = '서지사항 전체 복사'), 1500);
 });
 
 // 메모로 만들기: 사건 정보를 메모 한 장으로 (메모 창이 열린다)

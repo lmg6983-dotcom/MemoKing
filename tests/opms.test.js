@@ -199,6 +199,18 @@ test('OPMS 더 보기: 서버에서 표 목록 → 고른 표 → 메모에도',
   assert.match(md, /## 메모\n\n\| 구분 \| 필독 \| 고객명 \| 작성일 \| 말머리 \| 메모 \|\n.*\n\| 고객 \| 필독 \| 한국과학기술원 \| 2019-03-01 \|/);
 });
 
+test('OPMS 더 보기: 표 목록을 못 받아도 우선권 · 메모는 보임', async () => {
+  const fakeFetch = async (url, init = {}) => {
+    const sql = new URLSearchParams(init.body).get('sql');
+    if (/INFORMATION_SCHEMA/.test(sql)) return new Response('권한 없음');
+    if (/FROM opms_pri/.test(sql)) return new Response(table(['pri_nation', 'n_pri'], [['KR', '10-2026-0182644']]));
+    return new Response(table(['x'], []));
+  };
+  const d = await new Opms({ host: TEST_HOST, fetch: fakeFetch, retries: 0 }).details({ idx: '7' });
+  assert.equal(d.sections.find((x) => x.id === 'priority').rows[0].n_pri, '10-2026-0182644');
+  assert.deepEqual(d.missing, ['신규성 의제', '진행사항']);
+});
+
 test('OPMS 전자포대: 최신순으로 받아 위에 새 서류 · No. 는 오래된 것부터 1', () => {
   assert.match(buildAttachSql('7'), /ORDER BY registered_at DESC, IDX DESC/);
   const items = attachmentItems([
