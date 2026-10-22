@@ -17,6 +17,7 @@ import { HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
 import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
 import { haptic } from './dom.js';
+import { UI } from './core/ui-text.js';
 
 export const listDragKey = new PluginKey('memoking-list-drag');
 
@@ -245,7 +246,7 @@ export function createListDrag({ readOnly = false } = {}) {
       if (spec) decorate(view, [{ pos: at, ...spec }]);
       else if (!drag && !press && listDragKey.getState(view.state)?.find().length) decorate(view, []);
     };
-    showDeleteButton(view, { pos: at, node, target: li, label: only ? '이 목록 지우기' : '이 항목 지우기', deco });
+    showDeleteButton(view, { pos: at, node, target: li, label: only ? '이 목록 삭제' : '이 항목 삭제', deco });
   }
 
   // 들어 올린 항목 대신 목록 전체(맨 바깥 줄)를 들어 올린다 — 손가락은 그대로, 옮기기는 block-move.js 가
@@ -349,7 +350,7 @@ export function createListDrag({ readOnly = false } = {}) {
   }
 
   // 틀 오른쪽 안내: 지금 놓으면 무엇이 되는지
-  const BADGES = { swap: '⇅ 맞바꾸기', insert: '↳ 여기에 넣기', indent: '→ 하위 항목으로', outdent: '← 상위 항목으로', blocked: '더 옮길 수 없어요' };
+  const BADGES = { swap: UI.swapHere, insert: UI.dropHere, indent: '→ 하위 항목으로', outdent: '← 상위 항목으로', blocked: '더 옮길 수 없어요' };
   function showBadge(kind) {
     drag.frames.label(kind ?? null, BADGES[kind] ?? '', { x: drag.x, y: drag.y }, drag.kind);
     // 놓을 자리가 바뀔 때 톡 (터치)

@@ -9,6 +9,7 @@ import { alertPicker } from './alert-picker.js';
 import { defaultEventStart } from './quick-event.js';
 import { toLocalIso } from './core/time.js';
 import { dateTimePicker, timePicker } from './date-picker.js';
+import { UI } from './core/ui-text.js';
 
 const $ = (id) => document.getElementById(id);
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
@@ -72,7 +73,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
   function alertHint() {
     const start = chosenStart();
     const set = [...picked[alertKind()]];
-    if (!set.length) return '알림 없이 달력에만 보여요';
+    if (!set.length) return UI.calendarOnly;
     if (!start) return '';
     const allDay = alertKind() === 'allDay';
     if (pendingAlerts(set, start, { allDay }).length) return '';
@@ -124,7 +125,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     title.textContent = isEvent(r) && r.title ? `${r.title}, ${describeReminder(r)}` : describeReminder(r);
     const sub = document.createElement('div');
     sub.className = 'rem-sub';
-    const state = sentAll ? '알림을 모두 보냈어요' : isDone(r) || over ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : next ? `다음 알림 ${next}` : '';
+    const state = sentAll ? '알림을 모두 보냈어요' : isDone(r) || over ? '끝났어요' : !r.enabled ? UI.off : r.kind === 'startup' ? '' : next ? `다음 알림 ${next}` : '';
     const alerts = isEvent(r) ? `알림 ${describeAlerts(r)}` : '';
     sub.textContent = [alerts, state, r.action === 'open' ? '메모 바로 열기' : '알림으로 받기'].filter(Boolean).join(', ');
     text.append(title, sub);
@@ -151,7 +152,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     del.type = 'button';
     del.className = 'icon-btn';
     del.title = '삭제';
-    del.setAttribute('aria-label', `${title.textContent} 지우기`);
+    del.setAttribute('aria-label', `${title.textContent} 삭제`);
     del.append(icon('trash'));
     del.addEventListener('click', () => save(reminders.filter((x) => x.id !== r.id)));
 
@@ -167,7 +168,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
       return true;
     } catch (err) {
       console.error(err);
-      setStatus('알림을 저장하지 못했어요. 다시 시도해 주세요.', true);
+      setStatus('알림을 저장하지 못했어요. 다시 해 주세요.', true);
       return false;
     }
   }
@@ -322,7 +323,7 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
         if (at < new Date(now.getFullYear(), now.getMonth(), now.getDate())) throw new Error('이미 지난 날이에요. 앞으로의 날을 골라 주세요');
         return withPending({ ...base, ...event, at: toLocalIso(at), allDay: true }, at, now);
       }
-      if (at <= now) throw new Error('이미 지난 시각이에요. 앞으로의 시각을 골라 주세요');
+      if (at <= now) throw new Error(UI.pastTime);
       return withPending({ ...base, ...event, at: toLocalIso(at) }, at, now);
     }
     if (kind === 'repeat') {

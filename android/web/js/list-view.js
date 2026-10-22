@@ -13,7 +13,7 @@ import { call } from './native.js';
 import { renderCollage, collageName } from '../../app/js/memories-collage.js';
 import { base64Bytes, collageMemoBody } from '../../app/js/collage-preview.js';
 import { tutEvent, tutorialStepId } from './tutorial.js';
-import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition, setModeSwitch } from '../../app/js/dom.js';
+import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition, setModeSwitch, EASE_OUT } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
 import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode } from '../../app/js/core/modes.js';
@@ -21,6 +21,7 @@ import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { setListTheme } from './theme.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -107,7 +108,6 @@ export function setWorkLife(on) {
   if (on) workClock();
   app.rescheduleAlarms?.(); // 퇴근 뒤 조용히가 켜지거나 꺼진다
 }
-export const currentMode = () => state.mode;
 
 /** 튜토리얼 뒷정리 (tutorial.js): 시작할 때 모습을 적어 두고, 끝나면 연습으로 바꾼 카드 모양 · 태그 고르기 · 모드 · Work/Life 켜기를 처음대로 */
 export const tutorialSnapshot = () => ({ layout, tags: [...state.filter.tags], mode: state.mode, panel: !el.filterPanel.hidden, workLife: workLifeOn() });
@@ -340,7 +340,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
     : narrowed && elsewhere
     ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
     : narrowed
-    ? state.query ? `'${state.query}' 검색 결과가 없어요.` : '조건에 맞는 메모가 없어요.'
+    ? state.query ? `'${state.query}' 검색 결과가 없어요.` : UI.noMatch
     : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 메모를 꾹 눌러 "Work로 옮기기" 해 보세요.'
       : '아직 메모가 없어요.\n떠오른 생각을 바로 적거나 말로 남겨 보세요.';
   const actions = document.createElement('span');
@@ -355,7 +355,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
   };
   if (narrowed && elsewhere) button(`${other}에서 보기`, () => setMode(otherMode(state.mode)), true);
   else if (narrowed) {
-    button('검색과 필터 풀기', () => {
+    button(UI.clearFilters, () => {
       state.filter = { tags: [], colors: [], kinds: [] };
       el.search.value = '';
       el.search.dispatchEvent(new Event('input', { bubbles: true }));
@@ -364,7 +364,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
   } else {
     button('글 메모', () => app.newMemo(), true);
     button('🎙 음성 메모', () => app.newMemo({ voice: true }));
-    if (workLifeOn() && state.mode === 'work') button('정리 도우미로 찾기', () => openHelper());
+    if (workLifeOn() && state.mode === 'work') button(UI.findWithHelper, () => openHelper());
   }
   el.empty.replaceChildren(art, text, actions);
 }
@@ -524,7 +524,7 @@ function setTab(tab) {
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
   el.filterBtn.hidden = tab !== 'memos';
-  el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: '보관한 알림 검색' }[tab];
+  el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: UI.searchHistory }[tab];
   $('fab').hidden = tab === 'history'; // 보관함엔 + 없음. 일정 탭의 + 는 새 일정 (메모 탭과 같은 자리)
   $('fab').setAttribute('aria-label', tab === 'reminders' ? '새 일정' : '새 메모');
   if (tab === 'reminders') $('fab').removeAttribute('aria-haspopup');
@@ -642,7 +642,7 @@ function endSwipe(e) {
   card.classList.remove('swiping', 'swipe-ready', 'swipe-open');
   const w = card.offsetWidth || 1;
   if (opening) {
-    card.style.transition = 'transform 0.22s cubic-bezier(0.23, 1, 0.32, 1)';
+    card.style.transition = `transform 0.22s ${EASE_OUT}`;
     card.style.transform = '';
     setTimeout(() => (card.style.transition = ''), 240);
     if (dx > w * 0.28) {
@@ -659,7 +659,7 @@ function endSwipe(e) {
     // 카드가 끝까지 날아간 뒤에 지운다 — 날아가는 중에 목록을 다시 그리면(무거운 일) 카드가 중간에 멈칫했다.
     //   날아가는 동안도 따로 그리는 층(flying: will-change)에 둬 화면 스레드가 바빠도 매끄럽게
     card.classList.add('flying');
-    card.style.transition = 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s cubic-bezier(0.23, 1, 0.32, 1)';
+    card.style.transition = `transform 0.2s ${EASE_OUT}, opacity 0.2s ${EASE_OUT}`;
     card.style.transform = `translate3d(${Math.sign(dx) * w * 1.3}px, 0, 0) rotate(${Math.sign(dx) * 8}deg)`;
     card.style.opacity = '0';
     card.dataset.swiped = '1';
@@ -674,7 +674,7 @@ function endSwipe(e) {
     setTimeout(remove, 260); // transitionend 가 오지 않을 때(움직임 줄이기 등)
     return;
   }
-  card.style.transition = 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s';
+  card.style.transition = `transform 0.2s ${EASE_OUT}, opacity 0.2s`;
   card.style.transform = '';
   card.style.opacity = '';
   setTimeout(() => (card.style.transition = ''), 220);
@@ -752,7 +752,7 @@ function glideCards(change) {
     const dx = a.left - b.left;
     const dy = a.top - b.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 260, easing: EASE_OUT });
   }
 }
 
@@ -822,20 +822,20 @@ export function setup() {
           } },
           { id: 'copy', label: '복사', icon: 'copy', run: async () => {
             await call('copyImage', { base64 });
-            return '그림을 복사했어요. 붙여 넣어 보낼 수 있어요';
+            return UI.imageCopied;
           } },
           { id: 'save', label: '저장', icon: 'folder', run: async () => {
             const name = await call('saveAs', { name: collageName(o), mime: 'image/png', base64 });
             return name ? `${name}로 저장했어요` : '';
           } },
-          { id: 'memo', label: '메모로 만들기', icon: 'note', close: true, run: async () => {
+          { id: 'memo', label: UI.makeMemo, icon: 'note', close: true, run: async () => {
             if (!app.vault) throw new Error('메모 폴더가 아직 없어요');
             const rel = app.vault.saveAttachment(base64Bytes(base64), 'png');
             const id = app.vault.import({ body: collageMemoBody(o.title, rel) });
-            if (!id) throw new Error('메모를 만들지 못했어요');
+            if (!id) throw new Error(UI.memoCreateFail);
             refresh();
             app.api.memo.open(id);
-            return '새 메모로 만들었어요';
+            return UI.madeNewMemo;
           } },
         ],
       },

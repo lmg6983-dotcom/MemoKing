@@ -7,6 +7,7 @@
 // 셋 다 마크다운 표에는 적을 곳이 없어 메모 머리말(tables)에 표 순서대로 저장한다 (core/table-sizes.js).
 import { Plugin, PluginKey, Decoration, DecorationSet, TableMap, CellSelection, TextSelection, selectedRect } from '../vendor/milkdown.js';
 import { normalizeTables, sameTables, ROW_MIN, ROW_MAX } from './core/table-sizes.js';
+import { UI } from './core/ui-text.js';
 
 export const tableExtrasKey = new PluginKey('memoking-table-extras');
 const EDGE = 5; // 테두리에서 이만큼 안쪽까지 잡을 수 있다 (px)
@@ -96,7 +97,7 @@ export function mergeAllowed(top, rowspan) {
  * @returns {boolean|string} true = 합침, 문자열 = 못 합친 이유
  */
 export function mergeSelectedCells(state, dispatch) {
-  if (!(state.selection instanceof CellSelection)) return '합칠 칸들을 끌어서 골라 주세요';
+  if (!(state.selection instanceof CellSelection)) return UI.mergePick;
   const rect = selectedRect(state);
   const { map, tableStart, table } = rect;
   if (rect.right - rect.left < 1 || rect.bottom - rect.top < 1 || (rect.right - rect.left === 1 && rect.bottom - rect.top === 1)) return '두 칸 이상 골라 주세요';

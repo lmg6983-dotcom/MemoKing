@@ -52,6 +52,7 @@ import {
 import { WindowManager } from './window-manager.js';
 import { registerIpc } from './ipc-handlers.js';
 import { CalendarFeeds } from './calendar-feeds.js';
+import { UI } from '../app/js/core/ui-text.js';
 
 // 점검 때는 가짜 마이크(삐 소리)로 녹음한다 — 실제 마이크·권한 창 없이
 if (SMOKE) {
@@ -153,7 +154,7 @@ async function memoHotkeyPressed(slot) {
   const bound = memoHotkeys.map[slot];
   const memo = bound && vault?.get(bound.id);
   if (!memo) {
-    windowManager.showHud({ title: `${hotkeyLabel(slot)}: 메모를 찾지 못했어요`, body: '지웠거나 다른 메모 폴더의 메모예요', kind: 'warn' });
+    windowManager.showHud({ title: `${hotkeyLabel(slot)}: 메모를 찾지 못했어요`, body: '삭제했거나 다른 메모 폴더의 메모예요', kind: 'warn' });
     return;
   }
   const title = memo.title || '제목 없음';
@@ -188,7 +189,7 @@ async function memoHotkeyPressed(slot) {
   }
   if (copied) windowManager.showHud({ title: `“${title}” 내용을 복사했어요`, body: tip ? 'Ctrl+V 로 붙여 넣으세요' : '' });
   else if (bound.copy && memo.needsPassword) windowManager.showHud({ title: '잠긴 메모라 복사하지 않았어요', body: '비밀번호를 넣고 열어 주세요', kind: 'warn' });
-  else if (bound.copy) windowManager.showHud({ title: '복사하지 못했어요', body: '다시 눌러 주세요', kind: 'warn' });
+  else if (bound.copy) windowManager.showHud({ title: UI.copyFail, body: '다시 눌러 주세요', kind: 'warn' });
 }
 
 // ---------- 볼트(Vault) 연결 및 동기화 ----------
@@ -615,7 +616,7 @@ async function switchDriveFolder(folderId, folderName) {
   return { info: vaultInfo(), status, drive: driveInfo() };
 }
 
-const SYNC_FOLDER = '메모킹 동기화';
+const SYNC_FOLDER = UI.driveFolder;
 // 내 드라이브의 "메모킹 동기화" 를 찾거나 만들어 맞춘다 — 같은 이름이 여럿이면 늘 가장 먼저 만든 것 (PC · 휴대폰이 같은 폴더를 고르게)
 function autoDriveFolder() {
   return oneAtATime(async () => {
@@ -627,7 +628,7 @@ function autoDriveFolder() {
 // 같은 이름 폴더가 이미 있으면 그것 (새로 만들지 않는다) — 만드는 중에 또 부탁해도 하나만
 const folderMaking = new Map();
 function findOrCreateDriveFolder(parent, name) {
-  if (!driveApi) return Promise.reject(new Error('Google Drive 를 쓸 수 없어요. 설정의 Google Drive 동기화에서 먼저 연결해 주세요'));
+  if (!driveApi) return Promise.reject(new Error(UI.driveUnavailable));
   const key = `${parent}\u0000${name}`;
   if (!folderMaking.has(key)) {
     folderMaking.set(key, (async () => {
@@ -691,7 +692,7 @@ function tutorialPayload() {
   const step = tutorialStepFor(raw, (need) => (need === 'workLife' ? settings.workLife === true : need === 'quickMemo' || need === 'magic' ? shortcutStatus(need).registered : true));
   const keys = (t) => (typeof t === 'string' ? withShortcuts(t, settings.shortcuts) : t);
   const text = step.noTape && !windowManager.canTape ? step.noTape : step.text; // 테이프를 못 쓰는 PC 에서는 왕관만
-  // 다시 보는 사람(설정 › 사용법 둘러보기)에게는 첫 말풍선에서 어디부터 볼지 고르게
+  // 다시 보는 사람(설정 › 튜토리얼 보기)에게는 첫 말풍선에서 어디부터 볼지 고르게
   const jumps = tutorial.index === 0 && tutorial.again ? tutorialJumps(TUTORIAL_STEPS) : undefined;
   return { ...step, title: keys(step.title), text: keys(text), try: keys(step.try), index: tutorial.index, total: TUTORIAL_STEPS.length, praise: tutorial.praise, chapter: tutorialChapter(TUTORIAL_STEPS, tutorial.index), jumps, sandbox: Boolean(sandbox) };
 }
@@ -731,7 +732,8 @@ async function enterSandbox() {
   next.on('changed', () => windowManager.pushList());
   next.on('error', (err) => console.error('[연습 공간]', err));
   next.open();
-  seedTutorialSandbox(next, toLocalIso);
+  // 예시 사진: 앱에 든 사진을 연습 폴더 첨부로 복사
+  await seedTutorialSandbox(next, toLocalIso, { photo: (name) => next.saveAttachment(fs.readFileSync(path.join(import.meta.dirname, '..', 'app', 'assets', 'tutorial', 'sample', `${name}.jpg`)), 'jpg') }); // 설치본(asar) 안의 사진도 readFileSync 로 읽힌다
   sandbox = { real, dir, openNotes, workLife: settings.workLife };
   vault = next;
   windowManager.loadStacks();
@@ -878,7 +880,7 @@ function registerQuickMemoKey() {
   if (!settings.quickMemo || process.platform !== 'win32' || shortcutsPaused) return false;
   const key = shortcutKey('quickMemo');
   const ok = globalShortcut.register(key, () => onQuickMemoKey());
-  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다`);
+  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else {
     heldKeys.quickMemo = key;
     windowManager.captureHelper.start();
@@ -892,7 +894,7 @@ function registerMagicKey() {
   if (!normalizeMagicSettings(settings.magic).enabled || shortcutsPaused) return false;
   const key = shortcutKey('magic');
   const ok = globalShortcut.register(key, () => windowManager.showMagic());
-  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다`);
+  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else heldKeys.magic = key;
   return ok;
 }
@@ -1005,7 +1007,7 @@ function updateTrayMenu() {
   if (!tray || tray.isDestroyed()) return;
   const recent = vault?.list().slice(0, 5) ?? [];
   trayMenuTemplate = [
-    { label: '메모 목록 열기', click: () => windowManager.createListWindow() },
+    { label: UI.openList, click: () => windowManager.createListWindow() },
     { label: '새 메모', enabled: Boolean(vault), click: () => windowManager.createNote({}) },
     { label: '화면 캡처로 새 메모', enabled: Boolean(vault), click: () => windowManager.startAreaCapture() },
     { label: '복사해 둔 내용으로 새 메모', enabled: Boolean(vault), click: () => windowManager.quickMemo({ copy: false }) },
@@ -1037,7 +1039,7 @@ function updateTrayMenu() {
       click: (item) => setAutoStart(item.checked, updateTrayMenu),
     },
     { type: 'separator' },
-    { label: '사용법 보기', enabled: Boolean(vault), click: startTutorial },
+    { label: '사용법 둘러보기', enabled: Boolean(vault), click: startTutorial },
     { label: '메모킹 종료', click: quitApp },
   ];
   tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate));

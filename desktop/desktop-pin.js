@@ -11,7 +11,7 @@
 //   도우미가 다시 뜨면(죽었다 살아남) 붙여 둔 창들을 다시 알려 준다. 도우미가 없으면(다른 OS) 붙이지 못한다 (available = false)
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
-import os from 'node:os';
+import { POWERSHELL, psArgs, psOptions } from './powershell.js';
 
 const SCRIPT = `
 $ErrorActionPreference = 'Stop'
@@ -184,9 +184,7 @@ export class DesktopPin {
 
   start() {
     if (this.proc || !this.available) return;
-    const proc = this.spawnHelper('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', SCRIPT], {
-      cwd: os.tmpdir(), windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'], // cwd: 설치 폴더를 붙잡지 않게 (업데이트)
-    });
+    const proc = this.spawnHelper(POWERSHELL, psArgs(['-Command', SCRIPT]), psOptions({ stdio: ['pipe', 'pipe', 'ignore'] }));
     this.proc = proc;
     const started = Date.now();
     readline.createInterface({ input: proc.stdout }).on('line', (line) => {

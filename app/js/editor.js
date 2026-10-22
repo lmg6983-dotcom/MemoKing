@@ -389,7 +389,7 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
     }
     if (!main.isConnected) dom.replaceChildren(main);
     if (!loaded) load();
-    main.title = `열기 단추로 브라우저에서 열어요\n${href}`;
+    main.title = `열기 버튼으로 브라우저에서 열어요\n${href}`;
     const state = preview ? (preview.ok ? 'ok' : 'plain') : 'loading';
     dom.dataset.state = state;
     dom.dataset.kind = preview?.kind === 'youtube' || preview?.site === 'YouTube' ? 'youtube' : '';
@@ -524,7 +524,7 @@ function doneTagAt(doc, pos, { lineEnd = false } = {}) {
 //   친 띄어쓰기 · 탭은 줄 바꿈 없는 빈칸(U+00A0)으로 바꿔 둔다 — 마크다운으로 저장했다 다시 열어도 그대로
 //   일부러 넣은 것만: 줄 앞에서 친 띄어쓰기(handleTextInput)와 붙여 넣은 글의 들여쓰기(붙여넣기 트랜잭션의 바뀐 줄).
 //   줄을 나누다 앞에 남은 띄어쓰기는 보통 띄어쓰기로 두어 다듬기(tidy)가 지운다. 코드 블록 · 글 속 코드는 그대로.
-//   붙여넣은 글의 줄바꿈도 그대로 줄바꿈으로
+//   붙여 넣은 글의 줄바꿈도 그대로 줄바꿈으로
 const BREAKS = new Set(['hardbreak', 'hard_break']);
 let plainPasting = false; // 메모장 같은 일반 글자를 붙이는 중 (아래 붙여넣기에서 잠깐)
 function indentFixes(doc, from, to) {
@@ -639,7 +639,7 @@ const keepIndentPlugin = $prose(() => {
       if (!range) return null;
       const { from, to } = range;
       const tr = state.tr;
-      // 붙여넣은 글의 줄바꿈: 마크다운으로 읽으면 "부드러운 줄바꿈"(띄어쓰기로 보임)이 된다 → 진짜 줄바꿈으로 (메모장 글이 한 줄로 합쳐지지 않게)
+      // 붙여 넣은 글의 줄바꿈: 마크다운으로 읽으면 "부드러운 줄바꿈"(띄어쓰기로 보임)이 된다 → 진짜 줄바꿈으로 (메모장 글이 한 줄로 합쳐지지 않게)
       if (plainPasting) {
         state.doc.nodesBetween(from, to, (node, pos) => {
           if (node.type.spec.code) return false;
@@ -1025,9 +1025,9 @@ function tableMeasure(view) {
   };
 }
 
-// 붙여넣은 표마다 따로 살펴볼 이유(병합된 칸·표 안의 표·그림·수식) — 붙인 뒤 열 너비를 자동으로 맞출 때 쓴다
+// 붙여 넣은 표마다 따로 살펴볼 이유(병합된 칸·표 안의 표·그림·수식) — 붙인 뒤 열 너비를 자동으로 맞출 때 쓴다
 let pastedTableReviews = [];
-let pastedTablesAt = 0; // 표가 든 내용을 붙여넣은 시각 (Milkdown 붙여넣기는 "paste" 표시 없이 문서를 바꾸므로 이것으로 안다)
+let pastedTablesAt = 0; // 표가 든 내용을 붙여 넣은 시각 (Milkdown 붙여넣기는 "paste" 표시 없이 문서를 바꾸므로 이것으로 안다)
 
 function normalizePastedTables(html) {
   pastedTableReviews = [];
@@ -1231,7 +1231,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         if (kind === 'file') items.push({ kind, src, name: file.name });
         else items.push({ kind, src, alt: kind === 'video' ? `동영상 ${baseName(file.name)}` : baseName(file.name) });
       } catch (err) {
-        console.warn('파일을 넣지 못했습니다', file.name, err);
+        console.warn('파일을 넣지 못했어요', file.name, err);
         failed.push(file.name || '이름 없는 파일');
       }
     }
@@ -1244,8 +1244,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return items;
   }
 
-  // ---------- 붙여넣은 인터넷 사진을 메모 폴더로 ----------
-  // 글과 함께 붙여넣은 사진은 먼저 인터넷 주소로 들어오고, 받아지는 대로 attachments/ 파일로 바뀐다.
+  // ---------- 붙여 넣은 인터넷 사진을 메모 폴더로 ----------
+  // 글과 함께 붙여 넣은 사진은 먼저 인터넷 주소로 들어오고, 받아지는 대로 attachments/ 파일로 바뀐다.
   // 받지 못한 사진은 주소를 그대로 둔다. 주소 교체는 실행 취소 기록에 넣지 않는다 (Ctrl+Z 한 번에 붙여넣기 전체 취소).
 
   const imageSources = (doc) => {
@@ -1262,7 +1262,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const results = await Promise.all(srcs.map((src) => fetchImage(src).then(
       (rel) => [src, rel],
       (err) => {
-        console.warn('사진을 받지 못했습니다', src.slice(0, 120), err?.message);
+        console.warn('사진을 받지 못했어요', src.slice(0, 120), err?.message);
         return [src, null];
       },
     )));
@@ -1519,7 +1519,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         const tsv = html ? null : parseTsv(data.getData('text/plain'));
         // 진짜 표(HTML 에 표가 있음)일 때만 칸으로 — 그냥 여러 줄도 붙이는 자리(칸)에 맞춰 칸들로 읽히므로
         const grid = tsv ? tsv.map((row) => row.map((t) => textLines(schema, t))) : /<t(able|r|d|h)[\s>]/i.test(html) ? sliceGrid(schema, slice) : null;
-        pastedTablesAt = 0; // 있던 표의 열 너비·정렬을 붙여넣은 표처럼 저절로 맞추지 않게
+        pastedTablesAt = 0; // 있던 표의 열 너비·정렬을 붙여 넣은 표처럼 저절로 맞추지 않게
         const handled = grid?.length ? fillCells(v, grid) : pasteLines(v, slice);
         if (handled) event.preventDefault();
         return handled;
@@ -1617,7 +1617,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         const pos = v.state.selection.from;
         filesToItems(files)
           .then((items) => items.length && insertBlocks(pos, items))
-          .catch((err) => console.error('붙여넣은 파일을 넣지 못했습니다', err));
+          .catch((err) => console.error('붙여 넣은 파일을 넣지 못했어요', err));
         return true;
       },
       // 메모에서 끌어낸 파일이 도로 이 메모에 떨어지면 무시 (같은 파일이 한 번 더 들어가지 않게 — block-move.js 끌어내기)
@@ -1728,7 +1728,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   // 열 너비: 칸 오른쪽 테두리를 끌기 (prosemirror-tables — Milkdown gfm 묶음에는 빠져 있어 따로 켠다)
   const tableResize = $prose(() => columnResizing({ cellMinWidth: 24 }));
 
-  // 붙여넣은 표(엑셀·구글 시트 등): 내용·본문 폭에 맞춰 열 너비·정렬을 자동으로 (core/table-autofit.js)
+  // 붙여 넣은 표(엑셀·구글 시트 등): 내용·본문 폭에 맞춰 열 너비·정렬을 자동으로 (core/table-autofit.js)
   // 병합된 칸·표 안의 표·그림·수식이 있던 표는 자동으로 맞추지 않고 확인해 달라고 알린다.
   let fitView = null;
   const tableAutoFit = $prose(() => new Plugin({
@@ -1743,7 +1743,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const range = changedRange(trs, state.doc);
       if (!range || !(range.to > range.from)) return null;
       const { from, to } = range;
-      // 그 범위 안의, 아직 너비가 없는 표 = 방금 붙여넣은 표
+      // 그 범위 안의, 아직 너비가 없는 표 = 방금 붙여 넣은 표
       const tables = [];
       state.doc.nodesBetween(from, to, (node, pos) => {
         if (node.type.name !== 'table') return true;
@@ -1768,8 +1768,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         fitTable(tr, node, pos, { available, measure });
         fitted++;
       });
-      if (skipped.size) onNotice?.(`붙여넣은 표에 ${[...skipped].join(', ')}이 있어 열 너비를 자동으로 맞추지 않았어요. 표를 확인해 주세요`);
-      else if (fitted) onNotice?.('붙여넣은 표의 열 너비와 정렬을 내용에 맞춰 정리했어요');
+      if (skipped.size) onNotice?.(`붙여 넣은 표에 ${[...skipped].join(', ')}이 있어 열 너비를 자동으로 맞추지 않았어요. 표를 확인해 주세요`);
+      else if (fitted) onNotice?.('붙여 넣은 표의 열 너비와 정렬을 내용에 맞춰 정리했어요');
       return tr.docChanged ? tr : null;
     },
   }));
@@ -1880,7 +1880,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       ctx.get(listenerCtx).markdownUpdated((_ctx, md) => {
         if (ready) onChange(unescapeTags(trimTrailingBreaks(md)));
       });
-      // 끌어다 놓거나 붙여넣은 파일을 첨부 폴더에 저장하고 그 자리에 넣는다.
+      // 끌어다 놓거나 붙여 넣은 파일을 첨부 폴더에 저장하고 그 자리에 넣는다.
       ctx.update(uploadConfig.key, (prev) => ({
         ...prev,
         enableHtmlFileUploader: false,
@@ -1992,7 +1992,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return items;
   }
 
-  // 목록·체크리스트로 바꾸기 전에: 한 문단 안에서 줄바꿈(Shift+Enter·붙여넣은 여러 줄)으로 나뉜 줄들을 문단으로 나눈다
+  // 목록·체크리스트로 바꾸기 전에: 한 문단 안에서 줄바꿈(Shift+Enter·붙여 넣은 여러 줄)으로 나뉜 줄들을 문단으로 나눈다
   // → 줄마다 항목 하나 (그렇지 않으면 여러 줄이 항목 하나가 되어 맨 위에만 체크가 달린다)
   function splitLinesInSelection() {
     const v = view();
@@ -2506,7 +2506,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     plainText: () => plainTextOf(view().state.doc.content),
     // 지금 보이는 본문 DOM (그림·PDF 로 보내기)
     dom: () => view().dom,
-    // 붙여넣은 인터넷 사진 받기가 모두 끝날 때까지 (최대 timeout)
+    // 붙여 넣은 인터넷 사진 받기가 모두 끝날 때까지 (최대 timeout)
     async imagesSettled(timeout = 25_000) {
       const end = Date.now() + timeout;
       while ((pendingChecks > 0 || localizing.size > 0) && Date.now() < end) await new Promise((r) => setTimeout(r, 50));

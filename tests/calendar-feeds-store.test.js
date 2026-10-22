@@ -65,7 +65,7 @@ test('iCal 이 아니거나(로그인 화면) 404 · 너무 크면 알기 쉬운
   }
 });
 
-test('목록 저장: 지운 캘린더의 받아 둔 파일도 지움 · 없는 캘린더는 오류', async () => {
+test('목록 저장: 삭제한 캘린더의 받아 둔 파일도 지움 · 없는 캘린더는 오류', async () => {
   const { store, dir, list } = setup(() => new Response(ICS));
   await store.get('g1');
   assert.ok(fs.existsSync(path.join(dir, 'g1.ics')));

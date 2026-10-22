@@ -118,7 +118,7 @@ export class DriveApi {
       raw: true,
     });
     const location = res.headers.get('location');
-    if (!location) throw new Error('Google Drive가 올릴 주소를 주지 않았어요. 잠시 뒤 다시 시도해 주세요');
+    if (!location) throw new Error('Google Drive가 올릴 주소를 주지 않았어요. 잠시 뒤 다시 해 주세요');
     for (let attempt = 0; ; attempt++) {
       const put = await this.fetch(location, { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: data });
       if (put.ok) return item(await put.json());

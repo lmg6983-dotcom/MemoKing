@@ -2,6 +2,7 @@
 //   권하는 규칙은 core/mode-helper.js. 점수가 높은 것(태그 · 제목에 일 낱말)은 미리 골라 둔다.
 import { suggestWork } from './core/mode-helper.js';
 import { icon } from './icons.js';
+import { UI } from './core/ui-text.js';
 
 function el(tag, className = '', text = '') {
   const e = document.createElement(tag);
@@ -22,7 +23,7 @@ export function openModeHelper({ memos, move }) {
     const dialog = el('dialog', 'dialog mode-helper');
     dialog.setAttribute('aria-labelledby', 'mh-h');
     const head = el('div', 'dialog-head');
-    const h = el('h2', '', '정리 도우미');
+    const h = el('h2', '', UI.modeHelper);
     h.id = 'mh-h';
     const x = el('button', 'icon-btn dialog-x');
     x.type = 'button';

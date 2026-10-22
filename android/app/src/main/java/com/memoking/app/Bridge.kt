@@ -28,7 +28,7 @@ class Bridge(private val activity: MainActivity) {
     private val ctx: Context = activity.applicationContext
     private val pool = Executors.newCachedThreadPool()
 
-    private fun storage(): Storage = Vaults.forScreen(ctx) ?: throw IllegalStateException("저장 위치가 설정되지 않았어요. 설정에서 메모 폴더를 골라 주세요")
+    private fun storage(): Storage = Vaults.forScreen(ctx) ?: throw IllegalStateException("메모 폴더가 아직 없어요. 설정에서 메모 폴더를 골라 주세요")
 
     private inline fun reply(block: () -> Any?): String = try {
         val v = block()

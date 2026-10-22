@@ -46,11 +46,12 @@ function paintPreview(glyph, f) {
 }
 
 /**
- * @param {{ host: HTMLElement, after?: HTMLElement|null, find: () => any, notify?: (text: string, o?: { undo?: () => void }) => void, onToggle?: (open: boolean) => void }} o
+ * @param {{ host: HTMLElement, after?: HTMLElement|null, find: () => any, notify?: (text: string, o?: { undo?: () => void }) => void, onToggle?: (open: boolean) => void, onReplace?: () => void }} o
  *   host · after: 막대를 둘 곳 — 화면 위 막대(after) 바로 아래에 끼워 글을 아래로 밀어낸다 (글을 가리지 않게)
  *   find: 지금 편집기의 editor.find (메모를 바꿔 열면 새 편집기) · notify: "3곳을 바꿨어요" 같은 알림
+ *   onReplace: 바꾸기를 펼칠 때 (휴대폰: 다이얼이 옮기기 · 그리기여도 글 고치기로 — 바꿀 수 있게)
  */
-export function createFindBar({ host, after = null, find, notify = () => {}, onToggle = () => {} }) {
+export function createFindBar({ host, after = null, find, notify = () => {}, onToggle = () => {}, onReplace = () => {} }) {
   const bar = el('div', 'mk-find-bar');
   bar.setAttribute('role', 'search');
   bar.setAttribute('aria-label', '메모 안 찾기, 바꾸기');
@@ -418,7 +419,11 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
     more.title = on ? '바꾸기 접기 (Ctrl+H)' : '바꾸기 펼치기 (Ctrl+H)';
     more.setAttribute('aria-label', on ? '바꾸기 접기' : '바꾸기 펼치기');
     if (!on) closePop({ focus: false });
-    if (on) (query.value || hasFormat(formats.find) ? rep : query).focus();
+    if (on) {
+      onReplace();
+      paint(); // 글 고치기로 바뀌었으면 바꿀 말 칸 · 바꾸기 단추가 바로 눌리게
+      (query.value || hasFormat(formats.find) ? rep : query).focus();
+    }
   }
   function hide({ focus = false } = {}) {
     if (bar.hidden) return false;

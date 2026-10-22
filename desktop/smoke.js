@@ -719,14 +719,14 @@ export async function runSmoke({
       await new Promise((ok) => setTimeout(ok, 700));
       return { buttons: document.querySelectorAll('.mk-delete-btn, .mk-copy-btn').length };
     })()`);
-    check('PC: 그림에 마우스를 올려도 복사 · 지우기 단추는 뜨지 않음', hoverDel?.buttons === 0, JSON.stringify(hoverDel));
+    check('PC: 그림에 마우스를 올려도 복사 · 삭제 버튼은 뜨지 않음', hoverDel?.buttons === 0, JSON.stringify(hoverDel));
     const imgCount = () => js(webNote.win, `document.querySelectorAll('.mk-doc img.mk-image').length`);
     const beforeDel = await imgCount();
     const imgIcons = await ctxOf(webNote.win, '.mk-doc img.mk-image');
-    check('PC: 그림을 오른쪽 클릭 → 맨 위 아이콘 줄 (잘라내기 · 복사 · 저장 · 공유 · 지우기)', imgIcons?.length === 5 && imgIcons[4].startsWith('delete:'), JSON.stringify(imgIcons));
+    check('PC: 그림을 오른쪽 클릭 → 맨 위 아이콘 줄 (잘라내기 · 복사 · 저장 · 공유 · 삭제)', imgIcons?.length === 5 && imgIcons[4].startsWith('delete:'), JSON.stringify(imgIcons));
     await clickIcon(webNote.win, 'delete');
-    const deleted = await until(async () => (await imgCount()) === beforeDel - 1, '그림 지우기').catch(() => false);
-    check('PC: 메뉴의 지우기 아이콘을 누르면 그 그림이 지워짐', deleted, `${beforeDel} → ${await imgCount()}`);
+    const deleted = await until(async () => (await imgCount()) === beforeDel - 1, '그림 삭제').catch(() => false);
+    check('PC: 메뉴의 삭제 아이콘을 누르면 그 그림이 지워짐', deleted, `${beforeDel} → ${await imgCount()}`);
     await closeNote(webNote.id);
 
     // 13-0) 목록 창에 파일을 끌어다 놓으면 메모로 (.md 는 글 그대로, 그림은 메모 안에)
@@ -811,11 +811,11 @@ export async function runSmoke({
     const openedBefore = smokeOpened.length;
     await js(linkNote.win, `document.querySelector('.mk-link-card .lc-main').click()`);
     await wait(200);
-    check('PC: 링크 카드를 누르면 바로 열리고 단추 줄은 뜨지 않음', smokeOpened.slice(openedBefore).some((o) => o.kind === 'web') && await js(linkNote.win, `!document.querySelector('.mk-open-btn')`));
+    check('PC: 링크 카드를 누르면 바로 열리고 버튼 줄은 뜨지 않음', smokeOpened.slice(openedBefore).some((o) => o.kind === 'web') && await js(linkNote.win, `!document.querySelector('.mk-open-btn')`));
     await js(linkNote.win, `document.querySelector('.mk-doc p a[href="${base}/euckr.html"]').click()`);
     await wait(300);
     const openedWeb = smokeOpened.slice(openedBefore).filter((o) => o.kind === 'web').map((o) => o.target);
-    check('카드는 열기 단추로 · 글 사이 링크는 한 번 누르면 브라우저로 열기', openedWeb.includes(articleUrl) && openedWeb.includes(`${base}/euckr.html`), JSON.stringify(openedWeb));
+    check('카드는 열기 버튼으로 · 글 사이 링크는 한 번 누르면 브라우저로 열기', openedWeb.includes(articleUrl) && openedWeb.includes(`${base}/euckr.html`), JSON.stringify(openedWeb));
 
     // 엣지 주소창 복사: <a href="주소">페이지 제목</a> → 그 제목으로 카드
     const edgeUrl = `${base}/article.html?edge=1`;
@@ -877,8 +877,8 @@ export async function runSmoke({
     const cardExtra = await js(reopenedLink.win, `document.querySelectorAll('.mk-link-card .lc-remove, .mk-delete-btn').length`);
     check('링크 카드: 오른쪽 클릭 → 아이콘 줄 한 벌 · "링크 주소 복사"', cardIcons?.[1] === 'copy:링크 주소 복사' && cardIcons.at(-1).startsWith('delete:') && cardExtra <= 1, JSON.stringify({ cardIcons, cardExtra }));
     await clickIcon(reopenedLink.win, 'delete');
-    const removed = await until(() => readMemo(reopenedLink.id).split('"미리보기"').length === 2, '카드 지우기').catch(() => false);
-    check('메뉴의 지우기 아이콘 → 카드 지우기', removed && readMemo(reopenedLink.id).includes('관련 글'));
+    const removed = await until(() => readMemo(reopenedLink.id).split('"미리보기"').length === 2, '카드 삭제').catch(() => false);
+    check('메뉴의 삭제 아이콘 → 카드 삭제', removed && readMemo(reopenedLink.id).includes('관련 글'));
     await closeNote(reopenedLink.id);
 
     // 13-2) 태그 · # 자동완성 · 목록 필터 (v0.11.0)
@@ -1289,8 +1289,8 @@ export async function runSmoke({
       const under = await js(dn.win, `document.querySelector('.mk-doc .mk-date')?.textContent ?? ''`);
       const typingChip = await js(dn.win, `Boolean(document.querySelector('.mk-date-chip'))`);
       await key(dn.win, 'Home');
-      const chip = await until(() => js(dn.win, `document.querySelector('.mk-date-chip')?.textContent ?? null`), '날짜 단추').catch(() => '');
-      check('글 속 날짜: 밑줄 · 치는 중에는 단추 없음 · 커서를 옮기면 "📅 일정 추가" 단추',
+      const chip = await until(() => js(dn.win, `document.querySelector('.mk-date-chip')?.textContent ?? null`), '날짜 버튼').catch(() => '');
+      check('글 속 날짜: 밑줄 · 치는 중에는 버튼 없음 · 커서를 옮기면 "📅 일정 추가" 버튼',
         under === '다음 주 화요일 오후 2시 반' && !typingChip && /일정 추가: .*오후 2:30/.test(chip), JSON.stringify({ under, typingChip, chip }));
       await capture(dn.win, 'smoke-date-chip.png');
       // 단추 → 일정 창: 이름은 줄에서 짐작(발표), 미리 알림은 고른다 (구글 캘린더처럼 시각이 아니라 미리)
@@ -1329,7 +1329,7 @@ export async function runSmoke({
       }
       // 뒤의 알림 예약 탭 점검이 세는 알림 수에 섞이지 않게 지운다
       await js(dn.win, `document.querySelector('#reminder-list .rem-item .icon-btn')?.click()`);
-      await until(() => remindersOf(dn.id).length === 0, '날짜 알림 지우기').catch(() => {});
+      await until(() => remindersOf(dn.id).length === 0, '날짜 알림 삭제').catch(() => {});
       await closeNote(dn.id);
     }
     // 14-01) 이어 쓰기: 휴대폰에서 방금 고친 메모가 들어오면 목록 위에 "휴대폰에서 방금 고친 메모: … [열기]"
@@ -1591,7 +1591,7 @@ export async function runSmoke({
     const notiBack = await listJs(`!document.querySelector('#history-rows .noti-undo') && !!document.querySelector('#history-rows .noti')`);
     await listJs(`document.querySelector('#history-rows .noti [aria-label="알림 보관함에서 삭제"]').click()`);
     const notiRemoved = await until(() => history.list({ query: '회의' }).length === 0, '알림 지움', 7000).then(() => true).catch(() => false);
-    check('보관한 알림 지우기 (그 자리에 되돌리기 5초, 되돌리면 그대로)', notiUndoShown && notiBack && notiRemoved, JSON.stringify({ notiUndoShown, notiBack, notiRemoved }));
+    check('보관한 알림 삭제 (그 자리에 되돌리기 5초, 되돌리면 그대로)', notiUndoShown && notiBack && notiRemoved, JSON.stringify({ notiUndoShown, notiBack, notiRemoved }));
     await listJs(`document.querySelector('.tabs [aria-selected="true"]').focus()`);
     await key(getList(), 'Left');
     const tabAfter = await listJs(`document.querySelector('.tabs [aria-selected="true"]').dataset.tab`);
@@ -1623,7 +1623,7 @@ export async function runSmoke({
       // 이 점검 환경은 전역 단축키를 잡을 수 없어(위 "전역 등록" 점검) "다른 앱이 쓰는 중" 으로 남을 수 있다 — 둘 다 맞는 결과
       const changed = saved.key === 'Control+Alt+M' && after.label === 'Ctrl+Alt+M' && /키로 바꿨어요/.test(after.note);
       const refused = saved.key === 'Control+Alt+Space' && /다른 앱이 이미 쓰고/.test(after.note);
-      check('단축키 바꾸기: 키 단추 → 새 조합 → 바뀜(또는 다른 앱이 쓰면 그대로 두고 알림)', label0 === 'Ctrl+Alt+Space' && asking && (changed || refused), JSON.stringify({ label0, asking, after, saved: saved.key }));
+      check('단축키 바꾸기: 키 버튼 → 새 조합 → 바뀜(또는 다른 앱이 쓰면 그대로 두고 알림)', label0 === 'Ctrl+Alt+Space' && asking && (changed || refused), JSON.stringify({ label0, asking, after, saved: saved.key }));
       await js(lw, `document.getElementById('sc-magic').click()`);
       await wait(250);
       await press('C', ['control', 'alt']);

@@ -1,5 +1,6 @@
 // 다른 캘린더 구독 목록 · 받은 글 확인 (ical.js 없이 — PC 메인 프로세스 · 휴대폰 받기가 함께 쓴다)
 //   주소 정리, 구독 목록 정리, 받은 응답이 iCal 인지와 알기 쉬운 오류 문구, 다시 받을 때
+import { UI } from './ui-text.js';
 export const MAX_FEED_BYTES = 5 * 1024 * 1024;
 export const MAX_FEEDS = 10;
 // 구독 캘린더 색 (메모 색과 겹치지 않는 진한 색 — 달력에서 "다른 캘린더" 로 보이게)
@@ -25,7 +26,7 @@ export function normalizeFeedUrl(raw) {
 export function feedLabel(url) {
   try {
     const u = new URL(url);
-    if (/(^|\.)google\.com$/.test(u.hostname)) return 'Google 캘린더';
+    if (/(^|\.)google\.com$/.test(u.hostname)) return UI.googleCalendar;
     if (/(^|\.)(icloud|me)\.com$/.test(u.hostname)) return 'iCloud 캘린더';
     if (/outlook|office|live\.com/.test(u.hostname)) return 'Outlook 캘린더';
     return u.hostname.replace(/^www\./, '');

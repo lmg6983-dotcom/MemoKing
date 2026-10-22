@@ -11,6 +11,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+import { UI } from '../../app/js/core/ui-text.js';
 
 // 기본: 메모킹이 만든(또는 사용자가 메모킹으로 연) 파일·폴더만 — Drive 전체를 보지 않는다 (스토어 심사의 "제한 범위"가 아님).
 //   PC 메모킹과 휴대폰 메모킹은 같은 Google Cloud 프로젝트의 클라이언트라 서로 만든 메모를 본다
@@ -39,7 +40,7 @@ export class GoogleAuth {
     // scope: 정해진 권한 하나만 (Google 캘린더 동기화 — Drive 연결과 따로 로그인). 없으면 Drive (drive.file / 전체)
     this.fixedScope = scope;
     this.fallbackClient = fallbackClient; // 붙여 넣은 · 함께 넣은 연결 정보가 없을 때 빌려 쓸 클라이언트 (Drive 연결의 것)
-    this.label = scope ? 'Google 캘린더' : 'Google Drive';
+    this.label = scope ? UI.googleCalendar : 'Google Drive';
     this.bundledClient = bundledClient;
     this.fetch = fetchImpl;
     this.openExternal = openExternal;
@@ -233,12 +234,12 @@ export class GoogleAuth {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(page(ok, this.label));
         finish(() => {
           const error = url.searchParams.get('error');
-          if (url.searchParams.get('state') !== state) reject(new AuthError('로그인 확인 값이 맞지 않아요. 다시 시도해 주세요'));
+          if (url.searchParams.get('state') !== state) reject(new AuthError('로그인 확인 값이 맞지 않아요. 다시 해 주세요'));
           else if (!ok) reject(new AuthError(error === 'access_denied' ? '로그인을 취소했어요' : `로그인하지 못했어요 (${error})`));
           else resolve({ code: url.searchParams.get('code'), redirect: redirectUri });
         });
       });
-      const timer = setTimeout(() => finish(() => reject(new AuthError('로그인을 기다리다 시간이 지났어요. 다시 시도해 주세요'))), LOGIN_TIMEOUT);
+      const timer = setTimeout(() => finish(() => reject(new AuthError('로그인을 기다리다 시간이 지났어요. 다시 해 주세요'))), LOGIN_TIMEOUT);
       const finish = (then) => {
         clearTimeout(timer);
         server.close();
@@ -263,7 +264,7 @@ export class GoogleAuth {
     }).catch((err) => {
       throw invalidClientHelp(err, source) ?? err;
     });
-    if (!token.refresh_token) throw new AuthError('구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 시도해 주세요');
+    if (!token.refresh_token) throw new AuthError('구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 해 주세요');
     // 허용 화면에서 Drive 전체 칸을 끄고 허용할 수도 있다 — 실제로 받은 범위로 정한다
     const granted = String(token.scope ?? scope).split(/\s+/);
     if (full && !granted.includes(FULL_SCOPE)) throw new AuthError('Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요');
@@ -341,7 +342,7 @@ export class GoogleAuth {
       // 글자 응답
     }
     if (res.status >= 400 && res.status < 500) throw new AuthError(`Google 로그인 오류: ${json.error_description || json.error || text}`);
-    if (!res.ok) throw new Error(`Google 서버에 문제가 있어요 (${res.status}). 잠시 뒤 다시 시도해 주세요`);
+    if (!res.ok) throw new Error(`Google 서버에 문제가 있어요 (${res.status}). 잠시 뒤 다시 해 주세요`);
     return json;
   }
 }
@@ -350,7 +351,7 @@ export class GoogleAuth {
 export function invalidClientHelp(err, source) {
   if (!(err instanceof AuthError) || !/invalid_client|client secret is invalid|client_secret|Unauthorized|The OAuth client was not found/i.test(err.message)) return null;
   const where = {
-    manual: '설정에 붙여 넣은 클라이언트 ID, 보안 비밀번호가 서로 맞지 않아요. 설정의 Google Drive 의 클라이언트를 지우거나 같은 클라이언트의 값으로 다시 붙여 넣어 주세요 (지우면 앱에 들어 있는 연결 정보를 써요)',
+    manual: '설정에 붙여 넣은 클라이언트 ID, 보안 비밀번호가 서로 맞지 않아요. 설정의 Google Drive 의 클라이언트를 삭제하거나 같은 클라이언트의 값으로 다시 붙여 넣어 주세요 (삭제하면 앱에 들어 있는 연결 정보를 써요)',
     bundled: '이 앱에 들어 있는 Google 연결 정보(보안 비밀번호)가 맞지 않아요. 배포할 때 넣는 MEMOKING_GOOGLE_CLIENT_ID, MEMOKING_GOOGLE_CLIENT_SECRET 이 같은 클라이언트의 값인지 확인하고 다시 배포해야 해요',
     env: '환경 변수 MEMOKING_GOOGLE_CLIENT_ID, MEMOKING_GOOGLE_CLIENT_SECRET 이 서로 맞지 않아요',
     remembered: '예전에 로그인했던 클라이언트의 보안 비밀번호가 더 이상 맞지 않아요. 설정에서 클라이언트를 새로 붙여 넣어 주세요',
@@ -360,7 +361,7 @@ export function invalidClientHelp(err, source) {
 
 function page(ok, label = 'Google Drive') {
   const title = ok ? `메모킹에 ${label}를 연결했어요` : '연결하지 못했어요';
-  const sub = ok ? '이 창을 닫고 메모킹으로 돌아가세요.' : '메모킹으로 돌아가 다시 시도해 주세요.';
+  const sub = ok ? '이 창을 닫고 메모킹으로 돌아가세요.' : '메모킹으로 돌아가 다시 해 주세요.';
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>메모킹</title>
 <style>body{font-family:system-ui,"Malgun Gothic",sans-serif;background:#f6f5f1;color:#111;display:grid;place-items:center;min-height:90vh;margin:0;text-align:center}
 h1{font-size:22px}p{color:#6b6860}</style></head><body><div><h1>${title}</h1><p>${sub}</p></div></body></html>`;

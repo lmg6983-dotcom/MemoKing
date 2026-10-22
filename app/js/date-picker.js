@@ -2,6 +2,7 @@
 //   값은 원래 입력칸(<input id="at-input"> · <input id="rep-time">)에 그대로 써 넣어 reminder-panel.js 의 계산은 바뀌지 않는다.
 //   PC 메모 창 · 휴대폰이 함께 쓴다.
 import { dayLabel, sameDay, startOfDay } from './core/time.js';
+import { UI } from './core/ui-text.js';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 const pad = (n) => String(n).padStart(2, '0');
@@ -132,7 +133,7 @@ export function dateTimePicker(box, { input }) {
     const today = now();
     summary.textContent = `${dayLabel(d, today)} ${timeLabel(d.getHours(), d.getMinutes())}에 알려요`;
     summary.classList.toggle('past', d <= today);
-    if (d <= today) summary.textContent = '이미 지난 시각이에요. 앞으로의 시각을 골라 주세요';
+    if (d <= today) summary.textContent = UI.pastTime;
     input.dispatchEvent(new Event('input')); // 알림 패널이 이미 지난 미리 알림을 다시 가리게
   };
 

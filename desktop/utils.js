@@ -14,6 +14,8 @@ import { normalizeMagicSettings } from '../app/js/core/magic-modules.js';
 import { APP_DIR, APP_ICON_PNG } from './window-utils.js';
 import { cleanOverrides } from '../app/js/core/keymap.js';
 import { normalizeHours } from '../app/js/core/work-hours.js';
+import { POWERSHELL, psArgs, psOptions } from './powershell.js';
+import { UI } from '../app/js/core/ui-text.js';
 
 export const SMOKE = process.argv.includes('--smoke');
 export const APP_ID = 'com.memoking.desktop';
@@ -249,8 +251,8 @@ export function copyFileToClipboard(p) {
     if (process.platform === 'win32') {
       const list = path.join(os.tmpdir(), `memoking-copy-${process.pid}-${Date.now()}.txt`);
       fs.writeFileSync(list, `${p}\r\n`, 'utf8');
-      execFile('powershell.exe', ['-STA', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', CLIPBOARD_HELPER, '-Action', 'files', '-ListFile', list],
-        { cwd: os.tmpdir(), windowsHide: true, timeout: 15000 }, (err) => {
+      execFile(POWERSHELL, psArgs(['-File', CLIPBOARD_HELPER, '-Action', 'files', '-ListFile', list], { sta: true }),
+        psOptions({ timeout: 15000 }), (err) => {
           if (err) console.error('파일을 클립보드에 넣지 못했어요', err.message);
           fs.rmSync(list, { force: true });
           resolve(!err);
@@ -273,8 +275,8 @@ export function copyImageToClipboard(file) {
     smokeClipboard.push(file);
     return;
   }
-  execFile('powershell.exe', ['-STA', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', CLIPBOARD_HELPER, '-Action', 'image', '-ImageFile', file],
-    { cwd: os.tmpdir(), windowsHide: true }, (err) => {
+  execFile(POWERSHELL, psArgs(['-File', CLIPBOARD_HELPER, '-Action', 'image', '-ImageFile', file], { sta: true }),
+    psOptions(), (err) => {
       if (err) console.error('캡처한 그림을 클립보드에 넣지 못했어요', err.message);
       setTimeout(() => fs.rmSync(file, { force: true }), 5000);
     });
@@ -282,7 +284,7 @@ export function copyImageToClipboard(file) {
 
 // ---------- 원격 그림 다운로드 ----------
 export async function fetchRemoteImage(vault, url) {
-  if (!vault) throw new Error('메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요');
+  if (!vault) throw new Error(UI.noVault);
   const target = new URL(url);
   if (!/^https?:$/.test(target.protocol)) throw new Error('인터넷 주소(http, https)만 받을 수 있어요.');
   const controller = new AbortController();

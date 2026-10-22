@@ -2,6 +2,7 @@
 import { PAPERS, RATIOS, MARGINS, pageSize, keepRatio, ratioLabel, mmToPx, clampPrintScale } from './core/pdf-page.js';
 import { attachSliders } from './seg-slider.js';
 import { flipFrom, radioGroups } from './dom.js';
+import { UI } from './core/ui-text.js';
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
@@ -230,7 +231,7 @@ $('form').addEventListener('submit', async (e) => {
 });
 
 const memo = await api.pdf.memo(id);
-$('heading').textContent = memo ? `"${memo.title}" PDF로 저장` : 'PDF로 저장';
+$('heading').textContent = memo ? `"${memo.title}" PDF로 저장` : UI.saveAsPdf;
 render();
 document.documentElement.dataset.ready = 'true';
 

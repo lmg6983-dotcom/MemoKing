@@ -1,6 +1,7 @@
 // 예약 알림 실행기 — 15초마다 모든 메모의 알림을 살펴 울릴 때가 된 것을 울린다.
 // 울리기 "전에" 먼저 울림 표시(last)를 파일에 적어, 같은 알림이 두 번 울리지 않게 한다.
 import { dueOccurrence, dueAtStartup, markFired } from '../app/js/core/reminders.js';
+import { UI } from '../app/js/core/ui-text.js';
 
 /**
  * @param {{ getVault: () => import('./vault.js').Vault | null,
@@ -23,13 +24,13 @@ export function createAlarmRunner({ getVault, fire, now = () => new Date(), inte
       try {
         marked = vault.updateReminder(memoId, markFired(reminder, t));
       } catch (err) {
-        console.error('울림 표시를 적지 못했습니다', err); // 이 메모만 건너뛰고 다른 알림은 계속
+        console.error(UI.ringMarkFail, err); // 이 메모만 건너뛰고 다른 알림은 계속
       }
       if (!marked) continue;
       try {
         fire(memoId, reminder, info);
       } catch (err) {
-        console.error('알림을 울리지 못했습니다', err);
+        console.error(UI.ringFail, err);
       }
       count++;
     }

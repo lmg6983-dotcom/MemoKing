@@ -7,9 +7,9 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { parseCfHtml, htmlHasText } from '../app/js/core/clipboard-html.js';
 import { mediaKindOf } from '../app/js/core/memo-file.js';
+import { POWERSHELL, psArgs, psOptions } from './powershell.js';
 
 // ---------- 상주 도우미 ----------
 
@@ -23,9 +23,7 @@ export class CaptureHelper {
 
   start() {
     if (this.proc) return this.ready;
-    const proc = spawn('powershell.exe', [
-      '-STA', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', this.scriptPath, '-Action', 'serve',
-    ], { cwd: os.tmpdir(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] }); // cwd: 설치 폴더를 붙잡지 않게 (업데이트)
+    const proc = spawn(POWERSHELL, psArgs(['-File', this.scriptPath, '-Action', 'serve'], { sta: true }), psOptions({ stdio: ['pipe', 'pipe', 'pipe'] }));
     this.proc = proc;
     let markReady;
     this.ready = new Promise((resolve) => (markReady = resolve));
@@ -51,7 +49,7 @@ export class CaptureHelper {
 
   async request(line, timeout = 10_000) {
     if (!this.proc) this.start();
-    if (!(await this.ready)) throw new Error('도우미를 시작하지 못했습니다');
+    if (!(await this.ready)) throw new Error('도우미를 시작하지 못했어요');
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         const i = this.waiting.indexOf(entry);

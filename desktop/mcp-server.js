@@ -220,7 +220,7 @@ server.registerTool('create_memo', {
 
 server.registerTool('append_to_memo', {
   title: '메모에 덧붙이기',
-  description: '이미 있는 메모의 끝에 내용을 덧붙입니다 (지우거나 고치지 않음). memo 에는 id 또는 정확한 제목 (모르면 search_memos 로 먼저 찾기).',
+  description: '이미 있는 메모의 끝에 내용을 덧붙입니다 (삭제하거나 고치지 않음). memo 에는 id 또는 정확한 제목 (모르면 search_memos 로 먼저 찾기).',
   inputSchema: { memo: z.string().describe('메모 id 또는 제목'), content: z.string().min(1).describe('덧붙일 마크다운') },
   annotations: { readOnlyHint: false, destructiveHint: false },
 }, async ({ memo, content }) => {
@@ -252,7 +252,7 @@ server.registerTool('append_to_memo', {
     }
     if (saved?.refused) {
       return fail(saved.retry
-        ? `"${m.title}" 메모 파일이 보이지 않아 덧붙이지 못했어요 (지워졌거나 동기화 중일 수 있어요). 잠시 뒤 다시 해 주세요.`
+        ? `"${m.title}" 메모 파일이 보이지 않아 덧붙이지 못했어요 (삭제됐거나 동기화 중일 수 있어요). 잠시 뒤 다시 해 주세요.`
         : `"${m.title}" 은(는) 방금 다른 기기에서 잠겨 덧붙이지 못했어요.`);
     }
     return text({ ok: true, id: m.id, title: m.title });

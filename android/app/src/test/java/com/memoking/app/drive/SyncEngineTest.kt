@@ -157,7 +157,7 @@ class SyncEngineTest {
         sync()
         local.delete("휴대폰.md")
         assertEquals(1, sync().deletedRemote)
-        assertNull("휴대폰에서 지우면 Drive 휴지통으로", drive.path("휴대폰.md"))
+        assertNull("휴대폰에서 삭제하면 Drive 휴지통으로", drive.path("휴대폰.md"))
 
         // PC 에서 메모를 휴지통으로 옮김 (_memoking/trash 로 이름 바뀜)
         val f = drive.path("회의.md")!!

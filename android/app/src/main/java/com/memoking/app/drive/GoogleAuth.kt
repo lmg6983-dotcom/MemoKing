@@ -186,7 +186,7 @@ object GoogleAuth {
                 }
             }
         } catch (e: SocketTimeoutException) {
-            throw AuthError("로그인을 기다리다 시간이 지났어요. 다시 시도해 주세요")
+            throw AuthError("로그인을 기다리다 시간이 지났어요. 다시 해 주세요")
         } catch (e: java.net.SocketException) {
             throw AuthError("로그인을 취소했어요")
         } finally {
@@ -194,7 +194,7 @@ object GoogleAuth {
             if (pendingServer === server) pendingServer = null
         }
         val params = received!!
-        if (params["state"] != state) throw AuthError("로그인 확인 값이 맞지 않아요. 다시 시도해 주세요")
+        if (params["state"] != state) throw AuthError("로그인 확인 값이 맞지 않아요. 다시 해 주세요")
         val code = params["code"] ?: throw AuthError(if (params["error"] == "access_denied") "로그인을 취소했어요" else "로그인하지 못했어요 (${params["error"]})")
 
         val token = post(
@@ -204,7 +204,7 @@ object GoogleAuth {
                 "redirect_uri" to redirect, "grant_type" to "authorization_code", "code_verifier" to verifier,
             ),
         )
-        val refresh = token.optString("refresh_token").ifEmpty { throw AuthError("구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 시도해 주세요") }
+        val refresh = token.optString("refresh_token").ifEmpty { throw AuthError("구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 해 주세요") }
         // 허용 화면에서 Drive 전체 칸을 빼고 허용할 수도 있다 — 그러면 켜지 않고 지금 연결 그대로
         if (full && FULL_SCOPE !in token.optString("scope", scope).split(' ')) throw AuthError("Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요")
         accessToken = token.getString("access_token")
@@ -226,7 +226,7 @@ object GoogleAuth {
 
     private fun page(ok: Boolean): String {
         val title = if (ok) "메모킹에 Google Drive를 연결했어요" else "연결하지 못했어요"
-        val sub = if (ok) "아래 버튼을 눌러 메모킹으로 돌아가세요." else "메모킹으로 돌아가 다시 시도해 주세요."
+        val sub = if (ok) "아래 버튼을 눌러 메모킹으로 돌아가세요." else "메모킹으로 돌아가 다시 해 주세요."
         return """<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>메모킹</title><style>body{font-family:system-ui,sans-serif;background:#f6f5f1;color:#111;display:grid;place-items:center;min-height:90vh;margin:0;text-align:center;padding:24px}
 a{display:inline-block;margin-top:20px;padding:14px 28px;border-radius:14px;background:#ffcc00;color:#111;font-weight:700;text-decoration:none;font-size:17px}h1{font-size:22px}</style></head>
@@ -280,7 +280,7 @@ a{display:inline-block;margin-top:20px;padding:14px 28px;border-radius:14px;back
             }
             throw AuthError("Google 로그인 오류: $err")
         }
-        if (code !in 200..299) throw IOException("Google 서버에 문제가 있어요 ($code). 잠시 뒤 다시 시도해 주세요")
+        if (code !in 200..299) throw IOException("Google 서버에 문제가 있어요 ($code). 잠시 뒤 다시 해 주세요")
         return if (text.isBlank()) JSONObject() else JSONObject(text)
     }
 }

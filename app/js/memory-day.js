@@ -2,11 +2,11 @@
 //   여행 기록을 다녀와서 정리할 때처럼 만든 날과 그날이 다를 때 쓴다. PC 메모 창 · 목록 카드 메뉴 · 휴대폰 메모 메뉴가 같이 쓴다.
 import { dayKey, keyDate } from './core/memories.js';
 import { icon } from './icons.js';
+import { WEEKDAY } from './core/time.js';
 
-const WEEK = '일월화수목금토';
 const label = (key) => {
   const d = keyDate(key);
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEK[d.getDay()]})`;
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY[d.getDay()]})`;
 };
 const short = (key) => {
   const d = keyDate(key);

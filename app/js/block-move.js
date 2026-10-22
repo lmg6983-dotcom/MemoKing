@@ -26,6 +26,7 @@ import { isContextMenuOpen } from './ctx-menu.js';
 import { haptic } from './dom.js';
 import { hintOnce } from './hints.js';
 import { renameTarget, renameContent, cleanName, promptName } from './rename-content.js';
+import { UI } from './core/ui-text.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
 
@@ -507,7 +508,7 @@ class Mover {
         const host = e.target instanceof Element ? e.target.closest(HOVER_TARGET) : null;
         if (!host || !view.dom.contains(host) || this.busy() || isContextMenuOpen()) return;
         hoverTimer = setTimeout(() => {
-          if (host.isConnected && host.matches(':hover') && !this.busy()) hintOnce('content-menu', '오른쪽 클릭하면 잘라내기, 복사, 저장, 공유, 지우기 메뉴가 떠요', { anchor: host });
+          if (host.isConnected && host.matches(':hover') && !this.busy()) hintOnce('content-menu', '오른쪽 클릭하면 잘라내기, 복사, 저장, 공유, 삭제 메뉴가 떠요', { anchor: host });
         }, 1200);
       };
       view.dom.addEventListener('mouseover', this.onHoverHint);
@@ -854,7 +855,7 @@ class Mover {
     frames.set('target', target);
     frames.set('slot', slot);
     const kind = d.drop?.kind ?? null;
-    frames.label(kind, kind === 'swap' ? '⇅ 맞바꾸기' : kind === 'insert' ? '↳ 여기에 넣기' : '', { x: d.x, y: d.y }, d.kind);
+    frames.label(kind, kind === 'swap' ? UI.swapHere : kind === 'insert' ? UI.dropHere : '', { x: d.x, y: d.y }, d.kind);
   }
 
   finish(commit) {
@@ -921,8 +922,8 @@ class Mover {
     // 표는 편집기가 감싼 상자(.tableWrapper)에 단추를 붙인다 (표 막대 · 크기 손잡이와 같은 자리)
     const target = media ?? (block.node.type.name === 'table' ? dom.closest('.tableWrapper') ?? dom.querySelector('.tableWrapper') ?? dom : dom);
     this.shownTarget = target;
-    const copyLabel = block.node.type.name === 'mk_link_card' ? '링크 주소 복사' : null; // 카드 모양이 아니라 주소를
-    const opts = { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
+    const copyLabel = block.node.type.name === 'mk_link_card' ? UI.copyLink : null; // 카드 모양이 아니라 주소를
+    const opts = { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 삭제`, copyLabel, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
     // PC 메뉴: 파일 · 소리 · 그림 · 음성 카드는 보이는 이름을 바꿀 수 있다 (rename-content.js)
     if (canContentMenu() && renameTarget(view.state.doc, block.pos, block.node)) {
       opts.extraItems = [{ id: 'rename', label: '이름 변경' }];
@@ -970,8 +971,8 @@ class Mover {
         { id: 'cut', label: '잘라내기', hint: 'Ctrl+X', disabled: sel.empty },
         { id: 'copy-text', label: '복사', hint: 'Ctrl+C', disabled: sel.empty },
         { id: 'paste', label: '붙여넣기', hint: 'Ctrl+V' },
-        { id: 'paste-plain', label: '서식 없이 붙여넣기', hint: 'Ctrl+Shift+V' },
-        ...(sel.empty ? [] : [{ id: 'clear-format', label: '서식 지우기', hint: 'Ctrl+\\' }]),
+        { id: 'paste-plain', label: UI.pastePlain, hint: 'Ctrl+Shift+V' },
+        ...(sel.empty ? [] : [{ id: 'clear-format', label: UI.clearFormat, hint: 'Ctrl+\\' }]),
         { type: 'separator' },
         { id: 'toList', label: '표를 목록으로' },
         { id: 'toTask', label: '표를 체크리스트로' },

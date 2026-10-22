@@ -93,7 +93,6 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   padding: 0 6px 0 16px;
 }
 .brand-icon { width: 28px; height: 28px; }
-.brand { margin-left: 8px; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 
 /* 맨 위: 첫 줄은 로고 · Life | Work · 동기화 · 설정, 둘째 줄은 검색칸 + 보기 단추 (검색칸이 넓게) */
 .searchbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px; padding: 8px 6px 8px 12px; flex: none; }
@@ -1246,7 +1245,6 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .note-screen .mk-audio .mk-media-label::after,
 .note-screen .mk-voice-body > p:first-child .mk-media-label::after { content: "\22EF"; margin-left: auto; padding: 0 8px; font-size: 22px; line-height: 1; opacity: 0.7; }
 /* 정렬: 기본(최신순)이 아니면 단추에 표시 (필터처럼) */
-.sort-btn.active { background: var(--brand-yellow-soft); color: var(--text-strong); }
 
 /* 메모킹 Work / Life 고르기: 검색 왼쪽에 작게 (손가락 높이 44px 은 둘레 칸으로) */
 .searchbar .brand-mark { margin: 0 8px 0 4px; }

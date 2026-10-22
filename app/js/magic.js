@@ -2,6 +2,8 @@ import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
 import { looksLikeRef } from './core/magic-modules.js';
 import { searchingNode } from './searching.js';
+import { COLOR_DOTS } from './core/memo-file.js';
+import { UI } from './core/ui-text.js';
 // 매직키 창 — 입력한 글을 바로 메모로(기본), 입력하는 대로 메모·폴더·파일을 찾아 바로 연다.
 //   비어 있으면 최근 메모 · 쓰면 맨 위 "새 메모로 저장" 그 아래 메모 / 폴더 / 파일 (비슷한 것부터 몇 개씩)
 //   다 못 보여 준 나머지는 맨 아래 "다른 n건 더 보기" — 고르면 전체 결과 창(모두 찾기)
@@ -16,7 +18,6 @@ const resultsEl = document.getElementById('magic-results');
 const modulesEl = document.getElementById('magic-modules');
 const hintEl = document.getElementById('magic-hint');
 
-const COLORS = { yellow: '#ffe58a', green: '#c8ecb4', pink: '#ffc9d6', purple: '#dccbff', blue: '#bfe0ff', gray: '#e3e3e3', charcoal: '#3b3b3b' };
 
 let modules = []; // { id, name, description, on }
 let rows = []; // { kind: 'new' | 'note' | 'folder' | 'file', ... }
@@ -140,7 +141,7 @@ function row(r, index, query) {
   } else if (r.kind === 'note') {
     const dot = document.createElement('span');
     dot.className = 'dot';
-    dot.style.background = COLORS[r.color] ?? COLORS.yellow;
+    dot.style.background = COLOR_DOTS[r.color] ?? COLOR_DOTS.yellow;
     ico.append(dot);
     t.append(highlighted(r.title || '제목 없음', query));
     s.append(highlighted(r.snippet || '', query));
@@ -225,7 +226,7 @@ function render() {
     nodes.push(note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요. Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`));
   }
   if (query && isOn('files') && results.index && !results.index.count) {
-    nodes.push(note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : '파일 목록이 아직 없어요'));
+    nodes.push(note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : UI.noFileIndex));
   }
   resultsEl.replaceChildren(...nodes);
   box.classList.toggle('has-results', nodes.length > 0);

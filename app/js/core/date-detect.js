@@ -7,13 +7,12 @@
 //   날짜 뒤 시각:  오후 3시 · 3시 반 · 3시 20분 · 15:30 · 세 시 · 열한 시 반 · 저녁(시각 없이 때만: 19시)
 //   시각만:        오전·오후 없는 1~6시는 오후, 7~11시는 오전. 이미 지났으면 찾지 않음 (새벽·자정은 다음 날로)
 
-import { startOfDay, addDays } from './time.js';
+import { startOfDay, addDays, WEEKDAY as WEEKDAYS } from './time.js';
 
 // 하루·한 주 뒤는 달력으로 더한다 (서머타임이 바뀌는 날에도 같은 시각이 되게)
 const plusDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes());
 export const DEFAULT_HOUR = 9; // 날짜만 적었으면 그날 아침 9시
 
-const WEEKDAYS = '일월화수목금토';
 // 앞이 숫자·영문이면 다른 말의 일부 ("2026년" 의 "26년" 같은)
 const NOT_AFTER = '(?<![0-9A-Za-z])';
 const NOT_AFTER_HANGUL = '(?<![가-힣])';

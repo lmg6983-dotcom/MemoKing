@@ -1,6 +1,5 @@
 // 메모 화면 — 데스크탑 스티커 창(app/js/note.js)을 휴대폰 한 화면으로.
 // 편집기(app/js/editor.js)·예약 알림 패널(app/js/reminder-panel.js)은 데스크탑과 같은 코드를 쓴다.
-import { icon } from '../../app/js/icons.js';
 import { createNoteEditor } from '../../app/js/editor.js';
 import { setCopyHost } from '../../app/js/copy-content.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from '../../app/js/core/html-marks.js';
@@ -33,12 +32,14 @@ import * as recorder from './recorder.js';
 import { setupAnnotation } from '../../app/js/ink-annotate.js';
 import { autoTagsFor } from '../../app/js/core/auto-tags.js';
 import { conflictCopyBody, isBlankBody, sameBody } from '../../app/js/core/memo-file.js';
-import { haptic, reduceMotion, replayClass, swipeDismiss } from '../../app/js/dom.js';
+import { haptic, reduceMotion, replayClass, swipeDismiss, EASE_OUT } from '../../app/js/dom.js';
 import { createFindBar } from '../../app/js/find-bar.js';
 import { createClearStamp } from '../../app/js/clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from '../../app/js/suggest-chips.js';
 import { setTouchMode, penJustTouched } from '../../app/js/keyboard-guard.js';
 import { setupModeKnob, MODES } from './mode-knob.js';
+import { UI } from '../../app/js/core/ui-text.js';
+import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from '../../app/js/note-shared.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -50,7 +51,6 @@ const el = {
   linksBtn: $('links-btn'),
   linksCount: $('links-count'),
   banner: $('banner'),
-  bannerText: $('banner-text'),
   bannerLoad: $('banner-load'),
   linksPanel: $('links-panel'),
   linkSearch: $('link-search'),
@@ -89,7 +89,7 @@ let closingSave = false; // closeNote 가 저장을 마무리하는 중
 export const currentId = () => id;
 
 // ---------- 메모 안 찾기 · 바꾸기 (메모 메뉴 › 찾기, 바꾸기 · 키보드를 붙인 태블릿은 Ctrl+F · Ctrl+H) ----------
-const findBar = createFindBar({ host: document.getElementById('note-screen'), after: document.querySelector('#note-screen > .bar'), find: () => editor?.find, notify: (text, o) => toast(text, false, o?.undo ? { label: '되돌리기', run: o.undo } : null) });
+const findBar = createFindBar({ host: document.getElementById('note-screen'), after: document.querySelector('#note-screen > .bar'), find: () => editor?.find, notify: (text, o) => toast(text, false, o?.undo ? { label: '되돌리기', run: o.undo } : null), onReplace: () => useEditMode() }); // 바꾸기를 펼치면 글 고치기로
 export const openFind = (o) => editor && findBar.open(o);
 /** 열려 있으면 닫는다 → 닫았으면 true (뒤로 가기) */
 export const closeFind = () => findBar.close({ focus: false });
@@ -158,7 +158,7 @@ export function flush() {
       // 다른 기기가 이 메모를 잠갔다 — 사본으로 남겼으면 쓴 글은 안전, 아니면 닫을 때 사본으로 (closeNote)
       if (r.copied) {
         saved = body;
-        setStatus('다른 기기에서 이 메모를 잠가, 쓰던 내용은 사본 메모로 남겼어요', true);
+        setStatus(UI.lockedElsewhereCopy, true);
       } else {
         refusedSave = true;
         setStatus('잠긴 메모라 저장하지 못했어요', true);
@@ -171,7 +171,7 @@ export function flush() {
   } catch (err) {
     console.error(err);
     refusedSave = true; // 이대로 닫으면 사본 메모로라도 남긴다 (closeNote)
-    setStatus('저장하지 못했어요. 저장 위치를 확인해 주세요', true);
+    setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
   }
 }
 
@@ -182,7 +182,7 @@ function applyExternal(next) {
   current = saved = editor.getMarkdown();
   el.banner.hidden = true;
   pendingExternal = null;
-  setStatus('바뀐 내용을 불러왔어요');
+  setStatus(UI.reloaded);
 }
 
 /** 이전 버전으로 되돌린 내용을 지금 화면에 */
@@ -200,7 +200,7 @@ export function lockChanged(locked) {
 export function onVaultChanged({ ids, external, removed }) {
   if (!id || !editor || closingSave) return; // 닫는 중 다시 읽은 것은 closeNote 가 맡는다 (사본·닫기를 두 번 하지 않게)
   if (removed.includes(id)) {
-    showBanner('이 메모가 저장 위치에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
+    showBanner('이 메모가 메모 폴더에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
     return;
   }
   if (external.includes(id)) {
@@ -210,12 +210,12 @@ export function onVaultChanged({ ids, external, removed }) {
       // 다른 기기에서 이 메모를 잠갔거나(여기선 안 잠긴 메모) 다른 비밀번호로 다시 잠갔다 — 덮어쓰지 않는다.
       // 아직 저장 못 한 쓰던 글은 사본 메모로 먼저 남기고 닫는다 (PC 와 같게, 쓰던 글이 사라지지 않게)
       const wasLocked = Boolean(memo?.locked);
-      const what = wasLocked ? '다른 기기에서 이 메모의 비밀번호를 바꿨어요.' : '다른 기기에서 이 메모를 잠갔어요.';
+      const what = wasLocked ? UI.passwordChangedElsewhere : UI.lockedElsewhere;
       let kept = '';
       if (isDirty() && !isBlankBody(current)) {
         try {
           const copy = wasLocked ? app.vault.importCopyOf(id, current, { color: next.color }) : app.vault.import({ body: current, color: next.color });
-          if (copy) kept = wasLocked ? ' 쓰던 내용은 예전 비밀번호로 잠근 사본 메모로 남겼어요.' : ' 쓰던 내용은 사본 메모로 따로 남겼어요.';
+          if (copy) kept = wasLocked ? UI.copyOldPassword : UI.copyKept;
         } catch (err) {
           console.error(err);
         }
@@ -263,20 +263,14 @@ function keepTheirsAsCopy(next) {
   }
   if (!copied) {
     pendingExternal = next;
-    showBanner('다른 기기에서 이 메모가 바뀌었어요.', { load: '바뀐 내용 보기', keep: '지금 내용 두기' });
+    showBanner(UI.changedElsewhere, { load: UI.showChanges, keep: UI.keepMine });
     return;
   }
   flush(); // 들어온 내용으로 바뀐 파일을 지금 쓰는 글로
-  showBanner(conflictCopy ? '다른 기기에서도 이 메모를 고쳤어요. 그쪽 내용은 따로 저장해 뒀어요.' : '다른 기기에서도 이 메모를 고쳤어요.', { load: conflictCopy ? '그쪽 내용 보기' : null, keep: '확인' });
+  showBanner(conflictCopy ? UI.conflictSaved : UI.conflict, { load: conflictCopy ? UI.showTheirs : null, keep: '확인' });
 }
 
-function showBanner(text, { load = null, keep = '지금 내용 두기' } = {}) {
-  el.bannerText.textContent = text;
-  el.bannerLoad.hidden = !load;
-  if (load) el.bannerLoad.textContent = load;
-  $('banner-keep').textContent = keep;
-  el.banner.hidden = false;
-}
+const showBanner = (text, { load = null, keep = UI.keepMine } = {}) => showNoteBanner(text, { load, keep });
 
 // 고를 것이 없는 안내("다른 기기에서도 고쳤어요 · 확인")는 옆으로 밀어 닫는다 — 바뀐 내용을 볼지 고르는 중이면 제자리로
 swipeDismiss(el.banner, () => $('banner-keep').click(), { can: () => !pendingExternal });
@@ -324,44 +318,17 @@ el.screen.addEventListener('animationend', (e) => {
 
 // ---------- 연결 패널 ----------
 
-function linkItem(target, { onRemove, onAdd, score } = {}) {
-  const li = document.createElement('li');
-  li.className = 'link-item';
-  const open = document.createElement('button');
-  open.className = 'link-open';
-  open.dataset.color = target.color;
-  const dot = document.createElement('span');
-  dot.className = 'link-dot';
-  const title = document.createElement('span');
-  title.textContent = target.title;
-  open.append(dot, title);
-  open.addEventListener('click', () => {
+const linkItem = (target, opts = {}) => sharedLinkItem(target, {
+  ...opts,
+  onOpen: () => {
     closeSheet(el.linksPanel);
     app.openMemo(target.id);
-  });
-  li.append(open);
-  if (score != null) {
-    const s = document.createElement('span');
-    s.className = 'link-score';
-    s.textContent = `${Math.round(score * 100)}%`;
-    li.append(s);
-  }
-  const addBtn = (name, label, handler) => {
-    const b = document.createElement('button');
-    b.className = 'icon-btn';
-    b.setAttribute('aria-label', `${target.title} ${label}`);
-    b.append(icon(name));
-    b.addEventListener('click', handler);
-    li.append(b);
-  };
-  if (onAdd) addBtn('plus', '연결하기', onAdd);
-  if (onRemove) addBtn('close', '연결 끊기', onRemove);
-  return li;
-}
+  },
+});
 
 function setLink(targetId, on) {
   flush();
-  if (!app.vault.link(id, targetId, on)) toast('연결을 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
+  if (!app.vault.link(id, targetId, on)) toast(UI.linkSaveFail, true);
   el.linkSearch.value = '';
   el.linkResults.replaceChildren();
   refreshLinks();
@@ -595,7 +562,7 @@ async function saveFile(file) {
 async function fetchImage(src) {
   if (isDataImage(src)) {
     const image = decodeDataImage(src);
-    if (!image) throw new Error('지원하지 않는 그림 형식이에요. PNG, JPG, GIF, WebP 그림을 써 주세요');
+    if (!image) throw new Error(UI.imageType);
     return app.vault.saveAttachment(image.bytes, image.ext);
   }
   return fetchRemoteImage(app.vault, src);
@@ -645,7 +612,7 @@ async function pasteClipboardFiles(text) {
       setStatus(files.length > 1 ? `파일 ${files.length}개를 붙여 넣었어요` : '붙여 넣었어요');
     } catch (err) {
       console.error(err);
-      setStatus('붙여 넣지 못했어요. 다시 시도해 주세요', true);
+      setStatus('붙여 넣지 못했어요. 다시 해 주세요', true);
     }
     return;
   }
@@ -681,7 +648,7 @@ async function pickAndInsert(accept) {
     setStatus(`파일 ${items.length}개를 추가했어요`);
   } catch (err) {
     console.error(err);
-    setStatus('파일을 추가하지 못했어요. 다시 시도해 주세요', true);
+    setStatus(UI.fileAddFail, true);
   }
 }
 
@@ -736,78 +703,20 @@ const PALETTES = {
   color: { title: '글자 색', colors: TEXT_COLORS, apply: (c) => editor.setTextColor(c) },
   highlight: { title: '형광펜', colors: HIGHLIGHT_COLORS, apply: (c) => editor.setHighlight(c) },
 };
-const lastColor = { color: TEXT_COLORS[0].value, highlight: HIGHLIGHT_COLORS[0].value };
-// 지금 커서·고른 글자에 칠해진 색 (showActive 가 채움) — 판에서 같은 색을 다시 누르면 지우고, 판에 지금 색을 표시
-const appliedColor = { color: null, highlight: null };
-const sameColor = (a, b) => Boolean(a && b) && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
-try {
-  Object.assign(lastColor, JSON.parse(localStorage.getItem('memoking.lastColor') ?? '{}'));
-} catch {
-  // 기본색
-}
-let paletteKind = null;
-
-function paintSwatchBars() {
-  for (const bar of document.querySelectorAll('[data-bar]')) bar.style.background = lastColor[bar.dataset.bar];
-}
-
-function openPalette(kind, anchor) {
-  const def = PALETTES[kind];
-  paletteKind = kind;
-  $('palette-title').textContent = def.title;
-  $('palette-swatches').replaceChildren(...def.colors.map(({ name, value }) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'palette-swatch';
-    b.dataset.color = value;
-    b.setAttribute('aria-label', `${def.title} ${name}`);
-    if (kind === 'color') {
-      b.textContent = 'A';
-      b.classList.add('text-sample');
-      b.style.color = value;
-    } else b.style.background = value;
-    b.setAttribute('aria-checked', String(sameColor(value, appliedColor[kind] ?? lastColor[kind])));
-    if (sameColor(value, appliedColor[kind])) b.title = '다시 누르면 색을 지워요';
-    return b;
-  }));
-  el.palette.hidden = false;
-  const rect = anchor.getBoundingClientRect();
-  const width = el.palette.offsetWidth;
-  el.palette.style.left = `${Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8)}px`;
-  el.palette.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 8)}px`;
-}
-
-export function closePalette() {
-  if (el.palette.hidden) return false;
-  el.palette.hidden = true;
-  paletteKind = null;
-  return true;
-}
-
-function applyPaletteColor(color) {
-  const kind = paletteKind;
-  if (!kind) return;
-  if (color && sameColor(color, appliedColor[kind])) color = null; // 지금 칠해진 색을 다시 고르면 지운다
-  if (color) {
-    lastColor[kind] = color;
-    try {
-      localStorage.setItem('memoking.lastColor', JSON.stringify(lastColor));
-    } catch {
-      // 무시
-    }
-    paintSwatchBars();
-  }
-  PALETTES[kind].apply(color);
-  closePalette();
-}
-
-el.palette.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 선택 유지
-el.palette.addEventListener('click', (e) => {
-  // 색 칩만 (판 밖의 [data-color] — 메모 창 자체의 메모 색 — 을 잡으면 "색 지우기"가 그 색으로 칠해 버린다)
-  const swatch = e.target.closest('.palette-swatch[data-color]');
-  if (swatch) applyPaletteColor(swatch.dataset.color);
-  else if (e.target.closest('#palette-clear')) applyPaletteColor(null);
+// 색판은 PC 와 같은 코드 (note-shared.js) — 휴대폰은 누른 버튼 위 가운데에 띄운다
+const palette = createPalette({
+  palette: el.palette,
+  palettes: PALETTES,
+  place: (pop, anchor) => {
+    const rect = anchor.getBoundingClientRect();
+    const width = pop.offsetWidth;
+    pop.style.left = `${Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8)}px`;
+    pop.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 8)}px`;
+  },
 });
+const { applied: appliedColor, last: lastColor } = palette;
+/** 열려 있던 색판을 닫았으면 true */
+export const closePalette = () => palette.close();
 
 // ---------- 서식 도구막대 ----------
 
@@ -936,7 +845,7 @@ function applyPreset(kind, btn) {
     delete btn.dataset.longPressed; // 꾹 눌러 판을 연 손가락을 뗀 것 — 색은 판에서
     return;
   }
-  if (paletteKind) return closePalette();
+  if (palette.kind) return closePalette();
   // 누르기 = 켜고 끄기: 이미 칠해져 있으면 지우고, 아니면 지난번 색으로 (PC 단축키 Ctrl+Shift+C·H 와 같음)
   if (kind === 'color') editor.toggleTextColor(lastColor.color);
   else editor.toggleHighlight(lastColor.highlight);
@@ -953,7 +862,7 @@ for (const btn of el.formatBar.querySelectorAll('[data-action="color"], [data-ac
       haptic(12);
       closeStyleMenu();
       closeAddMenu();
-      openPalette(btn.dataset.action, btn);
+      palette.open(btn.dataset.action, btn);
     }, 450);
   });
   for (const t of ['pointerup', 'pointercancel', 'pointerleave']) btn.addEventListener(t, () => clearTimeout(timer));
@@ -1014,7 +923,7 @@ window.addEventListener('mk:media-error', (e) => {
 
 // 내용을 지우거나 잘라냈으면: 되돌리기 단추가 있는 안내 (↶ 와 같은 기록으로 되돌림)
 window.addEventListener('mk:removed', (e) => {
-  const { what = '내용', verb = '지웠어요' } = e.detail ?? {};
+  const { what = '내용', verb = '삭제했어요' } = e.detail ?? {};
   const josa = /[가-힣]$/.test(what) && (what.charCodeAt(what.length - 1) - 0xac00) % 28 ? '을' : '를';
   toast(`${what}${josa} ${verb}`, false, { label: '되돌리기', run: () => editor && pressKey('z', false) });
 });
@@ -1029,34 +938,7 @@ function showTableBar(table) {
     placeKnob(); // + · 다이얼을 표 막대 위로 (닫히면 제자리)
   }
   for (const b of document.querySelectorAll('[data-action="table"]')) b.classList.toggle('active', Boolean(table));
-  if (!table) return;
-  const bar = el.tableBar;
-  const delRow = bar.querySelector('[data-table="delRow"]');
-  const delCol = bar.querySelector('[data-table="delCol"]');
-  const setBtn = (b, label, title) => {
-    b.querySelector('.lbl').textContent = label;
-    b.title = title;
-    b.setAttribute('aria-label', `${b.closest('.tb-group')?.getAttribute('aria-label') ?? ''} ${label}`.trim());
-  };
-  // 머리글 아래 행은 마지막 하나까지 지울 수 있다. 머리글 행만 남았을 때 머리글에서 누르면, 열이 하나뿐일 때 누르면 표 전체를 지운다
-  const lastRow = table.header && table.rows <= 1;
-  delRow.disabled = table.header && !lastRow;
-  delRow.dataset.wholeTable = lastRow ? '1' : '';
-  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : '이 행 삭제');
-  delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
-  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : '이 열 삭제');
-  // 셀 병합: 여러 칸을 골랐으면 "병합", 병합한 칸 안이면 "병합 풀기"
-  const merge = bar.querySelector('[data-table="merge"]');
-  merge.disabled = !table.canMerge && !table.merged;
-  setBtn(merge, table.merged ? '병합 풀기' : '병합', table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : '합칠 칸들을 끌어서 골라 주세요');
-  bar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
-  // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만 (숨기지 않고 흐리게 — 커서를 옮길 때마다 단추가 생겼다 사라지지 않게)
-  const split = bar.querySelector('[data-table="splitTable"]');
-  const join = bar.querySelector('[data-table="joinTable"]');
-  split.disabled = !table.canSplit;
-  split.title = table.canSplit ? '커서가 있는 행부터 아래를 새 표로 (아래 표에도 머리글 행)' : '나눌 자리의 행(머리글 아래 두 번째 행부터)에 커서를 두세요';
-  join.disabled = !table.canJoin;
-  join.title = table.canJoin ? '바로 아래 표를 이 표에 이어 붙이기 (열 수가 같을 때)' : '바로 아래에 열 수가 같은 표가 있을 때 합칠 수 있어요';
+  if (table) paintTableBar(el.tableBar, table); // 버튼 상태는 PC 와 같은 코드 (note-shared.js)
 }
 // 덜 쓰는 표 도구(표 · 바꾸기)는 "⋯" 로 막대 위에 펼친다 — 막대가 한 줄만 차지하게. 하나를 고르거나 바깥을 누르면 접힌다
 const tableMoreBtn = $('table-more-btn');
@@ -1072,13 +954,8 @@ tableMoreBtn?.addEventListener('click', () => {
 document.addEventListener('pointerdown', (e) => {
   if (el.tableBar.classList.contains('more-open') && !el.tableBar.contains(e.target)) closeTableMore();
 }, true);
-el.tableBar.addEventListener('mousedown', (e) => e.preventDefault());
-el.tableBar.addEventListener('click', (e) => {
-  const b = e.target.closest('[data-table]');
-  if (!b || b.disabled) return;
-  // 마지막 남은 머리글 행 · 열을 지우면 표 전체를 지운다
-  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.dataset.wholeTable === '1';
-  editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
+bindTableBar(el.tableBar, (cmd, b) => {
+  editor.tableCommand(cmd);
   if (b.closest('.tb-more')) closeTableMore();
 });
 
@@ -1250,7 +1127,7 @@ el.editorRoot.addEventListener('pointerdown', (e) => {
   } catch {
     return;
   }
-  showGuide('글자 칸에 쓰면 글자로 바뀌어요. 톡 누르면 커서, 꾹 누르면 고르기예요. 키보드는 아래 키보드 단추로 꺼내요', 'S펜 손글씨', 4200);
+  showGuide('글자 칸에 쓰면 글자로 바뀌어요. 톡 누르면 커서, 꾹 누르면 고르기예요. 키보드는 아래 키보드 버튼으로 꺼내요', 'S펜 손글씨', 4200);
 }, true);
 
 function applyMode(mode, { user = false, quiet = false } = {}) {
@@ -1427,7 +1304,7 @@ export async function openNote(memoId, options = {}) {
   if (id) closeNote({ quiet: true });
   const next = app.vault.get(memoId);
   if (!next) {
-    toast('메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요', true);
+    toast(UI.memoMissing, true);
     return;
   }
   opening = (async () => {
@@ -1463,13 +1340,13 @@ export async function openNote(memoId, options = {}) {
             const now = app.vault.entries.get(memoId)?.body ?? memo.body;
             if (!isLockedBody(now)) {
               const opened = app.vault.get(memoId); // 그사이 다른 기기에서 잠금을 풀었다 — 그대로 연다
-              if (!opened) return '메모를 찾을 수 없어요. 이동했거나 삭제됐을 수 있어요';
+              if (!opened) return UI.memoMissing;
               memo = opened;
               return null;
             }
             const { session } = await openLock(now, password);
             const r = app.vault.openLock(memoId, session);
-            if (!r) return '메모를 열지 못했어요';
+            if (!r) return UI.memoOpenFail;
             memo = r;
             return null;
           } catch (err) {
@@ -1531,7 +1408,7 @@ export async function openNote(memoId, options = {}) {
       read: async () => (memo?.ink ? (await fetch(vaultUrl(memo.ink))).json() : null),
       save: async (data) => {
         const memoId = id; // 닫으면서 저장할 때도 그 메모에
-        const rel = data ? await saveFile(new File([JSON.stringify(data)], '글 위에 그리기.json', { type: 'application/json' })) : '';
+        const rel = data ? await saveFile(new File([JSON.stringify(data)], UI.annotateFile, { type: 'application/json' })) : '';
         if (memoId && app.vault.get(memoId) && !app.vault.setMeta(memoId, { ink: rel })) {
           toast('그린 것을 메모에 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true); // 파일이 잠깐 없는 등
           return;
@@ -1577,7 +1454,7 @@ function cardMorph(rect, opening, done = () => {}) {
   const frames = [{ clipPath: card, opacity: 0.55 }, { clipPath: full, opacity: 1 }];
   const anim = el.screen.animate(opening ? frames : frames.reverse(), opening
     ? { duration: 280, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' }
-    : { duration: 200, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'forwards' });
+    : { duration: 200, easing: EASE_OUT, fill: 'forwards' });
   anim.finished.then(() => {
     done();
     if (!opening) anim.cancel(); // 다음에 열 때 오려 낸 모양이 남지 않게
@@ -1616,9 +1493,9 @@ export function closeNote({ quiet = false } = {}) {
       // 사본도 남기지 못했다(저장 위치에 쓸 수 없음) — 쓰던 글을 잃지 않게 클립보드로
       try {
         native.copyText(current);
-        toast('저장하지 못해 쓰던 내용을 클립보드에 복사해 두었어요. 저장 위치를 확인해 주세요', true);
+        toast('저장하지 못해 쓰던 내용을 클립보드에 복사해 두었어요. 메모 폴더를 확인해 주세요', true);
       } catch {
-        toast('저장하지 못했어요. 저장 위치를 확인해 주세요', true);
+        toast('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
       }
     }
   }
@@ -1703,7 +1580,7 @@ function flushTables() {
   try {
     app.vault.setMeta(p.id, { tables: p.tables });
   } catch {
-    setStatus('표 크기를 저장하지 못했어요', true);
+    setStatus(UI.tableSizeFail, true);
   }
 }
 
@@ -1807,7 +1684,6 @@ export function editorMarkdown() {
   return current;
 }
 
-paintSwatchBars();
 
 export const getEditor = () => editor;
 

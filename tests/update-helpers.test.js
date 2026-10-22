@@ -8,13 +8,20 @@ const sources = fs.readdirSync(desktop).filter((f) => f.endsWith('.js') && !/smo
 
 // 업데이트가 "Failed to uninstall old application files" 로 멈추던 까닭 가운데 하나: 메모킹이 띄운 PowerShell 이 설치 폴더를
 // 작업 폴더로 물려받아 앱이 끝난 뒤에도 그 폴더를 붙잡았다. 새 도우미를 띄울 때 작업 폴더를 정하는 것을 잊지 않게
-test('PowerShell 도우미는 설치 폴더가 아닌 임시 폴더를 작업 폴더로 띄운다', () => {
+test('PowerShell 도우미는 설치 폴더가 아닌 임시 폴더를 작업 폴더로 띄운다', async () => {
+  // 규칙은 desktop/powershell.js 한 곳 (psOptions 의 cwd) — 모든 호출이 그것을 거치는지
+  const { psOptions, psArgs } = await import('../desktop/powershell.js');
+  assert.equal(psOptions().cwd, (await import('node:os')).default.tmpdir());
+  assert.equal(psOptions({ timeout: 1 }).windowsHide, true);
+  assert.deepEqual(psArgs(['-File', 'x'], { sta: true }).slice(0, 2), ['-STA', '-NoProfile']);
   let found = 0;
   for (const [file, text] of sources) {
-    for (const m of text.matchAll(/(?:spawn|execFile|spawnHelper)\(\s*'powershell\.exe'/g)) {
+    if (file === 'powershell.js') continue;
+    assert.doesNotMatch(text, /(?:spawn|execFile|spawnHelper)\(\s*'powershell\.exe'/, `${file}: powershell.exe 를 직접 띄워요 (powershell.js 의 POWERSHELL · psOptions 로)`);
+    for (const m of text.matchAll(/(?:spawn|execFile|spawnHelper)\(\s*POWERSHELL\b/g)) {
       found++;
-      const call = text.slice(m.index, m.index + 700);
-      assert.match(call, /cwd:\s*os\.tmpdir\(\)/, `${file}: powershell.exe 를 cwd 없이 띄워요 (${call.slice(0, 60)}…)`);
+      const call = text.slice(m.index, m.index + 400);
+      assert.match(call, /psOptions\(/, `${file}: PowerShell 을 psOptions 없이 띄워요 (${call.slice(0, 60)})`);
     }
   }
   assert.ok(found >= 6, `점검할 PowerShell 호출을 ${found}개만 찾았어요`);

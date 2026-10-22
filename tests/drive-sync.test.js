@@ -200,7 +200,7 @@ test('양쪽에서 고치면 Drive 것을 남기고 이 PC 것은 사본으로',
   assert.equal((await sync()).conflicts.length, 0);
 });
 
-test('지운 것 반영 (이 PC → Drive 휴지통, 다른 기기 → 이 PC)', async () => {
+test('삭제한 것 반영 (이 PC → Drive 휴지통, 다른 기기 → 이 PC)', async () => {
   await startFromPhone();
   await lw('PC.md', '# PC');
   await sync();

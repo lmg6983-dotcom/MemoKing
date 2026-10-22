@@ -1,6 +1,7 @@
 // 메모 안 찾기 · 바꾸기 (워드의 찾기 및 바꾸기처럼) — 글자 줄에서 찾을 말의 자리 찾기 (순수 함수, 단위 테스트 대상)
 //   편집기(find-replace.js)는 문단마다 글을 모아 이것으로 찾고, 찾은 자리를 표시 · 바꾼다.
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from './html-marks.js';
+import { UI } from './ui-text.js';
 
 // 낱말 글자: 글자 · 숫자 · 밑줄 (한글 포함)
 const WORD = /[\p{L}\p{N}_]/u;
@@ -89,7 +90,7 @@ export function hasFormat(f) {
 export function formatSummary(f) {
   if (!hasFormat(f)) return '';
   const parts = [];
-  if (f.clear) parts.push('서식 지우기');
+  if (f.clear) parts.push(UI.clearFormat);
   for (const k of FORMAT_FLAGS) if (f[k.key]) parts.push(k.label);
   for (const k of FORMAT_COLORS) {
     const v = f[k.key];

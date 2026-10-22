@@ -103,7 +103,7 @@ if (!(await state()).cls.includes('pane-list')) { await page.tap('#back-btn'); a
 const c3 = await cardRect('아이디어');
 await gesture(Array.from({ length: 12 }, (_, i) => [c3.x + c3.width - 30 - i * 20, c3.y + c3.height / 2]));
 await wait(500);
-check('왼쪽으로 밀기 → 지우기 (태블릿)', !fs.existsSync(path.join(vault, '아이디어.md')));
+check('왼쪽으로 밀기 → 삭제 (태블릿)', !fs.existsSync(path.join(vault, '아이디어.md')));
 // 9) 음성 카드 안에서 + › 표 · 손 메모 → 카드 아래로
 await page.tap(card('녹음'));
 await wait(600);
@@ -139,7 +139,7 @@ await p2.waitForTimeout(500);
 await p2.tap('#table-more-btn');
 await p2.waitForTimeout(300);
 const tb = await p2.evaluate(() => { const bar = document.getElementById('table-bar').getBoundingClientRect(); const more = document.getElementById('table-more').getBoundingClientRect(); const last = document.getElementById('table-more-btn').getBoundingClientRect(); return { barH: Math.round(bar.height), moreW: Math.round(more.width), moreBtnRight: Math.round(last.right), barW: Math.round(bar.width) }; });
-check('태블릿 표 막대: 한 줄이고, ⋯ 판은 넓은 화면에서도 440px 안, 단추가 멀리 퍼지지 않음', tb.barH <= 80 && tb.moreW <= 440 && tb.moreBtnRight < 900, JSON.stringify(tb));
+check('태블릿 표 막대: 한 줄이고, ⋯ 판은 넓은 화면에서도 440px 안, 버튼이 멀리 퍼지지 않음', tb.barH <= 80 && tb.moreW <= 440 && tb.moreBtnRight < 900, JSON.stringify(tb));
 await p2.screenshot({ path: path.join(OUT, '07-table-bar.png') });
 check('화면 오류 없음', errors.length === 0, errors.join(' | '));
 await browser.close(); server.kill();

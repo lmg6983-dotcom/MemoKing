@@ -211,7 +211,7 @@ test('꺼 둔 사이 다른 기기에서 잠근 메모: 켤 때 이 기기의 �
   v2.close();
 });
 
-test('열지 않은 잠긴 메모를 지우면 그 메모만 쓰던 첨부도 휴지통으로 (머리말의 표로 찾음)', async () => {
+test('열지 않은 잠긴 메모를 삭제하면 그 메모만 쓰던 첨부도 휴지통으로 (머리말의 표로 찾음)', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
   const v = new Vault(root);
   v.open();
@@ -363,7 +363,7 @@ test('휴지통에서 되살린 잠긴 메모는 그 첨부도 함께 돌아옴'
     v.save(id, '# 금고\n\n![](attachments/a.png)');
     v.lock(id, await newLockSession('사과1234', FAST), { keepOpen: false });
     const name = v.trash(id);
-    assert.ok(!fs.existsSync(path.join(root, 'attachments', 'a.png')), '지우면 휴지통으로');
+    assert.ok(!fs.existsSync(path.join(root, 'attachments', 'a.png')), '삭제하면 휴지통으로');
     v.restoreTrash(typeof name === 'string' ? name : v.trashList()[0].name);
     assert.ok(fs.existsSync(path.join(root, 'attachments', 'a.png')), '되살리면 돌아옴');
   } finally {
@@ -438,7 +438,7 @@ test('파일이 사라진 사이 글을 저장하면 바로 되살리지 않고 
   }
 });
 
-test('머리말만 쓰는 사이 다른 기기가 지운 알림은 되살아나지 않음', async () => {
+test('머리말만 쓰는 사이 다른 기기가 삭제한 알림은 되살아나지 않음', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-lock-'));
   const v = new Vault(root);
   const other = new Vault(root, { device: 'phone' });
@@ -454,7 +454,7 @@ test('머리말만 쓰는 사이 다른 기기가 지운 알림은 되살아나�
     other.setReminders(id, []); // 휴대폰이 알림을 지움
     v.setMeta(id, { pinned: true }); // PC 는 아직 모르고 고정만
     const text = fs.readFileSync(path.join(root, v.get(id).file), 'utf8');
-    assert.ok(!/reminders:/.test(text), '지운 알림이 되살아나지 않음');
+    assert.ok(!/reminders:/.test(text), '삭제한 알림이 되살아나지 않음');
     assert.match(text, /pinned: true/);
     assert.match(text, /아침 저녁/);
   } finally {
@@ -463,7 +463,7 @@ test('머리말만 쓰는 사이 다른 기기가 지운 알림은 되살아나�
   }
 });
 
-test('알림 합치기: 그쪽에서 지운 것은 되살리지 않고, 이 기기의 울림 기록·새 알림은 남김', async () => {
+test('알림 합치기: 그쪽에서 삭제한 것은 되살리지 않고, 이 기기의 울림 기록·새 알림은 남김', async () => {
   const { mergeReminders } = await import('../app/js/core/vault-locks.js');
   const a = { id: 'a', last: null };
   const b = { id: 'b', last: null };
@@ -513,7 +513,7 @@ test('파일이 사라진 사이 고정·연결을 바꾸면: 바뀐 것처럼 �
   }
 });
 
-test('머리말 합치기: 이 기기가 지운 항목은 (그쪽이 바꾸지 않았으면) 지운 채로', async () => {
+test('머리말 합치기: 이 기기가 삭제한 항목은 (그쪽이 바꾸지 않았으면) 삭제한 채로', async () => {
   const { installLockMethods } = await import('../app/js/core/vault-locks.js');
   class Fake {
     emit() {}

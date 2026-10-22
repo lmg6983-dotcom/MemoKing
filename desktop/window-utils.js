@@ -2,6 +2,7 @@
 import { app, BrowserWindow, nativeTheme, screen } from 'electron';
 import path from 'node:path';
 import { tweenBounds, DEFAULT_NOTE_SIZE } from './placement.js';
+import { NOTE_BG } from '../app/js/core/memo-file.js';
 
 export const APP_DIR = path.join(import.meta.dirname, '..', 'app');
 export const PRELOAD = path.join(import.meta.dirname, 'preload.cjs');
@@ -23,11 +24,7 @@ export const webPreferences = {
 
 export const windowIcon = { icon: APP_ICON };
 
-// 스티커 창이 뜨는 순간의 배경색 (화면 CSS 와 같은 값)
-export const NOTE_BG = {
-  light: { yellow: '#fff4b8', green: '#ddf5df', pink: '#ffe0ec', purple: '#ede3ff', blue: '#ddeeff', gray: '#f1f0ec', charcoal: '#1c1c1b' },
-  dark: { yellow: '#3a3317', green: '#1e3322', pink: '#3d2230', purple: '#2c2440', blue: '#1c2d42', gray: '#262624', charcoal: '#141413' },
-};
+// 메모 창이 뜨는 순간의 배경색은 core/memo-file.js 의 NOTE_BG
 
 // 메모킹 Work / Life 를 나눠 쓰면: Work 는 어두운 화면 · Life 는 밝은 화면 (시스템 설정과 상관없이) — 목록 창은 지금 모드, 메모 창은 그 메모의 모드.
 //   나눠 쓰지 않으면 mode 는 null — 예전처럼 시스템 설정을 따른다
@@ -63,10 +60,6 @@ const TITLEBAR_DIM = { light: { dialog: '#949391', coach: '#878785' }, dark: { d
 
 export function setTitleBarDim(level) {
   currentTitleBarDim = level === 'dialog' || level === 'coach' ? level : false;
-  return currentTitleBarDim;
-}
-
-export function getTitleBarDim() {
   return currentTitleBarDim;
 }
 

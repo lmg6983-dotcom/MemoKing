@@ -109,7 +109,7 @@ async function typeSlowly(text) {
   }
 }
 async function nextBtn() {
-  await tapOn('.coach-bubble .coach-next', '다음 단추');
+  await tapOn('.coach-bubble .coach-next', '다음 버튼');
   await wait(400);
 }
 async function atStep(id) {
@@ -253,7 +253,7 @@ await tapOn('#back-btn', '뒤로');
 for (const s of STEPS.filter((s) => s.win === 'list' && STEPS.indexOf(s) > STEPS.findIndex((x) => x.id === 'back'))) {
   await atStep(s.id);
   if (s.id === 'layout') {
-    await tapOn('#filter-btn', '보기 단추');
+    await tapOn('#filter-btn', '보기 버튼');
     await wait(400);
     await tapOn('#layout-group [data-value="rows"]', '한 줄씩');
   }

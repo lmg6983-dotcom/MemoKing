@@ -2,6 +2,7 @@
 //   키는 e.code 기준 글자: 'ctrl+shift+KeyP' (한글 입력 상태에서도 같은 키). 순서는 ctrl → shift → alt → 코드
 //   설정(settings.keymap)에는 기본값과 다른 기능만 { id: ['ctrl+KeyH'] | [] } 로 둔다 ([] = 키 없음)
 import { keyName } from './accelerators.js';
+import { UI } from './ui-text.js';
 
 /**
  * 기능: id · 무리(group) · 이름(label) · 하는 일(help, 마우스를 올리면) · 기본 키(keys, 여럿이면 둘째부터는 같은 일을 하는 다른 키)
@@ -15,12 +16,12 @@ export const KEYMAP_ACTIONS = [
   { id: 'tape', group: '메모 창', label: '바탕화면에 붙이기 (테이프)', help: '테이프로 바탕화면에 붙여 다른 창 뒤에 두어요. 다시 누르면 떼어져요.', keys: ['ctrl+shift+KeyG'], run: ['app', 'tape'] },
   { id: 'reminders', group: '메모 창', label: '예약 알림', help: '원하는 날짜와 시간에 이 메모를 알려 주는 알림을 맞춰요.', keys: ['ctrl+shift+KeyA'], run: ['app', 'reminders'] },
   { id: 'links', group: '메모 창', label: '메모 연결', help: '관련된 메모를 이어 두거나, 이어 둔 메모를 봐요.', keys: ['ctrl+KeyK'], run: ['app', 'links'] },
-  { id: 'pdf', group: '메모 창', label: 'PDF로 저장', help: '종이 크기, 여백, 글자 크기를 골라 이 메모를 PDF 파일로 저장해요.', keys: ['ctrl+shift+KeyP'], run: ['menu', 'pdf-btn'] },
+  { id: 'pdf', group: '메모 창', label: UI.saveAsPdf, help: '종이 크기, 여백, 글자 크기를 골라 이 메모를 PDF 파일로 저장해요.', keys: ['ctrl+shift+KeyP'], run: ['menu', 'pdf-btn'] },
   { id: 'versions', group: '메모 창', label: '이전 버전', help: '10분마다 남겨 둔 이 메모의 지난 모습을 보고, 되돌릴 수 있어요.', keys: ['ctrl+shift+KeyY'], run: ['menu', 'versions-btn'] },
-  { id: 'list', group: '메모 창', label: '메모 목록 열기', help: '모든 메모가 모인 목록 창을 앞으로 가져와요.', keys: ['ctrl+shift+KeyM'], run: ['menu', 'show-list'] },
+  { id: 'list', group: '메모 창', label: UI.openList, help: '모든 메모가 모인 목록 창을 앞으로 가져와요.', keys: ['ctrl+shift+KeyM'], run: ['menu', 'show-list'] },
   { id: 'imageCopy', group: '메모 창', label: '그림으로 복사', help: '메모를 보이는 그대로 그림으로 복사해요. 메신저나 문서에 바로 붙여 넣을 수 있어요.', keys: [], run: ['menu', 'image-copy-btn'] },
-  { id: 'imageSave', group: '메모 창', label: '그림으로 저장', help: '메모를 보이는 그대로 그림 파일(PNG)로 저장해요.', keys: [], run: ['menu', 'image-save-btn'] },
-  { id: 'pin', group: '메모 창', label: '목록 맨 위에 고정', help: '이 메모를 메모 목록의 맨 위에 붙여 두거나 풀어요.', keys: [], run: ['menu', 'pin-toggle'] },
+  { id: 'imageSave', group: '메모 창', label: UI.saveAsImage, help: '메모를 보이는 그대로 그림 파일(PNG)로 저장해요.', keys: [], run: ['menu', 'image-save-btn'] },
+  { id: 'pin', group: '메모 창', label: UI.pin, help: '이 메모를 메모 목록의 맨 위에 붙여 두거나 풀어요.', keys: [], run: ['menu', 'pin-toggle'] },
   { id: 'lock', group: '메모 창', label: '잠그기', help: '비밀번호로 이 메모를 잠가요. 잠근 메모는 비밀번호를 넣어야 볼 수 있어요.', keys: [], run: ['menu', 'lock-btn'] },
   { id: 'find', group: '메모 창', label: '찾기', help: '이 메모 안에서 낱말을 찾아요. Enter 는 다음, Shift+Enter 는 이전이에요.', keys: ['ctrl+KeyF'], run: ['app', 'find'] },
   { id: 'replace', group: '메모 창', label: '바꾸기', help: '이 메모 안에서 낱말을 찾아 다른 말로 하나씩, 또는 모두 바꿔요.', keys: ['ctrl+KeyH'], run: ['app', 'replace'] },
@@ -33,7 +34,7 @@ export const KEYMAP_ACTIONS = [
   { id: 'code', group: '글자', label: '코드', help: '고른 글자를 코드 모양(고정 폭 글꼴)으로 바꿔요.', keys: ['ctrl+KeyE'], run: ['cmd', 'code'] },
   { id: 'color', group: '글자', label: '글자 색 (마지막 색)', help: '마지막으로 쓴 글자 색을 고른 글자에 칠해요.', keys: ['ctrl+shift+KeyC'], run: ['color', 'color'] },
   { id: 'highlight', group: '글자', label: '형광펜 (마지막 색)', help: '마지막으로 쓴 형광펜 색으로 고른 글자를 칠해요.', keys: ['ctrl+shift+KeyH'], run: ['color', 'highlight'] },
-  { id: 'clearFormat', group: '글자', label: '서식 지우기', help: '고른 글자의 굵게, 색 같은 모양을 지워요. 고른 것이 없으면 커서가 있는 문단을 보통 글로 되돌려요 (표는 글로, 목록은 풀어서).', keys: ['ctrl+Backslash'], run: ['cmd', 'clearFormat'] },
+  { id: 'clearFormat', group: '글자', label: UI.clearFormat, help: '고른 글자의 굵게, 색 같은 모양을 지워요. 고른 것이 없으면 커서가 있는 문단을 보통 글로 되돌려요 (표는 글로, 목록은 풀어서).', keys: ['ctrl+Backslash'], run: ['cmd', 'clearFormat'] },
   { id: 'h1', group: '글자', label: '제목 1', help: '지금 줄을 가장 큰 제목으로 바꿔요.', keys: ['ctrl+Digit1'], run: ['cmd', 'h1'] },
   { id: 'h2', group: '글자', label: '제목 2', help: '지금 줄을 중간 제목으로 바꿔요.', keys: ['ctrl+Digit2'], run: ['cmd', 'h2'] },
   { id: 'h3', group: '글자', label: '제목 3', help: '지금 줄을 작은 제목으로 바꿔요.', keys: ['ctrl+Digit3'], run: ['cmd', 'h3'] },
@@ -42,7 +43,7 @@ export const KEYMAP_ACTIONS = [
   // ---------- 목록 ----------
   { id: 'bullet', group: '목록', label: '글머리 목록', help: '줄 앞에 점(•)을 붙여 목록으로 만들어요.', keys: ['ctrl+shift+Digit8', 'ctrl+shift+KeyL'], run: ['cmd', 'bullet'] },
   { id: 'ordered', group: '목록', label: '번호 목록', help: '줄 앞에 1, 2, 3 번호를 붙여 목록으로 만들어요.', keys: ['ctrl+shift+Digit7'], run: ['cmd', 'ordered'] },
-  { id: 'task', group: '목록', label: '체크리스트', help: '줄 앞에 네모 칸을 붙여 할 일 목록으로 만들어요. 모두 끝내면 CLEAR 도장!', keys: ['ctrl+shift+Digit9'], run: ['cmd', 'task'] },
+  { id: 'task', group: '목록', label: '체크리스트', help: '줄 앞에 네모 칸을 붙여 체크리스트로 만들어요. 모두 끝내면 CLEAR 도장!', keys: ['ctrl+shift+Digit9'], run: ['cmd', 'task'] },
   // ---------- 넣기 ----------
   { id: 'file', group: '넣기', label: '파일 넣기', help: '사진이나 문서 같은 파일을 골라 메모에 넣어요.', keys: ['ctrl+shift+KeyI'], run: ['action', 'file'] },
   { id: 'record', group: '넣기', label: '음성 녹음 시작, 끝내기', help: '말을 녹음하고, 말한 내용을 글로 받아 적어 함께 넣어요.', keys: ['ctrl+shift+KeyR'], run: ['action', 'record'] },
@@ -56,7 +57,7 @@ export const FIXED_KEYS = [
   ['본문 확대, 축소', 'Ctrl+휠 / Ctrl+= / Ctrl+-'],
   ['항목, 줄 순서 바꾸기', 'Alt+↑ / Alt+↓'],
   ['표: 다음, 이전 칸', 'Tab / Shift+Tab'],
-  ['서식 없이 붙여넣기', 'Ctrl+Shift+V'],
+  [UI.pastePlain, 'Ctrl+Shift+V'],
   ['찾기: 다음, 이전, 모두 찾기 · 바꾸기: 하나, 모두', 'Enter, F3 / Shift+Enter / Alt+Enter · Enter / Ctrl+Enter'],
 ];
 

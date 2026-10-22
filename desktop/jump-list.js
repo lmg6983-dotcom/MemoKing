@@ -1,6 +1,7 @@
 // Windows 작업 표시줄 아이콘을 오른쪽 클릭했을 때의 목록 (점프 목록)
 //   "작업": 메모 목록 열기 · 새 메모 / "최근에 연 메모": 최근에 연 메모들 (누르면 그 메모가 뜬다)
 //   목록의 항목은 메모킹을 인자와 함께 다시 실행하는 것 — 이미 켜져 있으면 second-instance 로 그 인자가 전해진다
+import { UI } from '../app/js/core/ui-text.js';
 
 export const LAUNCH = { list: '--open-list', newMemo: '--new-memo', memo: '--open-memo=' };
 const MAX_RECENT = 8;
@@ -22,7 +23,7 @@ export function jumpListCategories(recent, { program, prefix = [] }) {
   const categories = [{
     type: 'tasks',
     items: [
-      task('메모 목록 열기', '메모킹 메모 목록 창을 엽니다', LAUNCH.list),
+      task(UI.openList, '메모킹 메모 목록 창을 엽니다', LAUNCH.list),
       task('새 메모', '빈 메모를 새로 만듭니다', LAUNCH.newMemo),
     ],
   }];

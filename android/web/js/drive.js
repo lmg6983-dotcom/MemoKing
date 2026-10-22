@@ -4,13 +4,14 @@ import { app } from './state.js';
 import { openSheet, closeSheet, toast, adoptSheet, releaseSheet } from './ui.js';
 import { icon } from '../../app/js/icons.js';
 import { openAiDriveGuide } from '../../app/js/ai-drive-guide.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 const $ = (x) => document.getElementById(x);
 const sheet = $('drive-sheet');
 // 메모킹이 Drive 에 만드는 폴더 (PC 와 같은 이름 — app/js/drive-panel.js SYNC_FOLDER)
-const SUGGEST = '메모킹 동기화';
+const SUGGEST = UI.driveFolder;
 
-let path = [{ id: 'root', name: '내 드라이브' }];
+let path = [{ id: 'root', name: UI.myDrive }];
 let onConnected = () => {};
 let loggingIn = false;
 
@@ -109,7 +110,7 @@ async function autoConnect() {
 // ---------- ③-1 폴더 바꾸기 (고급: 연결된 뒤 "폴더 바꾸기") ----------
 
 function openFolders() {
-  path = [{ id: 'root', name: '내 드라이브' }];
+  path = [{ id: 'root', name: UI.myDrive }];
   showStep('folder');
   const s = drive.status();
   $('drive-account').textContent = s.email ? `${s.email} 의 Google Drive` : '';
@@ -248,11 +249,11 @@ export function renderStatus(s = drive.status()) {
       : st.state === 'error' ? st.error
       : [s.email, st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'].filter(Boolean).join(', ');
   } else {
-    $('drive-title').textContent = s.connected ? '폴더를 골라 주세요' : '연결 안 됨';
+    $('drive-title').textContent = s.connected ? '폴더를 골라 주세요' : UI.notConnected;
     $('drive-sub').textContent = s.connected ? s.email : 'PC와 같은 메모를 함께 써요';
   }
   if (s.reconnect && !s.connected) {
-    $('drive-title').textContent = '다시 연결해 주세요';
+    $('drive-title').textContent = UI.reconnect;
     $('drive-sub').textContent = 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 휴대폰에 그대로 있어요';
   }
   // 외부 앱 메모 연동: 연결돼 있을 때만 (켜는 중에는 그대로)
@@ -260,7 +261,7 @@ export function renderStatus(s = drive.status()) {
   if (!fullBusy) $('drive-full').checked = Boolean(s.fullScope);
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;
-  $('drive-connect').textContent = s.active && s.connected ? '폴더 바꾸기' : '연결하기';
+  $('drive-connect').textContent = s.active && s.connected ? UI.changeFolder : '연결하기';
   $('drive-connect').classList.toggle('primary', !(s.active && s.connected)); // 연결 전에는 PC처럼 주 단추
 }
 

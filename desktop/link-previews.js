@@ -7,6 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseLinkPreview, detectCharset, hostOf, youtubeOEmbedUrl, parseYoutubeOEmbed, staleYoutubeEntry } from '../app/js/core/link-preview.js';
 import { imageExtFromType, imageExtFromUrl } from '../app/js/core/remote-images.js';
+import { UI } from '../app/js/core/ui-text.js';
 
 const FILE = 'link-previews.json';
 const DIR = 'link-previews';
@@ -84,7 +85,7 @@ export class LinkPreviews {
           return entry;
         })
         .catch((err) => {
-          console.warn('[링크 미리보기]', url, err?.message);
+          console.warn(UI.linkPreviewMark, url, err?.message);
           this.failed.set(url, Date.now());
           return cached ?? null;
         })
@@ -140,7 +141,7 @@ export class LinkPreviews {
 
   async #fetchPreview(vault, url) {
     const target = new URL(url);
-    if (!/^https?:$/.test(target.protocol)) throw new Error('인터넷 주소가 아니에요');
+    if (!/^https?:$/.test(target.protocol)) throw new Error(UI.notUrl);
     const youtube = await this.#fetchYoutube(vault, url).catch(() => null);
     if (youtube) return youtube;
     const { res, body, finalUrl } = await this.#request(target.href, 'text/html,application/xhtml+xml,*/*;q=0.8', MAX_HTML, true);

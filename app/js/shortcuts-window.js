@@ -157,7 +157,7 @@ function captureAction(btn, a) {
       if ((e.key === 'Backspace' || e.key === 'Delete') && !e.ctrlKey && !e.altKey) {
         await cap.stop();
         state = await api.keymap.set(a.id, '');
-        setStatus(`${a.label}의 키를 없앴어요. 메뉴나 단추로는 그대로 쓸 수 있어요`);
+        setStatus(`${a.label}의 키를 없앴어요. 메뉴나 버튼으로는 그대로 쓸 수 있어요`);
         render();
         return flashRows([a.label]);
       }

@@ -57,7 +57,7 @@ export class MemoHotkeys {
       if (ok) this.held.set(slot, acc);
       else {
         this.failed.add(slot);
-        console.warn(`${hotkeyLabel(slot)} 를 다른 프로그램이 쓰고 있어 등록하지 못했습니다`);
+        console.warn(`${hotkeyLabel(slot)} 를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
       }
     }
   }

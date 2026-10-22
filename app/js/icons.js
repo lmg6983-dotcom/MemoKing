@@ -74,11 +74,8 @@ const ICONS = {
   note: `<path d="M5 4.5h14v10l-5 5H5z" ${stroke}/><path d="M14 19.5v-5h5M8.5 9h7M8.5 12.5h4" ${stroke}/>`,
   inbox: `<path d="M3.5 13.5l2.5-8h12l2.5 8v5a1.5 1.5 0 01-1.5 1.5h-14a1.5 1.5 0 01-1.5-1.5z" ${stroke}/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5" ${stroke}/>`,
   'chev-right': `<path d="M9 6l6 6-6 6" ${stroke} stroke-width="2"/>`,
-  // 잘린 상태 줄 전문 보기: 말줄임 세 점이 든 말풍선
-  talk: `<path d="M5.5 5.5h13a2 2 0 012 2v7a2 2 0 01-2 2h-6.5l-4 3.5v-3.5H5.5a2 2 0 01-2-2v-7a2 2 0 012-2z" ${stroke}/><circle cx="8.5" cy="11" r="1.1" fill="currentColor"/><circle cx="12" cy="11" r="1.1" fill="currentColor"/><circle cx="15.5" cy="11" r="1.1" fill="currentColor"/>`,
   chevrons: `<path d="M6 7l5 5-5 5M13 7l5 5-5 5" ${stroke} stroke-width="2"/>`,
   list: `<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" ${stroke} stroke-width="2.2"/>`,
-  filter: `<path d="M4 5.5h16l-6.2 7.3V19l-3.6-1.8v-4.4L4 5.5z" ${stroke}/>`,
   tag: `<path d="M3.5 12.2V4.5a1 1 0 011-1h7.7l8.3 8.3a1.5 1.5 0 010 2.1l-6.6 6.6a1.5 1.5 0 01-2.1 0l-8.3-8.3z" ${stroke}/><circle cx="8" cy="8" r="1.4" fill="currentColor"/>`,
   tabs: `<path d="M3.5 9.5V18a1.5 1.5 0 001.5 1.5h14a1.5 1.5 0 001.5-1.5V9.5M3.5 9.5V6A1.5 1.5 0 015 4.5h4.5l1.5 5M3.5 9.5h17M11 9.5l1.2-3.5H18a1.5 1.5 0 011.5 1.5v2" ${stroke}/>`,
   table: `<rect x="3.5" y="4.5" width="17" height="15" rx="2" ${stroke}/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10" ${stroke}/>`,
@@ -87,10 +84,6 @@ const ICONS = {
   block: `<circle cx="12" cy="12" r="8.5" ${stroke}/><path d="M6 6l12 12" ${stroke}/>`,
   cloud: `<path d="M7 18.5h10.5a4 4 0 00.6-7.95A6 6 0 006.6 9.1 4.75 4.75 0 007 18.5z" ${stroke}/>`,
   folder: `<path d="M3.5 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2h-13a2 2 0 01-2-2V7z" ${stroke}/>`,
-  // (예전) 다른 창보다 늘 위에 두기: 창 + 위 화살표 — 지금은 왕관. 압정은 "목록 맨 위에 고정" 에만, "고정" 이라는 말도 그쪽에만 쓴다
-  ontop: `<rect x="3.5" y="4.5" width="17" height="15" rx="2" ${stroke}/><path d="M3.5 8.5h17" ${stroke}/><path d="M12 17v-5.5M9.2 14l2.8-2.8 2.8 2.8" ${stroke} stroke-width="2"/>`,
-  // (예전) 기울어진 압정
-  pushpin: `<g transform="rotate(40 12 12)"><path d="M9 3h6l-1 6 3 3v2h-4v6l-1 1.5-1-1.5v-6H7v-2l3-3-1-6z" ${stroke}/></g>`,
 };
 
 export function injectIcons() {

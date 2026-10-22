@@ -5,6 +5,7 @@
 import { parseLinkPreview, detectCharset, hostOf, youtubeOEmbedUrl, parseYoutubeOEmbed, staleYoutubeEntry } from '../../app/js/core/link-preview.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../../app/js/core/remote-images.js';
 import { fs, call } from './native.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 const FILE = '_memoking/link-previews.json';
 const DIR = '_memoking/link-previews';
@@ -95,7 +96,7 @@ export class LinkPreviews {
           return entry;
         })
         .catch((err) => {
-          console.warn('[링크 미리보기]', url, err?.message);
+          console.warn(UI.linkPreviewMark, url, err?.message);
           this.failed.set(url, Date.now());
           return cached ?? null;
         })
@@ -122,7 +123,7 @@ export class LinkPreviews {
 
   async #fetchPreview(url) {
     const target = new URL(url);
-    if (!/^https?:$/.test(target.protocol)) throw new Error('인터넷 주소가 아니에요');
+    if (!/^https?:$/.test(target.protocol)) throw new Error(UI.notUrl);
     const youtube = await this.#fetchYoutube(url).catch(() => null);
     if (youtube) return youtube;
     const res = await call('http', { url: target.href, accept: 'text/html,application/xhtml+xml,*/*;q=0.8', limit: MAX_HTML, headOnly: true });

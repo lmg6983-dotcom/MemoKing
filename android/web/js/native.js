@@ -22,7 +22,6 @@ export function setSandbox(on) {
   unwrap(raw.sandbox(Boolean(on)));
   sandboxOn = Boolean(on);
 }
-export const inSandbox = () => sandboxOn;
 // 화면을 새로 띄우면(앱이 화면만 다시 만든 때 등) 연습 공간은 늘 꺼진 채로 — 실제 메모를 연습 폴더에 쓰지 않게
 try {
   if (typeof raw.sandbox === 'function') unwrap(raw.sandbox(false));

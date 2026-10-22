@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { joinTranscript, labelSpeakers } from '../../app/js/core/transcript-lines.js';
 import { vocabularyFrom, fixTranscript } from '../../app/js/core/transcript-fix.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 const GH = 'https://github.com/k2-fsa/sherpa-onnx/releases/download';
 const HF = 'https://huggingface.co/k2-fsa/sherpa-onnx-zipformer-korean-2024-06-24/resolve/main';
@@ -172,7 +173,7 @@ export function createSttService(opts) {
       }
       downloads.delete(pack);
     } catch (err) {
-      d.error = err.message || '받지 못했어요. 인터넷 연결을 확인해 주세요';
+      d.error = err.message || UI.downloadFail;
       emit();
       downloads.delete(pack);
       throw new Error(d.error);

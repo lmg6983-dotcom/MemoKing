@@ -5,6 +5,7 @@
 //   한 문장이 끝날 때마다 패널에 글이 나타난다. 끝내면 소리와 받아쓴 글이 한 음성 카드로.
 import { voiceCardMarkdown, recordingClock, recordingWhen } from './core/voice-card.js';
 import { icon as svg } from './icons.js';
+import { UI } from './core/ui-text.js';
 
 // 앞에서부터 이 PC 의 녹음기가 만들 수 있는 것 — MP4(AAC, 없으면 Opus)는 길이가 바로 보여 끌어서 넘기기 쉽다.
 // WebM 은 녹음기가 길이를 적지 않아 마지막 수단
@@ -26,7 +27,7 @@ export function micErrorText(err) {
   if (name === 'NotAllowedError' || name === 'SecurityError') return '마이크를 쓸 수 없어요. Windows 설정 개인 정보의 마이크에서 앱의 마이크 사용을 켜 주세요';
   if (name === 'NotFoundError' || name === 'OverconstrainedError') return '마이크를 찾지 못했어요. 마이크가 연결돼 있는지 확인해 주세요';
   if (name === 'NotReadableError') return '다른 프로그램이 마이크를 쓰고 있어요. 그 프로그램을 끄고 다시 해 주세요';
-  return '녹음을 시작하지 못했어요';
+  return UI.recordFail;
 }
 
 /**
@@ -63,7 +64,7 @@ export function setupVoiceRecorder(opts) {
     } else if (!rec.lines.length) {
       const div = document.createElement('div');
       div.className = 'rec-hint';
-      div.textContent = '말하면 여기에 글로 나타나요';
+      div.textContent = UI.speakHint;
       textBox.append(div);
     }
     textBox.scrollTop = textBox.scrollHeight;
@@ -94,10 +95,10 @@ export function setupVoiceRecorder(opts) {
     }
     if (!on) return;
     time.textContent = recordingClock(elapsed());
-    state.textContent = rec.paused ? '일시 정지' : rec.stt ? '받아쓰는 중' : '녹음 중';
+    state.textContent = rec.paused ? '일시 정지' : rec.stt ? UI.transcribing : '녹음 중';
     panel.classList.toggle('paused', rec.paused);
     pause.replaceChildren(svg(rec.paused ? 'play' : 'pause'));
-    const label = rec.paused ? '이어서 녹음' : '일시 정지';
+    const label = rec.paused ? UI.recordMore : '일시 정지';
     pause.title = label;
     pause.setAttribute('aria-label', label);
   }

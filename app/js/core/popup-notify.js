@@ -1,11 +1,12 @@
 // 팝업 알림(Windows 알림 센터를 쓰지 않는 앱의 알림 창) — 읽은 글을 알림 보관함 항목으로 (순수 함수, 단위 테스트 대상)
+import { UI } from './ui-text.js';
 
 // 지켜볼 앱: 프로세스 이름 → 보관함에 보일 이름
 export const POPUP_APPS = {
   KakaoTalk: '카카오톡',
 };
 
-export const popupAppName = (process) => POPUP_APPS[process] ?? process ?? '알 수 없는 앱';
+export const popupAppName = (process) => POPUP_APPS[process] ?? process ?? UI.unknownApp;
 
 // 알림 창 글에서 뺄 것: 앱 이름만 있는 줄, 시각만 있는 줄("오후 3:12", "15:12"), 버튼 글자
 const NOISE = [

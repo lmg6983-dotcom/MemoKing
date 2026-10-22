@@ -15,6 +15,7 @@ import { openCalendarLinks } from './calendar-links.js';
 import { openEventDetail, whenText } from './event-detail.js';
 import { monthSketchPng } from './month-sketch.js';
 import { setupMemoriesView } from './memories-view.js';
+import { UI } from './core/ui-text.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
@@ -602,6 +603,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     div.dataset.color = item.color;
     div.dataset.memo = item.memoId;
     div.dataset.reminder = r.id;
+    div.dataset.kind = r.kind; // 반복 일정은 자세히 보기에서 지우지 않는다 (점검이 고를 때도)
 
     const main = el('button', 'row-main');
     main.title = '자세히 보기';
@@ -621,7 +623,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
     const del = el('button', 'icon-btn');
     del.title = '일정 삭제';
-    del.setAttribute('aria-label', `${rowTitle.textContent} 일정 지우기`);
+    del.setAttribute('aria-label', `${rowTitle.textContent} 일정 삭제`);
     del.append(icon('trash'));
     del.addEventListener('click', () => update(item, (list) => list.filter((x) => x.id !== r.id)));
 
@@ -673,9 +675,9 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       ],
       // 반복 일정은 한 회차만 지울 수 없어(지우면 모든 회차가 사라짐) 여기서는 지우지 않는다 — 메모에서 고치기
       actions: [
-        ...(r.kind === 'repeat' ? [] : [{ label: '일정 지우기', danger: true, run: () => update(item, (list) => list.filter((x) => x.id !== r.id))
-          .then(() => notify(`"${r.title || item.title}" 일정을 지웠어요`))
-          .catch((err) => notify(err.message || '일정을 지우지 못했어요', true)) }]),
+        ...(r.kind === 'repeat' ? [] : [{ label: '일정 삭제', danger: true, run: () => update(item, (list) => list.filter((x) => x.id !== r.id))
+          .then(() => notify(`"${r.title || item.title}" 일정을 삭제했어요`))
+          .catch((err) => notify(err.message || '일정을 삭제하지 못했어요', true)) }]),
         { label: '메모 열기', primary: true, run: () => api.memo.open(item.memoId) },
       ],
     });
@@ -754,9 +756,9 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const rowTitle = el('span', 'row-title', item.title);
     const sub = el('span', 'row-sub');
     const words = el('span');
-    const when = isDone(r) ? '끝났어요' : !r.enabled ? '꺼져 있어요' : r.kind === 'startup' ? '' : nextLabel(r);
+    const when = isDone(r) ? '끝났어요' : !r.enabled ? UI.off : r.kind === 'startup' ? '' : nextLabel(r);
     if (when) words.append(el('b', '', when), ', ');
-    words.append(`${describeReminder(r)}, ${r.action === 'open' ? '메모 띄우기' : '알림만 보내기'}`);
+    words.append(`${describeReminder(r)}, ${r.action === 'open' ? UI.showMemo : '알림만 보내기'}`);
     sub.append(icon(KIND_ICON[r.kind]), words);
     text.append(rowTitle, sub);
     main.append(dot, text);
@@ -772,7 +774,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
     const del = el('button', 'icon-btn');
     del.title = '알림 삭제';
-    del.setAttribute('aria-label', `${item.title} 알림 지우기`);
+    del.setAttribute('aria-label', `${item.title} 알림 삭제`);
     del.append(icon('trash'));
     del.addEventListener('click', () => update(item, (list) => list.filter((x) => x.id !== r.id)));
 

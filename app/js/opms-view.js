@@ -5,6 +5,7 @@
 //   글은 모두 textContent 로 넣는다 (서버 값을 HTML 로 읽지 않는다)
 import { searchingNode } from './searching.js';
 import { progressItems, dueState } from './core/opms-progress.js';
+import { UI } from './core/ui-text.js';
 
 const api = window.opms;
 const $ = (id) => document.getElementById(id);
@@ -430,7 +431,7 @@ async function showWrapper(my) {
 
   const dir = el('span', 'op-dir', current.wrapperDir);
   dir.title = current.wrapperDir;
-  const change = el('button', 'op-link', '폴더 바꾸기');
+  const change = el('button', 'op-link', UI.changeFolder);
   change.type = 'button';
   change.addEventListener('click', async () => {
     current.wrapperDir = await api.chooseDir();
@@ -537,12 +538,12 @@ $('op-memo').addEventListener('click', async () => {
     await api.toMemo(current.case.idx);
     b.textContent = '✓ 메모로 만들었어요';
   } catch (err) {
-    b.textContent = '메모로 만들기';
+    b.textContent = UI.makeMemo;
     message(errText(err), 'err');
   } finally {
     setTimeout(() => {
       b.disabled = false;
-      b.textContent = '메모로 만들기';
+      b.textContent = UI.makeMemo;
     }, 1500);
   }
 });

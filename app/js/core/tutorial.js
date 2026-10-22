@@ -13,6 +13,7 @@
 //   enable: 꺼져 있을 때(needs) 말풍선에서 바로 켜는 단추 글자 (켜면 그 자리에서 직접 해 보기로)
 //   needs: 이 기능이 켜져 있어야 직접 해 볼 수 있다 ('workLife' Work / Life 나누기 · 'quickMemo' Ctrl+Alt+C · 'magic' 매직키)
 //          꺼져 있으면 offText 로 안내만 하고 "다음"으로 (tutorialStepFor)
+import { normalizeReminder } from './reminders.js';
 
 const LATER = '다음에 해 볼게요';
 
@@ -21,21 +22,105 @@ export const TUTORIAL_SAMPLE = '- [ ] 우유\n- [ ] 달걀\n- [ ] 사과\n- [ ] 
 
 /**
  * 튜토리얼 연습 공간: 튜토리얼은 실제 메모 폴더 대신 잠깐 만든 빈 폴더에서 한다 (실제 메모 · 동기화 · 알림은 그대로)
- *   그 폴더에 미리 넣어 두는 예시 메모 — 목록 · 보기 · 태그 · Work/Life 를 해 볼 거리. 끝나면 폴더째 사라진다
- *   daysAgo: 며칠 전에 쓴 메모로 (목록이 실제처럼 보이게)
+ *   그 폴더에 미리 넣어 두는 예시 메모 — 목록 · 보기 · 태그 · 검색 · Work/Life · 일정 · 회상을 해 볼 거리.
+ *   메모킹으로 쓸 수 있는 것(할 일 · 표 · 인용 · 굵게 · 형광펜 · 글자 색 · 코드 · 링크 · 일정)을 골고루. 끝나면 폴더째 사라진다
+ *   daysAgo: 며칠 전에 쓴 메모로 (목록 · 회상 달력이 실제처럼) · events: 며칠 뒤(inDays) 몇 시(time)의 일정
+ *   photos: 사진 (app/assets/tutorial/sample/이름.jpg — 회상 달력 · 사진 모아 보기가 비지 않게)
+ *   예시 장보기 목록(TUTORIAL_SAMPLE)의 낱말은 쓰지 않는다 (옮기기 단계에서 헷갈리지 않게)
+ *   Life 태그는 #여행 · #생활 둘만 — 휴대폰 태그 줄에서 튜토리얼 중 만든 #태그가 밀려나지 않게
  */
 export const TUTORIAL_SANDBOX_MEMOS = [
-  { body: '# 연습 공간이에요\n\n여기서 만들고 고친 메모는 튜토리얼을 마치면 사라지고, 원래 메모로 돌아가요. 마음껏 눌러 보세요.', color: 'yellow', pinned: true, daysAgo: 0 },
-  { body: '# 여행 준비\n\n- [x] 숙소 예약\n- [ ] 기차표\n- [ ] 우산 챙기기\n\n#여행', color: 'green', daysAgo: 1 },
-  { body: '# 읽고 싶은 책\n\n데미안\n\n어린 왕자\n\n#책', color: 'purple', daysAgo: 3 },
-  { body: '# 주간 회의\n\n- 지난주 정리\n- 이번 주 할 일 나누기\n\n#회의', color: 'blue', mode: 'work', daysAgo: 2 },
+  {
+    body: '# 연습 공간이에요\n\n여기서 만들고 고친 메모는 튜토리얼을 마치면 **사라지고**, 내 메모로 돌아가요. 마음껏 눌러 보세요.\n\n- 카드를 누르면 열려요\n- 위쪽 <mark>태그</mark>를 누르면 그 태그가 붙은 메모만\n- 위의 검색칸에 **회의**를 쳐 보세요',
+    color: 'yellow', pinned: true, daysAgo: 0,
+  },
+  {
+    body: '# 제주 여행 준비\n\n- [x] 숙소 예약\n- [x] 렌터카\n- [ ] 비행기 표 확인\n- [ ] 선크림 챙기기\n\n> 첫날은 바다가 보이는 카페에서 쉬기\n\n#여행',
+    color: 'green', daysAgo: 1, events: [{ inDays: 9, allDay: true, title: '제주 여행' }],
+  },
+  {
+    body: '# 이번 달 생활비\n\n| 항목 | 금액 | 메모 |\n| --- | --- | --- |\n| 식비 | 320,000 | 외식 줄이기 |\n| 교통 | 68,000 | |\n| 구독 | 24,900 | 하나 해지 |\n\n<span style="color: #e03131">예산까지 87,100원</span> 남았어요\n\n#생활',
+    color: 'pink', daysAgo: 4,
+  },
+  {
+    body: '# 읽고 싶은 책\n\n1. 데미안\n2. 어린 왕자\n3. 아몬드\n\n> 새는 알에서 나오려고 투쟁한다.\n\n#생활',
+    color: 'purple', daysAgo: 6,
+  },
+  {
+    body: '# 된장찌개\n\n**재료**: 된장 2숟갈, 애호박, 두부, 양파, 청양고추\n\n1. 멸치 육수를 끓인다\n2. 된장을 풀고 채소를 넣는다\n3. <mark>두부는 마지막에</mark> 넣고 5분 더\n\n#생활',
+    color: 'yellow', daysAgo: 11,
+  },
+  {
+    body: '# 운동 기록\n\n- [x] 월 걷기 40분\n- [x] 수 수영 30분\n- [ ] 금 요가\n\n이번 주 목표: **세 번**\n\n#생활',
+    color: 'gray', daysAgo: 2, events: [{ inDays: 3, time: '07:00', title: '아침 요가', alerts: [10] }],
+  },
+  {
+    body: '# 주간 회의\n\n## 지난주\n- 시안 두 개 완성\n- 고객 피드백 정리\n\n## 이번 주\n- [ ] 최종안 고르기\n- [ ] 일정표 공유\n\n#회의',
+    color: 'blue', mode: 'work', daysAgo: 3, events: [{ inDays: 2, time: '10:00', title: '주간 회의', alerts: [10] }],
+  },
+  {
+    body: '# 출시 준비\n\n| 할 일 | 맡은 사람 | 마감 |\n| --- | --- | --- |\n| 소개 글 | 지민 | 금요일 |\n| 화면 사진 | 현우 | 목요일 |\n\n점검 명령은 `npm test` 로 돌려요. 자료는 [예시 문서](https://example.com) 에\n\n#업무',
+    color: 'charcoal', mode: 'work', daysAgo: 5,
+  },
+  {
+    body: '# 춘천 닭갈비\n\n치즈 추가는 **꼭**. 남은 양념에 볶음밥까지 먹어야 끝\n\n#여행',
+    color: 'pink', daysAgo: 8, photos: ['dakgalbi-cheese', 'dakgalbi-rice'],
+  },
+  {
+    body: '# 라멘 한 그릇\n\n흑마늘 기름이 진하다. 반숙 달걀은 하나 더 시키기\n\n#생활',
+    color: 'gray', daysAgo: 6, photos: ['ramen'],
+  },
+  {
+    body: '# 레몬 파스타\n\n구운 레몬을 짜서 먹으니 산뜻했다. <span style="color: #e03131">고추가 은근 매움</span>\n\n#생활',
+    color: 'blue', daysAgo: 3, photos: ['pasta'],
+  },
+  {
+    body: '# 기념일 저녁\n\n스테이크와 피시앤칩스, 맥주 한 잔\n\n> 내년에도 여기서\n\n#생활',
+    color: 'purple', daysAgo: 10, photos: ['steak', 'fish-and-chips'],
+  },
+  {
+    body: '# 인절미 토스트\n\n콩고물이 산처럼 쌓여 나온다. <mark>둘이서 하나면 충분</mark>\n\n#생활',
+    color: 'yellow', daysAgo: 12, photos: ['injeolmi-toast'],
+  },
+  {
+    body: '# 캠핑 불멍\n\n장작 두 묶음이면 밤새 충분했다.\n\n다음 캠핑 준비물\n- [ ] 장갑\n- [ ] 접이식 의자\n\n#여행',
+    color: 'charcoal', daysAgo: 13, photos: ['campfire'],
+  },
+  {
+    body: '# 파르페와 라자냐\n\n창가 자리 그네 의자가 귀엽다\n\n#생활',
+    color: 'pink', daysAgo: 17, photos: ['parfait'],
+  },
+  {
+    body: '# 미국식 한 접시\n\n칠리 감자튀김, 나초, 소시지. 셋이 먹어도 남았다\n\n#생활',
+    color: 'yellow', daysAgo: 19, photos: ['chili-platter'],
+  },
 ];
 
-/** 연습 공간 예시 메모를 볼트에 넣는다 (PC · 휴대폰 볼트 모두 import 가 같다) */
-export function seedTutorialSandbox(vault, toIso, now = new Date()) {
-  for (const m of TUTORIAL_SANDBOX_MEMOS) {
-    const at = toIso(new Date(now.getTime() - m.daysAgo * 86_400_000));
-    vault.import({ body: m.body, color: m.color, mode: m.mode, pinned: m.pinned === true, created: at, updated: at });
+/**
+ * 연습 공간 예시 메모를 볼트에 넣는다 (PC · 휴대폰 볼트 모두 import · setReminders 가 같다)
+ * @param {(name: string) => Promise<string|null>|string|null} [photo] 예시 사진 하나를 볼트 첨부로 넣고 그 경로 (못 넣으면 null — 그 사진은 빼고)
+ */
+export async function seedTutorialSandbox(vault, toIso, { now = new Date(), photo = () => null } = {}) {
+  const day = (n, time = '09:00') => {
+    const [h, m] = time.split(':').map(Number);
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + n, h, m);
+  };
+  for (const [i, m] of TUTORIAL_SANDBOX_MEMOS.entries()) {
+    // 같은 날 쓴 메모도 순서가 늘 같게 (뒤의 것일수록 조금 앞선 시각)
+    const at = toIso(new Date(now.getTime() - m.daysAgo * 86_400_000 - i * 60_000));
+    const pics = [];
+    for (const name of m.photos ?? []) {
+      const rel = await Promise.resolve().then(() => photo(name)).catch(() => null); // 사진을 못 읽어도(바로 던지든 나중에 실패하든) 글만으로
+      if (rel) pics.push(`![](${rel})`);
+    }
+    const body = pics.length ? `${m.body}\n\n${pics.join('\n\n')}` : m.body;
+    const id = vault.import({ body, color: m.color, mode: m.mode, pinned: m.pinned === true, created: at, updated: at });
+    if (id && m.events?.length) {
+      vault.setReminders(id, m.events.map((e, k) => normalizeReminder({
+        id: `tut-${i}-${k}`, kind: 'at', action: 'notify', title: e.title, created: at,
+        at: toIso(day(e.inDays, e.allDay ? '00:00' : e.time)), allDay: e.allDay === true, alerts: e.alerts, // 하루 종일은 그날 00:00
+      }, now)));
+    }
   }
 }
 
@@ -63,23 +148,23 @@ export const TUTORIAL_STEPS = [
   {
     id: 'write', chapter: '쓰기', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], advance: 'typed', emoji: '📝',
     title: '떠오르는 생각을 적어 보세요',
-    text: '첫 줄은 메모 제목이 되고, 적는 대로 저절로 저장돼요. 💾 저장 단추는 없어요!',
+    text: '첫 줄은 메모 제목이 되고, 적는 대로 저절로 저장돼요. 💾 저장 버튼은 없어요!',
     try: '아무 말이나 한 줄 적어 보세요',
     next: '다음',
   },
   {
     id: 'style', chapter: '쓰기', win: 'note', target: ['.format-bar .style-btn', '#format-bar'], keep: ['.ProseMirror > *', '#style-menu:not([hidden])'], advance: 'styled', emoji: '🔠',
     title: '제목이나 인용으로 바꾸기',
-    text: '"본문" 단추를 누르면 그 줄이 제목, 인용, 코드 모양으로 바뀌어요.',
+    text: '"본문" 버튼을 누르면 그 줄이 제목, 인용, 코드 모양으로 바뀌어요.',
     try: '"본문"을 누르고 "제목 2"를 골라 보세요',
     next: LATER,
   },
   {
     id: 'lists', chapter: '쓰기', win: 'note', target: ['[data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *'], advance: 'tasked', emoji: '✅',
     image: 'clear.jpg',
-    title: '할 일 목록 만들기',
-    text: '체크리스트 단추를 누르면 줄 앞에 네모 칸이 생겨요. 모두 끝내면 CLEAR 도장이 쾅! 🎊',
-    try: '체크리스트 단추를 눌러 보세요',
+    title: '체크리스트 만들기',
+    text: '체크리스트 버튼을 누르면 줄 앞에 네모 칸이 생겨요. 모두 끝내면 CLEAR 도장이 쾅! 🎊',
+    try: '체크리스트 버튼을 눌러 보세요',
     next: LATER,
   },
   {
@@ -116,7 +201,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'content', chapter: '넣기', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-ctx'], advance: 'content-tools', emoji: '💾',
     title: '넣은 내용 저장, 공유하기',
-    text: '사진, 손 메모, 녹음, 파일, 표를 오른쪽 클릭하면 메뉴 맨 위 한 줄에 아이콘이 떠요. ✂ 잘라내기, 📋 복사, 💾 파일로 저장, 📤 공유(Drive 링크, LocalSend, 메일), 🗑 지우기.',
+    text: '사진, 손 메모, 녹음, 파일, 표를 오른쪽 클릭하면 메뉴 맨 위 한 줄에 아이콘이 떠요. ✂ 잘라내기, 📋 복사, 💾 파일로 저장, 📤 공유(Drive 링크, LocalSend, 메일), 🗑 삭제.',
     try: '방금 그린 손 메모를 오른쪽 클릭하고 📋 복사 아이콘을 눌러 보세요',
     next: LATER,
   },
@@ -125,7 +210,7 @@ export const TUTORIAL_STEPS = [
     image: 'annotate.jpg',
     title: '글 위에 바로 그리기',
     text: '"글 위에 그리기"로 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요.',
-    try: '+ 단추에서 "글 위에 그리기"를 눌러 글 위에 쓱 긋고 ✓ 완료',
+    try: '+ 버튼에서 "글 위에 그리기"를 눌러 글 위에 쓱 긋고 ✓ 완료',
     next: LATER,
   },
   {
@@ -145,7 +230,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'crown', chapter: '메모 창', win: 'note', target: ['#top-btn'], keep: ['#tape-btn:not([hidden])'], advance: 'crown-on', emoji: '👑',
     title: '늘 위에, 또는 바탕화면에',
-    text: '👑 왕관: 다른 창에 가려지지 않게 늘 위에. 🩹 테이프(옆 단추): 바탕화면에 붙여 다른 창 뒤에. 둘 중 하나만 붙고, 창 위의 스티커를 누르면 떼어져요.',
+    text: '👑 왕관: 다른 창에 가려지지 않게 늘 위에. 🩹 테이프(옆 버튼): 바탕화면에 붙여 다른 창 뒤에. 둘 중 하나만 붙고, 창 위의 스티커를 누르면 떼어져요.',
     noTape: '왕관을 누르면 이 메모가 다른 창에 가려지지 않아요. 창 위에 붙은 왕관 스티커를 누르거나 Ctrl+Shift+T 를 다시 누르면 떼어져요.',
     try: '지금은 왕관을 눌러 보세요',
     next: LATER,
@@ -153,13 +238,13 @@ export const TUTORIAL_STEPS = [
   {
     id: 'bell', chapter: '메모 창', win: 'note', target: ['#bell-btn', '.bar'], emoji: '⏰',
     title: '잊지 않게 알림 맞추기',
-    text: '종 단추로 원하는 날짜와 시간에 이 메모를 알려 드려요. 매일, 매주 되풀이도 돼요.',
+    text: '종 버튼으로 원하는 날짜와 시간에 이 메모를 알려 드려요. 매일, 매주 되풀이도 돼요.',
     next: '다음',
   },
   {
     id: 'hotkey', chapter: '메모 창', win: 'note', target: ['#hotkey-btn', '.bar'], emoji: '⚡',
     title: '어디서든 불러오는 키',
-    text: '번개 단추로 Ctrl+Alt+숫자 키를 정해 두면 다른 앱을 쓰다가도 이 메모를 바로 불러와요. 정한 숫자가 번개 옆에 작게 보여요.',
+    text: '번개 버튼으로 Ctrl+Alt+숫자 키를 정해 두면 다른 앱을 쓰다가도 이 메모를 바로 불러와요. 정한 숫자가 번개 옆에 작게 보여요.',
     next: '다음',
   },
   {
@@ -192,14 +277,14 @@ export const TUTORIAL_STEPS = [
   {
     id: 'layout', chapter: '목록', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
-    text: '"보기" 단추에서 카드를 바둑판처럼 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 고를 수 있어요.',
+    text: '"보기" 버튼에서 카드를 바둑판처럼 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 고를 수 있어요.',
     try: '"보기"를 누르고 "한 줄씩"을 골라 보세요',
     next: LATER,
   },
   {
     id: 'filters', chapter: '목록', win: 'list', target: ['#tag-strip:not([hidden])', '#filter-btn'], keep: ['#tag-strip:not([hidden]) .tag-chip'], advance: 'tag-filtered', emoji: '🔎',
     title: '원하는 메모만 보기',
-    text: '태그를 누르면 그 태그가 붙은 메모만 보여요. "보기" 단추로 색이나 사진으로도 골라요.',
+    text: '태그를 누르면 그 태그가 붙은 메모만 보여요. "보기" 버튼으로 색이나 사진으로도 골라요.',
     try: '방금 만든 #태그를 눌러 보세요',
     next: LATER,
   },
@@ -289,9 +374,9 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'lists', chapter: '쓰기', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], write: true, advance: 'tasked', emoji: '✅',
     image: 'm-clear.jpg',
-    title: '할 일 목록 만들기',
-    text: '체크리스트 단추를 누르면 네모 칸이 생겨요. 줄바꿈이나 쓰던 줄 아래를 누르면 다음 칸이 이어지고, 모두 끝내면 CLEAR 도장! 🎊',
-    try: '체크리스트 단추를 눌러 보세요',
+    title: '체크리스트 만들기',
+    text: '체크리스트 버튼을 누르면 네모 칸이 생겨요. 줄바꿈이나 쓰던 줄 아래를 누르면 다음 칸이 이어지고, 모두 끝내면 CLEAR 도장! 🎊',
+    try: '체크리스트 버튼을 눌러 보세요',
     next: LATER,
   },
   {
@@ -332,7 +417,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'voice', chapter: '넣기', win: 'note', target: ['#add-btn', '#format-bar'], emoji: '🎙️', image: 'm-voice.jpg',
     title: '말로 메모하기',
-    text: '+ 단추에서 "음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
+    text: '+ 버튼에서 "음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
     next: '다음',
   },
   {
@@ -352,18 +437,18 @@ export const MOBILE_TUTORIAL_STEPS = [
     id: 'back', chapter: '메모 화면', win: 'note', target: ['#back-btn'], advance: 'note-closed', emoji: '↩️',
     title: '목록으로 돌아가요',
     text: '적은 내용은 이미 저장되어 있어요. 휴대폰의 뒤로 가기를 눌러도 돼요.',
-    try: '왼쪽 위 단추를 눌러 보세요',
+    try: '왼쪽 위 버튼을 눌러 보세요',
   },
   {
     id: 'cards', chapter: '목록', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
     title: '메모는 모두 여기에',
-    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유, 색, 지우기)가 떠요. 왼쪽으로 밀면 지우기예요.',
+    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유, 색, 삭제)가 떠요. 왼쪽으로 밀면 삭제예요.',
     next: '다음',
   },
   {
     id: 'layout', chapter: '목록', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
-    text: '"보기" 단추에서 카드를 두 줄로 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 골라요.',
+    text: '"보기" 버튼에서 카드를 두 줄로 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 골라요.',
     try: '"보기"를 누르고 "한 줄씩"을 골라 보세요',
     next: LATER,
   },

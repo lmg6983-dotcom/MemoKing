@@ -6,6 +6,7 @@ import { dueOccurrence, dueAtStartup, markFired, upcomingAlerts, alarmLabel, ala
 import { extractPreview } from '../../app/js/core/memo-file.js';
 import { native } from './native.js';
 import { quietAlarm } from '../../app/js/core/work-hours.js';
+import { UI } from '../../app/js/core/ui-text.js';
 
 // 일정의 미리 알림마다 따로 (같은 일정의 "하루 전" 과 "30분 전" 이 서로를 지우지 않게)
 const keyOf = (memoId, reminder, offset = 0) => `${memoId}/${reminder.id}${offset ? `/${offset}` : ''}`;
@@ -59,7 +60,7 @@ export function createAlarms({ getVault, onFire, getHours = () => null, interval
       try {
         marked = vault.updateReminder(memoId, markFired(reminder, t));
       } catch (err) {
-        console.error('울림 표시를 적지 못했습니다', err); // 이 메모만 건너뛰고 다른 알림은 계속
+        console.error(UI.ringMarkFail, err); // 이 메모만 건너뛰고 다른 알림은 계속
       }
       if (!marked) continue; // 적지 못했으면 다시 읽은 뒤 다음 차례에
       // 시스템 알람이 이미 울렸으면 알림 막대에 다시 띄우지 않는다
@@ -67,7 +68,7 @@ export function createAlarms({ getVault, onFire, getHours = () => null, interval
       try {
         fire(memoId, reminder, info, { silent: already });
       } catch (err) {
-        console.error('알림을 울리지 못했습니다', err);
+        console.error(UI.ringFail, err);
       }
       count++;
     }
