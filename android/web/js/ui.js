@@ -190,7 +190,7 @@ wide.addEventListener('change', () => {
 // ---------- 확인 ----------
 
 // danger: 지우기처럼 되돌릴 수 없는 일이면 빨간 단추 (아니면 보통 단추) · cancelLabel: "취소" 가 헷갈릴 때 (예: 남겨 두기)
-export function confirmDialog(message, okLabel = '지우기', { cancelLabel = '취소', danger = true } = {}) {
+export function confirmDialog(message, okLabel = '삭제', { cancelLabel = '취소', danger = true } = {}) {
   const dialog = $('confirm-dialog');
   $('confirm-message').textContent = message;
   $('confirm-ok').textContent = okLabel;

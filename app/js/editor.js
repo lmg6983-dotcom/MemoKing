@@ -389,7 +389,7 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
     }
     if (!main.isConnected) dom.replaceChildren(main);
     if (!loaded) load();
-    main.title = `열기 단추로 브라우저에서 열어요\n${href}`;
+    main.title = `열기 버튼으로 브라우저에서 열어요\n${href}`;
     const state = preview ? (preview.ok ? 'ok' : 'plain') : 'loading';
     dom.dataset.state = state;
     dom.dataset.kind = preview?.kind === 'youtube' || preview?.site === 'YouTube' ? 'youtube' : '';

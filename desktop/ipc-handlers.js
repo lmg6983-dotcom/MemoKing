@@ -862,7 +862,7 @@ export function registerIpc(ctx) {
   // ---------- 첨부 파일 ----------
   ipcMain.handle('attachment:read', (_e, rel) => {
     const file = getVault()?.resolve(String(rel ?? ''));
-    if (!file || !fs.existsSync(file)) throw new Error('파일을 찾지 못했어요. 메모 폴더에서 지워졌거나 옮겨졌는지 확인해 주세요');
+    if (!file || !fs.existsSync(file)) throw new Error('파일을 찾지 못했어요. 메모 폴더에서 삭제됐거나 옮겨졌는지 확인해 주세요');
     if (fs.statSync(file).size > 500 * 1024 * 1024) throw new Error('파일이 너무 커요 (500MB 넘음). 더 작은 파일로 해 주세요');
     return new Uint8Array(fs.readFileSync(file));
   });
@@ -881,7 +881,7 @@ export function registerIpc(ctx) {
       // 이미 디코딩됨
     }
     const file = getVault()?.resolve(decoded);
-    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌는지 확인해 주세요.';
+    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 삭제됐는지 확인해 주세요.';
     const result = await openVaultFile(file, BrowserWindow.fromWebContents(e.sender));
     return result && result !== 'cancelled' ? '파일을 열지 못했어요. 이 파일을 열 수 있는 프로그램이 있는지 확인해 주세요.' : result;
   });
@@ -905,7 +905,7 @@ export function registerIpc(ctx) {
   /** 메모 폴더 attachments/ 안의 파일 → { file } | { error } (화면이 이미 풀어 보낸 경로 — 다시 풀면 이름의 %XX 가 깨진다) */
   const attachmentFile = (rel) => {
     const file = /^attachments\//.test(String(rel)) ? getVault()?.resolve(String(rel)) : null;
-    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 지워졌는지 확인해 주세요' };
+    if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return { error: '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 삭제됐는지 확인해 주세요' };
     return { file };
   };
   ipcMain.handle('attachment:save-as', async (e, f = {}) => {

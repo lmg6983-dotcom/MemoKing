@@ -234,7 +234,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     if (conflicts.length) {
       const note = document.createElement('p');
       note.className = 'sync-pop-note';
-      note.textContent = '양쪽에서 같은 메모를 고쳐 이 PC 에서 쓴 것을 "(PC 충돌 …)" 사본으로 남겼어요. 확인하고 필요 없으면 지우세요';
+      note.textContent = '양쪽에서 같은 메모를 고쳐 이 PC 에서 쓴 것을 "(PC 충돌 …)" 사본으로 남겼어요. 확인하고 필요 없으면 삭제하세요';
       pop.append(note);
     }
   }
@@ -289,7 +289,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     saveConflicts(conflicts);
     render();
     if (files.length) showFiles(files);
-    else confirm('충돌 사본을 이미 모두 지웠거나 옮겼어요.', '확인');
+    else confirm('충돌 사본을 이미 모두 삭제했거나 옮겼어요.', '확인');
   }
 
   async function refresh() {
@@ -508,7 +508,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
       $('new-folder-row').hidden = true;
       path.push(f);
       await showFolder();
-      folderMsg(f.existed ? `"${name}" 폴더가 이미 있어서 새로 만들지 않고 그 폴더를 열었어요` : `"${name}" 폴더를 만들었어요. 아래 단추로 이 폴더를 쓰세요`);
+      folderMsg(f.existed ? `"${name}" 폴더가 이미 있어서 새로 만들지 않고 그 폴더를 열었어요` : `"${name}" 폴더를 만들었어요. 아래 버튼으로 이 폴더를 쓰세요`);
     } catch (err) {
       await confirm(`폴더를 만들지 못했어요.\n${cleanError(err)}`, '확인');
     } finally {

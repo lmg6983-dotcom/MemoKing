@@ -480,7 +480,7 @@ export class WindowManager {
   untapeFromList(id) {
     const stack = this.stacks?.stackOf(id);
     if ((stack ? this.stackLayer(stack) : this.layerOf(id)) !== 'bottom' || !this.canTape) return false;
-    this.setNoteLayer(id, null, { note: '테이프가 떨어졌어요. 다시 붙이려면 위의 테이프 단추를 눌러 주세요' });
+    this.setNoteLayer(id, null, { note: '테이프가 떨어졌어요. 다시 붙이려면 위의 테이프 버튼을 눌러 주세요' });
     return true;
   }
 
@@ -494,7 +494,7 @@ export class WindowManager {
     const layer = stack ? this.stackLayer(stack) : this.layerOf(id);
     if (!layer) return false;
     const [what, obj] = layer === 'top' ? ['왕관', '왕관을'] : ['테이프', '테이프를'];
-    this.setNoteLayer(id, null, { note: `단축키로 불러와 ${obj} 뗐어요. 다시 붙이려면 위의 ${what} 단추를 눌러 주세요` });
+    this.setNoteLayer(id, null, { note: `단축키로 불러와 ${obj} 뗐어요. 다시 붙이려면 위의 ${what} 버튼을 눌러 주세요` });
     return true;
   }
 

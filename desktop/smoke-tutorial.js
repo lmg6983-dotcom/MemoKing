@@ -164,7 +164,7 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     note().webContents.insertText('장보기 목록');
     await wait(200);
     await arrive(note, 'style', { praise: true });
-    await press(note(), '.format-bar .style-btn', '[style] "본문" 단추');
+    await press(note(), '.format-bar .style-btn', '[style] "본문" 버튼');
     await wait(250);
     await press(note(), '#style-menu [data-style="h2"]', '[style] 제목 2');
     await arrive(note, 'lists', { praise: true });
@@ -239,7 +239,7 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
       list().webContents.sendInputEvent({ type: 'mouseWheel', x: c.x ?? 100, y: c.y ?? 200, deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
     }
     await arrive(list, 'layout', { praise: true });
-    await press(list(), '#filter-btn', '[layout] 보기 단추');
+    await press(list(), '#filter-btn', '[layout] 보기 버튼');
     await new Promise((r) => setTimeout(r, 400));
     await press(list(), '#layout-group [data-value="rows"]', '[layout] 한 줄씩');
     await arrive(list, 'filters', { praise: true });

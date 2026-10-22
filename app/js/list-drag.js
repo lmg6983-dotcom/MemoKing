@@ -246,7 +246,7 @@ export function createListDrag({ readOnly = false } = {}) {
       if (spec) decorate(view, [{ pos: at, ...spec }]);
       else if (!drag && !press && listDragKey.getState(view.state)?.find().length) decorate(view, []);
     };
-    showDeleteButton(view, { pos: at, node, target: li, label: only ? '이 목록 지우기' : '이 항목 지우기', deco });
+    showDeleteButton(view, { pos: at, node, target: li, label: only ? '이 목록 삭제' : '이 항목 삭제', deco });
   }
 
   // 들어 올린 항목 대신 목록 전체(맨 바깥 줄)를 들어 올린다 — 손가락은 그대로, 옮기기는 block-move.js 가

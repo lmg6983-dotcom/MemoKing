@@ -154,7 +154,7 @@ async function memoHotkeyPressed(slot) {
   const bound = memoHotkeys.map[slot];
   const memo = bound && vault?.get(bound.id);
   if (!memo) {
-    windowManager.showHud({ title: `${hotkeyLabel(slot)}: 메모를 찾지 못했어요`, body: '지웠거나 다른 메모 폴더의 메모예요', kind: 'warn' });
+    windowManager.showHud({ title: `${hotkeyLabel(slot)}: 메모를 찾지 못했어요`, body: '삭제했거나 다른 메모 폴더의 메모예요', kind: 'warn' });
     return;
   }
   const title = memo.title || '제목 없음';
@@ -1039,7 +1039,7 @@ function updateTrayMenu() {
       click: (item) => setAutoStart(item.checked, updateTrayMenu),
     },
     { type: 'separator' },
-    { label: '튜토리얼 보기', enabled: Boolean(vault), click: startTutorial },
+    { label: '사용법 둘러보기', enabled: Boolean(vault), click: startTutorial },
     { label: '메모킹 종료', click: quitApp },
   ];
   tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate));

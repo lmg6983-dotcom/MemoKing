@@ -148,7 +148,7 @@ function render() {
   let only = null;
   if (state.onlyFiles) {
     only = state.memos.filter((m) => state.onlyFiles.has(String(m.file ?? '').replace(/\\/g, '/')));
-    if (only.length) $('conflict-bar-text').textContent = `동기화 충돌 사본 ${only.length}개만 보는 중, 원래 메모와 견주어 보고 필요 없으면 지우세요`;
+    if (only.length) $('conflict-bar-text').textContent = `동기화 충돌 사본 ${only.length}개만 보는 중, 원래 메모와 견주어 보고 필요 없으면 삭제하세요`;
     else {
       closeOnlyFiles();
       only = null;
@@ -609,7 +609,7 @@ async function runSearch() {
 
 // ---------- 동작 ----------
 
-function confirmDialog(message, okLabel = '지우기') {
+function confirmDialog(message, okLabel = '삭제') {
   el.confirmMessage.textContent = message;
   $('confirm-ok').textContent = okLabel;
   el.confirm.returnValue = '';
@@ -1012,7 +1012,7 @@ if (api.stt) {
     renderStt(st);
   });
   $('stt-remove').addEventListener('click', async () => {
-    if (!(await confirmDialog('받아쓰기 데이터를 지울까요?\n다시 쓰려면 다시 받아야 해요.', '지우기'))) return;
+    if (!(await confirmDialog('받아쓰기 데이터를 삭제할까요?\n다시 쓰려면 다시 받아야 해요.', '삭제'))) return;
     renderStt(await api.stt.remove('asr'));
   });
   $('stt-speaker').addEventListener('change', async (e) => {
@@ -1099,7 +1099,7 @@ $('opms-host-form').addEventListener('submit', async (e) => {
   const r = await api.opms.setHost($('opms-host').value);
   if (r?.error) return setOpmsNote(r.error, true);
   $('opms-host').value = r.host;
-  setOpmsNote(r.host ? `저장했어요: ${r.host}` : '서버 주소를 지웠어요');
+  setOpmsNote(r.host ? `저장했어요: ${r.host}` : '서버 주소를 삭제했어요');
 });
 $('opms-dir-open').addEventListener('click', () => api.opms.openFolder());
 $('opms-dir-btn').addEventListener('click', async () => {
@@ -1175,7 +1175,7 @@ async function blockHistoryApp(appId, appName) {
   if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함의 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const apps = await api.history.apps();
   const count = apps.find((a) => a.appId === appId)?.count ?? 0;
-  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 지울까요?`, '지우기');
+  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제');
   await api.history.blockApp(appId, appName, remove);
   historyTab.refresh();
   return true;
@@ -1810,8 +1810,8 @@ async function renderTrash() {
   const [items, s] = await Promise.all([api.trash.list(), api.settings.get()]);
   $('trash-count').textContent = items.length ? String(items.length) : '';
   trashEl.note.textContent = s.trashDays > 0
-    ? `지운 메모는 여기에 있다가 ${DAYS_LABEL[s.trashDays] ?? `${s.trashDays}일`}이 지나면 저절로 지워져요.`
-    : '지운 메모는 직접 지울 때까지 여기에 있어요.';
+    ? `삭제한 메모는 여기에 있다가 ${DAYS_LABEL[s.trashDays] ?? `${s.trashDays}일`}이 지나면 저절로 삭제돼요.`
+    : '삭제한 메모는 직접 삭제할 때까지 여기에 있어요.';
   trashEl.empty.hidden = items.length > 0;
   trashEl.clear.disabled = items.length === 0;
   trashEl.list.replaceChildren(...items.map((t) => {

@@ -237,9 +237,9 @@ async function enableHistory(on) {
 async function blockApp(appId, appName) {
   if (!(await confirmDialog(`${appName} 알림을 더 이상 보관하지 않을까요?\n알림 보관함의 모을 앱에서 다시 켤 수 있어요.`, '보관 중지'))) return false;
   const count = history.all().entries.filter((x) => x.appId === appId && x.source !== 'memoking').length;
-  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 지울까요?`, '지우기', { cancelLabel: '남겨 두기' });
+  const remove = count > 0 && await confirmDialog(`보관된 ${appName} 알림 ${count}개도 삭제할까요?`, '삭제', { cancelLabel: '남겨 두기' });
   const removed = history.block(appId, appName, remove);
-  toast(removed ? `${appName} 알림 보관을 멈추고 ${removed}개를 지웠어요` : `${appName} 알림을 더 이상 보관하지 않아요`);
+  toast(removed ? `${appName} 알림 보관을 멈추고 ${removed}개를 삭제했어요` : `${appName} 알림을 더 이상 보관하지 않아요`);
   return true;
 }
 
@@ -635,7 +635,7 @@ async function deleteMemo(id, { flown = false } = {}) {
   if (inNote) app.showList();
   else list.refresh();
   if (isBlankBody(body) || typeof name !== 'string') {
-    toast('메모를 지웠어요');
+    toast('메모를 삭제했어요');
     return;
   }
   toast(trashedText(titleOf(body)), false, {
@@ -1055,8 +1055,8 @@ function renderTrash() {
   const items = app.vault.trashList();
   const days = trashDays();
   $('trash-note').textContent = days
-    ? `지운 메모는 ${days}일 동안 보관한 뒤 영구 삭제돼요.`
-    : '지운 메모는 직접 지울 때까지 보관돼요.';
+    ? `삭제한 메모는 ${days}일 동안 보관한 뒤 영구 삭제돼요.`
+    : '삭제한 메모는 직접 삭제할 때까지 보관돼요.';
   $('trash-empty').hidden = items.length > 0;
   $('trash-clear').disabled = items.length === 0;
   $('trash-list').replaceChildren(...items.map((t) => {

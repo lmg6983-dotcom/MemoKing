@@ -133,7 +133,7 @@ export function openAiDriveGuide({ folder = '메모킹', linked = null, copy, no
   s4.append(ex);
   steps.append(s1, s2, s3, s4);
 
-  const foot = el('p', 'ai-guide-note', 'AI 가 만든 메모는 다음 동기화 때 목록에 나타나요. 잠긴 메모는 AI 가 읽을 수 없어요. 안내문에는 메모를 지우기 전에 먼저 묻도록 적어 두었어요.');
+  const foot = el('p', 'ai-guide-note', 'AI 가 만든 메모는 다음 동기화 때 목록에 나타나요. 잠긴 메모는 AI 가 읽을 수 없어요. 안내문에는 메모를 삭제 전에 먼저 묻도록 적어 두었어요.');
   dlg.append(head, lead, steps, foot);
   document.body.append(dlg);
   let release = null;

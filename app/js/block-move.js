@@ -508,7 +508,7 @@ class Mover {
         const host = e.target instanceof Element ? e.target.closest(HOVER_TARGET) : null;
         if (!host || !view.dom.contains(host) || this.busy() || isContextMenuOpen()) return;
         hoverTimer = setTimeout(() => {
-          if (host.isConnected && host.matches(':hover') && !this.busy()) hintOnce('content-menu', '오른쪽 클릭하면 잘라내기, 복사, 저장, 공유, 지우기 메뉴가 떠요', { anchor: host });
+          if (host.isConnected && host.matches(':hover') && !this.busy()) hintOnce('content-menu', '오른쪽 클릭하면 잘라내기, 복사, 저장, 공유, 삭제 메뉴가 떠요', { anchor: host });
         }, 1200);
       };
       view.dom.addEventListener('mouseover', this.onHoverHint);
@@ -923,7 +923,7 @@ class Mover {
     const target = media ?? (block.node.type.name === 'table' ? dom.closest('.tableWrapper') ?? dom.querySelector('.tableWrapper') ?? dom : dom);
     this.shownTarget = target;
     const copyLabel = block.node.type.name === 'mk_link_card' ? UI.copyLink : null; // 카드 모양이 아니라 주소를
-    const opts = { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 지우기`, copyLabel, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
+    const opts = { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 삭제`, copyLabel, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
     // PC 메뉴: 파일 · 소리 · 그림 · 음성 카드는 보이는 이름을 바꿀 수 있다 (rename-content.js)
     if (canContentMenu() && renameTarget(view.state.doc, block.pos, block.node)) {
       opts.extraItems = [{ id: 'rename', label: '이름 변경' }];

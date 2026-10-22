@@ -226,7 +226,7 @@ object GoogleAuth {
 
     private fun page(ok: Boolean): String {
         val title = if (ok) "메모킹에 Google Drive를 연결했어요" else "연결하지 못했어요"
-        val sub = if (ok) "아래 단추를 눌러 메모킹으로 돌아가세요." else "메모킹으로 돌아가 다시 해 주세요."
+        val sub = if (ok) "아래 버튼을 눌러 메모킹으로 돌아가세요." else "메모킹으로 돌아가 다시 해 주세요."
         return """<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>메모킹</title><style>body{font-family:system-ui,sans-serif;background:#f6f5f1;color:#111;display:grid;place-items:center;min-height:90vh;margin:0;text-align:center;padding:24px}
 a{display:inline-block;margin-top:20px;padding:14px 28px;border-radius:14px;background:#ffcc00;color:#111;font-weight:700;text-decoration:none;font-size:17px}h1{font-size:22px}</style></head>

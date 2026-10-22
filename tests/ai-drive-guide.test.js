@@ -4,7 +4,7 @@ import { aiDrivePrompt } from '../app/js/ai-drive-guide.js';
 import { parseMemoFile, extractTitle, COLORS } from '../app/js/core/memo-file.js';
 import { normalizeReminder } from '../app/js/core/reminders.js';
 
-test('AI 안내문: 폴더 이름 · .md · Google 문서 금지 · 지우기 전에 묻기 · 색 목록', () => {
+test('AI 안내문: 폴더 이름 · .md · Google 문서 금지 · 삭제 전에 묻기 · 색 목록', () => {
   const p = aiDrivePrompt({ folder: '내 메모' });
   assert.match(p, /"내 메모" 폴더/);
   assert.match(p, /\.md/);

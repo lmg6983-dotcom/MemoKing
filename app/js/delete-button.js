@@ -39,7 +39,7 @@ function announce(text) {
  * PC: 한 일을 알리며 "되돌리기" 단추 (지우기 · 잘라내기 · 이름 변경 …)
  * @param {string} what 대상 이름("이 표" 의 "표" 처럼, 조사는 알아서) · @param {string} [verb] 한 일 (기본 "지웠어요")
  */
-export function undoHint(what, rect, view, verb = '지웠어요') {
+export function undoHint(what, rect, view, verb = '삭제했어요') {
   document.getElementById('mk-undo-hint')?.remove();
   const tip = document.createElement('div');
   tip.id = 'mk-undo-hint';
@@ -104,7 +104,7 @@ function scrollParent(el) {
  * @param {{ pos: number, node: object, target: Element, markTarget?: boolean, deco: Function, label?: string, remove?: Function }} o
  * @param {{ undo?: boolean }} how undo: 지운 자리에 되돌리기 안내 (PC)
  */
-export function deleteContent(view, { pos, node, target, markTarget = false, deco, label = '이 내용 지우기', remove }, { undo = false } = {}) {
+export function deleteContent(view, { pos, node, target, markTarget = false, deco, label = '이 내용 삭제', remove }, { undo = false } = {}) {
   if (view.state.doc.nodeAt(pos) !== node) return false;
   if (markTarget) target.classList.remove('mk-delete-target');
   // 대상: 붉게 비쳤다가 작아지며 흐려지고 → 그 자리가 접힌다 (높이를 정해 두어야 접히는 모습이 보인다)
@@ -133,9 +133,9 @@ export function deleteContent(view, { pos, node, target, markTarget = false, dec
  * @returns {Promise<boolean>} 메뉴를 띄웠는가
  */
 export async function showContentMenu(view, opts, at) {
-  const { pos, node, target, label = '이 내용 지우기', copyLabel = null, open = null, extraItems = [], onExtra = null } = opts;
+  const { pos, node, target, label = '이 내용 삭제', copyLabel = null, open = null, extraItems = [], onExtra = null } = opts;
   hideDeleteButton(true);
-  const verb = (v) => label.replace(/지우기$/, v); // "이 표 지우기" → "이 표 복사"
+  const verb = (v) => label.replace(/지우기$/, v); // "이 표 삭제" → "이 표 복사"
   const icons = [
     { id: 'cut', icon: CUT_ICON, label: verb('잘라내기') }, // 복사한 뒤 지움 (Ctrl+Z 로 되돌림)
     { id: 'copy', icon: COPY_ICON, label: copyLabel ?? verb('복사') },
@@ -198,7 +198,7 @@ export async function showContentMenu(view, opts, at) {
  *   placement: 'corner'(기본) 대상의 오른쪽 위 모서리 · 'above' 대상 위 오른쪽 밖 — 표를 가리지 않게
  *   persist: 시간으로 사라지지 않고 follow 가 찾는 동안 계속 (표를 고치는 동안). 글을 쳐서 노드가 바뀌어도 follow 가 같은 표를 찾으면 그대로
  */
-export function showDeleteButton(view, { pos, node, target, label = '이 내용 지우기', copyLabel = null, deco, markTarget = false, remove, showMs = DELETE_SHOW_MS, open = null, placement = 'corner', persist = false, follow = null }) {
+export function showDeleteButton(view, { pos, node, target, label = '이 내용 삭제', copyLabel = null, deco, markTarget = false, remove, showMs = DELETE_SHOW_MS, open = null, placement = 'corner', persist = false, follow = null }) {
   hideDeleteButton(true);
   if (isShareMenuOpen()) return; // 공유 방법을 고르는 동안은 메뉴만 (단추가 메뉴 위에 다시 뜨지 않게)
   const btn = document.createElement('button');
@@ -212,7 +212,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     const b = document.createElement('button');
     b.type = 'button';
     b.className = cls;
-    const text = label.replace(/지우기$/, verb); // "이 표 지우기" → "이 표 복사" · "이 표 저장"
+    const text = label.replace(/지우기$/, verb); // "이 표 삭제" → "이 표 복사" · "이 표 저장"
     b.title = text;
     b.setAttribute('aria-label', text);
     b.innerHTML = icon;
@@ -347,7 +347,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     setTimeout(() => btn.remove(), 180);
     deleteContent(view, { pos: del.pos, node: del.node, target: del.target, markTarget, deco, label, remove });
     // 휴대폰: 지운 뒤 되돌리기 단추가 있는 안내를 띄우도록 알린다 (android/web/js/note-view.js) — PC 는 deleteContent 의 undo 안내
-    window.dispatchEvent(new CustomEvent('mk:removed', { detail: { what: label.replace(/ 지우기$/, '').replace(/^이 /, ''), verb: cutDone ? '잘라냈어요' : '지웠어요' } }));
+    window.dispatchEvent(new CustomEvent('mk:removed', { detail: { what: label.replace(/ 지우기$/, '').replace(/^이 /, ''), verb: cutDone ? '잘라냈어요' : '삭제했어요' } }));
   };
   const press = (e) => {
     e.preventDefault();

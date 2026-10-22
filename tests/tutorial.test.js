@@ -13,7 +13,7 @@ for (const [name, steps] of [['PC', TUTORIAL_STEPS], ['휴대폰', MOBILE_TUTORI
       assert.ok(['list', 'note'].includes(s.win), s.id);
       if (s.advance) assert.ok(TUTORIAL_EVENTS.includes(s.advance), `${s.id} advance`);
       if (s.advance) assert.ok(s.try, `${s.id} 직접 해 보기 안내`);
-      assert.ok(s.next || s.advance, `${s.id}: 다음 단추나 직접 해 보기 중 하나는 있어야 넘어갈 수 있음`);
+      assert.ok(s.next || s.advance, `${s.id}: 다음 버튼이나 직접 해 보기 중 하나는 있어야 넘어갈 수 있음`);
       if (s.image) assert.ok(fs.existsSync(path.join(import.meta.dirname, '..', 'app', 'assets', 'tutorial', s.image)), `${s.id} 사진`);
     }
     assert.ok(steps.filter((s) => s.advance).length >= 8, '직접 해 보는 단계가 넉넉히');
@@ -63,8 +63,8 @@ test('기능이 꺼져 있으면(needs) 직접 해 보기 없이 안내(offText)
       assert.equal(off.text, s.offText);
       assert.equal(off.next, '다음');
       const { enable, ...on } = s;
-      assert.deepEqual(tutorialStepFor(s, () => true), on, '켜져 있으면 그대로 (켜기 단추만 빠짐)');
-      if (enable) assert.deepEqual(off.enable, { need: s.needs, label: enable }, `${s.id}: 꺼져 있으면 바로 켜는 단추`);
+      assert.deepEqual(tutorialStepFor(s, () => true), on, '켜져 있으면 그대로 (켜기 버튼만 빠짐)');
+      if (enable) assert.deepEqual(off.enable, { need: s.needs, label: enable }, `${s.id}: 꺼져 있으면 바로 켜는 버튼`);
     }
   }
   const plain = TUTORIAL_STEPS.find((s) => s.id === 'welcome');

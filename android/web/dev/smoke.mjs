@@ -145,7 +145,7 @@ try {
   check('검색: 본문 글자', (await page.locator('.card').count()) === 1);
   await page.fill('#search', '없는말쯤');
   await page.waitForTimeout(250);
-  check('빈 결과: 안내와 풀기 단추', await page.isVisible('#empty .btn.primary'));
+  check('빈 결과: 안내와 풀기 버튼', await page.isVisible('#empty .btn.primary'));
   const emptyMid = await page.evaluate(() => {
     const v = document.getElementById('view-memos').getBoundingClientRect();
     const b = document.querySelector('#empty .btn.primary').getBoundingClientRect();
@@ -181,7 +181,7 @@ try {
   const hlOff = (await page.locator('.mk-doc mark').count()) === 0;
   await page.tap('#format-bar [data-action="highlight"]');
   await page.waitForTimeout(300);
-  check('형광펜 단추: 다시 누르면 지워짐 · 또 누르면 다시', hlOff && (await page.locator('.mk-doc mark').count()) === 1, String(hlOff));
+  check('형광펜 버튼: 다시 누르면 지워짐 · 또 누르면 다시', hlOff && (await page.locator('.mk-doc mark').count()) === 1, String(hlOff));
   await page.locator('.mk-doc p').last().tap();
   await page.keyboard.press('End');
   await page.keyboard.type(' 휴대폰에서 추가');
@@ -316,7 +316,7 @@ try {
   await page.waitForTimeout(300);
   const dateUnderline = await page.locator('.mk-doc .mk-date').first().textContent().catch(() => '');
   check('날짜 알림: "내일 오후 3시" 에 점선 밑줄', dateUnderline === '내일 오후 3시', dateUnderline);
-  check('날짜 알림: 치는 중에는 단추가 뜨지 않음', (await page.locator('.mk-date-chip').count()) === 0);
+  check('날짜 알림: 치는 중에는 버튼이 뜨지 않음', (await page.locator('.mk-date-chip').count()) === 0);
   {
     const box = await page.locator('.mk-doc .mk-date').first().boundingBox();
     const bar = await page.locator('#format-bar').boundingBox().catch(() => null);
@@ -325,7 +325,7 @@ try {
   }
   await page.waitForTimeout(300);
   const chipText = await page.textContent('.mk-date-chip').catch(() => '');
-  check('날짜 알림: 날짜를 누르면 "📅 일정 추가: 내일 오후 3:00" 단추', /일정 추가: 내일 오후 3:00/.test(chipText), chipText);
+  check('날짜 알림: 날짜를 누르면 "📅 일정 추가: 내일 오후 3:00" 버튼', /일정 추가: 내일 오후 3:00/.test(chipText), chipText);
   await shot('02c-date-chip');
   await page.tap('.mk-date-chip');
   await page.waitForSelector('.event-dialog[open]', { timeout: 5000 }).catch(() => {});
@@ -371,7 +371,7 @@ try {
   }
   await page.waitForTimeout(300);
   const repChip = await page.textContent('.mk-date-chip').catch(() => '');
-  check('날짜 알림: "매주 수요일 저녁 7시" → 반복 일정 단추', /일정 추가: 매주 수요일 오후 7:00/.test(repChip ?? ''), repChip);
+  check('날짜 알림: "매주 수요일 저녁 7시" → 반복 일정 버튼', /일정 추가: 매주 수요일 오후 7:00/.test(repChip ?? ''), repChip);
   if (repChip) await page.tap('.mk-date-chip');
   await page.waitForSelector('.event-dialog[open]', { timeout: 5000 }).catch(() => {});
   check('일정 창(반복): 🔁 매주 수요일 표시 · 이름 "운동"', /매주 수요일/.test(await page.textContent('.event-dialog .event-repeat').catch(() => '')) && (await page.inputValue('#event-name').catch(() => '')) === '운동');
@@ -425,7 +425,7 @@ try {
   const viewNames = await page.evaluate(() => [...document.querySelectorAll('.cal-views button')].map((b) => b.textContent));
   check('일정 보기: 캘린더 · 회상 둘', viewNames.join() === '캘린더,회상', JSON.stringify(viewNames));
   // 새 일정: 한 화면 (이름 · 날짜 · 시각 · 🔔 · 📝 → 일정 저장). 입구: 일정 탭의 + · 빈 앞날 누르기 · "＋ 일정 추가"
-  check('일정 탭: + 단추 = 새 일정 (메모 탭과 같은 자리)', await page.isVisible('#fab') && (await page.getAttribute('#fab', 'aria-label')) === '새 일정');
+  check('일정 탭: + 버튼 = 새 일정 (메모 탭과 같은 자리)', await page.isVisible('#fab') && (await page.getAttribute('#fab', 'aria-label')) === '새 일정');
   await page.tap('#fab');
   await page.waitForSelector('.quick-event[open]');
   const sheet = await page.evaluate(() => ({
@@ -437,7 +437,7 @@ try {
     save: document.querySelector('.quick-event .qe-save')?.textContent,
     focused: document.activeElement?.classList.contains('qe-name'),
   }));
-  check('새 일정 창: 한 화면 (이름 · 날짜 · 🔔 미리 알림 · 📝 저장할 메모 줄, 알림 · 메모 칸은 접힘) · 단추 "일정 저장" · 이름 칸에 바로 입력',
+  check('새 일정 창: 한 화면 (이름 · 날짜 · 🔔 미리 알림 · 📝 저장할 메모 줄, 알림 · 메모 칸은 접힘) · 버튼 "일정 저장" · 이름 칸에 바로 입력',
     sheet.name && /오늘|\d+월 \d+일/.test(sheet.date) && !sheet.alertsOpen && !sheet.memoOpen && sheet.rows.length === 2 && /미리 알림/.test(sheet.rows[0]) && /새 메모/.test(sheet.rows[1]) && sheet.save === '일정 저장' && sheet.focused, JSON.stringify(sheet));
   await page.fill('.qe-name', '팀 점심');
   check('새 일정 창: 이름을 쓰면 📝 줄이 새 메모 "팀 점심"', /새 메모 "팀 점심"/.test(await page.textContent('.qe-memo-row')));
@@ -467,7 +467,7 @@ try {
   await page.fill('.qe-search', '회의');
   await page.waitForTimeout(200);
   await page.tap('.qe-memo:not(.qe-new)');
-  check('새 일정 창: 메모를 고르면 📝 줄이 그 메모 · 단추는 그대로 "일정 저장"', /회의 메모/.test(await page.textContent('.qe-memo-row')) && (await page.textContent('.qe-save')) === '일정 저장', await page.textContent('.qe-memo-row'));
+  check('새 일정 창: 메모를 고르면 📝 줄이 그 메모 · 버튼은 그대로 "일정 저장"', /회의 메모/.test(await page.textContent('.qe-memo-row')) && (await page.textContent('.qe-save')) === '일정 저장', await page.textContent('.qe-memo-row'));
   await page.tap('.qe-save');
   await page.waitForTimeout(600);
   const meet = read('회의 메모.md');
@@ -527,10 +527,10 @@ try {
   await page.tap('.ev-row:not(.ev-ext):not([data-kind="repeat"]) .row-main >> nth=0'); // 반복 일정은 지우기가 없어 (날짜에 따라 첫 줄이 반복일 수 있음)
   await page.waitForSelector('.event-detail[open]');
   const memoDetail = await page.evaluate(() => [...document.querySelectorAll('.event-detail .ed-actions .btn')].map((b) => b.textContent));
-  check('일정 누르기: 메모킹 일정 → 자세히 보기 (메모 열기 · 일정 지우기)', memoDetail.includes('메모 열기') && memoDetail.includes('일정 지우기'), JSON.stringify(memoDetail));
+  check('일정 누르기: 메모킹 일정 → 자세히 보기 (메모 열기 · 일정 삭제)', memoDetail.includes('메모 열기') && memoDetail.includes('일정 삭제'), JSON.stringify(memoDetail));
   await page.tap('.event-detail .dialog-x');
   await page.waitForTimeout(200);
-  check('일정 줄: 다른 캘린더로 보내는 단추 없음 (읽기만)', (await page.locator('.ev-send').count()) === 0);
+  check('일정 줄: 다른 캘린더로 보내는 버튼 없음 (읽기만)', (await page.locator('.ev-send').count()) === 0);
   // 다른 캘린더 일정 → 메모로 가져오기: 그 달 달력 그림(그 날짜에 색연필 동그라미) · 장소 · 설명이 들어간 메모
   await page.locator('.ev-ext', { hasText: '가족 저녁' }).first().locator('.ev-import').tap();
   await page.waitForSelector('#note-screen:not([hidden])', { timeout: 8000 }).catch(() => {});
@@ -700,12 +700,12 @@ try {
   await post('/dev/pick', [{ name: '보고서.pdf', mime: 'application/pdf', base64: Buffer.from('%PDF-1.4').toString('base64') }]);
   await page.tap('#add-btn');
   await page.waitForTimeout(350);
-  check('도구막대: + 를 누르면 위성 단추 6개 (음성 녹음·손 메모·사진·파일·표·수식) · 글 위에 그리기는 다이얼로', (await page.locator('#add-menu:not([hidden]) .add-sat').count()) === 6 && !(await page.locator('#add-menu [data-add="annotate"]').count()));
+  check('도구막대: + 를 누르면 위성 버튼 6개 (음성 녹음·손 메모·사진·파일·표·수식) · 글 위에 그리기는 다이얼로', (await page.locator('#add-menu:not([hidden]) .add-sat').count()) === 6 && !(await page.locator('#add-menu [data-add="annotate"]').count()));
   check('도구막대: + 를 펼치면 키보드를 닫음', await page.evaluate(() => !document.querySelector('.ProseMirror').contains(document.activeElement)));
   await shot('19-add-menu');
   await page.tap('[data-add="file"]');
   await page.waitForTimeout(800);
-  check('도구막대: 고르면 위성 단추가 접힘', await page.isHidden('#add-menu'));
+  check('도구막대: 고르면 위성 버튼이 접힘', await page.isHidden('#add-menu'));
   const withFile = read(shared);
   check('파일 넣기: 파일 칩 링크', /\n\[보고서\.pdf\]\(attachments\/[^)]+\.pdf\)\n?$/.test(withFile), withFile);
   await back();
@@ -788,11 +788,11 @@ try {
       const midFlight = await page.evaluate((sel) => ({ inDom: Boolean(document.querySelector(sel)), flying: document.querySelector(sel)?.classList.contains('flying') }), cardSel);
       await page.waitForTimeout(800);
       const rebuilt = await page.evaluate(() => window.__colsBuilt);
-      check('밀어 지우기: 날아가는 동안은 그대로 · 다 날아간 뒤 지우고 목록은 한 번만 다시 그림', midFlight.inDom && midFlight.flying && rebuilt === 1
+      check('밀어 삭제: 날아가는 동안은 그대로 · 다 날아간 뒤 삭제하고 목록은 한 번만 다시 그림', midFlight.inDom && midFlight.flying && rebuilt === 1
         && !fs.existsSync(path.join(vault, fileName)) && await page.isHidden(cardSel), JSON.stringify({ midFlight, rebuilt }));
       await page.tap('.toast-action');
       await page.waitForTimeout(500);
-      check('밀어 지우기 → 되돌리기: 같은 파일 · 카드 다시 보임', fs.existsSync(path.join(vault, fileName)) && await page.isVisible(cardSel));
+      check('밀어 삭제 → 되돌리기: 같은 파일 · 카드 다시 보임', fs.existsSync(path.join(vault, fileName)) && await page.isVisible(cardSel));
     }
   }
   await page.tap('.card[data-id="00000000-0000-4000-8000-000000000001"]');
@@ -1011,24 +1011,24 @@ try {
   await pickMode(page, 'edit'); // 그리기는 다이얼로 끝낸다 (완료 단추 없음)
   await page.waitForTimeout(300);
   const editBack = await page.evaluate(() => ({ mode: document.querySelector('.mode-knob').dataset.mode, annot: document.body.classList.contains('annotating'), im: document.querySelector('.mk-doc').getAttribute('inputmode'), focus: document.querySelector('.mk-doc').contains(document.activeElement) || document.activeElement === document.querySelector('.mk-doc') }));
-  check('다이얼: 누르면 다음 방식 · 둘레 칸은 바로 · 그리기는 완료 단추 없이 다이얼로 끝 · 글 고치기로 돌리면 키보드와 커서', nextMove === 'move' && drawOn.on && drawOn.done === 0 && editBack.mode === 'edit' && !editBack.annot && editBack.im === null && editBack.focus, JSON.stringify({ nextMove, drawOn, editBack }));
+  check('다이얼: 누르면 다음 방식 · 둘레 칸은 바로 · 그리기는 완료 버튼 없이 다이얼로 끝 · 글 고치기로 돌리면 키보드와 커서', nextMove === 'move' && drawOn.on && drawOn.done === 0 && editBack.mode === 'edit' && !editBack.annot && editBack.im === null && editBack.focus, JSON.stringify({ nextMove, drawOn, editBack }));
   await back();
   await page.waitForTimeout(300);
 
   await page.dispatchEvent('.card[data-id="00000000-0000-4000-8000-000000000002"]', 'contextmenu');
   await page.tap('[data-memo-action="delete"]');
   await page.waitForTimeout(500);
-  check('지우기: 묻지 않음', !(await page.evaluate(() => document.getElementById('confirm-dialog').open)));
-  check('지우기: 되돌리기 버튼', await page.isVisible('#toast-action'));
-  check('지우기: 휴지통으로', !fs.existsSync(path.join(vault, '로고 사진.md')) && fs.readdirSync(path.join(vault, '_memoking/trash')).some((f) => f.startsWith('로고 사진 (')));
-  check('지우기: 그 메모만 쓰던 첨부도 휴지통으로', fs.existsSync(path.join(vault, '_memoking/trash/attachments/20261001-090000-ab12.png')));
+  check('삭제: 묻지 않음', !(await page.evaluate(() => document.getElementById('confirm-dialog').open)));
+  check('삭제: 되돌리기 버튼', await page.isVisible('#toast-action'));
+  check('삭제: 휴지통으로', !fs.existsSync(path.join(vault, '로고 사진.md')) && fs.readdirSync(path.join(vault, '_memoking/trash')).some((f) => f.startsWith('로고 사진 (')));
+  check('삭제: 그 메모만 쓰던 첨부도 휴지통으로', fs.existsSync(path.join(vault, '_memoking/trash/attachments/20261001-090000-ab12.png')));
   await page.tap('#settings-btn');
   await page.locator('#rec-stt').scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
   check('설정: 받아쓰기는 Google 음성 인식 하나 (방식 고르기·데이터 받기 없음)', (await page.locator('#stt-engine, #stt-model-row').count()) === 0 && (await page.textContent('#rec-stt-note')).includes('Google'));
   await shot('17-settings-stt');
   // 둘 중 하나(켜고 끄기)는 모두 같은 스위치 — 말한 사람 나누기·S펜 손글씨도 (예전엔 단추·목록 상자)
-  check('설정: 켜고 끄기는 모두 스위치 (단추·목록 상자 없음)', (await page.locator('#spk-btn, select#pen-writing').count()) === 0
+  check('설정: 켜고 끄기는 모두 스위치 (버튼·목록 상자 없음)', (await page.locator('#spk-btn, select#pen-writing').count()) === 0
     && (await page.locator('#spk-switch.switch, #pen-writing.switch').count()) === 2);
   check('설정: 말한 사람 나누기 (처음엔 꺼짐, 켜면 데이터를 받는다고 안내)', await page.isVisible('#spk-row') && !(await page.isChecked('#spk-switch')) && (await page.textContent('#spk-note')).includes('켜면 데이터'));
   await page.tap('#spk-row');
@@ -1329,7 +1329,7 @@ try {
       return r.width && r.left < stop.right && r.right > stop.left && r.top < stop.bottom && r.bottom > stop.top;
     });
   });
-  check('녹음: 다이얼 · + 단추가 끝내기 단추를 가리지 않음', !overlap);
+  check('녹음: 다이얼 · + 버튼이 끝내기 버튼을 가리지 않음', !overlap);
   await shot('11-recording');
   await page.tap('#rec-stop');
   await page.waitForTimeout(1200);
@@ -1345,7 +1345,7 @@ try {
   await page.tap('[data-new="voice"]');
   await page.waitForSelector('#rec-panel:not([hidden])');
   await page.waitForTimeout(300);
-  check('받아쓰기 못 쓰는 휴대폰: 녹음은 하면서 "녹음만 해요" 알림 (다운로드 단추 없음)', (await page.textContent('#toast-text')).includes('녹음만') && !(await page.isVisible('#toast-action')), await page.textContent('#toast-text'));
+  check('받아쓰기 못 쓰는 휴대폰: 녹음은 하면서 "녹음만 해요" 알림 (다운로드 버튼 없음)', (await page.textContent('#toast-text')).includes('녹음만') && !(await page.isVisible('#toast-action')), await page.textContent('#toast-text'));
   await page.tap('#rec-stop');
   await page.waitForTimeout(1200);
   await back();
@@ -1392,7 +1392,7 @@ try {
       await page.waitForTimeout(700);
       await page.evaluate(() => document.querySelector('.mk-delete-btn')?.remove());
     }
-    check('소리 옮기기: 상자 어디를 꾹 눌러도 들어 올림 (재생 막대·시간·단추·빈 곳)', !missed.length, missed.join(', '));
+    check('소리 옮기기: 상자 어디를 꾹 눌러도 들어 올림 (재생 막대·시간·버튼·빈 곳)', !missed.length, missed.join(', '));
     check('소리 옮기기: 꾹 눌렀다 놓기만 하면 순서 그대로', JSON.stringify(orderOf('녹음 테스트', '첫 문단')) === JSON.stringify(ord), read('옮기기.md'));
   }
   // 표·글 문단도 목록 항목과 같은 방식: 꾹 누르면 들어 올림 (손잡이 없음)
@@ -1441,7 +1441,7 @@ try {
   await page.waitForTimeout(350);
   await touch('touchEnd', ib.x + 40, ib.y + 40);
   await page.waitForTimeout(150);
-  check('꾹 눌렀다 놓으면: 오른쪽 위에 지우기 단추 · 그 왼쪽에 복사 단추', await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn'));
+  check('꾹 눌렀다 놓으면: 오른쪽 위에 삭제 버튼 · 그 왼쪽에 복사 버튼', await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn'));
   await shot('18b-delete-btn');
   // 복사 단추: 그림은 그림 자체(PNG)로 휴대폰 클립보드에 · 누르면 ✓
   const copiedBefore = (await devLog()).log.filter((x) => x.copyImage).length;
@@ -1449,9 +1449,9 @@ try {
   await page.waitForTimeout(600);
   const logNow = await devLog();
   const copies = logNow.log.filter((x) => x.copyImage);
-  check('복사 단추: 그림을 그림 그대로 클립보드에 · ✓ 표시', copies.length > copiedBefore && copies.at(-1).copyImage.bytes > 50 && await page.isVisible('.mk-copy-btn.done'), JSON.stringify(copies.at(-1)));
+  check('복사 버튼: 그림을 그림 그대로 클립보드에 · ✓ 표시', copies.length > copiedBefore && copies.at(-1).copyImage.bytes > 50 && await page.isVisible('.mk-copy-btn.done'), JSON.stringify(copies.at(-1)));
   await page.waitForTimeout(2500);
-  check('지우기 단추: 2초 뒤 사라짐', (await page.locator('.mk-delete-btn').count()) === 0);
+  check('삭제 버튼: 2초 뒤 사라짐', (await page.locator('.mk-delete-btn').count()) === 0);
   await touch('touchStart', ib.x + 40, ib.y + 40);
   await page.waitForTimeout(650);
   await touch('touchEnd', ib.x + 40, ib.y + 40);
@@ -1459,7 +1459,7 @@ try {
   await page.tap('.mk-delete-btn');
   await page.waitForFunction(() => document.querySelectorAll('img.mk-image').length === 1, null, { timeout: 4000 }).catch(() => {}); // 접히는 움직임 뒤 (느린 환경에서도)
   await page.waitForTimeout(1500); // 그리고 파일에 저장될 때까지
-  check('지우기 단추: 누르면 그 그림만 지움', (await page.locator('img.mk-image').count()) === 1 && !read('그림 둘.md').includes('two-a.png') && read('그림 둘.md').includes('two-b.png'), read('그림 둘.md'));
+  check('삭제 버튼: 누르면 그 그림만 지움', (await page.locator('img.mk-image').count()) === 1 && !read('그림 둘.md').includes('two-a.png') && read('그림 둘.md').includes('two-b.png'), read('그림 둘.md'));
   // 글 고치기 방식에서도 그림을 짧게 누르면(탭): 저장 · 복사 · 지우기 단추
   await setMode('edit');
   {
@@ -1470,7 +1470,7 @@ try {
     await page.waitForTimeout(250);
     const shown = await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn') && await page.isVisible('.mk-save-btn');
     const order = await page.evaluate(() => ['.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
-    check('글 고치기 방식: 그림을 짧게 누르면 저장 · 복사 · × 단추 (왼쪽부터)', shown && order[0] < order[1] && order[1] < order[2], JSON.stringify({ shown, order }));
+    check('글 고치기 방식: 그림을 짧게 누르면 저장 · 복사 · × 버튼 (왼쪽부터)', shown && order[0] < order[1] && order[1] < order[2], JSON.stringify({ shown, order }));
     // 잘라내기 단추: 복사(그림 그대로)와 지우기가 함께 — 복사 단추와 저장 단추 사이, 누르면 그 그림이 사라지고 복사 기록이 남으며 되돌릴 수 있다
     {
       const cutOrder = await page.evaluate(() => ['.mk-save-btn', '.mk-cut-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
@@ -1480,13 +1480,13 @@ try {
       await page.waitForTimeout(1400);
       const imgsAfter = await page.locator('img.mk-image').count();
       const copied = (await devLog()).log.filter((x) => x.copyImage).length > copyLog;
-      check('잘라내기 단추: 저장 · 잘라내기 · 복사 · × 순서, 누르면 그림을 복사한 뒤 지움', cutOrder.every((x) => x >= 0) && cutOrder[0] < cutOrder[1] && cutOrder[1] < cutOrder[2] && cutOrder[2] < cutOrder[3] && copied && imgsAfter === imgsBefore - 1, JSON.stringify({ cutOrder, copied, imgsBefore, imgsAfter }));
+      check('잘라내기 버튼: 저장 · 잘라내기 · 복사 · × 순서, 누르면 그림을 복사한 뒤 지움', cutOrder.every((x) => x >= 0) && cutOrder[0] < cutOrder[1] && cutOrder[1] < cutOrder[2] && cutOrder[2] < cutOrder[3] && copied && imgsAfter === imgsBefore - 1, JSON.stringify({ cutOrder, copied, imgsBefore, imgsAfter }));
       const cutToast = await page.evaluate(() => ({ text: document.getElementById('toast-text')?.textContent, action: !document.getElementById('toast-action')?.hidden && document.getElementById('toast-action')?.textContent }));
-      check('잘라낸 뒤: "그림을 잘라냈어요" 안내에 되돌리기 단추', /잘라냈어요/.test(cutToast.text ?? '') && cutToast.action === '되돌리기', JSON.stringify(cutToast));
+      check('잘라낸 뒤: "그림을 잘라냈어요" 안내에 되돌리기 버튼', /잘라냈어요/.test(cutToast.text ?? '') && cutToast.action === '되돌리기', JSON.stringify(cutToast));
       await page.tap('#toast-action');
       await page.waitForTimeout(600);
       const backByToast = (await page.locator('img.mk-image').count()) === imgsBefore;
-      check('안내의 되돌리기 단추를 누르면 잘라낸 그림이 되살아남', backByToast, String(await page.locator('img.mk-image').count()));
+      check('안내의 되돌리기 버튼을 누르면 잘라낸 그림이 되살아남', backByToast, String(await page.locator('img.mk-image').count()));
       if (!backByToast) await page.tap('#undo-btn').catch(() => {});
       const ib3 = await page.locator('img.mk-image').first().boundingBox();
       await touch('touchStart', ib3.x + 40, ib3.y + 40);
@@ -1499,7 +1499,7 @@ try {
     await page.tap('.mk-save-btn');
     await page.waitForTimeout(500);
     const saves = (await devLog()).log.filter((x) => x.saveAs);
-    check('저장 단추: 사진은 원본 파일 그대로 저장 · ✓', saves.at(-1)?.saveAs.rel === 'attachments/two-b.png' && saves.at(-1).saveAs.name === 'two-b.png' && await page.isVisible('.mk-save-btn.done'), JSON.stringify(saves.at(-1)));
+    check('저장 버튼: 사진은 원본 파일 그대로 저장 · ✓', saves.at(-1)?.saveAs.rel === 'attachments/two-b.png' && saves.at(-1).saveAs.name === 'two-b.png' && await page.isVisible('.mk-save-btn.done'), JSON.stringify(saves.at(-1)));
     // 복사한 그림을 메모에 붙여 넣기 (WebView 는 클립보드의 그림을 주지 않고 주소 글만 — 앱이 클립보드에서 읽어 넣음)
     await page.tap('.mk-copy-btn');
     await page.waitForTimeout(500);
@@ -1520,7 +1520,7 @@ try {
   {
     fs.writeFileSync(path.join(vault, 'attachments/voice-btn.m4a'), Buffer.from('fake audio'));
     fs.writeFileSync(path.join(vault, 'attachments/안내서.pdf'), Buffer.from('%PDF-1.4 fake'));
-    write('콘텐츠 단추.md', '---\nid: 00000000-0000-4000-8000-0000000000dd\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: purple\n---\n# 콘텐츠 단추\n\n> ![녹음 10월 14일](attachments/voice-btn.m4a)\n>\n> 도레미파솔라시도\n\n[안내서.pdf](attachments/안내서.pdf)\n\n$$\nx^2\n$$\n\n끝\n');
+    write('콘텐츠 버튼.md', '---\nid: 00000000-0000-4000-8000-0000000000dd\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: purple\n---\n# 콘텐츠 버튼\n\n> ![녹음 10월 14일](attachments/voice-btn.m4a)\n>\n> 도레미파솔라시도\n\n[안내서.pdf](attachments/안내서.pdf)\n\n$$\nx^2\n$$\n\n끝\n');
     await back();
     await page.waitForTimeout(300);
     await page.evaluate(() => window.__mk.emit('app', 'resume'));
@@ -1536,24 +1536,24 @@ try {
     await page.waitForTimeout(250);
     const four = await page.evaluate(() => ['.mk-share-btn', '.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => { const e = document.querySelector(s); return e && e.style.visibility !== 'hidden' ? Math.round(e.getBoundingClientRect().left) : -1; }));
     const voiceLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
-    check('음성 카드: 이름 줄을 짧게 누르면 공유 · 저장 · 복사 · × (왼쪽부터)', four.every((x) => x >= 0) && four[0] < four[1] && four[1] < four[2] && four[2] < four[3] && voiceLabel === '이 음성 지우기', JSON.stringify({ four, voiceLabel }));
+    check('음성 카드: 이름 줄을 짧게 누르면 공유 · 저장 · 복사 · × (왼쪽부터)', four.every((x) => x >= 0) && four[0] < four[1] && four[1] < four[2] && four[2] < four[3] && voiceLabel === '이 음성 삭제', JSON.stringify({ four, voiceLabel }));
     // 소리 상자: 음소거 단추 없음 · 이름 줄은 손가락이 닿을 만큼(44px) · 재생하지 못하면(여기서는 가짜 소리 파일) 재생 단추를 누른 뒤 안내 + 다른 앱으로 열기
     {
       const props = await page.evaluate(() => ({ mute: document.querySelectorAll('.mk-audio [data-plyr="mute"]').length, labelH: Math.round(document.querySelector('.mk-media-label').getBoundingClientRect().height) }));
       const quiet = await page.evaluate(() => document.getElementById('toast')?.hidden !== false);
-      check('소리 상자: 음소거 단추는 없고 이름 줄은 44px 이상 (4종 단추를 누르기 쉽게)', props.mute === 0 && props.labelH >= 44, JSON.stringify(props));
+      check('소리 상자: 음소거 버튼은 없고 이름 줄은 44px 이상 (4종 버튼을 누르기 쉽게)', props.mute === 0 && props.labelH >= 44, JSON.stringify(props));
       check('메모를 열기만 해서는 "재생하지 못했어요" 안내가 뜨지 않음', quiet || !/재생하지 못했어요/.test(await page.textContent('#toast-text')), String(quiet));
       await page.waitForTimeout(2600);
       await page.tap('.mk-audio .plyr__control[data-plyr="play"]').catch(() => {});
       await page.waitForTimeout(900);
       const err = await page.evaluate(() => ({ text: document.getElementById('toast-text')?.textContent, action: document.getElementById('toast-action')?.textContent, shown: !document.getElementById('toast')?.hidden }));
-      check('재생하지 못하면 단추를 누른 뒤 안내 + "다른 앱으로 열기"', err.shown && /재생하지 못했어요/.test(err.text ?? '') && err.action === '다른 앱으로 열기', JSON.stringify(err));
+      check('재생하지 못하면 버튼을 누른 뒤 안내 + "다른 앱으로 열기"', err.shown && /재생하지 못했어요/.test(err.text ?? '') && err.action === '다른 앱으로 열기', JSON.stringify(err));
     }
     await shot('18d-voice-buttons');
     await page.tap('.mk-share-btn');
     await page.waitForTimeout(500);
     const shared = (await devLog()).log.filter((x) => x.shareContent).at(-1);
-    check('공유 단추: 음성은 소리 파일 그대로 공유 창으로', shared?.shareContent.rel === 'attachments/voice-btn.m4a' && await page.isVisible('.mk-share-btn.done'), JSON.stringify(shared));
+    check('공유 버튼: 음성은 소리 파일 그대로 공유 창으로', shared?.shareContent.rel === 'attachments/voice-btn.m4a' && await page.isVisible('.mk-share-btn.done'), JSON.stringify(shared));
     await page.waitForTimeout(300);
     // 파일 칩: 짧게 누르면 열기 그대로, 꾹 누르면 단추 (열지 않음)
     const opensBefore = (await devLog()).log.filter((x) => x.openFile).length;
@@ -1564,11 +1564,11 @@ try {
     await page.waitForTimeout(300);
     const chipLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
     const opensAfter = (await devLog()).log.filter((x) => x.openFile).length;
-    check('파일 칩: 꾹 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 지우기' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
+    check('파일 칩: 꾹 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 삭제' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
     await page.tap('.mk-save-btn');
     await page.waitForTimeout(500);
     const saved = (await devLog()).log.filter((x) => x.saveAs).at(-1);
-    check('저장 단추: PDF 는 파일 그대로', saved?.saveAs.rel === 'attachments/안내서.pdf' && saved.saveAs.name === '안내서.pdf', JSON.stringify(saved));
+    check('저장 버튼: PDF 는 파일 그대로', saved?.saveAs.rel === 'attachments/안내서.pdf' && saved.saveAs.name === '안내서.pdf', JSON.stringify(saved));
     await page.waitForTimeout(1900);
     // 파일 칩을 짧게 눌러도 바로 열지 않고 단추 + 노란 "열기" (맨 왼쪽) → "열기"를 누르면 그때 연다
     const tapAt = async (sel) => {
@@ -1588,18 +1588,18 @@ try {
     await page.tap('.mk-open-btn');
     await page.waitForTimeout(500);
     const opened = (await devLog()).log.filter((x) => x.openFile);
-    check('열기 단추: 누르면 그 파일을 연다 (단추는 거둠)', opened.length === opens0 + 1 && opened.at(-1).openFile === 'attachments/안내서.pdf' && !(await page.locator('.mk-open-btn').count()), JSON.stringify(opened.at(-1)));
+    check('열기 버튼: 누르면 그 파일을 연다 (버튼은 거둠)', opened.length === opens0 + 1 && opened.at(-1).openFile === 'attachments/안내서.pdf' && !(await page.locator('.mk-open-btn').count()), JSON.stringify(opened.at(-1)));
     // 수식: 눌러도 고치기 창이 바로 뜨지 않고 단추 + "고치기"
     await tapAt('.mk-doc .mk-math-block');
     const mathRow = { editor: await page.locator('.mk-math-editor').count(), label: await page.getAttribute('.mk-open-btn', 'aria-label').catch(() => null) };
-    check('수식: 눌러도 바로 고치기 창이 뜨지 않고 단추 + "이 수식 고치기"', mathRow.editor === 0 && mathRow.label === '이 수식 고치기', JSON.stringify(mathRow));
+    check('수식: 눌러도 바로 고치기 창이 뜨지 않고 버튼 + "이 수식 고치기"', mathRow.editor === 0 && mathRow.label === '이 수식 고치기', JSON.stringify(mathRow));
     await page.tap('.mk-open-btn');
     await page.waitForTimeout(400);
-    check('고치기 단추: 누르면 수식 고치기 창', (await page.locator('.mk-math-editor').count()) === 1);
+    check('고치기 버튼: 누르면 수식 고치기 창', (await page.locator('.mk-math-editor').count()) === 1);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
     // 파일 칩 이름은 고칠 수 없다: 칩 글자 가운데에 커서를 두고 쳐도 · 지워도 그대로
-    const chipBefore = read('콘텐츠 단추.md');
+    const chipBefore = read('콘텐츠 버튼.md');
     await page.evaluate(() => {
       const t = document.querySelector('.mk-doc a[data-file]').firstChild;
       document.querySelector('#note-screen .ProseMirror').focus();
@@ -1610,7 +1610,7 @@ try {
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(1500);
     const chipText = await page.textContent('.mk-doc a[data-file]');
-    check('파일 칩: 이름 가운데에 쳐도 · 지워도 바뀌지 않음', chipText === '안내서.pdf' && read('콘텐츠 단추.md').includes('[안내서.pdf](attachments/안내서.pdf)') && !read('콘텐츠 단추.md').includes('XY'), JSON.stringify({ chipText, same: chipBefore === read('콘텐츠 단추.md') }));
+    check('파일 칩: 이름 가운데에 쳐도 · 지워도 바뀌지 않음', chipText === '안내서.pdf' && read('콘텐츠 버튼.md').includes('[안내서.pdf](attachments/안내서.pdf)') && !read('콘텐츠 버튼.md').includes('XY'), JSON.stringify({ chipText, same: chipBefore === read('콘텐츠 버튼.md') }));
     // 다음 점검을 위해 '그림 둘' 로 돌아감
     await back();
     await page.waitForTimeout(300);
@@ -1627,7 +1627,7 @@ try {
   await page.tap('[data-add="table"]');
   await page.waitForTimeout(400);
   check('도구막대: + › 표', (await page.locator('.mk-doc table').count()) === 1);
-  check('도구막대: 평소엔 + 하나 (첨부·녹음·표 단추 없음)', (await page.locator('#format-bar [data-action="file"], #format-bar [data-action="record"], #format-bar [data-action="table"]').count()) === 0);
+  check('도구막대: 평소엔 + 하나 (첨부·녹음·표 버튼 없음)', (await page.locator('#format-bar [data-action="file"], #format-bar [data-action="record"], #format-bar [data-action="table"]').count()) === 0);
   if (process.env.MK_PDF) await page.pdf({ path: path.join(outDir, 'share-images.pdf'), format: 'A4' });
   await back();
   await page.waitForTimeout(300);
@@ -1642,9 +1642,9 @@ try {
   await page.locator('.mk-doc td', { hasText: '배' }).tap();
   await page.waitForTimeout(300);
   check('표 막대: 두 번째 본문 행이면 "표 나누기" 를 누를 수 있고 · 아래에 표가 없으면 "아래 표와 합치기" 는 흐림', await page.isEnabled('#table-bar [data-table="splitTable"]') && await page.isDisabled('#table-bar [data-table="joinTable"]'));
-  // 표 막대: PC 와 같은 묶음 (행 · 열 · 칸 · 표 · 바꾸기), "표 지우기" 단추는 없음
+  // 표 막대: PC 와 같은 묶음 (행 · 열 · 칸 · 표 · 바꾸기), "표 삭제" 단추는 없음
   const tbGroups = await page.evaluate(() => [...document.querySelectorAll('#table-bar .tb-group')].map((g) => g.querySelector('.tb-name').textContent + ':' + [...g.querySelectorAll('button')].map((b) => b.dataset.table).join('/')));
-  check('표 막대: 행 · 열 · 칸 · 표 · 바꾸기 묶음 (PC 와 같음), 표 지우기 단추는 없음',
+  check('표 막대: 행 · 열 · 칸 · 표 · 바꾸기 묶음 (PC 와 같음), 표 삭제 버튼은 없음',
     tbGroups.join(' ') === '행:addRow/delRow 열:addCol/delCol 칸:merge/accent 표:autoFit/splitTable/joinTable 바꾸기:toList/toTask/toText' && (await page.locator('#table-bar [data-table="delTable"]').count()) === 0, JSON.stringify(tbGroups));
   // 표 막대는 한 줄 (예전엔 4줄로 감겨 화면 ¼ 가까이) — 덜 쓰는 도구는 "⋯" 로 위에 펼침
   {
@@ -1672,7 +1672,7 @@ try {
     });
     const coverTable = geo.btns.some((b) => b.r.bottom > geo.tr.top + 1 && b.r.top < geo.tr.bottom && b.r.right > geo.tr.left && b.r.left < geo.tr.right);
     const rightSide = geo.btns.length >= 3 && geo.btns.every((b) => b.r.right <= geo.tr.right + 1 && b.r.left > geo.tr.left + geo.tr.width / 3);
-    check('표 편집 중: 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽에 (표를 가리지 않음)', geo.btns.length >= 3 && !coverTable && rightSide && geo.btns.every((b) => b.vis !== 'hidden'), JSON.stringify(geo));
+    check('표 편집 중: 복사 · 저장 · 공유 · 삭제 버튼이 표 위 오른쪽에 (표를 가리지 않음)', geo.btns.length >= 3 && !coverTable && rightSide && geo.btns.every((b) => b.vis !== 'hidden'), JSON.stringify(geo));
     await shot('10-table-buttons');
   }
   await page.tap('#table-more-btn');
@@ -1996,7 +1996,7 @@ try {
   // 목록 항목: 꾹 눌렀다 놓으면 × (2.5초), 더 오래 누르면 목록 전체를 옮긴다
   {
     const id = '00000000-0000-4000-8000-0000000000af';
-    write('목록 지우기.md', `---\nid: ${id}\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: yellow\n---\n# 목록 지우기\n\n위 문단\n\n- 사과\n- 배\n- 감\n\n아래 문단\n\n끝 문단\n`);
+    write('목록 삭제.md', `---\nid: ${id}\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: yellow\n---\n# 목록 삭제\n\n위 문단\n\n- 사과\n- 배\n- 감\n\n아래 문단\n\n끝 문단\n`);
     await page.evaluate(() => window.__mk.emit('app', 'resume'));
     await page.waitForTimeout(400);
     await page.tap(`.card[data-id="${id}"]`);
@@ -2004,7 +2004,7 @@ try {
     await page.waitForTimeout(800);
     await setMode('move'); // 꾹 눌러 들어 올리기는 옮기기 방식에서
     const { parseMemoFile } = await import('../../../app/js/core/memo-file.js');
-    const body = () => parseMemoFile(read('목록 지우기.md')).body;
+    const body = () => parseMemoFile(read('목록 삭제.md')).body;
     const liBox = (t) => page.locator('.mk-doc li', { hasText: t }).first().boundingBox();
     let b = await liBox('배');
     await touch('touchStart', b.x + 30, b.y + b.height / 2);
@@ -2045,7 +2045,7 @@ try {
     const look = await page.evaluate(() => { const e = document.querySelector('.mk-delete-btn'); if (!e) return null; const c = getComputedStyle(e); return { w: Math.round(e.getBoundingClientRect().width), bg: c.backgroundColor, color: c.color }; });
     // 바탕: 밝은 화면은 흰색, 어두운 화면은 시트와 같은 짙은 바탕(--surface-2) — 어느 쪽이든 빨간 × 가 또렷하게
     const delBg = process.env.MK_DARK ? 'rgb(37, 37, 34)' : 'rgb(255, 255, 255)';
-    check('목록 전체: 놓으면 목록 전체 × (밝은 화면 흰 바탕 · 어두운 화면 짙은 바탕 · 빨간 × · 작게)', lab === '이 목록 지우기' && look?.bg === delBg && look?.color === (process.env.MK_DARK ? 'rgb(255, 107, 112)' : 'rgb(196, 40, 46)') && look.w <= 26 && (await page.locator('.mk-doc ul.mk-delete-target').count()) === 1, JSON.stringify({ lab, look }));
+    check('목록 전체: 놓으면 목록 전체 × (밝은 화면 흰 바탕 · 어두운 화면 짙은 바탕 · 빨간 × · 작게)', lab === '이 목록 삭제' && look?.bg === delBg && look?.color === (process.env.MK_DARK ? 'rgb(255, 107, 112)' : 'rgb(196, 40, 46)') && look.w <= 26 && (await page.locator('.mk-doc ul.mk-delete-target').count()) === 1, JSON.stringify({ lab, look }));
     const xb = await page.locator('.mk-delete-btn').boundingBox();
     await touch('touchStart', xb.x + 12, xb.y + 12);
     await touch('touchEnd', 0, 0);
@@ -2176,7 +2176,7 @@ try {
       const del = document.querySelector('.mk-delete-btn')?.getBoundingClientRect();
       return { sheet: !!document.querySelector('.ink-sheet'), copy: !!document.querySelector('.mk-copy-btn'), save: !!document.querySelector('.mk-save-btn'), del: !!del, edit: !!edit && getComputedStyle(edit).opacity === '1', apart: !!r && !!del && (r.top >= del.bottom || r.bottom <= del.top) };
     });
-    check('손 메모 톡: 바로 넘어가지 않고 복사·저장·× 단추 + 아래 "이어 그리기" (겹치지 않음)', !armed.sheet && armed.copy && armed.save && armed.del && armed.edit && armed.apart, JSON.stringify(armed));
+    check('손 메모 톡: 바로 넘어가지 않고 복사·저장·× 버튼 + 아래 "이어 그리기" (겹치지 않음)', !armed.sheet && armed.copy && armed.save && armed.del && armed.edit && armed.apart, JSON.stringify(armed));
     await page.tap('.mk-doc .mk-ink.mk-ink-armed .mk-ink-edit');
     await page.waitForSelector('.ink-sheet');
     await page.waitForTimeout(200);
@@ -2204,7 +2204,7 @@ try {
       const k = document.querySelector('.mode-knob').getBoundingClientRect();
       return r.left >= 0 && r.right <= innerWidth && !document.querySelector('.mk-annot-bar .ink-done') && k.bottom <= r.top && !!document.querySelector('.mk-annot-scroller');
     });
-    check('주석 모드: 도구 막대가 화면 안에 · 완료 단추 없음(다이얼로 끝냄) · 다이얼은 막대 위 · 본문 둘레 점선', annBar);
+    check('주석 모드: 도구 막대가 화면 안에 · 완료 버튼 없음(다이얼로 끝냄) · 다이얼은 막대 위 · 본문 둘레 점선', annBar);
     await pickMode(page, 'edit'); // 다이얼을 돌려 끝내면 저장
     const body3 = await waitFile((b) => /^ink: /m.test(b));
     const inkRel = body3.match(/^ink: (attachments\/\S+\.json)$/m)?.[1];
@@ -2330,12 +2330,12 @@ try {
     const allLabel = await page.textContent('.mk-find-all');
     await shot('29-find');
     check('찾기: 찾기만 할 때는 한 줄 막대 · 찾은 곳 표시 · 개수(1/3) · 대소문자 아이콘(2 → 1) · 다음 찾기로 한 칸 다음 · "모두 바꾸기 (3)"', !oneRow.opts && oneRow.h < 80 && s1.hits === 3 && s1.cur === 1 && s1.count === '1/3' && c1 === '1/2' && c2 === '1/1' && s2.hits === 3 && s3.count === `${(Number(s2.count.split('/')[0]) % 3) + 1}/3` && allLabel === '모두 바꾸기 (3)', JSON.stringify({ oneRow, s1, c1, c2, s2, s3, allLabel }));
-    check('찾기 막대 배치(PC 와 같게): 닫기는 위 줄 · 접기는 아래 줄 · 위아래 화살표와 낱말 단위 없음 · 바꾸기도 다른 단추와 같은 모양', layout.closeTop && layout.moreBottom && !layout.arrows && !layout.word && layout.primary === 0, JSON.stringify(layout));
+    check('찾기 막대 배치(PC 와 같게): 닫기는 위 줄 · 접기는 아래 줄 · 위아래 화살표와 낱말 단위 없음 · 바꾸기도 다른 버튼과 같은 모양', layout.closeTop && layout.moreBottom && !layout.arrows && !layout.word && layout.primary === 0, JSON.stringify(layout));
     await page.tap('.mk-find-all');
     await page.waitForTimeout(900);
     const body = read('찾기 연습.md');
     const undoBtn = await page.isVisible('#toast-action') && (await page.textContent('#toast-action'));
-    check('모두 바꾸기: 찾은 세 곳 모두 "포도"로 (사과즙은 포도즙) · 알림에 되돌리기 단추', /포도 한 개, 포도 두 개/.test(body) && /포도즙/.test(body) && !/사과/.test(body) && undoBtn === '되돌리기', JSON.stringify({ body, undoBtn }));
+    check('모두 바꾸기: 찾은 세 곳 모두 "포도"로 (사과즙은 포도즙) · 알림에 되돌리기 버튼', /포도 한 개, 포도 두 개/.test(body) && /포도즙/.test(body) && !/사과/.test(body) && undoBtn === '되돌리기', JSON.stringify({ body, undoBtn }));
     await page.tap('#toast-action');
     await page.waitForTimeout(900);
     check('모두 바꾸기 되돌리기: 알림의 되돌리기로 한 번에 처음대로', /사과 한 개, 사과 두 개/.test(read('찾기 연습.md')), read('찾기 연습.md'));
@@ -2393,7 +2393,7 @@ try {
     await page.tap('.coach-bubble .coach-next');
     const newMemo = await stepIs('new-memo');
     const trying = await page.evaluate(() => !!document.querySelector('.coach-try') && document.querySelector('.coach-spot').classList.contains('pulse'));
-    check('튜토리얼: 설정 › 튜토리얼 보기 → 이모지·진행 막대 · 직접 해 보기 단계는 누를 곳만 노란 테두리 + 해 보기 안내 (손가락 이모지 없음)', welcome && head.emoji === '👑' && head.bar && newMemo && trying, JSON.stringify({ welcome, head, newMemo, trying }));
+    check('튜토리얼: 설정 › 사용법 둘러보기 → 이모지·진행 막대 · 직접 해 보기 단계는 누를 곳만 노란 테두리 + 해 보기 안내 (손가락 이모지 없음)', welcome && head.emoji === '👑' && head.bar && newMemo && trying, JSON.stringify({ welcome, head, newMemo, trying }));
     await page.tap('#fab');
     await page.waitForTimeout(300);
     await page.tap('#fab-menu [data-new="text"]');
@@ -2487,7 +2487,7 @@ try {
   await page.evaluate(() => window.__mk.emit('update', { done: 500, total: 1000 }));
   await page.waitForTimeout(150);
   const prog = await page.evaluate(() => ({ shown: !document.getElementById('update-progress').hidden, text: document.getElementById('update-progress-text').textContent, go: document.getElementById('update-go').disabled, bar: document.getElementById('update-bar-fill').style.transform }));
-  check('받는 중: 진행률 막대 · "50% · …" · 단추는 잠깐 눌리지 않음', prog.shown && /^50%/.test(prog.text) && prog.go && prog.bar === 'scaleX(0.5)', JSON.stringify(prog));
+  check('받는 중: 진행률 막대 · "50% · …" · 버튼은 잠깐 눌리지 않음', prog.shown && /^50%/.test(prog.text) && prog.go && prog.bar === 'scaleX(0.5)', JSON.stringify(prog));
   await page.waitForFunction(() => !document.getElementById('update-hint').hidden, null, { timeout: 4000 });
   const perm = await page.evaluate(() => ({ hint: document.getElementById('update-hint').textContent, go: document.getElementById('update-go').textContent, title: document.getElementById('update-title').textContent }));
   check('설치 허용이 꺼져 있으면: 허용 화면을 열었다고 알리고 "설치하기" 로 다시', /출처 허용/.test(perm.hint) && perm.go === '설치하기' && perm.title === '설치할 준비가 됐어요', JSON.stringify(perm));

@@ -148,14 +148,14 @@ export const TUTORIAL_STEPS = [
   {
     id: 'write', chapter: '쓰기', win: 'note', target: ['.ProseMirror > :first-child', '#editor'], keep: ['.ProseMirror > *'], advance: 'typed', emoji: '📝',
     title: '떠오르는 생각을 적어 보세요',
-    text: '첫 줄은 메모 제목이 되고, 적는 대로 저절로 저장돼요. 💾 저장 단추는 없어요!',
+    text: '첫 줄은 메모 제목이 되고, 적는 대로 저절로 저장돼요. 💾 저장 버튼은 없어요!',
     try: '아무 말이나 한 줄 적어 보세요',
     next: '다음',
   },
   {
     id: 'style', chapter: '쓰기', win: 'note', target: ['.format-bar .style-btn', '#format-bar'], keep: ['.ProseMirror > *', '#style-menu:not([hidden])'], advance: 'styled', emoji: '🔠',
     title: '제목이나 인용으로 바꾸기',
-    text: '"본문" 단추를 누르면 그 줄이 제목, 인용, 코드 모양으로 바뀌어요.',
+    text: '"본문" 버튼을 누르면 그 줄이 제목, 인용, 코드 모양으로 바뀌어요.',
     try: '"본문"을 누르고 "제목 2"를 골라 보세요',
     next: LATER,
   },
@@ -163,8 +163,8 @@ export const TUTORIAL_STEPS = [
     id: 'lists', chapter: '쓰기', win: 'note', target: ['[data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *'], advance: 'tasked', emoji: '✅',
     image: 'clear.jpg',
     title: '체크리스트 만들기',
-    text: '체크리스트 단추를 누르면 줄 앞에 네모 칸이 생겨요. 모두 끝내면 CLEAR 도장이 쾅! 🎊',
-    try: '체크리스트 단추를 눌러 보세요',
+    text: '체크리스트 버튼을 누르면 줄 앞에 네모 칸이 생겨요. 모두 끝내면 CLEAR 도장이 쾅! 🎊',
+    try: '체크리스트 버튼을 눌러 보세요',
     next: LATER,
   },
   {
@@ -201,7 +201,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'content', chapter: '넣기', win: 'note', target: ['.ProseMirror .mk-image-line', '.ProseMirror > :last-child', '#editor'], keep: ['.ProseMirror .mk-image-line', '.mk-ctx'], advance: 'content-tools', emoji: '💾',
     title: '넣은 내용 저장, 공유하기',
-    text: '사진, 손 메모, 녹음, 파일, 표를 오른쪽 클릭하면 메뉴 맨 위 한 줄에 아이콘이 떠요. ✂ 잘라내기, 📋 복사, 💾 파일로 저장, 📤 공유(Drive 링크, LocalSend, 메일), 🗑 지우기.',
+    text: '사진, 손 메모, 녹음, 파일, 표를 오른쪽 클릭하면 메뉴 맨 위 한 줄에 아이콘이 떠요. ✂ 잘라내기, 📋 복사, 💾 파일로 저장, 📤 공유(Drive 링크, LocalSend, 메일), 🗑 삭제.',
     try: '방금 그린 손 메모를 오른쪽 클릭하고 📋 복사 아이콘을 눌러 보세요',
     next: LATER,
   },
@@ -210,7 +210,7 @@ export const TUTORIAL_STEPS = [
     image: 'annotate.jpg',
     title: '글 위에 바로 그리기',
     text: '"글 위에 그리기"로 글자 위에 밑줄이나 동그라미를 쳐요. 글의 자리는 그대로예요.',
-    try: '+ 단추에서 "글 위에 그리기"를 눌러 글 위에 쓱 긋고 ✓ 완료',
+    try: '+ 버튼에서 "글 위에 그리기"를 눌러 글 위에 쓱 긋고 ✓ 완료',
     next: LATER,
   },
   {
@@ -230,7 +230,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'crown', chapter: '메모 창', win: 'note', target: ['#top-btn'], keep: ['#tape-btn:not([hidden])'], advance: 'crown-on', emoji: '👑',
     title: '늘 위에, 또는 바탕화면에',
-    text: '👑 왕관: 다른 창에 가려지지 않게 늘 위에. 🩹 테이프(옆 단추): 바탕화면에 붙여 다른 창 뒤에. 둘 중 하나만 붙고, 창 위의 스티커를 누르면 떼어져요.',
+    text: '👑 왕관: 다른 창에 가려지지 않게 늘 위에. 🩹 테이프(옆 버튼): 바탕화면에 붙여 다른 창 뒤에. 둘 중 하나만 붙고, 창 위의 스티커를 누르면 떼어져요.',
     noTape: '왕관을 누르면 이 메모가 다른 창에 가려지지 않아요. 창 위에 붙은 왕관 스티커를 누르거나 Ctrl+Shift+T 를 다시 누르면 떼어져요.',
     try: '지금은 왕관을 눌러 보세요',
     next: LATER,
@@ -238,13 +238,13 @@ export const TUTORIAL_STEPS = [
   {
     id: 'bell', chapter: '메모 창', win: 'note', target: ['#bell-btn', '.bar'], emoji: '⏰',
     title: '잊지 않게 알림 맞추기',
-    text: '종 단추로 원하는 날짜와 시간에 이 메모를 알려 드려요. 매일, 매주 되풀이도 돼요.',
+    text: '종 버튼으로 원하는 날짜와 시간에 이 메모를 알려 드려요. 매일, 매주 되풀이도 돼요.',
     next: '다음',
   },
   {
     id: 'hotkey', chapter: '메모 창', win: 'note', target: ['#hotkey-btn', '.bar'], emoji: '⚡',
     title: '어디서든 불러오는 키',
-    text: '번개 단추로 Ctrl+Alt+숫자 키를 정해 두면 다른 앱을 쓰다가도 이 메모를 바로 불러와요. 정한 숫자가 번개 옆에 작게 보여요.',
+    text: '번개 버튼으로 Ctrl+Alt+숫자 키를 정해 두면 다른 앱을 쓰다가도 이 메모를 바로 불러와요. 정한 숫자가 번개 옆에 작게 보여요.',
     next: '다음',
   },
   {
@@ -277,14 +277,14 @@ export const TUTORIAL_STEPS = [
   {
     id: 'layout', chapter: '목록', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
-    text: '"보기" 단추에서 카드를 바둑판처럼 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 고를 수 있어요.',
+    text: '"보기" 버튼에서 카드를 바둑판처럼 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 고를 수 있어요.',
     try: '"보기"를 누르고 "한 줄씩"을 골라 보세요',
     next: LATER,
   },
   {
     id: 'filters', chapter: '목록', win: 'list', target: ['#tag-strip:not([hidden])', '#filter-btn'], keep: ['#tag-strip:not([hidden]) .tag-chip'], advance: 'tag-filtered', emoji: '🔎',
     title: '원하는 메모만 보기',
-    text: '태그를 누르면 그 태그가 붙은 메모만 보여요. "보기" 단추로 색이나 사진으로도 골라요.',
+    text: '태그를 누르면 그 태그가 붙은 메모만 보여요. "보기" 버튼으로 색이나 사진으로도 골라요.',
     try: '방금 만든 #태그를 눌러 보세요',
     next: LATER,
   },
@@ -375,8 +375,8 @@ export const MOBILE_TUTORIAL_STEPS = [
     id: 'lists', chapter: '쓰기', win: 'note', target: ['#format-bar [data-cmd="task"]', '#format-bar'], keep: ['.ProseMirror > *', '#format-bar'], write: true, advance: 'tasked', emoji: '✅',
     image: 'm-clear.jpg',
     title: '체크리스트 만들기',
-    text: '체크리스트 단추를 누르면 네모 칸이 생겨요. 줄바꿈이나 쓰던 줄 아래를 누르면 다음 칸이 이어지고, 모두 끝내면 CLEAR 도장! 🎊',
-    try: '체크리스트 단추를 눌러 보세요',
+    text: '체크리스트 버튼을 누르면 네모 칸이 생겨요. 줄바꿈이나 쓰던 줄 아래를 누르면 다음 칸이 이어지고, 모두 끝내면 CLEAR 도장! 🎊',
+    try: '체크리스트 버튼을 눌러 보세요',
     next: LATER,
   },
   {
@@ -417,7 +417,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'voice', chapter: '넣기', win: 'note', target: ['#add-btn', '#format-bar'], emoji: '🎙️', image: 'm-voice.jpg',
     title: '말로 메모하기',
-    text: '+ 단추에서 "음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
+    text: '+ 버튼에서 "음성 녹음"을 누르고 말하면, 말한 내용이 글로 받아 적혀 녹음과 함께 들어가요. 화면을 꺼도 계속 녹음돼요.',
     next: '다음',
   },
   {
@@ -437,18 +437,18 @@ export const MOBILE_TUTORIAL_STEPS = [
     id: 'back', chapter: '메모 화면', win: 'note', target: ['#back-btn'], advance: 'note-closed', emoji: '↩️',
     title: '목록으로 돌아가요',
     text: '적은 내용은 이미 저장되어 있어요. 휴대폰의 뒤로 가기를 눌러도 돼요.',
-    try: '왼쪽 위 단추를 눌러 보세요',
+    try: '왼쪽 위 버튼을 눌러 보세요',
   },
   {
     id: 'cards', chapter: '목록', win: 'list', target: ['#cards .card', '#cards'], emoji: '🃏',
     title: '메모는 모두 여기에',
-    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유, 색, 지우기)가 떠요. 왼쪽으로 밀면 지우기예요.',
+    text: '카드를 누르면 열리고, 꾹 누르면 메뉴(공유, 색, 삭제)가 떠요. 왼쪽으로 밀면 삭제예요.',
     next: '다음',
   },
   {
     id: 'layout', chapter: '목록', win: 'list', target: ['#filter-panel:not([hidden]) #layout-group', '#filter-btn'], keep: ['#cards', '#filter-panel'], advance: 'layout-changed', emoji: '🔲',
     title: '보기 바꾸기',
-    text: '"보기" 단추에서 카드를 두 줄로 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 골라요.',
+    text: '"보기" 버튼에서 카드를 두 줄로 볼지, 한 줄씩 볼지와 정렬(최신순, 많이 본 순 등)을 골라요.',
     try: '"보기"를 누르고 "한 줄씩"을 골라 보세요',
     next: LATER,
   },

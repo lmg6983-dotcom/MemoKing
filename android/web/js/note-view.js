@@ -1015,7 +1015,7 @@ window.addEventListener('mk:media-error', (e) => {
 
 // 내용을 지우거나 잘라냈으면: 되돌리기 단추가 있는 안내 (↶ 와 같은 기록으로 되돌림)
 window.addEventListener('mk:removed', (e) => {
-  const { what = '내용', verb = '지웠어요' } = e.detail ?? {};
+  const { what = '내용', verb = '삭제했어요' } = e.detail ?? {};
   const josa = /[가-힣]$/.test(what) && (what.charCodeAt(what.length - 1) - 0xac00) % 28 ? '을' : '를';
   toast(`${what}${josa} ${verb}`, false, { label: '되돌리기', run: () => editor && pressKey('z', false) });
 });
@@ -1043,9 +1043,9 @@ function showTableBar(table) {
   const lastRow = table.header && table.rows <= 1;
   delRow.disabled = table.header && !lastRow;
   delRow.dataset.wholeTable = lastRow ? '1' : '';
-  setBtn(delRow, lastRow ? '표 지우기' : '지우기', lastRow ? '머리글 행만 남았어요. 누르면 표를 지워요' : table.header ? '머리글 행은 지울 수 없어요 (아래 행을 모두 지우면 표를 지울 수 있어요)' : UI.rowDelete);
+  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : UI.rowDelete);
   delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
-  setBtn(delCol, table.cols <= 1 ? '표 지우기' : '지우기', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 지워요' : UI.colDelete);
+  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : UI.colDelete);
   // 셀 병합: 여러 칸을 골랐으면 "병합", 병합한 칸 안이면 "병합 풀기"
   const merge = bar.querySelector('[data-table="merge"]');
   merge.disabled = !table.canMerge && !table.merged;
@@ -1251,7 +1251,7 @@ el.editorRoot.addEventListener('pointerdown', (e) => {
   } catch {
     return;
   }
-  showGuide('글자 칸에 쓰면 글자로 바뀌어요. 톡 누르면 커서, 꾹 누르면 고르기예요. 키보드는 아래 키보드 단추로 꺼내요', 'S펜 손글씨', 4200);
+  showGuide('글자 칸에 쓰면 글자로 바뀌어요. 톡 누르면 커서, 꾹 누르면 고르기예요. 키보드는 아래 키보드 버튼으로 꺼내요', 'S펜 손글씨', 4200);
 }, true);
 
 function applyMode(mode, { user = false, quiet = false } = {}) {

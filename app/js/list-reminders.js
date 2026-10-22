@@ -622,8 +622,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     main.addEventListener('click', () => showMemoEvent(item, start));
 
     const del = el('button', 'icon-btn');
-    del.title = '일정 지우기';
-    del.setAttribute('aria-label', `${rowTitle.textContent} 일정 지우기`);
+    del.title = '일정 삭제';
+    del.setAttribute('aria-label', `${rowTitle.textContent} 일정 삭제`);
     del.append(icon('trash'));
     del.addEventListener('click', () => update(item, (list) => list.filter((x) => x.id !== r.id)));
 
@@ -675,9 +675,9 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       ],
       // 반복 일정은 한 회차만 지울 수 없어(지우면 모든 회차가 사라짐) 여기서는 지우지 않는다 — 메모에서 고치기
       actions: [
-        ...(r.kind === 'repeat' ? [] : [{ label: '일정 지우기', danger: true, run: () => update(item, (list) => list.filter((x) => x.id !== r.id))
-          .then(() => notify(`"${r.title || item.title}" 일정을 지웠어요`))
-          .catch((err) => notify(err.message || '일정을 지우지 못했어요', true)) }]),
+        ...(r.kind === 'repeat' ? [] : [{ label: '일정 삭제', danger: true, run: () => update(item, (list) => list.filter((x) => x.id !== r.id))
+          .then(() => notify(`"${r.title || item.title}" 일정을 삭제했어요`))
+          .catch((err) => notify(err.message || '일정을 삭제하지 못했어요', true)) }]),
         { label: '메모 열기', primary: true, run: () => api.memo.open(item.memoId) },
       ],
     });
@@ -773,8 +773,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       : x))));
 
     const del = el('button', 'icon-btn');
-    del.title = '알림 지우기';
-    del.setAttribute('aria-label', `${item.title} 알림 지우기`);
+    del.title = '알림 삭제';
+    del.setAttribute('aria-label', `${item.title} 알림 삭제`);
     del.append(icon('trash'));
     del.addEventListener('click', () => update(item, (list) => list.filter((x) => x.id !== r.id)));
 

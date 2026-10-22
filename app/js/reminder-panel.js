@@ -151,8 +151,8 @@ export function setupReminderPanel({ api, memoId, setStatus, onToggle, onChange 
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'icon-btn';
-    del.title = '지우기';
-    del.setAttribute('aria-label', `${title.textContent} 지우기`);
+    del.title = '삭제';
+    del.setAttribute('aria-label', `${title.textContent} 삭제`);
     del.append(icon('trash'));
     del.addEventListener('click', () => save(reminders.filter((x) => x.id !== r.id)));
 
