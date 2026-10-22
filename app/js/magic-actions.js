@@ -35,6 +35,7 @@ export function actionsFor(r) {
     case 'file':
       return [{ id: 'open', label: r.app ? '실행' : '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '폴더 열기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '파일 복사' }];
     case 'more':
+    case 'opmsMore':
       return [{ id: 'more', label: '모두 보기' }];
     case 'calc':
       return [{ id: 'copy', label: '결과 복사' }, { id: 'copyExpr', label: '식과 함께 복사' }];

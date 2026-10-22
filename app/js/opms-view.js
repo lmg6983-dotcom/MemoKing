@@ -97,15 +97,16 @@ form.addEventListener('submit', async (e) => {
   const my = ++seq;
   loading('OPMS 에서 찾는 중이에요');
   let list;
+  let total;
   try {
-    list = await api.search(q);
+    ({ list, total } = await api.search(q));
   } catch (err) {
     if (my === seq) message(errText(err), 'err');
     return;
   }
   if (my !== seq) return;
   if (!list.length) return message(`'${q}'와 맞는 사건이 없어요`);
-  if (list.length === 1) return open(list[0].idx, 'info');
+  if (list.length === 1 && total === 1) return open(list[0].idx, 'info');
   // 여러 건: 고르기
   head.hidden = true;
   tabsEl.hidden = true;
@@ -113,11 +114,13 @@ form.addEventListener('submit', async (e) => {
   const pick = (r) => {
     const b = el('button', 'op-pick', null);
     b.type = 'button';
-    b.append(el('b', '', [r.ourref, r.yourref].filter(Boolean).join(' / ') || '-'), el('span', '', [r.n_app, r.applicant, r.title].filter(Boolean).join(', ')));
+    b.append(el('b', '', [r.ourref, r.yourref].filter(Boolean).join(' / ') || '-'), el('span', '', [r.n_app, r.applicant, r.inventor && `발명자 ${r.inventor}`, r.title].filter(Boolean).join(', ')));
     b.addEventListener('click', () => open(r.idx, 'info'));
     return b;
   };
-  main.replaceChildren(el('p', 'op-msg', `${list.length}건이 찾아졌어요. 사건을 고르세요`), ...list.map(pick));
+  // 정확한 것부터 (번호 · 이름이 그대로 맞는 것 → 첫머리 → 일부), 너무 많으면 앞의 것만
+  const note = total > list.length ? `${total.toLocaleString()}건 중 정확한 것부터 ${list.length}건이에요. 더 좁히려면 번호나 이름을 더 써 보세요` : `${list.length}건이 찾아졌어요. 정확한 것부터예요`;
+  main.replaceChildren(el('p', 'op-msg', note), ...list.map(pick));
 });
 
 const errText = (err) => String(err?.message ?? err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
@@ -572,8 +575,11 @@ document.addEventListener('keydown', (e) => {
   window.close();
 });
 
-api.onShow(({ idx, tab: which }) => {
+api.onShow(({ idx, tab: which, query }) => {
   if (idx) open(idx, which || 'info');
-  else input.focus();
+  else if (query) { // 매직키 "OPMS 다른 n건 더 보기": 그 글로 찾은 목록
+    input.value = query;
+    form.requestSubmit();
+  } else input.focus();
 });
 input.focus();

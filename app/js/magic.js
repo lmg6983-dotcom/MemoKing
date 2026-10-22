@@ -1,6 +1,6 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
-import { looksLikeRef } from './core/magic-modules.js';
+import { opmsQueryKind } from './core/opms-search.js';
 import { calcInput, calcOutput, siteUrl, sitesInOrder, looksLikeQuestion, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { dateCalc } from './core/date-calc.js';
 import { findDates, guessTitle } from './core/date-detect.js';
@@ -364,8 +364,12 @@ function row(r, index, query) {
   } else if (r.kind === 'opms') {
     ico.textContent = 'O';
     t.append(highlighted([r.ourref, r.n_app].filter(Boolean).join(', ') || r.yourref || '관리번호 없음', query));
-    s.textContent = [r.applicant, r.title].filter(Boolean).join(', ');
+    s.append(highlighted([r.applicant, r.inventor && `발명자 ${r.inventor}`, r.title].filter(Boolean).join(', '), query)); // 이름으로 찾았으면 맞은 이름이 굵게
     side.textContent = r.div || '';
+  } else if (r.kind === 'opmsMore') {
+    ico.textContent = '⋯';
+    t.textContent = `OPMS 다른 ${r.count.toLocaleString()}건 더 보기`;
+    s.textContent = 'OPMS 창에서 정확한 것부터 모두 보여 줘요';
   } else if (r.kind === 'more') {
     ico.textContent = '⋯';
     t.textContent = `다른 ${r.count.toLocaleString()}건 더 보기`;
@@ -463,10 +467,13 @@ function render() {
     }
   }
   // 관리번호·출원번호를 쓰면 OPMS 사건 (찾는 중 · 사내망이 아님도 이 자리에)
-  if (query && isOn('opms') && opms.query === query && !(calc && opms.error)) { // 식에는 "OPMS 주소를 넣으면" 안내를 안 띄운다
+  // 번호로 찾을 때만 "찾는 중" · 오류를 보인다 — 이름 · 초성은 메모를 찾을 때도 같이 물으므로 찾은 것만 조용히
+  const opmsByRef = opmsQueryKind(query) === 'ref';
+  if (query && isOn('opms') && opms.query === query && !(calc && opms.error) && (opmsByRef || opms.cases.length)) { // 식에는 "OPMS 주소를 넣으면" 안내를 안 띄운다
     if (opms.cases.length) {
       put('opms', { head: ['OPMS', opms.total] });
       opms.cases.forEach((c) => put('opms', { row: { kind: 'opms', ...c } }));
+      if (opms.total > opms.cases.length) put('opms', { row: { kind: 'opmsMore', count: opms.total - opms.cases.length } });
     } else if (opms.loading) {
       const li = note('');
       li.classList.add('loading');
@@ -661,7 +668,7 @@ let opmsSeq = 0;
 function searchOpms() {
   const query = input.value.trim();
   clearTimeout(opmsTimer);
-  if (!isOn('opms') || !looksLikeRef(query)) {
+  if (!isOn('opms') || !opmsQueryKind(query)) {
     opms = { query: '', loading: false, cases: [], total: 0, error: '' };
     return;
   }
@@ -733,6 +740,11 @@ async function run(i, { alt = false, act = 0 } = {}) {
   }
   if (r.kind === 'more') {
     await api.openAll(input.value.trim()).catch(() => {});
+    return;
+  }
+  if (r.kind === 'opmsMore') {
+    const res = await api.act({ action: 'opmsAll', text: input.value.trim() }).catch(() => null);
+    if (res?.ok) api.close();
     return;
   }
   if (r.kind === 'calc' || r.kind === 'date' || r.kind === 'site' || r.kind === 'web' || r.kind === 'ai') {

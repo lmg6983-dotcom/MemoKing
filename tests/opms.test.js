@@ -7,7 +7,7 @@ import {
 
   isOpenableFile, numberedName, fitName,
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
-  wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
+  wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, Opms,
   buildAttachSql, groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf, buildPrioritySql, buildMemoSql, fixedRows, PRIORITY_COLUMNS, MEMO_COLUMNS,
 } from '../desktop/opms.js';
 
@@ -42,8 +42,6 @@ test('OPMS: 관리번호·출원번호로 찾는 SQL (하이픈 없이 · 앞자
   assert.match(buildLookupSql('FPD/202608-0118/E'), /= 'FPD2026080118E'/);
   assert.match(buildLookupSql('P20261170KR01'), /ourref, '-', ''.* = 'P20261170KR01'/);
   assert.doesNotMatch(buildLookupSql('1020260012345'), /REPLACE/, '숫자뿐인 출원번호는 그대로');
-  assert.ok(looksLikeRef('FPD/2026') && looksLikeRef('2026-0173230'));
-  assert.ok(!looksLikeRef('회의') && !looksLikeRef('abc') && !looksLikeRef('12'));
 });
 
 test('OPMS: 해외출원 세 길을 하나로 · 요약', () => {
@@ -574,4 +572,54 @@ test('OPMS: 글로 적혀 온 \\r\\n 은 줄바꿈으로 (끝의 빈 줄은 떼�
   assert.equal(rows[0].MEMO, '데이터이관');
   assert.equal(rows[0].FILE_NAME_UPLOAD, '/OPMS/a\\new.pdf');
   assert.equal(attachmentItems(rows)[0].summary, '데이터이관');
+});
+
+test('OPMS 일부 · 이름 · 초성 찾기 SQL: LIKE 안의 % _ [ 는 글자 그대로, 따옴표 막기, TOP · 개수', async () => {
+  const { buildSearchWhere, buildSearchSql, buildCountSql, buildNamesSql } = await import('../desktop/opms.js');
+  const ref = buildSearchWhere('0271', { kind: 'ref' });
+  assert.match(ref, /ourref LIKE '%0271%'/);
+  assert.match(ref, /n_app LIKE '%0271%'/);
+  assert.match(ref, /n_issue LIKE '%0271%'/);
+  assert.match(ref, /REPLACE\(.*n_app.*\) LIKE '%0271%'/, '기호를 빼고도');
+  assert.match(ref, /ourref = '0271'/, '예전 같은 번호 조건도');
+  assert.match(buildSearchWhere('2026-0012', { kind: 'ref' }), /LIKE '%20260012%'/);
+  assert.equal(buildSearchWhere('홍길 메모킹', { kind: 'name' }), "(applicant LIKE '%홍길%' OR inventor LIKE '%홍길%') AND (applicant LIKE '%메모킹%' OR inventor LIKE '%메모킹%')");
+  assert.match(buildSearchWhere('FPD', { kind: 'name' }), /ourref LIKE '%FPD%'/, '영문은 관리번호에도');
+  assert.match(buildSearchWhere("O'Neil", { kind: 'name' }), /LIKE '%O''Neil%'/);
+  assert.match(buildSearchWhere('10%_[a', { kind: 'ref' }), /LIKE '%10\[%\]\[_\]\[\[\]a%'/);
+  assert.equal(buildSearchWhere('ㅎㄱㄷ', { kind: 'choseong', names: [] }), null, '맞는 이름이 없으면 묻지 않음');
+  assert.equal(buildSearchWhere('ㅎㄱㄷ', { kind: 'choseong', names: ['홍길동'] }), "(applicant LIKE '%홍길동%' OR inventor LIKE '%홍길동%')");
+  assert.match(buildSearchSql('(x = 1)', 60), /^SELECT TOP 60 idx, .*WHERE del_flag = 'N' AND \(x = 1\)\nORDER BY d_accept DESC/s);
+  assert.match(buildCountSql('(x = 1)'), /SELECT COUNT\(\*\) AS n/);
+  assert.match(buildNamesSql(), /DISTINCT applicant AS name.*UNION.*DISTINCT inventor AS name/s);
+});
+
+test('OPMS 찾기: 정확한 것부터, 많으면 개수를 따로, 초성은 이름 목록(한 번 받아 둠)으로', async () => {
+  const sqls = [];
+  const cases = [
+    ['1', 'FPD/2026-0271/D', '메모킹 주식회사', '김철수', '2026-01-09'],
+    ['2', 'P-0271', '홍길동', '', '2025-01-01'],
+    ['3', 'X-1', '김홍길동', '홍길동', '2026-05-01'],
+  ];
+  const fakeFetch = async (_url, init) => {
+    const sql = new URLSearchParams(init.body).get('sql');
+    sqls.push(sql);
+    if (/COUNT\(\*\)/.test(sql)) return new Response(table(['n'], [['42']]));
+    if (/DISTINCT applicant AS name/.test(sql)) return new Response(table(['name'], [['메모킹 주식회사'], ['홍길동'], ['김홍길동'], ['김철수, 홍길동']]));
+    const like = [...sql.matchAll(/LIKE '%([^%']+)%'/g)].map((m) => m[1]);
+    const rows = cases.filter((c) => like.some((t) => c.join(' ').includes(t)));
+    return new Response(table(['idx', 'ourref', 'applicant', 'inventor', 'd_accept'], rows));
+  };
+  const client = new Opms({ host: TEST_HOST, fetch: fakeFetch, retries: 0 });
+  const byName = await client.search('홍길동');
+  assert.deepEqual(byName.rows.map((r) => r.idx), ['2', '3'], '출원인이 그대로 같은 것이 앞');
+  assert.equal(byName.total, 2);
+  const many = await client.search('0271', { limit: 2 });
+  assert.equal(many.total, 42, 'TOP 만큼 찼으면 개수를 따로 묻는다');
+  assert.ok(sqls.some((s) => /COUNT/.test(s)));
+  const cho = await client.search('ㅎㄱㄷ');
+  assert.deepEqual(cho.rows.map((r) => r.idx).slice(0, 2), ['2', '3']);
+  await client.search('ㄱㅊㅅ');
+  assert.equal(sqls.filter((s) => /DISTINCT applicant AS name/.test(s)).length, 1, '이름 목록은 한 번만');
+  assert.deepEqual(await client.search('내일 오후 3시까지 보고서 정리해서 보내기'), { rows: [], total: 0 });
 });

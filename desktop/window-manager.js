@@ -27,6 +27,7 @@ import {
 } from './utils.js';
 import { UI } from '../app/js/core/ui-text.js';
 import { appendToBody } from '../app/js/core/magic-modules.js';
+import { matchedInventor } from '../app/js/core/opms-search.js';
 
 // 창 위 가장자리에 반쯤 걸쳐 붙는 스티커: 왕관(늘 위) · 셀로판 테이프(늘 아래, 바탕화면 층)
 // 목록 창 제목 줄: 왼쪽은 로고 · Life/Work 스위치(~196px), 오른쪽은 단추 묶음 + Windows 창 버튼(~242px) — 스티커는 그 사이 빈 줄에
@@ -1682,6 +1683,10 @@ export class WindowManager {
   }
 
   async magicAct({ action, path: p, id, opms, text } = {}) {
+    if (action === 'opmsAll') {
+      this.showOpms(null, 'info', String(text ?? '').slice(0, 60));
+      return { ok: true, close: true };
+    }
     if (opms != null) {
       const c = this.caseOf(opms);
       if (action === 'copyOur' || action === 'copyApp') {
@@ -1776,14 +1781,16 @@ export class WindowManager {
     while (this.opmsCases.size > 300) this.opmsCases.delete(this.opmsCases.keys().next().value);
   }
 
-  opmsBrief(r) {
+  opmsBrief(r, query = '') {
     return {
       idx: r.idx, ourref: r.ourref, yourref: r.yourref, n_app: r.n_app, div: r.div,
       applicant: r.applicant, title: r.title_kor, accepted: cleanDate(r.d_accept),
+      inventor: query ? matchedInventor(r, query) : '', // 발명자 이름으로 찾았을 때만 보인다
     };
   }
 
-  showOpms(idx, tab = 'info') {
+  /** query: 사건 대신 이 글로 찾은 목록을 보인다 (매직키 "OPMS 다른 n건 더 보기") */
+  showOpms(idx, tab = 'info', query = null) {
     if (!this.opmsWin || this.opmsWin.isDestroyed()) {
       this.opmsWin = new BrowserWindow({
         width: 980,
@@ -1799,9 +1806,9 @@ export class WindowManager {
       this.opmsWin.loadFile(path.join(APP_DIR, 'opms.html'));
       this.opmsWin.once('ready-to-show', () => this.opmsWin?.show());
       this.opmsWin.on('closed', () => { this.opmsWin = null; });
-      this.opmsWin.webContents.once('did-finish-load', () => this.opmsWin?.webContents.send('opms:show', { idx, tab }));
+      this.opmsWin.webContents.once('did-finish-load', () => this.opmsWin?.webContents.send('opms:show', { idx, tab, query }));
     } else {
-      this.opmsWin.webContents.send('opms:show', { idx, tab });
+      this.opmsWin.webContents.send('opms:show', { idx, tab, query });
       if (this.opmsWin.isMinimized()) this.opmsWin.restore();
       this.opmsWin.show();
     }
