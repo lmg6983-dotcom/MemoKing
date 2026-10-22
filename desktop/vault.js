@@ -59,6 +59,7 @@ export class Vault extends EventEmitter {
     this.orphanTimer = null;
     /** @type {Map<string, {id, file: string|null, meta, body, mtimeMs, size, idSaved: boolean}>} */
     this.entries = new Map();
+    this.partsCache = new WeakMap(); // 메모(entry) → 본문에서 뽑은 것 (bodyParts)
     this.locks = new Map(); // 연 잠금 메모: id → 세션 (메모를 닫으면 잊는다)
     this.lockCopies = new Map(); // 잠긴 메모 id → 그 메모를 연 동안 만든 사본 id 들 (같은 열쇠)
     this.copyOf = new Map(); // 사본 id → 원래 메모 id
@@ -219,32 +220,58 @@ export class Vault extends EventEmitter {
 
   // ---------- 조회 ----------
 
-  summary(entry) {
-    const media = extractMedia(entry.body);
+  // 본문에서 뽑는 것(제목 · 미리 보기 · 사진 · 태그 · 체크리스트 …)은 본문이 같으면 다시 뽑지 않는다
+  //   (목록은 메모를 저장할 때마다 다시 만드는데, 메모 2,000개를 매번 다 읽으면 한 번에 1초 넘게 걸렸다)
+  bodyParts(entry) {
+    const hit = this.partsCache.get(entry);
+    if (hit && hit.body === entry.body) return hit;
+    const body = entry.body;
+    const media = extractMedia(body);
     const has = (kind) => media.some((m) => m.kind === kind);
+    const parts = {
+      body,
+      title: extractTitle(body),
+      preview: extractPreview(body, 1200), // 목록을 확대하면 카드에 요약을 여러 줄 보여 주므로 넉넉히
+      thumb: media.find((m) => m.kind === 'image')?.src ?? null,
+      images: media.filter((m) => m.kind === 'image').slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진)
+      tags: extractTags(body),
+      hasImage: has('image'),
+      hasWebLink: /\]\(https?:\/\/|<https?:\/\//i.test(body),
+      hasAudio: has('audio'),
+      hasVideo: has('video'),
+      hasFile: has('file'),
+      tasks: taskProgress(body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
+      locked: isLockedBody(body),
+    };
+    this.partsCache.set(entry, parts);
+    return parts;
+  }
+
+  summary(entry) {
+    const p = this.bodyParts(entry);
     return {
       id: entry.id,
       file: entry.file,
-      title: extractTitle(entry.body),
-      preview: extractPreview(entry.body, 1200), // 목록을 확대하면 카드에 요약을 여러 줄 보여 주므로 넉넉히
+      title: p.title,
+      preview: p.preview,
       color: entry.meta.color,
       pinned: entry.meta.pinned,
       created: entry.meta.created,
       updated: entry.meta.updated,
-      thumb: media.find((m) => m.kind === 'image')?.src ?? null,
-      images: media.filter((m) => m.kind === 'image').slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진)
+      thumb: p.thumb,
+      images: [...p.images], // 받는 쪽이 고쳐도 기억해 둔 것은 그대로
       day: entry.meta.day || '', // 회상 달력: "이 날의 기록으로" 정한 날
       mode: entry.meta.mode ?? 'life', // Work / Life
-      tags: extractTags(entry.body),
-      hasImage: has('image'),
-      hasWebLink: /\]\(https?:\/\/|<https?:\/\//i.test(entry.body),
-      hasAudio: has('audio'),
-      hasVideo: has('video'),
-      hasFile: has('file'),
+      tags: [...p.tags],
+      hasImage: p.hasImage,
+      hasWebLink: p.hasWebLink,
+      hasAudio: p.hasAudio,
+      hasVideo: p.hasVideo,
+      hasFile: p.hasFile,
       reminderCount: entry.meta.reminders.filter((r) => isLiveCached(r)).length, // 종 버튼·일정 탭과 같은 규칙 (앞으로 울릴 것만)
       linkCount: entry.meta.links.filter((id) => this.entries.has(id)).length,
-      tasks: taskProgress(entry.body), // 체크리스트 진행 (모두 끝나면 카드에 CLEAR 도장)
-      locked: isLockedBody(entry.body),
+      tasks: p.tasks && typeof p.tasks === 'object' ? { ...p.tasks } : p.tasks,
+      locked: p.locked,
     };
   }
 
@@ -279,11 +306,8 @@ export class Vault extends EventEmitter {
 
   search(query, excludeId = null) {
     const matches = textMatcher(query);
-    return this.list().filter((m) => {
-      if (m.id === excludeId) return false;
-      const entry = this.entries.get(m.id);
-      return matches(m.title, plainLines(entry.body).join('\n'));
-    });
+    const texts = new Map(this.searchable().map((m) => [m.id, m.text])); // 매직키와 같이 기억해 둔 찾기용 글
+    return this.list().filter((m) => m.id !== excludeId && matches(m.title, texts.get(m.id) ?? ''));
   }
 
   get(id) {
