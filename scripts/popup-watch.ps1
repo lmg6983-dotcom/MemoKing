@@ -100,6 +100,34 @@ public static class MkPopup {
     return bmp;
   }
 
+  // 창 그림 → 대부분 검으면(반투명 창은 PrintWindow 가 내용을 못 그리고 검게 돌려줄 때가 있다) 화면에 보이는 그 자리를 찍는다.
+  //   알림 창은 맨 위에 떠 있으므로 화면에는 제대로 보인다. 둘 다 안 되면 창 그림 그대로 (IsBlank 가 다음 차례로 미룬다)
+  public static Bitmap CaptureWin(Win w) {
+    var bmp = Capture(w.Hwnd, w.W, w.H);
+    if (bmp != null && !IsMostlyBlack(bmp)) return bmp;
+    try {
+      var shot = new Bitmap(w.W, w.H, PixelFormat.Format32bppArgb);
+      using (var g = Graphics.FromImage(shot)) g.CopyFromScreen(w.X, w.Y, 0, 0, new Size(w.W, w.H));
+      if (!IsMostlyBlack(shot)) { if (bmp != null) bmp.Dispose(); LastFromScreen = true; return shot; }
+      shot.Dispose();
+    } catch { }
+    return bmp;
+  }
+  // 마지막 CaptureWin 이 화면을 찍었는가 (진단 기록용)
+  public static bool LastFromScreen;
+
+  // 거의 검은 그림인가: 표본의 80% 넘게가 아주 어둡다 (다크 모드 알림의 바탕은 이보다 밝다)
+  public static bool IsMostlyBlack(Bitmap b) {
+    int dark = 0, n = 0;
+    for (int y = 1; y < b.Height; y += Math.Max(1, b.Height / 24))
+      for (int x = 1; x < b.Width; x += Math.Max(1, b.Width / 32)) {
+        Color c = b.GetPixel(x, y);
+        n++;
+        if (c.R + c.G + c.B <= 30) dark++;
+      }
+    return n > 0 && dark >= n * 0.8;
+  }
+
   // 글자 인식용 그림: 알파를 무시해 불투명하게 (GDI 로 그린 글자는 알파가 0 이라 그대로면 빈 그림으로 보인다),
   // 왼쪽 프로필 사진은 바탕색으로 지우고 (글자 인식이 사진을 '렐' · '반' 같은 글자로 읽어 이름에 붙인다),
   // factor 배로 키운 뒤 흑백 · 대비를 늘린다 (작은 글자는 키우면 훨씬 잘 읽히고, 가는 획이 흐려지지 않게)
@@ -359,7 +387,7 @@ public static class MkPopup {
         if (v < lo) lo = v;
         if (v > hi) hi = v;
       }
-    return hi - lo < 30;
+    return hi - lo < 30 || IsMostlyBlack(b); // 테두리 · 점 몇 개만 있는 검은 그림도 (글자 인식이 '222' 같은 것으로 읽는다)
   }
   public static string Fingerprint(Bitmap b) {
     long sum = 0; int n = 0;
@@ -571,7 +599,8 @@ while ($true) {
     if ($pids.Count) {
       foreach ($w in [MkPopup]::Candidates($pids)) {
         $alive[$w.Hwnd] = $true
-        $bmp = [MkPopup]::Capture($w.Hwnd, $w.W, $w.H)
+        [MkPopup]::LastFromScreen = $false
+        $bmp = [MkPopup]::CaptureWin($w)
         if (-not $bmp) { continue }
         try {
           $s = $state[$w.Hwnd]
@@ -622,7 +651,7 @@ while ($true) {
           if ($direct.Count -and $cover -ge 0.6) { $via = $directVia; $lines = $direct }
           else { $via = 'ocr'; $lines = $ocrLines }
           $size = [ordered]@{ w = [Math]::Round($w.W / $w.Scale); h = [Math]::Round($w.H / $w.Scale) }
-          Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); classes = @([MkText]::Classes($w.Hwnd)); title = $w.Title; size = "$($size.w)x$($size.h)"; scale = $w.Scale; uia = $found.uia; msaa = $found.msaa; win32 = $found.win32; ocr = $boxes; cover = [Math]::Round($cover, 2); via = $via; lines = $lines })
+          Write-PopupLog ([ordered]@{ time = (Get-Date).ToString('o'); classes = @([MkText]::Classes($w.Hwnd)); title = $w.Title; size = "$($size.w)x$($size.h)"; scale = $w.Scale; uia = $found.uia; msaa = $found.msaa; win32 = $found.win32; ocr = $boxes; cover = [Math]::Round($cover, 2); via = $via; lines = $lines; fromScreen = [MkPopup]::LastFromScreen })
           $key = ($lines -join "`n")
           # via 가 'ocr' 이면 Node 가 ocrImage 를 한글 OCR 로 다시 읽으므로, 바로 읽은 글만으로 중복 판단하지 않는다
           $dedupeKey = $(if ($via -eq 'ocr') { "ocr:$($w.Hwnd):$fp" } else { $key })
