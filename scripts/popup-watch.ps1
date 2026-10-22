@@ -7,7 +7,8 @@
 #   4) captures the window (PrintWindow) and reads it with the OCR built into Windows (Windows.Media.Ocr).
 #      OCR always runs; text from 1)~3) is used only when it covers what OCR sees (some apps expose only junk names).
 #      For OCR the capture is made opaque (layered/GDI windows leave alpha at 0 and OCR then sees an empty canvas)
-#      the profile picture on the left is painted over (OCR reads it as stray letters glued to the sender name),
+#      the profile picture on the left is painted over (OCR reads it as stray letters glued to the sender name) and its top
+#      is reported (lines above it are the chat room name), emoji are painted over (OCR reads them as symbols),
 #      the image is turned gray with stretched contrast (dark popups inverted to dark-on-white),
 #      and enlarged (small UI text reads much better), and each line keeps its place (x, y, w, h in 100%-scale px).
 # One JSON line per new popup text on stdout:
@@ -102,7 +103,10 @@ public static class MkPopup {
   // 글자 인식용 그림: 알파를 무시해 불투명하게 (GDI 로 그린 글자는 알파가 0 이라 그대로면 빈 그림으로 보인다),
   // 왼쪽 프로필 사진은 바탕색으로 지우고 (글자 인식이 사진을 '렐' · '반' 같은 글자로 읽어 이름에 붙인다),
   // factor 배로 키운 뒤 흑백 · 대비를 늘린다 (작은 글자는 키우면 훨씬 잘 읽히고, 가는 획이 흐려지지 않게)
+  // 마지막 OcrImage 에서 찾은 프로필 사진의 윗변 (원래 그림 px, 못 찾으면 -1) — 그 위 줄이 채팅방 이름
+  public static int LastProfileTop = -1;
   public static Bitmap OcrImage(Bitmap src, double factor, double scale = 1) {
+    LastProfileTop = -1;
     var opaque = new Bitmap(src.Width, src.Height, PixelFormat.Format32bppArgb);
     var rect = new Rectangle(0, 0, src.Width, src.Height);
     var from = src.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
@@ -112,7 +116,12 @@ public static class MkPopup {
       var buf = new byte[bytes];
       Marshal.Copy(from.Scan0, buf, 0, bytes);
       for (int i = 3; i < bytes; i += 4) buf[i] = 255;
-      HideProfile(buf, Math.Abs(from.Stride), src.Width, src.Height, scale);
+      int stride = Math.Abs(from.Stride), bin = BackgroundBin(buf, stride, src.Width, src.Height);
+      var bgc = BackgroundColor(buf, stride, src.Width, src.Height, bin);
+      int top = HideProfile(buf, stride, src.Width, src.Height, scale, bin, bgc);
+      // 프로필 사진 윗변: 그보다 위의 작은 줄은 채팅방 이름 (메모킹이 보낸 사람과 같으면 1:1 대화로 보고 뺀다)
+      if (top > 2 && top < src.Height * 0.6) LastProfileTop = top;
+      HideEmoji(buf, stride, src.Width, src.Height, scale, bin, bgc);
       Marshal.Copy(buf, 0, to.Scan0, bytes);
     } finally { src.UnlockBits(from); opaque.UnlockBits(to); }
     Bitmap big = opaque;
@@ -161,11 +170,29 @@ public static class MkPopup {
     return bin;
   }
 
-  // 왼쪽 프로필 사진: 왼쪽 1/4 안에서 시작해 100% 배율로 16px 넘게 이어지는, 세로로 빽빽한(높이의 25% 넘게 바탕과 다른) 열들.
-  // 글자는 그렇게 넓게 빽빽하지 않다. 찾으면 그 덩어리(옅은 가장자리까지)를 바탕색으로 칠한다
-  static void HideProfile(byte[] buf, int stride, int w, int h, double scale) {
-    if (w < 40 || h < 20) return;
-    int bin = BackgroundBin(buf, stride, w, h), bg = bin * 4 + 2;
+  // 바탕색 (가장 많은 밝기 칸의 평균 색, BGR)
+  static byte[] BackgroundColor(byte[] buf, int stride, int w, int h, int bin) {
+    long r = 0, g = 0, bl = 0, cnt = 0;
+    for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+      int o = y * stride + x * 4;
+      if ((Lum(buf, o) >> 2) == bin) { bl += buf[o]; g += buf[o + 1]; r += buf[o + 2]; cnt++; }
+    }
+    if (cnt == 0) return new byte[] { 255, 255, 255 };
+    return new byte[] { (byte)(bl / cnt), (byte)(g / cnt), (byte)(r / cnt) };
+  }
+
+  static void Paint(byte[] buf, int stride, int x0, int y0, int x1, int y1, byte[] c) {
+    for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) {
+      int o = y * stride + x * 4;
+      buf[o] = c[0]; buf[o + 1] = c[1]; buf[o + 2] = c[2];
+    }
+  }
+
+  // 왼쪽 프로필 사진: 왼쪽 1/4 안에서 시작해 100% 배율로 16px 넘게 이어지는, 세로로 빽빽한(높이의 18% 넘게 바탕과 다른) 열들.
+  // 글자는 그렇게 넓게 빽빽하지 않다. 찾으면 그 덩어리(옅은 가장자리까지)를 바탕색으로 칠하고, 사진의 윗변(행)을 돌려준다 (없으면 -1)
+  static int HideProfile(byte[] buf, int stride, int w, int h, double scale, int bin, byte[] bgc) {
+    if (w < 40 || h < 20) return -1;
+    int bg = bin * 4 + 2;
     int lim = (int)(w * 0.35);
     var ink = new double[lim];
     for (int x = 0; x < lim; x++) {
@@ -175,25 +202,118 @@ public static class MkPopup {
     }
     int need = Math.Max(8, (int)Math.Round(16 * scale)), start = -1;
     for (int x = 0, run = 0; x < lim; x++) {
-      run = ink[x] > 0.25 ? run + 1 : 0;
+      run = ink[x] > 0.18 ? run + 1 : 0;
       if (run >= need) { start = x - run + 1; break; }
     }
-    if (start < 0 || start > w * 0.25) return;
-    int a = start, b = start;
-    while (a > 0 && ink[a - 1] > 0.02) a--;
-    while (b < lim - 1 && ink[b + 1] > 0.02) b++;
-    long r = 0, g = 0, bl = 0, cnt = 0;
-    for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
-      int o = y * stride + x * 4;
-      if ((Lum(buf, o) >> 2) == bin) { bl += buf[o]; g += buf[o + 1]; r += buf[o + 2]; cnt++; }
+    if (start < 0 || start > w * 0.25) return -1;
+    int end = start;
+    while (end < lim - 1 && ink[end + 1] > 0.18) end++;
+    // 사진의 윗변 · 아랫변: 빽빽한 열들 가운데 절반 넘게 칠해진 행이 4행 넘게 이어지는 곳 (1px 테두리 줄은 건너뛴다)
+    int top = -1, bottom = -1;
+    for (int y = 0, run = 0; y < h; y++) {
+      int n = 0;
+      for (int x = start; x <= end; x++) if (Math.Abs(Lum(buf, y * stride + x * 4) - bg) > 40) n++;
+      run = n * 2 > end - start + 1 ? run + 1 : 0;
+      if (run >= 4 && top < 0) top = y - 3;
+      if (run >= 4) bottom = y;
     }
-    if (cnt == 0) return;
-    byte cb = (byte)(bl / cnt), cg = (byte)(g / cnt), cr = (byte)(r / cnt);
-    int x1 = Math.Min(w, b + 3);
-    for (int y = 0; y < h; y++) for (int x = a; x < x1; x++) {
-      int o = y * stride + x * 4;
-      buf[o] = cb; buf[o + 1] = cg; buf[o + 2] = cr;
+    if (top < 0) return -1;
+    // 사진은 (둥글어도) 거의 정사각형: 높이만큼의 폭을 가운데 기준으로 지운다 — 옆의 글까지 번지지 않게
+    int size = bottom - top + 1, mid = (start + end) / 2;
+    int pad = Math.Max(2, (int)Math.Round(2 * scale));
+    Paint(buf, stride, Math.Max(0, mid - size / 2 - pad), Math.Max(0, top - pad), Math.Min(w, mid + size / 2 + pad + 1), Math.Min(h, bottom + pad + 1), bgc);
+    return top;
+  }
+
+  // 이모티콘: 글자 하나 크기(100% 배율 11~30px)의 거의 정사각형 덩어리 가운데
+  //   (1) 테두리 얼굴: 안쪽에 큰 빈 곳(상자의 30% 넘게)이 있고 그 안에 작은 조각(눈 · 입)이 둘 넘게 있거나
+  //   (2) 색칠한 그림: 상자의 55% 넘게 꽉 차고 색이 짙은 것 (글자는 회색 — 가장자리 색 번짐보다 훨씬 짙어야).
+  //   한글은 받침 · 'ㅁ' 의 안쪽이 작고 안에 다른 조각을 품지 않는다. 찾으면 바탕색으로 지운다 (글자 인식이 기호로 읽지 않게)
+  static int HideEmoji(byte[] buf, int stride, int w, int h, double scale, int bin, byte[] bgc) {
+    int bg = bin * 4 + 2;
+    var label = new int[w * h];
+    var ink = new bool[w * h];
+    for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) ink[y * w + x] = Math.Abs(Lum(buf, y * stride + x * 4) - bg) > 40;
+    var boxes = new List<long[]>(); // x0, y0, x1, y1, 칸 수, B · G · R 합
+    var stack = new Stack<int>();
+    for (int i = 0; i < ink.Length; i++) {
+      if (!ink[i] || label[i] != 0) continue;
+      int id = boxes.Count + 1, x0 = w, y0 = h, x1 = -1, y1 = -1, n = 0;
+      long sb = 0, sg = 0, sr = 0;
+      label[i] = id; stack.Push(i);
+      while (stack.Count > 0) {
+        int p = stack.Pop(), px = p % w, py = p / w;
+        n++;
+        int o = py * stride + px * 4;
+        sb += buf[o]; sg += buf[o + 1]; sr += buf[o + 2];
+        if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+        for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
+          int qx = px + dx, qy = py + dy;
+          if (qx < 0 || qy < 0 || qx >= w || qy >= h) continue;
+          int q = qy * w + qx;
+          if (ink[q] && label[q] == 0) { label[q] = id; stack.Push(q); }
+        }
+      }
+      boxes.Add(new long[] { x0, y0, x1, y1, n, sb, sg, sr });
     }
+    double lo = 11 * scale, hi = 30 * scale;
+    int hidden = 0;
+    for (int k = 0; k < boxes.Count; k++) {
+      var bx = boxes[k];
+      int bw = (int)(bx[2] - bx[0] + 1), bh = (int)(bx[3] - bx[1] + 1);
+      if (bw < lo || bh < lo || bw > hi || bh > hi) continue;
+      double aspect = (double)bw / bh;
+      if (aspect < 0.7 || aspect > 1.4) continue;
+      // 평균 색의 짙기: 글자 가장자리의 ClearType 번짐은 양쪽이 빨강 · 파랑이라 평균하면 회색, 색 그림(노란 얼굴 등)은 그 색 그대로
+      double mb = bx[5] / (double)bx[4], mg = bx[6] / (double)bx[4], mr = bx[7] / (double)bx[4];
+      bool colored = bx[4] > bw * bh * 0.55 && Math.Max(mb, Math.Max(mg, mr)) - Math.Min(mb, Math.Min(mg, mr)) > 80;
+      if (!colored && !IsFace(label, w, bx, k + 1, boxes)) continue;
+      Paint(buf, stride, (int)Math.Max(0, bx[0] - 1), (int)Math.Max(0, bx[1] - 1), (int)Math.Min(w, bx[2] + 2), (int)Math.Min(h, bx[3] + 2), bgc);
+      hidden++;
+    }
+    return hidden;
+  }
+
+  // 고리 안쪽(상자 가장자리에서 이 덩어리를 넘지 않고는 닿을 수 없는 곳)이 크고, 그 안에 다른 조각이 둘 넘게 있는가
+  static bool IsFace(int[] label, int w, long[] bx, int id, List<long[]> boxes) {
+    int x0 = (int)bx[0], y0 = (int)bx[1], bw = (int)(bx[2] - bx[0] + 1), bh = (int)(bx[3] - bx[1] + 1);
+    var outside = new bool[bw * bh];
+    var stack = new Stack<int>();
+    for (int y = 0; y < bh; y++) for (int x = 0; x < bw; x++) {
+      if (x != 0 && y != 0 && x != bw - 1 && y != bh - 1) continue;
+      int i = y * bw + x;
+      if (label[(y + y0) * w + x + x0] != id && !outside[i]) { outside[i] = true; stack.Push(i); }
+    }
+    while (stack.Count > 0) {
+      int p = stack.Pop(), px = p % bw, py = p / bw;
+      for (int d = 0; d < 4; d++) {
+        int qx = px + (d == 0 ? 1 : d == 1 ? -1 : 0), qy = py + (d == 2 ? 1 : d == 3 ? -1 : 0);
+        if (qx < 0 || qy < 0 || qx >= bw || qy >= bh) continue;
+        int q = qy * bw + qx;
+        if (!outside[q] && label[(qy + y0) * w + qx + x0] != id) { outside[q] = true; stack.Push(q); }
+      }
+    }
+    if (bx[4] > bw * bh * 0.55) return false; // 고리는 가늘다
+    // 안쪽 빈 곳: 넓고(상자의 30% 넘게) 상자의 가로 · 세로 대부분(60%)에 걸친다 (글자 안의 좁은 틈과 다르게)
+    int hole = 0, hx0 = bw, hy0 = bh, hx1 = -1, hy1 = -1;
+    for (int y = 0; y < bh; y++) for (int x = 0; x < bw; x++) {
+      if (outside[y * bw + x] || label[(y + y0) * w + x + x0] == id) continue;
+      hole++;
+      if (x < hx0) hx0 = x; if (x > hx1) hx1 = x; if (y < hy0) hy0 = y; if (y > hy1) hy1 = y;
+    }
+    if (hole < bw * bh * 0.3 || hx1 - hx0 + 1 < bw * 0.6 || hy1 - hy0 + 1 < bh * 0.6) return false;
+    // 그 안의 작은 조각(눈 · 입): 둘 넘게, 하나하나가 상자의 35% 를 넘지 않는다
+    int inner = 0;
+    for (int k = 0; k < boxes.Count && inner < 2; k++) {
+      var o = boxes[k];
+      if (k + 1 == id) continue;
+      int cx = (int)((o[0] + o[2]) / 2) - x0, cy = (int)((o[1] + o[3]) / 2) - y0;
+      if (cx <= 0 || cy <= 0 || cx >= bw - 1 || cy >= bh - 1) continue;
+      if (o[2] - o[0] + 1 > bw * 0.35 && o[3] - o[1] + 1 > bh * 0.35) continue;
+      if (o[2] - o[0] + 1 > bw * 0.6 || o[3] - o[1] + 1 > bh * 0.6) continue;
+      if (!outside[cy * bw + cx]) inner++;
+    }
+    return inner >= 2;
   }
 
   // 흑백 · 대비 늘리기: 바탕은 흰색, 가장 진한 글자는 검정으로 펴고 감마로 가는 획을 진하게.
@@ -510,7 +630,7 @@ while ($true) {
           $s.sent = $dedupeKey
           $proc = (Get-Process -Id $w.Pid -ErrorAction SilentlyContinue).ProcessName
           $msg = [ordered]@{ process = $proc; pid = $w.Pid; hwnd = $w.Hwnd; windowTitle = $w.Title; lines = @($lines); via = $via; image = $png; size = $size }
-          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes); $msg['ocrImage'] = $ocrPng; $msg['ocrUnit'] = [Math]::Round($ocrUnit, 4); $msg['verifyImage'] = $verifyPng; $msg['scale'] = $w.Scale }
+          if ($via -eq 'ocr') { $msg['boxes'] = @($boxes); $msg['ocrImage'] = $ocrPng; $msg['ocrUnit'] = [Math]::Round($ocrUnit, 4); $msg['verifyImage'] = $verifyPng; $msg['scale'] = $w.Scale; $msg['profileTop'] = $(if ([MkPopup]::LastProfileTop -gt 0) { [Math]::Round([MkPopup]::LastProfileTop / $w.Scale, 1) } else { 0 }) }
           else { @($ocrPng, $verifyPng) | Where-Object { $_ } | Remove-Item -ErrorAction SilentlyContinue }
           [Console]::Out.WriteLine(($msg | ConvertTo-Json -Compress -Depth 4))
           [Console]::Out.Flush()

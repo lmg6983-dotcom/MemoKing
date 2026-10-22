@@ -848,6 +848,7 @@ el.fabMenu.addEventListener('click', (e) => {
 el.settingsBtn.addEventListener('click', async () => {
   await loadSettings();
   drivePanel?.refresh();
+  paintPhoneQr().catch((err) => console.warn('[휴대폰 앱 QR]', err));
   openPanelDialog(el.settings);
 });
 
@@ -917,6 +918,24 @@ $('mcp-copy').addEventListener('click', async () => {
   showMcp((await api.settings.get()).mcp, '설정을 복사했어요. AI 앱의 MCP 설정(mcpServers)에 붙여 넣어 주세요');
 });
 $('mcp-write').addEventListener('change', async (e) => showMcp(await api.mcp.setWrite(e.target.checked)));
+// 휴대폰 앱(안드로이드) 설치: 늘 최신 설치 파일 주소 (memoking-releases 의 "android" 릴리스) — QR 코드 · 링크 복사 · 브라우저로
+const ANDROID_APK = 'https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk';
+let phoneQrDone = false;
+async function paintPhoneQr() {
+  if (phoneQrDone) return;
+  phoneQrDone = true;
+  const { default: qrcode } = await import('../vendor/qrcode.js');
+  const qr = qrcode(0, 'M');
+  qr.addData(ANDROID_APK);
+  qr.make();
+  $('phone-qr').innerHTML = qr.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
+}
+$('phone-copy').addEventListener('click', async () => {
+  await api.copyText(ANDROID_APK);
+  $('phone-note').textContent = '설치 링크를 복사했어요. 메신저나 메일로 휴대폰에 보내 열어 주세요';
+});
+$('phone-open').dataset.url = ANDROID_APK;
+$('phone-open').addEventListener('click', () => api.links.open(ANDROID_APK));
 // Gemini, ChatGPT 의 Google Drive 연결로 메모 폴더를 직접 다룰 때 붙여 넣을 안내문 (ai-drive-guide.js)
 $('ai-drive-guide').addEventListener('click', async () => {
   const d = await api.drive.status().catch(() => null);

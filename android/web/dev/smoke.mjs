@@ -2357,6 +2357,15 @@ try {
     await shot('29b-find-format');
     check('찾기 막대(엑셀처럼): 찾을 말 · 바꿀 말 칸이 같은 폭 · 서식 찾기로 굵은 "배"만(2 → 1) · 모두 찾기 목록에 그 한 곳',
       widths.length === 2 && widths[0] === widths[1] && widths[0] > 120 && plain === '1/2' && boldOnly === '1/1' && fmtSet && items.length === 1 && /배/.test(items[0]), JSON.stringify({ widths, plain, boldOnly, fmtSet, items }));
+    // 할 일 버튼 넷: 같은 폭 · 같은 높이 · 같은 간격으로 한 줄
+    const acts = await page.evaluate(() => [...document.querySelectorAll('.mk-find-acts .mk-find-act')].map((b) => { const r = b.getBoundingClientRect(); return { x: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height), y: Math.round(r.top) }; }));
+    const gaps = acts.slice(1).map((a, i) => a.x - (acts[i].x + acts[i].w));
+    check('찾기 막대: 할 일 버튼 넷이 같은 폭 · 높이 34 · 같은 간격으로 한 줄', acts.length === 4 && new Set(acts.map((a) => a.y)).size === 1 && Math.max(...acts.map((a) => a.w)) - Math.min(...acts.map((a) => a.w)) <= 1 && acts.every((a) => a.h === 34) && Math.max(...gaps) - Math.min(...gaps) <= 1, JSON.stringify({ acts, gaps }));
+    // 모두 찾기 목록에서 고르면 메모에서 그 글이 골라진 채로
+    await page.tap('.mk-find-list .mk-find-item >> nth=0');
+    await page.waitForTimeout(200);
+    const picked = await page.evaluate(() => getSelection().toString());
+    check('모두 찾기 목록: 누르면 메모에서 그 글이 골라짐', picked === '배', JSON.stringify(picked));
     await page.tap('.mk-find-grid .mk-find-fmt >> nth=1');
     await page.tap('.mk-find-pop [role="radio"][aria-label="노랑"]');
     await page.tap('.mk-find-pop .mk-find-pop-foot .primary');

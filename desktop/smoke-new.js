@@ -314,6 +314,20 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         check('찾기(Ctrl+F): 막대가 뜨고 찾을 말로 바로 · 찾은 곳 3곳 · Enter 로 다음(2/3) · 글을 가리지 않음', opened && fs1?.hits === 3 && fs2 && noCover, JSON.stringify({ opened, fs1, fs2, noCover }));
         key(fw, 'H', ['control']);
         const repFocus = await until(() => js(fw, `(() => { const f = [...document.querySelectorAll('.mk-find-grid .mk-find-field')].map((x) => Math.round(x.getBoundingClientRect().width)); return document.querySelector('.mk-find-bar').dataset.mode === 'replace' && document.activeElement === document.querySelector('.mk-find-rep .mk-find-input') && f[0] === f[1]; })()`), 'Ctrl+H 바꾸기 줄', 2000).catch(() => false);
+        // 할 일 버튼 넷: 같은 폭 · 같은 높이(28) · 같은 간격 / 모두 찾기 목록에서 고르면 메모에서 그 글이 골라짐 (편집기로)
+        await js(fw, `[...document.querySelectorAll('.mk-find-act')].find((b) => b.textContent === '모두 찾기').click()`);
+        await wait(150);
+        const acts = await js(fw, `[...document.querySelectorAll('.mk-find-acts .mk-find-act')].map((b) => { const r = b.getBoundingClientRect(); return { x: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height), y: Math.round(r.top) }; })`);
+        const gaps = acts.slice(1).map((a, i) => a.x - (acts[i].x + acts[i].w));
+        await capture(fw, 'smoke-new-find-all.png');
+        await js(fw, `document.querySelectorAll('.mk-find-list .mk-find-item')[1].click()`);
+        await wait(150);
+        const picked = await js(fw, `({ text: getSelection().toString(), inEditor: !!document.activeElement?.closest('.ProseMirror'), count: document.querySelector('.mk-find-count').textContent })`);
+        check('찾기 막대: 할 일 버튼 넷이 같은 폭 · 높이 28 · 같은 간격 / 모두 찾기 목록에서 고르면 메모에서 그 글이 골라짐',
+          acts.length === 4 && new Set(acts.map((a) => a.y)).size === 1 && Math.max(...acts.map((a) => a.w)) - Math.min(...acts.map((a) => a.w)) <= 1 && acts.every((a) => a.h === 28) && Math.max(...gaps) - Math.min(...gaps) <= 1
+            && picked.text === '사과' && picked.inEditor && picked.count === '2/3', JSON.stringify({ acts, gaps, picked }));
+        await js(fw, `[...document.querySelectorAll('.mk-find-act')].find((b) => b.textContent === '모두 찾기').click(); document.querySelector('.mk-find-rep .mk-find-input').focus()`);
+        await wait(100);
         fw.webContents.insertText('포도');
         // Ctrl+Enter: sendInputEvent 로는 Ctrl 을 붙인 Enter 가 실제 키보드처럼 오지 않아, 크롬 개발 도구 입력(실제 키보드와 같은 길)으로
         {

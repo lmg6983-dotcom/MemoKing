@@ -18,7 +18,7 @@ import { pickHandoff, recentlyUpdated } from '../app/js/core/handoff.js';
 import { PopupWatcher } from './popup-watch.js';
 import { createSttService } from './stt/stt-service.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
-import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS } from '../app/js/core/popup-notify.js';
+import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { FileIndex, defaultRoots } from './file-index.js';
@@ -459,10 +459,12 @@ async function addPopupToHistory(p) {
       }
     }
     const byLayout = p.process === 'KakaoTalk' && p.via === 'ocr' && Array.isArray(p.boxes)
-      ? kakaoEntry(p.boxes, { width: p.size?.w, height: p.size?.h, appName })
+      ? kakaoEntry(p.boxes, { width: p.size?.w, height: p.size?.h, appName, profileTop: Number(p.profileTop) || 0 })
       : null;
     const entry = byLayout ?? popupToEntry(p.lines, { appName });
     if (!entry || !history) return;
+    // 글자 인식으로 읽은 이름은 이미 받은 이름과 한 글자만 다르면 그 이름으로 (작은 글씨의 채팅방 이름 등)
+    if (p.via === 'ocr') entry.title = correctTitle(entry.title, knownNames(history.list({ app: appName }).filter((e) => e.source === 'popup').slice(0, 500).map((e) => e.title)));
     const now = Date.now();
     while (recentPopups.length && now - recentPopups[0].at > 5 * 60 * 1000) recentPopups.shift();
     if (isRepeat(recentPopups, { app: appName, hwnd: p.hwnd, ...entry }, now)) return;
@@ -533,10 +535,25 @@ function historyToMemo(entryId) {
   const e = history?.get(entryId);
   if (!e || !vault) return null;
   const when = new Date(e.time).toLocaleString('ko-KR');
-  const body = `# ${e.title || e.app}\n\n${e.body ? `${e.body}\n\n` : ''}> ${e.app} 알림, ${when}`;
+  const pic = historyPicture(e);
+  const body = `# ${e.title || e.app}\n\n${e.body ? `${e.body}\n\n` : ''}${pic ? `![](${pic})\n\n` : ''}> ${e.app} 알림, ${when}`;
   const id = vault.import({ body });
   windowManager.openNote(id);
   return id;
+}
+
+// 알림의 그림을 메모 첨부로: 팝업 알림(카카오톡 등)은 알림 창 사진, Windows 알림은 들어 있는 그림.
+//   Windows 알림의 작은 앱 아이콘(100px 아래)은 넣지 않는다
+function historyPicture(e) {
+  const file = e.image ? history.resolveImage(e.image) : null;
+  if (!file) return null;
+  try {
+    if (e.source !== 'popup' && nativeImage.createFromPath(file).getSize().width < 100) return null;
+    return vault.saveAttachment(fs.readFileSync(file), path.extname(file).slice(1) || 'png');
+  } catch (err) {
+    console.warn('[알림 → 메모] 그림', err.message);
+    return null;
+  }
 }
 
 // ---------- Google Drive 직접 동기화 ----------
@@ -1257,6 +1274,7 @@ app.whenReady().then(async () => {
       alarms,
       smokeToasts,
       getHistory: () => history,
+      historyToMemo,
       appSettings: () => appSettings(vault, fileIndex, shortcutStatus, shortcutLabel),
       quickMemo: (opts) => windowManager.quickMemo(opts),
       registerQuickMemoKey,
