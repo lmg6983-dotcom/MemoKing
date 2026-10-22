@@ -531,6 +531,10 @@ h2.sheet-title { font-size: 20px; }
 .sheet .btn.small { height: var(--tap); padding: 0 14px; font-size: 14px; }
 
 .sheet .label { margin: 18px 4px 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
+/* 설정: 묶음마다 가는 줄로 나누고 묶음 이름은 진하게 (PC 설정과 같은 위계), 묶음 안의 작은 이름은 흐리게 */
+.settings-sheet > .label { margin: 22px 4px 8px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 14px; color: var(--text); }
+.settings-sheet .sub-label { margin: 12px 4px 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.settings-sheet .sheet-actions + .setting-row { margin-top: 6px; }
 .sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .sheet-actions .btn { flex: 1; }
 .hint { margin: 10px 4px 0; font-size: 13px; line-height: 1.55; color: var(--muted); }

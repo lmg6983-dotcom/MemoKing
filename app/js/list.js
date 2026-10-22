@@ -21,6 +21,7 @@ import { openMemoryDay, dayText } from './memory-day.js';
 import { renderCollage, collageName } from './memories-collage.js';
 import { base64Bytes, collageMemoBody } from './collage-preview.js';
 import { openAiDriveGuide } from './ai-drive-guide.js';
+import { ANDROID_APK, WINDOWS_SETUP, installShareText } from './core/install-links.js';
 import { chooseShare, showSharePop, SHARE_DONE } from './share-menu.js';
 import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL } from './core/modes.js';
 import { openModeHelper } from './mode-helper-dialog.js';
@@ -918,8 +919,7 @@ $('mcp-copy').addEventListener('click', async () => {
   showMcp((await api.settings.get()).mcp, '설정을 복사했어요. AI 앱의 MCP 설정(mcpServers)에 붙여 넣어 주세요');
 });
 $('mcp-write').addEventListener('change', async (e) => showMcp(await api.mcp.setWrite(e.target.checked)));
-// 휴대폰 앱(안드로이드) 설치: 늘 최신 설치 파일 주소 (memoking-releases 의 "android" 릴리스) — QR 코드 · 링크 복사 · 브라우저로
-const ANDROID_APK = 'https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk';
+// 다른 기기에 설치: 휴대폰 앱(QR 코드 · 링크 복사 · 브라우저로) · Windows PC 버전(링크 복사 · 브라우저로) — 늘 최신 설치 파일 주소
 let phoneQrDone = false;
 async function paintPhoneQr() {
   if (phoneQrDone) return;
@@ -936,6 +936,16 @@ $('phone-copy').addEventListener('click', async () => {
 });
 $('phone-open').dataset.url = ANDROID_APK;
 $('phone-open').addEventListener('click', () => api.links.open(ANDROID_APK));
+$('pc-open').dataset.url = WINDOWS_SETUP;
+$('pc-open').addEventListener('click', () => api.links.open(WINDOWS_SETUP));
+$('pc-copy').addEventListener('click', async () => {
+  await api.copyText(WINDOWS_SETUP);
+  $('pc-note').textContent = 'PC 설치 링크를 복사했어요. 메신저나 메일로 보내 주세요';
+});
+$('share-both').addEventListener('click', async () => {
+  await api.copyText(installShareText());
+  $('pc-note').textContent = 'PC와 휴대폰 설치 링크를 함께 복사했어요';
+});
 // Gemini, ChatGPT 의 Google Drive 연결로 메모 폴더를 직접 다룰 때 붙여 넣을 안내문 (ai-drive-guide.js)
 $('ai-drive-guide').addEventListener('click', async () => {
   const d = await api.drive.status().catch(() => null);

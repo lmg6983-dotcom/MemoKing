@@ -558,13 +558,6 @@
       <button type="button" id="ai-drive-guide" class="btn small">안내 보기</button>
     </div>
 
-    <p class="label">메모 폴더</p>
-    <div class="path-box" id="vault-path"></div>
-    <div class="sheet-actions">
-      <button id="change-vault" class="btn">위치 변경</button>
-      <button id="use-internal-2" class="btn">이 휴대폰으로 바꾸기</button>
-    </div>
-    <p class="hint" id="vault-hint">PC와 함께 쓰려면 Google Drive를 연결해 주세요.</p>
 
     <p class="label">알림</p>
     <div class="setting-row" id="notify-row">
@@ -583,7 +576,7 @@
     <p class="label">Work / Life</p>
     <div id="work-settings"></div>
 
-    <p class="label">링크, 태그, 녹음</p>
+    <p class="label">메모 보기</p>
     <label class="setting-row">
       <input type="checkbox" id="link-previews" class="switch" role="switch" checked>
       <span>링크 미리보기 <small>주소를 붙이면 제목, 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
@@ -592,6 +585,7 @@
       <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
       <span>태그 자동 추가 <small>태그 없는 메모를 닫을 때 확실한 태그만 달아요</small></span>
     </label>
+    <p class="label">음성 녹음과 받아쓰기</p>
     <label class="setting-row">
       <input type="checkbox" id="rec-stt" class="switch" role="switch" checked>
       <span>녹음하며 받아쓰기 <small id="rec-stt-note">말하는 내용을 바로 글로 받아써요</small></span>
@@ -605,12 +599,15 @@
       <input type="checkbox" id="pen-writing" class="switch" role="switch" checked>
       <span>손글씨를 글자로 <small>글 고치기에서 S펜으로 쓰면 글자로 바꿔요. 옮기기와 그리기에서는 늘 꺼져 있어요</small></span>
     </label>
-    <p class="label">도움말</p>
+    <p class="label">저장 공간</p>
+    <p class="sub-label">메모 폴더</p>
+    <div class="path-box" id="vault-path"></div>
     <div class="sheet-actions">
-      <button id="tutorial-btn" class="btn">🎓 사용법 둘러보기</button>
+      <button id="change-vault" class="btn">위치 변경</button>
+      <button id="use-internal-2" class="btn">이 휴대폰으로 바꾸기</button>
     </div>
-
-    <p class="label">휴지통</p>
+    <p class="hint" id="vault-hint">PC와 함께 쓰려면 Google Drive를 연결해 주세요.</p>
+    <p class="sub-label">휴지통</p>
     <div class="sheet-actions">
       <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
     </div>
@@ -624,8 +621,16 @@
         <option value="0">안 함</option>
       </select>
     </label>
+    <p class="label">도움말과 나눠 주기</p>
+    <div class="sheet-actions">
+      <button id="tutorial-btn" class="btn">사용법 둘러보기</button>
+    </div>
+    <div class="setting-row select-row">
+      <span>메모킹 나눠 주기 <small>Windows PC 버전과 이 휴대폰 앱의 설치 링크를 메신저나 메일로 보내요. 늘 최신 버전이에요</small></span>
+      <button type="button" id="share-install" class="btn small">링크 보내기</button>
+    </div>
     <p class="version" id="version"></p>
-    <p class="copyright">© 2026 메모킹 | 문의 lmg6983@gmail.com</p>
+    <p class="copyright">© 2026 메모킹, 문의 lmg6983@gmail.com</p>
   </section>
 
   <!-- 새 버전: 바뀐 점 → 받아서 설치(진행률) → 안드로이드 설치 화면 (android/web/js/updates.js) -->
