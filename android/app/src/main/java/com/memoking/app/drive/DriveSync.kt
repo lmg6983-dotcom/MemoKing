@@ -43,6 +43,12 @@ object DriveSync {
 
     private val worker = Executors.newSingleThreadScheduledExecutor()
     private var pending: ScheduledFuture<*>? = null
+
+    /** 파일이 오간 뒤 이때까지는 화면이 보이는 동안 5초마다 (PC 와 주고받는 중일 때 빨리) */
+    @Volatile var burstUntil = 0L
+
+    /** 화면이 보이는 동안 다음 동기화까지 — 보통 10초, 파일이 오간 뒤 2분은 5초 (PC 와 같음) */
+    fun pollDelay(now: Long = System.currentTimeMillis()): Long = if (now < burstUntil) 5_000 else 10_000
     @Volatile var status = Status("off", 0, "")
         private set
 
@@ -104,6 +110,7 @@ object DriveSync {
             return Status("error", status.lastSync, message).also(::publish)
         }
         saveState(file, state)
+        if (result.uploaded + result.downloaded + result.deletedLocal + result.deletedRemote > 0) burstUntil = System.currentTimeMillis() + 120_000
         if (result.downloaded > 0) {
             // 다른 기기에서 잠근 메모를 홈 화면 위젯에서 바로 숨김 — 위젯의 파일 일은 한 줄로(체크·내용 보내기와 서로 덮어쓰지 않게),
             // 동기화가 끝났다고 알리기 전에 마친다 (그 뒤 앱이 바로 꺼져도 풀린 글이 위젯에 남지 않게)

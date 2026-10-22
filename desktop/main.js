@@ -207,7 +207,7 @@ function openVault(dir) {
     }
     next.defaultMode = viewMode(); // 새 메모는 지금 고른 Work / Life 로 (나눠 쓰지 않으면 Life)
     next.on('changed', ({ ids, external, removed }) => {
-      driveSync?.request(3000);
+      driveSync?.request(1000); // 메모 저장은 이미 0.6초 모아서 오므로 1초면 충분
       if (sandbox?.real === next) return; // 연습 중: 화면은 연습 공간 것 (돌아올 때 목록을 다시 그린다)
       windowManager.pushList();
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
@@ -580,6 +580,9 @@ function initDrive() {
   });
   driveApi = new DriveApi({ auth: driveAuth, fetch: (...args) => net.fetch(...args) });
   driveSync = new DriveSync({ api: driveApi, auth: driveAuth, stateDir: path.join(app.getPath('userData'), 'drive') });
+  // 메모킹 창을 쓰는 중이면 10초마다, 창을 다시 볼 때 바로 (휴대폰에서 고친 것이 빨리 보이게)
+  driveSync.isActive = () => Boolean(BrowserWindow.getFocusedWindow());
+  app.on('browser-window-focus', () => driveSync?.focused());
   driveSync.on('status', (st) => {
     if (st.changed) realVault()?.scan();
     windowManager.listWin?.webContents.send('drive:status', driveInfo());

@@ -473,3 +473,21 @@ test('이름 바꾸기 · 옮기기처럼 기준만으로 모르는 것은 폴�
   assert.equal(lt('새 이름.md'), '# 메모');
   assert.equal(lt('메모.md'), null);
 });
+
+test('동기화 주기: 쉬는 중 1분 · 창을 쓰는 중 10초 · 파일이 오간 뒤 2분은 5초, 창을 다시 볼 때는 5초에 한 번만', async () => {
+  const { DriveSync, POLL, pollDelay } = await import('../desktop/drive/drive-sync.js');
+  const now = 1_000_000;
+  assert.equal(pollDelay({ now, active: false, burstUntil: 0 }), POLL.idle);
+  assert.equal(pollDelay({ now, active: true, burstUntil: 0 }), POLL.active);
+  assert.equal(pollDelay({ now, active: false, burstUntil: now + 1 }), POLL.burst);
+  const sync = new DriveSync({ api: {}, auth: { connected: false }, stateDir: os.tmpdir() });
+  let asked = 0;
+  sync.request = () => asked++;
+  sync.focused();
+  sync.focused();
+  assert.equal(asked, 1);
+  sync.lastFocus -= POLL.focusGap;
+  sync.focused();
+  assert.equal(asked, 2);
+  sync.stop();
+});

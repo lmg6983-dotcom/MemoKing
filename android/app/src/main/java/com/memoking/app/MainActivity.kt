@@ -308,11 +308,11 @@ class MainActivity : Activity() {
         runOnUiThread { if (pageReady) emit("alarm", item) }
     }
 
-    // 화면이 보이는 동안 1분마다 Google Drive 와 맞추기
+    // 화면이 보이는 동안 10초마다 (파일이 오간 뒤 2분은 5초) Google Drive 와 맞추기 — 평소에는 바뀐 목록 한 번만 묻는다
     private val syncTick = object : Runnable {
         override fun run() {
             DriveSync.request(this@MainActivity)
-            root.postDelayed(this, 60_000)
+            root.postDelayed(this, DriveSync.pollDelay())
         }
     }
 
