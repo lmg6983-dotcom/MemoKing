@@ -1,6 +1,6 @@
 // OPMS 창 — 매직키에서 사건을 고르면 열린다 (PC 전용, 사내망)
 //   위: 관리번호·출원번호 찾기 + 고른 사건 머리줄(사무소/출원인 관리번호 · 출원인 · 명칭 · 해외출원 배지)
-//   탭: 정보(서지 + 업무배분 + 신규성 의제 · 진행사항 · 메모) · 전자포대(골라 받기 / 전체 받기 → 저장 폴더 열기) · 청구서 · 해외출원
+//   탭: 정보(서지 + 업무배분 + 신규성 의제 · 진행사항 · 우선권 · 메모) · 전자포대(골라 받기 / 전체 받기 → 저장 폴더 열기) · 청구서 · 해외출원
 //   "메모로 만들기": 고른 사건의 서지 · 업무배분 · 해외출원을 새 메모 한 장으로
 //   글은 모두 textContent 로 넣는다 (서버 값을 HTML 로 읽지 않는다)
 import { searchingNode } from './searching.js';
@@ -182,7 +182,7 @@ async function show(which) {
     if (tab === 'info') {
       const work = loadingLine('업무배분을 불러오는 중');
       const more = el('div', 'op-more');
-      more.append(loadingLine('신규성 의제, 진행사항, 메모를 불러오는 중'));
+      more.append(loadingLine('신규성 의제, 진행사항, 우선권, 메모를 불러오는 중'));
       main.replaceChildren(infoGrid(c), el('h3', 'op-h', '업무배분'), work, more);
       showDetails(more, my); // 업무배분과 따로 (한쪽이 늦거나 실패해도 다른 쪽은 보이게)
       let rows;
@@ -237,13 +237,13 @@ async function show(which) {
   }
 }
 
-// 신규성 의제 · 진행사항 · 메모 — OPMS 에서 그 표를 찾은 것만 (못 찾으면 알리고 표 목록을 복사할 수 있게)
+// 신규성 의제 · 진행사항 · 우선권 · 메모 — OPMS 에서 그 표를 찾은 것만 (못 찾으면 알리고 표 목록을 복사할 수 있게)
 async function showDetails(box, my) {
   let d;
   try {
     d = await load('details', api.details);
   } catch (err) {
-    if (my === seq) box.replaceChildren(el('p', 'op-msg err', `신규성 의제, 진행사항, 메모를 불러오지 못했어요. ${errText(err)}`));
+    if (my === seq) box.replaceChildren(el('p', 'op-msg err', `신규성 의제, 진행사항, 우선권, 메모를 불러오지 못했어요. ${errText(err)}`));
     return;
   }
   if (my !== seq) return;
@@ -263,7 +263,7 @@ async function showDetails(box, my) {
     out.push(el('h3', 'op-h', sec.label));
     if (sec.error) out.push(el('p', 'op-msg err', `불러오지 못했어요. ${sec.error}`));
     else if (sec.id === 'progress') out.push(progressTimeline(sec.rows));
-    else out.push(table(sec.columns.map((x) => [x.label, (r) => r[x.key]]), sec.rows, { empty: `${sec.label}이(가) 없어요` }));
+    else out.push(table(sec.columns.map((x) => [x.label, (r) => r[x.key], x.key === 'memo' ? 'long' : undefined]), sec.rows, { empty: `${sec.label}이(가) 없어요` }));
   }
   const missing = d.missing.filter((m) => !(m === '신규성 의제' && d.novelty.length));
   if (missing.length) {

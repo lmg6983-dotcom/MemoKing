@@ -8,7 +8,7 @@ import {
   isOpenableFile, numberedName, fitName,
   normalize, sqlQuote, cleanDate, parseResultset, buildLookupSql, buildForeignSqls, mergeForeign, foreignSummary,
   wrapperFolderName, safeFilename, fileSizeLabel, attachmentItems, caseInfoText, caseMemoMarkdown, looksLikeRef, Opms,
-  buildAttachSql, groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf,
+  buildAttachSql, groupSchema, pickDetailTables, buildDetailSql, detailRows, noveltyColumnsOf, buildPrioritySql, buildMemoSql, fixedRows, PRIORITY_COLUMNS, MEMO_COLUMNS,
 } from '../desktop/opms.js';
 
 // 서버 주소는 코드에 없다 (설정에서 사용자가 넣음) — 점검용 가짜 주소
@@ -125,7 +125,7 @@ test('OPMS: 사건 정보 → 메모 (제목 · 서지 표 · 업무배분 · �
   assert.match(md, /\n#OPMS\n$/);
 });
 
-test('OPMS 더 보기: 표 이름으로 신규성 의제 · 진행사항 · 메모 표 고르기 (사건으로 이어지는 표만)', () => {
+test('OPMS 더 보기: 표 이름으로 신규성 의제 · 진행사항 표 고르기 (사건으로 이어지는 표만)', () => {
   const schema = groupSchema([
     ...['idx', 'ourref', 'memo', 'ck_novelty', 'd_novelty'].map((c) => ({ TABLE_NAME: 'opms_app', COLUMN_NAME: c })),
     ...['idx', 'idx_app', 'd_pub', 'content', 'del_flag'].map((c) => ({ TABLE_NAME: 'opms_app_novelty', COLUMN_NAME: c })),
@@ -138,10 +138,9 @@ test('OPMS 더 보기: 표 이름으로 신규성 의제 · 진행사항 · 메�
   const picks = pickDetailTables(schema);
   assert.deepEqual(picks.novelty && [picks.novelty.table, picks.novelty.link], ['opms_app_novelty', 'idx_app']);
   assert.equal(picks.progress.table, 'opms_app_progress'); // 보기(view_)보다 원래 표
-  assert.equal(picks.memo.table, 'opms_app_memo');
   assert.deepEqual(noveltyColumnsOf(schema), ['ck_novelty', 'd_novelty']);
   assert.equal(buildDetailSql(picks.progress, "7'"), "SELECT TOP 200 * FROM [opms_app_progress] WHERE [idx_parent] = '7''' AND [del_flag] = 'N' ORDER BY [idx] ASC");
-  assert.deepEqual(pickDetailTables(groupSchema([{ TABLE_NAME: 'opms_app', COLUMN_NAME: 'idx' }])), { novelty: null, progress: null, memo: null });
+  assert.deepEqual(pickDetailTables(groupSchema([{ TABLE_NAME: 'opms_app', COLUMN_NAME: 'idx' }])), { novelty: null, progress: null });
 });
 
 test('OPMS 더 보기: 보일 열만 (번호·삭제 표시·바꾼 때·빈 열은 빼고, 날짜는 YYYY-MM-DD)', () => {
@@ -154,26 +153,50 @@ test('OPMS 더 보기: 보일 열만 (번호·삭제 표시·바꾼 때·빈 열
   assert.deepEqual(detailRows([]), { columns: [], rows: [] });
 });
 
+test('OPMS 우선권: opms_pri 를 사건 번호로, OPMS 화면의 열 순서 그대로', () => {
+  assert.equal(buildPrioritySql("7'"), "SELECT TOP 100 pri_order, pri_nation, d_pri, n_pri, n_pri_acc, d_pri_rec, d_pri_due, d_pri_pre, memo\nFROM opms_pri\nWHERE idx_parent = '7''' AND del_flag = 'N'\nORDER BY pri_order, d_pri, idx");
+  const out = fixedRows([{ pri_order: '1', pri_nation: 'KR', d_pri: '2026-09-23 00:00:00.0', n_pri: '10-2026-0182644', n_pri_acc: '', memo: 'null' }], PRIORITY_COLUMNS);
+  assert.deepEqual(out.columns.map((c) => c.label), ['우선국', '우선권주장일', '우선권번호', '접근코드', '접수일', '제출마감일', '제출일', '비고']);
+  assert.deepEqual(out.rows[0], { pri_nation: 'KR', d_pri: '2026-09-23', n_pri: '10-2026-0182644', n_pri_acc: '', d_pri_rec: '', d_pri_due: '', d_pri_pre: '', memo: 'null' });
+});
+
+test('OPMS 메모: 사건에 단 메모 + 출원인 · 고객에 단 "고객" 메모 (고객명 · 필독 · 줄바꿈 그대로)', () => {
+  const sql = buildMemoSql("7'");
+  assert.match(sql, /FROM opms_memo M\nLEFT JOIN opms_customer C ON M\.div = '고객' AND C\.idx = M\.idx_parent/);
+  assert.match(sql, /SELECT idx_custom FROM opms_applicant WHERE idx_parent = '7''' AND del_flag = 'N'/);
+  assert.match(sql, /UNION SELECT idx_custom FROM opms_client WHERE idx_parent = '7''' AND del_flag = 'N'/);
+  assert.match(sql, /OR \(M\.div <> '고객' AND M\.idx_parent = '7'''\)/);
+  assert.match(sql, /M\.del_flag = 'N'/);
+  const out = fixedRows([{ div: '고객', ck_popup: 'Y', cust: '한국과학기술원', d_memo: '2016-03-11 00:00:00.0', header: '', memo: '1. 경고 조치\r\n2. 업무 공지' }], MEMO_COLUMNS);
+  assert.deepEqual(out.columns.map((c) => c.label), ['구분', '필독', '고객명', '작성일', '말머리', '메모']);
+  assert.deepEqual(out.rows[0], { div: '고객', ck_popup: '필독', cust: '한국과학기술원', d_memo: '2016-03-11', header: '', memo: '1. 경고 조치\n2. 업무 공지' });
+  assert.equal(fixedRows([{ ck_popup: 'N' }], MEMO_COLUMNS).rows[0].ck_popup, '');
+});
+
 test('OPMS 더 보기: 서버에서 표 목록 → 고른 표 → 메모에도', async () => {
   const sqls = [];
   const fakeFetch = async (url, init = {}) => {
     const sql = new URLSearchParams(init.body).get('sql');
     sqls.push(sql);
-    if (/INFORMATION_SCHEMA/.test(sql)) return new Response(table(['TABLE_NAME', 'COLUMN_NAME'], [['opms_app', 'idx'], ['opms_app', 'd_novelty'], ['opms_app_memo', 'idx'], ['opms_app_memo', 'idx_app'], ['opms_app_memo', 'memo']]));
-    if (/FROM \[opms_app_memo\]/.test(sql)) return new Response(table(['idx', 'idx_app', 'memo'], [['1', '7', '심사관 면담 예정']]));
+    if (/INFORMATION_SCHEMA/.test(sql)) return new Response(table(['TABLE_NAME', 'COLUMN_NAME'], [['opms_app', 'idx'], ['opms_app', 'd_novelty']]));
+    if (/FROM opms_memo M/.test(sql)) return new Response(table(['div', 'ck_popup', 'cust', 'd_memo', 'header', 'memo'], [['고객', 'Y', '한국과학기술원', '2019-03-01 00:00:00.0', '', '나노팹연구소']]));
+    if (/FROM opms_pri/.test(sql)) return new Response(table(['pri_order', 'pri_nation', 'd_pri', 'n_pri'], [['1', 'KR', '2026-09-23 00:00:00.0', '10-2026-0182644']]));
     if (/SELECT \[d_novelty\] FROM opms_app/.test(sql)) return new Response(table(['d_novelty'], [['2025-12-01 00:00:00.0']]));
     return new Response(table(['x'], []));
   };
   const client = new Opms({ host: TEST_HOST, fetch: fakeFetch, retries: 0 });
   const d = await client.details({ idx: '7' });
-  assert.deepEqual(d.sections.find((x) => x.id === 'memo').rows, [{ memo: '심사관 면담 예정' }]);
+  assert.deepEqual(d.sections.map((x) => x.id), ['novelty', 'progress', 'priority', 'memo']);
+  assert.deepEqual(d.sections.find((x) => x.id === 'memo').rows, [{ div: '고객', ck_popup: '필독', cust: '한국과학기술원', d_memo: '2019-03-01', header: '', memo: '나노팹연구소' }]);
+  assert.equal(d.sections.find((x) => x.id === 'priority').rows[0].n_pri, '10-2026-0182644');
   assert.deepEqual(d.novelty, [{ label: '의제일', value: '2025-12-01' }]);
   assert.deepEqual(d.missing, ['신규성 의제', '진행사항']); // 표로는 없음 (신규성 의제는 사건 표의 칸으로 보임)
   await client.details({ idx: '7' });
   assert.equal(sqls.filter((q) => /INFORMATION_SCHEMA/.test(q)).length, 1); // 표 목록은 한 번만
   const md = caseMemoMarkdown({ ourref: 'P-1' }, { details: d });
   assert.match(md, /## 신규성 의제\n\n\| 항목 \| 내용 \|\n\| --- \| --- \|\n\| 의제일 \| 2025-12-01 \|/);
-  assert.match(md, /## 메모\n\n\| 메모 \|\n\| --- \|\n\| 심사관 면담 예정 \|/);
+  assert.match(md, /## 우선권\n\n\| 우선국 \| 우선권주장일 \| 우선권번호 \|.*\n.*\n\| KR \| 2026-09-23 \| 10-2026-0182644 \|/);
+  assert.match(md, /## 메모\n\n\| 구분 \| 필독 \| 고객명 \| 작성일 \| 말머리 \| 메모 \|\n.*\n\| 고객 \| 필독 \| 한국과학기술원 \| 2019-03-01 \|/);
 });
 
 test('OPMS 전자포대: 최신순으로 받아 위에 새 서류 · No. 는 오래된 것부터 1', () => {
