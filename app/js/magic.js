@@ -1,6 +1,6 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
-import { opmsQueryKind, isExactCaseRef, isKnownRefShape } from './core/opms-search.js';
+import { opmsQueryKind, autoOpmsQuery } from './core/opms-search.js';
 import { calcInput, calcOutput, siteUrl, sitesInOrder, looksLikeQuestion, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { dateCalc } from './core/date-calc.js';
 import { findDates, guessTitle } from './core/date-detect.js';
@@ -109,7 +109,8 @@ function animateResults(before, beforeHeight) {
 // 웹 검색 · AI 기본 사이트 (설정 매직키에서 고름)
 let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id, opms: false, opmsShapes: [] };
 // 저절로 OPMS 에 묻는 번호: 온전한 출원번호 · 관리번호 꼴, 또는 예전에 OPMS 에서 찾은 번호와 같은 양식
-const autoOpms = (q) => isExactCaseRef(q) || isKnownRefShape(q, prefs.opmsShapes);
+//   (글 중간 띄어쓰기 · 맨 앞 0(전화 국번)은 늘 빼고 — core/opms-search blocksAutoOpms)
+const autoOpms = (q) => autoOpmsQuery(q, prefs.opmsShapes);
 async function loadPrefs() {
   prefs = { ...prefs, ...(await api.prefs?.().catch(() => null)) };
 }

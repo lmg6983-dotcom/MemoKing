@@ -80,3 +80,14 @@ test('번호 양식 배우기: 기호는 그대로 · 영문 A · 숫자 9 · �
   const many = learnShapes([], Array.from({ length: 60 }, (_, k) => ({ ourref: `P${'9'.repeat(k % 30)}-${k}0000` })));
   assert.ok(many.length <= MAX_SHAPES);
 });
+
+test('저절로 묻지 않는 하드 규칙: 글 중간 띄어쓰기 · 맨 앞이 0 (전화 국번) — 배운 양식이어도', async () => {
+  const { autoOpmsQuery, blocksAutoOpms } = await import('../app/js/core/opms-search.js');
+  const shapes = ['999-9999-9999999', '999-999-9999', 'AAA/9999-9999/A'];
+  assert.ok(autoOpmsQuery('10-2026-0012345', shapes) && autoOpmsQuery('FPD/2026-0271/E', shapes));
+  for (const q of ['010-1234-56789', '054-123-4567', '02-1234-5678', '070-1234-5678', '0101234567890', 'FPD 2026-0271/E', 'FPD/2026 -0271/E', '10-2026 0012345']) {
+    assert.ok(!autoOpmsQuery(q, shapes), q);
+    assert.ok(blocksAutoOpms(q), q);
+  }
+  assert.ok(!blocksAutoOpms('  FPD/2026-0271/E  '), '앞뒤 띄어쓰기는 괜찮음');
+});

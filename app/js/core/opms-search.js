@@ -184,3 +184,16 @@ export const isKnownRefShape = (text, shapes) => {
   const shape = refShape(text);
   return Boolean(shape && Array.isArray(shapes) && shapes.includes(shape));
 };
+
+/**
+ * 저절로 묻지 않는 글 (하드 규칙 — 배운 양식보다 앞선다)
+ *   글 중간에 띄어쓰기가 있으면 (번호가 아니라 문장 · 여러 낱말)
+ *   맨 앞 숫자가 0 으로 시작하면 — 전화 국번(010 · 02 · 054 · 070 …): 출원번호는 1~4 로, 관리번호는 글자로 시작한다
+ */
+export function blocksAutoOpms(text) {
+  const s = String(text ?? '').trim();
+  return /\s/.test(s) || /^0/.test(s);
+}
+
+/** 매직키가 저절로 OPMS 에 물을 글: 하드 규칙에 걸리지 않고, 온전한 사건번호이거나 배운 양식과 같은 꼴 */
+export const autoOpmsQuery = (text, shapes) => !blocksAutoOpms(text) && (isExactCaseRef(text) || isKnownRefShape(text, shapes));

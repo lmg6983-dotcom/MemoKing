@@ -311,10 +311,14 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     await typeMagic('홍길동');
     await typeMagic('특허-2025-0099'); // 아직 모르는 양식 (한글이 든 의뢰인 번호) — 저절로 묻지 않는다
     await wait(500);
+    for (const q of ['FPD 2026-0271/E', '010-2026-0012345']) { // 하드 규칙: 중간 띄어쓰기 · 맨 앞 0(전화 국번)
+      await typeMagic(q);
+      await wait(500);
+    }
     await typeMagic('0271');
     await wait(900);
     const beforeAsk = { hits: fake.hits.cases, ask: await js(magic, `document.querySelector('.magic-row.kind-opmsAsk')?.getAttribute('aria-selected')`), cases: await js(magic, `document.querySelectorAll('.magic-row.kind-opms').length`) };
-    check('매직키 OPMS: 치는 동안에는 회사 서버에 묻지 않고 "OPMS 에서 찾기" 줄만 (번호 일부 · 이름, 번호처럼 보이면 그 줄이 골라짐)', beforeAsk.hits === 0 && beforeAsk.ask === 'true' && beforeAsk.cases === 0, JSON.stringify(beforeAsk));
+    check('매직키 OPMS: 치는 동안에는 회사 서버에 묻지 않고 "OPMS 에서 찾기" 줄만 (번호 일부 · 이름 · 중간 띄어쓰기 · 맨 앞 0, 번호처럼 보이면 그 줄이 골라짐)', beforeAsk.hits === 0 && beforeAsk.ask === 'true' && beforeAsk.cases === 0, JSON.stringify(beforeAsk));
     await typeMagic('FPD/2026-0271/E');
     const auto = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row.kind-opms'); return r && { t: r.querySelector('.t').textContent, sel: r.getAttribute('aria-selected') }; })()`), 'OPMS 저절로', 8000).catch(() => null);
     check('매직키 OPMS: 온전한 사건번호(FPD/2026-0271/E)는 예전처럼 손을 멈추면 저절로 찾고 그 사건이 골라짐', fake.hits.cases === 1 && auto?.t.startsWith('FPD/2026-0271/E') && auto.sel === 'true', JSON.stringify({ auto, hits: fake.hits.cases }));
