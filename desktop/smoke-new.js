@@ -146,7 +146,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     check('→ 로 "경로 복사" 를 고르고 Enter → 그 파일 경로가 클립보드에', sel.act === 'copyPath' && copied.endsWith('.txt') && copied.includes('견적서'), JSON.stringify({ sel, copied }));
 
     // 2-1) 계산기 · 웹 검색 · AI 에게 묻기
-    const typeMagic = (text) => js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input')); })()`);
+    // 사람이 치듯: 키를 누른 것으로 쳐서 "다시 띄웠을 때 남겨 둔 글" 상태를 끝낸 뒤 글을 바꾼다
+    const typeMagic = (text) => js(magic, `(() => { const i = document.getElementById('magic-input'); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true })); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input')); })()`);
 
     // 1-1) 결과 묶음은 캡슐 순서 · 같은 색 머리말, 캡슐을 끌어 놓으면 묶음 순서도 바뀌고 다음에도 그대로
     showMagic();
@@ -178,6 +179,39 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     const reopened = await chipOrder();
     check('캡슐을 끌어 맨 앞으로 → 캡슐 · 결과 묶음 순서가 바뀌고 (켜고 끄지는 않음), 다시 열어도 그대로', afterDrag.chips.startsWith('ai,memo') && afterDrag.groups.startsWith('ai,memo') && afterDrag.aiOn && reopened.startsWith('ai,memo'), JSON.stringify({ afterDrag, reopened }));
     await js(magic, `window.magic.reorderModules(${JSON.stringify(['memo', 'opms', 'notes', 'files', 'calc', 'web', 'ai'])})`);
+
+    // 1-2) 초성 검색: ㄱㅈㅅ → 견적서 메모 · 견적서 파일, 맞은 글자를 굵게
+    showMagic();
+    await typeMagic('ㄱㅈㅅ');
+    const cho = await until(() => js(magic, `(() => { const n = [...document.querySelectorAll('.magic-row.kind-note')]; const f = [...document.querySelectorAll('.magic-row.kind-file')]; return n.length && f.length && { notes: n.length, files: f.length, bold: n[0].querySelector('.t b')?.textContent, sel: document.querySelector('.magic-row[aria-selected="true"]')?.className }; })()`), '초성 결과').catch(() => null);
+    check('매직키 초성 검색: ㄱㅈㅅ 로 견적서 메모 · 파일, 맞은 글자 굵게 · 첫 결과가 골라짐 (ㄱㅈㅅ 메모로 저장 아님)', cho?.notes > 0 && cho?.files > 0 && cho?.bold === '견적서' && /kind-note/.test(cho?.sel ?? ''), JSON.stringify(cho));
+
+    // 1-3) 날짜 계산: 맨 위에 날짜 줄 (계산기 캡슐)
+    await typeMagic('12월 25일까지');
+    const dateRow = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row'); return r?.classList.contains('kind-date') && { t: r.querySelector('.t').textContent, s: r.querySelector('.s').textContent, sel: r.getAttribute('aria-selected') }; })()`), '날짜 줄').catch(() => null);
+    check('매직키 날짜 계산: "12월 25일까지" → 맨 위 남은 날 줄 (골라져 있음)', /일 남음|오늘이에요|일 지남/.test(dateRow?.t ?? '') && /D-|D\+|D-day/.test(dateRow?.s ?? '') && dateRow?.sel === 'true', JSON.stringify(dateRow));
+
+    // 1-4) 날짜를 쓰면 "알림 맞춰 저장" → 메모 + 일정 하나
+    await typeMagic('내일 오후 3시 거래처 전화');
+    const remindAt = await until(() => js(magic, `(() => { const rows = [...document.querySelectorAll('.magic-row')]; const i = rows.findIndex((e) => e.classList.contains('kind-remind')); return i >= 0 && { i, t: rows[i].querySelector('.t').textContent, s: rows[i].querySelector('.s').textContent }; })()`), '알림 줄').catch(() => null);
+    if (remindAt) {
+      for (let k = 0; k < remindAt.i; k++) key(magic, 'Down');
+      await wait(120);
+        key(magic, 'Return');
+      }
+    const reminded = await until(() => { const m = getVault().list().find((x) => x.title === '내일 오후 3시 거래처 전화'); return m && getVault().get(m.id).reminders?.length ? getVault().get(m.id).reminders[0] : null; }, '알림 저장').catch(() => null);
+    check('매직키: 날짜를 쓰면 "알림 맞춰 저장" 줄 → 메모와 일정(거래처 전화, 오후 3시, 10분 전)', /내일 오후 3:00 알림 맞춰 저장/.test(remindAt?.t ?? '') && remindAt?.s === '거래처 전화' && reminded?.title === '거래처 전화' && new Date(reminded?.at).getHours() === 15 && reminded?.alerts?.[0] === 10, JSON.stringify({ remindAt, reminded }));
+
+    // 1-5) 찾은 메모에 덧붙이기 (→ 로 고르는 할 일)
+    showMagic();
+    await typeMagic('견적서 메모 7');
+    await until(() => js(magic, `!!document.querySelector('.magic-row.kind-note')`), '메모 줄');
+    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-note'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 })); })()`);
+    await wait(120);
+    const target = await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-note[aria-selected="true"]'); return r?.querySelector('.t').textContent; })()`);
+    await js(magic, `document.querySelector('.magic-row.kind-note[aria-selected="true"] [data-action="append"]')?.click()`);
+    const appended = await until(() => { const m = getVault().list().find((x) => x.title === target); const b = m && getVault().get(m.id).body; return b && b.trimEnd().endsWith('견적서 메모 7') && b.includes('거래처 견적 정리') ? b : null; }, '덧붙이기').catch(() => null);
+    check('매직키: 찾은 메모에 "이 메모에 덧붙이기" → 그 메모 끝에 쓴 글이 붙음 (원래 글은 그대로)', Boolean(appended), JSON.stringify({ target, appended }));
     showMagic();
     await wait(300);
     await typeMagic('1,200 × 3');
@@ -198,13 +232,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     })()`), '웹 검색 · AI 줄').catch(() => null);
     await capture(magic, 'smoke-new-magic-tools.png');
     const before = smokeOpened.length;
-    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-web'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true })); r.querySelector('[data-action="google"]').click(); })()`);
+    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-web'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 })); r.querySelector('[data-action="google"]').click(); })()`);
     await wait(300);
     showMagic();
     await wait(300);
     await typeMagic('서울 날씨');
     await until(() => js(magic, `!!document.querySelector('.magic-row.kind-ai')`), 'AI 줄');
-    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-ai'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true })); })()`);
+    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-ai'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 })); })()`);
     await wait(100);
     await capture(magic, 'smoke-new-magic-ai.png');
     key(magic, 'Return');
@@ -260,7 +294,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     const firstKind = await js(magic, `[...document.querySelectorAll('.magic-row')].map((e) => e.className.split('kind-')[1])[1]`);
     check('매직키: 관리번호를 쓰면 OPMS 사건이 맨 위에 (관리번호 · 출원번호 / 출원인 · 명칭)', opmsRows.length === 2 && firstKind === 'opms' && opmsRows[0].includes('FPD/2026-0271/E, 10-2026-0012345') && opmsRows[0].includes('메모킹 주식회사'), JSON.stringify(opmsRows));
     // 관리번호 복사 (→ → → 세 번째 할 일은 관리번호 복사)
-    await js(magic, `(() => { const rows = [...document.querySelectorAll('.magic-row')]; const i = rows.findIndex((e) => e.classList.contains('kind-opms')); rows[i].dispatchEvent(new MouseEvent('mousemove', { bubbles: true })); })()`);
+    await js(magic, `(() => { const rows = [...document.querySelectorAll('.magic-row')]; const i = rows.findIndex((e) => e.classList.contains('kind-opms')); rows[i].dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 })); })()`);
     await wait(100);
     key(magic, 'Right');
     key(magic, 'Right');

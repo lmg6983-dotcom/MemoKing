@@ -127,3 +127,18 @@ test('파일 검색: 지켜보는 폴더에 생긴 파일은 곧바로 목록에
   assert.equal(index.search('거절결정서').length, 1);
   assert.equal(index.search('받는중').length, 0, '받는 중인 파일은 빼고');
 });
+
+test('초성으로도 찾음 (ㅎㅇㄹ → 회의록, 띄어쓰기 건너뜀) · 첫머리가 맞는 것이 앞', () => {
+  const idx = new FileIndex({ roots: () => [] });
+  idx.use([
+    { n: '9월 회의록.hwp', p: 'C:/a/9월 회의록.hwp', d: false, a: false, depth: 2 },
+    { n: '회의록 모음', p: 'C:/a/회의록 모음', d: true, a: false, depth: 1 },
+    { n: '견적서 01.txt', p: 'C:/a/견적서 01.txt', d: false, a: false, depth: 1 },
+  ], Date.now());
+  const names = idx.search('ㅎㅇㄹ').map((r) => r.name);
+  assert.deepEqual(names.sort(), ['9월 회의록.hwp', '회의록 모음'].sort());
+  assert.equal(idx.search('ㅎㅇㄹ')[0].name, '회의록 모음', '초성 첫머리가 맞는 것이 앞');
+  assert.deepEqual(idx.search('ㄱㅈㅅ 01').map((r) => r.name), ['견적서 01.txt'], '초성 + 글자 섞어도');
+  assert.deepEqual(idx.search('ㅎㅇㄹㅁㅇ').map((r) => r.name), ['회의록 모음'], '띄어쓰기 건너뜀');
+  assert.deepEqual(idx.search('ㅋㅋ'), []);
+});

@@ -2,6 +2,10 @@ import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
 import { looksLikeRef } from './core/magic-modules.js';
 import { calcInput, calcOutput, siteUrl, sitesInOrder, looksLikeQuestion, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
+import { dateCalc } from './core/date-calc.js';
+import { findDates, guessTitle } from './core/date-detect.js';
+import { dayLabel, koClock } from './core/time.js';
+import { isChoseongQuery, choseongRange } from './core/text-match.js';
 import { searchingNode } from './searching.js';
 import { COLOR_DOTS } from './core/memo-file.js';
 import { UI } from './core/ui-text.js';
@@ -137,6 +141,8 @@ function calcFor(query) {
 const SVG = {
   web: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3.6 9h16.8M3.6 15h16.8M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z',
   ai: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z',
+  bell: 'M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0',
+  date: 'M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM8 13h3v3H8z',
 };
 function svgIcon(name) {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -284,6 +290,9 @@ function highlighted(text, query) {
     for (const t of terms) {
       const k = lower.indexOf(t, i);
       if (k >= 0 && (!hit || k < hit.k)) hit = { k, len: t.length };
+      // 초성(ㄱㅈㅅ)으로 찾았으면 그 글자들(견적서)을 굵게
+      const r = k < 0 && isChoseongQuery(t) ? choseongRange(text.slice(i), t) : null;
+      if (r && (!hit || i + r[0] < hit.k)) hit = { k: i + r[0], len: r[1] - r[0] };
     }
     if (!hit) {
       span.append(text.slice(i));
@@ -339,6 +348,11 @@ function row(r, index, query) {
     ico.textContent = '=';
     t.textContent = r.value;
     s.textContent = r.text; // 쓴 그대로 (1,200 × 3)
+  } else if (r.kind === 'date') {
+    ico.append(svgIcon('date'));
+    t.textContent = r.value; // 2026년 11월 12일 (목) · 64일 남음 · 오후 5:10
+    s.textContent = r.detail;
+    s.title = r.detail;
   } else if (r.kind === 'site') {
     ico.append(svgIcon('web'));
     t.textContent = '사이트 열기';
@@ -360,6 +374,10 @@ function row(r, index, query) {
     ico.textContent = '✎';
     t.textContent = '새 메모로 저장';
     s.textContent = query.split('\n')[0];
+  } else if (r.kind === 'remind') {
+    ico.append(svgIcon('bell'));
+    t.textContent = `${r.label} 알림 맞춰 저장`;
+    s.textContent = r.title || query.split('\n')[0];
   } else if (r.kind === 'note') {
     const dot = document.createElement('span');
     dot.className = 'dot';
@@ -380,7 +398,10 @@ function row(r, index, query) {
     s.title = r.path;
     if (r.app) side.textContent = '프로그램';
   }
-  li.addEventListener('mousemove', () => {
+  li.addEventListener('mousemove', (e) => {
+    // 마우스가 정말 움직였을 때만 — 가만히 있는 마우스 아래로 목록이 다시 그려질 때도 mousemove 가 와서,
+    //   치는 동안 고른 줄이 마우스 아래 줄로 바뀌면 Enter 가 엉뚱한 줄을 실행했다
+    if (!e.movementX && !e.movementY) return; // 목록이 바뀌어 생긴 mousemove 는 움직인 거리가 0
     if (selected !== index) select(index);
   });
   li.addEventListener('mousedown', (e) => e.preventDefault()); // 입력 칸 포커스 유지
@@ -425,11 +446,22 @@ function render() {
     if (!groups.has(mod)) groups.set(mod, []);
     groups.get(mod).push(item);
   };
-  const calc = query ? calcFor(query) : null;
-  if (calc) put('calc', { row: { kind: 'calc', ...calc, text: query } });
+  // 날짜 계산(3주 뒤 · 12/25까지 · 9:15부터 18:30까지)이 먼저, 아니면 식 계산 — 둘 다 계산기 캡슐
+  const date = query && isOn('calc') ? dateCalc(query) : null;
+  const calc = date ?? (query ? calcFor(query) : null);
+  if (calc) put('calc', { row: date ? { kind: 'date', ...date, text: query } : { kind: 'calc', ...calc, text: query } });
   const url = query && isOn('web') ? siteUrl(query) : null;
   if (url) put('site', { row: { kind: 'site', url } });
-  if (query && isOn('memo')) put('memo', { row: { kind: 'new' } });
+  if (query && isOn('memo')) {
+    put('memo', { row: { kind: 'new' } });
+    // 첫 줄에 날짜 · 시각이 있으면 (내일 3시 거래처 전화) 그때 알림을 맞춰 저장하는 줄도 — 날짜 계산 글은 빼고
+    const line = query.split('\n')[0];
+    const when = date ? null : findDates(line)[0];
+    if (when) {
+      const label = when.repeat ? when.text : when.hasTime ? `${dayLabel(when.at)} ${koClock(when.at)}` : dayLabel(when.at);
+      put('memo', { row: { kind: 'remind', label, title: guessTitle(line, when.from, when.to), when: { at: when.at.toISOString(), hasTime: when.hasTime, repeat: when.repeat ?? null } } });
+    }
+  }
   // 관리번호·출원번호를 쓰면 OPMS 사건 (찾는 중 · 사내망이 아님도 이 자리에)
   if (query && isOn('opms') && opms.query === query && !(calc && opms.error)) { // 식에는 "OPMS 주소를 넣으면" 안내를 안 띄운다
     if (opms.cases.length) {
@@ -449,7 +481,7 @@ function render() {
   const files = query && isOn('files') ? results.files : [];
   if (notes.length) {
     put('notes', { head: [results.recent ? '최근 메모' : '메모', results.recent ? 0 : notes.length] });
-    notes.forEach((n) => put('notes', { row: { kind: 'note', ...n } }));
+    notes.forEach((n) => put('notes', { row: { kind: 'note', ...n, canAppend: Boolean(query && isOn('memo') && !results.recent) } }));
   }
   if (folders.length) {
     put('files', { head: ['폴더', folders.length] });
@@ -511,6 +543,11 @@ function render() {
   clearBtn.hidden = !raw;
   // 남겨 둔 지난 글로 다시 띄운 경우 첫 줄("메모로 저장")이 아니라 찾은 결과를 골라 둔다 (Enter 로 같은 메모를 또 만들지 않게)
   if (retained && selected === 0 && rows[0]?.kind === 'new' && rows.length > 1) selected = 1;
+  // 초성만 쓴 글(ㄱㅈㅅ)은 찾으려는 것 — 메모로 저장하지 않고 첫 결과를 골라 둔다
+  if (!retained && selected === 0 && rows[0]?.kind === 'new' && query.split(/\s+/).every(isChoseongQuery)) {
+    const first = rows.findIndex((r) => r.kind === 'note' || r.kind === 'file' || r.kind === 'folder');
+    if (first > 0) selected = first;
+  }
   // 쓴 글이 이미 있는 메모 제목과 똑같으면 그 메모를 골라 둔다 (Enter 로 같은 이름의 메모를 또 만들지 않게 — 새로 만들려면 ↑)
   const same = (t) => String(t ?? '').trim().toLowerCase() === query.trim().toLowerCase();
   if (!retained && selected === 0 && rows[0]?.kind === 'new') {
@@ -665,31 +702,47 @@ function clearText() {
 clearBtn.addEventListener('mousedown', (e) => e.preventDefault());
 clearBtn.addEventListener('click', clearText);
 
+// 안내를 잠깐 보여 준 뒤 닫기 — 그사이 창을 다시 띄우면 취소 (새로 연 창이 닫히지 않게)
+let closeTimer = 0;
+const closeSoon = () => {
+  clearTimeout(closeTimer);
+  closeTimer = setTimeout(() => api.close(), 650);
+};
+
 // 실행: act = 고른 할 일(몇 번째), alt = Ctrl+Enter (다른 실행)
 async function run(i, { alt = false, act = 0 } = {}) {
   const r = rows[i];
   if (!r) return;
   const acts = actionsFor(r);
   const id = (alt && ALT_ACTION[r.kind]) || acts[act]?.id || acts[0]?.id;
-  if (r.kind === 'new') {
+  if (r.kind === 'new' || r.kind === 'remind') {
     const text = input.value;
-    await api.run({ module: 'memo', text, open: id === 'saveOpen' }).catch(() => {});
+    await api.run({ module: 'memo', text, open: id === 'saveOpen', remind: r.kind === 'remind' ? { ...r.when, title: r.title } : null }).catch(() => {});
     input.value = '';
     api.close();
+    return;
+  }
+  if (r.kind === 'note' && id === 'append') {
+    const res = await api.act({ action: 'append', id: r.id, text: input.value }).catch(() => null);
+    if (res?.ok) {
+      input.value = '';
+      flash(true, res.message);
+      closeSoon();
+    } else flash(false, res?.message ?? '덧붙이지 못했어요');
     return;
   }
   if (r.kind === 'more') {
     await api.openAll(input.value.trim()).catch(() => {});
     return;
   }
-  if (r.kind === 'calc' || r.kind === 'site' || r.kind === 'web' || r.kind === 'ai') {
-    const req = r.kind === 'calc' ? { type: 'copy', text: id === 'copyExpr' ? `${r.text} = ${r.value}` : r.plain }
+  if (r.kind === 'calc' || r.kind === 'date' || r.kind === 'site' || r.kind === 'web' || r.kind === 'ai') {
+    const req = r.kind === 'calc' || r.kind === 'date' ? { type: 'copy', text: id === 'copyExpr' ? `${r.text} = ${r.value}` : r.kind === 'date' && id === 'copy' ? r.value : r.plain }
       : r.kind === 'site' ? { type: 'site', text: r.url }
         : { type: r.kind, site: id, text: input.value };
     const res = await api.tool(req).catch(() => null);
     if (res?.message) {
       flash(res.ok, res.message);
-      if (res.ok) setTimeout(() => api.close(), 650);
+      if (res.ok) closeSoon();
     } else if (res?.ok) api.close();
     else flash(false, '열지 못했어요');
     return;
@@ -698,7 +751,7 @@ async function run(i, { alt = false, act = 0 } = {}) {
   const res = await api.act(req).catch(() => null);
   if (res?.message) {
     flash(res.ok, res.message);
-    if (res.ok) setTimeout(() => api.close(), 650); // 복사했다는 표시를 잠깐 보여 주고
+    if (res.ok) closeSoon(); // 복사했다는 표시를 잠깐 보여 주고
     return;
   }
   if (res?.ok) api.close();
@@ -753,6 +806,8 @@ input.addEventListener('keydown', (e) => {
 //   이어서 찾으려면 그대로 Enter · 방향키, 새로 찾으려면 바로 치면 바뀐다 (메모로 저장한 글은 그때 비움)
 let retained = false; // 다시 띄웠을 때 남겨 둔 지난 글 (아직 손대지 않음)
 async function reset() {
+  clearTimeout(closeTimer);
+  flashUntil = 0; // 지난번의 "복사했어요" 안내는 다시 띄울 때 지운다
   selected = 0;
   retained = Boolean(input.value.trim());
   activeAct = 0;

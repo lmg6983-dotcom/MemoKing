@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import fuzzysort from '../app/vendor/fuzzysort.js';
-import { compactTermOf } from '../app/js/core/text-match.js';
+import { compactTermOf, isChoseongQuery, choseongAligned } from '../app/js/core/text-match.js';
 
 export const MAX_ENTRIES = 400_000;
 const SKIP = new Set([
@@ -215,6 +215,7 @@ export class FileIndex {
   use(entries, at) {
     this.entries = entries;
     this.lower = entries.map((e) => e.n.toLowerCase());
+    this.initials = null; // 초성 이름 (shortcut: 처음 초성으로 찾을 때 한 번 만듦 — 메모리를 이름 목록만큼 더 씀)
     this.snapshot = entries.length ? true : null;
     this.builtAt = at;
   }
@@ -313,12 +314,21 @@ export class FileIndex {
     let folders = 0;
     let files = 0;
     const { lower } = this;
+    // 초성 검색(ㄱㅈㅅ → 견적서): 이름의 한글을 초성으로 바꾼 목록에서 (띄어쓰기 빼고)
+    const cho = terms.map((t) => isChoseongQuery(t));
+    if (cho.some(Boolean)) this.initials ??= lower.map((n) => choseongAligned(n).replace(/\s+/g, ''));
+    const choHit = new Set();
     for (let i = 0; i < lower.length; i++) {
       const name = lower[i];
       let all = true;
       let whole = true;
-      for (const t of terms) {
+      for (let ti = 0; ti < terms.length; ti++) {
+        const t = terms[ti];
         if (name.includes(t)) continue;
+        if (cho[ti] && this.initials[i].includes(t)) {
+          choHit.add(i);
+          continue;
+        }
         whole = false;
         let at = 0;
         for (let k = 0; k < t.length; k++) {
@@ -347,9 +357,11 @@ export class FileIndex {
     for (const i of [...contiguous, ...loose].slice(0, cap * 1.5)) {
       const e = this.entries[i];
       const r = fuzzysort.single(q, e.n) ?? (qCompact ? fuzzysort.single(qCompact, e.n) : null);
-      if (!r) continue;
+      // 초성으로만 맞은 이름: 글자로 맞은 것과 비슷한 자리에 (첫머리면 더 앞, 짧은 이름이 앞)
+      const score = r?.score ?? (choHit.has(i) ? 0.75 + (terms.every((t, ti) => !cho[ti] || this.initials[i].startsWith(t)) ? 0.15 : 0) - Math.min(0.2, e.n.length * 0.004) : null);
+      if (score == null) continue;
       const bonus = (e.a ? 0.12 : 0) + (this.lower[i].startsWith(ql) ? 0.08 : 0) - Math.min(0.15, (e.depth ?? 0) * 0.012);
-      scored.push({ e, score: r.score * (1 + bonus) });
+      scored.push({ e, score: score * (1 + bonus) });
     }
     scored.sort((a, b) => b.score - a.score);
     const items = [];

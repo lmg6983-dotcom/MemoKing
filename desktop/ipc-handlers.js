@@ -7,7 +7,7 @@ import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
-import { normalizeReminder } from '../app/js/core/reminders.js';
+import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { activeModules, memoBodyFromText, magicChips, toggleMagicChip, reorderMagicChips, normalizeMagicSettings } from '../app/js/core/magic-modules.js';
 import { WEB_ENGINES, AI_SITES, siteLink, siteUrl } from '../app/js/core/magic-tools.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
@@ -657,10 +657,18 @@ export function registerIpc(ctx) {
     if (!body) return { ok: false };
     const id = vault.import({ body });
     if (!id) return { ok: false };
+    // "알림 맞춰 저장": 글 속 날짜로 일정 하나 (미리 알림은 기본값 — 바꾸려면 메모의 종 버튼)
+    const reminder = payload.remind ? eventFromDate(payload.remind) : null;
+    const saved = reminder ? vault.setReminders(id, [reminder]) : null;
+    if (saved) {
+      pushReminders();
+      alarms.tick();
+    }
+    const when = saved ? `\n알림: ${describeReminder(saved[0])}` : '';
     if (payload.open) wm.openNote(id);
     else {
       const showNow = () => wm.openNote(id, { inactive: true });
-      if (!toast({ memoId: id, kind: 'magic-memo', title: UI.memoCreated, body: `${body.split('\n')[0].slice(0, 40)}\n눌러서 열기`, onClick: () => wm.revealNote(id), onFail: showNow })) showNow();
+      if (!toast({ memoId: id, kind: 'magic-memo', title: UI.memoCreated, body: `${body.split('\n')[0].slice(0, 40)}${when}\n눌러서 열기`, onClick: () => wm.revealNote(id), onFail: showNow })) showNow();
     }
     return { ok: true, id };
   });

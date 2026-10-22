@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { looksLikeRef, MAGIC_MODULES, normalizeMagicSettings, activeModules, memoBodyFromText, magicChips, toggleMagicChip, reorderMagicChips, DEFAULT_ORDER } from '../app/js/core/magic-modules.js';
+import { looksLikeRef, MAGIC_MODULES, normalizeMagicSettings, activeModules, memoBodyFromText, magicChips, toggleMagicChip, reorderMagicChips, DEFAULT_ORDER, appendToBody } from '../app/js/core/magic-modules.js';
 
 test('매직키 설정: 기본은 켜짐 · 모든 기능 켜짐, 모르는 기능은 버림 · 기본 사이트는 네이버 · ChatGPT', () => {
   const s = normalizeMagicSettings(undefined);
@@ -58,4 +58,10 @@ test('매직키 캡슐 순서: 끌어 놓은 순서대로 캡슐 · 결과 묶�
   assert.deepEqual(ids(activeModules(toggleMagicChip(moved, 'memo'))), ['web', 'notes', 'files', 'calc', 'ai'], '잠깐 꺼도 순서는 그대로');
   assert.deepEqual(moved.order.at(-1), 'opms');
   assert.deepEqual(ids(magicChips({ ...moved, modules: { ...moved.modules, opms: true } })).at(-1), 'opms', '설정에서 다시 켜면 맨 뒤');
+});
+
+test('메모에 덧붙이기: 빈 줄 하나 두고 끝에, 앞뒤 빈 줄은 정리 · 빈 글은 null', () => {
+  assert.equal(appendToBody('# 견적서\n\n첫 줄\n\n\n', '추가 내용\n둘째 줄\n'), '# 견적서\n\n첫 줄\n\n추가 내용\n둘째 줄\n');
+  assert.equal(appendToBody('', '새 글'), '새 글\n');
+  assert.equal(appendToBody('# 제목', '   \n  '), null);
 });

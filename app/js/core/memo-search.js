@@ -1,4 +1,4 @@
-import { textMatcher, compactText, compactTermOf } from './text-match.js';
+import { textMatcher, compactText, compactTermOf, isChoseongQuery, choseongRange } from './text-match.js';
 
 // 매직키의 메모 검색 — 띄어 쓴 낱말이 모두 들어간 메모를, 제목에 있는 것·최근 것부터 (순수 함수, 단위 테스트 대상)
 
@@ -25,6 +25,12 @@ export function searchMemos(memos, query, limit = 5) {
     if (lt.startsWith(q)) score += 2;
     score += terms.filter((t) => lt.includes(t)).length; // 제목에 든 낱말
     if (lx.includes(q)) score += 1;
+    // 초성(ㄱㅈㅅ)도 글자로 찾은 것처럼 점수 — 제목에 맞으면 앞으로, 제목 첫머리면 더
+    for (const t of terms) {
+      if (!isChoseongQuery(t) || lt.includes(t)) continue;
+      const r = choseongRange(title, t);
+      if (r) score += terms.length === 1 ? 4 + (r[0] === 0 ? 2 : 0) : 1;
+    }
     found.push({ m, score, at: Date.parse(m.updated ?? '') || 0 });
   }
   found.sort((a, b) => b.score - a.score || b.at - a.at);
@@ -36,6 +42,7 @@ export function snippetOf(text, terms, title = '') {
   const lines = text.split('\n').map((l) => l.trim()).filter((l) => l && l !== title);
   const lower = lines.map((l) => l.toLowerCase());
   let i = lower.findIndex((l) => terms.some((t) => l.includes(t)));
+  if (i < 0) i = lines.findIndex((l) => terms.some((t) => choseongRange(l, t))); // 초성으로 찾은 줄
   if (i < 0) i = lower.findIndex((l) => terms.some((t) => compactTermOf(t) && compactText(l).includes(compactTermOf(t)))); // 기호를 빼고 찾은 관리번호
   if (i < 0) i = 0;
   const line = lines[i] ?? '';

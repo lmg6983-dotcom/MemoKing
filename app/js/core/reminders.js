@@ -461,3 +461,25 @@ export function isLiveCached(r, now = new Date()) {
   liveCache.set(r, { t: now.getTime(), v });
   return v;
 }
+
+/**
+ * 글 속 날짜(date-detect findDates 의 하나)로 일정 하나 — 일정 창 없이 바로 저장할 때 (매직키 "알림 맞춰 저장")
+ *   미리 알림은 기본값(시각이 있으면 10분 전, 날짜만이면 그날 오전 9시), 이미 지난 알림은 그때 바로 울리는 것으로
+ * @param {{ at: Date|string, hasTime?: boolean, repeat?: object|null, title?: string }} d
+ */
+export function eventFromDate(d, now = new Date()) {
+  const start = new Date(d.at);
+  if (Number.isNaN(start.getTime())) return null;
+  const allDay = !d.hasTime && !d.repeat;
+  const alerts = pendingAlerts(allDay ? DEFAULT_ALERTS.allDay : DEFAULT_ALERTS.timed, start, { repeat: Boolean(d.repeat), now, fallback: fallbackAlert(allDay), allDay });
+  const base = { action: 'notify', enabled: true, created: toLocalIso(now), alerts, ...(d.title ? { title: String(d.title).slice(0, 80) } : {}) };
+  if (d.repeat) {
+    const r = { every: d.repeat.every, time: d.repeat.time };
+    if (d.repeat.every === 'week') r.weekdays = d.repeat.weekdays;
+    if (d.repeat.every === 'month' || d.repeat.every === 'year') r.day = d.repeat.day;
+    if (d.repeat.every === 'year') r.month = d.repeat.month;
+    return normalizeReminder({ ...base, kind: 'repeat', repeat: r }, now);
+  }
+  const at = allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate()) : start;
+  return normalizeReminder({ ...base, kind: 'at', at: toLocalIso(at), ...(allDay ? { allDay: true } : {}) }, now);
+}

@@ -16,6 +16,26 @@ export const compactTermOf = (term) => {
 
 export const isChoseongQuery = (term) => CHOSEONG_ONLY.test(term);
 
+const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+/** 한글 글자만 초성으로 (다른 글자는 그대로 — 길이가 같아 찾은 자리를 원래 글에 그대로 쓴다) */
+export const choseongAligned = (s) => String(s ?? '').replace(/[가-힣]/g, (ch) => CHO[Math.floor((ch.charCodeAt(0) - 0xac00) / 588)]);
+
+/** 초성 검색어(ㄱㅈㅅ)가 글의 어디에 맞나 — 띄어쓰기는 건너뛰고 ("회의 록" 도 ㅎㅇㄹ) [from, to) 또는 null */
+export function choseongRange(text, term) {
+  const t = String(text ?? '');
+  if (!isChoseongQuery(term)) return null;
+  const initials = choseongAligned(t).toLowerCase();
+  let compact = '';
+  const at = [];
+  for (let i = 0; i < initials.length; i++) {
+    if (/\s/.test(initials[i])) continue;
+    compact += initials[i];
+    at.push(i);
+  }
+  const k = compact.indexOf(term);
+  return k < 0 ? null : [at[k], at[k + term.length - 1] + 1];
+}
+
 /**
  * @param {string} query
  * @returns {(...texts: string[]) => boolean} 낱말마다 texts 중 하나에 들어 있으면 true (빈 검색어는 늘 true)

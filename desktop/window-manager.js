@@ -26,6 +26,7 @@ import {
   copyImageToClipboard, CLIPBOARD_HELPER, SMOKE,
 } from './utils.js';
 import { UI } from '../app/js/core/ui-text.js';
+import { appendToBody } from '../app/js/core/magic-modules.js';
 
 // 창 위 가장자리에 반쯤 걸쳐 붙는 스티커: 왕관(늘 위) · 셀로판 테이프(늘 아래, 바탕화면 층)
 // 목록 창 제목 줄: 왼쪽은 로고 · Life/Work 스위치(~196px), 오른쪽은 단추 묶음 + Windows 창 버튼(~242px) — 스티커는 그 사이 빈 줄에
@@ -1680,7 +1681,7 @@ export class WindowManager {
     return typeof p === 'string' && (this.lastFileResults.has(p) || this.lastFinderResults.has(p));
   }
 
-  async magicAct({ action, path: p, id, opms } = {}) {
+  async magicAct({ action, path: p, id, opms, text } = {}) {
     if (opms != null) {
       const c = this.caseOf(opms);
       if (action === 'copyOur' || action === 'copyApp') {
@@ -1698,6 +1699,14 @@ export class WindowManager {
       if (action === 'copyText') {
         copyFileToClipboard(shareText(memo.body));
         return { ok: true, message: '메모 내용을 복사했어요', close: true };
+      }
+      if (action === 'append') {
+        if (memo.locked) return { ok: false, message: '잠긴 메모에는 덧붙일 수 없어요' };
+        const body = appendToBody(memo.body, text);
+        if (!body) return { ok: false };
+        const r = this.getVault().save(String(id), body);
+        if (!r || r.refused) return { ok: false, message: UI.savedElsewhere };
+        return { ok: true, message: `'${(memo.title || '제목 없음').slice(0, 20)}'에 덧붙였어요` };
       }
       this.revealNote(String(id));
       return { ok: true, close: true };

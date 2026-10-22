@@ -5,7 +5,9 @@
 //   PC·휴대폰 같은 코드. 날짜 찾기는 core/date-detect.js (한국어) + chrono (영어, MIT)
 import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { casual as chrono } from '../vendor/chrono.js';
-import { findAllDates } from './core/date-detect.js';
+import { findAllDates, guessTitle } from './core/date-detect.js';
+
+export { guessTitle }; // 예전 자리에서 부르던 곳을 위해
 import { koClock, dayLabel, WEEKDAY, sameDay } from './core/time.js';
 import { hintOnce } from './hints.js';
 import { openEventEditor } from './event-editor.js';
@@ -26,19 +28,6 @@ export function repeatLabel(repeat, at) {
   return `매년 ${repeat.month}월 ${repeat.day}일 ${clock}`;
 }
 const chipLabel = (d) => (d.repeat ? repeatLabel(d.repeat, d.at) : d.hasTime ? dateLabel(d.at) : dateLabel(d.at).replace(/ (오전|오후) .*$/, ''));
-
-/** 일정 이름 짐작: 그 줄에서 날짜 말을 빼고 남은 말 ("내일 오후 3시 치과" → "치과", "15일까지 보고서 제출" → "보고서 제출") */
-export function guessTitle(line, from, to) {
-  const rest = `${line.slice(0, from)} ${line.slice(to)}`
-    .replace(/\uFFFC/g, ' ')
-    .replace(/^\s*(?:까지|에는|에|부터|은|는|이|가|의|쯤|경)(?=\s|$)/, '')
-    .replace(/(?:^|\s)(?:까지|에는|에|부터)(?=\s)/g, ' ')
-    .replace(/[\s,:·\-–~]+$/, '')
-    .replace(/^[\s,:·\-–~]+/, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return rest.slice(0, 40);
-}
 
 // 빠른 거르기 — date-detect.js 가 읽는 말을 하나라도 빠뜨리면 그 줄의 날짜를 못 찾는다 ("한 달 뒤" · "엿새 후" · "삼십 분 뒤")
 const DATE_HINT = /\d|내일|낼|모레|글피|요일|욜|주말|정오|자정|매일|날마다|일주일|시|뒤|후|있다가|이따|지나서|크리스마스|[A-Za-z]/;
