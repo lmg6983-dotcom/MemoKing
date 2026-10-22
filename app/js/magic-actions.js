@@ -13,6 +13,8 @@ const ICONS = {
   more: 'M4 6h16M4 12h16M4 18h10',
   wrapper: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   copyOur: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
+  copy: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
+  copyExpr: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M7 12h6M7 16h4M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
   copyApp: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M7 12h6M7 16h4M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
 };
 
@@ -29,6 +31,14 @@ export function actionsFor(r) {
       return [{ id: 'open', label: r.app ? '실행' : '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '폴더 열기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '파일 복사' }];
     case 'more':
       return [{ id: 'more', label: '모두 보기' }];
+    case 'calc':
+      return [{ id: 'copy', label: '결과 복사' }, { id: 'copyExpr', label: '식과 함께 복사' }];
+    case 'site':
+      return [{ id: 'open', label: '사이트 열기' }];
+    // 웹 검색 · AI: 사이트마다 단추 (이름 글자로, 설정에서 고른 사이트가 맨 앞 = Enter)
+    case 'web':
+    case 'ai':
+      return (r.sites ?? []).map((site) => ({ id: site.id, label: site.name, text: true }));
     case 'opms':
       return [{ id: 'open', label: '사건 보기' }, { id: 'wrapper', label: '전자포대' }, { id: 'copyOur', label: '관리번호 복사' }, { id: 'copyApp', label: '출원번호 복사' }];
     default:
@@ -60,13 +70,13 @@ export function actionButtons(r, active, onRun) {
   actionsFor(r).forEach((a, i) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = `act-btn${i === active ? ' on' : ''}`;
+    b.className = `act-btn${a.text ? ' act-text' : ''}${i === active ? ' on' : ''}`;
     b.dataset.action = a.id;
     b.tabIndex = -1; // 키보드는 입력 칸에서 ← → 로
     b.title = a.key ? `${a.label} (${a.key})` : a.label;
     b.setAttribute('aria-label', a.label);
     b.setAttribute('aria-pressed', String(i === active));
-    b.append(icon(a.id));
+    if (!a.text) b.append(icon(a.id)); // 사이트 단추는 이름만
     // 고른 단추는 이름도 보인다 (다른 단추는 그림만 — 자리가 좁으니)
     const label = document.createElement('span');
     label.className = 'act-label';

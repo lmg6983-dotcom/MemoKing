@@ -142,6 +142,45 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     await capture(magic, 'smoke-new-magic.png');
     check('→ 로 "경로 복사" 를 고르고 Enter → 그 파일 경로가 클립보드에', sel.act === 'copyPath' && copied.endsWith('.txt') && copied.includes('견적서'), JSON.stringify({ sel, copied }));
 
+    // 2-1) 계산기 · 웹 검색 · AI 에게 묻기
+    const typeMagic = (text) => js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input')); })()`);
+    showMagic();
+    await wait(300);
+    await typeMagic('1,200 × 3');
+    const calcRow = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row'); return r?.classList.contains('kind-calc') && { t: r.querySelector('.t').textContent, s: r.querySelector('.s').textContent, sel: r.getAttribute('aria-selected') }; })()`), '계산 결과', 8000).catch(() => null);
+    await capture(magic, 'smoke-new-magic-calc.png');
+    await wait(300); // 메모 · 파일 찾기 결과가 다 온 뒤에 (늦게 온 결과가 아래 안내를 다시 그리지 않게)
+    key(magic, 'Return');
+    const calcFlash = await until(() => js(magic, `document.querySelector('.magic-flash')?.textContent`), '계산 결과 복사').catch(() => '');
+    check('매직키 계산기: 식을 쓰면 맨 위에 결과(골라져 있음) · Enter 로 결과 복사', calcRow?.t === '3,600' && calcRow.s === '1,200 × 3' && calcRow.sel === 'true' && /계산 결과를 복사/.test(calcFlash), JSON.stringify({ calcRow, calcFlash }));
+    showMagic();
+    await wait(300);
+    await typeMagic('서울 날씨');
+    const tail = await until(() => js(magic, `(() => {
+      const rows = [...document.querySelectorAll('.magic-row')];
+      const kinds = rows.map((e) => e.className.match(/kind-(\\w+)/)[1]);
+      const sites = (k) => [...(rows.find((e) => e.classList.contains('kind-' + k))?.querySelectorAll('.act-btn') ?? [])].map((b) => b.dataset.action);
+      return kinds.includes('ai') && { kinds, web: sites('web'), ai: sites('ai') };
+    })()`), '웹 검색 · AI 줄').catch(() => null);
+    await capture(magic, 'smoke-new-magic-tools.png');
+    const before = smokeOpened.length;
+    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-web'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true })); r.querySelector('[data-action="google"]').click(); })()`);
+    await wait(300);
+    showMagic();
+    await wait(300);
+    await typeMagic('서울 날씨');
+    await until(() => js(magic, `!!document.querySelector('.magic-row.kind-ai')`), 'AI 줄');
+    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-ai'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true })); })()`);
+    await wait(100);
+    await capture(magic, 'smoke-new-magic-ai.png');
+    key(magic, 'Return');
+    await wait(300);
+    const webOpened = smokeOpened.slice(before).map((o) => o.target);
+    check('매직키 웹 검색 · AI: 맨 아래 두 줄 (기본 네이버 · ChatGPT 가 첫 단추) · 고른 사이트로 열기',
+      tail?.kinds.at(-2) === 'web' && tail.kinds.at(-1) === 'ai' && tail.web[0] === 'naver' && tail.ai[0] === 'chatgpt'
+      && webOpened[0] === 'https://www.google.com/search?q=%EC%84%9C%EC%9A%B8%20%EB%82%A0%EC%94%A8' && webOpened[1] === 'https://chatgpt.com/?q=%EC%84%9C%EC%9A%B8%20%EB%82%A0%EC%94%A8',
+      JSON.stringify({ tail, webOpened }));
+
     // 3) "다른 n건" → 모두 찾기 창: 전부(31 + 메모 7), 열 · 탭 · 크기
     showMagic();
     await wait(300);

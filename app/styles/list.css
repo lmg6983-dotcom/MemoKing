@@ -521,7 +521,7 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
 
 /* 설정: 고르기 한 줄 */
 .setting-row.select-row { justify-content: space-between; cursor: default; }
-.setting-row select {
+:is(.setting-row, .magic-site) select {
   flex: none;
   height: 32px;
   padding: 0 8px;
@@ -782,6 +782,8 @@ body.is-dragging .card:hover { transform: none; }
 .magic-mod small { display: block; color: var(--muted); font-size: 12px; }
 .magic-mod em { color: var(--muted); font-style: normal; }
 .magic-mod.soon > span { opacity: 0.6; }
+/* 웹 검색 · AI 에게 묻기의 기본 사이트 — 그 기능 바로 아래, 들여 써서 딸린 것으로 */
+.magic-site { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -2px 0 2px 14px; padding-left: 10px; border-left: 2px solid var(--border); font-size: 12.5px; color: var(--muted); }
 
 /* ---------- v0.18.0: 지운 뒤 되돌리기 (묻지 않고 바로 휴지통으로) ---------- */
 .undo-bar {

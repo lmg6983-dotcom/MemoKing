@@ -8,7 +8,8 @@ import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder } from '../app/js/core/reminders.js';
-import { activeModules, memoBodyFromText, magicChips, toggleMagicChip } from '../app/js/core/magic-modules.js';
+import { activeModules, memoBodyFromText, magicChips, toggleMagicChip, normalizeMagicSettings } from '../app/js/core/magic-modules.js';
+import { WEB_ENGINES, AI_SITES, siteLink, siteUrl } from '../app/js/core/magic-tools.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
 import { isBlankBody } from '../app/js/core/memo-file.js';
@@ -399,7 +400,7 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 매직키 ----------
-  const magicModuleList = () => magicChips(settings.magic).map(({ id, name, description, on }) => ({ id, name, description, on }));
+  const magicModuleList = () => magicChips(settings.magic).map(({ id, name, chip, description, on }) => ({ id, name, chip, description, on }));
   ipcMain.handle('magic:modules', () => magicModuleList());
   ipcMain.handle('magic:toggle-module', (_e, id) => {
     setMagicSettings(toggleMagicChip(settings.magic, String(id)));
@@ -437,6 +438,33 @@ export function registerIpc(ctx) {
     return { notes, folders, files, more, index: fileIndex?.status() ?? null };
   });
   ipcMain.handle('magic:act', (_e, req) => wm.magicAct(req));
+  // 웹 검색 · AI 에게 묻기 기본 사이트 (매직키 창의 할 일 단추 순서)
+  ipcMain.handle('magic:prefs', () => {
+    const m = normalizeMagicSettings(settings.magic);
+    return { engine: m.engine, ai: m.ai };
+  });
+  // 계산 결과 복사 · 웹 검색 · AI 에게 묻기 · 사이트 열기 — 고른 줄을 실행할 때만 브라우저로 (주소는 여기서 만든다)
+  ipcMain.handle('magic:tool', (_e, req) => {
+    const mods = new Set(activeModules(settings.magic).map((m) => m.id));
+    const text = String(req?.text ?? '').slice(0, 4000);
+    if (req?.type === 'copy' && mods.has('calc')) {
+      if (!SMOKE) clipboard.writeText(text); // 점검은 진짜 클립보드를 건드리지 않는다
+      return { ok: true, message: '계산 결과를 복사했어요' };
+    }
+    if (req?.type === 'site' && mods.has('web')) {
+      const url = siteUrl(text);
+      return { ok: Boolean(url && openWebPage(url)) };
+    }
+    const kind = req?.type === 'web' ? 'web' : req?.type === 'ai' ? 'ai' : null;
+    if (!kind || !mods.has(kind)) return { ok: false };
+    const link = siteLink(kind === 'web' ? WEB_ENGINES : AI_SITES, String(req.site), text);
+    if (!link) return { ok: false };
+    // 주소로 질문을 넘길 수 없는 사이트(Gemini)는 질문을 복사해 두고 연다
+    if (link.paste && !SMOKE) clipboard.writeText(text.trim());
+    if (!openWebPage(link.url)) return { ok: false };
+    if (link.paste) toast({ title: `${link.name} 를 열었어요`, body: '질문을 복사해 두었어요. 입력 칸에 붙여 넣기(Ctrl+V)만 하면 돼요' });
+    return { ok: true };
+  });
   ipcMain.handle('magic:opms-search', async (_e, query) => {
     const q = String(query ?? '').slice(0, 40);
     if (!activeModules(settings.magic).some((m) => m.id === 'opms') || !looksLikeRef(q)) return { cases: [], total: 0 };

@@ -10,6 +10,10 @@
 .act-btn .act-label { display: none; }
 .act-btn.on { padding: 0 9px 0 7px; background: #ffd84d; color: #2b2400; }
 .act-btn.on .act-label { display: inline; }
+/* 사이트 단추 (웹 검색 · AI): 그림 대신 이름이 늘 보인다 */
+.act-btn.act-text { padding: 0 8px; font-weight: 600; }
+.act-btn.act-text .act-label { display: inline; }
+.act-btn.act-text.on { padding: 0 8px; font-weight: 700; }
 .act-btn:not(.on):hover { background: rgba(0, 0, 0, 0.08); color: #111; }
 .act-btn:active { transform: scale(0.96); }
 @media (prefers-color-scheme: dark) {

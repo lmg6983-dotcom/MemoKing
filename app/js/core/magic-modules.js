@@ -1,21 +1,25 @@
 // 매직키 (Ctrl+Alt+Space) — 어디서든 빠르게 입력하는 창. 여러 기능 모듈로 이루어지고, 설정에서 모듈마다 끄고 켠다.
-// (순수 함수, 단위 테스트 대상) 모듈을 더할 때는 여기에 한 줄 + magic.js 의 처리기(HANDLERS)에 한 개.
+// (순수 함수, 단위 테스트 대상) 모듈을 더할 때는 여기에 한 줄 + magic.js 의 render() 에 결과 줄.
+import { WEB_ENGINES, AI_SITES, pickId } from './magic-tools.js';
 
-// ready: 지금 쓸 수 있는가 (false = 준비 중, 설정에서 켤 수 없음)
+// chip: 매직키 창 아래 캡슐의 짧은 이름 · ready: 지금 쓸 수 있는가 (false = 준비 중, 설정에서 켤 수 없음)
 export const MAGIC_MODULES = [
-  { id: 'memo', name: '메모 만들기', description: '입력한 글을 새 메모로 바로 저장해요 (Enter 저장, Ctrl+Enter 저장하고 열기)', ready: true, defaultOn: true },
-  { id: 'notes', name: '메모 검색', description: '입력하는 대로 메모의 제목과 내용에서 찾아 바로 열어요', ready: true, defaultOn: true },
-  { id: 'files', name: '파일 검색', description: 'PC 의 파일, 폴더, 프로그램 이름을 바로 찾아 열어요. 따로 설치할 것 없이 메모킹이 이름 목록을 만들어 두어요 (이 PC 안에서만, 내용은 읽지 않음)', ready: true, defaultOn: true },
-  { id: 'calc', name: '계산기', description: '수식을 입력하면 바로 계산해요', ready: false, defaultOn: false },
-  { id: 'opms', name: 'OPMS 검색', description: '관리번호나 출원번호를 쓰면 회사 OPMS 사건을 찾아 서지정보, 전자포대, 청구서를 봐요 (사내망에서만)', ready: true, defaultOn: true },
+  { id: 'memo', name: '메모 만들기', chip: '새 메모', description: '입력한 글을 새 메모로 바로 저장해요 (Enter 저장, Ctrl+Enter 저장하고 열기)', ready: true, defaultOn: true },
+  { id: 'notes', name: '메모 검색', chip: '메모 검색', description: '입력하는 대로 메모의 제목과 내용에서 찾아 바로 열어요', ready: true, defaultOn: true },
+  { id: 'files', name: '파일 검색', chip: '파일 검색', description: 'PC 의 파일, 폴더, 프로그램 이름을 바로 찾아 열어요. 따로 설치할 것 없이 메모킹이 이름 목록을 만들어 두어요 (이 PC 안에서만, 내용은 읽지 않음)', ready: true, defaultOn: true },
+  { id: 'calc', name: '계산기', chip: '계산기', description: '식을 쓰면 바로 계산해요 (1,200 × 3, 15% * 80000, 5 inch to cm). Enter 로 결과 복사', ready: true, defaultOn: true },
+  { id: 'web', name: '웹 검색', chip: '웹 검색', description: '쓴 글을 검색 사이트에서 찾거나, 사이트 주소를 바로 열어요. 고르기 전에는 아무것도 보내지 않아요', ready: true, defaultOn: true },
+  { id: 'ai', name: 'AI 에게 묻기', chip: 'AI', description: 'ChatGPT, Claude 등에 바로 물어봐요. 브라우저에서 로그인한 계정 그대로, API 키는 필요 없어요', ready: true, defaultOn: true },
+  { id: 'opms', name: 'OPMS 검색', chip: 'OPMS', description: '관리번호나 출원번호를 쓰면 회사 OPMS 사건을 찾아 서지정보, 전자포대, 청구서를 봐요 (사내망에서만)', ready: true, defaultOn: true },
 ];
 
 /**
  * 저장된 설정 → 쓸 수 있는 설정. 모르는 모듈은 버리고, 준비 중인 모듈은 늘 꺼 둔다.
  *   modules: 설정 창에서 켠 기능 (꺼 두면 매직키 창에 아예 나오지 않음)
  *   paused: 매직키 창 아래 캡슐로 잠깐 끈 기능 (설정에서 켠 것만, 다시 누르면 켜짐)
+ *   engine: 웹 검색 기본 사이트, ai: AI 에게 묻기 기본 사이트 (Enter 로 열리는 것)
  * @param {any} raw
- * @returns {{ enabled: boolean, modules: Record<string, boolean>, paused: Record<string, boolean> }}
+ * @returns {{ enabled: boolean, modules: Record<string, boolean>, paused: Record<string, boolean>, engine: string, ai: string, known: string[] }}
  */
 export function normalizeMagicSettings(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
@@ -23,11 +27,18 @@ export function normalizeMagicSettings(raw) {
   const savedPaused = src.paused && typeof src.paused === 'object' ? src.paused : {};
   const modules = {};
   const paused = {};
+  // known: 저장할 때 설정에 있던 기능. 예전 설정(known 없음)의 계산기는 "준비 중"이라 늘 false 로 저장됐으니 고른 값이 아니다
+  const known = Array.isArray(src.known) ? src.known : MAGIC_MODULES.map((m) => m.id).filter((id) => id !== 'calc');
   for (const m of MAGIC_MODULES) {
-    modules[m.id] = m.ready ? (typeof saved[m.id] === 'boolean' ? saved[m.id] : m.defaultOn) : false;
+    const chosen = typeof saved[m.id] === 'boolean' && known.includes(m.id);
+    modules[m.id] = m.ready ? (chosen ? saved[m.id] : m.defaultOn) : false;
     if (modules[m.id] && savedPaused[m.id] === true) paused[m.id] = true;
   }
-  return { enabled: typeof src.enabled === 'boolean' ? src.enabled : true, modules, paused };
+  return {
+    enabled: typeof src.enabled === 'boolean' ? src.enabled : true, modules, paused,
+    engine: pickId(WEB_ENGINES, src.engine), ai: pickId(AI_SITES, src.ai),
+    known: MAGIC_MODULES.filter((m) => m.ready).map((m) => m.id),
+  };
 }
 
 /** 매직키 창 아래 캡슐에 보일 기능: 설정에서 켠 것만 (켜짐 = 잠깐 끄지 않았음) */
