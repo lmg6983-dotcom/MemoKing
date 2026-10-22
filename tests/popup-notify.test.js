@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { popupToEntry, popupAppName, isRepeat, kakaoEntry } from '../app/js/core/popup-notify.js';
+import { popupToEntry, popupAppName, isRepeat, kakaoEntry, correctTitle, knownNames, splitTitle } from '../app/js/core/popup-notify.js';
 
 test('팝업 글: 첫 줄은 보낸 사람(제목), 나머지는 내용', () => {
   assert.deepEqual(popupToEntry(['김대리', '회의 자료 보냈어요', '내일 봬요']), { title: '김대리', body: '회의 자료 보냈어요\n내일 봬요' });
@@ -109,4 +109,24 @@ test('카카오톡: 프로필 사진 윗변을 알면 그 위는 채팅방, 아�
   assert.equal(kakaoEntry(latin, { width: 330, height: 140, appName: '카카오톡', profileTop: 30 }).title, '김대리 (Team AB)');
   const xBtn = [box('우리 가족 x', 14, 8, 11), ...group.slice(1)];
   assert.equal(kakaoEntry(xBtn, { width: 330, height: 140, appName: '카카오톡', profileTop: 30 }).title, '김대리 (우리 가족)');
+});
+
+test('이미 받은 이름으로 맞추기: 처음 보는 이름이 한 글자만 다르면 받은 이름으로', () => {
+  const known = knownNames(['김대리 (회사 동기방)', '박과장 (회사 동기방)', '우리 여보']);
+  assert.equal(correctTitle('김대리 (회사 등기방)', known), '김대리 (회사 동기방)');
+  assert.equal(correctTitle('김대리 (회사 동기방', known), '김대리 (회사 동기방'); // 괄호가 깨지면 그대로
+  assert.equal(correctTitle('우리 여부', known), '우리 여보');
+  // 두 글자 이름 · 두 글자 넘게 다른 이름 · 처음 보는 단체방은 그대로
+  assert.equal(correctTitle('김대 (회사 동기방)', knownNames(['김대리', '김대'].slice(0, 1))), '김대 (회사 동기방)');
+  assert.equal(correctTitle('이부장 (볼링 동호회)', known), '이부장 (볼링 동호회)');
+  assert.deepEqual(splitTitle('김대리 (회사 동기방)'), { sender: '김대리', room: '회사 동기방' });
+});
+
+test('이미 받은 이름으로 맞추기: 먼저 잘못 읽은 이름이 맞는 이름을 덮지 않고, 훨씬 자주 온 이름이 이긴다', () => {
+  // 잘못 읽은 이름이 한 번 들어간 뒤 맞게 읽힌 이름은 그대로 (이미 받은 이름 = 둘 다)
+  const once = knownNames(['김대리 (회사 등기방)', '김대리 (회사 동기방)']);
+  assert.equal(correctTitle('김대리 (회사 동기방)', once), '김대리 (회사 동기방)');
+  // 맞는 이름이 훨씬 자주 왔으면 가끔 잘못 읽은 이름은 그쪽으로
+  const many = knownNames(['a (회사 동기방)', 'b (회사 동기방)', 'c (회사 동기방)', 'd (회사 동기방)', 'e (회사 등기방)']);
+  assert.equal(correctTitle('김대리 (회사 등기방)', many), '김대리 (회사 동기방)');
 });

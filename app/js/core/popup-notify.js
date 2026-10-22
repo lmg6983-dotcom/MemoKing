@@ -143,3 +143,58 @@ export function kakaoEntry(boxes, { width = 0, height = 0, appName = '', profile
   const title = room && room !== sender ? `${sender} (${room})` : sender;
   return { title: title.slice(0, 200), body: body.join('\n').slice(0, 2000) };
 }
+
+// ---------- 이미 받은 이름으로 맞추기 ----------
+// 채팅방 이름(작은 글씨)과 보낸 사람 이름은 같은 것이 되풀이해 온다. 처음 보는 이름이 이미 받은 이름과 한 글자만 다르면
+// (글자 인식이 한 글자를 잘못 읽음) 그 이름으로 맞춘다. 이미 받은 이름은 대개 그대로 둔다 (먼저 잘못 읽은 이름이 맞는 이름을 덮지 않게).
+
+const nameKey = (s) => String(s ?? '').replace(/\s+/g, '');
+
+// 한 글자 차이(바뀜 · 빠짐 · 더해짐)인가 — 두 글자 넘는 이름만 (짧은 이름은 한 글자 차이로도 다른 사람)
+function oneOff(a, b) {
+  if (a === b || a.length < 3 || b.length < 3 || Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1);
+  return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+}
+
+/** "보낸 사람 (채팅방)" → { sender, room } */
+export function splitTitle(title) {
+  const m = /^(.*\S)\s+\(([^()]*)\)$/.exec(String(title ?? '').trim());
+  return m ? { sender: m[1], room: m[2] } : { sender: String(title ?? '').trim(), room: '' };
+}
+
+/** 이미 받은 알림 제목들에서 이름별 횟수 */
+export function knownNames(titles) {
+  const count = new Map();
+  for (const t of titles) {
+    const { sender, room } = splitTitle(t);
+    for (const n of [sender, room]) if (n) count.set(n, (count.get(n) ?? 0) + 1);
+  }
+  return count;
+}
+
+// 처음 보는 이름 → 한 글자 차이인 이미 받은 이름 가운데 가장 자주 온 것으로.
+// 이미 받은 이름이라도 한 글자 차이인 이름이 훨씬 자주(3배 넘게, 3번 넘게) 왔으면 그쪽이 맞는 이름
+function fixName(name, known) {
+  if (!name) return name;
+  const mine = known.get(name) ?? 0;
+  const key = nameKey(name);
+  let best = null;
+  for (const [cand, n] of known) {
+    if (cand === name || !oneOff(key, nameKey(cand))) continue;
+    if (!best || n > best.n) best = { cand, n };
+  }
+  if (!best) return name;
+  if (mine === 0 || (best.n >= 3 && best.n > mine * 3)) return best.cand;
+  return name;
+}
+
+/** 알림 제목의 보낸 사람 · 채팅방 이름을 이미 받은 이름으로 맞춘다 (known: knownNames 결과) */
+export function correctTitle(title, known) {
+  const { sender, room } = splitTitle(title);
+  const s = fixName(sender, known);
+  const r = fixName(room, known);
+  return r ? `${s} (${r})` : s;
+}
