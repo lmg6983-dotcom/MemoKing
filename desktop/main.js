@@ -933,7 +933,7 @@ function setMagicSettings(next) {
   syncFileIndex();
   if (!settings.magic.enabled && windowManager.magicWin && !windowManager.magicWin.isDestroyed()) windowManager.magicWin.hide();
   if (windowManager.magicWin && !windowManager.magicWin.isDestroyed()) {
-    windowManager.magicWin.webContents.send('magic:modules-changed', magicChips(settings.magic).map(({ id, name, description, on }) => ({ id, name, description, on })));
+    windowManager.magicWin.webContents.send('magic:modules-changed', magicChips(settings.magic).map(({ id, name, chip, description, on }) => ({ id, name, chip, description, on })));
   }
   return settings.magic;
 }

@@ -1,6 +1,7 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
 import { looksLikeRef } from './core/magic-modules.js';
+import { calcInput, calcOutput, siteUrl, sitesInOrder, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { searchingNode } from './searching.js';
 import { COLOR_DOTS } from './core/memo-file.js';
 import { UI } from './core/ui-text.js';
@@ -10,6 +11,7 @@ import { UI } from './core/ui-text.js';
 //   ↑↓ 고르기 · ← → 할 일 고르기(열기 · 경로 복사 · 폴더 열기 · 파일 복사, 고른 줄 오른쪽 단추) · Enter 실행
 //   Ctrl+Enter 다른 실행 · Ctrl+Shift+C 경로 복사 · Ctrl+Shift+E 폴더 열기 · Esc 글 지우기 → 닫기
 //   아래 캡슐 = 기능 모듈, 누르면 켜고 끈다
+//   계산기: 식이면 맨 위에 결과 (Enter 복사) · 웹 검색 · AI 에게 묻기: 맨 아래 줄, 사이트 단추로 골라 브라우저로 연다
 const api = window.magic;
 const box = document.getElementById('magic');
 const input = document.getElementById('magic-input');
@@ -30,6 +32,52 @@ let opms = { query: '', loading: false, cases: [], total: 0, error: '' };
 
 const isOn = (id) => modules.some((m) => m.id === id && m.on);
 
+// 웹 검색 · AI 기본 사이트 (설정 매직키에서 고름)
+let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id };
+async function loadPrefs() {
+  prefs = { ...prefs, ...(await api.prefs?.().catch(() => null)) };
+}
+
+// 계산기: math.js 는 크니(0.6MB) 매직키 창이 처음 뜰 때 뒤에서 불러 둔다 (계산기를 켰을 때만)
+let math = null;
+let mathLoading = null;
+function loadMath() {
+  mathLoading ??= import('../vendor/mathjs.js').then((m) => {
+    math = m;
+    if (input.value.trim()) render(); // 다 불러오기 전에 쓴 식도 계산
+  }).catch(() => {
+    mathLoading = null;
+  });
+}
+function calcFor(query) {
+  const expr = isOn('calc') ? calcInput(query) : null;
+  if (!expr) return null;
+  if (!math) {
+    loadMath();
+    return null;
+  }
+  try {
+    const out = calcOutput(math.evaluate(expr), math.format);
+    return out && { expr, ...out };
+  } catch {
+    return null; // 식이 아니었다 (모르는 낱말 · 덜 쓴 식)
+  }
+}
+
+const SVG = {
+  web: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3.6 9h16.8M3.6 15h16.8M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z',
+  ai: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z',
+};
+function svgIcon(name) {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', SVG[name]);
+  s.append(p);
+  return s;
+}
+
 // ---------- 아래 캡슐: 기능 켜고 끄기 ----------
 function renderModules() {
   modulesEl.hidden = modules.length === 0; // 설정에서 모두 꺼 두면 캡슐 줄도 없음
@@ -38,10 +86,10 @@ function renderModules() {
     chip.type = 'button';
     chip.className = `magic-chip${m.on ? ' on' : ''}`;
     chip.setAttribute('aria-pressed', String(m.on));
-    chip.title = `${m.description}\n누르면 ${m.on ? '꺼요' : '켜요'}`;
+    chip.title = `${m.name}: ${m.description}\n누르면 ${m.on ? '꺼요' : '켜요'}`;
     const dot = document.createElement('span');
     dot.className = 'chip-dot';
-    chip.append(dot, m.name);
+    chip.append(dot, m.chip ?? m.name);
     chip.addEventListener('mousedown', (e) => e.preventDefault()); // 입력 칸 포커스 유지
     chip.addEventListener('click', async () => {
       modules = await api.toggleModule(m.id).catch(() => modules);
@@ -57,9 +105,11 @@ function renderModules() {
 function updatePlaceholder() {
   const memo = isOn('memo');
   // 찾는 것: 켜진 기능만 이름에 (파일 검색을 껐으면 "파일" 이라고 하지 않게)
-  const what = [isOn('notes') && '메모', isOn('files') && '파일', isOn('opms') && 'OPMS'].filter(Boolean).join(', ');
-  input.placeholder = memo && what ? `메모를 쓰거나, ${what} 찾기` : memo ? '메모를 쓰고 Enter' : what ? `${what} 찾기`
-    : modules.length ? '아래 캡슐을 눌러 기능을 켜 주세요' : '설정의 매직키에서 기능을 켜 주세요';
+  const what = [isOn('notes') && '메모', isOn('files') && '파일', isOn('opms') && 'OPMS', isOn('web') && '웹'].filter(Boolean).join(', ');
+  const extra = [isOn('calc') && '계산', isOn('ai') && 'AI 에게 묻기'].filter(Boolean).join(', ');
+  const main = memo && what ? `메모를 쓰거나, ${what} 찾기` : memo ? '메모를 쓰고 Enter' : what ? `${what} 찾기` : '';
+  input.placeholder = main && extra ? `${main}, ${extra}` : main || extra
+    || (modules.length ? '아래 캡슐을 눌러 기능을 켜 주세요' : '설정의 매직키에서 기능을 켜 주세요');
 }
 
 // ---------- 결과 ----------
@@ -125,7 +175,19 @@ function row(r, index, query) {
   const side = document.createElement('span');
   side.className = 'side';
   li.append(ico, txt, side, actionButtons(r, 0, (k) => run(index, { act: k })));
-  if (r.kind === 'opms') {
+  if (r.kind === 'calc') {
+    ico.textContent = '=';
+    t.textContent = r.value;
+    s.textContent = r.text; // 쓴 그대로 (1,200 × 3)
+  } else if (r.kind === 'site') {
+    ico.append(svgIcon('web'));
+    t.textContent = '사이트 열기';
+    s.textContent = r.url;
+  } else if (r.kind === 'web' || r.kind === 'ai') {
+    ico.append(svgIcon(r.kind));
+    t.textContent = r.kind === 'web' ? '웹에서 찾기' : 'AI 에게 묻기';
+    s.textContent = r.sites.map((x) => x.name).join(', '); // 고르면 오른쪽에 사이트 버튼
+  } else if (r.kind === 'opms') {
     ico.textContent = 'O';
     t.append(highlighted([r.ourref, r.n_app].filter(Boolean).join(', ') || r.yourref || '관리번호 없음', query));
     s.textContent = [r.applicant, r.title].filter(Boolean).join(', ');
@@ -194,9 +256,14 @@ function render() {
   rows = [];
   const nodes = [];
   const add = (r) => nodes.push(row(r, rows.push(r) - 1, query || raw));
+  // 식이면 계산 결과, 사이트 주소면 열기가 맨 위 (Enter 로 바로)
+  const calc = query ? calcFor(query) : null;
+  if (calc) add({ kind: 'calc', ...calc, text: query });
+  const url = query && isOn('web') ? siteUrl(query) : null;
+  if (url) add({ kind: 'site', url });
   if (query && isOn('memo')) add({ kind: 'new' });
   // 관리번호·출원번호를 쓰면 OPMS 사건이 맨 위 (찾는 중 · 사내망이 아님도 이 자리에)
-  if (query && isOn('opms') && opms.query === query) {
+  if (query && isOn('opms') && opms.query === query && !(calc && opms.error)) { // 식에는 "OPMS 주소를 넣으면" 안내를 안 띄운다
     if (opms.cases.length) {
       nodes.push(section('OPMS', opms.total));
       opms.cases.forEach((c) => add({ kind: 'opms', ...c }));
@@ -221,13 +288,18 @@ function render() {
     results.files.forEach((f) => add({ kind: 'file', ...f }));
   }
   if (query && results.more > 0) add({ kind: 'more', count: results.more });
+  // 웹 검색 · AI 에게 묻기: 늘 맨 아래 (고를 때만 브라우저로 연다)
+  const tail = [];
+  if (query && isOn('web')) tail.push({ kind: 'web', sites: sitesInOrder(WEB_ENGINES, prefs.engine) });
+  if (query && isOn('ai')) tail.push({ kind: 'ai', sites: sitesInOrder(AI_SITES, prefs.ai) });
   const searched = isOn('notes') || isOn('files');
-  if (query && searched && !results.notes.length && !results.folders.length && !results.files.length && !opms.cases.length && !opms.loading) {
+  if (query && searched && !calc && !url && !results.notes.length && !results.folders.length && !results.files.length && !opms.cases.length && !opms.loading) {
     nodes.push(note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요. Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`));
   }
   if (query && isOn('files') && results.index && !results.index.count) {
     nodes.push(note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : UI.noFileIndex));
   }
+  tail.forEach(add);
   resultsEl.replaceChildren(...nodes);
   box.classList.toggle('has-results', nodes.length > 0);
   clearBtn.hidden = !raw;
@@ -266,7 +338,9 @@ function markAct() {
   });
 }
 
+let flashUntil = 0; // 복사했어요 같은 안내를 보이는 동안은 늦게 온 찾기 결과가 덮지 않게
 function updateHint() {
+  if (Date.now() < flashUntil) return;
   const r = rows[selected];
   // 중요한 것부터 (자리가 모자라면 뒤의 것이 가려진다)
   const parts = [];
@@ -365,6 +439,18 @@ async function run(i, { alt = false, act = 0 } = {}) {
     await api.openAll(input.value.trim()).catch(() => {});
     return;
   }
+  if (r.kind === 'calc' || r.kind === 'site' || r.kind === 'web' || r.kind === 'ai') {
+    const req = r.kind === 'calc' ? { type: 'copy', text: id === 'copyExpr' ? `${r.text} = ${r.value}` : r.plain }
+      : r.kind === 'site' ? { type: 'site', text: r.url }
+        : { type: r.kind, site: id, text: input.value };
+    const res = await api.tool(req).catch(() => null);
+    if (res?.message) {
+      flash(res.ok, res.message);
+      if (res.ok) setTimeout(() => api.close(), 650);
+    } else if (res?.ok) api.close();
+    else flash(false, '열지 못했어요');
+    return;
+  }
   const req = r.kind === 'note' ? { action: id, id: r.id } : r.kind === 'opms' ? { action: id, opms: r.idx } : { action: id, path: r.path };
   const res = await api.act(req).catch(() => null);
   if (res?.message) {
@@ -381,6 +467,7 @@ function flash(ok, text) {
   span.className = `magic-flash${ok ? '' : ' err'}`;
   span.textContent = `${ok ? '✓ ' : ''}${text}`;
   hintEl.replaceChildren(span);
+  flashUntil = Date.now() + 900;
 }
 
 input.addEventListener('keydown', (e) => {
@@ -432,7 +519,8 @@ async function reset() {
     opms = { query: '', loading: false, cases: [], total: 0, error: '' };
   }
   resizeInput();
-  modules = await api.modules().catch(() => []);
+  [modules] = await Promise.all([api.modules().catch(() => []), loadPrefs()]);
+  if (isOn('calc')) loadMath();
   renderModules();
   updatePlaceholder();
   render();
@@ -444,8 +532,9 @@ async function reset() {
   }, 0);
 }
 api.onShow(reset);
-api.onModules?.((list) => {
+api.onModules?.(async (list) => {
   modules = list ?? [];
+  await loadPrefs(); // 설정에서 기본 사이트를 바꿨을 수도
   renderModules();
   updatePlaceholder();
   search();

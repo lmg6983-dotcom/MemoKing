@@ -30,6 +30,7 @@ import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/mem
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
 import { MAGIC_MODULES } from './core/magic-modules.js';
+import { WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
@@ -1084,7 +1085,7 @@ function renderMagicModules() {
       // 설정에서 켜면 매직키 창에서 잠깐 꺼 둔 것도 함께 풀어 바로 쓰게 (끈 기능은 매직키 창에 캡슐도 없음)
       const paused = { ...(magicState.paused ?? {}) };
       delete paused[m.id];
-      magicState = await api.settings.setMagic({ enabled: magicState.enabled, modules: { ...magicState.modules, [m.id]: cb.checked }, paused });
+      magicState = await api.settings.setMagic({ ...magicState, modules: { ...magicState.modules, [m.id]: cb.checked }, paused });
       renderMagicModules();
       showOpmsSetup();
     });
@@ -1099,8 +1100,25 @@ function renderMagicModules() {
     small.textContent = m.description + (m.id === 'files' && cb.checked ? indexNote(magicIndex) : '') + (cb.checked && magicState.paused?.[m.id] ? ', 지금은 매직키 창에서 잠깐 꺼 둠' : '');
     text.append(' ', small);
     row.append(cb, text);
-    return row;
-  }));
+    const choice = cb.checked && (m.id === 'web' || m.id === 'ai') ? siteChoice(m.id) : null;
+    return choice ? [row, choice] : [row];
+  }).flat());
+}
+// 웹 검색 · AI 에게 묻기: Enter 로 열 기본 사이트 (나머지는 매직키 창의 사이트 단추로)
+function siteChoice(id) {
+  const key = id === 'web' ? 'engine' : 'ai';
+  const wrap = document.createElement('label');
+  wrap.className = 'magic-site';
+  const name = document.createElement('span');
+  name.textContent = id === 'web' ? '기본 검색 사이트' : '기본 AI';
+  const sel = document.createElement('select');
+  for (const site of id === 'web' ? WEB_ENGINES : AI_SITES) sel.append(new Option(site.name + (site.paste ? ' (질문은 붙여 넣기)' : ''), site.id));
+  sel.value = magicState[key];
+  sel.addEventListener('change', async () => {
+    magicState = await api.settings.setMagic({ ...magicState, [key]: sel.value });
+  });
+  wrap.append(name, sel);
+  return wrap;
 }
 function showMagic(magic) {
   magicState = magic ?? { enabled: true, modules: {} };
@@ -1135,7 +1153,7 @@ $('opms-dir-btn').addEventListener('click', async () => {
   $('opms-dir').textContent = await api.opms.chooseDir();
 });
 $('magic-enabled').addEventListener('change', async (e) => {
-  magicState = await api.settings.setMagic({ enabled: e.target.checked, modules: magicState.modules, paused: magicState.paused });
+  magicState = await api.settings.setMagic({ ...magicState, enabled: e.target.checked });
   showMagic(magicState);
 });
 $('history-enabled').addEventListener('change', async (e) => {

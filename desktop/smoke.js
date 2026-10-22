@@ -1674,6 +1674,22 @@ export async function runSmoke({
         check('단축키 바꾸기: 다른 앱이 쓰는 키면 바꾸지 않고 알림', appSettings().shortcuts.magic.key === 'Control+Alt+Space' && /다른 앱이 이미 쓰고/.test(takenNote), takenNote);
       }
     }
+    // 매직키 기능: 계산기 · 웹 검색 · AI 에게 묻기가 켜져 있고, 기본 사이트를 고르면 저장
+    {
+      await listJs(`document.getElementById('settings-dialog').close()`);
+      await listJs(`document.getElementById('settings-btn').click()`);
+      await wait(300);
+      const mods = await listJs(`[...document.querySelectorAll('#magic-modules-list .magic-mod')].map((r) => r.querySelector('span').firstChild.textContent + ':' + r.querySelector('input').checked)`);
+      const sites = await listJs(`[...document.querySelectorAll('#magic-modules-list .magic-site select')].map((s) => s.value)`);
+      await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'google'; s.dispatchEvent(new Event('change')); })()`);
+      const engine = await until(() => appSettings().magic.engine === 'google' && 'google', '기본 검색 사이트 저장').catch(() => appSettings().magic.engine);
+      check('설정 매직키: 계산기 · 웹 검색 · AI 에게 묻기 켜짐, 기본 사이트(네이버 · ChatGPT)를 고르면 저장',
+        ['계산기:true', '웹 검색:true', 'AI 에게 묻기:true'].every((m) => mods.includes(m)) && sites.join() === 'naver,chatgpt' && engine === 'google', JSON.stringify({ mods, sites, engine }));
+      await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'naver'; s.dispatchEvent(new Event('change')); })()`);
+      await listJs(`document.getElementById('set-magic').scrollIntoView()`);
+      await wait(200);
+      await capture(getList(), 'smoke-settings-magic.png');
+    }
     // AI 비서 연결 (MCP): 연결 → Claude 설정 파일에 메모킹이 적힘(다른 서버는 그대로) → 적힌 명령으로 띄우면 도구가 보임 → 끊기
     {
       const cfgDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-claude-'));

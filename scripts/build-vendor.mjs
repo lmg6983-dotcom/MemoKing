@@ -26,6 +26,7 @@ const DEPS = {
   fullcalendar: '7.1.0',
   'temporal-polyfill': '1.0.5',
   'ical.js': '2.2.1',
+  mathjs: '15.2.0',
   esbuild: '0.28.2',
 };
 
@@ -65,6 +66,7 @@ await esbuild.build({
     'noble-crypto': join(ROOT, 'scripts', 'vendor', 'noble-crypto.js'),
     fullcalendar: join(ROOT, 'scripts', 'vendor', 'fullcalendar.js'),
     ical: join(ROOT, 'scripts', 'vendor', 'ical.js'),
+    mathjs: join(ROOT, 'scripts', 'vendor', 'mathjs.js'),
   },
   outdir: OUT,
   bundle: true,

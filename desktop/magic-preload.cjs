@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('magic', {
   search: (query) => ipcRenderer.invoke('magic:search', query),
   opmsSearch: (query) => ipcRenderer.invoke('magic:opms-search', query),
   act: (req) => ipcRenderer.invoke('magic:act', req), // { action, path } · { action, id }
+  prefs: () => ipcRenderer.invoke('magic:prefs'), // 웹 검색 · AI 기본 사이트
+  tool: (req) => ipcRenderer.invoke('magic:tool', req), // { type: 'copy' | 'web' | 'ai' | 'site', text, site }
   openAll: (query) => ipcRenderer.invoke('magic:open-all', query),
   resize: (height) => ipcRenderer.send('magic:resize', height),
   close: () => ipcRenderer.send('magic:close'),
