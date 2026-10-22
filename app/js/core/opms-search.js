@@ -125,3 +125,17 @@ export function matchedInventor(r, query) {
   const hit = splitNames(r.inventor).find((n) => nameScore({ applicant: '', inventor: n }, query, kind) > 0);
   return hit ?? '';
 }
+
+/**
+ * 사건번호를 온전히 쓴 글인가 — 이것만 매직키가 고르기 전에 저절로 OPMS 에 묻는다 (일부 번호 · 이름 · 초성은 고를 때만)
+ *   출원번호 전체: 10-2026-0012345 · 1020260012345 · 2026-0012345
+ *   관리번호 꼴: 영문과 숫자가 기호로 이어진 것 (FPD/2026-0271/E · P2026-1170-KR01 · P-12345) 또는 영문으로 시작해 숫자가 4개 넘는 것 (P20261170KR01)
+ *   전화번호(010-1234-5678) · 날짜(2026-10-22) · 숫자만 · 띄어 쓴 글은 아님
+ */
+export function isExactCaseRef(text) {
+  const s = String(text ?? '').trim();
+  if (!s || s.length > 30 || /\s/.test(s)) return false;
+  if (/^\d{2}-\d{4}-\d{7}$/.test(s) || /^\d{13}$/.test(s) || /^\d{4}-\d{7}$/.test(s)) return true;
+  if (!/[A-Za-z]/.test(s) || (s.match(/\d/g) ?? []).length < 4) return false;
+  return /^[A-Za-z0-9]+(?:[-/._][A-Za-z0-9]+)+$/.test(s) || /^[A-Za-z]{1,5}\d{4,}[A-Za-z0-9]*$/.test(s);
+}

@@ -302,16 +302,20 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
 
     // 4-0) OPMS 이름 · 초성 · 번호 일부로 찾기, 정확한 것부터 6건 + "OPMS 다른 n건 더 보기" → OPMS 창 목록
     //   치는 동안은 회사 서버에 묻지 않고 "OPMS 에서 찾기" 줄만 — 그 줄을 골라야 묻는다
+    // 고르기 (온전한 사건번호는 저절로 찾으므로, 이미 찾았거나 찾는 중이면 그대로)
     const askOpms = async () => {
-      await until(() => js(magic, `!!document.querySelector('.magic-row.kind-opmsAsk')`), 'OPMS 에서 찾기 줄', 4000);
-      await js(magic, `document.querySelector('.magic-row.kind-opmsAsk').click()`);
+      await until(() => js(magic, `!!document.querySelector('.magic-row.kind-opmsAsk, .magic-row.kind-opms, .magic-note.loading')`), 'OPMS 에서 찾기 줄', 4000);
+      await js(magic, `document.querySelector('.magic-row.kind-opmsAsk')?.click()`);
     };
     showMagic();
     await typeMagic('홍길동');
-    await typeMagic('FPD/2026-0271');
+    await typeMagic('0271');
     await wait(900);
     const beforeAsk = { hits: fake.hits.cases, ask: await js(magic, `document.querySelector('.magic-row.kind-opmsAsk')?.getAttribute('aria-selected')`), cases: await js(magic, `document.querySelectorAll('.magic-row.kind-opms').length`) };
-    check('매직키 OPMS: 치는 동안에는 회사 서버에 묻지 않고 "OPMS 에서 찾기" 줄만 (관리번호처럼 보이면 그 줄이 골라짐)', beforeAsk.hits === 0 && beforeAsk.ask === 'true' && beforeAsk.cases === 0, JSON.stringify(beforeAsk));
+    check('매직키 OPMS: 치는 동안에는 회사 서버에 묻지 않고 "OPMS 에서 찾기" 줄만 (번호 일부 · 이름, 번호처럼 보이면 그 줄이 골라짐)', beforeAsk.hits === 0 && beforeAsk.ask === 'true' && beforeAsk.cases === 0, JSON.stringify(beforeAsk));
+    await typeMagic('FPD/2026-0271/E');
+    const auto = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row.kind-opms'); return r && { t: r.querySelector('.t').textContent, sel: r.getAttribute('aria-selected') }; })()`), 'OPMS 저절로', 8000).catch(() => null);
+    check('매직키 OPMS: 온전한 사건번호(FPD/2026-0271/E)는 예전처럼 손을 멈추면 저절로 찾고 그 사건이 골라짐', fake.hits.cases === 1 && auto?.t.startsWith('FPD/2026-0271/E') && auto.sel === 'true', JSON.stringify({ auto, hits: fake.hits.cases }));
     await typeMagic('홍길동');
     await askOpms();
     const byName = await until(() => js(magic, `(() => { const r = [...document.querySelectorAll('.magic-row.kind-opms')]; const more = document.querySelector('.magic-row.kind-opmsMore'); return r.length && more && { n: r.length, first: r[0].querySelector('.s').textContent, more: more.querySelector('.t').textContent, inv: r.map((e) => e.querySelector('.s').textContent).find((t) => t.includes('발명자')) }; })()`), 'OPMS 이름 결과', 8000).catch(() => null);

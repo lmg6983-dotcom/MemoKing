@@ -57,3 +57,9 @@ test('사건 줄의 발명자: 이름 · 초성으로 찾았고 발명자 칸에
   assert.equal(matchedInventor(r, '메모킹'), '');
   assert.equal(matchedInventor(r, '0271'), '');
 });
+
+test('저절로 묻는 것은 온전한 사건번호뿐: 출원번호 전체 · 관리번호 꼴, 전화번호 · 날짜 · 일부 번호 · 글은 아님', async () => {
+  const { isExactCaseRef } = await import('../app/js/core/opms-search.js');
+  for (const q of ['10-2026-0012345', '1020260012345', '2026-0012345', 'FPD/2026-0271/E', 'P2026-1170-KR01', 'P20261170KR01', 'P-12345']) assert.ok(isExactCaseRef(q), q);
+  for (const q of ['010-1234-5678', '2026-10-22', '0271', '0012345', '2026년 회의록', 'FPD', 'P-12', '홍길동', 'abc', 'FPD 2026-0271', '12345678']) assert.ok(!isExactCaseRef(q), q);
+});

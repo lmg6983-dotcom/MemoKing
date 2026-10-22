@@ -1,6 +1,6 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
-import { opmsQueryKind } from './core/opms-search.js';
+import { opmsQueryKind, isExactCaseRef } from './core/opms-search.js';
 import { calcInput, calcOutput, siteUrl, sitesInOrder, looksLikeQuestion, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { dateCalc } from './core/date-calc.js';
 import { findDates, guessTitle } from './core/date-detect.js';
@@ -557,7 +557,7 @@ function render() {
   // 남겨 둔 지난 글로 다시 띄운 경우 첫 줄("메모로 저장")이 아니라 찾은 결과를 골라 둔다 (Enter 로 같은 메모를 또 만들지 않게)
   if (retained && selected === 0 && rows[0]?.kind === 'new' && rows.length > 1) selected = 1;
   // 관리번호 · 출원번호처럼 보이는 글은 메모로 저장하기보다 OPMS 에서 찾으려는 것 — "OPMS 에서 찾기" 를 골라 둔다 (아직 묻지는 않음)
-  if (!retained && selected === 0 && rows[0]?.kind === 'new' && opmsKind === 'ref') {
+  if (!retained && selected === 0 && rows[0]?.kind === 'new' && opmsKind === 'ref' && !isExactCaseRef(query)) {
     const ask = rows.findIndex((r) => r.kind === 'opmsAsk');
     if (ask > 0) selected = ask;
   }
@@ -673,14 +673,21 @@ async function search() {
   render();
 }
 
-// OPMS: 치는 동안에는 회사 서버에 아무것도 보내지 않는다 — "OPMS 에서 찾기" 줄을 골랐을 때만 묻는다
-//   (매직키에 쓰는 메모 · 검색어가 저절로 회사 서버로 가지 않게)
+// OPMS: 치는 동안에는 회사 서버에 보내지 않는다 — "OPMS 에서 찾기" 줄을 골랐을 때만 묻는다
+//   (매직키에 쓰는 메모 · 검색어가 저절로 회사 서버로 가지 않게). 사건번호를 온전히 쓴 것만은 손을 멈추면(0.35초) 저절로
 let opmsSeq = 0;
+let opmsTimer = 0;
 function searchOpms() {
   const query = input.value.trim();
+  clearTimeout(opmsTimer);
   if (opms.query !== query || !isOn('opms')) {
     opmsSeq++; // 묻는 중이던 것은 버린다
     opms = { query: '', loading: false, cases: [], total: 0, error: '' };
+  }
+  if (isOn('opms') && prefs.opms && opms.query !== query && isExactCaseRef(query)) {
+    opmsTimer = setTimeout(() => {
+      if (input.value.trim() === query) askOpms();
+    }, 350);
   }
 }
 async function askOpms() {
