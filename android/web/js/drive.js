@@ -4,6 +4,7 @@ import { app } from './state.js';
 import { openSheet, closeSheet, toast, adoptSheet, releaseSheet } from './ui.js';
 import { icon } from '../../app/js/icons.js';
 import { openAiDriveGuide } from '../../app/js/ai-drive-guide.js';
+import { installShareText } from '../../app/js/core/install-links.js';
 import { UI } from '../../app/js/core/ui-text.js';
 
 const $ = (x) => document.getElementById(x);
@@ -303,6 +304,10 @@ export async function syncNow() {
   renderStatus();
 }
 
+// 메모킹 나눠 주기: PC · 휴대폰 설치 링크를 안드로이드 공유 창으로
+$('share-install')?.addEventListener('click', () => {
+  call('share', { title: '메모킹 설치 링크', text: installShareText() }).catch((err) => toast(err.message, true));
+});
 // Gemini, ChatGPT 의 Google Drive 연결로 메모 폴더를 직접 다룰 때 붙여 넣을 안내문 (app/js/ai-drive-guide.js)
 $('ai-drive-guide')?.addEventListener('click', () => {
   const s = drive.status();

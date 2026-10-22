@@ -1626,6 +1626,9 @@ export async function runSmoke({
       await listJs(`document.querySelector('.phone-how').open = false`);
       const note = await until(() => listJs(`document.getElementById('phone-note').textContent`), '복사 안내', 2000).catch(() => '');
       check('설정: 휴대폰 앱(안드로이드) 설치 QR 코드 · 링크 복사 안내 · 설치 방법', qr > 0 && /releases\/download\/android\/MemoKing-android\.apk$/.test(copied) && how === 6 && /복사했어요/.test(note), JSON.stringify({ qr, copied, how, note }));
+      await listJs(`document.getElementById('pc-copy').click()`);
+      const pc = await until(() => listJs(`(() => { const n = document.getElementById('pc-note').textContent; return n && { n, url: document.getElementById('pc-open').dataset.url }; })()`), 'PC 링크 복사 안내', 2000).catch(() => null);
+      check('설정: Windows PC 버전 설치 링크 (늘 최신 · 복사 안내)', /releases\/latest\/download\/MemoKing-Setup\.exe$/.test(pc?.url ?? '') && /복사했어요/.test(pc?.n ?? ''), JSON.stringify(pc));
     }
     // 전역 단축키 바꾸기: 키 단추 → 새 조합을 누르면 저장(다른 앱이 쓰는 키면 그대로 두고 알림) · 같은 키는 거절 · 기본값으로
     {

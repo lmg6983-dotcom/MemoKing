@@ -159,13 +159,14 @@
       </details>
     </section>
     <section class="set-sec" aria-labelledby="set-phone">
-      <h3 class="set-title" id="set-phone">휴대폰 앱 (안드로이드) <small>PC와 같은 메모를 휴대폰에서도</small></h3>
+      <h3 class="set-title" id="set-phone">다른 기기에 설치 <small>휴대폰에서도 같은 메모를, 다른 사람에게는 링크로</small></h3>
+      <p class="label">휴대폰 앱 (안드로이드)</p>
       <div class="drive-box phone-box">
         <div class="phone-qr" id="phone-qr" role="img" aria-label="안드로이드 설치 파일 주소 QR 코드"></div>
         <div class="drive-box-text"><b>휴대폰 카메라로 찍어 받기</b><small>QR 코드를 찍으면 설치 파일(MemoKing-android.apk)을 바로 받아요. 새 버전은 휴대폰 앱이 알아서 알려 줘요.</small></div>
       </div>
       <div class="dialog-actions left">
-        <button id="phone-copy" class="btn">설치 링크 복사</button>
+        <button id="phone-copy" class="btn">휴대폰 설치 링크 복사</button>
         <button id="phone-open" class="link-btn">브라우저로 열기</button>
         <small class="sc-note" id="phone-note" role="status"></small>
       </div>
@@ -180,6 +181,17 @@
           <li>PC와 같은 메모를 보려면 PC와 휴대폰 모두 위의 Google Drive 동기화에서 같은 폴더로 연결해요.</li>
         </ol>
       </details>
+      <p class="label">Windows PC 버전</p>
+      <div class="drive-box">
+        <svg class="drive-box-icon"><use href="#i-link"/></svg>
+        <div class="drive-box-text"><b>다른 PC에 설치하기</b><small>링크를 열면 설치 파일(MemoKing-Setup.exe)을 받아요. 늘 최신 버전이고, 설치한 뒤에는 메모킹이 알아서 업데이트해요.</small></div>
+      </div>
+      <div class="dialog-actions left">
+        <button id="pc-copy" class="btn">PC 설치 링크 복사</button>
+        <button id="pc-open" class="link-btn">브라우저로 열기</button>
+        <button id="share-both" class="link-btn">두 링크 함께 복사</button>
+        <small class="sc-note" id="pc-note" role="status"></small>
+      </div>
     </section>
     <section class="set-sec" aria-labelledby="set-daily">
       <h3 class="set-title" id="set-daily">자주 쓰는 기능</h3>

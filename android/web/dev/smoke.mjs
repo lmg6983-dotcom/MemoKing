@@ -1027,6 +1027,12 @@ try {
   await page.waitForTimeout(300);
   check('설정: 받아쓰기는 Google 음성 인식 하나 (방식 고르기·데이터 받기 없음)', (await page.locator('#stt-engine, #stt-model-row').count()) === 0 && (await page.textContent('#rec-stt-note')).includes('Google'));
   await shot('17-settings-stt');
+  // 메모킹 나눠 주기: PC · 휴대폰 설치 링크를 공유 창으로
+  await page.locator('#share-install').scrollIntoViewIfNeeded();
+  await page.tap('#share-install');
+  await page.waitForTimeout(300);
+  const installShare = (await devLog()).log.filter((l) => l.share).at(-1)?.share?.text ?? '';
+  check('설정: 메모킹 나눠 주기 (PC · 휴대폰 설치 링크를 공유 창으로)', /latest\/download\/MemoKing-Setup\.exe/.test(installShare) && /MemoKing-android\.apk/.test(installShare), installShare);
   // 둘 중 하나(켜고 끄기)는 모두 같은 스위치 — 말한 사람 나누기·S펜 손글씨도 (예전엔 단추·목록 상자)
   check('설정: 켜고 끄기는 모두 스위치 (버튼·목록 상자 없음)', (await page.locator('#spk-btn, select#pen-writing').count()) === 0
     && (await page.locator('#spk-switch.switch, #pen-writing.switch').count()) === 2);
