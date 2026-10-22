@@ -18,7 +18,7 @@ import { pickHandoff, recentlyUpdated } from '../app/js/core/handoff.js';
 import { PopupWatcher } from './popup-watch.js';
 import { createSttService } from './stt/stt-service.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
-import { popupToEntry, kakaoEntry, popupAppName, isRepeat, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
+import { popupToEntry, kakaoEntry, popupAppName, findRepeat, betterReading, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { FileIndex, defaultRoots } from './file-index.js';
@@ -469,10 +469,19 @@ async function addPopupToHistory(p) {
     if (p.via === 'ocr') entry.title = correctTitle(entry.title, knownNames(history.list({ app: appName }).filter((e) => e.source === 'popup').slice(0, 500).map((e) => e.title)));
     const now = Date.now();
     while (recentPopups.length && now - recentPopups[0].at > 5 * 60 * 1000) recentPopups.shift();
-    if (isRepeat(recentPopups, { app: appName, hwnd: p.hwnd, ...entry }, now)) return;
-    recentPopups.push({ app: appName, hwnd: p.hwnd, ...entry, at: now });
+    const via = p.via ?? '';
+    // 같은 앱이 Windows 알림 센터에도 같은 알림을 남겼으면(그쪽 글이 정확하다) 알림 창 것은 넣지 않는다
+    const toasts = history.list().filter((e) => e.source === 'windows' && now - Date.parse(e.time) < 2 * 60 * 1000 && (e.app === appName || (p.process && String(e.appId).toLowerCase().includes(String(p.process).toLowerCase()))))
+      .map((e) => ({ app: appName, title: e.title, body: e.body, at: Date.parse(e.time) }));
+    if (findRepeat(toasts, { app: appName, ...entry }, now)) return;
+    const prev = findRepeat(recentPopups, { app: appName, hwnd: p.hwnd, ...entry }, now);
+    // 같은 알림을 또 읽었으면 넣지 않는다 — 다만 앞의 것은 그림 글자 인식, 이번 것은 글 그대로 읽었으면 이번 것으로 바꾼다
+    if (prev && !betterReading(prev, { via })) return;
+    if (prev?.id) history.remove(prev.id);
+    if (prev) recentPopups.splice(recentPopups.indexOf(prev), 1);
     const image = p.image ? history.keepImage(p.image) : null;
-    history.add({ source: 'popup', appId: p.process, app: appName, ...entry, image, via: p.via ?? '' });
+    const item = history.add({ source: 'popup', appId: p.process, app: appName, ...entry, image, via });
+    recentPopups.push({ app: appName, hwnd: p.hwnd, ...entry, via, id: item?.id, at: now });
   } finally {
     if (p.image) fs.rm(p.image, { force: true }, () => {});
     if (p.ocrImage) fs.rm(p.ocrImage, { force: true }, () => {});
