@@ -12,6 +12,7 @@ const ICONS = {
   saveOpen: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
   more: 'M4 6h16M4 12h16M4 18h10',
   append: 'M12 5v14M5 12h14',
+  ask: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4',
   wrapper: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   copyOur: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
   copy: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
@@ -34,6 +35,8 @@ export function actionsFor(r) {
       return [{ id: 'open', label: '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '위 폴더에서 보기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '폴더 복사' }];
     case 'file':
       return [{ id: 'open', label: r.app ? '실행' : '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '폴더 열기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '파일 복사' }];
+    case 'opmsAsk':
+      return [{ id: 'ask', label: 'OPMS 에서 찾기' }];
     case 'more':
     case 'opmsMore':
       return [{ id: 'more', label: '모두 보기' }];

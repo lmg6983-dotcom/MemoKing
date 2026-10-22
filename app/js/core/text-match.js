@@ -20,6 +20,37 @@ const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
 /** 한글 글자만 초성으로 (다른 글자는 그대로 — 길이가 같아 찾은 자리를 원래 글에 그대로 쓴다) */
 export const choseongAligned = (s) => String(s ?? '').replace(/[가-힣]/g, (ch) => CHO[Math.floor((ch.charCodeAt(0) - 0xac00) / 588)]);
 
+// 글자 하나의 초성 (한글이 아니면 그 글자, 소문자로) — 문자 코드로만 (새 글을 만들지 않게)
+const choOf = (code) => (code >= 0xac00 && code <= 0xd7a3 ? CHO.charCodeAt(Math.floor((code - 0xac00) / 588)) : code >= 65 && code <= 90 ? code + 32 : code);
+const isSpace = (code) => code === 32 || code === 9 || code === 10 || code === 13 || code === 0x3000;
+
+/**
+ * 초성 검색어가 글에 들어 있으면 띄어쓰기를 뺀 글에서 몇 번째 글자부터인지, 없으면 -1 — 많은 이름(파일 30만 개)을 훑을 때용.
+ *   choseongAligned 로 글을 만들지 않고 문자 코드로만 견준다 (메모리를 쓰지 않고, 같은 일을 더 빨리)
+ */
+export function choseongIndex(text, term) {
+  const t = String(text ?? '');
+  const n = term.length;
+  if (!n) return 0;
+  const first = term.charCodeAt(0);
+  let at = -1; // 띄어쓰기를 뺀 글자 번호
+  for (let i = 0; i < t.length; i++) {
+    const c = t.charCodeAt(i);
+    if (isSpace(c)) continue;
+    at++;
+    if (choOf(c) !== first) continue;
+    let k = 1;
+    for (let j = i + 1; k < n && j < t.length; j++) {
+      const d = t.charCodeAt(j);
+      if (isSpace(d)) continue;
+      if (choOf(d) !== term.charCodeAt(k)) break;
+      k++;
+    }
+    if (k === n) return at;
+  }
+  return -1;
+}
+
 /** 초성 검색어(ㄱㅈㅅ)가 글의 어디에 맞나 — 띄어쓰기는 건너뛰고 ("회의 록" 도 ㅎㅇㄹ) [from, to) 또는 null */
 export function choseongRange(text, term) {
   const t = String(text ?? '');

@@ -446,7 +446,7 @@ export function registerIpc(ctx) {
   // 웹 검색 · AI 에게 묻기 기본 사이트 (매직키 창의 할 일 단추 순서)
   ipcMain.handle('magic:prefs', () => {
     const m = normalizeMagicSettings(settings.magic);
-    return { engine: m.engine, ai: m.ai };
+    return { engine: m.engine, ai: m.ai, opms: Boolean(wm.opmsSettings().host) }; // opms: 서버 주소를 넣었나 (없으면 "OPMS 에서 찾기" 줄도 없음)
   });
   // 계산 결과 복사 · 웹 검색 · AI 에게 묻기 · 사이트 열기 — 고른 줄을 실행할 때만 브라우저로 (주소는 여기서 만든다)
   ipcMain.handle('magic:tool', (_e, req) => {

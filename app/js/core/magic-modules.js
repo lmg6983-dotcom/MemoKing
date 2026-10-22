@@ -10,7 +10,7 @@ export const MAGIC_MODULES = [
   { id: 'calc', name: '계산기', chip: '계산기', description: '식이나 날짜를 쓰면 바로 계산해요 (1,200 × 3, 15% * 80000, 3주 뒤, 12/25까지, 9:15부터 18:30까지). Enter 로 결과 복사', ready: true, defaultOn: true },
   { id: 'web', name: '웹 검색', chip: '웹 검색', description: '쓴 글을 검색 사이트에서 찾거나, 사이트 주소를 바로 열어요. 고르기 전에는 아무것도 보내지 않아요', ready: true, defaultOn: true },
   { id: 'ai', name: 'AI 에게 묻기', chip: 'AI', description: 'ChatGPT, Claude 등에 바로 물어봐요. 브라우저에서 로그인한 계정 그대로, API 키는 필요 없어요', ready: true, defaultOn: true },
-  { id: 'opms', name: 'OPMS 검색', chip: 'OPMS', description: '관리번호, 출원번호(일부만도), 출원인, 발명자 이름(초성도)으로 회사 OPMS 사건을 찾아 서지정보, 전자포대, 청구서를 봐요 (사내망에서만)', ready: true, defaultOn: true },
+  { id: 'opms', name: 'OPMS 검색', chip: 'OPMS', description: '관리번호, 출원번호(일부만도), 출원인, 발명자 이름(초성도)으로 회사 OPMS 사건을 찾아 서지정보, 전자포대, 청구서를 봐요. "OPMS 에서 찾기" 줄을 골랐을 때만 회사 서버에 물어요 (사내망에서만)', ready: true, defaultOn: true },
 ];
 
 // 처음 캡슐 · 결과 묶음 순서 — 관리번호를 쓰면 OPMS 사건이 새 메모 바로 아래 (전에 늘 그랬듯)

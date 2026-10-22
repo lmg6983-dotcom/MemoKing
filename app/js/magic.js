@@ -107,7 +107,7 @@ function animateResults(before, beforeHeight) {
 }
 
 // 웹 검색 · AI 기본 사이트 (설정 매직키에서 고름)
-let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id };
+let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id, opms: false };
 async function loadPrefs() {
   prefs = { ...prefs, ...(await api.prefs?.().catch(() => null)) };
 }
@@ -366,6 +366,10 @@ function row(r, index, query) {
     t.append(highlighted([r.ourref, r.n_app].filter(Boolean).join(', ') || r.yourref || '관리번호 없음', query));
     s.append(highlighted([r.applicant, r.inventor && `발명자 ${r.inventor}`, r.title].filter(Boolean).join(', '), query)); // 이름으로 찾았으면 맞은 이름이 굵게
     side.textContent = r.div || '';
+  } else if (r.kind === 'opmsAsk') {
+    ico.textContent = 'O';
+    t.textContent = 'OPMS 에서 찾기';
+    s.textContent = r.opmsKind === 'ref' ? '관리번호, 출원번호에서 (고르면 회사 OPMS 에 물어봐요)' : '출원인, 발명자 이름에서 (고르면 회사 OPMS 에 물어봐요)';
   } else if (r.kind === 'opmsMore') {
     ico.textContent = '⋯';
     t.textContent = `OPMS 다른 ${r.count.toLocaleString()}건 더 보기`;
@@ -467,9 +471,10 @@ function render() {
     }
   }
   // 관리번호·출원번호를 쓰면 OPMS 사건 (찾는 중 · 사내망이 아님도 이 자리에)
-  // 번호로 찾을 때만 "찾는 중" · 오류를 보인다 — 이름 · 초성은 메모를 찾을 때도 같이 물으므로 찾은 것만 조용히
-  const opmsByRef = opmsQueryKind(query) === 'ref';
-  if (query && isOn('opms') && opms.query === query && !(calc && opms.error) && (opmsByRef || opms.cases.length)) { // 식에는 "OPMS 주소를 넣으면" 안내를 안 띄운다
+  // OPMS: 고르기 전에는 "OPMS 에서 찾기" 줄만 (서버에 묻지 않음), 고른 뒤에는 찾은 사건 · 찾는 중 · 오류
+  const opmsKind = query && isOn('opms') && prefs.opms ? opmsQueryKind(query) : null;
+  if (opmsKind && opms.query !== query) put('opms', { row: { kind: 'opmsAsk', opmsKind } });
+  if (opmsKind && opms.query === query && !(calc && opms.error)) { // 식에는 "OPMS 주소를 넣으면" 안내를 안 띄운다
     if (opms.cases.length) {
       put('opms', { head: ['OPMS', opms.total] });
       opms.cases.forEach((c) => put('opms', { row: { kind: 'opms', ...c } }));
@@ -481,6 +486,7 @@ function render() {
       put('opms', { node: li });
     }
     else if (opms.error) put('opms', { node: note(opms.error) });
+    else put('opms', { node: note(`OPMS 에서 '${query.slice(0, 30)}'와 맞는 사건을 못 찾았어요`) });
   }
   // 캡슐로 끈 기능은 새 결과를 기다리지 않고 바로 뺀다
   const notes = isOn('notes') ? results.notes : [];
@@ -550,6 +556,11 @@ function render() {
   clearBtn.hidden = !raw;
   // 남겨 둔 지난 글로 다시 띄운 경우 첫 줄("메모로 저장")이 아니라 찾은 결과를 골라 둔다 (Enter 로 같은 메모를 또 만들지 않게)
   if (retained && selected === 0 && rows[0]?.kind === 'new' && rows.length > 1) selected = 1;
+  // 관리번호 · 출원번호처럼 보이는 글은 메모로 저장하기보다 OPMS 에서 찾으려는 것 — "OPMS 에서 찾기" 를 골라 둔다 (아직 묻지는 않음)
+  if (!retained && selected === 0 && rows[0]?.kind === 'new' && opmsKind === 'ref') {
+    const ask = rows.findIndex((r) => r.kind === 'opmsAsk');
+    if (ask > 0) selected = ask;
+  }
   // 초성만 쓴 글(ㄱㅈㅅ)은 찾으려는 것 — 메모로 저장하지 않고 첫 결과를 골라 둔다
   if (!retained && selected === 0 && rows[0]?.kind === 'new' && query.split(/\s+/).every(isChoseongQuery)) {
     const first = rows.findIndex((r) => r.kind === 'note' || r.kind === 'file' || r.kind === 'folder');
@@ -662,25 +673,28 @@ async function search() {
   render();
 }
 
-// OPMS: 치는 동안은 기다렸다가(0.35초) 한 번만 — 관리번호·출원번호처럼 보일 때만
-let opmsTimer = 0;
+// OPMS: 치는 동안에는 회사 서버에 아무것도 보내지 않는다 — "OPMS 에서 찾기" 줄을 골랐을 때만 묻는다
+//   (매직키에 쓰는 메모 · 검색어가 저절로 회사 서버로 가지 않게)
 let opmsSeq = 0;
 function searchOpms() {
   const query = input.value.trim();
-  clearTimeout(opmsTimer);
-  if (!isOn('opms') || !opmsQueryKind(query)) {
+  if (opms.query !== query || !isOn('opms')) {
+    opmsSeq++; // 묻는 중이던 것은 버린다
     opms = { query: '', loading: false, cases: [], total: 0, error: '' };
-    return;
   }
-  if (opms.query === query && !opms.loading) return;
-  opms = { query, loading: true, cases: [], total: 0, error: '' };
+}
+async function askOpms() {
+  const query = input.value.trim();
+  if (!isOn('opms') || !opmsQueryKind(query)) return;
   const my = ++opmsSeq;
-  opmsTimer = setTimeout(async () => {
-    const res = await api.opmsSearch(query).catch((err) => ({ cases: [], total: 0, error: err.message }));
-    if (my !== opmsSeq) return;
-    opms = { query, loading: false, cases: res.cases ?? [], total: res.total ?? 0, error: res.error ?? '' };
-    render();
-  }, 350);
+  opms = { query, loading: true, cases: [], total: 0, error: '' };
+  render();
+  const res = await api.opmsSearch(query).catch((err) => ({ cases: [], total: 0, error: err.message }));
+  if (my !== opmsSeq) return;
+  opms = { query, loading: false, cases: res.cases ?? [], total: res.total ?? 0, error: res.error ?? '' };
+  render();
+  const first = rows.findIndex((r) => r.kind === 'opms'); // 찾은 첫 사건을 골라 둔다 (Enter 로 바로 사건 보기)
+  if (first >= 0) select(first);
 }
 
 let searchTimer = 0;
@@ -740,6 +754,10 @@ async function run(i, { alt = false, act = 0 } = {}) {
   }
   if (r.kind === 'more') {
     await api.openAll(input.value.trim()).catch(() => {});
+    return;
+  }
+  if (r.kind === 'opmsAsk') {
+    askOpms();
     return;
   }
   if (r.kind === 'opmsMore') {
