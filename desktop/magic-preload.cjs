@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('magic', {
   modules: () => ipcRenderer.invoke('magic:modules'),
   toggleModule: (id) => ipcRenderer.invoke('magic:toggle-module', id),
+  reorderModules: (ids) => ipcRenderer.invoke('magic:reorder-modules', ids), // 캡슐을 끌어 놓은 순서
   run: (payload) => ipcRenderer.invoke('magic:run', payload),
   search: (query) => ipcRenderer.invoke('magic:search', query),
   opmsSearch: (query) => ipcRenderer.invoke('magic:opms-search', query),
