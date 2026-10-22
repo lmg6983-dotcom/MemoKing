@@ -586,7 +586,7 @@ export function registerIpc(ctx) {
     saveSettings();
     return r.filePaths[0];
   });
-  ipcMain.handle('opms:copy', (_e, text) => clipboard.writeText(String(text ?? '').slice(0, 2000)));
+  ipcMain.handle('opms:copy', (_e, text) => clipboard.writeText(String(text ?? '').slice(0, 20000))); // 서지사항 전체(긴 비고 포함)도
   ipcMain.handle('opms:to-memo', async (_e, idx) => {
     const vault = getVault();
     if (!vault) throw new Error(UI.noVault);

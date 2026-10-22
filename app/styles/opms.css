@@ -35,6 +35,7 @@ body {
 .op-head { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .op-head-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
 .op-actions { flex: none; display: flex; gap: 6px; }
+.op-copy-biblio { min-width: 150px; } /* "✓ 복사했어요" 로 바뀌어도 자리가 흔들리지 않게 */
 .op-memo { min-width: 132px; } /* "✓ 메모로 만들었어요" 로 바뀌어도 자리가 흔들리지 않게 */
 .op-refs { display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; font-size: 18px; }
 .op-refs b { font-weight: 800; }
@@ -117,6 +118,7 @@ body {
 
 /* 전자포대: 요약은 넓게 줄바꿈, 열기 단추 칸은 좁게 */
 .op-table td.wide { min-width: 180px; max-width: 360px; white-space: normal; overflow-wrap: anywhere; }
+.op-table td.long { min-width: 240px; white-space: pre-line; overflow-wrap: anywhere; } /* 메모: OPMS 처럼 줄바꿈 그대로 */
 .op-table td.act { width: 1%; white-space: nowrap; text-align: right; }
 .op-table :is(th, td).nowrap { white-space: nowrap; } /* 등록자 이름: "한재원" 이 한 글자씩 줄바뀜되지 않게 */
 .op-open-file:disabled { opacity: 0.6; cursor: default; }

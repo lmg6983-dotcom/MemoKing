@@ -8,6 +8,7 @@ import path from 'node:path';
 export { looksLikeRef } from '../app/js/core/magic-modules.js';
 import { progressItems } from '../app/js/core/opms-progress.js';
 import { decodeEntities } from '../app/js/core/entities.js';
+import { biblioFields } from '../app/js/core/opms-biblio.js';
 
 // 서버 주소 · 전자포대 폴더는 코드에 두지 않는다 (설치 파일은 공개 저장소에 올라간다) — 설정 › 매직키 › OPMS 에서 사용자가 넣는다
 export const DEFAULT_HOST = '';
@@ -294,11 +295,7 @@ export function caseInfoText(c, { mywork = [], foreign = [], files = [], now = n
   const L = [];
   const bar = '='.repeat(80);
   L.push(bar, `[OPMS 사건 정보] ${dash(c.ourref)} / ${dash(c.yourref)}`, bar, '', '[기본 서지정보]');
-  for (const [k, v] of [
-    ['사무소관리번호', c.ourref], ['출원인관리번호', c.yourref], ['구분', c.div], ['출원인', c.applicant], ['발명자', c.inventor],
-    ['수임일', cleanDate(c.d_accept)], ['출원번호', c.n_app], ['출원일', cleanDate(c.d_app)], ['등록번호', c.n_issue],
-    ['등록일', cleanDate(c.d_issue)], ['발명명칭', c.title_kor], ['비고', c.memo],
-  ]) L.push(`  ${k.padEnd(14)} : ${dash(v).replace(/\n/g, `\n${' '.repeat(19)}`)}`); // 여러 줄(비고)은 값 자리에 맞춰 들여 쓴다
+  for (const [k, v] of biblioFields({ ...c, memo: c.memo || '-' })) L.push(`  ${k.padEnd(14)} : ${dash(v).replace(/\n/g, `\n${' '.repeat(19)}`)}`); // 여러 줄(비고)은 값 자리에 맞춰 들여 쓴다
   L.push('', '[업무배분]');
   if (mywork.length) {
     mywork.forEach((r, i) => {
@@ -333,11 +330,7 @@ export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '', d
   const L = [`# ${title}`, ''];
   if (summary) L.push(`해외출원: ${summary}`, '');
   L.push('| 항목 | 내용 |', '| --- | --- |');
-  for (const [k, v] of [
-    ['사무소관리번호', c.ourref], ['출원인관리번호', c.yourref], ['구분', c.div], ['출원인', c.applicant], ['발명자', c.inventor],
-    ['수임일', cleanDate(c.d_accept)], ['출원번호', c.n_app], ['출원일', cleanDate(c.d_app)], ['등록번호', c.n_issue],
-    ['등록일', cleanDate(c.d_issue)], ['발명명칭', c.title_kor], ['비고', c.memo],
-  ]) if (String(v ?? '').trim() || k !== '비고') L.push(`| ${k} | ${cell(v)} |`);
+  for (const [k, v] of biblioFields(c)) L.push(`| ${k} | ${cell(v)} |`);
   if (mywork.length) {
     L.push('', '## 업무배분', '', '| 업무 | 담당 | 접수 | 기한 | 완료 | 상세 |', '| --- | --- | --- | --- | --- | --- |');
     for (const r of mywork) {
@@ -345,7 +338,7 @@ export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '', d
       L.push(`| ${cell(r.div_job)} | ${cell(per)} | ${cell(cleanDate(r.d_rec))} | ${cell(cleanDate(r.d_due))} | ${cell(cleanDate(r.d_end))} | ${cell(r.detail || r.memo)} |`);
     }
   }
-  // 신규성 의제 (사건 표의 칸) · 찾은 표마다 (신규성 의제 · 진행사항 · 메모)
+  // 신규성 의제 (사건 표의 칸) · 표마다 (신규성 의제 · 진행사항 · 우선권 · 메모)
   if (details?.novelty?.length) {
     L.push('', '## 신규성 의제', '', '| 항목 | 내용 |', '| --- | --- |');
     for (const n of details.novelty) L.push(`| ${cell(n.label)} | ${cell(n.value)} |`);
@@ -372,15 +365,51 @@ export function caseMemoMarkdown(c, { mywork = [], foreign = [], summary = '', d
   return L.join('\n');
 }
 
-// ---------- 더 보기: 신규성 의제 · 진행사항 · 메모 ----------
-// 이 세 가지가 어느 표에 있는지는 회사 DB 마다 이름이 달라, 처음 한 번 OPMS 의 표·열 목록(INFORMATION_SCHEMA)을 받아
+// ---------- 더 보기: 신규성 의제 · 진행사항 · 우선권 · 메모 ----------
+// 신규성 의제 · 진행사항이 어느 표에 있는지는 회사 DB 마다 이름이 달라, 처음 한 번 OPMS 의 표·열 목록(INFORMATION_SCHEMA)을 받아
 // 이름으로 고른다: 표 이름에 그 말이 들고, 사건 번호(idx)로 이어지는 열이 있는 표. 못 찾으면 그렇게 알리고, 표 목록을 복사할 수 있다.
 
 export const DETAIL_KINDS = [
   { id: 'novelty', label: '신규성 의제', words: /novel|grace|except|nov(?![a-z])|ex30|30jo/i },
   { id: 'progress', label: '진행사항', words: /progress|prog(?![a-z])|hist|step|proc(?![a-z])|process|timeline|tracking/i },
-  { id: 'memo', label: '메모', words: /memo|note|remark|comment/i },
 ];
+
+// 우선권 · 메모는 표를 알고 있다 (회사 OPMS 의 표 목록으로 확인) — OPMS 화면의 탭과 같은 열 · 순서
+//   우선권: opms_pri (사건 idx_parent). 메모: opms_memo — 사건에 단 메모(idx_parent = 사건)와,
+//   구분이 "고객"인 메모는 고객에 달려 있어(idx_parent = 고객) 이 사건의 출원인 · 고객(opms_applicant · opms_client 의 idx_custom)으로 찾는다
+export const PRIORITY_COLUMNS = [
+  ['pri_nation', '우선국'], ['d_pri', '우선권주장일'], ['n_pri', '우선권번호'], ['n_pri_acc', '접근코드'],
+  ['d_pri_rec', '접수일'], ['d_pri_due', '제출마감일'], ['d_pri_pre', '제출일'], ['memo', '비고'],
+];
+export const MEMO_COLUMNS = [['div', '구분'], ['ck_popup', '필독'], ['cust', '고객명'], ['d_memo', '작성일'], ['header', '말머리'], ['memo', '메모']];
+const CUSTOMER_MEMO = '고객';
+
+export const buildPrioritySql = (caseIdx) =>
+  `SELECT TOP 100 pri_order, pri_nation, d_pri, n_pri, n_pri_acc, d_pri_rec, d_pri_due, d_pri_pre, memo\nFROM opms_pri\n` +
+  `WHERE idx_parent = '${sqlQuote(caseIdx)}' AND del_flag = 'N'\nORDER BY pri_order, d_pri, idx`;
+
+export function buildMemoSql(caseIdx) {
+  const q = sqlQuote(caseIdx);
+  const customers = `SELECT idx_custom FROM opms_applicant WHERE idx_parent = '${q}' AND del_flag = 'N'\n` +
+    `    UNION SELECT idx_custom FROM opms_client WHERE idx_parent = '${q}' AND del_flag = 'N'`;
+  return `SELECT TOP 200 M.div, M.ck_popup, C.cust_kor AS cust, M.d_memo, M.header, M.memo\n` +
+    `FROM opms_memo M\nLEFT JOIN opms_customer C ON M.div = '${CUSTOMER_MEMO}' AND C.idx = M.idx_parent\n` +
+    `WHERE M.del_flag = 'N' AND (\n` +
+    `  (M.div = '${CUSTOMER_MEMO}' AND M.idx_parent IN (\n    ${customers}))\n` +
+    `  OR (M.div <> '${CUSTOMER_MEMO}' AND M.idx_parent = '${q}')\n)\nORDER BY M.idx`;
+}
+
+/** 정해진 열 그대로 (OPMS 화면과 같은 순서) — 날짜는 YYYY-MM-DD, 메모의 줄바꿈은 그대로, 필독은 "필독" */
+export function fixedRows(rows, cols) {
+  return {
+    columns: cols.map(([key, label]) => ({ key, label })),
+    rows: rows.map((r) => Object.fromEntries(cols.map(([k]) => {
+      const v = String(r[k] ?? '').trim();
+      if (k === 'ck_popup') return [k, /^(y|1|true)$/i.test(v) ? '필독' : ''];
+      return [k, /^\d{4}-\d{2}-\d{2}[ T]\d/.test(v) ? cleanDate(v) : k === 'memo' ? v.replace(/\r\n?/g, '\n') : v.replace(/[\r\n]+/g, ' ')];
+    }))),
+  };
+}
 // 사건(opms_app.idx)을 가리키는 열 이름 — 앞의 것일수록 먼저
 export const LINK_COLUMNS = ['idx_app', 'app_idx', 'idx_parent', 'idx_relation', 'idx_case', 'case_idx', 'parent_idx', 'idx_master'];
 // 이미 다른 탭에서 보이는 표 (다시 고르지 않음)
@@ -870,13 +899,14 @@ export class Opms {
   }
 
   /**
-   * 신규성 의제 · 진행사항 · 메모 — 표를 찾은 것만 받아 온다
+   * 신규성 의제 · 진행사항(표를 찾은 것만) · 우선권 · 메모
    * @returns {Promise<{ sections: { id, label, table, columns, rows, error? }[], novelty: { label, value }[], missing: string[] }>}
    */
   async details(c) {
-    const schema = await this.schema();
+    // 표 목록을 못 받아도(권한 등) 표를 아는 우선권 · 메모는 보이게 — 신규성 의제 · 진행사항만 "찾지 못함"
+    const schema = await this.schema().catch(() => new Map());
     const picks = pickDetailTables(schema);
-    const sections = await Promise.all(DETAIL_KINDS.map(async (kind) => {
+    const guessed = DETAIL_KINDS.map(async (kind) => {
       const pick = picks[kind.id];
       if (!pick) return { id: kind.id, label: kind.label, table: null, columns: [], rows: [] };
       try {
@@ -884,7 +914,16 @@ export class Opms {
       } catch (err) {
         return { id: kind.id, label: kind.label, table: pick.table, columns: [], rows: [], error: err.message };
       }
-    }));
+    });
+    const fixed = (id, label, table, sql, cols) => this.select(sql)
+      .then((rows) => ({ id, label, table, ...fixedRows(rows, cols) }))
+      .catch((err) => ({ id, label, table, ...fixedRows([], cols), error: err.message }));
+    // OPMS 화면의 탭 순서: 진행사항 · 우선권 · 메모
+    const sections = await Promise.all([
+      ...guessed,
+      fixed('priority', '우선권', 'opms_pri', buildPrioritySql(c.idx), PRIORITY_COLUMNS),
+      fixed('memo', '메모', 'opms_memo', buildMemoSql(c.idx), MEMO_COLUMNS),
+    ]);
     // 사건 표에 바로 든 신규성 의제 칸
     const ncols = noveltyColumnsOf(schema);
     let novelty = [];

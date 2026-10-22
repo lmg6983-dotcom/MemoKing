@@ -41,6 +41,9 @@ function fakeOpms() {
       if (req.url.startsWith('/OPMS/')) return Promise.resolve(gate.held).then(() => res.end(`FILE ${decodeURIComponent(req.url)}`));
       const sql = new URLSearchParams(body).get('sql') ?? '';
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      // 우선권 · 메모 먼저 (메모 SQL 안의 "FROM opms_applicant" 가 아래 사건 표 줄에 걸리지 않게)
+      if (/FROM opms_pri/.test(sql)) return res.end(table(['pri_order', 'pri_nation', 'd_pri', 'n_pri', 'n_pri_acc', 'd_pri_rec', 'd_pri_due', 'd_pri_pre', 'memo'], [['1', 'KR', '2026-09-23 00:00:00.0', '10-2026-0182644', '', '', '', '', '']]));
+      if (/FROM opms_memo M/.test(sql)) return res.end(table(['div', 'ck_popup', 'cust', 'd_memo', 'header', 'memo'], [['고객', 'Y', '메모킹 주식회사', '2026-03-11 00:00:00.0', '', '1. 비용 산정은 발명신고일 기준\\r\\n2. 청구서에 상세 내역 적기']]));
       if (/FROM opms_app/.test(sql)) {
         const one = sql.match(/\bidx = '(\d+)'/)?.[1]; // 사건 하나 (idx 로) — 회사 서버처럼 그 사건만
         return res.end(table(['idx', 'div', 'ourref', 'yourref', 'n_app', 'd_app', 'applicant', 'inventor', 'title_kor', 'd_accept', 'ck_out'], [
@@ -258,6 +261,24 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       return t && { our: document.getElementById('op-our').textContent, badge: document.getElementById('op-badge').textContent,
         app: [...document.querySelectorAll('.op-info dd')].map((d) => d.textContent).join('|'), work: t.querySelector('tbody td')?.textContent };
     })()`), 'OPMS 정보', 10000);
+    const extra = await until(() => js(ow, `(() => {
+      const hs = [...document.querySelectorAll('.op-h')].map((h) => h.textContent);
+      if (!hs.includes('우선권') || !hs.includes('메모')) return null;
+      const tableAfter = (name) => { const h = [...document.querySelectorAll('.op-h')].find((x) => x.textContent === name); let t = h.nextElementSibling; return t && t.matches('table') ? { head: [...t.querySelectorAll('th')].map((x) => x.textContent), row: [...t.querySelectorAll('tbody td')].map((x) => x.textContent) } : null; };
+      return { pri: tableAfter('우선권'), memo: tableAfter('메모'), lines: [...document.querySelectorAll('.op-table td.long')].some((td) => td.textContent.includes('\\n')) };
+    })()`), '우선권 · 메모', 8000).catch(() => null);
+    check('OPMS 정보: 우선권(우선국 · 우선권주장일 · 우선권번호 …) · 메모(구분 · 필독 · 고객명 · 작성일 · 말머리 · 메모, 줄바꿈 그대로)',
+      extra?.pri?.head.join() === '우선국,우선권주장일,우선권번호,접근코드,접수일,제출마감일,제출일,비고' && extra.pri.row.slice(0, 3).join() === 'KR,2026-09-23,10-2026-0182644'
+      && extra.memo?.head.join() === '구분,필독,고객명,작성일,말머리,메모' && extra.memo.row.slice(0, 4).join() === '고객,필독,메모킹 주식회사,2026-03-11' && extra.lines,
+      JSON.stringify(extra));
+    // 서지사항 전체 복사 (메모로 만들기 옆)
+    clipboard.writeText('');
+    await js(ow, `document.getElementById('op-copy-biblio').click()`);
+    const biblio = await until(() => clipboard.readText(), '서지사항 복사').catch(() => '');
+    const biblioBtn = await js(ow, `(() => { const b = document.getElementById('op-copy-biblio'); return { text: b.textContent, nextIsMemo: b.nextElementSibling?.id === 'op-memo' }; })()`);
+    check('OPMS: 메모로 만들기 옆 "서지사항 전체 복사" → 서지사항이 한 줄씩 클립보드에',
+      biblioBtn.nextIsMemo && /복사했어요/.test(biblioBtn.text) && /^사무소관리번호 : FPD\/2026-0271\/E/.test(biblio) && /출원번호 +: 10-2026-0012345/.test(biblio) && /발명명칭 +: 메모를 쉽게 쓰는 장치/.test(biblio),
+      JSON.stringify({ biblioBtn, biblio }));
     check('OPMS 창 정보: 서지 · 업무배분 · 해외출원 배지', info.our === 'FPD/2026-0271/E' && info.app.includes('10-2026-0012345') && info.app.includes('2026-02-03') && info.work === '명세서 작성' && /해외 1건 \(US\)/.test(info.badge), JSON.stringify(info));
     // 청구서 · 해외출원
     await js(ow, `document.querySelector('[data-tab="bills"]').click()`);
