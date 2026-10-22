@@ -39,12 +39,13 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-results { -webkit-app-region: no-drag; position: relative; list-style: none; margin: 0; padding: 4px 8px 6px; max-height: 430px; overflow-y: auto; border-top: 1px solid var(--mk-line); }
 .magic-results:not(:has(> :not(.magic-pill))) { display: none; }
 /* 기능마다 색 하나 — 아래 캡슐의 점 · 결과 묶음 머리말의 점이 같은 색이라 짝이 한눈에 */
+/*   색 계열이 서로 멀게: 노랑 · 빨강 · 청록 · 초록 · 분홍 · 보라 · 남색 */
 [data-mod="memo"] { --mod: #d99a00; }
 [data-mod="opms"] { --mod: #2b4c9b; }
-[data-mod="notes"] { --mod: #e8590c; }
-[data-mod="files"] { --mod: #1c7ed6; }
+[data-mod="notes"] { --mod: #e03131; }
+[data-mod="files"] { --mod: #1098ad; }
 [data-mod="calc"] { --mod: #2f9e44; }
-[data-mod="web"], [data-mod="site"] { --mod: #0c8599; }
+[data-mod="web"], [data-mod="site"] { --mod: #d6336c; }
 [data-mod="ai"] { --mod: #7048e8; }
 .magic-section { display: flex; align-items: center; gap: 6px; padding: 7px 10px 3px; color: var(--muted, #6b6860); font-size: 12px; font-weight: 700; letter-spacing: 0.03em; }
 .magic-section::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--mod, #b5b5b5); }
@@ -53,8 +54,10 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-section .count { padding: 0 6px; border-radius: 99px; background: rgba(0, 0, 0, 0.06); font-weight: 600; }
 .magic-row { position: relative; display: flex; align-items: center; gap: 11px; min-height: 38px; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
 /* 고른 줄 표시 하나가 줄 사이를 미끄러져 따라간다 (다시 그릴 때는 바로 그 자리에) */
-.magic-pill { position: absolute; top: 0; left: 8px; right: 8px; border-radius: 10px; background: var(--mk-sel); pointer-events: none; transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.12s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.magic-pill { position: absolute; top: 0; left: 8px; right: 8px; border-radius: 10px; background: var(--mk-sel); pointer-events: none; transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), height 0.18s cubic-bezier(0.22, 1, 0.36, 1); }
 .magic-pill.instant { transition: none; }
+/* 빠지는 줄: 그 자리에 잠깐 남아 흐려진다 */
+.magic-results > .ghost { position: absolute; left: 8px; right: 8px; margin: 0; pointer-events: none; z-index: 0; }
 .magic-row .ico { flex: none; width: 24px; height: 24px; display: grid; place-items: center; font-size: 15px; color: #555; }
 .magic-row .ico img { width: 22px; height: 22px; }
 .magic-row .dot { width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16); }
@@ -64,11 +67,12 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-row .s { font-size: 12px; color: #646464; /* 흰 바탕 · 고른 줄(노랑) 모두 4.5:1 넘게 */ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .magic-row .s:empty { display: none; }
 .magic-row b { font-weight: 800; color: #111; background: rgba(255, 205, 0, 0.38); border-radius: 3px; padding: 0 1px; }
+.magic-row[aria-selected="true"] b { background: transparent; box-shadow: inset 0 -2px 0 #e0a800; border-radius: 0; } /* 고른 줄(노랑) 위에서는 밑줄로 — 노랑끼리 묻히지 않게 */
 .magic-row .side { flex: none; color: #6f6f6f; font-size: 12px; } /* 흰 바탕에서 4.5:1 넘게 */
 .magic-row[aria-selected="true"] .side { display: none; }
 .magic-row.kind-opms .ico { border-radius: 7px; background: var(--opms-mark, #1f3b73); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -0.02em; }
 .magic-row.kind-more .ico { border-radius: 7px; background: rgba(0, 0, 0, 0.06); font-weight: 800; }
-.magic-row:is(.kind-calc, .kind-site, .kind-web, .kind-ai) .ico { border-radius: 7px; background: rgba(0, 0, 0, 0.06); color: #3b3829; }
+.magic-row:is(.kind-calc, .kind-site, .kind-web, .kind-ai) .ico { border-radius: 7px; background: color-mix(in srgb, var(--mod, #888) 15%, transparent); color: color-mix(in srgb, var(--mod, #555) 78%, #000); } /* 한 줄 묶음은 머리말 대신 아이콘 칸이 기능 색 */
 .magic-row .ico svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 /* 계산기: 결과가 주인공 (크고 굵게, 숫자 폭 고정), 식은 아래 작게 */
 .magic-row.kind-calc .ico { font-size: 16px; font-weight: 800; }
@@ -95,10 +99,11 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-chip:hover { border-color: rgba(0, 0, 0, 0.25); color: #333; }
 .magic-chip:active:not(.dragging) { transform: scale(0.95); }
 /* 끄는 캡슐은 살짝 들린다 */
-.magic-chip.dragging { position: relative; z-index: 1; transform: translateY(-2px) scale(1.07); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2); cursor: grabbing; }
+.magic-chip.dragging { position: relative; z-index: 2; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12); cursor: grabbing; transition: box-shadow 0.15s, background 0.15s; } /* 자리는 JS 가 손을 따라 옮긴다 */
 .magic-modules.sorting, .magic-modules.sorting .magic-chip { cursor: grabbing; }
 .magic-chip .chip-dot { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #b5b5b5; transition: background 0.15s, box-shadow 0.15s; }
-.magic-chip.on { border-color: transparent; background: #fff1b8; color: #111; }
+.magic-chip { cursor: grab; } /* 누르면 켜고 끄기, 끌면 순서 바꾸기 */
+.magic-chip.on { border-color: transparent; background: color-mix(in srgb, var(--mod, #ffcd00) 16%, #fff); color: #111; }
 .magic-chip.on .chip-dot { background: var(--mod, #22a35a); box-shadow: none; }
 .magic-chip:not(.on) { text-decoration: line-through; text-decoration-color: rgba(0, 0, 0, 0.35); } /* 잠깐 꺼 둠 — 켜진 것과 한눈에 */
 .magic-chip:focus-visible { outline: 2px solid #e0a800; outline-offset: 1px; }
@@ -107,7 +112,10 @@ kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px
 
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .magic-row.kind-opms .ico { --opms-mark: #3d63b8; }
-  :where(:root:not([data-theme="light"])) .magic-row:is(.kind-calc, .kind-site, .kind-web, .kind-ai, .kind-more) .ico { background: rgba(255, 255, 255, 0.1); color: #e6e2d3; }
+  :where(:root:not([data-theme="light"])) .magic-row.kind-more .ico { background: rgba(255, 255, 255, 0.1); color: #e6e2d3; }
+  :where(:root:not([data-theme="light"])) .magic-row:is(.kind-calc, .kind-site, .kind-web, .kind-ai) .ico { background: color-mix(in srgb, var(--mod, #888) 26%, transparent); color: color-mix(in srgb, var(--mod, #ccc) 55%, #fff); }
+  :where(:root:not([data-theme="light"])) .magic-row .s, :where(:root:not([data-theme="light"])) .magic-row .side { color: #b8b8b8; } /* 어두운 바탕 · 고른 줄 모두 4.5:1 넘게 */
+  :where(:root:not([data-theme="light"])) .magic-row[aria-selected="true"] b { box-shadow: inset 0 -2px 0 #ffcd00; }
   :where(:root:not([data-theme="light"])) body { --mk-sel: rgba(255, 205, 0, 0.18); --mk-line: rgba(255, 255, 255, 0.08); }
   :where(:root:not([data-theme="light"])) .magic { background: #26262a; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08); }
   :where(:root:not([data-theme="light"])) .magic-input, :where(:root:not([data-theme="light"])) .magic-row .t, :where(:root:not([data-theme="light"])) .magic-row b { color: #f3f3f3; }
@@ -115,12 +123,15 @@ kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px
   :where(:root:not([data-theme="light"])) .magic-chip { border-color: rgba(255, 255, 255, 0.14); color: #a8a8a8; }
   :where(:root:not([data-theme="light"])) .magic-chip:not(.on) { text-decoration-color: rgba(255, 255, 255, 0.35); }
   :where(:root:not([data-theme="light"])) .magic-note, :where(:root:not([data-theme="light"])) .magic-hint { color: #a0a0a0; }
-  :where(:root:not([data-theme="light"])) .magic-chip.on { background: rgba(255, 205, 0, 0.18); color: #f3f3f3; }
+  :where(:root:not([data-theme="light"])) .magic-chip.on { background: color-mix(in srgb, var(--mod, #ffcd00) 24%, #26262a); color: #f3f3f3; }
   :where(:root:not([data-theme="light"])) kbd { background: rgba(255, 255, 255, 0.1); color: #ddd; }
 }
 /* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
   :where(:root[data-theme="dark"]) .magic-row.kind-opms .ico { --opms-mark: #3d63b8; }
-  :where(:root[data-theme="dark"]) .magic-row:is(.kind-calc, .kind-site, .kind-web, .kind-ai, .kind-more) .ico { background: rgba(255, 255, 255, 0.1); color: #e6e2d3; }
+  :where(:root[data-theme="dark"]) .magic-row.kind-more .ico { background: rgba(255, 255, 255, 0.1); color: #e6e2d3; }
+  :where(:root[data-theme="dark"]) .magic-row:is(.kind-calc, .kind-site, .kind-web, .kind-ai) .ico { background: color-mix(in srgb, var(--mod, #888) 26%, transparent); color: color-mix(in srgb, var(--mod, #ccc) 55%, #fff); }
+  :where(:root[data-theme="dark"]) .magic-row .s, :where(:root[data-theme="dark"]) .magic-row .side { color: #b8b8b8; } /* 어두운 바탕 · 고른 줄 모두 4.5:1 넘게 */
+  :where(:root[data-theme="dark"]) .magic-row[aria-selected="true"] b { box-shadow: inset 0 -2px 0 #ffcd00; }
   :where(:root[data-theme="dark"]) body { --mk-sel: rgba(255, 205, 0, 0.18); --mk-line: rgba(255, 255, 255, 0.08); }
   :where(:root[data-theme="dark"]) .magic { background: #26262a; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08); }
   :where(:root[data-theme="dark"]) .magic-input, :where(:root[data-theme="dark"]) .magic-row .t, :where(:root[data-theme="dark"]) .magic-row b { color: #f3f3f3; }
@@ -128,7 +139,7 @@ kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px
   :where(:root[data-theme="dark"]) .magic-chip { border-color: rgba(255, 255, 255, 0.14); color: #a8a8a8; }
   :where(:root[data-theme="dark"]) .magic-chip:not(.on) { text-decoration-color: rgba(255, 255, 255, 0.35); }
   :where(:root[data-theme="dark"]) .magic-note, :where(:root[data-theme="dark"]) .magic-hint { color: #a0a0a0; }
-  :where(:root[data-theme="dark"]) .magic-chip.on { background: rgba(255, 205, 0, 0.18); color: #f3f3f3; }
+  :where(:root[data-theme="dark"]) .magic-chip.on { background: color-mix(in srgb, var(--mod, #ffcd00) 24%, #26262a); color: #f3f3f3; }
   :where(:root[data-theme="dark"]) kbd { background: rgba(255, 255, 255, 0.1); color: #ddd; }
 
 @media (prefers-reduced-motion: reduce) {

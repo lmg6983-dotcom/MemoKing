@@ -1,7 +1,7 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
 import { looksLikeRef } from './core/magic-modules.js';
-import { calcInput, calcOutput, siteUrl, sitesInOrder, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
+import { calcInput, calcOutput, siteUrl, sitesInOrder, looksLikeQuestion, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { searchingNode } from './searching.js';
 import { COLOR_DOTS } from './core/memo-file.js';
 import { UI } from './core/ui-text.js';
@@ -37,27 +37,68 @@ const calm = matchMedia('(prefers-reduced-motion: reduce)');
 let shownAt = 0; // 창을 연 때: 그 뒤 잠깐 처음 나오는 줄은 차례로 나타난다
 let introFresh = false; // 연 뒤 아직 결과를 그리지 않았다 (지난번과 같은 줄도 처음처럼)
 let glideUntil = 0; // 캡슐을 끌거나 끄고 켠 뒤: 자리를 옮긴 줄은 미끄러지고, 새 줄은 나타난다
-const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'; // 빨리 출발해 부드럽게 멈춤
+const SPRING = 'cubic-bezier(0.34, 1.4, 0.64, 1)'; // 살짝 지나쳤다 돌아옴 (놓을 때 · 켤 때)
+const DUR = 260;
+const gliding = () => !calm.matches && Date.now() < glideUntil;
 
-function slide(el, dx, dy) {
-  if (dx || dy) el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 200, easing: EASE });
+// el 을 dx, dy 만큼 떨어진 곳에서 제자리로 — 이미 움직이는 중이면 지금 보이는 자리에서 이어서
+function slide(el, dx, dy, easing = EASE) {
+  if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+  el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: DUR, easing });
 }
-const positions = () => new Map([...resultsEl.children].filter((el) => el.dataset.key).map((el) => [el.dataset.key, el.offsetTop]));
-function animateResults(before) {
+// 결과 줄이 지금 보이는 자리 (움직이는 중이면 그 중간 — 연달아 다시 그려도 튀지 않게)
+function relTop(el) {
+  return el.getBoundingClientRect().top - resultsEl.getBoundingClientRect().top + resultsEl.scrollTop;
+}
+const positions = () => new Map([...resultsEl.children]
+  .filter((el) => el.dataset.key && !el.classList.contains('ghost'))
+  .map((el) => [el.dataset.key, { el, top: relTop(el) }]));
+
+let listTarget = 0; // 결과 칸 높이가 바뀌는 중이면 다 바뀐 뒤 높이 (창 크기는 그것으로)
+function animateResults(before, beforeHeight) {
   const now = Date.now();
   const intro = now - shownAt < 400;
-  const glide = now < glideUntil;
+  const glide = gliding();
   if (calm.matches || (!intro && !glide)) return;
+  const seen = new Set();
   let k = 0;
   for (const el of resultsEl.children) {
-    if (!el.dataset.key) continue;
-    const old = before.get(el.dataset.key);
-    if (old !== undefined) {
-      if (glide) slide(el, 0, old - el.offsetTop);
+    const key = el.dataset.key;
+    if (!key) continue;
+    seen.add(key);
+    const old = before.get(key);
+    if (old) {
+      if (glide) slide(el, 0, old.top - relTop(el));
     } else {
-      el.animate([{ opacity: 0, transform: 'translateY(-3px)' }, { opacity: 1, transform: 'none' }],
-        { duration: 160, delay: intro ? Math.min(k++, 8) * 18 : 0, easing: 'ease-out', fill: 'backwards' });
+      el.animate([{ opacity: 0, transform: 'translateY(-6px) scale(0.985)' }, { opacity: 1, transform: 'none' }],
+        { duration: DUR, delay: intro ? Math.min(k++, 8) * 22 : 40, easing: EASE, fill: 'backwards' });
     }
+  }
+  if (!glide) return;
+  // 빠진 줄은 그 자리에서 흐려지며 사라진다 (바로 없어지지 않게)
+  for (const [key, { el, top }] of before) {
+    if (seen.has(key)) continue;
+    el.getAnimations().forEach((a) => a.cancel());
+    el.classList.add('ghost');
+    el.removeAttribute('id');
+    el.removeAttribute('data-index');
+    el.setAttribute('aria-hidden', 'true');
+    el.style.top = `${top}px`;
+    resultsEl.append(el);
+    el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(0.97)' }], { duration: 180, easing: 'ease-out', fill: 'forwards' })
+      .onfinish = () => el.remove();
+  }
+  // 결과 칸 높이도 미끄러지듯 (창 아래 캡슐 줄이 툭 튀지 않게)
+  const h = resultsEl.getBoundingClientRect().height;
+  if (Math.abs(h - beforeHeight) > 1) {
+    listTarget = h;
+    resultsEl.style.overflow = 'hidden';
+    const a = resultsEl.animate([{ height: `${beforeHeight}px` }, { height: `${h}px` }], { duration: DUR, easing: EASE });
+    a.onfinish = a.oncancel = () => {
+      resultsEl.style.overflow = '';
+      listTarget = 0;
+    };
   }
 }
 
@@ -122,11 +163,15 @@ function renderModules() {
     chip.append(dot, m.chip ?? m.name);
     chip.addEventListener('mousedown', (e) => e.preventDefault()); // 입력 칸 포커스 유지
     chip.addEventListener('pointerdown', (e) => dragChip(e, chip));
+    // 끌 수 있다는 것을 마우스를 올렸을 때 아래 안내 자리에
+    chip.addEventListener('mouseenter', () => showHint([['누르기', m.on ? '끄기' : '켜기'], ['끌기', '순서 바꾸기']]));
+    chip.addEventListener('mouseleave', () => updateHint());
     chip.addEventListener('click', async () => {
       if (chip.dataset.dragged) return; // 끌어 놓은 것은 누른 것이 아님
       modules = await api.toggleModule(m.id).catch(() => modules);
       glideUntil = Date.now() + 400;
       renderModules();
+      if (!calm.matches) modulesEl.querySelector(`[data-mod="${m.id}"]`)?.animate([{ transform: 'scale(0.9)' }, { transform: 'none' }], { duration: 320, easing: SPRING });
       updatePlaceholder();
       searchOpms();
       render();
@@ -142,17 +187,27 @@ function dragChip(e, chip) {
   const x0 = e.clientX;
   const y0 = e.clientY;
   let moving = false;
+  let grab = null; // 캡슐 안에서 잡은 곳
+  let last = { x: x0, y: y0 };
   const chips = () => [...modulesEl.children];
+  // 끄는 캡슐은 손가락(마우스)을 그대로 따라온다 — 제자리(바뀐 순서의 자리)에서 얼마나 떨어졌는지로
+  const follow = () => {
+    chip.style.transform = '';
+    const home = chip.getBoundingClientRect();
+    chip.style.transform = `translate(${last.x - grab.x - home.left}px, ${last.y - grab.y - home.top}px) scale(1.06)`;
+  };
   const glideChips = (mutate) => {
     const before = new Map(chips().map((c) => [c, c.getBoundingClientRect()]));
     mutate();
-    if (calm.matches) return;
     for (const c of chips()) {
       if (c === chip) continue;
+      c.getAnimations().forEach((a) => a.cancel());
+      if (calm.matches) continue;
       const a = before.get(c);
       const b = c.getBoundingClientRect();
       slide(c, a.left - b.left, a.top - b.top);
     }
+    follow();
   };
   const move = (ev) => {
     if (!moving) {
@@ -163,9 +218,13 @@ function dragChip(e, chip) {
       } catch {
         // 붙잡지 못해도 창 안에서는 window 로 받는다
       }
+      const r0 = chip.getBoundingClientRect();
+      grab = { x: x0 - r0.left, y: y0 - r0.top };
       chip.classList.add('dragging');
       modulesEl.classList.add('sorting');
     }
+    last = { x: ev.clientX, y: ev.clientY };
+    follow();
     const list = chips();
     const over = list.find((c) => {
       const r = c.getBoundingClientRect();
@@ -184,8 +243,12 @@ function dragChip(e, chip) {
     removeEventListener('pointerup', end);
     removeEventListener('pointercancel', end);
     if (!moving) return;
+    // 놓으면 제자리로 쏙 (살짝 지나쳤다 돌아옴)
+    const from = chip.style.transform;
+    chip.style.transform = '';
     chip.classList.remove('dragging');
     modulesEl.classList.remove('sorting');
+    if (!calm.matches && from) chip.animate([{ transform: from }, { transform: 'none' }], { duration: 320, easing: SPRING });
     chip.dataset.dragged = '1';
     setTimeout(() => delete chip.dataset.dragged, 0); // 놓을 때 따라오는 click 만 넘긴다
     const ids = chips().map((c) => c.dataset.mod);
@@ -202,11 +265,10 @@ function dragChip(e, chip) {
 
 function updatePlaceholder() {
   const memo = isOn('memo');
-  // 찾는 것: 켜진 기능만 이름에 (파일 검색을 껐으면 "파일" 이라고 하지 않게)
-  const what = [isOn('notes') && '메모', isOn('files') && '파일', isOn('opms') && 'OPMS', isOn('web') && '웹'].filter(Boolean).join(', ');
-  const extra = [isOn('calc') && '계산', isOn('ai') && 'AI 에게 묻기'].filter(Boolean).join(', ');
-  const main = memo && what ? `메모를 쓰거나, ${what} 찾기` : memo ? '메모를 쓰고 Enter' : what ? `${what} 찾기` : '';
-  input.placeholder = main && extra ? `${main}, ${extra}` : main || extra
+  const find = ['notes', 'files', 'opms', 'web'].some(isOn);
+  // 짧게: 켜진 기능을 하나하나 늘어놓지 않는다 (무엇을 찾는지는 아래 캡슐이 보여 준다)
+  const parts = [memo && '메모 쓰기', find && '찾기', isOn('calc') && '계산', isOn('ai') && 'AI 에게 묻기'].filter(Boolean);
+  input.placeholder = parts.join(', ')
     || (modules.length ? '아래 캡슐을 눌러 기능을 켜 주세요' : '설정의 매직키에서 기능을 켜 주세요');
 }
 
@@ -350,13 +412,12 @@ function note(text) {
   return li;
 }
 
-// 묶음 머리말 (기능 이름 그대로 — 메모 · 폴더 · 파일 · OPMS 처럼 따로 붙이는 묶음은 그 이름)
-const GROUP_LABEL = { calc: '계산기', site: '사이트', memo: '새 메모', web: '웹 검색', ai: 'AI 에게 묻기' };
-
 function render() {
   const raw = input.value;
   const query = raw.trim();
   const before = introFresh ? new Map() : positions();
+  const beforeHeight = resultsEl.getBoundingClientRect().height;
+  resultsEl.getAnimations().forEach((a) => a.cancel()); // 높이가 바뀌던 중이면 지금 높이에서 다시
   rows = [];
   // 기능 id → 묶음 [{ head: [이름, 개수] } | { row } | { node }] — 계산 · 사이트 주소는 늘 맨 위 (식 · 주소면 Enter 로 바로), 나머지는 캡슐 순서
   const groups = new Map();
@@ -416,11 +477,17 @@ function render() {
   pill.hidden = true;
   const nodes = [pill];
   let first = true;
-  for (const mod of ['calc', 'site', ...modules.map((m) => m.id)]) {
+  // 묻는 글이면 AI 에게 묻기를 새 메모 바로 아래로 (맨 아래 화면 밖에 묻히지 않게)
+  const order = ['calc', 'site', ...modules.map((m) => m.id)];
+  if (groups.has('ai') && looksLikeQuestion(query)) {
+    order.splice(order.indexOf('ai'), 1);
+    order.splice(order.indexOf('memo') + 1 || 2, 0, 'ai');
+  }
+  // 머리말은 여러 줄 묶음(메모 · 폴더 · 파일 · OPMS)에만 — 한 줄 묶음은 아이콘 칸의 기능 색으로 구분
+  for (const mod of order) {
     const items = groups.get(mod);
     if (!items) continue;
     let heads = 0;
-    if (!items[0].head && items.some((it) => it.row)) items.unshift({ head: [GROUP_LABEL[mod] ?? modules.find((m) => m.id === mod)?.name ?? '', 0] });
     for (const it of items) {
       if (it.head) {
         const li = section(it.head[0], it.head[1], mod, heads++ > 0);
@@ -450,15 +517,29 @@ function render() {
     const hit = rows.findIndex((r) => r.kind === 'note' && same(r.title));
     if (hit > 0) selected = hit;
   }
-  select(Math.min(selected, Math.max(0, rows.length - 1)), { scroll: false, glide: false });
-  animateResults(before);
+  select(Math.min(selected, Math.max(0, rows.length - 1)), { scroll: false, glide: gliding() });
+  animateResults(before, beforeHeight);
   fit();
 }
 
+// 창 크기: 커질 때는 바로, 줄어드는 움직임 중이면 다 줄어든 뒤 (창이 먼저 잘라 먹지 않게)
+let winHeight = 0;
+let shrinkTimer = 0;
 function fit() {
-  requestAnimationFrame(() => api.resize(Math.ceil(box.getBoundingClientRect().height) + 16));
+  requestAnimationFrame(() => {
+    const list = resultsEl.getBoundingClientRect().height;
+    const h = Math.ceil(box.getBoundingClientRect().height - list + (listTarget || list)) + 16;
+    clearTimeout(shrinkTimer);
+    const apply = () => {
+      winHeight = h;
+      api.resize(h);
+    };
+    if (h < winHeight && gliding()) shrinkTimer = setTimeout(apply, DUR);
+    else apply();
+  });
 }
 
+let lastPill = null;
 function select(i, { scroll = true, glide = true } = {}) {
   if (i !== selected) activeAct = 0;
   selected = i;
@@ -466,11 +547,20 @@ function select(i, { scroll = true, glide = true } = {}) {
   const pill = resultsEl.querySelector('.magic-pill');
   const li = resultsEl.querySelector(`.magic-row[data-index="${i}"]`);
   if (pill) {
+    // 다시 그린 새 표시는 지난 표시 자리에서 출발 (끄고 켜거나 끌어 옮길 때 고른 줄을 따라 미끄러지게)
+    if (pill.hidden && glide && lastPill && li) {
+      pill.hidden = false;
+      pill.classList.add('instant');
+      pill.style.transform = `translateY(${lastPill.y}px)`;
+      pill.style.height = `${lastPill.h}px`;
+      void pill.offsetWidth;
+    }
     pill.hidden = !li;
     pill.classList.toggle('instant', !glide || calm.matches);
     if (li) {
-      pill.style.transform = `translateY(${li.offsetTop}px)`;
-      pill.style.height = `${li.offsetHeight}px`;
+      lastPill = { y: li.offsetTop, h: li.offsetHeight };
+      pill.style.transform = `translateY(${lastPill.y}px)`;
+      pill.style.height = `${lastPill.h}px`;
     }
   }
   markAct();
@@ -502,6 +592,9 @@ function updateHint() {
   parts.push(['Esc', input.value ? '지우기' : '닫기']);
   if (rows.length > 1) parts.push(['↑↓', '고르기']);
   if (r?.kind === 'new') parts.push(['Shift ↵', '줄바꿈']);
+  showHint(parts);
+}
+function showHint(parts) {
   hintEl.replaceChildren(...parts.map(([k, label]) => {
     const span = document.createElement('span');
     const kbd = document.createElement('kbd');

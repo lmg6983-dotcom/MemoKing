@@ -151,11 +151,17 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     // 1-1) 결과 묶음은 캡슐 순서 · 같은 색 머리말, 캡슐을 끌어 놓으면 묶음 순서도 바뀌고 다음에도 그대로
     showMagic();
     await typeMagic('견적서');
-    const groupOrder = () => js(magic, `[...document.querySelectorAll('.magic-section:not(.sub)')].map((e) => e.dataset.mod).join()`);
+    const groupOrder = () => js(magic, `[...new Set([...document.querySelectorAll('#magic-results > [data-mod]:not(.ghost)')].map((e) => e.dataset.mod))].join()`);
     const chipOrder = () => js(magic, `[...document.querySelectorAll('.magic-chip')].map((e) => e.dataset.mod).join()`);
     const groups0 = await until(async () => (await groupOrder()).includes('files') && groupOrder(), '결과 묶음');
     const dotColor = await js(magic, `getComputedStyle(document.querySelector('.magic-chip[data-mod="files"] .chip-dot')).backgroundColor === getComputedStyle(document.querySelector('.magic-section[data-mod="files"]'), '::before').backgroundColor`);
-    check('매직키: 결과 묶음마다 머리말, 캡슐 순서대로 · 캡슐 점과 같은 색', groups0 === 'memo,notes,files,web,ai' && dotColor, groups0);
+    const heads = await js(magic, `[...document.querySelectorAll('.magic-section:not(.sub)')].map((e) => e.dataset.mod).join()`);
+    check('매직키: 결과 묶음은 캡슐 순서대로, 머리말은 여러 줄 묶음에만 · 캡슐 점과 같은 색', groups0 === 'memo,notes,files,web,ai' && heads === 'notes,files' && dotColor, JSON.stringify({ groups0, heads }));
+    await typeMagic('견적서 정리해줘');
+    const asked = await until(async () => (await groupOrder()).includes('ai') && groupOrder(), '묻는 글');
+    check('매직키: 묻는 글이면 AI 에게 묻기가 새 메모 바로 아래', asked.startsWith('memo,ai'), asked);
+    await typeMagic('견적서');
+    await until(async () => (await groupOrder()) === 'memo,notes,files,web,ai', '다시 견적서');
     const at = (mod) => js(magic, `(() => { const r = document.querySelector('.magic-chip[data-mod="${mod}"]').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: r.width }; })()`);
     const from = await at('ai');
     const to = await at('memo');
