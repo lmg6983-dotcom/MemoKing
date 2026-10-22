@@ -1453,7 +1453,12 @@ async function enterSandbox() {
     const r = await fetch(new URL(`../../app/assets/tutorial/sample/${name}.jpg`, import.meta.url));
     return r.ok ? vault.saveAttachment(new Uint8Array(await r.arrayBuffer()), 'jpg') : null;
   };
-  await seedTutorialSandbox(vault, toLocalIso, { photo });
+  try {
+    await seedTutorialSandbox(vault, toLocalIso, { photo });
+  } catch (err) {
+    // 채우는 사이 튜토리얼을 끝내 연습 폴더가 닫혔으면 그만 (예시 메모는 연습 폴더와 함께 사라진다)
+    if (app.vault === vault) console.warn('예시 메모를 다 넣지 못했어요', err);
+  }
   if (app.vault === vault) list.refresh();
 }
 function leaveSandbox() {

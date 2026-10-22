@@ -122,3 +122,12 @@ test('처음 말풍선 안내가 실제 단계와 맞음 (몇 분 같은 약속 
   for (const name of new Set(TUTORIAL_STEPS.map((s) => s.chapter).filter((n) => !['시작', '마무리'].includes(n)))) assert.ok(pc.includes(name), `PC 처음 안내에 ${name}`);
   assert.doesNotMatch(pc, /\d+분/);
 });
+
+test('연습 공간 예시 사진을 못 읽어도 예시 메모는 모두 들어간다 (바로 던져도)', async () => {
+  const { seedTutorialSandbox, TUTORIAL_SANDBOX_MEMOS } = await import('../app/js/core/tutorial.js');
+  const bodies = [];
+  const vault = { import: ({ body }) => (bodies.push(body), `m${bodies.length}`), setReminders: () => {} };
+  await seedTutorialSandbox(vault, (d) => d.toISOString(), { photo: () => { throw new Error('없는 파일'); } });
+  assert.equal(bodies.length, TUTORIAL_SANDBOX_MEMOS.length);
+  assert.ok(bodies.every((b) => !b.includes('![](')));
+});

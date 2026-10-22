@@ -110,7 +110,7 @@ export async function seedTutorialSandbox(vault, toIso, { now = new Date(), phot
     const at = toIso(new Date(now.getTime() - m.daysAgo * 86_400_000 - i * 60_000));
     const pics = [];
     for (const name of m.photos ?? []) {
-      const rel = await Promise.resolve(photo(name)).catch(() => null);
+      const rel = await Promise.resolve().then(() => photo(name)).catch(() => null); // 사진을 못 읽어도(바로 던지든 나중에 실패하든) 글만으로
       if (rel) pics.push(`![](${rel})`);
     }
     const body = pics.length ? `${m.body}\n\n${pics.join('\n\n')}` : m.body;
