@@ -162,13 +162,31 @@ export function findController(view) {
       v.dispatch(tr);
       return true;
     },
-    /** i 번째 찾은 곳으로 (모두 찾기 목록에서 고름) */
-    go(i) {
+    /** i 번째 찾은 곳으로 (모두 찾기 목록에서 고름). focus: 그 글을 메모에서 고른 채로 보이게 (편집기로 포커스) */
+    go(i, { focus = false } = {}) {
       const v = view();
       const f = state();
       const m = f.matches[i];
       if (!m) return f;
       v.dispatch(reveal(v.state.tr.setMeta(findKey, { current: i }), m));
+      if (focus) {
+        if (v.editable) v.focus();
+        else {
+          // 읽기만 하는 메모(휴대폰 보기)는 편집기가 포커스를 받지 않으므로 화면의 고르기를 직접
+          try {
+            const a = v.domAtPos(m.from);
+            const b = v.domAtPos(m.to);
+            const r = document.createRange();
+            r.setStart(a.node, a.offset);
+            r.setEnd(b.node, b.offset);
+            const sel = getSelection();
+            sel.removeAllRanges();
+            sel.addRange(r);
+          } catch {
+            // 고를 수 없는 자리 — 화면만 옮긴 채로
+          }
+        }
+      }
       return state();
     },
     /** 모두 찾기 목록: 찾은 곳마다 그 줄의 앞뒤 글 */

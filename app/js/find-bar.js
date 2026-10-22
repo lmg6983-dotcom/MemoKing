@@ -293,7 +293,7 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
   count.addEventListener('click', toggleResults);
   list.addEventListener('click', (e) => {
     const b = e.target.closest('.mk-find-item');
-    if (b) paint(find()?.go(Number(b.dataset.i)));
+    if (b) paint(find()?.go(Number(b.dataset.i), { focus: true })); // 메모에서 그 글이 골라진 채로
   });
   more.addEventListener('click', () => setReplace(bar.dataset.mode !== 'replace'));
   close.addEventListener('click', () => hide({ focus: true }));
