@@ -1,6 +1,5 @@
 // 메모 화면 — 데스크탑 스티커 창(app/js/note.js)을 휴대폰 한 화면으로.
 // 편집기(app/js/editor.js)·예약 알림 패널(app/js/reminder-panel.js)은 데스크탑과 같은 코드를 쓴다.
-import { icon } from '../../app/js/icons.js';
 import { createNoteEditor } from '../../app/js/editor.js';
 import { setCopyHost } from '../../app/js/copy-content.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from '../../app/js/core/html-marks.js';
@@ -40,6 +39,7 @@ import { fillSuggestChips, trackPlaceholder } from '../../app/js/suggest-chips.j
 import { setTouchMode, penJustTouched } from '../../app/js/keyboard-guard.js';
 import { setupModeKnob, MODES } from './mode-knob.js';
 import { UI } from '../../app/js/core/ui-text.js';
+import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from '../../app/js/note-shared.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -51,7 +51,6 @@ const el = {
   linksBtn: $('links-btn'),
   linksCount: $('links-count'),
   banner: $('banner'),
-  bannerText: $('banner-text'),
   bannerLoad: $('banner-load'),
   linksPanel: $('links-panel'),
   linkSearch: $('link-search'),
@@ -271,13 +270,7 @@ function keepTheirsAsCopy(next) {
   showBanner(conflictCopy ? UI.conflictSaved : UI.conflict, { load: conflictCopy ? UI.showTheirs : null, keep: '확인' });
 }
 
-function showBanner(text, { load = null, keep = UI.keepMine } = {}) {
-  el.bannerText.textContent = text;
-  el.bannerLoad.hidden = !load;
-  if (load) el.bannerLoad.textContent = load;
-  $('banner-keep').textContent = keep;
-  el.banner.hidden = false;
-}
+const showBanner = (text, { load = null, keep = UI.keepMine } = {}) => showNoteBanner(text, { load, keep });
 
 // 고를 것이 없는 안내("다른 기기에서도 고쳤어요 · 확인")는 옆으로 밀어 닫는다 — 바뀐 내용을 볼지 고르는 중이면 제자리로
 swipeDismiss(el.banner, () => $('banner-keep').click(), { can: () => !pendingExternal });
@@ -325,40 +318,13 @@ el.screen.addEventListener('animationend', (e) => {
 
 // ---------- 연결 패널 ----------
 
-function linkItem(target, { onRemove, onAdd, score } = {}) {
-  const li = document.createElement('li');
-  li.className = 'link-item';
-  const open = document.createElement('button');
-  open.className = 'link-open';
-  open.dataset.color = target.color;
-  const dot = document.createElement('span');
-  dot.className = 'link-dot';
-  const title = document.createElement('span');
-  title.textContent = target.title;
-  open.append(dot, title);
-  open.addEventListener('click', () => {
+const linkItem = (target, opts = {}) => sharedLinkItem(target, {
+  ...opts,
+  onOpen: () => {
     closeSheet(el.linksPanel);
     app.openMemo(target.id);
-  });
-  li.append(open);
-  if (score != null) {
-    const s = document.createElement('span');
-    s.className = 'link-score';
-    s.textContent = `${Math.round(score * 100)}%`;
-    li.append(s);
-  }
-  const addBtn = (name, label, handler) => {
-    const b = document.createElement('button');
-    b.className = 'icon-btn';
-    b.setAttribute('aria-label', `${target.title} ${label}`);
-    b.append(icon(name));
-    b.addEventListener('click', handler);
-    li.append(b);
-  };
-  if (onAdd) addBtn('plus', '연결하기', onAdd);
-  if (onRemove) addBtn('close', '연결 끊기', onRemove);
-  return li;
-}
+  },
+});
 
 function setLink(targetId, on) {
   flush();
@@ -737,78 +703,20 @@ const PALETTES = {
   color: { title: '글자 색', colors: TEXT_COLORS, apply: (c) => editor.setTextColor(c) },
   highlight: { title: '형광펜', colors: HIGHLIGHT_COLORS, apply: (c) => editor.setHighlight(c) },
 };
-const lastColor = { color: TEXT_COLORS[0].value, highlight: HIGHLIGHT_COLORS[0].value };
-// 지금 커서·고른 글자에 칠해진 색 (showActive 가 채움) — 판에서 같은 색을 다시 누르면 지우고, 판에 지금 색을 표시
-const appliedColor = { color: null, highlight: null };
-const sameColor = (a, b) => Boolean(a && b) && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
-try {
-  Object.assign(lastColor, JSON.parse(localStorage.getItem('memoking.lastColor') ?? '{}'));
-} catch {
-  // 기본색
-}
-let paletteKind = null;
-
-function paintSwatchBars() {
-  for (const bar of document.querySelectorAll('[data-bar]')) bar.style.background = lastColor[bar.dataset.bar];
-}
-
-function openPalette(kind, anchor) {
-  const def = PALETTES[kind];
-  paletteKind = kind;
-  $('palette-title').textContent = def.title;
-  $('palette-swatches').replaceChildren(...def.colors.map(({ name, value }) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'palette-swatch';
-    b.dataset.color = value;
-    b.setAttribute('aria-label', `${def.title} ${name}`);
-    if (kind === 'color') {
-      b.textContent = 'A';
-      b.classList.add('text-sample');
-      b.style.color = value;
-    } else b.style.background = value;
-    b.setAttribute('aria-checked', String(sameColor(value, appliedColor[kind] ?? lastColor[kind])));
-    if (sameColor(value, appliedColor[kind])) b.title = '다시 누르면 색을 지워요';
-    return b;
-  }));
-  el.palette.hidden = false;
-  const rect = anchor.getBoundingClientRect();
-  const width = el.palette.offsetWidth;
-  el.palette.style.left = `${Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8)}px`;
-  el.palette.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 8)}px`;
-}
-
-export function closePalette() {
-  if (el.palette.hidden) return false;
-  el.palette.hidden = true;
-  paletteKind = null;
-  return true;
-}
-
-function applyPaletteColor(color) {
-  const kind = paletteKind;
-  if (!kind) return;
-  if (color && sameColor(color, appliedColor[kind])) color = null; // 지금 칠해진 색을 다시 고르면 지운다
-  if (color) {
-    lastColor[kind] = color;
-    try {
-      localStorage.setItem('memoking.lastColor', JSON.stringify(lastColor));
-    } catch {
-      // 무시
-    }
-    paintSwatchBars();
-  }
-  PALETTES[kind].apply(color);
-  closePalette();
-}
-
-el.palette.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 선택 유지
-el.palette.addEventListener('click', (e) => {
-  // 색 칩만 (판 밖의 [data-color] — 메모 창 자체의 메모 색 — 을 잡으면 "색 지우기"가 그 색으로 칠해 버린다)
-  const swatch = e.target.closest('.palette-swatch[data-color]');
-  if (swatch) applyPaletteColor(swatch.dataset.color);
-  else if (e.target.closest('#palette-clear')) applyPaletteColor(null);
+// 색판은 PC 와 같은 코드 (note-shared.js) — 휴대폰은 누른 버튼 위 가운데에 띄운다
+const palette = createPalette({
+  palette: el.palette,
+  palettes: PALETTES,
+  place: (pop, anchor) => {
+    const rect = anchor.getBoundingClientRect();
+    const width = pop.offsetWidth;
+    pop.style.left = `${Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8)}px`;
+    pop.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 8)}px`;
+  },
 });
+const { applied: appliedColor, last: lastColor } = palette;
+/** 열려 있던 색판을 닫았으면 true */
+export const closePalette = () => palette.close();
 
 // ---------- 서식 도구막대 ----------
 
@@ -937,7 +845,7 @@ function applyPreset(kind, btn) {
     delete btn.dataset.longPressed; // 꾹 눌러 판을 연 손가락을 뗀 것 — 색은 판에서
     return;
   }
-  if (paletteKind) return closePalette();
+  if (palette.kind) return closePalette();
   // 누르기 = 켜고 끄기: 이미 칠해져 있으면 지우고, 아니면 지난번 색으로 (PC 단축키 Ctrl+Shift+C·H 와 같음)
   if (kind === 'color') editor.toggleTextColor(lastColor.color);
   else editor.toggleHighlight(lastColor.highlight);
@@ -954,7 +862,7 @@ for (const btn of el.formatBar.querySelectorAll('[data-action="color"], [data-ac
       haptic(12);
       closeStyleMenu();
       closeAddMenu();
-      openPalette(btn.dataset.action, btn);
+      palette.open(btn.dataset.action, btn);
     }, 450);
   });
   for (const t of ['pointerup', 'pointercancel', 'pointerleave']) btn.addEventListener(t, () => clearTimeout(timer));
@@ -1030,34 +938,7 @@ function showTableBar(table) {
     placeKnob(); // + · 다이얼을 표 막대 위로 (닫히면 제자리)
   }
   for (const b of document.querySelectorAll('[data-action="table"]')) b.classList.toggle('active', Boolean(table));
-  if (!table) return;
-  const bar = el.tableBar;
-  const delRow = bar.querySelector('[data-table="delRow"]');
-  const delCol = bar.querySelector('[data-table="delCol"]');
-  const setBtn = (b, label, title) => {
-    b.querySelector('.lbl').textContent = label;
-    b.title = title;
-    b.setAttribute('aria-label', `${b.closest('.tb-group')?.getAttribute('aria-label') ?? ''} ${label}`.trim());
-  };
-  // 머리글 아래 행은 마지막 하나까지 지울 수 있다. 머리글 행만 남았을 때 머리글에서 누르면, 열이 하나뿐일 때 누르면 표 전체를 지운다
-  const lastRow = table.header && table.rows <= 1;
-  delRow.disabled = table.header && !lastRow;
-  delRow.dataset.wholeTable = lastRow ? '1' : '';
-  setBtn(delRow, lastRow ? '표 삭제' : '삭제', lastRow ? '머리글 행만 남았어요. 누르면 표를 삭제해요' : table.header ? '머리글 행은 삭제할 수 없어요 (아래 행을 모두 삭제하면 표를 삭제할 수 있어요)' : UI.rowDelete);
-  delCol.dataset.wholeTable = table.cols <= 1 ? '1' : '';
-  setBtn(delCol, table.cols <= 1 ? '표 삭제' : '삭제', table.cols <= 1 ? '열이 하나뿐이에요. 누르면 표를 삭제해요' : UI.colDelete);
-  // 셀 병합: 여러 칸을 골랐으면 "병합", 병합한 칸 안이면 "병합 풀기"
-  const merge = bar.querySelector('[data-table="merge"]');
-  merge.disabled = !table.canMerge && !table.merged;
-  setBtn(merge, table.merged ? '병합 풀기' : '병합', table.merged ? '합친 칸을 다시 나누기' : table.canMerge ? '고른 칸들을 하나로 합치기' : UI.mergePick);
-  bar.querySelector('[data-table="accent"]').setAttribute('aria-pressed', String(Boolean(table.accent)));
-  // 표 나누기 · 아래 표와 합치기: 할 수 있을 때만 (숨기지 않고 흐리게 — 커서를 옮길 때마다 단추가 생겼다 사라지지 않게)
-  const split = bar.querySelector('[data-table="splitTable"]');
-  const join = bar.querySelector('[data-table="joinTable"]');
-  split.disabled = !table.canSplit;
-  split.title = table.canSplit ? UI.splitHere : UI.splitWhere;
-  join.disabled = !table.canJoin;
-  join.title = table.canJoin ? UI.joinBelow : UI.joinWhen;
+  if (table) paintTableBar(el.tableBar, table); // 버튼 상태는 PC 와 같은 코드 (note-shared.js)
 }
 // 덜 쓰는 표 도구(표 · 바꾸기)는 "⋯" 로 막대 위에 펼친다 — 막대가 한 줄만 차지하게. 하나를 고르거나 바깥을 누르면 접힌다
 const tableMoreBtn = $('table-more-btn');
@@ -1073,13 +954,8 @@ tableMoreBtn?.addEventListener('click', () => {
 document.addEventListener('pointerdown', (e) => {
   if (el.tableBar.classList.contains('more-open') && !el.tableBar.contains(e.target)) closeTableMore();
 }, true);
-el.tableBar.addEventListener('mousedown', (e) => e.preventDefault());
-el.tableBar.addEventListener('click', (e) => {
-  const b = e.target.closest('[data-table]');
-  if (!b || b.disabled) return;
-  // 마지막 남은 머리글 행 · 열을 지우면 표 전체를 지운다
-  const lastOne = (b.dataset.table === 'delRow' || b.dataset.table === 'delCol') && b.dataset.wholeTable === '1';
-  editor.tableCommand(lastOne ? 'delTable' : b.dataset.table);
+bindTableBar(el.tableBar, (cmd, b) => {
+  editor.tableCommand(cmd);
   if (b.closest('.tb-more')) closeTableMore();
 });
 
@@ -1808,7 +1684,6 @@ export function editorMarkdown() {
   return current;
 }
 
-paintSwatchBars();
 
 export const getEditor = () => editor;
 
