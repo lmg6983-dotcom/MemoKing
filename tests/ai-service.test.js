@@ -71,3 +71,10 @@ test('로컬 AI: 모델 넣기 · 묻기 · 지우기', async () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('로컬 AI: 엔진이 꺼진 까닭을 알아듣게', async () => {
+  const { engineError } = await import('../app/js/core/llama-client.js');
+  assert.match(engineError("llama_model_load: error loading model: error loading model architecture: unknown model architecture: 'kanana2tiny'", 1), /모르는 모델 구조예요 \(kanana2tiny\)/);
+  assert.match(engineError('ggml_backend_cpu_buffer_type_alloc_buffer: failed to allocate buffer', 1), /메모리가 모자라요/);
+  assert.equal(engineError('', 3), '모델이 멈췄어요 (3)');
+});

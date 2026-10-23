@@ -23,6 +23,14 @@ export function sseText(line) {
   return JSON.parse(data).choices?.[0]?.delta?.content ?? '';
 }
 
+/** 엔진(llama-server)이 꺼질 때의 로그 → 사람이 알아듣는 까닭 (PC ai-service.js · 휴대폰 LocalAi.kt 가 같은 말로) */
+export function engineError(log, code) {
+  const arch = /unknown model architecture: '([^']+)'/.exec(log)?.[1];
+  if (arch) return `이 엔진이 모르는 모델 구조예요 (${arch}). 같은 모델을 엔진이 아는 구조로 바꾼 GGUF 를 넣어 주세요`;
+  if (/out of memory|failed to allocate|bad_alloc/i.test(log)) return '메모리가 모자라요. 더 작은 모델을 넣거나 다른 앱을 닫아 주세요';
+  return `모델이 멈췄어요 (${code})`;
+}
+
 /** 한 번에 받은 답 → 글 */
 export const replyText = (data) => noThink(data.choices?.[0]?.message?.content);
 

@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { createRagStore } from '../../app/js/core/rag-store.js';
-import { llamaClient } from '../../app/js/core/llama-client.js';
+import { llamaClient, engineError } from '../../app/js/core/llama-client.js';
 
 export const AI_ROLES = { chat: '글 모델', embed: '검색 모델' };
 const IDLE_MS = 5 * 60_000;
@@ -124,7 +124,7 @@ export function createAiService(opts) {
         clearTimeout(s.timer);
         if (code && !s.stopping) {
           console.error(`AI ${role} 꺼짐`, code, log.join('\n'));
-          errors.set(role, /out of memory|failed to allocate|bad_alloc/i.test(log.join('\n')) ? '메모리가 모자라요. 더 작은 모델을 넣거나 다른 앱을 닫아 주세요' : `모델이 멈췄어요 (${code})`);
+          errors.set(role, engineError(log.join('\n'), code));
         }
         emit();
       });

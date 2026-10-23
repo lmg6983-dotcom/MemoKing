@@ -142,9 +142,13 @@ object LocalAi {
             if (!s.stopping) {
                 val log = synchronized(s.log) { s.log.joinToString("\n") }
                 android.util.Log.w("MemoKing", "AI $role 꺼짐 $code\n$log")
-                errors[role] = if (Regex("out of memory|failed to allocate|bad_alloc", RegexOption.IGNORE_CASE).containsMatchIn(log)) {
-                    "메모리가 모자라요. 더 작은 모델을 넣거나 다른 앱을 닫아 주세요"
-                } else "모델이 멈췄어요 ($code)"
+                // PC app/js/core/llama-client.js engineError 와 같은 말로
+                val arch = Regex("unknown model architecture: '([^']+)'").find(log)?.groupValues?.get(1)
+                errors[role] = when {
+                    arch != null -> "이 엔진이 모르는 모델 구조예요 ($arch). 같은 모델을 엔진이 아는 구조로 바꾼 GGUF 를 넣어 주세요"
+                    Regex("out of memory|failed to allocate|bad_alloc", RegexOption.IGNORE_CASE).containsMatchIn(log) -> "메모리가 모자라요. 더 작은 모델을 넣거나 다른 앱을 닫아 주세요"
+                    else -> "모델이 멈췄어요 ($code)"
+                }
             }
             changed()
         }.start()
