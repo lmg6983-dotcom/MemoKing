@@ -696,6 +696,7 @@ function initAi() {
   ai = createAiService({
     dir: path.join(app.getPath('userData'), 'ai'),
     serverPath: process.env.MEMOKING_LLAMA_SERVER || LLAMA_SERVER,
+    fetch: (url) => net.fetch(url), // 기본 모델 받기 — 시스템 프록시를 따른다
     getNames: () => settings.ai ?? {},
     setName: (role, name) => {
       settings.ai = { ...settings.ai, [role]: name };

@@ -3,12 +3,13 @@
 //   이 PC 의 앱 데이터 폴더(ai\)로 복사해 둔다 — USB 로 옮긴 파일도 되고, 메모 폴더(동기화)에는 넣지 않는다.
 //   메모리 8GB PC 를 생각해 쓸 때만 띄우고 몇 분 쓰지 않으면 끈다. 모델이 멈추거나 꺼져도 앱은 그대로.
 import { spawn as childSpawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { createRagStore } from '../../app/js/core/rag-store.js';
 import { llamaClient, engineError } from '../../app/js/core/llama-client.js';
+import { DEFAULT_MODEL, modelInfoUrl, pickModelFile } from '../../app/js/core/model-catalog.js';
 
 export const AI_ROLES = { chat: '글 모델', embed: '검색 모델' };
 const IDLE_MS = 5 * 60_000;
@@ -38,12 +39,14 @@ const freePort = () => new Promise((resolve, reject) => {
 
 /**
  * @param {{ dir: string, serverPath: string, getNames: () => { chat?: string, embed?: string },
- *           setName: (role: string, name: string) => void, onStatus: (status) => void, spawn?: typeof childSpawn }} opts
+ *           setName: (role: string, name: string) => void, onStatus: (status) => void, spawn?: typeof childSpawn, fetch?: typeof fetch }} opts
+ *   fetch: 기본 모델 받기 (PC 는 Electron net.fetch — 시스템 프록시를 따른다)
  */
 export function createAiService(opts) {
-  const { dir, serverPath, spawn = childSpawn } = opts;
+  const { dir, serverPath, spawn = childSpawn, fetch: get = fetch } = opts;
   const servers = new Map(); // role → { proc, base, key, ready, timer }
   const copying = new Set();
+  const progress = new Map(); // role → 기본 모델을 받은 정도 (0~1)
   const errors = new Map(); // role → 마지막 오류 (화면에 보임)
   const fileOf = (role) => path.join(dir, `${role}.gguf`);
 
@@ -54,7 +57,7 @@ export function createAiService(opts) {
         size = fs.statSync(fileOf(role)).size;
       } catch { /* 없음 */ }
       const state = copying.has(role) ? 'copying' : !size ? 'missing' : servers.has(role) ? 'running' : 'ready';
-      return { state, name: size ? (opts.getNames()[role] ?? '') : '', size, error: errors.get(role) ?? '' };
+      return { state, name: size ? (opts.getNames()[role] ?? '') : '', size, error: errors.get(role) ?? '', progress: progress.get(role) ?? null };
     };
     return { engine: fs.existsSync(serverPath), chat: one('chat'), embed: one('embed') };
   }
@@ -62,29 +65,73 @@ export function createAiService(opts) {
 
   // ---------- 모델 파일 ----------
 
-  async function importModel(role, source) {
-    if (!AI_ROLES[role]) throw new Error('모르는 모델이에요');
+  // 모델을 .part 로 채운 뒤(fill → 이름) 다 됐을 때만 바꿔 넣는다 — 몇 GB 라 도중에 끊겨도 쓰던 모델이 깨지지 않게
+  async function bringIn(role, fill) {
     if (copying.has(role)) return status();
-    if (!isGguf(source)) throw new Error('모델 파일(.gguf)이 아니에요');
     copying.add(role);
     errors.delete(role);
     emit();
     const part = `${fileOf(role)}.part`;
     try {
       fs.mkdirSync(dir, { recursive: true });
-      await fs.promises.copyFile(source, part); // 몇 GB — 다 복사한 뒤에만 바꿔 넣어 쓰던 모델이 깨지지 않게
+      const name = await fill(part);
       await stop(role);
       fs.renameSync(part, fileOf(role));
-      opts.setName(role, path.basename(source));
+      opts.setName(role, name);
     } catch (err) {
       fs.rmSync(part, { force: true });
       errors.set(role, err.code === 'ENOSPC' ? '저장 공간이 모자라요' : err.message);
       throw new Error(errors.get(role));
     } finally {
       copying.delete(role);
+      progress.delete(role);
       emit();
     }
     return status();
+  }
+
+  async function importModel(role, source) {
+    if (!AI_ROLES[role]) throw new Error('모르는 모델이에요');
+    if (!isGguf(source)) throw new Error('모델 파일(.gguf)이 아니에요');
+    return bringIn(role, async (part) => {
+      await fs.promises.copyFile(source, part);
+      return path.basename(source);
+    });
+  }
+
+  /** 기본 모델 받기 (core/model-catalog.js) — Hugging Face 가 알려 준 SHA-256 과 맞아야 넣는다 */
+  function downloadDefault() {
+    const role = DEFAULT_MODEL.role;
+    const offline = '인터넷에 연결하지 못했어요. 인터넷이 될 때 다시 누르거나, 모델 파일을 직접 넣어 주세요';
+    const request = (url) => get(url).catch(() => { throw new Error(offline); });
+    return bringIn(role, async (part) => {
+      const list = await request(modelInfoUrl(DEFAULT_MODEL));
+      if (!list.ok) throw new Error(`모델 목록을 받지 못했어요 (${list.status}). 인터넷을 확인하고 다시 눌러 주세요`);
+      const f = pickModelFile(DEFAULT_MODEL, await list.json());
+      const res = await request(f.url);
+      if (!res.ok || !res.body) throw new Error(`받지 못했어요 (${res.status}). 인터넷을 확인하고 다시 눌러 주세요`);
+      const out = fs.createWriteStream(part);
+      const hash = createHash('sha256');
+      let got = 0;
+      let shown = 0;
+      try {
+        for await (const chunk of res.body) {
+          hash.update(chunk);
+          if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
+          got += chunk.length;
+          if (f.size && got / f.size - shown >= 0.01) {
+            progress.set(role, (shown = got / f.size));
+            emit();
+          }
+        }
+      } catch (err) {
+        throw err.code === 'ENOSPC' ? err : new Error('받다가 끊겼어요. 인터넷을 확인하고 다시 눌러 주세요');
+      } finally {
+        await new Promise((r) => out.end(r));
+      }
+      if (hash.digest('hex') !== f.sha256) throw new Error('받은 파일이 맞지 않아요. 다시 받아 주세요');
+      return f.name;
+    });
   }
 
   async function remove(role) {
@@ -191,7 +238,7 @@ export function createAiService(opts) {
   const { chat, embed } = llamaClient(request);
 
   return {
-    status, emit, importModel, remove, chat, embed,
+    status, emit, importModel, downloadDefault, remove, chat, embed,
     // AI 검색용 조각 · 벡터 — 이 PC 에만
     rag: createRagStore({
       load: () => fs.promises.readFile(path.join(dir, 'vectors.json'), 'utf8').catch(() => null),

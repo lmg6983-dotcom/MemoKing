@@ -109,6 +109,13 @@ export function registerIpc(ctx) {
     }
   });
   ipcMain.handle('ai:remove', (_e, role) => getAi()?.remove(role));
+  ipcMain.handle('ai:download-default', async () => {
+    try {
+      return await getAi().downloadDefault();
+    } catch (err) {
+      return { ...getAi().status(), error: err.message };
+    }
+  });
   // 글 도우미 · AI 검색 (core/ai-tasks.js — 휴대폰과 같은 흐름). 조각은 ai:token, 진행은 ai:progress 로 보낸 창에
   const aiJobs = new Map(); // 보낸 창:작업 → 멈추기
   let tasks = null;

@@ -1,6 +1,7 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
 import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { setupAiAsk } from './ai-ask.js';
+import { DEFAULT_MODEL } from './core/model-catalog.js';
 import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
 import { captureGlobalKey, stopKeyCapture, isCapturing, globalShortcutResult } from './key-capture.js';
@@ -1051,7 +1052,7 @@ if (api.stt) {
 // ---------- AI 도우미 (desktop/ai — 인터넷 없이 이 PC 안에서) ----------
 // 모델 파일(.gguf)은 사용자가 넣는다 (USB 로 옮긴 파일도). 이 PC 의 앱 데이터 폴더에 복사되고, 메모 폴더에는 넣지 않음
 const AI_HINT = {
-  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 메모리 8GB PC 는 2~4B 모델(.gguf)이 알맞아요',
+  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 아래 기본 모델을 받거나 .gguf 파일을 넣어 주세요 (메모리 8GB PC 는 2~4B, 카나나2 등도 돼요)',
   embed: '내 메모에서 AI 로 찾을 때 써요 (예: KURE-v1 .gguf)',
 };
 function renderAi(st, failed = {}) {
@@ -1060,12 +1061,15 @@ function renderAi(st, failed = {}) {
     const m = st[role];
     const have = m.state === 'ready' || m.state === 'running';
     $(`ai-${role}-note`).textContent = !st.engine ? 'AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'
-      : failed[role] || m.error || (m.state === 'copying' ? '모델 파일을 복사하는 중이에요. 몇 분 걸릴 수 있어요'
+      : failed[role] || m.error || (m.state === 'copying' ? (m.progress != null ? `${DEFAULT_MODEL.label} 를 받는 중이에요 ${Math.round(m.progress * 100)}%` : '모델 파일을 복사하는 중이에요. 몇 분 걸릴 수 있어요')
         : have ? `${m.name || '모델'} · ${(m.size / 2 ** 30).toFixed(1)}GB${m.state === 'running' ? ' · 켜져 있어요' : ''}` : AI_HINT[role]);
     $(`ai-${role}-import`).disabled = !st.engine || m.state === 'copying';
     $(`ai-${role}-import`).textContent = have ? '다른 모델로' : '모델 파일 넣기';
     $(`ai-${role}-remove`).hidden = !have;
   }
+  // 기본 모델: 글 모델이 없을 때 한 번 받기 (인터넷이 없는 곳은 위 모델 파일 넣기)
+  $('ai-default-row').hidden = !st.engine || st.chat.state !== 'missing';
+  $('ai-default').textContent = `기본 모델 받기 (${DEFAULT_MODEL.label}, ${DEFAULT_MODEL.approx}, ${DEFAULT_MODEL.license})`;
   $('ai-try-row').hidden = !st.engine || !['ready', 'running'].includes(st.chat.state);
 }
 if (api.ai) {
@@ -1080,6 +1084,11 @@ if (api.ai) {
       renderAi(await api.ai.remove(role));
     });
   }
+  $('ai-default').addEventListener('click', async () => {
+    $('ai-default-row').hidden = true;
+    const st = await api.ai.downloadDefault();
+    renderAi(st, st?.error ? { chat: st.error } : {});
+  });
   $('ai-try').addEventListener('click', async () => {
     const btn = $('ai-try');
     btn.disabled = true;
