@@ -15,7 +15,9 @@ import { previewOrder, dropAt } from './core/list-order.js';
 import { holdKeyboard, edgeScroll, canDrag, holdFor, isStylusTouch } from './keyboard-guard.js';
 import { HYSTERESIS_PX } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
-import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged } from './delete-button.js';
+import { showDeleteButton, hideDeleteButton, hideDeleteIfChanged, undoHint } from './delete-button.js';
+import { holdMs, holdSignal, notePressReleased, takeLateRetry, noteMoved } from './hold-tune.js';
+import { isMisfireRelease } from './core/hold-tuning.js';
 import { haptic } from './dom.js';
 import { UI } from './core/ui-text.js';
 
@@ -281,14 +283,22 @@ export function createListDrag({ readOnly = false } = {}) {
     document.body.classList.remove('mk-list-dragging');
     if (quiet) return; // 목록 전체 옮기기로 넘김 (block-move.js 가 이어서)
     const { state } = view;
+    const mouse = d.kind === 'mouse';
     if (commit && !d.drop && d.shift) {
-      if (shiftItem(view, d.srcPos, d.shift)) flashMoved(view);
+      if (shiftItem(view, d.srcPos, d.shift)) {
+        flashMoved(view);
+        if (mouse) undoHint('항목', { top: d.y + 18, left: d.x, width: 0 }, view, '옮겼어요');
+      }
       view.focus();
       return;
     }
     if (!commit || !d.drop) {
-      // 끄는 동안 늘어난 글자 선택은 버리고 커서를 그 항목에
-      view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(Math.min(d.srcPos + 2, state.doc.content.size)))));
+      // PC: 들어 올렸다가 곧 제자리에 놓으면 커서를 놓으려던 것 — 누른 글자 자리에 커서, 다음부터는 조금 더 눌러야 들리게
+      const misfire = commit && mouse && !d.shift && isMisfireRelease({ liftedMs: Date.now() - d.liftAt, movedPx: stillAt ? 0 : 99 });
+      if (misfire) holdSignal('misfire');
+      // 끄는 동안 늘어난 글자 선택은 버리고 커서를 그 항목에 (PC 는 누른 자리에)
+      const at = misfire && d.anchor != null ? d.anchor : d.srcPos + 2;
+      view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(Math.min(at, state.doc.content.size)))));
       view.focus();
       // (터치) 꾹 눌러 들어 올렸다가 그 자리에 놓으면: 사진·소리처럼 오른쪽 위에 지우기 단추
       if (commit && !d.shift && stillAt && d.kind === 'touch') showItemDelete(view, d.srcPos);
@@ -307,6 +317,11 @@ export function createListDrag({ readOnly = false } = {}) {
     if (tr) {
       view.dispatch(tr);
       flashMoved(view);
+      if (mouse) {
+        noteMoved(Date.now() - d.liftAt); // 곧 되돌리면 실수로 배운다
+        if (d.late) holdSignal('late');
+        undoHint('항목', { top: d.y + 18, left: d.x, width: 0 }, view, '옮겼어요');
+      }
     }
     view.focus();
   }
@@ -437,7 +452,7 @@ export function createListDrag({ readOnly = false } = {}) {
     });
   }
 
-  function lift(view, li, x, y, kind = 'mouse') {
+  function lift(view, li, x, y, kind = 'mouse', extra = {}) {
     const srcPos = itemPosOf(view, li);
     const list = li.parentElement;
     if (srcPos == null || !list) return;
@@ -458,6 +473,7 @@ export function createListDrag({ readOnly = false } = {}) {
       tops, heights, slots, bottom: tops.at(-1) + heights.at(-1), scale, scroller, frames: new DragFrames(view.dom),
       fx: items.map((it, i) => xExtent(it, rects[i])), lastKey: '', lastCy: null, lastDrop: null, buzzKey: '',
       drop: null, shift: 0, x, y, startX: x, startY: y + st, timer: 0, raf: 0, kind,
+      liftAt: Date.now(), anchor: extra.anchor ?? null, late: Boolean(extra.late),
     };
     // 더 누르고 있으면 목록 전체: 맨 바깥 줄이 목록이고 옮길 다른 줄이 있을 때만
     const top = view.state.doc.resolve(srcPos);
@@ -612,6 +628,7 @@ export function createListDrag({ readOnly = false } = {}) {
     hideDeleteButton(true);
     const io = INPUT[kind];
     press = { li, view, kind, x: pt.clientX, y: pt.clientY, t0: Date.now() };
+    if (kind === 'mouse') press.anchor = view.posAtCoords({ left: pt.clientX, top: pt.clientY })?.pos ?? null; // 실수로 들렸으면 이 자리에 커서
     // 글 고치기 방식(휴대폰 다이얼): 꾹 누르기는 글자 고르기에 맡기고, 곧바로 옆으로 미는 것만 하위·상위로
     const lifting = canDrag();
     // 잠깐 뒤(그냥 누르는 클릭에는 깜빡이지 않게)부터 테두리가 점점 진해진다 → 다 진해지면 들어 올림
@@ -643,12 +660,18 @@ export function createListDrag({ readOnly = false } = {}) {
         press.y2 = p.clientY;
       }
     };
-    press.up = () => cancelPress();
+    press.up = () => {
+      // 들리기 전에 손을 뗐다 — 거의 다 눌렀다 뗀 뒤 같은 항목을 곧 다시 눌러 옮기면 "기다리기 길다"로 배운다
+      if (kind === 'mouse' && lifting && press) notePressReleased(itemPosOf(view, press.li), Date.now() - press.t0);
+      cancelPress();
+    };
     if (lifting) press.timer = setTimeout(() => {
       const p = press;
       cancelPress({ keepMark: true });
-      if (p?.li.isConnected) lift(view, p.li, p.x2 ?? p.x, p.y2 ?? p.y, kind);
-    }, holdFor(io.hold));
+      if (!p?.li.isConnected) return;
+      const late = kind === 'mouse' && takeLateRetry(itemPosOf(view, p.li));
+      lift(view, p.li, p.x2 ?? p.x, p.y2 ?? p.y, kind, { anchor: p.anchor, late });
+    }, holdFor(kind === 'mouse' ? holdMs() : io.hold)); // PC 는 쓰는 사람 손에 맞춘 시간 (hold-tune.js)
     window.addEventListener(io.move, press.move, LISTEN);
     window.addEventListener(io.up, press.up, LISTEN);
     if (io.cancel) window.addEventListener(io.cancel, press.up, LISTEN);

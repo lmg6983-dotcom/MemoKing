@@ -21,6 +21,9 @@ import { remarkEmptyTasks } from './core/empty-tasks.js';
 import { remarkInlineHtmlMarks, stringifyHandlers, safeColor, DEFAULT_HIGHLIGHT } from './core/html-marks.js';
 import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
 import { vaultUrl, mediaKind, baseName } from './media.js';
+import { openAlbumViewer } from './album-viewer.js';
+import { promptChoice } from './rename-content.js';
+import { isDocumentFile, documentPages } from './doc-pages.js';
 import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from './core/link-preview.js';
 import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
@@ -88,6 +91,9 @@ const MEDIA_CONTROL = `${MEDIA_SCRUB}, .plyr__progress, input, [role="slider"], 
 
 // 손 메모 이어 그리기 (편집기마다 createNoteEditor 가 정함: (view, getPos) => void)
 let inkEditHandler = null;
+// 묶음 사진 한 장을 누르면 크게 넘겨 보기 (편집기마다 createNoteEditor 가 정함: (view, pos) => void)
+let albumHandler = null;
+export const ALBUM = 'album'; // 묶음 사진의 그림 title — 파일에는 ![이름](그림 "album") 으로 (다른 앱에서는 그냥 사진들)
 let inkReader = null; // 손 메모 SVG 글 읽기 (createNoteEditor 의 readAttachment)
 const INK_FILE = '손 메모';
 
@@ -186,11 +192,17 @@ function mediaView(node, view, getPos) {
     };
   }
   const dom = document.createElement('img');
-  dom.className = 'mk-image';
+  dom.className = title === ALBUM ? 'mk-image mk-album-img' : 'mk-image';
   dom.src = vaultUrl(src);
   dom.alt = alt ?? '';
-  if (title) dom.title = title;
+  if (title && title !== ALBUM) dom.title = title;
   dom.onerror = () => dom.classList.add('broken');
+  if (title === ALBUM) {
+    dom.addEventListener('click', (e) => {
+      if (e.defaultPrevented || typeof getPos !== 'function') return;
+      albumHandler?.(view, getPos());
+    });
+  }
   return { dom };
 }
 
@@ -1130,6 +1142,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const { schema } = v.state;
     pos = afterVoiceCard(v.state, pos);
     const paragraphs = items.map((item) => {
+      if (item.kind === 'album') {
+        return schema.nodes.paragraph.create(null, item.images.map((im) => schema.nodes.image.create({ src: im.src, alt: im.alt, title: ALBUM })));
+      }
       if (item.kind === 'file') {
         return schema.nodes.paragraph.create(null, schema.text(item.name, [schema.marks.link.create({ href: item.src })]));
       }
@@ -1218,6 +1233,32 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     });
   }
   if (!readOnly) inkEditHandler = (v, pos) => editInk(v, pos); // 보기만 하는 편집기(PDF·옆 메모)는 이어 그리기 없음
+  // 묶음 사진: 누른 장부터 크게 넘겨 보기 · 그 장 위에 그리면 그린 것을 합친 새 그림으로 바꾼다 (보기만 하는 편집기는 그리기 없음)
+  albumHandler = (v, pos) => {
+    const $p = v.state.doc.resolve(pos);
+    const images = [];
+    let start = 0;
+    $p.parent.forEach((child, offset) => {
+      if (child.type.name !== 'image' || child.attrs.title !== ALBUM) return;
+      const at = $p.start() + offset;
+      if (at === pos) start = images.length;
+      images.push({ src: child.attrs.src, alt: child.attrs.alt, pos: at });
+    });
+    if (!images.length) return;
+    openAlbumViewer({
+      images,
+      start,
+      url: vaultUrl,
+      onDraw: readOnly ? null : async (i, png) => {
+        const it = images[i];
+        const src = await saveFile(new File([png], `${baseName(it.alt || '그림')} 그림.png`, { type: 'image/png' }));
+        const cur = v.state.doc.nodeAt(it.pos);
+        if (v.isDestroyed || cur?.type.name !== 'image') return null; // 보는 사이 메모가 바뀌었으면 넣지 않음
+        v.dispatch(v.state.tr.setNodeMarkup(it.pos, null, { ...cur.attrs, src }));
+        return src;
+      },
+    });
+  };
 
   // 파일들을 메모 폴더에 저장 → 넣을 줄들. 하나가 안 읽혀도(폴더 · 잠긴 파일 · 너무 큰 파일) 나머지는 그대로 넣고 알린다
   //   (예전에는 하나만 실패해도 여러 파일을 한꺼번에 놓은 것이 통째로 사라졌다)
@@ -1241,7 +1282,64 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         ? `파일 ${items.length}개를 넣었어요. ${failed.length}개(${names})는 읽지 못해 넣지 못했어요`
         : `파일을 넣지 못했어요 (${names}). 폴더는 넣을 수 없어요`, true);
     } else if (items.length > 1) onNotice?.(`파일 ${items.length}개를 넣었어요`);
-    return items;
+    return arrangeItems(items);
+  }
+
+  /**
+   * 넣을 것 다듬기 (PC·휴대폰 같은 질문 — 휴대폰은 앱이 저장한 뒤 이것만 부른다):
+   *   문서(PDF · Word · 한글)는 파일로 둘지 장마다 그림(묶음 사진)으로 바꿀지 — 원노트처럼
+   *   사진 여러 장은 따로따로 둘지 묶음 사진(카카오톡처럼 몇 장만 모아 보이기)으로 할지
+   */
+  async function arrangeItems(items) {
+    if (readOnly) return items;
+    const docs = items.filter((it) => it.kind === 'file' && isDocumentFile({ name: it.name }));
+    const docsAsPages = docs.length > 0 && await promptChoice({
+      title: docs.length > 1 ? `문서 ${docs.length}개를 어떻게 넣을까요?` : `${docs[0].name} 을 어떻게 넣을까요?`,
+      message: '그림으로 넣으면 장마다 넘겨 보고, 그 위에 펜으로 쓸 수 있어요',
+      choices: [{ id: 'file', label: '파일로' }, { id: 'pages', label: '그림으로', primary: true }],
+    }) === 'pages';
+    const photos = items.filter((it) => it.kind === 'image');
+    const asAlbum = photos.length > 1 && await promptChoice({
+      title: `사진 ${photos.length}장을 어떻게 넣을까요?`,
+      message: '묶음 사진은 몇 장만 모아 보이고, 누르면 크게 넘겨 봐요',
+      choices: [{ id: 'each', label: '따로따로' }, { id: 'album', label: '묶음 사진으로', primary: true }],
+    }) === 'album';
+    const out = [];
+    let album = null; // 모으는 중인 묶음 (처음 사진 자리에 한 묶음)
+    for (const it of items) {
+      if (docsAsPages && docs.includes(it)) {
+        out.push(await documentAlbum(it));
+        continue;
+      }
+      if (asAlbum && it.kind === 'image') {
+        if (!album) out.push((album = { kind: 'album', images: [] }));
+        album.images.push({ src: it.src, alt: it.alt });
+        continue;
+      }
+      out.push(it);
+    }
+    return out;
+  }
+
+  // 메모 폴더에 넣은 문서 → 장마다 그림 → 묶음 사진 (바꾸지 못하면 파일 칩 그대로 — 원본 파일은 메모 폴더에 남는다)
+  async function documentAlbum(it) {
+    const name = it.name;
+    try {
+      onNotice?.(`${name} 을 그림으로 바꾸고 있어요`);
+      const blob = await (await fetch(vaultUrl(it.src))).blob();
+      const { pages, total } = await documentPages(new File([blob], name), (n, all) => onNotice?.(`${name} 을 그림으로 바꾸고 있어요 (${n}/${all})`));
+      const images = [];
+      for (let i = 0; i < pages.length; i++) {
+        const alt = `${baseName(name)} ${i + 1}쪽`;
+        images.push({ src: await saveFile(new File([pages[i]], `${alt}.png`, { type: 'image/png' })), alt });
+      }
+      onNotice?.(total > pages.length ? `${name} 의 앞 ${pages.length}장을 넣었어요 (모두 ${total}장)` : `${name} 을 ${pages.length}장의 그림으로 넣었어요`);
+      return { kind: 'album', images };
+    } catch (err) {
+      console.warn('문서를 그림으로 바꾸지 못했어요', name, err);
+      onNotice?.(`${name} 은 그림으로 바꾸지 못해 파일로 넣었어요`, true);
+      return it;
+    }
   }
 
   // ---------- 붙여 넣은 인터넷 사진을 메모 폴더로 ----------
@@ -1871,6 +1969,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         const schema = factory(c);
         return {
           ...schema,
+          inclusive: false, // 링크 · 파일 칩 바로 뒤에서 친 글은 링크에 붙지 않는다 (한글 조합 중에도)
           toDOM: (mark) => {
             const [tag, attrs] = schema.toDOM(mark);
             return [tag, { ...attrs, ...linkDomAttrs(String(mark.attrs.href ?? '')) }];
@@ -2556,6 +2655,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       view().dom.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
     },
     // atCursor: 커서 자리에 (안드로이드에서 앱이 저장해 둔 파일을 넣을 때). 기본은 문서 끝
+    /** 앱이 저장해 둔 것을 넣기 전에: 문서 → 그림 묶음 · 사진 여러 장 → 묶음 사진 (물어본다) */
+    arrangeItems: (items) => arrangeItems(items),
     insertItems(items, { atCursor = false } = {}) {
       if (items.length) insertBlocks(atCursor ? view().state.selection.from : view().state.doc.content.size, items);
     },

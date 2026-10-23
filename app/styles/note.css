@@ -1739,7 +1739,12 @@ body.recording .format-bar button.add-btn::after {
 .add-sat:active .add-sat-btn { transform: scale(0.92); }
 @keyframes add-sat-out { from { opacity: 0; transform: translate(-6px, 24px) scale(0.5); } }
 @keyframes add-sat-in { to { opacity: 0; transform: translate(-6px, 24px) scale(0.5); } }
-@media print { .add-menu { display: none !important; } }
+/* + 를 펼치면 창은 옅게 덮고 + 단추만 또렷하게 (휴대폰과 같은 느낌) — 서식 막대는 덮개 위로 올리고 막대 안에서 + 말고는 덮는다 */
+.add-scrim { position: fixed; inset: 0; z-index: 39; background: color-mix(in srgb, var(--note-bg) 70%, transparent); backdrop-filter: blur(2px); animation: mk-fade-in 0.15s ease-out; }
+body.add-open .format-bar { z-index: 41; }
+body.add-open .format-bar::after { content: ''; position: absolute; inset: 0; z-index: 1; background: color-mix(in srgb, var(--note-bg) 70%, transparent); pointer-events: none; }
+body.add-open .format-bar button.add-btn { z-index: 2; }
+@media print { .add-menu, .add-scrim { display: none !important; } }
 
 /* 주석: 글 위에 겹친 층 (칸을 차지하지 않음). 평소엔 보이기만, 주석 모드에서만 그리기 */
 .mk-annot { position: absolute; z-index: 4; overflow: visible; pointer-events: none; }
@@ -2077,3 +2082,41 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-find-clear { align-self: flex-start; }
 .mk-find-clear[hidden] { display: none; }
 .mk-find-pop-foot { display: flex; justify-content: space-between; gap: 6px; padding-top: 2px; }
+
+/* ---------- 묶음 사진 (카카오톡처럼): 한 줄에 모은 사진은 두 칸 격자로 4장까지, 더 있으면 4번째 칸에 +N ----------
+   파일에는 그림마다 title "album" (editor.js ALBUM). 숨긴 장도 수를 세도록 display: none 대신 안 보이게만 */
+.mk-doc p:has(> img.mk-album-img) {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+  width: min(100%, 380px); border-radius: 12px; overflow: hidden; counter-reset: mk-album -4;
+}
+.mk-doc img.mk-album-img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; margin: 0; border-radius: 0; cursor: zoom-in; counter-increment: mk-album; background: #fff; }
+.mk-doc[contenteditable="true"] img.mk-album-img { cursor: zoom-in; }
+.mk-doc img.mk-album-img:nth-of-type(n + 5) { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* 3장: 첫 장을 세로로 크게 */
+.mk-doc p:has(> img.mk-album-img:nth-of-type(3):last-of-type) > img.mk-album-img:first-of-type { grid-row: span 2; aspect-ratio: auto; height: 100%; }
+/* 5장 넘으면 4번째 칸 위에 +N (counter 가 -4 에서 시작해 장 수 - 4) */
+.mk-doc p:has(> img.mk-album-img:nth-of-type(5))::after {
+  content: '+' counter(mk-album); grid-row: 2; grid-column: 2; z-index: 1; display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 22px; font-weight: 700; pointer-events: none;
+}
+
+/* 묶음 사진 크게 보기 (album-viewer.js) */
+.mk-album-view { position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: rgba(12, 12, 12, 0.94); color: #fff; animation: mk-fade-in 0.15s ease-out; }
+.mk-album-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top)); }
+.mk-album-count { flex: 1; font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; font-size: 13.5px; cursor: pointer; }
+.mk-album-btn:hover { background: rgba(255, 255, 255, 0.2); }
+.mk-album-btn svg { width: 18px; height: 18px; }
+.mk-album-stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; padding: 8px 56px 16px; touch-action: pan-y; }
+.mk-album-big { max-width: 100%; max-height: 100%; background: #fff; user-select: none; -webkit-user-drag: none; }
+.mk-album-nav { position: absolute; top: 50%; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #fff; cursor: pointer; display: grid; place-items: center; }
+.mk-album-nav:hover { background: rgba(255, 255, 255, 0.24); }
+.mk-album-nav svg { width: 20px; height: 20px; }
+.mk-album-nav.prev { left: 8px; }
+.mk-album-nav.prev svg { transform: rotate(180deg); }
+.mk-album-nav.next { right: 8px; }
+.mk-album-nav[hidden] { display: none; }
+.mk-album-ink { position: absolute; touch-action: none; }
+.mk-album-view.inking .mk-album-nav, .mk-album-view.inking .mk-album-head .mk-album-btn:not(:last-child) { display: none; }
+@media (max-width: 600px) { .mk-album-stage { padding: 4px 0 12px; } .mk-album-nav { display: none; } }
+@media print { .mk-album-view { display: none !important; } }

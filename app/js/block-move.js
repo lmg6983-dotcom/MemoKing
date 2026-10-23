@@ -15,6 +15,8 @@ import { holdKeyboard, keyboardFor, edgeScroll, canDrag, holdFor, touchMode } fr
 import { Plugin, PluginKey, TextSelection, NodeSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { previewOrder, dropAt } from './core/list-order.js';
 import { HOLD_MS, TOUCH_HOLD_MS } from './list-drag.js';
+import { holdMs, holdSignal, notePressReleased, takeLateRetry, noteMoved } from './hold-tune.js';
+import { isMisfireRelease, isSidewaysSelect } from './core/hold-tuning.js';
 import { isVoiceCard } from './voice-card-view.js';
 import { mediaKindOf } from './core/memo-file.js';
 import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
@@ -608,7 +610,9 @@ class Mover {
     this.cancelPress();
     const io = INPUT[kind];
     const pt = pointOf(event);
-    const p = { block, kind, text, x: pt.clientX, y: pt.clientY, x2: pt.clientX, y2: pt.clientY };
+    const p = { block, kind, text, x: pt.clientX, y: pt.clientY, x2: pt.clientX, y2: pt.clientY, t0: Date.now() };
+    // PC 글 줄: 누른 글자 자리 (실수로 들렸으면 그 자리에 커서 · 글자 고르기로 돌려준다)
+    if (kind === 'mouse' && text) p.anchor = view.posAtCoords({ left: pt.clientX, top: pt.clientY })?.pos ?? null;
     const media = event.target instanceof Element ? event.target.closest('.mk-media')?.querySelector('audio, video') : null;
     if (media) p.media = { el: media, time: media.currentTime };
     this.pressing = p;
@@ -626,6 +630,8 @@ class Mover {
       } else this.cancelPress(); // 터치는 꾹 누르기 전에 밀면 스크롤
     };
     p.up = () => {
+      // 들리기 전에 손을 뗐다 — 거의 다 눌렀다 뗀 뒤 같은 줄을 곧 다시 눌러 옮기면 "기다리기 길다"로 배운다
+      if (kind === 'mouse' && text && this.pressing === p) notePressReleased(block.pos, Date.now() - p.t0);
       this.cancelPress();
       // 누르는 동안에는 안내를 미뤘으므로 손을 뗀 뒤에 — 휴대폰 옮기기 방식은 글을 고를 수 없어 누른 줄로 알려 준다
       this.hintIfNew(p.block);
@@ -646,8 +652,9 @@ class Mover {
         haptic(12);
         if (p.media && p.media.el.currentTime !== p.media.time) p.media.el.currentTime = p.media.time; // 재생 막대를 눌러 감긴 것 되돌리기
         if (document.activeElement instanceof HTMLInputElement) document.activeElement.blur();
+        if (kind === 'mouse' && text) p.late = takeLateRetry(block.pos);
         this.lift(p);
-      }, holdFor(text ? (kind === 'touch' ? TOUCH_HOLD_MS : HOLD_MS) : io.hold));
+      }, holdFor(text ? (kind === 'touch' ? TOUCH_HOLD_MS : holdMs()) : io.hold)); // PC 글 줄은 쓰는 사람 손에 맞춘 시간 (hold-tune.js)
     }
   }
 
@@ -682,6 +689,7 @@ class Mover {
     if (doms.some((d) => !(d instanceof Element))) return;
     getSelection()?.removeAllRanges();
     const scroller = scrollerOf(view.dom);
+    const scrollBefore = scroller?.scrollTop ?? null; // 글자 고르기로 돌려줄 때 원래 스크롤로
     // 옮기는 동안은 모든 줄을 짧게 접는다 (그림은 작은 썸네일, 긴 글·표는 첫 부분만) — 앞뒤 내용이 커도
     // 한 칸 옮기는 데 손가락을 조금만 움직이면 되게. 놓으면 원래 크기로
     const before = doms.map((el) => el.getBoundingClientRect().height);
@@ -714,6 +722,7 @@ class Mover {
       gain: p.kind === 'touch' ? slotGain(slots[block.index]) : 1, lastKey: '', lastCy: null,
       block, positions, tops, heights, slots, scale, scroller, drop: null, kind: p.kind,
       x: p.x2, y: p.y2, x0: p.x2, y0: p.y2, raf: 0, timer: 0,
+      text: p.text, anchor: p.anchor ?? null, late: Boolean(p.late), liftAt: Date.now(), scrollBefore,
     };
     this.drag = d;
     document.body.classList.add('mk-block-dragging');
@@ -728,6 +737,11 @@ class Mover {
       e.stopPropagation(); // 편집기의 글자 고르기 늘리기를 막는다
       const pt = pointOf(e);
       if (this.tryDragOut(d, pt)) return;
+      // PC 글 줄: 들어 올린 뒤 처음 움직임이 옆으로면 글자를 고르려던 것 — 옮기기를 접고 누른 자리부터 글자 고르기로
+      if (d.kind === 'mouse' && d.text && !d.whole && !d.decided && Math.hypot(pt.clientX - d.x0, pt.clientY - d.y0) >= 16) { // (옆으로 보는 거리와 같게 — 작은 흔들림으로는 정하지 않음)
+        d.decided = true;
+        if (isSidewaysSelect(pt.clientX - d.x0, pt.clientY - d.y0)) return this.toSelection(d, pt);
+      }
       d.x = pt.clientX;
       d.y = pt.clientY;
       if (!d.raf) {
@@ -884,6 +898,13 @@ class Mover {
     const { view } = this;
     if (view.isDestroyed) return;
     this.decorate([]);
+    const mouseText = d.kind === 'mouse' && d.text && !d.whole;
+    // PC 글 줄을 들어 올렸다가 곧 제자리에 놓으면: 커서를 놓으려던 것 — 누른 자리에 커서, 다음부터는 조금 더 눌러야 들리게
+    if (commit && !d.drop && mouseText && isMisfireRelease({ liftedMs: Date.now() - d.liftAt, movedPx: Math.hypot(d.x - d.x0, d.y - d.y0) })) {
+      holdSignal('misfire');
+      this.caretAt(d.anchor);
+      return;
+    }
     // 꾹 눌러 들어 올렸다가 그 자리에 놓으면(옮기지 않음): 내용이면 오른쪽 위에 지우기 단추
     if (commit && !d.drop && Math.hypot(d.x - d.x0, d.y - d.y0) < 14) {
       const block = blockInfo(view.state.doc, d.block.pos, d.block.inner);
@@ -897,8 +918,53 @@ class Mover {
       if (tr) {
         view.dispatch(tr);
         this.flash();
+        if (d.kind === 'mouse') {
+          // 곧 되돌리면(Ctrl+Z · 되돌리기 단추) 실수로 배운다 · 다시 눌러 겨우 옮겼으면 기다리기를 조금 줄인다
+          if (mouseText) {
+            noteMoved(Date.now() - d.liftAt);
+            if (d.late) holdSignal('late');
+          }
+          undoHint('줄', { top: d.y + 18, left: d.x, width: 0 }, view, '옮겼어요');
+        }
       }
     }
+  }
+
+  /** 누른 글자 자리에 커서 (문서가 그새 바뀌었어도 안에서) */
+  caretAt(pos) {
+    const { view } = this;
+    if (pos == null || view.isDestroyed) return;
+    const { doc } = view.state;
+    view.dispatch(view.state.tr.setSelection(TextSelection.near(doc.resolve(Math.min(pos, doc.content.size)))));
+    view.focus();
+  }
+
+  /** 들어 올린 글 줄을 옆으로 끌었다: 옮기기를 접고 누른 자리부터 마우스까지 글자를 고른다 (손을 뗄 때까지 따라감) */
+  toSelection(d, pt) {
+    const { view } = this;
+    this.finish(false);
+    if (d.scroller && d.scrollBefore != null) d.scroller.scrollTop = d.scrollBefore;
+    holdSignal('misfire');
+    if (d.anchor == null || view.isDestroyed) return;
+    const extend = (x, y) => {
+      const hit = view.posAtCoords({ left: x, top: y });
+      if (!hit || view.isDestroyed) return;
+      const { doc } = view.state;
+      const size = doc.content.size;
+      view.dispatch(view.state.tr.setSelection(TextSelection.between(doc.resolve(Math.min(d.anchor, size)), doc.resolve(Math.min(hit.pos, size)))));
+    };
+    view.focus();
+    extend(pt.clientX, pt.clientY);
+    const move = (e) => {
+      e.preventDefault();
+      extend(e.clientX, e.clientY);
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move, true);
+      window.removeEventListener('mouseup', up, true);
+    };
+    window.addEventListener('mousemove', move, true);
+    window.addEventListener('mouseup', up, true);
   }
 
   // ---------- 지우기 단추: 꾹 눌렀다 놓은 내용의 오른쪽 위 (delete-button.js) ----------

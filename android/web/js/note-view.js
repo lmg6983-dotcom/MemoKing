@@ -1,6 +1,7 @@
 // 메모 화면 — 데스크탑 스티커 창(app/js/note.js)을 휴대폰 한 화면으로.
 // 편집기(app/js/editor.js)·예약 알림 패널(app/js/reminder-panel.js)은 데스크탑과 같은 코드를 쓴다.
 import { createNoteEditor } from '../../app/js/editor.js';
+import { closeAlbumViewer } from '../../app/js/album-viewer.js';
 import { setCopyHost } from '../../app/js/copy-content.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from '../../app/js/core/html-marks.js';
 import { fileExtension, mediaKind, baseName, vaultUrl } from '../../app/js/media.js';
@@ -607,7 +608,7 @@ async function pasteClipboardFiles(text) {
   if (!editor) return;
   if (files.length) {
     try {
-      editor.insertItems(tempsToItems(files), { atCursor: true });
+      editor.insertItems(await editor.arrangeItems(tempsToItems(files)), { atCursor: true }); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
       flush();
       setStatus(files.length > 1 ? `파일 ${files.length}개를 붙여 넣었어요` : '붙여 넣었어요');
     } catch (err) {
@@ -639,13 +640,13 @@ async function pickAndInsert(accept) {
   if (!files?.length || !editor) return;
   try {
     setStatus(`파일 ${files.length}개 추가 중`);
-    const items = tempsToItems(files);
+    const items = await editor.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
     // 쓰던 자리가 있으면 그 자리에, 아니면(키보드를 내리고 버튼만 누름) 메모 끝에
     //   (+ 를 펼치면 키보드를 닫으므로, 펼칠 때 쓰던 중이었는지를 본다)
     const typing = addFromCursor || el.editorRoot.contains(document.activeElement);
     editor.insertItems(items, { atCursor: typing });
     flush();
-    setStatus(`파일 ${items.length}개를 추가했어요`);
+    setStatus(`파일 ${files.length}개를 추가했어요`);
   } catch (err) {
     console.error(err);
     setStatus(UI.fileAddFail, true);
@@ -690,7 +691,7 @@ function vaultPathOf(src) {
 }
 el.editorRoot.addEventListener('dblclick', (e) => {
   const img = e.target.closest?.('img.mk-image');
-  if (!img) return;
+  if (!img || img.classList.contains('mk-album-img')) return; // 묶음 사진은 한 번 눌러 크게 보기 (editor.js)
   const target = vaultPathOf(img.src);
   if (!target) return;
   e.preventDefault();
@@ -793,6 +794,7 @@ window.addEventListener('resize', () => {
 });
 /** 뒤로 가기: 손 메모 그리기 화면 → 주석 모드 순으로 저장하고 닫는다 (취소는 없다) */
 export function closeInk() {
+  if (closeAlbumViewer()) return true; // 묶음 사진 보기 (그리던 중이면 저장하고)
   if (document.querySelector('.ink-sheet:not(.closing)')) {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     return true;

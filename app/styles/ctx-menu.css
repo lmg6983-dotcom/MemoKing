@@ -108,6 +108,7 @@
   font: 13.5px/1.4 var(--font-sans, system-ui, sans-serif);
 }
 .mk-prompt b { font-size: 14.5px; color: var(--text-strong, inherit); }
+.mk-prompt-msg { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted, #666); }
 .mk-prompt input { height: 36px; padding: 0 10px; border: 1px solid var(--border, #ccc); border-radius: 8px; background: var(--surface, #fff); color: inherit; font: inherit; outline: none; }
 .mk-prompt input:focus { border-color: var(--text-strong, #111); }
 .mk-prompt-actions { display: flex; justify-content: flex-end; gap: 8px; }

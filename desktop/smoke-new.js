@@ -1667,6 +1667,154 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         check('음성 카드 이름 변경: 소리의 설명(alt)이 새 이름으로 저장됨', saved, vault2.get(vid)?.body);
       }
     }
+    // 내 손에 맞추기: 글을 고르려다 줄이 들리면(제자리에 놓음 · 옆으로 끎 · 옮기고 곧 되돌림) 꾹 누르는 시간이 늘고, 실수는 그 자리에서 고쳐짐
+    {
+      const vault3 = getVault();
+      const hid = vault3.import({ body: '# 손 맞추기\n\n첫째 줄 글입니다 길게 씁니다\n\n둘째 줄 글입니다 길게 씁니다\n\n셋째 줄 글입니다 길게 씁니다\n' });
+      windowManager.openNote(hid);
+      const hw = await until(() => noteWins.get(hid), '손 맞추기 창', 6000);
+      await until(() => js(hw, `document.documentElement.dataset.ready === 'true' && document.querySelectorAll('.ProseMirror > p').length === 3`), '손 맞추기 준비', 8000);
+      hw.focus();
+      await js(hw, `localStorage.removeItem('memoking.holdTune')`);
+      await wait(200);
+      const paraAt = (n, dx = 16) => js(hw, `(() => { const r = document.querySelectorAll('.ProseMirror > p')[${n}].getBoundingClientRect(); return { x: Math.round(r.left + ${dx}), y: Math.round(r.top + r.height / 2) }; })()`);
+      const order = () => js(hw, `[...document.querySelectorAll('.ProseMirror > p')].map((p) => p.textContent.slice(0, 2)).join()`);
+      const tune = () => js(hw, `JSON.parse(localStorage.getItem('memoking.holdTune') ?? 'null')`);
+      const lifted = () => js(hw, `document.body.classList.contains('mk-block-dragging')`);
+      const mv = (x, y, buttons = 1) => hw.webContents.sendInputEvent({ type: 'mouseMove', x, y, movementX: 1, movementY: 1, button: 'left', modifiers: buttons ? ['leftButtonDown'] : [] });
+      const down = (x, y) => hw.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+      const up = (x, y) => hw.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+      const start = order();
+      // 1) 들렸다가 곧 제자리에 놓음 → 커서는 누른 자리, 시간 늘어남
+      let a = await paraAt(1, 30);
+      hw.webContents.sendInputEvent({ type: 'mouseMove', x: a.x, y: a.y });
+      down(a.x, a.y);
+      await wait(520);
+      const l1 = await lifted();
+      up(a.x, a.y);
+      await wait(250);
+      const t1 = await tune();
+      const caret1 = await js(hw, `(() => { const s = getSelection(); return s.isCollapsed && !!s.anchorNode && document.querySelectorAll('.ProseMirror > p')[1].contains(s.anchorNode); })()`);
+      check('손 맞추기: 들렸다가 곧 제자리에 놓으면 누른 자리에 커서, 꾹 누르는 시간이 늘어남', l1 && caret1 && t1?.ms === 390 && (await order()) === (await start), JSON.stringify({ l1, caret1, t1 }));
+      // 2) 들린 뒤 옆으로 끎 → 옮기기를 접고 글자 고르기
+      a = await paraAt(1, 20);
+      hw.webContents.sendInputEvent({ type: 'mouseMove', x: a.x, y: a.y });
+      down(a.x, a.y);
+      await wait(560);
+      const l2 = await lifted();
+      for (let k = 1; k <= 8; k++) {
+        mv(a.x + k * 12, a.y + (k % 2));
+        await wait(30);
+      }
+      await wait(120);
+      const sel2 = await js(hw, `({ dragging: document.body.classList.contains('mk-block-dragging'), text: getSelection().toString() })`);
+      up(a.x + 96, a.y);
+      await wait(250);
+      const t2 = await tune();
+      check('손 맞추기: 들린 줄을 옆으로 끌면 옮기기 대신 누른 자리부터 글자를 고름 (시간도 늘어남)', l2 && !sel2.dragging && sel2.text.length >= 3 && t2?.ms === 430 && (await order()) === (await start), JSON.stringify({ l2, sel2, t2 }));
+      // 3) 옮기면 되돌리기 막대, 곧 되돌리면 실수로 배움
+      a = await paraAt(1, 30);
+      const b = await paraAt(2, 30);
+      hw.webContents.sendInputEvent({ type: 'mouseMove', x: a.x, y: a.y });
+      down(a.x, a.y);
+      await wait(600);
+      for (let k = 1; k <= 10; k++) {
+        mv(a.x, Math.round(a.y + ((b.y - a.y + 14) * k) / 10));
+        await wait(30);
+      }
+      await wait(150);
+      up(a.x, b.y + 14);
+      await wait(300);
+      const moved = await order();
+      const hint = await js(hw, `document.getElementById('mk-undo-hint')?.textContent ?? ''`);
+      check('손 맞추기: 줄을 옮기면 "줄을 옮겼어요 되돌리기" 막대', moved !== (await start) && hint.includes('줄을 옮겼어요') && hint.includes('되돌리기'), JSON.stringify({ moved, hint }));
+      await wait(400); // 놓은 뒤 잠깐(0.4초)은 따라오는 클릭을 먹는다 — 사람도 단추까지 가는 데 그보다 걸린다
+      const ub = await js(hw, `(() => { const r = document.querySelector('#mk-undo-hint .mk-undo-btn').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+      hw.webContents.sendInputEvent({ type: 'mouseMove', x: ub.x, y: ub.y });
+      down(ub.x, ub.y);
+      up(ub.x, ub.y);
+      await wait(300);
+      const t3 = await tune();
+      check('손 맞추기: 되돌리기를 누르면 원래 순서, 빨리 옮기고 곧 되돌린 것은 실수로 배움', (await order()) === (await start) && t3?.ms === 470, JSON.stringify({ order: await order(), t3 }));
+      // 4) 설정 › 처음 값으로 (목록 창) → 메모 창도 같은 값
+      const lw = getList();
+      await js(lw, `document.getElementById('hold-reset').click()`);
+      await wait(200);
+      const t4 = await tune();
+      check('손 맞추기: 설정의 "처음 값으로" 가 메모 창에도 바로 (꾹 누르는 시간 0.35초)', t4?.ms === 350 && t4.on === true, JSON.stringify(t4));
+      hw.close();
+      // 목록 항목은 그대로: 들린 뒤 옆으로 끌면 하위 항목으로 (글자 고르기로 바꾸지 않음)
+      const lid = vault3.import({ body: '# 목록 옆으로\n\n- 가나다 항목\n- 라마바 항목\n' });
+      windowManager.openNote(lid);
+      const lw2 = await until(() => noteWins.get(lid), '목록 옆으로 창', 6000);
+      await until(() => js(lw2, `document.documentElement.dataset.ready === 'true' && document.querySelectorAll('.ProseMirror li').length === 2`), '목록 옆으로 준비', 8000);
+      lw2.focus();
+      await wait(200);
+      const li = await js(lw2, `(() => { const r = document.querySelectorAll('.ProseMirror li p')[1].getBoundingClientRect(); return { x: Math.round(r.left + 20), y: Math.round(r.top + r.height / 2) }; })()`);
+      lw2.webContents.sendInputEvent({ type: 'mouseMove', x: li.x, y: li.y });
+      lw2.webContents.sendInputEvent({ type: 'mouseDown', x: li.x, y: li.y, button: 'left', clickCount: 1 });
+      await wait(500);
+      for (let k = 1; k <= 8; k++) {
+        lw2.webContents.sendInputEvent({ type: 'mouseMove', x: li.x + k * 10, y: li.y, movementX: 1, movementY: 0, button: 'left', modifiers: ['leftButtonDown'] });
+        await wait(30);
+      }
+      await wait(120);
+      lw2.webContents.sendInputEvent({ type: 'mouseUp', x: li.x + 80, y: li.y, button: 'left', clickCount: 1 });
+      await wait(300);
+      const nested = await js(lw2, `document.querySelectorAll('.ProseMirror li li').length`);
+      check('손 맞추기: 목록 항목은 들린 뒤 옆으로 끌면 예전처럼 하위 항목으로', nested === 1, String(nested));
+      lw2.close();
+    }
+    // 파일 칩은 캡슐 하나: 커서는 칩 앞뒤에만 (가운데를 눌러도 · 화살표로 지나가도), 칩 뒤에서 친 글은 칩 이름에 붙지 않음
+    {
+      const vault4 = getVault();
+      const cid = vault4.import({ body: '# 칩 커서\n\n앞글 [보고서최종본.pdf](attachments/보고서최종본.pdf) 뒷글\n' });
+      windowManager.openNote(cid);
+      const cw = await until(() => noteWins.get(cid), '칩 커서 창', 6000);
+      await until(() => js(cw, `document.documentElement.dataset.ready === 'true' && !!document.querySelector('.ProseMirror a[data-file]')`), '칩 커서 준비', 8000);
+      cw.focus();
+      await wait(200);
+      // 커서가 어디인가: 'in' = 칩 이름 가운데, 'start' / 'end' = 칩 앞 · 뒤, 그 밖은 앞글 · 뒷글 안 몇 번째
+      const where = () => js(cw, `(() => {
+        const a = document.querySelector('.ProseMirror a[data-file]');
+        const s = getSelection();
+        const r = document.createRange(); r.selectNodeContents(a);
+        const p = document.createRange(); p.setStart(s.anchorNode, s.anchorOffset); p.collapse(true);
+        const before = p.compareBoundaryPoints(Range.START_TO_START, r) <= 0;
+        const after = p.compareBoundaryPoints(Range.END_TO_START, r) >= 0; // 커서(p 시작) 가 칩 끝 이후
+        return { at: before ? 'start' : after ? 'end' : 'in', text: s.toString(), chip: a.textContent };
+      })()`);
+      const caretInChip = (offset) => js(cw, `(() => { document.querySelector('.ProseMirror').focus(); const t = document.querySelector('.ProseMirror a[data-file]').firstChild; const r = document.createRange(); r.setStart(t, ${offset}); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+      await caretInChip(3);
+      await wait(250);
+      const w1 = await where();
+      check('파일 칩: 이름 가운데에 커서를 두면 칩 앞이나 뒤로 옮겨짐', w1.at !== 'in', JSON.stringify(w1));
+      await js(cw, `(() => { document.querySelector('.ProseMirror').focus(); const r = document.createRange(); r.selectNodeContents(document.querySelector('.ProseMirror p')); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+      await wait(100);
+      for (let k = 0; k < 3; k++) { key(cw, 'Right'); await wait(60); } // "앞글 " 을 지나 칩 앞
+      const w2a = await where();
+      key(cw, 'Right');
+      await wait(150);
+      const w2 = await where();
+      check('파일 칩: 칩 앞에서 → 한 번이면 칩 뒤로 (이름 안으로 들어가지 않음)', w2a.at === 'start' && w2.at === 'end', JSON.stringify({ w2a, w2 }));
+      key(cw, 'Left');
+      await wait(150);
+      const w3 = await where();
+      check('파일 칩: 칩 뒤에서 ← 한 번이면 칩 앞으로', w3.at === 'start', JSON.stringify(w3));
+      key(cw, 'Right', ['shift']);
+      await wait(150);
+      const w4 = await where();
+      check('파일 칩: Shift+→ 는 칩을 통째로 고름', w4.text === '보고서최종본.pdf', JSON.stringify(w4));
+      key(cw, 'Right');
+      await wait(100);
+      cw.webContents.insertText('가');
+      await wait(100);
+      cw.webContents.sendInputEvent({ type: 'char', keyCode: 'x' });
+      await wait(400);
+      const typed = await js(cw, `({ chip: document.querySelector('.ProseMirror a[data-file]').textContent, line: document.querySelector('.ProseMirror p').textContent })`);
+      check('파일 칩: 칩 바로 뒤에서 친 글(한글 · 영문)은 칩 이름에 붙지 않고 칩 밖에', typed.chip === '보고서최종본.pdf' && typed.line.includes('가x'), JSON.stringify(typed));
+      cw.close();
+    }
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {

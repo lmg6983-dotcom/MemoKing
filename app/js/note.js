@@ -938,7 +938,7 @@ function vaultPathOf(src) {
 
 el.editorRoot.addEventListener('dblclick', (e) => {
   const img = e.target.closest?.('img.mk-image');
-  if (!img) return;
+  if (!img || img.classList.contains('mk-album-img')) return; // 묶음 사진은 한 번 눌러 크게 보기 (editor.js)
   const target = vaultPathOf(img.src);
   if (!target) return;
   e.preventDefault();
@@ -1094,6 +1094,13 @@ styleMenu.addEventListener('keydown', (e) => {
 // ---------- 콘텐츠 추가 (+): 위로 위성 단추 (휴대폰과 같음) ----------
 const addMenu = $('add-menu');
 const addBtn = $('add-btn');
+// 위성 단추 뒤를 옅게 덮는다 (휴대폰처럼 + 단추만 또렷하게) — 누르면 닫힘
+const addScrim = Object.assign(document.createElement('div'), { className: 'add-scrim', hidden: true });
+addMenu.before(addScrim);
+addScrim.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  closeAddMenu();
+});
 let addCloseTimer = 0;
 function openAddMenu() {
   closePalette();
@@ -1102,6 +1109,8 @@ function openAddMenu() {
   clearTimeout(addCloseTimer);
   addMenu.classList.remove('closing');
   addMenu.hidden = false;
+  addScrim.hidden = false;
+  document.body.classList.add('add-open');
   const r = addBtn.getBoundingClientRect();
   addMenu.style.left = `${Math.max(8, Math.round(r.left))}px`;
   addMenu.style.bottom = `${Math.round(window.innerHeight - r.top + 10)}px`;
@@ -1115,6 +1124,8 @@ function closeAddMenu() {
   addBtn.setAttribute('aria-expanded', 'false');
   if (addMenu.contains(document.activeElement)) addBtn.focus(); // 키보드로 쓰던 사람이 제자리로 (고른 동작이 편집기로 옮겨 감)
   addMenu.classList.add('closing');
+  addScrim.hidden = true;
+  document.body.classList.remove('add-open');
   addCloseTimer = setTimeout(() => {
     addMenu.hidden = true;
     addMenu.classList.remove('closing');
