@@ -7,9 +7,7 @@ import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor, appendTags } from '../app/js/core/tag-suggest.js';
 import { extractTags } from '../app/js/core/tags.js';
-import { spellMessages, styleMessages, draftMessages, plausibleFix } from '../app/js/core/ai-write.js';
-import { aiTagRequest, aiTagResult } from '../app/js/core/ai-tags.js';
-import { retrieve, ragMessages } from '../app/js/core/rag.js';
+import { createAiTasks } from '../app/js/core/ai-tasks.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
@@ -111,65 +109,34 @@ export function registerIpc(ctx) {
     }
   });
   ipcMain.handle('ai:remove', (_e, role) => getAi()?.remove(role));
-  // 글 도우미 (메모 창): 맞춤법은 문단마다 묻고 믿을 만한 답만, 문체 · 초안은 글자가 오는 대로 보낸다
+  // 글 도우미 · AI 검색 (core/ai-tasks.js — 휴대폰과 같은 흐름). 조각은 ai:token, 진행은 ai:progress 로 보낸 창에
   const aiJobs = new Map(); // 보낸 창:작업 → 멈추기
-  ipcMain.handle('ai:write', async (e, { id, task, text = '', blocks = [], style, title, request }) => {
+  let tasks = null;
+  const aiTasks = () => (tasks ??= createAiTasks({
+    ai: getAi(),
+    memos: () => getVault()?.bodies() ?? [],
+    graph: () => getVault()?.index?.memos ?? [],
+    store: getAi().rag,
+  }));
+  async function aiJob(e, id, run) {
     const key = `${e.sender.id}:${id}`;
     const ctrl = new AbortController();
     aiJobs.set(key, ctrl);
     const send = (channel, data) => !e.sender.isDestroyed() && e.sender.send(channel, { id, ...data });
     try {
-      if (task === 'spell') {
-        const fixed = [];
-        for (const [i, block] of blocks.entries()) {
-          send('ai:progress', { done: i, total: blocks.length });
-          const out = await getAi().chat(spellMessages(block), { temperature: 0, maxTokens: block.length * 2 + 32, signal: ctrl.signal });
-          fixed.push(plausibleFix(block, out) ? out : block);
-        }
-        return { fixed };
-      }
-      const messages = task === 'style' ? styleMessages(text, style) : draftMessages({ title, body: text, request });
-      return { text: await getAi().chat(messages, { maxTokens: 1024, signal: ctrl.signal, onToken: (t) => send('ai:token', { text: t }) }) };
-    } catch (err) {
-      return { error: err.message };
-    } finally {
-      aiJobs.delete(key);
-    }
-  });
-  // AI 검색 (목록 검색창 › AI에게 묻기): 낱말 · 뜻 · 그래프로 메모를 찾고, 고른 메모만 근거로 답 (출처 번호)
-  ipcMain.handle('ai:ask', async (e, { id, question }) => {
-    const key = `${e.sender.id}:${id}`;
-    const ctrl = new AbortController();
-    aiJobs.set(key, ctrl);
-    const send = (channel, data) => !e.sender.isDestroyed() && e.sender.send(channel, { id, ...data });
-    try {
-      const ai = getAi();
-      const vault = getVault();
-      const embedOn = ['ready', 'running'].includes(ai.status().embed.state); // 검색 모델이 없으면 낱말 · 그래프만
-      const embedName = embedOn ? ai.status().embed.name : '';
-      const embed = (texts) => {
-        if (ctrl.signal.aborted) throw new Error('멈췄어요');
-        return ai.embed(texts);
-      };
-      const chunks = await ai.rag.chunksFor(vault.bodies().filter((m) => !isLockedBody(m.body)), {
-        model: embedOn ? `${embedName}:${ai.status().embed.size}` : '',
-        embed,
+      return await run({
+        signal: ctrl.signal,
+        onToken: (text) => send('ai:token', { text }),
         onProgress: (done, total) => send('ai:progress', { done, total }),
       });
-      // shortcut: Qwen3-Embedding 은 질문 앞에 지시문을 붙여야 제 성능 — 파일 이름으로만 가린다
-      const qvec = embedOn ? (await embed([`${/qwen/i.test(embedName) ? 'Instruct: Given a search query, retrieve relevant notes\nQuery: ' : ''}${question}`]))[0] : undefined;
-      const graph = new Map((vault.index?.memos ?? []).map((m) => [m.id, m.related ?? []]));
-      const picked = retrieve(question, chunks, { qvec, related: (mid) => graph.get(mid) ?? [] });
-      const sources = picked.map((m) => ({ id: m.id, title: m.title, via: m.via }));
-      if (!picked.length) return { text: '메모에서 찾지 못했어요.', sources };
-      const text = await ai.chat(ragMessages(question, picked), { maxTokens: 400, temperature: 0.2, signal: ctrl.signal, onToken: (t) => send('ai:token', { text: t }) });
-      return { text, sources };
     } catch (err) {
       return { error: err.message };
     } finally {
       aiJobs.delete(key);
     }
-  });
+  }
+  ipcMain.handle('ai:write', (e, { id, ...job }) => aiJob(e, id, (o) => aiTasks().write(job, o)));
+  ipcMain.handle('ai:ask', (e, { id, question }) => aiJob(e, id, (o) => aiTasks().ask(question, o)));
   ipcMain.handle('ai:cancel', (e, id) => aiJobs.get(`${e.sender.id}:${id}`)?.abort());
   ipcMain.handle('ai:try', async () => {
     const started = Date.now();
@@ -293,10 +260,8 @@ export function registerIpc(ctx) {
   ipcMain.handle('tags:suggest', (_e, body, id) => suggestTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { excludeId: id }));
   // 추천 태그 막대 › AI로 고르기 (이 PC 안의 글 모델, 후보 중에서만)
   ipcMain.handle('tags:ai', async (_e, body, id) => {
-    const text = String(body ?? '');
-    const req = aiTagRequest(text, getVault()?.bodies() ?? [], { excludeId: id });
     try {
-      return aiTagResult(await getAi().chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, text);
+      return await aiTasks().pickTags(String(body ?? ''), id);
     } catch (err) {
       return { error: err.message };
     }
@@ -307,18 +272,11 @@ export function registerIpc(ctx) {
     const vault = getVault();
     const memo = vault?.get(id);
     if (!memo || memo.locked || settings.autoTags === false || extractTags(memo.body).length) return null;
-    const req = aiTagRequest(memo.body, vault.bodies(), { excludeId: id });
-    let picked;
-    try {
-      picked = aiTagResult(await getAi().chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, memo.body)[0];
-    } catch (err) {
-      console.error('AI 태그', err.message);
-    }
-    picked ??= suggestTagsFor(memo.body, vault.bodies(), { excludeId: id }).find((t) => t.sure && t.existing); // AI 가 못 고르면 AI 없이 확실한 것
+    const name = await aiTasks().autoTag(memo.body, id);
     const now = vault.get(id);
-    if (!picked || now?.body !== memo.body) return null; // 그사이 다시 열어 고쳤으면 건드리지 않는다
-    vault.save(id, appendTags(now.body, [picked.name]));
-    return picked.name;
+    if (!name || now?.body !== memo.body) return null; // 그사이 다시 열어 고쳤으면 건드리지 않는다
+    vault.save(id, appendTags(now.body, [name]));
+    return name;
   });
   ipcMain.handle('tags:auto', (_e, body, source, id) => autoTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { source, excludeId: id }));
   ipcMain.handle('memos:search', (_e, query, excludeId) => wm.withOpenFlag(getVault()?.search(String(query ?? ''), excludeId) ?? []));

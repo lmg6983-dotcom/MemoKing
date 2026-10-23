@@ -7,7 +7,7 @@ import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { createRagStore } from './rag-store.js';
+import { createRagStore } from '../../app/js/core/rag-store.js';
 
 export const AI_ROLES = { chat: '글 모델', embed: '검색 모델' };
 const IDLE_MS = 5 * 60_000;
@@ -224,7 +224,14 @@ export function createAiService(opts) {
 
   return {
     status, emit, importModel, remove, chat, embed,
-    rag: createRagStore({ file: path.join(dir, 'vectors.json') }), // AI 검색용 조각 · 벡터
+    // AI 검색용 조각 · 벡터 — 이 PC 에만
+    rag: createRagStore({
+      load: () => fs.promises.readFile(path.join(dir, 'vectors.json'), 'utf8').catch(() => null),
+      save: async (text) => {
+        await fs.promises.mkdir(dir, { recursive: true });
+        await fs.promises.writeFile(path.join(dir, 'vectors.json'), text);
+      },
+    }),
     close: () => {
       for (const s of servers.values()) {
         clearTimeout(s.timer);
