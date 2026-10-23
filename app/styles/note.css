@@ -2084,8 +2084,8 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-find-pop-foot { display: flex; justify-content: space-between; gap: 6px; padding-top: 2px; }
 
 /* ---------- 묶음 사진 ----------
-   2~3장: 두 칸 격자 (3장은 첫 장을 세로로 크게)
-   4장 이상: 포개 놓은 사진 더미 — 맨 위 한 장 + 뒤로 비스듬히 두 장, 모서리에 "N장" (마우스를 올리면 조금 펼친다)
+   2~4장: 두 칸 격자 (3장은 첫 장을 세로로 크게)
+   5장 이상: 포개 놓은 사진 더미 — 맨 위 한 장 + 뒤로 비스듬히 두 장, 모서리에 "N장" (마우스를 올리면 조금 펼친다)
    문서를 넣은 장(mk-album-page)은 종이 묶음처럼 — 첫 쪽이 다 보이고 뒤 장은 가지런히 어긋나게, "N쪽"
    파일에는 그림마다 title "album" / "album page" (core/memo-file.js). 편집기가 그림 사이마다 숨은 img(ProseMirror-separator)를
    끼우므로 장 수는 "of .mk-album-img" 로 센다. 뒤에 숨은 장도 수를 세도록 display: none 대신 안 보이게만 */
@@ -2096,7 +2096,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-doc img.mk-album-img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; margin: 0; border-radius: 0; cursor: zoom-in; counter-increment: mk-album; background: #fff; }
 .mk-doc[contenteditable="true"] img.mk-album-img { cursor: zoom-in; }
 /* 숨은 img · 줄 끝 br 이 격자 칸을 차지하지 않게 (그림만 든 줄 표시가 늦게 붙어도) */
-.mk-doc p:has(> img.mk-album-img) > :is(img.ProseMirror-separator, br) { display: none; }
+.mk-doc p:has(> img.mk-album-img) > :is(img.ProseMirror-separator, br) { display: none !important; } /* prosemirror.css 가 숨은 img 를 display: inline !important 로 둔다 */
 /* 그림만 든 줄의 "그림 사이 여백" 규칙(mk-image-line)이 칸을 밀지 않게 */
 .mk-doc p.mk-image-line > .mk-image.mk-album-img { margin: 0; }
 /* 3장: 첫 장을 세로로 크게 */
@@ -2104,20 +2104,20 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 /* 문서 장은 격자에서도 종이 비율로 (윗부분부터) */
 .mk-doc img.mk-album-img.mk-album-page { aspect-ratio: 1 / 1.414; object-position: top; }
 
-/* 4장 이상 (문서는 2쪽부터): 포개 놓은 더미 */
-.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) {
+/* 5장 이상 (문서는 2쪽부터): 포개 놓은 더미 */
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) {
   display: block; width: min(76%, 240px); margin: 18px 0 26px 14px; overflow: visible; border-radius: 0; isolation: isolate;
 }
-.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img {
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img {
   position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; box-sizing: border-box;
   border: 5px solid #fff; border-radius: 4px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16), 0 8px 18px -6px rgba(0, 0, 0, 0.28);
   opacity: 0; pointer-events: none; z-index: 0; transform-origin: 50% 60%; transition: transform 0.24s var(--ease-out, ease-out);
 }
-.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(1 of .mk-album-img) { position: relative; inset: auto; height: auto; aspect-ratio: 1; opacity: 1; pointer-events: auto; z-index: 3; }
-.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(2 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 2; transform: rotate(5deg) translate(9px, 1px); }
-.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(3 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 1; transform: rotate(-6deg) translate(-8px, 5px); }
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(1 of .mk-album-img) { position: relative; inset: auto; height: auto; aspect-ratio: 1; opacity: 1; pointer-events: auto; z-index: 3; }
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(2 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 2; transform: rotate(5deg) translate(9px, 1px); }
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(3 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 1; transform: rotate(-6deg) translate(-8px, 5px); }
 /* 장 수 (counter 는 줄 끝에서 모든 장을 센 값) */
-.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img)))::after {
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img)))::after {
   content: counter(mk-album) '장'; position: absolute; right: -10px; bottom: -12px; z-index: 4;
   padding: 5px 9px; border-radius: 999px; background: rgba(24, 24, 22, 0.8); color: #fff;
   font-size: 12.5px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; pointer-events: none;
@@ -2133,8 +2133,8 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img))::after { content: counter(mk-album) '쪽'; right: -22px; bottom: -22px; }
 /* 마우스를 올리면 살짝 펼쳐 "여러 장" 임을 보인다 */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))):hover > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: rotate(9deg) translate(20px, -2px); }
-  .mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: rotate(-10deg) translate(-18px, 8px); }
+  .mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))):hover > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: rotate(9deg) translate(20px, -2px); }
+  .mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: rotate(-10deg) translate(-18px, 8px); }
   .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)):hover > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: translate(12px, 10px); }
   .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: translate(24px, 20px); }
 }

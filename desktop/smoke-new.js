@@ -1718,10 +1718,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           key(aw, 'Escape');
           aw.setSize(bw, bh);
           // "앞으로 이렇게": 체크하고 고르면 다음부터는 묻지 않음 → 설정의 "다시 묻기" 로 지움
-          const dropPhotos = () => js(aw, `(async () => {
+          const dropPhotos = (n = 2) => js(aw, `(async () => {
             const mk = (c) => new Promise((done) => { const cv = document.createElement('canvas'); cv.width = 300; cv.height = 300; const g = cv.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 300, 300); cv.toBlob((b) => done(new File([b], c.slice(1) + '.png', { type: 'image/png' }))); });
             const dt = new DataTransfer();
-            for (const f of await Promise.all([mk('#ff8800'), mk('#0088ff')])) dt.items.add(f);
+            for (const f of await Promise.all(['#ff8800', '#0088ff', '#22aa55', '#aa3399'].slice(0, ${n}).map(mk))) dt.items.add(f);
             const ps = document.querySelectorAll('.mk-doc p'); const r = ps[ps.length - 1].getBoundingClientRect();
             document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
           })()`);
@@ -1733,6 +1733,12 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           await until(async () => (await albumsNow()) === albums0 + 1, '첫 묶음', 4000).catch(() => null);
           await dropPhotos();
           const noAsk = await until(async () => (await albumsNow()) === albums0 + 2 && !(await js(aw, `!!document.querySelector('.mk-prompt')`)), '묻지 않고 묶음', 5000).catch(() => false);
+          // 4장은 두 칸 격자 (포개기는 5장부터)
+          await dropPhotos(4);
+          const four = await until(() => js(aw, `(() => { const ps = [...document.querySelectorAll('.mk-doc p')].filter((p) => p.querySelectorAll('img.mk-album-img').length === 4); const p = ps.at(-1); if (!p) return null; const imgs = [...p.querySelectorAll('img.mk-album-img')]; const lefts = [...new Set(imgs.map((i) => Math.round(i.getBoundingClientRect().left)))]; const tops = [...new Set(imgs.map((i) => Math.round(i.getBoundingClientRect().top)))]; return { display: getComputedStyle(p).display, visible: imgs.filter((i) => getComputedStyle(i).opacity !== '0' && getComputedStyle(i).position !== 'absolute').length, cols: lefts.length, rows: tops.length }; })()`), '4장 격자', 5000).catch(() => null);
+          check('묶음 사진 4장은 두 칸 격자(2 × 2)에 4장 모두 (포개기는 5장부터)', four?.display === 'grid' && four.visible === 4 && four.cols === 2 && four.rows === 2, JSON.stringify(four));
+          await js(aw, `[...document.querySelectorAll('.mk-doc p')].filter((p) => p.querySelectorAll('img.mk-album-img').length === 4).at(-1)?.scrollIntoView({ block: 'center' })`);
+          await capture(aw, 'album-four.png');
           const stored = await js(aw, `localStorage.getItem('memoking.choices')`);
           await js(getList(), `document.getElementById('choices-reset').click()`);
           await wait(150);
