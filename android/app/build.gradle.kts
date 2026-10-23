@@ -90,8 +90,14 @@ val llamaServer by tasks.registering {
         build.resolve("bin").listFiles().orEmpty().filter { it.name.endsWith(".so") }.forEach { it.copyTo(out.resolve(it.name)) }
         build.resolve("bin/llama-server").copyTo(out.resolve("libllama-server.so"))
         // c++_shared 는 앱이 함께 넣어야 한다 (NDK 의 것)
-        ndk.resolve("toolchains/llvm/prebuilt").listFiles().orEmpty().map { it.resolve("sysroot/usr/lib/aarch64-linux-android/libc++_shared.so") }
-            .first { it.isFile }.copyTo(out.resolve("libc++_shared.so"))
+        val prebuilt = ndk.resolve("toolchains/llvm/prebuilt").listFiles().orEmpty().first { it.resolve("bin").isDirectory }
+        prebuilt.resolve("sysroot/usr/lib/aarch64-linux-android/libc++_shared.so").copyTo(out.resolve("libc++_shared.so"))
+        // 기호를 벗겨 APK 를 줄인다 (AGP 는 NDK 를 못 찾으면 벗기지 않고 그대로 넣는다)
+        val strip = prebuilt.resolve("bin").listFiles().orEmpty().first { it.name.startsWith("llvm-strip") }
+        out.listFiles().orEmpty().forEach { sh(strip.path, "--strip-unneeded", it.path) }
+        // CPU 변종은 넷만 (휴대폰은 있는 것 중 맞는 것을 고른다 — 뺀 변종의 휴대폰은 한 단계 아래 것으로): 모든 폰 · dotprod+fp16 · i8mm(2021~ 대부분) · SME2(최신)
+        listOf("armv8.2_1", "armv9.0_1", "armv9.2_1").forEach { out.resolve("libggml-cpu-android_$it.so").delete() }
+        out.listFiles().orEmpty().sortedBy { it.name }.forEach { logger.lifecycle("  ${it.name} ${it.length() / 1024}KB") }
     }
 }
 

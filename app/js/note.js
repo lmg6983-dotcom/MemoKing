@@ -207,7 +207,7 @@ async function renderTagBar() {
   if (seq !== tagSeq) return;
   fillSuggestChips($('tag-suggest-chips'), list, addTags);
   $('tag-ai-btn').hidden = !['ready', 'running'].includes(ai); // 글 모델을 넣은 PC 에서만
-  tagBar.hidden = list.length === 0 && $('tag-ai-btn').hidden;
+  tagBar.hidden = list.length === 0; // 추천이 있을 때만 (AI 단추만으로 모든 메모에 막대를 띄우지 않게 — 닫을 때 AI 태그는 그대로)
 }
 // AI로 고르기: 쓰는 동안 저절로 돌리면 8GB PC 가 무거워져 누를 때만 (모델은 이 PC 안)
 $('tag-ai-btn')?.addEventListener('click', async () => {

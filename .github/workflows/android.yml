@@ -39,7 +39,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: android/.gradle/llama/*/jni
-          key: llama-android-b11400-arm64-v1
+          key: llama-android-b11400-arm64-v2 # v2: 기호를 벗기고 CPU 변종은 넷만
 
       - name: 동기화 엔진 테스트 + APK 빌드 (디버그 서명 — 휴대폰에 바로 설치 가능)
         # 저장소 설정 › Secrets 에 넣어 두면 Google Drive 로그인 설정이 APK 에 들어간다 (android/DRIVE-SETUP.md)

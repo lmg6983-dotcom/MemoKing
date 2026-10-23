@@ -488,7 +488,7 @@ function renderTagBar() {
   }
   const list = currentSuggestions();
   $('tag-ai-btn').hidden = !chatReady() || extractTags(editorMarkdown()).length > 0; // 글 모델을 넣었을 때만
-  el.tagBar.hidden = list.length === 0 && $('tag-ai-btn').hidden;
+  el.tagBar.hidden = list.length === 0; // 추천이 있을 때만 (AI 단추만으로 모든 메모에 막대를 띄우지 않게 — 닫을 때 AI 태그는 그대로)
   fillSuggestChips(el.tagChips, list, addTags, (name, onClick) => tagChip(name, { add: true, onClick }));
 }
 // AI로 고르기 (PC 와 같음): 쓰는 동안 저절로 돌리면 휴대폰이 무거워져 누를 때만, 모델은 이 휴대폰 안
