@@ -20,7 +20,8 @@ if (existsSync(join(DEST, 'llama-server.exe')) && existsSync(MARK)) {
 }
 
 // shortcut: 체크섬을 GitHub 가 올릴 때 잰 값(API digest)으로 확인 — 받다 깨지거나 바뀐 파일은 막지만, 릴리스 자체가 바뀌면 못 막음. 해시를 코드에 박으려면 한 번 받아 본 뒤 여기에
-const rel = await (await fetch(`https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/${LLAMA_TAG}`)).json();
+const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN; // CI: 인증 없이는 시간당 60번이라 러너끼리 나눠 쓰면 막힐 수 있다
+const rel = await (await fetch(`https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/${LLAMA_TAG}`, token ? { headers: { authorization: `Bearer ${token}` } } : {})).json();
 const asset = rel.assets?.find((a) => a.name === ASSET);
 if (!asset?.digest?.startsWith('sha256:')) throw new Error(`${ASSET} 을 릴리스에서 찾지 못했어요`);
 console.log(`받기: ${ASSET} (${Math.round(asset.size / 2 ** 20)}MB)`);
