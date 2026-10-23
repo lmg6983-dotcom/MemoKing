@@ -1765,6 +1765,56 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('손 맞추기: 목록 항목은 들린 뒤 옆으로 끌면 예전처럼 하위 항목으로', nested === 1, String(nested));
       lw2.close();
     }
+    // 파일 칩은 캡슐 하나: 커서는 칩 앞뒤에만 (가운데를 눌러도 · 화살표로 지나가도), 칩 뒤에서 친 글은 칩 이름에 붙지 않음
+    {
+      const vault4 = getVault();
+      const cid = vault4.import({ body: '# 칩 커서\n\n앞글 [보고서최종본.pdf](attachments/보고서최종본.pdf) 뒷글\n' });
+      windowManager.openNote(cid);
+      const cw = await until(() => noteWins.get(cid), '칩 커서 창', 6000);
+      await until(() => js(cw, `document.documentElement.dataset.ready === 'true' && !!document.querySelector('.ProseMirror a[data-file]')`), '칩 커서 준비', 8000);
+      cw.focus();
+      await wait(200);
+      // 커서가 어디인가: 'in' = 칩 이름 가운데, 'start' / 'end' = 칩 앞 · 뒤, 그 밖은 앞글 · 뒷글 안 몇 번째
+      const where = () => js(cw, `(() => {
+        const a = document.querySelector('.ProseMirror a[data-file]');
+        const s = getSelection();
+        const r = document.createRange(); r.selectNodeContents(a);
+        const p = document.createRange(); p.setStart(s.anchorNode, s.anchorOffset); p.collapse(true);
+        const before = p.compareBoundaryPoints(Range.START_TO_START, r) <= 0;
+        const after = p.compareBoundaryPoints(Range.END_TO_START, r) >= 0; // 커서(p 시작) 가 칩 끝 이후
+        return { at: before ? 'start' : after ? 'end' : 'in', text: s.toString(), chip: a.textContent };
+      })()`);
+      const caretInChip = (offset) => js(cw, `(() => { document.querySelector('.ProseMirror').focus(); const t = document.querySelector('.ProseMirror a[data-file]').firstChild; const r = document.createRange(); r.setStart(t, ${offset}); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+      await caretInChip(3);
+      await wait(250);
+      const w1 = await where();
+      check('파일 칩: 이름 가운데에 커서를 두면 칩 앞이나 뒤로 옮겨짐', w1.at !== 'in', JSON.stringify(w1));
+      await js(cw, `(() => { document.querySelector('.ProseMirror').focus(); const r = document.createRange(); r.selectNodeContents(document.querySelector('.ProseMirror p')); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+      await wait(100);
+      for (let k = 0; k < 3; k++) { key(cw, 'Right'); await wait(60); } // "앞글 " 을 지나 칩 앞
+      const w2a = await where();
+      key(cw, 'Right');
+      await wait(150);
+      const w2 = await where();
+      check('파일 칩: 칩 앞에서 → 한 번이면 칩 뒤로 (이름 안으로 들어가지 않음)', w2a.at === 'start' && w2.at === 'end', JSON.stringify({ w2a, w2 }));
+      key(cw, 'Left');
+      await wait(150);
+      const w3 = await where();
+      check('파일 칩: 칩 뒤에서 ← 한 번이면 칩 앞으로', w3.at === 'start', JSON.stringify(w3));
+      key(cw, 'Right', ['shift']);
+      await wait(150);
+      const w4 = await where();
+      check('파일 칩: Shift+→ 는 칩을 통째로 고름', w4.text === '보고서최종본.pdf', JSON.stringify(w4));
+      key(cw, 'Right');
+      await wait(100);
+      cw.webContents.insertText('가');
+      await wait(100);
+      cw.webContents.sendInputEvent({ type: 'char', keyCode: 'x' });
+      await wait(400);
+      const typed = await js(cw, `({ chip: document.querySelector('.ProseMirror a[data-file]').textContent, line: document.querySelector('.ProseMirror p').textContent })`);
+      check('파일 칩: 칩 바로 뒤에서 친 글(한글 · 영문)은 칩 이름에 붙지 않고 칩 밖에', typed.chip === '보고서최종본.pdf' && typed.line.includes('가x'), JSON.stringify(typed));
+      cw.close();
+    }
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {

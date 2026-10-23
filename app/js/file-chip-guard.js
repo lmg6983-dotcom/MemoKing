@@ -2,7 +2,9 @@
 //   칩 글자는 파일을 가리키는 이름이라, 몇 글자만 지우거나 끼워 넣으면 칩 이름과 실제 파일이 어긋난다
 //   - 칩 글자 일부만 바꾸는 편집(치기 · 지우기 · 붙여넣기)은 받지 않는다. 칩을 통째로 지우거나 옮기는 것은 된다
 //   - 칩 바로 뒤에서 Backspace · 바로 앞에서 Delete 는 칩을 통째로 지운다 (한 글자씩 지워지지 않으니)
-import { Plugin, PluginKey } from '../vendor/milkdown.js';
+//   - 커서는 칩 앞 · 뒤에만 (칩 하나가 캡슐 하나): 가운데를 누르면 가까운 끝으로, 화살표는 칩을 한 번에 건너뛰고,
+//     Shift 로 고르면 칩을 통째로 고른다 (칩 뒤에서 친 글이 칩 이름에 붙지 않는 것은 editor.js 링크 inclusive: false)
+import { Plugin, PluginKey, TextSelection } from '../vendor/milkdown.js';
 
 const isFileHref = (href) => typeof href === 'string' && href.startsWith('attachments/');
 const fileMarkOf = (node) => node.marks.find((m) => m.type.name === 'link' && isFileHref(m.attrs.href));
@@ -48,6 +50,21 @@ function chipNextTo(state, dir) {
   return chipRanges($from.parent, $from.start()).find((c) => (dir < 0 ? c.to === at : c.from === at)) ?? null;
 }
 
+/**
+ * 칩 안에 든 자리를 칩 끝으로: 칩 끝에서 들어왔으면 건너편으로, 아니면 가까운 끝으로
+ * @param {{ from: number, to: number }[]} chips @param {number} pos @param {number|null} came 바로 전 자리 (±Infinity: 그 방향으로 가는 중)
+ */
+export function snapOutOfChip(chips, pos, came) {
+  const c = chips.find((x) => pos > x.from && pos < x.to);
+  if (!c) return pos;
+  // 칩 끝에서 한 칸 들어왔으면(화살표) 건너편으로 — 멀리서 누른 것(마우스)은 가까운 끝으로
+  if (came === c.from || came === -Infinity) return c.to;
+  if (came === c.to || came === Infinity) return c.from;
+  return pos - c.from <= c.to - pos ? c.from : c.to;
+}
+
+const chipsAt = ($pos) => ($pos.parent.isTextblock ? chipRanges($pos.parent, $pos.start()) : []);
+
 export const fileChipGuard = () => new Plugin({
   key: new PluginKey('memoking-file-chip-guard'),
   filterTransaction(tr) {
@@ -61,6 +78,24 @@ export const fileChipGuard = () => new Plugin({
       if (bad) return false;
     }
     return true;
+  },
+  // 커서 · 고른 범위의 끝이 칩 가운데면 칩 끝으로 (누르기 · 화살표 · 위아래 줄 이동 · 끌어 고르기 모두)
+  appendTransaction(trs, oldState, state) {
+    const sel = state.selection;
+    if (!(sel instanceof TextSelection) || !trs.some((t) => t.selectionSet || t.docChanged)) return null;
+    const { doc } = state;
+    let oldHead = oldState.selection.head;
+    for (const t of trs) oldHead = t.mapping.map(oldHead);
+    const forward = sel.head > sel.anchor;
+    let { head, anchor } = sel;
+    if (sel.empty) head = anchor = snapOutOfChip(chipsAt(sel.$head), sel.head, oldHead);
+    else {
+      // 늘리는 쪽 끝은 가는 방향으로 칩을 넘고, 붙박이 끝은 칩을 감싸도록 바깥으로
+      head = snapOutOfChip(chipsAt(sel.$head), head, forward ? -Infinity : Infinity);
+      anchor = snapOutOfChip(chipsAt(sel.$anchor), anchor, forward ? Infinity : -Infinity);
+    }
+    if (head === sel.head && anchor === sel.anchor) return null;
+    return state.tr.setSelection(TextSelection.create(doc, anchor, head));
   },
   props: {
     handleKeyDown(view, e) {

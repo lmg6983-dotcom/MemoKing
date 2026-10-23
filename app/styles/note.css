@@ -1739,7 +1739,12 @@ body.recording .format-bar button.add-btn::after {
 .add-sat:active .add-sat-btn { transform: scale(0.92); }
 @keyframes add-sat-out { from { opacity: 0; transform: translate(-6px, 24px) scale(0.5); } }
 @keyframes add-sat-in { to { opacity: 0; transform: translate(-6px, 24px) scale(0.5); } }
-@media print { .add-menu { display: none !important; } }
+/* + 를 펼치면 창은 옅게 덮고 + 단추만 또렷하게 (휴대폰과 같은 느낌) — 서식 막대는 덮개 위로 올리고 막대 안에서 + 말고는 덮는다 */
+.add-scrim { position: fixed; inset: 0; z-index: 39; background: color-mix(in srgb, var(--note-bg) 70%, transparent); backdrop-filter: blur(2px); animation: mk-fade-in 0.15s ease-out; }
+body.add-open .format-bar { z-index: 41; }
+body.add-open .format-bar::after { content: ''; position: absolute; inset: 0; z-index: 1; background: color-mix(in srgb, var(--note-bg) 70%, transparent); pointer-events: none; }
+body.add-open .format-bar button.add-btn { z-index: 2; }
+@media print { .add-menu, .add-scrim { display: none !important; } }
 
 /* 주석: 글 위에 겹친 층 (칸을 차지하지 않음). 평소엔 보이기만, 주석 모드에서만 그리기 */
 .mk-annot { position: absolute; z-index: 4; overflow: visible; pointer-events: none; }

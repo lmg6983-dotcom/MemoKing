@@ -1871,6 +1871,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         const schema = factory(c);
         return {
           ...schema,
+          inclusive: false, // 링크 · 파일 칩 바로 뒤에서 친 글은 링크에 붙지 않는다 (한글 조합 중에도)
           toDOM: (mark) => {
             const [tag, attrs] = schema.toDOM(mark);
             return [tag, { ...attrs, ...linkDomAttrs(String(mark.attrs.href ?? '')) }];
