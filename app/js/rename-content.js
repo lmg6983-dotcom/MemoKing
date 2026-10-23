@@ -117,3 +117,68 @@ export function promptName({ title = '이름 변경', value = '', label = '새 �
     input.setSelectionRange(0, dot > 0 ? dot : value.length); // 확장자는 그대로 두고 이름만 바꾸기 쉽게
   });
 }
+
+/**
+ * 고르기 창 (PC·휴대폰 함께 — promptName 과 같은 모양): 단추 하나를 고르면 그 id, Esc · 바깥 누르기는 null
+ * @param {{ title: string, message?: string, choices: { id: string, label: string, primary?: boolean }[] }} o
+ * @returns {Promise<string|null>}
+ */
+export function promptChoice({ title, message = '', choices }) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'mk-prompt-back';
+    const box = document.createElement('div');
+    box.className = 'mk-prompt';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', title);
+    const h = document.createElement('b');
+    h.textContent = title;
+    box.append(h);
+    if (message) {
+      const p = document.createElement('p');
+      p.className = 'mk-prompt-msg';
+      p.textContent = message;
+      box.append(p);
+    }
+    const row = document.createElement('div');
+    row.className = 'mk-prompt-actions';
+    const buttons = choices.map((c) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      if (c.primary) b.className = 'primary';
+      b.textContent = c.label;
+      b.addEventListener('click', () => done(c.id));
+      return b;
+    });
+    row.append(...buttons);
+    box.append(row);
+    wrap.append(box);
+    const restore = document.activeElement;
+    let closed = false;
+    const done = (result) => {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener('keydown', onKey, true);
+      wrap.remove();
+      if (restore instanceof HTMLElement && restore.isConnected) restore.focus({ preventScroll: true });
+      resolve(result);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Tab') {
+        const i = buttons.indexOf(document.activeElement);
+        e.preventDefault();
+        buttons[(i + (e.shiftKey ? buttons.length - 1 : 1) + buttons.length) % buttons.length].focus();
+        return;
+      }
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      done(null);
+    };
+    document.addEventListener('keydown', onKey, true);
+    wrap.addEventListener('mousedown', (e) => e.target === wrap && done(null));
+    document.body.append(wrap);
+    (buttons.find((b) => b.className === 'primary') ?? buttons[0])?.focus();
+  });
+}

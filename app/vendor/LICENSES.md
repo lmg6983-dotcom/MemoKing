@@ -23,3 +23,7 @@
 | fuzzysort | 4.0.2 | MIT | https://github.com/farzher/fuzzysort |
 | qrcode-generator | 1.4.4 | MIT | https://github.com/kazuhikoarase/qrcode-generator |
 | perfect-freehand | 1.2.3 | MIT | https://github.com/steveruizok/perfect-freehand |
+| pdfjs-dist | 5.4.149 | Apache-2.0 | https://github.com/mozilla/pdf.js |
+| docx-preview | 0.4.1 | Apache-2.0 | https://github.com/VolodymyrBaydalka/docxjs |
+| hwp.js | 0.0.3 | Apache-2.0 | https://github.com/hahnlee/hwp.js |
+| jszip | 3.10.1 | (MIT OR GPL-3.0-or-later) | https://github.com/Stuk/jszip |

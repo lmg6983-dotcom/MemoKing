@@ -938,7 +938,7 @@ function vaultPathOf(src) {
 
 el.editorRoot.addEventListener('dblclick', (e) => {
   const img = e.target.closest?.('img.mk-image');
-  if (!img) return;
+  if (!img || img.classList.contains('mk-album-img')) return; // 묶음 사진은 한 번 눌러 크게 보기 (editor.js)
   const target = vaultPathOf(img.src);
   if (!target) return;
   e.preventDefault();

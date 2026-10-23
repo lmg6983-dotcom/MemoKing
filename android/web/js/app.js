@@ -1283,7 +1283,7 @@ async function memoFromShare(payload) {
       if (files.length) {
         const items = note.tempsToItems(files);
         audioItems = items.filter((it) => it.kind === 'audio');
-        editor.insertItems(items);
+        editor.insertItems(await editor.arrangeItems(items)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
       }
       await new Promise((r) => setTimeout(r, 30));
       editor.appendMarkdown(sourceLine(payload.app));

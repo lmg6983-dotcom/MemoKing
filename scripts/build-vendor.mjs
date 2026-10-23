@@ -26,6 +26,10 @@ const DEPS = {
   'temporal-polyfill': '1.0.5',
   'ical.js': '2.2.1',
   mathjs: '15.2.0',
+  'pdfjs-dist': '5.4.149',
+  'docx-preview': '0.4.1',
+  'hwp.js': '0.0.3',
+  jszip: '3.10.1',
   esbuild: '0.28.2',
 };
 
@@ -77,6 +81,23 @@ await esbuild.build({
   nodePaths: [MODULES],
   logLevel: 'info',
 });
+// 문서를 그림으로 (PDF · Word · 한글): 브라우저용으로 따로 — jszip 의 node 스트림은 빼고, hwp.js 가 부르는 fs 는 빈 모듈로
+const emptyModule = join(BUILD, 'empty.js');
+writeFileSync(emptyModule, 'export default {};\n');
+await esbuild.build({
+  entryPoints: { docpages: join(ROOT, 'scripts', 'vendor', 'docpages.js') },
+  outdir: OUT,
+  bundle: true,
+  format: 'esm',
+  platform: 'browser',
+  target: 'es2022',
+  minify: true,
+  legalComments: 'eof',
+  nodePaths: [MODULES],
+  alias: { fs: emptyModule },
+  logLevel: 'info',
+});
+copyFileSync(join(MODULES, 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.min.mjs'), join(OUT, 'pdf.worker.js'));
 // AI 비서 연결(MCP) 서버는 PC 메인 프로세스(node)에서만 — desktop/vendor 로 따로
 await esbuild.build({
   entryPoints: { 'mcp-sdk': join(ROOT, 'scripts', 'vendor', 'mcp-sdk.js') },
