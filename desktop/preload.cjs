@@ -176,6 +176,7 @@ contextBridge.exposeInMainWorld('memoking', {
     try: invoke('ai:try'),
     write: invoke('ai:write'), // { id, task: 'spell' | 'style' | 'draft', … } — 조각은 ai:token · ai:progress 로
     cancel: invoke('ai:cancel'),
+    ask: invoke('ai:ask'), // { id, question } → { text, sources: [{ id, title, via }] } — 조각은 ai:token, 색인은 ai:progress
   },
   attachments: {
     save: invoke('attachment:save'),

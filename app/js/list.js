@@ -1,5 +1,6 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
 import { hotkeyLabel } from './core/memo-hotkeys.js';
+import { setupAiAsk } from './ai-ask.js';
 import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
 import { captureGlobalKey, stopKeyCapture, isCapturing, globalShortcutResult } from './key-capture.js';
@@ -41,6 +42,7 @@ let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
+const aiAsk = api.ai ? setupAiAsk({ box: $('ai-ask'), api }) : null; // 검색창 › AI에게 묻기 (글 모델을 넣은 PC 에서만)
 const el = {
   setup: $('setup'),
   suggested: $('suggested-path'),
@@ -608,6 +610,7 @@ async function runSearch() {
   state.queryTags = tags;
   state.results = text ? await api.memos.search(text) : null;
   render();
+  aiAsk?.update(text);
 }
 
 // ---------- 동작 ----------

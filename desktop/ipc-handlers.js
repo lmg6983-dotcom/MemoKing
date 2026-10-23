@@ -9,6 +9,7 @@ import { suggestTagsFor, appendTags } from '../app/js/core/tag-suggest.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { spellMessages, styleMessages, draftMessages, plausibleFix } from '../app/js/core/ai-write.js';
 import { aiTagRequest, aiTagResult } from '../app/js/core/ai-tags.js';
+import { retrieve, ragMessages } from '../app/js/core/rag.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
@@ -129,6 +130,40 @@ export function registerIpc(ctx) {
       }
       const messages = task === 'style' ? styleMessages(text, style) : draftMessages({ title, body: text, request });
       return { text: await getAi().chat(messages, { maxTokens: 1024, signal: ctrl.signal, onToken: (t) => send('ai:token', { text: t }) }) };
+    } catch (err) {
+      return { error: err.message };
+    } finally {
+      aiJobs.delete(key);
+    }
+  });
+  // AI 검색 (목록 검색창 › AI에게 묻기): 낱말 · 뜻 · 그래프로 메모를 찾고, 고른 메모만 근거로 답 (출처 번호)
+  ipcMain.handle('ai:ask', async (e, { id, question }) => {
+    const key = `${e.sender.id}:${id}`;
+    const ctrl = new AbortController();
+    aiJobs.set(key, ctrl);
+    const send = (channel, data) => !e.sender.isDestroyed() && e.sender.send(channel, { id, ...data });
+    try {
+      const ai = getAi();
+      const vault = getVault();
+      const embedOn = ['ready', 'running'].includes(ai.status().embed.state); // 검색 모델이 없으면 낱말 · 그래프만
+      const embedName = embedOn ? ai.status().embed.name : '';
+      const embed = (texts) => {
+        if (ctrl.signal.aborted) throw new Error('멈췄어요');
+        return ai.embed(texts);
+      };
+      const chunks = await ai.rag.chunksFor(vault.bodies().filter((m) => !isLockedBody(m.body)), {
+        model: embedOn ? `${embedName}:${ai.status().embed.size}` : '',
+        embed,
+        onProgress: (done, total) => send('ai:progress', { done, total }),
+      });
+      // shortcut: Qwen3-Embedding 은 질문 앞에 지시문을 붙여야 제 성능 — 파일 이름으로만 가린다
+      const qvec = embedOn ? (await embed([`${/qwen/i.test(embedName) ? 'Instruct: Given a search query, retrieve relevant notes\nQuery: ' : ''}${question}`]))[0] : undefined;
+      const graph = new Map((vault.index?.memos ?? []).map((m) => [m.id, m.related ?? []]));
+      const picked = retrieve(question, chunks, { qvec, related: (mid) => graph.get(mid) ?? [] });
+      const sources = picked.map((m) => ({ id: m.id, title: m.title, via: m.via }));
+      if (!picked.length) return { text: '메모에서 찾지 못했어요.', sources };
+      const text = await ai.chat(ragMessages(question, picked), { maxTokens: 400, temperature: 0.2, signal: ctrl.signal, onToken: (t) => send('ai:token', { text: t }) });
+      return { text, sources };
     } catch (err) {
       return { error: err.message };
     } finally {
