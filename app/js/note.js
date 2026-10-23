@@ -1463,6 +1463,7 @@ window.addEventListener('wheel', (e) => {
 }, { passive: false });
 window.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey && e.code !== 'Equal') return;
+  if (document.querySelector('.mk-album-view')) return; // 묶음 사진 보기가 떠 있으면 그 장을 확대 · 축소
   if (e.code === 'Equal' || e.code === 'NumpadAdd') setZoom(stepZoom(zoom, 1));
   else if (e.code === 'Minus' || e.code === 'NumpadSubtract') setZoom(stepZoom(zoom, -1));
   else return;

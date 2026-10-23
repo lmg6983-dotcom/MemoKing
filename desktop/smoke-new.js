@@ -1651,6 +1651,35 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           key(aw, 'Right');
           await wait(150);
           const after = await js(aw, `document.querySelector('.mk-album-view .mk-album-count')?.textContent`);
+          // 확대 · 축소: 휠 → 크게 (배율 단추) · 끌어서 둘러보기 · 0 → 원래대로 · 두 번 누르기 → 250%
+          const mid = await js(aw, `(() => { const r = document.querySelector('.mk-album-big').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+          const zoomState = `({ t: document.querySelector('.mk-album-big').style.transform, btn: document.querySelector('.mk-album-zoom').hidden ? '' : document.querySelector('.mk-album-zoom').textContent, count: document.querySelector('.mk-album-count').textContent })`;
+          for (let k = 0; k < 3; k++) aw.webContents.sendInputEvent({ type: 'mouseWheel', x: mid.x, y: mid.y, deltaX: 0, deltaY: 120, canScroll: true });
+          await wait(200);
+          const zoomed = await js(aw, zoomState);
+          aw.webContents.sendInputEvent({ type: 'mouseMove', x: mid.x, y: mid.y });
+          aw.webContents.sendInputEvent({ type: 'mouseDown', x: mid.x, y: mid.y, button: 'left', clickCount: 1 });
+          for (let k = 1; k <= 6; k++) {
+            aw.webContents.sendInputEvent({ type: 'mouseMove', x: mid.x + k * 15, y: mid.y + k * 10, button: 'left', modifiers: ['leftButtonDown'] });
+            await wait(20);
+          }
+          aw.webContents.sendInputEvent({ type: 'mouseUp', x: mid.x + 90, y: mid.y + 60, button: 'left', clickCount: 1 });
+          await wait(150);
+          const panned = await js(aw, zoomState);
+          await capture(aw, 'album-zoom.png');
+          key(aw, '0');
+          await wait(150);
+          const reset = await js(aw, zoomState);
+          for (let k = 1; k <= 2; k++) {
+            aw.webContents.sendInputEvent({ type: 'mouseDown', x: mid.x, y: mid.y, button: 'left', clickCount: k });
+            aw.webContents.sendInputEvent({ type: 'mouseUp', x: mid.x, y: mid.y, button: 'left', clickCount: k });
+            await wait(60);
+          }
+          await wait(150);
+          const tapped = await js(aw, zoomState);
+          key(aw, '0');
+          await wait(100);
+          check('묶음 사진: 휠로 확대 (배율 단추) · 끌면 둘러보기 (장은 그대로) · 0 으로 원래대로 · 두 번 누르면 250%', zoomed.t.includes('scale') && zoomed.btn.endsWith('%') && zoomed.btn !== '100%' && panned.t !== zoomed.t && panned.count === '3 / 5' && reset.t === '' && reset.btn === '' && tapped.btn === '250%', JSON.stringify({ zoomed, panned, reset, tapped }));
           // 그리기: 단추를 누르고 진짜 마우스로 한 획
           const srcsBefore = await js(aw, `[...document.querySelectorAll('.mk-doc img.mk-album-img')].map((i) => i.src)`);
           await js(aw, `[...document.querySelectorAll('.mk-album-btn')].find((b) => b.textContent.includes('그리기'))?.click()`);

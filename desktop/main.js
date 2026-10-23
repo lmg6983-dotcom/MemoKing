@@ -616,7 +616,6 @@ function driveInfo() {
     insideDriveApp: insideDriveForDesktop(vault?.root),
     reconnect: driveAuth?.scopeUpgraded ?? false,
     status: driveSync?.status ?? { state: 'off' },
-    fullScope: driveAuth?.fullScope ?? false, // 외부 앱 메모 연동 (전체 드라이브 권한)
   };
 }
 

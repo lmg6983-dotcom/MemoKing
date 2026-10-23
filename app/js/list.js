@@ -20,7 +20,6 @@ import { openCardMenu } from './list-card-menu.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { renderCollage, collageName } from './memories-collage.js';
 import { base64Bytes, collageMemoBody } from './collage-preview.js';
-import { openAiDriveGuide } from './ai-drive-guide.js';
 import { ANDROID_APK, WINDOWS_SETUP, installShareText } from './core/install-links.js';
 import { chooseShare, showSharePop, SHARE_DONE } from './share-menu.js';
 import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL } from './core/modes.js';
@@ -948,16 +947,6 @@ $('pc-copy').addEventListener('click', async () => {
 $('share-both').addEventListener('click', async () => {
   await api.copyText(installShareText());
   $('pc-note').textContent = 'PC와 휴대폰 설치 링크를 함께 복사했어요';
-});
-// Gemini, ChatGPT 의 Google Drive 연결로 메모 폴더를 직접 다룰 때 붙여 넣을 안내문 (ai-drive-guide.js)
-$('ai-drive-guide').addEventListener('click', async () => {
-  const d = await api.drive.status().catch(() => null);
-  openAiDriveGuide({
-    folder: d?.folderName || '메모킹',
-    linked: d?.connected && d?.active ? Boolean(d.fullScope) : null,
-    copy: (text) => api.copyText(text),
-    notify: (text) => flashStatus(text),
-  });
 });
 
 // ---------- 전역 단축키 바꾸기 (빠른 메모·매직키) ----------

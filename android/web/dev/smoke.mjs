@@ -706,6 +706,9 @@ try {
   await page.tap('[data-add="file"]');
   await page.waitForTimeout(800);
   check('도구막대: 고르면 위성 버튼이 접힘', await page.isHidden('#add-menu'));
+  // 문서는 어떻게 넣을지 묻는다 (PC 와 같음) → 이번엔 "파일로"
+  await page.locator('.mk-prompt button', { hasText: '파일로' }).tap({ timeout: 3000 }).catch(() => {});
+  await page.waitForTimeout(500);
   const withFile = read(shared);
   check('파일 넣기: 파일 칩 링크', /\n\[보고서\.pdf\]\(attachments\/[^)]+\.pdf\)\n?$/.test(withFile), withFile);
   await back();
@@ -2450,21 +2453,8 @@ try {
   check('Drive: 폴더 바꾸기는 목록에서 (메모킹 동기화가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
   await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
-  // 외부 앱 메모 연동 (전체 드라이브 권한): 연결된 뒤에만 보이고 기본은 꺼짐 → 켜면 다시 허용받고 폴더를 처음부터 · 취소하면 꺼진 채 · 끄기
-  if (!(await page.isVisible('#drive-full-row'))) await page.tap('#settings-btn');
-  await page.waitForTimeout(200);
-  check('외부 앱 메모 연동: 연결된 뒤 설정에 보이고 기본은 꺼짐', await page.isVisible('#drive-full-row') && !(await page.isChecked('#drive-full')));
-  const fullLog = async () => (await devLog()).log.filter((l) => l.driveFullScope).map((l) => l.driveFullScope.on);
-  await post('/dev/drive-deny', {});
-  await page.tap('#drive-full-row .switch');
-  await page.waitForTimeout(700);
-  check('외부 앱 메모 연동: 허용 화면에서 취소하면 다시 꺼짐 (지금 연결 그대로)', !(await page.isChecked('#drive-full')) && (await fullLog()).at(-1) === true && await page.isVisible('#drive-disconnect'));
-  await page.tap('#drive-full-row .switch');
-  await page.waitForTimeout(900);
-  check('외부 앱 메모 연동: 허용하면 켜짐', await page.isChecked('#drive-full') && (await page.evaluate(() => window.memoking?.driveStatus ? true : true)));
-  await page.tap('#drive-full-row .switch');
-  await page.waitForTimeout(700);
-  check('외부 앱 메모 연동: 끄면 drive.file 로 (꺼짐)', !(await page.isChecked('#drive-full')) && (await fullLog()).at(-1) === false);
+  // Drive 전체 권한을 쓰는 설정(외부 앱 메모 연동) · AI 안내는 없앴다 — drive.file 만
+  check('Drive: 전체 드라이브 권한 설정 · AI 안내 없음', !(await page.locator('#drive-full-row, #ai-drive-guide').count()));
   await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
   if (await page.isVisible('#settings-sheet')) await page.evaluate(() => window.__mk.back());

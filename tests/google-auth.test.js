@@ -119,81 +119,16 @@ test('권한: 메모킹이 만든 파일만(drive.file) 요청하고, 다른 범
   await new Promise((r) => setTimeout(r, 10));
   assert.ok(revoked.some(([url, body]) => url.includes('/revoke') && body.includes('OLD')));
   assert.equal(new GoogleAuth({ file, openExternal: () => {} }).scopeUpgraded, false); // 한 번만
-  // 0.33.7~0.33.8 에서 Drive 전체로 연결해 둔 것은 끊지 않고 "외부 앱 메모 연동" 을 켠 것으로 이어 간다
-  fs.writeFileSync(file, JSON.stringify({ plain: { clientId: 'id-1.apps.googleusercontent.com', refreshToken: 'WIDE', scope: 'https://www.googleapis.com/auth/drive' } }));
-  const wide = new GoogleAuth({ file, openExternal: () => {}, fetch: async () => new Response('{}') });
+  // 예전 외부 앱 메모 연동으로 Drive 전체를 받아 둔 연결은 끊지 않는다 — 다시 로그인하면 drive.file 만
+  fs.writeFileSync(file, JSON.stringify({ plain: { clientId: 'id-1.apps.googleusercontent.com', refreshToken: 'WIDE', scope: 'https://www.googleapis.com/auth/drive', useFullDriveScope: true } }));
+  const wide = setup().auth;
+  wide.file = file;
+  wide.data = wide.load();
   assert.equal(wide.connected, true);
-  assert.equal(wide.scopeUpgraded, false);
-  assert.equal(wide.fullScope, true);
-});
-
-const FULL = 'https://www.googleapis.com/auth/drive';
-const FILE = 'https://www.googleapis.com/auth/drive.file';
-
-test('외부 앱 메모 연동: 기본은 drive.file · 켜면 Drive 전체로 다시 로그인 · 껐다 켜도 앱을 다시 켜도 그대로', async () => {
-  const scopes = [];
-  const { auth, dir } = setup({ tokenResponse: (p) => ({ access_token: 'AT', refresh_token: `RT${scopes.length}`, expires_in: 3600, scope: scopes.at(-1) }) });
-  auth.openExternal = ((open) => (url) => { scopes.push(new URL(url).searchParams.get('scope')); open(url); })(auth.openExternal);
-  auth.setClient('id-1.apps.googleusercontent.com', 's');
-  await auth.login();
-  assert.equal(scopes.at(-1), FILE, '기본은 drive.file');
-  assert.equal(auth.fullScope, false);
-  const on = await auth.setFullScope(true);
-  assert.deepEqual([on.full, on.relogged], [true, true]);
-  assert.equal(scopes.at(-1), FULL, '켜면 Drive 전체를 요청');
-  assert.equal(auth.fullScope, true);
-  assert.equal(auth.grantedFull, true);
-  // 앱을 다시 켜도 끊거나 낮추지 않는다
-  const again = new GoogleAuth({ file: path.join(dir, 'google-auth.json'), openExternal: () => {} });
-  assert.deepEqual([again.connected, again.fullScope, again.scopeUpgraded], [true, true, false]);
-  // 다시 로그인(연결하기)해도 켜 둔 범위로
-  await auth.login();
-  assert.equal(scopes.at(-1), FULL);
-  // 끄면 drive.file 로 다시 로그인
-  const off = await auth.setFullScope(false);
-  assert.deepEqual([off.full, off.relogged], [false, true]);
-  assert.equal(scopes.at(-1), FILE);
-  assert.deepEqual([auth.fullScope, auth.grantedFull, auth.connected], [false, false, true]);
-});
-
-test('외부 앱 메모 연동: 허용 화면에서 취소하거나 Drive 전체 칸을 빼고 허용하면 꺼진 채, 지금 연결은 그대로', async () => {
-  let cancel = false;
-  let grant = FILE;
-  const { auth } = setup({
-    deny: () => cancel,
-    tokenResponse: () => ({ access_token: 'AT', refresh_token: grant === FILE ? 'RT-FILE' : 'RT-OTHER', expires_in: 3600, scope: grant }),
-  });
-  auth.setClient('id-1.apps.googleusercontent.com', 's');
-  await auth.login();
-  const before = auth.data.refreshToken;
-  cancel = true;
-  const res = await auth.setFullScope(true);
-  assert.equal(res.full, false);
-  assert.match(res.error, /취소/);
-  assert.deepEqual([auth.fullScope, auth.connected, auth.data.refreshToken, auth.data.scope], [false, true, before, FILE], '취소: 그대로');
-  cancel = false;
-  grant = FILE; // 허용은 했지만 Drive 전체 칸을 뺐다
-  const partial = await auth.setFullScope(true);
-  assert.equal(partial.full, false);
-  assert.match(partial.error, /허용하지 않았어요/);
-  assert.deepEqual([auth.fullScope, auth.data.refreshToken], [false, before]);
-});
-
-test('외부 앱 메모 연동 끄기: 다시 로그인을 취소해도 설정은 꺼지고, 다음 연결은 drive.file', async () => {
-  let cancel = false;
-  const scopes = [];
-  const { auth } = setup({ deny: (u) => { scopes.push(u.searchParams.get('scope')); return cancel; }, tokenResponse: () => ({ access_token: 'AT', refresh_token: 'RT', expires_in: 3600, scope: scopes.at(-1) }) });
-  auth.setClient('id-1.apps.googleusercontent.com', 's');
-  await auth.setFullScope(true);
-  assert.equal(auth.fullScope, true);
-  cancel = true;
-  const off = await auth.setFullScope(false);
-  assert.deepEqual([off.full, off.relogged], [false, false]);
-  assert.equal(auth.fullScope, false);
-  assert.equal(auth.connected, true, '지금 연결은 그대로');
-  cancel = false;
-  await auth.login();
-  assert.equal(scopes.at(-1), FILE);
+  assert.equal(wide.grantedFull, true);
+  await wide.login();
+  assert.equal(new URL(wide.data.scope).pathname, '/auth/drive.file');
+  assert.deepEqual([wide.grantedFull, wide.data.useFullDriveScope], [false, undefined]);
 });
 
 test('로그인한 클라이언트를 기억: 연결 정보 없이 빌드된 새 버전으로 업데이트돼도 연결 · 새 토큰 · 다시 로그인이 그대로', async () => {

@@ -2142,7 +2142,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 /* 묶음 사진 크게 보기 (album-viewer.js) */
 .mk-album-view { position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: rgba(12, 12, 12, 0.94); color: #fff; animation: mk-fade-in 0.15s ease-out; }
 .mk-album-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top)); }
-.mk-album-count { font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.mk-album-count { font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.85; white-space: nowrap; }
 .mk-album-gap { flex: 1; }
 .mk-album-inked { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(255, 204, 0, 0.18); color: #ffd84d; font-size: 12px; }
 .mk-album-inked svg { width: 13px; height: 13px; }
@@ -2161,12 +2161,16 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-note { position: absolute; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: #1f1f1c; font-size: 13px; line-height: 1.45; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 .mk-album-note[hidden] { display: none; }
 .mk-album-note-btn { flex: none; border: 0; background: none; color: #8a6a00; font: inherit; font-weight: 700; cursor: pointer; padding: 2px 0; }
-.mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; font-size: 13.5px; cursor: pointer; }
+.mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .mk-album-btn:hover { background: rgba(255, 255, 255, 0.2); }
 .mk-album-btn svg { width: 18px; height: 18px; }
-.mk-album-stage { position: relative; flex: 1; min-height: 0; margin: 8px 56px 16px; touch-action: pan-y; }
+.mk-album-stage { position: relative; flex: 1; min-height: 0; margin: 8px 56px 16px; overflow: hidden; touch-action: none; } /* 두 손가락 벌리기는 그림 확대로 (화면 전체 확대 아님) */
 /* 장 전체가 화면 안에 (세로로 긴 장도) — 그림 상자 = 보이는 그림이어야 그리기판이 그 위에 꼭 맞는다 */
-.mk-album-big { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; background: #fff; user-select: none; -webkit-user-drag: none; }
+.mk-album-big { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; background: #fff; user-select: none; -webkit-user-drag: none; transform-origin: 0 0; }
+.mk-album-view.zoomed .mk-album-stage { cursor: grab; }
+.mk-album-view.zoomed .mk-album-stage:active { cursor: grabbing; }
+.mk-album-zoom { position: absolute; left: 50%; top: calc(64px + env(safe-area-inset-top)); transform: translateX(-50%); padding: 4px 12px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.mk-album-zoom[hidden] { display: none; }
 .mk-album-nav { position: absolute; top: 50%; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #fff; cursor: pointer; display: grid; place-items: center; }
 .mk-album-nav:hover { background: rgba(255, 255, 255, 0.24); }
 .mk-album-nav svg { width: 20px; height: 20px; }

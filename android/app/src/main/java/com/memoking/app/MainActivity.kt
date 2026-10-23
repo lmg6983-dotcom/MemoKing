@@ -335,17 +335,13 @@ class MainActivity : Activity() {
         super.onPause()
     }
 
-    // 지금 받는 허용이 Drive 전체(외부 앱 메모 연동)인가
-    private var authFull = false
-
-    /** 휴대폰에 로그인된 구글 계정으로 Drive 권한 받기 — 계정 고르기·허용 화면만. full: Drive 전체 (기본은 지금 설정) */
-    fun loginWithPhoneAccount(id: Int, full: Boolean = GoogleAuth.fullScope(this)) {
+    /** 휴대폰에 로그인된 구글 계정으로 Drive 권한 받기 (drive.file) — 계정 고르기·허용 화면만 */
+    fun loginWithPhoneAccount(id: Int) {
         waiting[REQ_AUTH]?.let { old -> bridge.resolve(old) { throw GoogleAuth.AuthError("로그인을 취소했어요") } }
         waiting[REQ_AUTH] = id
-        authFull = full
         NativeAuth.begin(
             this,
-            GoogleAuth.scopeFor(full),
+            GoogleAuth.SCOPE,
             startForResult = { sender ->
                 try {
                     @Suppress("DEPRECATION")
@@ -365,8 +361,7 @@ class MainActivity : Activity() {
 
     private fun finishPhoneLogin(token: String) {
         val id = waiting.remove(REQ_AUTH) ?: return
-        val full = authFull
-        io.execute { bridge.resolve(id) { JSONObject().put("email", GoogleAuth.completeNative(this, token, full)).put("full", full) } }
+        io.execute { bridge.resolve(id) { JSONObject().put("email", GoogleAuth.completeNative(this, token)) } }
     }
 
     fun openBrowser(url: String) {
@@ -586,7 +581,7 @@ class MainActivity : Activity() {
         if (requestCode == REQ_AUTH) {
             val token = try {
                 if (resultCode != RESULT_OK) throw GoogleAuth.AuthError("로그인을 취소했어요")
-                NativeAuth.finish(this, data, GoogleAuth.scopeFor(authFull))
+                NativeAuth.finish(this, data)
             } catch (e: Exception) {
                 val id = waiting.remove(REQ_AUTH) ?: return
                 bridge.resolve(id) { throw GoogleAuth.AuthError(if (e is GoogleAuth.AuthError) e.message ?: "" else NativeAuth.describe(e)) }

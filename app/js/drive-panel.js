@@ -81,7 +81,6 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
   let info = null;
   let path = [{ id: 'root', name: UI.myDrive }];
   let loginRun = 0;
-  let fullBusy = false;
   let connecting = false;
   let creating = false; // 새 폴더 만들기를 두 번(Enter + 단추) 해도 한 번만
   let conflicts = loadConflicts();
@@ -169,9 +168,6 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     $('drive-conflicts').textContent = `충돌 사본 ${conflicts.length}개 보기`;
     $('drive-folder').hidden = !on;
     $('drive-disconnect').hidden = !info.connected;
-    // 외부 앱 메모 연동: 연결돼 있을 때만 (켜는 중에는 누르지 못하게)
-    $('drive-full-row').hidden = !info.connected;
-    if (!fullBusy) $('drive-full').checked = Boolean(info.fullScope);
     paintBar($('drive-bar'), sum);
     renderSyncStep(sum);
     renderHeader(sum);
@@ -547,29 +543,6 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     login();
   });
   $('sync-bg').addEventListener('click', () => dialog.close()); // 첫 동기화는 뒤에서 계속 (끝나면 위쪽 구름 단추에)
-  // 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 로그인 — 취소·실패하면 꺼진 채 (지금 연결은 그대로)
-  const fullNote = $('drive-full-note').textContent;
-  $('drive-full').addEventListener('change', async (e) => {
-    const on = e.target.checked;
-    fullBusy = true;
-    e.target.disabled = true;
-    $('drive-full-note').textContent = '브라우저에서 Google 계정을 고르고 허용해 주세요';
-    let res;
-    try {
-      res = await api.drive.setFullScope(on);
-    } catch (err) {
-      res = { full: info?.fullScope ?? false, error: cleanError(err) };
-    } finally {
-      fullBusy = false;
-      e.target.disabled = false;
-      $('drive-full-note').textContent = fullNote;
-    }
-    e.target.checked = Boolean(res.full);
-    if (res.drive) render(res.drive);
-    else refresh();
-    const msg = res.error ? cleanError(res.error) : '';
-    if (on && msg && !/취소/.test(msg)) await confirm(`외부 앱 메모 연동을 켜지 못했어요. 지금 연결은 그대로예요.\n${msg}`, '확인');
-  });
   $('drive-disconnect').addEventListener('click', async () => {
     if (!(await confirm('Google Drive 연결을 끊을까요?\n이 PC의 메모는 그대로 남고, 휴대폰과 더 이상 동기화하지 않아요.', '연결 끊기'))) return;
     render(await api.drive.disconnect());

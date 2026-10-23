@@ -272,15 +272,6 @@ export function registerIpc(ctx) {
     return { email };
   });
   ipcMain.handle('drive:cancel-login', () => getDriveAuth()?.cancelLogin());
-  // 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 로그인 → 받았으면 폴더를 처음부터 훑어 다른 앱이 넣은 메모를 바로 받는다
-  ipcMain.handle('drive:full-scope', async (_e, on) => {
-    const auth = getDriveAuth();
-    if (!auth) return { full: false, error: UI.driveUnavailable };
-    const res = await auth.setFullScope(Boolean(on));
-    if (wm.listWin) bringToFront(wm.listWin);
-    if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
-    return { ...res, drive: driveInfo() };
-  });
   ipcMain.handle('drive:folders', async (_e, parent) => {
     const api = getDriveApi();
     if (!api) throw new Error(UI.driveUnavailable);

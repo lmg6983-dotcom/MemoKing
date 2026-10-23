@@ -251,7 +251,7 @@ const recordState = () => (fakeRec
 
 // 가짜 Google Drive (화면 점검용) — 진짜 동기화는 앱(DriveSync.kt)이 한다
 const fakeDrive = {
-  configured: false, connected: false, email: '', active: false, folderId: '', folderName: '', fullScope: false,
+  configured: false, connected: false, email: '', active: false, folderId: '', folderName: '',
   status: { state: 'off', lastSync: 0, error: '', changed: false, conflicts: [] },
   folders: { root: [{ id: 'f-memo', name: '메모킹 동기화' }, { id: 'f-work', name: '업무' }, { id: 'f-photo', name: '사진' }], 'f-work': [{ id: 'f-work-2026', name: '2026' }] },
 };
@@ -346,18 +346,6 @@ const calls = {
     await new Promise((r) => setTimeout(r, 300));
     Object.assign(fakeDrive, { connected: true, email: 'me@gmail.com' });
     return { email: fakeDrive.email };
-  },
-  // 외부 앱 메모 연동: 점검이 /dev/drive-deny 로 "허용 화면에서 취소" 를 흉내 낸다
-  driveFullScope: async ({ on }) => {
-    await new Promise((r) => setTimeout(r, 200));
-    log.push({ driveFullScope: { on } });
-    if (!on) fakeDrive.fullScope = false;
-    if (fakeDrive.denyNext) {
-      fakeDrive.denyNext = false;
-      throw new Error('로그인을 취소했어요');
-    }
-    fakeDrive.fullScope = Boolean(on);
-    return { email: fakeDrive.email, full: Boolean(on) };
   },
   driveFolders: async ({ parent }) => fakeDrive.folders[parent] ?? [],
   driveCreateFolder: async ({ parent, name }) => {
@@ -515,11 +503,6 @@ const server = http.createServer(async (req, res) => {
       const payload = JSON.parse(await readBody(req));
       payload.files = (payload.files ?? []).map((f) => makeTemp(f.name, f.mime, Buffer.from(f.base64, 'base64')));
       pendingIntent = payload;
-      res.writeHead(200).end('{}');
-      return;
-    }
-    if (req.method === 'POST' && p === '/dev/drive-deny') {
-      fakeDrive.denyNext = true; // 다음 허용 화면에서 취소
       res.writeHead(200).end('{}');
       return;
     }

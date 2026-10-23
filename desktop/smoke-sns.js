@@ -387,9 +387,6 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       await js(list, `document.getElementById('set-ai').scrollIntoView({ block: 'start' })`);
       await wait(500);
       await shot(list, 'ai-settings', 'ai');
-      await js(list, `document.getElementById('ai-drive-guide').click()`);
-      await wait(900);
-      await shot(list, 'ai-drive-guide', 'ai');
       fs.writeFileSync(path.join(OUT, 'vault-files.json'), JSON.stringify(fs.readdirSync(VAULT).filter((f) => f.endsWith('.md')).sort()));
     });
 
