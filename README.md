@@ -217,6 +217,7 @@ Windows 스티커 메모처럼 쓰는 메모 앱. 메모는 **지정한 폴더(�
 | `npm run android:preview` | 안드로이드 휴대폰 화면을 PC 브라우저에서 미리보기 (`http://localhost:8790/m/index.html`) |
 | `npm run android:smoke` | 안드로이드 화면 자동 점검 (휴대폰 크기 크로미움, Playwright 필요) |
 | `cd android && ./gradlew assembleDebug` | 안드로이드 APK 만들기 (JDK 17 · Android SDK) |
+| `node scripts/ai-bench.mjs --server <llama-server.exe> --vault <메모 폴더> --model <gguf>… --embed <gguf>…` | 로컬 AI 모델 비교 (인터넷 없이): [llama.cpp](https://github.com/ggml-org/llama.cpp) 의 llama-server 로 모델마다 맞춤법 · 문체 · 태그 · 메모 찾기를 풀려 `ai-bench-결과.md` 로 (속도 · 메모리 · 한자 섞임 · 지금 앱 방식과 비교) |
 
 사람이 직접 확인해야 하는 테스트 목록: [docs/MANUAL-TESTS.md](docs/MANUAL-TESTS.md)
 
