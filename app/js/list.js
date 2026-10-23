@@ -35,6 +35,7 @@ import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
 import { UI } from './core/ui-text.js';
+import { holdTune, setHoldTune } from './hold-tune.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -1144,6 +1145,19 @@ function showOpmsShapes(shapes) {
   $('opms-shapes').textContent = shapes.length ? `${shapes.slice(0, 6).join(', ')}${shapes.length > 6 ? ` 외 ${shapes.length - 6}개` : ''} (A 영문, 9 숫자, 가 한글)` : '';
 }
 $('opms-shapes-clear').addEventListener('click', async () => showOpmsShapes(await api.opms.clearShapes()));
+// 메모 보기 › 내 손에 맞추기: 꾹 눌러 줄 옮기기 시간 (메모 창들과 같은 저장소 — hold-tune.js)
+$('hold-tune').checked = holdTune().on;
+$('hold-tune').addEventListener('change', (e) => setHoldTune({ on: e.target.checked }));
+$('hold-reset').addEventListener('click', () => {
+  setHoldTune({ reset: true });
+  const b = $('hold-reset');
+  b.textContent = '되돌렸어요';
+  b.disabled = true;
+  setTimeout(() => {
+    b.textContent = '처음 값으로';
+    b.disabled = false;
+  }, 1500);
+});
 function setOpmsNote(text, warn = false) {
   $('opms-host-note').textContent = text;
   $('opms-host-note').classList.toggle('warn', warn);
