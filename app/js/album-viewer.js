@@ -1,5 +1,5 @@
 // 묶음 사진 보기 (PC·휴대폰 함께) — 카카오톡 묶음 사진처럼 메모에는 몇 장만 모아 보이고, 누르면 크게 한 장씩 넘겨 본다
-//   ← → · 밀기로 넘기기, Esc · 닫기. "그리기" 로 그 장 위에 펜 · 형광펜으로 쓰고 완료하면 그린 것을 그 장에 합쳐 저장
+//   ← → · 밀기로 넘기기, Esc · 닫기. 휠 · 두 손가락 · 두 번 누르기 · + - 0 으로 확대 · 축소 (크게 보면 끌어서 둘러보기). "그리기" 로 그 장 위에 펜 · 형광펜으로 쓰고 완료하면 그린 것을 그 장에 합쳐 저장
 //   (원본 파일은 그대로 두고 새 그림 파일로 바꾼다 — 메모에서 되돌리기 Ctrl+Z 로 원래 장으로)
 import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys, strokeEl } from './ink-editor.js';
 import { icon } from './icons.js';
@@ -45,6 +45,9 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   draw.append(icon('pen'), document.createTextNode('그리기'));
   const close = el('button', 'mk-album-btn', { type: 'button', title: '닫기 (Esc)', ariaLabel: '닫기' });
   close.append(icon('close'));
+  // 확대해 보는 중이면 장 위쪽 가운데에 배율 단추 (누르면 원래 크기로 · 좁은 창의 머리 줄을 붐비게 하지 않게)
+  const zoomBtn = el('button', 'mk-album-btn mk-album-zoom', { type: 'button', title: '원래 크기로 (0)', hidden: true });
+  zoomBtn.addEventListener('click', () => resetZoom());
   head.append(count, inkedMark, el('span', 'mk-album-gap'), ...[save, share, del].filter(Boolean), ...(onDraw ? [draw] : []), close);
   const stage = el('div', 'mk-album-stage');
   const img = el('img', 'mk-album-big', { draggable: false });
@@ -56,7 +59,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // 아래 쪽 목록: 장이 많은 문서도 원하는 장으로 바로 (지금 장은 테두리, 그린 장은 펜 표시)
   const strip = el('div', 'mk-album-strip', { role: 'tablist', ariaLabel: '장 목록' });
   const note = el('div', 'mk-album-note', { role: 'status' }); // 알림 (저장했어요 · 삭제 되돌리기 · 처음 한 번 안내)
-  view.append(head, stage, prev, next, strip, note);
+  view.append(head, stage, prev, next, zoomBtn, strip, note);
   document.body.append(view);
   const restore = document.activeElement;
 
@@ -73,6 +76,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   }
   function show() {
     const it = images[i];
+    resetZoom();
     img.src = url(it.src);
     img.alt = it.alt ?? '';
     count.textContent = `${i + 1} / ${images.length}`;
@@ -146,23 +150,119 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   prev.addEventListener('click', () => go(-1));
   next.addEventListener('click', () => go(1));
 
-  // 밀어서 넘기기 (손가락 · 마우스)
-  let swipe = null;
+  // ---------- 확대 · 축소 ----------
+  //   그림을 translate · scale 로 (기준점 왼쪽 위). 크게 본 그림은 화면 밖으로 빈틈이 생기지 않게, 작으면 가운데로
+  const MAX_ZOOM = 5;
+  let z = { s: 1, x: 0, y: 0 };
+  function applyZoom() {
+    img.style.transform = z.s === 1 ? '' : `translate(${z.x}px, ${z.y}px) scale(${z.s})`;
+    view.classList.toggle('zoomed', z.s > 1);
+    zoomBtn.hidden = z.s === 1;
+    zoomBtn.textContent = `${Math.round(z.s * 100)}%`;
+  }
+  function clampZoom() {
+    const fit = (t, off, size, room) => (size * z.s <= room ? (room - size * z.s) / 2 - off : Math.min(-off, Math.max(room - off - size * z.s, t)));
+    z.x = fit(z.x, img.offsetLeft, img.offsetWidth, stage.clientWidth);
+    z.y = fit(z.y, img.offsetTop, img.offsetHeight, stage.clientHeight);
+  }
+  // (cx, cy) 화면 자리가 그림의 같은 곳에 머물도록 배율을 바꾼다 (자리 없으면 가운데)
+  function zoomTo(s, cx, cy) {
+    if (inking || !img.naturalWidth) return;
+    const r = stage.getBoundingClientRect();
+    const s2 = Math.max(1, Math.min(MAX_ZOOM, s));
+    const px = (cx ?? r.left + r.width / 2) - r.left - img.offsetLeft;
+    const py = (cy ?? r.top + r.height / 2) - r.top - img.offsetTop;
+    z = s2 === 1 ? { s: 1, x: 0, y: 0 } : { s: s2, x: px - (s2 / z.s) * (px - z.x), y: py - (s2 / z.s) * (py - z.y) };
+    if (z.s > 1) clampZoom();
+    applyZoom();
+  }
+  function resetZoom() {
+    z = { s: 1, x: 0, y: 0 };
+    applyZoom();
+  }
+  const onResize = () => {
+    if (z.s === 1) return;
+    clampZoom();
+    applyZoom();
+  };
+  window.addEventListener('resize', onResize);
+  // 휠 (터치패드 벌리기는 Ctrl+휠로 온다) — 뒤의 메모 창 글자 크기는 그대로
+  view.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.deltaY) zoomTo(z.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025)), e.clientX, e.clientY);
+  }, { passive: false });
+
+  // 누르기: 한 손가락은 밀어 넘기기(크게 보면 끌어서 둘러보기), 두 손가락은 벌려 확대, 두 번 누르면 크게 ↔ 원래대로
+  const pts = new Map();
+  let gesture = null; // { kind: 'swipe' | 'pan' | 'pinch' | 'none', x, y, moved, d, m }
+  let lastTap = null;
+  const spread = () => {
+    const [a, b] = [...pts.values()];
+    return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+  };
   stage.addEventListener('pointerdown', (e) => {
-    if (!inking) swipe = { x: e.clientX, y: e.clientY };
+    if (inking) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    stage.setPointerCapture?.(e.pointerId);
+    if (pts.size === 2) gesture = { kind: 'pinch', moved: true, ...spread() };
+    else if (pts.size === 1) gesture = { kind: z.s > 1 ? 'pan' : 'swipe', x: e.clientX, y: e.clientY, moved: false };
   });
-  stage.addEventListener('pointerup', (e) => {
-    if (!swipe) return;
-    const dx = e.clientX - swipe.x;
-    const dy = e.clientY - swipe.y;
-    swipe = null;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
+  stage.addEventListener('pointermove', (e) => {
+    const p = pts.get(e.pointerId);
+    if (!p || !gesture) return;
+    const dx = e.clientX - p.x;
+    const dy = e.clientY - p.y;
+    p.x = e.clientX;
+    p.y = e.clientY;
+    if (gesture.kind === 'pinch' && pts.size >= 2) {
+      const { d, m } = spread();
+      z.x += m.x - gesture.m.x;
+      z.y += m.y - gesture.m.y;
+      zoomTo(z.s * (d / gesture.d), m.x, m.y);
+      gesture.d = d;
+      gesture.m = m;
+    } else if (gesture.kind === 'pan') {
+      z.x += dx;
+      z.y += dy;
+      clampZoom();
+      applyZoom();
+    }
+    if (!gesture.moved && Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > 8) gesture.moved = true;
   });
+  const lift = (e) => {
+    if (!pts.delete(e.pointerId)) return;
+    const g = gesture;
+    if (pts.size) {
+      // 두 손가락 중 하나를 떼면 남은 손가락으로 이어서 둘러보기
+      const [p] = pts.values();
+      gesture = { kind: z.s > 1 ? 'pan' : 'none', x: p.x, y: p.y, moved: true };
+      return;
+    }
+    gesture = null;
+    if (!g || e.type === 'pointercancel') return;
+    const dx = e.clientX - g.x;
+    const dy = e.clientY - g.y;
+    if (g.kind === 'swipe' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      go(dx < 0 ? 1 : -1);
+      return;
+    }
+    if (g.moved) return;
+    const now = Date.now();
+    if (lastTap && now - lastTap.at < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+      lastTap = null;
+      if (z.s > 1) resetZoom();
+      else zoomTo(2.5, e.clientX, e.clientY);
+    } else lastTap = { at: now, x: e.clientX, y: e.clientY };
+  };
+  stage.addEventListener('pointerup', lift);
+  stage.addEventListener('pointercancel', lift);
 
   // ---------- 그리기 ----------
   let inking = null; // { svg, surface, toolbar, hist }
   function startInk() {
     if (inking || !img.naturalWidth) return;
+    resetZoom(); // 그리기판은 원래 크기의 장 위에
     view.classList.add('inking'); // 도구 막대 자리를 비운 뒤에 그림 크기를 잰다 (그리기판이 그림에 꼭 맞게)
     const r = img.getBoundingClientRect();
     const sr = stage.getBoundingClientRect();
@@ -295,10 +395,17 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     else if (e.key === 'ArrowRight') go(1);
     else if (e.key === 'Home') goTo(0);
     else if (e.key === 'End') goTo(images.length - 1);
+    else if (e.key === '+' || e.key === '=') zoomTo(z.s * 1.25);
+    else if (e.key === '-') zoomTo(z.s / 1.25);
+    else if (e.key === '0') resetZoom();
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
   };
   async function shut() {
     if (inking) await finishInk();
     document.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('resize', onResize);
     current = null;
     view.remove();
     if (restore instanceof HTMLElement && restore.isConnected) restore.focus({ preventScroll: true });
@@ -313,7 +420,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     if (!localStorage.getItem(HINT_KEY) && images.length > 1) {
       localStorage.setItem(HINT_KEY, '1');
       const coarse = matchMedia('(pointer: coarse)').matches;
-      say(coarse ? '옆으로 밀거나 아래 장을 눌러 넘겨요. 그리기로 이 장 위에 쓸 수 있어요' : '← → 나 아래 장을 눌러 넘겨요. 그리기로 이 장 위에 쓸 수 있어요');
+      say(coarse ? '옆으로 밀거나 아래 장을 눌러 넘겨요. 두 손가락으로 벌리면 크게 보여요' : '← → 나 아래 장을 눌러 넘겨요. 휠을 굴리면 크게 보여요');
     }
   } catch {
     // 저장소를 못 써도 보기는 그대로
