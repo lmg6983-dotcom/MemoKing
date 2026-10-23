@@ -63,16 +63,37 @@ object LocalAi {
         return JSONObject().put("engine", exe(ctx).isFile).put("chat", one("chat")).put("embed", one("embed"))
     }
 
-    /** 고른 파일(USB · 내려받은 파일 등)을 앱 안으로 복사 — 앞 4바이트로 .gguf 인지 보고, 다 복사한 뒤에만 바꿔 넣는다 */
-    fun import(ctx: Context, role: String, uri: Uri, name: String, total: Long, onProgress: (Double) -> Unit): JSONObject {
+    /** 고른 파일(USB · 내려받은 파일 등)을 앱 안으로 복사 */
+    fun import(ctx: Context, role: String, uri: Uri, name: String, total: Long, onProgress: (Double) -> Unit): JSONObject =
+        bringIn(ctx, role, name, total, null, onProgress) { ctx.contentResolver.openInputStream(uri) ?: throw IOException("파일을 열지 못했어요") }
+
+    /** 기본 모델 받기 (화면이 app/js/core/model-catalog.js 로 고른 주소 · 크기 · SHA-256) — 해시가 맞아야 넣는다 */
+    fun download(ctx: Context, role: String, url: String, name: String, total: Long, sha256: String, onProgress: (Double) -> Unit): JSONObject {
+        require(url.startsWith("https://huggingface.co/")) { "받을 수 없는 주소예요" }
+        require(Regex("[0-9a-f]{64}").matches(sha256)) { "모델 확인값이 없어요" }
+        return bringIn(ctx, role, name, total, sha256, onProgress) {
+            val c = URL(url).openConnection() as HttpURLConnection // https → https 리디렉트(파일 저장소)는 저절로 따라간다
+            c.connectTimeout = 20_000
+            c.readTimeout = 60_000
+            try {
+                if (c.responseCode !in 200..299) throw IOException("받지 못했어요 (${c.responseCode}). 인터넷을 확인하고 다시 눌러 주세요")
+            } catch (e: IOException) {
+                throw IOException(if (e.message?.startsWith("받지 못했어요") == true) e.message else "인터넷에 연결하지 못했어요. 인터넷이 될 때 다시 누르거나, 모델 파일을 직접 넣어 주세요")
+            }
+            c.inputStream
+        }
+    }
+
+    // 모델을 .part 로 채운 뒤 다 됐을 때만 바꿔 넣는다 — 몇 GB 라 도중에 끊겨도 쓰던 모델이 깨지지 않게 (PC ai-service.js bringIn 과 같음)
+    private fun bringIn(ctx: Context, role: String, name: String, total: Long, sha256: String?, onProgress: (Double) -> Unit, open: () -> java.io.InputStream): JSONObject {
         require(role in ROLES) { "모르는 모델이에요" }
-        check(copying.add(role)) { "이미 복사하는 중이에요" }
+        check(copying.add(role)) { "이미 넣는 중이에요" }
         errors.remove(role)
         changed()
         val part = File(dir(ctx), "$role.gguf.part")
         try {
-            val input = ctx.contentResolver.openInputStream(uri) ?: throw IOException("파일을 열지 못했어요")
-            input.use { i ->
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            open().use { i ->
                 part.outputStream().use { o ->
                     val buf = ByteArray(1 shl 20)
                     var done = 0L
@@ -80,7 +101,7 @@ object LocalAi {
                     while (true) {
                         val n = i.read(buf)
                         if (n < 0) break
-                        if (done == 0L) require(n >= 4 && String(buf, 0, 4, Charsets.ISO_8859_1) == "GGUF") { "모델 파일(.gguf)이 아니에요" }
+                        digest.update(buf, 0, n)
                         o.write(buf, 0, n)
                         done += n
                         val p = if (total > 0) done.toDouble() / total else 0.0
@@ -88,12 +109,19 @@ object LocalAi {
                     }
                 }
             }
+            val head = ByteArray(4).also { h -> part.inputStream().use { it.read(h) } }
+            require(String(head, Charsets.ISO_8859_1) == "GGUF") { "모델 파일(.gguf)이 아니에요" }
+            if (sha256 != null) check(digest.digest().joinToString("") { "%02x".format(it) } == sha256) { "받은 파일이 맞지 않아요. 다시 받아 주세요" }
             stop(role)
             check(part.renameTo(model(ctx, role))) { "모델 파일을 바꿔 넣지 못했어요" }
             prefs(ctx).edit().putString(role, name).apply()
         } catch (e: Exception) {
             part.delete()
-            errors[role] = if (e.message?.contains("ENOSPC") == true) "저장 공간이 모자라요" else e.message ?: "복사하지 못했어요"
+            errors[role] = when {
+                e.message?.contains("ENOSPC") == true -> "저장 공간이 모자라요"
+                sha256 != null && e is IOException && e.message?.let { it.startsWith("받지 못했어요") || it.startsWith("인터넷에") } != true -> "받다가 끊겼어요. 인터넷을 확인하고 다시 눌러 주세요"
+                else -> e.message ?: "넣지 못했어요"
+            }
             throw IllegalStateException(errors[role])
         } finally {
             copying.remove(role)

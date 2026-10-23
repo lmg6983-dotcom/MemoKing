@@ -407,6 +407,11 @@ const calls = {
     fakeAi[role] = `${role}-model.gguf`;
     return sync.aiStatus();
   },
+  aiDownload: async ({ role, name, url, sha256 }) => {
+    if (!url.startsWith('https://huggingface.co/') || sha256.length !== 64) throw new Error('받을 수 없는 주소예요');
+    fakeAi[role] = name;
+    return sync.aiStatus();
+  },
   aiRemove: async ({ role }) => {
     fakeAi[role] = '';
     return sync.aiStatus();
@@ -472,6 +477,11 @@ const calls = {
     return true;
   },
   http: async ({ url, accept = '*/*', limit = 5 * 1024 * 1024, save = false }) => {
+    // 기본 모델 목록(Hugging Face) 흉내 — 받기는 아래 aiDownload 가 흉내 낸다
+    if (url.startsWith('https://huggingface.co/api/models/')) {
+      const list = { sha: 'dev', siblings: [{ rfilename: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf', lfs: { sha256: 'd'.repeat(64), size: 2_700_000_000 } }] };
+      return { status: 200, url, type: 'application/json', latin1: Buffer.from(JSON.stringify(list)).toString('latin1') };
+    }
     const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) MemoKing-dev' }, redirect: 'follow' });
     const type = (res.headers.get('content-type') ?? '').toLowerCase();
     const result = { status: res.status, url: res.url || url, type };

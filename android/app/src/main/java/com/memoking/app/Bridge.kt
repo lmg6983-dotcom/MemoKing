@@ -407,6 +407,14 @@ class Bridge(private val activity: MainActivity) {
             // 로컬 AI: 모델 파일 고르기 → 앱 안으로 복사(진행은 'aiImport' 소식) · 지우기 · 묻기(스트리밍이면 줄마다 'aiLine' 소식)
             "aiImport" -> activity.runOnUiThread { activity.pickModel(id, a.getString("role")) }
             "aiRemove" -> pool.execute { resolve(id) { LocalAi.remove(ctx, a.getString("role")) } }
+            // 기본 모델 받기 (몇 GB — 다른 일을 막지 않게 따로, 진행은 'aiImport' 소식)
+            "aiDownload" -> Thread {
+                resolve(id) {
+                    LocalAi.download(ctx, a.getString("role"), a.getString("url"), a.getString("name"), a.optLong("size"), a.getString("sha256")) { p ->
+                        activity.runOnUiThread { activity.emit("aiImport", JSONObject().put("progress", p)) }
+                    }
+                }
+            }.start()
             "aiRequest" -> pool.execute {
                 resolve(id) {
                     val job = a.optString("job").ifBlank { null }

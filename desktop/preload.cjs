@@ -172,6 +172,7 @@ contextBridge.exposeInMainWorld('memoking', {
   ai: {
     status: invoke('ai:status'),
     importModel: invoke('ai:import'),
+    downloadDefault: invoke('ai:download-default'), // 기본 모델(core/model-catalog.js) 받기 — 진행은 ai:status 의 progress
     remove: invoke('ai:remove'),
     try: invoke('ai:try'),
     write: invoke('ai:write'), // { id, task: 'spell' | 'style' | 'draft', … } — 조각은 ai:token · ai:progress 로
