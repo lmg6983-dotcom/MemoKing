@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { createRagStore } from '../../app/js/core/rag-store.js';
+import { llamaClient } from '../../app/js/core/llama-client.js';
 
 export const AI_ROLES = { chat: '글 모델', embed: '검색 모델' };
 const IDLE_MS = 5 * 60_000;
@@ -157,8 +158,8 @@ export function createAiService(opts) {
     await gone;
   }
 
-  // onEvent 를 주면 답을 조각(SSE "data: {…}" 줄)마다 받는다
-  async function request(role, route, body, { signal, onEvent } = {}) {
+  // onLine 을 주면 답을 줄(SSE "data: {…}")마다 받는다
+  async function request(role, route, body, { signal, onLine } = {}) {
     const s = await start(role);
     clearTimeout(s.timer);
     try {
@@ -169,17 +170,14 @@ export function createAiService(opts) {
         signal,
       });
       if (!res.ok) throw new Error(`AI 가 답하지 못했어요 (${res.status})`);
-      if (!onEvent) return await res.json();
+      if (!onLine) return await res.json();
       const decoder = new TextDecoder();
       let buf = '';
       for await (const chunk of res.body) {
         buf += decoder.decode(chunk, { stream: true });
         const lines = buf.split('\n');
         buf = lines.pop();
-        for (const line of lines) {
-          const data = line.startsWith('data: ') ? line.slice(6).trim() : '';
-          if (data && data !== '[DONE]') onEvent(JSON.parse(data));
-        }
+        for (const line of lines) onLine(line);
       }
       return null;
     } catch (err) {
@@ -190,37 +188,7 @@ export function createAiService(opts) {
     }
   }
 
-  const noThink = (text) => text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim(); // 다 오기 전의 생각 블록도
-
-  /** 글 모델에 묻기 → 답 글. schema: 그 JSON 모양으로만 답 · onToken: 지금까지 온 글을 조각마다 · signal: 멈추기 */
-  async function chat(messages, { maxTokens = 512, temperature = 0.3, schema, onToken, signal } = {}) {
-    const body = {
-      messages,
-      max_tokens: maxTokens,
-      temperature,
-      chat_template_kwargs: { enable_thinking: false }, // Qwen3 계열의 생각 모드 끄기 (다른 모델은 무시)
-      ...(schema ? { response_format: { type: 'json_schema', json_schema: { name: 'out', schema } } } : {}),
-    };
-    if (!onToken) {
-      const data = await request('chat', '/v1/chat/completions', body, { signal });
-      return noThink(String(data.choices?.[0]?.message?.content ?? ''));
-    }
-    let text = '';
-    await request('chat', '/v1/chat/completions', { ...body, stream: true }, {
-      signal,
-      onEvent: (e) => {
-        const piece = e.choices?.[0]?.delta?.content;
-        if (piece) onToken(noThink((text += piece)));
-      },
-    });
-    return noThink(text);
-  }
-
-  /** 검색 모델로 글들의 벡터 */
-  async function embed(texts) {
-    const data = await request('embed', '/v1/embeddings', { input: texts });
-    return data.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
-  }
+  const { chat, embed } = llamaClient(request);
 
   return {
     status, emit, importModel, remove, chat, embed,

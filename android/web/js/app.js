@@ -43,6 +43,7 @@ import { renderWorkSettings } from '../../app/js/work-settings.js';
 import { workHours, saveWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
 import { hasRememberedChoices, forgetChoices } from '../../app/js/rename-content.js';
+import { aiSupported, aiStatus, aiApi, chatReady } from './local-ai.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -452,6 +453,7 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="open"]').hidden = inNote;
   memoSheet.querySelector('[data-memo-action="print"]').hidden = !inNote;
   memoSheet.querySelector('[data-memo-action="find"]').hidden = !inNote; // 열어 둔 메모에서만
+  memoSheet.querySelector('[data-memo-action="ai"]').hidden = !inNote || !chatReady(); // 글 모델을 넣었을 때만
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
   pin.querySelector('span').textContent = memo.pinned ? UI.unpin : UI.pin;
   memoSheet.querySelector('[data-memo-action="lock"] span').textContent = memo.locked ? '잠금 풀기' : '잠그기';
@@ -488,6 +490,10 @@ memoSheet.addEventListener('click', async (e) => {
     case 'find':
       closeSheet(memoSheet);
       note.openFind();
+      break;
+    case 'ai':
+      closeSheet(memoSheet);
+      note.openAiPanel();
       break;
     case 'open':
       closeSheet(memoSheet);
@@ -953,7 +959,54 @@ function openSettings() {
     },
     quietNote: '업무 시간 밖에는 Work 메모의 알림을 울리지 않아요. 고정한 메모의 알림은 늘 울려요',
   });
+  renderAi();
   openSheet($('settings-sheet'));
+}
+
+// ---------- AI 도우미 (LocalAi.kt — 인터넷 없이 이 휴대폰 안에서, PC 설정과 같은 것) ----------
+// 모델 파일(.gguf)은 사용자가 넣는다 (USB · 내려받기 폴더). 앱 안 저장공간에 복사되고, 메모 폴더 · 백업에는 넣지 않음
+const AI_HINT = {
+  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 휴대폰은 1~2B 모델(.gguf)이 알맞아요',
+  embed: '내 메모에서 AI 로 찾을 때 써요 (예: KURE-v1 .gguf)',
+};
+function renderAi(st = aiStatus(), failed = {}, progress = null) {
+  $('local-ai-sec').hidden = !aiSupported;
+  if (!st) return;
+  for (const role of ['chat', 'embed']) {
+    const m = st[role];
+    const have = m.state === 'ready' || m.state === 'running';
+    $(`ai-${role}-note`).textContent = !st.engine ? '이 휴대폰에서는 쓸 수 없어요 (64비트 ARM 휴대폰만)'
+      : failed[role] || m.error || (m.state === 'copying' ? `모델 파일을 복사하는 중이에요${progress != null ? ` ${Math.round(progress * 100)}%` : ''}`
+        : have ? `${m.name || '모델'} · ${(m.size / 2 ** 30).toFixed(1)}GB${m.state === 'running' ? ' · 켜져 있어요' : ''}` : AI_HINT[role]);
+    $(`ai-${role}-import`).disabled = !st.engine || m.state === 'copying';
+    $(`ai-${role}-import`).textContent = have ? '다른 모델로' : '모델 파일 넣기';
+    $(`ai-${role}-more`).hidden = !have || !st.engine;
+  }
+  $('auto-tags-note').textContent = chatReady() ? '태그 없는 메모를 닫을 때 AI 가 고른 태그 하나를 달아요' : '태그 없는 메모를 닫을 때 확실한 태그만 달아요';
+}
+if (aiSupported) {
+  on('ai', (st) => !$('settings-sheet').hidden && renderAi(st));
+  on('aiImport', ({ progress }) => !$('settings-sheet').hidden && renderAi(aiStatus(), {}, progress));
+  for (const role of ['chat', 'embed']) {
+    $(`ai-${role}-import`).addEventListener('click', async () => {
+      try {
+        renderAi(await aiApi.ai.importModel(role) ?? aiStatus()); // 고르지 않고 닫으면 null
+      } catch (err) {
+        renderAi(aiStatus(), { [role]: err.message });
+      }
+    });
+    $(`ai-${role}-remove`).addEventListener('click', async () => {
+      if (!(await confirmDialog('이 모델 파일을 삭제할까요?\n다시 쓰려면 다시 넣어야 해요.', '삭제'))) return;
+      renderAi(await aiApi.ai.remove(role));
+    });
+  }
+  $('ai-try').addEventListener('click', async () => {
+    $('ai-try').disabled = true;
+    $('ai-try-out').textContent = '모델을 올리고 묻는 중이에요…';
+    const r = await aiApi.ai.try();
+    $('ai-try').disabled = false;
+    $('ai-try-out').textContent = r.error ? r.error : `답: ${r.text} (${r.seconds.toFixed(1)}초)`;
+  });
 }
 
 // 말한 사람 나누기: 다른 켜고 끄기와 같은 스위치 (PC 설정과 같음). 데이터(약 28MB)가 없으면 켤 때 받고, 받는 동안은 켜진 채 잠금

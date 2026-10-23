@@ -18,9 +18,10 @@ function diffView(before, after) {
 }
 
 /**
- * @param {{ panel: HTMLElement, api: any, editor: () => any, title: () => string, onOpen: () => void }} o
+ * @param {{ panel: HTMLElement, api: any, editor: () => any, title: () => string, onOpen: () => void,
+ *           show?: (panel) => void, hide?: (panel) => void }} o  show · hide: 휴대폰은 아래에서 올라오는 시트로
  */
-export function createAiWritePanel({ panel, api, editor, title, onOpen }) {
+export function createAiWritePanel({ panel, api, editor, title, onOpen, show = (p) => { p.hidden = false; }, hide = (p) => { p.hidden = true; editor()?.focus(); } }) {
   const $ = (sel) => panel.querySelector(sel);
   const state = $('.ai-state');
   const result = $('.ai-result');
@@ -145,20 +146,25 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen }) {
   $('.ai-draft').addEventListener('click', draft);
   stop.addEventListener('click', () => job && api.ai.cancel(job));
 
+  /** 닫힐 때: 묻던 것을 멈추고 결과를 비운다 (휴대폰은 시트가 뒤로 가기 · 바깥 누르기로 닫혀도) */
+  function reset() {
+    if (job) api.ai.cancel(job);
+    job = null;
+    busy(false);
+    result.replaceChildren();
+    state.textContent = '';
+  }
+
   function toggle(force) {
-    panel.hidden = force === undefined ? !panel.hidden : !force;
-    if (panel.hidden) {
-      if (job) api.ai.cancel(job);
-      job = null;
-      busy(false);
-      result.replaceChildren();
-      state.textContent = '';
-      editor()?.focus();
-    } else {
+    if (force ?? panel.hidden) {
+      show(panel);
       onOpen();
       $('.ai-spell').focus();
+    } else {
+      hide(panel);
+      reset();
     }
   }
   panel.querySelector('.ai-close').addEventListener('click', () => toggle(false));
-  return { toggle, get open() { return !panel.hidden; } };
+  return { toggle, reset, get open() { return !panel.hidden; } };
 }

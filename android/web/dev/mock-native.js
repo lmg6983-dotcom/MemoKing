@@ -15,13 +15,22 @@
     'driveStatus', 'driveSetClient', 'driveDisconnect', 'driveCancelLogin', 'driveSyncSoon',
     'recordStatus', 'recordPause', 'recordResume', 'recordTakeDone', 'recordAck', 'sttStatus',
     'widgetMemoIds', 'widgetPublish', 'widgetAssign', 'widgetPin',
+    'aiStatus', 'aiCancel', 'aiCacheRead', 'aiCacheWrite',
   ];
   const native = {};
   for (const m of methods) native[m] = (...args) => syncCall(m, args);
   native.call = (id, method, args) => {
     fetch('/native/call', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ method, args: JSON.parse(args || '{}') }) })
       .then((r) => r.text())
-      .then((json) => window.__mk?.resolve(id, json));
+      .then((json) => {
+        // 로컬 AI 스트리밍 흉내: 서버가 한꺼번에 준 줄을 앱처럼 'aiLine' 소식으로 (LocalAi.kt)
+        const lines = JSON.parse(json).v?.__lines;
+        if (lines) {
+          for (const line of lines) window.__mk?.emit('aiLine', { job: JSON.parse(args).job, line });
+          json = '{"v":null}';
+        }
+        window.__mk?.resolve(id, json);
+      });
   };
   window.MemoKingNative = native;
 })();
