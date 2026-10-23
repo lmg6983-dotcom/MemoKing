@@ -73,6 +73,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw }) {
   let inking = null; // { svg, surface, toolbar, hist }
   function startInk() {
     if (inking || !img.naturalWidth) return;
+    view.classList.add('inking'); // 도구 막대 자리를 비운 뒤에 그림 크기를 잰다 (그리기판이 그림에 꼭 맞게)
     const r = img.getBoundingClientRect();
     const sr = stage.getBoundingClientRect();
     const svg = document.createElementNS(SVGNS, 'svg');

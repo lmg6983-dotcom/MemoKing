@@ -193,7 +193,7 @@ function mediaView(node, view, getPos) {
   }
   const dom = document.createElement('img');
   const album = isAlbumTitle(title);
-  dom.className = album ? 'mk-image mk-album-img' : 'mk-image';
+  dom.className = album ? `mk-image mk-album-img${title === ALBUM_PAGE_TITLE ? ' mk-album-page' : ''}` : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
   dom.src = vaultUrl(src);
   dom.alt = alt ?? '';
   if (title && !album) dom.title = title;
@@ -1235,7 +1235,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }
   if (!readOnly) inkEditHandler = (v, pos) => editInk(v, pos); // 보기만 하는 편집기(PDF·옆 메모)는 이어 그리기 없음
   // 묶음 사진: 누른 장부터 크게 넘겨 보기 · 그 장 위에 그리면 그린 것을 합친 새 그림으로 바꾼다 (보기만 하는 편집기는 그리기 없음)
-  albumHandler = (v, pos) => {
+  // 창 하나에 편집기가 여럿일 수 있어(옆 메모 · 스택 탭) 그리기는 그 편집기(v)가 고칠 수 있을 때만 — 보기만 하는 편집기가 나중에 만들어져도 덮어쓰지 않게
+  if (!readOnly || !albumHandler) albumHandler = (v, pos) => {
     const $p = v.state.doc.resolve(pos);
     const images = [];
     let start = 0;
@@ -1250,7 +1251,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       images,
       start,
       url: vaultUrl,
-      onDraw: readOnly ? null : async (i, png) => {
+      onDraw: !v.editable ? null : async (i, png) => {
         const it = images[i];
         const src = await saveFile(new File([png], `${baseName(it.alt || '그림')} 그림.png`, { type: 'image/png' }));
         const cur = v.state.doc.nodeAt(it.pos);
@@ -1985,6 +1986,13 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       ctx.update(uploadConfig.key, (prev) => ({
         ...prev,
         enableHtmlFileUploader: false,
+        // 넣는 동안(어떻게 넣을지 묻는 창 · 문서를 그림으로 바꾸는 중) 그 자리에 영어 "Upload in progress..." 대신
+        uploadWidgetFactory: (pos, spec) => {
+          const el = document.createElement('span');
+          el.className = 'mk-uploading';
+          el.textContent = '넣는 중';
+          return Decoration.widget(pos, el, spec);
+        },
         uploader: async (files, _schema, _ctx, insertPos) => {
           const items = await filesToItems(Array.from(files));
           if (items.length) insertBlocks(insertPos, items);

@@ -957,6 +957,7 @@ class Mover {
     view.focus();
     extend(pt.clientX, pt.clientY);
     const move = (e) => {
+      if (!e.buttons) return up(); // 창 밖에서 손을 뗐으면 (mouseup 이 오지 않음) 여기서 끝낸다 — 다시 들어온 마우스를 따라 고르지 않게
       e.preventDefault();
       extend(e.clientX, e.clientY);
     };

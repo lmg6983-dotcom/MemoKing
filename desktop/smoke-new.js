@@ -1619,28 +1619,63 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         {
           const { win: aw } = await openMemo('# 묶음 사진\n\n끝\n', '묶음 사진');
           const pngB = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-          await js(aw, `(() => {
-            const bin = Uint8Array.from(atob(${JSON.stringify(pngB)}), (c) => c.charCodeAt(0));
+          void pngB;
+          // 화면 확인용으로 그럴듯한 사진 (색 · 크기가 다른 그림) — 캔버스로 만들어 놓는다
+          await js(aw, `(async () => {
+            const make = (w, h, a, b, label) => new Promise((done) => {
+              const c = document.createElement('canvas'); c.width = w; c.height = h;
+              const g = c.getContext('2d'); const grd = g.createLinearGradient(0, 0, w, h); grd.addColorStop(0, a); grd.addColorStop(1, b);
+              g.fillStyle = grd; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = 'bold ' + Math.round(h / 7) + 'px sans-serif'; g.fillText(label, w * 0.08, h * 0.9);
+              c.toBlob((bl) => done(new File([bl], label + '.png', { type: 'image/png' })), 'image/png');
+            });
+            const files = await Promise.all([
+              make(1200, 800, '#f7b267', '#f4845f', '바다'), make(800, 1200, '#4d908e', '#277da1', '숲'), make(1000, 1000, '#9d4edd', '#5a189a', '야경'),
+              make(1200, 900, '#ffd166', '#ef476f', '노을'), make(900, 1200, '#06d6a0', '#118ab2', '산책'),
+            ]);
             const dt = new DataTransfer();
-            for (const n of ['하나.png', '둘.png', '셋.png', '넷.png', '다섯.png']) dt.items.add(new File([bin], n, { type: 'image/png' }));
+            for (const f of files) dt.items.add(f);
             const r = document.querySelector('.mk-doc p').getBoundingClientRect();
             document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
           })()`);
           const askAlbum = await until(() => js(aw, `document.querySelector('.mk-prompt b')?.textContent`), '묶음 사진 질문', 4000).catch(() => null);
+          await capture(aw, 'album-ask.png');
           await js(aw, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '묶음 사진으로')?.click()`);
           const album = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')]; const p = imgs[0]?.parentElement; if (imgs.length < 5) return null; const vis = imgs.filter((i) => getComputedStyle(i).opacity !== '0'); return { n: imgs.length, sameLine: imgs.every((i) => i.parentElement === p), grid: getComputedStyle(p).display, visible: vis.length, more: getComputedStyle(p, '::after').content, gap: vis.slice(1).map((i) => getComputedStyle(i).marginTop) }; })()`), '묶음 사진 넣기', 5000).catch(() => null);
-          check('사진 5장 → "묶음 사진으로" 고르면 한 줄 격자에 4장 + "+1"', askAlbum === '사진 5장을 어떻게 넣을까요?' && album?.n === 5 && album.sameLine && album.grid === 'grid' && album.visible === 4 && album.more.includes('+') && album.gap.every((g) => g === '0px'), JSON.stringify({ askAlbum, album }));
+          await wait(500);
+          await capture(aw, 'album-grid.png');
+          check('사진 5장 → "묶음 사진으로" 고르면 한 줄에 모아 포갠 더미 (위 1장 + 뒤로 2장, "장" 수 표시)', askAlbum === '사진 5장을 어떻게 넣을까요?' && album?.n === 5 && album.sameLine && album.grid === 'block' && album.visible === 3 && album.more.includes('장'), JSON.stringify({ askAlbum, album }));
           await js(aw, `document.querySelectorAll('.mk-doc img.mk-album-img')[1].click()`);
           const viewer = await until(() => js(aw, `document.querySelector('.mk-album-view .mk-album-count')?.textContent`), '크게 보기', 3000).catch(() => null);
+          await wait(300);
+          await capture(aw, 'album-view.png');
           key(aw, 'Right');
           await wait(150);
           const after = await js(aw, `document.querySelector('.mk-album-view .mk-album-count')?.textContent`);
+          // 그리기: 단추를 누르고 진짜 마우스로 한 획
+          const srcsBefore = await js(aw, `[...document.querySelectorAll('.mk-doc img.mk-album-img')].map((i) => i.src)`);
+          await js(aw, `[...document.querySelectorAll('.mk-album-btn')].find((b) => b.textContent.includes('그리기'))?.click()`);
+          await wait(300);
+          const ink = await js(aw, `(() => { const r = document.querySelector('.mk-album-ink')?.getBoundingClientRect(); return r && { x: Math.round(r.left + r.width * 0.2), y: Math.round(r.top + r.height * 0.3), w: Math.round(r.width * 0.6) }; })()`);
+          if (ink) {
+            aw.webContents.sendInputEvent({ type: 'mouseMove', x: ink.x, y: ink.y });
+            aw.webContents.sendInputEvent({ type: 'mouseDown', x: ink.x, y: ink.y, button: 'left', clickCount: 1 });
+            for (let k = 1; k <= 12; k++) {
+              aw.webContents.sendInputEvent({ type: 'mouseMove', x: ink.x + Math.round((ink.w * k) / 12), y: ink.y + Math.round(Math.sin(k / 2) * 30), movementX: 1, movementY: 1, button: 'left', modifiers: ['leftButtonDown'] });
+              await wait(20);
+            }
+            aw.webContents.sendInputEvent({ type: 'mouseUp', x: ink.x + ink.w, y: ink.y, button: 'left', clickCount: 1 });
+          }
+          await wait(300);
+          await capture(aw, 'album-ink.png');
+          key(aw, 'Escape'); // 그리기 끝 (저장)
+          const inked = await until(() => js(aw, `(() => { const before = ${JSON.stringify(srcsBefore)}; const now = [...document.querySelectorAll('.mk-doc img.mk-album-img')].map((i) => i.src); const changed = now.map((s, k) => (s !== before[k] ? k : -1)).filter((k) => k >= 0); return changed.length ? changed : null; })()`), '그린 장 저장', 5000).catch(() => null);
+          check('묶음 사진: 3번째 장 위에 그리고 Esc 로 끝내면 그 장만 그린 것을 합친 새 그림으로 바뀜', Boolean(ink) && inked?.join() === '2', JSON.stringify({ ink, inked }));
           key(aw, 'Escape');
           await wait(200);
           const closed = await js(aw, `!document.querySelector('.mk-album-view')`);
           check('묶음 사진: 누른 장부터 크게 (2 / 5), → 로 다음 장, Esc 로 닫힘', viewer === '2 / 5' && after === '3 / 5' && closed, JSON.stringify({ viewer, after, closed }));
           // PDF → 장마다 그림 (pdf.js 로 실제로 바꿔 본다)
-          const pdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R 5 0 R]/Count 2>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n4 0 obj<</Length 33>>stream\n0 0 1 rg 20 20 160 240 re f\nendstream endobj\n5 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
+          const pdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R 5 0 R 6 0 R 7 0 R 8 0 R]/Count 5>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n4 0 obj<</Length 33>>stream\n0 0 1 rg 20 20 160 240 re f\nendstream endobj\n5 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n6 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n7 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n8 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
           await js(aw, `(() => {
             const dt = new DataTransfer();
             dt.items.add(new File([${JSON.stringify(pdf)}], '설명서.pdf', { type: 'application/pdf' }));
@@ -1650,9 +1685,22 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           })()`);
           await until(() => js(aw, `!!document.querySelector('.mk-prompt')`), 'PDF 질문', 4000).catch(() => null);
           await js(aw, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '그림으로')?.click()`);
-          const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 2 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);
+          const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 5 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);
           const pdfNote = await js(aw, `document.getElementById('status').textContent`);
-          check('PDF 를 "그림으로" 넣으면 장마다 그림 (2쪽 → 2장, 또렷한 크기) 묶음으로', Boolean(pages), JSON.stringify({ pages, pdfNote }));
+          check('PDF 를 "그림으로" 넣으면 장마다 그림 (5쪽 → 5장, 또렷한 크기) 종이 묶음으로', Boolean(pages), JSON.stringify({ pages, pdfNote }));
+          await js(aw, `document.querySelectorAll('.mk-doc img.mk-album-img')[5]?.scrollIntoView({ block: 'center' })`);
+          await capture(aw, 'album-pdf.png');
+          // 좁은 창 (휴대폰 폭쯤)
+          const [bw, bh] = aw.getSize();
+          aw.setSize(380, 760);
+          await wait(400);
+          await js(aw, `document.querySelector('.mk-doc img.mk-album-img')?.scrollIntoView({ block: 'center' })`);
+          await capture(aw, 'album-narrow.png');
+          await js(aw, `document.querySelectorAll('.mk-doc img.mk-album-img')[0].click()`);
+          await wait(400);
+          await capture(aw, 'album-view-narrow.png');
+          key(aw, 'Escape');
+          aw.setSize(bw, bh);
           aw.close();
         }
         await wait(600);

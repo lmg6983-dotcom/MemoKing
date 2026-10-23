@@ -2083,23 +2083,60 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-find-clear[hidden] { display: none; }
 .mk-find-pop-foot { display: flex; justify-content: space-between; gap: 6px; padding-top: 2px; }
 
-/* ---------- 묶음 사진 (카카오톡처럼): 한 줄에 모은 사진은 두 칸 격자로 4장까지, 더 있으면 4번째 칸에 +N ----------
-   파일에는 그림마다 title "album" (editor.js ALBUM). 숨긴 장도 수를 세도록 display: none 대신 안 보이게만 */
+/* ---------- 묶음 사진 ----------
+   2~3장: 두 칸 격자 (3장은 첫 장을 세로로 크게)
+   4장 이상: 포개 놓은 사진 더미 — 맨 위 한 장 + 뒤로 비스듬히 두 장, 모서리에 "N장" (마우스를 올리면 조금 펼친다)
+   문서를 넣은 장(mk-album-page)은 종이 묶음처럼 — 첫 쪽이 다 보이고 뒤 장은 가지런히 어긋나게, "N쪽"
+   파일에는 그림마다 title "album" / "album page" (core/memo-file.js). 편집기가 그림 사이마다 숨은 img(ProseMirror-separator)를
+   끼우므로 장 수는 "of .mk-album-img" 로 센다. 뒤에 숨은 장도 수를 세도록 display: none 대신 안 보이게만 */
 .mk-doc p:has(> img.mk-album-img) {
-  position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
-  width: min(100%, 380px); border-radius: 12px; overflow: hidden; counter-reset: mk-album -4;
+  position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; line-height: 0;
+  width: min(100%, 380px); border-radius: 12px; overflow: hidden; counter-reset: mk-album;
 }
 .mk-doc img.mk-album-img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; margin: 0; border-radius: 0; cursor: zoom-in; counter-increment: mk-album; background: #fff; }
 .mk-doc[contenteditable="true"] img.mk-album-img { cursor: zoom-in; }
-.mk-doc img.mk-album-img:nth-child(n + 5 of .mk-album-img) { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-/* 그림만 든 줄의 "그림 사이 여백" 규칙(mk-image-line)이 격자 칸을 밀지 않게 */
+/* 숨은 img · 줄 끝 br 이 격자 칸을 차지하지 않게 (그림만 든 줄 표시가 늦게 붙어도) */
+.mk-doc p:has(> img.mk-album-img) > :is(img.ProseMirror-separator, br) { display: none; }
+/* 그림만 든 줄의 "그림 사이 여백" 규칙(mk-image-line)이 칸을 밀지 않게 */
 .mk-doc p.mk-image-line > .mk-image.mk-album-img { margin: 0; }
-/* 3장: 첫 장을 세로로 크게 — 편집기가 그림 사이마다 숨은 img(ProseMirror-separator)를 끼우므로 장 수는 "of .mk-album-img" 로 센다 */
+/* 3장: 첫 장을 세로로 크게 */
 .mk-doc p:has(> img.mk-album-img:nth-child(3 of .mk-album-img)):not(:has(> img.mk-album-img:nth-child(4 of .mk-album-img))) > img.mk-album-img:nth-child(1 of .mk-album-img) { grid-row: span 2; aspect-ratio: auto; height: 100%; }
-/* 5장 넘으면 4번째 칸 위에 +N (counter 가 -4 에서 시작해 장 수 - 4) */
-.mk-doc p:has(> img.mk-album-img:nth-child(5 of .mk-album-img))::after {
-  content: '+' counter(mk-album); grid-row: 2; grid-column: 2; z-index: 1; display: grid; place-items: center;
-  background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 22px; font-weight: 700; pointer-events: none;
+/* 문서 장은 격자에서도 종이 비율로 (윗부분부터) */
+.mk-doc img.mk-album-img.mk-album-page { aspect-ratio: 1 / 1.414; object-position: top; }
+
+/* 4장 이상: 포개 놓은 더미 */
+.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) {
+  display: block; width: min(76%, 240px); margin: 18px 0 26px 14px; overflow: visible; border-radius: 0; isolation: isolate;
+}
+.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) > img.mk-album-img {
+  position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; box-sizing: border-box;
+  border: 5px solid #fff; border-radius: 4px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16), 0 8px 18px -6px rgba(0, 0, 0, 0.28);
+  opacity: 0; pointer-events: none; z-index: 0; transform-origin: 50% 60%; transition: transform 0.24s var(--ease-out, ease-out);
+}
+.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(1 of .mk-album-img) { position: relative; inset: auto; height: auto; aspect-ratio: 1; opacity: 1; pointer-events: auto; z-index: 3; }
+.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(2 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 2; transform: rotate(5deg) translate(9px, 1px); }
+.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(3 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 1; transform: rotate(-6deg) translate(-8px, 5px); }
+/* 장 수 (counter 는 줄 끝에서 모든 장을 센 값) */
+.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img))::after {
+  content: counter(mk-album) '장'; position: absolute; right: -10px; bottom: -12px; z-index: 4;
+  padding: 5px 9px; border-radius: 999px; background: rgba(24, 24, 22, 0.8); color: #fff;
+  font-size: 12.5px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; pointer-events: none;
+}
+/* 문서: 종이 묶음 — 첫 쪽 전체(종이 비율), 뒤 장은 기울이지 않고 오른쪽 아래로 가지런히 */
+.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) { width: min(66%, 210px); }
+.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) > img.mk-album-img {
+  border: 0; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 3px 10px -4px rgba(0, 0, 0, 0.3); object-fit: cover; object-position: top;
+}
+.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(1 of .mk-album-img) { aspect-ratio: 1 / 1.414; }
+.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: translate(7px, 7px); }
+.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: translate(14px, 14px); }
+.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img))::after { content: counter(mk-album) '쪽'; right: -22px; bottom: -22px; }
+/* 마우스를 올리면 살짝 펼쳐 "여러 장" 임을 보인다 */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)):hover > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: rotate(9deg) translate(20px, -2px); }
+  .mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: rotate(-10deg) translate(-18px, 8px); }
+  .mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)):hover > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: translate(12px, 10px); }
+  .mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: translate(24px, 20px); }
 }
 
 /* 묶음 사진 크게 보기 (album-viewer.js) */
@@ -2109,8 +2146,9 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; font-size: 13.5px; cursor: pointer; }
 .mk-album-btn:hover { background: rgba(255, 255, 255, 0.2); }
 .mk-album-btn svg { width: 18px; height: 18px; }
-.mk-album-stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; padding: 8px 56px 16px; touch-action: pan-y; }
-.mk-album-big { max-width: 100%; max-height: 100%; background: #fff; user-select: none; -webkit-user-drag: none; }
+.mk-album-stage { position: relative; flex: 1; min-height: 0; margin: 8px 56px 16px; touch-action: pan-y; }
+/* 장 전체가 화면 안에 (세로로 긴 장도) — 그림 상자 = 보이는 그림이어야 그리기판이 그 위에 꼭 맞는다 */
+.mk-album-big { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; background: #fff; user-select: none; -webkit-user-drag: none; }
 .mk-album-nav { position: absolute; top: 50%; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #fff; cursor: pointer; display: grid; place-items: center; }
 .mk-album-nav:hover { background: rgba(255, 255, 255, 0.24); }
 .mk-album-nav svg { width: 20px; height: 20px; }
@@ -2119,6 +2157,10 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-nav.next { right: 8px; }
 .mk-album-nav[hidden] { display: none; }
 .mk-album-ink { position: absolute; touch-action: none; }
+.mk-album-view.inking .mk-album-stage { margin-bottom: calc(76px + env(safe-area-inset-bottom)); } /* 아래 도구 막대가 장을 가리지 않게 */
 .mk-album-view.inking .mk-album-nav, .mk-album-view.inking .mk-album-head .mk-album-btn:not(:last-child) { display: none; }
-@media (max-width: 600px) { .mk-album-stage { padding: 4px 0 12px; } .mk-album-nav { display: none; } }
+/* 손가락 화면(휴대폰)은 밀어서 넘기므로 앞 · 다음 단추 없이 장을 넓게 — PC 의 좁은 메모 창은 단추를 둔다 */
+@media (pointer: coarse) { .mk-album-stage { margin: 4px 0 12px; } .mk-album-nav { display: none; } }
+@media (pointer: fine) and (max-width: 420px) { .mk-album-stage { margin: 8px 44px 16px; } .mk-album-nav { width: 34px; height: 34px; margin-top: -17px; } .mk-album-nav.prev { left: 5px; } .mk-album-nav.next { right: 5px; } }
+.mk-uploading { margin-right: 6px; font-size: 12px; color: var(--muted, #888); }
 @media print { .mk-album-view { display: none !important; } }
