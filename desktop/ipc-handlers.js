@@ -82,6 +82,7 @@ export function registerIpc(ctx) {
     TRASH_DAYS,
     getStt,
     sttOptions,
+    getAi,
     getLinkPreviews,
     openWebPage,
     openVaultFile,
@@ -89,6 +90,32 @@ export function registerIpc(ctx) {
     fetchRemoteImage,
     getLastHandoff,
   } = ctx;
+
+  // ---------- 로컬 AI (desktop/ai) ----------
+  ipcMain.handle('ai:status', () => getAi()?.status());
+  ipcMain.handle('ai:import', async (event, role) => {
+    const r = await dialog.showOpenDialog(senderWindow(event), {
+      title: '모델 파일(.gguf) 고르기',
+      filters: [{ name: 'AI 모델', extensions: ['gguf'] }],
+      properties: ['openFile'],
+    });
+    if (r.canceled || !r.filePaths[0]) return getAi()?.status();
+    try {
+      return await getAi().importModel(role, r.filePaths[0]);
+    } catch (err) {
+      return { ...getAi().status(), error: err.message };
+    }
+  });
+  ipcMain.handle('ai:remove', (_e, role) => getAi()?.remove(role));
+  ipcMain.handle('ai:try', async () => {
+    const started = Date.now();
+    try {
+      const text = await getAi().chat([{ role: 'user', content: '메모 앱을 한 문장으로 소개해 주세요.' }], { maxTokens: 80 });
+      return { text, seconds: (Date.now() - started) / 1000 };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
 
   // ---------- STT (받아쓰기) ----------
   const sttKey = (e, id) => `${e.sender.id}:${id}`;

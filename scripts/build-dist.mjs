@@ -53,6 +53,7 @@ function copyDir(from, to) {
     else if (item.isFile()) copyFileSync(src, dest);
   }
 }
+execSync('node scripts/get-llama.mjs', { cwd: ROOT, stdio: 'inherit' }); // 로컬 AI 엔진 → desktop/vendor/llama (asar 밖)
 rmSync(STAGE, { recursive: true, force: true });
 mkdirSync(STAGE, { recursive: true });
 for (const dir of ['app', 'desktop', join('assets', 'icons')]) copyDir(join(ROOT, dir), join(STAGE, dir));

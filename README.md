@@ -211,6 +211,7 @@ Windows 스티커 메모처럼 쓰는 메모 앱. 메모는 **지정한 폴더(�
 | `npm run smoke:new` | 이번 버전에서 바뀐 기능만 확인하는 짧은 점검 (`desktop/smoke-new.js`, 버전마다 바꿔 씀) — 평소에는 이것만 |
 | `npm run dist` | 배포판(설치 파일) 만들기 → `dist/MemoKing-Setup-<버전>.exe`, 이어서 빌드된 앱으로 자동 점검 ([electron-builder](https://github.com/electron-userland/electron-builder)) |
 | `npm run launch` | 앱을 띄우고 터미널은 바로 끝냄 (`메모킹 실행.cmd` 가 사용) |
+| `npm run llama` | 로컬 AI 엔진(llama.cpp `llama-server.exe` · Vulkan) 받기 → `desktop/vendor/llama/` (git 에는 없음, `npm run dist` 가 먼저 부름). 개발 중에는 `MEMOKING_LLAMA_SERVER` 로 다른 엔진 경로도 |
 | `npm run vendor` | 오픈소스 라이브러리(Milkdown, yaml, Plyr)를 `app/vendor/` 로 다시 묶기 |
 | `npm run icons` | 아이콘 시안(`assets/source/`)에서 ico·png 아이콘 다시 만들기 (ImageMagick 필요) |
 | `npm run stage -- <plan\|build\|feedback> <버전> "<요약>"` | 단계 기록 (버전·히스토리·커밋·태그·백업) |

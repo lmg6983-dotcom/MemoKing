@@ -20,4 +20,7 @@ android/.kotlin/
 desktop/google-client.json
 
 *.exe
+
+# 로컬 AI 엔진 (npm run llama 로 받음)
+desktop/vendor/llama/
 .impeccable/critique/

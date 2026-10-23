@@ -883,6 +883,7 @@ async function loadSettings() {
     quietNote: '업무 시간 밖에는 Work 메모의 알림을 띄우지 않고 알림 보관함에 모아요. 고정한 메모의 알림은 늘 울려요',
   });
   if (api.stt) renderStt(await api.stt.status());
+  if (api.ai) renderAi(await api.ai.status());
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
 }
 function showQuickMemo(q) {
@@ -1043,6 +1044,49 @@ if (api.stt) {
   });
 } else {
   for (const x of ['stt-enabled', 'stt-download', 'stt-speaker']) $(x).closest('label, div').hidden = true;
+}
+// ---------- AI 도우미 (desktop/ai — 인터넷 없이 이 PC 안에서) ----------
+// 모델 파일(.gguf)은 사용자가 넣는다 (USB 로 옮긴 파일도). 이 PC 의 앱 데이터 폴더에 복사되고, 메모 폴더에는 넣지 않음
+const AI_HINT = {
+  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 메모리 8GB PC 는 2~4B 모델(.gguf)이 알맞아요',
+  embed: '내 메모에서 AI 로 찾을 때 써요 (예: KURE-v1 .gguf)',
+};
+function renderAi(st, failed = {}) {
+  if (!st) return;
+  for (const role of ['chat', 'embed']) {
+    const m = st[role];
+    const have = m.state === 'ready' || m.state === 'running';
+    $(`ai-${role}-note`).textContent = !st.engine ? 'AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'
+      : failed[role] || m.error || (m.state === 'copying' ? '모델 파일을 복사하는 중이에요. 몇 분 걸릴 수 있어요'
+        : have ? `${m.name || '모델'} · ${(m.size / 2 ** 30).toFixed(1)}GB${m.state === 'running' ? ' · 켜져 있어요' : ''}` : AI_HINT[role]);
+    $(`ai-${role}-import`).disabled = !st.engine || m.state === 'copying';
+    $(`ai-${role}-import`).textContent = have ? '다른 모델로' : '모델 파일 넣기';
+    $(`ai-${role}-remove`).hidden = !have;
+  }
+  $('ai-try-row').hidden = !st.engine || !['ready', 'running'].includes(st.chat.state);
+}
+if (api.ai) {
+  api.on('ai:status', (st) => renderAi(st));
+  for (const role of ['chat', 'embed']) {
+    $(`ai-${role}-import`).addEventListener('click', async () => {
+      const st = await api.ai.importModel(role);
+      renderAi(st, st?.error ? { [role]: st.error } : {});
+    });
+    $(`ai-${role}-remove`).addEventListener('click', async () => {
+      if (!(await confirmDialog('이 모델 파일을 삭제할까요?\n다시 쓰려면 다시 넣어야 해요.', '삭제'))) return;
+      renderAi(await api.ai.remove(role));
+    });
+  }
+  $('ai-try').addEventListener('click', async () => {
+    const btn = $('ai-try');
+    btn.disabled = true;
+    $('ai-try-out').textContent = '모델을 올리고 묻는 중이에요…';
+    const r = await api.ai.try();
+    btn.disabled = false;
+    $('ai-try-out').textContent = r.error ? r.error : `답: ${r.text} (${r.seconds.toFixed(1)}초)`;
+  });
+} else {
+  $('local-ai-sec').hidden = true;
 }
 $('quick-memo').addEventListener('change', async (e) => showQuickMemo(await api.settings.setQuickMemo(e.target.checked)));
 $('auto-start').addEventListener('change', async (e) => {
