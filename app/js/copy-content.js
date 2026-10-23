@@ -98,6 +98,14 @@ export async function copyText({ text, html = '' }) {
 const isImageNode = (node) => node?.type.name === 'image';
 /** 그림 하나만 든 줄 */
 const loneImage = (node) => node?.type.name === 'paragraph' && node.childCount === 1 && isImageNode(node.firstChild);
+/** 그림만 든 줄(묶음 사진 포함) → 다룰 그림 노드: 화면에서 누른 그림(target), 없으면 첫 장 */
+function imageOfLine(node, target, view, pos) {
+  if (node?.type.name !== 'paragraph' || !node.childCount || !node.content.content.every(isImageNode)) return null;
+  const dom = view.nodeDOM(pos);
+  const imgs = dom instanceof Element ? [...dom.querySelectorAll('img.mk-image')] : [];
+  const at = imgs.indexOf(imageIn(target));
+  return node.child(at >= 0 && at < node.childCount ? at : 0);
+}
 
 const isAttachment = (href) => typeof href === 'string' && /^attachments\//.test(href);
 
@@ -148,7 +156,7 @@ export async function copyBlock(view, pos, node, target) {
     await copyText(linkCardClip(node.attrs));
     return '링크';
   }
-  const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : null; // 그림 · 소리 · 동영상 · 손 메모 노드
+  const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : imageOfLine(node, target, view, pos); // 그림 · 소리 · 동영상 · 손 메모 노드 (묶음 사진은 그 장)
   if (media) {
     const img = imageIn(target) ?? imageIn(view.nodeDOM(pos));
     if (img) {
@@ -248,7 +256,7 @@ const baseNameOf = (rel) => rel.split('/').pop().replace(/^[0-9a-f]{6,}-/i, '');
  * @param {import('prosemirror-view').EditorView} view
  */
 export async function blockPayload(view, pos, node, target) {
-  const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : null;
+  const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : imageOfLine(node, target, view, pos); // 묶음 사진은 그 장 (빈 글 파일이 되지 않게)
   // 파일이 있는 것 (소리 · 동영상 · 파일 칩 · 음성 카드)
   const file = attachmentOf(node);
   if (file) {

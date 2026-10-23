@@ -73,6 +73,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw }) {
   let inking = null; // { svg, surface, toolbar, hist }
   function startInk() {
     if (inking || !img.naturalWidth) return;
+    view.classList.add('inking'); // 도구 막대 자리를 비운 뒤에 그림 크기를 잰다 (그리기판이 그림에 꼭 맞게)
     const r = img.getBoundingClientRect();
     const sr = stage.getBoundingClientRect();
     const svg = document.createElementNS(SVGNS, 'svg');
@@ -112,7 +113,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw }) {
     }
     view.append(toolbar.el);
     view.classList.add('inking');
-    inking = { svg, surface, toolbar, hist, refresh, w: r.width, h: r.height };
+    inking = { svg, surface, toolbar, hist, refresh, tools, w: r.width, h: r.height };
   }
   draw.addEventListener('click', startInk);
 
@@ -168,13 +169,30 @@ export function openAlbumViewer({ images, start = 0, url, onDraw }) {
 
   // ---------- 닫기 · 키 ----------
   const onKey = (e) => {
+    // 포커스는 이 화면 안에서만 돈다 (뒤의 메모로 빠져 보이지 않는 곳에 글이 써지지 않게)
+    if (e.key === 'Tab') {
+      const stops = [...view.querySelectorAll('button')].filter((b) => !b.hidden && b.offsetParent);
+      const at = stops.indexOf(document.activeElement);
+      e.preventDefault();
+      stops[(at + (e.shiftKey ? stops.length - 1 : 1) + stops.length) % stops.length]?.focus();
+      return;
+    }
     if (inking) {
+      const k = inking;
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation(); // 메모 창의 Esc(닫기 등)까지 가지 않게
         finishInk();
         return;
       }
-      inkKeys(e, { undo: () => inking.hist.undo() && inking.refresh(), redo: () => inking.hist.redo() && inking.refresh(), setTool: () => {} });
+      const setTool = (tool) => {
+        k.tools.tool = tool;
+        k.refresh();
+      };
+      if (inkKeys(e, { undo: () => k.hist.undo() && k.refresh(), redo: () => k.hist.redo() && k.refresh(), setTool })) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       return;
     }
     if (e.key === 'Escape') {

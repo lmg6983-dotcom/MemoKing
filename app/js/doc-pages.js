@@ -88,6 +88,7 @@ async function domPages(render, onProgress) {
     return { pages, total: all.length };
   } finally {
     box.remove();
+    for (const u of box.urls ?? []) URL.revokeObjectURL(u); // HWPX 그림 주소 (찍은 뒤에는 필요 없음)
   }
 }
 
@@ -100,10 +101,13 @@ async function hwpxPages(lib, data, box) {
   if (!names.length) throw new Error('한글 문서의 내용을 찾지 못했어요');
   // 그림: BinData/<id>.<확장자> → 화면에 쓸 주소
   const images = new Map();
+  box.urls = []; // domPages 가 다 찍은 뒤 풀어 준다
   for (const n of Object.keys(zip.files).filter((x) => /^BinData\//i.test(x))) {
     const id = n.split('/').pop().replace(/\.[^.]+$/, '');
     const blob = await zip.file(n).async('blob');
-    images.set(id, URL.createObjectURL(blob));
+    const url = URL.createObjectURL(blob);
+    box.urls.push(url);
+    images.set(id, url);
   }
   const W = 794;
   const H = 1123; // A4 96dpi

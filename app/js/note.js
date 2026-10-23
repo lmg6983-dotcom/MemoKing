@@ -841,7 +841,7 @@ async function applyCapture(c) {
   if (c.heading) editor.setMarkdown(`# ${escapeMd(c.heading)}\n`);
   editor.focusEnd();
   if (c.html || c.text) editor.pasteData({ html: c.html, text: c.text });
-  editor.insertItems(c.items);
+  editor.insertItems(await editor.arrangeItems(c.items)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다 (+ 로 넣을 때와 같게)
   await new Promise((r) => setTimeout(r, 30)); // 붙여넣기가 반영된 뒤
   editor.appendMarkdown(c.sourceMd);
   editor.focusEnd();
