@@ -234,7 +234,6 @@ class Bridge(private val activity: MainActivity) {
         .put("browserConfigured", GoogleAuth.clientId(ctx).isNotBlank())
         .put("connected", GoogleAuth.connected(ctx))
         .put("reconnect", GoogleAuth.reconnectNeeded(ctx))
-        .put("fullScope", GoogleAuth.fullScope(ctx)) // 외부 앱 메모 연동 (전체 드라이브 권한)
         .put("email", GoogleAuth.email(ctx))
         .put("active", DriveSync.active(ctx))
         .put("folderId", DriveSync.folderId(ctx) ?: "")
@@ -493,48 +492,6 @@ class Bridge(private val activity: MainActivity) {
                     val email = GoogleAuth.login(ctx) { url -> activity.runOnUiThread { activity.openBrowser(url) } }
                     activity.runOnUiThread { activity.bringToFront() }
                     JSONObject().put("email", email)
-                }
-            }
-            // 외부 앱 메모 연동 켜기·끄기: 그 범위로 다시 허용받는다. 켜기는 허용을 받아야만 켜지고(취소·실패하면 꺼진 채, 지금 연결 그대로),
-            //   끄기는 설정을 먼저 끈다 (다시 허용을 취소해도 다음 연결은 drive.file)
-            "driveFullScope" -> {
-                val on = a.optBoolean("on")
-                if (!on) GoogleAuth.setFullScope(ctx, false)
-                // 끄는데 지금 권한이 이미 drive.file 이면 다시 허용받을 것이 없다 (PC google-auth.js setFullScope 와 같게)
-                if (!on && GoogleAuth.grantedScope(ctx) != GoogleAuth.FULL_SCOPE) {
-                    resolve(id) { JSONObject().put("email", GoogleAuth.email(ctx)).put("full", false) }
-                } else if (GoogleAuth.native(ctx) && NativeAuth.available(ctx)) {
-                    activity.runOnUiThread { activity.loginWithPhoneAccount(id, on) }
-                } else pool.execute {
-                    resolve(id) {
-                        val email = GoogleAuth.login(ctx, on) { url -> activity.runOnUiThread { activity.openBrowser(url) } }
-                        activity.runOnUiThread { activity.bringToFront() }
-                        JSONObject().put("email", email).put("full", on)
-                    }
-                }
-            }
-            // 다른 앱 메모 가져오기 (PC ipc-handlers drive:pick 과 같음 — 고른 뒤의 일은 화면의 core/drive-import.js):
-            //   브라우저의 Google 파일 고르기 → 고른 id 들. 정보 · 폴더 안 · 사본은 아래 셋으로
-            "drivePick" -> pool.execute {
-                resolve(id) {
-                    val ids = GoogleAuth.pick(ctx) { url -> activity.runOnUiThread { activity.openBrowser(url) } }
-                    activity.runOnUiThread { activity.bringToFront() }
-                    JSONArray(ids)
-                }
-            }
-            "driveMeta" -> pool.execute {
-                resolve(id) {
-                    val (f, parents) = DriveApi(ctx).meta(a.getString("id"))
-                    JSONObject().put("id", f.id).put("name", f.name).put("folder", f.folder).put("parents", JSONArray(parents))
-                }
-            }
-            "driveChildren" -> pool.execute {
-                resolve(id) { JSONArray(DriveApi(ctx).listChildren(a.getString("id")).map { JSONObject().put("id", it.id).put("name", it.name).put("folder", it.folder) }) }
-            }
-            "driveCopy" -> pool.execute {
-                resolve(id) {
-                    val f = DriveApi(ctx).copy(a.getString("id"), a.getString("parent"), a.getString("name"))
-                    JSONObject().put("id", f.id).put("name", f.name)
                 }
             }
             "driveFolders" -> pool.execute {

@@ -28,9 +28,8 @@ import java.security.SecureRandom
 object GoogleAuth {
     // 기본: 메모킹(같은 Google Cloud 프로젝트)이 만든 파일만 — 제한 범위 심사·'확인되지 않은 앱' 안내 없이 (PC 와 같음)
     const val SCOPE = "https://www.googleapis.com/auth/drive.file"
-    // 설정 "외부 앱 메모 연동"을 켠 사람만: Drive 전체 — 제미나이 등 다른 앱이 폴더에 직접 넣은 .md 도 보인다 (PC google-auth.js 와 같음)
+    // Drive 전체 — 더는 요청하지 않는다. 예전 "외부 앱 메모 연동" 으로 받아 둔 브라우저 연결만 끊지 않고 쓰다가, 다시 연결하면 drive.file (PC 와 같음)
     const val FULL_SCOPE = "https://www.googleapis.com/auth/drive"
-    fun scopeFor(full: Boolean) = if (full) FULL_SCOPE else SCOPE
     private const val AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
     private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
     private const val KEY_ID = "googleClientId"
@@ -40,7 +39,7 @@ object GoogleAuth {
     private const val KEY_NATIVE = "googleNative"
     private const val KEY_SCOPE = "googleScope"
     private const val KEY_RECONNECT = "googleReconnect"
-    private const val KEY_FULL = "useFullDriveScope"
+    private const val KEY_FULL = "useFullDriveScope" // 예전 외부 앱 메모 연동 설정 (연결할 때 지운다)
     private const val LOGIN_TIMEOUT = 5 * 60 * 1000
 
     class AuthError(message: String) : IOException(message)
@@ -66,30 +65,27 @@ object GoogleAuth {
     /** 연결 방식이 바뀌어 다시 연결해야 하는가 (예전 Drive 전체 권한 연결을 끊은 뒤) */
     fun reconnectNeeded(ctx: Context) = prefs(ctx).getBoolean(KEY_RECONNECT, false)
 
-    /** 설정 "외부 앱 메모 연동 (전체 드라이브 권한)" 을 켰는가 */
-    fun fullScope(ctx: Context) = prefs(ctx).getBoolean(KEY_FULL, false)
-    fun setFullScope(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean(KEY_FULL, on).apply()
-
-    /** 지금 받아 둔 권한 (배경에서 토큰을 받을 때 이 범위로) */
-    fun grantedScope(ctx: Context): String = prefs(ctx).getString(KEY_SCOPE, null)?.takeIf { it == FULL_SCOPE } ?: SCOPE
+    /**
+     * 지금 쓰는 토큰의 권한 — 동기화가 Drive 전체 → drive.file 로 줄 때 메모를 지우지 않게 본다.
+     * 휴대폰 계정 연결은 토큰을 늘 drive.file 로 받으므로 drive.file, 예전 브라우저 연결은 받아 둔 그대로
+     */
+    fun grantedScope(ctx: Context): String = if (native(ctx)) SCOPE else prefs(ctx).getString(KEY_SCOPE, null)?.takeIf { it == FULL_SCOPE } ?: SCOPE
 
     /**
      * 앱을 켤 때 한 번: 범위 표시가 없는 아주 예전 연결만 끊고 다시 연결하게 한다.
-     * drive.file · Drive 전체(외부 앱 메모 연동)는 그대로 — 켜 둔 설정을 끊거나 낮추지 않는다.
+     * drive.file · 예전 Drive 전체 연결은 그대로 — 앱을 켤 때마다 끊지 않는다.
      * 메모 폴더(휴대폰 안 사본)는 그대로라 메모는 계속 보인다 — 다시 연결해 새 폴더를 고르면 그리로 옮겨 맞춘다
      */
     fun upgradeScope(ctx: Context) {
         val saved = prefs(ctx).getString(KEY_SCOPE, null)
-        // 0.23.8 에서 Drive 전체로 연결한 것(설정 값 없이)은 켠 것으로 이어 간다
-        if (connected(ctx) && saved == FULL_SCOPE && !prefs(ctx).contains(KEY_FULL)) setFullScope(ctx, true)
         if (!connected(ctx) || saved in setOf(SCOPE, FULL_SCOPE)) return
         signOut(ctx)
         prefs(ctx).edit().putBoolean(KEY_RECONNECT, true).apply()
     }
 
-    /** 휴대폰 구글 계정으로 허용받은 뒤 (NativeAuth) — 계정 이메일을 돌려준다. full: Drive 전체를 받았다 */
-    fun completeNative(ctx: Context, token: String, full: Boolean = false): String {
-        prefs(ctx).edit().putBoolean(KEY_NATIVE, true).remove(KEY_REFRESH).putString(KEY_SCOPE, scopeFor(full)).putBoolean(KEY_FULL, full).remove(KEY_RECONNECT).apply()
+    /** 휴대폰 구글 계정으로 허용받은 뒤 (NativeAuth) — 계정 이메일을 돌려준다 */
+    fun completeNative(ctx: Context, token: String): String {
+        prefs(ctx).edit().putBoolean(KEY_NATIVE, true).remove(KEY_REFRESH).putString(KEY_SCOPE, SCOPE).remove(KEY_FULL).remove(KEY_RECONNECT).apply()
         accessToken = token
         expiresAt = System.currentTimeMillis() + 45 * 60 * 1000
         val email = try {
@@ -142,46 +138,11 @@ object GoogleAuth {
     /**
      * 로그인. openBrowser 로 구글 로그인 화면을 열고, 사용자가 허용하면 돌아온 코드를 토큰으로 바꾼다.
      * 오래 걸리므로(사용자가 로그인하는 동안) 배경 스레드에서 부른다. 돌려주는 값: 구글 계정 이메일.
-     * full: Drive 전체 (기본은 지금 설정). 취소·실패하면 지금 연결은 그대로
+     * 취소·실패하면 지금 연결은 그대로
      */
-    fun login(ctx: Context, full: Boolean = fullScope(ctx), openBrowser: (String) -> Unit): String {
-        val scope = scopeFor(full)
+    fun login(ctx: Context, openBrowser: (String) -> Unit): String {
+        val scope = SCOPE
         if (!configured(ctx)) throw AuthError("Google 로그인 설정(OAuth 클라이언트 ID)이 아직 없어요")
-        val (token, _) = authorize(ctx, scope, "", openBrowser)
-        val refresh = token.optString("refresh_token").ifEmpty { throw AuthError("구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 해 주세요") }
-        // 허용 화면에서 Drive 전체 칸을 빼고 허용할 수도 있다 — 그러면 켜지 않고 지금 연결 그대로
-        if (full && FULL_SCOPE !in token.optString("scope", scope).split(' ')) throw AuthError("Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요")
-        return keep(ctx, token, refresh, scope, full)
-    }
-
-    /**
-     * 다른 앱 메모 가져오기: 브라우저로 허용 → Google 파일 고르기 화면 (drive.file 만). 돌려주는 값: 고른 파일 · 폴더 id.
-     * 고른 파일은 같은 Google Cloud 프로젝트(휴대폰 계정 연결 · PC)가 모두 열 수 있다 — 휴대폰 계정으로 연결했으면 그 연결은 그대로 두고,
-     * 브라우저로 연결했으면 새 토큰으로 바꾼다. Drive 전체 권한일 때는 부르지 않는다 (권한이 낮아지므로)
-     */
-    fun pick(ctx: Context, openBrowser: (String) -> Unit): List<String> {
-        if (clientId(ctx).isBlank()) throw AuthError("이 휴대폰 앱에는 브라우저 로그인 정보가 없어 가져오기를 쓸 수 없어요. PC 메모킹에서 가져오면 휴대폰에도 들어와요")
-        val (token, params) = authorize(ctx, SCOPE, "&trigger_onepick=true&allow_multiple=true&allow_folder_selection=true", openBrowser)
-        val refresh = token.optString("refresh_token")
-        if (!native(ctx) && refresh.isNotEmpty()) keep(ctx, token, refresh, SCOPE, false)
-        return params["picked_file_ids"].orEmpty().split(',').filter { it.isNotBlank() }
-    }
-
-    private fun keep(ctx: Context, token: JSONObject, refresh: String, scope: String, full: Boolean): String {
-        accessToken = token.getString("access_token")
-        expiresAt = System.currentTimeMillis() + token.optLong("expires_in", 3600) * 1000
-        prefs(ctx).edit().putString(KEY_REFRESH, refresh).putBoolean(KEY_NATIVE, false).putString(KEY_SCOPE, scope).putBoolean(KEY_FULL, full).remove(KEY_RECONNECT).apply()
-        val email = try {
-            DriveApi(ctx).about()
-        } catch (e: Exception) {
-            ""
-        }
-        prefs(ctx).edit().putString(KEY_EMAIL, email).apply()
-        return email
-    }
-
-    /** 브라우저 로그인 한 번: 허용 화면을 열고 127.0.0.1 로 돌아온 코드를 토큰으로 → (토큰, 돌아온 값들). extra: 더 붙일 주소 값 */
-    private fun authorize(ctx: Context, scope: String, extra: String, openBrowser: (String) -> Unit): Pair<JSONObject, Map<String, String>> {
         pendingServer?.close()
         val server = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
         pendingServer = server
@@ -195,7 +156,7 @@ object GoogleAuth {
         val state = random(16)
         val url = "$AUTH_URL?client_id=${enc(clientId(ctx))}&redirect_uri=${enc(redirect)}&response_type=code" +
             "&scope=${enc(scope)}&code_challenge=$challenge&code_challenge_method=S256&state=$state" +
-            "&access_type=offline&prompt=consent$extra"
+            "&access_type=offline&prompt=consent"
         openBrowser(url)
 
         var received: Map<String, String>? = null
@@ -239,7 +200,17 @@ object GoogleAuth {
                 "redirect_uri" to redirect, "grant_type" to "authorization_code", "code_verifier" to verifier,
             ),
         )
-        return token to params
+        val refresh = token.optString("refresh_token").ifEmpty { throw AuthError("구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 해 주세요") }
+        accessToken = token.getString("access_token")
+        expiresAt = System.currentTimeMillis() + token.optLong("expires_in", 3600) * 1000
+        prefs(ctx).edit().putString(KEY_REFRESH, refresh).putBoolean(KEY_NATIVE, false).putString(KEY_SCOPE, scope).remove(KEY_FULL).remove(KEY_RECONNECT).apply()
+        val email = try {
+            DriveApi(ctx).about()
+        } catch (e: Exception) {
+            ""
+        }
+        prefs(ctx).edit().putString(KEY_EMAIL, email).apply()
+        return email
     }
 
     /** 로그인 화면을 닫고 돌아왔을 때 기다리기 그만 */
@@ -261,7 +232,7 @@ a{display:inline-block;margin-top:20px;padding:14px 28px;border-radius:14px;back
     fun token(ctx: Context): String {
         accessToken?.let { if (System.currentTimeMillis() < expiresAt - 60_000) return it }
         if (native(ctx)) {
-            accessToken = NativeAuth.token(ctx, grantedScope(ctx))
+            accessToken = NativeAuth.token(ctx, SCOPE)
             expiresAt = System.currentTimeMillis() + 45 * 60 * 1000
             return accessToken!!
         }

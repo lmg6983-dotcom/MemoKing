@@ -2453,36 +2453,8 @@ try {
   check('Drive: 폴더 바꾸기는 목록에서 (메모킹 동기화가 맨 위)', (await page.locator('.folder-item').first().textContent()).includes('메모킹 동기화'));
   await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
-  // 외부 앱 메모 연동 (전체 드라이브 권한): 연결된 뒤에만 보이고 기본은 꺼짐 → 켜면 다시 허용받고 폴더를 처음부터 · 취소하면 꺼진 채 · 끄기
-  if (!(await page.isVisible('#drive-full-row'))) await page.tap('#settings-btn');
-  await page.waitForTimeout(200);
-  check('외부 앱 메모 연동: 연결된 뒤 설정에 보이고 기본은 꺼짐', await page.isVisible('#drive-full-row') && !(await page.isChecked('#drive-full')));
-  const fullLog = async () => (await devLog()).log.filter((l) => l.driveFullScope).map((l) => l.driveFullScope.on);
-  await post('/dev/drive-deny', {});
-  await page.tap('#drive-full-row .switch');
-  await page.waitForTimeout(700);
-  check('외부 앱 메모 연동: 허용 화면에서 취소하면 다시 꺼짐 (지금 연결 그대로)', !(await page.isChecked('#drive-full')) && (await fullLog()).at(-1) === true && await page.isVisible('#drive-disconnect'));
-  await page.tap('#drive-full-row .switch');
-  await page.waitForTimeout(900);
-  check('외부 앱 메모 연동: 허용하면 켜짐', await page.isChecked('#drive-full') && (await page.evaluate(() => window.memoking?.driveStatus ? true : true)));
-  await page.tap('#drive-full-row .switch');
-  await page.waitForTimeout(700);
-  check('외부 앱 메모 연동: 끄면 drive.file 로 (꺼짐)', !(await page.isChecked('#drive-full')) && (await fullLog()).at(-1) === false);
-  // 다른 앱 메모 가져오기: 브라우저 로그인 정보가 든 앱에서, Drive 전체가 아닐 때만 → 고른 .md 는 메모 폴더로 사본 (같은 이름은 (2)), 그림은 건너뜀
-  const pickHidden = !(await page.isVisible('#drive-pick-row'));
-  await post('/dev/drive-browser', {});
-  await page.evaluate(() => window.__mk.back());
-  await page.waitForTimeout(300);
-  await page.tap('#settings-btn');
-  await page.waitForTimeout(400);
-  const pickShown = await page.isVisible('#drive-pick-row');
-  await page.locator('#drive-pick-row').scrollIntoViewIfNeeded();
-  await shot('06b-drive-pick');
-  await page.tap('#drive-pick');
-  await page.waitForTimeout(900);
-  const copied = (await devLog()).log.filter((l) => l.driveCopy).map((l) => l.driveCopy);
-  const pickMsg = await page.textContent('#toast-text').catch(() => '');
-  check('다른 앱 메모 가져오기: 브라우저 로그인 정보가 있을 때 보이고, 고른 메모는 메모 폴더로 사본 (같은 이름은 (2)) · 그림은 건너뜀', pickHidden && pickShown && copied.length === 1 && copied[0].name === '회의 정리 (2).md' && pickMsg === '다른 앱 메모 1개를 가져왔어요. 메모(.md)가 아닌 파일 1개는 건너뛰었어요', JSON.stringify({ pickHidden, pickShown, copied, pickMsg }));
+  // Drive 전체 권한을 쓰는 설정(외부 앱 메모 연동) · AI 안내는 없앴다 — drive.file 만
+  check('Drive: 전체 드라이브 권한 설정 · AI 안내 없음', !(await page.locator('#drive-full-row, #ai-drive-guide').count()));
   await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
   if (await page.isVisible('#settings-sheet')) await page.evaluate(() => window.__mk.back());

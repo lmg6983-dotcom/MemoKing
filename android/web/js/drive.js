@@ -1,12 +1,10 @@
 // Google Drive 연결 화면 (① OAuth 클라이언트 ② 로그인 ③ 폴더 고르기) 과 동기화 상태 표시
 import { drive, call } from './native.js';
 import { app } from './state.js';
-import { openSheet, closeSheet, toast, adoptSheet, releaseSheet } from './ui.js';
+import { openSheet, closeSheet, toast } from './ui.js';
 import { icon } from '../../app/js/icons.js';
-import { openAiDriveGuide } from '../../app/js/ai-drive-guide.js';
 import { installShareText } from '../../app/js/core/install-links.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { importPicked, importMessage } from '../../app/js/core/drive-import.js';
 
 const $ = (x) => document.getElementById(x);
 const sheet = $('drive-sheet');
@@ -258,77 +256,18 @@ export function renderStatus(s = drive.status()) {
     $('drive-title').textContent = UI.reconnect;
     $('drive-sub').textContent = 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 휴대폰에 그대로 있어요';
   }
-  // 외부 앱 메모 연동: 연결돼 있을 때만 (켜는 중에는 그대로)
-  $('drive-full-row').hidden = !s.connected;
-  // 다른 앱 메모 가져오기: 메모 폴더와 연결돼 있고 Drive 전체 권한이 아닐 때 (브라우저 로그인 정보가 든 앱만)
-  $('drive-pick-row').hidden = !(s.active && s.connected) || Boolean(s.fullScope) || !s.browserConfigured;
-  if (!fullBusy) $('drive-full').checked = Boolean(s.fullScope);
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;
   $('drive-connect').textContent = s.active && s.connected ? UI.changeFolder : '연결하기';
   $('drive-connect').classList.toggle('primary', !(s.active && s.connected)); // 연결 전에는 PC처럼 주 단추
 }
 
-// 외부 앱 메모 연동 (전체 드라이브 권한): 그 범위로 다시 허용받는다 — 취소·실패하면 꺼진 채 (지금 연결은 그대로).
-//   켜지면 폴더를 처음부터 훑어 제미나이 등이 넣은 메모를 바로 받는다
-let fullBusy = false;
-const fullNote = $('drive-full-note').textContent;
-$('drive-full').addEventListener('change', async (e) => {
-  const on = e.target.checked;
-  fullBusy = true;
-  e.target.disabled = true;
-  $('drive-full-note').textContent = 'Google 계정을 고르고 허용해 주세요';
-  let error = '';
-  try {
-    await call('driveFullScope', { on });
-  } catch (err) {
-    error = err.message || '';
-  } finally {
-    fullBusy = false;
-    e.target.disabled = false;
-    $('drive-full-note').textContent = fullNote;
-  }
-  renderStatus();
-  if (on && !error) {
-    toast('외부 앱 메모 연동을 켰어요. 드라이브 폴더를 확인할게요');
-    if (drive.status().active) syncNow();
-  } else if (on && !/취소/.test(error)) toast(`외부 앱 메모 연동을 켜지 못했어요. 지금 연결은 그대로예요. ${error}`, true);
-});
-
-// 다른 앱 메모 가져오기 (PC drive-panel.js 와 같음): 브라우저의 Google 파일 고르기 → 고른 메모를 메모 폴더로 → 폴더를 처음부터 맞춘다
-const pickNote = $('drive-pick-note').textContent;
-$('drive-pick').addEventListener('click', async () => {
-  const btn = $('drive-pick');
-  const folderId = drive.status().folderId;
-  if (!folderId) return;
-  btn.disabled = true;
-  $('drive-pick-note').textContent = 'Google 계정을 고르고, 가져올 메모 파일을 골라 주세요';
-  try {
-    const before = (await call('driveChildren', { id: folderId }).catch(() => [])).map((f) => f.id);
-    const ids = await call('drivePick');
-    const res = await importPicked(ids, folderId, {
-      meta: (id) => call('driveMeta', { id }),
-      children: (id) => call('driveChildren', { id }),
-      copy: (id, parent, name) => call('driveCopy', { id, parent, name }),
-    }, before);
-    if (res.kept + res.copied) await syncNow(importMessage(res)); // 가져온 메모가 바로 목록에
-    else toast(importMessage(res), true);
-  } catch (err) {
-    const msg = err.message || '';
-    if (!/취소/.test(msg)) toast(`다른 앱 메모를 가져오지 못했어요. ${msg}`, true);
-  } finally {
-    btn.disabled = false;
-    $('drive-pick-note').textContent = pickNote;
-  }
-});
-
-/** done: 다 맞춘 뒤 알릴 말 (가져오기는 가져온 개수) */
-export async function syncNow(done = '동기화했어요') {
+export async function syncNow() {
   renderStatus({ ...drive.status(), status: { ...drive.status().status, state: 'syncing' } });
   try {
     const st = await call('driveSync');
     if (st.state === 'error') toast(st.error, true);
-    else toast(done);
+    else toast('동기화했어요');
   } catch (err) {
     toast(err.message, true);
   }
@@ -338,18 +277,4 @@ export async function syncNow(done = '동기화했어요') {
 // 메모킹 나눠 주기: PC · 휴대폰 설치 링크를 안드로이드 공유 창으로
 $('share-install')?.addEventListener('click', () => {
   call('share', { title: '메모킹 설치 링크', text: installShareText() }).catch((err) => toast(err.message, true));
-});
-// Gemini, ChatGPT 의 Google Drive 연결로 메모 폴더를 직접 다룰 때 붙여 넣을 안내문 (app/js/ai-drive-guide.js)
-$('ai-drive-guide')?.addEventListener('click', () => {
-  const s = drive.status();
-  openAiDriveGuide({
-    folder: s.folderName || '메모킹',
-    linked: s.connected && s.active ? Boolean(s.fullScope) : null,
-    copy: (text) => app.api.copyText(text), // "복사했어요" 는 copyText 가 알린다
-    notify: (text, isError) => isError && toast(text, true),
-    onOverlay: (el, close) => {
-      adoptSheet(el, close); // 뒤로 가기로 닫히게
-      return () => releaseSheet(el);
-    },
-  });
 });

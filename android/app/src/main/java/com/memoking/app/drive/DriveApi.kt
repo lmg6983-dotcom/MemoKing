@@ -132,19 +132,6 @@ class DriveApi(private val ctx: Context) : Remote {
     fun folders(parent: String): List<Remote.Item> =
         query("'${parent.replace("'", "\\'")}' in parents and mimeType = '${SyncEngine.FOLDER}' and trashed = false", "name,createdTime").map(::item)
 
-    /** 다른 앱 메모 가져오기: 파일 하나의 정보와 든 폴더 (PC drive-api.js meta 와 같음) */
-    fun meta(id: String): Pair<Remote.Item, List<String>> {
-        val o = get("$API/files/${enc(id)}?fields=${enc("$FIELDS,parents")}")
-        val parents = o.optJSONArray("parents") ?: JSONArray()
-        return item(o) to List(parents.length()) { parents.getString(it) }
-    }
-
-    /** parent 폴더에 사본 — 사본은 메모킹이 만든 파일이라 drive.file 로 계속 동기화된다 */
-    fun copy(id: String, parentId: String, name: String): Remote.Item {
-        val meta = JSONObject().put("name", name).put("parents", JSONArray().put(parentId))
-        return request("POST", "$API/files/${enc(id)}/copy?fields=${enc(FIELDS)}", body = meta.toString().toByteArray()) { item(json(it)) }
-    }
-
     fun folderName(id: String): String = get("$API/files/${enc(id)}?fields=name").optString("name")
 
     override fun download(id: String, out: OutputStream) {

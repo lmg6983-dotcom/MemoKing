@@ -251,11 +251,11 @@ const recordState = () => (fakeRec
 
 // 가짜 Google Drive (화면 점검용) — 진짜 동기화는 앱(DriveSync.kt)이 한다
 const fakeDrive = {
-  configured: false, connected: false, email: '', active: false, folderId: '', folderName: '', fullScope: false,
+  configured: false, connected: false, email: '', active: false, folderId: '', folderName: '',
   status: { state: 'off', lastSync: 0, error: '', changed: false, conflicts: [] },
   folders: { root: [{ id: 'f-memo', name: '메모킹 동기화' }, { id: 'f-work', name: '업무' }, { id: 'f-photo', name: '사진' }], 'f-work': [{ id: 'f-work-2026', name: '2026' }] },
 };
-const driveInfo = () => ({ ...fakeDrive, configured: true, builtIn: false, nativeAvailable: !process.env.NO_PLAY_SERVICES, browserConfigured: fakeDrive.configured || Boolean(fakeDrive.browser), folders: undefined });
+const driveInfo = () => ({ ...fakeDrive, configured: true, builtIn: false, nativeAvailable: !process.env.NO_PLAY_SERVICES, browserConfigured: fakeDrive.configured, folders: undefined });
 const fakeHistory = { enabled: false, granted: false, blocked: {}, entries: [] };
 let pendingIntent = null;
 const widgetMemos = new Set();
@@ -346,34 +346,6 @@ const calls = {
     await new Promise((r) => setTimeout(r, 300));
     Object.assign(fakeDrive, { connected: true, email: 'me@gmail.com' });
     return { email: fakeDrive.email };
-  },
-  // 외부 앱 메모 연동: 점검이 /dev/drive-deny 로 "허용 화면에서 취소" 를 흉내 낸다
-  driveFullScope: async ({ on }) => {
-    await new Promise((r) => setTimeout(r, 200));
-    log.push({ driveFullScope: { on } });
-    if (!on) fakeDrive.fullScope = false;
-    if (fakeDrive.denyNext) {
-      fakeDrive.denyNext = false;
-      throw new Error('로그인을 취소했어요');
-    }
-    fakeDrive.fullScope = Boolean(on);
-    return { email: fakeDrive.email, full: Boolean(on) };
-  },
-  // 다른 앱 메모 가져오기: 고르기 화면에서 Gemini 폴더의 메모 하나와 그림 하나를 고른 것처럼
-  drivePick: async () => {
-    await new Promise((r) => setTimeout(r, 200));
-    if (fakeDrive.denyNext) {
-      fakeDrive.denyNext = false;
-      throw new Error('로그인을 취소했어요');
-    }
-    log.push({ drivePick: true });
-    return ['gem-1', 'gem-png'];
-  },
-  driveMeta: async ({ id }) => ({ 'gem-1': { id, name: '회의 정리.md', folder: false, parents: ['gemini'] }, 'gem-png': { id, name: '사진.png', folder: false, parents: ['gemini'] } })[id],
-  driveChildren: async ({ id }) => (id === fakeDrive.folderId ? [{ id: 'mine-1', name: '회의 정리.md', folder: false }] : []),
-  driveCopy: async ({ id, parent, name }) => {
-    log.push({ driveCopy: { id, parent, name } });
-    return { id: `copy-${id}`, name };
   },
   driveFolders: async ({ parent }) => fakeDrive.folders[parent] ?? [],
   driveCreateFolder: async ({ parent, name }) => {
@@ -531,16 +503,6 @@ const server = http.createServer(async (req, res) => {
       const payload = JSON.parse(await readBody(req));
       payload.files = (payload.files ?? []).map((f) => makeTemp(f.name, f.mime, Buffer.from(f.base64, 'base64')));
       pendingIntent = payload;
-      res.writeHead(200).end('{}');
-      return;
-    }
-    if (req.method === 'POST' && p === '/dev/drive-browser') {
-      fakeDrive.browser = true; // 브라우저 로그인 정보가 든 앱 (가져오기를 쓸 수 있음)
-      res.writeHead(200).end('{}');
-      return;
-    }
-    if (req.method === 'POST' && p === '/dev/drive-deny') {
-      fakeDrive.denyNext = true; // 다음 허용 화면에서 취소
       res.writeHead(200).end('{}');
       return;
     }

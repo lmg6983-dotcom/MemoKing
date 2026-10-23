@@ -23,17 +23,12 @@ import java.util.concurrent.TimeUnit
  * 등록돼 있어야 권한을 준다. 개발자가 한 번만 등록하면 된다 (android/DRIVE-SETUP.md).
  */
 object NativeAuth {
-    // 범위: 기본 drive.file, 외부 앱 메모 연동을 켰으면 Drive 전체 (GoogleAuth.scopeFor)
+    // 범위: drive.file (GoogleAuth.SCOPE) — 메모킹이 만든 파일만
     private fun request(scope: String): AuthorizationRequest =
         AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(scope))).build()
 
-    /** 허용 결과에서 토큰 — 요청한 범위를 실제로 받았을 때만 (Drive 전체 칸을 빼고 허용했으면 오류) */
-    private fun tokenOf(result: AuthorizationResult, scope: String): String {
-        val token = result.accessToken ?: throw GoogleAuth.AuthError("Google이 권한을 주지 않았어요")
-        val granted = result.grantedScopes
-        if (scope == GoogleAuth.FULL_SCOPE && granted.isNotEmpty() && scope !in granted) throw GoogleAuth.AuthError("Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요")
-        return token
-    }
+    /** 허용 결과에서 토큰 */
+    private fun tokenOf(result: AuthorizationResult): String = result.accessToken ?: throw GoogleAuth.AuthError("Google이 권한을 주지 않았어요")
 
     fun available(ctx: Context): Boolean = try {
         GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(ctx) == ConnectionResult.SUCCESS
@@ -64,7 +59,7 @@ object NativeAuth {
                 if (result.hasResolution() && pending != null) startForResult(pending.intentSender)
                 else {
                     val token = try {
-                        tokenOf(result, scope)
+                        tokenOf(result)
                     } catch (e: GoogleAuth.AuthError) {
                         onError(e.message ?: "")
                         return@addOnSuccessListener
@@ -76,8 +71,8 @@ object NativeAuth {
     }
 
     /** 계정 고르기·허용 화면에서 돌아왔을 때 */
-    fun finish(activity: Activity, data: Intent?, scope: String): String =
-        tokenOf(Identity.getAuthorizationClient(activity).getAuthorizationResultFromIntent(data), scope)
+    fun finish(activity: Activity, data: Intent?): String =
+        tokenOf(Identity.getAuthorizationClient(activity).getAuthorizationResultFromIntent(data))
 
     /** 배경에서 토큰 받기 (이미 허용한 뒤라면 화면 없이). 다시 허용이 필요하면 오류 */
     fun token(ctx: Context, scope: String): String {
