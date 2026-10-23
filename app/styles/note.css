@@ -2104,45 +2104,63 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 /* 문서 장은 격자에서도 종이 비율로 (윗부분부터) */
 .mk-doc img.mk-album-img.mk-album-page { aspect-ratio: 1 / 1.414; object-position: top; }
 
-/* 4장 이상: 포개 놓은 더미 */
-.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) {
+/* 4장 이상 (문서는 2쪽부터): 포개 놓은 더미 */
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) {
   display: block; width: min(76%, 240px); margin: 18px 0 26px 14px; overflow: visible; border-radius: 0; isolation: isolate;
 }
-.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) > img.mk-album-img {
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img {
   position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; box-sizing: border-box;
   border: 5px solid #fff; border-radius: 4px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16), 0 8px 18px -6px rgba(0, 0, 0, 0.28);
   opacity: 0; pointer-events: none; z-index: 0; transform-origin: 50% 60%; transition: transform 0.24s var(--ease-out, ease-out);
 }
-.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(1 of .mk-album-img) { position: relative; inset: auto; height: auto; aspect-ratio: 1; opacity: 1; pointer-events: auto; z-index: 3; }
-.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(2 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 2; transform: rotate(5deg) translate(9px, 1px); }
-.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(3 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 1; transform: rotate(-6deg) translate(-8px, 5px); }
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(1 of .mk-album-img) { position: relative; inset: auto; height: auto; aspect-ratio: 1; opacity: 1; pointer-events: auto; z-index: 3; }
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(2 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 2; transform: rotate(5deg) translate(9px, 1px); }
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(3 of .mk-album-img) { opacity: 1; pointer-events: auto; z-index: 1; transform: rotate(-6deg) translate(-8px, 5px); }
 /* 장 수 (counter 는 줄 끝에서 모든 장을 센 값) */
-.mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img))::after {
+.mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img)))::after {
   content: counter(mk-album) '장'; position: absolute; right: -10px; bottom: -12px; z-index: 4;
   padding: 5px 9px; border-radius: 999px; background: rgba(24, 24, 22, 0.8); color: #fff;
   font-size: 12.5px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; pointer-events: none;
 }
-/* 문서: 종이 묶음 — 첫 쪽 전체(종이 비율), 뒤 장은 기울이지 않고 오른쪽 아래로 가지런히 */
-.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) { width: min(66%, 210px); }
-.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) > img.mk-album-img {
+/* 문서: 2쪽부터 종이 묶음 — 첫 쪽 전체(종이 비율), 뒤 장은 기울이지 않고 오른쪽 아래로 가지런히 */
+.mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)) { width: min(66%, 210px); }
+.mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)) > img.mk-album-img {
   border: 0; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 3px 10px -4px rgba(0, 0, 0, 0.3); object-fit: cover; object-position: top;
 }
-.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(1 of .mk-album-img) { aspect-ratio: 1 / 1.414; }
-.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: translate(7px, 7px); }
-.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)) > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: translate(14px, 14px); }
-.mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img))::after { content: counter(mk-album) '쪽'; right: -22px; bottom: -22px; }
+.mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)) > img.mk-album-img:nth-child(1 of .mk-album-img) { aspect-ratio: 1 / 1.414; }
+.mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)) > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: translate(7px, 7px); }
+.mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)) > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: translate(14px, 14px); }
+.mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img))::after { content: counter(mk-album) '쪽'; right: -22px; bottom: -22px; }
 /* 마우스를 올리면 살짝 펼쳐 "여러 장" 임을 보인다 */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)):hover > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: rotate(9deg) translate(20px, -2px); }
-  .mk-doc p:has(> img.mk-album-img:nth-child(4 of .mk-album-img)):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: rotate(-10deg) translate(-18px, 8px); }
-  .mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)):hover > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: translate(12px, 10px); }
-  .mk-doc p:has(> img.mk-album-page:nth-child(4 of .mk-album-img)):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: translate(24px, 20px); }
+  .mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))):hover > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: rotate(9deg) translate(20px, -2px); }
+  .mk-doc p:is(:has(> img.mk-album-img:nth-child(4 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: rotate(-10deg) translate(-18px, 8px); }
+  .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)):hover > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: translate(12px, 10px); }
+  .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: translate(24px, 20px); }
 }
 
 /* 묶음 사진 크게 보기 (album-viewer.js) */
 .mk-album-view { position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: rgba(12, 12, 12, 0.94); color: #fff; animation: mk-fade-in 0.15s ease-out; }
 .mk-album-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top)); }
-.mk-album-count { flex: 1; font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.mk-album-count { font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.mk-album-gap { flex: 1; }
+.mk-album-inked { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(255, 204, 0, 0.18); color: #ffd84d; font-size: 12px; }
+.mk-album-inked svg { width: 13px; height: 13px; }
+.mk-album-inked[hidden] { display: none; }
+.mk-album-icon { width: 36px; padding: 0; justify-content: center; }
+.mk-album-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+/* 아래 장 목록 */
+.mk-album-strip { display: flex; gap: 6px; padding: 0 12px calc(12px + env(safe-area-inset-bottom)); overflow-x: auto; scrollbar-width: thin; justify-content: safe center; }
+.mk-album-strip[hidden] { display: none; }
+.mk-album-thumb { position: relative; flex: none; width: 46px; height: 46px; padding: 0; border: 2px solid transparent; border-radius: 7px; background: #222; opacity: 0.6; cursor: pointer; overflow: hidden; }
+.mk-album-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+.mk-album-thumb:hover { opacity: 0.85; }
+.mk-album-thumb.on { opacity: 1; border-color: var(--brand-yellow, #ffcc00); }
+.mk-album-thumb.inked::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--brand-yellow, #ffcc00); box-shadow: 0 0 0 1.5px #111; }
+/* 알림 한 줄 (저장했어요 · 삭제 되돌리기 · 처음 한 번 안내) */
+.mk-album-note { position: absolute; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: #1f1f1c; font-size: 13px; line-height: 1.45; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+.mk-album-note[hidden] { display: none; }
+.mk-album-note-btn { flex: none; border: 0; background: none; color: #8a6a00; font: inherit; font-weight: 700; cursor: pointer; padding: 2px 0; }
 .mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; font-size: 13.5px; cursor: pointer; }
 .mk-album-btn:hover { background: rgba(255, 255, 255, 0.2); }
 .mk-album-btn svg { width: 18px; height: 18px; }
@@ -2158,7 +2176,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-nav[hidden] { display: none; }
 .mk-album-ink { position: absolute; touch-action: none; }
 .mk-album-view.inking .mk-album-stage { margin-bottom: calc(76px + env(safe-area-inset-bottom)); } /* 아래 도구 막대가 장을 가리지 않게 */
-.mk-album-view.inking .mk-album-nav, .mk-album-view.inking .mk-album-head .mk-album-btn:not(:last-child) { display: none; }
+.mk-album-view.inking :is(.mk-album-nav, .mk-album-strip, .mk-album-head .mk-album-btn:not(:last-child)) { display: none; }
 /* 손가락 화면(휴대폰)은 밀어서 넘기므로 앞 · 다음 단추 없이 장을 넓게 — PC 의 좁은 메모 창은 단추를 둔다 */
 @media (pointer: coarse) { .mk-album-stage { margin: 4px 0 12px; } .mk-album-nav { display: none; } }
 @media (pointer: fine) and (max-width: 420px) { .mk-album-stage { margin: 8px 44px 16px; } .mk-album-nav { width: 34px; height: 34px; margin-top: -17px; } .mk-album-nav.prev { left: 5px; } .mk-album-nav.next { right: 5px; } }

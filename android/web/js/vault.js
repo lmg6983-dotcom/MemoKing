@@ -3,7 +3,7 @@
 // 그래서 PC 와 휴대폰이 같은 폴더를 동기화해 써도 서로의 메모를 그대로 읽는다.
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
-  extractMedia, isBlankBody, titleToFileName, COLORS, ALBUM_PAGE_TITLE } from '../../app/js/core/memo-file.js';
+  extractMedia, isBlankBody, titleToFileName, COLORS, isAlbumPageTitle } from '../../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
@@ -191,7 +191,7 @@ export class Vault extends EventTarget {
       title: extractTitle(body),
       preview: extractPreview(body),
       thumb: media.find((m) => m.kind === 'image')?.src ?? null,
-      images: media.filter((m) => m.kind === 'image' && m.title !== ALBUM_PAGE_TITLE).slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진 — 문서를 넣은 장은 빼고)
+      images: media.filter((m) => m.kind === 'image' && !isAlbumPageTitle(m.title)).slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진 — 문서를 넣은 장은 빼고)
       tags: extractTags(body),
       hasImage: has('image'),
       hasWebLink: /\]\(https?:\/\/|<https?:\/\//i.test(body),

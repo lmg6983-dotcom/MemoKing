@@ -1670,6 +1670,22 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           key(aw, 'Escape'); // 그리기 끝 (저장)
           const inked = await until(() => js(aw, `(() => { const before = ${JSON.stringify(srcsBefore)}; const now = [...document.querySelectorAll('.mk-doc img.mk-album-img')].map((i) => i.src); const changed = now.map((s, k) => (s !== before[k] ? k : -1)).filter((k) => k >= 0); return changed.length ? changed : null; })()`), '그린 장 저장', 5000).catch(() => null);
           check('묶음 사진: 3번째 장 위에 그리고 Esc 로 끝내면 그 장만 그린 것을 합친 새 그림으로 바뀜', Boolean(ink) && inked?.join() === '2', JSON.stringify({ ink, inked }));
+          // 그린 장 표시 · 아래 장 목록으로 바로 가기 · 이 장 삭제 → 되돌리기
+          const marks = await js(aw, `({ head: !document.querySelector('.mk-album-inked').hidden, thumbs: [...document.querySelectorAll('.mk-album-thumb')].map((b) => b.classList.contains('inked') ? 1 : 0).join('') })`);
+          await js(aw, `document.querySelectorAll('.mk-album-thumb')[4].click()`);
+          await wait(150);
+          const jumped = await js(aw, `document.querySelector('.mk-album-count').textContent`);
+          check('묶음 사진: 그린 장은 머리 줄 · 아래 목록에 표시, 아래 목록의 장을 누르면 바로 그 장으로', marks.head && marks.thumbs === '00100' && jumped === '5 / 5', JSON.stringify({ marks, jumped }));
+          await js(aw, `document.querySelector('.mk-album-icon[title="이 장 삭제"]').click()`);
+          await wait(250);
+          const afterDel = await js(aw, `({ n: document.querySelectorAll('.mk-doc img.mk-album-img').length, count: document.querySelector('.mk-album-count').textContent, note: document.querySelector('.mk-album-note').textContent })`);
+          await js(aw, `document.querySelector('.mk-album-note-btn')?.click()`);
+          await wait(300);
+          const afterUndo = await js(aw, `({ n: document.querySelectorAll('.mk-doc img.mk-album-img').length, count: document.querySelector('.mk-album-count').textContent })`);
+          check('묶음 사진: 이 장 삭제 → 4장, 알림의 되돌리기 → 5장 그대로', afterDel.n === 4 && afterDel.count === '4 / 4' && afterDel.note.includes('되돌리기') && afterUndo.n === 5 && afterUndo.count === '4 / 5', JSON.stringify({ afterDel, afterUndo }));
+          await capture(aw, 'album-view-strip.png');
+          key(aw, 'Escape');
+          await wait(200);
           key(aw, 'Escape');
           await wait(200);
           const closed = await js(aw, `!document.querySelector('.mk-album-view')`);
@@ -1701,6 +1717,27 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           await capture(aw, 'album-view-narrow.png');
           key(aw, 'Escape');
           aw.setSize(bw, bh);
+          // "앞으로 이렇게": 체크하고 고르면 다음부터는 묻지 않음 → 설정의 "다시 묻기" 로 지움
+          const dropPhotos = () => js(aw, `(async () => {
+            const mk = (c) => new Promise((done) => { const cv = document.createElement('canvas'); cv.width = 300; cv.height = 300; const g = cv.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 300, 300); cv.toBlob((b) => done(new File([b], c.slice(1) + '.png', { type: 'image/png' }))); });
+            const dt = new DataTransfer();
+            for (const f of await Promise.all([mk('#ff8800'), mk('#0088ff')])) dt.items.add(f);
+            const ps = document.querySelectorAll('.mk-doc p'); const r = ps[ps.length - 1].getBoundingClientRect();
+            document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
+          })()`);
+          const albumsNow = () => js(aw, `[...document.querySelectorAll('.mk-doc p')].filter((p) => p.querySelector('img.mk-album-img')).length`);
+          const albums0 = await albumsNow();
+          await dropPhotos();
+          await until(() => js(aw, `!!document.querySelector('.mk-prompt-keep input')`), '앞으로 이렇게 칸', 4000).catch(() => null);
+          await js(aw, `(() => { document.querySelector('.mk-prompt-keep input').checked = true; [...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '묶음 사진으로').click(); })()`);
+          await until(async () => (await albumsNow()) === albums0 + 1, '첫 묶음', 4000).catch(() => null);
+          await dropPhotos();
+          const noAsk = await until(async () => (await albumsNow()) === albums0 + 2 && !(await js(aw, `!!document.querySelector('.mk-prompt')`)), '묻지 않고 묶음', 5000).catch(() => false);
+          const stored = await js(aw, `localStorage.getItem('memoking.choices')`);
+          await js(getList(), `document.getElementById('choices-reset').click()`);
+          await wait(150);
+          const cleared = await js(aw, `localStorage.getItem('memoking.choices')`);
+          check('넣을 때 묻기: "앞으로 이렇게" 를 고르면 다음엔 묻지 않고 묶음 사진, 설정의 "다시 묻기" 로 지워짐', Boolean(noAsk) && /photos-insert/.test(stored ?? '') && !cleared, JSON.stringify({ noAsk, stored, cleared }));
           aw.close();
         }
         await wait(600);

@@ -118,12 +118,34 @@ export function promptName({ title = '이름 변경', value = '', label = '새 �
   });
 }
 
+// "앞으로 이렇게" 로 기억한 고르기 (이 기기에만 — 설정의 "넣을 때 다시 묻기" 로 지운다)
+const CHOICE_KEY = 'memoking.choices';
+const loadChoices = () => {
+  try {
+    return JSON.parse(localStorage.getItem(CHOICE_KEY) ?? '{}') ?? {};
+  } catch {
+    return {};
+  }
+};
+/** 기억한 고르기가 있나 (설정에서 "다시 묻기" 단추를 보일지) */
+export const hasRememberedChoices = () => Object.keys(loadChoices()).length > 0;
+export function forgetChoices() {
+  try {
+    localStorage.removeItem(CHOICE_KEY);
+  } catch {
+    // 지우지 못해도 이번엔 그대로
+  }
+}
+
 /**
  * 고르기 창 (PC·휴대폰 함께 — promptName 과 같은 모양): 단추 하나를 고르면 그 id, Esc · 바깥 누르기는 null
- * @param {{ title: string, message?: string, choices: { id: string, label: string, primary?: boolean }[] }} o
+ *   remember: 이 이름으로 "앞으로 이렇게" 칸을 보이고, 기억해 둔 것이 있으면 묻지 않고 그것을 돌려준다
+ * @param {{ title: string, message?: string, choices: { id: string, label: string, primary?: boolean }[], remember?: string }} o
  * @returns {Promise<string|null>}
  */
-export function promptChoice({ title, message = '', choices }) {
+export function promptChoice({ title, message = '', choices, remember = '' }) {
+  const kept = remember ? loadChoices()[remember] : null;
+  if (kept && choices.some((c) => c.id === kept)) return Promise.resolve(kept);
   return new Promise((resolve) => {
     const wrap = document.createElement('div');
     wrap.className = 'mk-prompt-back';
@@ -152,6 +174,15 @@ export function promptChoice({ title, message = '', choices }) {
       return b;
     });
     row.append(...buttons);
+    let keep = null;
+    if (remember) {
+      const label = document.createElement('label');
+      label.className = 'mk-prompt-keep';
+      keep = document.createElement('input');
+      keep.type = 'checkbox';
+      label.append(keep, document.createTextNode('앞으로 묻지 않고 이렇게 (설정에서 다시 묻게 할 수 있어요)'));
+      box.append(label);
+    }
     box.append(row);
     wrap.append(box);
     const restore = document.activeElement;
@@ -159,16 +190,24 @@ export function promptChoice({ title, message = '', choices }) {
     const done = (result) => {
       if (closed) return;
       closed = true;
+      if (keep?.checked && result) {
+        try {
+          localStorage.setItem(CHOICE_KEY, JSON.stringify({ ...loadChoices(), [remember]: result }));
+        } catch {
+          // 기억하지 못해도 이번 고르기는 그대로
+        }
+      }
       document.removeEventListener('keydown', onKey, true);
       wrap.remove();
       if (restore instanceof HTMLElement && restore.isConnected) restore.focus({ preventScroll: true });
       resolve(result);
     };
+    const stops = keep ? [keep, ...buttons] : buttons;
     const onKey = (e) => {
       if (e.key === 'Tab') {
-        const i = buttons.indexOf(document.activeElement);
+        const i = stops.indexOf(document.activeElement);
         e.preventDefault();
-        buttons[(i + (e.shiftKey ? buttons.length - 1 : 1) + buttons.length) % buttons.length].focus();
+        stops[(i + (e.shiftKey ? stops.length - 1 : 1) + stops.length) % stops.length].focus();
         return;
       }
       if (e.key !== 'Escape') return;

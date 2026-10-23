@@ -228,9 +228,13 @@ const isLocalPath = (src) => !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWit
  */
 // 묶음 사진: 한 줄에 모은 그림마다 title — 다른 앱에서는 그냥 사진들 (editor.js · album-viewer.js)
 //   문서를 장마다 그림으로 넣은 것은 따로 표시해, 회상 달력의 "그날의 사진" 에는 넣지 않는다
+//   그 장 위에 그렸으면 끝에 " ink" (보기 화면에서 그린 장 표시)
 export const ALBUM_TITLE = 'album';
 export const ALBUM_PAGE_TITLE = 'album page';
-export const isAlbumTitle = (t) => t === ALBUM_TITLE || t === ALBUM_PAGE_TITLE;
+export const isAlbumTitle = (t) => /^album( page)?( ink)?$/.test(t ?? '');
+export const isAlbumPageTitle = (t) => /^album page( ink)?$/.test(t ?? '');
+export const isInkedAlbumTitle = (t) => /^album( page)? ink$/.test(t ?? '');
+export const inkedAlbumTitle = (t) => (isInkedAlbumTitle(t) ? t : `${t} ink`);
 
 export function extractMedia(body) {
   const found = [];
