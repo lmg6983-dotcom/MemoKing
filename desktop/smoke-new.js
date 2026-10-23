@@ -1703,6 +1703,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           await js(aw, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '그림으로')?.click()`);
           const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 5 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);
           const pdfNote = await js(aw, `document.getElementById('status').textContent`);
+          const chipAbove = await js(aw, `(() => { const p = [...document.querySelectorAll('.mk-doc p')].find((x) => x.querySelector('img.mk-album-page')); return p?.previousElementSibling?.querySelector('a[data-file]')?.textContent ?? null; })()`);
+          check('PDF 를 그림으로 넣으면 원본 문서 파일(칩)도 묶음 바로 위 줄에', chipAbove === '설명서.pdf', String(chipAbove));
           check('PDF 를 "그림으로" 넣으면 장마다 그림 (5쪽 → 5장, 또렷한 크기) 종이 묶음으로', Boolean(pages), JSON.stringify({ pages, pdfNote }));
           await js(aw, `document.querySelectorAll('.mk-doc img.mk-album-img')[5]?.scrollIntoView({ block: 'center' })`);
           await capture(aw, 'album-pdf.png');

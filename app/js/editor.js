@@ -1350,7 +1350,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     let album = null; // 모으는 중인 묶음 (처음 사진 자리에 한 묶음)
     for (const it of items) {
       if (docsAsPages && docs.includes(it)) {
-        out.push(await documentAlbum(it));
+        // 원본 문서 파일(칩)을 묶음 바로 위 줄에 — 그림으로 본 뒤에도 원본을 열거나 보낼 수 있게 (바꾸지 못하면 칩만)
+        const pages = await documentAlbum(it);
+        out.push(it);
+        if (pages !== it) out.push(pages);
         continue;
       }
       if (asAlbum && it.kind === 'image') {
@@ -1363,7 +1366,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return out;
   }
 
-  // 메모 폴더에 넣은 문서 → 장마다 그림 → 묶음 사진 (바꾸지 못하면 파일 칩 그대로 — 원본 파일은 메모 폴더에 남는다)
+  // 메모 폴더에 넣은 문서 → 장마다 그림 → 묶음 사진 (바꾸지 못하면 받은 것(파일 칩) 그대로 돌려준다)
   async function documentAlbum(it) {
     const name = it.name;
     try {
