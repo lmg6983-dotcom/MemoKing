@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
-import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
+import { suggestTagsFor, appendTags } from '../app/js/core/tag-suggest.js';
+import { extractTags } from '../app/js/core/tags.js';
 import { spellMessages, styleMessages, draftMessages, plausibleFix } from '../app/js/core/ai-write.js';
 import { aiTagRequest, aiTagResult } from '../app/js/core/ai-tags.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
@@ -264,6 +265,25 @@ export function registerIpc(ctx) {
     } catch (err) {
       return { error: err.message };
     }
+  });
+  // 메모 창을 닫은 뒤: 태그 없는 메모에 AI 가 고른 태그 하나를 저절로 (설정 › 태그 자동 추가).
+  //   모델을 올리는 몇 초 동안 창이 안 닫히면 안 되므로 창은 먼저 닫고 여기서 이어서 한다
+  ipcMain.handle('tags:ai-auto', async (_e, id) => {
+    const vault = getVault();
+    const memo = vault?.get(id);
+    if (!memo || memo.locked || settings.autoTags === false || extractTags(memo.body).length) return null;
+    const req = aiTagRequest(memo.body, vault.bodies(), { excludeId: id });
+    let picked;
+    try {
+      picked = aiTagResult(await getAi().chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, memo.body)[0];
+    } catch (err) {
+      console.error('AI 태그', err.message);
+    }
+    picked ??= suggestTagsFor(memo.body, vault.bodies(), { excludeId: id }).find((t) => t.sure && t.existing); // AI 가 못 고르면 AI 없이 확실한 것
+    const now = vault.get(id);
+    if (!picked || now?.body !== memo.body) return null; // 그사이 다시 열어 고쳤으면 건드리지 않는다
+    vault.save(id, appendTags(now.body, [picked.name]));
+    return picked.name;
   });
   ipcMain.handle('tags:auto', (_e, body, source, id) => autoTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { source, excludeId: id }));
   ipcMain.handle('memos:search', (_e, query, excludeId) => wm.withOpenFlag(getVault()?.search(String(query ?? ''), excludeId) ?? []));

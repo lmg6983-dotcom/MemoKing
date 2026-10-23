@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('memoking', {
     auto: invoke('tags:auto'),
     suggest: invoke('tags:suggest'),
     ai: invoke('tags:ai'), // AI 로 고르기 → 칩 목록 | { error }
+    aiAuto: invoke('tags:ai-auto'), // 닫은 뒤 AI 가 고른 태그 하나를 저절로 (메인에서)
   },
   memo: {
     open: invoke('memo:open'),

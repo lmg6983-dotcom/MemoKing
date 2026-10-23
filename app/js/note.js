@@ -1597,27 +1597,32 @@ function showTasks(tasks, opts) {
   clearStamp.show(tasks, opts);
 }
 
-// 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)
+// 닫을 때: 태그 없는 메모에 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)
+//   글 모델을 넣은 PC: AI 가 고른 태그 하나 — 창을 닫은 뒤 메인이 단다(aiTagAfterClose). 아니면 확실한 추천 태그
 async function autoTagOnClose() {
-  if (!editor || tagDismissed || memo?.locked) return; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
+  if (!editor || tagDismissed || memo?.locked) return false; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
   try {
     const s = await api.settings.get();
-    if (s?.autoTags === false) return;
+    if (s?.autoTags === false) return false;
     const body = editor.getMarkdown();
-    if (isBlankBody(body) || extractTags(body).length) return;
+    if (isBlankBody(body) || extractTags(body).length) return false;
+    if (['ready', 'running'].includes((await api.ai?.status())?.chat.state)) return true;
     const list = (await api.tags.suggest?.(body, id)) ?? [];
     const sure = list.filter((t) => t.sure && t.existing).slice(0, 2);
     if (sure.length) editor.appendMarkdown(sure.map((t) => `#${t.name}`).join(' '));
   } catch {
     // 태그를 못 달아도 닫기는 그대로
   }
+  return false;
 }
+const aiTagAfterClose = (ask) => ask && api.tags.aiAuto?.(id).catch(() => {}); // 기다리지 않는다 (저장한 뒤에 부름)
 
 async function closeWindow() {
   await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
   await annotation?.exit(); // 주석을 그리던 중이면 저장하고 닫는다
-  await autoTagOnClose();
+  const askAi = await autoTagOnClose();
   await flush();
+  aiTagAfterClose(askAi);
   api.win.close();
 }
 
@@ -1625,8 +1630,9 @@ async function closeWindow() {
 async function closeTabOrWindow() {
   if (tabsEl.hidden) return closeWindow();
   await recorder?.finish();
-  await autoTagOnClose();
+  const askAi = await autoTagOnClose();
   await flush();
+  aiTagAfterClose(askAi);
   api.stack.remove(id);
 }
 
