@@ -12,7 +12,7 @@ import {
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
-import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE } from './core/memo-file.js';
+import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, isAlbumPageTitle, isInkedAlbumTitle, inkedAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE } from './core/memo-file.js';
 import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkForDark } from './core/ink.js';
 import { getStroke } from '../vendor/perfect-freehand.js';
 import { openInkEditor } from './ink-editor.js';
@@ -31,7 +31,7 @@ import { autoFitTable, tableReviewReasons } from './core/table-autofit.js';
 import { keepIndent, keepLeadingSpaces, hasLeadingSpaces, NBSP } from './core/indent-spaces.js';
 import { INVISIBLE } from './tidy-text.js';
 import { plainTextOf, spacedHtml } from './clipboard-text.js';
-import { isOwnDragOut, handleImageCopy } from './copy-content.js';
+import { isOwnDragOut, handleImageCopy, saveBlock, shareBlock, canShare } from './copy-content.js';
 import { findTags, unescapeTags, suggestTags, sameTag, TAG_CHAR } from './core/tags.js';
 import { createTableExtras, applyTables, toggleAccent, resetTableSize, isAccent, tableExtrasKey, mergeSelectedCells, tableAt, splitTableAt, joinNextTable, tableToBlocks, tableLines } from './table-extras.js';
 import { createListDrag, moveItemBy, currentItem } from './list-drag.js';
@@ -193,7 +193,7 @@ function mediaView(node, view, getPos) {
   }
   const dom = document.createElement('img');
   const album = isAlbumTitle(title);
-  dom.className = album ? `mk-image mk-album-img${title === ALBUM_PAGE_TITLE ? ' mk-album-page' : ''}` : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
+  dom.className = album ? `mk-image mk-album-img${isAlbumPageTitle(title) ? ' mk-album-page' : ''}` : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
   dom.src = vaultUrl(src);
   dom.alt = alt ?? '';
   if (title && !album) dom.title = title;
@@ -1237,28 +1237,65 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   // 묶음 사진: 누른 장부터 크게 넘겨 보기 · 그 장 위에 그리면 그린 것을 합친 새 그림으로 바꾼다 (보기만 하는 편집기는 그리기 없음)
   // 창 하나에 편집기가 여럿일 수 있어(옆 메모 · 스택 탭) 그리기는 그 편집기(v)가 고칠 수 있을 때만 — 보기만 하는 편집기가 나중에 만들어져도 덮어쓰지 않게
   if (!readOnly || !albumHandler) albumHandler = (v, pos) => {
-    const $p = v.state.doc.resolve(pos);
-    const images = [];
-    let start = 0;
-    $p.parent.forEach((child, offset) => {
-      if (child.type.name !== 'image' || !isAlbumTitle(child.attrs.title)) return;
-      const at = $p.start() + offset;
-      if (at === pos) start = images.length;
-      images.push({ src: child.attrs.src, alt: child.attrs.alt, pos: at });
-    });
+    // 묶음 줄의 장들 (줄 자리 para 는 지우기 · 되돌리기 뒤에도 따라간다)
+    let para = v.state.doc.resolve(pos).before();
+    const collect = () => {
+      const node = v.state.doc.nodeAt(para);
+      const images = [];
+      node?.forEach((child, offset) => {
+        if (child.type.name !== 'image' || !isAlbumTitle(child.attrs.title)) return;
+        images.push({ src: child.attrs.src, alt: child.attrs.alt, pos: para + 1 + offset, inked: isInkedAlbumTitle(child.attrs.title) });
+      });
+      return images;
+    };
+    const images = collect();
+    const start = Math.max(0, images.findIndex((im) => im.pos === pos));
     if (!images.length) return;
+    // 보는 사이 메모가 바뀌었으면(동기화 등) 엉뚱한 장을 고치지 않게 — 그 자리가 아직 그 장일 때만
+    const nodeOf = (it) => {
+      const cur = v.state.doc.nodeAt(it.pos);
+      return !v.isDestroyed && cur?.type.name === 'image' && cur.attrs.src === it.src ? cur : null;
+    };
+    const editable = v.editable;
     openAlbumViewer({
       images,
       start,
       url: vaultUrl,
-      onDraw: !v.editable ? null : async (i, png) => {
+      onDraw: !editable ? null : async (i, png) => {
         const it = images[i];
         const src = await saveFile(new File([png], `${baseName(it.alt || '그림')} 그림.png`, { type: 'image/png' }));
-        const cur = v.state.doc.nodeAt(it.pos);
-        if (v.isDestroyed || cur?.type.name !== 'image' || cur.attrs.src !== it.src) return null; // 보는 사이 메모가 바뀌었으면(동기화 등) 엉뚱한 그림을 바꾸지 않게
+        const cur = nodeOf(it);
+        if (!cur) return null;
         it.src = src; // 같은 장을 또 그리면 이번 그림에서 이어서
-        v.dispatch(v.state.tr.setNodeMarkup(it.pos, null, { ...cur.attrs, src }));
+        it.inked = true;
+        v.dispatch(v.state.tr.setNodeMarkup(it.pos, null, { ...cur.attrs, src, title: inkedAlbumTitle(cur.attrs.title) }));
         return src;
+      },
+      // 이 장만 저장 · 공유 (원본 그대로) — 휴대폰은 공유 창
+      onSave: async (i) => {
+        const cur = nodeOf(images[i]);
+        if (!cur) return null;
+        const r = await saveBlock(v, images[i].pos, cur, null);
+        return r && r !== 'cancelled' ? '이 장을 저장했어요' : null;
+      },
+      onShare: canShare() ? async (i) => {
+        const cur = nodeOf(images[i]);
+        if (cur) await shareBlock(v, images[i].pos, cur, null);
+        return null;
+      } : null,
+      // 이 장만 묶음에서 빼기 → 남은 장들 (메모의 되돌리기 기록에 남아 되살릴 수 있다)
+      onDelete: !editable ? null : (i) => {
+        const it = images[i];
+        if (!nodeOf(it)) return null;
+        const tr = v.state.tr.delete(it.pos, it.pos + 1);
+        para = tr.mapping.map(para);
+        v.dispatch(tr);
+        return collect();
+      },
+      onUndo: !editable ? null : () => {
+        v.focus();
+        v.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true })); // 편집기의 Ctrl+Z 와 같은 기록
+        return collect();
       },
     });
   };
@@ -1300,18 +1337,23 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       title: docs.length > 1 ? `문서 ${docs.length}개를 어떻게 넣을까요?` : `${docs[0].name} 을 어떻게 넣을까요?`,
       message: '그림으로 넣으면 장마다 넘겨 보고, 그 위에 펜으로 쓸 수 있어요',
       choices: [{ id: 'file', label: '파일로' }, { id: 'pages', label: '그림으로', primary: true }],
+      remember: 'doc-insert',
     }) === 'pages';
     const photos = items.filter((it) => it.kind === 'image');
     const asAlbum = photos.length > 1 && await promptChoice({
       title: `사진 ${photos.length}장을 어떻게 넣을까요?`,
       message: '묶음 사진은 몇 장만 모아 보이고, 누르면 크게 넘겨 봐요',
       choices: [{ id: 'each', label: '따로따로' }, { id: 'album', label: '묶음 사진으로', primary: true }],
+      remember: 'photos-insert',
     }) === 'album';
     const out = [];
     let album = null; // 모으는 중인 묶음 (처음 사진 자리에 한 묶음)
     for (const it of items) {
       if (docsAsPages && docs.includes(it)) {
-        out.push(await documentAlbum(it));
+        // 원본 문서 파일(칩)을 묶음 바로 위 줄에 — 그림으로 본 뒤에도 원본을 열거나 보낼 수 있게 (바꾸지 못하면 칩만)
+        const pages = await documentAlbum(it);
+        out.push(it);
+        if (pages !== it) out.push(pages);
         continue;
       }
       if (asAlbum && it.kind === 'image') {
@@ -1324,7 +1366,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return out;
   }
 
-  // 메모 폴더에 넣은 문서 → 장마다 그림 → 묶음 사진 (바꾸지 못하면 파일 칩 그대로 — 원본 파일은 메모 폴더에 남는다)
+  // 메모 폴더에 넣은 문서 → 장마다 그림 → 묶음 사진 (바꾸지 못하면 받은 것(파일 칩) 그대로 돌려준다)
   async function documentAlbum(it) {
     const name = it.name;
     try {

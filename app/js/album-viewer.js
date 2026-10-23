@@ -3,6 +3,9 @@
 //   (원본 파일은 그대로 두고 새 그림 파일로 바꾼다 — 메모에서 되돌리기 Ctrl+Z 로 원래 장으로)
 import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys, strokeEl } from './ink-editor.js';
 import { icon } from './icons.js';
+import { SAVE_ICON, SHARE_ICON, TRASH_ICON } from './content-icons.js';
+
+const HINT_KEY = 'memoking.albumHint'; // 처음 한 번 안내 (이 기기)
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 let current = null; // 떠 있는 보기 (휴대폰 뒤로 가기가 닫는다)
@@ -15,20 +18,34 @@ export function closeAlbumViewer() {
 const el = (tag, cls, attrs = {}) => Object.assign(document.createElement(tag), cls ? { className: cls } : {}, attrs);
 
 /**
- * @param {{ images: { src: string, alt: string }[], start: number, url: (src: string) => string,
- *           onDraw?: (index: number, png: Blob) => Promise<string|null> }} o
- *   onDraw: 그린 장(PNG)을 저장하고 새 src 를 돌려준다 (읽기 전용이면 없음 — 그리기 단추도 없음)
+ * @param {{ images: { src: string, alt: string, inked?: boolean }[], start: number, url: (src: string) => string,
+ *           onDraw?: (index: number, png: Blob) => Promise<string|null>,
+ *           onSave?: (index: number) => Promise<string|null>, onShare?: (index: number) => Promise<void>,
+ *           onDelete?: (index: number) => object[]|null, onUndo?: () => object[] }} o
+ *   onDraw: 그린 장(PNG)을 저장하고 새 src 를 돌려준다 · onSave: 이 장 저장 (알릴 말) · onShare: 이 장 공유 (휴대폰)
+ *   onDelete: 이 장을 묶음에서 빼고 남은 장들 · onUndo: 방금 뺀 것 되돌리기 → 장들. 없는 것은 단추도 없다 (읽기 전용)
  */
-export function openAlbumViewer({ images, start = 0, url, onDraw }) {
+export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShare, onDelete, onUndo }) {
   let i = Math.max(0, Math.min(images.length - 1, start));
   const view = el('div', 'mk-album-view', { role: 'dialog', ariaModal: 'true', ariaLabel: '묶음 사진' });
   const head = el('div', 'mk-album-head');
   const count = el('span', 'mk-album-count');
+  const inkedMark = el('span', 'mk-album-inked');
+  inkedMark.append(icon('pen'), document.createTextNode('그린 장'));
+  const svgBtn = (label, svg, run) => {
+    const b = el('button', 'mk-album-btn mk-album-icon', { type: 'button', title: label, ariaLabel: label });
+    b.innerHTML = svg;
+    b.addEventListener('click', run);
+    return b;
+  };
+  const save = onSave ? svgBtn('이 장 저장', SAVE_ICON, () => act(onSave)) : null;
+  const share = onShare ? svgBtn('이 장 공유', SHARE_ICON, () => act(onShare)) : null;
+  const del = onDelete ? svgBtn('이 장 삭제', TRASH_ICON, () => removePage()) : null;
   const draw = el('button', 'mk-album-btn', { type: 'button', title: '이 장 위에 그리기' });
   draw.append(icon('pen'), document.createTextNode('그리기'));
   const close = el('button', 'mk-album-btn', { type: 'button', title: '닫기 (Esc)', ariaLabel: '닫기' });
   close.append(icon('close'));
-  head.append(count, ...(onDraw ? [draw] : []), close);
+  head.append(count, inkedMark, el('span', 'mk-album-gap'), ...[save, share, del].filter(Boolean), ...(onDraw ? [draw] : []), close);
   const stage = el('div', 'mk-album-stage');
   const img = el('img', 'mk-album-big', { draggable: false });
   stage.append(img);
@@ -36,23 +53,96 @@ export function openAlbumViewer({ images, start = 0, url, onDraw }) {
   const next = el('button', 'mk-album-nav next', { type: 'button', ariaLabel: '다음 장' });
   prev.append(icon('chevrons'));
   next.append(icon('chevrons'));
-  view.append(head, stage, prev, next);
+  // 아래 쪽 목록: 장이 많은 문서도 원하는 장으로 바로 (지금 장은 테두리, 그린 장은 펜 표시)
+  const strip = el('div', 'mk-album-strip', { role: 'tablist', ariaLabel: '장 목록' });
+  const note = el('div', 'mk-album-note', { role: 'status' }); // 알림 (저장했어요 · 삭제 되돌리기 · 처음 한 번 안내)
+  view.append(head, stage, prev, next, strip, note);
   document.body.append(view);
   const restore = document.activeElement;
 
+  function paintStrip() {
+    strip.hidden = images.length < 2;
+    strip.replaceChildren(...images.map((it, k) => {
+      const b = el('button', `mk-album-thumb${k === i ? ' on' : ''}${it.inked ? ' inked' : ''}`, { type: 'button', role: 'tab', ariaLabel: `${k + 1}번째 장`, title: `${k + 1}번째 장${it.inked ? ' (그린 장)' : ''}` });
+      b.setAttribute('aria-selected', String(k === i));
+      const t = el('img', '', { src: url(it.src), alt: '', loading: 'lazy', draggable: false });
+      b.append(t);
+      b.addEventListener('click', () => goTo(k));
+      return b;
+    }));
+  }
   function show() {
     const it = images[i];
     img.src = url(it.src);
     img.alt = it.alt ?? '';
     count.textContent = `${i + 1} / ${images.length}`;
+    inkedMark.hidden = !it.inked;
     prev.hidden = i === 0;
     next.hidden = i === images.length - 1;
+    strip.querySelectorAll('.mk-album-thumb').forEach((b, k) => {
+      b.classList.toggle('on', k === i);
+      b.classList.toggle('inked', Boolean(images[k]?.inked));
+      b.setAttribute('aria-selected', String(k === i));
+    });
+    strip.children[i]?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
-  const go = (d) => {
-    if (inking || i + d < 0 || i + d >= images.length) return;
-    i += d;
+  const goTo = (k) => {
+    if (inking || k < 0 || k >= images.length) return;
+    i = k;
     show();
   };
+  const go = (d) => goTo(i + d);
+
+  // 알림 한 줄 (몇 초 뒤 사라짐) — action: { label, run } 단추 하나
+  let noteTimer = 0;
+  function say(text, action = null) {
+    clearTimeout(noteTimer);
+    note.replaceChildren(document.createTextNode(text));
+    if (action) {
+      const b = el('button', 'mk-album-note-btn', { type: 'button', textContent: action.label });
+      b.addEventListener('click', () => {
+        note.hidden = true;
+        action.run();
+      });
+      note.append(b);
+    }
+    note.hidden = false;
+    noteTimer = setTimeout(() => (note.hidden = true), action ? 6000 : 2600);
+  }
+  note.hidden = true;
+  async function act(fn) {
+    try {
+      const msg = await fn(i);
+      if (msg) say(msg);
+    } catch (err) {
+      say(err?.message || '하지 못했어요');
+    }
+  }
+  // 이 장 빼기 → 남은 장으로 (다 빼면 닫힘) · 알림의 "되돌리기" 로 되살림
+  function removePage() {
+    if (inking) return;
+    const left = onDelete(i);
+    if (!left) return;
+    if (!left.length) {
+      shut();
+      return;
+    }
+    images.splice(0, images.length, ...left);
+    i = Math.min(i, images.length - 1);
+    paintStrip();
+    show();
+    say('이 장을 묶음에서 삭제했어요', onUndo && {
+      label: '되돌리기',
+      run: () => {
+        const back = onUndo();
+        if (!back?.length) return;
+        images.splice(0, images.length, ...back);
+        i = Math.min(i, images.length - 1);
+        paintStrip();
+        show();
+      },
+    });
+  }
   prev.addEventListener('click', () => go(-1));
   next.addEventListener('click', () => go(1));
 
@@ -132,8 +222,10 @@ export function openAlbumViewer({ images, start = 0, url, onDraw }) {
       const png = await flatten(strokes, k.w, k.h);
       const src = await onDraw(i, png);
       if (src) {
-        images[i] = { ...images[i], src };
+        images[i] = { ...images[i], src, inked: true };
+        paintStrip();
         show();
+        say('그린 것을 이 장에 저장했어요');
       }
     } catch (err) {
       console.warn('그린 장을 저장하지 못했어요', err);
@@ -201,6 +293,8 @@ export function openAlbumViewer({ images, start = 0, url, onDraw }) {
       shut();
     } else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'ArrowRight') go(1);
+    else if (e.key === 'Home') goTo(0);
+    else if (e.key === 'End') goTo(images.length - 1);
   };
   async function shut() {
     if (inking) await finishInk();
@@ -212,7 +306,18 @@ export function openAlbumViewer({ images, start = 0, url, onDraw }) {
   close.addEventListener('click', shut);
   document.addEventListener('keydown', onKey, true);
   current = shut;
+  paintStrip();
   show();
+  // 처음 한 번: 넘기는 법 · 그리기 (손가락 화면은 밀기, PC 는 화살표)
+  try {
+    if (!localStorage.getItem(HINT_KEY) && images.length > 1) {
+      localStorage.setItem(HINT_KEY, '1');
+      const coarse = matchMedia('(pointer: coarse)').matches;
+      say(coarse ? '옆으로 밀거나 아래 장을 눌러 넘겨요. 그리기로 이 장 위에 쓸 수 있어요' : '← → 나 아래 장을 눌러 넘겨요. 그리기로 이 장 위에 쓸 수 있어요');
+    }
+  } catch {
+    // 저장소를 못 써도 보기는 그대로
+  }
   close.focus();
   return { close: shut };
 }

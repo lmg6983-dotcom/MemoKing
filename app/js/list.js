@@ -36,6 +36,7 @@ import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
+import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -1146,6 +1147,19 @@ function showOpmsShapes(shapes) {
 }
 $('opms-shapes-clear').addEventListener('click', async () => showOpmsShapes(await api.opms.clearShapes()));
 // 메모 보기 › 내 손에 맞추기: 꾹 눌러 줄 옮기기 시간 (메모 창들과 같은 저장소 — hold-tune.js)
+// 메모 보기 › 넣을 때 묻기: "앞으로 이렇게" 로 기억한 것을 지운다 (메모 창들과 같은 저장소 — rename-content.js)
+const choicesBtn = $('choices-reset');
+const paintChoices = () => {
+  choicesBtn.disabled = !hasRememberedChoices();
+  choicesBtn.textContent = choicesBtn.disabled ? '늘 물어요' : '다시 묻기';
+};
+choicesBtn.addEventListener('click', () => {
+  forgetChoices();
+  paintChoices();
+});
+window.addEventListener('focus', paintChoices); // 메모 창에서 정하고 돌아왔을 때
+window.addEventListener('storage', (e) => e.key === 'memoking.choices' && paintChoices()); // 메모 창에서 정하면 바로
+paintChoices();
 $('hold-tune').checked = holdTune().on;
 $('hold-tune').addEventListener('change', (e) => setHoldTune({ on: e.target.checked }));
 $('hold-reset').addEventListener('click', () => {
