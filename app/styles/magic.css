@@ -70,14 +70,14 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-row[aria-selected="true"] b { background: transparent; box-shadow: inset 0 -2px 0 #e0a800; border-radius: 0; } /* 고른 줄(노랑) 위에서는 밑줄로 — 노랑끼리 묻히지 않게 */
 .magic-row .side { flex: none; color: #6f6f6f; font-size: 12px; } /* 흰 바탕에서 4.5:1 넘게 */
 .magic-row[aria-selected="true"] .side { display: none; }
-.magic-row.kind-opms .ico { border-radius: 7px; background: var(--opms-mark, #1f3b73); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -0.02em; }
-.magic-row.kind-more .ico { border-radius: 7px; background: rgba(0, 0, 0, 0.06); font-weight: 800; }
-.magic-row:is(.kind-calc, .kind-site, .kind-web, .kind-ai) .ico { border-radius: 7px; background: color-mix(in srgb, var(--mod, #888) 15%, transparent); color: color-mix(in srgb, var(--mod, #555) 78%, #000); } /* 한 줄 묶음은 머리말 대신 아이콘 칸이 기능 색 */
+.magic-row:is(.kind-opms, .kind-opmsAsk) .ico { border-radius: 7px; background: var(--opms-mark, #1f3b73); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -0.02em; }
+.magic-row:is(.kind-more, .kind-opmsMore) .ico { border-radius: 7px; background: rgba(0, 0, 0, 0.06); font-weight: 800; }
+.magic-row:is(.kind-calc, .kind-date, .kind-remind, .kind-site, .kind-web, .kind-ai) .ico { border-radius: 7px; background: color-mix(in srgb, var(--mod, #888) 15%, transparent); color: color-mix(in srgb, var(--mod, #555) 78%, #000); } /* 한 줄 묶음은 머리말 대신 아이콘 칸이 기능 색 */
 .magic-row .ico svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 /* 계산기: 결과가 주인공 (크고 굵게, 숫자 폭 고정), 식은 아래 작게 */
 .magic-row.kind-calc .ico { font-size: 16px; font-weight: 800; }
-.magic-row.kind-calc .t { font-size: 18px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.magic-row.kind-more .t { font-weight: 700; }
+.magic-row:is(.kind-calc, .kind-date) .t { font-size: 18px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.magic-row:is(.kind-more, .kind-opmsMore) .t { font-weight: 700; }
 /* 고른 줄 오른쪽의 할 일 단추 (← → 로 옮김) — 고른 단추만 이름까지 */
 .magic-row .acts { display: none; flex: none; align-items: center; gap: 3px; }
 .magic-row[aria-selected="true"] .acts { display: inline-flex; }
@@ -111,9 +111,9 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.06); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12); color: #555; font: 600 10.5px/16px inherit; text-align: center; }
 
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .magic-row.kind-opms .ico { --opms-mark: #3d63b8; }
-  :where(:root:not([data-theme="light"])) .magic-row.kind-more .ico { background: rgba(255, 255, 255, 0.1); color: #e6e2d3; }
-  :where(:root:not([data-theme="light"])) .magic-row:is(.kind-calc, .kind-site, .kind-web, .kind-ai) .ico { background: color-mix(in srgb, var(--mod, #888) 26%, transparent); color: color-mix(in srgb, var(--mod, #ccc) 55%, #fff); }
+  :where(:root:not([data-theme="light"])) .magic-row:is(.kind-opms, .kind-opmsAsk) .ico { --opms-mark: #3d63b8; }
+  :where(:root:not([data-theme="light"])) .magic-row:is(.kind-more, .kind-opmsMore) .ico { background: rgba(255, 255, 255, 0.1); color: #e6e2d3; }
+  :where(:root:not([data-theme="light"])) .magic-row:is(.kind-calc, .kind-date, .kind-remind, .kind-site, .kind-web, .kind-ai) .ico { background: color-mix(in srgb, var(--mod, #888) 26%, transparent); color: color-mix(in srgb, var(--mod, #ccc) 55%, #fff); }
   :where(:root:not([data-theme="light"])) .magic-row .s, :where(:root:not([data-theme="light"])) .magic-row .side { color: #b8b8b8; } /* 어두운 바탕 · 고른 줄 모두 4.5:1 넘게 */
   :where(:root:not([data-theme="light"])) .magic-row[aria-selected="true"] b { box-shadow: inset 0 -2px 0 #ffcd00; }
   :where(:root:not([data-theme="light"])) body { --mk-sel: rgba(255, 205, 0, 0.18); --mk-line: rgba(255, 255, 255, 0.08); }
@@ -127,9 +127,9 @@ kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px
   :where(:root:not([data-theme="light"])) kbd { background: rgba(255, 255, 255, 0.1); color: #ddd; }
 }
 /* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .magic-row.kind-opms .ico { --opms-mark: #3d63b8; }
-  :where(:root[data-theme="dark"]) .magic-row.kind-more .ico { background: rgba(255, 255, 255, 0.1); color: #e6e2d3; }
-  :where(:root[data-theme="dark"]) .magic-row:is(.kind-calc, .kind-site, .kind-web, .kind-ai) .ico { background: color-mix(in srgb, var(--mod, #888) 26%, transparent); color: color-mix(in srgb, var(--mod, #ccc) 55%, #fff); }
+  :where(:root[data-theme="dark"]) .magic-row:is(.kind-opms, .kind-opmsAsk) .ico { --opms-mark: #3d63b8; }
+  :where(:root[data-theme="dark"]) .magic-row:is(.kind-more, .kind-opmsMore) .ico { background: rgba(255, 255, 255, 0.1); color: #e6e2d3; }
+  :where(:root[data-theme="dark"]) .magic-row:is(.kind-calc, .kind-date, .kind-remind, .kind-site, .kind-web, .kind-ai) .ico { background: color-mix(in srgb, var(--mod, #888) 26%, transparent); color: color-mix(in srgb, var(--mod, #ccc) 55%, #fff); }
   :where(:root[data-theme="dark"]) .magic-row .s, :where(:root[data-theme="dark"]) .magic-row .side { color: #b8b8b8; } /* 어두운 바탕 · 고른 줄 모두 4.5:1 넘게 */
   :where(:root[data-theme="dark"]) .magic-row[aria-selected="true"] b { box-shadow: inset 0 -2px 0 #ffcd00; }
   :where(:root[data-theme="dark"]) body { --mk-sel: rgba(255, 205, 0, 0.18); --mk-line: rgba(255, 255, 255, 0.08); }

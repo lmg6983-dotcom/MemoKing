@@ -5,7 +5,7 @@
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-export { looksLikeRef } from '../app/js/core/magic-modules.js';
+import { opmsQueryKind, matchChoseongNames, rankCases, splitNames } from '../app/js/core/opms-search.js';
 import { progressItems } from '../app/js/core/opms-progress.js';
 import { decodeEntities } from '../app/js/core/entities.js';
 import { biblioFields } from '../app/js/core/opms-biblio.js';
@@ -93,6 +93,10 @@ const stripRefSql = (col) => ['-', '/', '.', '_', ' '].reduce((s, ch) => `REPLAC
 
 /** 관리번호(사무소·출원인) 또는 출원번호(하이픈 있든 없든, 앞자리 생략)로 사건 찾기 */
 export function buildLookupSql(query, field = 'both') {
+  return `SELECT ${CASE_COLUMNS.join(', ')}\nFROM opms_app\nWHERE del_flag = 'N' AND ${buildLookupWhere(query, field)}\nORDER BY d_accept DESC, idx DESC`;
+}
+/** 같은 번호 조건 (buildLookupSql · 일부로 찾기가 함께 쓴다) */
+export function buildLookupWhere(query, field = 'both') {
   const raw = String(query ?? '').trim();
   const q = sqlQuote(raw);
   const clean = raw.replace(/[^0-9A-Za-z]/g, '');
@@ -106,12 +110,52 @@ export function buildLookupSql(query, field = 'both') {
   const compact = raw.replace(/[^0-9A-Za-z]/g, '');
   const loose = compact.length >= 4 && /\d/.test(compact) && /[A-Za-z]/.test(compact);
   const refIs = (col) => (loose ? `(${col} = '${q}' OR ${stripRefSql(col)} = '${sqlQuote(compact)}')` : `${col} = '${q}'`);
-  const cond = field === 'our' ? refIs('ourref')
+  return field === 'our' ? refIs('ourref')
     : field === 'your' ? refIs('yourref')
       : field === 'app' ? `(${app})`
         : `(${refIs('ourref')} OR ${refIs('yourref')} OR ${app})`;
-  return `SELECT ${CASE_COLUMNS.join(', ')}\nFROM opms_app\nWHERE del_flag = 'N' AND ${cond}\nORDER BY d_accept DESC, idx DESC`;
 }
+
+// LIKE 안에서 % _ [ 는 글자 그대로 (SQL Server)
+const likeQuote = (v) => sqlQuote(v).replace(/[[%_]/g, (ch) => `[${ch}]`);
+// '%글%' — 한글이 들어 있으면 N'' (서버 정렬 규칙이 한글 코드 페이지가 아니어도 글자가 깨지지 않게)
+const likeAny = (v) => `${/[^\x00-\x7f]/.test(v) ? 'N' : ''}'%${likeQuote(v)}%'`;
+export const SEARCH_LIMIT = 200;
+
+/**
+ * 일부 · 이름 · 초성으로 찾기 — 조건만 (사건 목록 · 개수에 같이 쓴다)
+ *   ref: 번호 칸에 그 글이 들어 있으면 (기호를 빼고도) + 예전처럼 같은 번호 · 출원번호 꼴
+ *   name: 낱말마다 출원인 · 발명자 칸에 (영문은 관리번호에도)
+ *   choseong: 초성이 맞는 이름들(names) 중 하나가 출원인 · 발명자 칸에
+ */
+export function buildSearchWhere(query, { kind, names = [] } = {}) {
+  const raw = String(query ?? '').trim();
+  if (kind === 'choseong') {
+    if (!names.length) return null;
+    const ors = names.slice(0, 12).flatMap((n) => [`applicant LIKE ${likeAny(n)}`, `inventor LIKE ${likeAny(n)}`]);
+    return `(${ors.join(' OR ')})`;
+  }
+  if (kind === 'name') {
+    const terms = raw.split(/\s+/).filter(Boolean);
+    return terms.map((t) => {
+      const ors = [`applicant LIKE ${likeAny(t)}`, `inventor LIKE ${likeAny(t)}`];
+      if (/^[A-Za-z]+$/.test(t)) ors.push(`ourref LIKE ${likeAny(t)}`, `yourref LIKE ${likeAny(t)}`);
+      return `(${ors.join(' OR ')})`;
+    }).join(' AND ');
+  }
+  const compact = raw.replace(/[^0-9A-Za-z]/g, '');
+  const parts = ['ourref', 'yourref', 'n_app', 'n_issue'].flatMap((col) => [
+    `${col} LIKE ${likeAny(raw)}`,
+    ...(compact.length >= 3 ? [`${stripRefSql(col)} LIKE ${likeAny(compact)}`] : []), // 기호를 빼고도 (2026-0012 ↔ 20260012)
+  ]);
+  return `(${buildLookupWhere(raw)} OR ${parts.join(' OR ')})`;
+}
+export const buildSearchSql = (where, limit = SEARCH_LIMIT) =>
+  `SELECT TOP ${Math.max(1, Math.min(1000, limit | 0))} ${CASE_COLUMNS.join(', ')}\nFROM opms_app\nWHERE del_flag = 'N' AND ${where}\nORDER BY d_accept DESC, idx DESC`;
+export const buildCountSql = (where) => `SELECT COUNT(*) AS n\nFROM opms_app\nWHERE del_flag = 'N' AND ${where}`;
+// 초성 검색용 이름 목록 (출원인 · 발명자 — 칸 하나에 여럿이면 나눠 쓴다)
+export const buildNamesSql = () =>
+  `SELECT DISTINCT applicant AS name FROM opms_app WHERE del_flag = 'N' AND applicant <> ''\nUNION\nSELECT DISTINCT inventor AS name FROM opms_app WHERE del_flag = 'N' AND inventor <> ''`;
 
 export const buildCaseByIdxSql = (idx) =>
   `SELECT ${CASE_COLUMNS.join(', ')}\nFROM opms_app\nWHERE del_flag = 'N' AND idx = '${sqlQuote(idx)}'`;
@@ -942,6 +986,38 @@ export class Opms {
 
   find(query, opts) {
     return this.select(buildLookupSql(query), opts);
+  }
+
+  /**
+   * 번호 일부 · 이름 · 초성으로 찾아 정확한 것부터 — { rows, total } (rows 는 많아야 limit 건, total 은 맞는 것 전부)
+   */
+  async search(query, { limit = SEARCH_LIMIT, ...opts } = {}) {
+    const kind = opmsQueryKind(query);
+    if (!kind) return { rows: [], total: 0 };
+    const names = kind === 'choseong' ? matchChoseongNames(await this.names(opts), query) : [];
+    const where = buildSearchWhere(query, { kind, names });
+    if (!where) return { rows: [], total: 0 };
+    const rows = rankCases(await this.select(buildSearchSql(where, limit), opts), query);
+    let total = rows.length;
+    if (rows.length >= limit) {
+      const [c] = await this.select(buildCountSql(where), opts).catch(() => [null]);
+      total = Math.max(rows.length, Number(c?.n) || rows.length);
+    }
+    return { rows, total };
+  }
+
+  /** 출원인 · 발명자 이름 목록 (초성 검색) — 한 번 받아 6시간 둔다 (shortcut: 그사이 새 이름은 다음에 받을 때부터) */
+  async names(opts = {}) {
+    if (this.nameList && Date.now() - this.nameList.at < 6 * 3600_000) return this.nameList.names;
+    // 표 전체를 훑는 무거운 질문이라: 기다림은 넉넉히, 실패하면 10분은 다시 묻지 않는다 (치는 글자마다 묻지 않게)
+    if (this.nameFailedAt && Date.now() - this.nameFailedAt < 10 * 60_000) return [];
+    const rows = await this.select(buildNamesSql(), { ...opts, timeoutMs: Math.max(opts.timeoutMs ?? 0, 20_000) }).catch((err) => {
+      this.nameFailedAt = Date.now();
+      throw err;
+    });
+    const names = [...new Set(rows.flatMap((r) => splitNames(r.name)))];
+    this.nameList = { at: Date.now(), names };
+    return names;
   }
 
   async caseByIdx(idx) {

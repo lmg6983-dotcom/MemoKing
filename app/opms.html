@@ -10,7 +10,7 @@
 <body>
   <header class="op-top">
     <form id="op-form" class="op-search" role="search">
-      <input id="op-input" type="search" placeholder="관리번호 또는 출원번호" aria-label="관리번호 또는 출원번호" autocomplete="off" spellcheck="false" />
+      <input id="op-input" type="search" placeholder="관리번호, 출원번호, 출원인, 발명자 (일부만, 초성도)" aria-label="관리번호, 출원번호, 출원인, 발명자로 찾기" autocomplete="off" spellcheck="false" />
       <button type="submit" class="op-btn">찾기</button>
     </form>
     <div id="op-head" class="op-head" hidden>
@@ -35,7 +35,7 @@
     <button type="button" id="op-refresh" class="op-refresh" title="서버에서 다시 불러오기">새로 고침</button>
   </nav>
   <main id="op-main" class="op-main" role="tabpanel" aria-labelledby="op-tab-info" tabindex="-1">
-    <div class="op-empty"><b>관리번호 또는 출원번호로 찾아 보세요</b>사무소 관리번호, 출원인 관리번호, 출원번호(하이픈 없이도) 모두 돼요. 매직키(Ctrl+Alt+Space)에 써도 찾아져요.</div>
+    <div class="op-empty"><b>관리번호, 출원번호, 출원인, 발명자로 찾아 보세요</b>번호는 일부만(0271, 0012345), 이름도 일부만(홍길, 메모킹) 써도 되고, 초성(ㅎㄱㄷ)으로도 찾아요. 정확한 것부터 보여요. 매직키(Ctrl+Alt+Space)에 써도 찾아져요.</div>
   </main>
   <footer id="op-foot" class="op-foot" hidden></footer>
   <script type="module" src="js/opms-view.js"></script>

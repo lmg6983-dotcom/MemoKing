@@ -38,3 +38,14 @@ test('메모 검색: 관리번호는 기호(- / 등)를 빼고도 찾는다', ()
   assert.equal(searchMemos(memos, 'a-b').length, 0, '짧은 말은 기호를 빼지 않음');
   assert.equal(snippetOf('첫 줄\n사건 P20261170KR01 마감', ['p2026-1170-kr01']), '사건 P20261170KR01 마감', '찾은 줄을 보여 준다');
 });
+
+test('초성 검색: 제목에 맞는 메모가 앞, 본문에서 맞은 줄을 미리 보기로', () => {
+  const memos = [
+    { id: 'a', title: '회의록', text: '회의록\n견적서 첨부', updated: '2026-10-22T10:00:00' },
+    { id: 'b', title: '견적서 정리', text: '견적서 정리\n거래처', updated: '2026-10-01T10:00:00' },
+    { id: 'c', title: '장보기', text: '우유', updated: '2026-10-22T11:00:00' },
+  ];
+  const r = searchMemos(memos, 'ㄱㅈㅅ');
+  assert.deepEqual(r.map((m) => m.id), ['b', 'a'], '예전 것이어도 제목에 맞으면 앞');
+  assert.equal(r[1].snippet, '견적서 첨부');
+});

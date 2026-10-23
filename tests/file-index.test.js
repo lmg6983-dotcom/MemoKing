@@ -127,3 +127,43 @@ test('파일 검색: 지켜보는 폴더에 생긴 파일은 곧바로 목록에
   assert.equal(index.search('거절결정서').length, 1);
   assert.equal(index.search('받는중').length, 0, '받는 중인 파일은 빼고');
 });
+
+test('초성으로도 찾음 (ㅎㅇㄹ → 회의록, 띄어쓰기 건너뜀) · 첫머리가 맞는 것이 앞', () => {
+  const idx = new FileIndex({ roots: () => [] });
+  idx.use([
+    { n: '9월 회의록.hwp', p: 'C:/a/9월 회의록.hwp', d: false, a: false, depth: 2 },
+    { n: '회의록 모음', p: 'C:/a/회의록 모음', d: true, a: false, depth: 1 },
+    { n: '견적서 01.txt', p: 'C:/a/견적서 01.txt', d: false, a: false, depth: 1 },
+  ], Date.now());
+  const names = idx.search('ㅎㅇㄹ').map((r) => r.name);
+  assert.deepEqual(names.sort(), ['9월 회의록.hwp', '회의록 모음'].sort());
+  assert.equal(idx.search('ㅎㅇㄹ')[0].name, '회의록 모음', '초성 첫머리가 맞는 것이 앞');
+  assert.deepEqual(idx.search('ㄱㅈㅅ 01').map((r) => r.name), ['견적서 01.txt'], '초성 + 글자 섞어도');
+  assert.deepEqual(idx.search('ㅎㅇㄹㅁㅇ').map((r) => r.name), ['회의록 모음'], '띄어쓰기 건너뜀');
+  assert.deepEqual(idx.search('ㅋㅋ'), []);
+});
+
+test('이어 친 글은 앞에서 맞은 이름 안에서만 찾아도 처음부터 찾은 것과 같음 (지우거나 바꾸면 처음부터)', () => {
+  const names = ['견적서 01.txt', '견적 메모.hwp', '견본 사진.jpg', '회의록 견적.docx', 'estimate-2026.xlsx', 'P2026-1170-KR01.pdf', '견적서 모음'];
+  const entries = names.map((n, k) => ({ n, p: `C:/a/${k}/${n}`, d: !n.includes('.'), a: false, depth: 1 }));
+  const fresh = (q) => { const x = new FileIndex({ roots: () => [] }); x.use(entries, Date.now()); return x.searchAll(q, 20); };
+  const idx = new FileIndex({ roots: () => [] });
+  idx.use(entries, Date.now());
+  for (const q of ['견', '견적', '견적서', '견적서 0', 'ㄱ', 'ㄱㅈ', 'ㄱㅈㅅ', 'e', 'est', '견', '견본', 'p2026', 'p2026-1170']) {
+    assert.deepEqual(idx.searchAll(q, 20), fresh(q), q);
+  }
+});
+
+test('이어 치는 사이에 새로 받은 파일도 찾힘 (초성으로도)', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-fi-late-'));
+  const idx = new FileIndex({ roots: () => [] });
+  idx.use([{ n: '견적서 01.txt', p: 'C:/a/견적서 01.txt', d: false, a: false, depth: 1 }], Date.now());
+  assert.equal(idx.searchAll('견적', 20).total, 1);
+  assert.equal(idx.searchAll('ㄱㅈ', 20).total, 1);
+  const late = path.join(root, '견적서 02.txt');
+  fs.writeFileSync(late, 'x');
+  assert.equal(idx.add([late]), 1);
+  assert.equal(idx.searchAll('견적서', 20).total, 2, '앞에서 맞은 이름 안에서만 찾지 않음');
+  assert.equal(idx.searchAll('ㄱㅈㅅ', 20).total, 2, '새 이름도 초성으로');
+  fs.rmSync(root, { recursive: true, force: true });
+});

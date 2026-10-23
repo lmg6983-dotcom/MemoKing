@@ -31,6 +31,7 @@ export function prepareSmoke(userData) {
 
 // 가짜 OPMS 서버: 받은 SELECT 글을 보고 표를 돌려준다 (1줄 열 이름 · 2~4줄 정보 · 5줄부터 자료, \x01 로 나눔)
 function fakeOpms() {
+  const hits = { cases: 0 }; // 사건 표(opms_app)를 물은 횟수 — 고르기 전에는 0 이어야
   const gate = { held: null, release: () => {} }; // gate.hold() 동안 파일 받기는 기다린다 (받는 중에 다른 사건을 보는 점검)
   gate.hold = () => { gate.held = new Promise((r) => { gate.release = r; }); };
   const table = (cols, rows) => [cols.join('\x01'), 'm', 'm', 'm', ...rows.map((r) => r.join('\x01'))].join('\n');
@@ -45,11 +46,22 @@ function fakeOpms() {
       if (/FROM opms_pri/.test(sql)) return res.end(table(['pri_order', 'pri_nation', 'd_pri', 'n_pri', 'n_pri_acc', 'd_pri_rec', 'd_pri_due', 'd_pri_pre', 'memo'], [['1', 'KR', '2026-09-23 00:00:00.0', '10-2026-0182644', '', '', '', '', '']]));
       if (/FROM opms_memo M/.test(sql)) return res.end(table(['div', 'ck_popup', 'cust', 'd_memo', 'header', 'memo'], [['고객', 'Y', '메모킹 주식회사', '2026-03-11 00:00:00.0', '', '1. 비용 산정은 발명신고일 기준\\r\\n2. 청구서에 상세 내역 적기']]));
       if (/FROM opms_app/.test(sql)) {
-        const one = sql.match(/\bidx = '(\d+)'/)?.[1]; // 사건 하나 (idx 로) — 회사 서버처럼 그 사건만
-        return res.end(table(['idx', 'div', 'ourref', 'yourref', 'n_app', 'd_app', 'applicant', 'inventor', 'title_kor', 'd_accept', 'ck_out'], [
+        hits.cases++;
+        const cases = [
           ['101', '특허', 'FPD/2026-0271/E', 'Y-77', '10-2026-0012345', '2026-02-03 00:00:00.0', '메모킹 주식회사', '홍길동', '메모를 쉽게 쓰는 장치', '2026-01-10 00:00:00.0', 'N'],
           ['102', '특허', 'FPD/2026-0271/D', 'Y-78', '10-2026-0099999', '', '메모킹 주식회사', '', '두 번째 사건', '2026-01-09 00:00:00.0', 'N'],
-        ].filter((r) => !one || r[0] === one)));
+          // 출원인 이름으로 찾기 · "다른 n건 더 보기" 용 (관리번호는 FPD 와 겹치지 않게)
+          ...Array.from({ length: 8 }, (_, k) => [String(201 + k), '상표', `HGD-${k + 1}`, `특허-2025-00${k + 40}`, `40-2025-00${k + 10}000`, '', '홍길동', '', `길동 상표 ${k + 1}`, `2025-0${k + 1}-01 00:00:00.0`, 'N']),
+        ];
+        if (/DISTINCT applicant AS name/.test(sql)) return res.end(table(['name'], [...new Set(cases.flatMap((c) => [c[6], c[7]]).filter(Boolean))].map((n) => [n])));
+        // 회사 서버처럼 조건대로: idx 하나 · LIKE '%글%' (기호를 뺀 것도) · 그 밖은 전부
+        const one = sql.match(/\bidx = '(\d+)'/)?.[1];
+        const likes = [...sql.matchAll(/LIKE N?'%(.+?)%'/g)].map((m) => m[1].replace(/\[(.)\]/g, '$1'));
+        const compact = (v) => v.replace(/[^0-9A-Za-z가-힣]/g, '');
+        const rows = cases.filter((r) => (!one || r[0] === one) && (!likes.length || likes.some((t) => r.join(' ').includes(t) || compact(r.join('')).includes(t))));
+        if (/COUNT\(\*\)/.test(sql)) return res.end(table(['n'], [[String(rows.length)]]));
+        const top = Number(sql.match(/SELECT TOP (\d+)/)?.[1] ?? rows.length);
+        return res.end(table(['idx', 'div', 'ourref', 'yourref', 'n_app', 'd_app', 'applicant', 'inventor', 'title_kor', 'd_accept', 'ck_out'], rows.slice(0, top)));
       }
       if (/FROM opms_attach/.test(sql)) {
         // 회사 서버와 같은 열: 요약은 MEMO, 올린 사람은 MUNAME (로그인 ID MUID 는 보이지 않아야)
@@ -64,7 +76,7 @@ function fakeOpms() {
       return res.end(table(['idx'], []));
     });
   });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, gate, host: `http://127.0.0.1:${server.address().port}` })));
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, gate, hits, host: `http://127.0.0.1:${server.address().port}` })));
 }
 
 export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow, memoHotkeys, smokeHud, windowManager }) {
@@ -146,7 +158,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     check('→ 로 "경로 복사" 를 고르고 Enter → 그 파일 경로가 클립보드에', sel.act === 'copyPath' && copied.endsWith('.txt') && copied.includes('견적서'), JSON.stringify({ sel, copied }));
 
     // 2-1) 계산기 · 웹 검색 · AI 에게 묻기
-    const typeMagic = (text) => js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input')); })()`);
+    // 사람이 치듯: 키를 누른 것으로 쳐서 "다시 띄웠을 때 남겨 둔 글" 상태를 끝낸 뒤 글을 바꾼다
+    const typeMagic = (text) => js(magic, `(() => { const i = document.getElementById('magic-input'); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true })); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input')); })()`);
 
     // 1-1) 결과 묶음은 캡슐 순서 · 같은 색 머리말, 캡슐을 끌어 놓으면 묶음 순서도 바뀌고 다음에도 그대로
     showMagic();
@@ -178,6 +191,39 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     const reopened = await chipOrder();
     check('캡슐을 끌어 맨 앞으로 → 캡슐 · 결과 묶음 순서가 바뀌고 (켜고 끄지는 않음), 다시 열어도 그대로', afterDrag.chips.startsWith('ai,memo') && afterDrag.groups.startsWith('ai,memo') && afterDrag.aiOn && reopened.startsWith('ai,memo'), JSON.stringify({ afterDrag, reopened }));
     await js(magic, `window.magic.reorderModules(${JSON.stringify(['memo', 'opms', 'notes', 'files', 'calc', 'web', 'ai'])})`);
+
+    // 1-2) 초성 검색: ㄱㅈㅅ → 견적서 메모 · 견적서 파일, 맞은 글자를 굵게
+    showMagic();
+    await typeMagic('ㄱㅈㅅ');
+    const cho = await until(() => js(magic, `(() => { const n = [...document.querySelectorAll('.magic-row.kind-note')]; const f = [...document.querySelectorAll('.magic-row.kind-file')]; return n.length && f.length && { notes: n.length, files: f.length, bold: n[0].querySelector('.t b')?.textContent, sel: document.querySelector('.magic-row[aria-selected="true"]')?.className }; })()`), '초성 결과').catch(() => null);
+    check('매직키 초성 검색: ㄱㅈㅅ 로 견적서 메모 · 파일, 맞은 글자 굵게 · 첫 결과가 골라짐 (ㄱㅈㅅ 메모로 저장 아님)', cho?.notes > 0 && cho?.files > 0 && cho?.bold === '견적서' && /kind-note/.test(cho?.sel ?? ''), JSON.stringify(cho));
+
+    // 1-3) 날짜 계산: 맨 위에 날짜 줄 (계산기 캡슐)
+    await typeMagic('12월 25일까지');
+    const dateRow = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row'); return r?.classList.contains('kind-date') && { t: r.querySelector('.t').textContent, s: r.querySelector('.s').textContent, sel: r.getAttribute('aria-selected') }; })()`), '날짜 줄').catch(() => null);
+    check('매직키 날짜 계산: "12월 25일까지" → 맨 위 남은 날 줄 (골라져 있음)', /일 남음|오늘이에요|일 지남/.test(dateRow?.t ?? '') && /D-|D\+|D-day/.test(dateRow?.s ?? '') && dateRow?.sel === 'true', JSON.stringify(dateRow));
+
+    // 1-4) 날짜를 쓰면 "알림 맞춰 저장" → 메모 + 일정 하나
+    await typeMagic('내일 오후 3시 거래처 전화');
+    const remindAt = await until(() => js(magic, `(() => { const rows = [...document.querySelectorAll('.magic-row')]; const i = rows.findIndex((e) => e.classList.contains('kind-remind')); return i >= 0 && { i, t: rows[i].querySelector('.t').textContent, s: rows[i].querySelector('.s').textContent }; })()`), '알림 줄').catch(() => null);
+    if (remindAt) {
+      for (let k = 0; k < remindAt.i; k++) key(magic, 'Down');
+      await wait(120);
+        key(magic, 'Return');
+      }
+    const reminded = await until(() => { const m = getVault().list().find((x) => x.title === '내일 오후 3시 거래처 전화'); return m && getVault().get(m.id).reminders?.length ? getVault().get(m.id).reminders[0] : null; }, '알림 저장').catch(() => null);
+    check('매직키: 날짜를 쓰면 "알림 맞춰 저장" 줄 → 메모와 일정(거래처 전화, 오후 3시, 10분 전)', /내일 오후 3:00 알림 맞춰 저장/.test(remindAt?.t ?? '') && remindAt?.s === '거래처 전화' && reminded?.title === '거래처 전화' && new Date(reminded?.at).getHours() === 15 && reminded?.alerts?.[0] === 10, JSON.stringify({ remindAt, reminded }));
+
+    // 1-5) 찾은 메모에 덧붙이기 (→ 로 고르는 할 일)
+    showMagic();
+    await typeMagic('견적서 메모 7');
+    await until(() => js(magic, `!!document.querySelector('.magic-row.kind-note')`), '메모 줄');
+    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-note'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 })); })()`);
+    await wait(120);
+    const target = await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-note[aria-selected="true"]'); return r?.querySelector('.t').textContent; })()`);
+    await js(magic, `document.querySelector('.magic-row.kind-note[aria-selected="true"] [data-action="append"]')?.click()`);
+    const appended = await until(() => { const m = getVault().list().find((x) => x.title === target); const b = m && getVault().get(m.id).body; return b && b.trimEnd().endsWith('견적서 메모 7') && b.includes('거래처 견적 정리') ? b : null; }, '덧붙이기').catch(() => null);
+    check('매직키: 찾은 메모에 "이 메모에 덧붙이기" → 그 메모 끝에 쓴 글이 붙음 (원래 글은 그대로)', Boolean(appended), JSON.stringify({ target, appended }));
     showMagic();
     await wait(300);
     await typeMagic('1,200 × 3');
@@ -198,13 +244,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     })()`), '웹 검색 · AI 줄').catch(() => null);
     await capture(magic, 'smoke-new-magic-tools.png');
     const before = smokeOpened.length;
-    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-web'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true })); r.querySelector('[data-action="google"]').click(); })()`);
+    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-web'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 })); r.querySelector('[data-action="google"]').click(); })()`);
     await wait(300);
     showMagic();
     await wait(300);
     await typeMagic('서울 날씨');
     await until(() => js(magic, `!!document.querySelector('.magic-row.kind-ai')`), 'AI 줄');
-    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-ai'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true })); })()`);
+    await js(magic, `(() => { const r = document.querySelector('.magic-row.kind-ai'); r.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 })); })()`);
     await wait(100);
     await capture(magic, 'smoke-new-magic-ai.png');
     key(magic, 'Return');
@@ -253,14 +299,68 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     process.env.MEMOKING_OPMS_HOST = fake.host;
     const wrapperDir = path.join(SMOKE_DIR, 'wrapper');
     getSettings().opms = { wrapperDir };
+
+    // 4-0) OPMS 이름 · 초성 · 번호 일부로 찾기, 정확한 것부터 6건 + "OPMS 다른 n건 더 보기" → OPMS 창 목록
+    //   치는 동안은 회사 서버에 묻지 않고 "OPMS 에서 찾기" 줄만 — 그 줄을 골라야 묻는다
+    // 고르기 (온전한 사건번호는 저절로 찾으므로, 이미 찾았거나 찾는 중이면 그대로)
+    const askOpms = async () => {
+      await until(() => js(magic, `!!document.querySelector('.magic-row.kind-opmsAsk, .magic-row.kind-opms, .magic-note.loading')`), 'OPMS 에서 찾기 줄', 4000);
+      await js(magic, `document.querySelector('.magic-row.kind-opmsAsk')?.click()`);
+    };
+    showMagic();
+    await typeMagic('홍길동');
+    await typeMagic('특허-2025-0099'); // 아직 모르는 양식 (한글이 든 의뢰인 번호) — 저절로 묻지 않는다
+    await wait(500);
+    for (const q of ['FPD 2026-0271/E', '010-2026-0012345']) { // 하드 규칙: 중간 띄어쓰기 · 맨 앞 0(전화 국번)
+      await typeMagic(q);
+      await wait(500);
+    }
+    await typeMagic('0271');
+    await wait(900);
+    const beforeAsk = { hits: fake.hits.cases, ask: await js(magic, `document.querySelector('.magic-row.kind-opmsAsk')?.getAttribute('aria-selected')`), cases: await js(magic, `document.querySelectorAll('.magic-row.kind-opms').length`) };
+    check('매직키 OPMS: 치는 동안에는 회사 서버에 묻지 않고 "OPMS 에서 찾기" 줄만 (번호 일부 · 이름 · 중간 띄어쓰기 · 맨 앞 0, 번호처럼 보이면 그 줄이 골라짐)', beforeAsk.hits === 0 && beforeAsk.ask === 'true' && beforeAsk.cases === 0, JSON.stringify(beforeAsk));
+    await typeMagic('FPD/2026-0271/E');
+    const auto = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row.kind-opms'); return r && { t: r.querySelector('.t').textContent, sel: r.getAttribute('aria-selected') }; })()`), 'OPMS 저절로', 8000).catch(() => null);
+    check('매직키 OPMS: 온전한 사건번호(FPD/2026-0271/E)는 예전처럼 손을 멈추면 저절로 찾고 그 사건이 골라짐', fake.hits.cases === 1 && auto?.t.startsWith('FPD/2026-0271/E') && auto.sel === 'true', JSON.stringify({ auto, hits: fake.hits.cases }));
+    await typeMagic('홍길동');
+    await askOpms();
+    const byName = await until(() => js(magic, `(() => { const r = [...document.querySelectorAll('.magic-row.kind-opms')]; const more = document.querySelector('.magic-row.kind-opmsMore'); return r.length && more && { n: r.length, first: r[0].querySelector('.s').textContent, more: more.querySelector('.t').textContent, inv: r.map((e) => e.querySelector('.s').textContent).find((t) => t.includes('발명자')) }; })()`), 'OPMS 이름 결과', 8000).catch(() => null);
+    // 골라 찾은 사건에서 새 번호 양식(가가-9999-9999)을 배웠으니, 같은 양식의 다른 번호는 이제 저절로
+    const hitsBefore = fake.hits.cases;
+    await typeMagic('특허-2025-0099');
+    await until(() => fake.hits.cases > hitsBefore, '배운 양식 저절로', 4000).catch(() => null);
+    const learned = await js(magic, 'document.querySelector(".magic-row.kind-opmsAsk") ? "ask" : "auto"');
+    check('매직키 OPMS: 골라 찾은 사건의 번호 양식(특허-2025-0042 → 가가-9999-9999)을 배워, 같은 양식(특허-2025-0099)은 앞으로 저절로 찾음', fake.hits.cases === hitsBefore + 1 && learned === 'auto' && getSettings().opmsShapes?.includes('가가-9999-9999'), JSON.stringify({ hitsBefore, hits: fake.hits.cases, learned, shapes: getSettings().opmsShapes }));
+    await typeMagic('홍길동');
+    await askOpms();
+    await until(() => js(magic, `document.querySelectorAll('.magic-row.kind-opms').length === 6`), '이름 결과 다시', 8000);
+    check('매직키 OPMS: 출원인 · 발명자 이름으로 → 정확한 것(출원인이 그대로 홍길동)부터 6건 + 발명자로 맞은 사건은 "발명자 홍길동" + "OPMS 다른 3건 더 보기"', byName?.n === 6 && byName.first.startsWith('홍길동') && byName.more === 'OPMS 다른 3건 더 보기', JSON.stringify(byName));
+    await typeMagic('ㅎㄱㄷ');
+    await askOpms();
+    const byCho = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row.kind-opms'); return r && { s: r.querySelector('.s').textContent, b: r.querySelector('.s b')?.textContent }; })()`), 'OPMS 초성 결과', 8000).catch(() => null);
+    check('매직키 OPMS: 초성(ㅎㄱㄷ)으로도 출원인 · 발명자 찾기 · 맞은 이름 굵게', byCho?.b === '홍길동', JSON.stringify(byCho));
+    await typeMagic('0012345');
+    await askOpms();
+    const byPart = await until(() => js(magic, `(() => { const r = [...document.querySelectorAll('.magic-row.kind-opms')].map((e) => e.querySelector('.t').textContent); return r.length && r; })()`), 'OPMS 번호 일부', 8000).catch(() => null);
+    check('매직키 OPMS: 출원번호 일부(0012345)만 써도 그 사건', byPart?.length === 1 && byPart[0].includes('10-2026-0012345'), JSON.stringify(byPart));
+    await typeMagic('홍길동');
+    await askOpms();
+    await until(() => js(magic, `!!document.querySelector('.magic-row.kind-opmsMore')`), '더 보기 줄', 8000);
+    await js(magic, `document.querySelector('.magic-row.kind-opmsMore').click()`);
+    const owList = await until(() => getOpms(), 'OPMS 창');
+    const picked = await until(() => js(owList, `(() => { const p = document.querySelectorAll('.op-pick'); return p.length && { n: p.length, msg: document.querySelector('.op-msg')?.textContent, q: document.getElementById('op-input').value, last: p[p.length - 1].textContent }; })()`), 'OPMS 창 목록', 8000).catch(() => null);
+    check('"OPMS 다른 n건 더 보기" → OPMS 창이 그 글로 찾은 목록 (9건, 정확한 것부터, 발명자로 맞은 사건도)', picked?.n === 9 && picked.q === '홍길동' && /9건이 찾아졌어요/.test(picked.msg ?? '') && /발명자 홍길동/.test(picked.last ?? ''), JSON.stringify(picked));
+    owList.close();
+
     showMagic();
     await wait(300);
     await js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = 'FPD/2026-0271'; i.dispatchEvent(new Event('input')); })()`);
+    await askOpms();
     const opmsRows = await until(() => js(magic, `(() => { const r = [...document.querySelectorAll('.magic-row.kind-opms')].map((e) => e.querySelector('.t').textContent + ' | ' + e.querySelector('.s').textContent); return r.length && r; })()`), 'OPMS 결과', 8000);
     const firstKind = await js(magic, `[...document.querySelectorAll('.magic-row')].map((e) => e.className.split('kind-')[1])[1]`);
     check('매직키: 관리번호를 쓰면 OPMS 사건이 맨 위에 (관리번호 · 출원번호 / 출원인 · 명칭)', opmsRows.length === 2 && firstKind === 'opms' && opmsRows[0].includes('FPD/2026-0271/E, 10-2026-0012345') && opmsRows[0].includes('메모킹 주식회사'), JSON.stringify(opmsRows));
     // 관리번호 복사 (→ → → 세 번째 할 일은 관리번호 복사)
-    await js(magic, `(() => { const rows = [...document.querySelectorAll('.magic-row')]; const i = rows.findIndex((e) => e.classList.contains('kind-opms')); rows[i].dispatchEvent(new MouseEvent('mousemove', { bubbles: true })); })()`);
+    await js(magic, `(() => { const rows = [...document.querySelectorAll('.magic-row')]; const i = rows.findIndex((e) => e.classList.contains('kind-opms')); rows[i].dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 })); })()`);
     await wait(100);
     key(magic, 'Right');
     key(magic, 'Right');
@@ -284,6 +384,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     showMagic();
     await wait(300);
     await js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = 'FPD/2026-0271'; i.dispatchEvent(new Event('input')); })()`);
+    if (!(await js(magic, `!!document.querySelector('.magic-row.kind-opms')`))) await askOpms();
     await until(() => js(magic, `!!document.querySelector('.magic-row.kind-opms')`), 'OPMS 줄');
     await js(magic, `document.querySelector('.magic-row.kind-opms').click()`);
     const ow = await until(() => getOpms(), 'OPMS 창');

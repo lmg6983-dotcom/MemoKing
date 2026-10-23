@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import fuzzysort from '../app/vendor/fuzzysort.js';
-import { compactTermOf } from '../app/js/core/text-match.js';
+import { compactTermOf, isChoseongQuery, choseongIndex } from '../app/js/core/text-match.js';
 
 export const MAX_ENTRIES = 400_000;
 const SKIP = new Set([
@@ -117,7 +117,11 @@ export class FileIndex {
       this.extra.set(p.toLowerCase(), e);
       added++;
     }
-    if (added) this.snapshot = true;
+    if (added) {
+      this.snapshot = true;
+      this.last = null; // 이어 친 글도 새 이름까지 다시 훑게
+      this.hangul = null; // 새 이름의 한글 표시도 다시
+    }
     return added;
   }
 
@@ -215,6 +219,8 @@ export class FileIndex {
   use(entries, at) {
     this.entries = entries;
     this.lower = entries.map((e) => e.n.toLowerCase());
+    this.last = null; // 바로 앞 찾기의 맞은 이름들 (이어 친 글은 그 안에서만)
+    this.hangul = null; // 이름에 한글이 있나 (1바이트씩 — 초성은 찾을 때 그 이름만 바꿔 본다, 처음 초성으로 찾을 때 만듦)
     this.snapshot = entries.length ? true : null;
     this.builtAt = at;
   }
@@ -313,12 +319,35 @@ export class FileIndex {
     let folders = 0;
     let files = 0;
     const { lower } = this;
-    for (let i = 0; i < lower.length; i++) {
+    // 초성 검색(ㄱㅈㅅ → 견적서): 이름의 한글을 초성으로 바꾼 목록에서 (띄어쓰기 빼고)
+    const cho = terms.map((t) => isChoseongQuery(t));
+    if (cho.some(Boolean) && !this.hangul) {
+      this.hangul = new Uint8Array(lower.length);
+      for (let i = 0; i < lower.length; i++) if (/[가-힣]/.test(lower[i])) this.hangul[i] = 1;
+    }
+    const choHit = new Map(); // 초성으로 맞은 이름 → 모든 초성 낱말이 이름 첫머리에서 맞았나 (점수용)
+    // 글자를 이어 쳤으면(견적 → 견적서) 바로 앞에 맞았던 이름 안에서만 — 이어 친 글에 맞는 이름은 앞 글에도 늘 맞아 결과가 같다.
+    //   기호를 빼고 견주는 말(관리번호)은 그렇지 않을 수 있어 글자 · 숫자 · 띄어쓰기만인 글일 때만
+    const ql0 = q.toLowerCase();
+    const simple = /^[\p{L}\p{N}\s]+$/u.test(ql0);
+    const pool = simple && this.last && this.last.entries === this.entries && ql0.startsWith(this.last.q) ? this.last.hits : null;
+    const hits = [];
+    const count = pool ? pool.length : lower.length;
+    for (let k = 0; k < count; k++) {
+      const i = pool ? pool[k] : k;
       const name = lower[i];
       let all = true;
       let whole = true;
-      for (const t of terms) {
+      for (let ti = 0; ti < terms.length; ti++) {
+        const t = terms[ti];
         if (name.includes(t)) continue;
+        if (cho[ti] && this.hangul[i]) {
+          const at = choseongIndex(name, t); // 한글 이름만, 찾는 그때 문자 코드로 (초성 글을 따로 들고 있지 않음)
+          if (at >= 0) {
+            choHit.set(i, (choHit.get(i) ?? true) && at === 0);
+            continue;
+          }
+        }
         whole = false;
         let at = 0;
         for (let k = 0; k < t.length; k++) {
@@ -335,21 +364,25 @@ export class FileIndex {
         }
       }
       if (!all) continue;
+      hits.push(i);
       if (this.entries[i].d) folders++;
       else files++;
       if (whole) {
         if (contiguous.length < cap) contiguous.push(i);
       } else if (loose.length < cap) loose.push(i);
     }
+    this.last = simple && hits.length <= 200_000 ? { q: ql0, entries: this.entries, hits } : null;
     // 2) 후보만 fuzzysort 로 점수 (프로그램 바로 가기·이름이 찾는 말로 시작·얕은 곳을 조금 앞으로)
     const ql = q.toLowerCase();
     const scored = [];
     for (const i of [...contiguous, ...loose].slice(0, cap * 1.5)) {
       const e = this.entries[i];
       const r = fuzzysort.single(q, e.n) ?? (qCompact ? fuzzysort.single(qCompact, e.n) : null);
-      if (!r) continue;
+      // 초성으로만 맞은 이름: 글자로 맞은 것과 비슷한 자리에 (첫머리면 더 앞, 짧은 이름이 앞)
+      const score = r?.score ?? (choHit.has(i) ? 0.75 + (choHit.get(i) ? 0.15 : 0) - Math.min(0.2, e.n.length * 0.004) : null);
+      if (score == null) continue;
       const bonus = (e.a ? 0.12 : 0) + (this.lower[i].startsWith(ql) ? 0.08 : 0) - Math.min(0.15, (e.depth ?? 0) * 0.012);
-      scored.push({ e, score: r.score * (1 + bonus) });
+      scored.push({ e, score: score * (1 + bonus) });
     }
     scored.sort((a, b) => b.score - a.score);
     const items = [];

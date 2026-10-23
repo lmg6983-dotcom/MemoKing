@@ -244,7 +244,7 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       await until(() => js(magic, `!!document.querySelector('.magic-row.kind-calc')`), '계산 결과').catch(() => {});
       await shot(magic, 'magic-calc', 'magic');
       await type('제주 3박 4일 일정 짜 줘. 렌터카로 동쪽 해안 위주로');
-      await js(magic, `document.querySelector('.magic-row.kind-ai')?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }))`);
+      await js(magic, `document.querySelector('.magic-row.kind-ai')?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 }))`);
       await shot(magic, 'magic-ai', 'magic');
       await js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = ''; i.dispatchEvent(new Event('input')); })()`);
       magic.hide();

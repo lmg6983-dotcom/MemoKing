@@ -118,6 +118,7 @@ contextBridge.exposeInMainWorld('memoking', {
   opms: {
     settings: invoke('opms:settings'),
     setHost: invoke('opms:set-host'),
+    clearShapes: invoke('opms:clear-shapes'), // 저절로 찾는 번호 양식 모두 지우기
     chooseDir: invoke('opms:choose-dir'),
     openFolder: invoke('opms:open-folder'),
   },

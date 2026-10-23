@@ -26,6 +26,8 @@ import {
   copyImageToClipboard, CLIPBOARD_HELPER, SMOKE,
 } from './utils.js';
 import { UI } from '../app/js/core/ui-text.js';
+import { appendToBody } from '../app/js/core/magic-modules.js';
+import { matchedInventor } from '../app/js/core/opms-search.js';
 
 // 창 위 가장자리에 반쯤 걸쳐 붙는 스티커: 왕관(늘 위) · 셀로판 테이프(늘 아래, 바탕화면 층)
 // 목록 창 제목 줄: 왼쪽은 로고 · Life/Work 스위치(~196px), 오른쪽은 단추 묶음 + Windows 창 버튼(~242px) — 스티커는 그 사이 빈 줄에
@@ -1649,6 +1651,8 @@ export class WindowManager {
       return;
     }
     this.magicWin ??= this.createMagicWindow();
+    // 메모 찾기용 글을 미리 다듬어 둔다 (처음 한 번만 오래 걸리고 그 뒤로는 바뀐 메모만) — 첫 글자를 칠 때 기다리지 않게
+    setTimeout(() => this.getVault()?.searchable(), 0);
     const [w] = this.magicWin.getSize();
     const saved = settings.magicPos;
     const isSavedOnScreen = saved && screen.getAllDisplays().some((d) => {
@@ -1680,7 +1684,11 @@ export class WindowManager {
     return typeof p === 'string' && (this.lastFileResults.has(p) || this.lastFinderResults.has(p));
   }
 
-  async magicAct({ action, path: p, id, opms } = {}) {
+  async magicAct({ action, path: p, id, opms, text } = {}) {
+    if (action === 'opmsAll') {
+      this.showOpms(null, 'info', String(text ?? '').slice(0, 60));
+      return { ok: true, close: true };
+    }
     if (opms != null) {
       const c = this.caseOf(opms);
       if (action === 'copyOur' || action === 'copyApp') {
@@ -1698,6 +1706,14 @@ export class WindowManager {
       if (action === 'copyText') {
         copyFileToClipboard(shareText(memo.body));
         return { ok: true, message: '메모 내용을 복사했어요', close: true };
+      }
+      if (action === 'append') {
+        if (memo.locked) return { ok: false, message: '잠긴 메모에는 덧붙일 수 없어요' };
+        const body = appendToBody(memo.body, text);
+        if (!body) return { ok: false };
+        const r = this.getVault().save(String(id), body);
+        if (!r || r.refused) return { ok: false, message: UI.savedElsewhere };
+        return { ok: true, message: `'${(memo.title || '제목 없음').slice(0, 20)}'에 덧붙였어요` };
       }
       this.revealNote(String(id));
       return { ok: true, close: true };
@@ -1767,14 +1783,16 @@ export class WindowManager {
     while (this.opmsCases.size > 300) this.opmsCases.delete(this.opmsCases.keys().next().value);
   }
 
-  opmsBrief(r) {
+  opmsBrief(r, query = '') {
     return {
       idx: r.idx, ourref: r.ourref, yourref: r.yourref, n_app: r.n_app, div: r.div,
       applicant: r.applicant, title: r.title_kor, accepted: cleanDate(r.d_accept),
+      inventor: query ? matchedInventor(r, query) : '', // 발명자 이름으로 찾았을 때만 보인다
     };
   }
 
-  showOpms(idx, tab = 'info') {
+  /** query: 사건 대신 이 글로 찾은 목록을 보인다 (매직키 "OPMS 다른 n건 더 보기") */
+  showOpms(idx, tab = 'info', query = null) {
     if (!this.opmsWin || this.opmsWin.isDestroyed()) {
       this.opmsWin = new BrowserWindow({
         width: 980,
@@ -1790,9 +1808,9 @@ export class WindowManager {
       this.opmsWin.loadFile(path.join(APP_DIR, 'opms.html'));
       this.opmsWin.once('ready-to-show', () => this.opmsWin?.show());
       this.opmsWin.on('closed', () => { this.opmsWin = null; });
-      this.opmsWin.webContents.once('did-finish-load', () => this.opmsWin?.webContents.send('opms:show', { idx, tab }));
+      this.opmsWin.webContents.once('did-finish-load', () => this.opmsWin?.webContents.send('opms:show', { idx, tab, query }));
     } else {
-      this.opmsWin.webContents.send('opms:show', { idx, tab });
+      this.opmsWin.webContents.send('opms:show', { idx, tab, query });
       if (this.opmsWin.isMinimized()) this.opmsWin.restore();
       this.opmsWin.show();
     }

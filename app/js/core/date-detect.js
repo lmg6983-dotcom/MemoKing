@@ -495,3 +495,16 @@ export function findAllDates(text, { chrono = null, now = new Date() } = {}) {
   }
   return [...ko, ...en].sort((a, b) => a.from - b.from);
 }
+
+/** 일정 이름 짐작: 그 줄에서 날짜 말을 빼고 남은 말 ("내일 오후 3시 치과" → "치과", "15일까지 보고서 제출" → "보고서 제출") */
+export function guessTitle(line, from, to) {
+  const rest = `${line.slice(0, from)} ${line.slice(to)}`
+    .replace(/\uFFFC/g, ' ')
+    .replace(/^\s*(?:까지|에는|에|부터|은|는|이|가|의|쯤|경)(?=\s|$)/, '')
+    .replace(/(?:^|\s)(?:까지|에는|에|부터)(?=\s)/g, ' ')
+    .replace(/[\s,:·\-–~]+$/, '')
+    .replace(/^[\s,:·\-–~]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return rest.slice(0, 40);
+}

@@ -7,10 +7,10 @@ export const MAGIC_MODULES = [
   { id: 'memo', name: '메모 만들기', chip: '새 메모', description: '입력한 글을 새 메모로 바로 저장해요 (Enter 저장, Ctrl+Enter 저장하고 열기)', ready: true, defaultOn: true },
   { id: 'notes', name: '메모 검색', chip: '메모 검색', description: '입력하는 대로 메모의 제목과 내용에서 찾아 바로 열어요', ready: true, defaultOn: true },
   { id: 'files', name: '파일 검색', chip: '파일 검색', description: 'PC 의 파일, 폴더, 프로그램 이름을 바로 찾아 열어요. 따로 설치할 것 없이 메모킹이 이름 목록을 만들어 두어요 (이 PC 안에서만, 내용은 읽지 않음)', ready: true, defaultOn: true },
-  { id: 'calc', name: '계산기', chip: '계산기', description: '식을 쓰면 바로 계산해요 (1,200 × 3, 15% * 80000, 5 inch to cm). Enter 로 결과 복사', ready: true, defaultOn: true },
+  { id: 'calc', name: '계산기', chip: '계산기', description: '식이나 날짜를 쓰면 바로 계산해요 (1,200 × 3, 15% * 80000, 3주 뒤, 12/25까지, 9:15부터 18:30까지). Enter 로 결과 복사', ready: true, defaultOn: true },
   { id: 'web', name: '웹 검색', chip: '웹 검색', description: '쓴 글을 검색 사이트에서 찾거나, 사이트 주소를 바로 열어요. 고르기 전에는 아무것도 보내지 않아요', ready: true, defaultOn: true },
   { id: 'ai', name: 'AI 에게 묻기', chip: 'AI', description: 'ChatGPT, Claude 등에 바로 물어봐요. 브라우저에서 로그인한 계정 그대로, API 키는 필요 없어요', ready: true, defaultOn: true },
-  { id: 'opms', name: 'OPMS 검색', chip: 'OPMS', description: '관리번호나 출원번호를 쓰면 회사 OPMS 사건을 찾아 서지정보, 전자포대, 청구서를 봐요 (사내망에서만)', ready: true, defaultOn: true },
+  { id: 'opms', name: 'OPMS 검색', chip: 'OPMS', description: '관리번호, 출원번호(일부만도), 출원인, 발명자 이름(초성도)으로 회사 OPMS 사건을 찾아 서지정보, 전자포대, 청구서를 봐요. "OPMS 에서 찾기" 줄을 골랐을 때만 회사 서버에 물어요 (사내망에서만)', ready: true, defaultOn: true },
 ];
 
 // 처음 캡슐 · 결과 묶음 순서 — 관리번호를 쓰면 OPMS 사건이 새 메모 바로 아래 (전에 늘 그랬듯)
@@ -81,8 +81,10 @@ export function memoBodyFromText(text) {
   return String(text ?? '').replace(/\r\n/g, '\n').replace(/^\s*\n+/, '').replace(/\s+$/, '');
 }
 
-// OPMS 로 찾아볼 만한 말인가: 관리번호·출원번호처럼 숫자가 든 4~40글자 한 줄 — 아무 글이나 회사 서버에 보내지 않게
-export const looksLikeRef = (q) => {
-  const s = String(q ?? '').trim();
-  return s.length >= 4 && s.length <= 40 && /\d/.test(s) && !s.includes('\n');
-};
+/** 있는 메모 끝에 매직키 글을 덧붙인 본문 — 빈 줄 하나를 두고, 글의 줄바꿈은 그대로 (빈 글이면 null) */
+export function appendToBody(body, text) {
+  const add = memoBodyFromText(text);
+  if (!add) return null;
+  const base = String(body ?? '').replace(/\s+$/, '');
+  return base ? `${base}\n\n${add}\n` : `${add}\n`;
+}

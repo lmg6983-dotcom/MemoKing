@@ -7,11 +7,12 @@ import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
-import { normalizeReminder } from '../app/js/core/reminders.js';
+import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
+import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
 import { activeModules, memoBodyFromText, magicChips, toggleMagicChip, reorderMagicChips, normalizeMagicSettings } from '../app/js/core/magic-modules.js';
 import { WEB_ENGINES, AI_SITES, siteLink, siteUrl } from '../app/js/core/magic-tools.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
-import { looksLikeRef, isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
+import { isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
 import { isBlankBody } from '../app/js/core/memo-file.js';
 import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
@@ -421,10 +422,12 @@ export function registerIpc(ctx) {
       const recent = mods.has('notes') && vault ? vault.list().slice(0, 4).map((m) => ({ id: m.id, title: m.title, snippet: (m.preview ?? '').split('\n')[0], color: m.color, updated: m.updated })) : [];
       return { notes: recent, recent: true, folders: [], files: [], index: getFileIndex()?.status() ?? null };
     }
-    const updatedOf = new Map((vault?.list() ?? []).map((m) => [m.id, m.updated]));
     const memos = mods.has('notes') && vault ? vault.searchable() : [];
-    const notes = searchMemos(memos, q, 5).map((n) => ({ ...n, updated: updatedOf.get(n.id) }));
-    const notesTotal = notes.length < 5 ? notes.length : searchMemos(memos, q, Infinity).length;
+    const updatedOf = new Map(memos.map((m) => [m.id, m.updated]));
+    // 한 번에 앞 5건 + 맞는 것 전부의 개수 — 예전에는 개수를 세려고 한 번 더 찾았다
+    const found = searchMemos(memos, q, 5);
+    const notes = found.map((n) => ({ ...n, updated: updatedOf.get(n.id) }));
+    const notesTotal = found.total;
     let folders = [];
     let files = [];
     let totalFolders = 0;
@@ -445,7 +448,7 @@ export function registerIpc(ctx) {
   // 웹 검색 · AI 에게 묻기 기본 사이트 (매직키 창의 할 일 단추 순서)
   ipcMain.handle('magic:prefs', () => {
     const m = normalizeMagicSettings(settings.magic);
-    return { engine: m.engine, ai: m.ai };
+    return { engine: m.engine, ai: m.ai, opms: Boolean(wm.opmsSettings().host), opmsShapes: settings.opmsShapes ?? [] }; // opms: 서버 주소를 넣었나 (없으면 "OPMS 에서 찾기" 줄도 없음)
   });
   // 계산 결과 복사 · 웹 검색 · AI 에게 묻기 · 사이트 열기 — 고른 줄을 실행할 때만 브라우저로 (주소는 여기서 만든다)
   ipcMain.handle('magic:tool', (_e, req) => {
@@ -469,24 +472,38 @@ export function registerIpc(ctx) {
     if (link.paste) toast({ title: `${link.name} 를 열었어요`, body: '질문을 복사해 두었어요. 입력 칸에 붙여 넣기(Ctrl+V)만 하면 돼요' });
     return { ok: true };
   });
+  // 사용자가 골라 찾은 사건의 번호 양식을 배워 둔다 — 같은 양식의 번호는 앞으로 매직키가 저절로 찾는다 (설정에서 지우기)
+  const learnOpms = (rows) => {
+    const next = learnShapes(settings.opmsShapes, rows);
+    if (next !== settings.opmsShapes) {
+      settings.opmsShapes = next;
+      saveSettings();
+    }
+    return next;
+  };
   ipcMain.handle('magic:opms-search', async (_e, query) => {
     const q = String(query ?? '').slice(0, 40);
-    if (!activeModules(settings.magic).some((m) => m.id === 'opms') || !looksLikeRef(q)) return { cases: [], total: 0 };
+    if (!activeModules(settings.magic).some((m) => m.id === 'opms') || !looksLikeOpmsQuery(q)) return { cases: [], total: 0 };
     if (!wm.opmsSettings().host) return { cases: [], total: 0, error: '설정 매직키의 OPMS 연결에 서버 주소를 넣으면 OPMS 사건도 찾아요' }; // 주소를 넣기 전
     try {
-      const rows = await wm.opmsClient().find(q, { timeoutMs: 5000, retries: 0 });
-      wm.rememberCases(rows);
-      return { cases: rows.slice(0, 6).map((r) => wm.opmsBrief(r)), total: rows.length };
+      // 정확한 것부터 6건 (번호 일부 · 출원인 · 발명자 · 초성), 나머지는 "OPMS 다른 n건 더 보기"
+      const { rows, total } = await wm.opmsClient().search(q, { timeoutMs: 5000, retries: 0, limit: 60 });
+      const top = rows.slice(0, 6);
+      wm.rememberCases(top);
+      return { cases: top.map((r) => wm.opmsBrief(r, q)), total, shapes: learnOpms(rows) };
     } catch (err) {
       return { cases: [], total: 0, error: err.offline ? '사내망에 연결돼 있지 않아 OPMS 를 찾지 못했어요' : err.message };
     }
   });
 
   // ---------- OPMS 창 ----------
+  // OPMS 창: 정확한 것부터 200건까지 + 맞는 것 전부의 개수
   ipcMain.handle('opms:search', async (_e, query) => {
-    const rows = await wm.opmsClient().find(String(query ?? '').slice(0, 60), { retries: 1 });
+    const q = String(query ?? '').slice(0, 60);
+    const { rows, total } = await wm.opmsClient().search(q, { retries: 1 });
     wm.rememberCases(rows);
-    return rows.map((r) => wm.opmsBrief(r));
+    learnOpms(rows);
+    return { list: rows.map((r) => wm.opmsBrief(r, q)), total };
   });
   ipcMain.handle('opms:case', async (_e, idx) => {
     const known = wm.caseOf(idx);
@@ -567,7 +584,12 @@ export function registerIpc(ctx) {
     return { file };
   });
   // 설정 › 매직키 › OPMS: 서버 주소 · 전자포대 폴더 (코드에 두지 않고 사용자가 넣는다)
-  ipcMain.handle('opms:settings', () => ({ ...wm.opmsSettings(), hostSet: Boolean(wm.opmsSettings().host) }));
+  ipcMain.handle('opms:settings', () => ({ ...wm.opmsSettings(), hostSet: Boolean(wm.opmsSettings().host), shapes: settings.opmsShapes ?? [] }));
+  ipcMain.handle('opms:clear-shapes', () => {
+    settings.opmsShapes = [];
+    saveSettings();
+    return [];
+  });
   ipcMain.handle('opms:set-host', (_e, text) => {
     const raw = String(text ?? '').trim();
     const host = raw ? normalizeOpmsHost(raw) : '';
@@ -619,8 +641,9 @@ export function registerIpc(ctx) {
     }
     const vault = getVault();
     const mods = new Set(activeModules(settings.magic).map((m) => m.id));
-    const updatedOf = new Map((vault?.list() ?? []).map((m) => [m.id, m.updated]));
-    const notes = mods.has('notes') && vault ? searchMemos(vault.searchable(), q, 300).map((n) => ({ kind: 'note', ...n, updated: updatedOf.get(n.id) })) : [];
+    const searchable = mods.has('notes') && vault ? vault.searchable() : [];
+    const updatedOf = new Map(searchable.map((m) => [m.id, m.updated]));
+    const notes = searchable.length ? searchMemos(searchable, q, 300).map((n) => ({ kind: 'note', ...n, updated: updatedOf.get(n.id) })) : [];
     const found = mods.has('files') && fileIndex ? fileIndex.searchAll(q, 2000) : { items: [], total: 0 };
     wm.lastFinderResults = new Set(found.items.map((f) => f.path));
     const home = os.homedir();
@@ -657,10 +680,18 @@ export function registerIpc(ctx) {
     if (!body) return { ok: false };
     const id = vault.import({ body });
     if (!id) return { ok: false };
+    // "알림 맞춰 저장": 글 속 날짜로 일정 하나 (미리 알림은 기본값 — 바꾸려면 메모의 종 버튼)
+    const reminder = payload.remind ? eventFromDate(payload.remind) : null;
+    const saved = reminder ? vault.setReminders(id, [reminder]) : null;
+    if (saved) {
+      pushReminders();
+      alarms.tick();
+    }
+    const when = saved ? `\n알림: ${describeReminder(saved[0])}` : '';
     if (payload.open) wm.openNote(id);
     else {
       const showNow = () => wm.openNote(id, { inactive: true });
-      if (!toast({ memoId: id, kind: 'magic-memo', title: UI.memoCreated, body: `${body.split('\n')[0].slice(0, 40)}\n눌러서 열기`, onClick: () => wm.revealNote(id), onFail: showNow })) showNow();
+      if (!toast({ memoId: id, kind: 'magic-memo', title: UI.memoCreated, body: `${body.split('\n')[0].slice(0, 40)}${when}\n눌러서 열기`, onClick: () => wm.revealNote(id), onFail: showNow })) showNow();
     }
     return { ok: true, id };
   });

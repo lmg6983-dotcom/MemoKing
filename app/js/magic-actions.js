@@ -11,9 +11,12 @@ const ICONS = {
   save: 'M5 12l5 5L20 7',
   saveOpen: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
   more: 'M4 6h16M4 12h16M4 18h10',
+  append: 'M12 5v14M5 12h14',
+  ask: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4',
   wrapper: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   copyOur: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
   copy: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
+  copyIso: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
   copyExpr: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M7 12h6M7 16h4M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
   copyApp: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M7 12h6M7 16h4M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
 };
@@ -24,15 +27,23 @@ export function actionsFor(r) {
     case 'new':
       return [{ id: 'save', label: '저장' }, { id: 'saveOpen', label: '저장하고 열기' }];
     case 'note':
-      return [{ id: 'open', label: '열기' }, { id: 'copyText', label: '내용 복사' }];
+      // canAppend: 매직키에 글을 썼을 때 — 그 글을 이 메모 끝에 덧붙이기
+      return [{ id: 'open', label: '열기' }, ...(r.canAppend ? [{ id: 'append', label: '이 메모에 덧붙이기' }] : []), { id: 'copyText', label: '내용 복사' }];
+    case 'remind':
+      return [{ id: 'save', label: '알림 맞춰 저장' }, { id: 'saveOpen', label: '저장하고 열기' }];
     case 'folder':
       return [{ id: 'open', label: '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '위 폴더에서 보기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '폴더 복사' }];
     case 'file':
       return [{ id: 'open', label: r.app ? '실행' : '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '폴더 열기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '파일 복사' }];
+    case 'opmsAsk':
+      return [{ id: 'ask', label: 'OPMS 에서 찾기' }];
     case 'more':
+    case 'opmsMore':
       return [{ id: 'more', label: '모두 보기' }];
     case 'calc':
       return [{ id: 'copy', label: '결과 복사' }, { id: 'copyExpr', label: '식과 함께 복사' }];
+    case 'date':
+      return [{ id: 'copy', label: '결과 복사' }, { id: 'copyIso', label: `${r.plain} 복사` }, { id: 'copyExpr', label: '쓴 글과 함께 복사' }];
     case 'site':
       return [{ id: 'open', label: '사이트 열기' }];
     // 웹 검색 · AI: 사이트마다 단추 (이름 글자로, 설정에서 고른 사이트가 맨 앞 = Enter)

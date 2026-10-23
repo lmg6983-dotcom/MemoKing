@@ -1,7 +1,11 @@
 import { replayClass } from './dom.js';
 import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
-import { looksLikeRef } from './core/magic-modules.js';
+import { opmsQueryKind, autoOpmsQuery } from './core/opms-search.js';
 import { calcInput, calcOutput, siteUrl, sitesInOrder, looksLikeQuestion, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
+import { dateCalc } from './core/date-calc.js';
+import { findDates, guessTitle } from './core/date-detect.js';
+import { dayLabel, koClock } from './core/time.js';
+import { isChoseongQuery, choseongRange } from './core/text-match.js';
 import { searchingNode } from './searching.js';
 import { COLOR_DOTS } from './core/memo-file.js';
 import { UI } from './core/ui-text.js';
@@ -103,7 +107,10 @@ function animateResults(before, beforeHeight) {
 }
 
 // 웹 검색 · AI 기본 사이트 (설정 매직키에서 고름)
-let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id };
+let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id, opms: false, opmsShapes: [] };
+// 저절로 OPMS 에 묻는 번호: 온전한 출원번호 · 관리번호 꼴, 또는 예전에 OPMS 에서 찾은 번호와 같은 양식
+//   (글 중간 띄어쓰기 · 맨 앞 0(전화 국번)은 늘 빼고 — core/opms-search blocksAutoOpms)
+const autoOpms = (q) => autoOpmsQuery(q, prefs.opmsShapes);
 async function loadPrefs() {
   prefs = { ...prefs, ...(await api.prefs?.().catch(() => null)) };
 }
@@ -137,6 +144,8 @@ function calcFor(query) {
 const SVG = {
   web: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3.6 9h16.8M3.6 15h16.8M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z',
   ai: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z',
+  bell: 'M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0',
+  date: 'M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM8 13h3v3H8z',
 };
 function svgIcon(name) {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -284,6 +293,9 @@ function highlighted(text, query) {
     for (const t of terms) {
       const k = lower.indexOf(t, i);
       if (k >= 0 && (!hit || k < hit.k)) hit = { k, len: t.length };
+      // 초성(ㄱㅈㅅ)으로 찾았으면 그 글자들(견적서)을 굵게
+      const r = k < 0 && isChoseongQuery(t) ? choseongRange(text.slice(i), t) : null;
+      if (r && (!hit || i + r[0] < hit.k)) hit = { k: i + r[0], len: r[1] - r[0] };
     }
     if (!hit) {
       span.append(text.slice(i));
@@ -339,6 +351,11 @@ function row(r, index, query) {
     ico.textContent = '=';
     t.textContent = r.value;
     s.textContent = r.text; // 쓴 그대로 (1,200 × 3)
+  } else if (r.kind === 'date') {
+    ico.append(svgIcon('date'));
+    t.textContent = r.value; // 2026년 11월 12일 (목) · 64일 남음 · 오후 5:10
+    s.textContent = r.detail;
+    s.title = r.detail;
   } else if (r.kind === 'site') {
     ico.append(svgIcon('web'));
     t.textContent = '사이트 열기';
@@ -350,8 +367,16 @@ function row(r, index, query) {
   } else if (r.kind === 'opms') {
     ico.textContent = 'O';
     t.append(highlighted([r.ourref, r.n_app].filter(Boolean).join(', ') || r.yourref || '관리번호 없음', query));
-    s.textContent = [r.applicant, r.title].filter(Boolean).join(', ');
+    s.append(highlighted([r.applicant, r.inventor && `발명자 ${r.inventor}`, r.title].filter(Boolean).join(', '), query)); // 이름으로 찾았으면 맞은 이름이 굵게
     side.textContent = r.div || '';
+  } else if (r.kind === 'opmsAsk') {
+    ico.textContent = 'O';
+    t.textContent = 'OPMS 에서 찾기';
+    s.textContent = r.opmsKind === 'ref' ? '관리번호, 출원번호에서 (고르면 회사 OPMS 에 물어봐요)' : '출원인, 발명자 이름에서 (고르면 회사 OPMS 에 물어봐요)';
+  } else if (r.kind === 'opmsMore') {
+    ico.textContent = '⋯';
+    t.textContent = `OPMS 다른 ${r.count.toLocaleString()}건 더 보기`;
+    s.textContent = 'OPMS 창에서 정확한 것부터 모두 보여 줘요';
   } else if (r.kind === 'more') {
     ico.textContent = '⋯';
     t.textContent = `다른 ${r.count.toLocaleString()}건 더 보기`;
@@ -360,6 +385,10 @@ function row(r, index, query) {
     ico.textContent = '✎';
     t.textContent = '새 메모로 저장';
     s.textContent = query.split('\n')[0];
+  } else if (r.kind === 'remind') {
+    ico.append(svgIcon('bell'));
+    t.textContent = `${r.label} 알림 맞춰 저장`;
+    s.textContent = r.title || query.split('\n')[0];
   } else if (r.kind === 'note') {
     const dot = document.createElement('span');
     dot.className = 'dot';
@@ -380,7 +409,10 @@ function row(r, index, query) {
     s.title = r.path;
     if (r.app) side.textContent = '프로그램';
   }
-  li.addEventListener('mousemove', () => {
+  li.addEventListener('mousemove', (e) => {
+    // 마우스가 정말 움직였을 때만 — 가만히 있는 마우스 아래로 목록이 다시 그려질 때도 mousemove 가 와서,
+    //   치는 동안 고른 줄이 마우스 아래 줄로 바뀌면 Enter 가 엉뚱한 줄을 실행했다
+    if (!e.movementX && !e.movementY) return; // 목록이 바뀌어 생긴 mousemove 는 움직인 거리가 0
     if (selected !== index) select(index);
   });
   li.addEventListener('mousedown', (e) => e.preventDefault()); // 입력 칸 포커스 유지
@@ -415,9 +447,11 @@ function note(text) {
 function render() {
   const raw = input.value;
   const query = raw.trim();
-  const before = introFresh ? new Map() : positions();
-  const beforeHeight = resultsEl.getBoundingClientRect().height;
-  resultsEl.getAnimations().forEach((a) => a.cancel()); // 높이가 바뀌던 중이면 지금 높이에서 다시
+  // 움직일 때만 지금 자리를 잰다 (재는 것만으로도 화면 배치를 한 번 더 계산한다 — 평소 글자 칠 때는 재지 않음)
+  const moving = !calm.matches && (introFresh || Date.now() - shownAt < 400 || Date.now() < glideUntil);
+  const before = !moving || introFresh ? new Map() : positions();
+  const beforeHeight = moving ? resultsEl.getBoundingClientRect().height : 0;
+  if (moving) resultsEl.getAnimations().forEach((a) => a.cancel()); // 높이가 바뀌던 중이면 지금 높이에서 다시
   rows = [];
   // 기능 id → 묶음 [{ head: [이름, 개수] } | { row } | { node }] — 계산 · 사이트 주소는 늘 맨 위 (식 · 주소면 Enter 로 바로), 나머지는 캡슐 순서
   const groups = new Map();
@@ -425,16 +459,31 @@ function render() {
     if (!groups.has(mod)) groups.set(mod, []);
     groups.get(mod).push(item);
   };
-  const calc = query ? calcFor(query) : null;
-  if (calc) put('calc', { row: { kind: 'calc', ...calc, text: query } });
+  // 날짜 계산(3주 뒤 · 12/25까지 · 9:15부터 18:30까지)이 먼저, 아니면 식 계산 — 둘 다 계산기 캡슐
+  const date = query && isOn('calc') ? dateCalc(query) : null;
+  const calc = date ?? (query ? calcFor(query) : null);
+  if (calc) put('calc', { row: date ? { kind: 'date', ...date, text: query } : { kind: 'calc', ...calc, text: query } });
   const url = query && isOn('web') ? siteUrl(query) : null;
   if (url) put('site', { row: { kind: 'site', url } });
-  if (query && isOn('memo')) put('memo', { row: { kind: 'new' } });
+  if (query && isOn('memo')) {
+    put('memo', { row: { kind: 'new' } });
+    // 첫 줄에 날짜 · 시각이 있으면 (내일 3시 거래처 전화) 그때 알림을 맞춰 저장하는 줄도 — 날짜 계산 글은 빼고
+    const line = query.split('\n')[0];
+    const when = date ? null : findDates(line)[0];
+    if (when) {
+      const label = when.repeat ? when.text : when.hasTime ? `${dayLabel(when.at)} ${koClock(when.at)}` : dayLabel(when.at);
+      put('memo', { row: { kind: 'remind', label, title: guessTitle(line, when.from, when.to), when: { at: when.at.toISOString(), hasTime: when.hasTime, repeat: when.repeat ?? null } } });
+    }
+  }
   // 관리번호·출원번호를 쓰면 OPMS 사건 (찾는 중 · 사내망이 아님도 이 자리에)
-  if (query && isOn('opms') && opms.query === query && !(calc && opms.error)) { // 식에는 "OPMS 주소를 넣으면" 안내를 안 띄운다
+  // OPMS: 고르기 전에는 "OPMS 에서 찾기" 줄만 (서버에 묻지 않음), 고른 뒤에는 찾은 사건 · 찾는 중 · 오류
+  const opmsKind = query && isOn('opms') && prefs.opms ? opmsQueryKind(query) : null;
+  if (opmsKind && opms.query !== query) put('opms', { row: { kind: 'opmsAsk', opmsKind } });
+  if (opmsKind && opms.query === query && !(calc && opms.error)) { // 식에는 "OPMS 주소를 넣으면" 안내를 안 띄운다
     if (opms.cases.length) {
       put('opms', { head: ['OPMS', opms.total] });
       opms.cases.forEach((c) => put('opms', { row: { kind: 'opms', ...c } }));
+      if (opms.total > opms.cases.length) put('opms', { row: { kind: 'opmsMore', count: opms.total - opms.cases.length } });
     } else if (opms.loading) {
       const li = note('');
       li.classList.add('loading');
@@ -442,6 +491,7 @@ function render() {
       put('opms', { node: li });
     }
     else if (opms.error) put('opms', { node: note(opms.error) });
+    else put('opms', { node: note(`OPMS 에서 '${query.slice(0, 30)}'와 맞는 사건을 못 찾았어요`) });
   }
   // 캡슐로 끈 기능은 새 결과를 기다리지 않고 바로 뺀다
   const notes = isOn('notes') ? results.notes : [];
@@ -449,7 +499,7 @@ function render() {
   const files = query && isOn('files') ? results.files : [];
   if (notes.length) {
     put('notes', { head: [results.recent ? '최근 메모' : '메모', results.recent ? 0 : notes.length] });
-    notes.forEach((n) => put('notes', { row: { kind: 'note', ...n } }));
+    notes.forEach((n) => put('notes', { row: { kind: 'note', ...n, canAppend: Boolean(query && isOn('memo') && !results.recent) } }));
   }
   if (folders.length) {
     put('files', { head: ['폴더', folders.length] });
@@ -511,6 +561,16 @@ function render() {
   clearBtn.hidden = !raw;
   // 남겨 둔 지난 글로 다시 띄운 경우 첫 줄("메모로 저장")이 아니라 찾은 결과를 골라 둔다 (Enter 로 같은 메모를 또 만들지 않게)
   if (retained && selected === 0 && rows[0]?.kind === 'new' && rows.length > 1) selected = 1;
+  // 관리번호 · 출원번호처럼 보이는 글은 메모로 저장하기보다 OPMS 에서 찾으려는 것 — "OPMS 에서 찾기" 를 골라 둔다 (아직 묻지는 않음)
+  if (!retained && selected === 0 && rows[0]?.kind === 'new' && opmsKind === 'ref' && !autoOpms(query)) {
+    const ask = rows.findIndex((r) => r.kind === 'opmsAsk');
+    if (ask > 0) selected = ask;
+  }
+  // 초성만 쓴 글(ㄱㅈㅅ)은 찾으려는 것 — 메모로 저장하지 않고 첫 결과를 골라 둔다
+  if (!retained && selected === 0 && rows[0]?.kind === 'new' && query.split(/\s+/).every(isChoseongQuery)) {
+    const first = rows.findIndex((r) => r.kind === 'note' || r.kind === 'file' || r.kind === 'folder');
+    if (first > 0) selected = first;
+  }
   // 쓴 글이 이미 있는 메모 제목과 똑같으면 그 메모를 골라 둔다 (Enter 로 같은 이름의 메모를 또 만들지 않게 — 새로 만들려면 ↑)
   const same = (t) => String(t ?? '').trim().toLowerCase() === query.trim().toLowerCase();
   if (!retained && selected === 0 && rows[0]?.kind === 'new') {
@@ -518,7 +578,7 @@ function render() {
     if (hit > 0) selected = hit;
   }
   select(Math.min(selected, Math.max(0, rows.length - 1)), { scroll: false, glide: gliding() });
-  animateResults(before, beforeHeight);
+  if (moving) animateResults(before, beforeHeight);
   fit();
 }
 
@@ -531,6 +591,7 @@ function fit() {
     const h = Math.ceil(box.getBoundingClientRect().height - list + (listTarget || list)) + 16;
     clearTimeout(shrinkTimer);
     const apply = () => {
+      if (h === winHeight) return; // 높이가 그대로면 창에 묻지 않는다
       winHeight = h;
       api.resize(h);
     };
@@ -618,25 +679,38 @@ async function search() {
   render();
 }
 
-// OPMS: 치는 동안은 기다렸다가(0.35초) 한 번만 — 관리번호·출원번호처럼 보일 때만
-let opmsTimer = 0;
+// OPMS: 치는 동안에는 회사 서버에 보내지 않는다 — "OPMS 에서 찾기" 줄을 골랐을 때만 묻는다
+//   (매직키에 쓰는 메모 · 검색어가 저절로 회사 서버로 가지 않게). 사건번호를 온전히 쓴 것만은 손을 멈추면(0.35초) 저절로
 let opmsSeq = 0;
+let opmsTimer = 0;
 function searchOpms() {
   const query = input.value.trim();
   clearTimeout(opmsTimer);
-  if (!isOn('opms') || !looksLikeRef(query)) {
+  if (opms.query !== query || !isOn('opms')) {
+    opmsSeq++; // 묻는 중이던 것은 버린다
     opms = { query: '', loading: false, cases: [], total: 0, error: '' };
-    return;
   }
-  if (opms.query === query && !opms.loading) return;
-  opms = { query, loading: true, cases: [], total: 0, error: '' };
+  if (isOn('opms') && prefs.opms && opms.query !== query && autoOpms(query)) {
+    opmsTimer = setTimeout(() => {
+      if (input.value.trim() === query) askOpms();
+    }, 350);
+  }
+}
+async function askOpms() {
+  const query = input.value.trim();
+  if (!isOn('opms') || !opmsQueryKind(query)) return;
   const my = ++opmsSeq;
-  opmsTimer = setTimeout(async () => {
-    const res = await api.opmsSearch(query).catch((err) => ({ cases: [], total: 0, error: err.message }));
-    if (my !== opmsSeq) return;
-    opms = { query, loading: false, cases: res.cases ?? [], total: res.total ?? 0, error: res.error ?? '' };
-    render();
-  }, 350);
+  opms = { query, loading: true, cases: [], total: 0, error: '' };
+  render();
+  const pick = selected; // 기다리는 동안 다른 줄로 옮겼으면 그 줄을 그대로 둔다 (Enter 가 엉뚱한 사건을 열지 않게)
+  const res = await api.opmsSearch(query).catch((err) => ({ cases: [], total: 0, error: err.message }));
+  if (my !== opmsSeq) return;
+  const moved = selected !== pick;
+  opms = { query, loading: false, cases: res.cases ?? [], total: res.total ?? 0, error: res.error ?? '' };
+  if (Array.isArray(res.shapes)) prefs.opmsShapes = res.shapes; // 방금 배운 번호 양식도 바로
+  render();
+  const first = rows.findIndex((r) => r.kind === 'opms'); // 찾은 첫 사건을 골라 둔다 (Enter 로 바로 사건 보기)
+  if (first >= 0 && !moved) select(first);
 }
 
 let searchTimer = 0;
@@ -665,31 +739,56 @@ function clearText() {
 clearBtn.addEventListener('mousedown', (e) => e.preventDefault());
 clearBtn.addEventListener('click', clearText);
 
+// 안내를 잠깐 보여 준 뒤 닫기 — 그사이 창을 다시 띄우면 취소 (새로 연 창이 닫히지 않게)
+let closeTimer = 0;
+const closeSoon = () => {
+  clearTimeout(closeTimer);
+  closeTimer = setTimeout(() => api.close(), 650);
+};
+
 // 실행: act = 고른 할 일(몇 번째), alt = Ctrl+Enter (다른 실행)
 async function run(i, { alt = false, act = 0 } = {}) {
   const r = rows[i];
   if (!r) return;
   const acts = actionsFor(r);
   const id = (alt && ALT_ACTION[r.kind]) || acts[act]?.id || acts[0]?.id;
-  if (r.kind === 'new') {
+  if (r.kind === 'new' || r.kind === 'remind') {
     const text = input.value;
-    await api.run({ module: 'memo', text, open: id === 'saveOpen' }).catch(() => {});
+    await api.run({ module: 'memo', text, open: id === 'saveOpen', remind: r.kind === 'remind' ? { ...r.when, title: r.title } : null }).catch(() => {});
     input.value = '';
     api.close();
+    return;
+  }
+  if (r.kind === 'note' && id === 'append') {
+    const res = await api.act({ action: 'append', id: r.id, text: input.value }).catch(() => null);
+    if (res?.ok) {
+      input.value = '';
+      flash(true, res.message);
+      closeSoon();
+    } else flash(false, res?.message ?? '덧붙이지 못했어요');
     return;
   }
   if (r.kind === 'more') {
     await api.openAll(input.value.trim()).catch(() => {});
     return;
   }
-  if (r.kind === 'calc' || r.kind === 'site' || r.kind === 'web' || r.kind === 'ai') {
-    const req = r.kind === 'calc' ? { type: 'copy', text: id === 'copyExpr' ? `${r.text} = ${r.value}` : r.plain }
+  if (r.kind === 'opmsAsk') {
+    askOpms();
+    return;
+  }
+  if (r.kind === 'opmsMore') {
+    const res = await api.act({ action: 'opmsAll', text: input.value.trim() }).catch(() => null);
+    if (res?.ok) api.close();
+    return;
+  }
+  if (r.kind === 'calc' || r.kind === 'date' || r.kind === 'site' || r.kind === 'web' || r.kind === 'ai') {
+    const req = r.kind === 'calc' || r.kind === 'date' ? { type: 'copy', text: id === 'copyExpr' ? `${r.text} = ${r.value}` : r.kind === 'date' && id === 'copy' ? r.value : r.plain }
       : r.kind === 'site' ? { type: 'site', text: r.url }
         : { type: r.kind, site: id, text: input.value };
     const res = await api.tool(req).catch(() => null);
     if (res?.message) {
       flash(res.ok, res.message);
-      if (res.ok) setTimeout(() => api.close(), 650);
+      if (res.ok) closeSoon();
     } else if (res?.ok) api.close();
     else flash(false, '열지 못했어요');
     return;
@@ -698,7 +797,7 @@ async function run(i, { alt = false, act = 0 } = {}) {
   const res = await api.act(req).catch(() => null);
   if (res?.message) {
     flash(res.ok, res.message);
-    if (res.ok) setTimeout(() => api.close(), 650); // 복사했다는 표시를 잠깐 보여 주고
+    if (res.ok) closeSoon(); // 복사했다는 표시를 잠깐 보여 주고
     return;
   }
   if (res?.ok) api.close();
@@ -753,6 +852,8 @@ input.addEventListener('keydown', (e) => {
 //   이어서 찾으려면 그대로 Enter · 방향키, 새로 찾으려면 바로 치면 바뀐다 (메모로 저장한 글은 그때 비움)
 let retained = false; // 다시 띄웠을 때 남겨 둔 지난 글 (아직 손대지 않음)
 async function reset() {
+  clearTimeout(closeTimer);
+  flashUntil = 0; // 지난번의 "복사했어요" 안내는 다시 띄울 때 지운다
   selected = 0;
   retained = Boolean(input.value.trim());
   activeAct = 0;
