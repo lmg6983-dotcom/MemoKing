@@ -153,3 +153,17 @@ test('이어 친 글은 앞에서 맞은 이름 안에서만 찾아도 처음부
     assert.deepEqual(idx.searchAll(q, 20), fresh(q), q);
   }
 });
+
+test('이어 치는 사이에 새로 받은 파일도 찾힘 (초성으로도)', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-fi-late-'));
+  const idx = new FileIndex({ roots: () => [] });
+  idx.use([{ n: '견적서 01.txt', p: 'C:/a/견적서 01.txt', d: false, a: false, depth: 1 }], Date.now());
+  assert.equal(idx.searchAll('견적', 20).total, 1);
+  assert.equal(idx.searchAll('ㄱㅈ', 20).total, 1);
+  const late = path.join(root, '견적서 02.txt');
+  fs.writeFileSync(late, 'x');
+  assert.equal(idx.add([late]), 1);
+  assert.equal(idx.searchAll('견적서', 20).total, 2, '앞에서 맞은 이름 안에서만 찾지 않음');
+  assert.equal(idx.searchAll('ㄱㅈㅅ', 20).total, 2, '새 이름도 초성으로');
+  fs.rmSync(root, { recursive: true, force: true });
+});

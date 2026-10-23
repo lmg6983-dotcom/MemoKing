@@ -118,6 +118,8 @@ export function buildLookupWhere(query, field = 'both') {
 
 // LIKE 안에서 % _ [ 는 글자 그대로 (SQL Server)
 const likeQuote = (v) => sqlQuote(v).replace(/[[%_]/g, (ch) => `[${ch}]`);
+// '%글%' — 한글이 들어 있으면 N'' (서버 정렬 규칙이 한글 코드 페이지가 아니어도 글자가 깨지지 않게)
+const likeAny = (v) => `${/[^\x00-\x7f]/.test(v) ? 'N' : ''}'%${likeQuote(v)}%'`;
 export const SEARCH_LIMIT = 200;
 
 /**
@@ -130,21 +132,21 @@ export function buildSearchWhere(query, { kind, names = [] } = {}) {
   const raw = String(query ?? '').trim();
   if (kind === 'choseong') {
     if (!names.length) return null;
-    const ors = names.slice(0, 12).flatMap((n) => [`applicant LIKE '%${likeQuote(n)}%'`, `inventor LIKE '%${likeQuote(n)}%'`]);
+    const ors = names.slice(0, 12).flatMap((n) => [`applicant LIKE ${likeAny(n)}`, `inventor LIKE ${likeAny(n)}`]);
     return `(${ors.join(' OR ')})`;
   }
   if (kind === 'name') {
     const terms = raw.split(/\s+/).filter(Boolean);
     return terms.map((t) => {
-      const ors = [`applicant LIKE '%${likeQuote(t)}%'`, `inventor LIKE '%${likeQuote(t)}%'`];
-      if (/^[A-Za-z]+$/.test(t)) ors.push(`ourref LIKE '%${likeQuote(t)}%'`, `yourref LIKE '%${likeQuote(t)}%'`);
+      const ors = [`applicant LIKE ${likeAny(t)}`, `inventor LIKE ${likeAny(t)}`];
+      if (/^[A-Za-z]+$/.test(t)) ors.push(`ourref LIKE ${likeAny(t)}`, `yourref LIKE ${likeAny(t)}`);
       return `(${ors.join(' OR ')})`;
     }).join(' AND ');
   }
   const compact = raw.replace(/[^0-9A-Za-z]/g, '');
   const parts = ['ourref', 'yourref', 'n_app', 'n_issue'].flatMap((col) => [
-    `${col} LIKE '%${likeQuote(raw)}%'`,
-    ...(compact.length >= 3 ? [`${stripRefSql(col)} LIKE '%${likeQuote(compact)}%'`] : []), // 기호를 빼고도 (2026-0012 ↔ 20260012)
+    `${col} LIKE ${likeAny(raw)}`,
+    ...(compact.length >= 3 ? [`${stripRefSql(col)} LIKE ${likeAny(compact)}`] : []), // 기호를 빼고도 (2026-0012 ↔ 20260012)
   ]);
   return `(${buildLookupWhere(raw)} OR ${parts.join(' OR ')})`;
 }

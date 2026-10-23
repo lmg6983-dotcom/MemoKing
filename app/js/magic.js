@@ -702,13 +702,15 @@ async function askOpms() {
   const my = ++opmsSeq;
   opms = { query, loading: true, cases: [], total: 0, error: '' };
   render();
+  const pick = selected; // 기다리는 동안 다른 줄로 옮겼으면 그 줄을 그대로 둔다 (Enter 가 엉뚱한 사건을 열지 않게)
   const res = await api.opmsSearch(query).catch((err) => ({ cases: [], total: 0, error: err.message }));
   if (my !== opmsSeq) return;
+  const moved = selected !== pick;
   opms = { query, loading: false, cases: res.cases ?? [], total: res.total ?? 0, error: res.error ?? '' };
   if (Array.isArray(res.shapes)) prefs.opmsShapes = res.shapes; // 방금 배운 번호 양식도 바로
   render();
   const first = rows.findIndex((r) => r.kind === 'opms'); // 찾은 첫 사건을 골라 둔다 (Enter 로 바로 사건 보기)
-  if (first >= 0) select(first);
+  if (first >= 0 && !moved) select(first);
 }
 
 let searchTimer = 0;

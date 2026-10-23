@@ -69,7 +69,7 @@ test('번호 양식 배우기: 기호는 그대로 · 영문 A · 숫자 9 · �
   assert.equal(refShape('FPD/2026-0271/E'), 'AAA/9999-9999/A');
   assert.equal(refShape('특-2026-001'), '가-9999-999');
   assert.equal(refShape('Y-77'), null, '숫자가 4개보다 적으면');
-  for (const v of ['010-1234-5678', '2026-10-22', '1234567', '12 34', 'a@b.com12345']) assert.equal(refShape(v), null, v);
+  for (const v of ['010-1234-5678', '2026-10-22', '1234567', '12 34', 'a@b.com12345', '900101-1234567', '123-45-67890', '1234-5678-9012-3456']) assert.equal(refShape(v), null, v);
   const shapes = learnShapes([], [{ ourref: 'FPD/2026-0271/E', yourref: 'CL-2025-0017', n_app: '10-2026-0012345' }, { ourref: 'FPD/2026-1111/D' }]);
   assert.deepEqual(shapes, ['AAA/9999-9999/A', 'AA-9999-9999', '99-9999-9999999']);
   assert.equal(learnShapes(shapes, [{ ourref: 'FPD/2027-0001/E' }]), shapes, '이미 아는 양식이면 그대로');

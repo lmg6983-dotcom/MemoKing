@@ -56,7 +56,7 @@ function fakeOpms() {
         if (/DISTINCT applicant AS name/.test(sql)) return res.end(table(['name'], [...new Set(cases.flatMap((c) => [c[6], c[7]]).filter(Boolean))].map((n) => [n])));
         // 회사 서버처럼 조건대로: idx 하나 · LIKE '%글%' (기호를 뺀 것도) · 그 밖은 전부
         const one = sql.match(/\bidx = '(\d+)'/)?.[1];
-        const likes = [...sql.matchAll(/LIKE '%(.+?)%'/g)].map((m) => m[1].replace(/\[(.)\]/g, '$1'));
+        const likes = [...sql.matchAll(/LIKE N?'%(.+?)%'/g)].map((m) => m[1].replace(/\[(.)\]/g, '$1'));
         const compact = (v) => v.replace(/[^0-9A-Za-z가-힣]/g, '');
         const rows = cases.filter((r) => (!one || r[0] === one) && (!likes.length || likes.some((t) => r.join(' ').includes(t) || compact(r.join('')).includes(t))));
         if (/COUNT\(\*\)/.test(sql)) return res.end(table(['n'], [[String(rows.length)]]));

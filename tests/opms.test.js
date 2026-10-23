@@ -583,12 +583,12 @@ test('OPMS 일부 · 이름 · 초성 찾기 SQL: LIKE 안의 % _ [ 는 글자 �
   assert.match(ref, /REPLACE\(.*n_app.*\) LIKE '%0271%'/, '기호를 빼고도');
   assert.match(ref, /ourref = '0271'/, '예전 같은 번호 조건도');
   assert.match(buildSearchWhere('2026-0012', { kind: 'ref' }), /LIKE '%20260012%'/);
-  assert.equal(buildSearchWhere('홍길 메모킹', { kind: 'name' }), "(applicant LIKE '%홍길%' OR inventor LIKE '%홍길%') AND (applicant LIKE '%메모킹%' OR inventor LIKE '%메모킹%')");
+  assert.equal(buildSearchWhere('홍길 메모킹', { kind: 'name' }), "(applicant LIKE N'%홍길%' OR inventor LIKE N'%홍길%') AND (applicant LIKE N'%메모킹%' OR inventor LIKE N'%메모킹%')", '한글은 N 을 붙여 (서버 코드 페이지와 상관없이)');
   assert.match(buildSearchWhere('FPD', { kind: 'name' }), /ourref LIKE '%FPD%'/, '영문은 관리번호에도');
   assert.match(buildSearchWhere("O'Neil", { kind: 'name' }), /LIKE '%O''Neil%'/);
   assert.match(buildSearchWhere('10%_[a', { kind: 'ref' }), /LIKE '%10\[%\]\[_\]\[\[\]a%'/);
   assert.equal(buildSearchWhere('ㅎㄱㄷ', { kind: 'choseong', names: [] }), null, '맞는 이름이 없으면 묻지 않음');
-  assert.equal(buildSearchWhere('ㅎㄱㄷ', { kind: 'choseong', names: ['홍길동'] }), "(applicant LIKE '%홍길동%' OR inventor LIKE '%홍길동%')");
+  assert.equal(buildSearchWhere('ㅎㄱㄷ', { kind: 'choseong', names: ['홍길동'] }), "(applicant LIKE N'%홍길동%' OR inventor LIKE N'%홍길동%')");
   assert.match(buildSearchSql('(x = 1)', 60), /^SELECT TOP 60 idx, .*WHERE del_flag = 'N' AND \(x = 1\)\nORDER BY d_accept DESC/s);
   assert.match(buildCountSql('(x = 1)'), /SELECT COUNT\(\*\) AS n/);
   assert.match(buildNamesSql(), /DISTINCT applicant AS name.*UNION.*DISTINCT inventor AS name/s);
@@ -606,7 +606,7 @@ test('OPMS 찾기: 정확한 것부터, 많으면 개수를 따로, 초성은 �
     sqls.push(sql);
     if (/COUNT\(\*\)/.test(sql)) return new Response(table(['n'], [['42']]));
     if (/DISTINCT applicant AS name/.test(sql)) return new Response(table(['name'], [['메모킹 주식회사'], ['홍길동'], ['김홍길동'], ['김철수, 홍길동']]));
-    const like = [...sql.matchAll(/LIKE '%([^%']+)%'/g)].map((m) => m[1]);
+    const like = [...sql.matchAll(/LIKE N?'%([^%']+)%'/g)].map((m) => m[1]);
     const rows = cases.filter((c) => like.some((t) => c.join(' ').includes(t)));
     return new Response(table(['idx', 'ourref', 'applicant', 'inventor', 'd_accept'], rows));
   };

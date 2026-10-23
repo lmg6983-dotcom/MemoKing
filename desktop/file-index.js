@@ -117,7 +117,11 @@ export class FileIndex {
       this.extra.set(p.toLowerCase(), e);
       added++;
     }
-    if (added) this.snapshot = true;
+    if (added) {
+      this.snapshot = true;
+      this.last = null; // 이어 친 글도 새 이름까지 다시 훑게
+      this.hangul = null; // 새 이름의 한글 표시도 다시
+    }
     return added;
   }
 
