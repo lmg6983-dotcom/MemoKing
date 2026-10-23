@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 안드로이드 11 이하 자동 백업: 로컬 AI 모델 · 검색 벡터(files/ai, 몇 GB)는 빼다 — 25MB 를 넘으면 백업 전체가 멈춘다 -->
+<full-backup-content>
+    <exclude domain="file" path="ai/" />
+</full-backup-content>

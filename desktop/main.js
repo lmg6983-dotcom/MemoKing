@@ -17,6 +17,7 @@ import { LinkPreviews } from './link-previews.js';
 import { pickHandoff, recentlyUpdated } from '../app/js/core/handoff.js';
 import { PopupWatcher } from './popup-watch.js';
 import { createSttService } from './stt/stt-service.js';
+import { createAiService } from './ai/ai-service.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, findRepeat, betterReading, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
@@ -41,7 +42,7 @@ import {
 } from './window-utils.js';
 
 import {
-  SMOKE, APP_ID, STT_WORKER, STT_VENDOR, POPUP_HELPER,
+  SMOKE, APP_ID, STT_WORKER, STT_VENDOR, LLAMA_SERVER, POPUP_HELPER,
   settings, loadSettings, saveSettings, installMark, suggestedVaultPath,
   purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings,
   TRASH_DAYS, openWebPage, openVaultFile, toast, smokeToasts, smokeOpened,
@@ -103,6 +104,7 @@ let driveApi = null;
 let driveSync = null;
 
 let stt = null;
+let ai = null;
 const heldLocks = new Map();
 
 let fileIndex = null;
@@ -688,6 +690,24 @@ function holdLock(memoId, session) {
 
 const sttOptions = () => ({ enabled: settings.stt?.enabled !== false, speaker: settings.stt?.speaker === true });
 
+// ---------- 로컬 AI (desktop/ai) ----------
+
+function initAi() {
+  ai = createAiService({
+    dir: path.join(app.getPath('userData'), 'ai'),
+    serverPath: process.env.MEMOKING_LLAMA_SERVER || LLAMA_SERVER,
+    getNames: () => settings.ai ?? {},
+    setName: (role, name) => {
+      settings.ai = { ...settings.ai, [role]: name };
+      saveSettings();
+    },
+    onStatus: (status) => {
+      const w = windowManager.listWin;
+      if (w && !w.isDestroyed()) w.webContents.send('ai:status', status);
+    },
+  });
+}
+
 function initStt() {
   stt = createSttService({
     dir: process.env.MEMOKING_STT_DIR || path.join(app.getPath('userData'), 'stt'),
@@ -1164,6 +1184,7 @@ app.whenReady().then(async () => {
 
   registerVaultProtocol(() => vault, () => history);
   initStt();
+  initAi();
 
   calendarFeeds = new CalendarFeeds({
     dir: path.join(app.getPath('userData'), 'calendars'),
@@ -1224,6 +1245,7 @@ app.whenReady().then(async () => {
     TRASH_DAYS,
     getStt: () => stt,
     sttOptions,
+    getAi: () => ai,
     getLinkPreviews,
     openWebPage,
     openVaultFile,
@@ -1459,6 +1481,7 @@ app.on('will-quit', () => {
   updater?.stop();
   flushOpmsFiles();
   stt?.close();
+  ai?.close();
   windowManager.topWatch.stop();
   globalShortcut.unregisterAll();
   windowManager.captureHelper.stop();

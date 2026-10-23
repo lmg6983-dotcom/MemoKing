@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 안드로이드 12+ 백업 · 기기 옮기기: 로컬 AI 모델 · 검색 벡터(files/ai)는 빼다 (몇 GB, 새 기기에서 다시 넣으면 됨) -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="ai/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="ai/" />
+    </device-transfer>
+</data-extraction-rules>

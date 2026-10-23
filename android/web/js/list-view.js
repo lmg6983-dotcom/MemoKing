@@ -22,6 +22,8 @@ import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { setListTheme } from './theme.js';
 import { UI } from '../../app/js/core/ui-text.js';
+import { setupAiAsk } from '../../app/js/ai-ask.js';
+import { aiSupported, aiApi } from './local-ai.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -40,6 +42,8 @@ const el = {
   sortGroup: $('sort-group'),
   layoutGroup: $('layout-group'),
 };
+// 검색창 › AI에게 묻기 (PC 와 같은 것, 이 휴대폰 안의 모델로 — 글 모델을 넣었을 때만)
+const aiAsk = aiSupported ? setupAiAsk({ box: $('ai-ask'), api: aiApi }) : null;
 
 let layout = 'grid';
 let sort = 'updated'; // 목록 정렬 (아래 "정렬")
@@ -496,6 +500,7 @@ function runSearch() {
   state.queryTags = tags;
   state.results = text ? app.vault.search(text) : null;
   render();
+  aiAsk?.update(text);
 }
 el.search.addEventListener('input', () => {
   clearTimeout(searchTimer);

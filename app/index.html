@@ -79,6 +79,7 @@
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>
       </div>
+      <div id="ai-ask" class="ai-ask" hidden></div>
       <p id="count" class="result-count" role="status" hidden></p>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
@@ -253,6 +254,22 @@
         <input type="checkbox" id="stt-speaker" class="switch" role="switch">
         <span>말한 사람 나누기 <small id="stt-speaker-note">녹음이 끝난 뒤 "화자 1:" 처럼 이름표를 붙여요</small></span>
       </label>
+    </section>
+    <section class="set-sec" aria-labelledby="set-local-ai" id="local-ai-sec">
+      <h3 class="set-title" id="set-local-ai">AI 도우미 <small>인터넷 없이 이 PC 안에서 돌아가요</small></h3>
+      <div class="setting-row keymap-row">
+        <span>글 모델 <small id="ai-chat-note" role="status"></small><small id="ai-try-out" role="status"></small></span>
+        <button type="button" class="link-btn danger" id="ai-chat-remove" hidden>삭제</button>
+        <button type="button" class="btn" id="ai-chat-import">모델 파일 넣기</button>
+      </div>
+      <div class="dialog-actions left sub-actions" id="ai-try-row" hidden>
+        <button type="button" class="link-btn" id="ai-try">시험해 보기</button>
+      </div>
+      <div class="setting-row keymap-row">
+        <span>검색 모델 <small id="ai-embed-note" role="status"></small></span>
+        <button type="button" class="link-btn danger" id="ai-embed-remove" hidden>삭제</button>
+        <button type="button" class="btn" id="ai-embed-import">모델 파일 넣기</button>
+      </div>
     </section>
     <section class="set-sec" aria-labelledby="set-keys">
       <h3 class="set-title" id="set-keys">단축키</h3>

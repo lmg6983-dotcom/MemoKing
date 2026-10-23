@@ -24,6 +24,7 @@ export const LOGIN_ARGS = ['--hidden'];
 const unpacked = (p) => p.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 export const STT_WORKER = unpacked(path.join(import.meta.dirname, 'stt', 'stt-worker.js'));
 export const STT_VENDOR = unpacked(path.join(import.meta.dirname, 'vendor'));
+export const LLAMA_SERVER = unpacked(path.join(import.meta.dirname, 'vendor', 'llama', 'llama-server.exe')); // scripts/get-llama.mjs
 export const POPUP_HELPER = path.join(import.meta.dirname, '..', 'scripts', 'popup-watch.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 export const CLIPBOARD_HELPER = path.join(import.meta.dirname, '..', 'scripts', 'clipboard-helper.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 

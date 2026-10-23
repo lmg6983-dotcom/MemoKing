@@ -21,7 +21,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45 # 로컬 AI 엔진(llama.cpp)을 처음 빌드하면 10분 넘게 (그다음은 아래 캐시)
     defaults:
       run:
         working-directory: android
@@ -34,6 +34,12 @@ jobs:
           java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v4
+
+      # 로컬 AI 엔진 빌드 결과 (android/app/build.gradle.kts 의 llamaServer) — 버전이 같으면 다시 빌드하지 않는다
+      - uses: actions/cache@v4
+        with:
+          path: android/.gradle/llama/*/jni
+          key: llama-android-b11400-arm64-v2 # v2: 기호를 벗기고 CPU 변종은 넷만
 
       - name: 동기화 엔진 테스트 + APK 빌드 (디버그 서명 — 휴대폰에 바로 설치 가능)
         # 저장소 설정 › Secrets 에 넣어 두면 Google Drive 로그인 설정이 APK 에 들어간다 (android/DRIVE-SETUP.md)
@@ -51,10 +57,11 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-      # 휴대폰에서 바로 받을 수 있게 GitHub 릴리스 "android" 에 늘 최신 APK 를 올린다
+      # 휴대폰에서 바로 받을 수 있게 GitHub 릴리스 "android" 에 늘 최신 APK 를 올린다 — main 에서 만든 것만
+      #   (작업 가지의 시험 빌드는 위 Artifacts 로만 — 다운로드 링크가 시험 빌드로 바뀌지 않게)
       #   https://github.com/<저장소>/releases/download/android/MemoKing-android.apk
       - name: 최신 APK 를 릴리스에 올리기
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}

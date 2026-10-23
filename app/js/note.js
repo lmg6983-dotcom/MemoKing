@@ -33,6 +33,7 @@ import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { memoMode, otherMode, moveLabel, MODE_LABEL } from './core/modes.js';
 import { createFindBar } from './find-bar.js';
+import { createAiWritePanel } from './ai-write-panel.js';
 import { UI } from './core/ui-text.js';
 import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from './note-shared.js';
 
@@ -202,10 +203,26 @@ async function renderTagBar() {
   } catch {
     list = [];
   }
+  const ai = (await api.ai?.status().catch(() => null))?.chat.state;
   if (seq !== tagSeq) return;
   fillSuggestChips($('tag-suggest-chips'), list, addTags);
-  tagBar.hidden = list.length === 0;
+  $('tag-ai-btn').hidden = !['ready', 'running'].includes(ai); // 글 모델을 넣은 PC 에서만
+  tagBar.hidden = list.length === 0; // 추천이 있을 때만 (AI 단추만으로 모든 메모에 막대를 띄우지 않게 — 닫을 때 AI 태그는 그대로)
 }
+// AI로 고르기: 쓰는 동안 저절로 돌리면 8GB PC 가 무거워져 누를 때만 (모델은 이 PC 안)
+$('tag-ai-btn')?.addEventListener('click', async () => {
+  const btn = $('tag-ai-btn');
+  const seq = ++tagSeq;
+  btn.disabled = true;
+  btn.textContent = 'AI가 고르는 중…';
+  const r = await api.tags.ai(editor.getMarkdown(), id).catch((err) => ({ error: err.message }));
+  btn.disabled = false;
+  btn.textContent = 'AI로 고르기';
+  if (seq !== tagSeq) return;
+  if (r.error) return setStatus(r.error, true);
+  if (!r.length) return setStatus('AI 가 맞는 태그를 찾지 못했어요');
+  fillSuggestChips($('tag-suggest-chips'), r, addTags);
+});
 function addTags(names) {
   if (!editor || !names.length) return;
   editor.appendMarkdown(names.map((n) => `#${n}`).join(' '));
@@ -652,6 +669,8 @@ function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
   if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
+  // AI 글 도우미는 글 모델을 넣어 둔 PC 에서만 (설정 › AI 도우미)
+  if (!el.menu.hidden && api.ai) api.ai.status().then((st) => { $('ai-btn').hidden = !['ready', 'running'].includes(st?.chat.state); });
 }
 function closeMenu() {
   if (el.menu.hidden) return;
@@ -709,6 +728,7 @@ async function toggleLinks(force) {
   if (!el.linksPanel.hidden) {
     if (reminderPanel?.open) reminderPanel.toggle(false); // 패널은 하나씩
     if (!versionsPanel.hidden) toggleVersions(false);
+    if (aiPanel?.open) aiPanel.toggle(false);
     await flush();
     await refreshLinks();
     el.linkSearch.focus();
@@ -741,6 +761,7 @@ async function toggleVersions(force) {
   if (!versionsPanel.hidden) {
     if (!el.linksPanel.hidden) toggleLinks(false);
     if (reminderPanel?.open) reminderPanel.toggle(false);
+    if (aiPanel?.open) aiPanel.toggle(false);
     await flush();
     await refreshVersions();
     $('versions-close').focus();
@@ -751,6 +772,23 @@ $('versions-btn').addEventListener('click', () => {
   toggleVersions(true);
 });
 $('versions-close').addEventListener('click', () => toggleVersions(false));
+
+// ---------- AI 글 도우미 (ai-write-panel.js) ----------
+const aiPanel = api.ai ? createAiWritePanel({
+  panel: $('ai-panel'),
+  api,
+  editor: () => editor,
+  title: () => extractTitle(editor?.getMarkdown() ?? ''),
+  onOpen: () => {
+    if (!el.linksPanel.hidden) toggleLinks(false);
+    if (!versionsPanel.hidden) toggleVersions(false);
+    if (reminderPanel?.open) reminderPanel.toggle(false);
+  },
+}) : null;
+$('ai-btn').addEventListener('click', () => {
+  closeMenu();
+  aiPanel?.toggle(true);
+});
 // 끌어서 합치기(스택)의 메뉴 버전 — 끌기가 어려운 사람도
 $('join-btn').addEventListener('click', async () => {
   closeMenu();
@@ -1297,6 +1335,7 @@ window.addEventListener('keydown', (e) => {
     else if (!el.menu.hidden) closeMenu();
     else if (!el.linksPanel.hidden) toggleLinks(false);
     else if (!versionsPanel.hidden) toggleVersions(false);
+    else if (aiPanel?.open) aiPanel.toggle(false);
     else if (reminderPanel?.open) reminderPanel.toggle(false);
     else if (findBar.isOpen) findBar.close({ focus: true }); // 글을 고치다가 Esc: 찾기 막대를 닫고 찾은 곳을 고른 채
     return;
@@ -1558,27 +1597,32 @@ function showTasks(tasks, opts) {
   clearStamp.show(tasks, opts);
 }
 
-// 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)
+// 닫을 때: 태그 없는 메모에 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)
+//   글 모델을 넣은 PC: AI 가 고른 태그 하나 — 창을 닫은 뒤 메인이 단다(aiTagAfterClose). 아니면 확실한 추천 태그
 async function autoTagOnClose() {
-  if (!editor || tagDismissed || memo?.locked) return; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
+  if (!editor || tagDismissed || memo?.locked) return false; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
   try {
     const s = await api.settings.get();
-    if (s?.autoTags === false) return;
+    if (s?.autoTags === false) return false;
     const body = editor.getMarkdown();
-    if (isBlankBody(body) || extractTags(body).length) return;
+    if (isBlankBody(body) || extractTags(body).length) return false;
+    if (['ready', 'running'].includes((await api.ai?.status())?.chat.state)) return true;
     const list = (await api.tags.suggest?.(body, id)) ?? [];
     const sure = list.filter((t) => t.sure && t.existing).slice(0, 2);
     if (sure.length) editor.appendMarkdown(sure.map((t) => `#${t.name}`).join(' '));
   } catch {
     // 태그를 못 달아도 닫기는 그대로
   }
+  return false;
 }
+const aiTagAfterClose = (ask) => ask && api.tags.aiAuto?.(id).catch(() => {}); // 기다리지 않는다 (저장한 뒤에 부름)
 
 async function closeWindow() {
   await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
   await annotation?.exit(); // 주석을 그리던 중이면 저장하고 닫는다
-  await autoTagOnClose();
+  const askAi = await autoTagOnClose();
   await flush();
+  aiTagAfterClose(askAi);
   api.win.close();
 }
 
@@ -1586,8 +1630,9 @@ async function closeWindow() {
 async function closeTabOrWindow() {
   if (tabsEl.hidden) return closeWindow();
   await recorder?.finish();
-  await autoTagOnClose();
+  const askAi = await autoTagOnClose();
   await flush();
+  aiTagAfterClose(askAi);
   api.stack.remove(id);
 }
 
@@ -1897,7 +1942,7 @@ if (!memo) {
     api,
     memoId: id,
     setStatus,
-    onToggle: (open) => open && !el.linksPanel.hidden && toggleLinks(false),
+    onToggle: (open) => open && (!el.linksPanel.hidden && toggleLinks(false), aiPanel?.open && aiPanel.toggle(false)),
     onChange: () => editor?.refreshDates(),
   });
   reminderPanel.set(memo.reminders);

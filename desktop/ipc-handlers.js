@@ -5,7 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
-import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
+import { suggestTagsFor, appendTags } from '../app/js/core/tag-suggest.js';
+import { extractTags } from '../app/js/core/tags.js';
+import { createAiTasks } from '../app/js/core/ai-tasks.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
@@ -82,6 +84,7 @@ export function registerIpc(ctx) {
     TRASH_DAYS,
     getStt,
     sttOptions,
+    getAi,
     getLinkPreviews,
     openWebPage,
     openVaultFile,
@@ -89,6 +92,61 @@ export function registerIpc(ctx) {
     fetchRemoteImage,
     getLastHandoff,
   } = ctx;
+
+  // ---------- 로컬 AI (desktop/ai) ----------
+  ipcMain.handle('ai:status', () => getAi()?.status());
+  ipcMain.handle('ai:import', async (event, role) => {
+    const r = await dialog.showOpenDialog(senderWindow(event), {
+      title: '모델 파일(.gguf) 고르기',
+      filters: [{ name: 'AI 모델', extensions: ['gguf'] }],
+      properties: ['openFile'],
+    });
+    if (r.canceled || !r.filePaths[0]) return getAi()?.status();
+    try {
+      return await getAi().importModel(role, r.filePaths[0]);
+    } catch (err) {
+      return { ...getAi().status(), error: err.message };
+    }
+  });
+  ipcMain.handle('ai:remove', (_e, role) => getAi()?.remove(role));
+  // 글 도우미 · AI 검색 (core/ai-tasks.js — 휴대폰과 같은 흐름). 조각은 ai:token, 진행은 ai:progress 로 보낸 창에
+  const aiJobs = new Map(); // 보낸 창:작업 → 멈추기
+  let tasks = null;
+  const aiTasks = () => (tasks ??= createAiTasks({
+    ai: getAi(),
+    memos: () => getVault()?.bodies() ?? [],
+    graph: () => getVault()?.index?.memos ?? [],
+    store: getAi().rag,
+  }));
+  async function aiJob(e, id, run) {
+    const key = `${e.sender.id}:${id}`;
+    const ctrl = new AbortController();
+    aiJobs.set(key, ctrl);
+    const send = (channel, data) => !e.sender.isDestroyed() && e.sender.send(channel, { id, ...data });
+    try {
+      return await run({
+        signal: ctrl.signal,
+        onToken: (text) => send('ai:token', { text }),
+        onProgress: (done, total) => send('ai:progress', { done, total }),
+      });
+    } catch (err) {
+      return { error: err.message };
+    } finally {
+      aiJobs.delete(key);
+    }
+  }
+  ipcMain.handle('ai:write', (e, { id, ...job }) => aiJob(e, id, (o) => aiTasks().write(job, o)));
+  ipcMain.handle('ai:ask', (e, { id, question }) => aiJob(e, id, (o) => aiTasks().ask(question, o)));
+  ipcMain.handle('ai:cancel', (e, id) => aiJobs.get(`${e.sender.id}:${id}`)?.abort());
+  ipcMain.handle('ai:try', async () => {
+    const started = Date.now();
+    try {
+      const text = await getAi().chat([{ role: 'user', content: '메모 앱을 한 문장으로 소개해 주세요.' }], { maxTokens: 80 });
+      return { text, seconds: (Date.now() - started) / 1000 };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
 
   // ---------- STT (받아쓰기) ----------
   const sttKey = (e, id) => `${e.sender.id}:${id}`;
@@ -200,6 +258,26 @@ export function registerIpc(ctx) {
   ipcMain.handle('memos:list', () => wm.listMemos());
   ipcMain.handle('tags:list', () => collectTags(getVault()?.list() ?? []));
   ipcMain.handle('tags:suggest', (_e, body, id) => suggestTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { excludeId: id }));
+  // 추천 태그 막대 › AI로 고르기 (이 PC 안의 글 모델, 후보 중에서만)
+  ipcMain.handle('tags:ai', async (_e, body, id) => {
+    try {
+      return await aiTasks().pickTags(String(body ?? ''), id);
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+  // 메모 창을 닫은 뒤: 태그 없는 메모에 AI 가 고른 태그 하나를 저절로 (설정 › 태그 자동 추가).
+  //   모델을 올리는 몇 초 동안 창이 안 닫히면 안 되므로 창은 먼저 닫고 여기서 이어서 한다
+  ipcMain.handle('tags:ai-auto', async (_e, id) => {
+    const vault = getVault();
+    const memo = vault?.get(id);
+    if (!memo || memo.locked || settings.autoTags === false || extractTags(memo.body).length) return null;
+    const name = await aiTasks().autoTag(memo.body, id);
+    const now = vault.get(id);
+    if (!name || now?.body !== memo.body) return null; // 그사이 다시 열어 고쳤으면 건드리지 않는다
+    vault.save(id, appendTags(now.body, [name]));
+    return name;
+  });
   ipcMain.handle('tags:auto', (_e, body, source, id) => autoTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { source, excludeId: id }));
   ipcMain.handle('memos:search', (_e, query, excludeId) => wm.withOpenFlag(getVault()?.search(String(query ?? ''), excludeId) ?? []));
 
