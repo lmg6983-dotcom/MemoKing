@@ -259,3 +259,34 @@ test('클라이언트 보안 비밀번호 오류: 어디를 고쳐야 하는지 
   assert.equal(invalidClientHelp(new AuthError('Google 로그인 오류: 로그인을 취소했어요'), 'manual'), null, '다른 오류는 그대로');
   assert.equal(invalidClientHelp(new Error('x'), 'manual'), null);
 });
+
+test('다른 앱 메모 가져오기: 허용 뒤 Google 파일 고르기 화면 (drive.file 만), 고른 id 를 돌려받음', async () => {
+  const { auth } = setup();
+  auth.setClient('id-1.apps.googleusercontent.com', 'GOCSPX-s');
+  // 고르기 화면에서 두 개를 고르고 돌아온 것처럼
+  auth.openExternal = ((open) => (url) => {
+    const u = new URL(url);
+    assert.equal(u.searchParams.get('scope'), FILE);
+    assert.equal(u.searchParams.get('trigger_onepick'), 'true');
+    assert.equal(u.searchParams.get('prompt'), 'consent');
+    const back = new URL(u.searchParams.get('redirect_uri'));
+    back.searchParams.set('state', u.searchParams.get('state'));
+    back.searchParams.set('code', 'CODE123');
+    back.searchParams.set('picked_file_ids', 'A1,B2');
+    setTimeout(() => fetch(back).catch(() => {}), 10);
+  })(auth.openExternal);
+  const { picked } = await auth.login({ pick: true });
+  assert.deepEqual(picked, ['A1', 'B2']);
+  assert.equal(auth.connected, true);
+  assert.equal(auth.fullScope, false);
+  // 보통 로그인은 고르기 화면 없이 (고른 것도 없음)
+  auth.openExternal = ((open) => (url) => {
+    assert.equal(new URL(url).searchParams.get('trigger_onepick'), null);
+    const u = new URL(url);
+    const back = new URL(u.searchParams.get('redirect_uri'));
+    back.searchParams.set('state', u.searchParams.get('state'));
+    back.searchParams.set('code', 'CODE123');
+    setTimeout(() => fetch(back).catch(() => {}), 10);
+  })(auth.openExternal);
+  assert.deepEqual((await auth.login()).picked, []);
+});

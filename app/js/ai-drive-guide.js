@@ -3,7 +3,8 @@
 //     - 메모는 폴더 바로 안의 .md 하나. Google 문서(Docs)로 만든 파일은 동기화가 건너뛴다 (내용 해시가 없는 Drive 전용 파일)
 //     - 머리말의 id 는 메모킹이 처음 읽을 때 붙인다 → AI 는 쓰지 않는다 (지어낸 id 가 다른 메모와 겹치지 않게)
 //     - Drive 에서 파일을 지우면 휴대폰 · PC 에서도 메모가 지워진다 → 지우기는 사람에게 묻게
-//     - 다른 앱이 만든 파일은 "외부 앱 메모 연동"(전체 드라이브 권한)을 켜야 메모킹이 본다 (기본 권한은 메모킹이 만든 파일만)
+//     - 다른 앱이 만든 파일은 "다른 앱 메모 가져오기"로 골라 주거나 "외부 앱 메모 연동"(전체 드라이브 권한)을 켜야 메모킹이 본다
+//       (기본 권한은 메모킹이 만들었거나 사용자가 고른 파일만 — AI 가 메모킹이 만든 메모를 고친 것은 그대로 들어온다)
 import { COLORS } from './core/memo-file.js';
 import { icon } from './icons.js';
 
@@ -97,10 +98,10 @@ export function openAiDriveGuide({ folder = '메모킹', linked = null, copy, no
 
   const steps = el('ol', 'ai-guide-steps');
   const s1 = el('li');
-  s1.append(el('b', '', '외부 앱 메모 연동을 켜요. '));
-  const state = linked == null ? '먼저 Google Drive 동기화를 연결해 주세요.' : linked ? '지금 켜져 있어요.' : '지금은 꺼져 있어요. 설정의 Google Drive 동기화에서 켜 주세요.';
+  s1.append(el('b', '', 'AI 가 새로 만든 메모는 가져오기로 골라요. '));
+  const state = linked == null ? '먼저 Google Drive 동기화를 연결해 주세요.' : linked ? '외부 앱 메모 연동이 켜져 있어 저절로 들어와요.' : '설정의 Google Drive 동기화에서 다른 앱 메모 가져오기를 누르고 그 파일을 골라 주세요.';
   s1.append(el('span', linked ? 'ai-guide-ok' : 'ai-guide-warn', state));
-  s1.append(el('small', '', '꺼져 있으면 AI 가 만든 메모가 메모킹에 들어오지 않아요.'));
+  s1.append(el('small', '', '메모킹은 직접 만들었거나 사용자가 고른 파일만 열어요. 메모킹 메모를 AI 가 고친 것은 고르지 않아도 들어와요. 저절로 들어오게 하려면 고급의 외부 앱 메모 연동을 켜요.'));
   const s2 = el('li');
   s2.append(el('b', '', 'AI 앱에서 Google Drive 연결을 켜요. '));
   s2.append(el('small', '', '파일을 읽기만 하는 연결이면 메모를 찾고 요약하는 데만 쓸 수 있어요. 새 메모를 쓰려면 파일을 만들 수 있는 연결이어야 해요.'));
@@ -133,7 +134,7 @@ export function openAiDriveGuide({ folder = '메모킹', linked = null, copy, no
   s4.append(ex);
   steps.append(s1, s2, s3, s4);
 
-  const foot = el('p', 'ai-guide-note', 'AI 가 만든 메모는 다음 동기화 때 목록에 나타나요. 잠긴 메모는 AI 가 읽을 수 없어요. 안내문에는 메모를 삭제 전에 먼저 묻도록 적어 두었어요.');
+  const foot = el('p', 'ai-guide-note', 'AI 가 고친 메모는 다음 동기화 때, 새로 만든 메모는 가져온 뒤 목록에 나타나요. 잠긴 메모는 AI 가 읽을 수 없어요. 안내문에는 메모를 삭제 전에 먼저 묻도록 적어 두었어요.');
   dlg.append(head, lead, steps, foot);
   document.body.append(dlg);
   let release = null;

@@ -18,6 +18,7 @@ import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
 import { cleanOverrides, setActionKey } from '../app/js/core/keymap.js';
 import { HANDOFF_MS } from '../app/js/core/handoff.js';
+import { importPicked, importMessage } from '../app/js/core/drive-import.js';
 import { noteBg, setTitleBarDim, titleBarOverlay, bringToFront, broadcast, APP_ICON_PNG } from './window-utils.js';
 import { SMOKE, toast, copyFileToClipboard, smokeOpened } from './utils.js';
 import { insideDriveForDesktop } from './drive/drive-sync.js';
@@ -280,6 +281,24 @@ export function registerIpc(ctx) {
     if (wm.listWin) bringToFront(wm.listWin);
     if (res.relogged) getDriveSync()?.run({ full: true }).catch(() => {});
     return { ...res, drive: driveInfo() };
+  });
+  // 다른 앱 메모 가져오기: Google 파일 고르기 화면(drive.file 그대로)에서 고른 .md 를 메모 폴더로 → 폴더를 처음부터 맞춘다
+  ipcMain.handle('drive:pick', async () => {
+    const auth = getDriveAuth();
+    const api = getDriveApi();
+    const folderId = settings.drive?.folderId;
+    if (!auth || !api || !folderId) return { error: UI.driveUnavailable };
+    // Drive 전체 권한이면 고를 것 없이 다른 앱 메모도 들어온다 (고르기 화면은 권한을 drive.file 로 낮춘다)
+    if (auth.fullScope) {
+      await getDriveSync()?.run({ full: true }).catch(() => {});
+      return { message: '외부 앱 메모 연동이 켜져 있어 다른 앱 메모도 저절로 들어와요', drive: driveInfo() };
+    }
+    const before = (await api.listChildren(folderId).catch(() => [])).map((f) => f.id);
+    const { picked } = await auth.login({ pick: true });
+    if (wm.listWin) bringToFront(wm.listWin);
+    const res = await importPicked(picked, folderId, { meta: (id) => api.meta(id), children: (id) => api.listChildren(id), copy: (id, p, n) => api.copy(id, p, n) }, before);
+    await getDriveSync()?.run({ full: true }).catch(() => {});
+    return { ...res, message: importMessage(res), drive: driveInfo() };
   });
   ipcMain.handle('drive:folders', async (_e, parent) => {
     const api = getDriveApi();

@@ -171,6 +171,8 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     $('drive-disconnect').hidden = !info.connected;
     // 외부 앱 메모 연동: 연결돼 있을 때만 (켜는 중에는 누르지 못하게)
     $('drive-full-row').hidden = !info.connected;
+    // 다른 앱 메모 가져오기: 메모 폴더와 연결돼 있고 Drive 전체 권한이 아닐 때 (전체면 저절로 들어온다)
+    $('drive-pick-row').hidden = !on || Boolean(info.fullScope);
     if (!fullBusy) $('drive-full').checked = Boolean(info.fullScope);
     paintBar($('drive-bar'), sum);
     renderSyncStep(sum);
@@ -569,6 +571,34 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     else refresh();
     const msg = res.error ? cleanError(res.error) : '';
     if (on && msg && !/취소/.test(msg)) await confirm(`외부 앱 메모 연동을 켜지 못했어요. 지금 연결은 그대로예요.\n${msg}`, '확인');
+  });
+  // 다른 앱 메모 가져오기: 브라우저의 Google 파일 고르기 화면 → 고른 메모를 메모 폴더로 (권한은 drive.file 그대로)
+  const pickNote = $('drive-pick-note').textContent;
+  let pickTimer = 0;
+  $('drive-pick').addEventListener('click', async () => {
+    const btn = $('drive-pick');
+    btn.disabled = true;
+    clearTimeout(pickTimer);
+    $('drive-pick-note').textContent = '브라우저에서 Google 계정을 고르고, 가져올 메모 파일을 골라 주세요';
+    let res;
+    try {
+      res = await api.drive.pick();
+    } catch (err) {
+      res = { error: cleanError(err) };
+    } finally {
+      btn.disabled = false;
+      $('drive-pick-note').textContent = pickNote;
+    }
+    if (res.drive) render(res.drive);
+    else refresh();
+    if (res.error) {
+      if (!/취소/.test(res.error)) await confirm(`다른 앱 메모를 가져오지 못했어요.\n${cleanError(res.error)}`, '확인');
+      return;
+    }
+    // 한 일은 그 줄의 설명 자리에 잠시 (가져온 메모는 방금 동기화로 목록에 들어와 있다)
+    $('drive-pick-note').textContent = res.message;
+    clearTimeout(pickTimer);
+    pickTimer = setTimeout(() => ($('drive-pick-note').textContent = pickNote), 8000);
   });
   $('drive-disconnect').addEventListener('click', async () => {
     if (!(await confirm('Google Drive 연결을 끊을까요?\n이 PC의 메모는 그대로 남고, 휴대폰과 더 이상 동기화하지 않아요.', '연결 끊기'))) return;

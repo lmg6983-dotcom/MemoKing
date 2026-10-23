@@ -156,6 +156,17 @@ export class DriveApi {
     return (await this.findFolders(name))[0] ?? null;
   }
 
+  /** 파일 하나의 정보와 든 폴더 (다른 앱 메모 가져오기: 고른 파일이 메모 폴더 안인지) */
+  async meta(id) {
+    const o = await this.request('GET', `${API}/files/${encodeURIComponent(id)}?fields=${encodeURIComponent(`${FIELDS},parents`)}`);
+    return { ...item(o), parents: o.parents ?? [] };
+  }
+
+  /** parent 폴더에 사본 — 사본은 메모킹이 만든 파일이라 drive.file 로 계속 동기화된다 */
+  async copy(id, parentId, name) {
+    return item(await this.json('POST', `${API}/files/${encodeURIComponent(id)}/copy?fields=${encodeURIComponent(FIELDS)}`, { name, parents: [parentId] }));
+  }
+
   /** 링크가 있는 사람은 볼 수 있게 열고 그 링크 (공유) — 조직 설정이 막으면 DriveError 403 */
   async shareLink(id) {
     await this.json('POST', `${API}/files/${encodeURIComponent(id)}/permissions?fields=id`, { type: 'anyone', role: 'reader' });

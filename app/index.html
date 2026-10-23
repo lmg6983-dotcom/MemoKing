@@ -149,11 +149,15 @@
         <button id="drive-folder" class="link-btn">다른 폴더로 바꾸기</button>
         <button id="drive-disconnect" class="link-btn danger">연결 끊기</button>
       </div>
+      <div class="setting-row hold-row" id="drive-pick-row" hidden>
+        <span class="hold-label">다른 앱 메모 가져오기 <small id="drive-pick-note" aria-live="polite">Gemini, ChatGPT 같은 앱이 드라이브에 만든 메모(.md)를 골라 메모킹으로 가져와요</small></span>
+        <button type="button" class="btn" id="drive-pick">가져오기</button>
+      </div>
       <details class="drive-adv" id="drive-adv">
         <summary>고급</summary>
         <label class="setting-row" id="drive-full-row" hidden>
           <input type="checkbox" id="drive-full" class="switch" role="switch">
-          <span>외부 앱 메모 연동 (전체 드라이브 권한) <small id="drive-full-note">제미나이 등 외부 도구가 드라이브 폴더에 직접 추가한 .md 메모도 동기화합니다. 활성화 시 전체 드라이브 접근 권한으로 다시 로그인합니다.</small></span>
+          <span>외부 앱 메모 연동 (전체 드라이브 권한) <small id="drive-full-note">고르지 않아도 다른 앱이 드라이브 폴더에 넣은 .md 메모가 저절로 들어와요. 전체 드라이브 권한으로 다시 로그인하고, Google 이 확인되지 않은 앱이라고 안내할 수 있어요</small></span>
         </label>
         <button id="client-edit" class="link-btn">연결 정보(OAuth 클라이언트) 바꾸기</button>
       </details>

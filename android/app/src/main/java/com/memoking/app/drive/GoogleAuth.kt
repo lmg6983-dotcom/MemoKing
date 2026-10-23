@@ -147,6 +147,41 @@ object GoogleAuth {
     fun login(ctx: Context, full: Boolean = fullScope(ctx), openBrowser: (String) -> Unit): String {
         val scope = scopeFor(full)
         if (!configured(ctx)) throw AuthError("Google 로그인 설정(OAuth 클라이언트 ID)이 아직 없어요")
+        val (token, _) = authorize(ctx, scope, "", openBrowser)
+        val refresh = token.optString("refresh_token").ifEmpty { throw AuthError("구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 해 주세요") }
+        // 허용 화면에서 Drive 전체 칸을 빼고 허용할 수도 있다 — 그러면 켜지 않고 지금 연결 그대로
+        if (full && FULL_SCOPE !in token.optString("scope", scope).split(' ')) throw AuthError("Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요")
+        return keep(ctx, token, refresh, scope, full)
+    }
+
+    /**
+     * 다른 앱 메모 가져오기: 브라우저로 허용 → Google 파일 고르기 화면 (drive.file 만). 돌려주는 값: 고른 파일 · 폴더 id.
+     * 고른 파일은 같은 Google Cloud 프로젝트(휴대폰 계정 연결 · PC)가 모두 열 수 있다 — 휴대폰 계정으로 연결했으면 그 연결은 그대로 두고,
+     * 브라우저로 연결했으면 새 토큰으로 바꾼다. Drive 전체 권한일 때는 부르지 않는다 (권한이 낮아지므로)
+     */
+    fun pick(ctx: Context, openBrowser: (String) -> Unit): List<String> {
+        if (clientId(ctx).isBlank()) throw AuthError("이 휴대폰 앱에는 브라우저 로그인 정보가 없어 가져오기를 쓸 수 없어요. PC 메모킹에서 가져오면 휴대폰에도 들어와요")
+        val (token, params) = authorize(ctx, SCOPE, "&trigger_onepick=true&allow_multiple=true&allow_folder_selection=true", openBrowser)
+        val refresh = token.optString("refresh_token")
+        if (!native(ctx) && refresh.isNotEmpty()) keep(ctx, token, refresh, SCOPE, false)
+        return params["picked_file_ids"].orEmpty().split(',').filter { it.isNotBlank() }
+    }
+
+    private fun keep(ctx: Context, token: JSONObject, refresh: String, scope: String, full: Boolean): String {
+        accessToken = token.getString("access_token")
+        expiresAt = System.currentTimeMillis() + token.optLong("expires_in", 3600) * 1000
+        prefs(ctx).edit().putString(KEY_REFRESH, refresh).putBoolean(KEY_NATIVE, false).putString(KEY_SCOPE, scope).putBoolean(KEY_FULL, full).remove(KEY_RECONNECT).apply()
+        val email = try {
+            DriveApi(ctx).about()
+        } catch (e: Exception) {
+            ""
+        }
+        prefs(ctx).edit().putString(KEY_EMAIL, email).apply()
+        return email
+    }
+
+    /** 브라우저 로그인 한 번: 허용 화면을 열고 127.0.0.1 로 돌아온 코드를 토큰으로 → (토큰, 돌아온 값들). extra: 더 붙일 주소 값 */
+    private fun authorize(ctx: Context, scope: String, extra: String, openBrowser: (String) -> Unit): Pair<JSONObject, Map<String, String>> {
         pendingServer?.close()
         val server = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
         pendingServer = server
@@ -160,7 +195,7 @@ object GoogleAuth {
         val state = random(16)
         val url = "$AUTH_URL?client_id=${enc(clientId(ctx))}&redirect_uri=${enc(redirect)}&response_type=code" +
             "&scope=${enc(scope)}&code_challenge=$challenge&code_challenge_method=S256&state=$state" +
-            "&access_type=offline&prompt=consent"
+            "&access_type=offline&prompt=consent$extra"
         openBrowser(url)
 
         var received: Map<String, String>? = null
@@ -204,19 +239,7 @@ object GoogleAuth {
                 "redirect_uri" to redirect, "grant_type" to "authorization_code", "code_verifier" to verifier,
             ),
         )
-        val refresh = token.optString("refresh_token").ifEmpty { throw AuthError("구글이 오래 쓸 수 있는 권한을 주지 않았어요. 다시 해 주세요") }
-        // 허용 화면에서 Drive 전체 칸을 빼고 허용할 수도 있다 — 그러면 켜지 않고 지금 연결 그대로
-        if (full && FULL_SCOPE !in token.optString("scope", scope).split(' ')) throw AuthError("Drive 전체 권한을 허용하지 않았어요. 외부 앱 메모 연동은 꺼 둘게요")
-        accessToken = token.getString("access_token")
-        expiresAt = System.currentTimeMillis() + token.optLong("expires_in", 3600) * 1000
-        prefs(ctx).edit().putString(KEY_REFRESH, refresh).putBoolean(KEY_NATIVE, false).putString(KEY_SCOPE, scope).putBoolean(KEY_FULL, full).remove(KEY_RECONNECT).apply()
-        val email = try {
-            DriveApi(ctx).about()
-        } catch (e: Exception) {
-            ""
-        }
-        prefs(ctx).edit().putString(KEY_EMAIL, email).apply()
-        return email
+        return token to params
     }
 
     /** 로그인 화면을 닫고 돌아왔을 때 기다리기 그만 */

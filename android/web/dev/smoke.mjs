@@ -706,6 +706,9 @@ try {
   await page.tap('[data-add="file"]');
   await page.waitForTimeout(800);
   check('도구막대: 고르면 위성 버튼이 접힘', await page.isHidden('#add-menu'));
+  // 문서는 어떻게 넣을지 묻는다 (PC 와 같음) → 이번엔 "파일로"
+  await page.locator('.mk-prompt button', { hasText: '파일로' }).tap({ timeout: 3000 }).catch(() => {});
+  await page.waitForTimeout(500);
   const withFile = read(shared);
   check('파일 넣기: 파일 칩 링크', /\n\[보고서\.pdf\]\(attachments\/[^)]+\.pdf\)\n?$/.test(withFile), withFile);
   await back();
@@ -2465,6 +2468,21 @@ try {
   await page.tap('#drive-full-row .switch');
   await page.waitForTimeout(700);
   check('외부 앱 메모 연동: 끄면 drive.file 로 (꺼짐)', !(await page.isChecked('#drive-full')) && (await fullLog()).at(-1) === false);
+  // 다른 앱 메모 가져오기: 브라우저 로그인 정보가 든 앱에서, Drive 전체가 아닐 때만 → 고른 .md 는 메모 폴더로 사본 (같은 이름은 (2)), 그림은 건너뜀
+  const pickHidden = !(await page.isVisible('#drive-pick-row'));
+  await post('/dev/drive-browser', {});
+  await page.evaluate(() => window.__mk.back());
+  await page.waitForTimeout(300);
+  await page.tap('#settings-btn');
+  await page.waitForTimeout(400);
+  const pickShown = await page.isVisible('#drive-pick-row');
+  await page.locator('#drive-pick-row').scrollIntoViewIfNeeded();
+  await shot('06b-drive-pick');
+  await page.tap('#drive-pick');
+  await page.waitForTimeout(900);
+  const copied = (await devLog()).log.filter((l) => l.driveCopy).map((l) => l.driveCopy);
+  const pickMsg = await page.textContent('#toast-text').catch(() => '');
+  check('다른 앱 메모 가져오기: 브라우저 로그인 정보가 있을 때 보이고, 고른 메모는 메모 폴더로 사본 (같은 이름은 (2)) · 그림은 건너뜀', pickHidden && pickShown && copied.length === 1 && copied[0].name === '회의 정리 (2).md' && pickMsg === '다른 앱 메모 1개를 가져왔어요. 메모(.md)가 아닌 파일 1개는 건너뛰었어요', JSON.stringify({ pickHidden, pickShown, copied, pickMsg }));
   await page.evaluate(() => window.__mk.back());
   await page.waitForTimeout(300);
   if (await page.isVisible('#settings-sheet')) await page.evaluate(() => window.__mk.back());

@@ -210,9 +210,12 @@ export class GoogleAuth {
 
   /**
    * 기본 브라우저로 로그인 → 허용하면 토큰을 받아 둔다. 취소·실패하면 지금 연결(토큰·설정)은 그대로.
-   * @param {{ full?: boolean }} [opts] full: Drive 전체 (기본은 지금 설정 — 외부 앱 메모 연동)
+   * @param {{ full?: boolean, pick?: boolean }} [opts] full: Drive 전체 (기본은 지금 설정 — 외부 앱 메모 연동)
+   *   pick: 허용한 뒤 Google 파일 고르기 화면 (다른 앱 메모 가져오기 — drive.file 만 · 고른 파일 · 폴더를 메모킹이 열 수 있게)
+   * @returns {Promise<{ picked: string[] }>} picked: 고른 파일 · 폴더 id
    */
-  async login({ full = this.fullScope } = {}) {
+  async login({ full = this.fullScope, pick = false } = {}) {
+    if (pick) full = false; // 고르기 화면은 drive.file 하고만 쓸 수 있다
     const scope = this.fixedScope ?? scopeFor(full);
     if (this.fixedScope) full = false;
     const client = this.client();
@@ -222,7 +225,7 @@ export class GoogleAuth {
     const challenge = b64url(createHash('sha256').update(verifier).digest());
     const state = b64url(randomBytes(16));
 
-    const { code, redirect } = await new Promise((resolve, reject) => {
+    const { code, redirect, picked } = await new Promise((resolve, reject) => {
       let redirectUri = '';
       const server = http.createServer((req, res) => {
         const url = new URL(req.url, 'http://127.0.0.1');
@@ -236,7 +239,7 @@ export class GoogleAuth {
           const error = url.searchParams.get('error');
           if (url.searchParams.get('state') !== state) reject(new AuthError('로그인 확인 값이 맞지 않아요. 다시 해 주세요'));
           else if (!ok) reject(new AuthError(error === 'access_denied' ? '로그인을 취소했어요' : `로그인하지 못했어요 (${error})`));
-          else resolve({ code: url.searchParams.get('code'), redirect: redirectUri });
+          else resolve({ code: url.searchParams.get('code'), redirect: redirectUri, picked: (url.searchParams.get('picked_file_ids') ?? '').split(',').filter(Boolean) });
         });
       });
       const timer = setTimeout(() => finish(() => reject(new AuthError('로그인을 기다리다 시간이 지났어요. 다시 해 주세요'))), LOGIN_TIMEOUT);
@@ -253,6 +256,7 @@ export class GoogleAuth {
         const q = new URLSearchParams({
           client_id: client.id, redirect_uri: redirectUri, response_type: 'code', scope,
           code_challenge: challenge, code_challenge_method: 'S256', state, access_type: 'offline', prompt: 'consent',
+          ...(pick ? { trigger_onepick: 'true', allow_multiple: 'true', allow_folder_selection: 'true' } : {}),
         });
         this.openExternal(`${AUTH_URL}?${q}`);
       });
@@ -277,6 +281,7 @@ export class GoogleAuth {
     this.accessToken = token.access_token;
     this.expiresAt = Date.now() + (token.expires_in ?? 3600) * 1000;
     this.save();
+    return { picked };
   }
 
   cancelLogin() {

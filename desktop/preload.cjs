@@ -86,6 +86,7 @@ contextBridge.exposeInMainWorld('memoking', {
     login: invoke('drive:login'),
     cancelLogin: invoke('drive:cancel-login'),
     setFullScope: invoke('drive:full-scope'),
+    pick: invoke('drive:pick'),
     folders: invoke('drive:folders'),
     createFolder: invoke('drive:create-folder'),
     use: invoke('drive:use'),

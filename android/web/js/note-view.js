@@ -641,6 +641,7 @@ async function pickAndInsert(accept) {
   try {
     setStatus(`파일 ${files.length}개 추가 중`);
     const items = await editor.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
+    if (!editor) return; // 묻는 사이에 메모를 닫았다
     // 쓰던 자리가 있으면 그 자리에, 아니면(키보드를 내리고 버튼만 누름) 메모 끝에
     //   (+ 를 펼치면 키보드를 닫으므로, 펼칠 때 쓰던 중이었는지를 본다)
     const typing = addFromCursor || el.editorRoot.contains(document.activeElement);

@@ -513,6 +513,30 @@ class Bridge(private val activity: MainActivity) {
                     }
                 }
             }
+            // 다른 앱 메모 가져오기 (PC ipc-handlers drive:pick 과 같음 — 고른 뒤의 일은 화면의 core/drive-import.js):
+            //   브라우저의 Google 파일 고르기 → 고른 id 들. 정보 · 폴더 안 · 사본은 아래 셋으로
+            "drivePick" -> pool.execute {
+                resolve(id) {
+                    val ids = GoogleAuth.pick(ctx) { url -> activity.runOnUiThread { activity.openBrowser(url) } }
+                    activity.runOnUiThread { activity.bringToFront() }
+                    JSONArray(ids)
+                }
+            }
+            "driveMeta" -> pool.execute {
+                resolve(id) {
+                    val (f, parents) = DriveApi(ctx).meta(a.getString("id"))
+                    JSONObject().put("id", f.id).put("name", f.name).put("folder", f.folder).put("parents", JSONArray(parents))
+                }
+            }
+            "driveChildren" -> pool.execute {
+                resolve(id) { JSONArray(DriveApi(ctx).listChildren(a.getString("id")).map { JSONObject().put("id", it.id).put("name", it.name).put("folder", it.folder) }) }
+            }
+            "driveCopy" -> pool.execute {
+                resolve(id) {
+                    val f = DriveApi(ctx).copy(a.getString("id"), a.getString("parent"), a.getString("name"))
+                    JSONObject().put("id", f.id).put("name", f.name)
+                }
+            }
             "driveFolders" -> pool.execute {
                 resolve(id) {
                     val parent = a.optString("parent", "root").ifEmpty { "root" }
