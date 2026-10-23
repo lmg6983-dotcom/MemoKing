@@ -1027,7 +1027,8 @@ async function chooseFolder() {
 $('choose-drive').addEventListener('click', () => startConnect(() => openVault()));
 $('drive-connect').addEventListener('click', () => startConnect(() => openVault()));
 $('drive-sync-now').addEventListener('click', () => syncNow());
-$('sync-btn').addEventListener('click', () => syncNow());
+// 구름 단추: 연결돼 있으면 지금 동기화, 로그인이 끊겼으면 알림만 띄우지 않고 바로 연결하기로
+$('sync-btn').addEventListener('click', () => (drive.status().connected ? syncNow() : startConnect(() => openVault())));
 $('drive-disconnect').addEventListener('click', async () => {
   const ok = await confirmDialog('Google Drive 연결을 끊을까요?\n휴대폰에 받아 둔 메모는 그대로 볼 수 있지만, 다시 연결할 때까지 PC와 맞추지 않아요.', '연결 끊기');
   if (!ok) return;
