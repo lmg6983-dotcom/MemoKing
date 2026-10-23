@@ -6,6 +6,7 @@ import path from 'node:path';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
+import { spellMessages, styleMessages, draftMessages, plausibleFix } from '../app/js/core/ai-write.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
@@ -107,6 +108,32 @@ export function registerIpc(ctx) {
     }
   });
   ipcMain.handle('ai:remove', (_e, role) => getAi()?.remove(role));
+  // 글 도우미 (메모 창): 맞춤법은 문단마다 묻고 믿을 만한 답만, 문체 · 초안은 글자가 오는 대로 보낸다
+  const aiJobs = new Map(); // 보낸 창:작업 → 멈추기
+  ipcMain.handle('ai:write', async (e, { id, task, text = '', blocks = [], style, title, request }) => {
+    const key = `${e.sender.id}:${id}`;
+    const ctrl = new AbortController();
+    aiJobs.set(key, ctrl);
+    const send = (channel, data) => !e.sender.isDestroyed() && e.sender.send(channel, { id, ...data });
+    try {
+      if (task === 'spell') {
+        const fixed = [];
+        for (const [i, block] of blocks.entries()) {
+          send('ai:progress', { done: i, total: blocks.length });
+          const out = await getAi().chat(spellMessages(block), { temperature: 0, maxTokens: block.length * 2 + 32, signal: ctrl.signal });
+          fixed.push(plausibleFix(block, out) ? out : block);
+        }
+        return { fixed };
+      }
+      const messages = task === 'style' ? styleMessages(text, style) : draftMessages({ title, body: text, request });
+      return { text: await getAi().chat(messages, { maxTokens: 1024, signal: ctrl.signal, onToken: (t) => send('ai:token', { text: t }) }) };
+    } catch (err) {
+      return { error: err.message };
+    } finally {
+      aiJobs.delete(key);
+    }
+  });
+  ipcMain.handle('ai:cancel', (e, id) => aiJobs.get(`${e.sender.id}:${id}`)?.abort());
   ipcMain.handle('ai:try', async () => {
     const started = Date.now();
     try {

@@ -46,6 +46,7 @@
     <button class="menu-item" id="join-btn" role="menuitem"><svg><use href="#i-tabs"/></svg><span>다른 메모 창과 합치기</span></button>
     <button class="menu-item" id="lock-btn" role="menuitem"><svg><use href="#i-lock"/></svg><span>잠그기</span></button>
     <button class="menu-item" id="versions-btn" role="menuitem"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
+    <button class="menu-item" id="ai-btn" role="menuitem" hidden><svg><use href="#i-pen"/></svg><span>AI 글 도우미 <small>맞춤법, 문체, 초안</small></span></button>
     <button class="menu-item" id="find-btn" role="menuitem"><svg><use href="#i-search"/></svg><span>찾기, 바꾸기</span></button>
     <button class="menu-item" id="shortcuts-btn" role="menuitem"><svg><use href="#i-keys"/></svg><span>단축키 보기 <small>Ctrl+/</small></span></button>
     <button class="menu-item" id="pdf-btn" role="menuitem"><svg><use href="#i-pdf"/></svg><span>PDF로 저장</span></button>
@@ -209,6 +210,25 @@
     </header>
     <p class="versions-hint">쓰는 동안 10분마다 그때 내용을 남겨 둬요(30일). 되돌려도 지금 내용이 여기에 남아요.</p>
     <ul id="versions-list" class="link-list versions-list"></ul>
+  </aside>
+
+  <!-- AI 글 도우미: 이 PC 안의 모델로 (ai-write-panel.js) -->
+  <aside id="ai-panel" class="links-panel ai-panel" hidden>
+    <header class="links-head">
+      <b>AI 글 도우미</b>
+      <button class="icon-btn ai-close" aria-label="AI 글 도우미 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <p class="versions-hint">글을 고르면 그 부분만, 고르지 않으면 메모 전체에 써요. 인터넷 없이 이 PC 안에서 돌아가요.</p>
+    <h4>맞춤법</h4>
+    <button type="button" class="btn ai-task ai-spell">맞춤법 검사</button>
+    <h4>문체 바꾸기</h4>
+    <div class="ai-styles" role="group" aria-label="문체 바꾸기"></div>
+    <h4>초안 쓰기</h4>
+    <textarea class="link-search ai-request" rows="2" aria-label="초안 부탁" placeholder="무엇을 쓸까요? (비우면 제목으로)"></textarea>
+    <button type="button" class="btn ai-task ai-draft">초안 쓰기</button>
+    <p class="versions-hint ai-state" role="status" aria-live="polite"></p>
+    <button type="button" class="link-btn ai-stop" hidden>멈추기</button>
+    <div class="ai-result"></div>
   </aside>
 
   <!-- 서식 도구막대: 창 폭에 들어가지 않는 버튼은 끝의 » 더보기 안으로 옮겨진다 (note.js layoutToolbar) -->

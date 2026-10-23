@@ -18,7 +18,11 @@ http.createServer((req, res) => {
     if (req.headers.authorization !== 'Bearer ' + arg('--api-key')) { res.statusCode = 401; return res.end('{}'); }
     const j = JSON.parse(body);
     if (req.url === '/v1/embeddings') return res.end(JSON.stringify({ data: j.input.map((t, index) => ({ index, embedding: [t.length] })).reverse() }));
-    res.end(JSON.stringify({ choices: [{ message: { content: '<think>음</think> 답: ' + j.messages[0].content + (a.includes('--embedding') ? ' embed' : '') } }] }));
+    if (j.stream) {
+      for (const piece of ['<think>음', '</think> 답', ': ', j.messages[0].content]) res.write('data: ' + JSON.stringify({ choices: [{ delta: { content: piece } }] }) + '\\n\\n');
+      return res.end('data: [DONE]\\n\\n');
+    }
+    res.end(JSON.stringify({ choices: [{ message: { content: '<think>음</think> 답: ' + j.messages[0].content } }] }));
   });
 }).listen(Number(arg('--port')), arg('--host'));
 `;
@@ -51,6 +55,10 @@ test('로컬 AI: 모델 넣기 · 묻기 · 지우기', async () => {
 
     assert.equal(await ai.chat([{ role: 'user', content: '안녕' }]), '답: 안녕');
     assert.equal(ai.status().chat.state, 'running');
+
+    const seen = [];
+    assert.equal(await ai.chat([{ role: 'user', content: '조각' }], { onToken: (t) => seen.push(t) }), '답: 조각');
+    assert.deepEqual(seen, ['', '답', '답:', '답: 조각']); // 다 오기 전의 생각 블록은 보이지 않는다
 
     await ai.importModel('embed', model);
     assert.deepEqual(await ai.embed(['가', '가나다']), [[1], [3]]);

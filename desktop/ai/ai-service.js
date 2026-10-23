@@ -156,7 +156,8 @@ export function createAiService(opts) {
     await gone;
   }
 
-  async function request(role, route, body) {
+  // onEvent 를 주면 답을 조각(SSE "data: {…}" 줄)마다 받는다
+  async function request(role, route, body, { signal, onEvent } = {}) {
     const s = await start(role);
     clearTimeout(s.timer);
     try {
@@ -164,24 +165,54 @@ export function createAiService(opts) {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${s.key}` },
         body: JSON.stringify(body),
+        signal,
       });
       if (!res.ok) throw new Error(`AI 가 답하지 못했어요 (${res.status})`);
-      return await res.json();
+      if (!onEvent) return await res.json();
+      const decoder = new TextDecoder();
+      let buf = '';
+      for await (const chunk of res.body) {
+        buf += decoder.decode(chunk, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          const data = line.startsWith('data: ') ? line.slice(6).trim() : '';
+          if (data && data !== '[DONE]') onEvent(JSON.parse(data));
+        }
+      }
+      return null;
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('멈췄어요');
+      throw err;
     } finally {
       s.timer = setTimeout(() => stop(role).then(emit), IDLE_MS);
     }
   }
 
-  /** 글 모델에 묻기 → 답 글. schema 를 주면 그 JSON 모양으로만 답한다 */
-  async function chat(messages, { maxTokens = 512, temperature = 0.3, schema } = {}) {
-    const data = await request('chat', '/v1/chat/completions', {
+  const noThink = (text) => text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim(); // 다 오기 전의 생각 블록도
+
+  /** 글 모델에 묻기 → 답 글. schema: 그 JSON 모양으로만 답 · onToken: 지금까지 온 글을 조각마다 · signal: 멈추기 */
+  async function chat(messages, { maxTokens = 512, temperature = 0.3, schema, onToken, signal } = {}) {
+    const body = {
       messages,
       max_tokens: maxTokens,
       temperature,
       chat_template_kwargs: { enable_thinking: false }, // Qwen3 계열의 생각 모드 끄기 (다른 모델은 무시)
       ...(schema ? { response_format: { type: 'json_schema', json_schema: { name: 'out', schema } } } : {}),
+    };
+    if (!onToken) {
+      const data = await request('chat', '/v1/chat/completions', body, { signal });
+      return noThink(String(data.choices?.[0]?.message?.content ?? ''));
+    }
+    let text = '';
+    await request('chat', '/v1/chat/completions', { ...body, stream: true }, {
+      signal,
+      onEvent: (e) => {
+        const piece = e.choices?.[0]?.delta?.content;
+        if (piece) onToken(noThink((text += piece)));
+      },
     });
-    return String(data.choices?.[0]?.message?.content ?? '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    return noThink(text);
   }
 
   /** 검색 모델로 글들의 벡터 */
