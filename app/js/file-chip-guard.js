@@ -57,13 +57,18 @@ function chipNextTo(state, dir) {
 export function snapOutOfChip(chips, pos, came) {
   const c = chips.find((x) => pos > x.from && pos < x.to);
   if (!c) return pos;
-  // 칩 끝에서 한 칸 들어왔으면(화살표) 건너편으로 — 멀리서 누른 것(마우스)은 가까운 끝으로
+  // 칩 끝에서 들어왔으면(화살표 — came 은 화살표일 때만) 건너편으로, 아니면 가까운 끝으로
   if (came === c.from || came === -Infinity) return c.to;
   if (came === c.to || came === Infinity) return c.from;
   return pos - c.from <= c.to - pos ? c.from : c.to;
 }
 
 const chipsAt = ($pos) => ($pos.parent.isTextblock ? chipRanges($pos.parent, $pos.start()) : []);
+
+// 화살표로 움직였나 (그때만 칩을 건너뛴다 — 누르기 · 오른쪽 클릭은 가까운 끝: 칩 앞에 있다가 칩을 오른쪽 클릭했는데
+//   건너편으로 가면 커서가 바뀌어 막 뜬 메뉴가 닫혔다)
+let arrowAt = 0;
+const ARROWS = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End']);
 
 export const fileChipGuard = () => new Plugin({
   key: new PluginKey('memoking-file-chip-guard'),
@@ -88,7 +93,8 @@ export const fileChipGuard = () => new Plugin({
     for (const t of trs) oldHead = t.mapping.map(oldHead);
     const forward = sel.head > sel.anchor;
     let { head, anchor } = sel;
-    if (sel.empty) head = anchor = snapOutOfChip(chipsAt(sel.$head), sel.head, oldHead);
+    const byArrow = Date.now() - arrowAt < 500;
+    if (sel.empty) head = anchor = snapOutOfChip(chipsAt(sel.$head), sel.head, byArrow ? oldHead : null);
     else {
       // 늘리는 쪽 끝은 가는 방향으로 칩을 넘고, 붙박이 끝은 칩을 감싸도록 바깥으로
       head = snapOutOfChip(chipsAt(sel.$head), head, forward ? -Infinity : Infinity);
@@ -99,6 +105,7 @@ export const fileChipGuard = () => new Plugin({
   },
   props: {
     handleKeyDown(view, e) {
+      if (ARROWS.has(e.key)) arrowAt = Date.now();
       if ((e.key !== 'Backspace' && e.key !== 'Delete') || e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return false;
       const chip = chipNextTo(view.state, e.key === 'Backspace' ? -1 : 1);
       if (!chip) return false;

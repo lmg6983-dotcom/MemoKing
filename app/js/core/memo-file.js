@@ -226,17 +226,23 @@ const isLocalPath = (src) => !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWit
  *   [파일명](attachments/b.pdf)  → 그 밖의 파일 (파일 칩)
  * @returns {{ src: string, alt: string, kind: 'image'|'audio'|'video'|'file' }[]}
  */
+// 묶음 사진: 한 줄에 모은 그림마다 title — 다른 앱에서는 그냥 사진들 (editor.js · album-viewer.js)
+//   문서를 장마다 그림으로 넣은 것은 따로 표시해, 회상 달력의 "그날의 사진" 에는 넣지 않는다
+export const ALBUM_TITLE = 'album';
+export const ALBUM_PAGE_TITLE = 'album page';
+export const isAlbumTitle = (t) => t === ALBUM_TITLE || t === ALBUM_PAGE_TITLE;
+
 export function extractMedia(body) {
   const found = [];
   const seen = new Set();
-  const re = /(!?)\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
+  const re = /(!?)\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"([^"]*)")?\s*\)/g;
   for (const m of body.matchAll(re)) {
     const embed = m[1] === '!';
     const src = safeDecode(m[3]);
     if (!isLocalPath(src) || seen.has(src)) continue;
     if (!embed && !src.startsWith('attachments/')) continue; // 다른 메모로 가는 링크 등은 첨부가 아님
     seen.add(src);
-    found.push({ src, alt: m[2], kind: embed ? mediaKindOf(src, m[2]) ?? 'file' : 'file' });
+    found.push({ src, alt: m[2], kind: embed ? mediaKindOf(src, m[2]) ?? 'file' : 'file', title: m[4] ?? '' });
   }
   return found;
 }

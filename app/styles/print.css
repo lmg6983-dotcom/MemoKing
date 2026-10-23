@@ -59,3 +59,8 @@ html.preview.multi body { width: var(--page-w); height: auto; padding: 0; overfl
 .page-table > thead > tr > td, .page-table > tfoot > tr > td { height: var(--page-m); padding: 0; }
 .page-table .page-cell { padding: 0 var(--page-m); vertical-align: top; }
 .page-table > * > tr > td { border: 0 !important; background: none !important; } /* 바깥 여백 표만 (메모 안의 표는 그대로) */
+
+/* 묶음 사진 · 문서를 넣은 장: 종이에는 모든 장을 원래 비율로 차례로 (메모 화면의 4장 격자 · +N 은 빼고) */
+html.print-page .mk-doc p:has(> img.mk-album-img) { display: block; width: auto; border-radius: 0; overflow: visible; }
+html.print-page .mk-doc p > img.mk-image.mk-album-img { position: static; display: block; width: auto; height: auto; max-width: 100%; aspect-ratio: auto; opacity: 1; margin: 0 0 8px; break-inside: avoid; }
+html.print-page .mk-doc p:has(> img.mk-album-img)::after { content: none; }

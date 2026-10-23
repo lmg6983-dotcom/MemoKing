@@ -171,6 +171,7 @@ export function contentKindName(node, dom) {
   if (dom.querySelector('.mk-ink')) return '손 메모';
   if (dom.querySelector('.mk-video')) return '동영상';
   if (dom.querySelector('.mk-media')) return '소리';
+  if (dom.querySelector('img.mk-album-img')) return '묶음 사진';
   if (dom.querySelector('img.mk-image')) return '그림';
   if (dom.querySelector('a[data-file]')) return '파일';
   if (dom.querySelector('.mk-link-card, [data-link-card]')) return '링크';

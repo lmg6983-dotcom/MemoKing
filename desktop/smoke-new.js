@@ -740,7 +740,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         nw.webContents.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
         nw.webContents.sendInputEvent({ type: 'mouseDown', x: r.x, y: r.y, button: 'right', clickCount: 1 });
         nw.webContents.sendInputEvent({ type: 'mouseUp', x: r.x, y: r.y, button: 'right', clickCount: 1 });
-        return until(() => js(nw, `(() => { const m = document.querySelector('.mk-ctx'); return m && { icons: [...m.querySelectorAll('.mk-ctx-ic')].map((b) => b.dataset.id + ':' + b.getAttribute('aria-label')), items: [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.querySelector('.mk-ctx-text').textContent), rect: m.getBoundingClientRect().toJSON() }; })()`), `${sel} 오른쪽 클릭 메뉴`, 3000).catch(() => null);
+        return until(() => js(nw, `(() => { const m = document.querySelector('.mk-ctx:not(.closing)'); return m && { icons: [...m.querySelectorAll('.mk-ctx-ic')].map((b) => b.dataset.id + ':' + b.getAttribute('aria-label')), items: [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.querySelector('.mk-ctx-text').textContent), rect: m.getBoundingClientRect().toJSON() }; })()`), `${sel} 오른쪽 클릭 메뉴`, 3000).catch(() => null);
       };
       // 메뉴의 아이콘 · 항목을 진짜 마우스로 누른다 (자리 · 가려짐까지 함께 확인)
       const clickMenu = async (selector) => {
@@ -795,24 +795,27 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await renameVia('안내 자료.pdf').catch(() => {});
         await until(() => js(nw, `document.querySelector('.mk-doc a[data-file]')?.textContent === '안내 자료.pdf'`), '칩 이름 되돌림', 3000).catch(() => {});
       }
-      // 서식 막대: 파일 칩에 커서가 있으면 글 서식 단추는 쓸 수 없다 (content-fixed)
+      // 서식 막대: 파일 칩을 고르면 글 서식 단추는 쓸 수 없다 (content-fixed) — 커서는 칩 앞뒤에만 가므로 칩을 통째로 고른다
       {
-        await js(nw, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); const r = document.createRange(); r.setStart(a.firstChild, 1); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new Event('selectionchange')); })()`);
+        await js(nw, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); const r = document.createRange(); r.selectNodeContents(a); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new Event('selectionchange')); })()`);
         const fixed = await until(() => js(nw, `document.body.classList.contains('content-fixed') && getComputedStyle(document.querySelector('[data-cmd="bold"]')).pointerEvents === 'none'`), '서식 막대 비활성', 3000).catch(() => false);
         check('파일 칩을 고르면 글 서식 막대(굵게 · 기울임 …)는 쓸 수 없음', fixed);
+        // 다음 점검을 위해 고른 것을 풀어 둔다 (칩을 고른 채 오른쪽 클릭은 글 메뉴)
+        await js(nw, `(() => { const r = document.createRange(); r.selectNodeContents(document.querySelector('.mk-doc p:last-child')); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new Event('selectionchange')); })()`);
+        await wait(150);
       }
       // 잘라내기 아이콘: 복사한 뒤 지움 → Ctrl+Z 로 되돌림
       {
         const before = await js(nw, `document.querySelectorAll('.mk-doc a[data-file]').length`);
-        await openMenu('.mk-doc a[data-file]');
+        const cutMenu = await openMenu('.mk-doc a[data-file]');
         const copiesBefore = smokeOpened.filter((o) => o.kind === 'copy-file').length;
-        await clickMenu('.mk-ctx-ic[data-id="cut"]');
+        const cutClick = await clickMenu('.mk-ctx-ic[data-id="cut"]').catch((e) => String(e));
         const gone = await until(() => js(nw, `document.querySelectorAll('.mk-doc a[data-file]').length === ${before - 1}`), '잘라낸 칩 사라짐', 3000).catch(() => false);
         const copied = smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1;
         await js(nw, `document.querySelector('.mk-doc').focus()`);
         key(nw, 'Z', ['control']);
         const back = await until(() => js(nw, `document.querySelectorAll('.mk-doc a[data-file]').length === ${before}`), 'Ctrl+Z 로 되살림', 3000).catch(() => false);
-        check('잘라내기 아이콘: 파일을 복사한 뒤 지우고, Ctrl+Z 로 되돌아옴', gone && copied && back, JSON.stringify({ before, gone, copied, back }));
+        check('잘라내기 아이콘: 파일을 복사한 뒤 지우고, Ctrl+Z 로 되돌아옴', gone && copied && back, JSON.stringify({ before, gone, copied, back, cutMenu: Boolean(cutMenu), cutClick }));
       }
       // PDF 저장: 파일 그대로
       await openMenu('.mk-doc a[data-file]');
@@ -1604,10 +1607,54 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           const r = document.querySelector('.mk-doc p').getBoundingClientRect();
           document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
         })()`);
+        // 문서(PDF)가 섞여 있으면 어떻게 넣을지 묻는다 → 이번엔 "파일로"
+        const askDoc = await until(() => js(win, `(() => { const p = document.querySelector('.mk-prompt'); return p && { title: p.querySelector('b').textContent, buttons: [...p.querySelectorAll('button')].map((b) => b.textContent) }; })()`), '문서 넣기 질문', 4000).catch(() => null);
+        check('문서를 넣으면 파일로 · 그림으로 중 고르게 물음', askDoc?.title.includes('다.pdf') && askDoc.buttons.join() === '파일로,그림으로', JSON.stringify(askDoc));
+        await js(win, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '파일로')?.click()`);
         const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
         const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image').length })`);
         const dropNote = await js(win, `document.getElementById('status').textContent`);
         check('여러 파일 놓기: 4개 (글 파일 2 · PDF · 사진)가 한 번에 모두 들어감, 읽지 못한 하나(폴더)는 알리고 나머지는 그대로', fallback.chips.length === 3 && fallback.imgs === 1 && ['가.txt', '다.pdf', '라.txt'].every((n) => fallback.chips.includes(n)) && /4개를 넣었어요.*1개.*읽지 못해/.test(dropNote.replace('파일 ', '')), JSON.stringify({ fallback, dropNote }));
+        // 사진 여러 장: 묶음 사진으로 넣을지 묻고, 고르면 한 줄에 모아 격자로 · 누르면 크게 넘겨 보기
+        {
+          const { win: aw } = await openMemo('# 묶음 사진\n\n끝\n', '묶음 사진');
+          const pngB = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+          await js(aw, `(() => {
+            const bin = Uint8Array.from(atob(${JSON.stringify(pngB)}), (c) => c.charCodeAt(0));
+            const dt = new DataTransfer();
+            for (const n of ['하나.png', '둘.png', '셋.png', '넷.png', '다섯.png']) dt.items.add(new File([bin], n, { type: 'image/png' }));
+            const r = document.querySelector('.mk-doc p').getBoundingClientRect();
+            document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
+          })()`);
+          const askAlbum = await until(() => js(aw, `document.querySelector('.mk-prompt b')?.textContent`), '묶음 사진 질문', 4000).catch(() => null);
+          await js(aw, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '묶음 사진으로')?.click()`);
+          const album = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')]; const p = imgs[0]?.parentElement; if (imgs.length < 5) return null; const vis = imgs.filter((i) => getComputedStyle(i).opacity !== '0'); return { n: imgs.length, sameLine: imgs.every((i) => i.parentElement === p), grid: getComputedStyle(p).display, visible: vis.length, more: getComputedStyle(p, '::after').content, gap: vis.slice(1).map((i) => getComputedStyle(i).marginTop) }; })()`), '묶음 사진 넣기', 5000).catch(() => null);
+          check('사진 5장 → "묶음 사진으로" 고르면 한 줄 격자에 4장 + "+1"', askAlbum === '사진 5장을 어떻게 넣을까요?' && album?.n === 5 && album.sameLine && album.grid === 'grid' && album.visible === 4 && album.more.includes('+') && album.gap.every((g) => g === '0px'), JSON.stringify({ askAlbum, album }));
+          await js(aw, `document.querySelectorAll('.mk-doc img.mk-album-img')[1].click()`);
+          const viewer = await until(() => js(aw, `document.querySelector('.mk-album-view .mk-album-count')?.textContent`), '크게 보기', 3000).catch(() => null);
+          key(aw, 'Right');
+          await wait(150);
+          const after = await js(aw, `document.querySelector('.mk-album-view .mk-album-count')?.textContent`);
+          key(aw, 'Escape');
+          await wait(200);
+          const closed = await js(aw, `!document.querySelector('.mk-album-view')`);
+          check('묶음 사진: 누른 장부터 크게 (2 / 5), → 로 다음 장, Esc 로 닫힘', viewer === '2 / 5' && after === '3 / 5' && closed, JSON.stringify({ viewer, after, closed }));
+          // PDF → 장마다 그림 (pdf.js 로 실제로 바꿔 본다)
+          const pdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R 5 0 R]/Count 2>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n4 0 obj<</Length 33>>stream\n0 0 1 rg 20 20 160 240 re f\nendstream endobj\n5 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
+          await js(aw, `(() => {
+            const dt = new DataTransfer();
+            dt.items.add(new File([${JSON.stringify(pdf)}], '설명서.pdf', { type: 'application/pdf' }));
+            const ps = document.querySelectorAll('.mk-doc p');
+            const r = ps[ps.length - 1].getBoundingClientRect();
+            document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
+          })()`);
+          await until(() => js(aw, `!!document.querySelector('.mk-prompt')`), 'PDF 질문', 4000).catch(() => null);
+          await js(aw, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '그림으로')?.click()`);
+          const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 2 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);
+          const pdfNote = await js(aw, `document.getElementById('status').textContent`);
+          check('PDF 를 "그림으로" 넣으면 장마다 그림 (2쪽 → 2장, 또렷한 크기) 묶음으로', Boolean(pages), JSON.stringify({ pages, pdfNote }));
+          aw.close();
+        }
         await wait(600);
         // 끌어내기: 파일 칩 · 사진을 메모 밖으로 → 보이는 이름의 임시 파일이 간다
         const dragBefore = smokeOpened.filter((o) => o.kind === 'drag-out').length;
@@ -1778,7 +1825,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const where = () => js(cw, `(() => {
         const a = document.querySelector('.ProseMirror a[data-file]');
         const s = getSelection();
-        const r = document.createRange(); r.selectNodeContents(a);
+        const r = document.createRange(); r.selectNodeContents(a.firstChild); // 칩 글자(글자 마디)와 견준다 — 끝(글자 마디 끝)이 a 의 끝보다 앞으로 잡히지 않게
         const p = document.createRange(); p.setStart(s.anchorNode, s.anchorOffset); p.collapse(true);
         const before = p.compareBoundaryPoints(Range.START_TO_START, r) <= 0;
         const after = p.compareBoundaryPoints(Range.END_TO_START, r) >= 0; // 커서(p 시작) 가 칩 끝 이후

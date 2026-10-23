@@ -2091,11 +2091,13 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 }
 .mk-doc img.mk-album-img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; margin: 0; border-radius: 0; cursor: zoom-in; counter-increment: mk-album; background: #fff; }
 .mk-doc[contenteditable="true"] img.mk-album-img { cursor: zoom-in; }
-.mk-doc img.mk-album-img:nth-of-type(n + 5) { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-/* 3장: 첫 장을 세로로 크게 */
-.mk-doc p:has(> img.mk-album-img:nth-of-type(3):last-of-type) > img.mk-album-img:first-of-type { grid-row: span 2; aspect-ratio: auto; height: 100%; }
+.mk-doc img.mk-album-img:nth-child(n + 5 of .mk-album-img) { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* 그림만 든 줄의 "그림 사이 여백" 규칙(mk-image-line)이 격자 칸을 밀지 않게 */
+.mk-doc p.mk-image-line > .mk-image.mk-album-img { margin: 0; }
+/* 3장: 첫 장을 세로로 크게 — 편집기가 그림 사이마다 숨은 img(ProseMirror-separator)를 끼우므로 장 수는 "of .mk-album-img" 로 센다 */
+.mk-doc p:has(> img.mk-album-img:nth-child(3 of .mk-album-img)):not(:has(> img.mk-album-img:nth-child(4 of .mk-album-img))) > img.mk-album-img:nth-child(1 of .mk-album-img) { grid-row: span 2; aspect-ratio: auto; height: 100%; }
 /* 5장 넘으면 4번째 칸 위에 +N (counter 가 -4 에서 시작해 장 수 - 4) */
-.mk-doc p:has(> img.mk-album-img:nth-of-type(5))::after {
+.mk-doc p:has(> img.mk-album-img:nth-child(5 of .mk-album-img))::after {
   content: '+' counter(mk-album); grid-row: 2; grid-column: 2; z-index: 1; display: grid; place-items: center;
   background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 22px; font-weight: 700; pointer-events: none;
 }

@@ -12,7 +12,7 @@ import {
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
-import { mediaKindOf, trimTrailingBreaks } from './core/memo-file.js';
+import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE } from './core/memo-file.js';
 import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkForDark } from './core/ink.js';
 import { getStroke } from '../vendor/perfect-freehand.js';
 import { openInkEditor } from './ink-editor.js';
@@ -93,7 +93,7 @@ const MEDIA_CONTROL = `${MEDIA_SCRUB}, .plyr__progress, input, [role="slider"], 
 let inkEditHandler = null;
 // 묶음 사진 한 장을 누르면 크게 넘겨 보기 (편집기마다 createNoteEditor 가 정함: (view, pos) => void)
 let albumHandler = null;
-export const ALBUM = 'album'; // 묶음 사진의 그림 title — 파일에는 ![이름](그림 "album") 으로 (다른 앱에서는 그냥 사진들)
+
 let inkReader = null; // 손 메모 SVG 글 읽기 (createNoteEditor 의 readAttachment)
 const INK_FILE = '손 메모';
 
@@ -192,12 +192,13 @@ function mediaView(node, view, getPos) {
     };
   }
   const dom = document.createElement('img');
-  dom.className = title === ALBUM ? 'mk-image mk-album-img' : 'mk-image';
+  const album = isAlbumTitle(title);
+  dom.className = album ? 'mk-image mk-album-img' : 'mk-image';
   dom.src = vaultUrl(src);
   dom.alt = alt ?? '';
-  if (title && title !== ALBUM) dom.title = title;
+  if (title && !album) dom.title = title;
   dom.onerror = () => dom.classList.add('broken');
-  if (title === ALBUM) {
+  if (album) {
     dom.addEventListener('click', (e) => {
       if (e.defaultPrevented || typeof getPos !== 'function') return;
       albumHandler?.(view, getPos());
@@ -1143,7 +1144,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     pos = afterVoiceCard(v.state, pos);
     const paragraphs = items.map((item) => {
       if (item.kind === 'album') {
-        return schema.nodes.paragraph.create(null, item.images.map((im) => schema.nodes.image.create({ src: im.src, alt: im.alt, title: ALBUM })));
+        return schema.nodes.paragraph.create(null, item.images.map((im) => schema.nodes.image.create({ src: im.src, alt: im.alt, title: im.page ? ALBUM_PAGE_TITLE : ALBUM_TITLE })));
       }
       if (item.kind === 'file') {
         return schema.nodes.paragraph.create(null, schema.text(item.name, [schema.marks.link.create({ href: item.src })]));
@@ -1239,7 +1240,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const images = [];
     let start = 0;
     $p.parent.forEach((child, offset) => {
-      if (child.type.name !== 'image' || child.attrs.title !== ALBUM) return;
+      if (child.type.name !== 'image' || !isAlbumTitle(child.attrs.title)) return;
       const at = $p.start() + offset;
       if (at === pos) start = images.length;
       images.push({ src: child.attrs.src, alt: child.attrs.alt, pos: at });
@@ -1253,7 +1254,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         const it = images[i];
         const src = await saveFile(new File([png], `${baseName(it.alt || '그림')} 그림.png`, { type: 'image/png' }));
         const cur = v.state.doc.nodeAt(it.pos);
-        if (v.isDestroyed || cur?.type.name !== 'image') return null; // 보는 사이 메모가 바뀌었으면 넣지 않음
+        if (v.isDestroyed || cur?.type.name !== 'image' || cur.attrs.src !== it.src) return null; // 보는 사이 메모가 바뀌었으면(동기화 등) 엉뚱한 그림을 바꾸지 않게
+        it.src = src; // 같은 장을 또 그리면 이번 그림에서 이어서
         v.dispatch(v.state.tr.setNodeMarkup(it.pos, null, { ...cur.attrs, src }));
         return src;
       },
@@ -1331,7 +1333,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const images = [];
       for (let i = 0; i < pages.length; i++) {
         const alt = `${baseName(name)} ${i + 1}쪽`;
-        images.push({ src: await saveFile(new File([pages[i]], `${alt}.png`, { type: 'image/png' })), alt });
+        images.push({ src: await saveFile(new File([pages[i]], `${alt}.png`, { type: 'image/png' })), alt, page: true });
       }
       onNotice?.(total > pages.length ? `${name} 의 앞 ${pages.length}장을 넣었어요 (모두 ${total}장)` : `${name} 을 ${pages.length}장의 그림으로 넣었어요`);
       return { kind: 'album', images };

@@ -6,7 +6,7 @@ import { EventEmitter } from 'node:events';
 import { randomUUID, randomBytes } from 'node:crypto';
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
-  extractMedia, isBlankBody, titleToFileName, COLORS } from '../app/js/core/memo-file.js';
+  extractMedia, isBlankBody, titleToFileName, COLORS, ALBUM_PAGE_TITLE } from '../app/js/core/memo-file.js';
 import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { taskProgress } from '../app/js/core/tasks.js';
@@ -233,7 +233,7 @@ export class Vault extends EventEmitter {
       title: extractTitle(body),
       preview: extractPreview(body, 1200), // 목록을 확대하면 카드에 요약을 여러 줄 보여 주므로 넉넉히
       thumb: media.find((m) => m.kind === 'image')?.src ?? null,
-      images: media.filter((m) => m.kind === 'image').slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진)
+      images: media.filter((m) => m.kind === 'image' && m.title !== ALBUM_PAGE_TITLE).slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진 — 문서를 넣은 장은 빼고)
       tags: extractTags(body),
       hasImage: has('image'),
       hasWebLink: /\]\(https?:\/\/|<https?:\/\//i.test(body),

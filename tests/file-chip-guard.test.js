@@ -28,5 +28,6 @@ test('파일 칩: 커서는 칩 앞뒤에만 — 끝에서 한 칸 들어오면 
   assert.equal(snapOutOfChip(chips, 15, -Infinity), 20, '오른쪽으로 고르는 중');
   assert.equal(snapOutOfChip(chips, 15, Infinity), 10, '왼쪽으로 고르는 중');
   assert.equal(snapOutOfChip(chips, 10, 3), 10, '칩 앞뒤는 그대로');
+  assert.equal(snapOutOfChip(chips, 12, null), 10, '화살표가 아니면(누르기) 가까운 끝');
   assert.equal(snapOutOfChip(chips, 5, 3), 5);
 });
