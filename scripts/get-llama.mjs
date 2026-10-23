@@ -33,7 +33,9 @@ const tmp = join(tmpdir(), `memoking-llama-${process.pid}`);
 mkdirSync(tmp, { recursive: true });
 try {
   writeFileSync(join(tmp, ASSET), zip);
-  execFileSync('tar', ['-xf', ASSET], { cwd: tmp }); // Windows 10 이상의 tar 는 zip 도 푼다
+  // Windows 10 이상의 tar(bsdtar)는 zip 도 푼다 — Git 의 GNU tar 가 PATH 에서 먼저 잡혀도 Windows 의 것으로
+  const tar = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+  execFileSync(tar, ['-xf', ASSET], { cwd: tmp });
   const found = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? found(join(dir, d.name)) : [join(dir, d.name)]));
   const files = found(tmp).filter((f) => /[\\/](llama-server\.exe|[^\\/]+\.dll)$/i.test(f)); // 다른 도구(llama-cli 등)는 설치 파일을 키우기만 해서 뺀다
   if (!files.some((f) => /llama-server\.exe$/i.test(f))) throw new Error('묶음에 llama-server.exe 가 없어요');
