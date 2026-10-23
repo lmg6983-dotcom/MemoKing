@@ -203,10 +203,26 @@ async function renderTagBar() {
   } catch {
     list = [];
   }
+  const ai = (await api.ai?.status().catch(() => null))?.chat.state;
   if (seq !== tagSeq) return;
   fillSuggestChips($('tag-suggest-chips'), list, addTags);
-  tagBar.hidden = list.length === 0;
+  $('tag-ai-btn').hidden = !['ready', 'running'].includes(ai); // 글 모델을 넣은 PC 에서만
+  tagBar.hidden = list.length === 0 && $('tag-ai-btn').hidden;
 }
+// AI로 고르기: 쓰는 동안 저절로 돌리면 8GB PC 가 무거워져 누를 때만 (모델은 이 PC 안)
+$('tag-ai-btn')?.addEventListener('click', async () => {
+  const btn = $('tag-ai-btn');
+  const seq = ++tagSeq;
+  btn.disabled = true;
+  btn.textContent = 'AI가 고르는 중…';
+  const r = await api.tags.ai(editor.getMarkdown(), id).catch((err) => ({ error: err.message }));
+  btn.disabled = false;
+  btn.textContent = 'AI로 고르기';
+  if (seq !== tagSeq) return;
+  if (r.error) return setStatus(r.error, true);
+  if (!r.length) return setStatus('AI 가 맞는 태그를 찾지 못했어요');
+  fillSuggestChips($('tag-suggest-chips'), r, addTags);
+});
 function addTags(names) {
   if (!editor || !names.length) return;
   editor.appendMarkdown(names.map((n) => `#${n}`).join(' '));

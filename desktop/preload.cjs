@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('memoking', {
     list: invoke('tags:list'),
     auto: invoke('tags:auto'),
     suggest: invoke('tags:suggest'),
+    ai: invoke('tags:ai'), // AI 로 고르기 → 칩 목록 | { error }
   },
   memo: {
     open: invoke('memo:open'),

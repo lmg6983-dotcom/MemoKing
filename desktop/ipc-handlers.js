@@ -7,6 +7,7 @@ import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { spellMessages, styleMessages, draftMessages, plausibleFix } from '../app/js/core/ai-write.js';
+import { aiTagRequest, aiTagResult } from '../app/js/core/ai-tags.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
@@ -254,6 +255,16 @@ export function registerIpc(ctx) {
   ipcMain.handle('memos:list', () => wm.listMemos());
   ipcMain.handle('tags:list', () => collectTags(getVault()?.list() ?? []));
   ipcMain.handle('tags:suggest', (_e, body, id) => suggestTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { excludeId: id }));
+  // 추천 태그 막대 › AI로 고르기 (이 PC 안의 글 모델, 후보 중에서만)
+  ipcMain.handle('tags:ai', async (_e, body, id) => {
+    const text = String(body ?? '');
+    const req = aiTagRequest(text, getVault()?.bodies() ?? [], { excludeId: id });
+    try {
+      return aiTagResult(await getAi().chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, text);
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
   ipcMain.handle('tags:auto', (_e, body, source, id) => autoTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { source, excludeId: id }));
   ipcMain.handle('memos:search', (_e, query, excludeId) => wm.withOpenFlag(getVault()?.search(String(query ?? ''), excludeId) ?? []));
 
