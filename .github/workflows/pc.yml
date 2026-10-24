@@ -1,7 +1,7 @@
 # PC 점검 — PR · main 에 올릴 때마다 단위 테스트와 실제 Electron 자동 점검(스모크)을 돌린다.
 #   v0.64.0 ~ v0.68.0 은 목록 창이 켤 때 멈췄는데(preload 이벤트 등록 빠짐) 스모크를 한 번만 돌렸어도 잡혔다.
 #   Linux(가상 화면): 단위 테스트 · 기본 · 튜토리얼 · 바뀐 기능 점검
-#   Windows: 기본 점검 + Windows 에서만 되는 클립보드 점검(PowerShell · 그림 복사)
+#   Windows: 기본 점검 (클립보드 점검은 사람이 로그인한 화면이 필요해 Windows PC 에서 따로)
 name: PC 점검
 
 on:
@@ -40,10 +40,13 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb > /dev/null
           npx -y $ELECTRON --version
       - name: 기본 점검
+        timeout-minutes: 10
         run: xvfb-run -a -s "-screen 0 1920x1080x24" npx -y $ELECTRON --no-sandbox --disable-gpu . --smoke
       - name: 튜토리얼 점검
+        timeout-minutes: 10
         run: xvfb-run -a -s "-screen 0 1920x1080x24" npx -y $ELECTRON --no-sandbox --disable-gpu . --smoke --tutorial
       - name: 바뀐 기능 점검
+        timeout-minutes: 10
         run: xvfb-run -a -s "-screen 0 1920x1080x24" npx -y $ELECTRON --no-sandbox --disable-gpu . --smoke --new
 
   windows:
@@ -57,6 +60,7 @@ jobs:
       - name: Electron 받기
         run: npx -y $env:ELECTRON --version
       - name: 기본 점검
+        timeout-minutes: 10
         run: npx -y $env:ELECTRON . --smoke
-      - name: 클립보드 점검 (Windows 전용 — PowerShell · 그림 복사)
-        run: npx -y $env:ELECTRON . --smoke --clipboard
+      # 클립보드 점검(--clipboard)은 여기 넣지 않는다 — 러너는 사람이 로그인한 화면이 없어 PowerShell 클립보드 ·
+      #   그림 복사에서 멈춘다 (2026-10-24 시험: 27분 멈춤). Windows PC 에서 npm run smoke:clipboard 로
