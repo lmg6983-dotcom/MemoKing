@@ -145,7 +145,7 @@ function applyFind() {
   }
 }
 
-const HELP = 'Esc 는 그만두기, Backspace 는 이 기능의 키 없애기예요';
+const HELP = 'Esc는 그만두기, Backspace는 이 기능의 키 없애기예요';
 
 // 메모 창 기능의 키 칸 (key-capture.js — 설정 창의 매직 카피 · 매직키 칸과 같은 동작)
 function captureAction(btn, a) {
@@ -174,7 +174,7 @@ function captureAction(btn, a) {
       await cap.stop();
       const res = await api.keymap.set(a.id, r.combo);
       state = res;
-      setStatus(`${a.label}: ${label} 로 바꿨어요${res.moved?.length ? `. 같은 키를 쓰던 '${res.moved.join(', ')}'에서는 그 키를 뺐어요` : ''}`);
+      setStatus(`${a.label}: ${label}로 바꿨어요${res.moved?.length ? `. 같은 키를 쓰던 '${res.moved.join(', ')}'에서는 그 키를 뺐어요` : ''}`);
       render();
       flashRows([a.label, ...(res.moved ?? [])]);
     },

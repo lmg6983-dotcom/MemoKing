@@ -87,7 +87,7 @@ export function prepareSmoke(userData) {
   // v0.1.0 데이터 옮기기 확인용
   fs.writeFileSync(path.join(userData, 'memos.json'), JSON.stringify({
     version: 1,
-    memos: [{ id: 'old', title: '옛 메모', body: 'v0.1.0 에서 쓴 메모', pinned: true, createdAt: 1790000000000, updatedAt: 1790000000000 }],
+    memos: [{ id: 'old', title: '옛 메모', body: 'v0.1.0에서 쓴 메모', pinned: true, createdAt: 1790000000000, updatedAt: 1790000000000 }],
   }));
 }
 
@@ -333,7 +333,7 @@ export async function runSmoke({
     check('글자 색(색판) → <span style="color">', md1.includes('<span style="color: #e03131">빨강</span>'));
     check('하이라이트(Ctrl+Shift+H) → "<mark>"', md1.includes('<mark>형광</mark>'));
     const attachments = [...md1.matchAll(/!?\[[^\]]*\]\((attachments\/[^)]+)\)/g)].map((m) => m[1]);
-    check('이미지·소리·동영상·파일이 attachments 폴더에 저장되고 md 로 참조됨',
+    check('이미지·소리·동영상·파일이 attachments 폴더에 저장되고 md로 참조됨',
       attachments.length === 4 && attachments.every((a) => fs.existsSync(path.join(VAULT, a)))
         && md1.includes('![동영상 데모 영상](attachments/') && md1.includes('[회의자료.txt](attachments/'),
       attachments.join(', '));
@@ -470,7 +470,7 @@ export async function runSmoke({
     await key(t1.win, 'T', ['control', 'shift']);
     const keyOn = await until(async () => t1.win.isAlwaysOnTop() && (await pressed(t1.win)) === 'true'
       && (!stickers || Boolean(stickers.get(t1.win.id))), '단축키로 켜기').catch(() => false);
-    check('Ctrl+Shift+T 로 끄고 켜기 (붙은 왕관 스티커도 떼고 다시 붙음)', stuckBefore && keyOff && keyOn, JSON.stringify({ stuckBefore, keyOff, keyOn }));
+    check('Ctrl+Shift+T로 끄고 켜기 (붙은 왕관 스티커도 떼고 다시 붙음)', stuckBefore && keyOff && keyOn, JSON.stringify({ stuckBefore, keyOff, keyOn }));
     await closeNote(t1.id);
     const t2 = await openN1();
     check('다시 열어도 항상 위 유지 (창·버튼 모두)', t2.win.isAlwaysOnTop() && (await pressed(t2.win)) === 'true');
@@ -597,7 +597,7 @@ export async function runSmoke({
     list.webContents.focus();
     await key(list, 'Escape');
     await wait(400);
-    check('Esc 로 취소 (창 안 열림, 미리보기 사라짐)', !noteWins.has(n1.id) && !getGhost()?.isVisible());
+    check('Esc로 취소 (창 안 열림, 미리보기 사라짐)', !noteWins.has(n1.id) && !getGhost()?.isVisible());
 
     // 이미 열린 메모를 끌면 그 창이 새 자리로 이동
     const drop2 = dropPoint(160);
@@ -671,7 +671,7 @@ export async function runSmoke({
     const catFile = localOf('고양이');
     check('웹 글+사진 붙여넣기 → 글은 서식대로', webMd.includes('## 웹 기사 제목') && webMd.includes('기사 본문 첫 문단'),
       JSON.stringify(webMd.slice(0, 400)));
-    check('인터넷 사진 → attachments 에 저장 (원본과 같은 파일)',
+    check('인터넷 사진 → attachments에 저장 (원본과 같은 파일)',
       Boolean(catFile) && fs.readFileSync(path.join(VAULT, catFile)).equals(png) && !webMd.includes(`${base}/cat.png`), catFile);
     check('지연 로딩 사진 → 진짜 주소(data-src)에서 받아 저장', Boolean(localOf('지연 로딩')), webMd.match(/!\[지연 로딩\][^\n]*/)?.[0]);
     check('글 안에 박힌 data: 사진 → 파일로 풀어서 저장 (메모에 data: 없음)', Boolean(localOf('박힌 그림')) && !webMd.includes('data:image'));
@@ -746,7 +746,7 @@ export async function runSmoke({
         return fresh.length >= 2 ? fresh : null;
       }, '끌어다 놓은 파일 → 메모').catch(() => []);
       const bodies = made.map((m) => readMemo(m.id));
-      check('목록 창에 파일을 끌어다 놓으면 메모로 (.md 는 글 그대로 · 그림은 파일 이름 제목 + 그림)',
+      check('목록 창에 파일을 끌어다 놓으면 메모로 (.md는 글 그대로 · 그림은 파일 이름 제목 + 그림)',
         bodies.some((b) => /# 끌어온 회의록\n\n- 안건 하나\n- 안건 둘/.test(b)) && bodies.some((b) => /# 끌어온 그림\n\n!\[끌어온 그림\.png\]\(attachments\/[^)]+\.png\)/.test(b)),
         JSON.stringify(bodies.map((b) => b.slice(-160))));
       for (const m of made) getVault().trash(m.id); // 뒤 점검의 메모 수에 섞이지 않게
@@ -906,7 +906,7 @@ export async function runSmoke({
     check('자동완성 맨 위는 쓴 그대로, 처음엔 그것이 골라짐 (#업 → [#업, #업무])', JSON.stringify(narrowed) === JSON.stringify(['#업', '#업무']) && typedFirst, JSON.stringify(narrowed));
     await key(tagNote2.win, 'Down');
     await key(tagNote2.win, 'Enter');
-    const afterPick = await until(() => js(tagNote2.win, `(() => { const p = document.querySelector('.mk-doc p'); return p && p.textContent.includes('#업무') && { text: p.textContent, open: !document.querySelector('.tag-suggest')?.hidden, paras: document.querySelectorAll('.mk-doc > p').length }; })()`), 'Enter 로 넣기').catch(() => null);
+    const afterPick = await until(() => js(tagNote2.win, `(() => { const p = document.querySelector('.mk-doc p'); return p && p.textContent.includes('#업무') && { text: p.textContent, open: !document.querySelector('.tag-suggest')?.hidden, paras: document.querySelectorAll('.mk-doc > p').length }; })()`), 'Enter로 넣기').catch(() => null);
     check('↓ 로 고른 뒤 Enter → 그 태그를 넣고 목록 닫기 (줄바꿈 안 함)', afterPick?.text === '출장 준비물 #업무 ' && !afterPick.open && afterPick.paras === 1, JSON.stringify(afterPick));
     await type(tagNote2.win, '#');
     await until(() => js(tagNote2.win, `!document.querySelector('.tag-suggest')?.hidden`), '다시 열림').catch(() => {});
@@ -1047,7 +1047,7 @@ export async function runSmoke({
     const cb = noteWins.get(sC.id).getBounds();
     check('합친 탭은 받는 창과 같은 자리·크기', cb.x === aBounds.x && cb.y === aBounds.y && cb.width === aBounds.width && cb.height === aBounds.height, JSON.stringify({ cb, aBounds }));
     const stacksFile = JSON.parse(fs.readFileSync(path.join(VAULT, '_memoking', 'stacks.json'), 'utf8'));
-    check('스택은 메모 폴더 _memoking/stacks.json 에 저장', stacksFile.stacks?.[0]?.memos?.join() === [sA.id, sC.id].join(), JSON.stringify(stacksFile));
+    check('스택은 메모 폴더 _memoking/stacks.json에 저장', stacksFile.stacks?.[0]?.memos?.join() === [sA.id, sC.id].join(), JSON.stringify(stacksFile));
     await capture(noteWins.get(sC.id), 'smoke-stack-tabs.png');
 
     // 탭 누르기 → 즉시 전환 (창을 미리 만들어 둠)
@@ -1627,7 +1627,7 @@ export async function runSmoke({
       await press('C', ['control']);
       const reservedNote = await js(lw, `document.getElementById('sc-magic-note').textContent`);
       await press('Escape');
-      check('단축키 바꾸기: 복사(Ctrl+C) 같은 흔한 키는 거절 · Esc 로 그만', /늘 쓰는 키/.test(reservedNote) && !(await js(lw, `document.getElementById('sc-magic').classList.contains('capturing')`)), reservedNote);
+      check('단축키 바꾸기: 복사(Ctrl+C) 같은 흔한 키는 거절 · Esc로 그만', /늘 쓰는 키/.test(reservedNote) && !(await js(lw, `document.getElementById('sc-magic').classList.contains('capturing')`)), reservedNote);
       if (changed) {
         await js(lw, `document.getElementById('sc-magic-reset').click()`);
         await until(() => appSettings().shortcuts.magic.key === 'Control+Alt+Space', '기본값으로').catch(() => {});
@@ -1652,8 +1652,8 @@ export async function runSmoke({
       const sites = await listJs(`[...document.querySelectorAll('#magic-modules-list .magic-site select')].map((s) => s.value)`);
       await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'google'; s.dispatchEvent(new Event('change')); })()`);
       const engine = await until(() => appSettings().magic.engine === 'google' && 'google', '기본 검색 사이트 저장').catch(() => appSettings().magic.engine);
-      check('설정 매직키: 계산기 · 웹 검색 · AI 에게 묻기 켜짐, 기본 사이트(네이버 · ChatGPT)를 고르면 저장',
-        ['계산기:true', '웹 검색:true', 'AI 에게 묻기:true'].every((m) => mods.includes(m)) && sites.join() === 'naver,chatgpt' && engine === 'google', JSON.stringify({ mods, sites, engine }));
+      check('설정 매직키: 계산기 · 웹 검색 · AI에게 묻기 켜짐, 기본 사이트(네이버 · ChatGPT)를 고르면 저장',
+        ['계산기:true', '웹 검색:true', 'AI에게 묻기:true'].every((m) => mods.includes(m)) && sites.join() === 'naver,chatgpt' && engine === 'google', JSON.stringify({ mods, sites, engine }));
       await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'naver'; s.dispatchEvent(new Event('change')); })()`);
       await listJs(`document.getElementById('set-magic').scrollIntoView()`);
       await wait(200);
@@ -1728,7 +1728,7 @@ export async function runSmoke({
         otherRunning || (registered && appSettings().quickMemo.registered));
     } else {
       // 매직 카피(화면 글 가져오기)는 Windows 전용 — 다른 운영체제에서는 키를 잡지 않아야 다른 앱의 Ctrl+Alt+C 를 빼앗지 않는다
-      check('매직 카피 단축키: Windows 가 아니면 등록하지 않음 (다른 앱 키를 빼앗지 않음)',
+      check('매직 카피 단축키: Windows가 아니면 등록하지 않음 (다른 앱 키를 빼앗지 않음)',
         !registered && !appSettings().quickMemo.registered && !globalShortcut.isRegistered('Control+Alt+C'));
     }
     globalShortcut.unregister('Control+Alt+C');

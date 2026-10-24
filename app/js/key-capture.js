@@ -29,7 +29,7 @@ export function modsLabel(e, kind = 'memo') {
  */
 export function globalShortcutResult(res, label = '', { reset = false } = {}) {
   if (res?.ok) return { text: reset ? '처음 키로 되돌렸어요' : `${label} 키로 바꿨어요`, warn: false };
-  if (res?.reason === 'taken') return { text: reset ? `처음 키 ${res.label} 는 다른 앱이 쓰고 있어 되돌리지 못했어요` : `${res.label} 키는 다른 앱이 이미 쓰고 있어요. 다른 키를 골라 주세요`, warn: true };
+  if (res?.reason === 'taken') return { text: reset ? `처음 키 ${res.label}는 다른 앱이 쓰고 있어 되돌리지 못했어요` : `${res.label} 키는 다른 앱이 이미 쓰고 있어요. 다른 키를 골라 주세요`, warn: true };
   if (res?.reason === 'same') return { text: reset ? `처음 키를 ${res.other}가 쓰고 있어 되돌리지 못했어요` : `${res.other}와 같은 키예요. 다른 키를 골라 주세요`, warn: true };
   return { text: reset ? '처음 키로 되돌리지 못했어요' : '이 키는 쓸 수 없어요', warn: true };
 }
@@ -63,7 +63,7 @@ function onPointerDown(e) {
  * @param {{ api: object, name: string, note: (text: string, warn?: boolean) => void, done?: (res: object) => any, stopped?: (reason: string) => any }} o
  */
 export function captureGlobalKey(btn, { api, name, note, done, stopped }) {
-  note('Ctrl, Alt, Win 중 하나와 함께 눌러요. Esc 는 그만');
+  note('Ctrl, Alt, Win 중 하나와 함께 눌러요. Esc는 그만');
   return startKeyCapture(btn, {
     prompt: '새 키 조합을 누르세요',
     pause: (on) => api.settings.pauseShortcuts(on),

@@ -1245,7 +1245,7 @@ async function transcribeEach(memoId, items) {
   }
 }
 
-// 공유하기로 받은 글·주소·파일로 새 메모 (PC 의 매직 카피와 같은 모양: 제목 → 글 → 파일 → 출처)
+// 공유하기로 받은 글·주소·파일로 새 메모 (PC의 매직 카피와 같은 모양: 제목 → 글 → 파일 → 출처)
 //   마크다운 글·.md 파일은 서식대로, 소리 파일은 받아쓸지 묻는다
 async function memoFromShare(payload) {
   const text = String(payload.text ?? '').trim();
@@ -1269,7 +1269,7 @@ async function memoFromShare(payload) {
     }
     stt = answer.stt;
   }
-  // .md · .txt 는 첨부가 아니라 글로
+  // .md · .txt는 첨부가 아니라 글로
   const docTexts = [];
   for (const f of docs) {
     try {
@@ -1436,7 +1436,7 @@ function openVault() {
   if (app.vaultInfo?.drive) drive.syncSoon();
   recorder.resume(); // 녹음이 도는 중인지, 꺼져 있는 동안 끝난 녹음이 있는지
   widgets.publishSoon(0); // 앱이 꺼져 있는 동안 바뀐 메모(동기화 등)를 위젯에도
-  // 켜기 전에 PC 에서 방금 고친 메모가 있으면 (가장 최근 하나)
+  // 켜기 전에 PC에서 방금 고친 메모가 있으면 (가장 최근 하나)
   if (!pendingIntent) showHandoff(recentlyUpdated(vault.list()).map((m) => m.id));
   if (pendingIntent) {
     const p = pendingIntent;
@@ -1489,7 +1489,7 @@ function leaveSandbox() {
 
 // ---------- 이어 쓰기: PC·AI 비서에서 방금 고친 메모 → "PC에서 방금 고친 메모: 장보기 [열기]" ----------
 const handoffSeen = new Set();
-// 규칙(지금 보고 있는 메모는 본 것으로, 처음 하나만)은 core/handoff.js 의 pickHandoff — PC 와 같음
+// 규칙(지금 보고 있는 메모는 본 것으로, 처음 하나만)은 core/handoff.js의 pickHandoff — PC와 같음
 function showHandoff(ids) {
   const hit = pickHandoff(ids.map((id) => app.vault?.get(id)), { mine: 'phone', seen: handoffSeen, isOpen: (id) => note.currentId() === id });
   if (hit) toast(handoffText(hit.from, hit.memo.title), false, { label: '열기', run: () => app.openMemo(hit.memo.id) });

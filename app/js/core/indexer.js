@@ -182,7 +182,7 @@ export const AGENT_GUIDE = `# 메모킹 폴더 안내 (LLM 에이전트용)
 | pinned | 목록 맨 위 고정 여부 |
 | links | 사용자가 직접 연결한 메모들의 id |
 
-## index.json 의 memos[] 항목
+## index.json의 memos[] 항목
 | 키 | 뜻 |
 |---|---|
 | id, file, title | 메모 id, 폴더 기준 파일 경로, 제목 |
@@ -194,7 +194,7 @@ export const AGENT_GUIDE = `# 메모킹 폴더 안내 (LLM 에이전트용)
 | attachments | 첨부 파일 경로 |
 
 ## 권장 사용법
-1. index.json 에서 title·summary·keywords 로 후보를 찾는다.
-2. 후보의 related 를 따라 score 높은 메모를 함께 확인한다.
-3. 필요한 메모의 file 을 열어 본문을 읽는다.
+1. index.json에서 title·summary·keywords로 후보를 찾는다.
+2. 후보의 related를 따라 score 높은 메모를 함께 확인한다.
+3. 필요한 메모의 file을 열어 본문을 읽는다.
 `;

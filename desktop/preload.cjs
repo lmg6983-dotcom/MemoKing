@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('memoking', {
   vault: {
     use: invoke('vault:use'),
     choose: invoke('vault:choose'),
+    retry: invoke('vault:retry'),
     reveal: invoke('vault:reveal'),
     revealIndex: invoke('vault:reveal-index'),
   },

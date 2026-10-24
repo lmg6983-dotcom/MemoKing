@@ -26,7 +26,7 @@ export function aiTagRequest(body, memos, { excludeId } = {}) {
     required: ['tags'],
   };
   const messages = [
-    { role: 'system', content: '너는 메모에 태그를 다는 도우미다. 후보 태그 중 이 메모에 꼭 맞는 것만 0~3개 고른다. 맞는 후보가 없을 때만 new 에 새 태그 하나(띄어쓰기 없는 짧은 명사)를 쓴다.' },
+    { role: 'system', content: '너는 메모에 태그를 다는 도우미다. 후보 태그 중 이 메모에 꼭 맞는 것만 0~3개 고른다. 맞는 후보가 없을 때만 new에 새 태그 하나(띄어쓰기 없는 짧은 명사)를 쓴다.' },
     { role: 'user', content: `후보: ${candidates.join(', ') || '(없음)'}\n\n메모:\n${plainLines(body).join('\n').slice(0, 1500)}` },
   ];
   return { messages, schema, existing };
@@ -48,11 +48,11 @@ export function aiTagResult(json, existing, body) {
     taken.add(keyOf(name));
     out.push({ name, existing: isExisting, sure: false, why });
   };
-  for (const t of Array.isArray(data.tags) ? data.tags : []) if (known.has(keyOf(String(t)))) add(known.get(keyOf(String(t))), 'AI 가 고른 태그', true);
+  for (const t of Array.isArray(data.tags) ? data.tags : []) if (known.has(keyOf(String(t)))) add(known.get(keyOf(String(t))), 'AI가 고른 태그', true);
   const fresh = String(data.new ?? '').replace(/^#/, '').trim();
   if (fresh && isValidTag(fresh)) {
     const same = matchExisting(fresh, existing);
-    add(same?.name ?? fresh, same ? `"${fresh}" 대신 이미 쓰는 #${same.name}` : 'AI 가 제안한 새 태그', Boolean(same));
+    add(same?.name ?? fresh, same ? `"${fresh}" 대신 이미 쓰는 #${same.name}` : 'AI가 제안한 새 태그', Boolean(same));
   }
   return out;
 }

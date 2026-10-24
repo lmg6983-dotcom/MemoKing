@@ -16,7 +16,7 @@ const FILES = {
   'app/js/core/memo-lock.js': ['잠금 정보가 망가진 메모예요'],
   'android/web/js/note-view.js': ['잠긴 메모의 사본을 만들 수 없어요'],
   // 여러 파일이 함께 쓰는 문구 (PC · 휴대폰 · 메인 프로세스)
-  'app/js/core/ui-text.js': ['Google Drive 를 쓸 수 없어요', '메모를 찾지 못했어요', '메모 폴더가 아직 없어요', '지원하지 않는 그림 형식이에요'],
+  'app/js/core/ui-text.js': ['Google Drive를 쓸 수 없어요', '메모를 찾지 못했어요', '메모 폴더가 아직 없어요', '지원하지 않는 그림 형식이에요'],
   'android/app/src/main/java/com/memoking/app/RecorderService.kt': ['마이크 권한이 없어요', '마이크를 열지 못했어요', '이미 녹음하고 있어요'],
   'android/app/src/main/java/com/memoking/app/AppUpdate.kt': ['업데이트 정보를 받지 못했어요', '새 버전을 받지 못했어요'],
 };

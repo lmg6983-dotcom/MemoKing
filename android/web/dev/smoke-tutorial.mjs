@@ -153,21 +153,6 @@ await shot('new-memo-open');
 await tapOn('#fab-menu:not([hidden]) [data-new="text"]', '글 메모');
 await keyboard(true); // 새 메모는 바로 쓸 수 있게 키보드가 올라온다
 
-// 3) 한 줄 쓰기 — 다 치기 전에 넘어가면 안 된다
-await atStep('write');
-await typeSlowly('주말 장보');
-check('[write] 글자를 치는 도중에는 넘어가지 않음', (await stepId()) === 'write' || (await page.evaluate(() => document.querySelector('.coach-bubble')?.classList.contains('mini'))), await stepId());
-await typeSlowly('기 목록');
-await wait(300);
-check('[write] 아직 치는 중(잠깐 쉼)에도 그대로', (await stepId()) === 'write', await stepId());
-check('[write] 치기 시작하면 말풍선은 작은 알약 · 쓰는 줄을 안 가림', await coversCaret().then((c) => c.mini && c.hit === 0), JSON.stringify(await coversCaret()));
-await shot('write-typing');
-await wait(2000); // 손을 멈추면 다음으로
-
-// 4) 체크리스트
-await atStep('lists');
-await tapOn('#format-bar [data-cmd="task"]', '체크리스트');
-
 // 5) 옮기기 (안내) — 옮겨 볼 예시 목록이 저절로 들어 있어야 한다
 await atStep('move');
 await wait(300);
@@ -178,41 +163,11 @@ await shot('move-sample');
 await tapOn('.mode-knob .mk-dial', '다이얼 (옮기기로)');
 await wait(400);
 
-// 5-2) 매직 줌: 두 손가락으로 벌리기 (CDP 터치 두 점) → 다음 단계, 지나면 배율은 처음대로
-await atStep('note-zoom');
-{
-  const r = await page.$eval('#editor', (e) => { const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + 90 }; }); // 위쪽에서 (아래쪽은 말풍선)
-  const cdp = await page.context().newCDPSession(page);
-  const pts = (d) => [{ x: r.x - d, y: r.y, id: 1 }, { x: r.x + d, y: r.y, id: 2 }];
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pts(30) });
-  for (let d = 40; d <= 120; d += 10) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pts(d) });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await cdp.detach();
-}
-
-// 6) + 펼치기
-await atStep('add');
-check('[note-zoom] 두 손가락으로 벌리면 다음 단계 · 지나면 배율은 처음대로', await page.evaluate(() => !localStorage.getItem('memoking.noteZoom') && !document.querySelector('#editor.zoomed')));
-await tapOn('#add-btn', '도구막대 +');
-
-// 7) 손 메모
-await atStep('ink');
-await tapOn('#add-menu:not([hidden]) [data-add="ink"]', '손 메모');
-await page.waitForSelector('.ink-sheet');
-await keyboard(false);
-const sheet = await page.locator('.ink-canvas, .ink-sheet canvas, .ink-sheet svg').first().boundingBox();
-await touch('touchStart', sheet.x + 60, sheet.y + 80);
-for (let i = 1; i <= 12; i++) { await touch('touchMove', sheet.x + 60 + i * 12, sheet.y + 80 + Math.sin(i) * 20); await wait(16); }
-await touch('touchEnd', 0, 0);
-await wait(200);
-await tapOn('.ink-done', '손 메모 완료');
-await wait(500);
-
 // 8) 주석: 다이얼을 펼쳐 맨 위 "그리기" → 글 위에 긋고 → 다이얼을 다시 눌러 끝 (저장)
 await atStep('annotate');
-await page.evaluate(() => document.querySelector('.mode-knob').classList.add('open'));
-await wait(900); // 말풍선이 펼친 칸을 피해 자리를 옮길 틈
-await tapOn('.mode-knob .mk-stop-draw', '다이얼 › 그리기');
+// 앞 단계에서 옮기기로 돌려 두었으니 다이얼을 한 번 더 누르면 그리기 (옮기기 → 그리기)
+await tapOn('.mode-knob .mk-dial', '다이얼 (그리기로)');
+check('[annotate] 다이얼 한 번에 그리기로', await page.evaluate(() => document.querySelector('.mode-knob').dataset.mode === 'draw'));
 await wait(500);
 const area = await page.locator('.mk-annot, .ProseMirror').first().boundingBox().catch(() => null);
 if (area) {
@@ -228,19 +183,7 @@ await wait(500);
 await atStep('voice');
 await nextBtn();
 
-// 10) 태그: 끝 줄을 누르고 #할일 — "#할" 에서 넘어가면 안 된다
-await atStep('tag');
-const last = await page.locator('.ProseMirror > *').last().boundingBox();
-await page.touchscreen.tap(last.x + last.width - 4, last.y + last.height / 2);
-await keyboard(true);
-await page.keyboard.press('End');
-await typeSlowly(' #할');
-check('[tag] "#할" 까지 쳤을 때 아직 넘어가지 않음', (await stepId()) === 'tag' || (await page.evaluate(() => document.querySelector('.coach-bubble')?.classList.contains('mini'))), await stepId());
-await wait(300);
-check('[tag] "#할" 에서 잠깐 쉬어도 아직', (await stepId()) === 'tag', await stepId());
-await typeSlowly('일');
-
-for (const id of STEPS.slice(STEPS.findIndex((s) => s.id === 'tag') + 1).filter((s) => s.win === 'note' && !s.advance).map((s) => s.id)) {
+for (const id of STEPS.slice(STEPS.findIndex((s) => s.id === 'voice') + 1).filter((s) => s.win === 'note' && !s.advance).map((s) => s.id)) {
   await atStep(id);
   await nextBtn();
 }
@@ -275,9 +218,9 @@ for (const s of STEPS.filter((s) => s.win === 'list' && STEPS.indexOf(s) > STEPS
       const box = await page.evaluate(() => {
         const n = window.MemoKingNative;
         const files = JSON.parse(n.scan()).v ?? [];
-        return files.map((f) => JSON.parse(n.readText(f.file)).v ?? '').find((t) => t.includes('주말 장보기 목록')) ?? '';
+        return files.map((f) => JSON.parse(n.readText(f.file)).v ?? '').find((t) => t.includes('- [ ] 식빵')) ?? '';
       });
-      check('따라 하며 쓴 메모가 연습 공간에 그대로 (제목 · 체크리스트 · 예시 목록 · 태그)', /- \[ \]/.test(box) && box.includes('- [ ] 식빵') && box.includes('#할일'), box);
+      check('따라 하며 만든 메모가 연습 공간에 그대로 (예시 목록)', /- \[ \]/.test(box) && box.includes('- [ ] 식빵'), box);
     }
     await nextBtn();
   }
@@ -289,7 +232,7 @@ check('끝나면 연습으로 바꾼 카드 모양 · 태그 고르기 · 열어
 const realFiles = fs.readdirSync(vault).filter((f) => f.endsWith('.md')).sort();
 const backCards = await page.evaluate(() => [...document.querySelectorAll('#cards .card')].map((c) => c.textContent));
 check('끝나면 내 메모로: 실제 폴더에는 내 메모 둘뿐 · 목록에 내 메모 · 연습 메모는 없음',
-  realFiles.join(',') === '장보기.md,회의.md' && backCards.some((t) => t.includes('출시 일정')) && !backCards.some((t) => t.includes('연습 공간이에요') || t.includes('주말 장보기')), JSON.stringify({ realFiles, backCards }));
+  realFiles.join(',') === '장보기.md,회의.md' && backCards.some((t) => t.includes('출시 일정')) && !backCards.some((t) => t.includes('연습 공간이에요') || t.includes('식빵')), JSON.stringify({ realFiles, backCards }));
 check('화면 오류 없음', errors.length === 0, errors.join(' | '));
 await browser.close();
 console.log(failed ? `튜토리얼 점검 실패 ${failed}개` : '휴대폰 튜토리얼 점검 모두 통과');

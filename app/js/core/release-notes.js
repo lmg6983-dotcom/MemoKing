@@ -35,7 +35,7 @@ export function parseReleaseNotes(notes) {
   return blocks;
 }
 
-/** "앞 **굵게** 뒤" → [{ text, bold }] (화면이 <strong> 으로 그린다 — 글을 HTML 로 넣지 않는다) */
+/** "앞 **굵게** 뒤" → [{ text, bold }] (화면이 <strong> 으로 그린다 — 글을 HTML로 넣지 않는다) */
 export function boldParts(text) {
   return String(text).split(/\*\*/).map((t, i) => ({ text: t, bold: i % 2 === 1 })).filter((p) => p.text);
 }
@@ -48,7 +48,7 @@ const cmpVersion = (a, b) => {
 };
 
 /**
- * 업데이트 뒤 한 번 보여 줄 "개선된 점": README 이력 표에서 from 다음부터 to 까지 버전마다 제목 한 줄 (새것부터 limit 개).
+ * 업데이트 뒤 한 번 보여 줄 "개선된 점": README 이력 표에서 from 다음부터 to까지 버전마다 제목 한 줄 (새것부터 limit 개).
  *   제목은 행의 첫 **굵은 글** — 끝의 "(휴대폰 0.47.0)" 같은 덧붙임은 뺀다. 제목 없는 옛 행은 건너뛴다
  * @returns {{ version: string, title: string }[]}
  */

@@ -91,7 +91,7 @@ export function ragMessages(question, picked) {
     if (text) parts.push(`[${i + 1}] ${m.title}\n${text}`);
   });
   return [
-    { role: 'system', content: '너는 사용자의 메모에서 답을 찾는 도우미다. 아래 [번호] 메모에 적힌 것만 근거로 한국어 해요체로 짧게 답한다. 문장 끝에 근거 메모 번호를 [1] 처럼 붙인다. 메모에 답이 없으면 "메모에서 찾지 못했어요."라고만 답한다. 지어내지 않는다.' },
+    { role: 'system', content: '너는 사용자의 메모에서 답을 찾는 도우미다. 아래 [번호] 메모에 적힌 것만 근거로 한국어 해요체로 짧게 답한다. 문장 끝에 근거 메모 번호를 [1]처럼 붙인다. 메모에 답이 없으면 "메모에서 찾지 못했어요."라고만 답한다. 지어내지 않는다.' },
     { role: 'user', content: `메모:\n${parts.join('\n\n')}\n\n질문: ${question}` },
   ];
 }

@@ -266,7 +266,7 @@ function safeDecode(value) {
 const pathOnly = (src) => src.split(/[?#]/)[0];
 export const isImage = (src) => IMAGE_EXT.test(pathOnly(src));
 
-// 이미지·소리·동영상 구분. .webm 은 소리·영상 둘 다 될 수 있어 설명 글로 가른다
+// 이미지·소리·동영상 구분. .webm은 소리·영상 둘 다 될 수 있어 설명 글로 가른다
 // ("동영상"/"video" 가 들어 있으면 영상, 아니면 소리 — 예전 녹음 메모는 소리로 재생).
 export function mediaKindOf(src, alt = '') {
   const path = pathOnly(src);

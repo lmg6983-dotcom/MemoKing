@@ -58,7 +58,7 @@ export class Updater {
   start() {
     if (!this.enabled) return Promise.resolve();
     this.starting ??= this.init().catch((err) => {
-      console.warn('[update] electron-updater 를 불러오지 못했어요', err);
+      console.warn('[update] electron-updater를 불러오지 못했어요', err);
       this.starting = null; // 다음 확인 때 다시
     });
     return this.starting;
@@ -112,7 +112,7 @@ export class Updater {
     const delivered = this.send(channel, this.state);
     if (!delivered) {
       this.notify({
-        title: channel === 'update:ready' ? `메모킹 v${this.state.version} 을 설치할 준비가 됐어요` : `메모킹 새 버전 v${this.state.version}`,
+        title: channel === 'update:ready' ? `메모킹 v${this.state.version}을 설치할 준비가 됐어요` : `메모킹 새 버전 v${this.state.version}`,
         body: channel === 'update:ready' ? '메모킹을 다시 시작하면 바로 바뀌어요' : '눌러서 바뀐 점을 보고 받을 수 있어요',
         channel,
       });

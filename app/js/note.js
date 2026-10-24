@@ -220,7 +220,7 @@ $('tag-ai-btn')?.addEventListener('click', async () => {
   btn.textContent = 'AI로 고르기';
   if (seq !== tagSeq) return;
   if (r.error) return setStatus(r.error, true);
-  if (!r.length) return setStatus('AI 가 맞는 태그를 찾지 못했어요');
+  if (!r.length) return setStatus('AI가 맞는 태그를 찾지 못했어요');
   fillSuggestChips($('tag-suggest-chips'), r, addTags);
 });
 function addTags(names) {
@@ -625,7 +625,7 @@ function showHotkey(state) {
   const slot = state?.slot ?? null;
   $('hotkey-num').textContent = slot ? String(slot) : '';
   btn.classList.toggle('off', !slot);
-  const what = slot ? `${hotkeyLabel(slot)} 로 불러와요` : '아직 없어요';
+  const what = slot ? `${hotkeyLabel(slot)}로 불러와요` : '아직 없어요';
   btn.title = `불러오기 키 정하기: ${what} (Ctrl+Alt+숫자로 어디서든 이 메모를 불러와요)`;
   btn.setAttribute('aria-label', `불러오기 키 정하기, ${slot ? hotkeyLabel(slot) : '아직 없음'}`);
 }
@@ -834,7 +834,7 @@ $('find-btn').addEventListener('click', () => {
 // 메모 창을 몇 번 써 본 뒤 한 번: 단축키 모음이 있다는 것
 setTimeout(() => {
   const k = resolveKeymap(keymapOverrides).shortcuts[0];
-  hintOnce('shortcuts', k ? `${comboLabel(k)} 를 누르면 단축키를 한눈에 볼 수 있어요` : '메뉴의 단축키 보기에서 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn });
+  hintOnce('shortcuts', k ? `${comboLabel(k)}를 누르면 단축키를 한눈에 볼 수 있어요` : '메뉴의 단축키 보기에서 단축키를 한눈에 볼 수 있어요', { anchor: el.menuBtn });
 }, 2500);
 $('links-close').addEventListener('click', () => toggleLinks(false));
 api.on('memo:links-changed', refreshLinks);
@@ -998,7 +998,7 @@ el.editorRoot.addEventListener('dblclick', (e) => {
   openHref(target);
 });
 
-// 파일 칩에 마우스를 올리면 이름·크기 안내 (PC 는 누르면 바로 열리고, 휴대폰은 눌러서 나오는 단추 줄의 "열기" — block-move.js)
+// 파일 칩에 마우스를 올리면 이름·크기 안내 (PC는 누르면 바로 열리고, 휴대폰은 눌러서 나오는 단추 줄의 "열기" — block-move.js)
 const hint = document.createElement('div');
 hint.className = 'hover-hint';
 hint.hidden = true;
@@ -1280,10 +1280,10 @@ function showTableBar(table) {
 bindTableBar(tableBar, (cmd) => editor.tableCommand(cmd));
 
 // 처음 그 상황이 됐을 때 한 번만: 눈에 안 보이는 동작(꾹 눌러 옮기기·테두리 끌기) 알려 주기
-// (그림·파일 옮기기 안내는 block-move.js 가 따로)
+// (그림·파일 옮기기 안내는 block-move.js가 따로)
 function firstTimeHints(active) {
   // 안내는 표에 붙인다 (표 막대에 붙이면 설명하는 막대를 풍선이 가린다)
-  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab 은 다음 칸, 마지막 칸에서 Tab 은 새 줄이에요', { anchor: getSelection()?.anchorNode?.parentElement?.closest('table') ?? el.editorRoot.querySelector('table') ?? tableBar, avoid: tableBar });
+  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab은 다음 칸, 마지막 칸에서 Tab은 새 줄이에요', { anchor: getSelection()?.anchorNode?.parentElement?.closest('table') ?? el.editorRoot.querySelector('table') ?? tableBar, avoid: tableBar });
   else if (active.task || active.bullet || active.ordered) hintOnce('list-move', '목록 항목은 글자를 꾹 누르면 들어 올려져 순서를 바꿀 수 있어요. 키보드는 Alt+↑ / Alt+↓', { anchor: el.editorRoot.querySelector('li') });
 }
 
@@ -1398,7 +1398,7 @@ window.addEventListener('keydown', (e) => {
 }, true);
 
 // ---------- 본문 확대·축소 (Ctrl+마우스 휠, Ctrl+= / Ctrl+-) — 웹 브라우저처럼 글·사진·표가 함께 ----------
-// 배율은 메모마다 이 PC 에 기억한다. 위 막대·서식 막대는 그대로.
+// 배율은 메모마다 이 PC에 기억한다. 위 막대·서식 막대는 그대로.
 const ZOOM_KEY = `memoking.zoom.${id}`;
 let zoom = 1;
 try {
@@ -1456,7 +1456,7 @@ setZoom(zoom, { show: false });
 
 // ---------- 표가 넘치면 메모를 줄여 맞추고, 더 못 줄이면 창을 넓힌다 (v0.17.13, 설정으로 끄고 켬) ----------
 // 열 너비를 줄이지 않고(사용자 요청) 본문 배율(--note-zoom)을 낮춰 표 가로가 잘리지 않게 한다.
-// 측정은 화면 px 로 (표는 배율이 걸린 .mk-doc 안, 편집 영역은 배율이 없음).
+// 측정은 화면 px로 (표는 배율이 걸린 .mk-doc 안, 편집 영역은 배율이 없음).
 let fitTables = true;
 let fitTimer = 0;
 let growing = false;
@@ -1478,7 +1478,7 @@ async function fitWide() {
   const widest = widestTableWidth();
   if (widest <= 1 || avail <= 1) return;
   if (widest <= avail + 1) return; // 이미 들어온다
-  // 지금 배율에서 표가 avail 에 들어갈 배율. 더 키우지는 않는다 (줄이기만)
+  // 지금 배율에서 표가 avail에 들어갈 배율. 더 키우지는 않는다 (줄이기만)
   const target = clampZoom(Math.max(MIN_ZOOM, (zoom * avail) / widest));
   if (target < zoom - 0.001) {
     setZoom(target);
@@ -1507,7 +1507,7 @@ const scheduleFit = () => {
   fitTimer = setTimeout(fitWide, 250);
 };
 
-// Ctrl+휠: 위로 굴리면 크게, 아래로 굴리면 작게 (창 전체가 아니라 본문만 — Chromium 의 페이지 확대는 막는다)
+// Ctrl+휠: 위로 굴리면 크게, 아래로 굴리면 작게 (창 전체가 아니라 본문만 — Chromium의 페이지 확대는 막는다)
 window.addEventListener('wheel', (e) => {
   if (!e.ctrlKey) return;
   e.preventDefault();
@@ -1546,7 +1546,7 @@ function markInactive() {
   if (tabLeaving) return;
   document.body.classList.toggle('win-inactive', !document.hasFocus());
 }
-// 스택에서 이 탭으로 바뀌려 할 때 (main 이 보이기 전에 알림): 서식 막대를 움직임 없이 미리 펴 둔다 —
+// 스택에서 이 탭으로 바뀌려 할 때 (main이 보이기 전에 알림): 서식 막대를 움직임 없이 미리 펴 둔다 —
 //   보인 뒤 포커스를 받으며 막대가 올라오면 본문 높이가 바뀌어 한 번 출렁이므로. 포커스가 오면(또는 잠시 뒤) 평소대로
 api.on('stack:activating', () => {
   tabArriving = true;
@@ -1613,7 +1613,7 @@ function showTasks(tasks, opts) {
 }
 
 // 닫을 때: 태그 · 일정을 저절로 (설정 › 태그 자동 추가 · 일정 자동 등록)
-//   글 모델을 넣은 PC: AI 가 고른 태그를 사용자 태그와 합쳐 3개까지 — 창을 닫은 뒤 메인이 단다(aiTagAfterClose, 메모마다 한 번).
+//   글 모델을 넣은 PC: AI가 고른 태그를 사용자 태그와 합쳐 3개까지 — 창을 닫은 뒤 메인이 단다(aiTagAfterClose, 메모마다 한 번).
 //   아니면 태그 없는 메모에 확실한 추천 태그 (휴대폰과 같음)
 async function autoTagOnClose() {
   if (!editor || tagDismissed || memo?.locked) return false; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
@@ -1678,7 +1678,7 @@ const tutCounts = (md) => tutorialCounts(md, extractTags(md));
 function tutEvent(name) {
   if (coach?.step?.advance === name) api.tutorial.event(name);
 }
-// 사진 · 손 메모 · 파일의 복사 · 저장 · 공유 단추를 눌러 해 내면 (delete-button.js 가 알린다)
+// 사진 · 손 메모 · 파일의 복사 · 저장 · 공유 단추를 눌러 해 내면 (delete-button.js가 알린다)
 document.addEventListener('mk:content-tools', () => tutEvent('content-tools'));
 
 const TAB_CHARS = 7;
@@ -1760,7 +1760,7 @@ window.addEventListener('pointermove', (e) => {
   if (!p.moved) {
     if (Math.hypot(dx, dy) < 6) return;
     p.moved = true;
-    // 움직이기 시작한 뒤부터 잡는다 (그냥 누르기는 보통 click 으로)
+    // 움직이기 시작한 뒤부터 잡는다 (그냥 누르기는 보통 click으로)
     try {
       document.documentElement.setPointerCapture(e.pointerId);
     } catch {
@@ -1793,7 +1793,7 @@ window.addEventListener('pointermove', (e) => {
 function liveReorderTabs(p, dy, dx) {
   const tabs = [...tabsEl.querySelectorAll('[data-tab-id]')];
   if (!p.slots) {
-    // 끌기 시작 때의 자리(위아래)를 기억 — 끄는 동안 transform 이 바뀌어도 기준은 그대로
+    // 끌기 시작 때의 자리(위아래)를 기억 — 끄는 동안 transform이 바뀌어도 기준은 그대로
     p.slots = tabs.map((t) => ({ el: t, top: t.offsetTop, h: t.offsetHeight }));
     p.from = tabs.indexOf(p.el);
     p.to = p.from;
@@ -1938,7 +1938,7 @@ if (!memo) {
   document.title = memo.title;
   current = saved = memo.body;
   // 링크 미리보기 설정 (끄면 카드 대신 링크 글자) — 설정을 바꾸면 바로
-  const linkPreviews = memo.linkPreviews !== false; // memo:get 이 함께 보낸다 (창을 열 때 설정을 따로 묻지 않게)
+  const linkPreviews = memo.linkPreviews !== false; // memo:get이 함께 보낸다 (창을 열 때 설정을 따로 묻지 않게)
   editor = await createNoteEditor(el.editorRoot, {
     markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus, linkPreviews,
     tables: memo.tables ?? [], onTables: saveTables,

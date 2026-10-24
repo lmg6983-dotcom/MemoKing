@@ -180,7 +180,7 @@ export function suggestTagsFor(body, memos, { limit = 3, excludeId } = {}) {
     for (const [kb, { name, n }] of co) {
       const p = n / withA.length;
       if (p < 0.6 || n < 2 || scored.has(kb)) continue;
-      put({ name, score: Math.round(a.score * p * 0.6 * 100) / 100, reason: 'related', existing: true, sure: false, why: `#${a.name} 와 자주 같이 다는 태그` });
+      put({ name, score: Math.round(a.score * p * 0.6 * 100) / 100, reason: 'related', existing: true, sure: false, why: `#${a.name}와 자주 같이 다는 태그` });
     }
   }
 

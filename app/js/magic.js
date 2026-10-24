@@ -276,7 +276,7 @@ function updatePlaceholder() {
   const memo = isOn('memo');
   const find = ['notes', 'files', 'opms', 'web'].some(isOn);
   // 짧게: 켜진 기능을 하나하나 늘어놓지 않는다 (무엇을 찾는지는 아래 캡슐이 보여 준다)
-  const parts = [memo && '메모 쓰기', find && '찾기', isOn('calc') && '계산', isOn('ai') && 'AI 에게 묻기'].filter(Boolean);
+  const parts = [memo && '메모 쓰기', find && '찾기', isOn('calc') && '계산', isOn('ai') && 'AI에게 묻기'].filter(Boolean);
   input.placeholder = parts.join(', ')
     || (modules.length ? '아래 캡슐을 눌러 기능을 켜 주세요' : '설정의 매직키에서 기능을 켜 주세요');
 }
@@ -362,7 +362,7 @@ function row(r, index, query) {
     s.textContent = r.url;
   } else if (r.kind === 'web' || r.kind === 'ai') {
     ico.append(svgIcon(r.kind));
-    t.textContent = r.kind === 'web' ? '웹에서 찾기' : 'AI 에게 묻기';
+    t.textContent = r.kind === 'web' ? '웹에서 찾기' : 'AI에게 묻기';
     s.textContent = r.sites.map((x) => x.name).join(', '); // 고르면 오른쪽에 사이트 버튼
   } else if (r.kind === 'opms') {
     ico.textContent = 'O';
@@ -371,8 +371,8 @@ function row(r, index, query) {
     side.textContent = r.div || '';
   } else if (r.kind === 'opmsAsk') {
     ico.textContent = 'O';
-    t.textContent = 'OPMS 에서 찾기';
-    s.textContent = r.opmsKind === 'ref' ? '관리번호, 출원번호에서 (고르면 회사 OPMS 에 물어봐요)' : '출원인, 발명자 이름에서 (고르면 회사 OPMS 에 물어봐요)';
+    t.textContent = 'OPMS에서 찾기';
+    s.textContent = r.opmsKind === 'ref' ? '관리번호, 출원번호에서 (고르면 회사 OPMS에 물어봐요)' : '출원인, 발명자 이름에서 (고르면 회사 OPMS에 물어봐요)';
   } else if (r.kind === 'opmsMore') {
     ico.textContent = '⋯';
     t.textContent = `OPMS 다른 ${r.count.toLocaleString()}건 더 보기`;
@@ -487,11 +487,11 @@ function render() {
     } else if (opms.loading) {
       const li = note('');
       li.classList.add('loading');
-      li.append(searchingNode('OPMS 에서 찾는 중', { inline: true, tag: 'span' }));
+      li.append(searchingNode('OPMS에서 찾는 중', { inline: true, tag: 'span' }));
       put('opms', { node: li });
     }
     else if (opms.error) put('opms', { node: note(opms.error) });
-    else put('opms', { node: note(`OPMS 에서 '${query.slice(0, 30)}'와 맞는 사건을 못 찾았어요`) });
+    else put('opms', { node: note(`OPMS에서 '${query.slice(0, 30)}'와 맞는 사건을 못 찾았어요`) });
   }
   // 캡슐로 끈 기능은 새 결과를 기다리지 않고 바로 뺀다
   const notes = isOn('notes') ? results.notes : [];
@@ -512,7 +512,7 @@ function render() {
   if (query && results.more > 0) put(groups.has('files') || !groups.has('notes') ? 'files' : 'notes', { row: { kind: 'more', count: results.more } });
   const searched = isOn('notes') || isOn('files');
   if (query && searched && !calc && !url && !notes.length && !folders.length && !files.length && !opms.cases.length && !opms.loading) {
-    put(isOn('notes') ? 'notes' : 'files', { node: note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요. Enter 로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`) });
+    put(isOn('notes') ? 'notes' : 'files', { node: note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요. Enter로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`) });
   }
   if (query && isOn('files') && results.index && !results.index.count) {
     put('files', { node: note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : UI.noFileIndex) });

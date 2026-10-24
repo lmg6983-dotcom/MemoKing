@@ -156,7 +156,7 @@ export function createAiService(opts) {
   function start(role) {
     const running = servers.get(role);
     if (running) return running.ready;
-    if (!fs.existsSync(serverPath)) return Promise.reject(new Error('이 PC 에 AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'));
+    if (!fs.existsSync(serverPath)) return Promise.reject(new Error('이 PC에 AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'));
     if (!fs.existsSync(fileOf(role))) return Promise.reject(new Error(`${AI_ROLES[role]} 파일을 먼저 넣어 주세요 (설정의 AI 도우미)`));
     const s = {};
     servers.set(role, s);
@@ -223,7 +223,7 @@ export function createAiService(opts) {
         body: JSON.stringify(body),
         signal,
       });
-      if (!res.ok) throw new Error(`AI 가 답하지 못했어요 (${res.status})`);
+      if (!res.ok) throw new Error(`AI가 답하지 못했어요 (${res.status})`);
       if (!onLine) return await res.json();
       const decoder = new TextDecoder();
       let buf = '';

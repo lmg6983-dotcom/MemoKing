@@ -36,7 +36,7 @@ export function actionsFor(r) {
     case 'file':
       return [{ id: 'open', label: r.app ? '실행' : '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '폴더 열기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '파일 복사' }];
     case 'opmsAsk':
-      return [{ id: 'ask', label: 'OPMS 에서 찾기' }];
+      return [{ id: 'ask', label: 'OPMS에서 찾기' }];
     case 'more':
     case 'opmsMore':
       return [{ id: 'more', label: '모두 보기' }];

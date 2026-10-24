@@ -137,7 +137,7 @@ export function tutEvent(name) {
   if (state.active && STEPS[state.index]?.advance === name) event(name);
 }
 
-/** 지금 단계 id (튜토리얼 중이 아니면 null) — "Work 로 바꿔 보고 다시 Life 로" 처럼 두 번에 걸쳐 해 내는 일을 단계 안에서만 세려고 */
+/** 지금 단계 id (튜토리얼 중이 아니면 null) — "Work로 바꿔 보고 다시 Life로" 처럼 두 번에 걸쳐 해 내는 일을 단계 안에서만 세려고 */
 export const tutorialStepId = () => (state.active ? STEPS[state.index]?.id ?? null : null);
 
 /**

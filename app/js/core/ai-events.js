@@ -40,7 +40,7 @@ export function aiEventRequest(cands) {
     required: ['events'],
   };
   const messages = [
-    { role: 'system', content: '너는 메모에서 일정을 고르는 도우미다. 번호 붙은 줄 중 약속, 회의, 마감, 해야 할 일처럼 그때 무엇을 하는 줄만 고른다. 날씨, 지난 이야기, 날짜만 나온 줄은 고르지 않는다. 고른 줄마다 날짜와 시각을 뺀 짧은 한국어 일정 이름(15자 안팎)을 title 에 쓴다.' },
+    { role: 'system', content: '너는 메모에서 일정을 고르는 도우미다. 번호 붙은 줄 중 약속, 회의, 마감, 해야 할 일처럼 그때 무엇을 하는 줄만 고른다. 날씨, 지난 이야기, 날짜만 나온 줄은 고르지 않는다. 고른 줄마다 날짜와 시각을 뺀 짧은 한국어 일정 이름(15자 안팎)을 title에 쓴다.' },
     { role: 'user', content: cands.map((c, i) => `${i + 1}. ${c.line}`).join('\n') },
   ];
   return { messages, schema };

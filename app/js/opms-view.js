@@ -95,7 +95,7 @@ form.addEventListener('submit', async (e) => {
   const q = input.value.trim();
   if (!q) return;
   const my = ++seq;
-  loading('OPMS 에서 찾는 중이에요');
+  loading('OPMS에서 찾는 중이에요');
   let list;
   let total;
   try {
@@ -271,10 +271,10 @@ async function showDetails(box, my) {
   }
   const missing = d.missing.filter((m) => !(m === '신규성 의제' && d.novelty.length));
   if (missing.length) {
-    const p = el('p', 'op-msg op-missing', `OPMS 에서 ${missing.join(', ')} 표를 찾지 못했어요. `);
+    const p = el('p', 'op-msg op-missing', `OPMS에서 ${missing.join(', ')} 표를 찾지 못했어요. `);
     const copy = el('button', 'op-link', '표 목록 복사');
     copy.type = 'button';
-    copy.title = 'OPMS 의 표 이름과 열을 복사해요. 메모킹 개발자에게 보내 주면 맞춰 드려요';
+    copy.title = 'OPMS의 표 이름과 열을 복사해요. 메모킹 개발자에게 보내 주면 맞춰 드려요';
     copy.addEventListener('click', async () => {
       try {
         const n = await api.copySchema();

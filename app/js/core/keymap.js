@@ -23,7 +23,7 @@ export const KEYMAP_ACTIONS = [
   { id: 'imageSave', group: '메모 창', label: UI.saveAsImage, help: '메모를 보이는 그대로 그림 파일(PNG)로 저장해요.', keys: [], run: ['menu', 'image-save-btn'] },
   { id: 'pin', group: '메모 창', label: UI.pin, help: '이 메모를 메모 목록의 맨 위에 붙여 두거나 풀어요.', keys: [], run: ['menu', 'pin-toggle'] },
   { id: 'lock', group: '메모 창', label: '잠그기', help: '비밀번호로 이 메모를 잠가요. 잠근 메모는 비밀번호를 넣어야 볼 수 있어요.', keys: [], run: ['menu', 'lock-btn'] },
-  { id: 'find', group: '메모 창', label: '찾기', help: '이 메모 안에서 낱말을 찾아요. Enter 는 다음, Shift+Enter 는 이전이에요.', keys: ['ctrl+KeyF'], run: ['app', 'find'] },
+  { id: 'find', group: '메모 창', label: '찾기', help: '이 메모 안에서 낱말을 찾아요. Enter는 다음, Shift+Enter는 이전이에요.', keys: ['ctrl+KeyF'], run: ['app', 'find'] },
   { id: 'replace', group: '메모 창', label: '바꾸기', help: '이 메모 안에서 낱말을 찾아 다른 말로 하나씩, 또는 모두 바꿔요.', keys: ['ctrl+KeyH'], run: ['app', 'replace'] },
   { id: 'shortcuts', group: '메모 창', label: '단축키 보기', help: '지금 쓸 수 있는 단축키를 한눈에 보여 줘요.', keys: ['ctrl+Slash'], run: ['app', 'shortcuts'] },
   // ---------- 글자 ----------
@@ -100,12 +100,12 @@ export function isValidCombo(combo) {
 /** 누른 키(keydown) → { combo } · 조합 중이면 { pending } · 못 쓰면 { error } */
 export function comboFromEvent(e) {
   if (/^(Control|Alt|Shift|Meta|OS)(Left|Right)?$/.test(e.code)) return { pending: true };
-  if (e.metaKey) return { error: 'Win 키는 Windows 가 쓰는 키라 메모 창 단축키에는 쓸 수 없어요. Ctrl 이나 Alt 와 함께 눌러 주세요' };
+  if (e.metaKey) return { error: 'Win 키는 Windows가 쓰는 키라 메모 창 단축키에는 쓸 수 없어요. Ctrl이나 Alt와 함께 눌러 주세요' };
   const combo = `${e.ctrlKey ? 'ctrl+' : ''}${e.shiftKey ? 'shift+' : ''}${e.altKey ? 'alt+' : ''}${e.code}`;
   if (!keyName(e.code)) return { error: '이 키는 쓸 수 없어요. 글자, 숫자, F1~F12 같은 키와 함께 눌러 주세요' };
   const why = reservedWhy(combo);
   if (why) return { error: why };
-  if (!isValidCombo(combo)) return { error: 'Ctrl 이나 Alt 와 함께 눌러 주세요 (글을 쓸 때 눌리지 않게). F1~F12 는 혼자도 돼요' };
+  if (!isValidCombo(combo)) return { error: 'Ctrl이나 Alt와 함께 눌러 주세요 (글을 쓸 때 눌리지 않게). F1~F12는 혼자도 돼요' };
   return { combo };
 }
 

@@ -252,7 +252,7 @@ const decodeRel = (src) => {
 const baseNameOf = (rel) => rel.split('/').pop().replace(/^[0-9a-f]{6,}-/i, '');
 
 /**
- * 저장 · 공유할 것: { rel, name, mime } (메모 폴더의 파일 그대로) | { base64, name, mime } (만든 파일) — 글이면 text 도
+ * 저장 · 공유할 것: { rel, name, mime } (메모 폴더의 파일 그대로) | { base64, name, mime } (만든 파일) — 글이면 text도
  * @param {import('prosemirror-view').EditorView} view
  */
 export async function blockPayload(view, pos, node, target) {

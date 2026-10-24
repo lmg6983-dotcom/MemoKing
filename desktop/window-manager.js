@@ -1927,7 +1927,7 @@ export class WindowManager {
       this.areaCapture = null;
       toast({
         title: '화면을 캡처하지 못했어요',
-        body: `잠시 뒤 ${this.getShortcutLabel('quickMemo')} 를 두 번 다시 눌러 주세요.`,
+        body: `잠시 뒤 ${this.getShortcutLabel('quickMemo')}를 두 번 다시 눌러 주세요.`,
       });
       return false;
     }
