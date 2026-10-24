@@ -32,9 +32,7 @@ import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, is
 import * as recorder from './recorder.js';
 import { setupAnnotation } from '../../app/js/ink-annotate.js';
 import { autoTagsFor } from '../../app/js/core/auto-tags.js';
-import { conflictCopyBody, isBlankBody, sameBody, extractTitle } from '../../app/js/core/memo-file.js';
-import { createAiWritePanel } from '../../app/js/ai-write-panel.js';
-import { aiSupported, aiApi, aiTasks, chatReady } from './local-ai.js';
+import { conflictCopyBody, isBlankBody, sameBody } from '../../app/js/core/memo-file.js';
 import { haptic, reduceMotion, replayClass, swipeDismiss, EASE_OUT } from '../../app/js/dom.js';
 import { createFindBar } from '../../app/js/find-bar.js';
 import { createClearStamp } from '../../app/js/clear-stamp.js';
@@ -487,28 +485,9 @@ function renderTagBar() {
     return;
   }
   const list = currentSuggestions();
-  $('tag-ai-btn').hidden = !chatReady() || extractTags(editorMarkdown()).length > 0; // 글 모델을 넣었을 때만
-  el.tagBar.hidden = list.length === 0; // 추천이 있을 때만 (AI 단추만으로 모든 메모에 막대를 띄우지 않게 — 닫을 때 AI 태그는 그대로)
+  el.tagBar.hidden = list.length === 0;
   fillSuggestChips(el.tagChips, list, addTags, (name, onClick) => tagChip(name, { add: true, onClick }));
 }
-// AI로 고르기 (PC 와 같음): 쓰는 동안 저절로 돌리면 휴대폰이 무거워져 누를 때만, 모델은 이 휴대폰 안
-$('tag-ai-btn').addEventListener('click', async () => {
-  const btn = $('tag-ai-btn');
-  const memoId = id;
-  btn.disabled = true;
-  btn.textContent = 'AI가 고르는 중…';
-  let list = [];
-  try {
-    list = await aiTasks.pickTags(editorMarkdown(), memoId);
-  } catch (err) {
-    toast(err.message, true);
-  }
-  btn.disabled = false;
-  btn.textContent = 'AI로 고르기';
-  if (memoId !== id) return;
-  if (!list.length) return toast('AI 가 맞는 태그를 찾지 못했어요');
-  fillSuggestChips(el.tagChips, list, addTags, (name, onClick) => tagChip(name, { add: true, onClick }));
-});
 function scheduleTagBar() {
   clearTimeout(suggestTimer);
   suggestTimer = setTimeout(renderTagBar, 1500); // 쓰는 동안은 기다렸다가
@@ -532,25 +511,18 @@ function addTags(names) {
   }, 50);
 }
 
-/** 닫을 때: 태그 없는 메모에 태그를 저절로 (설정, 되돌리기 가능) — 글 모델을 넣었으면 AI 가 고른 하나, 아니면 확실한 추천 태그 */
+/** 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정, 되돌리기 가능) */
 function autoTag(memoId, body) {
   if (!autoTagsOn() || dismissed.has(memoId) || extractTags(body).length) return;
-  if (chatReady()) {
-    // 모델을 올리는 동안 기다리지 않고 닫는다 — 그사이 다시 열어 고쳤으면 건드리지 않음
-    aiTasks.autoTag(body, memoId).then((name) => name && app.vault.get(memoId)?.body === body && saveAutoTags(memoId, body, [name]));
-    return;
-  }
   const sure = suggestionsFor(body, memoId).filter((t) => t.sure).slice(0, 2);
-  if (sure.length) saveAutoTags(memoId, body, sure.map((t) => t.name));
-}
-function saveAutoTags(memoId, body, names) {
-  const next = appendTags(body, names);
+  if (!sure.length) return;
+  const next = appendTags(body, sure.map((t) => t.name));
   try {
     app.vault.save(memoId, next);
   } catch {
     return;
   }
-  toast(`${names.map((n) => `#${n}`).join(' ')} 태그를 달았어요`, false, {
+  toast(`${sure.map((t) => `#${t.name}`).join(' ')} 태그를 달았어요`, false, {
     label: '되돌리기',
     run: () => {
       app.vault.save(memoId, body);
@@ -559,19 +531,6 @@ function saveAutoTags(memoId, body, names) {
     },
   });
 }
-
-// ---------- AI 글 도우미 (app/js/ai-write-panel.js — PC 메모 창과 같은 것, 아래에서 올라오는 시트로) ----------
-
-const aiPanel = aiSupported ? createAiWritePanel({
-  panel: $('ai-panel'),
-  api: aiApi,
-  editor: () => editor,
-  title: () => extractTitle(editorMarkdown()),
-  onOpen: () => {},
-  show: (p) => openSheet(p, { onClose: () => aiPanel.reset() }), // 뒤로 가기 · 바깥을 눌러 닫아도 묻던 것을 멈춘다
-  hide: (p) => closeSheet(p),
-}) : null;
-export const openAiPanel = () => aiPanel?.toggle(true);
 
 let linkSearchTimer = null;
 el.linkSearch.addEventListener('input', () => {
