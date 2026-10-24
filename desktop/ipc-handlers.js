@@ -995,7 +995,7 @@ export function registerIpc(ctx) {
     const memo = getVault()?.setMeta(id, patch ?? {});
     const win = wm.noteWins.get(id);
     if (memo && win) {
-      win.setBackgroundColor(noteBg(memo.color, settings.workLife === true ? memo.mode ?? 'life' : null));
+      win.setBackgroundColor(noteBg(memo.color));
       win.webContents.send('memo:meta', memo);
     }
     return memo;

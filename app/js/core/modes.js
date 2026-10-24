@@ -21,5 +21,20 @@ export function splitByMode(memos, mode) {
   return { mine, other };
 }
 
+/**
+ * 고칠 수 없는 모드 태그 (Work / Life 를 나눠 쓸 때 카드 · 메모 화면에) — 본문의 #태그가 아니라 머리말 mode 에서 나오므로
+ *   글로 지우거나 고칠 수 없고, 메뉴의 "…로 옮기기"로만 바뀐다. 색 · 밝기는 강요하지 않고 글자색(currentColor) 테두리만
+ */
+export function fillModeTag(el, memo, on) {
+  el.hidden = !on;
+  if (!on) return el;
+  const label = MODE_LABEL[memoMode(memo)];
+  el.className = 'mode-tag';
+  el.dataset.mode = memoMode(memo);
+  el.textContent = label;
+  el.title = `${label} 메모예요. 메뉴의 "${moveLabel(memo)}"로만 바꿀 수 있어요`;
+  return el;
+}
+
 /** 메뉴 글: "Work로 옮기기" / "Life로 옮기기" */
 export const moveLabel = (memo) => `${MODE_LABEL[otherMode(memoMode(memo))]}로 옮기기`;

@@ -201,9 +201,7 @@ export class WindowManager {
       this.ghostWin?.destroy();
       this.ghostWin = null;
     });
-    // mode: 처음 그릴 때부터 그 모드의 밝기로 (Work 는 어둡게 — 설정을 읽기 전에 밝게 번쩍이지 않게)
-    const mode = settings.workLife !== true ? 'system' : settings.mode === 'work' ? 'work' : 'life'; // system: Work / Life 를 나눠 쓰지 않음
-    this.listWin.loadFile(path.join(APP_DIR, 'index.html'), { query: { ...(tab ? { tab } : {}), mode } });
+    this.listWin.loadFile(path.join(APP_DIR, 'index.html'), { query: tab ? { tab } : {} });
     return this.listWin;
   }
 
@@ -248,7 +246,7 @@ export class WindowManager {
       win = spare.win;
       win.setBounds(at);
       win.setTitle(memo.title);
-      win.setBackgroundColor(noteBg(memo.color, settings.workLife === true ? memo.mode ?? 'life' : null));
+      win.setBackgroundColor(noteBg(memo.color));
     } else {
       win = new BrowserWindow({
         ...at,
@@ -258,7 +256,7 @@ export class WindowManager {
         show: false,
         title: memo.title,
         alwaysOnTop: settings.onTop[id] === true,
-        backgroundColor: noteBg(memo.color, settings.workLife === true ? memo.mode ?? 'life' : null),
+        backgroundColor: noteBg(memo.color),
         ...windowIcon,
         webPreferences,
       });
@@ -1474,7 +1472,7 @@ export class WindowManager {
       title: '단축키 설정',
       show: false,
       autoHideMenuBar: true,
-      backgroundColor: listBg(), // 지금 모드의 밝기 (Work 는 어둡게)
+      backgroundColor: listBg(),
       ...windowIcon,
       webPreferences,
     });
@@ -1503,7 +1501,7 @@ export class WindowManager {
       title: UI.saveAsPdf,
       show: false,
       autoHideMenuBar: true,
-      backgroundColor: listBg(), // 지금 모드의 밝기 (Work 는 어둡게)
+      backgroundColor: listBg(),
       ...windowIcon,
       webPreferences: { ...webPreferences, nodeIntegrationInSubFrames: true },
     });

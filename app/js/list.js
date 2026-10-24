@@ -24,7 +24,7 @@ import { renderCollage, collageName } from './memories-collage.js';
 import { base64Bytes, collageMemoBody } from './collage-preview.js';
 import { ANDROID_APK, WINDOWS_SETUP, installShareText } from './core/install-links.js';
 import { chooseShare, showSharePop, SHARE_DONE } from './share-menu.js';
-import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL } from './core/modes.js';
+import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL, fillModeTag } from './core/modes.js';
 import { openModeHelper } from './mode-helper-dialog.js';
 import { renderWorkSettings } from './work-settings.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
@@ -83,11 +83,6 @@ const state = {
   // 필터 (창을 닫으면 잊는다): 태그는 모두 가진 메모, 색은 그중 하나, 담긴 것은 모두 해당
   filter: { tags: [], colors: [], kinds: [] },
 };
-// 처음 그릴 때부터 그 모드의 밝기로 (창을 연 쪽이 ?mode= 로 알려 준다)
-{
-  const m = new URLSearchParams(location.search).get('mode'); // system: Work / Life 를 나눠 쓰지 않음 → 시스템 설정
-  if (m === 'work' || m === 'life') document.documentElement.dataset.theme = m === 'work' ? 'dark' : 'light';
-}
 let searchTimer = null;
 let drivePanel = null; // Google Drive 직접 동기화 (설정 · 처음 화면)
 
@@ -321,9 +316,6 @@ function showMode({ later = false } = {}) {
   if (!later) syncSwitch();
   const root = document.documentElement;
   root.dataset.mode = state.mode;
-  // Work 는 어두운 화면 · Life 는 밝은 화면 — 나눠 쓰지 않으면 시스템 설정
-  if (state.workLife) root.dataset.theme = state.mode === 'work' ? 'dark' : 'light';
-  else delete root.dataset.theme;
   $('mode-switch').hidden = !state.workLife;
   for (const b of document.querySelectorAll('#mode-switch [data-mode]')) {
     b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));
@@ -526,6 +518,7 @@ function renderCard(memo) {
   foot.className = 'card-foot';
   const tags = document.createElement('div');
   tags.className = 'card-tags';
+  if (state.workLife) tags.append(fillModeTag(document.createElement('span'), memo, true));
   for (const name of memo.tags ?? []) {
     const t = document.createElement('span');
     t.className = 'card-tag';

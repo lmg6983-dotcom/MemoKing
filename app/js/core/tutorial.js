@@ -180,7 +180,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'mode', chapter: '메모킹만의 기능', win: 'list', target: ['#mode-switch:not([hidden])'], keep: ['#mode-switch'], needs: 'workLife', advance: 'mode-switched', emoji: '🌗',
     title: '일할 때는 Work, 쉴 때는 Life',
-    text: '왼쪽 위 해와 달 스위치로 일할 때 쓰는 메모(Work)와 일상 메모(Life)를 나눠 봐요. Work는 밤처럼 어두운 화면이고, 새 메모도 지금 모드로 들어가요.',
+    text: '왼쪽 위 해와 달 스위치로 일할 때 쓰는 메모(Work)와 일상 메모(Life)를 나눠 봐요. 메모마다 Work · Life 태그가 붙고, 지금 모드는 작업 표시줄 아이콘의 작은 표시로 보여요. 새 메모도 지금 모드로 들어가요.',
     try: '스위치를 눌러 Work로 바꿔 보고, 다시 눌러 Life로 돌아와 보세요',
     enable: 'Work / Life 나누기 켜기',
     offText: '"Work / Life 나누기"를 켜면 왼쪽 위에 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 보고, 업무 시간에 저절로 Work로 바꿀 수도 있어요.',
@@ -237,7 +237,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'mode', chapter: '목록', win: 'list', target: ['#mode-switch:not([hidden])'], keep: ['#mode-switch'], needs: 'workLife', advance: 'mode-switched', emoji: '🌗',
     title: '일할 때는 Work, 쉴 때는 Life',
-    text: '검색 줄 옆 해와 달 스위치로 일할 때 쓰는 메모(Work)와 일상 메모(Life)를 나눠 봐요. Work는 밤처럼 어두운 화면이에요.',
+    text: '검색 줄 옆 해와 달 스위치로 일할 때 쓰는 메모(Work)와 일상 메모(Life)를 나눠 봐요. 메모마다 Work · Life 태그가 붙어요.',
     try: '스위치를 눌러 Work로 바꿔 보고, 다시 눌러 Life로 돌아와 보세요',
     enable: 'Work / Life 나누기 켜기',
     offText: '"Work / Life 나누기"를 켜면 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 볼 수 있어요.',

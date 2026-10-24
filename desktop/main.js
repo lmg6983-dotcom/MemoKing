@@ -7,6 +7,7 @@ import { contextMenuTemplate } from './context-menu.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { createErrorLog, problemMail } from './error-log.js';
+import { MODE_LABEL } from '../app/js/core/modes.js';
 import path from 'node:path';
 import { Vault } from './vault.js';
 import { createAlarmRunner } from './alarms.js';
@@ -42,7 +43,7 @@ import { quietAlarm, modeClock, normalizeHours } from '../app/js/core/work-hours
 
 import {
   APP_ICON, APP_ICON_PNG, ASSETS_DIR,
-  noteBg, titleBarOverlay, bringToFront, broadcast, setListTheme, listBg,
+  noteBg, titleBarOverlay, bringToFront, broadcast, listBg,
 } from './window-utils.js';
 
 import {
@@ -368,20 +369,25 @@ let quietCount = 0; // 퇴근 뒤 조용히 넘긴 Work 알림
 const workLifeOn = () => settings.workLife === true;
 /** 지금 보는 모드 (나눠 쓰지 않으면 늘 Life) */
 const viewMode = () => (workLifeOn() && settings.mode === 'work' ? 'work' : 'life');
-/** 화면 밝기를 정할 모드 — 나눠 쓰지 않으면 null (시스템 설정) */
-const themeMode = (mode = viewMode()) => (workLifeOn() ? mode : null);
+// 지금 모드는 화면을 바꾸지 않고(밝기는 늘 시스템 설정) 앱 밖에서만 보인다: 작업 표시줄 아이콘의 작은 표시 · 트레이 글.
+//   메모마다의 모드는 카드 · 메모 창의 고칠 수 없는 Work / Life 태그로 (core/modes.js modeTag)
+const MODE_BADGE = { work: path.join(ASSETS_DIR, 'icons', 'mode-work.png'), life: path.join(ASSETS_DIR, 'icons', 'mode-life.png') };
+function showModeOutside() {
+  const mode = workLifeOn() ? viewMode() : null;
+  tray?.setToolTip(mode ? `메모킹 · ${MODE_LABEL[mode]}` : '메모킹: 누르면 메모 목록이 열려요');
+  if (process.platform !== 'win32') return;
+  const badge = mode ? nativeImage.createFromPath(MODE_BADGE[mode]) : null;
+  for (const w of [windowManager.listWin, ...windowManager.noteWins.values()]) {
+    if (w && !w.isDestroyed()) w.setOverlayIcon(badge, mode ? `메모킹 ${MODE_LABEL[mode]}` : '');
+  }
+}
 
-/** 모드 · 나누기가 바뀌었을 때: 새 메모 · 목록 창 · 작은 창 · 열린 메모 창의 밝기 */
+app.on('browser-window-created', () => setImmediate(showModeOutside)); // 새로 연 목록 · 메모 창에도 표시
+
+/** 모드 · 나누기가 바뀌었을 때: 새 메모의 모드 · 작업 표시줄 · 트레이 · 열린 창들 */
 function applyAppMode() {
   if (vault) vault.defaultMode = viewMode();
-  setListTheme(themeMode()); // Work 는 어두운 화면 — 창 버튼 줄 · 창 바탕도 함께
-  windowManager.listWin?.setTitleBarOverlay(titleBarOverlay());
-  windowManager.listWin?.setBackgroundColor(listBg());
-  for (const w of BrowserWindow.getAllWindows()) themeWindow(w);
-  for (const [id, win] of windowManager.noteWins) {
-    const m = vault?.get(id);
-    if (!win.isDestroyed()) win.setBackgroundColor(noteBg(m?.color, themeMode(m?.mode ?? 'life')));
-  }
+  showModeOutside();
   broadcast('mode:changed', { mode: viewMode(), enabled: workLifeOn() });
 }
 
@@ -402,19 +408,6 @@ function setWorkLife(on) {
   if (settings.workLife) workClock();
   return settings.workLife;
 }
-// 작은 창들(매직키 · 스티커 · 말풍선 · 단축키 설정 · PDF …)도 지금 모드의 밝기로 — Work 는 어둡게, Life 는 밝게.
-//   목록 창 · 메모 창은 스스로 정하고(메모 창은 그 메모의 모드), 인쇄할 종이(print.html)는 늘 밝게
-const SELF_THEMED = /\/(index|note|print)\.html/;
-function themeWindow(w) {
-  const wc = w?.webContents;
-  if (!wc || wc.isDestroyed()) return;
-  const url = wc.getURL();
-  if (!url.startsWith('file:') || SELF_THEMED.test(url)) return;
-  const mode = themeMode();
-  const js = mode ? `document.documentElement.dataset.theme = ${JSON.stringify(mode === 'work' ? 'dark' : 'light')}` : 'delete document.documentElement.dataset.theme';
-  wc.executeJavaScript(js).catch(() => {});
-}
-app.on('browser-window-created', (_e, w) => w.webContents.on('dom-ready', () => themeWindow(w)));
 
 // 업무 시간이 시작되면 Work, 끝나면 Life (저절로 바꾸기를 켰을 때만 · 경계를 넘을 때만)
 const workClock = modeClock({
@@ -1107,7 +1100,7 @@ setInterval(() => {
 
 function createTray() {
   tray = new Tray(process.platform === 'win32' ? APP_ICON : APP_ICON_PNG);
-  tray.setToolTip('메모킹: 누르면 메모 목록이 열려요');
+  showModeOutside();
   tray.on('click', () => windowManager.createListWindow());
   tray.on('double-click', () => windowManager.createListWindow());
   updateTrayMenu();
@@ -1391,8 +1384,10 @@ app.whenReady().then(async () => {
   }
 
   nativeTheme.on('updated', () => {
+    // 화면 밝기는 시스템 설정을 따른다 — 창 버튼 줄 · 창 바탕만 다시 (화면 글은 CSS 가 스스로)
     windowManager.listWin?.setTitleBarOverlay(titleBarOverlay());
-    applyAppMode(); // 나눠 쓰지 않으면 시스템 설정을 따르므로 다시
+    windowManager.listWin?.setBackgroundColor(listBg());
+    for (const [id, win] of windowManager.noteWins) if (!win.isDestroyed()) win.setBackgroundColor(noteBg(vault?.get(id)?.color));
   });
 
   for (const w of BrowserWindow.getAllWindows()) w.on('session-end', flushOpmsFiles);
@@ -1426,7 +1421,6 @@ app.whenReady().then(async () => {
     if (!runSmoke) return;
     prepareSmoke(app.getPath('userData'));
     loadSettings();
-    setListTheme(themeMode());
     initHistory();
     openVault(settings.vaultPath);
     runSmoke({
@@ -1483,7 +1477,6 @@ app.whenReady().then(async () => {
   }
 
   loadSettings();
-  setListTheme(themeMode()); // 목록 창은 지금 모드의 화면 (Work 는 어둡게 · 나눠 쓰지 않으면 시스템 설정)
   initHistory();
   initDrive();
 

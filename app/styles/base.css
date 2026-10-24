@@ -965,21 +965,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 @media (pointer: coarse) { .memory-day .md-chip { min-height: 44px; font-size: 14px; } }
 
 /* ---------- 메모킹 Work / Life (core/modes.js) ----------
-   Life 는 지금 그대로(노랑). Work 는 남색 — 목록 · 단추 · 고른 칩이 차분한 남색으로. 메모 안의 강조(체크 · 선택 막대)는 메모지 그대로 노랑 */
-:root { --work-accent: #2f4a7a; --work-accent-hover: #263d66; --work-soft: #e3e9f4; --on-work: #ffffff; }
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) { --work-accent: #7f9fdc; --work-accent-hover: #93b0e6; --work-soft: #1c2638; --on-work: #0b1220; }
-}
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :root:where([data-theme="dark"]) { --work-accent: #7f9fdc; --work-accent-hover: #93b0e6; --work-soft: #1c2638; --on-work: #0b1220; }
-:root[data-mode="work"] {
-  --brand-yellow: var(--work-accent);
-  --brand-yellow-hover: var(--work-accent-hover);
-  --brand-yellow-soft: var(--work-soft);
-  --on-brand: var(--on-work);
-  --focus-ring: var(--work-accent);
-}
-:root[data-mode="work"] [data-color] { --note-accent: #ffcc00; }
+   모드는 색 · 밝기를 바꾸지 않는다 (0.70.0) — 메모의 모드 태그(.mode-tag)와 작업 표시줄 · 트레이 표시로만 */
 
 /* 메모킹 로고 (PC 제목 줄 · 휴대폰 검색 줄) */
 .brand-mark { position: relative; display: inline-flex; flex: none; }
@@ -1072,7 +1058,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .mode-helper .mh-list { max-height: min(52vh, 380px); margin: 0 -8px 16px; overflow-y: auto; overscroll-behavior: contain; }
 .mode-helper .mh-row { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 8px; border-radius: 10px; cursor: pointer; }
 .mode-helper .mh-row:hover { background: var(--hover); }
-.mode-helper .mh-row input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--work-accent); }
+.mode-helper .mh-row input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--brand-yellow); }
 .mode-helper .mh-dot { flex: none; width: 12px; height: 12px; border-radius: 4px; background: var(--note-chip); }
 .mode-helper .mh-words { display: flex; flex-direction: column; min-width: 0; }
 .mode-helper .mh-title { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
@@ -1083,7 +1069,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .work-hours .wh-days { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
 .work-hours .wh-day { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .work-hours .wh-day.sun { color: var(--danger); }
-.work-hours .wh-day[aria-pressed="true"] { border-color: transparent; background: var(--work-accent); color: var(--on-work); }
+.work-hours .wh-day[aria-pressed="true"] { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); }
 .work-hours .wh-time { display: flex; align-items: center; gap: 8px; }
 .work-hours .wh-time input { height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
 .work-hours .wh-sum { font-weight: 500; color: var(--muted); }
@@ -1118,3 +1104,13 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .ai-sources:empty { display: none; }
 .ai-source { padding: 1px 0; border: 0; background: none; color: var(--text); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .ai-source small { color: var(--muted); text-decoration: none; }
+
+/* 고칠 수 없는 Work / Life 모드 태그 (core/modes.js fillModeTag) — 색 · 밝기를 강요하지 않게 글자색 테두리만 */
+.mode-tag {
+  display: inline-flex; align-items: center; flex: none;
+  height: 18px; padding: 0 7px;
+  border: 1px solid currentColor; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em; line-height: 1;
+  opacity: 0.72; user-select: none; cursor: default; white-space: nowrap;
+}
+.mode-tag[hidden] { display: none; }

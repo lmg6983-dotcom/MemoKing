@@ -31,7 +31,7 @@ import { KEYMAP_ACTIONS, keymapTable, resolveKeymap, comboLabel } from './core/k
 import { hotkeyDialog } from './hotkey-dialog.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { openMemoryDay, dayText } from './memory-day.js';
-import { memoMode, otherMode, moveLabel, MODE_LABEL } from './core/modes.js';
+import { memoMode, otherMode, moveLabel, MODE_LABEL, fillModeTag } from './core/modes.js';
 import { createFindBar } from './find-bar.js';
 import { createAiWritePanel } from './ai-write-panel.js';
 import { UI } from './core/ui-text.js';
@@ -389,12 +389,10 @@ api.on('memo:external', async (next) => {
   showBanner(conflictCopy ? UI.conflictSaved : UI.conflict, { load: conflictCopy ? UI.showTheirs : null, keep: '확인' });
 });
 api.on('settings:link-previews', (on) => editor?.setLinkPreviews(on));
-// Work / Life 나누기: Work 메모는 어두운 화면 · Life 는 밝은 화면, 나눠 쓰지 않으면 시스템 설정 (메뉴의 "Work로 옮기기"도 그때만)
+// Work / Life 나누기: 메뉴의 "Work로 옮기기"는 나눠 쓸 때만 (밝기는 늘 시스템 설정 — 0.70.0)
 function showModeTheme() {
-  const root = document.documentElement;
-  if (memo?.workLife) root.dataset.theme = memo.mode === 'work' ? 'dark' : 'light';
-  else delete root.dataset.theme;
   $('mode-btn').hidden = !memo?.workLife;
+  fillModeTag($('mode-tag'), memo, Boolean(memo?.workLife));
 }
 api.on('mode:changed', ({ enabled } = {}) => {
   if (!memo) return;

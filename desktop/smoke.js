@@ -1708,6 +1708,20 @@ export async function runSmoke({
       check('AI 비서 연결: 끊으면 메모킹만 빠짐', removed && JSON.parse(fs.readFileSync(cfg, 'utf8')).mcpServers.other?.command === 'x');
       delete process.env.MEMOKING_CLAUDE_CONFIG;
     }
+    // Work / Life (0.70.0): 밝기는 시스템 그대로 · 카드에 고칠 수 없는 모드 태그 · 트레이 글
+    {
+      await js(lw, `window.memoking.mode.setWorkLife(true)`);
+      await wait(600);
+      const tag = await js(lw, `document.querySelector('#cards .card .mode-tag')?.textContent ?? null`); // 점검 메모는 모두 Life
+      await js(lw, `window.memoking.mode.set('work')`);
+      await wait(600);
+      const look = { tag, theme: await js(lw, `document.documentElement.dataset.theme ?? null`) };
+      await js(lw, `window.memoking.mode.set('life')`);
+      await js(lw, `window.memoking.mode.setWorkLife(false)`);
+      await wait(400);
+      const off = await js(lw, `!document.querySelector('#cards .card .mode-tag')`);
+      check('Work / Life: Work 로 바꿔도 화면 밝기는 시스템 그대로, 카드에 모드 태그(Life), 나누기를 끄면 태그 없음', look.theme === null && look.tag === 'Life' && off, JSON.stringify({ look, off }));
+    }
     // 문제 보내기: 화면에서 난 오류가 이 PC 의 기록에 남고, 누르면 그 기록을 붙인 새 메일 (smoke 에서는 열지 않고 주소만)
     {
       await js(lw, `console.error('스모크 화면 오류 기록')`);
