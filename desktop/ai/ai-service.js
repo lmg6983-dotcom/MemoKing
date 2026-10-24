@@ -99,8 +99,10 @@ export function createAiService(opts) {
     });
   }
 
+  let stopDownload = false; // 설정의 "멈추기" — 다음 조각에서 멈추고 받던 것은 버린다
   /** 기본 모델 받기 (core/model-catalog.js) — Hugging Face 가 알려 준 SHA-256 과 맞아야 넣는다 */
   function downloadDefault() {
+    stopDownload = false;
     const role = DEFAULT_MODEL.role;
     const offline = '인터넷에 연결하지 못했어요. 인터넷이 될 때 다시 누르거나, 모델 파일을 직접 넣어 주세요';
     const request = (url) => get(url).catch(() => { throw new Error(offline); });
@@ -116,6 +118,7 @@ export function createAiService(opts) {
       let shown = 0;
       try {
         for await (const chunk of res.body) {
+          if (stopDownload) throw Object.assign(new Error('받기를 멈췄어요. 다시 누르면 처음부터 받아요'), { stopped: true });
           hash.update(chunk);
           if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
           got += chunk.length;
@@ -125,7 +128,7 @@ export function createAiService(opts) {
           }
         }
       } catch (err) {
-        throw err.code === 'ENOSPC' ? err : new Error('받다가 끊겼어요. 인터넷을 확인하고 다시 눌러 주세요');
+        throw err.code === 'ENOSPC' || err.stopped ? err : new Error('받다가 끊겼어요. 인터넷을 확인하고 다시 눌러 주세요');
       } finally {
         await new Promise((r) => out.end(r));
       }
@@ -241,7 +244,7 @@ export function createAiService(opts) {
   const { chat, embed } = llamaClient(request);
 
   return {
-    status, emit, importModel, downloadDefault, remove, chat, embed,
+    status, emit, importModel, downloadDefault, cancelDownload: () => (stopDownload = true), remove, chat, embed,
     // AI 검색용 조각 · 벡터 — 이 PC 에만
     rag: createRagStore({
       load: () => fs.promises.readFile(path.join(dir, 'vectors.json'), 'utf8').catch(() => null),

@@ -188,10 +188,6 @@
         <button type="button" class="link-btn sc-reset" id="sc-magic-reset" hidden>기본값으로</button>
         <small class="sc-note" id="sc-magic-note" role="status"></small>
       </div>
-      <label class="setting-row" id="magic-polish-row" hidden>
-        <input type="checkbox" id="magic-polish" class="switch" role="switch" checked>
-        <span>저장할 때 AI 로 다듬기 <small>매직키로 저장한 메모의 맞춤법 · 띄어쓰기를 고치고, 첫 줄이 길면 짧은 제목을 붙여요. 저장은 바로, 다듬기는 뒤에서 (알림을 누르면 원래 글로)</small></span>
-      </label>
       <div id="magic-modules-row" class="setting-sub" hidden>
         <p class="label sub">매직키 기능</p>
         <div id="magic-modules-list" class="magic-settings-modules"></div>
@@ -263,30 +259,40 @@
       <h3 class="set-title" id="set-local-ai">AI 도우미 <small>인터넷 없이 이 PC 안에서 돌아가요</small></h3>
       <div class="setting-row keymap-row">
         <span>글 모델 <small id="ai-chat-note" role="status"></small><small id="ai-try-out" role="status"></small></span>
+        <button type="button" class="link-btn" id="ai-try" hidden>시험해 보기</button>
         <button type="button" class="link-btn danger" id="ai-chat-remove" hidden>삭제</button>
         <button type="button" class="btn" id="ai-chat-import">모델 파일 넣기</button>
       </div>
       <div class="dialog-actions left sub-actions" id="ai-default-row" hidden>
         <button type="button" class="btn" id="ai-default"></button>
-      </div>
-      <p class="set-note">기본 모델은 카카오 카나나2 — Powered by Kanana · <a href="https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/LICENSE" target="_blank" rel="noopener">라이선스 보기</a></p>
-      <div class="dialog-actions left sub-actions" id="ai-try-row" hidden>
-        <button type="button" class="link-btn" id="ai-try">시험해 보기</button>
-      </div>
-      <label class="setting-row" id="auto-events-row" hidden>
-        <input type="checkbox" id="auto-events" class="switch" role="switch" checked>
-        <span>일정 자동 등록 <small>메모를 닫을 때 · 매직키로 저장할 때 · 휴대폰에서 들어올 때, 새로 쓴 줄의 약속 · 마감을 AI 가 골라 일정 탭에 넣어요 (미리 알림은 매직키 알림 맞춰 저장과 같게, 알림을 누르면 되돌리기)</small></span>
-      </label>
-      <div class="setting-row keymap-row" id="ai-tags-row" hidden>
-        <span>AI 태그 <small id="ai-tags-note" role="status">닫을 때 · 매직키로 저장할 때 · 휴대폰에서 들어올 때, 메모마다 한 번 태그를 합쳐 3개까지 달아요</small></span>
-        <button type="button" class="link-btn danger" id="ai-tags-clear">AI 태그 모두 지우기</button>
-        <button type="button" class="btn" id="ai-tags-all">모든 메모에 달기</button>
+        <button type="button" class="link-btn" id="ai-default-stop" hidden>멈추기</button>
       </div>
       <div class="setting-row keymap-row">
         <span>검색 모델 <small id="ai-embed-note" role="status"></small></span>
         <button type="button" class="link-btn danger" id="ai-embed-remove" hidden>삭제</button>
         <button type="button" class="btn" id="ai-embed-import">모델 파일 넣기</button>
       </div>
+      <div id="ai-auto-group" hidden>
+        <p class="label sub">AI 가 자동으로 하는 일</p>
+        <label class="setting-row">
+          <input type="checkbox" id="auto-tags-ai" class="switch" role="switch" checked>
+          <span>AI 태그 <small id="ai-tags-note" role="status">메모마다 한 번, 태그를 합쳐 3개까지 달아요</small></span>
+        </label>
+        <div class="dialog-actions left sub-actions" id="ai-tags-actions">
+          <button type="button" class="link-btn" id="ai-tags-all">예전 메모에도 달기</button>
+          <button type="button" class="link-btn danger" id="ai-tags-clear">AI 태그 모두 지우기</button>
+        </div>
+        <label class="setting-row">
+          <input type="checkbox" id="auto-events" class="switch" role="switch" checked>
+          <span>일정 자동 등록 <small>새로 쓴 줄의 약속 · 마감을 일정 탭에 넣어요</small></span>
+        </label>
+        <label class="setting-row" id="magic-polish-row">
+          <input type="checkbox" id="magic-polish" class="switch" role="switch" checked>
+          <span>매직키 메모 다듬기 <small>맞춤법을 고치고, 첫 줄이 길면 짧은 제목을 붙여요</small></span>
+        </label>
+        <p class="set-note">메모를 닫을 때 · 매직키로 저장할 때 · 휴대폰에서 들어올 때 뒤에서 해요. 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
+      </div>
+      <p class="set-note">기본 모델: 카카오 카나나2 · Powered by Kanana · <a href="https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/LICENSE" target="_blank" rel="noopener">라이선스 보기</a></p>
     </section>
     <section class="set-sec" aria-labelledby="set-keys">
       <h3 class="set-title" id="set-keys">단축키</h3>
