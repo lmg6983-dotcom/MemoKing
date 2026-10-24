@@ -11,8 +11,9 @@ const MAX_TEXT = 1500; // 글자 — 앞부분이면 태그를 고르기에 충�
 
 const keyOf = (name) => name.toLocaleLowerCase('ko');
 
-/** → { state, questions, candidates } | null (너무 짧거나 · 기존 태그가 없거나 · 이미 다 달린 메모) */
-export function tagQuestion(body, memos, { excludeId } = {}) {
+/** → { state, questions, candidates, scores } | null (너무 짧거나 · 기존 태그가 없거나 · 이미 다 달린 메모)
+ *    limit: 보기 수 · scores: 태그 → AI 없는 추천 점수(0~1, 없으면 0) */
+export function tagQuestion(body, memos, { excludeId, limit = MAX_CANDIDATES } = {}) {
   const state = plainLines(body).join('\n').slice(0, MAX_TEXT);
   if (state.replace(/\s/g, '').length < MIN_TEXT) return null;
   const taken = new Set(extractTags(body).map(keyOf));
@@ -22,13 +23,15 @@ export function tagQuestion(body, memos, { excludeId } = {}) {
     for (const t of extractTags(m.body)) uses.set(t, (uses.get(t) ?? 0) + 1);
   }
   const byUse = [...uses.keys()].sort((a, b) => uses.get(b) - uses.get(a));
-  const fit = suggestTagsFor(body, memos, { limit: 8, excludeId }).filter((t) => t.existing).map((t) => t.name);
-  const candidates = [...new Set([...fit, ...byUse])].filter((t) => !taken.has(keyOf(t))).slice(0, MAX_CANDIDATES);
+  const fit = suggestTagsFor(body, memos, { limit: 8, excludeId }).filter((t) => t.existing);
+  const scores = new Map(fit.map((t) => [t.name, t.score]));
+  const candidates = [...new Set([...fit.map((t) => t.name), ...byUse])].filter((t) => !taken.has(keyOf(t))).slice(0, limit);
   if (!candidates.length) return null;
   return {
     state,
     questions: { tag: { type: 'choice', instructions: '이 메모에 가장 알맞은 태그는?', criteria: candidates } },
     candidates,
+    scores,
   };
 }
 
@@ -36,6 +39,12 @@ export function tagQuestion(body, memos, { excludeId } = {}) {
 export function rankedTags(result) {
   const probs = result?.answers?.tag?.probabilities ?? {};
   return Object.entries(probs).map(([name, p]) => ({ name, p })).sort((a, b) => b.p - a.p);
+}
+
+/** Laya 확률과 AI 없는 추천 점수를 섞어 다시 줄 세우기 — weight: 추천 점수 쪽 몫 (0 이면 Laya 만) */
+export function blend(ranked, scores, weight) {
+  if (!weight) return ranked;
+  return ranked.map((r) => ({ name: r.name, p: (1 - weight) * r.p + weight * (scores.get(r.name) ?? 0) })).sort((a, b) => b.p - a.p);
 }
 
 /** 닫을 때 저절로 달 태그: 확률 높은 셋 (첫째만 달 때보다 정답이 들어갈 때가 훨씬 많다) */

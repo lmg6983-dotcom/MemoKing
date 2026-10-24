@@ -7,9 +7,6 @@ on:
   push:
     paths:
       - '.github/workflows/laya-model.yml'
-      - 'scripts/laya-bench.mjs'
-      - 'scripts/laya-bench/**'
-      - 'app/js/core/laya-*.js'
       - 'app/vendor/laya.js'
   workflow_dispatch:
 
