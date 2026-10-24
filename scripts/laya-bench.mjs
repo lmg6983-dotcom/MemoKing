@@ -6,8 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tagQuestion, rankedTags, blend, pickTags, pairQuestions, togetherFrom, togetherInVault } from '../app/js/core/laya-tags.js';
-import { extractTags } from '../app/js/core/tags.js';
+import { tagQuestion, rankedTags, blend, pickTags } from '../app/js/core/laya-tags.js';
 import { layaAgent, ortProvider } from '../app/js/core/laya-agent.js';
 
 const LIMITS = [20, 8, 5];
@@ -69,29 +68,4 @@ for (const t of table) console.log(`| ${t.limit} | ${t.weight === 1 ? '1 (AI 없
 const best = table.filter((t) => t.weight < 1).sort((a, b) => b.hit3 + b.top1 - (a.hit3 + a.top1))[0];
 console.log(`\n가장 나은 것: 보기 ${best.limit}개 · 섞는 몫 ${best.weight}`);
 for (const r of best.rows) console.log(`${r.gold.includes(r.ranked[0]?.name) ? '✓' : '✗'} ${r.title} → ${r.picked.map((x) => (r.gold.includes(x) ? `#${x}✓` : `#${x}`)).join(' ')} · 정답: ${r.gold.join(', ')}`);
-// 함께 못 가는 태그 거르기: 섞는 몫 0.5 에서, 둘째 · 셋째 태그를 이미 고른 태그와 함께 갈 만한 것으로만
-const allTags = [...new Set(memos.flatMap((m) => extractTags(m.body)))];
-const pairs = pairQuestions(allTags);
-const keys = Object.keys(pairs);
-const pairAnswers = {};
-const tp = Date.now();
-for (let i = 0; i < keys.length; i += 16) {
-  const chunk = Object.fromEntries(keys.slice(i, i + 16).map((k) => [k, pairs[k]]));
-  Object.assign(pairAnswers, (await agent.predict('메모 앱의 태그', chunk)).answers);
-}
-console.log(`\n태그 짝 ${keys.length}개를 Laya 에 물음 (${((Date.now() - tp) / 1000).toFixed(1)}초)`);
-const base = table.find((t) => t.limit === 20 && t.weight === 0.5);
-const filters = [['거르지 않음', () => true], ['폴더에서 함께 달린 적 있는 짝만', togetherInVault(memos)]];
-for (const th of [0.3, 0.5, 0.7]) filters.push([`Laya: 함께일 확률 ${th} 넘는 짝만`, togetherFrom(pairAnswers, th)]);
-const blocked = (fn) => keys.filter((k) => { const [a, b] = k.split('\u0000'); return !fn(a, b); }).length;
-console.log('\n| 거르기 | 막힌 짝 | 셋 안에 정답 | 정밀도(셋) | 재현율(셋) |');
-console.log('|---|---|---|---|---|');
-for (const [label, fn] of filters) {
-  const rows = base.rows.map((r) => ({ ...r, picked: pickTags(r.ranked, fn) }));
-  const s = score(rows);
-  console.log(`| ${label} | ${blocked(fn)}/${keys.length} | ${pct(s.hit3)} | ${pct(s.precision)} | ${pct(s.recall)} |`);
-}
-const strict = togetherFrom(pairAnswers, 0.5);
-console.log('\nLaya 가 함께 못 간다고 본 짝 (0.5):', keys.filter((k) => { const [a, b] = k.split('\u0000'); return !strict(a, b); }).slice(0, 40).map((k) => k.replace('\u0000', '+')).join(', '));
-console.log('Laya 가 함께 간다고 본 짝 (확률 높은 순):', keys.sort((a, b) => pairAnswers[b].noul - pairAnswers[a].noul).slice(0, 20).map((k) => `${k.replace('\u0000', '+')} ${pairAnswers[k].noul.toFixed(2)}`).join(', '));
 if (flag === '--dump') fs.writeFileSync(dumpTo, JSON.stringify(dump));

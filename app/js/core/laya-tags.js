@@ -50,44 +50,8 @@ export function blend(ranked, scores, weight) {
   return ranked.map((r) => ({ name: r.name, p: (1 - weight) * r.p + weight * (scores.get(r.name) ?? 0) })).sort((a, b) => b.p - a.p);
 }
 
-/** 닫을 때 저절로 달 태그: 확률 높은 것부터 셋 (첫째만 달 때보다 정답이 들어갈 때가 훨씬 많다).
- *    together(a, b): 두 태그가 한 메모에 함께 달릴 만한지 — 이미 고른 태그와 함께 못 가는 태그는 건너뛴다 */
-export function pickTags(ranked, together = () => true) {
-  const out = [];
-  for (const r of ranked) {
-    if (out.length >= 3) break;
-    if (out.every((t) => together(t, r.name))) out.push(r.name);
-  }
-  return out;
-}
-
-const pairKey = (a, b) => (a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`);
-
-/** 태그 짝마다 "한 메모에 함께 달 만한가?" 를 Laya 에 물을 질문들 (noul) — 폴더의 태그가 바뀔 때만 다시 묻고 저장해 둔다 */
-export function pairQuestions(tags) {
-  const questions = {};
-  for (let i = 0; i < tags.length; i++) {
-    for (let j = i + 1; j < tags.length; j++) {
-      questions[pairKey(tags[i], tags[j])] = { type: 'noul', instructions: `메모 하나에 #${tags[i]} 태그와 #${tags[j]} 태그를 함께 달 수 있나요?` };
-    }
-  }
-  return questions;
-}
-
-/** Laya 짝 답들 → together(a, b) — 함께일 확률이 threshold 넘으면 */
-export function togetherFrom(answers, threshold = 0.5) {
-  return (a, b) => (answers[pairKey(a, b)]?.noul ?? 1) > threshold;
-}
-
-/** 폴더에서 한 번이라도 함께 달린 적 있는 태그 짝만 together (견주기용 — AI 없이) */
-export function togetherInVault(memos) {
-  const seen = new Set();
-  for (const m of memos) {
-    const tags = extractTags(m.body);
-    for (let i = 0; i < tags.length; i++) for (let j = i + 1; j < tags.length; j++) seen.add(pairKey(tags[i], tags[j]));
-  }
-  return (a, b) => seen.has(pairKey(a, b));
-}
+/** 닫을 때 저절로 달 태그: 확률 높은 셋 (첫째만 달 때보다 정답이 들어갈 때가 훨씬 많다) */
+export const pickTags = (ranked) => ranked.slice(0, 3).map((r) => r.name);
 
 /** 추천 칩(tag-suggest.js) 순서를 Laya 확률로 — Laya 가 첫째로 고른 기존 태그가 없으면 맨 앞에 넣는다. 새 태그 추천은 뒤로 */
 export function withLaya(list, ranked, limit = 3) {
