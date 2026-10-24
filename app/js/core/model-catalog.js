@@ -6,8 +6,8 @@ export const LAYA_MODEL = {
   approx: '약 390MB',
   license: 'Apache 2.0',
   base: 'https://github.com/lmg6983-dotcom/memoking-releases/releases/download/laya-multilingual-e4e9ddf/',
-  files: [ // laya-model.yml 실행 40046845261 의 결과 (Artifacts: laya-multilingual-int8)
-    { name: 'encoder.onnx', size: 309462933, sha256: '461790181d6c14fb6ccda5bba5d325c13504016bc44e22642db215424c780196' },
+  files: [ // laya-model.yml 실행 40049858171 의 결과 (Artifacts: laya-multilingual-int8 — 만들 때마다 encoder 가 조금 달라서 올린 그 파일로 고정)
+    { name: 'encoder.onnx', size: 309462936, sha256: '29f3cfa7b174867f3b4f004db222620bc75ad2e3dc945858b4d54e12f33e5a37' },
     { name: 'head.onnx', size: 228564, sha256: 'd59f297303127fd994aa331002afa5608a846545bfd2ac08587bd3faaf5c7f21' },
     { name: 'head.onnx.data', size: 59877376, sha256: '7b3c5cd0fa1bd10c1ce4ba1e7d9b218b3c1577ed6b1e5f39757b17cdc6b07605' },
     { name: 'tokenizer.json', size: 34363188, sha256: '609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f' },
