@@ -372,17 +372,22 @@ const viewMode = () => (workLifeOn() && settings.mode === 'work' ? 'work' : 'lif
 // 지금 모드는 화면을 바꾸지 않고(밝기는 늘 시스템 설정) 앱 밖에서만 보인다: 작업 표시줄 아이콘의 작은 표시 · 트레이 글.
 //   메모마다의 모드는 카드 · 메모 창의 고칠 수 없는 Work / Life 태그로 (core/modes.js modeTag)
 const MODE_BADGE = { work: path.join(ASSETS_DIR, 'icons', 'mode-work.png'), life: path.join(ASSETS_DIR, 'icons', 'mode-life.png') };
+let badgeMode = null; // 작업 표시줄에 붙여 둔 표시 — 바뀔 때만 다시 (창을 열 때마다 모든 창에 부르지 않게)
+function setBadge(w, mode) {
+  if (process.platform !== 'win32' || !w || w.isDestroyed()) return;
+  w.setOverlayIcon(mode ? nativeImage.createFromPath(MODE_BADGE[mode]) : null, mode ? `메모킹 ${MODE_LABEL[mode]}` : '');
+}
 function showModeOutside() {
   const mode = workLifeOn() ? viewMode() : null;
   tray?.setToolTip(mode ? `메모킹 · ${MODE_LABEL[mode]}` : '메모킹: 누르면 메모 목록이 열려요');
-  if (process.platform !== 'win32') return;
-  const badge = mode ? nativeImage.createFromPath(MODE_BADGE[mode]) : null;
-  for (const w of [windowManager.listWin, ...windowManager.noteWins.values()]) {
-    if (w && !w.isDestroyed()) w.setOverlayIcon(badge, mode ? `메모킹 ${MODE_LABEL[mode]}` : '');
-  }
+  if (mode === badgeMode) return;
+  badgeMode = mode;
+  for (const w of [windowManager.listWin, ...windowManager.noteWins.values()]) setBadge(w, mode);
 }
-
-app.on('browser-window-created', () => setImmediate(showModeOutside)); // 새로 연 목록 · 메모 창에도 표시
+// 새로 연 목록 · 메모 창에도 (표시를 붙여 둔 때만, 그 창 하나만)
+app.on('browser-window-created', (_e, w) => {
+  if (badgeMode) setImmediate(() => (w === windowManager.listWin || [...windowManager.noteWins.values()].includes(w)) && setBadge(w, badgeMode));
+});
 
 /** 모드 · 나누기가 바뀌었을 때: 새 메모의 모드 · 작업 표시줄 · 트레이 · 열린 창들 */
 function applyAppMode() {
