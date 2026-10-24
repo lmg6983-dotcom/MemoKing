@@ -241,6 +241,10 @@ class SyncEngine(
         if (!keepMissing && goneRemote >= MASS_DELETE_MIN && goneRemote * 2 > known.size) {
             throw SafetyStop("Google Drive 폴더에서 파일 ${goneRemote}개가 한꺼번에 사라져서 동기화를 멈췄어요. 고른 폴더가 맞는지 확인해 주세요.")
         }
+        // 메모 폴더가 통째로 비었으면 지운 게 아니라 못 읽은 것 (SD 카드가 빠짐 · 고른 폴더 권한이 풀림) — 적은 수라도 Drive 에서 지우지 않는다
+        if (goneLocal > 0 && localFiles.isEmpty()) {
+            throw SafetyStop("휴대폰 메모 폴더가 비어 있거나 읽을 수 없어 동기화를 멈췄어요. 설정에서 메모 폴더를 다시 골라 주세요.")
+        }
         if (goneLocal >= MASS_DELETE_MIN && goneLocal * 2 > known.size) {
             throw SafetyStop("휴대폰 메모 폴더에서 파일 ${goneLocal}개가 한꺼번에 사라져서 동기화를 멈췄어요.")
         }
