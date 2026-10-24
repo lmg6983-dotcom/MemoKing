@@ -85,12 +85,9 @@ export function saveSettings(now = false) {
   else settingsTimer = setTimeout(write, 500);
 }
 
-// Google Drive 가 있으면 그 안의 "메모킹" 폴더를 추천한다.
-export function suggestedVaultPath() {
-  const drives = ['G:\\내 드라이브', 'G:\\My Drive', path.join(os.homedir(), 'Google Drive'), path.join(os.homedir(), 'My Drive')];
-  const base = drives.find((d) => fs.existsSync(d)) ?? app.getPath('documents');
-  return path.join(base, '메모킹');
-}
+// 처음 메모 폴더: 문서\메모킹 — Google Drive 데스크탑 앱 폴더 안은 고르지 않는다 (휴대폰과 맞추는 메모킹 동기화가
+//   두 번 동기화를 막으려 그 폴더를 옮겨야 해서, Drive 에 메모가 두 벌 남는다)
+export const suggestedVaultPath = () => path.join(app.getPath('documents'), '메모킹');
 
 // 휴지통 자동 비우기
 export const TRASH_DAYS = [0, 7, 30, 90, 365];

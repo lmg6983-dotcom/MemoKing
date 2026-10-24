@@ -1447,8 +1447,11 @@ app.whenReady().then(async () => {
 
   if (autoStartAvailable() && !settings.autoStartSet) setAutoStart(true, updateTrayMenu);
   // 처음 설치: 고르는 화면 없이 이 PC 의 기본 폴더(문서\메모킹)로 바로 시작 — Google 동기화는 목록의 안내 줄 · 구름 단추에서.
-  //   못 열면(권한 등) 예전처럼 고르는 화면이 오류와 함께 뜬다
-  openVault(settings.vaultPath || suggestedVaultPath());
+  //   못 열면(권한 등) 예전처럼 고르는 화면이 오류와 함께 뜬다.
+  //   쓰던 폴더가 없어졌으면(꺼 둔 사이 옮김 · 이름 바꿈) 빈 폴더를 새로 만들지 않는다 — 동기화가 "모두 지웠다" 로 읽어 Drive · 휴대폰에서도 지우므로
+  if (settings.vaultPath && !fs.existsSync(settings.vaultPath)) {
+    vaultError = `쓰던 메모 폴더(${settings.vaultPath})를 찾을 수 없어요. 옮겼다면 옮긴 폴더를 골라 주세요`;
+  } else openVault(settings.vaultPath || suggestedVaultPath());
 
   const launched = launchAction(process.argv);
   if (!HIDDEN_START || !vault) {
