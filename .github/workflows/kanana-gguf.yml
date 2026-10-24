@@ -72,7 +72,7 @@ jobs:
           print(sorted(os.listdir("ckpt")))
           EOF
           cat ckpt/config.json; echo; cat ckpt/generation_config.json 2>/dev/null; echo
-          for f in ckpt/LICENSE* ckpt/NOTICE*; do [ -f "$f" ] && { echo "== $f"; head -c 6000 "$f"; echo; }; done
+          for f in ckpt/LICENSE* ckpt/NOTICE*; do if [ -f "$f" ]; then echo "== $f"; cat "$f"; echo; fi; done
 
       - name: 한국어 글 (imatrix 용 · 견주기 용)
         run: |
