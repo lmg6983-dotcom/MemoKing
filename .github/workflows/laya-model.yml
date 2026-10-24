@@ -1,6 +1,6 @@
-# AI 태그 모델 만들기 — Laya 다국어(convaiinnovations/laya-multilingual, Apache-2.0)를 고정한 커밋에서 받아
-#   ONNX(encoder · head)로 바꾸고 8비트로 줄인 뒤, 한국어 태그 시험(scripts/laya-bench.mjs)을 돌린다.
-#   결과는 실행 결과(Artifacts)의 "laya-multilingual-int8" — 앱이 받는 파일 (SHA-256 은 로그 끝에)
+# AI 태그 모델 만들기 — Laya(Apache-2.0)를 고정한 커밋에서 받아 ONNX(encoder · head)로 바꾸고 8비트로 줄인 뒤,
+#   한국어 태그 시험(scripts/laya-bench.mjs)을 돌린다. 모델 둘을 나란히: 다국어(convaiinnovations/laya-multilingual)와
+#   그것을 한국어로 더 학습시킨 2nugu/laya-ko. 결과는 실행 결과(Artifacts)의 "laya-<이름>-int8" (SHA-256 은 로그 끝에)
 name: Laya 모델 (AI 태그)
 
 on:
@@ -17,10 +17,20 @@ jobs:
   export:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: multilingual
+            repo: convaiinnovations/laya-multilingual
+            rev: e4e9ddf21a7b1903b7acffd8814ad4307bf63a67 # laya-ts PINNED_REVISIONS
+          - name: ko
+            repo: 2nugu/laya-ko
+            rev: main # 처음 시험 — 받은 커밋을 로그에 적는다 (쓰기로 하면 그 커밋으로 고정)
     env:
       LAYA_COMMIT: 0a05a45052e23ae0b887a490fe8d6d9c8cff2ab5 # app/vendor/laya.js 와 같은 커밋
-      MODEL_REPO: convaiinnovations/laya-multilingual
-      MODEL_REV: e4e9ddf21a7b1903b7acffd8814ad4307bf63a67 # laya-ts PINNED_REVISIONS
+      MODEL_REPO: ${{ matrix.repo }}
+      MODEL_REV: ${{ matrix.rev }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,7 +51,8 @@ jobs:
         run: |
           python - <<'EOF'
           import os
-          from huggingface_hub import snapshot_download
+          from huggingface_hub import snapshot_download, HfApi
+          print("커밋:", HfApi().model_info(os.environ["MODEL_REPO"], revision=os.environ["MODEL_REV"]).sha)
           path = snapshot_download(os.environ["MODEL_REPO"], revision=os.environ["MODEL_REV"], local_dir="ckpt",
               allow_patterns=["rl_agent_config.json", "model.safetensors", "config.json", "tokenizer.json", "tokenizer/*", "encoder/*"])
           print(path, sorted(os.listdir(path)))
@@ -88,6 +99,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: laya-multilingual-int8
+          name: laya-${{ matrix.name }}-int8
           path: out/int8/
           retention-days: 30
