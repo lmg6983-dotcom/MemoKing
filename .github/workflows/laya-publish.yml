@@ -1,0 +1,52 @@
+# AI 태그 모델 올리기 — laya-model.yml 이 만든 파일(Artifacts: laya-multilingual-int8)을 공개 배포 저장소
+#   memoking-releases 의 릴리스 "laya-multilingual-e4e9ddf" 에 올린다. 앱(core/model-catalog.js)이 그 주소에서 받고
+#   파일마다 SHA-256 을 확인하므로, 올리기 전에 같은 값인지 여기서도 확인한다. Actions 탭 › Run workflow 로 손으로만
+name: Laya 모델 올리기
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read # 다른 실행의 Artifacts 받기
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RUN_ID: '40049858171'
+      TAG: laya-multilingual-e4e9ddf
+      RELEASES_REPO: lmg6983-dotcom/memoking-releases
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: laya-multilingual-int8
+          path: model
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: core/model-catalog.js 의 크기 · SHA-256 과 같은지
+        run: |
+          node --input-type=module -e "
+            import fs from 'node:fs'; import { createHash } from 'node:crypto';
+            import { LAYA_MODEL } from './app/js/core/model-catalog.js';
+            for (const f of LAYA_MODEL.files) {
+              const b = fs.readFileSync('model/' + f.name);
+              const sha = createHash('sha256').update(b).digest('hex');
+              if (b.length !== f.size || sha !== f.sha256) throw new Error(f.name + ' 이 달라요: ' + b.length + ' ' + sha);
+              console.log('✔', f.name, b.length);
+            }"
+
+      - name: 공개 배포 저장소에 올리기
+        env:
+          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
+        run: |
+          notes="메모킹 AI 태그 모델 — Laya 다국어 (convaiinnovations/laya-multilingual e4e9ddf, Apache-2.0)를 ONNX 로 바꾸고 encoder 를 8비트로 줄인 것. 앱이 설정 › AI 태그 › 받기에서 받아요."
+          if gh release view "$TAG" --repo "$RELEASES_REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" model/* --repo "$RELEASES_REPO" --clobber
+          else
+            gh release create "$TAG" model/* --repo "$RELEASES_REPO" --title "AI 태그 모델 (Laya 다국어)" --notes "$notes" --prerelease
+          fi
+          gh release view "$TAG" --repo "$RELEASES_REPO" --json assets --jq '.assets[] | "\(.name) \(.size)"'
