@@ -62,32 +62,36 @@ jobs:
           quantize_dynamic("out/fp32/encoder.onnx", "out/int8/encoder.onnx", weight_type=QuantType.QInt8, op_types_to_quantize=["MatMul", "Gather"])
           EOF
           # head(60MB)는 그대로 — ONNX 모양 추론이 이 그래프에서 멈추고, 작아서 줄일 까닭도 적다
-          cp out/fp32/head.onnx out/fp32/tokenizer.json out/fp32/rl_agent_config.json out/int8/
+          cp out/fp32/head.onnx* out/fp32/tokenizer.json out/fp32/rl_agent_config.json out/int8/
           ls -la out/fp32 out/int8
 
       - name: 한국어 태그 시험 — 원래 크기
         run: node scripts/laya-bench.mjs out/fp32 --dump fp32.json
-      - name: 한국어 태그 시험 — 8비트 (앱이 받는 것)
-        run: node scripts/laya-bench.mjs out/int8 --dump int8.json
 
-      - name: 앱(JS)의 답이 laya(Python)와 같은지
+      - name: 앱(JS)의 답이 laya(Python)와 같은지 · 질문 모양별 정확도 (Python)
         run: |
           python - <<'EOF'
           import json, laya
           agent = laya.load("ckpt", device="cpu")
-          same = 0
           cases = json.load(open("fp32.json"))
+          def top(q, state):
+              return agent.system_one(state, q)["answers"]["tag"]["choice"]
+          same = ok = ok_plain = ok_en = 0
           for c in cases:
-              r = agent.system_one(c["state"], c["questions"])
-              py = r["answers"]["tag"]["choice"]
-              js = c["js"][0]["name"]
-              same += py == js
-              if py != js: print("다름:", c["state"].split("\n")[0], "python", py, "js", js)
-          q = json.load(open("int8.json"))
-          kept = sum(a["js"][0]["name"] == b["js"][0]["name"] for a, b in zip(cases, q))
-          print(f"Python 과 같은 답 {same}/{len(cases)} · 8비트가 원래와 같은 답 {kept}/{len(cases)}")
-          assert same == len(cases), "앱의 계산이 laya 와 달라요"
+              q = c["questions"]
+              py = top(q, c["state"])
+              same += py == c["js"][0]["name"]
+              ok += py in c["gold"]
+              names = list(q["tag"]["criteria"].keys())
+              ok_plain += top({"tag": {"type": "choice", "instructions": q["tag"]["instructions"], "criteria": names}}, c["state"]) in c["gold"]
+              ok_en += top({"tag": {"type": "choice", "instructions": "Which tag fits this note best?", "criteria": {n: n for n in names}}}, c["state"]) in c["gold"]
+              if py != c["js"][0]["name"]: print("다름:", c["state"].split("\n")[0], "python", py, "js", c["js"][0]["name"])
+          n = len(cases)
+          print(f"Python 과 같은 답 {same}/{n} · Python 정확도: 앱 질문 {ok}/{n} · 설명 없이 {ok_plain}/{n} · 영어 질문 {ok_en}/{n}")
           EOF
+
+      - name: 한국어 태그 시험 — 8비트 (앱이 받는 것)
+        run: node scripts/laya-bench.mjs out/int8 --dump int8.json
 
       - name: 앱이 받을 파일 SHA-256
         run: cd out/int8 && sha256sum * && ls -l

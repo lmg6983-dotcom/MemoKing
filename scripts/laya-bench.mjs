@@ -31,7 +31,7 @@ for (const c of cases) {
   const t = Date.now();
   const ranked = rankedTags(await agent.predict(q.state, q.questions));
   const ms = Date.now() - t;
-  dump.push({ state: q.state, questions: q.questions, js: ranked.slice(0, 3) });
+  dump.push({ state: q.state, questions: q.questions, gold: c.gold, js: ranked.slice(0, 3) });
   rows.push({ title: c.text.split('\n')[0], gold: c.gold, top: ranked[0]?.name, p: ranked[0]?.p ?? 0, top3: ranked.slice(0, 3).map((r) => r.name), ms });
 }
 const ok = rows.filter((r) => r.gold.includes(r.top)).length;
