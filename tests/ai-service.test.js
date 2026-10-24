@@ -61,6 +61,7 @@ test('로컬 AI: 모델 넣기 · 묻기 · 지우기', async () => {
 
     await assert.rejects(ai.importModel('embed', model), /모르는 모델/, '검색 모델은 없앴다 (AI 검색도 글 모델 하나로)');
 
+    await assert.rejects(ai.remove('../chat'), /모르는 모델/); // 앱 폴더 밖 파일은 지우지 않는다
     await ai.remove('chat');
     assert.equal(ai.status().chat.state, 'missing');
     assert.equal(names.chat, '');

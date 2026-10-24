@@ -33,7 +33,8 @@ export function createAiTagger({
   /** 아직 보지 않은 모든 메모 → { done, total } */
   function all() {
     const vault = getVault();
-    const ids = (vault?.list() ?? []).map((m) => m.id).filter((id) => vault.get(id)?.aiTags == null);
+    const todo = (m) => m && m.aiTags == null && !m.locked && !isBlankBody(m.body) && extractTags(m.body).length < MAX_TAGS; // tagOne 이 건너뛰는 메모는 세지 않는다
+    const ids = (vault?.list() ?? []).map((m) => m.id).filter((id) => todo(vault.get(id)));
     batch = ids.length ? { left: new Set(ids), done: 0, total: ids.length } : null;
     progress();
     add(ids);

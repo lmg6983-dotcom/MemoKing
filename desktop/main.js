@@ -754,8 +754,12 @@ function initAi() {
 // AI 가 뒤에서 한 일 (매직키 다듬기 · 일정 자동 등록): Windows 알림을 누르면 메모가 열리고, 메모 창 아래 막대에서 되돌린다.
 //   알림을 누르는 습관은 "열기"라 알림 자체로는 되돌리지 않는다. 메모마다 차례로 쌓고 막대는 마지막 것부터
 const aiNotices = new Map(); // 메모 id → [{ text, undo: () => { ok, message } }]
+const MAX_AI_NOTICES = 30; // 열어 보지 않은 메모가 이보다 많으면 오래된 것부터 버린다 (원래 글은 이전 버전에 남음)
 function showAiNotice(id, { title, body, text, undo }) {
-  aiNotices.set(id, [...(aiNotices.get(id) ?? []), { text, undo }]);
+  const list = [...(aiNotices.get(id) ?? []), { text, undo }];
+  aiNotices.delete(id); // 맨 뒤(새것)로
+  aiNotices.set(id, list);
+  if (aiNotices.size > MAX_AI_NOTICES) aiNotices.delete(aiNotices.keys().next().value);
   toast({
     memoId: id, kind: 'ai-notice', title, body: `${body}\n눌러서 열기 · 메모에서 되돌릴 수 있어요`,
     onClick: () => {

@@ -142,6 +142,7 @@ export function createAiService(opts) {
   }
 
   async function remove(role) {
+    if (!AI_ROLES[role]) throw new Error('모르는 모델이에요');
     await stop(role);
     fs.rmSync(fileOf(role), { force: true });
     errors.delete(role);

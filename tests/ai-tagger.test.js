@@ -56,6 +56,12 @@ test('AI 태그: 열린 메모 · 태그가 이미 3개인 메모는 건너뛰�
     await t.tagger.add([full, opened]);
     assert.equal(t.asked.length, 0);
     assert.equal(t.vault.get(opened).aiTags, null); // 닫을 때 다시
+    // "예전 메모에도 달기" 는 건너뛸 메모(태그 3개 · 빈 메모)를 세지 않는다 — 다 달면 끝났다고 보이게
+    t.vault.import({ body: '' });
+    open.clear();
+    assert.equal(t.tagger.all().total, 1);
+    await t.tagger.add([]);
+    assert.equal(t.tagger.all().total, 0);
   } finally {
     t.done();
   }
