@@ -35,3 +35,17 @@ test('AI 작업: 검색 모델 없이도 낱말로 찾아 근거 메모만 주�
   assert.equal(r.sources[0].id, 'a');
   assert.match(asked, /\[1\] 주간 회의/);
 });
+
+test('AI 작업: 매직키 다듬기 — 문단마다 믿을 만한 맞춤법만, 첫 줄이 길면 맨 위에 제목', async () => {
+  const chat = async (m) => (m[0].content.includes('제목')
+    ? '김 부장 견적 미팅'
+    : m[1].content.includes('엉뚱') ? '会议' : m[1].content.replace('됬', '됐').replace('몇일', '며칠'));
+  const long = '내일 3시에 김 부장님이랑 강남역에서 만나서 견적 이야기 하기로 됬음';
+  const r = await tasks(chat).polish(`${long}\n\n몇일 걸릴지 엉뚱한 문단`);
+  assert.equal(r.body, `# 김 부장 견적 미팅\n\n${long.replace('됬', '됐')}\n\n몇일 걸릴지 엉뚱한 문단`);
+  assert.equal(r.fixes, 1);
+  assert.equal(r.title, '김 부장 견적 미팅');
+
+  const short = await tasks(chat).polish('우유 사기');
+  assert.deepEqual(short, { body: '우유 사기', fixes: 0, title: '' });
+});
