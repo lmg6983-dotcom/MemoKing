@@ -7,6 +7,7 @@ import { collectTags, extractTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor, appendTags } from '../app/js/core/tag-suggest.js';
 import { withLaya, pickTags } from '../app/js/core/laya-tags.js';
+import { runWrite } from '../app/js/core/ai-write.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
@@ -84,6 +85,7 @@ export function registerIpc(ctx) {
     getStt,
     sttOptions,
     getAi,
+    getLlm,
     getLinkPreviews,
     openWebPage,
     openVaultFile,
@@ -96,6 +98,59 @@ export function registerIpc(ctx) {
   ipcMain.handle('ai:status', () => getAi()?.status());
   ipcMain.handle('ai:download', () => getAi()?.download());
   ipcMain.handle('ai:remove', () => getAi()?.remove());
+
+  // ---------- AI 글 도우미 (desktop/ai/ai-service.js, PC 에만) ----------
+  ipcMain.handle('llm:status', () => getLlm()?.status());
+  ipcMain.handle('llm:import', async (event) => {
+    const r = await dialog.showOpenDialog(senderWindow(event), {
+      title: '모델 파일(.gguf) 고르기',
+      filters: [{ name: 'AI 모델', extensions: ['gguf'] }],
+      properties: ['openFile'],
+    });
+    if (r.canceled || !r.filePaths[0]) return getLlm()?.status();
+    try {
+      return await getLlm().importModel('chat', r.filePaths[0]);
+    } catch (err) {
+      return { ...getLlm().status(), error: err.message };
+    }
+  });
+  ipcMain.handle('llm:remove', () => getLlm()?.remove('chat'));
+  ipcMain.handle('llm:download-default', async () => {
+    try {
+      return await getLlm().downloadDefault();
+    } catch (err) {
+      return { ...getLlm().status(), error: err.message };
+    }
+  });
+  // 조각은 llm:token, 맞춤법 진행은 llm:progress 로 보낸 창에
+  const llmJobs = new Map(); // 보낸 창:작업 → 멈추기
+  ipcMain.handle('llm:write', async (e, { id, ...job }) => {
+    const key = `${e.sender.id}:${id}`;
+    const ctrl = new AbortController();
+    llmJobs.set(key, ctrl);
+    const send = (channel, data) => !e.sender.isDestroyed() && e.sender.send(channel, { id, ...data });
+    try {
+      return await runWrite(getLlm().chat, job, {
+        signal: ctrl.signal,
+        onToken: (text) => send('llm:token', { text }),
+        onProgress: (done, total) => send('llm:progress', { done, total }),
+      });
+    } catch (err) {
+      return { error: err.message };
+    } finally {
+      llmJobs.delete(key);
+    }
+  });
+  ipcMain.handle('llm:cancel', (e, id) => llmJobs.get(`${e.sender.id}:${id}`)?.abort());
+  ipcMain.handle('llm:try', async () => {
+    const started = Date.now();
+    try {
+      const text = await getLlm().chat([{ role: 'user', content: '메모 앱을 한 문장으로 소개해 주세요.' }], { maxTokens: 80 });
+      return { text, seconds: (Date.now() - started) / 1000 };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
 
   // ---------- STT (받아쓰기) ----------
   const sttKey = (e, id) => `${e.sender.id}:${id}`;

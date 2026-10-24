@@ -15,3 +15,27 @@ export const LAYA_MODEL = {
     { name: 'rl_agent_config.json', size: 1402, sha256: 'f7eb0277c898078c431c73250cb3000279b5884f3835344ecd8aa1f14bec48c4' },
   ],
 };
+
+// AI 글 도우미 기본 모델 (PC 설정 › AI 글 도우미 › 기본 모델 받기) — PC 에만.
+//   Apache 2.0 이라 누구에게나 쓰게 할 수 있는 것으로 (카나나2 는 제3자용 온디바이스 제공에 카카오 별도 계약이 필요해 사용자가 직접 넣는 선택 모델).
+//   앱에 넣으면 설치 파일 · 업데이트가 GB 단위로 커져서, 인터넷이 될 때 한 번 Hugging Face 에서 받는다. 그다음은 인터넷 없이
+export const DEFAULT_MODEL = {
+  role: 'chat',
+  label: '젬마4 E2B',
+  repo: 'unsloth/gemma-4-E2B-it-qat-GGUF', // 구글 QAT 체크포인트를 Unsloth 가 GGUF 로 — 같은 크기의 보통 4비트보다 품질 손실이 작다
+  file: /UD-Q4_K_XL\.gguf$/i,
+  approx: '약 2.6GB',
+  license: 'Apache 2.0',
+};
+
+/** 저장소의 파일 목록 (파일마다 크기 · SHA-256) */
+export const modelInfoUrl = (m) => `https://huggingface.co/api/models/${m.repo}?blobs=true`;
+
+/** 목록 → 받을 것 { name, url, size, sha256 } — 보조 파일(mtp 초안 · mmproj 그림)은 빼고, 목록을 받은 그 커밋으로 고정 */
+export function pickModelFile(m, info) {
+  const f = (info?.siblings ?? []).find((s) => m.file.test(s.rfilename) && !/mtp|mmproj/i.test(s.rfilename));
+  const sha256 = f?.lfs?.sha256 ?? '';
+  if (!f || !/^[0-9a-f]{64}$/.test(sha256)) throw new Error('받을 모델 파일을 찾지 못했어요. 잠시 뒤 다시 해 주세요');
+  const path = f.rfilename.split('/').map(encodeURIComponent).join('/');
+  return { name: f.rfilename.split('/').pop(), url: `https://huggingface.co/${m.repo}/resolve/${info.sha ?? 'main'}/${path}`, size: f.lfs.size ?? f.size ?? 0, sha256 };
+}

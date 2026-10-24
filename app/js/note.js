@@ -33,6 +33,7 @@ import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { memoMode, otherMode, moveLabel, MODE_LABEL } from './core/modes.js';
 import { createFindBar } from './find-bar.js';
+import { createAiWritePanel } from './ai-write-panel.js';
 import { UI } from './core/ui-text.js';
 import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from './note-shared.js';
 
@@ -652,6 +653,8 @@ function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
   if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
+  // AI 글 도우미는 글 모델을 넣어 둔 PC 에서만 (설정 › AI 글 도우미)
+  if (!el.menu.hidden && api.llm) api.llm.status().then((st) => { $('ai-btn').hidden = !['ready', 'running'].includes(st?.chat.state); });
 }
 function closeMenu() {
   if (el.menu.hidden) return;
@@ -708,6 +711,7 @@ async function toggleLinks(force) {
   el.linksPanel.hidden = force === undefined ? !el.linksPanel.hidden : !force;
   if (!el.linksPanel.hidden) {
     if (reminderPanel?.open) reminderPanel.toggle(false); // 패널은 하나씩
+    if (aiPanel?.open) aiPanel.toggle(false);
     if (!versionsPanel.hidden) toggleVersions(false);
     await flush();
     await refreshLinks();
@@ -741,6 +745,7 @@ async function toggleVersions(force) {
   if (!versionsPanel.hidden) {
     if (!el.linksPanel.hidden) toggleLinks(false);
     if (reminderPanel?.open) reminderPanel.toggle(false);
+    if (aiPanel?.open) aiPanel.toggle(false);
     await flush();
     await refreshVersions();
     $('versions-close').focus();
@@ -751,6 +756,23 @@ $('versions-btn').addEventListener('click', () => {
   toggleVersions(true);
 });
 $('versions-close').addEventListener('click', () => toggleVersions(false));
+
+// ---------- AI 글 도우미 (ai-write-panel.js, PC 에만) ----------
+const aiPanel = api.llm ? createAiWritePanel({
+  panel: $('ai-panel'),
+  api,
+  editor: () => editor,
+  title: () => extractTitle(editor?.getMarkdown() ?? ''),
+  onOpen: () => {
+    if (!el.linksPanel.hidden) toggleLinks(false);
+    if (!versionsPanel.hidden) toggleVersions(false);
+    if (reminderPanel?.open) reminderPanel.toggle(false);
+  },
+}) : null;
+$('ai-btn').addEventListener('click', () => {
+  closeMenu();
+  aiPanel?.toggle(true);
+});
 // 끌어서 합치기(스택)의 메뉴 버전 — 끌기가 어려운 사람도
 $('join-btn').addEventListener('click', async () => {
   closeMenu();
@@ -1297,6 +1319,7 @@ window.addEventListener('keydown', (e) => {
     else if (!el.menu.hidden) closeMenu();
     else if (!el.linksPanel.hidden) toggleLinks(false);
     else if (!versionsPanel.hidden) toggleVersions(false);
+    else if (aiPanel?.open) aiPanel.toggle(false);
     else if (reminderPanel?.open) reminderPanel.toggle(false);
     else if (findBar.isOpen) findBar.close({ focus: true }); // 글을 고치다가 Esc: 찾기 막대를 닫고 찾은 곳을 고른 채
     return;
@@ -1903,7 +1926,7 @@ if (!memo) {
     api,
     memoId: id,
     setStatus,
-    onToggle: (open) => open && !el.linksPanel.hidden && toggleLinks(false),
+    onToggle: (open) => open && (!el.linksPanel.hidden && toggleLinks(false), aiPanel?.open && aiPanel.toggle(false)),
     onChange: () => editor?.refreshDates(),
   });
   reminderPanel.set(memo.reminders);

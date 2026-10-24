@@ -2716,6 +2716,52 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     insertMarkdown(md) {
       if (md) editor.action(insert(md));
     },
+    // AI 글 도우미 (ai-write-panel.js) -----------------------------------
+    /** 고칠 문단: 고른 곳(없으면 메모 전체)에서 글자만 있는 문단 [{ pos, text }] — 그림 · 링크 카드 · 코드가 든 칸은 뺀다 */
+    aiBlocks() {
+      const { doc, selection } = view().state;
+      const out = [];
+      doc.nodesBetween(selection.empty ? 0 : selection.from, selection.empty ? doc.content.size : selection.to, (node, pos) => {
+        if (!node.isTextblock) return true;
+        if (node.type.name !== 'code_block' && node.textContent.trim().length > 1 && node.content.content.every((c) => c.isText)) out.push({ pos, text: node.textContent });
+        return false;
+      });
+      return out;
+    },
+    /** 그 문단이 아직 before 그대로면 고침(글자 위치)을 넣는다 — 바뀌지 않은 글자의 서식은 남는다. 그사이 글이 바뀌었으면 false */
+    aiApply(pos, before, edits) {
+      const v = view();
+      let at = -1; // 앞 문단을 고쳐 자리가 밀렸어도 찾는다 (같은 글이 여럿이면 가장 가까운 것)
+      v.state.doc.descendants((node, p) => {
+        if (node.isTextblock && node.textContent === before && (at < 0 || Math.abs(p - pos) < Math.abs(at - pos))) at = p;
+        return !node.isTextblock;
+      });
+      if (at < 0) return false;
+      let tr = v.state.tr;
+      for (const e of [...edits].reverse()) tr = e.text ? tr.insertText(e.text, at + 1 + e.from, at + 1 + e.to) : tr.delete(at + 1 + e.from, at + 1 + e.to);
+      v.dispatch(tr);
+      return true;
+    },
+    /** 정리 · 고치기 · 문체 바꿀 곳: 고른 곳(없으면 메모 전체)의 글 — 그림 · 표 · 파일이 섞이면 바꾸다 잃을 수 있어 null */
+    aiRange() {
+      const { doc, selection } = view().state;
+      const [from, to] = selection.empty ? [0, doc.content.size] : [selection.from, selection.to];
+      let plain = true;
+      doc.nodesBetween(from, to, (node) => {
+        if (!['doc', 'paragraph', 'heading', 'bullet_list', 'ordered_list', 'list_item', 'blockquote', 'text', 'hardbreak', 'hard_break'].includes(node.type.name)) plain = false;
+        return plain;
+      });
+      return plain ? { from, to, text: doc.textBetween(from, to, '\n') } : null;
+    },
+    /** 그곳의 글이 그대로면 마크다운으로 바꿔 넣는다 (되돌리기 Ctrl+Z 한 번) */
+    aiReplace({ from, to, text }, md) {
+      const v = view();
+      const { doc } = v.state;
+      if (to > doc.content.size || doc.textBetween(from, to, '\n') !== text) return false;
+      v.dispatch(v.state.tr.setSelection(TextSelection.between(doc.resolve(from), doc.resolve(to))));
+      editor.action(insert(md));
+      return true;
+    },
     // 문서를 통째로 다시 쓰지 않고 끝에 끼워 넣는다 (받는 중인 사진의 주소 교체와 엇갈리지 않게)
     appendMarkdown(md) {
       const v = view();

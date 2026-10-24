@@ -1,6 +1,6 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
 import { hotkeyLabel } from './core/memo-hotkeys.js';
-import { LAYA_MODEL } from './core/model-catalog.js';
+import { LAYA_MODEL, DEFAULT_MODEL } from './core/model-catalog.js';
 import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
 import { captureGlobalKey, stopKeyCapture, isCapturing, globalShortcutResult } from './key-capture.js';
@@ -885,6 +885,7 @@ async function loadSettings() {
   });
   if (api.stt) renderStt(await api.stt.status());
   if (api.ai) renderAi(await api.ai.status());
+  if (api.llm) renderLlm(await api.llm.status());
   $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
 }
 function showQuickMemo(q) {
@@ -1067,6 +1068,49 @@ if (api.ai) {
   });
 } else {
   $('local-ai-sec').hidden = true;
+}
+// ---------- AI 글 도우미 (desktop/ai/ai-service.js — PC 에만) ----------
+// 모델 파일(.gguf)은 기본 모델을 받거나 사용자가 넣는다 (USB 로 옮긴 파일도). 이 PC 의 앱 데이터 폴더에 두고, 메모 폴더에는 넣지 않음
+function renderLlm(st, failed = '') {
+  if (!st) return;
+  const m = st.chat;
+  const have = m.state === 'ready' || m.state === 'running';
+  $('llm-note').textContent = !st.engine ? 'AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'
+    : failed || m.error || (m.state === 'copying' ? (m.progress != null ? `${DEFAULT_MODEL.label} 를 받는 중이에요 ${Math.round(m.progress * 100)}%` : '모델 파일을 복사하는 중이에요. 몇 분 걸릴 수 있어요')
+      : have ? `${m.name || '모델'} · ${(m.size / 2 ** 30).toFixed(1)}GB${m.state === 'running' ? ' · 켜져 있어요' : ''}`
+        : '메모 창 › 메뉴 › AI 글 도우미에서 써요. 아래 기본 모델을 받거나 .gguf 파일을 넣어 주세요 (메모리 8GB PC 는 2~4B)');
+  $('llm-import').disabled = !st.engine || m.state === 'copying';
+  $('llm-import').textContent = have ? '다른 모델로' : '모델 파일 넣기';
+  $('llm-remove').hidden = !have;
+  $('llm-default-row').hidden = !st.engine || m.state !== 'missing'; // 인터넷이 없는 곳은 모델 파일 넣기
+  $('llm-default').textContent = `기본 모델 받기 (${DEFAULT_MODEL.label}, ${DEFAULT_MODEL.approx}, ${DEFAULT_MODEL.license})`;
+  $('llm-try-row').hidden = !st.engine || !have;
+}
+if (api.llm) {
+  api.on('llm:status', (st) => renderLlm(st));
+  $('llm-import').addEventListener('click', async () => {
+    const st = await api.llm.importModel();
+    renderLlm(st, st?.error);
+  });
+  $('llm-remove').addEventListener('click', async () => {
+    if (!(await confirmDialog('글 모델 파일을 삭제할까요?\n다시 쓰려면 다시 넣어야 해요.', '삭제'))) return;
+    renderLlm(await api.llm.remove());
+  });
+  $('llm-default').addEventListener('click', async () => {
+    $('llm-default-row').hidden = true;
+    const st = await api.llm.downloadDefault();
+    renderLlm(st, st?.error);
+  });
+  $('llm-try').addEventListener('click', async () => {
+    const btn = $('llm-try');
+    btn.disabled = true;
+    $('llm-try-out').textContent = '모델을 올리고 묻는 중이에요…';
+    const r = await api.llm.try();
+    btn.disabled = false;
+    $('llm-try-out').textContent = r.error ? r.error : `답: ${r.text} (${r.seconds.toFixed(1)}초)`;
+  });
+} else {
+  $('llm-sec').hidden = true;
 }
 $('quick-memo').addEventListener('change', async (e) => showQuickMemo(await api.settings.setQuickMemo(e.target.checked)));
 $('auto-start').addEventListener('change', async (e) => {

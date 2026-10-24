@@ -18,6 +18,7 @@ import { pickHandoff, recentlyUpdated } from '../app/js/core/handoff.js';
 import { PopupWatcher } from './popup-watch.js';
 import { createSttService } from './stt/stt-service.js';
 import { createLayaService } from './ai/laya-service.js';
+import { createAiService } from './ai/ai-service.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, findRepeat, betterReading, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
@@ -42,7 +43,7 @@ import {
 } from './window-utils.js';
 
 import {
-  SMOKE, APP_ID, STT_WORKER, STT_VENDOR, POPUP_HELPER,
+  SMOKE, APP_ID, STT_WORKER, STT_VENDOR, LLAMA_SERVER, POPUP_HELPER,
   settings, loadSettings, saveSettings, installMark, suggestedVaultPath,
   purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings,
   TRASH_DAYS, openWebPage, openVaultFile, toast, smokeToasts, smokeOpened,
@@ -105,6 +106,7 @@ let driveSync = null;
 
 let stt = null;
 let ai = null;
+let llm = null;
 const heldLocks = new Map();
 
 let fileIndex = null;
@@ -703,6 +705,25 @@ function initAi() {
   });
 }
 
+// ---------- AI 글 도우미 (desktop/ai/ai-service.js) ----------
+
+function initLlm() {
+  llm = createAiService({
+    dir: path.join(app.getPath('userData'), 'ai'),
+    serverPath: process.env.MEMOKING_LLAMA_SERVER || LLAMA_SERVER,
+    fetch: (url) => net.fetch(url), // 기본 모델 받기 — 시스템 프록시를 따른다
+    getNames: () => settings.llm ?? {},
+    setName: (role, name) => {
+      settings.llm = { ...settings.llm, [role]: name };
+      saveSettings();
+    },
+    onStatus: (status) => {
+      const w = windowManager.listWin;
+      if (w && !w.isDestroyed()) w.webContents.send('llm:status', status);
+    },
+  });
+}
+
 function initStt() {
   stt = createSttService({
     dir: process.env.MEMOKING_STT_DIR || path.join(app.getPath('userData'), 'stt'),
@@ -1180,6 +1201,7 @@ app.whenReady().then(async () => {
   registerVaultProtocol(() => vault, () => history);
   initStt();
   initAi();
+  initLlm();
 
   calendarFeeds = new CalendarFeeds({
     dir: path.join(app.getPath('userData'), 'calendars'),
@@ -1241,6 +1263,7 @@ app.whenReady().then(async () => {
     getStt: () => stt,
     sttOptions,
     getAi: () => ai,
+    getLlm: () => llm,
     getLinkPreviews,
     openWebPage,
     openVaultFile,
@@ -1477,6 +1500,7 @@ app.on('will-quit', () => {
   flushOpmsFiles();
   stt?.close();
   ai?.close();
+  llm?.close();
   windowManager.topWatch.stop();
   globalShortcut.unregisterAll();
   windowManager.captureHelper.stop();

@@ -7,7 +7,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:dock', 'sticker:hover', 'list:on-top', 'list:crown-docked',
-  'stt:status', 'ai:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
+  'stt:status', 'ai:status', 'llm:status', 'llm:token', 'llm:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'card:trash', 'card:copied', 'edit:paste-plain', 'edit:clear-format',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
@@ -172,6 +172,16 @@ contextBridge.exposeInMainWorld('memoking', {
     status: invoke('ai:status'),
     download: invoke('ai:download'),
     remove: invoke('ai:remove'),
+  },
+  // AI 글 도우미 (PC, 인터넷 없이): 글 모델 넣기 · 지우기 · 시험 · 정리 · 고치기
+  llm: {
+    status: invoke('llm:status'),
+    importModel: invoke('llm:import'),
+    downloadDefault: invoke('llm:download-default'), // 기본 모델(core/model-catalog.js) 받기 — 진행은 llm:status 의 progress
+    remove: invoke('llm:remove'),
+    try: invoke('llm:try'),
+    write: invoke('llm:write'), // { id, task: 'tidy' | 'custom' | 'style' | 'spell' | 'draft', … } — 조각은 llm:token · llm:progress 로
+    cancel: invoke('llm:cancel'),
   },
   attachments: {
     save: invoke('attachment:save'),

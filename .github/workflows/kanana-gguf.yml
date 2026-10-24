@@ -1,0 +1,147 @@
+# AI 글 도우미 모델 만들기 — 카카오 카나나2(kakaocorp/kanana-2-1.3b · 3b-instruct)를 앱 엔진(llama.cpp, get-llama.mjs 와 같은 태그)용 GGUF 로.
+#   1) 원래 모델과 같은지: llama.cpp 가 모르는 구조(1.3B 의 Kanana2Tiny)는 qwen3 로 config 만 바꿔 두 가지로 만들고,
+#      한국어 위키 글의 PPL 이 원래 모델(transformers)과 가장 가까운 쪽을 고른다
+#   2) 한국어 글로 중요도(imatrix)를 재서 양자화 — 같은 크기의 보통 양자화보다 덜 망가진다. 크기마다 PPL · 속도를 찍는다
+#   3) 앱과 같은 묻는 말(scripts/kanana-bench.mjs)로 정리 · 고치기 · 문체 · 맞춤법 답을 찍는다
+#   결과(Artifacts "kanana-2-<크기>-gguf"): GGUF · imatrix · 카나나 라이선스 파일 · SHA-256 (로그 끝)
+name: 카나나2 GGUF (AI 글 도우미)
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kanana-gguf.yml'
+      - 'scripts/kanana-gguf.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gguf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - size: 1.3b
+            quants: Q4_K_M Q5_K_M Q6_K Q8_0
+          - size: 3b
+            quants: IQ4_XS Q4_K_M Q5_K_M
+    env:
+      LLAMA_TAG: b11400 # scripts/get-llama.mjs 와 같게
+      MODEL_REPO: kakaocorp/kanana-2-${{ matrix.size }}-instruct
+      NAME: kanana-2-${{ matrix.size }}-instruct
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 디스크 비우기 (3B 는 원본 + f16 만 16GB)
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+
+      - uses: actions/cache@v4
+        with:
+          path: lc
+          key: llama-cpp-${{ env.LLAMA_TAG }}-linux-cpu
+      - name: llama.cpp 빌드 (CPU)
+        run: |
+          [ -x lc/build/bin/llama-quantize ] && exit 0
+          git clone -q --depth 1 --branch "$LLAMA_TAG" https://github.com/ggml-org/llama.cpp lc
+          cmake -S lc -B lc/build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF > /dev/null
+          cmake --build lc/build -j4 --target llama-quantize llama-imatrix llama-server llama-perplexity llama-bench > /dev/null
+          ls lc/build/bin
+
+      - name: 도구 설치
+        run: |
+          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet "transformers>=4.57,<5" accelerate safetensors sentencepiece protobuf huggingface_hub pyarrow numpy ./lc/gguf-py
+
+      - name: 모델 받기 — 커밋 · 구조 · 라이선스
+        run: |
+          python - <<'EOF'
+          import os, glob
+          from huggingface_hub import snapshot_download, HfApi
+          repo = os.environ["MODEL_REPO"]
+          print("커밋:", HfApi().model_info(repo).sha)
+          snapshot_download(repo, local_dir="ckpt")
+          print(sorted(os.listdir("ckpt")))
+          EOF
+          cat ckpt/config.json; echo; cat ckpt/generation_config.json 2>/dev/null; echo
+          for f in ckpt/LICENSE* ckpt/NOTICE*; do [ -f "$f" ] && { echo "== $f"; head -c 6000 "$f"; echo; }; done
+
+      - name: 한국어 글 (imatrix 용 · 견주기 용)
+        run: |
+          python - <<'EOF'
+          from huggingface_hub import hf_hub_download
+          import shutil
+          shutil.copy(hf_hub_download("wikimedia/wikipedia", "20231101.ko/train-00000-of-00003.parquet", repo_type="dataset"), "wiki.parquet")
+          EOF
+          python scripts/kanana-gguf.py text wiki.parquet text
+
+      - name: GGUF(f16) 로 바꾸기
+        run: |
+          mkdir -p remap out
+          python scripts/kanana-gguf.py remap ckpt remap | tee remap.log
+          for v in $(sed -n 's/^variants: //p' remap.log); do
+            python lc/convert_hf_to_gguf.py "remap/$v" --outtype f16 --outfile "out/$v-f16.gguf"
+          done
+          rm -rf ~/.cache/huggingface/hub/models--* && ls -la out && df -h /
+
+      - name: 원래 모델과 가장 가까운 것 고르기 (한국어 PPL)
+        run: |
+          python scripts/kanana-gguf.py hf-ppl ckpt text/eval.txt 16 | tee hf.log
+          HF=$(sed -n 's/^HF PPL = //p' hf.log)
+          best=""; bestd=1e9
+          for f in out/*-f16.gguf; do
+            p=$(lc/build/bin/llama-perplexity -m "$f" -f text/eval.txt -c 512 --chunks 16 -t 4 2>&1 | sed -n 's/.*Final estimate: PPL = \([0-9.]*\).*/\1/p')
+            d=$(python -c "print(abs($p-$HF))")
+            echo "$f PPL $p (원래 $HF, 차이 $d)"
+            if python -c "import sys; sys.exit(0 if $d < $bestd else 1)"; then best=$f; bestd=$d; fi
+          done
+          echo "고름: $best"
+          echo "F16=$best" >> "$GITHUB_ENV"
+
+      - name: 중요도(imatrix) — 한국어 글로
+        run: lc/build/bin/llama-imatrix -m "$F16" -f text/calib.txt -c 512 --chunks 120 -t 4 -o imatrix.gguf 2>&1 | tail -5
+
+      - name: 양자화 — 크기 · PPL · 속도
+        run: |
+          mkdir -p release
+          for q in ${{ matrix.quants }}; do
+            f="release/$NAME-$q.gguf"
+            lc/build/bin/llama-quantize --imatrix imatrix.gguf "$F16" "$f" "$q" > /dev/null 2>&1
+            p=$(lc/build/bin/llama-perplexity -m "$f" -f text/eval.txt -c 512 --chunks 16 -t 4 2>&1 | sed -n 's/.*Final estimate: PPL = \([0-9.]*\).*/\1/p')
+            s=$(lc/build/bin/llama-bench -m "$f" -p 256 -n 64 -t 4 -o csv 2>/dev/null | python -c "import csv,sys; r=list(csv.DictReader(sys.stdin)); print(' / '.join(f\"{x['n_prompt'] if x['n_prompt']!='0' else 'gen'}:{float(x['avg_ts']):.1f}t/s\" for x in r))")
+            echo "$q  $(du -m "$f" | cut -f1)MB  PPL $p  $s"
+          done | tee quant.log
+
+      - name: 앱과 같은 묻는 말로 답 보기 (Q4_K_M)
+        run: |
+          lc/build/bin/llama-server -m "release/$NAME-Q4_K_M.gguf" --port 8080 -c 4096 -np 1 -t 4 --no-webui > server.log 2>&1 &
+          for i in $(seq 120); do curl -sf localhost:8080/health > /dev/null && break; sleep 1; done
+          node scripts/kanana-bench.mjs http://127.0.0.1:8080 "$NAME Q4_K_M"
+          kill %1
+
+      - name: 라이선스 파일 · SHA-256
+        run: |
+          cp ckpt/LICENSE* ckpt/NOTICE* release/ 2>/dev/null || true
+          cp imatrix.gguf "release/$NAME-imatrix.gguf"
+          cat > release/README.md <<EOF
+          # $NAME GGUF (Powered by Kanana)
+          원본: https://huggingface.co/$MODEL_REPO (카카오, 라이선스는 함께 든 LICENSE)
+          바꾼 것: llama.cpp $LLAMA_TAG 의 GGUF 로 바꾸고(구조 이름 qwen3), 한국어 글로 잰 imatrix 로 양자화함. 가중치를 새로 학습하지 않음.
+          EOF
+          cat quant.log
+          cd release && sha256sum * && ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kanana-2-${{ matrix.size }}-gguf
+          path: release/
+          retention-days: 30
+          compression-level: 0
