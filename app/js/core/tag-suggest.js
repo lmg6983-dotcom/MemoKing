@@ -224,3 +224,12 @@ export function appendTags(body, names) {
   }
   return `${text}\n\n${tags.join(' ')}\n`;
 }
+
+/** 태그만 있는 줄(appendTags 가 붙인 줄)에서 그 태그들을 뺀 새 본문 — 빈 줄이 되면 그 줄도 (AI 태그 모두 지우기) */
+export function removeTags(body, names) {
+  const drop = new Set(names.map((n) => n.toLocaleLowerCase('ko')));
+  const lines = String(body ?? '').split('\n').map((line) => (/^(\s*#[^\s#]+)+\s*$/u.test(line)
+    ? line.trim().split(/\s+/).filter((t) => !drop.has(t.slice(1).toLocaleLowerCase('ko'))).join(' ')
+    : line));
+  return `${lines.join('\n').replace(/\s+$/, '')}\n`;
+}

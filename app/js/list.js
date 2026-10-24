@@ -1072,6 +1072,14 @@ function renderAi(st, failed = {}) {
   $('ai-default-row').hidden = !st.engine || !(st.chat.state === 'missing' || old);
   $('ai-default').textContent = `${old ? '기본 모델로 바꾸기' : '기본 모델 받기'} (${DEFAULT_MODEL.label}, ${DEFAULT_MODEL.approx}, ${DEFAULT_MODEL.license})`;
   $('ai-try-row').hidden = !st.engine || !['ready', 'running'].includes(st.chat.state);
+  $('ai-tags-row').hidden = $('ai-try-row').hidden;
+}
+// AI 태그: 모든 메모에 달기 ⇄ 멈추기, 진행은 메인이 'ai:tagging' 으로 ({ done, total } · { error } · null = 끝)
+const AI_TAGS_NOTE = $('ai-tags-note').textContent;
+function renderAiTagging(p) {
+  const on = Boolean(p && !p.error);
+  $('ai-tags-note').textContent = p?.error ?? (on ? `AI 태그를 다는 중이에요 ${p.done} / ${p.total}` : AI_TAGS_NOTE);
+  $('ai-tags-all').textContent = on ? '멈추기' : '모든 메모에 달기';
 }
 if (api.ai) {
   api.on('ai:status', (st) => renderAi(st));
@@ -1089,6 +1097,18 @@ if (api.ai) {
     $('ai-default-row').hidden = true;
     const st = await api.ai.downloadDefault();
     renderAi(st, st?.error ? { chat: st.error } : {});
+  });
+  api.on('ai:tagging', renderAiTagging);
+  api.tags.aiStatus().then(renderAiTagging);
+  $('ai-tags-all').addEventListener('click', async () => {
+    if ($('ai-tags-all').textContent === '멈추기') return api.tags.aiStop();
+    const p = await api.tags.aiAll();
+    if (!p?.total) $('ai-tags-note').textContent = '모든 메모를 이미 봤어요';
+  });
+  $('ai-tags-clear').addEventListener('click', async () => {
+    if (!(await confirmDialog('AI 가 단 태그를 모든 메모에서 지울까요?\n지운 메모에는 AI 태그를 다시 달지 않아요. 직접 단 태그는 그대로예요.', '지우기'))) return;
+    const n = await api.tags.aiClear();
+    $('ai-tags-note').textContent = n ? `메모 ${n}개에서 AI 태그를 지웠어요` : '지울 AI 태그가 없어요';
   });
   $('ai-try').addEventListener('click', async () => {
     const btn = $('ai-try');

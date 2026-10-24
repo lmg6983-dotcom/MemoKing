@@ -5,9 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
-import { suggestTagsFor, appendTags } from '../app/js/core/tag-suggest.js';
-import { extractTags } from '../app/js/core/tags.js';
-import { createAiTasks } from '../app/js/core/ai-tasks.js';
+import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
@@ -85,6 +83,8 @@ export function registerIpc(ctx) {
     getStt,
     sttOptions,
     getAi,
+    getAiTasks: aiTasks,
+    getAiTagger,
     getLinkPreviews,
     openWebPage,
     openVaultFile,
@@ -118,13 +118,6 @@ export function registerIpc(ctx) {
   });
   // 글 도우미 · AI 검색 (core/ai-tasks.js — 휴대폰과 같은 흐름). 조각은 ai:token, 진행은 ai:progress 로 보낸 창에
   const aiJobs = new Map(); // 보낸 창:작업 → 멈추기
-  let tasks = null;
-  const aiTasks = () => (tasks ??= createAiTasks({
-    ai: getAi(),
-    memos: () => getVault()?.bodies() ?? [],
-    graph: () => getVault()?.index?.memos ?? [],
-    store: getAi().rag,
-  }));
   async function aiJob(e, id, run) {
     const key = `${e.sender.id}:${id}`;
     const ctrl = new AbortController();
@@ -273,18 +266,16 @@ export function registerIpc(ctx) {
       return { error: err.message };
     }
   });
-  // 메모 창을 닫은 뒤: 태그 없는 메모에 AI 가 고른 태그 하나를 저절로 (설정 › 태그 자동 추가).
-  //   모델을 올리는 몇 초 동안 창이 안 닫히면 안 되므로 창은 먼저 닫고 여기서 이어서 한다
-  ipcMain.handle('tags:ai-auto', async (_e, id) => {
-    const vault = getVault();
-    const memo = vault?.get(id);
-    if (!memo || memo.locked || settings.autoTags === false || extractTags(memo.body).length) return null;
-    const name = await aiTasks().autoTag(memo.body, id);
-    const now = vault.get(id);
-    if (!name || now?.body !== memo.body) return null; // 그사이 다시 열어 고쳤으면 건드리지 않는다
-    vault.save(id, appendTags(now.body, [name]));
-    return name;
+  // 메모 창을 닫은 뒤: AI 가 고른 태그를 사용자 태그와 합쳐 3개까지 (설정 › 태그 자동 추가, ai/ai-tagger.js).
+  //   모델을 올리는 몇 초 동안 창이 안 닫히면 안 되므로 창은 먼저 닫고 뒤에서 한다
+  ipcMain.handle('tags:ai-auto', (_e, id) => {
+    getAiTagger()?.add([String(id)]);
   });
+  // 설정 › AI 도우미: 아직 보지 않은 모든 메모에 AI 태그 · 멈추기 · AI 태그 모두 지우기
+  ipcMain.handle('tags:ai-all', () => getAiTagger()?.all());
+  ipcMain.handle('tags:ai-stop', () => getAiTagger()?.stop());
+  ipcMain.handle('tags:ai-clear', () => getAiTagger()?.clearAll() ?? 0);
+  ipcMain.handle('tags:ai-status', () => getAiTagger()?.status() ?? null);
   ipcMain.handle('tags:auto', (_e, body, source, id) => autoTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { source, excludeId: id }));
   ipcMain.handle('memos:search', (_e, query, excludeId) => wm.withOpenFlag(getVault()?.search(String(query ?? ''), excludeId) ?? []));
 
@@ -764,6 +755,7 @@ export function registerIpc(ctx) {
       alarms.tick();
     }
     const when = saved ? `\n알림: ${describeReminder(saved[0])}` : '';
+    getAiTagger()?.add([id]); // 연 메모는 닫을 때
     if (payload.open) wm.openNote(id);
     else {
       const showNow = () => wm.openNote(id, { inactive: true });
