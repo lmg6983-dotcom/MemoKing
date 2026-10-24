@@ -27,3 +27,4 @@
 | docx-preview | 0.4.1 | Apache-2.0 | https://github.com/VolodymyrBaydalka/docxjs |
 | hwp.js | 0.0.3 | Apache-2.0 | https://github.com/hahnlee/hwp.js |
 | jszip | 3.10.1 | (MIT OR GPL-3.0-or-later) | https://github.com/Stuk/jszip |
+| laya-ts (NandhaKishorM/laya `0a05a45`) | 0.1.0 | Apache-2.0 | https://github.com/NandhaKishorM/laya — npm 에 없어 `laya-ts/src` 를 esbuild 로 직접 묶음 (app/vendor/laya.js) |

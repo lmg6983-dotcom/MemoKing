@@ -1,0 +1,99 @@
+# AI 태그 모델 만들기 — Laya 다국어(convaiinnovations/laya-multilingual, Apache-2.0)를 고정한 커밋에서 받아
+#   ONNX(encoder · head)로 바꾸고 8비트로 줄인 뒤, 한국어 태그 시험(scripts/laya-bench.mjs)을 돌린다.
+#   결과는 실행 결과(Artifacts)의 "laya-multilingual-int8" — 앱이 받는 파일 (SHA-256 은 로그 끝에)
+name: Laya 모델 (AI 태그)
+
+on:
+  push:
+    paths:
+      - '.github/workflows/laya-model.yml'
+      - 'scripts/laya-bench.mjs'
+      - 'scripts/laya-bench/**'
+      - 'app/js/core/laya-*.js'
+      - 'app/vendor/laya.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      LAYA_COMMIT: 0a05a45052e23ae0b887a490fe8d6d9c8cff2ab5 # app/vendor/laya.js 와 같은 커밋
+      MODEL_REPO: convaiinnovations/laya-multilingual
+      MODEL_REV: e4e9ddf21a7b1903b7acffd8814ad4307bf63a67 # laya-ts PINNED_REVISIONS
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 도구 설치 (CPU 용 PyTorch · laya · ONNX)
+        run: |
+          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet "laya @ git+https://github.com/NandhaKishorM/laya.git@${LAYA_COMMIT}" onnx onnxscript onnxruntime huggingface_hub
+          git init -q laya-src && git -C laya-src fetch -q --depth 1 https://github.com/NandhaKishorM/laya.git "${LAYA_COMMIT}" && git -C laya-src checkout -q FETCH_HEAD
+          npm install --no-save --no-audit --no-fund onnxruntime-node@1.30.0
+
+      - name: 모델 받기 (고정 커밋)
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import snapshot_download
+          path = snapshot_download(os.environ["MODEL_REPO"], revision=os.environ["MODEL_REV"], local_dir="ckpt",
+              allow_patterns=["rl_agent_config.json", "model.safetensors", "config.json", "tokenizer.json", "tokenizer/*", "encoder/*"])
+          print(path, sorted(os.listdir(path)))
+          EOF
+
+      - name: ONNX 로 바꾸기 (torch 와 1e-4 안에서 같은지 확인)
+        run: python laya-src/laya-ts/scripts/export_onnx.py --model-dir ckpt --out-dir out/fp32
+
+      - name: 8비트로 줄이기
+        run: |
+          mkdir -p out/int8
+          python - <<'EOF'
+          from onnxruntime.quantization import quantize_dynamic, QuantType
+          # 낱말 표(Gather)가 대부분이라 그것까지 — MatMul 은 계산, Gather 는 크기
+          quantize_dynamic("out/fp32/encoder.onnx", "out/int8/encoder.onnx", weight_type=QuantType.QInt8, op_types_to_quantize=["MatMul", "Gather"])
+          quantize_dynamic("out/fp32/head.onnx", "out/int8/head.onnx", weight_type=QuantType.QInt8, op_types_to_quantize=["MatMul"])
+          EOF
+          cp out/fp32/tokenizer.json out/fp32/rl_agent_config.json out/int8/
+          ls -la out/fp32 out/int8
+
+      - name: 한국어 태그 시험 — 원래 크기
+        run: node scripts/laya-bench.mjs out/fp32 --dump fp32.json
+      - name: 한국어 태그 시험 — 8비트 (앱이 받는 것)
+        run: node scripts/laya-bench.mjs out/int8 --dump int8.json
+
+      - name: 앱(JS)의 답이 laya(Python)와 같은지
+        run: |
+          python - <<'EOF'
+          import json, laya
+          agent = laya.load("ckpt", device="cpu")
+          same = 0
+          cases = json.load(open("fp32.json"))
+          for c in cases:
+              r = agent.system_one(c["state"], c["questions"])
+              py = r["answers"]["tag"]["choice"]
+              js = c["js"][0]["name"]
+              same += py == js
+              if py != js: print("다름:", c["state"].split("\n")[0], "python", py, "js", js)
+          q = json.load(open("int8.json"))
+          kept = sum(a["js"][0]["name"] == b["js"][0]["name"] for a, b in zip(cases, q))
+          print(f"Python 과 같은 답 {same}/{len(cases)} · 8비트가 원래와 같은 답 {kept}/{len(cases)}")
+          assert same == len(cases), "앱의 계산이 laya 와 달라요"
+          EOF
+
+      - name: 앱이 받을 파일 SHA-256
+        run: cd out/int8 && sha256sum * && ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: laya-multilingual-int8
+          path: out/int8/
+          retention-days: 30
