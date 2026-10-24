@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { tagQuestion, rankedTags, withLaya, pickTags, blend } from '../app/js/core/laya-tags.js';
+import { tagQuestion, rankedTags, withLaya, pickTags, blend, pairQuestions, togetherFrom, togetherInVault } from '../app/js/core/laya-tags.js';
 import { createLayaService } from '../desktop/ai/laya-service.js';
 
 const memo = (id, title, tags, updated = '2026-10-01') => ({ id, updated, body: `# ${title}\n\n${tags.map((t) => `#${t}`).join(' ')}\n` });
@@ -41,6 +41,15 @@ test('Laya 확률과 AI 없는 추천 점수 섞기', () => {
   const q = tagQuestion('# 스탠드업\n\n어제 한 일 공유, 배포 일정 확인', vault);
   assert.ok(q.scores instanceof Map);
   assert.equal(tagQuestion('# 스탠드업\n\n어제 한 일 공유, 배포 일정 확인', vault, { limit: 1 }).candidates.length, 1);
+});
+
+test('함께 못 가는 태그는 둘째 · 셋째로 고르지 않음', () => {
+  const ranked = ['장보기', '보고서', '요리', '가계부'].map((name, i) => ({ name, p: 1 - i / 10 }));
+  const q = pairQuestions(['장보기', '보고서', '요리']);
+  assert.equal(Object.keys(q).length, 3);
+  const together = togetherFrom(Object.fromEntries(Object.keys(q).map((k) => [k, { noul: k.includes('보고서') ? 0.1 : 0.9 }])));
+  assert.deepEqual(pickTags(ranked, together), ['장보기', '요리', '가계부']); // 가계부는 물어보지 않은 짝 — 함께 갈 수 있는 것으로
+  assert.deepEqual(pickTags(ranked, togetherInVault(vault)), ['장보기']);
 });
 
 test('AI 태그 모델 받기: 파일마다 SHA-256 이 맞아야 넣고, 맞지 않으면 아무것도 남기지 않음', async () => {
