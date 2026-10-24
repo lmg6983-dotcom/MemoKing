@@ -239,7 +239,7 @@ const sync = {
   sttStatus: () => ({ system: fakeStt.system, speakerSupported: true, speaker: fakeStt.speaker, speakerOn: fakeStt.speakerOn, speakerSize: '약 28MB' }),
   // 로컬 AI (LocalAi.kt 흉내) — 아래 fakeAi
   aiStatus: () => {
-    const one = (role) => ({ state: fakeAi[role] ? 'ready' : 'missing', name: fakeAi[role], size: fakeAi[role] ? 1.2e9 : 0, error: '' });
+    const one = (role) => ({ state: fakeAi[role] ? 'ready' : 'missing', name: fakeAi[role], size: fakeAi[role] ? 1.2e9 : 0, error: '', format: fakeAi[role] ? (fakeAi[role].endsWith('.litertlm') ? 'litertlm' : 'gguf') : '' });
     return { engine: true, chat: one('chat'), embed: one('embed') };
   },
   aiCancel: () => null,
@@ -479,7 +479,7 @@ const calls = {
   http: async ({ url, accept = '*/*', limit = 5 * 1024 * 1024, save = false }) => {
     // 기본 모델 목록(Hugging Face) 흉내 — 받기는 아래 aiDownload 가 흉내 낸다
     if (url.startsWith('https://huggingface.co/api/models/')) {
-      const list = { sha: 'dev', siblings: [{ rfilename: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf', lfs: { sha256: 'd'.repeat(64), size: 2_700_000_000 } }] };
+      const list = { sha: 'dev', siblings: [{ rfilename: 'gemma-4-E2B-it.litertlm', lfs: { sha256: 'd'.repeat(64), size: 2_588_147_712 } }] };
       return { status: 200, url, type: 'application/json', latin1: Buffer.from(JSON.stringify(list)).toString('latin1') };
     }
     const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) MemoKing-dev' }, redirect: 'follow' });

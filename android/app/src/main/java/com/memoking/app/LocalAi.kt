@@ -19,7 +19,8 @@ import java.util.concurrent.TimeUnit
  * 로컬 AI (휴대폰) — llama.cpp 의 llama-server 를 앱 안에서 띄워 이 휴대폰에서만 모델을 돌린다 (인터넷 없이).
  *   PC desktop/ai/ai-service.js 와 같은 일: 모델 파일(.gguf) 넣기 · 지우기, 쓸 때만 띄우고 5분 쉬면 끄기, 127.0.0.1 + 실행마다 새 키.
  *   묻는 말 · 답 풀기는 화면(android/web/js/local-ai.js → app/js/core/llama-client.js)이 PC 와 같은 코드로 한다. 여기는 길만.
- *   엔진은 APK 의 libllama-server.so (app/build.gradle.kts 의 llamaServer) — arm64 휴대폰만
+ *   엔진은 APK 의 libllama-server.so (app/build.gradle.kts 의 llamaServer) — arm64 휴대폰만.
+ *   글 모델이 .litertlm 이면 llama-server 대신 구글 LiteRT-LM(GPU, LiteRtChat.kt) — 휴대폰에서는 이쪽이 훨씬 빠르다
  */
 object LocalAi {
     val ROLES = mapOf("chat" to "글 모델", "embed" to "검색 모델")
@@ -37,13 +38,16 @@ object LocalAi {
     private val copying: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val jobs = ConcurrentHashMap<String, HttpURLConnection>()
     private val timer = Executors.newSingleThreadScheduledExecutor()
+    @Volatile private var lite: LiteRtChat? = null
+    private var liteIdle: ScheduledFuture<*>? = null
 
     /** 상태가 바뀌면 (화면에 알림) */
     @Volatile var listener: (() -> Unit)? = null
 
     private fun exe(ctx: Context) = File(ctx.applicationInfo.nativeLibraryDir, "libllama-server.so")
     private fun dir(ctx: Context) = File(ctx.filesDir, "ai").apply { mkdirs() }
-    private fun model(ctx: Context, role: String) = File(dir(ctx), "$role.gguf")
+    private fun model(ctx: Context, role: String) = File(dir(ctx), "$role.litertlm").takeIf { it.isFile } ?: File(dir(ctx), "$role.gguf")
+    private fun isLite(f: File) = f.name.endsWith(".litertlm")
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("local-ai", Context.MODE_PRIVATE)
     private fun changed() = listener?.invoke()
 
@@ -54,11 +58,11 @@ object LocalAi {
             val state = when {
                 role in copying -> "copying"
                 size == 0L -> "missing"
-                servers.containsKey(role) -> "running"
+                servers.containsKey(role) || (role == "chat" && lite != null) -> "running"
                 else -> "ready"
             }
             return JSONObject().put("state", state).put("name", if (size > 0) prefs(ctx).getString(role, "") else "")
-                .put("size", size).put("error", errors[role] ?: "")
+                .put("size", size).put("error", errors[role] ?: "").put("format", if (size == 0L) "" else if (isLite(f)) "litertlm" else "gguf")
         }
         return JSONObject().put("engine", exe(ctx).isFile).put("chat", one("chat")).put("embed", one("embed"))
     }
@@ -90,7 +94,7 @@ object LocalAi {
         check(copying.add(role)) { "이미 넣는 중이에요" }
         errors.remove(role)
         changed()
-        val part = File(dir(ctx), "$role.gguf.part")
+        val part = File(dir(ctx), "$role.part")
         try {
             val digest = java.security.MessageDigest.getInstance("SHA-256")
             open().use { i ->
@@ -109,11 +113,16 @@ object LocalAi {
                     }
                 }
             }
-            val head = ByteArray(4).also { h -> part.inputStream().use { it.read(h) } }
-            require(String(head, Charsets.ISO_8859_1) == "GGUF") { "모델 파일(.gguf)이 아니에요" }
+            val head = String(ByteArray(8).also { h -> part.inputStream().use { it.read(h) } }, Charsets.ISO_8859_1)
+            val ext = when {
+                head.startsWith("GGUF") -> "gguf"
+                head == LiteRtChat.MAGIC && role == "chat" -> "litertlm"
+                else -> throw IllegalArgumentException(if (role == "chat") "모델 파일(.litertlm · .gguf)이 아니에요" else "모델 파일(.gguf)이 아니에요")
+            }
             if (sha256 != null) check(digest.digest().joinToString("") { "%02x".format(it) } == sha256) { "받은 파일이 맞지 않아요. 다시 받아 주세요" }
             stop(role)
-            check(part.renameTo(model(ctx, role))) { "모델 파일을 바꿔 넣지 못했어요" }
+            model(ctx, role).delete() // 다른 형식의 예전 모델
+            check(part.renameTo(File(dir(ctx), "$role.$ext"))) { "모델 파일을 바꿔 넣지 못했어요" }
             prefs(ctx).edit().putString(role, name).apply()
         } catch (e: Exception) {
             part.delete()
@@ -132,7 +141,8 @@ object LocalAi {
 
     fun remove(ctx: Context, role: String): JSONObject {
         stop(role)
-        model(ctx, role).delete()
+        File(dir(ctx), "$role.litertlm").delete()
+        File(dir(ctx), "$role.gguf").delete()
         prefs(ctx).edit().remove(role).apply()
         errors.remove(role)
         changed()
@@ -206,6 +216,7 @@ object LocalAi {
     }
 
     private fun stop(role: String) {
+        if (role == "chat") stopLite()
         val s = servers.remove(role) ?: return
         s.stopping = true
         s.idle?.cancel(false)
@@ -220,6 +231,7 @@ object LocalAi {
      */
     fun request(ctx: Context, role: String, route: String, body: String, job: String?, onLine: ((String) -> Unit)?): String? {
         require(role in ROLES) { "모르는 모델이에요" }
+        if (role == "chat" && isLite(model(ctx, role))) return requestLite(ctx, body, job, onLine)
         val s = server(ctx, role)
         s.idle?.cancel(false)
         val c = URL("http://127.0.0.1:${s.port}$route").openConnection() as HttpURLConnection
@@ -249,7 +261,47 @@ object LocalAi {
     }
 
     fun cancel(job: String) {
+        if (lite?.cancel(job) == true) return
         jobs.remove(job)?.disconnect()
+    }
+
+    // ---------- LiteRT-LM (.litertlm 글 모델) ----------
+
+    @Synchronized
+    private fun liteChat(ctx: Context): LiteRtChat {
+        lite?.let { return it }
+        val l = try {
+            LiteRtChat(ctx, model(ctx, "chat"))
+        } catch (e: Throwable) { // 깨진 파일 · 메모리 부족 · 이 엔진이 모르는 파일
+            android.util.Log.w("MemoKing", "LiteRT 못 올림", e)
+            errors["chat"] = if (e is OutOfMemoryError || e.message?.contains("memory", true) == true) "메모리가 모자라요. 다른 앱을 닫아 주세요"
+                else "모델을 올리지 못했어요. 파일이 깨졌거나 이 앱의 엔진보다 새 모델이에요. 기본 모델을 다시 받아 주세요"
+            changed()
+            throw IllegalStateException(errors["chat"])
+        }
+        errors.remove("chat")
+        lite = l
+        changed()
+        return l
+    }
+
+    private fun requestLite(ctx: Context, body: String, job: String?, onLine: ((String) -> Unit)?): String? {
+        val l = liteChat(ctx)
+        synchronized(this) { liteIdle?.cancel(false) }
+        try {
+            return l.request(body, job, onLine)
+        } finally {
+            synchronized(this) { liteIdle = timer.schedule(Runnable { stopLite() }, IDLE_MS, TimeUnit.MILLISECONDS) }
+        }
+    }
+
+    @Synchronized
+    private fun stopLite() {
+        liteIdle?.cancel(false)
+        val l = lite ?: return
+        lite = null
+        l.close()
+        changed()
     }
 
     /** AI 검색용 조각 · 벡터 (이 휴대폰에만 — 메모 폴더에는 넣지 않음) */

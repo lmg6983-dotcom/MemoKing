@@ -44,7 +44,7 @@ import { workHours, saveWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
 import { hasRememberedChoices, forgetChoices } from '../../app/js/rename-content.js';
 import { aiSupported, aiStatus, aiApi, chatReady } from './local-ai.js';
-import { DEFAULT_MODEL, modelInfoUrl, pickModelFile } from '../../app/js/core/model-catalog.js';
+import { PHONE_MODEL, modelInfoUrl, pickModelFile } from '../../app/js/core/model-catalog.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -965,9 +965,9 @@ function openSettings() {
 }
 
 // ---------- AI 도우미 (LocalAi.kt — 인터넷 없이 이 휴대폰 안에서, PC 설정과 같은 것) ----------
-// 모델 파일(.gguf)은 사용자가 넣는다 (USB · 내려받기 폴더). 앱 안 저장공간에 복사되고, 메모 폴더 · 백업에는 넣지 않음
+// 모델 파일(.litertlm · .gguf)은 사용자가 넣는다 (USB · 내려받기 폴더). 앱 안 저장공간에 복사되고, 메모 폴더 · 백업에는 넣지 않음
 const AI_HINT = {
-  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 아래 기본 모델을 받거나 .gguf 파일을 넣어 주세요 (휴대폰은 1~3GB, 카나나2 등도 돼요)',
+  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 아래 기본 모델을 받거나 .litertlm · .gguf 파일을 넣어 주세요 (.litertlm 이 휴대폰에서 훨씬 빨라요)',
   embed: '내 메모에서 AI 로 찾을 때 써요 (예: KURE-v1 .gguf)',
 };
 function renderAi(st = aiStatus(), failed = {}, progress = null) {
@@ -983,9 +983,10 @@ function renderAi(st = aiStatus(), failed = {}, progress = null) {
     $(`ai-${role}-import`).textContent = have ? '다른 모델로' : '모델 파일 넣기';
     $(`ai-${role}-more`).hidden = !have || !st.engine;
   }
-  // 기본 모델: 글 모델이 없을 때 한 번 받기 (인터넷이 없는 곳은 모델 파일 넣기)
-  $('ai-default-row').hidden = !st.engine || st.chat.state !== 'missing';
-  $('ai-default').textContent = `기본 모델 받기 (${DEFAULT_MODEL.label}, ${DEFAULT_MODEL.approx}, ${DEFAULT_MODEL.license})`;
+  // 기본 모델: 글 모델이 없거나 느린 .gguf 일 때 한 번 받기 (인터넷이 없는 곳은 모델 파일 넣기)
+  const slow = st.chat.format === 'gguf';
+  $('ai-default-row').hidden = !st.engine || (st.chat.state !== 'missing' && !slow);
+  $('ai-default').textContent = `${slow ? '빠른 기본 모델로 바꾸기' : '기본 모델 받기'} (${PHONE_MODEL.label}, ${PHONE_MODEL.approx}, ${PHONE_MODEL.license})`;
   $('auto-tags-note').textContent = chatReady() ? '태그 없는 메모를 닫을 때 AI 가 고른 태그 하나를 달아요' : '태그 없는 메모를 닫을 때 확실한 태그만 달아요';
 }
 if (aiSupported) {
@@ -1008,11 +1009,11 @@ if (aiSupported) {
   $('ai-default').addEventListener('click', async () => {
     $('ai-default-row').hidden = true;
     try {
-      const res = await call('http', { url: modelInfoUrl(DEFAULT_MODEL), accept: 'application/json', limit: 4 * 1024 * 1024, timeout: 20_000 });
+      const res = await call('http', { url: modelInfoUrl(PHONE_MODEL), accept: 'application/json', limit: 4 * 1024 * 1024, timeout: 20_000 });
       if (res.status !== 200) throw new Error(`모델 목록을 받지 못했어요 (${res.status}). 인터넷을 확인하고 다시 눌러 주세요`);
       const json = new TextDecoder().decode(Uint8Array.from(res.latin1, (ch) => ch.charCodeAt(0)));
-      const f = pickModelFile(DEFAULT_MODEL, JSON.parse(json));
-      renderAi(await call('aiDownload', { role: DEFAULT_MODEL.role, ...f }));
+      const f = pickModelFile(PHONE_MODEL, JSON.parse(json));
+      renderAi(await call('aiDownload', { role: PHONE_MODEL.role, ...f }));
     } catch (err) {
       renderAi(aiStatus(), { chat: /fetch|network|connect|resolve|timeout/i.test(err.message) ? '인터넷에 연결하지 못했어요. 인터넷이 될 때 다시 누르거나, 모델 파일을 직접 넣어 주세요' : err.message });
     }

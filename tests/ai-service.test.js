@@ -99,6 +99,15 @@ test('기본 모델: 목록에서 본 파일만 (보조 파일 빼고), 커밋 �
   assert.throws(() => pickModelFile(DEFAULT_MODEL, { siblings: [{ rfilename: 'x-UD-Q4_K_XL.gguf' }] }), /찾지 못했어요/);
 });
 
+test('휴대폰 기본 모델: LiteRT-LM 파일을 엔진에 맞는 커밋으로 고정해서', async () => {
+  const { PHONE_MODEL, modelInfoUrl, pickModelFile } = await import('../app/js/core/model-catalog.js');
+  const rev = '7fa1d78473894f7e736a21d920c3aa80f950c0db';
+  assert.equal(modelInfoUrl(PHONE_MODEL), `https://huggingface.co/api/models/litert-community/gemma-4-E2B-it-litert-lm/revision/${rev}?blobs=true`);
+  const sha = 'b'.repeat(64);
+  const info = { sha: rev, siblings: [{ rfilename: 'gemma-4-E2B-it-web.task', lfs: { sha256: sha, size: 1 } }, { rfilename: 'gemma-4-E2B-it.litertlm', lfs: { sha256: sha, size: 2_588_147_712 } }] };
+  assert.equal(pickModelFile(PHONE_MODEL, info).url, `https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/${rev}/gemma-4-E2B-it.litertlm`);
+});
+
 test('기본 모델 받기: 해시가 맞을 때만 넣고, 틀리면 버린다', async () => {
   const { createHash } = await import('node:crypto');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-ai-dl-'));

@@ -10,8 +10,17 @@ export const DEFAULT_MODEL = {
   license: 'Apache 2.0',
 };
 
+/** 휴대폰 기본 모델 — 같은 젬마4 E2B 를 구글 LiteRT-LM(GPU) 형식으로. llama.cpp(CPU)는 휴대폰에서 너무 느리다 (LocalAi.kt 의 LiteRtChat)
+ *    revision: 앱의 LiteRT-LM 버전과 맞는 파일로 고정 (구글 AI Edge Gallery 가 같은 엔진 0.18.0 으로 쓰는 커밋 — 새 파일은 새 엔진에서만 열릴 수 있다) */
+export const PHONE_MODEL = {
+  ...DEFAULT_MODEL,
+  repo: 'litert-community/gemma-4-E2B-it-litert-lm',
+  revision: '7fa1d78473894f7e736a21d920c3aa80f950c0db',
+  file: /^gemma-4-E2B-it\.litertlm$/,
+};
+
 /** 저장소의 파일 목록 (파일마다 크기 · SHA-256) */
-export const modelInfoUrl = (m) => `https://huggingface.co/api/models/${m.repo}?blobs=true`;
+export const modelInfoUrl = (m) => `https://huggingface.co/api/models/${m.repo}${m.revision ? `/revision/${m.revision}` : ''}?blobs=true`;
 
 /** 목록 → 받을 것 { name, url, size, sha256 } — 보조 파일(mtp 초안 · mmproj 그림)은 빼고, 목록을 받은 그 커밋으로 고정 */
 export function pickModelFile(m, info) {

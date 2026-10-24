@@ -660,7 +660,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // 로컬 AI 모델 파일 고르기 (설정 › AI 도우미) — USB · 내려받기 폴더의 .gguf 를 LocalAi 가 앱 안으로 복사
+    // 로컬 AI 모델 파일 고르기 (설정 › AI 도우미) — USB · 내려받기 폴더의 .litertlm · .gguf 를 LocalAi 가 앱 안으로 복사
     private var pendingAiRole = ""
     fun pickModel(id: Int, role: String) {
         pendingAiRole = role

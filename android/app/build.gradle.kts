@@ -156,6 +156,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += "-Xskip-metadata-version-check" // LiteRT-LM 은 더 새 Kotlin 으로 만들어져 있다 (쓰는 API 는 평범한 클래스 · 함수)
     }
     buildFeatures {
         buildConfig = true
@@ -167,6 +168,8 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.3.0")
     // 화자 구분: 목소리 특징 엔진 (위에서 받은 AAR)
     implementation(files(sherpaAar))
+    // 로컬 AI 글 모델 (.litertlm) — 구글 LiteRT-LM, 휴대폰 GPU 로 (LiteRtChat.kt). 0.18.0: 구글 AI Edge Gallery 와 같은 버전 (model-catalog.js 의 PHONE_MODEL 커밋과 짝)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
 
 
     // 동기화 엔진 단위 테스트 (PC 에서 JVM 으로)
