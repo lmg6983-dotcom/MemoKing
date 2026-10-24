@@ -1708,6 +1708,21 @@ export async function runSmoke({
       check('AI 비서 연결: 끊으면 메모킹만 빠짐', removed && JSON.parse(fs.readFileSync(cfg, 'utf8')).mcpServers.other?.command === 'x');
       delete process.env.MEMOKING_CLAUDE_CONFIG;
     }
+    // 문제 보내기: 화면에서 난 오류가 이 PC 의 기록에 남고, 누르면 그 기록을 붙인 새 메일 (smoke 에서는 열지 않고 주소만)
+    {
+      await js(lw, `console.error('스모크 화면 오류 기록')`);
+      const logged = await until(() => {
+        try {
+          return fs.readFileSync(path.join(app.getPath('userData'), 'logs', 'memoking.log'), 'utf8').includes('스모크 화면 오류 기록');
+        } catch {
+          return false;
+        }
+      }, '오류 기록', 3000).catch(() => false);
+      const before = smokeOpened.length;
+      await js(lw, `document.getElementById('report-btn').click()`);
+      const mail = await until(() => smokeOpened.slice(before).find((o) => o.kind === 'mail'), '문제 보내기', 3000).catch(() => null);
+      check('문제 보내기: 화면 오류가 기록에 남고, 누르면 그 기록을 붙인 새 메일', logged && Boolean(mail) && decodeURIComponent(mail.target).includes('스모크 화면 오류 기록'), JSON.stringify({ logged, mail: mail?.target?.slice(0, 80) }));
+    }
     await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight / 2 - 120; })()`);
     await capture(lw, 'smoke-settings-2.png');
     await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight; })()`);
@@ -1745,7 +1760,8 @@ export async function runSmoke({
     }
 
     // 점검용 웹 서버의 "없는 사진"을 화면이 불러오다 생기는 네트워크 오류는 예상된 것
-    const unexpected = errors.filter((m) => !/^Failed to load resource: the server responded with a status of 404/.test(m));
+    // "스모크 화면 오류 기록" 은 문제 보내기 점검이 일부러 남긴 것
+    const unexpected = errors.filter((m) => !/^Failed to load resource: the server responded with a status of 404/.test(m) && !m.includes('스모크 화면 오류 기록'));
     check('콘솔 오류 없음', unexpected.length === 0, unexpected.join(' / '));
     exitCode = checks.every((c) => c.ok) ? 0 : 1;
   } catch (err) {

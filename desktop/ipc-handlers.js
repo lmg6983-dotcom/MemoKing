@@ -43,6 +43,7 @@ export function registerIpc(ctx) {
     openVault,
     vaultInfo,
     retryMissingVault,
+    reportProblem,
     whatsNew,
     suggestedVaultPath,
     appSettings,
@@ -234,6 +235,7 @@ export function registerIpc(ctx) {
     return info;
   });
   ipcMain.handle('vault:retry', () => retryMissingVault());
+  ipcMain.handle('app:report-problem', () => reportProblem());
   ipcMain.handle('vault:choose', async (event) => {
     const result = await dialog.showOpenDialog(senderWindow(event), {
       title: '메모를 저장할 폴더 선택',

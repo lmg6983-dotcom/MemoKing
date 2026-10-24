@@ -26,6 +26,8 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      ELECTRON_DISABLE_SANDBOX: '1' # 러너에는 Chromium 샌드박스 도우미(chrome-sandbox, root · 4755)가 없다 — 점검 전용
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -15,6 +15,7 @@ const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 contextBridge.exposeInMainWorld('memoking', {
   platform: 'desktop',
   info: invoke('app:info'),
+  reportProblem: invoke('app:report-problem'), // 설정 › 문제 보내기 → { ok, lines }
   whatsNew: invoke('app:whats-new'), // 업데이트 뒤 한 번: { version, items: [{ version, title }] } | null
   vault: {
     use: invoke('vault:use'),

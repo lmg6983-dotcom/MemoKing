@@ -6,6 +6,7 @@ import {
 import { contextMenuTemplate } from './context-menu.js';
 import fs from 'node:fs';
 import os from 'node:os';
+import { createErrorLog, problemMail } from './error-log.js';
 import path from 'node:path';
 import { Vault } from './vault.js';
 import { createAlarmRunner } from './alarms.js';
@@ -1222,7 +1223,36 @@ app.on('second-instance', (_e, argv) => {
 });
 
 // 오른쪽 클릭 메뉴 (모든 창 — 메모 글 · 글 칸 · 링크 · 그림 · 맞춤법). 무엇을 넣는지는 context-menu.js
+// ---------- 오류 기록 · 문제 보내기 (desktop/error-log.js — 이 PC 에만) ----------
+let errorLog = null;
+const errors = () => (errorLog ??= createErrorLog(path.join(app.getPath('userData'), 'logs', 'memoking.log')));
+const consoleError = console.error.bind(console);
+console.error = (...args) => {
+  consoleError(...args);
+  errors().write(args.map((a) => (a instanceof Error ? a.stack ?? a.message : typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
+};
+app.on('render-process-gone', (_e, wc, details) => errors().write(`[창 꺼짐] ${wc.getURL().split('/').pop()} ${details.reason} (${details.exitCode})`));
+
+/** 설정 › 문제 보내기: 최근 기록은 클립보드에, 들어가는 만큼은 새 메일 본문에 (보낼지는 사용자가) */
+async function reportProblem() {
+  const lines = errors().tail(300);
+  const version = app.getVersion();
+  const osName = `${os.type()} ${os.release()}`;
+  clipboard.writeText([`메모킹 v${version} · ${osName}`, ...lines].join('\n'));
+  const url = problemMail({ to: 'lmg6983@gmail.com', version, os: osName, lines });
+  if (SMOKE) return smokeOpened.push({ kind: 'mail', target: url }), { ok: true, lines: lines.length };
+  await shell.openExternal(url).catch(() => {});
+  return { ok: true, lines: lines.length };
+}
+
 app.on('web-contents-created', (_e, wc) => {
+  // 화면 코드의 오류도 기록에 (Electron 의 console-message — 예전 꼴(level 숫자)도 함께)
+  wc.on('console-message', (e, level, message, line, source) => {
+    const lvl = e?.level ?? level;
+    if (lvl !== 'error' && lvl !== 3) return;
+    const src = String(e?.sourceId ?? source ?? '').split('/').pop();
+    errors().write(`[화면] ${e?.message ?? message} (${src}:${e?.lineNumber ?? line})`);
+  });
   wc.on('context-menu', (_event, params) => {
     const win = BrowserWindow.fromWebContents(wc);
     // 메모 폴더 안 그림(memoking://vault/…)만 파일로 저장할 수 있다 (웹 그림은 복사만)
@@ -1299,6 +1329,7 @@ app.whenReady().then(async () => {
     openVault,
     vaultInfo,
     retryMissingVault,
+    reportProblem,
     whatsNew,
     suggestedVaultPath,
     appSettings: () => appSettings(vault, fileIndex, shortcutStatus, shortcutLabel),

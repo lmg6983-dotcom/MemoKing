@@ -2089,6 +2089,12 @@ $('trash-days').addEventListener('change', async (e) => {
   refreshTrashCount();
 });
 
+// 문제 보내기: 최근 오류 기록을 붙인 새 메일 (전체 기록은 클립보드에) — 보낼지는 사용자가
+$('report-btn').addEventListener('click', async () => {
+  const r = await api.reportProblem?.();
+  $('report-btn').textContent = r?.ok ? '메일 앱을 열었어요 · 기록은 클립보드에' : '메일 앱을 열지 못했어요';
+  setTimeout(() => ($('report-btn').textContent = '문제 보내기'), 4000);
+});
 $('tutorial-btn').addEventListener('click', () => {
   el.settings.close();
   api.tutorial.start();
