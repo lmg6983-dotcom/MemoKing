@@ -108,6 +108,7 @@ contextBridge.exposeInMainWorld('memoking', {
     setAutoTags: invoke('app:set-auto-tags'),
     setMagicPolish: invoke('app:set-magic-polish'),
     setAutoEvents: invoke('app:set-auto-events'),
+    setAiPhone: invoke('app:set-ai-phone'),
     setLinkPreviews: invoke('app:set-link-previews'),
     setMagic: invoke('app:set-magic'),
     setTrashDays: invoke('app:set-trash-days'),

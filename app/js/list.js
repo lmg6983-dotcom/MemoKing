@@ -901,6 +901,7 @@ async function loadSettings() {
   $('auto-tags').checked = $('auto-tags-ai').checked = s.autoTags !== false;
   $('magic-polish').checked = s.magicPolish !== false;
   $('auto-events').checked = s.autoEvents !== false;
+  $('ai-phone').checked = s.aiPhone === true;
   $('link-previews').checked = s.linkPreviews !== false;
   magicIndex = s.magicIndex ?? null;
   showMagic(s.magic);
@@ -1185,6 +1186,9 @@ $('magic-polish').addEventListener('change', async (e) => {
 });
 $('auto-events').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setAutoEvents(e.target.checked);
+});
+$('ai-phone').addEventListener('change', async (e) => {
+  e.target.checked = await api.settings.setAiPhone(e.target.checked);
 });
 
 // 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)

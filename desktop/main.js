@@ -219,6 +219,8 @@ function openVault(dir) {
       if (sandbox?.real === next) return; // 연습 중: 화면은 연습 공간 것 (돌아올 때 목록을 다시 그린다)
       windowManager.pushList();
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
+      // 휴대폰에서 쓴 메모: 정해 둔 PC 한 대만 AI 태그 · 일정 (설정 › AI 도우미 › 휴대폰 메모도 이 PC에서)
+      if (settings.aiPhone === true) aiTagger?.later(external.filter((id) => !removed.includes(id) && next.get(id)?.device === 'phone'));
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));

@@ -17,7 +17,7 @@ function setup({ picks = ['회의', '거래처', '출장'], open = new Set() } =
   const progress = [];
   const tagger = createAiTagger({
     getVault: () => vault, tasks: () => tasks, ready: async () => true, isOpen: (id) => open.has(id), enabled: () => true,
-    onProgress: (p) => progress.push(p),
+    onProgress: (p) => progress.push(p), settleMs: 20,
   });
   return { dir, vault, tagger, asked, progress, done: () => {
     vault.close();
@@ -41,6 +41,24 @@ test('AI 태그: 사용자 태그와 합쳐 3개까지, 고친 시각은 그대�
     t.vault.save(id, m.body.replace(' #거래처', ''));
     await t.tagger.add([id]);
     assert.equal(t.asked.length, 1);
+  } finally {
+    t.done();
+  }
+});
+
+test('휴대폰에서 들어온 메모(later): 조용해진 뒤에 한 번, 그사이 또 들어오면 다시 기다린다', async () => {
+  const t = setup();
+  try {
+    const id = t.vault.import({ body: '# 휴대폰 메모\n\n거래처 견적' });
+    t.tagger.later([id]);
+    await new Promise((r) => setTimeout(r, 10));
+    t.tagger.later([id]); // 아직 쓰는 중
+    await new Promise((r) => setTimeout(r, 12));
+    assert.equal(t.asked.length, 0, '조용해지기 전에는 묻지 않음');
+    await new Promise((r) => setTimeout(r, 40));
+    await t.tagger.add([]);
+    assert.equal(t.asked.length, 1);
+    assert.deepEqual(t.vault.get(id).aiTags, ['회의', '거래처', '출장']);
   } finally {
     t.done();
   }

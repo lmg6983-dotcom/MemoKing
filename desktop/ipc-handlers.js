@@ -487,6 +487,11 @@ export function registerIpc(ctx) {
     saveSettings();
     return settings.autoEvents;
   });
+  ipcMain.handle('app:set-ai-phone', (_e, on) => {
+    settings.aiPhone = Boolean(on);
+    saveSettings();
+    return settings.aiPhone;
+  });
   ipcMain.handle('app:set-magic-polish', (_e, on) => {
     settings.magicPolish = Boolean(on);
     saveSettings();
