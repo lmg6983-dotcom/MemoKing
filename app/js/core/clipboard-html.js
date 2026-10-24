@@ -1,4 +1,4 @@
-// Windows 클립보드의 "HTML Format"(CF_HTML) 해석 — 빠른 메모(Ctrl+Alt+C)용 (순수 함수, 단위 테스트 대상)
+// Windows 클립보드의 "HTML Format"(CF_HTML) 해석 — 매직 카피(Ctrl+Alt+C)용 (순수 함수, 단위 테스트 대상)
 //
 //   Version:0.9
 //   StartHTML:0000000105

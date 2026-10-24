@@ -70,7 +70,7 @@ test('기능이 꺼져 있으면(needs) 직접 해 보기 없이 안내(offText)
   assert.equal(tutorialStepFor(plain, () => false), plain, 'needs 가 없으면 늘 그대로');
 });
 
-test('PC: 매직키 · Life/Work · 목록 왕관 · 빠른 메모 · 화면 자르기는 직접 해 보기', () => {
+test('PC: 매직키 · Life/Work · 목록 왕관 · 매직 카피 · 화면 자르기는 직접 해 보기', () => {
   const by = Object.fromEntries(TUTORIAL_STEPS.map((s) => [s.id, s]));
   assert.deepEqual(['mode', 'list-crown', 'quick', 'capture', 'magic'].map((id) => by[id]?.advance),
     ['mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried']);

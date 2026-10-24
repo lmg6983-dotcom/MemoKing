@@ -1245,7 +1245,7 @@ async function transcribeEach(memoId, items) {
   }
 }
 
-// 공유하기로 받은 글·주소·파일로 새 메모 (PC 의 빠른 메모와 같은 모양: 제목 → 글 → 파일 → 출처)
+// 공유하기로 받은 글·주소·파일로 새 메모 (PC 의 매직 카피와 같은 모양: 제목 → 글 → 파일 → 출처)
 //   마크다운 글·.md 파일은 서식대로, 소리 파일은 받아쓸지 묻는다
 async function memoFromShare(payload) {
   const text = String(payload.text ?? '').trim();

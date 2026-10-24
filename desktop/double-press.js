@@ -1,5 +1,5 @@
 // 단축키 한 번·두 번 누르기 가르기 — 두 번째가 ms 안에 오면 onDouble, 아니면 ms 뒤 onSingle.
-// (Ctrl+Alt+C 한 번 = 빠른 메모, 두 번 = 화면 영역 캡처)
+// (Ctrl+Alt+C 한 번 = 매직 카피, 두 번 = 화면 영역 캡처)
 export function createDoublePress({ ms = 350, onSingle, onDouble, setTimer = setTimeout, clearTimer = clearTimeout }) {
   let timer = null;
   let inCooldown = false;

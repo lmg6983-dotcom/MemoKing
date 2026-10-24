@@ -805,7 +805,7 @@ function initStt() {
 function tutorialPayload() {
   const raw = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
   if (!raw) return null;
-  // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 빠른 메모 키 · 매직키 · 알림 보관함)
+  // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 매직 카피 키 · 매직키 · 알림 보관함)
   const has = (need) => (need === 'workLife' ? settings.workLife === true : need === 'history' ? settings.historyEnabled === true
     : need === 'quickMemo' || need === 'magic' ? shortcutStatus(need).registered : true);
   const step = tutorialStepFor(raw, has);
@@ -1165,7 +1165,7 @@ function updateTrayMenu() {
     { label: '메모 폴더 열기', enabled: Boolean(vault), click: () => shell.openPath(vault.root) },
     { type: 'separator' },
     {
-      label: `빠른 메모 ${shortcutLabel('quickMemo')} (두 번: 화면 캡처)${settings.quickMemo && !shortcutStatus('quickMemo').registered ? ', 다른 앱이 쓰는 중' : ''}`,
+      label: `매직 카피 ${shortcutLabel('quickMemo')} (두 번: 화면 캡처)${settings.quickMemo && !shortcutStatus('quickMemo').registered ? ', 다른 앱이 쓰는 중' : ''}`,
       type: 'checkbox',
       checked: settings.quickMemo && shortcutStatus('quickMemo').registered,
       click: (item) => setQuickMemo(item.checked),

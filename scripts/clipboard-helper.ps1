@@ -81,7 +81,7 @@ function Save-Clipboard([string]$dir) {
   }
 }
 
-# ---------- 빠른 메모 (Ctrl+Alt+C) ----------
+# ---------- 매직 카피 (Ctrl+Alt+C) ----------
 # 앞에 있는 창의 선택 영역을 Ctrl+C 로 복사하게 한 뒤, 클립보드를 풀어 둔다.
 $script:winApiLoaded = $false
 function Initialize-WinApi {

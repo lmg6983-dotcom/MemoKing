@@ -47,7 +47,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- 다른 앱에서 공유하기 → 새 메모 (PC 의 빠른 메모 Ctrl+Alt+C 에 해당) -->
+            <!-- 다른 앱에서 공유하기 → 새 메모 (PC 의 매직 카피 Ctrl+Alt+C 에 해당) -->
             <intent-filter android:label="@string/share_label">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />

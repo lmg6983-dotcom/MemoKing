@@ -230,7 +230,7 @@ function textOf(node) {
   return (node.children ?? []).map(textOf).join('');
 }
 
-// 카드 한 장의 마크다운 (빠른 메모·테스트용)
+// 카드 한 장의 마크다운 (매직 카피·테스트용)
 export function cardMarkdown(url, title) {
   const text = String(title || url).replace(/([\\[\]])/g, '\\$1');
   return `[${text}](${url} "${CARD_TITLE}")`;

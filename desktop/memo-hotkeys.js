@@ -6,7 +6,7 @@ import { HOTKEY_SLOTS, hotkeyAccelerator, hotkeyLabel, normalizeHotkeys, assignH
 export class MemoHotkeys {
   /**
    * @param {{ settings: object, saveSettings: () => void, getVault: () => any, onPress: (slot: string) => void,
-   *           reserved?: () => { key: string, name: string }[] }} o reserved: 메모킹의 다른 전역 단축키 (빠른 메모 · 매직키)
+   *           reserved?: () => { key: string, name: string }[] }} o reserved: 메모킹의 다른 전역 단축키 (매직 카피 · 매직키)
    */
   constructor({ settings, saveSettings, getVault, onPress, reserved = () => [] }) {
     this.settings = settings;

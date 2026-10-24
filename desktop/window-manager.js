@@ -1823,7 +1823,7 @@ export class WindowManager {
     return c;
   }
 
-  // ---------- 빠른 메모 & 캡처 메모 ----------
+  // ---------- 매직 카피 & 캡처 메모 ----------
 
   openCaptureMemo(capture, point, message) {
     const vault = this.getVault();
@@ -1888,7 +1888,7 @@ export class WindowManager {
       if (info.copySkipped) return null;
       return this.captureToMemo(dir, info, point);
     } catch (err) {
-      console.error('빠른 메모 실패', err);
+      console.error('매직 카피 실패', err);
       toast({
         title: UI.memoCreateFail,
         body: `${this.getShortcutLabel('quickMemo')}를 한 번 더 눌러 주세요.`,

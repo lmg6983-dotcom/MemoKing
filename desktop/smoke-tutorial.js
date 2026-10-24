@@ -147,7 +147,7 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
       box !== vault && box.root !== vault.root && boxTitles.includes('연습 공간이에요') && !boxTitles.includes('회의 메모') && !noteWins.has(keep), `${box.root} ${JSON.stringify(boxTitles)}`);
     await arrive(list, 'welcome');
     await next(list, 'welcome');
-    // 메모킹만의 기능 (0.68.0~ 목록 창에서만): 매직키 · 빠른 메모 · 화면 자르기는 Windows 단축키라 "다음에 해 볼게요" 로
+    // 메모킹만의 기능 (0.68.0~ 목록 창에서만): 매직키 · 매직 카피 · 화면 자르기는 Windows 단축키라 "다음에 해 볼게요" 로
     for (const [id, to] of [['magic', 'quick'], ['quick', 'capture'], ['capture', 'list-crown']]) {
       await arrive(list, id);
       await next(list, id);

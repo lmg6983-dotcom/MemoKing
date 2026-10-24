@@ -464,7 +464,7 @@ export function registerIpc(ctx) {
     saveSettings();
     return settings.fitTables;
   });
-  // 메모킹 Work / Life 바꾸기 — 목록이 그 모드의 메모만 보이고, 새 메모(빠른 메모 · 캡처 포함)도 그 모드로
+  // 메모킹 Work / Life 바꾸기 — 목록이 그 모드의 메모만 보이고, 새 메모(매직 카피 · 캡처 포함)도 그 모드로
   ipcMain.handle('mode:set', (_e, mode) => setAppMode(mode));
   ipcMain.handle('mode:hours', (_e, hours) => setWorkHours(hours));
   ipcMain.handle('mode:work-life', (_e, on) => setWorkLife(on)); // 설정 › Work / Life 나누기
