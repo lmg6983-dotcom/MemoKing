@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
  */
 object LayaTags {
     private const val IDLE_MS = 5 * 60_000L
-    val FILES = listOf("encoder.onnx", "head.onnx", "tokenizer.json", "rl_agent_config.json")
+    val FILES = listOf("encoder.onnx", "head.onnx", "head.onnx.data", "tokenizer.json", "rl_agent_config.json")
 
     private class Loaded(val encoder: OrtSession, val head: OrtSession)
 

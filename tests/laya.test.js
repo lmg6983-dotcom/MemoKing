@@ -10,11 +10,11 @@ import { createLayaService } from '../desktop/ai/laya-service.js';
 const memo = (id, title, tags, updated = '2026-10-01') => ({ id, updated, body: `# ${title}\n\n${tags.map((t) => `#${t}`).join(' ')}\n` });
 const vault = [memo('a', '주간 회의록', ['회의', '업무'], '2026-10-03'), memo('b', '마트', ['장보기']), memo('c', '디자인 리뷰', ['회의'])];
 
-test('AI 태그 질문: 기존 태그 중에서, 태그마다 그 태그를 단 메모 제목을 설명으로', () => {
+test('AI 태그 질문: 기존 태그 중에서, 보기는 태그 이름만', () => {
   const q = tagQuestion('# 스탠드업\n\n어제 한 일 공유, 배포 일정 확인', vault, { excludeId: 'x' });
   assert.equal(q.questions.tag.type, 'choice');
   assert.deepEqual(new Set(q.candidates), new Set(['회의', '업무', '장보기']));
-  assert.equal(q.questions.tag.criteria['회의'], '#회의 — 예: 주간 회의록, 디자인 리뷰'); // 최근 메모부터
+  assert.deepEqual(q.questions.tag.criteria, q.candidates);
   assert.ok(!q.state.includes('#'));
 });
 
