@@ -1,4 +1,4 @@
-// AI 태그 (순수 함수) — Laya 다국어 모델(글을 쓰지 않고 보기 중 하나를 고르는 모델)이 이 폴더의 기존 태그 중에서 고른다.
+// AI 태그 (순수 함수) — Laya 한국어 모델(글을 쓰지 않고 보기 중 하나를 고르는 모델)이 이 폴더의 기존 태그 중에서 고른다.
 //   PC(desktop/ai/laya-service.js) · 휴대폰(android/web/js/local-ai.js) · 시험(scripts/laya-bench.mjs)이 같은 질문으로 묻는다.
 //   후보: AI 없이 고른 추천(tag-suggest.js) + 많이 쓰는 기존 태그를 보기로 주고 하나를 고르게(choice) 해서 그 확률 순으로.
 //   태그마다 "어울리나?" 를 따로 물으면(noul) 확률을 태그끼리 견줄 수 없어 더 틀리고 열 배 느렸다 (scripts/laya-bench)
@@ -41,7 +41,7 @@ export function rankedTags(result) {
   return Object.entries(probs).map(([name, p]) => ({ name, p })).sort((a, b) => b.p - a.p);
 }
 
-/** 앱이 섞는 몫 — 시험(문제 99개)에서 0.5 가 가장 나았다: 셋 안에 정답 Laya 만 70% · AI 없이 77% · 섞어서 80% */
+/** 앱이 섞는 몫 — 시험(문제 99개, laya-ko 8비트)에서 0.5 가 가장 나았다: 첫째가 맞음 Laya 만 49% · AI 없이 56% · 섞어서 61% */
 export const BLEND = 0.5;
 
 /** Laya 확률과 AI 없는 추천 점수를 섞어 다시 줄 세우기 — weight: 추천 점수 쪽 몫 (0 이면 Laya 만) */
@@ -50,8 +50,8 @@ export function blend(ranked, scores, weight) {
   return ranked.map((r) => ({ name: r.name, p: (1 - weight) * r.p + weight * (scores.get(r.name) ?? 0) })).sort((a, b) => b.p - a.p);
 }
 
-/** 닫을 때 저절로 달 태그: 확률 높은 셋 (첫째만 달 때보다 정답이 들어갈 때가 훨씬 많다) */
-export const pickTags = (ranked) => ranked.slice(0, 3).map((r) => r.name);
+/** 닫을 때 저절로 달 태그: 첫째 하나 — 셋을 달면 둘은 대개 틀린 태그라서 (단 셋 중 맞는 것 32%). 나머지는 추천 칩으로 */
+export const pickTags = (ranked) => ranked.slice(0, 1).map((r) => r.name);
 
 /** 추천 칩(tag-suggest.js) 순서를 Laya 확률로 — Laya 가 첫째로 고른 기존 태그가 없으면 맨 앞에 넣는다. 새 태그 추천은 뒤로 */
 export function withLaya(list, ranked, limit = 3) {

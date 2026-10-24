@@ -28,9 +28,9 @@ jobs:
           node-version: 22
       - uses: actions/download-artifact@v4
         with:
-          name: laya-multilingual-int8
+          name: laya-ko-int8
           path: model
-          run-id: '40049858171' # core/model-catalog.js 의 파일
+          run-id: '40064852464' # core/model-catalog.js 의 파일
           github-token: ${{ github.token }}
       - run: npm install --no-save --no-audit --no-fund onnxruntime-node@1.30.0
       - name: 한국어 태그 시험

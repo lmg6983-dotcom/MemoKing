@@ -1,4 +1,4 @@
-// AI 태그 (휴대폰) — Laya 다국어 모델을 이 휴대폰 안에서 (LayaTags.kt, 인터넷 없이).
+// AI 태그 (휴대폰) — Laya 한국어 모델을 이 휴대폰 안에서 (LayaTags.kt, 인터넷 없이).
 //   질문 만들기 · 글 나누기 · 답 풀기는 PC 와 같은 공용 코드(app/js/core/laya-*.js), 계산(encoder · head)만 앱이 한다
 import { call, aiStatusNative } from './native.js';
 import { app } from './state.js';

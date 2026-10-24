@@ -528,7 +528,7 @@ function autoTag(memoId, body) {
   if (!autoTagsOn() || dismissed.has(memoId) || extractTags(body).length) return;
   const sure = () => suggestionsFor(body, memoId).filter((t) => t.sure).slice(0, 2).map((t) => t.name);
   if (aiReady()) {
-    // AI 태그: 모델이 고른 기존 태그 셋 (core/laya-tags.js pickTags — 못 고르면 확실한 추천 태그). 기다리지 않고 닫는다 — 그사이 다시 열어 고쳤으면 건드리지 않음
+    // AI 태그: 모델이 고른 기존 태그 하나 (core/laya-tags.js pickTags — 못 고르면 확실한 추천 태그). 기다리지 않고 닫는다 — 그사이 다시 열어 고쳤으면 건드리지 않음
     aiRank(body, memoId).then((ranked) => {
       const names = ranked.length ? pickTags(ranked) : sure();
       if (names.length && app.vault.get(memoId)?.body === body) saveAutoTags(memoId, body, names);

@@ -25,10 +25,10 @@ test('AI 태그 질문: 짧은 메모 · 기존 태그가 없는 폴더 · 이�
   assert.ok(!q.candidates.includes('회의'));
 });
 
-test('Laya 답 → 확률 순 · 닫을 때 달 태그(셋) · 추천 칩 순서', () => {
+test('Laya 답 → 확률 순 · 닫을 때 달 태그(첫째 하나) · 추천 칩 순서', () => {
   const ranked = rankedTags({ answers: { tag: { choice: '회의', probabilities: { 업무: 0.2, 회의: 0.6, 장보기: 0.1, 여행: 0.1 } } } });
   assert.deepEqual(ranked.map((r) => r.name), ['회의', '업무', '장보기', '여행']);
-  assert.deepEqual(pickTags(ranked), ['회의', '업무', '장보기']);
+  assert.deepEqual(pickTags(ranked), ['회의']);
   const list = [{ name: '배포', existing: false }, { name: '업무', existing: true }];
   assert.deepEqual(withLaya(list, ranked).map((t) => t.name), ['회의', '업무', '배포']);
   assert.equal(withLaya(list, []), list);

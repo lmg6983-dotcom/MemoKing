@@ -967,11 +967,11 @@ function renderAi(st = aiStatus()) {
   const have = st.state === 'ready' || st.state === 'running';
   $('ai-note').textContent = st.error || (st.state === 'downloading' ? `${LAYA_MODEL.label} 를 받는 중이에요 ${Math.round((st.progress ?? 0) * 100)}%`
     : have ? `${LAYA_MODEL.label} · ${Math.round(st.size / 2 ** 20)}MB`
-      : `닫을 때 기존 태그 중 알맞은 것 셋을 AI 가 골라 달아요. 한 번 받으면 (${LAYA_MODEL.approx}, ${LAYA_MODEL.license}) 인터넷 없이 돌아가요`);
+      : `닫을 때 기존 태그 중 알맞은 것 하나를 AI 가 골라 달아요. 한 번 받으면 (${LAYA_MODEL.approx}, ${LAYA_MODEL.license}) 인터넷 없이 돌아가요`);
   $('ai-download').hidden = have;
   $('ai-download').disabled = st.state === 'downloading';
   $('ai-remove').hidden = !have;
-  $('auto-tags-note').textContent = aiReady() ? '태그 없는 메모를 닫을 때 AI 가 고른 기존 태그 셋을 달아요' : '태그 없는 메모를 닫을 때 확실한 태그만 달아요';
+  $('auto-tags-note').textContent = aiReady() ? '태그 없는 메모를 닫을 때 AI 가 고른 기존 태그 하나를 달아요' : '태그 없는 메모를 닫을 때 확실한 태그만 달아요';
 }
 if (aiSupported) {
   on('ai', (st) => !$('settings-sheet').hidden && renderAi(st));

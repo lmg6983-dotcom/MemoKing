@@ -1,4 +1,4 @@
-// Laya 다국어 모델을 부르는 법 (PC desktop/ai/laya-service.js · 휴대폰 android/web/js/local-ai.js · scripts/laya-bench.mjs).
+// Laya 모델을 부르는 법 (PC desktop/ai/laya-service.js · 휴대폰 android/web/js/local-ai.js · scripts/laya-bench.mjs).
 //   글을 나누고(토크나이저) 질문을 붙이는 것은 laya-ts(app/vendor/laya.js), 계산은 기기마다 다른 provider 가 한다
 //   provider: { runEncoder(batch) → { lastHidden }, runHead(lastHidden, batch) → { logits, act } }
 import { Agent, parseTokenizerJson, encodeWithData } from '../../vendor/laya.js';

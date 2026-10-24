@@ -14,4 +14,4 @@
 | pyannote segmentation 3.0 (int8) | k2-fsa/sherpa-onnx 릴리스 `speaker-segmentation-models` | MIT |
 | 3D-Speaker CAM++ (`3dspeaker_speech_campplus_sv_zh-cn_16k-common`) | k2-fsa/sherpa-onnx 릴리스 `speaker-recongition-models` | Apache-2.0 |
 
-AI 태그 엔진 [onnxruntime-node](https://github.com/microsoft/onnxruntime) 1.30.0 (MIT) 은 설치 파일의 `node_modules` 에 (Windows x64 CPU 파일만). AI 태그 모델(Laya 다국어, Apache-2.0)은 앱에 들어 있지 않고 설정 › AI 태그 › 받기로 이 PC 의 앱 데이터 폴더 `ai\laya\` 에 받아요.
+AI 태그 엔진 [onnxruntime-node](https://github.com/microsoft/onnxruntime) 1.30.0 (MIT) 은 설치 파일의 `node_modules` 에 (Windows x64 CPU 파일만). AI 태그 모델(Laya 한국어 2nugu/laya-ko, Apache-2.0)은 앱에 들어 있지 않고 설정 › AI 태그 › 받기로 이 PC 의 앱 데이터 폴더 `ai\laya\` 에 받아요.
