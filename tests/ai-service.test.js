@@ -78,48 +78,36 @@ test('로컬 AI: 엔진이 꺼진 까닭을 알아듣게', async () => {
   assert.equal(engineError('', 3), '모델이 멈췄어요 (3)');
 });
 
-test('기본 모델: 목록에서 본 파일만 (보조 파일 빼고), 커밋 고정 · 해시 필수', async () => {
-  const { DEFAULT_MODEL, pickModelFile } = await import('../app/js/core/model-catalog.js');
-  const sha = 'a'.repeat(64);
-  const info = {
-    sha: 'c0ffee',
-    siblings: [
-      { rfilename: 'mtp-gemma-4-E2B-it-UD-Q4_K_XL.gguf', lfs: { sha256: sha, size: 1 } },
-      { rfilename: 'mmproj-F16.gguf', lfs: { sha256: sha, size: 1 } },
-      { rfilename: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf', lfs: { sha256: sha, size: 2_800_000_000 } },
-    ],
-  };
-  assert.deepEqual(pickModelFile(DEFAULT_MODEL, info), {
-    name: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
-    url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-qat-GGUF/resolve/c0ffee/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
-    size: 2_800_000_000,
-    sha256: sha,
-  });
-  assert.throws(() => pickModelFile(DEFAULT_MODEL, { siblings: [{ rfilename: 'x-UD-Q4_K_XL.gguf' }] }), /찾지 못했어요/);
+test('글 모델 추천: 8GB PC 는 1.3B, 16GB 는 3B', async () => {
+  const { recommendModel } = await import('../app/js/core/model-catalog.js');
+  assert.equal(recommendModel(7.8 * 2 ** 30).id, '1.3b'); // 윈도가 알려 주는 8GB
+  assert.equal(recommendModel(15.9 * 2 ** 30).id, '3b');
 });
 
-test('기본 모델 받기: 해시가 맞을 때만 넣고, 틀리면 버린다', async () => {
+test('글 모델 받기: 크기 · 해시가 맞을 때만 넣고, 틀리면 버린다', async () => {
   const { createHash } = await import('node:crypto');
+  const { WRITE_MODELS } = await import('../app/js/core/model-catalog.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-ai-dl-'));
   const body = Buffer.from('GGUF 모델 내용');
-  let sha = createHash('sha256').update(body).digest('hex');
+  const m = WRITE_MODELS[0];
+  const saved = { size: m.size, sha256: m.sha256 };
+  Object.assign(m, { size: body.length, sha256: createHash('sha256').update(body).digest('hex') });
   const names = {};
-  const fakeFetch = async (url) => (url.includes('/api/models/')
-    ? new Response(JSON.stringify({ sha: 'abc', siblings: [{ rfilename: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf', lfs: { sha256: sha, size: body.length } }] }))
-    : new Response(body));
-  const ai = createAiService({ dir, serverPath: process.execPath, getNames: () => names, setName: (r, n) => { names[r] = n; }, onStatus: () => {}, fetch: fakeFetch });
+  const ai = createAiService({ dir, serverPath: process.execPath, getNames: () => names, setName: (r, n) => { names[r] = n; }, onStatus: () => {}, fetch: async () => new Response(body) });
   try {
-    const st = await ai.downloadDefault();
+    const st = await ai.download(m.id);
     assert.equal(st.chat.state, 'ready');
-    assert.equal(names.chat, 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf');
+    assert.equal(names.chat, m.url.split('/').pop());
     assert.deepEqual(fs.readFileSync(path.join(dir, 'chat.gguf')), body);
 
     await ai.remove('chat');
-    sha = 'b'.repeat(64); // 목록이 알려 준 해시와 다른 파일
-    await assert.rejects(ai.downloadDefault(), /맞지 않아요/);
+    m.sha256 = 'b'.repeat(64); // 올린 것과 다른 파일
+    await assert.rejects(ai.download(m.id), /맞지 않아요/);
     assert.equal(ai.status().chat.state, 'missing');
     assert.ok(!fs.existsSync(path.join(dir, 'chat.gguf.part')));
+    await assert.rejects(ai.download('7b'), /모르는 모델/);
   } finally {
+    Object.assign(m, saved);
     ai.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }

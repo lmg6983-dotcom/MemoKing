@@ -16,26 +16,17 @@ export const LAYA_MODEL = {
   ],
 };
 
-// AI 글 도우미 기본 모델 (PC 설정 › AI 글 도우미 › 기본 모델 받기) — PC 에만.
-//   Apache 2.0 이라 누구에게나 쓰게 할 수 있는 것으로 (카나나2 는 제3자용 온디바이스 제공에 카카오 별도 계약이 필요해 사용자가 직접 넣는 선택 모델).
-//   앱에 넣으면 설치 파일 · 업데이트가 GB 단위로 커져서, 인터넷이 될 때 한 번 Hugging Face 에서 받는다. 그다음은 인터넷 없이
-export const DEFAULT_MODEL = {
-  role: 'chat',
-  label: '젬마4 E2B',
-  repo: 'unsloth/gemma-4-E2B-it-qat-GGUF', // 구글 QAT 체크포인트를 Unsloth 가 GGUF 로 — 같은 크기의 보통 4비트보다 품질 손실이 작다
-  file: /UD-Q4_K_XL\.gguf$/i,
-  approx: '약 2.6GB',
-  license: 'Apache 2.0',
-};
+// AI 글 도우미 모델 (PC 설정 › AI 글 도우미 › 받기) — PC 에만. 카카오 카나나2 (한국어로 학습, kanana-open-license, Powered by Kanana)
+//   .github/workflows/kanana-gguf.yml 이 llama.cpp 용 GGUF 로 바꾸고 한국어 글로 잰 중요도(imatrix)로 양자화한 것.
+//   앱에 넣으면 설치 파일이 GB 단위로 커져서, 인터넷이 될 때 한 번 받는다. 그다음은 인터넷 없이. 크기 · SHA-256 이 맞아야 넣는다
+const KANANA = 'https://github.com/lmg6983-dotcom/memoking-releases/releases/download/kanana-2-gguf-1/';
+export const WRITE_MODELS = [
+  { id: '1.3b', label: '카나나2 1.3B', note: '가볍고 빨라요', minRamGB: 0, license: 'Kanana 오픈 라이선스', url: `${KANANA}kanana-2-1.3b-instruct-Q4_K_M.gguf`, size: 0, sha256: '' },
+  { id: '3b', label: '카나나2 3B', note: '더 정확해요', minRamGB: 12, license: 'Kanana 오픈 라이선스', url: `${KANANA}kanana-2-3b-instruct-Q4_K_M.gguf`, size: 0, sha256: '' },
+];
 
-/** 저장소의 파일 목록 (파일마다 크기 · SHA-256) */
-export const modelInfoUrl = (m) => `https://huggingface.co/api/models/${m.repo}?blobs=true`;
+/** 이 PC 에 알맞은 모델 — 메모리(GB)가 넉넉하면 큰 것 (8GB PC 는 1.3B: 윈도 · 브라우저와 함께 돌려도 버벅이지 않게) */
+export const recommendModel = (ramBytes) => WRITE_MODELS.findLast((m) => ramBytes / 2 ** 30 >= m.minRamGB) ?? WRITE_MODELS[0];
 
-/** 목록 → 받을 것 { name, url, size, sha256 } — 보조 파일(mtp 초안 · mmproj 그림)은 빼고, 목록을 받은 그 커밋으로 고정 */
-export function pickModelFile(m, info) {
-  const f = (info?.siblings ?? []).find((s) => m.file.test(s.rfilename) && !/mtp|mmproj/i.test(s.rfilename));
-  const sha256 = f?.lfs?.sha256 ?? '';
-  if (!f || !/^[0-9a-f]{64}$/.test(sha256)) throw new Error('받을 모델 파일을 찾지 못했어요. 잠시 뒤 다시 해 주세요');
-  const path = f.rfilename.split('/').map(encodeURIComponent).join('/');
-  return { name: f.rfilename.split('/').pop(), url: `https://huggingface.co/${m.repo}/resolve/${info.sha ?? 'main'}/${path}`, size: f.lfs.size ?? f.size ?? 0, sha256 };
-}
+/** 화면에 쓸 크기 "약 0.8GB" */
+export const approxSize = (m) => `약 ${(m.size / 2 ** 30).toFixed(1)}GB`;

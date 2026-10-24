@@ -1,14 +1,15 @@
 // AI 글 도우미 (PC 메인 프로세스, PC 에만) — llama.cpp 의 llama-server 를 자식 프로세스로 띄워 이 PC 안에서만 글 모델을 돌린다 (인터넷 없이).
-//   정리 · 지시대로 고치기 · 문체 · 맞춤법 · 초안. 모델 파일(.gguf)은 기본 모델(젬마4 E2B)을 받거나 사용자가 고른 파일을
+//   정리 · 지시대로 고치기 · 문체 · 맞춤법 · 초안. 모델 파일(.gguf)은 카나나2(1.3B · 3B, PC 메모리에 맞춰 추천)를 받거나 사용자가 고른 파일을
 //   이 PC 의 앱 데이터 폴더(ai\)로 복사해 둔다 — USB 로 옮긴 파일도 되고, 메모 폴더(동기화)에는 넣지 않는다.
 //   메모리 8GB PC 를 생각해 쓸 때만 띄우고 몇 분 쓰지 않으면 끈다. 모델이 멈추거나 꺼져도 앱은 그대로.
 import { spawn as childSpawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { llamaClient, engineError } from '../../app/js/core/llama-client.js';
-import { DEFAULT_MODEL, modelInfoUrl, pickModelFile } from '../../app/js/core/model-catalog.js';
+import { WRITE_MODELS, recommendModel } from '../../app/js/core/model-catalog.js';
 
 export const AI_ROLES = { chat: '글 모델' };
 const IDLE_MS = 5 * 60_000;
@@ -39,7 +40,7 @@ const freePort = () => new Promise((resolve, reject) => {
 /**
  * @param {{ dir: string, serverPath: string, getNames: () => { chat?: string, embed?: string },
  *           setName: (role: string, name: string) => void, onStatus: (status) => void, spawn?: typeof childSpawn, fetch?: typeof fetch }} opts
- *   fetch: 기본 모델 받기 (PC 는 Electron net.fetch — 시스템 프록시를 따른다)
+ *   fetch: 모델 받기 (PC 는 Electron net.fetch — 시스템 프록시를 따른다)
  */
 export function createAiService(opts) {
   const { dir, serverPath, spawn = childSpawn, fetch: get = fetch } = opts;
@@ -58,7 +59,7 @@ export function createAiService(opts) {
       const state = copying.has(role) ? 'copying' : !size ? 'missing' : servers.has(role) ? 'running' : 'ready';
       return { state, name: size ? (opts.getNames()[role] ?? '') : '', size, error: errors.get(role) ?? '', progress: progress.get(role) ?? null };
     };
-    return { engine: fs.existsSync(serverPath), chat: one('chat') };
+    return { engine: fs.existsSync(serverPath), chat: one('chat'), recommended: recommendModel(os.totalmem()).id };
   }
   const emit = () => opts.onStatus(status());
 
@@ -98,16 +99,13 @@ export function createAiService(opts) {
     });
   }
 
-  /** 기본 모델 받기 (core/model-catalog.js) — Hugging Face 가 알려 준 SHA-256 과 맞아야 넣는다 */
-  function downloadDefault() {
-    const role = DEFAULT_MODEL.role;
-    const offline = '인터넷에 연결하지 못했어요. 인터넷이 될 때 다시 누르거나, 모델 파일을 직접 넣어 주세요';
-    const request = (url) => get(url).catch(() => { throw new Error(offline); });
+  /** 글 모델 받기 (core/model-catalog.js WRITE_MODELS 의 id) — 크기 · SHA-256 이 맞아야 넣는다 */
+  function download(id) {
+    const f = WRITE_MODELS.find((m) => m.id === id);
+    if (!f) return Promise.reject(new Error('모르는 모델이에요'));
+    const role = 'chat';
     return bringIn(role, async (part) => {
-      const list = await request(modelInfoUrl(DEFAULT_MODEL));
-      if (!list.ok) throw new Error(`모델 목록을 받지 못했어요 (${list.status}). 인터넷을 확인하고 다시 눌러 주세요`);
-      const f = pickModelFile(DEFAULT_MODEL, await list.json());
-      const res = await request(f.url);
+      const res = await get(f.url).catch(() => { throw new Error('인터넷에 연결하지 못했어요. 인터넷이 될 때 다시 누르거나, 모델 파일을 직접 넣어 주세요'); });
       if (!res.ok || !res.body) throw new Error(`받지 못했어요 (${res.status}). 인터넷을 확인하고 다시 눌러 주세요`);
       const out = fs.createWriteStream(part);
       const hash = createHash('sha256');
@@ -128,8 +126,8 @@ export function createAiService(opts) {
       } finally {
         await new Promise((r) => out.end(r));
       }
-      if (hash.digest('hex') !== f.sha256) throw new Error('받은 파일이 맞지 않아요. 다시 받아 주세요');
-      return f.name;
+      if (got !== f.size || hash.digest('hex') !== f.sha256) throw new Error('받은 파일이 맞지 않아요. 다시 받아 주세요');
+      return f.url.split('/').pop();
     });
   }
 
@@ -236,7 +234,7 @@ export function createAiService(opts) {
   const { chat } = llamaClient(request);
 
   return {
-    status, emit, importModel, downloadDefault, remove, chat,
+    status, emit, importModel, download, remove, chat,
     close: () => {
       for (const s of servers.values()) {
         clearTimeout(s.timer);

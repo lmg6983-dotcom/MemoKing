@@ -1,6 +1,6 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
 import { hotkeyLabel } from './core/memo-hotkeys.js';
-import { LAYA_MODEL, DEFAULT_MODEL } from './core/model-catalog.js';
+import { LAYA_MODEL, WRITE_MODELS, approxSize } from './core/model-catalog.js';
 import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
 import { captureGlobalKey, stopKeyCapture, isCapturing, globalShortcutResult } from './key-capture.js';
@@ -1076,14 +1076,30 @@ function renderLlm(st, failed = '') {
   const m = st.chat;
   const have = m.state === 'ready' || m.state === 'running';
   $('llm-note').textContent = !st.engine ? 'AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'
-    : failed || m.error || (m.state === 'copying' ? (m.progress != null ? `${DEFAULT_MODEL.label} 를 받는 중이에요 ${Math.round(m.progress * 100)}%` : '모델 파일을 복사하는 중이에요. 몇 분 걸릴 수 있어요')
-      : have ? `${m.name || '모델'} · ${(m.size / 2 ** 30).toFixed(1)}GB${m.state === 'running' ? ' · 켜져 있어요' : ''}`
-        : '메모 창 › 메뉴 › AI 글 도우미에서 써요. 아래 기본 모델을 받거나 .gguf 파일을 넣어 주세요 (메모리 8GB PC 는 2~4B)');
+    : failed || m.error || (m.state === 'copying' ? (m.progress != null ? `모델을 받는 중이에요 ${Math.round(m.progress * 100)}%` : '모델 파일을 복사하는 중이에요. 몇 분 걸릴 수 있어요')
+      : have ? `${m.name || '모델'} · ${(m.size / 2 ** 30).toFixed(1)}GB${m.state === 'running' ? ' · 켜져 있어요' : ''}${/kanana/i.test(m.name) ? ' · Powered by Kanana' : ''}`
+        : '메모 창 › 메뉴 › AI 글 도우미에서 써요. 아래에서 모델을 받거나 .gguf 파일을 넣어 주세요');
   $('llm-import').disabled = !st.engine || m.state === 'copying';
   $('llm-import').textContent = have ? '다른 모델로' : '모델 파일 넣기';
   $('llm-remove').hidden = !have;
-  $('llm-default-row').hidden = !st.engine || m.state !== 'missing'; // 인터넷이 없는 곳은 모델 파일 넣기
-  $('llm-default').textContent = `기본 모델 받기 (${DEFAULT_MODEL.label}, ${DEFAULT_MODEL.approx}, ${DEFAULT_MODEL.license})`;
+  // 받기: 이 PC 메모리에 맞는 것을 앞에 (인터넷이 없는 곳은 모델 파일 넣기)
+  const row = $('llm-default-row');
+  row.hidden = !st.engine || m.state !== 'missing';
+  if (!row.hidden && !row.childElementCount) {
+    const models = [...WRITE_MODELS].sort((a, b) => (b.id === st.recommended) - (a.id === st.recommended));
+    row.append(...models.map((w) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = w.id === st.recommended ? 'btn' : 'link-btn';
+      b.textContent = `${w.label} 받기 (${approxSize(w)}, ${w.note}${w.id === st.recommended ? ', 이 PC 에 추천' : ''})`;
+      b.addEventListener('click', async () => {
+        row.hidden = true;
+        const r = await api.llm.download(w.id);
+        renderLlm(r, r?.error);
+      });
+      return b;
+    }));
+  }
   $('llm-try-row').hidden = !st.engine || !have;
 }
 if (api.llm) {
@@ -1095,11 +1111,6 @@ if (api.llm) {
   $('llm-remove').addEventListener('click', async () => {
     if (!(await confirmDialog('글 모델 파일을 삭제할까요?\n다시 쓰려면 다시 넣어야 해요.', '삭제'))) return;
     renderLlm(await api.llm.remove());
-  });
-  $('llm-default').addEventListener('click', async () => {
-    $('llm-default-row').hidden = true;
-    const st = await api.llm.downloadDefault();
-    renderLlm(st, st?.error);
   });
   $('llm-try').addEventListener('click', async () => {
     const btn = $('llm-try');

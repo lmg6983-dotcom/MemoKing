@@ -115,9 +115,9 @@ export function registerIpc(ctx) {
     }
   });
   ipcMain.handle('llm:remove', () => getLlm()?.remove('chat'));
-  ipcMain.handle('llm:download-default', async () => {
+  ipcMain.handle('llm:download', async (_e, id) => {
     try {
-      return await getLlm().downloadDefault();
+      return await getLlm().download(id);
     } catch (err) {
       return { ...getLlm().status(), error: err.message };
     }

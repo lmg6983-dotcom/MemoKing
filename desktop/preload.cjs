@@ -177,7 +177,7 @@ contextBridge.exposeInMainWorld('memoking', {
   llm: {
     status: invoke('llm:status'),
     importModel: invoke('llm:import'),
-    downloadDefault: invoke('llm:download-default'), // 기본 모델(core/model-catalog.js) 받기 — 진행은 llm:status 의 progress
+    download: invoke('llm:download'), // 카나나2 받기 (core/model-catalog.js WRITE_MODELS 의 id) — 진행은 llm:status 의 progress
     remove: invoke('llm:remove'),
     try: invoke('llm:try'),
     write: invoke('llm:write'), // { id, task: 'tidy' | 'custom' | 'style' | 'spell' | 'draft', … } — 조각은 llm:token · llm:progress 로
