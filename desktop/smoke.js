@@ -1652,7 +1652,7 @@ export async function runSmoke({
       await wait(250);
       await press('C', ['control', 'alt']);
       const sameNote = await js(lw, `document.getElementById('sc-magic-note').textContent`);
-      check('단축키 바꾸기: 빠른 메모와 같은 키는 거절', /빠른 메모와 같은 키/.test(sameNote), sameNote);
+      check('단축키 바꾸기: 매직 카피와 같은 키는 거절', /매직 카피와 같은 키/.test(sameNote), sameNote);
       await js(lw, `document.getElementById('sc-magic').click()`);
       await wait(250);
       await press('C', ['control']);
@@ -1747,7 +1747,7 @@ export async function runSmoke({
     await listJs(`document.getElementById('settings-dialog').close()`);
     await listJs(`document.querySelector('[data-tab="memos"]').click()`);
 
-    // 17) 빠른 메모 단축키 등록 확인 — 점검 중 사용자의 Ctrl+Alt+C 를 붙잡지 않도록 바로 해제
+    // 17) 매직 카피 단축키 등록 확인 — 점검 중 사용자의 Ctrl+Alt+C 를 붙잡지 않도록 바로 해제
     const registered = registerQuickMemoKey();
     // 설치된 메모킹이 켜져 있으면 그쪽이 단축키를 쓰고 있으므로 등록 확인은 건너뛴다
     const otherRunning = !registered && process.platform === 'win32' && execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
@@ -1755,11 +1755,11 @@ export async function runSmoke({
       .split(/\r?\n/).map((p) => p.trim().toLowerCase()).filter(Boolean)
       .some((p) => p !== process.execPath.toLowerCase());
     if (process.platform === 'win32') {
-      check(otherRunning ? '빠른 메모 단축키 등록 — 건너뜀: 설치된 메모킹이 실행 중이라 이미 사용 중' : '빠른 메모 단축키 Ctrl+Alt+C 전역 등록',
+      check(otherRunning ? '매직 카피 단축키 등록 — 건너뜀: 설치된 메모킹이 실행 중이라 이미 사용 중' : '매직 카피 단축키 Ctrl+Alt+C 전역 등록',
         otherRunning || (registered && appSettings().quickMemo.registered));
     } else {
-      // 빠른 메모(화면 글 가져오기)는 Windows 전용 — 다른 운영체제에서는 키를 잡지 않아야 다른 앱의 Ctrl+Alt+C 를 빼앗지 않는다
-      check('빠른 메모 단축키: Windows 가 아니면 등록하지 않음 (다른 앱 키를 빼앗지 않음)',
+      // 매직 카피(화면 글 가져오기)는 Windows 전용 — 다른 운영체제에서는 키를 잡지 않아야 다른 앱의 Ctrl+Alt+C 를 빼앗지 않는다
+      check('매직 카피 단축키: Windows 가 아니면 등록하지 않음 (다른 앱 키를 빼앗지 않음)',
         !registered && !appSettings().quickMemo.registered && !globalShortcut.isRegistered('Control+Alt+C'));
     }
     globalShortcut.unregister('Control+Alt+C');

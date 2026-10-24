@@ -810,7 +810,7 @@ $('join-btn').addEventListener('click', async () => {
   await flush();
   api.stack.joinMenu(id);
 });
-// 단축키 모음: 전역 단축키(빠른 메모·매직키)는 설정에서 바꾼 키로
+// 단축키 모음: 전역 단축키(매직 카피·매직키)는 설정에서 바꾼 키로
 async function openShortcutSheet() {
   let keys;
   try {
@@ -874,7 +874,7 @@ window.addEventListener('mk:edit', (e) => {
 });
 window.addEventListener('mk:table-command', (e) => editor?.tableCommand(e.detail?.name));
 
-// 빠른 메모 알림을 눌러 이 메모로 왔을 때 등: 창 테두리가 두 번 반짝여 "이 메모" 임을 알린다
+// 매직 카피 알림을 눌러 이 메모로 왔을 때 등: 창 테두리가 두 번 반짝여 "이 메모" 임을 알린다
 api.on('memo:highlight', () => {
   replayClass(document.body, 'highlight');
 });
@@ -885,7 +885,7 @@ api.on('memo:reminders', (list) => reminderPanel?.set(list));
 // 스티커를 눌러 뗐을 때 · 스택의 다른 탭에서 왕관 · 테이프를 바꾼 경우 (이 창은 숨어 있었음)
 api.on('memo:layer', (state) => applyLayer(state));
 
-// ---------- 빠른 메모 (Ctrl+Alt+C) ----------
+// ---------- 매직 카피 (Ctrl+Alt+C) ----------
 // 메인 프로세스가 복사해 온 내용으로 새 메모를 채운다: 제목(파일·그림일 때) → 글(붙여넣기) → 파일·그림 → 출처
 
 const escapeMd = (s) => s.replace(/([\\`*_[\]<>#])/g, '\\$1');

@@ -265,17 +265,17 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       memoHotkeys.set(id, null);
     });
 
-    // 6) 빠른 메모 — 워드에서 고른 글을 출처까지 메모로
+    // 6) 매직 카피 — 워드에서 고른 글을 출처까지 메모로
     await scene('quick', async () => {
       const html = '<h2>하반기 마케팅 핵심</h2><ul><li><b>10월</b> 체험단 30명 모집, 후기 이벤트</li><li><b>11월</b> 블랙프라이데이 1+1 쿠폰</li><li><b>12월</b> 연말 감사 메일, 재구매 할인</li></ul><p>예산은 분기별로 나눠 쓰고, 결과는 매주 월요일 회의에서 공유</p>';
       const id = windowManager.openCaptureMemo({
         heading: null, html, text: '', items: [], skipped: [],
         source: { window: '2026 하반기 마케팅 계획.docx - Word', process: 'WINWORD', url: '', time: new Date().toISOString(), copied: true },
       }, { x: area.x + 620, y: area.y + 160 }, { title: '메모를 만들었어요', body: '' });
-      const win = await until(() => noteWins.get(id), '빠른 메모 창');
+      const win = await until(() => noteWins.get(id), '매직 카피 창');
       win.setBounds({ x: area.x + 600, y: area.y + 140, width: 380, height: 400 });
       win.showInactive();
-      await until(() => js(win, `/출처/.test(document.querySelector('.mk-doc')?.textContent ?? '')`), '빠른 메모 내용');
+      await until(() => js(win, `/출처/.test(document.querySelector('.mk-doc')?.textContent ?? '')`), '매직 카피 내용');
       await shot(win, 'quick-memo', 'quick');
       await close(id);
     });

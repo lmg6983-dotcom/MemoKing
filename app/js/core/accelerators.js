@@ -1,9 +1,9 @@
-// 전역 단축키(빠른 메모·매직키)를 사용자가 바꿀 수 있게 — 누른 키를 Electron 단축키 글자로, 그리고 화면에 보일 글자로.
+// 전역 단축키(매직 카피·매직키)를 사용자가 바꿀 수 있게 — 누른 키를 Electron 단축키 글자로, 그리고 화면에 보일 글자로.
 //   저장: Electron accelerator ("Control+Alt+C") · 보이기: "Ctrl+Alt+C"
 //   Ctrl·Alt·Win 중 하나는 꼭 함께 (Shift 만 또는 글자 하나만은 글을 쓸 때 눌리므로 안 됨), 흔한 편집 단축키는 막는다
 
 export const DEFAULT_SHORTCUTS = { quickMemo: 'Control+Alt+C', magic: 'Control+Alt+Space' };
-export const SHORTCUT_NAMES = { quickMemo: '빠른 메모', magic: '매직키' };
+export const SHORTCUT_NAMES = { quickMemo: '매직 카피', magic: '매직키' };
 
 const PUNCT = {
   Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'",

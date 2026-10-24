@@ -2670,7 +2670,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       currentTables = nextTables;
       extras.setLoading(false);
     },
-    // 빠른 메모(Ctrl+Alt+C)로 받은 내용 채우기 --------------------------------
+    // 매직 카피(Ctrl+Alt+C)로 받은 내용 채우기 --------------------------------
     /** 휴대폰 다루기 방식: 글 고치기에서만 고칠 수 있게 (옮기기·그리기에서는 커서·손글씨 입력이 생기지 않게) */
     /** 알림 목록이 바뀌었을 때 글 속 날짜 밑줄(맞춤 표시)을 다시 */
     refreshDates() {

@@ -719,7 +719,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .dp-summary { margin: 8px 0 0; font-size: 13px; font-weight: 700; }
 .dp-summary.past { color: var(--danger); }
 
-/* ---------- 이 메모예요: 창 테두리 반짝임 (빠른 메모 알림을 눌렀을 때 등) ---------- */
+/* ---------- 이 메모예요: 창 테두리 반짝임 (매직 카피 알림을 눌렀을 때 등) ---------- */
 body.highlight::after, .note-screen.highlight::after { /* 휴대폰 메모 화면은 mobile.css 가 absolute 로 */
   content: "";
   position: fixed;

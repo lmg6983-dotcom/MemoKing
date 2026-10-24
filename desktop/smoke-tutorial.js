@@ -147,125 +147,26 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
       box !== vault && box.root !== vault.root && boxTitles.includes('연습 공간이에요') && !boxTitles.includes('회의 메모') && !noteWins.has(keep), `${box.root} ${JSON.stringify(boxTitles)}`);
     await arrive(list, 'welcome');
     await next(list, 'welcome');
-    await arrive(list, 'new-memo');
-    await press(list(), '#fab', '[new-memo] 노란 +');
-    await wait(350);
-    const before = new Set(noteWins.keys());
-    await press(list(), '#fab-menu [data-new="text"]', '[new-memo] 글 메모');
-    const memoId = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '튜토리얼 메모 창');
-    const note = () => noteWins.get(memoId);
-    await until(() => js(note(), 'document.documentElement.dataset.ready === "true"'), '메모 준비', 12000);
-    const size = note().getSize();
-    check('튜토리얼 메모 창은 넓게 (말풍선과 함께 해 볼 수 있게)', size[0] >= 540 && size[1] >= 600, JSON.stringify(size));
-
-    // ---------- 메모 창 ----------
-    await arrive(note, 'write');
-    await press(note(), '.ProseMirror', '[write] 본문');
-    note().webContents.insertText('장보기 목록');
-    await wait(200);
-    await arrive(note, 'style', { praise: true });
-    await press(note(), '.format-bar .style-btn', '[style] "본문" 버튼');
-    await wait(250);
-    await press(note(), '#style-menu [data-style="h2"]', '[style] 제목 2');
-    await arrive(note, 'lists', { praise: true });
-    await press(note(), '[data-cmd="task"]', '[lists] 체크리스트');
-    await arrive(note, 'move', { praise: true });
-    const items = await js(note(), `[...document.querySelectorAll('.ProseMirror li')].map((li) => li.textContent.trim())`);
-    check('[move] 옮겨 볼 예시 목록(우유·달걀·사과·식빵)이 저절로 들어감', ['우유', '달걀', '사과', '식빵'].every((w) => items.includes(w)), JSON.stringify(items));
-    await next(note, 'move');
-    // 매직 줌: 메모 안에서 Ctrl 을 누른 채 휠 → 다음 단계, 지나면 배율은 처음대로
-    await arrive(note, 'note-zoom');
-    {
-      const c = await probe(note(), '#editor');
-      note().webContents.sendInputEvent({ type: 'mouseWheel', x: c.x ?? 100, y: c.y ?? 200, deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
+    // 메모킹만의 기능 (0.68.0~ 목록 창에서만): 매직키 · 매직 카피 · 화면 자르기는 Windows 단축키라 "다음에 해 볼게요" 로
+    for (const [id, to] of [['magic', 'quick'], ['quick', 'capture'], ['capture', 'list-crown']]) {
+      await arrive(list, id);
+      await next(list, id);
     }
-    await arrive(note, 'add', { praise: true });
-    check('[note-zoom] Ctrl+휠로 다음 단계 · 지나면 배율은 처음대로', await js(note(), `document.body.dataset.zoom === '1'`));
-    await press(note(), '#add-btn', '[add] 왼쪽 아래 +');
-    await arrive(note, 'ink', { praise: true });
-    await press(note(), '#add-menu [data-add="ink"]', '[ink] 손 메모');
-    await until(() => js(note(), `!!document.querySelector('.ink-sheet')`), '그리기 화면');
-    const hidden = await js(note(), `getComputedStyle(document.querySelector('.coach-bubble')).visibility === 'hidden'`);
-    check('[ink] 그리는 동안 말풍선이 숨어 그리기를 가리지 않음', hidden);
-    const [w, h] = note().getContentSize();
-    await drag(note(), Array.from({ length: 12 }, (_, i) => [w * 0.2 + i * 18, h * 0.4 + Math.sin(i / 1.8) * 30]));
-    await capture(note(), 'ink-drawing');
-    await press(note(), '.ink-sheet .ink-done', '[ink] 완료');
-    await arrive(note, 'content', { praise: true });
-    const pic = await until(async () => { const v = await probe(note(), '.ProseMirror .mk-image-line'); return v.found && v; }, '손 메모 그림');
-    // 오른쪽 클릭 → 메뉴 맨 위 아이콘 줄의 📋 복사
-    note().webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(pic.x), y: Math.round(pic.y) });
-    note().webContents.sendInputEvent({ type: 'mouseDown', x: Math.round(pic.x), y: Math.round(pic.y), button: 'right', clickCount: 1 });
-    note().webContents.sendInputEvent({ type: 'mouseUp', x: Math.round(pic.x), y: Math.round(pic.y), button: 'right', clickCount: 1 });
-    await press(note(), '.mk-ctx-ic[data-id="copy"]', '[content] 📋 복사');
-    await arrive(note, 'annotate', { praise: true });
-    await press(note(), '#add-btn', '[annotate] +');
-    await wait(300);
-    await press(note(), '#add-menu [data-add="annotate"]', '[annotate] 주석');
-    await until(() => js(note(), `!!document.querySelector('.mk-annot.drawing')`), '주석 모드');
-    const line = await probe(note(), '.ProseMirror > :first-child', 'text');
-    await drag(note(), [[line.left, line.bottom + 2], [line.left + 60, line.bottom + 4], [line.right, line.bottom + 2]]);
-    await press(note(), '.mk-annot-bar .ink-done', '[annotate] 완료');
-    const annot = await until(() => {
-      const m = box.get(memoId);
-      return m?.ink && JSON.parse(fs.readFileSync(path.join(box.root, m.ink), 'utf8')).strokes.length;
-    }, '주석 저장', 5000).catch(() => 0);
-    check('[annotate] 글 위에 그은 주석이 (연습 공간에) 저장됨', annot >= 1, JSON.stringify(box.get(memoId)?.ink));
-    await arrive(note, 'voice', { praise: true });
-    await next(note, 'voice');
-    await arrive(note, 'tag');
-    await press(note(), '.ProseMirror > :last-child', '[tag] 마지막 줄');
-    note().webContents.sendInputEvent({ type: 'keyDown', keyCode: 'End' });
-    await wait(80);
-    note().webContents.insertText(' #할일 ');
-    await arrive(note, 'crown', { praise: true });
-    await press(note(), '#top-btn', '[crown] 왕관');
-    await arrive(note, 'bell', { praise: true });
-    for (const id of ['bell', 'hotkey']) {
-      await next(note, id);
-      await arrive(note, id === 'bell' ? 'hotkey' : 'bar');
-    }
-    await next(note, 'bar');
-    await arrive(note, 'close');
-    await press(note(), '#close-btn', '[close] ×');
-
-    // ---------- 목록 ----------
-    await arrive(list, 'cards', { praise: true });
-    await next(list, 'cards');
-    // 카드를 크게: Ctrl 을 누른 채 휠
-    await arrive(list, 'zoom');
-    {
-      const c = await probe(list(), '#cards .card');
-      list().webContents.sendInputEvent({ type: 'mouseWheel', x: c.x ?? 100, y: c.y ?? 200, deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
-    }
-    await arrive(list, 'layout', { praise: true });
-    await press(list(), '#filter-btn', '[layout] 보기 버튼');
-    await new Promise((r) => setTimeout(r, 400));
-    await press(list(), '#layout-group [data-value="rows"]', '[layout] 한 줄씩');
-    await arrive(list, 'filters', { praise: true });
-    await press(list(), '#tag-strip .tag-chip[data-tag="할일"]', '[filters] #할일');
+    await arrive(list, 'list-crown');
+    await press(list(), '#list-top-btn', '[list-crown] 왕관');
+    await arrive(list, 'history', { praise: true });
+    await next(list, 'history');
     // Work 로 바꿔 보고 다시 Life 로
-    await arrive(list, 'mode', { praise: true });
+    await arrive(list, 'mode');
     await press(list(), '#mode-switch [data-mode="work"]', '[mode] Work');
     await wait(700);
     await press(list(), '#mode-switch [data-mode="life"]', '[mode] Life');
-    await arrive(list, 'tabs', { praise: true });
-    await next(list, 'tabs');
-    // 목록도 늘 위에: 왕관 (좁은 창이라 작은 왕관으로 들어간다)
-    await arrive(list, 'list-crown');
-    await press(list(), '#list-top-btn', '[list-crown] 왕관');
-    await arrive(list, 'quick', { praise: true });
-    // 빠른 메모 · 화면 자르기 · 매직키는 Windows 단축키라 여기서는 "다음에 해 볼게요" 로
-    for (const [id, to] of [['quick', 'capture'], ['capture', 'magic'], ['magic', 'settings'], ['settings', 'done']]) {
-      await next(list, id);
-      await arrive(list, to);
-    }
-    const tutBody = box.get(memoId)?.body ?? '';
-    check('따라 한 결과가 연습 메모에 그대로 (체크리스트 · 손 메모 · 태그)', /\[[ x]\]/.test(tutBody) && /!\[손 메모\]/.test(tutBody) && /#할일/.test(tutBody), tutBody);
+    await arrive(list, 'done', { praise: true });
+    check('메모를 만들지 않음 (목록 창에서만)', box.list().length === boxTitles.length, JSON.stringify(box.list().map((m) => m.title)));
     await next(list, 'done');
     const finished = await until(async () => !getTutorial().active && (await stepOf(list())) === null, '튜토리얼 끝').then(() => true).catch(() => false);
     check('끝까지 따라 하면 말풍선이 사라지고 끝', finished);
-    // 뒷정리: 연습하며 바꾼 카드 모양 · 확대 · 태그 고르기 · 목록 늘 위에는 처음대로
+    // 뒷정리: 연습하며 바꾼 목록 늘 위에 · Work / Life 는 처음대로
     const after = await until(() => js(list(), `(() => {
       const r = { layout: document.getElementById('cards').dataset.layout, zoom: document.body.dataset.listZoom, tags: [...document.querySelectorAll('#tag-strip .tag-chip[aria-pressed="true"]')].length, top: document.getElementById('list-top-btn').getAttribute('aria-pressed'), mode: document.documentElement.dataset.mode, panel: document.getElementById('filter-panel').hidden };
       return r.layout === 'grid' && r.tags === 0 && r.top === 'false' && r.panel ? r : null;
@@ -274,8 +175,8 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     // 끝나면 실제 메모 폴더로: 연습 메모는 남지 않고, 닫아 두었던 내 메모 창은 다시 열린다
     const back = await until(() => getVault() === vault && noteWins.get(keep)?.isVisible(), '내 메모로 돌아옴', 6000).then(() => true).catch(() => false);
     const s = getSettings();
-    check('끝나면 내 메모로: 실제 폴더에는 내 메모 하나뿐 · 연습 폴더는 지워짐 · 내 메모 창이 다시 열림 · 연습 메모의 창 기억 없음',
-      back && vault.list().length === 1 && vault.list()[0].id === keep && !fs.existsSync(box.root) && !noteWins.has(memoId) && !(memoId in (s.noteBounds ?? {})) && !(s.openNotes ?? []).includes(memoId),
+    check('끝나면 내 메모로: 실제 폴더에는 내 메모 하나뿐 · 연습 폴더는 지워짐 · 내 메모 창이 다시 열림',
+      back && vault.list().length === 1 && vault.list()[0].id === keep && !fs.existsSync(box.root),
       JSON.stringify({ back, list: vault.list().map((m) => m.title), boxLeft: fs.existsSync(box.root), open: s.openNotes }));
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

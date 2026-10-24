@@ -1,4 +1,4 @@
-// 빠른 메모 (Ctrl+Alt+C) — 어느 앱에서든 선택한 것(글·파일·그림)을 복사해 새 메모로 만든다.
+// 매직 카피 (Ctrl+Alt+C) — 어느 앱에서든 선택한 것(글·파일·그림)을 복사해 새 메모로 만든다.
 //
 // 1) 전역 단축키가 눌리면 PowerShell 도우미(상주)가 사용자가 키에서 손을 뗄 때까지 기다렸다가
 //    앞에 있는 창에 Ctrl+C 를 보내고, 클립보드가 바뀌면 그 내용을 임시 폴더에 풀어 둔다.
@@ -38,7 +38,7 @@ export class CaptureHelper {
       if (msg.ready) return markReady(true);
       this.waiting.shift()?.resolve(msg);
     });
-    proc.stderr.on('data', (d) => console.warn('[빠른 메모 도우미]', String(d).trim()));
+    proc.stderr.on('data', (d) => console.warn('[매직 카피 도우미]', String(d).trim()));
     proc.on('exit', () => {
       if (this.proc === proc) this.proc = null;
       markReady(false);

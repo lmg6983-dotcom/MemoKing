@@ -79,6 +79,12 @@
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>
       </div>
+      <!-- 처음엔 이 PC 에 바로 저장 (고르는 화면 없이) — 휴대폰과 같이 쓰려면 여기서 연결 (drive-panel.js, 닫으면 다시 안 뜸) -->
+      <div id="drive-hint" class="filter-summary" hidden>
+        <span>휴대폰 · 다른 PC 와 같은 메모를 쓰려면</span>
+        <button id="drive-hint-connect" class="link-btn">Google 계정으로 연결</button>
+        <button id="drive-hint-close" class="link-btn">닫기</button>
+      </div>
       <div id="ai-ask" class="ai-ask" hidden></div>
       <p id="count" class="result-count" role="status" hidden></p>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
@@ -159,7 +165,7 @@
       <h3 class="set-title" id="set-daily">자주 쓰는 기능</h3>
       <label class="setting-row">
         <input type="checkbox" id="quick-memo" class="switch" role="switch">
-        <span>빠른 메모 <kbd id="quick-memo-kbd">Ctrl+Alt+C</kbd> <small id="quick-memo-note">고른 내용을 바로 메모로, 두 번 누르면 화면 캡처</small></span>
+        <span>매직 카피 <kbd id="quick-memo-kbd">Ctrl+Alt+C</kbd> <small id="quick-memo-note">고른 내용을 바로 메모로, 두 번 누르면 화면 캡처</small></span>
       </label>
       <div class="shortcut-row" data-shortcut="quickMemo">
         <span class="shortcut-label">단축키</span>
@@ -397,6 +403,21 @@
     <div class="dialog-actions">
       <button type="button" class="btn" id="update-later">나중에</button>
       <button type="button" class="btn primary" id="update-go" autofocus>받기</button>
+    </div>
+  </dialog>
+
+  <!-- 업데이트 뒤 한 번: 개선된 점 (버전마다 제목 한 줄) -->
+  <dialog id="whatsnew-dialog" class="dialog update-dialog" aria-labelledby="whatsnew-title">
+    <header class="update-head">
+      <span class="update-badge" aria-hidden="true"><svg><use href="#i-crown"/></svg></span>
+      <div class="update-head-text">
+        <h2 id="whatsnew-title"></h2>
+        <p class="update-version">이렇게 좋아졌어요</p>
+      </div>
+    </header>
+    <ul class="update-notes" id="whatsnew-list"></ul>
+    <div class="dialog-actions">
+      <button type="button" class="btn primary" id="whatsnew-ok" autofocus>확인</button>
     </div>
   </dialog>
 

@@ -60,6 +60,7 @@ for (const dir of ['app', 'desktop', join('assets', 'icons')]) copyDir(join(ROOT
 mkdirSync(join(STAGE, 'scripts'), { recursive: true });
 copyFileSync(join(ROOT, 'scripts', 'clipboard-helper.ps1'), join(STAGE, 'scripts', 'clipboard-helper.ps1'));
 copyFileSync(join(ROOT, 'scripts', 'popup-watch.ps1'), join(STAGE, 'scripts', 'popup-watch.ps1'));
+copyFileSync(join(ROOT, 'README.md'), join(STAGE, 'README.md')); // 업데이트 뒤 한 번 보여 줄 개선된 점 (main.js whatsNew 가 이력 표를 읽는다)
 // 설치 파일에 끼우는 NSIS 조각 (electron-builder 가 build/installer.nsh 를 자동으로 읽는다) — 업데이트 때 남은 도우미 프로세스 정리
 mkdirSync(join(STAGE, 'build'), { recursive: true });
 copyFileSync(join(ROOT, 'scripts', 'installer.nsh'), join(STAGE, 'build', 'installer.nsh'));
@@ -104,10 +105,10 @@ const config = {
     artifactName: 'MemoKing-Setup-${version}.${ext}',
   },
   nsis: {
-    // oneClick: false — 설치 폴더를 고를 수 있게 (지금까지와 같음). 자동 업데이트는 설치 화면 없이(/S) 같은 폴더에 덮어쓴다
-    oneClick: false,
+    // oneClick: 묻지 않고 바로 설치 → 바로 실행 (0.68.0~ — 폴더를 고르던 화면이 첫인상을 무겁게 했다).
+    //   이미 설치한 PC 는 electron-builder 가 기억해 둔 설치 폴더(InstallLocation)에 그대로 덮어쓴다
+    oneClick: true,
     perMachine: false, // 사용자별 설치(%LOCALAPPDATA%\Programs) — 관리자 권한 없이 업데이트도 바로
-    allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
     shortcutName: '메모킹',

@@ -149,8 +149,8 @@ export async function runClipboardChecks({
     check('[클립보드] 워드처럼 글+그림 → 글만 붙음', r.office, r.officeDetail);
     check('[클립보드] 웹 글+사진 → 사진도 메모 폴더에 저장', r.webMixed);
 
-    // ---------- 빠른 메모 (Ctrl+Alt+C) ----------
-    // 빠른 메모는 숨긴 창에서 채워진다 (알림을 눌러야 뜸) — focus() 는 창을 띄워 버리므로 부르지 않는다
+    // ---------- 매직 카피 (Ctrl+Alt+C) ----------
+    // 매직 카피는 숨긴 창에서 채워진다 (알림을 눌러야 뜸) — focus() 는 창을 띄워 버리므로 부르지 않는다
     const quick = async (options) => {
       const before = new Set(noteWins.keys());
       await quickMemo(options);
@@ -171,23 +171,23 @@ export async function runClipboardChecks({
     clip.html(`<h2>빠른 메모 기사</h2><p>본문 <b>굵게</b></p><p><img src="${imageBase}/cat.png?quick=1" alt="사진"></p>`, '빠른 메모 기사 본문 굵게');
     const q1 = await quick({ copy: false });
     const q1ok = await mdWhen(q1.id, (md) => md.includes('## 빠른 메모 기사') && md.includes('**굵게**')
-      && /!\[사진\]\(attachments\//.test(md) && /> 출처: .*\(Ctrl\+Alt\+C\)/.test(md), '빠른 메모: 웹 글');
-    check('[빠른 메모] 웹 글+사진 → 새 메모 (서식·사진 저장·출처)', q1ok,
+      && /!\[사진\]\(attachments\//.test(md) && /> 출처: .*\(Ctrl\+Alt\+C\)/.test(md), '매직 카피: 웹 글');
+    check('[매직 카피] 웹 글+사진 → 새 메모 (서식·사진 저장·출처)', q1ok,
       `${JSON.stringify(readMemo(q1.id)).slice(0, 600)} | 상태: ${await js(q1.win, `document.getElementById('status').textContent`)}`);
     const cursor = getCapturePoint(); // 메모를 만든 순간의 마우스 위치 (그 뒤에 사용자가 움직여도 무관)
     // v0.31.1: 하던 일을 가로막지 않게 바로 띄우지 않고 Windows 알림만 — 누르면 그 메모가 마우스 자리에 뜬다
     const t1 = smokeToasts.find((t) => t.kind === 'quick-memo' && t.memoId === q1.id);
-    check('[빠른 메모] Windows 알림 (제목 · 메모 제목 · 눌러서 열기 안내)',
+    check('[매직 카피] Windows 알림 (제목 · 메모 제목 · 눌러서 열기 안내)',
       t1 && t1.title === '메모를 만들었어요' && /빠른 메모 기사/.test(t1.body) && /눌러서 열기/.test(t1.body), JSON.stringify(t1));
     await wait(1000);
-    check('[빠른 메모] 메모 창은 바로 뜨지 않음 (알림을 눌러야 뜸)', !q1.win.isVisible());
+    check('[매직 카피] 메모 창은 바로 뜨지 않음 (알림을 눌러야 뜸)', !q1.win.isVisible());
     t1?.onClick();
     const back = await until(() => { const w = noteWins.get(q1.id); return w?.isVisible() && w; }, '알림 눌러 메모 열기').catch(() => null);
     const flashed = back ? await until(() => js(back, `document.body.classList.contains('highlight')`), '반짝임', 3000).catch(() => false) : false;
-    check('[빠른 메모] 알림을 누르면 그 메모가 앞으로 뜨고 반짝임', Boolean(back) && flashed);
+    check('[매직 카피] 알림을 누르면 그 메모가 앞으로 뜨고 반짝임', Boolean(back) && flashed);
     if (back) {
       const b = back.getBounds();
-      check('[빠른 메모] 마우스 위치 근처에 뜬다', Math.abs(b.x - (cursor.x - 48)) < 400 && Math.abs(b.y - (cursor.y - 18)) < 400, JSON.stringify({ b, cursor }));
+      check('[매직 카피] 마우스 위치 근처에 뜬다', Math.abs(b.x - (cursor.x - 48)) < 400 && Math.abs(b.y - (cursor.y - 18)) < 400, JSON.stringify({ b, cursor }));
       await capture(back, 'smoke-quick-memo.png');
     }
     if (back) await closeNote(q1.id);
@@ -196,18 +196,18 @@ export async function runClipboardChecks({
     clip.files([files[0], files[2]]);
     const q2 = await quick({ copy: false });
     const q2ok = await mdWhen(q2.id, (md) => md.includes('# 분기 보고서.pdf 외 1개') && md.includes('[분기 보고서.pdf](attachments/')
-      && /!\[사진\]\(attachments\//.test(md), '빠른 메모: 파일');
-    check('[빠른 메모] 탐색기 파일 → 파일 칩·그림, 제목은 파일 이름', q2ok, readMemo(q2.id).split('---').pop().slice(0, 300));
+      && /!\[사진\]\(attachments\//.test(md), '매직 카피: 파일');
+    check('[매직 카피] 탐색기 파일 → 파일 칩·그림, 제목은 파일 이름', q2ok, readMemo(q2.id).split('---').pop().slice(0, 300));
     await closeNote(q2.id);
 
     // Q3) 화면 캡처 그림
     clip.image(iconPng);
     const q3 = await quick({ copy: false });
-    const q3ok = await mdWhen(q3.id, (md) => md.includes('# 캡처한 그림') && /!\[캡처한 그림\]\(attachments\/[^)]+\.png\)/.test(md), '빠른 메모: 그림');
-    check('[빠른 메모] 캡처 그림 → 그림 메모', q3ok);
+    const q3ok = await mdWhen(q3.id, (md) => md.includes('# 캡처한 그림') && /!\[캡처한 그림\]\(attachments\/[^)]+\.png\)/.test(md), '매직 카피: 그림');
+    check('[매직 카피] 캡처 그림 → 그림 메모', q3ok);
     await closeNote(q3.id);
 
-    // Q4) 실제 복사: 메모 창에서 글을 선택해 두고 빠른 메모 → 도우미가 앞 창에 Ctrl+C 를 보내 복사
+    // Q4) 실제 복사: 메모 창에서 글을 선택해 두고 매직 카피 → 도우미가 앞 창에 Ctrl+C 를 보내 복사
     clip.text('이전 클립보드 내용');
     const src = await newNote(() => js(list, `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     src.win.webContents.insertText('선택해서 빠른 메모로 보낼 글');
@@ -222,11 +222,11 @@ export async function runClipboardChecks({
     const before4 = new Set(noteWins.keys());
     const made = await quickMemo({ copy: true, onlyPid: process.pid });
     if (!made) {
-      check('[빠른 메모] 선택한 글을 Ctrl+C 로 복사해 메모로 (실제 키 보내기) — 건너뜀: 다른 앱이 맨 앞에 있어 키를 보내지 않음', true);
+      check('[매직 카피] 선택한 글을 Ctrl+C 로 복사해 메모로 (실제 키 보내기) — 건너뜀: 다른 앱이 맨 앞에 있어 키를 보내지 않음', true);
     } else {
       const q4id = [...noteWins.keys()].find((k) => !before4.has(k));
-      const q4ok = q4id && await mdWhen(q4id, (md) => md.includes('선택해서 빠른 메모로 보낼 글'), '빠른 메모: 실제 복사');
-      check('[빠른 메모] 선택한 글을 Ctrl+C 로 복사해 메모로 (실제 키 보내기)', q4ok,
+      const q4ok = q4id && await mdWhen(q4id, (md) => md.includes('선택해서 빠른 메모로 보낼 글'), '매직 카피: 실제 복사');
+      check('[매직 카피] 선택한 글을 Ctrl+C 로 복사해 메모로 (실제 키 보내기)', q4ok,
         q4id ? readMemo(q4id).split('---').pop().slice(0, 200) : '새 메모가 열리지 않음');
       if (q4id) await closeNote(q4id);
     }

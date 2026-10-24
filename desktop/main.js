@@ -36,6 +36,7 @@ import { hotkeyCopyText, hotkeyLabel, hotkeyAccelerator } from '../app/js/core/m
 import { TUTORIAL_STEPS, advanceTutorial, tutorialStepFor, tutorialChapter, tutorialJumps, seedTutorialSandbox } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { alarmText, describeReminder } from '../app/js/core/reminders.js';
+import { versionTitles } from '../app/js/core/release-notes.js';
 import { quietAlarm, modeClock, normalizeHours } from '../app/js/core/work-hours.js';
 
 import {
@@ -45,7 +46,7 @@ import {
 
 import {
   SMOKE, APP_ID, STT_WORKER, STT_VENDOR, LLAMA_SERVER, POPUP_HELPER,
-  settings, loadSettings, saveSettings, installMark, suggestedVaultPath,
+  settings, loadSettings, saveSettings, suggestedVaultPath,
   purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings,
   TRASH_DAYS, openWebPage, openVaultFile, toast, smokeToasts, smokeOpened,
   smokeConfirmAnswers, writeClipboard, fetchRemoteImage, registerVaultProtocol,
@@ -804,8 +805,10 @@ function initStt() {
 function tutorialPayload() {
   const raw = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
   if (!raw) return null;
-  // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 빠른 메모 키 · 매직키)
-  const step = tutorialStepFor(raw, (need) => (need === 'workLife' ? settings.workLife === true : need === 'quickMemo' || need === 'magic' ? shortcutStatus(need).registered : true));
+  // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 매직 카피 키 · 매직키 · 알림 보관함)
+  const has = (need) => (need === 'workLife' ? settings.workLife === true : need === 'history' ? settings.historyEnabled === true
+    : need === 'quickMemo' || need === 'magic' ? shortcutStatus(need).registered : true);
+  const step = tutorialStepFor(raw, has);
   const keys = (t) => (typeof t === 'string' ? withShortcuts(t, settings.shortcuts) : t);
   const text = step.noTape && !windowManager.canTape ? step.noTape : step.text; // 테이프를 못 쓰는 PC 에서는 왕관만
   // 다시 보는 사람(설정 › 튜토리얼 보기)에게는 첫 말풍선에서 어디부터 볼지 고르게
@@ -890,6 +893,23 @@ function dropSandbox() {
   saveSettings();
 }
 
+// 업데이트 뒤 한 번: 지난번 켠 버전 다음부터 이번 버전까지 바뀐 점의 제목 (앱에 든 README 이력 표). 처음 설치는 튜토리얼이 먼저라 없음
+function whatsNew() {
+  const now = app.getVersion();
+  const seen = settings.seenVersion;
+  if (seen === now) return null;
+  settings.seenVersion = now;
+  saveSettings();
+  if (!settings.tutorialDone) return null;
+  let readme = '';
+  try {
+    readme = fs.readFileSync(path.join(app.getAppPath(), 'README.md'), 'utf8');
+  } catch {
+    // README 가 없으면 버전만
+  }
+  return { version: now, items: versionTitles(readme, seen ?? null, now) };
+}
+
 async function startTutorial() {
   if (!vault) return false;
   await enterSandbox();
@@ -902,7 +922,6 @@ async function startTutorial() {
 async function finishTutorial() {
   tutorial = { active: false, index: -1, memoId: null, praise: false };
   settings.tutorialDone = true;
-  settings.tutorialInstall = installMark();
   saveSettings();
   sendTutorial();
   windowManager.listWin?.webContents.send('tutorial:finished'); // 목록 창: 연습하며 바꾼 보기 · 확대 · 태그 고르기 · 늘 위에를 처음대로
@@ -923,6 +942,10 @@ function tutorialAction(action) {
   }
   if (action === 'enable:workLife' && TUTORIAL_STEPS[tutorial.index]?.needs === 'workLife') {
     setWorkLife(true); // 목록 창은 mode:changed 로 스위치를 보인다
+    sendTutorial();
+  }
+  if (action === 'enable:history' && TUTORIAL_STEPS[tutorial.index]?.needs === 'history') {
+    setHistoryEnabled(true); // 알림 보관함 (이 PC 에만)
     sendTutorial();
   }
 }
@@ -1142,7 +1165,7 @@ function updateTrayMenu() {
     { label: '메모 폴더 열기', enabled: Boolean(vault), click: () => shell.openPath(vault.root) },
     { type: 'separator' },
     {
-      label: `빠른 메모 ${shortcutLabel('quickMemo')} (두 번: 화면 캡처)${settings.quickMemo && !shortcutStatus('quickMemo').registered ? ', 다른 앱이 쓰는 중' : ''}`,
+      label: `매직 카피 ${shortcutLabel('quickMemo')} (두 번: 화면 캡처)${settings.quickMemo && !shortcutStatus('quickMemo').registered ? ', 다른 앱이 쓰는 중' : ''}`,
       type: 'checkbox',
       checked: settings.quickMemo && shortcutStatus('quickMemo').registered,
       click: (item) => setQuickMemo(item.checked),
@@ -1263,6 +1286,7 @@ app.whenReady().then(async () => {
     getVault: () => vault,
     openVault,
     vaultInfo,
+    whatsNew,
     suggestedVaultPath,
     appSettings: () => appSettings(vault, fileIndex, shortcutStatus, shortcutLabel),
     settings,
@@ -1389,7 +1413,6 @@ app.whenReady().then(async () => {
       getSettings: () => settings,
       stickers: windowManager.stickers,
       reloadSettings: loadSettings,
-      installMark,
       startAreaCapture: (opts) => windowManager.startAreaCapture(opts),
       getAreaCapture: () => windowManager.areaCapture,
       smokeClipboard: windowManager.smokeClipboard,
@@ -1421,7 +1444,9 @@ app.whenReady().then(async () => {
   initDrive();
 
   if (autoStartAvailable() && !settings.autoStartSet) setAutoStart(true, updateTrayMenu);
-  if (settings.vaultPath) openVault(settings.vaultPath);
+  // 처음 설치: 고르는 화면 없이 이 PC 의 기본 폴더(문서\메모킹)로 바로 시작 — Google 동기화는 목록의 안내 줄 · 구름 단추에서.
+  //   못 열면(권한 등) 예전처럼 고르는 화면이 오류와 함께 뜬다
+  openVault(settings.vaultPath || suggestedVaultPath());
 
   const launched = launchAction(process.argv);
   if (!HIDDEN_START || !vault) {

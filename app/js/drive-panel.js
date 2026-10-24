@@ -186,6 +186,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
   const syncBtn = $('sync-btn');
   const pop = $('sync-pop');
   function renderHeader(sum = summary()) {
+    renderHint(sum);
     if (!syncBtn) return;
     syncBtn.hidden = false;
     syncBtn.dataset.tone = sum.tone;
@@ -197,6 +198,27 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     syncBtn.setAttribute('aria-label', label);
     if (!pop.hidden) fillPop(sum);
   }
+  // 연결 안내 줄: 아직 연결하지 않았고 닫은 적 없을 때만 (이 PC 에만 기억)
+  function renderHint(sum = summary()) {
+    const hint = $('drive-hint');
+    if (!hint) return;
+    let closed = false;
+    try {
+      closed = localStorage.getItem('memoking.driveHintClosed') === '1';
+    } catch {
+      // 기억을 못 읽으면 보인다
+    }
+    hint.hidden = sum.on || closed;
+  }
+  $('drive-hint-connect')?.addEventListener('click', () => connect());
+  $('drive-hint-close')?.addEventListener('click', () => {
+    try {
+      localStorage.setItem('memoking.driveHintClosed', '1');
+    } catch {
+      // 기억 못 해도 지금은 닫는다
+    }
+    $('drive-hint').hidden = true;
+  });
   function fillPop(sum = summary()) {
     const st = info.status ?? {};
     const focused = pop.contains(document.activeElement) ? document.activeElement.dataset.act : null; // 다시 그려도 누르던 단추에 머물게

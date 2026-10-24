@@ -956,7 +956,7 @@ $('share-both').addEventListener('click', async () => {
   $('pc-note').textContent = 'PC와 휴대폰 설치 링크를 함께 복사했어요';
 });
 
-// ---------- 전역 단축키 바꾸기 (빠른 메모·매직키) ----------
+// ---------- 전역 단축키 바꾸기 (매직 카피·매직키) ----------
 // 키 단추를 누르고 새 조합을 누르면 바뀐다. 다른 앱이 이미 쓰는 키면 바꾸지 않고 알려 준다 (Esc·다른 곳 누르기 = 그만)
 let shortcutState = {};
 const SC_TAKEN = '다른 앱이 이 키를 먼저 쓰고 있어서 작동하지 않아요 (예: 같은 단축키를 쓰는 다른 프로그램). 다른 키로 바꿔 주세요';
@@ -966,7 +966,7 @@ function showShortcuts(sc) {
     const st = shortcutState[name];
     if (!st) continue;
     $(`sc-${name}`).textContent = st.label;
-    $(`sc-${name}`).setAttribute('aria-label', `${name === 'quickMemo' ? '빠른 메모' : '매직키'} 단축키 ${st.label}, 눌러서 바꾸기`);
+    $(`sc-${name}`).setAttribute('aria-label', `${name === 'quickMemo' ? '매직 카피' : '매직키'} 단축키 ${st.label}, 눌러서 바꾸기`);
     $(`sc-${name}-reset`).hidden = st.isDefault;
     $(`sc-${name}-note`).textContent = st.enabled && !st.registered ? SC_TAKEN : '';
     $(`sc-${name}-note`).classList.toggle('warn', st.enabled && !st.registered);
@@ -984,7 +984,7 @@ async function refreshShortcuts({ onlyIfChanged = false } = {}) {
   if (!same) showShortcuts(s.shortcuts);
   showQuickMemo(s.quickMemo);
 }
-// 빠른 메모 · 매직키 칸: 새 키 받기 (key-capture.js — 단축키 설정 창과 같은 동작)
+// 매직 카피 · 매직키 칸: 새 키 받기 (key-capture.js — 단축키 설정 창과 같은 동작)
 function startCapture(name) {
   captureGlobalKey($(`sc-${name}`), {
     api,
@@ -2059,6 +2059,14 @@ $('tutorial-btn').addEventListener('click', () => {
   api.tutorial.start();
 });
 applyInfo(await api.info());
+// 업데이트 뒤 한 번: 개선된 점 (메인이 한 번만 준다)
+api.whatsNew?.().then((n) => {
+  if (!n?.items?.length || !$('whatsnew-dialog')) return;
+  $('whatsnew-title').textContent = `v${n.version} 으로 업데이트했어요`;
+  $('whatsnew-list').replaceChildren(...n.items.map((it) => Object.assign(document.createElement('li'), { textContent: it.title })));
+  $('whatsnew-dialog').showModal();
+}, () => {});
+$('whatsnew-ok')?.addEventListener('click', () => $('whatsnew-dialog').close());
 if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog, showFiles: (files) => showOnlyFiles(files),
   memoFiles: () => (state.memos.length ? new Set(state.memos.map((m) => String(m.file ?? '').replace(/\\/g, '/'))) : null) });
 {

@@ -32,3 +32,20 @@ test('굵은 글 표시 나누기', () => {
   assert.deepEqual(boldParts('앞 **굵게** 뒤'), [{ text: '앞 ', bold: false }, { text: '굵게', bold: true }, { text: ' 뒤', bold: false }]);
   assert.deepEqual(boldParts('그냥 글'), [{ text: '그냥 글', bold: false }]);
 });
+
+test('업데이트 뒤 개선된 점: 지난번 버전 다음부터 지금 버전까지, 버전마다 제목 한 줄 (새것부터 5개)', async () => {
+  const { versionTitles } = await import('../app/js/core/release-notes.js');
+  const readme = [
+    '| `v0.68.0` | 2026-10-24 | 3. 개선 | **처음 쓰기가 가벼워졌어요**: 설치 파일을 열면 … |',
+    '| `v0.67.0` | 2026-10-24 | 3. 개선 | **AI 화면 다듬기 (UI · UX 리뷰 반영)**: … |',
+    '| `v0.63.0` | 2026-10-24 | 4. 기능 | **AI 기본 모델은 카나나2, AI 는 PC 에서만 (휴대폰 0.47.0)**: … |',
+    '| `v0.12.0` | 2026-09-30 | 2. 생성 | 메모 스택(제목 없는 옛 행) |',
+  ].join('\n');
+  assert.deepEqual(versionTitles(readme, '0.66.0', '0.68.0'), [
+    { version: '0.68.0', title: '처음 쓰기가 가벼워졌어요' },
+    { version: '0.67.0', title: 'AI 화면 다듬기 (UI · UX 리뷰 반영)' },
+  ]);
+  assert.deepEqual(versionTitles(readme, null, '0.67.0').map((t) => t.title), ['AI 화면 다듬기 (UI · UX 리뷰 반영)', 'AI 기본 모델은 카나나2, AI 는 PC 에서만']);
+  assert.deepEqual(versionTitles(readme, '0.68.0', '0.68.0'), []);
+  assert.equal(versionTitles(readme, null, '0.68.0', 1).length, 1);
+});
