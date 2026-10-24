@@ -143,8 +143,8 @@ export async function runClipboardChecks({
     check('[클립보드] 메모장 텍스트', r.plain);
     check('[클립보드] 마크다운 텍스트 → 서식으로', r.markdown);
     check('[클립보드] 웹·워드 서식 있는 글 → 굵게·기울임·밑줄·링크·목록 유지', r.html);
-    check('[클립보드] 화면 캡처 그림 → attachments 에 저장', r.screenshot);
-    check('[클립보드] 브라우저 "이미지 복사" → attachments 에 저장', r.webImage, r.webImageDetail);
+    check('[클립보드] 화면 캡처 그림 → attachments에 저장', r.screenshot);
+    check('[클립보드] 브라우저 "이미지 복사" → attachments에 저장', r.webImage, r.webImageDetail);
     check('[클립보드] 탐색기에서 복사한 파일 3개 → 파일 칩·이미지', r.explorer, r.explorerDetail);
     check('[클립보드] 워드처럼 글+그림 → 글만 붙음', r.office, r.officeDetail);
     check('[클립보드] 웹 글+사진 → 사진도 메모 폴더에 저장', r.webMixed);
@@ -222,11 +222,11 @@ export async function runClipboardChecks({
     const before4 = new Set(noteWins.keys());
     const made = await quickMemo({ copy: true, onlyPid: process.pid });
     if (!made) {
-      check('[매직 카피] 선택한 글을 Ctrl+C 로 복사해 메모로 (실제 키 보내기) — 건너뜀: 다른 앱이 맨 앞에 있어 키를 보내지 않음', true);
+      check('[매직 카피] 선택한 글을 Ctrl+C로 복사해 메모로 (실제 키 보내기) — 건너뜀: 다른 앱이 맨 앞에 있어 키를 보내지 않음', true);
     } else {
       const q4id = [...noteWins.keys()].find((k) => !before4.has(k));
       const q4ok = q4id && await mdWhen(q4id, (md) => md.includes('선택해서 빠른 메모로 보낼 글'), '매직 카피: 실제 복사');
-      check('[매직 카피] 선택한 글을 Ctrl+C 로 복사해 메모로 (실제 키 보내기)', q4ok,
+      check('[매직 카피] 선택한 글을 Ctrl+C로 복사해 메모로 (실제 키 보내기)', q4ok,
         q4id ? readMemo(q4id).split('---').pop().slice(0, 200) : '새 메모가 열리지 않음');
       if (q4id) await closeNote(q4id);
     }

@@ -26,7 +26,7 @@ export function sseText(line) {
 /** 엔진(llama-server)이 꺼질 때의 로그 → 사람이 알아듣는 까닭 (PC ai-service.js · 휴대폰 LocalAi.kt 가 같은 말로) */
 export function engineError(log, code) {
   const arch = /unknown model architecture: '([^']+)'/.exec(log)?.[1];
-  if (arch) return `이 엔진이 모르는 모델 구조예요 (${arch}). 같은 모델을 엔진이 아는 구조로 바꾼 GGUF 를 넣어 주세요`;
+  if (arch) return `이 엔진이 모르는 모델 구조예요 (${arch}). 같은 모델을 엔진이 아는 구조로 바꾼 GGUF를 넣어 주세요`;
   if (/out of memory|failed to allocate|bad_alloc/i.test(log)) return '메모리가 모자라요. 더 작은 모델을 넣거나 다른 앱을 닫아 주세요';
   return `모델이 멈췄어요 (${code})`;
 }
@@ -35,8 +35,8 @@ export function engineError(log, code) {
 export const replyText = (data) => noThink(data.choices?.[0]?.message?.content);
 
 /**
- * 주고받는 길만 받아 chat · embed 를 만든다
- * @param {(role: 'chat' | 'embed', route: string, body: object, o: { signal?: AbortSignal, onLine?: (line: string) => void }) => Promise<any>} request
+ * 주고받는 길만 받아 chat 을 만든다
+ * @param {(role: 'chat', route: string, body: object, o: { signal?: AbortSignal, onLine?: (line: string) => void }) => Promise<any>} request
  *   onLine 을 주면 스트리밍 답을 줄마다 넘기고, 아니면 답 JSON 을 돌려준다
  */
 export function llamaClient(request) {
@@ -53,11 +53,6 @@ export function llamaClient(request) {
         },
       });
       return noThink(text);
-    },
-    /** 검색 모델로 글들의 벡터 */
-    async embed(texts) {
-      const data = await request('embed', '/v1/embeddings', { input: texts });
-      return data.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
     },
   };
 }

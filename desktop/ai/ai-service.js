@@ -7,11 +7,10 @@ import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { createRagStore } from '../../app/js/core/rag-store.js';
 import { llamaClient, engineError } from '../../app/js/core/llama-client.js';
 import { DEFAULT_MODEL, modelInfoUrl, pickModelFile } from '../../app/js/core/model-catalog.js';
 
-export const AI_ROLES = { chat: '글 모델', embed: '검색 모델' };
+export const AI_ROLES = { chat: 'AI 모델' };
 const IDLE_MS = 5 * 60_000;
 const START_MS = 3 * 60_000; // 느린 PC 에서 큰 모델을 올리는 시간
 
@@ -38,7 +37,7 @@ const freePort = () => new Promise((resolve, reject) => {
 });
 
 /**
- * @param {{ dir: string, serverPath: string, getNames: () => { chat?: string, embed?: string },
+ * @param {{ dir: string, serverPath: string, getNames: () => { chat?: string },
  *           setName: (role: string, name: string) => void, onStatus: (status) => void, spawn?: typeof childSpawn, fetch?: typeof fetch }} opts
  *   fetch: 기본 모델 받기 (PC 는 Electron net.fetch — 시스템 프록시를 따른다)
  */
@@ -49,6 +48,8 @@ export function createAiService(opts) {
   const progress = new Map(); // role → 기본 모델을 받은 정도 (0~1)
   const errors = new Map(); // role → 마지막 오류 (화면에 보임)
   const fileOf = (role) => path.join(dir, `${role}.gguf`);
+  // 0.69.0: AI 검색도 글 모델(카나나2) 하나로 — 예전에 넣은 검색 모델 · 벡터는 쓰지 않으니 치운다 (몇백 MB)
+  for (const f of ['embed.gguf', 'embed.gguf.part', 'vectors.json']) fs.rmSync(path.join(dir, f), { force: true });
 
   function status() {
     const one = (role) => {
@@ -59,7 +60,7 @@ export function createAiService(opts) {
       const state = copying.has(role) ? 'copying' : !size ? 'missing' : servers.has(role) ? 'running' : 'ready';
       return { state, name: size ? (opts.getNames()[role] ?? '') : '', size, error: errors.get(role) ?? '', progress: progress.get(role) ?? null };
     };
-    return { engine: fs.existsSync(serverPath), chat: one('chat'), embed: one('embed') };
+    return { engine: fs.existsSync(serverPath), chat: one('chat') };
   }
   const emit = () => opts.onStatus(status());
 
@@ -141,6 +142,7 @@ export function createAiService(opts) {
   }
 
   async function remove(role) {
+    if (!AI_ROLES[role]) throw new Error('모르는 모델이에요');
     await stop(role);
     fs.rmSync(fileOf(role), { force: true });
     errors.delete(role);
@@ -154,7 +156,7 @@ export function createAiService(opts) {
   function start(role) {
     const running = servers.get(role);
     if (running) return running.ready;
-    if (!fs.existsSync(serverPath)) return Promise.reject(new Error('이 PC 에 AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'));
+    if (!fs.existsSync(serverPath)) return Promise.reject(new Error('이 PC에 AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'));
     if (!fs.existsSync(fileOf(role))) return Promise.reject(new Error(`${AI_ROLES[role]} 파일을 먼저 넣어 주세요 (설정의 AI 도우미)`));
     const s = {};
     servers.set(role, s);
@@ -164,7 +166,6 @@ export function createAiService(opts) {
       s.base = `http://127.0.0.1:${port}`;
       s.key = randomBytes(16).toString('hex'); // 이 PC 의 다른 프로그램 · 웹 페이지가 모델을 부르지 못하게
       const args = ['-m', fileOf(role), '--host', '127.0.0.1', '--port', String(port), '--api-key', s.key, '--no-webui', '-c', '4096', '-np', '1'];
-      if (role === 'embed') args.push('--embedding', '-b', '4096', '-ub', '4096'); // 긴 메모 하나를 한 번에
       s.proc = spawn(serverPath, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
       const log = [];
       s.proc.stderr.setEncoding('utf8').on('data', (chunk) => {
@@ -222,7 +223,7 @@ export function createAiService(opts) {
         body: JSON.stringify(body),
         signal,
       });
-      if (!res.ok) throw new Error(`AI 가 답하지 못했어요 (${res.status})`);
+      if (!res.ok) throw new Error(`AI가 답하지 못했어요 (${res.status})`);
       if (!onLine) return await res.json();
       const decoder = new TextDecoder();
       let buf = '';
@@ -241,18 +242,10 @@ export function createAiService(opts) {
     }
   }
 
-  const { chat, embed } = llamaClient(request);
+  const { chat } = llamaClient(request);
 
   return {
-    status, emit, importModel, downloadDefault, cancelDownload: () => (stopDownload = true), remove, chat, embed,
-    // AI 검색용 조각 · 벡터 — 이 PC 에만
-    rag: createRagStore({
-      load: () => fs.promises.readFile(path.join(dir, 'vectors.json'), 'utf8').catch(() => null),
-      save: async (text) => {
-        await fs.promises.mkdir(dir, { recursive: true });
-        await fs.promises.writeFile(path.join(dir, 'vectors.json'), text);
-      },
-    }),
+    status, emit, importModel, downloadDefault, cancelDownload: () => (stopDownload = true), remove, chat,
     close: () => {
       for (const s of servers.values()) {
         clearTimeout(s.timer);

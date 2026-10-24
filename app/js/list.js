@@ -97,12 +97,21 @@ function applyInfo(info) {
   if (state.onlyFiles && info.vaultPath !== state.info?.vaultPath) closeOnlyFiles(); // 다른 메모 폴더로 바뀌면 사본만 보기를 푼다
   state.info = info;
   const ready = Boolean(info.vaultPath);
-  el.setup.hidden = ready;
+  const lost = !ready && Boolean(info.missingPath);
+  el.setup.hidden = ready || lost;
+  $('lost').hidden = !lost;
+  $('lost-path').textContent = info.missingPath ?? '';
   el.main.hidden = !ready;
   el.suggested.textContent = info.suggestedPath;
   el.setupError.hidden = !info.vaultError;
   el.setupError.textContent = info.vaultError ?? '';
-  el.vaultPath.textContent = info.vaultPath ?? '';
+  // 설정의 메모 폴더: 폴더 이름은 굵게, 전체 경로는 그 아래 작게 (긴 경로가 이름을 묻지 않게)
+  const vp = info.vaultPath ?? '';
+  const name = document.createElement('b');
+  name.textContent = vp.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
+  const full = document.createElement('small');
+  full.textContent = vp;
+  el.vaultPath.replaceChildren(name, full);
 }
 
 // 목록을 이 파일들만으로 좁히기 (동기화 충돌 사본) — 위에 "N개만 보는 중 · 모두 보기"
@@ -655,7 +664,7 @@ const MAX_TEXT_BYTES = 5 * 1024 * 1024;
 const dropShade = document.createElement('div');
 dropShade.className = 'file-drop';
 dropShade.hidden = true;
-dropShade.innerHTML = '<div class="file-drop-box"><b>놓으면 메모로 만들어요</b><span>.md, .txt 는 글 그대로, 그림과 파일은 메모 안에</span></div>';
+dropShade.innerHTML = '<div class="file-drop-box"><b>놓으면 메모로 만들어요</b><span>.md, .txt는 글 그대로, 그림과 파일은 메모 안에</span></div>';
 document.body.append(dropShade);
 const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
 let dragDepth = 0;
@@ -824,6 +833,25 @@ api.memo.handoff().then(showHandoff).catch(() => {});
 
 el.useSuggested.addEventListener('click', async () => applyInfo(await api.vault.use(state.info.suggestedPath)));
 el.chooseFolder.addEventListener('click', async () => applyInfo(await api.vault.choose()));
+// 설정 바로가기: 그 묶음으로 넘기기 (AI 도우미가 숨어 있으면 다른 AI 앱 연결로)
+document.querySelector('.set-jump')?.addEventListener('click', (e) => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a) return;
+  e.preventDefault();
+  const head = [a.getAttribute('href').slice(1), a.dataset.alt].map((id) => id && $(id)).find((h) => h && !h.closest('[hidden]'));
+  head?.closest('section')?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+});
+// 쓰던 폴더를 찾지 못했을 때: 옮긴 폴더 고르기 · 다시 찾아보기 · (확인 뒤) 새 빈 폴더
+$('lost-pick').addEventListener('click', async () => applyInfo(await api.vault.choose()));
+$('lost-retry').addEventListener('click', async () => {
+  const info = await api.vault.retry();
+  applyInfo(info);
+  if (info.stillMissing) $('lost-note').textContent = '아직 찾지 못했어요. 폴더를 옮겼다면 옮긴 폴더 고르기로 알려 주세요.';
+});
+$('lost-fresh').addEventListener('click', async () => {
+  const ok = await confirmDialog(`${state.info.suggestedPath}에서 새로 시작할까요?\n찾지 못한 폴더의 메모는 그대로 있어요. 나중에 설정 › 메모 폴더에서 다시 고를 수 있어요.`, '새로 시작');
+  if (ok) applyInfo(await api.vault.use(state.info.suggestedPath));
+});
 
 // ---------- 새 메모: + 를 누르면 위로 위성 버튼 (음성 메모 · 손 메모 · 글 메모) — 휴대폰과 같음 ----------
 function setFabMenu(open, { keyboard = false } = {}) {
@@ -910,6 +938,7 @@ function showMcp(m, message = '') {
         : m.claudeFound ? '연결하면 Claude에게 "장보기 메모에 우유 추가해 줘" 처럼 부탁할 수 있어요'
           : 'Claude 데스크톱이 없으면 설정 복사로 다른 AI 앱(Cursor 등)에 넣을 수 있어요');
   $('mcp-box').classList.toggle('on', m.connected && !m.stale);
+  if (m.connected) $('mcp-adv').open = true; // 연결해 둔 사람에게는 상태가 보이게
   $('mcp-connect').textContent = m.stale ? '다시 연결' : 'Claude 데스크톱에 연결';
   $('mcp-connect').hidden = m.connected && !m.stale;
   $('mcp-disconnect').hidden = !m.connected;
@@ -1054,23 +1083,24 @@ if (api.stt) {
 // ---------- AI 도우미 (desktop/ai — 인터넷 없이 이 PC 안에서) ----------
 // 모델 파일(.gguf)은 사용자가 넣는다 (USB 로 옮긴 파일도). 이 PC 의 앱 데이터 폴더에 복사되고, 메모 폴더에는 넣지 않음
 const AI_HINT = {
-  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 아래 기본 모델을 받거나 .gguf 파일을 넣어 주세요 (메모리 8GB PC 는 2~4B)',
-  embed: '내 메모에서 AI 로 찾을 때 써요 (예: KURE-v1 .gguf)',
+  chat: '맞춤법, 태그, 일정, AI에게 묻기에 써요. 아래에서 카나나2를 받아 주세요 (인터넷이 없는 PC는 받아 둔 파일 넣기)',
 };
 // 모델 이름: 기본 모델은 이름으로 (파일 이름은 사용자 말이 아님), 직접 넣은 모델은 파일 이름
 const modelName = (m) => (DEFAULT_MODEL.file.test(m.name ?? '') ? DEFAULT_MODEL.label : m.name || '모델');
 function renderAi(st, failed = {}) {
   if (!st) return;
-  for (const role of ['chat', 'embed']) {
+  for (const role of ['chat']) {
     const m = st[role];
     const have = m.state === 'ready' || m.state === 'running';
-    $(`ai-${role}-note`).textContent = !st.engine ? 'AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'
-      : failed[role] || m.error || (m.state === 'copying' ? (m.progress != null ? `${DEFAULT_MODEL.label} 를 받는 중이에요 ${Math.round(m.progress * 100)}%` : '모델 파일을 복사하는 중이에요. 몇 분 걸릴 수 있어요')
+    $(`ai-${role}-note`).textContent = !st.engine ? 'AI를 쓸 준비가 덜 됐어요. 백신이 AI 파일을 막았을 수 있어요. 아래에서 설치 파일을 다시 받아 덮어 설치하면 메모는 그대로예요'
+      : failed[role] || m.error || (m.state === 'copying' ? (m.progress != null ? `${DEFAULT_MODEL.label}를 받는 중이에요 ${Math.round(m.progress * 100)}%` : '모델 파일을 복사하는 중이에요. 몇 분 걸릴 수 있어요')
         : have ? `${modelName(m)} · ${(m.size / 2 ** 30).toFixed(1)}GB${m.state === 'running' ? ' · 켜져 있어요' : ''}` : AI_HINT[role]);
     $(`ai-${role}-import`).disabled = !st.engine || m.state === 'copying';
-    $(`ai-${role}-import`).textContent = have ? '다른 모델로' : '모델 파일 넣기';
+    $(`ai-${role}-import`).title = !st.engine ? 'AI를 쓸 준비가 되면 넣을 수 있어요' : m.state === 'copying' ? '받거나 복사하는 중이에요' : '';
+    $(`ai-${role}-import`).textContent = have ? '다른 파일로 바꾸기' : '받아 둔 파일 넣기';
     $(`ai-${role}-remove`).hidden = !have;
   }
+  $('ai-reinstall-row').hidden = Boolean(st.engine);
   const ready = st.engine && ['ready', 'running'].includes(st.chat.state);
   // 기본 모델: 글 모델이 없을 때 한 번 받기 (인터넷이 없는 곳은 위 모델 파일 넣기). 예전 기본(젬마)을 받은 PC 는 바꾸기로, 받는 중이면 멈추기
   const old = st.chat.state === 'ready' && /gemma/i.test(st.chat.name ?? '');
@@ -1078,7 +1108,7 @@ function renderAi(st, failed = {}) {
   $('ai-default-row').hidden = !st.engine || !(st.chat.state === 'missing' || old || downloading);
   $('ai-default').hidden = downloading;
   $('ai-default-stop').hidden = !downloading;
-  $('ai-default').textContent = old ? `${DEFAULT_MODEL.label} 로 바꾸기 (${DEFAULT_MODEL.approx}, 한국어에 맞춘 모델)` : `${DEFAULT_MODEL.label} 받기 (${DEFAULT_MODEL.approx})`;
+  $('ai-default').textContent = old ? `${DEFAULT_MODEL.label}로 바꾸기 (${DEFAULT_MODEL.approx}, 한국어에 맞춘 모델)` : `${DEFAULT_MODEL.label} 받기 (${DEFAULT_MODEL.approx})`;
   $('ai-try').hidden = !ready;
   // 글 모델이 있으면 태그 켜고 끄기는 "AI 가 자동으로 하는 일" 묶음에서 (위 태그 자동 추가 줄은 AI 없는 PC 용)
   $('ai-auto-group').hidden = !ready;
@@ -1094,7 +1124,7 @@ function renderAiTagging(p) {
 }
 if (api.ai) {
   api.on('ai:status', (st) => renderAi(st));
-  for (const role of ['chat', 'embed']) {
+  for (const role of ['chat']) {
     $(`ai-${role}-import`).addEventListener('click', async () => {
       const st = await api.ai.importModel(role);
       renderAi(st, st?.error ? { [role]: st.error } : {});
@@ -1110,6 +1140,7 @@ if (api.ai) {
     renderAi(st, st?.error ? { chat: st.error } : {});
   });
   $('ai-default-stop').addEventListener('click', () => api.ai.cancelDownload());
+  $('ai-reinstall').addEventListener('click', () => api.links.open(WINDOWS_SETUP));
   api.on('ai:tagging', renderAiTagging);
   api.tags.aiStatus().then(renderAiTagging);
   $('ai-tags-all').addEventListener('click', async () => {
@@ -1118,7 +1149,7 @@ if (api.ai) {
     if (!p?.total) $('ai-tags-note').textContent = '예전 메모도 모두 봤어요';
   });
   $('ai-tags-clear').addEventListener('click', async () => {
-    if (!(await confirmDialog('AI 가 단 태그를 모든 메모에서 지울까요?\n지운 메모에는 AI 태그를 다시 달지 않아요. 직접 단 태그는 그대로예요.', '지우기'))) return;
+    if (!(await confirmDialog('AI가 단 태그를 모든 메모에서 지울까요?\n지운 메모에는 AI 태그를 다시 달지 않아요. 직접 단 태그는 그대로예요.', '지우기'))) return;
     const n = await api.tags.aiClear();
     $('ai-tags-note').textContent = n ? `메모 ${n}개에서 AI 태그를 지웠어요` : '지울 AI 태그가 없어요';
   });
@@ -2062,7 +2093,7 @@ applyInfo(await api.info());
 // 업데이트 뒤 한 번: 개선된 점 (메인이 한 번만 준다)
 api.whatsNew?.().then((n) => {
   if (!n?.items?.length || !$('whatsnew-dialog')) return;
-  $('whatsnew-title').textContent = `v${n.version} 으로 업데이트했어요`;
+  $('whatsnew-title').textContent = `v${n.version}으로 업데이트했어요`;
   $('whatsnew-list').replaceChildren(...n.items.map((it) => Object.assign(document.createElement('li'), { textContent: it.title })));
   $('whatsnew-dialog').showModal();
 }, () => {});
@@ -2115,9 +2146,9 @@ function showUpdateRow(st) {
     checking: UI.updChecking,
     latest: UI.updLatest,
     dev: '개발 중에는 확인하지 않아요',
-    available: `새 버전 v${st.version} 이 나왔어요`,
+    available: `새 버전 v${st.version}이 나왔어요`,
     downloading: UI.updDownloading,
-    ready: `v${st.version} 을 받아 뒀어요. 끝낼 때도 설치돼요`,
+    ready: `v${st.version}을 받아 뒀어요. 끝낼 때도 설치돼요`,
     error: st.message ?? '',
   }[st.status] ?? '';
   updateEl.note.textContent = text;
@@ -2153,7 +2184,7 @@ function renderUpdateDialog(st) {
   to.className = 'to';
   to.textContent = `v${st.version ?? ''}`;
   updateEl.version.replaceChildren(from, arrow, to);
-  updateEl.version.setAttribute('aria-label', `지금 ${from.textContent}에서 ${to.textContent} 으로`);
+  updateEl.version.setAttribute('aria-label', `지금 ${from.textContent}에서 ${to.textContent}으로`);
   renderReleaseNotes(updateEl.notes, st.notes);
   updateEl.notes.scrollTop = 0;
   updateEl.progress.hidden = !downloading;

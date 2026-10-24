@@ -153,7 +153,7 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
     vault.trash(find('연습 공간이에요')); // 튜토리얼 안내 메모는 빼고
     { // 튜토리얼 예시의 "예시 문서" 링크는 실제로 쓰는 듯한 공유 폴더로
       const file = path.join(VAULT, vault.get(find('출시 준비')).file);
-      fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('[예시 문서](https://example.com) 에', '[팀 공유 폴더](https://drive.google.com) 에 있어요'));
+      fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('[예시 문서](https://example.com)에', '[팀 공유 폴더](https://drive.google.com)에 있어요'));
       await wait(600);
     }
     for (const m of WORK_MEMOS) {

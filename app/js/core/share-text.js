@@ -73,8 +73,8 @@ export function shareText(markdown) {
       counters.length = 0;
       continue;
     }
-    // 줄 앞 들여쓰기(편집기가 줄 바꿈 없는 빈칸 U+00A0 로 지킨 것 — core/indent-spaces.js)는 그 칸 수 그대로
-    //   (목록 · 제목보다 먼저: U+00A0 로 시작하는 줄은 마크다운에서도 그냥 글)
+    // 줄 앞 들여쓰기(편집기가 줄 바꿈 없는 빈칸 U+00A0로 지킨 것 — core/indent-spaces.js)는 그 칸 수 그대로
+    //   (목록 · 제목보다 먼저: U+00A0로 시작하는 줄은 마크다운에서도 그냥 글)
     const indent = /^\u00a0+/.exec(raw)?.[0];
     if (indent) {
       counters.length = 0;

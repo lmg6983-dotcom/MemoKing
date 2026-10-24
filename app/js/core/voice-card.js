@@ -110,7 +110,7 @@ export function audioNeedingTranscript(body) {
 }
 
 /**
- * 음성 카드의 받아쓴 글을 통째로 바꾼다 (말한 사람을 나눈 뒤 "화자 N:" 을 붙일 때). 카드가 아니면 attachTranscript 처럼
+ * 음성 카드의 받아쓴 글을 통째로 바꾼다 (말한 사람을 나눈 뒤 "화자 N:" 을 붙일 때). 카드가 아니면 attachTranscript처럼
  * @returns {string | null} 소리 줄이 없으면 null
  */
 export function replaceTranscript(body, src, transcript) {

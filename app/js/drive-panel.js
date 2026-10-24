@@ -93,7 +93,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
   function summary() {
     const st = info.status ?? { state: 'off' };
     const on = info.connected && info.active;
-    if (info.reconnect && !info.connected) return { tone: 'error', title: UI.reconnect, sub: 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC 에 그대로 있어요', on };
+    if (info.reconnect && !info.connected) return { tone: 'error', title: UI.reconnect, sub: 'Google Drive 연결 방식이 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC에 그대로 있어요', on };
     if (!info.connected) return { tone: 'off', title: '동기화 꺼짐', sub: 'Google 계정으로 연결하면 휴대폰 메모킹과 같은 메모를 써요', on };
     if (!info.active) return { tone: 'off', title: `${info.email || 'Google 계정'} 로그인됨`, sub: '동기화할 Drive 폴더를 아직 고르지 않았어요', on };
     const where = `${info.email || 'Google 계정'}의 ${info.folderName || '메모킹'} 폴더`;
@@ -217,7 +217,10 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     } catch {
       // 기억 못 해도 지금은 닫는다
     }
-    $('drive-hint').hidden = true;
+    // 어디서 다시 찾는지 잠깐 알려 주고 닫는다 (단추는 감춰 다시 누르지 않게)
+    $('drive-hint-text').textContent = '설정 › Google Drive 동기화에서 언제든 연결할 수 있어요';
+    for (const b of ['drive-hint-connect', 'drive-hint-close']) $(b).hidden = true;
+    setTimeout(() => ($('drive-hint').hidden = true), 4000);
   });
   function fillPop(sum = summary()) {
     const st = info.status ?? {};
@@ -252,7 +255,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     if (conflicts.length) {
       const note = document.createElement('p');
       note.className = 'sync-pop-note';
-      note.textContent = '양쪽에서 같은 메모를 고쳐 이 PC 에서 쓴 것을 "(PC 충돌 …)" 사본으로 남겼어요. 확인하고 필요 없으면 삭제하세요';
+      note.textContent = '양쪽에서 같은 메모를 고쳐 이 PC에서 쓴 것을 "(PC 충돌 …)" 사본으로 남겼어요. 확인하고 필요 없으면 삭제하세요';
       pop.append(note);
     }
   }
@@ -400,11 +403,11 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
 
   async function openFolders() {
     step('folder');
-    $('drive-account').textContent = info.email ? `${info.email} 의 Drive` : '';
+    $('drive-account').textContent = info.email ? `${info.email}의 Drive` : '';
     $('folder-local').textContent = info.insideDriveApp
       ? `지금 메모 폴더(${info.root})의 메모를 "문서\\메모킹" 으로 복사해서 맞춰요. 원래 폴더는 그대로 둬요.`
       : !info.root ? '이 PC 에서는 "문서\\메모킹" 폴더에 메모를 두고 맞춰요.'
-      : `이 PC 의 메모 폴더: ${info.root} (처음 맞출 때 이 메모들을 새 폴더로 올려요)`;
+      : `이 PC의 메모 폴더: ${info.root} (처음 맞출 때 이 메모들을 새 폴더로 올려요)`;
     $('folder-change-note').hidden = !info.active;
     folderMsg('');
     path = [{ id: 'root', name: UI.myDrive }];
@@ -573,7 +576,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     const id = $('client-id').value.trim();
     if (!/\.apps\.googleusercontent\.com$/.test(id)) {
       $('client-id').focus();
-      $('client-id').setCustomValidity?.('apps.googleusercontent.com 으로 끝나는 클라이언트 ID 를 넣어 주세요');
+      $('client-id').setCustomValidity?.('apps.googleusercontent.com으로 끝나는 클라이언트 ID를 넣어 주세요');
       $('client-id').reportValidity?.();
       return;
     }
@@ -625,7 +628,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     } catch {
       // 이번에만 묻기
     }
-    if (await confirm('Google Drive 동기화를 다시 켜 주세요.\n연결 방식이 더 안전하게 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC 에 그대로 있어요.', '다시 연결')) connect();
+    if (await confirm('Google Drive 동기화를 다시 켜 주세요.\n연결 방식이 더 안전하게 바뀌었어요 (메모킹이 만든 폴더만 봐요). 메모는 이 PC에 그대로 있어요.', '다시 연결')) connect();
   });
   return { refresh };
 }

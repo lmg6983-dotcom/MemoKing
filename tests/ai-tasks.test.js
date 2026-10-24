@@ -1,17 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAiTasks } from '../app/js/core/ai-tasks.js';
-import { createRagStore } from '../app/js/core/rag-store.js';
 
 const memos = [
   { id: 'a', body: '# 주간 회의\n\n출시일은 11월 3일 #업무 #회의' },
   { id: 'b', body: '# 장보기\n\n우유 계란 #장보기' },
 ];
-const tasks = (chat, status = { chat: { state: 'ready' }, embed: { state: 'missing' } }) => createAiTasks({
-  ai: { status: () => status, chat, embed: async (texts) => texts.map(() => [1, 0]) },
+const tasks = (chat) => createAiTasks({
+  ai: { status: () => ({ chat: { state: 'ready' } }), chat },
   memos: () => memos,
   graph: () => [],
-  store: createRagStore({ load: async () => null, save: async () => {} }),
 });
 
 test('AI 작업: 맞춤법은 믿을 만한 답만, 아니면 원래 글', async () => {
@@ -28,12 +26,20 @@ test('AI 작업: 더 달 태그 — 이미 단 태그와 합쳐 3개까지, 모�
   await assert.rejects(tasks(async () => { throw new Error('모델 없음'); }).autoTags('# 내일 회의', 'x'), /모델 없음/);
 });
 
-test('AI 작업: 검색 모델 없이도 낱말로 찾아 근거 메모만 주고 답', async () => {
-  let asked = '';
-  const r = await tasks(async (m) => { asked = m[1].content; return '11월 3일이에요 [1]'; }).ask('출시일');
+test('AI 검색: 카나나2 가 질문을 넓혀 낱말로 찾고, 근거 메모만 주고 답', async () => {
+  const asked = [];
+  const chat = async (m, o) => {
+    asked.push(m[1].content);
+    if (o?.schema) return '{"words":["출시일"]}'; // "언제 내놓아" 를 메모의 낱말로 넓힘
+    return '11월 3일이에요 [1]';
+  };
+  const r = await tasks(chat).ask('언제 내놓아');
   assert.equal(r.text, '11월 3일이에요 [1]');
   assert.equal(r.sources[0].id, 'a');
-  assert.match(asked, /\[1\] 주간 회의/);
+  assert.match(asked[1], /\[1\] 주간 회의/);
+  // 넓히기가 실패해도 질문 낱말로는 찾는다
+  const plain = await tasks(async (m, o) => { if (o?.schema) throw new Error('모델 오류'); return '우유요 [1]'; }).ask('우유');
+  assert.equal(plain.sources[0].id, 'b');
 });
 
 test('AI 작업: 매직키 다듬기 — 문단마다 믿을 만한 맞춤법만, 첫 줄이 길면 맨 위에 제목', async () => {

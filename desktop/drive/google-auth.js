@@ -312,9 +312,9 @@ export class GoogleAuth {
 export function invalidClientHelp(err, source) {
   if (!(err instanceof AuthError) || !/invalid_client|client secret is invalid|client_secret|Unauthorized|The OAuth client was not found/i.test(err.message)) return null;
   const where = {
-    manual: '설정에 붙여 넣은 클라이언트 ID, 보안 비밀번호가 서로 맞지 않아요. 설정의 Google Drive 의 클라이언트를 삭제하거나 같은 클라이언트의 값으로 다시 붙여 넣어 주세요 (삭제하면 앱에 들어 있는 연결 정보를 써요)',
-    bundled: '이 앱에 들어 있는 Google 연결 정보(보안 비밀번호)가 맞지 않아요. 배포할 때 넣는 MEMOKING_GOOGLE_CLIENT_ID, MEMOKING_GOOGLE_CLIENT_SECRET 이 같은 클라이언트의 값인지 확인하고 다시 배포해야 해요',
-    env: '환경 변수 MEMOKING_GOOGLE_CLIENT_ID, MEMOKING_GOOGLE_CLIENT_SECRET 이 서로 맞지 않아요',
+    manual: '설정에 붙여 넣은 클라이언트 ID, 보안 비밀번호가 서로 맞지 않아요. 설정의 Google Drive의 클라이언트를 삭제하거나 같은 클라이언트의 값으로 다시 붙여 넣어 주세요 (삭제하면 앱에 들어 있는 연결 정보를 써요)',
+    bundled: '이 앱에 들어 있는 Google 연결 정보(보안 비밀번호)가 맞지 않아요. 배포할 때 넣는 MEMOKING_GOOGLE_CLIENT_ID, MEMOKING_GOOGLE_CLIENT_SECRET이 같은 클라이언트의 값인지 확인하고 다시 배포해야 해요',
+    env: '환경 변수 MEMOKING_GOOGLE_CLIENT_ID, MEMOKING_GOOGLE_CLIENT_SECRET이 서로 맞지 않아요',
     remembered: '예전에 로그인했던 클라이언트의 보안 비밀번호가 더 이상 맞지 않아요. 설정에서 클라이언트를 새로 붙여 넣어 주세요',
   }[source] ?? 'Google 클라이언트(ID, 보안 비밀번호)를 확인해 주세요';
   return new AuthError(`Google 로그인 오류: 클라이언트 보안 비밀번호가 올바르지 않아요. ${where}. (원문: ${err.message.replace(/^Google 로그인 오류: /, '')})`);

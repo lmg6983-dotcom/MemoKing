@@ -214,7 +214,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 }
 /* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
   :where(:root[data-theme="dark"]) .chip[aria-pressed="true"], :where(:root[data-theme="dark"]) .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
-.tag-chip small { font-weight: 500; opacity: 0.6; }
+.tag-chip small { font-size: 12px; font-weight: 500; opacity: 0.72; }
 .tag-strip {
   display: flex;
   gap: 6px;
@@ -232,7 +232,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 2px 12px;
+  padding: 2px 12px 96px; /* 마지막 카드가 + 버튼 위로 올라오게 */
 }
 .cards .col { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
 .cards[data-layout="rows"] .col { gap: 8px; }

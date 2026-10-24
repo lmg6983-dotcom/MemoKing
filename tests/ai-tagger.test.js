@@ -17,7 +17,7 @@ function setup({ picks = ['회의', '거래처', '출장'], open = new Set() } =
   const progress = [];
   const tagger = createAiTagger({
     getVault: () => vault, tasks: () => tasks, ready: async () => true, isOpen: (id) => open.has(id), enabled: () => true,
-    onProgress: (p) => progress.push(p), settleMs: 5,
+    onProgress: (p) => progress.push(p),
   });
   return { dir, vault, tagger, asked, progress, done: () => {
     vault.close();
@@ -56,6 +56,12 @@ test('AI 태그: 열린 메모 · 태그가 이미 3개인 메모는 건너뛰�
     await t.tagger.add([full, opened]);
     assert.equal(t.asked.length, 0);
     assert.equal(t.vault.get(opened).aiTags, null); // 닫을 때 다시
+    // "예전 메모에도 달기" 는 건너뛸 메모(태그 3개 · 빈 메모)를 세지 않는다 — 다 달면 끝났다고 보이게
+    t.vault.import({ body: '' });
+    open.clear();
+    assert.equal(t.tagger.all().total, 1);
+    await t.tagger.add([]);
+    assert.equal(t.tagger.all().total, 0);
   } finally {
     t.done();
   }
@@ -110,12 +116,14 @@ test('AI 뒤처리: 새로 쓴 줄의 일정을 넣고, 본 줄은 다시 묻지
   vault.open();
   const asked = [];
   const added = [];
+  const written = [];
   const tagger = createAiTagger({
     getVault: () => vault, ready: async () => true, isOpen: () => false, enabled: () => false, eventsOn: () => true,
     onEvents: (id, events) => added.push(...events),
     tasks: () => ({ autoEvents: async (body, o) => {
+      written.push(o.written);
       const { createAiTasks } = await import('../app/js/core/ai-tasks.js');
-      return createAiTasks({ ai: { chat: async (m) => { asked.push(m[1].content); return '{"events":[{"n":1,"title":"치과"}]}'; } }, memos: () => [], graph: () => [], store: null }).autoEvents(body, o);
+      return createAiTasks({ ai: { chat: async (m) => { asked.push(m[1].content); return '{"events":[{"n":1,"title":"치과"}]}'; } }, memos: () => [], graph: () => [] }).autoEvents(body, o);
     } }),
   });
   try {
@@ -123,6 +131,7 @@ test('AI 뒤처리: 새로 쓴 줄의 일정을 넣고, 본 줄은 다시 묻지
     await tagger.add([id]);
     assert.equal(vault.get(id).reminders.length, 1);
     assert.equal(added[0].title, '치과');
+    assert.equal(written[0].getTime(), Date.parse(vault.get(id).updated)); // "내일" 은 처리한 때가 아니라 고친 때 기준
     vault.save(id, `${vault.get(id).body}\n메모 더 씀`);
     await tagger.add([id]);
     assert.equal(asked.length, 1); // 본 줄은 다시 묻지 않음

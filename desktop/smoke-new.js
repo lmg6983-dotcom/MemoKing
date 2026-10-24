@@ -172,7 +172,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     check('매직키: 결과 묶음은 캡슐 순서대로, 머리말은 여러 줄 묶음에만 · 캡슐 점과 같은 색', groups0 === 'memo,notes,files,web,ai' && heads === 'notes,files' && dotColor, JSON.stringify({ groups0, heads }));
     await typeMagic('견적서 정리해줘');
     const asked = await until(async () => (await groupOrder()).includes('ai') && groupOrder(), '묻는 글');
-    check('매직키: 묻는 글이면 AI 에게 묻기가 새 메모 바로 아래', asked.startsWith('memo,ai'), asked);
+    check('매직키: 묻는 글이면 AI에게 묻기가 새 메모 바로 아래', asked.startsWith('memo,ai'), asked);
     await typeMagic('견적서');
     await until(async () => (await groupOrder()) === 'memo,notes,files,web,ai', '다시 견적서');
     const at = (mod) => js(magic, `(() => { const r = document.querySelector('.magic-chip[data-mod="${mod}"]').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: r.width }; })()`);
@@ -232,7 +232,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     await wait(300); // 메모 · 파일 찾기 결과가 다 온 뒤에 (늦게 온 결과가 아래 안내를 다시 그리지 않게)
     key(magic, 'Return');
     const calcFlash = await until(() => js(magic, `document.querySelector('.magic-flash')?.textContent`), '계산 결과 복사').catch(() => '');
-    check('매직키 계산기: 식을 쓰면 맨 위에 결과(골라져 있음) · Enter 로 결과 복사', calcRow?.t === '3,600' && calcRow.s === '1,200 × 3' && calcRow.sel === 'true' && /계산 결과를 복사/.test(calcFlash), JSON.stringify({ calcRow, calcFlash }));
+    check('매직키 계산기: 식을 쓰면 맨 위에 결과(골라져 있음) · Enter로 결과 복사', calcRow?.t === '3,600' && calcRow.s === '1,200 × 3' && calcRow.sel === 'true' && /계산 결과를 복사/.test(calcFlash), JSON.stringify({ calcRow, calcFlash }));
     showMagic();
     await wait(300);
     await typeMagic('서울 날씨');
@@ -256,7 +256,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     key(magic, 'Return');
     await wait(300);
     const webOpened = smokeOpened.slice(before).map((o) => o.target);
-    check('매직키 웹 검색 · AI: 맨 아래 두 줄 (기본 네이버 · ChatGPT 가 첫 단추) · 고른 사이트로 열기',
+    check('매직키 웹 검색 · AI: 맨 아래 두 줄 (기본 네이버 · ChatGPT가 첫 단추) · 고른 사이트로 열기',
       tail?.kinds.at(-2) === 'web' && tail.kinds.at(-1) === 'ai' && tail.web[0] === 'naver' && tail.ai[0] === 'chatgpt'
       && webOpened[0] === 'https://www.google.com/search?q=%EC%84%9C%EC%9A%B8%20%EB%82%A0%EC%94%A8' && webOpened[1] === 'https://chatgpt.com/?q=%EC%84%9C%EC%9A%B8%20%EB%82%A0%EC%94%A8',
       JSON.stringify({ tail, webOpened }));
@@ -304,7 +304,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     //   치는 동안은 회사 서버에 묻지 않고 "OPMS 에서 찾기" 줄만 — 그 줄을 골라야 묻는다
     // 고르기 (온전한 사건번호는 저절로 찾으므로, 이미 찾았거나 찾는 중이면 그대로)
     const askOpms = async () => {
-      await until(() => js(magic, `!!document.querySelector('.magic-row.kind-opmsAsk, .magic-row.kind-opms, .magic-note.loading')`), 'OPMS 에서 찾기 줄', 4000);
+      await until(() => js(magic, `!!document.querySelector('.magic-row.kind-opmsAsk, .magic-row.kind-opms, .magic-note.loading')`), 'OPMS에서 찾기 줄', 4000);
       await js(magic, `document.querySelector('.magic-row.kind-opmsAsk')?.click()`);
     };
     showMagic();
@@ -318,7 +318,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     await typeMagic('0271');
     await wait(900);
     const beforeAsk = { hits: fake.hits.cases, ask: await js(magic, `document.querySelector('.magic-row.kind-opmsAsk')?.getAttribute('aria-selected')`), cases: await js(magic, `document.querySelectorAll('.magic-row.kind-opms').length`) };
-    check('매직키 OPMS: 치는 동안에는 회사 서버에 묻지 않고 "OPMS 에서 찾기" 줄만 (번호 일부 · 이름 · 중간 띄어쓰기 · 맨 앞 0, 번호처럼 보이면 그 줄이 골라짐)', beforeAsk.hits === 0 && beforeAsk.ask === 'true' && beforeAsk.cases === 0, JSON.stringify(beforeAsk));
+    check('매직키 OPMS: 치는 동안에는 회사 서버에 묻지 않고 "OPMS에서 찾기" 줄만 (번호 일부 · 이름 · 중간 띄어쓰기 · 맨 앞 0, 번호처럼 보이면 그 줄이 골라짐)', beforeAsk.hits === 0 && beforeAsk.ask === 'true' && beforeAsk.cases === 0, JSON.stringify(beforeAsk));
     await typeMagic('FPD/2026-0271/E');
     const auto = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row.kind-opms'); return r && { t: r.querySelector('.t').textContent, sel: r.getAttribute('aria-selected') }; })()`), 'OPMS 저절로', 8000).catch(() => null);
     check('매직키 OPMS: 온전한 사건번호(FPD/2026-0271/E)는 예전처럼 손을 멈추면 저절로 찾고 그 사건이 골라짐', fake.hits.cases === 1 && auto?.t.startsWith('FPD/2026-0271/E') && auto.sel === 'true', JSON.stringify({ auto, hits: fake.hits.cases }));
@@ -379,7 +379,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     const firstPick = await until(() => js(magic, `document.querySelector('.magic-row[aria-selected="true"]')?.className.match(/kind-(\\w+)/)?.[1]`), '골라진 줄', 4000).catch(() => '');
     magic.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
     magic.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
-    const closedOnce = await until(() => !magic.isVisible(), 'Esc 로 닫힘', 3000).catch(() => false);
+    const closedOnce = await until(() => !magic.isVisible(), 'Esc로 닫힘', 3000).catch(() => false);
     check('매직키: 남겨 둔 글이면 Esc 한 번에 닫힘 · 골라진 줄은 "메모로 저장" 이 아님', closedOnce && firstPick && firstPick !== 'new', JSON.stringify({ closedOnce, firstPick }));
     showMagic();
     await wait(300);
@@ -422,7 +422,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     await js(ow, `document.querySelector('[data-tab="wrapper"]').click()`);
     await until(() => js(ow, `document.querySelectorAll('.op-table tbody tr').length === 2`), '전자포대 목록');
     const wrapCols = await js(ow, `({ head: [...document.querySelectorAll('.op-table thead th')].map((t) => t.textContent), rows: [...document.querySelectorAll('.op-table tbody tr')].map((r) => r.textContent) })`);
-    check('전자포대: 요약(MEMO) · 등록자(MUNAME) 열 — 로그인 ID 는 안 보임', wrapCols.head.includes('요약') && wrapCols.head.includes('등록자')
+    check('전자포대: 요약(MEMO) · 등록자(MUNAME) 열 — 로그인 ID는 안 보임', wrapCols.head.includes('요약') && wrapCols.head.includes('등록자')
       && wrapCols.rows.some((t) => t.includes('최초 출원 서류') && t.includes('김변리')) && !wrapCols.rows.some((t) => t.includes('kim01')), JSON.stringify(wrapCols));
     const footLinks = await js(ow, `[...document.querySelectorAll('#op-foot .op-link')].map((b) => b.textContent).join(',')`);
     check('전자포대 저장 위치: 폴더 바꾸기 옆에 폴더 열기', footLinks.startsWith('폴더 바꾸기,폴더 열기'), footLinks);
@@ -503,7 +503,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         // 찾기 막대는 글을 가리지 않고 위 막대 아래에 끼워져 글을 민다
         const noCover = await js(fw, `(() => { const b = document.querySelector('.mk-find-bar').getBoundingClientRect(); const d = document.querySelector('.ProseMirror').getBoundingClientRect(); return d.top >= b.bottom - 1; })()`);
         await capture(fw, 'smoke-new-find.png');
-        check('찾기(Ctrl+F): 막대가 뜨고 찾을 말로 바로 · 찾은 곳 3곳 · Enter 로 다음(2/3) · 글을 가리지 않음', opened && fs1?.hits === 3 && fs2 && noCover, JSON.stringify({ opened, fs1, fs2, noCover }));
+        check('찾기(Ctrl+F): 막대가 뜨고 찾을 말로 바로 · 찾은 곳 3곳 · Enter로 다음(2/3) · 글을 가리지 않음', opened && fs1?.hits === 3 && fs2 && noCover, JSON.stringify({ opened, fs1, fs2, noCover }));
         key(fw, 'H', ['control']);
         const repFocus = await until(() => js(fw, `(() => { const f = [...document.querySelectorAll('.mk-find-grid .mk-find-field')].map((x) => Math.round(x.getBoundingClientRect().width)); return document.querySelector('.mk-find-bar').dataset.mode === 'replace' && document.activeElement === document.querySelector('.mk-find-rep .mk-find-input') && f[0] === f[1]; })()`), 'Ctrl+H 바꾸기 줄', 2000).catch(() => false);
         // 할 일 버튼 넷: 같은 폭 · 같은 높이(28) · 같은 간격 / 모두 찾기 목록에서 고르면 메모에서 그 글이 골라짐 (편집기로)
@@ -535,7 +535,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await js(fw, `document.querySelector('.ProseMirror').focus()`);
         key(fw, 'Z', ['control']);
         const undone = await until(() => /사과 하나, 사과 둘, 사과즙/.test(v0.get(fid)?.body ?? ''), '되돌리기', 4000).catch(() => false);
-        check('바꾸기(Ctrl+H): 찾을 말과 같은 폭의 바꿀 말 칸으로 · Ctrl+Enter 모두 바꾸기 · Esc 로 닫기 · Ctrl+Z 한 번에 되돌림', repFocus && replaced && closedF && undone, JSON.stringify({ repFocus, replaced: Boolean(replaced), closedF, undone, body: v0.get(fid)?.body }));
+        check('바꾸기(Ctrl+H): 찾을 말과 같은 폭의 바꿀 말 칸으로 · Ctrl+Enter 모두 바꾸기 · Esc로 닫기 · Ctrl+Z 한 번에 되돌림', repFocus && replaced && closedF && undone, JSON.stringify({ repFocus, replaced: Boolean(replaced), closedF, undone, body: v0.get(fid)?.body }));
         fw.close();
       }
 
@@ -612,7 +612,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await until(() => js(list, `!!document.querySelector('[data-id="${cid}"]')`), '콘텐츠 메모 카드');
       // 카드 키보드: 카드마다 Tab 한 번 (단추 셋은 Tab 으로 가지 않음), 카드에 포커스가 오면 단추 묶음이 보임
       const cardKeys = await js(list, `(() => { const item = document.querySelector('[data-id="${cid}"]').closest('li, .item') ?? document.querySelector('[data-id="${cid}"]').parentElement; const card = item.querySelector('.card') ?? document.querySelector('[data-id="${cid}"]'); const bs = [...item.querySelectorAll('.card-actions button')]; card.focus(); return new Promise((r) => setTimeout(() => r({ n: bs.length, skip: bs.every((b) => b.tabIndex === -1), focused: document.activeElement === card, visible: card.matches(':focus-visible'), shown: getComputedStyle(item.querySelector('.card-actions')).opacity }), 300)); })()`);
-      check('목록 카드 키보드: 버튼 셋은 Tab 으로 가지 않고(카드마다 Tab 한 번) · 카드에 포커스가 오면 버튼 묶음이 보임',
+      check('목록 카드 키보드: 버튼 셋은 Tab으로 가지 않고(카드마다 Tab 한 번) · 카드에 포커스가 오면 버튼 묶음이 보임',
         cardKeys.n === 3 && cardKeys.skip && cardKeys.focused && (!cardKeys.visible || cardKeys.shown === '1'), JSON.stringify(cardKeys));
       // 목록 카드 오른쪽 클릭 → Windows 11 식 HTML 메뉴 (list-card-menu.js): 맨 위 아이콘 줄 + 열기 · 고정 · 색 · 잠그기 · 이전 버전
       {
@@ -670,7 +670,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         key(list, 'Right');
         key(list, 'Escape');
         const gone = await until(() => js(list, `!document.querySelector('.mk-ctx')`), '메뉴 닫힘', 2000).catch(() => false);
-        check('목록 카드 메뉴 키보드: ↓ 로 아이콘 줄 › 열기 › 고정 › 색 줄, Esc 로 닫기', onColors === true && gone, JSON.stringify({ onColors, gone }));
+        check('목록 카드 메뉴 키보드: ↓ 로 아이콘 줄 › 열기 › 고정 › 색 줄, Esc로 닫기', onColors === true && gone, JSON.stringify({ onColors, gone }));
         // 제목 줄 오른쪽 위: 왕관 · 동기화 · 설정이 검색 줄이 아니라 맨 위에, 창 버튼 영역을 침범하지 않음
         const bar = await js(list, `(() => { const q = (s) => document.querySelector(s)?.getBoundingClientRect(); const c = q('#list-top-btn'), g = q('#settings-btn'), t = q('.titlebar'), s = q('#search'); return { crown: c && [c.left, c.top], gearInTitle: g.top >= t.top && g.bottom <= t.bottom, gearRight: g.right <= (navigator.windowControlsOverlay?.visible ? navigator.windowControlsOverlay.getTitlebarAreaRect().right : innerWidth - 142) + 1, order: c.left < g.left, searchBelow: s.top >= t.bottom - 1, inToolbar: !!document.querySelector('.toolbar #settings-btn, .toolbar #sync-btn') }; })()`);
         check('목록 제목 줄: 왕관 · 동기화 · 설정이 맨 위(창 버튼 왼쪽)에 있고 검색 줄에는 없음', bar.gearInTitle && bar.gearRight && bar.order && bar.searchBelow && !bar.inToolbar, JSON.stringify(bar));
@@ -814,8 +814,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         const copied = smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1;
         await js(nw, `document.querySelector('.mk-doc').focus()`);
         key(nw, 'Z', ['control']);
-        const back = await until(() => js(nw, `document.querySelectorAll('.mk-doc a[data-file]').length === ${before}`), 'Ctrl+Z 로 되살림', 3000).catch(() => false);
-        check('잘라내기 아이콘: 파일을 복사한 뒤 지우고, Ctrl+Z 로 되돌아옴', gone && copied && back, JSON.stringify({ before, gone, copied, back, cutMenu: Boolean(cutMenu), cutClick }));
+        const back = await until(() => js(nw, `document.querySelectorAll('.mk-doc a[data-file]').length === ${before}`), 'Ctrl+Z로 되살림', 3000).catch(() => false);
+        check('잘라내기 아이콘: 파일을 복사한 뒤 지우고, Ctrl+Z로 되돌아옴', gone && copied && back, JSON.stringify({ before, gone, copied, back, cutMenu: Boolean(cutMenu), cutClick }));
       }
       // PDF 저장: 파일 그대로
       await openMenu('.mk-doc a[data-file]');
@@ -829,14 +829,14 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const buttonsLeft = await js(nw, `document.querySelectorAll('.mk-ctx, .mk-delete-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn').length`);
       await js(nw, `document.querySelector('.mk-share-menu [data-via="mail"]')?.click()`);
       const sharedPdf = await until(() => smokeOpened.filter((o) => o.kind === 'share').find((o) => o.via === 'mail' && /안내 자료\.pdf$/.test(o.target)), 'PDF 공유', 3000).catch(() => null);
-      check('공유 아이콘 → 방법 고르기(Drive 링크 · LocalSend · 메일, Windows 공유는 없음, Drive 는 연결 전이면 흐리게 — 눌러서 연결하러 감) · 그때 오른쪽 클릭 메뉴는 닫혀 남지 않음 → 그 파일',
+      check('공유 아이콘 → 방법 고르기(Drive 링크 · LocalSend · 메일, Windows 공유는 없음, Drive는 연결 전이면 흐리게 — 눌러서 연결하러 감) · 그때 오른쪽 클릭 메뉴는 닫혀 남지 않음 → 그 파일',
         shareShown && !/sheet/.test(menu) && /drive(,|$)/.test(menu) && /localsend/.test(menu) && /mail/.test(menu) && buttonsLeft === 0 && Boolean(sharedPdf), JSON.stringify({ shareShown, menu, buttonsLeft, sharedPdf }));
       // Drive 링크를 복사하면 가운데 알림 + 폭죽
-      const popped = await js(nw, `import('./js/share-menu.js').then(async (m) => { m.showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V 로 붙여 넣으세요' }); await new Promise((r) => setTimeout(r, 300)); const p = document.querySelector('.mk-share-pop'); return { text: p?.innerText ?? '', confetti: Boolean(document.querySelector('canvas.mk-confetti')), z: p ? getComputedStyle(p).zIndex : '' }; })`);
+      const popped = await js(nw, `import('./js/share-menu.js').then(async (m) => { m.showSharePop({ title: '링크를 복사했어요', sub: '메신저나 메일에 Ctrl+V로 붙여 넣으세요' }); await new Promise((r) => setTimeout(r, 300)); const p = document.querySelector('.mk-share-pop'); return { text: p?.innerText ?? '', confetti: Boolean(document.querySelector('canvas.mk-confetti')), z: p ? getComputedStyle(p).zIndex : '' }; })`);
       await capture(nw, 'smoke-new-share-pop.png');
       await js(nw, `document.querySelector('.mk-share-pop')?.click()`);
       await wait(300); // 사라지는 0.2초 (그 사이에는 아래 내용을 가린다)
-      check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V 로 붙여 넣으세요" + 폭죽 (주소는 보이지 않음)', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && !/https?:/.test(popped.text) && popped.confetti, JSON.stringify(popped));
+      check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V로 붙여 넣으세요" + 폭죽 (주소는 보이지 않음)', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && !/https?:/.test(popped.text) && popped.confetti, JSON.stringify(popped));
       // 상태 줄이 잘리면 메모 창 바깥에 말풍선으로 전문 (내용을 가리지 않게) — 좁은 창
       const wide = nw.getBounds();
       const bubbleWin = () => windowManager.statusBubbles.byOwner.get(nw.id)?.win;
@@ -849,7 +849,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         const o = bw.getBounds();
         return { ...r, screen: { left: o.x + r.left, top: o.y + r.top, right: o.x + r.right, bottom: o.y + r.bottom } };
       };
-      const longText = '공유 창을 열지 못했어요. 설정에서 Google Drive 를 먼저 연결하거나 메일 · LocalSend 를 골라 주세요';
+      const longText = '공유 창을 열지 못했어요. 설정에서 Google Drive를 먼저 연결하거나 메일 · LocalSend를 골라 주세요';
       nw.setBounds({ ...wide, x: 400, y: 320, width: 300 });
       nw.focus();
       await wait(250);
@@ -928,7 +928,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await until(() => js(nw, `!!document.querySelector('.mk-share-menu [data-via="mail"]')`), '표 공유 메뉴 2', 3000).catch(() => {});
       await js(nw, `document.querySelector('.mk-share-menu [data-via="mail"]')?.click()`);
       const sharedCsv = await until(() => smokeOpened.filter((o) => o.kind === 'share').find((o) => o.via === 'mail' && /\.csv$/.test(o.target)), '표 공유', 3000).catch(() => null);
-      check('표 공유: Esc 는 그만두기, 메일에 첨부를 고르면 임시 CSV 파일로', escClosed && Boolean(sharedCsv) && fs.readFileSync(sharedCsv.target, 'utf8').includes('이름'), JSON.stringify({ escClosed, sharedCsv }));
+      check('표 공유: Esc는 그만두기, 메일에 첨부를 고르면 임시 CSV 파일로', escClosed && Boolean(sharedCsv) && fs.readFileSync(sharedCsv.target, 'utf8').includes('이름'), JSON.stringify({ escClosed, sharedCsv }));
       await leave();
       // 표: 표째로 복사 (엑셀에 붙도록 칸 사이 탭 · 서식은 표 그대로)
       const tableMenu = await openMenu('.mk-doc .tableWrapper td');
@@ -968,7 +968,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const tipAfterCtrl = await js(nw, `Boolean(document.getElementById('mk-undo-hint'))`);
       await js(nw, `document.querySelector('#mk-undo-hint .mk-undo-btn')?.click()`);
       const mathBack = await until(() => js(nw, `Boolean(document.querySelector('.mk-doc .mk-math-block'))`), '되돌리기 버튼', 3000).catch(() => false);
-      check('삭제한 내용: 안내의 되돌리기 버튼으로 되살림 (Ctrl 만 눌러서는 안내가 사라지지 않음)', tipAfterCtrl && mathBack, JSON.stringify({ tipAfterCtrl, mathBack }));
+      check('삭제한 내용: 안내의 되돌리기 버튼으로 되살림 (Ctrl만 눌러서는 안내가 사라지지 않음)', tipAfterCtrl && mathBack, JSON.stringify({ tipAfterCtrl, mathBack }));
       // 키보드: 메뉴가 뜬 뒤 ← → ↑ ↓ Enter Esc (손만으로)
       await leave();
       await openMenu('.mk-doc a[data-file]');
@@ -983,7 +983,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await key(nw, 'Escape');
       await wait(200);
       const closedByEsc = await js(nw, `!document.querySelector('.mk-ctx')`);
-      check('오른쪽 클릭 메뉴: 키보드로 오가고(→ → ↓) Esc 로 닫힘', afterRight.length > 0 && afterDown.length > 0 && afterRight !== afterDown && closedByEsc, JSON.stringify({ afterRight, afterDown, closedByEsc }));
+      check('오른쪽 클릭 메뉴: 키보드로 오가고(→ → ↓) Esc로 닫힘', afterRight.length > 0 && afterDown.length > 0 && afterRight !== afterDown && closedByEsc, JSON.stringify({ afterRight, afterDown, closedByEsc }));
       nw.close();
     }
 
@@ -1117,7 +1117,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('윗막대: 메모 연결 대신 불러오기 키 버튼 (없으면 사선, 정하면 숫자 3) · 메모 연결은 ⋯ 메뉴로 · 소리 받아쓰기 메뉴 없음',
         barBefore.inBar && barBefore.off && barBefore.slash && barBefore.links && !barBefore.linksInBar && !barBefore.transcribe && !barAfter.off && barAfter.numShown,
         JSON.stringify({ barBefore, barAfter }));
-      check('메모 단축키 창: 1~9 · 할 일 세 칸 중 하나 · 저장하면 Ctrl+Alt+3 에 이 메모 (번개 버튼에 표시)',
+      check('메모 단축키 창: 1~9 · 할 일 세 칸 중 하나 · 저장하면 Ctrl+Alt+3에 이 메모 (번개 버튼에 표시)',
         dlg.keys === 9 && dlg.before && dlg.none.modes.length === 3 && dlg.none.picked === 1 && !dlg.after && /^Ctrl\+Alt\+3: 어느 앱에서든 누르면 내용을 복사해요$/.test(dlg.hint) && dlg.legend && dlg.fits
           && saved?.id === hid && saved.copy && !saved.show && label === 'Ctrl+Alt+3' && memoHotkeys.held.has('3'),
         JSON.stringify({ dlg, saved, label, held: [...memoHotkeys.held.keys()] }));
@@ -1208,10 +1208,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('테이프에 마우스를 올리면 상태 줄에 "누르면 떼어져요" — 처음 한 번만', hint && !again, JSON.stringify({ hint, again }));
       // 왕관과 함께 붙지 않는다: 단축키로 바꿔 붙임
       await key(nw, 'T', ['control', 'shift']);
-      const crowned = await until(() => nw.isAlwaysOnTop() && kindOf(nw) === 'crown' && !getSettings().onBottom?.[tid] && getSettings().onTop?.[tid] === true, 'Ctrl+Shift+T 로 바꿈', 3000).catch(() => false);
+      const crowned = await until(() => nw.isAlwaysOnTop() && kindOf(nw) === 'crown' && !getSettings().onBottom?.[tid] && getSettings().onTop?.[tid] === true, 'Ctrl+Shift+T로 바꿈', 3000).catch(() => false);
       await key(nw, 'G', ['control', 'shift']);
-      const backTaped = await until(() => !nw.isAlwaysOnTop() && kindOf(nw) === 'tape' && getSettings().onBottom?.[tid] === true && !getSettings().onTop?.[tid], 'Ctrl+Shift+G 로 바꿈', 3000).catch(() => false);
-      check('왕관 · 테이프는 함께 붙지 않음 (Ctrl+Shift+T / G 로 바꿔 붙음)', crowned && backTaped, JSON.stringify({ crowned, backTaped }));
+      const backTaped = await until(() => !nw.isAlwaysOnTop() && kindOf(nw) === 'tape' && getSettings().onBottom?.[tid] === true && !getSettings().onTop?.[tid], 'Ctrl+Shift+G로 바꿈', 3000).catch(() => false);
+      check('왕관 · 테이프는 함께 붙지 않음 (Ctrl+Shift+T / G로 바꿔 붙음)', crowned && backTaped, JSON.stringify({ crowned, backTaped }));
       // 닫았다 다시 열어도 테이프
       nw.close();
       await until(() => !noteWins.has(tid), '테이프 메모 닫힘', 3000).catch(() => {});
@@ -1286,7 +1286,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
 
     // ---------- PDF로 저장 창: 작은 창에서도 취소 · 저장이 보이고, 글자 크기 · 단축키 ----------
     {
-      const lines = Array.from({ length: 60 }, (_, i) => `줄 ${i + 1} 이 메모는 여러 쪽이 되도록 길게 적은 글이에요`).join('\n\n');
+      const lines = Array.from({ length: 60 }, (_, i) => `줄 ${i + 1}이 메모는 여러 쪽이 되도록 길게 적은 글이에요`).join('\n\n');
       const pid = vault.import({ body: `# PDF 점검\n\n${lines}` });
       const pw = windowManager.openNote(pid);
       await until(() => pw.isVisible() && js(pw, 'document.documentElement.dataset.ready === "true"'), 'PDF 점검 메모', 8000);
@@ -1526,7 +1526,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         key(win, 'V', ['control']);
         await wait(400);
         const rich = await js(win, `(() => { const p = [...document.querySelectorAll('.mk-doc p')].at(-1); return { strong: p.querySelectorAll('strong, b').length, text: p.textContent }; })()`);
-        check('Ctrl+V 는 서식 그대로 (Ctrl+Shift+V 와 다름)', rich.strong >= 1, JSON.stringify(rich));
+        check('Ctrl+V는 서식 그대로 (Ctrl+Shift+V와 다름)', rich.strong >= 1, JSON.stringify(rich));
         // 메인이 보내는 '서식 없이 붙여넣기'(오른쪽 클릭 메뉴) 도 같은 일
         await js(win, caretIn('.mk-doc p', 'end', 0));
         await wait(100);
@@ -1679,7 +1679,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           const tapped = await js(aw, zoomState);
           key(aw, '0');
           await wait(100);
-          check('묶음 사진: 휠로 확대 (배율 단추) · 끌면 둘러보기 (장은 그대로) · 0 으로 원래대로 · 두 번 누르면 250%', zoomed.t.includes('scale') && zoomed.btn.endsWith('%') && zoomed.btn !== '100%' && panned.t !== zoomed.t && panned.count === '3 / 5' && reset.t === '' && reset.btn === '' && tapped.btn === '250%', JSON.stringify({ zoomed, panned, reset, tapped }));
+          check('묶음 사진: 휠로 확대 (배율 단추) · 끌면 둘러보기 (장은 그대로) · 0으로 원래대로 · 두 번 누르면 250%', zoomed.t.includes('scale') && zoomed.btn.endsWith('%') && zoomed.btn !== '100%' && panned.t !== zoomed.t && panned.count === '3 / 5' && reset.t === '' && reset.btn === '' && tapped.btn === '250%', JSON.stringify({ zoomed, panned, reset, tapped }));
           // 그리기: 단추를 누르고 진짜 마우스로 한 획
           const srcsBefore = await js(aw, `[...document.querySelectorAll('.mk-doc img.mk-album-img')].map((i) => i.src)`);
           await js(aw, `[...document.querySelectorAll('.mk-album-btn')].find((b) => b.textContent.includes('그리기'))?.click()`);
@@ -1698,7 +1698,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           await capture(aw, 'album-ink.png');
           key(aw, 'Escape'); // 그리기 끝 (저장)
           const inked = await until(() => js(aw, `(() => { const before = ${JSON.stringify(srcsBefore)}; const now = [...document.querySelectorAll('.mk-doc img.mk-album-img')].map((i) => i.src); const changed = now.map((s, k) => (s !== before[k] ? k : -1)).filter((k) => k >= 0); return changed.length ? changed : null; })()`), '그린 장 저장', 5000).catch(() => null);
-          check('묶음 사진: 3번째 장 위에 그리고 Esc 로 끝내면 그 장만 그린 것을 합친 새 그림으로 바뀜', Boolean(ink) && inked?.join() === '2', JSON.stringify({ ink, inked }));
+          check('묶음 사진: 3번째 장 위에 그리고 Esc로 끝내면 그 장만 그린 것을 합친 새 그림으로 바뀜', Boolean(ink) && inked?.join() === '2', JSON.stringify({ ink, inked }));
           // 그린 장 표시 · 아래 장 목록으로 바로 가기 · 이 장 삭제 → 되돌리기
           const marks = await js(aw, `({ head: !document.querySelector('.mk-album-inked').hidden, thumbs: [...document.querySelectorAll('.mk-album-thumb')].map((b) => b.classList.contains('inked') ? 1 : 0).join('') })`);
           await js(aw, `document.querySelectorAll('.mk-album-thumb')[4].click()`);
@@ -1718,7 +1718,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           key(aw, 'Escape');
           await wait(200);
           const closed = await js(aw, `!document.querySelector('.mk-album-view')`);
-          check('묶음 사진: 누른 장부터 크게 (2 / 5), → 로 다음 장, Esc 로 닫힘', viewer === '2 / 5' && after === '3 / 5' && closed, JSON.stringify({ viewer, after, closed }));
+          check('묶음 사진: 누른 장부터 크게 (2 / 5), → 로 다음 장, Esc로 닫힘', viewer === '2 / 5' && after === '3 / 5' && closed, JSON.stringify({ viewer, after, closed }));
           // PDF → 장마다 그림 (pdf.js 로 실제로 바꿔 본다)
           const pdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R 5 0 R 6 0 R 7 0 R 8 0 R]/Count 5>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n4 0 obj<</Length 33>>stream\n0 0 1 rg 20 20 160 240 re f\nendstream endobj\n5 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n6 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n7 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n8 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
           await js(aw, `(() => {
@@ -1733,8 +1733,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 5 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);
           const pdfNote = await js(aw, `document.getElementById('status').textContent`);
           const chipAbove = await js(aw, `(() => { const p = [...document.querySelectorAll('.mk-doc p')].find((x) => x.querySelector('img.mk-album-page')); return p?.previousElementSibling?.querySelector('a[data-file]')?.textContent ?? null; })()`);
-          check('PDF 를 그림으로 넣으면 원본 문서 파일(칩)도 묶음 바로 위 줄에', chipAbove === '설명서.pdf', String(chipAbove));
-          check('PDF 를 "그림으로" 넣으면 장마다 그림 (5쪽 → 5장, 또렷한 크기) 종이 묶음으로', Boolean(pages), JSON.stringify({ pages, pdfNote }));
+          check('PDF를 그림으로 넣으면 원본 문서 파일(칩)도 묶음 바로 위 줄에', chipAbove === '설명서.pdf', String(chipAbove));
+          check('PDF를 "그림으로" 넣으면 장마다 그림 (5쪽 → 5장, 또렷한 크기) 종이 묶음으로', Boolean(pages), JSON.stringify({ pages, pdfNote }));
           await js(aw, `document.querySelectorAll('.mk-doc img.mk-album-img')[5]?.scrollIntoView({ block: 'center' })`);
           await capture(aw, 'album-pdf.png');
           // 좁은 창 (휴대폰 폭쯤)
@@ -1947,10 +1947,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const where = () => js(cw, `(() => {
         const a = document.querySelector('.ProseMirror a[data-file]');
         const s = getSelection();
-        const r = document.createRange(); r.selectNodeContents(a.firstChild); // 칩 글자(글자 마디)와 견준다 — 끝(글자 마디 끝)이 a 의 끝보다 앞으로 잡히지 않게
+        const r = document.createRange(); r.selectNodeContents(a.firstChild); // 칩 글자(글자 마디)와 견준다 — 끝(글자 마디 끝)이 a의 끝보다 앞으로 잡히지 않게
         const p = document.createRange(); p.setStart(s.anchorNode, s.anchorOffset); p.collapse(true);
         const before = p.compareBoundaryPoints(Range.START_TO_START, r) <= 0;
-        const after = p.compareBoundaryPoints(Range.END_TO_START, r) >= 0; // 커서(p 시작) 가 칩 끝 이후
+        const after = p.compareBoundaryPoints(Range.END_TO_START, r) >= 0; // 커서(p 시작)가 칩 끝 이후
         return { at: before ? 'start' : after ? 'end' : 'in', text: s.toString(), chip: a.textContent };
       })()`);
       const caretInChip = (offset) => js(cw, `(() => { document.querySelector('.ProseMirror').focus(); const t = document.querySelector('.ProseMirror a[data-file]').firstChild; const r = document.createRange(); r.setStart(t, ${offset}); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);

@@ -88,6 +88,7 @@ protocol.registerSchemesAsPrivileged([
 
 let vault = null;
 let vaultError = null;
+let vaultMissing = null; // 켤 때 찾지 못한 쓰던 메모 폴더 (화면이 '찾을 수 없어요' 로)
 let quitting = false;
 
 let tray = null;
@@ -194,7 +195,7 @@ async function memoHotkeyPressed(slot) {
     settings.hotkeyTips = (settings.hotkeyTips ?? 0) + 1;
     saveSettings();
   }
-  if (copied) windowManager.showHud({ title: `“${title}” 내용을 복사했어요`, body: tip ? 'Ctrl+V 로 붙여 넣으세요' : '' });
+  if (copied) windowManager.showHud({ title: `“${title}” 내용을 복사했어요`, body: tip ? 'Ctrl+V로 붙여 넣으세요' : '' });
   else if (bound.copy && memo.needsPassword) windowManager.showHud({ title: '잠긴 메모라 복사하지 않았어요', body: '비밀번호를 넣고 열어 주세요', kind: 'warn' });
   else if (bound.copy) windowManager.showHud({ title: UI.copyFail, body: '다시 눌러 주세요', kind: 'warn' });
 }
@@ -218,7 +219,6 @@ function openVault(dir) {
       if (sandbox?.real === next) return; // 연습 중: 화면은 연습 공간 것 (돌아올 때 목록을 다시 그린다)
       windowManager.pushList();
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
-      aiTagger?.later(external.filter((id) => !removed.includes(id))); // 휴대폰 등에서 들어온 메모에도 AI 태그
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));
@@ -232,6 +232,7 @@ function openVault(dir) {
     next.open();
     vault = next;
     vaultError = null;
+    vaultMissing = null;
     showHandoff(recentlyUpdated(next.list()).map((m) => next.get(m.id)));
     settings.vaultPath = next.root;
     saveSettings();
@@ -252,9 +253,15 @@ function openVault(dir) {
   return vaultInfo();
 }
 
+/** 찾지 못한 메모 폴더를 다시 찾아본다 (외장 드라이브를 다시 꽂음 등) — 있으면 열고, 없으면 그대로 */
+function retryMissingVault() {
+  if (vaultMissing && fs.existsSync(vaultMissing)) return openVault(vaultMissing);
+  return { ...vaultInfo(), stillMissing: Boolean(vaultMissing) };
+}
+
 function vaultInfo() {
   const root = realVault()?.root ?? null;
-  return { vaultPath: root, vaultError, suggestedPath: suggestedVaultPath(), version: app.getVersion(), sandbox: Boolean(sandbox) };
+  return { vaultPath: root, vaultError, missingPath: vaultMissing, suggestedPath: suggestedVaultPath(), version: app.getVersion(), sandbox: Boolean(sandbox) };
 }
 
 function showHandoff(memos) {
@@ -717,7 +724,6 @@ function initAi() {
     ai,
     memos: () => vault?.bodies() ?? [],
     graph: () => vault?.index?.memos ?? [],
-    store: ai.rag,
   });
   aiTagger = createAiTagger({
     getVault: () => vault,
@@ -733,7 +739,7 @@ function initAi() {
       const ids = new Set(events.map((r) => r.id));
       const list = events.map((r) => `${describeReminder(r)}${r.title ? ` ${r.title}` : ''}`);
       showAiNotice(id, {
-        title: `일정 ${events.length}개를 넣었어요`, body: list.join('\n'), text: `AI 가 일정을 넣었어요: ${list.join(', ')}`,
+        title: `일정 ${events.length}개를 넣었어요`, body: list.join('\n'), text: `AI가 일정을 넣었어요: ${list.join(', ')}`,
         undo: () => {
           const now = vault?.get(id);
           if (!now?.reminders.some((r) => ids.has(r.id))) return { ok: false, message: '넣은 일정이 이미 없어요' };
@@ -742,7 +748,7 @@ function initAi() {
           windowManager.sendToNote(id, 'memo:reminders', saved);
           pushReminders();
           alarms.tick();
-          return { ok: true, message: 'AI 가 넣은 일정을 뺐어요' };
+          return { ok: true, message: 'AI가 넣은 일정을 뺐어요' };
         },
       });
     },
@@ -756,8 +762,12 @@ function initAi() {
 // AI 가 뒤에서 한 일 (매직키 다듬기 · 일정 자동 등록): Windows 알림을 누르면 메모가 열리고, 메모 창 아래 막대에서 되돌린다.
 //   알림을 누르는 습관은 "열기"라 알림 자체로는 되돌리지 않는다. 메모마다 차례로 쌓고 막대는 마지막 것부터
 const aiNotices = new Map(); // 메모 id → [{ text, undo: () => { ok, message } }]
+const MAX_AI_NOTICES = 30; // 열어 보지 않은 메모가 이보다 많으면 오래된 것부터 버린다 (원래 글은 이전 버전에 남음)
 function showAiNotice(id, { title, body, text, undo }) {
-  aiNotices.set(id, [...(aiNotices.get(id) ?? []), { text, undo }]);
+  const list = [...(aiNotices.get(id) ?? []), { text, undo }];
+  aiNotices.delete(id); // 맨 뒤(새것)로
+  aiNotices.set(id, list);
+  if (aiNotices.size > MAX_AI_NOTICES) aiNotices.delete(aiNotices.keys().next().value);
   toast({
     memoId: id, kind: 'ai-notice', title, body: `${body}\n눌러서 열기 · 메모에서 되돌릴 수 있어요`,
     onClick: () => {
@@ -1019,7 +1029,7 @@ function registerQuickMemoKey() {
   if (!settings.quickMemo || process.platform !== 'win32' || shortcutsPaused) return false;
   const key = shortcutKey('quickMemo');
   const ok = globalShortcut.register(key, () => onQuickMemoKey());
-  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
+  if (!ok) console.warn(`${displayAccelerator(key)}를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else {
     heldKeys.quickMemo = key;
     windowManager.captureHelper.start();
@@ -1033,7 +1043,7 @@ function registerMagicKey() {
   if (!normalizeMagicSettings(settings.magic).enabled || shortcutsPaused) return false;
   const key = shortcutKey('magic');
   const ok = globalShortcut.register(key, () => windowManager.showMagic());
-  if (!ok) console.warn(`${displayAccelerator(key)} 를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
+  if (!ok) console.warn(`${displayAccelerator(key)}를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else heldKeys.magic = key;
   return ok;
 }
@@ -1286,6 +1296,7 @@ app.whenReady().then(async () => {
     getVault: () => vault,
     openVault,
     vaultInfo,
+    retryMissingVault,
     whatsNew,
     suggestedVaultPath,
     appSettings: () => appSettings(vault, fileIndex, shortcutStatus, shortcutLabel),
@@ -1445,8 +1456,10 @@ app.whenReady().then(async () => {
 
   if (autoStartAvailable() && !settings.autoStartSet) setAutoStart(true, updateTrayMenu);
   // 처음 설치: 고르는 화면 없이 이 PC 의 기본 폴더(문서\메모킹)로 바로 시작 — Google 동기화는 목록의 안내 줄 · 구름 단추에서.
-  //   못 열면(권한 등) 예전처럼 고르는 화면이 오류와 함께 뜬다
-  openVault(settings.vaultPath || suggestedVaultPath());
+  //   못 열면(권한 등) 예전처럼 고르는 화면이 오류와 함께 뜬다.
+  //   쓰던 폴더가 없어졌으면(꺼 둔 사이 옮김 · 이름 바꿈) 빈 폴더를 새로 만들지 않는다 — 동기화가 "모두 지웠다" 로 읽어 Drive · 휴대폰에서도 지우므로
+  if (settings.vaultPath && !fs.existsSync(settings.vaultPath)) vaultMissing = settings.vaultPath;
+  else openVault(settings.vaultPath || suggestedVaultPath());
 
   const launched = launchAction(process.argv);
   if (!HIDDEN_START || !vault) {

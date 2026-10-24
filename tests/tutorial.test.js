@@ -16,7 +16,7 @@ for (const [name, steps] of [['PC', TUTORIAL_STEPS], ['휴대폰', MOBILE_TUTORI
       assert.ok(s.next || s.advance, `${s.id}: 다음 버튼이나 직접 해 보기 중 하나는 있어야 넘어갈 수 있음`);
       if (s.image) assert.ok(fs.existsSync(path.join(import.meta.dirname, '..', 'app', 'assets', 'tutorial', s.image)), `${s.id} 사진`);
     }
-    assert.ok(steps.filter((s) => s.advance).length >= (name === 'PC' ? 4 : 8), '직접 해 보는 단계가 넉넉히');
+    assert.ok(steps.filter((s) => s.advance).length >= 4, '직접 해 보는 단계가 넉넉히');
   });
 }
 
@@ -37,13 +37,13 @@ test('다음에 해 볼게요(next) · 직접 해 냄(advance) 모두 다음 단
   assert.equal(advanceTutorial(i, 'magic-tried'), i + 1);
   assert.equal(advanceTutorial(i, 'quick-memo'), i, '다른 단계의 일은 무시');
   assert.equal(advanceTutorial(i, 'skip'), -1);
-  const m = MOBILE_TUTORIAL_STEPS.findIndex((s) => s.id === 'ink');
+  const m = MOBILE_TUTORIAL_STEPS.findIndex((s) => s.id === 'annotate');
   assert.equal(MOBILE_TUTORIAL_STEPS[advanceTutorial(m, 'note-closed', MOBILE_TUTORIAL_STEPS)].win, 'list', '메모를 먼저 닫으면 목록 단계로');
 });
 
 test('옮기기 전 예시 목록: PC·휴대폰 모두 옮기기 단계에서 한 번만', () => {
   assert.deepEqual(MOBILE_TUTORIAL_STEPS.filter((s) => s.sample).map((s) => s.id), ['move']);
-  assert.deepEqual(TUTORIAL_STEPS.filter((s) => s.sample), [], 'PC 는 쓰기 단계가 없다');
+  assert.deepEqual(TUTORIAL_STEPS.filter((s) => s.sample), [], 'PC는 쓰기 단계가 없다');
   assert.match(TUTORIAL_SAMPLE, /^- \[ \] /m, '체크리스트 줄');
   assert.ok(TUTORIAL_SAMPLE.split('\n').length >= 3, '옮겨 볼 줄이 넉넉히');
   assert.equal(hasTutorialSample('제목\n\n- [ ] 글'), false);
@@ -67,7 +67,7 @@ test('기능이 꺼져 있으면(needs) 직접 해 보기 없이 안내(offText)
     }
   }
   const plain = TUTORIAL_STEPS.find((s) => s.id === 'welcome');
-  assert.equal(tutorialStepFor(plain, () => false), plain, 'needs 가 없으면 늘 그대로');
+  assert.equal(tutorialStepFor(plain, () => false), plain, 'needs가 없으면 늘 그대로');
 });
 
 test('PC: 매직키 · Life/Work · 목록 왕관 · 매직 카피 · 화면 자르기는 직접 해 보기', () => {
@@ -76,7 +76,8 @@ test('PC: 매직키 · Life/Work · 목록 왕관 · 매직 카피 · 화면 자
     ['mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried']);
   const m = Object.fromEntries(MOBILE_TUTORIAL_STEPS.map((s) => [s.id, s]));
   assert.equal(m.mode?.advance, 'mode-switched', '휴대폰 Life/Work');
-  assert.equal(m['note-zoom']?.advance, 'note-zoomed', '휴대폰 매직 줌 (두 손가락)');
+  assert.ok(m.move && m.annotate && m.voice, '휴대폰: 다이얼 · 글 위에 그리기 · 말로 메모');
+  assert.deepEqual(['write', 'lists', 'tag', 'cards', 'layout', 'filters'].filter((id) => m[id]), [], '다른 메모 앱에도 있는 단계는 뺐다');
   assert.ok(m.tabs, '휴대폰 아래 탭 안내');
   for (const s of [...TUTORIAL_STEPS, ...MOBILE_TUTORIAL_STEPS]) assert.doesNotMatch(`${s.text} ${s.offText ?? ''}`, /추억|(?<!알림 )보관함/, `${s.id}: 지금 이름(회상 · 알림 보관함)으로`);
 });
@@ -87,7 +88,7 @@ test('묶음(chapter): 모든 단계에 있고 같은 묶음은 붙어 있음 ·
     for (const [i, s] of steps.entries()) {
       assert.ok(s.chapter, `${s.id} 묶음`);
       if (steps[i - 1]?.chapter !== s.chapter) {
-        assert.ok(!seen.includes(s.chapter), `${s.chapter} 가 떨어져 있음`);
+        assert.ok(!seen.includes(s.chapter), `${s.chapter}가 떨어져 있음`);
         seen.push(s.chapter);
       }
     }
@@ -102,7 +103,7 @@ test('묶음(chapter): 모든 단계에 있고 같은 묶음은 붙어 있음 ·
 });
 
 test('다시 볼 때 바로 가기: 목록 화면에서 시작하는 묶음만, "시작할게요"와 같은 첫 묶음은 빼고', () => {
-  assert.deepEqual(tutorialJumps(TUTORIAL_STEPS), [], 'PC 는 한 묶음뿐이라 처음부터');
+  assert.deepEqual(tutorialJumps(TUTORIAL_STEPS), [], 'PC는 한 묶음뿐이라 처음부터');
   for (const steps of [MOBILE_TUTORIAL_STEPS]) {
     const jumps = tutorialJumps(steps);
     assert.ok(jumps.length >= 2);

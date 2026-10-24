@@ -307,6 +307,13 @@ test('Drive 에서 한꺼번에 사라지면 멈추고 이 PC 파일은 그대�
   assert.equal(lt('많은/1.md'), 'x1');
 });
 
+test('메모 폴더가 통째로 비면(못 읽음) 적은 수라도 Drive 에서 지우지 않는다', async () => {
+  await startFromPhone();
+  for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f), { recursive: true, force: true });
+  await assert.rejects(sync(), SafetyStop);
+  assert.ok([...drive.files.values()].every((f) => !f.trashed));
+});
+
 test('PC 메모 폴더 옮기기: Google Drive 앱 폴더의 메모·첨부를 문서\\메모킹 으로 복사 (원래 폴더는 그대로, 있는 파일은 두기)', async () => {
   const { copyVault } = await import('../desktop/drive/drive-sync.js');
   const from = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-from-'));

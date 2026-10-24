@@ -5,13 +5,14 @@
 //   받은 글 다듬기는 휴대폰과 같다: 이 메모 폴더의 낱말로 고치기(core/transcript-fix.js) · 문장마다 줄 · 화자 이름표
 import { Worker } from 'node:worker_threads';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { joinTranscript, labelSpeakers } from '../../app/js/core/transcript-lines.js';
 import { vocabularyFrom, fixTranscript } from '../../app/js/core/transcript-fix.js';
 import { UI } from '../../app/js/core/ui-text.js';
 
 const GH = 'https://github.com/k2-fsa/sherpa-onnx/releases/download';
-const HF = 'https://huggingface.co/k2-fsa/sherpa-onnx-zipformer-korean-2024-06-24/resolve/main';
+const HF = 'https://huggingface.co/k2-fsa/sherpa-onnx-zipformer-korean-2024-06-24/resolve/0fb4b2b5c8d3e5766121481ba911961e3649c664'; // 커밋 고정
 const KO_FILES = {
   'encoder-epoch-99-avg-1.int8.onnx': 'encoder.onnx',
   'decoder-epoch-99-avg-1.int8.onnx': 'decoder.onnx',
@@ -20,7 +21,7 @@ const KO_FILES = {
 };
 
 // 받을 것: 묶음 → 부분들 (모두 있어야 함) → 부분마다 받는 곳 (앞에서부터, 안 되면 다음)
-//   files: 받은 뒤 크기로 확인 (중간에 끊기거나 엉뚱한 페이지를 받지 않았는지)
+//   files: 크기 (있는지 볼 때 — 가볍게), sha256: 다 받은 뒤 내용 확인 (받는 곳이 바뀌거나 엉뚱한 파일이면 넣지 않음)
 export const STT_PACKS = {
   asr: {
     label: '받아쓰기 데이터', size: '약 80MB',
@@ -28,6 +29,12 @@ export const STT_PACKS = {
       {
         dir: 'ko',
         files: { 'encoder.onnx': 70784728, 'decoder.onnx': 2844692, 'joiner.onnx': 2581421, 'tokens.txt': 60246 },
+        sha256: {
+          'encoder.onnx': '8b196d723421a0513c98ec25da2c43420c029e817f5e4a90b29ff80291c0af2b',
+          'decoder.onnx': '2cc8c04ea080a657c18ebc59702e6b049cef08163eba5d68ac5bf707925cb0fb',
+          'joiner.onnx': 'eb654db1ea2cc9d63474855f65958b6059084692a9f2eb4f3812aceb1e416a20',
+          'tokens.txt': '016bdf0965029263b7ad01b742366ee542ef0bef38261510e8176ff6f2e9e668',
+        },
         sources: [
           { files: Object.fromEntries(Object.entries(KO_FILES).map(([from, to]) => [`${HF}/${from}`, to])), bytes: 76270000 },
           { archive: `${GH}/asr-models/sherpa-onnx-zipformer-korean-2024-06-24.tar.bz2`, pick: KO_FILES, bytes: 329740690 },
@@ -36,6 +43,7 @@ export const STT_PACKS = {
       {
         dir: 'vad',
         files: { 'silero_vad.onnx': 643854 },
+        sha256: { 'silero_vad.onnx': '9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6' },
         sources: [{ files: { [`${GH}/asr-models/silero_vad.onnx`]: 'silero_vad.onnx' }, bytes: 643854 }],
       },
     ],
@@ -46,11 +54,13 @@ export const STT_PACKS = {
       {
         dir: 'speaker',
         files: { 'segmentation.onnx': 1540506 },
+        sha256: { 'segmentation.onnx': 'd582f4b4c6b48205de7e0643c57df0df5615a3c176189be3fc461e9d18827b5d' },
         sources: [{ archive: `${GH}/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2`, pick: { 'model.int8.onnx': 'segmentation.onnx' }, bytes: 6958444 }],
       },
       {
         dir: 'speaker',
         files: { 'embedding.onnx': 28281138 },
+        sha256: { 'embedding.onnx': 'f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11' },
         sources: [{ files: { [`${GH}/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx`]: 'embedding.onnx' }, bytes: 28281138 }],
       },
     ],
@@ -82,6 +92,14 @@ export function createSttService(opts) {
     }
   });
   const ready = (pack) => STT_PACKS[pack].parts.every(partReady);
+  const sha256Of = (file) => new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    fs.createReadStream(file).on('data', (c) => hash.update(c)).on('error', reject).on('end', () => resolve(hash.digest('hex')));
+  });
+  const sumsMatch = async (part) => {
+    for (const [name, sum] of Object.entries(part.sha256)) if (await sha256Of(path.join(packDir(part.dir), name)) !== sum) return false;
+    return true;
+  };
 
   function status() {
     const one = (pack) => {
@@ -136,7 +154,8 @@ export function createSttService(opts) {
           await fetchTo(src.archive, archive, count);
           await call({ type: 'extract', archive, dest, files: src.pick });
         }
-        if (partReady(part)) return;
+        if (partReady(part) && await sumsMatch(part)) return;
+        for (const name of Object.keys(part.files)) fs.rmSync(path.join(dest, name), { force: true });
         throw new Error('받은 파일이 맞지 않아요. 다시 받아 주세요');
       } catch (err) {
         lastErr = err;

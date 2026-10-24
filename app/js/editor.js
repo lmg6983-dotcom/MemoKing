@@ -759,7 +759,7 @@ function createTagSuggest(getTags) {
     box.replaceChildren();
     const head = document.createElement('div');
     head.className = 'tag-suggest-head';
-    head.textContent = active.prefix ? 'Enter 는 쓴 그대로, ↓ 로 고르기' : '지금까지 쓴 태그 (↓ 로 고르기)';
+    head.textContent = active.prefix ? 'Enter는 쓴 그대로, ↓ 로 고르기' : '지금까지 쓴 태그 (↓ 로 고르기)';
     box.append(head);
     if (active.typed) {
       const row = document.createElement('div');
@@ -1334,7 +1334,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     if (readOnly) return items;
     const docs = items.filter((it) => it.kind === 'file' && isDocumentFile({ name: it.name }));
     const docsAsPages = docs.length > 0 && await promptChoice({
-      title: docs.length > 1 ? `문서 ${docs.length}개를 어떻게 넣을까요?` : `${docs[0].name} 을 어떻게 넣을까요?`,
+      title: docs.length > 1 ? `문서 ${docs.length}개를 어떻게 넣을까요?` : `${docs[0].name}을 어떻게 넣을까요?`,
       message: '그림으로 넣으면 장마다 넘겨 보고, 그 위에 펜으로 쓸 수 있어요',
       choices: [{ id: 'file', label: '파일로' }, { id: 'pages', label: '그림으로', primary: true }],
       remember: 'doc-insert',
@@ -1370,19 +1370,19 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   async function documentAlbum(it) {
     const name = it.name;
     try {
-      onNotice?.(`${name} 을 그림으로 바꾸고 있어요`);
+      onNotice?.(`${name}을 그림으로 바꾸고 있어요`);
       const blob = await (await fetch(vaultUrl(it.src))).blob();
-      const { pages, total } = await documentPages(new File([blob], name), (n, all) => onNotice?.(`${name} 을 그림으로 바꾸고 있어요 (${n}/${all})`));
+      const { pages, total } = await documentPages(new File([blob], name), (n, all) => onNotice?.(`${name}을 그림으로 바꾸고 있어요 (${n}/${all})`));
       const images = [];
       for (let i = 0; i < pages.length; i++) {
         const alt = `${baseName(name)} ${i + 1}쪽`;
         images.push({ src: await saveFile(new File([pages[i]], `${alt}.png`, { type: 'image/png' })), alt, page: true });
       }
-      onNotice?.(total > pages.length ? `${name} 의 앞 ${pages.length}장을 넣었어요 (모두 ${total}장)` : `${name} 을 ${pages.length}장의 그림으로 넣었어요`);
+      onNotice?.(total > pages.length ? `${name}의 앞 ${pages.length}장을 넣었어요 (모두 ${total}장)` : `${name}을 ${pages.length}장의 그림으로 넣었어요`);
       return { kind: 'album', images };
     } catch (err) {
       console.warn('문서를 그림으로 바꾸지 못했어요', name, err);
-      onNotice?.(`${name} 은 그림으로 바꾸지 못해 파일로 넣었어요`, true);
+      onNotice?.(`${name}은 그림으로 바꾸지 못해 파일로 넣었어요`, true);
       return it;
     }
   }

@@ -113,7 +113,7 @@ function openFolders() {
   path = [{ id: 'root', name: UI.myDrive }];
   showStep('folder');
   const s = drive.status();
-  $('drive-account').textContent = s.email ? `${s.email} 의 Google Drive` : '';
+  $('drive-account').textContent = s.email ? `${s.email}의 Google Drive` : '';
   // 지금까지의 메모(휴대폰 폴더 또는 예전 Drive 폴더의 휴대폰 사본)를 새 폴더로 함께
   const count = app.vault ? app.vault.list().length : 0;
   $('import-row').hidden = count === 0;

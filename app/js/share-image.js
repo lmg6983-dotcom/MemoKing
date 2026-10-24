@@ -47,7 +47,7 @@ export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
     const height = paper.offsetHeight;
     // 길면 배율을 낮춰 캔버스 한계 안에 (1 아래로도) — 너무 길어 글자를 읽을 수 없을 만큼이면 안내
     const ratio = Math.min(2, MAX_PIXELS / Math.max(WIDTH, height));
-    if (ratio < 0.4) throw new Error('메모가 너무 길어 그림 한 장으로 만들 수 없어요. PDF 로 저장해 주세요');
+    if (ratio < 0.4) throw new Error('메모가 너무 길어 그림 한 장으로 만들 수 없어요. PDF로 저장해 주세요');
     fontCss ??= await getFontEmbedCSS(paper).catch(() => '');
     const canvas = await toCanvas(paper, {
       pixelRatio: ratio,

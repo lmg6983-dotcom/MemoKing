@@ -39,7 +39,7 @@ export function hotkeyDialog({ state, locked = false, onSave }) {
     const otherTitle = (s) => (s?.title && !s.mine ? s.title : null);
 
     const keysLabel = make('div', { class: 'label', id: 'hk-keys-label' }, 'Ctrl + Alt +');
-    const keys = make('div', { class: 'hk-keys', role: 'radiogroup', 'aria-label': 'Ctrl + Alt 와 함께 누를 숫자' });
+    const keys = make('div', { class: 'hk-keys', role: 'radiogroup', 'aria-label': 'Ctrl + Alt와 함께 누를 숫자' });
     const keyButtons = new Map();
     const legend = make('p', { class: 'hk-legend', 'aria-hidden': 'true' });
     const legendTaken = make('span', {}, '다른 메모가 써요');

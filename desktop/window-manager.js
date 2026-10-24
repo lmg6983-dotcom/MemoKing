@@ -587,6 +587,7 @@ export class WindowManager {
       this.hudWin.setIgnoreMouseEvents(true);
       this.hudLoaded = new Promise((resolve) => this.hudWin.webContents.once('did-finish-load', resolve));
       this.hudWin.on('closed', () => (this.hudWin = null));
+      guardWindow(this.hudWin, { openWebPage });
       this.hudWin.loadFile(path.join(APP_DIR, 'hud.html'));
     }
     const win = this.hudWin;
@@ -1371,6 +1372,7 @@ export class WindowManager {
     this.ghostWin.setIgnoreMouseEvents(true);
     this.ghostWin.setAlwaysOnTop(true, 'screen-saver');
     this.ghostLoaded = new Promise((resolve) => this.ghostWin.webContents.once('did-finish-load', resolve));
+    guardWindow(this.ghostWin, { openWebPage });
     this.ghostWin.loadFile(path.join(APP_DIR, 'ghost.html'));
   }
 
@@ -1538,6 +1540,7 @@ export class WindowManager {
       height: Math.round(mmToPx(height)),
       webPreferences,
     });
+    guardWindow(win, { openWebPage });
     try {
       await win.loadFile(path.join(APP_DIR, 'print.html'), {
         query: {
@@ -1578,6 +1581,7 @@ export class WindowManager {
         this.ocrWin.webContents.once('ipc-message', (_e, channel) => {
           if (channel === 'ocr:ready') onReady();
         });
+        guardWindow(this.ocrWin, { openWebPage });
         this.ocrWin.webContents.on('render-process-gone', () => { this.ocrWin = null; this.ocrReady = null; });
         this.ocrWin.on('closed', () => { this.ocrWin = null; this.ocrReady = null; });
         this.ocrWin.loadURL('memoking://ocr/ocr.html').catch(reject);
@@ -1630,6 +1634,7 @@ export class WindowManager {
       webPreferences: { preload: MAGIC_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
     });
     win.setAlwaysOnTop(true, 'screen-saver');
+    guardWindow(win, { openWebPage });
     win.loadFile(path.join(APP_DIR, 'magic.html'));
     win.on('blur', () => win.hide());
     win.on('hide', () => this.onTutorialEvent('magic-tried')); // 튜토리얼: 매직키를 열어 보고 닫으면 다음 단계로 (열자마자 넘기면 목록 창이 앞으로 와 매직키가 닫힌다)
@@ -1749,6 +1754,7 @@ export class WindowManager {
         ...windowIcon,
         webPreferences: { preload: FINDER_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
       });
+      guardWindow(this.finderWin, { openWebPage });
       this.finderWin.loadFile(path.join(APP_DIR, 'finder.html'));
       this.finderWin.once('ready-to-show', () => this.finderWin?.show());
       this.finderWin.on('closed', () => {
@@ -1805,6 +1811,7 @@ export class WindowManager {
         ...windowIcon,
         webPreferences: { preload: OPMS_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
       });
+      guardWindow(this.opmsWin, { openWebPage });
       this.opmsWin.loadFile(path.join(APP_DIR, 'opms.html'));
       this.opmsWin.once('ready-to-show', () => this.opmsWin?.show());
       this.opmsWin.on('closed', () => { this.opmsWin = null; });
@@ -1920,7 +1927,7 @@ export class WindowManager {
       this.areaCapture = null;
       toast({
         title: '화면을 캡처하지 못했어요',
-        body: `잠시 뒤 ${this.getShortcutLabel('quickMemo')} 를 두 번 다시 눌러 주세요.`,
+        body: `잠시 뒤 ${this.getShortcutLabel('quickMemo')}를 두 번 다시 눌러 주세요.`,
       });
       return false;
     }

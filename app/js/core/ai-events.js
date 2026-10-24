@@ -40,13 +40,13 @@ export function aiEventRequest(cands) {
     required: ['events'],
   };
   const messages = [
-    { role: 'system', content: '너는 메모에서 일정을 고르는 도우미다. 번호 붙은 줄 중 약속, 회의, 마감, 해야 할 일처럼 그때 무엇을 하는 줄만 고른다. 날씨, 지난 이야기, 날짜만 나온 줄은 고르지 않는다. 고른 줄마다 날짜와 시각을 뺀 짧은 한국어 일정 이름(15자 안팎)을 title 에 쓴다.' },
+    { role: 'system', content: '너는 메모에서 일정을 고르는 도우미다. 번호 붙은 줄 중 약속, 회의, 마감, 해야 할 일처럼 그때 무엇을 하는 줄만 고른다. 날씨, 지난 이야기, 날짜만 나온 줄은 고르지 않는다. 고른 줄마다 날짜와 시각을 뺀 짧은 한국어 일정 이름(15자 안팎)을 title에 쓴다.' },
     { role: 'user', content: cands.map((c, i) => `${i + 1}. ${c.line}`).join('\n') },
   ];
   return { messages, schema };
 }
 
-/** 모델 답(JSON 글) → 넣을 일정 [reminder] — 번호 밖 · 겹치는 번호는 빼고, 이름이 비면 줄에서 짐작, 이미 있는 일정과 같은 때는 뺀다 */
+/** 모델 답(JSON 글) → 넣을 일정 [reminder] — 번호 밖 · 겹치는 번호는 빼고, 이름이 비면 줄에서 짐작, 이미 있는 일정과 같은 때 · 이미 지난 때는 뺀다 */
 export function aiEventResult(json, cands, existing = [], now = new Date()) {
   let data;
   try {
@@ -63,7 +63,8 @@ export function aiEventResult(json, cands, existing = [], now = new Date()) {
     used.add(c);
     const title = String(e.title ?? '').replace(/\p{Script=Han}/gu, '').trim().slice(0, 30) || guessTitle(c.line, c.date.from, c.date.to);
     const r = eventFromDate({ ...c.date, title }, now);
-    if (r && ![...existing, ...out].some((x) => same(x, r))) out.push(r);
+    const past = r?.kind === 'at' && new Date(r.at).getTime() + (r.allDay ? 86_400_000 : 0) <= now.getTime();
+    if (r && !past && ![...existing, ...out].some((x) => same(x, r))) out.push(r);
   }
   return out;
 }

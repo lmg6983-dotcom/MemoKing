@@ -87,7 +87,7 @@ public static class MkDeskPin {
     if (kind == "bottom") { Bottom(h); return "ok"; }
     return "err";
   }
-  // 앞 창이 h 이거나 h 가 띄운 창(대화 상자 · 메뉴)인가 — 주인을 거슬러 올라가 본다 (바탕화면에서 멈춤)
+  // 앞 창이 h 이거나 h가 띄운 창(대화 상자 · 메뉴)인가 — 주인을 거슬러 올라가 본다 (바탕화면에서 멈춤)
   static bool InUse(IntPtr h, IntPtr fg) {
     for (int i = 0; fg != IntPtr.Zero && i < 8; i++) {
       if (fg == h) return true;

@@ -115,8 +115,8 @@ export function chooseShare(anchor, targets) {
 export const SHARE_DONE = {
   shared: '공유 창을 열었어요', // 휴대폰 (시스템 공유 창)
   link: 'Google Drive 링크를 복사했어요. 메신저나 메일에 붙여 넣으세요',
-  localsend: 'LocalSend 에 넘겼어요. 받을 기기를 골라 보내세요',
-  'localsend-missing': 'LocalSend 가 없어 내려받기 페이지를 열었어요. 설치한 뒤 다시 눌러 주세요',
+  localsend: 'LocalSend에 넘겼어요. 받을 기기를 골라 보내세요',
+  'localsend-missing': 'LocalSend가 없어 내려받기 페이지를 열었어요. 설치한 뒤 다시 눌러 주세요',
   mail: '새 메일에 첨부했어요',
 };
 

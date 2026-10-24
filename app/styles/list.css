@@ -37,6 +37,15 @@ body {
 .setup-actions { display: flex; flex-direction: column; gap: 8px; }
 .setup .setup-later { margin: 12px 0 0; font-size: 12.5px; line-height: 1.6; }
 .setup-error { margin-top: 16px !important; color: var(--danger) !important; font-weight: 600; }
+/* 메모 폴더를 찾지 못함 — 환영 대신 안심 · 되찾기가 먼저 */
+.lost-mark { display: block; width: 48px; height: 48px; margin: 4px auto 6px; color: var(--muted); }
+.lost-mark svg { width: 48px; height: 48px; stroke-width: 1.4; }
+.setup.lost .lost-calm { margin-bottom: 14px; color: var(--text); }
+.setup.lost .lost-calm b { font-weight: 700; }
+.setup.lost .lost-where { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; font-size: 12.5px; text-align: left; }
+.setup.lost .lost-where .path-box { overflow-wrap: anywhere; }
+.setup.lost .setup-actions .btn svg { width: 18px; height: 18px; }
+.setup.lost .lost-fresh { margin: 18px 0 0; font-size: 13px; }
 
 /* ---------- 목록 ---------- */
 .main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -369,6 +378,24 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .setting-row small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); }
 /* 설정 창: 자주 보는 것(버전 · 업데이트)이 맨 위 카드, 나머지는 굵은 제목 + 가는 선으로 나눈 묶음 */
 .panel-dialog { width: min(440px, calc(100vw - 32px)); scroll-padding-top: 72px; } /* 위에 붙은 제목 줄 밑으로 포커스가 숨지 않게 */
+/* 설정 바로가기 — 제목 줄 밑에 붙어 있다 (가로로 넘김) */
+.set-jump {
+  position: sticky; top: 34px; z-index: 2;
+  display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+  margin: 0 -24px; padding: 2px 24px 10px;
+  background: var(--surface-2);
+}
+.set-jump::-webkit-scrollbar { display: none; }
+.set-jump a {
+  flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 10px;
+  border-radius: 999px; background: var(--fill-tab); color: var(--text);
+  font-size: 12.5px; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.set-jump a:hover { background: var(--hover); }
+.set-jump a:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 1px; }
+.panel-dialog .set-sec { scroll-margin-top: 80px; }
+#vault-path b { display: block; font-size: 13.5px; }
+#vault-path small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .set-sec { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .set-title { margin: 0 0 12px; font-size: 14px; line-height: 20px; font-weight: 700; color: var(--text-strong); }
 .set-title small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
@@ -487,6 +514,19 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
 }
 .filter-summary span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .filter-summary .link-btn { flex: none; color: var(--text); font-weight: 600; }
+
+/* Google 연결 안내 줄 — 필터 요약(노랑)과 다르게: 구름 + 무채색 바탕 */
+.connect-hint {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 12px 8px; padding: 4px 4px 4px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: 12.5px; font-weight: 600;
+}
+body.coaching .connect-hint { display: none; } /* 튜토리얼 동안은 매직키부터 — 연결 안내는 끝난 뒤에 */
+.connect-hint > svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
+.connect-hint span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.connect-hint .link-btn { flex: none; min-height: 32px; padding: 6px 10px; font-size: 12.5px; }
 
 /* 카드의 태그: 요약 아래 작게 */
 /* 아랫줄은 한 줄 — 태그가 많으면 넘치는 것은 숨김 */

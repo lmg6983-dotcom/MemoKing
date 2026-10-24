@@ -20,7 +20,7 @@ try {
   try {
     ({ chromium } = await import('/opt/node-tools/node_modules/playwright/index.mjs'));
   } catch {
-    console.error('Playwright 가 필요해요: npm i -D playwright && npx playwright install chromium');
+    console.error('Playwright가 필요해요: npm i -D playwright && npx playwright install chromium');
     process.exit(2);
   }
 }
@@ -658,7 +658,7 @@ try {
     await shot('02d-handoff');
     if (hasOpen) await page.tap('#toast-action');
     await page.waitForTimeout(600);
-    check('이어 쓰기: [열기] 를 누르면 그 메모', (await page.locator('.mk-doc h1').first().textContent().catch(() => '')) === 'PC에서 쓴 메모');
+    check('이어 쓰기: [열기]를 누르면 그 메모', (await page.locator('.mk-doc h1').first().textContent().catch(() => '')) === 'PC에서 쓴 메모');
     for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
       await back();
       await page.waitForTimeout(400);
@@ -1071,7 +1071,7 @@ try {
     const copyName = fs.readdirSync(vault).find((f) => f.endsWith('.md') && f.includes('다른 기기'));
     const copyText = copyName ? read(copyName) : '';
     check('동시 수정: 내 글은 이 메모에 저장', read('약 먹기.md').includes('휴대폰 글'), read('약 먹기.md'));
-    check('동시 수정: PC 에서 고친 내용은 "(다른 기기 …)" 사본 메모로', copyText.includes('PC에서 또 고친 내용') && /^# 약 먹기 \(다른 기기 /m.test(copyText), `${copyName}\n${copyText}`);
+    check('동시 수정: PC에서 고친 내용은 "(다른 기기 …)" 사본 메모로', copyText.includes('PC에서 또 고친 내용') && /^# 약 먹기 \(다른 기기 /m.test(copyText), `${copyName}\n${copyText}`);
     if (copyName) fs.rmSync(path.join(vault, copyName)); // 뒤 점검(메모 수)에 끼지 않게
   }
   await back();
@@ -1577,7 +1577,7 @@ try {
     await page.tap('.mk-save-btn');
     await page.waitForTimeout(500);
     const saved = (await devLog()).log.filter((x) => x.saveAs).at(-1);
-    check('저장 버튼: PDF 는 파일 그대로', saved?.saveAs.rel === 'attachments/안내서.pdf' && saved.saveAs.name === '안내서.pdf', JSON.stringify(saved));
+    check('저장 버튼: PDF는 파일 그대로', saved?.saveAs.rel === 'attachments/안내서.pdf' && saved.saveAs.name === '안내서.pdf', JSON.stringify(saved));
     await page.waitForTimeout(1900);
     // 파일 칩을 짧게 눌러도 바로 열지 않고 단추 + 노란 "열기" (맨 왼쪽) → "열기"를 누르면 그때 연다
     const tapAt = async (sel) => {
@@ -1653,7 +1653,7 @@ try {
   check('표 막대: 두 번째 본문 행이면 "표 나누기" 를 누를 수 있고 · 아래에 표가 없으면 "아래 표와 합치기" 는 흐림', await page.isEnabled('#table-bar [data-table="splitTable"]') && await page.isDisabled('#table-bar [data-table="joinTable"]'));
   // 표 막대: PC 와 같은 묶음 (행 · 열 · 칸 · 표 · 바꾸기), "표 삭제" 단추는 없음
   const tbGroups = await page.evaluate(() => [...document.querySelectorAll('#table-bar .tb-group')].map((g) => g.querySelector('.tb-name').textContent + ':' + [...g.querySelectorAll('button')].map((b) => b.dataset.table).join('/')));
-  check('표 막대: 행 · 열 · 칸 · 표 · 바꾸기 묶음 (PC 와 같음), 표 삭제 버튼은 없음',
+  check('표 막대: 행 · 열 · 칸 · 표 · 바꾸기 묶음 (PC와 같음), 표 삭제 버튼은 없음',
     tbGroups.join(' ') === '행:addRow/delRow 열:addCol/delCol 칸:merge/accent 표:autoFit/splitTable/joinTable 바꾸기:toList/toTask/toText' && (await page.locator('#table-bar [data-table="delTable"]').count()) === 0, JSON.stringify(tbGroups));
   // 표 막대는 한 줄 (예전엔 4줄로 감겨 화면 ¼ 가까이) — 덜 쓰는 도구는 "⋯" 로 위에 펼침
   {
@@ -1819,7 +1819,7 @@ try {
     await page.waitForTimeout(900);
     const t = read('사진 다섯.md');
     const at = ['p1', 'p2', 'p3', 'p4', 'p5'].map((n) => t.indexOf(`(attachments/${n}.png)`));
-    check('손가락 입력 보정: 큰 사진 5장 사이에서 손가락 135px 로 세 칸 이상 아래로', at[0] > at[3], t.split('---').pop());
+    check('손가락 입력 보정: 큰 사진 5장 사이에서 손가락 135px로 세 칸 이상 아래로', at[0] > at[3], t.split('---').pop());
   }
   await back();
   await page.waitForTimeout(300);
@@ -2198,7 +2198,7 @@ try {
     const body2 = await waitFile((b) => /!\[손 메모 · 흰 바탕\]/.test(b));
     const svgRel2 = body2.match(/!\[손 메모 · 흰 바탕\]\((attachments\/[^)]+\.svg)\)/)?.[1];
     const svg2 = svgRel2 ? read(svgRel2) : '';
-    check('이어 그리기: 그린 획을 그대로 열고, 바탕 판에서 흰 바탕 · 그리기 시작하면 판이 닫힘 · Esc 도 저장', popGone && again === 2 && svgRel2 && svgRel2 !== svgRel && (svg2.match(/<path /g) ?? []).length === 3 && /<rect [^>]*#ffffff/.test(svg2), JSON.stringify({ again, svgRel2, body2 }));
+    check('이어 그리기: 그린 획을 그대로 열고, 바탕 판에서 흰 바탕 · 그리기 시작하면 판이 닫힘 · Esc도 저장', popGone && again === 2 && svgRel2 && svgRel2 !== svgRel && (svg2.match(/<path /g) ?? []).length === 3 && /<rect [^>]*#ffffff/.test(svg2), JSON.stringify({ again, svgRel2, body2 }));
     // 주석: 글 위에 그리기 (칸을 차지하지 않음)
     const docH = await page.evaluate(() => document.querySelector('.ProseMirror').getBoundingClientRect().height);
     await pickMode(page, 'draw'); // 글 위에 그리기는 다이얼에서
@@ -2339,7 +2339,7 @@ try {
     const allLabel = await page.textContent('.mk-find-all');
     await shot('29-find');
     check('찾기: 찾기만 할 때는 한 줄 막대 · 찾은 곳 표시 · 개수(1/3) · 대소문자 아이콘(2 → 1) · 다음 찾기로 한 칸 다음 · "모두 바꾸기 (3)"', !oneRow.opts && oneRow.h < 80 && s1.hits === 3 && s1.cur === 1 && s1.count === '1/3' && c1 === '1/2' && c2 === '1/1' && s2.hits === 3 && s3.count === `${(Number(s2.count.split('/')[0]) % 3) + 1}/3` && allLabel === '모두 바꾸기 (3)', JSON.stringify({ oneRow, s1, c1, c2, s2, s3, allLabel }));
-    check('찾기 막대 배치(PC 와 같게): 닫기는 위 줄 · 접기는 아래 줄 · 위아래 화살표와 낱말 단위 없음 · 바꾸기도 다른 버튼과 같은 모양', layout.closeTop && layout.moreBottom && !layout.arrows && !layout.word && layout.primary === 0, JSON.stringify(layout));
+    check('찾기 막대 배치(PC와 같게): 닫기는 위 줄 · 접기는 아래 줄 · 위아래 화살표와 낱말 단위 없음 · 바꾸기도 다른 버튼과 같은 모양', layout.closeTop && layout.moreBottom && !layout.arrows && !layout.word && layout.primary === 0, JSON.stringify(layout));
     await page.tap('.mk-find-all');
     await page.waitForTimeout(900);
     const body = read('찾기 연습.md');
@@ -2392,7 +2392,7 @@ try {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
     const closed = await page.evaluate(() => document.querySelector('.mk-find-bar').hidden && !document.querySelector('.mk-doc .mk-find-hit'));
-    check('찾기 막대: Esc 는 열린 모두 찾기 목록부터 · 한 번 더 누르면 막대를 닫고 표시도 사라짐', listClosed && closed, JSON.stringify({ listClosed, closed }));
+    check('찾기 막대: Esc는 열린 모두 찾기 목록부터 · 한 번 더 누르면 막대를 닫고 표시도 사라짐', listClosed && closed, JSON.stringify({ listClosed, closed }));
     for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
       await back();
       await page.waitForTimeout(400);
@@ -2415,19 +2415,13 @@ try {
     await page.tap('#fab');
     await page.waitForTimeout(300);
     await page.tap('#fab-menu [data-new="text"]');
-    const write = await stepIs('write');
-    await page.keyboard.type('튜토리얼 메모');
-    const lists = await stepIs('lists');
-    const praised = await page.isVisible('.coach-bubble .coach-praise');
-    await page.waitForTimeout(500);
-    await shot('25-tutorial-praise');
-    check('새 메모 → 메모 화면에서 다음 말풍선 · 글을 쓰면 "잘했어요" 칭찬과 함께 다음', write && lists && praised, JSON.stringify({ write, lists, praised }));
-    await page.evaluate(() => document.querySelector('#format-bar [data-cmd="task"]').click());
+    // 새 메모를 만들면(직접 해 냄) 칭찬과 함께 다음 — 다이얼로 옮기기 (쓰기 · 체크리스트처럼 다른 메모 앱에도 있는 단계는 뺐다)
     const move = await stepIs('move');
+    const praised = await page.isVisible('.coach-bubble .coach-praise');
     await page.waitForTimeout(400);
     const shotShown = await page.evaluate(() => { const i = document.querySelector('.coach-shot'); return i && i.complete && i.naturalWidth > 0; });
-    await shot('26-tutorial-shot');
-    check('체크리스트를 만들면 다음 단계 · 실제 화면 사진이 보임', move && shotShown, JSON.stringify({ move, shotShown }));
+    await shot('25-tutorial-praise');
+    check('새 메모를 만들면 "잘했어요" 칭찬과 함께 다이얼 단계 · 실제 화면 사진이 보임', move && praised && shotShown, JSON.stringify({ move, praised, shotShown }));
     await page.tap('.coach-bubble .coach-skip');
     const ended = await page.waitForSelector('.coach-bubble', { state: 'hidden', timeout: 3000 }).then(() => true).catch(() => false);
     check('튜토리얼 그만하기 → 말풍선이 사라짐', ended && !(await page.evaluate(() => document.body.classList.contains('coaching'))));

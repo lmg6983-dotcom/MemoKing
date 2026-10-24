@@ -121,17 +121,17 @@ const server = new McpServer(
   { name: 'memoking', version: VERSION },
   {
     instructions:
-      '메모킹(MemoKing) 사용자의 메모(마크다운)를 찾고 읽고 남기는 도구입니다. 먼저 search_memos 로 찾고 read_memo 로 읽으세요. '
+      '메모킹(MemoKing) 사용자의 메모(마크다운)를 찾고 읽고 남기는 도구입니다. 먼저 search_memos로 찾고 read_memo로 읽으세요. '
       + '새로 남길 때는 첫 줄을 "# 제목" 으로 쓰면 그 제목이 파일 이름이 됩니다. #태그 는 본문 어디에나 쓸 수 있습니다. '
       + '잠긴 메모(locked)는 내용을 볼 수 없습니다. '
-      + '메모를 새로 만들거나 덧붙일 때는 반드시 create_memo · append_to_memo 를 쓰세요 — Google Drive 의 메모킹 폴더에 파일을 직접 만들거나 올리면 '
+      + '메모를 새로 만들거나 덧붙일 때는 반드시 create_memo · append_to_memo를 쓰세요 — Google Drive의 메모킹 폴더에 파일을 직접 만들거나 올리면 '
       + '메모킹(PC·휴대폰)은 자기가 만든 파일만 볼 수 있어 그 메모가 보이지 않습니다.',
   },
 );
 
 server.registerTool('search_memos', {
   title: '메모 찾기',
-  description: '메모킹 메모를 찾습니다. query 를 비우면 최근에 고친 메모부터. 제목·본문·#태그·초성(ㅈㅂㄱ)으로 찾을 수 있습니다.',
+  description: '메모킹 메모를 찾습니다. query를 비우면 최근에 고친 메모부터. 제목·본문·#태그·초성(ㅈㅂㄱ)으로 찾을 수 있습니다.',
   inputSchema: { query: z.string().optional().describe('찾을 말 (비우면 최근 메모)'), tag: z.string().optional().describe('이 태그가 있는 메모만 (# 없이)'), limit: z.number().int().min(1).max(50).optional() },
   annotations: { readOnlyHint: true },
 }, async ({ query = '', tag, limit = 10 }) => {
@@ -158,7 +158,7 @@ server.registerTool('read_memo', {
   try {
     const v = openVault();
     const m = findMemo(v, memo);
-    if (!m) return fail(`"${memo}" 메모를 찾지 못했어요. search_memos 로 먼저 찾아 주세요.`);
+    if (!m) return fail(`"${memo}" 메모를 찾지 못했어요. search_memos로 먼저 찾아 주세요.`);
     // 제목·id 가 딱 맞지 않아 찾기로 고른 메모면 그렇다고 알린다 (다른 메모를 그 메모로 오해하지 않게)
     const exactHit = m.id === String(memo).trim() || m.title.toLowerCase() === String(memo).trim().toLowerCase();
     if (isLockedBody(m.body)) return fail(`"${m.title}" 은(는) 잠긴 메모라 내용을 볼 수 없어요.`);
@@ -194,7 +194,7 @@ server.registerTool('list_tags', {
 server.registerTool('create_memo', {
   title: '새 메모 남기기',
   description: '새 메모를 만듭니다 (PC·휴대폰 메모킹에 함께 보임). 메모킹 메모는 반드시 이 도구로 만드세요 — Google Drive 메모킹 폴더에 파일을 직접 만들면 메모킹에 보이지 않습니다. '
-    + 'content 는 마크다운 — 첫 줄을 "# 제목" 으로 쓰세요. 체크리스트는 "- [ ] 할 일".',
+    + 'content는 마크다운 — 첫 줄을 "# 제목" 으로 쓰세요. 체크리스트는 "- [ ] 할 일".',
   inputSchema: {
     content: z.string().min(1).describe('메모 내용 (마크다운)'),
     color: z.enum(['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal']).optional().describe('메모 색 (기본 노랑)'),
@@ -202,7 +202,7 @@ server.registerTool('create_memo', {
   annotations: { readOnlyHint: false, destructiveHint: false },
 }, async ({ content, color }) => {
   if (!canWrite()) return fail('메모킹 설정에서 "AI가 메모를 남기도록 허용" 이 꺼져 있어요.');
-  if (!content.trim()) return fail('메모 내용이 비어 있어요. content 에 남길 글을 넣어 주세요.');
+  if (!content.trim()) return fail('메모 내용이 비어 있어요. content에 남길 글을 넣어 주세요.');
   if (isLockedBody(content) || /<!--\s*memoking-lock/.test(content)) return fail('잠금 정보가 든 글은 남길 수 없어요 (아무도 열 수 없는 메모가 될 수 있어요).');
   try {
     const v = openVault();
@@ -220,7 +220,7 @@ server.registerTool('create_memo', {
 
 server.registerTool('append_to_memo', {
   title: '메모에 덧붙이기',
-  description: '이미 있는 메모의 끝에 내용을 덧붙입니다 (삭제하거나 고치지 않음). memo 에는 id 또는 정확한 제목 (모르면 search_memos 로 먼저 찾기).',
+  description: '이미 있는 메모의 끝에 내용을 덧붙입니다 (삭제하거나 고치지 않음). memo 에는 id 또는 정확한 제목 (모르면 search_memos로 먼저 찾기).',
   inputSchema: { memo: z.string().describe('메모 id 또는 제목'), content: z.string().min(1).describe('덧붙일 마크다운') },
   annotations: { readOnlyHint: false, destructiveHint: false },
 }, async ({ memo, content }) => {
@@ -228,10 +228,10 @@ server.registerTool('append_to_memo', {
   try {
     const v = openVault();
     const m = findMemo(v, memo, { exact: true });
-    if (m?.ambiguous) return fail(`제목이 "${memo}" 인 메모가 ${m.ambiguous.length}개예요: ${m.ambiguous.map((x) => `${x.title} (id: ${x.id}, ${x.updated ?? ''})`).join(', ')} — 덧붙일 메모의 id 로 다시 불러 주세요.`);
+    if (m?.ambiguous) return fail(`제목이 "${memo}" 인 메모가 ${m.ambiguous.length}개예요: ${m.ambiguous.map((x) => `${x.title} (id: ${x.id}, ${x.updated ?? ''})`).join(', ')} — 덧붙일 메모의 id로 다시 불러 주세요.`);
     if (!m) {
       const near = closeTitles(v, memo);
-      return fail(`"${memo}" 와(과) 제목이 같은 메모가 없어요.${near.length ? ` 비슷한 메모: ${near.join(', ')} — 맞는 것의 id 로 다시 불러 주세요.` : ' search_memos 로 먼저 찾아 주세요.'}`);
+      return fail(`"${memo}" 와(과) 제목이 같은 메모가 없어요.${near.length ? ` 비슷한 메모: ${near.join(', ')} — 맞는 것의 id 로 다시 불러 주세요.` : ' search_memos로 먼저 찾아 주세요.'}`);
     }
     if (isLockedBody(m.body)) return fail(`"${m.title}" 은(는) 잠긴 메모라 덧붙일 수 없어요.`);
     if (!content.trim()) return fail('덧붙일 내용이 비어 있어요.');

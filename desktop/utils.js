@@ -77,20 +77,25 @@ export function loadSettings() {
 
 export function saveSettings(now = false) {
   clearTimeout(settingsTimer);
+  // 임시 파일에 다 쓴 뒤 바꿔치기 — 쓰는 도중 꺼지면 설정이 통째로 비어 처음 설치처럼 보이던 것 (창 위치 등으로 자주 쓴다).
+  //   못 쓰면(백신이 잠깐 붙잡음 등) 다음 저장 때 다시 — 메인 프로세스 오류 창을 띄우지 않는다
   const write = () => {
-    fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
-    fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2));
+    const file = settingsFile();
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(`${file}.tmp`, JSON.stringify(settings, null, 2));
+      fs.renameSync(`${file}.tmp`, file);
+    } catch (err) {
+      console.error('설정 저장 실패', err.message);
+    }
   };
   if (now) write();
   else settingsTimer = setTimeout(write, 500);
 }
 
-// Google Drive 가 있으면 그 안의 "메모킹" 폴더를 추천한다.
-export function suggestedVaultPath() {
-  const drives = ['G:\\내 드라이브', 'G:\\My Drive', path.join(os.homedir(), 'Google Drive'), path.join(os.homedir(), 'My Drive')];
-  const base = drives.find((d) => fs.existsSync(d)) ?? app.getPath('documents');
-  return path.join(base, '메모킹');
-}
+// 처음 메모 폴더: 문서\메모킹 — Google Drive 데스크탑 앱 폴더 안은 고르지 않는다 (휴대폰과 맞추는 메모킹 동기화가
+//   두 번 동기화를 막으려 그 폴더를 옮겨야 해서, Drive 에 메모가 두 벌 남는다)
+export const suggestedVaultPath = () => path.join(app.getPath('documents'), '메모킹');
 
 // 휴지통 자동 비우기
 export const TRASH_DAYS = [0, 7, 30, 90, 365];

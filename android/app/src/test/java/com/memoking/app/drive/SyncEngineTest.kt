@@ -6,6 +6,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -116,6 +117,15 @@ class SyncEngineTest {
         assertTrue(run().skipped)
         now += SyncEngine.FULL_SCAN_MS
         assertEquals("15분마다", 1, run().downloaded)
+    }
+
+    @Test
+    fun emptyLocalFolderStopsInsteadOfDeleting() {
+        // SD 카드가 빠지거나 고른 폴더 권한이 풀리면 목록이 비어 온다 — 지운 게 아니므로 Drive 에서 지우지 않는다
+        startFromPc()
+        dir.listFiles()?.forEach { it.deleteRecursively() }
+        assertThrows(SyncEngine.SafetyStop::class.java) { sync() }
+        assertEquals("# 회의\n내용", drive.text("회의.md"))
     }
 
     @Test

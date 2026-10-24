@@ -42,6 +42,7 @@ export function registerIpc(ctx) {
     getVault,
     openVault,
     vaultInfo,
+    retryMissingVault,
     whatsNew,
     suggestedVaultPath,
     appSettings,
@@ -232,6 +233,7 @@ export function registerIpc(ctx) {
     if (getVault() && !settings.tutorialDone && !SMOKE) startTutorial();
     return info;
   });
+  ipcMain.handle('vault:retry', () => retryMissingVault());
   ipcMain.handle('vault:choose', async (event) => {
     const result = await dialog.showOpenDialog(senderWindow(event), {
       title: '메모를 저장할 폴더 선택',
@@ -571,7 +573,7 @@ export function registerIpc(ctx) {
     // 주소로 질문을 넘길 수 없는 사이트(Gemini)는 질문을 복사해 두고 연다
     if (link.paste && !SMOKE) clipboard.writeText(text.trim());
     if (!openWebPage(link.url)) return { ok: false };
-    if (link.paste) toast({ title: `${link.name} 를 열었어요`, body: '질문을 복사해 두었어요. 입력 칸에 붙여 넣기(Ctrl+V)만 하면 돼요' });
+    if (link.paste) toast({ title: `${link.name}를 열었어요`, body: '질문을 복사해 두었어요. 입력 칸에 붙여 넣기(Ctrl+V)만 하면 돼요' });
     return { ok: true };
   });
   // 사용자가 골라 찾은 사건의 번호 양식을 배워 둔다 — 같은 양식의 번호는 앞으로 매직키가 저절로 찾는다 (설정에서 지우기)
@@ -594,7 +596,7 @@ export function registerIpc(ctx) {
       wm.rememberCases(top);
       return { cases: top.map((r) => wm.opmsBrief(r, q)), total, shapes: learnOpms(rows) };
     } catch (err) {
-      return { cases: [], total: 0, error: err.offline ? '사내망에 연결돼 있지 않아 OPMS 를 찾지 못했어요' : err.message };
+      return { cases: [], total: 0, error: err.offline ? '사내망에 연결돼 있지 않아 OPMS를 찾지 못했어요' : err.message };
     }
   });
 
@@ -786,7 +788,7 @@ export function registerIpc(ctx) {
         if (r.body !== before && untouched() && vault.get(id)?.body === before && !vault.save(id, r.body).refused) {
           const what = [r.fixes && `맞춤법 ${r.fixes}곳`, r.title && `제목 "${r.title}"`].filter(Boolean).join(' · ');
           showAiNotice(id, {
-            title: 'AI 가 메모를 다듬었어요', body: what, text: `AI 가 다듬었어요: ${what}`,
+            title: 'AI가 메모를 다듬었어요', body: what, text: `AI가 다듬었어요: ${what}`,
             undo: () => {
               if (getVault() !== vault || vault.get(id)?.body !== r.body) return { ok: false, message: '그사이 고쳐서 되돌리지 않았어요. 메뉴 › 이전 버전에서 원래 글을 볼 수 있어요' };
               if (vault.save(id, before).refused) return { ok: false, message: '되돌리지 못했어요. 메뉴 › 이전 버전에서 원래 글을 볼 수 있어요' };
@@ -1194,7 +1196,7 @@ export function registerIpc(ctx) {
     const localSend = Boolean(findLocalSend());
     return [
       { id: 'drive', label: 'Google Drive 링크', sub: drive ? '올리고 링크를 복사해요 (링크가 있는 사람은 보기)' : '아직 연결 전이에요. 눌러서 설정에서 연결하기', ready: drive, connect: !drive },
-      { id: 'localsend', label: 'LocalSend', sub: localSend ? '같은 와이파이의 휴대폰, PC 로 바로 (오픈소스)' : '무료 오픈소스 앱, 누르면 내려받기 페이지를 열어요', ready: true },
+      { id: 'localsend', label: 'LocalSend', sub: localSend ? '같은 와이파이의 휴대폰, PC로 바로 (오픈소스)' : '무료 오픈소스 앱, 누르면 내려받기 페이지를 열어요', ready: true },
       { id: 'mail', label: '메일에 첨부', sub: '기본 메일 앱(Outlook 등)의 새 메일에', ready: process.platform === 'win32' || SMOKE },
     ];
   });
@@ -1224,7 +1226,7 @@ export function registerIpc(ctx) {
     }
     if (via === 'drive') {
       const api = getDriveApi();
-      if (!api || !getDriveAuth()?.connected) return { error: '설정에서 Google Drive 를 먼저 연결해 주세요' };
+      if (!api || !getDriveAuth()?.connected) return { error: '설정에서 Google Drive를 먼저 연결해 주세요' };
       try {
         // 공유 폴더 id 는 따로 (Drive 동기화 폴더를 바꿀 때 settings.drive 를 통째로 갈아 끼우므로)
         const link = await driveShareLink(api, {
@@ -1237,7 +1239,7 @@ export function registerIpc(ctx) {
         clipboard.writeText(link);
         return { ok: true, link };
       } catch (err) {
-        return { error: err?.status === 403 ? '조직 설정 때문에 링크로 공유할 수 없어요. 메일이나 LocalSend 를 써 주세요' : `Google Drive 에 올리지 못했어요 (${err?.message ?? err})` };
+        return { error: err?.status === 403 ? '조직 설정 때문에 링크로 공유할 수 없어요. 메일이나 LocalSend를 써 주세요' : `Google Drive에 올리지 못했어요 (${err?.message ?? err})` };
       }
     }
     if (via === 'localsend') {
@@ -1246,11 +1248,11 @@ export function registerIpc(ctx) {
         shell.openExternal(LOCALSEND_DOWNLOAD);
         return { missing: true };
       }
-      return r === 'ok' ? { ok: true } : { error: `LocalSend 를 열지 못했어요 (${r.replace(/^err /, '')})` };
+      return r === 'ok' ? { ok: true } : { error: `LocalSend를 열지 못했어요 (${r.replace(/^err /, '')})` };
     }
     // 남은 것은 메일 (위에서 방법을 걸렀다)
     const r = await mailAttach(file, title);
-    return r === 'ok' ? { ok: true } : { error: /mapi/.test(r) ? '기본 메일 앱을 찾지 못했어요. Google Drive 링크나 LocalSend 를 써 보세요' : `새 메일을 만들지 못했어요 (${r.replace(/^err /, '')})` };
+    return r === 'ok' ? { ok: true } : { error: /mapi/.test(r) ? '기본 메일 앱을 찾지 못했어요. Google Drive 링크나 LocalSend를 써 보세요' : `새 메일을 만들지 못했어요 (${r.replace(/^err /, '')})` };
   };
   ipcMain.handle('attachment:info', (_e, rel) => {
     let decoded = String(rel ?? '');

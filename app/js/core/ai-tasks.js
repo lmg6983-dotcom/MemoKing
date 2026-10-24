@@ -2,23 +2,22 @@
 //   다른 것은 모델을 부르는 법(ai)과 메모를 읽는 법(memos · graph)뿐이다. 모델은 이 기기 안(llama-server), 인터넷 없이.
 import { spellMessages, styleMessages, draftMessages, plausibleFix, titleMessages, cleanTitle, wordDiff, diffEdits, TITLE_OVER } from './ai-write.js';
 import { aiTagRequest, aiTagResult } from './ai-tags.js';
-import { retrieve, ragMessages } from './rag.js';
+import { chunkMemo, retrieve, ragMessages, expandMessages, expandResult } from './rag.js';
+import { extractTitle } from './memo-file.js';
 import { extractTags } from './tags.js';
 import { eventCandidates, aiEventRequest, aiEventResult, nextSeen } from './ai-events.js';
 import { isLockedBody } from './memo-lock.js';
 
 export const MAX_TAGS = 3; // 한 메모의 태그 (사용자 + AI) — AI 는 이만큼까지만 채운다
-const ready = (m) => ['ready', 'running'].includes(m?.state);
 
 /**
  * @param {{
- *   ai: { status: () => any, chat: (messages, o) => Promise<string>, embed: (texts: string[]) => Promise<number[][]> },
+ *   ai: { status: () => any, chat: (messages, o) => Promise<string> },
  *   memos: () => { id: string, body: string }[],
  *   graph: () => { id: string, related?: { id: string, score: number }[] }[],
- *   store: { chunksFor: Function },
  * }} o
  */
-export function createAiTasks({ ai, memos, graph, store }) {
+export function createAiTasks({ ai, memos, graph }) {
   /** 글 도우미: spell → { fixed: [] } (믿을 만한 답만, 아니면 원래 글) · style · draft → { text } */
   async function write({ task, text = '', blocks = [], style, title, request }, { signal, onToken, onProgress } = {}) {
     if (task === 'spell') {
@@ -74,34 +73,29 @@ export function createAiTasks({ ai, memos, graph, store }) {
 
   /**
    * 글 속 일정: 아직 보지 않은 줄 중 앞으로의 날짜가 있는 줄을 AI 가 고르고 이름 → { events: [reminder], seen }.
-   *   fresh 가 아니면(오래된 메모를 처음 볼 때 — "내일" 이 쓴 날이 아니라 오늘 기준이 되므로) 묻지 않고 본 줄로만
+   *   fresh 가 아니면(오래된 메모를 처음 볼 때 — "내일" 이 쓴 날이 아니라 오늘 기준이 되므로) 묻지 않고 본 줄로만.
+   *   written: 글을 쓴 때 — "내일" 은 이때 기준 (휴대폰에서 밤 11시 반에 쓴 메모를 PC 가 자정 넘어 봐도 하루 밀리지 않게)
    */
-  async function autoEvents(body, { seen = [], existing = [], fresh = true, now = new Date() } = {}) {
-    const cands = eventCandidates(body, seen, now);
+  async function autoEvents(body, { seen = [], existing = [], fresh = true, now = new Date(), written = now } = {}) {
+    const cands = eventCandidates(body, seen, written);
     if (!cands.length || !fresh) return { events: [], seen: nextSeen(seen, cands) };
     const req = aiEventRequest(cands);
     const json = await ai.chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 60 + cands.length * 40 });
     return { events: aiEventResult(json, cands, existing, now), seen: nextSeen(seen, cands) };
   }
 
-  /** AI 검색: 낱말 · 뜻 · 그래프로 메모를 찾고 고른 메모만 근거로 답 → { text, sources } */
-  async function ask(question, { signal, onToken, onProgress } = {}) {
-    const st = await ai.status();
-    const embedOn = ready(st.embed); // 검색 모델이 없으면 낱말 · 그래프만
-    const embed = (texts) => {
-      if (signal?.aborted) throw new Error('멈췄어요');
-      return ai.embed(texts);
-    };
-    const chunks = await store.chunksFor(memos().filter((m) => !isLockedBody(m.body)), {
-      model: embedOn ? `${st.embed.name}:${st.embed.size}` : '',
-      embed,
-      onProgress,
+  /** AI 검색: 글 모델(카나나2)이 질문을 넓히고, 낱말 · 그래프로 메모를 찾아 고른 메모만 근거로 답 → { text, sources } */
+  async function ask(question, { signal, onToken } = {}) {
+    const chunks = memos().filter((m) => !isLockedBody(m.body)).flatMap((m) => {
+      const title = extractTitle(m.body);
+      return chunkMemo(m.body).map((text) => ({ id: m.id, title, text }));
     });
-    // shortcut: Qwen3-Embedding 은 질문 앞에 지시문을 붙여야 제 성능 — 파일 이름으로만 가린다
-    const prefix = /qwen/i.test(st.embed?.name ?? '') ? 'Instruct: Given a search query, retrieve relevant notes\nQuery: ' : '';
-    const qvec = embedOn ? (await embed([prefix + question]))[0] : undefined;
+    const ex = expandMessages(question);
+    // 넓히지 못해도(모델 오류 · 엉뚱한 답) 질문 낱말만으로 찾는다
+    const words = await ai.chat(ex.messages, { schema: ex.schema, temperature: 0, maxTokens: 120, signal }).then(expandResult, () => []);
+    if (signal?.aborted) throw new Error('멈췄어요');
     const related = new Map(graph().map((m) => [m.id, m.related ?? []]));
-    const picked = retrieve(question, chunks, { qvec, related: (id) => related.get(id) ?? [] });
+    const picked = retrieve(question, chunks, { words, related: (id) => related.get(id) ?? [] });
     const sources = picked.map((m) => ({ id: m.id, title: m.title, via: m.via }));
     if (!picked.length) return { text: '메모에서 찾지 못했어요.', sources };
     return { text: await ai.chat(ragMessages(question, picked), { maxTokens: 400, temperature: 0.2, signal, onToken }), sources };

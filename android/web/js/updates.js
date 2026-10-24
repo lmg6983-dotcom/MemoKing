@@ -46,9 +46,9 @@ function render() {
     idle: UI.updWait,
     checking: UI.updChecking,
     latest: UI.updLatest,
-    available: `새 버전 ${v} 이 나왔어요`,
+    available: `새 버전 ${v}이 나왔어요`,
     downloading: UI.updDownloading,
-    ready: `${v} 을 받아 뒀어요. 설치 화면에서 "업데이트" 를 눌러 주세요`,
+    ready: `${v}을 받아 뒀어요. 설치 화면에서 "업데이트" 를 눌러 주세요`,
     installing: '설치 화면에서 "업데이트" 를 눌러 주세요',
     error: state.message,
   }[st] ?? '';
