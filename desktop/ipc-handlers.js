@@ -455,6 +455,11 @@ export function registerIpc(ctx) {
     saveSettings();
     return settings.autoTags;
   });
+  ipcMain.handle('app:set-auto-events', (_e, on) => {
+    settings.autoEvents = Boolean(on);
+    saveSettings();
+    return settings.autoEvents;
+  });
   ipcMain.handle('app:set-magic-polish', (_e, on) => {
     settings.magicPolish = Boolean(on);
     saveSettings();

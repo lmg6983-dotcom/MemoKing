@@ -122,6 +122,21 @@ class LockMethods {
     return this.get(id);
   }
 
+  /** AI 가 글에서 찾은 일정을 더하고 본 줄(aiEvents)을 남긴다 — 머리말만, 고친 시각 그대로. 쓰지 못했으면 되돌리고 null */
+  addAiEvents(id, events, seen) {
+    const entry = this.entries.get(id);
+    if (!entry?.file || isLockedBody(entry.body)) return null;
+    const prev = metaSnapshot(entry.meta);
+    entry.meta.reminders = [...entry.meta.reminders, ...events];
+    entry.meta.extra = { ...entry.meta.extra, aiEvents: seen };
+    if (this.write(entry) !== true) {
+      entry.meta = prev;
+      return null;
+    }
+    this.changed([id]);
+    return this.get(id);
+  }
+
   /** 색·고정·표 크기·그림 — 머리말만 쓴다. 쓰지 못했으면 되돌리고 null */
   setMeta(id, patch) {
     const entry = this.entries.get(id);

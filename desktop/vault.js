@@ -335,6 +335,7 @@ export class Vault extends EventEmitter {
       day: entry.meta.day || '',
       mode: entry.meta.mode ?? 'life',
       aiTags: Array.isArray(entry.meta.extra?.aiTags) ? entry.meta.extra.aiTags : null, // AI 가 단 태그 (null = 아직 안 봄)
+      aiEvents: Array.isArray(entry.meta.extra?.aiEvents) ? entry.meta.extra.aiEvents : null, // 일정을 찾아 본 줄 (null = 아직 안 봄)
     };
   }
 

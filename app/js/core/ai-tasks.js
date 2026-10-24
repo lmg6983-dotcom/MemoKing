@@ -4,6 +4,7 @@ import { spellMessages, styleMessages, draftMessages, plausibleFix, titleMessage
 import { aiTagRequest, aiTagResult } from './ai-tags.js';
 import { retrieve, ragMessages } from './rag.js';
 import { extractTags } from './tags.js';
+import { eventCandidates, aiEventRequest, aiEventResult, nextSeen } from './ai-events.js';
 import { isLockedBody } from './memo-lock.js';
 
 export const MAX_TAGS = 3; // 한 메모의 태그 (사용자 + AI) — AI 는 이만큼까지만 채운다
@@ -71,6 +72,18 @@ export function createAiTasks({ ai, memos, graph, store }) {
     return room > 0 ? (await pickTags(body, id)).slice(0, room).map((t) => t.name) : [];
   }
 
+  /**
+   * 글 속 일정: 아직 보지 않은 줄 중 앞으로의 날짜가 있는 줄을 AI 가 고르고 이름 → { events: [reminder], seen }.
+   *   fresh 가 아니면(오래된 메모를 처음 볼 때 — "내일" 이 쓴 날이 아니라 오늘 기준이 되므로) 묻지 않고 본 줄로만
+   */
+  async function autoEvents(body, { seen = [], existing = [], fresh = true, now = new Date() } = {}) {
+    const cands = eventCandidates(body, seen, now);
+    if (!cands.length || !fresh) return { events: [], seen: nextSeen(seen, cands) };
+    const req = aiEventRequest(cands);
+    const json = await ai.chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 60 + cands.length * 40 });
+    return { events: aiEventResult(json, cands, existing, now), seen: nextSeen(seen, cands) };
+  }
+
   /** AI 검색: 낱말 · 뜻 · 그래프로 메모를 찾고 고른 메모만 근거로 답 → { text, sources } */
   async function ask(question, { signal, onToken, onProgress } = {}) {
     const st = await ai.status();
@@ -94,5 +107,5 @@ export function createAiTasks({ ai, memos, graph, store }) {
     return { text: await ai.chat(ragMessages(question, picked), { maxTokens: 400, temperature: 0.2, signal, onToken }), sources };
   }
 
-  return { write, pickTags, autoTags, polish, ask };
+  return { write, pickTags, autoTags, autoEvents, polish, ask };
 }
