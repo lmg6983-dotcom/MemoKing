@@ -1,9 +1,9 @@
 // AI 작업 흐름 (PC 메인 · 휴대폰 화면이 함께) — 글 도우미 · 태그 · AI 검색.
 //   다른 것은 모델을 부르는 법(ai)과 메모를 읽는 법(memos · graph)뿐이다. 모델은 이 기기 안(llama-server), 인터넷 없이.
 import { spellMessages, styleMessages, draftMessages, plausibleFix, titleMessages, cleanTitle, wordDiff, diffEdits, TITLE_OVER } from './ai-write.js';
-import { aiTagRequest, aiTagResult } from './ai-tags.js';
+import { aiTagRequest, aiTagResult, MIN_AI_TEXT } from './ai-tags.js';
 import { chunkMemo, retrieve, ragMessages, expandMessages, expandResult } from './rag.js';
-import { extractTitle } from './memo-file.js';
+import { extractTitle, plainLines } from './memo-file.js';
 import { extractTags } from './tags.js';
 import { eventCandidates, aiEventRequest, aiEventResult, nextSeen } from './ai-events.js';
 import { isLockedBody } from './memo-lock.js';
@@ -36,7 +36,7 @@ export function createAiTasks({ ai, memos, graph }) {
   /** AI 로 태그 고르기 → 칩 목록 */
   async function pickTags(body, id) {
     const req = aiTagRequest(body, memos(), { excludeId: id });
-    return aiTagResult(await ai.chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, body);
+    return aiTagResult(await ai.chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, body, req.grounded);
   }
 
   /**
@@ -68,7 +68,9 @@ export function createAiTasks({ ai, memos, graph }) {
   /** 메모에 더 달 태그 이름들 — 이미 단 태그와 합쳐 3개까지 (저장은 부른 쪽, 모델 오류는 그대로 던짐) */
   async function autoTags(body, id) {
     const room = MAX_TAGS - extractTags(body).length;
-    return room > 0 ? (await pickTags(body, id)).slice(0, room).map((t) => t.name) : [];
+    // 짧은 메모(인사 · 한 줄 대답)에는 저절로 달지 않는다 — 고를 주제가 없는데 억지로 채우던 것
+    if (room <= 0 || plainLines(body).join('').replace(/\s/g, '').length < MIN_AI_TEXT) return [];
+    return (await pickTags(body, id)).slice(0, room).map((t) => t.name);
   }
 
   /**

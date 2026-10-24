@@ -43,7 +43,7 @@ let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
-const aiAsk = api.ai ? setupAiAsk({ box: $('ai-ask'), api }) : null; // 검색창 › AI에게 묻기 (글 모델을 넣은 PC 에서만)
+const aiAsk = api.ai ? setupAiAsk({ btn: $('ai-ask-btn'), box: $('ai-ask'), api }) : null; // 검색창 안 ✦ › AI에게 묻기 (글 모델을 넣은 PC 에서만)
 const el = {
   setup: $('setup'),
   suggested: $('suggested-path'),
@@ -1266,8 +1266,11 @@ $('opms-shapes-clear').addEventListener('click', async () => showOpmsShapes(awai
 // 메모 보기 › 넣을 때 묻기: "앞으로 이렇게" 로 기억한 것을 지운다 (메모 창들과 같은 저장소 — rename-content.js)
 const choicesBtn = $('choices-reset');
 const paintChoices = () => {
-  choicesBtn.disabled = !hasRememberedChoices();
-  choicesBtn.textContent = choicesBtn.disabled ? '늘 물어요' : '다시 묻기';
+  const kept = hasRememberedChoices();
+  choicesBtn.hidden = !kept; // 지울 것이 없으면 꺼진 단추 대신 지금 상태만 글로
+  $('choices-note').textContent = kept
+    ? '사진 여러 장 · 문서를 넣을 때 "앞으로 이렇게" 로 정해 둔 것이 있어요. 지우면 다시 물어요'
+    : '사진 여러 장 · 문서를 넣을 때마다 어떻게 넣을지 물어요';
 };
 choicesBtn.addEventListener('click', () => {
   forgetChoices();

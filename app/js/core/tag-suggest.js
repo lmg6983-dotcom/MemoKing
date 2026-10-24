@@ -5,6 +5,9 @@
 //   4) 새 태그는 마지막에만: 이 메모의 핵심어(명사 위주)로 — 하지만 기존 태그와 사실상 같은 말이면
 //      (대소문자·띄어쓰기, 회의록↔회의, 미팅↔회의, 한 글자 오타) 새로 만들지 않고 그 기존 태그로
 // 결과: [{ name, score(0~1), reason, sure, existing, why }] — sure 는 저절로 달아도 될 만큼 확실한 기존 태그
+// 근거 없는 추천은 하지 않는다 (0.70.0): 많이 쓰는 태그라고 점수를 더하지 않고, 조금만 닮은 메모(유사도 0.1 아래)의
+//   태그는 세지 않는다 — 인사 한 줄에 #공유 · #ETRI 가 추천되던 것. 기존 태그는 본문에 나오거나(같은 뜻 포함),
+//   닮은 메모 여럿이 함께 달았거나, 그 태그 메모들과 꽤 닮았을 때만
 import { tokenize, tfidfVectors, cosine } from './indexer.js';
 import { extractTags, isValidTag } from './tags.js';
 import { plainLines, extractTitle } from './memo-file.js';
@@ -12,6 +15,9 @@ import { isHangul, jamoDistance, stem, normalizeTag } from './korean.js';
 
 export const MIN_TEXT = 12; // 이보다 짧은 메모에는 추천하지 않는다 (글자 수)
 const K = 7; // 닮은 메모 몇 개의 태그를 볼지
+const MIN_SIM = 0.1; // 이보다 덜 닮은 메모의 태그는 세지 않는다
+const STRONG_SIM = 0.15; // 닮은 메모가 하나뿐이면 이만큼은 닮아야
+const CENTROID_SIM = 0.2; // 그 태그를 단 메모들 전체와 이만큼 닮으면
 
 // 같은 뜻의 말 묶음 (한국어·영어) — 묶음 안에 이미 쓰는 태그가 있으면 그것으로.
 //   본문에 묶음의 말이 나오면 "확실한" 태그로 저절로 달리므로, 뜻이 넓은 흔한 말은 넣지 않는다
@@ -71,6 +77,16 @@ const textOf = (body) => {
   return noUrls(`${title} ${title} ${plainLines(body).join(' ')}`);
 };
 
+/** 이 태그(또는 같은 뜻 말)가 본문에 낱말로 나오는가 — AI 가 고른 기존 태그의 근거 (ai-tags.js) */
+export function mentionsTag(name, body) {
+  const plain = noUrls(plainLines(body).join(' '));
+  const lower = plain.toLocaleLowerCase('ko');
+  const stems = new Set(tokenize(plain).map(stem));
+  const key = keyOf(name);
+  if (mentions(key, stems, lower)) return true;
+  return SYN.has(key) && SYNONYMS[SYN.get(key)].some((w) => mentions(w, stems, lower));
+}
+
 /** 기존 태그 중 이 말과 사실상 같은 것 (없으면 null) */
 export function matchExisting(word, existing) {
   const k = keyOf(word);
@@ -119,14 +135,15 @@ export function suggestTagsFor(body, memos, { limit = 3, excludeId } = {}) {
   const existing = [...groups.values()].map((g) => ({ name: g.name, count: g.count }));
 
   // 닮은 메모 k개의 태그 투표
-  const sims = others.map((_, i) => ({ i, s: cosine(target, vectors[i + 1]) })).filter((x) => x.s > 0.05).sort((a, b) => b.s - a.s).slice(0, K);
+  const sims = others.map((_, i) => ({ i, s: cosine(target, vectors[i + 1]) })).filter((x) => x.s >= MIN_SIM).sort((a, b) => b.s - a.s).slice(0, K);
   const simTotal = sims.reduce((a, x) => a + x.s, 0) || 1;
-  const votes = new Map(); // key → { share, n }
+  const votes = new Map(); // key → { share, n, max }
   for (const { i, s } of sims) {
     for (const name of tagsOf[i]) {
-      const v = votes.get(keyOf(name)) ?? { share: 0, n: 0 };
+      const v = votes.get(keyOf(name)) ?? { share: 0, n: 0, max: 0 };
       v.share += s / simTotal;
       v.n++;
+      v.max = Math.max(v.max, s);
       votes.set(keyOf(name), v);
     }
   }
@@ -156,12 +173,13 @@ export function suggestTagsFor(body, memos, { limit = 3, excludeId } = {}) {
       via = group.find((w) => keyOf(w) !== key && mentions(w, stems, lower));
       if (via) mention = true;
     }
-    const popularity = Math.min(0.06, Math.log2(1 + g.count) * 0.015);
+    // 근거: 본문에 나옴 · 닮은 메모 여럿(또는 아주 닮은 하나)이 달았음 · 그 태그 메모들과 꽤 닮음 — 없으면 추천하지 않는다
+    const strongVote = vote && (vote.n >= 2 ? vote.share >= 0.3 : vote.max >= STRONG_SIM);
+    if (!mention && !strongVote && sim < CENTROID_SIM) continue;
     const voteScore = vote ? vote.share * 0.6 + Math.min(0.15, vote.n * 0.04) : 0;
     // 본문에 그대로 나온 태그 > 같은 뜻 말로 나온 태그 > 닮은 메모의 태그
-    const raw = (mention ? (via ? 0.6 : 0.7) : 0) + voteScore + sim * 0.35 + popularity;
+    const raw = (mention ? (via ? 0.6 : 0.7) : 0) + voteScore + sim * 0.35;
     const score = Math.min(1, raw);
-    if (score < 0.16) continue;
     const reason = mention ? (via ? 'consistent' : 'mention') : vote ? 'similar' : 'centroid';
     const why = mention
       ? via ? `본문의 "${via}", 같은 뜻으로 이미 쓰는 태그` : '본문에 나오는 기존 태그'
@@ -169,8 +187,8 @@ export function suggestTagsFor(body, memos, { limit = 3, excludeId } = {}) {
     put({ name: g.name, score: Math.round(score * 100) / 100, rank: raw, reason, existing: true, sure: mention || (vote && vote.share >= 0.45 && vote.n >= 2), why });
   }
 
-  // 함께 다는 태그: 추천된 태그 A 와 자주 같이 단 태그 B
-  const firstPass = [...scored.values()].sort((a, b) => b.rank - a.rank).slice(0, 3);
+  // 함께 다는 태그: 본문에 나온 태그 A 와 거의 늘 같이 단 태그 B (닮은 메모로만 고른 A 에서는 넓히지 않는다)
+  const firstPass = [...scored.values()].filter((r) => r.reason === 'mention' || r.reason === 'consistent').sort((a, b) => b.rank - a.rank).slice(0, 3);
   for (const a of firstPass) {
     const ka = keyOf(a.name);
     const withA = tagsOf.filter((tags) => tags.some((t) => keyOf(t) === ka));
@@ -179,7 +197,7 @@ export function suggestTagsFor(body, memos, { limit = 3, excludeId } = {}) {
     for (const tags of withA) for (const t of tags) if (keyOf(t) !== ka) co.set(keyOf(t), { name: t, n: (co.get(keyOf(t))?.n ?? 0) + 1 });
     for (const [kb, { name, n }] of co) {
       const p = n / withA.length;
-      if (p < 0.6 || n < 2 || scored.has(kb)) continue;
+      if (p < 0.8 || n < 2 || scored.has(kb)) continue;
       put({ name, score: Math.round(a.score * p * 0.6 * 100) / 100, reason: 'related', existing: true, sure: false, why: `#${a.name}와 자주 같이 다는 태그` });
     }
   }

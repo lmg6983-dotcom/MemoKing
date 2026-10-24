@@ -1,4 +1,4 @@
-// AI 검색 (목록 › 검색창에 쓰면 결과 위에 "AI에게 묻기") — 내 메모에서 찾아 출처 번호를 단 답.
+// AI 검색 (목록 › 검색창 안 오른쪽 ✦) — 검색어로 내 메모에서 찾아 출처 번호를 단 답을 검색창 바로 아래에.
 //   찾기 · 답하기는 desktop (core/rag.js, 이 PC 안의 모델, 인터넷 없이). 글 모델을 넣은 PC 에서만 보인다.
 
 const h = (tag, cls, text) => {
@@ -8,20 +8,20 @@ const h = (tag, cls, text) => {
   return n;
 };
 
-/** @param {{ box: HTMLElement, api: any }} o */
-export function setupAiAsk({ box, api }) {
-  const ask = h('button', 'ai-ask-btn');
-  ask.type = 'button';
-  const answer = h('div', 'ai-answer');
-  answer.hidden = true;
+/** @param {{ btn: HTMLButtonElement, box: HTMLElement, api: any }} o */
+export function setupAiAsk({ btn, box, api }) {
   const state = h('p', 'ai-ask-state');
   state.setAttribute('role', 'status');
   const out = h('p', 'ai-ask-out');
+  const label = h('p', 'ai-sources-label');
   const sources = h('ol', 'ai-sources');
   const stop = h('button', 'link-btn', '멈추기');
   stop.type = 'button';
-  answer.append(state, out, sources, stop);
-  box.append(ask, answer);
+  const close = h('button', 'icon-btn ai-close', '×');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'AI 답 닫기');
+  box.append(close, state, out, label, sources, stop);
+  const view = box.closest('.view');
 
   let query = '';
   let job = null;
@@ -34,19 +34,25 @@ export function setupAiAsk({ box, api }) {
     }
   });
 
+  function show(on) {
+    box.hidden = !on;
+    btn.setAttribute('aria-expanded', String(on));
+    view?.classList.toggle('ai-open', on); // 답이 떠 있으면 "검색 결과가 없어요" 는 겹쳐 말하지 않는다
+  }
   function reset() {
     if (job) api.ai.cancel(job);
     job = null;
-    answer.hidden = true;
+    show(false);
   }
 
-  ask.addEventListener('click', async () => {
+  btn.addEventListener('click', async () => {
     reset();
     job = `q${++seq}`;
     const id = job;
-    answer.hidden = false;
+    show(true);
     stop.hidden = false;
     out.textContent = '';
+    label.textContent = '';
     sources.replaceChildren();
     state.textContent = '내 메모에서 찾는 중이에요…';
     const r = await api.ai.ask({ id, question: query });
@@ -56,9 +62,11 @@ export function setupAiAsk({ box, api }) {
     if (r.error) return (state.textContent = r.error);
     state.textContent = '';
     out.textContent = r.text; // 마지막 조각보다 답이 먼저 올 수 있다
-    // 답이 [번호]로 든 메모만 출처로 (못 찾았으면 가까운 메모 모두 — 직접 열어 보게)
+    // 답이 [번호]로 든 메모만 출처로. 든 게 없으면(못 찾음) 번호 없이 "관련 있어 보이는 메모" — 직접 열어 보게
     const cited = new Set([...r.text.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]) - 1));
     const shown = cited.size ? r.sources.filter((_, i) => cited.has(i)) : r.sources;
+    label.textContent = shown.length ? (cited.size ? '출처' : '관련 있어 보이는 메모') : '';
+    sources.classList.toggle('plain', !cited.size);
     sources.start = cited.size ? Math.min(...cited) + 1 : 1;
     sources.replaceChildren(...shown.map((s) => {
       const li = h('li');
@@ -71,17 +79,17 @@ export function setupAiAsk({ box, api }) {
     }));
   });
   stop.addEventListener('click', () => job && api.ai.cancel(job));
+  close.addEventListener('click', reset);
 
   return {
-    /** 검색어가 바뀔 때 (AI 모델이 없거나 다른 탭이면 숨김) */
+    /** 검색어가 바뀔 때 — 글자가 있고 글 모델이 준비됐을 때만 ✦ 를 보인다 */
     async update(text) {
       const st = text ? await api.ai.status().catch(() => null) : null;
       const on = ['ready', 'running'].includes(st?.chat.state);
       if (text !== query) reset();
       query = text;
-      box.hidden = !on;
-      if (!on) return;
-      ask.replaceChildren(h('span', 'ai-ask-mark', '✦'), ` AI에게 묻기: `, h('b', null, `“${text}”`), h('small', null, ' 내 메모에서 찾아 답해요'));
+      btn.hidden = !on;
+      btn.parentElement.classList.toggle('has-ai', on);
     },
   };
 }

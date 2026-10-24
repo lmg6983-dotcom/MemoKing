@@ -481,6 +481,25 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         JSON.stringify({ shownBar, groups, doc: await js(w, `document.querySelector('.ProseMirror').innerHTML.slice(0, 200)`) }));
       check('표 막대: 아래 서식 도구막대가 숨어도 제자리 (버튼이 커서를 피하지 않음)', Math.abs(shown - hiddenTop) < 1, JSON.stringify({ shown, hiddenTop }));
 
+      // AI 글쓰기 (0.70.0): 서식 막대 끝 ✦ → 부탁 한 줄 + 칩(맞춤법 · 문체 4) 작은 창, Esc 로 닫힘. 옆 패널 · 메뉴 항목은 없음
+      //   (점검 PC 엔 글 모델이 없어 ✦ 가 숨어 있다 — 보이게 하고 누른다)
+      const aiPop = await js(w, `(() => {
+        const b = document.getElementById('ai-btn');
+        const hiddenNoModel = b.hidden;
+        b.hidden = false;
+        b.click();
+        const pop = document.getElementById('ai-pop');
+        return { hiddenNoModel, inBar: b.parentElement.id === 'format-bar', open: !pop.hidden, chips: [...pop.querySelectorAll('.ai-chip')].map((c) => c.textContent).join(','),
+          focus: document.activeElement?.classList.contains('ai-request'), above: pop.getBoundingClientRect().bottom <= b.getBoundingClientRect().top,
+          oldPanel: !!document.getElementById('ai-panel') };
+      })()`);
+      await capture(w, 'smoke-new-ai-pop.png');
+      key(w, 'Escape');
+      const aiClosed = await until(() => js(w, `document.getElementById('ai-pop').hidden && document.getElementById('ai-btn').getAttribute('aria-expanded') === 'false'`), 'AI 창 닫힘', 2000).catch(() => false);
+      await js(w, `document.getElementById('ai-btn').hidden = true`);
+      check('메모 창 AI: 서식 막대 끝 ✦ → 부탁 한 줄 + 맞춤법 · 문체 칩 작은 창 (✦ 위), Esc 로 닫힘, 옆 패널 없음',
+        aiPop.hiddenNoModel && aiPop.inBar && aiPop.open && aiPop.chips === '맞춤법,해요체,합니다체,간결체,보고서체' && aiPop.focus && aiPop.above && !aiPop.oldPanel && aiClosed, JSON.stringify({ aiPop, aiClosed }));
+
       // 메모 안 찾기 · 바꾸기 (워드처럼 한 막대): Ctrl+F → 찾은 곳 · 개수, Enter 다음, Ctrl+H 바꾸기 줄, Ctrl+Enter 모두 바꾸기, Esc 닫기
       {
         const v0 = getVault();

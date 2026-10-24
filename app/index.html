@@ -67,10 +67,11 @@
     </nav>
 
     <div class="toolbar">
-      <label class="search">
+      <div class="search">
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
-      </label>
+        <button id="ai-ask-btn" class="search-ai" type="button" title="AI에게 묻기 — 내 메모에서 찾아 답해요" aria-label="AI에게 묻기" aria-controls="ai-ask" hidden>✦</button>
+      </div>
       <button id="filter-btn" class="icon-btn filter-btn" title="보기 (정렬, 카드 모양, 필터)" aria-label="보기: 정렬, 카드 모양, 필터" aria-expanded="false" aria-controls="filter-panel"><svg><use href="#i-tune"/></svg><span class="filter-count" id="filter-count"></span></button>
     </div>
 
@@ -80,6 +81,7 @@
 
     <!-- 메모 -->
     <div class="view" id="view-memos" role="tabpanel">
+      <div id="ai-ask" class="ai-answer" role="region" aria-label="AI 답" hidden></div>
       <!-- 필터: 태그 줄(늘 보임) + 색·담긴 것(필터 버튼) -->
       <!-- 보기 (위 "보기" 단추): 정렬 · 카드 모양 · 필터(색 · 담긴 것) -->
       <div id="filter-panel" class="filter-panel" hidden>
@@ -100,7 +102,6 @@
         <button id="drive-hint-connect" class="link-btn">Google 계정으로 연결</button>
         <button id="drive-hint-close" class="link-btn">다시 보지 않기</button>
       </div>
-      <div id="ai-ask" class="ai-ask" hidden></div>
       <p id="count" class="result-count" role="status" hidden></p>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
@@ -236,7 +237,7 @@
     </section>
     <section class="set-sec" aria-labelledby="set-local-ai" id="local-ai-sec">
       <h3 class="set-title" id="set-local-ai">AI 도우미 · 카나나2 <small>인터넷 없이 이 PC 안에서 돌아가요</small></h3>
-      <div class="setting-row keymap-row">
+      <div class="setting-row">
         <span>카나나2 <small id="ai-chat-note" role="status"></small><small id="ai-try-out" role="status"></small></span>
         <button type="button" class="link-btn" id="ai-try" hidden>시험해 보기</button>
         <button type="button" class="link-btn danger" id="ai-chat-remove" hidden>삭제</button>
@@ -306,18 +307,15 @@
       </label>
       <label class="setting-row">
         <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
-        <span>태그 자동 추가 <small>메모를 닫을 때 태그를 달아요. AI 모델이 있으면 AI가 골라 태그를 합쳐 3개까지, 없으면 태그 없는 메모에 확실한 태그만</small></span>
+        <span>태그 자동 추가 <small>메모를 닫을 때 내용에 맞는 태그를 달아요 (합쳐 3개까지). 인사 · 짧은 대답처럼 주제가 없는 메모에는 달지 않아요</small></span>
       </label>
-      <div class="setting-row hold-row">
-        <label class="hold-label">
-          <input type="checkbox" id="hold-tune" class="switch" role="switch" checked>
-          <span>내 손에 맞추기 <small>메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려 손에 맞춰요. 이 PC에만 저장해요</small></span>
-        </label>
-        <button type="button" class="btn" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button>
-      </div>
-      <div class="setting-row hold-row">
-        <span class="hold-label">넣을 때 묻기 <small>사진 여러 장 · 문서를 넣을 때 "앞으로 이렇게" 로 정해 둔 것을 지우고 다시 물어요</small></span>
-        <button type="button" class="btn" id="choices-reset">다시 묻기</button>
+      <label class="setting-row">
+        <input type="checkbox" id="hold-tune" class="switch" role="switch" checked>
+        <span>내 손에 맞추기 <small>메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려 손에 맞춰요. 이 PC에만 저장해요 <button type="button" class="link-btn inline-link" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button></small></span>
+      </label>
+      <div class="setting-row">
+        <span>넣을 때 묻기 <small id="choices-note"></small></span>
+        <button type="button" class="btn small" id="choices-reset" hidden>다시 묻기</button>
       </div>
     </section>
     <section class="set-sec" aria-labelledby="set-mode">
@@ -341,7 +339,7 @@
     </section>
     <section class="set-sec" aria-labelledby="set-keys">
       <h3 class="set-title" id="set-keys">단축키</h3>
-      <div class="setting-row keymap-row">
+      <div class="setting-row">
         <span>메모 창 단축키 <small>PDF로 저장, 서식, 왕관 같은 기능의 키를 바꿔요</small></span>
         <button type="button" class="btn" id="keymap-open">단축키 설정하기</button>
       </div>
@@ -354,8 +352,8 @@
         <button id="reveal-vault" class="btn">폴더 열기</button>
         <button id="change-vault" class="btn">폴더 바꾸기</button>
       </div>
-      <p class="label">휴지통</p>
-      <div class="dialog-actions left">
+      <div class="setting-row">
+        <span>휴지통 <small>지운 메모는 여기에 모여요</small></span>
         <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
       </div>
       <label class="setting-row select-row">

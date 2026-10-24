@@ -18,12 +18,14 @@ test('AI 작업: 맞춤법은 믿을 만한 답만, 아니면 원래 글', async
   assert.deepEqual(r.fixed, ['다 됐어요', '엉뚱한 문단']);
 });
 
-test('AI 작업: 더 달 태그 — 이미 단 태그와 합쳐 3개까지, 모델 오류는 그대로 던짐', async () => {
+test('AI 작업: 더 달 태그 — 이미 단 태그와 합쳐 3개까지, 짧은 메모는 건너뜀, 모델 오류는 그대로 던짐', async () => {
   const two = tasks(async () => '{"tags":["업무","회의"]}');
-  assert.deepEqual(await two.autoTags('# 내일 일\n\n출시 준비', 'x'), ['업무', '회의']);
-  assert.deepEqual(await two.autoTags('# 내일 일\n\n출시 준비 #가 #나', 'x'), ['업무']);
+  const body = '# 내일 일\n\n출시 준비 회의에서 업무를 나누고 일정도 다시 맞춰 보기';
+  assert.deepEqual(await two.autoTags(body, 'x'), ['업무', '회의']);
+  assert.deepEqual(await two.autoTags(`${body} #가 #나`, 'x'), ['업무']);
   assert.deepEqual(await two.autoTags('# 내일 일 #가 #나 #다', 'x'), []);
-  await assert.rejects(tasks(async () => { throw new Error('모델 없음'); }).autoTags('# 내일 회의', 'x'), /모델 없음/);
+  assert.deepEqual(await two.autoTags('네, 잘 받았어요 회의', 'x'), [], '인사 · 짧은 대답에는 달지 않는다');
+  await assert.rejects(tasks(async () => { throw new Error('모델 없음'); }).autoTags(body, 'x'), /모델 없음/);
 });
 
 test('AI 검색: 카나나2 가 질문을 넓혀 낱말로 찾고, 근거 메모만 주고 답', async () => {

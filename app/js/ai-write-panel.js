@@ -1,4 +1,4 @@
-// AI 글 도우미 패널 (메모 창 › 메뉴 › AI 글 도우미) — 맞춤법 검사 · 문체 바꾸기 · 초안 쓰기.
+// AI 글쓰기 (메모 창 › 서식 막대 끝 ✦) — 부탁 한 줄(Enter: 초안) + 빠른 작업 칩(맞춤법 · 문체)만 든 작은 창.
 //   모델은 이 PC 안(desktop/ai, 인터넷 없이). 고친 글은 바로 덮지 않는다:
 //   맞춤법은 문단마다 바뀐 곳(지운 글 · 새 글)을 보여 주고 하나씩 또는 모두 바꾸고, 문체 · 초안은 다 쓴 뒤 바꾸기 · 메모 끝에 넣기를 고른다.
 import { STYLES, MAX_CHARS, wordDiff, diffEdits } from './core/ai-write.js';
@@ -19,9 +19,9 @@ function diffView(before, after) {
 
 /**
  * @param {{ panel: HTMLElement, api: any, editor: () => any, title: () => string, onOpen: () => void,
- *           show?: (panel) => void, hide?: (panel) => void }} o  show · hide: 휴대폰은 아래에서 올라오는 시트로
+ *           show: (panel) => void, hide: (panel) => void }} o  show: ✦ 위에 띄우기
  */
-export function createAiWritePanel({ panel, api, editor, title, onOpen, show = (p) => { p.hidden = false; }, hide = (p) => { p.hidden = true; editor()?.focus(); } }) {
+export function createAiWritePanel({ panel, api, editor, title, onOpen, show, hide }) {
   const $ = (sel) => panel.querySelector(sel);
   const state = $('.ai-state');
   const result = $('.ai-result');
@@ -47,7 +47,6 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show = (
     result.replaceChildren(h('p', 'ai-out'));
     state.textContent = waiting;
     busy(true);
-    state.scrollIntoView({ block: 'start', behavior: 'smooth' }); // 좁은 창: 단추 아래 결과가 보이게
     const r = await api.ai.write({ id, ...payload });
     if (id !== job) return null; // 그사이 다른 작업 · 닫기
     job = null;
@@ -125,7 +124,7 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show = (
 
   // ---------- 초안 ----------
   async function draft() {
-    const r = await run({ task: 'draft', title: title(), text: editor().plainText(), request: $('.ai-request').value }, '초안을 쓰는 중이에요…');
+    const r = await run({ task: 'draft', title: title(), text: editor().plainText(), request: request.value }, '초안을 쓰는 중이에요…');
     if (!r) return;
     state.textContent = '초안이에요. [ ] 칸은 직접 채워 주세요';
     actions(
@@ -138,12 +137,13 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show = (
     );
   }
 
+  const request = $('.ai-request');
   $('.ai-spell').addEventListener('click', spell);
-  for (const style of Object.keys(STYLES)) {
-    const b = button(style, 'btn ai-task', () => restyle(style));
-    $('.ai-styles').append(b);
-  }
-  $('.ai-draft').addEventListener('click', draft);
+  $('.ai-chips').append(...Object.keys(STYLES).map((style) => button(style, 'ai-chip ai-task', () => restyle(style))));
+  $('.ai-ask-row').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!job) draft();
+  });
   stop.addEventListener('click', () => job && api.ai.cancel(job));
 
   /** 닫힐 때: 묻던 것을 멈추고 결과를 비운다 (휴대폰은 시트가 뒤로 가기 · 바깥 누르기로 닫혀도) */
@@ -159,12 +159,11 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show = (
     if (force ?? panel.hidden) {
       show(panel);
       onOpen();
-      $('.ai-spell').focus();
+      request.focus();
     } else {
       hide(panel);
       reset();
     }
   }
-  panel.querySelector('.ai-close').addEventListener('click', () => toggle(false));
   return { toggle, reset, get open() { return !panel.hidden; } };
 }

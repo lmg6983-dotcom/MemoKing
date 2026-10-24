@@ -682,8 +682,6 @@ function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
   if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
-  // AI 글 도우미는 글 모델을 넣어 둔 PC 에서만 (설정 › AI 도우미)
-  if (!el.menu.hidden && api.ai) api.ai.status().then((st) => { $('ai-btn').hidden = !['ready', 'running'].includes(st?.chat.state); });
 }
 function closeMenu() {
   if (el.menu.hidden) return;
@@ -786,22 +784,38 @@ $('versions-btn').addEventListener('click', () => {
 });
 $('versions-close').addEventListener('click', () => toggleVersions(false));
 
-// ---------- AI 글 도우미 (ai-write-panel.js) ----------
+// ---------- AI 글쓰기 (서식 막대 끝 ✦ → ai-write-panel.js) ----------
+const aiBtn = $('ai-btn');
 const aiPanel = api.ai ? createAiWritePanel({
-  panel: $('ai-panel'),
+  panel: $('ai-pop'),
   api,
   editor: () => editor,
   title: () => extractTitle(editor?.getMarkdown() ?? ''),
   onOpen: () => {
-    if (!el.linksPanel.hidden) toggleLinks(false);
-    if (!versionsPanel.hidden) toggleVersions(false);
-    if (reminderPanel?.open) reminderPanel.toggle(false);
+    closeMore();
+    closePalette();
+  },
+  show: (p) => {
+    p.hidden = false;
+    placePopover(p, aiBtn);
+    aiBtn.setAttribute('aria-expanded', 'true');
+  },
+  hide: (p) => {
+    p.hidden = true;
+    aiBtn.setAttribute('aria-expanded', 'false');
+    editor?.focus();
   },
 }) : null;
-$('ai-btn').addEventListener('click', () => {
-  closeMenu();
-  aiPanel?.toggle(true);
-});
+aiBtn.addEventListener('click', () => aiPanel?.toggle());
+// ✦ 는 글 모델을 넣어 둔 PC 에서만 (설정 › AI 도우미) — 설정에서 넣고 돌아와도 보이게 창에 들어올 때마다
+async function showAiBtn() {
+  const st = await api.ai?.status().catch(() => null);
+  aiBtn.hidden = !['ready', 'running'].includes(st?.chat.state);
+}
+if (api.ai) {
+  showAiBtn();
+  window.addEventListener('focus', showAiBtn);
+}
 // 끌어서 합치기(스택)의 메뉴 버전 — 끌기가 어려운 사람도
 $('join-btn').addEventListener('click', async () => {
   closeMenu();
@@ -1243,6 +1257,7 @@ document.addEventListener('mousedown', (e) => {
   if (!el.palette.hidden && !el.palette.contains(e.target) && !e.target.closest?.('[data-action="color"],[data-action="highlight"]')) closePalette();
   if (!el.morePanel.hidden && !el.morePanel.contains(e.target) && !el.moreBtn.contains(e.target) && !el.palette.contains(e.target) && !styleMenu.contains(e.target)) closeMore();
   if (!styleMenu.hidden && !styleMenu.contains(e.target) && !e.target.closest?.('[data-action="style"]')) closeStyleMenu();
+  if (aiPanel?.open && !$('ai-pop').contains(e.target) && !aiBtn.contains(e.target) && !e.target.closest?.('.mk-doc')) aiPanel.toggle(false);
 });
 
 // 표 열 너비·행 높이·머리글 강조 → 메모 머리말 (끄는 동안 여러 번 바뀌어도 한 번에)
