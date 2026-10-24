@@ -39,3 +39,25 @@ export function parseReleaseNotes(notes) {
 export function boldParts(text) {
   return String(text).split(/\*\*/).map((t, i) => ({ text: t, bold: i % 2 === 1 })).filter((p) => p.text);
 }
+
+const cmpVersion = (a, b) => {
+  const x = a.split('.').map(Number);
+  const y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] - y[i];
+  return 0;
+};
+
+/**
+ * 업데이트 뒤 한 번 보여 줄 "개선된 점": README 이력 표에서 from 다음부터 to 까지 버전마다 제목 한 줄 (새것부터 limit 개).
+ *   제목은 행의 첫 **굵은 글** — 끝의 "(휴대폰 0.47.0)" 같은 덧붙임은 뺀다. 제목 없는 옛 행은 건너뛴다
+ * @returns {{ version: string, title: string }[]}
+ */
+export function versionTitles(readme, from, to, limit = 5) {
+  const out = [];
+  for (const line of String(readme ?? '').split('\n')) {
+    const m = /^\| `v(\d+\.\d+\.\d+)` \|[^|]*\|[^|]*\| \*\*([^*]+)\*\*/.exec(line);
+    if (!m || cmpVersion(m[1], to) > 0 || (from && cmpVersion(m[1], from) <= 0)) continue;
+    out.push({ version: m[1], title: m[2].replace(/\s*\((?:휴대폰|PC)[^)]*\)\s*$/, '').trim() });
+  }
+  return out.sort((a, b) => cmpVersion(b.version, a.version)).slice(0, limit);
+}

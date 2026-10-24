@@ -978,6 +978,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 바뀐 점: 제목 줄 + 점 항목 (core/release-notes.js 가 나눈다). 길면 안에서 스크롤 — 아래가 이어진다는 흐림은 스크롤이 남았을 때만 */
 .update-notes { max-height: 260px; overflow-y: auto; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; scrollbar-width: thin; }
 .update-notes:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
+#whatsnew-list { margin: 0 0 4px; padding-left: 30px; display: grid; gap: 4px; }
 .update-notes .notes-head { margin: 0 0 6px; font-size: 13.5px; font-weight: 800; color: var(--text-strong); line-height: 1.45; }
 .update-notes .notes-head:not(:first-child) { margin-top: 14px; }
 .update-notes .notes-list { margin: 0; padding: 0; list-style: none; }

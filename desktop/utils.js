@@ -60,25 +60,12 @@ export const settings = {
 
 let settingsTimer = null;
 
-// 지금 설치를 알아보는 표시: 버전 + 앱 파일을 설치한 때
-export function installMark() {
-  let at = 0;
-  if (app.isPackaged) {
-    try {
-      at = Math.round(fs.statSync(path.join(process.resourcesPath, 'app.asar')).birthtimeMs);
-    } catch {
-      // 알 수 없으면 버전만
-    }
-  }
-  return `${app.getVersion()}@${at}`;
-}
-
+// 튜토리얼은 처음 설치(설정 파일이 없는 PC)에만 — 업데이트 · 다시 설치로는 다시 띄우지 않는다 (설정 › 사용법 둘러보기로만)
 export function loadSettings() {
   try {
     const loaded = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
     Object.assign(settings, loaded);
     if (!('tutorialDone' in loaded)) settings.tutorialDone = true;
-    if (settings.tutorialInstall !== installMark()) settings.tutorialDone = false;
     if (!settings.opmsIntroduced && settings.magic?.modules) {
       settings.magic = { ...settings.magic, modules: { ...settings.magic.modules, opms: true } };
       settings.opmsIntroduced = true;

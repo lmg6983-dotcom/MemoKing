@@ -42,6 +42,7 @@ export function registerIpc(ctx) {
     getVault,
     openVault,
     vaultInfo,
+    whatsNew,
     suggestedVaultPath,
     appSettings,
     settings,
@@ -225,6 +226,7 @@ export function registerIpc(ctx) {
 
   // ---------- Vault / 폴더 ----------
   ipcMain.handle('app:info', () => vaultInfo());
+  ipcMain.handle('app:whats-new', () => whatsNew()); // 업데이트 뒤 한 번만 { version, items } (두 번째부터 null)
   ipcMain.handle('vault:use', (_e, dir) => {
     const info = openVault(dir);
     if (getVault() && !settings.tutorialDone && !SMOKE) startTutorial();

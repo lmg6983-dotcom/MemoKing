@@ -406,6 +406,21 @@
     </div>
   </dialog>
 
+  <!-- 업데이트 뒤 한 번: 개선된 점 (버전마다 제목 한 줄) -->
+  <dialog id="whatsnew-dialog" class="dialog update-dialog" aria-labelledby="whatsnew-title">
+    <header class="update-head">
+      <span class="update-badge" aria-hidden="true"><svg><use href="#i-crown"/></svg></span>
+      <div class="update-head-text">
+        <h2 id="whatsnew-title"></h2>
+        <p class="update-version">이렇게 좋아졌어요</p>
+      </div>
+    </header>
+    <ul class="update-notes" id="whatsnew-list"></ul>
+    <div class="dialog-actions">
+      <button type="button" class="btn primary" id="whatsnew-ok" autofocus>확인</button>
+    </div>
+  </dialog>
+
   <!-- 휴지통: 지운 메모 되살리기·영구 삭제 -->
   <!-- Google Drive 연결: ① OAuth 클라이언트 ② 로그인 ③ 폴더 고르기 -->
   <dialog id="drive-dialog" class="dialog drive-dialog">

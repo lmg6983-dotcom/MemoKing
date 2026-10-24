@@ -60,6 +60,7 @@ for (const dir of ['app', 'desktop', join('assets', 'icons')]) copyDir(join(ROOT
 mkdirSync(join(STAGE, 'scripts'), { recursive: true });
 copyFileSync(join(ROOT, 'scripts', 'clipboard-helper.ps1'), join(STAGE, 'scripts', 'clipboard-helper.ps1'));
 copyFileSync(join(ROOT, 'scripts', 'popup-watch.ps1'), join(STAGE, 'scripts', 'popup-watch.ps1'));
+copyFileSync(join(ROOT, 'README.md'), join(STAGE, 'README.md')); // 업데이트 뒤 한 번 보여 줄 개선된 점 (main.js whatsNew 가 이력 표를 읽는다)
 // 설치 파일에 끼우는 NSIS 조각 (electron-builder 가 build/installer.nsh 를 자동으로 읽는다) — 업데이트 때 남은 도우미 프로세스 정리
 mkdirSync(join(STAGE, 'build'), { recursive: true });
 copyFileSync(join(ROOT, 'scripts', 'installer.nsh'), join(STAGE, 'build', 'installer.nsh'));

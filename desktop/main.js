@@ -36,6 +36,7 @@ import { hotkeyCopyText, hotkeyLabel, hotkeyAccelerator } from '../app/js/core/m
 import { TUTORIAL_STEPS, advanceTutorial, tutorialStepFor, tutorialChapter, tutorialJumps, seedTutorialSandbox } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
 import { alarmText, describeReminder } from '../app/js/core/reminders.js';
+import { versionTitles } from '../app/js/core/release-notes.js';
 import { quietAlarm, modeClock, normalizeHours } from '../app/js/core/work-hours.js';
 
 import {
@@ -45,7 +46,7 @@ import {
 
 import {
   SMOKE, APP_ID, STT_WORKER, STT_VENDOR, LLAMA_SERVER, POPUP_HELPER,
-  settings, loadSettings, saveSettings, installMark, suggestedVaultPath,
+  settings, loadSettings, saveSettings, suggestedVaultPath,
   purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings,
   TRASH_DAYS, openWebPage, openVaultFile, toast, smokeToasts, smokeOpened,
   smokeConfirmAnswers, writeClipboard, fetchRemoteImage, registerVaultProtocol,
@@ -892,6 +893,23 @@ function dropSandbox() {
   saveSettings();
 }
 
+// 업데이트 뒤 한 번: 지난번 켠 버전 다음부터 이번 버전까지 바뀐 점의 제목 (앱에 든 README 이력 표). 처음 설치는 튜토리얼이 먼저라 없음
+function whatsNew() {
+  const now = app.getVersion();
+  const seen = settings.seenVersion;
+  if (seen === now) return null;
+  settings.seenVersion = now;
+  saveSettings();
+  if (!settings.tutorialDone) return null;
+  let readme = '';
+  try {
+    readme = fs.readFileSync(path.join(app.getAppPath(), 'README.md'), 'utf8');
+  } catch {
+    // README 가 없으면 버전만
+  }
+  return { version: now, items: versionTitles(readme, seen ?? null, now) };
+}
+
 async function startTutorial() {
   if (!vault) return false;
   await enterSandbox();
@@ -904,7 +922,6 @@ async function startTutorial() {
 async function finishTutorial() {
   tutorial = { active: false, index: -1, memoId: null, praise: false };
   settings.tutorialDone = true;
-  settings.tutorialInstall = installMark();
   saveSettings();
   sendTutorial();
   windowManager.listWin?.webContents.send('tutorial:finished'); // 목록 창: 연습하며 바꾼 보기 · 확대 · 태그 고르기 · 늘 위에를 처음대로
@@ -1269,6 +1286,7 @@ app.whenReady().then(async () => {
     getVault: () => vault,
     openVault,
     vaultInfo,
+    whatsNew,
     suggestedVaultPath,
     appSettings: () => appSettings(vault, fileIndex, shortcutStatus, shortcutLabel),
     settings,
@@ -1395,7 +1413,6 @@ app.whenReady().then(async () => {
       getSettings: () => settings,
       stickers: windowManager.stickers,
       reloadSettings: loadSettings,
-      installMark,
       startAreaCapture: (opts) => windowManager.startAreaCapture(opts),
       getAreaCapture: () => windowManager.areaCapture,
       smokeClipboard: windowManager.smokeClipboard,

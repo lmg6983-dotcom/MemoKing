@@ -2059,6 +2059,14 @@ $('tutorial-btn').addEventListener('click', () => {
   api.tutorial.start();
 });
 applyInfo(await api.info());
+// 업데이트 뒤 한 번: 개선된 점 (메인이 한 번만 준다)
+api.whatsNew?.().then((n) => {
+  if (!n?.items?.length || !$('whatsnew-dialog')) return;
+  $('whatsnew-title').textContent = `v${n.version} 으로 업데이트했어요`;
+  $('whatsnew-list').replaceChildren(...n.items.map((it) => Object.assign(document.createElement('li'), { textContent: it.title })));
+  $('whatsnew-dialog').showModal();
+}, () => {});
+$('whatsnew-ok')?.addEventListener('click', () => $('whatsnew-dialog').close());
 if (api.drive) drivePanel = setupDrivePanel({ api, onVault: (info) => applyInfo(info), confirm: confirmDialog, showFiles: (files) => showOnlyFiles(files),
   memoFiles: () => (state.memos.length ? new Set(state.memos.map((m) => String(m.file ?? '').replace(/\\/g, '/'))) : null) });
 {
