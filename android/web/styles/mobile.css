@@ -489,8 +489,8 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   animation: sheet-up 0.24s var(--ease-drawer);
 }
 @keyframes sheet-up { from { transform: translateY(40%); opacity: 0; } }
-/* 닫기 띠: 자리를 차지하지 않고 위에 붙어 있다. 내리면 바탕색 띠가 되어 그 아래로 내용이 지나간다 (× 가 단추 위에 겹치지 않게) */
-.sheet > .sheet-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: flex-end; height: 50px; margin: -6px -16px -44px; padding: 6px 6px 0; pointer-events: none; transition: background-color 0.15s, box-shadow 0.15s; }
+/* 닫기 띠: 자리를 차지하지 않고 위에 붙어 있다 (top: 시트의 위 여백만큼 올려 그 틈으로 내용이 비치지 않게). 내리면 바탕색 띠가 되어 그 아래로 내용이 지나간다 (× 가 단추 위에 겹치지 않게) */
+.sheet > .sheet-bar { position: sticky; top: -6px; z-index: 2; display: flex; justify-content: flex-end; height: 50px; margin: -6px -16px -44px; padding: 6px 6px 0; pointer-events: none; transition: background-color 0.15s, box-shadow 0.15s; }
 .sheet.scrolled > .sheet-bar { background: var(--surface-2); box-shadow: 0 1px 0 var(--line); }
 .sheet > .sheet-bar .sheet-x { pointer-events: auto; color: var(--muted); }
 .sheet-bar-title { flex: 1; min-width: 0; align-self: center; padding: 0 8px 0 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 16px; font-weight: 800; opacity: 0; transition: opacity 0.15s; }
