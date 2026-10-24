@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { wordDiff, diffEdits, applyEdits, plausibleFix, draftMessages } from '../app/js/core/ai-write.js';
+import { wordDiff, diffEdits, applyEdits, plausibleFix, draftMessages, cleanTitle } from '../app/js/core/ai-write.js';
 
 test('AI 글 도우미: 바뀐 낱말만 고침으로', () => {
   const a = '몇일 뒤에 다시 연락드릴께요.';
@@ -32,4 +32,11 @@ test('AI 글 도우미: 초안은 제목 · 쓴 내용 · 부탁을 함께', () 
   assert.match(m[1].content, /주간 회의/);
   assert.match(m[1].content, /출시일/);
   assert.match(m[1].content, /초안/);
+});
+
+test('cleanTitle: 한 줄 · 기호 없이 · 30자까지, 한자 섞이면 버림', () => {
+  assert.equal(cleanTitle('# "김 부장 견적 미팅".\n설명'), '김 부장 견적 미팅');
+  assert.equal(cleanTitle('견적 会议'), '');
+  assert.equal(cleanTitle('가'.repeat(31)), '');
+  assert.equal(cleanTitle(''), '');
 });

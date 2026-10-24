@@ -28,6 +28,17 @@ export function draftMessages({ title, body, request }) {
   ];
 }
 
+// 매직키로 저장한 메모 다듬기: 첫 줄이 이보다 길면 짧은 제목 줄을 맨 위에 (메모킹은 첫 줄이 목록의 제목)
+export const TITLE_OVER = 30;
+const TITLE = '너는 메모 제목을 짓는 도우미다. 메모 내용을 15자 안팎의 짧은 한국어 명사구 제목 하나로 쓴다. 제목만 출력한다. 따옴표, 마침표, #태그는 쓰지 않는다.';
+export const titleMessages = (text) => [{ role: 'system', content: TITLE }, { role: 'user', content: text }];
+
+/** 제목 답 → 제목 | '' (한 줄, 기호 없이, TITLE_OVER 자 이하, 한자 섞이면 버림) */
+export function cleanTitle(out) {
+  const t = String(out ?? '').trim().split('\n')[0].replace(/^#+\s*/, '').replace(/["'“”‘’]/g, '').replace(/[.。]+$/, '').trim();
+  return t && t.length <= TITLE_OVER && !/\p{Script=Han}/u.test(t) ? t : '';
+}
+
 const KEEP = /#[\p{L}\p{N}_-]+|https?:\/\/\S+/gu; // 고친 글에도 그대로 있어야 하는 것
 
 /** 맞춤법 답이 믿을 만한가 — 작은 모델은 글을 통째로 바꾸거나 한자를 섞거나 태그를 지우곤 한다 */

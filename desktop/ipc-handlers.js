@@ -455,6 +455,11 @@ export function registerIpc(ctx) {
     saveSettings();
     return settings.autoTags;
   });
+  ipcMain.handle('app:set-magic-polish', (_e, on) => {
+    settings.magicPolish = Boolean(on);
+    saveSettings();
+    return settings.magicPolish;
+  });
   ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings({ ...next, order: settings.magic?.order })); // 순서는 매직키 창에서만 바꾼다 (열어 둔 설정 창의 지난 순서로 덮지 않게)
   ipcMain.handle('mcp:connect', (_e, on) => mcpConnect(on !== false));
   ipcMain.handle('mcp:copy', () => {
@@ -739,6 +744,28 @@ export function registerIpc(ctx) {
     const [w, cur] = wm.magicWin.getSize();
     if (cur !== height) wm.magicWin.setSize(w, height);
   });
+  // 매직키로 저장한 메모를 뒤에서 다듬고(맞춤법 · 띄어쓰기 · 긴 첫 줄이면 제목, core/ai-tasks.js polish) 그다음 AI 태그.
+  //   창은 이미 닫혔다. 연 메모 · 그사이 고친 메모는 건드리지 않고, 알림을 누르면 원래 글로 (이전 버전에도 남음)
+  async function polishMagicMemo(id) {
+    const vault = getVault();
+    const before = vault?.get(id)?.body;
+    try {
+      if (before && settings.magicPolish !== false && ['ready', 'running'].includes((await getAi().status()).chat?.state)) {
+        const r = await aiTasks().polish(before);
+        const untouched = () => getVault() === vault && !wm.noteWins.has(id);
+        if (r.body !== before && untouched() && vault.get(id)?.body === before && !vault.save(id, r.body).refused) {
+          const what = [r.fixes && `맞춤법 ${r.fixes}곳`, r.title && `제목 "${r.title}"`].filter(Boolean).join(' · ');
+          toast({
+            memoId: id, kind: 'magic-polish', title: 'AI 가 메모를 다듬었어요', body: `${what}\n눌러서 원래 글로 되돌리기`,
+            onClick: () => untouched() && vault.get(id)?.body === r.body && vault.save(id, before),
+          });
+        }
+      }
+    } catch (err) {
+      console.error('AI 다듬기', err.message); // 다듬지 못해도 메모는 이미 저장됨
+    }
+    getAiTagger()?.add([id]);
+  }
   ipcMain.handle('magic:run', (_e, payload) => {
     const vault = getVault();
     const mods = activeModules(settings.magic);
@@ -755,7 +782,8 @@ export function registerIpc(ctx) {
       alarms.tick();
     }
     const when = saved ? `\n알림: ${describeReminder(saved[0])}` : '';
-    getAiTagger()?.add([id]); // 연 메모는 닫을 때
+    if (payload.open) getAiTagger()?.add([id]); // 연 메모는 다듬지 않고, 태그는 닫을 때
+    else polishMagicMemo(id);
     if (payload.open) wm.openNote(id);
     else {
       const showNow = () => wm.openNote(id, { inactive: true });

@@ -1,6 +1,6 @@
 // AI 작업 흐름 (PC 메인 · 휴대폰 화면이 함께) — 글 도우미 · 태그 · AI 검색.
 //   다른 것은 모델을 부르는 법(ai)과 메모를 읽는 법(memos · graph)뿐이다. 모델은 이 기기 안(llama-server), 인터넷 없이.
-import { spellMessages, styleMessages, draftMessages, plausibleFix } from './ai-write.js';
+import { spellMessages, styleMessages, draftMessages, plausibleFix, titleMessages, cleanTitle, wordDiff, diffEdits, TITLE_OVER } from './ai-write.js';
 import { aiTagRequest, aiTagResult } from './ai-tags.js';
 import { retrieve, ragMessages } from './rag.js';
 import { extractTags } from './tags.js';
@@ -39,6 +39,32 @@ export function createAiTasks({ ai, memos, graph, store }) {
     return aiTagResult(await ai.chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, body);
   }
 
+  /**
+   * 매직키로 저장한 메모 다듬기: 문단마다 맞춤법 · 띄어쓰기(믿을 만한 답만), 첫 줄이 길면 맨 위에 "# 짧은 제목"
+   *   → { body, fixes: 고친 곳 수, title: 붙인 제목 | '' }
+   */
+  async function polish(body) {
+    let fixes = 0;
+    const blocks = [];
+    for (const block of body.split(/(\n{2,})/)) {
+      if (!block.trim() || /^\n+$/.test(block)) {
+        blocks.push(block);
+        continue;
+      }
+      const out = (await ai.chat(spellMessages(block), { temperature: 0, maxTokens: block.length * 2 + 32 })).trim();
+      const ok = out !== block && plausibleFix(block, out);
+      if (ok) fixes += diffEdits(wordDiff(block, out)).length;
+      blocks.push(ok ? out : block);
+    }
+    let text = blocks.join('');
+    const first = text.split('\n')[0];
+    const title = first.length > TITLE_OVER && !/^#/.test(first)
+      ? cleanTitle(await ai.chat(titleMessages(text.slice(0, 1500)), { temperature: 0, maxTokens: 40 }))
+      : '';
+    if (title) text = `# ${title}\n\n${text}`;
+    return { body: text, fixes, title };
+  }
+
   /** 메모에 더 달 태그 이름들 — 이미 단 태그와 합쳐 3개까지 (저장은 부른 쪽, 모델 오류는 그대로 던짐) */
   async function autoTags(body, id) {
     const room = MAX_TAGS - extractTags(body).length;
@@ -68,5 +94,5 @@ export function createAiTasks({ ai, memos, graph, store }) {
     return { text: await ai.chat(ragMessages(question, picked), { maxTokens: 400, temperature: 0.2, signal, onToken }), sources };
   }
 
-  return { write, pickTags, autoTags, ask };
+  return { write, pickTags, autoTags, polish, ask };
 }
