@@ -130,6 +130,9 @@ export function createAiService(opts) {
         await new Promise((r) => out.end(r));
       }
       if (hash.digest('hex') !== f.sha256) throw new Error('받은 파일이 맞지 않아요. 다시 받아 주세요');
+      // 라이선스 사본을 모델 옆에 (카나나 라이선스 3.1) — 못 받아도 설정의 링크로 볼 수 있어 모델은 넣는다
+      const lic = await get(DEFAULT_MODEL.licenseUrl).catch(() => null);
+      if (lic?.ok) fs.writeFileSync(path.join(path.dirname(part), 'KANANA-LICENSE.txt'), await lic.text());
       return f.name;
     });
   }

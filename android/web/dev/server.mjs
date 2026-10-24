@@ -237,30 +237,7 @@ const sync = {
     return true;
   },
   sttStatus: () => ({ system: fakeStt.system, speakerSupported: true, speaker: fakeStt.speaker, speakerOn: fakeStt.speakerOn, speakerSize: '약 28MB' }),
-  // 로컬 AI (LocalAi.kt 흉내) — 아래 fakeAi
-  aiStatus: () => {
-    const one = (role) => ({ state: fakeAi[role] ? 'ready' : 'missing', name: fakeAi[role], size: fakeAi[role] ? 1.2e9 : 0, error: '' });
-    return { engine: true, chat: one('chat'), embed: one('embed') };
-  },
-  aiCancel: () => null,
-  aiCacheRead: () => fakeAi.cache,
-  aiCacheWrite: (text) => {
-    fakeAi.cache = text;
-  },
 };
-
-// 로컬 AI 흉내: 모델은 없고 정해진 답 (화면 흐름 점검용). MEMOKING_DEV_AI=off 면 모델을 안 넣은 휴대폰
-const fakeAi = { chat: process.env.MEMOKING_DEV_AI === 'off' ? '' : 'qwen3-1.7b-q4_k_m.gguf', embed: '', cache: null };
-function fakeAiReply(body) {
-  const sys = body.messages?.[0]?.content ?? '';
-  const user = body.messages?.at(-1)?.content ?? '';
-  if (body.response_format) return JSON.stringify({ tags: (body.response_format.json_schema.schema.properties.tags.items.enum ?? []).slice(0, 1), new: '미팅' });
-  if (sys.includes('맞춤법')) return user.replace('됬', '됐').replace('몇일', '며칠');
-  if (sys.includes('바꿔 쓴다')) return '- 바꾼 글이에요';
-  if (sys.includes('메모에서 답을')) return '메모에 적힌 대로예요 [1]';
-  if (sys.includes('초안')) return '## 초안\n\n- 할 일: [ ]';
-  return '메모킹은 메모 앱이에요.';
-}
 
 
 
@@ -403,27 +380,6 @@ const calls = {
   },
   exactAlarmSettings: async () => true,
   micPermission: async () => true,
-  aiImport: async ({ role }) => {
-    fakeAi[role] = `${role}-model.gguf`;
-    return sync.aiStatus();
-  },
-  aiDownload: async ({ role, name, url, sha256 }) => {
-    if (!url.startsWith('https://huggingface.co/') || sha256.length !== 64) throw new Error('받을 수 없는 주소예요');
-    fakeAi[role] = name;
-    return sync.aiStatus();
-  },
-  aiRemove: async ({ role }) => {
-    fakeAi[role] = '';
-    return sync.aiStatus();
-  },
-  // 스트리밍은 줄을 한꺼번에 돌려주고 mock-native.js 가 'aiLine' 소식으로 나눠 보낸다
-  aiRequest: async ({ route, body, stream }) => {
-    const b = JSON.parse(body);
-    if (route.endsWith('/embeddings')) return JSON.stringify({ data: b.input.map((t, index) => ({ index, embedding: [...'회의장보기여행출시'].map((ch) => (t.includes(ch) ? 1 : 0)) })) });
-    const out = fakeAiReply(b);
-    if (!stream) return JSON.stringify({ choices: [{ message: { content: out } }] });
-    return { __lines: (out.match(/[\s\S]{1,3}/g) ?? []).map((c) => `data: ${JSON.stringify({ choices: [{ delta: { content: c } }] })}`) };
-  },
   speakerModel: async (a) => {
     if (a.delete) Object.assign(fakeStt, { speaker: 'missing', speakerOn: false });
     else if ('on' in a) fakeStt.speakerOn = Boolean(a.on);
@@ -477,11 +433,6 @@ const calls = {
     return true;
   },
   http: async ({ url, accept = '*/*', limit = 5 * 1024 * 1024, save = false }) => {
-    // 기본 모델 목록(Hugging Face) 흉내 — 받기는 아래 aiDownload 가 흉내 낸다
-    if (url.startsWith('https://huggingface.co/api/models/')) {
-      const list = { sha: 'dev', siblings: [{ rfilename: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf', lfs: { sha256: 'd'.repeat(64), size: 2_700_000_000 } }] };
-      return { status: 200, url, type: 'application/json', latin1: Buffer.from(JSON.stringify(list)).toString('latin1') };
-    }
     const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) MemoKing-dev' }, redirect: 'follow' });
     const type = (res.headers.get('content-type') ?? '').toLowerCase();
     const result = { status: res.status, url: res.url || url, type };

@@ -70,5 +70,7 @@ class MemoKingApp : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashLog.install(this)
+        // 0.45~0.46 의 로컬 AI 모델 · 검색 벡터(몇 GB) — AI 는 PC 에서만 쓰게 되어 지운다
+        File(filesDir, "ai").takeIf { it.exists() }?.let { Thread { it.deleteRecursively() }.start() }
     }
 }

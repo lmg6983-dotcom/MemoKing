@@ -1052,7 +1052,7 @@ if (api.stt) {
 // ---------- AI 도우미 (desktop/ai — 인터넷 없이 이 PC 안에서) ----------
 // 모델 파일(.gguf)은 사용자가 넣는다 (USB 로 옮긴 파일도). 이 PC 의 앱 데이터 폴더에 복사되고, 메모 폴더에는 넣지 않음
 const AI_HINT = {
-  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 아래 기본 모델을 받거나 .gguf 파일을 넣어 주세요 (메모리 8GB PC 는 2~4B, 카나나2 등도 돼요)',
+  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 아래 기본 모델을 받거나 .gguf 파일을 넣어 주세요 (메모리 8GB PC 는 2~4B)',
   embed: '내 메모에서 AI 로 찾을 때 써요 (예: KURE-v1 .gguf)',
 };
 function renderAi(st, failed = {}) {
@@ -1067,9 +1067,10 @@ function renderAi(st, failed = {}) {
     $(`ai-${role}-import`).textContent = have ? '다른 모델로' : '모델 파일 넣기';
     $(`ai-${role}-remove`).hidden = !have;
   }
-  // 기본 모델: 글 모델이 없을 때 한 번 받기 (인터넷이 없는 곳은 위 모델 파일 넣기)
-  $('ai-default-row').hidden = !st.engine || st.chat.state !== 'missing';
-  $('ai-default').textContent = `기본 모델 받기 (${DEFAULT_MODEL.label}, ${DEFAULT_MODEL.approx}, ${DEFAULT_MODEL.license})`;
+  // 기본 모델: 글 모델이 없을 때 한 번 받기 (인터넷이 없는 곳은 위 모델 파일 넣기). 예전 기본(젬마)을 받은 PC 는 바꾸기로
+  const old = st.chat.state === 'ready' && /gemma/i.test(st.chat.name ?? '');
+  $('ai-default-row').hidden = !st.engine || !(st.chat.state === 'missing' || old);
+  $('ai-default').textContent = `${old ? '기본 모델로 바꾸기' : '기본 모델 받기'} (${DEFAULT_MODEL.label}, ${DEFAULT_MODEL.approx}, ${DEFAULT_MODEL.license})`;
   $('ai-try-row').hidden = !st.engine || !['ready', 'running'].includes(st.chat.state);
 }
 if (api.ai) {

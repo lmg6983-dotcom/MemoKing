@@ -85,18 +85,18 @@ test('기본 모델: 목록에서 본 파일만 (보조 파일 빼고), 커밋 �
   const info = {
     sha: 'c0ffee',
     siblings: [
-      { rfilename: 'mtp-gemma-4-E2B-it-UD-Q4_K_XL.gguf', lfs: { sha256: sha, size: 1 } },
-      { rfilename: 'mmproj-F16.gguf', lfs: { sha256: sha, size: 1 } },
-      { rfilename: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf', lfs: { sha256: sha, size: 2_800_000_000 } },
+      { rfilename: 'kanana-2-3b-instruct.imatrix.gguf', lfs: { sha256: sha, size: 1 } },
+      { rfilename: 'kanana-2-3b-instruct.i1-Q4_K_S.gguf', lfs: { sha256: sha, size: 1 } },
+      { rfilename: 'kanana-2-3b-instruct.i1-Q4_K_M.gguf', lfs: { sha256: sha, size: 2_161_794_208 } },
     ],
   };
   assert.deepEqual(pickModelFile(DEFAULT_MODEL, info), {
-    name: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
-    url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-qat-GGUF/resolve/c0ffee/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
-    size: 2_800_000_000,
+    name: 'kanana-2-3b-instruct.i1-Q4_K_M.gguf',
+    url: 'https://huggingface.co/mradermacher/kanana-2-3b-instruct-i1-GGUF/resolve/c0ffee/kanana-2-3b-instruct.i1-Q4_K_M.gguf',
+    size: 2_161_794_208,
     sha256: sha,
   });
-  assert.throws(() => pickModelFile(DEFAULT_MODEL, { siblings: [{ rfilename: 'x-UD-Q4_K_XL.gguf' }] }), /찾지 못했어요/);
+  assert.throws(() => pickModelFile(DEFAULT_MODEL, { siblings: [{ rfilename: 'x.i1-Q4_K_M.gguf' }] }), /찾지 못했어요/);
 });
 
 test('기본 모델 받기: 해시가 맞을 때만 넣고, 틀리면 버린다', async () => {
@@ -106,14 +106,15 @@ test('기본 모델 받기: 해시가 맞을 때만 넣고, 틀리면 버린다'
   let sha = createHash('sha256').update(body).digest('hex');
   const names = {};
   const fakeFetch = async (url) => (url.includes('/api/models/')
-    ? new Response(JSON.stringify({ sha: 'abc', siblings: [{ rfilename: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf', lfs: { sha256: sha, size: body.length } }] }))
-    : new Response(body));
+    ? new Response(JSON.stringify({ sha: 'abc', siblings: [{ rfilename: 'kanana-2-3b-instruct.i1-Q4_K_M.gguf', lfs: { sha256: sha, size: body.length } }] }))
+    : url.endsWith('/LICENSE') ? new Response('KANANA OPEN LICENSE') : new Response(body));
   const ai = createAiService({ dir, serverPath: process.execPath, getNames: () => names, setName: (r, n) => { names[r] = n; }, onStatus: () => {}, fetch: fakeFetch });
   try {
     const st = await ai.downloadDefault();
     assert.equal(st.chat.state, 'ready');
-    assert.equal(names.chat, 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf');
+    assert.equal(names.chat, 'kanana-2-3b-instruct.i1-Q4_K_M.gguf');
     assert.deepEqual(fs.readFileSync(path.join(dir, 'chat.gguf')), body);
+    assert.equal(fs.readFileSync(path.join(dir, 'KANANA-LICENSE.txt'), 'utf8'), 'KANANA OPEN LICENSE');
 
     await ai.remove('chat');
     sha = 'b'.repeat(64); // 목록이 알려 준 해시와 다른 파일

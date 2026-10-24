@@ -59,7 +59,6 @@ class MainActivity : Activity() {
         private const val REQ_SAVE = 6
         private const val REQ_CALENDAR = 7
         private const val REQ_INSTALL = 8
-        private const val REQ_AI = 9
         private const val PDF_TIMEOUT_MS = 15_000L // PDF 만들기를 이만큼 기다리고, 넘으면 인쇄 화면으로
 
         /** 지금 앞에 보이는 화면 (알림이 울렸을 때 바로 알리기 위해) */
@@ -323,7 +322,6 @@ class MainActivity : Activity() {
         if (pageReady) emit("app", "resume")
         DriveSync.listener = { status -> runOnUiThread { if (pageReady) emit("sync", status.json()) } }
         NotiStore.listener = { runOnUiThread { if (pageReady) emit("history", null) } }
-        LocalAi.listener = { runOnUiThread { if (pageReady) emit("ai", LocalAi.status(this)) } }
         root.removeCallbacks(syncTick)
         root.post(syncTick)
     }
@@ -639,32 +637,7 @@ class MainActivity : Activity() {
                 }.distinct()
                 io.execute { bridge.resolve(id) { copyToTemp(uris) } }
             }
-            REQ_AI -> {
-                val uri = data.data ?: return bridge.resolve(id) { null }
-                val role = pendingAiRole
-                var name = ""
-                var size = -1L
-                contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
-                    if (c.moveToFirst()) {
-                        name = c.getString(0) ?: ""
-                        if (!c.isNull(1)) size = c.getLong(1)
-                    }
-                }
-                // 몇 GB 를 복사하는 동안 다른 일(io)을 막지 않게 따로
-                Thread {
-                    bridge.resolve(id) {
-                        LocalAi.import(this, role, uri, name, size) { p -> runOnUiThread { if (pageReady) emit("aiImport", JSONObject().put("progress", p)) } }
-                    }
-                }.start()
-            }
         }
-    }
-
-    // 로컬 AI 모델 파일 고르기 (설정 › AI 도우미) — USB · 내려받기 폴더의 .gguf 를 LocalAi 가 앱 안으로 복사
-    private var pendingAiRole = ""
-    fun pickModel(id: Int, role: String) {
-        pendingAiRole = role
-        startForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"), REQ_AI, id)
     }
 
     fun openVaultFile(id: Int, rel: String) {
