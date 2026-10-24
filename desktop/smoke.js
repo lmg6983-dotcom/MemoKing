@@ -1217,61 +1217,30 @@ export async function runSmoke({
     const welcome = await waitStep(getList, 'welcome');
     await capture(getList(), 'smoke-tutorial-welcome.png');
     check('튜토리얼 시작 → 목록 창에 환영 말풍선', welcome);
+    // 메모킹만의 기능 (0.68.0~): 목록 창에서만 — 단축키 단계는 "다음에 해 볼게요", 왕관은 직접 눌러 보기
     await coachNext(getList());
-    const newStep = await waitStep(getList, 'new-memo');
-    await wait(350); // 비추는 테두리가 옮겨 가는 움직임(0.2초)이 끝난 뒤
-    const spotOnBtn = await js(getList(), `(() => { const s = document.querySelector('.coach-spot').getBoundingClientRect(); const b = document.getElementById('fab').getBoundingClientRect(); return s.left <= b.left && s.right >= b.right && s.top <= b.top && s.bottom >= b.bottom && s.width < b.width + 20; })()`);
-    const noNext = await js(getList(), `!document.querySelector('.coach-bubble .coach-next') && !!document.querySelector('.coach-try')`);
-    check('따라 하기 단계: + 버튼만 밝게 비추고 "직접 해 보세요" (다음 버튼 없음)', newStep && spotOnBtn && noNext);
     const notesBeforeTutorial = new Set(noteWins.keys());
-    await js(getList(), `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`);
-    const tutMemo = await until(() => [...noteWins.keys()].find((k) => !notesBeforeTutorial.has(k)), '튜토리얼 메모').catch(() => null);
-    const tutWin = () => noteWins.get(tutMemo);
-    const writeStep = tutMemo && (await ready(tutWin()).then(() => waitStep(tutWin, 'write')));
-    check('+ 를 누르면 → 새 메모 창에서 다음 말풍선 (목록 말풍선은 사라짐)', writeStep && (await bubbleStep(getList())) === null);
-    if (writeStep) {
-      tutWin().webContents.focus();
-      await js(tutWin(), `document.querySelector('.mk-doc').focus()`);
-      await type(tutWin(), '튜토리얼 메모');
-      const styleStep = await waitStep(tutWin, 'style');
-      const barShown = styleStep && (await js(tutWin(), `!document.body.classList.contains('bar-hidden')`));
-      check('글을 쓰면 → 저절로 다음 단계 (튜토리얼 동안 서식 도구막대는 보임)', styleStep && barShown);
-      // 안내만 하는 단계는 "다음"으로, 직접 해 보는 단계(태그·닫기)는 실제로 해서 넘어간다
-      const stepIds = TUTORIAL_STEPS.map((x) => x.id);
-      const walk = async (win, from, to) => {
-        for (const id of stepIds.slice(stepIds.indexOf(from) + 1, stepIds.indexOf(to) + 1)) {
-          await coachNext(win());
-          await waitStep(win, id);
-        }
-      };
-      await walk(tutWin, 'style', 'tag');
-      await type(tutWin(), ' #할일 ');
-      const crownStep = await waitStep(tutWin, 'crown');
-      check('#태그를 쓰면 → 저절로 다음 단계', crownStep);
-      await walk(tutWin, 'crown', 'bar');
-      await capture(tutWin(), 'smoke-tutorial-note.png');
-      await coachNext(tutWin());
-      await waitStep(tutWin, 'close');
-      await js(tutWin(), `document.getElementById('close-btn').click()`);
-      const cardsStep = await waitStep(getList, 'cards');
-      check('메모를 닫으면 → 목록 창으로 돌아와 다음 단계 (메모는 연습 공간에)', cardsStep && !noteWins.has(tutMemo) && getVault() !== vault && getVault().get(tutMemo)?.title.startsWith('튜토리얼 메모') && !vault.get(tutMemo), JSON.stringify({ cardsStep, open: noteWins.has(tutMemo), title: getVault().get(tutMemo)?.title }));
-      await walk(getList, 'cards', 'done');
-      await coachNext(getList());
-      const finished = await until(async () => !getTutorial().active && (await bubbleStep(getList())) === null, '튜토리얼 끝').catch(() => false);
-      check('마지막 단계까지 → 말풍선이 사라지고 끝 · 내 메모 폴더로 돌아옴 (연습 메모는 남지 않음)', finished && getVault() === vault && !vault.get(tutMemo));
+    const stepIds = TUTORIAL_STEPS.map((x) => x.id);
+    let walked = true;
+    for (const id of stepIds.slice(1, -1)) {
+      walked = (await waitStep(getList, id)) && walked;
+      if (id === 'list-crown') await lj(`document.getElementById('list-top-btn').click()`);
+      else await coachNext(getList());
     }
+    const doneStep = await waitStep(getList, 'done');
+    check('메모킹만의 기능을 차례로 (목록 창에서만, 메모 창은 열리지 않음)', walked && doneStep && [...noteWins.keys()].every((k) => notesBeforeTutorial.has(k)), JSON.stringify({ walked, doneStep }));
+    await coachNext(getList());
+    const finished = await until(async () => !getTutorial().active && (await bubbleStep(getList())) === null, '튜토리얼 끝').catch(() => false);
+    check('마지막 단계까지 → 말풍선이 사라지고 끝 · 내 메모 폴더로 돌아옴', finished && getVault() === vault);
     // 설정에서 언제든 다시, 건너뛰기
     await lj(`document.getElementById('settings-btn').click()`);
     await wait(200);
     await lj(`document.getElementById('tutorial-btn').click()`);
     const tutorialAgain = await waitStep(getList, 'welcome');
     const settingsClosed = await lj(`!document.getElementById('settings-dialog').open`);
-    // 다시 볼 때: 첫 말풍선에 바로 가기(목록 · 어디서든) — 누르면 그 묶음 첫 단계로, 머리에는 "목록 1/7"
-    const jumps = await lj(`[...document.querySelectorAll('.coach-bubble .coach-jump')].map((b) => b.textContent)`);
-    await lj(`[...document.querySelectorAll('.coach-bubble .coach-jump')].find((b) => b.textContent === '목록')?.click()`);
-    const jumped = await waitStep(getList, 'cards');
-    const head = await lj(`document.querySelector('.coach-bubble .coach-count')?.textContent`);
-    check('다시 볼 때: 바로 가기(목록 · 어디서든) → 그 묶음 첫 단계, 머리에 "목록 1/…"', jumps.join(',') === '목록,어디서든' && jumped && /^목록 1\/\d+$/.test(head), JSON.stringify({ jumps, head }));
+    // 한 묶음뿐이라 바로 가기는 없다
+    const jumps = await lj(`document.querySelectorAll('.coach-bubble .coach-jump').length`);
+    check('다시 볼 때: 처음부터 (바로 가기 없음)', jumps === 0, String(jumps));
     await lj(`document.querySelector('.coach-bubble .coach-skip').click()`);
     const skipped = await until(async () => !getTutorial().active && (await bubbleStep(getList())) === null, '건너뛰기').catch(() => false);
     check('설정 › 사용법 둘러보기 → 처음부터 다시, "다음에 할게요" → 끝', tutorialAgain && settingsClosed && skipped);
