@@ -1054,14 +1054,13 @@ if (api.stt) {
 // ---------- AI 도우미 (desktop/ai — 인터넷 없이 이 PC 안에서) ----------
 // 모델 파일(.gguf)은 사용자가 넣는다 (USB 로 옮긴 파일도). 이 PC 의 앱 데이터 폴더에 복사되고, 메모 폴더에는 넣지 않음
 const AI_HINT = {
-  chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 아래 기본 모델을 받거나 .gguf 파일을 넣어 주세요 (메모리 8GB PC 는 2~4B)',
-  embed: '내 메모에서 AI 로 찾을 때 써요 (예: KURE-v1 .gguf)',
+  chat: '맞춤법, 태그, 일정, AI에게 묻기에 써요. 아래에서 카나나2 를 받아 주세요 (인터넷이 없는 PC 는 받아 둔 모델 파일 넣기)',
 };
 // 모델 이름: 기본 모델은 이름으로 (파일 이름은 사용자 말이 아님), 직접 넣은 모델은 파일 이름
 const modelName = (m) => (DEFAULT_MODEL.file.test(m.name ?? '') ? DEFAULT_MODEL.label : m.name || '모델');
 function renderAi(st, failed = {}) {
   if (!st) return;
-  for (const role of ['chat', 'embed']) {
+  for (const role of ['chat']) {
     const m = st[role];
     const have = m.state === 'ready' || m.state === 'running';
     $(`ai-${role}-note`).textContent = !st.engine ? 'AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'
@@ -1094,7 +1093,7 @@ function renderAiTagging(p) {
 }
 if (api.ai) {
   api.on('ai:status', (st) => renderAi(st));
-  for (const role of ['chat', 'embed']) {
+  for (const role of ['chat']) {
     $(`ai-${role}-import`).addEventListener('click', async () => {
       const st = await api.ai.importModel(role);
       renderAi(st, st?.error ? { [role]: st.error } : {});

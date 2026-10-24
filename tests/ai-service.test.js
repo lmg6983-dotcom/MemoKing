@@ -17,7 +17,6 @@ http.createServer((req, res) => {
     if (req.url === '/health') return res.end('{}');
     if (req.headers.authorization !== 'Bearer ' + arg('--api-key')) { res.statusCode = 401; return res.end('{}'); }
     const j = JSON.parse(body);
-    if (req.url === '/v1/embeddings') return res.end(JSON.stringify({ data: j.input.map((t, index) => ({ index, embedding: [t.length] })).reverse() }));
     if (j.stream) {
       for (const piece of ['<think>음', '</think> 답', ': ', j.messages[0].content]) res.write('data: ' + JSON.stringify({ choices: [{ delta: { content: piece } }] }) + '\\n\\n');
       return res.end('data: [DONE]\\n\\n');
@@ -60,8 +59,7 @@ test('로컬 AI: 모델 넣기 · 묻기 · 지우기', async () => {
     assert.equal(await ai.chat([{ role: 'user', content: '조각' }], { onToken: (t) => seen.push(t) }), '답: 조각');
     assert.deepEqual(seen, ['', '답', '답:', '답: 조각']); // 다 오기 전의 생각 블록은 보이지 않는다
 
-    await ai.importModel('embed', model);
-    assert.deepEqual(await ai.embed(['가', '가나다']), [[1], [3]]);
+    await assert.rejects(ai.importModel('embed', model), /모르는 모델/, '검색 모델은 없앴다 (AI 검색도 글 모델 하나로)');
 
     await ai.remove('chat');
     assert.equal(ai.status().chat.state, 'missing');

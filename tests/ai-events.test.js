@@ -23,3 +23,16 @@ test('일정 고르기: AI 가 고른 번호만, 이름이 비면 줄에서 짐�
   assert.equal(aiEventResult(json, c, [out[0]], now).length, 1); // 같은 때 일정이 이미 있으면 빼고
   assert.deepEqual(aiEventResult('엉뚱한 답', c, [], now), []);
 });
+
+test('일정 자동 등록: "내일" 은 쓴 때 기준, 이미 지난 때는 넣지 않는다', async () => {
+  const { createAiTasks } = await import('../app/js/core/ai-tasks.js');
+  const tasks = createAiTasks({ ai: { chat: async () => '{"events":[{"n":1,"title":"치과"}]}' }, memos: () => [], graph: () => [] });
+  const body = '내일 오후 3시 치과';
+  // 휴대폰에서 어젯밤 11시 반에 쓴 메모를 오늘 0시 반에 봄 → 오늘 오후 3시 (하루 밀리지 않음)
+  const late = await tasks.autoEvents(body, { now: new Date(2026, 9, 25, 0, 30), written: new Date(2026, 9, 24, 23, 30) });
+  assert.equal(new Date(late.events[0].at).getDate(), 25);
+  // 그저께 쓴 "내일" 은 이미 지났다
+  const old = await tasks.autoEvents(body, { now, written: new Date(2026, 9, 22, 9, 0) });
+  assert.deepEqual(old.events, []);
+  assert.deepEqual(old.seen, [body]);
+});

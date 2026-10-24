@@ -46,7 +46,7 @@ export function aiEventRequest(cands) {
   return { messages, schema };
 }
 
-/** 모델 답(JSON 글) → 넣을 일정 [reminder] — 번호 밖 · 겹치는 번호는 빼고, 이름이 비면 줄에서 짐작, 이미 있는 일정과 같은 때는 뺀다 */
+/** 모델 답(JSON 글) → 넣을 일정 [reminder] — 번호 밖 · 겹치는 번호는 빼고, 이름이 비면 줄에서 짐작, 이미 있는 일정과 같은 때 · 이미 지난 때는 뺀다 */
 export function aiEventResult(json, cands, existing = [], now = new Date()) {
   let data;
   try {
@@ -63,7 +63,8 @@ export function aiEventResult(json, cands, existing = [], now = new Date()) {
     used.add(c);
     const title = String(e.title ?? '').replace(/\p{Script=Han}/gu, '').trim().slice(0, 30) || guessTitle(c.line, c.date.from, c.date.to);
     const r = eventFromDate({ ...c.date, title }, now);
-    if (r && ![...existing, ...out].some((x) => same(x, r))) out.push(r);
+    const past = r?.kind === 'at' && new Date(r.at).getTime() + (r.allDay ? 86_400_000 : 0) <= now.getTime();
+    if (r && !past && ![...existing, ...out].some((x) => same(x, r))) out.push(r);
   }
   return out;
 }

@@ -218,7 +218,6 @@ function openVault(dir) {
       if (sandbox?.real === next) return; // 연습 중: 화면은 연습 공간 것 (돌아올 때 목록을 다시 그린다)
       windowManager.pushList();
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
-      aiTagger?.later(external.filter((id) => !removed.includes(id))); // 휴대폰 등에서 들어온 메모에도 AI 태그
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));
@@ -717,7 +716,6 @@ function initAi() {
     ai,
     memos: () => vault?.bodies() ?? [],
     graph: () => vault?.index?.memos ?? [],
-    store: ai.rag,
   });
   aiTagger = createAiTagger({
     getVault: () => vault,

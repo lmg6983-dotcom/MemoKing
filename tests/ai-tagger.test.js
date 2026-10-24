@@ -17,7 +17,7 @@ function setup({ picks = ['회의', '거래처', '출장'], open = new Set() } =
   const progress = [];
   const tagger = createAiTagger({
     getVault: () => vault, tasks: () => tasks, ready: async () => true, isOpen: (id) => open.has(id), enabled: () => true,
-    onProgress: (p) => progress.push(p), settleMs: 5,
+    onProgress: (p) => progress.push(p),
   });
   return { dir, vault, tagger, asked, progress, done: () => {
     vault.close();
@@ -115,7 +115,7 @@ test('AI 뒤처리: 새로 쓴 줄의 일정을 넣고, 본 줄은 다시 묻지
     onEvents: (id, events) => added.push(...events),
     tasks: () => ({ autoEvents: async (body, o) => {
       const { createAiTasks } = await import('../app/js/core/ai-tasks.js');
-      return createAiTasks({ ai: { chat: async (m) => { asked.push(m[1].content); return '{"events":[{"n":1,"title":"치과"}]}'; } }, memos: () => [], graph: () => [], store: null }).autoEvents(body, o);
+      return createAiTasks({ ai: { chat: async (m) => { asked.push(m[1].content); return '{"events":[{"n":1,"title":"치과"}]}'; } }, memos: () => [], graph: () => [] }).autoEvents(body, o);
     } }),
   });
   try {

@@ -76,7 +76,7 @@ export function setupAiAsk({ box, api }) {
   stop.addEventListener('click', () => job && api.ai.cancel(job));
 
   return {
-    /** 검색어가 바뀔 때 (글 모델이 없거나 다른 탭이면 숨김) */
+    /** 검색어가 바뀔 때 (AI 모델이 없거나 다른 탭이면 숨김) */
     async update(text) {
       const st = text ? await api.ai.status().catch(() => null) : null;
       const on = ['ready', 'running'].includes(st?.chat.state);
@@ -84,7 +84,7 @@ export function setupAiAsk({ box, api }) {
       query = text;
       box.hidden = !on;
       if (!on) return;
-      ask.replaceChildren(h('span', 'ai-ask-mark', '✦'), ` AI에게 묻기: `, h('b', null, `“${text}”`), h('small', null, st.embed.state === 'missing' ? ' 내 메모에서 찾아 답해요 (검색 모델을 넣으면 뜻으로도 찾아요)' : ' 내 메모에서 찾아 답해요'));
+      ask.replaceChildren(h('span', 'ai-ask-mark', '✦'), ` AI에게 묻기: `, h('b', null, `“${text}”`), h('small', null, ' 내 메모에서 찾아 답해요'));
     },
   };
 }

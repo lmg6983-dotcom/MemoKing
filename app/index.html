@@ -228,7 +228,7 @@
       </label>
       <label class="setting-row">
         <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
-        <span>태그 자동 추가 <small>메모를 닫을 때 태그를 달아요. 글 모델이 있으면 AI 가 골라 태그를 합쳐 3개까지, 없으면 태그 없는 메모에 확실한 태그만</small></span>
+        <span>태그 자동 추가 <small>메모를 닫을 때 태그를 달아요. AI 모델이 있으면 AI 가 골라 태그를 합쳐 3개까지, 없으면 태그 없는 메모에 확실한 태그만</small></span>
       </label>
       <div class="setting-row hold-row">
         <label class="hold-label">
@@ -264,7 +264,7 @@
     <section class="set-sec" aria-labelledby="set-local-ai" id="local-ai-sec">
       <h3 class="set-title" id="set-local-ai">AI 도우미 <small>인터넷 없이 이 PC 안에서 돌아가요</small></h3>
       <div class="setting-row keymap-row">
-        <span>글 모델 <small id="ai-chat-note" role="status"></small><small id="ai-try-out" role="status"></small></span>
+        <span>AI 모델 <small id="ai-chat-note" role="status"></small><small id="ai-try-out" role="status"></small></span>
         <button type="button" class="link-btn" id="ai-try" hidden>시험해 보기</button>
         <button type="button" class="link-btn danger" id="ai-chat-remove" hidden>삭제</button>
         <button type="button" class="btn" id="ai-chat-import">모델 파일 넣기</button>
@@ -272,11 +272,6 @@
       <div class="dialog-actions left sub-actions" id="ai-default-row" hidden>
         <button type="button" class="btn" id="ai-default"></button>
         <button type="button" class="link-btn" id="ai-default-stop" hidden>멈추기</button>
-      </div>
-      <div class="setting-row keymap-row">
-        <span>검색 모델 <small id="ai-embed-note" role="status"></small></span>
-        <button type="button" class="link-btn danger" id="ai-embed-remove" hidden>삭제</button>
-        <button type="button" class="btn" id="ai-embed-import">모델 파일 넣기</button>
       </div>
       <div id="ai-auto-group" hidden>
         <p class="label sub">AI 가 자동으로 하는 일</p>
@@ -296,7 +291,7 @@
           <input type="checkbox" id="magic-polish" class="switch" role="switch" checked>
           <span>매직키 메모 다듬기 <small>맞춤법을 고치고, 첫 줄이 길면 짧은 제목을 붙여요</small></span>
         </label>
-        <p class="set-note">메모를 닫을 때 · 매직키로 저장할 때 · 휴대폰에서 들어올 때 뒤에서 해요. 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
+        <p class="set-note">메모를 닫을 때 · 매직키로 저장할 때 뒤에서 해요 (휴대폰에서 쓴 메모는 PC 에서 열었다 닫을 때). 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
       </div>
       <p class="set-note">기본 모델: 카카오 카나나2 · Powered by Kanana · <a href="https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/LICENSE" target="_blank" rel="noopener">라이선스 보기</a></p>
     </section>
