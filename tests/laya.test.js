@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { tagQuestion, rankedTags, withLaya, pickTags } from '../app/js/core/laya-tags.js';
+import { tagQuestion, rankedTags, withLaya, pickTags, blend } from '../app/js/core/laya-tags.js';
 import { createLayaService } from '../desktop/ai/laya-service.js';
 
 const memo = (id, title, tags, updated = '2026-10-01') => ({ id, updated, body: `# ${title}\n\n${tags.map((t) => `#${t}`).join(' ')}\n` });
@@ -32,6 +32,15 @@ test('Laya 답 → 확률 순 · 닫을 때 달 태그(셋) · 추천 칩 순서
   const list = [{ name: '배포', existing: false }, { name: '업무', existing: true }];
   assert.deepEqual(withLaya(list, ranked).map((t) => t.name), ['회의', '업무', '배포']);
   assert.equal(withLaya(list, []), list);
+});
+
+test('Laya 확률과 AI 없는 추천 점수 섞기', () => {
+  const ranked = [{ name: '맛집', p: 0.6 }, { name: '장보기', p: 0.4 }];
+  assert.equal(blend(ranked, new Map([['장보기', 0.9]]), 0), ranked);
+  assert.deepEqual(blend(ranked, new Map([['장보기', 0.9]]), 0.5).map((r) => r.name), ['장보기', '맛집']);
+  const q = tagQuestion('# 스탠드업\n\n어제 한 일 공유, 배포 일정 확인', vault);
+  assert.ok(q.scores instanceof Map);
+  assert.equal(tagQuestion('# 스탠드업\n\n어제 한 일 공유, 배포 일정 확인', vault, { limit: 1 }).candidates.length, 1);
 });
 
 test('AI 태그 모델 받기: 파일마다 SHA-256 이 맞아야 넣고, 맞지 않으면 아무것도 남기지 않음', async () => {

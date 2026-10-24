@@ -41,6 +41,9 @@ export function rankedTags(result) {
   return Object.entries(probs).map(([name, p]) => ({ name, p })).sort((a, b) => b.p - a.p);
 }
 
+/** 앱이 섞는 몫 — 시험(문제 99개)에서 0.5 가 가장 나았다: 셋 안에 정답 Laya 만 70% · AI 없이 77% · 섞어서 80% */
+export const BLEND = 0.5;
+
 /** Laya 확률과 AI 없는 추천 점수를 섞어 다시 줄 세우기 — weight: 추천 점수 쪽 몫 (0 이면 Laya 만) */
 export function blend(ranked, scores, weight) {
   if (!weight) return ranked;

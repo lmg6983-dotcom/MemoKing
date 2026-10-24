@@ -4,7 +4,7 @@ import { call, aiStatusNative } from './native.js';
 import { app } from './state.js';
 import { LAYA_MODEL } from '../../app/js/core/model-catalog.js';
 import { layaAgent } from '../../app/js/core/laya-agent.js';
-import { tagQuestion, rankedTags } from '../../app/js/core/laya-tags.js';
+import { tagQuestion, rankedTags, blend, BLEND } from '../../app/js/core/laya-tags.js';
 
 const IDLE_MS = 5 * 60_000;
 
@@ -44,7 +44,7 @@ export async function aiRank(body, id) {
   if (!q) return [];
   clearTimeout(idle);
   try {
-    return rankedTags(await (await load()).predict(q.state, q.questions));
+    return blend(rankedTags(await (await load()).predict(q.state, q.questions)), q.scores, BLEND);
   } catch (err) {
     console.error('AI 태그', err.message);
     return [];

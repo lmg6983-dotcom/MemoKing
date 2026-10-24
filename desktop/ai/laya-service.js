@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { LAYA_MODEL } from '../../app/js/core/model-catalog.js';
 import { layaAgent, ortProvider } from '../../app/js/core/laya-agent.js';
-import { tagQuestion, rankedTags } from '../../app/js/core/laya-tags.js';
+import { tagQuestion, rankedTags, blend, BLEND } from '../../app/js/core/laya-tags.js';
 
 const IDLE_MS = 5 * 60_000;
 
@@ -123,7 +123,7 @@ export function createLayaService({ dir, onStatus, fetch: get = fetch, loadOrt =
     if (!q) return [];
     clearTimeout(idle);
     try {
-      return rankedTags(await (await load()).predict(q.state, q.questions));
+      return blend(rankedTags(await (await load()).predict(q.state, q.questions)), q.scores, BLEND);
     } finally {
       idle = setTimeout(unload, IDLE_MS);
     }
