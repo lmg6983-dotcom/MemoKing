@@ -7,7 +7,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:dock', 'sticker:hover', 'list:on-top', 'list:crown-docked',
-  'stt:status', 'ai:status', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
+  'stt:status', 'ai:status', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'card:trash', 'card:copied', 'edit:paste-plain', 'edit:clear-format',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
@@ -29,7 +29,6 @@ contextBridge.exposeInMainWorld('memoking', {
     list: invoke('tags:list'),
     auto: invoke('tags:auto'),
     suggest: invoke('tags:suggest'),
-    ai: invoke('tags:ai'), // AI 로 고르기 → 칩 목록 | { error }
     aiAuto: invoke('tags:ai-auto'), // 닫은 뒤 AI 가 고른 태그 하나를 저절로 (메인에서)
   },
   memo: {
@@ -168,16 +167,11 @@ contextBridge.exposeInMainWorld('memoking', {
     audio: (id, samples) => ipcRenderer.send('stt:audio', id, samples),
     stop: invoke('stt:stop'),
   },
-  // 로컬 AI (PC, 인터넷 없이): 모델 파일 넣기 · 지우기 · 시험 · 글 도우미
+  // AI 태그 (PC, 인터넷 없이): 모델 받기 · 지우기 — 진행은 ai:status 의 progress
   ai: {
     status: invoke('ai:status'),
-    importModel: invoke('ai:import'),
-    downloadDefault: invoke('ai:download-default'), // 기본 모델(core/model-catalog.js) 받기 — 진행은 ai:status 의 progress
+    download: invoke('ai:download'),
     remove: invoke('ai:remove'),
-    try: invoke('ai:try'),
-    write: invoke('ai:write'), // { id, task: 'spell' | 'style' | 'draft', … } — 조각은 ai:token · ai:progress 로
-    cancel: invoke('ai:cancel'),
-    ask: invoke('ai:ask'), // { id, question } → { text, sources: [{ id, title, via }] } — 조각은 ai:token, 색인은 ai:progress
   },
   attachments: {
     save: invoke('attachment:save'),

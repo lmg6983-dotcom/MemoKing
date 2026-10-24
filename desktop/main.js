@@ -17,7 +17,7 @@ import { LinkPreviews } from './link-previews.js';
 import { pickHandoff, recentlyUpdated } from '../app/js/core/handoff.js';
 import { PopupWatcher } from './popup-watch.js';
 import { createSttService } from './stt/stt-service.js';
-import { createAiService } from './ai/ai-service.js';
+import { createLayaService } from './ai/laya-service.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, findRepeat, betterReading, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
@@ -42,7 +42,7 @@ import {
 } from './window-utils.js';
 
 import {
-  SMOKE, APP_ID, STT_WORKER, STT_VENDOR, LLAMA_SERVER, POPUP_HELPER,
+  SMOKE, APP_ID, STT_WORKER, STT_VENDOR, POPUP_HELPER,
   settings, loadSettings, saveSettings, installMark, suggestedVaultPath,
   purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings,
   TRASH_DAYS, openWebPage, openVaultFile, toast, smokeToasts, smokeOpened,
@@ -690,18 +690,12 @@ function holdLock(memoId, session) {
 
 const sttOptions = () => ({ enabled: settings.stt?.enabled !== false, speaker: settings.stt?.speaker === true });
 
-// ---------- 로컬 AI (desktop/ai) ----------
+// ---------- AI 태그 (desktop/ai/laya-service.js) ----------
 
 function initAi() {
-  ai = createAiService({
-    dir: path.join(app.getPath('userData'), 'ai'),
-    serverPath: process.env.MEMOKING_LLAMA_SERVER || LLAMA_SERVER,
-    fetch: (url) => net.fetch(url), // 기본 모델 받기 — 시스템 프록시를 따른다
-    getNames: () => settings.ai ?? {},
-    setName: (role, name) => {
-      settings.ai = { ...settings.ai, [role]: name };
-      saveSettings();
-    },
+  ai = createLayaService({
+    dir: path.join(app.getPath('userData'), 'ai', 'laya'),
+    fetch: (url) => net.fetch(url), // 모델 받기 — 시스템 프록시를 따른다
     onStatus: (status) => {
       const w = windowManager.listWin;
       if (w && !w.isDestroyed()) w.webContents.send('ai:status', status);

@@ -62,13 +62,8 @@ export const native = {
   lastError: () => (typeof raw.lastError === 'function' ? unwrap(raw.lastError()) : null),
 };
 
-// 로컬 AI (LocalAi.kt) — 모델 넣기 · 지우기 · 묻기는 call('aiImport' | 'aiRemove' | 'aiRequest'). 예전 앱에는 없음
-export const localAiNative = typeof raw.aiStatus === 'function' ? {
-  status: sync('aiStatus'),
-  cancel: sync('aiCancel'),
-  cacheRead: sync('aiCacheRead'),
-  cacheWrite: sync('aiCacheWrite'),
-} : null;
+// AI 태그 (LayaTags.kt) — 받기 · 지우기 · 계산은 call('aiDownload' | 'aiRemove' | 'layaRun'). 예전 앱에는 없음
+export const aiStatusNative = typeof raw.aiStatus === 'function' ? sync('aiStatus') : null;
 
 // 홈 화면 위젯 (Widgets.kt)
 export const widget = {

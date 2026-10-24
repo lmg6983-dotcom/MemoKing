@@ -236,37 +236,17 @@ const sync = {
     fakeDone = fakeDone.filter((r) => r.id !== id);
     return true;
   },
+  // AI 태그 흉내 (LayaTags.kt): MEMOKING_DEV_AI=ready 면 받아 둔 것으로 — 계산(layaRun)은 흉내 내지 않아 태그는 AI 없이 고른 것
+  aiStatus: () => ({ state: fakeAi.state, size: fakeAi.state === 'ready' ? 420_000_000 : 0, progress: null, error: '' }),
   sttStatus: () => ({ system: fakeStt.system, speakerSupported: true, speaker: fakeStt.speaker, speakerOn: fakeStt.speakerOn, speakerSize: '약 28MB' }),
-  // 로컬 AI (LocalAi.kt 흉내) — 아래 fakeAi
-  aiStatus: () => {
-    const one = (role) => ({ state: fakeAi[role] ? 'ready' : 'missing', name: fakeAi[role], size: fakeAi[role] ? 1.2e9 : 0, error: '', format: fakeAi[role] ? (fakeAi[role].endsWith('.litertlm') ? 'litertlm' : 'gguf') : '' });
-    return { engine: true, chat: one('chat'), embed: one('embed') };
-  },
-  aiCancel: () => null,
-  aiCacheRead: () => fakeAi.cache,
-  aiCacheWrite: (text) => {
-    fakeAi.cache = text;
-  },
 };
-
-// 로컬 AI 흉내: 모델은 없고 정해진 답 (화면 흐름 점검용). MEMOKING_DEV_AI=off 면 모델을 안 넣은 휴대폰
-const fakeAi = { chat: process.env.MEMOKING_DEV_AI === 'off' ? '' : 'qwen3-1.7b-q4_k_m.gguf', embed: '', cache: null };
-function fakeAiReply(body) {
-  const sys = body.messages?.[0]?.content ?? '';
-  const user = body.messages?.at(-1)?.content ?? '';
-  if (body.response_format) return JSON.stringify({ tags: (body.response_format.json_schema.schema.properties.tags.items.enum ?? []).slice(0, 1), new: '미팅' });
-  if (sys.includes('맞춤법')) return user.replace('됬', '됐').replace('몇일', '며칠');
-  if (sys.includes('바꿔 쓴다')) return '- 바꾼 글이에요';
-  if (sys.includes('메모에서 답을')) return '메모에 적힌 대로예요 [1]';
-  if (sys.includes('초안')) return '## 초안\n\n- 할 일: [ ]';
-  return '메모킹은 메모 앱이에요.';
-}
 
 
 
 let fakeRec = null;
 // 받아쓰기(휴대폰 Google 음성 인식): 점검 도구가 /dev/stt 로 "이 휴대폰은 못 씀"(안드로이드 13 아래)을 흉내 낸다
 const fakeStt = { system: true, speaker: 'missing', speakerOn: false };
+const fakeAi = { state: process.env.MEMOKING_DEV_AI === 'ready' ? 'ready' : 'missing' };
 let fakeDone = [];
 const recordState = () => (fakeRec
   ? { active: true, paused: Boolean(fakeRec.paused), memoId: fakeRec.memoId, elapsedMs: Date.now() - fakeRec.at, stt: fakeRec.stt, text: fakeRec.stt ? '오늘 회의를 시작하겠습니다' : '', partial: '' }
@@ -403,26 +383,14 @@ const calls = {
   },
   exactAlarmSettings: async () => true,
   micPermission: async () => true,
-  aiImport: async ({ role }) => {
-    fakeAi[role] = `${role}-model.gguf`;
+  aiDownload: async ({ base, files }) => {
+    if (!base.startsWith('https://github.com/') || !files.length) throw new Error('받을 수 없는 주소예요');
+    fakeAi.state = 'ready';
     return sync.aiStatus();
   },
-  aiDownload: async ({ role, name, url, sha256 }) => {
-    if (!url.startsWith('https://huggingface.co/') || sha256.length !== 64) throw new Error('받을 수 없는 주소예요');
-    fakeAi[role] = name;
+  aiRemove: async () => {
+    fakeAi.state = 'missing';
     return sync.aiStatus();
-  },
-  aiRemove: async ({ role }) => {
-    fakeAi[role] = '';
-    return sync.aiStatus();
-  },
-  // 스트리밍은 줄을 한꺼번에 돌려주고 mock-native.js 가 'aiLine' 소식으로 나눠 보낸다
-  aiRequest: async ({ route, body, stream }) => {
-    const b = JSON.parse(body);
-    if (route.endsWith('/embeddings')) return JSON.stringify({ data: b.input.map((t, index) => ({ index, embedding: [...'회의장보기여행출시'].map((ch) => (t.includes(ch) ? 1 : 0)) })) });
-    const out = fakeAiReply(b);
-    if (!stream) return JSON.stringify({ choices: [{ message: { content: out } }] });
-    return { __lines: (out.match(/[\s\S]{1,3}/g) ?? []).map((c) => `data: ${JSON.stringify({ choices: [{ delta: { content: c } }] })}`) };
   },
   speakerModel: async (a) => {
     if (a.delete) Object.assign(fakeStt, { speaker: 'missing', speakerOn: false });
@@ -477,11 +445,6 @@ const calls = {
     return true;
   },
   http: async ({ url, accept = '*/*', limit = 5 * 1024 * 1024, save = false }) => {
-    // 기본 모델 목록(Hugging Face) 흉내 — 받기는 아래 aiDownload 가 흉내 낸다
-    if (url.startsWith('https://huggingface.co/api/models/')) {
-      const list = { sha: 'dev', siblings: [{ rfilename: 'gemma-4-E2B-it.litertlm', lfs: { sha256: 'd'.repeat(64), size: 2_588_147_712 } }] };
-      return { status: 200, url, type: 'application/json', latin1: Buffer.from(JSON.stringify(list)).toString('latin1') };
-    }
     const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) MemoKing-dev' }, redirect: 'follow' });
     const type = (res.headers.get('content-type') ?? '').toLowerCase();
     const result = { status: res.status, url: res.url || url, type };

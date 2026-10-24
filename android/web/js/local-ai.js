@@ -1,91 +1,54 @@
-// 로컬 AI (휴대폰) — 엔진은 앱(LocalAi.kt)이 띄우고, 묻는 말 · 답 풀기 · 작업 흐름은 PC 와 같은 공용 코드 (인터넷 없이)
-//   aiApi 는 PC 의 window.memoking 과 같은 모양 (ai · on · memo.open) — 공용 화면 모듈(ai-write-panel.js · ai-ask.js)이 그대로 쓴다
-import { call, on, localAiNative as raw } from './native.js';
+// AI 태그 (휴대폰) — Laya 다국어 모델을 이 휴대폰 안에서 (LayaTags.kt, 인터넷 없이).
+//   질문 만들기 · 글 나누기 · 답 풀기는 PC 와 같은 공용 코드(app/js/core/laya-*.js), 계산(encoder · head)만 앱이 한다
+import { call, aiStatusNative } from './native.js';
 import { app } from './state.js';
-import { llamaClient } from '../../app/js/core/llama-client.js';
-import { createAiTasks } from '../../app/js/core/ai-tasks.js';
-import { createRagStore } from '../../app/js/core/rag-store.js';
+import { LAYA_MODEL } from '../../app/js/core/model-catalog.js';
+import { layaAgent } from '../../app/js/core/laya-agent.js';
+import { tagQuestion, rankedTags } from '../../app/js/core/laya-tags.js';
 
-export const aiSupported = Boolean(raw);
-export const aiStatus = () => raw?.status() ?? null;
-export const chatReady = () => ['ready', 'running'].includes(aiStatus()?.chat.state);
+const IDLE_MS = 5 * 60_000;
 
-// ---------- 엔진에 묻기 (앱을 거쳐 127.0.0.1 의 llama-server 로) ----------
+export const aiSupported = Boolean(aiStatusNative);
+export const aiStatus = () => aiStatusNative?.() ?? null;
+export const aiReady = () => ['ready', 'running'].includes(aiStatus()?.state);
 
-const lineHandlers = new Map(); // 스트리밍 작업 → 줄마다
-on('aiLine', ({ job, line }) => lineHandlers.get(job)?.(line));
-let seq = 0;
-
-async function request(role, route, body, { signal, onLine } = {}) {
-  if (signal?.aborted) throw new Error('멈췄어요');
-  const job = `j${++seq}`;
-  if (onLine) lineHandlers.set(job, onLine);
-  const stop = () => raw.cancel(job);
-  signal?.addEventListener('abort', stop);
-  try {
-    const text = await call('aiRequest', { role, route, body: JSON.stringify(body), job, stream: Boolean(onLine) });
-    return text ? JSON.parse(text) : null;
-  } catch (err) {
-    throw signal?.aborted ? new Error('멈췄어요') : err;
-  } finally {
-    lineHandlers.delete(job);
-    signal?.removeEventListener('abort', stop);
-  }
-}
-
-const localAi = { status: aiStatus, ...llamaClient(request) };
-
-export const aiTasks = createAiTasks({
-  ai: localAi,
-  memos: () => app.vault?.bodies() ?? [],
-  graph: () => app.vault?.index?.memos ?? [],
-  store: createRagStore({ load: async () => raw.cacheRead(), save: async (text) => raw.cacheWrite(text) }), // 이 휴대폰에만
-});
-
-// ---------- PC 와 같은 모양의 api ----------
-
-const listeners = new Map();
-const emit = (name, data) => listeners.get(name)?.forEach((fn) => fn(data));
-const jobs = new Map(); // 화면 작업 id → 멈추기
-
-async function runJob(id, run) {
-  const ctrl = new AbortController();
-  jobs.set(id, ctrl);
-  try {
-    return await run({
-      signal: ctrl.signal,
-      onToken: (text) => emit('ai:token', { id, text }),
-      onProgress: (done, total) => emit('ai:progress', { id, done, total }),
-    });
-  } catch (err) {
-    return { error: err.message };
-  } finally {
-    jobs.delete(id);
-  }
-}
-
-export const aiApi = {
-  ai: {
-    status: async () => aiStatus(),
-    importModel: (role) => call('aiImport', { role }), // 고르고 복사 (진행은 on('aiImport'))
-    remove: (role) => call('aiRemove', { role }),
-    async try() {
-      const started = Date.now();
-      try {
-        const text = await localAi.chat([{ role: 'user', content: '메모 앱을 한 문장으로 소개해 주세요.' }], { maxTokens: 80 });
-        return { text, seconds: (Date.now() - started) / 1000 };
-      } catch (err) {
-        return { error: err.message };
-      }
-    },
-    write: ({ id, ...job }) => runJob(id, (o) => aiTasks.write(job, o)),
-    ask: ({ id, question }) => runJob(id, (o) => aiTasks.ask(question, o)),
-    cancel: async (id) => jobs.get(id)?.abort(),
-  },
-  on(name, fn) {
-    if (!listeners.has(name)) listeners.set(name, new Set());
-    listeners.get(name).add(fn);
-    return () => listeners.get(name).delete(fn);
-  },
-  memo: { open: (id) => app.openMemo(id) },
+export const downloadModel = () => call('aiDownload', { base: LAYA_MODEL.base, files: LAYA_MODEL.files });
+export const removeModel = () => {
+  agent = null;
+  return call('aiRemove', {});
 };
+
+let agent = null; // Promise<Agent> — 토크나이저(수십 MB)를 들고 있으니 쉬면 놓는다
+let idle = null;
+const json = async (name) => (await fetch(`/ai/${name}`)).json(); // WebServer.kt 의 /ai/
+
+function load() {
+  agent ??= (async () => layaAgent({
+    tokenizerJson: await json('tokenizer.json'),
+    cfg: await json('rl_agent_config.json'),
+    provider: {
+      runEncoder: async () => ({ lastHidden: null }), // 가운데 결과는 앱 안에 두고 head 까지 한 번에 (layaRun)
+      runHead: async (_hidden, batch) => call('layaRun', { batch: JSON.stringify(batch) }),
+    },
+  }))().catch((err) => {
+    agent = null;
+    throw err;
+  });
+  return agent;
+}
+
+/** 이 메모에 알맞은 기존 태그를 확률 높은 순으로 [{ name, p }] — 모델이 없거나 묻지 못하면 [] */
+export async function aiRank(body, id) {
+  if (!aiReady()) return [];
+  const q = tagQuestion(body, app.vault?.bodies() ?? [], { excludeId: id });
+  if (!q) return [];
+  clearTimeout(idle);
+  try {
+    return rankedTags(await (await load()).predict(q.state, q.questions));
+  } catch (err) {
+    console.error('AI 태그', err.message);
+    return [];
+  } finally {
+    idle = setTimeout(() => { agent = null; }, IDLE_MS);
+  }
+}

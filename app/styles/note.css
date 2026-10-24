@@ -504,23 +504,6 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .version-preview { color: var(--muted); }
 .version-restore { flex: none; height: 28px; padding: 0 10px; font-size: 12px; }
 
-/* ---------- AI 글 도우미 (links-panel 모양을 같이 씀) ---------- */
-.ai-panel { width: min(320px, 100%); }
-.ai-styles { display: flex; flex-wrap: wrap; gap: 4px; }
-.ai-panel .btn { height: 30px; padding: 0 10px; font-size: 12.5px; }
-.ai-request { height: auto; min-height: 52px; padding: 6px 10px; margin-bottom: 6px; resize: vertical; font: inherit; font-size: 12.5px; }
-.ai-state:empty { display: none; }
-.ai-state { margin-top: 12px; }
-.ai-out { margin: 6px 0; white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
-.ai-out:empty { display: none; }
-.ai-all { margin-bottom: 6px; }
-.ai-card { padding: 8px 0; border-bottom: 1px solid var(--border); }
-.ai-diff { margin: 0 0 6px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
-.ai-diff del { color: var(--danger); text-decoration: line-through; }
-.ai-diff ins { text-decoration: none; border-bottom: 2px solid var(--brand-yellow); font-weight: 600; }
-.ai-card-note:empty { display: none; }
-.ai-card-note { display: block; margin-bottom: 4px; font-size: 12px; color: var(--muted); }
-
 /* ---------- 서식 도구막대 ---------- */
 /* 창 폭에 안 들어가는 버튼은 note.js 가 » 더보기 패널로 옮긴다 (스크롤로 숨기지 않음) */
 .format-bar {

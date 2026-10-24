@@ -47,60 +47,6 @@ val sherpaAar: File = rootDir.resolve(".gradle/sherpa-onnx/sherpa-onnx-$sherpaVe
     }
 }
 
-// 로컬 AI 엔진 llama.cpp (MIT) — llama-server 를 휴대폰용(arm64)으로 빌드해 libllama-server.so 라는 이름으로 넣는다.
-//   안드로이드는 앱 폴더의 실행 파일은 막고 네이티브 라이브러리 폴더(nativeLibraryDir)만 실행을 허락해서.
-//   PC 와 같은 버전 · 같은 실행 옵션 (scripts/get-llama.mjs). CPU 기능(dotprod · i8mm 등)에 맞는 계산 코드는 휴대폰에서 골라 쓴다 (GGML_CPU_ALL_VARIANTS).
-//   처음 한 번 몇 분 — 결과는 android/.gradle/llama 에 두고 다시 빌드하지 않는다. NDK · CMake 가 없으면 건너뛴다 (그 APK 는 AI 없이 그대로)
-val llamaTag = "b11400" // 2026-10-05
-val llamaCommit = "0bb496dbd3af0add77ff82c406a915b41e839d56"
-val llamaWork: File = rootDir.resolve(".gradle/llama/$llamaTag")
-val llamaLibs: File = llamaWork.resolve("jni")
-fun sh(vararg cmd: String): String {
-    val p = ProcessBuilder(*cmd).redirectErrorStream(true).start()
-    val out = p.inputStream.bufferedReader().readText()
-    check(p.waitFor() == 0) { "${cmd.joinToString(" ")} 실패:\n${out.takeLast(4000)}" }
-    return out
-}
-val llamaServer by tasks.registering {
-    doLast {
-        if (llamaLibs.resolve("arm64-v8a/libllama-server.so").isFile) return@doLast
-        val toolchain = "build/cmake/android.toolchain.cmake"
-        val ndk = listOfNotNull(System.getenv("ANDROID_NDK_LATEST_HOME"), System.getenv("ANDROID_NDK_HOME"), System.getenv("ANDROID_NDK_ROOT")).map(::File)
-            .plus(android.sdkDirectory.resolve("ndk").listFiles().orEmpty().sortedByDescending { it.name })
-            .firstOrNull { it.resolve(toolchain).isFile }
-        if (ndk == null) return@doLast logger.warn("NDK 가 없어 로컬 AI 엔진(llama.cpp)을 넣지 않아요 — 이 APK 는 AI 없이 만들어져요")
-        val src = llamaWork.resolve("src")
-        if (!src.resolve("CMakeLists.txt").isFile) {
-            src.deleteRecursively()
-            sh("git", "clone", "--depth", "1", "--branch", llamaTag, "https://github.com/ggml-org/llama.cpp", src.path)
-        }
-        val head = sh("git", "-C", src.path, "rev-parse", "HEAD").trim()
-        check(head == llamaCommit) { "llama.cpp $llamaTag 커밋이 달라요: $head" }
-        val build = llamaWork.resolve("build")
-        logger.lifecycle("로컬 AI 엔진(llama.cpp $llamaTag) 빌드 — 처음 한 번 몇 분 걸려요")
-        sh(
-            "cmake", "-S", src.path, "-B", build.path,
-            "-DCMAKE_TOOLCHAIN_FILE=${ndk.resolve(toolchain)}", "-DANDROID_ABI=arm64-v8a", "-DANDROID_PLATFORM=android-26", "-DANDROID_STL=c++_shared",
-            "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=ON",
-            "-DGGML_NATIVE=OFF", "-DGGML_BACKEND_DL=ON", "-DGGML_CPU_ALL_VARIANTS=ON", "-DGGML_OPENMP=OFF", "-DGGML_LLAMAFILE=OFF",
-            "-DLLAMA_OPENSSL=OFF", "-DLLAMA_USE_PREBUILT_UI=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_APP=OFF",
-        )
-        sh("cmake", "--build", build.path, "--target", "llama-server", "-j", "${Runtime.getRuntime().availableProcessors()}")
-        val out = llamaLibs.resolve("arm64-v8a").apply { deleteRecursively(); mkdirs() }
-        build.resolve("bin").listFiles().orEmpty().filter { it.name.endsWith(".so") }.forEach { it.copyTo(out.resolve(it.name)) }
-        build.resolve("bin/llama-server").copyTo(out.resolve("libllama-server.so"))
-        // c++_shared 는 앱이 함께 넣어야 한다 (NDK 의 것)
-        val prebuilt = ndk.resolve("toolchains/llvm/prebuilt").listFiles().orEmpty().first { it.resolve("bin").isDirectory }
-        prebuilt.resolve("sysroot/usr/lib/aarch64-linux-android/libc++_shared.so").copyTo(out.resolve("libc++_shared.so"))
-        // 기호를 벗겨 APK 를 줄인다 (AGP 는 NDK 를 못 찾으면 벗기지 않고 그대로 넣는다)
-        val strip = prebuilt.resolve("bin").listFiles().orEmpty().first { it.name.startsWith("llvm-strip") }
-        out.listFiles().orEmpty().forEach { sh(strip.path, "--strip-unneeded", it.path) }
-        // CPU 변종은 넷만 (휴대폰은 있는 것 중 맞는 것을 고른다 — 뺀 변종의 휴대폰은 한 단계 아래 것으로): 모든 폰 · dotprod+fp16 · i8mm(2021~ 대부분) · SME2(최신)
-        listOf("armv8.2_1", "armv9.0_1", "armv9.2_1").forEach { out.resolve("libggml-cpu-android_$it.so").delete() }
-        out.listFiles().orEmpty().sortedBy { it.name }.forEach { logger.lifecycle("  ${it.name} ${it.length() / 1024}KB") }
-    }
-}
-
 android {
     namespace = "com.memoking.app"
     compileSdk = 35
@@ -142,13 +88,6 @@ android {
     }
 
     sourceSets["main"].assets.srcDir(webOut.get().asFile)
-    sourceSets["main"].jniLibs.srcDir(llamaLibs) // 로컬 AI 엔진 (위 llamaServer)
-
-    packaging {
-        // llama-server 는 실행 파일이라 설치할 때 nativeLibraryDir 로 풀려 있어야 한다
-        jniLibs.useLegacyPackaging = true
-        jniLibs.pickFirsts += "**/libc++_shared.so" // 화자 구분 엔진(sherpa-onnx)도 넣을 수 있어서
-    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -156,7 +95,6 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += "-Xskip-metadata-version-check" // LiteRT-LM 은 더 새 Kotlin 으로 만들어져 있다 (쓰는 API 는 평범한 클래스 · 함수)
     }
     buildFeatures {
         buildConfig = true
@@ -168,8 +106,8 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.3.0")
     // 화자 구분: 목소리 특징 엔진 (위에서 받은 AAR)
     implementation(files(sherpaAar))
-    // 로컬 AI 글 모델 (.litertlm) — 구글 LiteRT-LM, 휴대폰 GPU 로 (LiteRtChat.kt). 0.18.0: 구글 AI Edge Gallery 와 같은 버전 (model-catalog.js 의 PHONE_MODEL 커밋과 짝)
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
+    // AI 태그: Laya 다국어 모델을 휴대폰 안에서 (LayaTags.kt) — 모델은 설정에서 한 번 받는다
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.30.0")
 
 
     // 동기화 엔진 단위 테스트 (PC 에서 JVM 으로)
@@ -182,4 +120,4 @@ tasks.withType<Test>().configureEach {
     systemProperty("file.encoding", "UTF-8")
 }
 
-tasks.named("preBuild").configure { dependsOn(syncWeb, llamaServer) }
+tasks.named("preBuild").configure { dependsOn(syncWeb) }

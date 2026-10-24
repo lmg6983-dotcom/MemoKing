@@ -321,20 +321,10 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun sttStatus(): String = reply { Stt.status(ctx) }
 
-    // ---------- 로컬 AI (LocalAi.kt — 이 휴대폰 안의 llama-server) ----------
+    // ---------- AI 태그 (LayaTags.kt — 이 휴대폰 안의 Laya 모델) ----------
 
     @JavascriptInterface
-    fun aiStatus(): String = reply { LocalAi.status(ctx) }
-
-    @JavascriptInterface
-    fun aiCancel(job: String): String = reply { LocalAi.cancel(job) }
-
-    // AI 검색용 조각 · 벡터 (앱 안 저장공간에만)
-    @JavascriptInterface
-    fun aiCacheRead(): String = reply { LocalAi.cacheRead(ctx) }
-
-    @JavascriptInterface
-    fun aiCacheWrite(text: String): String = reply { LocalAi.cacheWrite(ctx, text) }
+    fun aiStatus(): String = reply { LayaTags.status(ctx) }
 
     // ---------- 오래 걸리는 일 ----------
 
@@ -404,26 +394,10 @@ class Bridge(private val activity: MainActivity) {
                     Stt.status(ctx)
                 }
             }
-            // 로컬 AI: 모델 파일 고르기 → 앱 안으로 복사(진행은 'aiImport' 소식) · 지우기 · 묻기(스트리밍이면 줄마다 'aiLine' 소식)
-            "aiImport" -> activity.runOnUiThread { activity.pickModel(id, a.getString("role")) }
-            "aiRemove" -> pool.execute { resolve(id) { LocalAi.remove(ctx, a.getString("role")) } }
-            // 기본 모델 받기 (몇 GB — 다른 일을 막지 않게 따로, 진행은 'aiImport' 소식)
-            "aiDownload" -> Thread {
-                resolve(id) {
-                    LocalAi.download(ctx, a.getString("role"), a.getString("url"), a.getString("name"), a.optLong("size"), a.getString("sha256")) { p ->
-                        activity.runOnUiThread { activity.emit("aiImport", JSONObject().put("progress", p)) }
-                    }
-                }
-            }.start()
-            "aiRequest" -> pool.execute {
-                resolve(id) {
-                    val job = a.optString("job").ifBlank { null }
-                    val onLine: ((String) -> Unit)? = if (a.optBoolean("stream")) {
-                        { line -> activity.runOnUiThread { activity.emit("aiLine", JSONObject().put("job", job).put("line", line)) } }
-                    } else null
-                    LocalAi.request(ctx, a.getString("role"), a.getString("route"), a.getString("body"), job, onLine)
-                }
-            }
+            // AI 태그: 모델 받기(수백 MB — 다른 일을 막지 않게 따로, 진행은 'ai' 소식) · 지우기 · 계산(encoder · head)
+            "aiDownload" -> Thread { resolve(id) { LayaTags.download(ctx, a.getString("base"), a.getJSONArray("files")) } }.start()
+            "aiRemove" -> pool.execute { resolve(id) { LayaTags.remove(ctx) } }
+            "layaRun" -> pool.execute { resolve(id) { LayaTags.run(ctx, a.getString("batch")) } }
             "micPermission" -> activity.runOnUiThread { activity.requestMicPermission(id) }
             "recordStart" -> activity.runOnUiThread {
                 resolve(id) { RecorderService.start(activity, a.getString("memoId"), a.optBoolean("stt", true), terms(a)) }

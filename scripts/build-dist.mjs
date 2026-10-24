@@ -53,7 +53,6 @@ function copyDir(from, to) {
     else if (item.isFile()) copyFileSync(src, dest);
   }
 }
-execSync('node scripts/get-llama.mjs', { cwd: ROOT, stdio: 'inherit' }); // 로컬 AI 엔진 → desktop/vendor/llama (asar 밖)
 rmSync(STAGE, { recursive: true, force: true });
 mkdirSync(STAGE, { recursive: true });
 for (const dir of ['app', 'desktop', join('assets', 'icons')]) copyDir(join(ROOT, dir), join(STAGE, dir));
@@ -79,6 +78,19 @@ if (Object.keys(pkg.dependencies ?? {}).length) {
   console.log(`설치: ${Object.entries(pkg.dependencies).map(([n, v]) => `${n}@${v}`).join(', ')} → 조립 폴더`);
   execSync('npm install --omit=dev --no-audit --no-fund --no-package-lock', { cwd: STAGE, stdio: 'inherit' });
 }
+// AI 태그 엔진(onnxruntime-node): Windows x64 CPU 것만 남긴다 (다른 OS · GPU(DirectML) 파일은 수백 MB).
+//   VC++ 런타임 DLL 도 옆에 — 없는 PC 에서도 열리게 (Microsoft 재배포 허용 파일)
+const ortBin = join(STAGE, 'node_modules', 'onnxruntime-node', 'bin', 'napi-v6');
+if (existsSync(ortBin)) {
+  for (const os of readdirSync(ortBin)) if (os !== 'win32') rmSync(join(ortBin, os), { recursive: true, force: true });
+  rmSync(join(ortBin, 'win32', 'arm64'), { recursive: true, force: true });
+  const x64 = join(ortBin, 'win32', 'x64');
+  for (const f of ['DirectML.dll', 'dxcompiler.dll', 'dxil.dll']) rmSync(join(x64, f), { force: true });
+  const sys32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
+  for (const f of ['msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_atomic_wait.dll', 'vcruntime140.dll', 'vcruntime140_1.dll']) {
+    if (existsSync(join(sys32, f))) copyFileSync(join(sys32, f), join(x64, f));
+  }
+}
 
 // 3) 빌드
 const config = {
@@ -90,8 +102,8 @@ const config = {
   files: ['**/*'],
   asar: true,
   // PowerShell 이 읽어야 하는 도우미와, 숨은 OCR 창이 워커·wasm 으로 불러오는 tesseract 파일은 asar 밖에 둔다
-  // 받아쓰기 작업 스레드(desktop/stt)·엔진(desktop/vendor: sherpa-onnx WebAssembly, bzip2)과 그것이 읽는 공용 모듈도
-  asarUnpack: ['scripts/clipboard-helper.ps1', 'scripts/popup-watch.ps1', 'app/vendor/tesseract/**', 'desktop/stt/**', 'desktop/vendor/**', 'app/js/core/transcript-lines.js'],
+  // 받아쓰기 작업 스레드(desktop/stt)·엔진(desktop/vendor: sherpa-onnx WebAssembly, bzip2)과 그것이 읽는 공용 모듈도, AI 태그 엔진(onnxruntime-node)의 DLL 도
+  asarUnpack: ['scripts/clipboard-helper.ps1', 'scripts/popup-watch.ps1', 'app/vendor/tesseract/**', 'desktop/stt/**', 'desktop/vendor/**', 'app/js/core/transcript-lines.js', 'node_modules/onnxruntime-node/bin/**'],
   npmRebuild: false,
   nodeGypRebuild: false,
   // 자동 업데이트: 공개 배포 저장소의 Release (releaseType 'release' — 기본값 draft 는 앱이 볼 수 없다).

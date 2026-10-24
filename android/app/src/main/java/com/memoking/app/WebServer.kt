@@ -11,6 +11,7 @@ import java.io.ByteArrayInputStream
  *   https://appassets.androidplatform.net/app/...    공용 웹 코어 (assets/www/app)
  *   https://appassets.androidplatform.net/m/...      휴대폰 화면 (assets/www/m)
  *   https://appassets.androidplatform.net/vault/...  메모 폴더의 파일 (첨부·링크 미리보기 사진)
+ *   https://appassets.androidplatform.net/ai/...     AI 태그 모델의 글 파일 (tokenizer.json · rl_agent_config.json — LayaTags.kt)
  * appassets.androidplatform.net 은 이런 용도로 비워 둔 주소라 실제 인터넷과 겹치지 않는다.
  */
 class WebServer(private val context: Context) {
@@ -43,11 +44,19 @@ class WebServer(private val context: Context) {
                 path.startsWith("/app/") || path.startsWith("/m/") -> asset("www$path")
                 path.startsWith("/vault/") -> vault(Uri.decode(path.removePrefix("/vault/")), request.requestHeaders)
                 path.startsWith("/history/") -> historyIcon(Uri.decode(path.removePrefix("/history/")))
+                path.startsWith("/ai/") -> aiFile(path.removePrefix("/ai/"))
                 else -> notFound()
             }
         } catch (e: Exception) {
             notFound()
         }
+    }
+
+    private fun aiFile(name: String): WebResourceResponse {
+        if (name !in listOf("tokenizer.json", "rl_agent_config.json")) return notFound()
+        val f = java.io.File(LayaTags.dir(context), name)
+        if (!f.isFile) return notFound()
+        return WebResourceResponse("application/json", "utf-8", 200, "OK", headers("application/json"), f.inputStream())
     }
 
     private fun headers(type: String) = mutableMapOf(
