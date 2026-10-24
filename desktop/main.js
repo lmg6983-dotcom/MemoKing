@@ -804,8 +804,10 @@ function initStt() {
 function tutorialPayload() {
   const raw = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
   if (!raw) return null;
-  // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 빠른 메모 키 · 매직키)
-  const step = tutorialStepFor(raw, (need) => (need === 'workLife' ? settings.workLife === true : need === 'quickMemo' || need === 'magic' ? shortcutStatus(need).registered : true));
+  // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 빠른 메모 키 · 매직키 · 알림 보관함)
+  const has = (need) => (need === 'workLife' ? settings.workLife === true : need === 'history' ? settings.historyEnabled === true
+    : need === 'quickMemo' || need === 'magic' ? shortcutStatus(need).registered : true);
+  const step = tutorialStepFor(raw, has);
   const keys = (t) => (typeof t === 'string' ? withShortcuts(t, settings.shortcuts) : t);
   const text = step.noTape && !windowManager.canTape ? step.noTape : step.text; // 테이프를 못 쓰는 PC 에서는 왕관만
   // 다시 보는 사람(설정 › 튜토리얼 보기)에게는 첫 말풍선에서 어디부터 볼지 고르게
@@ -923,6 +925,10 @@ function tutorialAction(action) {
   }
   if (action === 'enable:workLife' && TUTORIAL_STEPS[tutorial.index]?.needs === 'workLife') {
     setWorkLife(true); // 목록 창은 mode:changed 로 스위치를 보인다
+    sendTutorial();
+  }
+  if (action === 'enable:history' && TUTORIAL_STEPS[tutorial.index]?.needs === 'history') {
+    setHistoryEnabled(true); // 알림 보관함 (이 PC 에만)
     sendTutorial();
   }
 }
@@ -1421,7 +1427,9 @@ app.whenReady().then(async () => {
   initDrive();
 
   if (autoStartAvailable() && !settings.autoStartSet) setAutoStart(true, updateTrayMenu);
-  if (settings.vaultPath) openVault(settings.vaultPath);
+  // 처음 설치: 고르는 화면 없이 이 PC 의 기본 폴더(문서\메모킹)로 바로 시작 — Google 동기화는 목록의 안내 줄 · 구름 단추에서.
+  //   못 열면(권한 등) 예전처럼 고르는 화면이 오류와 함께 뜬다
+  openVault(settings.vaultPath || suggestedVaultPath());
 
   const launched = launchAction(process.argv);
   if (!HIDDEN_START || !vault) {

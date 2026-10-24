@@ -79,6 +79,12 @@
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>
       </div>
+      <!-- 처음엔 이 PC 에 바로 저장 (고르는 화면 없이) — 휴대폰과 같이 쓰려면 여기서 연결 (drive-panel.js, 닫으면 다시 안 뜸) -->
+      <div id="drive-hint" class="filter-summary" hidden>
+        <span>휴대폰 · 다른 PC 와 같은 메모를 쓰려면</span>
+        <button id="drive-hint-connect" class="link-btn">Google 계정으로 연결</button>
+        <button id="drive-hint-close" class="link-btn">닫기</button>
+      </div>
       <div id="ai-ask" class="ai-ask" hidden></div>
       <p id="count" class="result-count" role="status" hidden></p>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>

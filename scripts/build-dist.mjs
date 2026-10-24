@@ -104,10 +104,10 @@ const config = {
     artifactName: 'MemoKing-Setup-${version}.${ext}',
   },
   nsis: {
-    // oneClick: false — 설치 폴더를 고를 수 있게 (지금까지와 같음). 자동 업데이트는 설치 화면 없이(/S) 같은 폴더에 덮어쓴다
-    oneClick: false,
+    // oneClick: 묻지 않고 바로 설치 → 바로 실행 (0.68.0~ — 폴더를 고르던 화면이 첫인상을 무겁게 했다).
+    //   이미 설치한 PC 는 electron-builder 가 기억해 둔 설치 폴더(InstallLocation)에 그대로 덮어쓴다
+    oneClick: true,
     perMachine: false, // 사용자별 설치(%LOCALAPPDATA%\Programs) — 관리자 권한 없이 업데이트도 바로
-    allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
     shortcutName: '메모킹',

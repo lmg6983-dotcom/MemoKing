@@ -147,6 +147,15 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
       box !== vault && box.root !== vault.root && boxTitles.includes('연습 공간이에요') && !boxTitles.includes('회의 메모') && !noteWins.has(keep), `${box.root} ${JSON.stringify(boxTitles)}`);
     await arrive(list, 'welcome');
     await next(list, 'welcome');
+    // 이것부터: 매직키(Windows 단축키라 "다음에 해 볼게요") → 왕관 → 알림 보관함 → 더 둘러보기
+    await arrive(list, 'magic');
+    await next(list, 'magic');
+    await arrive(list, 'list-crown');
+    await press(list(), '#list-top-btn', '[list-crown] 왕관');
+    await arrive(list, 'history', { praise: true });
+    await next(list, 'history');
+    await arrive(list, 'more');
+    await next(list, 'more');
     await arrive(list, 'new-memo');
     await press(list(), '#fab', '[new-memo] 노란 +');
     await wait(350);
@@ -251,12 +260,9 @@ export async function runSmoke({ noteWins, getVault, getList, createListWindow, 
     await press(list(), '#mode-switch [data-mode="life"]', '[mode] Life');
     await arrive(list, 'tabs', { praise: true });
     await next(list, 'tabs');
-    // 목록도 늘 위에: 왕관 (좁은 창이라 작은 왕관으로 들어간다)
-    await arrive(list, 'list-crown');
-    await press(list(), '#list-top-btn', '[list-crown] 왕관');
-    await arrive(list, 'quick', { praise: true });
-    // 빠른 메모 · 화면 자르기 · 매직키는 Windows 단축키라 여기서는 "다음에 해 볼게요" 로
-    for (const [id, to] of [['quick', 'capture'], ['capture', 'magic'], ['magic', 'settings'], ['settings', 'done']]) {
+    await arrive(list, 'quick');
+    // 빠른 메모 · 화면 자르기는 Windows 단축키라 여기서는 "다음에 해 볼게요" 로
+    for (const [id, to] of [['quick', 'capture'], ['capture', 'settings'], ['settings', 'done']]) {
       await next(list, id);
       await arrive(list, to);
     }

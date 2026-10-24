@@ -55,7 +55,7 @@ test('옮기기 전 예시 목록: PC·휴대폰 모두 옮기기 단계에서 �
 test('기능이 꺼져 있으면(needs) 직접 해 보기 없이 안내(offText)만, 켜져 있으면 그대로', () => {
   for (const steps of [TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS]) {
     for (const s of steps.filter((x) => x.needs)) {
-      assert.ok(['workLife', 'quickMemo', 'magic'].includes(s.needs), s.id);
+      assert.ok(['workLife', 'quickMemo', 'magic', 'history'].includes(s.needs), s.id);
       assert.ok(s.offText, `${s.id} 꺼져 있을 때 안내`);
       const off = tutorialStepFor(s, () => false);
       assert.equal(off.advance, undefined, `${s.id}: 꺼져 있으면 기다리지 않음`);
@@ -114,7 +114,7 @@ test('다시 볼 때 바로 가기: 목록 화면에서 시작하는 묶음만, 
       assert.ok(j.index > 1);
     }
   }
-  assert.deepEqual(tutorialJumps(TUTORIAL_STEPS).map((j) => j.name), ['목록', '어디서든']);
+  assert.deepEqual(tutorialJumps(TUTORIAL_STEPS).map((j) => j.name), ['쓰기', '목록', '어디서든']);
 });
 
 test('처음 말풍선 안내가 실제 단계와 맞음 (몇 분 같은 약속 없이 묶음 이름으로)', () => {
@@ -130,4 +130,12 @@ test('연습 공간 예시 사진을 못 읽어도 예시 메모는 모두 들�
   await seedTutorialSandbox(vault, (d) => d.toISOString(), { photo: () => { throw new Error('없는 파일'); } });
   assert.equal(bodies.length, TUTORIAL_SANDBOX_MEMOS.length);
   assert.ok(bodies.every((b) => !b.includes('![](')));
+});
+
+test('PC 첫 묶음은 메모킹만 할 수 있는 것 (매직키 · 왕관 · 알림 보관함), 끝에서 더 볼지 고르기', () => {
+  const first = TUTORIAL_STEPS.filter((s) => s.chapter === '이것부터').map((s) => s.id);
+  assert.deepEqual(first, ['magic', 'list-crown', 'history', 'more']);
+  assert.equal(TUTORIAL_STEPS.findIndex((s) => s.chapter === '이것부터'), 1, '시작 바로 다음');
+  const more = TUTORIAL_STEPS.find((s) => s.id === 'more');
+  assert.ok(more.next && more.skip, '더 둘러보기 · 여기까지');
 });

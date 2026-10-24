@@ -11,7 +11,7 @@
 //         (없으면 직접 해 봐야 넘어감 — 튜토리얼 끝내기는 언제나 있음)
 //   chapter: 묶음 이름 (말풍선 머리에 "목록 2/7" 처럼 · 다시 볼 때 어디부터 볼지 고르기) — 같은 묶음은 붙어 있다
 //   enable: 꺼져 있을 때(needs) 말풍선에서 바로 켜는 단추 글자 (켜면 그 자리에서 직접 해 보기로)
-//   needs: 이 기능이 켜져 있어야 직접 해 볼 수 있다 ('workLife' Work / Life 나누기 · 'quickMemo' Ctrl+Alt+C · 'magic' 매직키)
+//   needs: 이 기능이 켜져 있어야 직접 해 볼 수 있다 ('workLife' Work / Life 나누기 · 'quickMemo' Ctrl+Alt+C · 'magic' 매직키 · 'history' 알림 보관함)
 //          꺼져 있으면 offText 로 안내만 하고 "다음"으로 (tutorialStepFor)
 import { normalizeReminder } from './reminders.js';
 
@@ -135,8 +135,38 @@ export const TUTORIAL_STEPS = [
   {
     id: 'welcome', chapter: '시작', win: 'list', target: [], emoji: '👑',
     title: '반가워요! 메모킹이에요',
-    text: '하나씩 직접 눌러 보면서 배워 볼게요. 내 메모는 그대로 두고 예시 메모가 든 연습 공간에서 해요. 쓰기, 넣기, 메모 창, 목록, 어디서든 다섯 묶음이고, 언제든 그만둘 수 있어요.',
+    text: '먼저 메모킹만 할 수 있는 것부터 해 볼게요 (이것부터). 쓰기, 넣기, 메모 창, 목록, 어디서든은 원하면 이어서 봐요. 내 메모는 그대로 두고 예시 메모가 든 연습 공간에서 해요.',
     next: '시작할게요 🚀', skip: '나중에 볼게요',
+  },
+  // ---------- 이것부터: 메모킹만 할 수 있는 것 먼저 (30초) ----------
+  {
+    id: 'magic', chapter: '이것부터', win: 'list', target: [], needs: 'magic', advance: 'magic-tried', emoji: '🔮',
+    title: '무엇이든 찾기, 매직키 (Ctrl+Alt+Space)',
+    text: '어느 앱을 쓰다가도 Ctrl+Alt+Space! 메모와 파일을 몇 글자로 찾아요. 찾는 게 없으면 Enter, 적은 말이 바로 메모가 돼요.',
+    try: 'Ctrl+Alt+Space 를 누르고 "회의"를 쳐 보세요. 예시 메모가 보이면 Esc 로 닫아요',
+    offText: '설정에서 매직키를 켜면 Ctrl+Alt+Space 로 어디서든 메모와 파일을 찾고, 떠오른 말을 바로 메모로 남겨요.',
+    next: LATER,
+  },
+  {
+    id: 'list-crown', chapter: '이것부터', win: 'list', target: ['#list-top-btn'], advance: 'list-crown-on', emoji: '👑',
+    title: '창을 스티커처럼 늘 위에',
+    text: '왕관을 누르면 다른 창에 가려지지 않아요. 메모 창도 똑같고, 테이프로 바탕화면에 붙여 둘 수도 있어요. 창 위에 왕관 스티커가 붙고, 창이 좁거나 화면 끝이면 작아져서 이 자리에 들어가요. 스티커나 작은 왕관을 누르면 떼어져요.',
+    try: '오른쪽 위 왕관을 눌러 보세요',
+    next: LATER,
+  },
+  {
+    id: 'history', chapter: '이것부터', win: 'list', target: ['[data-tab="history"]'], needs: 'history', emoji: '📥',
+    title: '놓친 알림도 다시 보기 (알림 보관함)',
+    text: '카카오톡처럼 금방 사라지는 Windows 알림을 모아 두고 다시 찾아봐요. 이 PC 에만 저장하고, 앱마다 모으지 않게 고를 수 있어요.',
+    offText: '카카오톡처럼 금방 사라지는 Windows 알림을 모아 두고 다시 찾아봐요. 다른 앱 알림을 읽는 기능이라 처음엔 꺼져 있어요. 켜도 이 PC 에만 저장해요.',
+    enable: '알림 모으기 켜기',
+    next: '다음',
+  },
+  {
+    id: 'more', chapter: '이것부터', win: 'list', target: [], emoji: '🧭',
+    title: '더 둘러볼까요?',
+    text: '여기까지가 메모킹만 할 수 있는 것들이에요. 이어서 쓰기, 넣기, 메모 창, 목록을 볼까요? 나중에 설정의 사용법 둘러보기에서 언제든 볼 수 있어요.',
+    next: '더 둘러보기', skip: '여기까지 할게요',
   },
   {
     id: 'new-memo', chapter: '쓰기', win: 'list', target: ['#fab-menu:not([hidden]) [data-new="text"]', '#fab'], keep: ['#fab-menu:not([hidden]) [data-new]'], advance: 'memo-created', emoji: '✨',
@@ -303,13 +333,6 @@ export const TUTORIAL_STEPS = [
     text: '"일정"에서는 캘린더로 일정과 미리 알림을, 회상으로 그날의 사진과 메모를 봐요. "알림 보관함"에는 지나간 Windows 알림이 모여요.',
     next: '다음',
   },
-  {
-    id: 'list-crown', chapter: '목록', win: 'list', target: ['#list-top-btn'], advance: 'list-crown-on', emoji: '👑',
-    title: '목록도 늘 위에',
-    text: '목록 창도 왕관을 누르면 다른 창에 가려지지 않아요. 창 위에 왕관 스티커가 붙고, 창이 좁거나 화면 끝이면 작아져서 이 자리에 들어가요. 스티커나 작은 왕관을 누르면 떼어져요.',
-    try: '오른쪽 위 왕관을 눌러 보세요',
-    next: LATER,
-  },
   // ---------- 어디서든 ----------
   {
     id: 'quick', chapter: '어디서든', win: 'list', target: [], needs: 'quickMemo', advance: 'quick-memo', emoji: '⚡',
@@ -325,14 +348,6 @@ export const TUTORIAL_STEPS = [
     text: 'Ctrl+Alt+C 를 빠르게 두 번! 화면이 멈추면 담고 싶은 곳을 끌어서 잘라요. 자른 그림이 바로 메모가 돼요.',
     try: 'Ctrl+Alt+C 를 빠르게 두 번 누르고, 아무 곳이나 네모로 끌어 보세요',
     offText: '설정에서 빠른 메모 키를 켜면 Ctrl+Alt+C 를 빠르게 두 번 눌러 화면의 원하는 곳을 잘라 메모로 담아요.',
-    next: LATER,
-  },
-  {
-    id: 'magic', chapter: '어디서든', win: 'list', target: [], needs: 'magic', advance: 'magic-tried', emoji: '🔮',
-    title: '무엇이든 찾기, 매직키 (Ctrl+Alt+Space)',
-    text: '어느 앱을 쓰다가도 Ctrl+Alt+Space! 메모와 파일을 몇 글자로 찾아요. 찾는 게 없으면 Enter, 적은 말이 바로 메모가 돼요.',
-    try: 'Ctrl+Alt+Space 를 누르고 "튜토리얼"을 쳐 보세요. 방금 쓴 메모가 보이면 Esc 로 닫아요',
-    offText: '설정에서 매직키를 켜면 Ctrl+Alt+Space 로 어디서든 메모와 파일을 찾고, 떠오른 말을 바로 메모로 남겨요.',
     next: LATER,
   },
   {
