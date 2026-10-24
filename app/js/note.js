@@ -231,6 +231,21 @@ function addTags(names) {
   tagBar.hidden = true;
 }
 tagBar?.addEventListener('mousedown', (e) => e.preventDefault()); // 커서 유지
+// AI 가 뒤에서 한 일 (매직키 다듬기 · 일정 자동 등록): 알림을 눌러 열면 아래 막대에서 되돌리기 (메인 aiNotices)
+function showAiNotice(n) {
+  const bar = $('ai-notice-bar');
+  if (!bar) return;
+  bar.hidden = !n;
+  if (n) $('ai-notice-text').textContent = n.text;
+}
+api.ai?.notice(id).then(showAiNotice, () => {});
+api.on('ai:notice', showAiNotice);
+$('ai-notice-undo')?.addEventListener('click', async () => {
+  const r = await api.ai.noticeUndo(id).catch(() => null);
+  showAiNotice(r?.next ?? null);
+  if (r?.message) setStatus(r.message, !r.ok);
+});
+$('ai-notice-close')?.addEventListener('click', async () => showAiNotice(await api.ai.noticeDismiss(id).catch(() => null)));
 $('tag-suggest-close')?.addEventListener('click', () => {
   tagDismissed = true;
   tagBar.hidden = true;

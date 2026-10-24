@@ -85,6 +85,8 @@ export function registerIpc(ctx) {
     getAi,
     getAiTasks: aiTasks,
     getAiTagger,
+    aiNotices,
+    showAiNotice,
     getLinkPreviews,
     openWebPage,
     openVaultFile,
@@ -109,6 +111,27 @@ export function registerIpc(ctx) {
     }
   });
   ipcMain.handle('ai:remove', (_e, role) => getAi()?.remove(role));
+  ipcMain.handle('ai:cancel-download', () => getAi()?.cancelDownload());
+  // AI 가 뒤에서 한 일 (main.js showAiNotice): 메모 창 아래 막대 — 마지막 것부터 보이고, 되돌리거나 닫으면 그 앞의 것
+  const lastNotice = (id) => aiNotices.get(id)?.at(-1) ?? null;
+  const dropNotice = (id) => {
+    const left = (aiNotices.get(id) ?? []).slice(0, -1);
+    if (left.length) aiNotices.set(id, left);
+    else aiNotices.delete(id);
+  };
+  ipcMain.handle('ai:notice', (_e, id) => (lastNotice(String(id)) ? { text: lastNotice(String(id)).text } : null));
+  ipcMain.handle('ai:notice-undo', (_e, id) => {
+    const n = lastNotice(String(id));
+    dropNotice(String(id));
+    const r = n ? n.undo() : { ok: false, message: '되돌릴 것이 없어요' };
+    const next = lastNotice(String(id));
+    return { ...r, next: next && { text: next.text } };
+  });
+  ipcMain.handle('ai:notice-dismiss', (_e, id) => {
+    dropNotice(String(id));
+    const next = lastNotice(String(id));
+    return next && { text: next.text };
+  });
   ipcMain.handle('ai:download-default', async () => {
     try {
       return await getAi().downloadDefault();
@@ -760,9 +783,14 @@ export function registerIpc(ctx) {
         const untouched = () => getVault() === vault && !wm.noteWins.has(id);
         if (r.body !== before && untouched() && vault.get(id)?.body === before && !vault.save(id, r.body).refused) {
           const what = [r.fixes && `맞춤법 ${r.fixes}곳`, r.title && `제목 "${r.title}"`].filter(Boolean).join(' · ');
-          toast({
-            memoId: id, kind: 'magic-polish', title: 'AI 가 메모를 다듬었어요', body: `${what}\n눌러서 원래 글로 되돌리기`,
-            onClick: () => untouched() && vault.get(id)?.body === r.body && vault.save(id, before),
+          showAiNotice(id, {
+            title: 'AI 가 메모를 다듬었어요', body: what, text: `AI 가 다듬었어요: ${what}`,
+            undo: () => {
+              if (getVault() !== vault || vault.get(id)?.body !== r.body) return { ok: false, message: '그사이 고쳐서 되돌리지 않았어요. 메뉴 › 이전 버전에서 원래 글을 볼 수 있어요' };
+              if (vault.save(id, before).refused) return { ok: false, message: '되돌리지 못했어요. 메뉴 › 이전 버전에서 원래 글을 볼 수 있어요' };
+              wm.sendToNote(id, 'memo:external', vault.get(id));
+              return { ok: true, message: '원래 글로 돌렸어요' };
+            },
           });
         }
       }

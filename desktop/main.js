@@ -730,22 +730,38 @@ function initAi() {
       pushReminders();
       alarms.tick();
       const ids = new Set(events.map((r) => r.id));
-      toast({
-        memoId: id, kind: 'ai-events', title: `일정 ${events.length}개를 넣었어요`,
-        body: `${events.map((r) => `${describeReminder(r)}${r.title ? ` ${r.title}` : ''}`).join('\n')}\n눌러서 되돌리기`,
-        onClick: () => {
+      const list = events.map((r) => `${describeReminder(r)}${r.title ? ` ${r.title}` : ''}`);
+      showAiNotice(id, {
+        title: `일정 ${events.length}개를 넣었어요`, body: list.join('\n'), text: `AI 가 일정을 넣었어요: ${list.join(', ')}`,
+        undo: () => {
           const now = vault?.get(id);
-          if (!now || windowManager.noteWins.has(id)) return;
-          if (vault.setReminders(id, now.reminders.filter((r) => !ids.has(r.id)))) {
-            pushReminders();
-            alarms.tick();
-          }
+          if (!now?.reminders.some((r) => ids.has(r.id))) return { ok: false, message: '넣은 일정이 이미 없어요' };
+          const saved = vault.setReminders(id, now.reminders.filter((r) => !ids.has(r.id)));
+          if (!saved) return { ok: false, message: '일정을 빼지 못했어요. 일정 탭에서 지워 주세요' };
+          windowManager.sendToNote(id, 'memo:reminders', saved);
+          pushReminders();
+          alarms.tick();
+          return { ok: true, message: 'AI 가 넣은 일정을 뺐어요' };
         },
       });
     },
     onProgress: (p) => {
       const w = windowManager.listWin;
       if (w && !w.isDestroyed()) w.webContents.send('ai:tagging', p);
+    },
+  });
+}
+
+// AI 가 뒤에서 한 일 (매직키 다듬기 · 일정 자동 등록): Windows 알림을 누르면 메모가 열리고, 메모 창 아래 막대에서 되돌린다.
+//   알림을 누르는 습관은 "열기"라 알림 자체로는 되돌리지 않는다. 메모마다 차례로 쌓고 막대는 마지막 것부터
+const aiNotices = new Map(); // 메모 id → [{ text, undo: () => { ok, message } }]
+function showAiNotice(id, { title, body, text, undo }) {
+  aiNotices.set(id, [...(aiNotices.get(id) ?? []), { text, undo }]);
+  toast({
+    memoId: id, kind: 'ai-notice', title, body: `${body}\n눌러서 열기 · 메모에서 되돌릴 수 있어요`,
+    onClick: () => {
+      windowManager.revealNote(id);
+      windowManager.sendToNote(id, 'ai:notice', { text });
     },
   });
 }
@@ -1290,6 +1306,8 @@ app.whenReady().then(async () => {
     getAi: () => ai,
     getAiTasks: () => aiTasks,
     getAiTagger: () => aiTagger,
+    aiNotices,
+    showAiNotice,
     getLinkPreviews,
     openWebPage,
     openVaultFile,

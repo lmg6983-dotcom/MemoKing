@@ -870,7 +870,7 @@ async function loadSettings() {
   $('history-enabled').checked = s.historyEnabled;
   showBlockedCount();
   $('fit-tables').checked = s.fitTables !== false;
-  $('auto-tags').checked = s.autoTags !== false;
+  $('auto-tags').checked = $('auto-tags-ai').checked = s.autoTags !== false;
   $('magic-polish').checked = s.magicPolish !== false;
   $('auto-events').checked = s.autoEvents !== false;
   $('link-previews').checked = s.linkPreviews !== false;
@@ -1057,6 +1057,8 @@ const AI_HINT = {
   chat: '초안, 맞춤법, 문체, 태그 추천에 써요. 아래 기본 모델을 받거나 .gguf 파일을 넣어 주세요 (메모리 8GB PC 는 2~4B)',
   embed: '내 메모에서 AI 로 찾을 때 써요 (예: KURE-v1 .gguf)',
 };
+// 모델 이름: 기본 모델은 이름으로 (파일 이름은 사용자 말이 아님), 직접 넣은 모델은 파일 이름
+const modelName = (m) => (DEFAULT_MODEL.file.test(m.name ?? '') ? DEFAULT_MODEL.label : m.name || '모델');
 function renderAi(st, failed = {}) {
   if (!st) return;
   for (const role of ['chat', 'embed']) {
@@ -1064,26 +1066,31 @@ function renderAi(st, failed = {}) {
     const have = m.state === 'ready' || m.state === 'running';
     $(`ai-${role}-note`).textContent = !st.engine ? 'AI 엔진이 없어요. 메모킹을 다시 설치해 주세요'
       : failed[role] || m.error || (m.state === 'copying' ? (m.progress != null ? `${DEFAULT_MODEL.label} 를 받는 중이에요 ${Math.round(m.progress * 100)}%` : '모델 파일을 복사하는 중이에요. 몇 분 걸릴 수 있어요')
-        : have ? `${m.name || '모델'} · ${(m.size / 2 ** 30).toFixed(1)}GB${m.state === 'running' ? ' · 켜져 있어요' : ''}` : AI_HINT[role]);
+        : have ? `${modelName(m)} · ${(m.size / 2 ** 30).toFixed(1)}GB${m.state === 'running' ? ' · 켜져 있어요' : ''}` : AI_HINT[role]);
     $(`ai-${role}-import`).disabled = !st.engine || m.state === 'copying';
     $(`ai-${role}-import`).textContent = have ? '다른 모델로' : '모델 파일 넣기';
     $(`ai-${role}-remove`).hidden = !have;
   }
-  // 기본 모델: 글 모델이 없을 때 한 번 받기 (인터넷이 없는 곳은 위 모델 파일 넣기). 예전 기본(젬마)을 받은 PC 는 바꾸기로
+  const ready = st.engine && ['ready', 'running'].includes(st.chat.state);
+  // 기본 모델: 글 모델이 없을 때 한 번 받기 (인터넷이 없는 곳은 위 모델 파일 넣기). 예전 기본(젬마)을 받은 PC 는 바꾸기로, 받는 중이면 멈추기
   const old = st.chat.state === 'ready' && /gemma/i.test(st.chat.name ?? '');
-  $('ai-default-row').hidden = !st.engine || !(st.chat.state === 'missing' || old);
-  $('ai-default').textContent = `${old ? '기본 모델로 바꾸기' : '기본 모델 받기'} (${DEFAULT_MODEL.label}, ${DEFAULT_MODEL.approx}, ${DEFAULT_MODEL.license})`;
-  $('ai-try-row').hidden = !st.engine || !['ready', 'running'].includes(st.chat.state);
-  $('ai-tags-row').hidden = $('ai-try-row').hidden;
-  $('magic-polish-row').hidden = $('ai-try-row').hidden; // 글 모델이 있을 때만
-  $('auto-events-row').hidden = $('ai-try-row').hidden;
+  const downloading = st.chat.state === 'copying' && st.chat.progress != null;
+  $('ai-default-row').hidden = !st.engine || !(st.chat.state === 'missing' || old || downloading);
+  $('ai-default').hidden = downloading;
+  $('ai-default-stop').hidden = !downloading;
+  $('ai-default').textContent = old ? `${DEFAULT_MODEL.label} 로 바꾸기 (${DEFAULT_MODEL.approx}, 한국어에 맞춘 모델)` : `${DEFAULT_MODEL.label} 받기 (${DEFAULT_MODEL.approx})`;
+  $('ai-try').hidden = !ready;
+  // 글 모델이 있으면 태그 켜고 끄기는 "AI 가 자동으로 하는 일" 묶음에서 (위 태그 자동 추가 줄은 AI 없는 PC 용)
+  $('ai-auto-group').hidden = !ready;
+  $('auto-tags').closest('label').hidden = ready;
 }
-// AI 태그: 모든 메모에 달기 ⇄ 멈추기, 진행은 메인이 'ai:tagging' 으로 ({ done, total } · { error } · null = 끝)
+// AI 태그: 예전 메모에도 달기 ⇄ 멈추기, 진행은 메인이 'ai:tagging' 으로 ({ done, total } · { error } · null = 끝)
 const AI_TAGS_NOTE = $('ai-tags-note').textContent;
 function renderAiTagging(p) {
   const on = Boolean(p && !p.error);
   $('ai-tags-note').textContent = p?.error ?? (on ? `AI 태그를 다는 중이에요 ${p.done} / ${p.total}` : AI_TAGS_NOTE);
-  $('ai-tags-all').textContent = on ? '멈추기' : '모든 메모에 달기';
+  $('ai-tags-all').textContent = on ? '멈추기' : '예전 메모에도 달기';
+  $('ai-tags-clear').hidden = on; // 다는 중에는 지우기를 멈추기 옆에 두지 않는다
 }
 if (api.ai) {
   api.on('ai:status', (st) => renderAi(st));
@@ -1098,16 +1105,17 @@ if (api.ai) {
     });
   }
   $('ai-default').addEventListener('click', async () => {
-    $('ai-default-row').hidden = true;
+    $('ai-default').hidden = true;
     const st = await api.ai.downloadDefault();
     renderAi(st, st?.error ? { chat: st.error } : {});
   });
+  $('ai-default-stop').addEventListener('click', () => api.ai.cancelDownload());
   api.on('ai:tagging', renderAiTagging);
   api.tags.aiStatus().then(renderAiTagging);
   $('ai-tags-all').addEventListener('click', async () => {
     if ($('ai-tags-all').textContent === '멈추기') return api.tags.aiStop();
     const p = await api.tags.aiAll();
-    if (!p?.total) $('ai-tags-note').textContent = '모든 메모를 이미 봤어요';
+    if (!p?.total) $('ai-tags-note').textContent = '예전 메모도 모두 봤어요';
   });
   $('ai-tags-clear').addEventListener('click', async () => {
     if (!(await confirmDialog('AI 가 단 태그를 모든 메모에서 지울까요?\n지운 메모에는 AI 태그를 다시 달지 않아요. 직접 단 태그는 그대로예요.', '지우기'))) return;
@@ -1135,9 +1143,12 @@ $('fit-tables').addEventListener('change', async (e) => {
 $('link-previews').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setLinkPreviews(e.target.checked);
 });
-$('auto-tags').addEventListener('change', async (e) => {
-  e.target.checked = await api.settings.setAutoTags(e.target.checked);
-});
+// 태그 자동 추가: AI 없는 PC 는 위 줄, 글 모델이 있으면 AI 묶음의 줄 (같은 설정)
+for (const id of ['auto-tags', 'auto-tags-ai']) {
+  $(id).addEventListener('change', async (e) => {
+    $('auto-tags').checked = $('auto-tags-ai').checked = await api.settings.setAutoTags(e.target.checked);
+  });
+}
 $('magic-polish').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setMagicPolish(e.target.checked);
 });
@@ -1202,6 +1213,7 @@ function showMagic(magic) {
   magicState = magic ?? { enabled: true, modules: {} };
   $('magic-enabled').checked = magicState.enabled;
   $('magic-modules-row').hidden = !magicState.enabled;
+  $('magic-polish-row').hidden = !magicState.enabled; // 매직키를 끄면 다듬기 스위치도 안 보이게
   renderMagicModules();
   showOpmsSetup();
 }
