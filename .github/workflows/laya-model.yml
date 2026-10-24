@@ -60,9 +60,9 @@ jobs:
           from onnxruntime.quantization import quantize_dynamic, QuantType
           # 낱말 표(Gather)가 대부분이라 그것까지 — MatMul 은 계산, Gather 는 크기
           quantize_dynamic("out/fp32/encoder.onnx", "out/int8/encoder.onnx", weight_type=QuantType.QInt8, op_types_to_quantize=["MatMul", "Gather"])
-          quantize_dynamic("out/fp32/head.onnx", "out/int8/head.onnx", weight_type=QuantType.QInt8, op_types_to_quantize=["MatMul"])
           EOF
-          cp out/fp32/tokenizer.json out/fp32/rl_agent_config.json out/int8/
+          # head(60MB)는 그대로 — ONNX 모양 추론이 이 그래프에서 멈추고, 작아서 줄일 까닭도 적다
+          cp out/fp32/head.onnx out/fp32/tokenizer.json out/fp32/rl_agent_config.json out/int8/
           ls -la out/fp32 out/int8
 
       - name: 한국어 태그 시험 — 원래 크기
