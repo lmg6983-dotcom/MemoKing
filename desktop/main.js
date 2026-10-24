@@ -35,7 +35,7 @@ import { MemoHotkeys } from './memo-hotkeys.js';
 import { hotkeyCopyText, hotkeyLabel, hotkeyAccelerator } from '../app/js/core/memo-hotkeys.js';
 import { TUTORIAL_STEPS, advanceTutorial, tutorialStepFor, tutorialChapter, tutorialJumps, seedTutorialSandbox } from '../app/js/core/tutorial.js';
 import { toLocalIso, extractPreview } from '../app/js/core/memo-file.js';
-import { alarmText } from '../app/js/core/reminders.js';
+import { alarmText, describeReminder } from '../app/js/core/reminders.js';
 import { quietAlarm, modeClock, normalizeHours } from '../app/js/core/work-hours.js';
 
 import {
@@ -724,6 +724,25 @@ function initAi() {
     ready: async () => ['ready', 'running'].includes((await ai.status()).chat?.state),
     isOpen: (id) => windowManager.noteWins.has(id),
     enabled: () => settings.autoTags !== false,
+    eventsOn: () => settings.autoEvents !== false,
+    // 글에서 찾은 일정을 넣었으면: 일정 탭 · 알림을 새로 하고, 알림을 누르면 넣은 것만 뺀다 (본 줄은 그대로 — 다시 넣지 않음)
+    onEvents: (id, events) => {
+      pushReminders();
+      alarms.tick();
+      const ids = new Set(events.map((r) => r.id));
+      toast({
+        memoId: id, kind: 'ai-events', title: `일정 ${events.length}개를 넣었어요`,
+        body: `${events.map((r) => `${describeReminder(r)}${r.title ? ` ${r.title}` : ''}`).join('\n')}\n눌러서 되돌리기`,
+        onClick: () => {
+          const now = vault?.get(id);
+          if (!now || windowManager.noteWins.has(id)) return;
+          if (vault.setReminders(id, now.reminders.filter((r) => !ids.has(r.id)))) {
+            pushReminders();
+            alarms.tick();
+          }
+        },
+      });
+    },
     onProgress: (p) => {
       const w = windowManager.listWin;
       if (w && !w.isDestroyed()) w.webContents.send('ai:tagging', p);

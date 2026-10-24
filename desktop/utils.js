@@ -46,6 +46,7 @@ export const settings = {
   fitTables: true,
   linkPreviews: true,
   autoTags: true,
+  autoEvents: true, // 글 속 일정을 AI 가 골라 일정 탭에 (글 모델이 있을 때)
   magicPolish: true, // 매직키로 저장한 메모를 AI 로 다듬기 (글 모델이 있을 때)
   magic: undefined,
   magicPos: null,
@@ -151,6 +152,7 @@ export function appSettings(vault, fileIndex, shortcutStatus, shortcutLabel) {
     linkPreviews: settings.linkPreviews !== false,
     autoTags: settings.autoTags !== false,
     magicPolish: settings.magicPolish !== false,
+    autoEvents: settings.autoEvents !== false,
     mode: settings.mode === 'work' ? 'work' : 'life',
     workLife: settings.workLife === true, // Work / Life 나누기 (꺼져 있으면 모든 메모가 한 목록)
     workHours: normalizeHours(settings.workHours),

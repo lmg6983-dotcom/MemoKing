@@ -872,6 +872,7 @@ async function loadSettings() {
   $('fit-tables').checked = s.fitTables !== false;
   $('auto-tags').checked = s.autoTags !== false;
   $('magic-polish').checked = s.magicPolish !== false;
+  $('auto-events').checked = s.autoEvents !== false;
   $('link-previews').checked = s.linkPreviews !== false;
   magicIndex = s.magicIndex ?? null;
   showMagic(s.magic);
@@ -1075,6 +1076,7 @@ function renderAi(st, failed = {}) {
   $('ai-try-row').hidden = !st.engine || !['ready', 'running'].includes(st.chat.state);
   $('ai-tags-row').hidden = $('ai-try-row').hidden;
   $('magic-polish-row').hidden = $('ai-try-row').hidden; // 글 모델이 있을 때만
+  $('auto-events-row').hidden = $('ai-try-row').hidden;
 }
 // AI 태그: 모든 메모에 달기 ⇄ 멈추기, 진행은 메인이 'ai:tagging' 으로 ({ done, total } · { error } · null = 끝)
 const AI_TAGS_NOTE = $('ai-tags-note').textContent;
@@ -1138,6 +1140,9 @@ $('auto-tags').addEventListener('change', async (e) => {
 });
 $('magic-polish').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setMagicPolish(e.target.checked);
+});
+$('auto-events').addEventListener('change', async (e) => {
+  e.target.checked = await api.settings.setAutoEvents(e.target.checked);
 });
 
 // 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)

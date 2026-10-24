@@ -103,3 +103,37 @@ test('removeTags: 태그만 있는 줄에서만 빼고, 빈 줄이 되면 그 �
   assert.equal(removeTags('본문 #회의 그대로\n\n#업무 #회의\n', ['회의']), '본문 #회의 그대로\n\n#업무\n');
   assert.equal(removeTags('본문\n\n#회의\n', ['회의']), '본문\n');
 });
+
+test('AI 뒤처리: 새로 쓴 줄의 일정을 넣고, 본 줄은 다시 묻지 않으며, 오래된 메모는 처음엔 본 줄로만', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-aievent-'));
+  const vault = new Vault(dir);
+  vault.open();
+  const asked = [];
+  const added = [];
+  const tagger = createAiTagger({
+    getVault: () => vault, ready: async () => true, isOpen: () => false, enabled: () => false, eventsOn: () => true,
+    onEvents: (id, events) => added.push(...events),
+    tasks: () => ({ autoEvents: async (body, o) => {
+      const { createAiTasks } = await import('../app/js/core/ai-tasks.js');
+      return createAiTasks({ ai: { chat: async (m) => { asked.push(m[1].content); return '{"events":[{"n":1,"title":"치과"}]}'; } }, memos: () => [], graph: () => [], store: null }).autoEvents(body, o);
+    } }),
+  });
+  try {
+    const id = vault.import({ body: '내일 오후 3시 치과' });
+    await tagger.add([id]);
+    assert.equal(vault.get(id).reminders.length, 1);
+    assert.equal(added[0].title, '치과');
+    vault.save(id, `${vault.get(id).body}\n메모 더 씀`);
+    await tagger.add([id]);
+    assert.equal(asked.length, 1); // 본 줄은 다시 묻지 않음
+
+    const old = vault.import({ body: '내일 오후 4시 미팅', created: '2025-01-01T09:00:00+09:00' });
+    await tagger.add([old]);
+    assert.equal(vault.get(old).reminders.length, 0);
+    assert.deepEqual(vault.get(old).aiEvents, ['내일 오후 4시 미팅']);
+    assert.equal(asked.length, 1);
+  } finally {
+    vault.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

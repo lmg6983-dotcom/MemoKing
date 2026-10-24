@@ -1,18 +1,24 @@
-// AI 태그 (PC 메인) — 메모마다 한 번, AI 가 고른 태그를 사용자 태그와 합쳐 3개까지 뒤에서 단다.
-//   닫은 메모 · 매직키로 저장한 메모 · 다른 기기(휴대폰)에서 들어온 메모 · 설정의 "모든 메모" 를 하나씩 차례로 (모델이 하나라서).
-//   본 메모는 머리말 aiTags 로 기억해 다시 달지 않는다 (사용자가 지운 AI 태그는 지워진 채). 열려 있는 메모는 닫을 때.
+// AI 뒤처리 (PC 메인) — 닫은 메모 · 매직키로 저장한 메모 · 다른 기기(휴대폰)에서 들어온 메모 · 설정의 "모든 메모" 를
+//   하나씩 차례로 (모델이 하나라서). 열려 있는 메모는 닫을 때, 그사이 고친 메모는 건드리지 않는다.
+//   ① 일정: 새로 쓴 줄의 앞으로의 날짜를 AI 가 골라 일정으로 (core/ai-events.js, 본 줄은 머리말 aiEvents — 지운 일정은 되살리지 않음)
+//   ② 태그: 메모마다 한 번, AI 가 고른 태그를 사용자 태그와 합쳐 3개까지 (본 메모는 머리말 aiTags — 지운 AI 태그는 지워진 채)
 import { extractTags } from '../../app/js/core/tags.js';
 import { appendTags, removeTags } from '../../app/js/core/tag-suggest.js';
 import { isBlankBody } from '../../app/js/core/memo-file.js';
 import { MAX_TAGS } from '../../app/js/core/ai-tasks.js';
 
 const SETTLE_MS = 60_000; // 다른 기기에서 쓰는 중인 메모는 1분 조용해진 뒤에
+// 이보다 오래된 메모를 처음 볼 때는 일정을 넣지 않고 본 줄로만 ("내일" 이 쓴 날이 아니라 오늘 기준으로 계산되므로)
+const FRESH_MS = 24 * 60 * 60_000;
 
 /**
- * @param {{ getVault: () => any, tasks: () => { autoTags: Function }, ready: () => Promise<boolean>,
- *   isOpen: (id: string) => boolean, enabled: () => boolean, onProgress?: (p: object | null) => void, settleMs?: number }} o
+ * @param {{ getVault: () => any, tasks: () => { autoTags: Function, autoEvents: Function }, ready: () => Promise<boolean>,
+ *   isOpen: (id: string) => boolean, enabled: () => boolean, eventsOn?: () => boolean,
+ *   onEvents?: (id: string, events: object[]) => void, onProgress?: (p: object | null) => void, settleMs?: number }} o  enabled: 태그
  */
-export function createAiTagger({ getVault, tasks, ready, isOpen, enabled, onProgress = () => {}, settleMs = SETTLE_MS }) {
+export function createAiTagger({
+  getVault, tasks, ready, isOpen, enabled, eventsOn = () => false, onEvents = () => {}, onProgress = () => {}, settleMs = SETTLE_MS,
+}) {
   const queue = new Set();
   const waiting = new Map(); // id → 타이머 (다른 기기에서 들어온 메모)
   let running = null;
@@ -52,7 +58,7 @@ export function createAiTagger({ getVault, tasks, ready, isOpen, enabled, onProg
   }
 
   async function run() {
-    while (queue.size && enabled() && (await ready())) {
+    while (queue.size && (enabled() || eventsOn()) && (await ready())) {
       const [id] = queue;
       queue.delete(id);
       try {
@@ -75,11 +81,21 @@ export function createAiTagger({ getVault, tasks, ready, isOpen, enabled, onProg
 
   async function tagOne(id) {
     const vault = getVault();
-    const m = vault?.get(id);
-    if (!m || m.locked || m.aiTags || isOpen(id) || isBlankBody(m.body) || extractTags(m.body).length >= MAX_TAGS) return;
+    let m = vault?.get(id);
+    if (!m || m.locked || isOpen(id) || isBlankBody(m.body)) return;
+    const changed = () => getVault() !== vault || vault.get(id)?.body !== m.body || isOpen(id); // 다음에 닫을 때 · 들어올 때 다시
+    if (eventsOn()) {
+      const fresh = m.aiEvents != null || Date.now() - Date.parse(m.created ?? '') < FRESH_MS;
+      const r = await tasks().autoEvents(m.body, { seen: m.aiEvents ?? [], existing: m.reminders, fresh });
+      if (changed()) return;
+      if (r.events.length || JSON.stringify(r.seen) !== JSON.stringify(m.aiEvents)) {
+        if (vault.addAiEvents(id, r.events, r.seen) && r.events.length) onEvents(id, r.events);
+      }
+      m = vault.get(id);
+    }
+    if (!enabled() || m.aiTags || extractTags(m.body).length >= MAX_TAGS) return;
     const names = await tasks().autoTags(m.body, id);
-    // 그사이 고쳤거나 열었으면 건드리지 않는다 (다음에 닫을 때 · 들어올 때 다시)
-    if (getVault() !== vault || vault.get(id)?.body !== m.body || isOpen(id)) return;
+    if (changed()) return;
     vault.setAiTags(id, appendTags(m.body, names), names);
   }
 
