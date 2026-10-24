@@ -76,8 +76,7 @@ jobs:
           cases = json.load(open("fp32.json"))
           same = 0
           for c in cases:
-              ans = agent.system_one(c["state"], c["questions"])["answers"]
-              py = max(ans, key=lambda k: ans[k]["noul"])
+              py = agent.system_one(c["state"], c["questions"])["answers"]["tag"]["choice"]
               same += py == c["js"][0]["name"]
               if py != c["js"][0]["name"]: print("다름:", c["state"].split("\n")[0], "python", py, "js", c["js"][0]["name"])
           print(f"Python 과 같은 첫째 태그 {same}/{len(cases)}")

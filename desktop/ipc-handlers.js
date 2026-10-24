@@ -213,7 +213,7 @@ export function registerIpc(ctx) {
     const ranked = await getAi()?.rank(String(body ?? ''), memos, id).catch(() => []);
     return withLaya(list, ranked ?? []);
   });
-  // 메모 창을 닫은 뒤: 태그 없는 메모에 AI 가 고른 기존 태그(셋 이상, core/laya-tags.js pickTags)를 저절로 (설정 › 태그 자동 추가).
+  // 메모 창을 닫은 뒤: 태그 없는 메모에 AI 가 고른 기존 태그 셋(core/laya-tags.js pickTags)를 저절로 (설정 › 태그 자동 추가).
   //   모델을 올리는 몇 초 동안 창이 안 닫히면 안 되므로 창은 먼저 닫고 여기서 이어서 한다. AI 가 못 고르면 확실한 추천 태그
   ipcMain.handle('tags:ai-auto', async (_e, id) => {
     const vault = getVault();
