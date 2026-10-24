@@ -897,7 +897,7 @@ function dropSandbox() {
 function whatsNew() {
   const now = app.getVersion();
   const seen = settings.seenVersion;
-  if (seen === now) return null;
+  if (seen === now || SMOKE) return null; // 자동 점검은 창 없이 (모달이라 뒤 화면을 막는다)
   settings.seenVersion = now;
   saveSettings();
   if (!settings.tutorialDone) return null;
