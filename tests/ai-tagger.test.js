@@ -110,10 +110,12 @@ test('AI 뒤처리: 새로 쓴 줄의 일정을 넣고, 본 줄은 다시 묻지
   vault.open();
   const asked = [];
   const added = [];
+  const written = [];
   const tagger = createAiTagger({
     getVault: () => vault, ready: async () => true, isOpen: () => false, enabled: () => false, eventsOn: () => true,
     onEvents: (id, events) => added.push(...events),
     tasks: () => ({ autoEvents: async (body, o) => {
+      written.push(o.written);
       const { createAiTasks } = await import('../app/js/core/ai-tasks.js');
       return createAiTasks({ ai: { chat: async (m) => { asked.push(m[1].content); return '{"events":[{"n":1,"title":"치과"}]}'; } }, memos: () => [], graph: () => [] }).autoEvents(body, o);
     } }),
@@ -123,6 +125,7 @@ test('AI 뒤처리: 새로 쓴 줄의 일정을 넣고, 본 줄은 다시 묻지
     await tagger.add([id]);
     assert.equal(vault.get(id).reminders.length, 1);
     assert.equal(added[0].title, '치과');
+    assert.equal(written[0].getTime(), Date.parse(vault.get(id).updated)); // "내일" 은 처리한 때가 아니라 고친 때 기준
     vault.save(id, `${vault.get(id).body}\n메모 더 씀`);
     await tagger.add([id]);
     assert.equal(asked.length, 1); // 본 줄은 다시 묻지 않음

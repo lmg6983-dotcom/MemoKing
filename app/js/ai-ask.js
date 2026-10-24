@@ -33,9 +33,6 @@ export function setupAiAsk({ box, api }) {
       state.textContent = '';
     }
   });
-  api.on('ai:progress', ({ id, done, total }) => {
-    if (id === job) state.textContent = `처음 한 번 메모를 살펴보는 중이에요 (${done}/${total})`; // 그다음부터는 바뀐 메모만
-  });
 
   function reset() {
     if (job) api.ai.cancel(job);
