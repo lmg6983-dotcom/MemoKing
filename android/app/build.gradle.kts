@@ -46,6 +46,22 @@ val sherpaAar: File = rootDir.resolve(".gradle/sherpa-onnx/sherpa-onnx-$sherpaVe
         part.renameTo(aar)
     }
 }
+// AI 태그(onnxruntime-android 1.30)와 같은 이름의 libonnxruntime.so 가 겹치므로 sherpa-onnx 의 것은 빼고 하나로 쓴다
+//   (onnxruntime 의 C API 는 예전 버전을 계속 받아 준다 — sherpa-onnx 가 부르는 버전도 그대로)
+val sherpaNoOrt: File = sherpaAar.resolveSibling("sherpa-onnx-$sherpaVersion-no-ort.aar").also { out ->
+    if (!out.isFile) {
+        java.util.zip.ZipFile(sherpaAar).use { zin ->
+            java.util.zip.ZipOutputStream(out.outputStream()).use { zout ->
+                for (e in zin.entries()) {
+                    if (e.name.endsWith("/libonnxruntime.so")) continue
+                    zout.putNextEntry(java.util.zip.ZipEntry(e.name))
+                    zin.getInputStream(e).use { it.copyTo(zout) }
+                    zout.closeEntry()
+                }
+            }
+        }
+    }
+}
 
 android {
     namespace = "com.memoking.app"
@@ -105,7 +121,7 @@ dependencies {
     // 휴대폰에 로그인된 구글 계정으로 Drive 권한 받기 (계정 고르기·허용만)
     implementation("com.google.android.gms:play-services-auth:21.3.0")
     // 화자 구분: 목소리 특징 엔진 (위에서 받은 AAR)
-    implementation(files(sherpaAar))
+    implementation(files(sherpaNoOrt))
     // AI 태그: Laya 다국어 모델을 휴대폰 안에서 (LayaTags.kt) — 모델은 설정에서 한 번 받는다
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.30.0")
 
