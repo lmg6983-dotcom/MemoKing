@@ -1597,16 +1597,18 @@ function showTasks(tasks, opts) {
   clearStamp.show(tasks, opts);
 }
 
-// 닫을 때: 태그 없는 메모에 태그를 저절로 (설정 › 태그 자동 추가, 휴대폰과 같음)
-//   글 모델을 넣은 PC: AI 가 고른 태그 하나 — 창을 닫은 뒤 메인이 단다(aiTagAfterClose). 아니면 확실한 추천 태그
+// 닫을 때: 태그를 저절로 (설정 › 태그 자동 추가)
+//   글 모델을 넣은 PC: AI 가 고른 태그를 사용자 태그와 합쳐 3개까지 — 창을 닫은 뒤 메인이 단다(aiTagAfterClose, 메모마다 한 번).
+//   아니면 태그 없는 메모에 확실한 추천 태그 (휴대폰과 같음)
 async function autoTagOnClose() {
   if (!editor || tagDismissed || memo?.locked) return false; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
   try {
     const s = await api.settings.get();
     if (s?.autoTags === false) return false;
     const body = editor.getMarkdown();
-    if (isBlankBody(body) || extractTags(body).length) return false;
+    if (isBlankBody(body)) return false;
     if (['ready', 'running'].includes((await api.ai?.status())?.chat.state)) return true;
+    if (extractTags(body).length) return false;
     const list = (await api.tags.suggest?.(body, id)) ?? [];
     const sure = list.filter((t) => t.sure && t.existing).slice(0, 2);
     if (sure.length) editor.appendMarkdown(sure.map((t) => `#${t.name}`).join(' '));

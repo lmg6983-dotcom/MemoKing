@@ -30,7 +30,11 @@ contextBridge.exposeInMainWorld('memoking', {
     auto: invoke('tags:auto'),
     suggest: invoke('tags:suggest'),
     ai: invoke('tags:ai'), // AI 로 고르기 → 칩 목록 | { error }
-    aiAuto: invoke('tags:ai-auto'), // 닫은 뒤 AI 가 고른 태그 하나를 저절로 (메인에서)
+    aiAuto: invoke('tags:ai-auto'), // 닫은 뒤 AI 가 고른 태그를 저절로 (메인에서, ai/ai-tagger.js)
+    aiAll: invoke('tags:ai-all'), // 아직 보지 않은 모든 메모에 → { done, total } (진행은 'ai:tagging')
+    aiStop: invoke('tags:ai-stop'),
+    aiClear: invoke('tags:ai-clear'), // AI 가 단 태그를 모두 걷어 냄 → 메모 수
+    aiStatus: invoke('tags:ai-status'),
   },
   memo: {
     open: invoke('memo:open'),

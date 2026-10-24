@@ -222,7 +222,7 @@
       </label>
       <label class="setting-row">
         <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
-        <span>태그 자동 추가 <small>태그 없는 메모를 닫을 때 확실한 태그만 달아요</small></span>
+        <span>태그 자동 추가 <small>메모를 닫을 때 태그를 달아요. 글 모델이 있으면 AI 가 골라 태그를 합쳐 3개까지, 없으면 태그 없는 메모에 확실한 태그만</small></span>
       </label>
       <div class="setting-row hold-row">
         <label class="hold-label">
@@ -268,6 +268,11 @@
       <p class="set-note">기본 모델은 카카오 카나나2 — Powered by Kanana · <a href="https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/LICENSE" target="_blank" rel="noopener">라이선스 보기</a></p>
       <div class="dialog-actions left sub-actions" id="ai-try-row" hidden>
         <button type="button" class="link-btn" id="ai-try">시험해 보기</button>
+      </div>
+      <div class="setting-row keymap-row" id="ai-tags-row" hidden>
+        <span>AI 태그 <small id="ai-tags-note" role="status">닫을 때 · 매직키로 저장할 때 · 휴대폰에서 들어올 때, 메모마다 한 번 태그를 합쳐 3개까지 달아요</small></span>
+        <button type="button" class="link-btn danger" id="ai-tags-clear">AI 태그 모두 지우기</button>
+        <button type="button" class="btn" id="ai-tags-all">모든 메모에 달기</button>
       </div>
       <div class="setting-row keymap-row">
         <span>검색 모델 <small id="ai-embed-note" role="status"></small></span>

@@ -18,6 +18,8 @@ import { pickHandoff, recentlyUpdated } from '../app/js/core/handoff.js';
 import { PopupWatcher } from './popup-watch.js';
 import { createSttService } from './stt/stt-service.js';
 import { createAiService } from './ai/ai-service.js';
+import { createAiTagger } from './ai/ai-tagger.js';
+import { createAiTasks } from '../app/js/core/ai-tasks.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, findRepeat, betterReading, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
@@ -105,6 +107,8 @@ let driveSync = null;
 
 let stt = null;
 let ai = null;
+let aiTasks = null; // core/ai-tasks.js — 글 도우미 · 태그 · AI 검색 (initAi)
+let aiTagger = null;
 const heldLocks = new Map();
 
 let fileIndex = null;
@@ -213,6 +217,7 @@ function openVault(dir) {
       if (sandbox?.real === next) return; // 연습 중: 화면은 연습 공간 것 (돌아올 때 목록을 다시 그린다)
       windowManager.pushList();
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
+      aiTagger?.later(external.filter((id) => !removed.includes(id))); // 휴대폰 등에서 들어온 메모에도 AI 태그
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));
@@ -705,6 +710,23 @@ function initAi() {
     onStatus: (status) => {
       const w = windowManager.listWin;
       if (w && !w.isDestroyed()) w.webContents.send('ai:status', status);
+    },
+  });
+  aiTasks = createAiTasks({
+    ai,
+    memos: () => vault?.bodies() ?? [],
+    graph: () => vault?.index?.memos ?? [],
+    store: ai.rag,
+  });
+  aiTagger = createAiTagger({
+    getVault: () => vault,
+    tasks: () => aiTasks,
+    ready: async () => ['ready', 'running'].includes((await ai.status()).chat?.state),
+    isOpen: (id) => windowManager.noteWins.has(id),
+    enabled: () => settings.autoTags !== false,
+    onProgress: (p) => {
+      const w = windowManager.listWin;
+      if (w && !w.isDestroyed()) w.webContents.send('ai:tagging', p);
     },
   });
 }
@@ -1247,6 +1269,8 @@ app.whenReady().then(async () => {
     getStt: () => stt,
     sttOptions,
     getAi: () => ai,
+    getAiTasks: () => aiTasks,
+    getAiTagger: () => aiTagger,
     getLinkPreviews,
     openWebPage,
     openVaultFile,

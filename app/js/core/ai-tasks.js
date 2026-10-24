@@ -3,9 +3,10 @@
 import { spellMessages, styleMessages, draftMessages, plausibleFix } from './ai-write.js';
 import { aiTagRequest, aiTagResult } from './ai-tags.js';
 import { retrieve, ragMessages } from './rag.js';
-import { suggestTagsFor } from './tag-suggest.js';
+import { extractTags } from './tags.js';
 import { isLockedBody } from './memo-lock.js';
 
+export const MAX_TAGS = 3; // 한 메모의 태그 (사용자 + AI) — AI 는 이만큼까지만 채운다
 const ready = (m) => ['ready', 'running'].includes(m?.state);
 
 /**
@@ -38,16 +39,10 @@ export function createAiTasks({ ai, memos, graph, store }) {
     return aiTagResult(await ai.chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, body);
   }
 
-  /** 닫은 메모에 달 태그 하나 → 이름 | null — AI 가 못 고르면 AI 없이 확실한 것 (저장은 부른 쪽) */
-  async function autoTag(body, id) {
-    let picked;
-    try {
-      picked = (await pickTags(body, id))[0];
-    } catch (err) {
-      console.error('AI 태그', err.message);
-    }
-    picked ??= suggestTagsFor(body, memos(), { excludeId: id }).find((t) => t.sure && t.existing);
-    return picked?.name ?? null;
+  /** 메모에 더 달 태그 이름들 — 이미 단 태그와 합쳐 3개까지 (저장은 부른 쪽, 모델 오류는 그대로 던짐) */
+  async function autoTags(body, id) {
+    const room = MAX_TAGS - extractTags(body).length;
+    return room > 0 ? (await pickTags(body, id)).slice(0, room).map((t) => t.name) : [];
   }
 
   /** AI 검색: 낱말 · 뜻 · 그래프로 메모를 찾고 고른 메모만 근거로 답 → { text, sources } */
@@ -73,5 +68,5 @@ export function createAiTasks({ ai, memos, graph, store }) {
     return { text: await ai.chat(ragMessages(question, picked), { maxTokens: 400, temperature: 0.2, signal, onToken }), sources };
   }
 
-  return { write, pickTags, autoTag, ask };
+  return { write, pickTags, autoTags, ask };
 }

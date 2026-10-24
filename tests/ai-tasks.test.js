@@ -20,9 +20,12 @@ test('AI 작업: 맞춤법은 믿을 만한 답만, 아니면 원래 글', async
   assert.deepEqual(r.fixed, ['다 됐어요', '엉뚱한 문단']);
 });
 
-test('AI 작업: 닫은 메모 태그 — AI 가 고른 것, 못 고르면 AI 없이 확실한 것', async () => {
-  assert.equal(await tasks(async () => '{"tags":["업무"]}').autoTag('# 내일 일\n\n출시 준비', 'x'), '업무');
-  assert.equal(await tasks(async () => { throw new Error('모델 없음'); }).autoTag('# 내일 회의\n\n다음 주 회의 안건을 미리 정리하기', 'x'), '회의');
+test('AI 작업: 더 달 태그 — 이미 단 태그와 합쳐 3개까지, 모델 오류는 그대로 던짐', async () => {
+  const two = tasks(async () => '{"tags":["업무","회의"]}');
+  assert.deepEqual(await two.autoTags('# 내일 일\n\n출시 준비', 'x'), ['업무', '회의']);
+  assert.deepEqual(await two.autoTags('# 내일 일\n\n출시 준비 #가 #나', 'x'), ['업무']);
+  assert.deepEqual(await two.autoTags('# 내일 일 #가 #나 #다', 'x'), []);
+  await assert.rejects(tasks(async () => { throw new Error('모델 없음'); }).autoTags('# 내일 회의', 'x'), /모델 없음/);
 });
 
 test('AI 작업: 검색 모델 없이도 낱말로 찾아 근거 메모만 주고 답', async () => {
