@@ -82,12 +82,13 @@ jobs:
               py = top(q, c["state"])
               same += py == c["js"][0]["name"]
               ok += py in c["gold"]
-              names = list(q["tag"]["criteria"].keys())
+              names = list(q["tag"]["criteria"])
               ok_plain += top({"tag": {"type": "choice", "instructions": q["tag"]["instructions"], "criteria": names}}, c["state"]) in c["gold"]
               ok_en += top({"tag": {"type": "choice", "instructions": "Which tag fits this note best?", "criteria": {n: n for n in names}}}, c["state"]) in c["gold"]
               if py != c["js"][0]["name"]: print("다름:", c["state"].split("\n")[0], "python", py, "js", c["js"][0]["name"])
           n = len(cases)
-          print(f"Python 과 같은 답 {same}/{n} · Python 정확도: 앱 질문 {ok}/{n} · 설명 없이 {ok_plain}/{n} · 영어 질문 {ok_en}/{n}")
+          print(f"Python 과 같은 답 {same}/{n} · Python 정확도: 앱 질문 {ok}/{n} · 이름만 {ok_plain}/{n} · 영어 질문 {ok_en}/{n}")
+          assert same == n, "앱의 계산이 laya 와 달라요"
           EOF
 
       - name: 한국어 태그 시험 — 8비트 (앱이 받는 것)

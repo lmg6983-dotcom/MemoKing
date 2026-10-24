@@ -1,5 +1,8 @@
 import java.net.URI
 import java.security.MessageDigest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 import java.util.Properties
 
 plugins {
@@ -50,11 +53,11 @@ val sherpaAar: File = rootDir.resolve(".gradle/sherpa-onnx/sherpa-onnx-$sherpaVe
 //   (onnxruntime 의 C API 는 예전 버전을 계속 받아 준다 — sherpa-onnx 가 부르는 버전도 그대로)
 val sherpaNoOrt: File = sherpaAar.resolveSibling("sherpa-onnx-$sherpaVersion-no-ort.aar").also { out ->
     if (!out.isFile) {
-        java.util.zip.ZipFile(sherpaAar).use { zin ->
-            java.util.zip.ZipOutputStream(out.outputStream()).use { zout ->
+        ZipFile(sherpaAar).use { zin ->
+            ZipOutputStream(out.outputStream()).use { zout ->
                 for (e in zin.entries()) {
                     if (e.name.endsWith("/libonnxruntime.so")) continue
-                    zout.putNextEntry(java.util.zip.ZipEntry(e.name))
+                    zout.putNextEntry(ZipEntry(e.name))
                     zin.getInputStream(e).use { it.copyTo(zout) }
                     zout.closeEntry()
                 }
