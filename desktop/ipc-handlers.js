@@ -6,7 +6,7 @@ import path from 'node:path';
 import { collectTags, extractTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor, appendTags } from '../app/js/core/tag-suggest.js';
-import { withLaya } from '../app/js/core/laya-tags.js';
+import { withLaya, pickTags } from '../app/js/core/laya-tags.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
@@ -213,24 +213,24 @@ export function registerIpc(ctx) {
     const ranked = await getAi()?.rank(String(body ?? ''), memos, id).catch(() => []);
     return withLaya(list, ranked ?? []);
   });
-  // 메모 창을 닫은 뒤: 태그 없는 메모에 AI 가 고른 기존 태그 하나를 저절로 (설정 › 태그 자동 추가).
+  // 메모 창을 닫은 뒤: 태그 없는 메모에 AI 가 고른 기존 태그(셋 이상, core/laya-tags.js pickTags)를 저절로 (설정 › 태그 자동 추가).
   //   모델을 올리는 몇 초 동안 창이 안 닫히면 안 되므로 창은 먼저 닫고 여기서 이어서 한다. AI 가 못 고르면 확실한 추천 태그
   ipcMain.handle('tags:ai-auto', async (_e, id) => {
     const vault = getVault();
     const memo = vault?.get(id);
     if (!memo || memo.locked || settings.autoTags === false || extractTags(memo.body).length) return null;
     const memos = vault.bodies();
-    let name = null;
+    let names = [];
     try {
-      name = (await getAi()?.rank(memo.body, memos, id))?.[0]?.name ?? null;
+      names = pickTags((await getAi()?.rank(memo.body, memos, id)) ?? []);
     } catch (err) {
       console.error('AI 태그', err.message);
     }
-    name ??= suggestTagsFor(memo.body, memos, { excludeId: id }).find((t) => t.sure && t.existing)?.name ?? null;
+    if (!names.length) names = suggestTagsFor(memo.body, memos, { excludeId: id }).filter((t) => t.sure && t.existing).slice(0, 2).map((t) => t.name);
     const now = vault.get(id);
-    if (!name || now?.body !== memo.body) return null; // 그사이 다시 열어 고쳤으면 건드리지 않는다
-    vault.save(id, appendTags(now.body, [name]));
-    return name;
+    if (!names.length || now?.body !== memo.body) return null; // 그사이 다시 열어 고쳤으면 건드리지 않는다
+    vault.save(id, appendTags(now.body, names));
+    return names;
   });
   ipcMain.handle('tags:auto', (_e, body, source, id) => autoTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { source, excludeId: id }));
   ipcMain.handle('memos:search', (_e, query, excludeId) => wm.withOpenFlag(getVault()?.search(String(query ?? ''), excludeId) ?? []));

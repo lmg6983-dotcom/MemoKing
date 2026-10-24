@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tagQuestion, rankedTags } from '../app/js/core/laya-tags.js';
+import { tagQuestion, rankedTags, pickTags } from '../app/js/core/laya-tags.js';
 import { layaAgent, ortProvider } from '../app/js/core/laya-agent.js';
 
 const [dir, flag, dumpTo] = process.argv.slice(2);
@@ -31,12 +31,19 @@ for (const c of cases) {
   const t = Date.now();
   const ranked = rankedTags(await agent.predict(q.state, q.questions));
   const ms = Date.now() - t;
+  const picked = pickTags(ranked);
   dump.push({ state: q.state, questions: q.questions, gold: c.gold, js: ranked.slice(0, 3) });
-  rows.push({ title: c.text.split('\n')[0], gold: c.gold, top: ranked[0]?.name, p: ranked[0]?.p ?? 0, top3: ranked.slice(0, 3).map((r) => r.name), ms });
+  rows.push({ title: c.text.split('\n')[0], gold: c.gold, ranked, picked, ms });
 }
-const ok = rows.filter((r) => r.gold.includes(r.top)).length;
-const ok3 = rows.filter((r) => r.top3.some((n) => r.gold.includes(n))).length;
-for (const r of rows) console.log(`${r.gold.includes(r.top) ? '✓' : '✗'} ${r.title} → #${r.top} (${r.p.toFixed(2)}) · 셋: ${r.top3.join(', ')} · 정답: ${r.gold.join(', ')} · ${r.ms}ms`);
+// 첫째가 맞음 · 단 태그(pickTags) 중 맞은 비율(정밀도) · 정답 태그 중 단 비율(재현율) · 단 태그에 정답이 하나라도
+const n = rows.length;
+const top1 = rows.filter((r) => r.gold.includes(r.ranked[0]?.name)).length;
+const hit = rows.filter((r) => r.picked.some((x) => r.gold.includes(x))).length;
+const precision = rows.reduce((a, r) => a + r.picked.filter((x) => r.gold.includes(x)).length / Math.max(1, r.picked.length), 0) / n;
+const recall = rows.reduce((a, r) => a + r.gold.filter((x) => r.picked.includes(x)).length / r.gold.length, 0) / n;
+const avgPicked = rows.reduce((a, r) => a + r.picked.length, 0) / n;
+for (const r of rows) console.log(`${r.gold.includes(r.ranked[0]?.name) ? '✓' : '✗'} ${r.title} → 단 것: ${r.picked.map((x) => (r.gold.includes(x) ? `#${x}✓` : `#${x}`)).join(' ')} · 확률: ${r.ranked.slice(0, 4).map((x) => `${x.name} ${x.p.toFixed(2)}`).join(', ')} · 정답: ${r.gold.join(', ')} · ${r.ms}ms`);
 const ms = rows.map((r) => r.ms).sort((a, b) => a - b);
-console.log(`\n첫째가 맞음 ${ok}/${rows.length} · 셋 안에 ${ok3}/${rows.length} · 한 번에 가운데 ${ms[ms.length >> 1]}ms (첫 번 ${rows[0].ms}ms)`);
+const pct = (x) => `${Math.round(x * 100)}%`;
+console.log(`\n첫째가 맞음 ${top1}/${n} · 단 태그에 정답 ${hit}/${n} · 단 태그 평균 ${avgPicked.toFixed(1)}개 · 정밀도 ${pct(precision)} · 재현율 ${pct(recall)} · 한 번에 가운데 ${ms[ms.length >> 1]}ms`);
 if (flag === '--dump') fs.writeFileSync(dumpTo, JSON.stringify(dump));

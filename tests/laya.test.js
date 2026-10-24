@@ -4,17 +4,17 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { tagQuestion, rankedTags, withLaya } from '../app/js/core/laya-tags.js';
+import { tagQuestion, rankedTags, withLaya, pickTags } from '../app/js/core/laya-tags.js';
 import { createLayaService } from '../desktop/ai/laya-service.js';
 
 const memo = (id, title, tags, updated = '2026-10-01') => ({ id, updated, body: `# ${title}\n\n${tags.map((t) => `#${t}`).join(' ')}\n` });
 const vault = [memo('a', '주간 회의록', ['회의', '업무'], '2026-10-03'), memo('b', '마트', ['장보기']), memo('c', '디자인 리뷰', ['회의'])];
 
-test('AI 태그 질문: 기존 태그 중에서, 보기는 태그 이름만', () => {
+test('AI 태그 질문: 기존 태그마다 어울리는지 따로 (예일 확률)', () => {
   const q = tagQuestion('# 스탠드업\n\n어제 한 일 공유, 배포 일정 확인', vault, { excludeId: 'x' });
-  assert.equal(q.questions.tag.type, 'choice');
   assert.deepEqual(new Set(q.candidates), new Set(['회의', '업무', '장보기']));
-  assert.deepEqual(q.questions.tag.criteria, q.candidates);
+  assert.deepEqual(Object.keys(q.questions), q.candidates);
+  assert.deepEqual(q.questions['회의'], { type: 'noul', instructions: '이 메모에 #회의 태그가 어울리나요?' });
   assert.ok(!q.state.includes('#'));
 });
 
@@ -25,9 +25,11 @@ test('AI 태그 질문: 짧은 메모 · 기존 태그가 없는 폴더 · 이�
   assert.ok(!q.candidates.includes('회의'));
 });
 
-test('Laya 답 → 확률 순 · 추천 칩 순서 (Laya 가 고른 기존 태그를 앞에, 새 태그 추천은 뒤로)', () => {
-  const ranked = rankedTags({ answers: { tag: { choice: '회의', probabilities: { 업무: 0.2, 회의: 0.7, 장보기: 0.1 } } } });
+test('Laya 답 → 확률 순 · 닫을 때 달 태그(셋 + 절반 넘는 것) · 추천 칩 순서', () => {
+  const ranked = rankedTags({ answers: { 업무: { type: 'noul', noul: 0.2 }, 회의: { type: 'noul', noul: 0.7 }, 장보기: { type: 'noul', noul: 0.1 } } });
   assert.deepEqual(ranked.map((r) => r.name), ['회의', '업무', '장보기']);
+  assert.deepEqual(pickTags(ranked), ['회의', '업무', '장보기']);
+  assert.deepEqual(pickTags([0.9, 0.8, 0.7, 0.6, 0.4].map((p, i) => ({ name: `t${i}`, p }))), ['t0', 't1', 't2', 't3']);
   const list = [{ name: '배포', existing: false }, { name: '업무', existing: true }];
   assert.deepEqual(withLaya(list, ranked).map((t) => t.name), ['회의', '업무', '배포']);
   assert.equal(withLaya(list, []), list);

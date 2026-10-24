@@ -12,7 +12,7 @@ import { lockScreen } from '../../app/js/lock-ui.js';
 import { openLock, isLockedBody } from '../../app/js/core/memo-lock.js';
 import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
 import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
-import { withLaya } from '../../app/js/core/laya-tags.js';
+import { withLaya, pickTags } from '../../app/js/core/laya-tags.js';
 import { aiReady, aiRank } from './local-ai.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
 import { app } from './state.js';
@@ -528,9 +528,9 @@ function autoTag(memoId, body) {
   if (!autoTagsOn() || dismissed.has(memoId) || extractTags(body).length) return;
   const sure = () => suggestionsFor(body, memoId).filter((t) => t.sure).slice(0, 2).map((t) => t.name);
   if (aiReady()) {
-    // AI 태그: 모델이 고른 기존 태그 하나 (못 고르면 확실한 추천 태그). 기다리지 않고 닫는다 — 그사이 다시 열어 고쳤으면 건드리지 않음
+    // AI 태그: 모델이 고른 기존 태그 셋 이상 (core/laya-tags.js pickTags — 못 고르면 확실한 추천 태그). 기다리지 않고 닫는다 — 그사이 다시 열어 고쳤으면 건드리지 않음
     aiRank(body, memoId).then((ranked) => {
-      const names = ranked.length ? [ranked[0].name] : sure();
+      const names = ranked.length ? pickTags(ranked) : sure();
       if (names.length && app.vault.get(memoId)?.body === body) saveAutoTags(memoId, body, names);
     });
     return;

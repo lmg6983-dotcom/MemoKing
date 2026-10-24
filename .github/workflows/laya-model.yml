@@ -68,27 +68,20 @@ jobs:
       - name: 한국어 태그 시험 — 원래 크기
         run: node scripts/laya-bench.mjs out/fp32 --dump fp32.json
 
-      - name: 앱(JS)의 답이 laya(Python)와 같은지 · 질문 모양별 정확도 (Python)
+      - name: 앱(JS)의 답이 laya(Python)와 같은지
         run: |
           python - <<'EOF'
           import json, laya
           agent = laya.load("ckpt", device="cpu")
           cases = json.load(open("fp32.json"))
-          def top(q, state):
-              return agent.system_one(state, q)["answers"]["tag"]["choice"]
-          same = ok = ok_plain = ok_en = 0
+          same = 0
           for c in cases:
-              q = c["questions"]
-              py = top(q, c["state"])
+              ans = agent.system_one(c["state"], c["questions"])["answers"]
+              py = max(ans, key=lambda k: ans[k]["noul"])
               same += py == c["js"][0]["name"]
-              ok += py in c["gold"]
-              names = list(q["tag"]["criteria"])
-              ok_plain += top({"tag": {"type": "choice", "instructions": q["tag"]["instructions"], "criteria": names}}, c["state"]) in c["gold"]
-              ok_en += top({"tag": {"type": "choice", "instructions": "Which tag fits this note best?", "criteria": {n: n for n in names}}}, c["state"]) in c["gold"]
               if py != c["js"][0]["name"]: print("다름:", c["state"].split("\n")[0], "python", py, "js", c["js"][0]["name"])
-          n = len(cases)
-          print(f"Python 과 같은 답 {same}/{n} · Python 정확도: 앱 질문 {ok}/{n} · 이름만 {ok_plain}/{n} · 영어 질문 {ok_en}/{n}")
-          assert same == n, "앱의 계산이 laya 와 달라요"
+          print(f"Python 과 같은 첫째 태그 {same}/{len(cases)}")
+          assert same == len(cases), "앱의 계산이 laya 와 달라요"
           EOF
 
       - name: 한국어 태그 시험 — 8비트 (앱이 받는 것)
