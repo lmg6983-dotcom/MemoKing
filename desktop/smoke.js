@@ -1193,16 +1193,20 @@ export async function runSmoke({
       //   숨은 창의 자리는 Windows 러너에서 테이프를 붙였다 뗀 탭만 늦게 따라올 때가 있어, 보일 때의 자리로 본다 (숨은 자리는 아래 기록에)
       const shownAt = [];
       const order = stacks.stackOf(newTab).memos;
+      // 한 탭만 보일 때까지 (Windows 는 바꾸는 동안 잠깐 둘이 보인다 — 그때 Ctrl+Tab 을 엉뚱한 창에 보내지 않게)
+      const onlyShown = (id) => order.filter(tabShown).length === 1 && tabShown(id);
       for (let i = 1; i <= order.length; i++) {
+        const cur = order[(order.indexOf(newTab) + i - 1) % order.length];
         const next = order[(order.indexOf(newTab) + i) % order.length];
-        const cur = order.find(tabShown);
+        await until(() => onlyShown(cur), '한 탭만', 3000).catch(() => {});
         await key(noteWins.get(cur), 'Tab', ['control']);
-        const b = await until(() => tabShown(next) && (() => { const r = noteWins.get(next).getBounds(); return r.x === moved.x && r.y === moved.y && r.width === moved.width && r; })(), '탭 자리 (보일 때)', 3000)
-          .catch(() => noteWins.get(next)?.getBounds() ?? null);
+        const b = await until(() => onlyShown(next) && (() => { const r = noteWins.get(next).getBounds(); return r.x === moved.x && r.y === moved.y && r.width === moved.width && r; })(), '탭 자리 (보일 때)', 4000)
+          .catch(() => ({ ...(noteWins.get(next)?.getBounds() ?? {}), shown: order.filter(tabShown).map((m) => m.slice(0, 6)) }));
         shownAt.push({ tab: next === newTab ? 'me' : next.slice(0, 6), ...b });
       }
+      const backHome = await until(() => onlyShown(newTab), '지금 탭으로 돌아옴', 3000).catch(() => false);
       const shownSame = shownAt.every((b) => b.x === moved.x && b.y === moved.y && b.width === moved.width);
-      check('창을 옮기면 모든 탭이 같은 자리·크기 (탭을 바꿔 보이면 옮긴 자리)', shownSame && tabShown(newTab), JSON.stringify({ moved, shownAt, hiddenSame: Boolean(same), hidden }));
+      check('창을 옮기면 모든 탭이 같은 자리·크기 (탭을 바꿔 보이면 옮긴 자리)', shownSame && backHome, JSON.stringify({ moved, shownAt, backHome, hiddenSame: Boolean(same), hidden }));
       // 탭의 × → 스택에서 빼고 닫기
       await js(noteWins.get(newTab), `document.querySelector('.stack-close[data-close-tab="${newTab}"]').click()`);
       const closedTab = await until(() => !noteWins.has(newTab) && !stacks.stackOf(newTab), '× 빼기').catch(() => false);
