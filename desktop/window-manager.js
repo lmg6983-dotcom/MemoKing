@@ -201,9 +201,7 @@ export class WindowManager {
       this.ghostWin?.destroy();
       this.ghostWin = null;
     });
-    // mode: 처음 그릴 때부터 그 모드의 밝기로 (Work 는 어둡게 — 설정을 읽기 전에 밝게 번쩍이지 않게)
-    const mode = settings.workLife !== true ? 'system' : settings.mode === 'work' ? 'work' : 'life'; // system: Work / Life 를 나눠 쓰지 않음
-    this.listWin.loadFile(path.join(APP_DIR, 'index.html'), { query: { ...(tab ? { tab } : {}), mode } });
+    this.listWin.loadFile(path.join(APP_DIR, 'index.html'), { query: tab ? { tab } : {} });
     return this.listWin;
   }
 
@@ -248,7 +246,7 @@ export class WindowManager {
       win = spare.win;
       win.setBounds(at);
       win.setTitle(memo.title);
-      win.setBackgroundColor(noteBg(memo.color, settings.workLife === true ? memo.mode ?? 'life' : null));
+      win.setBackgroundColor(noteBg(memo.color));
     } else {
       win = new BrowserWindow({
         ...at,
@@ -258,7 +256,7 @@ export class WindowManager {
         show: false,
         title: memo.title,
         alwaysOnTop: settings.onTop[id] === true,
-        backgroundColor: noteBg(memo.color, settings.workLife === true ? memo.mode ?? 'life' : null),
+        backgroundColor: noteBg(memo.color),
         ...windowIcon,
         webPreferences,
       });
@@ -934,7 +932,18 @@ export class WindowManager {
       if (!missing) return;
       const at = shown?.getNormalBounds() ?? (onScreen(settings.noteBounds[missing]) ? settings.noteBounds[missing] : null);
       // 예비 창은 쓰지 않는다 (지금 열려는 다른 메모가 가져가게 남겨 둠) — 다 그린 뒤 다음 탭
-      this.createNoteWindow(missing, { show: false, bounds: at, useSpare: false, onReady: () => this.prewarmStack(now) });
+      // 다 그린 뒤 스택의 지금 자리로 한 번 더 — 만드는 사이 스택 창을 옮기면 Windows 는 그리기 전에 옮긴 자리를 잃는다
+      //   (점검: 4개 탭 중 미리 만든 탭만 옮기기 전 자리에 남음)
+      this.createNoteWindow(missing, {
+        show: false, bounds: at, useSpare: false,
+        onReady: () => {
+          const w = this.noteWins.get(missing);
+          const st = this.stacks?.stackOf(missing);
+          const cur = st && this.visibleStackWin(st)?.getNormalBounds();
+          if (w && !w.isDestroyed() && !w.isVisible() && cur) w.setBounds(cur);
+          this.prewarmStack(now);
+        },
+      });
     }, 700);
   }
 
@@ -1474,7 +1483,7 @@ export class WindowManager {
       title: '단축키 설정',
       show: false,
       autoHideMenuBar: true,
-      backgroundColor: listBg(), // 지금 모드의 밝기 (Work 는 어둡게)
+      backgroundColor: listBg(),
       ...windowIcon,
       webPreferences,
     });
@@ -1503,7 +1512,7 @@ export class WindowManager {
       title: UI.saveAsPdf,
       show: false,
       autoHideMenuBar: true,
-      backgroundColor: listBg(), // 지금 모드의 밝기 (Work 는 어둡게)
+      backgroundColor: listBg(),
       ...windowIcon,
       webPreferences: { ...webPreferences, nodeIntegrationInSubFrames: true },
     });

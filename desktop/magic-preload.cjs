@@ -12,6 +12,13 @@ contextBridge.exposeInMainWorld('magic', {
   prefs: () => ipcRenderer.invoke('magic:prefs'), // 웹 검색 · AI 기본 사이트
   tool: (req) => ipcRenderer.invoke('magic:tool', req), // { type: 'copy' | 'web' | 'ai' | 'site', text, site }
   openAll: (query) => ipcRenderer.invoke('magic:open-all', query),
+  // 매직 에이전트 (이 PC 안의 글 모델) — 목록 검색창 ✦ 와 같은 일
+  aiReady: () => ipcRenderer.invoke('ai:status').then((s) => ['ready', 'running'].includes(s?.chat?.state)).catch(() => false),
+  agent: (req) => ipcRenderer.invoke('ai:agent', req), // { id, text }
+  agentRun: (action) => ipcRenderer.invoke('ai:agent-run', action),
+  agentCancel: (id) => ipcRenderer.invoke('ai:cancel', id),
+  onAgentToken: (cb) => ipcRenderer.on('ai:token', (_e, data) => cb(data)),
+  openMemo: (id) => ipcRenderer.invoke('magic:act', { action: 'open', id }),
   resize: (height) => ipcRenderer.send('magic:resize', height),
   close: () => ipcRenderer.send('magic:close'),
   onShow: (cb) => ipcRenderer.on('magic:show', () => cb()),

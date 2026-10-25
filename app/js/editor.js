@@ -2716,7 +2716,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     insertMarkdown(md) {
       if (md) editor.action(insert(md));
     },
-    // AI 글 도우미 (ai-write-panel.js) -----------------------------------
+    // AI 글쓰기 (서식 막대 ✦, ai-write-panel.js) ------------------------
     /** 고칠 문단: 고른 곳(없으면 메모 전체)에서 글자만 있는 문단 [{ pos, text }] — 그림 · 링크 카드 · 코드가 든 칸은 뺀다 */
     aiBlocks() {
       const { doc, selection } = view().state;

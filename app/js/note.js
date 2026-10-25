@@ -31,7 +31,7 @@ import { KEYMAP_ACTIONS, keymapTable, resolveKeymap, comboLabel } from './core/k
 import { hotkeyDialog } from './hotkey-dialog.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { openMemoryDay, dayText } from './memory-day.js';
-import { memoMode, otherMode, moveLabel, MODE_LABEL } from './core/modes.js';
+import { memoMode, otherMode, moveLabel, MODE_LABEL, fillModeTag } from './core/modes.js';
 import { createFindBar } from './find-bar.js';
 import { createAiWritePanel } from './ai-write-panel.js';
 import { UI } from './core/ui-text.js';
@@ -389,12 +389,10 @@ api.on('memo:external', async (next) => {
   showBanner(conflictCopy ? UI.conflictSaved : UI.conflict, { load: conflictCopy ? UI.showTheirs : null, keep: '확인' });
 });
 api.on('settings:link-previews', (on) => editor?.setLinkPreviews(on));
-// Work / Life 나누기: Work 메모는 어두운 화면 · Life 는 밝은 화면, 나눠 쓰지 않으면 시스템 설정 (메뉴의 "Work로 옮기기"도 그때만)
+// Work / Life 나누기: 메뉴의 "Work로 옮기기"는 나눠 쓸 때만 (밝기는 늘 시스템 설정 — 0.70.0)
 function showModeTheme() {
-  const root = document.documentElement;
-  if (memo?.workLife) root.dataset.theme = memo.mode === 'work' ? 'dark' : 'light';
-  else delete root.dataset.theme;
   $('mode-btn').hidden = !memo?.workLife;
+  fillModeTag($('mode-tag'), memo, Boolean(memo?.workLife));
 }
 api.on('mode:changed', ({ enabled } = {}) => {
   if (!memo) return;
@@ -619,7 +617,7 @@ $('lock-btn').addEventListener('click', async () => {
   setStatus('잠갔어요. 창을 닫으면 다시 비밀번호로 열려요');
 });
 // 단축키 정하기 (Ctrl+Alt+1~9): 어느 앱에서든 이 메모를 복사하거나 띄운다 (hotkey-dialog.js)
-//   윗막대 번개 단추: 정한 숫자를 작게, 없으면 사선 (다른 메모가 그 숫자를 가져갈 수 있어 창에 돌아올 때마다 다시 본다)
+//   윗막대 번개 단추는 정했을 때만 (숫자를 작게) · ⋯ 메뉴에서 정하기 (다른 메모가 그 숫자를 가져갈 수 있어 창에 돌아올 때마다 다시 본다)
 function showHotkey(state) {
   const btn = $('hotkey-btn');
   const slot = state?.slot ?? null;
@@ -628,10 +626,11 @@ function showHotkey(state) {
   const what = slot ? `${hotkeyLabel(slot)}로 불러와요` : '아직 없어요';
   btn.title = `불러오기 키 정하기: ${what} (Ctrl+Alt+숫자로 어디서든 이 메모를 불러와요)`;
   btn.setAttribute('aria-label', `불러오기 키 정하기, ${slot ? hotkeyLabel(slot) : '아직 없음'}`);
+  $('hotkey-menu-label').textContent = slot ? hotkeyLabel(slot) : '';
 }
 const refreshHotkey = () => api.hotkeys?.state(id).then(showHotkey, () => {});
 window.addEventListener('focus', () => memo && refreshHotkey());
-$('hotkey-btn').addEventListener('click', async () => {
+async function editHotkey() {
   closeMenu();
   await flush();
   const state = await api.hotkeys.state(id);
@@ -640,7 +639,9 @@ $('hotkey-btn').addEventListener('click', async () => {
   if (!next) return;
   showHotkey(next);
   setStatus(next.slot ? `단축키를 정했어요: ${hotkeyLabel(next.slot)}` : '단축키를 풀었어요');
-});
+}
+$('hotkey-btn').addEventListener('click', editHotkey);
+$('hotkey-menu-btn').addEventListener('click', editHotkey);
 // 메모 단축키로 복사하기 직전: 막 고친 글까지 저장 (main.js memoHotkeyPressed)
 window.__memokingFlush = () => flush();
 $('image-save-btn').addEventListener('click', () => memoImage('save'));
@@ -684,8 +685,6 @@ function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
   if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
-  // AI 글 도우미는 글 모델을 넣어 둔 PC 에서만 (설정 › AI 도우미)
-  if (!el.menu.hidden && api.ai) api.ai.status().then((st) => { $('ai-btn').hidden = !['ready', 'running'].includes(st?.chat.state); });
 }
 function closeMenu() {
   if (el.menu.hidden) return;
@@ -788,22 +787,38 @@ $('versions-btn').addEventListener('click', () => {
 });
 $('versions-close').addEventListener('click', () => toggleVersions(false));
 
-// ---------- AI 글 도우미 (ai-write-panel.js) ----------
+// ---------- AI 글쓰기 (서식 막대 끝 ✦ → ai-write-panel.js) ----------
+const aiBtn = $('ai-btn');
 const aiPanel = api.ai ? createAiWritePanel({
-  panel: $('ai-panel'),
+  panel: $('ai-pop'),
   api,
   editor: () => editor,
   title: () => extractTitle(editor?.getMarkdown() ?? ''),
   onOpen: () => {
-    if (!el.linksPanel.hidden) toggleLinks(false);
-    if (!versionsPanel.hidden) toggleVersions(false);
-    if (reminderPanel?.open) reminderPanel.toggle(false);
+    closeMore();
+    closePalette();
+  },
+  show: (p) => {
+    p.hidden = false;
+    placePopover(p, aiBtn);
+    aiBtn.setAttribute('aria-expanded', 'true');
+  },
+  hide: (p) => {
+    p.hidden = true;
+    aiBtn.setAttribute('aria-expanded', 'false');
+    editor?.focus();
   },
 }) : null;
-$('ai-btn').addEventListener('click', () => {
-  closeMenu();
-  aiPanel?.toggle(true);
-});
+aiBtn.addEventListener('click', () => aiPanel?.toggle());
+// ✦ 는 글 모델을 넣어 둔 PC 에서만 (설정 › AI 도우미) — 설정에서 넣고 돌아와도 보이게 창에 들어올 때마다
+async function showAiBtn() {
+  const st = await api.ai?.status().catch(() => null);
+  aiBtn.hidden = !['ready', 'running'].includes(st?.chat.state);
+}
+if (api.ai) {
+  showAiBtn();
+  window.addEventListener('focus', showAiBtn);
+}
 // 끌어서 합치기(스택)의 메뉴 버전 — 끌기가 어려운 사람도
 $('join-btn').addEventListener('click', async () => {
   closeMenu();
@@ -1245,6 +1260,7 @@ document.addEventListener('mousedown', (e) => {
   if (!el.palette.hidden && !el.palette.contains(e.target) && !e.target.closest?.('[data-action="color"],[data-action="highlight"]')) closePalette();
   if (!el.morePanel.hidden && !el.morePanel.contains(e.target) && !el.moreBtn.contains(e.target) && !el.palette.contains(e.target) && !styleMenu.contains(e.target)) closeMore();
   if (!styleMenu.hidden && !styleMenu.contains(e.target) && !e.target.closest?.('[data-action="style"]')) closeStyleMenu();
+  if (aiPanel?.open && !$('ai-pop').contains(e.target) && !aiBtn.contains(e.target) && !e.target.closest?.('.mk-doc')) aiPanel.toggle(false);
 });
 
 // 표 열 너비·행 높이·머리글 강조 → 메모 머리말 (끄는 동안 여러 번 바뀌어도 한 번에)

@@ -1,9 +1,11 @@
-// AI 작업 흐름 (PC 메인 · 휴대폰 화면이 함께) — 글 도우미 · 태그 · AI 검색.
+// AI 작업 흐름 (PC 메인) — 글 도우미 · 태그 · AI 검색 · 매직 에이전트.
 //   다른 것은 모델을 부르는 법(ai)과 메모를 읽는 법(memos · graph)뿐이다. 모델은 이 기기 안(llama-server), 인터넷 없이.
 import { spellMessages, styleMessages, draftMessages, plausibleFix, titleMessages, cleanTitle, wordDiff, diffEdits, TITLE_OVER } from './ai-write.js';
-import { aiTagRequest, aiTagResult } from './ai-tags.js';
-import { chunkMemo, retrieve, ragMessages, expandMessages, expandResult } from './rag.js';
-import { extractTitle } from './memo-file.js';
+import { aiTagRequest, aiTagResult, MIN_AI_TEXT } from './ai-tags.js';
+import { chunkMemo, retrieve, buildIndex, ragMessages, expandMessages, expandResult, finishAnswer, NOT_FOUND } from './rag.js';
+import { detectIntent, planMessages, planResult, appendTargets, appendText, memoBody, summaryMessages, scheduleQuery, eventsIn, scheduleText, memoDraftMessages, memoDraftResult } from './agent.js';
+import { occurrencesBetween } from './reminders.js';
+import { extractTitle, plainLines } from './memo-file.js';
 import { extractTags } from './tags.js';
 import { eventCandidates, aiEventRequest, aiEventResult, nextSeen } from './ai-events.js';
 import { isLockedBody } from './memo-lock.js';
@@ -15,9 +17,10 @@ export const MAX_TAGS = 3; // 한 메모의 태그 (사용자 + AI) — AI 는 �
  *   ai: { status: () => any, chat: (messages, o) => Promise<string> },
  *   memos: () => { id: string, body: string }[],
  *   graph: () => { id: string, related?: { id: string, score: number }[] }[],
+ *   reminders?: () => { memoId: string, title: string, locked?: boolean, reminder: any }[],
  * }} o
  */
-export function createAiTasks({ ai, memos, graph }) {
+export function createAiTasks({ ai, memos, graph, reminders = () => [] }) {
   /** 글 도우미: spell → { fixed: [] } (믿을 만한 답만, 아니면 원래 글) · style · draft → { text } */
   async function write({ task, text = '', blocks = [], style, title, request }, { signal, onToken, onProgress } = {}) {
     if (task === 'spell') {
@@ -36,7 +39,7 @@ export function createAiTasks({ ai, memos, graph }) {
   /** AI 로 태그 고르기 → 칩 목록 */
   async function pickTags(body, id) {
     const req = aiTagRequest(body, memos(), { excludeId: id });
-    return aiTagResult(await ai.chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, body);
+    return aiTagResult(await ai.chat(req.messages, { schema: req.schema, temperature: 0, maxTokens: 80 }), req.existing, body, req.grounded);
   }
 
   /**
@@ -68,7 +71,9 @@ export function createAiTasks({ ai, memos, graph }) {
   /** 메모에 더 달 태그 이름들 — 이미 단 태그와 합쳐 3개까지 (저장은 부른 쪽, 모델 오류는 그대로 던짐) */
   async function autoTags(body, id) {
     const room = MAX_TAGS - extractTags(body).length;
-    return room > 0 ? (await pickTags(body, id)).slice(0, room).map((t) => t.name) : [];
+    // 짧은 메모(인사 · 한 줄 대답)에는 저절로 달지 않는다 — 고를 주제가 없는데 억지로 채우던 것
+    if (room <= 0 || plainLines(body).join('').replace(/\s/g, '').length < MIN_AI_TEXT) return [];
+    return (await pickTags(body, id)).slice(0, room).map((t) => t.name);
   }
 
   /**
@@ -84,22 +89,96 @@ export function createAiTasks({ ai, memos, graph }) {
     return { events: aiEventResult(json, cands, existing, now), seen: nextSeen(seen, cands) };
   }
 
-  /** AI 검색: 글 모델(카나나2)이 질문을 넓히고, 낱말 · 그래프로 메모를 찾아 고른 메모만 근거로 답 → { text, sources } */
-  async function ask(question, { signal, onToken } = {}) {
-    const chunks = memos().filter((m) => !isLockedBody(m.body)).flatMap((m) => {
+  // 찾기 색인: 메모마다 조각을 기억해 두고(본문 · 고친 때가 같으면 다시 쪼개지 않음), 하나라도 바뀌면 색인만 다시
+  let pieces = new Map(); // id → { body, updated, chunks }
+  let index = null;
+  function searchIndex() {
+    const next = new Map();
+    let changed = false;
+    for (const m of memos()) {
+      if (isLockedBody(m.body)) continue;
+      const old = pieces.get(m.id);
+      if (old && old.body === m.body && old.updated === m.updated) {
+        next.set(m.id, old);
+        continue;
+      }
+      changed = true;
       const title = extractTitle(m.body);
-      return chunkMemo(m.body).map((text) => ({ id: m.id, title, text }));
-    });
+      next.set(m.id, { body: m.body, updated: m.updated, chunks: chunkMemo(m.body).map((text) => ({ id: m.id, title, text, updated: m.updated })) });
+    }
+    if (changed || next.size !== pieces.size || !index) index = buildIndex([...next.values()].flatMap((p) => p.chunks));
+    pieces = next;
+    return index;
+  }
+
+  /** 찾기: 잠긴 메모 빼고 모든 메모의 조각에서, 질문을 넓혀(모델) 낱말 · 두 글자 조각 · 그래프로 */
+  async function find(question, { signal, limit = 4, now = new Date() } = {}) {
     const ex = expandMessages(question);
     // 넓히지 못해도(모델 오류 · 엉뚱한 답) 질문 낱말만으로 찾는다
     const words = await ai.chat(ex.messages, { schema: ex.schema, temperature: 0, maxTokens: 120, signal }).then(expandResult, () => []);
     if (signal?.aborted) throw new Error('멈췄어요');
     const related = new Map(graph().map((m) => [m.id, m.related ?? []]));
-    const picked = retrieve(question, chunks, { words, related: (id) => related.get(id) ?? [] });
-    const sources = picked.map((m) => ({ id: m.id, title: m.title, via: m.via }));
-    if (!picked.length) return { text: '메모에서 찾지 못했어요.', sources };
-    return { text: await ai.chat(ragMessages(question, picked), { maxTokens: 400, temperature: 0.2, signal, onToken }), sources };
+    return retrieve(question, searchIndex(), { words, related: (id) => related.get(id) ?? [], limit, now });
+  }
+  const sourcesOf = (picked) => picked.map((m) => ({ id: m.id, title: m.title, via: m.via }));
+
+  /** AI 검색: 찾은 메모만 근거로 답 (물러서면 찾은 문장 그대로) → { text, sources, quoted } */
+  async function ask(question, { signal, onToken, now = new Date() } = {}) {
+    const picked = await find(question, { signal, now });
+    const sources = sourcesOf(picked);
+    if (!picked.length) return { text: NOT_FOUND, sources, quoted: false };
+    const raw = await ai.chat(ragMessages(question, picked, now), { maxTokens: 400, temperature: 0.2, signal, onToken });
+    return { ...finishAnswer(raw, question, picked), sources };
   }
 
-  return { write, pickTags, autoTags, autoEvents, polish, ask };
+  /**
+   * 매직 에이전트: 질문이면 답, 할 일이면 확인 카드 (바꾸는 일은 부른 쪽이 사용자 확인 뒤에 한다)
+   *   → { kind: 'answer', text, sources } | { kind: 'summary', topic, text, sources } | { kind: 'confirm', action, targets? }
+   *   action: { type: 'event', title, when } | { type: 'memo', body } | { type: 'append', id, text }
+   */
+  async function agent(text, { signal, onToken, now = new Date() } = {}) {
+    let intent = detectIntent(text, { now });
+    // "내일 일정 알려줘" 처럼 시각 없이 일정을 물으면 넣기가 아니라 일정 답 ("내일 3시 치과 알려줘" 는 넣기)
+    const sq = scheduleQuery(text, now);
+    if (sq && intent.action === 'event' && !intent.when.hasTime && !intent.when.repeat && /일정|약속|스케줄|계획|뭐\s*있|할\s*일/.test(text)) intent = { action: 'answer' };
+    if (intent.unsure) {
+      const p = planMessages(text);
+      const keep = intent;
+      intent = await ai.chat(p.messages, { schema: p.schema, temperature: 0, maxTokens: 200, signal }).then((j) => planResult(j, text, { now }), () => keep);
+      if (intent.action === 'answer' && keep.action === 'event') intent = keep; // 날짜가 든 짧은 명령은 일정으로 (확인 카드에서 고칠 수 있다)
+    }
+    if (signal?.aborted) throw new Error('멈췄어요');
+    if (intent.action === 'event') return { kind: 'confirm', action: { type: 'event', title: intent.title, when: intent.when } };
+    if (intent.action === 'memo') {
+      // 내용 없이 "출시 준비 체크리스트 만들어줘" 면 모델이 초안 항목을 (확인 카드에서 고친다)
+      if (intent.list ? !intent.items.length : !intent.text) {
+        const d = memoDraftMessages(text, intent);
+        intent = await ai.chat(d.messages, { schema: d.schema, temperature: 0.3, maxTokens: 400, signal }).then((j) => memoDraftResult(j, intent), () => intent);
+      }
+      return { kind: 'confirm', action: { type: 'memo', body: memoBody(intent) }, drafted: Boolean(intent.drafted) };
+    }
+    if (intent.action === 'append') {
+      const targets = appendTargets(intent.target, memos());
+      if (!targets.length) return { kind: 'answer', text: `"${intent.target}" 메모를 찾지 못했어요. 덧붙일 메모의 제목으로 다시 말해 주세요.`, sources: [] };
+      return { kind: 'confirm', action: { type: 'append', id: targets[0].id, text: appendText(intent.content) }, targets };
+    }
+    if (intent.action === 'summary') {
+      const picked = (await find(intent.topic, { signal, limit: 6, now })).filter((m) => m.via !== 'graph');
+      if (!picked.length) return { kind: 'answer', text: NOT_FOUND, sources: [] };
+      const raw = await ai.chat(summaryMessages(intent.topic, picked), { maxTokens: 500, temperature: 0.2, signal, onToken });
+      const body = String(raw).trim().replace(/\[(\d+)\]/g, (all, n) => (Number(n) >= 1 && Number(n) <= picked.length ? all : ''));
+      return { kind: 'summary', topic: intent.topic, text: body || NOT_FOUND, sources: sourcesOf(picked) };
+    }
+    // 일정을 물으면 ("내일 뭐 있어?") 일정 탭에서 바로 — 모델 없이, 틀릴 일 없이
+    if (sq) {
+      const events = eventsIn(reminders(), sq, occurrencesBetween);
+      if (events.length || !sq.words.length) {
+        const ids = [...new Set(events.map((e) => e.memoId))];
+        return { kind: 'answer', text: scheduleText(sq, events, now), sources: ids.map((id) => ({ id, title: events.find((e) => e.memoId === id).title, via: 'event' })) };
+      }
+    }
+    return { kind: 'answer', ...(await ask(text, { signal, onToken, now })) };
+  }
+
+  return { write, pickTags, autoTags, autoEvents, polish, ask, agent };
 }

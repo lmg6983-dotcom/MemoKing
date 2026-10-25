@@ -12,8 +12,7 @@
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .mk-ctx { --ctx-bg: #2b2b2b; --ctx-text: #f1f1f1; --ctx-muted: #a6a6a6; --ctx-line: rgba(255, 255, 255, 0.12); --ctx-hover: rgba(255, 255, 255, 0.1); --ctx-danger: #ff6b70; }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .mk-ctx { --ctx-bg: #2b2b2b; --ctx-text: #f1f1f1; --ctx-muted: #a6a6a6; --ctx-line: rgba(255, 255, 255, 0.12); --ctx-hover: rgba(255, 255, 255, 0.1); --ctx-danger: #ff6b70; }
+
 .mk-ctx.closing { opacity: 0; transition: opacity 0.09s; pointer-events: none; animation: none; }
 @keyframes mk-ctx-in { from { opacity: 0; transform: scale(0.97) translateY(-2px); } }
 .mk-ctx-icons { display: flex; gap: 2px; padding: 2px 2px 6px; margin-bottom: 4px; border-bottom: 1px solid var(--ctx-line); }

@@ -25,14 +25,11 @@ export const webPreferences = {
 export const windowIcon = { icon: APP_ICON };
 
 // 메모 창이 뜨는 순간의 배경색은 core/memo-file.js 의 NOTE_BG
-
-// 메모킹 Work / Life 를 나눠 쓰면: Work 는 어두운 화면 · Life 는 밝은 화면 (시스템 설정과 상관없이) — 목록 창은 지금 모드, 메모 창은 그 메모의 모드.
 //   나눠 쓰지 않으면 mode 는 null — 예전처럼 시스템 설정을 따른다
-let listMode = null;
-const darkFor = (mode) => (mode ? mode === 'work' : nativeTheme.shouldUseDarkColors);
-export const setListTheme = (mode) => (listMode = mode ?? null);
-export const listBg = () => (darkFor(listMode) ? '#0e0e0d' : '#f6f5f1');
-export const noteBg = (color, mode = null) => NOTE_BG[darkFor(mode) ? 'dark' : 'light'][color] ?? NOTE_BG.light.yellow;
+// 화면 밝기는 늘 시스템 설정 (0.70.0 — Work 를 어둡게 하던 것은 그만둠. Work / Life 는 작업 표시줄 · 트레이 표시와 모드 태그로)
+const dark = () => nativeTheme.shouldUseDarkColors;
+export const listBg = () => (dark() ? '#0e0e0d' : '#f6f5f1');
+export const noteBg = (color) => NOTE_BG[dark() ? 'dark' : 'light'][color] ?? NOTE_BG.light.yellow;
 
 export function guardWindow(win, { openWebPage } = {}) {
   win.webContents.on('will-navigate', (event) => event.preventDefault());
@@ -64,11 +61,11 @@ export function setTitleBarDim(level) {
 }
 
 export function titleBarOverlay() {
-  const dark = darkFor(listMode);
-  const base = dark ? '#0e0e0d' : '#f6f5f1';
+  const isDark = dark();
+  const base = isDark ? '#0e0e0d' : '#f6f5f1';
   return {
-    color: currentTitleBarDim ? TITLEBAR_DIM[dark ? 'dark' : 'light'][currentTitleBarDim] : base,
-    symbolColor: dark ? '#f5f4ef' : '#111111',
+    color: currentTitleBarDim ? TITLEBAR_DIM[isDark ? 'dark' : 'light'][currentTitleBarDim] : base,
+    symbolColor: isDark ? '#f5f4ef' : '#111111',
     height: 44,
   };
 }

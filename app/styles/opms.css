@@ -8,8 +8,6 @@ body {
   --sel: #fff1b8;
 }
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) body { --op-accent: #8fb3ff; --sel: rgba(255, 205, 0, 0.18); } }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
- :where(:root[data-theme="dark"]) body { --op-accent: #8fb3ff; --sel: rgba(255, 205, 0, 0.18); } 
 
 .op-top { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
 .op-search { display: flex; gap: 8px; max-width: 520px; }

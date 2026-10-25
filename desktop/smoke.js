@@ -1157,15 +1157,23 @@ export async function runSmoke({
         await stickerOf(newTab)?.webContents.executeJavaScript(`window.memoking.sticker.peel()`).catch(() => {});
         await until(() => !noteWins.get(newTab).isAlwaysOnTop(), '늘 위 끄기').catch(() => {});
         // 테이프(바탕화면에 붙이기)도 스택의 탭 모두에 — 탭을 바꾸면 같은 테이프가 새 탭으로 옮겨 간다
-        await until(() => !stickerOf(newTab), '왕관 떼어짐').catch(() => {});
+        // 왕관이 탭 모두에서 떨어진 뒤에 테이프를 붙인다 (Windows 러너에서 덜 떨어진 채 누르면 테이프가 안 붙을 때가 있었다)
+        const memosOf = () => stacks.stackOf(newTab)?.memos ?? [];
+        await until(() => !stickerOf(newTab) && memosOf().every((m) => !getSettings().onTop?.[m] && !noteWins.get(m)?.isAlwaysOnTop()), '왕관 떼어짐').catch(() => {});
+        const tapeState = () => ({
+          memos: memosOf().map((m) => ({ shown: tabShown(m), onTop: Boolean(getSettings().onTop?.[m]), onBottom: Boolean(getSettings().onBottom?.[m]), aot: noteWins.get(m)?.isAlwaysOnTop(), sticker: stickers.get(noteWins.get(m)?.id)?.kind ?? null })),
+          stickerVisible: Boolean(stickerOf(newTab)?.isVisible()),
+        });
+        const beforeTape = tapeState();
         await js(noteWins.get(newTab), `document.getElementById('tape-btn').click()`);
-        const tapedAll = await until(() => stickerOf(newTab)?.isVisible() && stacks.stackOf(newTab).memos.every((m) => getSettings().onBottom?.[m] === true), '스택 테이프').catch(() => false);
+        const tapedAll = await until(() => stickerOf(newTab)?.isVisible() && memosOf().every((m) => getSettings().onBottom?.[m] === true), '스택 테이프').catch(() => false);
+        const afterTape = tapeState();
         const tape1 = stickerOf(newTab);
         await key(noteWins.get(newTab), 'Tab', ['control']);
         await until(() => tabShown(sC.id) && !tabShown(newTab), 'Ctrl+Tab (테이프)').catch(() => {});
         await wait(400);
         const moved = stickerOf(sC.id) === tape1 && stickers.get(noteWins.get(sC.id).id)?.kind === 'tape' && !noteWins.get(sC.id).isAlwaysOnTop();
-        check('테이프 붙인 스택: 탭 모두 바탕화면에, 탭을 바꿔도 같은 테이프가 옮겨 감', tapedAll && moved, JSON.stringify({ tapedAll: Boolean(tapedAll), moved }));
+        check('테이프 붙인 스택: 탭 모두 바탕화면에, 탭을 바꿔도 같은 테이프가 옮겨 감', tapedAll && moved, JSON.stringify({ tapedAll: Boolean(tapedAll), moved, beforeTape, afterTape, end: tapeState() }));
         await stickerOf(sC.id)?.webContents.executeJavaScript(`window.memoking.sticker.peel()`).catch(() => {});
         await until(() => stacks.stackOf(sC.id).memos.every((m) => !getSettings().onBottom?.[m]), '테이프 떼기').catch(() => {});
         await key(noteWins.get(sC.id), 'Tab', ['control', 'shift']);
@@ -1175,9 +1183,30 @@ export async function runSmoke({
       const moved = { x: aBounds.x + 30, y: aBounds.y + 20, width: 340, height: 320 };
       noteWins.get(newTab).setBounds(moved);
       noteWins.get(newTab).emit('moved');
-      await wait(100);
-      const same = stacks.stackOf(sA.id).memos.every((m) => { const b = noteWins.get(m)?.getBounds(); return !b || (b.x === moved.x && b.y === moved.y && b.width === moved.width); });
-      check('창을 옮기면 모든 탭이 같은 자리·크기', same);
+      // 숨은 탭은 메인이 따라 옮긴다 — Windows 러너는 100ms 안에 끝나지 않을 때가 있어 맞을 때까지 기다린다
+      const tabBounds = () => stacks.stackOf(sA.id).memos.map((m) => noteWins.get(m)?.getBounds()).filter(Boolean);
+      const same = await until(() => tabBounds().every((b) => b.x === moved.x && b.y === moved.y && b.width === moved.width), '탭 자리 맞춤', 3000).catch(() => false);
+      // 따라오지 않은 탭이 왜 그런지 (보이는 채 남았는지 · 왕관/테이프가 남았는지 · 최소화)
+      const tabInfo = () => stacks.stackOf(sA.id).memos.map((m) => { const w = noteWins.get(m); return w && { me: m === newTab, visible: w.isVisible(), minimized: w.isMinimized(), opacity: w.getOpacity(), aot: w.isAlwaysOnTop(), onTop: Boolean(getSettings().onTop?.[m]), onBottom: Boolean(getSettings().onBottom?.[m]), sticker: stickers?.get(w.id)?.kind ?? null, saved: getSettings().noteBounds?.[m], ...w.getBounds() }; });
+      const hidden = tabInfo();
+      // 사용자가 보는 것: 탭을 하나씩 바꿔 보이면 모두 옮긴 자리 · 크기 (Ctrl+Tab 으로 한 바퀴 — 다시 지금 탭으로)
+      //   숨은 창의 자리는 Windows 러너에서 테이프를 붙였다 뗀 탭만 늦게 따라올 때가 있어, 보일 때의 자리로 본다 (숨은 자리는 아래 기록에)
+      const shownAt = [];
+      const order = stacks.stackOf(newTab).memos;
+      // 한 탭만 보일 때까지 (Windows 는 바꾸는 동안 잠깐 둘이 보인다 — 그때 Ctrl+Tab 을 엉뚱한 창에 보내지 않게)
+      const onlyShown = (id) => order.filter(tabShown).length === 1 && tabShown(id);
+      for (let i = 1; i <= order.length; i++) {
+        const cur = order[(order.indexOf(newTab) + i - 1) % order.length];
+        const next = order[(order.indexOf(newTab) + i) % order.length];
+        await until(() => onlyShown(cur), '한 탭만', 3000).catch(() => {});
+        await key(noteWins.get(cur), 'Tab', ['control']);
+        const b = await until(() => onlyShown(next) && (() => { const r = noteWins.get(next).getBounds(); return r.x === moved.x && r.y === moved.y && r.width === moved.width && r; })(), '탭 자리 (보일 때)', 4000)
+          .catch(() => ({ ...(noteWins.get(next)?.getBounds() ?? {}), shown: order.filter(tabShown).map((m) => m.slice(0, 6)) }));
+        shownAt.push({ tab: next === newTab ? 'me' : next.slice(0, 6), ...b });
+      }
+      const backHome = await until(() => onlyShown(newTab), '지금 탭으로 돌아옴', 3000).catch(() => false);
+      const shownSame = shownAt.every((b) => b.x === moved.x && b.y === moved.y && b.width === moved.width);
+      check('창을 옮기면 모든 탭이 같은 자리·크기 (탭을 바꿔 보이면 옮긴 자리)', shownSame && backHome, JSON.stringify({ moved, shownAt, backHome, hiddenSame: Boolean(same), hidden }));
       // 탭의 × → 스택에서 빼고 닫기
       await js(noteWins.get(newTab), `document.querySelector('.stack-close[data-close-tab="${newTab}"]').click()`);
       const closedTab = await until(() => !noteWins.has(newTab) && !stacks.stackOf(newTab), '× 빼기').catch(() => false);
@@ -1652,8 +1681,8 @@ export async function runSmoke({
       const sites = await listJs(`[...document.querySelectorAll('#magic-modules-list .magic-site select')].map((s) => s.value)`);
       await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'google'; s.dispatchEvent(new Event('change')); })()`);
       const engine = await until(() => appSettings().magic.engine === 'google' && 'google', '기본 검색 사이트 저장').catch(() => appSettings().magic.engine);
-      check('설정 매직키: 계산기 · 웹 검색 · AI에게 묻기 켜짐, 기본 사이트(네이버 · ChatGPT)를 고르면 저장',
-        ['계산기:true', '웹 검색:true', 'AI에게 묻기:true'].every((m) => mods.includes(m)) && sites.join() === 'naver,chatgpt' && engine === 'google', JSON.stringify({ mods, sites, engine }));
+      check('설정 매직키: 계산기 · 웹 검색 · 매직 에이전트 켜짐, 기본 사이트(네이버 · ChatGPT)를 고르면 저장',
+        ['계산기:true', '웹 검색:true', '매직 에이전트:true'].every((m) => mods.includes(m)) && sites.join() === 'naver,chatgpt' && engine === 'google', JSON.stringify({ mods, sites, engine }));
       await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'naver'; s.dispatchEvent(new Event('change')); })()`);
       await listJs(`document.getElementById('set-magic').scrollIntoView()`);
       await wait(200);
@@ -1708,6 +1737,35 @@ export async function runSmoke({
       check('AI 비서 연결: 끊으면 메모킹만 빠짐', removed && JSON.parse(fs.readFileSync(cfg, 'utf8')).mcpServers.other?.command === 'x');
       delete process.env.MEMOKING_CLAUDE_CONFIG;
     }
+    // Work / Life (0.70.0): 밝기는 시스템 그대로 · 카드에 고칠 수 없는 모드 태그 · 트레이 글
+    {
+      await js(lw, `window.memoking.mode.setWorkLife(true)`);
+      await wait(600);
+      const tag = await js(lw, `document.querySelector('#cards .card .mode-tag')?.textContent ?? null`); // 점검 메모는 모두 Life
+      await js(lw, `window.memoking.mode.set('work')`);
+      await wait(600);
+      const look = { tag, theme: await js(lw, `document.documentElement.dataset.theme ?? null`) };
+      await js(lw, `window.memoking.mode.set('life')`);
+      await js(lw, `window.memoking.mode.setWorkLife(false)`);
+      await wait(400);
+      const off = await js(lw, `!document.querySelector('#cards .card .mode-tag')`);
+      check('Work / Life: Work 로 바꿔도 화면 밝기는 시스템 그대로, 카드에 모드 태그(Life), 나누기를 끄면 태그 없음', look.theme === null && look.tag === 'Life' && off, JSON.stringify({ look, off }));
+    }
+    // 문제 보내기: 화면에서 난 오류가 이 PC 의 기록에 남고, 누르면 그 기록을 붙인 새 메일 (smoke 에서는 열지 않고 주소만)
+    {
+      await js(lw, `console.error('스모크 화면 오류 기록')`);
+      const logged = await until(() => {
+        try {
+          return fs.readFileSync(path.join(app.getPath('userData'), 'logs', 'memoking.log'), 'utf8').includes('스모크 화면 오류 기록');
+        } catch {
+          return false;
+        }
+      }, '오류 기록', 3000).catch(() => false);
+      const before = smokeOpened.length;
+      await js(lw, `document.getElementById('report-btn').click()`);
+      const mail = await until(() => smokeOpened.slice(before).find((o) => o.kind === 'mail'), '문제 보내기', 3000).catch(() => null);
+      check('문제 보내기: 화면 오류가 기록에 남고, 누르면 그 기록을 붙인 새 메일', logged && Boolean(mail) && decodeURIComponent(mail.target).includes('스모크 화면 오류 기록'), JSON.stringify({ logged, mail: mail?.target?.slice(0, 80) }));
+    }
     await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight / 2 - 120; })()`);
     await capture(lw, 'smoke-settings-2.png');
     await js(lw, `(() => { const d = document.getElementById('settings-dialog'); d.scrollTop = d.scrollHeight; })()`);
@@ -1745,7 +1803,8 @@ export async function runSmoke({
     }
 
     // 점검용 웹 서버의 "없는 사진"을 화면이 불러오다 생기는 네트워크 오류는 예상된 것
-    const unexpected = errors.filter((m) => !/^Failed to load resource: the server responded with a status of 404/.test(m));
+    // "스모크 화면 오류 기록" 은 문제 보내기 점검이 일부러 남긴 것
+    const unexpected = errors.filter((m) => !/^Failed to load resource: the server responded with a status of 404/.test(m) && !m.includes('스모크 화면 오류 기록'));
     check('콘솔 오류 없음', unexpected.length === 0, unexpected.join(' / '));
     exitCode = checks.every((c) => c.ok) ? 0 : 1;
   } catch (err) {

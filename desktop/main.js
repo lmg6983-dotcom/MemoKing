@@ -6,6 +6,8 @@ import {
 import { contextMenuTemplate } from './context-menu.js';
 import fs from 'node:fs';
 import os from 'node:os';
+import { createErrorLog, problemMail } from './error-log.js';
+import { MODE_LABEL } from '../app/js/core/modes.js';
 import path from 'node:path';
 import { Vault } from './vault.js';
 import { createAlarmRunner } from './alarms.js';
@@ -41,7 +43,7 @@ import { quietAlarm, modeClock, normalizeHours } from '../app/js/core/work-hours
 
 import {
   APP_ICON, APP_ICON_PNG, ASSETS_DIR,
-  noteBg, titleBarOverlay, bringToFront, broadcast, setListTheme, listBg,
+  noteBg, titleBarOverlay, bringToFront, broadcast, listBg,
 } from './window-utils.js';
 
 import {
@@ -219,6 +221,8 @@ function openVault(dir) {
       if (sandbox?.real === next) return; // 연습 중: 화면은 연습 공간 것 (돌아올 때 목록을 다시 그린다)
       windowManager.pushList();
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));
+      // 휴대폰에서 쓴 메모: 정해 둔 PC 한 대만 AI 태그 · 일정 (설정 › AI 도우미 › 휴대폰 메모도 이 PC에서)
+      if (settings.aiPhone === true) aiTagger?.later(external.filter((id) => !removed.includes(id) && next.get(id)?.device === 'phone'));
       for (const id of removed) windowManager.sendToNote(id, 'memo:removed');
       if (removed.length || ids.some((id) => memoHotkeys.slotOf(id))) memoHotkeys.refresh();
       showHandoff(external.filter((id) => !removed.includes(id)).map((id) => next.get(id)));
@@ -365,20 +369,30 @@ let quietCount = 0; // 퇴근 뒤 조용히 넘긴 Work 알림
 const workLifeOn = () => settings.workLife === true;
 /** 지금 보는 모드 (나눠 쓰지 않으면 늘 Life) */
 const viewMode = () => (workLifeOn() && settings.mode === 'work' ? 'work' : 'life');
-/** 화면 밝기를 정할 모드 — 나눠 쓰지 않으면 null (시스템 설정) */
-const themeMode = (mode = viewMode()) => (workLifeOn() ? mode : null);
+// 지금 모드는 화면을 바꾸지 않고(밝기는 늘 시스템 설정) 앱 밖에서만 보인다: 작업 표시줄 아이콘의 작은 표시 · 트레이 글.
+//   메모마다의 모드는 카드 · 메모 창의 고칠 수 없는 Work / Life 태그로 (core/modes.js modeTag)
+const MODE_BADGE = { work: path.join(ASSETS_DIR, 'icons', 'mode-work.png'), life: path.join(ASSETS_DIR, 'icons', 'mode-life.png') };
+let badgeMode = null; // 작업 표시줄에 붙여 둔 표시 — 바뀔 때만 다시 (창을 열 때마다 모든 창에 부르지 않게)
+function setBadge(w, mode) {
+  if (process.platform !== 'win32' || !w || w.isDestroyed()) return;
+  w.setOverlayIcon(mode ? nativeImage.createFromPath(MODE_BADGE[mode]) : null, mode ? `메모킹 ${MODE_LABEL[mode]}` : '');
+}
+function showModeOutside() {
+  const mode = workLifeOn() ? viewMode() : null;
+  tray?.setToolTip(mode ? `메모킹 · ${MODE_LABEL[mode]}` : '메모킹: 누르면 메모 목록이 열려요');
+  if (mode === badgeMode) return;
+  badgeMode = mode;
+  for (const w of [windowManager.listWin, ...windowManager.noteWins.values()]) setBadge(w, mode);
+}
+// 새로 연 목록 · 메모 창에도 (표시를 붙여 둔 때만, 그 창 하나만)
+app.on('browser-window-created', (_e, w) => {
+  if (badgeMode) setImmediate(() => (w === windowManager.listWin || [...windowManager.noteWins.values()].includes(w)) && setBadge(w, badgeMode));
+});
 
-/** 모드 · 나누기가 바뀌었을 때: 새 메모 · 목록 창 · 작은 창 · 열린 메모 창의 밝기 */
+/** 모드 · 나누기가 바뀌었을 때: 새 메모의 모드 · 작업 표시줄 · 트레이 · 열린 창들 */
 function applyAppMode() {
   if (vault) vault.defaultMode = viewMode();
-  setListTheme(themeMode()); // Work 는 어두운 화면 — 창 버튼 줄 · 창 바탕도 함께
-  windowManager.listWin?.setTitleBarOverlay(titleBarOverlay());
-  windowManager.listWin?.setBackgroundColor(listBg());
-  for (const w of BrowserWindow.getAllWindows()) themeWindow(w);
-  for (const [id, win] of windowManager.noteWins) {
-    const m = vault?.get(id);
-    if (!win.isDestroyed()) win.setBackgroundColor(noteBg(m?.color, themeMode(m?.mode ?? 'life')));
-  }
+  showModeOutside();
   broadcast('mode:changed', { mode: viewMode(), enabled: workLifeOn() });
 }
 
@@ -399,19 +413,6 @@ function setWorkLife(on) {
   if (settings.workLife) workClock();
   return settings.workLife;
 }
-// 작은 창들(매직키 · 스티커 · 말풍선 · 단축키 설정 · PDF …)도 지금 모드의 밝기로 — Work 는 어둡게, Life 는 밝게.
-//   목록 창 · 메모 창은 스스로 정하고(메모 창은 그 메모의 모드), 인쇄할 종이(print.html)는 늘 밝게
-const SELF_THEMED = /\/(index|note|print)\.html/;
-function themeWindow(w) {
-  const wc = w?.webContents;
-  if (!wc || wc.isDestroyed()) return;
-  const url = wc.getURL();
-  if (!url.startsWith('file:') || SELF_THEMED.test(url)) return;
-  const mode = themeMode();
-  const js = mode ? `document.documentElement.dataset.theme = ${JSON.stringify(mode === 'work' ? 'dark' : 'light')}` : 'delete document.documentElement.dataset.theme';
-  wc.executeJavaScript(js).catch(() => {});
-}
-app.on('browser-window-created', (_e, w) => w.webContents.on('dom-ready', () => themeWindow(w)));
 
 // 업무 시간이 시작되면 Work, 끝나면 Life (저절로 바꾸기를 켰을 때만 · 경계를 넘을 때만)
 const workClock = modeClock({
@@ -724,6 +725,7 @@ function initAi() {
     ai,
     memos: () => vault?.bodies() ?? [],
     graph: () => vault?.index?.memos ?? [],
+    reminders: () => vault?.allReminders() ?? [],
   });
   aiTagger = createAiTagger({
     getVault: () => vault,
@@ -890,7 +892,12 @@ function dropSandbox() {
   vault.close();
   vault = box.real;
   sandbox = null;
-  fs.rmSync(box.dir, { recursive: true, force: true });
+  // Windows 는 막 닫은 파일을 잠깐 붙잡고 있어 ENOTEMPTY 가 날 수 있다 — 몇 번 다시, 그래도 안 되면 임시 폴더라 남겨 둔다
+  try {
+    fs.rmSync(box.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch (err) {
+    console.error('연습 폴더를 지우지 못했어요 (임시 폴더라 Windows 가 나중에 치워요)', err.message);
+  }
   for (const id of ids) {
     delete settings.noteBounds[id];
     delete settings.onTop?.[id];
@@ -1104,7 +1111,7 @@ setInterval(() => {
 
 function createTray() {
   tray = new Tray(process.platform === 'win32' ? APP_ICON : APP_ICON_PNG);
-  tray.setToolTip('메모킹: 누르면 메모 목록이 열려요');
+  showModeOutside();
   tray.on('click', () => windowManager.createListWindow());
   tray.on('double-click', () => windowManager.createListWindow());
   updateTrayMenu();
@@ -1220,7 +1227,46 @@ app.on('second-instance', (_e, argv) => {
 });
 
 // 오른쪽 클릭 메뉴 (모든 창 — 메모 글 · 글 칸 · 링크 · 그림 · 맞춤법). 무엇을 넣는지는 context-menu.js
+// ---------- 오류 기록 · 문제 보내기 (desktop/error-log.js — 이 PC 에만) ----------
+let errorLog = null;
+const errors = () => (errorLog ??= createErrorLog(path.join(app.getPath('userData'), 'logs', 'memoking.log')));
+const consoleError = console.error.bind(console);
+// 글로 바꾸다 오류가 나도(서로를 가리키는 객체 등) 기록하던 곳이 멈추지 않게
+const logText = (a) => {
+  if (a instanceof Error) return a.stack ?? a.message;
+  if (typeof a === 'string') return a;
+  try {
+    return JSON.stringify(a);
+  } catch {
+    return String(a);
+  }
+};
+console.error = (...args) => {
+  consoleError(...args);
+  errors().write(args.map(logText).join(' '));
+};
+app.on('render-process-gone', (_e, wc, details) => errors().write(`[창 꺼짐] ${wc.getURL().split('/').pop()} ${details.reason} (${details.exitCode})`));
+
+/** 설정 › 문제 보내기: 최근 기록은 클립보드에, 들어가는 만큼은 새 메일 본문에 (보낼지는 사용자가) */
+async function reportProblem() {
+  const lines = errors().tail(300);
+  const version = app.getVersion();
+  const osName = `${os.type()} ${os.release()}`;
+  clipboard.writeText([`메모킹 v${version} · ${osName}`, ...lines].join('\n'));
+  const url = problemMail({ to: 'lmg6983@gmail.com', version, os: osName, lines });
+  if (SMOKE) return smokeOpened.push({ kind: 'mail', target: url }), { ok: true, lines: lines.length };
+  await shell.openExternal(url).catch(() => {});
+  return { ok: true, lines: lines.length };
+}
+
 app.on('web-contents-created', (_e, wc) => {
+  // 화면 코드의 오류도 기록에 (Electron 의 console-message — 예전 꼴(level 숫자)도 함께)
+  wc.on('console-message', (e, level, message, line, source) => {
+    const lvl = e?.level ?? level;
+    if (lvl !== 'error' && lvl !== 3) return;
+    const src = String(e?.sourceId ?? source ?? '').split('/').pop();
+    errors().write(`[화면] ${e?.message ?? message} (${src}:${e?.lineNumber ?? line})`);
+  });
   wc.on('context-menu', (_event, params) => {
     const win = BrowserWindow.fromWebContents(wc);
     // 메모 폴더 안 그림(memoking://vault/…)만 파일로 저장할 수 있다 (웹 그림은 복사만)
@@ -1297,6 +1343,7 @@ app.whenReady().then(async () => {
     openVault,
     vaultInfo,
     retryMissingVault,
+    reportProblem,
     whatsNew,
     suggestedVaultPath,
     appSettings: () => appSettings(vault, fileIndex, shortcutStatus, shortcutLabel),
@@ -1358,8 +1405,10 @@ app.whenReady().then(async () => {
   }
 
   nativeTheme.on('updated', () => {
+    // 화면 밝기는 시스템 설정을 따른다 — 창 버튼 줄 · 창 바탕만 다시 (화면 글은 CSS 가 스스로)
     windowManager.listWin?.setTitleBarOverlay(titleBarOverlay());
-    applyAppMode(); // 나눠 쓰지 않으면 시스템 설정을 따르므로 다시
+    windowManager.listWin?.setBackgroundColor(listBg());
+    for (const [id, win] of windowManager.noteWins) if (!win.isDestroyed()) win.setBackgroundColor(noteBg(vault?.get(id)?.color));
   });
 
   for (const w of BrowserWindow.getAllWindows()) w.on('session-end', flushOpmsFiles);
@@ -1393,7 +1442,6 @@ app.whenReady().then(async () => {
     if (!runSmoke) return;
     prepareSmoke(app.getPath('userData'));
     loadSettings();
-    setListTheme(themeMode());
     initHistory();
     openVault(settings.vaultPath);
     runSmoke({
@@ -1422,6 +1470,11 @@ app.whenReady().then(async () => {
       stackInto: (targetId, movingId) => windowManager.stackInto(targetId, movingId),
       getTabTear: () => windowManager.tabTear,
       getSettings: () => settings,
+      // 점검 전용: 글 모델 대신 정해 둔 답을 하는 가짜 모델 (매직 에이전트 화면 · 실행 흐름 점검)
+      setAi: (fake) => {
+        ai = fake;
+        aiTasks = createAiTasks({ ai, memos: () => vault?.bodies() ?? [], graph: () => vault?.index?.memos ?? [], reminders: () => vault?.allReminders() ?? [] });
+      },
       stickers: windowManager.stickers,
       reloadSettings: loadSettings,
       startAreaCapture: (opts) => windowManager.startAreaCapture(opts),
@@ -1450,7 +1503,6 @@ app.whenReady().then(async () => {
   }
 
   loadSettings();
-  setListTheme(themeMode()); // 목록 창은 지금 모드의 화면 (Work 는 어둡게 · 나눠 쓰지 않으면 시스템 설정)
   initHistory();
   initDrive();
 

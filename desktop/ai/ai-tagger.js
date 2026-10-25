@@ -7,19 +7,21 @@ import { appendTags, removeTags } from '../../app/js/core/tag-suggest.js';
 import { isBlankBody } from '../../app/js/core/memo-file.js';
 import { MAX_TAGS } from '../../app/js/core/ai-tasks.js';
 
+const SETTLE_MS = 60_000; // 휴대폰에서 쓰는 중인 메모는 1분 조용해진 뒤에
 // 이보다 오래된 메모를 처음 볼 때는 일정을 넣지 않고 본 줄로만 ("내일" 이 쓴 날이 아니라 오늘 기준으로 계산되므로)
 const FRESH_MS = 24 * 60 * 60_000;
 
 /**
  * @param {{ getVault: () => any, tasks: () => { autoTags: Function, autoEvents: Function }, ready: () => Promise<boolean>,
  *   isOpen: (id: string) => boolean, enabled: () => boolean, eventsOn?: () => boolean,
- *   onEvents?: (id: string, events: object[]) => void, onProgress?: (p: object | null) => void }} o  enabled: 태그
- *   다른 기기(휴대폰)에서 들어온 메모는 여기서 하지 않는다 — PC 가 여러 대면 저마다 고쳐 써서 Drive 충돌 사본이 생기므로, 열었다 닫을 때만
+ *   onEvents?: (id: string, events: object[]) => void, onProgress?: (p: object | null) => void, settleMs?: number }} o  enabled: 태그
+ *   휴대폰에서 들어온 메모(later)는 설정에서 정한 PC 한 대만 — PC 가 여러 대면 저마다 고쳐 써서 Drive 충돌 사본이 생기므로
  */
 export function createAiTagger({
-  getVault, tasks, ready, isOpen, enabled, eventsOn = () => false, onEvents = () => {}, onProgress = () => {},
+  getVault, tasks, ready, isOpen, enabled, eventsOn = () => false, onEvents = () => {}, onProgress = () => {}, settleMs = SETTLE_MS,
 }) {
   const queue = new Set();
+  const waiting = new Map(); // id → 타이머 (휴대폰에서 들어온 메모)
   let running = null;
   let batch = null; // 설정의 "모든 메모": { left: Set, done, total }
 
@@ -28,6 +30,17 @@ export function createAiTagger({
   function add(ids) {
     for (const id of ids) queue.add(id);
     return (running ??= run().finally(() => (running = null)));
+  }
+
+  /** 휴대폰에서 들어온 메모: 이어서 쓰는 중일 수 있어 조용해진 뒤에 */
+  function later(ids) {
+    for (const id of ids) {
+      clearTimeout(waiting.get(id));
+      waiting.set(id, setTimeout(() => {
+        waiting.delete(id);
+        add([id]);
+      }, settleMs));
+    }
   }
 
   /** 아직 보지 않은 모든 메모 → { done, total } */
@@ -103,5 +116,5 @@ export function createAiTagger({
     return n;
   }
 
-  return { add, all, stop, clearAll, status: () => batch && { done: batch.done, total: batch.total } };
+  return { add, later, all, stop, clearAll, status: () => batch && { done: batch.done, total: batch.total } };
 }

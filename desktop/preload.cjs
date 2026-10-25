@@ -15,6 +15,7 @@ const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 contextBridge.exposeInMainWorld('memoking', {
   platform: 'desktop',
   info: invoke('app:info'),
+  reportProblem: invoke('app:report-problem'), // 설정 › 문제 보내기 → { ok, lines }
   whatsNew: invoke('app:whats-new'), // 업데이트 뒤 한 번: { version, items: [{ version, title }] } | null
   vault: {
     use: invoke('vault:use'),
@@ -108,6 +109,7 @@ contextBridge.exposeInMainWorld('memoking', {
     setAutoTags: invoke('app:set-auto-tags'),
     setMagicPolish: invoke('app:set-magic-polish'),
     setAutoEvents: invoke('app:set-auto-events'),
+    setAiPhone: invoke('app:set-ai-phone'),
     setLinkPreviews: invoke('app:set-link-previews'),
     setMagic: invoke('app:set-magic'),
     setTrashDays: invoke('app:set-trash-days'),
@@ -190,6 +192,8 @@ contextBridge.exposeInMainWorld('memoking', {
     write: invoke('ai:write'), // { id, task: 'spell' | 'style' | 'draft', … } — 조각은 ai:token · ai:progress 로
     cancel: invoke('ai:cancel'),
     ask: invoke('ai:ask'), // { id, question } → { text, sources: [{ id, title, via }] } — 조각은 ai:token, 색인은 ai:progress
+    agent: invoke('ai:agent'), // 매직 에이전트 { id, text } → 답 { kind: 'answer' | 'summary', … } | 확인 카드 { kind: 'confirm', action }
+    agentRun: invoke('ai:agent-run'), // 확인한 일 실행 (action) → { ok, id, message }
   },
   attachments: {
     save: invoke('attachment:save'),

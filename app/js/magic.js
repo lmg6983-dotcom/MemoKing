@@ -9,13 +9,15 @@ import { isChoseongQuery, choseongRange } from './core/text-match.js';
 import { searchingNode } from './searching.js';
 import { COLOR_DOTS } from './core/memo-file.js';
 import { UI } from './core/ui-text.js';
+import { createAgentView } from './agent-view.js';
 // 매직키 창 — 입력한 글을 바로 메모로(기본), 입력하는 대로 메모·폴더·파일을 찾아 바로 연다.
 //   비어 있으면 최근 메모 · 쓰면 맨 위 "새 메모로 저장" 그 아래 메모 / 폴더 / 파일 (비슷한 것부터 몇 개씩)
 //   다 못 보여 준 나머지는 맨 아래 "다른 n건 더 보기" — 고르면 전체 결과 창(모두 찾기)
 //   ↑↓ 고르기 · ← → 할 일 고르기(열기 · 경로 복사 · 폴더 열기 · 파일 복사, 고른 줄 오른쪽 단추) · Enter 실행
 //   Ctrl+Enter 다른 실행 · Ctrl+Shift+C 경로 복사 · Ctrl+Shift+E 폴더 열기 · Esc 글 지우기 → 닫기
 //   아래 캡슐 = 기능 모듈, 누르면 켜고 끈다 · 끌면 순서를 바꾼다 (결과 묶음도 그 순서, 캡슐과 같은 색 머리말)
-//   계산기: 식이면 맨 위에 결과 (Enter 복사) · 웹 검색 · AI 에게 묻기: 맨 아래 줄, 사이트 단추로 골라 브라우저로 연다
+//   계산기: 식이면 맨 위에 결과 (Enter 복사) · 웹 검색: 맨 아래 줄, 사이트 단추로 골라 브라우저로 연다
+//   AI 줄: 글 모델을 넣은 PC 면 Enter 가 매직 에이전트(이 창 안에 답 · 확인 카드, 목록 검색창 ✦ 와 같은 것), 오른쪽 단추는 웹 AI
 const api = window.magic;
 const box = document.getElementById('magic');
 const input = document.getElementById('magic-input');
@@ -23,6 +25,58 @@ const clearBtn = document.getElementById('magic-clear');
 const resultsEl = document.getElementById('magic-results');
 const modulesEl = document.getElementById('magic-modules');
 const hintEl = document.getElementById('magic-hint');
+const agentEl = document.getElementById('magic-agent');
+
+// 매직 에이전트 칸: 열려 있으면 결과 목록 대신 (Esc 로 결과로 돌아감 · 글을 고치면 닫힘)
+let agentOpen = false;
+const agent = createAgentView({
+  box: agentEl,
+  api: {
+    agent: (req) => api.agent(req),
+    run: (action) => api.agentRun(action),
+    cancel: (id) => api.agentCancel(id),
+    onToken: (cb) => api.onAgentToken(cb),
+    openMemo: async (id) => {
+      await api.openMemo(id).catch(() => {});
+      api.close();
+    },
+  },
+  onChange: () => fit(),
+  onDone: (res) => {
+    flash(true, res.message);
+    if (!res.id) return;
+    input.value = ''; // 한 일은 끝 — 다음에 띄우면 빈 창 (결과 목록도 빈 글로 — Esc 로 돌아가도 지난 결과가 남지 않게)
+    resizeInput();
+    render();
+    search();
+    input.focus();
+  },
+});
+function openAgent() {
+  agentOpen = true;
+  resultsEl.hidden = true;
+  agentEl.hidden = false;
+  agent.start(input.value);
+  fit();
+}
+// 창을 숨기면(닫기 · 다른 곳 누르기) 묻던 것을 멈춘다 — 모델이 뒤에서 계속 돌지 않게
+document.addEventListener('visibilitychange', () => document.hidden && closeAgent());
+// 에이전트 칸 안(확인 카드 단추 · 입력칸)에 포커스가 있어도 Esc 는 결과 목록으로
+document.addEventListener('keydown', (e) => {
+  if (!agentOpen || e.key !== 'Escape' || e.target === input || e.isComposing) return;
+  e.preventDefault();
+  closeAgent();
+  input.focus();
+});
+function closeAgent() {
+  if (!agentOpen) return false;
+  agentOpen = false;
+  agent.reset();
+  agentEl.hidden = true;
+  resultsEl.hidden = false;
+  fit();
+  return true;
+}
 
 
 let modules = []; // { id, name, description, on }
@@ -112,7 +166,8 @@ let prefs = { engine: WEB_ENGINES[0].id, ai: AI_SITES[0].id, opms: false, opmsSh
 //   (글 중간 띄어쓰기 · 맨 앞 0(전화 국번)은 늘 빼고 — core/opms-search blocksAutoOpms)
 const autoOpms = (q) => autoOpmsQuery(q, prefs.opmsShapes);
 async function loadPrefs() {
-  prefs = { ...prefs, ...(await api.prefs?.().catch(() => null)) };
+  const [p, agentOn] = await Promise.all([api.prefs?.().catch(() => null), api.aiReady?.().catch(() => false)]);
+  prefs = { ...prefs, ...p, agent: Boolean(agentOn) }; // agent: 글 모델이 준비됨 → AI 줄은 매직 에이전트
 }
 
 // 계산기: math.js 는 크니(0.6MB) 매직키 창이 처음 뜰 때 뒤에서 불러 둔다 (계산기를 켰을 때만)
@@ -276,7 +331,7 @@ function updatePlaceholder() {
   const memo = isOn('memo');
   const find = ['notes', 'files', 'opms', 'web'].some(isOn);
   // 짧게: 켜진 기능을 하나하나 늘어놓지 않는다 (무엇을 찾는지는 아래 캡슐이 보여 준다)
-  const parts = [memo && '메모 쓰기', find && '찾기', isOn('calc') && '계산', isOn('ai') && 'AI에게 묻기'].filter(Boolean);
+  const parts = [memo && '메모 쓰기', find && '찾기', isOn('calc') && '계산', isOn('ai') && (prefs.agent ? '매직 에이전트' : 'AI에게 묻기')].filter(Boolean);
   input.placeholder = parts.join(', ')
     || (modules.length ? '아래 캡슐을 눌러 기능을 켜 주세요' : '설정의 매직키에서 기능을 켜 주세요');
 }
@@ -362,8 +417,8 @@ function row(r, index, query) {
     s.textContent = r.url;
   } else if (r.kind === 'web' || r.kind === 'ai') {
     ico.append(svgIcon(r.kind));
-    t.textContent = r.kind === 'web' ? '웹에서 찾기' : 'AI에게 묻기';
-    s.textContent = r.sites.map((x) => x.name).join(', '); // 고르면 오른쪽에 사이트 버튼
+    t.textContent = r.kind === 'web' ? '웹에서 찾기' : r.agent ? '매직 에이전트' : 'AI에게 묻기';
+    s.textContent = r.agent ? '내 메모로 답하고 일정 · 메모 · 덧붙이기 · 요약 (Enter) · 웹 AI는 오른쪽 단추' : r.sites.map((x) => x.name).join(', '); // 고르면 오른쪽에 사이트 버튼
   } else if (r.kind === 'opms') {
     ico.textContent = 'O';
     t.append(highlighted([r.ourref, r.n_app].filter(Boolean).join(', ') || r.yourref || '관리번호 없음', query));
@@ -519,7 +574,7 @@ function render() {
   }
   // 웹 검색 · AI 에게 묻기: 고를 때만 브라우저로 연다
   if (query && isOn('web')) put('web', { row: { kind: 'web', sites: sitesInOrder(WEB_ENGINES, prefs.engine) } });
-  if (query && isOn('ai')) put('ai', { row: { kind: 'ai', sites: sitesInOrder(AI_SITES, prefs.ai) } });
+  if (query && isOn('ai')) put('ai', { row: { kind: 'ai', agent: prefs.agent, sites: sitesInOrder(AI_SITES, prefs.ai) } });
 
   const pill = document.createElement('li'); // 고른 줄 표시 (줄 사이를 미끄러져 따라간다)
   pill.className = 'magic-pill';
@@ -529,7 +584,7 @@ function render() {
   let first = true;
   // 묻는 글이면 AI 에게 묻기를 새 메모 바로 아래로 (맨 아래 화면 밖에 묻히지 않게)
   const order = ['calc', 'site', ...modules.map((m) => m.id)];
-  if (groups.has('ai') && looksLikeQuestion(query)) {
+  if (groups.has('ai') && (looksLikeQuestion(query) || (prefs.agent && /(?:해\s*줘|해\s*주세요|줘|주세요|부탁해)\s*[.!?~]*$/.test(query)))) {
     order.splice(order.indexOf('ai'), 1);
     order.splice(order.indexOf('memo') + 1 || 2, 0, 'ai');
   }
@@ -588,7 +643,7 @@ let shrinkTimer = 0;
 function fit() {
   requestAnimationFrame(() => {
     const list = resultsEl.getBoundingClientRect().height;
-    const h = Math.ceil(box.getBoundingClientRect().height - list + (listTarget || list)) + 16;
+    const h = agentOpen ? Math.ceil(box.getBoundingClientRect().height) + 16 : Math.ceil(box.getBoundingClientRect().height - list + (listTarget || list)) + 16;
     clearTimeout(shrinkTimer);
     const apply = () => {
       if (h === winHeight) return; // 높이가 그대로면 창에 묻지 않는다
@@ -715,6 +770,7 @@ async function askOpms() {
 
 let searchTimer = 0;
 input.addEventListener('input', () => {
+  closeAgent(); // 글을 고치면 결과 목록으로 (다시 Enter 로 묻는다)
   resizeInput();
   selected = 0;
   searchOpms();
@@ -768,6 +824,10 @@ async function run(i, { alt = false, act = 0 } = {}) {
     } else flash(false, res?.message ?? '덧붙이지 못했어요');
     return;
   }
+  if (r.kind === 'ai' && id === 'agent') {
+    openAgent();
+    return;
+  }
   if (r.kind === 'more') {
     await api.openAll(input.value.trim()).catch(() => {});
     return;
@@ -814,6 +874,12 @@ function flash(ok, text) {
 
 input.addEventListener('keydown', (e) => {
   if (e.isComposing) return; // 한글 조합 중
+  if (agentOpen && (e.key === 'Escape' || e.key === 'Enter') && !e.shiftKey) {
+    e.preventDefault();
+    if (e.key === 'Escape') closeAgent(); // 결과 목록으로
+    else agent.confirm(); // 확인 카드가 떠 있으면 실행
+    return;
+  }
   if (e.key === 'Escape') {
     e.preventDefault();
     // 먼저 글을 지우고, 비어 있으면 닫는다 — 남겨 둔 지난 글을 그대로 둔 채면 한 번에 닫는다 (글은 다음에도 남음)
@@ -853,6 +919,7 @@ input.addEventListener('keydown', (e) => {
 let retained = false; // 다시 띄웠을 때 남겨 둔 지난 글 (아직 손대지 않음)
 async function reset() {
   clearTimeout(closeTimer);
+  closeAgent();
   flashUntil = 0; // 지난번의 "복사했어요" 안내는 다시 띄울 때 지운다
   selected = 0;
   retained = Boolean(input.value.trim());

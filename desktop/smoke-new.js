@@ -79,7 +79,7 @@ function fakeOpms() {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, gate, hits, host: `http://127.0.0.1:${server.address().port}` })));
 }
 
-export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow, memoHotkeys, smokeHud, windowManager }) {
+export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow, memoHotkeys, smokeHud, windowManager, setAi }) {
   const checks = [];
   const errors = [];
   const check = (name, ok, detail = '') => {
@@ -172,7 +172,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     check('매직키: 결과 묶음은 캡슐 순서대로, 머리말은 여러 줄 묶음에만 · 캡슐 점과 같은 색', groups0 === 'memo,notes,files,web,ai' && heads === 'notes,files' && dotColor, JSON.stringify({ groups0, heads }));
     await typeMagic('견적서 정리해줘');
     const asked = await until(async () => (await groupOrder()).includes('ai') && groupOrder(), '묻는 글');
-    check('매직키: 묻는 글이면 AI에게 묻기가 새 메모 바로 아래', asked.startsWith('memo,ai'), asked);
+    check('매직키: 묻는 글이면 AI 줄(매직 에이전트 · 웹 AI)이 새 메모 바로 아래', asked.startsWith('memo,ai'), asked);
     await typeMagic('견적서');
     await until(async () => (await groupOrder()) === 'memo,notes,files,web,ai', '다시 견적서');
     const at = (mod) => js(magic, `(() => { const r = document.querySelector('.magic-chip[data-mod="${mod}"]').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: r.width }; })()`);
@@ -481,6 +481,25 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         JSON.stringify({ shownBar, groups, doc: await js(w, `document.querySelector('.ProseMirror').innerHTML.slice(0, 200)`) }));
       check('표 막대: 아래 서식 도구막대가 숨어도 제자리 (버튼이 커서를 피하지 않음)', Math.abs(shown - hiddenTop) < 1, JSON.stringify({ shown, hiddenTop }));
 
+      // AI 글쓰기 (0.70.0): 서식 막대 끝 ✦ → 부탁 한 줄 + 칩(맞춤법 · 문체 4) 작은 창, Esc 로 닫힘. 옆 패널 · 메뉴 항목은 없음
+      //   (점검 PC 엔 글 모델이 없어 ✦ 가 숨어 있다 — 보이게 하고 누른다)
+      const aiPop = await js(w, `(() => {
+        const b = document.getElementById('ai-btn');
+        const hiddenNoModel = b.hidden;
+        b.hidden = false;
+        b.click();
+        const pop = document.getElementById('ai-pop');
+        return { hiddenNoModel, inBar: b.parentElement.id === 'format-bar', open: !pop.hidden, chips: [...pop.querySelectorAll('.ai-chip')].map((c) => c.textContent).join(','),
+          focus: document.activeElement?.classList.contains('ai-request'), above: pop.getBoundingClientRect().bottom <= b.getBoundingClientRect().top,
+          oldPanel: !!document.getElementById('ai-panel') };
+      })()`);
+      await capture(w, 'smoke-new-ai-pop.png');
+      key(w, 'Escape');
+      const aiClosed = await until(() => js(w, `document.getElementById('ai-pop').hidden && document.getElementById('ai-btn').getAttribute('aria-expanded') === 'false'`), 'AI 창 닫힘', 2000).catch(() => false);
+      await js(w, `document.getElementById('ai-btn').hidden = true`);
+      check('메모 창 AI: 서식 막대 끝 ✦ → 부탁 한 줄 + 맞춤법 · 문체 칩 작은 창 (✦ 위), Esc 로 닫힘, 옆 패널 없음',
+        aiPop.hiddenNoModel && aiPop.inBar && aiPop.open && aiPop.chips === '맞춤법,해요체,합니다체,간결체,보고서체' && aiPop.focus && aiPop.above && !aiPop.oldPanel && aiClosed, JSON.stringify({ aiPop, aiClosed }));
+
       // 메모 안 찾기 · 바꾸기 (워드처럼 한 막대): Ctrl+F → 찾은 곳 · 개수, Enter 다음, Ctrl+H 바꾸기 줄, Ctrl+Enter 모두 바꾸기, Esc 닫기
       {
         const v0 = getVault();
@@ -519,8 +538,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           acts.length === 4 && new Set(acts.map((a) => a.y)).size === 1 && Math.max(...acts.map((a) => a.w)) - Math.min(...acts.map((a) => a.w)) <= 1 && acts.every((a) => a.h === 28) && Math.max(...gaps) - Math.min(...gaps) <= 1
             && picked.text === '사과' && picked.inEditor && picked.count === '2/3', JSON.stringify({ acts, gaps, picked }));
         await js(fw, `[...document.querySelectorAll('.mk-find-act')].find((b) => b.textContent === '모두 찾기').click(); document.querySelector('.mk-find-rep .mk-find-input').focus()`);
-        await wait(100);
+        // 바꿀 말 칸에 포커스가 간 뒤에 치고, 들어간 것을 본 뒤에 Ctrl+Enter (CI 러너에서 100ms 안에 안 될 때가 있었다)
+        await until(() => js(fw, `document.activeElement === document.querySelector('.mk-find-rep .mk-find-input')`), '바꿀 말 칸', 3000).catch(() => {});
         fw.webContents.insertText('포도');
+        await until(() => js(fw, `document.querySelector('.mk-find-rep .mk-find-input').value === '포도'`), '바꿀 말 입력', 3000).catch(() => {});
         // Ctrl+Enter: sendInputEvent 로는 Ctrl 을 붙인 Enter 가 실제 키보드처럼 오지 않아, 크롬 개발 도구 입력(실제 키보드와 같은 길)으로
         {
           const dbg = fw.webContents.debugger;
@@ -529,13 +550,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           dbg.detach();
         }
         const replaced = await until(() => { const b = v0.get(fid)?.body ?? ''; return /포도 하나, 포도 둘, 포도즙/.test(b) && b; }, '모두 바꾸기 저장', 8000).catch(() => '');
-        if (process.env.MK_SMOKE_TRACE) console.log(`… 바꾸기 상태: ${JSON.stringify(await js(fw, `({ rep: document.querySelector('.mk-find-rep input').value, q: document.querySelector('.mk-find-grid input').value, count: document.querySelector('.mk-find-count').textContent, mode: document.querySelector('.mk-find-bar').dataset.mode, active: document.activeElement?.placeholder, doc: document.querySelector('.ProseMirror').textContent })`))}`);
+        const repState = await js(fw, `({ rep: document.querySelector('.mk-find-rep input').value, q: document.querySelector('.mk-find-grid input').value, count: document.querySelector('.mk-find-count').textContent, mode: document.querySelector('.mk-find-bar').dataset.mode, active: document.activeElement?.placeholder })`);
         key(fw, 'Escape');
         const closedF = await until(() => js(fw, `document.querySelector('.mk-find-bar').hidden && !document.querySelector('.mk-find-hit')`), 'Esc 닫기', 2000).catch(() => false);
         await js(fw, `document.querySelector('.ProseMirror').focus()`);
         key(fw, 'Z', ['control']);
         const undone = await until(() => /사과 하나, 사과 둘, 사과즙/.test(v0.get(fid)?.body ?? ''), '되돌리기', 4000).catch(() => false);
-        check('바꾸기(Ctrl+H): 찾을 말과 같은 폭의 바꿀 말 칸으로 · Ctrl+Enter 모두 바꾸기 · Esc로 닫기 · Ctrl+Z 한 번에 되돌림', repFocus && replaced && closedF && undone, JSON.stringify({ repFocus, replaced: Boolean(replaced), closedF, undone, body: v0.get(fid)?.body }));
+        check('바꾸기(Ctrl+H): 찾을 말과 같은 폭의 바꿀 말 칸으로 · Ctrl+Enter 모두 바꾸기 · Esc로 닫기 · Ctrl+Z 한 번에 되돌림', repFocus && replaced && closedF && undone, JSON.stringify({ repFocus, replaced: Boolean(replaced), closedF, undone, repState, body: v0.get(fid)?.body }));
         fw.close();
       }
 
@@ -1088,9 +1109,9 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '단축키 메모 창');
       const nw = noteWins.get(nid);
       await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '단축키 메모 준비');
-      // 윗막대 번개 단추(불러오기 키) → 3 · 내용 복사만. 정하기 전에는 사선 · 메뉴에는 메모 연결이 있고 소리 받아쓰기는 없다
-      const barBefore = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { inBar: Boolean(b.closest('.bar')), off: b.classList.contains('off'), slash: getComputedStyle(b, '::after').content !== 'none', links: Boolean(document.querySelector('#menu #links-btn')), linksInBar: Boolean(document.querySelector('.bar #links-btn')), transcribe: Boolean(document.getElementById('transcribe-btn')) }; })()`);
-      await js(nw, `document.getElementById('hotkey-btn').click()`);
+      // ⋯ 메뉴의 불러오기 키 정하기 → 3 · 내용 복사만. 정하기 전에는 윗막대에 번개가 없다 · 메뉴에는 메모 연결이 있고 소리 받아쓰기는 없다
+      const barBefore = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { inBar: Boolean(b.closest('.bar')), off: b.classList.contains('off'), hidden: getComputedStyle(b).display === 'none', inMenu: Boolean(document.querySelector('#menu #hotkey-menu-btn')), links: Boolean(document.querySelector('#menu #links-btn')), linksInBar: Boolean(document.querySelector('.bar #links-btn')), transcribe: Boolean(document.getElementById('transcribe-btn')) }; })()`);
+      await js(nw, `document.getElementById('hotkey-menu-btn').click()`);
       await until(() => js(nw, `!!document.querySelector('.hotkey-dialog[open] .hk-key')`), '단축키 창');
       const dlg = await js(nw, `(() => {
         const d = document.querySelector('.hotkey-dialog');
@@ -1114,8 +1135,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const barAfter = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { num: document.getElementById('hotkey-num').textContent, off: b.classList.contains('off'), numShown: getComputedStyle(document.getElementById('hotkey-num')).display !== 'none', title: b.title }; })()`);
       const label = barAfter.num === '3' && /Ctrl\+Alt\+3/.test(barAfter.title) ? 'Ctrl+Alt+3' : '';
       await capture(nw, 'smoke-new-hotkey-bar.png');
-      check('윗막대: 메모 연결 대신 불러오기 키 버튼 (없으면 사선, 정하면 숫자 3) · 메모 연결은 ⋯ 메뉴로 · 소리 받아쓰기 메뉴 없음',
-        barBefore.inBar && barBefore.off && barBefore.slash && barBefore.links && !barBefore.linksInBar && !barBefore.transcribe && !barAfter.off && barAfter.numShown,
+      check('불러오기 키: 정하기 전에는 ⋯ 메뉴에만, 정하면 윗막대에 번개 + 숫자 3 · 메모 연결은 ⋯ 메뉴로 · 소리 받아쓰기 메뉴 없음',
+        barBefore.inBar && barBefore.off && barBefore.hidden && barBefore.inMenu && barBefore.links && !barBefore.linksInBar && !barBefore.transcribe && !barAfter.off && barAfter.numShown,
         JSON.stringify({ barBefore, barAfter }));
       check('메모 단축키 창: 1~9 · 할 일 세 칸 중 하나 · 저장하면 Ctrl+Alt+3에 이 메모 (번개 버튼에 표시)',
         dlg.keys === 9 && dlg.before && dlg.none.modes.length === 3 && dlg.none.picked === 1 && !dlg.after && /^Ctrl\+Alt\+3: 어느 앱에서든 누르면 내용을 복사해요$/.test(dlg.hint) && dlg.legend && dlg.fits
@@ -1232,18 +1253,21 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       // 테이프 창이 아직 안 떴으면 기다리다 멈추지 않게 (멈추면 뒤의 점검이 모두 안 돈다)
       const tapeWin = stickers.get(nw.id)?.win;
       if (process.env.MK_SMOKE_TRACE) console.log(`… 테이프 창: ${JSON.stringify({ kind: kindOf(nw), onBottom: getSettings().onBottom?.[tid], has: Boolean(tapeWin), loading: tapeWin?.webContents.isLoading(), url: tapeWin?.webContents.getURL() })}`);
+      // 테이프가 창 가운데에 그려진 뒤에 누른다 (그리기 전에 누르면 바탕을 눌러 떼어지지 않는다)
+      if (tapeWin) await until(() => js(tapeWin, `Boolean(document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest('#tape .hit'))`), '테이프 그려짐', 5000).catch(() => {});
       const hitTape = tapeWin ? await Promise.race([
         js(tapeWin, `(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); const ok = Boolean(el?.closest('#tape .hit')); el?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return ok; })()`),
-        wait(4000).then(() => false),
+        wait(10000).then(() => false), // CI 러너는 느려 4초를 넘기기도 했다 (그래도 눌려 떼어짐)
       ]) : false;
-      const peeled = await until(() => !stickers.get(nw.id) && !getSettings().onBottom?.[tid], '테이프 떼기', 3000).catch(() => false);
+      const peeled = await until(() => !stickers.get(nw.id) && !getSettings().onBottom?.[tid], '테이프 떼기', 8000).catch(() => false);
       const b3 = await buttons(nw);
       // 목록에서 지우면 그 카드가 제자리에서 흐려지며 사라진다 (옆으로 날아가지 않게)
       const did = vault.import({ body: '# 지울 메모\n\n흐려지며 사라져요\n' });
       await until(() => js(list, `!!document.querySelector('[data-delete="${did}"]')`), '지울 메모 카드');
       const ghostAnim = await js(list, `(() => { document.querySelector('[data-delete="${did}"]').click(); const g = document.querySelector('.card-ghost'); return g ? getComputedStyle(g).animationName : 'reduce'; })()`);
       check('목록에서 삭제: 옆으로 날아가지 않고 제자리에서 흐려짐', ghostAnim === 'card-fade' || ghostAnim === 'reduce', ghostAnim);
-      check('테이프를 누르면 떼어짐 → 메모 창은 그대로, 왕관 · 테이프 버튼이 돌아옴', hitTape && peeled && !nw.isDestroyed() && nw.isVisible() && b3.top === 'shown' && b3.tape === 'shown' && /뗐어요/.test(b3.status), JSON.stringify(b3));
+      // 떼어졌으면 누른 곳이 테이프다 (sticker.html 은 .hit 안을 눌렀을 때만 뗀다) — hitTape 는 CI 러너가 느려 답이 늦을 때가 있어 기록만
+      check('테이프를 누르면 떼어짐 → 메모 창은 그대로, 왕관 · 테이프 버튼이 돌아옴', peeled && !nw.isDestroyed() && nw.isVisible() && b3.top === 'shown' && b3.tape === 'shown' && /뗐어요/.test(b3.status), JSON.stringify({ hitTape, peeled, visible: !nw.isDestroyed() && nw.isVisible(), ...b3 }));
       nw.close();
       await until(() => !noteWins.has(tid), '메모 닫힘 2', 3000).catch(() => {});
       // 예전 바탕화면 위젯 → 테이프 붙인 메모 창 (그 자리에)
@@ -1983,6 +2007,56 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const typed = await js(cw, `({ chip: document.querySelector('.ProseMirror a[data-file]').textContent, line: document.querySelector('.ProseMirror p').textContent })`);
       check('파일 칩: 칩 바로 뒤에서 친 글(한글 · 영문)은 칩 이름에 붙지 않고 칩 밖에', typed.chip === '보고서최종본.pdf' && typed.line.includes('가x'), JSON.stringify(typed));
       cw.close();
+    }
+    // 매직 에이전트 (0.70.0): 가짜 글 모델로 — 매직키 AI 줄 Enter → 확인 카드 → 넣기 → 일정 · 메모에서 찾은 문장 · 목록 ✦ 덧붙이기
+    if (setAi) {
+      const v = getVault();
+      v.import({ body: '# 주간 회의\n\n출시일은 11월 3일로 확정했어요\n' });
+      const shopId = v.import({ body: '# 장보기\n\n- 우유\n' });
+      setAi({
+        status: () => ({ engine: true, chat: { state: 'ready', name: '점검', size: 1 } }),
+        chat: async (_m, o) => (o?.schema ? '{"words":[]}' : '메모에서 찾지 못했어요.'),
+      });
+      const magic = getMagic();
+      showMagic();
+      await until(() => js(magic, `document.activeElement?.id === 'magic-input'`), '매직키 다시 뜸');
+      await js(magic, `(() => { const i = document.getElementById('magic-input'); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true })); i.value = '내일 오후 3시 거래처 미팅 등록해줘'; i.dispatchEvent(new Event('input')); })()`);
+      const agentBtn = `document.querySelector('.magic-row.kind-ai .act-btn[data-action="agent"]')`;
+      const row = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row.kind-ai'); return r && ${agentBtn} && r.querySelector('.t').textContent; })()`), '매직 에이전트 줄', 5000).catch(() => null);
+      await js(magic, `${agentBtn}.click()`).catch(() => {});
+      const card = await until(() => js(magic, `(() => { const c = document.querySelector('#magic-agent .agent-card'); return c && c.children.length && { head: c.querySelector('.agent-card-head').textContent, title: c.querySelector('input').value, when: c.querySelector('.agent-when').textContent, results: document.getElementById('magic-results').hidden }; })()`), '확인 카드', 5000).catch(() => null);
+      await js(magic, `document.querySelector('#magic-agent .agent-run').click()`).catch(() => {});
+      const event = await until(() => v.allReminders().find((e) => e.reminder.title === '거래처 미팅'), '일정 넣음', 5000).catch(() => null);
+      const at = event && new Date(event.reminder.at);
+      const tomorrow = new Date(Date.now() + 86_400_000);
+      check('매직 에이전트(매직키): AI 줄 Enter → 결과 대신 "일정 넣기" 확인 카드(이름 · 때) → 넣기 → 내일 오후 3시 "거래처 미팅" 일정',
+        row === '매직 에이전트' && card?.head === '일정 넣기' && card.title === '거래처 미팅' && card.results && at?.getDate() === tomorrow.getDate() && at.getHours() === 15,
+        JSON.stringify({ row, card, event: event?.reminder }));
+      // 질문: 모델이 물러서도 찾은 메모의 문장을 그대로 + 출처
+      await js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = '출시일 언제야?'; i.dispatchEvent(new Event('input')); })()`);
+      await until(() => js(magic, `!!(${agentBtn})`), 'AI 줄 다시', 5000).catch(() => {});
+      await js(magic, `${agentBtn}.click()`).catch(() => {});
+      const answer = await until(() => js(magic, `(() => { const o = document.querySelector('#magic-agent .agent-out').textContent; return o && { o, src: [...document.querySelectorAll('#magic-agent .agent-source')].map((b) => b.textContent).join() }; })()`), '답', 5000).catch(() => null);
+      await capture(magic, 'smoke-new-agent-magic.png');
+      key(magic, 'Escape');
+      const back = await until(() => js(magic, `document.getElementById('magic-agent').hidden && !document.getElementById('magic-results').hidden`), 'Esc 결과로', 2000).catch(() => false);
+      check('매직 에이전트: 질문엔 메모에서 찾아 답 (모델이 물러서도 그 메모의 문장 그대로 + 출처) · Esc 로 결과 목록',
+        /출시일은 11월 3일로 확정했어요/.test(answer?.o ?? '') && answer.src === '주간 회의' && back, JSON.stringify({ answer, back }));
+      magic.hide();
+      // 목록 검색창 ✦ → 덧붙이기 확인 카드 → 장보기 메모에 계란
+      const list = getList() ?? createListWindow();
+      await until(() => js(list, `document.documentElement.dataset.ready === 'true'`), '목록 준비');
+      await js(list, `(() => { const i = document.getElementById('search'); i.value = '장보기에 계란이랑 두부 추가해줘'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+      await until(() => js(list, `!document.getElementById('ai-ask-btn').hidden`), '검색창 ✦', 5000).catch(() => {});
+      await js(list, `document.getElementById('ai-ask-btn').click()`);
+      const apCard = await until(() => js(list, `(() => { const c = document.querySelector('#ai-ask .agent-card'); return c && c.children.length && { head: c.querySelector('.agent-card-head').textContent, memo: c.querySelector('select').selectedOptions[0]?.textContent, text: c.querySelector('textarea').value }; })()`), '덧붙이기 카드', 5000).catch(() => null);
+      await capture(list, 'smoke-new-agent-list.png');
+      await js(list, `document.querySelector('#ai-ask .agent-run').click()`).catch(() => {});
+      const shop = await until(() => { const b = v.get(shopId)?.body ?? ''; return b.includes('- 계란') && b.includes('- 두부') && b; }, '덧붙임', 5000).catch(() => null);
+      const msg = await js(list, `document.querySelector('#ai-ask .agent-state').textContent`);
+      check('매직 에이전트(목록 ✦): "장보기에 계란이랑 두부 추가해줘" → 덧붙이기 카드(장보기 · 항목 줄) → 덧붙이기 → 메모 끝에 - 계란 / - 두부',
+        apCard?.head === '메모에 덧붙이기' && apCard.memo === '장보기' && apCard.text === '- 계란\n- 두부' && Boolean(shop) && /덧붙였어요/.test(msg), JSON.stringify({ apCard, shop, msg }));
+      await js(list, `(() => { const i = document.getElementById('search'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     }
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;

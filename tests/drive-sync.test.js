@@ -498,3 +498,18 @@ test('동기화 주기: 쉬는 중 1분 · 창을 쓰는 중 10초 · 파일이 
   assert.equal(asked, 2);
   sync.stop();
 });
+
+test('훑는 사이 사라진 파일(메모 창을 닫으며 제목에 맞춰 이름 바꾸기)은 건너뛰고, 동기화는 멈추지 않는다', async () => {
+  await startFromPhone();
+  await lw('옛 이름.md', '# 새 이름');
+  const orig = fs.statSync;
+  // 목록에는 있었는데 크기를 재려는 순간 사라짐
+  fs.statSync = (p, o) => (String(p).endsWith('옛 이름.md') ? (o?.throwIfNoEntry === false ? undefined : orig(path.join(dir, '없음'), o)) : orig(p, o));
+  try {
+    const r = await sync();
+    assert.equal(r.uploaded, 0, '사라진 파일은 이번 차례에 올리지 않는다');
+  } finally {
+    fs.statSync = orig;
+  }
+  assert.equal((await sync()).uploaded, 1, '다음 차례에 맞춰진다');
+});

@@ -59,7 +59,7 @@ body {
 .search { position: relative; flex: 1; }
 .search-icon {
   position: absolute;
-  left: 10px;
+  left: 13px;
   top: 50%;
   width: 16px;
   height: 16px;
@@ -70,13 +70,32 @@ body {
 .search input {
   width: 100%;
   height: 36px;
-  padding: 0 10px 0 32px;
+  padding: 0 14px 0 36px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 999px; /* 휴대폰과 같은 알약 모양 */
   background: var(--surface);
   outline: none;
 }
 .search input:focus { border-color: var(--text-strong); }
+.search.has-ai input { padding-right: 38px; }
+/* 검색창 안 오른쪽 ✦ — AI에게 묻기 (ai-ask.js, 글 모델을 넣은 PC 에서 검색어가 있을 때만) */
+.search-ai {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 50%; /* 알약 검색창 안의 동그라미 */
+  background: none;
+  color: var(--brand-yellow);
+  font-size: 15px;
+  cursor: pointer;
+}
+.search-ai[hidden] { display: none; }
+.search-ai[aria-expanded="true"] { background: var(--hover); }
+@media (hover: hover) and (pointer: fine) { .search-ai:hover { background: var(--hover); } }
 
 /* 카드 (휴대폰과 같은 모양): 바탕·글씨 = 메모 색. 격자는 메모지처럼 엇갈려 쌓고(열마다 .col), 한 줄씩이면 한 열 */
 .cards {
@@ -113,8 +132,8 @@ body {
 }
 .cards[data-layout="rows"] .card { min-height: 0; }
 .card:hover { box-shadow: 0 2px 4px rgba(17, 17, 17, 0.08), 0 6px 16px rgba(17, 17, 17, 0.08); }
-/* 열린 메모: 바탕이 노랑이어도 보이게 메모 글씨 색 테두리 */
-.card.open { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--note-fg) 75%, transparent), var(--shadow-card); }
+/* 열린 메모: 바탕이 노랑이어도 보이게 메모 글씨 색 테두리 — 키보드 포커스(2px 진한 선)와 헷갈리지 않게 가늘고 옅게 */
+.card.open { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--note-fg) 38%, transparent), var(--shadow-card); }
 .card-head { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
 .card-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; }
 .card-badge svg { width: 13px; height: 13px; }
@@ -161,8 +180,7 @@ body {
 .cards[data-layout="rows"] .card-thumb { aspect-ratio: 16 / 7; }
 /* 어두운 화면: 사진 · 흰 바탕 손 메모 미리 보기는 조금 어둡게 (검은 카드 사이에서 흰 칸이 튀지 않게) */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .card-thumb { filter: brightness(0.86); } }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
- :where(:root[data-theme="dark"]) .card-thumb { filter: brightness(0.86); } 
+
 .card-foot { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: auto; font-size: 12px; }
 .card-meta { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; opacity: 0.7; }
 .card-time { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
@@ -312,11 +330,10 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .row-sub svg { width: 13px; height: 13px; flex: none; margin-top: 2px; color: var(--text-strong); }
 .row-sub b { color: var(--text); font-weight: 700; }
 
-
 /* 알림 보관함 */
 .consent { flex: 1; overflow-y: auto; padding: 20px 22px; text-align: center; }
 .consent-icon { width: 56px; height: 56px; padding: 12px; border-radius: 50%; background: var(--brand-yellow); color: var(--on-brand); }
-.consent h3 { margin: 10px 0 6px; font-size: 20px; line-height: 28px; letter-spacing: -0.015em; }
+.consent h2 { margin: 10px 0 6px; font-size: 20px; line-height: 28px; letter-spacing: -0.015em; }
 .consent p { margin: 0 0 12px; color: var(--muted); line-height: 1.6; }
 .consent ul { margin: 0 0 18px; padding-left: 20px; text-align: left; line-height: 1.7; font-size: 13px; }
 #history-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -370,6 +387,12 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 }
 .noti:hover .noti-actions, .noti:focus-within .noti-actions { opacity: 1; }
 .noti-actions .cap { display: none; } /* PC 는 마우스 안내(title)로 */
+/* 펼친 알림: 휴대폰처럼 이름 붙은 단추를 아래 줄에 늘 — 읽고 나서 할 일을 마우스를 올리지 않아도 보이게 */
+.noti.expanded { flex-wrap: wrap; }
+.noti.expanded .noti-actions { position: static; width: 100%; justify-content: flex-end; gap: 4px; padding: 6px 0 0; border-top: 1px solid var(--line); border-radius: 0; background: none; box-shadow: none; opacity: 1; }
+.noti.expanded .noti-actions .icon-btn { display: inline-flex; gap: 5px; width: auto; padding: 0 10px; color: var(--text); font-size: 12.5px; font-weight: 600; }
+.noti.expanded .noti-actions .icon-btn svg { width: 16px; height: 16px; }
+.noti.expanded .noti-actions .cap { display: inline; }
 /* 알림 하나 지운 자리: 되돌리기 5초 */
 .noti-undo { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; }
 
@@ -403,6 +426,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .set-sec .label { margin-top: 4px; }
 .set-sec .label + .set-note { margin-top: -2px; }
 .set-note { margin: 0 0 10px; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.set-note a { color: var(--text); text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; } /* 브라우저 기본 파란 링크 대신 앱의 밑줄 링크 (오늘 · 링크 단추와 같은 노란 밑줄) */
 .set-sec .phone-how + .label { margin-top: 16px; }
 .app-box { margin: 2px 0 0; padding: 12px 12px 12px 14px; }
 .app-box .drive-box-icon { color: var(--text-strong); }
@@ -413,11 +437,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .set-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 .set-foot .link-btn { margin-left: -6px; font-size: 13px; font-weight: 600; color: var(--text); }
 .set-sec .dialog-actions .link-btn { align-self: center; font-size: 13px; }
-.keymap-row { cursor: default; }
-.keymap-row > span { flex: 1; min-width: 0; }
-.keymap-row > .btn { flex: none; }
 .setting-row kbd { padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; font-size: 12px; }
-
 
 /* ---------- 필터 (v0.11.0): 태그 줄 · 색 · 담긴 것 ---------- */
 .filter-btn { position: relative; }
@@ -442,15 +462,21 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 }
 body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 · 정렬 · 모양)는 메모 탭에서만 */
 
+/* 보기 판: 카드 위에 뜬다 (열어도 목록이 밀리지 않게) */
+#view-memos { position: relative; }
 .filter-panel {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 0 12px 8px;
   padding: 10px 12px;
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
 }
 .filter-group { display: flex; align-items: center; gap: 10px; }
 .filter-label { flex: none; width: 44px; font-size: 12px; font-weight: 700; color: var(--muted); }
@@ -514,19 +540,6 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
 }
 .filter-summary span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .filter-summary .link-btn { flex: none; color: var(--text); font-weight: 600; }
-
-/* Google 연결 안내 줄 — 필터 요약(노랑)과 다르게: 구름 + 무채색 바탕 */
-.connect-hint {
-  display: flex; align-items: center; gap: 6px;
-  margin: 0 12px 8px; padding: 4px 4px 4px 12px;
-  border: 1px solid var(--line); border-radius: var(--radius-md);
-  background: var(--surface-2);
-  font-size: 12.5px; font-weight: 600;
-}
-body.coaching .connect-hint { display: none; } /* 튜토리얼 동안은 매직키부터 — 연결 안내는 끝난 뒤에 */
-.connect-hint > svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
-.connect-hint span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.connect-hint .link-btn { flex: none; min-height: 32px; padding: 6px 10px; font-size: 12.5px; }
 
 /* 카드의 태그: 요약 아래 작게 */
 /* 아랫줄은 한 줄 — 태그가 많으면 넘치는 것은 숨김 */
@@ -644,8 +657,7 @@ body.is-dragging .card-actions { visibility: hidden; }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .card[data-color="charcoal"] { box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card); }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .card[data-color="charcoal"] { box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card); }
+
 /* 카드: 마우스를 올리면 살짝 떠오르고, 누르면 살짝 눌린다 */
 .card { transition: transform 0.15s ease-out, box-shadow 0.15s ease-out; }
 @media (hover: hover) and (pointer: fine) { .card:hover { transform: translateY(-1px); } } /* 터치 화면(태블릿 PC)에서는 누를 때 떠오르지 않게 */
@@ -654,8 +666,6 @@ body.is-dragging .card:hover { transform: none; }
 .card-actions { transform: translateY(2px); transition: opacity 0.15s ease-out, transform 0.15s ease-out; }
 .cards .item:hover .card-actions, .card-actions:focus-within { transform: none; }
 
-/* 탭: 흰 선택 표시가 다음 탭으로 미끄러진다 (움직임은 base.css 의 .mk-slider) */
-.tabs > .tab-indicator { background: var(--surface); }
 .filter-panel { overflow: hidden; }
 
 /* 칩·색 점: 누르면 살짝 눌림 */
@@ -788,7 +798,6 @@ body.is-dragging .card:hover { transform: none; }
 /* 팝업 알림을 그림 글자 인식으로 읽은 경우 (v0.17.4) */
 .noti-via { padding: 0 5px; border-radius: 4px; background: var(--fill-hover); font-size: 12px; font-weight: 600; }
 
-
 /* ---------- v0.17.13: 체크리스트를 모두 끝낸 메모 카드의 CLEAR 도장 ---------- */
 .card-clear {
   position: absolute;
@@ -819,6 +828,10 @@ body.is-dragging .card:hover { transform: none; }
 /* 설정의 켜고 끄기는 PC·휴대폰 모두 같은 모양: 글은 왼쪽, 스위치는 오른쪽 (모을 앱 고르기 창과도 같게) */
 :is(.setting-row, .magic-mod) > .switch { order: 2; flex: none; margin-left: auto; }
 :is(.setting-row, .magic-mod) > span { flex: 1; min-width: 0; }
+/* 글 왼쪽 · 단추 오른쪽 (스위치와 같은 자리) */
+.setting-row > .btn { flex: none; margin-left: auto; }
+div.setting-row { cursor: default; }
+.setting-row .inline-link { padding: 0 2px; font-size: inherit; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .magic-mod small { display: block; color: var(--muted); font-size: 12px; }
 .magic-mod em { color: var(--muted); font-style: normal; }
 .magic-mod.soon > span { opacity: 0.6; }
@@ -985,8 +998,6 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .opms-host-row { display: flex; gap: 8px; }
 .opms-host-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; }
 .opms-host-row input:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
-.hold-row { cursor: default; }
-.hold-label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; }
 .opms-dir-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13px; }
 .opms-dir-row > span { flex: 1; min-width: 0; }
 .opms-dir-row small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
@@ -997,8 +1008,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 최신: 초록 (밝은 · 어두운 화면 각각) — 새 버전 · 받아 둠은 .primary (노랑) */
 :root { --update-ok: #157a3f; --update-ok-hover: #116634; --update-ok-text: #fff; } /* 흰 글자 5.4:1 */
 @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --update-ok: #2fb36b; --update-ok-hover: #3cc479; --update-ok-text: #06210f; } }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
- :root:where([data-theme="dark"]) { --update-ok: #2fb36b; --update-ok-hover: #3cc479; --update-ok-text: #06210f; } 
+
 .update-btn[data-state="latest"] { border-color: transparent; background: var(--update-ok); color: var(--update-ok-text); }
 .update-btn[data-state="downloading"] { font-variant-numeric: tabular-nums; }
 @media (hover: hover) and (pointer: fine) { .update-btn[data-state="latest"]:hover { background: var(--update-ok-hover); } }
@@ -1044,7 +1054,9 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .sync-btn[data-tone="ok"] .sync-mark { background: #2fb36b; }
 .sync-btn[data-tone="busy"] .sync-mark { background: var(--brand-yellow); animation: sync-pulse 1s ease-in-out infinite alternate; }
 .sync-btn[data-tone="error"] .sync-mark { background: var(--danger); }
-.sync-btn[data-tone="off"] .sync-mark { display: none; }
+.sync-btn[data-tone="off"]:not(.invite) .sync-mark { display: none; }
+.sync-btn.invite .sync-mark { background: var(--brand-yellow); } /* 아직 연결 안 함: 안내 띠 대신 노란 점 하나 (구름을 열어 보면 사라짐) */
+body.coaching .sync-btn.invite .sync-mark { display: none; } /* 튜토리얼 동안은 매직키부터 */
 .sync-btn.has-conflicts .sync-mark { right: -1px; bottom: auto; top: -1px; height: 16px; min-width: 16px; padding: 0 4px; background: var(--brand-yellow); color: var(--on-brand); font-size: 11px; font-weight: 800; line-height: 12px; text-align: center; }
 @keyframes sync-pulse { from { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .sync-btn[data-tone="busy"] .sync-mark { animation: none; } }

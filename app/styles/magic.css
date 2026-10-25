@@ -38,6 +38,10 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 
 .magic-results { -webkit-app-region: no-drag; position: relative; list-style: none; margin: 0; padding: 4px 8px 6px; max-height: 430px; overflow-y: auto; border-top: 1px solid var(--mk-line); }
 .magic-results:not(:has(> :not(.magic-pill))) { display: none; }
+.magic-results[hidden] { display: none; }
+/* 매직 에이전트 칸 (agent-view.js — 글 · 출처 · 확인 카드) */
+.magic-agent { -webkit-app-region: no-drag; max-height: 430px; overflow-y: auto; padding: 10px 16px 12px; border-top: 1px solid var(--mk-line); }
+.magic-agent[hidden] { display: none; }
 /* 기능마다 색 하나 — 아래 캡슐의 점 · 결과 묶음 머리말의 점이 같은 색이라 짝이 한눈에 */
 /*   색 계열이 서로 멀게: 노랑 · 빨강 · 청록 · 초록 · 분홍 · 보라 · 남색 */
 [data-mod="memo"] { --mod: #d99a00; }
@@ -83,32 +87,32 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 .magic-row[aria-selected="true"] .acts { display: inline-flex; }
 .magic-flash { color: var(--ok-text); font-weight: 700; }
 .magic-flash.err { color: var(--err-text); }
-.magic-note { padding: 8px 12px 10px; color: #6e6e6e; font-size: 12.5px; } /* 흰 바탕에서 4.5:1 넘게 */
+.magic-note { padding: 8px 12px 10px; color: var(--muted); font-size: 12.5px; }
 .magic-note.loading .mk-searching { padding: 0; color: inherit; font-size: inherit; }
 
 .magic-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 9px 12px 10px 14px; border-top: 1px solid var(--mk-line); }
 .magic-modules { -webkit-app-region: no-drag; display: flex; flex-wrap: wrap; flex: 0 1 auto; gap: 6px; } /* 기능이 많으면 줄을 바꾸고, 안내는 그 아래 오른쪽 */
+/* 기능 캡슐: 목록 창의 태그 칩과 같은 무채색 (켜짐 = 옅은 칠, 꺼짐 = 테두리 + 취소선) — 기능 색은 머리말과 짝을 맞추는 점에만 */
 .magic-chip {
   display: inline-flex; align-items: center; gap: 6px;
   height: 24px; padding: 0 10px 0 8px;
-  border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 999px;
-  background: transparent; color: #6e6e6e;
-  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: transparent; color: var(--muted);
+  font: inherit; font-size: 12px; font-weight: 600; cursor: grab; /* 누르면 켜고 끄기, 끌면 순서 바꾸기 */
   transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.08s;
 }
-.magic-chip:hover { border-color: rgba(0, 0, 0, 0.25); color: #333; }
+.magic-chip:hover { border-color: color-mix(in srgb, var(--text) 28%, transparent); color: var(--text); }
 .magic-chip:active:not(.dragging) { transform: scale(0.95); }
 /* 끄는 캡슐은 살짝 들린다 */
-.magic-chip.dragging { position: relative; z-index: 2; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12); cursor: grabbing; transition: box-shadow 0.15s, background 0.15s; } /* 자리는 JS 가 손을 따라 옮긴다 */
+.magic-chip.dragging { position: relative; z-index: 2; box-shadow: var(--shadow-pop); cursor: grabbing; transition: box-shadow 0.15s, background 0.15s; } /* 자리는 JS 가 손을 따라 옮긴다 */
 .magic-modules.sorting, .magic-modules.sorting .magic-chip { cursor: grabbing; }
-.magic-chip .chip-dot { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #b5b5b5; transition: background 0.15s, box-shadow 0.15s; }
-.magic-chip { cursor: grab; } /* 누르면 켜고 끄기, 끌면 순서 바꾸기 */
-.magic-chip.on { border-color: transparent; background: color-mix(in srgb, var(--mod, #ffcd00) 16%, #fff); color: #111; }
-.magic-chip.on .chip-dot { background: var(--mod, #22a35a); box-shadow: none; }
-.magic-chip:not(.on) { text-decoration: line-through; text-decoration-color: rgba(0, 0, 0, 0.35); } /* 잠깐 꺼 둠 — 켜진 것과 한눈에 */
-.magic-chip:focus-visible { outline: 2px solid #e0a800; outline-offset: 1px; }
-.magic-hint { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 10px; height: 18px; overflow: hidden; min-width: 0; color: #707070; font-size: 12px; white-space: nowrap; }
-kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.06); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12); color: #555; font: 600 10.5px/16px inherit; text-align: center; }
+.magic-chip .chip-dot { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px currentColor; transition: background 0.15s, box-shadow 0.15s; }
+.magic-chip.on { border-color: transparent; background: var(--fill-tab); color: var(--text); }
+.magic-chip.on .chip-dot { background: var(--mod); box-shadow: none; }
+.magic-chip:not(.on) { text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 60%, transparent); } /* 잠깐 꺼 둠 — 빈 점 + 취소선 */
+.magic-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.magic-hint { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 10px; height: 18px; overflow: hidden; min-width: 0; color: var(--muted); font-size: 12px; white-space: nowrap; }
+kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px; background: var(--fill-tab); box-shadow: inset 0 -1px 0 var(--line); color: var(--text); font: 600 11px/16px inherit; text-align: center; }
 
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .magic-row:is(.kind-opms, .kind-opmsAsk) .ico { --opms-mark: #3d63b8; }
@@ -120,27 +124,7 @@ kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px
   :where(:root:not([data-theme="light"])) .magic { background: #26262a; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08); }
   :where(:root:not([data-theme="light"])) .magic-input, :where(:root:not([data-theme="light"])) .magic-row .t, :where(:root:not([data-theme="light"])) .magic-row b { color: #f3f3f3; }
   :where(:root:not([data-theme="light"])) .magic-grip span { background: rgba(255, 255, 255, 0.2); }
-  :where(:root:not([data-theme="light"])) .magic-chip { border-color: rgba(255, 255, 255, 0.14); color: #a8a8a8; }
-  :where(:root:not([data-theme="light"])) .magic-chip:not(.on) { text-decoration-color: rgba(255, 255, 255, 0.35); }
-  :where(:root:not([data-theme="light"])) .magic-note, :where(:root:not([data-theme="light"])) .magic-hint { color: #a0a0a0; }
-  :where(:root:not([data-theme="light"])) .magic-chip.on { background: color-mix(in srgb, var(--mod, #ffcd00) 24%, #26262a); color: #f3f3f3; }
-  :where(:root:not([data-theme="light"])) kbd { background: rgba(255, 255, 255, 0.1); color: #ddd; }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .magic-row:is(.kind-opms, .kind-opmsAsk) .ico { --opms-mark: #3d63b8; }
-  :where(:root[data-theme="dark"]) .magic-row:is(.kind-more, .kind-opmsMore) .ico { background: rgba(255, 255, 255, 0.1); color: #e6e2d3; }
-  :where(:root[data-theme="dark"]) .magic-row:is(.kind-calc, .kind-date, .kind-remind, .kind-site, .kind-web, .kind-ai) .ico { background: color-mix(in srgb, var(--mod, #888) 26%, transparent); color: color-mix(in srgb, var(--mod, #ccc) 55%, #fff); }
-  :where(:root[data-theme="dark"]) .magic-row .s, :where(:root[data-theme="dark"]) .magic-row .side { color: #b8b8b8; } /* 어두운 바탕 · 고른 줄 모두 4.5:1 넘게 */
-  :where(:root[data-theme="dark"]) .magic-row[aria-selected="true"] b { box-shadow: inset 0 -2px 0 #ffcd00; }
-  :where(:root[data-theme="dark"]) body { --mk-sel: rgba(255, 205, 0, 0.18); --mk-line: rgba(255, 255, 255, 0.08); }
-  :where(:root[data-theme="dark"]) .magic { background: #26262a; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08); }
-  :where(:root[data-theme="dark"]) .magic-input, :where(:root[data-theme="dark"]) .magic-row .t, :where(:root[data-theme="dark"]) .magic-row b { color: #f3f3f3; }
-  :where(:root[data-theme="dark"]) .magic-grip span { background: rgba(255, 255, 255, 0.2); }
-  :where(:root[data-theme="dark"]) .magic-chip { border-color: rgba(255, 255, 255, 0.14); color: #a8a8a8; }
-  :where(:root[data-theme="dark"]) .magic-chip:not(.on) { text-decoration-color: rgba(255, 255, 255, 0.35); }
-  :where(:root[data-theme="dark"]) .magic-note, :where(:root[data-theme="dark"]) .magic-hint { color: #a0a0a0; }
-  :where(:root[data-theme="dark"]) .magic-chip.on { background: color-mix(in srgb, var(--mod, #ffcd00) 24%, #26262a); color: #f3f3f3; }
-  :where(:root[data-theme="dark"]) kbd { background: rgba(255, 255, 255, 0.1); color: #ddd; }
 
 @media (prefers-reduced-motion: reduce) {
   .magic-pill, .magic-chip, .magic-chip .chip-dot { transition: none; }
@@ -148,4 +132,4 @@ kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) [data-mod="opms"] { --mod: #5c7cfa; }
 }
-:where(:root[data-theme="dark"]) [data-mod="opms"] { --mod: #5c7cfa; }
+

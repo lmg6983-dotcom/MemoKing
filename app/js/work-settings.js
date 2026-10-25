@@ -29,7 +29,7 @@ function switchRow(id, title, note, checked) {
  */
 export function renderWorkSettings(box, { enabled, setEnabled, hours, save, openHelper, quietNote }) {
   let h = normalizeHours(hours);
-  const main = switchRow('work-life', 'Work / Life 나누기', '일할 때 쓰는 메모와 일상 메모를 나눠 봐요. Work는 어두운 화면, Life는 밝은 화면이에요. 끄면 모든 메모가 한 목록에 보여요', enabled);
+  const main = switchRow('work-life', 'Work / Life 나누기', '일할 때 쓰는 메모와 일상 메모를 나눠 봐요. 메모마다 Work · Life 태그가 붙고, 화면 밝기는 그대로예요. 끄면 모든 메모가 한 목록에 보여요', enabled);
   const rest = el('div', 'work-life-more');
   rest.hidden = !enabled;
   main.input.addEventListener('change', () => {

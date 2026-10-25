@@ -67,10 +67,11 @@
     </nav>
 
     <div class="toolbar">
-      <label class="search">
+      <div class="search">
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
-      </label>
+        <button id="ai-ask-btn" class="search-ai" type="button" title="매직 에이전트 (Ctrl+Enter) — 내 메모에서 찾아 답하고, 일정 · 메모 · 덧붙이기 · 요약을 해요" aria-label="매직 에이전트" aria-controls="ai-ask" hidden>✦</button>
+      </div>
       <button id="filter-btn" class="icon-btn filter-btn" title="보기 (정렬, 카드 모양, 필터)" aria-label="보기: 정렬, 카드 모양, 필터" aria-expanded="false" aria-controls="filter-panel"><svg><use href="#i-tune"/></svg><span class="filter-count" id="filter-count"></span></button>
     </div>
 
@@ -80,6 +81,7 @@
 
     <!-- 메모 -->
     <div class="view" id="view-memos" role="tabpanel">
+      <div id="ai-ask" class="ai-answer" role="region" aria-label="매직 에이전트" hidden></div>
       <!-- 필터: 태그 줄(늘 보임) + 색·담긴 것(필터 버튼) -->
       <!-- 보기 (위 "보기" 단추): 정렬 · 카드 모양 · 필터(색 · 담긴 것) -->
       <div id="filter-panel" class="filter-panel" hidden>
@@ -93,14 +95,6 @@
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>
       </div>
-      <!-- 처음엔 이 PC 에 바로 저장 (고르는 화면 없이) — 휴대폰과 같이 쓰려면 여기서 연결 (drive-panel.js, 닫으면 다시 안 뜸) -->
-      <div id="drive-hint" class="connect-hint" hidden>
-        <svg aria-hidden="true"><use href="#i-cloud"/></svg>
-        <span id="drive-hint-text">휴대폰 · 다른 PC와 같은 메모를 쓰려면</span>
-        <button id="drive-hint-connect" class="link-btn">Google 계정으로 연결</button>
-        <button id="drive-hint-close" class="link-btn">다시 보지 않기</button>
-      </div>
-      <div id="ai-ask" class="ai-ask" hidden></div>
       <p id="count" class="result-count" role="status" hidden></p>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
@@ -115,7 +109,7 @@
     <div class="view" id="view-history" role="tabpanel" hidden>
       <div id="history-consent" class="consent" hidden>
         <svg class="consent-icon"><use href="#i-inbox"/></svg>
-        <h3>알림 보관함</h3>
+        <h2>알림 보관함</h2>
         <p>알림 센터에서 사라진 알림도 여기서 다시 볼 수 있어요.</p>
         <ul>
           <li>메신저, 메일 등 다른 앱 알림의 <b>제목과 내용</b>을 보관해요.</li>
@@ -236,7 +230,7 @@
     </section>
     <section class="set-sec" aria-labelledby="set-local-ai" id="local-ai-sec">
       <h3 class="set-title" id="set-local-ai">AI 도우미 · 카나나2 <small>인터넷 없이 이 PC 안에서 돌아가요</small></h3>
-      <div class="setting-row keymap-row">
+      <div class="setting-row">
         <span>카나나2 <small id="ai-chat-note" role="status"></small><small id="ai-try-out" role="status"></small></span>
         <button type="button" class="link-btn" id="ai-try" hidden>시험해 보기</button>
         <button type="button" class="link-btn danger" id="ai-chat-remove" hidden>삭제</button>
@@ -267,7 +261,11 @@
           <input type="checkbox" id="magic-polish" class="switch" role="switch" checked>
           <span>매직키 메모 다듬기 <small>맞춤법을 고치고, 첫 줄이 길면 짧은 제목을 붙여요</small></span>
         </label>
-        <p class="set-note">메모를 닫을 때 · 매직키로 저장할 때 뒤에서 해요 (휴대폰에서 쓴 메모는 PC에서 열었다 닫을 때). 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
+        <label class="setting-row">
+          <input type="checkbox" id="ai-phone" class="switch" role="switch">
+          <span>휴대폰 메모도 이 PC에서 <small>휴대폰에서 쓴 메모가 들어오면 1분 뒤 태그 · 일정을 달아요. PC가 여러 대면 한 대에서만 켜 주세요</small></span>
+        </label>
+        <p class="set-note">메모를 닫을 때 · 매직키로 저장할 때 뒤에서 해요. 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
       </div>
       <p class="set-note">기본 모델: 카카오 카나나2 · Powered by Kanana · <a href="https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/LICENSE" target="_blank" rel="noopener">라이선스 보기</a></p>
     </section>
@@ -302,22 +300,19 @@
       </label>
       <label class="setting-row">
         <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
-        <span>태그 자동 추가 <small>메모를 닫을 때 태그를 달아요. AI 모델이 있으면 AI가 골라 태그를 합쳐 3개까지, 없으면 태그 없는 메모에 확실한 태그만</small></span>
+        <span>태그 자동 추가 <small>메모를 닫을 때 내용에 맞는 태그를 달아요 (합쳐 3개까지). 인사 · 짧은 대답처럼 주제가 없는 메모에는 달지 않아요</small></span>
       </label>
-      <div class="setting-row hold-row">
-        <label class="hold-label">
-          <input type="checkbox" id="hold-tune" class="switch" role="switch" checked>
-          <span>내 손에 맞추기 <small>메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려 손에 맞춰요. 이 PC에만 저장해요</small></span>
-        </label>
-        <button type="button" class="btn" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button>
-      </div>
-      <div class="setting-row hold-row">
-        <span class="hold-label">넣을 때 묻기 <small>사진 여러 장 · 문서를 넣을 때 "앞으로 이렇게" 로 정해 둔 것을 지우고 다시 물어요</small></span>
-        <button type="button" class="btn" id="choices-reset">다시 묻기</button>
+      <label class="setting-row">
+        <input type="checkbox" id="hold-tune" class="switch" role="switch" checked>
+        <span>내 손에 맞추기 <small>메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려 손에 맞춰요. 이 PC에만 저장해요 <button type="button" class="link-btn inline-link" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button></small></span>
+      </label>
+      <div class="setting-row">
+        <span>넣을 때 묻기 <small id="choices-note"></small></span>
+        <button type="button" class="btn small" id="choices-reset" hidden>다시 묻기</button>
       </div>
     </section>
     <section class="set-sec" aria-labelledby="set-mode">
-      <h3 class="set-title" id="set-mode">Work / Life <small>일할 때 메모와 일상 메모를 나눠 봐요</small></h3>
+      <h3 class="set-title" id="set-mode">Work / Life 나누기 <small>일할 때 메모와 일상 메모를 나눠 봐요</small></h3>
       <div id="work-settings"></div>
     </section>
     <section class="set-sec" aria-labelledby="set-stt">
@@ -337,7 +332,7 @@
     </section>
     <section class="set-sec" aria-labelledby="set-keys">
       <h3 class="set-title" id="set-keys">단축키</h3>
-      <div class="setting-row keymap-row">
+      <div class="setting-row">
         <span>메모 창 단축키 <small>PDF로 저장, 서식, 왕관 같은 기능의 키를 바꿔요</small></span>
         <button type="button" class="btn" id="keymap-open">단축키 설정하기</button>
       </div>
@@ -350,8 +345,8 @@
         <button id="reveal-vault" class="btn">폴더 열기</button>
         <button id="change-vault" class="btn">폴더 바꾸기</button>
       </div>
-      <p class="label">휴지통</p>
-      <div class="dialog-actions left">
+      <div class="setting-row">
+        <span>휴지통 <small>지운 메모는 여기에 모여요</small></span>
         <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
       </div>
       <label class="setting-row select-row">
@@ -399,6 +394,7 @@
     </section>
     <footer class="set-foot">
       <button id="tutorial-btn" class="link-btn">사용법 둘러보기</button>
+      <button id="report-btn" class="link-btn">문제 보내기</button>
       <span>© 2026 메모킹, 문의 lmg6983@gmail.com</span>
     </footer>
   </dialog>

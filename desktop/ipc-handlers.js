@@ -9,7 +9,7 @@ import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
 import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
-import { activeModules, memoBodyFromText, magicChips, toggleMagicChip, reorderMagicChips, normalizeMagicSettings } from '../app/js/core/magic-modules.js';
+import { activeModules, memoBodyFromText, appendToBody, magicChips, toggleMagicChip, reorderMagicChips, normalizeMagicSettings } from '../app/js/core/magic-modules.js';
 import { WEB_ENGINES, AI_SITES, siteLink, siteUrl } from '../app/js/core/magic-tools.js';
 import { searchMemos } from '../app/js/core/memo-search.js';
 import { isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
@@ -25,6 +25,7 @@ import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
 import { mailAttach, openLocalSend, findLocalSend, LOCALSEND_DOWNLOAD } from './share-file.js';
 import { driveShareLink } from './share-drive.js';
 import { UI } from '../app/js/core/ui-text.js';
+import { summaryBody } from '../app/js/core/agent.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 // 메뉴를 띄울 자리 (화면이 준 창 안 좌표 — 키보드로 연 메뉴는 마우스 자리가 아니라 그 카드 · 내용 자리에). 없으면 마우스 자리
@@ -43,6 +44,7 @@ export function registerIpc(ctx) {
     openVault,
     vaultInfo,
     retryMissingVault,
+    reportProblem,
     whatsNew,
     suggestedVaultPath,
     appSettings,
@@ -162,6 +164,9 @@ export function registerIpc(ctx) {
   }
   ipcMain.handle('ai:write', (e, { id, ...job }) => aiJob(e, id, (o) => aiTasks().write(job, o)));
   ipcMain.handle('ai:ask', (e, { id, question }) => aiJob(e, id, (o) => aiTasks().ask(question, o)));
+  // 매직 에이전트 (목록 검색창 ✦ · 매직키 AI 줄): 답이나 확인 카드 → 확인하면 agent-run 으로 실행
+  ipcMain.handle('ai:agent', (e, { id, text }) => aiJob(e, id, (o) => aiTasks().agent(String(text ?? '').slice(0, 2000), o)));
+  ipcMain.handle('ai:agent-run', (_e, action) => runAgentAction(action));
   ipcMain.handle('ai:cancel', (e, id) => aiJobs.get(`${e.sender.id}:${id}`)?.abort());
   ipcMain.handle('ai:try', async () => {
     const started = Date.now();
@@ -234,6 +239,7 @@ export function registerIpc(ctx) {
     return info;
   });
   ipcMain.handle('vault:retry', () => retryMissingVault());
+  ipcMain.handle('app:report-problem', () => reportProblem());
   ipcMain.handle('vault:choose', async (event) => {
     const result = await dialog.showOpenDialog(senderWindow(event), {
       title: '메모를 저장할 폴더 선택',
@@ -319,6 +325,58 @@ export function registerIpc(ctx) {
     return saved;
   });
   ipcMain.handle('reminders:all', () => getVault()?.allReminders() ?? []);
+  /**
+   * 매직 에이전트가 사용자 확인을 받은 일 — 화면이 보낸 값이므로 여기서 다시 거른다 (종류 · 길이 · 날짜 · 잠금)
+   *   → { ok, id?, message }
+   */
+  function runAgentAction(a) {
+    const vault = getVault();
+    if (!vault || !a || typeof a !== 'object') return { ok: false, message: UI.memoPickAgain };
+    const str = (v, max) => String(v ?? '').slice(0, max);
+    const clean = (v, max) => str(v, max).replace(/\s+/g, ' ').trim();
+    const created = (id) => {
+      getAiTagger()?.add([id]);
+      return id;
+    };
+    if (a.type === 'event') {
+      const title = clean(a.title, 80) || '일정';
+      const when = a.when && typeof a.when === 'object' ? a.when : {};
+      const r = eventFromDate({ at: str(when.at, 40), hasTime: Boolean(when.hasTime), repeat: when.repeat && typeof when.repeat === 'object' ? when.repeat : null, title });
+      if (!r) return { ok: false, message: '날짜를 알아보지 못했어요' };
+      const id = vault.import({ body: `# ${title}\n` });
+      const saved = id ? vault.setReminders(id, [r]) : null;
+      if (!saved) return { ok: false, message: UI.savedElsewhere };
+      pushReminders();
+      alarms.tick();
+      created(id);
+      return { ok: true, id, message: `일정을 넣었어요 · ${describeReminder(saved[0])}` };
+    }
+    if (a.type === 'memo' || a.type === 'summary') {
+      const body = a.type === 'summary'
+        ? summaryBody(clean(a.topic, 60), str(a.text, 8000), (Array.isArray(a.sources) ? a.sources : []).slice(0, 10).map((x) => ({ title: clean(x?.title, 80) })))
+        : str(a.body, 20000);
+      if (!body.trim() || isLockedBody(body)) return { ok: false, message: '쓸 내용이 없어요' };
+      const id = vault.import({ body: body.endsWith('\n') ? body : `${body}\n` });
+      if (!id) return { ok: false, message: UI.savedElsewhere };
+      created(id);
+      return { ok: true, id, message: a.type === 'summary' ? '요약을 새 메모로 저장했어요' : '메모를 만들었어요' };
+    }
+    if (a.type === 'append') {
+      const memo = vault.get(String(a.id ?? ''));
+      if (!memo) return { ok: false, message: '덧붙일 메모를 찾지 못했어요' };
+      if (memo.locked || isLockedBody(memo.body)) return { ok: false, message: '잠긴 메모에는 덧붙일 수 없어요' };
+      const text = str(a.text, 8000);
+      if (/<!--\s*memoking-lock/.test(text)) return { ok: false, message: '잠금 정보가 든 글은 덧붙일 수 없어요' };
+      const body = appendToBody(memo.body, text);
+      if (!body) return { ok: false, message: '덧붙일 내용이 없어요' };
+      const r = vault.save(memo.id, body);
+      if (!r || r.refused) return { ok: false, message: UI.savedElsewhere };
+      wm.sendToNote(memo.id, 'memo:external', vault.get(memo.id)); // 열린 메모 창도 덧붙인 글로
+      return { ok: true, id: memo.id, message: `'${(memo.title || '제목 없음').slice(0, 20)}'에 덧붙였어요` };
+    }
+    return { ok: false, message: '할 수 없는 일이에요' };
+  }
+
   // body: 새 메모를 만들 때 쓸 본문 (다른 캘린더 일정 가져오기 — 달력 그림 · 장소 · 설명). 없으면 "# 일정 이름" 만
   ipcMain.handle('reminders:add', (_e, id, reminder, newTitle, body) => {
     const vault = getVault();
@@ -486,6 +544,11 @@ export function registerIpc(ctx) {
     settings.autoEvents = Boolean(on);
     saveSettings();
     return settings.autoEvents;
+  });
+  ipcMain.handle('app:set-ai-phone', (_e, on) => {
+    settings.aiPhone = Boolean(on);
+    saveSettings();
+    return settings.aiPhone;
   });
   ipcMain.handle('app:set-magic-polish', (_e, on) => {
     settings.magicPolish = Boolean(on);
@@ -988,7 +1051,7 @@ export function registerIpc(ctx) {
     const memo = getVault()?.setMeta(id, patch ?? {});
     const win = wm.noteWins.get(id);
     if (memo && win) {
-      win.setBackgroundColor(noteBg(memo.color, settings.workLife === true ? memo.mode ?? 'life' : null));
+      win.setBackgroundColor(noteBg(memo.color));
       win.webContents.send('memo:meta', memo);
     }
     return memo;

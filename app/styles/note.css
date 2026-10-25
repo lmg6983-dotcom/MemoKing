@@ -16,8 +16,7 @@ body, .note-screen, .share-paper {
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) body, :where(:root:not([data-theme="light"])) .note-screen, :where(:root:not([data-theme="light"])) .share-paper { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) body, :where(:root[data-theme="dark"]) .note-screen, :where(:root[data-theme="dark"]) .share-paper { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
+
 :is(body, .note-screen, .share-paper)[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.1); }
 
 .icon-btn { width: 30px; height: 30px; color: var(--note-muted); }
@@ -62,24 +61,15 @@ body, .note-screen, .share-paper {
 .count-btn { width: auto; min-width: 30px; padding: 0 6px; gap: 2px; display: inline-flex; }
 .count-btn .count { font-size: 12px; font-weight: 700; }
 .count-btn.has-links { color: var(--note-text); }
-/* 불러오기 키: 번개 + 오른쪽 아래 작은 검은 숫자 (Ctrl+Alt+숫자), 없으면 흐린 번개에 사선 */
-.hotkey-btn { position: relative; }
+/* 불러오기 키: 정했을 때만 윗막대에 번개 + 오른쪽 아래 작은 숫자 (Ctrl+Alt+숫자) — 정하기 전에는 ⋯ 메뉴에서 (윗막대를 휴대폰처럼 가볍게) */
+.hotkey-btn { position: relative; color: var(--note-text); }
+.hotkey-btn.off { display: none; }
 .hotkey-num {
   position: absolute; right: 2px; bottom: 3px;
   min-width: 8px; height: 12px;
   color: var(--note-text); /* 바탕 없이 숫자만 — 번개와 겹치는 곳은 막대 색 테두리로 또렷하게 */
   text-shadow: 0 0 2px var(--note-bar), 0 0 2px var(--note-bar), 0 0 1px var(--note-bar);
   font-size: 11px; line-height: 12px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums;
-  pointer-events: none;
-}
-.hotkey-btn.off .hotkey-num { display: none; }
-.hotkey-btn:not(.off) { color: var(--note-text); }
-.hotkey-btn.off::after {
-  content: ''; position: absolute; left: 50%; top: 50%;
-  width: 19px; height: 1.6px; border-radius: 1px;
-  background: currentColor;
-  box-shadow: 0 0 0 1.2px var(--note-bar); /* 번개 위에 그어도 사선이 또렷하게 */
-  transform: translate(-50%, -50%) rotate(-45deg);
   pointer-events: none;
 }
 #links-count:empty { display: none; }
@@ -241,9 +231,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   :where(:root:not([data-theme="light"])) .mk-doc mark { filter: brightness(0.8); }
   :where(:root:not([data-theme="light"])) .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .mk-doc mark { filter: brightness(0.8); }
-  :where(:root[data-theme="dark"]) .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
+
 @media print { .mk-doc :is(mark, img) { filter: none !important; } }
 
 /* 이미지 */
@@ -504,13 +492,19 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .version-preview { color: var(--muted); }
 .version-restore { flex: none; height: 28px; padding: 0 10px; font-size: 12px; }
 
-/* ---------- AI 글 도우미 (links-panel 모양을 같이 씀) ---------- */
-.ai-panel { width: min(320px, 100%); }
-.ai-styles { display: flex; flex-wrap: wrap; gap: 4px; }
-.ai-panel .btn { height: 30px; padding: 0 10px; font-size: 12.5px; }
-.ai-request { height: auto; min-height: 52px; padding: 6px 10px; margin-bottom: 6px; resize: vertical; font: inherit; font-size: 12.5px; }
+/* ---------- AI 글쓰기 (서식 막대 끝 ✦ 위로 뜨는 작은 창) ---------- */
+.format-bar .ai-btn { font-size: 15px; }
+.format-bar .ai-btn[aria-expanded="true"] { background: var(--note-hover); color: var(--note-text); }
+.ai-pop { width: min(400px, calc(100vw - 12px)); max-height: min(70vh, 520px); padding: 8px; overflow-y: auto; }
+.ai-request { width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; outline: none; }
+.ai-request:focus { border-color: var(--text-strong); }
+.ai-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ai-chip { height: 26px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+.ai-chip:disabled { opacity: 0.45; cursor: default; }
+@media (hover: hover) and (pointer: fine) { .ai-chip:not(:disabled):hover { background: var(--hover); } }
+.ai-pop .btn { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.ai-pop .ai-state { margin: 8px 2px 0; font-size: 12px; color: var(--muted); }
 .ai-state:empty { display: none; }
-.ai-state { margin-top: 12px; }
 .ai-out { margin: 6px 0; white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
 .ai-out:empty { display: none; }
 .ai-all { margin-bottom: 6px; }
@@ -655,7 +649,6 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .rem-item .icon-btn { width: 26px; height: 26px; }
 .rem-item .icon-btn svg { width: 15px; height: 15px; }
 
-
 .reminder-form { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .reminder-form h4 { margin: 0 0 8px; }
 .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--fill-tab); margin-bottom: 10px; }
@@ -691,7 +684,6 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .rem-radio small { color: var(--muted); }
 .rem-action { margin-bottom: 10px; padding-top: 6px; border-top: 1px dashed var(--border); }
 .rem-submit { width: 100%; }
-
 
 /* 날짜·시각 고르기 (date-picker.js) — 다이얼 대신 달력 한 장 + 시각 칩 */
 .date-picker { margin-top: 2px; }
@@ -1066,7 +1058,6 @@ body.mk-row-resizing { user-select: none; }
 .mk-list-dragging, .mk-list-dragging * { cursor: grabbing !important; user-select: none !important; }
 .mk-list-dragging ::selection { background: transparent !important; } /* 끄는 동안 글자 선택 표시는 숨김 */
 
-
 /* 모든 체크리스트를 끝내면 CLEAR 도장 — 메모 본문 정중앙에 반투명 (글을 가리지 않게, 눌리지 않음) */
 .clear-stamp {
   position: fixed;
@@ -1399,8 +1390,7 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
 .mk-delete-btn { background: var(--surface-2); color: #c4282e; } /* 흰 바탕 위 빨간 × 를 4.5:1 넘게 (--rec #e5484d 는 3.9) */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .mk-delete-btn { color: #ff6b70; } }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
- :where(:root[data-theme="dark"]) .mk-delete-btn { color: #ff6b70; } 
+
 body[data-color="charcoal"] .mk-delete-btn { color: #ff6b70; }
 /* 어두운 숯색 메모 위에서도 또렷하게 */
 body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
@@ -1717,11 +1707,9 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
   :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
   :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .mk-doc .mk-ink.bg-none:has(.ink-dark-src) .ink-light-src { display: none; }
-  :where(:root[data-theme="dark"]) .mk-doc .mk-ink.bg-none .ink-dark-src { display: block; }
-  :where(:root[data-theme="dark"]) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
-  :where(:root[data-theme="dark"]) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
+
+  
+
 @media print {
   .mk-doc .mk-ink .ink-light-src { display: block !important; }
   .mk-doc .mk-ink .ink-dark-src { display: none !important; }
@@ -1847,7 +1835,8 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 }
 .lock-screen h2 { margin: 0 0 4px; font-size: 18px; text-align: center; overflow-wrap: anywhere; }
 .lock-screen .lock-note { margin: 0 0 18px; text-align: center; color: var(--note-muted); }
-.lock-screen .lock-icon { font-size: 34px; text-align: center; margin-bottom: 8px; }
+.lock-screen .lock-icon { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto 10px; border-radius: 50%; background: color-mix(in srgb, var(--note-text) 8%, transparent); color: var(--note-text); }
+.lock-screen .lock-icon svg { width: 26px; height: 26px; }
 .lock-screen .lock-field { color: var(--note-muted); }
 /* 단추도 가운데 위 아이콘 · 제목과 맞춰 칸 폭 그대로 (닫기 1 : 열기 2 — 다른 창의 아래 막대와 같은 비율). 닫기가 없으면 열기가 한 줄 */
 .lock-screen .dialog-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
@@ -1856,11 +1845,10 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 @media (pointer: coarse) { .lock-field input { min-height: 48px; font-size: 16px; } }
 /* 비밀번호를 넣기 전: 서식 막대·+ 는 숨김 */
 .memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
-.memo-locked #bell-btn, .memo-locked #hotkey-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
+.memo-locked #bell-btn, .memo-locked #hotkey-btn, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
 .lock-dialog h2 { margin-bottom: 8px; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
 .lock-hide-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 4px 0; font-size: 13px; color: var(--muted); }
-
 
 /* 일정과 알림 패널: 이름 · 하루 종일 · 미리 알림 (reminder-panel.js) */
 .rem-title-row input { flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-0); color: var(--text); font: inherit; }
@@ -1887,11 +1875,14 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 /* 지우기 단추는 늘 살짝 붉게 (마우스를 올리기 전에도 "추가" 와 구별) */
 .table-bar.grouped button.danger:not(:disabled) { color: color-mix(in srgb, var(--danger) 72%, var(--note-text)); }
 .table-bar.grouped button:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 1px; }
-/* 좁은 메모 창: 행 · 열의 추가 · 삭제는 아이콘만 (묶음 이름이 뜻을 알려 주고, 이름은 풍선 · 화면 읽기에 그대로) — 세 줄이 두 줄로 */
-@media (max-width: 420px) {
-  .table-bar.grouped :is([data-table="addRow"], [data-table="delRow"], [data-table="addCol"], [data-table="delCol"]):not([data-whole-table="1"]) .lbl { display: none; }
-  .table-bar.grouped :is([data-table="addRow"], [data-table="delRow"], [data-table="addCol"], [data-table="delCol"]) { padding: 0 6px; }
+/* 좁은 메모 창 (기본 340px): 휴대폰처럼 아이콘만 한 줄 — 세 줄로 쌓여 본문이 1/3 만 남던 것을 한 줄로 (이름은 풍선 · 화면 읽기에 그대로, 넘치면 옆으로 밀어 보기) */
+@media (max-width: 420px) { /* body > : PC 메모 창만 (휴대폰은 mobile.css 가 아이콘 + 더보기로) */
+  body > .table-bar.grouped { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+  body > .table-bar.grouped :is(.tb-name, .lbl) { display: none; }
+  body > .table-bar.grouped button { padding: 0 6px; }
 }
+/* 표를 고치는 동안 추천 태그 줄은 접는다 (휴대폰과 같이 — 세로 자리를 표에) */
+body.in-table .tag-suggest-bar { display: none; }
 
 /* ---------- 메모 단축키 창 (hotkey-dialog.js): Ctrl+Alt+1~9 고르기 · 누르면 할 일 ---------- */
 /*   기본 메모 창(340×380)에도 들어가게: 숫자는 키보드 숫자 줄처럼 한 줄 */
@@ -1956,13 +1947,11 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 .mk-undo-hint.fading { opacity: 0; }
 @keyframes mk-undo-in { from { opacity: 0; transform: translateY(4px); } }
 
-
 /* 파일 · 음성(소리 줄) · 그림 같은 내용을 골랐을 때: 글 서식 단추는 쓸 수 없다 (+ 콘텐츠 추가 · 더보기는 그대로) */
 body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-action="highlight"], [data-action="style"]) { opacity: 0.35; pointer-events: none; }
 
 /* 누르면 열리는 내용(파일 칩 · 소리 이름 줄 · 링크 카드 · 수식)은 글 커서(I)가 아니라 손가락 커서 — 짧게 눌렀다 떼면 열고, 누른 채 움직이면 옮긴다 */
 .mk-doc a[data-file], .mk-doc .mk-media .mk-media-label, .mk-doc .mk-link-card .lc-main, .mk-doc .mk-math-block { cursor: pointer; }
-
 
 /* 탭 순서 바꾸기(크롬 탭처럼): 끄는 동안 비켜 서는 탭들이 부드럽게 자리를 바꾼다 */
 .stack-tab.shifting { transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1); }

@@ -24,7 +24,7 @@ import { renderCollage, collageName } from './memories-collage.js';
 import { base64Bytes, collageMemoBody } from './collage-preview.js';
 import { ANDROID_APK, WINDOWS_SETUP, installShareText } from './core/install-links.js';
 import { chooseShare, showSharePop, SHARE_DONE } from './share-menu.js';
-import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL } from './core/modes.js';
+import { validMode, splitByMode, memoMode, otherMode, MODE_LABEL, fillModeTag } from './core/modes.js';
 import { openModeHelper } from './mode-helper-dialog.js';
 import { renderWorkSettings } from './work-settings.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
@@ -43,7 +43,7 @@ let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
-const aiAsk = api.ai ? setupAiAsk({ box: $('ai-ask'), api }) : null; // 검색창 › AI에게 묻기 (글 모델을 넣은 PC 에서만)
+const aiAsk = api.ai ? setupAiAsk({ btn: $('ai-ask-btn'), box: $('ai-ask'), input: $('search'), api }) : null; // 검색창 안 ✦ › 매직 에이전트 (글 모델을 넣은 PC 에서만)
 const el = {
   setup: $('setup'),
   suggested: $('suggested-path'),
@@ -83,11 +83,6 @@ const state = {
   // 필터 (창을 닫으면 잊는다): 태그는 모두 가진 메모, 색은 그중 하나, 담긴 것은 모두 해당
   filter: { tags: [], colors: [], kinds: [] },
 };
-// 처음 그릴 때부터 그 모드의 밝기로 (창을 연 쪽이 ?mode= 로 알려 준다)
-{
-  const m = new URLSearchParams(location.search).get('mode'); // system: Work / Life 를 나눠 쓰지 않음 → 시스템 설정
-  if (m === 'work' || m === 'life') document.documentElement.dataset.theme = m === 'work' ? 'dark' : 'light';
-}
 let searchTimer = null;
 let drivePanel = null; // Google Drive 직접 동기화 (설정 · 처음 화면)
 
@@ -321,9 +316,6 @@ function showMode({ later = false } = {}) {
   if (!later) syncSwitch();
   const root = document.documentElement;
   root.dataset.mode = state.mode;
-  // Work 는 어두운 화면 · Life 는 밝은 화면 — 나눠 쓰지 않으면 시스템 설정
-  if (state.workLife) root.dataset.theme = state.mode === 'work' ? 'dark' : 'light';
-  else delete root.dataset.theme;
   $('mode-switch').hidden = !state.workLife;
   for (const b of document.querySelectorAll('#mode-switch [data-mode]')) {
     b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));
@@ -416,18 +408,23 @@ el.kindFilter.addEventListener('click', (e) => {
   toggleIn(state.filter.kinds, b.dataset.kind);
   render();
 });
-el.filterBtn.addEventListener('click', async () => {
-  const open = el.filterPanel.hidden;
-  el.filterBtn.setAttribute('aria-expanded', String(open));
+// 보기 판: 카드 위에 떠서 목록을 밀지 않는다 — 밖을 누르거나 Esc 로 닫힌다
+async function setFilterPanel(open) {
   const p = el.filterPanel;
+  if (open === !p.hidden) return false;
+  el.filterBtn.setAttribute('aria-expanded', String(open));
   if (open) p.hidden = false;
   if (!reduceMotion()) {
-    const h = p.scrollHeight;
-    const frames = [{ height: '0px', opacity: 0, marginBottom: '0px', paddingTop: '0px', paddingBottom: '0px' }, { height: `${h}px`, opacity: 1 }];
-    await p.animate(open ? frames : frames.slice().reverse(), { duration: 200, easing: EASE_OUT }).finished.catch(() => {});
+    const frames = [{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }];
+    await p.animate(open ? frames : frames.slice().reverse(), { duration: open ? 160 : 120, easing: EASE_OUT }).finished.catch(() => {});
   }
   if (!open) p.hidden = true;
-});
+  return true;
+}
+el.filterBtn.addEventListener('click', () => setFilterPanel(el.filterPanel.hidden));
+document.addEventListener('pointerdown', (e) => {
+  if (!el.filterPanel.hidden && !el.filterPanel.contains(e.target) && !el.filterBtn.contains(e.target) && !e.target.closest?.('.coach-bubble')) setFilterPanel(false);
+}, true);
 $('filter-clear').addEventListener('click', () => {
   state.filter = { tags: [], colors: [], kinds: [] };
   render();
@@ -526,6 +523,7 @@ function renderCard(memo) {
   foot.className = 'card-foot';
   const tags = document.createElement('div');
   tags.className = 'card-tags';
+  if (state.workLife) tags.append(fillModeTag(document.createElement('span'), memo, true));
   for (const name of memo.tags ?? []) {
     const t = document.createElement('span');
     t.className = 'card-tag';
@@ -901,6 +899,7 @@ async function loadSettings() {
   $('auto-tags').checked = $('auto-tags-ai').checked = s.autoTags !== false;
   $('magic-polish').checked = s.magicPolish !== false;
   $('auto-events').checked = s.autoEvents !== false;
+  $('ai-phone').checked = s.aiPhone === true;
   $('link-previews').checked = s.linkPreviews !== false;
   magicIndex = s.magicIndex ?? null;
   showMagic(s.magic);
@@ -1083,7 +1082,7 @@ if (api.stt) {
 // ---------- AI 도우미 (desktop/ai — 인터넷 없이 이 PC 안에서) ----------
 // 모델 파일(.gguf)은 사용자가 넣는다 (USB 로 옮긴 파일도). 이 PC 의 앱 데이터 폴더에 복사되고, 메모 폴더에는 넣지 않음
 const AI_HINT = {
-  chat: '맞춤법, 태그, 일정, AI에게 묻기에 써요. 아래에서 카나나2를 받아 주세요 (인터넷이 없는 PC는 받아 둔 파일 넣기)',
+  chat: '맞춤법, 태그, 일정, 매직 에이전트에 써요. 아래에서 카나나2를 받아 주세요 (인터넷이 없는 PC는 받아 둔 파일 넣기)',
 };
 // 모델 이름: 기본 모델은 이름으로 (파일 이름은 사용자 말이 아님), 직접 넣은 모델은 파일 이름
 const modelName = (m) => (DEFAULT_MODEL.file.test(m.name ?? '') ? DEFAULT_MODEL.label : m.name || '모델');
@@ -1186,6 +1185,9 @@ $('magic-polish').addEventListener('change', async (e) => {
 $('auto-events').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setAutoEvents(e.target.checked);
 });
+$('ai-phone').addEventListener('change', async (e) => {
+  e.target.checked = await api.settings.setAiPhone(e.target.checked);
+});
 
 // 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)
 let magicState = { enabled: true, modules: {}, paused: {} };
@@ -1269,8 +1271,11 @@ $('opms-shapes-clear').addEventListener('click', async () => showOpmsShapes(awai
 // 메모 보기 › 넣을 때 묻기: "앞으로 이렇게" 로 기억한 것을 지운다 (메모 창들과 같은 저장소 — rename-content.js)
 const choicesBtn = $('choices-reset');
 const paintChoices = () => {
-  choicesBtn.disabled = !hasRememberedChoices();
-  choicesBtn.textContent = choicesBtn.disabled ? '늘 물어요' : '다시 묻기';
+  const kept = hasRememberedChoices();
+  choicesBtn.hidden = !kept; // 지울 것이 없으면 꺼진 단추 대신 지금 상태만 글로
+  $('choices-note').textContent = kept
+    ? '사진 여러 장 · 문서를 넣을 때 "앞으로 이렇게" 로 정해 둔 것이 있어요. 지우면 다시 물어요'
+    : '사진 여러 장 · 문서를 넣을 때마다 어떻게 넣을지 물어요';
 };
 choicesBtn.addEventListener('click', () => {
   forgetChoices();
@@ -1684,6 +1689,11 @@ el.search.addEventListener('input', () => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && cancelDrag()) return;
   if (e.key === 'Escape' && setFabMenu(false)) return;
+  if (e.key === 'Escape' && !el.filterPanel.hidden) {
+    setFilterPanel(false);
+    el.filterBtn.focus();
+    return;
+  }
   if (el.settings.open || el.confirm.open || el.main.hidden) return;
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.code === 'KeyN') {
@@ -2085,6 +2095,12 @@ $('trash-days').addEventListener('change', async (e) => {
   refreshTrashCount();
 });
 
+// 문제 보내기: 최근 오류 기록을 붙인 새 메일 (전체 기록은 클립보드에) — 보낼지는 사용자가
+$('report-btn').addEventListener('click', async () => {
+  const r = await api.reportProblem?.();
+  $('report-btn').textContent = r?.ok ? '메일 앱을 열었어요 · 기록은 클립보드에' : '메일 앱을 열지 못했어요';
+  setTimeout(() => ($('report-btn').textContent = '문제 보내기'), 4000);
+});
 $('tutorial-btn').addEventListener('click', () => {
   el.settings.close();
   api.tutorial.start();

@@ -108,8 +108,9 @@ export class SyncEngine {
         const r = rel ? `${rel}/${d.name}` : d.name;
         if (d.isDirectory()) walk(path.join(dir, d.name), r);
         else if (d.isFile() && !skipPath(r)) {
-          const st = fs.statSync(path.join(dir, d.name));
-          out.set(r, { mtime: Math.floor(st.mtimeMs), size: st.size });
+          // 목록을 읽은 뒤 사라진 파일 (메모 창을 닫으며 제목에 맞춰 이름을 바꾸는 사이 등) — 없는 것으로 치고 다음 차례에
+          const st = fs.statSync(path.join(dir, d.name), { throwIfNoEntry: false });
+          if (st) out.set(r, { mtime: Math.floor(st.mtimeMs), size: st.size });
         }
       }
     };

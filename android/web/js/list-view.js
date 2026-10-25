@@ -16,11 +16,10 @@ import { tutEvent, tutorialStepId } from './tutorial.js';
 import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition, setModeSwitch, EASE_OUT } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
-import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode } from '../../app/js/core/modes.js';
+import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode, fillModeTag } from '../../app/js/core/modes.js';
 import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
-import { setListTheme } from './theme.js';
 import { UI } from '../../app/js/core/ui-text.js';
 
 const $ = (x) => document.getElementById(x);
@@ -135,7 +134,6 @@ const syncSwitch = () => setModeSwitch($('mode-switch'), state.mode);
 function showMode({ later = false } = {}) {
   if (!later) syncSwitch();
   document.documentElement.dataset.mode = state.mode;
-  setListTheme(workLifeOn() ? state.mode : null, { noteOpen: app.isNoteOpen?.() ?? false }); // Work 는 어두운 화면 · Life 는 밝은 화면 (나눠 쓰지 않으면 시스템 설정)
   $('mode-switch').hidden = !workLifeOn();
   if (app.vault) app.vault.defaultMode = state.mode; // 새 메모도 이 모드로
   for (const b of document.querySelectorAll('#mode-switch [data-mode]')) {
@@ -257,7 +255,8 @@ function renderCard(memo) {
   foot.className = 'card-foot';
   const tags = document.createElement('div');
   tags.className = 'card-tags';
-  tags.textContent = (memo.tags ?? []).map((t) => `#${t}`).join(' ');
+  if (workLifeOn()) tags.append(fillModeTag(document.createElement('span'), memo, true), ' ');
+  tags.append((memo.tags ?? []).map((t) => `#${t}`).join(' '));
   const meta = document.createElement('div');
   meta.className = 'card-meta';
   if (memo.reminderCount) {

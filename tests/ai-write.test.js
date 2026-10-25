@@ -25,6 +25,10 @@ test('AI 글 도우미: 작은 모델의 엉뚱한 답은 버린다', () => {
   assert.ok(!plausibleFix('짧은 글이에요', '짧은 글이에요. 그리고 여기에 모델이 마음대로 붙인 아주 긴 설명이 있어요.'));
   assert.ok(!plausibleFix('안건 정리 #업무', '안건 정리'));
   assert.ok(!plausibleFix('자료 https://a.com/x 참고', '자료 참고'));
+  // 매직키로 저장한 질문을 답으로 바꾼 일 (v0.69.0 사용자 시험): 길이는 비슷해도 다른 글
+  assert.ok(!plausibleFix('새매모로 작동하니 ?', '네, 잘 작동하고 있습니다.'));
+  assert.ok(!plausibleFix('오늘 회의 몇 시야?', '오늘 회의는 3시예요.'));
+  assert.ok(plausibleFix('새메모로 작동하니?', '새 메모로 작동하니?'), '띄어쓰기만 고친 것은 그대로');
 });
 
 test('AI 글 도우미: 초안은 제목 · 쓴 내용 · 부탁을 함께', () => {

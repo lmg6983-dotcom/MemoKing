@@ -374,8 +374,7 @@ app.noteBack = () => {
   if (isTwoPane() && !tutorialWaitsFor('note-closed')) panes.toggleList();
   else app.showList();
 };
-app.isNoteOpen = () => note.isOpen();
-app.workLifeOn = () => list.workLifeOn(); // Work / Life 나누기 (note-view: 메모 화면 밝기)
+app.workLifeOn = () => list.workLifeOn(); // Work / Life 나누기 (note-view: 메모의 모드 태그)
 
 // 넓은 화면: 메모를 고르지 않았으면 오른쪽에 안내
 function syncPane() {
