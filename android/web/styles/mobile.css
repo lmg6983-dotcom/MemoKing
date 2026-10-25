@@ -1261,7 +1261,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .searchbar .brand-icon { width: 26px; height: 26px; }
 .searchbar .mode-switch { --ms-pad: 3px; --ms-h: 32px; margin-right: 6px; }
 @media (max-width: 370px) { .searchbar .brand-mark { margin: 0 6px 0 0; } .searchbar .brand-icon { width: 22px; height: 22px; } }
-.searchbar .mode-switch button { min-width: 36px; font-size: 12.5px; }
+.searchbar .mode-switch button { font-size: 12.5px; }
 .other-mode { display: block; margin: 0 16px 8px auto; padding: 6px 0; font-size: 13.5px; }
 
 /* 동기화 단추 아래 진행 줄 (받는 중) — PC 목록 창의 구름 단추와 같은 모양 */
