@@ -38,6 +38,10 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 
 .magic-results { -webkit-app-region: no-drag; position: relative; list-style: none; margin: 0; padding: 4px 8px 6px; max-height: 430px; overflow-y: auto; border-top: 1px solid var(--mk-line); }
 .magic-results:not(:has(> :not(.magic-pill))) { display: none; }
+.magic-results[hidden] { display: none; }
+/* 매직 에이전트 칸 (agent-view.js — 글 · 출처 · 확인 카드) */
+.magic-agent { -webkit-app-region: no-drag; max-height: 430px; overflow-y: auto; padding: 10px 16px 12px; border-top: 1px solid var(--mk-line); }
+.magic-agent[hidden] { display: none; }
 /* 기능마다 색 하나 — 아래 캡슐의 점 · 결과 묶음 머리말의 점이 같은 색이라 짝이 한눈에 */
 /*   색 계열이 서로 멀게: 노랑 · 빨강 · 청록 · 초록 · 분홍 · 보라 · 남색 */
 [data-mod="memo"] { --mod: #d99a00; }

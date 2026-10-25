@@ -284,7 +284,7 @@ export class Vault extends EventEmitter {
 
   // 태그 추천용: 메모마다 본문
   bodies() {
-    return [...this.entries.values()].filter((e) => e.file).map((e) => ({ id: e.id, body: e.body }));
+    return [...this.entries.values()].filter((e) => e.file).map((e) => ({ id: e.id, body: e.body, updated: e.meta?.updated }));
   }
 
   // 매직키 메모 검색용: 메모마다 제목·본문 글 — 다듬은 글(서식 뺀 줄)은 본문이 같으면 다시 만들지 않는다

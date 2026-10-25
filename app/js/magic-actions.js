@@ -49,7 +49,8 @@ export function actionsFor(r) {
     // 웹 검색 · AI: 사이트마다 단추 (이름 글자로, 설정에서 고른 사이트가 맨 앞 = Enter)
     case 'web':
     case 'ai':
-      return (r.sites ?? []).map((site) => ({ id: site.id, label: site.name, text: true }));
+      // AI 줄: 글 모델이 있으면 맨 앞(Enter)이 매직 에이전트 (이 PC 안), 그 뒤가 웹 AI
+      return [...(r.agent ? [{ id: 'agent', label: '매직 에이전트', text: true }] : []), ...(r.sites ?? []).map((site) => ({ id: site.id, label: site.name, text: true }))];
     case 'opms':
       return [{ id: 'open', label: '사건 보기' }, { id: 'wrapper', label: '전자포대' }, { id: 'copyOur', label: '관리번호 복사' }, { id: 'copyApp', label: '출원번호 복사' }];
     default:

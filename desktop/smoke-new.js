@@ -79,7 +79,7 @@ function fakeOpms() {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, gate, hits, host: `http://127.0.0.1:${server.address().port}` })));
 }
 
-export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow, memoHotkeys, smokeHud, windowManager }) {
+export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFileIndex, getOpms, getSettings, getList, noteWins, createListWindow, memoHotkeys, smokeHud, windowManager, setAi }) {
   const checks = [];
   const errors = [];
   const check = (name, ok, detail = '') => {
@@ -172,7 +172,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     check('매직키: 결과 묶음은 캡슐 순서대로, 머리말은 여러 줄 묶음에만 · 캡슐 점과 같은 색', groups0 === 'memo,notes,files,web,ai' && heads === 'notes,files' && dotColor, JSON.stringify({ groups0, heads }));
     await typeMagic('견적서 정리해줘');
     const asked = await until(async () => (await groupOrder()).includes('ai') && groupOrder(), '묻는 글');
-    check('매직키: 묻는 글이면 AI에게 묻기가 새 메모 바로 아래', asked.startsWith('memo,ai'), asked);
+    check('매직키: 묻는 글이면 AI 줄(매직 에이전트 · 웹 AI)이 새 메모 바로 아래', asked.startsWith('memo,ai'), asked);
     await typeMagic('견적서');
     await until(async () => (await groupOrder()) === 'memo,notes,files,web,ai', '다시 견적서');
     const at = (mod) => js(magic, `(() => { const r = document.querySelector('.magic-chip[data-mod="${mod}"]').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: r.width }; })()`);
@@ -2006,6 +2006,56 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const typed = await js(cw, `({ chip: document.querySelector('.ProseMirror a[data-file]').textContent, line: document.querySelector('.ProseMirror p').textContent })`);
       check('파일 칩: 칩 바로 뒤에서 친 글(한글 · 영문)은 칩 이름에 붙지 않고 칩 밖에', typed.chip === '보고서최종본.pdf' && typed.line.includes('가x'), JSON.stringify(typed));
       cw.close();
+    }
+    // 매직 에이전트 (0.70.0): 가짜 글 모델로 — 매직키 AI 줄 Enter → 확인 카드 → 넣기 → 일정 · 메모에서 찾은 문장 · 목록 ✦ 덧붙이기
+    if (setAi) {
+      const v = getVault();
+      v.import({ body: '# 주간 회의\n\n출시일은 11월 3일로 확정했어요\n' });
+      const shopId = v.import({ body: '# 장보기\n\n- 우유\n' });
+      setAi({
+        status: () => ({ engine: true, chat: { state: 'ready', name: '점검', size: 1 } }),
+        chat: async (_m, o) => (o?.schema ? '{"words":[]}' : '메모에서 찾지 못했어요.'),
+      });
+      const magic = getMagic();
+      showMagic();
+      await until(() => js(magic, `document.activeElement?.id === 'magic-input'`), '매직키 다시 뜸');
+      await js(magic, `(() => { const i = document.getElementById('magic-input'); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true })); i.value = '내일 오후 3시 거래처 미팅 등록해줘'; i.dispatchEvent(new Event('input')); })()`);
+      const agentBtn = `document.querySelector('.magic-row.kind-ai .act-btn[data-action="agent"]')`;
+      const row = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row.kind-ai'); return r && ${agentBtn} && r.querySelector('.t').textContent; })()`), '매직 에이전트 줄', 5000).catch(() => null);
+      await js(magic, `${agentBtn}.click()`).catch(() => {});
+      const card = await until(() => js(magic, `(() => { const c = document.querySelector('#magic-agent .agent-card'); return c && c.children.length && { head: c.querySelector('.agent-card-head').textContent, title: c.querySelector('input').value, when: c.querySelector('.agent-when').textContent, results: document.getElementById('magic-results').hidden }; })()`), '확인 카드', 5000).catch(() => null);
+      await js(magic, `document.querySelector('#magic-agent .agent-run').click()`).catch(() => {});
+      const event = await until(() => v.allReminders().find((e) => e.reminder.title === '거래처 미팅'), '일정 넣음', 5000).catch(() => null);
+      const at = event && new Date(event.reminder.at);
+      const tomorrow = new Date(Date.now() + 86_400_000);
+      check('매직 에이전트(매직키): AI 줄 Enter → 결과 대신 "일정 넣기" 확인 카드(이름 · 때) → 넣기 → 내일 오후 3시 "거래처 미팅" 일정',
+        row === '매직 에이전트' && card?.head === '일정 넣기' && card.title === '거래처 미팅' && card.results && at?.getDate() === tomorrow.getDate() && at.getHours() === 15,
+        JSON.stringify({ row, card, event: event?.reminder }));
+      // 질문: 모델이 물러서도 찾은 메모의 문장을 그대로 + 출처
+      await js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = '출시일 언제야?'; i.dispatchEvent(new Event('input')); })()`);
+      await until(() => js(magic, `!!(${agentBtn})`), 'AI 줄 다시', 5000).catch(() => {});
+      await js(magic, `${agentBtn}.click()`).catch(() => {});
+      const answer = await until(() => js(magic, `(() => { const o = document.querySelector('#magic-agent .agent-out').textContent; return o && { o, src: [...document.querySelectorAll('#magic-agent .agent-source')].map((b) => b.textContent).join() }; })()`), '답', 5000).catch(() => null);
+      await capture(magic, 'smoke-new-agent-magic.png');
+      key(magic, 'Escape');
+      const back = await until(() => js(magic, `document.getElementById('magic-agent').hidden && !document.getElementById('magic-results').hidden`), 'Esc 결과로', 2000).catch(() => false);
+      check('매직 에이전트: 질문엔 메모에서 찾아 답 (모델이 물러서도 그 메모의 문장 그대로 + 출처) · Esc 로 결과 목록',
+        /출시일은 11월 3일로 확정했어요/.test(answer?.o ?? '') && answer.src === '주간 회의' && back, JSON.stringify({ answer, back }));
+      magic.hide();
+      // 목록 검색창 ✦ → 덧붙이기 확인 카드 → 장보기 메모에 계란
+      const list = getList() ?? createListWindow();
+      await until(() => js(list, `document.documentElement.dataset.ready === 'true'`), '목록 준비');
+      await js(list, `(() => { const i = document.getElementById('search'); i.value = '장보기에 계란이랑 두부 추가해줘'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+      await until(() => js(list, `!document.getElementById('ai-ask-btn').hidden`), '검색창 ✦', 5000).catch(() => {});
+      await js(list, `document.getElementById('ai-ask-btn').click()`);
+      const apCard = await until(() => js(list, `(() => { const c = document.querySelector('#ai-ask .agent-card'); return c && c.children.length && { head: c.querySelector('.agent-card-head').textContent, memo: c.querySelector('select').selectedOptions[0]?.textContent, text: c.querySelector('textarea').value }; })()`), '덧붙이기 카드', 5000).catch(() => null);
+      await capture(list, 'smoke-new-agent-list.png');
+      await js(list, `document.querySelector('#ai-ask .agent-run').click()`).catch(() => {});
+      const shop = await until(() => { const b = v.get(shopId)?.body ?? ''; return b.includes('- 계란') && b.includes('- 두부') && b; }, '덧붙임', 5000).catch(() => null);
+      const msg = await js(list, `document.querySelector('#ai-ask .agent-state').textContent`);
+      check('매직 에이전트(목록 ✦): "장보기에 계란이랑 두부 추가해줘" → 덧붙이기 카드(장보기 · 항목 줄) → 덧붙이기 → 메모 끝에 - 계란 / - 두부',
+        apCard?.head === '메모에 덧붙이기' && apCard.memo === '장보기' && apCard.text === '- 계란\n- 두부' && Boolean(shop) && /덧붙였어요/.test(msg), JSON.stringify({ apCard, shop, msg }));
+      await js(list, `(() => { const i = document.getElementById('search'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     }
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;

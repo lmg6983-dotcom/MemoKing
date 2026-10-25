@@ -1,38 +1,30 @@
-// AI 검색 (목록 › 검색창 안 오른쪽 ✦) — 검색어로 내 메모에서 찾아 출처 번호를 단 답을 검색창 바로 아래에.
-//   찾기 · 답하기는 desktop (core/rag.js, 이 PC 안의 모델, 인터넷 없이). 글 모델을 넣은 PC 에서만 보인다.
+// 매직 에이전트 (목록 › 검색창 안 오른쪽 ✦, 또는 검색창에서 Ctrl+Enter) — 검색창의 글로 묻거나 시키면 검색창 바로 아래에
+//   답(내 메모에서 찾아 출처를 단) · 요약 · 일정 / 메모 / 덧붙이기 확인 카드 (agent-view.js — 매직키와 같은 화면).
+//   찾기 · 답하기는 desktop (core/ai-tasks.js agent, 이 PC 안의 모델, 인터넷 없이). 글 모델을 넣은 PC 에서만 보인다.
+import { createAgentView } from './agent-view.js';
 
-const h = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-};
-
-/** @param {{ btn: HTMLButtonElement, box: HTMLElement, api: any }} o */
-export function setupAiAsk({ btn, box, api }) {
-  const state = h('p', 'ai-ask-state');
-  state.setAttribute('role', 'status');
-  const out = h('p', 'ai-ask-out');
-  const label = h('p', 'ai-sources-label');
-  const sources = h('ol', 'ai-sources');
-  const stop = h('button', 'link-btn', '멈추기');
-  stop.type = 'button';
-  const close = h('button', 'icon-btn ai-close', '×');
+/** @param {{ btn: HTMLButtonElement, box: HTMLElement, input: HTMLInputElement, api: any }} o */
+export function setupAiAsk({ btn, box, input, api }) {
+  const close = document.createElement('button');
   close.type = 'button';
-  close.setAttribute('aria-label', 'AI 답 닫기');
-  box.append(close, state, out, label, sources, stop);
+  close.className = 'icon-btn ai-close';
+  close.textContent = '×';
+  close.setAttribute('aria-label', '매직 에이전트 닫기');
+  const inner = document.createElement('div');
+  box.append(close, inner);
   const view = box.closest('.view');
+  const agent = createAgentView({
+    box: inner,
+    api: {
+      agent: (req) => api.ai.agent(req),
+      run: (action) => api.ai.agentRun(action),
+      cancel: (id) => api.ai.cancel(id),
+      onToken: (cb) => api.on('ai:token', cb),
+      openMemo: (id) => api.memo.open(id),
+    },
+  });
 
   let query = '';
-  let job = null;
-  let seq = 0;
-
-  api.on('ai:token', ({ id, text }) => {
-    if (id === job) {
-      out.textContent = text;
-      state.textContent = '';
-    }
-  });
 
   function show(on) {
     box.hidden = !on;
@@ -40,46 +32,23 @@ export function setupAiAsk({ btn, box, api }) {
     view?.classList.toggle('ai-open', on); // 답이 떠 있으면 "검색 결과가 없어요" 는 겹쳐 말하지 않는다
   }
   function reset() {
-    if (job) api.ai.cancel(job);
-    job = null;
+    agent.reset();
     show(false);
   }
-
-  btn.addEventListener('click', async () => {
-    reset();
-    job = `q${++seq}`;
-    const id = job;
+  function start() {
+    if (btn.hidden || !query) return;
     show(true);
-    stop.hidden = false;
-    out.textContent = '';
-    label.textContent = '';
-    sources.replaceChildren();
-    state.textContent = '내 메모에서 찾는 중이에요…';
-    const r = await api.ai.ask({ id, question: query });
-    if (id !== job) return;
-    job = null;
-    stop.hidden = true;
-    if (r.error) return (state.textContent = r.error);
-    state.textContent = '';
-    out.textContent = r.text; // 마지막 조각보다 답이 먼저 올 수 있다
-    // 답이 [번호]로 든 메모만 출처로. 든 게 없으면(못 찾음) 번호 없이 "관련 있어 보이는 메모" — 직접 열어 보게
-    const cited = new Set([...r.text.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]) - 1));
-    const shown = cited.size ? r.sources.filter((_, i) => cited.has(i)) : r.sources;
-    label.textContent = shown.length ? (cited.size ? '출처' : '관련 있어 보이는 메모') : '';
-    sources.classList.toggle('plain', !cited.size);
-    sources.start = cited.size ? Math.min(...cited) + 1 : 1;
-    sources.replaceChildren(...shown.map((s) => {
-      const li = h('li');
-      const b = h('button', 'ai-source', s.title || '제목 없음');
-      b.type = 'button';
-      if (s.via === 'graph') b.append(h('small', null, ' 연결된 메모'));
-      b.addEventListener('click', () => api.memo.open(s.id));
-      li.append(b);
-      return li;
-    }));
-  });
-  stop.addEventListener('click', () => job && api.ai.cancel(job));
+    agent.start(input.value.trim());
+  }
+
+  btn.addEventListener('click', start);
   close.addEventListener('click', reset);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) {
+      e.preventDefault();
+      start();
+    }
+  });
 
   return {
     /** 검색어가 바뀔 때 — 글자가 있고 글 모델이 준비됐을 때만 ✦ 를 보인다 */

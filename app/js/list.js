@@ -43,7 +43,7 @@ let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·
 
 const api = window.memoking;
 const $ = (id) => document.getElementById(id);
-const aiAsk = api.ai ? setupAiAsk({ btn: $('ai-ask-btn'), box: $('ai-ask'), api }) : null; // 검색창 안 ✦ › AI에게 묻기 (글 모델을 넣은 PC 에서만)
+const aiAsk = api.ai ? setupAiAsk({ btn: $('ai-ask-btn'), box: $('ai-ask'), input: $('search'), api }) : null; // 검색창 안 ✦ › 매직 에이전트 (글 모델을 넣은 PC 에서만)
 const el = {
   setup: $('setup'),
   suggested: $('suggested-path'),
@@ -1077,7 +1077,7 @@ if (api.stt) {
 // ---------- AI 도우미 (desktop/ai — 인터넷 없이 이 PC 안에서) ----------
 // 모델 파일(.gguf)은 사용자가 넣는다 (USB 로 옮긴 파일도). 이 PC 의 앱 데이터 폴더에 복사되고, 메모 폴더에는 넣지 않음
 const AI_HINT = {
-  chat: '맞춤법, 태그, 일정, AI에게 묻기에 써요. 아래에서 카나나2를 받아 주세요 (인터넷이 없는 PC는 받아 둔 파일 넣기)',
+  chat: '맞춤법, 태그, 일정, 매직 에이전트에 써요. 아래에서 카나나2를 받아 주세요 (인터넷이 없는 PC는 받아 둔 파일 넣기)',
 };
 // 모델 이름: 기본 모델은 이름으로 (파일 이름은 사용자 말이 아님), 직접 넣은 모델은 파일 이름
 const modelName = (m) => (DEFAULT_MODEL.file.test(m.name ?? '') ? DEFAULT_MODEL.label : m.name || '모델');

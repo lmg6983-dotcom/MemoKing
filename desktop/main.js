@@ -725,6 +725,7 @@ function initAi() {
     ai,
     memos: () => vault?.bodies() ?? [],
     graph: () => vault?.index?.memos ?? [],
+    reminders: () => vault?.allReminders() ?? [],
   });
   aiTagger = createAiTagger({
     getVault: () => vault,
@@ -1454,6 +1455,11 @@ app.whenReady().then(async () => {
       stackInto: (targetId, movingId) => windowManager.stackInto(targetId, movingId),
       getTabTear: () => windowManager.tabTear,
       getSettings: () => settings,
+      // 점검 전용: 글 모델 대신 정해 둔 답을 하는 가짜 모델 (매직 에이전트 화면 · 실행 흐름 점검)
+      setAi: (fake) => {
+        ai = fake;
+        aiTasks = createAiTasks({ ai, memos: () => vault?.bodies() ?? [], graph: () => vault?.index?.memos ?? [], reminders: () => vault?.allReminders() ?? [] });
+      },
       stickers: windowManager.stickers,
       reloadSettings: loadSettings,
       startAreaCapture: (opts) => windowManager.startAreaCapture(opts),

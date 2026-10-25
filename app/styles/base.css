@@ -1075,22 +1075,34 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .work-hours .wh-sum { font-weight: 500; color: var(--muted); }
 @media (pointer: coarse) { .work-hours .wh-day { width: 44px; height: 44px; } .work-hours .wh-time input { height: 44px; } }
 
-/* AI 검색 답: 검색창 안 ✦ 를 누르면 검색창 바로 아래에 (ai-ask.js) */
-.ai-answer { position: relative; flex: none; margin: 0 12px 8px; padding: 10px 36px 10px 12px; border-radius: var(--radius-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+/* 매직 에이전트: 목록 검색창 ✦ 아래 칸 (ai-ask.js) · 매직키 창 (magic.js) — 안쪽은 agent-view.js */
+.ai-answer { position: relative; flex: none; margin: 0 12px 8px; padding: 10px 36px 10px 12px; border-radius: var(--radius-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); max-height: 50vh; overflow-y: auto; }
 .ai-answer[hidden] { display: none; }
 .ai-close { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; font-size: 18px; line-height: 1; }
-.ai-ask-state { margin: 0; font-size: 12px; color: var(--muted); }
-.ai-ask-state:empty { display: none; }
-.ai-ask-out { margin: 0; font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; }
-.ai-ask-out:empty { display: none; }
-.ai-sources-label { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
-.ai-sources-label:empty { display: none; }
-.ai-sources { margin: 2px 0 0; padding-left: 22px; font-size: 12.5px; color: var(--muted); }
-.ai-sources.plain { padding-left: 16px; list-style: disc; }
-.ai-sources:empty { display: none; }
-.ai-source { padding: 1px 0; border: 0; background: none; color: var(--text); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
-.ai-source small { color: var(--muted); text-decoration: none; }
-.ai-open .empty { display: none; }
+.ai-open .empty, .ai-open #empty:not([hidden]) { display: none; }
+.agent-state { margin: 0; font-size: 12px; color: var(--muted); }
+.agent-state:empty { display: none; }
+.agent-out { margin: 0; font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.agent-out:empty { display: none; }
+.agent-sources-label { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.agent-sources-label:empty { display: none; }
+.agent-sources { margin: 2px 0 0; padding-left: 22px; font-size: 12.5px; color: var(--muted); }
+.agent-sources.plain { padding-left: 16px; list-style: disc; }
+.agent-sources:empty { display: none; }
+.agent-source { padding: 1px 0; border: 0; background: none; color: var(--text); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; text-align: left; }
+.agent-source small { color: var(--muted); text-decoration: none; }
+.agent-card:empty { display: none; }
+.agent-card { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.agent-card-head { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-strong); }
+.agent-field { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.agent-field > span { flex: none; width: 32px; }
+.agent-input { flex: 1; min-width: 0; width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); font: inherit; font-size: 13px; resize: vertical; outline: none; }
+.agent-input:focus { border-color: var(--text-strong); }
+.agent-when { margin: 0; font-size: 12.5px; color: var(--text); }
+.agent-note { margin: 0; font-size: 12px; color: var(--muted); }
+.agent-foot:empty { display: none; }
+.agent-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.agent-foot .btn { height: 30px; padding: 0 14px; font-size: 13px; }
 
 /* 고칠 수 없는 Work / Life 모드 태그 (core/modes.js fillModeTag) — 색 · 밝기를 강요하지 않게 글자색 테두리만 */
 .mode-tag {

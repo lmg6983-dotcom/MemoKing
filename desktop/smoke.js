@@ -1663,8 +1663,8 @@ export async function runSmoke({
       const sites = await listJs(`[...document.querySelectorAll('#magic-modules-list .magic-site select')].map((s) => s.value)`);
       await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'google'; s.dispatchEvent(new Event('change')); })()`);
       const engine = await until(() => appSettings().magic.engine === 'google' && 'google', '기본 검색 사이트 저장').catch(() => appSettings().magic.engine);
-      check('설정 매직키: 계산기 · 웹 검색 · AI에게 묻기 켜짐, 기본 사이트(네이버 · ChatGPT)를 고르면 저장',
-        ['계산기:true', '웹 검색:true', 'AI에게 묻기:true'].every((m) => mods.includes(m)) && sites.join() === 'naver,chatgpt' && engine === 'google', JSON.stringify({ mods, sites, engine }));
+      check('설정 매직키: 계산기 · 웹 검색 · 매직 에이전트 켜짐, 기본 사이트(네이버 · ChatGPT)를 고르면 저장',
+        ['계산기:true', '웹 검색:true', '매직 에이전트:true'].every((m) => mods.includes(m)) && sites.join() === 'naver,chatgpt' && engine === 'google', JSON.stringify({ mods, sites, engine }));
       await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'naver'; s.dispatchEvent(new Event('change')); })()`);
       await listJs(`document.getElementById('set-magic').scrollIntoView()`);
       await wait(200);

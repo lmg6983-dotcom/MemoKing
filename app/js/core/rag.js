@@ -1,16 +1,35 @@
 // AI 검색 (순수 함수) — 내 메모에서 찾아 출처를 단 답. 모델은 desktop/ai (이 PC 안, 인터넷 없이).
-//   찾기는 낱말(TF-IDF, 지금 앱과 같은 토큰) · 그래프(연결 · 관련도, index.json). 뜻으로 찾기는 따로 검색 모델 없이
-//   글 모델(카나나2)이 질문을 비슷한 말 몇 개로 넓혀 낱말 찾기에 더한다 (expandMessages).
-//   작은 모델은 지어내기 쉬워 찾기가 일을 대부분 하고, 모델은 고른 메모만 보고 짧게 답한다 (없으면 없다고).
+//   찾기: 낱말(TF-IDF, 지금 앱과 같은 토큰) + 한글 두 글자 조각(바이그램 — "회의했어" 로도 "회의" 를 찾게, 0.70.0)
+//         + 제목에 든 말 · 물은 때(지난주 · 어제 …)에 고친 메모를 앞으로 + 그래프(연결 · 관련도, index.json).
+//   뜻으로 찾기는 따로 검색 모델 없이 글 모델(카나나2)이 질문을 비슷한 말 몇 개로 넓혀 낱말 찾기에 더한다 (expandMessages).
+//   작은 모델은 지어내기도 쉽고 "못 찾았어요" 로 물러서기도 쉬워, 찾기가 일을 대부분 하고 모델은 고른 메모만 보고 짧게 답한다.
+//   찾은 메모가 분명한데 모델이 물러서면 그 메모에서 가장 맞는 문장을 그대로 보여 준다 (finishAnswer).
 import { tokenize, tfidfVectors, cosine } from './indexer.js';
 import { plainLines, extractTitle } from './memo-file.js';
 
 const CHUNK = 400; // 글자 — 한 조각이 문맥에 여럿 들어가게
 const MAX_CHUNKS = 20; // 메모 하나에서
-const CONTEXT = 1800; // 답할 때 모델에 주는 메모 글자 (4096 토큰 문맥에 질문 · 답과 함께)
+const CONTEXT = 2400; // 답할 때 모델에 주는 메모 글자 (4096 토큰 문맥에 질문 · 답과 함께 — 카나나는 한글 한 토큰에 1~2자)
 const MAX_WORDS = 6; // 질문을 넓힐 낱말 수
+const KEEP = 0.25; // 맨 위 메모 점수의 이만큼은 돼야 함께 보여 준다 (조금만 걸린 메모로 문맥이 흐려지지 않게)
+const STRONG = 0.12; // 이만큼 맞으면 모델이 물러서도 문장을 그대로 보여 준다
+export const NOT_FOUND = '메모에서 찾지 못했어요.';
 
-/** 메모 → 조각 글들 (줄을 모아 CHUNK 자 안팎, 첫 조각 앞에 제목) */
+// 물음 말 — 메모에 쓰였을 리 없어 찾기에서 뺀다 ("출시일 언제야" 의 "언제야")
+const ASK_WORDS = new Set(['뭐야', '뭐였지', '뭐지', '뭐', '무엇', '무엇이', '무엇인지', '언제', '언제야', '언제지', '언제였지', '어디', '어디야', '어디였지', '누구', '누구야', '누가', '몇', '몇시', '몇일', '며칠', '얼마', '얼마야', '어떻게', '어떤', '왜', '알려줘', '알려', '알려주세요', '있어', '있나', '있었지', '했어', '했지', '했나', '했었지', '였지', '이었지', '인가', '일까', '거야', '건가', '건지', '그거', '그게', '내가', '우리', '메모', '메모에서', '찾아줘', '찾아', '말해줘', '기억나', '해줘', '좀', '혹시', '있는지', '했는지', '인지']);
+
+/** 찾기 특징: 낱말 + 한글 낱말의 두 글자 조각 (조사 · 어미가 달라도 맞게) */
+function features(text, { ask = false } = {}) {
+  const words = tokenize(text).filter((w) => !(ask && ASK_WORDS.has(w)));
+  const out = [...words];
+  for (const w of words) {
+    if (!/^\p{Script=Hangul}{2,}$/u.test(w)) continue;
+    for (let i = 0; i + 2 <= w.length; i++) out.push(`·${w.slice(i, i + 2)}`); // 두 글자 낱말은 그 자체가 조각 ("출시" ↔ "출시일")
+  }
+  return out;
+}
+
+/** 메모 → 조각 글들 (줄을 모아 CHUNK 자 안팎, 조각마다 앞에 제목 — 어느 조각이 걸려도 무슨 메모인지 알게) */
 export function chunkMemo(body) {
   const title = extractTitle(body);
   const lines = plainLines(body).slice(1);
@@ -24,28 +43,60 @@ export function chunkMemo(body) {
     cur = cur ? `${cur}\n${line}` : line;
   }
   if (cur || !out.length) out.push(cur);
-  return out.slice(0, MAX_CHUNKS).map((text, i) => (i === 0 ? `${title}\n${text}`.trim() : text));
+  return out.slice(0, MAX_CHUNKS).map((text) => `${title}\n${text}`.trim());
+}
+
+/**
+ * 물은 때: "오늘 · 어제 · 이번 주 · 지난주 · 이번 달 · 지난달 · 올해" → { from, to } (그때 고친 메모를 앞으로)
+ * @returns {{ from: Date, to: Date } | null}
+ */
+export function askedPeriod(question, now = new Date()) {
+  const q = String(question ?? '');
+  const day = (d, n = 0) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const monday = (d) => day(d, -((d.getDay() + 6) % 7));
+  if (/오늘/.test(q)) return { from: day(now), to: day(now, 1) };
+  if (/어제/.test(q)) return { from: day(now, -1), to: day(now) };
+  if (/그저께|그제/.test(q)) return { from: day(now, -2), to: day(now, -1) };
+  if (/지난\s*주|저번\s*주/.test(q)) return { from: day(monday(now), -7), to: monday(now) };
+  if (/이번\s*주|금주/.test(q)) return { from: monday(now), to: day(monday(now), 7) };
+  if (/지난\s*달|저번\s*달/.test(q)) return { from: new Date(now.getFullYear(), now.getMonth() - 1, 1), to: new Date(now.getFullYear(), now.getMonth(), 1) };
+  if (/이번\s*달/.test(q)) return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
+  if (/올해|금년/.test(q)) return { from: new Date(now.getFullYear(), 0, 1), to: new Date(now.getFullYear() + 1, 0, 1) };
+  return null;
 }
 
 /**
  * 관련 메모 찾기
  * @param {string} query
- * @param {{ id: string, title: string, text: string }[]} chunks 모든 메모의 조각
- * @param {{ words?: string[], related?: (id: string) => { id: string, score: number }[], limit?: number }} o words: 질문을 넓힌 낱말 (expandMessages)
+ * @param {{ id: string, title: string, text: string, updated?: string }[]} chunks 모든 메모의 조각
+ * @param {{ words?: string[], related?: (id: string) => { id: string, score: number }[], limit?: number, now?: Date }} o words: 질문을 넓힌 낱말 (expandMessages)
  * @returns {{ id: string, title: string, score: number, via: 'match' | 'graph', texts: string[] }[]}
  */
-export function retrieve(query, chunks, { words = [], related = () => [], limit = 4 } = {}) {
+export function retrieve(query, chunks, { words = [], related = () => [], limit = 4, now = new Date() } = {}) {
   if (!chunks.length) return [];
-  const vecs = tfidfVectors([...chunks.map((c) => tokenize(c.text)), tokenize([query, ...words].join(' '))]);
+  const qf = [...features(query, { ask: true }), ...words.flatMap((w) => features(w))];
+  if (!qf.length) return [];
+  const vecs = tfidfVectors([...chunks.map((c) => features(c.text)), qf]);
   const q = vecs.pop();
-  const ranked = vecs.map((v, i) => [i, cosine(q, v)]).filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1]);
+  const asked = new Set(tokenize(query).filter((w) => !ASK_WORDS.has(w)));
+  const period = askedPeriod(query, now);
+  const inPeriod = (c) => period && c.updated && new Date(c.updated) >= period.from && new Date(c.updated) < period.to;
+  const ranked = vecs.map((v, i) => {
+    const c = chunks[i];
+    let s = cosine(q, v);
+    if (s <= 0) return [i, 0];
+    if (tokenize(c.title ?? '').some((w) => asked.has(w))) s *= 1.3; // 제목에 물은 말
+    if (inPeriod(c)) s *= 1.5;
+    return [i, s];
+  }).filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1]);
   const memos = new Map();
   for (const [i, score] of ranked) {
     const c = chunks[i];
     const m = memos.get(c.id) ?? memos.set(c.id, { id: c.id, title: c.title, score, via: 'match', texts: [] }).get(c.id);
-    if (m.texts.length < 2) m.texts.push(c.text);
+    if (m.texts.length < 3) m.texts.push(c.text);
   }
-  const top = [...memos.values()].slice(0, limit);
+  const best = ranked[0]?.[1] ?? 0;
+  const top = [...memos.values()].filter((m) => m.score >= best * KEEP).slice(0, limit);
   // 그래프: 찾은 메모와 연결 · 비슷한 메모 (찾기에서 놓친 것) — 앞 메모 점수의 절반 × 관련도
   const byId = new Map(chunks.map((c) => [c.id, c]));
   for (const m of top.slice(0, 2)) {
@@ -81,8 +132,10 @@ export function expandResult(json) {
   }
 }
 
-/** 답하기: 고른 메모만 근거로, 번호로 출처를 달게 */
-export function ragMessages(question, picked) {
+const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+/** 답하기: 고른 메모만 근거로, 번호로 출처를 달게 (오늘 날짜도 — "다음 주 회의" 같은 물음에) */
+export function ragMessages(question, picked, now = new Date()) {
   let budget = CONTEXT;
   const parts = [];
   picked.forEach((m, i) => {
@@ -90,8 +143,44 @@ export function ragMessages(question, picked) {
     budget -= text.length;
     if (text) parts.push(`[${i + 1}] ${m.title}\n${text}`);
   });
+  const today = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${DAYS[now.getDay()]}요일`;
   return [
-    { role: 'system', content: '너는 사용자의 메모에서 답을 찾는 도우미다. 아래 [번호] 메모에 적힌 것만 근거로 한국어 해요체로 짧게 답한다. 문장 끝에 근거 메모 번호를 [1]처럼 붙인다. 메모에 답이 없으면 "메모에서 찾지 못했어요."라고만 답한다. 지어내지 않는다.' },
+    { role: 'system', content: `너는 사용자의 메모를 읽고 질문에 답하는 비서다. 오늘은 ${today}이다. 아래 [번호] 메모에 적힌 것만 근거로 한국어 해요체로 1~3문장 답한다. 문장 끝에 근거 메모 번호를 [1]처럼 붙인다. 질문과 관련된 내용이 조금이라도 있으면 있는 만큼 답하고, 모르는 부분만 모른다고 한다. 관련 내용이 전혀 없을 때만 "${NOT_FOUND}"라고 답한다. 메모에 없는 것은 지어내지 않는다.` },
     { role: 'user', content: `메모:\n${parts.join('\n\n')}\n\n질문: ${question}` },
   ];
+}
+
+/** 찾은 메모에서 질문과 가장 맞는 문장 (그대로 보여 줄 때) → { text, n } | null  n: 몇 번 메모 */
+export function bestSentence(question, picked) {
+  const qf = new Set(features(question, { ask: true }));
+  if (!qf.size) return null;
+  let best = null;
+  picked.forEach((m, i) => {
+    if (m.via === 'graph') return;
+    for (const text of m.texts) {
+      for (const s of text.split('\n').slice(1).flatMap((line) => line.split(/(?<=[.!?。])\s+/))) {
+        const f = new Set(features(s));
+        const hit = [...qf].filter((x) => f.has(x)).length;
+        if (!hit) continue;
+        const score = hit / qf.size + (i === 0 ? 0.05 : 0);
+        if (!best || score > best.score) best = { text: s.trim().slice(0, 200), n: i + 1, score };
+      }
+    }
+  });
+  return best && { text: best.text, n: best.n };
+}
+
+/**
+ * 모델 답 다듬기: 없는 번호는 지우고, 분명히 찾았는데 물러섰으면(못 찾았어요 · 번호 없음) 메모의 문장을 그대로
+ * @returns {{ text: string, quoted: boolean }}
+ */
+export function finishAnswer(answer, question, picked) {
+  let text = String(answer ?? '').trim().replace(/\[(\d+)\]/g, (all, n) => (Number(n) >= 1 && Number(n) <= picked.length ? all : ''));
+  const gaveUp = !text || text.includes('찾지 못했');
+  const strong = picked[0] && picked[0].via !== 'graph' && picked[0].score >= STRONG;
+  const s = strong && (gaveUp || !/\[\d+\]/.test(text)) ? bestSentence(question, picked) : null;
+  // 물러섰으면 문장을 그대로, 답은 했는데 번호가 없으면 근거 문장을 아래에 (지어낸 답인지 바로 보이게)
+  if (s && gaveUp) return { text: `메모에 이렇게 적혀 있어요.\n“${s.text}” [${s.n}]`, quoted: true };
+  if (s) return { text: `${text}\n근거: “${s.text}” [${s.n}]`, quoted: true };
+  return { text: text || NOT_FOUND, quoted: false };
 }
