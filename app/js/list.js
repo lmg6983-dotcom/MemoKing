@@ -9,6 +9,7 @@ import { injectIcons, icon } from './icons.js';
 import { handoffText } from './core/handoff.js';
 import { friendlyTime, shortUrls } from './core/format.js';
 import { vaultUrl, mediaKind, fileExtension } from './media.js';
+import { videoThumb } from './video-poster.js';
 import { memoBodyFromFile } from './core/file-memo.js';
 import { isTextDocument } from './core/markdown-import.js';
 import { setupRemindersTab } from './list-reminders.js';
@@ -506,7 +507,7 @@ function renderCard(memo) {
     img.draggable = false;
     img.onerror = () => img.remove();
     card.append(img);
-  }
+  } else if (memo.video) card.append(videoThumb(memo.video)); // 사진이 없고 동영상이 있으면 첫 장면 + ▶
 
   // 체크리스트를 모두 끝낸 메모: CLEAR 도장 (v0.17.13)
   if (isAllClear(memo.tasks)) {

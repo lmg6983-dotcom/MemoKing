@@ -288,6 +288,15 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 /* 사진 높이를 미리 정해 두어야 카드를 엇갈려 쌓을 때 자리가 맞는다 */
 .card-thumb { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: rgba(128, 128, 128, 0.12); }
 .cards[data-layout="rows"] .card-thumb { aspect-ratio: 16 / 7; }
+
+/* 동영상 첫 장면 (video-poster.js): 사진 썸네일과 같은 칸 · 가운데 ▶ (그리는 동안은 빈 칸 — 자리는 미리 잡아 카드가 흔들리지 않게) */
+.card-video { position: relative; overflow: hidden; }
+.card-video img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.card-video img:not([src]) { visibility: hidden; }
+.card-video::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.5 3.5v9l7-4.5z' fill='%23fff'/%3E%3C/svg%3E") 55% 50% / 16px no-repeat;
+}
 /* 어두운 화면: 사진 · 흰 바탕 손 메모 미리 보기는 조금 어둡게 (검은 카드 사이에서 흰 칸이 튀지 않게) */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .card-thumb { filter: brightness(0.86); } }
 

@@ -2,6 +2,7 @@
 import { icon } from '../../app/js/icons.js';
 import { formatStamp, friendlyTime, shortUrls } from '../../app/js/core/format.js';
 import { vaultUrl } from '../../app/js/media.js';
+import { videoThumb } from '../../app/js/video-poster.js';
 import { setupRemindersTab } from '../../app/js/list-reminders.js';
 import { setupHistoryTab } from '../../app/js/list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../../app/js/core/tags.js';
@@ -239,7 +240,7 @@ function renderCard(memo) {
     img.draggable = false;
     img.onerror = () => img.remove();
     card.append(img);
-  }
+  } else if (memo.video) card.append(videoThumb(memo.video)); // 사진이 없고 동영상이 있으면 첫 장면 + ▶
 
   // 체크리스트를 모두 끝낸 메모: CLEAR 도장 (데스크탑과 같은 모양)
   if (isAllClear(memo.tasks)) {

@@ -233,6 +233,7 @@ export class Vault extends EventEmitter {
       title: extractTitle(body),
       preview: extractPreview(body, 1200), // 목록을 확대하면 카드에 요약을 여러 줄 보여 주므로 넉넉히
       thumb: media.find((m) => m.kind === 'image')?.src ?? null,
+      video: media.find((m) => m.kind === 'video')?.src ?? null, // 사진이 없으면 목록 카드에 이 영상의 첫 장면 (video-poster.js)
       images: media.filter((m) => m.kind === 'image' && !isAlbumPageTitle(m.title)).slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진 — 문서를 넣은 장은 빼고)
       tags: extractTags(body),
       hasImage: has('image'),
@@ -259,6 +260,7 @@ export class Vault extends EventEmitter {
       created: entry.meta.created,
       updated: entry.meta.updated,
       thumb: p.thumb,
+      video: p.video,
       images: [...p.images], // 받는 쪽이 고쳐도 기억해 둔 것은 그대로
       day: entry.meta.day || '', // 회상 달력: "이 날의 기록으로" 정한 날
       mode: entry.meta.mode ?? 'life', // Work / Life
