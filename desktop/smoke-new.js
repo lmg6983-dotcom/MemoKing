@@ -643,8 +643,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         list.webContents.sendInputEvent({ type: 'mouseDown', x: at.x, y: at.y, button: 'right', clickCount: 1 });
         list.webContents.sendInputEvent({ type: 'mouseUp', x: at.x, y: at.y, button: 'right', clickCount: 1 });
         const shape = await until(() => js(list, `(() => { const m = document.querySelector('.mk-ctx'); return m && { icons: [...m.querySelectorAll('.mk-ctx-ic')].map((b) => b.dataset.id), items: [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.dataset.id), dots: m.querySelectorAll('.mk-ctx-sw').length, native: false }; })()`), '목록 카드 메뉴').catch(() => null);
-        check('목록 카드 오른쪽 클릭: 맨 위 아이콘 줄(복사 · 공유 · PDF · 휴지통) + 열기 · 고정 · 색 점 7개 · 이 날의 기록 · 잠그기 · 이전 버전',
-          shape && shape.icons.join() === 'cut,copy,share,pdf,trash' && shape.items.join() === 'open,pin,day,lock,versions' && shape.dots === 7, JSON.stringify(shape));
+        check('목록 카드 오른쪽 클릭: 맨 위 아이콘 줄(복사 · 공유 · PDF · 잘라내기 · 휴지통 — 메모 창 메뉴와 같은 자리) + 열기 · 고정 · 색 점 7개 · 회상 날짜 · 잠그기 · 이전 버전',
+          shape && shape.icons.join() === 'copy,share,pdf,cut,trash' && shape.items.join() === 'open,pin,day,lock,versions' && shape.dots === 7, JSON.stringify(shape));
         await capture(list, 'list-card-menu.png');
         const pickList = async (selector) => {
           const b = await js(list, `(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(${JSON.stringify(selector)}) !== null }; })()`);
@@ -686,13 +686,11 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await until(() => js(list, `!!document.querySelector('.mk-ctx')`), '키보드로 연 목록 카드 메뉴');
         key(list, 'Down');
         key(list, 'Down');
-        key(list, 'Down');
-        key(list, 'Down');
         const onColors = await until(() => js(list, `document.activeElement?.classList.contains('mk-ctx-sw')`), '색 줄로 옮김', 2000).catch(() => false);
         key(list, 'Right');
         key(list, 'Escape');
         const gone = await until(() => js(list, `!document.querySelector('.mk-ctx')`), '메뉴 닫힘', 2000).catch(() => false);
-        check('목록 카드 메뉴 키보드: ↓ 로 아이콘 줄 › 열기 › 고정 › 색 줄, Esc로 닫기', onColors === true && gone, JSON.stringify({ onColors, gone }));
+        check('목록 카드 메뉴 키보드: ↓ 로 아이콘 줄 › 색 줄 (메모 창 메뉴처럼 아이콘 바로 아래), Esc로 닫기', onColors === true && gone, JSON.stringify({ onColors, gone }));
         // 제목 줄 오른쪽 위: 왕관 · 동기화 · 설정이 검색 줄이 아니라 맨 위에, 창 버튼 영역을 침범하지 않음
         const bar = await js(list, `(() => { const q = (s) => document.querySelector(s)?.getBoundingClientRect(); const c = q('#list-top-btn'), g = q('#settings-btn'), t = q('.titlebar'), s = q('#search'); return { crown: c && [c.left, c.top], gearInTitle: g.top >= t.top && g.bottom <= t.bottom, gearRight: g.right <= (navigator.windowControlsOverlay?.visible ? navigator.windowControlsOverlay.getTitlebarAreaRect().right : innerWidth - 142) + 1, order: c.left < g.left, searchBelow: s.top >= t.bottom - 1, inToolbar: !!document.querySelector('.toolbar #settings-btn, .toolbar #sync-btn') }; })()`);
         check('목록 제목 줄: 왕관 · 동기화 · 설정이 맨 위(창 버튼 왼쪽)에 있고 검색 줄에는 없음', bar.gearInTitle && bar.gearRight && bar.order && bar.searchBelow && !bar.inToolbar, JSON.stringify(bar));

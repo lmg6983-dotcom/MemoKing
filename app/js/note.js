@@ -431,7 +431,7 @@ function applyMeta(next) {
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
   el.pinToggle.querySelector('span').textContent = memo.pinned ? UI.unpin : UI.pin;
-  $('day-label').textContent = memo.day ? dayText(memo.day) : '';
+  $('day-label').textContent = memo.day ? dayText(memo.day) : UI.madeDay;
   $('mode-btn').querySelector('span').textContent = moveLabel(memo);
   showModeTheme();
 }
@@ -644,7 +644,7 @@ function showHotkey(state) {
   const what = slot ? `${hotkeyLabel(slot)}로 불러와요` : '아직 없어요';
   btn.title = `불러오기 키 정하기: ${what} (Ctrl+Alt+숫자로 어디서든 이 메모를 불러와요)`;
   btn.setAttribute('aria-label', `불러오기 키 정하기, ${slot ? hotkeyLabel(slot) : '아직 없음'}`);
-  $('hotkey-menu-label').textContent = slot ? hotkeyLabel(slot) : '';
+  $('hotkey-menu-label').textContent = slot ? hotkeyLabel(slot) : 'Ctrl+Alt+숫자'; // 정하기 전에도 무슨 키인지
 }
 const refreshHotkey = () => api.hotkeys?.state(id).then(showHotkey, () => {});
 window.addEventListener('focus', () => memo && refreshHotkey());
@@ -1335,7 +1335,7 @@ bindTableBar(tableBar, (cmd, b) => {
 // (그림·파일 옮기기 안내는 block-move.js가 따로)
 function firstTimeHints(active) {
   // 안내는 표에 붙인다 (표 막대에 붙이면 설명하는 막대를 풍선이 가린다)
-  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab은 다음 칸, 마지막 칸에서 Tab은 새 줄이에요', { anchor: (() => { const t = getSelection()?.anchorNode?.parentElement?.closest('table') ?? el.editorRoot.querySelector('table'); return t?.closest('.tableWrapper') ?? t ?? tableBar; })(), avoid: tableBar }); // 표를 감싼 상자(가로 막대 · 아래 테두리까지)를 피해 그 밖에
+  if (active.table) hintOnce('table', '표: 아래 막대로 줄 · 칸을 더하고 빼요. 칸 테두리를 끌면 크기가 바뀌고, Tab은 다음 칸이에요', { anchor: (() => { const t = getSelection()?.anchorNode?.parentElement?.closest('table') ?? el.editorRoot.querySelector('table'); return t?.closest('.tableWrapper') ?? t ?? tableBar; })(), avoid: tableBar }); // 표를 감싼 상자(가로 막대 · 아래 테두리까지)를 피해 그 밖에
   else if (active.task || active.bullet || active.ordered) hintOnce('list-move', '목록 항목은 글자를 꾹 누르면 들어 올려져 순서를 바꿀 수 있어요. 키보드는 Alt+↑ / Alt+↓', { anchor: el.editorRoot.querySelector('li') });
 }
 
@@ -1363,13 +1363,18 @@ function useKeymap(overrides) {
   SHORTCUTS = keymapTable(keymapOverrides);
   // 메뉴에 지금 키를 함께 보인다 (PDF로 저장 Ctrl+Shift+P 등)
   const keys = resolveKeymap(keymapOverrides);
+  // 메뉴 단추마다 그 단추가 하는 일의 키 (찾기 · 바꾸기는 한 줄에 둘 다) — 단축키 창에 있는 키는 메뉴에도 모두
+  const byBtn = new Map();
   for (const a of KEYMAP_ACTIONS) {
-    const btnId = a.run[0] === 'menu' ? a.run[1] : a.id === 'shortcuts' ? 'shortcuts-btn' : a.id === 'find' ? 'find-btn' : null;
-    const btn = btnId && document.getElementById(btnId);
+    const btnId = a.run[0] === 'menu' ? a.run[1] : { shortcuts: 'shortcuts-btn', find: 'find-btn', replace: 'find-btn', links: 'links-btn' }[a.id];
+    if (btnId) byBtn.set(btnId, [...(byBtn.get(btnId) ?? []), ...keys[a.id]]);
+  }
+  for (const [btnId, combos] of byBtn) {
+    const btn = document.getElementById(btnId);
     if (!btn) continue;
     // 맨 위 아이콘 줄 · 아래 작은 줄은 글자 자리가 없어 풍선말에 키를 함께
     if (btn.matches('.menu-ic, .menu-mini')) {
-      const k = keys[a.id].map(comboLabel).join(', ');
+      const k = combos.map(comboLabel).join(', ');
       const name = btn.getAttribute('aria-label') ?? (btn.dataset.name ??= btn.title.replace(/ \(.*\)$/, ''));
       btn.title = k ? `${name} (${k})` : name;
       continue;
@@ -1382,7 +1387,7 @@ function useKeymap(overrides) {
       hint.className = 'key-hint';
       btn.append(hint);
     }
-    hint.textContent = keys[a.id].map(comboLabel).join(', ');
+    hint.textContent = combos.map(comboLabel).join(', ');
     hint.hidden = !hint.textContent;
   }
   // 단추 풍선말(title) · 글자 모양 메뉴의 키 글자도 지금 키로 (처음 적힌 기본 키 글자를 바꿔 끼운다)

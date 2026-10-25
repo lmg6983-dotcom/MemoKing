@@ -2104,6 +2104,15 @@ $('tutorial-btn').addEventListener('click', () => {
   el.settings.close();
   api.tutorial.start();
 });
+// 처음 한 번만 뜨던 작은 안내(hints.js · 왕관/테이프 안내)를 다시 — 지나간 안내를 다시 볼 길 (모든 창이 같은 기억을 쓴다)
+$('hints-reset').addEventListener('click', () => {
+  try {
+    for (const k of ['memoking.hints', 'memoking.stickerHintSeen']) localStorage.removeItem(k);
+  } catch {
+    // 기억을 못 지우면 그대로
+  }
+  flashStatus('작은 안내를 그 상황이 되면 다시 보여 드릴게요');
+});
 applyInfo(await api.info());
 // 업데이트 뒤 한 번: 개선된 점 (메인이 한 번만 준다)
 api.whatsNew?.().then((n) => {

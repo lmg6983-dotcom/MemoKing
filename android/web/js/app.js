@@ -454,7 +454,7 @@ app.memoMenu = (id) => {
   const pin = memoSheet.querySelector('[data-memo-action="pin"]');
   pin.querySelector('span').textContent = memo.pinned ? UI.unpin : UI.pin;
   memoSheet.querySelector('[data-memo-action="lock"] span').textContent = memo.locked ? '잠금 풀기' : '잠그기';
-  memoSheet.querySelector('[data-memo-action="day"] small').textContent = memo.day ? dayText(memo.day) : '';
+  memoSheet.querySelector('[data-memo-action="day"] small').textContent = memo.day ? dayText(memo.day) : UI.madeDay;
   memoSheet.querySelector('[data-memo-action="mode"] span').textContent = moveLabel(memo);
   memoSheet.querySelector('[data-memo-action="mode"]').hidden = !list.workLifeOn(); // Work / Life 를 나눠 쓸 때만
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));

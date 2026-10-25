@@ -118,6 +118,8 @@ body, .note-screen, .share-paper {
 #menu .swatch { width: 24px; height: 24px; padding: 0; border: 0; background: var(--note-chip); }
 #menu .swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--text-strong); }
 #menu .menu-item:not(.menu-ic, .menu-mini) { padding-block: 4px; }
+#menu .menu-item > span { display: flex; align-items: baseline; gap: 8px; }
+#menu .menu-item > span > small { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; } /* 회상 날짜 · 불러오기 키 · 연결 수: 카드 메뉴처럼 오른쪽 끝에 */
 /* 아래 작은 줄: 그림 복사 · 그림 저장 · 목록 · 단축키 (키는 풍선말에) */
 #menu .menu-foot { display: flex; gap: 2px; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
 #menu .menu-item.menu-mini { flex: 1 1 auto; width: auto; justify-content: center; padding: 4px 4px; font-size: 12px; color: var(--muted); white-space: nowrap; }
