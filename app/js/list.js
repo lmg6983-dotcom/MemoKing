@@ -408,18 +408,23 @@ el.kindFilter.addEventListener('click', (e) => {
   toggleIn(state.filter.kinds, b.dataset.kind);
   render();
 });
-el.filterBtn.addEventListener('click', async () => {
-  const open = el.filterPanel.hidden;
-  el.filterBtn.setAttribute('aria-expanded', String(open));
+// 보기 판: 카드 위에 떠서 목록을 밀지 않는다 — 밖을 누르거나 Esc 로 닫힌다
+async function setFilterPanel(open) {
   const p = el.filterPanel;
+  if (open === !p.hidden) return false;
+  el.filterBtn.setAttribute('aria-expanded', String(open));
   if (open) p.hidden = false;
   if (!reduceMotion()) {
-    const h = p.scrollHeight;
-    const frames = [{ height: '0px', opacity: 0, marginBottom: '0px', paddingTop: '0px', paddingBottom: '0px' }, { height: `${h}px`, opacity: 1 }];
-    await p.animate(open ? frames : frames.slice().reverse(), { duration: 200, easing: EASE_OUT }).finished.catch(() => {});
+    const frames = [{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }];
+    await p.animate(open ? frames : frames.slice().reverse(), { duration: open ? 160 : 120, easing: EASE_OUT }).finished.catch(() => {});
   }
   if (!open) p.hidden = true;
-});
+  return true;
+}
+el.filterBtn.addEventListener('click', () => setFilterPanel(el.filterPanel.hidden));
+document.addEventListener('pointerdown', (e) => {
+  if (!el.filterPanel.hidden && !el.filterPanel.contains(e.target) && !el.filterBtn.contains(e.target) && !e.target.closest?.('.coach-bubble')) setFilterPanel(false);
+}, true);
 $('filter-clear').addEventListener('click', () => {
   state.filter = { tags: [], colors: [], kinds: [] };
   render();
@@ -1684,6 +1689,11 @@ el.search.addEventListener('input', () => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && cancelDrag()) return;
   if (e.key === 'Escape' && setFabMenu(false)) return;
+  if (e.key === 'Escape' && !el.filterPanel.hidden) {
+    setFilterPanel(false);
+    el.filterBtn.focus();
+    return;
+  }
   if (el.settings.open || el.confirm.open || el.main.hidden) return;
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.code === 'KeyN') {

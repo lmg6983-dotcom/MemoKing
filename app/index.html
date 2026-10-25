@@ -95,13 +95,6 @@
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>
       </div>
-      <!-- 처음엔 이 PC 에 바로 저장 (고르는 화면 없이) — 휴대폰과 같이 쓰려면 여기서 연결 (drive-panel.js, 닫으면 다시 안 뜸) -->
-      <div id="drive-hint" class="connect-hint" hidden>
-        <svg aria-hidden="true"><use href="#i-cloud"/></svg>
-        <span id="drive-hint-text">휴대폰 · 다른 PC와 같은 메모를 쓰려면</span>
-        <button id="drive-hint-connect" class="link-btn">Google 계정으로 연결</button>
-        <button id="drive-hint-close" class="link-btn">다시 보지 않기</button>
-      </div>
       <p id="count" class="result-count" role="status" hidden></p>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
@@ -116,7 +109,7 @@
     <div class="view" id="view-history" role="tabpanel" hidden>
       <div id="history-consent" class="consent" hidden>
         <svg class="consent-icon"><use href="#i-inbox"/></svg>
-        <h3>알림 보관함</h3>
+        <h2>알림 보관함</h2>
         <p>알림 센터에서 사라진 알림도 여기서 다시 볼 수 있어요.</p>
         <ul>
           <li>메신저, 메일 등 다른 앱 알림의 <b>제목과 내용</b>을 보관해요.</li>
@@ -319,7 +312,7 @@
       </div>
     </section>
     <section class="set-sec" aria-labelledby="set-mode">
-      <h3 class="set-title" id="set-mode">Work / Life <small>일할 때 메모와 일상 메모를 나눠 봐요</small></h3>
+      <h3 class="set-title" id="set-mode">Work / Life 나누기 <small>일할 때 메모와 일상 메모를 나눠 봐요</small></h3>
       <div id="work-settings"></div>
     </section>
     <section class="set-sec" aria-labelledby="set-stt">

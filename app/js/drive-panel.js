@@ -193,35 +193,22 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     $('sync-mark').textContent = conflicts.length && sum.tone !== 'error' ? String(conflicts.length) : '';
     syncBtn.classList.toggle('has-conflicts', Boolean(conflicts.length) && sum.tone !== 'error');
     paintBar($('sync-line'), sum);
-    const label = `Google Drive 동기화: ${sum.title}${sum.tone === 'busy' && sum.sub ? ` — ${sum.sub}` : ''}${conflicts.length ? `, 충돌 사본 ${conflicts.length}개` : ''}`;
+    const label = `Google Drive 동기화: ${sum.title}${sum.tone === 'off' && !info.connected ? ' — 휴대폰 · 다른 PC와 같은 메모를 쓰려면 눌러서 연결' : ''}${sum.tone === 'busy' && sum.sub ? ` — ${sum.sub}` : ''}${conflicts.length ? `, 충돌 사본 ${conflicts.length}개` : ''}`;
     syncBtn.title = label;
     syncBtn.setAttribute('aria-label', label);
     if (!pop.hidden) fillPop(sum);
   }
-  // 연결 안내 줄: 아직 연결하지 않았고 닫은 적 없을 때만 (이 PC 에만 기억)
+  // 연결 안내: 아직 연결하지 않았으면 구름에 노란 점 — 한 번 열어 보면 그만 (이 PC 에만 기억)
+  const INVITED = 'memoking.driveHintClosed';
   function renderHint(sum = summary()) {
-    const hint = $('drive-hint');
-    if (!hint) return;
-    let closed = false;
+    let seen = false;
     try {
-      closed = localStorage.getItem('memoking.driveHintClosed') === '1';
+      seen = localStorage.getItem(INVITED) === '1';
     } catch {
       // 기억을 못 읽으면 보인다
     }
-    hint.hidden = sum.on || closed;
+    syncBtn?.classList.toggle('invite', sum.tone === 'off' && !seen);
   }
-  $('drive-hint-connect')?.addEventListener('click', () => connect());
-  $('drive-hint-close')?.addEventListener('click', () => {
-    try {
-      localStorage.setItem('memoking.driveHintClosed', '1');
-    } catch {
-      // 기억 못 해도 지금은 닫는다
-    }
-    // 어디서 다시 찾는지 잠깐 알려 주고 닫는다 (단추는 감춰 다시 누르지 않게)
-    $('drive-hint-text').textContent = '설정 › Google Drive 동기화에서 언제든 연결할 수 있어요';
-    for (const b of ['drive-hint-connect', 'drive-hint-close']) $(b).hidden = true;
-    setTimeout(() => ($('drive-hint').hidden = true), 4000);
-  });
   function fillPop(sum = summary()) {
     const st = info.status ?? {};
     const focused = pop.contains(document.activeElement) ? document.activeElement.dataset.act : null; // 다시 그려도 누르던 단추에 머물게
@@ -260,6 +247,14 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     }
   }
   function openPop() {
+    if (syncBtn.classList.contains('invite')) {
+      try {
+        localStorage.setItem(INVITED, '1');
+      } catch {
+        // 기억 못 해도 지금은 끈다
+      }
+      syncBtn.classList.remove('invite');
+    }
     fillPop();
     pop.hidden = false;
     syncBtn.setAttribute('aria-expanded', 'true');

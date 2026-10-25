@@ -2,6 +2,7 @@
 //   잊으면 아무도(메모킹도) 열 수 없다는 것과, 제목은 목록에 보이고 사진·파일은 잠기지 않는다는 것을 미리 알린다
 import { passwordProblem } from './core/memo-lock.js';
 import { UI } from './core/ui-text.js';
+import { icon } from './icons.js';
 
 function el(tag, attrs = {}, text = '') {
   const node = document.createElement(tag);
@@ -124,8 +125,10 @@ export function lockScreen(container, { title, onTry, onCancel }) {
       actions.append(cancel);
     }
     actions.append(open);
+    const mark = el('div', { class: 'lock-icon' });
+    mark.append(icon('lock'));
     screen.append(
-      el('div', { class: 'lock-icon', 'aria-hidden': 'true' }, '🔒'),
+      mark,
       el('h2', { id: 'lock-screen-title' }, title || '잠긴 메모'),
       el('p', { class: 'lock-note' }, '비밀번호를 넣으면 열려요'),
       field.wrap, error, actions,

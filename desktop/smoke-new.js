@@ -1109,9 +1109,9 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const nid = await until(() => [...noteWins.keys()].find((k) => !before.has(k)), '단축키 메모 창');
       const nw = noteWins.get(nid);
       await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '단축키 메모 준비');
-      // 윗막대 번개 단추(불러오기 키) → 3 · 내용 복사만. 정하기 전에는 사선 · 메뉴에는 메모 연결이 있고 소리 받아쓰기는 없다
-      const barBefore = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { inBar: Boolean(b.closest('.bar')), off: b.classList.contains('off'), slash: getComputedStyle(b, '::after').content !== 'none', links: Boolean(document.querySelector('#menu #links-btn')), linksInBar: Boolean(document.querySelector('.bar #links-btn')), transcribe: Boolean(document.getElementById('transcribe-btn')) }; })()`);
-      await js(nw, `document.getElementById('hotkey-btn').click()`);
+      // ⋯ 메뉴의 불러오기 키 정하기 → 3 · 내용 복사만. 정하기 전에는 윗막대에 번개가 없다 · 메뉴에는 메모 연결이 있고 소리 받아쓰기는 없다
+      const barBefore = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { inBar: Boolean(b.closest('.bar')), off: b.classList.contains('off'), hidden: getComputedStyle(b).display === 'none', inMenu: Boolean(document.querySelector('#menu #hotkey-menu-btn')), links: Boolean(document.querySelector('#menu #links-btn')), linksInBar: Boolean(document.querySelector('.bar #links-btn')), transcribe: Boolean(document.getElementById('transcribe-btn')) }; })()`);
+      await js(nw, `document.getElementById('hotkey-menu-btn').click()`);
       await until(() => js(nw, `!!document.querySelector('.hotkey-dialog[open] .hk-key')`), '단축키 창');
       const dlg = await js(nw, `(() => {
         const d = document.querySelector('.hotkey-dialog');
@@ -1135,8 +1135,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const barAfter = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { num: document.getElementById('hotkey-num').textContent, off: b.classList.contains('off'), numShown: getComputedStyle(document.getElementById('hotkey-num')).display !== 'none', title: b.title }; })()`);
       const label = barAfter.num === '3' && /Ctrl\+Alt\+3/.test(barAfter.title) ? 'Ctrl+Alt+3' : '';
       await capture(nw, 'smoke-new-hotkey-bar.png');
-      check('윗막대: 메모 연결 대신 불러오기 키 버튼 (없으면 사선, 정하면 숫자 3) · 메모 연결은 ⋯ 메뉴로 · 소리 받아쓰기 메뉴 없음',
-        barBefore.inBar && barBefore.off && barBefore.slash && barBefore.links && !barBefore.linksInBar && !barBefore.transcribe && !barAfter.off && barAfter.numShown,
+      check('불러오기 키: 정하기 전에는 ⋯ 메뉴에만, 정하면 윗막대에 번개 + 숫자 3 · 메모 연결은 ⋯ 메뉴로 · 소리 받아쓰기 메뉴 없음',
+        barBefore.inBar && barBefore.off && barBefore.hidden && barBefore.inMenu && barBefore.links && !barBefore.linksInBar && !barBefore.transcribe && !barAfter.off && barAfter.numShown,
         JSON.stringify({ barBefore, barAfter }));
       check('메모 단축키 창: 1~9 · 할 일 세 칸 중 하나 · 저장하면 Ctrl+Alt+3에 이 메모 (번개 버튼에 표시)',
         dlg.keys === 9 && dlg.before && dlg.none.modes.length === 3 && dlg.none.picked === 1 && !dlg.after && /^Ctrl\+Alt\+3: 어느 앱에서든 누르면 내용을 복사해요$/.test(dlg.hint) && dlg.legend && dlg.fits

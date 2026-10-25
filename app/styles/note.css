@@ -61,24 +61,15 @@ body, .note-screen, .share-paper {
 .count-btn { width: auto; min-width: 30px; padding: 0 6px; gap: 2px; display: inline-flex; }
 .count-btn .count { font-size: 12px; font-weight: 700; }
 .count-btn.has-links { color: var(--note-text); }
-/* 불러오기 키: 번개 + 오른쪽 아래 작은 검은 숫자 (Ctrl+Alt+숫자), 없으면 흐린 번개에 사선 */
-.hotkey-btn { position: relative; }
+/* 불러오기 키: 정했을 때만 윗막대에 번개 + 오른쪽 아래 작은 숫자 (Ctrl+Alt+숫자) — 정하기 전에는 ⋯ 메뉴에서 (윗막대를 휴대폰처럼 가볍게) */
+.hotkey-btn { position: relative; color: var(--note-text); }
+.hotkey-btn.off { display: none; }
 .hotkey-num {
   position: absolute; right: 2px; bottom: 3px;
   min-width: 8px; height: 12px;
   color: var(--note-text); /* 바탕 없이 숫자만 — 번개와 겹치는 곳은 막대 색 테두리로 또렷하게 */
   text-shadow: 0 0 2px var(--note-bar), 0 0 2px var(--note-bar), 0 0 1px var(--note-bar);
   font-size: 11px; line-height: 12px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums;
-  pointer-events: none;
-}
-.hotkey-btn.off .hotkey-num { display: none; }
-.hotkey-btn:not(.off) { color: var(--note-text); }
-.hotkey-btn.off::after {
-  content: ''; position: absolute; left: 50%; top: 50%;
-  width: 19px; height: 1.6px; border-radius: 1px;
-  background: currentColor;
-  box-shadow: 0 0 0 1.2px var(--note-bar); /* 번개 위에 그어도 사선이 또렷하게 */
-  transform: translate(-50%, -50%) rotate(-45deg);
   pointer-events: none;
 }
 #links-count:empty { display: none; }
@@ -1844,7 +1835,8 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 }
 .lock-screen h2 { margin: 0 0 4px; font-size: 18px; text-align: center; overflow-wrap: anywhere; }
 .lock-screen .lock-note { margin: 0 0 18px; text-align: center; color: var(--note-muted); }
-.lock-screen .lock-icon { font-size: 34px; text-align: center; margin-bottom: 8px; }
+.lock-screen .lock-icon { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto 10px; border-radius: 50%; background: color-mix(in srgb, var(--note-text) 8%, transparent); color: var(--note-text); }
+.lock-screen .lock-icon svg { width: 26px; height: 26px; }
 .lock-screen .lock-field { color: var(--note-muted); }
 /* 단추도 가운데 위 아이콘 · 제목과 맞춰 칸 폭 그대로 (닫기 1 : 열기 2 — 다른 창의 아래 막대와 같은 비율). 닫기가 없으면 열기가 한 줄 */
 .lock-screen .dialog-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
@@ -1853,7 +1845,7 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 @media (pointer: coarse) { .lock-field input { min-height: 48px; font-size: 16px; } }
 /* 비밀번호를 넣기 전: 서식 막대·+ 는 숨김 */
 .memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
-.memo-locked #bell-btn, .memo-locked #hotkey-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
+.memo-locked #bell-btn, .memo-locked #hotkey-btn, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
 .lock-dialog h2 { margin-bottom: 8px; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
 .lock-hide-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 4px 0; font-size: 13px; color: var(--muted); }
@@ -1883,11 +1875,14 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 /* 지우기 단추는 늘 살짝 붉게 (마우스를 올리기 전에도 "추가" 와 구별) */
 .table-bar.grouped button.danger:not(:disabled) { color: color-mix(in srgb, var(--danger) 72%, var(--note-text)); }
 .table-bar.grouped button:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 1px; }
-/* 좁은 메모 창: 행 · 열의 추가 · 삭제는 아이콘만 (묶음 이름이 뜻을 알려 주고, 이름은 풍선 · 화면 읽기에 그대로) — 세 줄이 두 줄로 */
-@media (max-width: 420px) {
-  .table-bar.grouped :is([data-table="addRow"], [data-table="delRow"], [data-table="addCol"], [data-table="delCol"]):not([data-whole-table="1"]) .lbl { display: none; }
-  .table-bar.grouped :is([data-table="addRow"], [data-table="delRow"], [data-table="addCol"], [data-table="delCol"]) { padding: 0 6px; }
+/* 좁은 메모 창 (기본 340px): 휴대폰처럼 아이콘만 한 줄 — 세 줄로 쌓여 본문이 1/3 만 남던 것을 한 줄로 (이름은 풍선 · 화면 읽기에 그대로, 넘치면 옆으로 밀어 보기) */
+@media (max-width: 420px) { /* body > : PC 메모 창만 (휴대폰은 mobile.css 가 아이콘 + 더보기로) */
+  body > .table-bar.grouped { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+  body > .table-bar.grouped :is(.tb-name, .lbl) { display: none; }
+  body > .table-bar.grouped button { padding: 0 6px; }
 }
+/* 표를 고치는 동안 추천 태그 줄은 접는다 (휴대폰과 같이 — 세로 자리를 표에) */
+body.in-table .tag-suggest-bar { display: none; }
 
 /* ---------- 메모 단축키 창 (hotkey-dialog.js): Ctrl+Alt+1~9 고르기 · 누르면 할 일 ---------- */
 /*   기본 메모 창(340×380)에도 들어가게: 숫자는 키보드 숫자 줄처럼 한 줄 */

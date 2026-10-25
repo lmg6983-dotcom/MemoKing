@@ -617,7 +617,7 @@ $('lock-btn').addEventListener('click', async () => {
   setStatus('잠갔어요. 창을 닫으면 다시 비밀번호로 열려요');
 });
 // 단축키 정하기 (Ctrl+Alt+1~9): 어느 앱에서든 이 메모를 복사하거나 띄운다 (hotkey-dialog.js)
-//   윗막대 번개 단추: 정한 숫자를 작게, 없으면 사선 (다른 메모가 그 숫자를 가져갈 수 있어 창에 돌아올 때마다 다시 본다)
+//   윗막대 번개 단추는 정했을 때만 (숫자를 작게) · ⋯ 메뉴에서 정하기 (다른 메모가 그 숫자를 가져갈 수 있어 창에 돌아올 때마다 다시 본다)
 function showHotkey(state) {
   const btn = $('hotkey-btn');
   const slot = state?.slot ?? null;
@@ -626,10 +626,11 @@ function showHotkey(state) {
   const what = slot ? `${hotkeyLabel(slot)}로 불러와요` : '아직 없어요';
   btn.title = `불러오기 키 정하기: ${what} (Ctrl+Alt+숫자로 어디서든 이 메모를 불러와요)`;
   btn.setAttribute('aria-label', `불러오기 키 정하기, ${slot ? hotkeyLabel(slot) : '아직 없음'}`);
+  $('hotkey-menu-label').textContent = slot ? hotkeyLabel(slot) : '';
 }
 const refreshHotkey = () => api.hotkeys?.state(id).then(showHotkey, () => {});
 window.addEventListener('focus', () => memo && refreshHotkey());
-$('hotkey-btn').addEventListener('click', async () => {
+async function editHotkey() {
   closeMenu();
   await flush();
   const state = await api.hotkeys.state(id);
@@ -638,7 +639,9 @@ $('hotkey-btn').addEventListener('click', async () => {
   if (!next) return;
   showHotkey(next);
   setStatus(next.slot ? `단축키를 정했어요: ${hotkeyLabel(next.slot)}` : '단축키를 풀었어요');
-});
+}
+$('hotkey-btn').addEventListener('click', editHotkey);
+$('hotkey-menu-btn').addEventListener('click', editHotkey);
 // 메모 단축키로 복사하기 직전: 막 고친 글까지 저장 (main.js memoHotkeyPressed)
 window.__memokingFlush = () => flush();
 $('image-save-btn').addEventListener('click', () => memoImage('save'));
