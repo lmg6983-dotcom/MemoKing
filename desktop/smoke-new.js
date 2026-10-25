@@ -538,8 +538,10 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           acts.length === 4 && new Set(acts.map((a) => a.y)).size === 1 && Math.max(...acts.map((a) => a.w)) - Math.min(...acts.map((a) => a.w)) <= 1 && acts.every((a) => a.h === 28) && Math.max(...gaps) - Math.min(...gaps) <= 1
             && picked.text === '사과' && picked.inEditor && picked.count === '2/3', JSON.stringify({ acts, gaps, picked }));
         await js(fw, `[...document.querySelectorAll('.mk-find-act')].find((b) => b.textContent === '모두 찾기').click(); document.querySelector('.mk-find-rep .mk-find-input').focus()`);
-        await wait(100);
+        // 바꿀 말 칸에 포커스가 간 뒤에 치고, 들어간 것을 본 뒤에 Ctrl+Enter (CI 러너에서 100ms 안에 안 될 때가 있었다)
+        await until(() => js(fw, `document.activeElement === document.querySelector('.mk-find-rep .mk-find-input')`), '바꿀 말 칸', 3000).catch(() => {});
         fw.webContents.insertText('포도');
+        await until(() => js(fw, `document.querySelector('.mk-find-rep .mk-find-input').value === '포도'`), '바꿀 말 입력', 3000).catch(() => {});
         // Ctrl+Enter: sendInputEvent 로는 Ctrl 을 붙인 Enter 가 실제 키보드처럼 오지 않아, 크롬 개발 도구 입력(실제 키보드와 같은 길)으로
         {
           const dbg = fw.webContents.debugger;
@@ -548,13 +550,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           dbg.detach();
         }
         const replaced = await until(() => { const b = v0.get(fid)?.body ?? ''; return /포도 하나, 포도 둘, 포도즙/.test(b) && b; }, '모두 바꾸기 저장', 8000).catch(() => '');
-        if (process.env.MK_SMOKE_TRACE) console.log(`… 바꾸기 상태: ${JSON.stringify(await js(fw, `({ rep: document.querySelector('.mk-find-rep input').value, q: document.querySelector('.mk-find-grid input').value, count: document.querySelector('.mk-find-count').textContent, mode: document.querySelector('.mk-find-bar').dataset.mode, active: document.activeElement?.placeholder, doc: document.querySelector('.ProseMirror').textContent })`))}`);
+        const repState = await js(fw, `({ rep: document.querySelector('.mk-find-rep input').value, q: document.querySelector('.mk-find-grid input').value, count: document.querySelector('.mk-find-count').textContent, mode: document.querySelector('.mk-find-bar').dataset.mode, active: document.activeElement?.placeholder })`);
         key(fw, 'Escape');
         const closedF = await until(() => js(fw, `document.querySelector('.mk-find-bar').hidden && !document.querySelector('.mk-find-hit')`), 'Esc 닫기', 2000).catch(() => false);
         await js(fw, `document.querySelector('.ProseMirror').focus()`);
         key(fw, 'Z', ['control']);
         const undone = await until(() => /사과 하나, 사과 둘, 사과즙/.test(v0.get(fid)?.body ?? ''), '되돌리기', 4000).catch(() => false);
-        check('바꾸기(Ctrl+H): 찾을 말과 같은 폭의 바꿀 말 칸으로 · Ctrl+Enter 모두 바꾸기 · Esc로 닫기 · Ctrl+Z 한 번에 되돌림', repFocus && replaced && closedF && undone, JSON.stringify({ repFocus, replaced: Boolean(replaced), closedF, undone, body: v0.get(fid)?.body }));
+        check('바꾸기(Ctrl+H): 찾을 말과 같은 폭의 바꿀 말 칸으로 · Ctrl+Enter 모두 바꾸기 · Esc로 닫기 · Ctrl+Z 한 번에 되돌림', repFocus && replaced && closedF && undone, JSON.stringify({ repFocus, replaced: Boolean(replaced), closedF, undone, repState, body: v0.get(fid)?.body }));
         fw.close();
       }
 
@@ -1251,6 +1253,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       // 테이프 창이 아직 안 떴으면 기다리다 멈추지 않게 (멈추면 뒤의 점검이 모두 안 돈다)
       const tapeWin = stickers.get(nw.id)?.win;
       if (process.env.MK_SMOKE_TRACE) console.log(`… 테이프 창: ${JSON.stringify({ kind: kindOf(nw), onBottom: getSettings().onBottom?.[tid], has: Boolean(tapeWin), loading: tapeWin?.webContents.isLoading(), url: tapeWin?.webContents.getURL() })}`);
+      // 테이프가 창 가운데에 그려진 뒤에 누른다 (그리기 전에 누르면 바탕을 눌러 떼어지지 않는다)
+      if (tapeWin) await until(() => js(tapeWin, `Boolean(document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest('#tape .hit'))`), '테이프 그려짐', 5000).catch(() => {});
       const hitTape = tapeWin ? await Promise.race([
         js(tapeWin, `(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); const ok = Boolean(el?.closest('#tape .hit')); el?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return ok; })()`),
         wait(10000).then(() => false), // CI 러너는 느려 4초를 넘기기도 했다 (그래도 눌려 떼어짐)
