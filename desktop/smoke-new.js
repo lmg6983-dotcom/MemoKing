@@ -1253,16 +1253,16 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       if (process.env.MK_SMOKE_TRACE) console.log(`… 테이프 창: ${JSON.stringify({ kind: kindOf(nw), onBottom: getSettings().onBottom?.[tid], has: Boolean(tapeWin), loading: tapeWin?.webContents.isLoading(), url: tapeWin?.webContents.getURL() })}`);
       const hitTape = tapeWin ? await Promise.race([
         js(tapeWin, `(() => { const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); const ok = Boolean(el?.closest('#tape .hit')); el?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return ok; })()`),
-        wait(4000).then(() => false),
+        wait(10000).then(() => false), // CI 러너는 느려 4초를 넘기기도 했다 (그래도 눌려 떼어짐)
       ]) : false;
-      const peeled = await until(() => !stickers.get(nw.id) && !getSettings().onBottom?.[tid], '테이프 떼기', 3000).catch(() => false);
+      const peeled = await until(() => !stickers.get(nw.id) && !getSettings().onBottom?.[tid], '테이프 떼기', 8000).catch(() => false);
       const b3 = await buttons(nw);
       // 목록에서 지우면 그 카드가 제자리에서 흐려지며 사라진다 (옆으로 날아가지 않게)
       const did = vault.import({ body: '# 지울 메모\n\n흐려지며 사라져요\n' });
       await until(() => js(list, `!!document.querySelector('[data-delete="${did}"]')`), '지울 메모 카드');
       const ghostAnim = await js(list, `(() => { document.querySelector('[data-delete="${did}"]').click(); const g = document.querySelector('.card-ghost'); return g ? getComputedStyle(g).animationName : 'reduce'; })()`);
       check('목록에서 삭제: 옆으로 날아가지 않고 제자리에서 흐려짐', ghostAnim === 'card-fade' || ghostAnim === 'reduce', ghostAnim);
-      check('테이프를 누르면 떼어짐 → 메모 창은 그대로, 왕관 · 테이프 버튼이 돌아옴', hitTape && peeled && !nw.isDestroyed() && nw.isVisible() && b3.top === 'shown' && b3.tape === 'shown' && /뗐어요/.test(b3.status), JSON.stringify(b3));
+      check('테이프를 누르면 떼어짐 → 메모 창은 그대로, 왕관 · 테이프 버튼이 돌아옴', hitTape && peeled && !nw.isDestroyed() && nw.isVisible() && b3.top === 'shown' && b3.tape === 'shown' && /뗐어요/.test(b3.status), JSON.stringify({ hitTape, peeled, visible: !nw.isDestroyed() && nw.isVisible(), ...b3 }));
       nw.close();
       await until(() => !noteWins.has(tid), '메모 닫힘 2', 3000).catch(() => {});
       // 예전 바탕화면 위젯 → 테이프 붙인 메모 창 (그 자리에)
