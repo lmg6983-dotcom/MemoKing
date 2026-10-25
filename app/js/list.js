@@ -321,7 +321,7 @@ function showMode({ later = false } = {}) {
     b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));
     b.tabIndex = b.dataset.mode === state.mode ? 0 : -1;
   }
-  $('count-memos').textContent = String(modeMemos().length);
+  $('count-memos').textContent = modeMemos().length ? String(modeMemos().length) : ''; // 0 은 숨김 (일정 탭과 같이)
 }
 
 // 정리 도우미: Life 메모 중 일 이야기 같은 것을 골라 Work 로
@@ -1713,7 +1713,7 @@ api.on('memos:changed', (memos) => {
   // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
   const hb = $('handoff-bar');
   if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;
-  $('count-memos').textContent = String(modeMemos().length);
+  $('count-memos').textContent = modeMemos().length ? String(modeMemos().length) : ''; // 0 은 숨김 (일정 탭과 같이)
   if (activeTab !== 'memos') {
     memosStale = true; // 메모 탭으로 돌아오면 다시 그린다
     return remindersTab.refresh({ quiet: activeTab !== 'reminders' }); // 메모 제목이 바뀌면 알림 탭에도

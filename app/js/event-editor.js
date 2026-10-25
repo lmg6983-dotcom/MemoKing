@@ -5,6 +5,7 @@ import { DEFAULT_ALERTS, MAX_ALERTS, alertLabel, pendingAlerts, fallbackAlert, v
 import { alertPicker } from './alert-picker.js';
 import { koClock, dayLabel } from './core/time.js';
 import { UI } from './core/ui-text.js';
+import { timePicker } from './date-picker.js';
 
 const KEY = 'memoking.eventAlerts';
 
@@ -47,8 +48,10 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
   return new Promise((resolve) => {
     let isAllDay = Boolean(allDay);
     // 하루 종일로 바꾸면 그날 00:00, 되돌리면 원래 시각
-    const timed = new Date(start);
-    const dayStart = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    let timed = new Date(start);
+    const dayStart = () => new Date(timed.getFullYear(), timed.getMonth(), timed.getDate());
+    const pad = (n) => String(n).padStart(2, '0');
+    let ready = false; // 시각 고르기가 처음 그릴 때 부르는 onChange 는 건너뛴다 (알림 칩을 아직 만들기 전)
     const picked = { timed: new Set(isAllDay ? remembered('timed') : alerts ?? remembered('timed')), allDay: new Set(isAllDay ? alerts ?? remembered('allDay') : remembered('allDay')) };
 
     const dialog = el('dialog', { class: 'dialog event-dialog', 'aria-labelledby': 'event-title-h' });
@@ -58,7 +61,40 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
     name.value = title;
     nameWrap.append(el('span', {}, '일정'), name);
 
-    const when = el('p', { class: 'event-when', id: 'event-when' });
+    // 때: 글에서 읽은 날짜 · 시각을 보여 주고, 잘못 읽었으면 "바꾸기"로 그 자리에서 고친다 (되풀이 일정은 메모의 글로)
+    const when = el('p', { class: 'event-when' });
+    const whenText = el('span', { id: 'event-when' });
+    when.append(whenText);
+    const whenBox = el('div', { class: 'event-when-box', hidden: '' });
+    if (!repeatLabel) {
+      const change = el('button', { type: 'button', class: 'link-btn event-when-edit', 'aria-expanded': 'false', 'aria-controls': 'event-when-box' }, '바꾸기');
+      whenBox.id = 'event-when-box';
+      change.addEventListener('click', () => {
+        whenBox.hidden = !whenBox.hidden;
+        change.setAttribute('aria-expanded', String(!whenBox.hidden));
+        change.textContent = whenBox.hidden ? '바꾸기' : '접기';
+      });
+      when.append(change);
+      const date = el('input', { type: 'date', class: 'event-date', 'aria-label': '날짜' });
+      date.value = `${timed.getFullYear()}-${pad(timed.getMonth() + 1)}-${pad(timed.getDate())}`;
+      date.addEventListener('change', () => {
+        const [y, mo, d] = date.value.split('-').map(Number);
+        if (!y) return;
+        timed = new Date(y, mo - 1, d, timed.getHours(), timed.getMinutes());
+        changed();
+      });
+      const timeBox = el('div', { class: 'date-picker event-time', 'aria-label': '시각' });
+      timePicker(timeBox, {
+        compact: true,
+        value: `${pad(timed.getHours())}:${pad(timed.getMinutes())}`,
+        onChange: (hhmm) => {
+          const [h, m] = hhmm.split(':').map(Number);
+          timed = new Date(timed.getFullYear(), timed.getMonth(), timed.getDate(), h, m);
+          changed();
+        },
+      });
+      whenBox.append(date, timeBox);
+    }
     const allDayRow = el('label', { class: 'event-allday' });
     const allDaySwitch = el('input', { type: 'checkbox', class: 'switch', id: 'event-allday' });
     allDaySwitch.checked = isAllDay;
@@ -73,14 +109,14 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
     const actions = el('div', { class: 'dialog-actions' });
     actions.append(cancel, save);
 
-    form.append(el('h2', { id: 'event-title-h' }, heading), nameWrap, when);
+    form.append(el('h2', { id: 'event-title-h' }, heading), nameWrap, when, whenBox);
     if (repeatLabel) form.append(el('p', { class: 'event-repeat' }, `반복: ${repeatLabel}`));
     else form.append(allDayRow);
     form.append(alertsLabel, chips, none, actions);
     dialog.append(form);
 
     const kind = () => (isAllDay ? 'allDay' : 'timed');
-    const startAt = () => (isAllDay ? dayStart : timed);
+    const startAt = () => (isAllDay ? dayStart() : timed);
     const alertBox = alertPicker(chips, {
       picked,
       kind,
@@ -89,13 +125,20 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
       onChange: () => render(),
       onLimit: (text) => (none.textContent = text),
     });
+    function changed() {
+      if (!ready) return;
+      alertBox.render(); // 지난 미리 알림은 고를 수 없게 (때가 바뀌었으니 다시)
+      render();
+    }
     function render() {
-      when.textContent = eventWhen(startAt(), isAllDay);
+      whenText.textContent = eventWhen(startAt(), isAllDay);
+      whenBox.querySelector('.event-time')?.toggleAttribute('hidden', isAllDay);
       const set = picked[kind()];
       const active = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), allDay: isAllDay });
       const fb = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay), allDay: isAllDay });
       none.textContent = active.length ? '' : fb.length ? `고른 알림 시각이 지나 ${alertLabel(fb[0], isAllDay)}에 알려요` : UI.calendarOnly;
     }
+    ready = true;
     allDaySwitch.addEventListener('change', () => {
       isAllDay = allDaySwitch.checked;
       alertBox.render();

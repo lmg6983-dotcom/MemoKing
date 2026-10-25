@@ -569,7 +569,7 @@ function render() {
   if (query && results.more > 0) put(groups.has('files') || !groups.has('notes') ? 'files' : 'notes', { row: { kind: 'more', count: results.more } });
   const searched = isOn('notes') || isOn('files');
   if (query && searched && !calc && !url && !notes.length && !folders.length && !files.length && !opms.cases.length && !opms.loading) {
-    put(isOn('notes') ? 'notes' : 'files', { node: note(isOn('memo') ? `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요. Enter로 메모를 저장할 수 있어요` : `'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`) });
+    put(isOn('notes') ? 'notes' : 'files', { node: note(`'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`) }); // Enter 가 하는 일은 아래 키 안내가 고른 줄에 맞춰 말한다 (여기서 "Enter로 저장" 이라 하면 AI 줄을 골랐을 때 어긋났다)
   }
   if (query && isOn('files') && results.index && !results.index.count) {
     put('files', { node: note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : UI.noFileIndex) });

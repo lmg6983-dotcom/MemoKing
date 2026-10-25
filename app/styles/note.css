@@ -95,10 +95,11 @@ body, .note-screen, .share-paper {
   box-shadow: var(--shadow-pop);
 }
 /* 맨 위 아이콘 줄 (PDF · 그림 복사 · 그림 저장 · 삭제) — 목록 카드 메뉴(.mk-ctx-icons)와 같은 모양 */
-.menu-icons { display: flex; gap: 2px; padding: 0 0 6px; margin-bottom: 6px; border-bottom: 1px solid var(--border); }
-.menu-item.menu-ic { flex: 1 1 0; justify-content: center; height: 36px; padding: 0; }
-.menu-item.menu-ic svg { width: 18px; height: 18px; }
-.menu-sep { height: 1px; margin: 4px 2px; border: 0; background: var(--border); }
+.menu-icons { display: flex; gap: 2px; padding: 0 0 4px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.menu-item.menu-ic { flex: 1 1 0; justify-content: center; height: 32px; padding: 0; color: var(--text); }
+.menu-item.menu-ic svg { width: 18px; height: 18px; color: inherit; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; fill: none; } /* content-icons 의 선 그림 (카드 메뉴 .mk-ctx-ic 와 같은 굵기) */
+.menu-item.menu-ic.danger { color: var(--danger); }
+.menu-sep { height: 1px; margin: 3px 2px; border: 0; background: var(--border); }
 .swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 2px 2px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .swatch {
   aspect-ratio: 1;
@@ -109,6 +110,11 @@ body, .note-screen, .share-paper {
   cursor: pointer;
 }
 .swatch[aria-checked="true"] { border-color: var(--text-strong); }
+/* PC 메모 창 메뉴: 목록 카드 메뉴 · 보기 판과 같은 진한 색 점 · 같은 고른 고리 (연한 메모 바탕색이면 같은 색인지 헷갈렸다) */
+#menu .swatches { display: flex; justify-content: space-between; padding: 2px 6px 6px; }
+#menu .swatch { width: 24px; height: 24px; padding: 0; border: 0; background: var(--note-chip); }
+#menu .swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--text-strong); }
+#menu .menu-item:not(.menu-ic) { padding-block: 5px; } /* 기본 메모 창(380px) 높이에 메뉴가 스크롤 없이 들어가게 (휴대폰 시트는 그대로) */
 .menu-item {
   display: flex;
   align-items: center;

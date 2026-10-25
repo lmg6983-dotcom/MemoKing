@@ -1,5 +1,6 @@
 // 스티커 메모 창 — 메모 1개 = 창 1개 = 파일 1개.
 import { injectIcons, icon } from './icons.js';
+import { SAVE_ICON, TRASH_ICON } from './content-icons.js';
 import { createNoteEditor } from './editor.js';
 import { setCopyHost } from './copy-content.js';
 import { hideDeleteButton } from './delete-button.js';
@@ -571,6 +572,9 @@ async function memoImage(kind) {
     setStatus('그림을 만들지 못했어요. 다시 해 주세요', true);
   }
 }
+// 메뉴 맨 위 아이콘: 목록 카드 메뉴와 같은 그림 (같은 아이콘은 같은 뜻)
+$('pdf-btn').innerHTML = SAVE_ICON;
+$('delete-btn').innerHTML = TRASH_ICON;
 $('image-copy-btn').addEventListener('click', () => memoImage('copy'));
 /** 확인 창 (confirm-dialog): 확인 단추 글자를 바꿔 쓴다 */
 function confirmDialog(message, okLabel) {
