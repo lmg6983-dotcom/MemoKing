@@ -41,9 +41,9 @@ export function actionsFor(r) {
     case 'opmsMore':
       return [{ id: 'more', label: '모두 보기' }];
     case 'calc':
-      return [{ id: 'copy', label: '결과 복사' }, { id: 'copyExpr', label: '식과 함께 복사' }];
+      return [{ id: 'copy', label: '결과 복사' }, { id: 'copyExpr', label: '식까지 복사', text: true }]; // 둘째는 글자로 — 같은 복사 아이콘이 두 개라 무엇이 다른지 몰랐다
     case 'date':
-      return [{ id: 'copy', label: '결과 복사' }, { id: 'copyIso', label: `${r.plain} 복사` }, { id: 'copyExpr', label: '쓴 글과 함께 복사' }];
+      return [{ id: 'copy', label: '결과 복사' }, { id: 'copyIso', label: `${r.plain} 복사` }, { id: 'copyExpr', label: '쓴 글까지 복사', text: true }]; // 계산 줄의 "식까지 복사" 와 같은 꼴
     case 'site':
       return [{ id: 'open', label: '사이트 열기' }];
     // 웹 검색 · AI: 사이트마다 단추 (이름 글자로, 설정에서 고른 사이트가 맨 앞 = Enter)

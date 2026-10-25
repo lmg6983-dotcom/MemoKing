@@ -167,6 +167,14 @@ svg { width: 20px; height: 20px; flex: none; }
 @media (hover: hover) and (pointer: fine) { .icon-btn.primary:hover { background: var(--brand-yellow-hover); } }
 @media (hover: hover) and (pointer: fine) { .icon-btn.danger:hover { color: var(--danger); } }
 
+/* 글자 단추 (모든 창 — 목록 창 CSS 에만 있어 메모 창 · 일정 창의 "바꾸기" · "그대로 두기" 가 브라우저 기본 단추로 보였다. 휴대폰은 mobile.css 가 손가락 크기로 덮어씀)
+   누를 수 있는 글자는 그렇게 보이게 (휴대폰과 같은 노란 밑줄 · 지우는 일은 빨강) */
+.link-btn { border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+@media (hover: hover) and (pointer: fine) { .link-btn:hover { background: var(--hover); color: var(--text); } .link-btn.danger:hover { color: var(--danger); } }
+.link-btn:where(:not(.ev-add)) { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.link-btn.danger { color: var(--danger); text-decoration-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.link-btn:where(:disabled) { opacity: 0.45; cursor: default; background: none; color: var(--muted); } /* :where — 각 창 CSS(휴대폰 mobile.css 등)의 .link-btn 이 그대로 이기게 */
+
 /* 버튼: 기본(앱 바탕 + 테두리) · primary(노랑, 한 화면에 하나) · danger — 버튼에 검정 바탕은 쓰지 않는다 */
 .btn {
   display: inline-flex;
@@ -406,7 +414,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   transition: transform 0.24s var(--ease-out), opacity 0.15s;
 }
 /* 어두운 화면: 고른 칸이 탭 줄 바탕과 거의 같아 안 보였다 — 한 단 밝게 + 옅은 테두리 */
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) :is(.seg-thumb, .mk-slider > .tab-indicator) { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card); } }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) :is(.seg-thumb, .mk-slider > .tab-indicator) { background: var(--surface-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 16%, transparent), var(--shadow-card); } }
 
 /* 켜기/끄기 스위치 (체크박스) — 메모 창 · 목록 · PDF · 휴대폰 (휴대폰은 mobile.css 가 손가락 크기로) */
 .switch {
@@ -535,7 +543,12 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   background: var(--surface-0); color: var(--text); font: inherit; font-size: 15px;
 }
 .event-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.event-dialog .event-when { margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--text); }
+.event-dialog .event-when { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--text); }
+.event-dialog .event-when-edit { font-size: 13px; font-weight: 600; }
+/* 바꾸기: 날짜 칸 + 새 일정 창과 같은 시각 고르기 (칩 · 다른 시각 — 모양은 .qe-time 과 함께) */
+.event-dialog .event-when-box { display: flex; flex-direction: column; gap: 8px; margin: 0 0 10px; }
+.event-dialog .event-when-box[hidden] { display: none; }
+.event-dialog .event-date { height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
 .event-dialog .event-repeat { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
 .event-allday { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-bottom: 6px; font-size: 14px; }
 .event-dialog .event-label { margin: 6px 0 6px; font-size: 12px; color: var(--muted); }
@@ -604,11 +617,11 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   background: var(--surface-0); color: var(--text); font: inherit; font-size: 15px;
 }
 .quick-event .qe-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.quick-event .qe-time .dp-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.quick-event .qe-time .dp-quick button { min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
-.quick-event .qe-time .dp-quick button[aria-pressed="true"] { border-color: transparent; background: var(--accent); color: var(--on-brand); font-weight: 700; }
-.quick-event .qe-time .dp-time { display: flex; gap: 6px; }
-.quick-event .qe-time select { flex: 1; height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
+:is(.quick-event .qe-time, .event-dialog .event-time) .dp-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+:is(.quick-event .qe-time, .event-dialog .event-time) .dp-quick button { min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+:is(.quick-event .qe-time, .event-dialog .event-time) .dp-quick button[aria-pressed="true"] { border-color: transparent; background: var(--accent); color: var(--on-brand); font-weight: 700; }
+:is(.quick-event .qe-time, .event-dialog .event-time) .dp-time { display: flex; gap: 6px; }
+:is(.quick-event .qe-time, .event-dialog .event-time) select { flex: 1; height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
 .quick-event .qe-search { width: 100%; height: 38px; margin-bottom: 6px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-0); color: var(--text); font: inherit; }
 .quick-event .qe-memos { max-height: min(40vh, 280px); margin: 0 0 8px; padding: 0; overflow-y: auto; list-style: none; }
 .quick-event .qe-memo { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 6px 10px; border: 1.5px solid transparent; border-radius: 10px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
@@ -630,7 +643,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .quick-event .qe-date::after { content: '›'; margin-left: auto; color: var(--muted); font-weight: 800; }
 .quick-event .qe-date-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; } /* 보이는 건 글자, 누르면 달력 */
 .quick-event .qe-allday { flex: none; gap: 8px; margin: 0; }
-.quick-event .qe-time .dp-more { color: var(--muted); }
+:is(.quick-event .qe-time, .event-dialog .event-time) .dp-more { color: var(--muted); }
 .quick-event .qe-err:empty { display: none; }
 .quick-event .qe-date-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .quick-event .qe-pane .event-none:empty { display: none; }
@@ -874,7 +887,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .rows-title.ev-upcoming-title { margin-top: 18px; color: var(--text); font-size: 13px; }
 .rows-title.ev-sub-title { margin-top: 8px; font-weight: 600; }
 /* 어두운 화면: 노랑을 섞은 칠은 칙칙한 올리브가 돼 — 한 단 밝은 바탕 + 노란 테두리로 */
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-body [role="gridcell"].mk-selected { background: var(--surface-2); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent); } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-body [role="gridcell"].mk-selected { background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent); } } /* 밝은 화면 · 휴대폰처럼 채움 + 테두리 */
 .event-dialog { max-height: calc(100vh - 16px); }
 @media (max-height: 520px) {
   .event-dialog { padding-top: 14px; padding-bottom: 12px; }

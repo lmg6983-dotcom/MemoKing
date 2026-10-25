@@ -848,7 +848,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const found = searching && (items.some(matches) || externalMatches());
     if (searching ? !found : !items.length && !feeds.some((f) => f.on) && !device.on) {
       out.push(el('p', 'ev-hint', searching ? '찾는 일정이 없어요.'
-        : '날짜를 고르고 "＋ 일정 추가"를 누르거나, 메모에 "내일 오후 3시 치과"처럼 쓰면 일정이 돼요. "다른 캘린더"로 Google 캘린더, 삼성 캘린더 일정도 함께 볼 수 있어요.'));
+        : `날짜를 고르고 "＋ 일정 추가"를 누르거나, 메모에 "내일 오후 3시 치과"처럼 쓰면 일정이 돼요.${linkBtn.hidden ? '' : ' "다른 캘린더"로 Google 캘린더, 삼성 캘린더 일정도 함께 볼 수 있어요.'}`)); // 단추가 없는 화면에서는 그 단추 이야기를 하지 않는다
     }
     const top = container.scrollTop; // 다시 그려도 보던 자리 그대로 (1분마다 새로 그릴 때·켜고 끌 때)
     rowsEl.replaceChildren(...out);

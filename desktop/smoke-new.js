@@ -229,10 +229,11 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     await typeMagic('1,200 × 3');
     const calcRow = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row'); return r?.classList.contains('kind-calc') && { t: r.querySelector('.t').textContent, s: r.querySelector('.s').textContent, sel: r.getAttribute('aria-selected') }; })()`), '계산 결과', 8000).catch(() => null);
     await capture(magic, 'smoke-new-magic-calc.png');
+    const calcRows = await js(magic, `document.querySelectorAll('.magic-row.kind-calc').length`);
     await wait(300); // 메모 · 파일 찾기 결과가 다 온 뒤에 (늦게 온 결과가 아래 안내를 다시 그리지 않게)
     key(magic, 'Return');
     const calcFlash = await until(() => js(magic, `document.querySelector('.magic-flash')?.textContent`), '계산 결과 복사').catch(() => '');
-    check('매직키 계산기: 식을 쓰면 맨 위에 결과(골라져 있음) · Enter로 결과 복사', calcRow?.t === '3,600' && calcRow.s === '1,200 × 3' && calcRow.sel === 'true' && /계산 결과를 복사/.test(calcFlash), JSON.stringify({ calcRow, calcFlash }));
+    check('매직키 계산기: 식을 쓰면 맨 위에 결과 한 줄(골라져 있음) · Enter로 결과 복사', calcRow?.t === '3,600' && calcRow.s === '1,200 × 3' && calcRow.sel === 'true' && calcRows === 1 && /계산 결과를 복사/.test(calcFlash), JSON.stringify({ calcRow, calcRows, calcFlash }));
     showMagic();
     await wait(300);
     await typeMagic('서울 날씨');
@@ -642,8 +643,8 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         list.webContents.sendInputEvent({ type: 'mouseDown', x: at.x, y: at.y, button: 'right', clickCount: 1 });
         list.webContents.sendInputEvent({ type: 'mouseUp', x: at.x, y: at.y, button: 'right', clickCount: 1 });
         const shape = await until(() => js(list, `(() => { const m = document.querySelector('.mk-ctx'); return m && { icons: [...m.querySelectorAll('.mk-ctx-ic')].map((b) => b.dataset.id), items: [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.dataset.id), dots: m.querySelectorAll('.mk-ctx-sw').length, native: false }; })()`), '목록 카드 메뉴').catch(() => null);
-        check('목록 카드 오른쪽 클릭: 맨 위 아이콘 줄(복사 · 공유 · PDF · 휴지통) + 열기 · 고정 · 색 점 7개 · 이 날의 기록 · 잠그기 · 이전 버전',
-          shape && shape.icons.join() === 'cut,copy,share,pdf,trash' && shape.items.join() === 'open,pin,day,lock,versions' && shape.dots === 7, JSON.stringify(shape));
+        check('목록 카드 오른쪽 클릭: 맨 위 아이콘 줄(복사 · 공유 · PDF · 잘라내기 · 휴지통 — 메모 창 메뉴와 같은 자리) + 열기 · 고정 · 색 점 7개 · 회상 날짜 · 잠그기 · 이전 버전',
+          shape && shape.icons.join() === 'copy,share,pdf,cut,trash' && shape.items.join() === 'open,pin,day,lock,versions' && shape.dots === 7, JSON.stringify(shape));
         await capture(list, 'list-card-menu.png');
         const pickList = async (selector) => {
           const b = await js(list, `(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(${JSON.stringify(selector)}) !== null }; })()`);
@@ -685,13 +686,11 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await until(() => js(list, `!!document.querySelector('.mk-ctx')`), '키보드로 연 목록 카드 메뉴');
         key(list, 'Down');
         key(list, 'Down');
-        key(list, 'Down');
-        key(list, 'Down');
         const onColors = await until(() => js(list, `document.activeElement?.classList.contains('mk-ctx-sw')`), '색 줄로 옮김', 2000).catch(() => false);
         key(list, 'Right');
         key(list, 'Escape');
         const gone = await until(() => js(list, `!document.querySelector('.mk-ctx')`), '메뉴 닫힘', 2000).catch(() => false);
-        check('목록 카드 메뉴 키보드: ↓ 로 아이콘 줄 › 열기 › 고정 › 색 줄, Esc로 닫기', onColors === true && gone, JSON.stringify({ onColors, gone }));
+        check('목록 카드 메뉴 키보드: ↓ 로 아이콘 줄 › 색 줄 (메모 창 메뉴처럼 아이콘 바로 아래), Esc로 닫기', onColors === true && gone, JSON.stringify({ onColors, gone }));
         // 제목 줄 오른쪽 위: 왕관 · 동기화 · 설정이 검색 줄이 아니라 맨 위에, 창 버튼 영역을 침범하지 않음
         const bar = await js(list, `(() => { const q = (s) => document.querySelector(s)?.getBoundingClientRect(); const c = q('#list-top-btn'), g = q('#settings-btn'), t = q('.titlebar'), s = q('#search'); return { crown: c && [c.left, c.top], gearInTitle: g.top >= t.top && g.bottom <= t.bottom, gearRight: g.right <= (navigator.windowControlsOverlay?.visible ? navigator.windowControlsOverlay.getTitlebarAreaRect().right : innerWidth - 142) + 1, order: c.left < g.left, searchBelow: s.top >= t.bottom - 1, inToolbar: !!document.querySelector('.toolbar #settings-btn, .toolbar #sync-btn') }; })()`);
         check('목록 제목 줄: 왕관 · 동기화 · 설정이 맨 위(창 버튼 왼쪽)에 있고 검색 줄에는 없음', bar.gearInTitle && bar.gearRight && bar.order && bar.searchBelow && !bar.inToolbar, JSON.stringify(bar));
@@ -857,7 +856,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await capture(nw, 'smoke-new-share-pop.png');
       await js(nw, `document.querySelector('.mk-share-pop')?.click()`);
       await wait(300); // 사라지는 0.2초 (그 사이에는 아래 내용을 가린다)
-      check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V로 붙여 넣으세요" + 폭죽 (주소는 보이지 않음)', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && !/https?:/.test(popped.text) && popped.confetti, JSON.stringify(popped));
+      check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V로 붙여 넣으세요" + 처음엔 폭죽 (주소는 보이지 않음)', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && !/https?:/.test(popped.text) && popped.confetti, JSON.stringify(popped));
       // 상태 줄이 잘리면 메모 창 바깥에 말풍선으로 전문 (내용을 가리지 않게) — 좁은 창
       const wide = nw.getBounds();
       const bubbleWin = () => windowManager.statusBubbles.byOwner.get(nw.id)?.win;
@@ -1316,7 +1315,14 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await until(() => pw.isVisible() && js(pw, 'document.documentElement.dataset.ready === "true"'), 'PDF 점검 메모', 8000);
       await js(pw, `document.getElementById('menu-btn').click()`);
       await capture(pw, 'note-menu.png');
-      await js(pw, `document.getElementById('menu-btn').click()`);
+      // ⋯ 메뉴: 목록 카드 메뉴와 같은 아이콘 순서(글 복사 · 공유 · PDF · 휴지통) · 기본 창(380px)에 스크롤 없이 · 목록 · 단축키도 마우스로
+      const menuShape = await js(pw, `(() => { const m = document.getElementById('menu'); return { icons: [...m.querySelectorAll('.menu-icons button')].map((b) => b.id), fits: m.scrollHeight <= m.clientHeight + 1, size: [m.scrollHeight, m.clientHeight, innerHeight], foot: [...m.querySelectorAll('.menu-foot button')].filter((b) => !b.hidden && b.getClientRects().length).map((b) => b.id) }; })()`);
+      clipboard.writeText('');
+      await js(pw, `document.getElementById('copy-text-btn').click()`);
+      const textCopied = await until(() => clipboard.readText(), '글 복사').catch(() => '');
+      check('메모 창 ⋯ 메뉴: 카드 메뉴와 같은 아이콘 순서 · 기본 창에 스크롤 없이 · 아래 줄에 그림 · 목록 · 단축키 · 글 복사가 그 메모 글',
+        menuShape.icons.join() === 'copy-text-btn,share-btn,pdf-btn,delete-btn' && menuShape.fits && menuShape.foot.join() === 'image-copy-btn,image-save-btn,show-list,shortcuts-btn' && /여러 쪽이 되도록/.test(textCopied),
+        JSON.stringify({ menuShape, textCopied: textCopied.slice(0, 40) }));
       // 메모 창에서 Ctrl+Shift+P → PDF 창
       pw.focus();
       key(pw, 'P', ['control', 'shift']);

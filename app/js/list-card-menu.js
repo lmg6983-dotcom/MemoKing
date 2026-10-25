@@ -16,18 +16,19 @@ export function cardMenuSpec(memo, { workLife = true } = {}) {
   const locked = memo.locked === true;
   return {
     icons: [
-      { id: 'cut', icon: CUT_ICON, label: locked ? '잘라내기 (잠긴 메모는 풀어야 해요)' : '잘라내기 (글을 복사하고 휴지통으로)', disabled: locked },
+      // 메모 창 ⋯ 메뉴와 같은 자리: 글 복사 · 공유 · PDF 가 앞, 지우는 일(잘라내기 · 휴지통)은 끝에
       { id: 'copy', icon: COPY_ICON, label: locked ? '글 복사 (잠긴 메모는 풀어야 해요)' : '글 복사', disabled: locked },
       { id: 'share', icon: SHARE_ICON, label: locked ? '공유 (잠긴 메모는 풀어야 해요)' : '공유', disabled: locked },
       { id: 'pdf', icon: SAVE_ICON, label: UI.saveAsPdf },
+      { id: 'cut', icon: CUT_ICON, label: locked ? '잘라내기 (잠긴 메모는 풀어야 해요)' : '잘라내기 (글을 복사하고 휴지통으로)', disabled: locked },
       { id: 'trash', icon: TRASH_ICON, label: UI.toTrash, danger: true },
     ],
     items: [
+      { type: 'colors', label: '색', colors: COLORS.map((c) => ({ id: `color:${c}`, label: COLOR_NAMES[c] ?? c, color: c, checked: memo.color === c })) }, // 메모 창 메뉴처럼 아이콘 바로 아래
       { id: 'open', label: '열기', hint: 'Enter' },
       { type: 'separator' },
       { id: 'pin', label: UI.pin, checked: memo.pinned === true },
-      { type: 'colors', label: '색', colors: COLORS.map((c) => ({ id: `color:${c}`, label: COLOR_NAMES[c] ?? c, color: c, checked: memo.color === c })) },
-      { id: 'day', label: '이 날의 기록으로', hint: memo.day ? dayText(memo.day) : '' },
+      { id: 'day', label: UI.memoryDay, hint: memo.day ? dayText(memo.day) : UI.madeDay },
       ...(workLife ? [{ id: 'mode', label: moveLabel(memo) }] : []),
       { type: 'separator' },
       locked ? { id: 'unlock', label: '잠금 풀기' } : { id: 'lock', label: '잠그기' },
@@ -67,7 +68,7 @@ export async function openCardMenu({ memo, at, api, run, workLife = true }) {
 }
 
 /** 메모 한 개를 공유: 방법 고르기 (Google Drive 링크 · LocalSend · 메일) → 글 파일로 보낸다 */
-async function shareMemo(memo, at, api, run) {
+export async function shareMemo(memo, at, api, run) {
   try {
     const file = await api.memo.shareFile(memo.id);
     if (file?.error) return run.flash(file.error);

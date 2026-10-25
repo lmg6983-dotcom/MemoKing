@@ -321,7 +321,7 @@ function showMode({ later = false } = {}) {
     b.setAttribute('aria-checked', String(b.dataset.mode === state.mode));
     b.tabIndex = b.dataset.mode === state.mode ? 0 : -1;
   }
-  $('count-memos').textContent = String(modeMemos().length);
+  $('count-memos').textContent = modeMemos().length ? String(modeMemos().length) : ''; // 0 은 숨김 (일정 탭과 같이)
 }
 
 // 정리 도우미: Life 메모 중 일 이야기 같은 것을 골라 Work 로
@@ -998,7 +998,6 @@ function showShortcuts(sc) {
     $(`sc-${name}-reset`).hidden = st.isDefault;
     $(`sc-${name}-note`).textContent = st.enabled && !st.registered ? SC_TAKEN : '';
     $(`sc-${name}-note`).classList.toggle('warn', st.enabled && !st.registered);
-    $(name === 'quickMemo' ? 'quick-memo-kbd' : 'magic-kbd').textContent = st.label;
   }
 }
 function setScNote(name, text, warn = false) {
@@ -1714,7 +1713,7 @@ api.on('memos:changed', (memos) => {
   // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
   const hb = $('handoff-bar');
   if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;
-  $('count-memos').textContent = String(modeMemos().length);
+  $('count-memos').textContent = modeMemos().length ? String(modeMemos().length) : ''; // 0 은 숨김 (일정 탭과 같이)
   if (activeTab !== 'memos') {
     memosStale = true; // 메모 탭으로 돌아오면 다시 그린다
     return remindersTab.refresh({ quiet: activeTab !== 'reminders' }); // 메모 제목이 바뀌면 알림 탭에도
@@ -2104,6 +2103,15 @@ $('report-btn').addEventListener('click', async () => {
 $('tutorial-btn').addEventListener('click', () => {
   el.settings.close();
   api.tutorial.start();
+});
+// 처음 한 번만 뜨던 작은 안내(hints.js · 왕관/테이프 안내)를 다시 — 지나간 안내를 다시 볼 길 (모든 창이 같은 기억을 쓴다)
+$('hints-reset').addEventListener('click', () => {
+  try {
+    for (const k of ['memoking.hints', 'memoking.stickerHintSeen']) localStorage.removeItem(k);
+  } catch {
+    // 기억을 못 지우면 그대로
+  }
+  flashStatus('작은 안내를 그 상황이 되면 다시 보여 드릴게요');
 });
 applyInfo(await api.info());
 // 업데이트 뒤 한 번: 개선된 점 (메인이 한 번만 준다)

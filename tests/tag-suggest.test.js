@@ -106,3 +106,9 @@ test('태그 추천: 웹 주소 속 낱말(example.com 의 com 등)은 추천하
   const got = suggestTagsFor(body, memos).map((t) => t.name);
   for (const bad of ['com', 'example', 'www', 'restaurant', 'menu', 'https']) assert.ok(!got.includes(bad), `${bad} 가 추천됨: ${got}`);
 });
+
+test('태그 추천: 파일 이름의 확장자(회의자료.txt 의 txt 등)는 추천하지 않음', () => {
+  const body = '# 장보기 목록\n\n우유와 계란 한 판 밑줄 빨강 형광 사과 사기 회의자료.txt 설치.bat 보고서.pdf';
+  const got = [...suggestTagsFor(body, memos), ...suggestTagsFor(body, [])].map((t) => t.name); // 기존 태그가 없으면 핵심어로 — 여기서 #txt 가 나왔다
+  for (const bad of ['txt', 'bat', 'pdf']) assert.ok(!got.includes(bad), `${bad} 가 추천됨: ${got}`);
+});

@@ -9,6 +9,8 @@ export const UI = Object.freeze({
   memoCreateFail: '메모를 만들지 못했어요',
   madeNewMemo: '새 메모로 만들었어요',
   makeMemo: '메모로 만들기',
+  memoryDay: '회상 날짜 정하기', // 회상 달력에서 이 메모를 둘 날 (예전 이름 "이 날의 기록으로" 는 그날로 가기처럼 읽혔다)
+  madeDay: '만든 날', // 회상 날짜를 정하지 않았을 때
   openList: '메모 목록 열기',
   noVault: '메모 폴더가 아직 없어요. 처음 화면에서 메모 폴더를 정해 주세요',
   savedElsewhere: '그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요',

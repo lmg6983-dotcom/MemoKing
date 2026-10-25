@@ -159,17 +159,17 @@
       <h3 class="set-title" id="set-daily">자주 쓰는 기능</h3>
       <label class="setting-row">
         <input type="checkbox" id="quick-memo" class="switch" role="switch">
-        <span>매직 카피 <kbd id="quick-memo-kbd">Ctrl+Alt+C</kbd> <small id="quick-memo-note">고른 내용을 바로 메모로, 두 번 누르면 화면 캡처</small></span>
+        <span>매직 카피 <small id="quick-memo-note">고른 내용을 바로 메모로, 두 번 누르면 화면 캡처</small></span>
       </label>
       <div class="shortcut-row" data-shortcut="quickMemo">
         <span class="shortcut-label">단축키</span>
-        <button type="button" class="kbd-btn" id="sc-quickMemo" aria-describedby="sc-quickMemo-note">…</button>
+        <button type="button" class="kbd-btn" id="sc-quickMemo" aria-describedby="sc-quickMemo-note">Ctrl+Alt+C</button>
         <button type="button" class="link-btn sc-reset" id="sc-quickMemo-reset" hidden>기본값으로</button>
         <small class="sc-note" id="sc-quickMemo-note" role="status"></small>
       </div>
       <label class="setting-row">
         <input type="checkbox" id="history-enabled" class="switch" role="switch">
-        <span>Windows 알림 모아두기 <small>카카오톡 알림도 함께 모아 알림 보관함 탭에서 봐요. 모을 앱은 알림 보관함 위 “모을 앱” 버튼에서</small></span>
+        <span>Windows 알림 모아두기 <small title="모을 앱은 알림 보관함 위 “모을 앱” 버튼에서 골라요">카카오톡 등 다른 앱 알림을 알림 보관함에 모아요</small></span>
       </label>
       <label class="setting-row">
         <input type="checkbox" id="auto-start" class="switch" role="switch">
@@ -180,11 +180,11 @@
       <h3 class="set-title" id="set-magic">매직키</h3>
       <label class="setting-row">
         <input type="checkbox" id="magic-enabled" class="switch" role="switch">
-        <span>매직키 <kbd id="magic-kbd">Ctrl+Alt+Space</kbd> <small>어디서든 입력창을 띄워 바로 메모하고 찾아요</small></span>
+        <span>매직키 쓰기 <small>어디서든 입력창을 띄워 바로 메모하고 찾아요</small></span>
       </label>
       <div class="shortcut-row" data-shortcut="magic">
         <span class="shortcut-label">단축키</span>
-        <button type="button" class="kbd-btn" id="sc-magic" aria-describedby="sc-magic-note">…</button>
+        <button type="button" class="kbd-btn" id="sc-magic" aria-describedby="sc-magic-note">Ctrl+Alt+Space</button>
         <button type="button" class="link-btn sc-reset" id="sc-magic-reset" hidden>기본값으로</button>
         <small class="sc-note" id="sc-magic-note" role="status"></small>
       </div>
@@ -214,14 +214,15 @@
       <h3 class="set-title" id="set-drive">Google Drive 동기화</h3>
       <div class="drive-box" id="drive-box">
         <svg class="drive-box-icon"><use href="#i-cloud"/></svg>
-        <div class="drive-box-text"><b id="drive-title"></b><small id="drive-sub"></small><div class="sync-bar" id="drive-bar" hidden><i></i></div></div>
+        <div class="drive-box-text"><b id="drive-title">확인하는 중…</b><small id="drive-sub"></small><div class="sync-bar" id="drive-bar" hidden><i></i></div></div>
       </div>
       <div class="dialog-actions left">
-        <button id="drive-sync-now" class="btn primary">지금 동기화</button>
+        <!-- 상태를 읽기 전에는 연결하기만 (render 가 상태에 맞춰 보이고 숨긴다) -->
+        <button id="drive-sync-now" class="btn primary" hidden>지금 동기화</button>
         <button id="drive-connect" class="btn primary">연결하기</button>
         <button id="drive-conflicts" class="btn" hidden></button>
-        <button id="drive-folder" class="link-btn">다른 폴더로 바꾸기</button>
-        <button id="drive-disconnect" class="link-btn danger">연결 끊기</button>
+        <button id="drive-folder" class="link-btn" hidden>다른 폴더로 바꾸기</button>
+        <button id="drive-disconnect" class="link-btn danger" hidden>연결 끊기</button>
       </div>
       <details class="drive-adv" id="drive-adv">
         <summary>고급</summary>
@@ -263,7 +264,7 @@
         </label>
         <label class="setting-row">
           <input type="checkbox" id="ai-phone" class="switch" role="switch">
-          <span>휴대폰 메모도 이 PC에서 <small>휴대폰에서 쓴 메모가 들어오면 1분 뒤 태그 · 일정을 달아요. PC가 여러 대면 한 대에서만 켜 주세요</small></span>
+          <span>휴대폰 메모도 이 PC에서 <small title="휴대폰에서 쓴 메모가 들어오면 1분 뒤 달아요. PC가 여러 대면 한 대에서만 켜 주세요">휴대폰 메모에도 태그 · 일정을 달아요 (PC 한 대에서만)</small></span>
         </label>
         <p class="set-note">메모를 닫을 때 · 매직키로 저장할 때 뒤에서 해요. 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
       </div>
@@ -296,15 +297,15 @@
       </label>
       <label class="setting-row">
         <input type="checkbox" id="link-previews" class="switch" role="switch" checked>
-        <span>링크 미리보기 <small>주소를 붙이면 제목, 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
+        <span>링크 미리보기 <small title="끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요">링크를 제목 · 사진 카드로 보여요</small></span>
       </label>
       <label class="setting-row">
         <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
-        <span>태그 자동 추가 <small>메모를 닫을 때 내용에 맞는 태그를 달아요 (합쳐 3개까지). 인사 · 짧은 대답처럼 주제가 없는 메모에는 달지 않아요</small></span>
+        <span>태그 자동 추가 <small title="합쳐 3개까지. 인사 · 짧은 대답처럼 주제가 없는 메모에는 달지 않아요">메모를 닫을 때 내용에 맞는 태그를 달아요</small></span>
       </label>
       <label class="setting-row">
         <input type="checkbox" id="hold-tune" class="switch" role="switch" checked>
-        <span>내 손에 맞추기 <small>메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려 손에 맞춰요. 이 PC에만 저장해요 <button type="button" class="link-btn inline-link" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button></small></span>
+        <span>내 손에 맞추기 <small title="메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려요. 이 PC에만 저장해요">꾹 눌러 줄 옮기기를 손에 맞춰요 <button type="button" class="link-btn inline-link" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button></small></span>
       </label>
       <div class="setting-row">
         <span>넣을 때 묻기 <small id="choices-note"></small></span>
@@ -365,7 +366,7 @@
       <p class="label">휴대폰 앱 (안드로이드)</p>
       <div class="drive-box phone-box">
         <div class="phone-qr" id="phone-qr" role="img" aria-label="안드로이드 설치 파일 주소 QR 코드"></div>
-        <div class="drive-box-text"><b>휴대폰 카메라로 찍어 받기</b><small>QR 코드를 찍으면 설치 파일(MemoKing-android.apk)을 바로 받아요. 새 버전은 휴대폰 앱이 알아서 알려 줘요.</small></div>
+        <div class="drive-box-text"><b>휴대폰 카메라로 찍어 받기</b><small title="설치 파일(MemoKing-android.apk). 새 버전은 휴대폰 앱이 알아서 알려 줘요">QR을 찍으면 휴대폰 설치 파일을 바로 받아요</small></div>
       </div>
       <div class="dialog-actions left">
         <button id="phone-copy" class="btn">휴대폰 설치 링크 복사</button>
@@ -394,6 +395,7 @@
     </section>
     <footer class="set-foot">
       <button id="tutorial-btn" class="link-btn">사용법 둘러보기</button>
+      <button id="hints-reset" class="link-btn" title="표 · 목록 끌기 · 스티커처럼 처음 한 번만 뜨던 작은 안내를 다시 보여 줘요">처음 안내 다시 보기</button>
       <button id="report-btn" class="link-btn">문제 보내기</button>
       <span>© 2026 메모킹, 문의 lmg6983@gmail.com</span>
     </footer>

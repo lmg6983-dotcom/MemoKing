@@ -3,6 +3,7 @@
 import { dayKey, keyDate } from './core/memories.js';
 import { icon } from './icons.js';
 import { WEEKDAY } from './core/time.js';
+import { UI } from './core/ui-text.js';
 
 const label = (key) => {
   const d = keyDate(key);
@@ -37,7 +38,7 @@ export function openMemoryDay({ created, day, title } = {}) {
     const dialog = el('dialog', 'dialog memory-day');
     dialog.setAttribute('aria-labelledby', 'md-h');
     const head = el('div', 'dialog-head');
-    const h = el('h2', '', '이 날의 기록으로');
+    const h = el('h2', '', UI.memoryDay);
     h.id = 'md-h';
     const x = el('button', 'icon-btn dialog-x');
     x.type = 'button';

@@ -1,5 +1,7 @@
 // 스티커 메모 창 — 메모 1개 = 창 1개 = 파일 1개.
 import { injectIcons, icon } from './icons.js';
+import { COPY_ICON, SHARE_ICON, SAVE_ICON, TRASH_ICON } from './content-icons.js';
+import { shareMemo } from './list-card-menu.js';
 import { createNoteEditor } from './editor.js';
 import { setCopyHost } from './copy-content.js';
 import { hideDeleteButton } from './delete-button.js';
@@ -429,7 +431,7 @@ function applyMeta(next) {
   for (const s of el.swatches.children) s.setAttribute('aria-checked', String(s.dataset.color === memo.color));
   el.pinToggle.setAttribute('aria-checked', String(memo.pinned));
   el.pinToggle.querySelector('span').textContent = memo.pinned ? UI.unpin : UI.pin;
-  $('day-label').textContent = memo.day ? dayText(memo.day) : '';
+  $('day-label').textContent = memo.day ? dayText(memo.day) : UI.madeDay;
   $('mode-btn').querySelector('span').textContent = moveLabel(memo);
   showModeTheme();
 }
@@ -571,6 +573,22 @@ async function memoImage(kind) {
     setStatus('그림을 만들지 못했어요. 다시 해 주세요', true);
   }
 }
+// 메뉴 맨 위 아이콘: 목록 카드 메뉴와 같은 그림 · 같은 순서 · 같은 일 (같은 아이콘은 같은 뜻)
+$('copy-text-btn').innerHTML = COPY_ICON;
+$('share-btn').innerHTML = SHARE_ICON;
+$('pdf-btn').innerHTML = SAVE_ICON;
+$('delete-btn').innerHTML = TRASH_ICON;
+$('copy-text-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush(); // 지금 적은 글까지
+  setStatus((await api.memo.copyText(id).catch(() => false)) ? UI.textCopied : memo?.locked ? '잠긴 메모는 잠금을 풀어야 복사할 수 있어요' : UI.copyFail);
+});
+$('share-btn').addEventListener('click', async () => {
+  const r = el.menuBtn.getBoundingClientRect();
+  closeMenu();
+  await flush();
+  await shareMemo({ id }, { x: Math.round(r.left), y: Math.round(r.bottom) }, api, { flash: (text) => setStatus(text) });
+});
 $('image-copy-btn').addEventListener('click', () => memoImage('copy'));
 /** 확인 창 (confirm-dialog): 확인 단추 글자를 바꿔 쓴다 */
 function confirmDialog(message, okLabel) {
@@ -626,7 +644,7 @@ function showHotkey(state) {
   const what = slot ? `${hotkeyLabel(slot)}로 불러와요` : '아직 없어요';
   btn.title = `불러오기 키 정하기: ${what} (Ctrl+Alt+숫자로 어디서든 이 메모를 불러와요)`;
   btn.setAttribute('aria-label', `불러오기 키 정하기, ${slot ? hotkeyLabel(slot) : '아직 없음'}`);
-  $('hotkey-menu-label').textContent = slot ? hotkeyLabel(slot) : '';
+  $('hotkey-menu-label').textContent = slot ? hotkeyLabel(slot) : 'Ctrl+Alt+숫자'; // 정하기 전에도 무슨 키인지
 }
 const refreshHotkey = () => api.hotkeys?.state(id).then(showHotkey, () => {});
 window.addEventListener('focus', () => memo && refreshHotkey());
@@ -684,7 +702,7 @@ api.on('memo:meta', applyMeta);
 function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
-  if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
+  if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item:not(.menu-ic)'); // 키보드로 열면 글 메뉴 첫 항목에 (위 아이콘 줄은 ↑ · Home 으로)
 }
 function closeMenu() {
   if (el.menu.hidden) return;
@@ -1288,18 +1306,36 @@ tableBar?.addEventListener('wheel', (e) => {
   tableBar.scrollLeft += e.deltaY;
 }, { passive: false });
 function showTableBar(table) {
+  if (!table) closeTableMore();
   tableBar.hidden = !table;
   document.body.classList.toggle('in-table', Boolean(table));
   for (const b of document.querySelectorAll('[data-action="table"]')) b.classList.toggle('active', Boolean(table));
   if (table) paintTableBar(tableBar, table); // 버튼 상태는 휴대폰과 같은 코드 (note-shared.js)
 }
-bindTableBar(tableBar, (cmd) => editor.tableCommand(cmd));
+// 좁은 창: 덜 쓰는 표 도구(표 · 바꾸기)는 "⋯" 로 막대 위에 펼친다 (휴대폰 note-view.js 와 같이) — 하나를 고르거나 바깥을 누르면 접힘
+const tableMoreBtn = $('table-more-btn');
+function closeTableMore() {
+  tableBar.classList.remove('more-open');
+  tableMoreBtn.setAttribute('aria-expanded', 'false');
+}
+tableMoreBtn.addEventListener('click', () => {
+  const open = !tableBar.classList.contains('more-open');
+  tableBar.classList.toggle('more-open', open);
+  tableMoreBtn.setAttribute('aria-expanded', String(open));
+});
+document.addEventListener('pointerdown', (e) => {
+  if (tableBar.classList.contains('more-open') && !tableBar.contains(e.target)) closeTableMore();
+}, true);
+bindTableBar(tableBar, (cmd, b) => {
+  editor.tableCommand(cmd);
+  if (b.closest('.tb-more')) closeTableMore();
+});
 
 // 처음 그 상황이 됐을 때 한 번만: 눈에 안 보이는 동작(꾹 눌러 옮기기·테두리 끌기) 알려 주기
 // (그림·파일 옮기기 안내는 block-move.js가 따로)
 function firstTimeHints(active) {
   // 안내는 표에 붙인다 (표 막대에 붙이면 설명하는 막대를 풍선이 가린다)
-  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab은 다음 칸, 마지막 칸에서 Tab은 새 줄이에요', { anchor: getSelection()?.anchorNode?.parentElement?.closest('table') ?? el.editorRoot.querySelector('table') ?? tableBar, avoid: tableBar });
+  if (active.table) hintOnce('table', '표: 아래 막대로 줄 · 칸을 더하고 빼요. 칸 테두리를 끌면 크기가 바뀌고, Tab은 다음 칸이에요', { anchor: (() => { const t = getSelection()?.anchorNode?.parentElement?.closest('table') ?? el.editorRoot.querySelector('table'); return t?.closest('.tableWrapper') ?? t ?? tableBar; })(), avoid: tableBar }); // 표를 감싼 상자(가로 막대 · 아래 테두리까지)를 피해 그 밖에
   else if (active.task || active.bullet || active.ordered) hintOnce('list-move', '목록 항목은 글자를 꾹 누르면 들어 올려져 순서를 바꿀 수 있어요. 키보드는 Alt+↑ / Alt+↓', { anchor: el.editorRoot.querySelector('li') });
 }
 
@@ -1327,10 +1363,22 @@ function useKeymap(overrides) {
   SHORTCUTS = keymapTable(keymapOverrides);
   // 메뉴에 지금 키를 함께 보인다 (PDF로 저장 Ctrl+Shift+P 등)
   const keys = resolveKeymap(keymapOverrides);
+  // 메뉴 단추마다 그 단추가 하는 일의 키 (찾기 · 바꾸기는 한 줄에 둘 다) — 단축키 창에 있는 키는 메뉴에도 모두
+  const byBtn = new Map();
   for (const a of KEYMAP_ACTIONS) {
-    const btnId = a.run[0] === 'menu' ? a.run[1] : a.id === 'shortcuts' ? 'shortcuts-btn' : a.id === 'find' ? 'find-btn' : null;
-    const btn = btnId && document.getElementById(btnId);
+    const btnId = a.run[0] === 'menu' ? a.run[1] : { shortcuts: 'shortcuts-btn', find: 'find-btn', replace: 'find-btn', links: 'links-btn' }[a.id];
+    if (btnId) byBtn.set(btnId, [...(byBtn.get(btnId) ?? []), ...keys[a.id]]);
+  }
+  for (const [btnId, combos] of byBtn) {
+    const btn = document.getElementById(btnId);
     if (!btn) continue;
+    // 맨 위 아이콘 줄 · 아래 작은 줄은 글자 자리가 없어 풍선말에 키를 함께
+    if (btn.matches('.menu-ic, .menu-mini')) {
+      const k = combos.map(comboLabel).join(', ');
+      const name = btn.getAttribute('aria-label') ?? (btn.dataset.name ??= btn.title.replace(/ \(.*\)$/, ''));
+      btn.title = k ? `${name} (${k})` : name;
+      continue;
+    }
     // 키 글자는 메뉴 글(잠그기 ↔ 잠금 풀기처럼 바뀜)과 따로, 단추 오른쪽 끝에
     btn.querySelector(':scope > span > small:not([id])')?.remove(); // 예전에 글 안에 적어 둔 키 글자
     let hint = btn.querySelector(':scope > .key-hint');
@@ -1339,7 +1387,7 @@ function useKeymap(overrides) {
       hint.className = 'key-hint';
       btn.append(hint);
     }
-    hint.textContent = keys[a.id].map(comboLabel).join(', ');
+    hint.textContent = combos.map(comboLabel).join(', ');
     hint.hidden = !hint.textContent;
   }
   // 단추 풍선말(title) · 글자 모양 메뉴의 키 글자도 지금 키로 (처음 적힌 기본 키 글자를 바꿔 끼운다)

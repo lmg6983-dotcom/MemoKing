@@ -1303,6 +1303,17 @@ export async function runSmoke({
         dlg?.name === '발표' && /오후 2:30/.test(dlg.when) && dlg.pressed.length === 1 && /10분 전/.test(dlg.pressed[0]),
         JSON.stringify(dlg));
       await capture(dn.win, 'smoke-event-dialog.png');
+      // 잘못 읽었으면 그 자리에서: "바꾸기" → 시 목록을 오후 3시로 → 때 글이 바뀜 → 다시 오후 2시로 (아래 저장 점검은 14:30 그대로)
+      const edit = await js(dn.win, `(() => {
+        document.querySelector('.event-when-edit').click();
+        const box = document.getElementById('event-when-box');
+        const hour = box.querySelector('.dp-hour');
+        const pick = (v) => { hour.value = v; hour.dispatchEvent(new Event('change')); return document.getElementById('event-when').textContent; };
+        const r = { open: !box.hidden, date: Boolean(box.querySelector('input[type="date"]')), three: pick('15') };
+        r.back = pick('14');
+        return r;
+      })()`);
+      check('일정 창: "바꾸기"로 날짜 · 시각을 그 자리에서 고침', edit.open && edit.date && /오후 3:30/.test(edit.three) && /오후 2:30/.test(edit.back), JSON.stringify(edit));
       await js(dn.win, `(() => { [...document.querySelectorAll('.event-alerts button')].find((b) => b.textContent.includes('하루 전')).click(); document.getElementById('event-save').click(); })()`);
       const set = await until(() => remindersOf(dn.id).find((r) => r.kind === 'at'), '일정 저장').catch(() => null);
       const at = set ? new Date(set.at) : null;

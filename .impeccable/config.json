@@ -1,0 +1,113 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "marquee",
+        "value": "*",
+        "files": [
+          "app/index.html"
+        ],
+        "createdAt": "2026-10-25T10:37:22.015Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 동기화 진행률을 모를 때의 진행 막대 sync-scan(list.css .sync-bar/.sync-line) — 흐르는 글이 아니라 작업 상태, reduced-motion 이면 멈춤"
+      },
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "app/note.html",
+          "app/print.html"
+        ],
+        "createdAt": "2026-10-25T10:38:01.721Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 실제 녹음 중일 때만 깜빡이는 녹음 점(note.css .rec-dot, body.recording add-btn::after), reduced-motion 이면 켜진 채. 인쇄 창은 note.css 를 함께 읽어 잡힘"
+      },
+      {
+        "rule": "repeating-stripes-gradient",
+        "value": "*",
+        "files": [
+          "app/index.html",
+          "app/note.html",
+          "app/print.html"
+        ],
+        "createdAt": "2026-10-25T10:38:01.738Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 추억 카드의 공책 줄(memories.css .mem-page), 찾기 막대 '아무 형광색' 견본 빗금 · 잉크 투명 바탕 체크무늬(note.css) — 기능을 보여 주는 무늬"
+      },
+      {
+        "rule": "image-hover-transform",
+        "value": "*",
+        "files": [
+          "app/note.html",
+          "app/print.html"
+        ],
+        "createdAt": "2026-10-25T10:38:01.754Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 묶음 사진에 마우스를 올리면 여러 장임을 펼쳐 보이는 기능(note.css 앨범 부채꼴), hover · reduced-motion 없을 때만"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "app/capture.html"
+        ],
+        "createdAt": "2026-10-25T10:38:01.769Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 화면 잘라 메모 창의 #shot — 찍은 화면을 JS 가 src 로 넣는 자리 (비어 있는 것은 찍기 전뿐)"
+      },
+      {
+        "rule": "clipped-overflow-container",
+        "value": "*",
+        "files": [
+          "app/capture.html"
+        ],
+        "createdAt": "2026-10-25T10:38:01.786Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 화면 잘라 메모는 화면 전체를 덮는 창 — 바깥으로 넘칠 것이 없게 html · body 를 잘라 두는 것이 의도"
+      },
+      {
+        "rule": "nested-cards",
+        "value": "*",
+        "files": [
+          "app/ghost.html"
+        ],
+        "createdAt": "2026-10-25T10:38:01.801Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 끌어 놓을 자리를 보여 주는 작은 메모 창 모형(.ghost 안의 .ghost-body) — 카드 속 카드가 아니라 창의 축소판"
+      },
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "android/web/index.html"
+        ],
+        "createdAt": "2026-10-25T10:38:21.303Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 휴대폰도 실제 녹음 중일 때만 깜빡이는 녹음 점(mobile.css .rec-dot, .add-fab.recording)"
+      },
+      {
+        "rule": "marquee",
+        "value": "*",
+        "files": [
+          "android/web/index.html"
+        ],
+        "createdAt": "2026-10-25T10:38:21.314Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 휴대폰 동기화 진행률을 모를 때의 진행 줄(m-sync-scan) — 흐르는 글이 아니라 작업 상태"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "app/bubble.html",
+          "app/capture.html",
+          "app/finder.html",
+          "app/ghost.html",
+          "app/hud.html",
+          "app/index.html",
+          "app/magic.html",
+          "app/note.html",
+          "app/opms.html",
+          "app/pdf.html",
+          "app/print.html",
+          "app/shortcuts.html"
+        ],
+        "createdAt": "2026-10-25T10:41:12.628Z",
+        "reason": "Agent(사용자 요청: 오탐 없애기): 앱의 #ffaa00 빛은 base.css .mode-switch::before 해 그림 하나뿐(모든 창이 base.css 를 함께 읽어 창마다 잡힘) — 빛나는 해가 주제, 장식 네온 아님"
+      }
+    ]
+  }
+}

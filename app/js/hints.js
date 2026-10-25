@@ -29,10 +29,11 @@ let current = null;
 
 function close() {
   if (!current) return;
-  const { bubble, timer, onDown } = current;
+  const { bubble, timer, onDown, onKey } = current;
   current = null;
   clearTimeout(timer);
   document.removeEventListener('pointerdown', onDown, true);
+  document.removeEventListener('keydown', onKey, true);
   if (reduceMotion()) return bubble.remove();
   bubble.classList.add('leaving');
   setTimeout(() => bubble.remove(), 160);
@@ -87,9 +88,17 @@ export function hintOnce(name, text, { anchor = null, avoid = null } = {}) {
   const onDown = (e) => {
     if (!bubble.contains(e.target)) close();
   };
+  // 단축키(Ctrl · Alt 와 함께)나 Esc 로 다른 창 · 판을 열면 그 위에 남지 않게 닫는다 (글자를 치는 것으로는 닫지 않음)
+  const onKey = (e) => {
+    if (e.key === 'Escape' || e.ctrlKey || e.altKey || e.metaKey) close();
+  };
   // 이 힌트를 띄운 바로 그 누르기로 닫히지 않게 다음 틱부터
-  setTimeout(() => current?.bubble === bubble && document.addEventListener('pointerdown', onDown, true), 0);
-  current = { bubble, onDown, timer: setTimeout(close, SHOW_MS) };
+  setTimeout(() => {
+    if (current?.bubble !== bubble) return;
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey, true);
+  }, 0);
+  current = { bubble, onDown, onKey, timer: setTimeout(close, SHOW_MS) };
   // 읽는 동안에는 사라지지 않게: 올려 두거나(포커스) 하면 멈추고, 떠나면 다시 6초
   const hold = () => current?.bubble === bubble && clearTimeout(current.timer);
   const resume = () => {
