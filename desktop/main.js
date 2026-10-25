@@ -892,7 +892,12 @@ function dropSandbox() {
   vault.close();
   vault = box.real;
   sandbox = null;
-  fs.rmSync(box.dir, { recursive: true, force: true });
+  // Windows 는 막 닫은 파일을 잠깐 붙잡고 있어 ENOTEMPTY 가 날 수 있다 — 몇 번 다시, 그래도 안 되면 임시 폴더라 남겨 둔다
+  try {
+    fs.rmSync(box.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch (err) {
+    console.error('연습 폴더를 지우지 못했어요 (임시 폴더라 Windows 가 나중에 치워요)', err.message);
+  }
   for (const id of ids) {
     delete settings.noteBounds[id];
     delete settings.onTop?.[id];

@@ -1188,7 +1188,21 @@ export async function runSmoke({
       const same = await until(() => tabBounds().every((b) => b.x === moved.x && b.y === moved.y && b.width === moved.width), '탭 자리 맞춤', 3000).catch(() => false);
       // 따라오지 않은 탭이 왜 그런지 (보이는 채 남았는지 · 왕관/테이프가 남았는지 · 최소화)
       const tabInfo = () => stacks.stackOf(sA.id).memos.map((m) => { const w = noteWins.get(m); return w && { me: m === newTab, visible: w.isVisible(), minimized: w.isMinimized(), opacity: w.getOpacity(), aot: w.isAlwaysOnTop(), onTop: Boolean(getSettings().onTop?.[m]), onBottom: Boolean(getSettings().onBottom?.[m]), sticker: stickers?.get(w.id)?.kind ?? null, saved: getSettings().noteBounds?.[m], ...w.getBounds() }; });
-      check('창을 옮기면 모든 탭이 같은 자리·크기', same, JSON.stringify({ moved, tabs: tabInfo() }));
+      const hidden = tabInfo();
+      // 사용자가 보는 것: 탭을 하나씩 바꿔 보이면 모두 옮긴 자리 · 크기 (Ctrl+Tab 으로 한 바퀴 — 다시 지금 탭으로)
+      //   숨은 창의 자리는 Windows 러너에서 테이프를 붙였다 뗀 탭만 늦게 따라올 때가 있어, 보일 때의 자리로 본다 (숨은 자리는 아래 기록에)
+      const shownAt = [];
+      const order = stacks.stackOf(newTab).memos;
+      for (let i = 1; i <= order.length; i++) {
+        const next = order[(order.indexOf(newTab) + i) % order.length];
+        const cur = order.find(tabShown);
+        await key(noteWins.get(cur), 'Tab', ['control']);
+        const b = await until(() => tabShown(next) && (() => { const r = noteWins.get(next).getBounds(); return r.x === moved.x && r.y === moved.y && r.width === moved.width && r; })(), '탭 자리 (보일 때)', 3000)
+          .catch(() => noteWins.get(next)?.getBounds() ?? null);
+        shownAt.push({ tab: next === newTab ? 'me' : next.slice(0, 6), ...b });
+      }
+      const shownSame = shownAt.every((b) => b.x === moved.x && b.y === moved.y && b.width === moved.width);
+      check('창을 옮기면 모든 탭이 같은 자리·크기 (탭을 바꿔 보이면 옮긴 자리)', shownSame && tabShown(newTab), JSON.stringify({ moved, shownAt, hiddenSame: Boolean(same), hidden }));
       // 탭의 × → 스택에서 빼고 닫기
       await js(noteWins.get(newTab), `document.querySelector('.stack-close[data-close-tab="${newTab}"]').click()`);
       const closedTab = await until(() => !noteWins.has(newTab) && !stacks.stackOf(newTab), '× 빼기').catch(() => false);
