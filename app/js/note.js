@@ -1288,12 +1288,30 @@ tableBar?.addEventListener('wheel', (e) => {
   tableBar.scrollLeft += e.deltaY;
 }, { passive: false });
 function showTableBar(table) {
+  if (!table) closeTableMore();
   tableBar.hidden = !table;
   document.body.classList.toggle('in-table', Boolean(table));
   for (const b of document.querySelectorAll('[data-action="table"]')) b.classList.toggle('active', Boolean(table));
   if (table) paintTableBar(tableBar, table); // 버튼 상태는 휴대폰과 같은 코드 (note-shared.js)
 }
-bindTableBar(tableBar, (cmd) => editor.tableCommand(cmd));
+// 좁은 창: 덜 쓰는 표 도구(표 · 바꾸기)는 "⋯" 로 막대 위에 펼친다 (휴대폰 note-view.js 와 같이) — 하나를 고르거나 바깥을 누르면 접힘
+const tableMoreBtn = $('table-more-btn');
+function closeTableMore() {
+  tableBar.classList.remove('more-open');
+  tableMoreBtn.setAttribute('aria-expanded', 'false');
+}
+tableMoreBtn.addEventListener('click', () => {
+  const open = !tableBar.classList.contains('more-open');
+  tableBar.classList.toggle('more-open', open);
+  tableMoreBtn.setAttribute('aria-expanded', String(open));
+});
+document.addEventListener('pointerdown', (e) => {
+  if (tableBar.classList.contains('more-open') && !tableBar.contains(e.target)) closeTableMore();
+}, true);
+bindTableBar(tableBar, (cmd, b) => {
+  editor.tableCommand(cmd);
+  if (b.closest('.tb-more')) closeTableMore();
+});
 
 // 처음 그 상황이 됐을 때 한 번만: 눈에 안 보이는 동작(꾹 눌러 옮기기·테두리 끌기) 알려 주기
 // (그림·파일 옮기기 안내는 block-move.js가 따로)

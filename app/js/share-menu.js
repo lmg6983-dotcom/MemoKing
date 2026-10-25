@@ -133,7 +133,7 @@ function closePop() {
 }
 
 /**
- * 잘 됐다는 알림 — 창 가운데 카드(✓ 제목 · 할 일) + 폭죽. 4.5초 뒤, 누르거나 Esc 면 닫힘
+ * 잘 됐다는 알림 — 창 가운데 카드(✓ 제목 · 할 일) + 처음 한 번은 폭죽. 4.5초 뒤, 누르거나 Esc 면 닫힘
  *   (링크 주소는 보이지 않는다 — 이미 복사돼 있는데 따로 복사해야 하는 것처럼 읽혀서)
  * @param {{ title: string, sub?: string }} o
  */
@@ -156,7 +156,17 @@ export function showSharePop({ title, sub = '' }) {
   };
   window.addEventListener('keydown', onKey, true);
   pop = { el, onKey, timer: setTimeout(closePop, 4500) };
-  const r = el.querySelector('.mk-share-pop-icon').getBoundingClientRect();
-  burstAt(r.left + r.width / 2, r.top + r.height / 2, { big: true });
+  // 폭죽은 처음 공유한 한 번만 — 링크를 복사할 때마다 터지면 흔해진다 (이 기기에 기억)
+  let first = true;
+  try {
+    first = localStorage.getItem('memoking.shareCheered') !== '1';
+    localStorage.setItem('memoking.shareCheered', '1');
+  } catch {
+    // 기억을 못 하면 늘 처음처럼
+  }
+  if (first) {
+    const r = el.querySelector('.mk-share-pop-icon').getBoundingClientRect();
+    burstAt(r.left + r.width / 2, r.top + r.height / 2, { big: true });
+  }
   return el;
 }

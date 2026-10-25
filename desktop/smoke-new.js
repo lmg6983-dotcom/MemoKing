@@ -229,10 +229,11 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
     await typeMagic('1,200 × 3');
     const calcRow = await until(() => js(magic, `(() => { const r = document.querySelector('.magic-row'); return r?.classList.contains('kind-calc') && { t: r.querySelector('.t').textContent, s: r.querySelector('.s').textContent, sel: r.getAttribute('aria-selected') }; })()`), '계산 결과', 8000).catch(() => null);
     await capture(magic, 'smoke-new-magic-calc.png');
+    const calcRows = await js(magic, `document.querySelectorAll('.magic-row.kind-calc').length`);
     await wait(300); // 메모 · 파일 찾기 결과가 다 온 뒤에 (늦게 온 결과가 아래 안내를 다시 그리지 않게)
     key(magic, 'Return');
     const calcFlash = await until(() => js(magic, `document.querySelector('.magic-flash')?.textContent`), '계산 결과 복사').catch(() => '');
-    check('매직키 계산기: 식을 쓰면 맨 위에 결과(골라져 있음) · Enter로 결과 복사', calcRow?.t === '3,600' && calcRow.s === '1,200 × 3' && calcRow.sel === 'true' && /계산 결과를 복사/.test(calcFlash), JSON.stringify({ calcRow, calcFlash }));
+    check('매직키 계산기: 식을 쓰면 맨 위에 결과 한 줄(골라져 있음) · Enter로 결과 복사', calcRow?.t === '3,600' && calcRow.s === '1,200 × 3' && calcRow.sel === 'true' && calcRows === 1 && /계산 결과를 복사/.test(calcFlash), JSON.stringify({ calcRow, calcRows, calcFlash }));
     showMagic();
     await wait(300);
     await typeMagic('서울 날씨');
@@ -857,7 +858,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await capture(nw, 'smoke-new-share-pop.png');
       await js(nw, `document.querySelector('.mk-share-pop')?.click()`);
       await wait(300); // 사라지는 0.2초 (그 사이에는 아래 내용을 가린다)
-      check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V로 붙여 넣으세요" + 폭죽 (주소는 보이지 않음)', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && !/https?:/.test(popped.text) && popped.confetti, JSON.stringify(popped));
+      check('Drive 링크 복사 알림: "링크를 복사했어요 · Ctrl+V로 붙여 넣으세요" + 처음엔 폭죽 (주소는 보이지 않음)', /링크를 복사했어요/.test(popped.text) && /붙여 넣으세요/.test(popped.text) && !/https?:/.test(popped.text) && popped.confetti, JSON.stringify(popped));
       // 상태 줄이 잘리면 메모 창 바깥에 말풍선으로 전문 (내용을 가리지 않게) — 좁은 창
       const wide = nw.getBounds();
       const bubbleWin = () => windowManager.statusBubbles.byOwner.get(nw.id)?.win;

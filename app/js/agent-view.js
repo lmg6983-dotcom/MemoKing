@@ -115,7 +115,7 @@ export function createAgentView({ box, api, onChange = () => {}, onDone = () => 
       text.rows = Math.min(10, Math.max(3, a.body.split('\n').length));
       text.value = a.body.trimEnd();
       body.push(text);
-      if (r.drafted) body.push(h('p', 'agent-note', 'AI가 지은 초안이에요. 고친 뒤 만들어 주세요'));
+      if (r.drafted) body.push(h('p', 'agent-note', 'AI가 지은 초안이에요'));
       read = () => ({ ...a, body: `${text.value.trimEnd()}\n` });
     } else if (a.type === 'append') {
       const pick = h('select', 'agent-input');
@@ -144,7 +144,8 @@ export function createAgentView({ box, api, onChange = () => {}, onDone = () => 
     confirm = go;
     // 카드마다 새 칸에 — 같은 칸에 키 처리를 붙이면 쌓여서, 지난 카드의 일까지 다시 실행됐다
     const form = h('div', 'agent-form');
-    form.append(head, ...body);
+    // 제목(할 일)이 맨 위, 안내는 고칠 칸 아래에 작게
+    form.append(head, ...body, h('p', 'agent-note', '고칠 곳이 있으면 고친 뒤 눌러 주세요'));
     card.append(form);
     foot.append(runBtn, btn('취소', 'link-btn', () => {
       clear();
@@ -158,7 +159,7 @@ export function createAgentView({ box, api, onChange = () => {}, onDone = () => 
         go();
       }
     });
-    state.textContent = '이렇게 할까요? 고칠 곳이 있으면 고친 뒤 눌러 주세요';
+    state.textContent = '';
     requestAnimationFrame(() => runBtn.focus({ preventScroll: true }));
   }
 

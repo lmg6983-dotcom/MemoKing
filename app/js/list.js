@@ -998,7 +998,6 @@ function showShortcuts(sc) {
     $(`sc-${name}-reset`).hidden = st.isDefault;
     $(`sc-${name}-note`).textContent = st.enabled && !st.registered ? SC_TAKEN : '';
     $(`sc-${name}-note`).classList.toggle('warn', st.enabled && !st.registered);
-    $(name === 'quickMemo' ? 'quick-memo-kbd' : 'magic-kbd').textContent = st.label;
   }
 }
 function setScNote(name, text, warn = false) {

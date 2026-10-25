@@ -1875,11 +1875,24 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 /* 지우기 단추는 늘 살짝 붉게 (마우스를 올리기 전에도 "추가" 와 구별) */
 .table-bar.grouped button.danger:not(:disabled) { color: color-mix(in srgb, var(--danger) 72%, var(--note-text)); }
 .table-bar.grouped button:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 1px; }
-/* 좁은 메모 창 (기본 340px): 휴대폰처럼 아이콘만 한 줄 — 세 줄로 쌓여 본문이 1/3 만 남던 것을 한 줄로 (이름은 풍선 · 화면 읽기에 그대로, 넘치면 옆으로 밀어 보기) */
-@media (max-width: 420px) { /* body > : PC 메모 창만 (휴대폰은 mobile.css 가 아이콘 + 더보기로) */
-  body > .table-bar.grouped { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+/* 덜 쓰는 표 도구(표 · 바꾸기): 넓은 창에선 막대에 그대로, ⋯ 단추는 좁은 창에서만 */
+body > .table-bar .tb-more { display: contents; }
+body > .table-bar .tb-more-btn { display: none; }
+/* 좁은 메모 창 (기본 340px): 휴대폰처럼 아이콘만 한 줄 + ⋯ (넘쳐서 잘리던 오른쪽 묶음은 막대 위에 펼침) — body > : PC 메모 창만 */
+@media (max-width: 420px) {
+  body > .table-bar.grouped { position: relative; flex-wrap: nowrap; align-items: center; overflow: visible; -webkit-mask-image: none; mask-image: none; } /* 낮은 창의 옆으로 밀기 · 끝 흐림은 접은 뒤 필요 없고, 펼친 판이 잘리지 않게 */
   body > .table-bar.grouped :is(.tb-name, .lbl) { display: none; }
   body > .table-bar.grouped button { padding: 0 6px; }
+  body > .table-bar .tb-more { display: none; }
+  body > .table-bar .tb-more-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 30px; height: 28px; margin-left: auto; padding: 0; }
+  body > .table-bar .tb-more-btn svg { width: 16px; height: 16px; fill: currentColor; stroke: none; }
+  body > .table-bar .tb-more-btn[aria-expanded="true"] { background: var(--note-hover); }
+  body > .table-bar.more-open .tb-more {
+    display: flex; flex-direction: column; gap: 4px; position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 50;
+    padding: 6px; border-radius: 12px; background: var(--note-bg); box-shadow: var(--shadow-pop), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
+  }
+  body > .table-bar.more-open .tb-more :is(.tb-name, .lbl) { display: inline; }
+  body > .table-bar.more-open .tb-more button { flex: 1 1 auto; justify-content: center; padding: 0 8px; }
 }
 /* 표를 고치는 동안 추천 태그 줄은 접는다 (휴대폰과 같이 — 세로 자리를 표에) */
 body.in-table .tag-suggest-bar { display: none; }

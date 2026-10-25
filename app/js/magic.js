@@ -583,7 +583,7 @@ function render() {
   const nodes = [pill];
   let first = true;
   // 묻는 글이면 AI 에게 묻기를 새 메모 바로 아래로 (맨 아래 화면 밖에 묻히지 않게)
-  const order = ['calc', 'site', ...modules.map((m) => m.id)];
+  const order = [...new Set(['calc', 'site', ...modules.map((m) => m.id)])]; // 계산 · 사이트를 맨 앞으로 (기능 목록에도 calc 가 있어 두 번 그리던 것)
   if (groups.has('ai') && (looksLikeQuestion(query) || (prefs.agent && /(?:해\s*줘|해\s*주세요|줘|주세요|부탁해)\s*[.!?~]*$/.test(query)))) {
     order.splice(order.indexOf('ai'), 1);
     order.splice(order.indexOf('memo') + 1 || 2, 0, 'ai');
