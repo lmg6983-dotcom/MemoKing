@@ -932,7 +932,18 @@ export class WindowManager {
       if (!missing) return;
       const at = shown?.getNormalBounds() ?? (onScreen(settings.noteBounds[missing]) ? settings.noteBounds[missing] : null);
       // 예비 창은 쓰지 않는다 (지금 열려는 다른 메모가 가져가게 남겨 둠) — 다 그린 뒤 다음 탭
-      this.createNoteWindow(missing, { show: false, bounds: at, useSpare: false, onReady: () => this.prewarmStack(now) });
+      // 다 그린 뒤 스택의 지금 자리로 한 번 더 — 만드는 사이 스택 창을 옮기면 Windows 는 그리기 전에 옮긴 자리를 잃는다
+      //   (점검: 4개 탭 중 미리 만든 탭만 옮기기 전 자리에 남음)
+      this.createNoteWindow(missing, {
+        show: false, bounds: at, useSpare: false,
+        onReady: () => {
+          const w = this.noteWins.get(missing);
+          const st = this.stacks?.stackOf(missing);
+          const cur = st && this.visibleStackWin(st)?.getNormalBounds();
+          if (w && !w.isDestroyed() && !w.isVisible() && cur) w.setBounds(cur);
+          this.prewarmStack(now);
+        },
+      });
     }, 700);
   }
 
