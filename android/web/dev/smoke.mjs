@@ -682,6 +682,33 @@ try {
     check('알림: 조금 밀면 제자리, 옆으로 밀면 바로 닫힘', tb && stayed && gone, JSON.stringify({ stayed, gone }));
   }
 
+  // 동영상만 있는 메모: 목록 카드에 첫 장면 그림 + ▶ (PC 와 같은 video-poster.js) — 짧은 영상을 이 화면에서 녹화해 넣는다
+  {
+    const b64 = await page.evaluate(async () => {
+      const c = document.createElement('canvas'); c.width = 160; c.height = 90; const g = c.getContext('2d');
+      const rec = new MediaRecorder(c.captureStream(20), { mimeType: 'video/webm' }); const parts = [];
+      rec.ondataavailable = (e) => parts.push(e.data); rec.start();
+      for (let i = 0; i < 30; i++) { g.fillStyle = 'rgb(220, 40, 40)'; g.fillRect(0, 0, 160, 90); g.fillStyle = '#fff'; g.fillRect(i * 4, 30, 20, 20); await new Promise((r) => setTimeout(r, 50)); }
+      rec.stop(); await new Promise((r) => (rec.onstop = r));
+      const bytes = new Uint8Array(await new Blob(parts, { type: 'video/webm' }).arrayBuffer()); let s = ''; for (const x of bytes) s += String.fromCharCode(x); return btoa(s);
+    });
+    fs.writeFileSync(path.join(vault, 'attachments/smoke-clip.webm'), Buffer.from(b64, 'base64'));
+    write('동영상 메모.md', `---\nid: 00000000-0000-4000-8000-0000000000v1\ncreated: ${pastIso}\nupdated: ${new Date().toISOString().replace(/\.\d+Z$/, '+00:00')}\n---\n# 동영상 메모\n\n![동영상](attachments/smoke-clip.webm)\n`);
+    await page.evaluate(() => window.__mk.emit('app', 'resume'));
+    await page.locator('.card[data-id="00000000-0000-4000-8000-0000000000v1"]').scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+    const poster = await page.waitForFunction(() => {
+      const img = document.querySelector('.card[data-id="00000000-0000-4000-8000-0000000000v1"] .card-video img');
+      if (!img?.getAttribute('src') || !img.complete || !img.naturalWidth) return null;
+      const c = document.createElement('canvas'); c.width = 8; c.height = 8; const g = c.getContext('2d'); g.drawImage(img, 0, 0, 8, 8);
+      const [r, gr, b] = g.getImageData(0, 0, 1, 1).data;
+      return { r, g: gr, b, blob: img.src.startsWith('blob:'), play: getComputedStyle(img.parentElement, '::after').backgroundImage.includes('svg') };
+    }, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null);
+    await shot('02e-video-thumb');
+    check('동영상만 있는 메모: 목록 카드에 영상의 첫 장면 그림(빨간 화면) + ▶',
+      Boolean(poster) && poster.blob && poster.play && poster.r > 150 && poster.g < 120 && poster.b < 120, JSON.stringify(poster));
+    if (await page.isVisible('#toast')) await page.waitForSelector('#toast', { state: 'hidden', timeout: 7000 }).catch(() => {});
+  }
+
   // 다른 앱에서 공유하기
   const png = fs.readFileSync(path.join(repo, 'assets/icons/icon-256.png')).toString('base64');
   await post('/dev/intent', { type: 'share', text: '좋은 문장\n둘째 줄', app: 'Chrome', files: [{ name: 'photo.png', mime: 'image/png', base64: png }] });

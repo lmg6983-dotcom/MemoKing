@@ -573,6 +573,29 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const vault = getVault();
       fs.mkdirSync(path.join(vault.root, 'attachments'), { recursive: true });
       fs.writeFileSync(path.join(vault.root, 'attachments', 'smoke-copy.png'), iconPng);
+      // 동영상만 있는 메모: 목록 카드에 첫 장면 그림 + ▶ (video-poster.js) — 짧은 영상을 이 창에서 녹화해 넣는다 (CI 에 ffmpeg 없이)
+      {
+        const b64 = await js(list, `(async () => {
+          const c = document.createElement('canvas'); c.width = 160; c.height = 90; const g = c.getContext('2d');
+          const rec = new MediaRecorder(c.captureStream(20), { mimeType: 'video/webm' }); const parts = [];
+          rec.ondataavailable = (e) => parts.push(e.data); rec.start();
+          for (let i = 0; i < 30; i++) { g.fillStyle = 'rgb(220, 40, 40)'; g.fillRect(0, 0, 160, 90); g.fillStyle = '#fff'; g.fillRect(i * 4, 30, 20, 20); await new Promise((r) => setTimeout(r, 50)); }
+          rec.stop(); await new Promise((r) => (rec.onstop = r));
+          const bytes = new Uint8Array(await new Blob(parts, { type: 'video/webm' }).arrayBuffer()); let s = ''; for (const x of bytes) s += String.fromCharCode(x); return btoa(s);
+        })()`);
+        fs.writeFileSync(path.join(vault.root, 'attachments', 'smoke-clip.webm'), Buffer.from(b64, 'base64'));
+        const vid = vault.import({ body: '# 동영상 메모\n\n![동영상](attachments/smoke-clip.webm)\n' });
+        const poster = await until(() => js(list, `(() => {
+          const img = document.querySelector('[data-id="${vid}"] .card-video img');
+          if (!img?.getAttribute('src') || !img.complete || !img.naturalWidth) return null;
+          const c = document.createElement('canvas'); c.width = 8; c.height = 8; const g = c.getContext('2d'); g.drawImage(img, 0, 0, 8, 8);
+          const [r, gr, b] = g.getImageData(0, 0, 1, 1).data;
+          return { r, g: gr, b, w: img.naturalWidth, blob: img.src.startsWith('blob:'), play: getComputedStyle(img.parentElement, '::after').backgroundImage.includes('svg') };
+        })()`), '동영상 첫 장면', 20000).catch(() => null);
+        await capture(list, 'smoke-new-video-thumb.png');
+        check('동영상만 있는 메모: 목록 카드에 영상의 첫 장면 그림(빨간 화면) + ▶ — 이 PC 에 기억한 그림',
+          Boolean(poster) && poster.blob && poster.play && poster.w > 0 && poster.r > 150 && poster.g < 120 && poster.b < 120, JSON.stringify(poster));
+      }
       const picId = vault.import({ body: '# 그림 복사\n\n![그림](attachments/smoke-copy.png)\n' });
       const beforePic = new Set(noteWins.keys());
       await until(() => js(list, `!!document.querySelector('.card[data-id="${picId}"], [data-id="${picId}"]')`), '그림 메모 카드');

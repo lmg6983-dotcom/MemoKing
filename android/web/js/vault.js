@@ -191,6 +191,7 @@ export class Vault extends EventTarget {
       title: extractTitle(body),
       preview: extractPreview(body),
       thumb: media.find((m) => m.kind === 'image')?.src ?? null,
+      video: media.find((m) => m.kind === 'video')?.src ?? null, // 사진이 없으면 목록 카드에 이 영상의 첫 장면 (video-poster.js)
       images: media.filter((m) => m.kind === 'image' && !isAlbumPageTitle(m.title)).slice(0, 24).map((m) => m.src), // 회상 달력 (그날의 사진 — 문서를 넣은 장은 빼고)
       tags: extractTags(body),
       hasImage: has('image'),
