@@ -70,8 +70,8 @@ const mentions = (word, stems, lower) => {
   for (const t of stems) if (t.startsWith(w) && t.length - w.length <= 2) return true;
   return w.length >= 3 && lower.includes(w);
 };
-// 웹 주소는 태그 거리에서 뺀다 (example.com → "#com" 처럼 엉뚱한 추천이 나왔다)
-const noUrls = (text) => text.replace(/\b(?:https?:\/\/|www\.)\S+/gi, ' ');
+// 웹 주소 · 파일 이름의 확장자는 태그 거리에서 뺀다 (example.com → "#com", 회의자료.txt → "#txt" 처럼 엉뚱한 추천이 나왔다)
+const noUrls = (text) => text.replace(/\b(?:https?:\/\/|www\.)\S+/gi, ' ').replace(/(?<=[^\s.])\.[A-Za-z][A-Za-z0-9]{0,4}\b/g, ' ');
 const textOf = (body) => {
   const title = extractTitle(body);
   return noUrls(`${title} ${title} ${plainLines(body).join(' ')}`);

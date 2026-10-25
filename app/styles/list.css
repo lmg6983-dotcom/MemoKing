@@ -280,17 +280,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 }
 .tabs button svg { width: 15px; height: 15px; }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
-.tab-count:not(:empty) {
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--border);
-  color: var(--text-strong);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 17px;
-}
-.tabs button[aria-selected="true"] .tab-count:not(:empty) { background: var(--accent); color: var(--accent-text); }
+/* 탭 숫자: 휴대폰처럼 바탕 없이 흐린 숫자만 (고른 탭은 글자색으로) */
+.tab-count { font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tabs button[aria-selected="true"] .tab-count { color: var(--text); }
 
 .view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 /* 메모 탭은 숨기지 않고(배치 그대로) 일정 · 보관함이 그 위를 덮는다 — 돌아올 때 카드 수백 개를 다시 배치하느라 멈칫하지 않게.

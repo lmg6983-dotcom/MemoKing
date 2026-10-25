@@ -684,7 +684,7 @@ api.on('memo:meta', applyMeta);
 function toggleMenu(e) {
   el.menu.hidden = !el.menu.hidden;
   el.menuBtn.setAttribute('aria-expanded', String(!el.menu.hidden));
-  if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item');
+  if (!el.menu.hidden) focusFirstIfKeyboard(e, el.menu, '.menu-item:not(.menu-ic)'); // 키보드로 열면 글 메뉴 첫 항목에 (위 아이콘 줄은 ↑ · Home 으로)
 }
 function closeMenu() {
   if (el.menu.hidden) return;
@@ -1349,6 +1349,12 @@ function useKeymap(overrides) {
     const btnId = a.run[0] === 'menu' ? a.run[1] : a.id === 'shortcuts' ? 'shortcuts-btn' : a.id === 'find' ? 'find-btn' : null;
     const btn = btnId && document.getElementById(btnId);
     if (!btn) continue;
+    // 맨 위 아이콘 줄(PDF · 그림 · 삭제)은 글자 자리가 없어 풍선말에 키를 함께
+    if (btn.classList.contains('menu-ic')) {
+      const k = keys[a.id].map(comboLabel).join(', ');
+      btn.title = k ? `${btn.getAttribute('aria-label')} (${k})` : btn.getAttribute('aria-label');
+      continue;
+    }
     // 키 글자는 메뉴 글(잠그기 ↔ 잠금 풀기처럼 바뀜)과 따로, 단추 오른쪽 끝에
     btn.querySelector(':scope > span > small:not([id])')?.remove(); // 예전에 글 안에 적어 둔 키 글자
     let hint = btn.querySelector(':scope > .key-hint');

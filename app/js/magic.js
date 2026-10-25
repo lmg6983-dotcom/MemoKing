@@ -214,8 +214,10 @@ function svgIcon(name) {
 
 // ---------- 아래 캡슐: 기능 켜고 끄기 ----------
 function renderModules() {
-  modulesEl.hidden = modules.length === 0; // 설정에서 모두 꺼 두면 캡슐 줄도 없음
-  modulesEl.replaceChildren(...modules.map((m) => {
+  // OPMS 는 회사 서버 주소를 넣었을 때만 (넣기 전에는 켜도 찾을 곳이 없다 — 설정 › 매직키에서 주소)
+  const shown = modules.filter((m) => m.id !== 'opms' || prefs.opms);
+  modulesEl.hidden = shown.length === 0; // 설정에서 모두 꺼 두면 캡슐 줄도 없음
+  modulesEl.replaceChildren(...shown.map((m) => {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = `magic-chip${m.on ? ' on' : ''}`;

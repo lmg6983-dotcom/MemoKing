@@ -169,7 +169,7 @@
       </div>
       <label class="setting-row">
         <input type="checkbox" id="history-enabled" class="switch" role="switch">
-        <span>Windows 알림 모아두기 <small>카카오톡 알림도 함께 모아 알림 보관함 탭에서 봐요. 모을 앱은 알림 보관함 위 “모을 앱” 버튼에서</small></span>
+        <span>Windows 알림 모아두기 <small title="모을 앱은 알림 보관함 위 “모을 앱” 버튼에서 골라요">카카오톡 등 다른 앱 알림을 알림 보관함에 모아요</small></span>
       </label>
       <label class="setting-row">
         <input type="checkbox" id="auto-start" class="switch" role="switch">
@@ -180,7 +180,7 @@
       <h3 class="set-title" id="set-magic">매직키</h3>
       <label class="setting-row">
         <input type="checkbox" id="magic-enabled" class="switch" role="switch">
-        <span>매직키 <small>어디서든 입력창을 띄워 바로 메모하고 찾아요</small></span>
+        <span>매직키 쓰기 <small>어디서든 입력창을 띄워 바로 메모하고 찾아요</small></span>
       </label>
       <div class="shortcut-row" data-shortcut="magic">
         <span class="shortcut-label">단축키</span>
@@ -264,7 +264,7 @@
         </label>
         <label class="setting-row">
           <input type="checkbox" id="ai-phone" class="switch" role="switch">
-          <span>휴대폰 메모도 이 PC에서 <small>휴대폰에서 쓴 메모가 들어오면 1분 뒤 태그 · 일정을 달아요. PC가 여러 대면 한 대에서만 켜 주세요</small></span>
+          <span>휴대폰 메모도 이 PC에서 <small title="휴대폰에서 쓴 메모가 들어오면 1분 뒤 달아요. PC가 여러 대면 한 대에서만 켜 주세요">휴대폰 메모에도 태그 · 일정을 달아요 (PC 한 대에서만)</small></span>
         </label>
         <p class="set-note">메모를 닫을 때 · 매직키로 저장할 때 뒤에서 해요. 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
       </div>
@@ -297,15 +297,15 @@
       </label>
       <label class="setting-row">
         <input type="checkbox" id="link-previews" class="switch" role="switch" checked>
-        <span>링크 미리보기 <small>주소를 붙이면 제목, 사진이 든 카드로 보여요. 끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요</small></span>
+        <span>링크 미리보기 <small title="끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요">링크를 제목 · 사진 카드로 보여요</small></span>
       </label>
       <label class="setting-row">
         <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
-        <span>태그 자동 추가 <small>메모를 닫을 때 내용에 맞는 태그를 달아요 (합쳐 3개까지). 인사 · 짧은 대답처럼 주제가 없는 메모에는 달지 않아요</small></span>
+        <span>태그 자동 추가 <small title="합쳐 3개까지. 인사 · 짧은 대답처럼 주제가 없는 메모에는 달지 않아요">메모를 닫을 때 내용에 맞는 태그를 달아요</small></span>
       </label>
       <label class="setting-row">
         <input type="checkbox" id="hold-tune" class="switch" role="switch" checked>
-        <span>내 손에 맞추기 <small>메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려 손에 맞춰요. 이 PC에만 저장해요 <button type="button" class="link-btn inline-link" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button></small></span>
+        <span>내 손에 맞추기 <small title="메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려요. 이 PC에만 저장해요">꾹 눌러 줄 옮기기를 손에 맞춰요 <button type="button" class="link-btn inline-link" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button></small></span>
       </label>
       <div class="setting-row">
         <span>넣을 때 묻기 <small id="choices-note"></small></span>
@@ -366,7 +366,7 @@
       <p class="label">휴대폰 앱 (안드로이드)</p>
       <div class="drive-box phone-box">
         <div class="phone-qr" id="phone-qr" role="img" aria-label="안드로이드 설치 파일 주소 QR 코드"></div>
-        <div class="drive-box-text"><b>휴대폰 카메라로 찍어 받기</b><small>QR 코드를 찍으면 설치 파일(MemoKing-android.apk)을 바로 받아요. 새 버전은 휴대폰 앱이 알아서 알려 줘요.</small></div>
+        <div class="drive-box-text"><b>휴대폰 카메라로 찍어 받기</b><small title="설치 파일(MemoKing-android.apk). 새 버전은 휴대폰 앱이 알아서 알려 줘요">QR을 찍으면 휴대폰 설치 파일을 바로 받아요</small></div>
       </div>
       <div class="dialog-actions left">
         <button id="phone-copy" class="btn">휴대폰 설치 링크 복사</button>
