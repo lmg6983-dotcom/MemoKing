@@ -952,7 +952,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
    Life 는 낮: 하늘 바탕 · 왼쪽 끝에 해 · 오른쪽 빈 자리에 구름 / Work 는 밤: 남색 하늘 · 오른쪽 끝에 달 · 왼쪽 빈 자리에 별.
    바꾸면 해가 통통 굴러가며 달로 이지러지고(안쪽 그림자), 구름은 흘러가고 별이 하나씩 돋는다 */
 .mode-switch {
-  --ms-pad: 2px; --ms-h: 26px; --orb: calc(var(--ms-h) - 6px);
+  --ms-pad: 2px; --ms-h: 22px; --orb: calc(var(--ms-h) - 6px);
   --ms-swing: cubic-bezier(0.5, -0.32, 0.3, 1.36); /* 살짝 뒤로 물러섰다 넘어가 통 하고 멈춤 */
   position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; flex: none; padding: var(--ms-pad); border-radius: 999px; overflow: hidden; isolation: isolate;
   background: linear-gradient(180deg, #a9dcff 0%, #e2f4ff 100%); box-shadow: inset 0 1px 2px rgba(20, 60, 110, 0.18);
@@ -1003,12 +1003,12 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 @keyframes ms-night { 0% { transform: none; } 35% { transform: scale(1.18, 0.86); } 70% { transform: scale(0.94, 1.06) rotate(-12deg); } 100% { transform: none; } }
 @keyframes ms-day { 0% { transform: none; } 35% { transform: scale(1.18, 0.86); } 70% { transform: scale(0.94, 1.06) rotate(12deg); } 100% { transform: none; } }
 .mode-switch button {
-  position: relative; z-index: 3; min-width: 46px; height: calc(var(--ms-h) - 2 * var(--ms-pad)); padding: 0 8px; border: 0; border-radius: 999px; background: none;
-  color: rgba(20, 45, 80, 0.5); font: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
+  position: relative; z-index: 3; min-width: 40px; height: calc(var(--ms-h) - 2 * var(--ms-pad)); padding: 0 7px; border: 0; border-radius: 999px; background: none;
+  color: rgba(20, 45, 80, 0.5); font: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
   transition: color 0.3s var(--ease-out);
 }
-.mode-switch button[data-mode="life"] { padding-left: calc(var(--orb) + 7px); } /* 해 자리 */
-.mode-switch button[data-mode="work"] { padding-right: calc(var(--orb) + 7px); } /* 달 자리 */
+.mode-switch button[data-mode="life"] { padding-left: calc(var(--orb) + 6px); } /* 해 자리 */
+.mode-switch button[data-mode="work"] { padding-right: calc(var(--orb) + 6px); } /* 달 자리 */
 .mode-switch button[aria-checked="true"] { color: #10294d; }
 .mode-switch[data-on="work"] button { color: rgba(255, 255, 255, 0.5); }
 .mode-switch[data-on="work"] button[aria-checked="true"] { color: #fff; }
