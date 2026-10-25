@@ -1157,15 +1157,23 @@ export async function runSmoke({
         await stickerOf(newTab)?.webContents.executeJavaScript(`window.memoking.sticker.peel()`).catch(() => {});
         await until(() => !noteWins.get(newTab).isAlwaysOnTop(), '늘 위 끄기').catch(() => {});
         // 테이프(바탕화면에 붙이기)도 스택의 탭 모두에 — 탭을 바꾸면 같은 테이프가 새 탭으로 옮겨 간다
-        await until(() => !stickerOf(newTab), '왕관 떼어짐').catch(() => {});
+        // 왕관이 탭 모두에서 떨어진 뒤에 테이프를 붙인다 (Windows 러너에서 덜 떨어진 채 누르면 테이프가 안 붙을 때가 있었다)
+        const memosOf = () => stacks.stackOf(newTab)?.memos ?? [];
+        await until(() => !stickerOf(newTab) && memosOf().every((m) => !getSettings().onTop?.[m] && !noteWins.get(m)?.isAlwaysOnTop()), '왕관 떼어짐').catch(() => {});
+        const tapeState = () => ({
+          memos: memosOf().map((m) => ({ shown: tabShown(m), onTop: Boolean(getSettings().onTop?.[m]), onBottom: Boolean(getSettings().onBottom?.[m]), aot: noteWins.get(m)?.isAlwaysOnTop(), sticker: stickers.get(noteWins.get(m)?.id)?.kind ?? null })),
+          stickerVisible: Boolean(stickerOf(newTab)?.isVisible()),
+        });
+        const beforeTape = tapeState();
         await js(noteWins.get(newTab), `document.getElementById('tape-btn').click()`);
-        const tapedAll = await until(() => stickerOf(newTab)?.isVisible() && stacks.stackOf(newTab).memos.every((m) => getSettings().onBottom?.[m] === true), '스택 테이프').catch(() => false);
+        const tapedAll = await until(() => stickerOf(newTab)?.isVisible() && memosOf().every((m) => getSettings().onBottom?.[m] === true), '스택 테이프').catch(() => false);
+        const afterTape = tapeState();
         const tape1 = stickerOf(newTab);
         await key(noteWins.get(newTab), 'Tab', ['control']);
         await until(() => tabShown(sC.id) && !tabShown(newTab), 'Ctrl+Tab (테이프)').catch(() => {});
         await wait(400);
         const moved = stickerOf(sC.id) === tape1 && stickers.get(noteWins.get(sC.id).id)?.kind === 'tape' && !noteWins.get(sC.id).isAlwaysOnTop();
-        check('테이프 붙인 스택: 탭 모두 바탕화면에, 탭을 바꿔도 같은 테이프가 옮겨 감', tapedAll && moved, JSON.stringify({ tapedAll: Boolean(tapedAll), moved }));
+        check('테이프 붙인 스택: 탭 모두 바탕화면에, 탭을 바꿔도 같은 테이프가 옮겨 감', tapedAll && moved, JSON.stringify({ tapedAll: Boolean(tapedAll), moved, beforeTape, afterTape, end: tapeState() }));
         await stickerOf(sC.id)?.webContents.executeJavaScript(`window.memoking.sticker.peel()`).catch(() => {});
         await until(() => stacks.stackOf(sC.id).memos.every((m) => !getSettings().onBottom?.[m]), '테이프 떼기').catch(() => {});
         await key(noteWins.get(sC.id), 'Tab', ['control', 'shift']);
