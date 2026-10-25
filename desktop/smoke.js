@@ -1186,7 +1186,9 @@ export async function runSmoke({
       // 숨은 탭은 메인이 따라 옮긴다 — Windows 러너는 100ms 안에 끝나지 않을 때가 있어 맞을 때까지 기다린다
       const tabBounds = () => stacks.stackOf(sA.id).memos.map((m) => noteWins.get(m)?.getBounds()).filter(Boolean);
       const same = await until(() => tabBounds().every((b) => b.x === moved.x && b.y === moved.y && b.width === moved.width), '탭 자리 맞춤', 3000).catch(() => false);
-      check('창을 옮기면 모든 탭이 같은 자리·크기', same, JSON.stringify({ moved, tabs: tabBounds() }));
+      // 따라오지 않은 탭이 왜 그런지 (보이는 채 남았는지 · 왕관/테이프가 남았는지 · 최소화)
+      const tabInfo = () => stacks.stackOf(sA.id).memos.map((m) => { const w = noteWins.get(m); return w && { me: m === newTab, visible: w.isVisible(), minimized: w.isMinimized(), opacity: w.getOpacity(), aot: w.isAlwaysOnTop(), onTop: Boolean(getSettings().onTop?.[m]), onBottom: Boolean(getSettings().onBottom?.[m]), sticker: stickers?.get(w.id)?.kind ?? null, saved: getSettings().noteBounds?.[m], ...w.getBounds() }; });
+      check('창을 옮기면 모든 탭이 같은 자리·크기', same, JSON.stringify({ moved, tabs: tabInfo() }));
       // 탭의 × → 스택에서 빼고 닫기
       await js(noteWins.get(newTab), `document.querySelector('.stack-close[data-close-tab="${newTab}"]').click()`);
       const closedTab = await until(() => !noteWins.has(newTab) && !stacks.stackOf(newTab), '× 빼기').catch(() => false);
