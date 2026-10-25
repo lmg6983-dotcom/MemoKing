@@ -569,7 +569,7 @@ function render() {
   if (query && results.more > 0) put(groups.has('files') || !groups.has('notes') ? 'files' : 'notes', { row: { kind: 'more', count: results.more } });
   const searched = isOn('notes') || isOn('files');
   if (query && searched && !calc && !url && !notes.length && !folders.length && !files.length && !opms.cases.length && !opms.loading) {
-    put(isOn('notes') ? 'notes' : 'files', { node: note(`'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`) }); // Enter 가 하는 일은 아래 키 안내가 고른 줄에 맞춰 말한다 (여기서 "Enter로 저장" 이라 하면 AI 줄을 골랐을 때 어긋났다)
+    put('none', { node: note(`'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`) }); // Enter 가 하는 일은 아래 키 안내가 고른 줄에 맞춰 말한다 (여기서 "Enter로 저장" 이라 하면 AI 줄을 골랐을 때 어긋났다)
   }
   if (query && isOn('files') && results.index && !results.index.count) {
     put('files', { node: note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : UI.noFileIndex) });
@@ -585,10 +585,10 @@ function render() {
   const nodes = [pill];
   let first = true;
   // 묻는 글이면 AI 에게 묻기를 새 메모 바로 아래로 (맨 아래 화면 밖에 묻히지 않게)
-  const order = [...new Set(['calc', 'site', ...modules.map((m) => m.id)])]; // 계산 · 사이트를 맨 앞으로 (기능 목록에도 calc 가 있어 두 번 그리던 것)
+  const order = [...new Set(['none', 'calc', 'site', ...modules.map((m) => m.id)])]; // none: "맞는 메모나 파일이 없어요" 는 맨 위에 // 계산 · 사이트를 맨 앞으로 (기능 목록에도 calc 가 있어 두 번 그리던 것)
   if (groups.has('ai') && (looksLikeQuestion(query) || (prefs.agent && /(?:해\s*줘|해\s*주세요|줘|주세요|부탁해)\s*[.!?~]*$/.test(query)))) {
     order.splice(order.indexOf('ai'), 1);
-    order.splice(order.indexOf('memo') + 1 || 2, 0, 'ai');
+    order.splice(order.indexOf('memo') + 1 || 3, 0, 'ai'); // 새 메모가 꺼져 있으면 결과 없음 · 계산 · 사이트 다음
   }
   // 머리말은 여러 줄 묶음(메모 · 폴더 · 파일 · OPMS)에만 — 한 줄 묶음은 아이콘 칸의 기능 색으로 구분
   for (const mod of order) {

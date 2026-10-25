@@ -1317,7 +1317,14 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await until(() => pw.isVisible() && js(pw, 'document.documentElement.dataset.ready === "true"'), 'PDF 점검 메모', 8000);
       await js(pw, `document.getElementById('menu-btn').click()`);
       await capture(pw, 'note-menu.png');
-      await js(pw, `document.getElementById('menu-btn').click()`);
+      // ⋯ 메뉴: 목록 카드 메뉴와 같은 아이콘 순서(글 복사 · 공유 · PDF · 휴지통) · 기본 창(380px)에 스크롤 없이 · 목록 · 단축키도 마우스로
+      const menuShape = await js(pw, `(() => { const m = document.getElementById('menu'); return { icons: [...m.querySelectorAll('.menu-icons button')].map((b) => b.id), fits: m.scrollHeight <= m.clientHeight + 1, size: [m.scrollHeight, m.clientHeight, innerHeight], foot: [...m.querySelectorAll('.menu-foot button')].filter((b) => !b.hidden && b.getClientRects().length).map((b) => b.id) }; })()`);
+      clipboard.writeText('');
+      await js(pw, `document.getElementById('copy-text-btn').click()`);
+      const textCopied = await until(() => clipboard.readText(), '글 복사').catch(() => '');
+      check('메모 창 ⋯ 메뉴: 카드 메뉴와 같은 아이콘 순서 · 기본 창에 스크롤 없이 · 아래 줄에 그림 · 목록 · 단축키 · 글 복사가 그 메모 글',
+        menuShape.icons.join() === 'copy-text-btn,share-btn,pdf-btn,delete-btn' && menuShape.fits && menuShape.foot.join() === 'image-copy-btn,image-save-btn,show-list,shortcuts-btn' && /여러 쪽이 되도록/.test(textCopied),
+        JSON.stringify({ menuShape, textCopied: textCopied.slice(0, 40) }));
       // 메모 창에서 Ctrl+Shift+P → PDF 창
       pw.focus();
       key(pw, 'P', ['control', 'shift']);

@@ -111,10 +111,17 @@ body, .note-screen, .share-paper {
 }
 .swatch[aria-checked="true"] { border-color: var(--text-strong); }
 /* PC 메모 창 메뉴: 목록 카드 메뉴 · 보기 판과 같은 진한 색 점 · 같은 고른 고리 (연한 메모 바탕색이면 같은 색인지 헷갈렸다) */
-#menu .swatches { display: flex; justify-content: space-between; padding: 2px 6px 6px; }
+/* 색 줄: 카드 메뉴처럼 "색" 이름 + 점 */
+#menu .menu-colors { display: flex; align-items: center; gap: 8px; padding: 2px 4px 6px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+#menu .menu-label { flex: none; font-size: 12px; font-weight: 600; color: var(--muted); }
+#menu .swatches { flex: 1; display: flex; justify-content: space-between; padding: 0; margin: 0; border: 0; }
 #menu .swatch { width: 24px; height: 24px; padding: 0; border: 0; background: var(--note-chip); }
 #menu .swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--text-strong); }
-#menu .menu-item:not(.menu-ic) { padding-block: 5px; } /* 기본 메모 창(380px) 높이에 메뉴가 스크롤 없이 들어가게 (휴대폰 시트는 그대로) */
+#menu .menu-item:not(.menu-ic, .menu-mini) { padding-block: 4px; }
+/* 아래 작은 줄: 그림 복사 · 그림 저장 · 목록 · 단축키 (키는 풍선말에) */
+#menu .menu-foot { display: flex; gap: 2px; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+#menu .menu-item.menu-mini { flex: 1 1 auto; width: auto; justify-content: center; padding: 4px 4px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+@media (hover: hover) and (pointer: fine) { #menu .menu-item.menu-mini:hover { color: var(--text); } } /* 기본 메모 창(380px) 높이에 메뉴가 스크롤 없이 들어가게 (휴대폰 시트는 그대로) */
 .menu-item {
   display: flex;
   align-items: center;
@@ -1421,7 +1428,7 @@ body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-sha
 @media (hover: hover) and (pointer: fine) { .tag-suggest-bar .tag-chip:hover { background: color-mix(in srgb, var(--note-text) 12%, transparent); } }
 .tag-suggest-bar .tag-chip.sure { box-shadow: inset 0 0 0 1.5px var(--note-text); }
 .tag-suggest-bar .tag-chip.new { outline: 1px dashed color-mix(in srgb, var(--note-text) 35%, transparent); outline-offset: -1px; }
-.tag-suggest-bar .link-btn { flex: none; white-space: nowrap; border: 0; background: none; color: var(--note-text); font-size: 12px; font-weight: 600; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--note-text) 35%, transparent); text-underline-offset: 3px; cursor: pointer; padding: 3px 6px; border-radius: 6px; } /* 휴대폰처럼 밑줄 링크 (모두 달기 · AI로 고르기) */
+.tag-suggest-bar .link-btn { flex: none; white-space: nowrap; border: 0; background: none; color: var(--note-text); font-size: 12px; font-weight: 600; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--note-text) 60%, transparent); text-underline-offset: 3px; cursor: pointer; padding: 3px 6px; border-radius: 6px; } /* 휴대폰처럼 밑줄 링크 (모두 달기 · AI로 고르기) */
 .tag-suggest-bar .icon-btn { flex: none; width: 26px; height: 26px; }
 .ai-notice-bar .ai-notice-text { flex: 1; min-width: 0; font-size: 12px; color: var(--note-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-notice-bar #ai-notice-undo { color: var(--note-text); font-weight: 700; }

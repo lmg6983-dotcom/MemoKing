@@ -1,6 +1,7 @@
 // 스티커 메모 창 — 메모 1개 = 창 1개 = 파일 1개.
 import { injectIcons, icon } from './icons.js';
-import { SAVE_ICON, TRASH_ICON } from './content-icons.js';
+import { COPY_ICON, SHARE_ICON, SAVE_ICON, TRASH_ICON } from './content-icons.js';
+import { shareMemo } from './list-card-menu.js';
 import { createNoteEditor } from './editor.js';
 import { setCopyHost } from './copy-content.js';
 import { hideDeleteButton } from './delete-button.js';
@@ -572,9 +573,22 @@ async function memoImage(kind) {
     setStatus('그림을 만들지 못했어요. 다시 해 주세요', true);
   }
 }
-// 메뉴 맨 위 아이콘: 목록 카드 메뉴와 같은 그림 (같은 아이콘은 같은 뜻)
+// 메뉴 맨 위 아이콘: 목록 카드 메뉴와 같은 그림 · 같은 순서 · 같은 일 (같은 아이콘은 같은 뜻)
+$('copy-text-btn').innerHTML = COPY_ICON;
+$('share-btn').innerHTML = SHARE_ICON;
 $('pdf-btn').innerHTML = SAVE_ICON;
 $('delete-btn').innerHTML = TRASH_ICON;
+$('copy-text-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush(); // 지금 적은 글까지
+  setStatus((await api.memo.copyText(id).catch(() => false)) ? UI.textCopied : memo?.locked ? '잠긴 메모는 잠금을 풀어야 복사할 수 있어요' : UI.copyFail);
+});
+$('share-btn').addEventListener('click', async () => {
+  const r = el.menuBtn.getBoundingClientRect();
+  closeMenu();
+  await flush();
+  await shareMemo({ id }, { x: Math.round(r.left), y: Math.round(r.bottom) }, api, { flash: (text) => setStatus(text) });
+});
 $('image-copy-btn').addEventListener('click', () => memoImage('copy'));
 /** 확인 창 (confirm-dialog): 확인 단추 글자를 바꿔 쓴다 */
 function confirmDialog(message, okLabel) {
@@ -1321,7 +1335,7 @@ bindTableBar(tableBar, (cmd, b) => {
 // (그림·파일 옮기기 안내는 block-move.js가 따로)
 function firstTimeHints(active) {
   // 안내는 표에 붙인다 (표 막대에 붙이면 설명하는 막대를 풍선이 가린다)
-  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab은 다음 칸, 마지막 칸에서 Tab은 새 줄이에요', { anchor: getSelection()?.anchorNode?.parentElement?.closest('table') ?? el.editorRoot.querySelector('table') ?? tableBar, avoid: tableBar });
+  if (active.table) hintOnce('table', '표: 칸 테두리를 끌면 크기가 바뀌어요. Tab은 다음 칸, 마지막 칸에서 Tab은 새 줄이에요', { anchor: (() => { const t = getSelection()?.anchorNode?.parentElement?.closest('table') ?? el.editorRoot.querySelector('table'); return t?.closest('.tableWrapper') ?? t ?? tableBar; })(), avoid: tableBar }); // 표를 감싼 상자(가로 막대 · 아래 테두리까지)를 피해 그 밖에
   else if (active.task || active.bullet || active.ordered) hintOnce('list-move', '목록 항목은 글자를 꾹 누르면 들어 올려져 순서를 바꿀 수 있어요. 키보드는 Alt+↑ / Alt+↓', { anchor: el.editorRoot.querySelector('li') });
 }
 
@@ -1353,10 +1367,11 @@ function useKeymap(overrides) {
     const btnId = a.run[0] === 'menu' ? a.run[1] : a.id === 'shortcuts' ? 'shortcuts-btn' : a.id === 'find' ? 'find-btn' : null;
     const btn = btnId && document.getElementById(btnId);
     if (!btn) continue;
-    // 맨 위 아이콘 줄(PDF · 그림 · 삭제)은 글자 자리가 없어 풍선말에 키를 함께
-    if (btn.classList.contains('menu-ic')) {
+    // 맨 위 아이콘 줄 · 아래 작은 줄은 글자 자리가 없어 풍선말에 키를 함께
+    if (btn.matches('.menu-ic, .menu-mini')) {
       const k = keys[a.id].map(comboLabel).join(', ');
-      btn.title = k ? `${btn.getAttribute('aria-label')} (${k})` : btn.getAttribute('aria-label');
+      const name = btn.getAttribute('aria-label') ?? (btn.dataset.name ??= btn.title.replace(/ \(.*\)$/, ''));
+      btn.title = k ? `${name} (${k})` : name;
       continue;
     }
     // 키 글자는 메뉴 글(잠그기 ↔ 잠금 풀기처럼 바뀜)과 따로, 단추 오른쪽 끝에

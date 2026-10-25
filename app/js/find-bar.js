@@ -87,18 +87,18 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
   r.f.classList.add('mk-find-rep');
 
   // 서식 단추: "가" 미리 보기 + 서식 (고르면 그 모양으로)
-  const fmtBtn = (area, label) => {
+  const fmtBtn = (area, label, text) => {
     const b = btn('mk-find-fmt', '', label);
     b.style.gridArea = area;
     b.setAttribute('aria-haspopup', 'dialog');
     b.setAttribute('aria-expanded', 'false');
     const glyph = el('span', 'mk-find-glyph', '가');
-    b.append(glyph, el('span', 'mk-find-fmt-label', '서식'));
+    b.append(glyph, el('span', 'mk-find-fmt-label', text)); // "서식" 만으로는 무엇을 하는지 몰랐다
     b.glyph = glyph;
     return b;
   };
-  const qFmtBtn = fmtBtn('qf', '찾을 서식: 이 서식인 글만 찾기');
-  const rFmtBtn = fmtBtn('rf', '바꿀 서식: 바꾼 글에 붙일 서식');
+  const qFmtBtn = fmtBtn('qf', '찾을 서식: 이 서식인 글만 찾기', '서식 찾기');
+  const rFmtBtn = fmtBtn('rf', '바꿀 서식: 바꾼 글에 붙일 서식', '서식 넣기');
   rFmtBtn.classList.add('mk-find-rfmt');
 
   // 바꾸기 펼치기 · 접기: 아래 · 위 꺾쇠 (펼치면 바꿀 말 줄 끝으로 내려간다) — 이전 · 다음은 Enter · Shift+Enter, 다음 찾기 단추

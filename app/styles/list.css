@@ -291,13 +291,6 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 #view-reminders, #view-history { position: absolute; left: 0; right: 0; top: var(--park-top, 0px); bottom: 0; z-index: 2; background: var(--bg); }
 .rows { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 12px; }
 .rows-title { margin: 10px 4px 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
-.link-btn { border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
-.link-btn:hover { background: var(--hover); color: var(--text); }
-.link-btn.danger:hover { color: var(--danger); }
-/* 누를 수 있는 글자는 그렇게 보이게 (휴대폰과 같은 노란 밑줄 · 지우는 일은 빨강) — 예전: 회색 보통 글자라 단추인 줄 몰랐다 */
-.link-btn:not(.ev-add) { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
-.link-btn.danger { color: var(--danger); text-decoration-color: color-mix(in srgb, var(--danger) 45%, transparent); }
-.link-btn:disabled { opacity: 0.45; cursor: default; background: none; color: var(--muted); }
 .grow { flex: 1; }
 
 /* 알림 예약 줄 */

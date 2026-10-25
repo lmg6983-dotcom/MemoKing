@@ -67,7 +67,7 @@ export async function openCardMenu({ memo, at, api, run, workLife = true }) {
 }
 
 /** 메모 한 개를 공유: 방법 고르기 (Google Drive 링크 · LocalSend · 메일) → 글 파일로 보낸다 */
-async function shareMemo(memo, at, api, run) {
+export async function shareMemo(memo, at, api, run) {
   try {
     const file = await api.memo.shareFile(memo.id);
     if (file?.error) return run.flash(file.error);

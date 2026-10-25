@@ -38,28 +38,32 @@
   </header>
 
   <div id="menu" class="menu" role="menu" hidden>
-    <!-- 맨 위 아이콘 줄: 목록 카드 메뉴와 같은 아이콘 (PDF = 받기 화살표, 삭제 = 휴지통 — content-icons.js 를 note.js 가 넣는다) + 그림으로 복사 · 저장 -->
-    <div class="menu-icons" role="group" aria-label="내보내기, 삭제">
+    <!-- 목록 카드 메뉴와 같은 모양: 맨 위 아이콘 줄(같은 아이콘 · 같은 순서 — 글 복사 · 공유 · PDF · 휴지통, content-icons.js 를 note.js 가 넣는다.
+         메모 창은 열려 있으니 잘라내기는 없음) → 색 → 글 메뉴(아이콘 없이, 휴대폰처럼) → 아래 작은 줄(그림으로 · 목록 · 단축키) -->
+    <div class="menu-icons" role="group" aria-label="복사, 공유, PDF, 삭제">
+      <button class="menu-item menu-ic" id="copy-text-btn" role="menuitem" title="글 복사" aria-label="글 복사"></button>
+      <button class="menu-item menu-ic" id="share-btn" role="menuitem" title="공유" aria-label="공유"></button>
       <button class="menu-item menu-ic" id="pdf-btn" role="menuitem" title="PDF로 저장" aria-label="PDF로 저장"></button>
-      <button class="menu-item menu-ic" id="image-copy-btn" role="menuitem" title="그림으로 복사" aria-label="그림으로 복사"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.6"/><circle cx="5.8" cy="6.2" r="1.2"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3"/></svg></button>
-      <button class="menu-item menu-ic" id="image-save-btn" role="menuitem" title="그림으로 저장" aria-label="그림으로 저장"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="1.5" width="12" height="8.5" rx="1.4"/><circle cx="5.6" cy="4.6" r="1"/><path d="M2.5 9l3-2.8 2.2 2 1.8-1.6 3.5 2.6M8 11.5v3.5M6.3 13.4 8 15l1.7-1.6"/></svg></button>
       <button class="menu-item menu-ic danger" id="delete-btn" role="menuitem" title="삭제 (휴지통으로)" aria-label="삭제"></button>
     </div>
-    <div class="swatches" id="swatches"></div>
-    <button class="menu-item" id="pin-toggle" role="menuitem"><svg><use href="#i-pin"/></svg><span>목록 맨 위에 고정</span></button>
-    <button class="menu-item" id="day-btn" role="menuitem"><svg><use href="#i-calendar"/></svg><span>이 날의 기록으로 <small id="day-label"></small></span></button>
-    <button class="menu-item" id="mode-btn" role="menuitem"><svg><use href="#i-swap"/></svg><span>Work로 옮기기</span></button>
+    <div class="menu-colors"><span class="menu-label">색</span><div class="swatches" id="swatches"></div></div>
+    <button class="menu-item" id="pin-toggle" role="menuitem"><span>목록 맨 위에 고정</span></button>
+    <button class="menu-item" id="day-btn" role="menuitem"><span>이 날의 기록으로 <small id="day-label"></small></span></button>
+    <button class="menu-item" id="mode-btn" role="menuitem"><span>Work로 옮기기</span></button>
     <hr class="menu-sep" role="separator">
-    <button class="menu-item" id="hotkey-menu-btn" role="menuitem"><svg><use href="#i-zap"/></svg><span>불러오기 키 정하기 <small id="hotkey-menu-label"></small></span></button>
-    <button class="menu-item" id="links-btn" role="menuitem"><svg><use href="#i-link"/></svg><span>메모 연결 <small id="links-count"></small></span></button>
-    <button class="menu-item" id="join-btn" role="menuitem"><svg><use href="#i-tabs"/></svg><span>다른 메모 창과 합치기</span></button>
+    <button class="menu-item" id="hotkey-menu-btn" role="menuitem"><span>불러오기 키 정하기 <small id="hotkey-menu-label"></small></span></button>
+    <button class="menu-item" id="links-btn" role="menuitem"><span>메모 연결 <small id="links-count"></small></span></button>
+    <button class="menu-item" id="join-btn" role="menuitem"><span>다른 메모 창과 합치기</span></button>
     <hr class="menu-sep" role="separator">
-    <button class="menu-item" id="lock-btn" role="menuitem"><svg><use href="#i-lock"/></svg><span>잠그기</span></button>
-    <button class="menu-item" id="versions-btn" role="menuitem"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
-    <button class="menu-item" id="find-btn" role="menuitem"><svg><use href="#i-search"/></svg><span>찾기, 바꾸기</span></button>
-    <!-- 단축키로만 (기본 메모 창 높이에 메뉴가 다 들어가게): 목록 열기 Ctrl+Shift+M · 단축키 보기 Ctrl+/ — 단축키가 이 단추를 누른다 -->
-    <button class="menu-item" id="show-list" role="menuitem" hidden><svg><use href="#i-list"/></svg><span>메모 목록 열기</span></button>
-    <button class="menu-item" id="shortcuts-btn" role="menuitem" hidden><svg><use href="#i-keys"/></svg><span>단축키 보기 <small>Ctrl+/</small></span></button>
+    <button class="menu-item" id="lock-btn" role="menuitem"><span>잠그기</span></button>
+    <button class="menu-item" id="versions-btn" role="menuitem"><span>이전 버전</span></button>
+    <button class="menu-item" id="find-btn" role="menuitem"><span>찾기, 바꾸기</span></button>
+    <div class="menu-foot" role="group" aria-label="그 밖에">
+      <button class="menu-item menu-mini" id="image-copy-btn" role="menuitem" title="메모를 보이는 그대로 그림으로 복사">그림 복사</button>
+      <button class="menu-item menu-mini" id="image-save-btn" role="menuitem" title="메모를 보이는 그대로 그림 파일(PNG)로 저장">그림 저장</button>
+      <button class="menu-item menu-mini" id="show-list" role="menuitem" title="메모 목록 열기 (Ctrl+Shift+M)">목록</button>
+      <button class="menu-item menu-mini" id="shortcuts-btn" role="menuitem" title="단축키 보기 (Ctrl+/)">단축키</button>
+    </div>
   </div>
 
   <div id="banner" class="banner" hidden>
@@ -297,7 +301,7 @@
   <!-- AI 글쓰기 (서식 막대 ✦): 부탁 한 줄 + 빠른 작업 칩 — 이 PC 안의 모델로 (ai-write-panel.js) -->
   <div id="ai-pop" class="pop ai-pop" role="dialog" aria-label="AI 글쓰기" hidden>
     <form class="ai-ask-row">
-      <input class="ai-request" type="text" autocomplete="off" aria-label="AI에게 부탁" placeholder="무엇을 쓸까요? Enter 로 초안 (비우면 제목으로)">
+      <input class="ai-request" type="text" autocomplete="off" aria-label="AI에게 부탁" placeholder="무엇을 쓸까요? Enter로 초안 (비우면 제목을 보고 써요)">
     </form>
     <div class="ai-chips" role="group" aria-label="고른 글, 고르지 않으면 메모 전체에">
       <button type="button" class="ai-chip ai-task ai-spell">맞춤법</button>
