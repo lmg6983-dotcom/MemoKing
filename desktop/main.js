@@ -1226,9 +1226,19 @@ app.on('second-instance', (_e, argv) => {
 let errorLog = null;
 const errors = () => (errorLog ??= createErrorLog(path.join(app.getPath('userData'), 'logs', 'memoking.log')));
 const consoleError = console.error.bind(console);
+// 글로 바꾸다 오류가 나도(서로를 가리키는 객체 등) 기록하던 곳이 멈추지 않게
+const logText = (a) => {
+  if (a instanceof Error) return a.stack ?? a.message;
+  if (typeof a === 'string') return a;
+  try {
+    return JSON.stringify(a);
+  } catch {
+    return String(a);
+  }
+};
 console.error = (...args) => {
   consoleError(...args);
-  errors().write(args.map((a) => (a instanceof Error ? a.stack ?? a.message : typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
+  errors().write(args.map(logText).join(' '));
 };
 app.on('render-process-gone', (_e, wc, details) => errors().write(`[창 꺼짐] ${wc.getURL().split('/').pop()} ${details.reason} (${details.exitCode})`));
 

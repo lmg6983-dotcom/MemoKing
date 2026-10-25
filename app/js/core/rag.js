@@ -4,7 +4,7 @@
 //   뜻으로 찾기는 따로 검색 모델 없이 글 모델(카나나2)이 질문을 비슷한 말 몇 개로 넓혀 낱말 찾기에 더한다 (expandMessages).
 //   작은 모델은 지어내기도 쉽고 "못 찾았어요" 로 물러서기도 쉬워, 찾기가 일을 대부분 하고 모델은 고른 메모만 보고 짧게 답한다.
 //   찾은 메모가 분명한데 모델이 물러서면 그 메모에서 가장 맞는 문장을 그대로 보여 준다 (finishAnswer).
-import { tokenize, tfidfVectors, cosine } from './indexer.js';
+import { tokenize, cosine } from './indexer.js';
 import { plainLines, extractTitle } from './memo-file.js';
 
 const CHUNK = 400; // 글자 — 한 조각이 문맥에 여럿 들어가게
@@ -65,19 +65,56 @@ export function askedPeriod(question, now = new Date()) {
   return null;
 }
 
+const termCounts = (list) => {
+  const tf = new Map();
+  for (const t of list) tf.set(t, (tf.get(t) ?? 0) + 1);
+  return tf;
+};
+/** tf-idf (indexer.js tfidfVectors 와 같은 셈), 길이 1로 */
+function weigh(tf, df, n) {
+  const v = new Map();
+  let norm = 0;
+  for (const [t, count] of tf) {
+    const w = (1 + Math.log(count)) * Math.log(1 + n / (df.get(t) ?? 1));
+    v.set(t, w);
+    norm += w * w;
+  }
+  norm = Math.sqrt(norm) || 1;
+  for (const [t, w] of v) v.set(t, w / norm);
+  return v;
+}
+
+/**
+ * 찾기 색인: 조각마다 tf-idf 벡터. 메모가 바뀔 때만 다시 만든다 (메모 3,000개면 만드는 데 1초 남짓 — 묻을 때마다 하면 그동안
+ *   메인 프로세스가 멈춰 모든 창이 굳었다). 조각의 특징(c.feats)은 조각 객체에 남겨 두어, 그대로인 메모는 다시 쪼개지 않는다
+ * @param {{ id: string, title: string, text: string, updated?: string, feats?: string[] }[]} chunks
+ */
+export function buildIndex(chunks) {
+  const df = new Map();
+  const tfs = chunks.map((c) => {
+    c.feats ??= features(c.text);
+    const tf = termCounts(c.feats);
+    for (const t of tf.keys()) df.set(t, (df.get(t) ?? 0) + 1);
+    return tf;
+  });
+  const n = chunks.length;
+  return { chunks, df, n, vecs: tfs.map((tf) => weigh(tf, df, n)) };
+}
+
 /**
  * 관련 메모 찾기
  * @param {string} query
- * @param {{ id: string, title: string, text: string, updated?: string }[]} chunks 모든 메모의 조각
+ * @param {{ id: string, title: string, text: string, updated?: string }[] | ReturnType<typeof buildIndex>} source 모든 메모의 조각 (또는 만들어 둔 색인)
  * @param {{ words?: string[], related?: (id: string) => { id: string, score: number }[], limit?: number, now?: Date }} o words: 질문을 넓힌 낱말 (expandMessages)
  * @returns {{ id: string, title: string, score: number, via: 'match' | 'graph', texts: string[] }[]}
  */
-export function retrieve(query, chunks, { words = [], related = () => [], limit = 4, now = new Date() } = {}) {
+export function retrieve(query, source, { words = [], related = () => [], limit = 4, now = new Date() } = {}) {
+  const index = Array.isArray(source) ? buildIndex(source) : source;
+  const { chunks, vecs } = index;
   if (!chunks.length) return [];
   const qf = [...features(query, { ask: true }), ...words.flatMap((w) => features(w))];
   if (!qf.length) return [];
-  const vecs = tfidfVectors([...chunks.map((c) => features(c.text)), qf]);
-  const q = vecs.pop();
+  const q = weigh(termCounts(qf), index.df, index.n + 1);
   const asked = new Set(tokenize(query).filter((w) => !ASK_WORDS.has(w)));
   const period = askedPeriod(query, now);
   const inPeriod = (c) => period && c.updated && new Date(c.updated) >= period.from && new Date(c.updated) < period.to;

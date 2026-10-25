@@ -16,8 +16,7 @@ body, .note-screen, .share-paper {
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) body, :where(:root:not([data-theme="light"])) .note-screen, :where(:root:not([data-theme="light"])) .share-paper { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) body, :where(:root[data-theme="dark"]) .note-screen, :where(:root[data-theme="dark"]) .share-paper { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
+
 :is(body, .note-screen, .share-paper)[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.1); }
 
 .icon-btn { width: 30px; height: 30px; color: var(--note-muted); }
@@ -241,9 +240,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   :where(:root:not([data-theme="light"])) .mk-doc mark { filter: brightness(0.8); }
   :where(:root:not([data-theme="light"])) .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .mk-doc mark { filter: brightness(0.8); }
-  :where(:root[data-theme="dark"]) .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
+
 @media print { .mk-doc :is(mark, img) { filter: none !important; } }
 
 /* 이미지 */
@@ -661,7 +658,6 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .rem-item .icon-btn { width: 26px; height: 26px; }
 .rem-item .icon-btn svg { width: 15px; height: 15px; }
 
-
 .reminder-form { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .reminder-form h4 { margin: 0 0 8px; }
 .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--fill-tab); margin-bottom: 10px; }
@@ -697,7 +693,6 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .rem-radio small { color: var(--muted); }
 .rem-action { margin-bottom: 10px; padding-top: 6px; border-top: 1px dashed var(--border); }
 .rem-submit { width: 100%; }
-
 
 /* 날짜·시각 고르기 (date-picker.js) — 다이얼 대신 달력 한 장 + 시각 칩 */
 .date-picker { margin-top: 2px; }
@@ -1072,7 +1067,6 @@ body.mk-row-resizing { user-select: none; }
 .mk-list-dragging, .mk-list-dragging * { cursor: grabbing !important; user-select: none !important; }
 .mk-list-dragging ::selection { background: transparent !important; } /* 끄는 동안 글자 선택 표시는 숨김 */
 
-
 /* 모든 체크리스트를 끝내면 CLEAR 도장 — 메모 본문 정중앙에 반투명 (글을 가리지 않게, 눌리지 않음) */
 .clear-stamp {
   position: fixed;
@@ -1405,8 +1399,7 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
 .mk-delete-btn { background: var(--surface-2); color: #c4282e; } /* 흰 바탕 위 빨간 × 를 4.5:1 넘게 (--rec #e5484d 는 3.9) */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .mk-delete-btn { color: #ff6b70; } }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
- :where(:root[data-theme="dark"]) .mk-delete-btn { color: #ff6b70; } 
+
 body[data-color="charcoal"] .mk-delete-btn { color: #ff6b70; }
 /* 어두운 숯색 메모 위에서도 또렷하게 */
 body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
@@ -1723,11 +1716,9 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
   :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
   :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .mk-doc .mk-ink.bg-none:has(.ink-dark-src) .ink-light-src { display: none; }
-  :where(:root[data-theme="dark"]) .mk-doc .mk-ink.bg-none .ink-dark-src { display: block; }
-  :where(:root[data-theme="dark"]) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
-  :where(:root[data-theme="dark"]) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
+
+  
+
 @media print {
   .mk-doc .mk-ink .ink-light-src { display: block !important; }
   .mk-doc .mk-ink .ink-dark-src { display: none !important; }
@@ -1867,7 +1858,6 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
 .lock-hide-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 4px 0; font-size: 13px; color: var(--muted); }
 
-
 /* 일정과 알림 패널: 이름 · 하루 종일 · 미리 알림 (reminder-panel.js) */
 .rem-title-row input { flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-0); color: var(--text); font: inherit; }
 .rem-allday-row { justify-content: space-between; }
@@ -1962,13 +1952,11 @@ body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 .mk-undo-hint.fading { opacity: 0; }
 @keyframes mk-undo-in { from { opacity: 0; transform: translateY(4px); } }
 
-
 /* 파일 · 음성(소리 줄) · 그림 같은 내용을 골랐을 때: 글 서식 단추는 쓸 수 없다 (+ 콘텐츠 추가 · 더보기는 그대로) */
 body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-action="highlight"], [data-action="style"]) { opacity: 0.35; pointer-events: none; }
 
 /* 누르면 열리는 내용(파일 칩 · 소리 이름 줄 · 링크 카드 · 수식)은 글 커서(I)가 아니라 손가락 커서 — 짧게 눌렀다 떼면 열고, 누른 채 움직이면 옮긴다 */
 .mk-doc a[data-file], .mk-doc .mk-media .mk-media-label, .mk-doc .mk-link-card .lc-main, .mk-doc .mk-math-block { cursor: pointer; }
-
 
 /* 탭 순서 바꾸기(크롬 탭처럼): 끄는 동안 비켜 서는 탭들이 부드럽게 자리를 바꾼다 */
 .stack-tab.shifting { transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1); }

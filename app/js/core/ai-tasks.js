@@ -2,7 +2,7 @@
 //   다른 것은 모델을 부르는 법(ai)과 메모를 읽는 법(memos · graph)뿐이다. 모델은 이 기기 안(llama-server), 인터넷 없이.
 import { spellMessages, styleMessages, draftMessages, plausibleFix, titleMessages, cleanTitle, wordDiff, diffEdits, TITLE_OVER } from './ai-write.js';
 import { aiTagRequest, aiTagResult, MIN_AI_TEXT } from './ai-tags.js';
-import { chunkMemo, retrieve, ragMessages, expandMessages, expandResult, finishAnswer, NOT_FOUND } from './rag.js';
+import { chunkMemo, retrieve, buildIndex, ragMessages, expandMessages, expandResult, finishAnswer, NOT_FOUND } from './rag.js';
 import { detectIntent, planMessages, planResult, appendTargets, appendText, memoBody, summaryMessages, scheduleQuery, eventsIn, scheduleText, memoDraftMessages, memoDraftResult } from './agent.js';
 import { occurrencesBetween } from './reminders.js';
 import { extractTitle, plainLines } from './memo-file.js';
@@ -89,18 +89,36 @@ export function createAiTasks({ ai, memos, graph, reminders = () => [] }) {
     return { events: aiEventResult(json, cands, existing, now), seen: nextSeen(seen, cands) };
   }
 
-  /** 찾기: 잠긴 메모 빼고 모든 메모를 조각으로, 질문을 넓혀(모델) 낱말 · 두 글자 조각 · 그래프로 */
-  async function find(question, { signal, limit = 4, now = new Date() } = {}) {
-    const chunks = memos().filter((m) => !isLockedBody(m.body)).flatMap((m) => {
+  // 찾기 색인: 메모마다 조각을 기억해 두고(본문 · 고친 때가 같으면 다시 쪼개지 않음), 하나라도 바뀌면 색인만 다시
+  let pieces = new Map(); // id → { body, updated, chunks }
+  let index = null;
+  function searchIndex() {
+    const next = new Map();
+    let changed = false;
+    for (const m of memos()) {
+      if (isLockedBody(m.body)) continue;
+      const old = pieces.get(m.id);
+      if (old && old.body === m.body && old.updated === m.updated) {
+        next.set(m.id, old);
+        continue;
+      }
+      changed = true;
       const title = extractTitle(m.body);
-      return chunkMemo(m.body).map((text) => ({ id: m.id, title, text, updated: m.updated }));
-    });
+      next.set(m.id, { body: m.body, updated: m.updated, chunks: chunkMemo(m.body).map((text) => ({ id: m.id, title, text, updated: m.updated })) });
+    }
+    if (changed || next.size !== pieces.size || !index) index = buildIndex([...next.values()].flatMap((p) => p.chunks));
+    pieces = next;
+    return index;
+  }
+
+  /** 찾기: 잠긴 메모 빼고 모든 메모의 조각에서, 질문을 넓혀(모델) 낱말 · 두 글자 조각 · 그래프로 */
+  async function find(question, { signal, limit = 4, now = new Date() } = {}) {
     const ex = expandMessages(question);
     // 넓히지 못해도(모델 오류 · 엉뚱한 답) 질문 낱말만으로 찾는다
     const words = await ai.chat(ex.messages, { schema: ex.schema, temperature: 0, maxTokens: 120, signal }).then(expandResult, () => []);
     if (signal?.aborted) throw new Error('멈췄어요');
     const related = new Map(graph().map((m) => [m.id, m.related ?? []]));
-    return retrieve(question, chunks, { words, related: (id) => related.get(id) ?? [], limit, now });
+    return retrieve(question, searchIndex(), { words, related: (id) => related.get(id) ?? [], limit, now });
   }
   const sourcesOf = (picked) => picked.map((m) => ({ id: m.id, title: m.title, via: m.via }));
 
@@ -120,6 +138,9 @@ export function createAiTasks({ ai, memos, graph, reminders = () => [] }) {
    */
   async function agent(text, { signal, onToken, now = new Date() } = {}) {
     let intent = detectIntent(text, { now });
+    // "내일 일정 알려줘" 처럼 시각 없이 일정을 물으면 넣기가 아니라 일정 답 ("내일 3시 치과 알려줘" 는 넣기)
+    const sq = scheduleQuery(text, now);
+    if (sq && intent.action === 'event' && !intent.when.hasTime && !intent.when.repeat && /일정|약속|스케줄|계획|뭐\s*있|할\s*일/.test(text)) intent = { action: 'answer' };
     if (intent.unsure) {
       const p = planMessages(text);
       const keep = intent;
@@ -149,7 +170,6 @@ export function createAiTasks({ ai, memos, graph, reminders = () => [] }) {
       return { kind: 'summary', topic: intent.topic, text: body || NOT_FOUND, sources: sourcesOf(picked) };
     }
     // 일정을 물으면 ("내일 뭐 있어?") 일정 탭에서 바로 — 모델 없이, 틀릴 일 없이
-    const sq = scheduleQuery(text, now);
     if (sq) {
       const events = eventsIn(reminders(), sq, occurrencesBetween);
       if (events.length || !sq.words.length) {

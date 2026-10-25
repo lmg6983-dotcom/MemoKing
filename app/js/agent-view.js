@@ -132,6 +132,7 @@ export function createAgentView({ box, api, onChange = () => {}, onDone = () => 
       read = () => ({ ...a, id: pick.value, text: text.value.trim() });
     }
     const go = async () => {
+      if (runBtn.disabled) return; // 하는 중에 Enter · 누르기를 또 해도 한 번만 (일정 · 메모가 두 개 생기지 않게)
       const action = read();
       runBtn.disabled = true;
       state.textContent = '하는 중이에요…';
@@ -141,14 +142,17 @@ export function createAgentView({ box, api, onChange = () => {}, onDone = () => 
     };
     const runBtn = btn(kind.run, 'btn primary agent-run', go);
     confirm = go;
-    card.append(head, ...body);
+    // 카드마다 새 칸에 — 같은 칸에 키 처리를 붙이면 쌓여서, 지난 카드의 일까지 다시 실행됐다
+    const form = h('div', 'agent-form');
+    form.append(head, ...body);
+    card.append(form);
     foot.append(runBtn, btn('취소', 'link-btn', () => {
       clear();
       state.textContent = '그만뒀어요';
       onChange();
     }));
     // 카드 안 입력칸: Enter(글 칸은 Ctrl+Enter)로 바로 실행
-    card.addEventListener('keydown', (e) => {
+    form.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.isComposing && (e.ctrlKey || e.target.tagName !== 'TEXTAREA')) {
         e.preventDefault();
         go();

@@ -5,8 +5,7 @@
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .mem, :where(:root:not([data-theme="light"])) .mem-album { --mem-paper: #1d1c19; --mem-pol: #2a2925; --mem-ink: #ece8dd; --mem-tape: rgba(255, 214, 51, 0.38); --mem-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.45); }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .mem, :where(:root[data-theme="dark"]) .mem-album { --mem-paper: #1d1c19; --mem-pol: #2a2925; --mem-ink: #ece8dd; --mem-tape: rgba(255, 214, 51, 0.38); --mem-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.45); }
+
 .mem[hidden] { display: none; }
 .mem { padding: 2px 0 6px; }
 
@@ -107,8 +106,7 @@ button.mem-day:active { transform: scale(0.96); }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .mem-album { --mem-paper: #1d1c19; --mem-pol: #2a2925; --mem-ink: #ece8dd; --mem-tape: rgba(255, 214, 51, 0.38); --mem-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.45); background: rgba(0, 0, 0, 0.6); }
 }
-/* 화면이 어두운 테마로 정했을 때 (Work 등 — data-theme="dark") */
-  :where(:root[data-theme="dark"]) .mem-album { --mem-paper: #1d1c19; --mem-pol: #2a2925; --mem-ink: #ece8dd; --mem-tape: rgba(255, 214, 51, 0.38); --mem-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.45); background: rgba(0, 0, 0, 0.6); }
+
 .mem-album.closing { animation: mem-out 0.16s var(--ease-out) both; }
 .mem-album.closing .mem-page { animation: mem-page-out 0.16s var(--ease-out) both; }
 @keyframes mem-out { to { opacity: 0; } }

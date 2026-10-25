@@ -45,8 +45,10 @@ const agent = createAgentView({
   onDone: (res) => {
     flash(true, res.message);
     if (!res.id) return;
-    input.value = ''; // 한 일은 끝 — 다음에 띄우면 빈 창
+    input.value = ''; // 한 일은 끝 — 다음에 띄우면 빈 창 (결과 목록도 빈 글로 — Esc 로 돌아가도 지난 결과가 남지 않게)
     resizeInput();
+    render();
+    search();
     input.focus();
   },
 });

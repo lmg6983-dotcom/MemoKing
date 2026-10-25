@@ -16,6 +16,8 @@ export const ACTIONS = ['answer', 'summary', 'event', 'memo', 'append'];
 // 부탁 끝말 — 할 일 이름 · 내용에서 뺀다
 const ASK_TAIL = /\s*(?:좀\s*)?(?:해\s*줘|해\s*주세요|해\s*줄래\??|해\s*줄\s*수\s*있어\??|부탁해(?:요)?|해\s*봐|하자|해요|할래|해|줘|주세요)\s*[.!?~]*\s*$/;
 const EVENT_VERB = /(알려\s*(?:줘|주세요|줄래)|알림|리마인드|일정|예약|약속\s*잡|잡아\s*(?:줘|주세요)|등록|챙겨\s*(?:줘|주세요)|깨워|기억해\s*(?:줘|주세요)|넣어\s*(?:줘|주세요)|추가해\s*(?:줘|주세요))/;
+// 일정을 넣으라고 시키는 말 — 이게 없으면 질문("치과 예약 몇 시였지?")은 일정 넣기가 아니다
+const EVENT_DO = /(알려\s*(?:줘|주세요|줄래)|등록|잡아\s*(?:줘|주세요)|넣어\s*(?:줘|주세요)|추가해\s*(?:줘|주세요)|챙겨\s*(?:줘|주세요)|깨워|기억해\s*(?:줘|주세요)|리마인드|알림\s*(?:줘|주세요|설정|맞춰))/;
 const SUMMARY_VERB = /(요약|정리|간추려|한눈에)\s*(?:해|좀|해서|해줘|해 줘|해주세요|해 주세요|부탁|$)|요약$|정리$/;
 const MEMO_VERB = /(?:(메모|노트|할\s*일|할일|체크\s*리스트|체크리스트|목록|리스트|투두)(?:를|을|로|으로)?\s*(?:하나\s*)?(?:만들어|써|작성|남겨|적어|새로)|^(?:메모|기록)\s*(?:해|해줘|해 줘|해주세요|남겨))/;
 const APPEND = /^(.+?)\s*(?:메모|노트|목록|리스트)?\s*(?:에|에다|에다가)\s+(.+?)\s*(?:을|를)?\s*(?:추가|덧붙|붙여|적어|넣어|기록|더해)/;
@@ -43,17 +45,28 @@ export function detectIntent(text, { now = new Date() } = {}) {
   if (!t) return { action: 'answer' };
   const question = QUESTION.test(t) && (!ASK_TAIL.test(t) || /알려|찾아|말해/.test(t));
   // 덧붙이기: "회의록에 다음 주 발표 추가해줘"
+  //   "금요일 2시에 치과 예약 추가해줘" 의 "금요일 2시" 는 메모가 아니라 때 — 일정으로
   const ap = APPEND.exec(t);
-  if (ap && !question) return { action: 'append', target: clean(ap[1]), content: stripAsk(ap[2]) };
-  // 일정: 앞으로의 날짜 + 알려줘 · 등록 · 예약 …
+  if (ap && !question && !isWhen(ap[1], now)) return { action: 'append', target: clean(ap[1]), content: stripAsk(ap[2]) };
+  // 일정: 앞으로의 날짜 + 알려줘 · 등록 · 예약 … (질문이면 시키는 말이 있을 때만)
   const when = findDates(t, now).find((d) => d.at > now || d.repeat);
-  if (when && EVENT_VERB.test(t)) return { action: 'event', ...eventFields(t, when) };
-  if (SUMMARY_VERB.test(t)) return { action: 'summary', topic: summaryTopic(t) };
+  if (when && EVENT_VERB.test(t) && (!question || EVENT_DO.test(t))) return { action: 'event', ...eventFields(t, when) };
+  if (SUMMARY_VERB.test(t) && !question) return { action: 'summary', topic: summaryTopic(t) };
   const mm = MEMO_VERB.exec(t);
   if (mm) return { action: 'memo', ...memoFields(t, mm) };
   // 날짜만 있고 명령 꼴이면 ("금요일 3시 치과" 처럼 질문이 아닌 짧은 줄) 일정으로 묻는다
   if (when && !question) return { action: 'event', ...eventFields(t, when), unsure: true };
   return { action: 'answer', unsure: !question && ASK_TAIL.test(t) };
+}
+
+/** 글이 날짜 · 시각 말뿐인가 ("금요일 2시", "내일 오후 3시에") */
+function isWhen(text, now) {
+  const s = String(text ?? '');
+  const ds = findDates(s, now);
+  if (!ds.length) return false;
+  let rest = s;
+  for (const d of [...ds].reverse()) rest = rest.slice(0, d.from) + rest.slice(d.to);
+  return !rest.replace(/(?:에|에는|쯤|경|까지|부터)/g, '').trim();
 }
 
 // 일정 이름에서 뺄 부탁 말 ("치과 예약 알려줘" → "치과 예약")
@@ -220,9 +233,8 @@ export function eventsIn(all, q, occurrences) {
     for (const at of occurrences(r, q.from, q.to)) out.push({ at, title: name, memoId: e.memoId, allDay: Boolean(r.allDay) });
   }
   out.sort((a, b) => a.at - b.at);
-  if (!q.words?.length) return out;
-  const hit = out.filter((e) => q.words.some((w) => e.title.includes(w)));
-  return hit.length ? hit : out; // 찾을 말에 맞는 일정이 없으면 그 기간 일정 모두 (물은 말과 이름이 다를 수 있다)
+  // 찾을 말("내일 회의 몇 시야" 의 회의)이 있으면 그 말이 든 일정만 — 없으면 [] (부른 쪽이 메모에서 찾는다)
+  return q.words?.length ? out.filter((e) => q.words.some((w) => e.title.includes(w))) : out;
 }
 
 /** 일정 답 글: "내일 일정이에요.\n- 오후 3:00 거래처 미팅 [1]" (번호는 출처 메모) */

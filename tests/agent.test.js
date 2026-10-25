@@ -30,6 +30,11 @@ test('매직 에이전트: 말 모양으로 가르기 — 일정 · 새 메모 �
     assert.equal(detectIntent(q, { now }).action, 'answer', q);
     assert.ok(!detectIntent(q, { now }).unsure, q);
   }
+  // 때가 덧붙일 메모로 · 일정 묻기가 일정 넣기로 읽히지 않게 (검수 1)
+  assert.deepEqual(['event', '치과 예약'], [detectIntent('금요일 2시에 치과 예약 추가해줘', { now }).action, detectIntent('금요일 2시에 치과 예약 추가해줘', { now }).title]);
+  assert.equal(detectIntent('내일 오후 3시에 회의 넣어줘', { now }).action, 'event');
+  assert.equal(detectIntent('금요일 치과 예약 몇 시였지?', { now }).action, 'answer');
+  assert.equal(detectIntent('정리해 둔 회의 메모 어디 있어?', { now }).action, 'answer');
   // 애매한 명령은 모델에 묻는다
   assert.ok(detectIntent('견적서 보내기 기억해줘', { now }).unsure);
   assert.ok(detectIntent('금요일 3시 치과', { now }).unsure);
@@ -78,6 +83,7 @@ test('매직 에이전트: 일정을 물으면 일정 탭에서 — 기간 · �
   assert.equal(scheduleText(q, events, now), '내일 일정이에요.\n- 오전 9:00 주간 회의 [1]\n- 오후 3:00 거래처 미팅 [2]');
   // 찾을 말 (회의) 에 맞는 것만
   assert.deepEqual(eventsIn(all, scheduleQuery('내일 회의 몇 시야', now), occurrencesBetween).map((e) => e.title), ['주간 회의']);
+  assert.deepEqual(eventsIn(all, scheduleQuery('내일 마감 몇 시야', now), occurrencesBetween), [], '물은 말에 맞는 일정이 없으면 엉뚱한 일정 대신 [] (메모에서 찾게)');
   assert.equal(scheduleText(scheduleQuery('모레 일정 있어?', now), [], now), '모레 일정은 없어요.');
   assert.equal(scheduleQuery('출시일 언제야?', now), null, '일정 말이 없으면 메모에서 찾는다');
   assert.equal(scheduleQuery('내일 회의 등록해줘', now), null, '시키는 말은 일정 묻기가 아니다');
@@ -123,6 +129,8 @@ test('매직 에이전트 흐름: 할 일은 확인 카드, 일정 묻기는 일
   const sch = await tasks.agent('내일 뭐 있어?', { now });
   assert.equal(sch.text, '내일 일정이에요.\n- 오후 2:00 치과 [1]');
   assert.equal(sch.sources[0].id, 'r');
+  assert.equal((await tasks.agent('내일 일정 알려줘', { now })).text, sch.text, '시각 없이 일정을 물으면 넣기가 아니라 일정 답');
+  assert.equal((await tasks.agent('내일 2시 치과 알려줘', { now })).kind, 'confirm', '시각이 있으면 알림 넣기');
 
   // 분명히 찾았는데 모델이 물러서면 메모의 문장을 그대로
   const ans = await tasks.agent('출시일 언제야?', { now });
