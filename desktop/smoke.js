@@ -1175,9 +1175,10 @@ export async function runSmoke({
       const moved = { x: aBounds.x + 30, y: aBounds.y + 20, width: 340, height: 320 };
       noteWins.get(newTab).setBounds(moved);
       noteWins.get(newTab).emit('moved');
-      await wait(100);
-      const same = stacks.stackOf(sA.id).memos.every((m) => { const b = noteWins.get(m)?.getBounds(); return !b || (b.x === moved.x && b.y === moved.y && b.width === moved.width); });
-      check('창을 옮기면 모든 탭이 같은 자리·크기', same);
+      // 숨은 탭은 메인이 따라 옮긴다 — Windows 러너는 100ms 안에 끝나지 않을 때가 있어 맞을 때까지 기다린다
+      const tabBounds = () => stacks.stackOf(sA.id).memos.map((m) => noteWins.get(m)?.getBounds()).filter(Boolean);
+      const same = await until(() => tabBounds().every((b) => b.x === moved.x && b.y === moved.y && b.width === moved.width), '탭 자리 맞춤', 3000).catch(() => false);
+      check('창을 옮기면 모든 탭이 같은 자리·크기', same, JSON.stringify({ moved, tabs: tabBounds() }));
       // 탭의 × → 스택에서 빼고 닫기
       await js(noteWins.get(newTab), `document.querySelector('.stack-close[data-close-tab="${newTab}"]').click()`);
       const closedTab = await until(() => !noteWins.has(newTab) && !stacks.stackOf(newTab), '× 빼기').catch(() => false);
