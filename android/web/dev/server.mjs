@@ -4,6 +4,7 @@
 // 앱(Kotlin Bridge.kt)이 하는 일을 이 서버가 대신한다: 메모 폴더 읽기·쓰기, 인터넷 받기, 임시 파일.
 // 개발용이라 APK 에는 들어가지 않는다 (app/build.gradle.kts 의 exclude("dev/**")).
 import http from 'node:http';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -526,6 +527,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (p.startsWith('/vault/')) return serveFile(res, vaultPath(p.slice('/vault/'.length)), req);
+    // 동영상 한 장면 (앱은 휴대폰 동영상 재생기로 — WebServer.kt poster). 미리보기는 ffmpeg 가 있으면 그것으로, 없으면 204(그림 없음)
+    if (p.startsWith('/poster/')) {
+      execFile('ffmpeg', ['-v', 'error', '-ss', '1', '-i', vaultPath(p.slice('/poster/'.length)), '-frames:v', '1', '-vf', 'scale=min(480\\,iw):-2', '-f', 'image2pipe', '-c:v', 'mjpeg', '-'],
+        { encoding: 'buffer', maxBuffer: 8 << 20 }, (err, jpg) => {
+          if (err || !jpg?.length) res.writeHead(204).end();
+          else res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(jpg);
+        });
+      return;
+    }
     // 알림 보관함 앱 아이콘 (앱은 앱 아이콘을 저장해 두지만 미리보기에는 없으므로 메모킹 아이콘으로)
     if (p.startsWith('/history/')) return serveFile(res, path.resolve(here, '../../../assets/icons/icon-256.png'), req);
     if (p.startsWith('/app/')) return serveFile(res, inside(appRoot, p.slice('/app/'.length)), req);

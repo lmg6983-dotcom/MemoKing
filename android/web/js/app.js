@@ -47,7 +47,7 @@ import { hasRememberedChoices, forgetChoices } from '../../app/js/rename-content
 const $ = (x) => document.getElementById(x);
 
 // 공용 코드(app/js/media.js)가 첨부 주소를 만들 때 쓴다
-window.memoking = { platform: 'android', vaultBase: `${location.origin}/vault/`, historyBase: `${location.origin}/history/` };
+window.memoking = { platform: 'android', vaultBase: `${location.origin}/vault/`, posterBase: `${location.origin}/poster/`, historyBase: `${location.origin}/history/` };
 
 injectIcons();
 attachSliders(); // 탭·고르기 칸: 선택 표시가 미끄러진다

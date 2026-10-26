@@ -707,6 +707,18 @@ try {
     check('동영상만 있는 메모: 목록 카드에 영상의 첫 장면 그림(빨간 화면) + ▶',
       Boolean(poster) && poster.blob && poster.play && poster.r > 150 && poster.g < 120 && poster.b < 120, JSON.stringify(poster));
     if (await page.isVisible('#toast')) await page.waitForSelector('#toast', { state: 'hidden', timeout: 7000 }).catch(() => {});
+    // 메모를 열면 동영상 재생 전 그림도 같은 장면 (회색 기본 그림 대신)
+    await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000v1"]');
+    const notePoster = await page.waitForFunction(() => {
+      const pp = document.querySelector('#note-screen .mk-video .plyr__poster');
+      return pp && getComputedStyle(pp).backgroundImage.includes('blob:');
+    }, null, { timeout: 8000 }).then(() => true).catch(() => false);
+    await shot('02f-video-note');
+    check('동영상 메모를 열면: 재생 전 그림이 그 영상의 장면 (플레이어 그림 칸)', notePoster);
+    for (let k = 0; k < 3 && await page.isVisible('#note-screen'); k++) {
+      await back();
+      await page.waitForTimeout(400);
+    }
   }
 
   // 다른 앱에서 공유하기

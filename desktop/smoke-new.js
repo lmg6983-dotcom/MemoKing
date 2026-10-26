@@ -595,6 +595,14 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
         await capture(list, 'smoke-new-video-thumb.png');
         check('동영상만 있는 메모: 목록 카드에 영상의 첫 장면 그림(빨간 화면) + ▶ — 이 PC 에 기억한 그림',
           Boolean(poster) && poster.blob && poster.play && poster.w > 0 && poster.r > 150 && poster.g < 120 && poster.b < 120, JSON.stringify(poster));
+        // 메모 창을 열면 동영상 재생 전 그림도 같은 장면
+        const beforeVid = new Set(noteWins.keys());
+        await js(list, `document.querySelector('[data-id="${vid}"]').click()`);
+        const vwid = await until(() => [...noteWins.keys()].find((k) => !beforeVid.has(k)), '동영상 메모 창');
+        const vw = noteWins.get(vwid);
+        const notePoster = await until(() => js(vw, `(() => { const p = document.querySelector('.mk-video .plyr__poster'); return p && getComputedStyle(p).backgroundImage.includes('blob:') || null; })()`), '메모 속 동영상 그림', 8000).catch(() => false);
+        check('동영상 메모 창: 재생 전 그림이 그 영상의 장면', notePoster === true);
+        vw.close();
       }
       const picId = vault.import({ body: '# 그림 복사\n\n![그림](attachments/smoke-copy.png)\n' });
       const beforePic = new Set(noteWins.keys());

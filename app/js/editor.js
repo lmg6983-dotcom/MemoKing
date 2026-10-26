@@ -21,6 +21,7 @@ import { remarkEmptyTasks } from './core/empty-tasks.js';
 import { remarkInlineHtmlMarks, stringifyHandlers, safeColor, DEFAULT_HIGHLIGHT } from './core/html-marks.js';
 import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
 import { vaultUrl, mediaKind, baseName } from './media.js';
+import { videoPoster } from './video-poster.js';
 import { openAlbumViewer } from './album-viewer.js';
 import { promptChoice } from './rename-content.js';
 import { isDocumentFile, documentPages } from './doc-pages.js';
@@ -165,6 +166,9 @@ function mediaView(node, view, getPos) {
     if (kind === 'video') el.setAttribute('playsinline', '');
     dom.append(el);
     const player = new Plyr(el, playerOptions(kind));
+    // 재생 전 그림: 1초쯤의 장면 (휴대폰 WebView 는 그대로 두면 회색 기본 그림만 보인다)
+    let gone = false;
+    if (kind === 'video') videoPoster(src).then((url) => { if (url && !gone) player.poster = url; });
     // 재생할 수 없을 때(파일이 없거나 읽지 못함 · 형식을 못 읽음) 조용히 멈춰 있지 않고 알린다 — 휴대폰은 다른 앱으로 열기 안내 (note-view.js).
     //   메모를 열기만 해도 뜨면 귀찮으니 재생 단추를 누른 뒤에만 (이미 오류 상태면 누르는 즉시)
     let tried = 0;
@@ -188,7 +192,10 @@ function mediaView(node, view, getPos) {
         return true;
       },
       ignoreMutation: () => true,
-      destroy: () => player.destroy(),
+      destroy: () => {
+        gone = true;
+        player.destroy();
+      },
     };
   }
   const dom = document.createElement('img');
