@@ -830,7 +830,7 @@ export async function runSmoke({
     const edgeSaved = await until(() => readMemo(linkNote.id).includes(`[엣지 제목](${edgeUrl} "미리보기")`), '엣지 카드').catch(() => false);
     check('제목과 함께 복사한 링크(엣지) → 그 제목으로 카드', edgeSaved && (await js(linkNote.win, "document.querySelectorAll('.mk-link-card').length")) === 2);
 
-    // 파일: 한 번 누르면 메모 폴더의 복사본을 열고, 프로그램 파일은 먼저 묻는다
+    // 파일: 두 번 누르면 메모 폴더의 복사본을 열고(한 번 누르면 열지 않음), 프로그램 파일은 먼저 묻는다
     await key(linkNote.win, 'End', ['control']);
     await js(linkNote.win, `(() => {
       const dt = new DataTransfer();
@@ -840,11 +840,17 @@ export async function runSmoke({
     })()`);
     const chips = await until(() => js(linkNote.win, `(() => { [...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '파일로')?.click(); const a = [...document.querySelectorAll('.mk-doc a[data-file]')]; return a.length === 2 && a.map((x) => ({ name: x.textContent, kind: x.dataset.file, ext: x.dataset.ext, href: x.getAttribute('href') })); })()`), '파일 칩 2개').catch(() => null);
     check('파일 칩: 종류·확장자 표시 (프로그램 파일 구분)', chips?.[0]?.kind === 'doc' && chips[0].ext === 'TXT' && chips[1]?.kind === 'program' && chips[1].ext === 'BAT', JSON.stringify(chips));
-    const clickChip = (i) => openViaMenu(linkNote.win, `document.querySelectorAll('.mk-doc a[data-file]')[${i}]`);
+    const chipAt = (i) => `document.querySelectorAll('.mk-doc a[data-file]')[${i}]`;
+    const clickChip = async (i) => {
+      await js(linkNote.win, `${chipAt(i)}.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))`);
+      await wait(250);
+    };
     let mark = smokeOpened.length;
+    await openViaMenu(linkNote.win, chipAt(0));
+    check('파일 칩: 한 번 누르면 열지 않음 (두 번 눌러 열기)', !smokeOpened.slice(mark).some((o) => o.kind === 'file'));
     await clickChip(0);
     const txtOpened = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '파일 열기').catch(() => null);
-    check('파일 칩 → 누르면 메모 폴더의 복사본을 기본 앱으로', Boolean(txtOpened) && txtOpened.target.startsWith(path.join(VAULT, 'attachments')) && fs.readFileSync(txtOpened.target, 'utf8') === '메모킹 회의록', JSON.stringify(txtOpened));
+    check('파일 칩 → 두 번 누르면 메모 폴더의 복사본을 기본 앱으로', Boolean(txtOpened) && txtOpened.target.startsWith(path.join(VAULT, 'attachments')) && fs.readFileSync(txtOpened.target, 'utf8') === '메모킹 회의록', JSON.stringify(txtOpened));
     mark = smokeOpened.length;
     await clickChip(1); // 답: 취소
     await wait(400);
