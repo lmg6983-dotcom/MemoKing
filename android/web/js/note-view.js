@@ -18,9 +18,14 @@ import { app } from './state.js';
 import { tutEvent, textChanged, screenChanged } from './tutorial.js';
 import { call, native } from './native.js';
 
-// 복사 단추 · 그림 복사: 안드로이드 클립보드에 그림(content://) / 글
+// 복사 단추 · 그림 복사: 안드로이드 클립보드에 그림(content://) / 글 / 파일(content:// + 이름 글)
+let copiedFileName = null; // 방금 복사한 파일의 이름 — 메모킹에 붙이면 이름 글 대신 파일로 (아래 paste)
 setCopyHost({
   image: (base64) => call('copyImage', { base64 }),
+  file: async (rel, name) => {
+    copiedFileName = await call('copyFile', { rel, name });
+    return true;
+  },
   text: ({ text }) => native.copyText(text),
   // 저장 단추: 안드로이드 저장 창 → 저장한 이름 | 'cancelled'
   save: async (f) => (await call('saveAs', f)) ?? 'cancelled',
@@ -592,7 +597,7 @@ el.editorRoot.addEventListener('paste', (e) => {
   if (pastingNative || !data || !editor) return;
   if (data.files?.length || data.getData('text/html')) return;
   const text = data.getData('text/plain');
-  if (text && !/^content:\/\//.test(text.trim())) return;
+  if (text && !/^content:\/\//.test(text.trim()) && text !== copiedFileName) return;
   e.preventDefault();
   e.stopPropagation();
   pasteClipboardFiles(text);
@@ -671,13 +676,6 @@ function openHref(href) {
 }
 
 el.editorRoot.addEventListener('click', (e) => {
-  const openBtn = e.target.closest?.('.mk-file-open');
-  if (openBtn && el.editorRoot.contains(openBtn)) {
-    e.preventDefault();
-    e.stopPropagation();
-    openHref(openBtn.dataset.fileOpen);
-    return;
-  }
   const a = e.target.closest?.('a[href]');
   if (!a || !el.editorRoot.contains(a)) return;
   e.preventDefault();
@@ -1254,12 +1252,12 @@ export function useEditMode() {
 }
 function setupKnob() {
   knob ??= setupModeKnob(el.screen, { value: storedMode(), onChange: (m, { quiet }) => applyMode(m, { user: true, quiet }) });
-  // 다이얼은 아래쪽 막대들(도구막대 · 녹음 판 · 추천 태그 줄) 바로 위 — 녹음 정지 단추 등을 가리지 않고,
-  //   키보드가 올라와 막대가 움직여도 따라간다
+  // 다이얼은 아래쪽 막대들(도구막대 · 추천 태그 줄) 바로 위 — 키보드가 올라와 막대가 움직여도 따라간다
   //   도구막대 · 옮기기 막대 · 그리기 도구 막대는 같은 높이(52px)·같은 자리라 그만큼은 고정 — 방식을 바꿔도
-  //   (막대가 올라오는 움직임 도중에 재더라도) 다이얼 · 안내가 제자리. 녹음 판 · 추천 태그 줄이 더 얹히면 그만큼 위로
+  //   (막대가 올라오는 움직임 도중에 재더라도) 다이얼 · 안내가 제자리. 추천 태그 줄이 더 얹히면 그만큼 위로
   // 도구막대도 — 두 줄로 접힐 때(좁은 화면) 위로. 표 막대도 — 표 안에 있으면 + · 다이얼이 표 막대를 가리지 않게 그 위로
-  const extras = [el.formatBar, el.tableBar, $('rec-panel'), el.tagBar].filter(Boolean);
+  // 녹음 판은 넣지 않는다: 좌측 상단에 떠 있어 넣으면 + · 다이얼이 화면 꼭대기로 올라간다
+  const extras = [el.formatBar, el.tableBar, el.tagBar].filter(Boolean);
   placeKnob = () => {
     const bottom = el.screen.getBoundingClientRect().bottom;
     const base = DOCK_H + (parseFloat(getComputedStyle($('move-bar')).marginBottom) || 8);
@@ -1269,8 +1267,7 @@ function setupKnob() {
   };
   const ro = new ResizeObserver(() => placeKnob());
   for (const e of [el.screen, ...extras]) ro.observe(e);
-  // 녹음 판 · 추천 태그 줄은 아래에서 미끄러져 올라온다 — 크기가 바뀐 순간(움직이기 전)에 재면 아직 아래에 있어
-  //   다이얼이 "끝내기" 단추를 가리므로, 다 올라온 뒤 한 번 더 잰다
+  // 추천 태그 줄은 아래에서 미끄러져 올라온다 — 크기가 바뀐 순간(움직이기 전)에 재면 아직 아래에 있으므로, 다 올라온 뒤 한 번 더 잰다
   for (const e of extras) e.addEventListener('animationend', () => placeKnob());
 }
 

@@ -5,7 +5,6 @@
 //   - 커서는 칩 앞 · 뒤에만 (칩 하나가 캡슐 하나): 가운데를 누르면 가까운 끝으로, 화살표는 칩을 한 번에 건너뛰고,
 //     Shift 로 고르면 칩을 통째로 고른다 (칩 뒤에서 친 글이 칩 이름에 붙지 않는 것은 editor.js 링크 inclusive: false)
 import { Plugin, PluginKey, TextSelection, Decoration, DecorationSet } from '../vendor/milkdown.js';
-import { isProgramFile } from './core/file-kinds.js';
 
 const isFileHref = (href) => typeof href === 'string' && href.startsWith('attachments/');
 const fileMarkOf = (node) => node.marks.find((m) => m.type.name === 'link' && isFileHref(m.attrs.href));
@@ -114,20 +113,6 @@ export const fileChipGuard = () => new Plugin({
         if (chips.length === 1 && chips[0].from === pos + 1 && chips[0].to === pos + 1 + node.content.size) {
           decos.push(Decoration.node(pos, pos + node.nodeSize, { class: 'mk-file-line' }));
         }
-        for (const c of chips) {
-          decos.push(Decoration.widget(c.to, () => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'mk-file-open';
-            btn.dataset.fileOpen = c.href;
-            btn.contentEditable = 'false';
-            btn.tabIndex = -1;
-            const run = isProgramFile(c.href);
-            btn.textContent = run ? '실행' : '열기';
-            btn.title = run ? '이 프로그램 실행' : '파일 열기';
-            return btn;
-          }, { side: 1, key: `open:${c.href}`, stopEvent: () => true }));
-        }
         return false;
       });
       return decos.length ? DecorationSet.create(state.doc, decos) : DecorationSet.empty;
@@ -135,10 +120,6 @@ export const fileChipGuard = () => new Plugin({
     handleDOMEvents: {
       mousedown(view, e) {
         if (!(e.target instanceof Element)) return false;
-        if (e.target.closest('.mk-file-open')) {
-          e.preventDefault();
-          return true;
-        }
         const capsule = e.target.closest('a[data-file], a[href^="attachments/"], .mk-tag');
         if (capsule && view.dom.contains(capsule)) {
           e.preventDefault();

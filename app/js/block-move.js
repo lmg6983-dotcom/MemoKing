@@ -289,9 +289,10 @@ function virtualY(d) {
 
 /** @param {{ readOnly?: boolean }} options */
 // 휴대폰: 내용에 공유 · 저장 · 복사 · 지우기 단추를 띄운다 — 고를 시간을 넉넉히
-//   짧게 누르기(탭): 그림 · 손 메모 · 소리/동영상/음성 카드의 이름 줄 (누르면 따로 하는 일이 없는 곳)
+//   짧게 누르기(탭): 그림 · 손 메모 · 동영상 이름 · 소리 상자의 빈 곳 (누르면 따로 하는 일이 없는 곳 — 재생 단추 · 막대는 빼고)
 //   꾹 누르기(글 고치기 방식): 파일 칩 · 링크 카드 · 수식 — 짧게 누르면 열기 · 고치기라서
-const TAP_TARGET = 'img.mk-image, .mk-ink, .mk-media-label';
+const TAP_TARGET = 'img.mk-image, .mk-ink, .mk-media-label, .mk-audio';
+const TAP_SKIP = '.plyr__control, .plyr__progress';
 const HOLD_TARGET = 'a[data-file], .mk-link-card, [data-link-card], .mk-math-block';
 const TAP_MS = 400;
 // 누르면 바로 열리던 것 → 단추 줄의 "열기" 단추가 그것을 대신 눌러 준다 (링크 카드는 안쪽 글 상자가 받는다)
@@ -417,7 +418,7 @@ export function createBlockMove({ readOnly = false } = {}) {
           if (!t0 || !t || !mover || mover.busy() || touchMode() === 'draw' || Date.now() - t0.at > TAP_MS) return false;
           if (Math.hypot(t.clientX - t0.x, t.clientY - t0.y) > 10) return false;
           const opens = t0.target instanceof Element ? t0.target.closest(HOLD_TARGET) : null;
-          const host = t0.target instanceof Element ? t0.target.closest(TAP_TARGET) ?? opens : null;
+          const host = t0.target instanceof Element && !t0.target.closest(TAP_SKIP) ? t0.target.closest(TAP_TARGET) ?? opens : null;
           if (!host || !view.dom.contains(host)) return false;
           const block = blockFromTarget(view, host);
           if (!block || !isContentBlock(block.node)) return false;
@@ -475,7 +476,6 @@ class Mover {
     if (!canContentMenu()) {
       this.onOpenClick = (e) => {
         if (e.mkOpen || e.button !== 0) return;
-        if (e.target instanceof Element && e.target.closest('.mk-file-open')) return;
         const host = e.target instanceof Element ? e.target.closest(OPEN_TARGET) : null;
         if (!host || !view.dom.contains(host) || e.target.closest('.lc-remove')) return;
         const block = blockFromTarget(view, host);
@@ -605,7 +605,6 @@ class Mover {
   press(event, kind) {
     const { view } = this;
     if (this.drag) return;
-    if (event.target instanceof Element && event.target.closest('.mk-file-open')) return;
     if (!persistentShown()) this.hideDelete(); // 표를 고치는 동안 표 위 단추는 눌러도 그대로 (휴대폰)
     let block = blockFromTarget(view, event.target);
     // 내용 줄이 아니면 글 줄(문단·제목·표·코드·인용·음성 카드): 꾹 눌러야 들어 올린다

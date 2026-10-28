@@ -263,6 +263,7 @@ const widgetData = {};
 let scheduled = [];
 let pickQueue = []; // 점검용: 다음 pickFiles 가 돌려줄 파일들 [{ name, mime, base64 }]
 let clipboardImage = null; // 휴대폰 클립보드의 그림 흉내 (copyImage 가 넣고 clipboardFiles 가 꺼냄)
+let clipboardFile = null; // 휴대폰 클립보드의 파일 흉내 (copyFile 이 넣고 clipboardFiles 가 꺼냄) — { name, bytes }
 
 function makeTemp(name, mime, bytes) {
   const id = randomUUID();
@@ -406,7 +407,7 @@ const calls = {
     return { text: '받아쓴 글이에요.\n두 번째 문장이에요.' };
   },
   // 클립보드의 그림 · 파일 → 임시 파일 (메모킹에서 복사한 그림을 붙여 넣기)
-  clipboardFiles: async () => (clipboardImage ? [makeTemp('메모킹 그림.png', 'image/png', clipboardImage)] : []),
+  clipboardFiles: async () => (clipboardFile ? [makeTemp(clipboardFile.name, '', clipboardFile.bytes)] : clipboardImage ? [makeTemp('메모킹 그림.png', 'image/png', clipboardImage)] : []),
   // 공유 단추: 안드로이드 공유 창 흉내
   shareContent: async (a) => {
     log.push({ shareContent: { name: a.name, mime: a.mime, rel: a.rel ?? null, text: a.text ?? null } });
@@ -418,7 +419,16 @@ const calls = {
     log.push({ saveAs: { name: a.name, mime: a.mime, rel: a.rel ?? null, bytes, text: a.base64 && /^text\//.test(a.mime) ? Buffer.from(a.base64, 'base64').toString('utf8') : null } });
     return a.name;
   },
+  copyFile: async (a) => {
+    const ext = path.extname(a.rel);
+    const name = (a.name || path.basename(a.rel)) + (ext && !a.name?.toLowerCase().endsWith(ext.toLowerCase()) ? ext : '');
+    clipboardFile = { name, bytes: fs.readFileSync(vaultPath(a.rel)) };
+    clipboardImage = null;
+    log.push({ copyFile: { rel: a.rel, name } });
+    return name;
+  },
   copyImage: async (a) => {
+    clipboardFile = null;
     clipboardImage = Buffer.from(a.base64 ?? '', 'base64');
     log.push({ copyImage: { bytes: Math.round((a.base64?.length ?? 0) * 0.75) } });
     return true;

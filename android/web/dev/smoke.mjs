@@ -1356,8 +1356,7 @@ try {
   await page.waitForSelector('#rec-panel:not([hidden])');
   check('음성 메모: 바로 녹음 시작', (await devLog()).log.some((l) => l.recordStart));
   await page.waitForTimeout(1200);
-  for (const lv of [0.2, 0.9, 0.6, 0.8, 0.3, 0.7, 0.5]) await page.evaluate((level) => window.__mk.emit('record', { type: 'level', level }), lv);
-  check('녹음: 소리 크기 막대가 움직임', (await page.evaluate(() => getComputedStyle(document.querySelector('#rec-wave i:last-child')).getPropertyValue('--lv'))).trim() === '0.50');
+  check('녹음 알약: 점 · 시간 · 멈춤 · 끝내기만 (받아쓰는 중 글자 · 파형 · 끝내기 글자 없음)', await page.evaluate(() => !document.querySelector('#rec-state, #rec-wave') && document.getElementById('rec-stop').textContent.trim() === '' && document.getElementById('rec-stop').getAttribute('aria-label') === '녹음 끝내기'));
   const overlap = await page.evaluate(() => {
     const stop = document.getElementById('rec-stop').getBoundingClientRect();
     return [...document.querySelectorAll('.mk-dial, #add-btn')].some((f) => {
@@ -1366,23 +1365,38 @@ try {
     });
   });
   check('녹음: 다이얼 · + 버튼이 끝내기 버튼을 가리지 않음', !overlap);
+  const recGeo = await page.evaluate(() => {
+    const screen = document.getElementById('note-screen').getBoundingClientRect();
+    const panel = document.getElementById('rec-panel').getBoundingClientRect();
+    const low = [...document.querySelectorAll('.mk-dial, #add-btn')].map((f) => Math.round(screen.bottom - f.getBoundingClientRect().bottom));
+    return { low, panelH: Math.round(panel.height), text: !!document.getElementById('rec-text') };
+  });
+  check('녹음 중: + · 다이얼은 아래 제자리, 녹음 판은 한 줄 알약 (받아쓴 글 없음)', recGeo.low.length === 2 && recGeo.low.every((d) => d < 140) && recGeo.panelH <= 46 && !recGeo.text, JSON.stringify(recGeo));
   await shot('11-recording');
   await page.tap('#rec-stop');
+  await page.waitForSelector('#name-dialog[open]');
+  check('녹음 끝: 이름 입력 창 (기본 이름이 채워져 있음)', (await page.inputValue('#name-input')).startsWith('녹음 '));
+  await shot('11b-recording-name');
+  await page.fill('#name-input', '주간 회의');
+  await page.press('#name-input', 'Enter');
   await page.waitForTimeout(1200);
+  check('녹음 끝: 알약이 사라짐', await page.locator('#rec-panel').isHidden());
   await back();
   await page.waitForTimeout(400);
   f = fileWith('오늘 회의를 시작하겠습니다');
-  check('음성 메모: 소리 파일 + 받아쓴 글', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 음성 메모'), f && read(f));
-  check('음성 카드: 소리와 받아쓴 글이 한 칸(인용), 문장마다 줄 · 화자 이름표', f && /^> !\[녹음/m.test(read(f)) && read(f).includes('>\n> **화자 2:** 다음 주 출시 일정을 정리했어요.\n>\n> 표로 공유할게요.'), f && read(f));
+  check('음성 메모: 소리 파일 + 받아쓴 글 · 고른 이름', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 주간 회의') && /!\[주간 회의 \(/.test(read(f)), f && read(f));
+  check('음성 카드: 소리와 받아쓴 글이 한 칸(인용), 문장마다 줄 · 화자 이름표', f && /^> !\[주간 회의/m.test(read(f)) && read(f).includes('>\n> **화자 2:** 다음 주 출시 일정을 정리했어요.\n>\n> 표로 공유할게요.'), f && read(f));
 
   // Google 음성 인식을 못 쓰는 휴대폰(안드로이드 13 아래): 녹음은 그대로, 받아쓰기는 못 한다고 바로 알림 (기다리게 하지 않음)
   await post('/dev/stt', { system: false });
   await page.tap('#fab');
   await page.tap('[data-new="voice"]');
   await page.waitForSelector('#rec-panel:not([hidden])');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(700); // 메모를 막 연 때는 끝내기를 잠깐 받지 않는다 (recorder.holdStop)
   check('받아쓰기 못 쓰는 휴대폰: 녹음은 하면서 "녹음만 해요" 알림 (다운로드 버튼 없음)', (await page.textContent('#toast-text')).includes('녹음만') && !(await page.isVisible('#toast-action')), await page.textContent('#toast-text'));
   await page.tap('#rec-stop');
+  await page.waitForSelector('#name-dialog[open]');
+  await page.tap('#name-dialog button[value="cancel"]'); // 그만둬도 기본 이름으로 들어간다
   await page.waitForTimeout(1200);
   await back();
   await page.waitForTimeout(400);
@@ -1575,9 +1589,9 @@ try {
     check('음성 카드: 이름 줄을 짧게 누르면 공유 · 저장 · 복사 · × (왼쪽부터)', four.every((x) => x >= 0) && four[0] < four[1] && four[1] < four[2] && four[2] < four[3] && voiceLabel === '이 음성 삭제', JSON.stringify({ four, voiceLabel }));
     // 소리 상자: 음소거 단추 없음 · 이름 줄은 손가락이 닿을 만큼(44px) · 재생하지 못하면(여기서는 가짜 소리 파일) 재생 단추를 누른 뒤 안내 + 다른 앱으로 열기
     {
-      const props = await page.evaluate(() => ({ mute: document.querySelectorAll('.mk-audio [data-plyr="mute"]').length, labelH: Math.round(document.querySelector('.mk-media-label').getBoundingClientRect().height) }));
+      const props = await page.evaluate(() => ({ mute: document.querySelectorAll('.mk-audio [data-plyr="mute"]').length, boxH: Math.round(document.querySelector('.mk-audio').getBoundingClientRect().height) }));
       const quiet = await page.evaluate(() => document.getElementById('toast')?.hidden !== false);
-      check('소리 상자: 음소거 버튼은 없고 이름 줄은 44px 이상 (4종 버튼을 누르기 쉽게)', props.mute === 0 && props.labelH >= 44, JSON.stringify(props));
+      check('소리 상자: 음소거 버튼은 없고 한 덩어리(60px 안팎) — 빈 곳 어디든 눌러 4종 버튼', props.mute === 0 && props.boxH >= 44 && props.boxH <= 66, JSON.stringify(props));
       check('메모를 열기만 해서는 "재생하지 못했어요" 안내가 뜨지 않음', quiet || !/재생하지 못했어요/.test(await page.textContent('#toast-text')), String(quiet));
       await page.waitForTimeout(2600);
       await page.tap('.mk-audio .plyr__control[data-plyr="play"]').catch(() => {});
@@ -1601,6 +1615,16 @@ try {
     const chipLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
     const opensAfter = (await devLog()).log.filter((x) => x.openFile).length;
     check('파일 칩: 꾹 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 삭제' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
+    check('파일 칩: 옆에 "열기" 단추 없음', (await page.locator('.mk-file-open').count()) === 0);
+    await page.tap('.mk-copy-btn');
+    await page.waitForTimeout(500);
+    const copiedFile = (await devLog()).log.filter((x) => x.copyFile).at(-1);
+    check('복사 버튼: 파일은 이름 글이 아니라 파일 그대로 (이름 붙여)', copiedFile?.copyFile.rel === 'attachments/안내서.pdf' && copiedFile.copyFile.name === '안내서.pdf', JSON.stringify(copiedFile));
+    await page.waitForTimeout(1900);
+    await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
+    await page.waitForTimeout(650);
+    await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
+    await page.waitForTimeout(300);
     await page.tap('.mk-save-btn');
     await page.waitForTimeout(500);
     const saved = (await devLog()).log.filter((x) => x.saveAs).at(-1);
@@ -1625,6 +1649,9 @@ try {
     await page.waitForTimeout(500);
     const opened = (await devLog()).log.filter((x) => x.openFile);
     check('열기 버튼: 누르면 그 파일을 연다 (버튼은 거둠)', opened.length === opens0 + 1 && opened.at(-1).openFile === 'attachments/안내서.pdf' && !(await page.locator('.mk-open-btn').count()), JSON.stringify(opened.at(-1)));
+    await page.locator('.mk-doc a[data-file]').first().dispatchEvent('dblclick');
+    await page.waitForTimeout(400);
+    check('파일 칩: 두 번 누르면 연다', (await devLog()).log.filter((x) => x.openFile).length === opened.length + 1);
     // 수식: 눌러도 고치기 창이 바로 뜨지 않고 단추 + "고치기"
     await tapAt('.mk-doc .mk-math-block');
     const mathRow = { editor: await page.locator('.mk-math-editor').count(), label: await page.getAttribute('.mk-open-btn', 'aria-label').catch(() => null) };
@@ -2292,16 +2319,19 @@ try {
       const ring = Array.from({ length: 13 }, (_, i) => [w0.x + Math.cos((i / 12) * Math.PI * 2) * (w0.w / 2 + 8), w0.y + Math.sin((i / 12) * Math.PI * 2) * (w0.h / 2 + 6)]);
       await draw(ring);
       await page.waitForTimeout(150);
+      // 같은 그림의 둘째 획: 낱말 아래 밑줄 (동그라미와 붙어 있음) — 줄바꿈이 달라져도 동그라미와 함께 다닌다
+      const under = Array.from({ length: 6 }, (_, i) => [w0.x - w0.w / 2 - 6 + (i / 5) * (w0.w + 12), w0.y + w0.h / 2 + 10]);
+      await draw(under);
+      await page.waitForTimeout(150);
       await pickMode(page, 'edit');
       await page.waitForTimeout(600);
-      const ringAt = () => page.evaluate(() => {
-        const paths = [...document.querySelectorAll('.mk-annot path')];
-        const b = paths[paths.length - 1].getBoundingClientRect();
+      const centers = () => page.evaluate(() => [...document.querySelectorAll('.mk-annot path')].slice(-2).map((p) => {
+        const b = p.getBoundingClientRect();
         return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
-      });
+      }));
       const off = async () => {
-        const [r, w] = [await ringAt(), await word()];
-        return { dx: Math.round(r.x - w.x), dy: Math.round(r.y - w.y) };
+        const [[r, u], w] = [await centers(), await word()];
+        return { dx: Math.round(r.x - w.x), dy: Math.round(r.y - w.y), ux: Math.round(u.x - r.x), uy: Math.round(u.y - r.y) };
       };
       const atStart = await off();
       const sizes = [];
@@ -2310,9 +2340,28 @@ try {
         await page.waitForTimeout(700);
         sizes.push({ width, ...(await off()) });
       }
-      const ok = sizes.every((v) => Math.abs(v.dx - atStart.dx) <= 6 && Math.abs(v.dy - atStart.dy) <= 6);
+      // 매직 줌(본문 확대): 같은 배율로 커지고 그 낱말 · 그림 모양은 그대로 (note-view.js applyZoom 과 같게 배율 · 폭을 준다)
+      const setZoom = (z) => page.evaluate((zz) => {
+        const root = document.getElementById('editor');
+        const cs = getComputedStyle(root);
+        const base = root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        root.style.setProperty('--note-zoom', String(zz));
+        for (const c of root.children) if (!c.classList.contains('mk-annot')) c.style.width = zz > 1 ? `${base}px` : '';
+      }, z);
+      await setZoom(1.5);
+      await page.waitForTimeout(700);
+      const zoomed = await off();
+      await setZoom(1);
+      await page.waitForTimeout(500);
+      const zoomOk = ['dx', 'dy', 'ux', 'uy'].every((k) => Math.abs(zoomed[k] - atStart[k] * 1.5) <= 8);
+      check('주석: 본문을 확대해도 그 낱말 위에 · 묶음 모양 그대로 (같은 배율로 커짐)', zoomOk, JSON.stringify({ atStart, zoomed }));
+      const near = (v, k) => Math.abs(v[k] - atStart[k]) <= 6;
+      const ok = sizes.every((v) => near(v, 'dx') && near(v, 'dy'));
+      const together = sizes.every((v) => near(v, 'ux') && near(v, 'uy'));
       const saved = JSON.parse(read((await waitFile((b) => /^ink: /m.test(b))).match(/^ink: (attachments\/\S+\.json)$/m)[1]));
-      check('주석 동그라미: 화면 폭이 바뀌어 줄바꿈이 달라져도 그 낱말 위에 (글자에 붙여 저장)', ok && saved.strokes.at(-1)?.anchor?.t === 'c', JSON.stringify({ atStart, sizes, anchor: saved.strokes.at(-1)?.anchor }));
+      const [a1, a2] = saved.strokes.slice(-2).map((x) => x.anchor);
+      check('주석 동그라미: 화면 폭이 바뀌어 줄바꿈이 달라져도 그 낱말 위에 (글자에 붙여 저장)', ok && a1?.t === 'c', JSON.stringify({ atStart, sizes, anchor: a1 }));
+      check('주석 묶음: 동그라미 + 밑줄은 같은 글자에 붙어 줄바꿈이 달라져도 흩어지지 않음', together && a2?.t === 'c' && a1.b === a2.b && a1.c === a2.c, JSON.stringify({ atStart, sizes, a1, a2 }));
       await shot('23b-annotate-reflow');
     }
     await back();

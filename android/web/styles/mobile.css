@@ -654,6 +654,7 @@ h2.sheet-title { font-size: 20px; }
 .field { display: flex; flex-direction: column; gap: 6px; margin: 14px 4px 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .field input { height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); color: var(--text); font-size: 14px; font-weight: 500; }
 .field input:focus { outline: 2px solid var(--text-strong); outline-offset: -1px; }
+.name-field { margin: 0 0 16px; }
 .drive-step > .link-btn { display: block; margin: 14px auto 0; color: var(--muted); }
 .wait { display: flex; align-items: center; gap: 10px; margin: 14px 4px 0; font-size: 14px; color: var(--muted); }
 .wait .link-btn { margin-left: auto; }
@@ -777,36 +778,30 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .note-screen .format-bar [data-action="record"].active { color: var(--on-rec); background: var(--rec); }
 .note-screen .format-bar [data-action="record"].active svg { animation: mk-blink 1.2s ease-in-out infinite; }
 
-/* ---------- 녹음 중: 필기할 때 손목이 닿는 아래쪽 대신 좌측 상단에 작게 플로팅 (바꾸기 막대처럼) ---------- */
+/* ---------- 녹음 중: 필기할 때 손목이 닿는 아래쪽 대신 좌측 상단에 작은 알약 — 점 · 시간 · 멈춤 · 끝내기만 (받아쓴 글은 끝난 뒤 본문에) ---------- */
 .rec-panel {
   position: relative; z-index: 5; flex: none; align-self: flex-start;
-  width: fit-content; max-width: min(460px, calc(100% - 16px)); box-sizing: border-box;
+  width: fit-content; max-width: calc(100% - 16px); box-sizing: border-box;
   margin: 4px 8px 6px;
-  padding: 6px 8px 6px 12px;
-  border-radius: 14px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--text-strong);
   box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card);
-  animation: mk-find-in 0.16s var(--ease-out);
+  animation: rec-in 0.24s var(--ease-out);
 }
-.rec-text:empty { display: none; }
+.rec-panel.leaving { animation: rec-out 0.18s ease-in forwards; pointer-events: none; }
+@keyframes rec-in { from { opacity: 0; transform: translateY(-12px) scale(0.96); } }
+@keyframes rec-out { to { opacity: 0; transform: translateY(-12px) scale(0.96); } }
 .rec-head { display: flex; align-items: center; gap: 8px; }
 .rec-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--rec); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rec) 20%, transparent); animation: mk-blink 1.2s ease-in-out infinite; }
 .rec-panel.paused .rec-dot { animation: none; background: var(--note-muted); box-shadow: none; }
-/* 좁은 화면에서도 한 줄: 시간·단추는 줄지 않고 줄바꿈도 없이, 모자라면 상태 글자만 말줄임 */
-.rec-time { flex: none; white-space: nowrap; font-size: 17px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
-.rec-state { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--note-muted); }
-.rec-wave { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 22px; margin-left: 2px; }
-.rec-wave i { display: block; width: 3px; height: 22px; border-radius: 2px; background: var(--rec); transform: scaleY(calc(0.12 + var(--lv, 0) * 0.88)); transition: transform 0.12s ease-out; }
-.rec-panel.paused .rec-wave i { background: var(--note-muted); transform: scaleY(0.12); }
-.rec-spk { display: inline-block; margin-right: 4px; padding: 0 7px; border-radius: 999px; font-size: 0.8em; font-weight: 700; line-height: 1.6; color: #fff; background: var(--spk, #2f6fdf); }
-.rec-btn { flex: none; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--tap); min-width: var(--tap); padding: 0 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); font-weight: 700; font-size: 14px; }
+.rec-time { flex: none; margin-right: 4px; white-space: nowrap; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.rec-panel.paused .rec-time { color: var(--note-muted); } /* 멈춤: 점 · 시간이 흐려지고 멈춤 단추가 ▶ 로 */
+.rec-btn { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 999px; /* 누르는 자리는 아래 48px 규칙 */ background: color-mix(in srgb, var(--note-text) 9%, transparent); color: var(--note-text); }
 .rec-btn svg { width: 18px; height: 18px; }
-.rec-btn.stop { background: var(--rec); color: var(--on-rec); }
+.rec-btn.stop { margin-left: 4px; background: var(--rec); color: var(--on-rec); } /* 멈춤과 12px 떨어져 48px 누르는 자리가 겹치지 않게 */
 .rec-btn:active { transform: scale(0.96); }
-.rec-text { max-height: 22vh; margin-top: 8px; overflow-y: auto; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.rec-partial { color: var(--note-muted); }
-.rec-hint { color: var(--note-muted); font-size: 13px; }
 /* 목록 화면: 녹음 중 알약 (+ 버튼 위 — + 버튼 아래 끝 20px + 높이 60px + 사이 12px, 아래 탭바 위) */
 .rec-pill {
   position: absolute;
@@ -1008,7 +1003,6 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 /* 가로로 눕힌 휴대폰 (높이가 낮음): 막대를 얇게 */
 @media (max-height: 460px) and (orientation: landscape) {
   :root { --top-h: 46px; }
-  .rec-text { max-height: 14vh; }
   .searchbar { padding-bottom: 4px; }
 }
 
@@ -1253,10 +1247,11 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 일정 탭에도 + 단추가 있으므로 마지막 줄이 단추 위로 올라올 만큼 아래 여백 */
 #reminder-groups { padding-bottom: 104px; }
 
-/* 소리 · 음성 카드의 이름 줄: 짧게 누르면 복사 · 잘라내기 · 저장 · 공유 · 지우기 단추가 뜬다 — 손가락이 닿을 만큼 크게(44px) + "⋯" 로 눌러 볼 수 있음을 보여 준다 */
-.note-screen .mk-media .mk-media-label { min-height: 44px; padding: 10px 10px 6px; font-size: 13px; }
-.note-screen .mk-audio .mk-media-label::after,
-.note-screen .mk-voice-body > p:first-child .mk-media-label::after { content: "\22EF"; margin-left: auto; padding: 0 8px; font-size: 22px; line-height: 1; opacity: 0.7; }
+/* 소리 상자는 빈 곳 어디든 짧게 누르면 복사 · 잘라내기 · 저장 · 공유 · 지우기 단추 (block-move.js TAP_TARGET) —
+   "⋯" 없이, 이름 줄은 얇게. 음성 카드 오른쪽 위 "음성 메모" 글자도 휴대폰에서는 뺀다 (좁은 화면) */
+.note-screen .mk-media .mk-media-label { font-size: 13.5px; }
+.note-screen .mk-voice-body > p:first-child .mk-media-label::after { content: none; }
+.note-screen .mk-video .mk-media-label { min-height: 44px; }
 /* 정렬: 기본(최신순)이 아니면 단추에 표시 (필터처럼) */
 
 /* 메모킹 Work / Life 고르기: 검색 왼쪽에 작게 (손가락 높이 44px 은 둘레 칸으로) */

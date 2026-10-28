@@ -2092,7 +2092,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await js(list, `(() => { const i = document.getElementById('search'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     }
     // 2026-10-28 피드백 스모크 점검 & 스크린샷:
-    //   1) 파일 캡슐 옆 "열기" 버튼 · 우클릭 "쪽 이미지 다시 넣기" 메뉴 · txt 문서 쪽 이미지 변환
+    //   1) 파일 캡슐 옆 "열기" 버튼 없음(두 번 눌러 열기) · 우클릭 "쪽 이미지 다시 넣기" 메뉴 · txt 문서 쪽 이미지 변환
     //   2) 되돌리기 안내(#mk-undo-hint)가 편집 영역(#editor) 바깥 하단에 위치
     //   3) 녹음 바(.desk-rec) 좌측 상단 컴팩트 플로팅 · AI 지시 편집("메모 덮어쓰기")
     {
@@ -2104,14 +2104,13 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await until(() => js(fw, `document.documentElement.dataset.ready === 'true' && !!document.querySelector('.ProseMirror a[data-file]')`), '피드백 메모 준비', 8000);
       fw.focus();
       await wait(300);
-      // (a) 파일 캡슐 옆 열기 버튼 확인 및 스크린샷
+      // (a) 파일 캡슐 옆에 "열기" 버튼이 없고(두 번 눌러 열기) 캡슐 안 캐럿은 투명 — 스크린샷
       const openBtnInfo = await js(fw, `(() => {
-        const b = document.querySelector('.mk-file-open');
         const a = document.querySelector('.ProseMirror a[data-file]');
-        return b && a && { text: b.textContent, caretColor: getComputedStyle(a).caretColor };
+        return a && { button: !!document.querySelector('.mk-file-open'), caretColor: getComputedStyle(a).caretColor };
       })()`);
-      check('파일 캡슐: 옆에 전용 "열기" 버튼이 표시되고 캡슐 내부 캐럿은 투명 처리됨',
-        openBtnInfo?.text === '열기' && openBtnInfo.caretColor === 'rgba(0, 0, 0, 0)', JSON.stringify(openBtnInfo));
+      check('파일 캡슐: 옆에 "열기" 버튼 없음 · 캡슐 내부 캐럿은 투명 처리됨',
+        openBtnInfo?.button === false && openBtnInfo.caretColor === 'rgba(0, 0, 0, 0)', JSON.stringify(openBtnInfo));
       await capture(fw, 'smoke-feedback-file-capsule.png');
       // (b) 파일 캡슐 우클릭 → "그림으로 펼치기" · "텍스트로 본문에 풀기" 메뉴 확인 및 스크린샷
       const chipPos = await js(fw, `(() => { const a = document.querySelector('.ProseMirror a[data-file]'); const r = a.getBoundingClientRect(); return { x: Math.round(r.left + 24), y: Math.round(r.top + r.height / 2) }; })()`);

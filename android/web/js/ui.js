@@ -206,6 +206,28 @@ export function confirmDialog(message, okLabel = '삭제', { cancelLabel = '취�
   });
 }
 
+/** 이름 묻기 → 쓴 이름 | null(취소). 칸은 value 로 채우고 모두 골라 둔다 (바로 덮어 쓰거나 Enter 로 그대로) */
+export function promptName({ title, value = '', okLabel = '저장', cancelLabel = '취소' }) {
+  const dialog = $('name-dialog');
+  const input = $('name-input');
+  $('name-title').textContent = title;
+  $('name-ok').textContent = okLabel;
+  dialog.querySelector('button[value="cancel"]').textContent = cancelLabel;
+  input.value = value;
+  dialog.returnValue = '';
+  dialog.showModal();
+  input.select();
+  return new Promise((resolve) => {
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok' ? input.value : null), { once: true });
+  });
+}
+// Enter = 저장 (그냥 두면 폼의 첫 단추인 "취소" 가 눌린다)
+$('name-input').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  e.preventDefault();
+  $('name-dialog').close('ok');
+});
+
 export function closeConfirm() {
   const dialog = $('confirm-dialog');
   if (!dialog.open) return false;
