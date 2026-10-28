@@ -244,6 +244,28 @@ export function anchorStrokeToChar(stroke, at) {
   };
 }
 
+/**
+ * 한 번에 그린 그림 묶기: 테두리가 gap(px) 안으로 닿는 획끼리 한 묶음 (손글씨 · 동그라미 + 화살표 등)
+ *   묶음은 같은 글자에 함께 붙여, 줄바꿈이 달라져도 그림이 흩어지지 않고 낱말을 따라간다 (v0.72 에서 획마다 붙여 흩어지던 것)
+ * @returns {number[][]} 획 번호 묶음들 (그린 순서)
+ */
+export function groupStrokes(strokes, gap = 24) {
+  const boxes = strokes.map((s) => inkBounds([s]));
+  const root = strokes.map((_, i) => i);
+  const find = (i) => (root[i] === i ? i : (root[i] = find(root[i])));
+  const near = (a, b) => a && b && a.x - gap <= b.x + b.w && b.x - gap <= a.x + a.w && a.y - gap <= b.y + b.h && b.y - gap <= a.y + a.h;
+  for (let i = 0; i < strokes.length; i++) {
+    for (let j = 0; j < i; j++) if (near(boxes[i], boxes[j])) root[find(i)] = find(j);
+  }
+  const groups = new Map();
+  strokes.forEach((_, i) => {
+    const r = find(i);
+    if (!groups.has(r)) groups.set(r, []);
+    groups.get(r).push(i);
+  });
+  return [...groups.values()];
+}
+
 /** 글자에 붙인 획의 글자 자리 다시 찾기: 그 자리 글이 그대로면 그대로, 고쳐졌으면 같은 글(w)의 가장 가까운 곳, 없으면 끝에 맞춤 */
 export function findChar(text, anchor) {
   const s = String(text ?? '');

@@ -2319,16 +2319,19 @@ try {
       const ring = Array.from({ length: 13 }, (_, i) => [w0.x + Math.cos((i / 12) * Math.PI * 2) * (w0.w / 2 + 8), w0.y + Math.sin((i / 12) * Math.PI * 2) * (w0.h / 2 + 6)]);
       await draw(ring);
       await page.waitForTimeout(150);
+      // 같은 그림의 둘째 획: 낱말 아래 밑줄 (동그라미와 붙어 있음) — 줄바꿈이 달라져도 동그라미와 함께 다닌다
+      const under = Array.from({ length: 6 }, (_, i) => [w0.x - w0.w / 2 - 6 + (i / 5) * (w0.w + 12), w0.y + w0.h / 2 + 10]);
+      await draw(under);
+      await page.waitForTimeout(150);
       await pickMode(page, 'edit');
       await page.waitForTimeout(600);
-      const ringAt = () => page.evaluate(() => {
-        const paths = [...document.querySelectorAll('.mk-annot path')];
-        const b = paths[paths.length - 1].getBoundingClientRect();
+      const centers = () => page.evaluate(() => [...document.querySelectorAll('.mk-annot path')].slice(-2).map((p) => {
+        const b = p.getBoundingClientRect();
         return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
-      });
+      }));
       const off = async () => {
-        const [r, w] = [await ringAt(), await word()];
-        return { dx: Math.round(r.x - w.x), dy: Math.round(r.y - w.y) };
+        const [[r, u], w] = [await centers(), await word()];
+        return { dx: Math.round(r.x - w.x), dy: Math.round(r.y - w.y), ux: Math.round(u.x - r.x), uy: Math.round(u.y - r.y) };
       };
       const atStart = await off();
       const sizes = [];
@@ -2337,9 +2340,28 @@ try {
         await page.waitForTimeout(700);
         sizes.push({ width, ...(await off()) });
       }
-      const ok = sizes.every((v) => Math.abs(v.dx - atStart.dx) <= 6 && Math.abs(v.dy - atStart.dy) <= 6);
+      // 매직 줌(본문 확대): 같은 배율로 커지고 그 낱말 · 그림 모양은 그대로 (note-view.js applyZoom 과 같게 배율 · 폭을 준다)
+      const setZoom = (z) => page.evaluate((zz) => {
+        const root = document.getElementById('editor');
+        const cs = getComputedStyle(root);
+        const base = root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        root.style.setProperty('--note-zoom', String(zz));
+        for (const c of root.children) if (!c.classList.contains('mk-annot')) c.style.width = zz > 1 ? `${base}px` : '';
+      }, z);
+      await setZoom(1.5);
+      await page.waitForTimeout(700);
+      const zoomed = await off();
+      await setZoom(1);
+      await page.waitForTimeout(500);
+      const zoomOk = ['dx', 'dy', 'ux', 'uy'].every((k) => Math.abs(zoomed[k] - atStart[k] * 1.5) <= 8);
+      check('주석: 본문을 확대해도 그 낱말 위에 · 묶음 모양 그대로 (같은 배율로 커짐)', zoomOk, JSON.stringify({ atStart, zoomed }));
+      const near = (v, k) => Math.abs(v[k] - atStart[k]) <= 6;
+      const ok = sizes.every((v) => near(v, 'dx') && near(v, 'dy'));
+      const together = sizes.every((v) => near(v, 'ux') && near(v, 'uy'));
       const saved = JSON.parse(read((await waitFile((b) => /^ink: /m.test(b))).match(/^ink: (attachments\/\S+\.json)$/m)[1]));
-      check('주석 동그라미: 화면 폭이 바뀌어 줄바꿈이 달라져도 그 낱말 위에 (글자에 붙여 저장)', ok && saved.strokes.at(-1)?.anchor?.t === 'c', JSON.stringify({ atStart, sizes, anchor: saved.strokes.at(-1)?.anchor }));
+      const [a1, a2] = saved.strokes.slice(-2).map((x) => x.anchor);
+      check('주석 동그라미: 화면 폭이 바뀌어 줄바꿈이 달라져도 그 낱말 위에 (글자에 붙여 저장)', ok && a1?.t === 'c', JSON.stringify({ atStart, sizes, anchor: a1 }));
+      check('주석 묶음: 동그라미 + 밑줄은 같은 글자에 붙어 줄바꿈이 달라져도 흩어지지 않음', together && a2?.t === 'c' && a1.b === a2.b && a1.c === a2.c, JSON.stringify({ atStart, sizes, a1, a2 }));
       await shot('23b-annotate-reflow');
     }
     await back();

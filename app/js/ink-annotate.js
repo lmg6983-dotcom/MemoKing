@@ -2,10 +2,11 @@
 //   - 평소: 글 위에 그린 획이 보이기만 (누르면 글을 고친다)
 //   - 주석 모드(+ › 주석, PC 는 Ctrl+Shift+E): 위에 그리기 · 아래에 떠 있는 도구 막대(펜·형광펜·지우개·색·굵기·되돌리기 · 완료)
 //     완료 · Esc · 뒤로 가기 = 저장하고 끝내기 (취소는 없다 — 되돌리기·모두 지우기로)
-//   - 획은 그 가운데 아래의 글자를 따라간다 (core/ink.js anchorStrokeToChar·placeStrokeAtChar): 글이 늘어 문단이 밀려도,
-//     화면 비율이 다른 기기에서 줄바꿈이 달라져도 그 낱말 위에. 글자가 없는 곳(그림 위 등)은 문단 폭 비율로 (anchorStroke·placeStroke)
+//   - 가까운 획끼리 묶어(core/ink.js groupStrokes) 묶음 가운데 아래의 글자를 함께 따라간다 (anchorStrokeToChar·placeStrokeAtChar):
+//     글이 늘어 문단이 밀려도, 화면 비율이 다른 기기에서 줄바꿈이 달라져도 그 낱말 위에 — 여러 획 그림도 흩어지지 않게.
+//     글자가 없는 곳(그림 위 등)은 문단 폭 비율로 (anchorStroke·placeStroke)
 //   - 저장: 완료할 때 JSON 파일 하나 → 메모 머리말 ink: (자료가 없으면 머리말에서 뺀다)
-import { anchorStroke, placeStroke, anchorStrokeToChar, placeStrokeAtChar, findAnchor, findChar, inkBounds, normalizeInk } from './core/ink.js';
+import { anchorStroke, placeStroke, anchorStrokeToChar, placeStrokeAtChar, findAnchor, findChar, groupStrokes, inkBounds, normalizeInk } from './core/ink.js';
 import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys, inkMode, strokeEl } from './ink-editor.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -162,11 +163,34 @@ export function setupAnnotation(o) {
     }
   }
 
-  // 화면 좌표 획 목록(그리기판이 준 것) → 저장 모양: 원래 있던 것은 짝을, 새로 그린 것은 문단 폭 비율(1/1000)로 고정해
-  //   확대·축소할 때 획 사이 거리가 벌어지지 않고 태블릿↔데스크탑에서도 위치·크기 비율이 그대로 유지되게 한다
+  // 화면 좌표 획 목록(그리기판이 준 것) → 저장 모양: 원래 있던 것은 짝을, 새로 그린 것은 가까운 획끼리 묶어 한 글자에 함께 붙인다 —
+  //   화면 폭 · 줄바꿈 · 확대가 달라져도 그 낱말을 따라가고, 여러 획 그림(손글씨 · 화살표)은 흩어지지 않는다.
+  //   이미 글자에 붙은 획 곁에 더 그리면 그 글자에. 글자가 없는 곳(그림 위 등)은 문단 폭 비율
   function toAnchored(list) {
     const b = blocks();
-    return list.map((s) => placed.get(s) ?? anchorStroke(s, b, width));
+    const base = o.docEl()?.getBoundingClientRect();
+    const fresh = new Map();
+    for (const group of groupStrokes(list)) {
+      const strokes = group.map((i) => list[i]);
+      const news = strokes.filter((s) => !placed.has(s));
+      if (!news.length) continue;
+      let at = null;
+      const old = strokes.map((s) => placed.get(s)).find((a) => a?.anchor?.t === 'c');
+      if (old && base) {
+        const i = findAnchor(b, old.anchor);
+        const c = i >= 0 ? findChar(b[i].text, old.anchor) : -1;
+        const origin = c >= 0 ? charOrigin(b[i].el, c, base) : null;
+        if (origin) at = { b: i, c, text: b[i].text, ...origin };
+      }
+      if (!at && base) {
+        const box = inkBounds(news);
+        const hit = box ? charAtPoint(box.x + box.w / 2, box.y + box.h / 2, b) : null;
+        const origin = hit ? charOrigin(b[hit.b].el, hit.c, base) : null;
+        if (origin) at = { ...hit, text: b[hit.b].text, ...origin };
+      }
+      for (const s of news) fresh.set(s, at ? anchorStrokeToChar(s, at) : anchorStroke(s, b, width));
+    }
+    return list.map((s) => placed.get(s) ?? fresh.get(s));
   }
 
   async function ensureLoaded() {

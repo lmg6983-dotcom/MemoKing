@@ -107,3 +107,15 @@ test('주석 자료: 글자에 붙인 획(t: c)의 자리는 저장 · 불러오
   assert.deepEqual(doc.strokes[0].anchor, { b: 1, f: 'abc', t: 'c', c: 7, w: 'x'.repeat(12) });
   assert.deepEqual(doc.strokes[1].anchor, { b: 0, f: 'old' });
 });
+
+test('주석 묶기: 가까운 획끼리 한 묶음 (같은 글자에 함께 붙여 줄바꿈에도 흩어지지 않게), 먼 획은 따로', async () => {
+  const { groupStrokes } = await import('../app/js/core/ink.js');
+  const s = (pts) => ({ tool: 'pen', color: '#1f1f1c', size: 3, pts: pts.map(([x, y]) => [x, y, 0.5]) });
+  const ring = s([[100, 40], [140, 44], [100, 52]]);
+  const arrow = s([[150, 48], [200, 48]]); // 동그라미 옆 10px — 같은 그림
+  const tick = s([[205, 40], [210, 52]]); // 화살표 끝에 닿음 — 이어서 같은 그림
+  const far = s([[100, 300], [160, 300]]); // 몇 줄 아래 밑줄 — 다른 그림
+  assert.deepEqual(groupStrokes([ring, arrow, far, tick]), [[0, 1, 3], [2]]);
+  assert.deepEqual(groupStrokes([ring, far], 24), [[0], [1]]);
+  assert.deepEqual(groupStrokes([]), []);
+});
