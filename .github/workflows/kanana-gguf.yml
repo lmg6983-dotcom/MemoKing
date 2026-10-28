@@ -47,12 +47,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: lc
-          key: llama-cpp-${{ env.LLAMA_TAG }}-linux-cpu
+          key: llama-cpp-${{ env.LLAMA_TAG }}-linux-cpu-portable # 러너마다 CPU 가 달라 NATIVE 로 빌드하면 다른 러너에서 Illegal instruction
       - name: llama.cpp 빌드 (CPU)
         run: |
           [ -x lc/build/bin/llama-quantize ] && exit 0
           git clone -q --depth 1 --branch "$LLAMA_TAG" https://github.com/ggml-org/llama.cpp lc
-          cmake -S lc -B lc/build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF > /dev/null
+          cmake -S lc -B lc/build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF > /dev/null
           cmake --build lc/build -j4 --target llama-quantize llama-imatrix llama-server llama-perplexity llama-bench > /dev/null
           ls lc/build/bin
 
