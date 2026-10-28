@@ -25,3 +25,6 @@ desktop/google-client.json
 # 로컬 AI 엔진 (npm run llama 로 받음)
 desktop/vendor/llama/
 __pycache__/
+
+# impeccable 미리보기 서버가 만드는 것
+.impeccable/live/
