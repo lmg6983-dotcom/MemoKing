@@ -254,8 +254,8 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 
 @media print { .mk-doc :is(mark, img) { filter: none !important; } }
 
-/* 이미지 */
-.mk-image { display: block; max-width: 100%; margin: 6px 0; border-radius: 6px; }
+/* 이미지 — 사진 · 손 메모 · 소리 · 동영상 · 음성 카드 · 링크 카드는 모두 같은 둥글기(--radius-lg)와 옅은 테두리 */
+.mk-image { display: block; max-width: 100%; margin: 6px 0; border-radius: var(--radius-lg); outline: 1px solid color-mix(in srgb, var(--note-text) 10%, transparent); outline-offset: -1px; }
 .mk-image.broken { min-height: 40px; min-width: 120px; outline: 1px dashed var(--note-muted); }
 
 /* 소리·동영상 (Plyr 플레이어) */
@@ -264,27 +264,53 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   flex-direction: column;
   gap: 4px;
   margin: 6px 0;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   --plyr-color-main: var(--note-accent);
   --plyr-font-size-base: 13px;
   --plyr-control-spacing: 8px;
 }
-.mk-audio {
-  padding: 8px 8px 4px;
-  background: var(--note-hover);
-  --plyr-audio-controls-background: transparent;
-  --plyr-audio-control-color: var(--note-text);
-  --plyr-audio-control-color-hover: #111;
-  --plyr-audio-control-background-hover: var(--note-accent);
-  --plyr-range-fill-background: var(--note-accent);
+/* 재생 단추: 메모 색(윗막대 색) 원 — 메모 색마다 어울린다 (소리 · 동영상 같게) */
+.mk-media .plyr__control[data-plyr="play"], .mk-media .plyr__control--overlaid {
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--note-bar), var(--note-text) 10%); /* 어두운 메모에서도 카드와 구분되게 글자색을 조금 */
+  color: var(--note-text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
 }
-.mk-audio .plyr--audio .plyr__controls { padding: 2px 0; }
+@media (hover: hover) and (pointer: fine) { .mk-media .plyr__control[data-plyr="play"]:hover, .mk-media .plyr__control--overlaid:hover { background: color-mix(in srgb, var(--note-bar), var(--note-text) 18%); color: var(--note-text); } }
 .mk-media .plyr__time { white-space: nowrap; }
-.mk-video { background: #000; }
-.mk-video .plyr { border-radius: 10px; }
 .mk-media-label { padding: 0 4px; font-size: 12px; color: var(--note-muted); user-select: none; }
-.mk-video .mk-media-label { padding: 6px 10px 2px; color: rgba(255, 255, 255, 0.75); }
+
+/* 소리: 한 덩어리 — 왼쪽 둥근 재생 단추, 오른쪽 위 이름 · 아래 막대와 시간 (플레이어 상자는 풀어 칸에 바로 놓는다) */
+.mk-audio {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
+  grid-template-areas: "play name name name" "play bar cur dur";
+  align-items: center;
+  gap: 0 10px;
+  padding: 10px 12px 8px 10px;
+  background: var(--note-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 8%, transparent);
+  --plyr-range-fill-background: var(--note-text);
+  --plyr-audio-range-track-background: color-mix(in srgb, var(--note-text) 14%, transparent);
+  --plyr-range-track-height: 4px;
+  --plyr-range-thumb-height: 12px;
+}
+.mk-audio :is(.plyr, .plyr__controls) { display: contents; }
+.mk-audio audio { display: none; }
+.mk-audio .mk-media-label { grid-area: name; }
+.mk-audio .plyr__control[data-plyr="play"] { grid-area: play; width: 40px; height: 40px; padding: 0; display: grid; place-items: center; }
+.mk-audio .plyr__control[data-plyr="play"] svg { width: 16px; height: 16px; }
+.mk-audio .plyr__progress__container { grid-area: bar; margin: 0; padding: 0; }
+.mk-audio .plyr__progress input[type="range"] { margin: 0; }
+.mk-audio .plyr__time { margin: 0; font-size: 12px; color: var(--note-muted); }
+.mk-audio .plyr__time--current { grid-area: cur; color: var(--note-text); }
+.mk-audio .plyr__time--duration { grid-area: dur; }
+
+/* 동영상: 이름 줄 없이 화면 그대로, 이름은 영상 위 왼쪽 위에 — 재생 중 단추가 숨으면 같이 숨는다 */
+.mk-video { position: relative; display: block; background: #000; }
+.mk-video .plyr { border-radius: inherit; }
+.mk-video .plyr__control--overlaid { padding: 18px; }
 
 /* 그 밖의 파일: 파일 칩 (끌어서 순서 바꾸기 · 옆의 열기 버튼이나 더블클릭으로 열기) */
 .mk-doc a[href^="attachments/"] {
@@ -1252,10 +1278,16 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 
 /* 소리·동영상: 위의 이름 줄을 꾹 눌러 옮긴다 (다른 내용과 같은 방식) */
 .mk-media .mk-media-label { display: flex; align-items: center; gap: 4px; padding: 3px 6px 2px; cursor: grab; touch-action: none; -webkit-touch-callout: none; }
-.mk-media .mk-media-label::before { content: "♪"; font-size: 13px; opacity: 0.7; }
-.mk-video .mk-media-label::before { content: "▶"; font-size: 10px; }
+.mk-audio .mk-media-label { overflow: hidden; padding: 0 0 2px; color: var(--note-text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.mk-video .mk-media-label {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  padding: 10px 14px 28px;
+  background: linear-gradient(rgba(0, 0, 0, 0.5), transparent);
+  color: #fff; font-size: 13px; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: opacity 0.25s ease-out;
+}
+.mk-video:has(.plyr--playing.plyr--hide-controls) .mk-media-label { opacity: 0; pointer-events: none; }
 .mk-doc[contenteditable="false"] .mk-media .mk-media-label { cursor: default; }
-.mk-doc[contenteditable="false"] .mk-media .mk-media-label::before { content: none; }
 
 /* ---------- 음성 카드: 소리 + 받아쓴 글 한 칸 (voice-card-view.js) ---------- */
 .mk-doc .mk-voice {
@@ -1274,8 +1306,9 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-voice-body > p:last-child { margin-bottom: 10px; }
 .mk-voice-body > p:first-child { line-height: 0; font-size: 0; }
 .mk-voice-body > p:first-child > br, .mk-voice-body > p:first-child > img.ProseMirror-separator { display: none; }
-.mk-voice-body > p:first-child .mk-media { margin: 0; border-radius: 0; background: transparent; line-height: normal; font-size: 13px; }
-.mk-voice-body > p:first-child .mk-media-label::after { content: "음성 메모"; margin-left: auto; padding: 0 8px; font-size: 12px; opacity: 0.6; }
+.mk-voice-body > p:first-child .mk-media { margin: 0; border-radius: 0; background: transparent; box-shadow: none; line-height: normal; font-size: 13px; }
+.mk-voice-body > p:first-child .mk-media-label { display: flex; }
+.mk-voice-body > p:first-child .mk-media-label::after { content: "음성 메모"; margin-left: auto; padding-left: 8px; font-size: 12px; font-weight: 400; color: var(--note-muted); }
 /* 복사 · 저장 · 공유 · × 단추가 떠 있는 동안은 오른쪽 위 "음성 메모" 글자를 숨긴다 (단추가 글자 위에 겹쳐 보였다) */
 :is(.mk-delete-target, body:has(.mk-delete-btn:not(.fading)) .mk-voice:hover) .mk-media-label::after { visibility: hidden; }
 .mk-voice.has-text .mk-voice-bar { margin: 0 12px; border-top: 1px dashed color-mix(in srgb, var(--note-text) 14%, transparent); }
@@ -1373,6 +1406,7 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 @keyframes mk-del-pressed { 40% { transform: scale(0.8); background: var(--rec); color: var(--on-rec); } to { opacity: 0; transform: scale(0.5); background: var(--rec); color: var(--on-rec); } }
 /* 지울 대상: 옅은 붉은 테두리 */
 .mk-delete-target { outline: 1.5px solid color-mix(in srgb, var(--rec) 55%, transparent); outline-offset: 3px; border-radius: 8px; }
+:is(.mk-image, .mk-media, .mk-voice).mk-delete-target { border-radius: var(--radius-lg); } /* 둥글기가 바뀌어 튀지 않게 */
 .mk-doc li.mk-delete-target { outline: none; }
 .mk-doc li.mk-delete-target::after { border: 1.5px solid color-mix(in srgb, var(--rec) 60%, transparent) !important; }
 /* 지워질 때: 붉게 비쳤다가 작아지며 흐려지고(0.2초) → 그 자리가 접히며 아래 줄이 올라온다(0.2초) */
@@ -1712,8 +1746,8 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 }
 
 /* 메모 안의 손 메모 한 칸: 그린 만큼의 크기 (넓으면 본문 폭에 맞춤), 누르면(PC 는 두 번) 이어 그리기 */
-.mk-doc .mk-ink { display: inline-block; position: relative; max-width: 100%; vertical-align: top; border-radius: 12px; line-height: 0; }
-.mk-doc .mk-ink img { display: block; max-width: 100%; height: auto; border-radius: 12px; user-select: none; -webkit-user-drag: none; }
+.mk-doc .mk-ink { display: inline-block; position: relative; max-width: 100%; vertical-align: top; border-radius: var(--radius-lg); line-height: 0; }
+.mk-doc .mk-ink img { display: block; max-width: 100%; height: auto; border-radius: var(--radius-lg); user-select: none; -webkit-user-drag: none; }
 .mk-doc .mk-ink-edit { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--ink-ui-bg); color: var(--ink-ui-fg); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--ink-ui-line); font: 700 12px/1 var(--font-sans, inherit); opacity: 0; transition: opacity 0.12s, background-color 0.12s; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .mk-doc .mk-ink-edit:hover { background: var(--brand-yellow); color: var(--on-brand); } }
 .mk-doc .mk-ink-edit svg { width: 14px; height: 14px; }
@@ -2145,9 +2179,9 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
    끼우므로 장 수는 "of .mk-album-img" 로 센다. 뒤에 숨은 장도 수를 세도록 display: none 대신 안 보이게만 */
 .mk-doc p:has(> img.mk-album-img) {
   position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; line-height: 0;
-  width: min(100%, 380px); border-radius: 12px; overflow: hidden; counter-reset: mk-album;
+  width: min(100%, 380px); border-radius: var(--radius-lg); overflow: hidden; counter-reset: mk-album;
 }
-.mk-doc img.mk-album-img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; margin: 0; border-radius: 0; cursor: zoom-in; counter-increment: mk-album; background: #fff; }
+.mk-doc img.mk-album-img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; margin: 0; border-radius: 0; outline: none; cursor: zoom-in; counter-increment: mk-album; background: #fff; }
 .mk-doc[contenteditable="true"] img.mk-album-img { cursor: zoom-in; }
 /* 숨은 img · 줄 끝 br 이 격자 칸을 차지하지 않게 (그림만 든 줄 표시가 늦게 붙어도) */
 .mk-doc p:has(> img.mk-album-img) > :is(img.ProseMirror-separator, br) { display: none !important; } /* prosemirror.css 가 숨은 img 를 display: inline !important 로 둔다 */

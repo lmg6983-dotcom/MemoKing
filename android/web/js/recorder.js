@@ -13,7 +13,6 @@ const $ = (x) => document.getElementById(x);
 const el = {
   panel: $('rec-panel'),
   time: $('rec-time'),
-  state: $('rec-state'),
   pause: $('rec-pause'),
   stop: $('rec-stop'),
   pill: null,
@@ -94,19 +93,9 @@ function render() {
   renderPill();
   if (!show) return;
   el.time.textContent = formatDuration(elapsed());
-  el.state.textContent = status.paused ? '일시 정지' : status.stt ? UI.transcribing : '녹음 중'; // 짧게 (빨간 점·시간이 녹음 중임을 알린다)
   el.panel.classList.toggle('paused', status.paused);
   el.pause.replaceChildren(svg(status.paused ? 'play' : 'pause'));
   el.pause.setAttribute('aria-label', status.paused ? UI.recordMore : '일시 정지');
-}
-
-// 소리 크기 막대: 새 크기가 오른쪽에서 들어와 왼쪽으로 흘러간다 (말하면 출렁)
-const levels = Array(7).fill(0);
-function showLevel(level) {
-  levels.shift();
-  levels.push(status.paused ? 0 : level);
-  const bars = $('rec-wave')?.children ?? [];
-  for (let i = 0; i < bars.length; i++) bars[i].style.setProperty('--lv', levels[i].toFixed(2));
 }
 
 // 목록 화면에서도 녹음 중임을 (+ 버튼 위 작은 알약, 누르면 그 메모로)
@@ -226,10 +215,7 @@ on('record', (ev) => {
     if (ev.result && !stopping) app.deliverRecording(ev.result).then(() => record.ack(ev.result.id)).catch(() => {});
     return;
   }
-  if (ev.type === 'level') {
-    showLevel(ev.level ?? 0);
-    return;
-  }
+  if (ev.type === 'level') return; // 소리 크기 — 알약은 점 · 시간만 (움직이는 막대는 메모를 방해)
   if (ev.type === 'error') {
     toast(ev.message || '녹음 중 문제가 생겼어요', true);
     return;

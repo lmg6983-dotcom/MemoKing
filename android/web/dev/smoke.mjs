@@ -1356,8 +1356,7 @@ try {
   await page.waitForSelector('#rec-panel:not([hidden])');
   check('음성 메모: 바로 녹음 시작', (await devLog()).log.some((l) => l.recordStart));
   await page.waitForTimeout(1200);
-  for (const lv of [0.2, 0.9, 0.6, 0.8, 0.3, 0.7, 0.5]) await page.evaluate((level) => window.__mk.emit('record', { type: 'level', level }), lv);
-  check('녹음: 소리 크기 막대가 움직임', (await page.evaluate(() => getComputedStyle(document.querySelector('#rec-wave i:last-child')).getPropertyValue('--lv'))).trim() === '0.50');
+  check('녹음 알약: 점 · 시간 · 멈춤 · 끝내기만 (받아쓰는 중 글자 · 파형 · 끝내기 글자 없음)', await page.evaluate(() => !document.querySelector('#rec-state, #rec-wave') && document.getElementById('rec-stop').textContent.trim() === '' && document.getElementById('rec-stop').getAttribute('aria-label') === '녹음 끝내기'));
   const overlap = await page.evaluate(() => {
     const stop = document.getElementById('rec-stop').getBoundingClientRect();
     return [...document.querySelectorAll('.mk-dial, #add-btn')].some((f) => {
@@ -1372,7 +1371,7 @@ try {
     const low = [...document.querySelectorAll('.mk-dial, #add-btn')].map((f) => Math.round(screen.bottom - f.getBoundingClientRect().bottom));
     return { low, panelH: Math.round(panel.height), text: !!document.getElementById('rec-text') };
   });
-  check('녹음 중: + · 다이얼은 아래 제자리, 녹음 판은 한 줄 알약 (받아쓴 글 없음)', recGeo.low.length === 2 && recGeo.low.every((d) => d < 140) && recGeo.panelH <= 52 && !recGeo.text, JSON.stringify(recGeo));
+  check('녹음 중: + · 다이얼은 아래 제자리, 녹음 판은 한 줄 알약 (받아쓴 글 없음)', recGeo.low.length === 2 && recGeo.low.every((d) => d < 140) && recGeo.panelH <= 46 && !recGeo.text, JSON.stringify(recGeo));
   await shot('11-recording');
   await page.tap('#rec-stop');
   await page.waitForSelector('#name-dialog[open]');
@@ -1590,9 +1589,9 @@ try {
     check('음성 카드: 이름 줄을 짧게 누르면 공유 · 저장 · 복사 · × (왼쪽부터)', four.every((x) => x >= 0) && four[0] < four[1] && four[1] < four[2] && four[2] < four[3] && voiceLabel === '이 음성 삭제', JSON.stringify({ four, voiceLabel }));
     // 소리 상자: 음소거 단추 없음 · 이름 줄은 손가락이 닿을 만큼(44px) · 재생하지 못하면(여기서는 가짜 소리 파일) 재생 단추를 누른 뒤 안내 + 다른 앱으로 열기
     {
-      const props = await page.evaluate(() => ({ mute: document.querySelectorAll('.mk-audio [data-plyr="mute"]').length, labelH: Math.round(document.querySelector('.mk-media-label').getBoundingClientRect().height) }));
+      const props = await page.evaluate(() => ({ mute: document.querySelectorAll('.mk-audio [data-plyr="mute"]').length, boxH: Math.round(document.querySelector('.mk-audio').getBoundingClientRect().height) }));
       const quiet = await page.evaluate(() => document.getElementById('toast')?.hidden !== false);
-      check('소리 상자: 음소거 버튼은 없고 이름 줄은 44px 이상 (4종 버튼을 누르기 쉽게)', props.mute === 0 && props.labelH >= 44, JSON.stringify(props));
+      check('소리 상자: 음소거 버튼은 없고 한 덩어리(60px 안팎) — 빈 곳 어디든 눌러 4종 버튼', props.mute === 0 && props.boxH >= 44 && props.boxH <= 66, JSON.stringify(props));
       check('메모를 열기만 해서는 "재생하지 못했어요" 안내가 뜨지 않음', quiet || !/재생하지 못했어요/.test(await page.textContent('#toast-text')), String(quiet));
       await page.waitForTimeout(2600);
       await page.tap('.mk-audio .plyr__control[data-plyr="play"]').catch(() => {});
