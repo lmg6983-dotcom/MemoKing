@@ -1,0 +1,69 @@
+# AI 글 도우미 견주기 — 앱과 같은 묻는 말(core/ai-write.js · scripts/kanana-bench.mjs)로 모델마다 정리 · 고치기 · 문체 · 맞춤법 답을 나란히.
+#   카나나2 는 kanana-gguf.yml 이 만든 파일(Artifacts)을, 젬마4 E2B 는 Hugging Face 에서 받아 같은 llama.cpp 로 돌린다. 묻는 말만 바꿨을 때 몇 분이면 끝난다
+name: AI 글 도우미 견주기
+
+on:
+  push:
+    paths:
+      - '.github/workflows/writing-bench.yml'
+      - 'app/js/core/ai-write.js'
+      - 'scripts/kanana-bench.mjs'
+      - 'scripts/kanana-bench/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read # 다른 실행의 Artifacts 받기
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: kanana-2-1.3b Q6_K
+            artifact: kanana-2-1.3b-gguf
+            file: kanana-2-1.3b-instruct-Q6_K.gguf
+          - name: kanana-2-3b Q5_K_M
+            artifact: kanana-2-3b-gguf
+            file: kanana-2-3b-instruct-Q5_K_M.gguf
+          - name: gemma-4-E2B UD-Q4_K_XL
+            hf: unsloth/gemma-4-E2B-it-qat-GGUF
+            file: gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf
+    env:
+      LLAMA_TAG: b11400 # scripts/get-llama.mjs 와 같게
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/cache@v4
+        with:
+          path: lc
+          key: llama-cpp-${{ env.LLAMA_TAG }}-linux-cpu
+      - name: llama.cpp 빌드 (CPU)
+        run: |
+          [ -x lc/build/bin/llama-server ] && exit 0
+          git clone -q --depth 1 --branch "$LLAMA_TAG" https://github.com/ggml-org/llama.cpp lc
+          cmake -S lc -B lc/build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF > /dev/null
+          cmake --build lc/build -j4 --target llama-quantize llama-imatrix llama-server llama-perplexity llama-bench > /dev/null
+      - if: matrix.artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: model
+          run-id: '40069270424' # kanana-gguf.yml
+          github-token: ${{ github.token }}
+      - name: 모델 받기 (Hugging Face)
+        if: matrix.hf
+        run: |
+          pip install --quiet huggingface_hub
+          python -c "from huggingface_hub import hf_hub_download as d; import shutil, os; os.makedirs('model', exist_ok=True); shutil.copy(d('${{ matrix.hf }}', '${{ matrix.file }}'), 'model/')"
+      - name: 답 보기
+        run: |
+          lc/build/bin/llama-server -m "model/${{ matrix.file }}" --port 8080 -c 4096 -np 1 -t 4 --no-webui > server.log 2>&1 &
+          for i in $(seq 180); do curl -sf localhost:8080/health > /dev/null && break; sleep 1; done
+          node scripts/kanana-bench.mjs http://127.0.0.1:8080 "${{ matrix.name }}"
+          kill %1

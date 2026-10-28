@@ -40,9 +40,17 @@ test('AI 글 도우미: 정리 · 지시대로 고치기 — 고를 일을 모�
   const chat = async (messages) => (asked.push(messages), '고친 글');
   assert.deepEqual(await runWrite(chat, { task: 'tidy', text: '회의 내일 3시 자료 준비' }), { text: '고친 글' });
   assert.match(asked[0][0].content, /마크다운/);
-  assert.equal(asked[0][1].content, '회의 내일 3시 자료 준비');
+  assert.equal(asked[0].at(-1).content, '회의 내일 3시 자료 준비');
   await runWrite(chat, { task: 'custom', text: '내일 와', instruction: '더 공손하게' });
-  assert.match(asked[1][1].content, /^지시: 더 공손하게\n\n글:\n내일 와$/);
-  const spelled = await runWrite(async (m) => (m[1].content === '됬어요' ? '됐어요' : '会议'), { task: 'spell', blocks: ['됬어요', '회의'] });
+  assert.match(asked[1].at(-1).content, /^지시: 더 공손하게\n\n글:\n내일 와$/);
+  const spelled = await runWrite(async (m) => (m.at(-1).content === '됬어요' ? '됐어요' : '会议'), { task: 'spell', blocks: ['됬어요', '회의'] });
   assert.deepEqual(spelled, { fixed: ['됐어요', '회의'] }); // 엉뚱한 답은 원래 글로
+});
+
+test('AI 글 도우미: 작은 모델이 되풀이한 지시문은 뗀다', async () => {
+  const { cleanReply, tidyMessages } = await import('../app/js/core/ai-write.js');
+  assert.equal(cleanReply('더 공손하게\n\n글:\n자료를 보내 주세요.', '더 공손하게'), '자료를 보내 주세요.');
+  assert.equal(cleanReply('지시: 더 짧게\n짧은 글', '더 짧게'), '짧은 글');
+  assert.equal(cleanReply('## 제목\n- 목록'), '## 제목\n- 목록');
+  assert.equal(tidyMessages('메모').at(-1).content, '메모'); // 보기 한 쌍 뒤에 사용자 글
 });

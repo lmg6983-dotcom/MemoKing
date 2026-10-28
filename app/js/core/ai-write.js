@@ -13,20 +13,39 @@ const SPELL = '너는 한국어 맞춤법 검사기다. 사용자가 준 글의 
 
 export const spellMessages = (text) => [{ role: 'system', content: SPELL }, { role: 'user', content: text }];
 
-export const styleMessages = (text, style) => [
-  { role: 'system', content: `다음 글을 ${STYLES[style] ?? style}로 바꿔 쓴다. 내용은 더하거나 빼지 않는다. #태그와 링크 주소는 그대로 둔다. 바꾼 글만 출력한다.` },
+// 작은 모델(1~3B)은 규칙만 주면 지시를 되풀이하거나 줄만 바꾼다 — 짧은 보기 하나(묻고 답한 한 쌍)를 앞에 두면 따라 한다
+const TIDY = '너는 메모 정리 도우미다. 서식 없이 대충 적은 메모를 마크다운으로 정리한다. 주제마다 ## 제목, 나열은 - 목록, 해야 할 일은 - [ ] , 여러 항목을 같은 기준으로 견주면 표로. 내용은 더하거나 빼지 않고 숫자, 날짜, 이름, #태그, 링크 주소는 그대로 둔다. 맺음말이나 설명 없이 정리한 글만 쓴다.';
+const TIDY_EXAMPLE = [
+  '주간회의 월요일 10시 참석 민수 지영 다음주까지 견적서 보내기 서버비 A사 월 30만 B사 월 25만 비교',
+  '## 주간 회의\n- 월요일 10시\n- 참석: 민수, 지영\n\n## 할 일\n- [ ] 다음 주까지 견적서 보내기\n\n## 서버비 비교\n| 회사 | 월 비용 |\n|---|---|\n| A사 | 30만 |\n| B사 | 25만 |',
+];
+
+export const tidyMessages = (text) => [
+  { role: 'system', content: TIDY },
+  { role: 'user', content: TIDY_EXAMPLE[0] },
+  { role: 'assistant', content: TIDY_EXAMPLE[1] },
   { role: 'user', content: text },
 ];
 
-const TIDY = '너는 메모 정리 도우미다. 서식 없이 대충 적은 메모를 읽기 좋은 마크다운으로 정리한다. 주제가 바뀌면 ## 제목, 나열은 - 목록, 해야 할 일은 - [ ] 할 일, 항목마다 같은 것을 견주면 표로. 내용은 더하거나 빼지 않고 숫자, 날짜, 이름, #태그, 링크 주소는 그대로 둔다. 정리한 글만 출력한다.';
+const ask = (instruction, text) => `지시: ${instruction}\n\n글:\n${text}`;
 
-export const tidyMessages = (text) => [{ role: 'system', content: TIDY }, { role: 'user', content: text }];
-
-/** 지시대로 고치기 ("더 공손하게", "세 줄로 줄여 줘" …) */
+/** 지시대로 고치기 ("더 공손하게", "세 줄로 줄여 줘" …) — 문체 단추도 같은 길 */
 export const customMessages = (text, instruction) => [
-  { role: 'system', content: '너는 글을 고쳐 쓰는 도우미다. 사용자의 지시대로 글을 고친다. 지시하지 않은 내용은 지어내지 않는다. #태그와 링크 주소는 그대로 둔다. 고친 글만 출력한다.' },
-  { role: 'user', content: `지시: ${instruction}\n\n글:\n${text}` },
+  { role: 'system', content: '너는 글을 고쳐 쓰는 도우미다. 사용자가 준 지시대로 글을 고쳐 쓴다. 지시하지 않은 내용은 지어내지 않고 #태그와 링크 주소는 그대로 둔다. 지시문을 되풀이하지 말고 고친 글만 쓴다.' },
+  { role: 'user', content: ask('더 짧게', '오늘 회의에서는 다음 달 출시 일정에 대해 이야기를 나누었고, 참석한 사람 모두 그 일정에 동의했습니다.') },
+  { role: 'assistant', content: '회의에서 다음 달 출시 일정에 모두 동의했습니다.' },
+  { role: 'user', content: ask(instruction, text) },
 ];
+
+export const styleMessages = (text, style) => customMessages(text, `${STYLES[style] ?? style}로 바꿔 써 줘. 내용은 그대로`);
+
+/** 모델이 묻는 말을 되풀이한 머리("지시: …", "글:", 지시문 그대로)를 뗀다 */
+export function cleanReply(out, instruction = '') {
+  const lines = String(out ?? '').split('\n');
+  const echo = (l) => /^(지시:|글:|\s*$)/.test(l) || (instruction && l.trim() === instruction.trim());
+  while (lines.length > 1 && echo(lines[0])) lines.shift();
+  return lines.join('\n').trim();
+}
 
 export function draftMessages({ title, body, request }) {
   const parts = [`메모 제목: ${title || '(없음)'}`];
@@ -122,5 +141,5 @@ export async function runWrite(chat, { task, text = '', blocks = [], style, inst
     : task === 'custom' ? customMessages(text, instruction)
       : task === 'style' ? styleMessages(text, style)
         : draftMessages({ title, body: text, request });
-  return { text: await chat(messages, { maxTokens: 1536, signal, onToken }) };
+  return { text: cleanReply(await chat(messages, { maxTokens: 1536, signal, onToken }), instruction) };
 }
