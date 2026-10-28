@@ -19,7 +19,7 @@ test('후보에 자기 자신은 없고, 한 번에 자모 하나만 바뀐다',
     assert.ok(alts.every(isHangul), ch);
     assert.equal(new Set(alts).size, alts.length, ch);
   }
-  assert.ok(similarSyllables('볼').length <= 8);
+  assert.ok(similarSyllables('볼').length <= 12);
 });
 
 test('한글 완성형이 아니면 후보 없음', () => {

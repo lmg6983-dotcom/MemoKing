@@ -317,7 +317,7 @@ export async function runSmoke({
     const plyrIcons = await js(n1.win, `(() => { const u = document.querySelector('.plyr use'); const id = (u?.getAttribute('href') ?? '').replace(/^#/, ''); return !!id && !!document.getElementById(id); })()`);
     check('플레이어 아이콘이 인터넷 없이 표시 (문서 안 아이콘 사용)', plyrIcons);
     await js(n1.win, PASTE_FILE);
-    const chip = await until(() => js(n1.win, `document.querySelector('.mk-doc a[href^="attachments/"]')?.textContent`), '파일 칩').catch(() => null);
+    const chip = await until(() => js(n1.win, `(() => { [...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '파일로')?.click(); return document.querySelector('.mk-doc a[href^="attachments/"]')?.textContent; })()`), '파일 칩').catch(() => null);
     check('그 밖의 파일 → 파일 칩', chip === '회의자료.txt', chip);
     await capture(n1.win, 'smoke-note.png');
 
@@ -838,7 +838,7 @@ export async function runSmoke({
       dt.items.add(new File(['@echo off'], '설치.bat', { type: 'application/x-bat' }));
       document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
     })()`);
-    const chips = await until(() => js(linkNote.win, `(() => { const a = [...document.querySelectorAll('.mk-doc a[data-file]')]; return a.length === 2 && a.map((x) => ({ name: x.textContent, kind: x.dataset.file, ext: x.dataset.ext, href: x.getAttribute('href') })); })()`), '파일 칩 2개').catch(() => null);
+    const chips = await until(() => js(linkNote.win, `(() => { [...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '파일로')?.click(); const a = [...document.querySelectorAll('.mk-doc a[data-file]')]; return a.length === 2 && a.map((x) => ({ name: x.textContent, kind: x.dataset.file, ext: x.dataset.ext, href: x.getAttribute('href') })); })()`), '파일 칩 2개').catch(() => null);
     check('파일 칩: 종류·확장자 표시 (프로그램 파일 구분)', chips?.[0]?.kind === 'doc' && chips[0].ext === 'TXT' && chips[1]?.kind === 'program' && chips[1].ext === 'BAT', JSON.stringify(chips));
     const clickChip = (i) => openViaMenu(linkNote.win, `document.querySelectorAll('.mk-doc a[data-file]')[${i}]`);
     let mark = smokeOpened.length;

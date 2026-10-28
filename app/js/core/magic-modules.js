@@ -6,7 +6,8 @@ import { WEB_ENGINES, AI_SITES, pickId } from './magic-tools.js';
 export const MAGIC_MODULES = [
   { id: 'memo', name: '메모 만들기', chip: '새 메모', description: '입력한 글을 새 메모로 바로 저장해요 (Enter 저장, Ctrl+Enter 저장하고 열기)', ready: true, defaultOn: true },
   { id: 'notes', name: '메모 검색', chip: '메모 검색', description: '입력하는 대로 메모의 제목과 내용에서 찾아 바로 열어요', ready: true, defaultOn: true },
-  { id: 'files', name: '파일 검색', chip: '파일 검색', description: 'PC의 파일, 폴더, 프로그램 이름을 바로 찾아 열어요. 따로 설치할 것 없이 메모킹이 이름 목록을 만들어 두어요 (이 PC 안에서만, 내용은 읽지 않음)', ready: true, defaultOn: true },
+  { id: 'apps', name: '앱 검색', chip: '앱 검색', description: '시작 메뉴와 설치된 프로그램(앱)을 바로 찾아 실행해요', ready: true, defaultOn: true },
+  { id: 'files', name: '파일 검색', chip: '파일 검색', description: 'PC의 파일, 폴더 이름을 바로 찾아 열어요. 따로 설치할 것 없이 메모킹이 이름 목록을 만들어 두어요 (이 PC 안에서만, 내용은 읽지 않음)', ready: true, defaultOn: true },
   { id: 'calc', name: '계산기', chip: '계산기', description: '식이나 날짜를 쓰면 바로 계산해요 (1,200 × 3, 15% * 80000, 3주 뒤, 12/25까지, 9:15부터 18:30까지). Enter로 결과 복사', ready: true, defaultOn: true },
   { id: 'web', name: '웹 검색', chip: '웹 검색', description: '쓴 글을 검색 사이트에서 찾거나, 사이트 주소를 바로 열어요. 고르기 전에는 아무것도 보내지 않아요', ready: true, defaultOn: true },
   { id: 'ai', name: '매직 에이전트', chip: 'AI', description: '이 PC의 AI(카나나2)가 내 메모에서 찾아 답하고, 일정 · 새 메모 · 덧붙이기 · 요약을 해요 (바꾸는 일은 확인하고). ChatGPT, Claude 같은 웹 AI도 같은 줄의 단추로 (브라우저에서 로그인한 계정 그대로)', ready: true, defaultOn: true },
@@ -14,7 +15,7 @@ export const MAGIC_MODULES = [
 ];
 
 // 처음 캡슐 · 결과 묶음 순서 — 관리번호를 쓰면 OPMS 사건이 새 메모 바로 아래 (전에 늘 그랬듯)
-export const DEFAULT_ORDER = ['memo', 'opms', 'notes', 'files', 'calc', 'web', 'ai'];
+export const DEFAULT_ORDER = ['memo', 'opms', 'notes', 'apps', 'files', 'calc', 'web', 'ai'];
 
 /**
  * 저장된 설정 → 쓸 수 있는 설정. 모르는 모듈은 버리고, 준비 중인 모듈은 늘 꺼 둔다.

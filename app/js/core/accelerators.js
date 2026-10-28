@@ -2,8 +2,8 @@
 //   저장: Electron accelerator ("Control+Alt+C") · 보이기: "Ctrl+Alt+C"
 //   Ctrl·Alt·Win 중 하나는 꼭 함께 (Shift 만 또는 글자 하나만은 글을 쓸 때 눌리므로 안 됨), 흔한 편집 단축키는 막는다
 
-export const DEFAULT_SHORTCUTS = { quickMemo: 'Control+Alt+C', magic: 'Control+Alt+Space' };
-export const SHORTCUT_NAMES = { quickMemo: '매직 카피', magic: '매직키' };
+export const DEFAULT_SHORTCUTS = { quickMemo: 'Control+Alt+C', magic: 'Control+Alt+Space', list: 'Control+Alt+`' };
+export const SHORTCUT_NAMES = { quickMemo: '매직 카피', magic: '매직키', list: '메모 목록' };
 
 const PUNCT = {
   Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'",
@@ -69,6 +69,9 @@ export function normalizeShortcuts(value) {
     if (isValidAccelerator(value?.[name])) out[name] = value[name];
   }
   if (out.quickMemo === out.magic) out.magic = out.quickMemo === DEFAULT_SHORTCUTS.magic ? DEFAULT_SHORTCUTS.quickMemo : DEFAULT_SHORTCUTS.magic;
+  if (out.list === out.quickMemo || out.list === out.magic) {
+    out.list = DEFAULT_SHORTCUTS.list;
+  }
   return out;
 }
 
@@ -78,8 +81,9 @@ export function withShortcuts(text, shortcuts) {
   const map = {
     [displayAccelerator(DEFAULT_SHORTCUTS.quickMemo)]: displayAccelerator(s.quickMemo),
     [displayAccelerator(DEFAULT_SHORTCUTS.magic)]: displayAccelerator(s.magic),
+    [displayAccelerator(DEFAULT_SHORTCUTS.list)]: displayAccelerator(s.list),
   };
   // 한 번에 바꾼다 (바꾼 결과가 다른 기본 키와 같아도 다시 바뀌지 않게)
-  const re = new RegExp(Object.keys(map).map((k) => k.replace(/[+]/g, '\\+')).join('|'), 'g');
+  const re = new RegExp(Object.keys(map).map((k) => k.replace(/[+`]/g, '\\$&')).join('|'), 'g');
   return String(text).replace(re, (m) => map[m]);
 }

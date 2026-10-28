@@ -1,6 +1,6 @@
 // AI 작업 흐름 (PC 메인) — 글 도우미 · 태그 · AI 검색 · 매직 에이전트.
 //   다른 것은 모델을 부르는 법(ai)과 메모를 읽는 법(memos · graph)뿐이다. 모델은 이 기기 안(llama-server), 인터넷 없이.
-import { spellMessages, styleMessages, draftMessages, plausibleFix, titleMessages, cleanTitle, wordDiff, diffEdits, TITLE_OVER } from './ai-write.js';
+import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibleFix, titleMessages, cleanTitle, wordDiff, diffEdits, TITLE_OVER } from './ai-write.js';
 import { aiTagRequest, aiTagResult, MIN_AI_TEXT } from './ai-tags.js';
 import { chunkMemo, retrieve, buildIndex, ragMessages, expandMessages, expandResult, finishAnswer, NOT_FOUND } from './rag.js';
 import { detectIntent, planMessages, planResult, appendTargets, appendText, memoBody, summaryMessages, scheduleQuery, eventsIn, scheduleText, memoDraftMessages, memoDraftResult } from './agent.js';
@@ -22,7 +22,7 @@ export const MAX_TAGS = 3; // 한 메모의 태그 (사용자 + AI) — AI 는 �
  */
 export function createAiTasks({ ai, memos, graph, reminders = () => [] }) {
   /** 글 도우미: spell → { fixed: [] } (믿을 만한 답만, 아니면 원래 글) · style · draft → { text } */
-  async function write({ task, text = '', blocks = [], style, title, request }, { signal, onToken, onProgress } = {}) {
+  async function write({ task, text = '', blocks = [], style, title, request, selection }, { signal, onToken, onProgress } = {}) {
     if (task === 'spell') {
       const fixed = [];
       for (const [i, block] of blocks.entries()) {
@@ -32,8 +32,9 @@ export function createAiTasks({ ai, memos, graph, reminders = () => [] }) {
       }
       return { fixed };
     }
-    const messages = task === 'style' ? styleMessages(text, style) : draftMessages({ title, body: text, request });
-    return { text: await ai.chat(messages, { maxTokens: 1024, signal, onToken }) };
+    const messages = task === 'style' ? styleMessages(text, style) : draftMessages({ title, body: text, request, selection });
+    const raw = await ai.chat(messages, { temperature: 0.2, maxTokens: 1024, signal, onToken });
+    return { text: cleanWriteOutput(raw) };
   }
 
   /** AI 로 태그 고르기 → 칩 목록 */
@@ -112,23 +113,24 @@ export function createAiTasks({ ai, memos, graph, reminders = () => [] }) {
   }
 
   /** 찾기: 잠긴 메모 빼고 모든 메모의 조각에서, 질문을 넓혀(모델) 낱말 · 두 글자 조각 · 그래프로 */
-  async function find(question, { signal, limit = 4, now = new Date() } = {}) {
+  async function find(question, { signal, limit = 4, now = new Date(), withWords = false } = {}) {
     const ex = expandMessages(question);
     // 넓히지 못해도(모델 오류 · 엉뚱한 답) 질문 낱말만으로 찾는다
     const words = await ai.chat(ex.messages, { schema: ex.schema, temperature: 0, maxTokens: 120, signal }).then(expandResult, () => []);
     if (signal?.aborted) throw new Error('멈췄어요');
     const related = new Map(graph().map((m) => [m.id, m.related ?? []]));
-    return retrieve(question, searchIndex(), { words, related: (id) => related.get(id) ?? [], limit, now });
+    const picked = retrieve(question, searchIndex(), { words, related: (id) => related.get(id) ?? [], limit, now });
+    return withWords ? { picked, words } : picked;
   }
   const sourcesOf = (picked) => picked.map((m) => ({ id: m.id, title: m.title, via: m.via }));
 
   /** AI 검색: 찾은 메모만 근거로 답 (물러서면 찾은 문장 그대로) → { text, sources, quoted } */
   async function ask(question, { signal, onToken, now = new Date() } = {}) {
-    const picked = await find(question, { signal, now });
+    const { picked, words } = await find(question, { signal, now, withWords: true });
     const sources = sourcesOf(picked);
     if (!picked.length) return { text: NOT_FOUND, sources, quoted: false };
     const raw = await ai.chat(ragMessages(question, picked, now), { maxTokens: 400, temperature: 0.2, signal, onToken });
-    return { ...finishAnswer(raw, question, picked), sources };
+    return { ...finishAnswer(raw, question, picked, words), sources };
   }
 
   /**

@@ -28,6 +28,8 @@ import { isContextMenuOpen } from './ctx-menu.js';
 import { haptic } from './dom.js';
 import { hintOnce } from './hints.js';
 import { renameTarget, renameContent, cleanName, promptName } from './rename-content.js';
+import { isDocumentFile } from './doc-pages.js';
+import { extOf } from './core/file-kinds.js';
 import { UI } from './core/ui-text.js';
 
 export const blockMoveKey = new PluginKey('memoking-block-move');
@@ -473,6 +475,7 @@ class Mover {
     if (!canContentMenu()) {
       this.onOpenClick = (e) => {
         if (e.mkOpen || e.button !== 0) return;
+        if (e.target instanceof Element && e.target.closest('.mk-file-open')) return;
         const host = e.target instanceof Element ? e.target.closest(OPEN_TARGET) : null;
         if (!host || !view.dom.contains(host) || e.target.closest('.lc-remove')) return;
         const block = blockFromTarget(view, host);
@@ -602,6 +605,7 @@ class Mover {
   press(event, kind) {
     const { view } = this;
     if (this.drag) return;
+    if (event.target instanceof Element && event.target.closest('.mk-file-open')) return;
     if (!persistentShown()) this.hideDelete(); // 표를 고치는 동안 표 위 단추는 눌러도 그대로 (휴대폰)
     let block = blockFromTarget(view, event.target);
     // 내용 줄이 아니면 글 줄(문단·제목·표·코드·인용·음성 카드): 꾹 눌러야 들어 올린다
@@ -993,9 +997,35 @@ class Mover {
     const copyLabel = block.node.type.name === 'mk_link_card' ? UI.copyLink : null; // 카드 모양이 아니라 주소를
     const opts = { pos: block.pos, node: block.node, target, markTarget: Boolean(media), deco, label: `이 ${kind} 삭제`, copyLabel, showMs, open: media || ['math_block', 'mk_link_card'].includes(block.node.type.name) ? openerOf(dom, kind) : null };
     // PC 메뉴: 파일 · 소리 · 그림 · 음성 카드는 보이는 이름을 바꿀 수 있다 (rename-content.js)
-    if (canContentMenu() && renameTarget(view.state.doc, block.pos, block.node)) {
-      opts.extraItems = [{ id: 'rename', label: '이름 변경' }];
-      opts.onExtra = (id) => id === 'rename' && this.renameAt(block.pos, block.node);
+    if (canContentMenu()) {
+      const extraItems = [];
+      if (renameTarget(view.state.doc, block.pos, block.node)) {
+        extraItems.push({ id: 'rename', label: '이름 변경' });
+      }
+      const chip = media?.matches?.('a[data-file]') ? media : media?.querySelector?.('a[data-file]');
+      if (chip) {
+        const href = chip.getAttribute('href') ?? '';
+        const name = chip.textContent.trim();
+        const ext = extOf(name) || extOf(href);
+        if (isDocumentFile({ name }) || isDocumentFile({ name: href })) {
+          extraItems.push({ id: 'expand-images', label: '그림으로 펼치기' });
+        }
+        if (['txt', 'md', 'csv', 'json', 'xml', 'log'].includes(ext)) {
+          extraItems.push({ id: 'expand-text', label: '텍스트로 본문에 풀기' });
+        }
+        opts.extraItems = extraItems;
+        opts.onExtra = (id) => {
+          if (id === 'rename') this.renameAt(block.pos, block.node);
+          else if (id === 'expand-images') {
+            window.dispatchEvent(new CustomEvent('mk:expand-document-images', { detail: { pos: block.pos, node: block.node, href, name } }));
+          } else if (id === 'expand-text') {
+            window.dispatchEvent(new CustomEvent('mk:expand-document-text', { detail: { pos: block.pos, node: block.node, href, name } }));
+          }
+        };
+      } else if (extraItems.length) {
+        opts.extraItems = extraItems;
+        opts.onExtra = (id) => id === 'rename' && this.renameAt(block.pos, block.node);
+      }
     }
     return opts;
   }

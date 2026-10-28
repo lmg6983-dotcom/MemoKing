@@ -47,7 +47,15 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
     b.dataset.id = spec.id;
     if (spec.danger) b.classList.add('danger');
     b.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서를 빼앗지 않게
-    b.addEventListener('click', () => closeContextMenu(spec.id));
+    b.addEventListener('click', () => {
+      if (cls === 'mk-ctx-ic' && spec.id === 'copy') {
+        b.classList.add('done');
+        b.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+        setTimeout(() => closeContextMenu(spec.id), 180);
+        return;
+      }
+      closeContextMenu(spec.id);
+    });
     focusables.push(b);
     return b;
   };

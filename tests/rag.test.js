@@ -62,5 +62,10 @@ test('AI 검색: 답 다듬기 — 없는 번호는 지우고, 분명히 찾았�
   assert.deepEqual(finishAnswer('메모에서 찾지 못했어요.', '출시일 언제야', picked), { text: '메모에 이렇게 적혀 있어요.\n“출시일은 11월 3일로 확정했어요” [1]', quoted: true });
   assert.deepEqual(finishAnswer('11월 3일이에요 [1][7]', '출시일 언제야', picked), { text: '11월 3일이에요 [1]', quoted: false });
   assert.equal(finishAnswer('11월 3일이에요', '출시일 언제야', picked).text, '11월 3일이에요\n근거: “출시일은 11월 3일로 확정했어요” [1]');
+  // 넓힌 낱말(words)로 찾은 메모인데 모델이 물러서도 넓힌 낱말 기준으로 문장을 뽑아 인용한다
+  assert.deepEqual(
+    finishAnswer('메모에서 찾지 못했어요.', '언제 내놓아', picked, ['출시일']),
+    { text: '메모에 이렇게 적혀 있어요.\n“출시일은 11월 3일로 확정했어요” [1]', quoted: true },
+  );
   assert.deepEqual(finishAnswer('메모에서 찾지 못했어요.', '출시일', [{ ...picked[0], score: 0.01 }]), { text: '메모에서 찾지 못했어요.', quoted: false }, '약하게 걸린 메모는 그대로 못 찾았다고');
 });

@@ -19,7 +19,22 @@ const ICONS = {
   copyIso: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
   copyExpr: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M7 12h6M7 16h4M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
   copyApp: 'M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M7 12h6M7 16h4M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
 };
+
+/** 복사 아이콘 단추를 눌렀을 때 초록색 체크 표시로 잠깐 바꾼다 */
+export function markCopyDone(btn) {
+  if (!btn) return;
+  const path = btn.querySelector('svg path');
+  const prev = path?.getAttribute('d');
+  btn.classList.add('done');
+  if (path) path.setAttribute('d', ICONS.check);
+  clearTimeout(btn._doneTimer);
+  btn._doneTimer = setTimeout(() => {
+    btn.classList.remove('done');
+    if (path && prev) path.setAttribute('d', prev);
+  }, 1100);
+}
 
 /** 이 줄에서 할 수 있는 일 (첫 번째가 Enter) */
 export function actionsFor(r) {
@@ -33,6 +48,8 @@ export function actionsFor(r) {
       return [{ id: 'save', label: '알림 맞춰 저장' }, { id: 'saveOpen', label: '저장하고 열기' }];
     case 'folder':
       return [{ id: 'open', label: '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '위 폴더에서 보기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '폴더 복사' }];
+    case 'app':
+      return [{ id: 'open', label: '실행' }, { id: 'reveal', label: '폴더 열기', key: 'Ctrl+Shift+E' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }];
     case 'file':
       return [{ id: 'open', label: r.app ? '실행' : '열기' }, { id: 'copyPath', label: '경로 복사', key: 'Ctrl+Shift+C' }, { id: 'reveal', label: '폴더 열기', key: 'Ctrl+Shift+E' }, { id: 'copyFile', label: '파일 복사' }];
     case 'opmsAsk':
@@ -97,6 +114,7 @@ export function actionButtons(r, active, onRun) {
     b.addEventListener('mousedown', (e) => e.preventDefault()); // 입력 칸 포커스 유지
     b.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (a.id.startsWith('copy')) markCopyDone(b);
       onRun(i);
     });
     wrap.append(b);

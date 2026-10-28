@@ -286,7 +286,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .mk-media-label { padding: 0 4px; font-size: 12px; color: var(--note-muted); user-select: none; }
 .mk-video .mk-media-label { padding: 6px 10px 2px; color: rgba(255, 255, 255, 0.75); }
 
-/* 그 밖의 파일: 파일 칩 (누르면 기본 앱으로 열림) */
+/* 그 밖의 파일: 파일 칩 (끌어서 순서 바꾸기 · 옆의 열기 버튼이나 더블클릭으로 열기) */
 .mk-doc a[href^="attachments/"] {
   display: inline-flex;
   align-items: center;
@@ -298,9 +298,35 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   color: inherit;
   text-decoration: none;
   font-size: 13.5px;
-  cursor: pointer;
+  cursor: grab;
+  caret-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
   transition: background-color 0.15s ease-out;
 }
+.mk-doc p.mk-file-line { caret-color: transparent; }
+.mk-doc .mk-file-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  margin-left: 6px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--brand-yellow, #ffd43b);
+  color: var(--on-brand, #111);
+  font: 700 12px/1 var(--font-sans);
+  cursor: pointer;
+  vertical-align: middle;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.12);
+  transition: transform 0.1s ease-out, filter 0.12s ease-out;
+}
+@media (hover: hover) and (pointer: fine) { .mk-doc .mk-file-open:hover { filter: brightness(0.95); } }
+.mk-doc .mk-file-open:active { transform: scale(0.95); }
+body[data-color="yellow"] .mk-doc .mk-file-open { background: var(--brand-black, #111); color: #fff; }
 @media (hover: hover) and (pointer: fine) { .mk-doc a[href^="attachments/"]:hover { background: var(--note-hover); box-shadow: inset 0 0 0 1px var(--note-muted); } }
 .mk-doc a[href^="attachments/"]::before {
   content: "";
@@ -415,6 +441,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   background: var(--note-hover);
   box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.18);
   font-weight: 600;
+  caret-color: transparent;
   -webkit-box-decoration-break: clone;
 }
 
@@ -1504,19 +1531,23 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 }
 @media (prefers-reduced-motion: reduce) { .mk-doc .mk-list-gather { animation: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--note-text) 55%, transparent); } }
 
-/* ---------- v0.19.0: 음성 녹음 (PC) — 위쪽 막대 아래 한 줄: 빨간 점 · 시간 · 소리 크기 · 잠시 멈춤 · 끝내기 ---------- */
+/* ---------- v0.19.0: 음성 녹음 (PC) — 좌측 상단에 작게 플로팅 (바꾸기 막대처럼) ---------- */
 .desk-rec {
+  position: relative; z-index: 5; flex: none; align-self: flex-start;
+  width: fit-content; max-width: min(460px, calc(100% - 16px)); box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  flex: none;
-  margin: 0 10px 6px;
-  padding: 6px 6px 6px 12px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--note-bg) 70%, var(--note-text) 8%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
-  animation: desk-rec-in 0.2s var(--ease-out);
+  margin: 4px 8px 6px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-strong);
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card);
+  -webkit-app-region: no-drag;
+  animation: desk-rec-in 0.16s var(--ease-out);
 }
+.desk-rec .rec-text:empty { display: none; }
 .desk-rec .rec-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .desk-rec .rec-text { max-height: 28vh; padding: 2px 6px 2px 0; overflow-y: auto; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--note-text); }
 .desk-rec .rec-hint, .desk-rec .rec-listening { color: var(--note-muted); font-size: 12.5px; }
@@ -1963,22 +1994,26 @@ body.in-table .tag-suggest-bar { display: none; }
 .hotkey-dialog .lock-error:empty { min-height: 0; margin: 0; }
 .hotkey-dialog .hk-clear { margin-right: auto; }
 
-/* 내용을 지운 자리에 잠깐: "표를 지웠어요 · Ctrl+Z 로 되돌리기" (delete-button.js undoHint) */
+/* 내용을 지운 뒤: 메모 수정영역(#editor) 바깥 아래 줄에 안내 ("표를 삭제했어요 [되돌리기] Ctrl+Z") */
 .mk-undo-hint {
-  position: fixed; z-index: 60;
-  padding: 6px 12px; border-radius: 999px;
-  background: var(--bubble-bg); color: var(--bubble-fg); box-shadow: var(--bubble-shadow);
-  display: inline-flex; align-items: center; gap: 8px;
+  position: relative; z-index: 6; flex: none;
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  width: 100%; box-sizing: border-box;
+  padding: 5px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--note-text) 10%, transparent);
+  background: color-mix(in srgb, var(--note-bg) 82%, var(--note-text) 7%);
+  color: var(--note-text);
   font-size: 12.5px; font-weight: 600; white-space: nowrap;
   animation: mk-undo-in 0.18s var(--ease-out);
-  transition: opacity 0.24s var(--ease-out);
+  transition: opacity 0.2s var(--ease-out), transform 0.2s var(--ease-out);
 }
-.mk-undo-hint .mk-undo-btn { padding: 2px 10px; border: 0; border-radius: 999px; background: var(--brand-yellow); color: var(--on-brand); font: inherit; font-weight: 800; cursor: pointer; }
+.mk-undo-hint > span:first-child { margin-right: auto; overflow: hidden; text-overflow: ellipsis; }
+.mk-undo-hint .mk-undo-btn { padding: 3px 10px; border: 0; border-radius: 999px; background: var(--brand-yellow); color: var(--on-brand); font: inherit; font-weight: 800; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .mk-undo-hint .mk-undo-btn:hover { background: var(--brand-yellow-hover); } }
 .mk-undo-hint .mk-undo-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.mk-undo-hint kbd { opacity: 0.7; padding: 0 4px; border: 1px solid var(--bubble-line); border-radius: 4px; font: inherit; font-size: 11.5px; }
-.mk-undo-hint.fading { opacity: 0; }
-@keyframes mk-undo-in { from { opacity: 0; transform: translateY(4px); } }
+.mk-undo-hint kbd { opacity: 0.7; padding: 0 4px; border: 1px solid color-mix(in srgb, var(--note-text) 20%, transparent); border-radius: 4px; font: inherit; font-size: 11.5px; }
+.mk-undo-hint.fading { opacity: 0; transform: translateY(4px); }
+@keyframes mk-undo-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
 /* 파일 · 음성(소리 줄) · 그림 같은 내용을 골랐을 때: 글 서식 단추는 쓸 수 없다 (+ 콘텐츠 추가 · 더보기는 그대로) */
 body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-action="highlight"], [data-action="style"]) { opacity: 0.35; pointer-events: none; }

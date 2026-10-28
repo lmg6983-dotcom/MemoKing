@@ -538,11 +538,15 @@ $('op-copy-biblio').addEventListener('click', async () => {
   const b = $('op-copy-biblio');
   try {
     await api.copy(biblioText(current.case));
+    b.classList.add('done');
     b.textContent = '✓ 복사했어요';
   } catch (err) {
     message(errText(err), 'err');
   }
-  setTimeout(() => (b.textContent = '서지사항 전체 복사'), 1500);
+  setTimeout(() => {
+    b.classList.remove('done');
+    b.textContent = '서지사항 전체 복사';
+  }, 1500);
 });
 
 // 메모로 만들기: 사건 정보를 메모 한 장으로 (메모 창이 열린다)

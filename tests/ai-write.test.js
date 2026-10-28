@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { wordDiff, diffEdits, applyEdits, plausibleFix, draftMessages, cleanTitle } from '../app/js/core/ai-write.js';
+import { wordDiff, diffEdits, applyEdits, plausibleFix, draftMessages, isEditRequest, cleanWriteOutput, cleanTitle } from '../app/js/core/ai-write.js';
 
 test('AI 글 도우미: 바뀐 낱말만 고침으로', () => {
   const a = '몇일 뒤에 다시 연락드릴께요.';
@@ -31,11 +31,18 @@ test('AI 글 도우미: 작은 모델의 엉뚱한 답은 버린다', () => {
   assert.ok(plausibleFix('새메모로 작동하니?', '새 메모로 작동하니?'), '띄어쓰기만 고친 것은 그대로');
 });
 
-test('AI 글 도우미: 초안은 제목 · 쓴 내용 · 부탁을 함께', () => {
+test('AI 글 도우미: 초안은 제목 · 쓴 내용 · 부탁을 함께, 기존 글에 지시가 있으면 편집 모드로', () => {
   const m = draftMessages({ title: '주간 회의', body: '- 출시일', request: '' });
   assert.match(m[1].content, /주간 회의/);
   assert.match(m[1].content, /출시일/);
   assert.match(m[1].content, /초안/);
+
+  assert.equal(isEditRequest('표로 정리해줘', '- 사과 1000원\n- 배 2000원'), true);
+  assert.equal(isEditRequest('이어서 초안 써줘', '- 사과 1000원'), false);
+  const editMsg = draftMessages({ title: '장보기', body: '- 사과 1000원\n- 배 2000원', request: '표로 정리해줘' });
+  assert.match(editMsg[0].content, /편집·변환/);
+  assert.match(editMsg[1].content, /지시사항: 표로 정리해줘/);
+  assert.equal(cleanWriteOutput('네, 요청하신 대로 정리했습니다:\n\n```markdown\n| 품목 | 가격 |\n```'), '| 품목 | 가격 |');
 });
 
 test('cleanTitle: 한 줄 · 기호 없이 · 30자까지, 한자 섞이면 버림', () => {

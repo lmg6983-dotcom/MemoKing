@@ -23,7 +23,7 @@ import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
 import { vaultUrl, mediaKind, baseName } from './media.js';
 import { openAlbumViewer } from './album-viewer.js';
 import { promptChoice } from './rename-content.js';
-import { isDocumentFile, documentPages } from './doc-pages.js';
+import { isDocumentFile, documentPages, decodeTxtBytes } from './doc-pages.js';
 import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from './core/link-preview.js';
 import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
@@ -46,6 +46,7 @@ import { haptic } from './dom.js';
 import { createFindPlugin, findController } from './find-replace.js';
 import { mathPlugins, insertMathBlock } from './math.js';
 import { fileChipGuard } from './file-chip-guard.js';
+import { listDeleteGuard } from './list-delete-guard.js';
 import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
@@ -584,6 +585,7 @@ function atLineIndent($pos) {
   return /^\u00a0*$/.test($pos.doc.textBetween(start, $pos.pos, '', ''));
 }
 const fileChips = $prose(() => fileChipGuard());
+const protectListDelete = $prose(() => listDeleteGuard());
 
 // 서식이 있는 HTML 인가 (글자 모양 · 목록 · 표 · 그림 · 링크 등) — 없으면 글자만 있는 것 (메신저 · 채팅 복사)
 const RICH_TAGS = 'h1,h2,h3,h4,h5,h6,ul,ol,li,table,pre,code,blockquote,img,picture,video,audio,svg,hr,strong,b,em,i,u,s,del,strike,mark,sub,sup,a[href]';
@@ -1309,7 +1311,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       try {
         const kind = mediaKind(file);
         const src = await saveFile(file);
-        if (kind === 'file') items.push({ kind, src, name: file.name });
+        if (kind === 'file') items.push({ kind, src, name: file.name, file });
         else items.push({ kind, src, alt: kind === 'video' ? `동영상 ${baseName(file.name)}` : baseName(file.name) });
       } catch (err) {
         console.warn('파일을 넣지 못했어요', file.name, err);
@@ -1371,8 +1373,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const name = it.name;
     try {
       onNotice?.(`${name}을 그림으로 바꾸고 있어요`);
-      const blob = await (await fetch(vaultUrl(it.src))).blob();
-      const { pages, total } = await documentPages(new File([blob], name), (n, all) => onNotice?.(`${name}을 그림으로 바꾸고 있어요 (${n}/${all})`));
+      const fileName = extOf(name) ? name : `${name}.${extOf(it.src) || 'txt'}`;
+      const srcFile = it.file instanceof File
+        ? new File([await it.file.arrayBuffer()], fileName, { type: it.file.type })
+        : new File([await (await fetch(vaultUrl(it.src))).blob()], fileName);
+      const { pages, total } = await documentPages(srcFile, (n, all) => onNotice?.(`${name}을 그림으로 바꾸고 있어요 (${n}/${all})`));
       const images = [];
       for (let i = 0; i < pages.length; i++) {
         const alt = `${baseName(name)} ${i + 1}쪽`;
@@ -1386,6 +1391,43 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       return it;
     }
   }
+
+  // 파일 칩 우클릭 메뉴 › 그림으로 펼치기
+  window.addEventListener('mk:expand-document-images', async (e) => {
+    if (readOnly) return;
+    const { pos, node, href, name } = e.detail ?? {};
+    if (!href) return;
+    const item = { kind: 'file', src: href, name: name || href.split('/').pop() };
+    const album = await documentAlbum(item);
+    if (album && album !== item && album.images?.length) {
+      const v = view();
+      const insertAt = pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head;
+      insertBlocks(insertAt, [album]);
+    }
+  });
+
+  // 파일 칩 우클릭 메뉴 › 텍스트로 본문에 풀기
+  window.addEventListener('mk:expand-document-text', async (e) => {
+    if (readOnly) return;
+    const { pos, node, href, name } = e.detail ?? {};
+    if (!href) return;
+    try {
+      onNotice?.(`${name}의 글을 읽고 있어요`);
+      const buf = new Uint8Array(await (await fetch(vaultUrl(href))).arrayBuffer());
+      const text = decodeTxtBytes(buf);
+      const v = view();
+      const { schema } = v.state;
+      const lines = text.replace(/\r\n?/g, '\n').split('\n');
+      const paras = lines.map((l) => schema.nodes.paragraph.create(null, l ? schema.text(l) : null));
+      const insertAt = pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head;
+      const tr = v.state.tr.insert(insertAt, paras);
+      v.dispatch(tr.scrollIntoView());
+      onNotice?.(`${name}의 내용을 본문에 풀었어요`);
+    } catch (err) {
+      console.warn('텍스트 풀기 오류', err);
+      onNotice?.(`${name}의 글을 읽지 못했어요`, true);
+    }
+  });
 
   // ---------- 붙여 넣은 인터넷 사진을 메모 폴더로 ----------
   // 글과 함께 붙여 넣은 사진은 먼저 인터넷 주소로 들어오고, 받아지는 대로 attachments/ 파일로 바뀐다.
@@ -2042,6 +2084,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         },
       }));
     })
+    .use(protectListDelete) // 목록 맨 앞 Delete 시 서식이 깨지는 버그 방지 (commonmark 키맵보다 먼저)
     .use(commonmark)
     .use(cellPaste) // 표 칸에 여러 줄 붙이기 — 표 기능보다 먼저
     .use(gfm)

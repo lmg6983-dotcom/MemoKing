@@ -1,7 +1,7 @@
 // AI 글쓰기 (메모 창 › 서식 막대 끝 ✦) — 부탁 한 줄(Enter: 초안) + 빠른 작업 칩(맞춤법 · 문체)만 든 작은 창.
 //   모델은 이 PC 안(desktop/ai, 인터넷 없이). 고친 글은 바로 덮지 않는다:
 //   맞춤법은 문단마다 바뀐 곳(지운 글 · 새 글)을 보여 주고 하나씩 또는 모두 바꾸고, 문체 · 초안은 다 쓴 뒤 바꾸기 · 메모 끝에 넣기를 고른다.
-import { STYLES, MAX_CHARS, wordDiff, diffEdits } from './core/ai-write.js';
+import { STYLES, MAX_CHARS, wordDiff, diffEdits, isEditRequest } from './core/ai-write.js';
 
 const h = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -122,19 +122,45 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show, hi
     );
   }
 
-  // ---------- 초안 ----------
+  // ---------- 초안 · 지시 편집 ----------
   async function draft() {
-    const r = await run({ task: 'draft', title: title(), text: editor().plainText(), request: request.value }, '초안을 쓰는 중이에요…');
+    const ed = editor();
+    const body = ed.plainText();
+    const range = ed.aiRange?.() ?? null;
+    const hasSelection = Boolean(range && range.from > 0 && range.text.trim() && range.text.trim() !== body.trim());
+    const req = request.value;
+    const editing = isEditRequest(req, hasSelection ? range.text : body);
+    const r = await run(
+      { task: 'draft', title: title(), text: body, selection: hasSelection ? range.text : '', request: req },
+      editing ? '지시대로 메모를 다듬는 중이에요…' : '초안을 쓰는 중이에요…',
+    );
     if (!r) return;
-    state.textContent = '초안이에요. [ ] 칸은 직접 채워 주세요';
-    actions(
-      button('메모 끝에 넣기', 'btn', () => {
-        editor().appendMarkdown(r.text); // 커서 자리면 목록 · 인용 안에 들어가 제목까지 들여 써진다
+    state.textContent = editing ? '지시대로 정리했어요. 반영할 방식을 골라 주세요' : '초안이에요. [ ] 칸은 직접 채워 주세요';
+    const btns = [];
+    if (editing && range && range.text.trim()) {
+      btns.push(button(hasSelection ? '선택 영역 바꾸기' : '메모 덮어쓰기', 'btn', () => {
+        if (!ed.aiReplace(range, r.text)) return (state.textContent = '그사이 글이 바뀌어서 넣지 못했어요. 다시 해 주세요');
+        result.replaceChildren();
+        state.textContent = '반영했어요. 되돌리려면 Ctrl+Z';
+      }));
+    } else if (editing && body.trim() && typeof ed.setMarkdown === 'function') {
+      btns.push(button('메모 덮어쓰기', 'btn', () => {
+        const heading = title()?.trim();
+        const nextMd = heading && !/^#\s/.test(r.text.trim()) ? `# ${heading}\n\n${r.text}` : r.text;
+        ed.setMarkdown(nextMd);
+        result.replaceChildren();
+        state.textContent = '반영했어요. 되돌리려면 Ctrl+Z';
+      }));
+    }
+    btns.push(
+      button('메모 끝에 넣기', btns.length ? 'link-btn' : 'btn', () => {
+        ed.appendMarkdown(r.text); // 커서 자리면 목록 · 인용 안에 들어가 제목까지 들여 써진다
         result.replaceChildren();
         state.textContent = '넣었어요. 되돌리려면 Ctrl+Z';
       }),
       button('버리기', 'link-btn', () => { result.replaceChildren(); state.textContent = ''; }),
     );
+    actions(...btns);
   }
 
   const request = $('.ai-request');
