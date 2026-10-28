@@ -137,14 +137,15 @@ export function kakaoEntry(boxes, { width = 0, height = 0, appName = '', profile
     items.push({ text, x, y, h });
   }
   if (!items.length) return null;
-  // 같은 높이(세로 가운데가 글자 높이의 절반 안)에 있는 조각은 한 줄로, 왼쪽부터
+  // 같은 높이(세로 가운데가 글자 높이의 65% 안)에 있는 조각은 한 줄로, 왼쪽부터 (받침 유무로 조각 높이가 달라도 한 줄로 묶이게)
   items.sort((a, b) => a.y - b.y);
   const rows = [];
   for (const it of items) {
-    const row = rows.find((r) => Math.abs((r.y + r.h / 2) - (it.y + it.h / 2)) < Math.min(r.h, it.h) / 2);
+    const row = rows.find((r) => Math.abs((r.y + r.h / 2) - (it.y + it.h / 2)) < Math.max(r.h, it.h) * 0.65);
     if (row) row.parts.push(it);
     else rows.push({ y: it.y, h: it.h, parts: [it] });
   }
+  const cleanLine = (s) => s.replace(/(\s+(?:[^\p{L}\p{N}\s]{1,2}|[xXoO0×✕]))+$/u, '').trim();
   const lines = rows.map((r) => ({ y: r.y, text: r.parts.sort((a, b) => a.x - b.x).map((p) => p.text).join(' ') }));
 
   let room;
@@ -154,20 +155,23 @@ export function kakaoEntry(boxes, { width = 0, height = 0, appName = '', profile
   if (below.length) {
     // 프로필 사진 윗변을 안다: 그 위 = 채팅방 이름, 아래 첫 줄 = 보낸 사람
     // 오른쪽 위 종 · 닫기 단추가 채팅방 줄 끝에 '×' · 'x' · '0' 같은 한 글자로 붙어 읽히면 뗀다
-    const roomLine = lines.filter((l) => l.y < profileTop - 4).map((l) => l.text).join(' ')
-      .replace(/(\s+(?:[^\p{L}\p{N}\s]{1,2}|[xXoO0]))+$/u, '').trim();
-    sender = below[0].text;
+    const roomLine = cleanLine(lines.filter((l) => l.y < profileTop - 4).map((l) => l.text).join(' '));
+    sender = cleanLine(below[0].text) || below[0].text;
     room = roomLine && !sameName(roomLine, sender) ? roomLine : sender;
     body = below.slice(1).map((l) => l.text);
   } else if (lines.length === 1) {
-    [room, sender, body] = [lines[0].text, lines[0].text, []];
-  } else if (lines[1].y >= KAKAO_BODY_Y || lines[0].text === lines[1].text) {
+    const first = cleanLine(lines[0].text) || lines[0].text;
+    [room, sender, body] = [first, first, []];
+  } else if (lines[1].y >= KAKAO_BODY_Y || sameName(cleanLine(lines[0].text), cleanLine(lines[1].text))) {
     // 윗줄 하나 + 메시지 (1:1 대화에서 보낸 사람 줄이 따로 없거나 같은 글로 두 번 읽힌 경우)
+    const first = cleanLine(lines[0].text) || lines[0].text;
     const rest = lines.slice(1).map((l) => l.text);
-    if (rest[0] === lines[0].text) rest.shift();
-    [room, sender, body] = [lines[0].text, lines[0].text, rest];
+    if (sameName(cleanLine(rest[0] ?? ''), first)) rest.shift();
+    [room, sender, body] = [first, first, rest];
   } else {
-    [room, sender, body] = [lines[0].text, lines[1].text, lines.slice(2).map((l) => l.text)];
+    const r0 = cleanLine(lines[0].text) || lines[0].text;
+    const s0 = cleanLine(lines[1].text) || lines[1].text;
+    [room, sender, body] = [sameName(r0, s0) ? s0 : r0, s0, lines.slice(2).map((l) => l.text)];
   }
   const title = room && room !== sender ? `${sender} (${room})` : sender;
   return { title: title.slice(0, 200), body: body.join('\n').slice(0, 2000) };

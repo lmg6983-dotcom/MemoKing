@@ -1,5 +1,5 @@
 // Electron 창 관련 기본 유틸리티 — 창 모양, 크기 계산, 애니메이션, 안전 가드.
-import { app, BrowserWindow, nativeTheme, screen } from 'electron';
+import { app, BrowserWindow, nativeImage, nativeTheme, screen } from 'electron';
 import path from 'node:path';
 import { tweenBounds, DEFAULT_NOTE_SIZE } from './placement.js';
 import { NOTE_BG } from '../app/js/core/memo-file.js';
@@ -15,6 +15,23 @@ export const ASSETS_DIR = path.join(import.meta.dirname, '..', 'assets');
 export const APP_ICON = path.join(ASSETS_DIR, 'icons', 'memoking.ico');
 export const APP_ICON_PNG = path.join(ASSETS_DIR, 'icons', 'icon-256.png');
 
+let _appIconNative = null;
+export function getAppIcon() {
+  if (!_appIconNative) {
+    if (process.platform === 'win32') {
+      try {
+        _appIconNative = nativeImage.createFromPath(APP_ICON);
+        if (_appIconNative.isEmpty()) _appIconNative = nativeImage.createFromPath(APP_ICON_PNG);
+      } catch {
+        _appIconNative = nativeImage.createFromPath(APP_ICON_PNG);
+      }
+    } else {
+      _appIconNative = nativeImage.createFromPath(APP_ICON_PNG);
+    }
+  }
+  return _appIconNative;
+}
+
 export const webPreferences = {
   preload: PRELOAD,
   contextIsolation: true,
@@ -22,7 +39,11 @@ export const webPreferences = {
   sandbox: true,
 };
 
-export const windowIcon = { icon: APP_ICON };
+export const windowIcon = {
+  get icon() {
+    return getAppIcon();
+  },
+};
 
 // 메모 창이 뜨는 순간의 배경색은 core/memo-file.js 의 NOTE_BG
 //   나눠 쓰지 않으면 mode 는 null — 예전처럼 시스템 설정을 따른다

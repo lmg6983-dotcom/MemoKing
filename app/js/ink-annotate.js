@@ -53,7 +53,7 @@ export function setupAnnotation(o) {
     }
     return last ? { node: last, offset: Math.max(0, last.data.length - 1) } : null;
   }
-  /** 문단의 c 번째 글자 왼쪽 위 (본문 왼쪽 위 기준) · 글자 크기 */
+  /** 문단의 c 번째 글자 왼쪽 위 (본문 왼쪽 위 기준) · 글자 크기 (확대·축소 배율 반영) */
   function charOrigin(blockEl, c, base) {
     const t = textAt(blockEl, c);
     if (!t) return null;
@@ -62,7 +62,10 @@ export function setupAnnotation(o) {
     r.setEnd(t.node, Math.min(t.node.data.length, t.offset + 1));
     const rect = [...r.getClientRects()].find((x) => x.width || x.height) ?? r.getBoundingClientRect();
     if (!rect || (!rect.width && !rect.height)) return null;
-    return { left: rect.left - base.left, top: rect.top - base.top, font: parseFloat(getComputedStyle(t.node.parentElement).fontSize) || 16 };
+    const doc = o.docEl();
+    const zoom = doc && doc.offsetWidth > 0 ? base.width / doc.offsetWidth : 1;
+    const cssFont = parseFloat(getComputedStyle(t.node.parentElement).fontSize) || 16;
+    return { left: rect.left - base.left, top: rect.top - base.top, font: cssFont * zoom };
   }
   /** 화면 자리(본문 기준 x, y) 아래 글자: 문단 번호 · 글자 번호 — 글자가 없는 곳(그림 · 파일 위)이면 null */
   function charAtPoint(x, y, b) {
@@ -112,15 +115,20 @@ export function setupAnnotation(o) {
     const sb = o.scroller.getBoundingClientRect();
     const db = doc.getBoundingClientRect();
     width = Math.max(1, db.width); // 화면 크기 (본문 확대·축소도 그대로)
+    const padX = Math.round(db.left - sb.left + o.scroller.scrollLeft);
+    const padY = Math.round(db.top - sb.top + o.scroller.scrollTop);
+    const layerW = Math.max(1, o.scroller.clientWidth, o.scroller.scrollWidth, Math.ceil(padX + width));
+    const layerH = Math.max(1, o.scroller.clientHeight, o.scroller.scrollHeight, Math.ceil(padY + db.height));
     Object.assign(layer.style, {
       display: '',
-      left: `${db.left - sb.left + o.scroller.scrollLeft}px`,
-      top: `${db.top - sb.top + o.scroller.scrollTop}px`,
-      width: `${width}px`,
-      height: `${Math.max(db.height, o.scroller.clientHeight - (db.top - sb.top) - 8)}px`,
+      left: '0px',
+      top: '0px',
+      width: `${layerW}px`,
+      height: `${layerH}px`,
     });
-    layer.setAttribute('width', String(width));
-    layer.setAttribute('height', layer.style.height.replace('px', ''));
+    layer.setAttribute('width', String(layerW));
+    layer.setAttribute('height', String(layerH));
+    layer.setAttribute('viewBox', `${-padX} ${-padY} ${layerW} ${layerH}`);
     paint();
   }
   const schedule = () => {
@@ -154,20 +162,11 @@ export function setupAnnotation(o) {
     }
   }
 
-  // 화면 좌표 획 목록(그리기판이 준 것) → 저장 모양: 원래 있던 것은 짝을, 새로 그린 것은 그 아래 문단에 붙여서
+  // 화면 좌표 획 목록(그리기판이 준 것) → 저장 모양: 원래 있던 것은 짝을, 새로 그린 것은 문단 폭 비율(1/1000)로 고정해
+  //   확대·축소할 때 획 사이 거리가 벌어지지 않고 태블릿↔데스크탑에서도 위치·크기 비율이 그대로 유지되게 한다
   function toAnchored(list) {
     const b = blocks();
-    const doc = o.docEl();
-    const base = doc?.getBoundingClientRect();
-    return list.map((s) => {
-      const had = placed.get(s);
-      if (had) return had;
-      // 새로 그린 획: 가운데 아래 글자에 붙인다 (글자가 없는 곳이면 예전처럼 문단 폭 비율)
-      const box = inkBounds([s]);
-      const at = box && base ? charAtPoint(box.x + box.w / 2, box.y + box.h / 2, b) : null;
-      const origin = at ? charOrigin(b[at.b].el, at.c, base) : null;
-      return origin ? anchorStrokeToChar(s, { ...at, text: b[at.b].text, ...origin }) : anchorStroke(s, b, width);
-    });
+    return list.map((s) => placed.get(s) ?? anchorStroke(s, b, width));
   }
 
   async function ensureLoaded() {

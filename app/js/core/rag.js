@@ -182,42 +182,52 @@ export function ragMessages(question, picked, now = new Date()) {
   });
   const today = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${DAYS[now.getDay()]}요일`;
   return [
-    { role: 'system', content: `너는 사용자의 메모를 읽고 질문에 답하는 비서다. 오늘은 ${today}이다. 아래 [번호] 메모에 적힌 것만 근거로 한국어 해요체로 1~3문장 답한다. 문장 끝에 근거 메모 번호를 [1]처럼 붙인다. 질문과 관련된 내용이 조금이라도 있으면 있는 만큼 답하고, 모르는 부분만 모른다고 한다. 관련 내용이 전혀 없을 때만 "${NOT_FOUND}"라고 답한다. 메모에 없는 것은 지어내지 않는다.` },
+    { role: 'system', content: `너는 사용자의 메모를 읽고 질문에 답하는 비서다. 오늘은 ${today}이다. 아래 [번호] 메모는 질문과 관련되어 이미 찾아 놓은 참고 메모다. 이 메모들의 내용(비슷한 표현이나 간접적인 단서 포함)을 적극적으로 활용해 한국어 해요체로 1~3문장 답하고, 문장마다 끝에 반드시 근거 메모 번호를 [1]처럼 붙인다. 여러 메모를 참고했으면 [1][2]처럼 모두 붙인다. 질문과 조금이라도 관련된 내용이 있으면 절대 포기하지 말고 찾은 내용을 바탕으로 답한다. 모든 메모가 질문과 완전히 무관할 때만 "${NOT_FOUND}"라고 답한다. 메모에 없는 사실은 지어내지 않는다.` },
     { role: 'user', content: `메모:\n${parts.join('\n\n')}\n\n질문: ${question}` },
   ];
 }
 
-/** 찾은 메모에서 질문과 가장 맞는 문장 (그대로 보여 줄 때) → { text, n } | null  n: 몇 번 메모 */
-export function bestSentence(question, picked) {
-  const qf = new Set(features(question, { ask: true }));
-  if (!qf.size) return null;
+/** 찾은 메모에서 질문(또는 넓힌 낱말)과 가장 맞는 문장 (그대로 보여 줄 때) → { text, n } | null  n: 몇 번 메모 */
+export function bestSentence(question, picked, words = []) {
+  const qf = new Set([...features(question, { ask: true }), ...words.flatMap((w) => features(w))]);
   let best = null;
   picked.forEach((m, i) => {
     if (m.via === 'graph') return;
     for (const text of m.texts) {
-      for (const s of text.split('\n').slice(1).flatMap((line) => line.split(/(?<=[.!?。])\s+/))) {
+      const lines = text.split('\n').slice(1).flatMap((line) => line.split(/(?<=[.!?。])\s+/)).map((s) => s.trim()).filter(Boolean);
+      for (const s of lines) {
         const f = new Set(features(s));
         const hit = [...qf].filter((x) => f.has(x)).length;
         if (!hit) continue;
-        const score = hit / qf.size + (i === 0 ? 0.05 : 0);
-        if (!best || score > best.score) best = { text: s.trim().slice(0, 200), n: i + 1, score };
+        const score = hit / Math.max(1, qf.size) + (i === 0 ? 0.05 : 0);
+        if (!best || score > best.score) best = { text: s.slice(0, 200), n: i + 1, score };
       }
     }
   });
-  return best && { text: best.text, n: best.n };
+  if (best) return { text: best.text, n: best.n };
+  // 넓힌 낱말이나 제목으로 찾았는데 본문 문장에 직접 겹치는 낱말이 없을 때는 첫 번째 매칭 메모의 핵심 줄을 돌려준다
+  const first = picked.find((m) => m.via !== 'graph');
+  if (!first) return null;
+  const idx = picked.indexOf(first);
+  for (const text of first.texts ?? []) {
+    const bodyLine = text.split('\n').slice(1).map((l) => l.trim()).find(Boolean);
+    if (bodyLine) return { text: bodyLine.slice(0, 200), n: idx + 1 };
+  }
+  return first.title ? { text: first.title.slice(0, 200), n: idx + 1 } : null;
 }
 
 /**
  * 모델 답 다듬기: 없는 번호는 지우고, 분명히 찾았는데 물러섰으면(못 찾았어요 · 번호 없음) 메모의 문장을 그대로
  * @returns {{ text: string, quoted: boolean }}
  */
-export function finishAnswer(answer, question, picked) {
+export function finishAnswer(answer, question, picked, words = []) {
   let text = String(answer ?? '').trim().replace(/\[(\d+)\]/g, (all, n) => (Number(n) >= 1 && Number(n) <= picked.length ? all : ''));
-  const gaveUp = !text || text.includes('찾지 못했');
+  const gaveUp = !text || text.includes('찾지 못했') || text.includes('없어요') && text.length < 25 && !/\[\d+\]/.test(text);
   const strong = picked[0] && picked[0].via !== 'graph' && picked[0].score >= STRONG;
-  const s = strong && (gaveUp || !/\[\d+\]/.test(text)) ? bestSentence(question, picked) : null;
+  const s = strong && (gaveUp || !/\[\d+\]/.test(text)) ? bestSentence(question, picked, words) : null;
   // 물러섰으면 문장을 그대로, 답은 했는데 번호가 없으면 근거 문장을 아래에 (지어낸 답인지 바로 보이게)
   if (s && gaveUp) return { text: `메모에 이렇게 적혀 있어요.\n“${s.text}” [${s.n}]`, quoted: true };
   if (s) return { text: `${text}\n근거: “${s.text}” [${s.n}]`, quoted: true };
+  if (!gaveUp && strong && !/\[\d+\]/.test(text)) return { text: `${text} [1]`, quoted: false };
   return { text: text || NOT_FOUND, quoted: false };
 }

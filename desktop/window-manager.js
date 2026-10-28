@@ -1,6 +1,6 @@
 // 창 관리자 (WindowManager) — 목록 창, 메모 스티커 창, 탭 스택, 드래그 미리보기, 캡처 오버레이, PDF 및 보조 창 생명주기 관리.
 import {
-  app, BrowserWindow, desktopCapturer, dialog, screen, shell,
+  app, BrowserWindow, clipboard, desktopCapturer, dialog, screen, shell,
 } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +18,7 @@ import { shareText } from '../app/js/core/share-text.js';
 import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
 import {
   APP_DIR, MAGIC_PRELOAD, FINDER_PRELOAD, OPMS_PRELOAD, OCR_PRELOAD,
-  webPreferences, windowIcon, noteBg, listBg, titleBarOverlay, bringToFront,
+  webPreferences, windowIcon, getAppIcon, noteBg, listBg, titleBarOverlay, bringToFront,
   guardWindow, onScreen, defaultNoteBounds, painted, trackPaint, whenPainted, animateBounds, fadeIn,
 } from './window-utils.js';
 import {
@@ -176,6 +176,7 @@ export class WindowManager {
       ...windowIcon,
       webPreferences,
     });
+    if (process.platform === 'win32') this.listWin.setIcon(getAppIcon());
     guardWindow(this.listWin, { openWebPage });
     if (settings.listOnTop) {
       this.listWin.setAlwaysOnTop(true, 'floating');
@@ -203,6 +204,22 @@ export class WindowManager {
     });
     this.listWin.loadFile(path.join(APP_DIR, 'index.html'), { query: tab ? { tab } : {} });
     return this.listWin;
+  }
+
+  toggleListWindow(tab) {
+    if (this.magicWin && !this.magicWin.isDestroyed() && this.magicWin.isVisible()) {
+      this.magicWin.hide();
+    }
+    if (this.listWin && !this.listWin.isDestroyed() && this.listWin.isVisible() && !this.listWin.isMinimized()) {
+      if (this.listWin.isFocused()) {
+        this.listWin.close();
+        return null;
+      }
+      bringToFront(this.listWin);
+      if (tab) this.listWin.webContents.send('list:tab', tab);
+      return this.listWin;
+    }
+    return this.createListWindow(tab);
   }
 
   setListOnTop(on) {
@@ -260,6 +277,7 @@ export class WindowManager {
         ...windowIcon,
         webPreferences,
       });
+      if (process.platform === 'win32') win.setIcon(getAppIcon());
       guardWindow(win, { openWebPage });
     }
     // 왕관(늘 위) · 테이프(바탕화면 층) — 보이기 전에 (작업 표시줄 단추가 번쩍이지 않게)
@@ -1688,7 +1706,28 @@ export class WindowManager {
     const ext = path.extname(p).toLowerCase();
     const key = isDir ? 'dir' : /^\.(exe|lnk|url|ico|appref-ms)$/.test(ext) ? p : ext || 'none';
     if (!this.iconCache.has(key)) {
-      this.iconCache.set(key, app.getFileIcon(p, { size: 'normal' }).then((img) => img.toDataURL()).catch(() => ''));
+      let targetPath = p;
+      if (process.platform === 'win32' && ext === '.lnk') {
+        try {
+          const sc = shell.readShortcutLink(p);
+          if (sc.target && fs.existsSync(sc.target)) targetPath = sc.target;
+          else if (sc.icon && fs.existsSync(sc.icon)) targetPath = sc.icon;
+        } catch {
+          // 바로가기 파싱 실패 시 원래 파일 경로 유지
+        }
+      }
+      const fetchIcon = async (file) => {
+        try {
+          const img = await app.getFileIcon(file, { size: 'normal' });
+          if (!img.isEmpty()) return img.toDataURL();
+        } catch {}
+        return '';
+      };
+      this.iconCache.set(key, (async () => {
+        let url = await fetchIcon(targetPath);
+        if (!url && targetPath !== p) url = await fetchIcon(p);
+        return url;
+      })());
       if (this.iconCache.size > 800) this.iconCache.delete(this.iconCache.keys().next().value);
     }
     return this.iconCache.get(key);
@@ -1708,7 +1747,7 @@ export class WindowManager {
       if (action === 'copyOur' || action === 'copyApp') {
         const text = action === 'copyOur' ? c.ourref : c.n_app;
         if (!text) return { ok: false, message: action === 'copyOur' ? '관리번호가 없어요' : '출원번호가 없어요' };
-        copyFileToClipboard(text);
+        clipboard.writeText(String(text));
         return { ok: true, message: `${action === 'copyOur' ? '관리번호' : '출원번호'}를 복사했어요`, close: true };
       }
       this.showOpms(c.idx, action === 'wrapper' ? 'wrapper' : 'info');
@@ -1718,7 +1757,7 @@ export class WindowManager {
       const memo = this.getVault()?.get(String(id));
       if (!memo) return { ok: false };
       if (action === 'copyText') {
-        copyFileToClipboard(shareText(memo.body));
+        clipboard.writeText(shareText(memo.body));
         return { ok: true, message: '메모 내용을 복사했어요', close: true };
       }
       if (action === 'append') {
@@ -1734,7 +1773,7 @@ export class WindowManager {
     }
     if (!this.shownPath(p) || !fs.existsSync(p)) return { ok: false, message: '찾을 수 없어요' };
     if (action === 'copyPath') {
-      copyFileToClipboard(p);
+      clipboard.writeText(p);
       return { ok: true, message: '경로를 복사했어요', close: true };
     }
     if (action === 'copyFile') {

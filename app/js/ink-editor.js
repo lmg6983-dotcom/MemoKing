@@ -96,7 +96,10 @@ export function createInkSurface(svg, o) {
   const local = (e) => {
     const r = svg.getBoundingClientRect();
     const k = o.scale?.() ?? 1;
-    return [(e.clientX - r.left) / k, (e.clientY - r.top) / k];
+    const vb = svg.viewBox?.baseVal;
+    const ox = vb && vb.width > 0 ? vb.x : 0;
+    const oy = vb && vb.height > 0 ? vb.y : 0;
+    return [(e.clientX - r.left) / k + ox, (e.clientY - r.top) / k + oy];
   };
   // 지우개: 고른 도구 · 펜 뒤쪽(지우개 끝) · 펜 옆 버튼(S펜 버튼 — 누른 채 그리면 지우개, 떼면 다시 펜)
   const isEraser = (e) => o.tools.tool === 'eraser' || (e.pointerType === 'pen' && (penButtonDown || e.button === 5 || e.button === 2 || (e.buttons & 32) === 32 || (e.buttons & 2) === 2));

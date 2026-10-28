@@ -56,11 +56,15 @@ export function undoHint(what, rect, view, verb = '삭제했어요') {
     // 편집기의 Ctrl+Z 와 똑같이 (같은 되돌리기 기록)
     view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true }));
   });
-  document.body.append(tip);
-  const top = Math.max(8, Math.min(window.innerHeight - tip.offsetHeight - 8, rect.top));
-  const left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, rect.left + rect.width / 2 - tip.offsetWidth / 2));
-  tip.style.top = `${Math.round(top)}px`;
-  tip.style.left = `${Math.round(left)}px`;
+  // 메모 수정영역(#editor)을 가리지 않도록 #editor 바깥(하단 도구막대 위 고정 줄)에 끼워 넣는다
+  const editorEl = document.getElementById('editor') || view?.dom?.closest?.('#editor, .editor');
+  if (editorEl?.parentElement) {
+    tip.classList.add('outside-editor');
+    editorEl.parentElement.insertBefore(tip, editorEl.nextSibling);
+  } else {
+    document.body.append(tip);
+  }
+
   const gone = () => {
     tip.remove();
     document.removeEventListener('keydown', onKey, true);
@@ -74,11 +78,11 @@ export function undoHint(what, rect, view, verb = '삭제했어요') {
   const later = () => {
     timer = setTimeout(() => {
       tip.classList.add('fading');
-      setTimeout(gone, 260);
-    }, 5000); // 되돌리기 단추를 누를 틈
+      setTimeout(gone, 240);
+    }, 2000); // 사용자 설정: 2초간 유지
   };
   later();
-  tip.addEventListener('mouseenter', () => clearTimeout(timer)); // 단추로 가는 동안 사라지지 않게
+  tip.addEventListener('mouseenter', () => clearTimeout(timer)); // 마우스를 올리면 단추 누를 때까지 정지
   tip.addEventListener('mouseleave', later);
   document.addEventListener('keydown', onKey, true);
 }

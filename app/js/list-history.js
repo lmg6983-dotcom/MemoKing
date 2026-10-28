@@ -73,7 +73,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
     b.append(icon(name), cap);
     b.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      handler();
+      handler(b);
     });
     return b;
   }
@@ -123,9 +123,19 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
     const actions = document.createElement('div');
     actions.className = 'noti-actions';
     const toMemo = () => api.history.toMemo(e.id);
-    const copy = async () => {
+    const copy = async (btn) => {
       try {
         await api.copyText([e.title, e.body].filter(Boolean).join('\n'));
+        if (btn) {
+          const use = btn.querySelector('use');
+          btn.classList.add('done');
+          use?.setAttribute('href', '#i-check');
+          clearTimeout(btn._doneTimer);
+          btn._doneTimer = setTimeout(() => {
+            btn.classList.remove('done');
+            use?.setAttribute('href', '#i-copy');
+          }, 1200);
+        }
         notify?.('알림 글을 복사했어요');
       } catch {
         notify?.(UI.copyFail);

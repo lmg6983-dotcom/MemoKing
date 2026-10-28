@@ -11,6 +11,12 @@ function getWorker() {
       corePath: 'vendor/tesseract/core',
       langPath: 'vendor/tesseract/lang',
       gzip: true,
+    }).then(async (worker) => {
+      await worker.setParameters({
+        tessedit_pageseg_mode: '6', // 알림 창은 한 덩어리 글 상자 (SINGLE_BLOCK)
+        preserve_interword_spaces: '1',
+      });
+      return worker;
     }).catch((err) => {
       workerPromise = null; // 다음에 다시 시도
       throw err;
@@ -27,8 +33,12 @@ function linesOf(data, unit, refined = new Map()) {
   for (const block of data.blocks ?? []) {
     for (const par of block.paragraphs ?? []) {
       for (const ln of par.lines ?? []) {
-        const text = (refined.get(ln) ?? ln.text ?? '').replace(/\s+/g, ' ').trim();
-        if (!text) continue;
+        const conf = Math.round(ln.confidence ?? 0);
+        const text = (refined.get(ln) ?? ln.text ?? '')
+          .replace(/^[|!I1l·•~_—-]+(?=\s*[\p{L}\p{N}])/u, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (!text || (conf > 0 && conf < 30 && text.length <= 1)) continue;
         const b = ln.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 };
         out.push({
           text,
@@ -36,7 +46,7 @@ function linesOf(data, unit, refined = new Map()) {
           y: Math.round(b.y0 / u),
           w: Math.round((b.x1 - b.x0) / u),
           h: Math.round((b.y1 - b.y0) / u),
-          conf: Math.round(ln.confidence ?? 0),
+          conf,
         });
       }
     }

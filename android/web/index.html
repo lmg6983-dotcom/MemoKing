@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' blob:; font-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' blob: data:; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' blob:; font-src 'self' data: blob:">
   <meta name="color-scheme" content="light dark">
   <title>메모킹</title>
   <link rel="stylesheet" href="../app/vendor/prosemirror.css">
@@ -168,6 +168,20 @@
       <button id="alarm-ok" class="banner-btn primary">확인했어요</button>
     </div>
 
+    <!-- 녹음 중: 손목이 닿는 아래쪽 대신 좌측 상단에 작게 띄운다 (바꾸기 막대처럼) -->
+    <div id="rec-panel" class="rec-panel" role="region" aria-label="녹음" hidden>
+      <div class="rec-head">
+        <span class="rec-dot" aria-hidden="true"></span>
+        <b id="rec-time" class="rec-time">00:00</b>
+        <span id="rec-state" class="rec-state">녹음 중</span>
+        <span id="rec-wave" class="rec-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="grow"></span>
+        <button id="rec-pause" class="rec-btn" aria-label="잠시 멈춤"><svg><use href="#i-pause"/></svg></button>
+        <button id="rec-stop" class="rec-btn stop"><svg><use href="#i-stop"/></svg><span>끝내기</span></button>
+      </div>
+      <div id="rec-text" class="rec-text" aria-live="polite"></div>
+    </div>
+
     <main id="editor" class="editor"></main>
 
     <!-- 표 막대: 표 안에 커서가 있을 때만 — 묶음(행 · 열 · 칸 · 표 · 바꾸기)마다 둥근 칸, 아이콘 + 짧은 이름 (PC 와 같은 모양 — app/note.html). 표 지우기는 여기에 없다: 복사 · 저장 · 공유 · 지우기 단추가 표 위 오른쪽에 떠 있다 -->
@@ -198,19 +212,6 @@
     </div>
     <button type="button" id="table-more-btn" class="tb-more-btn" aria-expanded="false" aria-controls="table-bar" title="표 도구 더보기 (맞춤, 나누기, 합치기, 목록으로, 체크리스트로, 글로)" aria-label="표 도구 더보기"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/></svg></button>
   </div>
-    <!-- 녹음 중: 시간·받아쓰기가 보이고, 멈추면 소리 파일과 받아쓴 글이 메모에 들어간다 -->
-    <div id="rec-panel" class="rec-panel" role="region" aria-label="녹음" hidden>
-      <div class="rec-head">
-        <span class="rec-dot" aria-hidden="true"></span>
-        <b id="rec-time" class="rec-time">00:00</b>
-        <span id="rec-state" class="rec-state">녹음 중</span>
-        <span id="rec-wave" class="rec-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
-        <span class="grow"></span>
-        <button id="rec-pause" class="rec-btn" aria-label="잠시 멈춤"><svg><use href="#i-pause"/></svg></button>
-        <button id="rec-stop" class="rec-btn stop"><svg><use href="#i-stop"/></svg><span>끝내기</span></button>
-      </div>
-      <div id="rec-text" class="rec-text" aria-live="polite"></div>
-    </div>
 
     <!-- 태그 없는 메모: 추천 태그 (누르면 달기) -->
     <div id="tag-suggest-bar" class="tag-suggest-bar" role="group" aria-label="추천 태그" hidden>

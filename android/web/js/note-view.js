@@ -671,11 +671,20 @@ function openHref(href) {
 }
 
 el.editorRoot.addEventListener('click', (e) => {
+  const openBtn = e.target.closest?.('.mk-file-open');
+  if (openBtn && el.editorRoot.contains(openBtn)) {
+    e.preventDefault();
+    e.stopPropagation();
+    openHref(openBtn.dataset.fileOpen);
+    return;
+  }
   const a = e.target.closest?.('a[href]');
   if (!a || !el.editorRoot.contains(a)) return;
   e.preventDefault();
+  const href = a.getAttribute('href') || '';
+  if (href.startsWith('attachments/') && !e.mkOpen) return;
   if (!e.mkOpen && !window.getSelection()?.isCollapsed) return; // "열기" 단추로 연 것은 고른 글자와 상관없이
-  openHref(a.getAttribute('href'));
+  openHref(href);
 });
 
 // 사진은 두 번 눌러 사진 앱으로
@@ -691,6 +700,12 @@ function vaultPathOf(src) {
   return null;
 }
 el.editorRoot.addEventListener('dblclick', (e) => {
+  const fileChip = e.target.closest?.('a[href^="attachments/"]');
+  if (fileChip && el.editorRoot.contains(fileChip)) {
+    e.preventDefault();
+    openHref(fileChip.getAttribute('href'));
+    return;
+  }
   const img = e.target.closest?.('img.mk-image');
   if (!img || img.classList.contains('mk-album-img')) return; // 묶음 사진은 한 번 눌러 크게 보기 (editor.js)
   const target = vaultPathOf(img.src);

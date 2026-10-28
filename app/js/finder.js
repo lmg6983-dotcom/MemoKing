@@ -1,4 +1,4 @@
-import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
+import { actionsFor, actionButtons, actionKey, markCopyDone } from './magic-actions.js';
 import { searchingNode } from './searching.js';
 import { COLOR_DOTS } from './core/memo-file.js';
 import { UI } from './core/ui-text.js';
@@ -244,6 +244,10 @@ async function run(i, act = activeAct) {
   const id = actionsFor(r)[act]?.id ?? 'open';
   const res = await api.act(r.kind === 'note' ? { action: id, id: r.id } : { action: id, path: r.path }).catch(() => null);
   if (res?.message) {
+    if (res.ok && String(id).startsWith('copy')) {
+      const btn = document.getElementById(`frow-${i}`)?.querySelector(`.act-btn[data-action="${id}"]`);
+      markCopyDone(btn);
+    }
     status(res.ok ? `✓ ${res.message}` : res.message, res.ok);
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => status(), 1800);

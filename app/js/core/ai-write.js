@@ -14,16 +14,52 @@ const SPELL = '너는 한국어 맞춤법 검사기다. 사용자가 준 글의 
 export const spellMessages = (text) => [{ role: 'system', content: SPELL }, { role: 'user', content: text }];
 
 export const styleMessages = (text, style) => [
-  { role: 'system', content: `다음 글을 ${STYLES[style] ?? style}로 바꿔 쓴다. 내용은 더하거나 빼지 않는다. #태그와 링크 주소는 그대로 둔다. 바꾼 글만 출력한다.` },
+  { role: 'system', content: `다음 글을 ${STYLES[style] ?? style}로 바꿔 쓴다. 내용은 더하거나 빼지 않는다. #태그와 링크 주소는 그대로 둔다. 인사말이나 설명 없이 바꾼 글만 바로 출력한다.` },
   { role: 'user', content: text },
 ];
 
-export function draftMessages({ title, body, request }) {
+// 지시가 기존 글을 고치라는 것인지(요약 · 정리 · 표 · 번역 · 수정 등), 아니면 빈 메모/새 초안인지 구분
+const EDIT_HINT = /요약|줄여|정리|다듬|바꿔|고쳐|수정|표로|목록|체크리스트|글머리|번호|번역|영어로|한국어로|짧게|길게|자세히|핵심|추출|나눠|분류|합쳐|지워|빼|삭제|순서|정렬|문체|말투|개조식/;
+
+export function isEditRequest(request, body = '') {
+  if (!body?.trim()) return false;
+  const req = String(request ?? '').trim();
+  if (!req) return false;
+  if (/이어서|덧붙여|뒤에\s*추가|초안/.test(req) && !EDIT_HINT.test(req)) return false;
+  return true;
+}
+
+export function cleanWriteOutput(out) {
+  let s = String(out ?? '').trim();
+  // 앞머리에 붙은 군말("네, 요청하신 대로 정리했습니다:" 등) 한 줄 제거
+  s = s.replace(/^(?:네[,.\s]*|알겠습니다[,.\s]*|물론이죠[,.\s]*)?(?:요청하신|말씀하신|부탁하신|지시하신|아래는|다음은)[^\n:：]*[:：]\s*\n+/u, '');
+  // 코드 블록으로 감싸 답한 경우(```markdown ... ```) 벗긴다
+  const fence = /^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/i.exec(s);
+  if (fence) s = fence[1].trim();
+  return s.trim();
+}
+
+export function draftMessages({ title, body, request, selection }) {
+  const req = request?.trim() || '이 제목에 맞는 메모 초안을 써 줘';
+  const target = (selection?.trim() || body?.trim() || '').slice(0, MAX_CHARS);
+  if (target && isEditRequest(req, target)) {
+    const parts = [];
+    if (title) parts.push(`메모 제목: ${title}`);
+    parts.push(`원본 글:\n${target}`);
+    parts.push(`지시사항: ${req}`);
+    return [
+      {
+        role: 'system',
+        content: '너는 사용자의 지시사항에 따라 메모를 정확히 편집·변환하는 도우미다. 원본 글의 사실과 핵심 정보(#태그, 날짜, 숫자, 링크 주소)를 유지하면서 사용자의 지시(요약, 표 정리, 목록화, 문장 다듬기, 번역, 내용 재구성 등)를 충실히 수행한다. 마크다운 서식(제목은 ##, 목록은 -, 체크리스트는 - [ ], 표는 | 열 |)을 알맞게 사용한다. "네, 수정했습니다" 같은 인사말이나 설명은 절대 쓰지 말고 결과 본문만 바로 출력한다.',
+      },
+      { role: 'user', content: parts.join('\n\n') },
+    ];
+  }
   const parts = [`메모 제목: ${title || '(없음)'}`];
-  if (body?.trim()) parts.push(`지금까지 쓴 내용:\n${body.trim().slice(0, MAX_CHARS)}`);
-  parts.push(`부탁: ${request?.trim() || '이 제목에 맞는 메모 초안을 써 줘'}`);
+  if (target) parts.push(`지금까지 쓴 내용:\n${target}`);
+  parts.push(`부탁: ${req}`);
   return [
-    { role: 'system', content: '너는 메모 초안을 쓰는 도우미다. 한국어 해요체로, 마크다운(제목은 ##, 목록은 -)으로 짧고 쓸모 있게 쓴다. 모르는 사실은 지어내지 말고 [ ] 빈칸으로 남긴다. 초안만 출력한다.' },
+    { role: 'system', content: '너는 메모 초안을 쓰는 도우미다. 사용자의 부탁을 정확히 따라 한국어 해요체로, 마크다운(제목은 ##, 목록은 -)으로 짧고 쓸모 있게 쓴다. 모르는 사실은 지어내지 말고 [ ] 빈칸으로 남긴다. 인사말이나 설명 없이 초안 본문만 출력한다.' },
     { role: 'user', content: parts.join('\n\n') },
   ];
 }

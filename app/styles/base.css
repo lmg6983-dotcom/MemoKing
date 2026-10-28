@@ -1091,3 +1091,11 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   opacity: 0.72; user-select: none; cursor: default; white-space: nowrap;
 }
 .mode-tag[hidden] { display: none; }
+
+/* 복사 아이콘 버튼 완료 피드백: 앱 전체 초록색 체크 표시 통일 */
+:is(.icon-btn, .act-btn, .mk-ctx-ic, .op-copy, .op-copy-biblio).done {
+  color: var(--ok-text, #2f9e44) !important;
+}
+:is(.icon-btn, .act-btn, .mk-ctx-ic).done svg {
+  color: var(--ok-text, #2f9e44) !important;
+}

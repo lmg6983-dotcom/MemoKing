@@ -47,6 +47,7 @@ body { font-family: var(--font, "Pretendard", system-ui, sans-serif); --mk-sel: 
 [data-mod="memo"] { --mod: #d99a00; }
 [data-mod="opms"] { --mod: #2b4c9b; }
 [data-mod="notes"] { --mod: #e03131; }
+[data-mod="apps"] { --mod: #f76707; }
 [data-mod="files"] { --mod: #1098ad; }
 [data-mod="calc"] { --mod: #2f9e44; }
 [data-mod="web"], [data-mod="site"] { --mod: #d6336c; }
@@ -131,5 +132,6 @@ kbd { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 4px
 }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) [data-mod="opms"] { --mod: #5c7cfa; }
+  :where(:root:not([data-theme="light"])) [data-mod="apps"] { --mod: #ff922b; }
 }
 

@@ -55,6 +55,8 @@ export class FileIndex {
     this.stopped = true;
     this.extra = new Map(); // 새로 고침 사이에 곧바로 넣은 것 (소문자 경로 → 항목) — 새로 고침이 아직 못 본 것은 이어 붙인다
     this.watchers = [];
+    this.lastQuickScanAt = 0;
+    this.lastAutoRebuildAt = 0;
   }
 
   get count() {
@@ -135,6 +137,73 @@ export class FileIndex {
       if (lower[i] === name && this.entries[i].p.toLowerCase() === key) return true;
     }
     return false;
+  }
+
+  /**
+   * 지정한 폴더들(전자포대, 다운로드, 작업 폴더 등)의 상위를 얕고 빠르게(depth 1~2) 훑어 신규 폴더/파일을 인덱스에 즉시 등록
+   * @param {string[]} targetDirs
+   * @param {{ maxDepth?: number }} options
+   * @returns {number} 새로 추가된 항목 수
+   */
+  quickScan(targetDirs, { maxDepth = 2 } = {}) {
+    const toAdd = [];
+    for (const raw of targetDirs ?? []) {
+      if (!raw || !fs.existsSync(raw)) continue;
+      const base = path.resolve(raw);
+      const queue = [{ dir: base, depth: 0 }];
+      while (queue.length > 0) {
+        const { dir, depth } = queue.shift();
+        let list;
+        try {
+          list = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+          continue;
+        }
+        for (const item of list) {
+          const name = item.name;
+          if (skipDir(name)) continue;
+          const fullPath = path.join(dir, name);
+          if (!this.has(fullPath)) {
+            toAdd.push(fullPath);
+          }
+          if (item.isDirectory() && depth < maxDepth) {
+            queue.push({ dir: fullPath, depth: depth + 1 });
+          }
+        }
+      }
+    }
+    return toAdd.length ? this.add(toAdd) : 0;
+  }
+
+  /**
+   * 관리번호나 폴더가 검색되지 않았을 때 2단계 최적화 자동 재색인 트리거
+   * 1단계: 지정된 주요 디렉터리 초고속 얕은 스캔 (쿨다운 4초)
+   * 2단계: 백그라운드 전체 재색인 (쿨다운 2분 = 120초, 중복 실행 방지)
+   * @param {{ targetDirs?: string[], onRebuildComplete?: () => void, force?: boolean }} options
+   * @returns {{ added: number, rebuilding: boolean }}
+   */
+  triggerAutoReindex({ targetDirs = [], onRebuildComplete = null, force = false } = {}) {
+    const now = Date.now();
+    let added = 0;
+    // 1단계: 빠른 타깃 스캔 (4초 쿨다운)
+    if (force || now - this.lastQuickScanAt >= 4_000) {
+      this.lastQuickScanAt = now;
+      added = this.quickScan(targetDirs, { maxDepth: 2 });
+    }
+
+    // 2단계: 백그라운드 전체 재구축 (2분 쿨다운)
+    let rebuilding = false;
+    if (!this.stopped && !this.building && (force || now - this.lastAutoRebuildAt >= 120_000)) {
+      this.lastAutoRebuildAt = now;
+      rebuilding = true;
+      this.rebuild()
+        .then(() => {
+          onRebuildComplete?.();
+        })
+        .catch(() => {});
+    }
+
+    return { added, rebuilding: Boolean(this.building || rebuilding) };
   }
 
   /** 이 폴더들 아래에 생기는 파일은 곧바로 목록에 (브라우저로 받아 넣은 전자포대 등). 못 지켜보는 곳이면 그냥 둔다 */
@@ -285,13 +354,20 @@ export class FileIndex {
   }
 
   /**
-   * 이름으로 찾기 — 폴더와 파일(프로그램 포함)을 따로 몇 개씩 (폴더가 파일들에 묻혀 안 보이는 일이 없게).
+   * 이름으로 찾기 — 앱(프로그램), 폴더, 파일을 따로 몇 개씩 (프로그램이나 폴더가 파일들에 묻혀 안 보이는 일이 없게).
    *   total* = 맞는 것 전체 개수 (보여 주지 못한 나머지는 "다른 n건" 으로 — 전체 결과 창에서)
-   * @returns {{ folders: object[], files: object[], totalFolders: number, totalFiles: number }}
+   * @returns {{ apps: object[], folders: object[], files: object[], totalApps: number, totalFolders: number, totalFiles: number }}
    */
-  searchSplit(query, { folders = 3, files = 6 } = {}) {
-    const { items, folders: totalFolders, files: totalFiles } = this.searchAll(query, (folders + files) * 4);
-    return { folders: items.filter((r) => r.isDir).slice(0, folders), files: items.filter((r) => !r.isDir).slice(0, files), totalFolders, totalFiles };
+  searchSplit(query, { apps = 3, folders = 3, files = 6 } = {}) {
+    const { items, apps: totalApps, folders: totalFolders, files: totalFiles } = this.searchAll(query, (apps + folders + files) * 4);
+    return {
+      apps: items.filter((r) => r.app).slice(0, apps),
+      folders: items.filter((r) => r.isDir).slice(0, folders),
+      files: items.filter((r) => !r.isDir && !r.app).slice(0, files),
+      totalApps,
+      totalFolders,
+      totalFiles,
+    };
   }
 
   /** 비슷한 것부터 limit 개 */
@@ -300,11 +376,11 @@ export class FileIndex {
   }
 
   /**
-   * 비슷한 것부터 limit 개 + 맞는 것 전체 개수 (폴더 · 파일)
-   * @returns {{ items: { name: string, path: string, isDir: boolean, app: boolean }[], total: number, folders: number, files: number }}
+   * 비슷한 것부터 limit 개 + 맞는 것 전체 개수 (앱 · 폴더 · 파일)
+   * @returns {{ items: { name: string, path: string, isDir: boolean, app: boolean }[], total: number, apps: number, folders: number, files: number }}
    */
   searchAll(query, limit = 8) {
-    const none = { items: [], total: 0, folders: 0, files: 0 };
+    const none = { items: [], total: 0, apps: 0, folders: 0, files: 0 };
     const q = String(query ?? '').trim();
     if (!q || !this.snapshot) return none;
     // 관리번호처럼 기호가 낀 말은 기호를 빼고 (P2026-1170-KR01 → 이름 P20261170KR01 도) — 글자 순서 비교라 기호 있는 이름도 그대로 맞는다
@@ -316,6 +392,7 @@ export class FileIndex {
     // 1) 빠른 거르기: 낱말마다 글자들이 이름에 순서대로 들어 있는가 (붙어 있으면 더 앞으로)
     const contiguous = [];
     const loose = [];
+    let apps = 0;
     let folders = 0;
     let files = 0;
     const { lower } = this;
@@ -365,7 +442,8 @@ export class FileIndex {
       }
       if (!all) continue;
       hits.push(i);
-      if (this.entries[i].d) folders++;
+      if (this.entries[i].a) apps++;
+      else if (this.entries[i].d) folders++;
       else files++;
       if (whole) {
         if (contiguous.length < cap) contiguous.push(i);
@@ -381,7 +459,7 @@ export class FileIndex {
       // 초성으로만 맞은 이름: 글자로 맞은 것과 비슷한 자리에 (첫머리면 더 앞, 짧은 이름이 앞)
       const score = r?.score ?? (choHit.has(i) ? 0.75 + (choHit.get(i) ? 0.15 : 0) - Math.min(0.2, e.n.length * 0.004) : null);
       if (score == null) continue;
-      const bonus = (e.a ? 0.12 : 0) + (this.lower[i].startsWith(ql) ? 0.08 : 0) - Math.min(0.15, (e.depth ?? 0) * 0.012);
+      const bonus = (e.a ? 0.25 : 0) + (this.lower[i].startsWith(ql) ? 0.08 : 0) - Math.min(0.15, (e.depth ?? 0) * 0.012);
       scored.push({ e, score: score * (1 + bonus) });
     }
     scored.sort((a, b) => b.score - a.score);
@@ -394,6 +472,6 @@ export class FileIndex {
       items.push({ name: e.a ? e.n.replace(/\.(lnk|url)$/i, '') : e.n, path: e.p, isDir: e.d, app: e.a });
       if (items.length >= limit) break;
     }
-    return { items, total: folders + files, folders, files };
+    return { items, total: apps + folders + files, apps, folders, files };
   }
 }

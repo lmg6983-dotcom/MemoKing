@@ -27,7 +27,7 @@ test('보이기 · 검사 · 정리', () => {
   assert.equal(isValidAccelerator('Control+C'), false);
   assert.equal(isValidAccelerator('Control+Bogus'), false);
   assert.deepEqual(normalizeShortcuts(undefined), DEFAULT_SHORTCUTS);
-  assert.deepEqual(normalizeShortcuts({ quickMemo: 'Control+Alt+M', magic: 'nope' }), { quickMemo: 'Control+Alt+M', magic: 'Control+Alt+Space' });
+  assert.deepEqual(normalizeShortcuts({ quickMemo: 'Control+Alt+M', magic: 'nope' }), { quickMemo: 'Control+Alt+M', magic: 'Control+Alt+Space', list: 'Control+Alt+`' });
   assert.notEqual(normalizeShortcuts({ quickMemo: 'Control+Alt+M', magic: 'Control+Alt+M' }).magic, 'Control+Alt+M');
 });
 

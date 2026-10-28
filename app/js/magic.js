@@ -1,5 +1,5 @@
 import { replayClass } from './dom.js';
-import { actionsFor, actionButtons, actionKey } from './magic-actions.js';
+import { actionsFor, actionButtons, actionKey, markCopyDone } from './magic-actions.js';
 import { opmsQueryKind, autoOpmsQuery } from './core/opms-search.js';
 import { calcInput, calcOutput, siteUrl, sitesInOrder, looksLikeQuestion, WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { dateCalc } from './core/date-calc.js';
@@ -84,7 +84,7 @@ let rows = []; // { kind: 'new' | 'note' | 'folder' | 'file', ... }
 let selected = 0;
 let activeAct = 0; // 고른 줄의 몇 번째 할 일 (← →)
 let seq = 0;
-let results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
+let results = { notes: [], apps: [], folders: [], files: [], more: 0, recent: false, index: null };
 // OPMS 는 회사 서버에 따로 묻는다 (메모·파일 결과를 기다리게 하지 않게) — { query, loading, cases, total, error }
 let opms = { query: '', loading: false, cases: [], total: 0, error: '' };
 
@@ -384,7 +384,7 @@ function ago(iso) {
 }
 
 // Ctrl+Enter 로 하는 다른 실행
-const ALT_ACTION = { new: 'saveOpen', folder: 'reveal', file: 'reveal' };
+const ALT_ACTION = { new: 'saveOpen', app: 'reveal', folder: 'reveal', file: 'reveal' };
 
 function row(r, index, query) {
   const li = document.createElement('li');
@@ -460,11 +460,11 @@ function row(r, index, query) {
       img.src = r.icon;
       img.alt = '';
       ico.append(img);
-    } else ico.textContent = r.kind === 'folder' ? '📁' : '📄';
+    } else ico.textContent = r.kind === 'folder' ? '📁' : r.kind === 'app' ? '🚀' : '📄';
     t.append(highlighted(r.name, query));
     s.textContent = r.where ?? r.path;
     s.title = r.path;
-    if (r.app) side.textContent = '프로그램';
+    if (r.kind === 'app' || r.app) side.textContent = '프로그램';
   }
   li.addEventListener('mousemove', (e) => {
     // 마우스가 정말 움직였을 때만 — 가만히 있는 마우스 아래로 목록이 다시 그려질 때도 mousemove 가 와서,
@@ -552,27 +552,37 @@ function render() {
   }
   // 캡슐로 끈 기능은 새 결과를 기다리지 않고 바로 뺀다
   const notes = isOn('notes') ? results.notes : [];
+  const apps = query && isOn('apps') ? results.apps ?? [] : [];
   const folders = query && isOn('files') ? results.folders : [];
   const files = query && isOn('files') ? results.files : [];
   if (notes.length) {
     put('notes', { head: [results.recent ? '최근 메모' : '메모', results.recent ? 0 : notes.length] });
     notes.forEach((n) => put('notes', { row: { kind: 'note', ...n, canAppend: Boolean(query && isOn('memo') && !results.recent) } }));
   }
+  if (apps.length) {
+    put('apps', { head: ['앱 검색', apps.length] });
+    apps.forEach((a) => put('apps', { row: { kind: 'app', ...a } }));
+  }
   if (folders.length) {
     put('files', { head: ['폴더', folders.length] });
     folders.forEach((f) => put('files', { row: { kind: 'folder', ...f } }));
+  } else if (query && isOn('files') && results.reindexing) {
+    const li = note('');
+    li.classList.add('loading');
+    li.append(searchingNode('새 폴더 찾는 중...', { inline: true, tag: 'span' }));
+    put('files', { node: li });
   }
   if (files.length) {
     put('files', { head: ['파일', files.length] });
     files.forEach((f) => put('files', { row: { kind: 'file', ...f } }));
   }
-  if (query && results.more > 0) put(groups.has('files') || !groups.has('notes') ? 'files' : 'notes', { row: { kind: 'more', count: results.more } });
-  const searched = isOn('notes') || isOn('files');
-  if (query && searched && !calc && !url && !notes.length && !folders.length && !files.length && !opms.cases.length && !opms.loading) {
-    put('none', { node: note(`'${query.slice(0, 30)}'와 맞는 메모나 파일이 없어요`) }); // Enter 가 하는 일은 아래 키 안내가 고른 줄에 맞춰 말한다 (여기서 "Enter로 저장" 이라 하면 AI 줄을 골랐을 때 어긋났다)
+  if (query && results.more > 0) put(groups.has('files') || groups.has('apps') || !groups.has('notes') ? (groups.has('files') ? 'files' : 'apps') : 'notes', { row: { kind: 'more', count: results.more } });
+  const searched = isOn('notes') || isOn('apps') || isOn('files');
+  if (query && searched && !calc && !url && !notes.length && !apps.length && !folders.length && !files.length && !opms.cases.length && !opms.loading && !results.reindexing) {
+    put('none', { node: note(`'${query.slice(0, 30)}'와 맞는 결과가 없어요`) }); // Enter 가 하는 일은 아래 키 안내가 고른 줄에 맞춰 말한다 (여기서 "Enter로 저장" 이라 하면 AI 줄을 골랐을 때 어긋났다)
   }
-  if (query && isOn('files') && results.index && !results.index.count) {
-    put('files', { node: note(results.index.building ? '파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 파일도 찾아져요' : UI.noFileIndex) });
+  if (query && (isOn('apps') || isOn('files')) && results.index && !results.index.count) {
+    put(isOn('files') ? 'files' : 'apps', { node: note(results.index.building ? '프로그램·파일 목록을 만드는 중이에요. 처음 한 번만, 잠시 뒤 찾아져요' : UI.noFileIndex) });
   }
   // 웹 검색 · AI 에게 묻기: 고를 때만 브라우저로 연다
   if (query && isOn('web')) put('web', { row: { kind: 'web', sites: sitesInOrder(WEB_ENGINES, prefs.engine) } });
@@ -625,7 +635,7 @@ function render() {
   }
   // 초성만 쓴 글(ㄱㅈㅅ)은 찾으려는 것 — 메모로 저장하지 않고 첫 결과를 골라 둔다
   if (!retained && selected === 0 && rows[0]?.kind === 'new' && query.split(/\s+/).every(isChoseongQuery)) {
-    const first = rows.findIndex((r) => r.kind === 'note' || r.kind === 'file' || r.kind === 'folder');
+    const first = rows.findIndex((r) => r.kind === 'note' || r.kind === 'app' || r.kind === 'file' || r.kind === 'folder');
     if (first > 0) selected = first;
   }
   // 쓴 글이 이미 있는 메모 제목과 똑같으면 그 메모를 골라 둔다 (Enter 로 같은 이름의 메모를 또 만들지 않게 — 새로 만들려면 ↑)
@@ -725,14 +735,14 @@ function showHint(parts) {
 async function search() {
   const query = input.value;
   const my = ++seq;
-  if (!isOn('notes') && !isOn('files')) {
-    results = { notes: [], folders: [], files: [], more: 0, recent: false, index: null };
+  if (!isOn('notes') && !isOn('apps') && !isOn('files')) {
+    results = { notes: [], apps: [], folders: [], files: [], more: 0, recent: false, index: null };
     render();
     return;
   }
   const res = await api.search(query).catch(() => null);
   if (my !== seq || !res) return; // 더 새 입력이 있으면 버린다
-  results = { notes: [], folders: [], files: [], more: 0, recent: false, ...res };
+  results = { notes: [], apps: [], folders: [], files: [], more: 0, recent: false, ...res };
   render();
 }
 
@@ -858,6 +868,10 @@ async function run(i, { alt = false, act = 0 } = {}) {
   const req = r.kind === 'note' ? { action: id, id: r.id } : r.kind === 'opms' ? { action: id, opms: r.idx } : { action: id, path: r.path };
   const res = await api.act(req).catch(() => null);
   if (res?.message) {
+    if (res.ok && String(id).startsWith('copy')) {
+      const btn = resultsEl.querySelector(`.magic-row[data-index="${i}"] .act-btn[data-action="${id}"]`);
+      markCopyDone(btn);
+    }
     flash(res.ok, res.message);
     if (res.ok) closeSoon(); // 복사했다는 표시를 잠깐 보여 주고
     return;
@@ -958,5 +972,10 @@ api.onModules?.(async (list) => {
   renderModules();
   updatePlaceholder();
   search();
+});
+api.onIndexUpdated?.((_data) => {
+  if (input.value.trim()) {
+    search();
+  }
 });
 reset();

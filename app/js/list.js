@@ -991,30 +991,33 @@ let shortcutState = {};
 const SC_TAKEN = '다른 앱이 이 키를 먼저 쓰고 있어서 작동하지 않아요 (예: 같은 단축키를 쓰는 다른 프로그램). 다른 키로 바꿔 주세요';
 function showShortcuts(sc) {
   shortcutState = sc ?? {};
-  for (const name of ['quickMemo', 'magic']) {
+  for (const name of ['quickMemo', 'magic', 'list']) {
     const st = shortcutState[name];
-    if (!st) continue;
+    if (!st || !$(`sc-${name}`)) continue;
     $(`sc-${name}`).textContent = st.label;
-    $(`sc-${name}`).setAttribute('aria-label', `${name === 'quickMemo' ? '매직 카피' : '매직키'} 단축키 ${st.label}, 눌러서 바꾸기`);
+    $(`sc-${name}`).setAttribute('aria-label', `${name === 'quickMemo' ? '매직 카피' : name === 'magic' ? '매직키' : '메모 목록'} 단축키 ${st.label}, 눌러서 바꾸기`);
     $(`sc-${name}-reset`).hidden = st.isDefault;
     $(`sc-${name}-note`).textContent = st.enabled && !st.registered ? SC_TAKEN : '';
     $(`sc-${name}-note`).classList.toggle('warn', st.enabled && !st.registered);
   }
 }
 function setScNote(name, text, warn = false) {
+  if (!$(`sc-${name}-note`)) return;
   $(`sc-${name}-note`).textContent = text;
   $(`sc-${name}-note`).classList.toggle('warn', warn);
 }
 /** onlyIfChanged: 키도 상태도 그대로면 칸은 다시 그리지 않는다 (방금 띄운 "바꿨어요" 안내가 지워지지 않게) */
 async function refreshShortcuts({ onlyIfChanged = false } = {}) {
   const s = await api.settings.get();
-  const same = onlyIfChanged && ['quickMemo', 'magic'].every((n) => JSON.stringify(s.shortcuts?.[n]) === JSON.stringify(shortcutState[n]));
+  const same = onlyIfChanged && ['quickMemo', 'magic', 'list'].every((n) => JSON.stringify(s.shortcuts?.[n]) === JSON.stringify(shortcutState[n]));
   if (!same) showShortcuts(s.shortcuts);
   showQuickMemo(s.quickMemo);
 }
-// 매직 카피 · 매직키 칸: 새 키 받기 (key-capture.js — 단축키 설정 창과 같은 동작)
+// 매직 카피 · 매직키 · 메모 목록 칸: 새 키 받기 (key-capture.js — 단축키 설정 창과 같은 동작)
 function startCapture(name) {
-  captureGlobalKey($(`sc-${name}`), {
+  const el = $(`sc-${name}`);
+  if (!el) return;
+  captureGlobalKey(el, {
     api,
     name,
     note: (text, warn) => setScNote(name, text, warn),
@@ -1023,9 +1026,11 @@ function startCapture(name) {
   });
 }
 $('keymap-open').addEventListener('click', () => api.keymap.openWindow());
-for (const name of ['quickMemo', 'magic']) {
-  $(`sc-${name}`).addEventListener('click', () => (isCapturing($(`sc-${name}`)) ? stopKeyCapture('cancel') : startCapture(name)));
-  $(`sc-${name}-reset`).addEventListener('click', async () => {
+for (const name of ['quickMemo', 'magic', 'list']) {
+  const btn = $(`sc-${name}`);
+  const rst = $(`sc-${name}-reset`);
+  if (btn) btn.addEventListener('click', () => (isCapturing(btn) ? stopKeyCapture('cancel') : startCapture(name)));
+  if (rst) rst.addEventListener('click', async () => {
     const res = await api.settings.setShortcut(name, null);
     await refreshShortcuts();
     if (!res.ok) setScNote(name, globalShortcutResult(res, '', { reset: true }).text, true);
@@ -1201,7 +1206,7 @@ function renderMagicModules() {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'switch';
-    cb.checked = m.ready && magicState.modules[m.id] !== false && !!magicState.modules[m.id];
+    cb.checked = m.ready && (magicState.modules?.[m.id] ?? m.defaultOn) !== false;
     cb.disabled = !m.ready || !magicState.enabled;
     cb.addEventListener('change', async () => {
       // 설정에서 켜면 매직키 창에서 잠깐 꺼 둔 것도 함께 풀어 바로 쓰게 (끈 기능은 매직키 창에 캡슐도 없음)

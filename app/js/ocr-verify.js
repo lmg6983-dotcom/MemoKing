@@ -5,8 +5,8 @@
 import { similarSyllables } from './core/hangul-similar.js';
 
 const FAMILY = 'Malgun Gothic';
-const MATCH_LIMIT = 0.03; // 글꼴이 맞다고 볼 차이 (0 = 똑같음). 시험장에서 맞는 글꼴은 0.00x, 다른 크기는 훨씬 크다
-const MARGIN = 0.3;
+const MATCH_LIMIT = 0.08; // 글꼴이 맞다고 볼 차이 (0 = 똑같음). 반투명 바탕·ClearType 차이를 감안해 넉넉히 잡고 바꿀 때만 엄격히 본다
+const MARGIN = 0.22;
 
 // 흑백 1배 그림: { w, h, px(Float32 밝기) } — 어두운 바탕(다크 모드)은 뒤집어 흰 바탕에 검은 글로
 export function grayImage(imageData) {

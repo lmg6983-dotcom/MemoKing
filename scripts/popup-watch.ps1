@@ -1,4 +1,4 @@
-﻿# Popup notification watcher for MemoKing.
+# Popup notification watcher for MemoKing.
 # Some apps (e.g. KakaoTalk PC) show their own small popup windows instead of Windows notifications,
 # so those never reach the Action Center database. This helper watches for such popups and reads them:
 #   1) UI Automation text of the popup window
@@ -167,7 +167,7 @@ public static class MkPopup {
       }
       opaque.Dispose();
     }
-    Enhance(big, 1.3);
+      Enhance(big, 1.5);
     return big;
   }
 
@@ -362,8 +362,9 @@ public static class MkPopup {
       int bgv = 0;
       for (int v = 1; v < 256; v++) if (hist[v] > hist[bgv]) bgv = v;
       long acc = 0, total = (long)w * h; int lo = 0;
-      for (int v = 0; v < 256; v++) { acc += hist[v]; if (acc >= total * 0.005) { lo = v; break; } }
-      double span = Math.Max(16, bgv - lo);
+      for (int v = 0; v < 256; v++) { acc += hist[v]; if (acc >= total * 0.01) { lo = v; break; } }
+      int hi = Math.Max(lo + 16, bgv - 6); // 바탕 근처의 옅은 그림자·티끌은 완전한 흰색(255)으로 밀어낸다
+      double span = Math.Max(16, hi - lo);
       var lut = new byte[256];
       for (int v = 0; v < 256; v++) {
         double t = Math.Min(1, Math.Max(0, ((inv ? 255 - v : v) - lo) / span));

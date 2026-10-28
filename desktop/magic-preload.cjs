@@ -23,4 +23,5 @@ contextBridge.exposeInMainWorld('magic', {
   close: () => ipcRenderer.send('magic:close'),
   onShow: (cb) => ipcRenderer.on('magic:show', () => cb()),
   onModules: (cb) => ipcRenderer.on('magic:modules-changed', (_e, list) => cb(list)), // 설정에서 기능을 끄고 켜면
+  onIndexUpdated: (cb) => ipcRenderer.on('magic:index-updated', (_e, data) => cb(data)),
 });

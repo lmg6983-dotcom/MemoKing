@@ -595,21 +595,75 @@ export function registerIpc(ctx) {
     const found = searchMemos(memos, q, 5);
     const notes = found.map((n) => ({ ...n, updated: updatedOf.get(n.id) }));
     const notesTotal = found.total;
+    let apps = [];
     let folders = [];
     let files = [];
+    let totalApps = 0;
     let totalFolders = 0;
     let totalFiles = 0;
     const fileIndex = getFileIndex();
-    if (mods.has('files') && fileIndex) {
-      ({ folders, files, totalFolders, totalFiles } = fileIndex.searchSplit(q, { folders: 3, files: 6 }));
-      wm.lastFileResults = new Set([...folders, ...files].map((f) => f.path));
+    const hasApps = mods.has('apps');
+    const hasFiles = mods.has('files');
+    if ((hasApps || hasFiles) && fileIndex) {
+      ({ apps, folders, files, totalApps, totalFolders, totalFiles } = fileIndex.searchSplit(q, {
+        apps: hasApps ? 4 : 0,
+        folders: hasFiles ? 3 : 0,
+        files: hasFiles ? 6 : 0,
+      }));
+
+      // 관리번호나 폴더 미검색 시 자동 재색인 (2단계 최적화: 1단계 얕은 타깃 스캔 + 2단계 2분 쿨다운 백그라운드 재색인)
+      if (hasFiles && folders.length === 0 && q.trim().length >= 2) {
+        const wrapperDir = wm.opmsSettings().wrapperDir;
+        let docsWrapper = '';
+        let downloadsDir = '';
+        try {
+          docsWrapper = path.join(app.getPath('documents'), '전자포대');
+          downloadsDir = app.getPath('downloads');
+        } catch {}
+        const targetDirs = [
+          wrapperDir,
+          docsWrapper,
+          downloadsDir,
+          getVault()?.root,
+        ].filter((d) => d && typeof d === 'string' && (!SMOKE || d === wrapperDir) && fs.existsSync(d));
+
+        const reindexRes = fileIndex.triggerAutoReindex({
+          targetDirs,
+          onRebuildComplete: () => {
+            if (wm.magicWin && !wm.magicWin.isDestroyed() && wm.magicWin.isVisible()) {
+              wm.magicWin.webContents.send('magic:index-updated', { query: q });
+            }
+          },
+        });
+
+        // 1단계: 퀵 스캔으로 새 항목이 즉시 발견된 경우 결과 즉시 재검색하여 화면에 반영
+        if (reindexRes.added > 0) {
+          ({ apps, folders, files, totalApps, totalFolders, totalFiles } = fileIndex.searchSplit(q, {
+            apps: hasApps ? 4 : 0,
+            folders: hasFiles ? 3 : 0,
+            files: hasFiles ? 6 : 0,
+          }));
+        }
+      }
+
+      wm.lastFileResults = new Set([...apps, ...folders, ...files].map((f) => f.path));
       const home = os.homedir();
       const shown = (p) => (p.toLowerCase().startsWith(home.toLowerCase()) ? `~${p.slice(home.length)}` : p);
       const withIcon = (list) => Promise.all(list.map(async (f) => ({ ...f, where: shown(path.dirname(f.path)), icon: await wm.fileIcon(f.path, f.isDir) })));
-      [folders, files] = await Promise.all([withIcon(folders), withIcon(files)]);
+      [apps, folders, files] = await Promise.all([withIcon(apps), withIcon(folders), withIcon(files)]);
     }
-    const more = Math.max(0, notesTotal - notes.length) + Math.max(0, totalFolders - folders.length) + Math.max(0, totalFiles - files.length);
-    return { notes, folders, files, more, index: fileIndex?.status() ?? null };
+    const more = Math.max(0, notesTotal - notes.length)
+      + (hasApps ? Math.max(0, totalApps - apps.length) : 0)
+      + (hasFiles ? Math.max(0, totalFolders - folders.length) + Math.max(0, totalFiles - files.length) : 0);
+    return {
+      notes,
+      apps,
+      folders,
+      files,
+      more,
+      index: fileIndex?.status() ?? null,
+      reindexing: Boolean(fileIndex?.building),
+    };
   });
   ipcMain.handle('magic:act', (_e, req) => wm.magicAct(req));
   // 웹 검색 · AI 에게 묻기 기본 사이트 (매직키 창의 할 일 단추 순서)

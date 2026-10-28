@@ -71,6 +71,10 @@ export function loadSettings() {
       settings.magic = { ...settings.magic, modules: { ...settings.magic.modules, opms: true } };
       settings.opmsIntroduced = true;
     }
+    if (!settings.appsIntroduced && settings.magic?.modules) {
+      settings.magic = { ...settings.magic, modules: { ...settings.magic.modules, apps: true } };
+      settings.appsIntroduced = true;
+    }
   } catch {
     // 첫 실행
   }
@@ -140,6 +144,7 @@ export function appSettings(vault, fileIndex, shortcutStatus, shortcutLabel) {
     shortcuts: {
       quickMemo: shortcutStatus('quickMemo'),
       magic: shortcutStatus('magic'),
+      list: shortcutStatus('list'),
     },
     fitTables: settings.fitTables !== false,
     linkPreviews: settings.linkPreviews !== false,

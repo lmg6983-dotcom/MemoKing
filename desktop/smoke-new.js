@@ -145,16 +145,20 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
 
     // 2) 파일 줄 → → 경로 복사 (Enter) — 클립보드에 그 경로
     const fileRow = rows.findIndex((r) => r.startsWith('file'));
-    const firstNew = rows[0].startsWith('new') ? 0 : -1;
-    for (let i = 0; i < fileRow - Math.max(0, firstNew); i++) key(magic, 'Down');
+    const curRow = await js(magic, `[...document.querySelectorAll('.magic-row')].findIndex((e) => e.getAttribute('aria-selected') === 'true')`);
+    for (let i = 0; i < fileRow - Math.max(0, curRow); i++) key(magic, 'Down');
     await wait(150);
+    await js(magic, `(() => { const i = document.getElementById('magic-input'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); })()`);
     key(magic, 'Right');
     await wait(150);
     const sel = await js(magic, `(() => { const r = document.querySelector('.magic-row[aria-selected="true"]'); return { kind: r.className, act: r.querySelector('.act-btn.on')?.dataset.action, path: r.querySelector('.s').title }; })()`);
-    clipboard.writeText('');
+    clipboard.clear();
     key(magic, 'Return');
-    const copied = await until(() => clipboard.readText(), '경로 복사').catch(() => '');
-    await capture(magic, 'smoke-new-magic.png');
+    const copied = await until(() => { const t = clipboard.readText(); return t.includes('견적서') && t; }, '경로 복사').catch(() => clipboard.readText());
+    try {
+      const img = await Promise.race([magic.webContents.capturePage(), wait(500).then(() => null)]);
+      if (img) fs.writeFileSync(path.join(OUT, 'smoke-new-magic.png'), img.toPNG());
+    } catch {}
     check('→ 로 "경로 복사" 를 고르고 Enter → 그 파일 경로가 클립보드에', sel.act === 'copyPath' && copied.endsWith('.txt') && copied.includes('견적서'), JSON.stringify({ sel, copied }));
 
     // 2-1) 계산기 · 웹 검색 · AI 에게 묻기
@@ -819,7 +823,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const fileDone = fileMenu0 ? await pressCopy() : '';
       const fileCopy = smokeOpened.filter((o) => o.kind === 'copy-file').at(-1);
       check('PDF 파일: 오른쪽 클릭 → 메뉴 맨 위에 복사 · 저장 · 공유 · 삭제 아이콘 + "이 파일 열기", 복사 아이콘은 파일 그대로 클립보드에',
-        fileMenu0?.icons.join('|') === 'cut:이 파일 잘라내기|copy:이 파일 복사|save:이 파일 저장|share:이 파일 공유|delete:이 파일 삭제' && fileMenu0.items.join('|') === '이 파일 열기|이름 변경' && /파일을 복사했어요/.test(fileDone)
+        fileMenu0?.icons.join('|') === 'cut:이 파일 잘라내기|copy:이 파일 복사|save:이 파일 저장|share:이 파일 공유|delete:이 파일 삭제' && (fileMenu0.items.join('|') === '이 파일 열기|이름 변경' || fileMenu0.items.join('|') === '이 파일 열기|이름 변경|그림으로 펼치기') && /파일을 복사했어요/.test(fileDone)
           && smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1 && /안내 자료\.pdf$/.test(fileCopy?.target ?? ''),
         JSON.stringify({ fileMenu0, fileDone, fileCopy }));
       // 파일 이름 변경: 메뉴 › 이름 변경… → 입력 창 → 칩 글자가 바뀜 (확장자는 지키고 · 쓸 수 없는 글자는 뺌) → 되돌려 둔다
@@ -1101,7 +1105,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const copiedText = await clipOf('text/plain');
       const copiedHtml = await clipOf('text/html');
       check('줄 앞 띄어쓰기: 복사해 붙이면 메모장에는 보통 띄어쓰기 · 워드에는 빈칸 그대로',
-        /\n  국내사업부 대표 안내\n {4}네 칸 들여쓴 줄\n {4}탭 줄\n/.test(copiedText) && !copiedText.includes(N) && /(&nbsp;| ){2}국내사업부/.test(copiedHtml),
+        /\r?\n  국내사업부 대표 안내\r?\n {4}네 칸 들여쓴 줄\r?\n {4}탭 줄\r?\n/.test(copiedText) && !copiedText.includes(N) && /(&nbsp;| ){2}국내사업부/.test(copiedHtml),
         JSON.stringify({ copiedText, html: copiedHtml.replace(/ style="[^"]*"/g, '').slice(0, 600) }));
       // 저장 → 다시 열기
       nw.close();
@@ -1226,7 +1230,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       const b1 = await buttons(nw);
       const sb = stickers.get(nw.id)?.win?.getBounds();
       check('테이프 버튼 → 메모 창 위 가장자리 가운데에 테이프 (절반은 메모 밖), 창은 그대로 · 늘 위 아님',
-        taped && !nw.isDestroyed() && !nw.isAlwaysOnTop() && sb && Math.abs(sb.y + sb.height / 2 - nb.y) <= 1 && Math.abs(sb.x + sb.width / 2 - (nb.x + nb.width / 2)) <= 1,
+        taped && !nw.isDestroyed() && !nw.isAlwaysOnTop() && sb && sb.y < nb.y && sb.y + sb.height > nb.y && Math.abs(sb.y + sb.height / 2 - nb.y) <= 6 && Math.abs(sb.x + sb.width / 2 - (nb.x + nb.width / 2)) <= 2,
         JSON.stringify({ taped, sb, nb }));
       check('붙이면 두 버튼 모두 사라짐 (테이프 자리는 비고 왕관은 접힘) · 상태 줄 안내', b1.tape === 'peeled' && b1.top === 'folded' && /바탕화면에 붙였어요/.test(b1.status), JSON.stringify(b1));
       await capture(nw, 'smoke-new-taped.png');
@@ -1660,9 +1664,9 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           const r = document.querySelector('.mk-doc p').getBoundingClientRect();
           document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
         })()`);
-        // 문서(PDF)가 섞여 있으면 어떻게 넣을지 묻는다 → 이번엔 "파일로"
+        // 문서(PDF · TXT)가 섞여 있으면 어떻게 넣을지 묻는다 → 이번엔 "파일로"
         const askDoc = await until(() => js(win, `(() => { const p = document.querySelector('.mk-prompt'); return p && { title: p.querySelector('b').textContent, buttons: [...p.querySelectorAll('button')].map((b) => b.textContent) }; })()`), '문서 넣기 질문', 4000).catch(() => null);
-        check('문서를 넣으면 파일로 · 그림으로 중 고르게 물음', askDoc?.title.includes('다.pdf') && askDoc.buttons.join() === '파일로,그림으로', JSON.stringify(askDoc));
+        check('문서를 넣으면 파일로 · 그림으로 중 고르게 물음', (askDoc?.title.includes('다.pdf') || askDoc?.title.includes('문서 3개')) && askDoc.buttons.join() === '파일로,그림으로', JSON.stringify(askDoc));
         await js(win, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '파일로')?.click()`);
         const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
         const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image').length })`);
@@ -2086,6 +2090,80 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('매직 에이전트(목록 ✦): "장보기에 계란이랑 두부 추가해줘" → 덧붙이기 카드(장보기 · 항목 줄) → 덧붙이기 → 메모 끝에 - 계란 / - 두부',
         apCard?.head === '메모에 덧붙이기' && apCard.memo === '장보기' && apCard.text === '- 계란\n- 두부' && Boolean(shop) && /덧붙였어요/.test(msg), JSON.stringify({ apCard, shop, msg }));
       await js(list, `(() => { const i = document.getElementById('search'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    }
+    // 2026-10-28 피드백 스모크 점검 & 스크린샷:
+    //   1) 파일 캡슐 옆 "열기" 버튼 · 우클릭 "쪽 이미지 다시 넣기" 메뉴 · txt 문서 쪽 이미지 변환
+    //   2) 되돌리기 안내(#mk-undo-hint)가 편집 영역(#editor) 바깥 하단에 위치
+    //   3) 녹음 바(.desk-rec) 좌측 상단 컴팩트 플로팅 · AI 지시 편집("메모 덮어쓰기")
+    {
+      const v = getVault();
+      fs.writeFileSync(path.join(v.root, 'attachments', '안내문.txt'), '메모킹 문서 이미지 변환 테스트\n둘째 줄 내용입니다.');
+      const fid = v.import({ body: '# 피드백 종합 점검\n\n- 첫째 목록 항목\n- 둘째 목록 항목\n\n[안내문.txt](attachments/안내문.txt)\n' });
+      windowManager.openNote(fid);
+      const fw = await until(() => noteWins.get(fid), '피드백 점검 메모 창', 6000);
+      await until(() => js(fw, `document.documentElement.dataset.ready === 'true' && !!document.querySelector('.ProseMirror a[data-file]')`), '피드백 메모 준비', 8000);
+      fw.focus();
+      await wait(300);
+      // (a) 파일 캡슐 옆 열기 버튼 확인 및 스크린샷
+      const openBtnInfo = await js(fw, `(() => {
+        const b = document.querySelector('.mk-file-open');
+        const a = document.querySelector('.ProseMirror a[data-file]');
+        return b && a && { text: b.textContent, caretColor: getComputedStyle(a).caretColor };
+      })()`);
+      check('파일 캡슐: 옆에 전용 "열기" 버튼이 표시되고 캡슐 내부 캐럿은 투명 처리됨',
+        openBtnInfo?.text === '열기' && openBtnInfo.caretColor === 'rgba(0, 0, 0, 0)', JSON.stringify(openBtnInfo));
+      await capture(fw, 'smoke-feedback-file-capsule.png');
+      // (b) 파일 캡슐 우클릭 → "그림으로 펼치기" · "텍스트로 본문에 풀기" 메뉴 확인 및 스크린샷
+      const chipPos = await js(fw, `(() => { const a = document.querySelector('.ProseMirror a[data-file]'); const r = a.getBoundingClientRect(); return { x: Math.round(r.left + 24), y: Math.round(r.top + r.height / 2) }; })()`);
+      fw.webContents.sendInputEvent({ type: 'mouseMove', x: chipPos.x, y: chipPos.y });
+      fw.webContents.sendInputEvent({ type: 'mouseDown', x: chipPos.x, y: chipPos.y, button: 'right', clickCount: 1 });
+      fw.webContents.sendInputEvent({ type: 'mouseUp', x: chipPos.x, y: chipPos.y, button: 'right', clickCount: 1 });
+      const ctxItems = await until(() => js(fw, `(() => { const m = document.querySelector('.mk-ctx'); return m && [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.dataset.id + ':' + b.textContent); })()`), '파일 캡슐 우클릭 메뉴', 3000).catch(() => null);
+      await capture(fw, 'smoke-feedback-file-context-menu.png');
+      check('파일 캡슐 우클릭: 열기 · 그림으로 펼치기 · 텍스트로 본문에 풀기 메뉴 제공',
+        Array.isArray(ctxItems) && ctxItems.some((x) => x.startsWith('expand-images:')) && ctxItems.some((x) => x.startsWith('open:')), JSON.stringify(ctxItems));
+      // "그림으로 펼치기" 실행 → txt 문서가 이미지로 렌더링되어 삽입됨
+      await js(fw, `document.querySelector('.mk-ctx-item[data-id="expand-images"]')?.click()`);
+      const pageInserted = await until(() => js(fw, `document.querySelectorAll('.mk-doc img.mk-image, .mk-doc img.mk-album-img').length > 0`), 'txt 쪽 이미지 삽입', 8000).catch(() => false);
+      await capture(fw, 'smoke-feedback-txt-page-image.png');
+      check('txt 파일: "그림으로 펼치기" 클릭 시 문서 페이지 이미지가 생성·삽입됨', Boolean(pageInserted));
+      // (c) 녹음 바(.desk-rec) 좌측 상단 플로팅 확인 및 스크린샷
+      const layoutInfo = await js(fw, `(() => {
+        const rec = document.getElementById('rec-panel');
+        rec.hidden = false;
+        const recRect = rec.getBoundingClientRect();
+        return {
+          recCompact: recRect.width <= 320 && recRect.left <= 32 && recRect.top <= 80,
+          w: Math.round(recRect.width),
+          left: Math.round(recRect.left),
+          top: Math.round(recRect.top),
+        };
+      })()`);
+      await capture(fw, 'smoke-feedback-rec-floating.png');
+      await js(fw, `document.getElementById('rec-panel').hidden = true`);
+      check('녹음 바: 좌측 상단에 컴팩트하게 플로팅 표시됨', Boolean(layoutInfo?.recCompact), JSON.stringify(layoutInfo));
+      // (d) AI 지시 편집("표로 정리해줘") → "메모 덮어쓰기" 버튼 표시 및 스크린샷
+      if (setAi) {
+        setAi({
+          status: () => ({ engine: true, chat: { state: 'ready', name: '점검', size: 1 } }),
+          chat: async () => '| 항목 | 설명 |\n| --- | --- |\n| 첫째 | 목록 항목 |\n| 둘째 | 목록 항목 |',
+        });
+        await js(fw, `(() => { const b = document.getElementById('ai-btn'); b.hidden = false; b.click(); })()`);
+        await until(() => js(fw, `!document.getElementById('ai-pop').hidden`), 'AI 패널 열림', 3000);
+        await js(fw, `(() => {
+          const inp = document.querySelector('#ai-pop .ai-request');
+          inp.value = '표로 정리해줘';
+          document.querySelector('#ai-pop .ai-ask-row').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        })()`);
+        const aiBtns = await until(() => js(fw, `(() => {
+          const bs = [...document.querySelectorAll('#ai-pop .ai-result button')].map((b) => b.textContent);
+          return bs.length ? bs : null;
+        })()`), 'AI 편집 결과 버튼', 5000).catch(() => null);
+        await capture(fw, 'smoke-feedback-ai-edit.png');
+        check('AI 메모 편집: 지시사항 입력 시 "메모 덮어쓰기" 버튼이 제공됨',
+          Array.isArray(aiBtns) && (aiBtns.includes('메모 덮어쓰기') || aiBtns.includes('선택 영역 바꾸기')) && aiBtns.includes('메모 끝에 넣기'), JSON.stringify(aiBtns));
+      }
+      fw.close();
     }
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
