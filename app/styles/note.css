@@ -305,28 +305,6 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   transition: background-color 0.15s ease-out;
 }
 .mk-doc p.mk-file-line { caret-color: transparent; }
-.mk-doc .mk-file-open {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 24px;
-  margin-left: 6px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--brand-yellow, #ffd43b);
-  color: var(--on-brand, #111);
-  font: 700 12px/1 var(--font-sans);
-  cursor: pointer;
-  vertical-align: middle;
-  user-select: none;
-  -webkit-user-select: none;
-  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.12);
-  transition: transform 0.1s ease-out, filter 0.12s ease-out;
-}
-@media (hover: hover) and (pointer: fine) { .mk-doc .mk-file-open:hover { filter: brightness(0.95); } }
-.mk-doc .mk-file-open:active { transform: scale(0.95); }
-body[data-color="yellow"] .mk-doc .mk-file-open { background: var(--brand-black, #111); color: #fff; }
 @media (hover: hover) and (pointer: fine) { .mk-doc a[href^="attachments/"]:hover { background: var(--note-hover); box-shadow: inset 0 0 0 1px var(--note-muted); } }
 .mk-doc a[href^="attachments/"]::before {
   content: "";

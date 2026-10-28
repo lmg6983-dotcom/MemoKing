@@ -1,11 +1,11 @@
 // 녹음 · 받아쓰기 (휴대폰) — 녹음은 앱(RecorderService.kt)이 화면이 꺼져도 계속하고, 여기서는 보여 주기만.
-//   시작: 메모 화면의 🎙 또는 목록 + › 음성 메모. 녹음하는 동안 시간·받아쓴 글이 보이고(잠시 멈춤·끝내기),
-//   끝내면 소리 파일(.m4a)과 받아쓴 글이 그 메모에 들어간다. 알림에서 끝내도(앱이 꺼져 있어도) 다음에 열 때 들어간다.
+//   시작: 메모 화면의 🎙 또는 목록 + › 음성 메모. 녹음하는 동안은 좌측 상단 작은 알약(시간·잠시 멈춤·끝내기)만 —
+//   받아쓴 글은 메모를 가리지 않게 끝난 뒤에. 끝내면 이름을 묻고, 소리 파일(.m4a)과 받아쓴 글이 그 메모에 들어간다. 알림에서 끝내도(앱이 꺼져 있어도) 다음에 열 때 들어간다.
 import { app } from './state.js';
 import { native, call, on, record } from './native.js';
-import { toast } from './ui.js';
-import { recordingClock as formatDuration } from '../../app/js/core/voice-card.js';
-import { haptic } from '../../app/js/dom.js';
+import { toast, promptName } from './ui.js';
+import { recordingClock as formatDuration, recordingWhen } from '../../app/js/core/voice-card.js';
+import { haptic, reduceMotion } from '../../app/js/dom.js';
 import { icon as svg } from '../../app/js/icons.js';
 import { UI } from '../../app/js/core/ui-text.js';
 
@@ -14,7 +14,6 @@ const el = {
   panel: $('rec-panel'),
   time: $('rec-time'),
   state: $('rec-state'),
-  text: $('rec-text'),
   pause: $('rec-pause'),
   stop: $('rec-stop'),
   pill: null,
@@ -60,9 +59,29 @@ function elapsed() {
   return status.paused ? tickBase.elapsed : tickBase.elapsed + (Date.now() - tickBase.at);
 }
 
+// 알약은 위에서 내려오고(.rec-panel 애니메이션) 위로 사라진다
+function showPanel(show) {
+  if (show) {
+    el.panel.classList.remove('leaving');
+    el.panel.hidden = false;
+    return;
+  }
+  if (el.panel.hidden || el.panel.classList.contains('leaving')) return;
+  if (reduceMotion()) {
+    el.panel.hidden = true;
+    return;
+  }
+  el.panel.classList.add('leaving');
+  el.panel.addEventListener('animationend', () => {
+    if (!el.panel.classList.contains('leaving')) return; // 그사이 다시 보이게 됐다
+    el.panel.classList.remove('leaving');
+    el.panel.hidden = true;
+  }, { once: true });
+}
+
 function render() {
-  const show = status.active && attached && attached === status.memoId;
-  el.panel.hidden = !show;
+  const show = Boolean(status.active && attached && attached === status.memoId);
+  showPanel(show);
   document.getElementById('note-screen').classList.toggle('recording', Boolean(status.active && attached === status.memoId));
   const here = Boolean(status.active && attached === status.memoId);
   for (const b of document.querySelectorAll('[data-action="record"]')) {
@@ -79,23 +98,6 @@ function render() {
   el.panel.classList.toggle('paused', status.paused);
   el.pause.replaceChildren(svg(status.paused ? 'play' : 'pause'));
   el.pause.setAttribute('aria-label', status.paused ? UI.recordMore : '일시 정지');
-  const text = status.text || '';
-  el.text.hidden = !status.stt && !text;
-  el.text.replaceChildren();
-  if (text) renderLines(el.text, text);
-  if (status.partial) {
-    const span = document.createElement('span');
-    span.className = 'rec-partial';
-    span.textContent = `${text ? '\n' : ''}${status.partial}`;
-    el.text.append(span);
-  }
-  if (!text && !status.partial) {
-    const span = document.createElement('span');
-    span.className = 'rec-hint';
-    span.textContent = status.stt ? UI.speakHint : '녹음만 하고 있어요';
-    el.text.append(span);
-  }
-  el.text.scrollTop = el.text.scrollHeight;
 }
 
 // 소리 크기 막대: 새 크기가 오른쪽에서 들어와 왼쪽으로 흘러간다 (말하면 출렁)
@@ -105,20 +107,6 @@ function showLevel(level) {
   levels.push(status.paused ? 0 : level);
   const bars = $('rec-wave')?.children ?? [];
   for (let i = 0; i < bars.length; i++) bars[i].style.setProperty('--lv', levels[i].toFixed(2));
-}
-
-// 받아쓴 글: 줄마다, "화자 N:" 은 색 이름표로
-function renderLines(box, text) {
-  for (const [i, line] of text.split('\n').entries()) {
-    if (i) box.append('\n');
-    const m = line.match(/^화자\s*(\d+)\s*:\s*/);
-    if (m) {
-      const chip = document.createElement('span');
-      chip.className = `rec-spk mk-spk-${(Number(m[1]) - 1) % 6}`;
-      chip.textContent = `화자 ${m[1]}`;
-      box.append(chip, line.slice(m[0].length));
-    } else box.append(line);
-  }
 }
 
 // 목록 화면에서도 녹음 중임을 (+ 버튼 위 작은 알약, 누르면 그 메모로)
@@ -145,7 +133,6 @@ function setStatus(next) {
   tickBase = { at: Date.now(), elapsed: status.elapsedMs ?? 0 };
   clearInterval(ticker);
   if (status.active) ticker = setInterval(render, 500);
-  if (was && !status.active) el.panel.hidden = true;
   render();
 }
 
@@ -197,7 +184,10 @@ export async function stop() {
     const result = await call('recordStop');
     setStatus({ active: false, paused: false, partial: '' });
     if (result) {
-      await app.deliverRecording(result);
+      // 이름 묻기 — 건너뛰어도 기본 이름으로 넣는다 (녹음을 잃지 않게)
+      const fallback = `녹음 ${recordingWhen(result.startedAt)}`;
+      const title = (await promptName({ title: '녹음 이름', value: fallback, okLabel: '저장', cancelLabel: '건너뛰기' }))?.trim();
+      await app.deliverRecording({ ...result, title: title || fallback });
       record.ack(result.id);
     }
   } catch (err) {

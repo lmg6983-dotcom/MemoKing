@@ -1,6 +1,7 @@
 package com.memoking.app
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -418,6 +419,27 @@ class Bridge(private val activity: MainActivity) {
                     val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newUri(ctx.contentResolver, "메모킹 그림", uri))
                     true
+                }
+            }
+            // 메모 안의 파일 복사: 첨부를 보내기 자리(cache/share)에 이름 그대로 두고, 클립보드에 파일(content://) + 이름 글을 한 칸에 —
+            //   파일을 받는 앱(메모킹 · 파일 앱 · 메신저)에는 파일로, 글만 받는 칸에는 이름으로 붙는다
+            //   shortcut: 보내기 자리는 1시간 지나면 비워져 그 뒤에 붙이면 파일이 없다, 오래 두고 붙이는 일이 잦으면 따로 둘 자리를
+            // → 클립보드에 넣은 이름
+            "copyFile" -> pool.execute {
+                resolve(id) {
+                    val rel = a.getString("rel")
+                    // 메모 폴더의 첨부만 (saveAs · shareContent 와 같게)
+                    if (!rel.startsWith("attachments/")) throw IllegalArgumentException("파일을 찾지 못했어요")
+                    val ext = rel.substringAfterLast('.', "")
+                    var name = a.optString("name").trim().ifEmpty { rel.substringAfterLast('/') }
+                    if (ext.isNotEmpty() && !name.endsWith(".$ext", ignoreCase = true)) name += ".$ext"
+                    val file = shareFile(name)
+                    storage().openRead(rel).use { input -> file.outputStream().use { input.copyTo(it) } }
+                    val uri = VaultFileProvider.shareUriFor(file.name)
+                    val desc = ClipDescription(name, arrayOf(VaultFileProvider.mimeOf(file.name), ClipDescription.MIMETYPE_TEXT_PLAIN))
+                    val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData(desc, ClipData.Item(name, null, uri)))
+                    name // 클립보드에 넣은 이름 글 (메모킹에 붙일 때 알아보려고)
                 }
             }
             // 클립보드의 그림 · 파일(content://) → 임시 파일 [{ temp, name, mime, size }] — 메모킹이나 다른 앱에서 복사한 그림을 메모에 붙여 넣기

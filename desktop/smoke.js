@@ -855,7 +855,7 @@ export async function runSmoke({
     const ran = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '프로그램 실행').catch(() => null);
     check('프로그램 파일(.bat) → 먼저 묻고, 취소하면 실행 안 함', cancelled.length === 1 && cancelled[0].kind === 'confirm' && Boolean(ran) && ran.target.endsWith('.bat'), JSON.stringify({ cancelled, ran }));
     const hintText = await js(linkNote.win, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return new Promise((r) => setTimeout(() => r(document.querySelector('.hover-hint')?.textContent ?? ''), 300)); })()`);
-    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 누르면 열려요/.test(hintText), hintText);
+    check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 두 번 누르면 열려요/.test(hintText), hintText);
 
     // 사진은 두 번 누르면 기본 사진 앱으로
     await key(linkNote.win, 'End', ['control']);

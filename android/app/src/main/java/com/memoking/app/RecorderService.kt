@@ -20,6 +20,7 @@ import android.media.MediaMuxer
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
 import org.json.JSONArray
@@ -193,6 +194,12 @@ class RecorderService : Service() {
             .addAction(action(ACTION_STOP, "끝내기", 7305))
         if (!s.paused) b.setUsesChronometer(true).setWhen(System.currentTimeMillis() - s.elapsedMs()).setShowWhen(true)
         if (Build.VERSION.SDK_INT >= 31) b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+        // 안드로이드 16+: 상태 막대 맨 위에 빨간 캡슐(시간)로 — 다른 앱을 쓰거나 화면이 꺼져 있어도 녹음 중임이 보인다 (갤럭시는 Now Bar 에도)
+        //   compileSdk 35 라 상수 이름(EXTRA_REQUEST_PROMOTED_ONGOING · EXTRA_SHORT_CRITICAL_TEXT) 대신 값 그대로
+        if (Build.VERSION.SDK_INT >= 36) b.addExtras(Bundle().apply {
+            putBoolean("android.requestPromotedOngoing", true)
+            if (s.paused) putCharSequence("android.shortCriticalText", "멈춤")
+        })
         return b.build()
     }
 

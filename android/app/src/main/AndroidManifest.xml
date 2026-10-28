@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- 녹음 중 상태 막대 캡슐 (안드로이드 16 Live Update · 갤럭시 Now Bar) — 일반 권한, 묻지 않음 -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- 앱 안 업데이트: 받은 새 버전(APK)을 안드로이드 설치 화면으로 넘긴다 (사용자가 "출처를 알 수 없는 앱 설치" 를 메모킹에 한 번 허용) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

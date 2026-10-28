@@ -1366,23 +1366,38 @@ try {
     });
   });
   check('녹음: 다이얼 · + 버튼이 끝내기 버튼을 가리지 않음', !overlap);
+  const recGeo = await page.evaluate(() => {
+    const screen = document.getElementById('note-screen').getBoundingClientRect();
+    const panel = document.getElementById('rec-panel').getBoundingClientRect();
+    const low = [...document.querySelectorAll('.mk-dial, #add-btn')].map((f) => Math.round(screen.bottom - f.getBoundingClientRect().bottom));
+    return { low, panelH: Math.round(panel.height), text: !!document.getElementById('rec-text') };
+  });
+  check('녹음 중: + · 다이얼은 아래 제자리, 녹음 판은 한 줄 알약 (받아쓴 글 없음)', recGeo.low.length === 2 && recGeo.low.every((d) => d < 140) && recGeo.panelH <= 52 && !recGeo.text, JSON.stringify(recGeo));
   await shot('11-recording');
   await page.tap('#rec-stop');
+  await page.waitForSelector('#name-dialog[open]');
+  check('녹음 끝: 이름 입력 창 (기본 이름이 채워져 있음)', (await page.inputValue('#name-input')).startsWith('녹음 '));
+  await shot('11b-recording-name');
+  await page.fill('#name-input', '주간 회의');
+  await page.press('#name-input', 'Enter');
   await page.waitForTimeout(1200);
+  check('녹음 끝: 알약이 사라짐', await page.locator('#rec-panel').isHidden());
   await back();
   await page.waitForTimeout(400);
   f = fileWith('오늘 회의를 시작하겠습니다');
-  check('음성 메모: 소리 파일 + 받아쓴 글', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 음성 메모'), f && read(f));
-  check('음성 카드: 소리와 받아쓴 글이 한 칸(인용), 문장마다 줄 · 화자 이름표', f && /^> !\[녹음/m.test(read(f)) && read(f).includes('>\n> **화자 2:** 다음 주 출시 일정을 정리했어요.\n>\n> 표로 공유할게요.'), f && read(f));
+  check('음성 메모: 소리 파일 + 받아쓴 글 · 고른 이름', f && /\]\(attachments\/[^)]+\.m4a\)/.test(read(f)) && read(f).startsWith('---') && read(f).includes('# 주간 회의') && /!\[주간 회의 \(/.test(read(f)), f && read(f));
+  check('음성 카드: 소리와 받아쓴 글이 한 칸(인용), 문장마다 줄 · 화자 이름표', f && /^> !\[주간 회의/m.test(read(f)) && read(f).includes('>\n> **화자 2:** 다음 주 출시 일정을 정리했어요.\n>\n> 표로 공유할게요.'), f && read(f));
 
   // Google 음성 인식을 못 쓰는 휴대폰(안드로이드 13 아래): 녹음은 그대로, 받아쓰기는 못 한다고 바로 알림 (기다리게 하지 않음)
   await post('/dev/stt', { system: false });
   await page.tap('#fab');
   await page.tap('[data-new="voice"]');
   await page.waitForSelector('#rec-panel:not([hidden])');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(700); // 메모를 막 연 때는 끝내기를 잠깐 받지 않는다 (recorder.holdStop)
   check('받아쓰기 못 쓰는 휴대폰: 녹음은 하면서 "녹음만 해요" 알림 (다운로드 버튼 없음)', (await page.textContent('#toast-text')).includes('녹음만') && !(await page.isVisible('#toast-action')), await page.textContent('#toast-text'));
   await page.tap('#rec-stop');
+  await page.waitForSelector('#name-dialog[open]');
+  await page.tap('#name-dialog button[value="cancel"]'); // 그만둬도 기본 이름으로 들어간다
   await page.waitForTimeout(1200);
   await back();
   await page.waitForTimeout(400);
@@ -1601,6 +1616,16 @@ try {
     const chipLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
     const opensAfter = (await devLog()).log.filter((x) => x.openFile).length;
     check('파일 칩: 꾹 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 삭제' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
+    check('파일 칩: 옆에 "열기" 단추 없음', (await page.locator('.mk-file-open').count()) === 0);
+    await page.tap('.mk-copy-btn');
+    await page.waitForTimeout(500);
+    const copiedFile = (await devLog()).log.filter((x) => x.copyFile).at(-1);
+    check('복사 버튼: 파일은 이름 글이 아니라 파일 그대로 (이름 붙여)', copiedFile?.copyFile.rel === 'attachments/안내서.pdf' && copiedFile.copyFile.name === '안내서.pdf', JSON.stringify(copiedFile));
+    await page.waitForTimeout(1900);
+    await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
+    await page.waitForTimeout(650);
+    await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
+    await page.waitForTimeout(300);
     await page.tap('.mk-save-btn');
     await page.waitForTimeout(500);
     const saved = (await devLog()).log.filter((x) => x.saveAs).at(-1);
@@ -1625,6 +1650,9 @@ try {
     await page.waitForTimeout(500);
     const opened = (await devLog()).log.filter((x) => x.openFile);
     check('열기 버튼: 누르면 그 파일을 연다 (버튼은 거둠)', opened.length === opens0 + 1 && opened.at(-1).openFile === 'attachments/안내서.pdf' && !(await page.locator('.mk-open-btn').count()), JSON.stringify(opened.at(-1)));
+    await page.locator('.mk-doc a[data-file]').first().dispatchEvent('dblclick');
+    await page.waitForTimeout(400);
+    check('파일 칩: 두 번 누르면 연다', (await devLog()).log.filter((x) => x.openFile).length === opened.length + 1);
     // 수식: 눌러도 고치기 창이 바로 뜨지 않고 단추 + "고치기"
     await tapAt('.mk-doc .mk-math-block');
     const mathRow = { editor: await page.locator('.mk-math-editor').count(), label: await page.getAttribute('.mk-open-btn', 'aria-label').catch(() => null) };

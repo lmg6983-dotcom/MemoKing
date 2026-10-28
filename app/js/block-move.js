@@ -475,7 +475,6 @@ class Mover {
     if (!canContentMenu()) {
       this.onOpenClick = (e) => {
         if (e.mkOpen || e.button !== 0) return;
-        if (e.target instanceof Element && e.target.closest('.mk-file-open')) return;
         const host = e.target instanceof Element ? e.target.closest(OPEN_TARGET) : null;
         if (!host || !view.dom.contains(host) || e.target.closest('.lc-remove')) return;
         const block = blockFromTarget(view, host);
@@ -605,7 +604,6 @@ class Mover {
   press(event, kind) {
     const { view } = this;
     if (this.drag) return;
-    if (event.target instanceof Element && event.target.closest('.mk-file-open')) return;
     if (!persistentShown()) this.hideDelete(); // 표를 고치는 동안 표 위 단추는 눌러도 그대로 (휴대폰)
     let block = blockFromTarget(view, event.target);
     // 내용 줄이 아니면 글 줄(문단·제목·표·코드·인용·음성 카드): 꾹 눌러야 들어 올린다

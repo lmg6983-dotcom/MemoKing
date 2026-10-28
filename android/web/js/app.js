@@ -838,10 +838,11 @@ function closeHeld(memoId, opened) {
   if (opened && !(note.currentId() === memoId && note.getEditor())) app.vault.closeLock(memoId);
 }
 
+// r.title: 끝낼 때 사용자가 붙인 이름 (알림에서 끝냈으면 없음 → 녹음한 때)
 app.deliverRecording = async (r) => {
   if (!app.vault || !r?.temp) return;
   const duration = recorder.formatDuration(r.durationMs ?? 0);
-  const alt = `녹음 ${whenLabel(r.startedAt)} (${duration})`;
+  const alt = `${r.title || `녹음 ${whenLabel(r.startedAt)}`} (${duration})`;
   const [item] = note.tempsToItems([{ temp: r.temp, name: r.name || 'recording.m4a', mime: r.mime || 'audio/mp4' }]);
   item.alt = alt;
   const transcript = polish(String(r.transcript ?? '').trim());
@@ -853,12 +854,12 @@ app.deliverRecording = async (r) => {
   let secretOut = false; // 잠긴 메모의 녹음을 풀린 새 메모에 넣었다
   // 편집기가 떠 있을 때만 화면에 (잠긴 메모의 비밀번호 화면이면 아직 편집기가 없다 — 파일에 넣는다)
   if (note.currentId() === memoId && note.getEditor()) {
-    note.insertRecording(card, `음성 메모 ${whenLabel(r.startedAt)}`);
+    note.insertRecording(card, r.title || `음성 메모 ${whenLabel(r.startedAt)}`);
   } else {
     const opened = openHeld(memoId);
     const memo = memoId && app.vault.get(memoId);
     const parts = card;
-    const heading = `# 음성 메모 ${whenLabel(r.startedAt)}`;
+    const heading = `# ${r.title || `음성 메모 ${whenLabel(r.startedAt)}`}`;
     if (memo?.needsPassword) {
       // 잠긴 메모를 열 열쇠가 없다(앱을 다시 켬 등) — 잠긴 글에 덧붙이면 저장되지 않으므로, 소리만 새 메모에 (받아쓴 글은 넣지 않음)
       lockedOut = true;

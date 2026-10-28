@@ -14,7 +14,7 @@ let host = {
   image: null,
   /** @param {{ text: string, html: string }} c */
   text: null,
-  /** @param {string} href 메모 폴더 안의 첨부 (attachments/…) → 넣었으면 true */
+  /** @param {string} href 메모 폴더 안의 첨부 (attachments/…) · @param {string} name 칩에 적힌 이름 → 넣었으면 true */
   file: null,
   /**
    * 저장: 어디에 둘지 고르는 창을 띄워 저장 → 저장한 파일 이름 | 'cancelled'
@@ -171,12 +171,13 @@ export async function copyBlock(view, pos, node, target) {
       }
     }
   }
-  // 파일: 그 파일 자체를 (못 넣으면 아래처럼 이름을 글로)
-  const file = attachmentOf(node);
-  if (file && host.file && (await host.file(file).catch(() => false))) return '파일';
   const slice = view.state.doc.slice(pos, pos + node.nodeSize);
   // 소리 · 동영상처럼 글이 없는 줄은 그 파일 이름(주소)을 글로
   const text = plainTextOf(slice.content).trim() || media?.attrs.title || media?.attrs.src || node.attrs?.href || node.attrs?.src || '';
+  // 파일: 그 파일 자체를 (못 넣으면 아래처럼 이름을 글로) — 휴대폰은 보일 이름도 함께 (칩 글자 · 소리/음성 카드는 설명 글, 받아쓴 글이 아니라)
+  const file = attachmentOf(node);
+  const named = media ?? voiceAudioOf(node);
+  if (file && host.file && (await host.file(file, fileNameOf(named?.attrs.alt || text, '')).catch(() => false))) return '파일';
   await copyText({ text, html: cleanHtml(view.nodeDOM(pos)) });
   return '내용';
 }

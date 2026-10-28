@@ -168,7 +168,7 @@
       <button id="alarm-ok" class="banner-btn primary">확인했어요</button>
     </div>
 
-    <!-- 녹음 중: 손목이 닿는 아래쪽 대신 좌측 상단에 작게 띄운다 (바꾸기 막대처럼) -->
+    <!-- 녹음 중: 손목이 닿는 아래쪽 대신 좌측 상단에 작은 알약 (받아쓴 글은 끝난 뒤 본문에) -->
     <div id="rec-panel" class="rec-panel" role="region" aria-label="녹음" hidden>
       <div class="rec-head">
         <span class="rec-dot" aria-hidden="true"></span>
@@ -179,7 +179,6 @@
         <button id="rec-pause" class="rec-btn" aria-label="잠시 멈춤"><svg><use href="#i-pause"/></svg></button>
         <button id="rec-stop" class="rec-btn stop"><svg><use href="#i-stop"/></svg><span>끝내기</span></button>
       </div>
-      <div id="rec-text" class="rec-text" aria-live="polite"></div>
     </div>
 
     <main id="editor" class="editor"></main>
@@ -683,6 +682,18 @@
       <div class="dialog-actions">
         <button value="cancel" class="btn">취소</button>
         <button value="ok" class="btn danger" id="confirm-ok">삭제</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 이름 묻기 (녹음을 끝냈을 때 등) — ui.js promptName -->
+  <dialog id="name-dialog" class="dialog">
+    <form method="dialog">
+      <h2 id="name-title"></h2>
+      <label class="field name-field"><input id="name-input" type="text" enterkeyhint="done" autocomplete="off" aria-labelledby="name-title"></label>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn">취소</button>
+        <button value="ok" class="btn primary" id="name-ok">저장</button>
       </div>
     </form>
   </dialog>

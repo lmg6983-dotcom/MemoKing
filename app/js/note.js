@@ -1002,13 +1002,6 @@ function openHref(href) {
 
 el.editorRoot.addEventListener('click', (e) => {
   if (e.button !== 0 || e.shiftKey) return;
-  const openBtn = e.target.closest?.('.mk-file-open');
-  if (openBtn && el.editorRoot.contains(openBtn)) {
-    e.preventDefault();
-    e.stopPropagation();
-    openHref(openBtn.dataset.fileOpen);
-    return;
-  }
   const a = e.target.closest?.('a[href]');
   if (!a || !el.editorRoot.contains(a)) return;
   e.preventDefault();
@@ -1046,7 +1039,7 @@ el.editorRoot.addEventListener('dblclick', (e) => {
   openHref(target);
 });
 
-// 파일 칩에 마우스를 올리면 이름·크기 안내 (PC는 누르면 바로 열리고, 휴대폰은 눌러서 나오는 단추 줄의 "열기" — block-move.js)
+// 파일 칩에 마우스를 올리면 이름·크기 안내 (PC · 휴대폰 모두 두 번 눌러 열기, 휴대폰은 눌러서 나오는 단추 줄의 "열기"도 — block-move.js)
 const hint = document.createElement('div');
 hint.className = 'hover-hint';
 hint.hidden = true;
@@ -1062,7 +1055,7 @@ el.editorRoot.addEventListener('mouseover', async (e) => {
   const program = a.dataset.file === 'program';
   hint.textContent = !info?.exists
     ? '이 PC의 메모 폴더에 파일이 아직 없어요'
-    : `${a.textContent} (${formatBytes(info.size)}). ${program ? '누르면 실행할지 물어볼게요' : '누르면 열려요'}`;
+    : `${a.textContent} (${formatBytes(info.size)}). ${program ? '두 번 누르면 실행할지 물어볼게요' : '두 번 누르면 열려요'}`;
   const r = a.getBoundingClientRect();
   hint.hidden = false;
   const left = Math.max(6, Math.min(r.left, window.innerWidth - hint.offsetWidth - 6));
