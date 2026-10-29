@@ -22,7 +22,7 @@ export function closeContextMenu(result = null) {
 
 /**
  * @param {{ x: number, y: number, icons?: { id: string, label: string, icon: string, danger?: boolean, disabled?: boolean }[],
- *           items?: ({ id: string, label: string, hint?: string, disabled?: boolean, checked?: boolean }
+ *           items?: ({ id: string, label: string, hint?: string, key?: string, disabled?: boolean, checked?: boolean }  key: 그 숫자 키로 바로 고른다
  *                    | { type: 'colors', label: string, colors: { id: string, label: string, color: string, checked?: boolean }[] }
  *                    | { type: 'separator' })[],
  *           label?: string }} o  icon: 16×16 svg 글 (content-icons.js)
@@ -45,6 +45,7 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
     b.setAttribute('role', 'menuitem');
     b.disabled = Boolean(spec.disabled);
     b.dataset.id = spec.id;
+    if (spec.key) b.dataset.key = spec.key;
     if (spec.danger) b.classList.add('danger');
     b.addEventListener('mousedown', (e) => e.preventDefault()); // 편집기 커서를 빼앗지 않게
     b.addEventListener('click', () => {
@@ -177,7 +178,8 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
       const i = buttons.indexOf(active);
       const n = i < 0 ? (k === 'ArrowRight' ? 0 : buttons.length - 1) : (i + (k === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
       buttons[n].focus({ preventScroll: true });
-    } else if (k === 'Home') enabled()[0]?.focus({ preventScroll: true });
+    } else if (el.querySelector(`[data-key="${CSS.escape(k)}"]:not(:disabled)`)) el.querySelector(`[data-key="${CSS.escape(k)}"]`).click();
+    else if (k === 'Home') enabled()[0]?.focus({ preventScroll: true });
     else if (k === 'End') enabled().at(-1)?.focus({ preventScroll: true });
     else if (k === 'Enter' || k === ' ') {
       if (!el.contains(active) || active === el) return closeContextMenu(); // 고른 것이 없으면 그냥 닫기

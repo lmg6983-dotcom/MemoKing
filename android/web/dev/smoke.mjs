@@ -1297,6 +1297,15 @@ try {
   await page.waitForTimeout(400);
   check('PDF: 크기를 고르면 미리보기도 그 크기로', /zoom: 1\.2/.test(await page.$eval('#print-frame', (f) => f.srcdoc)) && (await page.textContent('#print-scale-out')) === '120%');
   await shot('09b-print-size');
+  {
+    const on = await page.$eval('#print-frame', (f) => f.srcdoc.includes('class="print-page fit-images"'));
+    await page.tap('#print-fit');
+    await page.waitForTimeout(400);
+    const off = await page.$eval('#print-frame', (f) => !f.srcdoc.includes('fit-images'));
+    await page.tap('#print-fit');
+    await page.waitForTimeout(200);
+    check('PDF: 그림을 쪽 안에 맞추기 스위치 (기본 켬 — 끄면 그림을 줄이지 않음)', on && off && await page.isChecked('#print-fit'), JSON.stringify({ on, off }));
+  }
   await page.tap('#print-go');
   if (process.env.MK_PDF) {
     await page.pdf({ path: path.join(outDir, 'share.pdf'), format: 'A4' });
@@ -1401,6 +1410,21 @@ try {
   await back();
   await page.waitForTimeout(400);
   await post('/dev/stt', { system: true });
+
+  // 목록에는 글만: 목록 항목 안의 그림 · 파일 칩 · 표는 메모를 열면 목록 뒤로 (글 · 인터넷 링크 항목은 그대로)
+  write('목록 그림.md', '---\nid: 00000000-0000-4000-8000-0000000000ab\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: yellow\n---\n# 목록 그림\n\n- 첫 항목\n\n  ![사진](attachments/20261001-090000-ab12.png)\n\n- ![둘째 사진](attachments/20261001-090000-ab12.png)\n- 셋째 [링크](https://example.com) 항목\n\n끝 문단\n');
+  await page.evaluate(() => window.__mk.emit('app', 'resume'));
+  await page.waitForTimeout(400);
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000ab"]');
+  await page.waitForSelector('#note-screen:not([hidden]) img.mk-image');
+  await page.waitForTimeout(1200);
+  await back();
+  await page.waitForTimeout(600);
+  {
+    const body = read(fileWith('셋째 [링크]')).split('---').pop();
+    const listEnd = body.indexOf('항목\n\n![사진]');
+    check('목록 안 그림: 열면 목록 뒤로 차례대로 (글 · 링크 항목은 목록에 그대로)', listEnd > 0 && body.indexOf('![사진]') < body.indexOf('![둘째 사진]') && body.indexOf('![둘째 사진]') < body.indexOf('끝 문단') && /- 첫 항목\n\n?- 셋째 \[링크\]/.test(body) && !/^\s+!\[/m.test(body), body);
+  }
 
   // 소리·표·수식·글 문단도 자유롭게 옮기기 (모두 꾹 눌러 들어 올리기)
   fs.writeFileSync(path.join(vault, 'attachments/move-test.m4a'), Buffer.from('fake'));

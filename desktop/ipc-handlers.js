@@ -581,6 +581,23 @@ export function registerIpc(ctx) {
   ipcMain.on('magic:close', () => {
     if (wm.magicWin && !wm.magicWin.isDestroyed()) wm.magicWin.hide();
   });
+  let reindexTimer = null;
+  const notifyIndex = (q) => {
+    if (wm.magicWin && !wm.magicWin.isDestroyed() && wm.magicWin.isVisible()) wm.magicWin.webContents.send('magic:index-updated', { query: q });
+  };
+  async function autoReindex(fileIndex, q) {
+    const wrapperDir = wm.opmsSettings().wrapperDir;
+    let docsWrapper = '';
+    let downloadsDir = '';
+    try {
+      docsWrapper = path.join(app.getPath('documents'), '전자포대');
+      downloadsDir = app.getPath('downloads');
+    } catch {}
+    const targetDirs = [wrapperDir, docsWrapper, downloadsDir, getVault()?.root]
+      .filter((d) => d && typeof d === 'string' && (!SMOKE || d === wrapperDir) && fs.existsSync(d));
+    const { added } = await fileIndex.triggerAutoReindex({ targetDirs, onRebuildComplete: () => notifyIndex(q) }).catch(() => ({ added: 0 }));
+    if (added > 0) notifyIndex(q);
+  }
   ipcMain.handle('magic:search', async (_e, query) => {
     const vault = getVault();
     const mods = new Set(activeModules(settings.magic).map((m) => m.id));
@@ -611,39 +628,11 @@ export function registerIpc(ctx) {
         files: hasFiles ? 6 : 0,
       }));
 
-      // 관리번호나 폴더 미검색 시 자동 재색인 (2단계 최적화: 1단계 얕은 타깃 스캔 + 2단계 2분 쿨다운 백그라운드 재색인)
+      // 관리번호나 폴더가 안 찾아지면 자동 재색인 — 치는 동안이 아니라 손을 멈춘 뒤(0.6초)에, 훑기는 비동기로 (입력이 끊기지 않게).
+      //   새로 찾은 것이 있거나 전체 재색인이 끝나면 매직키 창이 다시 찾는다 (magic:index-updated)
+      clearTimeout(reindexTimer);
       if (hasFiles && folders.length === 0 && q.trim().length >= 2) {
-        const wrapperDir = wm.opmsSettings().wrapperDir;
-        let docsWrapper = '';
-        let downloadsDir = '';
-        try {
-          docsWrapper = path.join(app.getPath('documents'), '전자포대');
-          downloadsDir = app.getPath('downloads');
-        } catch {}
-        const targetDirs = [
-          wrapperDir,
-          docsWrapper,
-          downloadsDir,
-          getVault()?.root,
-        ].filter((d) => d && typeof d === 'string' && (!SMOKE || d === wrapperDir) && fs.existsSync(d));
-
-        const reindexRes = fileIndex.triggerAutoReindex({
-          targetDirs,
-          onRebuildComplete: () => {
-            if (wm.magicWin && !wm.magicWin.isDestroyed() && wm.magicWin.isVisible()) {
-              wm.magicWin.webContents.send('magic:index-updated', { query: q });
-            }
-          },
-        });
-
-        // 1단계: 퀵 스캔으로 새 항목이 즉시 발견된 경우 결과 즉시 재검색하여 화면에 반영
-        if (reindexRes.added > 0) {
-          ({ apps, folders, files, totalApps, totalFolders, totalFiles } = fileIndex.searchSplit(q, {
-            apps: hasApps ? 4 : 0,
-            folders: hasFiles ? 3 : 0,
-            files: hasFiles ? 6 : 0,
-          }));
-        }
+        reindexTimer = setTimeout(() => autoReindex(fileIndex, q), 600);
       }
 
       wm.lastFileResults = new Set([...apps, ...folders, ...files].map((f) => f.path));
@@ -1487,6 +1476,7 @@ export function registerIpc(ctx) {
     else if (name === 'copy') wc.copy();
     else if (name === 'paste') wc.paste();
     else if (name === 'pastePlain') wc.send('edit:paste-plain', await clipboard.readText());
+    else if (name === 'pasteList' || name === 'pasteTable') wc.send('edit:paste-as', { kind: name === 'pasteList' ? 'list' : 'table', text: await clipboard.readText() });
     return true;
   });
   // 화면이 정한 오른쪽 클릭 메뉴 (메모 창 내용 — block-move.js): [{ id, label, accelerator? } | { type: 'separator' }], 자리 { x, y }? → 고른 id | null

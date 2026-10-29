@@ -35,6 +35,8 @@ html.print-page.with-bg body[data-color="charcoal"] { --note-text: #f5f4ef; --no
 .print-doc .mk-media { display: block; padding: 6px 10px; border-radius: 8px; background: var(--note-hover); }
 .print-doc .mk-media-label::before { content: "▶ "; }
 .print-doc img, .print-doc table, .print-doc .mk-link-card { break-inside: avoid; }
+/* 그림을 쪽 안에 맞추기 (PDF 창 스위치, 기본 켬): 쪽보다 긴 그림은 비율을 지킨 채 한 쪽 높이로 — 잘려 두 쪽에 걸치지 않게 */
+html.fit-images .print-doc :is(img.mk-image, .mk-ink img) { max-height: var(--fit-h); width: auto; max-width: 100%; object-fit: contain; }
 .print-date { margin-top: 18px; font-size: 9pt; color: var(--note-muted); text-align: right; }
 
 /* 미리보기(PDF 만들기 창): 첫 쪽만 실제 크기 쪽 모양으로 */

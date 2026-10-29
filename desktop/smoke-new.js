@@ -505,6 +505,33 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('메모 창 AI: 서식 막대 끝 ✦ → 부탁 한 줄 + 맞춤법 · 문체 칩 작은 창 (✦ 위), Esc 로 닫힘, 옆 패널 없음',
         aiPop.hiddenNoModel && aiPop.inBar && aiPop.open && aiPop.chips === '맞춤법,해요체,합니다체,간결체,보고서체' && aiPop.focus && aiPop.above && !aiPop.oldPanel && aiClosed, JSON.stringify({ aiPop, aiClosed }));
 
+      // 골라 붙여넣기 (Ctrl+Alt+V): 커서 자리 메뉴(서식 유지 · 서식 없이 · 목록으로 · 표로) — 숫자 키로 바로
+      {
+        const v0 = getVault();
+        const gid = v0.import({ body: '# 골라 붙여넣기\n\n' });
+        windowManager.openNote(gid);
+        const gw = await until(() => noteWins.get(gid), '골라 붙여넣기 창', 6000);
+        await until(() => js(gw, `document.documentElement.dataset.ready === 'true'`), '골라 붙여넣기 준비', 8000);
+        gw.focus();
+        gw.webContents.focus();
+        await js(gw, `(() => { const p = document.querySelector('.ProseMirror'); p.focus(); const r = document.createRange(); r.selectNodeContents(p.lastElementChild); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
+        clipboard.writeText('이름\t나이\n철수\t20');
+        key(gw, 'V', ['control', 'alt']);
+        const menu = await until(() => js(gw, `(() => { const m = document.querySelector('.mk-ctx'); return m && [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.textContent); })()`), 'Ctrl+Alt+V 메뉴', 3000).catch(() => null);
+        await capture(gw, 'smoke-new-paste-as.png');
+        key(gw, '4');
+        const asTable = await until(() => js(gw, `document.querySelectorAll('.ProseMirror table td, .ProseMirror table th').length >= 4`), '표로 붙임', 3000).catch(() => false);
+        clipboard.writeText('사과\n• 배');
+        await js(gw, `(() => { const p = document.querySelector('.ProseMirror'); const r = document.createRange(); r.selectNodeContents(p.lastElementChild); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
+        key(gw, 'V', ['control', 'alt']);
+        await until(() => js(gw, `!!document.querySelector('.mk-ctx')`), 'Ctrl+Alt+V 메뉴 2', 3000).catch(() => null);
+        key(gw, '3');
+        const asList = await until(() => js(gw, `[...document.querySelectorAll('.ProseMirror li')].map((l) => l.textContent.trim()).join('|')`).then((t) => (t.includes('사과|배') ? t : null)), '목록으로 붙임', 3000).catch(() => null);
+        check('골라 붙여넣기 (Ctrl+Alt+V): 서식 유지 · 서식 없이 · 목록으로 · 표로 메뉴, 숫자 키 4 → 표 · 3 → 목록 (있던 글머리는 떼고)',
+          Array.isArray(menu) && menu.map((m) => m.replace(/\d$/, '')).join(',') === '서식 유지,서식 없이,목록으로,표로' && asTable && Boolean(asList), JSON.stringify({ menu, asTable, asList }));
+        gw.close();
+      }
+
       // 메모 안 찾기 · 바꾸기 (워드처럼 한 막대): Ctrl+F → 찾은 곳 · 개수, Enter 다음, Ctrl+H 바꾸기 줄, Ctrl+Enter 모두 바꾸기, Esc 닫기
       {
         const v0 = getVault();
@@ -1365,6 +1392,29 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           return { save: vis('save'), cancel: vis('cancel'), openInActions: Boolean(document.querySelector('.actions #open-after')), zoom: Boolean(document.getElementById('zoom-range')) };
         })()`);
         check('PDF 창이 작아도 취소 · PDF로 저장 버튼이 보이고, 저장한 뒤 열기는 버튼 줄과 떨어짐 · 글자 크기 조절 있음', layout.save && layout.cancel && !layout.openInActions && layout.zoom, JSON.stringify(layout));
+        // 그림을 쪽 안에 맞추기 (기본 켬): 쪽보다 긴 그림이 한 쪽 높이 안으로 — 끄면 원래 길이
+        {
+          fs.writeFileSync(path.join(vault.root, 'attachments', 'pdf-tall.png'), nativeImage.createFromBitmap(Buffer.alloc(60 * 2400 * 4, 0x99), { width: 60, height: 2400 }).toPNG());
+          const tid = vault.import({ body: '# 긴 그림\n\n![긴 그림](attachments/pdf-tall.png)\n' });
+          const tallAt = (fit) => js(pdfWin, `new Promise((done) => {
+            const f = document.getElementById('frame');
+            f.addEventListener('load', () => {
+              const t = Date.now();
+              const look = () => {
+                const d = f.contentDocument;
+                const img = d?.querySelector('img.mk-image');
+                if (img?.complete && d.documentElement.dataset.ready === 'true') return done({ natural: img.naturalHeight, max: parseFloat(getComputedStyle(img).maxHeight) || Infinity, page: Math.round(297 * 96 / 25.4), on: document.getElementById('fit').checked });
+                if (Date.now() - t > 6000) return done(null);
+                setTimeout(look, 100);
+              };
+              look();
+            }, { once: true });
+            f.src = 'print.html?' + new URLSearchParams({ id: '${tid}', w: 210, h: 297, m: 16, bg: 0, date: 0, fit: ${fit}, z: 1, preview: 1 });
+          })`);
+          const fitOn = await tallAt(1);
+          const fitOff = await tallAt(0);
+          check('PDF: 그림을 쪽 안에 맞추기 스위치(기본 켬) — 켜면 쪽보다 긴 그림이 한 쪽 안으로, 끄면 원래 길이', fitOn?.on && fitOn.natural > fitOn.page && fitOn.max < fitOn.page && fitOff?.max === Infinity, JSON.stringify({ fitOn, fitOff }));
+        }
         const pagesAt = async (z) => {
           await js(pdfWin, `(() => { const r = document.getElementById('zoom-range'); r.value = '${z}'; r.dispatchEvent(new Event('input', { bubbles: true })); })()`);
           return until(async () => {
