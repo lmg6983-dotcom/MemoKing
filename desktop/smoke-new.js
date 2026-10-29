@@ -2159,7 +2159,9 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       await capture(list, 'smoke-new-agent-list.png');
       await js(list, `document.querySelector('#ai-ask .agent-run').click()`).catch(() => {});
       const shop = await until(() => { const b = v.get(shopId)?.body ?? ''; return b.includes('- 계란') && b.includes('- 두부') && b; }, '덧붙임', 5000).catch(() => null);
-      const msg = await js(list, `document.querySelector('#ai-ask .agent-state').textContent`);
+      // 파일에 들어간 뒤 화면 안내가 "덧붙였어요" 로 바뀌기까지 조금 걸린다 (CI 에서 바로 읽으면 아직 "하는 중이에요…")
+      const stateText = () => js(list, `document.querySelector('#ai-ask .agent-state').textContent`);
+      const msg = await until(async () => { const t = await stateText(); return /덧붙였어요/.test(t) && t; }, '덧붙임 안내', 3000).catch(stateText);
       check('매직 에이전트(목록 ✦): "장보기에 계란이랑 두부 추가해줘" → 덧붙이기 카드(장보기 · 항목 줄) → 덧붙이기 → 메모 끝에 - 계란 / - 두부',
         apCard?.head === '메모에 덧붙이기' && apCard.memo === '장보기' && apCard.text === '- 계란\n- 두부' && Boolean(shop) && /덧붙였어요/.test(msg), JSON.stringify({ apCard, shop, msg }));
       await js(list, `(() => { const i = document.getElementById('search'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
