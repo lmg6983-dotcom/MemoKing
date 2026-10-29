@@ -34,7 +34,8 @@ import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
 import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
-import { printHtml } from './print-html.js';
+import { printHtml, PAGE_PX } from './print-html.js';
+import { fitPages } from '../../app/js/print-fit.js';
 import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
 import { openMemoryDay, dayText } from '../../app/js/memory-day.js';
@@ -730,6 +731,34 @@ function printTitle(id) {
 function printDoc(id, preview = false) {
   return printHtml(note.getEditor().dom(), { title: printTitle(id), color: app.vault.get(id)?.color, scale: printJob.scale, fit: printJob.fit, preview });
 }
+// 쪽 나눔 다듬기(print-fit.js)는 그려진 높이를 재야 한다 — 인쇄용 WebView 는 스크립트 없이 그대로 찍으므로
+//   여기서 보이지 않는 틀에 쪽 폭으로 그려 고친 뒤 그 HTML 을 넘긴다 (미리보기 틀은 그 자리에서 고친다)
+const imagesLoaded = (d) => Promise.all([...d.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r; }))));
+async function fitFrame(frame, pageH) {
+  const d = frame.contentDocument;
+  const doc = d?.querySelector('.mk-doc');
+  if (!doc) return;
+  await imagesLoaded(d);
+  await d.fonts?.ready;
+  fitPages(doc, { pageH, zoom: printJob.scale });
+}
+async function fittedDoc(id) {
+  const html = printDoc(id);
+  if (!printJob.fit) return html;
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${PAGE_PX.width}px; height: ${PAGE_PX.height}px; border: 0; visibility: hidden;`;
+  const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
+  frame.srcdoc = html;
+  document.body.append(frame);
+  try {
+    await loaded;
+    await fitFrame(frame, PAGE_PX.height);
+    return `<!doctype html>\n${frame.contentDocument.documentElement.outerHTML}`;
+  } finally {
+    frame.remove();
+  }
+}
 let previewTimer = 0;
 function drawPrintSize() {
   const pct = Math.round(printJob.scale * 100);
@@ -740,7 +769,9 @@ function drawPrintSize() {
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
     if (!printJob.id || printSheet.hidden) return;
-    $('print-frame').srcdoc = printDoc(printJob.id, true);
+    const frame = $('print-frame');
+    if (printJob.fit) frame.addEventListener('load', () => fitFrame(frame, 1123 - 2 * 48), { once: true }); // 미리보기 쪽: 794×1123, 안쪽 여백 48px (print-html.js)
+    frame.srcdoc = printDoc(printJob.id, true);
   }, 120);
 }
 function fitPreview() {
@@ -789,7 +820,7 @@ $('print-go').addEventListener('click', async () => {
   const id = printJob.id;
   if (!id) return;
   const title = printTitle(id);
-  const html = printDoc(id);
+  const html = await fittedDoc(id);
   if (printJob.mode === 'print') {
     closeSheet(printSheet);
     call('print', { title, html }).catch((err) => toast(err.message, true));

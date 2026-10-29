@@ -3,6 +3,10 @@
 //   앱이 이 HTML 을 보이지 않는 WebView 에 따로 띄워 PDF 로 쓴다 (글자는 글자 그대로, 고를 수 있게)
 import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 
+// 휴대폰 PDF 쪽: A4, 여백 0.72인치씩 (MainActivity pdfAttributes) — 쪽 안 내용 크기 (96dpi px)
+export const PAGE_MARGIN_MM = 18.288;
+export const PAGE_PX = { width: Math.round(((210 - 2 * PAGE_MARGIN_MM) * 96) / 25.4), height: Math.round(((297 - 2 * PAGE_MARGIN_MM) * 96) / 25.4) };
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 // 화면에서만 쓰는 표시(고른 줄·누르는 중·목록 커서 등)는 지운다
@@ -48,7 +52,7 @@ ${links}
 .print-doc p.mk-image-line { line-height: normal; font-size: inherit; }
 .print-doc .mk-doc li::after { border-color: transparent !important; }
 ${zoom !== 1 ? `.print-doc { zoom: ${zoom}; }` : ''}
-:root { --fit-h: ${((297 - 25.4 - 12) / zoom).toFixed(1)}mm; } /* A4 에서 위아래 여백(MainActivity pdfAttributes 1.27cm씩) · 줄 간격 몫을 뺀 높이, 내용 배율로 나눔 */
+:root { --fit-h: ${((297 - 2 * PAGE_MARGIN_MM - 12) / zoom).toFixed(1)}mm; } /* A4 에서 위아래 여백 · 줄 간격 몫을 뺀 높이, 내용 배율로 나눔 */
 ${preview ? 'html.print-page body { box-sizing: border-box; width: 794px; height: 1123px; padding: 48px; overflow: hidden; background: #fff; }' : ''}
 </style>
 </head>

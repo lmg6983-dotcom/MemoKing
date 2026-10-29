@@ -1404,6 +1404,39 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
           const fitOn = await tallAt(1);
           const fitOff = await tallAt(0);
           check('PDF: 그림을 쪽 안에 맞추기 스위치(기본 켬) — 켜면 쪽보다 긴 그림이 한 쪽 안으로, 끄면 원래 길이', fitOn?.on && fitOn.natural > fitOn.page && fitOn.max < fitOn.page && fitOff?.max === Infinity, JSON.stringify({ fitOn, fitOff }));
+          // 쪽 나눔 다듬기: 앞 글이 쪽을 많이 차지하면 남은 자리에 줄여 넣기 · 이어진 그림은 쪽에 두 장 · 아주 긴 그림은 여러 쪽에 · 표 머리글은 쪽마다
+          const png = (name, w, h) => fs.writeFileSync(path.join(vault.root, 'attachments', name), nativeImage.createFromBitmap(Buffer.alloc(w * h * 4, 0x77), { width: w, height: h }).toPNG());
+          png('pf-mid.png', 400, 350);
+          png('pf-pair.png', 400, 600);
+          png('pf-long.png', 60, 3000);
+          const text = Array.from({ length: 26 }, (_, i) => `${i + 1}번째 줄 — 글이 쪽을 거의 채운다`).join('\n\n');
+          const rows = Array.from({ length: 60 }, (_, i) => `| ${i + 1} | 값 ${i + 1} |`).join('\n');
+          const fid = vault.import({ body: `# 쪽 나눔\n\n${text}\n\n![가운데](attachments/pf-mid.png)\n\n![둘](attachments/pf-pair.png)\n\n![셋](attachments/pf-pair.png)\n\n![긴 캡처](attachments/pf-long.png)\n\n| 번호 | 값 |\n| --- | --- |\n${rows}\n` });
+          const shaped = await js(pdfWin, `new Promise((done) => {
+            const f = document.getElementById('frame');
+            f.addEventListener('load', () => {
+              const t = Date.now();
+              const look = () => {
+                const d = f.contentDocument;
+                if (d?.documentElement.dataset.ready !== 'true') return Date.now() - t > 8000 ? done(null) : setTimeout(look, 100);
+                const doc = d.querySelector('.pv-page .mk-doc') ?? d.querySelector('.mk-doc');
+                const pageH = (297 - 32) * 96 / 25.4;
+                const top = doc.getBoundingClientRect().top;
+                const imgs = [...doc.querySelectorAll('img.mk-image')].filter((i) => !i.closest('.mk-print-slices'));
+                const crossing = imgs.map((i) => { const r = i.getBoundingClientRect(); const at = (r.top - top) % pageH; return { alt: i.alt, h: Math.round(r.height), at: Math.round(at), ok: at + r.height <= pageH + 2 || pageH - at < 0.6 * r.height }; });
+                done({ crossing, pair: imgs.filter((i) => i.alt === '둘' || i.alt === '셋').map((i) => Math.round(i.getBoundingClientRect().height)), slices: doc.querySelectorAll('.mk-print-slice').length, more: doc.querySelectorAll('.mk-print-more').length, thead: !!doc.querySelector('table thead th'), pageH: Math.round(pageH) });
+              };
+              look();
+            }, { once: true });
+            f.src = 'print.html?' + new URLSearchParams({ id: '${fid}', w: 210, h: 297, m: 16, bg: 0, date: 0, fit: 1, z: 1, preview: 1 });
+          })`);
+          const fitPdf = path.join(OUT, 'pdf-fit.pdf');
+          windowManager.smokePdf.push(fitPdf);
+          await windowManager.savePdf(fid, { width: 210, height: 297, margin: 16, bg: false, date: false, fit: true, open: false, zoom: 1 });
+          const pdfPages = fs.existsSync(fitPdf) ? (fs.readFileSync(fitPdf, 'latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length : 0;
+          shaped.pdfPages = pdfPages;
+          check('PDF 쪽 나눔: 쪽 끝 그림은 남은 자리에 줄이거나 다음 쪽으로 · 이어진 그림 쪽에 두 장 · 긴 그림은 여러 쪽(이어짐 표시) · 표 머리글 쪽마다',
+            shaped && shaped.crossing.every((c) => c.ok) && shaped.pair.every((h) => h <= shaped.pageH / 2) && shaped.slices >= 3 && shaped.more === shaped.slices - 1 && shaped.thead && shaped.pdfPages >= 6, JSON.stringify(shaped));
         }
         const pagesAt = async (z) => {
           await js(pdfWin, `(() => { const r = document.getElementById('zoom-range'); r.value = '${z}'; r.dispatchEvent(new Event('input', { bubbles: true })); })()`);
