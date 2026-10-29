@@ -525,10 +525,7 @@ function setTab(tab) {
   $('view-history').hidden = tab !== 'history';
   el.filterBtn.hidden = tab !== 'memos';
   el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: UI.searchHistory }[tab];
-  $('fab').hidden = tab === 'history'; // 보관함엔 + 없음. 일정 탭의 + 는 새 일정 (메모 탭과 같은 자리)
-  $('fab').setAttribute('aria-label', tab === 'reminders' ? '새 일정' : '새 메모');
-  if (tab === 'reminders') $('fab').removeAttribute('aria-haspopup');
-  else $('fab').setAttribute('aria-haspopup', 'menu');
+  $('fab').hidden = tab !== 'memos'; // + 는 메모 탭에만. 일정 탭은 아래 빠른 추가 캡슐(list-reminders.js), 보관함엔 없음
   // 무거운 일(달력 · 카드 다시 그리기)은 탭 표시가 먼저 바뀐 다음 프레임에 — 누른 손가락 아래에서 탭이 바로 바뀌게
   //   (예전: 누르는 순간 목록 카드 전체를 다시 그려 150ms 넘게 멈춘 뒤에야 탭이 바뀌어 끊겨 보였다)
   const my = ++tabSeq;
@@ -965,10 +962,3 @@ export function back() {
   return false;
 }
 
-/** 지금 보는 목록 탭 (memos · reminders · history) */
-export const currentTab = () => state.tab;
-
-/** 일정 탭의 + : 고른 날에 새 일정 */
-export function addEvent() {
-  return remindersTab?.addEvent();
-}

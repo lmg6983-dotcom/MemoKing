@@ -1094,8 +1094,6 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       markView();
       updateCount(new Date()); // 탭 숫자도 그 모드의 것으로 (회상 보기로 가면 render 를 거치지 않는다)
     },
-    // + 단추 (휴대폰 일정 탭): 고른 날에 새 일정 — 지난 날을 골라 두었으면 오늘
-    addEvent: () => quickAdd(selected >= today() ? selected : today()),
     /** @param {{ quiet?: boolean }} [o] quiet: 그리지 않고 검색어만 (곧 refresh 가 그릴 때 — 달력을 두 번 그리지 않게) */
     setQuery(q, { quiet = false } = {}) {
       query = q;
