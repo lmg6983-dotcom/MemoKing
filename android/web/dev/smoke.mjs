@@ -424,10 +424,19 @@ try {
   // 보기는 캘린더 · 회상 둘 (주 · 목록 보기는 없앰)
   const viewNames = await page.evaluate(() => [...document.querySelectorAll('.cal-views button')].map((b) => b.textContent));
   check('일정 보기: 캘린더 · 회상 둘', viewNames.join() === '캘린더,회상', JSON.stringify(viewNames));
-  // 새 일정: 한 화면 (이름 · 날짜 · 시각 · 🔔 · 📝 → 일정 저장). 입구: 일정 탭의 + · 빈 앞날 누르기 · "＋ 일정 추가"
-  check('일정 탭: + 버튼 = 새 일정 (메모 탭과 같은 자리)', await page.isVisible('#fab') && (await page.getAttribute('#fab', 'aria-label')) === '새 일정');
-  await page.tap('#fab');
-  await page.waitForSelector('.quick-event[open]');
+  // 새 일정: 한 화면 (이름 · 날짜 · 시각 · 🔔 · 📝 → 일정 저장). 입구: 아래 빠른 추가 캡슐 (그 안의 ⋯) · 빈 앞날 누르기 · "＋ 일정 추가" — 일정 탭엔 플로팅 + 없음
+  const capsule = await page.evaluate(() => {
+    const pill = document.querySelector('.cal-quick-pill')?.getBoundingClientRect();
+    const tabs = document.querySelector('.tabs').getBoundingClientRect();
+    return { fab: !document.getElementById('fab').hidden, pill: Boolean(pill?.height), clear: Boolean(pill) && pill.bottom <= tabs.top };
+  });
+  check('일정 탭: 플로팅 + 없음, 아래 빠른 추가 캡슐은 하단 탭 막대를 가리지 않음', !capsule.fab && capsule.pill && capsule.clear, JSON.stringify(capsule));
+  const openSheetViaCapsule = async () => {
+    await page.tap('.cal-quick-pill');
+    await page.tap('.cal-quick-more');
+    await page.waitForSelector('.quick-event[open]');
+  };
+  await openSheetViaCapsule();
   const sheet = await page.evaluate(() => ({
     name: Boolean(document.querySelector('.quick-event .qe-name')),
     date: document.querySelector('.quick-event .qe-date-text')?.textContent ?? '',
@@ -437,8 +446,8 @@ try {
     save: document.querySelector('.quick-event .qe-save')?.textContent,
     focused: document.activeElement?.classList.contains('qe-name'),
   }));
-  check('새 일정 창: 한 화면 (이름 · 날짜 · 🔔 미리 알림 · 📝 저장할 메모 줄, 알림 · 메모 칸은 접힘) · 버튼 "일정 저장" · 이름 칸에 바로 입력',
-    sheet.name && /오늘|\d+월 \d+일/.test(sheet.date) && !sheet.alertsOpen && !sheet.memoOpen && sheet.rows.length === 2 && /미리 알림/.test(sheet.rows[0]) && /새 메모/.test(sheet.rows[1]) && sheet.save === '일정 저장' && sheet.focused, JSON.stringify(sheet));
+  check('새 일정 창: 한 화면 (이름 · 날짜 · 🔔 미리 알림 스위치(기본 켬) · 📝 저장할 메모 줄, 메모 칸은 접힘) · 버튼 "일정 저장" · 이름 칸에 바로 입력',
+    sheet.name && /오늘|\d+월 \d+일/.test(sheet.date) && sheet.alertsOpen && !sheet.memoOpen && sheet.rows.length === 2 && /미리 알림/.test(sheet.rows[0]) && /새 메모/.test(sheet.rows[1]) && sheet.save === '일정 저장' && sheet.focused, JSON.stringify(sheet));
   await page.fill('.qe-name', '팀 점심');
   check('새 일정 창: 이름을 쓰면 📝 줄이 새 메모 "팀 점심"', /새 메모 "팀 점심"/.test(await page.textContent('.qe-memo-row')));
   await page.tap('.qe-time .dp-quick [data-time="21:00"]').catch(() => {}); // 오늘이라도 지나지 않게 (21시 이후 실행이면 아래에서 날짜를 바꾼다)
@@ -455,8 +464,14 @@ try {
     const cells = [...document.querySelectorAll('#reminder-groups [role="gridcell"][data-date]')];
     return cells.find((c) => c.dataset.date > key(t) && !c.querySelector('.mk-ev, .mk-more'))?.dataset.date ?? null;
   });
-  if (emptyDay) await page.tap(`#reminder-groups [role="gridcell"][data-date="${emptyDay}"]`, { position: { x: 6, y: 6 } });
-  else await page.tap('#fab');
+  if (emptyDay) {
+    // 한 번 누르면 그날 고르기, 같은 날을 한 번 더 누르면 아래 캡슐이 빠른 입력으로 펼쳐진다 (⋯ 로 새 일정 창)
+    const cell = `#reminder-groups [role="gridcell"][data-date="${emptyDay}"]`;
+    await page.tap(cell, { position: { x: 6, y: 6 } });
+    await page.waitForTimeout(300);
+    await page.tap(cell, { position: { x: 6, y: 6 } });
+    await page.tap('.cal-quick-more');
+  } else await openSheetViaCapsule();
   await page.waitForSelector('.quick-event[open]', { timeout: 3000 }).catch(() => {});
   check('빈 앞날을 누르면 바로 새 일정 창', !emptyDay || await page.isVisible('.quick-event[open]'), String(emptyDay));
   await page.fill('.qe-name', '주간 보고');
@@ -1412,10 +1427,10 @@ try {
   await post('/dev/stt', { system: true });
 
   // 목록에는 글만: 목록 항목 안의 그림 · 파일 칩 · 표는 메모를 열면 목록 뒤로 (글 · 인터넷 링크 항목은 그대로)
-  write('목록 그림.md', '---\nid: 00000000-0000-4000-8000-0000000000ab\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: yellow\n---\n# 목록 그림\n\n- 첫 항목\n\n  ![사진](attachments/20261001-090000-ab12.png)\n\n- ![둘째 사진](attachments/20261001-090000-ab12.png)\n- 셋째 [링크](https://example.com) 항목\n\n끝 문단\n');
+  write('목록 그림.md', '---\nid: 00000000-0000-4000-8000-0000000000f1\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: yellow\n---\n# 목록 그림\n\n- 첫 항목\n\n  ![사진](attachments/20261001-090000-ab12.png)\n\n- ![둘째 사진](attachments/20261001-090000-ab12.png)\n- 셋째 [링크](https://example.com) 항목\n\n끝 문단\n');
   await page.evaluate(() => window.__mk.emit('app', 'resume'));
   await page.waitForTimeout(400);
-  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000ab"]');
+  await page.tap('.card[data-id="00000000-0000-4000-8000-0000000000f1"]');
   await page.waitForSelector('#note-screen:not([hidden]) img.mk-image');
   await page.waitForTimeout(1200);
   await back();
@@ -1423,7 +1438,7 @@ try {
   {
     const body = read(fileWith('셋째 [링크]')).split('---').pop();
     const listEnd = body.indexOf('항목\n\n![사진]');
-    check('목록 안 그림: 열면 목록 뒤로 차례대로 (글 · 링크 항목은 목록에 그대로)', listEnd > 0 && body.indexOf('![사진]') < body.indexOf('![둘째 사진]') && body.indexOf('![둘째 사진]') < body.indexOf('끝 문단') && /- 첫 항목\n\n?- 셋째 \[링크\]/.test(body) && !/^\s+!\[/m.test(body), body);
+    check('목록 안 그림: 열면 목록 뒤로 차례대로 (글 · 링크 항목은 목록에 그대로)', listEnd > 0 && body.indexOf('![사진]') < body.indexOf('![둘째 사진]') && body.indexOf('![둘째 사진]') < body.indexOf('끝 문단') && /- 첫 항목\n\n?- 셋째 \[링크\]/.test(body) && !/^[ \t]+!\[/m.test(body), body); // (들여쓴 그림 줄이 없음 — 빈 줄은 들여쓰기가 아님)
   }
 
   // 소리·표·수식·글 문단도 자유롭게 옮기기 (모두 꾹 눌러 들어 올리기)

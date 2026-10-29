@@ -1246,6 +1246,8 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .ev-add svg { width: 16px; height: 16px; }
 /* 일정 탭에도 + 단추가 있으므로 마지막 줄이 단추 위로 올라올 만큼 아래 여백 */
 #reminder-groups { padding-bottom: 104px; }
+/* 일정 탭 아래 빠른 추가 캡슐(base.css .cal-quick)은 아래 탭바 위에 — 탭바를 덮지 않게 (PC 는 탭바가 없어 base.css 의 자리 그대로) */
+.cal-quick { bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom)); }
 
 /* 소리 상자는 빈 곳 어디든 짧게 누르면 복사 · 잘라내기 · 저장 · 공유 · 지우기 단추 (block-move.js TAP_TARGET) —
    "⋯" 없이, 이름 줄은 얇게. 음성 카드 오른쪽 위 "음성 메모" 글자도 휴대폰에서는 뺀다 (좁은 화면) */
