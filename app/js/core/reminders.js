@@ -132,9 +132,11 @@ export function normalizeReminder(raw, now = new Date()) {
     if (raw.allDay === true) r.allDay = true;
   }
   if (r.kind === 'timer' || r.kind === 'at') {
-    if (!validDate(raw.at)) return null;
+    const start = validDate(raw.at);
+    if (!start) return null;
     r.at = String(raw.at);
     if (r.kind === 'timer') r.minutes = Math.max(1, Math.round(Number(raw.minutes) || 0)) || 1;
+    else if (validDate(raw.end) > start) r.end = String(raw.end);
   } else if (r.kind === 'repeat') {
     const src = raw.repeat ?? {};
     const every = EVERY.includes(src.every) ? src.every : 'day';
@@ -156,6 +158,7 @@ export function normalizeReminder(raw, now = new Date()) {
 export function serializeReminder(r) {
   const out = { id: r.id, kind: r.kind };
   if (r.at) out.at = r.at;
+  if (r.end) out.end = r.end;
   if (r.kind === 'timer') out.minutes = r.minutes;
   if (r.repeat) out.repeat = r.repeat;
   if (r.startup) out.startup = r.startup;
@@ -305,13 +308,17 @@ export function isDone(r) {
 // (예전 한 번짜리 알림 — 미리 알림이 없던 것 — 은 울린 기록이 있으면 다시 울리지 않으므로 처음부터)
 export const reenable = (r) => ({ ...r, enabled: true, last: isDone(r) && (r.kind !== 'at' || !Array.isArray(r.alerts)) ? null : r.last });
 
-/** 일정(한 회차)이 끝나는 때: 하루 종일이면 그날 끝, 아니면 시작 시각 */
-export const occurrenceEnd = (start, allDay) => (allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) : new Date(start));
+/** 일정(한 회차)이 끝나는 때: 하루 종일이면 마지막 날의 끝(다음 날 0시), 아니면 끝 시각(없으면 시작 시각) */
+export const occurrenceEnd = (start, allDay, end = null) => {
+  const e = end instanceof Date ? end : end ? validDate(end) : null;
+  const last = e && e > start ? e : new Date(start);
+  return allDay ? new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1) : last;
+};
 
 /** 한 번짜리 일정이 끝나는 때 */
 function eventEnd(r) {
   const t = validDate(r.at);
-  return t ? occurrenceEnd(t, r.allDay) : null;
+  return t ? occurrenceEnd(t, r.allDay, r.end) : null;
 }
 
 /**
@@ -339,8 +346,12 @@ export function describeReminder(r, now = new Date()) {
   switch (r.kind) {
     case 'timer':
       return `${r.minutes >= 60 && r.minutes % 60 === 0 ? `${r.minutes / 60}시간` : `${r.minutes}분`} 타이머`;
-    case 'at':
-      return r.allDay ? `${dayLabel(r.at, now)} 하루 종일` : formatWhen(r.at, now);
+    case 'at': {
+      const end = validDate(r.end);
+      if (r.allDay) return end && end > validDate(r.at) ? `${dayLabel(r.at, now)} ~ ${dayLabel(end, now)} 하루 종일` : `${dayLabel(r.at, now)} 하루 종일`;
+      if (end && end > validDate(r.at)) return dateKey(validDate(r.at)) === dateKey(end) ? `${formatWhen(r.at, now)}~${hhmm(end)}` : `${formatWhen(r.at, now)} ~ ${formatWhen(end, now)}`;
+      return formatWhen(r.at, now);
+    }
     case 'repeat': {
       const { every, weekdays, day, month } = r.repeat;
       const time = r.allDay ? '하루 종일' : r.repeat.time;
@@ -382,7 +393,7 @@ export function occurrencesBetween(r, from, to, limit = 100) {
   const out = [];
   if (r.kind === 'at') {
     const t = validDate(r.at);
-    if (t && t >= from && t < to) out.push(t);
+    if (t && t < to && (t >= from || occurrenceEnd(t, r.allDay, r.end) > from)) out.push(t);
     return out;
   }
   // 만든 날보다 앞의 회차는 없다 (1월 달력에 10월부터 시작한 매주 일정이 보이지 않게)

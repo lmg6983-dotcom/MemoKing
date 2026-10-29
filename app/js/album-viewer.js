@@ -59,9 +59,32 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // 아래 쪽 목록: 장이 많은 문서도 원하는 장으로 바로 (지금 장은 테두리, 그린 장은 펜 표시)
   const strip = el('div', 'mk-album-strip', { role: 'tablist', ariaLabel: '장 목록' });
   const note = el('div', 'mk-album-note', { role: 'status' }); // 알림 (저장했어요 · 삭제 되돌리기 · 처음 한 번 안내)
-  view.append(head, stage, prev, next, zoomBtn, strip, note);
+  view.append(stage, head, prev, next, zoomBtn, strip, note);
   document.body.append(view);
   const restore = document.activeElement;
+
+  // 헤더 · 테일(장 목록) 오버레이: 열거나 누르면(마우스 움직임 포함) 이미지 위에 뜨고 2초 뒤 비활성화, 떠 있을 때 탭하면 바로 숨김
+  let uiTimer = 0;
+  function hideUI() {
+    clearTimeout(uiTimer);
+    uiTimer = 0;
+    view.classList.remove('ui-active');
+  }
+  function wakeUI() {
+    clearTimeout(uiTimer);
+    view.classList.add('ui-active');
+    uiTimer = setTimeout(() => {
+      uiTimer = 0;
+      view.classList.remove('ui-active');
+    }, 2000);
+  }
+  for (const bar of [head, strip, prev, next]) {
+    bar.addEventListener('pointerdown', () => wakeUI());
+    bar.addEventListener('click', () => wakeUI());
+  }
+  view.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse' && !pts.size && !inking) wakeUI();
+  });
 
   function paintStrip() {
     strip.hidden = images.length < 2;
@@ -253,7 +276,11 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       lastTap = null;
       if (z.s > 1) resetZoom();
       else zoomTo(2.5, e.clientX, e.clientY);
-    } else lastTap = { at: now, x: e.clientX, y: e.clientY };
+    } else {
+      lastTap = { at: now, x: e.clientX, y: e.clientY };
+      if (view.classList.contains('ui-active')) hideUI();
+      else wakeUI();
+    }
   };
   stage.addEventListener('pointerup', lift);
   stage.addEventListener('pointercancel', lift);
@@ -403,6 +430,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     e.stopPropagation();
   };
   async function shut() {
+    clearTimeout(uiTimer);
     if (inking) await finishInk();
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onResize);
@@ -415,6 +443,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   current = shut;
   paintStrip();
   show();
+  wakeUI();
   // 처음 한 번: 넘기는 법 · 그리기 (손가락 화면은 밀기, PC 는 화살표)
   try {
     if (!localStorage.getItem(HINT_KEY) && images.length > 1) {

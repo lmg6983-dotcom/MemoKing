@@ -19,7 +19,7 @@ import { holdMs, holdSignal, notePressReleased, takeLateRetry, noteMoved } from 
 import { isMisfireRelease, isSidewaysSelect } from './core/hold-tuning.js';
 import { isVoiceCard } from './voice-card-view.js';
 import { mediaKindOf } from './core/memo-file.js';
-import { warpDrag, slotGain, HYSTERESIS_PX } from './core/drag-geometry.js';
+import { warpDrag, slotGain, HYSTERESIS_PX, dropScrollDelta } from './core/drag-geometry.js';
 import { DragFrames } from './drag-frames.js';
 import { showDeleteButton, showContentMenu, hideDeleteButton, hideDeleteIfChanged, deleteShownFor, persistentShown, undoHint } from './delete-button.js';
 import { canContentMenu, canDragOut, dragOutBlock } from './copy-content.js';
@@ -212,7 +212,7 @@ export function textBlockFromTarget(view, event) {
 }
 
 // 상자 안의 줄 순서를 order(원래 번호들)로 바꾸고, 옮긴 줄(src)을 다시 고른다
-export function reorderTr(state, block, order) {
+export function reorderTr(state, block, order, { scroll = true } = {}) {
   const parent = state.doc.resolve(block.pos).parent;
   const children = [];
   parent.forEach((c) => children.push(c));
@@ -224,6 +224,7 @@ export function reorderTr(state, block, order) {
     if (i === block.index) break;
     at += children[i].nodeSize;
   }
+  tr.setMeta('movedPos', at);
   const { inner } = block;
   try {
     if (inner.kind === 'node' && inner.offset < 0) tr.setSelection(NodeSelection.create(tr.doc, at));
@@ -236,7 +237,7 @@ export function reorderTr(state, block, order) {
   } catch {
     tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(at + 1, tr.doc.content.size))));
   }
-  return tr.scrollIntoView();
+  return scroll ? tr.scrollIntoView() : tr;
 }
 
 /** 다시 고를 때 쓸 정보: 통째로 고르는 줄(그림 줄 말고 수식·가로줄·링크 카드)은 node, 나머지는 글 자리 */
@@ -902,6 +903,9 @@ class Mover {
     const { view } = this;
     if (view.isDestroyed) return;
     this.decorate([]);
+    if ((!commit || !d.drop) && d.scroller && d.scrollBefore != null) {
+      d.scroller.scrollTop = d.scrollBefore;
+    }
     const mouseText = d.kind === 'mouse' && d.text && !d.whole;
     // PC 글 줄을 들어 올렸다가 곧 제자리에 놓으면: 커서를 놓으려던 것 — 누른 자리에 커서, 다음부터는 조금 더 눌러야 들리게
     if (commit && !d.drop && mouseText && isMisfireRelease({ liftedMs: Date.now() - d.liftAt, movedPx: Math.hypot(d.x - d.x0, d.y - d.y0) })) {
@@ -918,9 +922,23 @@ class Mover {
     }
     if (commit && d.drop) {
       const block = blockInfo(view.state.doc, d.block.pos, d.block.inner) ?? d.block;
-      const tr = reorderTr(view.state, block, previewOrder(d.positions.length, d.block.index, d.drop));
+      const order = previewOrder(d.positions.length, d.block.index, d.drop);
+      const newIndex = order.indexOf(d.block.index);
+      const movedUp = newIndex < d.block.index;
+      let slotY = d.tops[0] - (d.scroller?.scrollTop ?? 0);
+      for (let k = 0; k < newIndex; k++) slotY += d.slots[order[k]];
+      const tr = reorderTr(view.state, block, order, { scroll: !d.scroller });
       if (tr) {
         view.dispatch(tr);
+        if (d.scroller) {
+          const at = tr.getMeta('movedPos');
+          const dom = at != null ? view.nodeDOM(at) : null;
+          if (dom instanceof Element) {
+            d.scroller.scrollTop += dom.getBoundingClientRect().top - slotY;
+            const box = d.scroller === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : d.scroller.getBoundingClientRect();
+            d.scroller.scrollTop += dropScrollDelta(dom.getBoundingClientRect(), box, movedUp);
+          }
+        }
         this.flash();
         if (d.kind === 'mouse') {
           // 곧 되돌리면(Ctrl+Z · 되돌리기 단추) 실수로 배운다 · 다시 눌러 겨우 옮겼으면 기다리기를 조금 줄인다

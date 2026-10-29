@@ -1,8 +1,7 @@
-// 일정 탭 달력에서 바로 일정 만들기 (PC·휴대폰 같음) — 캘린더 앱처럼 한 화면에서:
-//   이름 → 날짜 · 시각 → 미리 알림 › → 넣을 메모 › → [일정 저장]
-//   알림 · 메모는 알맞은 값(지난번 알림 · 일정 이름으로 새 메모)이 골라져 있어 그대로면 이름만 쓰고 저장 — 바꿀 때만 그 줄을 펼친다
-import { pendingAlerts, fallbackAlert, alertLabel, describeAlerts } from './core/reminders.js';
-import { toLocalIso, relativeDay, koFullDate } from './core/time.js';
+// 일정 탭 달력에서 바로 일정 만들기 (PC·휴대폰 같음) — 삼성 캘린더처럼 한 화면에서:
+//   이름 → 하루 종일 토글 · 시작 날짜/시각 → 종료 날짜/시각 → 미리 알림 토글(켜면 칩 펼침) → 넣을 메모 › → [일정 저장]
+import { DEFAULT_ALERTS, pendingAlerts, fallbackAlert, alertLabel, describeAlerts } from './core/reminders.js';
+import { toLocalIso, relativeDay, koFullDate, koClock, startOfDay } from './core/time.js';
 import { remembered, remember } from './event-editor.js';
 import { alertPicker } from './alert-picker.js';
 import { timePicker } from './date-picker.js';
@@ -36,17 +35,24 @@ export function defaultStart(day, now = new Date()) {
 }
 
 /**
- * @param {{ day: Date, search: (q: string) => Promise<Array<{ id: string, title: string, color?: string, locked?: boolean }>> }} o
+ * @param {{ day: Date, start?: Date|null, allDay?: boolean, title?: string, search: (q: string) => Promise<Array<{ id: string, title: string, color?: string, locked?: boolean }>> }} o
  * @returns {Promise<{ memoId: string|null, newTitle: string, reminder: object } | null>}
  */
-export function openQuickEvent({ day, search }) {
+export function openQuickEvent({ day, start: initStart = null, allDay: initAllDay = false, title: initTitle = '', search }) {
   return new Promise((resolve) => {
-    let start = defaultStart(day);
-    let allDay = false;
+    let start = initStart ? new Date(initStart) : defaultStart(day);
+    let end = new Date(start.getTime() + 3600_000);
+    let allDay = Boolean(initAllDay);
+    let activeSide = 'start'; // 'start' | 'end' — 시각 칩·선택기가 바꾸는 쪽
+    let alerts = null;
+    let initializing = true;
     const picked = { timed: new Set(remembered('timed')), allDay: new Set(remembered('allDay')) };
     const kind = () => (allDay ? 'allDay' : 'timed');
-    const startAt = () => (allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate()) : start);
-    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const startAt = () => (allDay ? startOfDay(start) : start);
+    const endAt = () => (allDay ? startOfDay(end) : end);
+    const pad = (n) => String(n).padStart(2, '0');
+    const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const hhmmOf = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
     const dialog = el('dialog', { class: 'dialog event-dialog quick-event', 'aria-labelledby': 'qe-h' });
     const form = el('form', { method: 'dialog' });
@@ -58,24 +64,45 @@ export function openQuickEvent({ day, search }) {
 
     // 이름
     const name = el('input', { type: 'text', class: 'qe-name', maxlength: '80', autocomplete: 'off', placeholder: '무슨 일정이에요? (예: 치과, 회의)', 'aria-label': '일정 이름' });
+    name.value = initTitle;
 
-    // 날짜 (누르면 달력) · 하루 종일
-    const when = el('div', { class: 'qe-when' });
-    const dateWrap = el('label', { class: 'qe-date' });
-    const dateText = el('span', { class: 'qe-date-text' });
-    const date = el('input', { type: 'date', class: 'qe-date-input', 'aria-label': '날짜' });
-    date.value = ymd(start);
-    date.min = ymd(new Date());
-    dateWrap.append(icon('calendar', 'qe-ico'), dateText, date);
+    // 하루 종일 토글 줄 + 시작 → 종료 (삼성 캘린더 방식)
     const allDayRow = el('label', { class: 'event-allday qe-allday' });
+    const allDayLabel = el('span', { class: 'qe-allday-label' });
+    allDayLabel.append(icon('calendar', 'qe-ico'), el('span', {}, '하루 종일'));
     const allDaySwitch = el('input', { type: 'checkbox', class: 'switch' });
-    allDayRow.append(el('span', {}, '하루 종일'), allDaySwitch);
-    when.append(dateWrap, allDayRow);
+    allDaySwitch.checked = allDay;
+    allDayRow.append(allDayLabel, allDaySwitch);
+
+    const range = el('div', { class: 'qe-range', role: 'group', 'aria-label': '기간' });
+    const startSide = el('div', { class: 'qe-side' });
+    const startDateWrap = el('label', { class: 'qe-date' });
+    const startDateText = el('span', { class: 'qe-date-text' });
+    const startDate = el('input', { type: 'date', class: 'qe-date-input', 'aria-label': '시작 날짜' });
+    startDateWrap.append(startDateText, startDate);
+    const startClock = el('button', { type: 'button', class: 'qe-clock', 'aria-label': '시작 시각', 'aria-pressed': 'true' });
+    startSide.append(startDateWrap, startClock);
+
+    const arrow = el('span', { class: 'qe-arrow', 'aria-hidden': 'true' }, '→');
+
+    const endSide = el('div', { class: 'qe-side' });
+    const endDateWrap = el('label', { class: 'qe-date' });
+    const endDateText = el('span', { class: 'qe-date-text' });
+    const endDate = el('input', { type: 'date', class: 'qe-date-input', 'aria-label': '종료 날짜' });
+    endDateWrap.append(endDateText, endDate);
+    const endClock = el('button', { type: 'button', class: 'qe-clock', 'aria-label': '종료 시각', 'aria-pressed': 'false' });
+    endSide.append(endDateWrap, endClock);
+
+    range.append(startSide, arrow, endSide);
+
     const timeBox = el('div', { class: 'date-picker qe-time', 'aria-label': '시각' });
     const err = el('p', { class: 'event-none qe-err', role: 'status' });
 
-    // 미리 알림 · 넣을 메모: 한 줄 요약 (누르면 펼침)
-    const alertRow = el('button', { type: 'button', class: 'qe-row qe-alert-row', 'aria-expanded': 'false' });
+    // 미리 알림: 오른쪽에 토글 스위치 — 켜면 알림 칩이 펼쳐지고, 끄면 접히며 '없음'
+    const alertRow = el('label', { class: 'qe-row qe-alert-row' });
+    const alertVal = el('b', { class: 'qe-row-value' });
+    const alertSwitch = el('input', { type: 'checkbox', class: 'switch qe-alert-switch', 'aria-label': '미리 알림 켜기' });
+    alertRow.append(icon('bell', 'qe-ico'), el('span', { class: 'qe-row-label' }, '미리 알림'), alertVal, alertSwitch);
     const alertPane = el('section', { class: 'qe-pane', 'data-step': 'alerts', hidden: '' });
     const chips = el('div', { class: 'chips event-alerts', role: 'group', 'aria-label': '미리 알림' });
     const hint = el('p', { class: 'event-none', role: 'status' });
@@ -92,74 +119,158 @@ export function openQuickEvent({ day, search }) {
     const save = el('button', { type: 'button', class: 'btn primary qe-save' }, '일정 저장');
     const footer = el('div', { class: 'flow-footer' });
     footer.append(cancel, save);
-    form.append(head, name, when, timeBox, err, alertRow, alertPane, memoRow, memoPane, footer);
+    form.append(head, name, allDayRow, range, timeBox, err, alertRow, alertPane, memoRow, memoPane, footer);
     dialog.append(form);
 
     const title = () => name.value.replace(/\s+/g, ' ').trim();
     let target = null; // 넣을 메모 { id, title } — null 이면 새 메모
+    const dayLabelText = (d) => {
+      const rel = relativeDay(d);
+      const ko = koFullDate(d).replace(/ \((.)\)$/, ' ($1)');
+      return rel ? `${rel} · ${ko}` : ko;
+    };
 
-    function rowContent(row, ico, label, value) {
-      row.replaceChildren(icon(ico, 'qe-ico'), el('span', { class: 'qe-row-label' }, label), el('b', { class: 'qe-row-value' }, value), el('span', { class: 'qe-chev', 'aria-hidden': 'true' }, '›'));
+    function syncDates() {
+      startDate.value = ymd(start);
+      endDate.value = ymd(end);
+      endDate.min = ymd(start);
     }
+
     function draw() {
-      const rel = relativeDay(start);
-      dateText.textContent = rel ? `${rel}, ${koFullDate(start).replace(/ \((.)\)$/, ' $1')}` : koFullDate(start); // "오늘, 10월 17일 토" — 한 줄에
+      syncDates();
+      startDateText.textContent = dayLabelText(start);
+      endDateText.textContent = dayLabelText(end);
+      startClock.textContent = koClock(start);
+      endClock.textContent = koClock(end);
+      startClock.hidden = allDay;
+      endClock.hidden = allDay;
+      startClock.setAttribute('aria-pressed', String(activeSide === 'start'));
+      endClock.setAttribute('aria-pressed', String(activeSide === 'end'));
       timeBox.hidden = allDay;
       const set = [...picked[kind()]];
-      rowContent(alertRow, 'bell', '미리 알림', set.length ? describeAlerts({ kind: 'at', alerts: set, allDay }) : '없음');
-      rowContent(memoRow, 'note', '저장할 메모', target ? `"${target.title}"` : `새 메모 "${title() || '새 일정'}"`);
+      const on = set.length > 0;
+      alertSwitch.checked = on;
+      alertPane.hidden = !on;
+      alertVal.textContent = on ? describeAlerts({ kind: 'at', alerts: set, allDay }) : '없음';
+      memoRow.replaceChildren(
+        icon('note', 'qe-ico'),
+        el('span', { class: 'qe-row-label' }, '저장할 메모'),
+        el('b', { class: 'qe-row-value' }, target ? `"${target.title}"` : `새 메모 "${title() || '새 일정'}"`),
+        el('span', { class: 'qe-chev', 'aria-hidden': 'true' }, '›'),
+      );
     }
-    function toggle(row, pane, open = pane.hidden) {
-      pane.hidden = !open;
-      row.setAttribute('aria-expanded', String(open));
-      if (open && pane === alertPane) {
-        alerts.render();
-        showHint();
-      }
-      if (open && pane === memoPane) listMemos();
-    }
-    alertRow.addEventListener('click', () => toggle(alertRow, alertPane));
-    memoRow.addEventListener('click', () => toggle(memoRow, memoPane));
 
-    timePicker(timeBox, {
+    let updatingClock = false;
+    const clock = timePicker(timeBox, {
       compact: true,
-      value: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+      value: hhmmOf(start),
       onChange: (hhmm) => {
+        if (initializing || updatingClock) return;
         const [h, m] = hhmm.split(':').map(Number);
-        start = new Date(start.getFullYear(), start.getMonth(), start.getDate(), h, m);
+        if (activeSide === 'start') {
+          const span = Math.max(3600_000, end.getTime() - start.getTime());
+          start = new Date(start.getFullYear(), start.getMonth(), start.getDate(), h, m);
+          end = new Date(start.getTime() + span);
+        } else {
+          end = new Date(end.getFullYear(), end.getMonth(), end.getDate(), h, m);
+          if (end <= start) end = new Date(start.getTime() + 3600_000);
+        }
         err.textContent = '';
+        draw();
+        if (!alertPane.hidden) alerts?.render();
         showHint();
       },
     });
-    date.addEventListener('change', () => {
-      const [y, mo, d] = date.value.split('-').map(Number);
+
+    function selectSide(side) {
+      activeSide = side;
+      updatingClock = true;
+      clock.set(hhmmOf(side === 'start' ? start : end));
+      updatingClock = false;
+      draw();
+    }
+    startClock.addEventListener('click', () => selectSide('start'));
+    endClock.addEventListener('click', () => selectSide('end'));
+
+    startDate.addEventListener('change', () => {
+      const [y, mo, d] = startDate.value.split('-').map(Number);
       if (!y) return;
+      const span = Math.max(allDay ? 0 : 3600_000, end.getTime() - start.getTime());
       start = new Date(y, mo - 1, d, start.getHours(), start.getMinutes());
+      if (end < start) end = new Date(start.getTime() + span);
       err.textContent = '';
       draw();
+      if (!alertPane.hidden) alerts?.render();
       showHint();
     });
-    // 날짜 칸 어디를 눌러도 달력 (지원하는 곳에서)
-    dateWrap.addEventListener('click', (e) => {
-      if (e.target === date) return;
-      try {
-        date.showPicker?.();
-      } catch {
-        date.focus();
+    endDate.addEventListener('change', () => {
+      const [y, mo, d] = endDate.value.split('-').map(Number);
+      if (!y) return;
+      end = new Date(y, mo - 1, d, end.getHours(), end.getMinutes());
+      if (allDay ? startOfDay(end) < startOfDay(start) : end <= start) {
+        end = allDay ? new Date(start) : new Date(start.getTime() + 3600_000);
       }
+      err.textContent = '';
+      draw();
     });
+    for (const [wrap, input] of [[startDateWrap, startDate], [endDateWrap, endDate]]) {
+      wrap.addEventListener('click', (e) => {
+        if (e.target === input) return;
+        try {
+          input.showPicker?.();
+        } catch {
+          input.focus();
+        }
+      });
+    }
+
     allDaySwitch.addEventListener('change', () => {
       allDay = allDaySwitch.checked;
+      if (!allDay && end <= start) end = new Date(start.getTime() + 3600_000);
       err.textContent = '';
       draw();
-      if (!alertPane.hidden) alerts.render();
+      if (!alertPane.hidden) alerts?.render();
       showHint();
     });
+
+    alertSwitch.addEventListener('change', () => {
+      const set = picked[kind()];
+      if (alertSwitch.checked) {
+        if (!set.size) {
+          const rem = remembered(kind());
+          for (const v of rem.length ? rem : DEFAULT_ALERTS[kind()]) set.add(v);
+        }
+        alerts?.render();
+      } else {
+        set.clear();
+      }
+      showHint();
+      draw();
+    });
+
+    memoRow.addEventListener('click', () => {
+      const open = memoPane.hidden;
+      memoPane.hidden = !open;
+      memoRow.setAttribute('aria-expanded', String(open));
+      if (open) listMemos();
+    });
+
     name.addEventListener('input', () => {
       if (!target) draw();
-      if (!memoPane.hidden) fresh.lastChild.textContent = `새 메모 "${title() || '새 일정'}"`;
+      if (!memoPane.hidden && fresh.lastChild) fresh.lastChild.textContent = `새 메모 "${title() || '새 일정'}"`;
     });
-    const alerts = alertPicker(chips, { picked, kind, start: startAt, onChange: () => { showHint(); draw(); }, onLimit: (t) => (hint.textContent = t) });
+
+    alerts = alertPicker(chips, {
+      picked,
+      kind,
+      start: startAt,
+      onChange: () => {
+        showHint();
+        draw();
+      },
+      onLimit: (t) => (hint.textContent = t),
+    });
+
     function showHint() {
       const set = [...picked[kind()]];
       const live = pendingAlerts(set, startAt(), { allDay });
@@ -169,8 +280,10 @@ export function openQuickEvent({ day, search }) {
 
     save.addEventListener('click', () => {
       const today = new Date();
-      const past = allDay ? startAt() < new Date(today.getFullYear(), today.getMonth(), today.getDate()) : start <= today;
-      if (past) {
+      const s = startAt();
+      const e = endAt();
+      const lastMoment = allDay ? new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1) : e;
+      if (lastMoment <= today) {
         err.textContent = '이미 지난 때예요. 날짜나 시각을 앞으로 바꿔 주세요';
         return;
       }
@@ -220,9 +333,11 @@ export function openQuickEvent({ day, search }) {
     }
     function finish(memoId) {
       const s = startAt();
+      const e = endAt();
       const chosen = pendingAlerts([...picked[kind()]], s, { fallback: fallbackAlert(allDay), allDay });
       remember(kind(), [...picked[kind()]].sort((a, b) => b - a));
       const reminder = { kind: 'at', action: 'notify', enabled: true, created: toLocalIso(new Date()), at: toLocalIso(s), alerts: chosen };
+      if (e > s) reminder.end = toLocalIso(e);
       if (allDay) reminder.allDay = true;
       if (title()) reminder.title = title();
       close({ memoId, newTitle: title() || '새 일정', reminder });
@@ -234,7 +349,12 @@ export function openQuickEvent({ day, search }) {
     form.addEventListener('submit', (e) => e.preventDefault());
 
     document.body.append(dialog);
+    initializing = false;
     draw();
+    if (!alertPane.hidden) {
+      alerts?.render();
+      showHint();
+    }
     dialog.showModal();
     name.focus({ preventScroll: true });
   });

@@ -135,14 +135,17 @@ export function fromDeviceEvent(e) {
 export function reminderFromExternal(ev, now = new Date()) {
   const allDay = Boolean(ev.allDay);
   const start = allDay ? new Date(ev.start.getFullYear(), ev.start.getMonth(), ev.start.getDate()) : new Date(ev.start);
+  const rawEnd = ev.end ? new Date(ev.end) : null;
+  const end = rawEnd ? (allDay ? new Date(rawEnd.getFullYear(), rawEnd.getMonth(), rawEnd.getDate() - 1) : rawEnd) : null;
   return {
     kind: 'at',
     at: toLocalIso(start),
+    ...(end && end > start ? { end: toLocalIso(end) } : {}),
     title: plainText(ev.title).slice(0, 80),
     alerts: [...(allDay ? DEFAULT_ALERTS.allDay : DEFAULT_ALERTS.timed)],
     ...(allDay ? { allDay: true } : {}),
     action: 'notify',
-    enabled: occurrenceEnd(start, allDay) > now, // 오늘 하루 종일 일정도 켜 둔다 (당일 오전 9시 알림이 아직이면 울리게)
+    enabled: occurrenceEnd(start, allDay, end) > now, // 오늘 하루 종일 일정도 켜 둔다 (당일 오전 9시 알림이 아직이면 울리게)
     created: toLocalIso(now),
   };
 }

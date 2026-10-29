@@ -94,6 +94,14 @@ test('파일에 쓰고 읽기: 제목·미리 알림·하루 종일', () => {
   assert.deepEqual(r.alerts, [900, -540]);
   const back = normalizeReminder(serializeReminder(r));
   assert.deepEqual(back, r);
+  // 여러 날 일정 (시작 ~ 종료)
+  const span = event({ at: iso(2026, 10, 7), end: iso(2026, 10, 9), allDay: true, title: '휴가' });
+  assert.deepEqual(normalizeReminder(serializeReminder(span)), span);
+  assert.equal(describeReminder(span, at(2026, 10, 1)), '10월 7일 (수) ~ 10월 9일 (금) 하루 종일');
+  assert.equal(occurrencesBetween(span, at(2026, 10, 8), at(2026, 10, 9)).length, 1);
+  assert.equal(occurrencesBetween(span, at(2026, 10, 10), at(2026, 10, 11)).length, 0);
+  assert.equal(isPastEvent(span, at(2026, 10, 9, 23, 0)), false);
+  assert.equal(isPastEvent(span, at(2026, 10, 10, 0, 0)), true);
 });
 
 test('달력: 기간 안의 회차', () => {
