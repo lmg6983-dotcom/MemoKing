@@ -37,7 +37,6 @@ import { memoMode, otherMode, moveLabel, MODE_LABEL, fillModeTag } from './core/
 import { createFindBar } from './find-bar.js';
 import { createAiWritePanel } from './ai-write-panel.js';
 import { UI } from './core/ui-text.js';
-import { openContextMenu } from './ctx-menu.js';
 import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from './note-shared.js';
 
 const SAVE_DELAY = 600;
@@ -907,26 +906,14 @@ window.addEventListener('mk:edit', (e) => {
   else if (['cut', 'paste'].includes(name)) api.edit.run(name);
 });
 window.addEventListener('mk:table-command', (e) => editor?.tableCommand(e.detail?.name));
-api.on('edit:paste-as', ({ kind, text } = {}) => editor?.pasteAs(kind, text));
-
-// ---------- 골라 붙여넣기 (Ctrl+Alt+V) — 커서 자리에 작은 메뉴, 숫자 키로 바로 고르기 ----------
-const PASTE_CHOICES = [
-  { id: 'paste', label: '서식 유지', hint: '1', key: '1' },
-  { id: 'pastePlain', label: '서식 없이', hint: '2', key: '2' },
-  { id: 'pasteList', label: '목록으로', hint: '3', key: '3' },
-  { id: 'pasteTable', label: '표로', hint: '4', key: '4' },
-];
-document.addEventListener('keydown', async (e) => {
+// Ctrl+Alt+V: 서식 없이 붙여넣기 (Ctrl+Shift+V 와 같음 — 손에 익은 키로)
+document.addEventListener('keydown', (e) => {
   if (e.code !== 'KeyV' || !e.ctrlKey || !e.altKey || e.shiftKey || e.metaKey || e.repeat) return;
   if (!editor || !document.activeElement?.closest?.('.ProseMirror')) return;
   e.preventDefault();
   e.stopPropagation();
-  const sel = window.getSelection();
-  const r = sel?.rangeCount ? [...sel.getRangeAt(0).getClientRects()].at(-1) ?? sel.getRangeAt(0).getBoundingClientRect() : null;
-  const box = r && (r.width || r.height) ? r : document.activeElement.getBoundingClientRect();
-  const id = await openContextMenu({ x: box.left, y: box.bottom + 4, items: PASTE_CHOICES, label: '골라 붙여넣기' });
-  editor.focus();
-  if (id) api.edit.run(id);
+  editor.focus(); // 서식 없이 붙이기는 편집기가 포커스를 가진 때만 받는다 (editor.pastePlain)
+  api.edit.run('pastePlain');
 }, true);
 
 // 매직 카피 알림을 눌러 이 메모로 왔을 때 등: 창 테두리가 두 번 반짝여 "이 메모" 임을 알린다

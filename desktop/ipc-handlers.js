@@ -1476,7 +1476,6 @@ export function registerIpc(ctx) {
     else if (name === 'copy') wc.copy();
     else if (name === 'paste') wc.paste();
     else if (name === 'pastePlain') wc.send('edit:paste-plain', await clipboard.readText());
-    else if (name === 'pasteList' || name === 'pasteTable') wc.send('edit:paste-as', { kind: name === 'pasteList' ? 'list' : 'table', text: await clipboard.readText() });
     return true;
   });
   // 화면이 정한 오른쪽 클릭 메뉴 (메모 창 내용 — block-move.js): [{ id, label, accelerator? } | { type: 'separator' }], 자리 { x, y }? → 고른 id | null

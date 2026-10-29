@@ -57,8 +57,7 @@ export const FIXED_KEYS = [
   ['본문 확대, 축소', 'Ctrl+휠 / Ctrl+= / Ctrl+-'],
   ['항목, 줄 순서 바꾸기', 'Alt+↑ / Alt+↓'],
   ['표: 다음, 이전 칸', 'Tab / Shift+Tab'],
-  [UI.pastePlain, 'Ctrl+Shift+V'],
-  ['골라 붙여넣기 (서식 유지, 서식 없이, 목록으로, 표로)', 'Ctrl+Alt+V'],
+  [UI.pastePlain, 'Ctrl+Shift+V / Ctrl+Alt+V'],
   ['찾기: 다음, 이전, 모두 찾기 · 바꾸기: 하나, 모두', 'Enter, F3 / Shift+Enter / Alt+Enter · Enter / Ctrl+Enter'],
 ];
 

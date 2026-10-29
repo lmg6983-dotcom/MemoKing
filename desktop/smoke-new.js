@@ -505,30 +505,20 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       check('메모 창 AI: 서식 막대 끝 ✦ → 부탁 한 줄 + 맞춤법 · 문체 칩 작은 창 (✦ 위), Esc 로 닫힘, 옆 패널 없음',
         aiPop.hiddenNoModel && aiPop.inBar && aiPop.open && aiPop.chips === '맞춤법,해요체,합니다체,간결체,보고서체' && aiPop.focus && aiPop.above && !aiPop.oldPanel && aiClosed, JSON.stringify({ aiPop, aiClosed }));
 
-      // 골라 붙여넣기 (Ctrl+Alt+V): 커서 자리 메뉴(서식 유지 · 서식 없이 · 목록으로 · 표로) — 숫자 키로 바로
+      // Ctrl+Alt+V = 서식 없이 붙여넣기 (굵게 · 링크 없이 글자만)
       {
         const v0 = getVault();
-        const gid = v0.import({ body: '# 골라 붙여넣기\n\n' });
+        const gid = v0.import({ body: '# 서식 없이\n\n' });
         windowManager.openNote(gid);
-        const gw = await until(() => noteWins.get(gid), '골라 붙여넣기 창', 6000);
-        await until(() => js(gw, `document.documentElement.dataset.ready === 'true'`), '골라 붙여넣기 준비', 8000);
+        const gw = await until(() => noteWins.get(gid), '서식 없이 창', 6000);
+        await until(() => js(gw, `document.documentElement.dataset.ready === 'true'`), '서식 없이 준비', 8000);
         gw.focus();
         gw.webContents.focus();
         await js(gw, `(() => { const p = document.querySelector('.ProseMirror'); p.focus(); const r = document.createRange(); r.selectNodeContents(p.lastElementChild); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
-        clipboard.writeText('이름\t나이\n철수\t20');
+        clipboard.writeText('붙일 글 한 줄'); // (서식 빼기는 Ctrl+Shift+V 점검이 본다 — 같은 길)
         key(gw, 'V', ['control', 'alt']);
-        const menu = await until(() => js(gw, `(() => { const m = document.querySelector('.mk-ctx'); return m && [...m.querySelectorAll('.mk-ctx-item')].map((b) => b.textContent); })()`), 'Ctrl+Alt+V 메뉴', 3000).catch(() => null);
-        await capture(gw, 'smoke-new-paste-as.png');
-        key(gw, '4');
-        const asTable = await until(() => js(gw, `document.querySelectorAll('.ProseMirror table td, .ProseMirror table th').length >= 4`), '표로 붙임', 3000).catch(() => false);
-        clipboard.writeText('사과\n• 배');
-        await js(gw, `(() => { const p = document.querySelector('.ProseMirror'); const r = document.createRange(); r.selectNodeContents(p.lastElementChild); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
-        key(gw, 'V', ['control', 'alt']);
-        await until(() => js(gw, `!!document.querySelector('.mk-ctx')`), 'Ctrl+Alt+V 메뉴 2', 3000).catch(() => null);
-        key(gw, '3');
-        const asList = await until(() => js(gw, `[...document.querySelectorAll('.ProseMirror li')].map((l) => l.textContent.trim()).join('|')`).then((t) => (t.includes('사과|배') ? t : null)), '목록으로 붙임', 3000).catch(() => null);
-        check('골라 붙여넣기 (Ctrl+Alt+V): 서식 유지 · 서식 없이 · 목록으로 · 표로 메뉴, 숫자 키 4 → 표 · 3 → 목록 (있던 글머리는 떼고)',
-          Array.isArray(menu) && menu.map((m) => m.replace(/\d$/, '')).join(',') === '서식 유지,서식 없이,목록으로,표로' && asTable && Boolean(asList), JSON.stringify({ menu, asTable, asList }));
+        const pasted = await until(() => js(gw, `(() => { const d = document.querySelector('.ProseMirror'); return d.textContent.includes('붙일 글 한 줄') && { menu: !!document.querySelector('.mk-ctx') }; })()`), 'Ctrl+Alt+V 붙임', 3000).catch(() => null);
+        check('Ctrl+Alt+V: 메뉴 없이 바로 서식 없이 붙여넣기 (Ctrl+Shift+V 와 같음)', pasted && !pasted.menu, JSON.stringify(pasted));
         gw.close();
       }
 

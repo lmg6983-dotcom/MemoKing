@@ -47,7 +47,6 @@ import { createFindPlugin, findController } from './find-replace.js';
 import { mathPlugins, insertMathBlock } from './math.js';
 import { fileChipGuard } from './file-chip-guard.js';
 import { listContentGuard, listsFixed } from './list-content-guard.js';
-import { textToListMd, textToTableMd } from './core/paste-as.js';
 import { listDeleteGuard } from './list-delete-guard.js';
 import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
 
@@ -2890,22 +2889,6 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     pastePlain: (text) => {
       const v = view();
       return !readOnly && v.hasFocus() ? pasteAsText(v, text) : false;
-    },
-    /** 골라 붙여넣기 (Ctrl+Alt+V › 목록으로 · 표로): 클립보드 글자 → 목록 · 표 마크다운을 커서 자리에 → 넣었는가 */
-    pasteAs(kind, text) {
-      const v = view();
-      const md = kind === 'list' ? textToListMd(text) : textToTableMd(text);
-      if (readOnly || !md) return false;
-      v.focus();
-      // 목록 · 표는 글 줄 안에 들어갈 수 없다 — 커서가 제목이나 글이 있는 줄이면 그 아래 새 줄에 (빈 글 줄이면 그 자리에)
-      const { $from } = v.state.selection;
-      if ($from.parent.type.name !== 'paragraph' || $from.parent.content.size) {
-        const at = $from.after();
-        const tr = v.state.tr.insert(at, v.state.schema.nodes.paragraph.create());
-        v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + 1)));
-      }
-      editor.action(insert(md));
-      return true;
     },
     /** 목록 안 그림 등을 목록 뒤로 옮긴 적이 있나 (예전 메모를 열며 고쳤으면 저장해야 한다 — list-content-guard.js) */
     listsFixed: () => listsFixed(view().state),
