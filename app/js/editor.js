@@ -46,6 +46,7 @@ import { haptic } from './dom.js';
 import { createFindPlugin, findController } from './find-replace.js';
 import { mathPlugins, insertMathBlock } from './math.js';
 import { fileChipGuard } from './file-chip-guard.js';
+import { listContentGuard, listsFixed } from './list-content-guard.js';
 import { listDeleteGuard } from './list-delete-guard.js';
 import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
 
@@ -83,7 +84,7 @@ function playerOptions(kind) {
       ? ['play-large', 'play', 'progress', 'current-time', 'mute', 'settings', 'fullscreen']
       : ['play', 'progress', 'current-time', 'duration'], // 소리: 음소거 단추는 두지 않는다 (소리는 기기 음량 키로)
     keyboard: { focused: true, global: false },
-    tooltips: { controls: true, seek: true },
+    tooltips: kind === 'video' ? { controls: true, seek: true } : { controls: false, seek: false }, // 소리는 말풍선 없이 — 작은 상자 안에서 잘렸다 (시간은 오른쪽에 늘 보임)
   };
 }
 
@@ -585,6 +586,7 @@ function atLineIndent($pos) {
   return /^\u00a0*$/.test($pos.doc.textBetween(start, $pos.pos, '', ''));
 }
 const fileChips = $prose(() => fileChipGuard());
+const listContent = $prose(() => listContentGuard());
 const protectListDelete = $prose(() => listDeleteGuard());
 
 // 서식이 있는 HTML 인가 (글자 모양 · 목록 · 표 · 그림 · 링크 등) — 없으면 글자만 있는 것 (메신저 · 채팅 복사)
@@ -2098,6 +2100,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(keepIndentPlugin)
     .use(fileChips) // 파일 칩 이름은 고칠 수 없게
+    .use(listContent) // 목록 안에는 글만 (그림 · 파일 · 표 등은 목록 뒤로)
     .use(inlineHtmlMarks)
     .use(linkCards)
     .use(emptyTasks)
@@ -2887,6 +2890,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const v = view();
       return !readOnly && v.hasFocus() ? pasteAsText(v, text) : false;
     },
+    /** 목록 안 그림 등을 목록 뒤로 옮긴 적이 있나 (예전 메모를 열며 고쳤으면 저장해야 한다 — list-content-guard.js) */
+    listsFixed: () => listsFixed(view().state),
     /** 커서가 보이게 스크롤 (키보드가 올라와 화면이 줄었을 때 등) */
     revealCaret: () => {
       const v = view();

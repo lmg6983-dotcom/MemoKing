@@ -3,6 +3,10 @@
 //   앱이 이 HTML 을 보이지 않는 WebView 에 따로 띄워 PDF 로 쓴다 (글자는 글자 그대로, 고를 수 있게)
 import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 
+// 휴대폰 PDF 쪽: A4, 여백 0.72인치씩 (MainActivity pdfAttributes) — 쪽 안 내용 크기 (96dpi px)
+export const PAGE_MARGIN_MM = 18.288;
+export const PAGE_PX = { width: Math.round(((210 - 2 * PAGE_MARGIN_MM) * 96) / 25.4), height: Math.round(((297 - 2 * PAGE_MARGIN_MM) * 96) / 25.4) };
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 // 화면에서만 쓰는 표시(고른 줄·누르는 중·목록 커서 등)는 지운다
@@ -10,11 +14,12 @@ const SCREEN_ONLY = /^(ProseMirror-selectednode|ProseMirror-hideselection|mk-blo
 
 /**
  * @param {Element} dom 편집기 본문 (.mk-doc)
- * @param {{ title: string, color?: string, scale?: number, preview?: boolean }} memo
+ * @param {{ title: string, color?: string, scale?: number, preview?: boolean, fit?: boolean }} memo
  *   scale: 종이에 담을 내용 크기 (1 = 보통, 글·그림·표가 함께 커지고 작아진다)
+ *   fit: 쪽보다 긴 그림은 한 쪽 안에 들게 줄인다 (print.css html.fit-images)
  *   preview: 첫 쪽 미리보기용 (A4 한 장 크기, 여백 포함)
  */
-export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = false }) {
+export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = false, fit = true }) {
   const zoom = clampPrintScale(scale);
   const doc = dom.cloneNode(true);
   doc.removeAttribute('contenteditable');
@@ -36,7 +41,7 @@ export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = f
   ];
   const links = [...new Set(sheets)].map((h) => `<link rel="stylesheet" href="${esc(h)}">`).join('\n');
   return `<!doctype html>
-<html lang="ko" class="print-page">
+<html lang="ko" class="print-page${fit ? ' fit-images' : ''}">
 <head>
 <meta charset="utf-8">
 <title>${esc(title)}</title>
@@ -47,6 +52,7 @@ ${links}
 .print-doc p.mk-image-line { line-height: normal; font-size: inherit; }
 .print-doc .mk-doc li::after { border-color: transparent !important; }
 ${zoom !== 1 ? `.print-doc { zoom: ${zoom}; }` : ''}
+:root { --fit-h: ${((297 - 2 * PAGE_MARGIN_MM - 12) / zoom).toFixed(1)}mm; } /* A4 에서 위아래 여백 · 줄 간격 몫을 뺀 높이, 내용 배율로 나눔 */
 ${preview ? 'html.print-page body { box-sizing: border-box; width: 794px; height: 1123px; padding: 48px; overflow: hidden; background: #fff; }' : ''}
 </style>
 </head>

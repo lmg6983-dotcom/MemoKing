@@ -127,16 +127,12 @@ export class FileIndex {
     return added;
   }
 
-  /** 목록에 이미 있는 경로인가 (이름부터 견주어 빠르게) */
+  /** 목록에 이미 있는 경로인가 — 경로 표(처음 물을 때 한 번 만듦)로 바로. 예전엔 목록 전체를 훑어 파일 20만 개면 폴더 하나 훑기에 몇 초 멈췄다 */
   has(p) {
     const key = p.toLowerCase();
     if (this.extra.has(key)) return true;
-    const name = path.basename(key);
-    const { lower = [] } = this;
-    for (let i = 0; i < lower.length; i++) {
-      if (lower[i] === name && this.entries[i].p.toLowerCase() === key) return true;
-    }
-    return false;
+    this.paths ??= new Set(this.entries.map((e) => e.p.toLowerCase()));
+    return this.paths.has(key);
   }
 
   /**
@@ -145,7 +141,7 @@ export class FileIndex {
    * @param {{ maxDepth?: number }} options
    * @returns {number} 새로 추가된 항목 수
    */
-  quickScan(targetDirs, { maxDepth = 2 } = {}) {
+  async quickScan(targetDirs, { maxDepth = 2 } = {}) {
     const toAdd = [];
     for (const raw of targetDirs ?? []) {
       if (!raw || !fs.existsSync(raw)) continue;
@@ -155,7 +151,7 @@ export class FileIndex {
         const { dir, depth } = queue.shift();
         let list;
         try {
-          list = fs.readdirSync(dir, { withFileTypes: true });
+          list = await fs.promises.readdir(dir, { withFileTypes: true }); // 앱(매직키 입력)을 멈추지 않게
         } catch {
           continue;
         }
@@ -180,15 +176,15 @@ export class FileIndex {
    * 1단계: 지정된 주요 디렉터리 초고속 얕은 스캔 (쿨다운 4초)
    * 2단계: 백그라운드 전체 재색인 (쿨다운 2분 = 120초, 중복 실행 방지)
    * @param {{ targetDirs?: string[], onRebuildComplete?: () => void, force?: boolean }} options
-   * @returns {{ added: number, rebuilding: boolean }}
+   * @returns {Promise<{ added: number, rebuilding: boolean }>}
    */
-  triggerAutoReindex({ targetDirs = [], onRebuildComplete = null, force = false } = {}) {
+  async triggerAutoReindex({ targetDirs = [], onRebuildComplete = null, force = false } = {}) {
     const now = Date.now();
-    let added = 0;
+    let scan = null;
     // 1단계: 빠른 타깃 스캔 (4초 쿨다운)
     if (force || now - this.lastQuickScanAt >= 4_000) {
       this.lastQuickScanAt = now;
-      added = this.quickScan(targetDirs, { maxDepth: 2 });
+      scan = this.quickScan(targetDirs, { maxDepth: 2 });
     }
 
     // 2단계: 백그라운드 전체 재구축 (2분 쿨다운)
@@ -203,7 +199,8 @@ export class FileIndex {
         .catch(() => {});
     }
 
-    return { added, rebuilding: Boolean(this.building || rebuilding) };
+    const building = Boolean(this.building || rebuilding);
+    return { added: scan ? await scan : 0, rebuilding: building };
   }
 
   /** 이 폴더들 아래에 생기는 파일은 곧바로 목록에 (브라우저로 받아 넣은 전자포대 등). 못 지켜보는 곳이면 그냥 둔다 */
@@ -288,6 +285,7 @@ export class FileIndex {
   use(entries, at) {
     this.entries = entries;
     this.lower = entries.map((e) => e.n.toLowerCase());
+    this.paths = null; // has() 가 다시 만든다
     this.last = null; // 바로 앞 찾기의 맞은 이름들 (이어 친 글은 그 안에서만)
     this.hangul = null; // 이름에 한글이 있나 (1바이트씩 — 초성은 찾을 때 그 이름만 바꿔 본다, 처음 초성으로 찾을 때 만듦)
     this.snapshot = entries.length ? true : null;

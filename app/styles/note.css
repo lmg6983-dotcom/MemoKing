@@ -270,14 +270,10 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   --plyr-font-size-base: 13px;
   --plyr-control-spacing: 8px;
 }
-/* 재생 단추: 메모 색(윗막대 색) 원 — 메모 색마다 어울린다 (소리 · 동영상 같게) */
-.mk-media .plyr__control[data-plyr="play"], .mk-media .plyr__control--overlaid {
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--note-bar), var(--note-text) 10%); /* 어두운 메모에서도 카드와 구분되게 글자색을 조금 */
-  color: var(--note-text);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
-}
-@media (hover: hover) and (pointer: fine) { .mk-media .plyr__control[data-plyr="play"]:hover, .mk-media .plyr__control--overlaid:hover { background: color-mix(in srgb, var(--note-bar), var(--note-text) 18%); color: var(--note-text); } }
+/* 재생 단추: 배경 없이 옆 아이콘들과 같게 — 동영상은 흰색, 소리는 글자색. 영상 가운데 큰 단추도 원 없이 그림자만 (밝은 장면에서도 보이게) */
+.mk-video .plyr__control--overlaid { padding: 12px; background: transparent; color: #fff; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55)); }
+.mk-video .plyr__control--overlaid svg { width: 34px; height: 34px; }
+@media (hover: hover) and (pointer: fine) { .mk-video .plyr__control--overlaid:hover { background: transparent; color: #fff; opacity: 0.85; } }
 .mk-media .plyr__time { white-space: nowrap; }
 .mk-media-label { padding: 0 4px; font-size: 12px; color: var(--note-muted); user-select: none; }
 
@@ -292,6 +288,9 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   background: var(--note-hover);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--note-text) 8%, transparent);
   --plyr-range-fill-background: var(--note-text);
+  --plyr-audio-control-color: var(--note-text);
+  --plyr-audio-control-color-hover: var(--note-text);
+  --plyr-audio-control-background-hover: var(--note-hover);
   --plyr-audio-range-track-background: color-mix(in srgb, var(--note-text) 14%, transparent);
   --plyr-range-track-height: 4px;
   --plyr-range-thumb-height: 12px;
@@ -299,8 +298,8 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .mk-audio :is(.plyr, .plyr__controls) { display: contents; }
 .mk-audio audio { display: none; }
 .mk-audio .mk-media-label { grid-area: name; }
-.mk-audio .plyr__control[data-plyr="play"] { grid-area: play; width: 40px; height: 40px; padding: 0; display: grid; place-items: center; }
-.mk-audio .plyr__control[data-plyr="play"] svg { width: 16px; height: 16px; }
+.mk-audio .plyr__control[data-plyr="play"] { grid-area: play; width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 50%; }
+.mk-audio .plyr__control[data-plyr="play"] svg { width: 22px; height: 22px; }
 .mk-audio .plyr__progress__container { grid-area: bar; margin: 0; padding: 0; }
 .mk-audio .plyr__progress input[type="range"] { margin: 0; }
 .mk-audio .plyr__time { margin: 0; font-size: 12px; color: var(--note-muted); }
@@ -310,7 +309,6 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 /* 동영상: 이름 줄 없이 화면 그대로, 이름은 영상 위 왼쪽 위에 — 재생 중 단추가 숨으면 같이 숨는다 */
 .mk-video { position: relative; display: block; background: #000; }
 .mk-video .plyr { border-radius: inherit; }
-.mk-video .plyr__control--overlaid { padding: 18px; }
 
 /* 그 밖의 파일: 파일 칩 (끌어서 순서 바꾸기 · 옆의 열기 버튼이나 더블클릭으로 열기) */
 .mk-doc a[href^="attachments/"] {

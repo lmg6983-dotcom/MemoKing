@@ -1572,7 +1572,7 @@ export class WindowManager {
       await win.loadFile(path.join(APP_DIR, 'print.html'), {
         query: {
           id, w: String(width), h: String(height), m: String(margin),
-          bg: o.bg ? '1' : '0', date: o.date ? '1' : '0',
+          bg: o.bg ? '1' : '0', date: o.date ? '1' : '0', fit: o.fit === false ? '0' : '1',
           z: String(clampPrintScale(o.zoom)),
         },
       });

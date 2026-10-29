@@ -1,9 +1,10 @@
 // 메모를 PDF 쪽으로 — 메인 프로세스의 PDF 만들기(printToPDF)와 PDF 만들기 창의 미리보기가 함께 쓴다.
-//   ?id=메모&w=210&h=297&m=16&bg=1&date=1           (길이는 mm)
+//   ?id=메모&w=210&h=297&m=16&bg=1&date=1&fit=1     (길이는 mm · fit: 쪽보다 큰 그림은 한 쪽 안에 들게 줄인다)
 //   &preview=1  미리보기: 쪽마다 쪽 모양으로 이어 보이고(내용을 쪽 높이로 잘라서), 몇 쪽인지 부모 창에 알린다
 import { createNoteEditor } from './editor.js';
 import { injectIcons } from './icons.js';
 import { clampPrintScale } from './core/pdf-page.js';
+import { fitPages } from './print-fit.js';
 
 const api = window.memoking;
 const q = new URLSearchParams(location.search);
@@ -20,11 +21,13 @@ const root = document.getElementById('editor');
 const style = document.createElement('style');
 // 쪽 크기·여백은 CSS 의 @page 로 (PDF 만들기가 이것을 따른다)
 // 쪽 여백은 @page 가 아니라 안쪽 여백으로 — 메모 색 바탕이 쪽 가장자리까지 칠해지게 (Chromium 은 @page 여백을 칠하지 않음)
+// --fit-h: 그림이 한 쪽에 들어갈 높이 (위아래 여백 · 줄 간격 몫 12mm 를 빼고, 글자 크기 배율로 나눔 — 본문 전체가 그만큼 커지므로)
 style.textContent = `@page { size: ${W}mm ${H}mm; margin: 0; }
-:root { --page-w: ${W}mm; --page-h: ${H}mm; --page-m: ${M}mm; }`;
+:root { --page-w: ${W}mm; --page-h: ${H}mm; --page-m: ${M}mm; --fit-h: ${Math.max(20, (H - 2 * M - 12) / Z).toFixed(1)}mm; }`;
 document.head.append(style);
 document.documentElement.classList.toggle('with-bg', q.get('bg') === '1');
 document.documentElement.classList.toggle('preview', preview);
+document.documentElement.classList.toggle('fit-images', q.get('fit') !== '0');
 
 // PDF: 위아래 여백은 쪽마다 되풀이되는 표 머리·꼬리(빈 칸)로, 좌우 여백은 칸 안쪽 여백으로
 if (!preview && M > 0) {
@@ -80,6 +83,13 @@ if (memo) {
   }
   await document.fonts.ready;
   await settled();
+  if (q.get('fit') !== '0') {
+    // 쪽 나눔 다듬기는 그려진 높이를 재서 고친다 — 편집기 대신 그대로 굳힌 복사본에 (편집기는 고친 모양을 되돌린다)
+    const still = root.firstElementChild.cloneNode(true);
+    root.replaceChildren(still);
+    await settled();
+    fitPages(still.querySelector('.mk-doc') ?? still, { pageH: (H - 2 * M) * (96 / 25.4), zoom: Z }); // 쪽 높이는 확대와 상관없이 그대로 (잰 높이는 확대된 값)
+  }
 }
 const count = pages();
 if (preview && count > 1) paginate(count);

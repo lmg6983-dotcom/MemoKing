@@ -755,7 +755,7 @@ class MainActivity : Activity() {
     private fun pdfAttributes() = PrintAttributes.Builder()
         .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
         .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
-        .setMinMargins(PrintAttributes.Margins(720, 720, 720, 720)) // 1.27cm (1/1000 인치 단위)
+        .setMinMargins(PrintAttributes.Margins(720, 720, 720, 720)) // 0.72인치 = 1.83cm (1/1000 인치 단위) — print-html.js PAGE_MARGIN_MM 과 같게
         .build()
 
     // 인쇄용 WebView 치우기. 주의: 창에 붙지 않은 View 의 postDelayed 는 붙을 때까지 미뤄져 끝내 돌지 않으므로 Handler 로

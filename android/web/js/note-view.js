@@ -1405,6 +1405,11 @@ export async function openNote(memoId, options = {}) {
     });
     // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 (열기만 해도 저장되는 일 방지)
     current = saved = editor.getMarkdown();
+    // 단, 목록 안 그림을 목록 뒤로 옮겼으면 고친 대로 저장
+    if (editor.listsFixed()) {
+      saved = '';
+      onChange(current);
+    }
     if (!knob) setupKnob();
     if (options.fresh && !options.record && !options.ink) knob.set('edit', { quiet: true }); // 새 글 메모는 쓰려고 연 것
     applyMode(knob.mode === 'draw' ? restMode : knob.mode); // 새로 만든 편집기에도 키보드 설정을

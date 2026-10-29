@@ -906,6 +906,15 @@ window.addEventListener('mk:edit', (e) => {
   else if (['cut', 'paste'].includes(name)) api.edit.run(name);
 });
 window.addEventListener('mk:table-command', (e) => editor?.tableCommand(e.detail?.name));
+// Ctrl+Alt+V: 서식 없이 붙여넣기 (Ctrl+Shift+V 와 같음 — 손에 익은 키로)
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'KeyV' || !e.ctrlKey || !e.altKey || e.shiftKey || e.metaKey || e.repeat) return;
+  if (!editor || !document.activeElement?.closest?.('.ProseMirror')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  editor.focus(); // 서식 없이 붙이기는 편집기가 포커스를 가진 때만 받는다 (editor.pastePlain)
+  api.edit.run('pastePlain');
+}, true);
 
 // 매직 카피 알림을 눌러 이 메모로 왔을 때 등: 창 테두리가 두 번 반짝여 "이 메모" 임을 알린다
 api.on('memo:highlight', () => {
@@ -2025,6 +2034,11 @@ if (!memo) {
   });
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();
+  // 목록 안 그림을 열며 목록 뒤로 옮겼으면 고친 대로 저장
+  if (editor.listsFixed()) {
+    saved = '';
+    onChange(current);
+  }
   refreshLinks();
   refreshHotkey();
   scheduleTagBar();
