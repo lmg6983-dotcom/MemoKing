@@ -1462,7 +1462,9 @@ app.whenReady().then(async () => {
           ? './smoke-new.js'
           : process.argv.includes('--sns')
             ? './smoke-sns.js'
-            : './smoke.js'
+            : process.argv.includes('--fixes')
+              ? './smoke-fixes.js'
+              : './smoke.js'
     ).catch((err) => {
       console.error('✖ 점검 모듈 오류', err);
       app.exit(1);

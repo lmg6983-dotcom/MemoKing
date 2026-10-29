@@ -638,11 +638,16 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 /* 한 화면: 이름 → 날짜 · 하루 종일 → 시각 → 🔔 · 📝 줄(누르면 펼침) → 일정 저장 */
 .quick-event .qe-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .quick-event .qe-head h2 { margin: 0; }
-.quick-event .qe-when { display: flex; align-items: center; gap: 10px; margin: 10px 0 8px; }
-.quick-event .qe-date { position: relative; display: inline-flex; flex: 1; min-width: 0; align-items: center; gap: 6px; min-height: 40px; padding: 0 10px; white-space: nowrap; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); color: var(--text-strong); font-weight: 700; cursor: pointer; }
-.quick-event .qe-date::after { content: '›'; margin-left: auto; color: var(--muted); font-weight: 800; }
+.quick-event .qe-allday { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin: 4px 0 6px; padding: 0 4px; cursor: pointer; }
+.quick-event .qe-allday-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-strong); }
+.quick-event .qe-range { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; margin: 0 0 10px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); }
+.quick-event .qe-side { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.quick-event .qe-arrow { color: var(--muted); font-size: 16px; font-weight: 700; padding: 0 2px; }
+.quick-event .qe-date { position: relative; display: inline-flex; width: 100%; min-width: 0; align-items: center; justify-content: center; min-height: 36px; padding: 0 8px; white-space: nowrap; border-radius: 8px; color: var(--text-strong); font-size: 14px; font-weight: 700; cursor: pointer; }
+.quick-event .qe-date:hover { background: var(--hover); }
 .quick-event .qe-date-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; } /* 보이는 건 글자, 누르면 달력 */
-.quick-event .qe-allday { flex: none; gap: 8px; margin: 0; }
+.quick-event .qe-clock { width: 100%; min-height: 34px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: var(--surface-0); color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.quick-event .qe-clock[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent)); color: var(--text-strong); font-weight: 700; }
 :is(.quick-event .qe-time, .event-dialog .event-time) .dp-more { color: var(--muted); }
 .quick-event .qe-err:empty { display: none; }
 .quick-event .qe-date-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -663,7 +668,7 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
   .quick-event .qe-time .dp-quick button { min-height: 44px; font-size: 14px; }
   .quick-event .flow-footer .btn { min-height: 50px; font-size: 16px; border-radius: 14px; }
   .quick-event .rem-answer { min-height: 44px; }
-  .quick-event .qe-date, .quick-event .qe-row { min-height: 48px; font-size: 15px; }
+  .quick-event .qe-date, .quick-event .qe-clock, .quick-event .qe-row { min-height: 44px; font-size: 15px; }
 }
 /* 직접 정하는 미리 알림 (alert-picker.js — 일정 창 · 메모 창 알림 패널 · 일정 탭 바로 만들기) */
 /* "직접 정하기" 는 칩(고르는 것)이 아니라 칩 아래의 글 단추 */
@@ -685,7 +690,13 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 @media (pointer: coarse) { .event-alerts button { min-height: 44px; padding: 10px 14px; font-size: 14px; } .event-field input { min-height: 48px; font-size: 16px; } }
 
 /* ---------- 일정 탭 (list-reminders.js, PC·휴대폰): 달력(FullCalendar 월 · 주 · 목록) + 고른 날·다가오는 일정 ---------- */
-.cal { margin: 4px 0 6px; padding: 10px 8px 8px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-1); }
+.cal { margin: 4px 0 6px; padding: 10px 8px 8px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-1); overflow: hidden; }
+.cal-sliding { animation: cal-slide-in 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes cal-slide-in {
+  from { opacity: 0.35; transform: translateX(calc(var(--cal-slide, 1) * 42px)); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) { .cal-sliding { animation: none; } }
 .cal-head { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; }
 .cal-title { flex: 1; min-width: 0; overflow: hidden; text-align: center; font-size: 15px; white-space: nowrap; text-overflow: ellipsis; }
 .cal-nav { width: 36px; height: 36px; }
@@ -699,6 +710,61 @@ body.inking :is(.coach-spot, .coach-bubble), body.annotating :is(.coach-spot, .c
 .cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 12.5px; white-space: nowrap; }
 .cal-link svg { width: 15px; height: 15px; flex: none; }
 .cal-link[hidden] { display: none; }
+
+/* 삼성 캘린더 스타일 하단 추가 캡슐 ("N월 N일에 추가 ＋") 및 빠른 입력 상자 */
+.cal-quick {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(340px, calc(100vw - 32px));
+  max-width: 360px;
+  margin: 0;
+  z-index: 50;
+}
+@media (min-width: 640px) {
+  .cal-quick {
+    left: 28%;
+  }
+}
+.cal-quick[hidden], .cal-quick-pill[hidden], .cal-quick-box[hidden] { display: none; }
+.cal-quick-pill {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: min(320px, 100%); min-height: 44px; margin: 0 auto; padding: 0 18px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface-0); color: var(--muted); font: inherit; font-size: 14px; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16); cursor: pointer;
+}
+.cal-quick-pill svg { width: 18px; height: 18px; color: var(--text-strong); }
+.cal-quick-box {
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface-0); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.cal-quick-tip {
+  margin: 0 0 8px; padding: 8px 12px; border-radius: 10px;
+  background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent));
+  color: var(--text-strong); font-size: 12.5px; font-weight: 600; line-height: 1.4;
+}
+.cal-quick-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.cal-quick-input {
+  flex: 1; min-width: 0; min-height: 38px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 14px;
+}
+.cal-quick-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-quick-more { flex: none; width: 38px; height: 38px; transform: rotate(90deg); }
+.cal-quick-save { flex: none; min-height: 38px; padding: 0 14px; border-radius: 10px; font-weight: 700; }
+.cal-quick-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cal-quick-chips button {
+  min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.cal-quick-chips button[aria-pressed="true"] { border-color: transparent; background: var(--accent); color: var(--on-brand); font-weight: 700; }
+@media (pointer: coarse) {
+  .cal-quick-pill { min-height: 48px; font-size: 15px; }
+  .cal-quick-input, .cal-quick-save { min-height: 44px; font-size: 15px; }
+  .cal-quick-more { width: 44px; height: 44px; }
+  .cal-quick-chips button { min-height: 38px; font-size: 13.5px; }
+}
 
 /* FullCalendar 색 · 글꼴을 메모킹 것으로 (어두운 화면도 메모킹 색을 따라감) */
 .cal-body {

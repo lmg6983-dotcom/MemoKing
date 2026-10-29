@@ -2227,19 +2227,20 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
   .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)):hover > img.mk-album-img:nth-child(3 of .mk-album-img) { transform: translate(24px, 20px); }
 }
 
-/* 묶음 사진 크게 보기 (album-viewer.js) */
-.mk-album-view { position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: rgba(12, 12, 12, 0.94); color: #fff; animation: mk-fade-in 0.15s ease-out; }
-.mk-album-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top)); }
-.mk-album-count { font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.85; white-space: nowrap; }
+/* 묶음 사진 크게 보기 (album-viewer.js) — 테두리 없이 전체 화면, 헤더·테일은 이미지 위에 활성 상태에서만 표시(2초 뒤 숨김) */
+.mk-album-view { position: fixed; inset: 0; z-index: 100000; background: #000; color: #fff; animation: mk-fade-in 0.15s ease-out; }
+.mk-album-head { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 10px 12px; padding-top: calc(10px + env(safe-area-inset-top)); background: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), transparent); transition: opacity 0.2s ease-out; }
+.mk-album-count { font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.9; white-space: nowrap; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
 .mk-album-gap { flex: 1; }
-.mk-album-inked { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(255, 204, 0, 0.18); color: #ffd84d; font-size: 12px; }
+.mk-album-inked { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(255, 204, 0, 0.22); color: #ffd84d; font-size: 12px; }
 .mk-album-inked svg { width: 13px; height: 13px; }
 .mk-album-inked[hidden] { display: none; }
 .mk-album-icon { width: 36px; padding: 0; justify-content: center; }
 .mk-album-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-/* 아래 장 목록 */
-.mk-album-strip { display: flex; gap: 6px; padding: 0 12px calc(12px + env(safe-area-inset-bottom)); overflow-x: auto; scrollbar-width: thin; justify-content: safe center; }
+/* 아래 장 목록 (이미지 위 오버레이) */
+.mk-album-strip { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3; display: flex; gap: 6px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent); overflow-x: auto; scrollbar-width: thin; justify-content: safe center; transition: opacity 0.2s ease-out; }
 .mk-album-strip[hidden] { display: none; }
+.mk-album-view:not(.ui-active):not(.inking) :is(.mk-album-head, .mk-album-strip, .mk-album-nav) { opacity: 0; pointer-events: none; }
 .mk-album-thumb { position: relative; flex: none; width: 46px; height: 46px; padding: 0; border: 2px solid transparent; border-radius: 7px; background: #222; opacity: 0.6; cursor: pointer; overflow: hidden; }
 .mk-album-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
 .mk-album-thumb:hover { opacity: 0.85; }
@@ -2249,28 +2250,27 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-note { position: absolute; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: #1f1f1c; font-size: 13px; line-height: 1.45; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 .mk-album-note[hidden] { display: none; }
 .mk-album-note-btn { flex: none; border: 0; background: none; color: #8a6a00; font: inherit; font-weight: 700; cursor: pointer; padding: 2px 0; }
-.mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.mk-album-btn:hover { background: rgba(255, 255, 255, 0.2); }
+.mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(6px); color: #fff; font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.mk-album-btn:hover { background: rgba(0, 0, 0, 0.65); }
 .mk-album-btn svg { width: 18px; height: 18px; }
-.mk-album-stage { position: relative; flex: 1; min-height: 0; margin: 8px 56px 16px; overflow: hidden; touch-action: none; } /* 두 손가락 벌리기는 그림 확대로 (화면 전체 확대 아님) */
+.mk-album-stage { position: absolute; inset: 0; margin: 0; overflow: hidden; touch-action: none; } /* 테두리 여백 없이 화면 전체 */
 /* 장 전체가 화면 안에 (세로로 긴 장도) — 그림 상자 = 보이는 그림이어야 그리기판이 그 위에 꼭 맞는다 */
-.mk-album-big { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; background: #fff; user-select: none; -webkit-user-drag: none; transform-origin: 0 0; }
+.mk-album-big { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; background: transparent; user-select: none; -webkit-user-drag: none; transform-origin: 0 0; }
 .mk-album-view.zoomed .mk-album-stage { cursor: grab; }
 .mk-album-view.zoomed .mk-album-stage:active { cursor: grabbing; }
-.mk-album-zoom { position: absolute; left: 50%; top: calc(64px + env(safe-area-inset-top)); transform: translateX(-50%); padding: 4px 12px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.mk-album-zoom { position: absolute; left: 50%; top: calc(64px + env(safe-area-inset-top)); z-index: 3; transform: translateX(-50%); padding: 4px 12px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
 .mk-album-zoom[hidden] { display: none; }
-.mk-album-nav { position: absolute; top: 50%; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #fff; cursor: pointer; display: grid; place-items: center; }
-.mk-album-nav:hover { background: rgba(255, 255, 255, 0.24); }
+.mk-album-nav { position: absolute; top: 50%; z-index: 3; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.45); color: #fff; cursor: pointer; display: grid; place-items: center; transition: opacity 0.2s ease-out; }
+.mk-album-nav:hover { background: rgba(0, 0, 0, 0.65); }
 .mk-album-nav svg { width: 20px; height: 20px; }
 .mk-album-nav.prev { left: 8px; }
 .mk-album-nav.prev svg { transform: rotate(180deg); }
 .mk-album-nav.next { right: 8px; }
 .mk-album-nav[hidden] { display: none; }
 .mk-album-ink { position: absolute; touch-action: none; }
-.mk-album-view.inking .mk-album-stage { margin-bottom: calc(76px + env(safe-area-inset-bottom)); } /* 아래 도구 막대가 장을 가리지 않게 */
 .mk-album-view.inking :is(.mk-album-nav, .mk-album-strip, .mk-album-head .mk-album-btn:not(:last-child)) { display: none; }
 /* 손가락 화면(휴대폰)은 밀어서 넘기므로 앞 · 다음 단추 없이 장을 넓게 — PC 의 좁은 메모 창은 단추를 둔다 */
-@media (pointer: coarse) { .mk-album-stage { margin: 4px 0 12px; } .mk-album-nav { display: none; } }
-@media (pointer: fine) and (max-width: 420px) { .mk-album-stage { margin: 8px 44px 16px; } .mk-album-nav { width: 34px; height: 34px; margin-top: -17px; } .mk-album-nav.prev { left: 5px; } .mk-album-nav.next { right: 5px; } }
+@media (pointer: coarse) { .mk-album-nav { display: none; } }
+@media (pointer: fine) and (max-width: 420px) { .mk-album-nav { width: 34px; height: 34px; margin-top: -17px; } .mk-album-nav.prev { left: 5px; } .mk-album-nav.next { right: 5px; } }
 .mk-uploading { margin-right: 6px; font-size: 12px; color: var(--muted, #888); }
 @media print { .mk-album-view { display: none !important; } }

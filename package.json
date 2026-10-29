@@ -15,6 +15,7 @@
     "smoke": "node scripts/electron.mjs --smoke",
     "smoke:clipboard": "node scripts/electron.mjs --smoke --clipboard",
     "smoke:new": "node scripts/electron.mjs --smoke --new",
+    "smoke:fixes": "node scripts/electron.mjs --smoke --fixes",
     "smoke:tutorial": "node scripts/electron.mjs --smoke --tutorial",
     "shots:sns": "node scripts/shots-sns.mjs",
     "test": "node --test tests/*.test.js",

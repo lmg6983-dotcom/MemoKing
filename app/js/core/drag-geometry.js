@@ -85,3 +85,26 @@ export function placeBadge({ frame, bw, bh, bounds, finger = null, avoid = [] })
   const free = (c) => !zone || !hits(box(c), zone);
   return cands.find((c) => free(c) && !avoid.some((a) => hits(box(c), a))) ?? cands.find(free) ?? cands[0];
 }
+
+/**
+ * 블록 이동 후(접힘 해제 뒤) 뷰포트 안에 들어오도록 최소 스크롤 보정량(dy)을 구한다.
+ * 위로 이동(movedUp=true)할 때는 블록의 머리(top)가 보이도록 우선 보정하고,
+ * 아래로 이동(movedUp=false)할 때는 블록의 꼬리(bottom)가 보이도록 우선 보정한다.
+ * @param {{ top: number, bottom: number }} rect 이동된 블록의 화면 좌표
+ * @param {{ top: number, bottom: number }} viewBox 스크롤 컨테이너의 화면 좌표
+ * @param {boolean} movedUp 위로 이동 여부
+ * @param {number} [pad=16] 위·아래 여백(px)
+ */
+export function dropScrollDelta(rect, viewBox, movedUp, pad = 16) {
+  const hi = viewBox.top + pad;
+  const lo = viewBox.bottom - pad;
+  if (lo <= hi) return 0;
+  if (movedUp) {
+    if (rect.top < hi) return rect.top - hi;
+    if (rect.bottom > lo) return Math.min(rect.bottom - lo, rect.top - hi);
+    return 0;
+  }
+  if (rect.bottom > lo) return rect.bottom - lo;
+  if (rect.top < hi) return Math.max(rect.top - hi, rect.bottom - lo);
+  return 0;
+}

@@ -1,6 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { warpDrag, slotGain, placeBadge, inflate, EASE_PX, STEP_PX, MAX_GAIN } from '../app/js/core/drag-geometry.js';
+import { warpDrag, slotGain, placeBadge, inflate, dropScrollDelta, EASE_PX, STEP_PX, MAX_GAIN } from '../app/js/core/drag-geometry.js';
+
+const view = { top: 0, bottom: 800 };
+
+test('옮긴 뒤 스크롤: 이미 보이면 그대로', () => {
+  assert.equal(dropScrollDelta({ top: 100, bottom: 300 }, view, true), 0);
+  assert.equal(dropScrollDelta({ top: 100, bottom: 300 }, view, false), 0);
+});
+
+test('옮긴 뒤 스크롤: 위로 옮기면 머리가 보이게', () => {
+  assert.equal(dropScrollDelta({ top: -200, bottom: 100 }, view, true), -216);
+  // 꼬리가 화면 밖이어도 머리를 넘겨 내리지 않는다 (키 큰 사진)
+  assert.equal(dropScrollDelta({ top: 500, bottom: 1500 }, view, true), 484);
+});
+
+test('옮긴 뒤 스크롤: 아래로 옮기면 꼬리가 보이게', () => {
+  assert.equal(dropScrollDelta({ top: 600, bottom: 1000 }, view, false), 216);
+  assert.equal(dropScrollDelta({ top: -900, bottom: 300 }, view, false), -484);
+});
 
 // 칸 100px 셋 (사진 줄), 칸 30px 셋 (글 줄)
 const big = { tops: [0, 100, 200], slots: [100, 100, 100] };

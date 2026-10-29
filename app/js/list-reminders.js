@@ -7,9 +7,11 @@
 import { Calendar, dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin, koLocale } from '../vendor/fullcalendar.js';
 import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
-import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, DEFAULT_ALERTS } from './core/reminders.js';
+import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocalIso } from './core/time.js';
 import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, importedEventBody } from './core/calendar-feeds.js';
+import { findDates, guessTitle } from './core/date-detect.js';
+import { remembered } from './event-editor.js';
 import { openQuickEvent } from './quick-event.js';
 import { openCalendarLinks } from './calendar-links.js';
 import { openEventDetail, whenText } from './event-detail.js';
@@ -244,9 +246,9 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     b.addEventListener('click', onClick);
     return b;
   };
-  const prev = navButton('chev-right', '이전', () => calendar.prev());
+  const prev = navButton('chev-right', '이전', () => stepMonth(-1));
   prev.classList.add('cal-prev');
-  const next = navButton('chev-right', '다음', () => calendar.next());
+  const next = navButton('chev-right', '다음', () => stepMonth(1));
   const title = el('b', 'cal-title');
   title.setAttribute('aria-live', 'polite');
   const todayBtn = el('button', 'link-btn cal-today', '오늘');
@@ -279,7 +281,119 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   bar.append(views, linkBtn);
 
   const calEl = el('div', 'cal-body');
-  card.append(head, bar, calEl);
+
+  // 삼성 캘린더 스타일 하단 플로팅 캡슐 ("N월 N일에 추가 ＋") · 누르면 바로 입력 + 추천 시간 칩 (오전 10시 · 오후 2시 · 오후 3시)
+  const quickBar = el('div', 'cal-quick');
+  const pillBtn = el('button', 'cal-quick-pill');
+  pillBtn.type = 'button';
+  const pillText = el('span', 'cal-quick-label');
+  pillBtn.append(pillText, icon('plus'));
+  const inlineBox = el('div', 'cal-quick-box');
+  inlineBox.hidden = true;
+  const qTip = el('p', 'cal-quick-tip', '일정 제목에 시간을 같이 적으면, 해당 시간으로 일정이 설정됩니다.');
+  const qRow = el('div', 'cal-quick-row');
+  const qInput = el('input', 'cal-quick-input');
+  qInput.type = 'text';
+  qInput.maxLength = 80;
+  qInput.autocomplete = 'off';
+  qInput.placeholder = '일정 제목 (예: 워크숍, 치과 2시)';
+  qInput.setAttribute('aria-label', '빠른 일정 제목');
+  const qMore = el('button', 'icon-btn cal-quick-more');
+  qMore.type = 'button';
+  qMore.title = '상세 설정 (기간 · 알림 · 메모)';
+  qMore.setAttribute('aria-label', '상세 설정');
+  qMore.append(icon('chev-right'));
+  const qSave = el('button', 'btn primary cal-quick-save', '저장');
+  qSave.type = 'button';
+  qRow.append(qInput, qMore, qSave);
+  const qChips = el('div', 'chips cal-quick-chips');
+  qChips.setAttribute('role', 'group');
+  qChips.setAttribute('aria-label', '추천 시간');
+  let pickedHour = null;
+  for (const [h, label] of [[10, '오전 10시'], [14, '오후 2시'], [15, '오후 3시']]) {
+    const b = el('button', '', label);
+    b.type = 'button';
+    b.dataset.hour = String(h);
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => {
+      pickedHour = pickedHour === h ? null : h;
+      for (const c of qChips.querySelectorAll('button')) c.setAttribute('aria-pressed', String(Number(c.dataset.hour) === pickedHour));
+      qInput.focus();
+    });
+    qChips.append(b);
+  }
+  inlineBox.append(qTip, qRow, qChips);
+  quickBar.append(pillBtn, inlineBox);
+
+  function parseInline(day = selected) {
+    const raw = qInput.value.replace(/\s+/g, ' ').trim();
+    const base = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0);
+    const hits = raw ? findDates(raw, base) : [];
+    const hit = hits.find((h) => h.hasTime);
+    if (hit) {
+      const clean = guessTitle(raw, hit.from, hit.to) || raw;
+      const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hit.at.getHours(), hit.at.getMinutes());
+      return { title: clean, start, allDay: false };
+    }
+    if (pickedHour != null) {
+      return { title: raw, start: new Date(day.getFullYear(), day.getMonth(), day.getDate(), pickedHour, 0), allDay: false };
+    }
+    return { title: raw, start: new Date(day.getFullYear(), day.getMonth(), day.getDate()), allDay: true };
+  }
+
+  function toggleInline(open) {
+    inlineBox.hidden = !open;
+    pillBtn.hidden = open;
+    if (!open) {
+      qInput.value = '';
+      pickedHour = null;
+      for (const c of qChips.querySelectorAll('button')) c.setAttribute('aria-pressed', 'false');
+    } else {
+      qInput.focus({ preventScroll: true });
+    }
+  }
+
+  pillBtn.addEventListener('click', () => toggleInline(true));
+  qMore.addEventListener('click', () => {
+    const info = parseInline(selected);
+    toggleInline(false);
+    quickAdd(selected, info);
+  });
+  qSave.addEventListener('click', async () => {
+    const info = parseInline(selected);
+    if (!info.title) {
+      toggleInline(false);
+      return quickAdd(selected);
+    }
+    if (adding || !api.reminders.add) return;
+    adding = true;
+    try {
+      const k = info.allDay ? 'allDay' : 'timed';
+      const chosen = pendingAlerts(remembered(k), info.start, { fallback: fallbackAlert(info.allDay), allDay: info.allDay });
+      const reminder = { kind: 'at', action: 'notify', enabled: true, created: toLocalIso(new Date()), at: toLocalIso(info.start), alerts: chosen, title: info.title };
+      if (info.allDay) reminder.allDay = true;
+      await api.reminders.add(null, reminder, info.title);
+      toggleInline(false);
+      await refresh();
+      notify(`새 메모 "${info.title}"에 일정을 만들었어요`);
+    } catch (err) {
+      notify(err.message || '일정을 만들지 못했어요', true);
+    } finally {
+      adding = false;
+    }
+  });
+  qInput.addEventListener('keydown', (e) => {
+    if (e.isComposing) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      qSave.click();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      toggleInline(false);
+    }
+  });
+
+  card.append(head, bar, calEl, quickBar);
   const memView = viewList.some((v) => v.id === MEMORIES) ? setupMemoriesView({ api, notify, ...memories }) : null;
   if (memView) card.append(memView.el);
   const rowsEl = el('div', 'ev-rows');
@@ -297,7 +411,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     if (view) {
       for (const o of allBetween(view.activeStart, view.activeEnd)) {
         // 여러 날 일정은 걸친 날마다 (끝은 그 순간 직전까지)
-        const lastMs = o.ext ? Math.max(o.ext.end.getTime() - 1, o.start.getTime()) : o.start.getTime();
+        const spanEnd = o.ext ? o.ext.end : occurrenceEnd(o.start, o.item.reminder.allDay, o.item.reminder.end);
+        const lastMs = Math.max(spanEnd.getTime() - 1, o.start.getTime());
         for (let d = dayStart(o.start); d.getTime() <= lastMs && d < view.activeEnd; d = addDays(d, 1)) {
           const k = d.getTime();
           if (!map.has(k)) map.set(k, []);
@@ -337,11 +452,13 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const out = [];
     for (const { item, start } of occurrences(from, to)) {
       const r = item.reminder;
-      const past = occurrenceEnd(start, r.allDay) < now;
+      const end = occurrenceEnd(start, r.allDay, r.end);
+      const past = end < now;
       out.push({
         id: `${item.memoId}|${r.id}|${start.getTime()}`,
         title: r.title || item.title,
         start,
+        ...(end > start ? { end } : {}),
         allDay: Boolean(r.allDay),
         editable: r.kind === 'at', // 한 번짜리만 끌어 옮긴다 (반복은 메모 창에서)
         className: `mk-ev${r.enabled && !past ? '' : ' off'}`,
@@ -448,6 +565,56 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   calendar.render();
   markView();
 
+  // 좌우 스와이프 · 앞뒤 단추로 달 넘기기: 손가락을 따라 달력이 밀리다 스르르 다음/이전 달로 넘어간다
+  const activeStage = () => (viewId === MEMORIES && memView ? memView.el : calEl);
+  function stepMonth(dir) {
+    const stage = activeStage();
+    stage.style.transition = '';
+    stage.style.transform = '';
+    stage.style.setProperty('--cal-slide', String(dir));
+    stage.classList.remove('cal-sliding');
+    void stage.offsetWidth;
+    stage.classList.add('cal-sliding');
+    if (dir > 0) calendar.next();
+    else calendar.prev();
+  }
+  let swipe = null;
+  card.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1 || e.target.closest('.cal-head, .cal-bar, .cal-quick, .mem-tags, .mem-day')) return;
+    const t = e.touches[0];
+    swipe = { x0: t.clientX, y0: t.clientY, dx: 0, dy: 0, locked: null, stage: activeStage() };
+  }, { passive: true });
+  card.addEventListener('touchmove', (e) => {
+    if (!swipe || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    swipe.dx = t.clientX - swipe.x0;
+    swipe.dy = t.clientY - swipe.y0;
+    if (!swipe.locked) {
+      if (Math.hypot(swipe.dx, swipe.dy) < 10) return;
+      swipe.locked = Math.abs(swipe.dx) > Math.abs(swipe.dy) * 1.2 ? 'x' : 'y';
+    }
+    if (swipe.locked === 'x') {
+      swipe.stage.classList.remove('cal-sliding');
+      swipe.stage.style.transition = 'none';
+      swipe.stage.style.transform = `translateX(${(swipe.dx * 0.45).toFixed(1)}px)`;
+    }
+  }, { passive: true });
+  const endSwipe = () => {
+    if (!swipe) return;
+    const { dx, locked, stage } = swipe;
+    swipe = null;
+    if (locked !== 'x') return;
+    if (Math.abs(dx) >= 48) {
+      stepMonth(dx < 0 ? 1 : -1);
+    } else {
+      stage.style.transition = 'transform 0.18s ease-out';
+      stage.style.transform = '';
+      setTimeout(() => { if (!swipe) stage.style.transition = ''; }, 190);
+    }
+  };
+  card.addEventListener('touchend', endSwipe, { passive: true });
+  card.addEventListener('touchcancel', endSwipe, { passive: true });
+
   // 창 높이에 맞춰: 월 보기는 한 달이 다 보이게 칸 높이를(낮은 창은 납작하게), 주 보기는 정한 높이 안에서 위아래로 밀기
   //   넓은 창(달력이 왼쪽에 붙음)은 보이는 높이만큼, 좁은 창(휴대폰)도 Google 캘린더처럼 달력이 화면을 채우고
   //   아래 고른 날 목록은 제목 한 줄만 살짝 보이게 (밀어서 보기)
@@ -512,6 +679,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const memBtn = views.querySelector(`[data-view="${MEMORIES}"]`);
     if (memBtn) memBtn.hidden = !memoriesOn();
     calEl.hidden = mem;
+    quickBar.hidden = mem || !api.reminders.add;
     rowsEl.hidden = mem;
     if (memView) memView.el.hidden = !mem;
   }
@@ -547,14 +715,15 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     return occurrences(d, end).length > 0 || externalBetween(d, end).length > 0;
   }
 
-  // 날 누르기: 일정이 없는 앞으로의 날이면 바로 새 일정 (캘린더 앱처럼), 일정이 있으면 골라 아래 목록에 — 고른 날을 다시 누르면 새 일정
+  // 날 누르기: 처음 누르면 그날을 고르고 하단 "N월 N일에 추가 ＋" 바에 표시, 이미 고른 날을 한 번 더 누르면 빠른 입력 열기
   function pickDay(date, { add = true } = {}) {
     const d = dayStart(date);
     const again = sameDay(d, selected);
     selected = d;
     if (isMonth() && (d < calendar.view.currentStart || d >= calendar.view.currentEnd)) calendar.gotoDate(d);
+    if (!again) toggleInline(false);
     render();
-    if (add && d >= today() && (again || !busyOn(d))) return quickAdd(d);
+    if (add && again && d >= today()) toggleInline(true);
     if (!add) rowsEl.querySelector('.ev-day-title')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
@@ -565,18 +734,22 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
     const r = item.reminder;
     const allDay = arg.event.allDay;
     const start = allDay ? dayStart(arg.event.start) : arg.event.start;
+    const delta = start.getTime() - new Date(r.at).getTime();
+    const end = r.end ? toLocalIso(new Date(new Date(r.end).getTime() + delta)) : undefined;
     const now = new Date();
+    const spanEnd = occurrenceEnd(start, allDay, end);
     const moved = {
       ...r,
       at: toLocalIso(start),
+      ...(end ? { end } : {}),
       allDay: allDay || undefined,
       // 하루 종일 ↔ 시각 있는 일정이 바뀌면 미리 알림 뜻이 달라진다 (당일 오전 9시 ↔ 10분 전) — 기본값으로
       alerts: Boolean(r.allDay) === allDay ? r.alerts : [...(allDay ? DEFAULT_ALERTS.allDay : DEFAULT_ALERTS.timed)],
       // 앞으로 옮기면 새 시각의 알림이 다시 울리게, 지난 때로 옮기면 "놓친 알림" 이 울리지 않게 울린 것으로.
       // 꺼 둔 알림은 꺼진 채 (끌어 옮긴다고 켜지지 않게)
-      last: occurrenceEnd(start, allDay) > now ? null : toLocalIso(now),
+      last: spanEnd > now ? null : toLocalIso(now),
       // 다 울려 저절로 꺼진 일정을 앞으로 옮기면 다시 켠다 (사용자가 끈 것은 꺼진 채)
-      enabled: r.enabled || (isDone(r) && occurrenceEnd(start, allDay) > now),
+      enabled: r.enabled || (isDone(r) && spanEnd > now),
     };
     if (!moved.allDay) delete moved.allDay;
     try {
@@ -598,7 +771,7 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   function eventRow({ item, start }) {
     const r = item.reminder;
-    const past = occurrenceEnd(start, r.allDay) < new Date(); // core 의 "지난 일정" 규칙과 같게
+    const past = occurrenceEnd(start, r.allDay, r.end) < new Date(); // core 의 "지난 일정" 규칙과 같게
     const div = el('div', `row ev-row${r.enabled && !past ? '' : ' off'}`);
     div.dataset.color = item.color;
     div.dataset.memo = item.memoId;
@@ -661,11 +834,11 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
 
   function showMemoEvent(item, start) {
     const r = item.reminder;
-    const span = occurrenceEnd(start, r.allDay);
+    const span = occurrenceEnd(start, r.allDay, r.end);
     openEventDetail({
       title: r.title || item.title,
       start,
-      end: r.allDay ? span : null, // 메모킹 일정은 끝나는 시각이 없다 — 하루 종일만 그날까지
+      end: span > start ? span : null,
       allDay: Boolean(r.allDay),
       memoColor: item.color,
       source: r.title && r.title !== item.title ? `메모킹 메모 "${item.title}"` : '메모킹',
@@ -867,6 +1040,8 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
       shownToday = t;
     }
     dayIndexCache = null;
+    pillText.textContent = `${selected.getMonth() + 1}월 ${selected.getDate()}일에 추가`;
+    quickBar.hidden = viewId === MEMORIES || !api.reminders.add || selected < t;
     // 고른 날이 바뀌었거나 낮은 창(날 칸에 색 점)일 때만 날 칸을 다시 그린다 — 새 함수를 주면 다시 그린다
     if (compact || selected.getTime() !== lastCellKey) {
       lastCellKey = selected.getTime();
@@ -878,11 +1053,11 @@ export function setupRemindersTab({ api, container, countEl, notify = (text, isE
   }
 
   let adding = false;
-  async function quickAdd(day) {
+  async function quickAdd(day, init = {}) {
     if (adding || !api.reminders.add) return;
     adding = true;
     try {
-      const out = await openQuickEvent({ day, search: (q) => api.memos.search(q) });
+      const out = await openQuickEvent({ day, ...init, search: (q) => api.memos.search(q) });
       if (!out) return;
       await api.reminders.add(out.memoId, out.reminder, out.newTitle);
       selected = dayStart(new Date(out.reminder.at)); // 일정 창에서 날짜를 바꿨으면 그날로
