@@ -337,7 +337,7 @@ function nextRepeat(at, repeat, now) {
  * @param {Date} [now]
  * @returns {{ from: number, to: number, text: string, at: Date, hasTime: boolean, repeat?: { every: 'day'|'week'|'month'|'year', weekdays?: number[], day?: number, month?: number, time: string } }[]}
  */
-export function findDates(text, now = new Date()) {
+export function findDates(text, now = new Date(), { allowPast = false } = {}) {
   const s = String(text ?? '');
   const found = [];
   const taken = []; // 날짜 말이 차지한 자리 (지난 날 포함)
@@ -346,13 +346,13 @@ export function findDates(text, now = new Date()) {
     if (overlaps(from, to)) return;
     const span = { from, to };
     taken.push(span);
-    if (past || !(at instanceof Date) || Number.isNaN(at.getTime())) {
+    if ((past && !allowPast) || !(at instanceof Date) || Number.isNaN(at.getTime())) {
       span.skipped = true; // 지난 날 — 바로 뒤의 영어 시각도 지난 때로 (findAllDates)
       return;
     }
     // 되풀이는 이미 지났으면 다음 차례로
     if (repeat) at = nextRepeat(at, repeat, now);
-    if (at.getTime() <= now.getTime() + 30_000) return;
+    if (!allowPast && at.getTime() <= now.getTime() + 30_000) return;
     const item = { from, to, text: s.slice(from, to).trim(), at, hasTime };
     // 요일만 적은 말("화요일")인지 — 영어 시각을 붙일 때 이번 주/다음 주를 다시 고른다 (findAllDates). 결과 모양에는 드러내지 않음
     if (rollWeek) Object.defineProperty(item, 'rollWeek', { value: true });
@@ -411,7 +411,7 @@ export function findDates(text, now = new Date()) {
     if (!t.period && t.h === 24 && !t.midnight) continue;
     const end = rangeEnd(s, from + m[0].length);
     let at = atTime(ymd(now), t);
-    if (at <= now && (t.period === '새벽' || t.midnight)) at = plusDays(at, 1);
+    if (!allowPast && at <= now && (t.period === '새벽' || t.midnight)) at = plusDays(at, 1);
     add(from, end, at, true);
   }
 
@@ -443,8 +443,8 @@ export function findEnglishDates(text, chrono, now = new Date()) {
 }
 
 /** 한국어 + 영어를 합쳐 겹치지 않게 */
-export function findAllDates(text, { chrono = null, now = new Date() } = {}) {
-  const ko = findDates(text, now);
+export function findAllDates(text, { chrono = null, now = new Date(), allowPast = false } = {}) {
+  const ko = findDates(text, now, { allowPast });
   const s = String(text ?? '');
   // 한국어 날짜와 겹치거나, 지난 날 말 바로 뒤에 붙은 영어 시각("어제 3pm")은 빼고
   const afterPast = (e) => (ko.skipped ?? []).some((k) => (e.from < k.to && e.to > k.from) || (k.to <= e.from && !s.slice(k.to, e.from).trim()));

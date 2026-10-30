@@ -1748,7 +1748,7 @@ export class WindowManager {
         const text = action === 'copyOur' ? c.ourref : c.n_app;
         if (!text) return { ok: false, message: action === 'copyOur' ? '관리번호가 없어요' : '출원번호가 없어요' };
         clipboard.writeText(String(text));
-        return { ok: true, message: `${action === 'copyOur' ? '관리번호' : '출원번호'}를 복사했어요`, close: true };
+        return { ok: true, message: `${action === 'copyOur' ? '관리번호' : '출원번호'}를 복사했어요`, close: false };
       }
       this.showOpms(c.idx, action === 'wrapper' ? 'wrapper' : 'info');
       return { ok: true, close: true };
@@ -1758,7 +1758,7 @@ export class WindowManager {
       if (!memo) return { ok: false };
       if (action === 'copyText') {
         clipboard.writeText(shareText(memo.body));
-        return { ok: true, message: '메모 내용을 복사했어요', close: true };
+        return { ok: true, message: '메모 내용을 복사했어요', close: false };
       }
       if (action === 'append') {
         if (memo.locked) return { ok: false, message: '잠긴 메모에는 덧붙일 수 없어요' };
@@ -1774,11 +1774,11 @@ export class WindowManager {
     if (!this.shownPath(p) || !fs.existsSync(p)) return { ok: false, message: '찾을 수 없어요' };
     if (action === 'copyPath') {
       clipboard.writeText(p);
-      return { ok: true, message: '경로를 복사했어요', close: true };
+      return { ok: true, message: '경로를 복사했어요', close: false };
     }
     if (action === 'copyFile') {
       const ok = await copyFileToClipboard(p);
-      return ok ? { ok, message: fs.statSync(p).isDirectory() ? '폴더를 복사했어요. 붙여 넣으면 돼요' : '파일을 복사했어요. 붙여 넣으면 돼요', close: true } : { ok, message: UI.copyFail };
+      return ok ? { ok, message: fs.statSync(p).isDirectory() ? '폴더를 복사했어요. 붙여 넣으면 돼요' : '파일을 복사했어요. 붙여 넣으면 돼요', close: false } : { ok, message: UI.copyFail };
     }
     if (action === 'reveal') {
       shell.showItemInFolder(p);

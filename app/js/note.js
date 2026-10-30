@@ -732,6 +732,7 @@ async function setLink(targetId, on) {
 }
 
 async function refreshLinks() {
+  if (el.linksBtn?.hidden) return;
   const { links, backlinks, suggestions } = await api.memo.links(id);
   const total = new Set([...links, ...backlinks].map((m) => m.id)).size;
   el.linksCount.textContent = total ? String(total) : '';
@@ -756,6 +757,10 @@ el.linkSearch.addEventListener('input', () => {
 });
 
 async function toggleLinks(force) {
+  if (el.linksBtn?.hidden) {
+    el.linksPanel.hidden = true;
+    return;
+  }
   el.linksPanel.hidden = force === undefined ? !el.linksPanel.hidden : !force;
   if (!el.linksPanel.hidden) {
     if (reminderPanel?.open) reminderPanel.toggle(false); // 패널은 하나씩
@@ -1463,7 +1468,7 @@ window.addEventListener('keydown', (e) => {
     if (name === 'color') editor.toggleTextColor(lastColor.color);
     else editor.toggleHighlight(lastColor.highlight);
   } else if (kind === 'action') actions[name]();
-  else if (name === 'links') toggleLinks();
+  else if (name === 'links') { if (!el.linksBtn?.hidden) toggleLinks(); }
   else if (name === 'top') toggleLayer('top'); // 붙어 있으면 떼고, 테이프가 붙어 있으면 왕관으로 바꿔 붙임
   else if (name === 'tape') toggleLayer('bottom');
   else if (name === 'reminders') reminderPanel?.toggle();

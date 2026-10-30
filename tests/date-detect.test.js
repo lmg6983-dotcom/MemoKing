@@ -295,3 +295,16 @@ test('"매달 15일 3pm" · "매년 10월 15일 3pm" 은 오늘 그날이면 오
   assert.equal(fmt(findAllDates('매달 15일 3pm', { chrono: casual, now })[0].at), '2026-10-15 15:00');
   assert.equal(fmt(findAllDates('매년 10월 15일 3pm', { chrono: casual, now })[0].at), '2026-10-15 15:00');
 });
+
+test('allowPast 옵션 시 과거 날짜도 올바르게 인식한다', () => {
+  const now = new Date(2026, 9, 30, 9, 0);
+  const pastYear = findDates('2025-05-01 과거 일정', now, { allowPast: true });
+  assert.equal(pastYear.length, 1);
+  assert.equal(pastYear[0].text, '2025-05-01');
+  assert.equal(fmt(pastYear[0].at), '2025-5-1 9:00');
+
+  const yesterday = findDates('어제 영양제 먹기', now, { allowPast: true });
+  assert.equal(yesterday.length, 1);
+  assert.equal(yesterday[0].text, '어제');
+  assert.equal(fmt(yesterday[0].at), '2026-10-29 9:00');
+});

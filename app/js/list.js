@@ -1332,6 +1332,7 @@ let activeTab = 'memos';
 
 const remindersTab = setupRemindersTab({
   api, container: $('reminder-groups'), countEl: $('count-reminders'),
+  notify: (text, isErr) => (isErr ? window.alert(text) : flashStatus(text)),
   // 다른 캘린더 함께 보기 (읽기만): 구독은 메인이 받는다, 일정 속 주소는 브라우저로
   calendars: api.calendars && { ...api.calendars, openUrl: (url) => api.links.open(url) },
   // 회상 "한 장으로": 미리보기에서 공유(Drive · LocalSend · 메일) · 복사 · 저장 · 메모로 만들기

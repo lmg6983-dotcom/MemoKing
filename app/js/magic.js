@@ -854,38 +854,49 @@ async function run(i, { alt = false, act = 0 } = {}) {
     return;
   }
   if (r.kind === 'calc' || r.kind === 'date' || r.kind === 'site' || r.kind === 'web' || r.kind === 'ai') {
-    const req = r.kind === 'calc' || r.kind === 'date' ? { type: 'copy', text: id === 'copyExpr' ? `${r.text} = ${r.value}` : r.kind === 'date' && id === 'copy' ? r.value : r.plain }
+    const isCopy = r.kind === 'calc' || r.kind === 'date' || String(id).startsWith('copy');
+    const req = isCopy ? { type: 'copy', text: id === 'copyExpr' ? `${r.text} = ${r.value}` : r.kind === 'date' && id === 'copy' ? r.value : r.plain }
       : r.kind === 'site' ? { type: 'site', text: r.url }
         : { type: r.kind, site: id, text: input.value };
     const res = await api.tool(req).catch(() => null);
     if (res?.message) {
+      if (res.ok && isCopy) {
+        const btn = resultsEl.querySelector(`.magic-row[data-index="${i}"] .act-btn[data-action="${id}"]`);
+        markCopyDone(btn);
+      }
       flash(res.ok, res.message);
-      if (res.ok) closeSoon();
-    } else if (res?.ok) api.close();
-    else flash(false, '열지 못했어요');
+      if (res.ok && !isCopy) closeSoon();
+    } else if (res?.ok && !isCopy) api.close();
+    else if (!res?.ok) flash(false, '열지 못했어요');
     return;
   }
+  const isCopy = String(id).startsWith('copy');
   const req = r.kind === 'note' ? { action: id, id: r.id } : r.kind === 'opms' ? { action: id, opms: r.idx } : { action: id, path: r.path };
   const res = await api.act(req).catch(() => null);
   if (res?.message) {
-    if (res.ok && String(id).startsWith('copy')) {
+    if (res.ok && isCopy) {
       const btn = resultsEl.querySelector(`.magic-row[data-index="${i}"] .act-btn[data-action="${id}"]`);
       markCopyDone(btn);
     }
     flash(res.ok, res.message);
-    if (res.ok) closeSoon(); // 복사했다는 표시를 잠깐 보여 주고
+    if (res.ok && !isCopy) closeSoon();
     return;
   }
-  if (res?.ok) api.close();
+  if (res?.ok && !isCopy) api.close();
 }
 
+let flashTimer = 0;
 // 아래 안내 자리에 잠깐 (복사했어요 · 찾을 수 없어요)
-function flash(ok, text) {
+function flash(ok, text, { duration = 1800 } = {}) {
   const span = document.createElement('span');
   span.className = `magic-flash${ok ? '' : ' err'}`;
   span.textContent = `${ok ? '✓ ' : ''}${text}`;
   hintEl.replaceChildren(span);
-  flashUntil = Date.now() + 900;
+  flashUntil = Date.now() + duration;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => {
+    if (Date.now() >= flashUntil) updateHint();
+  }, duration);
 }
 
 input.addEventListener('keydown', (e) => {
@@ -935,6 +946,7 @@ input.addEventListener('keydown', (e) => {
 let retained = false; // 다시 띄웠을 때 남겨 둔 지난 글 (아직 손대지 않음)
 async function reset() {
   clearTimeout(closeTimer);
+  clearTimeout(flashTimer);
   closeAgent();
   flashUntil = 0; // 지난번의 "복사했어요" 안내는 다시 띄울 때 지운다
   selected = 0;

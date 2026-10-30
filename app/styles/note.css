@@ -685,10 +685,63 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   80% { transform: rotate(-6deg); }
 }
 
+/* ---------- 예약 알림 팝업 모달 (새 일정처럼 화면 중앙 팝업으로 공간 확보) ---------- */
+.reminder-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: cal-quick-fade 0.18s ease-out;
+}
+.reminder-backdrop[hidden] { display: none; }
+
+.reminder-panel.reminder-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  right: auto;
+  bottom: auto;
+  z-index: 50;
+  width: min(390px, calc(100vw - 28px));
+  min-height: 440px;
+  max-height: min(92vh, 600px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 16px 18px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl, 18px);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--shadow-pop, 0 16px 36px rgba(0, 0, 0, 0.22));
+  box-sizing: border-box;
+  animation: mk-pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  display: flex;
+  flex-direction: column;
+}
+.reminder-panel.reminder-modal[hidden] { display: none; }
+
+.rem-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.rem-dialog-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-strong);
+}
+
 .reminder-list { margin: 0; padding: 0; list-style: none; }
 .reminder-panel.creating .reminder-list:empty { display: none; } /* 만드는 동안은 "아직 알림이 없어요" 숨김 */
 .reminder-list:empty::after { content: "아직 알림이 없어요"; display: block; padding: 6px 2px 2px; font-size: 12px; color: var(--muted); }
-.rem-item { display: flex; align-items: center; gap: 8px; padding: 7px 4px; border-radius: 8px; }
+.rem-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; margin-bottom: 4px; border: 1px solid var(--border); background: var(--surface-1); }
 @media (hover: hover) and (pointer: fine) { .rem-item:hover { background: var(--hover); } }
 .rem-item.off { opacity: 0.55; }
 .rem-kind-icon { width: 18px; height: 18px; color: var(--text-strong); }
@@ -698,17 +751,615 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .rem-item .icon-btn { width: 26px; height: 26px; }
 .rem-item .icon-btn svg { width: 15px; height: 15px; }
 
-.reminder-form { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
-.reminder-form h4 { margin: 0 0 8px; }
-.seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--fill-tab); margin-bottom: 10px; }
+/* 440px 공간에 최적화된 2열 카드 그리드 (구버전 호환) */
+.reminder-panel .rem-kinds {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.reminder-panel .rem-kinds button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  text-align: left;
+}
+.reminder-panel .rem-kinds button svg {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 2px;
+}
+.reminder-panel .rem-kinds button b {
+  font-size: 14px;
+}
+.reminder-panel .rem-kinds button small {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* 상단 대분류: 일정(50%) vs 알림(50%) — 5-7 탭 스타일 & 슬라이딩 인디케이터 */
+.rem-kinds-wrap {
+  margin-bottom: 8px;
+}
+.rem-top-cats.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--fill-tab);
+  border: 1px solid var(--border);
+  position: relative;
+  isolation: isolate;
+}
+.reminder-panel .rem-top-cats.tabs .rem-cat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 0 !important;
+  border-radius: calc(var(--radius-md, 12px) - 2px);
+  background: transparent !important;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none !important;
+  transition: color 0.18s ease-out;
+  box-shadow: none !important;
+}
+.reminder-panel .rem-top-cats.tabs .rem-cat-btn svg {
+  width: 15px;
+  height: 15px;
+  color: currentColor;
+}
+.reminder-panel .rem-top-cats.tabs .rem-cat-btn:hover {
+  color: var(--text-strong);
+}
+.reminder-panel .rem-top-cats.tabs .rem-cat-btn:focus,
+.reminder-panel .rem-top-cats.tabs .rem-cat-btn:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.reminder-panel .rem-top-cats.tabs .rem-cat-btn.active,
+.reminder-panel .rem-top-cats.tabs .rem-cat-btn[aria-checked="true"] {
+  color: var(--text-strong);
+  font-weight: 700;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+/* 5-7 스타일 슬라이딩 흰색 카드 인디케이터 */
+.reminder-panel .rem-top-cats.tabs > .tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+  transition: transform 0.24s var(--ease-out), opacity 0.15s;
+}
+
+/* 알림 선택 시 노출되는 하위 옵션 (반복 · 타이머 · 앱 열 때) — 5-7 세그먼트 슬라이더 */
+.rem-alarm-sub.seg {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 2.5px;
+  border-radius: var(--radius-md, 10px);
+  background: var(--fill-tab);
+  border: 1px solid var(--border);
+  position: relative;
+  isolation: isolate;
+  animation: rem-step-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.reminder-panel .rem-alarm-sub.seg button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 0 !important;
+  border-radius: calc(var(--radius-md, 10px) - 2px);
+  background: transparent !important;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none !important;
+  transition: color 0.18s ease-out;
+  box-shadow: none !important;
+}
+.reminder-panel .rem-alarm-sub.seg button svg {
+  width: 13px;
+  height: 13px;
+  color: currentColor;
+}
+.reminder-panel .rem-alarm-sub.seg button:hover {
+  color: var(--text-strong);
+}
+.reminder-panel .rem-alarm-sub.seg button:focus,
+.reminder-panel .rem-alarm-sub.seg button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.reminder-panel .rem-alarm-sub.seg button[aria-checked="true"],
+.reminder-panel .rem-alarm-sub.seg button.active {
+  color: var(--text-strong);
+  font-weight: 700;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+.reminder-panel .rem-alarm-sub.seg > .seg-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+  transition: transform 0.24s var(--ease-out), opacity 0.15s;
+}
+
+/* 세그먼트 탭: 일정 / 반복 / 타이머 / 앱 열 때 (구버전 호환) */
+.reminder-panel .rem-kinds.seg {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.reminder-panel .rem-kinds.seg button {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.reminder-panel .rem-kinds.seg button svg {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex-shrink: 0;
+  color: currentColor;
+}
+.reminder-panel .rem-kinds.seg button b {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.reminder-panel .rem-kinds.seg button:hover {
+  background: var(--hover);
+  color: var(--text-strong);
+}
+.reminder-panel .rem-kinds.seg button[aria-checked="true"] {
+  background: var(--surface-0, #ffffff);
+  color: var(--text-strong);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-weight: 700;
+}
+
+.rem-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--border);
+}
+.rem-form-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.rem-cancel-btn {
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.rem-cancel-btn:hover {
+  color: var(--text-strong);
+  background: var(--hover);
+}
+
+.reminder-panel .reminder-form.rem-flow {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.reminder-panel .rem-steps.rem-single-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.reminder-panel .rem-panes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.reminder-panel .rem-pane {
+  flex: 1;
+  margin-bottom: 6px;
+}
+
+.rem-flow .rem-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.rem-flow .rem-title-row .rem-field-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+  min-width: 28px;
+}
+.rem-flow .rem-title-row input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-0, #ffffff);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.rem-flow .rem-title-row input:focus {
+  outline: none;
+  border-color: var(--brand-yellow);
+  box-shadow: 0 0 0 2px var(--brand-yellow-subtle, rgba(255, 212, 0, 0.25));
+}
+
+.reminder-panel .rem-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  min-height: 34px;
+}
+.reminder-panel .rem-time-row .dp-time-box {
+  flex: 1;
+  min-width: 0;
+}
+.reminder-panel .rem-allday-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+.reminder-panel .rem-allday-row span {
+  font-weight: 500;
+  color: var(--text-strong);
+}
+
+.reminder-panel .dp-summary {
+  display: inline-block;
+  margin: 4px 0 2px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: -0.01em;
+}
+
+.rem-alerts-wrap {
+  margin-top: 8px;
+  margin-bottom: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.rem-alerts-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.rem-alerts-label small {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.reminder-panel .alert-more.chip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.reminder-panel .alert-more.chip-btn:hover {
+  border-color: var(--text);
+  color: var(--text-strong);
+  background: var(--hover);
+}
+.reminder-panel .alert-more.chip-btn[aria-pressed="true"] {
+  border-style: solid;
+  border-color: var(--brand-yellow);
+  background: var(--brand-yellow-soft, #fff9db);
+  color: var(--text-strong);
+  font-weight: 700;
+}
+.reminder-panel .alert-more-row {
+  display: none !important;
+}
+
+/* 알림 세부 탭들(반복, 타이머, 앱 열 때) 레이아웃 개선 */
+.reminder-panel .rem-pane[data-pane="repeat"] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+.reminder-panel .rem-pane[data-pane="repeat"] .rem-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0;
+}
+.reminder-panel .rem-pane[data-pane="repeat"] select#rep-every {
+  width: 100%;
+  height: 36px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.reminder-panel .rem-pane[data-pane="repeat"] #rep-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+.reminder-panel .rem-pane[data-pane="repeat"] #rep-date input {
+  width: 60px;
+  height: 34px;
+  text-align: center;
+}
+.reminder-panel .rem-pane[data-pane="repeat"] #rep-time-picker .dp-time {
+  display: flex;
+  gap: 8px;
+}
+.reminder-panel .rem-pane[data-pane="repeat"] #rep-time-picker .dp-time select {
+  flex: 1;
+  height: 36px;
+  border-radius: 10px;
+}
+.reminder-panel .rem-pane[data-pane="repeat"] .weekdays {
+  display: flex;
+  gap: 5px;
+  margin: 2px 0 0;
+}
+.reminder-panel .rem-pane[data-pane="repeat"] .weekdays button {
+  flex: 1;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.reminder-panel .rem-pane[data-pane="timer"] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+.reminder-panel .rem-pane[data-pane="timer"] .chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 0;
+}
+.reminder-panel .rem-pane[data-pane="timer"] .chips button {
+  height: 38px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.reminder-panel .rem-pane[data-pane="timer"] .rem-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-0);
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.reminder-panel .rem-pane[data-pane="timer"] #timer-min {
+  width: 65px;
+  height: 32px;
+  text-align: center;
+  font-weight: 700;
+  border-radius: 8px;
+}
+
+.reminder-panel .rem-pane[data-pane="startup"] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 0;
+}
+.reminder-panel .rem-pane[data-pane="startup"] .rem-radio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-0, #ffffff);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.reminder-panel .rem-pane[data-pane="startup"] .rem-radio:hover {
+  background: var(--hover);
+  border-color: var(--brand-black, #1a1a1a);
+}
+.reminder-panel .rem-pane[data-pane="startup"] .rem-radio:has(input:checked) {
+  border-color: var(--brand-yellow);
+  background: var(--brand-yellow-soft, #fffdf0);
+  font-weight: 700;
+  color: var(--text-strong);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.reminder-panel select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 32px;
+  padding: 0 24px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--surface-0, #ffffff);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%23888888' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.reminder-panel select:hover {
+  border-color: var(--brand-black, #1a1a1a);
+}
+.reminder-panel select:focus {
+  outline: none;
+  border-color: var(--brand-yellow);
+  box-shadow: 0 0 0 2px var(--brand-yellow-subtle, rgba(255, 212, 0, 0.2));
+}
+
+.reminder-panel input:not(.switch):not([type="radio"]) {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--surface-0, #ffffff);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.reminder-panel input:not(.switch):not([type="radio"]):focus {
+  outline: none;
+  border-color: var(--brand-yellow);
+  box-shadow: 0 0 0 2px var(--brand-yellow-subtle, rgba(255, 212, 0, 0.2));
+}
+
+.reminder-panel .flow-footer.rem-single-footer {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  position: static !important;
+  margin-top: auto !important;
+  padding: 12px 0 2px !important;
+  background: transparent !important;
+}
+.reminder-panel .flow-footer.rem-single-footer .rem-submit {
+  display: block !important;
+  width: 100% !important;
+  min-height: 42px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  background: var(--brand-yellow) !important;
+  color: #1a1a1a !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(255, 212, 0, 0.35) !important;
+  cursor: pointer !important;
+  transition: transform 0.12s ease, filter 0.15s ease, box-shadow 0.15s ease !important;
+}
+.reminder-panel .flow-footer.rem-single-footer .rem-submit:hover {
+  filter: brightness(0.96) !important;
+  box-shadow: 0 4px 12px rgba(255, 212, 0, 0.45) !important;
+}
+.reminder-panel .flow-footer.rem-single-footer .rem-submit:active {
+  transform: scale(0.985) !important;
+}
+
+.reminder-form { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
+.reminder-form h4 { margin: 0 0 6px; }
+.seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 2px; padding: 2.5px; border-radius: var(--radius-md); background: var(--fill-tab); margin-bottom: 8px; }
 .seg button { height: 28px; padding: 0 4px; border: 0; border-radius: 6px; background: none; font-size: 12px; color: var(--muted); white-space: nowrap; cursor: pointer; }
 .seg button[aria-checked="true"] { background: var(--surface-1); color: var(--text); font-weight: 700; box-shadow: var(--shadow-card); }
-.rem-pane { margin-bottom: 10px; }
+.rem-pane { margin-bottom: 6px; }
 .rem-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
 .rem-inline { display: inline-flex; gap: 6px; align-items: center; }
 .reminder-form input[type="number"] { width: 58px; }
 .reminder-form input:not(.switch):not([type="radio"]), .reminder-form select { /* 스위치는 base.css 모양 그대로 */
-  height: 30px;
+  height: 28px;
   padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -716,37 +1367,37 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   color: var(--text);
 }
 .reminder-form input[type="radio"] { height: auto; accent-color: var(--brand-black); }
-.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .chips button {
-  min-width: 34px;
-  height: 28px;
-  padding: 0 8px;
+  min-width: 32px;
+  height: 26px;
+  padding: 0 7px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
-  font-size: 12px;
+  font-size: 11.5px;
   cursor: pointer;
 }
 .chips button[aria-pressed="true"] { background: var(--brand-yellow); border-color: var(--brand-yellow); color: var(--on-brand); font-weight: 700; }
-.weekdays { margin-top: 8px; }
+.weekdays { margin-top: 6px; }
 .rem-radio { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 13px; cursor: pointer; }
 .rem-radio small { color: var(--muted); }
-.rem-action { margin-bottom: 10px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.rem-action { margin-bottom: 8px; padding-top: 6px; border-top: 1px dashed var(--border); }
 .rem-submit { width: 100%; }
 
 /* 날짜·시각 고르기 (date-picker.js) — 다이얼 대신 달력 한 장 + 시각 칩 */
 .date-picker { margin-top: 2px; }
-.dp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.dp-title { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.dp-nav { font-size: 20px; line-height: 1; }
+.dp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+.dp-title { font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dp-nav { font-size: 18px; line-height: 1; }
 .dp-nav:disabled { opacity: 0.3; cursor: default; }
-.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 8px; text-align: center; }
-.dp-wd { padding: 2px 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1.5px; margin-bottom: 4px; text-align: center; }
+.dp-wd { padding: 1px 0 2px; font-size: 11px; font-weight: 700; color: var(--muted); }
 .dp-wd.sun, .dp-day.sun { color: var(--danger); }
 .dp-wd.sat, .dp-day.sat { color: var(--blue-chip); }
 .dp-day {
-  height: 32px; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--text);
-  font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer;
+  height: 26px; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--text);
+  font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer;
   transition: background-color 0.12s ease-out, transform 0.1s ease-out;
 }
 .dp-day:active:not(:disabled) { transform: scale(0.94); }
@@ -756,8 +1407,8 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 @media (hover: hover) and (pointer: fine) { .dp-day:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--hover); } }
 .dp-quick { flex-wrap: wrap; margin-bottom: 6px; } /* 잘려 보이지 않게 줄을 바꿔 다 보인다 */
 .dp-time { display: flex; gap: 6px; }
-.dp-time select { flex: 1; }
-.dp-summary { margin: 8px 0 0; font-size: 13px; font-weight: 700; }
+.dp-time select { flex: 1; height: 28px; font-size: 12.5px; border-radius: 6px; }
+.dp-summary { margin: 4px 0 0; font-size: 12px; font-weight: 600; }
 .dp-summary.past { color: var(--danger); }
 
 /* ---------- 이 메모예요: 창 테두리 반짝임 (매직 카피 알림을 눌렀을 때 등) ---------- */
