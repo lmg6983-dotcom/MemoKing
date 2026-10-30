@@ -75,23 +75,25 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
     allDayRow.append(allDayLabel, allDaySwitch);
 
     const range = el('div', { class: 'qe-range', role: 'group', 'aria-label': '기간' });
-    const startSide = el('div', { class: 'qe-side' });
+    const startSide = el('div', { class: 'qe-side qe-side-start' });
+    const startTag = el('span', { class: 'qe-side-tag' }, '시작');
     const startDateWrap = el('label', { class: 'qe-date' });
     const startDateText = el('span', { class: 'qe-date-text' });
     const startDate = el('input', { type: 'date', class: 'qe-date-input', 'aria-label': '시작 날짜' });
     startDateWrap.append(startDateText, startDate);
     const startClock = el('button', { type: 'button', class: 'qe-clock', 'aria-label': '시작 시각', 'aria-pressed': 'true' });
-    startSide.append(startDateWrap, startClock);
+    startSide.append(startTag, startDateWrap, startClock);
 
-    const arrow = el('span', { class: 'qe-arrow', 'aria-hidden': 'true' }, '→');
+    const arrow = el('span', { class: 'qe-arrow', 'aria-hidden': 'true' }, '↓');
 
-    const endSide = el('div', { class: 'qe-side' });
+    const endSide = el('div', { class: 'qe-side qe-side-end' });
+    const endTag = el('span', { class: 'qe-side-tag' }, '종료');
     const endDateWrap = el('label', { class: 'qe-date' });
     const endDateText = el('span', { class: 'qe-date-text' });
     const endDate = el('input', { type: 'date', class: 'qe-date-input', 'aria-label': '종료 날짜' });
     endDateWrap.append(endDateText, endDate);
     const endClock = el('button', { type: 'button', class: 'qe-clock', 'aria-label': '종료 시각', 'aria-pressed': 'false' });
-    endSide.append(endDateWrap, endClock);
+    endSide.append(endTag, endDateWrap, endClock);
 
     range.append(startSide, arrow, endSide);
 
@@ -110,16 +112,29 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
 
     const memoRow = el('button', { type: 'button', class: 'qe-row qe-memo-row', 'aria-expanded': 'false' });
     const memoPane = el('section', { class: 'qe-pane', 'data-step': 'memo', hidden: '' });
-    const find = el('input', { type: 'search', class: 'link-search qe-search', placeholder: '메모 검색', 'aria-label': '일정을 넣을 메모 검색', autocomplete: 'off' });
+    const freshBox = el('div', { class: 'qe-fresh-box' });
     const fresh = el('button', { type: 'button', class: 'qe-memo qe-new', role: 'radio', 'aria-checked': 'true' });
+    const freshBodyWrap = el('div', { class: 'qe-fresh-body-wrap' });
+    const freshBody = el('textarea', {
+      class: 'qe-fresh-body',
+      placeholder: '새 메모에 넣을 본문 내용 (비워두면 제목만 저장돼요)',
+      rows: '2',
+      'aria-label': '새 메모 본문',
+    });
+    freshBodyWrap.append(freshBody);
+    freshBox.append(fresh, freshBodyWrap);
+
+    const find = el('input', { type: 'search', class: 'link-search qe-search', placeholder: '기존 메모 검색', 'aria-label': '일정을 넣을 메모 검색', autocomplete: 'off' });
     const results = el('div', { class: 'qe-memos', role: 'radiogroup', 'aria-label': '일정을 넣을 메모' });
-    memoPane.append(el('p', { class: 'qe-pane-q' }, '일정은 메모와 함께 저장돼요. 어느 메모에 넣을까요?'), find, results);
+    memoPane.append(el('p', { class: 'qe-pane-q' }, '일정은 메모와 함께 저장돼요. 어느 메모에 넣을까요?'), freshBox, find, results);
 
     const cancel = el('button', { type: 'button', class: 'btn' }, '취소');
     const save = el('button', { type: 'button', class: 'btn primary qe-save' }, '일정 저장');
     const footer = el('div', { class: 'flow-footer' });
     footer.append(cancel, save);
-    form.append(head, name, allDayRow, range, timeBox, err, alertRow, alertPane, memoRow, memoPane, footer);
+    const body = el('div', { class: 'qe-body' });
+    body.append(name, allDayRow, range, timeBox, err, alertRow, alertPane, memoRow, memoPane);
+    form.append(head, body, footer);
     dialog.append(form);
 
     const title = () => name.value.replace(/\s+/g, ' ').trim();
@@ -214,14 +229,14 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
       draw();
     });
     for (const [wrap, input] of [[startDateWrap, startDate], [endDateWrap, endDate]]) {
-      wrap.addEventListener('click', (e) => {
-        if (e.target === input) return;
+      const open = () => {
         try {
           input.showPicker?.();
         } catch {
           input.focus();
         }
-      });
+      };
+      wrap.addEventListener('click', open);
     }
 
     allDaySwitch.addEventListener('change', () => {
@@ -305,11 +320,14 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
       if (mine !== seq) return;
       const pick = (b, memo) => {
         target = memo;
+        fresh.setAttribute('aria-checked', String(!target));
+        freshBodyWrap.hidden = Boolean(target);
         for (const r of results.querySelectorAll('[role="radio"]')) r.setAttribute('aria-checked', String(r === b));
         draw();
       };
       fresh.replaceChildren(el('i', { class: 'qe-plus', 'aria-hidden': 'true' }, '＋'), el('span', {}, `새 메모 "${title() || '새 일정'}"`));
       fresh.setAttribute('aria-checked', String(!target));
+      freshBodyWrap.hidden = Boolean(target);
       fresh.onclick = () => pick(fresh, null);
       const rows = found.filter((m) => !m.locked).slice(0, 30).map((m) => {
         const b = el('button', { type: 'button', class: 'qe-memo', role: 'radio', 'aria-checked': String(target?.id === m.id) });
@@ -318,8 +336,8 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
         b.addEventListener('click', () => pick(b, { id: m.id, title: m.title || '제목 없음' }));
         return b;
       });
-      results.replaceChildren(fresh, ...rows);
-      if (!rows.length) results.append(el('p', { class: 'qe-none' }, find.value.trim() ? '찾는 메모가 없어요' : '메모가 없어요'));
+      results.replaceChildren(...rows);
+      if (!rows.length) results.append(el('p', { class: 'qe-none' }, find.value.trim() ? '찾는 메모가 없어요' : ''));
     }
     find.addEventListener('input', listMemos);
 
@@ -340,7 +358,8 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
       if (e > s) reminder.end = toLocalIso(e);
       if (allDay) reminder.allDay = true;
       if (title()) reminder.title = title();
-      close({ memoId, newTitle: title() || '새 일정', reminder });
+      const memoBodyText = !memoId && freshBody.value.trim() ? `# ${title() || '새 일정'}\n\n${freshBody.value.trim()}\n` : null;
+      close({ memoId, newTitle: title() || '새 일정', reminder, memoBody: memoBodyText });
     }
     dialog.addEventListener('cancel', (e) => {
       e.preventDefault();
@@ -357,5 +376,8 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
     }
     dialog.showModal();
     name.focus({ preventScroll: true });
+    requestAnimationFrame(() => {
+      dialog.querySelector('.alert-add')?.scrollIntoView({ block: 'nearest' });
+    });
   });
 }

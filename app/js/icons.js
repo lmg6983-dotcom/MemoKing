@@ -74,6 +74,7 @@ const ICONS = {
   note: `<path d="M5 4.5h14v10l-5 5H5z" ${stroke}/><path d="M14 19.5v-5h5M8.5 9h7M8.5 12.5h4" ${stroke}/>`,
   inbox: `<path d="M3.5 13.5l2.5-8h12l2.5 8v5a1.5 1.5 0 01-1.5 1.5h-14a1.5 1.5 0 01-1.5-1.5z" ${stroke}/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5" ${stroke}/>`,
   'chev-right': `<path d="M9 6l6 6-6 6" ${stroke} stroke-width="2"/>`,
+  'chev-up': `<path d="M6 15l6-6 6 6" ${stroke} stroke-width="2"/>`,
   chevrons: `<path d="M6 7l5 5-5 5M13 7l5 5-5 5" ${stroke} stroke-width="2"/>`,
   list: `<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" ${stroke} stroke-width="2.2"/>`,
   tag: `<path d="M3.5 12.2V4.5a1 1 0 011-1h7.7l8.3 8.3a1.5 1.5 0 010 2.1l-6.6 6.6a1.5 1.5 0 01-2.1 0l-8.3-8.3z" ${stroke}/><circle cx="8" cy="8" r="1.4" fill="currentColor"/>`,

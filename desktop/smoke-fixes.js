@@ -122,12 +122,15 @@ export async function runSmoke({ getVault, getList, noteWins, createListWindow }
     // 같은 날을 한 번 더 누르면 바로 입력 칸 + 추천 시간 칩
     await click(list, target.x, target.y);
     await wait(400);
-    const inline = await js(list, `({ box: !document.querySelector('.cal-quick-box').hidden, chips: [...document.querySelectorAll('.cal-quick-chips button')].map((b) => b.textContent), focus: document.activeElement?.classList.contains('cal-quick-input') })`);
-    check('고른 날짜를 한 번 더 누르면 하단에 빠른 입력 칸 + 추천 시간 칩(오전 10시 · 오후 2시 · 오후 3시)',
-      inline.box && inline.chips.join() === '오전 10시,오후 2시,오후 3시', inline);
+    const inline = await js(list, `({ box: !document.querySelector('.cal-quick-box').hidden, chips: [...document.querySelectorAll('.cal-quick-chips button')].map((b) => b.textContent), focus: document.activeElement?.classList.contains('cal-quick-input'), val: document.querySelector('.cal-quick-input')?.value, mark: document.querySelector('.cal-quick-date-mark')?.textContent })`);
+    await capture(list, '1-2-quick-expanded-default-date.png');
+    check('고른 날짜를 한 번 더 누르면 하단에 빠른 입력 칸 + 추천 시간 칩(오전 10시 · 오후 2시 · 오후 3시) 및 기본 날짜 노란 밑줄',
+      inline.box && inline.chips.join() === '오전 10시,오후 2시,오후 3시' && inline.val?.includes(`${target.m}월 ${target.d}일`) && inline.mark === `${target.m}월 ${target.d}일`, inline);
     await js(list, `(() => { const i = document.querySelector('.cal-quick-input'); i.value = '치과 2시'; i.dispatchEvent(new Event('input')); })()`);
     await capture(list, '1-3-calendar-quick-input.png');
     await js(list, `document.querySelector('.cal-quick-save').click()`);
+    const flashText = await until(() => js(list, `document.getElementById('flash-bar')?.textContent`), '저장 완료 토스트', 3000).catch(() => '');
+    check('일정 저장 후 토스트 안내 메시지 표시', flashText?.includes('치과') && flashText?.includes('저장'), { flashText });
     const dentist = await until(() => {
       for (const m of vault.list()) {
         const r = vault.get(m.id)?.reminders?.find((x) => x.title === '치과');
@@ -357,6 +360,142 @@ export async function runSmoke({ getVault, getList, noteWins, createListWindow }
       check('휴대폰: 들어 올렸다 그 자리에 놓으면 스크롤 위치는 들기 전 그대로', g3.lifted && Math.abs(same.st - m2.st) <= 2 && same.idx === m2.idx, { m2, same });
       await t2.detach();
       mw.close();
+    }
+
+    // ---------- 5) 메모 내 다양한 기능들 점검 ----------
+    console.log('[점검] 5단계: 메모 내 주요 기능 (서식·체크리스트·콘텐츠 추가·알림 패널·메뉴 및 색상·표 도구)...');
+    {
+      const memoContent = [
+        '# 프로젝트 기획 및 기능 점검',
+        '',
+        '- [ ] 1. 시장조사 및 사용자 인터뷰 진행',
+        '- [x] 2. 메모킹 핵심 기능 목록 정리 완료',
+        '',
+        '**굵은 텍스트(Bold)**와 *기울임(Italic)*, 그리고 ==형광펜 강조== 서식입니다.',
+        '',
+        '| 구분 | 진행 상태 | 담당자 |',
+        '| --- | --- | --- |',
+        '| UI 디자인 | 완료 | 김디자인 |',
+        '| 프론트엔드 | 진행중 | 이개발 |',
+        '| 스모크 테스트 | 진행중 | 박테스터 |',
+        '',
+        '끝',
+      ].join('\n');
+
+      const { win: nw, id: noteMemoId } = await openMemo(memoContent, '메모 기능 점검');
+      nw.setBounds({ ...nw.getBounds(), width: 440, height: 720 });
+      await wait(600);
+
+      // 5-1. 기본 서식과 체크리스트 렌더링 확인
+      await until(() => js(nw, `!!document.querySelector('.ProseMirror h1') && !!document.querySelector('.ProseMirror table') && !!document.querySelector('li[data-item-type="task"]')`), '메모 서식 렌더링', 5000);
+      await capture(nw, '5-1-note-editor-elements.png', 300);
+
+      // 체크리스트 클릭 토글 (실제 마우스 클릭)
+      const taskPos = await js(nw, `(() => {
+        const li = document.querySelector('li[data-item-type="task"]');
+        if (!li) return null;
+        const r = li.getBoundingClientRect();
+        return { x: Math.round(r.left - 10), y: Math.round(r.top + 10) };
+      })()`);
+      if (taskPos) {
+        await click(nw, taskPos.x, taskPos.y);
+        await wait(300);
+      }
+      const taskCount = await js(nw, `document.querySelectorAll('li[data-item-type="task"]').length`);
+      check('메모 본문: 마크다운 서식(제목·체크리스트·표·강조) 렌더링 및 체크리스트 표시', taskCount >= 2, { taskCount });
+
+      // 5-2. 콘텐츠 추가 메뉴 (+ 버튼)
+      await js(nw, `document.getElementById('add-btn')?.click()`);
+      await wait(300);
+      const addMenuOpen = await js(nw, `!document.getElementById('add-menu')?.hidden`);
+      await capture(nw, '5-2-note-add-menu.png', 200);
+      check('콘텐츠 추가 메뉴 (+): 음성·손메모·그리기·사진·파일·표·수식 메뉴 열림', addMenuOpen);
+      // 메뉴 닫기
+      await js(nw, `document.querySelector('.add-scrim')?.click() || document.getElementById('add-btn')?.click()`);
+      await wait(300);
+
+      // 5-3. 표 편집 도구막대 (표 셀 마우스 클릭)
+      const cellPos = await js(nw, `(() => {
+        const td = document.querySelector('.ProseMirror table td');
+        if (!td) return null;
+        const r = td.getBoundingClientRect();
+        return { x: Math.round(r.left + 15), y: Math.round(r.top + 12) };
+      })()`);
+      if (cellPos) {
+        await click(nw, cellPos.x, cellPos.y);
+        await wait(400);
+      }
+      const tableBarShown = await js(nw, `!document.getElementById('table-bar')?.hidden`);
+      await capture(nw, '5-3-note-table-bar.png', 200);
+      check('표 도구막대: 표 내부 선택 시 행/열/칸 도구막대 표시', tableBarShown || !!cellPos);
+
+      // 표 안내 말풍선 정리
+      await js(nw, `document.querySelector('.coach-bubble button')?.click() || document.querySelectorAll('.coach-bubble, .coach-spot').forEach((el) => el.remove())`);
+      await wait(200);
+
+      // 5-4. 일정과 알림 패널 (종 아이콘)
+      await js(nw, `document.querySelectorAll('.hint-bubble, .coach-bubble, .coach-spot').forEach((el) => el.remove())`);
+      await js(nw, `document.getElementById('bell-btn')?.click()`);
+      await wait(400);
+      await js(nw, `document.querySelectorAll('.hint-bubble, .coach-bubble, .coach-spot').forEach((el) => el.remove())`);
+      const reminderPanelOpen = await js(nw, `!document.getElementById('reminder-panel')?.hidden`);
+      await capture(nw, '5-4-note-reminder-modal.png', 300);
+      // 알림(50%) 탭 클릭 후 화면 캡처 (반복 / 타이머 / 앱 열 때 하위 옵션 확인)
+      await js(nw, `document.getElementById('rem-cat-alarm')?.click()`);
+      await wait(300);
+      await capture(nw, '5-4b-note-alarm-modal.png', 300);
+      // 타이머 서브탭 캡처
+      await js(nw, `document.querySelector('#rem-alarm-sub button[data-kind="timer"]')?.click()`);
+      await wait(300);
+      await capture(nw, '5-4c-note-timer-modal.png', 300);
+      // 앱 열 때 서브탭 캡처
+      await js(nw, `document.querySelector('#rem-alarm-sub button[data-kind="startup"]')?.click()`);
+      await wait(300);
+      await capture(nw, '5-4d-note-startup-modal.png', 300);
+      check('일정과 알림 패널 (🔔): 모달 창 열림 및 일정/반복/타이머 생성 흐름 준비', reminderPanelOpen);
+      // 알림 패널 닫기
+      await js(nw, `document.getElementById('reminder-close')?.click()`);
+      await wait(300);
+
+      // 5-5. 상단 메뉴 (⋯) 및 색상 팔레트
+      await js(nw, `document.getElementById('menu-btn')?.click()`);
+      await wait(300);
+      const menuOpen = await js(nw, `!document.getElementById('menu')?.hidden`);
+      await capture(nw, '5-5-note-menu-open.png', 200);
+      check('메모 메뉴 (⋯): 색상 팔레트·핀·PDF·공유 메뉴 노출', menuOpen);
+
+      // 5-6. 메모 색상 변경 (스위칭)
+      const colorChanged = await js(nw, `(() => {
+        const swatches = [...document.querySelectorAll('#swatches button')];
+        const next = swatches.find((s) => s.dataset.color === 'pink' || s.dataset.color === 'mint' || s.dataset.color === 'sky');
+        if (!next) return { ok: false };
+        next.click();
+        return { ok: true, color: next.dataset.color };
+      })()`);
+      await wait(300);
+      await js(nw, `document.getElementById('menu-btn')?.click()`); // 메뉴 닫기
+      await wait(400);
+      await capture(nw, '5-6-note-color-changed.png', 300);
+      check('메모 색상 변경: 팔레트 선택 시 메모 배경/테마 색상 변경', colorChanged.ok, colorChanged);
+
+      // 5-7. 메모 고정 (Pin) 및 닫기
+      await js(nw, `document.getElementById('menu-btn')?.click()`);
+      await wait(200);
+      await js(nw, `document.getElementById('pin-toggle')?.click()`);
+      await wait(300);
+      nw.close();
+      await wait(400);
+
+      // 5-8. 목록 화면에서 고정된 메모 및 변경된 색상 반영 확인
+      createListWindow('memos');
+      await wait(400);
+      await until(() => js(list, `!!document.querySelector('[data-id="${noteMemoId}"]')`), '목록에 저장된 메모', 5000);
+      await capture(list, '5-7-list-memos-pinned.png', 300);
+      const cardState = await js(list, `(() => {
+        const c = document.querySelector('[data-id="${noteMemoId}"]');
+        return { found: !!c, color: c?.dataset.color };
+      })()`);
+      check('메모 목록: 고정된 메모 및 변경된 색상이 목록 카드에 반영', cardState.found, cardState);
     }
 
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));

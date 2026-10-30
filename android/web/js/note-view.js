@@ -398,7 +398,7 @@ function renderTagGroups() {
 }
 
 function refreshLinks() {
-  if (!id) return;
+  if (!id || el.linksBtn?.hidden) return;
   const { links, backlinks, suggestions: similar } = app.vault.links(id);
   // 위 "같은 태그의 메모"에 이미 보이는 메모는 비슷한 메모에서 뺀다 (같은 메모가 두 번 추천되지 않게)
   const inTags = new Set(tagGroups().flatMap((g) => g.memos.slice(0, 6).map((m) => m.id)));
@@ -550,6 +550,7 @@ el.linkSearch.addEventListener('input', () => {
 });
 
 el.linksBtn.addEventListener('click', () => {
+  if (el.linksBtn.hidden) return;
   flush();
   openSheet(el.linksPanel);
   refreshLinks();
