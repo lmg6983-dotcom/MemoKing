@@ -35,10 +35,11 @@ export function defaultStart(day, now = new Date()) {
 }
 
 /**
- * @param {{ day: Date, start?: Date|null, allDay?: boolean, title?: string, search: (q: string) => Promise<Array<{ id: string, title: string, color?: string, locked?: boolean }>> }} o
+ * 메모 창의 📅 도 같은 창 — memo 를 주면 그 메모에 넣는다 (넣을 메모 고르기는 숨김)
+ * @param {{ day: Date, start?: Date|null, allDay?: boolean, title?: string, memo?: { id: string, title: string }|null, search?: (q: string) => Promise<Array<{ id: string, title: string, color?: string, locked?: boolean }>> }} o
  * @returns {Promise<{ memoId: string|null, newTitle: string, reminder: object } | null>}
  */
-export function openQuickEvent({ day, start: initStart = null, allDay: initAllDay = false, title: initTitle = '', search }) {
+export function openQuickEvent({ day, start: initStart = null, allDay: initAllDay = false, title: initTitle = '', memo = null, search = async () => [] }) {
   return new Promise((resolve) => {
     let start = initStart ? new Date(initStart) : defaultStart(day);
     let end = new Date(start.getTime() + 3600_000);
@@ -65,6 +66,7 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
     // 이름
     const name = el('input', { type: 'text', class: 'qe-name', maxlength: '80', autocomplete: 'off', placeholder: '무슨 일정이에요? (예: 치과, 회의)', 'aria-label': '일정 이름' });
     name.value = initTitle;
+    if (memo) name.placeholder = `비우면 메모 제목 (${memo.title || '제목 없음'})`;
 
     // 하루 종일 토글 줄 + 시작 → 종료 (삼성 캘린더 방식)
     const allDayRow = el('label', { class: 'event-allday qe-allday' });
@@ -138,7 +140,8 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
     dialog.append(form);
 
     const title = () => name.value.replace(/\s+/g, ' ').trim();
-    let target = null; // 넣을 메모 { id, title } — null 이면 새 메모
+    let target = memo; // 넣을 메모 { id, title } — null 이면 새 메모
+    memoRow.hidden = Boolean(memo);
     const dayLabelText = (d) => {
       const rel = relativeDay(d);
       const ko = koFullDate(d).replace(/ \((.)\)$/, ' ($1)');

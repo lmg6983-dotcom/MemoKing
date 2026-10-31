@@ -512,12 +512,19 @@ h2.sheet-title { font-size: 20px; }
 .sheet .link-search { height: 44px; font-size: 15px; border-radius: 12px; }
 .sheet .link-open { min-height: 44px; font-size: 15px; }
 .sheet h4 { font-size: 13px; }
-.sheet .reminder-form input:not(.switch):not([type="radio"]), .sheet .reminder-form select { height: 40px; font-size: 15px; }
 .sheet .seg button { height: var(--tap); font-size: 13.5px; }
 .sheet .chips button { height: var(--tap); padding: 0 12px; font-size: 14px; }
-.sheet .rem-radio { min-height: 40px; font-size: 14.5px; }
 .sheet .rem-item { min-height: 52px; }
 .sheet .rem-start { height: 50px; font-size: 16px; border-radius: 14px; }
+.sheet .task-row { min-height: 50px; padding: 0 14px; }
+.sheet .task-row-label { font-size: 15px; }
+.sheet .task-row-when { font-size: 13.5px; }
+.sheet .task-trigger.seg button { height: 40px; font-size: 14px; }
+.sheet .reminder-panel .task-form .task-title, .sheet.reminder-panel .task-form .task-title { font-size: 19px; }
+.sheet .task-hint { font-size: 13px; }
+.sheet .task-summary { font-size: 14.5px; }
+.sheet .reminder-panel .task-repeat select, .sheet.reminder-panel .task-repeat select { height: 44px; font-size: 15px; }
+.sheet .task-check { width: 26px; height: 26px; }
 /* 아래 막대는 시트 아래 여백까지 덮는다 — 여백만큼 떠 있으면 그 틈으로 뒤 내용("…에 알려요")이 비쳐 보였다 */
 .sheet .flow-footer { bottom: calc(-20px - env(safe-area-inset-bottom)); margin-bottom: calc(-20px - env(safe-area-inset-bottom)); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 .sheet .flow-footer .btn { min-height: 52px; font-size: 16px; border-radius: 14px; }

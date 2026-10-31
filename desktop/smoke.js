@@ -513,7 +513,12 @@ export async function runSmoke({
     await press(v1.win, 'Escape');
     const backToBtn = await js(v1.win, `document.getElementById('menu').hidden && document.activeElement?.id === 'menu-btn'`);
     check('메뉴: 키보드로 열기(첫 항목) · ↓ 다음 · Esc 닫고 ⋯ 로', firstFocused && secondFocused && backToBtn, JSON.stringify([firstFocused, secondFocused, backToBtn]));
-    check('알림 종류 칸: 칸마다 radio (화면 읽기에 "4개 중 1번째, 선택됨")', await js(v1.win, `document.querySelectorAll('#rem-kind [role="radio"]').length === 4 && document.querySelectorAll('#rem-kind [tabindex="0"]').length === 1`));
+    check('알림 언제 고르기: 줄마다 radio (화면 읽기에 "N개 중 1번째, 선택됨")', await js(v1.win, `(() => {
+      document.getElementById('bell-btn').click();
+      const ok = document.querySelectorAll('.task-presets [role="radio"]').length >= 4 && document.querySelectorAll('.task-presets [tabindex="0"]').length === 1;
+      document.getElementById('reminder-close').click();
+      return ok;
+    })()`));
     await closeNote(v1.id);
 
     // 11) 목록 카드를 끌어 화면에 놓기 (v0.4.0)
@@ -1343,7 +1348,7 @@ export async function runSmoke({
         check('메뉴 › 그림으로 복사: 클립보드에 그림', copied);
       }
       // 뒤의 알림 예약 탭 점검이 세는 알림 수에 섞이지 않게 지운다
-      await js(dn.win, `document.querySelector('#reminder-list .rem-item .icon-btn')?.click()`);
+      await js(dn.win, `document.getElementById('event-btn').click(); document.querySelector('#reminder-list .rem-item .icon-btn')?.click()`);
       await until(() => remindersOf(dn.id).length === 0, '날짜 알림 삭제').catch(() => {});
       await closeNote(dn.id);
     }
@@ -1434,39 +1439,35 @@ export async function runSmoke({
     await capture(lw, 'smoke-history-consent.png');
     await listJs(`document.querySelector('[data-tab="memos"]').click()`);
 
-    // 14-1) 메모 창 알림 패널에서 "반복 매주 월 09:30, 메모 띄우기" 와 "5분 타이머, 알림만" 추가
+    // 14-1) 메모 창 알림 패널(🔔)에서 "월요일 아침, 매주" 와 "1시간 뒤" 알림 추가 (구글 리마인더처럼)
     const rn = await openN1();
     await key(rn.win, 'A', ['control', 'shift']);
     const panelOpen = await until(() => js(rn.win, `!document.getElementById('reminder-panel').hidden`), '알림 패널').catch(() => false);
-    check('종 버튼(Ctrl+Shift+A) → 예약 알림 패널', panelOpen);
+    check('종 버튼(Ctrl+Shift+A) → 알림 패널', panelOpen);
     await js(rn.win, `(() => {
-      document.querySelector('[data-kind="repeat"]').click();
-      const every = document.getElementById('rep-every');
+      document.querySelector('.task-title').value = '주간 보고';
+      document.querySelector('[data-preset="monday"]').click();
+      const every = document.querySelector('.task-repeat select');
       every.value = 'week';
       every.dispatchEvent(new Event('change'));
-      const mon = document.querySelector('[data-wd="1"]');
-      if (mon.getAttribute('aria-pressed') !== 'true') mon.click();
-      document.getElementById('rep-time').value = '09:30';
-      document.querySelector('input[name="action"][value="open"]').click();
-      document.getElementById('reminder-form').requestSubmit();
+      document.querySelector('.task-form').requestSubmit();
     })()`);
     await until(() => remindersOf(n1.id).length === 1, '반복 알림 저장').catch(() => {});
     await js(rn.win, `(() => {
-      document.querySelector('[data-kind="timer"]').click();
-      document.querySelector('[data-min="5"]').click();
-      document.querySelector('input[name="action"][value="notify"]').click();
-      document.getElementById('reminder-form').requestSubmit();
+      document.querySelector('.reminder-body .rem-start').click();
+      document.querySelector('[data-preset="hour"]').click();
+      document.querySelector('.task-form').requestSubmit();
     })()`);
-    await until(() => remindersOf(n1.id).length === 2, '타이머 저장').catch(() => {});
+    await until(() => remindersOf(n1.id).length === 2, '1시간 뒤 알림 저장').catch(() => {});
     const saved = remindersOf(n1.id);
     const weekly = saved.find((r) => r.kind === 'repeat');
-    const timer = saved.find((r) => r.kind === 'timer');
+    const soon = saved.find((r) => r.kind === 'at');
     const md = readMemo(n1.id);
-    check('반복 알림 → 메모 파일 머리말에 저장 (매주 월 09:30, 메모 띄우기)',
-      weekly?.repeat.every === 'week' && weekly.repeat.weekdays.includes(1) && weekly.repeat.time === '09:30' && weekly.action === 'open' && /reminders:/.test(md),
+    check('반복 알림 → 메모 파일 머리말에 저장 (주간 보고, 매주 월 09:00, 알림)',
+      weekly?.task === true && weekly.title === '주간 보고' && weekly.repeat.every === 'week' && weekly.repeat.weekdays.includes(1) && weekly.repeat.time === '09:00' && /reminders:/.test(md),
       JSON.stringify(weekly));
-    check('타이머 5분 → 약 5분 뒤 시각으로 저장',
-      timer && Math.abs(Date.parse(timer.at) - Date.now() - 5 * 60_000) < 60_000 && timer.action === 'notify', JSON.stringify(timer));
+    check('1시간 뒤 → 약 1시간 뒤 시각의 알림으로 저장',
+      soon?.task === true && Math.abs(Date.parse(soon.at) - Date.now() - 60 * 60_000) < 60_000, JSON.stringify(soon));
     check('메모 창 종 버튼 개수 표시', (await js(rn.win, `document.getElementById('bell-count').textContent`)) === '2');
     await capture(rn.win, 'smoke-reminder-panel.png');
 
@@ -1482,12 +1483,12 @@ export async function runSmoke({
       })(),
       dots: document.querySelectorAll('#reminder-groups .mk-ev, #reminder-groups .cal-dots i').length,
       events: [...document.querySelectorAll('#reminder-groups .ev-row')].map((r) => r.textContent),
-      timer: document.querySelector('#reminder-groups .rem-row-item .row-sub')?.textContent,
+      tasks: [...document.querySelectorAll('#reminder-groups .task-row-item .row-sub')].map((r) => r.textContent).join(' | '),
       count: document.getElementById('count-reminders').textContent,
     })`);
-    // 매주 월 일정은 만든 날(오늘)부터라 달 끝 가까이에는 달력에 보이는 월요일이 한두 번뿐이다 — 점이 하나 이상이면 된다
-    check('일정 탭: 한 달 달력(FullCalendar, 오늘 선택) · 매주 월 일정이 날짜별로 막대·목록 (미리 알림 표시) · 타이머는 따로',
-      tab.days === 42 && tab.today && tab.dots >= 1 && tab.events.some((t) => /09:30|9:30/.test(t) && /알림 10분 전/.test(t)) && /5분 타이머/.test(tab.timer) && tab.count === '2', JSON.stringify(tab));
+    // 알림은 달력에 동그라미로 (매주 월은 만든 날부터라 달 끝에는 한두 번뿐 — 하나 이상이면 된다), 아래 "알림" 목록에 동그라미와 함께
+    check('일정 탭: 한 달 달력(FullCalendar, 오늘 선택) · 알림은 달력에 동그라미 · 아래 알림 목록 (매주 월)',
+      tab.days === 42 && tab.today && tab.dots >= 1 && /매주 월/.test(tab.tasks) && tab.count === '2', JSON.stringify(tab));
     await capture(lw, 'smoke-reminders-tab.png');
     // 창을 줄이거나 넓혀도 달력이 잘리지 않는다 (가장 작은 창 300×380 · 낮고 넓은 창 · 넓은 창은 달력 왼쪽·목록 오른쪽)
     {
@@ -1523,7 +1524,7 @@ export async function runSmoke({
       ...${JSON.stringify(saved)}, { kind: 'at', at: ${JSON.stringify(past(20_000))}, action: 'notify' }])`);
     const toast = await until(() => smokeToasts.find((t) => t.memoId === n1.id), 'Windows 알림').catch(() => null);
     check('시각이 된 알림 → Windows 알림 (제목·때)', toast && toast.title === '장보기 목록' && /오늘 \d{2}:\d{2}/.test(toast.body), JSON.stringify(toast));
-    const done = remindersOf(n1.id).find((r) => r.kind === 'at');
+    const done = remindersOf(n1.id).find((r) => r.kind === 'at' && !r.task);
     check('한 번짜리 알림은 울린 뒤 꺼짐(완료)', done && !done.enabled && done.last);
     await closeNote(rn.id);
 

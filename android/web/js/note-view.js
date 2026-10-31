@@ -1160,6 +1160,7 @@ function setupPanels() {
   reminderPanel = setupReminderPanel({
     api: app.api,
     memoId: null,
+    memoTitle: () => memo?.title ?? '',
     setStatus,
     onToggle: (open) => {
       const panel = $('reminder-panel');

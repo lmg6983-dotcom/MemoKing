@@ -2050,6 +2050,7 @@ if (!memo) {
   reminderPanel = setupReminderPanel({
     api,
     memoId: id,
+    memoTitle: () => memo?.title ?? '',
     setStatus,
     onToggle: (open) => open && (!el.linksPanel.hidden && toggleLinks(false), aiPanel?.open && aiPanel.toggle(false)),
     onChange: () => editor?.refreshDates(),

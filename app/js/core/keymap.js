@@ -14,7 +14,7 @@ export const KEYMAP_ACTIONS = [
   { id: 'close', group: '메모 창', label: '닫기', help: '메모 창(또는 지금 탭)을 닫아요. 적은 내용은 이미 저장되어 있어요.', keys: ['ctrl+KeyW'], run: ['app', 'close'] },
   { id: 'top', group: '메모 창', label: '늘 위에 두기 (왕관)', help: '왕관 스티커를 붙여 이 메모가 다른 창에 가려지지 않게 해요. 다시 누르면 떼어져요.', keys: ['ctrl+shift+KeyT'], run: ['app', 'top'] },
   { id: 'tape', group: '메모 창', label: '바탕화면에 붙이기 (테이프)', help: '테이프로 바탕화면에 붙여 다른 창 뒤에 두어요. 다시 누르면 떼어져요.', keys: ['ctrl+shift+KeyG'], run: ['app', 'tape'] },
-  { id: 'reminders', group: '메모 창', label: '예약 알림', help: '원하는 날짜와 시간에 이 메모를 알려 주는 알림을 맞춰요.', keys: ['ctrl+shift+KeyA'], run: ['app', 'reminders'] },
+  { id: 'reminders', group: '메모 창', label: '알림', help: '할 일을 원하는 때에 알려 주는 알림을 맞춰요 (구글 리마인더처럼).', keys: ['ctrl+shift+KeyA'], run: ['app', 'reminders'] },
   { id: 'links', group: '메모 창', label: '메모 연결', help: '관련된 메모를 이어 두거나, 이어 둔 메모를 봐요.', keys: ['ctrl+KeyK'], run: ['app', 'links'] },
   { id: 'pdf', group: '메모 창', label: UI.saveAsPdf, help: '종이 크기, 여백, 글자 크기를 골라 이 메모를 PDF 파일로 저장해요.', keys: ['ctrl+shift+KeyP'], run: ['menu', 'pdf-btn'] },
   { id: 'versions', group: '메모 창', label: '이전 버전', help: '10분마다 남겨 둔 이 메모의 지난 모습을 보고, 되돌릴 수 있어요.', keys: ['ctrl+shift+KeyY'], run: ['menu', 'versions-btn'] },
