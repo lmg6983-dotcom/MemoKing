@@ -121,3 +121,14 @@ test('알림: 빨리 고르기 · 반복 고르기 문구', () => {
   assert.equal(taskPresets(new Date(2026, 9, 31, 20, 0)).some((p) => p.id === 'evening'), false);
   assert.deepEqual(taskRepeatChoices(sat).map((c) => c.label), ['반복 안 함', '매일', '매주 토요일', '매월 31일', '매년 10월 31일']);
 });
+
+test('알림 한 줄 설명: 오전 · 오후 시각, 반복은 다음 날, 완료', async () => {
+  const { describeTask } = await import('../app/js/core/reminders.js');
+  const now = new Date(2026, 9, 31, 10, 0); // 토
+  const once = norm(buildTask({ at: new Date(2026, 9, 31, 18, 0) }, now));
+  assert.equal(describeTask(once, now), '오늘 오후 6:00');
+  const weekly = norm({ ...buildTask({ at: new Date(2026, 9, 31, 18, 0), every: 'week' }, now), created: '2026-10-31T09:00:00' });
+  assert.equal(describeTask(weekly, now), '매주 토요일 오후 6:00 · 다음 오늘');
+  assert.equal(describeTask({ ...once, done: true }, now), '완료');
+  assert.equal(describeTask({ ...once, enabled: false }, now), '오늘 오후 6:00 · 꺼짐');
+});

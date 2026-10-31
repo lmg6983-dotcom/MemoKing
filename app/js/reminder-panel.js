@@ -6,7 +6,7 @@
 import { icon } from './icons.js';
 import {
   describeReminder, describeAlerts, nextLabel, isDone, isEvent, isPastEvent, reenable, pendingAlerts, fallbackAlert,
-  taskPresets, taskRepeatChoices, buildTask,
+  taskPresets, taskRepeatChoices, buildTask, describeTask,
 } from './core/reminders.js';
 import { openQuickEvent } from './quick-event.js';
 import { dayLabel, koClock, toLocalIso } from './core/time.js';
@@ -108,7 +108,7 @@ export function setupReminderPanel({ api, memoId, memoTitle = () => '', setStatu
     li.classList.toggle('off', !r.enabled && !done);
     const name = r.title || memoTitle() || '이 메모';
     const text = h('div', 'rem-text');
-    text.append(h('div', 'rem-title', name), h('div', 'rem-sub', taskWhen(r)));
+    text.append(h('div', 'rem-title', name), h('div', 'rem-sub', describeTask(r)));
     if (r.task) {
       // 구글 리마인더처럼: 동그라미를 누르면 완료 (다시 누르면 되살림)
       const check = h('button', 'task-check');
@@ -131,15 +131,6 @@ export function setupReminderPanel({ api, memoId, memoTitle = () => '', setStatu
     }
     li.append(iconButton('trash', `${name} 삭제`, () => remove(r)));
     return li;
-  }
-
-  function taskWhen(r) {
-    if (isDone(r)) return r.done ? '완료' : '알렸어요';
-    if (r.kind === 'startup') return describeReminder(r);
-    const next = nextLabel(r);
-    const repeat = r.kind === 'repeat' ? describeReminder(r).replace(/\s\d{2}:\d{2}$/, '') : '';
-    if (!next) return [repeat, !r.enabled ? UI.off : ''].filter(Boolean).join(', ');
-    return repeat ? `${repeat}, 다음 ${next}` : next;
   }
 
   function iconButton(name, label, onClick) {

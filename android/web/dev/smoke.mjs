@@ -491,7 +491,7 @@ try {
   await page.fill('.qe-name', '주간 보고');
   const moved = ymd(new Date(Date.now() + 2 * 86_400_000));
   await page.fill('.qe-date-input', moved);
-  check('새 일정 창: 날짜를 바꿀 수 있음 (📅 칸)', (await page.textContent('.qe-date-text')).includes(`${new Date(Date.now() + 2 * 86_400_000).getDate()}일`), await page.textContent('.qe-date-text'));
+  check('새 일정 창: 날짜를 바꿀 수 있음 (📅 칸)', new RegExp(`(/|월 )${new Date(Date.now() + 2 * 86_400_000).getDate()}(일| )`).test(await page.textContent('.qe-date-text')), await page.textContent('.qe-date-text'));
   await page.tap('.qe-memo-row');
   await page.fill('.qe-search', '회의');
   await page.waitForTimeout(200);

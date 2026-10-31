@@ -12,7 +12,7 @@
 //       last: 2026-10-01T09:00:02+09:00   # 마지막으로 울린 시각
 //       task: true              # 알림 (구글 리마인더처럼 "할 일 + 때") — 일정이 아니다. at(한 번) · repeat(반복)
 //       done: true              # (알림) 완료로 표시함
-import { toLocalIso, dateKey, hhmm, dayLabel, WEEKDAY } from './time.js';
+import { toLocalIso, dateKey, hhmm, dayLabel, koClock, WEEKDAY } from './time.js';
 
 export const KINDS = ['timer', 'at', 'repeat', 'startup'];
 export const EVERY = ['day', 'week', 'month', 'year'];
@@ -554,4 +554,25 @@ export function buildTask({ title = '', at: when, every = 'none', action = 'noti
   if (every === 'year') repeat.month = d.getMonth() + 1;
   // 첫 회차는 지금 뒤의 그 요일 · 그날 — 고른 날이 곧 첫 회차 (오늘 시각이 지났으면 다음 회차부터)
   return { ...base, kind: 'repeat', repeat };
+}
+
+/** 알림 한 줄 설명 (메모 창 · 일정 탭 같은 글): "오늘 오후 6:00" · "매주 토요일 오후 6:00 · 다음 내일" · "완료" */
+export function describeTask(r, now = new Date()) {
+  if (r.done) return '완료';
+  if (r.kind !== 'at' && r.kind !== 'repeat') return describeReminder(r, now);
+  const off = r.enabled ? '' : ' · 꺼짐';
+  if (r.kind === 'at') {
+    const at = validDate(r.at);
+    if (!at) return '';
+    const when = `${dayLabel(at, now)} ${koClock(at)}`;
+    return isDone(r) ? `${when}에 알렸어요` : when + off;
+  }
+  const { every, weekdays = [], day, month } = r.repeat;
+  const t = parseTime(r.repeat.time);
+  const label = every === 'day' || (every === 'week' && weekdays.length === 7) ? '매일'
+    : every === 'week' ? `매주 ${weekdays.map((w) => WEEKDAY[w]).join('·')}요일`
+    : every === 'month' ? `매월 ${day}일` : `매년 ${month}월 ${day}일`;
+  const next = r.enabled ? nextTime(r, now) : Infinity;
+  const nextDay = Number.isFinite(next) ? ` · 다음 ${dayLabel(new Date(next), now)}` : '';
+  return `${label} ${koClock(new Date(2000, 0, 1, t.h, t.min))}${nextDay}${off}`;
 }

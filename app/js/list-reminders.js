@@ -7,7 +7,7 @@
 import { Calendar, dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin, koLocale } from '../vendor/fullcalendar.js';
 import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
-import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
+import { describeReminder, describeTask, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocalIso } from './core/time.js';
 import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, importedEventBody } from './core/calendar-feeds.js';
 import { findDates, guessTitle } from './core/date-detect.js';
@@ -1170,7 +1170,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     const sub = el('span', 'row-sub');
     const words = el('span');
     const when = r.done ? '완료' : isDone(r) ? '끝났어요' : !r.enabled ? UI.off : r.kind === 'startup' ? '' : nextLabel(r);
-    if (r.task) words.append(...(when ? [el('b', '', when)] : []), r.kind === 'repeat' ? `, ${describeReminder(r)}` : '');
+    if (r.task) words.append(describeTask(r));
     else {
       if (when) words.append(el('b', '', when), ', ');
       words.append(`${describeReminder(r)}, ${r.action === 'open' ? UI.showMemo : '알림만 보내기'}`);

@@ -142,10 +142,11 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
     const title = () => name.value.replace(/\s+/g, ' ').trim();
     let target = memo; // 넣을 메모 { id, title } — null 이면 새 메모
     memoRow.hidden = Boolean(memo);
+    // 좁은 칸에도 다 보이게: "오늘 · 10/31 (토)" · "11월 3일 (화)" (해가 다르면 연도도)
     const dayLabelText = (d) => {
       const rel = relativeDay(d);
-      const ko = koFullDate(d).replace(/ \((.)\)$/, ' ($1)');
-      return rel ? `${rel} · ${ko}` : ko;
+      const wd = `(${'일월화수목금토'[d.getDay()]})`;
+      return rel ? `${rel} · ${d.getMonth() + 1}/${d.getDate()} ${wd}` : koFullDate(d);
     };
 
     function syncDates() {
