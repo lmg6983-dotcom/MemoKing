@@ -398,12 +398,12 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 }
 .note-screen .status { font-size: 12.5px; padding: 0 4px; }
 /* 숫자는 아이콘 바로 오른쪽 아래에 아래첨자처럼 (예전: 아이콘 밑 줄로 내려가 어수선함) */
-.note-screen .count-btn, .note-screen .links-btn { display: inline-flex; flex-direction: row; align-items: center; justify-content: center; width: auto; min-width: var(--tap); padding: 0 6px; gap: 0; }
-.note-screen .count-btn .count, .note-screen .links-btn .count {
+.note-screen .count-btn { display: inline-flex; flex-direction: row; align-items: center; justify-content: center; width: auto; min-width: var(--tap); padding: 0 6px; gap: 0; }
+.note-screen .count-btn .count {
   align-self: flex-end; margin: 0 0 11px -1px;
   font-size: 11px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
 }
-.note-screen .count-btn .count:empty, .note-screen .links-btn .count:empty { display: none; }
+.note-screen .count-btn .count:empty { display: none; }
 
 .note-screen .banner { font-size: 13.5px; padding: 10px 12px; }
 .note-screen .banner-btn { height: var(--tap); padding: 0 12px; font-size: 13px; }
@@ -517,12 +517,6 @@ h2.sheet-title { font-size: 20px; }
 .sheet .chips button { height: var(--tap); padding: 0 12px; font-size: 14px; }
 .sheet .rem-radio { min-height: 40px; font-size: 14.5px; }
 .sheet .rem-item { min-height: 52px; }
-.sheet .rem-q { font-size: 19px; margin-bottom: 14px; }
-.sheet .rem-kinds button { min-height: 60px; padding: 12px 14px; border-radius: 14px; }
-.sheet .rem-kinds button b { font-size: 16px; }
-.sheet .rem-kinds button small { font-size: 13px; }
-.sheet .rem-answer { min-height: 46px; padding: 10px 4px; }
-.sheet .rem-answer b { font-size: 15px; }
 .sheet .rem-start { height: 50px; font-size: 16px; border-radius: 14px; }
 /* 아래 막대는 시트 아래 여백까지 덮는다 — 여백만큼 떠 있으면 그 틈으로 뒤 내용("…에 알려요")이 비쳐 보였다 */
 .sheet .flow-footer { bottom: calc(-20px - env(safe-area-inset-bottom)); margin-bottom: calc(-20px - env(safe-area-inset-bottom)); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }

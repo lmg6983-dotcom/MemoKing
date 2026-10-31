@@ -539,7 +539,6 @@ function renderCard(memo) {
   if (memo.hasAudio) meta.append(badge('audio', ''));
   if (memo.hasVideo) meta.append(badge('video', ''));
   if (memo.hasFile) meta.append(badge('clip', ''));
-  if (memo.linkCount) meta.append(badge('link', memo.linkCount));
   if (memo.stack) meta.append(badge('tabs', memo.stack, 'stack'));
   // 테이프로 바탕화면에 붙여 둔 메모 (창이 떠 있을 때)
   if (memo.taped) {

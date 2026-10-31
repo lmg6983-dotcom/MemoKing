@@ -21,7 +21,7 @@ import { LinkPreviews } from './web-fetch.js';
 import { createAlarms } from './alarms.js';
 import { injectMobileIcons } from './m-icons.js';
 import { app } from './state.js';
-import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, confirmDialog, closeConfirm, cancelTopDialog, matchChrome, isTwoPane } from './ui.js';
+import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, copiedToast, confirmDialog, closeConfirm, cancelTopDialog, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
 import { renderMemoImage } from '../../app/js/share-image.js';
 import * as widgets from './widgets.js';
@@ -181,7 +181,7 @@ app.api = {
   memo: { open: (id) => app.openMemo(id) },
   copyText: async (text) => {
     native.copyText(text);
-    toast('복사했어요');
+    copiedToast('복사했어요');
   },
   // 알림 보관함 (app/js/list-history.js 가 씀) — 거르기·검색은 여기서
   history: {
@@ -525,7 +525,7 @@ memoSheet.addEventListener('click', async (e) => {
     case 'copy':
       closeSheet(memoSheet);
       native.copyText(shareText(body)); // 마크다운 원문(<br /> · \* · - [ ]) 대신 보이는 글 그대로
-      toast(UI.textCopied);
+      copiedToast(UI.textCopied);
       break;
     case 'print':
       closeSheet(memoSheet);

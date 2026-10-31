@@ -93,7 +93,6 @@ export const KIND_FILTERS = [
   { id: 'image', label: '사진', test: (m) => m.hasImage },
   { id: 'file', label: '파일', test: (m) => m.hasFile || m.hasAudio || m.hasVideo },
   { id: 'web', label: '웹 링크', test: (m) => m.hasWebLink },
-  { id: 'linked', label: '연결', test: (m) => m.linkCount > 0 },
 ];
 
 /** 검색어에서 #태그 를 떼어 낸다: "#업무 회의" → { text: '회의', tags: ['업무'] } */
