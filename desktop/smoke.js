@@ -338,19 +338,18 @@ export async function runSmoke({
         && md1.includes('![동영상 데모 영상](attachments/') && md1.includes('[회의자료.txt](attachments/'),
       attachments.join(', '));
 
-    // 5) 두 번째 메모 + 연결 패널에서 검색해 연결
+    // 5) 두 번째 메모 — 메모 연결 화면은 v0.74.2 에서 없앴다. 예전 메모의 연결(머리말 links)은 그대로 읽고 index.json 에 남는지 아래 7) 에서 본다
     const n2 = await newNote(() => js(list, `(document.getElementById('fab').click(), document.querySelector('#fab-menu [data-new="text"]').click())`));
     await type(n2.win, '마트 영수증');
     await key(n2.win, 'Enter');
     await type(n2.win, '우유와 계란을 샀다');
-    await key(n2.win, 'K', ['control']);
-    await until(() => js(n2.win, `!document.getElementById('links-panel').hidden`), '연결 패널');
-    await type(n2.win, '장보기');
-    await until(() => js(n2.win, `document.querySelectorAll('#link-results .link-item').length > 0`), '연결 검색 결과');
-    await js(n2.win, `document.querySelector('#link-results .link-item .icon-btn').click()`);
+    check('메모 연결 단추 없음 (Ctrl+K 로도 연결 화면이 열리지 않음)', await (async () => {
+      await key(n2.win, 'K', ['control']);
+      await wait(200);
+      return js(n2.win, `document.getElementById('links-btn').hidden && document.getElementById('links-panel').hidden`);
+    })());
+    vault.link(n2.id, n1.id, true); // 예전 기기에서 연결해 둔 메모처럼
     await until(() => vault.get(n2.id)?.links.includes(n1.id), '연결 저장');
-    check('연결 패널에서 검색해 연결', true);
-    await capture(n2.win, 'smoke-links.png');
 
     // 6) 입력 직후 바로 닫아도 저장
     await key(n2.win, 'Escape');
