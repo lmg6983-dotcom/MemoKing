@@ -123,6 +123,13 @@ document.addEventListener('touchend', () => {
 // ---------- 잠깐 알림 ----------
 
 let toastTimer = null;
+// 안드로이드 13+ 은 앱이 복사하면 시스템이 아래에 "복사됨" 을 띄운다 — 같은 말을 위에 또 띄우지 않게 (그 전 버전만 우리 알림)
+let systemCopyNotice = null;
+export function copiedToast(text) {
+  systemCopyNotice ??= (native.info()?.sdk ?? 0) >= 33;
+  if (!systemCopyNotice) toast(text);
+}
+
 /**
  * @param {string} text
  * @param {boolean} [isError]

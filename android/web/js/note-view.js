@@ -11,7 +11,7 @@ import { reminderAt } from '../../app/js/date-remind.js';
 import { lockScreen } from '../../app/js/lock-ui.js';
 import { openLock, isLockedBody } from '../../app/js/core/memo-lock.js';
 import { fillModeTag } from '../../app/js/core/modes.js';
-import { collectTags, extractTags, sameTag } from '../../app/js/core/tags.js';
+import { collectTags, extractTags } from '../../app/js/core/tags.js';
 import { suggestTagsFor, appendTags } from '../../app/js/core/tag-suggest.js';
 import { clampZoom, zoomLabel } from '../../app/js/core/zoom.js';
 import { app } from './state.js';
@@ -45,7 +45,7 @@ import { fillSuggestChips, trackPlaceholder } from '../../app/js/suggest-chips.j
 import { setTouchMode, penJustTouched } from '../../app/js/keyboard-guard.js';
 import { setupModeKnob, MODES } from './mode-knob.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from '../../app/js/note-shared.js';
+import { paintTableBar, bindTableBar, createPalette, showNoteBanner } from '../../app/js/note-shared.js';
 
 const SAVE_DELAY = 600;
 const $ = (x) => document.getElementById(x);
@@ -54,16 +54,8 @@ const el = {
   bar: document.querySelector('#note-screen .bar'),
   status: $('status'),
   editorRoot: $('editor'),
-  linksBtn: $('links-btn'),
-  linksCount: $('links-count'),
   banner: $('banner'),
   bannerLoad: $('banner-load'),
-  linksPanel: $('links-panel'),
-  linkSearch: $('link-search'),
-  linkResults: $('link-results'),
-  linksOut: $('links-out'),
-  linksIn: $('links-in'),
-  linksSuggest: $('links-suggest'),
   formatBar: $('format-bar'),
   palette: $('palette'),
   tableBar: $('table-bar'),
@@ -72,9 +64,6 @@ const el = {
   redoBtn: $('redo-btn'),
   tagBar: $('tag-suggest-bar'),
   tagChips: $('tag-suggest-chips'),
-  linksTags: $('links-tags'),
-  linksTagsEmpty: $('links-tags-empty'),
-  linksTagSuggest: $('links-tag-suggest'),
 };
 
 let editor = null;
@@ -246,7 +235,6 @@ export function onVaultChanged({ ids, external, removed }) {
       applyMeta(next);
       reminderPanel?.set(next.reminders);
     }
-    refreshLinks();
   }
 }
 // 쓰는 중에 다른 기기에서도 이 메모를 고쳤을 때: 지금 쓰는 글은 이 메모에 그대로 저장하고, 들어온 내용은 사본 메모로
@@ -322,39 +310,6 @@ el.screen.addEventListener('animationend', (e) => {
   if (e.animationName === 'note-highlight') el.screen.classList.remove('highlight');
 });
 
-// ---------- 연결 패널 ----------
-
-const linkItem = (target, opts = {}) => sharedLinkItem(target, {
-  ...opts,
-  onOpen: () => {
-    closeSheet(el.linksPanel);
-    app.openMemo(target.id);
-  },
-});
-
-function setLink(targetId, on) {
-  flush();
-  if (!app.vault.link(id, targetId, on)) toast(UI.linkSaveFail, true);
-  el.linkSearch.value = '';
-  el.linkResults.replaceChildren();
-  refreshLinks();
-}
-
-// 태그로 이어진 메모: 이 메모의 태그마다 같은 태그를 단 메모 (최근 고친 순, 태그마다 6개까지)
-function tagGroups() {
-  const tags = extractTags(editorMarkdown());
-  if (!tags.length) return [];
-  const all = app.vault.list().filter((m) => m.id !== id);
-  return tags.map((name) => ({ name, memos: all.filter((m) => (m.tags ?? []).some((t) => sameTag(t, name))) }));
-}
-
-function relatedCount() {
-  const { links, backlinks } = app.vault.links(id);
-  const ids = new Set([...links, ...backlinks].map((m) => m.id));
-  for (const g of tagGroups()) for (const m of g.memos) ids.add(m.id);
-  return ids.size;
-}
-
 function tagChip(name, { count, add = false, onClick } = {}) {
   const b = document.createElement('button');
   b.type = 'button';
@@ -367,66 +322,6 @@ function tagChip(name, { count, add = false, onClick } = {}) {
   }
   b.addEventListener('click', onClick);
   return b;
-}
-
-function renderTagGroups() {
-  const groups = tagGroups();
-  el.linksTagsEmpty.hidden = groups.length > 0;
-  el.linksTags.replaceChildren(...groups.map((g) => {
-    const box = document.createElement('div');
-    box.className = 'link-tag-group';
-    const head = document.createElement('div');
-    head.className = 'link-tag-head';
-    head.append(tagChip(g.name, { count: g.memos.length, onClick: () => app.filterByTag(g.name) }));
-    const more = document.createElement('span');
-    more.className = 'link-tag-hint';
-    more.textContent = g.memos.length ? '목록에서 모아 보기' : '같은 태그의 다른 메모가 없어요';
-    head.append(more);
-    box.append(head);
-    // 다른 메모가 없으면 위 안내 한 줄로 충분하다 (빈 목록의 "아직 없어요" 를 또 띄우지 않게)
-    if (g.memos.length) {
-      const ul = document.createElement('ul');
-      ul.className = 'link-list';
-      ul.append(...g.memos.slice(0, 6).map((m) => linkItem(m)));
-      box.append(ul);
-    }
-    return box;
-  }));
-  // 태그가 없으면 추천 태그를 여기서도 달 수 있게
-  const suggestions = groups.length ? [] : currentSuggestions();
-  el.linksTagSuggest.replaceChildren(...suggestions.map((t) => tagChip(t.name, { add: true, onClick: () => addTags([t.name]) })));
-}
-
-function refreshLinks() {
-  if (!id || el.linksBtn?.hidden) return;
-  const { links, backlinks, suggestions: similar } = app.vault.links(id);
-  // 위 "같은 태그의 메모"에 이미 보이는 메모는 비슷한 메모에서 뺀다 (같은 메모가 두 번 추천되지 않게)
-  const inTags = new Set(tagGroups().flatMap((g) => g.memos.slice(0, 6).map((m) => m.id)));
-  const suggestions = similar.filter((m) => !inTags.has(m.id));
-  const total = relatedCount();
-  el.linksCount.textContent = total ? String(total) : '';
-  el.linksBtn.setAttribute('aria-label', total ? `메모 연결 ${total}개` : '메모 연결');
-  el.linksBtn.classList.toggle('has-links', total > 0);
-  if (el.linksPanel.hidden) return;
-  renderTagGroups();
-  const mine = new Set(extractTags(editorMarkdown()).map((t) => t.toLocaleLowerCase('ko')));
-  el.linksOut.replaceChildren(...links.map((m) => linkItem(m, { onRemove: () => setLink(m.id, false) })));
-  // 이 메모를 연결한 메모·비슷한 메모는 있을 때만 (제목만 숨기면 빈 목록의 "아직 없어요"가 하나 더 보였다)
-  $('links-in-title').hidden = el.linksIn.hidden = backlinks.length === 0;
-  el.linksIn.replaceChildren(...backlinks.map((m) => linkItem(m)));
-  $('links-suggest-title').hidden = el.linksSuggest.hidden = suggestions.length === 0;
-  el.linksSuggest.replaceChildren(...suggestions.map((m) => {
-    const li = linkItem(m, { onAdd: () => setLink(m.id, true), score: m.score });
-    // 닮은 메모의 태그 중 이 메모에 없는 것: 함께 달면 태그로도 이어진다
-    const theirs = (app.vault.list().find((x) => x.id === m.id)?.tags ?? []).filter((t) => !mine.has(t.toLocaleLowerCase('ko'))).slice(0, 3);
-    if (theirs.length) {
-      const row = document.createElement('div');
-      row.className = 'link-borrow';
-      row.append(...theirs.map((t) => tagChip(t, { add: true, onClick: () => addTags([t]) })));
-      li.append(row);
-    }
-    return li;
-  }));
 }
 
 // ---------- 추천 태그 (태그가 없는 메모) ----------
@@ -510,10 +405,7 @@ function addTags(names) {
   flush();
   toast(`${names.map((n) => `#${n}`).join(' ')} 태그를 달았어요`);
   el.tagBar.hidden = true;
-  setTimeout(() => {
-    renderTagBar();
-    refreshLinks();
-  }, 50);
+  setTimeout(renderTagBar, 50);
 }
 
 /** 닫을 때: 태그 없는 메모에 확실한 추천 태그를 저절로 (설정, 되돌리기 가능) */
@@ -536,26 +428,6 @@ function autoTag(memoId, body) {
     },
   });
 }
-
-let linkSearchTimer = null;
-el.linkSearch.addEventListener('input', () => {
-  clearTimeout(linkSearchTimer);
-  linkSearchTimer = setTimeout(() => {
-    const q = el.linkSearch.value.trim();
-    if (!q) return el.linkResults.replaceChildren();
-    const linked = new Set(app.vault.links(id).links.map((m) => m.id));
-    const results = app.vault.search(q, id).filter((m) => !linked.has(m.id)).slice(0, 8);
-    el.linkResults.replaceChildren(...results.map((m) => linkItem(m, { onAdd: () => setLink(m.id, true) })));
-  }, 150);
-});
-
-el.linksBtn.addEventListener('click', () => {
-  if (el.linksBtn.hidden) return;
-  flush();
-  openSheet(el.linksPanel);
-  refreshLinks();
-});
-$('links-close').addEventListener('click', () => closeSheet(el.linksPanel));
 
 // ---------- 파일 넣기 ----------
 
@@ -1288,6 +1160,7 @@ function setupPanels() {
   reminderPanel = setupReminderPanel({
     api: app.api,
     memoId: null,
+    memoTitle: () => memo?.title ?? '',
     setStatus,
     onToggle: (open) => {
       const panel = $('reminder-panel');
@@ -1415,7 +1288,6 @@ export async function openNote(memoId, options = {}) {
     if (options.fresh && !options.record && !options.ink) knob.set('edit', { quiet: true }); // 새 글 메모는 쓰려고 연 것
     applyMode(knob.mode === 'draw' ? restMode : knob.mode); // 새로 만든 편집기에도 키보드 설정을
     reminderPanel.set(memo.reminders);
-    refreshLinks();
     el.undoBtn.disabled = true;
     el.redoBtn.disabled = true;
     renderTagBar();
@@ -1531,7 +1403,7 @@ export function closeNote({ quiet = false } = {}) {
   el.tagBar.hidden = true;
   recorder.detach();
   annotation?.exit(); // 주석을 그리던 중이면 저장
-  for (const panel of [el.linksPanel, $('reminder-panel')]) if (!panel.hidden) closeSheet(panel);
+  if (!$('reminder-panel').hidden) closeSheet($('reminder-panel'));
   editor?.destroy();
   editor = null;
   id = null;

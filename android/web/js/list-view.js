@@ -9,7 +9,7 @@ import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../
 import { COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
-import { matchChrome, confirmDialog, isTwoPane, toast, adoptSheet, releaseSheet } from './ui.js';
+import { matchChrome, confirmDialog, isTwoPane, toast, copiedToast, adoptSheet, releaseSheet } from './ui.js';
 import { call } from './native.js';
 import { renderCollage, collageName } from '../../app/js/memories-collage.js';
 import { base64Bytes, collageMemoBody } from '../../app/js/collage-preview.js';
@@ -269,7 +269,6 @@ function renderCard(memo) {
   if (memo.hasAudio) meta.append(badge('audio', ''));
   if (memo.hasVideo) meta.append(badge('video', ''));
   if (memo.hasFile) meta.append(badge('clip', ''));
-  if (memo.linkCount) meta.append(badge('link', memo.linkCount));
   const time = document.createElement('span');
   time.className = 'card-time';
   time.textContent = friendlyTime(memo.updated);
@@ -819,7 +818,8 @@ export function setup() {
           } },
           { id: 'copy', label: '복사', icon: 'copy', run: async () => {
             await call('copyImage', { base64 });
-            return UI.imageCopied;
+            copiedToast(UI.imageCopied);
+            return '';
           } },
           { id: 'save', label: '저장', icon: 'folder', run: async () => {
             const name = await call('saveAs', { name: collageName(o), mime: 'image/png', base64 });

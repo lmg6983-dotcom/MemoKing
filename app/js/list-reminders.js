@@ -7,7 +7,7 @@
 import { Calendar, dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin, koLocale } from '../vendor/fullcalendar.js';
 import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
-import { describeReminder, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
+import { describeReminder, describeTask, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocalIso } from './core/time.js';
 import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, importedEventBody } from './core/calendar-feeds.js';
 import { findDates, guessTitle } from './core/date-detect.js';
@@ -679,6 +679,23 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
         extendedProps: { item },
       });
     }
+    // 알림(구글 리마인더처럼): 그 때에 동그라미 표시 — 누르면 메모, 완료한 것은 줄을 긋는다
+    for (const item of items) {
+      const r = item.reminder;
+      if (!r.task || !matches(item)) continue;
+      for (const start of occurrencesBetween(r, from, to, 400)) {
+        out.push({
+          id: `${item.memoId}|${r.id}|${start.getTime()}`,
+          title: r.title || item.title,
+          start,
+          allDay: false,
+          editable: false,
+          className: `mk-ev mk-task${isDone(r) ? ' mk-done' : !r.enabled ? ' off' : ''}`,
+          color: 'var(--note-chip)',
+          extendedProps: { item },
+        });
+      }
+    }
     for (const e of externalBetween(from, to)) {
       out.push({
         id: `ext|${e.uid}|${e.start.getTime()}`,
@@ -756,7 +773,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       arg.jsEvent.preventDefault();
       const { item, ext } = arg.event.extendedProps;
       if (isMonth() && !sameDay(arg.event.start, selected)) pickDay(arg.event.start, { add: false });
-      if (item) showMemoEvent(item, arg.event.start);
+      if (item?.reminder.task) api.memo.open(item.memoId);
+      else if (item) showMemoEvent(item, arg.event.start);
       else if (ext) showExternal(ext);
     },
     eventDrop: (arg) => moveEvent(arg),
@@ -1151,21 +1169,42 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     const rowTitle = el('span', 'row-title', item.title);
     const sub = el('span', 'row-sub');
     const words = el('span');
-    const when = isDone(r) ? '끝났어요' : !r.enabled ? UI.off : r.kind === 'startup' ? '' : nextLabel(r);
-    if (when) words.append(el('b', '', when), ', ');
-    words.append(`${describeReminder(r)}, ${r.action === 'open' ? UI.showMemo : '알림만 보내기'}`);
-    sub.append(icon(KIND_ICON[r.kind]), words);
+    const when = r.done ? '완료' : isDone(r) ? '끝났어요' : !r.enabled ? UI.off : r.kind === 'startup' ? '' : nextLabel(r);
+    if (r.task) words.append(describeTask(r));
+    else {
+      if (when) words.append(el('b', '', when), ', ');
+      words.append(`${describeReminder(r)}, ${r.action === 'open' ? UI.showMemo : '알림만 보내기'}`);
+    }
+    sub.append(icon(r.task ? (r.kind === 'repeat' ? 'repeat' : 'bell') : KIND_ICON[r.kind]), words);
     text.append(rowTitle, sub);
     main.append(dot, text);
     main.addEventListener('click', () => api.memo.open(item.memoId));
 
-    const toggle = el('input', 'switch');
-    toggle.type = 'checkbox';
-    toggle.checked = r.enabled;
-    toggle.setAttribute('aria-label', `${item.title} 알림`);
-    toggle.addEventListener('change', () => update(item, (list) => list.map((x) => (x.id === r.id
-      ? (toggle.checked ? reenable(x) : { ...x, enabled: false })
-      : x))));
+    let toggle;
+    if (r.task) {
+      // 구글 리마인더처럼: 동그라미를 누르면 완료 (다시 누르면 되살림)
+      const done = isDone(r);
+      div.classList.add('task-row-item');
+      div.classList.toggle('done', done);
+      rowTitle.textContent = r.title || item.title;
+      toggle = el('button', 'task-check');
+      toggle.type = 'button';
+      toggle.setAttribute('aria-pressed', String(done));
+      toggle.setAttribute('aria-label', `${rowTitle.textContent} ${done ? '완료 취소' : '완료'}`);
+      toggle.title = done ? '완료 취소' : '완료';
+      toggle.append(icon('check'));
+      toggle.addEventListener('click', () => update(item, (list) => list.map((x) => (x.id === r.id
+        ? (done ? reenable(x) : { ...x, enabled: false, done: true })
+        : x))));
+    } else {
+      toggle = el('input', 'switch');
+      toggle.type = 'checkbox';
+      toggle.checked = r.enabled;
+      toggle.setAttribute('aria-label', `${item.title} 알림`);
+      toggle.addEventListener('change', () => update(item, (list) => list.map((x) => (x.id === r.id
+        ? (toggle.checked ? reenable(x) : { ...x, enabled: false })
+        : x))));
+    }
 
     const del = el('button', 'icon-btn');
     del.title = '알림 삭제';
@@ -1173,7 +1212,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     del.append(icon('trash'));
     del.addEventListener('click', () => update(item, (list) => list.filter((x) => x.id !== r.id)));
 
-    div.append(main, toggle, del);
+    if (r.task) div.append(toggle, main, del);
+    else div.append(main, toggle, del);
     return div;
   }
 
@@ -1227,8 +1267,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     const others = items.filter((i) => !isEvent(i.reminder) && matches(i));
     const active = others.filter((i) => i.reminder.enabled).sort((a, b) => nextTime(a.reminder, now) - nextTime(b.reminder, now));
     const off = others.filter((i) => !i.reminder.enabled);
-    if (active.length) out.push(heading(`타이머와 알림 ${active.length}`), ...active.map(row));
-    if (off.length) out.push(heading(`꺼졌거나 끝난 알림 ${off.length}`), ...off.map(row));
+    if (active.length) out.push(heading(`알림 ${active.length}`), ...active.map(row));
+    if (off.length) out.push(heading(`완료했거나 꺼진 알림 ${off.length}`), ...off.map(row));
 
     // 다른 캘린더를 받지 못했으면 한 줄로 (받아 둔 것은 그대로 보임)
     const failed = feeds.filter((f) => f.on && feedTexts.get(f.id)?.error);

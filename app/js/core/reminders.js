@@ -10,7 +10,9 @@
 //       allDay: true            # (일정) 하루 종일 — at 은 그날 00:00, 미리 알림은 그 기준 ("당일 오전 9시" = -540)
 //       created: 2026-09-30T10:00:00+09:00
 //       last: 2026-10-01T09:00:02+09:00   # 마지막으로 울린 시각
-import { toLocalIso, dateKey, hhmm, dayLabel, WEEKDAY } from './time.js';
+//       task: true              # 알림 (구글 리마인더처럼 "할 일 + 때") — 일정이 아니다. at(한 번) · repeat(반복)
+//       done: true              # (알림) 완료로 표시함
+import { toLocalIso, dateKey, hhmm, dayLabel, koClock, WEEKDAY } from './time.js';
 
 export const KINDS = ['timer', 'at', 'repeat', 'startup'];
 export const EVERY = ['day', 'week', 'month', 'year'];
@@ -43,7 +45,9 @@ export const MAX_ALERTS = 5;
 export const MAX_ALERT_MIN = 60 * 24 * 28;
 /** 미리 알림 값이 쓸 수 있는 것인지 (직접 정한 값 포함) — normalizeAlerts 와 같은 범위 */
 export const validAlert = (v, allDay = false) => Number.isInteger(v) && v >= (allDay ? -1439 : 0) && v <= MAX_ALERT_MIN;
-export const isEvent = (r) => r.kind === 'at' || r.kind === 'repeat';
+export const isEvent = (r) => (r.kind === 'at' || r.kind === 'repeat') && !r.task;
+/** 알림 (일정이 아닌 것): 구글 리마인더 같은 할 일 알림 · 예전 타이머 · 앱 열 때 */
+export const isTask = (r) => !isEvent(r);
 
 /** 미리 알림 (분 전) — 먼저 울리는 것부터. 적지 않았으면 정시(하루 종일은 당일 오전 9시) 한 번, [] 는 "알림 없음" (달력에만) */
 export function alertsOf(r) {
@@ -124,12 +128,15 @@ export function normalizeReminder(raw, now = new Date()) {
     created: validDate(raw.created) ? String(raw.created) : toLocalIso(now),
     last: validDate(raw.last) ? String(raw.last) : null,
   };
-  if (isEvent(r)) {
-    const title = typeof raw.title === 'string' ? raw.title.replace(/\s+/g, ' ').trim().slice(0, 80) : '';
-    if (title) r.title = title;
-    const alerts = normalizeAlerts(raw.alerts, raw.allDay === true);
+  if (raw.task === true && (r.kind === 'at' || r.kind === 'repeat')) r.task = true;
+  if (r.task && raw.done === true) r.done = true;
+  // 이름: 일정 · 알림 모두 (없으면 메모 제목)
+  const title = typeof raw.title === 'string' ? raw.title.replace(/\s+/g, ' ').trim().slice(0, 80) : '';
+  if (title) r.title = title;
+  if (isEvent(r) || r.task) {
+    const alerts = r.task ? null : normalizeAlerts(raw.alerts, raw.allDay === true);
     if (alerts) r.alerts = alerts;
-    if (raw.allDay === true) r.allDay = true;
+    if (raw.allDay === true && !r.task) r.allDay = true;
   }
   if (r.kind === 'timer' || r.kind === 'at') {
     const start = validDate(raw.at);
@@ -163,6 +170,8 @@ export function serializeReminder(r) {
   if (r.repeat) out.repeat = r.repeat;
   if (r.startup) out.startup = r.startup;
   if (r.title) out.title = r.title;
+  if (r.task) out.task = true;
+  if (r.done) out.done = true;
   if (r.allDay) out.allDay = true;
   if (Array.isArray(r.alerts)) out.alerts = r.alerts;
   out.action = r.action;
@@ -298,6 +307,7 @@ export function markFired(r, now = new Date()) {
 
 /** 끝난 알림: 한 번짜리가 울릴 것을 다 울리고 꺼진 것 (하루 전만 울리고 끈 일정은 "끝" 이 아니라 "꺼짐") */
 export function isDone(r) {
+  if (r.done) return true; // 알림을 완료로 표시함
   if (r.enabled || !r.last) return false;
   if (r.kind === 'timer' || r.startup === 'once') return true;
   return r.kind === 'at' && !nextAlert(r, validDate(r.last) ?? new Date(0));
@@ -306,7 +316,7 @@ export function isDone(r) {
 /** 다시 켤 때: 끝난 것만 처음부터(울린 기록 지움), 중간에 끈 것은 울린 기록을 지켜 이미 울린 알림이 또 울리지 않게 */
 // 일정은 울린 기록을 늘 지킨다 — 이미 울린 미리 알림이 "놓친 알림" 으로 다시 울리지 않게 (남은 알림만 울림)
 // (예전 한 번짜리 알림 — 미리 알림이 없던 것 — 은 울린 기록이 있으면 다시 울리지 않으므로 처음부터)
-export const reenable = (r) => ({ ...r, enabled: true, last: isDone(r) && (r.kind !== 'at' || !Array.isArray(r.alerts)) ? null : r.last });
+export const reenable = ({ done, ...r }) => ({ ...r, enabled: true, last: isDone(r) && (r.kind !== 'at' || !Array.isArray(r.alerts)) ? null : r.last });
 
 /** 일정(한 회차)이 끝나는 때: 하루 종일이면 마지막 날의 끝(다음 날 0시), 아니면 끝 시각(없으면 시작 시각) */
 export const occurrenceEnd = (start, allDay, end = null) => {
@@ -387,9 +397,9 @@ export function nextTime(r, now = new Date()) {
   return nextAlert(r, now)?.at.getTime() ?? Infinity;
 }
 
-/** 달력용: [from, to) 사이에 시작하는 일정 회차들 (시작 시각) */
+/** 달력용: [from, to) 사이에 시작하는 일정 회차들 (시작 시각) — 때가 있는 알림(task)도 달력에 */
 export function occurrencesBetween(r, from, to, limit = 100) {
-  if (!isEvent(r)) return [];
+  if (!isEvent(r) && !r.task) return [];
   const out = [];
   if (r.kind === 'at') {
     const t = validDate(r.at);
@@ -452,7 +462,7 @@ export function alarmLabel(r, info = {}, now = new Date()) {
 }
 
 /** 알림 제목: 일정 이름(없으면 메모 제목) */
-export const alarmTitle = (r, memoTitle) => (isEvent(r) && r.title) || memoTitle;
+export const alarmTitle = (r, memoTitle) => r.title || memoTitle;
 
 /**
  * 알림 하나의 글 (PC·휴대폰 같음): title 알림 제목 · label 때 · full 메모 띠·보관함에 쓰는 한 줄 ("치과, 내일 15:00 (30분 뒤)")
@@ -493,4 +503,76 @@ export function eventFromDate(d, now = new Date()) {
   }
   const at = allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate()) : start;
   return normalizeReminder({ ...base, kind: 'at', at: toLocalIso(at), ...(allDay ? { allDay: true } : {}) }, now);
+}
+
+// ---------- 알림 (구글 리마인더처럼: 무엇을 + 언제 + 반복) ----------
+
+/** 언제 빨리 고르기 (구글 킵처럼): 1시간 뒤 · 오늘 저녁 6시(그 전일 때만) · 내일 아침 9시 · (다음) 월요일 아침 9시 */
+export function taskPresets(now = new Date()) {
+  const hourLater = new Date(now.getTime() + 3600_000);
+  hourLater.setSeconds(0, 0);
+  const evening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0);
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0);
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + ((8 - now.getDay()) % 7 || 7), 9, 0);
+  return [
+    { id: 'hour', label: '1시간 뒤', at: hourLater },
+    ...(now.getHours() < 17 ? [{ id: 'evening', label: '오늘 저녁', at: evening }] : []),
+    { id: 'tomorrow', label: '내일 아침', at: tomorrow },
+    { id: 'monday', label: '월요일 아침', at: monday },
+  ];
+}
+
+/** 반복 고르기 — 고른 날에 맞춰: 안 함 · 매일 · 매주 토요일 · 매월 31일 · 매년 10월 31일 */
+export function taskRepeatChoices(at) {
+  const d = new Date(at);
+  return [
+    { id: 'none', label: '반복 안 함' },
+    { id: 'day', label: '매일' },
+    { id: 'week', label: `매주 ${WEEKDAY[d.getDay()]}요일` },
+    { id: 'month', label: `매월 ${d.getDate()}일` },
+    { id: 'year', label: `매년 ${d.getMonth() + 1}월 ${d.getDate()}일` },
+  ];
+}
+
+/**
+ * 알림 하나: 고른 때(at)와 반복으로 — 반복은 고른 날을 따른다 (매주 = 그 요일, 매월 = 그날)
+ * @param {{ title?: string, at: Date, every?: 'none'|'day'|'week'|'month'|'year', action?: string }} o
+ */
+export function buildTask({ title = '', at: when, every = 'none', action = 'notify' }, now = new Date()) {
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) throw new Error('언제 알릴지 골라 주세요');
+  const base = { kind: 'at', task: true, action, enabled: true, created: toLocalIso(now) };
+  const t = String(title).replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (t) base.title = t;
+  if (every === 'none' || !EVERY.includes(every)) {
+    if (d <= now) throw new Error('이미 지난 시각이에요. 앞으로의 시각을 골라 주세요');
+    return { ...base, at: toLocalIso(d) };
+  }
+  const repeat = { every, time: hhmm(d) };
+  if (every === 'week') repeat.weekdays = [d.getDay()];
+  if (every === 'month' || every === 'year') repeat.day = d.getDate();
+  if (every === 'year') repeat.month = d.getMonth() + 1;
+  // 첫 회차는 지금 뒤의 그 요일 · 그날 — 고른 날이 곧 첫 회차 (오늘 시각이 지났으면 다음 회차부터)
+  return { ...base, kind: 'repeat', repeat };
+}
+
+/** 알림 한 줄 설명 (메모 창 · 일정 탭 같은 글): "오늘 오후 6:00" · "매주 토요일 오후 6:00 · 다음 내일" · "완료" */
+export function describeTask(r, now = new Date()) {
+  if (r.done) return '완료';
+  if (r.kind !== 'at' && r.kind !== 'repeat') return describeReminder(r, now);
+  const off = r.enabled ? '' : ' · 꺼짐';
+  if (r.kind === 'at') {
+    const at = validDate(r.at);
+    if (!at) return '';
+    const when = `${dayLabel(at, now)} ${koClock(at)}`;
+    return isDone(r) ? `${when}에 알렸어요` : when + off;
+  }
+  const { every, weekdays = [], day, month } = r.repeat;
+  const t = parseTime(r.repeat.time);
+  const label = every === 'day' || (every === 'week' && weekdays.length === 7) ? '매일'
+    : every === 'week' ? `매주 ${weekdays.map((w) => WEEKDAY[w]).join('·')}요일`
+    : every === 'month' ? `매월 ${day}일` : `매년 ${month}월 ${day}일`;
+  const next = r.enabled ? nextTime(r, now) : Infinity;
+  const nextDay = Number.isFinite(next) ? ` · 다음 ${dayLabel(new Date(next), now)}` : '';
+  return `${label} ${koClock(new Date(2000, 0, 1, t.h, t.min))}${nextDay}${off}`;
 }

@@ -130,6 +130,14 @@ export function parseScheduleText(raw, defaultDay = null, now = new Date()) {
       // 캘린더에서 선택한 defaultDay 가 있으면 그 날짜에 시각을 결합한다
       const hasDateWord = /(?:\d{1,2}월|\d{1,2}일|내일|낼|모레|글피|어제|그제|요일|주말|\d{4}[-./])/.test(hits[i].text);
       let start = hits[i].at;
+      // "10월 31일 치과 오후 3시": 시각만 적힌 말은 앞의 (시각 없는) 날짜에 붙인다 — 하루 종일 + 3시 두 개가 되지 않게
+      const prev = schedules.at(-1);
+      if (!hasDateWord && hits[i].hasTime && prev?.type === 'single' && prev.allDay) {
+        prev.start = new Date(prev.start.getFullYear(), prev.start.getMonth(), prev.start.getDate(), hits[i].at.getHours(), hits[i].at.getMinutes());
+        prev.allDay = false;
+        i += 1;
+        continue;
+      }
       if (!hasDateWord && hits[i].hasTime && defaultDay) {
         start = new Date(defaultDay.getFullYear(), defaultDay.getMonth(), defaultDay.getDate(), hits[i].at.getHours(), hits[i].at.getMinutes());
       }

@@ -433,26 +433,32 @@ export async function runSmoke({ getVault, getList, noteWins, createListWindow }
       await js(nw, `document.querySelector('.coach-bubble button')?.click() || document.querySelectorAll('.coach-bubble, .coach-spot').forEach((el) => el.remove())`);
       await wait(200);
 
-      // 5-4. 일정과 알림 패널 (종 아이콘)
+      // 5-4. 알림 패널 (🔔) · 일정 (📅)
       await js(nw, `document.querySelectorAll('.hint-bubble, .coach-bubble, .coach-spot').forEach((el) => el.remove())`);
       await js(nw, `document.getElementById('bell-btn')?.click()`);
       await wait(400);
       await js(nw, `document.querySelectorAll('.hint-bubble, .coach-bubble, .coach-spot').forEach((el) => el.remove())`);
       const reminderPanelOpen = await js(nw, `!document.getElementById('reminder-panel')?.hidden`);
       await capture(nw, '5-4-note-reminder-modal.png', 300);
-      // 알림(50%) 탭 클릭 후 화면 캡처 (반복 / 타이머 / 앱 열 때 하위 옵션 확인)
-      await js(nw, `document.getElementById('rem-cat-alarm')?.click()`);
+      // 알림: 날짜와 시각 고르기 · 메모킹을 열 때 화면 캡처
+      await js(nw, `document.querySelector('[data-preset="custom"]')?.click()`);
       await wait(300);
-      await capture(nw, '5-4b-note-alarm-modal.png', 300);
-      // 타이머 서브탭 캡처
-      await js(nw, `document.querySelector('#rem-alarm-sub button[data-kind="timer"]')?.click()`);
+      await capture(nw, '5-4b-note-task-custom.png', 300);
+      await js(nw, `document.querySelector('[data-trigger="open"]')?.click()`);
       await wait(300);
-      await capture(nw, '5-4c-note-timer-modal.png', 300);
-      // 앱 열 때 서브탭 캡처
-      await js(nw, `document.querySelector('#rem-alarm-sub button[data-kind="startup"]')?.click()`);
+      await capture(nw, '5-4c-note-task-open.png', 300);
+      const taskForm = await js(nw, `Boolean(document.querySelector('#reminder-panel .task-form')) && !document.querySelector('#reminder-panel .event-alerts')`);
+      check('알림 패널 (🔔): 구글 리마인더처럼 무엇을 · 언제 · 반복 (미리 알림 없음)', reminderPanelOpen && taskForm);
+      await js(nw, `document.getElementById('reminder-close')?.click()`);
       await wait(300);
-      await capture(nw, '5-4d-note-startup-modal.png', 300);
-      check('일정과 알림 패널 (🔔): 모달 창 열림 및 일정/반복/타이머 생성 흐름 준비', reminderPanelOpen);
+      // 일정 (📅): 일정 탭과 같은 새 일정 창 (이 메모에 넣으니 메모 고르기 없음)
+      await js(nw, `document.getElementById('event-btn')?.click()`);
+      await wait(400);
+      const eventDialog = await js(nw, `Boolean(document.querySelector('.quick-event[open]')) && document.querySelector('.quick-event .qe-memo-row').hidden`);
+      await capture(nw, '5-4d-note-event-dialog.png', 300);
+      check('일정 (📅): 일정 탭과 같은 새 일정 창', eventDialog);
+      await js(nw, `document.querySelector('.quick-event .dialog-x')?.click()`);
+      await wait(300);
       // 알림 패널 닫기
       await js(nw, `document.getElementById('reminder-close')?.click()`);
       await wait(300);

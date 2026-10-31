@@ -91,3 +91,44 @@ test('Windows 알림: 틀린 글자 번호가 있어도 멈추지 않는다', ()
   assert.equal(r.title, '보낸 사람');
   assert.equal(r.body, '안녕 &#99999999; 😀 &');
 });
+
+// ---------- 알림 (구글 리마인더처럼) ----------
+import { buildTask, taskPresets, taskRepeatChoices, isEvent as isEv, isTask, isDone as done, normalizeReminder as norm, serializeReminder as ser, occurrencesBetween as occ, alarmTitle as aTitle } from '../app/js/core/reminders.js';
+
+test('알림: 한 번 · 반복은 일정이 아니다 (달력에는 때로 보임), 완료 표시는 파일에 남는다', () => {
+  const now = new Date(2026, 9, 31, 10, 0); // 토 10:00
+  const once = buildTask({ title: ' 약  먹기 ', at: new Date(2026, 9, 31, 18, 0) }, now);
+  assert.equal(once.kind, 'at');
+  assert.equal(once.task, true);
+  assert.equal(once.title, '약 먹기');
+  assert.equal(isEv(once), false);
+  assert.equal(isTask(once), true);
+  const weekly = buildTask({ at: new Date(2026, 9, 31, 18, 0), every: 'week' }, now);
+  assert.deepEqual(weekly.repeat, { every: 'week', time: '18:00', weekdays: [6] });
+  const back = norm(ser({ ...norm(weekly), done: true }));
+  assert.equal(back.task, true);
+  assert.equal(back.done, true);
+  assert.equal(done(back), true);
+  assert.equal(occ(norm(once), new Date(2026, 9, 31), new Date(2026, 10, 1)).length, 1);
+  assert.equal(aTitle(norm(once), '메모'), '약 먹기');
+  assert.throws(() => buildTask({ at: new Date(2026, 9, 31, 9, 0) }, now), /지난/);
+});
+
+test('알림: 빨리 고르기 · 반복 고르기 문구', () => {
+  const sat = new Date(2026, 9, 31, 10, 0);
+  assert.deepEqual(taskPresets(sat).map((p) => p.label), ['1시간 뒤', '오늘 저녁', '내일 아침', '월요일 아침']);
+  assert.equal(taskPresets(sat).at(-1).at.getDate(), 2); // 11월 2일 월요일
+  assert.equal(taskPresets(new Date(2026, 9, 31, 20, 0)).some((p) => p.id === 'evening'), false);
+  assert.deepEqual(taskRepeatChoices(sat).map((c) => c.label), ['반복 안 함', '매일', '매주 토요일', '매월 31일', '매년 10월 31일']);
+});
+
+test('알림 한 줄 설명: 오전 · 오후 시각, 반복은 다음 날, 완료', async () => {
+  const { describeTask } = await import('../app/js/core/reminders.js');
+  const now = new Date(2026, 9, 31, 10, 0); // 토
+  const once = norm(buildTask({ at: new Date(2026, 9, 31, 18, 0) }, now));
+  assert.equal(describeTask(once, now), '오늘 오후 6:00');
+  const weekly = norm({ ...buildTask({ at: new Date(2026, 9, 31, 18, 0), every: 'week' }, now), created: '2026-10-31T09:00:00' });
+  assert.equal(describeTask(weekly, now), '매주 토요일 오후 6:00 · 다음 오늘');
+  assert.equal(describeTask({ ...once, done: true }, now), '완료');
+  assert.equal(describeTask({ ...once, enabled: false }, now), '오늘 오후 6:00 · 꺼짐');
+});

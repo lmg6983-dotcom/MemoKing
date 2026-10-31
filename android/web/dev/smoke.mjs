@@ -237,24 +237,37 @@ try {
   }
 
   // 알림 추가
+  // 🔔 알림 (구글 리마인더처럼): 무엇을 → 언제(빨리 고르기 줄) → 반복 → 알림 추가. 미리 알림은 없다
   await page.tap('#bell-btn');
-  check('일정과 알림 패널: 처음엔 "무엇을 만들까요?" 한 가지만 · 아래 막대 "취소 | 다음"', await page.isVisible('#rem-kind [data-kind="at"]') && await page.isHidden('#rem-title') && (await page.textContent('#rem-back')) === '취소' && (await page.textContent('#rem-next')) === '다음');
-  await shot('05a-rem-kind');
-  await page.tap('#rem-kind [data-kind="at"]');
-  await shot('05b-rem-when');
-  await page.tap('#rem-next');
-  await page.tap('.alert-more');
-  await shot('05c-rem-alerts');
-  check('일정: 언제 → 미리 알림 (지난 시각은 빼고 칩 + 직접 정하기)', (await page.locator('#rem-alerts button').count()) >= 1 && (await page.locator('#rem-alerts button:disabled').count()) === 0 && await page.isVisible('.alert-more') && (await page.locator('.rem-answer').count()) === 2);
-  await page.tap('.rem-answer[data-goto="kind"]');
-  await page.tap('#rem-kind [data-kind="timer"]');
-  await page.tap('#rem-next');
-  check('타이머: 언제 → 바로 확인 (미리 알림 단계 없음) · 아래 막대 "이전 | 타이머 추가"', (await page.textContent('#rem-next')) === '타이머 추가' && (await page.textContent('#rem-back')) === '이전' && await page.isHidden('#rem-title'));
-  await page.tap('.rem-submit');
+  await page.waitForSelector('.task-form');
+  check('알림: 무엇을 · 시간 | 메모킹을 열 때 · 빨리 고르기 줄 · 반복, 미리 알림 없음', await page.isVisible('.task-title') && await page.isVisible('[data-trigger="open"]')
+    && (await page.locator('.task-presets [data-preset]').count()) >= 4 && await page.isVisible('.task-repeat select')
+    && (await page.locator('#reminder-panel .event-alerts, #reminder-panel .alert-more').count()) === 0 && (await page.textContent('.task-add')) === '알림 추가');
+  await shot('05a-task-new');
+  await page.locator('.task-title').fill('보고서 내기');
+  await page.tap('[data-preset="hour"]');
+  check('알림: 한 줄 요약 ("…에 알려 드려요")', /에 알려 드려요$/.test(await page.textContent('.task-summary')));
+  await page.tap('.task-add');
   await page.waitForTimeout(300);
-  check('알림 패널: 10분 타이머 추가', /kind: timer/.test(read('회의 메모.md')));
-  check('알림: 시스템에 예약', (await devLog()).scheduled.some((s) => s.key.endsWith(read('회의 메모.md').match(/- id: (r\w+)\n\s+kind: timer/)?.[1] ?? '?')));
-  await back();
+  const taskId = read('회의 메모.md').match(/- id: (r\w+)\n(?: {4}.*\n)*? {4}title: 보고서 내기\n {4}task: true/)?.[1];
+  check('알림 추가: 파일에 task · 이름', Boolean(taskId), read('회의 메모.md').split('---')[1]);
+  check('알림: 시스템에 예약', (await devLog()).scheduled.some((s) => s.key.endsWith(taskId ?? '?')));
+  check('알림 목록: 동그라미 · 🔔 숫자 1', await page.isVisible('.task-item .task-check') && (await page.textContent('#bell-count')) === '1');
+  await shot('05b-task-list');
+  await page.tap('.task-item .task-check');
+  await page.waitForTimeout(300);
+  check('동그라미 누르면 완료 (파일에 done · 숫자 사라짐)', /title: 보고서 내기\n {4}task: true\n {4}done: true/.test(read('회의 메모.md')) && (await page.textContent('#bell-count')) === '');
+  await page.tap('#reminder-close');
+  await page.waitForTimeout(250);
+  // 📅 일정: 일정 탭과 같은 "새 일정" 창 — 이 메모에 넣으니 넣을 메모 고르기는 없다
+  await page.tap('#event-btn');
+  await page.waitForSelector('.quick-event[open]');
+  check('📅: 일정 탭과 같은 새 일정 창, 넣을 메모 고르기 없음', await page.isHidden('.quick-event .qe-memo-row'));
+  await shot('05c-event-new');
+  await page.locator('.quick-event .qe-name').fill('리뷰');
+  await page.tap('.quick-event .qe-save');
+  await page.waitForTimeout(300);
+  check('새 일정: 이 메모에 (이름 리뷰 · 미리 알림)', /title: 리뷰\n {4}alerts:/.test(read('회의 메모.md')) && (await page.textContent('#event-count')) === '1');
   await back();
   await page.waitForTimeout(250); // 닫히는 움직임
   check('뒤로 가기: 메모 → 목록', await page.isHidden('#note-screen'));
@@ -420,6 +433,7 @@ try {
   await page.tap(`#reminder-groups [role="gridcell"][data-date="${ymd(now0)}"]`, { timeout: 3000, position: { x: 6, y: 6 } }).catch(() => {}); // 다시 오늘
   await page.waitForTimeout(300);
   if (await page.isVisible('.quick-event[open]')) await page.keyboard.press('Escape');
+  if (await page.isVisible('.cal-quick-close')) await page.tap('.cal-quick-close'); // 고른 날을 또 누르면 빠른 추가가 펼쳐진다 (PC 와 같이)
   await page.waitForTimeout(200);
   // 보기는 캘린더 · 회상 둘 (주 · 목록 보기는 없앰)
   const viewNames = await page.evaluate(() => [...document.querySelectorAll('.cal-views button')].map((b) => b.textContent));
@@ -477,7 +491,7 @@ try {
   await page.fill('.qe-name', '주간 보고');
   const moved = ymd(new Date(Date.now() + 2 * 86_400_000));
   await page.fill('.qe-date-input', moved);
-  check('새 일정 창: 날짜를 바꿀 수 있음 (📅 칸)', (await page.textContent('.qe-date-text')).includes(`${new Date(Date.now() + 2 * 86_400_000).getDate()}일`), await page.textContent('.qe-date-text'));
+  check('새 일정 창: 날짜를 바꿀 수 있음 (📅 칸)', new RegExp(`(/|월 )${new Date(Date.now() + 2 * 86_400_000).getDate()}(일| )`).test(await page.textContent('.qe-date-text')), await page.textContent('.qe-date-text'));
   await page.tap('.qe-memo-row');
   await page.fill('.qe-search', '회의');
   await page.waitForTimeout(200);
@@ -1361,15 +1375,9 @@ try {
   await page.waitForTimeout(2200);
   check('추천 태그: #업무', (await page.locator('#tag-suggest-chips .tag-chip', { hasText: '업무' }).count()) === 1);
   await shot('09-tag-suggest');
-  await page.tap('#links-btn');
-  await page.waitForTimeout(200);
-  check('연결: 태그 없으면 추천 태그로 이어 주기', (await page.locator('#links-tag-suggest .tag-chip').count()) > 0);
-  await page.locator('#links-tag-suggest .tag-chip', { hasText: '업무' }).tap();
+  check('메모 연결 사슬 단추 없음', (await page.locator('#links-btn, #links-panel').count()) === 0);
+  await page.locator('#tag-suggest-chips .tag-chip', { hasText: '업무' }).tap();
   await page.waitForTimeout(400);
-  check('연결: 태그로 이어진 메모', (await page.locator('#links-tags .link-item').count()) >= 1);
-  await shot('10-links');
-  await back();
-  await page.waitForTimeout(900);
   check('추천 태그: 누르면 본문에 #업무', read(fileWith('다음 주 업무 정리')).includes('#업무'));
   await back();
   await page.waitForTimeout(300);
