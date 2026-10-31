@@ -89,3 +89,12 @@ test('9. 같은 날짜 중복 인식 시 정규화(중복 제거)', () => {
   assert.equal(ymd(r.schedules[0].start), '2027-01-01');
 });
 
+
+test('시각만 적힌 말은 앞의 날짜에 붙는다 (빠른 추가가 날짜를 먼저 채워 둠)', () => {
+  const r = parseScheduleText('10월 31일 치과 오후 3시', new Date(2026, 9, 31), NOW);
+  assert.equal(r.title, '치과');
+  assert.equal(r.schedules.length, 1);
+  assert.equal(ymd(r.schedules[0].start), '2026-10-31');
+  assert.equal(r.schedules[0].start.getHours(), 15);
+  assert.equal(r.schedules[0].allDay, false);
+});
