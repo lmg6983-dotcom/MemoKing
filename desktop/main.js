@@ -1326,6 +1326,16 @@ app.whenReady().then(async () => {
   app.setAppUserModelId(APP_ID);
   // v0.75.1 이 만든 개발용 바로가기는 효과가 없었다 (알림 클릭은 Electron.lnk · COM 등록을 쓴다 — utils.js fixDevToastLaunch)
   if (process.platform === 'win32' && !app.isPackaged) fs.rmSync(path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', '메모킹 (개발).lnk'), { force: true });
+  // 0.75.0 까지의 개발 실행은 설치판과 같은 AppUserModelId 라, Electron 이 만든 시작 메뉴 Electron.lnk 가 설치판 작업 표시줄의 이름 · 아이콘을 "Electron" 으로 가로챘다
+  //   (재설치해도 남는다) → 우리 ID 를 단 것이면 지운다
+  if (process.platform === 'win32' && app.isPackaged) {
+    const lnk = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Electron.lnk');
+    try {
+      if (shell.readShortcutLink(lnk).appUserModelId === APP_ID) fs.rmSync(lnk, { force: true });
+    } catch {
+      // 없음
+    }
+  }
 
   if (app.isPackaged) {
     try {
