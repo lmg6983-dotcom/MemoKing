@@ -1326,7 +1326,7 @@ app.whenReady().then(async () => {
   //   개발 실행에는 바로가기가 없어 electron.exe 만 떠 빈 "Electron" 창이 나왔다 → 이 앱 폴더를 넘기는 바로가기 (두 번째 실행은 second-instance 로 온다)
   if (process.platform === 'win32' && !app.isPackaged && !SMOKE) {
     const lnk = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', '메모킹 (개발).lnk');
-    shell.writeShortcutLink(lnk, { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: '메모킹 개발 실행' });
+    shell.writeShortcutLink(lnk, { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: '메모킹 개발 실행', icon: APP_ICON, iconIndex: 0 }); // 작업 표시줄은 이 바로가기의 아이콘을 쓴다 (없으면 electron.exe 아이콘)
   }
 
   if (app.isPackaged) {
