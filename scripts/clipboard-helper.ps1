@@ -43,9 +43,19 @@ function Set-ClipboardData([System.Windows.Forms.DataObject]$data) {
 
 function New-Data { New-Object System.Windows.Forms.DataObject }
 
+# CF_HTML 의 본문 조각에 글자가 있는지 (app/js/core/clipboard-html.js 의 htmlHasText 와 같은 규칙) — 표시가 없으면 모른다($false)
+function Test-HtmlText([byte[]]$bytes) {
+  $s = $utf8.GetString($bytes)
+  $a = $s.IndexOf('<!--StartFragment-->'); $b = $s.IndexOf('<!--EndFragment-->')
+  if ($a -lt 0 -or $b -le $a) { return $false }
+  $s = $s.Substring($a, $b - $a) -replace '(?is)<(script|style)\b.*?</\1>', '' -replace '<[^>]+>', '' -replace '&nbsp;|&#160;', ' '
+  return $s.Trim().Length -gt 0
+}
+
 # 클립보드 내용을 폴더에 풀어 둔다: files.txt · text.txt · html.bin(CF_HTML 그대로) · image.png · manifest.json
 # 다른 앱이 클립보드를 잠깐 잡고 있으면 실패할 수 있어 몇 번 다시 시도한다.
-function Save-Clipboard([string]$dir) {
+#   capture: 매직 카피용 (쓰지 않을 그림은 꺼내지 않는다)
+function Save-Clipboard([string]$dir, [bool]$capture = $false) {
   New-Item -ItemType Directory -Force $dir | Out-Null
   for ($try = 1; ; $try++) {
     try {
@@ -68,7 +78,10 @@ function Save-Clipboard([string]$dir) {
           $manifest.html = $true
         }
       }
-      if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
+      # 매직 카피: 파일 · 글이 든 HTML 이 있으면 메모는 그림을 쓰지 않으니 꺼내지 않는다
+      #   (Office · 한글은 그림을 꺼낼 때에야 그려 내느라 몇 초씩 멈추고, 큰 그림은 PNG 로 저장하는 데도 오래 걸린다)
+      $skipImage = $capture -and ($manifest.files -or ($manifest.html -and (Test-HtmlText $bytes)))
+      if (-not $skipImage -and [System.Windows.Forms.Clipboard]::ContainsImage()) {
         [System.Windows.Forms.Clipboard]::GetImage().Save((Join-Path $dir 'image.png'), [System.Drawing.Imaging.ImageFormat]::Png)
         $manifest.image = $true
       }
@@ -166,7 +179,7 @@ function Invoke-Capture([string]$dir, [bool]$noCopy, [uint32]$onlyPid = 0) {
     }
     if ($changed) { Start-Sleep -Milliseconds 150 } # 앱이 여러 형식을 다 넣을 시간
   }
-  $manifest = Save-Clipboard $dir
+  $manifest = Save-Clipboard $dir $true
   $manifest.changed = $changed
   $manifest.copySkipped = $copySkipped
   $manifest.window = $title

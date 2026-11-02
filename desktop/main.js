@@ -1322,6 +1322,12 @@ app.on('web-contents-created', (_e, wc) => {
 app.whenReady().then(async () => {
   if (!gotLock) return;
   app.setAppUserModelId(APP_ID);
+  // 알림 센터에서 지난 알림을 누르면 Windows 는 이 AppUserModelId 의 시작 메뉴 바로가기로 앱을 다시 띄운다.
+  //   개발 실행에는 바로가기가 없어 electron.exe 만 떠 빈 "Electron" 창이 나왔다 → 이 앱 폴더를 넘기는 바로가기 (두 번째 실행은 second-instance 로 온다)
+  if (process.platform === 'win32' && !app.isPackaged && !SMOKE) {
+    const lnk = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', '메모킹 (개발).lnk');
+    shell.writeShortcutLink(lnk, { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: '메모킹 개발 실행' });
+  }
 
   if (app.isPackaged) {
     try {

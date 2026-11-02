@@ -1376,7 +1376,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     try {
       onNotice?.(`${name}을 그림으로 바꾸고 있어요`);
       const fileName = extOf(name) ? name : `${name}.${extOf(it.src) || 'txt'}`;
-      const srcFile = it.file instanceof File
+      // PC: Word · PowerPoint 는 Office 로 PDF 를 만들어 그 장들을 넣는다 (직접 그리면 그림이 깨지고 장이 어긋남) — Office 가 없으면 직접 그린다
+      const pdf = await window.memoking?.attachments?.toPdf?.(it.src).catch(() => null);
+      const srcFile = pdf
+        ? new File([pdf], `${baseName(name)}.pdf`, { type: 'application/pdf' })
+        : it.file instanceof File
         ? new File([await it.file.arrayBuffer()], fileName, { type: it.file.type })
         : new File([await (await fetch(vaultUrl(it.src))).blob()], fileName);
       const { pages, total } = await documentPages(srcFile, (n, all) => onNotice?.(`${name}을 그림으로 바꾸고 있어요 (${n}/${all})`));

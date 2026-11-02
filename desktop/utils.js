@@ -18,7 +18,8 @@ import { POWERSHELL, psArgs, psOptions } from './powershell.js';
 import { UI } from '../app/js/core/ui-text.js';
 
 export const SMOKE = process.argv.includes('--smoke');
-export const APP_ID = 'com.memoking.desktop';
+// 개발 실행(npm start)은 다른 이름 — 설치된 메모킹의 시작 메뉴 바로가기와 알림 주인이 섞이지 않게 (main.js 의 개발용 바로가기 참고)
+export const APP_ID = app.isPackaged ? 'com.memoking.desktop' : 'com.memoking.desktop.dev';
 export const LOGIN_ARGS = ['--hidden'];
 
 const unpacked = (p) => p.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);

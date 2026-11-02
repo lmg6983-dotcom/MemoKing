@@ -26,7 +26,7 @@ export async function documentPages(file, onProgress) {
   if (ext === 'docx') {
     return domPages(async (box) => {
       await lib.renderDocx(data, box, null, { inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false, experimental: true });
-      return [...box.querySelectorAll('section.docx')];
+      return fitDocxPages([...box.querySelectorAll('section.docx')]);
     }, onProgress);
   }
   if (ext === 'pptx') return domPages((box) => pptxPages(lib, data, box), onProgress);
@@ -87,6 +87,48 @@ async function domPages(render, onProgress) {
     box.remove();
     for (const u of box.urls ?? []) URL.revokeObjectURL(u); // HWPX 그림 주소 (찍은 뒤에는 필요 없음)
   }
+}
+
+// ---------- DOCX 장 나누기 ----------
+// docx-preview 는 문서에 저장된 쪽 나눔 표시(Word 가 저장할 때 남김)로만 장을 나눈다 — 다른 프로그램이 만든 문서는 한 장에 다 이어 그려져
+//   장 높이를 넘는 장은 문단 · 표 단위로 다음 장에 옮긴다 (머리글 · 바닥글은 장마다 복사, 각주는 첫 장에)
+export function fitDocxPages(sections) {
+  const out = [];
+  const tooTall = (p) => p.scrollHeight > p.clientHeight + 1;
+  const articles = (p) => p.querySelectorAll(':scope > article');
+  for (const sec of sections) {
+    if (!sec.style.minHeight) {
+      out.push(sec);
+      continue;
+    }
+    Object.assign(sec.style, { height: sec.style.minHeight, overflow: 'hidden' });
+    if (!tooTall(sec)) {
+      out.push(sec);
+      continue;
+    }
+    const blocks = [...articles(sec)].flatMap((a, i) => [...a.children].map((el) => ({ el, i })));
+    const blank = sec.cloneNode(true);
+    blank.querySelectorAll(':scope > :not(header, footer, article)').forEach((n) => n.remove());
+    articles(blank).forEach((a) => a.replaceChildren());
+    articles(sec).forEach((a) => a.replaceChildren());
+    let page = sec;
+    let count = 0;
+    out.push(page);
+    for (const { el, i } of blocks) {
+      articles(page)[i].append(el);
+      count++;
+      // 한 덩어리가 장보다 크면 그 장에 잘린 채로 둔다
+      if (count > 1 && tooTall(page)) {
+        el.remove();
+        const next = blank.cloneNode(true);
+        page.after(next);
+        out.push((page = next));
+        articles(page)[i].append(el);
+        count = 1;
+      }
+    }
+  }
+  return out;
 }
 
 // ---------- HWPX (한글 2014 이후 기본 형식 · 압축한 XML) ----------

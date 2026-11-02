@@ -24,6 +24,7 @@ import { insideDriveForDesktop } from './drive/drive-sync.js';
 import { hotkeyCopyText } from '../app/js/core/memo-hotkeys.js';
 import { mailAttach, openLocalSend, findLocalSend, LOCALSEND_DOWNLOAD } from './share-file.js';
 import { driveShareLink } from './share-drive.js';
+import { officeToPdf } from './office-pdf.js';
 import { UI } from '../app/js/core/ui-text.js';
 import { summaryBody } from '../app/js/core/agent.js';
 
@@ -1186,6 +1187,18 @@ export function registerIpc(ctx) {
     if (!file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return '파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 삭제됐는지 확인해 주세요.';
     const result = await openVaultFile(file, BrowserWindow.fromWebContents(e.sender));
     return result && result !== 'cancelled' ? '파일을 열지 못했어요. 이 파일을 열 수 있는 프로그램이 있는지 확인해 주세요.' : result;
+  });
+  // 메모 폴더의 Word · PowerPoint 첨부 → PDF 내용 (그림으로 넣기 전에) | null (Office 없음 · 실패 → 화면이 직접 그린다)
+  ipcMain.handle('attachment:to-pdf', (_e, rel) => {
+    let decoded = String(rel ?? '');
+    try {
+      decoded = decodeURI(decoded);
+    } catch {
+      // 이미 디코딩됨
+    }
+    const file = /^attachments\//.test(decoded) ? getVault()?.resolve(decoded) : null;
+    if (SMOKE || !file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return null;
+    return officeToPdf(file);
   });
   ipcMain.handle('attachment:copy', async (_e, rel) => {
     let decoded = String(rel ?? '');
