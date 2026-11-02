@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
 import { normalizeMagicSettings } from '../app/js/core/magic-modules.js';
-import { APP_DIR, APP_ICON_PNG } from './window-utils.js';
+import { APP_DIR, APP_ICON, APP_ICON_PNG } from './window-utils.js';
 import { cleanOverrides } from '../app/js/core/keymap.js';
 import { normalizeHours } from '../app/js/core/work-hours.js';
 import { POWERSHELL, psArgs, psOptions } from './powershell.js';
@@ -210,6 +210,29 @@ export const liveToasts = new Set();
 export const MAX_LIVE_TOASTS = 50;
 export const smokeToasts = [];
 
+// 알림 클릭이 실행 중인 앱에 닿지 못하면 Windows 가 앱을 새로 띄운다(-Embedding) → 두 번째 실행은 곧 꺼지고 main.js 가 이것으로 대신 연다
+let lastToastClick = null;
+export const clickLastToast = () => lastToastClick?.();
+
+// 개발 실행: Electron 44 는 첫 알림 때 시작 메뉴 Electron.lnk 와 알림 클릭 COM 등록(LocalServer32)을 앱 폴더 없는 electron.exe 로 만든다
+//   → 알림을 누르면 빈 "Electron" 창, 작업 표시줄은 Electron 아이콘. Electron 이 다 만든 뒤 앱 폴더 · 메모킹 아이콘을 덧붙인다
+//   (Electron 은 대상 · AUMID · CLSID 만 확인하므로 다음 실행에도 남는다)
+let devToastFixed = false;
+function fixDevToastLaunch() {
+  if (devToastFixed || app.isPackaged || process.platform !== 'win32') return;
+  devToastFixed = true;
+  setTimeout(() => {
+    const appArg = `"${app.getAppPath()}"`;
+    const lnk = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Electron.lnk');
+    if (fs.existsSync(lnk)) shell.writeShortcutLink(lnk, 'update', { args: appArg, icon: APP_ICON, iconIndex: 0 });
+    const clsid = app.toastActivatorCLSID;
+    if (clsid) {
+      execFile('reg', ['add', `HKCU\\Software\\Classes\\CLSID\\${clsid}\\LocalServer32`, '/ve', '/d', `"${process.execPath}" ${appArg}`, '/f'],
+        { windowsHide: true }, (err) => err && console.warn('[알림 클릭 등록]', err.message));
+    }
+  }, 3000);
+}
+
 export function toast(t) {
   if (SMOKE) {
     smokeToasts.push(t);
@@ -217,6 +240,8 @@ export function toast(t) {
   }
   if (!Notification.isSupported()) return false;
   const n = new Notification({ title: t.title, body: t.body, icon: APP_ICON_PNG });
+  lastToastClick = t.onClick ?? null;
+  fixDevToastLaunch();
   n.on('failed', () => {
     liveToasts.delete(n);
     t.onFail?.();

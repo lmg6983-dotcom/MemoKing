@@ -50,7 +50,7 @@ import {
   SMOKE, APP_ID, STT_WORKER, STT_VENDOR, LLAMA_SERVER, POPUP_HELPER,
   settings, loadSettings, saveSettings, suggestedVaultPath,
   purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings,
-  TRASH_DAYS, openWebPage, openVaultFile, toast, smokeToasts, smokeOpened,
+  TRASH_DAYS, openWebPage, openVaultFile, toast, clickLastToast, smokeToasts, smokeOpened,
   smokeConfirmAnswers, writeClipboard, fetchRemoteImage, registerVaultProtocol,
   mcpStatus, mcpConnect, mcpSnippet, shorten,
 } from './utils.js';
@@ -1252,6 +1252,8 @@ setInterval(() => purgeTrash(vault), 6 * 60 * 60 * 1000).unref?.();
 // ---------- 시작 및 초기화 ----------
 
 app.on('second-instance', (_e, argv) => {
+  // 알림 클릭으로 Windows 가 띄운 것(-Embedding): 목록 대신 그 알림이 열려던 것
+  if (argv.includes('-Embedding')) return void clickLastToast();
   if (!handleLaunch(argv)) windowManager.createListWindow();
 });
 
@@ -1322,12 +1324,8 @@ app.on('web-contents-created', (_e, wc) => {
 app.whenReady().then(async () => {
   if (!gotLock) return;
   app.setAppUserModelId(APP_ID);
-  // 알림 센터에서 지난 알림을 누르면 Windows 는 이 AppUserModelId 의 시작 메뉴 바로가기로 앱을 다시 띄운다.
-  //   개발 실행에는 바로가기가 없어 electron.exe 만 떠 빈 "Electron" 창이 나왔다 → 이 앱 폴더를 넘기는 바로가기 (두 번째 실행은 second-instance 로 온다)
-  if (process.platform === 'win32' && !app.isPackaged && !SMOKE) {
-    const lnk = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', '메모킹 (개발).lnk');
-    shell.writeShortcutLink(lnk, { target: process.execPath, args: `"${app.getAppPath()}"`, appUserModelId: APP_ID, description: '메모킹 개발 실행', icon: APP_ICON, iconIndex: 0 }); // 작업 표시줄은 이 바로가기의 아이콘을 쓴다 (없으면 electron.exe 아이콘)
-  }
+  // v0.75.1 이 만든 개발용 바로가기는 효과가 없었다 (알림 클릭은 Electron.lnk · COM 등록을 쓴다 — utils.js fixDevToastLaunch)
+  if (process.platform === 'win32' && !app.isPackaged) fs.rmSync(path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', '메모킹 (개발).lnk'), { force: true });
 
   if (app.isPackaged) {
     try {
