@@ -88,8 +88,12 @@ const config = {
   copyright: 'Copyright © 2026 lmg6983@gmail.com',
   electronVersion: ELECTRON_VERSION,
   directories: { output: OUT },
-  files: ['**/*'],
+  // 점검용 스크립트(desktop/smoke*.js)는 설치 파일에 넣지 않는다 (--smoke 는 개발 실행에서만)
+  files: ['**/*', '!desktop/smoke*.js'],
   asar: true,
+  // 용량 줄이기: Electron 언어 파일은 한국어 · 영어만 (나머지 50여 개는 앱 화면에 쓰이지 않는다), 설치 파일은 최대 압축
+  electronLanguages: ['ko', 'en-US'],
+  compression: 'maximum',
   // PowerShell 이 읽어야 하는 도우미와, 숨은 OCR 창이 워커·wasm 으로 불러오는 tesseract 파일은 asar 밖에 둔다
   // 받아쓰기 작업 스레드(desktop/stt)·엔진(desktop/vendor: sherpa-onnx WebAssembly, bzip2)과 그것이 읽는 공용 모듈도
   asarUnpack: ['scripts/clipboard-helper.ps1', 'scripts/popup-watch.ps1', 'app/vendor/tesseract/**', 'desktop/stt/**', 'desktop/vendor/**', 'app/js/core/transcript-lines.js'],
