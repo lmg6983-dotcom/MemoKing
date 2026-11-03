@@ -1452,6 +1452,8 @@ export async function runSmoke({
       document.querySelector('.task-form').requestSubmit();
     })()`);
     await until(() => remindersOf(n1.id).length === 1, '반복 알림 저장').catch(() => {});
+    // 파일에 저장된 뒤 창이 목록 + "새 알림" 으로 바뀌기까지 한 박자 걸린다 (느린 PC 에서는 단추가 아직 없을 수 있음)
+    await until(() => js(rn.win, `Boolean(document.querySelector('.reminder-body .rem-start'))`), '새 알림 단추').catch(() => {});
     await js(rn.win, `(() => {
       document.querySelector('.reminder-body .rem-start').click();
       document.querySelector('[data-preset="hour"]').click();
