@@ -11,7 +11,8 @@ test('설치 링크: 버전이 들어가지 않은 늘 같은 주소 (새 버전
 test('설치 링크: release.yml 이 PC 설치 파일을 같은 이름으로도 올린다', async () => {
   const { readFile } = await import('node:fs/promises');
   const yml = await readFile(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
-  assert.match(yml, /gh release upload [^\n]*MemoKing-Setup\.exe/);
+  assert.match(yml, /files=\([^\n]* MemoKing-Setup\.exe\)/); // Release 에 올리는 파일 목록
+  assert.match(yml, /gh release (create|upload) [^\n]*"\$\{files\[@\]\}"/);
 });
 
 test('나눠 줄 글에 두 링크가 모두', () => {
