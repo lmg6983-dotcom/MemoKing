@@ -54,15 +54,12 @@ jobs:
       # 휴대폰에서 바로 받는 링크이자 앱 안 업데이트(휴대폰의 "새 버전이 있어요")가 보는 곳 — 이 저장소의 릴리스 "android" 에
       #   https://github.com/<저장소>/releases/download/android/MemoKing-android.apk
       #   MemoKing-android.apk 와 android-latest.json(버전 · 크기 · SHA-256 · 바뀐 점)을 올린다. "prerelease" 라서 PC 의 "최신 릴리스" 링크 · 자동 업데이트를 건드리지 않는다
-      #   옛 배포 저장소(memoking-releases)를 보는 옛 앱도 넘어오게, Secrets 에 MEMOKING_RELEASES_TOKEN 이 있으면 그쪽에도 그쪽 주소로 올린다
-      #   (shortcut: 옛 앱이 다 업데이트되면 그 저장소 · 비밀값을 지우면 이 부분은 저절로 건너뜀)
       #   main 에서 만든 것만 (다른 가지의 시험 빌드가 모두의 업데이트로 나가지 않게), 이미 올라간 것보다 낮은 버전이면 올리지 않는다 (예전 실행을 다시 돌려도 되돌아가지 않게)
       - name: 최신 APK 와 업데이트 정보를 릴리스에 올리기
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         working-directory: .
         env:
           OWN_TOKEN: ${{ github.token }}
-          LEGACY_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk MemoKing-android.apk
           publish() {
@@ -83,4 +80,3 @@ jobs:
             echo "올렸어요: https://github.com/${RELEASES_REPO}/releases/tag/android"
           }
           publish "$GITHUB_REPOSITORY" "$OWN_TOKEN"
-          if [ -n "$LEGACY_TOKEN" ]; then publish lmg6983-dotcom/memoking-releases "$LEGACY_TOKEN"; fi

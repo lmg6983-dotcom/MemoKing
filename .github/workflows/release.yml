@@ -132,21 +132,6 @@ jobs:
           fi
           echo "https://github.com/${RELEASES_REPO}/releases/latest/download/MemoKing-Setup.exe"
 
-      # 옛 배포 저장소(memoking-releases)를 보는 옛 앱도 이 버전으로 넘어오게 같은 파일을 그쪽에도 — 새 버전부터는 이 저장소를 본다
-      #   shortcut: Secrets 에 MEMOKING_RELEASES_TOKEN 이 있을 때만. 옛 앱이 다 업데이트되면 그 저장소 · 비밀값을 지우면 저절로 건너뜀
-      - name: 옛 배포 저장소에도 올리기 (옮기는 동안만)
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
-          OWN_TOKEN: ${{ github.token }}
-          LEGACY_REPO: lmg6983-dotcom/memoking-releases
-        run: |
-          if [ -z "$GH_TOKEN" ]; then echo "옛 배포 저장소 비밀값이 없어 건너뛰어요"; exit 0; fi
-          version=$(node -p "require('./package.json').version")
-          GH_TOKEN="$OWN_TOKEN" gh release view "v${version}" --repo "$RELEASES_REPO" --json body -q .body > notes.txt
-          gh release view "v${version}" --repo "$LEGACY_REPO" >/dev/null 2>&1 || gh release create "v${version}" --repo "$LEGACY_REPO" --title "v${version}" --notes-file notes.txt --latest
-          gh release upload "v${version}" "dist/MemoKing-Setup-${version}.exe" "dist/MemoKing-Setup-${version}.exe.blockmap" dist/latest.yml MemoKing-Setup.exe --repo "$LEGACY_REPO" --clobber
-
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         with:

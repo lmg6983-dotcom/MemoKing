@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-// RELEASES_REPO: 올릴 저장소 (옛 배포 저장소에 올릴 때는 그쪽 주소여야 옛 앱이 받는다)
+// RELEASES_REPO: 올릴 저장소 (android.yml 이 이 저장소 이름을 넘긴다)
 export const APK_URL = `https://github.com/${process.env.RELEASES_REPO || 'lmg6983-dotcom/MemoKing'}/releases/download/android/MemoKing-android.apk`;
 
 /** android/app/build.gradle.kts 의 versionCode · versionName */

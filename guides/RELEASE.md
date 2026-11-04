@@ -25,13 +25,9 @@ Release v0.76.0: MemoKing-Setup-0.76.0.exe · .blockmap · latest.yml · MemoKin
 
 **배포:** `package.json` 의 버전을 올리고 README 이력에 그 버전 줄을 쓴 뒤 → `git tag v<버전> && git push origin v<버전>` (또는 Actions › Release (PC) › Run workflow 에서 main)
 
-### 옛 배포 저장소(memoking-releases)에서 옮기기
+### 옛 배포 저장소(memoking-releases)
 
-v0.75.3 까지 설치한 앱은 옛 저장소 `memoking-releases` 에서 새 버전을 찾아요. 그래서 옮기는 동안은 Secrets 에 `MEMOKING_RELEASES_TOKEN` 을 남겨 두면, 새 버전을 그쪽에도 같이 올려요 (`release.yml` · `android.yml` 의 "옮기는 동안만" 단계). 옛 앱이 그 버전으로 업데이트되면 그때부터 이 저장소를 봐요.
-
-1. 새 버전을 한 번 배포해요. 이 저장소와 옛 저장소 양쪽에 올라가요.
-2. 쓰는 PC · 휴대폰이 모두 새 버전으로 업데이트됐는지 확인해요 (설정의 지금 버전).
-3. 그다음 `memoking-releases` 저장소와 Secret `MEMOKING_RELEASES_TOKEN` 을 지워요. 옛 저장소로 올리는 단계는 비밀값이 없으면 저절로 건너뛰어요.
+v0.75.3 까지는 설치 파일을 따로 둔 공개 저장소 `memoking-releases` 에 올렸어요. v0.76.0 을 양쪽에 올려 옛 앱이 이 저장소로 넘어오게 한 뒤 그 저장소는 지웠어요. 그래서 v0.76.0 으로 업데이트하지 않은 채 남은 옛 앱(PC v0.75.3 · 휴대폰 0.53.x 까지)은 새 버전을 찾지 못해요 — 위 최신 설치 파일 링크로 한 번 다시 설치하면 돼요 (메모는 그대로). Secret `MEMOKING_RELEASES_TOKEN` 은 이제 쓰지 않으니 지워도 돼요.
 
 **자주 나는 문제**
 
