@@ -5,7 +5,7 @@
 // 완성된 설치 파일만 프로젝트의 dist\ 로 복사한다. 이어서 빌드된 실행 파일로 자동 점검을 한 번 돌린다.
 //   npm run dist               빌드 + 빌드된 앱으로 자동 점검
 //   npm run dist -- --no-smoke 빌드만
-//   npm run dist -- --no-smoke --publish always   빌드 + 공개 배포 저장소 Release 에 올리기 (GH_TOKEN 필요 — GitHub Actions 의 release.yml)
+//   npm run dist -- --no-smoke --publish always   빌드 + 이 저장소 Release 에 올리기 (GH_TOKEN 필요 — GitHub Actions 의 release.yml)
 import { execSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -22,8 +22,8 @@ const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const runSmoke = !process.argv.includes('--no-smoke');
 const publishArg = process.argv[process.argv.indexOf('--publish') + 1];
 const PUBLISH = process.argv.includes('--publish') && publishArg === 'always' ? 'always' : 'never';
-// 자동 업데이트가 보는 공개 배포 저장소 — 설치 파일 · .blockmap · latest.yml 만 올라간다 (소스 · 토큰은 없음)
-const RELEASES = { owner: 'lmg6983-dotcom', repo: 'memoking-releases' };
+// 자동 업데이트가 보는 저장소 — Release 에 설치 파일 · .blockmap · latest.yml 이 올라간다
+const RELEASES = { owner: 'lmg6983-dotcom', repo: 'MemoKing' };
 
 /** README 이력 표에서 이 버전의 줄 → 릴리스 노트 (앱의 새 버전 대화 상자에 보임) */
 function releaseNotes(version) {

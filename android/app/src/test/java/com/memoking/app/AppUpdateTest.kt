@@ -17,12 +17,12 @@ class AppUpdateTest {
 
     @Test
     fun downloadsOnlyFromOurReleaseRepo() {
-        val ok = "https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk"
+        val ok = "https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk"
         assertTrue(AppUpdate.trustedApkUrl(ok))
         assertFalse("다른 저장소", AppUpdate.trustedApkUrl("https://github.com/someone/else/releases/download/android/MemoKing-android.apk"))
         assertFalse("http", AppUpdate.trustedApkUrl(ok.replace("https", "http")))
         assertFalse("apk 가 아님", AppUpdate.trustedApkUrl(ok.removeSuffix(".apk") + ".zip"))
-        assertFalse("상위 폴더", AppUpdate.trustedApkUrl("https://github.com/lmg6983-dotcom/memoking-releases/releases/download/../x.apk"))
+        assertFalse("상위 폴더", AppUpdate.trustedApkUrl("https://github.com/lmg6983-dotcom/MemoKing/releases/download/../x.apk"))
     }
 
     @Test

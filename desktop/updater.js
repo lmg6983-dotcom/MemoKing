@@ -1,6 +1,6 @@
 import { decodeEntities } from '../app/js/core/entities.js';
 
-// 자동 업데이트 — electron-updater 로 공개 배포 저장소(lmg6983-dotcom/memoking-releases)의 Release 를 본다
+// 자동 업데이트 — electron-updater 로 이 저장소(lmg6983-dotcom/MemoKing)의 Release 를 본다
 //   앱에는 토큰이 없다: 공개 저장소라 읽기에 토큰이 필요 없고, 저장소 주소는 빌드가 넣은 app-update.yml 에서 읽는다.
 //   흐름: 켤 때(8초 뒤) · 4시간마다 · 절전에서 깨거나 잠금을 풀 때(1시간 넘게 안 봤으면) · 설정의 "업데이트 확인" → 새 버전이 있으면 화면(목록 창)에 알림(버전 · 바뀐 점)
 //         → 사용자가 받기를 고르면 받는 중 진행률 → 다 받으면 "지금 재시작" / "나중에 (끝낼 때 설치)"

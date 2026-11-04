@@ -2581,7 +2581,7 @@ try {
 
   // 앱 안 업데이트 (updates.js · AppUpdate.kt): 새 버전 알림 → 바뀐 점(제목 + 항목) → 받기(진행률) → 설치 화면 / 허용 안내
   await post('/dev/update', {
-    info: { available: true, current: '0.1.0-dev', version: '0.2.0', size: 1000, sha256: 'x', apk: 'https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk',
+    info: { available: true, current: '0.1.0-dev', version: '0.2.0', size: 1000, sha256: 'x', apk: 'https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk',
       notes: '**앱 안 업데이트**: 새 버전이 나오면 알려 줘요. **설치는** 안드로이드 설치 화면에서 업데이트만 누르면 돼요. 서식 지우기 (휴대폰 0.2.0)' },
     install: 'permission',
   });

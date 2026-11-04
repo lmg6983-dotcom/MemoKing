@@ -1,15 +1,14 @@
-# PC 정식 배포 — v*.*.* 태그를 올리면 Windows 설치 파일을 빌드해 공개 배포 저장소(memoking-releases)의 Release 에 올린다.
+# PC 정식 배포 — v*.*.* 태그를 올리면 Windows 설치 파일을 빌드해 이 저장소의 Release 에 올린다.
 #   올라가는 것: MemoKing-Setup-<버전>.exe · .blockmap · latest.yml (자동 업데이트용) + MemoKing-Setup.exe (늘 같은 이름의 최신 링크)
-#   소스는 이 비공개 저장소에만 있고, 공개 저장소에는 위 파일만 간다. 앱 안에는 토큰이 없다 (공개 저장소라 읽기에 필요 없음).
-#   올리기 토큰: Secrets 의 MEMOKING_RELEASES_TOKEN — memoking-releases 하나에만 Contents 쓰기 권한이 있는 fine-grained PAT
-#   최신 설치 파일: https://github.com/lmg6983-dotcom/memoking-releases/releases/latest/download/MemoKing-Setup.exe
+#   공개 저장소라 앱은 토큰 없이 Release 를 읽고, 올리기는 이 저장소의 기본 토큰(github.token)으로 한다.
+#   최신 설치 파일: https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe
 name: Release (PC)
 
 on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_dispatch: # Actions 탭 › Run workflow — main 을 고르면 package.json 버전으로 (공개 저장소의 v<버전> 태그 · Release 는 electron-builder 가 만든다)
+  workflow_dispatch: # Actions 탭 › Run workflow — main 을 고르면 package.json 버전으로 (v<버전> 태그 · Release 는 electron-builder 가 만든다)
     inputs:
       allow_no_google:
         description: 'Google 연결 정보 비밀값 없이도 배포 (사용자가 설정에서 OAuth 클라이언트를 붙여 넣어야 함)'
@@ -17,7 +16,7 @@ on:
         default: false
 
 permissions:
-  contents: read # 이 저장소는 읽기만 — 올리기는 공개 저장소 전용 토큰으로
+  contents: write # Release 만들기 · 파일 올리기
 
 concurrency:
   group: release-${{ github.ref }}
@@ -28,7 +27,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     env:
-      RELEASES_REPO: lmg6983-dotcom/memoking-releases
+      RELEASES_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,16 +55,6 @@ jobs:
           fi
           echo "버전 $version"
 
-      - name: 올리기 토큰이 있는지
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
-        run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::error::Secrets 에 MEMOKING_RELEASES_TOKEN 이 없어요 (README 의 '자동 업데이트 배포' 참고)"
-            exit 1
-          fi
-
       - name: 단위 테스트
         run: npm test
 
@@ -92,22 +81,37 @@ jobs:
             exit 1
           fi
 
-      # electron-builder 가 공개 저장소에 Release v<버전> 을 만들고 설치 파일 · .blockmap · latest.yml 을 올린다
-      - name: 빌드 + 공개 저장소에 올리기
+      # electron-builder 가 Release v<버전> 을 만들고 설치 파일 · .blockmap · latest.yml 을 올린다
+      - name: 빌드 + Release 에 올리기
         env:
-          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/build-dist.mjs --no-smoke --publish always
 
       # 늘 같은 이름의 최신 링크 (releases/latest/download/MemoKing-Setup.exe) — 처음 설치하는 사람용
       - name: 최신 설치 파일 링크
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=$(node -p "require('./package.json').version")
           cp "dist/MemoKing-Setup-${version}.exe" MemoKing-Setup.exe
           gh release upload "v${version}" MemoKing-Setup.exe --repo "$RELEASES_REPO" --clobber
           echo "https://github.com/${RELEASES_REPO}/releases/latest/download/MemoKing-Setup.exe"
+
+      # 옛 배포 저장소(memoking-releases)를 보는 옛 앱도 이 버전으로 넘어오게 같은 파일을 그쪽에도 — 새 버전부터는 이 저장소를 본다
+      #   shortcut: Secrets 에 MEMOKING_RELEASES_TOKEN 이 있을 때만. 옛 앱이 다 업데이트되면 그 저장소 · 비밀값을 지우면 저절로 건너뜀
+      - name: 옛 배포 저장소에도 올리기 (옮기는 동안만)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.MEMOKING_RELEASES_TOKEN }}
+          OWN_TOKEN: ${{ github.token }}
+          LEGACY_REPO: lmg6983-dotcom/memoking-releases
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "옛 배포 저장소 비밀값이 없어 건너뛰어요"; exit 0; fi
+          version=$(node -p "require('./package.json').version")
+          GH_TOKEN="$OWN_TOKEN" gh release view "v${version}" --repo "$RELEASES_REPO" --json body -q .body > notes.txt
+          gh release view "v${version}" --repo "$LEGACY_REPO" >/dev/null 2>&1 || gh release create "v${version}" --repo "$LEGACY_REPO" --title "v${version}" --notes-file notes.txt --latest
+          gh release upload "v${version}" "dist/MemoKing-Setup-${version}.exe" "dist/MemoKing-Setup-${version}.exe.blockmap" dist/latest.yml MemoKing-Setup.exe --repo "$LEGACY_REPO" --clobber
 
       - uses: actions/upload-artifact@v4
         continue-on-error: true

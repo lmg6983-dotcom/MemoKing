@@ -1,5 +1,5 @@
-// 메모킹 설치 파일의 늘 같은 주소 (공개 배포 저장소 memoking-releases — 새 버전이 나와도 바뀌지 않는다)
-const RELEASES = 'https://github.com/lmg6983-dotcom/memoking-releases/releases';
+// 메모킹 설치 파일의 늘 같은 주소 (이 저장소의 Release — 새 버전이 나와도 바뀌지 않는다)
+const RELEASES = 'https://github.com/lmg6983-dotcom/MemoKing/releases';
 
 /** Windows PC 설치 파일 (release.yml 이 Release 마다 같은 이름으로도 올린다) */
 export const WINDOWS_SETUP = `${RELEASES}/latest/download/MemoKing-Setup.exe`;

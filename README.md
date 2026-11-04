@@ -12,8 +12,8 @@ Windows 스티커 메모처럼 바탕화면에 붙여 쓰는 메모 앱이에요
 
 | | 받기 |
 |---|---|
-| **Windows PC** | [MemoKing-Setup.exe](https://github.com/lmg6983-dotcom/memoking-releases/releases/latest/download/MemoKing-Setup.exe) |
-| **안드로이드** | [MemoKing-android.apk](https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk) |
+| **Windows PC** | [MemoKing-Setup.exe](https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe) |
+| **안드로이드** | [MemoKing-android.apk](https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk) |
 
 - PC는 관리자 권한 없이 설치돼요. Windows를 켜면 알림 영역(작업 표시줄 오른쪽 아래)에서 저절로 실행돼요.
 - 처음 실행할 때 "Windows의 PC 보호" 경고가 뜨면 **추가 정보 › 실행**을 누르세요. 코드 서명이 아직 없어서 뜨는 경고예요.
@@ -97,6 +97,7 @@ npm run dist     설치 파일 만들기 → dist/MemoKing-Setup-<버전>.exe
 <!-- HISTORY:START -->
 | 태그 | 날짜 | 단계 | 내용 |
 |---|---|---|---|
+| `v0.76.0` | 2026-11-04 | 6. 배포 | **설치 파일과 업데이트가 메모킹 저장소에서 나와요 (휴대폰 0.54.0)**: 저장소를 공개로 바꾸면서 PC 설치 파일 · 휴대폰 APK · 자동 업데이트를 따로 둔 배포 저장소(memoking-releases) 대신 메모킹 저장소의 릴리스에서 받아요. 이 버전으로 업데이트하면 그다음부터는 새 주소에서 새 버전을 찾아요. 쓰는 기능은 그대로예요 |
 | `v0.75.3` | 2026-11-03 | 5. 다듬기 | **설치 파일이 가벼워졌어요**: PC 메모킹이 설치 뒤 차지하는 공간이 50MB 넘게 줄고, 내려받는 설치 파일도 작아졌어요. 메모킹 화면에 쓰지 않는 Electron 언어 파일(한국어 · 영어 말고 50여 개)과 쓰이지 않던 글자 인식 파일을 빼고, 설치 파일을 최대로 압축했어요. 쓰는 기능은 그대로예요 |
 | `v0.75.2` | 2026-11-02 | 5. 고침 | **알림을 누르면 메모가 열려요**: 메모킹이 띄운 알림을 눌렀는데 메모 대신 메모 목록이 뜨던 것을, 그 알림의 메모가 열리게 고쳤어요. 개발 실행에서 알림을 누르면 빈 "Electron" 창이 뜨고 작업 표시줄 아이콘이 Electron 으로 보이던 것도 고쳤어요 |
 | `v0.75.1` | 2026-11-02 | 5. 고침 | **Word · 파워포인트를 그림으로 넣을 때 PDF 로 바꿔 또렷하게 · 매직 카피 랙 줄임 (휴대폰 0.53.1)**: PC 에 Office 가 있으면 Word(DOCX) · 파워포인트(PPTX)를 먼저 PDF 로 바꾼 뒤 장마다 그림으로 넣어요 — 파워포인트 그림이 깨지던 것을 고쳤어요 (Office 가 없으면 예전처럼 메모킹이 직접 그려요). 다른 프로그램이 만든 Word 문서가 장이 나뉘지 않고 긴 그림 한 장으로 들어가던 것도 쪽 크기대로 나눠요(휴대폰도). Word · 엑셀 같은 곳에서 Ctrl+Alt+C 를 누르면 잠깐 멈추던 것(쓰지 않을 그림까지 꺼내던 것)을 줄였어요 |
