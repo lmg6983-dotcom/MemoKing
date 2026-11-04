@@ -87,6 +87,18 @@ npm run dist     설치 파일 만들기 → dist/MemoKing-Setup-<버전>.exe
 - 설치 파일 배포와 자동 업데이트 설정은 [배포 안내](guides/RELEASE.md)에 있어요.
 - 사용한 오픈소스와 라이선스는 [app/vendor/LICENSES.md](app/vendor/LICENSES.md)에 있어요.
 
+## 라이선스
+
+메모킹은 [MIT 라이선스](LICENSE)예요. 함께 묶은 오픈소스는 각자의 라이선스를 따르고, [app/vendor/LICENSES.md](app/vendor/LICENSES.md)에 정리돼 있어요.
+
+## 코드 서명 정책
+
+Windows 설치 파일은 [SignPath.io](https://about.signpath.io)가 무료로 제공하는 코드 서명을 받고, 인증서는 [SignPath Foundation](https://signpath.org)이 발급해요. (승인을 받은 뒤부터 적용돼요.)
+
+- 서명은 이 저장소의 GitHub Actions(`.github/workflows/release.yml`)에서 소스로 빌드한 설치 파일에만 해요.
+- 만들고 검토하는 사람(Committer · Reviewer)과 서명을 승인하는 사람(Approver): [lmg6983-dotcom](https://github.com/lmg6983-dotcom)
+- 개인정보: 메모킹은 사용자가 쓰기로 한 기능(Google Drive 동기화, 업데이트 확인, 링크 미리보기 등)이 아니면 다른 시스템으로 어떤 정보도 보내지 않아요. 개발자에게 보내는 정보는 없어요. 자세한 내용은 [개인정보 처리방침](docs/privacy.html)에 있어요.
+
 ## 바뀐 점 (버전별)
 
 버전마다 바뀐 점이에요. 새 버전이 위에 있어요.

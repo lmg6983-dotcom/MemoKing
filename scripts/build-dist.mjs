@@ -134,6 +134,7 @@ await builder.build({ projectDir: STAGE, config, targets: builder.Platform.WINDO
 const setupName = `MemoKing-Setup-${pkg.version}.exe`;
 mkdirSync(join(ROOT, 'dist'), { recursive: true });
 copyFileSync(join(OUT, setupName), join(ROOT, 'dist', setupName));
+writeFileSync(join(ROOT, 'dist', 'release-notes.md'), releaseNotes(pkg.version)); // release.yml 이 Release 를 만들 때
 console.log(`✔ 설치 파일: dist/${setupName}`);
 // 자동 업데이트에 필요한 것: latest.yml (새 버전 정보) · .blockmap (바뀐 부분만 받기)
 for (const f of ['latest.yml', `${setupName}.blockmap`]) {

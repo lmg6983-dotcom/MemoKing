@@ -1,6 +1,7 @@
 # PC 정식 배포 — v*.*.* 태그를 올리면 Windows 설치 파일을 빌드해 이 저장소의 Release 에 올린다.
 #   올라가는 것: MemoKing-Setup-<버전>.exe · .blockmap · latest.yml (자동 업데이트용) + MemoKing-Setup.exe (늘 같은 이름의 최신 링크)
 #   공개 저장소라 앱은 토큰 없이 Release 를 읽고, 올리기는 이 저장소의 기본 토큰(github.token)으로 한다.
+#   SIGNPATH_API_TOKEN 이 있으면 설치 파일을 SignPath 로 서명한 뒤 올린다 (guides/RELEASE.md 의 코드 서명).
 #   최신 설치 파일: https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe
 name: Release (PC)
 
@@ -8,7 +9,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_dispatch: # Actions 탭 › Run workflow — main 을 고르면 package.json 버전으로 (v<버전> 태그 · Release 는 electron-builder 가 만든다)
+  workflow_dispatch: # Actions 탭 › Run workflow — main 을 고르면 package.json 버전으로 (v<버전> 태그 · Release 는 마지막 단계가 만든다)
     inputs:
       allow_no_google:
         description: 'Google 연결 정보 비밀값 없이도 배포 (사용자가 설정에서 OAuth 클라이언트를 붙여 넣어야 함)'
@@ -28,6 +29,7 @@ jobs:
     timeout-minutes: 45
     env:
       RELEASES_REPO: ${{ github.repository }}
+      SIGNPATH_ON: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -81,21 +83,53 @@ jobs:
             exit 1
           fi
 
-      # electron-builder 가 Release v<버전> 을 만들고 설치 파일 · .blockmap · latest.yml 을 올린다
-      - name: 빌드 + Release 에 올리기
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/build-dist.mjs --no-smoke --publish always
+      # 설치 파일 · .blockmap · latest.yml 을 dist/ 에 만든다 (Release 는 서명 뒤에 만든다)
+      - name: 빌드
+        run: node scripts/build-dist.mjs --no-smoke
 
-      # 늘 같은 이름의 최신 링크 (releases/latest/download/MemoKing-Setup.exe) — 처음 설치하는 사람용
-      - name: 최신 설치 파일 링크
+      # 코드 서명 (SignPath Foundation, 오픈소스 무료) — Secrets 에 SIGNPATH_API_TOKEN 이 있을 때만. 없으면 지금처럼 서명 없이
+      #   설치 파일을 Actions 산출물로 올리면 SignPath 가 서명해 돌려준다. 서명하면 파일이 바뀌므로 latest.yml · .blockmap 을 다시 만든다
+      #   Variables: SIGNPATH_ORGANIZATION_ID (필수) · SIGNPATH_PROJECT_SLUG (기본 MemoKing) · SIGNPATH_POLICY_SLUG (기본 release-signing)
+      - name: 서명할 설치 파일 올리기
+        id: unsigned
+        if: env.SIGNPATH_ON == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-setup
+          path: dist/MemoKing-Setup-*.exe
+          if-no-files-found: error
+      - name: SignPath 로 서명
+        if: env.SIGNPATH_ON == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'MemoKing' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+      - name: 서명한 설치 파일로 바꾸고 업데이트 정보 맞추기
+        if: env.SIGNPATH_ON == 'true'
+        shell: bash
+        run: |
+          cp signed/MemoKing-Setup-*.exe dist/
+          node scripts/refresh-update-info.mjs
+
+      # Release v<버전> 을 만들고 설치 파일 · .blockmap · latest.yml + 늘 같은 이름의 최신 링크(releases/latest/download/MemoKing-Setup.exe)를 올린다
+      - name: Release 에 올리기
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(node -p "require('./package.json').version")
           cp "dist/MemoKing-Setup-${version}.exe" MemoKing-Setup.exe
-          gh release upload "v${version}" MemoKing-Setup.exe --repo "$RELEASES_REPO" --clobber
+          files=("dist/MemoKing-Setup-${version}.exe" "dist/MemoKing-Setup-${version}.exe.blockmap" dist/latest.yml MemoKing-Setup.exe)
+          if gh release view "v${version}" --repo "$RELEASES_REPO" >/dev/null 2>&1; then
+            gh release upload "v${version}" "${files[@]}" --repo "$RELEASES_REPO" --clobber
+          else
+            gh release create "v${version}" "${files[@]}" --repo "$RELEASES_REPO" --target "$GITHUB_SHA" --title "메모킹 v${version}" --notes-file dist/release-notes.md --latest
+          fi
           echo "https://github.com/${RELEASES_REPO}/releases/latest/download/MemoKing-Setup.exe"
 
       # 옛 배포 저장소(memoking-releases)를 보는 옛 앱도 이 버전으로 넘어오게 같은 파일을 그쪽에도 — 새 버전부터는 이 저장소를 본다
