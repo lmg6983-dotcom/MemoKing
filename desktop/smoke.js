@@ -665,7 +665,7 @@ export async function runSmoke({
     })()`);
     const webStatus = await until(async () => {
       const log = await js(webNote.win, 'window.__statusLog ?? []');
-      return log.find((t) => /받지 못해|저장했어요/.test(t)) ?? null;
+      return log.find((t) => /사진 \d+개를 저장했어요|받지 못해/.test(t)) ?? null; // 그냥 "저장했어요"(자동 저장)는 사진 받기 끝이 아니다
     }, '웹 사진 받기 완료', 15000).catch(async () => `(완료 안내 없음) ${JSON.stringify(await js(webNote.win, 'window.__statusLog ?? []'))}`);
     // 저장은 입력이 멈춘 뒤에 되므로 파일에 글이 들어올 때까지 기다린다 (빌드 앱은 더 느릴 수 있음)
     await until(() => readMemo(webNote.id).includes('기사 본문 첫 문단'), '웹 글 저장', 8000).catch(() => {});
