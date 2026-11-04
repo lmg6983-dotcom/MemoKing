@@ -44,9 +44,19 @@ v0.75.3 까지 설치한 앱은 옛 저장소 `memoking-releases` 에서 새 버
 | 설치 폴더 권한 오류 | 사용자별 설치(%LOCALAPPDATA%\Programs) 라 보통 없음. 예전에 관리자 권한으로 Program Files 에 설치했다면 지우고 새로 설치 |
 | "서명을 확인하지 못해…" | 서명이 바뀐(또는 생긴) 첫 업데이트에서 날 수 있음 — 아래 서명 참고 |
 
-**코드 서명 (지금은 없음)**
+**코드 서명 (SignPath Foundation — 승인 뒤 켬)**
 
-- 없을 때: 처음 설치 · 실행 때 SmartScreen "Windows의 PC 보호" (추가 정보 › 실행). electron-updater 는 서명이 **없으면** 서명을 확인하지 않고 설치합니다. 대신 위변조를 서명으로 막지 못하므로 공개 저장소 · 토큰 관리가 더 중요합니다.
-- 도입 체크리스트: ☐ OV/EV 코드 서명 인증서 구입 (EV 는 SmartScreen 평판이 바로, 하드웨어 토큰 · 클라우드 서명 필요) ☐ 빌드에 서명 연결 (electron-builder `win.signtoolOptions` 또는 Azure Trusted Signing — **electron.build 의 Code Signing 문서 확인 필요**) ☐ 서명한 첫 버전을 배포하면 그 뒤 업데이트는 같은 게시자 이름(publisherName)인지 확인되므로, 인증서를 바꿀 때 게시자 이름이 같아야 함 ☐ 서명 비밀값은 Secrets 에만
+오픈소스 프로젝트는 [SignPath Foundation](https://signpath.org) 에서 무료로 코드 서명을 받을 수 있어요. `release.yml` 에 서명 단계가 준비돼 있고, Secret `SIGNPATH_API_TOKEN` 이 생기면 저절로 켜져요 (없으면 지금처럼 서명 없이 배포).
+
+- 흐름: 빌드 → 설치 파일을 Actions 산출물로 올림 → `signpath/github-action-submit-signing-request@v3` 가 서명 요청 · 서명본 받기 → `scripts/refresh-update-info.mjs` 가 서명본에 맞춰 `latest.yml` · `.blockmap` 을 다시 만듦 (서명하면 파일이 바뀌어 자동 업데이트의 sha512 확인이 어긋나므로) → Release 에 올림
+- 켜는 법 (승인 뒤 한 번):
+  1. SignPath 에서 이 저장소를 **Trusted Build System: GitHub.com** 으로 연결하고, 프로젝트(slug `MemoKing`) · 서명 정책(slug `release-signing`) · 산출물 설정을 만들어요. 산출물 설정은 zip 안의 설치 파일 하나를 서명하는 것: `<zip-file><pe-file path="MemoKing-Setup-*.exe"><authenticode-sign/></pe-file></zip-file>`
+  2. SignPath 에서 CI 사용자를 만들고 그 API 토큰을 이 저장소 Settings › Secrets and variables › Actions › **Secrets** 에 `SIGNPATH_API_TOKEN` 으로
+  3. 같은 화면의 **Variables** 에 `SIGNPATH_ORGANIZATION_ID` (SignPath 조직 ID). slug 를 다르게 지었으면 `SIGNPATH_PROJECT_SLUG` · `SIGNPATH_POLICY_SLUG` 도
+  4. 버전을 올려 배포 → Actions 의 "SignPath 로 서명" 단계가 초록이고, 받은 설치 파일 › 속성 › 디지털 서명에 SignPath Foundation 이 보이면 끝
+- 서명되는 것은 설치 파일(MemoKing-Setup.exe)이에요. 설치 화면의 SmartScreen 경고가 이것으로 사라져요 (평판이 쌓이는 동안 처음 몇 주는 남을 수 있음). 설치된 MemoKing.exe 는 설치 파일 안에 들어가 있어 서명되지 않아요
+- 자동 업데이트: 앱 설정(app-update.yml)에 게시자 이름을 넣지 않아서 electron-updater 는 서명을 검사하지 않아요. 그래서 서명 없는 옛 버전에서 서명한 새 버전으로 문제없이 넘어가요
+- SignPath Foundation 은 README 에 코드 서명 정책을 두라고 해요 → README 의 "코드 서명 정책"
+- 없을 때: 처음 설치 · 실행 때 SmartScreen "Windows의 PC 보호" (추가 정보 › 실행)
 - 백신 오탐: 서명 없는 새 설치 파일 · PowerShell 도우미를 쓰는 앱은 오탐이 날 수 있음 → 같은 파일로 Microsoft Security Intelligence(제출 페이지)에 오탐 신고, 서명 도입이 가장 확실한 대책
 - electron-builder: 지금 v26.15.3(npm 정식 최신). v27 은 아직 알파(27.0.0-alpha.x) — 올릴 때 per-machine 설치 · 웹 설치기(nsis-web) 관련 바뀐 점을 **electron.build 의 v27 이전 안내(마이그레이션)에서 확인 필요** (이 앱은 perMachine: false · nsis(웹 설치기 아님)라 영향이 적을 것으로 보이나 확인 전)
