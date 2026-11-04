@@ -12,8 +12,8 @@ Windows 스티커 메모처럼 바탕화면에 붙여 쓰는 메모 앱이에요
 
 | | 받기 |
 |---|---|
-| **Windows PC** | [MemoKing-Setup.exe](https://github.com/lmg6983-dotcom/memoking-releases/releases/latest/download/MemoKing-Setup.exe) |
-| **안드로이드** | [MemoKing-android.apk](https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk) |
+| **Windows PC** | [MemoKing-Setup.exe](https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe) |
+| **안드로이드** | [MemoKing-android.apk](https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk) |
 
 - PC는 관리자 권한 없이 설치돼요. Windows를 켜면 알림 영역(작업 표시줄 오른쪽 아래)에서 저절로 실행돼요.
 - 처음 실행할 때 "Windows의 PC 보호" 경고가 뜨면 **추가 정보 › 실행**을 누르세요. 코드 서명이 아직 없어서 뜨는 경고예요.

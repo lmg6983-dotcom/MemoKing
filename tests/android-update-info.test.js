@@ -28,5 +28,5 @@ test('휴대폰 앱 업데이트 정보: 크기 · SHA-256 · 받을 주소', ()
   assert.equal(info.size, 3);
   assert.equal(info.sha256, 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   assert.equal(info.apk, APK_URL);
-  assert.match(info.apk, /^https:\/\/github\.com\/lmg6983-dotcom\/memoking-releases\/releases\/download\/android\/.+\.apk$/);
+  assert.match(info.apk, /^https:\/\/github\.com\/lmg6983-dotcom\/MemoKing\/releases\/download\/android\/.+\.apk$/);
 });

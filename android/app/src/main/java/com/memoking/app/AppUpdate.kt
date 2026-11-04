@@ -14,7 +14,7 @@ import java.net.URL
 import java.security.MessageDigest
 
 /**
- * 앱 안 업데이트 — PC 의 자동 업데이트에 해당. 공개 배포 저장소(memoking-releases)의 android-latest.json 을 보고,
+ * 앱 안 업데이트 — PC 의 자동 업데이트에 해당. 이 저장소 릴리스 "android" 의 android-latest.json 을 보고,
  * 새 버전이 있으면 APK 를 받아 안드로이드 설치 화면으로 넘긴다 (사용자가 "업데이트" 를 한 번 누른다 — 무음 설치는 스토어 앱만 가능).
  * 설치 화면은 브라우저로 받은 APK 를 열 때와 같은 안드로이드 기본 설치기(ACTION_INSTALL_PACKAGE) — 설치 중 · 완료(열기)까지 그 화면이 보여 준다.
  *   (예전의 설치 세션(PackageInstaller) 방식은 일부 휴대폰에서 "업데이트" 를 눌러도 아무 일도 일어나지 않았다)
@@ -24,7 +24,7 @@ import java.security.MessageDigest
  *       (서명이 다른 APK 는 안드로이드가 설치를 거부한다 — 같은 서명이라 업데이트로 덮어 설치되고 메모는 그대로).
  */
 object AppUpdate {
-    private const val REPO = "lmg6983-dotcom/memoking-releases"
+    private const val REPO = "lmg6983-dotcom/MemoKing"
     const val INFO_URL = "https://github.com/$REPO/releases/download/android/android-latest.json"
     const val APK_PREFIX = "https://github.com/$REPO/releases/download/"
     const val APK_MIME = "application/vnd.android.package-archive"

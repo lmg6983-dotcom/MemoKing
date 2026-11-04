@@ -1,4 +1,4 @@
-// 앱 안 업데이트용 정보 파일(android-latest.json) 만들기 — android.yml 이 APK 를 공개 배포 저장소에 올릴 때 함께 올린다
+// 앱 안 업데이트용 정보 파일(android-latest.json) 만들기 — android.yml 이 APK 를 릴리스 "android" 에 올릴 때 함께 올린다
 //   사용: node scripts/android-update-info.mjs <APK 경로> <만들 JSON 경로>
 //   { versionCode, versionName, apk(내려받을 주소), size, sha256, notes } — 앱(AppUpdate.kt)이 이것을 보고 새 버전인지 판단한다
 //   바뀐 점(notes)은 README 이력 표에서 "(휴대폰 <versionName>)" 이 적힌 줄 (PC 의 새 버전 안내와 같은 글)
@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-export const APK_URL = 'https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk';
+// RELEASES_REPO: 올릴 저장소 (옛 배포 저장소에 올릴 때는 그쪽 주소여야 옛 앱이 받는다)
+export const APK_URL = `https://github.com/${process.env.RELEASES_REPO || 'lmg6983-dotcom/MemoKing'}/releases/download/android/MemoKing-android.apk`;
 
 /** android/app/build.gradle.kts 의 versionCode · versionName */
 export function gradleVersion(text) {

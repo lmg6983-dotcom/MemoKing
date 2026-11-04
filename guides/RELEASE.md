@@ -2,45 +2,43 @@
 
 [← README](../README.md)
 
-## 자동 업데이트 배포 (비공개 소스 + 공개 배포 저장소)
+## 자동 업데이트 배포
 
-소스는 이 비공개 저장소에만 두고, 설치 파일만 공개 저장소 **`lmg6983-dotcom/memoking-releases`** 의 Release 에 올립니다. 앱은 공개 저장소의 Release 만 보며 **앱 · 설치 파일에 토큰이 없습니다** (공개 저장소라 읽기에 필요 없음).
+소스와 설치 파일 모두 이 공개 저장소(**`lmg6983-dotcom/MemoKing`**)에 있어요. 앱은 이 저장소의 Release 를 토큰 없이 읽고, 올리기는 Actions 의 기본 토큰(`github.token`)으로 해서 따로 만들 토큰이 없어요.
 
 ```
-[비공개 MemoKing]  git tag v0.39.0 && git push origin v0.39.0
+git tag v0.76.0 && git push origin v0.76.0
       │  .github/workflows/release.yml (windows-latest)
-      │  ① 태그 = package.json 버전 확인 ② npm test ③ scripts/build-dist.mjs --publish always (GH_TOKEN = 공개 저장소 전용 PAT)
+      │  ① 태그 = package.json 버전 확인 ② npm test ③ scripts/build-dist.mjs --publish always
       ▼
-[공개 memoking-releases]  Release v0.39.0: MemoKing-Setup-0.39.0.exe · .blockmap · latest.yml · MemoKing-Setup.exe
+Release v0.76.0: MemoKing-Setup-0.76.0.exe · .blockmap · latest.yml · MemoKing-Setup.exe
       ▲  latest.yml 확인 (켤 때 8초 뒤 · 4시간마다 · 절전 해제 · 설정 › 업데이트 확인)
-[설치된 메모킹 v0.38.0]  desktop/updater.js (electron-updater, autoDownload 끔)
-      → 새 버전 대화 상자(바뀐 점 = README 이 버전 줄) → 받기(진행률) → 지금 재시작(쓰던 메모 저장 후) / 나중에(끝낼 때 설치, 24시간 다시 묻지 않음)
+설치된 메모킹  desktop/updater.js (electron-updater, autoDownload 끔)
+      → 새 버전 대화 상자(바뀐 점 = README 이 버전 줄) → 받기(진행률) → 지금 재시작 / 나중에(끝낼 때 설치)
 ```
 
-- 최신 설치 파일 (로그인 필요 없음): `https://github.com/lmg6983-dotcom/memoking-releases/releases/latest/download/MemoKing-Setup.exe`
-- 설정: `scripts/build-dist.mjs` — nsis `perMachine: false` · `oneClick: false`, `publish: github (memoking-releases, releaseType: release)`. 빌드가 끝나면 `dist/` 에 `latest.yml` · `.blockmap` 이 있는지 스스로 확인하고 없으면 실패합니다.
-- 앱: `desktop/updater.js` (main) · `desktop/preload.cjs` 의 `update` · `app/js/list.js` (설정 › 업데이트, 새 버전 대화 상자). 개발 실행(`app.isPackaged` 아님)에서는 확인하지 않습니다.
+- 최신 설치 파일: `https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe`
+- 휴대폰: `.github/workflows/android.yml` 이 main 에서 APK 를 만들면 사전 배포 `android` 에 `MemoKing-android.apk` · `android-latest.json` 을 올리고, 앱은 그것을 봐요.
+- 사전 배포 `desktop` 은 main 이 바뀔 때마다 만드는 시험용 설치 파일이에요 (`desktop.yml`). 사전 배포라 "최신 릴리스" 링크와 자동 업데이트에는 걸리지 않아요.
+- 설정: `scripts/build-dist.mjs` — nsis `perMachine: false` · `oneClick: false`, `publish: github (MemoKing, releaseType: release)`. 빌드가 끝나면 `dist/` 에 `latest.yml` · `.blockmap` 이 있는지 스스로 확인하고 없으면 실패해요.
+- Secrets: `MEMOKING_GOOGLE_CLIENT_ID` · `MEMOKING_GOOGLE_CLIENT_SECRET` (Google 로그인 연결 정보)
 
-**처음 한 번 준비**
+**배포:** `package.json` 의 버전을 올리고 README 이력에 그 버전 줄을 쓴 뒤 → `git tag v<버전> && git push origin v<버전>` (또는 Actions › Release (PC) › Run workflow 에서 main)
 
-1. 공개 저장소 만들기: GitHub › New repository › 이름 `memoking-releases` · **Public** · README 만 (소스는 올리지 않음)
-2. 토큰 만들기: GitHub › Settings › Developer settings › Personal access tokens › **Fine-grained tokens** › Generate new token
-   - Repository access: **Only select repositories › memoking-releases**
-   - Permissions › Repository permissions › **Contents: Read and write** (나머지는 없음) · 만료일은 1년 이하 권장
-3. 이 비공개 저장소 › Settings › Secrets and variables › Actions › New repository secret
-   - `MEMOKING_RELEASES_TOKEN` = 위 토큰 (필수)
-   - `MEMOKING_GOOGLE_CLIENT_ID` · `MEMOKING_GOOGLE_CLIENT_SECRET` (있던 것 그대로 — Google 로그인 연결 정보)
+### 옛 배포 저장소(memoking-releases)에서 옮기기
 
-**배포:** `package.json` 의 버전을 올리고 README 이력에 그 버전 줄을 쓴 뒤 → `git tag v0.39.0 && git push origin v0.39.0` (또는 Actions › Release (PC) › Run workflow 에서 main — package.json 버전으로)
+v0.75.3 까지 설치한 앱은 옛 저장소 `memoking-releases` 에서 새 버전을 찾아요. 그래서 옮기는 동안은 Secrets 에 `MEMOKING_RELEASES_TOKEN` 을 남겨 두면, 새 버전을 그쪽에도 같이 올려요 (`release.yml` · `android.yml` 의 "옮기는 동안만" 단계). 옛 앱이 그 버전으로 업데이트되면 그때부터 이 저장소를 봐요.
 
-**테스트 순서:** ① v0.38.0 을 위 링크로 설치 ② 버전을 0.38.1 로 올려 태그 푸시 → Actions 가 공개 저장소에 Release v0.38.1 을 만듦 ③ 설치된 앱에서 설정 › 업데이트 확인 → 대화 상자 → 받기(진행률) → 지금 재시작 → 설정의 지금 버전이 v0.38.1
+1. 새 버전을 한 번 배포해요. 이 저장소와 옛 저장소 양쪽에 올라가요.
+2. 쓰는 PC · 휴대폰이 모두 새 버전으로 업데이트됐는지 확인해요 (설정의 지금 버전).
+3. 그다음 `memoking-releases` 저장소와 Secret `MEMOKING_RELEASES_TOKEN` 을 지워요. 옛 저장소로 올리는 단계는 비밀값이 없으면 저절로 건너뛰어요.
 
 **자주 나는 문제**
 
 | 증상 | 까닭 · 해결 |
 |---|---|
-| "업데이트 정보를 찾지 못했어요" (latest.yml 404) | 공개 저장소에 Release 가 없거나 **초안(draft)** · 사전 배포(prerelease) 로 올라감 → Release 를 정식(Latest)으로. 설정이 `releaseType: 'release'` 인지 |
-| Actions 의 올리기 단계 403 · 404 | 토큰이 memoking-releases 를 고르지 않았거나 Contents 쓰기가 없음 · 만료 → 토큰 다시 만들어 Secret 바꾸기 |
+| "업데이트 정보를 찾지 못했어요" (latest.yml 404) | Release 가 없거나 **초안(draft)** · 사전 배포(prerelease) 로 올라감 → Release 를 정식(Latest)으로. 설정이 `releaseType: 'release'` 인지 |
+| Actions 의 올리기 단계 403 | 저장소 Settings › Actions › General › Workflow permissions 가 "Read and write" 인지 (워크플로는 `contents: write` 를 달라고 함) |
 | "태그와 package.json 버전이 달라요" | 태그 `v0.39.0` 이면 package.json 도 `0.39.0` |
 | 개발 실행에서 업데이트 확인이 안 됨 | 정상 — 설치판(app-update.yml 이 있는 앱)에서만 확인 |
 | 설치 폴더 권한 오류 | 사용자별 설치(%LOCALAPPDATA%\Programs) 라 보통 없음. 예전에 관리자 권한으로 Program Files 에 설치했다면 지우고 새로 설치 |

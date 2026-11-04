@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { WINDOWS_SETUP, ANDROID_APK, installShareText } from '../app/js/core/install-links.js';
 
 test('설치 링크: 버전이 들어가지 않은 늘 같은 주소 (새 버전이 나와도 그대로)', () => {
-  assert.equal(WINDOWS_SETUP, 'https://github.com/lmg6983-dotcom/memoking-releases/releases/latest/download/MemoKing-Setup.exe');
-  assert.equal(ANDROID_APK, 'https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk');
+  assert.equal(WINDOWS_SETUP, 'https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe');
+  assert.equal(ANDROID_APK, 'https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk');
   assert.doesNotMatch(WINDOWS_SETUP + ANDROID_APK, /\d+\.\d+\.\d+/);
 });
 

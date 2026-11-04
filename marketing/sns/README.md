@@ -112,6 +112,6 @@ Ctrl+Alt+Space 하나로 메모, 파일 찾기, 계산, AI 질문까지.
 
 ## 올리기 전에 확인
 
-- 링크는 본문 대신 프로필(인스타그램), 첫 댓글(스레드, X)에: Windows `https://github.com/lmg6983-dotcom/memoking-releases/releases/latest/download/MemoKing-Setup.exe`, 안드로이드 `https://github.com/lmg6983-dotcom/memoking-releases/releases/download/android/MemoKing-android.apk`
+- 링크는 본문 대신 프로필(인스타그램), 첫 댓글(스레드, X)에: Windows `https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe`, 안드로이드 `https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk`
 - 해시태그: 인스타그램 8개 안쪽, 스레드 0~1개, X 0~2개
 - 화면 속 메모는 모두 촬영용 예시 (개인 정보 없음)
