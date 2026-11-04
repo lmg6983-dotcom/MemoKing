@@ -1,7 +1,9 @@
-// 목록 카드의 동영상 첫 장면 (PC 목록 · 휴대폰 목록이 함께 쓴다)
+// 동영상 첫 장면 — 목록 카드와 메모 속 동영상의 첫 그림 (PC · 휴대폰이 함께 쓴다)
 //   카드가 화면에 들어오면 그 동영상을 한 번 열어 1초쯤의 장면을 작은 JPG 로 그리고, 이 기기에 기억한다 (IndexedDB).
 //   다음부터는 그림만 띄운다 — 동영상을 카드마다 열지 않게. 메모 파일은 건드리지 않는다.
 //   열 수 없는 동영상(코덱 · 깨진 파일)은 칸을 지우고 지금처럼 카드 아래 동영상 아이콘만.
+//   휴대폰은 앱이 휴대폰 동영상 재생기로 그려 준다 (posterBase · WebServer.kt) — WebView 는 갤럭시 카메라의
+//   HDR · HEVC 영상을 캔버스에 검은 화면으로 그린다. 앱이 못 그리면(미리보기 서버 등) 여기서 그린다
 // shortcut: 기억은 첨부 경로로 찾는다 (첨부 파일은 넣을 때마다 새 이름이라). 같은 이름에 다른 영상을 덮어쓰면 옛 장면이 남는다
 import { vaultUrl } from './media.js';
 
@@ -14,8 +16,12 @@ const WAIT_MS = 10_000;
 let dbp = null;
 function db() {
   dbp ??= new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+    const req = indexedDB.open(DB, 2);
+    req.onupgradeneeded = () => {
+      // 2: 휴대폰에서 검게 그려 기억한 그림을 버린다 (이제 앱이 그린다)
+      if (req.result.objectStoreNames.contains(STORE)) req.result.deleteObjectStore(STORE);
+      req.result.createObjectStore(STORE);
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
@@ -71,6 +77,14 @@ export function grabFrame(url, { at = AT, width = WIDTH, wait = WAIT_MS } = {}) 
   });
 }
 
+/** 휴대폰 앱이 그린 장면 (없거나 못 그리면 null — 앱은 그림이 없으면 204) */
+async function nativeFrame(src) {
+  const base = globalThis.memoking?.posterBase;
+  if (!base) return null;
+  const res = await fetch(vaultUrl(src).replace(globalThis.memoking.vaultBase, base)).catch(() => null);
+  return res?.status === 200 ? res.blob() : null;
+}
+
 const urls = new Map(); // 첨부 경로 → 그림 주소 (이 창에서 한 번만 만든다)
 let queue = Promise.resolve(); // 동영상은 한 번에 하나씩 연다 (목록에 영상이 많아도 한꺼번에 열지 않게)
 
@@ -80,7 +94,7 @@ export function videoPoster(src) {
     urls.set(src, (async () => {
       let blob = await stored(src).catch(() => null);
       if (!blob) {
-        const run = queue.then(() => grabFrame(vaultUrl(src)));
+        const run = queue.then(async () => (await nativeFrame(src)) ?? grabFrame(vaultUrl(src)));
         queue = run.catch(() => {});
         blob = await run;
         if (blob) await stored(src, blob).catch(() => {}); // 기억 못 해도 이번엔 보인다
