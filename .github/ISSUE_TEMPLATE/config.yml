@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 기능 자세히
+    url: https://github.com/lmg6983-dotcom/MemoKing/blob/main/guides/FEATURES.md
+    about: 기능마다 자세한 동작과 전체 단축키 표
+  - name: 🔒 개인정보 처리방침
+    url: https://github.com/lmg6983-dotcom/MemoKing/blob/main/docs/privacy.html
+    about: 메모킹이 어떤 정보를 어디로 보내는지
