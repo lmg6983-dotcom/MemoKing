@@ -1,0 +1,23 @@
+name: ✨ 기능 제안
+description: 이런 게 있으면 좋겠어요
+title: "[제안] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 어떤 때 불편한가요
+      placeholder: 회의 중에 메모를 쓰다 보면 …
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 어떻게 되면 좋을까요
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 어디에서
+      options: [Windows PC, 안드로이드 휴대폰, 둘 다]
