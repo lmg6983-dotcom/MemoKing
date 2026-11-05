@@ -11,6 +11,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync,
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { releaseBody } from './release-body.mjs';
 
 const ELECTRON_VERSION = '44.4.5';
 const BUILDER_VERSION = '26.15.3';
@@ -134,7 +135,7 @@ await builder.build({ projectDir: STAGE, config, targets: builder.Platform.WINDO
 const setupName = `MemoKing-Setup-${pkg.version}.exe`;
 mkdirSync(join(ROOT, 'dist'), { recursive: true });
 copyFileSync(join(OUT, setupName), join(ROOT, 'dist', setupName));
-writeFileSync(join(ROOT, 'dist', 'release-notes.md'), releaseNotes(pkg.version)); // release.yml 이 Release 를 만들 때
+writeFileSync(join(ROOT, 'dist', 'release-notes.md'), releaseBody(readFileSync(join(ROOT, 'README.md'), 'utf8'), pkg.version)); // release.yml 이 Release 를 만들 때
 console.log(`✔ 설치 파일: dist/${setupName}`);
 // 자동 업데이트에 필요한 것: latest.yml (새 버전 정보) · .blockmap (바뀐 부분만 받기)
 for (const f of ['latest.yml', `${setupName}.blockmap`]) {
