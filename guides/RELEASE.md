@@ -18,8 +18,7 @@ Release v0.76.0: MemoKing-Setup-0.76.0.exe · .blockmap · latest.yml · MemoKin
 ```
 
 - 최신 설치 파일: `https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe`
-- 휴대폰: `.github/workflows/android.yml` 이 main 에서 APK 를 만들면 사전 배포 `android` 에 `MemoKing-android.apk` · `android-latest.json` 을 올리고, 앱은 그것을 봐요.
-- 사전 배포 `desktop` 은 main 이 바뀔 때마다 만드는 시험용 설치 파일이에요 (`desktop.yml`). 사전 배포라 "최신 릴리스" 링크와 자동 업데이트에는 걸리지 않아요.
+- 휴대폰: `.github/workflows/android.yml` 이 main 에서 APK 를 만들면 사전 배포 `android` 에 `MemoKing-android.apk` · `android-latest.json` 을 올리고, 앱은 그것을 봐요. PC 설정의 휴대폰 설치 QR · 링크도 이 파일이라 **`android` 릴리스는 지우면 안 돼요** (지우면 링크가 404, 휴대폰 업데이트도 멈춤).
 - 설정: `scripts/build-dist.mjs` — nsis `perMachine: false` · `oneClick: false`, `publish: github (MemoKing, releaseType: release)`. 빌드가 끝나면 `dist/` 에 `latest.yml` · `.blockmap` 이 있는지 스스로 확인하고 없으면 실패해요.
 - Secrets: `MEMOKING_GOOGLE_CLIENT_ID` · `MEMOKING_GOOGLE_CLIENT_SECRET` (Google 로그인 연결 정보)
 
@@ -34,6 +33,7 @@ v0.75.3 까지는 설치 파일을 따로 둔 공개 저장소 `memoking-release
 | 증상 | 까닭 · 해결 |
 |---|---|
 | "업데이트 정보를 찾지 못했어요" (latest.yml 404) | Release 가 없거나 **초안(draft)** · 사전 배포(prerelease) 로 올라감 → Release 를 정식(Latest)으로. 설정이 `releaseType: 'release'` 인지 |
+| 휴대폰 설치 링크 · QR 이 404 (`releases/download/android/…`) | 사전 배포 `android` 가 지워짐 → Actions › Android APK › Run workflow (main) 로 한 번 돌리면 다시 만들어 올려요 |
 | Actions 의 올리기 단계 403 | 저장소 Settings › Actions › General › Workflow permissions 가 "Read and write" 인지 (워크플로는 `contents: write` 를 달라고 함) |
 | "태그와 package.json 버전이 달라요" | 태그 `v0.39.0` 이면 package.json 도 `0.39.0` |
 | 개발 실행에서 업데이트 확인이 안 됨 | 정상 — 설치판(app-update.yml 이 있는 앱)에서만 확인 |
