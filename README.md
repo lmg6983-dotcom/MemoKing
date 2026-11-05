@@ -1,97 +1,122 @@
-# 메모킹 (MemoKing)
+<div align="center">
 
-<img src="assets/icons/icon-256.png" alt="메모킹 아이콘" width="96">
+<img src="assets/icons/icon-256.png" alt="메모킹 아이콘" width="112">
 
-Windows 스티커 메모처럼 바탕화면에 붙여 쓰는 메모 앱이에요. **Windows PC**와 **안드로이드 휴대폰**에서 같은 메모를 함께 써요.
+# 메모킹 · MemoKing
 
-- 메모 하나는 **마크다운 파일(.md) 하나**예요. 내가 고른 폴더에 저장되니 다른 앱으로도 열 수 있어요.
-- **Google Drive**로 PC와 휴대폰의 메모를 맞춰요.
-- AI 비서가 읽기 좋은 **메모 색인(JSON)**을 저절로 만들어요.
+**바탕화면에 붙여 쓰는 스티커 메모 — PC와 휴대폰에서 같은 메모를.**
 
-## 설치
+메모 하나는 마크다운 파일 하나. 내 폴더에 저장되고, Google Drive로 맞추고, AI 비서도 읽어요.
 
-| | 받기 |
+[![최신 버전](https://img.shields.io/github/v/release/lmg6983-dotcom/MemoKing?label=%EC%B5%9C%EC%8B%A0&color=FFC83D&labelColor=1f2328)](https://github.com/lmg6983-dotcom/MemoKing/releases/latest)
+[![받은 횟수](https://img.shields.io/github/downloads/lmg6983-dotcom/MemoKing/total?label=%EB%B0%9B%EC%9D%80%20%ED%9A%9F%EC%88%98&color=FFC83D&labelColor=1f2328)](https://github.com/lmg6983-dotcom/MemoKing/releases)
+[![PC 점검](https://img.shields.io/github/actions/workflow/status/lmg6983-dotcom/MemoKing/pc.yml?branch=main&label=PC%20%EC%A0%90%EA%B2%80&labelColor=1f2328)](https://github.com/lmg6983-dotcom/MemoKing/actions/workflows/pc.yml)
+[![Android APK](https://img.shields.io/github/actions/workflow/status/lmg6983-dotcom/MemoKing/android.yml?branch=main&label=Android%20APK&labelColor=1f2328)](https://github.com/lmg6983-dotcom/MemoKing/actions/workflows/android.yml)
+[![MIT 라이선스](https://img.shields.io/badge/license-MIT-blue?labelColor=1f2328)](LICENSE)
+
+<br>
+
+[![Windows용 받기](https://img.shields.io/badge/Windows-%EC%84%A4%EC%B9%98%20%ED%8C%8C%EC%9D%BC%20%EB%B0%9B%EA%B8%B0-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe)
+&nbsp;
+[![Android용 받기](https://img.shields.io/badge/Android-APK%20%EB%B0%9B%EA%B8%B0-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk)
+
+[기능](#-이런-걸-할-수-있어요) · [단축키](#-자주-쓰는-단축키) · [저장 위치](#-메모는-어디에-저장되나요) · [개발](#-개발) · [바뀐 점](#-바뀐-점-버전별)
+
+<br>
+
+<img src="assets/screenshots/list-life.png" alt="메모 목록 — 색깔 카드, 사진, 태그" width="31%">&nbsp;
+<img src="assets/screenshots/stack.png" alt="메모 창 — 표 · 글자 색 · 여러 메모를 탭으로 묶은 스택" width="31%">&nbsp;
+<img src="assets/screenshots/annotate.png" alt="다크 테마 메모 — 글 위에 그린 주석과 일정 추가" width="31%">
+
+<sub>메모 목록 · 탭으로 묶은 메모 창 · 글 위에 그리는 주석 (실제 앱 화면)</sub>
+
+</div>
+
+<br>
+
+## ✨ 이런 걸 할 수 있어요
+
+| | |
 |---|---|
-| **Windows PC** | [MemoKing-Setup.exe](https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe) |
-| **안드로이드** | [MemoKing-android.apk](https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk) |
+| ✍️ **쓰기** | 제목 · 목록 · 체크리스트 · 표 · 수식 · 글자 색을 화면에서 꾸미면 파일에는 마크다운으로 저장돼요. 사진 · 파일 · 링크 카드를 넣고, 웹이나 워드에서 붙여 넣어도 서식이 그대로 와요. 음성 녹음과 받아쓰기, 손글씨, 글 위에 그리기(주석)도 돼요. |
+| 💾 **알아서 저장** | 입력을 멈추면 저절로 저장해요. 지난 버전으로 되돌리기, 휴지통, 비밀번호 잠금도 있어요. |
+| ⚡ **어디서든 빠르게** | `Ctrl+Alt+Space` **매직키**로 메모 · 파일 · 폴더 · 앱 찾기, 계산, 새 메모 저장까지 한 입력창에서. `Ctrl+Alt+C` **매직 카피**는 어느 앱에서든 고른 글이나 그림을 새 메모로 (두 번 누르면 화면 영역 캡처). `Ctrl+Alt+1~9`로 정해 둔 메모를 바로 복사하거나 띄워요. |
+| 🗂️ **정리하고 찾기** | `#태그`로 나누고, 색 · 고정 · 사진 같은 조건으로 거르고, 검색해요. 메모 창 여러 개를 탭 하나로 묶거나(스택), 늘 위에 두거나(왕관), 바탕화면에 붙여요(테이프). |
+| 📅 **일정과 알림** | 글에 "내일 오후 3시"처럼 쓰면 일정으로 넣을 수 있고 미리 알림도 받아요. Windows 알림을 보관함에 모아 둘 수도 있어요 (처음에는 꺼져 있어요). |
+| 🤖 **AI — 인터넷 없이 이 PC 안에서** | 맞춤법 검사, 문체 다듬기, 초안 쓰기, 태그 붙이기. Claude 데스크톱 같은 AI 비서와 연결하면(MCP) 메모를 찾고 읽고 남기게 할 수 있어요. |
+| 📱 **휴대폰도 같이** | 안드로이드 앱이 같은 메모 폴더 형식을 쓰고 Google Drive로 PC와 맞춰요. 홈 화면 위젯, 녹음과 받아쓰기, 다른 앱에서 공유해 메모 만들기도 돼요. → [android/README.md](android/README.md) |
 
-- PC는 관리자 권한 없이 설치돼요. Windows를 켜면 알림 영역(작업 표시줄 오른쪽 아래)에서 저절로 실행돼요.
-- 처음 실행할 때 "Windows의 PC 보호" 경고가 뜨면 **추가 정보 › 실행**을 누르세요. 코드 서명이 아직 없어서 뜨는 경고예요.
+<div align="center">
+<img src="assets/screenshots/magic-search.png" alt="매직키 — 메모와 PC 파일을 한 번에 찾기" width="48%">&nbsp;
+<img src="assets/screenshots/magic-calc.png" alt="매직키 — 입력창에서 바로 계산" width="48%">
+
+<sub>매직키 <code>Ctrl+Alt+Space</code> — 메모 · 파일 찾기와 계산을 한 입력창에서</sub>
+</div>
+
+> [!TIP]
+> 기능마다 자세한 동작과 전체 단축키 표는 **[기능 자세히](guides/FEATURES.md)** 에 있어요.
+
+## 📦 설치
+
+| | 받기 | |
+|---|---|---|
+| 🪟 **Windows PC** | [MemoKing-Setup.exe](https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe) | 관리자 권한 없이 설치 · Windows를 켜면 알림 영역에서 저절로 실행 |
+| 🤖 **안드로이드** | [MemoKing-android.apk](https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk) | 휴대폰에서 받아 바로 설치 |
+
 - 새 버전이 나오면 앱이 알려 주고, 누르면 바로 업데이트돼요.
 - 앱을 지워도 메모는 메모 폴더에 그대로 남아요. 지우는 곳은 Windows 설정 › 앱 › 메모킹이에요.
 
-## 이런 걸 할 수 있어요
+> [!NOTE]
+> 처음 실행할 때 "Windows의 PC 보호" 경고가 뜨면 **추가 정보 › 실행**을 누르세요. 코드 서명이 아직 없어서 뜨는 경고예요 ([코드 서명 정책](#-코드-서명-정책)).
 
-**쓰기**
-- 서식(제목 · 목록 · 체크리스트 · 표 · 수식 · 글자 색)을 화면에서 꾸미면 파일에는 마크다운으로 저장돼요.
-- 사진 · 파일 · 링크 카드를 넣을 수 있어요. 웹이나 워드에서 붙여 넣으면 서식이 그대로 와요.
-- 음성 녹음과 받아쓰기, 손글씨(손 메모), 글 위에 그리기(주석)도 돼요.
-- 입력을 멈추면 저절로 저장해요. 지난 버전으로 되돌리기, 휴지통, 비밀번호 잠금도 있어요.
-
-**어디서든 빠르게**
-- `Ctrl+Alt+Space` **매직키**: 메모 · 파일 · 폴더 · 앱 찾기, 계산, 바로 새 메모 저장까지 한 입력창에서 해요.
-- `Ctrl+Alt+C` **매직 카피**: 어느 앱에서든 고른 글이나 그림을 새 메모로 만들어요. 두 번 누르면 화면 영역을 캡처해요.
-- `Ctrl+Alt+1~9` **메모 단축키**: 정해 둔 메모를 어디서든 복사하거나 띄워요.
-
-**정리하고 찾기**
-- `#태그`로 분류하고, 색 · 고정 · 사진 같은 조건으로 거르고, 검색해요.
-- 메모 창 여러 개를 탭 하나로 묶거나(스택), 늘 위에 두거나(왕관), 바탕화면에 붙여요(테이프).
-- 글에 "내일 오후 3시"처럼 쓰면 일정으로 넣을 수 있고, 미리 알림도 받아요.
-- Windows 알림을 보관함에 모아 둘 수 있어요. 처음에는 꺼져 있어요.
-
-**AI (인터넷 없이 이 PC 안에서)**
-- 맞춤법 검사, 문체 다듬기, 초안 쓰기, 태그 붙이기를 해요.
-- Claude 데스크톱 같은 AI 비서와 연결하면(MCP) 메모를 찾고 읽고 남기게 할 수 있어요.
-
-기능마다 자세한 동작과 전체 단축키 표는 **[기능 자세히](guides/FEATURES.md)**에 있어요.
-
-## 자주 쓰는 단축키
+## 🔑 자주 쓰는 단축키
 
 | 하는 일 | 단축키 | 하는 일 | 단축키 |
 |---|---|---|---|
-| 새 메모 | `Ctrl+N` | 단축키 모두 보기 | `Ctrl+/` |
-| 매직키 (어디서든) | `Ctrl+Alt+Space` | 매직 카피 (어디서든) | `Ctrl+Alt+C` |
-| 늘 위에 두기 (왕관) | `Ctrl+Shift+T` | 바탕화면에 붙이기 (테이프) | `Ctrl+Shift+G` |
-| 체크리스트 | `Ctrl+Shift+9` | 알림 | `Ctrl+Shift+A` |
-| 음성 녹음 | `Ctrl+Shift+R` | 닫기 (저장) | `Ctrl+W` |
+| 새 메모 | <kbd>Ctrl</kbd>+<kbd>N</kbd> | 단축키 모두 보기 | <kbd>Ctrl</kbd>+<kbd>/</kbd> |
+| 매직키 (어디서든) | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> | 매직 카피 (어디서든) | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> |
+| 늘 위에 두기 (왕관) | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> | 바탕화면에 붙이기 (테이프) | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> |
+| 체크리스트 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>9</kbd> | 알림 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> |
+| 음성 녹음 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> | 닫기 (저장) | <kbd>Ctrl</kbd>+<kbd>W</kbd> |
 
-## 메모는 어디에 저장되나요
+## 📁 메모는 어디에 저장되나요
 
 처음에는 `문서\메모킹` 폴더에 저장돼요. 설정 › 메모 폴더에서 바꿀 수 있어요.
 
-```
+```text
 메모킹/
-  장보기.md            메모 하나 = 파일 하나 (첫 줄 제목이 파일 이름)
-  attachments/         넣은 사진 · 파일
-  _memoking/
-    index.json         AI 가 읽는 메모 색인 (안내서: README.md)
-    versions/          지난 버전
-    trash/             휴지통
+├── 장보기.md          메모 하나 = 파일 하나 (첫 줄 제목이 파일 이름)
+├── attachments/       넣은 사진 · 파일
+└── _memoking/
+    ├── index.json     AI 가 읽는 메모 색인 (안내서: README.md)
+    ├── versions/      지난 버전
+    └── trash/         휴지통
 ```
 
-## 안드로이드
-
-PC와 같은 메모 폴더 형식을 쓰고, Google Drive에 직접 연결해 PC와 같은 메모를 맞춰요. 홈 화면 위젯, 녹음과 받아쓰기, 다른 앱에서 공유해 메모 만들기도 돼요. 자세한 내용은 [android/README.md](android/README.md)에 있어요.
-
-## 개발
+## 🔧 개발
 
 [Node.js](https://nodejs.org) 22 이상이 필요해요.
 
-```
-npm start        앱 실행
-npm test         단위 테스트
-npm run dist     설치 파일 만들기 → dist/MemoKing-Setup-<버전>.exe
+```sh
+npm start        # 앱 실행
+npm test         # 단위 테스트
+npm run dist     # 설치 파일 만들기 → dist/MemoKing-Setup-<버전>.exe
 ```
 
-- 모든 명령과 폴더 구조는 [개발 안내](guides/DEVELOP.md)에 있어요.
-- 설치 파일 배포와 자동 업데이트 설정은 [배포 안내](guides/RELEASE.md)에 있어요.
-- 사용한 오픈소스와 라이선스는 [app/vendor/LICENSES.md](app/vendor/LICENSES.md)에 있어요.
+| 문서 | 내용 |
+|---|---|
+| [개발 안내](guides/DEVELOP.md) | 모든 명령과 폴더 구조 |
+| [배포 안내](guides/RELEASE.md) | 설치 파일 배포와 자동 업데이트 설정 |
+| [기여 안내](CONTRIBUTING.md) | 커밋 · PR · 릴리스 글 쓰는 법 |
+| [오픈소스 목록](app/vendor/LICENSES.md) | 함께 묶은 오픈소스와 라이선스 |
 
-## 라이선스
+README의 화면 사진은 `npm run shots:sns`로 실제 앱을 띄워 찍은 것이에요 (`out/sns/` → `assets/screenshots/`).
+
+## 📜 라이선스
 
 메모킹은 [MIT 라이선스](LICENSE)예요. 함께 묶은 오픈소스는 각자의 라이선스를 따르고, [app/vendor/LICENSES.md](app/vendor/LICENSES.md)에 정리돼 있어요.
 
-## 코드 서명 정책
+## 🔏 코드 서명 정책
 
 Windows 설치 파일은 [SignPath.io](https://about.signpath.io)가 무료로 제공하는 코드 서명을 받고, 인증서는 [SignPath Foundation](https://signpath.org)이 발급해요. (승인을 받은 뒤부터 적용돼요.)
 
@@ -99,7 +124,7 @@ Windows 설치 파일은 [SignPath.io](https://about.signpath.io)가 무료로 �
 - 만들고 검토하는 사람(Committer · Reviewer)과 서명을 승인하는 사람(Approver): [lmg6983-dotcom](https://github.com/lmg6983-dotcom)
 - 개인정보: 메모킹은 사용자가 쓰기로 한 기능(Google Drive 동기화, 업데이트 확인, 링크 미리보기 등)이 아니면 다른 시스템으로 어떤 정보도 보내지 않아요. 개발자에게 보내는 정보는 없어요. 자세한 내용은 [개인정보 처리방침](docs/privacy.html)에 있어요.
 
-## 바뀐 점 (버전별)
+## 📝 바뀐 점 (버전별)
 
 버전마다 바뀐 점이에요. 새 버전이 위에 있어요.
 
