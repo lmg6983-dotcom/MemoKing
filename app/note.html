@@ -37,19 +37,22 @@
   <div id="menu" class="menu" role="menu" hidden>
     <!-- 목록 카드 메뉴와 같은 모양: 맨 위 아이콘 줄(같은 아이콘 · 같은 순서 — 글 복사 · 공유 · PDF · 휴지통, content-icons.js 를 note.js 가 넣는다.
          메모 창은 열려 있으니 잘라내기는 없음) → 색 → 글 메뉴(아이콘 없이, 휴대폰처럼) → 아래 작은 줄(그림으로 · 목록 · 단축키) -->
-    <div class="menu-icons" role="group" aria-label="복사, 공유, PDF, 삭제">
-      <button class="menu-item menu-ic" id="copy-text-btn" role="menuitem" title="글 복사" aria-label="글 복사"></button>
-      <button class="menu-item menu-ic" id="share-btn" role="menuitem" title="공유" aria-label="공유"></button>
-      <button class="menu-item menu-ic" id="pdf-btn" role="menuitem" title="PDF로 저장" aria-label="PDF로 저장"></button>
-      <button class="menu-item menu-ic danger" id="delete-btn" role="menuitem" title="삭제 (휴지통으로)" aria-label="삭제"></button>
+    <!-- 맨 위 한 줄: 카드 메뉴와 같은 아이콘 넷 | 윗막대에서 옮겨 온 알림 · 일정 · 바탕화면 (높이를 늘리지 않게 아이콘으로) -->
+    <div class="menu-top">
+      <div class="menu-icons" role="group" aria-label="복사, 공유, PDF, 삭제">
+        <button class="menu-item menu-ic" id="copy-text-btn" role="menuitem" title="글 복사" aria-label="글 복사"></button>
+        <button class="menu-item menu-ic" id="share-btn" role="menuitem" title="공유" aria-label="공유"></button>
+        <button class="menu-item menu-ic" id="pdf-btn" role="menuitem" title="PDF로 저장" aria-label="PDF로 저장"></button>
+        <button class="menu-item menu-ic danger" id="delete-btn" role="menuitem" title="삭제 (휴지통으로)" aria-label="삭제"></button>
+      </div>
+      <span class="menu-vsep" aria-hidden="true"></span>
+      <div class="menu-quick" role="group" aria-label="알림, 일정, 바탕화면">
+        <button class="menu-item menu-ic" id="remind-menu-btn" role="menuitem" title="알림 맞추기 (Ctrl+Shift+A)" aria-label="알림 맞추기"><svg><use href="#i-bell"/></svg></button>
+        <button class="menu-item menu-ic" id="event-menu-btn" role="menuitem" title="일정 넣기" aria-label="일정 넣기"><svg><use href="#i-calendar"/></svg></button>
+        <button class="menu-item menu-ic" id="tape-btn" role="menuitem" title="테이프로 바탕화면에 붙여 다른 창 뒤에 두기 (Ctrl+Shift+G)" aria-label="바탕화면에 붙이기" hidden><svg><use href="#i-tape"/></svg></button>
+      </div>
     </div>
     <div class="menu-colors"><span class="menu-label">색</span><div class="swatches" id="swatches"></div></div>
-    <!-- 윗막대에서 옮겨 온 것: 작은 한 줄로 (기본 메모 창 높이에 메뉴가 스크롤 없이 들어가게) -->
-    <div class="menu-foot menu-quick" role="group" aria-label="알림, 일정, 바탕화면">
-      <button class="menu-item menu-mini" id="remind-menu-btn" role="menuitem" title="알림 맞추기 (Ctrl+Shift+A)">알림 맞추기</button>
-      <button class="menu-item menu-mini" id="event-menu-btn" role="menuitem" title="일정 넣기">일정 넣기</button>
-      <button class="menu-item menu-mini" id="tape-btn" role="menuitem" title="테이프로 바탕화면에 붙여 다른 창 뒤에 두기 (Ctrl+Shift+G)" hidden>바탕화면에</button>
-    </div>
     <button class="menu-item" id="pin-toggle" role="menuitem"><span>목록 맨 위에 고정</span></button>
     <button class="menu-item" id="day-btn" role="menuitem"><span>회상 날짜 정하기 <small id="day-label"></small></span></button>
     <button class="menu-item" id="mode-btn" role="menuitem"><span>Work로 옮기기</span></button>

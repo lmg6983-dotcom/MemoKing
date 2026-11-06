@@ -86,6 +86,10 @@ body, .note-screen, .share-paper {
 }
 /* 맨 위 아이콘 줄 (PDF · 그림 복사 · 그림 저장 · 삭제) — 목록 카드 메뉴(.mk-ctx-icons)와 같은 모양 */
 .menu-icons { display: flex; gap: 2px; padding: 0 0 4px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+/* 맨 위 줄: 아이콘 넷 | 알림 · 일정 · 바탕화면 — 한 줄에 같은 폭으로 (두 묶음 사이 세로 줄) */
+.menu-top { display: flex; gap: 2px; padding: 0 0 4px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.menu-top > .menu-icons, .menu-top > .menu-quick { display: contents; }
+.menu-vsep { flex: none; width: 1px; margin: 6px 2px; background: var(--border); }
 .menu-item.menu-ic { flex: 1 1 0; justify-content: center; height: 32px; padding: 0; color: var(--text); }
 .menu-item.menu-ic svg { width: 18px; height: 18px; color: inherit; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; fill: none; } /* content-icons 의 선 그림 (카드 메뉴 .mk-ctx-ic 와 같은 굵기) */
 .menu-item.menu-ic.danger { color: var(--danger); }
@@ -112,7 +116,6 @@ body, .note-screen, .share-paper {
 #menu .menu-item > span > small { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; } /* 회상 날짜 · 불러오기 키 · 연결 수: 카드 메뉴처럼 오른쪽 끝에 */
 /* 아래 작은 줄: 그림 복사 · 그림 저장 · 목록 · 단축키 (키는 풍선말에) */
 #menu .menu-foot { display: flex; gap: 2px; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
-#menu .menu-foot.menu-quick { margin: 0 0 4px; padding: 0 0 4px; border-top: 0; border-bottom: 1px solid var(--border); } /* 색 줄 아래 · 글 메뉴 위 */
 #menu .menu-item.menu-mini { flex: 1 1 auto; width: auto; justify-content: center; padding: 4px 4px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 @media (hover: hover) and (pointer: fine) { #menu .menu-item.menu-mini:hover { color: var(--text); } } /* 기본 메모 창(380px) 높이에 메뉴가 스크롤 없이 들어가게 (휴대폰 시트는 그대로) */
 .menu-item {
