@@ -4,7 +4,7 @@ import { createDoublePress } from '../desktop/double-press.js';
 import { withShortcuts } from '../app/js/core/accelerators.js';
 import { SHORTCUT_GROUPS } from '../app/js/core/shortcuts.js';
 
-test('매직키 더블 프레스: 1회 누르면 350ms 뒤 showMagic, 2회 누르면 즉시 toggleListWindow', () => {
+test('더블 프레스: 1회 누르면 350ms 뒤 한 번 동작, 2회 누르면 즉시 두 번 동작', () => {
   let singleCount = 0;
   let doubleCount = 0;
   let timerCb = null;

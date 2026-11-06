@@ -1657,58 +1657,48 @@ export async function runSmoke({
         lw.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
         await wait(250);
       };
-      const label0 = await js(lw, `document.getElementById('sc-magic').textContent`);
-      await js(lw, `document.getElementById('sc-magic').click()`);
+      const label0 = await js(lw, `document.getElementById('sc-list').textContent`);
+      await js(lw, `document.getElementById('sc-list').click()`);
       await wait(250);
-      const asking = await js(lw, `document.getElementById('sc-magic').classList.contains('capturing')`);
+      const asking = await js(lw, `document.getElementById('sc-list').classList.contains('capturing')`);
       await press('M', ['control', 'alt']);
-      const after = await js(lw, `({ label: document.getElementById('sc-magic').textContent, note: document.getElementById('sc-magic-note').textContent })`);
-      const saved = appSettings().shortcuts.magic;
+      const after = await js(lw, `({ label: document.getElementById('sc-list').textContent, note: document.getElementById('sc-list-note').textContent })`);
+      const saved = appSettings().shortcuts.list;
       // 이 점검 환경은 전역 단축키를 잡을 수 없어(위 "전역 등록" 점검) "다른 앱이 쓰는 중" 으로 남을 수 있다 — 둘 다 맞는 결과
       const changed = saved.key === 'Control+Alt+M' && after.label === 'Ctrl+Alt+M' && /키로 바꿨어요/.test(after.note);
-      const refused = saved.key === 'Control+Alt+Space' && /다른 앱이 이미 쓰고/.test(after.note);
-      check('단축키 바꾸기: 키 버튼 → 새 조합 → 바뀜(또는 다른 앱이 쓰면 그대로 두고 알림)', label0 === 'Ctrl+Alt+Space' && asking && (changed || refused), JSON.stringify({ label0, asking, after, saved: saved.key }));
-      await js(lw, `document.getElementById('sc-magic').click()`);
+      const refused = saved.key === 'Control+Alt+`' && /다른 앱이 이미 쓰고/.test(after.note);
+      check('단축키 바꾸기: 키 버튼 → 새 조합 → 바뀜(또는 다른 앱이 쓰면 그대로 두고 알림)', label0 === 'Ctrl+Alt+`' && asking && (changed || refused), JSON.stringify({ label0, asking, after, saved: saved.key }));
+      await js(lw, `document.getElementById('sc-list').click()`);
       await wait(250);
       await press('C', ['control', 'alt']);
-      const sameNote = await js(lw, `document.getElementById('sc-magic-note').textContent`);
+      const sameNote = await js(lw, `document.getElementById('sc-list-note').textContent`);
       check('단축키 바꾸기: 매직 카피와 같은 키는 거절', /매직 카피와 같은 키/.test(sameNote), sameNote);
-      await js(lw, `document.getElementById('sc-magic').click()`);
+      await js(lw, `document.getElementById('sc-list').click()`);
       await wait(250);
       await press('C', ['control']);
-      const reservedNote = await js(lw, `document.getElementById('sc-magic-note').textContent`);
+      const reservedNote = await js(lw, `document.getElementById('sc-list-note').textContent`);
       await press('Escape');
-      check('단축키 바꾸기: 복사(Ctrl+C) 같은 흔한 키는 거절 · Esc로 그만', /늘 쓰는 키/.test(reservedNote) && !(await js(lw, `document.getElementById('sc-magic').classList.contains('capturing')`)), reservedNote);
+      check('단축키 바꾸기: 복사(Ctrl+C) 같은 흔한 키는 거절 · Esc로 그만', /늘 쓰는 키/.test(reservedNote) && !(await js(lw, `document.getElementById('sc-list').classList.contains('capturing')`)), reservedNote);
       if (changed) {
-        await js(lw, `document.getElementById('sc-magic-reset').click()`);
-        await until(() => appSettings().shortcuts.magic.key === 'Control+Alt+Space', '기본값으로').catch(() => {});
+        await js(lw, `document.getElementById('sc-list-reset').click()`);
+        await until(() => appSettings().shortcuts.list.key === 'Control+Alt+`', '기본값으로').catch(() => {});
       }
-      check('단축키: 기본값으로 되돌리기', appSettings().shortcuts.magic.key === 'Control+Alt+Space');
+      check('단축키: 기본값으로 되돌리기', appSettings().shortcuts.list.key === 'Control+Alt+`');
       // 다른 앱이 이미 잡고 있는 키 (점검에서는 먼저 잡아 두어 흉내) → 바꾸지 않고 "다른 앱이 이미 쓰고 있어요"
       if (globalShortcut.register('Control+Alt+J', () => {})) {
-        await js(lw, `document.getElementById('sc-magic').click()`);
+        await js(lw, `document.getElementById('sc-list').click()`);
         await wait(250);
         await press('J', ['control', 'alt']);
-        const takenNote = await js(lw, `document.getElementById('sc-magic-note').textContent`);
+        const takenNote = await js(lw, `document.getElementById('sc-list-note').textContent`);
         globalShortcut.unregister('Control+Alt+J');
-        check('단축키 바꾸기: 다른 앱이 쓰는 키면 바꾸지 않고 알림', appSettings().shortcuts.magic.key === 'Control+Alt+Space' && /다른 앱이 이미 쓰고/.test(takenNote), takenNote);
+        check('단축키 바꾸기: 다른 앱이 쓰는 키면 바꾸지 않고 알림', appSettings().shortcuts.list.key === 'Control+Alt+`' && /다른 앱이 이미 쓰고/.test(takenNote), takenNote);
       }
     }
-    // 매직키 기능: 계산기 · 웹 검색 · AI 에게 묻기가 켜져 있고, 기본 사이트를 고르면 저장
+    // MagicKey 칸: 매직키 · OPMS 는 따로 설치하는 앱 안내만 (메모킹 매직키 · OPMS 설정은 없음)
     {
-      await listJs(`document.getElementById('settings-dialog').close()`);
-      await listJs(`document.getElementById('settings-btn').click()`);
-      await wait(300);
-      const mods = await listJs(`[...document.querySelectorAll('#magic-modules-list .magic-mod')].map((r) => r.querySelector('span').firstChild.textContent + ':' + r.querySelector('input').checked)`);
-      const sites = await listJs(`[...document.querySelectorAll('#magic-modules-list .magic-site select')].map((s) => s.value)`);
-      await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'google'; s.dispatchEvent(new Event('change')); })()`);
-      const engine = await until(() => appSettings().magic.engine === 'google' && 'google', '기본 검색 사이트 저장').catch(() => appSettings().magic.engine);
-      check('설정 매직키: 계산기 · 웹 검색 · 매직 에이전트 켜짐, 기본 사이트(네이버 · ChatGPT)를 고르면 저장',
-        ['계산기:true', '웹 검색:true', '매직 에이전트:true'].every((m) => mods.includes(m)) && sites.join() === 'naver,chatgpt' && engine === 'google', JSON.stringify({ mods, sites, engine }));
-      await listJs(`(() => { const s = document.querySelector('#magic-modules-list .magic-site select'); s.value = 'naver'; s.dispatchEvent(new Event('change')); })()`);
-      await listJs(`document.getElementById('set-magic').scrollIntoView()`);
-      await wait(200);
-      await capture(getList(), 'smoke-settings-magic.png');
+      const sec = await listJs(`(() => { const h = document.getElementById('set-magic'); const sec = h.closest('section'); return { title: h.textContent, links: [...sec.querySelectorAll('a')].map((a) => a.href), old: !!document.getElementById('magic-enabled') || !!document.getElementById('opms-setup') || !!document.getElementById('sc-magic') }; })()`);
+      check('설정 MagicKey: MagicKey · MagicSystem 안내 링크만, 예전 매직키 · OPMS 설정 없음',
+        sec.title === 'MagicKey' && sec.links.some((u) => u.includes('/MagicKey/')) && sec.links.some((u) => u.includes('/MagicSystem/')) && !sec.old, JSON.stringify(sec));
     }
     // AI 비서 연결 (MCP): 연결 → Claude 설정 파일에 메모킹이 적힘(다른 서버는 그대로) → 적힌 명령으로 띄우면 도구가 보임 → 끊기
     {

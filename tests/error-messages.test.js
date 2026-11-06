@@ -8,7 +8,7 @@ const ACTION = /(다시|확인|연결|골라|넣어|설치|허용|풀고|기다|
 const FILES = {
   'desktop/drive/google-auth.js': ['Google 로그인 설정(연결 ID', 'Google 서버에 문제가 있어요'],
   'desktop/drive/drive-api.js': ['Google Drive가 올릴 주소를 주지 않았어요'],
-  'desktop/ipc-handlers.js': ['메모를 만들지 못했어요', '이 파일로는 메모를 만들 수 없어요', '파일을 찾지 못했어요', '파일이 너무 커요'],
+  'desktop/ipc-handlers.js': ['이 파일로는 메모를 만들 수 없어요', '파일을 찾지 못했어요', '파일이 너무 커요'],
   'desktop/utils.js': ['그림을 읽지 못했어요', '그림이 아니에요', '50MB보다 커서'],
   'desktop/stt/stt-service.js': ['받지 못했어요 (', '받은 파일이 맞지 않아요'],
   'app/js/copy-content.js': ['그림을 아직 불러오지 못했어요'],

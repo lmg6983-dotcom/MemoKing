@@ -24,15 +24,11 @@ import { createAiTagger } from './ai/ai-tagger.js';
 import { createAiTasks } from '../app/js/core/ai-tasks.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, findRepeat, betterReading, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
-import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
 import { remindFromText } from '../app/js/core/date-detect.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
-import { FileIndex, defaultRoots } from './file-index.js';
 import { Updater, isSnoozed } from './updater.js';
-import { recoverOpmsSettings, normalizeOpmsHost } from './opms.js';
 import { comboFromAccelerator, actionUsing } from '../app/js/core/keymap.js';
-import { jumpListCategories, launchAction, pushRecent, readMagicKeyFile, runningMagicKey } from './jump-list.js';
-import { flushOpmsFiles } from './opms.js';
+import { jumpListCategories, launchAction, pushRecent, readMagicKeyFile } from './jump-list.js';
 import { createDoublePress } from './double-press.js';
 import { MemoHotkeys } from './memo-hotkeys.js';
 import { hotkeyCopyText, hotkeyLabel, hotkeyAccelerator } from '../app/js/core/memo-hotkeys.js';
@@ -118,7 +114,6 @@ let aiTasks = null; // core/ai-tasks.js — 글 도우미 · 태그 · AI 검색
 let aiTagger = null;
 const heldLocks = new Map();
 
-let fileIndex = null;
 let updater = null; // 자동 업데이트 (updater.js) — 앱이 준비된 뒤
 let linkPreviews = null;
 let calendarFeeds = null; // 일정 탭이 구독하는 다른 캘린더 (.ics 주소)
@@ -146,7 +141,6 @@ const windowManager = new WindowManager({
   onHoldLock: (id, session) => holdLock(id, session),
   getStt: () => stt,
   getDriveSync: () => driveSync,
-  getFileIndex: () => fileIndex,
   isQuitting: () => quitting,
   getShortcutLabel: (name) => shortcutLabel(name),
 });
@@ -824,9 +818,9 @@ function initStt() {
 function tutorialPayload() {
   const raw = tutorial.active ? TUTORIAL_STEPS[tutorial.index] : null;
   if (!raw) return null;
-  // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 매직 카피 키 · 매직키 · 알림 보관함)
+  // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 매직 카피 키 · 알림 보관함)
   const has = (need) => (need === 'workLife' ? settings.workLife === true : need === 'history' ? settings.historyEnabled === true
-    : need === 'quickMemo' || need === 'magic' ? shortcutStatus(need).registered : true);
+    : need === 'quickMemo' ? shortcutStatus(need).registered : true);
   const step = tutorialStepFor(raw, has);
   const keys = (t) => (typeof t === 'string' ? withShortcuts(t, settings.shortcuts) : t);
   const text = step.noTape && !windowManager.canTape ? step.noTape : step.text; // 테이프를 못 쓰는 PC 에서는 왕관만
@@ -990,25 +984,19 @@ function tutorialEvent(event) {
 
 // ---------- 전역 단축키 ----------
 
-// 켜져 있는 MagicKey(따로 설치하는 매직키 앱) — MagicKey 가 켜질 때 userData/magickey.json 에 적는다.
-//   있으면 메모킹 매직키 단축키는 잡지 않고 MagicKey 에 넘긴다 (두 앱이 같은 키를 두고 다투지 않게).
-//   MagicKey 를 끄면 1분 점검이 다시 잡는다
-const magicKeyApp = () => runningMagicKey(path.join(app.getPath('userData'), 'magickey.json'));
+// 매직키는 따로 설치하는 MagicKey 앱이 맡는다 (메모킹은 그 키를 잡지 않음).
+//   매직키 단축키 칸(shortcuts.magic)은 지우지 않는다: MagicKey 가 처음 켜질 때 그 키를 이어받고, 메모 단축키가 그 키를 쓰지 않게
 
 function shortcutStatus(name) {
-  const handedOff = name === 'magic' && Boolean(magicKeyApp());
   const enabled = name === 'quickMemo'
     ? settings.quickMemo && process.platform === 'win32'
-    : name === 'magic'
-      ? normalizeMagicSettings(settings.magic).enabled && !handedOff
-      : true;
+    : name !== 'magic';
   const key = shortcutKey(name);
   return {
     key,
     label: displayAccelerator(key),
     isDefault: key === DEFAULT_SHORTCUTS[name],
     enabled,
-    handedOff,
     registered: Boolean(heldKeys[name]) && globalShortcut.isRegistered(key),
   };
 }
@@ -1036,7 +1024,6 @@ function setShortcut(name, acc) {
   settings.shortcuts = { ...normalizeShortcuts(settings.shortcuts), [name]: next };
   saveSettings();
   if (name === 'quickMemo') registerQuickMemoKey();
-  else if (name === 'magic') registerMagicKey();
   else if (name === 'list') registerListKey();
   memoHotkeys.register(); // 놓아 준 Ctrl+Alt+숫자를 메모 단축키가 다시 쓰게
   updateTrayMenu();
@@ -1048,7 +1035,6 @@ function setShortcut(name, acc) {
 function pauseShortcuts(on) {
   shortcutsPaused = Boolean(on);
   registerQuickMemoKey();
-  registerMagicKey();
   registerListKey();
   memoHotkeys.pause(on);
 }
@@ -1067,17 +1053,6 @@ function registerQuickMemoKey() {
   return ok;
 }
 
-function registerMagicKey() {
-  if (heldKeys.magic) globalShortcut.unregister(heldKeys.magic);
-  heldKeys.magic = null;
-  if (!normalizeMagicSettings(settings.magic).enabled || shortcutsPaused || magicKeyApp()) return false; // MagicKey 가 있으면 넘긴다
-  const key = shortcutKey('magic');
-  const ok = globalShortcut.register(key, () => onMagicKey());
-  if (!ok) console.warn(`${displayAccelerator(key)}를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
-  else heldKeys.magic = key;
-  return ok;
-}
-
 function registerListKey() {
   if (heldKeys.list) globalShortcut.unregister(heldKeys.list);
   heldKeys.list = null;
@@ -1089,24 +1064,12 @@ function registerListKey() {
   return ok;
 }
 
-function setMagicSettings(next) {
-  settings.magic = normalizeMagicSettings(next);
-  saveSettings();
-  registerMagicKey();
-  syncFileIndex();
-  if (!settings.magic.enabled && windowManager.magicWin && !windowManager.magicWin.isDestroyed()) windowManager.magicWin.hide();
-  if (windowManager.magicWin && !windowManager.magicWin.isDestroyed()) {
-    windowManager.magicWin.webContents.send('magic:modules-changed', magicChips(settings.magic).map(({ id, name, chip, description, on }) => ({ id, name, chip, description, on })));
-  }
-  return settings.magic;
-}
-
 function setQuickMemo(on) {
   settings.quickMemo = Boolean(on);
   saveSettings();
   if (!registerQuickMemoKey()) windowManager.captureHelper.stop();
   updateTrayMenu();
-  return appSettings(vault, fileIndex, shortcutStatus, shortcutLabel).quickMemo;
+  return appSettings(vault, shortcutStatus, shortcutLabel).quickMemo;
 }
 
 const onQuickMemoKey = createDoublePress({
@@ -1115,28 +1078,10 @@ const onQuickMemoKey = createDoublePress({
   onDouble: () => windowManager.startAreaCapture(),
 });
 
-const onMagicKey = () => windowManager.showMagic();
-
-function syncFileIndex() {
-  const on = !SMOKE && activeModules(settings.magic).some((m) => m.id === 'files' || m.id === 'apps');
-  if (on) {
-    // 전자포대 폴더는 맨 먼저 훑는다 (G: 같은 뒤쪽 드라이브는 목록이 차면 덜 들어가므로) · 생기는 파일은 곧바로 목록에
-    const wrapperDir = () => windowManager.opmsSettings().wrapperDir;
-    fileIndex ??= new FileIndex({
-      cacheFile: path.join(app.getPath('userData'), 'file-index.json'),
-      roots: () => [...(fs.existsSync(wrapperDir()) ? [{ dir: wrapperDir() }] : []), ...defaultRoots()],
-    });
-    fileIndex.start();
-    fileIndex.watch([wrapperDir()]);
-  } else fileIndex?.stop();
-}
-
 setInterval(() => {
   if (shortcutsPaused) return;
   const before = [shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered, shortcutStatus('list').registered].join();
-  if (heldKeys.magic && magicKeyApp()) registerMagicKey(); // 켜 둔 사이 MagicKey 를 깔았으면 키를 놓는다
   if (shortcutStatus('quickMemo').enabled && !shortcutStatus('quickMemo').registered) registerQuickMemoKey();
-  if (shortcutStatus('magic').enabled && !shortcutStatus('magic').registered) registerMagicKey();
   if (shortcutStatus('list').enabled && !shortcutStatus('list').registered) registerListKey();
   if ([...memoHotkeys.failed].some((slot) => !memoHotkeys.reservedBy(slot))) memoHotkeys.register(); // 다른 앱이 쓰던 숫자를 놓았으면 이제 잡는다
   if ([shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered, shortcutStatus('list').registered].join() !== before) {
@@ -1399,7 +1344,7 @@ app.whenReady().then(async () => {
     reportProblem,
     whatsNew,
     suggestedVaultPath,
-    appSettings: () => appSettings(vault, fileIndex, shortcutStatus, shortcutLabel),
+    appSettings: () => appSettings(vault, shortcutStatus, shortcutLabel),
     settings,
     saveSettings,
     alarms,
@@ -1422,11 +1367,9 @@ app.whenReady().then(async () => {
     setQuickMemo,
     setShortcut,
     pauseShortcuts,
-    setMagicSettings,
     mcpConnect,
     mcpStatus,
     mcpSnippet,
-    getFileIndex: () => fileIndex,
     startTutorial,
     tutorialPayload,
     getUpdater: () => updater,
@@ -1463,10 +1406,6 @@ app.whenReady().then(async () => {
     windowManager.listWin?.setBackgroundColor(listBg());
     for (const [id, win] of windowManager.noteWins) if (!win.isDestroyed()) win.setBackgroundColor(noteBg(vault?.get(id)?.color));
   });
-
-  for (const w of BrowserWindow.getAllWindows()) w.on('session-end', flushOpmsFiles);
-  app.on('browser-window-created', (_e, w) => w.on('session-end', flushOpmsFiles));
-  powerMonitor.on('shutdown', flushOpmsFiles);
 
   powerMonitor.on('resume', () => {
     alarms.tick();
@@ -1512,7 +1451,7 @@ app.whenReady().then(async () => {
       smokeToasts,
       getHistory: () => history,
       historyToMemo,
-      appSettings: () => appSettings(vault, fileIndex, shortcutStatus, shortcutLabel),
+      appSettings: () => appSettings(vault, shortcutStatus, shortcutLabel),
       quickMemo: (opts) => windowManager.quickMemo(opts),
       registerQuickMemoKey,
       getCapturePoint: () => windowManager.lastCapturePoint,
@@ -1536,7 +1475,6 @@ app.whenReady().then(async () => {
       getAreaCapture: () => windowManager.areaCapture,
       smokeClipboard: windowManager.smokeClipboard,
       onQuickMemoKey,
-      onMagicKey,
       createPopupWatcher,
       smokePdf: windowManager.smokePdf,
       getPdfWin: () => windowManager.pdfWin,
@@ -1546,11 +1484,6 @@ app.whenReady().then(async () => {
       captureToMemo: (dir, info, pt) => windowManager.captureToMemo(dir, info, pt),
       smokeToastsList: smokeToasts,
       getTitleBarOverlay: () => titleBarOverlay(),
-      showMagic: () => windowManager.showMagic(),
-      getMagic: () => windowManager.magicWin,
-      getFinder: () => windowManager.finderWin,
-      useFileIndex: (idx) => { fileIndex = idx; },
-      getOpms: () => windowManager.opmsWin,
       memoHotkeys,
       smokeHud: windowManager.smokeHud,
       windowManager,
@@ -1584,42 +1517,12 @@ app.whenReady().then(async () => {
   alarms.startup();
   alarms.start();
   registerQuickMemoKey();
-  registerMagicKey();
   registerListKey();
   memoHotkeys.register();
-  migrateOpmsSettings();
-  syncFileIndex();
   updateTrayMenu();
   if (vault && !settings.tutorialDone && !HIDDEN_START) startTutorial();
   updater.start();
 });
-
-// ---------- OPMS 설정 옮기기 (0.39.0) ----------
-// 서버 주소 · 전자포대 폴더를 코드에서 뺐다 (설치 파일이 공개 저장소에 올라가므로). 예전부터 쓰던 PC 는
-//   이 PC 의 받은 전자포대 기록에서 그 값을 찾아 설정으로 옮기고, 찾지 못하면 한 번 알려 설정에서 넣게 한다
-function migrateOpmsSettings() {
-  if (settings.opmsMigrated) return;
-  settings.opmsMigrated = true;
-  if (!settings.opms?.host || !settings.opms?.wrapperDir) {
-    const found = recoverOpmsSettings(path.join(app.getPath('userData'), 'opms-files.json'));
-    if (found) {
-      settings.opms = {
-        ...settings.opms,
-        host: settings.opms?.host || found.host,
-        ...(settings.opms?.wrapperDir || !fs.existsSync(found.wrapperDir) ? {} : { wrapperDir: found.wrapperDir }),
-      };
-    }
-  }
-  saveSettings();
-  const opmsOn = activeModules(settings.magic).some((m) => m.id === 'opms');
-  if (!normalizeOpmsHost(settings.opms?.host) && settings.opmsIntroduced && opmsOn && !SMOKE) {
-    toast({
-      title: 'OPMS 서버 주소를 한 번 넣어 주세요',
-      body: '보안을 위해 서버 주소를 설치 파일에서 뺐어요. 설정 매직키의 OPMS 연결에서 넣으면 돼요',
-      onClick: () => windowManager.createListWindow('memos'),
-    });
-  }
-}
 
 // ---------- 자동 업데이트 ----------
 // 화면은 목록 창(설정 › 업데이트 · 새 버전 대화 상자). 목록 창이 없으면 Windows 알림 → 누르면 목록 창을 열어 보여 준다
@@ -1689,7 +1592,6 @@ async function stopHelpers() {
 app.on('will-quit', () => {
   popupWatcher?.stop(); // 예전에는 이것만 빠져 알림 도우미가 앱이 끝난 뒤에도 남아 설치 폴더를 붙잡았다
   updater?.stop();
-  flushOpmsFiles();
   stt?.close();
   ai?.close();
   windowManager.topWatch.stop();

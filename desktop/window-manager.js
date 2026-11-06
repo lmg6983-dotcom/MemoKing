@@ -1,6 +1,6 @@
 // 창 관리자 (WindowManager) — 목록 창, 메모 스티커 창, 탭 스택, 드래그 미리보기, 캡처 오버레이, PDF 및 보조 창 생명주기 관리.
 import {
-  app, BrowserWindow, clipboard, desktopCapturer, dialog, screen, shell,
+  app, BrowserWindow, desktopCapturer, dialog, screen, shell,
 } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -10,24 +10,20 @@ import { StackStore } from './stacks.js';
 import { DesktopPin } from './desktop-pin.js';
 import { StatusBubbles } from './status-bubble-window.js';
 import { ForegroundWatch, LEAVE_ON_TOP, hwndOf } from './foreground-watch.js';
-import { Opms, cleanDate, normalizeOpmsHost } from './opms.js';
 import { CaptureHelper, readCaptureDir, buildCapture, sourceLine, captureTitle, captureWhere } from './quick-capture.js';
 import { extractPreview } from '../app/js/core/memo-file.js';
 import { pdfFileName, mmToPx, clampPrintScale } from '../app/js/core/pdf-page.js';
-import { shareText } from '../app/js/core/share-text.js';
 import { TUTORIAL_STEPS } from '../app/js/core/tutorial.js';
 import {
-  APP_DIR, MAGIC_PRELOAD, FINDER_PRELOAD, OPMS_PRELOAD, OCR_PRELOAD,
+  APP_DIR, OCR_PRELOAD,
   webPreferences, windowIcon, getAppIcon, noteBg, listBg, titleBarOverlay, bringToFront,
   guardWindow, onScreen, defaultNoteBounds, painted, trackPaint, whenPainted, animateBounds, fadeIn,
 } from './window-utils.js';
 import {
-  settings, saveSettings, openWebPage, toast, copyFileToClipboard,
+  settings, saveSettings, openWebPage, toast,
   copyImageToClipboard, CLIPBOARD_HELPER, SMOKE,
 } from './utils.js';
 import { UI } from '../app/js/core/ui-text.js';
-import { appendToBody } from '../app/js/core/magic-modules.js';
-import { matchedInventor } from '../app/js/core/opms-search.js';
 
 // 창 위 가장자리에 반쯤 걸쳐 붙는 스티커: 왕관(늘 위) · 셀로판 테이프(늘 아래, 바탕화면 층)
 // 목록 창 제목 줄: 왼쪽은 로고 · Life/Work 스위치(~196px), 오른쪽은 단추 묶음 + Windows 창 버튼(~242px) — 스티커는 그 사이 빈 줄에
@@ -55,7 +51,6 @@ export class WindowManager {
     this.onHoldLock = options.onHoldLock ?? (() => {});
     this.getStt = options.getStt ?? (() => null);
     this.getDriveSync = options.getDriveSync ?? (() => null);
-    this.getFileIndex = options.getFileIndex ?? (() => null);
     this.isQuitting = options.isQuitting ?? (() => false);
     this.getShortcutLabel = options.getShortcutLabel ?? ((name) => '');
 
@@ -99,18 +94,6 @@ export class WindowManager {
     this.ocrReady = null;
     this.ocrPending = new Map();
     this.ocrSeq = 0;
-
-    this.magicWin = null;
-    this.lastFileResults = new Set();
-    this.lastFinderResults = new Set();
-    this.iconCache = new Map();
-
-    this.opmsWin = null;
-    this.opmsDirs = new Set(); // 이번 실행에서 받은 사건 폴더 — 이 폴더들만 '폴더 열기' 로 연다
-    this.opmsCases = new Map();
-    this.attachCache = new Map();
-
-    this.finderWin = null;
 
     this.captureHelper = new CaptureHelper(CLIPBOARD_HELPER);
     this.pendingCaptures = new Map();
@@ -207,9 +190,6 @@ export class WindowManager {
   }
 
   toggleListWindow(tab) {
-    if (this.magicWin && !this.magicWin.isDestroyed() && this.magicWin.isVisible()) {
-      this.magicWin.hide();
-    }
     if (this.listWin && !this.listWin.isDestroyed() && this.listWin.isVisible() && !this.listWin.isMinimized()) {
       if (this.listWin.isFocused()) {
         this.listWin.close();
@@ -1167,7 +1147,7 @@ export class WindowManager {
   }
 
   ownOverlayOpen() {
-    return Boolean(this.areaCapture) || [this.ghostWin, this.magicWin].some((w) => w && !w.isDestroyed() && w.isVisible());
+    return Boolean(this.areaCapture) || [this.ghostWin].some((w) => w && !w.isDestroyed() && w.isVisible());
   }
 
   refreshTopWatch() {
@@ -1641,241 +1621,6 @@ export class WindowManager {
       if (data.error) throw new Error(data.error);
       return data;
     });
-  }
-
-  // ---------- 매직키 / 검색 / 탐색기 창 ----------
-
-  createMagicWindow() {
-    const win = new BrowserWindow({
-      width: 600,
-      height: 190,
-      show: false,
-      frame: false,
-      transparent: true,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      skipTaskbar: true,
-      alwaysOnTop: true,
-      ...windowIcon,
-      webPreferences: { preload: MAGIC_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
-    });
-    win.setAlwaysOnTop(true, 'screen-saver');
-    guardWindow(win, { openWebPage });
-    win.loadFile(path.join(APP_DIR, 'magic.html'));
-    win.on('blur', () => win.hide());
-    win.on('hide', () => this.onTutorialEvent('magic-tried')); // 튜토리얼: 매직키를 열어 보고 닫으면 다음 단계로 (열자마자 넘기면 목록 창이 앞으로 와 매직키가 닫힌다)
-    win.on('moved', () => {
-      if (!win.isVisible()) return;
-      const [x, y] = win.getPosition();
-      settings.magicPos = { x, y };
-      saveSettings();
-    });
-    win.on('closed', () => {
-      if (this.magicWin === win) this.magicWin = null;
-    });
-    return win;
-  }
-
-  showMagic() {
-    if (!this.getVault()) {
-      this.createListWindow();
-      return;
-    }
-    this.magicWin ??= this.createMagicWindow();
-    // 메모 찾기용 글을 미리 다듬어 둔다 (처음 한 번만 오래 걸리고 그 뒤로는 바뀐 메모만) — 첫 글자를 칠 때 기다리지 않게
-    setTimeout(() => this.getVault()?.searchable(), 0);
-    const [w] = this.magicWin.getSize();
-    const saved = settings.magicPos;
-    const isSavedOnScreen = saved && screen.getAllDisplays().some((d) => {
-      const a = d.workArea;
-      return saved.x >= a.x - 40 && saved.x + 80 <= a.x + a.width && saved.y >= a.y - 10 && saved.y + 40 <= a.y + a.height;
-    });
-    if (isSavedOnScreen) this.magicWin.setPosition(Math.round(saved.x), Math.round(saved.y));
-    else {
-      const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-      this.magicWin.setPosition(Math.round(area.x + (area.width - w) / 2), Math.round(area.y + area.height * 0.22));
-    }
-    this.magicWin.show();
-    this.magicWin.focus();
-    this.magicWin.webContents.send('magic:show');
-    this.getFileIndex()?.touch();
-  }
-
-  async fileIcon(p, isDir) {
-    const ext = path.extname(p).toLowerCase();
-    const key = isDir ? 'dir' : /^\.(exe|lnk|url|ico|appref-ms)$/.test(ext) ? p : ext || 'none';
-    if (!this.iconCache.has(key)) {
-      let targetPath = p;
-      if (process.platform === 'win32' && ext === '.lnk') {
-        try {
-          const sc = shell.readShortcutLink(p);
-          if (sc.target && fs.existsSync(sc.target)) targetPath = sc.target;
-          else if (sc.icon && fs.existsSync(sc.icon)) targetPath = sc.icon;
-        } catch {
-          // 바로가기 파싱 실패 시 원래 파일 경로 유지
-        }
-      }
-      const fetchIcon = async (file) => {
-        try {
-          const img = await app.getFileIcon(file, { size: 'normal' });
-          if (!img.isEmpty()) return img.toDataURL();
-        } catch {}
-        return '';
-      };
-      this.iconCache.set(key, (async () => {
-        let url = await fetchIcon(targetPath);
-        if (!url && targetPath !== p) url = await fetchIcon(p);
-        return url;
-      })());
-      if (this.iconCache.size > 800) this.iconCache.delete(this.iconCache.keys().next().value);
-    }
-    return this.iconCache.get(key);
-  }
-
-  shownPath(p) {
-    return typeof p === 'string' && (this.lastFileResults.has(p) || this.lastFinderResults.has(p));
-  }
-
-  async magicAct({ action, path: p, id, opms, text } = {}) {
-    if (action === 'opmsAll') {
-      this.showOpms(null, 'info', String(text ?? '').slice(0, 60));
-      return { ok: true, close: true };
-    }
-    if (opms != null) {
-      const c = this.caseOf(opms);
-      if (action === 'copyOur' || action === 'copyApp') {
-        const text = action === 'copyOur' ? c.ourref : c.n_app;
-        if (!text) return { ok: false, message: action === 'copyOur' ? '관리번호가 없어요' : '출원번호가 없어요' };
-        clipboard.writeText(String(text));
-        return { ok: true, message: `${action === 'copyOur' ? '관리번호' : '출원번호'}를 복사했어요`, close: false };
-      }
-      this.showOpms(c.idx, action === 'wrapper' ? 'wrapper' : 'info');
-      return { ok: true, close: true };
-    }
-    if (id != null) {
-      const memo = this.getVault()?.get(String(id));
-      if (!memo) return { ok: false };
-      if (action === 'copyText') {
-        clipboard.writeText(shareText(memo.body));
-        return { ok: true, message: '메모 내용을 복사했어요', close: false };
-      }
-      if (action === 'append') {
-        if (memo.locked) return { ok: false, message: '잠긴 메모에는 덧붙일 수 없어요' };
-        const body = appendToBody(memo.body, text);
-        if (!body) return { ok: false };
-        const r = this.getVault().save(String(id), body);
-        if (!r || r.refused) return { ok: false, message: UI.savedElsewhere };
-        return { ok: true, message: `'${(memo.title || '제목 없음').slice(0, 20)}'에 덧붙였어요` };
-      }
-      this.revealNote(String(id));
-      return { ok: true, close: true };
-    }
-    if (!this.shownPath(p) || !fs.existsSync(p)) return { ok: false, message: '찾을 수 없어요' };
-    if (action === 'copyPath') {
-      clipboard.writeText(p);
-      return { ok: true, message: '경로를 복사했어요', close: false };
-    }
-    if (action === 'copyFile') {
-      const ok = await copyFileToClipboard(p);
-      return ok ? { ok, message: fs.statSync(p).isDirectory() ? '폴더를 복사했어요. 붙여 넣으면 돼요' : '파일을 복사했어요. 붙여 넣으면 돼요', close: false } : { ok, message: UI.copyFail };
-    }
-    if (action === 'reveal') {
-      shell.showItemInFolder(p);
-      return { ok: true, close: true };
-    }
-    const err = await shell.openPath(p);
-    if (err) toast({ title: UI.openFail, body: err });
-    return { ok: !err, close: true };
-  }
-
-  showFinder(query) {
-    if (!this.finderWin || this.finderWin.isDestroyed()) {
-      this.finderWin = new BrowserWindow({
-        width: 960,
-        height: 620,
-        minWidth: 560,
-        minHeight: 360,
-        show: false,
-        title: '메모킹 모두 찾기',
-        autoHideMenuBar: true,
-        ...windowIcon,
-        webPreferences: { preload: FINDER_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
-      });
-      guardWindow(this.finderWin, { openWebPage });
-      this.finderWin.loadFile(path.join(APP_DIR, 'finder.html'));
-      this.finderWin.once('ready-to-show', () => this.finderWin?.show());
-      this.finderWin.on('closed', () => {
-        this.finderWin = null;
-        this.lastFinderResults = new Set();
-      });
-      this.finderWin.webContents.once('did-finish-load', () => this.finderWin?.webContents.send('finder:query', String(query ?? '')));
-    } else {
-      this.finderWin.webContents.send('finder:query', String(query ?? ''));
-      if (this.finderWin.isMinimized()) this.finderWin.restore();
-      this.finderWin.show();
-    }
-    this.finderWin.focus();
-  }
-
-  // ---------- OPMS ----------
-
-  opmsSettings() {
-    return {
-      // 서버 주소는 사용자가 설정에서 넣은 것만 (없으면 '' — OPMS 를 쓰려 하면 넣으라고 안내)
-      host: normalizeOpmsHost(process.env.MEMOKING_OPMS_HOST) ?? normalizeOpmsHost(settings.opms?.host) ?? '',
-      wrapperDir: settings.opms?.wrapperDir || path.join(app.getPath('documents'), '전자포대'),
-    };
-  }
-
-  opmsClient() {
-    return new Opms({ host: this.opmsSettings().host, filesIndex: path.join(app.getPath('userData'), 'opms-files.json') });
-  }
-
-  rememberCases(rows) {
-    for (const r of rows) if (r.idx) this.opmsCases.set(String(r.idx), r);
-    while (this.opmsCases.size > 300) this.opmsCases.delete(this.opmsCases.keys().next().value);
-  }
-
-  opmsBrief(r, query = '') {
-    return {
-      idx: r.idx, ourref: r.ourref, yourref: r.yourref, n_app: r.n_app, div: r.div,
-      applicant: r.applicant, title: r.title_kor, accepted: cleanDate(r.d_accept),
-      inventor: query ? matchedInventor(r, query) : '', // 발명자 이름으로 찾았을 때만 보인다
-    };
-  }
-
-  /** query: 사건 대신 이 글로 찾은 목록을 보인다 (매직키 "OPMS 다른 n건 더 보기") */
-  showOpms(idx, tab = 'info', query = null) {
-    if (!this.opmsWin || this.opmsWin.isDestroyed()) {
-      this.opmsWin = new BrowserWindow({
-        width: 980,
-        height: 700,
-        minWidth: 620,
-        minHeight: 420,
-        show: false,
-        title: '메모킹 OPMS',
-        autoHideMenuBar: true,
-        ...windowIcon,
-        webPreferences: { preload: OPMS_PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true },
-      });
-      guardWindow(this.opmsWin, { openWebPage });
-      this.opmsWin.loadFile(path.join(APP_DIR, 'opms.html'));
-      this.opmsWin.once('ready-to-show', () => this.opmsWin?.show());
-      this.opmsWin.on('closed', () => { this.opmsWin = null; });
-      this.opmsWin.webContents.once('did-finish-load', () => this.opmsWin?.webContents.send('opms:show', { idx, tab, query }));
-    } else {
-      this.opmsWin.webContents.send('opms:show', { idx, tab, query });
-      if (this.opmsWin.isMinimized()) this.opmsWin.restore();
-      this.opmsWin.show();
-    }
-    this.opmsWin.focus();
-  }
-
-  caseOf(idx) {
-    const c = this.opmsCases.get(String(idx ?? ''));
-    if (!c) throw new Error('찾아본 사건이 아니에요. 다시 찾아 주세요');
-    return c;
   }
 
   // ---------- 매직 카피 & 캡처 메모 ----------

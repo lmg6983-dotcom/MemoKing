@@ -1421,30 +1421,6 @@ dialog.quick-event[open] {
   .dialog .dialog-actions { position: sticky; bottom: -12px; z-index: 2; margin: 0 -18px -12px; padding: 10px 18px 12px; background: var(--surface-2); box-shadow: 0 -1px 0 var(--line); }
 }
 
-/* 찾는 중 · 불러오는 중 (searching.js): 흔들리며 살피는 돋보기 + 차례로 뜨는 점 — 빈 화면 대신 */
-.mk-searching { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 36px 16px; color: var(--muted); font-size: 13.5px; text-align: center; animation: mk-fade-in 0.2s ease-out 0.08s both; }
-.mk-searching.inline { flex-direction: row; justify-content: flex-start; gap: 8px; padding: 6px 2px; font-size: 13px; }
-.mk-glass { width: 40px; height: 40px; overflow: visible; color: var(--text-strong); transform-origin: 44% 44%; animation: mk-glass-look 1.6s ease-in-out infinite; }
-.mk-searching.inline .mk-glass { width: 18px; height: 18px; flex: none; }
-.mk-glass circle { fill: color-mix(in srgb, var(--brand-yellow) 28%, transparent); stroke: currentColor; stroke-width: 2; }
-.mk-glass .mk-glass-handle { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
-.mk-glass .mk-glass-shine { fill: none; stroke: var(--surface-1, #fff); stroke-width: 1.4; stroke-linecap: round; opacity: 0.9; }
-@keyframes mk-glass-look {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  20% { transform: translate(-4px, -1px) rotate(-14deg); }
-  45% { transform: translate(3px, 1px) rotate(12deg); }
-  70% { transform: translate(-2px, 2px) rotate(-8deg); }
-}
-.mk-dots i { font-style: normal; animation: mk-dot 1.2s ease-in-out infinite; }
-.mk-dots i:nth-child(2) { animation-delay: 0.2s; }
-.mk-dots i:nth-child(3) { animation-delay: 0.4s; }
-@keyframes mk-dot { 0%, 60%, 100% { opacity: 0.2; } 30% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) {
-  .mk-glass { animation: mk-glass-breathe 1.8s ease-in-out infinite; }
-  .mk-dots i { animation: none; opacity: 0.6; }
-}
-@keyframes mk-glass-breathe { 50% { opacity: 0.45; } }
-
 /* "이 날의 기록으로" (memory-day.js) — PC 메모 창 · 목록 · 휴대폰 */
 .memory-day .md-lead { margin: 0 0 14px; font-size: 13.5px; color: var(--muted); }
 .memory-day .md-title { display: block; margin-bottom: 4px; overflow: hidden; font-size: 15px; color: var(--text-strong); text-overflow: ellipsis; white-space: nowrap; }
@@ -1569,7 +1545,7 @@ dialog.quick-event[open] {
 .work-hours .wh-sum { font-weight: 500; color: var(--muted); }
 @media (pointer: coarse) { .work-hours .wh-day { width: 44px; height: 44px; } .work-hours .wh-time input { height: 44px; } }
 
-/* 매직 에이전트: 목록 검색창 ✦ 아래 칸 (ai-ask.js) · 매직키 창 (magic.js) — 안쪽은 agent-view.js */
+/* 매직 에이전트: 목록 검색창 ✦ 아래 칸 (ai-ask.js) — 안쪽은 agent-view.js */
 .ai-answer { position: relative; flex: none; margin: 0 12px 8px; padding: 10px 36px 10px 12px; border-radius: var(--radius-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); max-height: 50vh; overflow-y: auto; }
 .ai-answer[hidden] { display: none; }
 .ai-close { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; font-size: 18px; line-height: 1; }

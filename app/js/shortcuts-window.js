@@ -1,5 +1,5 @@
 // 단축키 설정 창 — 기능마다 지금 키를 보이고, 키 칸을 눌러 새 키를 받아 바꾼다
-//   메모 창 기능: core/keymap.js (바꾼 것만 설정에) · 어디서든(매직 카피 · 매직키): 전역 단축키 (설정의 같은 칸과 같은 값)
+//   메모 창 기능: core/keymap.js (바꾼 것만 설정에) · 어디서든(매직 카피): 전역 단축키 (설정의 같은 칸과 같은 값)
 import { keymapGroups, comboFromEvent, comboLabel, comboFromAccelerator } from './core/keymap.js';
 import { displayAccelerator, DEFAULT_SHORTCUTS } from './core/accelerators.js';
 import { startKeyCapture, stopKeyCapture, isCapturing, modsLabel, globalShortcutResult, captureGlobalKey } from './key-capture.js';
@@ -9,7 +9,6 @@ const $ = (id) => document.getElementById(id);
 
 const GLOBAL = [
   { id: 'quickMemo', label: '매직 카피, 화면 캡처', help: '어느 앱에서든 고른 글, 파일, 그림을 바로 메모로 만들어요. 빠르게 두 번 누르면 화면의 원하는 부분을 잘라 담아요.' },
-  { id: 'magic', label: '매직키', help: '어디서든 입력창을 띄워 메모와 파일을 몇 글자로 찾고, 찾는 게 없으면 바로 메모해요.' },
 ];
 
 let state = { overrides: {}, shortcuts: {} };
@@ -74,7 +73,7 @@ function keyRow({ label, help, keys, changed, onCapture, onReset }) {
 }
 
 function render() {
-  // 어디서든 (매직 카피 · 매직키)
+  // 어디서든 (매직 카피)
   const sections = [section('어디서든', GLOBAL.map((g) => {
     const st = state.shortcuts?.[g.id];
     return keyRow({
@@ -147,7 +146,7 @@ function applyFind() {
 
 const HELP = 'Esc는 그만두기, Backspace는 이 기능의 키 없애기예요';
 
-// 메모 창 기능의 키 칸 (key-capture.js — 설정 창의 매직 카피 · 매직키 칸과 같은 동작)
+// 메모 창 기능의 키 칸 (key-capture.js — 설정 창의 매직 카피 칸과 같은 동작)
 function captureAction(btn, a) {
   if (isCapturing(btn)) return stopKeyCapture('cancel');
   setStatus(HELP);
@@ -181,7 +180,7 @@ function captureAction(btn, a) {
   });
 }
 
-// 매직 카피 · 매직키 칸
+// 매직 카피 칸
 function captureGlobal(btn, g) {
   if (isCapturing(btn)) return stopKeyCapture('cancel');
   captureGlobalKey(btn, {
@@ -263,7 +262,7 @@ $('reset-all').addEventListener('click', async () => {
   if (!b.classList.contains('confirm')) {
     b.classList.add('confirm');
     b.textContent = '한 번 더 누르면 초기화';
-    setStatus('메모 창 단축키와 매직 카피, 매직키 키를 모두 처음대로 되돌려요');
+    setStatus('메모 창 단축키와 매직 카피 키를 모두 처음대로 되돌려요');
     clearTimeout(confirmTimer);
     confirmTimer = setTimeout(() => {
       b.classList.remove('confirm');
@@ -276,7 +275,7 @@ $('reset-all').addEventListener('click', async () => {
   b.textContent = '모두 초기화';
   await stopKeyCapture('cancel');
   state = await api.keymap.reset();
-  // 매직 카피 · 매직키를 서로 바꿔 두었으면 한쪽을 먼저 되돌려야 다른 쪽이 된다 → 안 된 것은 한 번 더
+  // 다른 전역 키와 서로 바꿔 두었으면 한쪽을 먼저 되돌려야 다른 쪽이 된다 → 안 된 것은 한 번 더
   let failed = [];
   for (let round = 0; round < 2; round++) {
     failed = [];

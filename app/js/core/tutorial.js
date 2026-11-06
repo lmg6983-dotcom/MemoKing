@@ -11,7 +11,7 @@
 //         (없으면 직접 해 봐야 넘어감 — 튜토리얼 끝내기는 언제나 있음)
 //   chapter: 묶음 이름 (말풍선 머리에 "목록 2/7" 처럼 · 다시 볼 때 어디부터 볼지 고르기) — 같은 묶음은 붙어 있다
 //   enable: 꺼져 있을 때(needs) 말풍선에서 바로 켜는 단추 글자 (켜면 그 자리에서 직접 해 보기로)
-//   needs: 이 기능이 켜져 있어야 직접 해 볼 수 있다 ('workLife' Work / Life 나누기 · 'quickMemo' Ctrl+Alt+C · 'magic' 매직키 · 'history' 알림 보관함)
+//   needs: 이 기능이 켜져 있어야 직접 해 볼 수 있다 ('workLife' Work / Life 나누기 · 'quickMemo' Ctrl+Alt+C · 'history' 알림 보관함)
 //          꺼져 있으면 offText 로 안내만 하고 "다음"으로 (tutorialStepFor)
 import { normalizeReminder } from './reminders.js';
 
@@ -135,16 +135,8 @@ export const TUTORIAL_STEPS = [
   {
     id: 'welcome', chapter: '시작', win: 'list', target: [], emoji: '👑',
     title: '반가워요! 메모킹이에요',
-    text: '다른 메모 앱에 없는 메모킹만의 기능을 직접 눌러 봐요. 첫 번째는 어디서든 부르는 매직키예요. 내 메모는 그대로, 예시 메모가 든 연습 공간에서 해요.',
-    next: '매직키부터 해 볼게요', skip: '나중에 볼게요',
-  },
-  {
-    id: 'magic', chapter: '메모킹만의 기능', win: 'list', target: [], needs: 'magic', advance: 'magic-tried', emoji: '🔮',
-    title: '무엇이든 찾기, 매직키 (Ctrl+Alt+Space)',
-    text: '어느 앱을 쓰다가도 Ctrl+Alt+Space! 메모와 파일을 몇 글자로 찾아요. 찾는 게 없으면 Enter, 적은 말이 바로 메모가 돼요.',
-    try: 'Ctrl+Alt+Space를 누르고 "회의"를 쳐 보세요. 예시 메모가 보이면 Esc로 닫아요',
-    offText: '설정에서 매직키를 켜면 Ctrl+Alt+Space로 어디서든 메모와 파일을 찾고, 떠오른 말을 바로 메모로 남겨요.',
-    next: LATER,
+    text: '다른 메모 앱에 없는 메모킹만의 기능을 직접 눌러 봐요. 첫 번째는 어디서든 글을 담는 매직 카피예요. 내 메모는 그대로, 예시 메모가 든 연습 공간에서 해요.',
+    next: '매직 카피부터 해 볼게요', skip: '나중에 볼게요',
   },
   {
     id: 'quick', chapter: '메모킹만의 기능', win: 'list', target: [], needs: 'quickMemo', advance: 'quick-memo', emoji: '⚡',
@@ -274,7 +266,7 @@ export const TUTORIAL_SETTLE_MS = { typed: 1800, tagged: 1500, styled: 900, task
 
 /** 사용자가 직접 해서 넘어가는 일들 (PC 메인 프로세스가 이 이름만 받는다) */
 export const TUTORIAL_EVENTS = ['memo-created', 'typed', 'styled', 'tasked', 'add-opened', 'ink-done', 'annotate-done', 'tagged', 'crown-on', 'content-tools', 'note-closed', 'layout-changed', 'tag-filtered', 'mode-moved',
-  'list-zoomed', 'mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried', 'note-zoomed'];
+  'list-zoomed', 'mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'note-zoomed'];
 
 /**
  * 이 기기에서 보일 단계: 필요한 기능(needs)이 꺼져 있으면 직접 해 보기 없이 안내(offText)만 하고 "다음"으로

@@ -25,7 +25,6 @@ const DEPS = {
   fullcalendar: '7.1.0',
   'temporal-polyfill': '1.0.5',
   'ical.js': '2.2.1',
-  mathjs: '15.2.0',
   'pdfjs-dist': '5.4.149',
   'docx-preview': '0.4.1',
   'hwp.js': '0.0.3',
@@ -68,7 +67,6 @@ await esbuild.build({
     'noble-crypto': join(ROOT, 'scripts', 'vendor', 'noble-crypto.js'),
     fullcalendar: join(ROOT, 'scripts', 'vendor', 'fullcalendar.js'),
     ical: join(ROOT, 'scripts', 'vendor', 'ical.js'),
-    mathjs: join(ROOT, 'scripts', 'vendor', 'mathjs.js'),
   },
   outdir: OUT,
   bundle: true,
@@ -139,7 +137,7 @@ const licenses = Object.keys(DEPS)
     const repo = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url ?? '';
     return `| ${name} | ${pkg.version} | ${pkg.license} | ${repo.replace(/^git\+/, '').replace(/\.git$/, '')} |`;
   });
-// 따로 넣은 것(canvas-confetti·tesseract.js·fuzzysort 등 — 이 스크립트가 묶지 않음)은 손으로 적은 줄을 그대로 둔다
+// 따로 넣은 것(canvas-confetti·tesseract.js 등 — 이 스크립트가 묶지 않음)은 손으로 적은 줄을 그대로 둔다
 const bundled = new Set(Object.keys(DEPS));
 const kept = existsSync(join(OUT, 'LICENSES.md'))
   ? readFileSync(join(OUT, 'LICENSES.md'), 'utf8').split('\n').filter((l) => /^\| [^-|]/.test(l) && !l.startsWith('| 패키지') && !bundled.has(l.split('|')[1].trim()))

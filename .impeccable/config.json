@@ -94,13 +94,10 @@
         "files": [
           "app/bubble.html",
           "app/capture.html",
-          "app/finder.html",
           "app/ghost.html",
           "app/hud.html",
           "app/index.html",
-          "app/magic.html",
           "app/note.html",
-          "app/opms.html",
           "app/pdf.html",
           "app/print.html",
           "app/shortcuts.html"

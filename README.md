@@ -40,22 +40,15 @@
 |---|---|
 | ✍️ **쓰기** | 제목 · 목록 · 체크리스트 · 표 · 수식 · 글자 색을 화면에서 꾸미면 파일에는 마크다운으로 저장돼요. 사진 · 파일 · 링크 카드를 넣고, 웹이나 워드에서 붙여 넣어도 서식이 그대로 와요. 음성 녹음과 받아쓰기, 손글씨, 글 위에 그리기(주석)도 돼요. |
 | 💾 **알아서 저장** | 입력을 멈추면 저절로 저장해요. 지난 버전으로 되돌리기, 휴지통, 비밀번호 잠금도 있어요. |
-| ⚡ **어디서든 빠르게** | `Ctrl+Alt+Space` **매직키**로 메모 · 파일 · 폴더 · 앱 찾기, 계산, 새 메모 저장까지 한 입력창에서. `Ctrl+Alt+C` **매직 카피**는 어느 앱에서든 고른 글이나 그림을 새 메모로 (두 번 누르면 화면 영역 캡처). `Ctrl+Alt+1~9`로 정해 둔 메모를 바로 복사하거나 띄워요. |
+| ⚡ **어디서든 빠르게** | `Ctrl+Alt+C` **매직 카피**는 어느 앱에서든 고른 글이나 그림을 새 메모로 (두 번 누르면 화면 영역 캡처). `Ctrl+Alt+1~9`로 정해 둔 메모를 바로 복사하거나 띄워요. |
 | 🗂️ **정리하고 찾기** | `#태그`로 나누고, 색 · 고정 · 사진 같은 조건으로 거르고, 검색해요. 메모 창 여러 개를 탭 하나로 묶거나(스택), 늘 위에 두거나(왕관), 바탕화면에 붙여요(테이프). |
 | 📅 **일정과 알림** | 글에 "내일 오후 3시"처럼 쓰면 일정으로 넣을 수 있고 미리 알림도 받아요. Windows 알림을 보관함에 모아 둘 수도 있어요 (처음에는 꺼져 있어요). |
 | 🤖 **AI — 인터넷 없이 이 PC 안에서** | 맞춤법 검사, 문체 다듬기, 초안 쓰기, 태그 붙이기. Claude 데스크톱 같은 AI 비서와 연결하면(MCP) 메모를 찾고 읽고 남기게 할 수 있어요. |
 | 📱 **휴대폰도 같이** | 안드로이드 앱이 같은 메모 폴더 형식을 쓰고 Google Drive로 PC와 맞춰요. 홈 화면 위젯, 녹음과 받아쓰기, 다른 앱에서 공유해 메모 만들기도 돼요. → [android/README.md](android/README.md) |
 
-<div align="center">
-<img src="assets/screenshots/magic-search.png" alt="매직키 — 메모와 PC 파일을 한 번에 찾기" width="48%">&nbsp;
-<img src="assets/screenshots/magic-calc.png" alt="매직키 — 입력창에서 바로 계산" width="48%">
-
-<sub>매직키 <code>Ctrl+Alt+Space</code> — 메모 · 파일 찾기와 계산을 한 입력창에서</sub>
-
 > [!TIP]
-> 매직키는 따로 설치하는 [**MagicKey**](https://github.com/lmg6983-dotcom/MagicKey) 앱으로, OPMS 검색은 [**MagicSystem**](https://github.com/lmg6983-dotcom/MagicSystem)(예전 이름 MagicOPMS) 앱으로 옮겨 가요.
-> MagicKey 를 깔면 메모킹 매직키는 저절로 쉬고, MagicKey 가 같은 단축키로 메모 찾기 · 새 메모를 이어받아요 ([함께 쓰기](docs/magickey.md)).
-</div>
+> 어디서든 찾고 메모하는 **매직키**는 따로 설치하는 [**MagicKey**](https://github.com/lmg6983-dotcom/MagicKey) 앱이, OPMS 검색은 [**MagicSystem**](https://github.com/lmg6983-dotcom/MagicSystem) 앱이 맡아요.
+> 둘 다 메모킹과 함께 쓰면 메모를 찾고 새 메모로 남겨요 ([함께 쓰기](docs/magickey.md)).
 
 > [!TIP]
 > 기능마다 자세한 동작과 전체 단축키 표는 **[기능 자세히](guides/FEATURES.md)** 에 있어요.
@@ -78,7 +71,7 @@
 | 하는 일 | 단축키 | 하는 일 | 단축키 |
 |---|---|---|---|
 | 새 메모 | <kbd>Ctrl</kbd>+<kbd>N</kbd> | 단축키 모두 보기 | <kbd>Ctrl</kbd>+<kbd>/</kbd> |
-| 매직키 (어디서든) | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> | 매직 카피 (어디서든) | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> |
+| 메모 목록 (어디서든) | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>`</kbd> | 매직 카피 (어디서든) | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> |
 | 늘 위에 두기 (왕관) | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> | 바탕화면에 붙이기 (테이프) | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> |
 | 체크리스트 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>9</kbd> | 알림 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> |
 | 음성 녹음 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> | 닫기 (저장) | <kbd>Ctrl</kbd>+<kbd>W</kbd> |
@@ -138,6 +131,7 @@ Windows 설치 파일은 [SignPath.io](https://about.signpath.io)가 무료로 �
 <!-- HISTORY:START -->
 | 태그 | 날짜 | 단계 | 내용 |
 |---|---|---|---|
+| `v0.78.0` | 2026-11-06 | 3. 개선 | **매직키 · OPMS 는 MagicKey · MagicSystem 앱에서**: 메모킹 안의 매직키(Ctrl+Alt+Space) 창 · 모두 찾기 창 · 파일 목록 · OPMS 검색을 걷어냈어요. 어디서든 찾고 메모하는 매직키는 따로 설치하는 [MagicKey](https://github.com/lmg6983-dotcom/MagicKey/releases/latest), OPMS 검색은 [MagicSystem](https://github.com/lmg6983-dotcom/MagicSystem) 앱이 맡아요. 두 앱이 넘긴 글은 지금처럼 메모킹 새 메모로 들어오고, 예전 매직키 · OPMS 설정은 두 앱이 처음 켜질 때 그대로 이어받아요. 설정 › MagicKey 칸에서 두 앱 링크를 볼 수 있어요. 튜토리얼은 매직 카피부터 시작해요. 쓰지 않게 된 계산기 · 찾기 부품이 빠져 설치 파일이 조금 가벼워졌어요 |
 | `v0.77.1` | 2026-11-06 | 5. 고침 | **MagicKey 가 메모킹 버전을 바로 알아봐요**: 알림 영역에서 조용히 켜진 메모킹을 MagicKey 가 옛 버전으로 보고 "키가 겹쳐요" 경고를 띄우거나 새 메모 줄을 숨기던 것을 고쳤어요. 메모킹이 켤 때마다 지금 버전을 설정에 적어 두어요 |
 | `v0.77.0` | 2026-11-06 | 3. 개선 | **매직키를 따로 설치하는 MagicKey 앱과 함께 · OPMS 는 MagicOPMS 로**: 따로 설치하는 MagicKey 가 켜져 있으면 메모킹은 매직키 단축키(Ctrl+Alt+Space)를 MagicKey 에 넘겨주고, MagicKey 를 끄면 1분 안에 다시 잡아요. MagicKey 입력창에서 메모킹 메모를 찾아 열고, 쓴 글을 새 메모로 저장하며, 글 속 날짜로 알림까지 맞춰 저장할 수 있어요. OPMS 검색은 따로 설치하는 MagicOPMS 앱으로 옮겨 가요 (서버 주소 · 전자포대 폴더 · 받은 기록을 그대로 이어 써요). MagicKey 를 깔지 않았으면 지금처럼 메모킹 매직키를 그대로 써요. 설정 › 매직키에 MagicKey 받기 링크가 있어요 |
 | `v0.76.1` | 2026-11-04 | 5. 고침 | **휴대폰 동영상 첫 장면이 검게 나오던 것 (휴대폰 0.54.1)**: 갤럭시 카메라로 찍은 동영상(HDR · HEVC)은 목록 카드의 첫 장면이 검은 화면이었어요. 이제 휴대폰의 동영상 재생기로 장면을 그려요 (예전에 검게 기억한 그림은 저절로 다시 그려요). 메모를 열었을 때도 동영상 재생 전 그림이 회색 기본 그림 대신 그 영상의 장면이에요 (PC · 휴대폰) |

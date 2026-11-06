@@ -568,7 +568,7 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
 
 /* 설정: 고르기 한 줄 */
 .setting-row.select-row { justify-content: space-between; cursor: default; }
-:is(.setting-row, .magic-site) select {
+.setting-row select {
   flex: none;
   height: 32px;
   padding: 0 8px;
@@ -813,24 +813,16 @@ body.is-dragging .card:hover { transform: none; }
 .card[data-color="charcoal"] .card-clear { color: var(--rec-on-dark); border-color: var(--rec-on-dark); opacity: 0.62; }
 .cards[data-layout="rows"] .card-clear { font-size: 18px; padding: 1px 10px 0; border-width: 3px; }
 
-/* ---------- v0.17.13: 매직키 설정 ---------- */
+/* ---------- 설정 줄 ---------- */
 .setting-sub { margin: 0 0 8px; padding: 2px 0 0 20px; }
 .label.sub { margin: 4px 0; font-size: 12px; color: var(--muted); }
-.magic-settings-modules { display: flex; flex-direction: column; gap: 8px; }
-.magic-mod { display: flex; align-items: flex-start; gap: 10px; }
-.magic-mod > span { font-size: 13px; line-height: 1.35; }
 /* 설정의 켜고 끄기는 PC·휴대폰 모두 같은 모양: 글은 왼쪽, 스위치는 오른쪽 (모을 앱 고르기 창과도 같게) */
-:is(.setting-row, .magic-mod) > .switch { order: 2; flex: none; margin-left: auto; }
-:is(.setting-row, .magic-mod) > span { flex: 1; min-width: 0; }
+.setting-row > .switch { order: 2; flex: none; margin-left: auto; }
+.setting-row > span { flex: 1; min-width: 0; }
 /* 글 왼쪽 · 단추 오른쪽 (스위치와 같은 자리) */
 .setting-row > .btn { flex: none; margin-left: auto; }
 div.setting-row { cursor: default; }
 .setting-row .inline-link { padding: 0 2px; font-size: inherit; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
-.magic-mod small { display: block; color: var(--muted); font-size: 12px; }
-.magic-mod em { color: var(--muted); font-style: normal; }
-.magic-mod.soon > span { opacity: 0.6; }
-/* 웹 검색 · AI 에게 묻기의 기본 사이트 — 그 기능 바로 아래, 들여 써서 딸린 것으로 */
-.magic-site { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -2px 0 2px 14px; padding-left: 10px; border-left: 2px solid var(--border); font-size: 12.5px; color: var(--muted); }
 
 /* ---------- v0.18.0: 지운 뒤 되돌리기 (묻지 않고 바로 휴지통으로) ---------- */
 .undo-bar {
@@ -918,7 +910,7 @@ body:not([data-tab="memos"]) .fab, body:not([data-tab="memos"]) .fab-menu, body:
 button.noti-text { display: block; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .noti-meta, .noti-title { display: block; }
 
-/* 전역 단축키 바꾸기 (설정 › 매직 카피·매직키 아래) */
+/* 전역 단축키 바꾸기 (설정 › 매직 카피 · MagicKey 아래) */
 .shortcut-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -6px 0 14px 20px; font-size: 12.5px; color: var(--muted); }
 .kbd-btn {
   min-width: 96px;
@@ -987,15 +979,6 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
   #reminder-groups > .cal { grid-column: 1; grid-row: 1 / span 999; align-self: start; position: sticky; top: 0; }
 }
 
-/* 설정 › 매직키 › OPMS 연결 */
-.opms-setup { margin-bottom: 14px; }
-.opms-host-row { display: flex; gap: 8px; }
-.opms-host-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; }
-.opms-host-row input:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
-.opms-dir-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13px; }
-.opms-dir-row > span { flex: 1; min-width: 0; }
-.opms-dir-row small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
-.opms-setup .sc-note { display: block; margin-top: 6px; }
 
 /* 설정 › 업데이트 · 새 버전 대화 상자 */
 .update-btn { min-width: 132px; transition: background-color 0.2s ease-out, color 0.2s ease-out, border-color 0.2s ease-out; }
@@ -1050,7 +1033,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .sync-btn[data-tone="error"] .sync-mark { background: var(--danger); }
 .sync-btn[data-tone="off"]:not(.invite) .sync-mark { display: none; }
 .sync-btn.invite .sync-mark { background: var(--bg); box-shadow: inset 0 0 0 2px var(--brand-yellow); } /* 아직 연결 안 함: 안내 띠 대신 속이 빈 노란 고리 (구름을 열어 보면 사라짐) — 동기화 중(꽉 찬 노란 점 · 깜빡임)과 다르게 */
-body.coaching .sync-btn.invite .sync-mark { display: none; } /* 튜토리얼 동안은 매직키부터 */
+body.coaching .sync-btn.invite .sync-mark { display: none; } /* 튜토리얼 동안은 매직 카피부터 */
 .sync-btn.has-conflicts .sync-mark { right: -1px; bottom: auto; top: -1px; height: 16px; min-width: 16px; padding: 0 4px; background: var(--brand-yellow); color: var(--on-brand); font-size: 11px; font-weight: 800; line-height: 12px; text-align: center; }
 @keyframes sync-pulse { from { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .sync-btn[data-tone="busy"] .sync-mark { animation: none; } }

@@ -146,14 +146,14 @@
       <h2>설정</h2>
       <button type="button" class="icon-btn dialog-x" data-dialog-close title="닫기 (Esc)" aria-label="설정 닫기"><svg><use href="#i-close"/></svg></button>
     </header>
-    <!-- 메모킹만의 것부터: 앱 상태 → 바로가기 → 매직 카피 · 매직키 → 동기화 → AI → 보기 · 녹음 · 단축키 → 한 번 정하고 마는 것(폴더 · 휴지통) → 다른 기기에 설치 -->
+    <!-- 메모킹만의 것부터: 앱 상태 → 바로가기 → 매직 카피 · MagicKey → 동기화 → AI → 보기 · 녹음 · 단축키 → 한 번 정하고 마는 것(폴더 · 휴지통) → 다른 기기에 설치 -->
     <div class="drive-box app-box" id="app-box" aria-label="메모킹 버전과 업데이트">
       <svg class="drive-box-icon"><use href="#i-crown"/></svg>
       <div class="drive-box-text"><b>메모킹 <span id="update-current"></span></b><small id="update-note" role="status"></small></div>
       <button type="button" class="btn update-btn" id="update-check" data-state="idle">업데이트 확인</button>
     </div>
     <nav class="set-jump" aria-label="설정 바로가기">
-      <a href="#set-magic">매직키</a><a href="#set-drive">동기화</a><a href="#set-local-ai" data-alt="set-ai">AI</a><a href="#set-view">보기</a><a href="#set-stt">녹음</a><a href="#set-storage">저장</a><a href="#set-phone">설치</a>
+      <a href="#set-magic">MagicKey</a><a href="#set-drive">동기화</a><a href="#set-local-ai" data-alt="set-ai">AI</a><a href="#set-view">보기</a><a href="#set-stt">녹음</a><a href="#set-storage">저장</a><a href="#set-phone">설치</a>
     </nav>
     <section class="set-sec" aria-labelledby="set-daily">
       <h3 class="set-title" id="set-daily">자주 쓰는 기능</h3>
@@ -177,44 +177,13 @@
       </label>
     </section>
     <section class="set-sec" aria-labelledby="set-magic">
-      <h3 class="set-title" id="set-magic">매직키</h3>
-      <label class="setting-row">
-        <input type="checkbox" id="magic-enabled" class="switch" role="switch">
-        <span>매직키 쓰기 <small>어디서든 입력창을 띄워 바로 메모하고 찾아요</small></span>
-      </label>
-      <p class="hint small">매직키는 따로 설치하는 <a href="https://github.com/lmg6983-dotcom/MagicKey/releases/latest" target="_blank" rel="noopener">MagicKey</a> 앱으로 옮겨 가요. 깔면 메모킹 매직키는 저절로 쉬고, MagicKey 가 같은 단축키 · 기능을 이어받아요.</p>
-      <div class="shortcut-row" data-shortcut="magic">
-        <span class="shortcut-label">매직키 단축키</span>
-        <button type="button" class="kbd-btn" id="sc-magic" aria-describedby="sc-magic-note">Ctrl+Alt+Space</button>
-        <button type="button" class="link-btn sc-reset" id="sc-magic-reset" hidden>기본값으로</button>
-        <small class="sc-note" id="sc-magic-note" role="status"></small>
-      </div>
+      <h3 class="set-title" id="set-magic">MagicKey</h3>
+      <p class="hint small">어디서든 입력창을 띄워 메모하고 찾는 매직키는 따로 설치하는 <a href="https://github.com/lmg6983-dotcom/MagicKey/releases/latest" target="_blank" rel="noopener">MagicKey</a> 앱이 맡아요. 단축키 · 기능은 MagicKey 의 알림 영역 ✦ 메뉴에서 바꿔요. OPMS 검색은 <a href="https://github.com/lmg6983-dotcom/MagicSystem/releases/latest" target="_blank" rel="noopener">MagicSystem</a> 앱에서 해요.</p>
       <div class="shortcut-row" data-shortcut="list">
         <span class="shortcut-label">메모 목록 단축키</span>
         <button type="button" class="kbd-btn" id="sc-list" aria-describedby="sc-list-note">Ctrl+Alt+`</button>
         <button type="button" class="link-btn sc-reset" id="sc-list-reset" hidden>기본값으로</button>
         <small class="sc-note" id="sc-list-note" role="status"></small>
-      </div>
-      <div id="magic-modules-row" class="setting-sub" hidden>
-        <p class="label sub">매직키 기능</p>
-        <div id="magic-modules-list" class="magic-settings-modules"></div>
-      </div>
-      <div id="opms-setup" class="setting-sub opms-setup" hidden>
-        <p class="label sub">OPMS 연결 <small>사내 OPMS 서버 주소는 이 PC에만 저장돼요</small></p>
-        <form id="opms-host-form" class="opms-host-row">
-          <input id="opms-host" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="서버 주소 (예: 192.168.0.10:8181)" aria-label="OPMS 서버 주소" aria-describedby="opms-host-note">
-          <button type="submit" class="btn" id="opms-host-save">저장</button>
-        </form>
-        <small class="sc-note" id="opms-host-note" role="status"></small>
-        <div class="opms-dir-row">
-          <span>전자포대 저장 폴더 <small id="opms-dir"></small></span>
-          <button type="button" class="btn" id="opms-dir-open" title="전자포대 저장 폴더를 탐색기로 열기">폴더 열기</button>
-          <button type="button" class="btn" id="opms-dir-btn">폴더 바꾸기</button>
-        </div>
-        <div class="opms-dir-row" id="opms-shapes-row" hidden>
-          <span>저절로 찾는 번호 양식 <small id="opms-shapes"></small></span>
-          <button type="button" class="btn" id="opms-shapes-clear" title="OPMS에서 찾은 번호로 배운 양식을 모두 지워요. 그 뒤로는 그 양식도 고를 때만 찾아요">모두 지우기</button>
-        </div>
       </div>
     </section>
     <section class="set-sec" aria-labelledby="set-drive">
@@ -267,13 +236,13 @@
         </label>
         <label class="setting-row" id="magic-polish-row">
           <input type="checkbox" id="magic-polish" class="switch" role="switch" checked>
-          <span>매직키 메모 다듬기 <small>맞춤법을 고치고, 첫 줄이 길면 짧은 제목을 붙여요</small></span>
+          <span>MagicKey 메모 다듬기 <small>맞춤법을 고치고, 첫 줄이 길면 짧은 제목을 붙여요</small></span>
         </label>
         <label class="setting-row">
           <input type="checkbox" id="ai-phone" class="switch" role="switch">
           <span>휴대폰 메모도 이 PC에서 <small title="휴대폰에서 쓴 메모가 들어오면 1분 뒤 달아요. PC가 여러 대면 한 대에서만 켜 주세요">휴대폰 메모에도 태그 · 일정을 달아요 (PC 한 대에서만)</small></span>
         </label>
-        <p class="set-note">메모를 닫을 때 · 매직키로 저장할 때 뒤에서 해요. 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
+        <p class="set-note">메모를 닫을 때 · MagicKey 로 저장할 때 뒤에서 해요. 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
       </div>
       <p class="set-note">기본 모델: 카카오 카나나2 · Powered by Kanana · <a href="https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/LICENSE" target="_blank" rel="noopener">라이선스 보기</a></p>
     </section>
