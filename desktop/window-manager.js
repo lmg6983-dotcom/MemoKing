@@ -67,6 +67,7 @@ export class WindowManager {
     this.inkingWins = new WeakSet();
     this.spare = null; // 미리 불러 둔 메모 창 { win, assign }
     this.spareTimer = 0;
+    this.movedAt = 0; // 메모 창을 마지막으로 끈 때 (busy)
     this.paintMarks = new WeakMap(); // 예비 창: 화면이 "메모를 그렸다" 고 알려 오면 부를 함수
     this.hotkeySlotOf = () => null; // 메모 단축키 칸 (main.js 가 채움)
     // 테이프로 붙인 메모 창을 바탕화면 층에. 도우미가 막힌 PC(Add-Type 금지 등)로 드러나면 붙여 둔 창을 보통 창으로
@@ -298,8 +299,12 @@ export class WindowManager {
     });
 
     const remember = () => this.syncStackBounds(id, win.getNormalBounds());
-    win.on('will-move', () => this.trackWindowDrag(id));
+    win.on('will-move', () => {
+      this.movedAt = Date.now();
+      this.trackWindowDrag(id);
+    });
     win.on('moved', () => {
+      this.movedAt = Date.now();
       remember();
       this.endWindowDrag(id);
     });
@@ -612,13 +617,22 @@ export class WindowManager {
   //   숨은 창 하나에 note.html 을 미리 불러 두고(메모는 아직 없음), 메모를 열면 그 창에 메모를 넣고 그린 뒤 보여 준다.
   //   쓰면 조금 뒤 새 예비 창을 다시 만든다. 목록 창도 메모 창도 없으면(알림 영역에만) 거둬 메모리를 쓰지 않는다
 
-  scheduleSpare(delay = 1200) {
+  //   예비 창을 만드는 동안(창 · 편집기 불러오기) 메인 프로세스가 잠깐 멈춘다 — 메모를 띄우고 바로 끌면 그때와 겹쳐 창이 툭툭 끊겼다.
+  //   그래서 연 뒤 넉넉히 기다리고, 창을 끄는 중이면 놓고 나서 만든다
+
+  /** 방금(1초 안에) 창을 끌었다 — 메인 프로세스를 오래 붙잡는 일은 미룬다 (예비 창 · 점프 목록) */
+  busy() {
+    return Date.now() - this.movedAt < 1000;
+  }
+
+  scheduleSpare(delay = 3000) {
     clearTimeout(this.spareTimer);
     this.spareTimer = setTimeout(() => this.makeSpare(), delay);
   }
 
   makeSpare() {
     if (this.spare || this.isQuitting() || !this.getVault() || (!this.listWin && this.noteWins.size === 0)) return;
+    if (this.busy()) return this.scheduleSpare(1000);
     const win = new BrowserWindow({
       ...DEFAULT_NOTE_SIZE,
       minWidth: 240,

@@ -1112,6 +1112,7 @@ function updateJumpList() {
   if (process.platform !== 'win32' || SMOKE) return;
   clearTimeout(jumpTimer);
   jumpTimer = setTimeout(() => {
+    if (windowManager.busy()) return updateJumpList(); // 창을 끄는 중이면 놓은 뒤에 (점프 목록 쓰기는 메인 프로세스를 잠깐 멈춘다)
     const recent = (settings.recentOpened ?? []).map((id) => vault?.get(id)).filter(Boolean);
     const prefix = app.isPackaged ? [] : [app.getAppPath()];
     const categories = jumpListCategories(recent, { program: process.execPath, prefix });
@@ -1124,7 +1125,7 @@ function updateJumpList() {
     } catch (err) {
       console.error('점프 목록을 만들지 못했어요', err);
     }
-  }, 800);
+  }, 3000); // 메모를 연 직후(창을 옮기는 때)를 비켜서
 }
 
 function handleLaunch(argv) {
