@@ -1339,7 +1339,7 @@ app.on('web-contents-created', (_e, wc) => {
 app.whenReady().then(async () => {
   if (!gotLock) return;
   app.setAppUserModelId(APP_ID);
-  // 지금 켜진 버전 — MagicKey · MagicOPMS 가 읽어 새 인자를 아는지 본다 (seenVersion 은 목록 창을 열 때만 바뀌어 알림 영역에서 켜면 늦다)
+  // 지금 켜진 버전 — MagicKey · MagicSystem 이 읽어 새 인자를 아는지 본다 (seenVersion 은 목록 창을 열 때만 바뀌어 알림 영역에서 켜면 늦다)
   if (settings.appVersion !== app.getVersion()) {
     settings.appVersion = app.getVersion();
     saveSettings();
