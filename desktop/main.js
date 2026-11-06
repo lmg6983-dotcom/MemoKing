@@ -990,11 +990,23 @@ function tutorialEvent(event) {
 
 // ---------- 전역 단축키 ----------
 
+// MagicKey(따로 설치하는 매직키 앱)의 실행 파일 — MagicKey 가 켜질 때 userData/magickey.json 에 적는다.
+//   있으면 메모킹 매직키 단축키는 잡지 않고 MagicKey 에 넘긴다 (두 앱이 같은 키를 두고 다투지 않게)
+function magicKeyApp() {
+  try {
+    const { exe } = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'magickey.json'), 'utf8'));
+    return typeof exe === 'string' && fs.existsSync(exe) ? exe : null;
+  } catch {
+    return null;
+  }
+}
+
 function shortcutStatus(name) {
+  const handedOff = name === 'magic' && Boolean(magicKeyApp());
   const enabled = name === 'quickMemo'
     ? settings.quickMemo && process.platform === 'win32'
     : name === 'magic'
-      ? normalizeMagicSettings(settings.magic).enabled
+      ? normalizeMagicSettings(settings.magic).enabled && !handedOff
       : true;
   const key = shortcutKey(name);
   return {
@@ -1002,6 +1014,7 @@ function shortcutStatus(name) {
     label: displayAccelerator(key),
     isDefault: key === DEFAULT_SHORTCUTS[name],
     enabled,
+    handedOff,
     registered: Boolean(heldKeys[name]) && globalShortcut.isRegistered(key),
   };
 }
@@ -1063,7 +1076,7 @@ function registerQuickMemoKey() {
 function registerMagicKey() {
   if (heldKeys.magic) globalShortcut.unregister(heldKeys.magic);
   heldKeys.magic = null;
-  if (!normalizeMagicSettings(settings.magic).enabled || shortcutsPaused) return false;
+  if (!normalizeMagicSettings(settings.magic).enabled || shortcutsPaused || magicKeyApp()) return false; // MagicKey 가 있으면 넘긴다
   const key = shortcutKey('magic');
   const ok = globalShortcut.register(key, () => onMagicKey());
   if (!ok) console.warn(`${displayAccelerator(key)}를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
@@ -1127,6 +1140,7 @@ function syncFileIndex() {
 setInterval(() => {
   if (shortcutsPaused) return;
   const before = [shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered, shortcutStatus('list').registered].join();
+  if (heldKeys.magic && magicKeyApp()) registerMagicKey(); // 켜 둔 사이 MagicKey 를 깔았으면 키를 놓는다
   if (shortcutStatus('quickMemo').enabled && !shortcutStatus('quickMemo').registered) registerQuickMemoKey();
   if (shortcutStatus('magic').enabled && !shortcutStatus('magic').registered) registerMagicKey();
   if (shortcutStatus('list').enabled && !shortcutStatus('list').registered) registerListKey();
