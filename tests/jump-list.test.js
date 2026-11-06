@@ -21,8 +21,8 @@ test('점프 목록: 실행 인자 읽기 · 최근 목록', () => {
   assert.deepEqual(launchAction(['x', '--new-memo']), { kind: 'new' });
   assert.equal(launchAction(['x', '--open-memo=../../bad']), null);
   assert.equal(launchAction(['x', '--hidden']), null);
-  assert.deepEqual(launchAction(['x', '--new-memo-file=C:\\Temp\\magickey-1a2b.txt']), { kind: 'newFile', file: 'C:\\Temp\\magickey-1a2b.txt', open: false });
-  assert.deepEqual(launchAction(['x', '--new-memo-file=/tmp/magickey-9.txt', '--open-new']), { kind: 'newFile', file: '/tmp/magickey-9.txt', open: true });
+  assert.deepEqual(launchAction(['x', '--new-memo-file=C:\\Temp\\magickey-1a2b.txt']), { kind: 'newFile', file: 'C:\\Temp\\magickey-1a2b.txt', open: false, remind: false });
+  assert.deepEqual(launchAction(['x', '--new-memo-file=/tmp/magickey-9.txt', '--open-new', '--remind']), { kind: 'newFile', file: '/tmp/magickey-9.txt', open: true, remind: true });
   assert.equal(launchAction(['x', '--new-memo-file=C:\\Users\\me\\secret.txt']), null, 'MagicKey 가 쓴 임시 파일 이름만');
   assert.deepEqual(pushRecent(['a', 'b', 'c'], 'b'), ['b', 'a', 'c']);
   assert.deepEqual(pushRecent(undefined, 'a'), ['a']);

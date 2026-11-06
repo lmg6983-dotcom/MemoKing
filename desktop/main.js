@@ -25,6 +25,7 @@ import { createAiTasks } from '../app/js/core/ai-tasks.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, findRepeat, betterReading, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
+import { remindFromText } from '../app/js/core/date-detect.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { FileIndex, defaultRoots } from './file-index.js';
 import { Updater, isSnoozed } from './updater.js';
@@ -1185,7 +1186,8 @@ function handleLaunch(argv) {
     else windowManager.createListWindow();
   } else if (act.kind === 'newFile') {
     const text = takeMagicKeyFile(act.file);
-    if (text == null || !ipc?.saveMagicMemo({ text, open: act.open }).ok) windowManager.createListWindow();
+    const remind = act.remind && text != null ? remindFromText(text) : null; // 날짜를 못 찾으면 알림 없이 저장
+    if (text == null || !ipc?.saveMagicMemo({ text, open: act.open, remind }).ok) windowManager.createListWindow();
   }
   return true;
 }
