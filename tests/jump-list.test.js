@@ -3,7 +3,28 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { jumpListCategories, launchAction, pushRecent, readMagicKeyFile, LAUNCH } from '../desktop/jump-list.js';
+import { jumpListCategories, launchAction, pushRecent, readMagicKeyFile, runningMagicKey, LAUNCH } from '../desktop/jump-list.js';
+
+test('runningMagicKey: 실행 파일이 있고 그 프로세스가 살아 있을 때만 (꺼 두면 메모킹이 매직키를 다시 잡게)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-run-'));
+  try {
+    const note = path.join(dir, 'magickey.json');
+    const exe = path.join(dir, 'MagicKey.exe');
+    fs.writeFileSync(exe, '');
+    const write = (v) => fs.writeFileSync(note, JSON.stringify(v));
+    write({ exe, pid: process.pid });
+    assert.equal(runningMagicKey(note), exe, '켜져 있음');
+    write({ exe, pid: 2 ** 22 + 12345 });
+    assert.equal(runningMagicKey(note), null, '꺼진 MagicKey (프로세스 없음)');
+    write({ exe });
+    assert.equal(runningMagicKey(note), null, 'pid 를 적지 않은 예전 MagicKey');
+    write({ exe: path.join(dir, '없음.exe'), pid: process.pid });
+    assert.equal(runningMagicKey(note), null, '지운 MagicKey');
+    assert.equal(runningMagicKey(path.join(dir, 'none.json')), null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('readMagicKeyFile: 임시 폴더 바로 아래의 작은 파일만 읽고, 지우지는 않는다', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-tmp-'));

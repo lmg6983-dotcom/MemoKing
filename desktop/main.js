@@ -31,7 +31,7 @@ import { FileIndex, defaultRoots } from './file-index.js';
 import { Updater, isSnoozed } from './updater.js';
 import { recoverOpmsSettings, normalizeOpmsHost } from './opms.js';
 import { comboFromAccelerator, actionUsing } from '../app/js/core/keymap.js';
-import { jumpListCategories, launchAction, pushRecent, readMagicKeyFile } from './jump-list.js';
+import { jumpListCategories, launchAction, pushRecent, readMagicKeyFile, runningMagicKey } from './jump-list.js';
 import { flushOpmsFiles } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { MemoHotkeys } from './memo-hotkeys.js';
@@ -990,16 +990,10 @@ function tutorialEvent(event) {
 
 // ---------- 전역 단축키 ----------
 
-// MagicKey(따로 설치하는 매직키 앱)의 실행 파일 — MagicKey 가 켜질 때 userData/magickey.json 에 적는다.
-//   있으면 메모킹 매직키 단축키는 잡지 않고 MagicKey 에 넘긴다 (두 앱이 같은 키를 두고 다투지 않게)
-function magicKeyApp() {
-  try {
-    const { exe } = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'magickey.json'), 'utf8'));
-    return typeof exe === 'string' && fs.existsSync(exe) ? exe : null;
-  } catch {
-    return null;
-  }
-}
+// 켜져 있는 MagicKey(따로 설치하는 매직키 앱) — MagicKey 가 켜질 때 userData/magickey.json 에 적는다.
+//   있으면 메모킹 매직키 단축키는 잡지 않고 MagicKey 에 넘긴다 (두 앱이 같은 키를 두고 다투지 않게).
+//   MagicKey 를 끄면 1분 점검이 다시 잡는다
+const magicKeyApp = () => runningMagicKey(path.join(app.getPath('userData'), 'magickey.json'));
 
 function shortcutStatus(name) {
   const handedOff = name === 'magic' && Boolean(magicKeyApp());

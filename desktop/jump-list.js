@@ -50,6 +50,25 @@ export function launchAction(argv = []) {
 }
 
 /**
+ * 지금 켜져 있는 MagicKey 의 실행 파일 — MagicKey 가 켜질 때 적는 magickey.json { exe, pid } 에서.
+ *   실행 파일이 있고 그 프로세스가 살아 있을 때만 (꺼 두거나 지웠으면 null → 메모킹이 매직키를 다시 잡는다)
+ */
+export function runningMagicKey(file) {
+  try {
+    const { exe, pid } = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (typeof exe !== 'string' || !fs.existsSync(exe) || !Number.isInteger(pid) || pid <= 0) return null;
+    try {
+      process.kill(pid, 0); // 신호는 보내지 않고 살아 있는지만
+    } catch (err) {
+      if (err.code !== 'EPERM') return null; // EPERM: 살아 있지만 건드릴 권한이 없음
+    }
+    return exe;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * MagicKey 가 임시 폴더에 쓴 글 — 임시 폴더 바로 아래의 1MB 이하 파일만 (아무 파일이나 메모로 읽지 않게, 링크는 따라간 실제 위치로 본다).
  * 지우지 않는다: 저장에 성공한 뒤에 부르는 쪽이 file 을 지운다 (실패하면 글이 남게)
  * @returns {{ text: string, file: string } | null}

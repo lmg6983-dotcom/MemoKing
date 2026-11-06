@@ -9,7 +9,7 @@
 |---|---|---|
 | MagicKey → 메모킹 | 메모 열기 | `MemoKing.exe --open-memo=<id>` |
 | MagicKey · MagicOPMS → 메모킹 | 새 메모 | `MemoKing.exe --new-memo-file=%TEMP%\magickey-*.txt [--open-new] [--remind]` (0.77.0~) |
-| MagicKey → 메모킹 | "여기 있어요" | `%APPDATA%\MemoKing\magickey.json` 의 `exe` 가 있으면 메모킹은 매직키 단축키를 잡지 않아요 (0.77.0~) |
+| MagicKey → 메모킹 | "여기 있어요" | `%APPDATA%\MemoKing\magickey.json` 의 `exe` 가 있고 그 `pid` 가 켜져 있으면 메모킹은 매직키 단축키를 잡지 않아요. MagicKey 를 끄면 1분 안에 다시 잡아요 (0.77.0~) |
 | MagicKey · MagicOPMS → 메모킹 설정 | 읽기만 | `settings.json` 의 `vaultPath` · `seenVersion` · `shortcuts.magic` · `magic` · `opms` · `opmsShapes` |
 | MagicOPMS → 메모킹 기록 | 읽기만 | `opms-files.json` (받은 전자포대 기록 — 같은 서류를 두 번 받지 않게) |
 
