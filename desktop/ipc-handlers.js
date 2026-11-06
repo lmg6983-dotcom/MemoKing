@@ -911,9 +911,14 @@ export function registerIpc(ctx) {
     getAiTagger()?.add([id]);
   }
   ipcMain.handle('magic:run', (_e, payload) => {
+    if (payload?.module !== 'memo' || !activeModules(settings.magic).some((m) => m.id === 'memo')) return { ok: false };
+    return saveMagicMemo(payload);
+  });
+
+  // 매직키 글 → 새 메모 (매직키 창 · MagicKey 앱 공통). open: 만들고 열기, remind: 글 속 날짜로 알림
+  function saveMagicMemo(payload) {
     const vault = getVault();
-    const mods = activeModules(settings.magic);
-    if (!vault || payload?.module !== 'memo' || !mods.some((m) => m.id === 'memo')) return { ok: false };
+    if (!vault) return { ok: false };
     const body = memoBodyFromText(payload.text);
     if (!body) return { ok: false };
     const id = vault.import({ body });
@@ -934,7 +939,7 @@ export function registerIpc(ctx) {
       if (!toast({ memoId: id, kind: 'magic-memo', title: UI.memoCreated, body: `${body.split('\n')[0].slice(0, 40)}${when}\n눌러서 열기`, onClick: () => wm.revealNote(id), onFail: showNow })) showNow();
     }
     return { ok: true, id };
-  });
+  }
 
   // ---------- 창 크기 조정 ----------
   // 본문 복사 (메모 단축키와 같은 글: 제목 줄 빼고, 서식 기호 없이, 줄 앞 띄어쓰기 그대로)
@@ -1579,4 +1584,6 @@ export function registerIpc(ctx) {
     clearTimeout(job.timer);
     job.resolve(data);
   });
+
+  return { saveMagicMemo };
 }

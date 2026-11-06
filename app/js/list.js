@@ -996,7 +996,7 @@ function showShortcuts(sc) {
     $(`sc-${name}`).textContent = st.label;
     $(`sc-${name}`).setAttribute('aria-label', `${name === 'quickMemo' ? '매직 카피' : name === 'magic' ? '매직키' : '메모 목록'} 단축키 ${st.label}, 눌러서 바꾸기`);
     $(`sc-${name}-reset`).hidden = st.isDefault;
-    $(`sc-${name}-note`).textContent = st.enabled && !st.registered ? SC_TAKEN : '';
+    $(`sc-${name}-note`).textContent = st.handedOff ? 'MagicKey 앱이 이 키로 매직키를 열어요. 단축키 · 기능은 MagicKey 의 알림 영역 ✦ 메뉴에서 바꿔요' : st.enabled && !st.registered ? SC_TAKEN : '';
     $(`sc-${name}-note`).classList.toggle('warn', st.enabled && !st.registered);
   }
 }

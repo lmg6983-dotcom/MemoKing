@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findDates, findAllDates } from '../app/js/core/date-detect.js';
+import { findDates, findAllDates, remindFromText } from '../app/js/core/date-detect.js';
+
+test('remindFromText: 첫 줄의 첫 날짜 → 알림 (MagicKey 알림 맞춰 저장)', () => {
+  const now = new Date(2026, 10, 6, 10, 0);
+  const r = remindFromText('내일 오후 3시 치과\n준비물: 보험증', now);
+  assert.deepEqual({ ...r, at: new Date(r.at).getTime() }, { at: new Date(2026, 10, 7, 15, 0).getTime(), hasTime: true, repeat: null, title: '치과' });
+  assert.equal(remindFromText('그냥 메모\n내일 3시', now), null, '둘째 줄 날짜는 보지 않는다');
+  assert.equal(remindFromText('', now), null);
+});
 
 // 기준: 2026-10-10 (토) 오전 10:00
 const NOW = new Date(2026, 9, 10, 10, 0);

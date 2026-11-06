@@ -496,6 +496,13 @@ export function findAllDates(text, { chrono = null, now = new Date(), allowPast 
   return [...ko, ...en].sort((a, b) => a.from - b.from);
 }
 
+/** 첫 줄의 첫 날짜로 맞출 알림 (매직키 "알림 맞춰 저장" · MagicKey --remind) — 날짜가 없으면 null */
+export function remindFromText(text, now = new Date()) {
+  const line = String(text ?? '').split('\n')[0];
+  const w = findDates(line, now)[0];
+  return w ? { at: w.at.toISOString(), hasTime: w.hasTime, repeat: w.repeat ?? null, title: guessTitle(line, w.from, w.to) } : null;
+}
+
 /** 일정 이름 짐작: 그 줄에서 날짜 말을 빼고 남은 말 ("내일 오후 3시 치과" → "치과", "15일까지 보고서 제출" → "보고서 제출") */
 export function guessTitle(line, from, to) {
   const rest = `${line.slice(0, from)} ${line.slice(to)}`

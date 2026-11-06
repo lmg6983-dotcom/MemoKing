@@ -25,12 +25,13 @@ import { createAiTasks } from '../app/js/core/ai-tasks.js';
 import { replaceTranscript } from '../app/js/core/voice-card.js';
 import { popupToEntry, kakaoEntry, popupAppName, findRepeat, betterReading, POPUP_APPS, correctTitle, knownNames } from '../app/js/core/popup-notify.js';
 import { normalizeMagicSettings, activeModules, magicChips } from '../app/js/core/magic-modules.js';
+import { remindFromText } from '../app/js/core/date-detect.js';
 import { normalizeShortcuts, isValidAccelerator, displayAccelerator, withShortcuts, DEFAULT_SHORTCUTS, SHORTCUT_NAMES } from '../app/js/core/accelerators.js';
 import { FileIndex, defaultRoots } from './file-index.js';
 import { Updater, isSnoozed } from './updater.js';
 import { recoverOpmsSettings, normalizeOpmsHost } from './opms.js';
 import { comboFromAccelerator, actionUsing } from '../app/js/core/keymap.js';
-import { jumpListCategories, launchAction, pushRecent } from './jump-list.js';
+import { jumpListCategories, launchAction, pushRecent, readMagicKeyFile, runningMagicKey } from './jump-list.js';
 import { flushOpmsFiles } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { MemoHotkeys } from './memo-hotkeys.js';
@@ -989,11 +990,17 @@ function tutorialEvent(event) {
 
 // ---------- 전역 단축키 ----------
 
+// 켜져 있는 MagicKey(따로 설치하는 매직키 앱) — MagicKey 가 켜질 때 userData/magickey.json 에 적는다.
+//   있으면 메모킹 매직키 단축키는 잡지 않고 MagicKey 에 넘긴다 (두 앱이 같은 키를 두고 다투지 않게).
+//   MagicKey 를 끄면 1분 점검이 다시 잡는다
+const magicKeyApp = () => runningMagicKey(path.join(app.getPath('userData'), 'magickey.json'));
+
 function shortcutStatus(name) {
+  const handedOff = name === 'magic' && Boolean(magicKeyApp());
   const enabled = name === 'quickMemo'
     ? settings.quickMemo && process.platform === 'win32'
     : name === 'magic'
-      ? normalizeMagicSettings(settings.magic).enabled
+      ? normalizeMagicSettings(settings.magic).enabled && !handedOff
       : true;
   const key = shortcutKey(name);
   return {
@@ -1001,6 +1008,7 @@ function shortcutStatus(name) {
     label: displayAccelerator(key),
     isDefault: key === DEFAULT_SHORTCUTS[name],
     enabled,
+    handedOff,
     registered: Boolean(heldKeys[name]) && globalShortcut.isRegistered(key),
   };
 }
@@ -1062,7 +1070,7 @@ function registerQuickMemoKey() {
 function registerMagicKey() {
   if (heldKeys.magic) globalShortcut.unregister(heldKeys.magic);
   heldKeys.magic = null;
-  if (!normalizeMagicSettings(settings.magic).enabled || shortcutsPaused) return false;
+  if (!normalizeMagicSettings(settings.magic).enabled || shortcutsPaused || magicKeyApp()) return false; // MagicKey 가 있으면 넘긴다
   const key = shortcutKey('magic');
   const ok = globalShortcut.register(key, () => onMagicKey());
   if (!ok) console.warn(`${displayAccelerator(key)}를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
@@ -1126,6 +1134,7 @@ function syncFileIndex() {
 setInterval(() => {
   if (shortcutsPaused) return;
   const before = [shortcutStatus('quickMemo').registered, shortcutStatus('magic').registered, shortcutStatus('list').registered].join();
+  if (heldKeys.magic && magicKeyApp()) registerMagicKey(); // 켜 둔 사이 MagicKey 를 깔았으면 키를 놓는다
   if (shortcutStatus('quickMemo').enabled && !shortcutStatus('quickMemo').registered) registerQuickMemoKey();
   if (shortcutStatus('magic').enabled && !shortcutStatus('magic').registered) registerMagicKey();
   if (shortcutStatus('list').enabled && !shortcutStatus('list').registered) registerListKey();
@@ -1182,6 +1191,11 @@ function handleLaunch(argv) {
     else windowManager.createNote({});
   } else if (act.kind === 'memo') {
     if (vault?.get(act.id)) windowManager.revealNote(act.id);
+    else windowManager.createListWindow();
+  } else if (act.kind === 'newFile') {
+    const got = readMagicKeyFile(act.file);
+    const remind = act.remind && got ? remindFromText(got.text) : null; // 날짜를 못 찾으면 알림 없이 저장
+    if (got && ipc?.saveMagicMemo({ text: got.text, open: act.open, remind }).ok) fs.rmSync(got.file, { force: true }); // 저장한 뒤에야 지운다
     else windowManager.createListWindow();
   }
   return true;
@@ -1260,6 +1274,7 @@ app.on('second-instance', (_e, argv) => {
 // 오른쪽 클릭 메뉴 (모든 창 — 메모 글 · 글 칸 · 링크 · 그림 · 맞춤법). 무엇을 넣는지는 context-menu.js
 // ---------- 오류 기록 · 문제 보내기 (desktop/error-log.js — 이 PC 에만) ----------
 let errorLog = null;
+let ipc = null; // registerIpc 가 돌려준 것 (saveMagicMemo)
 const errors = () => (errorLog ??= createErrorLog(path.join(app.getPath('userData'), 'logs', 'memoking.log')));
 const consoleError = console.error.bind(console);
 // 글로 바꾸다 오류가 나도(서로를 가리키는 객체 등) 기록하던 곳이 멈추지 않게
@@ -1365,7 +1380,7 @@ app.whenReady().then(async () => {
       saveSettings();
     },
   });
-  registerIpc({
+  ipc = registerIpc({
     setAppMode,
     setWorkLife,
     setWorkHours,
@@ -1551,7 +1566,8 @@ app.whenReady().then(async () => {
 
   const launched = launchAction(process.argv);
   if (!HIDDEN_START || !vault) {
-    if (launched?.kind !== 'memo' || !vault?.get(launched.id)) windowManager.createListWindow();
+    // 메모 하나를 열거나(점프 목록) MagicKey 가 새 메모를 만들 때는 목록 창을 띄우지 않는다
+    if (!(launched?.kind === 'memo' && vault?.get(launched.id)) && !(launched?.kind === 'newFile' && vault)) windowManager.createListWindow();
   }
   for (const id of [...settings.openNotes]) {
     // 테이프 메모는 바탕화면 층에 조용히 (로그인 때 쓰던 앱의 포커스를 빼앗지 않게)

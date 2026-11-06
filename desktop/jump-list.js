@@ -1,9 +1,15 @@
 // Windows 작업 표시줄 아이콘을 오른쪽 클릭했을 때의 목록 (점프 목록)
 //   "작업": 메모 목록 열기 · 새 메모 / "최근에 연 메모": 최근에 연 메모들 (누르면 그 메모가 뜬다)
 //   목록의 항목은 메모킹을 인자와 함께 다시 실행하는 것 — 이미 켜져 있으면 second-instance 로 그 인자가 전해진다
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { UI } from '../app/js/core/ui-text.js';
 
-export const LAUNCH = { list: '--open-list', newMemo: '--new-memo', memo: '--open-memo=' };
+//   newMemoFile: MagicKey(따로 설치하는 매직키 앱)가 쓴 글로 새 메모 — 글은 임시 폴더의 magickey-*.txt 로 (명령줄 길이 · 따옴표 걱정 없게)
+//     openNew 를 더하면 만든 메모를 열고, remind 를 더하면 첫 줄의 날짜로 알림도 맞춘다
+export const LAUNCH = { list: '--open-list', newMemo: '--new-memo', memo: '--open-memo=', newMemoFile: '--new-memo-file=', openNew: '--open-new', remind: '--remind' };
+const MAGICKEY_FILE = /^magickey-[\w-]{1,64}\.txt$/i;
 const MAX_RECENT = 8;
 const MAX_TITLE = 40;
 
@@ -36,9 +42,47 @@ export function jumpListCategories(recent, { program, prefix = [] }) {
 export function launchAction(argv = []) {
   const memo = argv.find((a) => typeof a === 'string' && a.startsWith(LAUNCH.memo))?.slice(LAUNCH.memo.length);
   if (memo && /^[\w-]{1,80}$/.test(memo)) return { kind: 'memo', id: memo };
+  const file = argv.find((a) => typeof a === 'string' && a.startsWith(LAUNCH.newMemoFile))?.slice(LAUNCH.newMemoFile.length);
+  if (file && MAGICKEY_FILE.test(file.split(/[\\/]/).pop())) return { kind: 'newFile', file, open: argv.includes(LAUNCH.openNew), remind: argv.includes(LAUNCH.remind) };
   if (argv.includes(LAUNCH.newMemo)) return { kind: 'new' };
   if (argv.includes(LAUNCH.list)) return { kind: 'list' };
   return null;
+}
+
+/**
+ * 지금 켜져 있는 MagicKey 의 실행 파일 — MagicKey 가 켜질 때 적는 magickey.json { exe, pid } 에서.
+ *   실행 파일이 있고 그 프로세스가 살아 있을 때만 (꺼 두거나 지웠으면 null → 메모킹이 매직키를 다시 잡는다)
+ */
+export function runningMagicKey(file) {
+  try {
+    const { exe, pid } = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (typeof exe !== 'string' || !fs.existsSync(exe) || !Number.isInteger(pid) || pid <= 0) return null;
+    try {
+      process.kill(pid, 0); // 신호는 보내지 않고 살아 있는지만
+    } catch (err) {
+      if (err.code !== 'EPERM') return null; // EPERM: 살아 있지만 건드릴 권한이 없음
+    }
+    return exe;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * MagicKey 가 임시 폴더에 쓴 글 — 임시 폴더 바로 아래의 1MB 이하 파일만 (아무 파일이나 메모로 읽지 않게, 링크는 따라간 실제 위치로 본다).
+ * 지우지 않는다: 저장에 성공한 뒤에 부르는 쪽이 file 을 지운다 (실패하면 글이 남게)
+ * @returns {{ text: string, file: string } | null}
+ */
+export function readMagicKeyFile(file, tmp = os.tmpdir()) {
+  try {
+    const real = fs.realpathSync(file);
+    const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
+    if (!same(path.dirname(real), fs.realpathSync(tmp)) || fs.statSync(real).size > 1024 * 1024) return null;
+    return { text: fs.readFileSync(real, 'utf8'), file: real };
+  } catch (err) {
+    console.warn('MagicKey 글을 읽지 못했어요', err.message);
+    return null;
+  }
 }
 
 /** 최근에 연 메모 목록에 맨 앞으로 (중복 없이, 개수 제한) */
