@@ -926,6 +926,11 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 @media (hover: hover) and (pointer: fine) { .kbd-btn:hover { border-color: var(--text-strong); } }
 .kbd-btn.capturing { border-color: var(--brand-yellow); box-shadow: 0 0 0 2px var(--brand-yellow); color: var(--text); }
 .sc-note { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+/* 이름 · 한 줄 설명 왼쪽, 단추 오른쪽 (단축키 › 메모 목록 열기 · 함께 쓰는 앱) */
+.setting-row.split { cursor: default; }
+.setting-row.split > span { flex: 1; min-width: 0; }
+.setting-row.split > :is(.kbd-btn, .btn) { flex: none; }
+.setting-row.split a.btn { height: 34px; color: var(--text); text-decoration: none; }
 .sc-note:empty { display: none; }
 .sc-note.warn { color: var(--danger); }
 

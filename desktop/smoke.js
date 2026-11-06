@@ -1694,11 +1694,11 @@ export async function runSmoke({
         check('단축키 바꾸기: 다른 앱이 쓰는 키면 바꾸지 않고 알림', appSettings().shortcuts.list.key === 'Control+Alt+`' && /다른 앱이 이미 쓰고/.test(takenNote), takenNote);
       }
     }
-    // MagicKey 칸: 매직키 · OPMS 는 따로 설치하는 앱 안내만 (메모킹 매직키 · OPMS 설정은 없음)
+    // 함께 쓰는 앱 칸: MagicKey · MagicSystem 받기 링크만 (메모킹 매직키 · OPMS 설정은 없음), 메모 목록 단축키는 단축키 칸에
     {
-      const sec = await listJs(`(() => { const h = document.getElementById('set-magic'); const sec = h.closest('section'); return { title: h.textContent, links: [...sec.querySelectorAll('a')].map((a) => a.href), old: !!document.getElementById('magic-enabled') || !!document.getElementById('opms-setup') || !!document.getElementById('sc-magic') }; })()`);
-      check('설정 MagicKey: MagicKey · MagicSystem 안내 링크만, 예전 매직키 · OPMS 설정 없음',
-        sec.title === 'MagicKey' && sec.links.some((u) => u.includes('/MagicKey/')) && sec.links.some((u) => u.includes('/MagicSystem/')) && !sec.old, JSON.stringify(sec));
+      const sec = await listJs(`(() => { const h = document.getElementById('set-apps'); const sec = h.closest('section'); return { links: [...sec.querySelectorAll('a')].map((a) => a.href), listKey: document.getElementById('sc-list').closest('section').querySelector('h3').id, old: !!document.getElementById('set-magic') || !!document.getElementById('magic-enabled') || !!document.getElementById('opms-setup') || !!document.getElementById('sc-magic') }; })()`);
+      check('설정 함께 쓰는 앱: MagicKey · MagicSystem 받기 링크, 메모 목록 단축키는 단축키 칸, 예전 매직키 · OPMS 설정 없음',
+        sec.links.some((u) => u.includes('/MagicKey/')) && sec.links.some((u) => u.includes('/MagicSystem/')) && sec.listKey === 'set-keys' && !sec.old, JSON.stringify(sec));
     }
     // AI 비서 연결 (MCP): 연결 → Claude 설정 파일에 메모킹이 적힘(다른 서버는 그대로) → 적힌 명령으로 띄우면 도구가 보임 → 끊기
     {
