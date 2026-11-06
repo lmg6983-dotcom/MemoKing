@@ -146,14 +146,14 @@
       <h2>설정</h2>
       <button type="button" class="icon-btn dialog-x" data-dialog-close title="닫기 (Esc)" aria-label="설정 닫기"><svg><use href="#i-close"/></svg></button>
     </header>
-    <!-- 메모킹만의 것부터: 앱 상태 → 바로가기 → 매직 카피 · MagicKey → 동기화 → AI → 보기 · 녹음 · 단축키 → 한 번 정하고 마는 것(폴더 · 휴지통) → 다른 기기에 설치 -->
+    <!-- 메모킹만의 것부터: 앱 상태 → 바로가기 → 매직 카피 → 동기화 → AI → 보기 · 녹음 · 단축키(전역 · 메모 창) → 한 번 정하고 마는 것(폴더 · 휴지통) → 다른 기기에 설치 → 따로 설치하는 앱(MagicKey · MagicSystem) -->
     <div class="drive-box app-box" id="app-box" aria-label="메모킹 버전과 업데이트">
       <svg class="drive-box-icon"><use href="#i-crown"/></svg>
       <div class="drive-box-text"><b>메모킹 <span id="update-current"></span></b><small id="update-note" role="status"></small></div>
       <button type="button" class="btn update-btn" id="update-check" data-state="idle">업데이트 확인</button>
     </div>
     <nav class="set-jump" aria-label="설정 바로가기">
-      <a href="#set-magic">MagicKey</a><a href="#set-drive">동기화</a><a href="#set-local-ai" data-alt="set-ai">AI</a><a href="#set-view">보기</a><a href="#set-stt">녹음</a><a href="#set-storage">저장</a><a href="#set-phone">설치</a>
+      <a href="#set-drive">동기화</a><a href="#set-local-ai" data-alt="set-ai">AI</a><a href="#set-view">보기</a><a href="#set-stt">녹음</a><a href="#set-keys">단축키</a><a href="#set-storage">저장</a><a href="#set-phone">설치</a><a href="#set-apps">다른 앱</a>
     </nav>
     <section class="set-sec" aria-labelledby="set-daily">
       <h3 class="set-title" id="set-daily">자주 쓰는 기능</h3>
@@ -175,16 +175,6 @@
         <input type="checkbox" id="auto-start" class="switch" role="switch">
         <span>PC를 켜면 메모킹 자동 실행 <small id="auto-start-note"></small></span>
       </label>
-    </section>
-    <section class="set-sec" aria-labelledby="set-magic">
-      <h3 class="set-title" id="set-magic">MagicKey</h3>
-      <p class="hint small">어디서든 입력창을 띄워 메모하고 찾는 매직키는 따로 설치하는 <a href="https://github.com/lmg6983-dotcom/MagicKey/releases/latest" target="_blank" rel="noopener">MagicKey</a> 앱이 맡아요. 단축키 · 기능은 MagicKey 의 알림 영역 ✦ 메뉴에서 바꿔요. OPMS 검색은 <a href="https://github.com/lmg6983-dotcom/MagicSystem/releases/latest" target="_blank" rel="noopener">MagicSystem</a> 앱에서 해요.</p>
-      <div class="shortcut-row" data-shortcut="list">
-        <span class="shortcut-label">메모 목록 단축키</span>
-        <button type="button" class="kbd-btn" id="sc-list" aria-describedby="sc-list-note">Ctrl+Alt+`</button>
-        <button type="button" class="link-btn sc-reset" id="sc-list-reset" hidden>기본값으로</button>
-        <small class="sc-note" id="sc-list-note" role="status"></small>
-      </div>
     </section>
     <section class="set-sec" aria-labelledby="set-drive">
       <h3 class="set-title" id="set-drive">Google Drive 동기화</h3>
@@ -309,6 +299,11 @@
     </section>
     <section class="set-sec" aria-labelledby="set-keys">
       <h3 class="set-title" id="set-keys">단축키</h3>
+      <div class="setting-row split" data-shortcut="list">
+        <span>메모 목록 열기 <small>어디서든 이 키로 메모 목록을 띄워요</small><small class="sc-note" id="sc-list-note" role="status"></small></span>
+        <button type="button" class="link-btn sc-reset" id="sc-list-reset" hidden>기본값으로</button>
+        <button type="button" class="kbd-btn" id="sc-list" aria-describedby="sc-list-note">Ctrl+Alt+`</button>
+      </div>
       <div class="setting-row">
         <span>메모 창 단축키 <small>PDF로 저장, 서식, 왕관 같은 기능의 키를 바꿔요</small></span>
         <button type="button" class="btn" id="keymap-open">단축키 설정하기</button>
@@ -367,6 +362,18 @@
         <button id="pc-open" class="link-btn">브라우저로 열기</button>
         <button id="share-both" class="link-btn">두 링크 함께 복사</button>
         <small class="sc-note" id="pc-note" role="status"></small>
+      </div>
+    </section>
+    <!-- 메모킹 설정이 아니라 따로 설치하는 짝 앱: 맨 아래에 받기 링크만 (단축키 · 기능은 그 앱의 알림 영역 메뉴에서) -->
+    <section class="set-sec" aria-labelledby="set-apps">
+      <h3 class="set-title" id="set-apps">함께 쓰는 앱 <small>따로 설치해요. 설정은 각 앱의 알림 영역 메뉴에서</small></h3>
+      <div class="setting-row split">
+        <span>MagicKey <small>어디서든 Ctrl+Alt+Space 로 메모하고, 메모 · 파일 · 앱을 찾아요</small></span>
+        <a class="btn" href="https://github.com/lmg6983-dotcom/MagicKey/releases/latest" target="_blank" rel="noopener" aria-label="MagicKey 받기">받기</a>
+      </div>
+      <div class="setting-row split">
+        <span>MagicSystem <small>OPMS 사건을 찾아요 (사내망)</small></span>
+        <a class="btn" href="https://github.com/lmg6983-dotcom/MagicSystem/releases/latest" target="_blank" rel="noopener" aria-label="MagicSystem 받기">받기</a>
       </div>
     </section>
     <footer class="set-foot">
