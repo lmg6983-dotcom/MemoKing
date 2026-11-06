@@ -1,6 +1,6 @@
 # ✦ 메모킹 × MagicKey · 🏢 MagicSystem
 
-매직키는 따로 설치하는 [MagicKey](https://github.com/lmg6983-dotcom/MagicKey) 앱으로, OPMS 검색은 [MagicSystem](https://github.com/lmg6983-dotcom/MagicSystem) 앱으로 옮겨 가요.
+매직키는 따로 설치하는 [MagicKey](https://github.com/lmg6983-dotcom/MagicKey) 앱이, OPMS 검색은 [MagicSystem](https://github.com/lmg6983-dotcom/MagicSystem) 앱이 맡아요 (메모킹 0.78.0 부터 메모킹 안의 매직키 · OPMS 는 없어요).
 세 앱은 따로 돌아가고, **명령줄 인자**와 **읽기만 하는 파일**로만 이야기해요. 메모 파일을 쓰는 건 메모킹뿐이에요.
 
 ## 🔌 메모킹이 지키는 약속
@@ -9,7 +9,7 @@
 |---|---|---|
 | MagicKey → 메모킹 | 메모 열기 | `MemoKing.exe --open-memo=<id>` |
 | MagicKey · MagicSystem → 메모킹 | 새 메모 | `MemoKing.exe --new-memo-file=%TEMP%\magickey-*.txt [--open-new] [--remind]` (0.77.0~) |
-| MagicKey → 메모킹 | "여기 있어요" | `%APPDATA%\MemoKing\magickey.json` 의 `exe` 가 있고 그 `pid` 가 켜져 있으면 메모킹은 매직키 단축키를 잡지 않아요. MagicKey 를 끄면 1분 안에 다시 잡아요 (0.77.0~) |
+| MagicKey → 메모킹 | "여기 있어요" | `%APPDATA%\MemoKing\magickey.json` 의 `exe` 가 있고 그 `pid` 가 켜져 있으면 메모킹은 매직키 단축키를 잡지 않아요 (0.77.x). 0.78.0 부터 메모킹은 매직키 단축키를 아예 잡지 않고, 메모 단축키(Ctrl+Alt+1~9)가 그 키를 쓰지 않게만 비워 둬요 |
 | MagicKey · MagicSystem → 메모킹 설정 | 읽기만 | `settings.json` 의 `vaultPath` · `appVersion`(0.77.1~, 켤 때마다) · `seenVersion` · `shortcuts.magic` · `magic` · `opms` · `opmsShapes` |
 | MagicSystem → 메모킹 기록 | 읽기만 | `opms-files.json` (받은 전자포대 기록 — 같은 서류를 두 번 받지 않게) |
 
@@ -19,5 +19,5 @@
 
 ## 📦 릴리스 순서
 
-MagicKey · MagicSystem 을 먼저, 메모킹 0.77.0 을 그다음에 내요. 메모킹은 자동 업데이트로 바로 퍼지지만,
-MagicKey 가 없는 사람은 지금처럼 메모킹 매직키를 그대로 써요. 매직키 · OPMS 코드는 몇 버전 뒤에 걷어내요.
+1. **0.77.x** — MagicKey · MagicSystem 을 먼저, 메모킹 0.77.0 을 그다음에. MagicKey 가 없는 사람은 메모킹 매직키를 그대로 썼어요.
+2. **0.78.0** — 메모킹에서 매직키 창 · 모두 찾기 창 · 파일 목록 · OPMS 를 걷어내요. 설정의 `magic` · `shortcuts.magic` · `opms` · `opmsShapes` 와 `opms-files.json` 은 지우지 않고 그대로 둬요 (MagicKey · MagicSystem 이 처음 켜질 때 읽어 가게).

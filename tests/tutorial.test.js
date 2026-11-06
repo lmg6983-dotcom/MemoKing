@@ -32,10 +32,10 @@ test('직접 해 보기: 단계 시작 때보다 늘었을 때만', () => {
 });
 
 test('다음에 해 볼게요(next) · 직접 해 냄(advance) 모두 다음 단계로, 끝내기는 -1', () => {
-  const i = TUTORIAL_STEPS.findIndex((s) => s.id === 'magic');
+  const i = TUTORIAL_STEPS.findIndex((s) => s.id === 'quick');
   assert.equal(advanceTutorial(i, 'next'), i + 1);
-  assert.equal(advanceTutorial(i, 'magic-tried'), i + 1);
-  assert.equal(advanceTutorial(i, 'quick-memo'), i, '다른 단계의 일은 무시');
+  assert.equal(advanceTutorial(i, 'quick-memo'), i + 1);
+  assert.equal(advanceTutorial(i, 'capture-done'), i, '다른 단계의 일은 무시');
   assert.equal(advanceTutorial(i, 'skip'), -1);
   const m = MOBILE_TUTORIAL_STEPS.findIndex((s) => s.id === 'annotate');
   assert.equal(MOBILE_TUTORIAL_STEPS[advanceTutorial(m, 'note-closed', MOBILE_TUTORIAL_STEPS)].win, 'list', '메모를 먼저 닫으면 목록 단계로');
@@ -54,7 +54,7 @@ test('옮기기 전 예시 목록: PC·휴대폰 모두 옮기기 단계에서 �
 test('기능이 꺼져 있으면(needs) 직접 해 보기 없이 안내(offText)만, 켜져 있으면 그대로', () => {
   for (const steps of [TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS]) {
     for (const s of steps.filter((x) => x.needs)) {
-      assert.ok(['workLife', 'quickMemo', 'magic', 'history'].includes(s.needs), s.id);
+      assert.ok(['workLife', 'quickMemo', 'history'].includes(s.needs), s.id);
       assert.ok(s.offText, `${s.id} 꺼져 있을 때 안내`);
       const off = tutorialStepFor(s, () => false);
       assert.equal(off.advance, undefined, `${s.id}: 꺼져 있으면 기다리지 않음`);
@@ -70,10 +70,11 @@ test('기능이 꺼져 있으면(needs) 직접 해 보기 없이 안내(offText)
   assert.equal(tutorialStepFor(plain, () => false), plain, 'needs가 없으면 늘 그대로');
 });
 
-test('PC: 매직키 · Life/Work · 목록 왕관 · 매직 카피 · 화면 자르기는 직접 해 보기', () => {
+test('PC: Life/Work · 목록 왕관 · 매직 카피 · 화면 자르기는 직접 해 보기', () => {
   const by = Object.fromEntries(TUTORIAL_STEPS.map((s) => [s.id, s]));
-  assert.deepEqual(['mode', 'list-crown', 'quick', 'capture', 'magic'].map((id) => by[id]?.advance),
-    ['mode-switched', 'list-crown-on', 'quick-memo', 'capture-done', 'magic-tried']);
+  assert.deepEqual(['mode', 'list-crown', 'quick', 'capture'].map((id) => by[id]?.advance),
+    ['mode-switched', 'list-crown-on', 'quick-memo', 'capture-done']);
+  assert.equal(by.magic, undefined, '매직키는 MagicKey 앱으로 옮겨 감');
   const m = Object.fromEntries(MOBILE_TUTORIAL_STEPS.map((s) => [s.id, s]));
   assert.equal(m.mode?.advance, 'mode-switched', '휴대폰 Life/Work');
   assert.ok(m.move && m.annotate && m.voice, '휴대폰: 다이얼 · 글 위에 그리기 · 말로 메모');
@@ -82,7 +83,7 @@ test('PC: 매직키 · Life/Work · 목록 왕관 · 매직 카피 · 화면 자
   for (const s of [...TUTORIAL_STEPS, ...MOBILE_TUTORIAL_STEPS]) assert.doesNotMatch(`${s.text} ${s.offText ?? ''}`, /추억|(?<!알림 )보관함/, `${s.id}: 지금 이름(회상 · 알림 보관함)으로`);
 });
 
-test('묶음(chapter): 모든 단계에 있고 같은 묶음은 붙어 있음 · 말풍선 머리에 "목록 2/7"', () => {
+test('묶음(chapter): 모든 단계에 있고 같은 묶음은 붙어 있음 · 말풍선 머리에 "목록 1/6"', () => {
   for (const steps of [TUTORIAL_STEPS, MOBILE_TUTORIAL_STEPS]) {
     const seen = [];
     for (const [i, s] of steps.entries()) {
@@ -98,7 +99,7 @@ test('묶음(chapter): 모든 단계에 있고 같은 묶음은 붙어 있음 ·
   const i = TUTORIAL_STEPS.findIndex((s) => s.id === 'quick');
   const c = tutorialChapter(TUTORIAL_STEPS, i);
   assert.equal(c.name, '메모킹만의 기능');
-  assert.equal(c.at, 2);
+  assert.equal(c.at, 1);
   assert.equal(c.of, TUTORIAL_STEPS.filter((s) => s.chapter === '메모킹만의 기능').length);
 });
 
@@ -132,6 +133,6 @@ test('연습 공간 예시 사진을 못 읽어도 예시 메모는 모두 들�
 });
 
 test('PC 튜토리얼은 다른 메모 앱에 없는 것만 (일반 메모 기능은 뺌)', () => {
-  assert.deepEqual(TUTORIAL_STEPS.map((s) => s.id), ['welcome', 'magic', 'quick', 'capture', 'list-crown', 'history', 'mode', 'done']);
+  assert.deepEqual(TUTORIAL_STEPS.map((s) => s.id), ['welcome', 'quick', 'capture', 'list-crown', 'history', 'mode', 'done']);
   assert.ok(TUTORIAL_STEPS.every((s) => s.win === 'list'), '메모를 만들지 않고 목록 창에서만');
 });

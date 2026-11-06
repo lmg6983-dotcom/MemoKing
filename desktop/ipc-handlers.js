@@ -1,18 +1,13 @@
 // IPC 라우팅 및 핸들러 등록 — 렌더러와 메인 프로세스 간 통신 채널 바인딩.
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, screen, shell } from 'electron';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { collectTags } from '../app/js/core/tags.js';
 import { autoTagsFor } from '../app/js/core/auto-tags.js';
 import { suggestTagsFor } from '../app/js/core/tag-suggest.js';
 import { newLockSession, openLock, isLockedBody } from '../app/js/core/memo-lock.js';
 import { normalizeReminder, eventFromDate, describeReminder } from '../app/js/core/reminders.js';
-import { looksLikeOpmsQuery, learnShapes } from '../app/js/core/opms-search.js';
-import { activeModules, memoBodyFromText, appendToBody, magicChips, toggleMagicChip, reorderMagicChips, normalizeMagicSettings } from '../app/js/core/magic-modules.js';
-import { WEB_ENGINES, AI_SITES, siteLink, siteUrl } from '../app/js/core/magic-tools.js';
-import { searchMemos } from '../app/js/core/memo-search.js';
-import { isOpenableFile, foreignSummary, caseMemoMarkdown, normalizeOpmsHost } from './opms.js';
+import { memoBodyFromText, appendToBody } from '../app/js/core/memo-text.js';
 import { isBlankBody } from '../app/js/core/memo-file.js';
 import { pdfFileName } from '../app/js/core/pdf-page.js';
 import { TUTORIAL_EVENTS } from '../app/js/core/tutorial.js';
@@ -71,11 +66,9 @@ export function registerIpc(ctx) {
     setQuickMemo,
     setShortcut,
     pauseShortcuts,
-    setMagicSettings,
     mcpConnect,
     mcpStatus,
     mcpSnippet,
-    getFileIndex,
     startTutorial,
     tutorialPayload,
     getUpdater,
@@ -556,7 +549,6 @@ export function registerIpc(ctx) {
     saveSettings();
     return settings.magicPolish;
   });
-  ipcMain.handle('app:set-magic', (_e, next) => setMagicSettings({ ...next, order: settings.magic?.order })); // 순서는 매직키 창에서만 바꾼다 (열어 둔 설정 창의 지난 순서로 덮지 않게)
   ipcMain.handle('mcp:connect', (_e, on) => mcpConnect(on !== false));
   ipcMain.handle('mcp:copy', () => {
     clipboard.writeText(mcpSnippet());
@@ -568,322 +560,7 @@ export function registerIpc(ctx) {
     return mcpStatus();
   });
 
-  // ---------- 매직키 ----------
-  const magicModuleList = () => magicChips(settings.magic).map(({ id, name, chip, description, on }) => ({ id, name, chip, description, on }));
-  ipcMain.handle('magic:modules', () => magicModuleList());
-  ipcMain.handle('magic:toggle-module', (_e, id) => {
-    setMagicSettings(toggleMagicChip(settings.magic, String(id)));
-    return magicModuleList();
-  });
-  ipcMain.handle('magic:reorder-modules', (_e, ids) => {
-    setMagicSettings(reorderMagicChips(settings.magic, Array.isArray(ids) ? ids.map(String) : []));
-    return magicModuleList();
-  });
-  ipcMain.on('magic:close', () => {
-    if (wm.magicWin && !wm.magicWin.isDestroyed()) wm.magicWin.hide();
-  });
-  let reindexTimer = null;
-  const notifyIndex = (q) => {
-    if (wm.magicWin && !wm.magicWin.isDestroyed() && wm.magicWin.isVisible()) wm.magicWin.webContents.send('magic:index-updated', { query: q });
-  };
-  async function autoReindex(fileIndex, q) {
-    const wrapperDir = wm.opmsSettings().wrapperDir;
-    let docsWrapper = '';
-    let downloadsDir = '';
-    try {
-      docsWrapper = path.join(app.getPath('documents'), '전자포대');
-      downloadsDir = app.getPath('downloads');
-    } catch {}
-    const targetDirs = [wrapperDir, docsWrapper, downloadsDir, getVault()?.root]
-      .filter((d) => d && typeof d === 'string' && (!SMOKE || d === wrapperDir) && fs.existsSync(d));
-    const { added } = await fileIndex.triggerAutoReindex({ targetDirs, onRebuildComplete: () => notifyIndex(q) }).catch(() => ({ added: 0 }));
-    if (added > 0) notifyIndex(q);
-  }
-  ipcMain.handle('magic:search', async (_e, query) => {
-    const vault = getVault();
-    const mods = new Set(activeModules(settings.magic).map((m) => m.id));
-    const q = String(query ?? '').slice(0, 200);
-    if (!q.trim()) {
-      const recent = mods.has('notes') && vault ? vault.list().slice(0, 4).map((m) => ({ id: m.id, title: m.title, snippet: (m.preview ?? '').split('\n')[0], color: m.color, updated: m.updated })) : [];
-      return { notes: recent, recent: true, folders: [], files: [], index: getFileIndex()?.status() ?? null };
-    }
-    const memos = mods.has('notes') && vault ? vault.searchable() : [];
-    const updatedOf = new Map(memos.map((m) => [m.id, m.updated]));
-    // 한 번에 앞 5건 + 맞는 것 전부의 개수 — 예전에는 개수를 세려고 한 번 더 찾았다
-    const found = searchMemos(memos, q, 5);
-    const notes = found.map((n) => ({ ...n, updated: updatedOf.get(n.id) }));
-    const notesTotal = found.total;
-    let apps = [];
-    let folders = [];
-    let files = [];
-    let totalApps = 0;
-    let totalFolders = 0;
-    let totalFiles = 0;
-    const fileIndex = getFileIndex();
-    const hasApps = mods.has('apps');
-    const hasFiles = mods.has('files');
-    if ((hasApps || hasFiles) && fileIndex) {
-      ({ apps, folders, files, totalApps, totalFolders, totalFiles } = fileIndex.searchSplit(q, {
-        apps: hasApps ? 4 : 0,
-        folders: hasFiles ? 3 : 0,
-        files: hasFiles ? 6 : 0,
-      }));
-
-      // 관리번호나 폴더가 안 찾아지면 자동 재색인 — 치는 동안이 아니라 손을 멈춘 뒤(0.6초)에, 훑기는 비동기로 (입력이 끊기지 않게).
-      //   새로 찾은 것이 있거나 전체 재색인이 끝나면 매직키 창이 다시 찾는다 (magic:index-updated)
-      clearTimeout(reindexTimer);
-      if (hasFiles && folders.length === 0 && q.trim().length >= 2) {
-        reindexTimer = setTimeout(() => autoReindex(fileIndex, q), 600);
-      }
-
-      wm.lastFileResults = new Set([...apps, ...folders, ...files].map((f) => f.path));
-      const home = os.homedir();
-      const shown = (p) => (p.toLowerCase().startsWith(home.toLowerCase()) ? `~${p.slice(home.length)}` : p);
-      const withIcon = (list) => Promise.all(list.map(async (f) => ({ ...f, where: shown(path.dirname(f.path)), icon: await wm.fileIcon(f.path, f.isDir) })));
-      [apps, folders, files] = await Promise.all([withIcon(apps), withIcon(folders), withIcon(files)]);
-    }
-    const more = Math.max(0, notesTotal - notes.length)
-      + (hasApps ? Math.max(0, totalApps - apps.length) : 0)
-      + (hasFiles ? Math.max(0, totalFolders - folders.length) + Math.max(0, totalFiles - files.length) : 0);
-    return {
-      notes,
-      apps,
-      folders,
-      files,
-      more,
-      index: fileIndex?.status() ?? null,
-      reindexing: Boolean(fileIndex?.building),
-    };
-  });
-  ipcMain.handle('magic:act', (_e, req) => wm.magicAct(req));
-  // 웹 검색 · AI 에게 묻기 기본 사이트 (매직키 창의 할 일 단추 순서)
-  ipcMain.handle('magic:prefs', () => {
-    const m = normalizeMagicSettings(settings.magic);
-    return { engine: m.engine, ai: m.ai, opms: Boolean(wm.opmsSettings().host), opmsShapes: settings.opmsShapes ?? [] }; // opms: 서버 주소를 넣었나 (없으면 "OPMS 에서 찾기" 줄도 없음)
-  });
-  // 계산 결과 복사 · 웹 검색 · AI 에게 묻기 · 사이트 열기 — 고른 줄을 실행할 때만 브라우저로 (주소는 여기서 만든다)
-  ipcMain.handle('magic:tool', (_e, req) => {
-    const mods = new Set(activeModules(settings.magic).map((m) => m.id));
-    const text = String(req?.text ?? '').slice(0, 4000);
-    if (req?.type === 'copy' && mods.has('calc')) {
-      if (!SMOKE) clipboard.writeText(text); // 점검은 진짜 클립보드를 건드리지 않는다
-      return { ok: true, message: '계산 결과를 복사했어요' };
-    }
-    if (req?.type === 'site' && mods.has('web')) {
-      const url = siteUrl(text);
-      return { ok: Boolean(url && openWebPage(url)) };
-    }
-    const kind = req?.type === 'web' ? 'web' : req?.type === 'ai' ? 'ai' : null;
-    if (!kind || !mods.has(kind)) return { ok: false };
-    const link = siteLink(kind === 'web' ? WEB_ENGINES : AI_SITES, String(req.site), text);
-    if (!link) return { ok: false };
-    // 주소로 질문을 넘길 수 없는 사이트(Gemini)는 질문을 복사해 두고 연다
-    if (link.paste && !SMOKE) clipboard.writeText(text.trim());
-    if (!openWebPage(link.url)) return { ok: false };
-    if (link.paste) toast({ title: `${link.name}를 열었어요`, body: '질문을 복사해 두었어요. 입력 칸에 붙여 넣기(Ctrl+V)만 하면 돼요' });
-    return { ok: true };
-  });
-  // 사용자가 골라 찾은 사건의 번호 양식을 배워 둔다 — 같은 양식의 번호는 앞으로 매직키가 저절로 찾는다 (설정에서 지우기)
-  const learnOpms = (rows) => {
-    const next = learnShapes(settings.opmsShapes, rows);
-    if (next !== settings.opmsShapes) {
-      settings.opmsShapes = next;
-      saveSettings();
-    }
-    return next;
-  };
-  ipcMain.handle('magic:opms-search', async (_e, query) => {
-    const q = String(query ?? '').slice(0, 40);
-    if (!activeModules(settings.magic).some((m) => m.id === 'opms') || !looksLikeOpmsQuery(q)) return { cases: [], total: 0 };
-    if (!wm.opmsSettings().host) return { cases: [], total: 0, error: '설정 매직키의 OPMS 연결에 서버 주소를 넣으면 OPMS 사건도 찾아요' }; // 주소를 넣기 전
-    try {
-      // 정확한 것부터 6건 (번호 일부 · 출원인 · 발명자 · 초성), 나머지는 "OPMS 다른 n건 더 보기"
-      const { rows, total } = await wm.opmsClient().search(q, { timeoutMs: 5000, retries: 0, limit: 60 });
-      const top = rows.slice(0, 6);
-      wm.rememberCases(top);
-      return { cases: top.map((r) => wm.opmsBrief(r, q)), total, shapes: learnOpms(rows) };
-    } catch (err) {
-      return { cases: [], total: 0, error: err.offline ? '사내망에 연결돼 있지 않아 OPMS를 찾지 못했어요' : err.message };
-    }
-  });
-
-  // ---------- OPMS 창 ----------
-  // OPMS 창: 정확한 것부터 200건까지 + 맞는 것 전부의 개수
-  ipcMain.handle('opms:search', async (_e, query) => {
-    const q = String(query ?? '').slice(0, 60);
-    const { rows, total } = await wm.opmsClient().search(q, { retries: 1 });
-    wm.rememberCases(rows);
-    learnOpms(rows);
-    return { list: rows.map((r) => wm.opmsBrief(r, q)), total };
-  });
-  ipcMain.handle('opms:case', async (_e, idx) => {
-    const known = wm.caseOf(idx);
-    const client = wm.opmsClient();
-    const c = (await client.caseByIdx(known.idx).catch(() => null)) ?? known;
-    wm.rememberCases([c]);
-    const foreign = await client.foreign(c).catch(() => []);
-    return { case: c, foreign, summary: foreignSummary(c, foreign), ...wm.opmsSettings() };
-  });
-  ipcMain.handle('opms:mywork', (_e, idx) => wm.opmsClient().mywork(wm.caseOf(idx).idx));
-  ipcMain.handle('opms:details', (_e, idx) => wm.opmsClient().details(wm.caseOf(idx)));
-  ipcMain.handle('opms:schema-copy', async () => {
-    const text = await wm.opmsClient().schemaText();
-    clipboard.writeText(text.slice(0, 200_000));
-    return text.split('\n').length;
-  });
-  ipcMain.handle('opms:bills', (_e, idx) => wm.opmsClient().bills(wm.caseOf(idx).idx));
-
-  const ATTACH_TTL = 5 * 60_000;
-  const attachmentsOf = async (c, { fresh = false } = {}) => {
-    const key = `${wm.opmsSettings().host}\n${c.idx}`;
-    const hit = wm.attachCache.get(key);
-    if (!fresh && hit && Date.now() - hit.at < ATTACH_TTL) return hit.list;
-    const list = await wm.opmsClient().attachments(c.idx);
-    wm.attachCache.set(key, { at: Date.now(), list });
-    if (wm.attachCache.size > 20) wm.attachCache.delete(wm.attachCache.keys().next().value);
-    return list;
-  };
-  ipcMain.handle('opms:attachments', (_e, idx) => attachmentsOf(wm.caseOf(idx), { fresh: true }));
-  ipcMain.handle('opms:download', async (event, { idx, uploads, all } = {}) => {
-    const c = wm.caseOf(idx);
-    const client = wm.opmsClient();
-    const picked = (Array.isArray(uploads) ? uploads : []).map(String);
-    let list = await attachmentsOf(c);
-    const has = (l) => new Set(l.map((it) => it.upload));
-    const first = has(list);
-    if (!all && picked.some((u) => !first.has(u))) list = await attachmentsOf(c, { fresh: true });
-    const known = has(list);
-    const items = all ? list : picked.filter((u) => known.has(u)).map((u) => list.find((it) => it.upload === u));
-    const gone = all ? [] : [...new Set(picked.filter((u) => !known.has(u)))];
-    const res = await client.download(c, items, {
-      baseDir: wm.opmsSettings().wrapperDir,
-      all: Boolean(all),
-      onProgress: (p) => { if (!event.sender.isDestroyed()) event.sender.send('opms:progress', { ...p, idx: c.idx }); }, // 여러 사건을 함께 받아도 어느 사건의 진행인지 알게
-    });
-    for (const u of gone) res.failed.push({ upload: u, name: path.basename(u), error: 'OPMS 목록에서 사라졌어요. 새로 고침 해 주세요' });
-    wm.opmsDirs.add(res.dir);
-    indexWrapper(res.dir);
-    if (!SMOKE) shell.openPath(res.dir);
-    return res;
-  });
-  // 받은 전자포대는 곧바로 매직키 파일 찾기에 (색인 새로 고침을 기다리지 않게)
-  const indexWrapper = (dir, files = null) => {
-    try {
-      const index = getFileIndex();
-      if (!index) return;
-      files ??= fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => path.join(dir, d.name));
-      index.add([dir, ...files], { base: wm.opmsSettings().wrapperDir });
-    } catch {
-      // 찾기 목록에 못 넣어도 받기는 끝났다
-    }
-  };
-  ipcMain.handle('opms:open-file', async (_e, { idx, upload } = {}) => {
-    const c = wm.caseOf(idx);
-    const find = (list) => list.find((x) => x.upload === String(upload ?? ''));
-    const it = find(await attachmentsOf(c)) ?? find(await attachmentsOf(c, { fresh: true }));
-    if (!it) throw new Error('그 파일을 찾지 못했어요. 새로 고침 뒤 다시 해 주세요');
-    const file = await wm.opmsClient().fileFor(c, it, wm.opmsSettings().wrapperDir);
-    if (!file) throw new Error('파일 이름이 이상해 열 수 없어요');
-    indexWrapper(path.dirname(file), [file]);
-    if (!isOpenableFile(file)) {
-      if (!SMOKE) shell.showItemInFolder(file);
-      return { file, shown: true, message: '서류가 아닌 파일이라 열지 않고 폴더에서 보여 줘요' };
-    }
-    if (SMOKE) return { file };
-    const err = await shell.openPath(file);
-    if (err) throw new Error(err);
-    return { file };
-  });
-  // 설정 › 매직키 › OPMS: 서버 주소 · 전자포대 폴더 (코드에 두지 않고 사용자가 넣는다)
-  ipcMain.handle('opms:settings', () => ({ ...wm.opmsSettings(), hostSet: Boolean(wm.opmsSettings().host), shapes: settings.opmsShapes ?? [] }));
-  ipcMain.handle('opms:clear-shapes', () => {
-    settings.opmsShapes = [];
-    saveSettings();
-    return [];
-  });
-  ipcMain.handle('opms:set-host', (_e, text) => {
-    const raw = String(text ?? '').trim();
-    const host = raw ? normalizeOpmsHost(raw) : '';
-    if (host == null) return { error: '주소를 알아보지 못했어요. 예: 192.168.0.10:8181 또는 http://서버이름:8181' };
-    settings.opms = { ...settings.opms, host };
-    saveSettings();
-    return { ok: true, host };
-  });
-  // 폴더 열기: dir 이 이번에 받은 사건 폴더면 그 폴더, 아니면 전자포대 저장 폴더 (화면이 아무 경로나 열게 하지 않는다)
-  ipcMain.handle('opms:open-folder', async (_e, dir) => {
-    const target = typeof dir === 'string' && wm.opmsDirs.has(dir) ? dir : wm.opmsSettings().wrapperDir;
-    await fs.promises.mkdir(target, { recursive: true }).catch(() => {});
-    return SMOKE ? target : shell.openPath(target);
-  });
-  ipcMain.handle('opms:choose-dir', async (event) => {
-    const r = await dialog.showOpenDialog(senderWindow(event), { title: '전자포대를 저장할 폴더', defaultPath: wm.opmsSettings().wrapperDir, properties: ['openDirectory', 'createDirectory'] });
-    if (r.canceled || !r.filePaths[0]) return wm.opmsSettings().wrapperDir;
-    settings.opms = { ...settings.opms, wrapperDir: r.filePaths[0] };
-    getFileIndex()?.watch([r.filePaths[0]]);
-    saveSettings();
-    return r.filePaths[0];
-  });
-  ipcMain.handle('opms:copy', (_e, text) => clipboard.writeText(String(text ?? '').slice(0, 20000))); // 서지사항 전체(긴 비고 포함)도
-  ipcMain.handle('opms:to-memo', async (_e, idx) => {
-    const vault = getVault();
-    if (!vault) throw new Error(UI.noVault);
-    const known = wm.caseOf(idx);
-    const client = wm.opmsClient();
-    const c = (await client.caseByIdx(known.idx).catch(() => null)) ?? known;
-    const [foreign, mywork, details] = await Promise.all([client.foreign(c).catch(() => []), client.mywork(c.idx).catch(() => []), client.details(c).catch(() => null)]);
-    const id = vault.import({ body: caseMemoMarkdown(c, { mywork, foreign, summary: foreignSummary(c, foreign), details }) });
-    if (!id) throw new Error('메모를 만들지 못했어요. 메모 폴더의 쓰기 권한과 빈 공간을 확인하고 다시 해 주세요');
-    wm.openNote(id);
-    return id;
-  });
-
-  // ---------- 전체 결과 창 (Finder) ----------
-  ipcMain.handle('magic:open-all', (_e, query) => {
-    wm.magicWin?.hide();
-    wm.showFinder(String(query ?? '').slice(0, 200));
-    return true;
-  });
-  ipcMain.handle('finder:search', async (_e, query) => {
-    const q = String(query ?? '').slice(0, 200);
-    const fileIndex = getFileIndex();
-    if (!q.trim()) {
-      wm.lastFinderResults = new Set();
-      return { items: [], total: 0, index: fileIndex?.status() ?? null };
-    }
-    const vault = getVault();
-    const mods = new Set(activeModules(settings.magic).map((m) => m.id));
-    const searchable = mods.has('notes') && vault ? vault.searchable() : [];
-    const updatedOf = new Map(searchable.map((m) => [m.id, m.updated]));
-    const notes = searchable.length ? searchMemos(searchable, q, 300).map((n) => ({ kind: 'note', ...n, updated: updatedOf.get(n.id) })) : [];
-    const found = mods.has('files') && fileIndex ? fileIndex.searchAll(q, 2000) : { items: [], total: 0 };
-    wm.lastFinderResults = new Set(found.items.map((f) => f.path));
-    const home = os.homedir();
-    const shown = (p) => (p.toLowerCase().startsWith(home.toLowerCase()) ? `~${p.slice(home.length)}` : p);
-    const files = await Promise.all(found.items.map(async (f) => ({ kind: f.isDir ? 'folder' : 'file', ...f, where: shown(path.dirname(f.path)), icon: await wm.fileIcon(f.path, f.isDir) })));
-    return { items: [...notes, ...files], total: notes.length + found.total, index: fileIndex?.status() ?? null };
-  });
-  ipcMain.handle('finder:stat', async (_e, paths) => {
-    const list = (Array.isArray(paths) ? paths : []).filter((p) => wm.shownPath(p)).slice(0, 200);
-    return Object.fromEntries(await Promise.all(list.map(async (p) => {
-      try {
-        const st = await fs.promises.stat(p);
-        return [p, { size: st.isDirectory() ? null : st.size, mtime: st.mtimeMs }];
-      } catch {
-        return [p, null];
-      }
-    })));
-  });
-  ipcMain.handle('finder:act', async (_e, req) => {
-    const res = await wm.magicAct(req);
-    return { ...res, close: false };
-  });
-  ipcMain.on('magic:resize', (_e, h) => {
-    if (!wm.magicWin || wm.magicWin.isDestroyed()) return;
-    const height = Math.max(120, Math.min(640, Math.round(Number(h) || 0)));
-    const [w, cur] = wm.magicWin.getSize();
-    if (cur !== height) wm.magicWin.setSize(w, height);
-  });
-  // 매직키로 저장한 메모를 뒤에서 다듬고(맞춤법 · 띄어쓰기 · 긴 첫 줄이면 제목, core/ai-tasks.js polish) 그다음 AI 태그.
+  // MagicKey 로 저장한 메모를 뒤에서 다듬고(맞춤법 · 띄어쓰기 · 긴 첫 줄이면 제목, core/ai-tasks.js polish) 그다음 AI 태그.
   //   창은 이미 닫혔다. 연 메모 · 그사이 고친 메모는 건드리지 않고, 알림을 누르면 원래 글로 (이전 버전에도 남음)
   async function polishMagicMemo(id) {
     const vault = getVault();
@@ -910,12 +587,7 @@ export function registerIpc(ctx) {
     }
     getAiTagger()?.add([id]);
   }
-  ipcMain.handle('magic:run', (_e, payload) => {
-    if (payload?.module !== 'memo' || !activeModules(settings.magic).some((m) => m.id === 'memo')) return { ok: false };
-    return saveMagicMemo(payload);
-  });
-
-  // 매직키 글 → 새 메모 (매직키 창 · MagicKey 앱 공통). open: 만들고 열기, remind: 글 속 날짜로 알림
+  // MagicKey · MagicSystem 이 넘긴 글 → 새 메모. open: 만들고 열기, remind: 글 속 날짜로 알림
   function saveMagicMemo(payload) {
     const vault = getVault();
     if (!vault) return { ok: false };

@@ -7,9 +7,6 @@ import { NOTE_BG } from '../app/js/core/memo-file.js';
 export const APP_DIR = path.join(import.meta.dirname, '..', 'app');
 export const PRELOAD = path.join(import.meta.dirname, 'preload.cjs');
 export const OCR_PRELOAD = path.join(import.meta.dirname, 'ocr-preload.cjs');
-export const MAGIC_PRELOAD = path.join(import.meta.dirname, 'magic-preload.cjs');
-export const FINDER_PRELOAD = path.join(import.meta.dirname, 'finder-preload.cjs');
-export const OPMS_PRELOAD = path.join(import.meta.dirname, 'opms-preload.cjs');
 export const ASSETS_DIR = path.join(import.meta.dirname, '..', 'assets');
 
 export const APP_ICON = path.join(ASSETS_DIR, 'icons', 'memoking.ico');

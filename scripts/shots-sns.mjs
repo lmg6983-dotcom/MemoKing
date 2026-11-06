@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SNS 소개 자료용 화면 찍기: 홈 폴더를 임시 폴더로 바꿔(매직키 파일 찾기가 "~/문서" 처럼 보이게) 2배 화질로 desktop/smoke-sns.js 를 돌린다
+// SNS 소개 자료용 화면 찍기: 홈 폴더를 임시 폴더로 바꿔(내 PC 파일이 사진에 나오지 않게) 2배 화질로 desktop/smoke-sns.js 를 돌린다
 //   결과: out/sns/*.png · out/sns/scenes.json
 import { mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';

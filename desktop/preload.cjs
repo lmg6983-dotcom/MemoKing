@@ -111,7 +111,6 @@ contextBridge.exposeInMainWorld('memoking', {
     setAutoEvents: invoke('app:set-auto-events'),
     setAiPhone: invoke('app:set-ai-phone'),
     setLinkPreviews: invoke('app:set-link-previews'),
-    setMagic: invoke('app:set-magic'),
     setTrashDays: invoke('app:set-trash-days'),
     // 전역 단축키 바꾸기: set(이름, 단축키|null=기본값) · pause(true) 는 새 키를 누르는 동안 잠시 놓기
     setShortcut: invoke('shortcuts:set'),
@@ -124,14 +123,6 @@ contextBridge.exposeInMainWorld('memoking', {
     download: invoke('update:download'),
     later: invoke('update:later'),
     install: invoke('update:install'),
-  },
-  // OPMS 연결 설정: settings() → { host, wrapperDir, hostSet } · setHost(주소 | '' 지우기) → { ok, host } | { error } · chooseDir() → 폴더
-  opms: {
-    settings: invoke('opms:settings'),
-    setHost: invoke('opms:set-host'),
-    clearShapes: invoke('opms:clear-shapes'), // 저절로 찾는 번호 양식 모두 지우기
-    chooseDir: invoke('opms:choose-dir'),
-    openFolder: invoke('opms:open-folder'),
   },
   // 메모 창 단축키: get() → { overrides, shortcuts } · set(기능, 키 | '' 없음 | null 기본값) · reset() 모두 처음대로 · openWindow() 설정 창
   keymap: {

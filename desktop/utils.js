@@ -10,7 +10,6 @@ import { execFile } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { isProgramFile } from '../app/js/core/file-kinds.js';
 import { imageExtFromType, imageExtFromUrl, MAX_REMOTE_IMAGE_BYTES } from '../app/js/core/remote-images.js';
-import { normalizeMagicSettings } from '../app/js/core/magic-modules.js';
 import { APP_DIR, APP_ICON, APP_ICON_PNG } from './window-utils.js';
 import { cleanOverrides } from '../app/js/core/keymap.js';
 import { normalizeHours } from '../app/js/core/work-hours.js';
@@ -48,10 +47,9 @@ export const settings = {
   linkPreviews: true,
   autoTags: true,
   autoEvents: true, // 글 속 일정을 AI 가 골라 일정 탭에 (글 모델이 있을 때)
-  magicPolish: true, // 매직키로 저장한 메모를 AI 로 다듬기 (글 모델이 있을 때)
+  magicPolish: true, // MagicKey 로 저장한 메모를 AI 로 다듬기 (글 모델이 있을 때)
   aiPhone: false, // 휴대폰에서 쓴 메모도 이 PC 가 AI 로 (PC 가 여러 대면 한 대만 — 저마다 고쳐 쓰면 Drive 충돌 사본)
-  magic: undefined,
-  magicPos: null,
+  magic: undefined, // 예전 매직키 설정 — 메모킹은 쓰지 않고 MagicKey 가 처음 켜질 때 읽어 간다
   shortcuts: undefined,
   keymap: {}, // 메모 창 단축키 중 바꾼 것 (app/js/core/keymap.js)
   mode: 'life', // 메모킹 Work / Life — 지금 보는 모드 (새 메모도 이 모드로)
@@ -68,14 +66,6 @@ export function loadSettings() {
     const loaded = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
     Object.assign(settings, loaded);
     if (!('tutorialDone' in loaded)) settings.tutorialDone = true;
-    if (!settings.opmsIntroduced && settings.magic?.modules) {
-      settings.magic = { ...settings.magic, modules: { ...settings.magic.modules, opms: true } };
-      settings.opmsIntroduced = true;
-    }
-    if (!settings.appsIntroduced && settings.magic?.modules) {
-      settings.magic = { ...settings.magic, modules: { ...settings.magic.modules, apps: true } };
-      settings.appsIntroduced = true;
-    }
   } catch {
     // 첫 실행
   }
@@ -131,7 +121,7 @@ export function setAutoStart(on, onUpdateTray) {
   return getAutoStart();
 }
 
-export function appSettings(vault, fileIndex, shortcutStatus, shortcutLabel) {
+export function appSettings(vault, shortcutStatus, shortcutLabel) {
   return {
     trashDays: settings.trashDays,
     trashCount: vault?.trashList().length ?? 0,
@@ -157,8 +147,6 @@ export function appSettings(vault, fileIndex, shortcutStatus, shortcutLabel) {
     workLife: settings.workLife === true, // Work / Life 나누기 (꺼져 있으면 모든 메모가 한 목록)
     workHours: normalizeHours(settings.workHours),
     keymap: cleanOverrides(settings.keymap),
-    magic: normalizeMagicSettings(settings.magic),
-    magicIndex: fileIndex?.status() ?? null,
     mcp: mcpStatus(),
     version: app.getVersion(),
   };

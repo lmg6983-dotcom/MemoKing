@@ -6,35 +6,21 @@ import { app, BrowserWindow, screen } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { FileIndex } from './file-index.js';
 import { seedTutorialSandbox } from '../app/js/core/tutorial.js';
 import { toLocalIso } from '../app/js/core/memo-file.js';
 
 const SMOKE_DIR = path.join(os.tmpdir(), 'memoking-smoke');
 const VAULT = path.join(SMOKE_DIR, 'vault');
-// 찾을 PC 파일은 홈 폴더에 (매직키에 "~/문서" 처럼 보이게 — shots:sns 는 HOME 을 임시 폴더로 바꿔 띄운다)
-const FILES = os.homedir();
 const OUT = path.join(import.meta.dirname, '..', 'out', 'sns');
 const SAMPLE = path.join(import.meta.dirname, '..', 'app', 'assets', 'tutorial', 'sample');
 
-// 매직키로 찾을 PC 파일 (이름만, 내용은 비어 있어도 된다)
-const PC_FILES = [
-  '문서/주간 회의록 10월.docx', '문서/회의실 배치도.pdf', '문서/2026 하반기 마케팅 계획.pptx', '문서/출시 준비 체크리스트.xlsx',
-  '문서/제주 여행 일정표.xlsx', '사진/제주 여행/협재 해변.jpg', '다운로드/견적서_메모킹.pdf',
-];
-
 export function prepareSmoke(userData) {
-  for (const dir of [VAULT, path.join(SMOKE_DIR, 'wpn'), path.join(userData, 'notification-history'), ...['문서', '사진', '다운로드'].map((d) => path.join(FILES, d))]) fs.rmSync(dir, { recursive: true, force: true });
+  for (const dir of [VAULT, path.join(SMOKE_DIR, 'wpn'), path.join(userData, 'notification-history')]) fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(userData, { recursive: true });
   fs.mkdirSync(VAULT, { recursive: true });
-  for (const f of PC_FILES) {
-    fs.mkdirSync(path.join(FILES, path.dirname(f)), { recursive: true });
-    fs.writeFileSync(path.join(FILES, f), 'x'.repeat(2048));
-  }
   fs.mkdirSync(path.join(SMOKE_DIR, 'wpn'), { recursive: true });
   fs.writeFileSync(path.join(userData, 'settings.json'), JSON.stringify({
     vaultPath: VAULT, tutorialDone: true, historyEnabled: true,
-    magic: { modules: { opms: false }, known: ['memo', 'notes', 'files', 'calc', 'web', 'ai', 'opms'] },
   }));
 }
 
@@ -55,7 +41,7 @@ const WORK_MEMOS = [
   { body: '# 신입 온보딩\n\n| 날 | 할 일 |\n| --- | --- |\n| 월 | 계정, 장비 |\n| 화 | 제품 교육 |\n| 수 | 짝 업무 |\n\n#업무', color: 'purple', daysAgo: 4 },
 ];
 
-export async function runSmoke({ getVault, getList, createListWindow, noteWins, showMagic, getMagic, useFileIndex, getHistory, memoHotkeys, windowManager }) {
+export async function runSmoke({ getVault, getList, createListWindow, noteWins, getHistory, memoHotkeys, windowManager }) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const js = (win, code) => win.webContents.executeJavaScript(code, true);
   const done = [];
@@ -160,11 +146,6 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       const at = toLocalIso(new Date(Date.now() - m.daysAgo * 86_400_000));
       vault.import({ body: m.body, color: m.color, mode: 'work', created: at, updated: at });
     }
-    const idx = new FileIndex({ roots: () => [{ dir: FILES }] });
-    idx.stopped = false;
-    await idx.rebuild();
-    useFileIndex(idx);
-
     // 바탕화면: 영역 캡처 장면에서 뒤에 깔리는 화면 (가상 화면은 까맣다)
     const wallpaper = new BrowserWindow({ ...area, frame: false, focusable: false, skipTaskbar: true, show: false, backgroundColor: '#dfe7ef' });
     await wallpaper.loadURL(`data:text/html,${encodeURIComponent('<body style="margin:0;height:100vh;background:linear-gradient(135deg,#e7eef6 0%,#f4efe4 55%,#efe2d6 100%)"></body>')}`);
@@ -174,7 +155,6 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
     await until(() => js(list, `document.documentElement.dataset.ready === 'true'`), '목록');
     list.setBounds({ x: area.x + 40, y: area.y + 40, width: 460, height: 760 });
     await until(() => js(list, `document.querySelectorAll('.card').length >= 10`), '예시 메모 카드');
-    await js(list, `window.memoking.settings.setMagic({ enabled: true, modules: { memo: true, notes: true, files: true, calc: true, web: true, ai: true, opms: false }, paused: {}, known: ['memo', 'notes', 'files', 'calc', 'web', 'ai', 'opms'] })`);
     await wait(800);
 
     // 1) Work / Life — 같은 목록, 일할 때와 일상
@@ -227,31 +207,7 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       await wait(400);
     });
 
-    // 4) 매직키 — 찾기 · 계산 · AI
-    await scene('magic', async () => {
-      const type = async (text) => {
-        await js(getMagic(), `(() => { const i = document.getElementById('magic-input'); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input')); })()`);
-        await wait(900);
-      };
-      showMagic();
-      const magic = await until(() => getMagic(), '매직키 창');
-      await until(() => js(magic, `!!document.getElementById('magic-input')`), '매직키 화면');
-      await wait(600); // 계산기(math.js) 불러오기
-      await type('회의');
-      await until(() => js(magic, `document.querySelectorAll('.magic-row.kind-file').length >= 1`), '찾기 결과').catch(() => {});
-      await shot(magic, 'magic-search', 'magic');
-      await type('320,000 + 68,000 + 24,900');
-      await until(() => js(magic, `!!document.querySelector('.magic-row.kind-calc')`), '계산 결과').catch(() => {});
-      await shot(magic, 'magic-calc', 'magic');
-      await type('제주 3박 4일 일정 짜 줘. 렌터카로 동쪽 해안 위주로');
-      await js(magic, `document.querySelector('.magic-row.kind-ai')?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: 1 }))`);
-      await shot(magic, 'magic-ai', 'magic');
-      await js(magic, `(() => { const i = document.getElementById('magic-input'); i.value = ''; i.dispatchEvent(new Event('input')); })()`);
-      magic.hide();
-      await wait(300);
-    });
-
-    // 5) 메모 단축키 — Ctrl+Alt+3 으로 자주 쓰는 문구를 어디서든 복사
+    // 4) 메모 단축키 — Ctrl+Alt+3 으로 자주 쓰는 문구를 어디서든 복사
     await scene('hotkey', async () => {
       const id = vault.import({ body: '# 회신 인사말\n\n안녕하세요, 메모 잘 받았습니다.\n확인하고 오늘 안에 다시 연락드릴게요. 감사합니다.\n', color: 'blue', mode: 'work' });
       memoHotkeys.set(id, '3', { copy: true, show: false });
@@ -265,7 +221,7 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       memoHotkeys.set(id, null);
     });
 
-    // 6) 매직 카피 — 워드에서 고른 글을 출처까지 메모로
+    // 5) 매직 카피 — 워드에서 고른 글을 출처까지 메모로
     await scene('quick', async () => {
       const html = '<h2>하반기 마케팅 핵심</h2><ul><li><b>10월</b> 체험단 30명 모집, 후기 이벤트</li><li><b>11월</b> 블랙프라이데이 1+1 쿠폰</li><li><b>12월</b> 연말 감사 메일, 재구매 할인</li></ul><p>예산은 분기별로 나눠 쓰고, 결과는 매주 월요일 회의에서 공유</p>';
       const id = windowManager.openCaptureMemo({
@@ -280,7 +236,7 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       await close(id);
     });
 
-    // 7) 메모 스택 — 서류철 색인 탭처럼 한 창에
+    // 6) 메모 스택 — 서류철 색인 탭처럼 한 창에
     await scene('stack', async () => {
       const a = find('주간 회의');
       const b = find('출시 준비');
@@ -299,7 +255,7 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       for (const id of [a, b, c]) await close(id);
     });
 
-    // 8) 왕관 · 테이프 — 늘 위에, 바탕화면에
+    // 7) 왕관 · 테이프 — 늘 위에, 바탕화면에
     await scene('stickers', async () => {
       const top = find('제주 여행 준비');
       const tw = await open(top, { x: area.x + 560, y: area.y + 140, width: 340, height: 380 });
@@ -325,7 +281,7 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       await wait(300);
     });
 
-    // 9) 영역 캡처 — 화면이 어두워지고 끌어서 고르기 (메모 창들이 떠 있는 바탕화면 그대로)
+    // 8) 영역 캡처 — 화면이 어두워지고 끌어서 고르기 (메모 창들이 떠 있는 바탕화면 그대로)
     await scene('area', async () => {
       list.showInactive();
       await wait(600);
@@ -350,7 +306,7 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       windowManager.endAreaCapture();
     });
 
-    // 10) 손 메모 · 주석 — 표 위에 펜으로 동그라미와 화살표
+    // 9) 손 메모 · 주석 — 표 위에 펜으로 동그라미와 화살표
     await scene('ink', async () => {
       const id = find('출시 준비');
       const win = await open(id, { x: area.x + 560, y: area.y + 100, width: 420, height: 440 });
@@ -374,7 +330,7 @@ export async function runSmoke({ getVault, getList, createListWindow, noteWins, 
       await close(id);
     });
 
-    // 11) 드라이브의 파일 + AI 연결 — 설정의 AI 비서와 연결
+    // 10) 드라이브의 파일 + AI 연결 — 설정의 AI 비서와 연결
     await scene('ai', async () => {
       const cfgDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-claude-'));
       process.env.MEMOKING_CLAUDE_CONFIG = path.join(cfgDir, 'claude_desktop_config.json');

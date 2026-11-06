@@ -31,8 +31,6 @@ import { renderWorkSettings } from './work-settings.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from './core/memo-sort.js';
 import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
-import { MAGIC_MODULES } from './core/magic-modules.js';
-import { WEB_ENGINES, AI_SITES } from './core/magic-tools.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
@@ -901,8 +899,6 @@ async function loadSettings() {
   $('auto-events').checked = s.autoEvents !== false;
   $('ai-phone').checked = s.aiPhone === true;
   $('link-previews').checked = s.linkPreviews !== false;
-  magicIndex = s.magicIndex ?? null;
-  showMagic(s.magic);
   showQuickMemo(s.quickMemo);
   showShortcuts(s.shortcuts);
   showMcp(s.mcp);
@@ -984,19 +980,19 @@ $('share-both').addEventListener('click', async () => {
   $('pc-note').textContent = 'PC와 휴대폰 설치 링크를 함께 복사했어요';
 });
 
-// ---------- 전역 단축키 바꾸기 (매직 카피·매직키) ----------
+// ---------- 전역 단축키 바꾸기 (매직 카피 · 메모 목록) ----------
 // 키 단추를 누르고 새 조합을 누르면 바뀐다. 다른 앱이 이미 쓰는 키면 바꾸지 않고 알려 준다 (Esc·다른 곳 누르기 = 그만)
 let shortcutState = {};
 const SC_TAKEN = '다른 앱이 이 키를 먼저 쓰고 있어서 작동하지 않아요 (예: 같은 단축키를 쓰는 다른 프로그램). 다른 키로 바꿔 주세요';
 function showShortcuts(sc) {
   shortcutState = sc ?? {};
-  for (const name of ['quickMemo', 'magic', 'list']) {
+  for (const name of ['quickMemo', 'list']) {
     const st = shortcutState[name];
     if (!st || !$(`sc-${name}`)) continue;
     $(`sc-${name}`).textContent = st.label;
-    $(`sc-${name}`).setAttribute('aria-label', `${name === 'quickMemo' ? '매직 카피' : name === 'magic' ? '매직키' : '메모 목록'} 단축키 ${st.label}, 눌러서 바꾸기`);
+    $(`sc-${name}`).setAttribute('aria-label', `${name === 'quickMemo' ? '매직 카피' : '메모 목록'} 단축키 ${st.label}, 눌러서 바꾸기`);
     $(`sc-${name}-reset`).hidden = st.isDefault;
-    $(`sc-${name}-note`).textContent = st.handedOff ? 'MagicKey 앱이 이 키로 매직키를 열어요. 단축키 · 기능은 MagicKey 의 알림 영역 ✦ 메뉴에서 바꿔요' : st.enabled && !st.registered ? SC_TAKEN : '';
+    $(`sc-${name}-note`).textContent = st.enabled && !st.registered ? SC_TAKEN : '';
     $(`sc-${name}-note`).classList.toggle('warn', st.enabled && !st.registered);
   }
 }
@@ -1008,11 +1004,11 @@ function setScNote(name, text, warn = false) {
 /** onlyIfChanged: 키도 상태도 그대로면 칸은 다시 그리지 않는다 (방금 띄운 "바꿨어요" 안내가 지워지지 않게) */
 async function refreshShortcuts({ onlyIfChanged = false } = {}) {
   const s = await api.settings.get();
-  const same = onlyIfChanged && ['quickMemo', 'magic', 'list'].every((n) => JSON.stringify(s.shortcuts?.[n]) === JSON.stringify(shortcutState[n]));
+  const same = onlyIfChanged && ['quickMemo', 'list'].every((n) => JSON.stringify(s.shortcuts?.[n]) === JSON.stringify(shortcutState[n]));
   if (!same) showShortcuts(s.shortcuts);
   showQuickMemo(s.quickMemo);
 }
-// 매직 카피 · 매직키 · 메모 목록 칸: 새 키 받기 (key-capture.js — 단축키 설정 창과 같은 동작)
+// 매직 카피 · 메모 목록 칸: 새 키 받기 (key-capture.js — 단축키 설정 창과 같은 동작)
 function startCapture(name) {
   const el = $(`sc-${name}`);
   if (!el) return;
@@ -1025,7 +1021,7 @@ function startCapture(name) {
   });
 }
 $('keymap-open').addEventListener('click', () => api.keymap.openWindow());
-for (const name of ['quickMemo', 'magic', 'list']) {
+for (const name of ['quickMemo', 'list']) {
   const btn = $(`sc-${name}`);
   const rst = $(`sc-${name}-reset`);
   if (btn) btn.addEventListener('click', () => (isCapturing(btn) ? stopKeyCapture('cancel') : startCapture(name)));
@@ -1193,84 +1189,6 @@ $('ai-phone').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setAiPhone(e.target.checked);
 });
 
-// 매직키 설정: 켜고 끄기 + 기능 모듈 끄고 켜기 (준비 중 모듈은 끌 수 없음)
-let magicState = { enabled: true, modules: {}, paused: {} };
-let magicIndex = null; // 파일 검색 목록 상태 { count, builtAt, building }
-const indexNote = (st) => (!st ? '' : st.building && !st.count ? ', 파일 목록을 만드는 중' : st.count ? `, 파일 ${st.count.toLocaleString('ko-KR')}개${st.building ? ' (새로 고치는 중)' : ''}` : '');
-function renderMagicModules() {
-  const list = $('magic-modules-list');
-  list.replaceChildren(...MAGIC_MODULES.filter((m) => m.ready).map((m) => { // 준비 중인 기능은 설정에도 보이지 않게
-    const row = document.createElement('label');
-    row.className = `magic-mod${m.ready ? '' : ' soon'}`;
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.className = 'switch';
-    cb.checked = m.ready && (magicState.modules?.[m.id] ?? m.defaultOn) !== false;
-    cb.disabled = !m.ready || !magicState.enabled;
-    cb.addEventListener('change', async () => {
-      // 설정에서 켜면 매직키 창에서 잠깐 꺼 둔 것도 함께 풀어 바로 쓰게 (끈 기능은 매직키 창에 캡슐도 없음)
-      const paused = { ...(magicState.paused ?? {}) };
-      delete paused[m.id];
-      magicState = await api.settings.setMagic({ ...magicState, modules: { ...magicState.modules, [m.id]: cb.checked }, paused });
-      renderMagicModules();
-      showOpmsSetup();
-    });
-    const text = document.createElement('span');
-    text.append(m.name);
-    if (!m.ready) {
-      const em = document.createElement('em');
-      em.textContent = ' (준비 중)';
-      text.append(em);
-    }
-    const small = document.createElement('small');
-    small.textContent = m.description + (m.id === 'files' && cb.checked ? indexNote(magicIndex) : '') + (cb.checked && magicState.paused?.[m.id] ? ', 지금은 매직키 창에서 잠깐 꺼 둠' : '');
-    text.append(' ', small);
-    row.append(cb, text);
-    const choice = cb.checked && (m.id === 'web' || m.id === 'ai') ? siteChoice(m.id) : null;
-    return choice ? [row, choice] : [row];
-  }).flat());
-}
-// 웹 검색 · AI 에게 묻기: Enter 로 열 기본 사이트 (나머지는 매직키 창의 사이트 단추로)
-function siteChoice(id) {
-  const key = id === 'web' ? 'engine' : 'ai';
-  const wrap = document.createElement('label');
-  wrap.className = 'magic-site';
-  const name = document.createElement('span');
-  name.textContent = id === 'web' ? '기본 검색 사이트' : '기본 AI';
-  const sel = document.createElement('select');
-  for (const site of id === 'web' ? WEB_ENGINES : AI_SITES) sel.append(new Option(site.name + (site.paste ? ' (질문은 붙여 넣기)' : ''), site.id));
-  sel.value = magicState[key];
-  sel.addEventListener('change', async () => {
-    magicState = await api.settings.setMagic({ ...magicState, [key]: sel.value });
-  });
-  wrap.append(name, sel);
-  return wrap;
-}
-function showMagic(magic) {
-  magicState = magic ?? { enabled: true, modules: {} };
-  $('magic-enabled').checked = magicState.enabled;
-  $('magic-modules-row').hidden = !magicState.enabled;
-  $('magic-polish-row').hidden = !magicState.enabled; // 매직키를 끄면 다듬기 스위치도 안 보이게
-  renderMagicModules();
-  showOpmsSetup();
-}
-// OPMS 연결: OPMS 검색을 켰을 때만 — 서버 주소(이 PC 에만 저장) · 전자포대 저장 폴더
-async function showOpmsSetup() {
-  const on = Boolean(magicState.enabled && magicState.modules?.opms);
-  $('opms-setup').hidden = !on;
-  if (!on) return;
-  const o = await api.opms.settings();
-  if (document.activeElement !== $('opms-host')) $('opms-host').value = o.host ?? '';
-  $('opms-dir').textContent = o.wrapperDir ?? '';
-  showOpmsShapes(o.shapes ?? []);
-  if (!o.hostSet && !$('opms-host-note').textContent) setOpmsNote('서버 주소를 넣으면 OPMS 사건을 찾을 수 있어요', false); // 아직 아무것도 안 했으니 빨간 글은 아님
-}
-// OPMS 에서 골라 찾은 번호로 배운 양식 (A 영문 · 9 숫자 · 가 한글) — 이 양식의 번호는 매직키가 저절로 찾는다
-function showOpmsShapes(shapes) {
-  $('opms-shapes-row').hidden = !shapes.length;
-  $('opms-shapes').textContent = shapes.length ? `${shapes.slice(0, 6).join(', ')}${shapes.length > 6 ? ` 외 ${shapes.length - 6}개` : ''} (A 영문, 9 숫자, 가 한글)` : '';
-}
-$('opms-shapes-clear').addEventListener('click', async () => showOpmsShapes(await api.opms.clearShapes()));
 // 메모 보기 › 내 손에 맞추기: 꾹 눌러 줄 옮기기 시간 (메모 창들과 같은 저장소 — hold-tune.js)
 // 메모 보기 › 넣을 때 묻기: "앞으로 이렇게" 로 기억한 것을 지운다 (메모 창들과 같은 저장소 — rename-content.js)
 const choicesBtn = $('choices-reset');
@@ -1299,25 +1217,6 @@ $('hold-reset').addEventListener('click', () => {
     b.textContent = '처음 값으로';
     b.disabled = false;
   }, 1500);
-});
-function setOpmsNote(text, warn = false) {
-  $('opms-host-note').textContent = text;
-  $('opms-host-note').classList.toggle('warn', warn);
-}
-$('opms-host-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const r = await api.opms.setHost($('opms-host').value);
-  if (r?.error) return setOpmsNote(r.error, true);
-  $('opms-host').value = r.host;
-  setOpmsNote(r.host ? `저장했어요: ${r.host}` : '서버 주소를 삭제했어요');
-});
-$('opms-dir-open').addEventListener('click', () => api.opms.openFolder());
-$('opms-dir-btn').addEventListener('click', async () => {
-  $('opms-dir').textContent = await api.opms.chooseDir();
-});
-$('magic-enabled').addEventListener('change', async (e) => {
-  magicState = await api.settings.setMagic({ ...magicState, enabled: e.target.checked });
-  showMagic(magicState);
 });
 $('history-enabled').addEventListener('change', async (e) => {
   e.target.checked = await api.history.setEnabled(e.target.checked);
