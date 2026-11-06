@@ -31,7 +31,7 @@ import { FileIndex, defaultRoots } from './file-index.js';
 import { Updater, isSnoozed } from './updater.js';
 import { recoverOpmsSettings, normalizeOpmsHost } from './opms.js';
 import { comboFromAccelerator, actionUsing } from '../app/js/core/keymap.js';
-import { jumpListCategories, launchAction, pushRecent } from './jump-list.js';
+import { jumpListCategories, launchAction, pushRecent, readMagicKeyFile } from './jump-list.js';
 import { flushOpmsFiles } from './opms.js';
 import { createDoublePress } from './double-press.js';
 import { MemoHotkeys } from './memo-hotkeys.js';
@@ -1185,26 +1185,12 @@ function handleLaunch(argv) {
     if (vault?.get(act.id)) windowManager.revealNote(act.id);
     else windowManager.createListWindow();
   } else if (act.kind === 'newFile') {
-    const text = takeMagicKeyFile(act.file);
-    const remind = act.remind && text != null ? remindFromText(text) : null; // 날짜를 못 찾으면 알림 없이 저장
-    if (text == null || !ipc?.saveMagicMemo({ text, open: act.open, remind }).ok) windowManager.createListWindow();
+    const got = readMagicKeyFile(act.file);
+    const remind = act.remind && got ? remindFromText(got.text) : null; // 날짜를 못 찾으면 알림 없이 저장
+    if (got && ipc?.saveMagicMemo({ text: got.text, open: act.open, remind }).ok) fs.rmSync(got.file, { force: true }); // 저장한 뒤에야 지운다
+    else windowManager.createListWindow();
   }
   return true;
-}
-
-// MagicKey 가 임시 폴더에 쓴 글을 읽고 지운다 — 임시 폴더 바로 아래의 작은 파일만 (아무 파일이나 메모로 읽지 않게)
-function takeMagicKeyFile(file) {
-  try {
-    const real = fs.realpathSync(file);
-    const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
-    if (!same(path.dirname(real), fs.realpathSync(os.tmpdir())) || fs.statSync(real).size > 1024 * 1024) return null;
-    const text = fs.readFileSync(real, 'utf8');
-    fs.rmSync(real, { force: true });
-    return text;
-  } catch (err) {
-    console.warn('MagicKey 글을 읽지 못했어요', err.message);
-    return null;
-  }
 }
 
 function updateTrayMenu() {

@@ -1,6 +1,40 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { jumpListCategories, launchAction, pushRecent, LAUNCH } from '../desktop/jump-list.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { jumpListCategories, launchAction, pushRecent, readMagicKeyFile, LAUNCH } from '../desktop/jump-list.js';
+
+test('readMagicKeyFile: 임시 폴더 바로 아래의 작은 파일만 읽고, 지우지는 않는다', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-tmp-'));
+  const other = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-other-'));
+  try {
+    const ok = path.join(tmp, 'magickey-1.txt');
+    fs.writeFileSync(ok, '내일 3시 치과');
+    assert.deepEqual(readMagicKeyFile(ok, tmp), { text: '내일 3시 치과', file: fs.realpathSync(ok) });
+    assert.ok(fs.existsSync(ok), '저장에 성공한 뒤에 부르는 쪽이 지운다');
+
+    const outside = path.join(other, 'magickey-2.txt');
+    fs.writeFileSync(outside, '비밀');
+    assert.equal(readMagicKeyFile(outside, tmp), null, '다른 폴더');
+    fs.mkdirSync(path.join(tmp, 'sub'));
+    fs.writeFileSync(path.join(tmp, 'sub', 'magickey-3.txt'), '안쪽');
+    assert.equal(readMagicKeyFile(path.join(tmp, 'sub', 'magickey-3.txt'), tmp), null, '임시 폴더 안쪽 폴더도 아님');
+    try {
+      fs.symlinkSync(outside, path.join(tmp, 'magickey-4.txt'));
+      assert.equal(readMagicKeyFile(path.join(tmp, 'magickey-4.txt'), tmp), null, '다른 폴더를 가리키는 링크');
+    } catch (err) {
+      if (err.code !== 'EPERM') throw err; // Windows 는 링크를 만들 권한이 없을 수 있다
+    }
+    const big = path.join(tmp, 'magickey-5.txt');
+    fs.writeFileSync(big, 'x'.repeat(1024 * 1024 + 1));
+    assert.equal(readMagicKeyFile(big, tmp), null, '1MB 보다 큼');
+    assert.equal(readMagicKeyFile(path.join(tmp, 'magickey-없음.txt'), tmp), null, '없는 파일');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(other, { recursive: true, force: true });
+  }
+});
 
 test('점프 목록: 작업(메모 목록 열기 · 새 메모)과 최근에 연 메모가 따로', () => {
   const cats = jumpListCategories([{ id: 'a-1', title: '회의 메모' }, { id: 'b-2', title: '가'.repeat(60) }], { program: 'C:\\Program Files\\MemoKing\\MemoKing.exe' });
