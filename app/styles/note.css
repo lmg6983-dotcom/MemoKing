@@ -112,6 +112,7 @@ body, .note-screen, .share-paper {
 #menu .menu-item > span > small { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; } /* 회상 날짜 · 불러오기 키 · 연결 수: 카드 메뉴처럼 오른쪽 끝에 */
 /* 아래 작은 줄: 그림 복사 · 그림 저장 · 목록 · 단축키 (키는 풍선말에) */
 #menu .menu-foot { display: flex; gap: 2px; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+#menu .menu-foot.menu-quick { margin: 0 0 4px; padding: 0 0 4px; border-top: 0; border-bottom: 1px solid var(--border); } /* 색 줄 아래 · 글 메뉴 위 */
 #menu .menu-item.menu-mini { flex: 1 1 auto; width: auto; justify-content: center; padding: 4px 4px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 @media (hover: hover) and (pointer: fine) { #menu .menu-item.menu-mini:hover { color: var(--text); } } /* 기본 메모 창(380px) 높이에 메뉴가 스크롤 없이 들어가게 (휴대폰 시트는 그대로) */
 .menu-item {

@@ -44,10 +44,12 @@
       <button class="menu-item menu-ic danger" id="delete-btn" role="menuitem" title="삭제 (휴지통으로)" aria-label="삭제"></button>
     </div>
     <div class="menu-colors"><span class="menu-label">색</span><div class="swatches" id="swatches"></div></div>
-    <button class="menu-item" id="remind-menu-btn" role="menuitem"><span>알림 맞추기 <small>Ctrl+Shift+A</small></span></button>
-    <button class="menu-item" id="event-menu-btn" role="menuitem"><span>일정 넣기</span></button>
-    <button class="menu-item" id="tape-btn" role="menuitem" hidden><span>바탕화면에 붙이기 <small>Ctrl+Shift+G</small></span></button>
-    <hr class="menu-sep" role="separator">
+    <!-- 윗막대에서 옮겨 온 것: 작은 한 줄로 (기본 메모 창 높이에 메뉴가 스크롤 없이 들어가게) -->
+    <div class="menu-foot menu-quick" role="group" aria-label="알림, 일정, 바탕화면">
+      <button class="menu-item menu-mini" id="remind-menu-btn" role="menuitem" title="알림 맞추기 (Ctrl+Shift+A)">알림 맞추기</button>
+      <button class="menu-item menu-mini" id="event-menu-btn" role="menuitem" title="일정 넣기">일정 넣기</button>
+      <button class="menu-item menu-mini" id="tape-btn" role="menuitem" title="테이프로 바탕화면에 붙여 다른 창 뒤에 두기 (Ctrl+Shift+G)" hidden>바탕화면에</button>
+    </div>
     <button class="menu-item" id="pin-toggle" role="menuitem"><span>목록 맨 위에 고정</span></button>
     <button class="menu-item" id="day-btn" role="menuitem"><span>회상 날짜 정하기 <small id="day-label"></small></span></button>
     <button class="menu-item" id="mode-btn" role="menuitem"><span>Work로 옮기기</span></button>
