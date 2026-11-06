@@ -9,7 +9,7 @@
 import { execSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, posix } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { releaseBody } from './release-body.mjs';
 
@@ -83,6 +83,14 @@ if (Object.keys(pkg.dependencies ?? {}).length) {
 }
 
 // 3) 빌드
+// 작업 스레드는 asar 안 파일을 못 읽는다 — 그 스레드가 불러오는 파일을 import 를 따라가며 모두 asar 밖에 둔다
+function importsOf(file, seen = new Set()) {
+  if (seen.has(file)) return seen;
+  seen.add(file);
+  for (const m of readFileSync(join(ROOT, file), 'utf8').matchAll(/^import[^'"]*['"](\.[^'"]+)['"]/gm)) importsOf(posix.join(posix.dirname(file), m[1]), seen);
+  return seen;
+}
+
 const config = {
   appId: 'com.memoking.desktop', // 앱 안의 AppUserModelId 와 같아야 Windows 알림이 "메모킹" 으로 뜬다
   productName: 'MemoKing',
@@ -96,8 +104,8 @@ const config = {
   electronLanguages: ['ko', 'en-US'],
   compression: 'maximum',
   // PowerShell 이 읽어야 하는 도우미와, 숨은 OCR 창이 워커·wasm 으로 불러오는 tesseract 파일은 asar 밖에 둔다
-  // 받아쓰기 작업 스레드(desktop/stt)·엔진(desktop/vendor: sherpa-onnx WebAssembly, bzip2)과 그것이 읽는 공용 모듈도
-  asarUnpack: ['scripts/clipboard-helper.ps1', 'scripts/popup-watch.ps1', 'app/vendor/tesseract/**', 'desktop/stt/**', 'desktop/vendor/**', 'app/js/core/transcript-lines.js'],
+  // 받아쓰기 작업 스레드(desktop/stt)·엔진(desktop/vendor: sherpa-onnx WebAssembly, bzip2)과 그것이 읽는 공용 모듈도, 색인 작업 스레드와 그것이 읽는 모듈도
+  asarUnpack: ['scripts/clipboard-helper.ps1', 'scripts/popup-watch.ps1', 'app/vendor/tesseract/**', 'desktop/stt/**', 'desktop/vendor/**', 'app/js/core/transcript-lines.js', ...importsOf('desktop/index-worker.js')], // 색인 작업 스레드 (desktop/vault.js)
   npmRebuild: false,
   nodeGypRebuild: false,
   // 자동 업데이트: 공개 배포 저장소의 Release (releaseType 'release' — 기본값 draft 는 앱이 볼 수 없다).

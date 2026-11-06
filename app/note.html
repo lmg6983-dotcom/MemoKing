@@ -23,18 +23,12 @@
     <button id="top-btn" class="icon-btn top-btn crown-btn" title="왕관 스티커를 붙여 다른 창보다 늘 위에 두기 (Ctrl+Shift+T, 다시 누르면 떼기)" aria-label="다른 창보다 늘 위에 두기" aria-pressed="false">
       <svg><use href="#i-crown-line"/></svg>
     </button>
-    <button id="tape-btn" class="icon-btn tape-btn crown-btn" title="테이프로 바탕화면에 붙여 다른 창 뒤에 두기 (Ctrl+Shift+G, 다시 누르면 떼기)" aria-label="바탕화면에 붙여 다른 창 뒤에 두기" aria-pressed="false" hidden>
-      <svg><use href="#i-tape"/></svg>
-    </button>
-    <button id="event-btn" class="icon-btn count-btn event-btn" title="일정" aria-label="일정">
+    <!-- 일정 · 알림 · 불러오기 키 · 테이프는 자주 쓰지 않아 ⋯ 메뉴에. 일정 · 알림은 이 메모에 있을 때만 숫자와 함께 윗막대에 -->
+    <button id="event-btn" class="icon-btn count-btn event-btn" title="일정" aria-label="일정" data-hide-empty hidden>
       <svg><use href="#i-calendar"/></svg><span id="event-count" class="count"></span>
     </button>
-    <button id="bell-btn" class="icon-btn count-btn bell-btn" title="알림 (Ctrl+Shift+A)" aria-label="알림">
+    <button id="bell-btn" class="icon-btn count-btn bell-btn" title="알림 (Ctrl+Shift+A)" aria-label="알림" data-hide-empty hidden>
       <svg><use href="#i-bell"/></svg><span id="bell-count" class="count"></span>
-    </button>
-    <!-- 불러오기 키 (Ctrl+Alt+1~9): 정했을 때만 번개 + 숫자 (정하기는 ⋯ 메뉴) -->
-    <button id="hotkey-btn" class="icon-btn hotkey-btn off" title="불러오기 키 정하기: 아직 없어요 (Ctrl+Alt+숫자로 어디서든 이 메모를 불러와요)" aria-label="불러오기 키 정하기, 아직 없음">
-      <svg><use href="#i-zap"/></svg><span id="hotkey-num" class="hotkey-num" aria-hidden="true"></span>
     </button>
     <button id="menu-btn" class="icon-btn" title="메뉴" aria-label="메뉴" aria-haspopup="true"><svg><use href="#i-more"/></svg></button>
     <button id="close-btn" class="icon-btn" title="닫기 (Ctrl+W), 자동 저장돼요" aria-label="닫기"><svg><use href="#i-close"/></svg></button>
@@ -43,11 +37,20 @@
   <div id="menu" class="menu" role="menu" hidden>
     <!-- 목록 카드 메뉴와 같은 모양: 맨 위 아이콘 줄(같은 아이콘 · 같은 순서 — 글 복사 · 공유 · PDF · 휴지통, content-icons.js 를 note.js 가 넣는다.
          메모 창은 열려 있으니 잘라내기는 없음) → 색 → 글 메뉴(아이콘 없이, 휴대폰처럼) → 아래 작은 줄(그림으로 · 목록 · 단축키) -->
-    <div class="menu-icons" role="group" aria-label="복사, 공유, PDF, 삭제">
-      <button class="menu-item menu-ic" id="copy-text-btn" role="menuitem" title="글 복사" aria-label="글 복사"></button>
-      <button class="menu-item menu-ic" id="share-btn" role="menuitem" title="공유" aria-label="공유"></button>
-      <button class="menu-item menu-ic" id="pdf-btn" role="menuitem" title="PDF로 저장" aria-label="PDF로 저장"></button>
-      <button class="menu-item menu-ic danger" id="delete-btn" role="menuitem" title="삭제 (휴지통으로)" aria-label="삭제"></button>
+    <!-- 맨 위 한 줄: 카드 메뉴와 같은 아이콘 넷 | 윗막대에서 옮겨 온 알림 · 일정 · 바탕화면 (높이를 늘리지 않게 아이콘으로) -->
+    <div class="menu-top">
+      <div class="menu-icons" role="group" aria-label="복사, 공유, PDF, 삭제">
+        <button class="menu-item menu-ic" id="copy-text-btn" role="menuitem" title="글 복사" aria-label="글 복사"></button>
+        <button class="menu-item menu-ic" id="share-btn" role="menuitem" title="공유" aria-label="공유"></button>
+        <button class="menu-item menu-ic" id="pdf-btn" role="menuitem" title="PDF로 저장" aria-label="PDF로 저장"></button>
+        <button class="menu-item menu-ic danger" id="delete-btn" role="menuitem" title="삭제 (휴지통으로)" aria-label="삭제"></button>
+      </div>
+      <span class="menu-vsep" aria-hidden="true"></span>
+      <div class="menu-quick" role="group" aria-label="알림, 일정, 바탕화면">
+        <button class="menu-item menu-ic" id="remind-menu-btn" role="menuitem" title="알림 맞추기 (Ctrl+Shift+A)" aria-label="알림 맞추기"><svg><use href="#i-bell"/></svg></button>
+        <button class="menu-item menu-ic" id="event-menu-btn" role="menuitem" title="일정 넣기" aria-label="일정 넣기"><svg><use href="#i-calendar"/></svg></button>
+        <button class="menu-item menu-ic" id="tape-btn" role="menuitem" title="테이프로 바탕화면에 붙여 다른 창 뒤에 두기 (Ctrl+Shift+G)" aria-label="바탕화면에 붙이기" hidden><svg><use href="#i-tape"/></svg></button>
+      </div>
     </div>
     <div class="menu-colors"><span class="menu-label">색</span><div class="swatches" id="swatches"></div></div>
     <button class="menu-item" id="pin-toggle" role="menuitem"><span>목록 맨 위에 고정</span></button>

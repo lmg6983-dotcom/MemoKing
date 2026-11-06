@@ -771,7 +771,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       const nw = noteWins.get(nid);
       await until(() => js(nw, `document.documentElement.dataset.ready === 'true'`), '단축키 메모 준비');
       // ⋯ 메뉴의 불러오기 키 정하기 → 3 · 내용 복사만. 정하기 전에는 윗막대에 번개가 없다 · 메뉴에는 메모 연결이 있고 소리 받아쓰기는 없다
-      const barBefore = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { inBar: Boolean(b.closest('.bar')), off: b.classList.contains('off'), hidden: getComputedStyle(b).display === 'none', inMenu: Boolean(document.querySelector('#menu #hotkey-menu-btn')), links: Boolean(document.querySelector('#menu #links-btn')), linksInBar: Boolean(document.querySelector('.bar #links-btn')), transcribe: Boolean(document.getElementById('transcribe-btn')) }; })()`);
+      const barBefore = await js(nw, `(() => { return { inBar: Boolean(document.querySelector('.bar #hotkey-btn')), inMenu: Boolean(document.querySelector('#menu #hotkey-menu-btn')), links: Boolean(document.querySelector('#menu #links-btn')), linksInBar: Boolean(document.querySelector('.bar #links-btn')), transcribe: Boolean(document.getElementById('transcribe-btn')) }; })()`);
       await js(nw, `document.getElementById('hotkey-menu-btn').click()`);
       await until(() => js(nw, `!!document.querySelector('.hotkey-dialog[open] .hk-key')`), '단축키 창');
       const dlg = await js(nw, `(() => {
@@ -793,13 +793,13 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       await js(nw, `document.querySelector('.hotkey-dialog button[type="submit"]').click()`);
       await until(() => js(nw, `!document.querySelector('.hotkey-dialog')`), '단축키 창 닫힘');
       const saved = getSettings().memoHotkeys?.['3'];
-      const barAfter = await js(nw, `(() => { const b = document.getElementById('hotkey-btn'); return { num: document.getElementById('hotkey-num').textContent, off: b.classList.contains('off'), numShown: getComputedStyle(document.getElementById('hotkey-num')).display !== 'none', title: b.title }; })()`);
-      const label = barAfter.num === '3' && /Ctrl\+Alt\+3/.test(barAfter.title) ? 'Ctrl+Alt+3' : '';
+      const barAfter = await js(nw, `({ menuLabel: document.getElementById('hotkey-menu-label').textContent, inBar: Boolean(document.querySelector('.bar #hotkey-btn')) })`);
+      const label = barAfter.menuLabel === 'Ctrl+Alt+3' ? 'Ctrl+Alt+3' : '';
       await capture(nw, 'smoke-new-hotkey-bar.png');
-      check('불러오기 키: 정하기 전에는 ⋯ 메뉴에만, 정하면 윗막대에 번개 + 숫자 3 · 메모 연결은 ⋯ 메뉴로 · 소리 받아쓰기 메뉴 없음',
-        barBefore.inBar && barBefore.off && barBefore.hidden && barBefore.inMenu && barBefore.links && !barBefore.linksInBar && !barBefore.transcribe && !barAfter.off && barAfter.numShown,
+      check('불러오기 키: ⋯ 메뉴에서 정하고 정한 키(Ctrl+Alt+3)도 메뉴에 · 윗막대에는 없음 · 메모 연결은 ⋯ 메뉴로 · 소리 받아쓰기 메뉴 없음',
+        !barBefore.inBar && barBefore.inMenu && barBefore.links && !barBefore.linksInBar && !barBefore.transcribe && !barAfter.inBar && label === 'Ctrl+Alt+3',
         JSON.stringify({ barBefore, barAfter }));
-      check('메모 단축키 창: 1~9 · 할 일 세 칸 중 하나 · 저장하면 Ctrl+Alt+3에 이 메모 (번개 버튼에 표시)',
+      check('메모 단축키 창: 1~9 · 할 일 세 칸 중 하나 · 저장하면 Ctrl+Alt+3에 이 메모 (⋯ 메뉴에 표시)',
         dlg.keys === 9 && dlg.before && dlg.none.modes.length === 3 && dlg.none.picked === 1 && !dlg.after && /^Ctrl\+Alt\+3: 어느 앱에서든 누르면 내용을 복사해요$/.test(dlg.hint) && dlg.legend && dlg.fits
           && saved?.id === hid && saved.copy && !saved.show && label === 'Ctrl+Alt+3' && memoHotkeys.held.has('3'),
         JSON.stringify({ dlg, saved, label, held: [...memoHotkeys.held.keys()] }));
@@ -853,12 +853,12 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       };
       const buttons = (w) => js(w, `(() => {
         const st = (b) => b.hidden ? 'hidden' : b.classList.contains('folded') ? 'folded' : b.classList.contains('peeled') ? 'peeled' : 'shown';
-        return { top: st(document.getElementById('top-btn')), tape: st(document.getElementById('tape-btn')), status: document.getElementById('status').textContent, menu: Boolean(document.getElementById('widget-btn')) };
+        return { top: st(document.getElementById('top-btn')), tape: st(document.getElementById('tape-btn')), tapeInMenu: Boolean(document.querySelector('#menu #tape-btn')), status: document.getElementById('status').textContent, menu: Boolean(document.getElementById('widget-btn')) };
       })()`);
       const kindOf = (w) => stickers.get(w.id)?.kind ?? null;
       let nw = await openTaped();
       const b0 = await buttons(nw);
-      check('메모 창 윗막대: 왕관 옆에 테이프 버튼, ⋯ 메뉴에는 바탕화면에 붙이기 없음', b0.top === 'shown' && b0.tape === 'shown' && !b0.menu, JSON.stringify(b0));
+      check('메모 창: 윗막대에는 왕관, 테이프(바탕화면에 붙이기)는 ⋯ 메뉴에', b0.top === 'shown' && b0.tape === 'shown' && b0.tapeInMenu && !b0.menu, JSON.stringify(b0));
       const nb = nw.getBounds();
       await js(nw, `document.getElementById('tape-btn').click()`);
       const taped = await until(() => kindOf(nw) === 'tape' && stickers.get(nw.id)?.win?.isVisible() && getSettings().onBottom?.[tid] === true, '테이프 붙이기', 4000).catch(() => false);
@@ -867,7 +867,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       check('테이프 버튼 → 메모 창 위 가장자리 가운데에 테이프 (절반은 메모 밖), 창은 그대로 · 늘 위 아님',
         taped && !nw.isDestroyed() && !nw.isAlwaysOnTop() && sb && sb.y < nb.y && sb.y + sb.height > nb.y && Math.abs(sb.y + sb.height / 2 - nb.y) <= 6 && Math.abs(sb.x + sb.width / 2 - (nb.x + nb.width / 2)) <= 2,
         JSON.stringify({ taped, sb, nb }));
-      check('붙이면 두 버튼 모두 사라짐 (테이프 자리는 비고 왕관은 접힘) · 상태 줄 안내', b1.tape === 'peeled' && b1.top === 'folded' && /바탕화면에 붙였어요/.test(b1.status), JSON.stringify(b1));
+      check('붙이면 왕관은 접히고 메뉴의 바탕화면에 붙이기도 숨음 · 상태 줄 안내', b1.tape === 'hidden' && b1.top === 'folded' && /바탕화면에 붙였어요/.test(b1.status), JSON.stringify(b1));
       await capture(nw, 'smoke-new-taped.png');
       // 스티커 창 안에 실제로 그려진 것이 테이프인지 (왕관이 아니라)
       const sw = stickers.get(nw.id)?.win;
@@ -900,7 +900,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       nw = await openTaped();
       const kept = await until(() => kindOf(nw) === 'tape', '다시 열어도 테이프', 3000).catch(() => false);
       const b2 = await buttons(nw);
-      check('다시 열어도 테이프 (버튼도 숨은 채 · 다시 열 때는 안내 없음)', kept && b2.tape === 'peeled' && b2.top === 'folded' && !/붙였어요/.test(b2.status), JSON.stringify(b2));
+      check('다시 열어도 테이프 (버튼도 숨은 채 · 다시 열 때는 안내 없음)', kept && b2.tape === 'hidden' && b2.top === 'folded' && !/붙였어요/.test(b2.status), JSON.stringify(b2));
       // 목록에서 테이프 메모를 고르면 테이프를 떼고 앞으로 (붙인 채로는 다른 창 뒤에 숨어 고를 수 없었다)
       await js(list, `window.memoking.memo.open(${JSON.stringify(tid)})`);
       const fell = await until(async () => !getSettings().onBottom?.[tid] && !stickers.get(nw.id) && /테이프가 떨어졌어요/.test((await buttons(nw)).status), '목록에서 고르면 테이프 떼기', 3000).catch(() => false);

@@ -491,9 +491,9 @@ function applyLayer(next) {
   const prev = layer;
   layer = { top, bottom, canTape: next?.canTape === true };
   const stuck = top || bottom;
-  const hadFocus = [el.topBtn, el.tapeBtn].includes(document.activeElement);
-  el.tapeBtn.hidden = !layer.canTape; // 바탕화면 층에 붙일 수 없는 PC (Windows 가 아님 등)
-  for (const [btn, mine] of [[el.topBtn, top], [el.tapeBtn, bottom]]) {
+  const hadFocus = el.topBtn === document.activeElement;
+  el.tapeBtn.hidden = !layer.canTape || stuck; // ⋯ 메뉴: 바탕화면 층에 붙일 수 없는 PC (Windows 가 아님 등) · 이미 붙였으면 (떼기는 스티커)
+  for (const [btn, mine] of [[el.topBtn, top]]) {
     btn.classList.toggle('peeled', mine);
     btn.classList.toggle('folded', stuck && !mine);
     btn.tabIndex = stuck ? -1 : 0;
@@ -502,7 +502,6 @@ function applyLayer(next) {
     if (prev && (prev.top || prev.bottom) !== stuck) flyButton(btn, stuck);
   }
   el.topBtn.setAttribute('aria-label', '다른 창보다 늘 위에 두기');
-  el.tapeBtn.setAttribute('aria-label', '바탕화면에 붙여 다른 창 뒤에 두기');
   document.body.classList.toggle('on-top', top);
   document.body.classList.toggle('on-desktop', bottom);
   if (stuck && hadFocus) editor?.focus(); // 사라진 버튼에 포커스가 남지 않게
@@ -524,7 +523,19 @@ async function toggleLayer(which) {
   if (next.top) tutEvent('crown-on'); // 튜토리얼은 왕관으로만 (테이프는 메모를 다른 창 뒤로 보내 다음 말풍선이 가려진다)
 }
 el.topBtn.addEventListener('click', () => !layer?.top && !layer?.bottom && toggleLayer('top'));
-el.tapeBtn.addEventListener('click', () => !layer?.top && !layer?.bottom && toggleLayer('bottom'));
+el.tapeBtn.addEventListener('click', () => {
+  closeMenu();
+  if (!layer?.top && !layer?.bottom) toggleLayer('bottom');
+});
+// ⋯ 메뉴의 알림 · 일정 = 윗막대 종 · 달력과 같은 것 (그 단추는 이 메모에 있을 때만 보인다)
+$('remind-menu-btn').addEventListener('click', () => {
+  closeMenu();
+  $('bell-btn').click();
+});
+$('event-menu-btn').addEventListener('click', () => {
+  closeMenu();
+  $('event-btn').click();
+});
 // 스티커에 마우스를 올리면 무엇을 누르는지 상태 줄에 (스티커 창은 글을 띄우지 못한다)
 //   왕관 · 테이프마다 처음 한 번만 — 한 번 알면 그다음부터는 띄우지 않는다
 const STICKER_HINT_KEY = 'memoking.stickerHintSeen';
@@ -635,15 +646,9 @@ $('lock-btn').addEventListener('click', async () => {
   setStatus('잠갔어요. 창을 닫으면 다시 비밀번호로 열려요');
 });
 // 단축키 정하기 (Ctrl+Alt+1~9): 어느 앱에서든 이 메모를 복사하거나 띄운다 (hotkey-dialog.js)
-//   윗막대 번개 단추는 정했을 때만 (숫자를 작게) · ⋯ 메뉴에서 정하기 (다른 메모가 그 숫자를 가져갈 수 있어 창에 돌아올 때마다 다시 본다)
+//   ⋯ 메뉴에서 정하고, 정한 키도 거기 보인다 (다른 메모가 그 숫자를 가져갈 수 있어 창에 돌아올 때마다 다시 본다)
 function showHotkey(state) {
-  const btn = $('hotkey-btn');
   const slot = state?.slot ?? null;
-  $('hotkey-num').textContent = slot ? String(slot) : '';
-  btn.classList.toggle('off', !slot);
-  const what = slot ? `${hotkeyLabel(slot)}로 불러와요` : '아직 없어요';
-  btn.title = `불러오기 키 정하기: ${what} (Ctrl+Alt+숫자로 어디서든 이 메모를 불러와요)`;
-  btn.setAttribute('aria-label', `불러오기 키 정하기, ${slot ? hotkeyLabel(slot) : '아직 없음'}`);
   $('hotkey-menu-label').textContent = slot ? hotkeyLabel(slot) : 'Ctrl+Alt+숫자'; // 정하기 전에도 무슨 키인지
 }
 const refreshHotkey = () => api.hotkeys?.state(id).then(showHotkey, () => {});
@@ -658,7 +663,6 @@ async function editHotkey() {
   showHotkey(next);
   setStatus(next.slot ? `단축키를 정했어요: ${hotkeyLabel(next.slot)}` : '단축키를 풀었어요');
 }
-$('hotkey-btn').addEventListener('click', editHotkey);
 $('hotkey-menu-btn').addEventListener('click', editHotkey);
 // 메모 단축키로 복사하기 직전: 막 고친 글까지 저장 (main.js memoHotkeyPressed)
 window.__memokingFlush = () => flush();
