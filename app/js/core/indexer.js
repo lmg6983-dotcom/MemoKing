@@ -102,8 +102,20 @@ export function buildIndex(memos, { now } = {}) {
   const backlinks = new Map(sorted.map((m) => [m.id, []]));
   for (const [from, targets] of links) for (const to of targets) backlinks.get(to).push(from);
 
+  // 같은 낱말을 가진 메모끼리만 곱해 더한다 (역색인) — 모든 메모 쌍을 cosine 으로 비교하면 메모 1000개에 몇 초,
+  //   저장할 때마다 메인 프로세스가 그만큼 멈춰 쓰던 글자 · 창 끌기가 툭툭 끊겼다
+  const postings = new Map();
+  vectors.forEach((vec, i) => {
+    for (const [t, w] of vec) (postings.get(t) ?? postings.set(t, []).get(t)).push(i, w);
+  });
+  const sims = new Float64Array(sorted.length);
   const entries = sorted.map((memo, i) => {
     const vec = vectors[i];
+    sims.fill(0);
+    for (const [t, w] of vec) {
+      const p = postings.get(t);
+      for (let k = 0; k < p.length; k += 2) sims[p[k]] += w * p[k + 1];
+    }
     const keywords = [...vec.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, KEYWORD_COUNT)
@@ -111,20 +123,23 @@ export function buildIndex(memos, { now } = {}) {
 
     const out = links.get(memo.id);
     const back = backlinks.get(memo.id);
-    const related = [];
-    sorted.forEach((other, j) => {
-      if (j === i) return;
-      const similarity = cosine(vec, vectors[j]);
+    // 점수만 먼저 모아 위 몇 개만 고른다 (동점은 파일 이름 순 = sorted 의 차례 j). 모든 후보를 글자 비교로 정렬하던 것이 느렸다
+    const scored = [];
+    for (let j = 0; j < sorted.length; j++) {
+      if (j === i) continue;
+      const id = sorted[j].id;
+      const score = (out.includes(id) ? 0.6 : 0) + (back.includes(id) ? 0.4 : 0) + (sims[j] >= SIMILAR_MIN ? sims[j] : 0);
+      if (score > 0) scored.push([round(Math.min(1, score)), j]);
+    }
+    scored.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+    const related = scored.slice(0, RELATED_COUNT).map(([score, j]) => {
+      const other = sorted[j];
       const reasons = [];
-      let score = 0;
-      if (out.includes(other.id)) { reasons.push('link'); score += 0.6; }
-      if (back.includes(other.id)) { reasons.push('backlink'); score += 0.4; }
-      if (similarity >= SIMILAR_MIN) { reasons.push('similar'); score += similarity; }
-      if (reasons.length) {
-        related.push({ id: other.id, file: other.file, title: titles.get(other.id), score: round(Math.min(1, score)), similarity: round(similarity), reasons });
-      }
+      if (out.includes(other.id)) reasons.push('link');
+      if (back.includes(other.id)) reasons.push('backlink');
+      if (sims[j] >= SIMILAR_MIN) reasons.push('similar');
+      return { id: other.id, file: other.file, title: titles.get(other.id), score, similarity: round(sims[j]), reasons };
     });
-    related.sort((a, b) => b.score - a.score || a.file.localeCompare(b.file, 'ko'));
 
     return {
       id: memo.id,
@@ -142,7 +157,7 @@ export function buildIndex(memos, { now } = {}) {
       attachments: extractAttachments(memo.body),
       links: out,
       backlinks: back,
-      related: related.slice(0, RELATED_COUNT),
+      related,
     };
   });
 

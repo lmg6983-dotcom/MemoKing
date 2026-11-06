@@ -20,7 +20,7 @@ import {
 export const APP_DIR = '_memoking';
 export const ATTACH_DIR = 'attachments';
 const SCAN_INTERVAL = 4000;
-const INDEX_DELAY = 1500;
+const INDEX_DELAY = 5000; // 저장 뒤 이만큼 손을 쉬면 색인 (메모가 많으면 몇백 ms 걸려 — 쓰는 도중에 끼어들지 않게)
 // 탐색기·다른 PC 에서 메모 파일이 없어졌을 때 첨부를 치우기 전에 기다리는 시간.
 // Google Drive 는 다른 PC 의 이름 바꾸기를 "지움 → 새로 만듦" 으로 늦게 전하기도 하므로 바로 치우지 않는다.
 const ORPHAN_DELAY = 30_000;
