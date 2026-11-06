@@ -1183,8 +1183,26 @@ function handleLaunch(argv) {
   } else if (act.kind === 'memo') {
     if (vault?.get(act.id)) windowManager.revealNote(act.id);
     else windowManager.createListWindow();
+  } else if (act.kind === 'newFile') {
+    const text = takeMagicKeyFile(act.file);
+    if (text == null || !ipc?.saveMagicMemo({ text, open: act.open }).ok) windowManager.createListWindow();
   }
   return true;
+}
+
+// MagicKey 가 임시 폴더에 쓴 글을 읽고 지운다 — 임시 폴더 바로 아래의 작은 파일만 (아무 파일이나 메모로 읽지 않게)
+function takeMagicKeyFile(file) {
+  try {
+    const real = fs.realpathSync(file);
+    const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
+    if (!same(path.dirname(real), fs.realpathSync(os.tmpdir())) || fs.statSync(real).size > 1024 * 1024) return null;
+    const text = fs.readFileSync(real, 'utf8');
+    fs.rmSync(real, { force: true });
+    return text;
+  } catch (err) {
+    console.warn('MagicKey 글을 읽지 못했어요', err.message);
+    return null;
+  }
 }
 
 function updateTrayMenu() {
@@ -1260,6 +1278,7 @@ app.on('second-instance', (_e, argv) => {
 // 오른쪽 클릭 메뉴 (모든 창 — 메모 글 · 글 칸 · 링크 · 그림 · 맞춤법). 무엇을 넣는지는 context-menu.js
 // ---------- 오류 기록 · 문제 보내기 (desktop/error-log.js — 이 PC 에만) ----------
 let errorLog = null;
+let ipc = null; // registerIpc 가 돌려준 것 (saveMagicMemo)
 const errors = () => (errorLog ??= createErrorLog(path.join(app.getPath('userData'), 'logs', 'memoking.log')));
 const consoleError = console.error.bind(console);
 // 글로 바꾸다 오류가 나도(서로를 가리키는 객체 등) 기록하던 곳이 멈추지 않게
@@ -1365,7 +1384,7 @@ app.whenReady().then(async () => {
       saveSettings();
     },
   });
-  registerIpc({
+  ipc = registerIpc({
     setAppMode,
     setWorkLife,
     setWorkHours,
@@ -1551,7 +1570,8 @@ app.whenReady().then(async () => {
 
   const launched = launchAction(process.argv);
   if (!HIDDEN_START || !vault) {
-    if (launched?.kind !== 'memo' || !vault?.get(launched.id)) windowManager.createListWindow();
+    // 메모 하나를 열거나(점프 목록) MagicKey 가 새 메모를 만들 때는 목록 창을 띄우지 않는다
+    if (!(launched?.kind === 'memo' && vault?.get(launched.id)) && !(launched?.kind === 'newFile' && vault)) windowManager.createListWindow();
   }
   for (const id of [...settings.openNotes]) {
     // 테이프 메모는 바탕화면 층에 조용히 (로그인 때 쓰던 앱의 포커스를 빼앗지 않게)
