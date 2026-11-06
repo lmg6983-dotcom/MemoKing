@@ -1,6 +1,6 @@
 # ✦ 메모킹 × MagicKey · 🏢 MagicSystem
 
-매직키는 따로 설치하는 [MagicKey](https://github.com/lmg6983-dotcom/MagicKey) 앱으로, OPMS 검색은 [MagicSystem](https://github.com/lmg6983-dotcom/MagicOPMS) 앱으로 옮겨 가요.
+매직키는 따로 설치하는 [MagicKey](https://github.com/lmg6983-dotcom/MagicKey) 앱으로, OPMS 검색은 [MagicSystem](https://github.com/lmg6983-dotcom/MagicSystem) 앱으로 옮겨 가요.
 세 앱은 따로 돌아가고, **명령줄 인자**와 **읽기만 하는 파일**로만 이야기해요. 메모 파일을 쓰는 건 메모킹뿐이에요.
 
 ## 🔌 메모킹이 지키는 약속
