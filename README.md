@@ -51,6 +51,10 @@
 <img src="assets/screenshots/magic-calc.png" alt="매직키 — 입력창에서 바로 계산" width="48%">
 
 <sub>매직키 <code>Ctrl+Alt+Space</code> — 메모 · 파일 찾기와 계산을 한 입력창에서</sub>
+
+> [!TIP]
+> 매직키는 따로 설치하는 [**MagicKey**](https://github.com/lmg6983-dotcom/MagicKey) 앱으로, OPMS 검색은 [**MagicOPMS**](https://github.com/lmg6983-dotcom/MagicOPMS) 앱으로 옮겨 가요.
+> MagicKey 를 깔면 메모킹 매직키는 저절로 쉬고, MagicKey 가 같은 단축키로 메모 찾기 · 새 메모를 이어받아요 ([함께 쓰기](docs/magickey.md)).
 </div>
 
 > [!TIP]
