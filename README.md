@@ -131,6 +131,7 @@ Windows 설치 파일은 [SignPath.io](https://about.signpath.io)가 무료로 �
 <!-- HISTORY:START -->
 | 태그 | 날짜 | 단계 | 내용 |
 |---|---|---|---|
+| `v0.78.1` | 2026-11-06 | 3. 개선 | **설정 정리**: 메모 목록 단축키를 '단축키' 칸으로 옮겼어요. MagicKey · MagicSystem 은 맨 아래 '함께 쓰는 앱' 칸에서 앱마다 한 줄 설명과 받기 단추로 보여요. 설정 바로가기에 단축키 · 다른 앱을 더했어요 |
 | `v0.78.0` | 2026-11-06 | 3. 개선 | **매직키 · OPMS 는 MagicKey · MagicSystem 앱에서**: 메모킹 안의 매직키(Ctrl+Alt+Space) 창 · 모두 찾기 창 · 파일 목록 · OPMS 검색을 걷어냈어요. 어디서든 찾고 메모하는 매직키는 따로 설치하는 [MagicKey](https://github.com/lmg6983-dotcom/MagicKey/releases/latest), OPMS 검색은 [MagicSystem](https://github.com/lmg6983-dotcom/MagicSystem) 앱이 맡아요. 두 앱이 넘긴 글은 지금처럼 메모킹 새 메모로 들어오고, 예전 매직키 · OPMS 설정은 두 앱이 처음 켜질 때 그대로 이어받아요. 설정 › MagicKey 칸에서 두 앱 링크를 볼 수 있어요. 튜토리얼은 매직 카피부터 시작해요. 쓰지 않게 된 계산기 · 찾기 부품이 빠져 설치 파일이 조금 가벼워졌어요 |
 | `v0.77.1` | 2026-11-06 | 5. 고침 | **MagicKey 가 메모킹 버전을 바로 알아봐요**: 알림 영역에서 조용히 켜진 메모킹을 MagicKey 가 옛 버전으로 보고 "키가 겹쳐요" 경고를 띄우거나 새 메모 줄을 숨기던 것을 고쳤어요. 메모킹이 켤 때마다 지금 버전을 설정에 적어 두어요 |
 | `v0.77.0` | 2026-11-06 | 3. 개선 | **매직키를 따로 설치하는 MagicKey 앱과 함께 · OPMS 는 MagicOPMS 로**: 따로 설치하는 MagicKey 가 켜져 있으면 메모킹은 매직키 단축키(Ctrl+Alt+Space)를 MagicKey 에 넘겨주고, MagicKey 를 끄면 1분 안에 다시 잡아요. MagicKey 입력창에서 메모킹 메모를 찾아 열고, 쓴 글을 새 메모로 저장하며, 글 속 날짜로 알림까지 맞춰 저장할 수 있어요. OPMS 검색은 따로 설치하는 MagicOPMS 앱으로 옮겨 가요 (서버 주소 · 전자포대 폴더 · 받은 기록을 그대로 이어 써요). MagicKey 를 깔지 않았으면 지금처럼 메모킹 매직키를 그대로 써요. 설정 › 매직키에 MagicKey 받기 링크가 있어요 |
