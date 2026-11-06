@@ -506,9 +506,9 @@ export async function runSmoke({
     };
     await js(v1.win, `document.getElementById('menu-btn').focus()`);
     await press(v1.win, 'Enter', '\r');
-    const firstFocused = await js(v1.win, `document.activeElement?.id === 'pin-toggle' && document.getElementById('menu-btn').getAttribute('aria-expanded') === 'true'`);
+    const firstFocused = await js(v1.win, `document.activeElement?.id === 'remind-menu-btn' && document.getElementById('menu-btn').getAttribute('aria-expanded') === 'true'`);
     await press(v1.win, 'Down');
-    const secondFocused = await js(v1.win, `document.activeElement?.id === 'day-btn'`);
+    const secondFocused = await js(v1.win, `document.activeElement?.id === 'event-menu-btn'`); // 첫 글 메뉴: 알림 맞추기 → 일정 넣기 (윗막대에서 옮겨 옴)
     await press(v1.win, 'Escape');
     const backToBtn = await js(v1.win, `document.getElementById('menu').hidden && document.activeElement?.id === 'menu-btn'`);
     check('메뉴: 키보드로 열기(첫 항목) · ↓ 다음 · Esc 닫고 ⋯ 로', firstFocused && secondFocused && backToBtn, JSON.stringify([firstFocused, secondFocused, backToBtn]));
