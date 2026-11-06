@@ -3,11 +3,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
+import { Worker } from 'node:worker_threads';
 import { randomUUID, randomBytes } from 'node:crypto';
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
   extractMedia, isBlankBody, titleToFileName, COLORS, isAlbumPageTitle } from '../app/js/core/memo-file.js';
-import { buildIndex, sameIndex, AGENT_GUIDE } from '../app/js/core/indexer.js';
+import { indexOutput, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { taskProgress } from '../app/js/core/tasks.js';
 import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
@@ -20,7 +21,10 @@ import {
 export const APP_DIR = '_memoking';
 export const ATTACH_DIR = 'attachments';
 const SCAN_INTERVAL = 4000;
-const INDEX_DELAY = 5000; // 저장 뒤 이만큼 손을 쉬면 색인 (메모가 많으면 몇백 ms 걸려 — 쓰는 도중에 끼어들지 않게)
+const INDEX_DELAY = 1500;
+// 색인(index.json)은 다른 스레드에서 만든다 — 메모가 많으면 몇백 ms 걸려, 메인 프로세스에서 하면 그동안 키 입력 · 창 끌기가 멈췄다.
+//   설치본에서는 작업 스레드가 asar 안 파일을 못 읽어 밖에 둔다 (build-dist.mjs asarUnpack)
+const INDEX_WORKER = path.join(import.meta.dirname, 'index-worker.js').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 // 탐색기·다른 PC 에서 메모 파일이 없어졌을 때 첨부를 치우기 전에 기다리는 시간.
 // Google Drive 는 다른 PC 의 이름 바꾸기를 "지움 → 새로 만듦" 으로 늦게 전하기도 하므로 바로 치우지 않는다.
 const ORPHAN_DELAY = 30_000;
@@ -99,10 +103,9 @@ export class Vault extends EventEmitter {
     clearInterval(this.pollTimer);
     clearTimeout(this.scanTimer);
     clearTimeout(this.orphanTimer);
-    if (this.indexTimer) {
-      clearTimeout(this.indexTimer);
-      this.writeIndex();
-    }
+    // 아직 쓰지 않은 색인은 끄기 전에 바로 (잠근 메모의 풀린 글이 색인에 남지 않게)
+    if (this.indexTimer || this.indexing) this.writeIndex({ now: true });
+    this.closed = true;
     this.removeAllListeners();
   }
 
@@ -816,20 +819,54 @@ export class Vault extends EventEmitter {
     this.indexTimer = setTimeout(() => this.writeIndex(), INDEX_DELAY);
   }
 
-  writeIndex() {
+  /** 색인을 다시 만들어 바뀌었으면 쓴다. 보통은 작업 스레드에서 (만드는 중에 또 부르면 끝난 뒤 한 번 더), now 면 여기서 바로 */
+  writeIndex({ now = false } = {}) {
     clearTimeout(this.indexTimer);
     this.indexTimer = null;
+    if (this.closed) return;
+    if (this.indexing && !now) {
+      this.indexAgain = true;
+      return;
+    }
     const memos = [...this.entries.values()].filter((e) => e.file).map(({ id, file, meta, body }) => ({ id, file, meta, body }));
-    const index = buildIndex(memos);
-    if (sameIndex(index, this.index)) return;
+    if (now) {
+      this.indexing = null; // 만들던 것은 버린다 (이것이 더 새 글)
+      this.putIndex(indexOutput(memos));
+      return;
+    }
+    const job = indexOffThread(memos).catch(() => indexOutput(memos)); // 작업 스레드를 못 띄우면 여기서라도
+    this.indexing = job;
+    job.then((out) => {
+      if (this.indexing !== job || this.closed) return;
+      this.indexing = null;
+      this.putIndex(out);
+      if (this.indexAgain) {
+        this.indexAgain = false;
+        this.writeIndex();
+      }
+    });
+  }
+
+  putIndex({ index, key, text }) {
+    if (key === this.indexKey) return; // generatedAt 만 다르면 같은 색인 (불필요한 동기화 없게)
     try {
-      writeAtomic(this.indexFile, `${JSON.stringify(index, null, 2)}\n`);
+      writeAtomic(this.indexFile, text);
       this.index = index;
+      this.indexKey = key;
       this.emit('indexed', index);
     } catch (err) {
       this.emit('error', err);
     }
   }
+}
+
+function indexOffThread(memos) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(INDEX_WORKER, { workerData: memos });
+    worker.once('message', resolve);
+    worker.once('error', reject);
+    worker.once('exit', (code) => reject(new Error(`색인 작업이 끝났어요 (${code})`))); // message 뒤의 exit 는 무시된다
+  });
 }
 
 installLockMethods(Vault);
