@@ -62,16 +62,6 @@ body, .note-screen, .share-paper {
 .count-btn .count { font-size: 12px; font-weight: 700; }
 .count-btn.has-links { color: var(--note-text); }
 /* 불러오기 키: 정했을 때만 윗막대에 번개 + 오른쪽 아래 작은 숫자 (Ctrl+Alt+숫자) — 정하기 전에는 ⋯ 메뉴에서 (윗막대를 휴대폰처럼 가볍게) */
-.hotkey-btn { position: relative; color: var(--note-text); }
-.hotkey-btn.off { display: none; }
-.hotkey-num {
-  position: absolute; right: 2px; bottom: 3px;
-  min-width: 8px; height: 12px;
-  color: var(--note-text); /* 바탕 없이 숫자만 — 번개와 겹치는 곳은 막대 색 테두리로 또렷하게 */
-  text-shadow: 0 0 2px var(--note-bar), 0 0 2px var(--note-bar), 0 0 1px var(--note-bar);
-  font-size: 11px; line-height: 12px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums;
-  pointer-events: none;
-}
 #links-count:empty { display: none; }
 
 /* ---------- 메뉴 ---------- */
@@ -2033,7 +2023,7 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 @media (pointer: coarse) { .lock-field input { min-height: 48px; font-size: 16px; } }
 /* 비밀번호를 넣기 전: 서식 막대·+ 는 숨김 */
 .memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
-.memo-locked #bell-btn, .memo-locked #hotkey-btn, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
+.memo-locked #bell-btn, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
 .lock-dialog h2 { margin-bottom: 8px; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
 .lock-hide-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 4px 0; font-size: 13px; color: var(--muted); }

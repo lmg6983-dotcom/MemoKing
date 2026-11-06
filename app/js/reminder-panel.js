@@ -77,11 +77,13 @@ export function setupReminderPanel({ api, memoId, memoTitle = () => '', setStatu
     const events = reminders.filter(upcomingEvent).length;
     el.bellCount.textContent = tasks ? String(tasks) : '';
     el.bell.classList.toggle('has-links', tasks > 0);
+    if ('hideEmpty' in el.bell.dataset) el.bell.hidden = !tasks; // PC 메모 창: 있을 때만 윗막대에 (맞추기는 ⋯ 메뉴 · Ctrl+Shift+A). 휴대폰은 늘
     el.bell.title = tasks ? `알림 ${tasks}개 (Ctrl+Shift+A)` : '알림 (Ctrl+Shift+A)';
     el.bell.setAttribute('aria-label', tasks ? `알림 ${tasks}개` : '알림');
     if (!el.event) return;
     el.eventCount.textContent = events ? String(events) : '';
     el.event.classList.toggle('has-links', events > 0);
+    if ('hideEmpty' in el.event.dataset) el.event.hidden = !events;
     el.event.title = events ? `일정 ${events}개` : '일정';
     el.event.setAttribute('aria-label', events ? `일정 ${events}개` : '일정');
   }
