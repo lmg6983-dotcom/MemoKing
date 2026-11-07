@@ -748,6 +748,8 @@ dialog.quick-event[open] {
   cursor: pointer;
 }
 .quick-event .qe-date-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.quick-event .qe-short { display: none; }
+@media (max-width: 420px) { .quick-event .qe-long { display: none; } .quick-event .qe-short { display: inline; } } /* 기본 메모 창 폭: "오늘 · 11/…" 처럼 잘리지 않게 짧게 */
 .quick-event .qe-date { gap: 6px; }
 .quick-event .qe-clock {
   flex: none; width: 6.6em; min-height: 36px; padding: 0 6px; white-space: nowrap; font-variant-numeric: tabular-nums; /* 오전 9:00 · 오후 10:00 이 같은 폭 (날짜 칸이 따라 줄지 않게) */

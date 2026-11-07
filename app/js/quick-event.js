@@ -142,11 +142,15 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
     const title = () => name.value.replace(/\s+/g, ' ').trim();
     let target = memo; // 넣을 메모 { id, title } — null 이면 새 메모
     memoRow.hidden = Boolean(memo);
-    // 좁은 칸에도 다 보이게: "오늘 · 10/31 (토)" · "11월 3일 (화)" (해가 다르면 연도도)
+    // 좁은 칸에도 다 보이게: "오늘 · 10/31 (토)" · "11월 3일 (화)" (해가 다르면 연도도).
+    //   기본 메모 창처럼 더 좁으면 짧은 것("오늘 (토)" · "11/3 (화)")으로 바꿔 끝이 "…" 로 잘리지 않게 (base.css)
     const dayLabelText = (d) => {
       const rel = relativeDay(d);
       const wd = `(${'일월화수목금토'[d.getDay()]})`;
-      return rel ? `${rel} · ${d.getMonth() + 1}/${d.getDate()} ${wd}` : koFullDate(d);
+      const long = rel ? `${rel} · ${d.getMonth() + 1}/${d.getDate()} ${wd}` : koFullDate(d);
+      const short = rel ? `${rel} ${wd}` : `${d.getMonth() + 1}/${d.getDate()} ${wd}`;
+      const span = (cls, text) => Object.assign(document.createElement('span'), { className: cls, textContent: text });
+      return [span('qe-long', long), span('qe-short', short)];
     };
 
     function syncDates() {
@@ -157,8 +161,8 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
 
     function draw() {
       syncDates();
-      startDateText.textContent = dayLabelText(start);
-      endDateText.textContent = dayLabelText(end);
+      startDateText.replaceChildren(...dayLabelText(start));
+      endDateText.replaceChildren(...dayLabelText(end));
       startClock.textContent = koClock(start);
       endClock.textContent = koClock(end);
       startClock.hidden = allDay;
@@ -379,9 +383,6 @@ export function openQuickEvent({ day, start: initStart = null, allDay: initAllDa
       showHint();
     }
     dialog.showModal();
-    name.focus({ preventScroll: true });
-    requestAnimationFrame(() => {
-      dialog.querySelector('.alert-add')?.scrollIntoView({ block: 'nearest' });
-    });
+    name.focus({ preventScroll: true }); // 이름 칸부터 보이게 (예전에는 미리 알림 '추가' 로 내려 가 낮은 창에서 이름 · 날짜가 가려졌다)
   });
 }

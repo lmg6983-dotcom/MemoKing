@@ -700,8 +700,8 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   bottom: auto;
   z-index: 50;
   width: min(390px, calc(100vw - 28px));
-  min-height: 440px;
-  max-height: min(92vh, 600px);
+  min-height: min(440px, calc(100vh - 24px)); /* 기본 메모 창(380px)보다 커서 제목 · 닫기 · 추가 단추가 위아래로 잘리던 것 */
+  max-height: min(calc(100vh - 24px), 600px);
   overflow-y: auto;
   overflow-x: hidden;
   margin: 0;
@@ -853,6 +853,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .task-summary { margin: 14px 2px 0; font-size: 13px; font-weight: 700; color: var(--text-strong); }
 .task-summary.error { color: var(--danger); }
 .task-form .flow-footer { grid-template-columns: 1fr; margin-top: 10px; }
+.reminder-panel.reminder-modal .flow-footer { bottom: -14px; margin-bottom: -14px; padding-bottom: 14px; } /* 창 아래 여백까지 덮어 단추 밑으로 글이 비치지 않게 (패널 padding-bottom 14px) */
 .task-add:disabled { opacity: 0.45; cursor: default; }
 
 /* 날짜·시각 고르기 (date-picker.js) — 다이얼 대신 달력 한 장 + 시각 칩 */
