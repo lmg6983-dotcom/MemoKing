@@ -50,6 +50,7 @@ let attached = null; // 지금 열린 메모 id
 let tickBase = { at: 0, elapsed: 0 };
 let ticker = 0;
 let stopping = false;
+let liveHintShown = false;
 
 export { recordingClock as formatDuration } from '../../app/js/core/voice-card.js';
 
@@ -152,6 +153,11 @@ export async function start(memoId) {
     setStatus({ active: true, paused: false, memoId, elapsedMs: 0, stt: Boolean(res?.stt), text: '', partial: '' });
     haptic(20);
     if (sttOn() && !res?.stt) toast(res?.reason || '받아쓰기를 쓸 수 없어 녹음만 해요');
+    // 안드로이드 16+ 인데 이 앱의 실시간 업데이트가 꺼져 있으면: 녹음은 알림에만 뜨고 시계 옆 캡슐은 없다 — 켜는 곳으로 (앱을 켤 때마다 한 번)
+    else if (res?.liveUpdate === false && !liveHintShown) {
+      liveHintShown = true;
+      toast('시계 옆 녹음 캡슐을 보려면 메모킹의 실시간 업데이트를 켜 주세요', false, { label: '켜기', run: () => native.openLiveUpdateSettings() });
+    }
     document.activeElement?.blur();
   } catch (err) {
     toast(err.message || UI.recordFail, true);
