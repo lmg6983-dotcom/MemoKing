@@ -200,9 +200,9 @@ body, .note-screen, .share-paper {
 .mk-doc pre code { padding: 0; background: none; }
 .mk-doc hr { border: 0; border-top: 1px solid var(--note-muted); margin: 0.8em 0; }
 .mk-doc a { color: inherit; text-decoration: underline; text-decoration-color: var(--note-accent); text-underline-offset: 2px; }
-/* 노랑 메모 위에서는 노랑 강조가 묻히므로 검정 계열로 */
-body[data-color="yellow"] .mk-doc a { text-decoration-color: rgba(17, 17, 17, 0.45); }
-body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-black); }
+/* 노랑 메모 위에서는 노랑 강조가 묻히므로 글자색 계열로 (어두운 화면의 노랑 메모에서는 검정이 묻혀 밝게 — 글자색 · 흐린 글자색이 따라 바뀐다) */
+body[data-color="yellow"] .mk-doc a { text-decoration-color: var(--note-muted); }
+body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--note-text); }
 .mk-doc .ProseMirror-selectednode { outline: 2px solid var(--note-accent); outline-offset: 2px; border-radius: 4px; }
 /* 메모 창이 비활성(다른 창으로 감)이면 고른 내용의 테두리는 없다 — 활성 창의 선택과 헷갈리지 않게 */
 body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .mk-ink.ProseMirror-selectednode img { outline: none; }
