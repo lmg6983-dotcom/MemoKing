@@ -1046,6 +1046,7 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
   pointer-events: none;
 }
 .mk-doc .column-resize-handle { position: absolute; top: 0; right: -2px; bottom: 0; width: 4px; background: var(--brand-yellow); pointer-events: none; }
+.mk-doc :is(td, th):last-child > .column-resize-handle { right: 0; } /* 맨 오른쪽 칸은 안쪽에 — 표 밖으로 2px 나가 표 아래에 가로 스크롤바가 생기던 것 */
 .mk-doc.resize-cursor { cursor: col-resize; }
 
 /* 표 막대: 서식 도구막대 바로 위 */
