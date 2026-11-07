@@ -533,6 +533,11 @@ function renderCard(memo) {
   }
   const meta = document.createElement('div');
   meta.className = 'card-meta';
+  if (memo.locked) { // 잠근 메모: 미리 보기가 없어 빈 카드처럼 보이던 것
+    const lk = badge('lock', '', 'locked');
+    lk.title = '잠근 메모예요';
+    meta.append(lk);
+  }
   if (memo.reminderCount) meta.append(badge('bell', memo.reminderCount));
   if (memo.hasAudio) meta.append(badge('audio', ''));
   if (memo.hasVideo) meta.append(badge('video', ''));
