@@ -492,8 +492,10 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   max-width: min(320px, calc(100vw - 16px));
   padding: 10px 10px 10px 14px;
   border-radius: var(--radius-sm, 8px);
-  background: var(--text-strong);
-  color: var(--bg);
+  /* 앱 화면과 같은 카드 (밝은 화면에서 검정 말풍선이 튀던 것 — 밝으면 흰 바탕, 어두우면 어두운 카드) */
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-strong);
   box-shadow: var(--shadow-pop);
   font-family: var(--font-sans);
   font-size: 13px;
