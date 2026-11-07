@@ -200,9 +200,9 @@ body, .note-screen, .share-paper {
 .mk-doc pre code { padding: 0; background: none; }
 .mk-doc hr { border: 0; border-top: 1px solid var(--note-muted); margin: 0.8em 0; }
 .mk-doc a { color: inherit; text-decoration: underline; text-decoration-color: var(--note-accent); text-underline-offset: 2px; }
-/* 노랑 메모 위에서는 노랑 강조가 묻히므로 검정 계열로 */
-body[data-color="yellow"] .mk-doc a { text-decoration-color: rgba(17, 17, 17, 0.45); }
-body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--brand-black); }
+/* 노랑 메모 위에서는 노랑 강조가 묻히므로 글자색 계열로 (어두운 화면의 노랑 메모에서는 검정이 묻혀 밝게 — 글자색 · 흐린 글자색이 따라 바뀐다) */
+body[data-color="yellow"] .mk-doc a { text-decoration-color: var(--note-muted); }
+body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--note-text); }
 .mk-doc .ProseMirror-selectednode { outline: 2px solid var(--note-accent); outline-offset: 2px; border-radius: 4px; }
 /* 메모 창이 비활성(다른 창으로 감)이면 고른 내용의 테두리는 없다 — 활성 창의 선택과 헷갈리지 않게 */
 body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .mk-ink.ProseMirror-selectednode img { outline: none; }
@@ -700,8 +700,8 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   bottom: auto;
   z-index: 50;
   width: min(390px, calc(100vw - 28px));
-  min-height: 440px;
-  max-height: min(92vh, 600px);
+  min-height: min(440px, calc(100vh - 24px)); /* 기본 메모 창(380px)보다 커서 제목 · 닫기 · 추가 단추가 위아래로 잘리던 것 */
+  max-height: min(calc(100vh - 24px), 600px);
   overflow-y: auto;
   overflow-x: hidden;
   margin: 0;
@@ -853,6 +853,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .task-summary { margin: 14px 2px 0; font-size: 13px; font-weight: 700; color: var(--text-strong); }
 .task-summary.error { color: var(--danger); }
 .task-form .flow-footer { grid-template-columns: 1fr; margin-top: 10px; }
+.reminder-panel.reminder-modal .flow-footer { bottom: -14px; margin-bottom: -14px; padding-bottom: 14px; } /* 창 아래 여백까지 덮어 단추 밑으로 글이 비치지 않게 (패널 padding-bottom 14px) */
 .task-add:disabled { opacity: 0.45; cursor: default; }
 
 /* 날짜·시각 고르기 (date-picker.js) — 다이얼 대신 달력 한 장 + 시각 칩 */
@@ -1045,6 +1046,7 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
   pointer-events: none;
 }
 .mk-doc .column-resize-handle { position: absolute; top: 0; right: -2px; bottom: 0; width: 4px; background: var(--brand-yellow); pointer-events: none; }
+.mk-doc :is(td, th):last-child > .column-resize-handle { right: 0; } /* 맨 오른쪽 칸은 안쪽에 — 표 밖으로 2px 나가 표 아래에 가로 스크롤바가 생기던 것 */
 .mk-doc.resize-cursor { cursor: col-resize; }
 
 /* 표 막대: 서식 도구막대 바로 위 */
@@ -1184,7 +1186,10 @@ body.mk-row-resizing { user-select: none; }
 }
 
 /* ---------- v0.17.14: 목록·체크리스트 항목 — 글자를 잠깐 누르고 끌어서 순서 바꾸기 ---------- */
-.mk-doc { --mk-hover-frame: color-mix(in srgb, var(--note-text) 28%, transparent); } /* 마우스를 올린 덩어리의 점선 — 목록 항목 · 글 · 표 · 내용이 모두 같은 모양 */
+.mk-doc { --mk-hover-frame: color-mix(in srgb, var(--note-text) 28%, transparent); }
+/* 글 · 제목 · 인용 · 표 · 목록 항목은 내용 폭만큼 — 누르거나 마우스를 올리면 뜨는 점선 틀이 창 폭이 아니라 글 · 표에 맞게.
+   그림 줄(mk-image-line)과 같은 방식. 왼쪽 정렬만 있어 글자 자리 · 줄 바꿈은 그대로 */
+.mk-doc > :is(p, h1, h2, h3, h4, h5, h6, blockquote, .tableWrapper), .mk-doc li { width: fit-content; max-width: 100%; box-sizing: border-box; } /* 마우스를 올린 덩어리의 점선 — 목록 항목 · 글 · 표 · 내용이 모두 같은 모양 */
 .mk-doc li { position: relative; }
 .mk-doc .mk-sorting > li { transition: transform 0.16s var(--ease-out); }
 /* 옮길 수 있다는 표시: 마우스를 올린 항목(가장 안쪽)에 흐린 점선 테두리 — 체크 네모·글머리까지 감싼다.

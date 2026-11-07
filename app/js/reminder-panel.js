@@ -96,8 +96,10 @@ export function setupReminderPanel({ api, memoId, memoTitle = () => '', setStatu
     li.classList.toggle('off', !r.enabled || over);
     li.append(icon(KIND_ICON[r.kind], 'rem-kind-icon'));
     const text = h('div', 'rem-text');
-    const title = h('div', 'rem-title', r.title ? `${r.title}, ${describeReminder(r)}` : describeReminder(r));
-    text.append(title, h('div', 'rem-sub', over ? '지난 일정' : `알림 ${describeAlerts(r)}`));
+    const when = describeReminder(r).replace(/\b(\d{2}):(\d{2})\b/g, (_, hh, mm) => koClock(new Date(2000, 0, 1, +hh, +mm))); // 알림 목록과 같은 "오후 5:15"
+    const title = h('div', 'rem-title', r.title ? `${r.title}, ${when}` : when);
+    const alerts = describeAlerts(r);
+    text.append(title, h('div', 'rem-sub', over ? '지난 일정' : alerts === '알림 없음' ? alerts : `${alerts}에 알림`)); // "알림 정시" · "알림 알림 없음" 이던 것
     const del = iconButton('trash', `${title.textContent} 삭제`, () => remove(r));
     li.append(text, del);
     return li;

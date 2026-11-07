@@ -537,8 +537,9 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
 
 /* 카드의 태그: 요약 아래 작게 */
 /* 아랫줄은 한 줄 — 태그가 많으면 넘치는 것은 숨김 */
-.card-tags { display: flex; flex: 1; flex-wrap: nowrap; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; mask-image: linear-gradient(to left, transparent, #000 14px); }
+.card-tags { display: flex; flex: 1; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 8px 6px; min-width: 0; height: 20px; line-height: 20px; overflow: hidden; white-space: nowrap; } /* 다 못 들어가는 태그는 둘째 줄로 넘겨 통째로 숨긴다 ("#업…" 처럼 글자 중간에서 흐려지던 것) */
 .card-tag {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; /* 태그 하나가 칸보다 길면 끝을 … 로 */
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);

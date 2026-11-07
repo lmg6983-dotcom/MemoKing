@@ -533,6 +533,11 @@ function renderCard(memo) {
   }
   const meta = document.createElement('div');
   meta.className = 'card-meta';
+  if (memo.locked) { // 잠근 메모: 미리 보기가 없어 빈 카드처럼 보이던 것
+    const lk = badge('lock', '', 'locked');
+    lk.title = '잠근 메모예요';
+    meta.append(lk);
+  }
   if (memo.reminderCount) meta.append(badge('bell', memo.reminderCount));
   if (memo.hasAudio) meta.append(badge('audio', ''));
   if (memo.hasVideo) meta.append(badge('video', ''));
@@ -1943,7 +1948,10 @@ async function renderTrash() {
     title.textContent = t.title;
     const sub = document.createElement('div');
     sub.className = 'trash-sub';
-    sub.textContent = [`${agoText(t.deletedAt)} 지움`, t.preview].filter(Boolean).join(', ');
+    // 저절로 비우는 휴지통이면 남은 날도 (언제 사라지는지 몰라 불안하지 않게)
+    const left = s.trashDays > 0 ? Math.ceil(s.trashDays - (Date.now() - Date.parse(t.deletedAt)) / 86400e3) : null;
+    const leftText = left == null || Number.isNaN(left) ? '' : left <= 1 ? '곧 영구 삭제' : `${left}일 뒤 영구 삭제`;
+    sub.textContent = [`${agoText(t.deletedAt)} 지움`, leftText, t.preview].filter(Boolean).join(', ');
     text.append(title, sub);
     const restore = document.createElement('button');
     restore.className = 'btn trash-restore';

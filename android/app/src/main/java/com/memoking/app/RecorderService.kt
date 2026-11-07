@@ -69,7 +69,37 @@ class RecorderService : Service() {
                 session = null
                 throw IllegalStateException("녹음을 시작하지 못했어요. 다른 앱이 마이크를 쓰고 있는지 확인해 주세요")
             }
-            return JSONObject().put("stt", s.stt).put("reason", reason ?: "")
+            return JSONObject().put("stt", s.stt).put("reason", reason ?: "").put("liveUpdate", liveUpdateAllowed(ctx) ?: JSONObject.NULL)
+        }
+
+        /**
+         * 안드로이드 16+: 이 앱의 "실시간 업데이트"(상태 막대 캡슐)가 켜져 있나 — 꺼져 있으면 요청해도 알림에만 뜬다. 16 미만은 null
+         *   compileSdk 35 라 canPostPromotedNotifications() 를 이름으로 부른다
+         */
+        fun liveUpdateAllowed(ctx: Context): Boolean? {
+            if (Build.VERSION.SDK_INT < 36) return null
+            return try {
+                val nm = ctx.getSystemService(NotificationManager::class.java)!!
+                nm.javaClass.getMethod("canPostPromotedNotifications").invoke(nm) as Boolean
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        /** 이 앱의 실시간 업데이트 설정 화면 (없으면 이 앱의 알림 설정) */
+        fun openLiveUpdateSettings(ctx: Context) {
+            val pkg = ctx.packageName
+            val promoted = Intent("android.settings.MANAGE_APP_PROMOTED_NOTIFICATIONS") // Settings.ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS (안드로이드 16)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, pkg).setData(Uri.parse("package:$pkg"))
+            val notif = Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, pkg)
+            for (i in listOf(promoted, notif)) {
+                try {
+                    ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    return
+                } catch (e: Exception) {
+                    // 다음 화면으로
+                }
+            }
         }
 
         fun status(): JSONObject = session?.status() ?: JSONObject()

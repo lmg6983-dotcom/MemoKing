@@ -298,6 +298,13 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun recordStatus(): String = reply { RecorderService.status() }
 
+    /** 녹음 중 상태 막대 캡슐(실시간 업데이트)을 켜는 설정 화면 */
+    @JavascriptInterface
+    fun openLiveUpdateSettings(): String = reply {
+        RecorderService.openLiveUpdateSettings(ctx)
+        true
+    }
+
     @JavascriptInterface
     fun recordPause(): String = reply {
         if (RecorderService.session != null) ctx.startService(Intent(ctx, RecorderService::class.java).setAction(RecorderService.ACTION_PAUSE))
