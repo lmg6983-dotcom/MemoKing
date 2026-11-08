@@ -170,13 +170,20 @@ export function buildIndex(memos, { now } = {}) {
   };
 }
 
+// generatedAt 만 다른 경우는 같은 인덱스로 본다 (불필요한 동기화 방지) — 휴대폰(android/web/js/vault.js)이 쓴다
+export const indexKey = (index) => JSON.stringify({ ...index, generatedAt: null });
+export function sameIndex(a, b) {
+  if (!a || !b) return false;
+  return indexKey(a) === indexKey(b);
+}
+
 /**
  * 색인과 파일에 쓸 글, 비교 열쇠(generatedAt 만 다르면 같은 색인 — 불필요한 동기화 방지).
  *   큰 JSON 만들기까지 작업 스레드(desktop/index-worker.js)에서 끝내 메인 프로세스는 받아 쓰기만
  */
 export function indexOutput(memos) {
   const index = buildIndex(memos);
-  return { index, key: JSON.stringify({ ...index, generatedAt: null }), text: `${JSON.stringify(index, null, 2)}\n` };
+  return { index, key: indexKey(index), text: `${JSON.stringify(index, null, 2)}\n` };
 }
 
 export const AGENT_GUIDE = `# 메모킹 폴더 안내 (LLM 에이전트용)
