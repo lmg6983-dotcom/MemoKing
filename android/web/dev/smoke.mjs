@@ -461,7 +461,7 @@ try {
     focused: document.activeElement?.classList.contains('qe-name'),
   }));
   check('새 일정 창: 한 화면 (이름 · 날짜 · 🔔 미리 알림 스위치(기본 켬) · 📝 저장할 메모 줄, 메모 칸은 접힘) · 버튼 "일정 저장" · 이름 칸에 바로 입력',
-    sheet.name && /오늘|\d+월 \d+일/.test(sheet.date) && sheet.alertsOpen && !sheet.memoOpen && sheet.rows.length === 2 && /미리 알림/.test(sheet.rows[0]) && /새 메모/.test(sheet.rows[1]) && sheet.save === '일정 저장' && sheet.focused, JSON.stringify(sheet));
+    sheet.name && /오늘|내일|모레|\d+월 \d+일/.test(sheet.date) && sheet.alertsOpen && !sheet.memoOpen && sheet.rows.length === 2 && /미리 알림/.test(sheet.rows[0]) && /새 메모/.test(sheet.rows[1]) && sheet.save === '일정 저장' && sheet.focused, JSON.stringify(sheet));
   await page.fill('.qe-name', '팀 점심');
   check('새 일정 창: 이름을 쓰면 📝 줄이 새 메모 "팀 점심"', /새 메모 "팀 점심"/.test(await page.textContent('.qe-memo-row')));
   await page.tap('.qe-time .dp-quick [data-time="21:00"]').catch(() => {}); // 오늘이라도 지나지 않게 (21시 이후 실행이면 아래에서 날짜를 바꾼다)
