@@ -24,7 +24,7 @@ const NATIVE_HOUR_RE = '열한|열두|다섯|여섯|일곱|여덟|아홉|한|두
 const NATIVE_COUNT = { 한: 1, 두: 2, 세: 3, 네: 4, 다섯: 5, 여섯: 6, 일곱: 7, 여덟: 8, 아홉: 9, 열: 10 };
 const COUNT_RE = '\\d{1,3}|열|다섯|여섯|일곱|여덟|아홉|한|두|세|네';
 // 날 수 고유어
-const NATIVE_DAYS = { 하루: 1, 이틀: 2, 사흘: 3, 나흘: 4, 닷새: 5, 엿새: 6, 이레: 7, 여드레: 8, 아흐레: 9, 열흘: 10 };
+const NATIVE_DAYS = { 하루: 1, 이틀: 2, 사흘: 3, 나흘: 4, 닷새: 5, 엿새: 6, 이레: 7, 여드레: 8, 아흐레: 9, 열흘: 10, 보름: 15 };
 // 한자어 수 (분: 십오 분 · 삼십 분)
 const SINO = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 };
 function sinoNumber(text) {
@@ -69,6 +69,40 @@ function withYear(year, mo, d, now) {
 }
 
 const WEEK_OFFSET = { 이번: 0, 이번주: 0, 다음: 1, 담: 1, 다다음: 2, 지난: -1, 저번: -1 };
+
+// 그 달의 n번째 X요일 (n = 0 이면 마지막) — 없는 날(다섯째 주가 없는 달)은 null
+function nthWeekday(y, mo, n, wd) {
+  if (!n) {
+    const last = new Date(y, mo + 1, 0);
+    return { y, mo, d: last.getDate() - ((last.getDay() - wd + 7) % 7) };
+  }
+  const d = 1 + ((wd - new Date(y, mo, 1).getDay() + 7) % 7) + (n - 1) * 7;
+  return d <= new Date(y, mo + 1, 0).getDate() ? { y, mo, d } : null;
+}
+const NTH = { 첫: 1, 첫째: 1, 첫번째: 1, 둘째: 2, 두번째: 2, 셋째: 3, 세번째: 3, 넷째: 4, 네번째: 4, 다섯째: 5, 다섯번째: 5, 마지막: 0 };
+const MONTH_OFFSET = { 이번: 0, 다음: 1, 다다음: 2 };
+// (이번|다음) 달 · M월 → 그 달의 첫날 { y, mo } (M월이 이미 지난 달이면 내년)
+function monthOf(word, num, now) {
+  if (word) {
+    const first = new Date(now.getFullYear(), now.getMonth() + MONTH_OFFSET[word], 1);
+    return { y: first.getFullYear(), mo: first.getMonth() };
+  }
+  const mo = +num - 1;
+  return { y: now.getFullYear() + (mo < now.getMonth() ? 1 : 0), mo };
+}
+
+// 음력 명절 (설날 = 1월 1일, 추석 = 8월 15일) — 브라우저의 한국 음력 달력으로 앞으로 가장 가까운 날을 찾는다 (표를 따로 두지 않음)
+const LUNAR = new Intl.DateTimeFormat('en-u-ca-dangi', { month: 'numeric', day: 'numeric' });
+function nextLunar(month, day, now) {
+  const from = startOfDay(now);
+  for (let i = 0; i < 400; i++) {
+    const d = addDays(from, i);
+    const parts = LUNAR.formatToParts(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12));
+    const val = (type) => parts.find((x) => x.type === type)?.value;
+    if (val('month') === String(month) && val('day') === String(day)) return ymd(d); // 윤달("8bis")은 아님
+  }
+  return null;
+}
 
 // ---------- 날짜 말 ----------
 // date(m, now) → { date: {y, mo, d} } | { at: Date, hasTime: true } (시각까지 정해지는 상대 표현) | null
@@ -117,6 +151,33 @@ const DATE_RULES = [
       return { date: { y: first.getFullYear(), mo: first.getMonth(), d: +m[2] } };
     },
   },
+  // 12월 첫째 주 월요일 · 다음 달 셋째 주 금요일 · 이번 달 마지막 주 수요일 (그 달의 n번째 그 요일 — 뒤의 "X요일" 규칙보다 먼저)
+  {
+    re: new RegExp(`(?<![0-9가-힣])(?:(이번|다음|다다음)\\s?달|(\\d{1,2})월)\\s?(첫|첫째|첫\\s?번째|둘째|두\\s?번째|셋째|세\\s?번째|넷째|네\\s?번째|다섯째|다섯\\s?번째|마지막)\\s?주\\s?([${WEEKDAYS}])(?:요일|욜)`, 'g'),
+    date: (m, now) => {
+      if (m[2] && (+m[2] < 1 || +m[2] > 12)) return null;
+      const { y, mo } = monthOf(m[1], m[2], now);
+      const date = nthWeekday(y, mo, NTH[m[3].replace(/\s/g, '')], weekdayIndex(m[4]));
+      return { date }; // 없는 날(다섯째 주가 없는 달)이면 자리만 차지 — 뒤의 "월요일" 을 가까운 월요일로 읽지 않게
+    },
+  },
+  // 월말 · 이번 달 말 · 다음 달 말일 · 11월 말 → 그 달 마지막 날 ("10월 말고" 는 아님)
+  {
+    re: /(?<![0-9가-힣])(?:(이번|다음|다다음)\s?달\s?말일?|(\d{1,2})월\s?말일?|월말)(?=$|[^가-힣]|까지|에|엔|쯤|경|일)/g,
+    date: (m, now) => {
+      if (m[2] && (+m[2] < 1 || +m[2] > 12)) return null;
+      const { y, mo } = m[1] || m[2] ? monthOf(m[1], m[2], now) : { y: now.getFullYear(), mo: now.getMonth() };
+      return { date: { y, mo, d: new Date(y, mo + 1, 0).getDate() } };
+    },
+  },
+  // 설날 · 추석 (음력 — 앞으로 가장 가까운 날)
+  {
+    re: /(?<![가-힣])(설날|구정|추석|한가위)/g,
+    date: (m, now) => {
+      const date = /설날|구정/.test(m[1]) ? nextLunar(1, 1, now) : nextLunar(8, 15, now);
+      return date ? { date } : null;
+    },
+  },
   // 크리스마스(이브)
   {
     re: /(?<![가-힣])크리스마스(\s?이브)?/g,
@@ -146,7 +207,7 @@ const DATE_RULES = [
   },
   // 하루·이틀·사흘 … 열흘 뒤
   {
-    re: /(?<![가-힣])(하루|이틀|사흘|나흘|닷새|엿새|이레|여드레|아흐레|열흘)\s?(?:뒤|후|있다가|지나서)/g,
+    re: /(?<![가-힣])(하루|이틀|사흘|나흘|닷새|엿새|이레|여드레|아흐레|열흘|보름)\s?(?:뒤|후|있다가|지나서)/g,
     date: (m, now) => ({ date: ymd(addDays(now, NATIVE_DAYS[m[1]])) }),
   },
   // 3일 뒤 · 일주일 후 · 2주 뒤 · 한 달 뒤 · 3개월 후 · 1년 뒤
