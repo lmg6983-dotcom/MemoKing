@@ -478,6 +478,7 @@ export function findDates(text, now = new Date(), { allowPast = false } = {}) {
       if (rule.needsMore && !paren && !(t?.explicit)) continue;
       if (t) {
         let at = atTime(date, t);
+        if (r.today && !allowPast) at = eveningIfPast(at, t, now);
         if ((rule.rollWeek || r.rollWeek) && at <= now) at = plusDays(at, 7);
         add(from, t.end, at, true, { past, repeat: r.repeat, rollWeek: Boolean(rule.rollWeek || r.rollWeek) });
       } else if (r.today) {
