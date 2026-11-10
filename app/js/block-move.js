@@ -298,6 +298,7 @@ const HOLD_TARGET = 'a[data-file], .mk-link-card, [data-link-card], .mk-math-blo
 const TAP_MS = 400;
 // 누르면 바로 열리던 것 → 단추 줄의 "열기" 단추가 그것을 대신 눌러 준다 (링크 카드는 안쪽 글 상자가 받는다)
 const OPEN_TARGET = 'a[data-file], .mk-link-card, [data-link-card], .mk-math-block';
+const LONG_TARGET = `${OPEN_TARGET}, img.mk-image`; // 오래 누르다 떼면 열지 않는 것 — 그림(크게 보기)도
 function openerOf(dom, kind) {
   const host = dom.matches(OPEN_TARGET) ? dom : dom.querySelector(OPEN_TARGET);
   if (!host) return null;
@@ -427,7 +428,15 @@ export function createBlockMove({ readOnly = false } = {}) {
           // 한 번 누른 손 메모를 또 누르면 이어 그리기로 넘어가니 단추를 다시 띄우지 않는다
           if (host.matches('.mk-ink.mk-ink-armed') || t0.target.closest?.('.mk-ink-edit')) return false;
           // 편집기가 누른 그림을 고르고 난 뒤에 (고르기가 바뀌면 단추가 거둬지므로)
-          setTimeout(() => !view.isDestroyed && !mover.busy() && mover.showDelete(block, { showMs: TAP_SHOW_MS }), 60);
+          setTimeout(() => {
+            if (view.isDestroyed || mover.busy()) return;
+            // 그림은 누르면 크게 보기가 뜬다 (editor.js) — 단추 줄은 그 보기에 가리니 닫은 뒤에 띄운다
+            if (!document.querySelector('.mk-album-view')) return mover.showDelete(block, { showMs: TAP_SHOW_MS });
+            window.addEventListener('mk:album-closed', () => {
+              const now = host.isConnected && !view.isDestroyed ? blockFromTarget(view, host) : null; // 보는 사이 지웠거나 그렸으면 없음
+              if (now && !mover.busy()) mover.showDelete(now, { showMs: TAP_SHOW_MS });
+            }, { once: true });
+          }, 60);
           return false;
         },
         dragstart(_view, event) {
@@ -494,13 +503,13 @@ class Mover {
     if (canContentMenu()) {
       let downAt = 0;
       this.onOpenDown = (e) => {
-        downAt = e.button === 0 && e.target instanceof Element && e.target.closest(OPEN_TARGET) ? Date.now() : 0;
+        downAt = e.button === 0 && e.target instanceof Element && e.target.closest(LONG_TARGET) ? Date.now() : 0;
       };
       this.onLongClick = (e) => {
         if (e.mkOpen || e.button !== 0 || !downAt) return;
         const held = Date.now() - downAt;
         downAt = 0;
-        if (held <= CLICK_MAX_MS || !(e.target instanceof Element) || !e.target.closest(OPEN_TARGET)) return;
+        if (held <= CLICK_MAX_MS || !(e.target instanceof Element) || !e.target.closest(LONG_TARGET)) return;
         e.preventDefault();
         e.stopPropagation();
       };

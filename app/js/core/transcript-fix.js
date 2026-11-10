@@ -15,12 +15,14 @@ const STOP = new Set(['그리고', '그래서', '하지만', '그러나', '오�
  */
 export function vocabularyFrom(memos, { limit = 120 } = {}) {
   const w = new Map();
+  const known = new Set(); // 이 폴더의 글에 한 번이라도 나온 낱말 — 맞게 받아쓴 보통 말("메모장")을 말모음의 말("메모킹")로 바꾸지 않게
   const add = (term, by) => {
     const t = String(term ?? '').trim();
     if (t.length < 2 || STOP.has(t) || /^\d+$/.test(t)) return;
     w.set(t, (w.get(t) ?? 0) + by);
   };
   for (const m of memos) {
+    for (const raw of String(m.body ?? '').split(/[^\p{L}\p{N}]+/u)) if (raw.length >= 2) known.add(stem(raw));
     for (const tag of extractTags(m.body)) add(tag, 3);
     const seen = new Set();
     for (const line of [extractTitle(m.body), ...extractHeadings(m.body)]) {
@@ -32,7 +34,8 @@ export function vocabularyFrom(memos, { limit = 120 } = {}) {
       }
     }
   }
-  return [...w].filter(([, v]) => v >= 2).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko')).slice(0, limit).map(([term, weight]) => ({ term, weight }));
+  const list = [...w].filter(([, v]) => v >= 2).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko')).slice(0, limit).map(([term, weight]) => ({ term, weight }));
+  return Object.defineProperty(list, 'known', { value: known }); // fixTranscript 가 쓴다 (목록 모양은 그대로)
 }
 
 /** 받아쓴 낱말 하나를 말모음으로 고칠 것이 있으면 그 말 (없으면 null) */
@@ -48,7 +51,7 @@ export function correctWord(word, vocab, known) {
     if (!isHangul(term) || Math.abs(term.length - core.length) > 0 || term === core) continue;
     const jt = jamo(term);
     if (jt[0] !== jc[0]) continue; // 첫소리는 같아야
-    const max = core.length >= 3 ? 2 : 1;
+    const max = core.length >= 4 ? 2 : 1; // 세 글자에 자모 둘은 다른 낱말이다 (메모장 ↔ 메모킹)
     const d = jamoDistance(core, term);
     if (d > max) continue;
     if (!best || d < best.d) {
@@ -62,7 +65,7 @@ export function correctWord(word, vocab, known) {
 
 /** 받아쓴 글 전체 다듬기 */
 export function fixTranscript(text, vocab = []) {
-  const known = new Set();
+  const known = new Set(vocab.known);
   for (const { term } of vocab) known.add(term);
   const out = String(text ?? '')
     .replace(/[ \t]+/g, ' ')

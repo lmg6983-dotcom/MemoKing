@@ -27,7 +27,7 @@ const el = (tag, cls, attrs = {}) => Object.assign(document.createElement(tag), 
  */
 export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShare, onDelete, onUndo }) {
   let i = Math.max(0, Math.min(images.length - 1, start));
-  const view = el('div', 'mk-album-view', { role: 'dialog', ariaModal: 'true', ariaLabel: '묶음 사진' });
+  const view = el('div', 'mk-album-view', { role: 'dialog', ariaModal: 'true', ariaLabel: images.length > 1 ? '묶음 사진' : '사진 크게 보기' });
   const head = el('div', 'mk-album-head');
   const count = el('span', 'mk-album-count');
   const inkedMark = el('span', 'mk-album-inked');
@@ -102,7 +102,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     resetZoom();
     img.src = url(it.src);
     img.alt = it.alt ?? '';
-    count.textContent = `${i + 1} / ${images.length}`;
+    count.textContent = images.length > 1 ? `${i + 1} / ${images.length}` : ''; // 한 장이면 번호 없이
     inkedMark.hidden = !it.inked;
     prev.hidden = i === 0;
     next.hidden = i === images.length - 1;
@@ -436,6 +436,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     window.removeEventListener('resize', onResize);
     current = null;
     view.remove();
+    window.dispatchEvent(new Event('mk:album-closed')); // 휴대폰: 닫은 뒤 그 그림의 단추 줄 (block-move.js)
     if (restore instanceof HTMLElement && restore.isConnected) restore.focus({ preventScroll: true });
   }
   close.addEventListener('click', shut);

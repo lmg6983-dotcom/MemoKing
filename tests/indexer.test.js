@@ -42,3 +42,8 @@ test('색인 related: 같은 낱말이 있는 메모끼리만 더해도 예전(�
     assert.deepEqual(m.related.map(({ id, score, similarity, reasons }) => ({ id, score, similarity, reasons })), want[i], m.file);
   });
 });
+
+test('tokenize: 조사는 앞 글자의 받침과 맞을 때만 뗀다', () => {
+  assert.deepEqual(tokenize('회의는 서울에서 자동차로 사무실로 회사와 출원인과 발명자를 견적서가 디자인이'), ['회의', '서울', '자동차', '사무실', '회사', '출원인', '발명자', '견적서', '디자인']);
+  assert.deepEqual(tokenize('하와이 소아과 미술가'), ['하와이', '소아과', '미술가'], '받침이 안 맞는 끝 글자는 조사가 아니다');
+});

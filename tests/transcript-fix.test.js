@@ -40,3 +40,13 @@ test('받아쓴 글 다듬기: 띄어쓰기·부호', () => {
   const vocab = vocabularyFrom(memos);
   assert.equal(fixTranscript('메모칭 회의를 시작합니다 .다음은  엄무 정리', vocab), '메모킹 회의를 시작합니다. 다음은 업무 정리');
 });
+
+test('받아쓰기 고치기: 맞게 받아쓴 보통 말은 바꾸지 않는다', () => {
+  const vocab = vocabularyFrom([...memos, { body: '# 출시 일정\n\n#출시\n부산 출신 디자이너와 통화' }, { body: '# 출시 점검\n\n#출시' }]);
+  const known = new Set([...vocab.known, ...vocab.map((t) => t.term)]);
+  assert.ok(vocab.some((t) => t.term === '출시'));
+  assert.equal(correctWord('메모장', vocab, known), null, '세 글자에 자모 둘 차이는 다른 낱말');
+  assert.equal(correctWord('메모지', vocab, known), null);
+  assert.equal(correctWord('출신', vocab, known), null, '이 폴더의 글에 나온 말은 그대로');
+  assert.equal(fixTranscript('부산 출신 메모칭 담당자', vocab), '부산 출신 메모킹 담당자');
+});

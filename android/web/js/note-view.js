@@ -558,18 +558,6 @@ el.editorRoot.addEventListener('click', (e) => {
   openHref(href);
 });
 
-// 사진은 두 번 눌러 사진 앱으로
-function vaultPathOf(src) {
-  try {
-    const u = new URL(src);
-    const base = new URL(window.memoking.vaultBase);
-    if (u.origin === base.origin && u.pathname.startsWith(base.pathname)) return decodeURIComponent(u.pathname.slice(base.pathname.length));
-    if (/^https?:$/.test(u.protocol)) return u.href;
-  } catch {
-    // 알 수 없는 주소
-  }
-  return null;
-}
 el.editorRoot.addEventListener('dblclick', (e) => {
   const fileChip = e.target.closest?.('a[href^="attachments/"]');
   if (fileChip && el.editorRoot.contains(fileChip)) {
@@ -577,12 +565,6 @@ el.editorRoot.addEventListener('dblclick', (e) => {
     openHref(fileChip.getAttribute('href'));
     return;
   }
-  const img = e.target.closest?.('img.mk-image');
-  if (!img || img.classList.contains('mk-album-img')) return; // 묶음 사진은 한 번 눌러 크게 보기 (editor.js)
-  const target = vaultPathOf(img.src);
-  if (!target) return;
-  e.preventDefault();
-  openHref(target);
 });
 
 // ---------- 글자 색 · 형광펜 ----------

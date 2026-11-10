@@ -1015,7 +1015,7 @@ $('photo-input').addEventListener('change', (e) => {
 });
 
 // ---------- 링크·파일 한 번 눌러 열기 ----------
-// 인터넷 링크는 기본 브라우저로, 파일 칩은 메모 폴더의 복사본을 기본 앱으로. 사진은 두 번 누르면 사진 앱으로.
+// 인터넷 링크는 기본 브라우저로, 파일 칩은 메모 폴더의 복사본을 기본 앱으로. 사진은 누르면 크게 보기 (editor.js).
 
 async function openAttachment(rel) {
   const result = await api.attachments.open(rel);
@@ -1040,16 +1040,6 @@ el.editorRoot.addEventListener('click', (e) => {
 });
 
 // memoking://vault/attachments/a.png → attachments/a.png
-function vaultPathOf(src) {
-  try {
-    const u = new URL(src);
-    if (u.protocol === 'memoking:' && u.host === 'vault') return decodeURIComponent(u.pathname.replace(/^\/+/, ''));
-    if (/^https?:$/.test(u.protocol)) return u.href;
-  } catch {
-    // 알 수 없는 주소
-  }
-  return null;
-}
 
 el.editorRoot.addEventListener('dblclick', (e) => {
   const fileChip = e.target.closest?.('a[href^="attachments/"]');
@@ -1058,12 +1048,6 @@ el.editorRoot.addEventListener('dblclick', (e) => {
     openHref(fileChip.getAttribute('href'));
     return;
   }
-  const img = e.target.closest?.('img.mk-image');
-  if (!img || img.classList.contains('mk-album-img')) return; // 묶음 사진은 한 번 눌러 크게 보기 (editor.js)
-  const target = vaultPathOf(img.src);
-  if (!target) return;
-  e.preventDefault();
-  openHref(target);
 });
 
 // 파일 칩에 마우스를 올리면 이름·크기 안내 (PC · 휴대폰 모두 두 번 눌러 열기, 휴대폰은 눌러서 나오는 단추 줄의 "열기"도 — block-move.js)

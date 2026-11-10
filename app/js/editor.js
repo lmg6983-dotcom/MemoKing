@@ -23,6 +23,7 @@ import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
 import { vaultUrl, mediaKind, baseName } from './media.js';
 import { videoPoster } from './video-poster.js';
 import { openAlbumViewer } from './album-viewer.js';
+import { touchMode } from './keyboard-guard.js';
 import { promptChoice } from './rename-content.js';
 import { isDocumentFile, documentPages, decodeTxtBytes } from './doc-pages.js';
 import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from './core/link-preview.js';
@@ -207,12 +208,12 @@ function mediaView(node, view, getPos) {
   dom.alt = alt ?? '';
   if (title && !album) dom.title = title;
   dom.onerror = () => dom.classList.add('broken');
-  if (album) {
-    dom.addEventListener('click', (e) => {
-      if (e.defaultPrevented || typeof getPos !== 'function') return;
-      albumHandler?.(view, getPos());
-    });
-  }
+  // 누르면 크게 보기 — 묶음 사진은 누른 장부터 넘겨 보고, 한 장짜리 그림도 같은 보기로
+  dom.addEventListener('click', (e) => {
+    if (e.defaultPrevented || typeof getPos !== 'function') return;
+    if (!album && ['move', 'draw'].includes(touchMode())) return; // 휴대폰 옮기기 · 그리기 방식: 누르기는 그 손짓에 쓴다
+    albumHandler?.(view, getPos());
+  });
   return { dom };
 }
 
@@ -1250,7 +1251,12 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   if (!readOnly || !albumHandler) albumHandler = (v, pos) => {
     // 묶음 줄의 장들 (줄 자리 para 는 지우기 · 되돌리기 뒤에도 따라간다)
     let para = v.state.doc.resolve(pos).before();
+    const album = isAlbumTitle(v.state.doc.nodeAt(pos)?.attrs.title);
     const collect = () => {
+      if (!album) { // 한 장짜리 그림: 그 그림만 (지웠다 되돌리면 같은 자리에 돌아온다)
+        const n = v.state.doc.nodeAt(pos);
+        return n?.type.name === 'image' ? [{ src: n.attrs.src, alt: n.attrs.alt, pos, inked: false }] : [];
+      }
       const node = v.state.doc.nodeAt(para);
       const images = [];
       node?.forEach((child, offset) => {
@@ -1279,7 +1285,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         if (!cur) return null;
         it.src = src; // 같은 장을 또 그리면 이번 그림에서 이어서
         it.inked = true;
-        v.dispatch(v.state.tr.setNodeMarkup(it.pos, null, { ...cur.attrs, src, title: inkedAlbumTitle(cur.attrs.title) }));
+        v.dispatch(v.state.tr.setNodeMarkup(it.pos, null, { ...cur.attrs, src, title: album ? inkedAlbumTitle(cur.attrs.title) : cur.attrs.title }));
         return src;
       },
       // 이 장만 저장 · 공유 (원본 그대로) — 휴대폰은 공유 창

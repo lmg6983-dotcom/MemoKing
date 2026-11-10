@@ -15,6 +15,19 @@ const JOSA = [
   '이에요', '입니다', '했다', '에서', '에게', '한테', '으로', '까지', '부터', '처럼', '보다', '라는', '이나',
   '하고', '이다', '이랑', '은', '는', '이', '가', '을', '를', '의', '에', '로', '와', '과', '도', '만', '랑', '나',
 ];
+// 조사는 앞 글자의 받침과 맞을 때만 뗀다 — "하와이" 의 "이", "소아과" 의 "과", "미술가" 의 "가" 는 조사가 아니다
+//   받침 뒤에만: 이 · 은 · 을 · 과 · 으로 · 이나 · 이랑 · 이다 …   받침 없는 글자 뒤에만: 가 · 는 · 를 · 와 · 나 · 랑 · 로(ㄹ 받침 뒤도)
+//   shortcut: 사전이 없어 "고양이 → 고양", "바나나 → 바나" 처럼 받침이 맞는 낱말은 여전히 잘린다, 핵심어가 자주 어색하면 형태소 사전으로
+const AFTER_BATCHIM = new Set(['이', '은', '을', '과', '으로', '으로는', '으로부터', '이나', '이랑', '이다', '이에요', '입니다', '이라는', '이라고']);
+const AFTER_VOWEL = new Set(['가', '는', '를', '와', '나', '랑', '로', '라는']);
+function josaFits(word, josa) {
+  const prev = word.charCodeAt(word.length - josa.length - 1) - 0xac00;
+  if (prev < 0 || prev > 11171) return true; // 한글 음절이 아니면 그대로
+  const batchim = prev % 28;
+  if (AFTER_BATCHIM.has(josa)) return batchim !== 0;
+  if (AFTER_VOWEL.has(josa)) return batchim === 0 || (josa === '로' && batchim === 8);
+  return true;
+}
 const STOPWORDS = new Set([
   '그리고', '그러나', '하지만', '그래서', '또는', '이것', '저것', '그것', '있다', '없다', '하다', '되다',
   'the', 'and', 'for', 'with', 'that', 'this', 'are', 'was', 'you', 'not', 'but', 'from', 'have',
@@ -26,7 +39,7 @@ export function tokenize(text) {
     let word = raw;
     if (/\p{Script=Hangul}$/u.test(word)) {
       // 뗀 뒤 두 글자 이상 남을 때만 뗀다 ("사과" 의 "과" 는 조사가 아님)
-      const josa = JOSA.find((j) => word.length - j.length >= 2 && word.endsWith(j));
+      const josa = JOSA.find((j) => word.length - j.length >= 2 && word.endsWith(j) && josaFits(word, j));
       if (josa) word = word.slice(0, -josa.length);
     }
     if (word.length < 2 || STOPWORDS.has(word) || /^\d+$/.test(word)) continue;
