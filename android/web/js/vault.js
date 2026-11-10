@@ -4,7 +4,7 @@
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
   extractMedia, isBlankBody, titleToFileName, COLORS, isAlbumPageTitle } from '../../app/js/core/memo-file.js';
-import { buildIndex, sameIndex, AGENT_GUIDE } from '../../app/js/core/indexer.js';
+import { indexOutput, indexKey, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { fs, toBase64 } from './native.js';
@@ -75,6 +75,7 @@ export class Vault extends EventTarget {
     for (const dir of [APP_DIR, TRASH_DIR, ATTACH_DIR]) fs.mkdirs(dir);
     try {
       this.index = JSON.parse(fs.readText(INDEX_FILE) ?? 'null');
+      this.indexKey = this.index && indexKey(this.index); // 내용이 같으면 다시 쓰지 않게
     } catch {
       this.index = null;
     }
@@ -83,7 +84,7 @@ export class Vault extends EventTarget {
     for (const e of this.entries.values()) if (isLockedBody(e.body)) this.dropUnsafeVersions(e.id);
     const guide = `${APP_DIR}/README.md`;
     if (fs.readText(guide) !== AGENT_GUIDE) fs.writeText(guide, AGENT_GUIDE);
-    this.writeIndex();
+    this.scheduleIndex(); // 켜자마자 만들면 첫 화면이 그만큼 늦게 뜬다
     this.resume();
   }
 
@@ -96,7 +97,7 @@ export class Vault extends EventTarget {
   pause() {
     clearInterval(this.pollTimer);
     this.pollTimer = null;
-    if (this.indexTimer) this.writeIndex();
+    if (this.indexTimer || this.indexing) this.writeIndex({ now: true }); // 뒤로 가면 작업 스레드가 멈출 수 있어 여기서 바로
   }
 
   close() {
@@ -234,11 +235,18 @@ export class Vault extends EventTarget {
 
   search(query, excludeId = null) {
     const matches = textMatcher(query);
-    return this.list().filter((m) => {
-      if (m.id === excludeId) return false;
-      const entry = this.entries.get(m.id);
-      return matches(m.title, plainLines(entry.body).join('\n'));
+    // 다듬은 본문은 본문이 같으면 다시 만들지 않는다 (글자를 칠 때마다 모든 메모를 다듬어 검색이 굼떴다 — PC 의 searchable 과 같게)
+    const prev = this.searchCache ?? new Map();
+    const next = new Map();
+    const out = this.list().filter((m) => {
+      const { body } = this.entries.get(m.id);
+      let c = prev.get(m.id);
+      if (!c || c.body !== body) c = { body, text: plainLines(body).join('\n') };
+      next.set(m.id, c);
+      return m.id !== excludeId && matches(m.title, c.text);
     });
+    this.searchCache = next; // 지운 메모는 여기서 빠진다
+    return out;
   }
 
   /** 태그 추천용: 파일이 있는 메모의 본문 (최근 고친 순, 많으면 앞의 limit 개) */
@@ -735,20 +743,57 @@ export class Vault extends EventTarget {
     }, INDEX_DELAY);
   }
 
-  writeIndex() {
+  /** 색인을 다시 만들어 바뀌었으면 쓴다. 보통은 작업 스레드에서 (만드는 중에 또 부르면 끝난 뒤 한 번 더), now 면 여기서 바로 — PC 와 같게 */
+  writeIndex({ now = false } = {}) {
     clearTimeout(this.indexTimer);
     this.indexTimer = null;
+    if (this.indexing && !now) {
+      this.indexAgain = true;
+      return;
+    }
     const memos = [...this.entries.values()].filter((e) => e.file).map(({ id, file, meta, body }) => ({ id, file, meta, body }));
-    const index = buildIndex(memos);
-    if (sameIndex(index, this.index)) return;
+    if (now) {
+      this.indexing = null; // 만들던 것은 버린다 (이것이 더 새 글)
+      this.putIndex(indexOutput(memos));
+      return;
+    }
+    const job = indexOffThread(memos).catch(() => indexOutput(memos)); // 작업 스레드를 못 띄우면 여기서라도
+    this.indexing = job;
+    job.then((out) => {
+      if (this.indexing !== job) return;
+      this.indexing = null;
+      this.putIndex(out);
+      if (this.indexAgain) {
+        this.indexAgain = false;
+        this.writeIndex();
+      }
+    });
+  }
+
+  putIndex({ index, key, text }) {
+    if (key === this.indexKey) return; // generatedAt 만 다르면 같은 색인 (불필요한 동기화 없게)
     try {
-      fs.writeText(INDEX_FILE, `${JSON.stringify(index, null, 2)}\n`);
+      fs.writeText(INDEX_FILE, text);
       this.index = index;
+      this.indexKey = key;
       this.emit('indexed', index);
     } catch (err) {
       this.emit('error', err);
     }
   }
+}
+
+function indexOffThread(memos) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./index-worker.js', import.meta.url), { type: 'module' });
+    const done = (settle) => (e) => {
+      worker.terminate();
+      settle(e.data ?? new Error(e.message || '색인 작업을 띄우지 못했어요'));
+    };
+    worker.onmessage = done(resolve);
+    worker.onerror = done(reject);
+    worker.postMessage(memos);
+  });
 }
 
 installLockMethods(Vault);

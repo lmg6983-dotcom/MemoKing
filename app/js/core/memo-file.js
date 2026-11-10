@@ -160,8 +160,8 @@ function stripBlock(line) {
     .replace(/^\s*(?:[-*+]|\d+[.)])(?:\s+|$)(?:\\?\[[ xX]\](?:\s+|$))?/, ''); // 빈 항목("- [ ]" · 글을 지운 "2." · "-")도
 }
 
-// 코드 블록 울타리(```)는 빼고, 각 줄을 읽는 글자로 바꾼다.
-export function plainLines(body) {
+// 코드 블록 울타리(```)는 빼고, 각 줄을 읽는 글자로 바꾼다. max: 앞의 몇 줄만 (제목은 첫 줄만 있으면 된다)
+export function plainLines(body, max = Infinity) {
   const lines = [];
   let fence = false;
   for (const raw of body.split(/\r?\n/)) {
@@ -174,7 +174,7 @@ export function plainLines(body) {
     // 표 줄은 "품목 · 가격" 처럼, 구분선(|---|) 은 뺀다
     const cells = fence ? null : tableLineText(raw);
     const text = fence ? raw.trim() : cells !== null ? stripInline(cells) : stripInline(stripBlock(raw));
-    if (text) lines.push(text);
+    if (text && lines.push(text) >= max) break;
   }
   return lines;
 }
@@ -194,7 +194,7 @@ function withoutBrokenHeader(body) {
 }
 
 export function extractTitle(body) {
-  const first = plainLines(withoutBrokenHeader(body))[0];
+  const first = plainLines(withoutBrokenHeader(body), 1)[0];
   return first ? first.slice(0, 80) : UNTITLED;
 }
 
