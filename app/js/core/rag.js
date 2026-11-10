@@ -18,6 +18,28 @@ export const NOT_FOUND = '메모에서 찾지 못했어요.';
 // 물음 말 — 메모에 쓰였을 리 없어 찾기에서 뺀다 ("출시일 언제야" 의 "언제야")
 const ASK_WORDS = new Set(['뭐야', '뭐였지', '뭐지', '뭐', '무엇', '무엇이', '무엇인지', '언제', '언제야', '언제지', '언제였지', '어디', '어디야', '어디였지', '누구', '누구야', '누가', '몇', '몇시', '몇일', '며칠', '얼마', '얼마야', '어떻게', '어떤', '왜', '알려줘', '알려', '알려주세요', '있어', '있나', '있었지', '했어', '했지', '했나', '했었지', '였지', '이었지', '인가', '일까', '거야', '건가', '건지', '그거', '그게', '내가', '우리', '메모', '메모에서', '찾아줘', '찾아', '말해줘', '기억나', '해줘', '좀', '혹시', '있는지', '했는지', '인지']);
 
+// 비슷한 말 묶음 — 모델이 질문을 넓혀 주지 못할 때(모델 없음 · 엉뚱한 답)에도 "인터넷 암호" 로 와이파이 비밀번호 메모를 찾게
+//   shortcut: 손으로 고른 흔한 생활 · 업무 낱말뿐이라 여기 없는 말은 여전히 모델이 넓혀 줘야 한다, 놓치는 말이 잦으면 묶음을 늘리거나 뜻 벡터로
+const SYNONYMS = [
+  ['비밀번호', '암호', '비번', '패스워드', 'password'], ['와이파이', 'wifi', '인터넷', '무선랜', '공유기'], ['아이디', '계정', '로그인'],
+  ['가격', '단가', '금액', '비용', '요금', '값'], ['월세', '집세', '임대료', '방세'], ['이체', '송금', '입금', '보내'], ['계좌', '통장'],
+  ['출시', '발매', '런칭', '릴리스', '내놓'], ['마감', '기한', '데드라인'], ['회의', '미팅'], ['일정', '스케줄', '약속'], ['담당자', '책임자'],
+  ['비행기', '항공편', '항공권', '비행편'], ['여행', '휴가'], ['숙소', '호텔', '펜션', '숙박'], ['자동차', '차량', '차'], ['정비', '수리', '점검'],
+  ['전화번호', '연락처'], ['주소', '위치'], ['생일', '생신'], ['식당', '맛집', '음식점'], ['요리', '레시피', '조리법'], ['운동', '헬스', '피트니스'],
+  ['책', '도서'], ['병원', '의원', '진료'], ['오류', '에러', '버그', '장애'], ['영수증', '계산서'], ['사진', '이미지', '그림'],
+];
+/** 질문 낱말과 같은 묶음의 다른 말들 — 두 글자 이상은 앞머리로 맞추고("내놓기로" ↔ "내놓"), 한 글자("차")는 그 낱말일 때만 */
+function synonyms(query) {
+  const out = new Set();
+  for (const w of query.toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
+    for (const group of SYNONYMS) {
+      const hit = group.find((k) => w === k || (k.length >= 2 && w.startsWith(k)));
+      if (hit) for (const k of group) if (k !== hit) out.add(k);
+    }
+  }
+  return [...out];
+}
+
 /** 찾기 특징: 낱말 + 한글 낱말의 두 글자 조각 (조사 · 어미가 달라도 맞게) */
 function features(text, { ask = false } = {}) {
   const words = tokenize(text).filter((w) => !(ask && ASK_WORDS.has(w)));
@@ -112,7 +134,7 @@ export function retrieve(query, source, { words = [], related = () => [], limit 
   const index = Array.isArray(source) ? buildIndex(source) : source;
   const { chunks, vecs } = index;
   if (!chunks.length) return [];
-  const qf = [...features(query, { ask: true }), ...words.flatMap((w) => features(w))];
+  const qf = [...features(query, { ask: true }), ...[...words, ...synonyms(query)].flatMap((w) => features(w))];
   if (!qf.length) return [];
   const q = weigh(termCounts(qf), index.df, index.n + 1);
   const asked = new Set(tokenize(query).filter((w) => !ASK_WORDS.has(w)));
