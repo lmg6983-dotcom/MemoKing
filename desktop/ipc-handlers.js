@@ -335,7 +335,7 @@ export function registerIpc(ctx) {
     if (a.type === 'event') {
       const title = clean(a.title, 80) || '일정';
       const when = a.when && typeof a.when === 'object' ? a.when : {};
-      const r = eventFromDate({ at: str(when.at, 40), hasTime: Boolean(when.hasTime), repeat: when.repeat && typeof when.repeat === 'object' ? when.repeat : null, title });
+      const r = eventFromDate({ at: str(when.at, 40), hasTime: Boolean(when.hasTime), repeat: when.repeat && typeof when.repeat === 'object' ? when.repeat : null, end: str(when.end, 40) || null, title });
       if (!r) return { ok: false, message: '날짜를 알아보지 못했어요' };
       const id = vault.import({ body: `# ${title}\n` });
       const saved = id ? vault.setReminders(id, [r]) : null;

@@ -20,9 +20,11 @@ test('AI 검색: 넓힌 낱말로 찾고, 연결된 메모를 더한다', () => 
     memo('d', '배포 일정', '런칭 날짜 공지 초안'),
   ];
   const related = (id) => (id === 'a' ? [{ id: 'c', score: 0.8 }] : []);
-  // "언제 내놓아" 만으로는 못 찾고, 넓힌 낱말(출시일 · 런칭)로 a · d, 연결로 c
-  assert.deepEqual(retrieve('언제 내놓아', chunks, { related }), []);
-  const got = retrieve('언제 내놓아', chunks, { words: ['출시일', '런칭'], related, limit: 2 });
+  // "언제 선보여" 만으로는 못 찾고, 넓힌 낱말(출시일 · 런칭)로 a · d, 연결로 c
+  assert.deepEqual(retrieve('언제 선보여', chunks, { related }), []);
+  const got = retrieve('언제 선보여', chunks, { words: ['출시일', '런칭'], related, limit: 2 });
+  // 비슷한 말 묶음에 있는 말("내놓" ↔ 출시 · 런칭)은 모델 없이도
+  assert.deepEqual(retrieve('언제 내놓아', chunks).map((m) => m.id).sort(), ['a', 'd']);
   assert.deepEqual(got.map((m) => m.id).sort(), ['a', 'c', 'd']);
   assert.equal(got.find((m) => m.id === 'c').via, 'graph');
   assert.equal(retrieve('우유', chunks)[0].id, 'b');

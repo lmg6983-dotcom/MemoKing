@@ -5,9 +5,9 @@
 //
 // 읽는 차례: ① 날짜 말(날짜 + 바로 뒤의 시각) ② 날짜 없이 시각만 (①이 차지한 자리는 건너뜀)
 //   날짜 뒤 시각:  오후 3시 · 3시 반 · 3시 20분 · 15:30 · 세 시 · 열한 시 반 · 저녁(시각 없이 때만: 19시)
-//   시각만:        오전·오후 없는 1~6시는 오후, 7~11시는 오전. 이미 지났으면 찾지 않음 (새벽·자정은 다음 날로)
+//   시각만:        오전·오후 없는 1~6시는 오후, 7~11시는 오전(지났으면 저녁). 그래도 지났으면 찾지 않음 (새벽·자정은 다음 날로)
 
-import { startOfDay, addDays, WEEKDAY as WEEKDAYS } from './time.js';
+import { startOfDay, addDays, dateKey, WEEKDAY as WEEKDAYS } from './time.js';
 
 // 하루·한 주 뒤는 달력으로 더한다 (서머타임이 바뀌는 날에도 같은 시각이 되게)
 const plusDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes());
@@ -109,6 +109,7 @@ function nextLunar(month, day, now) {
 // needsMore: 뒤에 요일 괄호나 시각이 있을 때만 날짜로 (분수·소수와 헷갈리지 않게)
 // rollWeek: 요일만 적은 말 — 그 시각이 지났으면 다음 주
 // noTime: 날짜만 (뒤 시각을 읽지 않음)
+// numeric: 숫자로 적은 날짜 — 범위의 끝 날도 숫자로 읽는다 ("2026-11-20 ~ 11-22", "11/20~11/22")
 const DATE_RULES = [
   // 매년 M월 D일 (되풀이 — "M월 D일" 보다 먼저)
   {
@@ -126,6 +127,7 @@ const DATE_RULES = [
   {
     re: new RegExp(`${NOT_AFTER}(\\d{4})[-./]\\s?(\\d{1,2})[-./]\\s?(\\d{1,2})(?![0-9])\\.?`, 'g'),
     date: (m) => ({ date: { y: +m[1], mo: +m[2] - 1, d: +m[3] } }),
+    numeric: true,
   },
   // (2026년) 10월 12일 · 26년 10월 12일
   {
@@ -136,12 +138,14 @@ const DATE_RULES = [
   {
     re: /(?<![0-9A-Za-z.])'?(\d{2})\.(\d{1,2})\.(\d{1,2})(?![0-9.])/g,
     date: (m) => ({ date: { y: 2000 + +m[1], mo: +m[2] - 1, d: +m[3] } }),
+    numeric: true,
   },
   // 10/12 · 10.12 — 뒤에 요일 괄호나 시각이 있을 때만 ("1/2 컵", "3.5" 는 날짜가 아님)
   {
     re: /(?<![0-9A-Za-z/.])(\d{1,2})[/.](\d{1,2})(?![0-9/.])/g,
     date: (m, now) => ({ date: withYear(null, +m[1] - 1, +m[2], now) }),
     needsMore: true,
+    numeric: true,
   },
   // 이번 달 20일 · 다음 달 3일 · 다다음 달 1일
   {
@@ -236,6 +240,16 @@ const DATE_RULES = [
     date: (m, now) => {
       const wd = weekdayIndex(m[1] ?? m[2]);
       return { date: ymd(addDays(startOfDay(now), (wd - now.getDay() + 7) % 7)), repeat: { every: 'week', weekdays: [wd] } };
+    },
+  },
+  // 격주 금요일 · 2주마다 금요일 · 3주에 한 번 금요일 · 금요일 격주 → N주마다 (첫 회차는 가장 가까운 그 요일, 12주까지)
+  {
+    re: new RegExp(`(?<![0-9가-힣])(?:격주|(\\d{1,2}|이|삼|사|두|세|네)\\s?주\\s?(?:마다|에\\s?한\\s?번))\\s?([${WEEKDAYS}])(?:요일|욜)(?:\\s?마다)?|(?<![가-힣])([${WEEKDAYS}])(?:요일|욜)\\s?격주(?:\\s?(?:로|마다))?`, 'g'),
+    date: (m, now) => {
+      const n = m[1] ? (count(m[1]) || sinoNumber(m[1])) : 2;
+      if (!(n >= 1 && n <= 12)) return null;
+      const wd = weekdayIndex(m[2] ?? m[3]);
+      return { date: ymd(addDays(startOfDay(now), (wd - now.getDay() + 7) % 7)), repeat: { every: 'week', weekdays: [wd], ...(n > 1 ? { interval: n } : {}) } };
     },
   },
   {
@@ -376,6 +390,34 @@ function rangeEnd(text, end) {
   return m.index + m[0].length + (tail ? tail[0].length : 0);
 }
 
+/** 오전·오후 없는 7~11시가 이미 지났으면 저녁으로 ("8시 운동" · "오늘 8시" 를 오전 10시에 적으면 저녁 8시) */
+const eveningIfPast = (at, t, now) => (at <= now && !t.period && !t.digital && t.h >= 7 && t.h <= 11 ? new Date(at.getTime() + 12 * 3_600_000) : at);
+
+/**
+ * 날짜 바로 뒤의 끝 날 → { end: 끝 날 0시, to, slash } (시작보다 뒤의 있는 날일 때만)
+ *   "~22일" · "부터 12월 2일까지" · 숫자 날짜 뒤에서는 "~ 2026-11-22" · "~11/22" · "~11.22" · "~22" 도
+ */
+function rangeDay(text, pos, start, numeric = false) {
+  const day = '(?:(\\d{1,2})월\\s?)?(\\d{1,2})일';
+  const num = '(\\d{4})[-./](\\d{1,2})[-./](\\d{1,2})(?![0-9])|(\\d{1,2})([-/.])(\\d{1,2})(?![0-9/.-])|(\\d{1,2})(?![0-9:/.]|\\s?[시분월년개명번])';
+  const m = new RegExp(`^\\s?(?:~|-|–|부터)\\s?(?:${day}${numeric ? `|${num}` : ''})(?:\\s?\\([월화수목금토일](?:요일)?\\))?(?:\\s?까지)?`).exec(text.slice(pos));
+  if (!m) return null;
+  const month = m[1] ?? m[4] ?? m[6];
+  const mo = month ? +month - 1 : start.getMonth();
+  // 끝 달이 시작 달보다 앞이면 해를 넘긴 것 ("12월 30일~1월 2일")
+  const date = { y: m[3] ? +m[3] : start.getFullYear() + (mo < start.getMonth() ? 1 : 0), mo, d: +(m[2] ?? m[5] ?? m[8] ?? m[9]) };
+  if (mo < 0 || mo > 11 || !validDay(date)) return null;
+  const end = new Date(date.y, date.mo, date.d);
+  return end > start ? { end, to: pos + m[0].length, slash: m[7] === '/' } : null;
+}
+
+/** 되풀이 규칙에 시각을 채운다 — 격주는 첫 회차 날을 기준(from)으로 */
+const repeatAt = (repeat, at) => ({
+  ...repeat,
+  time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`,
+  ...(repeat.interval ? { from: dateKey(at) } : {}),
+});
+
 /** 되풀이 알림의 다음 차례 (이미 지났으면 하루·한 주·한 달·한 해 뒤로) */
 function nextRepeat(at, repeat, now) {
   let next = at;
@@ -396,14 +438,14 @@ function nextRepeat(at, repeat, now) {
  * 글 속 날짜·시각들 (앞에서부터, 겹치지 않게)
  * @param {string} text 한 줄(문단)의 글
  * @param {Date} [now]
- * @returns {{ from: number, to: number, text: string, at: Date, hasTime: boolean, repeat?: { every: 'day'|'week'|'month'|'year', weekdays?: number[], day?: number, month?: number, time: string } }[]}
+ * @returns {{ from: number, to: number, text: string, at: Date, hasTime: boolean, end?: Date, repeat?: { every: 'day'|'week'|'month'|'year', weekdays?: number[], interval?: number, from?: string, day?: number, month?: number, time: string } }[]}
  */
 export function findDates(text, now = new Date(), { allowPast = false } = {}) {
   const s = String(text ?? '');
   const found = [];
   const taken = []; // 날짜 말이 차지한 자리 (지난 날 포함)
   const overlaps = (from, to) => taken.some((r) => from < r.to && to > r.from);
-  const add = (from, to, at, hasTime, { past = false, repeat = null, rollWeek = false } = {}) => {
+  const add = (from, to, at, hasTime, { past = false, repeat = null, rollWeek = false, end = null } = {}) => {
     if (overlaps(from, to)) return;
     const span = { from, to };
     taken.push(span);
@@ -417,7 +459,8 @@ export function findDates(text, now = new Date(), { allowPast = false } = {}) {
     const item = { from, to, text: s.slice(from, to).trim(), at, hasTime };
     // 요일만 적은 말("화요일")인지 — 영어 시각을 붙일 때 이번 주/다음 주를 다시 고른다 (findAllDates). 결과 모양에는 드러내지 않음
     if (rollWeek) Object.defineProperty(item, 'rollWeek', { value: true });
-    if (repeat) item.repeat = { ...repeat, time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };
+    if (repeat) item.repeat = repeatAt(repeat, at);
+    if (end) item.end = end;
     found.push(item);
   };
 
@@ -444,9 +487,12 @@ export function findDates(text, now = new Date(), { allowPast = false } = {}) {
       const pastWord = /(지난|저번)\s?(주\s?)?$/.test(s.slice(Math.max(0, from - 5), from));
       const past = r.past || pastWord;
       const t = timeAt(s, to);
-      if (rule.needsMore && !paren && !(t?.explicit)) continue;
+      // "11/20~11/22" 처럼 빗금 날짜 둘이 이어지면 날짜 범위 (점은 "3.5~4.5" 같은 수일 때가 많아 읽지 않는다)
+      const slashRange = rule.needsMore && m[0].includes('/') && !t ? rangeDay(s, to, atTime(date, { h: DEFAULT_HOUR, min: 0 }), true)?.slash : false;
+      if (rule.needsMore && !paren && !(t?.explicit) && !slashRange) continue;
       if (t) {
         let at = atTime(date, t);
+        if (r.today && !allowPast) at = eveningIfPast(at, t, now);
         if ((rule.rollWeek || r.rollWeek) && at <= now) at = plusDays(at, 7);
         add(from, t.end, at, true, { past, repeat: r.repeat, rollWeek: Boolean(rule.rollWeek || r.rollWeek) });
       } else if (r.today) {
@@ -455,7 +501,9 @@ export function findDates(text, now = new Date(), { allowPast = false } = {}) {
         let at = atTime(date, { h: DEFAULT_HOUR, min: 0 });
         // 오늘이 그 요일이고 9시가 지났으면: 날짜만 적은 "금요일" 은 다음 주
         if ((rule.rollWeek || r.rollWeek) && at <= now) at = plusDays(at, 7);
-        add(from, to, at, false, { past, repeat: r.repeat, rollWeek: Boolean(rule.rollWeek || r.rollWeek) });
+        // "11월 20일~22일" · "20일부터 12월 2일까지": 끝 날까지 한 자리로, 여러 날 일정
+        const range = r.repeat ? null : rangeDay(s, to, at, rule.numeric);
+        add(from, range?.to ?? to, at, false, { past, repeat: r.repeat, rollWeek: Boolean(rule.rollWeek || r.rollWeek), end: range?.end });
       }
     }
   }
@@ -473,6 +521,7 @@ export function findDates(text, now = new Date(), { allowPast = false } = {}) {
     const end = rangeEnd(s, from + m[0].length);
     let at = atTime(ymd(now), t);
     if (!allowPast && at <= now && (t.period === '새벽' || t.midnight)) at = plusDays(at, 1);
+    else if (!allowPast) at = eveningIfPast(at, t, now);
     add(from, end, at, true);
   }
 
@@ -532,7 +581,7 @@ export function findAllDates(text, { chrono = null, now = new Date(), allowPast 
       }
       at = nextRepeat(at, k.repeat, now);
       k.at = at;
-      k.repeat = { ...k.repeat, time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };
+      k.repeat = repeatAt(k.repeat, at);
       k.to = e.to;
       k.text = s.slice(k.from, e.to).trim();
       k.hasTime = true;
@@ -561,7 +610,7 @@ export function findAllDates(text, { chrono = null, now = new Date(), allowPast 
 export function remindFromText(text, now = new Date()) {
   const line = String(text ?? '').split('\n')[0];
   const w = findDates(line, now)[0];
-  return w ? { at: w.at.toISOString(), hasTime: w.hasTime, repeat: w.repeat ?? null, title: guessTitle(line, w.from, w.to) } : null;
+  return w ? { at: w.at.toISOString(), hasTime: w.hasTime, repeat: w.repeat ?? null, ...(w.end ? { end: w.end.toISOString() } : {}), title: guessTitle(line, w.from, w.to) } : null;
 }
 
 /** 일정 이름 짐작: 그 줄에서 날짜 말을 빼고 남은 말 ("내일 오후 3시 치과" → "치과", "15일까지 보고서 제출" → "보고서 제출") */

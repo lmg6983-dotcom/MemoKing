@@ -4,6 +4,7 @@
 //     - id: r7k2
 //       kind: repeat            # timer | at | repeat | startup
 //       repeat: { every: week, weekdays: [1, 3], time: "09:00" }
+//       repeat: { every: week, weekdays: [5], time: "09:00", interval: 2, from: "2026-11-13" }   # 격주(2) · 3주마다(3) … — from 이 든 주부터 interval 주마다
 //       action: open            # open(메모 띄우기) | notify(알림만)
 //       title: 치과               # (일정) 이름 — 없으면 메모 제목
 //       alerts: [30, 1440]      # (일정) 미리 알림: 시작 몇 분 전 (구글 캘린더처럼 여러 개, 없으면 정시 한 번)
@@ -151,6 +152,11 @@ export function normalizeReminder(raw, now = new Date()) {
     if (every === 'week') {
       const days = Array.isArray(src.weekdays) ? src.weekdays.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [];
       repeat.weekdays = [...new Set(days.length ? days : [validDate(r.created).getDay()])].sort((a, b) => a - b);
+      // 격주 · N주마다: 기준 날(from)이 든 주부터 interval 주마다 — 기준이 없으면 만든 날
+      if (Number.isInteger(Number(src.interval)) && src.interval >= 2 && src.interval <= MAX_WEEKS) {
+        repeat.interval = Number(src.interval);
+        repeat.from = /^\d{4}-\d{2}-\d{2}$/.test(src.from) && validDate(`${src.from}T00:00`) ? src.from : dateKey(validDate(r.created));
+      }
     }
     if (every === 'month' || every === 'year') repeat.day = Math.min(31, Math.max(1, Number(src.day) || 1));
     if (every === 'year') repeat.month = Math.min(12, Math.max(1, Number(src.month) || 1));
@@ -181,6 +187,18 @@ export function serializeReminder(r) {
   return out;
 }
 
+const MAX_WEEKS = 12; // N주마다의 가장 긴 간격
+/** 주 반복을 부르는 말: 매주 · 격주 · 3주마다 */
+export const everyWeeks = (repeat) => (repeat.interval === 2 ? '격주' : repeat.interval > 2 ? `${repeat.interval}주마다` : '매주');
+
+/** 격주 · N주마다 일정에서 그날이 울리는 주인가 (기준 날이 든 주에서 interval 주째마다) */
+function onWeek(repeat, day) {
+  if (!repeat.interval) return true;
+  const f = new Date(`${repeat.from}T00:00`);
+  const sunday = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
+  return Math.round((sunday(day) - sunday(f)) / (7 * 86_400_000)) % repeat.interval === 0;
+}
+
 const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
 const at = (y, m, d, time) => new Date(y, m, Math.min(d, daysInMonth(y, m)), time.h, time.min, 0, 0);
 
@@ -204,9 +222,9 @@ export function nextOccurrence(r, after) {
       }
       break;
     case 'week':
-      for (let i = 0; i <= 7; i++) {
+      for (let i = 0; i <= 7 * (r.repeat.interval ?? 1); i++) {
         const c = new Date(y, m, d + i, time.h, time.min, 0, 0);
-        if (r.repeat.weekdays.includes(c.getDay()) && c > base) return c;
+        if (r.repeat.weekdays.includes(c.getDay()) && c > base && onWeek(r.repeat, c)) return c;
       }
       break;
     case 'month':
@@ -368,7 +386,7 @@ export function describeReminder(r, now = new Date()) {
       if (every === 'day') return `매일 ${time}`;
       if (every === 'week') {
         if (weekdays.length === 7) return `매일 ${time}`; // "매주 매일" 이 아니라
-        return `매주 ${weekdays.map((w) => WEEKDAY[w]).join(', ')} ${time}`;
+        return `${everyWeeks(r.repeat)} ${weekdays.map((w) => WEEKDAY[w]).join(', ')} ${time}`;
       }
       if (every === 'month') return `매월 ${day}일 ${time}`;
       return `매년 ${month}월 ${day}일 ${time}`;
@@ -486,7 +504,7 @@ export function isLiveCached(r, now = new Date()) {
 /**
  * 글 속 날짜(date-detect findDates 의 하나)로 일정 하나 — 일정 창 없이 바로 저장할 때 (매직키 "알림 맞춰 저장")
  *   미리 알림은 기본값(시각이 있으면 10분 전, 날짜만이면 그날 오전 9시), 이미 지난 알림은 그때 바로 울리는 것으로
- * @param {{ at: Date|string, hasTime?: boolean, repeat?: object|null, title?: string }} d
+ * @param {{ at: Date|string, hasTime?: boolean, repeat?: object|null, end?: Date|string|null, title?: string }} d  end: 여러 날 일정의 마지막 날
  */
 export function eventFromDate(d, now = new Date()) {
   const start = new Date(d.at);
@@ -496,13 +514,14 @@ export function eventFromDate(d, now = new Date()) {
   const base = { action: 'notify', enabled: true, created: toLocalIso(now), alerts, ...(d.title ? { title: String(d.title).slice(0, 80) } : {}) };
   if (d.repeat) {
     const r = { every: d.repeat.every, time: d.repeat.time };
-    if (d.repeat.every === 'week') r.weekdays = d.repeat.weekdays;
+    if (d.repeat.every === 'week') Object.assign(r, { weekdays: d.repeat.weekdays }, d.repeat.interval ? { interval: d.repeat.interval, from: d.repeat.from } : null);
     if (d.repeat.every === 'month' || d.repeat.every === 'year') r.day = d.repeat.day;
     if (d.repeat.every === 'year') r.month = d.repeat.month;
     return normalizeReminder({ ...base, kind: 'repeat', repeat: r }, now);
   }
   const at = allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate()) : start;
-  return normalizeReminder({ ...base, kind: 'at', at: toLocalIso(at), ...(allDay ? { allDay: true } : {}) }, now);
+  const end = allDay && d.end ? new Date(d.end) : null;
+  return normalizeReminder({ ...base, kind: 'at', at: toLocalIso(at), ...(allDay ? { allDay: true } : {}), ...(end > at ? { end: toLocalIso(end) } : {}) }, now);
 }
 
 // ---------- 알림 (구글 리마인더처럼: 무엇을 + 언제 + 반복) ----------
@@ -570,7 +589,7 @@ export function describeTask(r, now = new Date()) {
   const { every, weekdays = [], day, month } = r.repeat;
   const t = parseTime(r.repeat.time);
   const label = every === 'day' || (every === 'week' && weekdays.length === 7) ? '매일'
-    : every === 'week' ? `매주 ${weekdays.map((w) => WEEKDAY[w]).join('·')}요일`
+    : every === 'week' ? `${everyWeeks(r.repeat)} ${weekdays.map((w) => WEEKDAY[w]).join('·')}요일`
     : every === 'month' ? `매월 ${day}일` : `매년 ${month}월 ${day}일`;
   const next = r.enabled ? nextTime(r, now) : Infinity;
   const nextDay = Number.isFinite(next) ? ` · 다음 ${dayLabel(new Date(next), now)}` : '';

@@ -9,6 +9,7 @@ import { findAllDates, guessTitle } from './core/date-detect.js';
 
 export { guessTitle }; // 예전 자리에서 부르던 곳을 위해
 import { koClock, dayLabel, WEEKDAY, sameDay } from './core/time.js';
+import { everyWeeks } from './core/reminders.js';
 import { hintOnce } from './hints.js';
 import { openEventEditor } from './event-editor.js';
 import { icon } from './icons.js';
@@ -23,11 +24,11 @@ export const dateLabel = (at, now = new Date()) => `${dayLabel(at, now)} ${koClo
 export function repeatLabel(repeat, at) {
   const clock = koClock(at);
   if (repeat.every === 'day') return `매일 ${clock}`;
-  if (repeat.every === 'week') return `매주 ${repeat.weekdays.map((w) => `${WEEKDAY[w]}요일`).join(', ')} ${clock}`;
+  if (repeat.every === 'week') return `${everyWeeks(repeat)} ${repeat.weekdays.map((w) => `${WEEKDAY[w]}요일`).join(', ')} ${clock}`;
   if (repeat.every === 'month') return `매달 ${repeat.day}일 ${clock}`;
   return `매년 ${repeat.month}월 ${repeat.day}일 ${clock}`;
 }
-const chipLabel = (d) => (d.repeat ? repeatLabel(d.repeat, d.at) : d.hasTime ? dateLabel(d.at) : dateLabel(d.at).replace(/ (오전|오후) .*$/, ''));
+const chipLabel = (d) => (d.repeat ? repeatLabel(d.repeat, d.at) : d.hasTime ? dateLabel(d.at) : dateLabel(d.at).replace(/ (오전|오후) .*$/, '') + (d.end ? ` ~ ${dayLabel(d.end)}` : ''));
 
 // 빠른 거르기 — date-detect.js 가 읽는 말을 하나라도 빠뜨리면 그 줄의 날짜를 못 찾는다 ("한 달 뒤" · "엿새 후" · "삼십 분 뒤")
 const DATE_HINT = /\d|내일|낼|모레|글피|요일|욜|주말|정오|자정|매일|날마다|일주일|시|뒤|후|있다가|이따|지나서|크리스마스|[A-Za-z]/;
@@ -169,7 +170,7 @@ class DateChip {
     if (!hit) return this.hide();
     const date = hit.spec.date;
     if (this.current && this.current.from === hit.from && this.current.at.getTime() === date.at.getTime()) return this.place();
-    this.current = { from: hit.from, to: hit.to, at: date.at, text: date.text, hasTime: date.hasTime, repeat: date.repeat ?? null, title: date.title ?? '' };
+    this.current = { from: hit.from, to: hit.to, at: date.at, text: date.text, hasTime: date.hasTime, repeat: date.repeat ?? null, end: date.end ?? null, title: date.title ?? '' };
     this.show();
   }
 
@@ -196,6 +197,7 @@ class DateChip {
         title: c.title,
         start: c.at,
         allDay: !c.hasTime && !c.repeat,
+        end: c.end,
         repeatLabel: c.repeat ? repeatLabel(c.repeat, c.at) : null,
       });
       this.suspended = false;
@@ -253,7 +255,7 @@ export function reminderAt(reminders, { at, repeat = null, hasTime = true }) {
     if (repeat) {
       const x = r.kind === 'repeat' ? r.repeat : null;
       return Boolean(x) && x.every === repeat.every && x.time === repeat.time
-        && (x.weekdays ?? []).join() === (repeat.weekdays ?? []).join() && (x.day ?? null) === (repeat.day ?? null) && (x.month ?? null) === (repeat.month ?? null);
+        && (x.weekdays ?? []).join() === (repeat.weekdays ?? []).join() && (x.interval ?? 1) === (repeat.interval ?? 1) && (x.day ?? null) === (repeat.day ?? null) && (x.month ?? null) === (repeat.month ?? null);
     }
     if (!r.at || r.kind !== 'at') return false;
     // 날짜만 적었거나, 시각이 있어도 일정 창에서 하루 종일로 바꿔 만든 일정이면 같은 날이면 맞춤

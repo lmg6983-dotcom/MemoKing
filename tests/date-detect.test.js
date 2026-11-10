@@ -40,6 +40,8 @@ test('오늘·내일·모레 + 시각', () => table([
   ['모레까지 제출', '모레', '2026-10-12 9:00'],
   ['오늘 할 일', null, null],
   ['오늘 아침 8시', null, null], // 이미 지난 시각
+  ['오늘 8시 운동', '오늘 8시', '2026-10-10 20:00'], // 오전·오후 없는 지난 7~11시는 저녁
+  ['오늘 9:30', null, null], // 숫자 시각은 그대로
   ['오늘의 할 일', null, null],
   ['내일의 나에게', null, null],
 ]));
@@ -143,6 +145,14 @@ test('되풀이 → 반복 알림', () => {
   assert.deepEqual(rep('매월 1일 관리비'), { text: '매월 1일', at: '2026-11-1 9:00', repeat: { every: 'month', day: 1, time: '09:00' } });
   assert.deepEqual(rep('매년 3월 15일 생일'), { text: '매년 3월 15일', at: '2027-3-15 9:00', repeat: { every: 'year', month: 3, day: 15, time: '09:00' } });
   assert.equal(first('일요일마다 등산').repeat.every, 'week');
+  // 격주: 두 주마다, 첫 회차(가장 가까운 그 요일)가 기준
+  const biweekly = { every: 'week', weekdays: [5], interval: 2, time: '09:00', from: '2026-10-16' };
+  assert.deepEqual(rep('격주 금요일 분리수거'), { text: '격주 금요일', at: '2026-10-16 9:00', repeat: biweekly });
+  assert.deepEqual(rep('2주마다 금요일 오후 3시'), { text: '2주마다 금요일 오후 3시', at: '2026-10-16 15:00', repeat: { ...biweekly, time: '15:00' } });
+  assert.deepEqual(rep('금요일 격주로 회의').repeat, biweekly);
+  assert.deepEqual(rep('3주마다 금요일 점검').repeat, { ...biweekly, interval: 3 });
+  assert.deepEqual(rep('네 주에 한 번 금요일').repeat, { ...biweekly, interval: 4 });
+  assert.deepEqual(rep('1주마다 금요일').repeat, { every: 'week', weekdays: [5], time: '09:00' }, '1주마다 = 매주');
 });
 
 test('상대 표현 (뒤·후)', () => table([
@@ -178,7 +188,10 @@ test('시각만', () => table([
   ['새벽 2시 비행기', '새벽 2시', '2026-10-11 2:00'], // 새벽은 지났으면 다음 날
   ['오후 3시~5시 회의', '오후 3시~5시', '2026-10-10 15:00'],
   ['오후 3시 30분부터 5시까지', '오후 3시 30분부터 5시까지', '2026-10-10 15:30'],
-  ['9시 출근', null, null], // 지난 시각
+  ['9시 출근', '9시', '2026-10-10 21:00'], // 오전·오후 없는 7~11시가 지났으면 저녁
+  ['8시 운동', '8시', '2026-10-10 20:00'],
+  ['11시 회의', '11시', '2026-10-10 11:00'], // 아직이면 오전 그대로
+  ['오전 9시 출근', null, null], // 오전이라고 적은 지난 시각
   ['3시간 동안', null, null],
   ['시험 시작 시간', null, null],
   ['기록 12:30', null, null],
@@ -195,6 +208,33 @@ test('지난 날의 시각은 오늘로 읽지 않는다', () => table([
   ['2025-10-01 3시', null, null],
   ['어젯밤 11시', null, null],
 ]));
+
+test('날짜 범위 → 여러 날 일정 (끝 날까지 한 자리)', () => {
+  const range = (text) => {
+    const r = first(text);
+    return r && { text: r.text, at: fmt(r.at), end: r.end ? fmt(r.end) : null };
+  };
+  assert.deepEqual(range('11월 20일~22일 제주 여행'), { text: '11월 20일~22일', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('11월 28일부터 12월 2일까지 출장'), { text: '11월 28일부터 12월 2일까지', at: '2026-11-28 9:00', end: '2026-12-2 0:00' });
+  assert.deepEqual(range('12월 30일 ~ 1월 2일 휴가'), { text: '12월 30일 ~ 1월 2일', at: '2026-12-30 9:00', end: '2027-1-2 0:00' });
+  assert.deepEqual(range('11월 20일(금)~22일(일)'), { text: '11월 20일(금)~22일(일)', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  // 끝이 시작보다 앞이거나 없는 날이면 시작일만
+  assert.deepEqual(range('11월 20일~18일'), { text: '11월 20일', at: '2026-11-20 9:00', end: null });
+  assert.deepEqual(range('11월 20일~31일'), { text: '11월 20일', at: '2026-11-20 9:00', end: null });
+  // 숫자로 적은 날짜
+  assert.deepEqual(range('2026-11-20 ~ 2026-11-22 워크숍'), { text: '2026-11-20 ~ 2026-11-22', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('2026.11.20~11.22'), { text: '2026.11.20~11.22', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('2026-11-20~22 출장'), { text: '2026-11-20~22', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('11/20~11/22 제주'), { text: '11/20~11/22', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('11/20(금)~22(일)'), { text: '11/20(금)~22(일)', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  // 수의 범위는 날짜가 아니다
+  for (const text of ['3.5~4.5점', '1/2~1컵', '11/20~22', '2026-11-20 3~5명']) assert.equal(first(text)?.end, undefined, text);
+  assert.equal(first('3.5~4.5점'), null);
+  assert.equal(first('1/2~1컵'), null);
+  // 시각이 붙으면 범위로 읽지 않는다
+  assert.equal(first('11월 20일 오후 3시~5시').end, undefined);
+  assert.equal(remindFromText('11월 20일~22일 제주 여행', NOW).end, new Date(2026, 10, 22).toISOString());
+});
 
 test('한 줄에 여러 개, 겹치지 않게', () => {
   const r = findDates('내일 3시 미팅, 금요일 오전 10시 마감', NOW);

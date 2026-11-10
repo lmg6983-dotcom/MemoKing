@@ -109,6 +109,11 @@ function setStatus(text, isError = false) {
   el.status.textContent = text;
   el.status.classList.toggle('error', isError);
   if (isError) toast(text, true);
+  else if (el.status.scrollWidth > el.status.clientWidth) {
+    // 윗줄 자리(단추 사이)에 다 안 들어가는 말은 잘린 채 두지 않고 아래 알림으로
+    el.status.textContent = '';
+    toast(text);
+  }
 }
 
 function isDirty() {
@@ -1521,7 +1526,7 @@ el.editorRoot.addEventListener('touchmove', (e) => {
   if (next === zoom) return;
   zoom = next;
   applyZoom(middle(e.touches));
-  setStatus(zoom >= 1 ? `매직 줌: 확대 ${zoomLabel(zoom)}` : `매직 줌: 글자 ${zoomLabel(zoom)}`);
+  setStatus(zoom >= 1 ? `확대 ${zoomLabel(zoom)}` : `글자 ${zoomLabel(zoom)}`); // 윗줄 좁은 자리에 다 보이게 짧게
 }, { passive: false });
 /** 매직 줌 배율 (튜토리얼: 연습 전 배율을 적어 두고 단계를 지나면 처음대로) */
 export const noteZoom = () => zoom;

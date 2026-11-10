@@ -224,7 +224,8 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .tag-strip::-webkit-scrollbar { display: none; }
 .filter-summary { display: flex; align-items: center; gap: 8px; margin: 0 16px 8px; font-size: 13px; color: var(--muted); }
 .filter-summary span { flex: 1; }
-.link-btn { min-height: var(--tap); padding: 6px 8px; border: 0; background: none; color: var(--text-strong); font-weight: 700; font-size: 13px; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+/* 글자 단추는 한 줄로 — 자리가 모자라면 옆(고르기 칸)이 줄어든다 */
+.link-btn { flex: none; white-space: nowrap; min-height: var(--tap); padding: 6px 8px; border: 0; background: none; color: var(--text-strong); font-weight: 700; font-size: 13px; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 
 /* 카드: 바탕이 실제 메모 색. 기본은 두 줄 격자, 목록 모양이면 한 줄씩 */
 .cards {
@@ -568,7 +569,7 @@ h2.sheet-title { font-size: 20px; }
 .consent .btn { width: 100%; height: 48px; }
 .history-bar { display: flex; align-items: center; gap: 8px; padding: 0 16px 8px; }
 .history-off { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 16px 8px; padding: 8px 12px; border-radius: 10px; background: var(--surface-1); color: var(--muted); font-size: 13px; box-shadow: inset 0 0 0 1px var(--line); }
-.history-bar select { height: 38px; max-width: 60%; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-1); color: var(--text); font-size: 14px; }
+.history-bar select { flex: 0 1 auto; min-width: 0; height: 38px; max-width: 60%; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-1); color: var(--text); font-size: 14px; }
 .link-btn.danger { color: var(--danger); text-decoration-color: var(--danger); }
 .link-btn:disabled { opacity: 0.45; }
 .noti { align-items: flex-start; gap: 10px; padding: 12px; }

@@ -2,6 +2,7 @@
 // 에이전트가 이 파일만 먼저 읽고 관련도 높은 메모 파일에 바로 접근할 수 있게 한다.
 import { extractTags } from './tags.js';
 import { plainLines, extractTitle, extractHeadings, extractAttachments } from './memo-file.js';
+import { TAIL_ANY, TAIL_NOUN, NOUNS } from './korean-nouns.js';
 
 export const INDEX_SCHEMA = 'memoking.index/v1';
 const SUMMARY_LENGTH = 200;
@@ -17,7 +18,16 @@ const JOSA = [
 ];
 // 조사는 앞 글자의 받침과 맞을 때만 뗀다 — "하와이" 의 "이", "소아과" 의 "과", "미술가" 의 "가" 는 조사가 아니다
 //   받침 뒤에만: 이 · 은 · 을 · 과 · 으로 · 이나 · 이랑 · 이다 …   받침 없는 글자 뒤에만: 가 · 는 · 를 · 와 · 나 · 랑 · 로(ㄹ 받침 뒤도)
-//   shortcut: 사전이 없어 "고양이 → 고양", "바나나 → 바나" 처럼 받침이 맞는 낱말은 여전히 잘린다, 핵심어가 자주 어색하면 형태소 사전으로
+// 받침이 맞아도 끝 글자가 조사가 아닌 낱말은 미리 담아 둔 낱말 묶음(korean-nouns.js)으로 가린다
+//   "고양이" · "부서회의" 는 그대로, "고양이를" · "위원회의"(위원회 + 의) · "사회의" 는 조사를 뗀다
+const knownNoun = (w) => {
+  for (let i = w.length - 2; i >= 0; i--) if (NOUNS.has(w.slice(i))) return true;
+  return false;
+};
+function endsInNoun(word, josa) {
+  if (TAIL_ANY.some((n) => word.endsWith(n))) return true;
+  return word.length >= 4 && TAIL_NOUN.has(word.slice(-2)) && !knownNoun(word.slice(0, -josa.length));
+}
 const AFTER_BATCHIM = new Set(['이', '은', '을', '과', '으로', '으로는', '으로부터', '이나', '이랑', '이다', '이에요', '입니다', '이라는', '이라고']);
 const AFTER_VOWEL = new Set(['가', '는', '를', '와', '나', '랑', '로', '라는']);
 function josaFits(word, josa) {
@@ -40,7 +50,7 @@ export function tokenize(text) {
     if (/\p{Script=Hangul}$/u.test(word)) {
       // 뗀 뒤 두 글자 이상 남을 때만 뗀다 ("사과" 의 "과" 는 조사가 아님)
       const josa = JOSA.find((j) => word.length - j.length >= 2 && word.endsWith(j) && josaFits(word, j));
-      if (josa) word = word.slice(0, -josa.length);
+      if (josa && !endsInNoun(word, josa)) word = word.slice(0, -josa.length);
     }
     if (word.length < 2 || STOPWORDS.has(word) || /^\d+$/.test(word)) continue;
     tokens.push(word);

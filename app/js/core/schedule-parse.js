@@ -97,6 +97,13 @@ export function parseScheduleText(raw, defaultDay = null, now = new Date()) {
   const schedules = [];
   let i = 0;
   while (i < hits.length) {
+    // 해석기가 이미 범위로 읽은 날짜 ("11월 20일~22일") — 끝 날은 시작과 같은 시각으로 (아래 두 날짜 범위와 같은 모양)
+    if (hits[i].end) {
+      const { at, end } = hits[i];
+      schedules.push({ type: 'range', start: at, end: new Date(end.getFullYear(), end.getMonth(), end.getDate(), at.getHours(), at.getMinutes()), allDay: true });
+      i += 1;
+      continue;
+    }
     if (i < hits.length - 1) {
       const h1 = hits[i];
       const h2 = hits[i + 1];
