@@ -2,6 +2,7 @@
 // 에이전트가 이 파일만 먼저 읽고 관련도 높은 메모 파일에 바로 접근할 수 있게 한다.
 import { extractTags } from './tags.js';
 import { plainLines, extractTitle, extractHeadings, extractAttachments } from './memo-file.js';
+import { TAIL_ANY, TAIL_NOUN, NOUNS } from './korean-nouns.js';
 
 export const INDEX_SCHEMA = 'memoking.index/v1';
 const SUMMARY_LENGTH = 200;
@@ -17,15 +18,16 @@ const JOSA = [
 ];
 // 조사는 앞 글자의 받침과 맞을 때만 뗀다 — "하와이" 의 "이", "소아과" 의 "과", "미술가" 의 "가" 는 조사가 아니다
 //   받침 뒤에만: 이 · 은 · 을 · 과 · 으로 · 이나 · 이랑 · 이다 …   받침 없는 글자 뒤에만: 가 · 는 · 를 · 와 · 나 · 랑 · 로(ㄹ 받침 뒤도)
-// 받침이 맞아도 끝 글자가 조사가 아닌 흔한 낱말 — 이 말로 끝나면 떼지 않는다 ("고양이" · "길고양이", 조사가 붙은 "고양이를" 은 "고양이" 로)
-//   shortcut: 손으로 고른 목록이라 여기 없는 낱말("부서회의 → 부서회")은 여전히 잘린다, 핵심어가 자주 어색하면 형태소 사전으로
-//   "회의" 는 붙여 쓴 흔한 말만 — "사회의" · "위원회의" 처럼 "~회" + "의" 인 말이 많아 "회의" 로 끝난다고 다 남기지는 않는다
-const NOT_JOSA = [
-  '고양이', '호랑이', '원숭이', '어린이', '젊은이', '늙은이', '지은이', '떡볶이', '손잡이', '목걸이', '귀걸이', '옷걸이', '달팽이', '올챙이',
-  '지팡이', '곰팡이', '엉덩이', '구덩이', '멍멍이', '나들이', '집들이', '해돋이', '미닫이', '맞벌이', '놀이', '먹이', '풀이',
-  '바나나', '사우나', '카나나', '난이도', '만족도', '완성도', '정확도', '해상도', '선호도', '인지도', '고속도로', '횡단보도', '산부인과', '첫사랑', '짝사랑',
-  '간회의', '화상회의', '팀회의', '정기회의', '전체회의', '임원회의', '긴급회의', '결과', '효과', '민주주의', '자본주의', '사회주의', '완벽주의',
-];
+// 받침이 맞아도 끝 글자가 조사가 아닌 낱말은 미리 담아 둔 낱말 묶음(korean-nouns.js)으로 가린다
+//   "고양이" · "부서회의" 는 그대로, "고양이를" · "위원회의"(위원회 + 의) · "사회의" 는 조사를 뗀다
+const knownNoun = (w) => {
+  for (let i = w.length - 2; i >= 0; i--) if (NOUNS.has(w.slice(i))) return true;
+  return false;
+};
+function endsInNoun(word, josa) {
+  if (TAIL_ANY.some((n) => word.endsWith(n))) return true;
+  return word.length >= 4 && TAIL_NOUN.has(word.slice(-2)) && !knownNoun(word.slice(0, -josa.length));
+}
 const AFTER_BATCHIM = new Set(['이', '은', '을', '과', '으로', '으로는', '으로부터', '이나', '이랑', '이다', '이에요', '입니다', '이라는', '이라고']);
 const AFTER_VOWEL = new Set(['가', '는', '를', '와', '나', '랑', '로', '라는']);
 function josaFits(word, josa) {
@@ -47,8 +49,8 @@ export function tokenize(text) {
     let word = raw;
     if (/\p{Script=Hangul}$/u.test(word)) {
       // 뗀 뒤 두 글자 이상 남을 때만 뗀다 ("사과" 의 "과" 는 조사가 아님)
-      const josa = NOT_JOSA.some((n) => word.endsWith(n)) ? null : JOSA.find((j) => word.length - j.length >= 2 && word.endsWith(j) && josaFits(word, j));
-      if (josa) word = word.slice(0, -josa.length);
+      const josa = JOSA.find((j) => word.length - j.length >= 2 && word.endsWith(j) && josaFits(word, j));
+      if (josa && !endsInNoun(word, josa)) word = word.slice(0, -josa.length);
     }
     if (word.length < 2 || STOPWORDS.has(word) || /^\d+$/.test(word)) continue;
     tokens.push(word);
