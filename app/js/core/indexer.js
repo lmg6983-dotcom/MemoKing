@@ -17,7 +17,13 @@ const JOSA = [
 ];
 // 조사는 앞 글자의 받침과 맞을 때만 뗀다 — "하와이" 의 "이", "소아과" 의 "과", "미술가" 의 "가" 는 조사가 아니다
 //   받침 뒤에만: 이 · 은 · 을 · 과 · 으로 · 이나 · 이랑 · 이다 …   받침 없는 글자 뒤에만: 가 · 는 · 를 · 와 · 나 · 랑 · 로(ㄹ 받침 뒤도)
-//   shortcut: 사전이 없어 "고양이 → 고양", "바나나 → 바나" 처럼 받침이 맞는 낱말은 여전히 잘린다, 핵심어가 자주 어색하면 형태소 사전으로
+// 받침이 맞아도 끝 글자가 조사가 아닌 흔한 낱말 — 이 말로 끝나면 떼지 않는다 ("고양이" · "길고양이", 조사가 붙은 "고양이를" 은 "고양이" 로)
+//   shortcut: 손으로 고른 목록이라 여기 없는 낱말("산책로" 는 맞지만 "주간회의 → 주간회")은 여전히 잘린다, 핵심어가 자주 어색하면 형태소 사전으로
+const NOT_JOSA = [
+  '고양이', '호랑이', '원숭이', '어린이', '젊은이', '늙은이', '지은이', '떡볶이', '손잡이', '목걸이', '귀걸이', '옷걸이', '달팽이', '올챙이',
+  '지팡이', '곰팡이', '엉덩이', '구덩이', '멍멍이', '나들이', '집들이', '해돋이', '미닫이', '맞벌이', '놀이', '먹이', '풀이',
+  '바나나', '사우나', '카나나', '난이도', '만족도', '완성도', '정확도', '해상도', '선호도', '인지도', '고속도로', '횡단보도', '산부인과', '첫사랑', '짝사랑',
+];
 const AFTER_BATCHIM = new Set(['이', '은', '을', '과', '으로', '으로는', '으로부터', '이나', '이랑', '이다', '이에요', '입니다', '이라는', '이라고']);
 const AFTER_VOWEL = new Set(['가', '는', '를', '와', '나', '랑', '로', '라는']);
 function josaFits(word, josa) {
@@ -39,7 +45,7 @@ export function tokenize(text) {
     let word = raw;
     if (/\p{Script=Hangul}$/u.test(word)) {
       // 뗀 뒤 두 글자 이상 남을 때만 뗀다 ("사과" 의 "과" 는 조사가 아님)
-      const josa = JOSA.find((j) => word.length - j.length >= 2 && word.endsWith(j) && josaFits(word, j));
+      const josa = NOT_JOSA.some((n) => word.endsWith(n)) ? null : JOSA.find((j) => word.length - j.length >= 2 && word.endsWith(j) && josaFits(word, j));
       if (josa) word = word.slice(0, -josa.length);
     }
     if (word.length < 2 || STOPWORDS.has(word) || /^\d+$/.test(word)) continue;
