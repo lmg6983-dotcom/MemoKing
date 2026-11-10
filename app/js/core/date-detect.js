@@ -5,7 +5,7 @@
 //
 // 읽는 차례: ① 날짜 말(날짜 + 바로 뒤의 시각) ② 날짜 없이 시각만 (①이 차지한 자리는 건너뜀)
 //   날짜 뒤 시각:  오후 3시 · 3시 반 · 3시 20분 · 15:30 · 세 시 · 열한 시 반 · 저녁(시각 없이 때만: 19시)
-//   시각만:        오전·오후 없는 1~6시는 오후, 7~11시는 오전. 이미 지났으면 찾지 않음 (새벽·자정은 다음 날로)
+//   시각만:        오전·오후 없는 1~6시는 오후, 7~11시는 오전(지났으면 저녁). 그래도 지났으면 찾지 않음 (새벽·자정은 다음 날로)
 
 import { startOfDay, addDays, WEEKDAY as WEEKDAYS } from './time.js';
 
@@ -473,6 +473,8 @@ export function findDates(text, now = new Date(), { allowPast = false } = {}) {
     const end = rangeEnd(s, from + m[0].length);
     let at = atTime(ymd(now), t);
     if (!allowPast && at <= now && (t.period === '새벽' || t.midnight)) at = plusDays(at, 1);
+    // 오전·오후 없는 7~11시가 이미 지났으면 저녁으로 ("8시 운동" 을 오전 10시에 적으면 저녁 8시)
+    else if (!allowPast && at <= now && !t.period && t.h >= 7 && t.h <= 11) at = new Date(at.getTime() + 12 * 3_600_000);
     add(from, end, at, true);
   }
 
