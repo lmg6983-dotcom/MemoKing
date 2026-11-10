@@ -29,6 +29,11 @@ test('격주: 기준 날이 든 주부터 두 주마다', () => {
   assert.deepEqual(nextOccurrence(r, at(2026, 10, 16, 9, 0)), at(2026, 10, 30, 9, 0)); // 23일은 건너뜀
   assert.deepEqual(nextOccurrence(r, at(2026, 12, 25, 9, 0)), at(2027, 1, 8, 9, 0)); // 해 넘김
   assert.equal(describeReminder(r), '격주 금 09:00');
+  // 3주마다
+  const r3 = repeat({ every: 'week', weekdays: [5], time: '09:00', interval: 3, from: '2026-10-16' });
+  assert.deepEqual(nextOccurrence(r3, at(2026, 10, 16, 9, 0)), at(2026, 11, 6, 9, 0));
+  assert.equal(describeReminder(r3), '3주마다 금 09:00');
+  assert.equal(repeat({ every: 'week', weekdays: [5], time: '09:00', interval: 99 }).repeat.interval, undefined, '너무 긴 간격은 매주로');
   // 기준 날이 없으면 만든 날(2026-10-01 목)이 든 주부터
   assert.equal(repeat({ every: 'week', weekdays: [5], time: '09:00', interval: 2 }).repeat.from, '2026-10-01');
 });

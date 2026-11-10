@@ -150,6 +150,9 @@ test('되풀이 → 반복 알림', () => {
   assert.deepEqual(rep('격주 금요일 분리수거'), { text: '격주 금요일', at: '2026-10-16 9:00', repeat: biweekly });
   assert.deepEqual(rep('2주마다 금요일 오후 3시'), { text: '2주마다 금요일 오후 3시', at: '2026-10-16 15:00', repeat: { ...biweekly, time: '15:00' } });
   assert.deepEqual(rep('금요일 격주로 회의').repeat, biweekly);
+  assert.deepEqual(rep('3주마다 금요일 점검').repeat, { ...biweekly, interval: 3 });
+  assert.deepEqual(rep('네 주에 한 번 금요일').repeat, { ...biweekly, interval: 4 });
+  assert.deepEqual(rep('1주마다 금요일').repeat, { every: 'week', weekdays: [5], time: '09:00' }, '1주마다 = 매주');
 });
 
 test('상대 표현 (뒤·후)', () => table([
@@ -218,6 +221,16 @@ test('날짜 범위 → 여러 날 일정 (끝 날까지 한 자리)', () => {
   // 끝이 시작보다 앞이거나 없는 날이면 시작일만
   assert.deepEqual(range('11월 20일~18일'), { text: '11월 20일', at: '2026-11-20 9:00', end: null });
   assert.deepEqual(range('11월 20일~31일'), { text: '11월 20일', at: '2026-11-20 9:00', end: null });
+  // 숫자로 적은 날짜
+  assert.deepEqual(range('2026-11-20 ~ 2026-11-22 워크숍'), { text: '2026-11-20 ~ 2026-11-22', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('2026.11.20~11.22'), { text: '2026.11.20~11.22', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('2026-11-20~22 출장'), { text: '2026-11-20~22', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('11/20~11/22 제주'), { text: '11/20~11/22', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('11/20(금)~22(일)'), { text: '11/20(금)~22(일)', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  // 수의 범위는 날짜가 아니다
+  for (const text of ['3.5~4.5점', '1/2~1컵', '11/20~22', '2026-11-20 3~5명']) assert.equal(first(text)?.end, undefined, text);
+  assert.equal(first('3.5~4.5점'), null);
+  assert.equal(first('1/2~1컵'), null);
   // 시각이 붙으면 범위로 읽지 않는다
   assert.equal(first('11월 20일 오후 3시~5시').end, undefined);
   assert.equal(remindFromText('11월 20일~22일 제주 여행', NOW).end, new Date(2026, 10, 22).toISOString());

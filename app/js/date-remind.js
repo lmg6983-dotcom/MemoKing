@@ -9,6 +9,7 @@ import { findAllDates, guessTitle } from './core/date-detect.js';
 
 export { guessTitle }; // 예전 자리에서 부르던 곳을 위해
 import { koClock, dayLabel, WEEKDAY, sameDay } from './core/time.js';
+import { everyWeeks } from './core/reminders.js';
 import { hintOnce } from './hints.js';
 import { openEventEditor } from './event-editor.js';
 import { icon } from './icons.js';
@@ -23,7 +24,7 @@ export const dateLabel = (at, now = new Date()) => `${dayLabel(at, now)} ${koClo
 export function repeatLabel(repeat, at) {
   const clock = koClock(at);
   if (repeat.every === 'day') return `매일 ${clock}`;
-  if (repeat.every === 'week') return `${repeat.interval === 2 ? '격주' : '매주'} ${repeat.weekdays.map((w) => `${WEEKDAY[w]}요일`).join(', ')} ${clock}`;
+  if (repeat.every === 'week') return `${everyWeeks(repeat)} ${repeat.weekdays.map((w) => `${WEEKDAY[w]}요일`).join(', ')} ${clock}`;
   if (repeat.every === 'month') return `매달 ${repeat.day}일 ${clock}`;
   return `매년 ${repeat.month}월 ${repeat.day}일 ${clock}`;
 }
