@@ -7,9 +7,9 @@ name: PC 점검
 on:
   push:
     branches: [main]
-    paths: ['app/**', 'desktop/**', 'tests/**', 'scripts/**', 'package.json', 'README.md', '.github/workflows/pc.yml']
+    paths: ['app/**', 'android/web/**', 'desktop/**', 'tests/**', 'scripts/**', 'package.json', 'README.md', '.github/workflows/pc.yml']
   pull_request:
-    paths: ['app/**', 'desktop/**', 'tests/**', 'scripts/**', 'package.json', 'README.md', '.github/workflows/pc.yml']
+    paths: ['app/**', 'android/web/**', 'desktop/**', 'tests/**', 'scripts/**', 'package.json', 'README.md', '.github/workflows/pc.yml']
   workflow_dispatch:
 
 permissions:
