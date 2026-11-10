@@ -870,14 +870,15 @@ export async function runSmoke({
     const hintText = await js(linkNote.win, `(() => { const a = document.querySelector('.mk-doc a[data-file]'); a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return new Promise((r) => setTimeout(() => r(document.querySelector('.hover-hint')?.textContent ?? ''), 300)); })()`);
     check('파일 칩에 마우스를 올리면 이름·크기 안내', /회의록\.txt \(\d+B\)\. 두 번 누르면 열려요/.test(hintText), hintText);
 
-    // 사진은 두 번 누르면 기본 사진 앱으로
+    // 사진은 누르면 크게 보기 (묶음 사진과 같은 보기 — 한 장이면 번호 · 장 목록 없이)
     await key(linkNote.win, 'End', ['control']);
     await js(linkNote.win, PASTE_IMAGE);
     await until(() => js(linkNote.win, `document.querySelector('.mk-image')?.naturalWidth > 0`), '사진').catch(() => {});
-    mark = smokeOpened.length;
-    await js(linkNote.win, `document.querySelector('.mk-image').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
-    const imgOpened = await until(() => smokeOpened.slice(mark).find((o) => o.kind === 'file'), '사진 열기').catch(() => null);
-    check('사진 두 번 누르기 → 기본 사진 앱으로', Boolean(imgOpened) && /\.png$/.test(imgOpened.target), JSON.stringify(imgOpened));
+    await js(linkNote.win, `document.querySelector('.mk-image').click()`);
+    const bigView = await until(() => js(linkNote.win, `(() => { const v = document.querySelector('.mk-album-view'); return v && { big: Boolean(v.querySelector('.mk-album-big')?.src), count: v.querySelector('.mk-album-count').textContent, strip: !v.querySelector('.mk-album-strip').hidden }; })()`), '사진 크게 보기').catch(() => null);
+    check('사진 한 장 누르기 → 크게 보기 (번호 · 장 목록 없이)', Boolean(bigView?.big) && bigView.count === '' && bigView.strip === false, JSON.stringify(bigView));
+    await key(linkNote.win, 'Escape');
+    await until(() => js(linkNote.win, `!document.querySelector('.mk-album-view')`), '크게 보기 닫힘').catch(() => {});
     await capture(linkNote.win, 'smoke-link-card.png');
 
     // 다시 열면 파일의 마크다운에서 카드로 되살아나고, 보관한 미리보기를 쓴다

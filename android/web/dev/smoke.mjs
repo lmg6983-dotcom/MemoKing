@@ -1577,6 +1577,11 @@ try {
     await page.waitForTimeout(80);
     await touch('touchEnd', ib2.x + 40, ib2.y + 40);
     await page.waitForTimeout(250);
+    // 그림 한 장도 누르면 크게 보기 (묶음 사진과 같은 보기) — 닫으면 그 그림의 단추 줄
+    const big = await page.evaluate(() => { const v = document.querySelector('.mk-album-view'); return v && { src: Boolean(v.querySelector('.mk-album-big')?.src), count: v.querySelector('.mk-album-count').textContent, row: Boolean(document.querySelector('.mk-delete-btn')) }; });
+    check('그림 한 장을 누르면 크게 보기 (번호 없이 · 단추 줄은 닫은 뒤에)', Boolean(big?.src) && big.count === '' && !big.row, JSON.stringify(big));
+    await page.tap('.mk-album-view button[aria-label="닫기"]');
+    await page.waitForTimeout(250);
     const shown = await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn') && await page.isVisible('.mk-save-btn');
     const order = await page.evaluate(() => ['.mk-save-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
     check('글 고치기 방식: 그림을 짧게 누르면 저장 · 복사 · × 버튼 (왼쪽부터)', shown && order[0] < order[1] && order[1] < order[2], JSON.stringify({ shown, order }));
@@ -1601,6 +1606,8 @@ try {
       await touch('touchStart', ib3.x + 40, ib3.y + 40);
       await page.waitForTimeout(80);
       await touch('touchEnd', ib3.x + 40, ib3.y + 40);
+      await page.waitForTimeout(250);
+      await page.tap('.mk-album-view button[aria-label="닫기"]'); // 크게 보기를 닫으면 단추 줄
       await page.waitForTimeout(250);
     }
     await shot('18c-tap-buttons');
