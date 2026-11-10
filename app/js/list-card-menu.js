@@ -17,11 +17,11 @@ export function cardMenuSpec(memo, { workLife = true } = {}) {
   return {
     icons: [
       // 메모 창 ⋯ 메뉴와 같은 자리: 글 복사 · 공유 · PDF 가 앞, 지우는 일(잘라내기 · 휴지통)은 끝에
-      { id: 'copy', icon: COPY_ICON, label: locked ? '글 복사 (잠긴 메모는 풀어야 해요)' : '글 복사', disabled: locked },
-      { id: 'share', icon: SHARE_ICON, label: locked ? '공유 (잠긴 메모는 풀어야 해요)' : '공유', disabled: locked },
-      { id: 'pdf', icon: SAVE_ICON, label: UI.saveAsPdf },
-      { id: 'cut', icon: CUT_ICON, label: locked ? '잘라내기 (잠긴 메모는 풀어야 해요)' : '잘라내기 (글을 복사하고 휴지통으로)', disabled: locked },
-      { id: 'trash', icon: TRASH_ICON, label: UI.toTrash, danger: true },
+      { id: 'copy', icon: COPY_ICON, label: locked ? '글 복사 (잠긴 메모는 풀어야 해요)' : '글 복사', short: '복사', disabled: locked },
+      { id: 'share', icon: SHARE_ICON, label: locked ? '공유 (잠긴 메모는 풀어야 해요)' : '공유', short: '공유', disabled: locked },
+      { id: 'pdf', icon: SAVE_ICON, label: UI.saveAsPdf, short: 'PDF' },
+      { id: 'cut', icon: CUT_ICON, label: locked ? '잘라내기 (잠긴 메모는 풀어야 해요)' : '잘라내기 (글을 복사하고 휴지통으로)', short: '잘라내기', disabled: locked },
+      { id: 'trash', icon: TRASH_ICON, label: UI.toTrash, short: '삭제', danger: true },
     ],
     items: [
       { type: 'colors', label: '색', colors: COLORS.map((c) => ({ id: `color:${c}`, label: COLOR_NAMES[c] ?? c, color: c, checked: memo.color === c })) }, // 메모 창 메뉴처럼 아이콘 바로 아래

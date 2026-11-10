@@ -21,7 +21,7 @@ export function closeContextMenu(result = null) {
 }
 
 /**
- * @param {{ x: number, y: number, icons?: { id: string, label: string, icon: string, danger?: boolean, disabled?: boolean }[],
+ * @param {{ x: number, y: number, icons?: { id: string, label: string, short?: string, icon: string, danger?: boolean, disabled?: boolean }[],
  *           items?: ({ id: string, label: string, hint?: string, disabled?: boolean, checked?: boolean }
  *                    | { type: 'colors', label: string, colors: { id: string, label: string, color: string, checked?: boolean }[] }
  *                    | { type: 'separator' })[],
@@ -67,6 +67,7 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
       const b = make(spec, 'mk-ctx-ic');
       b.title = spec.label; // 마우스를 올리면 이름 (Windows 메뉴의 아이콘처럼)
       b.setAttribute('aria-label', spec.label);
+      if (spec.short) b.dataset.label = spec.short; // 아이콘 아래 짧은 이름 (ctx-menu.css)
       b.innerHTML = spec.icon;
       row.append(b);
     }

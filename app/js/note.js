@@ -712,6 +712,8 @@ function closeMenu() {
   if (el.menu.hidden) return;
   el.menu.hidden = true;
   el.menuBtn.setAttribute('aria-expanded', 'false');
+  $('menu-more').hidden = true;
+  $('menu-more-btn').setAttribute('aria-expanded', 'false');
   if (el.menu.contains(document.activeElement)) el.menuBtn.focus(); // 키보드로 쓰던 사람이 제자리로
 }
 el.menuBtn.addEventListener('click', (e) => {
@@ -719,6 +721,13 @@ el.menuBtn.addEventListener('click', (e) => {
   toggleMenu(e);
 });
 menuKeys(el.menu, '.menu-item');
+// 더 보기: 가끔 쓰는 항목을 그 자리에서 펼친다 (메뉴는 닫지 않는다 — 닫을 때 다시 접는다)
+$('menu-more-btn').addEventListener('click', (e) => {
+  const more = $('menu-more');
+  more.hidden = !more.hidden;
+  e.currentTarget.setAttribute('aria-expanded', String(!more.hidden));
+  if (!more.hidden) more.lastElementChild.scrollIntoView({ block: 'nearest' });
+});
 document.addEventListener('mousedown', (e) => {
   if (!el.menu.hidden && !el.menu.contains(e.target) && !el.menuBtn.contains(e.target)) closeMenu();
 });
