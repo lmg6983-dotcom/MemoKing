@@ -74,7 +74,7 @@ const EVENT_ASK = /\s*(?:(?:일정|알림|알람|리마인드)(?:으로|로|을|
 function eventFields(t, when) {
   let title = clean(guessTitle(t, when.from, when.to));
   for (let i = 0; i < 3; i++) title = clean(title.replace(ASK_TAIL, '').replace(EVENT_ASK, '').replace(/\s*(?:에|을|를|좀|으로|로|라고|이라고|일정|알림)$/, ''));
-  return { title: title.slice(0, 60) || (/깨워|알람/.test(t) ? '알람' : '일정'), when: { at: when.at.toISOString(), hasTime: when.hasTime, repeat: when.repeat ?? null, text: when.text } };
+  return { title: title.slice(0, 60) || (/깨워|알람/.test(t) ? '알람' : '일정'), when: { at: when.at.toISOString(), hasTime: when.hasTime, repeat: when.repeat ?? null, ...(when.end ? { end: when.end.toISOString() } : {}), text: when.text } };
 }
 
 function memoFields(t, m) {

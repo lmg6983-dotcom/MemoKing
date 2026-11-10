@@ -204,6 +204,23 @@ test('지난 날의 시각은 오늘로 읽지 않는다', () => table([
   ['어젯밤 11시', null, null],
 ]));
 
+test('날짜 범위 → 여러 날 일정 (끝 날까지 한 자리)', () => {
+  const range = (text) => {
+    const r = first(text);
+    return r && { text: r.text, at: fmt(r.at), end: r.end ? fmt(r.end) : null };
+  };
+  assert.deepEqual(range('11월 20일~22일 제주 여행'), { text: '11월 20일~22일', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  assert.deepEqual(range('11월 28일부터 12월 2일까지 출장'), { text: '11월 28일부터 12월 2일까지', at: '2026-11-28 9:00', end: '2026-12-2 0:00' });
+  assert.deepEqual(range('12월 30일 ~ 1월 2일 휴가'), { text: '12월 30일 ~ 1월 2일', at: '2026-12-30 9:00', end: '2027-1-2 0:00' });
+  assert.deepEqual(range('11월 20일(금)~22일(일)'), { text: '11월 20일(금)~22일(일)', at: '2026-11-20 9:00', end: '2026-11-22 0:00' });
+  // 끝이 시작보다 앞이거나 없는 날이면 시작일만
+  assert.deepEqual(range('11월 20일~18일'), { text: '11월 20일', at: '2026-11-20 9:00', end: null });
+  assert.deepEqual(range('11월 20일~31일'), { text: '11월 20일', at: '2026-11-20 9:00', end: null });
+  // 시각이 붙으면 범위로 읽지 않는다
+  assert.equal(first('11월 20일 오후 3시~5시').end, undefined);
+  assert.equal(remindFromText('11월 20일~22일 제주 여행', NOW).end, new Date(2026, 10, 22).toISOString());
+});
+
 test('한 줄에 여러 개, 겹치지 않게', () => {
   const r = findDates('내일 3시 미팅, 금요일 오전 10시 마감', NOW);
   assert.deepEqual(r.map((x) => x.text), ['내일 3시', '금요일 오전 10시']);

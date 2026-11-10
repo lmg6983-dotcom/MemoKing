@@ -138,3 +138,13 @@ test('매직 에이전트 흐름: 할 일은 확인 카드, 일정 묻기는 일
   assert.equal(ans.text, '메모에 이렇게 적혀 있어요.\n“출시일은 11월 3일로 확정했어요” [1]');
   assert.equal(ans.sources[0].id, 'a');
 });
+
+test('eventFromDate: 날짜 범위는 여러 날 하루 종일 일정 · 격주는 간격을 그대로', () => {
+  const now = new Date(2026, 9, 10, 10, 0);
+  const trip = eventFromDate({ at: new Date(2026, 10, 20, 9), hasTime: false, end: new Date(2026, 10, 22), title: '제주 여행' }, now);
+  assert.equal(trip.allDay, true);
+  assert.equal(new Date(trip.end).getDate(), 22);
+  assert.equal(occurrencesBetween(trip, new Date(2026, 10, 22), new Date(2026, 10, 23)).length, 1, '마지막 날 달력에도 보인다');
+  const biweekly = eventFromDate({ at: new Date(2026, 9, 16, 9), hasTime: false, repeat: { every: 'week', weekdays: [5], interval: 2, from: '2026-10-16', time: '09:00' } }, now);
+  assert.deepEqual(biweekly.repeat, { every: 'week', time: '09:00', weekdays: [5], interval: 2, from: '2026-10-16' });
+});

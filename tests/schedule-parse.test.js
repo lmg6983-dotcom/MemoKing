@@ -38,6 +38,15 @@ test('3. 날짜 범위: 시작일과 종료일이 범위 표현으로 연결되�
   assert.equal(r.emptyTitle, false);
 });
 
+test('3-0. 날짜 범위: 끝 날에 달을 적지 않아도 (11월 20일~22일)', () => {
+  const r = parseScheduleText('11월 20일~22일 제주 여행', null, NOW);
+  assert.equal(r.title, '제주 여행');
+  assert.equal(r.schedules.length, 1);
+  assert.equal(r.schedules[0].type, 'range');
+  assert.equal(ymd(r.schedules[0].start).slice(5), '11-20');
+  assert.equal(ymd(r.schedules[0].end).slice(5), '11-22');
+});
+
 test('3-1. 날짜 범위: 부터...까지 표현도 기간 일정으로 해석한다', () => {
   const r = parseScheduleText('1월 1일부터 1월 3일까지 영양제 먹는 날', null, NOW);
   assert.equal(r.title, '영양제 먹는 날');

@@ -459,7 +459,7 @@ export function setupReminderPanel({ api, memoId, memoTitle = () => '', setStatu
     },
     /**
      * 일정 추가 (글 속 날짜 → 일정 창에서): 이름 · 때 · 미리 알림
-     * @param {{ title?: string, start: Date, allDay?: boolean, alerts: number[], repeat?: object|null }} e
+     * @param {{ title?: string, start: Date, allDay?: boolean, alerts: number[], repeat?: object|null, end?: Date|null }} e  end: 여러 날 일정의 마지막 날
      */
     async addEvent(e) {
       const now = new Date();
@@ -473,7 +473,7 @@ export function setupReminderPanel({ api, memoId, memoTitle = () => '', setStatu
         if (e.repeat.every === 'year') r.month = e.repeat.month;
         reminder = { ...base, kind: 'repeat', repeat: r };
       } else {
-        reminder = { ...base, kind: 'at', at: toLocalIso(e.start), ...(e.allDay ? { allDay: true } : {}) };
+        reminder = { ...base, kind: 'at', at: toLocalIso(e.start), ...(e.allDay ? { allDay: true } : {}), ...(e.allDay && e.end > e.start ? { end: toLocalIso(e.end) } : {}) };
       }
       if (!(await save([...reminders, reminder]))) return false;
       const saved = reminders.at(-1) ?? reminder;

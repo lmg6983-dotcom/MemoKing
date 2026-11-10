@@ -27,7 +27,7 @@ export function repeatLabel(repeat, at) {
   if (repeat.every === 'month') return `매달 ${repeat.day}일 ${clock}`;
   return `매년 ${repeat.month}월 ${repeat.day}일 ${clock}`;
 }
-const chipLabel = (d) => (d.repeat ? repeatLabel(d.repeat, d.at) : d.hasTime ? dateLabel(d.at) : dateLabel(d.at).replace(/ (오전|오후) .*$/, ''));
+const chipLabel = (d) => (d.repeat ? repeatLabel(d.repeat, d.at) : d.hasTime ? dateLabel(d.at) : dateLabel(d.at).replace(/ (오전|오후) .*$/, '') + (d.end ? ` ~ ${dayLabel(d.end)}` : ''));
 
 // 빠른 거르기 — date-detect.js 가 읽는 말을 하나라도 빠뜨리면 그 줄의 날짜를 못 찾는다 ("한 달 뒤" · "엿새 후" · "삼십 분 뒤")
 const DATE_HINT = /\d|내일|낼|모레|글피|요일|욜|주말|정오|자정|매일|날마다|일주일|시|뒤|후|있다가|이따|지나서|크리스마스|[A-Za-z]/;
@@ -169,7 +169,7 @@ class DateChip {
     if (!hit) return this.hide();
     const date = hit.spec.date;
     if (this.current && this.current.from === hit.from && this.current.at.getTime() === date.at.getTime()) return this.place();
-    this.current = { from: hit.from, to: hit.to, at: date.at, text: date.text, hasTime: date.hasTime, repeat: date.repeat ?? null, title: date.title ?? '' };
+    this.current = { from: hit.from, to: hit.to, at: date.at, text: date.text, hasTime: date.hasTime, repeat: date.repeat ?? null, end: date.end ?? null, title: date.title ?? '' };
     this.show();
   }
 
@@ -196,6 +196,7 @@ class DateChip {
         title: c.title,
         start: c.at,
         allDay: !c.hasTime && !c.repeat,
+        end: c.end,
         repeatLabel: c.repeat ? repeatLabel(c.repeat, c.at) : null,
       });
       this.suspended = false;

@@ -500,7 +500,7 @@ export function isLiveCached(r, now = new Date()) {
 /**
  * 글 속 날짜(date-detect findDates 의 하나)로 일정 하나 — 일정 창 없이 바로 저장할 때 (매직키 "알림 맞춰 저장")
  *   미리 알림은 기본값(시각이 있으면 10분 전, 날짜만이면 그날 오전 9시), 이미 지난 알림은 그때 바로 울리는 것으로
- * @param {{ at: Date|string, hasTime?: boolean, repeat?: object|null, title?: string }} d
+ * @param {{ at: Date|string, hasTime?: boolean, repeat?: object|null, end?: Date|string|null, title?: string }} d  end: 여러 날 일정의 마지막 날
  */
 export function eventFromDate(d, now = new Date()) {
   const start = new Date(d.at);
@@ -516,7 +516,8 @@ export function eventFromDate(d, now = new Date()) {
     return normalizeReminder({ ...base, kind: 'repeat', repeat: r }, now);
   }
   const at = allDay ? new Date(start.getFullYear(), start.getMonth(), start.getDate()) : start;
-  return normalizeReminder({ ...base, kind: 'at', at: toLocalIso(at), ...(allDay ? { allDay: true } : {}) }, now);
+  const end = allDay && d.end ? new Date(d.end) : null;
+  return normalizeReminder({ ...base, kind: 'at', at: toLocalIso(at), ...(allDay ? { allDay: true } : {}), ...(end > at ? { end: toLocalIso(end) } : {}) }, now);
 }
 
 // ---------- 알림 (구글 리마인더처럼: 무엇을 + 언제 + 반복) ----------

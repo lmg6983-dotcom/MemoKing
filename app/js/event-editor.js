@@ -41,10 +41,10 @@ function el(tag, attrs = {}, text = '') {
 }
 
 /**
- * @param {{ title: string, start: Date, allDay?: boolean, repeatLabel?: string|null, alerts?: number[]|null, heading?: string, saveLabel?: string }} o
- * @returns {Promise<{ title: string, allDay: boolean, start: Date, alerts: number[] } | null>}
+ * @param {{ title: string, start: Date, allDay?: boolean, end?: Date|null, repeatLabel?: string|null, alerts?: number[]|null, heading?: string, saveLabel?: string }} o  end: 여러 날 일정의 마지막 날 (하루 종일일 때만)
+ * @returns {Promise<{ title: string, allDay: boolean, start: Date, end: Date|null, alerts: number[] } | null>}
  */
-export function openEventEditor({ title = '', start, allDay = false, repeatLabel = null, alerts = null, heading = '일정 추가', saveLabel = '저장' }) {
+export function openEventEditor({ title = '', start, allDay = false, end = null, repeatLabel = null, alerts = null, heading = '일정 추가', saveLabel = '저장' }) {
   return new Promise((resolve) => {
     let isAllDay = Boolean(allDay);
     // 하루 종일로 바꾸면 그날 00:00, 되돌리면 원래 시각
@@ -81,6 +81,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
         const [y, mo, d] = date.value.split('-').map(Number);
         if (!y) return;
         timed = new Date(y, mo - 1, d, timed.getHours(), timed.getMinutes());
+        end = null; // 날짜를 바꾸면 글에서 읽은 끝 날은 버린다
         changed();
       });
       const timeBox = el('div', { class: 'date-picker event-time', 'aria-label': '시각' });
@@ -117,6 +118,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
 
     const kind = () => (isAllDay ? 'allDay' : 'timed');
     const startAt = () => (isAllDay ? dayStart() : timed);
+    const endDay = () => (isAllDay && end > dayStart() ? end : null);
     const alertBox = alertPicker(chips, {
       picked,
       kind,
@@ -131,7 +133,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
       render();
     }
     function render() {
-      whenText.textContent = eventWhen(startAt(), isAllDay);
+      whenText.textContent = endDay() ? `${dayLabel(startAt())} ~ ${dayLabel(endDay())} 하루 종일` : eventWhen(startAt(), isAllDay);
       whenBox.querySelector('.event-time')?.toggleAttribute('hidden', isAllDay);
       const set = picked[kind()];
       const active = pendingAlerts([...set], startAt(), { repeat: Boolean(repeatLabel), allDay: isAllDay });
@@ -163,7 +165,7 @@ export function openEventEditor({ title = '', start, allDay = false, repeatLabel
       const chosen = pendingAlerts([...picked[kind()]], startAt(), { repeat: Boolean(repeatLabel), fallback: fallbackAlert(isAllDay), allDay: isAllDay });
       // 기본값으로는 고른 것을 그대로 (이번 일정엔 이미 지나 빠진 "하루 전" 도 다음 일정엔 다시 고른 채로)
       remember(kind(), [...picked[kind()]].sort((a, b) => b - a));
-      finish({ title: name.value.replace(/\s+/g, ' ').trim(), allDay: isAllDay, start: startAt(), alerts: chosen });
+      finish({ title: name.value.replace(/\s+/g, ' ').trim(), allDay: isAllDay, start: startAt(), end: endDay(), alerts: chosen });
     });
 
     render();
