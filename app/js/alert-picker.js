@@ -76,7 +76,7 @@ export function alertPicker(box, { picked, kind, start = () => null, repeat = ()
     const desc = el('span', { class: 'alert-custom-desc' }, '알림 시점을 직접 정해서 추가해요:');
     const row = el('div', { class: 'alert-custom-row' });
     const actions = el('div', { class: 'alert-custom-actions' });
-    const add = el('button', { type: 'button', class: 'btn primary alert-add' }, '추가');
+    const add = el('button', { type: 'button', class: 'btn alert-add' }, '추가') // 노란 단추는 창의 '저장' 하나만 (둘이면 '추가'를 저장으로 안다);
     actions.append(add);
 
     const ensureAddVisible = () => {

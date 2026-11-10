@@ -8,7 +8,7 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import {
   parseMemoFile, serializeMemoFile, normalizeMeta, toLocalIso, plainLines, extractTitle, extractPreview,
   extractMedia, isBlankBody, titleToFileName, COLORS, isAlbumPageTitle } from '../app/js/core/memo-file.js';
-import { indexOutput, AGENT_GUIDE } from '../app/js/core/indexer.js';
+import { indexOutput, indexKey, AGENT_GUIDE } from '../app/js/core/indexer.js';
 import { extractTags } from '../app/js/core/tags.js';
 import { taskProgress } from '../app/js/core/tasks.js';
 import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
@@ -85,6 +85,7 @@ export class Vault extends EventEmitter {
     }
     try {
       this.index = JSON.parse(fs.readFileSync(this.indexFile, 'utf8'));
+      this.indexKey = indexKey(this.index); // 내용이 같으면 켤 때 다시 쓰지 않게 (Drive 가 매번 올리던 것)
     } catch {
       this.index = null;
     }

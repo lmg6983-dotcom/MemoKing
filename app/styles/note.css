@@ -90,7 +90,13 @@ body, .note-screen, .share-paper {
 .menu-top { display: flex; gap: 2px; padding: 0 0 4px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
 .menu-top > .menu-icons, .menu-top > .menu-quick { display: contents; }
 .menu-vsep { flex: none; width: 1px; margin: 6px 2px; background: var(--border); }
-.menu-item.menu-ic { flex: 1 1 0; justify-content: center; height: 32px; padding: 0; color: var(--text); }
+.menu-item.menu-ic { flex: 1 1 0; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; height: 44px; padding: 0; color: var(--text); }
+/* 아이콘 아래 이름 — 눌러 보기 전에는 뜻을 알기 어려웠다 (가위 · 테이프). 화면 낭독기는 aria-label 을 읽는다 */
+.menu-item.menu-ic[data-label]::after { content: attr(data-label); font-size: 10.5px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; color: var(--muted); white-space: nowrap; }
+.menu-item.menu-ic.danger[data-label]::after { color: inherit; }
+.menu-more-toggle svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.16s var(--ease-out); }
+.menu-more-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .menu-more-toggle svg { transition: none; } }
 .menu-item.menu-ic svg { width: 18px; height: 18px; color: inherit; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; fill: none; } /* content-icons 의 선 그림 (카드 메뉴 .mk-ctx-ic 와 같은 굵기) */
 .menu-item.menu-ic.danger { color: var(--danger); }
 .menu-sep { height: 1px; margin: 3px 2px; border: 0; background: var(--border); }

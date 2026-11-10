@@ -36,10 +36,10 @@ export function tokenize(text) {
 }
 
 // 제목을 뺀 본문 앞부분을 문장 단위로 잘라 요약으로 쓴다 (추출 요약).
-export function summarize(body) {
-  const lines = plainLines(body).slice(1);
+export const summarize = (body) => summaryOf(plainLines(body));
+function summaryOf(plain) {
   let summary = '';
-  for (const line of lines) {
+  for (const line of plain.slice(1)) {
     const next = summary ? `${summary} ${line}` : line;
     if (next.length > SUMMARY_LENGTH) {
       if (!summary) summary = `${line.slice(0, SUMMARY_LENGTH - 1)}…`;
@@ -96,7 +96,8 @@ export function buildIndex(memos, { now } = {}) {
   const titles = new Map(sorted.map((m) => [m.id, extractTitle(m.body)]));
 
   // 제목은 두 번 넣어 가중치를 높인다.
-  const vectors = tfidfVectors(sorted.map((m) => tokenize(`${titles.get(m.id)} ${titles.get(m.id)} ${plainLines(m.body).join(' ')}`)));
+  const plains = sorted.map((m) => plainLines(m.body)); // 본문 다듬기는 메모마다 한 번만 (낱말 · 요약 · 글자 수가 함께 쓴다)
+  const vectors = tfidfVectors(sorted.map((m, i) => tokenize(`${titles.get(m.id)} ${titles.get(m.id)} ${plains[i].join(' ')}`)));
 
   const links = new Map(sorted.map((m) => [m.id, m.meta.links.filter((id) => ids.has(id) && id !== m.id)]));
   const backlinks = new Map(sorted.map((m) => [m.id, []]));
@@ -145,7 +146,7 @@ export function buildIndex(memos, { now } = {}) {
       id: memo.id,
       file: memo.file,
       title: titles.get(memo.id),
-      summary: summarize(memo.body),
+      summary: summaryOf(plains[i]),
       headings: extractHeadings(memo.body),
       tags: extractTags(memo.body),
       keywords,
@@ -153,7 +154,7 @@ export function buildIndex(memos, { now } = {}) {
       updated: memo.meta.updated,
       color: memo.meta.color,
       pinned: memo.meta.pinned,
-      chars: plainLines(memo.body).join('').length,
+      chars: plains[i].join('').length,
       attachments: extractAttachments(memo.body),
       links: out,
       backlinks: back,
@@ -170,12 +171,8 @@ export function buildIndex(memos, { now } = {}) {
   };
 }
 
-// generatedAt 만 다른 경우는 같은 인덱스로 본다 (불필요한 동기화 방지) — 휴대폰(android/web/js/vault.js)이 쓴다
+// generatedAt 만 다른 경우는 같은 인덱스로 본다 (불필요한 동기화 방지)
 export const indexKey = (index) => JSON.stringify({ ...index, generatedAt: null });
-export function sameIndex(a, b) {
-  if (!a || !b) return false;
-  return indexKey(a) === indexKey(b);
-}
 
 /**
  * 색인과 파일에 쓸 글, 비교 열쇠(generatedAt 만 다르면 같은 색인 — 불필요한 동기화 방지).
