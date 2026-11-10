@@ -7,7 +7,7 @@
 //   날짜 뒤 시각:  오후 3시 · 3시 반 · 3시 20분 · 15:30 · 세 시 · 열한 시 반 · 저녁(시각 없이 때만: 19시)
 //   시각만:        오전·오후 없는 1~6시는 오후, 7~11시는 오전(지났으면 저녁). 그래도 지났으면 찾지 않음 (새벽·자정은 다음 날로)
 
-import { startOfDay, addDays, WEEKDAY as WEEKDAYS } from './time.js';
+import { startOfDay, addDays, dateKey, WEEKDAY as WEEKDAYS } from './time.js';
 
 // 하루·한 주 뒤는 달력으로 더한다 (서머타임이 바뀌는 날에도 같은 시각이 되게)
 const plusDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes());
@@ -238,6 +238,14 @@ const DATE_RULES = [
       return { date: ymd(addDays(startOfDay(now), (wd - now.getDay() + 7) % 7)), repeat: { every: 'week', weekdays: [wd] } };
     },
   },
+  // 격주 금요일 · 2주마다 금요일 · 금요일 격주 → 두 주마다 (첫 회차는 가장 가까운 그 요일)
+  {
+    re: new RegExp(`(?<![0-9가-힣])(?:격주|(?:2|이|두)\\s?주\\s?(?:마다|에\\s?한\\s?번))\\s?([${WEEKDAYS}])(?:요일|욜)(?:\\s?마다)?|(?<![가-힣])([${WEEKDAYS}])(?:요일|욜)\\s?격주(?:\\s?(?:로|마다))?`, 'g'),
+    date: (m, now) => {
+      const wd = weekdayIndex(m[1] ?? m[2]);
+      return { date: ymd(addDays(startOfDay(now), (wd - now.getDay() + 7) % 7)), repeat: { every: 'week', weekdays: [wd], interval: 2 } };
+    },
+  },
   {
     re: /(?<![가-힣])(?:매달|매월)\s?(\d{1,2})일(?:\s?마다)?/g,
     date: (m, now) => {
@@ -376,6 +384,13 @@ function rangeEnd(text, end) {
   return m.index + m[0].length + (tail ? tail[0].length : 0);
 }
 
+/** 되풀이 규칙에 시각을 채운다 — 격주는 첫 회차 날을 기준(from)으로 */
+const repeatAt = (repeat, at) => ({
+  ...repeat,
+  time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`,
+  ...(repeat.interval ? { from: dateKey(at) } : {}),
+});
+
 /** 되풀이 알림의 다음 차례 (이미 지났으면 하루·한 주·한 달·한 해 뒤로) */
 function nextRepeat(at, repeat, now) {
   let next = at;
@@ -396,7 +411,7 @@ function nextRepeat(at, repeat, now) {
  * 글 속 날짜·시각들 (앞에서부터, 겹치지 않게)
  * @param {string} text 한 줄(문단)의 글
  * @param {Date} [now]
- * @returns {{ from: number, to: number, text: string, at: Date, hasTime: boolean, repeat?: { every: 'day'|'week'|'month'|'year', weekdays?: number[], day?: number, month?: number, time: string } }[]}
+ * @returns {{ from: number, to: number, text: string, at: Date, hasTime: boolean, repeat?: { every: 'day'|'week'|'month'|'year', weekdays?: number[], interval?: 2, from?: string, day?: number, month?: number, time: string } }[]}
  */
 export function findDates(text, now = new Date(), { allowPast = false } = {}) {
   const s = String(text ?? '');
@@ -417,7 +432,7 @@ export function findDates(text, now = new Date(), { allowPast = false } = {}) {
     const item = { from, to, text: s.slice(from, to).trim(), at, hasTime };
     // 요일만 적은 말("화요일")인지 — 영어 시각을 붙일 때 이번 주/다음 주를 다시 고른다 (findAllDates). 결과 모양에는 드러내지 않음
     if (rollWeek) Object.defineProperty(item, 'rollWeek', { value: true });
-    if (repeat) item.repeat = { ...repeat, time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };
+    if (repeat) item.repeat = repeatAt(repeat, at);
     found.push(item);
   };
 
@@ -534,7 +549,7 @@ export function findAllDates(text, { chrono = null, now = new Date(), allowPast 
       }
       at = nextRepeat(at, k.repeat, now);
       k.at = at;
-      k.repeat = { ...k.repeat, time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };
+      k.repeat = repeatAt(k.repeat, at);
       k.to = e.to;
       k.text = s.slice(k.from, e.to).trim();
       k.hasTime = true;

@@ -468,7 +468,7 @@ export function setupReminderPanel({ api, memoId, memoTitle = () => '', setStatu
       let reminder;
       if (e.repeat) {
         const r = { every: e.repeat.every, time: e.repeat.time };
-        if (e.repeat.every === 'week') r.weekdays = e.repeat.weekdays;
+        if (e.repeat.every === 'week') Object.assign(r, { weekdays: e.repeat.weekdays }, e.repeat.interval ? { interval: e.repeat.interval, from: e.repeat.from } : null);
         if (e.repeat.every === 'month' || e.repeat.every === 'year') r.day = e.repeat.day;
         if (e.repeat.every === 'year') r.month = e.repeat.month;
         reminder = { ...base, kind: 'repeat', repeat: r };

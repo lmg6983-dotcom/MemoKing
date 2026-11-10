@@ -23,7 +23,7 @@ export const dateLabel = (at, now = new Date()) => `${dayLabel(at, now)} ${koClo
 export function repeatLabel(repeat, at) {
   const clock = koClock(at);
   if (repeat.every === 'day') return `매일 ${clock}`;
-  if (repeat.every === 'week') return `매주 ${repeat.weekdays.map((w) => `${WEEKDAY[w]}요일`).join(', ')} ${clock}`;
+  if (repeat.every === 'week') return `${repeat.interval === 2 ? '격주' : '매주'} ${repeat.weekdays.map((w) => `${WEEKDAY[w]}요일`).join(', ')} ${clock}`;
   if (repeat.every === 'month') return `매달 ${repeat.day}일 ${clock}`;
   return `매년 ${repeat.month}월 ${repeat.day}일 ${clock}`;
 }
@@ -253,7 +253,7 @@ export function reminderAt(reminders, { at, repeat = null, hasTime = true }) {
     if (repeat) {
       const x = r.kind === 'repeat' ? r.repeat : null;
       return Boolean(x) && x.every === repeat.every && x.time === repeat.time
-        && (x.weekdays ?? []).join() === (repeat.weekdays ?? []).join() && (x.day ?? null) === (repeat.day ?? null) && (x.month ?? null) === (repeat.month ?? null);
+        && (x.weekdays ?? []).join() === (repeat.weekdays ?? []).join() && (x.interval ?? 1) === (repeat.interval ?? 1) && (x.day ?? null) === (repeat.day ?? null) && (x.month ?? null) === (repeat.month ?? null);
     }
     if (!r.at || r.kind !== 'at') return false;
     // 날짜만 적었거나, 시각이 있어도 일정 창에서 하루 종일로 바꿔 만든 일정이면 같은 날이면 맞춤

@@ -143,6 +143,11 @@ test('되풀이 → 반복 알림', () => {
   assert.deepEqual(rep('매월 1일 관리비'), { text: '매월 1일', at: '2026-11-1 9:00', repeat: { every: 'month', day: 1, time: '09:00' } });
   assert.deepEqual(rep('매년 3월 15일 생일'), { text: '매년 3월 15일', at: '2027-3-15 9:00', repeat: { every: 'year', month: 3, day: 15, time: '09:00' } });
   assert.equal(first('일요일마다 등산').repeat.every, 'week');
+  // 격주: 두 주마다, 첫 회차(가장 가까운 그 요일)가 기준
+  const biweekly = { every: 'week', weekdays: [5], interval: 2, time: '09:00', from: '2026-10-16' };
+  assert.deepEqual(rep('격주 금요일 분리수거'), { text: '격주 금요일', at: '2026-10-16 9:00', repeat: biweekly });
+  assert.deepEqual(rep('2주마다 금요일 오후 3시'), { text: '2주마다 금요일 오후 3시', at: '2026-10-16 15:00', repeat: { ...biweekly, time: '15:00' } });
+  assert.deepEqual(rep('금요일 격주로 회의').repeat, biweekly);
 });
 
 test('상대 표현 (뒤·후)', () => table([

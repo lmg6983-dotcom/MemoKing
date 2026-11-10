@@ -23,6 +23,16 @@ test('매주: 고른 요일 중 다음', () => {
   assert.deepEqual(nextOccurrence(r, at(2026, 10, 5, 9, 0)), at(2026, 10, 7, 9, 0));
 });
 
+test('격주: 기준 날이 든 주부터 두 주마다', () => {
+  const r = repeat({ every: 'week', weekdays: [5], time: '09:00', interval: 2, from: '2026-10-16' }); // 금
+  assert.deepEqual(nextOccurrence(r, at(2026, 10, 10, 10, 0)), at(2026, 10, 16, 9, 0));
+  assert.deepEqual(nextOccurrence(r, at(2026, 10, 16, 9, 0)), at(2026, 10, 30, 9, 0)); // 23일은 건너뜀
+  assert.deepEqual(nextOccurrence(r, at(2026, 12, 25, 9, 0)), at(2027, 1, 8, 9, 0)); // 해 넘김
+  assert.equal(describeReminder(r), '격주 금 09:00');
+  // 기준 날이 없으면 만든 날(2026-10-01 목)이 든 주부터
+  assert.equal(repeat({ every: 'week', weekdays: [5], time: '09:00', interval: 2 }).repeat.from, '2026-10-01');
+});
+
 test('매월 31일: 짧은 달은 그 달 마지막 날', () => {
   const r = repeat({ every: 'month', day: 31, time: '09:00' });
   assert.deepEqual(nextOccurrence(r, at(2026, 10, 31, 10, 0)), at(2026, 11, 30, 9, 0));
