@@ -932,7 +932,7 @@ dialog.quick-event[open] {
 .cal-quick {
   position: fixed;
   bottom: max(14px, env(safe-area-inset-bottom, 14px));
-  left: 50%;
+  left: 50%; /* 달력이 창 폭 전체라 넓은 화면에서도 가운데 */
   transform: translateX(-50%);
   width: min(168px, calc(100vw - 32px)); /* 기본 상태: 기존 340px 대비 약 50% */
   height: 44px;
@@ -953,12 +953,6 @@ dialog.quick-event[open] {
   }
 }
 
-@media (min-width: 640px) {
-  .cal-quick {
-    left: 28%; /* 데스크탑에서 좌측 캘린더 영역 중앙 */
-  }
-}
-
 /* 확장 상태 */
 .cal-quick.is-expanded {
   width: min(540px, calc(100vw - 32px));
@@ -975,11 +969,6 @@ dialog.quick-event[open] {
   transform: translateX(-50%) translateY(8px) scale(0.96);
   pointer-events: none;
   transition: opacity 0.2s ease-out, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@media (min-width: 640px) {
-  .cal-quick.is-morphing {
-    transform: translateX(0) translateY(8px) scale(0.96);
-  }
 }
 
 .cal-quick[hidden] { display: none; }

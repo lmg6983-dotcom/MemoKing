@@ -22,6 +22,7 @@ import { UI } from './core/ui-text.js';
 
 const KIND_ICON = { timer: 'timer', at: 'calendar', repeat: 'repeat', startup: 'power' };
 const UPCOMING_DAYS = 30;
+const LONG_PRESS = 350; // 길게 누르면 일정 끌어 옮기기 — 이보다 빨리 옆으로 밀면 달 넘기기
 // 보기는 둘: 캘린더(달 달력) · 회상(사진 달력). 예전의 주 · 목록 보기는 없앴다 (저장된 값이면 캘린더로)
 const VIEWS = [
   { id: 'dayGridMonth', label: '캘린더' },
@@ -736,8 +737,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     nowIndicator: true,
     scrollTime: '08:00:00',
     eventTimeFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
-    longPressDelay: 350,
-    eventLongPressDelay: 350,
+    longPressDelay: LONG_PRESS,
+    eventLongPressDelay: LONG_PRESS,
     editable: true,
     eventDurationEditable: false,
     defaultTimedEventDuration: '01:00',
@@ -810,30 +811,31 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     else calendar.prev();
   }
   let swipe = null;
-  card.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1 || e.target.closest('.cal-head, .cal-bar, .cal-quick, .mem-tags, .mem-day')) return;
-    const t = e.touches[0];
-    swipe = { x0: t.clientX, y0: t.clientY, dx: 0, dy: 0, locked: null, stage: activeStage() };
-  }, { passive: true });
-  card.addEventListener('touchmove', (e) => {
+  // 움직임 · 끝은 손가락을 댄 요소에 단다 — 일정 칩은 누르는 순간 다시 그려져 문서에서 빠지면 그 뒤 터치가 카드까지 올라오지 않는다
+  //   (일정이 많은 달은 어디를 밀어도 칩 위라 달이 넘어가지 않았다)
+  const onMove = (e) => {
     if (!swipe || e.touches.length !== 1) return;
     const t = e.touches[0];
     swipe.dx = t.clientX - swipe.x0;
     swipe.dy = t.clientY - swipe.y0;
     if (!swipe.locked) {
       if (Math.hypot(swipe.dx, swipe.dy) < 10) return;
-      swipe.locked = Math.abs(swipe.dx) > Math.abs(swipe.dy) * 1.2 ? 'x' : 'y';
+      // 길게 누른 뒤 움직이면 일정 끌어 옮기기(eventLongPressDelay) — 달 넘기기로 보지 않는다
+      swipe.locked = Date.now() - swipe.t0 < LONG_PRESS && Math.abs(swipe.dx) > Math.abs(swipe.dy) * 1.2 ? 'x' : 'y';
     }
     if (swipe.locked === 'x') {
       swipe.stage.classList.remove('cal-sliding');
       swipe.stage.style.transition = 'none';
       swipe.stage.style.transform = `translateX(${(swipe.dx * 0.45).toFixed(1)}px)`;
     }
-  }, { passive: true });
+  };
   const endSwipe = () => {
     if (!swipe) return;
-    const { dx, locked, stage } = swipe;
+    const { dx, locked, stage, target } = swipe;
     swipe = null;
+    target.removeEventListener('touchmove', onMove);
+    target.removeEventListener('touchend', endSwipe);
+    target.removeEventListener('touchcancel', endSwipe);
     if (locked !== 'x') return;
     if (Math.abs(dx) >= 48) {
       stepMonth(dx < 0 ? 1 : -1);
@@ -843,8 +845,15 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       setTimeout(() => { if (!swipe) stage.style.transition = ''; }, 190);
     }
   };
-  card.addEventListener('touchend', endSwipe, { passive: true });
-  card.addEventListener('touchcancel', endSwipe, { passive: true });
+  card.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1 || e.target.closest('.cal-head, .cal-bar, .cal-quick, .mem-tags, .mem-day')) return;
+    if (swipe) endSwipe();
+    const t = e.touches[0];
+    swipe = { x0: t.clientX, y0: t.clientY, dx: 0, dy: 0, locked: null, stage: activeStage(), target: e.target, t0: Date.now() };
+    e.target.addEventListener('touchmove', onMove, { passive: true });
+    e.target.addEventListener('touchend', endSwipe, { passive: true });
+    e.target.addEventListener('touchcancel', endSwipe, { passive: true });
+  }, { passive: true });
 
   // 창 높이에 맞춰: 월 보기는 한 달이 다 보이게 칸 높이를(낮은 창은 납작하게), 주 보기는 정한 높이 안에서 위아래로 밀기
   //   넓은 창(달력이 왼쪽에 붙음)은 보이는 높이만큼, 좁은 창(휴대폰)도 Google 캘린더처럼 달력이 화면을 채우고
