@@ -8,27 +8,27 @@ import path from 'node:path';
 const files = ['app/js', 'android/web/js'].flatMap((d) => fs.readdirSync(d, { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => path.join(d, f)));
 const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-function exportsOf(file) {
+// export * from '…' 는 그 파일의 이름까지 따라간다
+function exportsOf(file, names = new Set()) {
   const src = strip(fs.readFileSync(file, 'utf8'));
-  const names = new Set();
   for (const m of src.matchAll(/export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+([\w$]+)/g)) names.add(m[1]);
   for (const m of src.matchAll(/export\s*\{([^}]*)\}/g)) for (const part of m[1].split(',')) if (part.trim()) names.add(part.trim().split(/\s+as\s+/).pop());
   if (/export\s+default\b/.test(src)) names.add('default');
-  return { names, star: /export\s*\*\s*from/.test(src) };
+  for (const m of src.matchAll(/export\s*\*\s*from\s*['"](\.[^'"]+)['"]/g)) exportsOf(path.join(path.dirname(file), m[1]), names);
+  return names;
 }
 
 test('상대 경로로 가져오는 이름은 모두 그 파일에 있다', () => {
   const missing = [];
   for (const file of files) {
-    for (const m of strip(fs.readFileSync(file, 'utf8')).matchAll(/import\s*\{([^}]*)\}\s*from\s*['"](\.[^'"]+)['"]/g)) {
+    for (const m of strip(fs.readFileSync(file, 'utf8')).matchAll(/import\s*(?:[\w$]+\s*,\s*)?\{([^}]*)\}\s*from\s*['"](\.[^'"]+)['"]/g)) {
       // 휴대폰에서는 android/web 이 app/ 옆에 놓인다 (android/app/build.gradle.kts) — ../../app 은 저장소의 app/
       const target = path.join(path.dirname(file), m[2]).replace(/^android[\\/]app[\\/]/, `app${path.sep}`);
       if (!fs.existsSync(target)) {
         missing.push(`${file}: ${m[2]} 파일 없음`);
         continue;
       }
-      const { names, star } = exportsOf(target);
-      if (star) continue;
+      const names = exportsOf(target);
       for (const part of m[1].split(',')) {
         const name = part.trim().split(/\s+as\s+/)[0];
         if (name && !names.has(name)) missing.push(`${file}: ${name} ← ${m[2]}`);
