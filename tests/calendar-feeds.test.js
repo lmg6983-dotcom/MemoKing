@@ -120,6 +120,9 @@ test('휴대폰 캘린더 일정: 하루 종일은 UTC 자정 → 그 날짜', (
   assert.equal(e.end.getDate(), 25);
   assert.equal(e.title, '결혼식');
   assert.equal(e.color, '#33B679');
+  // 캘린더 앱에서 열 때는 안드로이드가 준 원래 시각 그대로 (UTC 자정 — 화면용 start 는 이 기기 자정)
+  assert.equal(e.rawStart, Date.UTC(2026, 9, 24));
+  assert.equal(e.rawEnd, Date.UTC(2026, 9, 25));
   const timed = fromDeviceEvent({ id: 8, title: '', start: local(2026, 10, 24, 13).getTime(), end: 0, allDay: false });
   assert.equal(timed.title, '(제목 없음)');
   assert.equal(timed.end.getTime(), timed.start.getTime());

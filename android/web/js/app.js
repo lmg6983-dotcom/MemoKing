@@ -155,7 +155,7 @@ function calendarApi() {
       },
       setPrefs: (prefs) => lsSet(DEVICE_CALS_KEY, JSON.stringify(normalizeCals(prefs) ?? {})),
       // 그 일정을 캘린더 앱(삼성 캘린더 · Google 캘린더)에서 연다
-      open: (e) => call('calendarOpen', { id: e.deviceId, begin: e.start.getTime(), end: e.end.getTime() }),
+      open: (e) => call('calendarOpen', { id: e.deviceId, begin: e.rawStart ?? e.start.getTime(), end: e.rawEnd ?? e.end.getTime() }),
       events: async (from, to) => {
         const res = await call('calendarEvents', { from: from.getTime(), to: to.getTime() });
         if (!res.granted) lsSet(DEVICE_KEY, null); // 설정에서 권한을 거둬 갔다

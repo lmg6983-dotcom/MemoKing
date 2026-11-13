@@ -152,6 +152,9 @@ export function fromDeviceEvent(e) {
     description: noteText(e.description),
     calendar: plainText(e.calendar),
     calendarId: e.calendarId == null ? '' : String(e.calendarId),
+    // 캘린더 앱에서 그 회차를 열 때 넘길 원래 시각 (하루 종일 일정은 UTC 자정 — 위 start · end 는 이 기기 자정으로 바꾼 것)
+    rawStart: e.start,
+    rawEnd: e.end,
     color: /^#[0-9a-f]{6}$/i.test(e.color ?? '') ? e.color : null,
   };
 }
