@@ -133,11 +133,14 @@ try {
   check('알림: 지난 알림이 울림 (알림 막대)', (await devLog()).log.some((l) => l.notify?.title === '약 먹기'));
   check('알림: 울린 기록을 메모 파일에', /last:/.test(read('약 먹기.md')) && /enabled: false/.test(read('약 먹기.md')));
 
-  // 태그 필터
-  await page.tap('.tag-chip[data-tag="업무"]');
-  check('태그 줄: #업무 메모만', (await page.locator('.card').count()) === 2);
-  await back();
-  check('뒤로 가기: 필터 풀기', (await page.locator('.card').count()) === 4);
+  // 태그로 거르기: 검색창에 #태그 (태그 줄은 없앰 — 그 자리에 폴더 단추)
+  check('목록: 태그 줄 대신 폴더 단추 (전체)', (await page.locator('#tag-strip').count()) === 0 && /전체/.test(await page.textContent('#folder-bar')));
+  await page.fill('#search', '#업무');
+  await page.waitForTimeout(250);
+  check('검색 #업무: 그 태그의 메모만', (await page.locator('.card').count()) === 2);
+  await page.fill('#search', '');
+  await page.waitForTimeout(250);
+  check('검색 지우기: 전체 목록', (await page.locator('.card').count()) === 4);
 
   // 검색
   await page.fill('#search', '아이콘');
@@ -303,7 +306,7 @@ try {
   await back();
   await page.waitForTimeout(300);
   check('새 메모: 제목으로 파일', fs.existsSync(path.join(vault, '휴대폰 첫 메모.md')));
-  check('새 메모: 태그 줄에 #생활', (await page.locator('.tag-chip[data-tag="생활"]').count()) === 1);
+  check('새 메모: 카드에 #생활', (await page.locator('.card .card-tags', { hasText: '#생활' }).count()) === 1);
 
   // 빈 새 메모는 파일을 만들지 않음
   const before = fs.readdirSync(vault).length;

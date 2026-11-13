@@ -15,7 +15,7 @@ import { isTextDocument } from './core/markdown-import.js';
 import { setupRemindersTab } from './list-reminders.js';
 import { setupHistoryTab } from './list-history.js';
 import { renderReleaseNotes } from './release-notes-view.js';
-import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
+import { filterMemos, parseQuery, KIND_FILTERS, sameTag } from './core/tags.js';
 import { COLORS, COLOR_NAMES } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
 import { hintOnce } from './hints.js';
@@ -36,6 +36,8 @@ import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
+import { renderFolderList, askFolderName } from './folder-ui.js';
+import { folderList } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
@@ -70,7 +72,9 @@ const el = {
   filterPanel: $('filter-panel'),
   colorFilter: $('color-filter'),
   kindFilter: $('kind-filter'),
-  tagStrip: $('tag-strip'),
+  folderSide: $('folder-side'),
+  folderBtn: $('folder-btn'),
+  folderTitle: $('folder-title'),
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
 };
@@ -81,7 +85,14 @@ const state = {
   workLife: false, // 설정 › Work / Life 나누기 (꺼져 있으면 모든 메모가 한 목록 · 밝기는 시스템 설정)
   // 필터 (창을 닫으면 잊는다): 태그는 모두 가진 메모, 색은 그중 하나, 담긴 것은 모두 해당
   filter: { tags: [], colors: [], kinds: [] },
+  folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 PC 에 기억
+  folderDirs: [], // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도)
 };
+try {
+  state.folder = localStorage.getItem('memoking.folder') ?? '';
+} catch {
+  // 전체
+}
 let searchTimer = null;
 let drivePanel = null; // Google Drive 직접 동기화 (설정 · 처음 화면)
 
@@ -164,7 +175,9 @@ function render() {
     }
   }
   const narrowed = !only && (Boolean(state.query) || filterCount() > 0);
-  const { mine } = split(state.results ?? state.memos, state.mode);
+  // 폴더: 고른 폴더의 메모만 (검색은 모든 폴더에서 — 카드에 폴더 이름이 보인다)
+  const all = split(state.results ?? state.memos, state.mode).mine;
+  const mine = state.query ? all : inFolder(all);
   const memos = only ?? sortMemos(filterMemos(mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }), sort);
   // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
   const elsewhere = !only && state.query && state.workLife ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }).length : 0;
@@ -175,10 +188,79 @@ function render() {
   el.cards.classList.toggle('is-empty', !memos.length); // 빈 카드 칸이 자리를 반 나눠 가져 안내가 아래로 치우치지 않게
   if (!memos.length) renderEmpty(narrowed, elsewhere);
   // 검색·필터로 좁혔을 때만 "N개 중 M개" (평소 개수는 메모 탭에)
-  el.count.replaceChildren(`메모 ${modeMemos().length}개 중 ${memos.length}개`);
+  el.count.replaceChildren(`메모 ${(state.query ? modeMemos() : inFolder(modeMemos())).length}개 중 ${memos.length}개`);
   if (elsewhere) el.count.append(', ', otherModeLink(elsewhere));
   el.count.hidden = !narrowed || !memos.length; // 하나도 없으면 빈 화면 안내가 "다른 모드에서 보기" 를 맡는다
   renderFilters();
+  renderFolders();
+}
+
+// ---------- 폴더 (folder-ui.js · core/folders.js) ----------
+
+const inFolder = (memos) => (state.folder ? memos.filter((m) => m.folder === state.folder) : memos);
+// 새 메모는 보고 있는 폴더에
+const newMemo = (opts = {}) => api.memo.create({ ...opts, ...(state.folder ? { folder: state.folder } : {}) });
+
+async function loadFolders() {
+  state.folderDirs = await api.memos.folders?.().catch(() => []) ?? [];
+  renderFolders();
+}
+
+function setFolder(name) {
+  state.folder = name;
+  try {
+    localStorage.setItem('memoking.folder', name);
+  } catch {
+    // 이번만
+  }
+  render();
+  el.cards.scrollTop = 0;
+}
+
+async function newFolder() {
+  const name = await askFolderName({ existing: state.folderDirs });
+  if (!name) return;
+  try {
+    await api.memos.createFolder(name);
+  } catch (err) {
+    return flashStatus(err.message || '폴더를 만들지 못했어요');
+  }
+  await loadFolders();
+  setFolder(name);
+}
+
+function renderFolders() {
+  if (!el.folderSide) return;
+  const memos = modeMemos();
+  const folders = folderList(state.folderDirs, memos);
+  // 고른 폴더가 없어졌으면(탐색기에서 지움 · 다른 기기) 전체로
+  if (state.folder && !folders.some((f) => f.name === state.folder)) state.folder = '';
+  renderFolderList(el.folderSide, { folders, total: memos.length, current: state.folder, onPick: setFolder, onNew: newFolder });
+  // 막대를 숨겼으면 카드 위에 지금 폴더 이름
+  el.folderTitle.textContent = state.folder;
+  el.folderTitle.hidden = !state.folder || !el.folderSide.hidden || Boolean(state.query);
+}
+
+// 폴더 막대 보이기 · 숨기기 (이 PC 에 기억) — 좁은 창에서 카드 자리를 넓게 쓰려면 숨긴다
+function showFolderSide(on) {
+  el.folderSide.hidden = !on;
+  el.folderBtn.setAttribute('aria-pressed', String(on));
+  try {
+    localStorage.setItem('memoking.folderSide', on ? '1' : '0');
+  } catch {
+    // 이번만
+  }
+  renderFolders();
+  queueMicrotask(() => render()); // 카드 줄 수를 새 폭에 맞춘다
+}
+el.folderBtn?.addEventListener('click', () => showFolderSide(el.folderSide.hidden));
+try {
+  if (localStorage.getItem('memoking.folderSide') === '0') {
+    el.folderSide.hidden = true;
+    el.folderBtn.setAttribute('aria-pressed', 'false');
+  }
+} catch {
+  // 보임
 }
 
 // ---------- 카드 쌓기 (휴대폰과 같음): 메모지처럼 엇갈려 — 카드마다 지금 가장 짧은 줄(같으면 왼쪽)에 붙인다 ----------
@@ -359,16 +441,6 @@ async function setMode(mode) {
 }
 
 function renderFilters() {
-  const tags = collectTags(modeMemos());
-  // 골라 둔 태그가 지금은 없더라도 줄에 남겨 풀 수 있게
-  for (const t of state.filter.tags) if (!tags.some((x) => sameTag(x.name, t))) tags.unshift({ name: t, count: 0 });
-  const picked = (name) => state.filter.tags.some((t) => sameTag(t, name));
-  el.tagStrip.hidden = tags.length === 0;
-  el.tagStrip.replaceChildren(...tags.map((t) => {
-    const count = document.createElement('small');
-    count.textContent = String(t.count);
-    return chip('tag-chip', [`#${t.name}`, count], picked(t.name), { tag: t.name });
-  }));
   el.colorFilter.replaceChildren(...COLORS.map((c) => {
     const b = chip('color-dot', '', state.filter.colors.includes(c), { filterColor: c, color: c });
     b.title = COLOR_NAMES[c] ?? c;
@@ -388,13 +460,6 @@ function renderFilters() {
   el.filterSummaryText.textContent = `필터 ${n}개: ${parts.join(', ')}`;
 }
 
-el.tagStrip.addEventListener('click', (e) => {
-  const b = e.target.closest('[data-tag]');
-  if (b) {
-    toggleTagFilter(b.dataset.tag);
-    tutEvent('tag-filtered');
-  }
-});
 el.colorFilter.addEventListener('click', (e) => {
   const b = e.target.closest('[data-filter-color]');
   if (!b) return;
@@ -448,7 +513,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
   b.textContent = narrowed && elsewhere ? `${other}에서 보기` : narrowed ? UI.clearFilters : '새 메모 (Ctrl+N)';
   b.addEventListener('click', () => {
     if (narrowed && elsewhere) return setMode(otherMode(state.mode));
-    if (!narrowed) return api.memo.create();
+    if (!narrowed) return newMemo();
     state.filter = { tags: [], colors: [], kinds: [] };
     el.search.value = '';
     runSearch();
@@ -608,6 +673,7 @@ function badge(name, text, extra = '') {
 
 async function refresh() {
   state.memos = await api.memos.list();
+  loadFolders();
   await runSearch();
 }
 
@@ -879,7 +945,7 @@ el.fabMenu.addEventListener('click', (e) => {
   const b = e.target.closest('[data-new]');
   if (!b) return;
   setFabMenu(false);
-  api.memo.create(b.dataset.new === 'voice' ? { record: true } : b.dataset.new === 'ink' ? { ink: true } : {});
+  newMemo(b.dataset.new === 'voice' ? { record: true } : b.dataset.new === 'ink' ? { ink: true } : {});
 });
 el.settingsBtn.addEventListener('click', async () => {
   await loadSettings();
@@ -1607,7 +1673,7 @@ document.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.code === 'KeyN') {
     e.preventDefault();
-    api.memo.create();
+    newMemo();
   } else if (mod && e.code === 'KeyF') {
     e.preventDefault();
     el.search.focus();
@@ -1620,6 +1686,7 @@ document.addEventListener('keydown', (e) => {
 
 api.on('memos:changed', (memos) => {
   state.memos = memos;
+  if (memos.some((m) => m.folder && !state.folderDirs.includes(m.folder))) loadFolders(); // 다른 기기 · 탐색기에서 생긴 폴더
   // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
   const hb = $('handoff-bar');
   if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;

@@ -74,7 +74,8 @@
         <div class="filter-group"><span class="filter-label">색</span><div id="color-filter" class="color-filter" role="group" aria-label="색으로 거르기"></div></div>
         <div class="filter-group"><span class="filter-label">담긴 것</span><div id="kind-filter" class="chip-row" role="group" aria-label="담긴 것으로 거르기"></div></div>
       </div>
-      <div id="tag-strip" class="tag-strip" role="group" aria-label="태그로 거르기" hidden></div>
+      <!-- 메모킹 폴더: 누르면 아래에서 폴더 시트 (folder-ui.js) -->
+      <button id="folder-bar" class="folder-bar" type="button" aria-haspopup="dialog"><svg><use href="#i-folder"/></svg><span id="folder-bar-name">전체</span><small id="folder-bar-count"></small><span class="folder-bar-caret" aria-hidden="true">▾</span></button>
       <div id="filter-summary" class="filter-summary" hidden>
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>

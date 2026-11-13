@@ -437,7 +437,7 @@ app.newMemo = async ({ color, voice = false, ink = false } = {}) => {
       // 기본 노랑
     }
   }
-  const id = app.vault.create({ color: pick });
+  const id = app.vault.create({ color: pick, folder: list.currentFolder() }); // 보고 있는 폴더에
   await app.openMemo(id, { fresh: true, record: Boolean(voice), ink: Boolean(ink) });
   if (!voice && !ink) tutEvent('memo-created');
   return id;

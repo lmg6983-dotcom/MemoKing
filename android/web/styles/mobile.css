@@ -1283,3 +1283,14 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .mk-find-opt, .mk-find-choice { height: 32px; }
 .mk-find-swatch { width: 34px; height: 34px; }
 .mk-find-item { min-height: 40px; }
+
+/* 메모킹 폴더: 검색 아래 "📁 전체 ▾" — 누르면 폴더 시트 (folder-ui.js) */
+.folder-bar {
+  display: flex; align-items: center; gap: 6px; flex: none; align-self: flex-start; min-height: 40px; margin: 0 12px 6px; padding: 0 12px;
+  border: 0; border-radius: 999px; background: var(--fill-hover, rgba(0, 0, 0, 0.05)); color: var(--text-strong); font: inherit; font-size: 14.5px; font-weight: 700;
+}
+.folder-bar[hidden] { display: none; }
+.folder-bar svg { width: 17px; height: 17px; color: var(--muted); }
+.folder-bar small { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.folder-bar-caret { font-size: 11px; color: var(--muted); }
+.folder-bar:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }

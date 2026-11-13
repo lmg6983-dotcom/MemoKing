@@ -283,6 +283,20 @@ export function registerIpc(ctx) {
 
   // ---------- 메모 목록·검색·태그 ----------
   ipcMain.handle('memos:list', () => wm.listMemos());
+  // 메모킹 폴더 (core/folders.js): 폴더 목록 · 새 폴더 · 메모 옮기기
+  ipcMain.handle('memos:folders', () => getVault()?.folders() ?? []);
+  ipcMain.handle('folders:create', (_e, name) => {
+    const vault = getVault();
+    if (!vault) throw new Error(UI.noVault);
+    return vault.createFolder(String(name ?? ''));
+  });
+  ipcMain.handle('memo:move-folder', (_e, ids, folder) => {
+    const vault = getVault();
+    if (!vault) throw new Error(UI.noVault);
+    let moved = 0;
+    for (const id of (Array.isArray(ids) ? ids : [ids]).slice(0, 500)) if (vault.moveToFolder(String(id), String(folder ?? ''))) moved++;
+    return moved;
+  });
   ipcMain.handle('tags:list', () => collectTags(getVault()?.list() ?? []));
   ipcMain.handle('tags:suggest', (_e, body, id) => suggestTagsFor(String(body ?? ''), getVault()?.bodies() ?? [], { excludeId: id }));
   // 추천 태그 막대 › AI로 고르기 (이 PC 안의 글 모델, 후보 중에서만)

@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('memoking', {
   memos: {
     list: invoke('memos:list'),
     search: invoke('memos:search'),
+    folders: invoke('memos:folders'), // 메모킹 폴더 이름들 (빈 폴더도)
+    createFolder: invoke('folders:create'),
+    moveToFolder: invoke('memo:move-folder'), // (id 또는 id 들, 폴더 이름 — "" 는 폴더 밖) → 옮긴 수
   },
   tags: {
     list: invoke('tags:list'),

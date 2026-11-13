@@ -67,6 +67,8 @@
     </nav>
 
     <div class="toolbar">
+      <!-- 폴더 막대 보이기 · 숨기기 (folder-ui.js) -->
+      <button id="folder-btn" class="icon-btn folder-btn" title="폴더" aria-label="폴더 막대" aria-pressed="true" aria-controls="folder-side"><svg><use href="#i-folder"/></svg></button>
       <div class="search">
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모 검색 (Ctrl+F)" aria-label="메모 검색" autocomplete="off">
@@ -81,8 +83,11 @@
 
     <!-- 메모 -->
     <div class="view" id="view-memos" role="tabpanel">
+      <!-- 왼쪽: 폴더 막대 (전체 · 폴더 · 새 폴더) — 메모 카드를 끌어다 놓으면 그 폴더로 -->
+      <nav id="folder-side" class="folder-side" aria-label="폴더"></nav>
+      <div class="memos-col">
+      <h2 id="folder-title" class="folder-title"></h2>
       <div id="ai-ask" class="ai-answer" role="region" aria-label="매직 에이전트" hidden></div>
-      <!-- 필터: 태그 줄(늘 보임) + 색·담긴 것(필터 버튼) -->
       <!-- 보기 (위 "보기" 단추): 정렬 · 카드 모양 · 필터(색 · 담긴 것) -->
       <div id="filter-panel" class="filter-panel" hidden>
         <div class="filter-group"><span class="filter-label">정렬</span><div id="sort-group" class="chip-row" role="radiogroup" aria-label="정렬"></div></div>
@@ -90,7 +95,6 @@
         <div class="filter-group"><span class="filter-label">색</span><div id="color-filter" class="color-filter" role="group" aria-label="색으로 거르기"></div></div>
         <div class="filter-group"><span class="filter-label">담긴 것</span><div id="kind-filter" class="chip-row" role="group" aria-label="담긴 것으로 거르기"></div></div>
       </div>
-      <div id="tag-strip" class="tag-strip" role="group" aria-label="태그로 거르기" hidden></div>
       <div id="filter-summary" class="filter-summary" hidden>
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>
@@ -98,6 +102,7 @@
       <p id="count" class="result-count" role="status" hidden></p>
       <div id="cards" class="cards" role="list" aria-label="메모 목록"></div>
       <div id="empty" class="empty" hidden></div>
+      </div>
     </div>
 
     <!-- 일정: 모든 메모의 일정을 달력과 목록으로 (list-reminders.js) -->
