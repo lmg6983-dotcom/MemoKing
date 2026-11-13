@@ -553,7 +553,7 @@ function stopPicking() {
 
 el.folderBar.addEventListener('click', async () => {
   loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
-  const picked = await openFolderSheet({ folders: folders(), current: state.folder, onMenu: folderMenu });
+  const picked = await openFolderSheet({ folders: folders(), current: state.folder, onMenu: folderMenu, anchor: el.folderBar });
   if (picked == null) return;
   if (typeof picked === 'object') {
     try {
@@ -1144,6 +1144,8 @@ export function back() {
     render();
     return true;
   }
+  // 일정 탭의 펼친 입력창은 먼저 접는다 (탭을 바꾸면 펼친 채 남아 있었다)
+  if (state.tab === 'reminders' && remindersTab?.closeQuick?.()) return true;
   if (state.tab !== 'memos') {
     setTab('memos');
     return true;

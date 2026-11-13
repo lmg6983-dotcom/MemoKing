@@ -190,24 +190,82 @@ export function createPickBar({ onMove, onCancel }) {
 }
 
 /**
- * 폴더 시트 (휴대폰 · 좁은 PC 창): 고른 폴더 이름 ("" = 전체), 그만두면 null. 새 폴더는 { create: 이름 }
- *   ⋯ 메뉴(onMenu)를 누르면 시트를 닫고 메뉴를 연다 (이름이 바뀌면 시트 내용이 낡으므로)
- * @param {{ folders: { name: string, count: number }[], current: string, onMenu?: (name: string, anchor: HTMLElement) => any }} o
+ * 폴더 고르기 (휴대폰 · 좁은 PC 창): 누른 단추 바로 아래에 펼쳐지는 목록 — 고른 폴더 이름 ("" = 전체), 그만두면 null.
+ *   새 폴더는 그 자리에서 이름 칸이 열리고 만들면 { create: 이름 } (아래 시트 · 또 다른 창으로 오가던 동선을 줄였다)
+ *   ⋯ 메뉴(onMenu)를 누르면 목록을 닫고 메뉴를 연다 (이름이 바뀌면 목록 내용이 낡으므로)
+ * @param {{ folders: { name: string, count: number }[], current: string, anchor: HTMLElement,
+ *           onMenu?: (name: string, anchor: { getBoundingClientRect(): DOMRect }) => any }} o
  */
-export function openFolderSheet({ folders, current, onMenu }) {
-  const { body, closed, done } = sheet('폴더', 'folder-sheet');
+export function openFolderSheet({ folders, current, onMenu, anchor }) {
+  let result = null;
+  const dialog = el('dialog', 'folder-pop');
+  dialog.setAttribute('aria-label', '폴더');
+  const body = el('div', 'folder-pop-body');
+  dialog.append(body);
+  // 단추 바로 아래, 화면 안에 들어오게
+  const place = () => {
+    const r = anchor.getBoundingClientRect();
+    const width = Math.min(320, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(r.left, window.innerWidth - width - 12));
+    const top = r.bottom + 6;
+    Object.assign(dialog.style, { left: `${left}px`, top: `${top}px`, width: `${width}px`, maxHeight: `${Math.max(200, window.innerHeight - top - 12)}px` });
+  };
+  const done = (value) => {
+    result = value;
+    dialog.close();
+  };
+  // 새 폴더: "＋ 새 폴더" 자리에 이름 칸 (만들기 · Enter, 잘못된 이름은 그 아래 한 줄)
+  const newInline = () => {
+    const form = el('form', 'mf-inline');
+    const input = el('input', 'mf-name-input');
+    input.type = 'text';
+    input.maxLength = MAX_FOLDER_NAME;
+    input.placeholder = '새 폴더 이름';
+    input.setAttribute('aria-label', '새 폴더 이름');
+    input.autocomplete = 'off';
+    const ok = el('button', 'btn primary', '만들기');
+    ok.type = 'submit';
+    const note = el('p', 'mf-name-note');
+    note.setAttribute('role', 'status');
+    form.append(input, ok, note);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = cleanFolderName(input.value);
+      if (!name) {
+        note.textContent = input.value.trim() ? '이 이름은 폴더 이름으로 쓸 수 없어요' : '';
+        return input.focus();
+      }
+      const same = folders.find((f) => f.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0);
+      done(same ? same.name : { create: name }); // 같은 이름이 있으면 그 폴더로
+    });
+    body.querySelector('.mf-new')?.replaceWith(form);
+    input.focus();
+  };
   renderFolderList(body, {
     folders, current,
     onPick: (name) => done(name),
-    onNew: async () => {
-      const name = await askFolderName({ existing: folders.map((f) => f.name) });
-      if (name) done({ create: name });
-    },
-    onMenu: onMenu && ((name, anchor) => {
-      const r = anchor.getBoundingClientRect();
+    onNew: newInline,
+    onMenu: onMenu && ((name, a) => {
+      const r = a.getBoundingClientRect();
       done(null);
       onMenu(name, { getBoundingClientRect: () => r });
     }),
   });
+  // 바깥을 누르면 닫는다
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) done(null);
+  });
+  const closed = new Promise((resolve) => {
+    dialog.addEventListener('close', () => {
+      window.removeEventListener('resize', place);
+      dialog.remove();
+      resolve(result);
+    });
+  });
+  window.addEventListener('resize', place);
+  document.body.append(dialog);
+  place();
+  dialog.showModal();
+  body.querySelector('[aria-current="true"]')?.focus({ preventScroll: true });
   return closed;
 }

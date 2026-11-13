@@ -309,8 +309,9 @@ function applyFolderSide() {
   el.folderBtn.title = fits ? (sideWanted ? '폴더 막대 숨기기' : '폴더 막대 보이기') : `폴더: ${state.folder || '전체'}`;
 }
 
-async function openFolderPicker() {
-  const picked = await openFolderSheet({ folders: currentFolders(), current: state.folder, onMenu: folderMenu });
+// anchor: 누른 단추 (그 바로 아래에 폴더 목록)
+async function openFolderPicker(anchor = el.folderBtn) {
+  const picked = await openFolderSheet({ folders: currentFolders(), current: state.folder, onMenu: folderMenu, anchor });
   if (picked == null) return;
   if (typeof picked === 'object') return createAndOpenFolder(picked.create);
   setFolder(picked);
@@ -326,7 +327,7 @@ el.folderBtn?.addEventListener('click', () => {
   }
   render();
 });
-el.folderTitle?.addEventListener('click', openFolderPicker);
+el.folderTitle?.addEventListener('click', () => openFolderPicker(el.folderTitle));
 let sideWasShown = null;
 window.addEventListener('resize', () => {
   const shown = sideFits() && sideWanted;

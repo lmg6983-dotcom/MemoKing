@@ -1324,14 +1324,18 @@ dialog.quick-event[open] {
 .cal-body .mk-ev:not(.mk-ext) * { color: inherit !important; } /* 칩 안쪽 글자도 (FullCalendar 가 안쪽에 색을 따로 줌) */
 /* 목록 보기는 줄이 넓어 꽉 채우면 무거움 — 메모 일정은 진한 옅은 바탕, 다른 캘린더는 더 옅게 (무게 차이는 그대로) */
 .cal[data-view="listMonth"] .cal-body .mk-ev:not(.mk-ext) { background: color-mix(in srgb, var(--fc-event-color) 26%, transparent) !important; color: var(--text-strong); }
-/* 다른 캘린더 일정: 그 캘린더 색이 칩에서 구별되게 — 바탕은 그 색을 옅게(26%), 아래 2px 은 그 색 그대로 (앞 점 · 왼쪽 띠처럼 글자 자리를 먹지 않게) */
+/* 다른 캘린더 일정: 그 캘린더 색이 칩에서 구별되게 — 몸통은 그 색, 아래 2px 은 그 색보다 어두운 그림자
+   (몸통보다 밝은 줄을 아래에 두면 그림자가 뒤집힌 것처럼 보였다). 앞 점 · 왼쪽 띠처럼 글자 자리는 먹지 않는다 */
 .cal-body .mk-ext {
-  background: color-mix(in srgb, var(--fc-event-color) 26%, var(--surface-1, #fff)) !important;
-  box-shadow: inset 0 -2px 0 var(--fc-event-color);
+  background: color-mix(in srgb, var(--fc-event-color) 42%, var(--surface-1, #fff)) !important;
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--fc-event-color) 70%, #000);
   color: var(--text-strong);
 }
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .cal-body .mk-ext { background: color-mix(in srgb, var(--fc-event-color) 34%, var(--surface-1, #1c1c1e)) !important; }
+  :where(:root:not([data-theme="light"])) .cal-body .mk-ext {
+    background: color-mix(in srgb, var(--fc-event-color) 55%, var(--surface-1, #1c1c1e)) !important;
+    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--fc-event-color) 35%, #000);
+  }
 }
 .cal-body .mk-ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* 손가락으로 누르는 화면: 누르는 자리를 넉넉히 (보기 전환 · 앞뒤 달 · 오늘 · 달력 칩 · 다른 캘린더 창의 칸들) */
@@ -1639,16 +1643,30 @@ dialog.quick-event[open] {
 .mf-count { flex: none; font-size: 12px; color: var(--muted); }
 .mf-new { margin: 6px 0 0 4px; }
 .folder-dialog { width: min(360px, calc(100vw - 24px)); }
-.folder-dialog-body { max-height: min(60vh, 480px); overflow-y: auto; }
-.mf-name-form { display: grid; gap: 8px; }
-.mf-name-input { height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; }
-.mf-name-input:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
-.dialog p.mf-name-note { min-height: 1.2em; margin: 0; font-size: 12.5px; color: var(--danger); }
+.folder-dialog-body { max-height: min(60vh, 480px); padding: 3px; overflow-y: auto; } /* 3px: 칸의 노란 테두리가 잘리지 않게 */
+.mf-name-form { display: grid; gap: 8px; min-width: 0; }
+.mf-name-input { box-sizing: border-box; width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; }
+.mf-name-input:focus { outline: none; border-color: var(--brand-yellow); box-shadow: 0 0 0 2px var(--brand-yellow); }
+/* 폴더 목록: 누른 단추 바로 아래에 펼쳐지는 판 (folder-ui.js openFolderSheet) */
+dialog.folder-pop {
+  position: fixed; inset: auto; margin: 0; padding: 0; overflow: hidden auto; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 16px; background: var(--surface-1, #fff); color: var(--text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+dialog.folder-pop::backdrop { background: rgba(0, 0, 0, 0.18); }
+.folder-pop-body { padding: 8px; }
+.folder-pop .mf-new { margin: 6px 0 2px 8px; }
+/* 새 폴더: 목록 맨 아래 그 자리에서 이름 칸 + 만들기 */
+.mf-inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-top: 6px; padding: 3px; }
+.mf-inline .btn { height: 44px; }
+.mf-inline .mf-name-note { grid-column: 1 / -1; margin: 0; }
+.mf-inline .mf-name-note:empty { display: none; }
+.dialog p.mf-name-note, .folder-pop p.mf-name-note { min-height: 1.2em; margin: 0; font-size: 12.5px; color: var(--danger); }
 .mf-name-form .btn { justify-self: end; }
 @media (pointer: coarse) { .mf-item { min-height: 44px; font-size: 15px; } }
 /* 휴대폰: 아래에서 올라오는 시트 */
 @media (max-width: 700px) {
-  dialog.folder-sheet, dialog.folder-pick-dialog { width: 100%; max-width: none; margin: auto 0 0; border-radius: 18px 18px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  dialog.folder-pick-dialog { width: 100%; max-width: none; margin: auto 0 0; border-radius: 18px 18px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 }
 /* 메모 창 윗막대의 폴더 이름 (누르면 다른 폴더로) — Work / Life 표시처럼 작게 */
 .folder-tag {
