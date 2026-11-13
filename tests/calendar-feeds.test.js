@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizeFeedUrl, normalizeFeeds, feedLabel, icsName, looksLikeIcs, feedEvents, fromDeviceEvent, reminderFromExternal, importedEventBody,
+  normalizeFeedUrl, normalizeFeeds, feedLabel, icsName, looksLikeIcs, feedEvents, googleEventUrl, fromDeviceEvent, reminderFromExternal, importedEventBody,
   MAX_FEEDS,
 } from '../app/js/core/calendar-feeds.js';
 import { normalizeReminder } from '../app/js/core/reminders.js';
@@ -182,4 +182,20 @@ test('가져온 일정 메모 본문: 제목 · 달력 그림 · 장소 · 주�
   // 그림 · 장소 · 설명이 없으면 제목만, 설명에 이미 있는 주소는 또 쓰지 않음
   assert.equal(importedEventBody({ title: '' }), '# 새 일정\n');
   assert.doesNotMatch(importedEventBody({ title: 'a', url: 'https://a.example.com', description: '여기 https://a.example.com' }), /링크:/);
+});
+
+test('Google 구독 일정 → 그 일정의 Google 캘린더 주소 (반복은 회차까지), Google 이 아니면 빈 글', () => {
+  const feed = 'https://calendar.google.com/calendar/ical/me%40gmail.com/private-abc/basic.ics';
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0',
+    'BEGIN:VEVENT', 'UID:one123@google.com', 'DTSTART:20261120T010000Z', 'DTEND:20261120T020000Z', 'SUMMARY:한 번', 'END:VEVENT',
+    'BEGIN:VEVENT', 'UID:rep456@google.com', 'DTSTART;VALUE=DATE:20261102', 'RRULE:FREQ=WEEKLY;COUNT=2', 'SUMMARY:반복', 'END:VEVENT',
+    'END:VCALENDAR', ''].join('\r\n');
+  const events = feedEvents(ics, new Date(Date.UTC(2026, 10, 1)), new Date(Date.UTC(2026, 11, 1)));
+  const one = events.find((e) => e.title === '한 번');
+  const rep1 = events.find((e) => e.title === '반복');
+  const eid = (url) => atob(decodeURIComponent(new URL(url).searchParams.get('eid')));
+  assert.equal(eid(googleEventUrl(feed, one)), 'one123 me@gmail.com');
+  assert.equal(eid(googleEventUrl(feed, rep1)), 'rep456_20261102 me@gmail.com');
+  assert.equal(googleEventUrl('https://example.com/a.ics', one), '');
+  assert.equal(googleEventUrl(feed, { uid: 'x@naver.com' }), '');
 });

@@ -304,6 +304,10 @@ const calls = {
   },
   // 휴대폰 캘린더 (DeviceCalendar.kt): 미리보기에서는 늘 허용, 삼성 캘린더에 있는 것 같은 일정 몇 개
   calendarPermission: async () => true,
+  calendarOpen: async ({ id }) => {
+    log.push({ calendarOpen: id });
+    return true;
+  },
   calendarEvents: async ({ from, to }) => {
     const day = (offset, h = null, len = 1) => {
       const d = new Date();

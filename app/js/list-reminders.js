@@ -9,7 +9,7 @@ import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
 import { describeReminder, describeTask, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocalIso } from './core/time.js';
-import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, importedEventBody } from './core/calendar-feeds.js';
+import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, importedEventBody, googleEventUrl } from './core/calendar-feeds.js';
 import { findDates, guessTitle } from './core/date-detect.js';
 import { parseScheduleText } from './core/schedule-parse.js';
 import { remembered } from './event-editor.js';
@@ -134,7 +134,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
         if (parsed.size > 48) parsed.delete(parsed.keys().next().value);
         parsed.set(key, list);
       }
-      for (const e of list) out.push({ ...e, ext: true, source: f.name, color: f.color, feedId: f.id });
+      for (const e of list) out.push({ ...e, ext: true, source: f.name, color: f.color, feedId: f.id, link: googleEventUrl(f.url, e) });
     }
     if (device.on) {
       // "메모킹" 캘린더는 예전(v0.41) 상호 동기화가 Google 에 만든 메모킹 일정의 사본이라 빼고 (두 번 · 낡은 채로 보이지 않게)
@@ -1106,6 +1106,10 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   }
 
   function showExternal(e) {
+    const openLink = calendars?.openUrl ?? api.links?.open; // 휴대폰 · PC 모두 브라우저로
+    // 원래 캘린더에서 그 일정 열기: Google 구독은 그 일정 주소, 휴대폰 캘린더는 캘린더 앱
+    const original = e.link && openLink ? [{ label: 'Google 캘린더에서 열기', run: () => openLink(e.link) }]
+      : e.device && calendars?.device?.open ? [{ label: '캘린더 앱에서 열기', run: () => calendars.device.open(e) }] : [];
     openEventDetail({
       title: e.title,
       start: e.start,
@@ -1117,8 +1121,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       lines: [{ icon: 'pin', text: e.location }],
       note: e.description,
       url: e.url,
-      openUrl: calendars?.openUrl, // 회의 주소 등 — 다른 캘린더 앱이 아니라 그 주소만 연다
-      actions: api.reminders.add ? [{ label: '메모로 가져오기', primary: true, run: () => importExternal(e) }] : [],
+      openUrl: openLink, // 회의 주소 등 — 그 주소만 연다
+      actions: [...original, ...(api.reminders.add ? [{ label: '메모로 가져오기', primary: true, run: () => importExternal(e) }] : [])],
     });
   }
 
