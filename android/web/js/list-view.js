@@ -22,6 +22,9 @@ import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
+import { openFolderSheet, pickFolder, createPickBar, askFolderName } from '../../app/js/folder-ui.js';
+import { openContextMenu } from '../../app/js/ctx-menu.js';
+import { folderList, movedText, isFolderName } from '../../app/js/core/folders.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -29,12 +32,13 @@ const el = {
   search: $('search'),
   cards: $('cards'),
   empty: $('empty'),
-  tagStrip: $('tag-strip'),
+  folderBar: $('folder-bar'),
   filterBtn: $('filter-btn'),
   filterCount: $('filter-count'),
   filterPanel: $('filter-panel'),
   colorFilter: $('color-filter'),
   kindFilter: $('kind-filter'),
+  tagFilter: $('tag-filter'),
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
   sortGroup: $('sort-group'),
@@ -73,7 +77,19 @@ const state = {
   tab: 'memos',
   mode: 'life', // 메모킹 Work / Life — 이 휴대폰에서 고른 것 (메모 파일에는 메모마다 mode)
   workLife: null, // 설정 › Work / Life 나누기 (null: 정한 적 없음 — 처음 목록을 읽을 때 Work 메모가 있으면 켬)
+  folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 휴대폰에 기억
+  folderDirs: null, // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도) — 앱에 묻는 일이라 기억해 두고 필요할 때만 다시 (loadFolderDirs)
+  picking: false, // 여러 장 고르기 (메모 메뉴 › 여러 개 고르기) — 카드를 누르면 열지 않고 고른다
+  picked: new Set(),
 };
+try {
+  state.folder = localStorage.getItem('memoking.folder') ?? '';
+} catch {
+  // 전체
+}
+/** 보고 있는 폴더 — 새 메모는 이 폴더에 (app.newMemo) */
+export const currentFolder = () => state.folder;
+const inFolder = (memos) => (state.folder ? memos.filter((m) => m.folder === state.folder) : memos);
 const WORK_LIFE_KEY = 'memoking.workLife';
 try {
   state.mode = validMode(localStorage.getItem(MODE_KEY));
@@ -207,6 +223,10 @@ function renderCard(memo) {
   const card = document.createElement('button');
   card.className = 'card';
   card.dataset.id = memo.id;
+  if (state.picking) {
+    card.classList.toggle('picked', state.picked.has(memo.id));
+    card.setAttribute('aria-pressed', String(state.picked.has(memo.id)));
+  }
   card.dataset.color = memo.color;
 
   const head = document.createElement('div');
@@ -257,7 +277,21 @@ function renderCard(memo) {
   const tags = document.createElement('div');
   tags.className = 'card-tags';
   if (workLifeOn()) tags.append(fillModeTag(document.createElement('span'), memo, true), ' ');
-  tags.append((memo.tags ?? []).map((t) => `#${t}`).join(' '));
+  // 폴더 이름: 전체 · 검색에서만 (폴더 안에서는 다 같으니 빼서 조용하게)
+  if (memo.folder && (!state.folder || state.query)) {
+    const f = document.createElement('span');
+    f.className = 'card-folder';
+    f.append(icon('folder'), memo.folder);
+    tags.append(f, ' ');
+  }
+  // 태그: 누르면 그 태그의 메모만 (PC 카드와 같음)
+  for (const name of memo.tags ?? []) {
+    const t = document.createElement('span');
+    t.className = 'card-tag';
+    t.dataset.cardTag = name;
+    t.textContent = `#${name}`;
+    tags.append(t, ' ');
+  }
   const meta = document.createElement('div');
   meta.className = 'card-meta';
   if (memo.reminderCount) {
@@ -375,9 +409,12 @@ function filterCount() {
 export function render() {
   stale = false;
   clearTimeout(staleTimer);
+  keepFolderValid();
   const narrowed = Boolean(state.query) || filterCount() > 0;
   const pick = { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] };
-  const memos = sortMemos(withViews(filterMemos(split(state.results ?? state.memos, state.mode).mine, pick)), sort);
+  // 폴더: 고른 폴더의 메모만 (검색은 모든 폴더에서 — 카드에 폴더 이름이 보인다)
+  const all = split(state.results ?? state.memos, state.mode).mine;
+  const memos = sortMemos(withViews(filterMemos(state.query ? all : inFolder(all), pick)), sort);
   // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
   const elsewhere = state.query && workLifeOn() ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, pick).length : 0;
   $('other-mode').hidden = !elsewhere || !memos.length; // 하나도 없으면 빈 화면 안내가 대신
@@ -389,8 +426,146 @@ export function render() {
   if (!memos.length) renderEmpty(narrowed, elsewhere);
   $('count-memos').textContent = modeMemos().length ? String(modeMemos().length) : '';
   renderFilters();
+  renderFolderBar();
   if (memos.length >= 2) setTimeout(hintCards, 800);
 }
+
+// ---------- 폴더 (folder-ui.js · core/folders.js) ----------
+
+function loadFolderDirs() {
+  state.folderDirs = app.vault?.folders?.() ?? [];
+}
+
+// 폴더 목록: 기억해 둔 것 + 메모가 든 폴더 (처음 · 모르는 폴더의 메모가 들어왔을 때만 앱에 다시 묻는다)
+function folders() {
+  const memos = modeMemos();
+  // (폴더 이름으로 못 쓰는 폴더 — Drive 웹에서 만든 "회의:2026" 등 — 는 목록에 들지 않으니 묻지 않는다: 그리면서 매번 묻게 되므로)
+  if (!state.folderDirs || memos.some((m) => isFolderName(m.folder) && !state.folderDirs.includes(m.folder))) loadFolderDirs();
+  return folderList(state.folderDirs, memos);
+}
+
+// 고른 폴더가 없어졌으면(다른 기기 · 파일 앱에서 지움) 전체로 — 카드를 거르기 전에
+function keepFolderValid() {
+  if (state.folder && !folders().some((f) => f.name === state.folder)) state.folder = '';
+}
+
+function setFolder(name) {
+  state.folder = name;
+  try {
+    localStorage.setItem('memoking.folder', name);
+  } catch {
+    // 이번만
+  }
+  render();
+  el.cards.scrollTop = 0;
+}
+
+function renderFolderBar() {
+  const list = folders();
+  $('folder-bar-name').textContent = state.folder || '전체';
+  // 폴더 안에서만 수 (전체 수는 아래 메모 탭에 있다)
+  $('folder-bar-count').textContent = state.folder ? String(list.find((f) => f.name === state.folder)?.count ?? 0) : '';
+  el.folderBar.hidden = Boolean(state.query); // 검색은 모든 폴더에서
+}
+
+// 폴더 ⋯ 메뉴 (폴더 시트): 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
+async function folderMenu(name, anchor) {
+  const r = anchor.getBoundingClientRect();
+  const pick = await openContextMenu({
+    x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`,
+    items: [{ id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기 (메모는 폴더 밖으로)' }],
+  });
+  try {
+    if (pick === 'rename') {
+      const to = await askFolderName({ existing: (state.folderDirs ?? []).filter((f) => f !== name), title: '폴더 이름 바꾸기', value: name, okLabel: '바꾸기' });
+      if (!to || to === name) return;
+      const done = app.vault.renameFolder(name, to);
+      loadFolderDirs();
+      if (state.folder === name) setFolder(done);
+      else render();
+      toast(`폴더 이름을 "${done}"(으)로 바꿨어요`);
+    } else if (pick === 'delete') {
+      const { moved, removed } = app.vault.deleteFolder(name);
+      loadFolderDirs();
+      if (state.folder === name) setFolder('');
+      else render();
+      toast(!removed ? `메모 ${moved}개는 폴더 밖으로 옮겼어요. 폴더에 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
+        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖으로 옮겼어요` : `${name} 폴더를 지웠어요`);
+    }
+  } catch (err) {
+    toast(err.message || '폴더를 바꾸지 못했어요', true);
+  }
+}
+
+// ---------- 폴더로 옮기기 · 여러 장 고르기 ----------
+
+/** 메모들을 폴더로: 폴더 고르기 창 (current: 지금 폴더 — 흐리게) */
+export async function moveToFolder(ids, current) {
+  if (!ids.length || !app.vault) return;
+  loadFolderDirs();
+  const to = await pickFolder({ folders: state.folderDirs, current: ids.length === 1 ? current ?? '' : null, count: ids.length });
+  if (to === null) return;
+  let moved = 0;
+  try {
+    for (const id of ids) if (app.vault.moveToFolder(id, to)) moved++;
+  } catch (err) {
+    toast(err.message || '옮기지 못했어요', true);
+  }
+  stopPicking();
+  loadFolderDirs(); // 새 폴더로 옮겼으면 그 폴더도
+  render();
+  if (moved) toast(movedText(moved, to));
+}
+
+const pickBar = createPickBar({ onMove: () => moveToFolder([...state.picked], null), onCancel: () => stopPicking() });
+
+function showPicks() {
+  for (const c of el.cards.querySelectorAll('.card')) {
+    c.classList.toggle('picked', state.picked.has(c.dataset.id));
+    if (state.picking) c.setAttribute('aria-pressed', String(state.picked.has(c.dataset.id)));
+    else c.removeAttribute('aria-pressed');
+  }
+  pickBar.show(state.picked.size, state.picking);
+  document.body.classList.toggle('picking', state.picking); // 고르는 동안 + 단추는 숨긴다 (막대와 겹치지 않게)
+}
+
+/** 여러 장 고르기 시작 (이 메모를 고른 채) */
+export function startPicking(id) {
+  state.picking = true;
+  state.picked = new Set(id ? [id] : []);
+  showPicks();
+}
+
+function togglePick(id) {
+  if (state.picked.has(id)) state.picked.delete(id);
+  else state.picked.add(id);
+  haptic(5);
+  showPicks();
+}
+
+function stopPicking() {
+  if (!state.picking) return false;
+  state.picking = false;
+  state.picked.clear();
+  showPicks();
+  return true;
+}
+
+el.folderBar.addEventListener('click', async () => {
+  loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
+  const picked = await openFolderSheet({ folders: folders(), current: state.folder, onMenu: folderMenu });
+  if (picked == null) return;
+  if (typeof picked === 'object') {
+    try {
+      app.vault.createFolder(picked.create);
+      loadFolderDirs();
+    } catch (err) {
+      return toast(err.message || '폴더를 만들지 못했어요');
+    }
+    return setFolder(picked.create);
+  }
+  setFolder(picked);
+});
 
 // 카드가 두 개 이상 보일 때 한 번: 옆으로 밀기·꾹 누르기 (눈에 안 보이는 동작)
 function hintCards() {
@@ -413,18 +588,35 @@ function chip(className, content, pressed, data = {}) {
   return b;
 }
 
-function renderFilters() {
+const MAX_TAG_CHIPS = 30;
+
+// 보기 판의 태그 칩: 지금 모드에서 쓰는 태그를 많이 쓴 순으로 (골라 둔 태그는 앞에, 없어졌어도 남겨 풀 수 있게)
+function renderTagChips() {
   const tags = collectTags(modeMemos());
   for (const t of state.filter.tags) if (!tags.some((x) => sameTag(x.name, t))) tags.unshift({ name: t, count: 0 });
   const picked = (name) => state.filter.tags.some((t) => sameTag(t, name));
-  // 고른 태그를 앞으로
-  tags.sort((a, b) => Number(picked(b.name)) - Number(picked(a.name)));
-  el.tagStrip.hidden = tags.length === 0;
-  el.tagStrip.replaceChildren(...tags.map((t) => {
+  $('tag-filter-group').hidden = !tags.length;
+  el.tagFilter.replaceChildren(...tags.slice(0, MAX_TAG_CHIPS).map((t) => {
     const count = document.createElement('small');
     count.textContent = String(t.count);
     return chip('tag-chip', [`#${t.name}`, count], picked(t.name), { tag: t.name });
   }));
+}
+
+// 태그 고르기 · 풀기 (보기 판의 칩 · 카드의 태그)
+function toggleTag(name, { only = false } = {}) {
+  const i = state.filter.tags.findIndex((t) => sameTag(t, name));
+  if (only) state.filter.tags = i >= 0 && state.filter.tags.length === 1 ? [] : [name];
+  else if (i >= 0) state.filter.tags.splice(i, 1);
+  else {
+    state.filter.tags.push(name);
+    tutEvent('tag-filtered');
+  }
+  render();
+}
+
+function renderFilters() {
+  renderTagChips();
   el.colorFilter.replaceChildren(...COLORS.map((c) => {
     const b = chip('color-dot', '', state.filter.colors.includes(c), { filterColor: c, color: c });
     b.setAttribute('aria-label', `${COLOR_NAMES[c] ?? c} 메모`);
@@ -449,16 +641,9 @@ const toggleIn = (list, value) => {
   else list.push(value);
 };
 
-el.tagStrip.addEventListener('click', (e) => {
+el.tagFilter.addEventListener('click', (e) => {
   const b = e.target.closest('[data-tag]');
-  if (!b) return;
-  const i = state.filter.tags.findIndex((t) => sameTag(t, b.dataset.tag));
-  if (i >= 0) state.filter.tags.splice(i, 1);
-  else {
-    state.filter.tags.push(b.dataset.tag);
-    tutEvent('tag-filtered');
-  }
-  render();
+  if (b) toggleTag(b.dataset.tag);
 });
 el.colorFilter.addEventListener('click', (e) => {
   const b = e.target.closest('[data-filter-color]');
@@ -550,6 +735,9 @@ document.querySelector('.tabs').addEventListener('click', (e) => {
 
 el.cards.addEventListener('click', (e) => {
   const card = e.target.closest('.card');
+  if (card && state.picking) return togglePick(card.dataset.id);
+  const tag = e.target.closest('[data-card-tag]');
+  if (tag) return toggleTag(tag.dataset.cardTag, { only: true });
   if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect() }); // 그 카드가 커지며 메모 화면이 된다
 });
 // 카드를 옆으로 밀어 지우기 (여러 개를 빨리 지울 때) — 묻지 않고 휴지통으로, 되돌리기 가능
@@ -941,6 +1129,7 @@ export function show() {
 
 /** 뒤로 가기: 필터 패널 → 검색어 → 알림 탭 순으로 풀고, 더 없으면 false */
 export function back() {
+  if (stopPicking()) return true;
   if (!el.filterPanel.hidden) {
     toggleFilterPanel(false);
     return true;

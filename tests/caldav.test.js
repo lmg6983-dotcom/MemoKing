@@ -5,7 +5,7 @@ import { caldavIcs } from '../app/js/core/caldav.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { prepareFeed, feedEvents, normalizeFeeds } from '../app/js/core/calendar-feeds.js';
+import { prepareFeed, feedEvents, normalizeFeeds, feedCalendars, normalizeCals } from '../app/js/core/calendar-feeds.js';
 import { CalendarFeeds } from '../desktop/calendar-feeds.js';
 
 const TZ = 'BEGIN:VTIMEZONE\nTZID:Asia/Seoul\nBEGIN:STANDARD\nDTSTART:19700101T000000\nTZOFFSETFROM:+0900\nTZOFFSETTO:+0900\nEND:STANDARD\nEND:VTIMEZONE';
@@ -54,6 +54,9 @@ test('계정 → 캘린더 모음 → 캘린더마다 일정, 한 .ics 로 합�
   assert.equal(ics.match(/BEGIN:VTIMEZONE/g).length, 1); // 같은 시간대는 한 번
   const events = feedEvents(prepareFeed(ics), new Date(2026, 10, 1), new Date(2026, 11, 1));
   assert.deepEqual(events.map((e) => e.title).sort(), ['치과', '회의 & 점심']);
+  // 캘린더별로: 이름은 displayname, 없으면 주소 끝
+  assert.deepEqual(feedCalendars(ics), ['회사', 'home']);
+  assert.deepEqual(events.map((e) => `${e.title}:${e.cal}`).sort(), ['치과:home', '회의 & 점심:회사']);
 });
 
 test('비밀번호가 틀리면 알기 쉬운 오류, http 주소 · 다른 서버로는 비밀번호를 보내지 않는다', async () => {
@@ -94,4 +97,10 @@ test('PC: 아이디가 있는 구독은 CalDAV 로 받아 둔다', async () => {
   const got = await store.get('n1');
   assert.equal(got.error, undefined);
   assert.match(got.text, /SUMMARY:치과/);
+});
+
+test('캘린더별 설정: 켜기 · 색만 남기고 이상한 값은 버린다', () => {
+  assert.deepEqual(normalizeCals({ 회사: { on: false, color: '#0b8043' }, 개인: { color: 'red' }, '': { on: false } }), { 회사: { on: false, color: '#0b8043' }, 개인: { on: true } });
+  assert.equal(normalizeCals([]), null);
+  assert.deepEqual(normalizeFeeds([{ url: 'https://caldav.calendar.naver.com', user: 'mk', pass: 'p', cals: { 회사: { on: false } } }])[0].cals, { 회사: { on: false } });
 });

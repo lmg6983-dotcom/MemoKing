@@ -11,7 +11,7 @@ import { UI } from '../../app/js/core/ui-text.js';
 export const POLL = { idle: 60_000, active: 10_000, burst: 5_000, burstFor: 120_000, focusGap: 5_000 };
 export const pollDelay = ({ now, active, burstUntil }) => (now < burstUntil ? POLL.burst : active ? POLL.active : POLL.idle);
 export const DOUBLE_SYNC = '메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). '
-  + '설정의 Google Drive 동기화에서 "다른 폴더로 바꾸기"로 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요';
+  + '설정의 Google Drive 동기화에서 "다른 Drive 폴더로 바꾸기"로 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요';
 // 진행 상황은 이만큼마다 한 번만 알린다 (파일마다 창에 보내면 목록이 바빠진다)
 const PROGRESS_MS = 300;
 

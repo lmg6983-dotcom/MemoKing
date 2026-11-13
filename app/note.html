@@ -20,6 +20,8 @@
     <button id="new-btn" class="icon-btn" title="새 탭: 이 창에 메모를 하나 더 쌓아요 (새 창은 Ctrl+N)" aria-label="새 탭으로 메모 추가"><svg><use href="#i-plus"/></svg></button>
     <span id="status" class="status" role="status"></span>
     <span id="mode-tag" class="mode-tag" hidden></span>
+    <!-- 메모킹 폴더: 폴더에 있으면 이름, 누르면 다른 폴더로 (folder-ui.js) -->
+    <button id="folder-tag" class="folder-tag" type="button" title="다른 폴더로 옮기기" hidden><svg><use href="#i-folder"/></svg><span></span></button>
     <button id="top-btn" class="icon-btn top-btn crown-btn" title="왕관 스티커를 붙여 다른 창보다 늘 위에 두기 (Ctrl+Shift+T, 다시 누르면 떼기)" aria-label="다른 창보다 늘 위에 두기" aria-pressed="false">
       <svg><use href="#i-crown-line"/></svg>
     </button>
@@ -56,6 +58,7 @@
     <button class="menu-item" id="pin-toggle" role="menuitem"><span>목록 맨 위에 고정</span></button>
     <button class="menu-item" id="day-btn" role="menuitem"><span>회상 날짜 정하기 <small id="day-label"></small></span></button>
     <button class="menu-item" id="mode-btn" role="menuitem"><span>Work로 옮기기</span></button>
+    <button class="menu-item" id="folder-btn" role="menuitem"><span>폴더로 옮기기 <small id="folder-label"></small></span></button>
     <button class="menu-item" id="links-btn" role="menuitem" hidden><span>메모 연결 <small id="links-count"></small></span></button>
     <hr class="menu-sep" role="separator">
     <button class="menu-item" id="lock-btn" role="menuitem"><span>잠그기</span></button>

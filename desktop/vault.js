@@ -15,6 +15,7 @@ import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
 import { isLiveCached } from '../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles, diskCopy } from '../app/js/core/vault-locks.js';
 import { textMatcher } from '../app/js/core/text-match.js';
+import { folderOf, cleanFolderName, isFolderName, resolveMovedTwin, withoutId } from '../app/js/core/folders.js';
 import {
   VERSIONS_DIR, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune, describeVersions } from '../app/js/core/versions.js';
 
@@ -139,6 +140,7 @@ export class Vault extends EventEmitter {
     const changed = new Set();
     const external = [];
     const lockedNow = [];
+    const twins = []; // 폴더를 옮긴 사이 다른 기기가 옛 자리를 되살린 같은 id 의 두 파일 (core/folders.js)
 
     for (const file of files) {
       let stat;
@@ -162,6 +164,11 @@ export class Vault extends EventEmitter {
       // id 가 없는 파일(직접 만든 파일)이나 복사본처럼 id 가 겹치는 파일은 임시 id 를 준다.
       let id = meta.id;
       let idSaved = Boolean(id);
+      const twin = id && next.has(id) ? resolveMovedTwin(next.get(id), { file, meta }) : null;
+      if (twin) {
+        twins.push(twin);
+        continue;
+      }
       if (!id || next.has(id)) {
         id = prev && !prev.idSaved ? prev.id : randomUUID();
         idSaved = false;
@@ -197,6 +204,10 @@ export class Vault extends EventEmitter {
     this.rememberRemoved(removed); // 파일이 잠깐 없던 메모를 곧 다시 저장할 때 머리말(알림·잠금 설정)을 잃지 않게
     this.entries = next;
     for (const id of lockedNow) this.dropUnsafeVersions(id);
+    if (twins.length) {
+      for (const t of twins) this.settleTwin(t);
+      this.rescanSoon();
+    }
 
     if (changed.size && !silent) {
       this.emit('changed', { ids: [...changed], external, removed });
@@ -268,6 +279,7 @@ export class Vault extends EventEmitter {
       images: [...p.images], // 받는 쪽이 고쳐도 기억해 둔 것은 그대로
       day: entry.meta.day || '', // 회상 달력: "이 날의 기록으로" 정한 날
       mode: entry.meta.mode ?? 'life', // Work / Life
+      folder: entry.file ? folderOf(entry.file) : entry.folder ?? '', // 메모킹 폴더 (core/folders.js)
       tags: [...p.tags],
       hasImage: p.hasImage,
       hasWebLink: p.hasWebLink,
@@ -404,16 +416,17 @@ export class Vault extends EventEmitter {
 
   // 새 메모는 내용이 생길 때 파일로 만든다 (빈 파일이 쌓이지 않도록).
   // mode: Work / Life (없으면 지금 고른 모드 — defaultMode)
-  create({ color, mode } = {}) {
+  //   folder: 넣을 메모킹 폴더 (없으면 맨 위)
+  create({ color, mode, folder } = {}) {
     const id = randomUUID();
-    this.entries.set(id, this.newEntry(id, color, mode ?? this.defaultMode));
+    this.entries.set(id, this.newEntry(id, color, mode ?? this.defaultMode, folder));
     return id;
   }
 
-  newEntry(id, color, mode) {
+  newEntry(id, color, mode, folder = '') {
     const now = toLocalIso();
     const meta = normalizeMeta({ id, created: now, updated: now, color: COLORS.includes(color) ? color : undefined, mode });
-    return { id, file: null, meta, body: '', mtimeMs: 0, size: 0, idSaved: true };
+    return { id, file: null, folder: cleanFolderName(folder), meta, body: '', mtimeMs: 0, size: 0, idSaved: true };
   }
 
   import({ body, created, updated, pinned = false, color, mode }) {
@@ -504,7 +517,7 @@ export class Vault extends EventEmitter {
       const kept = this.keepChangedOnDisk(entry, known, { copy });
       if (kept === 'locked' || kept === 'copied' || kept === 'skipped') return kept;
     }
-    if (!entry.file) entry.file = this.uniqueFile(titleToFileName(extractTitle(entry.body)));
+    if (!entry.file) entry.file = this.uniqueFile(titleToFileName(extractTitle(entry.body)), entry.folder ?? '');
     const file = this.abs(entry.file);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     entry.meta.id = entry.id;
@@ -590,6 +603,138 @@ export class Vault extends EventEmitter {
 
   // setMeta · link 는 core/vault-locks.js (PC·휴대폰 같음 — 쓰지 못하면 되돌리고 null)
 
+  // ---------- 메모킹 폴더 (core/folders.js) ----------
+
+  /** 메모 폴더 맨 위의 하위 폴더 중 메모킹 폴더 (빈 폴더도) */
+  folders() {
+    try {
+      return fs.readdirSync(this.root, { withFileTypes: true }).filter((d) => d.isDirectory() && isFolderName(d.name)).map((d) => d.name);
+    } catch {
+      return [];
+    }
+  }
+
+  /** 새 폴더 → 만든 이름 (이미 있으면 그대로) */
+  createFolder(name) {
+    const dir = cleanFolderName(name);
+    if (!dir) throw new Error('폴더 이름으로 쓸 수 없어요');
+    fs.mkdirSync(path.join(this.root, dir), { recursive: true });
+    return dir;
+  }
+
+  /**
+   * 메모를 다른 폴더로 ("" = 맨 위). 파일을 옮긴 뒤 머리말에 옮긴 때(moved)를 남긴다 — 그사이 다른 기기가 옛 자리를
+   *   되살려도 이 자리로 맞추게 (settleTwin). 파일은 디스크의 것 그대로 옮긴다 (잠긴 메모가 풀린 채 쓰이지 않게)
+   */
+  moveToFolder(id, folder) {
+    const entry = this.entries.get(id);
+    if (!entry) return false;
+    const dir = folder ? cleanFolderName(folder) : '';
+    if (folder && !dir) throw new Error('폴더 이름으로 쓸 수 없어요');
+    if (!entry.file) {
+      entry.folder = dir; // 아직 파일이 없는 새 메모 — 처음 저장할 때 이 폴더에
+      return true;
+    }
+    if (folderOf(entry.file) === dir) return true;
+    const target = this.uniqueFile(path.posix.basename(entry.file, '.md'), dir);
+    fs.mkdirSync(path.dirname(this.abs(target)), { recursive: true });
+    fs.renameSync(this.abs(entry.file), this.abs(target));
+    entry.file = target;
+    this.stampMoved(entry);
+    this.changed([id]);
+    return true;
+  }
+
+  // 옮긴 메모의 머리말에 옮긴 때(moved) — 디스크의 글 그대로에 더한다 (잠긴 메모가 풀린 채 쓰이지 않게)
+  stampMoved(entry) {
+    try {
+      const { meta, body } = parseMemoFile(fs.readFileSync(this.abs(entry.file), 'utf8'));
+      meta.extra = { ...meta.extra, moved: toLocalIso() };
+      writeAtomic(this.abs(entry.file), serializeMemoFile(meta, body));
+      entry.meta.extra = { ...entry.meta.extra, moved: meta.extra.moved };
+      const stat = fs.statSync(this.abs(entry.file));
+      entry.mtimeMs = stat.mtimeMs;
+      entry.size = stat.size;
+      entry.diskMeta = diskCopy(entry.meta);
+    } catch (err) {
+      this.emit('error', err); // 옮기기는 됐다 — 옮긴 때만 못 남김
+    }
+  }
+
+  /**
+   * 폴더 이름 바꾸기 → 새 이름. 폴더를 통째로 옮긴 뒤 안의 메모마다 옮긴 때(moved)를 남긴다
+   *   (그사이 다른 기기가 옛 폴더의 메모를 고쳐 되살려도 새 폴더로 맞추게 — settleTwin)
+   */
+  renameFolder(from, to) {
+    const dst = cleanFolderName(to);
+    if (!isFolderName(from) || !dst) throw new Error('폴더 이름으로 쓸 수 없어요');
+    if (dst === from) return dst;
+    const a = path.join(this.root, from);
+    if (!fs.statSync(a, { throwIfNoEntry: false })?.isDirectory()) throw new Error('폴더를 찾지 못했어요. 다른 곳에서 지웠을 수 있어요');
+    const caseOnly = dst.toLowerCase() === from.toLowerCase(); // Windows 는 대소문자만 다른 이름을 같은 폴더로 본다
+    if (!caseOnly && fs.existsSync(path.join(this.root, dst))) throw new Error(`"${dst}" 폴더가 이미 있어요. 다른 이름을 써 주세요`);
+    if (caseOnly) {
+      const tmp = path.join(this.root, `.rename-${randomBytes(3).toString('hex')}`);
+      fs.renameSync(a, tmp);
+      fs.renameSync(tmp, path.join(this.root, dst));
+    } else fs.renameSync(a, path.join(this.root, dst));
+    const ids = [];
+    for (const e of this.entries.values()) {
+      if (!e.file || folderOf(e.file) !== from) continue;
+      e.file = `${dst}${e.file.slice(from.length)}`;
+      this.stampMoved(e);
+      ids.push(e.id);
+    }
+    if (ids.length) this.changed(ids);
+    return dst;
+  }
+
+  /**
+   * 폴더 지우기: 안의 메모는 모두 폴더 밖(맨 위)으로 꺼내고, 그러고 나서 비었으면 폴더를 지운다
+   *   (메모가 아닌 파일이 남아 있으면 폴더는 그대로 둔다 — 사용자의 파일을 지우지 않게) → { moved, removed }
+   */
+  deleteFolder(name) {
+    if (!isFolderName(name)) throw new Error('폴더 이름으로 쓸 수 없어요');
+    let moved = 0;
+    for (const e of [...this.entries.values()]) if (e.file && folderOf(e.file) === name && this.moveToFolder(e.id, '')) moved++;
+    const dir = path.join(this.root, name);
+    const junk = new Set(['desktop.ini', 'thumbs.db', '.ds_store']);
+    let left = [];
+    try {
+      left = fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter((d) => !d.isDirectory() && !junk.has(d.name.toLowerCase()));
+    } catch {
+      return { moved, removed: true }; // 이미 없음
+    }
+    if (left.length) return { moved, removed: false };
+    fs.rmSync(dir, { recursive: true, force: true });
+    return { moved, removed: true };
+  }
+
+  // 같은 id 의 두 파일을 하나로: 남길 자리에 남길 내용을 두고, 다른 파일은 id 를 뺀 채 휴지통으로
+  //   (지우지 않는다 — 되살리면 따로인 사본 메모로. 휴지통에 먼저 쓴 뒤에 지운다)
+  settleTwin({ target, source, drop }) {
+    try {
+      const dropText = fs.readFileSync(this.abs(drop), 'utf8');
+      if (source !== target) writeAtomic(this.abs(target), fs.readFileSync(this.abs(source), 'utf8'));
+      writeAtomic(path.join(this.trashDir, `${path.posix.basename(drop, '.md')} (${stamp()}).md`), withoutId(dropText));
+      fs.rmSync(this.abs(drop), { force: true });
+    } catch (err) {
+      this.emit('error', err);
+    }
+  }
+
+  // 휴지통 파일의 머리말에 있던 폴더를 남기거나(folder) 지운다(null) — 되살릴 때 그 폴더로
+  markTrashedFrom(file, folder) {
+    try {
+      const { meta, body } = parseMemoFile(fs.readFileSync(file, 'utf8'));
+      const { trashedFrom, ...rest } = meta.extra ?? {};
+      meta.extra = folder ? { ...rest, trashedFrom: folder } : rest;
+      writeAtomic(file, serializeMemoFile(meta, body));
+    } catch (err) {
+      this.emit('error', err);
+    }
+  }
+
   trash(id) {
     const entry = this.entries.get(id);
     if (!entry) return false;
@@ -607,6 +752,7 @@ export class Vault extends EventEmitter {
           throw err;
         }
       }
+      if (trashed && folderOf(entry.file)) this.markTrashedFrom(dest, folderOf(entry.file));
     }
     this.orphans.delete(id);
     this.trashAttachments(this.attachmentsOf(entry)); // 열지 않은 잠긴 메모도 머리말의 표로
@@ -725,8 +871,12 @@ export class Vault extends EventEmitter {
         this.emit('error', err);
       }
     }
-    const target = this.uniqueFile(titleToFileName(extractTitle(body)));
+    // 폴더에 있던 메모는 그 폴더로 (폴더가 없어졌으면 다시 만든다)
+    const dir = cleanFolderName(meta.extra?.trashedFrom);
+    const target = this.uniqueFile(titleToFileName(extractTitle(body)), dir);
+    fs.mkdirSync(path.dirname(this.abs(target)), { recursive: true });
     fs.renameSync(file, this.abs(target));
+    if (meta.extra?.trashedFrom !== undefined) this.markTrashedFrom(this.abs(target), null);
     // 이 기기에서 되살린 메모는 "다른 기기에서 방금 고친 메모" 로 알리지 않는다
     this.ownFiles = new Set([target]);
     try {

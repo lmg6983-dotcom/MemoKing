@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -13,6 +14,7 @@ import android.os.Bundle
 import android.print.PdfPrint
 import android.print.PrintAttributes
 import android.print.PrintManager
+import android.provider.CalendarContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -668,6 +670,22 @@ class MainActivity : Activity() {
         bridge.resolve(id) {
             if (uri.scheme != "http" && uri.scheme != "https") throw IllegalArgumentException("인터넷 주소가 아니에요")
             launchView(uri)
+        }
+    }
+
+    /** 휴대폰 캘린더의 일정을 그 캘린더 앱(삼성 캘린더 · Google 캘린더)에서 연다 */
+    fun openCalendarEvent(id: Int, eventId: Long, begin: Long, end: Long) {
+        val intent = Intent(Intent.ACTION_VIEW, ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId))
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, begin)
+            .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, end)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        bridge.resolve(id) {
+            try {
+                startActivity(intent)
+                true
+            } catch (e: ActivityNotFoundException) {
+                false
+            }
         }
     }
 

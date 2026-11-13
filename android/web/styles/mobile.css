@@ -214,14 +214,6 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 }
 
 .tag-chip small { font-size: 12px; font-weight: 500; opacity: 0.72; }
-.tag-strip {
-  display: flex;
-  gap: 6px;
-  padding: 2px 16px 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.tag-strip::-webkit-scrollbar { display: none; }
 .filter-summary { display: flex; align-items: center; gap: 8px; margin: 0 16px 8px; font-size: 13px; color: var(--muted); }
 .filter-summary span { flex: 1; }
 /* 글자 단추는 한 줄로 — 자리가 모자라면 옆(고르기 칸)이 줄어든다 */
@@ -1283,3 +1275,18 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .mk-find-opt, .mk-find-choice { height: 32px; }
 .mk-find-swatch { width: 34px; height: 34px; }
 .mk-find-item { min-height: 40px; }
+
+/* 메모킹 폴더: 검색 아래 "📁 전체 ▾" — 누르면 폴더 시트 (folder-ui.js) */
+.folder-bar {
+  display: flex; align-items: center; gap: 6px; flex: none; align-self: flex-start; min-height: 44px; margin: 0 12px 6px; padding: 0 14px;
+  border: 0; border-radius: 999px; background: var(--fill-hover, rgba(0, 0, 0, 0.05)); color: var(--text-strong); font: inherit; font-size: 14.5px; font-weight: 700;
+}
+.folder-bar[hidden] { display: none; }
+.folder-bar svg { width: 17px; height: 17px; color: var(--muted); }
+.folder-bar small { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.folder-bar svg.folder-bar-caret { width: 15px; height: 15px; }
+.folder-bar:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+/* 여러 장 고르기 막대: 아래 탭 막대 위에 */
+.pick-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.pick-bar .btn { min-height: 44px; }
+body.picking #fab { display: none; }

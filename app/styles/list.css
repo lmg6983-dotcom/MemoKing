@@ -457,7 +457,6 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 · 정렬 · 모양)는 메모 탭에서만 */
 
 /* 보기 판: 카드 위에 뜬다 (열어도 목록이 밀리지 않게) */
-#view-memos { position: relative; }
 .filter-panel {
   position: absolute;
   top: 0;
@@ -509,17 +508,22 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
 .tag-chip small { font-size: 12px; font-weight: 500; color: var(--muted); }
 .tag-chip[aria-pressed="true"] small { color: var(--on-brand); }
 
-/* 태그 줄: 옆으로 넘겨 보기 (스크롤 막대는 얇게) */
-.tag-strip {
-  display: flex;
-  gap: 4px;
-  flex: none;
-  padding: 0 12px 8px;
-  overflow-x: auto;
-  scrollbar-width: thin;
+/* 메모 탭: 왼쪽 폴더 막대 + 오른쪽 카드 (folder-ui.js) — 막대는 위 폴더 단추로 숨긴다 */
+#view-memos { flex-direction: row; }
+.memos-col { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.folder-side { flex: none; width: 156px; padding: 0 6px 12px 10px; overflow-y: auto; border-right: 1px solid var(--line); }
+.folder-side[hidden] { display: none; }
+.folder-title {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; align-self: flex-start; max-width: calc(100% - 24px); min-height: 34px; margin: 0 12px 6px; padding: 0 10px;
+  border: 0; border-radius: 999px; background: var(--hover); color: var(--text-strong); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
 }
-.tag-strip::-webkit-scrollbar { height: 4px; }
-.tag-strip::-webkit-scrollbar-thumb { border-radius: 2px; background: var(--border); }
+.folder-title > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.folder-title svg { flex: none; width: 15px; height: 15px; color: var(--muted); }
+.folder-title:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+.folder-title[hidden] { display: none; }
+.toolbar .folder-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); }
+.toolbar .folder-btn[aria-pressed="true"] { color: var(--text-strong); background: var(--hover); }
+body:not([data-tab="memos"]) .folder-btn { display: none; }
 
 .filter-summary {
   display: flex;

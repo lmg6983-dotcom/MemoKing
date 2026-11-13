@@ -20,6 +20,7 @@ const ICONS = {
   gear: `<circle cx="12" cy="12" r="3" ${stroke}/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z" ${stroke}/>`,
   close: `<path d="M6 6l12 12M18 6L6 18" ${stroke} stroke-width="2"/>`,
   check: `<path d="M5 12.5l4.5 4.5L19 7.5" ${stroke} stroke-width="2.2"/>`,
+  'chev-down': `<path d="M7 10l5 5 5-5" ${stroke} stroke-width="2"/>`, // 펼치기 (폴더 고르기 단추)
   more: '<circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/>',
   lock: `<rect x="5" y="10.5" width="14" height="10" rx="2" ${stroke}/><path d="M8 10.5V7.5a4 4 0 018 0v3" ${stroke}/>`,
   pin: `<path d="M9 4h6l-1 6 3 3v2h-4v5l-1 1-1-1v-5H7v-2l3-3-1-6z" ${stroke}/>`,

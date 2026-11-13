@@ -37,6 +37,8 @@ import { memoMode, otherMode, moveLabel, MODE_LABEL, fillModeTag } from './core/
 import { createFindBar } from './find-bar.js';
 import { createAiWritePanel } from './ai-write-panel.js';
 import { UI } from './core/ui-text.js';
+import { pickFolder } from './folder-ui.js';
+import { folderOf } from './core/folders.js';
 import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from './note-shared.js';
 
 const SAVE_DELAY = 600;
@@ -434,6 +436,11 @@ function applyMeta(next) {
   $('day-label').textContent = memo.day ? dayText(memo.day) : UI.madeDay;
   $('mode-btn').querySelector('span').textContent = moveLabel(memo);
   showModeTheme();
+  // 메모킹 폴더: 폴더에 있으면 윗막대에 이름 (누르면 옮기기), 메뉴에는 지금 폴더
+  const folder = folderOf(memo.file);
+  $('folder-tag').hidden = !folder;
+  $('folder-tag').querySelector('span').textContent = folder;
+  $('folder-label').textContent = folder || '폴더 없음';
 }
 
 for (const color of COLORS) {
@@ -459,6 +466,22 @@ async function moveMode(to) {
   applyMeta(next);
   setStatus(`${MODE_LABEL[to]}로 옮겼어요`);
 }
+// 다른 폴더로 옮기기 (folder-ui.js) — 메인이 옮긴 뒤 memo:meta 로 새 파일 자리를 보낸다
+async function moveFolder() {
+  closeMenu();
+  await flush();
+  const current = folderOf(memo.file);
+  const to = await pickFolder({ folders: await api.memos.folders(), current });
+  if (to === null || to === current) return;
+  try {
+    await api.memos.moveToFolder(id, to);
+    setStatus(to ? `${to} 폴더로 옮겼어요` : '폴더에서 뺐어요');
+  } catch (err) {
+    setStatus(err.message || '옮기지 못했어요', true);
+  }
+}
+$('folder-btn').addEventListener('click', moveFolder);
+$('folder-tag').addEventListener('click', moveFolder);
 // Work ↔ Life 로 옮기기 (목록에서는 그 모드에서 보인다)
 $('mode-btn').addEventListener('click', () => {
   closeMenu();

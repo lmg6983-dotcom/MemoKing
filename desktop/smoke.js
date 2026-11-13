@@ -948,16 +948,13 @@ export async function runSmoke({
       return t.length === 2 && t;
     }, '카드 태그').catch(() => null);
     check('카드 요약 아래에 태그 표시', JSON.stringify(cardTags) === JSON.stringify(['#업무', '#여행']), JSON.stringify(cardTags));
-    const strip = await lj(`[...document.querySelectorAll('#tag-strip .tag-chip')].map((b) => b.textContent)`);
-    check('태그 줄: 지금 있는 태그를 많이 쓴 순으로 (개수 포함)', strip[0] === '#업무2' && strip.includes('#회의1') && strip.includes('#여행1'), JSON.stringify(strip));
-    await lj(`document.querySelector('#tag-strip [data-tag="업무"]').click()`);
+    check('태그 줄은 없음 (그 자리에 왼쪽 폴더 막대)', await lj(`!document.getElementById('tag-strip') && !!document.querySelector('#folder-side .mf-item[aria-current="true"]')`));
+    // 카드의 태그를 누르면 그 태그의 메모만
+    await lj(`document.querySelector('.card[data-id="${tagNote2.id}"] [data-card-tag="업무"]').click()`);
     const byTag = await shownIds();
     const countText = await lj(`document.getElementById('count').textContent`);
-    check('태그 누르기 → 그 태그의 메모만', byTag.length === 2 && byTag.includes(tagNote1.id) && byTag.includes(tagNote2.id) && /중 2개/.test(countText), `${JSON.stringify(byTag)} ${countText}`);
-    await lj(`document.querySelector('#tag-strip [data-tag="회의"]').click()`);
-    const byTwo = await shownIds();
     const summary = await lj(`document.getElementById('filter-summary').hidden ? '' : document.getElementById('filter-summary-text').textContent`);
-    check('태그 두 개 → 모두 가진 메모 + "필터 2개" 안내', byTwo.length === 1 && byTwo[0] === tagNote1.id && /필터 2개/.test(summary), `${JSON.stringify(byTwo)} ${summary}`);
+    check('카드 태그 누르기 → 그 태그의 메모만 + "필터 1개" 안내', byTag.length === 2 && byTag.includes(tagNote1.id) && byTag.includes(tagNote2.id) && /중 2개/.test(countText) && /필터 1개/.test(summary), `${JSON.stringify(byTag)} ${countText} ${summary}`);
     await capture(getList(), 'smoke-tag-filter.png');
     await lj(`document.getElementById('filter-clear').click()`);
     const total = vault.list().length;

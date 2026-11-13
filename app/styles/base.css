@@ -1230,7 +1230,7 @@ dialog.quick-event[open] {
 .cal-body .mk-ev.off { opacity: 0.5; }
 /* 달 보기 칩 제목: 날짜 숫자보다 작지 않게(12px · 손가락 화면 13px), 칩 폭을 다 쓰고 넘치면 … (높이는 한 줄 그대로 —
    두 줄로 키우면 달력이 칸 높이를 다시 재며 고리를 돌았다) */
-.cal-body .mk-mt { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; font-weight: 600; line-height: 1.3; padding: 1px 3px; }
+.cal-body .mk-mt { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; flex: 1; min-width: 0; font-size: 12px; font-weight: 600; line-height: 1.3; padding: 1px 3px; }
 @media (pointer: coarse) { .cal-body .mk-mt { font-size: 13px; } }
 /* 좁은 칸(휴대폰 · 좁힌 창): "…" 가 한 글자 자리를 먹으므로 그냥 칸 끝에서 자른다 (끝을 흐리게 하지 않음) */
 @media (max-width: 700px) {
@@ -1269,8 +1269,9 @@ dialog.quick-event[open] {
 /* 칩 제목: 칸 폭에 맞춘 크기(공백 포함 한글 8자쯤 — 휴대폰 약 8~9px, 넓은 창은 11px 까지) · 보통 굵기 · 살짝 좁은 자간 */
 .cal[data-view="dayGridMonth"] .cal-body .mk-mt { font-size: clamp(8px, calc((var(--cal-col, 56px) - 5px) / 6.3), 11px) !important; font-weight: 500; letter-spacing: -0.03em; line-height: 1.3; padding: 1px 1.5px; }
 .cal[data-view="dayGridMonth"] .cal-body .mk-more { min-height: 0 !important; margin: 0 2px; padding: 0 2px; font-size: 11.5px; line-height: 13px; }
-/* 내 일정 칩 왼쪽의 색 점 자리: 칩이 이미 그 색이라 보이지 않고 좁은 칸만 차지했다 (다른 캘린더 일정은 점이 그 캘린더 표시라 둔다) */
-.cal-body .mk-ev:not(.mk-ext) > div:first-child:empty { display: none; }
+/* 칩 앞의 색 점 · 하루 종일 일정의 왼쪽 색 띠: 칩 바탕이 이미 그 색이라 좁은 칸만 차지했다 */
+.cal-body .mk-ev > div:first-child:empty { display: none; }
+.cal-body .mk-ev { border-inline-start-width: 0 !important; }
 /* 낮은 창: 일정 막대 대신 날짜 + 색 점 (list-reminders.js fitSize) */
 .cal.compact .cal-body { font-size: 11.5px; }
 .cal.compact .cal-body [role="gridcell"] > :first-child { min-height: 0; padding: 1px 2px 0; }
@@ -1323,7 +1324,15 @@ dialog.quick-event[open] {
 .cal-body .mk-ev:not(.mk-ext) * { color: inherit !important; } /* 칩 안쪽 글자도 (FullCalendar 가 안쪽에 색을 따로 줌) */
 /* 목록 보기는 줄이 넓어 꽉 채우면 무거움 — 메모 일정은 진한 옅은 바탕, 다른 캘린더는 더 옅게 (무게 차이는 그대로) */
 .cal[data-view="listMonth"] .cal-body .mk-ev:not(.mk-ext) { background: color-mix(in srgb, var(--fc-event-color) 26%, transparent) !important; color: var(--text-strong); }
-.cal-body .mk-ext { background: color-mix(in srgb, var(--fc-event-color) 12%, transparent) !important; color: var(--text); }
+/* 다른 캘린더 일정: 그 캘린더 색이 칩에서 구별되게 — 바탕은 그 색을 옅게(26%), 아래 2px 은 그 색 그대로 (앞 점 · 왼쪽 띠처럼 글자 자리를 먹지 않게) */
+.cal-body .mk-ext {
+  background: color-mix(in srgb, var(--fc-event-color) 26%, var(--surface-1, #fff)) !important;
+  box-shadow: inset 0 -2px 0 var(--fc-event-color);
+  color: var(--text-strong);
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root:not([data-theme="light"])) .cal-body .mk-ext { background: color-mix(in srgb, var(--fc-event-color) 34%, var(--surface-1, #1c1c1e)) !important; }
+}
 .cal-body .mk-ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* 손가락으로 누르는 화면: 누르는 자리를 넉넉히 (보기 전환 · 앞뒤 달 · 오늘 · 달력 칩 · 다른 캘린더 창의 칸들) */
 @media (pointer: coarse) {
@@ -1341,9 +1350,25 @@ dialog.quick-event[open] {
 .dialog p.cal-links-lead { margin-bottom: 4px; font-size: 13px; color: var(--muted); }
 .feed-list { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
 .feed-list:empty { display: none; }
-.feed-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 6px 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); }
+.feed-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 52px; padding: 8px 6px 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); }
 .feed-dot { flex: none; width: 10px; height: 10px; border-radius: 99px; background: var(--ext-color, var(--muted)); }
-.feed-device .feed-dot { background: conic-gradient(#1a73e8 0 25%, #34a853 0 50%, #fbbc04 0 75%, #ea4335 0); }
+.feed-color { width: 28px; height: 28px; margin: -9px; padding: 0; border: 0; border-radius: 99px; background: radial-gradient(circle, var(--ext-color) 0 5px, transparent 5.5px); cursor: pointer; }
+.feed-color:focus-visible, .feed-swatch:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+.feed-palette { display: flex; flex-basis: 100%; flex-wrap: wrap; gap: 8px; padding: 6px 0 2px 20px; }
+.feed-palette[hidden] { display: none; }
+/* 손가락 화면: 색 점은 점 둘레까지 눌리게(44px), 색 칸은 40px */
+@media (pointer: coarse) {
+  .feed-color { width: 40px; height: 44px; margin: -17px -15px; }
+}
+/* 캘린더 안의 캘린더 (네이버 계정 · 휴대폰): 줄 아래 들여 쓴 작은 줄 */
+.feed-subs { display: grid; flex-basis: 100%; gap: 2px; margin: 6px 0 0; padding: 0 0 0 20px; list-style: none; }
+.feed-subs:empty { display: none; }
+.feed-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 40px; }
+.feed-sub .feed-text b { font-size: 13px; font-weight: 600; }
+.feed-swatch { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 99px; background: var(--sw); cursor: pointer; }
+.feed-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--sw); }
+@media (pointer: coarse) { .feed-swatch { width: 40px; height: 40px; } }
+.feed-device > .feed-dot { background: conic-gradient(#1a73e8 0 25%, #34a853 0 50%, #fbbc04 0 75%, #ea4335 0); }
 .feed-text { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; text-align: left; }
 .feed-text b { overflow: hidden; font-size: 13.5px; white-space: nowrap; text-overflow: ellipsis; }
 .feed-text small { overflow: hidden; font-size: 11.5px; color: var(--muted); text-overflow: ellipsis; }
@@ -1352,9 +1377,11 @@ dialog.quick-event[open] {
 .feed-open-add { display: block; margin: 2px 0 0 -6px; min-height: 40px; }
 .feed-open-add[hidden], .cal-help[hidden] { display: none; }
 .feed-add[hidden] { display: none; }
-.feed-naver { flex-wrap: wrap; }
-.feed-naver .feed-url { flex-basis: 140px; }
-.feed-naver .btn { margin-left: auto; }
+.feed-naver { display: grid; gap: 10px; }
+.feed-naver[hidden] { display: none; }
+.feed-field { display: grid; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--text); }
+.feed-field .feed-url { width: 100%; box-sizing: border-box; font-weight: 400; }
+.feed-naver .btn { justify-self: end; }
 .feed-url { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; }
 .feed-url:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
 .feed-add .btn { height: 38px; padding: 0 14px; }
@@ -1587,3 +1614,75 @@ dialog.quick-event[open] {
 :is(.icon-btn, .act-btn, .mk-ctx-ic).done svg {
   color: var(--ok-text, #2f9e44) !important;
 }
+
+/* 메모킹 폴더 (folder-ui.js — PC 목록의 왼쪽 막대 · 휴대폰 시트 · 폴더 고르기 창) */
+.mf-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.mf-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 34px; padding: 6px 10px;
+  border: 0; border-radius: var(--radius-sm); background: none; color: var(--text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer;
+}
+.mf-item svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
+.mf-item:hover:not(:disabled) { background: var(--hover); }
+.mf-item:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
+.mf-item[aria-current="true"] { background: var(--brand-yellow); color: var(--on-brand); font-weight: 700; }
+.mf-item[aria-current="true"] svg, .mf-item[aria-current="true"] .mf-count { color: inherit; }
+.mf-item:disabled { cursor: default; opacity: 0.6; }
+.mf-item.drop-on { box-shadow: inset 0 0 0 2px var(--brand-yellow); background: var(--hover); }
+.mf-row { position: relative; display: flex; align-items: center; }
+.mf-row > .mf-item { flex: 1; min-width: 0; }
+/* 폴더 ⋯ (이름 바꾸기 · 지우기): 마우스는 올렸을 때 · 키보드로 갔을 때만, 손가락 화면은 늘 */
+.mf-more { flex: none; width: 30px; height: 30px; margin-left: 2px; opacity: 0; }
+.mf-row:hover .mf-more, .mf-more:focus-visible { opacity: 1; }
+.mf-more svg { width: 16px; height: 16px; }
+@media (pointer: coarse) { .mf-more { width: 44px; height: 44px; opacity: 1; } }
+.mf-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mf-count { flex: none; font-size: 12px; color: var(--muted); }
+.mf-new { margin: 6px 0 0 4px; }
+.folder-dialog { width: min(360px, calc(100vw - 24px)); }
+.folder-dialog-body { max-height: min(60vh, 480px); overflow-y: auto; }
+.mf-name-form { display: grid; gap: 8px; }
+.mf-name-input { height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; }
+.mf-name-input:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
+.dialog p.mf-name-note { min-height: 1.2em; margin: 0; font-size: 12.5px; color: var(--danger); }
+.mf-name-form .btn { justify-self: end; }
+@media (pointer: coarse) { .mf-item { min-height: 44px; font-size: 15px; } }
+/* 휴대폰: 아래에서 올라오는 시트 */
+@media (max-width: 700px) {
+  dialog.folder-sheet, dialog.folder-pick-dialog { width: 100%; max-width: none; margin: auto 0 0; border-radius: 18px 18px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+}
+/* 메모 창 윗막대의 폴더 이름 (누르면 다른 폴더로) — Work / Life 표시처럼 작게 */
+.folder-tag {
+  display: inline-flex; align-items: center; gap: 3px; flex: 0 1 auto; min-width: 0; max-width: 40%; height: 20px; padding: 0 7px;
+  border: 0; border-radius: 999px; background: color-mix(in srgb, currentColor 9%, transparent); color: inherit; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+}
+.folder-tag[hidden] { display: none; }
+.folder-tag svg { flex: none; width: 12px; height: 12px; }
+.folder-tag span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.folder-tag:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
+/* 카드의 폴더 이름 (전체 · 검색에서만 — folder-ui.js) */
+/* 카드의 폴더 이름: 태그(#굵은 글자)와 다르게 "자리" 로 읽히게 — 흐린 글자의 옅은 알약 */
+.card-folder {
+  display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 0 7px 0 5px; overflow: hidden;
+  border-radius: 999px; background: color-mix(in srgb, currentColor 9%, transparent); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; opacity: 0.8; cursor: pointer;
+}
+.card-folder svg { flex: none; width: 12px; height: 12px; }
+/* 여러 장 고르기 (PC Ctrl+클릭 · 휴대폰 고르기) */
+/* 고르는 동안: 카드 모서리에 동그라미(고를 수 있음), 고른 카드는 진한 테두리 + 체크 — 노란 카드 위에서도 보이게 */
+body.picking .card { position: relative; }
+body.picking .card::after {
+  content: ""; position: absolute; top: 8px; right: 8px; z-index: 2; width: 22px; height: 22px; box-sizing: border-box;
+  border: 2px solid color-mix(in srgb, var(--text-strong) 55%, transparent); border-radius: 50%; background: var(--surface-1, #fff); pointer-events: none;
+}
+.card.picked { box-shadow: 0 0 0 3px var(--text-strong), 0 4px 12px rgba(0, 0, 0, 0.12); }
+body.picking .card.picked::after {
+  border-color: var(--text-strong);
+  background: var(--text-strong) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 14px no-repeat;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root:not([data-theme="light"])) body.picking .card.picked::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+}
+.pick-bar {
+  position: fixed; left: 50%; bottom: 16px; z-index: 60; display: flex; align-items: center; gap: 8px; transform: translateX(-50%);
+  padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--surface-1, #fff); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); font-size: 13.5px; font-weight: 700; white-space: nowrap;
+}
+.pick-bar[hidden] { display: none; }

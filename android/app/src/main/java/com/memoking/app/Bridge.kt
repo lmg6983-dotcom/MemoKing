@@ -382,7 +382,9 @@ class Bridge(private val activity: MainActivity) {
             }
             // 휴대폰 캘린더 (삼성 캘린더 · Google 캘린더) 함께 보기: 권한 묻기 · 일정 읽기
             "calendarPermission" -> activity.runOnUiThread { activity.requestCalendarPermission(id) }
+            "calendarOpen" -> activity.runOnUiThread { activity.openCalendarEvent(id, a.getLong("id"), a.getLong("begin"), a.getLong("end")) }
             "calendarEvents" -> pool.execute { resolve(id) { DeviceCalendar.events(ctx, a.getLong("from"), a.getLong("to")) } }
+            "calendarList" -> pool.execute { resolve(id) { DeviceCalendar.calendars(ctx) } }
             // 화자 구분: {} 모델 받고 켜기 · {on} 켜기/끄기 · {delete} 모델 지우기
             "speakerModel" -> pool.execute {
                 resolve(id) {

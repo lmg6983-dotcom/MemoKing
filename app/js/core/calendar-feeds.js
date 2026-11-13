@@ -57,8 +57,32 @@ export function prepareFeed(text) {
   return { masters };
 }
 
+/** CalDAV 로 받은 .ics 속 캘린더 이름들 (X-MK-CAL, 처음 나온 순) — 캘린더별로 켜고 끄기 · 색 */
+export const feedCalendars = (text) => [...new Set([...String(text ?? '').matchAll(/^X-MK-CAL:(.*?)\r?$/gm)].map((m) => m[1]))];
+
+/** 회차 표시(RECURRENCE-ID) → "20261120" (하루 종일) · "20261120T013000Z" (UTC), 없으면 '' */
+const ridText = (t) => {
+  if (!t) return '';
+  if (t.isDate) return `${t.year}${String(t.month).padStart(2, '0')}${String(t.day).padStart(2, '0')}`;
+  return t.toJSDate().toISOString().replace(/[-:]|\.\d+/g, '');
+};
+
 /**
- * .ics 글(또는 prepareFeed 결과) → [from, to) 와 겹치는 일정 회차 [{ uid, title, start, end, allDay, location, description, url }] (시작 순)
+ * Google 캘린더 iCal 구독의 일정 → 그 일정을 여는 Google 캘린더 주소 (Google 이 아니면 '')
+ *   eid = base64("<일정 ID>[_<회차>] <캘린더 ID>") — Google 캘린더 화면이 일정 주소에 쓰는 모양
+ * @param {string} feedUrl 구독 주소 (https://calendar.google.com/calendar/ical/<캘린더 ID>/.../basic.ics)
+ * @param {{ uid: string, recurrenceId?: string }} e feedEvents 의 일정
+ */
+export function googleEventUrl(feedUrl, e) {
+  const cal = /^https:\/\/calendar\.google\.com\/calendar\/ical\/([^/]+)\//.exec(String(feedUrl ?? ''))?.[1];
+  const id = /^([\w-]+)@google\.com$/.exec(String(e?.uid ?? ''))?.[1];
+  if (!cal || !id) return '';
+  const eid = btoa(`${id}${e.recurrenceId ? `_${e.recurrenceId}` : ''} ${decodeURIComponent(cal)}`).replace(/=+$/, '');
+  return `https://www.google.com/calendar/event?eid=${encodeURIComponent(eid)}`;
+}
+
+/**
+ * .ics 글(또는 prepareFeed 결과) → [from, to) 와 겹치는 일정 회차 [{ uid, title, start, end, allDay, location, description, url, recurrenceId }] (시작 순)
  * 반복 일정은 회차마다, 취소된 일정은 빼고, 바뀐 회차(RECURRENCE-ID)는 바뀐 대로.
  * 반복 하나마다 따로 셈을 두어(아주 오래된 매일 반복이 있어도) 뒤의 다른 일정이 빠지지 않게 하고, 다 모은 뒤 시작 순으로 limit 개
  */
@@ -68,7 +92,7 @@ export function feedEvents(source, from, to, limit = 1500) {
   const seen = new Set();
   const fromMs = from.getTime();
   const toMs = to.getTime();
-  const push = (ev, startTime, endTime) => {
+  const push = (ev, startTime, endTime, rid) => {
     const allDay = startTime.isDate;
     const start = startTime.toJSDate();
     let end = endTime ? endTime.toJSDate() : null;
@@ -80,11 +104,11 @@ export function feedEvents(source, from, to, limit = 1500) {
     const key = `${ev.uid}|${start.getTime()}`;
     if (seen.has(key)) return;
     seen.add(key);
-    out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || UI.untitledParen, start, end, allDay, location: plainText(ev.location), description: noteText(ev.description), url: webUrl(ev.component.getFirstPropertyValue('url')) });
+    out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || UI.untitledParen, start, end, allDay, location: plainText(ev.location), description: noteText(ev.description), url: webUrl(ev.component.getFirstPropertyValue('url')), recurrenceId: ridText(rid), cal: String(ev.component.getFirstPropertyValue('x-mk-cal') ?? '') });
   };
   for (const { ev, moved } of masters) {
     if (!ev.isRecurring()) {
-      push(ev, ev.startDate, ev.endDate);
+      push(ev, ev.startDate, ev.endDate, ev.recurrenceId);
       continue;
     }
     const it = ev.iterator();
@@ -98,9 +122,9 @@ export function feedEvents(source, from, to, limit = 1500) {
       if (at + span <= fromMs) continue;
       const d = ev.getOccurrenceDetails(next);
       // 바뀐 회차는 그 일정의 상태(취소 등)로 본다
-      push(d.item, d.startDate, d.endDate);
+      push(d.item, d.startDate, d.endDate, d.recurrenceId);
     }
-    for (const ex of moved) push(ex, ex.startDate, ex.endDate);
+    for (const ex of moved) push(ex, ex.startDate, ex.endDate, ex.recurrenceId);
   }
   return out.sort((a, b) => a.start - b.start).slice(0, limit);
 }
@@ -127,6 +151,10 @@ export function fromDeviceEvent(e) {
     location: plainText(e.location),
     description: noteText(e.description),
     calendar: plainText(e.calendar),
+    calendarId: e.calendarId == null ? '' : String(e.calendarId),
+    // 캘린더 앱에서 그 회차를 열 때 넘길 원래 시각 (하루 종일 일정은 UTC 자정 — 위 start · end 는 이 기기 자정으로 바꾼 것)
+    rawStart: e.start,
+    rawEnd: e.end,
     color: /^#[0-9a-f]{6}$/i.test(e.color ?? '') ? e.color : null,
   };
 }

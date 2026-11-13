@@ -4,7 +4,7 @@ import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
-import { FeedStore, feedResponseText, MAX_FEED_BYTES } from '../../app/js/core/calendar-feed-list.js';
+import { FeedStore, feedResponseText, MAX_FEED_BYTES, normalizeCals } from '../../app/js/core/calendar-feed-list.js';
 import { caldavIcs } from '../../app/js/core/caldav.js';
 import { extractTitle, isBlankBody, COLORS, COLOR_NAMES, toLocalIso } from '../../app/js/core/memo-file.js';
 import { seedTutorialSandbox } from '../../app/js/core/tutorial.js';
@@ -41,6 +41,7 @@ import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
 import { openMemoryDay, dayText } from '../../app/js/memory-day.js';
 import { memoMode, otherMode, moveLabel, MODE_LABEL } from '../../app/js/core/modes.js';
+import { folderOf } from '../../app/js/core/folders.js';
 import { renderWorkSettings } from '../../app/js/work-settings.js';
 import { workHours, saveWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
@@ -63,6 +64,7 @@ injectMobileIcons();
 // 구독 주소 · CalDAV 비밀번호는 비밀(누구나 그 캘린더를 볼 수 있음)이라 메모 폴더(Drive 동기화)가 아니라 이 휴대폰에만 둔다
 const FEEDS_KEY = 'memoking.calendarFeeds';
 const DEVICE_KEY = 'memoking.deviceCalendar';
+const DEVICE_CALS_KEY = 'memoking.deviceCalendars'; // 캘린더 ID → { on, color } (휴대폰 캘린더별 켜기 · 색)
 const FEED_CACHE_MAX = 400 * 1024; // 이보다 큰 캘린더는 앱을 켤 때마다 다시 받는다
 const lsGet = (k) => {
   try {
@@ -82,6 +84,17 @@ const lsSet = (k, v) => {
 // 예전(0.27.0)의 Google 캘린더 상호 동기화는 없앴다 — 그 설정만 지운다 (Google 의 "메모킹" 캘린더는 그대로)
 for (const k of ['memoking.gcal', 'memoking.gcalDevice', 'memoking.gcalMine']) lsSet(k, null);
 
+// 앱의 인터넷 요청: 안드로이드가 준 영어 오류("Unable to resolve host ...")는 알기 쉬운 한국어로 (PC 와 같은 문구)
+//   앱이 쓴 한국어 오류(너무 큰 파일 등)는 그대로
+async function netCall(method, args) {
+  try {
+    return await call(method, args);
+  } catch (err) {
+    if (/[가-힣]/.test(err?.message ?? '')) throw err;
+    throw new Error('캘린더 서버에 연결하지 못했어요 (인터넷 확인)');
+  }
+}
+
 function calendarApi() {
   const mem = new Map(); // id → { url, text, at }
   const cacheKey = (id) => `memoking.calendarFeed.${id}`;
@@ -97,8 +110,8 @@ function calendarApi() {
     setList: (list) => lsSet(FEEDS_KEY, JSON.stringify(list)),
     download: async (url, feed) => {
       // CalDAV 계정(네이버 캘린더): PROPFIND · REPORT 는 앱(Http.dav)이 보낸다
-      if (feed?.user) return caldavIcs(feed, (u, init) => call('dav', { url: u, ...init, limit: MAX_FEED_BYTES }));
-      const res = await call('http', { url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
+      if (feed?.user) return caldavIcs(feed, (u, init) => netCall('dav', { url: u, ...init, limit: MAX_FEED_BYTES }));
+      const res = await netCall('http', { url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
       return feedResponseText(res.status, new TextDecoder().decode(Uint8Array.from(res.latin1 ?? '', (c) => c.charCodeAt(0) & 0xff)));
     },
     cache: {
@@ -142,6 +155,18 @@ function calendarApi() {
         lsSet(DEVICE_KEY, granted ? '1' : null);
         return Boolean(granted);
       },
+      // 이 휴대폰의 캘린더 목록 · 캘린더별 설정
+      list: async () => (await call('calendarList')).calendars ?? [],
+      prefs: () => {
+        try {
+          return normalizeCals(JSON.parse(lsGet(DEVICE_CALS_KEY) ?? 'null')) ?? {};
+        } catch {
+          return {};
+        }
+      },
+      setPrefs: (prefs) => lsSet(DEVICE_CALS_KEY, JSON.stringify(normalizeCals(prefs) ?? {})),
+      // 그 일정을 캘린더 앱(삼성 캘린더 · Google 캘린더)에서 연다
+      open: (e) => call('calendarOpen', { id: e.deviceId, begin: e.rawStart ?? e.start.getTime(), end: e.rawEnd ?? e.end.getTime() }),
       events: async (from, to) => {
         const res = await call('calendarEvents', { from: from.getTime(), to: to.getTime() });
         if (!res.granted) lsSet(DEVICE_KEY, null); // 설정에서 권한을 거둬 갔다
@@ -424,7 +449,7 @@ app.newMemo = async ({ color, voice = false, ink = false } = {}) => {
       // 기본 노랑
     }
   }
-  const id = app.vault.create({ color: pick });
+  const id = app.vault.create({ color: pick, folder: list.currentFolder() }); // 보고 있는 폴더에
   await app.openMemo(id, { fresh: true, record: Boolean(voice), ink: Boolean(ink) });
   if (!voice && !ink) tutEvent('memo-created');
   return id;
@@ -461,6 +486,8 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="day"] small').textContent = memo.day ? dayText(memo.day) : UI.madeDay;
   memoSheet.querySelector('[data-memo-action="mode"] span').textContent = moveLabel(memo);
   memoSheet.querySelector('[data-memo-action="mode"]').hidden = !list.workLifeOn(); // Work / Life 를 나눠 쓸 때만
+  memoSheet.querySelector('[data-memo-action="folder"] small').textContent = folderOf(memo.file) || '폴더 없음';
+  memoSheet.querySelector('[data-memo-action="pick"]').hidden = inNote; // 여러 장 고르기는 목록에서만
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -521,6 +548,16 @@ memoSheet.addEventListener('click', async (e) => {
       else toast(`${MODE_LABEL[to]}로 옮겼어요`);
       break;
     }
+    case 'folder':
+      // 다른 폴더로 (folder-ui.js · core/folders.js)
+      note.flush();
+      closeSheet(memoSheet);
+      await list.moveToFolder([id], folderOf(memo?.file));
+      break;
+    case 'pick':
+      closeSheet(memoSheet);
+      list.startPicking(id);
+      break;
     case 'share':
       closeSheet(memoSheet);
       openShare(id);
