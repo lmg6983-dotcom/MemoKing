@@ -1,11 +1,12 @@
 // CalDAV 캘린더 읽기 (네이버 캘린더처럼 .ics 주소 없이 아이디 · 비밀번호로만 여는 캘린더) — PC 메인 · 휴대폰 받기가 함께 쓴다
 //   계정의 캘린더를 모두 찾아(PROPFIND) 일정 주소를 모으고(PROPFIND) 내용을 받아(REPORT calendar-multiget) 한 .ics 글로 합친다
 //   → 그 뒤는 .ics 구독과 똑같이 보여 준다. calendar-query 는 쓰지 않는다: 네이버는 그 답에 일정 내용을 빼고 준다
+//   일정마다 X-MK-CAL:<캘린더 이름> 을 붙여 캘린더별로 켜고 끄고 색을 고를 수 있게 한다
 //   HTTP 는 기기마다 넘긴다: request(url, { method, headers, body }) → { status, text, location }
 import { MAX_FEED_BYTES } from './calendar-feed-list.js';
 
 const NS = 'xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"';
-const FIND = `<?xml version="1.0" encoding="utf-8"?><d:propfind ${NS}><d:prop><d:resourcetype/><d:current-user-principal/><c:calendar-home-set/></d:prop></d:propfind>`;
+const FIND = `<?xml version="1.0" encoding="utf-8"?><d:propfind ${NS}><d:prop><d:resourcetype/><d:displayname/><d:current-user-principal/><c:calendar-home-set/></d:prop></d:propfind>`;
 const LIST = `<?xml version="1.0" encoding="utf-8"?><d:propfind ${NS}><d:prop><d:resourcetype/><d:displayname/></d:prop></d:propfind>`;
 const ITEMS = `<?xml version="1.0" encoding="utf-8"?><d:propfind ${NS}><d:prop><d:resourcetype/><d:getetag/></d:prop></d:propfind>`;
 const MULTIGET_BATCH = 100;
@@ -54,8 +55,10 @@ export async function caldavIcs(feed, request) {
 
   // 1. 넣은 주소가 캘린더면 그것만, 아니면 계정 → 캘린더 모음 → 캘린더들
   const first = await send('PROPFIND', base, '0', FIND);
+  // 캘린더 이름: 서버의 displayname, 없으면 주소 끝 (줄바꿈은 빼서 .ics 한 줄에 들어가게)
+  const calOf = (r, url) => ({ url, name: (unxml(inner(r, 'displayname')).replace(/[\x00-\x1f]+/g, ' ').trim() || decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() ?? '')).slice(0, 60) || '캘린더' });
   let urls;
-  if (isCalendar(first.xml)) urls = [first.url];
+  if (isCalendar(first.xml)) urls = [calOf(first.xml, first.url)];
   else {
     let home = hrefIn(inner(first.xml, 'calendar-home-set'));
     if (!home) {
@@ -63,7 +66,7 @@ export async function caldavIcs(feed, request) {
       if (principal) home = hrefIn(inner((await send('PROPFIND', new URL(principal, first.url), '0', FIND)).xml, 'calendar-home-set'));
     }
     const list = await send('PROPFIND', home ? new URL(home, first.url) : first.url, '1', LIST);
-    urls = responses(list.xml).filter(isCalendar).map((r) => new URL(hrefIn(r), list.url));
+    urls = responses(list.xml).filter(isCalendar).map((r) => calOf(r, new URL(hrefIn(r), list.url)));
   }
   if (!urls.length) throw new Error('이 계정에서 캘린더를 찾지 못했어요');
 
@@ -71,7 +74,7 @@ export async function caldavIcs(feed, request) {
   const parts = [];
   const zones = new Set();
   let size = 0;
-  const add = (data) => {
+  const add = (data, name) => {
     const ics = unxml(data).replace(/\r\n?|\n/g, '\r\n');
     for (const [block, kind] of ics.matchAll(/^BEGIN:(VEVENT|VTIMEZONE)\r$[\s\S]*?^END:\1(?=\r?$)/gm)) {
       if (kind === 'VTIMEZONE') {
@@ -79,18 +82,19 @@ export async function caldavIcs(feed, request) {
         if (zones.has(tz)) continue;
         zones.add(tz);
       }
-      size += block.length;
+      const tagged = kind === 'VEVENT' ? block.replace(/^BEGIN:VEVENT\r\n/, `BEGIN:VEVENT\r\nX-MK-CAL:${name}\r\n`) : block;
+      size += tagged.length;
       if (size > MAX_FEED_BYTES) throw new Error('캘린더가 너무 커요 (5MB 넘음)');
-      parts.push(block);
+      parts.push(tagged);
     }
   };
-  for (const url of urls) {
+  for (const { url, name } of urls) {
     const items = await send('PROPFIND', url, '1', ITEMS);
     const paths = responses(items.xml).filter((r) => !isCollection(r)).map((r) => new URL(hrefIn(r), items.url))
       .filter((u) => u.origin === base.origin).map((u) => u.pathname);
     for (let i = 0; i < paths.length; i += MULTIGET_BATCH) {
       const { xml } = await send('REPORT', items.url, '1', multiget(paths.slice(i, i + MULTIGET_BATCH)));
-      for (const r of responses(xml)) add(inner(r, 'calendar-data'));
+      for (const r of responses(xml)) add(inner(r, 'calendar-data'), name);
     }
   }
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//MemoKing//CalDAV//KO', ...parts, 'END:VCALENDAR', ''].join('\r\n');

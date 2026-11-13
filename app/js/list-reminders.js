@@ -134,11 +134,20 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
         if (parsed.size > 48) parsed.delete(parsed.keys().next().value);
         parsed.set(key, list);
       }
-      for (const e of list) out.push({ ...e, ext: true, source: f.name, color: f.color, feedId: f.id, link: googleEventUrl(f.url, e) });
+      for (const e of list) {
+        const pref = e.cal ? f.cals?.[e.cal] : null; // 네이버 캘린더: 캘린더별 켜기 · 색
+        if (pref?.on === false) continue;
+        out.push({ ...e, ext: true, source: e.cal || f.name, color: pref?.color || f.color, feedId: f.id, link: googleEventUrl(f.url, e) });
+      }
     }
     if (device.on) {
       // "메모킹" 캘린더는 예전(v0.41) 상호 동기화가 Google 에 만든 메모킹 일정의 사본이라 빼고 (두 번 · 낡은 채로 보이지 않게)
-      for (const e of device.events) if (e.end > from && e.start < to && e.calendar !== '메모킹') out.push({ ...e, ext: true, source: e.calendar || '휴대폰 캘린더', device: true });
+      const prefs = calendars.device?.prefs?.() ?? {}; // 캘린더별 켜기 · 색 (이 휴대폰에만)
+      for (const e of device.events) {
+        const pref = prefs[e.calendarId];
+        if (pref?.on === false || !(e.end > from && e.start < to) || e.calendar === '메모킹') continue;
+        out.push({ ...e, ext: true, source: e.calendar || '휴대폰 캘린더', device: true, ...(pref?.color ? { color: pref.color } : {}) });
+      }
     }
     return query.trim() ? out.filter((e) => `${e.title} ${e.location ?? ''} ${e.source}`.toLowerCase().includes(query.trim().toLowerCase())) : out;
   }

@@ -57,6 +57,9 @@ export function prepareFeed(text) {
   return { masters };
 }
 
+/** CalDAV 로 받은 .ics 속 캘린더 이름들 (X-MK-CAL, 처음 나온 순) — 캘린더별로 켜고 끄기 · 색 */
+export const feedCalendars = (text) => [...new Set([...String(text ?? '').matchAll(/^X-MK-CAL:(.*?)\r?$/gm)].map((m) => m[1]))];
+
 /** 회차 표시(RECURRENCE-ID) → "20261120" (하루 종일) · "20261120T013000Z" (UTC), 없으면 '' */
 const ridText = (t) => {
   if (!t) return '';
@@ -101,7 +104,7 @@ export function feedEvents(source, from, to, limit = 1500) {
     const key = `${ev.uid}|${start.getTime()}`;
     if (seen.has(key)) return;
     seen.add(key);
-    out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || UI.untitledParen, start, end, allDay, location: plainText(ev.location), description: noteText(ev.description), url: webUrl(ev.component.getFirstPropertyValue('url')), recurrenceId: ridText(rid) });
+    out.push({ uid: String(ev.uid ?? ''), title: plainText(ev.summary) || UI.untitledParen, start, end, allDay, location: plainText(ev.location), description: noteText(ev.description), url: webUrl(ev.component.getFirstPropertyValue('url')), recurrenceId: ridText(rid), cal: String(ev.component.getFirstPropertyValue('x-mk-cal') ?? '') });
   };
   for (const { ev, moved } of masters) {
     if (!ev.isRecurring()) {
@@ -148,6 +151,7 @@ export function fromDeviceEvent(e) {
     location: plainText(e.location),
     description: noteText(e.description),
     calendar: plainText(e.calendar),
+    calendarId: e.calendarId == null ? '' : String(e.calendarId),
     color: /^#[0-9a-f]{6}$/i.test(e.color ?? '') ? e.color : null,
   };
 }

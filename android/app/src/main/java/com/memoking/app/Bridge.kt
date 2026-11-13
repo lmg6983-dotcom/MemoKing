@@ -384,6 +384,7 @@ class Bridge(private val activity: MainActivity) {
             "calendarPermission" -> activity.runOnUiThread { activity.requestCalendarPermission(id) }
             "calendarOpen" -> activity.runOnUiThread { activity.openCalendarEvent(id, a.getLong("id"), a.getLong("begin"), a.getLong("end")) }
             "calendarEvents" -> pool.execute { resolve(id) { DeviceCalendar.events(ctx, a.getLong("from"), a.getLong("to")) } }
+            "calendarList" -> pool.execute { resolve(id) { DeviceCalendar.calendars(ctx) } }
             // 화자 구분: {} 모델 받고 켜기 · {on} 켜기/끄기 · {delete} 모델 지우기
             "speakerModel" -> pool.execute {
                 resolve(id) {

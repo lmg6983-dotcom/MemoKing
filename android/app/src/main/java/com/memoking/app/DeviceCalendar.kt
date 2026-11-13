@@ -36,6 +36,7 @@ object DeviceCalendar {
             CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
             CalendarContract.Instances.DISPLAY_COLOR,
             CalendarContract.Instances.DESCRIPTION,
+            CalendarContract.Instances.CALENDAR_ID,
         )
         val list = JSONArray()
         ctx.contentResolver.query(uri, projection, "${CalendarContract.Instances.VISIBLE} = 1", null, "${CalendarContract.Instances.BEGIN} ASC")?.use { c ->
@@ -50,10 +51,36 @@ object DeviceCalendar {
                         .put("location", c.getString(5) ?: "")
                         .put("calendar", c.getString(6) ?: "")
                         .put("color", String.format("#%06X", 0xFFFFFF and c.getInt(7)))
-                        .put("description", (c.getString(8) ?: "").take(4000)),
+                        .put("description", (c.getString(8) ?: "").take(4000))
+                        .put("calendarId", c.getLong(9)),
                 )
             }
         }
         return out.put("events", list)
+    }
+
+    /** 이 휴대폰의 캘린더 목록 [{ id, name, account, color }] — 캘린더별로 켜고 끄기 · 색 고르기 */
+    fun calendars(ctx: Context): JSONObject {
+        val out = JSONObject().put("granted", granted(ctx))
+        val list = JSONArray()
+        if (!granted(ctx)) return out.put("calendars", list)
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.CALENDAR_COLOR,
+        )
+        ctx.contentResolver.query(CalendarContract.Calendars.CONTENT_URI, projection, "${CalendarContract.Calendars.VISIBLE} = 1", null, null)?.use { c ->
+            while (c.moveToNext() && list.length() < 100) {
+                list.put(
+                    JSONObject()
+                        .put("id", c.getLong(0))
+                        .put("name", c.getString(1) ?: "")
+                        .put("account", c.getString(2) ?: "")
+                        .put("color", String.format("#%06X", 0xFFFFFF and c.getInt(3))),
+                )
+            }
+        }
+        return out.put("calendars", list)
     }
 }

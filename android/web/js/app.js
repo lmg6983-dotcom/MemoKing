@@ -4,7 +4,7 @@ import { clampPrintScale } from '../../app/js/core/pdf-page.js';
 import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
-import { FeedStore, feedResponseText, MAX_FEED_BYTES } from '../../app/js/core/calendar-feed-list.js';
+import { FeedStore, feedResponseText, MAX_FEED_BYTES, normalizeCals } from '../../app/js/core/calendar-feed-list.js';
 import { caldavIcs } from '../../app/js/core/caldav.js';
 import { extractTitle, isBlankBody, COLORS, COLOR_NAMES, toLocalIso } from '../../app/js/core/memo-file.js';
 import { seedTutorialSandbox } from '../../app/js/core/tutorial.js';
@@ -63,6 +63,7 @@ injectMobileIcons();
 // 구독 주소 · CalDAV 비밀번호는 비밀(누구나 그 캘린더를 볼 수 있음)이라 메모 폴더(Drive 동기화)가 아니라 이 휴대폰에만 둔다
 const FEEDS_KEY = 'memoking.calendarFeeds';
 const DEVICE_KEY = 'memoking.deviceCalendar';
+const DEVICE_CALS_KEY = 'memoking.deviceCalendars'; // 캘린더 ID → { on, color } (휴대폰 캘린더별 켜기 · 색)
 const FEED_CACHE_MAX = 400 * 1024; // 이보다 큰 캘린더는 앱을 켤 때마다 다시 받는다
 const lsGet = (k) => {
   try {
@@ -142,6 +143,16 @@ function calendarApi() {
         lsSet(DEVICE_KEY, granted ? '1' : null);
         return Boolean(granted);
       },
+      // 이 휴대폰의 캘린더 목록 · 캘린더별 설정
+      list: async () => (await call('calendarList')).calendars ?? [],
+      prefs: () => {
+        try {
+          return normalizeCals(JSON.parse(lsGet(DEVICE_CALS_KEY) ?? 'null')) ?? {};
+        } catch {
+          return {};
+        }
+      },
+      setPrefs: (prefs) => lsSet(DEVICE_CALS_KEY, JSON.stringify(normalizeCals(prefs) ?? {})),
       // 그 일정을 캘린더 앱(삼성 캘린더 · Google 캘린더)에서 연다
       open: (e) => call('calendarOpen', { id: e.deviceId, begin: e.start.getTime(), end: e.end.getTime() }),
       events: async (from, to) => {

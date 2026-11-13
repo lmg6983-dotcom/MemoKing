@@ -2,10 +2,12 @@
 //   .ics 구독 주소(Google 캘린더 "iCal 형식의 비공개 주소" 등) · 네이버 캘린더(CalDAV, 아이디 · 애플리케이션 비밀번호)
 //   · 휴대폰 캘린더(삼성 캘린더 · Google 캘린더, 휴대폰만)
 import { icon } from './icons.js';
-import { normalizeFeedUrl, icsName, feedLabel, MAX_FEEDS } from './core/calendar-feeds.js';
+import { normalizeFeedUrl, icsName, feedLabel, feedCalendars, MAX_FEEDS } from './core/calendar-feeds.js';
 import { koClock, relativeDay, koMonthDay } from './core/time.js';
 
 const NAVER_CALDAV = 'https://caldav.calendar.naver.com';
+// Google 이 공개한 대한민국 공휴일 캘린더 (설날 · 추석 · 대체공휴일까지)
+const KR_HOLIDAYS = 'https://calendar.google.com/calendar/ical/ko.south_korea%23holiday%40group.v.calendar.google.com/public/basic.ics';
 // 고를 수 있는 캘린더 색 (Google 캘린더 색 이름처럼)
 const COLORS = [
   ['#d50000', '토마토'], ['#e67c73', '플라밍고'], ['#f4511e', '귤'], ['#f6bf26', '바나나'], ['#33b679', '세이지'], ['#0b8043', '바질'],
@@ -35,6 +37,56 @@ function switchInput(label, checked) {
   input.checked = checked;
   input.setAttribute('aria-label', label);
   return input;
+}
+
+/**
+ * 색 점(누르면 색 고르기 줄이 열림) → [점 단추, 색 줄]. 점의 색은 감싼 줄의 --ext-color
+ * @param {string} name 캘린더 이름 (읽어 주는 글)
+ * @param {string} current 지금 색 (#rrggbb)
+ * @param {(color: string) => any} onPick
+ */
+function colorPicker(name, current, onPick) {
+  const dot = el('button', 'feed-dot feed-color');
+  dot.type = 'button';
+  dot.title = '색 바꾸기';
+  dot.setAttribute('aria-label', `${name} 색 바꾸기`);
+  dot.setAttribute('aria-expanded', 'false');
+  const palette = el('div', 'feed-palette');
+  palette.hidden = true;
+  palette.setAttribute('role', 'group');
+  palette.setAttribute('aria-label', `${name} 색`);
+  dot.addEventListener('click', () => {
+    palette.hidden = !palette.hidden;
+    dot.setAttribute('aria-expanded', String(!palette.hidden));
+  });
+  for (const [color, label] of COLORS) {
+    const b = el('button', 'feed-swatch');
+    b.type = 'button';
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.setAttribute('aria-pressed', String(color === String(current ?? '').toLowerCase()));
+    b.style.setProperty('--sw', color);
+    b.addEventListener('click', () => onPick(color));
+    palette.append(b);
+  }
+  return [dot, palette];
+}
+
+/**
+ * 캘린더 하나 안의 작은 캘린더 줄 (네이버 계정의 캘린더 · 휴대폰의 캘린더): 색 점 · 이름 · 켜기
+ * @param {{ name: string, sub?: string, color: string, on: boolean, onToggle: (on: boolean) => any, onColor: (color: string) => any }} o
+ */
+function subRow({ name, sub = '', color, on, onToggle, onColor }) {
+  const li = el('li', 'feed-sub');
+  li.style.setProperty('--ext-color', color);
+  const [dot, palette] = colorPicker(name, color, onColor);
+  const text = el('span', 'feed-text');
+  text.append(el('b', '', name));
+  if (sub) text.append(el('small', '', sub));
+  const sw = switchInput(`${name} 함께 보기`, on);
+  sw.addEventListener('change', () => onToggle(sw.checked));
+  li.append(dot, text, sw, palette);
+  return li;
 }
 
 /**
@@ -76,44 +128,47 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
         sw.checked = on;
         sw.disabled = false;
         if (want && !on) notify('캘린더 권한을 허용해야 휴대폰 일정을 볼 수 있어요', true);
+        drawDeviceCals();
       });
       deviceRow.append(dot, text, sw);
     }
+    // 켜져 있으면 이 휴대폰의 캘린더마다 켜기 · 색 (예전 상호 동기화의 "메모킹" 캘린더는 늘 빼므로 목록에도 없다)
+    const deviceCals = el('ul', 'feed-subs');
+    deviceCals.setAttribute('aria-label', '이 휴대폰의 캘린더');
+    async function drawDeviceCals() {
+      deviceCals.replaceChildren();
+      if (!calendars.device?.list || !calendars.device.enabled()) return;
+      const cals = (await calendars.device.list().catch(() => [])).filter((c) => c.name !== '메모킹');
+      const prefs = calendars.device.prefs();
+      const save = (id, next) => {
+        calendars.device.setPrefs({ ...calendars.device.prefs(), [id]: { ...calendars.device.prefs()[id], ...next } });
+        drawDeviceCals();
+      };
+      deviceCals.replaceChildren(...cals.map((c) => subRow({
+        name: c.name || '캘린더',
+        sub: c.account && c.account !== c.name ? c.account : '',
+        color: prefs[c.id]?.color || c.color,
+        on: prefs[c.id]?.on !== false,
+        onToggle: (on) => save(c.id, { on }),
+        onColor: (color) => save(c.id, { color }),
+      })));
+    }
+    if (deviceRow) deviceRow.append(deviceCals);
+    drawDeviceCals();
 
     function feedRow(f) {
       const li = el('li', 'feed-row');
       li.style.setProperty('--ext-color', f.color);
+      const saveFeed = async (patch) => {
+        try {
+          feeds = await calendars.setFeeds(feeds.map((x) => (x.id === f.id ? patch(x) : x)));
+          drawList();
+        } catch (err) {
+          notify(err.message || '저장하지 못했어요', true);
+        }
+      };
       // 색 점을 누르면 색 고르기 줄이 열린다
-      const dot = el('button', 'feed-dot feed-color');
-      dot.type = 'button';
-      dot.title = '색 바꾸기';
-      dot.setAttribute('aria-label', `${f.name} 색 바꾸기`);
-      dot.setAttribute('aria-expanded', 'false');
-      const palette = el('div', 'feed-palette');
-      palette.hidden = true;
-      palette.setAttribute('role', 'group');
-      palette.setAttribute('aria-label', `${f.name} 색`);
-      dot.addEventListener('click', () => {
-        palette.hidden = !palette.hidden;
-        dot.setAttribute('aria-expanded', String(!palette.hidden));
-      });
-      for (const [color, label] of COLORS) {
-        const b = el('button', 'feed-swatch');
-        b.type = 'button';
-        b.title = label;
-        b.setAttribute('aria-label', label);
-        b.setAttribute('aria-pressed', String(color === f.color.toLowerCase()));
-        b.style.setProperty('--sw', color);
-        b.addEventListener('click', async () => {
-          try {
-            feeds = await calendars.setFeeds(feeds.map((x) => (x.id === f.id ? { ...x, color } : x)));
-            drawList();
-          } catch (err) {
-            notify(err.message || '저장하지 못했어요', true);
-          }
-        });
-        palette.append(b);
-      }
+      const [dot, palette] = colorPicker(f.name, f.color, (color) => saveFeed((x) => ({ ...x, color })));
       const text = el('span', 'feed-text');
       const got = feedTexts.get(f.id);
       const sub = got?.error ? got.error : got?.at ? `${feedLabel(f.url)}, ${receivedAt(got.at)} 받음` : feedLabel(f.url);
@@ -144,6 +199,21 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
         drawList();
       });
       li.append(dot, text, sw, del, palette);
+      // 네이버 계정처럼 캘린더가 여럿이면 캘린더마다 켜기 · 색
+      const names = feedCalendars(got?.text);
+      if (names.length > 1) {
+        const subs = el('ul', 'feed-subs');
+        subs.setAttribute('aria-label', `${f.name}의 캘린더`);
+        const saveCal = (name, next) => saveFeed((x) => ({ ...x, cals: { ...x.cals, [name]: { ...x.cals?.[name], ...next } } }));
+        subs.append(...names.map((name) => subRow({
+          name,
+          color: f.cals?.[name]?.color || f.color,
+          on: f.cals?.[name]?.on !== false,
+          onToggle: (on) => saveCal(name, { on }),
+          onColor: (color) => saveCal(name, { color }),
+        })));
+        li.append(subs);
+      }
       return li;
     }
 
@@ -161,6 +231,10 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
     };
     const openAdd = opener('＋ iCal 주소로 캘린더 더하기', 'ics', () => url);
     const openNaver = opener('＋ 네이버 캘린더 연결', 'naver', () => naverId);
+    // 공휴일: 주소를 찾을 필요 없이 한 번에
+    const addHolidays = el('button', 'link-btn feed-open-add', '＋ 대한민국 공휴일');
+    addHolidays.type = 'button';
+    addHolidays.addEventListener('click', () => addFeed({ url: KR_HOLIDAYS, name: '대한민국 공휴일', color: '#d50000' }, [addHolidays]));
     function drawList() {
       list.replaceChildren(...(deviceRow ? [deviceRow] : []), ...feeds.map(feedRow));
       const full = feeds.length >= MAX_FEEDS;
@@ -170,6 +244,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
       naverHelp.hidden = full || addOpen !== 'naver';
       openAdd.hidden = full || Boolean(addOpen);
       openNaver.hidden = full || Boolean(addOpen);
+      addHolidays.hidden = full || Boolean(addOpen) || feeds.some((f) => f.url === KR_HOLIDAYS);
     }
 
     // 주소 넣기
@@ -305,7 +380,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
     done.addEventListener('click', () => dialog.close());
     actions.append(done);
 
-    dialog.append(head, lead, list, openAdd, openNaver, addForm, naverForm, addNote, help, naverHelp, actions);
+    dialog.append(head, lead, list, addHolidays, openAdd, openNaver, addForm, naverForm, addNote, help, naverHelp, actions);
     dialog.addEventListener('close', () => {
       dialog.remove();
       resolve();

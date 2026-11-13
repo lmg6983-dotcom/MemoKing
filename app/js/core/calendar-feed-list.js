@@ -36,6 +36,20 @@ export function feedLabel(url) {
   }
 }
 
+/**
+ * 캘린더별 설정 { 이름 또는 ID: { on, color? } } 을 안전한 모양으로 (네이버 캘린더 · 휴대폰 캘린더). 비었으면 null
+ * @param {any} o
+ */
+export function normalizeCals(o) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  const out = {};
+  for (const [k, v] of Object.entries(o).slice(0, 100)) {
+    if (!k || k.length > 80) continue;
+    out[k] = { on: v?.on !== false, ...(/^#[0-9a-f]{6}$/i.test(v?.color ?? '') ? { color: v.color } : {}) };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /** 저장해 둔 구독 목록을 안전한 모양으로 [{ id, name, url, color, on, user?, pass? }] (user · pass 는 CalDAV 계정) */
 export function normalizeFeeds(list) {
   if (!Array.isArray(list)) return [];
@@ -54,6 +68,7 @@ export function normalizeFeeds(list) {
       color: /^#[0-9a-f]{6}$/i.test(f.color ?? '') ? f.color : FEED_COLORS[out.length % FEED_COLORS.length],
       on: f.on !== false,
       ...(user ? { user, pass: String(f.pass ?? '').slice(0, 200) } : {}),
+      ...(normalizeCals(f.cals) ? { cals: normalizeCals(f.cals) } : {}),
     });
     if (out.length >= MAX_FEEDS) break;
   }
