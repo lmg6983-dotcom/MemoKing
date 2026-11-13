@@ -178,7 +178,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 /* 필터 */
 .filter-panel { margin: 4px 16px 8px; padding: 12px; border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line); animation: mk-drop-in 0.15s ease-out; }
 .filter-group { display: flex; align-items: center; gap: 10px; }
-.filter-group + .filter-group { margin-top: 10px; }
+.filter-group + .filter-group { margin-top: 6px; }
 .filter-label { width: 48px; flex: none; font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .color-filter { display: flex; flex-wrap: wrap; gap: 8px; }
 .color-filter button {
@@ -186,10 +186,10 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   height: 30px;
   border: 2px solid transparent;
   border-radius: 50%;
-  background: var(--note-chip);
-  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.3);
+  background: var(--note-bg); /* 메모 메뉴의 색 고르기와 한 벌: 메모지 색 바탕 + 그 색의 진한 테두리 (바탕만으로는 색이 잘 안 갈린다) */
+  box-shadow: inset 0 0 0 2px var(--note-chip);
 }
-.color-filter button[aria-pressed="true"] { border-color: var(--text-strong); box-shadow: inset 0 0 0 2px var(--surface-1); }
+.color-filter button[aria-pressed="true"] { border-color: var(--text-strong); box-shadow: inset 0 0 0 2px var(--surface-1), inset 0 0 0 4px var(--note-chip); }
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip, .tag-chip {
   display: inline-flex;
@@ -497,7 +497,7 @@ h2.sheet-title { font-size: 20px; }
 .sheet .menu-item { min-height: 50px; padding: 10px 8px; font-size: 15.5px; }
 .sheet .menu-item svg { width: 21px; height: 21px; }
 .sheet .swatches { gap: 10px; padding: 4px 4px 14px; margin-bottom: 6px; }
-.sheet .swatch { min-height: 36px; }
+.sheet .swatch { min-height: 36px; box-shadow: inset 0 0 0 2px var(--note-chip); }
 .sheet .links-head { margin-bottom: 10px; font-size: 17px; }
 .sheet .link-search { height: 44px; font-size: 15px; border-radius: 12px; }
 .sheet .link-open { min-height: 44px; font-size: 15px; }
@@ -1128,7 +1128,7 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 }
 .color-filter { gap: 10px; } /* 30px 동그라미 사이를 넓혀 옆 동그라미와 누르는 자리가 덜 겹치게 (390px 폭에서도 7개가 한 줄) */
 .filter-group { align-items: flex-start; }
-.filter-label { line-height: 30px; }
+.filter-label { line-height: 36px; }
 /* 튜토리얼 그만두기 · 안내 알겠어요 단추도 손가락 크기로 */
 .coach-skip, .hint-ok { min-height: var(--tap); }
 

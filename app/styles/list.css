@@ -167,14 +167,14 @@ body {
   overflow-wrap: anywhere;
 }
 .cards[data-layout="rows"] .card-preview { -webkit-line-clamp: 2; }
-/* 사진 높이를 미리 정해 두어야 카드를 엇갈려 쌓을 때 자리가 맞는다 · 사진 전체가 보이게 (남는 자리는 옅은 바탕) */
+/* 사진 높이를 미리 정해 두어야 카드를 엇갈려 쌓을 때 자리가 맞는다 · 휴대폰처럼 칸을 꽉 채운다 (양옆 띠 없이) */
 .card-thumb {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 4 / 3;
   border-radius: 10px;
-  object-fit: contain;
+  object-fit: cover;
   background: color-mix(in srgb, var(--note-fg) 7%, transparent);
 }
 .cards[data-layout="rows"] .card-thumb { aspect-ratio: 16 / 7; }
