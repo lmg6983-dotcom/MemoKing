@@ -22,7 +22,7 @@ import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { openFolderSheet, pickFolder, createPickBar, askFolderName } from '../../app/js/folder-ui.js';
+import { openFolderSheet, pickFolder, createPickBar, askFolderName, renderFolderChips } from '../../app/js/folder-ui.js';
 import { openContextMenu } from '../../app/js/ctx-menu.js';
 import { folderList, movedText, isFolderName } from '../../app/js/core/folders.js';
 
@@ -32,7 +32,7 @@ const el = {
   search: $('search'),
   cards: $('cards'),
   empty: $('empty'),
-  folderBar: $('folder-bar'),
+  folderChips: $('folder-chips'),
   filterBtn: $('filter-btn'),
   filterCount: $('filter-count'),
   filterPanel: $('filter-panel'),
@@ -460,12 +460,48 @@ function setFolder(name) {
   el.cards.scrollTop = 0;
 }
 
+// 폴더 칩 줄: 폴더 · 고른 폴더가 바뀔 때만 다시 그린다 (메모를 쓸 때마다 그리면 넘겨 보던 자리가 튀고,
+//   새 폴더 이름을 쓰는 중이면 그대로 둔다 — 쓰던 이름이 날아가지 않게)
+let chipsKey = '';
 function renderFolderBar() {
+  el.folderChips.hidden = Boolean(state.query); // 검색은 모든 폴더에서
   const list = folders();
-  $('folder-bar-name').textContent = state.folder || '전체';
-  // 폴더 안에서만 수 (전체 수는 아래 메모 탭에 있다)
-  $('folder-bar-count').textContent = state.folder ? String(list.find((f) => f.name === state.folder)?.count ?? 0) : '';
-  el.folderBar.hidden = Boolean(state.query); // 검색은 모든 폴더에서
+  const key = JSON.stringify([list, state.folder]);
+  if (key === chipsKey || el.folderChips.querySelector('.fchip-new')) return;
+  chipsKey = key;
+  renderFolderChips(el.folderChips, {
+    folders: list,
+    current: state.folder,
+    onPick: setFolder,
+    onCreate: (name) => {
+      try {
+        app.vault.createFolder(name);
+        loadFolderDirs();
+      } catch (err) {
+        return toast(err.message || '폴더를 만들지 못했어요', true);
+      }
+      setFolder(name);
+    },
+    onMenu: folderMenu,
+    onAll: openAllFolders,
+  });
+}
+
+// 칩이 넘칠 때 "모두": 그 단추 바로 아래에 폴더 목록
+async function openAllFolders(anchor) {
+  loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
+  const picked = await openFolderSheet({ folders: folders(), current: state.folder, onMenu: folderMenu, anchor });
+  if (picked == null) return;
+  if (typeof picked === 'object') {
+    try {
+      app.vault.createFolder(picked.create);
+      loadFolderDirs();
+    } catch (err) {
+      return toast(err.message || '폴더를 만들지 못했어요', true);
+    }
+    return setFolder(picked.create);
+  }
+  setFolder(picked);
 }
 
 // 폴더 ⋯ 메뉴 (폴더 시트): 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
@@ -551,21 +587,6 @@ function stopPicking() {
   return true;
 }
 
-el.folderBar.addEventListener('click', async () => {
-  loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
-  const picked = await openFolderSheet({ folders: folders(), current: state.folder, onMenu: folderMenu, anchor: el.folderBar });
-  if (picked == null) return;
-  if (typeof picked === 'object') {
-    try {
-      app.vault.createFolder(picked.create);
-      loadFolderDirs();
-    } catch (err) {
-      return toast(err.message || '폴더를 만들지 못했어요');
-    }
-    return setFolder(picked.create);
-  }
-  setFolder(picked);
-});
 
 // 카드가 두 개 이상 보일 때 한 번: 옆으로 밀기·꾹 누르기 (눈에 안 보이는 동작)
 function hintCards() {

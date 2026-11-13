@@ -1704,3 +1704,43 @@ body.picking .card.picked::after {
   padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--surface-1, #fff); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); font-size: 13.5px; font-weight: 700; white-space: nowrap;
 }
 .pick-bar[hidden] { display: none; }
+
+/* 폴더 칩 줄 (휴대폰 · 좁은 PC 창, folder-ui.js renderFolderChips): 한 번 누르면 그 폴더로, 옆으로 넘겨 본다 */
+.folder-chips { display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; }
+.folder-chips[hidden] { display: none; }
+.fchip-row {
+  display: flex; gap: 6px; flex: 1; min-width: 0; padding: 3px 2px; overflow-x: auto;
+  scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding-inline: 12px;
+}
+/* 넘치는 끝은 살짝 흐리게 — 옆으로 더 있다는 표시 */
+.fchip-row.is-overflow { mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+.fchip-row::-webkit-scrollbar { display: none; }
+.fchip {
+  display: inline-flex; align-items: center; gap: 5px; flex: none; height: 36px; padding: 0 13px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface-1, #fff); color: var(--text);
+  font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  transition: background-color 0.15s ease-out, border-color 0.15s ease-out, transform 0.1s ease-out;
+}
+.fchip svg { flex: none; width: 15px; height: 15px; color: var(--muted); }
+.fchip-name { max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
+.fchip-count { font-size: 12px; font-weight: 500; color: var(--muted); }
+.fchip:active { transform: scale(0.96); }
+@media (hover: hover) and (pointer: fine) { .fchip:hover { background: var(--hover); } }
+.fchip:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+.fchip[aria-pressed="true"] { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
+.fchip[aria-pressed="true"] svg, .fchip[aria-pressed="true"] .fchip-count { color: inherit; }
+/* ＋ 새 폴더: 점선 — 폴더가 아니라 만드는 단추로 읽히게 */
+.fchip-add { border-style: dashed; color: var(--muted); }
+.fchip-all { flex: none; }
+.fchip-all[hidden] { display: none; }
+.fchip-new { display: flex; gap: 6px; flex: none; }
+.fchip-input {
+  box-sizing: border-box; width: 150px; height: 36px; padding: 0 12px; border: 1px solid var(--brand-yellow); border-radius: 999px;
+  background: var(--bg); color: var(--text-strong); font: inherit; font-size: 14px; outline: none; box-shadow: 0 0 0 1px var(--brand-yellow);
+}
+.fchip-input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
+.fchip-ok { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
+@media (pointer: coarse) {
+  .fchip, .fchip-input { height: 40px; font-size: 14.5px; }
+}

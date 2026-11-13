@@ -67,6 +67,130 @@ export function renderFolderList(container, { folders, current, onPick, onNew, o
   container.replaceChildren(list, add);
 }
 
+/**
+ * 폴더 칩 줄 (휴대폰 · 좁은 PC 창): 전체 · 폴더마다 · ＋ — 한 번 누르면 그 폴더로, 옆으로 넘겨 본다.
+ *   꾹 누르기 · 오른쪽 클릭은 폴더 메뉴(이름 바꾸기 · 지우기), ＋ 는 그 자리에서 이름 칸이 열린다.
+ *   칩이 줄을 넘치면 끝에 "모두" (누르면 단추 아래에 폴더 목록)
+ * @param {HTMLElement} container
+ * @param {{ folders: { name: string, count: number }[], current: string, onPick: (name: string) => any,
+ *           onCreate: (name: string) => any, onMenu?: (name: string, anchor: HTMLElement) => any, onAll?: (anchor: HTMLElement) => any }} o
+ */
+export function renderFolderChips(container, { folders, current, onPick, onCreate, onMenu, onAll }) {
+  const chip = (name, label, count) => {
+    const b = el('button', 'fchip');
+    b.type = 'button';
+    b.dataset.folder = name;
+    b.setAttribute('aria-pressed', String(name === current));
+    if (!name) b.append(icon('note'));
+    b.append(el('span', 'fchip-name', label));
+    if (count != null) b.append(el('small', 'fchip-count', String(count)));
+    if (name) b.title = `${label} (꾹 누르면 이름 바꾸기, 지우기)`;
+    return b;
+  };
+  const add = el('button', 'fchip fchip-add');
+  add.type = 'button';
+  add.setAttribute('aria-label', '새 폴더');
+  add.title = '새 폴더';
+  add.append(icon('plus'), el('span', 'fchip-name', '새 폴더'));
+  const row = el('div', 'fchip-row');
+  row.append(chip('', '전체'), ...folders.map((f) => chip(f.name, f.name, f.count)), add);
+  const all = el('button', 'fchip fchip-all');
+  all.type = 'button';
+  all.append(el('span', 'fchip-name', '모두'), icon('chev-down'));
+  all.setAttribute('aria-haspopup', 'dialog');
+  all.hidden = true;
+  container.replaceChildren(row, all);
+  // 고른 칩이 보이게, 넘치면 "모두"
+  // 넘칠 때만 끝을 흐리게 (끝까지 넘기면 지운다)
+  const fade = () => row.classList.toggle('is-overflow', row.scrollLeft + row.clientWidth < row.scrollWidth - 2);
+  row.addEventListener('scroll', fade, { passive: true });
+  queueMicrotask(() => {
+    // 고른 칩을 줄 가운데로 (끝의 흐린 자리 · "모두" 에 가리지 않게) — 줄만 옆으로 넘긴다
+    const on = row.querySelector('[aria-pressed="true"]');
+    if (on) row.scrollLeft = Math.max(0, on.offsetLeft - row.offsetLeft - (row.clientWidth - on.offsetWidth) / 2);
+    all.hidden = !onAll || row.scrollWidth <= row.clientWidth + 1;
+    fade();
+  });
+  all.addEventListener('click', () => onAll?.(all));
+
+  // 꾹 누르기(0.5초) → 폴더 메뉴. 그 뒤의 "누름" 은 폴더를 바꾸지 않게 막는다
+  let hold = null;
+  let held = false;
+  row.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('[data-folder]');
+    held = false;
+    if (!onMenu || !b?.dataset.folder) return;
+    const start = { x: e.clientX, y: e.clientY };
+    clearTimeout(hold);
+    hold = setTimeout(() => {
+      held = true;
+      onMenu(b.dataset.folder, b);
+    }, 500);
+    const cancel = (ev) => {
+      if (ev.type === 'pointermove' && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 8) return;
+      clearTimeout(hold);
+      row.removeEventListener('pointermove', cancel);
+    };
+    row.addEventListener('pointermove', cancel);
+    row.addEventListener('pointerup', cancel, { once: true });
+    row.addEventListener('pointercancel', cancel, { once: true });
+  });
+  row.addEventListener('contextmenu', (e) => {
+    const b = e.target.closest('[data-folder]');
+    e.preventDefault(); // 꾹 누르기를 위 타이머가 맡는다 (휴대폰 글자 고르기 메뉴가 뜨지 않게)
+    if (!onMenu || !b?.dataset.folder || held) return;
+    clearTimeout(hold);
+    held = true;
+    onMenu(b.dataset.folder, b);
+  });
+  row.addEventListener('click', (e) => {
+    if (held) {
+      held = false;
+      return;
+    }
+    if (e.target.closest('.fchip-add')) return openNew();
+    const b = e.target.closest('[data-folder]');
+    if (b) onPick(b.dataset.folder);
+  });
+
+  // ＋ → 그 자리에서 이름 칸 (Enter · 만들기, Esc · 다른 곳을 누르면 그만)
+  function openNew() {
+    const form = el('form', 'fchip-new');
+    const input = el('input', 'fchip-input');
+    input.type = 'text';
+    input.maxLength = MAX_FOLDER_NAME;
+    input.placeholder = '새 폴더 이름';
+    input.setAttribute('aria-label', '새 폴더 이름');
+    input.autocomplete = 'off';
+    const ok = el('button', 'fchip fchip-ok', '만들기');
+    ok.type = 'submit';
+    form.append(input, ok);
+    add.replaceWith(form);
+    input.focus();
+    form.scrollIntoView({ block: 'nearest', inline: 'end' });
+    const close = () => form.isConnected && form.replaceWith(add);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = cleanFolderName(input.value);
+      if (!name) {
+        input.setAttribute('aria-invalid', String(Boolean(input.value.trim())));
+        return input.focus();
+      }
+      const same = folders.find((f) => f.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0);
+      close();
+      if (same) onPick(same.name); // 같은 이름이 있으면 그 폴더로
+      else onCreate(name);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        close();
+      }
+    });
+    form.addEventListener('focusout', () => setTimeout(() => !form.contains(document.activeElement) && !input.value.trim() && close(), 0));
+  }
+}
+
 /** 작은 창 하나 (머리 · 닫기 · 몸통) → { dialog, body, done(값) } — 닫으면 값으로 끝난다 */
 function sheet(title, className) {
   let result = null;

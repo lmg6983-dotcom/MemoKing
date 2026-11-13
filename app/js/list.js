@@ -37,7 +37,7 @@ import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
-import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet } from './folder-ui.js';
+import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet, renderFolderChips } from './folder-ui.js';
 import { folderList, movedText, isFolderName } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
@@ -76,7 +76,7 @@ const el = {
   tagFilter: $('tag-filter'),
   folderSide: $('folder-side'),
   folderBtn: $('folder-btn'),
-  folderTitle: $('folder-title'),
+  folderChips: $('folder-chips'),
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
 };
@@ -277,13 +277,18 @@ async function createAndOpenFolder(name) {
 }
 
 const currentFolders = () => folderList(state.folderDirs ?? [], modeMemos());
+let chipsKey = ''; // 칩 줄에 그린 폴더 · 고른 폴더 (같으면 다시 그리지 않는다 — 넘겨 보던 자리가 튀지 않게)
 
 function renderFolders() {
   if (!el.folderSide) return;
-  renderFolderList(el.folderSide, { folders: currentFolders(), current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
-  // 막대가 없으면 카드 위에 지금 폴더 이름 (누르면 폴더 시트)
-  el.folderTitle.querySelector('span').textContent = state.folder;
-  el.folderTitle.hidden = !state.folder || !el.folderSide.hidden || Boolean(state.query);
+  const folders = currentFolders();
+  renderFolderList(el.folderSide, { folders, current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
+  // 막대가 없으면(좁은 창 · 숨김) 카드 위에 폴더 칩 줄 — 검색은 모든 폴더에서라 그때는 숨긴다
+  el.folderChips.hidden = !el.folderSide.hidden || Boolean(state.query);
+  const key = JSON.stringify([folders, state.folder]);
+  if (el.folderChips.hidden || key === chipsKey || el.folderChips.querySelector('.fchip-new')) return; // 새 폴더 이름을 쓰는 중이면 그대로
+  chipsKey = key;
+  renderFolderChips(el.folderChips, { folders, current: state.folder, onPick: setFolder, onCreate: createAndOpenFolder, onMenu: folderMenu, onAll: openFolderPicker });
 }
 
 // ---------- 폴더 막대: 넓은 창 · 폴더가 있을 때만 (좁은 기본 창에서 카드 자리를 빼앗지 않게) ----------
@@ -305,8 +310,9 @@ function applyFolderSide() {
   // 막대를 켜고 끄는 단추일 때만 눌림 상태, 아니면 시트를 여는 단추
   if (fits) el.folderBtn.setAttribute('aria-pressed', String(sideWanted));
   else el.folderBtn.removeAttribute('aria-pressed');
-  el.folderBtn.setAttribute('aria-haspopup', fits ? 'false' : 'dialog');
-  el.folderBtn.title = fits ? (sideWanted ? '폴더 막대 숨기기' : '폴더 막대 보이기') : `폴더: ${state.folder || '전체'}`;
+  // 좁은 창은 칩 줄이 폴더를 맡으므로 단추는 넓은 창(막대 켜고 끄기)에서만
+  el.folderBtn.hidden = !fits;
+  el.folderBtn.title = sideWanted ? '폴더 막대 숨기기' : '폴더 막대 보이기';
 }
 
 // anchor: 누른 단추 (그 바로 아래에 폴더 목록)
@@ -327,7 +333,7 @@ el.folderBtn?.addEventListener('click', () => {
   }
   render();
 });
-el.folderTitle?.addEventListener('click', () => openFolderPicker(el.folderTitle));
+
 let sideWasShown = null;
 window.addEventListener('resize', () => {
   const shown = sideFits() && sideWanted;
