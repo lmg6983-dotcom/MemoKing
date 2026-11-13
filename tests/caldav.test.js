@@ -31,10 +31,16 @@ function server() {
         + resp('/calendars/mk/home/', '<D:resourcetype><D:collection/><C:calendar/></D:resourcetype>')
         + resp('/calendars/mk/inbox/', '<D:resourcetype><D:collection/><C:schedule-inbox/></D:resourcetype>')) };
     }
+    // 캘린더 속 일정 주소 (네이버처럼 calendar-query 에는 내용을 빼고 주므로 쓰지 않는다)
+    if (method === 'PROPFIND' && /^\/calendars\/mk\/(work|home)\/$/.test(path)) {
+      assert.equal(headers.Depth, '1');
+      return { status: 207, text: ms(resp(path, '<D:resourcetype><D:collection/><C:calendar/></D:resourcetype>') + resp(`${path}1.ics`, '<D:resourcetype/><D:getetag>"e1"</D:getetag>')) };
+    }
     if (method === 'REPORT') {
-      assert.match(body, /calendar-query/);
+      assert.match(body, /calendar-multiget/);
+      assert.match(body, new RegExp(`<d:href>${path}1.ics</d:href>`));
       const one = path.includes('work') ? event('a', '20261120T100000', '회의 & 점심') : event('b', '20261121T150000', '치과');
-      return { status: 207, text: ms(resp(`${path}1.ics`, `<C:calendar-data>${xmlText(one)}</C:calendar-data>`)) };
+      return { status: 207, text: ms(resp(`${path}1.ics`, `<D:getetag>"e1"</D:getetag><C:calendar-data>${xmlText(one)}</C:calendar-data>`)) };
     }
     return { status: 404, text: '' };
   };
