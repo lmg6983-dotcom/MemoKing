@@ -214,14 +214,6 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 }
 
 .tag-chip small { font-size: 12px; font-weight: 500; opacity: 0.72; }
-.tag-strip {
-  display: flex;
-  gap: 6px;
-  padding: 2px 16px 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.tag-strip::-webkit-scrollbar { display: none; }
 .filter-summary { display: flex; align-items: center; gap: 8px; margin: 0 16px 8px; font-size: 13px; color: var(--muted); }
 .filter-summary span { flex: 1; }
 /* 글자 단추는 한 줄로 — 자리가 모자라면 옆(고르기 칸)이 줄어든다 */
