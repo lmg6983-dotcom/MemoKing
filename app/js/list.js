@@ -37,7 +37,7 @@ import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewT
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
 import { renderFolderList, askFolderName, pickFolder, createPickBar } from './folder-ui.js';
-import { folderList, movedText } from './core/folders.js';
+import { folderList, movedText, isFolderName } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
@@ -1771,7 +1771,7 @@ document.addEventListener('keydown', (e) => {
 
 api.on('memos:changed', (memos) => {
   state.memos = memos;
-  if (state.folderDirs && memos.some((m) => m.folder && !state.folderDirs.includes(m.folder))) loadFolders(); // 다른 기기 · 탐색기에서 생긴 폴더
+  if (state.folderDirs && memos.some((m) => isFolderName(m.folder) && !state.folderDirs.includes(m.folder))) loadFolders(); // 다른 기기 · 탐색기에서 생긴 폴더
   // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
   const hb = $('handoff-bar');
   if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;

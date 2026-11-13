@@ -23,7 +23,7 @@ import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
 import { openFolderSheet, pickFolder, createPickBar } from '../../app/js/folder-ui.js';
-import { folderList, movedText } from '../../app/js/core/folders.js';
+import { folderList, movedText, isFolderName } from '../../app/js/core/folders.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -427,7 +427,8 @@ function loadFolderDirs() {
 // 폴더 목록: 기억해 둔 것 + 메모가 든 폴더 (처음 · 모르는 폴더의 메모가 들어왔을 때만 앱에 다시 묻는다)
 function folders() {
   const memos = modeMemos();
-  if (!state.folderDirs || memos.some((m) => m.folder && !state.folderDirs.includes(m.folder))) loadFolderDirs();
+  // (폴더 이름으로 못 쓰는 폴더 — Drive 웹에서 만든 "회의:2026" 등 — 는 목록에 들지 않으니 묻지 않는다: 그리면서 매번 묻게 되므로)
+  if (!state.folderDirs || memos.some((m) => isFolderName(m.folder) && !state.folderDirs.includes(m.folder))) loadFolderDirs();
   return folderList(state.folderDirs, memos);
 }
 

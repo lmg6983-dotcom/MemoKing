@@ -28,7 +28,7 @@ export function cleanFolderName(raw) {
 }
 
 /** 메모 폴더 맨 위의 하위 폴더 이름 중 메모킹 폴더로 보일 것 */
-export const isFolderName = (name) => cleanFolderName(name) === name;
+export const isFolderName = (name) => Boolean(name) && cleanFolderName(name) === name;
 
 /**
  * 폴더 목록 [{ name, count }] (이름순) — 디스크의 폴더 + 메모가 든 폴더, count 는 넘긴 메모(지금 모드) 중 그 폴더의 수

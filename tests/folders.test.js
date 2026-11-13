@@ -1,7 +1,7 @@
 // 메모 폴더 — 폴더 이름 정리, 목록, 옮긴 사이 다른 기기에서 고쳐 생긴 같은 id 의 두 파일 맞추기
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { folderOf, cleanFolderName, folderList, resolveMovedTwin } from '../app/js/core/folders.js';
+import { folderOf, cleanFolderName, isFolderName, folderList, resolveMovedTwin } from '../app/js/core/folders.js';
 
 test('메모 파일 → 폴더: 맨 위 하위 폴더 하나, 더 깊으면 맨 위 것', () => {
   assert.equal(folderOf('회의.md'), '');
@@ -16,6 +16,8 @@ test('폴더 이름: 못 쓰는 글자 · 메모킹이 쓰는 폴더 · 장치 �
   assert.equal(cleanFolderName('끝에 점...'), '끝에 점');
   for (const bad of ['', '   ', '.숨김', '_memoking', 'Attachments', 'CON', 'nul', '~$임시']) assert.equal(cleanFolderName(bad), '', bad);
   assert.equal(cleanFolderName('가'.repeat(60)).length, 40);
+  // 목록에 둘 폴더: 이름 그대로 쓸 수 있는 것만 ("" 은 폴더 없음, Drive 웹에서 만든 "회의:2026" 은 아님)
+  assert.deepEqual(['업무', '', '회의:2026', '.git'].map(isFolderName), [true, false, false, false]);
 });
 
 test('폴더 목록: 디스크의 빈 폴더도, 메모 수는 넘긴 메모로, 이름순', () => {
