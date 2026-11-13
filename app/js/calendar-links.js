@@ -6,6 +6,11 @@ import { normalizeFeedUrl, icsName, feedLabel, MAX_FEEDS } from './core/calendar
 import { koClock, relativeDay, koMonthDay } from './core/time.js';
 
 const NAVER_CALDAV = 'https://caldav.calendar.naver.com';
+// 고를 수 있는 캘린더 색 (Google 캘린더 색 이름처럼)
+const COLORS = [
+  ['#d50000', '토마토'], ['#e67c73', '플라밍고'], ['#f4511e', '귤'], ['#f6bf26', '바나나'], ['#33b679', '세이지'], ['#0b8043', '바질'],
+  ['#039be5', '공작'], ['#3f51b5', '블루베리'], ['#7986cb', '라벤더'], ['#8e24aa', '포도'], ['#616161', '흑연'],
+];
 
 /** 받은 때: "방금" · "12분 전" · "오늘 오후 3:20" · "10월 14일" */
 function receivedAt(ms, now = Date.now()) {
@@ -78,7 +83,37 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
     function feedRow(f) {
       const li = el('li', 'feed-row');
       li.style.setProperty('--ext-color', f.color);
-      const dot = el('span', 'feed-dot');
+      // 색 점을 누르면 색 고르기 줄이 열린다
+      const dot = el('button', 'feed-dot feed-color');
+      dot.type = 'button';
+      dot.title = '색 바꾸기';
+      dot.setAttribute('aria-label', `${f.name} 색 바꾸기`);
+      dot.setAttribute('aria-expanded', 'false');
+      const palette = el('div', 'feed-palette');
+      palette.hidden = true;
+      palette.setAttribute('role', 'group');
+      palette.setAttribute('aria-label', `${f.name} 색`);
+      dot.addEventListener('click', () => {
+        palette.hidden = !palette.hidden;
+        dot.setAttribute('aria-expanded', String(!palette.hidden));
+      });
+      for (const [color, label] of COLORS) {
+        const b = el('button', 'feed-swatch');
+        b.type = 'button';
+        b.title = label;
+        b.setAttribute('aria-label', label);
+        b.setAttribute('aria-pressed', String(color === f.color.toLowerCase()));
+        b.style.setProperty('--sw', color);
+        b.addEventListener('click', async () => {
+          try {
+            feeds = await calendars.setFeeds(feeds.map((x) => (x.id === f.id ? { ...x, color } : x)));
+            drawList();
+          } catch (err) {
+            notify(err.message || '저장하지 못했어요', true);
+          }
+        });
+        palette.append(b);
+      }
       const text = el('span', 'feed-text');
       const got = feedTexts.get(f.id);
       const sub = got?.error ? got.error : got?.at ? `${feedLabel(f.url)}, ${receivedAt(got.at)} 받음` : feedLabel(f.url);
@@ -108,7 +143,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
         feedTexts.delete(f.id);
         drawList();
       });
-      li.append(dot, text, sw, del);
+      li.append(dot, text, sw, del, palette);
       return li;
     }
 
