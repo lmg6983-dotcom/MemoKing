@@ -75,8 +75,8 @@
         <div class="filter-group"><span class="filter-label">담긴 것</span><div id="kind-filter" class="chip-row" role="group" aria-label="담긴 것으로 거르기"></div></div>
         <div class="filter-group" id="tag-filter-group" hidden><span class="filter-label">태그</span><div id="tag-filter" class="chip-row tag-filter" role="group" aria-label="태그로 거르기"></div></div>
       </div>
-      <!-- 메모킹 폴더: 누르면 아래에서 폴더 시트 (folder-ui.js) -->
-      <button id="folder-bar" class="folder-bar" type="button" aria-haspopup="dialog"><svg><use href="#i-folder"/></svg><span id="folder-bar-name">전체</span><small id="folder-bar-count"></small><svg class="folder-bar-caret"><use href="#i-chev-down"/></svg></button>
+      <!-- 메모킹 폴더: 전체 · 폴더마다 · ＋ 칩 줄 — 한 번 누르면 그 폴더로, 꾹 누르면 이름 바꾸기 · 지우기 (folder-ui.js) -->
+      <div id="folder-chips" class="folder-chips" role="group" aria-label="폴더"></div>
       <div id="filter-summary" class="filter-summary" hidden>
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>

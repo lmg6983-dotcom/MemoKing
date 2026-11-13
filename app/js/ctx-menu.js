@@ -28,7 +28,8 @@ export function closeContextMenu(result = null) {
  *           label?: string }} o  icon: 16×16 svg 글 (content-icons.js)
  * @returns {Promise<string | null>} 고른 id (닫으면 null)
  */
-export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴' }) {
+// clamp: 단추 아래에 붙이는 메뉴 — 오른쪽 자리가 모자라면 커서 왼쪽으로 뒤집지 않고 화면 안으로 민다
+export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴', clamp = false }) {
   closeContextMenu();
   const el = document.createElement('div');
   el.className = 'mk-ctx';
@@ -132,7 +133,7 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
   // 화면 안으로 (오른쪽 · 아래가 모자라면 마우스 왼쪽 · 위로)
   const w = el.offsetWidth;
   const h = el.offsetHeight;
-  const left = x + w + 6 > window.innerWidth ? Math.max(6, x - w) : x;
+  const left = clamp ? Math.max(6, Math.min(x, window.innerWidth - w - 6)) : x + w + 6 > window.innerWidth ? Math.max(6, x - w) : x;
   const below = y + h + 6 > window.innerHeight ? Math.max(6, y - h) : y;
   const top = clearOfSticker({ left, top: below, width: w }); // 왕관 · 테이프 스티커 아래로
   el.style.left = `${Math.round(left)}px`;

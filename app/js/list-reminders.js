@@ -1372,6 +1372,12 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
 
   return {
     refresh,
+    /** 펼친 빠른 추가 입력창을 접는다 (휴대폰 뒤로 가기) → 접었는가 */
+    closeQuick() {
+      if (!isExpanded) return false;
+      closeInline();
+      return true;
+    },
     /** Work / Life 를 바꿨다: 그 모드의 일정만 다시 · 회상도 그 모드의 메모로 다시 */
     modeChanged() {
       items = visible ? allItems.filter(visible) : allItems;

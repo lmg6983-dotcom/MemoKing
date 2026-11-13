@@ -617,17 +617,18 @@ export class Vault extends EventTarget {
     return dst;
   }
 
-  /** 폴더 지우기: 안의 메모는 폴더 밖으로, 그러고 나서 메모가 아닌 파일이 없으면 폴더를 지운다 → { moved, removed } */
+  /** 폴더 지우기: 안의 메모는 폴더 밖으로, 그러고 나서 메모가 아닌 파일이 없으면 폴더를 지운다 → { moved, removed, ids } (ids: 되돌리기용) */
   deleteFolder(name) {
     if (!isFolderName(name)) throw new Error('폴더 이름으로 쓸 수 없어요');
-    let moved = 0;
-    for (const e of [...this.entries.values()]) if (e.file && folderOf(e.file) === name && this.moveToFolder(e.id, '')) moved++;
-    if (!fs.stat(name)) return { moved, removed: true };
+    const ids = [];
+    for (const e of [...this.entries.values()]) if (e.file && folderOf(e.file) === name && this.moveToFolder(e.id, '')) ids.push(e.id);
+    const moved = ids.length;
+    if (!fs.stat(name)) return { moved, removed: true, ids };
     const junk = new Set(['desktop.ini', 'thumbs.db', '.ds_store']);
     const hasFiles = (rel) => (fs.list(rel) ?? []).some((e) => (e.dir ? hasFiles(`${rel}/${e.name}`) : !junk.has(e.name.toLowerCase())));
-    if (hasFiles(name)) return { moved, removed: false };
+    if (hasFiles(name)) return { moved, removed: false, ids };
     fs.remove(name); // 빈 폴더(와 빈 하위 폴더, 시스템 찌꺼기 파일)만 — 위에서 확인했다
-    return { moved, removed: true };
+    return { moved, removed: true, ids };
   }
 
   // 같은 id 의 두 파일을 하나로: 남길 자리에 남길 내용을 두고, 다른 파일은 id 를 뺀 채 휴지통으로

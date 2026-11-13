@@ -37,7 +37,7 @@ import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
-import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet } from './folder-ui.js';
+import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet, renderFolderChips } from './folder-ui.js';
 import { folderList, movedText, isFolderName } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
@@ -76,7 +76,7 @@ const el = {
   tagFilter: $('tag-filter'),
   folderSide: $('folder-side'),
   folderBtn: $('folder-btn'),
-  folderTitle: $('folder-title'),
+  folderChips: $('folder-chips'),
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
 };
@@ -239,8 +239,8 @@ async function newFolder() {
 async function folderMenu(name, anchor) {
   const r = anchor.getBoundingClientRect();
   const pick = await openContextMenu({
-    x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`,
-    items: [{ id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기 (메모는 폴더 밖으로)' }],
+    x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
+    items: [{ id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
   });
   if (pick === 'rename') {
     const to = await askFolderName({ existing: (state.folderDirs ?? []).filter((f) => f !== name), title: '폴더 이름 바꾸기', value: name, okLabel: '바꾸기' });
@@ -255,11 +255,17 @@ async function folderMenu(name, anchor) {
     }
   } else if (pick === 'delete') {
     try {
-      const { moved, removed } = await api.memos.deleteFolder(name);
+      const { moved, removed, ids = [] } = await api.memos.deleteFolder(name);
       if (state.folder === name) setFolder('');
       await loadFolders();
-      flashStatus(!removed ? `메모 ${moved}개는 폴더 밖으로 옮겼어요. 폴더에 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
-        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖으로 옮겼어요` : `${name} 폴더를 지웠어요`);
+      // 메모는 지우지 않고 폴더 밖으로 — 되돌리기: 폴더를 다시 만들고 꺼낸 메모를 그 폴더로
+      showUndoBar(!removed ? `메모 ${moved}개를 폴더 밖으로 옮겼어요. 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
+        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 지웠어요`, async () => {
+        await api.memos.createFolder(name);
+        if (ids.length) await api.memos.moveToFolder(ids, name);
+        await loadFolders();
+        setFolder(name);
+      });
     } catch (err) {
       flashStatus(err.message || '폴더를 지우지 못했어요');
     }
@@ -277,13 +283,23 @@ async function createAndOpenFolder(name) {
 }
 
 const currentFolders = () => folderList(state.folderDirs ?? [], modeMemos());
+let chipsKey = ''; // 칩 줄에 그린 폴더 · 고른 폴더 (같으면 다시 그리지 않는다 — 넘겨 보던 자리가 튀지 않게)
+let chipsNames = ''; // 그중 폴더 이름 · 고른 폴더만
 
 function renderFolders() {
   if (!el.folderSide) return;
-  renderFolderList(el.folderSide, { folders: currentFolders(), current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
-  // 막대가 없으면 카드 위에 지금 폴더 이름 (누르면 폴더 시트)
-  el.folderTitle.querySelector('span').textContent = state.folder;
-  el.folderTitle.hidden = !state.folder || !el.folderSide.hidden || Boolean(state.query);
+  const folders = currentFolders();
+  renderFolderList(el.folderSide, { folders, current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
+  // 막대가 없으면(좁은 창 · 숨김) 카드 위에 폴더 칩 줄 — 검색은 모든 폴더에서라 그때는 숨긴다.
+  //   폴더가 하나도 없으면 칩 줄 대신 위 폴더 단추 하나 (쓰지 않는 기능이 줄 하나를 차지하지 않게)
+  el.folderChips.hidden = !el.folderSide.hidden || Boolean(state.query) || !folders.length;
+  const key = JSON.stringify([folders, state.folder]);
+  const names = JSON.stringify([folders.map((f) => f.name), state.folder]);
+  // 새 폴더 이름을 쓰는 중이면 메모 수만 바뀐 것으로는 다시 그리지 않는다 (폴더 · 고른 폴더가 바뀌면 다시)
+  if (el.folderChips.hidden || key === chipsKey || (el.folderChips.querySelector('.fchip-new') && names === chipsNames)) return;
+  chipsKey = key;
+  chipsNames = names;
+  renderFolderChips(el.folderChips, { folders, current: state.folder, onPick: setFolder, onCreate: createAndOpenFolder, onMenu: folderMenu, onAll: openFolderPicker });
 }
 
 // ---------- 폴더 막대: 넓은 창 · 폴더가 있을 때만 (좁은 기본 창에서 카드 자리를 빼앗지 않게) ----------
@@ -305,12 +321,14 @@ function applyFolderSide() {
   // 막대를 켜고 끄는 단추일 때만 눌림 상태, 아니면 시트를 여는 단추
   if (fits) el.folderBtn.setAttribute('aria-pressed', String(sideWanted));
   else el.folderBtn.removeAttribute('aria-pressed');
-  el.folderBtn.setAttribute('aria-haspopup', fits ? 'false' : 'dialog');
-  el.folderBtn.title = fits ? (sideWanted ? '폴더 막대 숨기기' : '폴더 막대 보이기') : `폴더: ${state.folder || '전체'}`;
+  // 좁은 창은 칩 줄이 폴더를 맡으므로 단추는 넓은 창(막대 켜고 끄기)에서만 — 폴더가 없으면 새 폴더를 여는 단추로
+  el.folderBtn.hidden = !fits && currentFolders().length > 0;
+  el.folderBtn.title = sideWanted ? '폴더 막대 숨기기' : '폴더 막대 보이기';
 }
 
-async function openFolderPicker() {
-  const picked = await openFolderSheet({ folders: currentFolders(), current: state.folder, onMenu: folderMenu });
+// anchor: 누른 단추 (그 바로 아래에 폴더 목록)
+async function openFolderPicker(anchor = el.folderBtn) {
+  const picked = await openFolderSheet({ folders: currentFolders(), current: state.folder, onMenu: folderMenu, anchor });
   if (picked == null) return;
   if (typeof picked === 'object') return createAndOpenFolder(picked.create);
   setFolder(picked);
@@ -326,7 +344,7 @@ el.folderBtn?.addEventListener('click', () => {
   }
   render();
 });
-el.folderTitle?.addEventListener('click', openFolderPicker);
+
 let sideWasShown = null;
 window.addEventListener('resize', () => {
   const shown = sideFits() && sideWanted;
@@ -598,6 +616,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
     ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
     : narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : UI.noMatch
+    : state.folder ? `${state.folder} 폴더가 비어 있어요.\n여기서 쓰는 새 메모는 이 폴더에 들어가요. 카드 메뉴의 "폴더로 옮기기"로 옮겨도 돼요.`
     : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 카드 메뉴의 "Work로 옮기기"로 옮겨 보세요.'
       : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
   const b = document.createElement('button');

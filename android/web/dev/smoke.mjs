@@ -134,7 +134,8 @@ try {
   check('알림: 울린 기록을 메모 파일에', /last:/.test(read('약 먹기.md')) && /enabled: false/.test(read('약 먹기.md')));
 
   // 태그로 거르기: 검색창에 #태그 (태그 줄은 없앰 — 그 자리에 폴더 단추)
-  check('목록: 태그 줄 대신 폴더 단추 (전체)', (await page.locator('#tag-strip').count()) === 0 && /전체/.test(await page.textContent('#folder-bar')));
+  check('목록: 태그 줄 대신 폴더 칩 줄 (전체가 골라짐 · 새 폴더 칩)', (await page.locator('#tag-strip').count()) === 0
+    && (await page.getAttribute('#folder-chips .fchip[data-folder=""]', 'aria-pressed')) === 'true' && (await page.locator('#folder-chips .fchip-add').count()) === 1);
   await page.fill('#search', '#업무');
   await page.waitForTimeout(250);
   check('검색 #업무: 그 태그의 메모만', (await page.locator('.card').count()) === 2);

@@ -22,7 +22,7 @@ import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { openFolderSheet, pickFolder, createPickBar, askFolderName } from '../../app/js/folder-ui.js';
+import { openFolderSheet, pickFolder, createPickBar, askFolderName, renderFolderChips, closeFolderInput } from '../../app/js/folder-ui.js';
 import { openContextMenu } from '../../app/js/ctx-menu.js';
 import { folderList, movedText, isFolderName } from '../../app/js/core/folders.js';
 
@@ -32,7 +32,7 @@ const el = {
   search: $('search'),
   cards: $('cards'),
   empty: $('empty'),
-  folderBar: $('folder-bar'),
+  folderChips: $('folder-chips'),
   filterBtn: $('filter-btn'),
   filterCount: $('filter-count'),
   filterPanel: $('filter-panel'),
@@ -374,6 +374,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
     ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
     : narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : UI.noMatch
+    : state.folder ? `${state.folder} 폴더가 비어 있어요.\n여기서 쓰는 새 메모는 이 폴더에 들어가요. 메모를 꾹 눌러 "폴더로 옮기기" 해도 돼요.`
     : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 메모를 꾹 눌러 "Work로 옮기기" 해 보세요.'
       : '아직 메모가 없어요.\n떠오른 생각을 바로 적거나 말로 남겨 보세요.';
   const actions = document.createElement('span');
@@ -460,20 +461,64 @@ function setFolder(name) {
   el.cards.scrollTop = 0;
 }
 
+// 폴더 칩 줄: 폴더 · 고른 폴더가 바뀔 때만 다시 그린다 (메모를 쓸 때마다 그리면 넘겨 보던 자리가 튀고,
+//   새 폴더 이름을 쓰는 중이면 그대로 둔다 — 쓰던 이름이 날아가지 않게)
+let chipsKey = '';
+let chipsNames = ''; // 그중 폴더 이름 · 고른 폴더만 (새 폴더 이름을 쓰는 중에는 메모 수만 바뀐 것으로 다시 그리지 않는다)
 function renderFolderBar() {
+  el.folderChips.hidden = Boolean(state.query); // 검색은 모든 폴더에서
   const list = folders();
-  $('folder-bar-name').textContent = state.folder || '전체';
-  // 폴더 안에서만 수 (전체 수는 아래 메모 탭에 있다)
-  $('folder-bar-count').textContent = state.folder ? String(list.find((f) => f.name === state.folder)?.count ?? 0) : '';
-  el.folderBar.hidden = Boolean(state.query); // 검색은 모든 폴더에서
+  const key = JSON.stringify([list, state.folder]);
+  const names = JSON.stringify([list.map((f) => f.name), state.folder]);
+  if (key === chipsKey || (el.folderChips.querySelector('.fchip-new') && names === chipsNames)) return;
+  chipsKey = key;
+  chipsNames = names;
+  // 폴더가 생기면 한 번: 꾹 누르면 이름 바꾸기 · 지우기 (눈에 안 보이는 동작)
+  if (list.length) setTimeout(() => {
+    const first = el.folderChips.querySelector('.fchip[data-folder]:not([data-folder=""])');
+    if (first?.getClientRects().length && state.tab === 'memos') hintOnce('folder-chips', '폴더를 꾹 누르면 이름을 바꾸거나 지울 수 있어요. 오른쪽 끝 단추로 폴더 목록도 봐요', { anchor: first });
+  }, 900);
+  renderFolderChips(el.folderChips, {
+    folders: list,
+    current: state.folder,
+    onPick: setFolder,
+    onCreate: (name) => {
+      try {
+        app.vault.createFolder(name);
+        loadFolderDirs();
+      } catch (err) {
+        return toast(err.message || '폴더를 만들지 못했어요', true);
+      }
+      setFolder(name);
+    },
+    onMenu: folderMenu,
+    onAll: openAllFolders,
+  });
+}
+
+// 칩이 넘칠 때 "모두": 그 단추 바로 아래에 폴더 목록
+async function openAllFolders(anchor) {
+  loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
+  const picked = await openFolderSheet({ folders: folders(), current: state.folder, onMenu: folderMenu, anchor });
+  if (picked == null) return;
+  if (typeof picked === 'object') {
+    try {
+      app.vault.createFolder(picked.create);
+      loadFolderDirs();
+    } catch (err) {
+      return toast(err.message || '폴더를 만들지 못했어요', true);
+    }
+    return setFolder(picked.create);
+  }
+  setFolder(picked);
 }
 
 // 폴더 ⋯ 메뉴 (폴더 시트): 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
 async function folderMenu(name, anchor) {
   const r = anchor.getBoundingClientRect();
   const pick = await openContextMenu({
-    x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`,
-    items: [{ id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기 (메모는 폴더 밖으로)' }],
+    x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
+    items: [{ id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
   });
   try {
     if (pick === 'rename') {
@@ -485,12 +530,21 @@ async function folderMenu(name, anchor) {
       else render();
       toast(`폴더 이름을 "${done}"(으)로 바꿨어요`);
     } else if (pick === 'delete') {
-      const { moved, removed } = app.vault.deleteFolder(name);
+      const { moved, removed, ids = [] } = app.vault.deleteFolder(name);
       loadFolderDirs();
       if (state.folder === name) setFolder('');
       else render();
-      toast(!removed ? `메모 ${moved}개는 폴더 밖으로 옮겼어요. 폴더에 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
-        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖으로 옮겼어요` : `${name} 폴더를 지웠어요`);
+      // 메모는 지우지 않고 폴더 밖으로 — 되돌리기: 폴더를 다시 만들고 꺼낸 메모를 그 폴더로
+      toast(!removed ? `메모 ${moved}개를 폴더 밖으로 옮겼어요. 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
+        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 지웠어요`, false, {
+        label: '되돌리기',
+        run: () => {
+          app.vault.createFolder(name);
+          for (const id of ids) app.vault.moveToFolder(id, name);
+          loadFolderDirs();
+          setFolder(name);
+        },
+      });
     }
   } catch (err) {
     toast(err.message || '폴더를 바꾸지 못했어요', true);
@@ -551,21 +605,6 @@ function stopPicking() {
   return true;
 }
 
-el.folderBar.addEventListener('click', async () => {
-  loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
-  const picked = await openFolderSheet({ folders: folders(), current: state.folder, onMenu: folderMenu });
-  if (picked == null) return;
-  if (typeof picked === 'object') {
-    try {
-      app.vault.createFolder(picked.create);
-      loadFolderDirs();
-    } catch (err) {
-      return toast(err.message || '폴더를 만들지 못했어요');
-    }
-    return setFolder(picked.create);
-  }
-  setFolder(picked);
-});
 
 // 카드가 두 개 이상 보일 때 한 번: 옆으로 밀기·꾹 누르기 (눈에 안 보이는 동작)
 function hintCards() {
@@ -1130,6 +1169,9 @@ export function show() {
 /** 뒤로 가기: 필터 패널 → 검색어 → 알림 탭 순으로 풀고, 더 없으면 false */
 export function back() {
   if (stopPicking()) return true;
+  if (closeFolderInput(el.folderChips)) return true; // 칩 줄의 새 폴더 이름 칸
+  // 일정 탭의 펼친 입력창을 먼저 (메모 탭의 검색 · 필터보다 — 보이지 않는 것이 먼저 풀리지 않게)
+  if (state.tab === 'reminders' && remindersTab?.closeQuick?.()) return true;
   if (!el.filterPanel.hidden) {
     toggleFilterPanel(false);
     return true;
