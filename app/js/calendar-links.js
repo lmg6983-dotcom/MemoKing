@@ -1,8 +1,11 @@
-// 일정 탭 › "다른 캘린더" 창 (PC·휴대폰 같음) — Google 캘린더 · 삼성 캘린더 함께 보기 (읽기만, 그 캘린더는 바꾸지 않는다)
-//   .ics 구독 주소(Google 캘린더 "iCal 형식의 비공개 주소" 등) · 휴대폰 캘린더(삼성 캘린더 · Google 캘린더, 휴대폰만)
+// 일정 탭 › "다른 캘린더" 창 (PC·휴대폰 같음) — Google 캘린더 · 삼성 캘린더 · 네이버 캘린더 함께 보기 (읽기만, 그 캘린더는 바꾸지 않는다)
+//   .ics 구독 주소(Google 캘린더 "iCal 형식의 비공개 주소" 등) · 네이버 캘린더(CalDAV, 아이디 · 애플리케이션 비밀번호)
+//   · 휴대폰 캘린더(삼성 캘린더 · Google 캘린더, 휴대폰만)
 import { icon } from './icons.js';
 import { normalizeFeedUrl, icsName, feedLabel, MAX_FEEDS } from './core/calendar-feeds.js';
 import { koClock, relativeDay, koMonthDay } from './core/time.js';
+
+const NAVER_CALDAV = 'https://caldav.calendar.naver.com';
 
 /** 받은 때: "방금" · "12분 전" · "오늘 오후 3:20" · "10월 14일" */
 function receivedAt(ms, now = Date.now()) {
@@ -47,7 +50,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
     close.append(icon('close'));
     close.addEventListener('click', () => dialog.close());
     head.append(h, close);
-    const lead = el('p', 'cal-links-lead', 'Google 캘린더, 삼성 캘린더의 일정을 메모킹 달력에 함께 보여 줘요. 보기만 하고, 그 캘린더는 바꾸지 않아요.');
+    const lead = el('p', 'cal-links-lead', 'Google 캘린더, 삼성 캘린더, 네이버 캘린더의 일정을 메모킹 달력에 함께 보여 줘요. 보기만 하고, 그 캘린더는 바꾸지 않아요.');
 
     // ---------- 함께 보기 ----------
     const list = el('ul', 'feed-list');
@@ -109,21 +112,29 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
       return li;
     }
 
-    // 주소로 더하기는 드물게 쓰니 접어 둔다 (누르면 칸이 열린다)
-    let addOpen = false;
-    const openAdd = el('button', 'link-btn feed-open-add', '＋ iCal 주소로 캘린더 더하기');
-    openAdd.type = 'button';
-    openAdd.addEventListener('click', () => {
-      addOpen = true;
-      drawList();
-      url.focus();
-    });
+    // 더하기는 드물게 쓰니 접어 둔다 (누르면 칸이 열린다): 'ics' · 'naver'
+    let addOpen = '';
+    const opener = (text, kind, focus) => {
+      const b = el('button', 'link-btn feed-open-add', text);
+      b.type = 'button';
+      b.addEventListener('click', () => {
+        addOpen = kind;
+        drawList();
+        focus().focus();
+      });
+      return b;
+    };
+    const openAdd = opener('＋ iCal 주소로 캘린더 더하기', 'ics', () => url);
+    const openNaver = opener('＋ 네이버 캘린더 연결', 'naver', () => naverId);
     function drawList() {
       list.replaceChildren(...(deviceRow ? [deviceRow] : []), ...feeds.map(feedRow));
       const full = feeds.length >= MAX_FEEDS;
-      addForm.hidden = full || !addOpen;
-      help.hidden = full || !addOpen;
-      openAdd.hidden = full || addOpen;
+      addForm.hidden = full || addOpen !== 'ics';
+      help.hidden = full || addOpen !== 'ics';
+      naverForm.hidden = full || addOpen !== 'naver';
+      naverHelp.hidden = full || addOpen !== 'naver';
+      openAdd.hidden = full || Boolean(addOpen);
+      openNaver.hidden = full || Boolean(addOpen);
     }
 
     // 주소 넣기
@@ -159,41 +170,87 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
         addNote.classList.add('err');
         return;
       }
-      if (feeds.some((f) => f.url === clean)) {
+      if (feeds.some((f) => f.url === clean && !f.user)) {
         addNote.textContent = '이미 잇고 있는 캘린더예요';
         return;
       }
-      addBtn.disabled = true;
-      url.disabled = true;
+      if (await addFeed({ url: clean, name: '' }, [url, addBtn])) url.value = '';
+      canAdd();
+    });
+
+    /** 구독을 더하고 바로 받아 본다 — 받지 못하면 남기지 않는다 (고쳐서 다시 넣게). 더했으면 true */
+    async function addFeed(entry, inputs) {
+      for (const i of inputs) i.disabled = true;
+      addNote.classList.remove('err');
       addNote.textContent = '캘린더를 받는 중이에요';
       addNote.classList.add('searching');
       try {
         const before = new Set(feeds.map((f) => f.id));
-        feeds = await calendars.setFeeds([...feeds, { url: clean, name: '' }]);
+        feeds = await calendars.setFeeds([...feeds, entry]);
         const added = feeds.find((f) => !before.has(f.id));
         const got = added ? await calendars.fetch(added.id, true) : { error: '추가하지 못했어요' };
         if (!got.text) {
-          // 받지 못한 주소는 남기지 않는다 (고쳐서 다시 넣게)
           feeds = await calendars.setFeeds(feeds.filter((f) => f.id !== added?.id));
           addNote.textContent = got.error || '캘린더를 받지 못했어요';
           addNote.classList.add('err');
-          return;
+          return false;
         }
         const name = icsName(got.text);
         if (name) feeds = await calendars.setFeeds(feeds.map((f) => (f.id === added.id ? { ...f, name } : f)));
         feedTexts.set(added.id, got);
-        url.value = '';
         addNote.textContent = `"${name || added.name}" 일정을 함께 보여요`;
         drawList();
+        return true;
       } catch (err) {
         addNote.textContent = err.message || '추가하지 못했어요';
         addNote.classList.add('err');
+        return false;
       } finally {
-        url.disabled = false;
-        canAdd();
+        for (const i of inputs) i.disabled = false;
         addNote.classList.remove('searching');
       }
+    }
+
+    // 네이버 캘린더: .ics 주소가 없어 CalDAV 로 연다 (아이디 + 애플리케이션 비밀번호, 이 기기에만 저장)
+    const naverForm = el('form', 'feed-add feed-naver');
+    const naverId = el('input', 'feed-url');
+    naverId.placeholder = '네이버 아이디';
+    naverId.setAttribute('aria-label', '네이버 아이디');
+    naverId.autocomplete = 'username';
+    naverId.spellcheck = false;
+    const naverPw = el('input', 'feed-url');
+    naverPw.type = 'password';
+    naverPw.placeholder = '애플리케이션 비밀번호';
+    naverPw.setAttribute('aria-label', '네이버 애플리케이션 비밀번호');
+    naverPw.autocomplete = 'off';
+    const naverBtn = el('button', 'btn', '연결');
+    naverBtn.type = 'submit';
+    naverForm.append(naverId, naverPw, naverBtn);
+    naverForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const user = naverId.value.trim().replace(/@naver\.com$/i, '');
+      if (!user) return naverId.focus();
+      if (!naverPw.value) return naverPw.focus();
+      if (feeds.some((f) => f.url === NAVER_CALDAV && f.user === user)) {
+        addNote.textContent = '이미 잇고 있는 캘린더예요';
+        return;
+      }
+      if (await addFeed({ url: NAVER_CALDAV, user, pass: naverPw.value, name: `네이버 캘린더 (${user})` }, [naverId, naverPw, naverBtn])) {
+        naverId.value = '';
+        naverPw.value = '';
+      }
     });
+    const naverHelp = el('details', 'cal-help');
+    naverHelp.append(el('summary', '', '애플리케이션 비밀번호는 어디서 만드나요?'));
+    const naverSteps = el('ol');
+    for (const s of [
+      '네이버에 로그인하고 "내정보 › 보안설정" 에서 2단계 인증을 켜기',
+      '같은 곳의 "애플리케이션 비밀번호 관리" 에서 종류를 "직접 입력"(예: 메모킹)으로 비밀번호 만들기',
+      '만든 비밀번호를 위에 붙여 넣기 (네이버 로그인 비밀번호가 아니에요)',
+    ]) naverSteps.append(el('li', '', s));
+    naverHelp.append(naverSteps, el('p', '', calendars.device
+      ? '네이버의 모든 캘린더를 읽기만 하고, 아이디와 비밀번호는 이 휴대폰에만 저장해요.'
+      : '네이버의 모든 캘린더를 읽기만 하고, 아이디와 비밀번호는 이 PC에만 저장해요.'));
 
     const help = el('details', 'cal-help');
     help.append(el('summary', '', 'Google 캘린더, 삼성 캘린더 주소는 어디서 찾나요?'));
@@ -213,7 +270,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
     done.addEventListener('click', () => dialog.close());
     actions.append(done);
 
-    dialog.append(head, lead, list, openAdd, addForm, addNote, help, actions);
+    dialog.append(head, lead, list, openAdd, openNaver, addForm, naverForm, addNote, help, naverHelp, actions);
     dialog.addEventListener('close', () => {
       dialog.remove();
       resolve();
@@ -222,9 +279,11 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
     // 저장된 구독을 읽기 전에는 넣지 못하게 (빈 목록에 더해 저장하면 있던 구독이 사라진다)
     addBtn.disabled = true;
     url.disabled = true;
+    naverBtn.disabled = true;
     calendars.feeds().then((list0) => {
       feeds = list0;
       url.disabled = false;
+      naverBtn.disabled = false;
       canAdd();
       drawList();
     }).catch((err) => {

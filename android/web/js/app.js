@@ -5,6 +5,7 @@ import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
 import { FeedStore, feedResponseText, MAX_FEED_BYTES } from '../../app/js/core/calendar-feed-list.js';
+import { caldavIcs } from '../../app/js/core/caldav.js';
 import { extractTitle, isBlankBody, COLORS, COLOR_NAMES, toLocalIso } from '../../app/js/core/memo-file.js';
 import { seedTutorialSandbox } from '../../app/js/core/tutorial.js';
 import { loneUrl } from '../../app/js/core/link-preview.js';
@@ -59,7 +60,7 @@ document.addEventListener('change', (e) => {
 injectMobileIcons();
 
 // ---------- 일정 탭의 다른 캘린더 (list-reminders.js 가 씀) ----------
-// 구독 주소는 비밀(누구나 그 캘린더를 볼 수 있음)이라 메모 폴더(Drive 동기화)가 아니라 이 휴대폰에만 둔다
+// 구독 주소 · CalDAV 비밀번호는 비밀(누구나 그 캘린더를 볼 수 있음)이라 메모 폴더(Drive 동기화)가 아니라 이 휴대폰에만 둔다
 const FEEDS_KEY = 'memoking.calendarFeeds';
 const DEVICE_KEY = 'memoking.deviceCalendar';
 const FEED_CACHE_MAX = 400 * 1024; // 이보다 큰 캘린더는 앱을 켤 때마다 다시 받는다
@@ -94,7 +95,9 @@ function calendarApi() {
       }
     },
     setList: (list) => lsSet(FEEDS_KEY, JSON.stringify(list)),
-    download: async (url) => {
+    download: async (url, feed) => {
+      // CalDAV 계정(네이버 캘린더): PROPFIND · REPORT 는 앱(Http.dav)이 보낸다
+      if (feed?.user) return caldavIcs(feed, (u, init) => call('dav', { url: u, ...init, limit: MAX_FEED_BYTES }));
       const res = await call('http', { url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
       return feedResponseText(res.status, new TextDecoder().decode(Uint8Array.from(res.latin1 ?? '', (c) => c.charCodeAt(0) & 0xff)));
     },

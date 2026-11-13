@@ -106,6 +106,8 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.3.0")
     // 화자 구분: 목소리 특징 엔진 (위에서 받은 AAR)
     implementation(files(sherpaAar))
+    // CalDAV(네이버 캘린더) 읽기: HttpURLConnection 은 PROPFIND · REPORT 를 보낼 수 없다
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
 
     // 동기화 엔진 단위 테스트 (PC 에서 JVM 으로)

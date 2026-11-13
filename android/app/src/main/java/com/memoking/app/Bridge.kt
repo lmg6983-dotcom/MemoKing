@@ -346,6 +346,7 @@ class Bridge(private val activity: MainActivity) {
             "exactAlarmSettings" -> activity.runOnUiThread { activity.openExactAlarmSettings(id) }
             "historyPermission" -> activity.runOnUiThread { activity.openNotificationAccess(id) }
             "http" -> pool.execute { resolve(id) { Http.fetch(ctx, a) } }
+            "dav" -> pool.execute { resolve(id) { Http.dav(a) } }
             // 앱 안 업데이트 (AppUpdate.kt): 확인 → 받기(진행은 'update' 소식) → 설치 화면 열기
             "updateCheck" -> pool.execute {
                 resolve(id) {
