@@ -1269,8 +1269,9 @@ dialog.quick-event[open] {
 /* 칩 제목: 칸 폭에 맞춘 크기(공백 포함 한글 8자쯤 — 휴대폰 약 8~9px, 넓은 창은 11px 까지) · 보통 굵기 · 살짝 좁은 자간 */
 .cal[data-view="dayGridMonth"] .cal-body .mk-mt { font-size: clamp(8px, calc((var(--cal-col, 56px) - 5px) / 6.3), 11px) !important; font-weight: 500; letter-spacing: -0.03em; line-height: 1.3; padding: 1px 1.5px; }
 .cal[data-view="dayGridMonth"] .cal-body .mk-more { min-height: 0 !important; margin: 0 2px; padding: 0 2px; font-size: 11.5px; line-height: 13px; }
-/* 내 일정 칩 왼쪽의 색 점 자리: 칩이 이미 그 색이라 보이지 않고 좁은 칸만 차지했다 (다른 캘린더 일정은 점이 그 캘린더 표시라 둔다) */
-.cal-body .mk-ev:not(.mk-ext) > div:first-child:empty { display: none; }
+/* 칩 앞의 색 점 · 하루 종일 일정의 왼쪽 색 띠: 칩 바탕이 이미 그 색이라 좁은 칸만 차지했다 */
+.cal-body .mk-ev > div:first-child:empty { display: none; }
+.cal-body .mk-ev { border-inline-start-width: 0 !important; }
 /* 낮은 창: 일정 막대 대신 날짜 + 색 점 (list-reminders.js fitSize) */
 .cal.compact .cal-body { font-size: 11.5px; }
 .cal.compact .cal-body [role="gridcell"] > :first-child { min-height: 0; padding: 1px 2px 0; }
