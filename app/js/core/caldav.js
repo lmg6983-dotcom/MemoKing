@@ -1,13 +1,17 @@
 // CalDAV 캘린더 읽기 (네이버 캘린더처럼 .ics 주소 없이 아이디 · 비밀번호로만 여는 캘린더) — PC 메인 · 휴대폰 받기가 함께 쓴다
-//   계정의 캘린더를 모두 찾아(PROPFIND) 일정을 받고(REPORT) 한 .ics 글로 합친다 → 그 뒤는 .ics 구독과 똑같이 보여 준다
+//   계정의 캘린더를 모두 찾아(PROPFIND) 일정 주소를 모으고(PROPFIND) 내용을 받아(REPORT calendar-multiget) 한 .ics 글로 합친다
+//   → 그 뒤는 .ics 구독과 똑같이 보여 준다. calendar-query 는 쓰지 않는다: 네이버는 그 답에 일정 내용을 빼고 준다
 //   HTTP 는 기기마다 넘긴다: request(url, { method, headers, body }) → { status, text, location }
 import { MAX_FEED_BYTES } from './calendar-feed-list.js';
 
 const NS = 'xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"';
 const FIND = `<?xml version="1.0" encoding="utf-8"?><d:propfind ${NS}><d:prop><d:resourcetype/><d:current-user-principal/><c:calendar-home-set/></d:prop></d:propfind>`;
 const LIST = `<?xml version="1.0" encoding="utf-8"?><d:propfind ${NS}><d:prop><d:resourcetype/><d:displayname/></d:prop></d:propfind>`;
-const EVENTS = `<?xml version="1.0" encoding="utf-8"?><c:calendar-query ${NS}><d:prop><c:calendar-data/></d:prop>`
-  + '<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT"/></c:comp-filter></c:filter></c:calendar-query>';
+const ITEMS = `<?xml version="1.0" encoding="utf-8"?><d:propfind ${NS}><d:prop><d:resourcetype/><d:getetag/></d:prop></d:propfind>`;
+const MULTIGET_BATCH = 100;
+const xmlEsc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const multiget = (paths) => `<?xml version="1.0" encoding="utf-8"?><c:calendar-multiget ${NS}><d:prop><d:getetag/><c:calendar-data/></d:prop>`
+  + `${paths.map((p) => `<d:href>${xmlEsc(p)}</d:href>`).join('')}</c:calendar-multiget>`;
 
 const unxml = (s) => String(s ?? '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
   .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
@@ -16,6 +20,7 @@ const unxml = (s) => String(s ?? '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1'
 const inner = (xml, name) => new RegExp(`<(?:[\\w-]+:)?${name}\\b[^>]*?(?:/>|>([\\s\\S]*?)</(?:[\\w-]+:)?${name}>)`).exec(xml)?.[1] ?? '';
 const hrefIn = (xml) => unxml(inner(xml, 'href')).trim();
 const isCalendar = (resp) => /<(?:[\w-]+:)?calendar[\s/>]/.test(inner(resp, 'resourcetype'));
+const isCollection = (resp) => /<(?:[\w-]+:)?collection[\s/>]/.test(inner(resp, 'resourcetype'));
 const responses = (xml) => [...String(xml).matchAll(/<(?:[\w-]+:)?response\b[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?response>/g)].map((m) => m[1]);
 
 /** UTF-8 아이디 · 비밀번호 → Basic 인증 (btoa 는 Node · 브라우저 모두) */
@@ -62,24 +67,30 @@ export async function caldavIcs(feed, request) {
   }
   if (!urls.length) throw new Error('이 계정에서 캘린더를 찾지 못했어요');
 
-  // 2. 캘린더마다 일정 → 한 .ics 로 (시간대는 겹치지 않게 한 번씩)
+  // 2. 캘린더마다 일정 주소 → 내용(100개씩) → 한 .ics 로 (시간대는 겹치지 않게 한 번씩)
   const parts = [];
   const zones = new Set();
   let size = 0;
-  for (const url of urls) {
-    const { xml } = await send('REPORT', url, '1', EVENTS);
-    for (const r of responses(xml)) {
-      const ics = unxml(inner(r, 'calendar-data')).replace(/\r?\n/g, '\r\n');
-      for (const [block, kind] of ics.matchAll(/^BEGIN:(VEVENT|VTIMEZONE)\r$[\s\S]*?^END:\1(?=\r?$)/gm)) {
-        if (kind === 'VTIMEZONE') {
-          const tz = /^TZID:(.*)\r$/m.exec(block)?.[1];
-          if (zones.has(tz)) continue;
-          zones.add(tz);
-        }
-        size += block.length;
-        if (size > MAX_FEED_BYTES) throw new Error('캘린더가 너무 커요 (5MB 넘음)');
-        parts.push(block);
+  const add = (data) => {
+    const ics = unxml(data).replace(/\r\n?|\n/g, '\r\n');
+    for (const [block, kind] of ics.matchAll(/^BEGIN:(VEVENT|VTIMEZONE)\r$[\s\S]*?^END:\1(?=\r?$)/gm)) {
+      if (kind === 'VTIMEZONE') {
+        const tz = /^TZID:(.*)\r$/m.exec(block)?.[1];
+        if (zones.has(tz)) continue;
+        zones.add(tz);
       }
+      size += block.length;
+      if (size > MAX_FEED_BYTES) throw new Error('캘린더가 너무 커요 (5MB 넘음)');
+      parts.push(block);
+    }
+  };
+  for (const url of urls) {
+    const items = await send('PROPFIND', url, '1', ITEMS);
+    const paths = responses(items.xml).filter((r) => !isCollection(r)).map((r) => new URL(hrefIn(r), items.url))
+      .filter((u) => u.origin === base.origin).map((u) => u.pathname);
+    for (let i = 0; i < paths.length; i += MULTIGET_BATCH) {
+      const { xml } = await send('REPORT', items.url, '1', multiget(paths.slice(i, i + MULTIGET_BATCH)));
+      for (const r of responses(xml)) add(inner(r, 'calendar-data'));
     }
   }
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//MemoKing//CalDAV//KO', ...parts, 'END:VCALENDAR', ''].join('\r\n');
