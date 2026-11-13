@@ -115,12 +115,12 @@ test('폴더 이름 바꾸기: 안의 메모가 같은 id 로 새 폴더에, 옮
 test('폴더 지우기: 메모는 폴더 밖으로 꺼내고 빈 폴더만 지운다 (메모가 아닌 파일이 있으면 폴더는 둔다)', () => withVault(({ dir, vault }) => {
   const a = vault.create({ folder: '업무' });
   vault.save(a, '# 보고서\n\n내용');
-  assert.deepEqual(vault.deleteFolder('업무'), { moved: 1, removed: true });
+  assert.deepEqual(vault.deleteFolder('업무'), { moved: 1, removed: true, ids: [a] });
   assert.equal(vault.list().find((m) => m.id === a).file, '보고서.md');
   assert.ok(!fs.existsSync(path.join(dir, '업무')));
   const b = vault.create({ folder: '자료' });
   vault.save(b, '# 링크\n\n내용');
   fs.writeFileSync(path.join(dir, '자료', '계약서.pdf'), 'pdf');
-  assert.deepEqual(vault.deleteFolder('자료'), { moved: 1, removed: false });
+  assert.deepEqual(vault.deleteFolder('자료'), { moved: 1, removed: false, ids: [b] });
   assert.ok(fs.existsSync(path.join(dir, '자료', '계약서.pdf')), '사용자의 파일은 지우지 않는다');
 }));

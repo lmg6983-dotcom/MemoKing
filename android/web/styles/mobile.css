@@ -1115,11 +1115,11 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 @media (max-width: 360px) { :root { --tap: 44px; } }
 :is(.color-filter button, .chip, .tag-chip, .tabs button, .seg button, .rec-btn, .note-screen .banner-btn,
   .note-screen .format-bar button, .note-screen .table-bar button, .palette-swatch, .sheet .swatch, .toast-action,
-  .crumbs button, .trash-item .btn, .sheet .btn.small, .sheet .chips button, .link-btn, .tag-suggest-bar .icon-btn,
+  .crumbs button, .trash-item .btn, .sheet .btn.small, .sheet .chips button, .link-btn, .tag-suggest-bar .icon-btn, .fchip,
   .note-screen .bar #undo-btn, .note-screen .bar #redo-btn, .switch) { position: relative; }
 :is(.color-filter button, .chip, .tag-chip, .tabs button, .seg button, .rec-btn, .note-screen .banner-btn,
   .note-screen .format-bar button, .note-screen .table-bar button, .palette-swatch, .sheet .swatch, .toast-action,
-  .crumbs button, .trash-item .btn, .sheet .btn.small, .sheet .chips button, .link-btn, .tag-suggest-bar .icon-btn,
+  .crumbs button, .trash-item .btn, .sheet .btn.small, .sheet .chips button, .link-btn, .tag-suggest-bar .icon-btn, .fchip,
   .note-screen .bar #undo-btn, .note-screen .bar #redo-btn, .switch)::before {
   content: "";
   position: absolute;
@@ -1276,8 +1276,9 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .mk-find-swatch { width: 34px; height: 34px; }
 .mk-find-item { min-height: 40px; }
 
-/* 메모킹 폴더 칩 줄: 화면 양옆까지 넘겨 보게 (folder-ui.js renderFolderChips) */
-.folder-chips { margin: 0 0 6px; padding: 0 16px; }
+/* 메모킹 폴더 칩 줄: 칩은 화면 끝까지 넘겨 보고, 처음 · 끝 자리만 16px 들여 둔다 (folder-ui.js renderFolderChips) */
+.folder-chips { margin: 0 0 6px; padding: 0 12px 0 0; }
+.folder-chips .fchip-row { padding-inline: 16px; scroll-padding-inline: 16px; }
 /* 여러 장 고르기 막대: 아래 탭 막대 위에 */
 .pick-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .pick-bar .btn { min-height: 44px; }

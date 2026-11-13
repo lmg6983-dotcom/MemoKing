@@ -691,23 +691,25 @@ export class Vault extends EventEmitter {
 
   /**
    * 폴더 지우기: 안의 메모는 모두 폴더 밖(맨 위)으로 꺼내고, 그러고 나서 비었으면 폴더를 지운다
-   *   (메모가 아닌 파일이 남아 있으면 폴더는 그대로 둔다 — 사용자의 파일을 지우지 않게) → { moved, removed }
+   *   (메모가 아닌 파일이 남아 있으면 폴더는 그대로 둔다 — 사용자의 파일을 지우지 않게) → { moved, removed, ids }
+   *   ids: 꺼낸 메모 (되돌리기 — 폴더를 다시 만들고 이 메모들을 옮긴다)
    */
   deleteFolder(name) {
     if (!isFolderName(name)) throw new Error('폴더 이름으로 쓸 수 없어요');
-    let moved = 0;
-    for (const e of [...this.entries.values()]) if (e.file && folderOf(e.file) === name && this.moveToFolder(e.id, '')) moved++;
+    const ids = [];
+    for (const e of [...this.entries.values()]) if (e.file && folderOf(e.file) === name && this.moveToFolder(e.id, '')) ids.push(e.id);
+    const moved = ids.length;
     const dir = path.join(this.root, name);
     const junk = new Set(['desktop.ini', 'thumbs.db', '.ds_store']);
     let left = [];
     try {
       left = fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter((d) => !d.isDirectory() && !junk.has(d.name.toLowerCase()));
     } catch {
-      return { moved, removed: true }; // 이미 없음
+      return { moved, removed: true, ids }; // 이미 없음
     }
-    if (left.length) return { moved, removed: false };
+    if (left.length) return { moved, removed: false, ids };
     fs.rmSync(dir, { recursive: true, force: true });
-    return { moved, removed: true };
+    return { moved, removed: true, ids };
   }
 
   // 같은 id 의 두 파일을 하나로: 남길 자리에 남길 내용을 두고, 다른 파일은 id 를 뺀 채 휴지통으로

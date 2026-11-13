@@ -50,6 +50,7 @@
 .mk-ctx-sw[aria-checked="true"] { box-shadow: 0 0 0 2px var(--ctx-bg), 0 0 0 4px var(--ctx-text); }
 .mk-ctx .mk-ctx-sw:not(:disabled):hover, .mk-ctx .mk-ctx-sw:not(:disabled):focus-visible { background: var(--note-chip, #ddd); transform: scale(1.12); }
 .mk-ctx-item[aria-checked="true"] .mk-ctx-text::before { content: "✓"; display: inline-block; width: 18px; margin-left: -4px; color: var(--ctx-text); }
+.mk-ctx-item.danger { color: var(--ctx-danger); }
 
 /* 공유 방법 고르기 (share-menu.js) — 내용의 공유 단추 옆 */
 .mk-share-menu {
