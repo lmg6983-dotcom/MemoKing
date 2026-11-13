@@ -173,7 +173,7 @@ svg { width: 20px; height: 20px; flex: none; }
    누를 수 있는 글자는 그렇게 보이게 (휴대폰과 같은 노란 밑줄 · 지우는 일은 빨강) */
 .link-btn { flex: none; white-space: nowrap; border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 @media (hover: hover) and (pointer: fine) { .link-btn:hover { background: var(--hover); color: var(--text); } .link-btn.danger:hover { color: var(--danger); } }
-.link-btn:where(:not(.ev-add)) { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.link-btn { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .link-btn.danger { color: var(--danger); text-decoration-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .link-btn:where(:disabled) { opacity: 0.45; cursor: default; background: none; color: var(--muted); } /* :where — 각 창 CSS(휴대폰 mobile.css 등)의 .link-btn 이 그대로 이기게 */
 
@@ -512,8 +512,9 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   padding: 6px 10px;
   border: 0;
   border-radius: 6px;
-  background: var(--brand-yellow);
-  color: var(--on-brand); /* Work 에서는 남색 바탕 · 흰 글자 */
+  background: transparent; /* 안내를 닫는 것뿐이라 채우지 않는다 (노랑 채움은 주요 동작에만) */
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-strong);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -1094,16 +1095,19 @@ dialog.quick-event[open] {
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: transparent;
-  color: var(--text-strong);
+  background: var(--brand-yellow); /* 이 줄의 주요 동작: 옆의 상세 · 닫기(고스트)와 달리 채운다 */
+  color: var(--on-brand);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
+/* 휴대폰의 48px 아이콘 단추 크기(mobile.css)보다 앞서게: 캡슐 안의 채운 동그라미, 누르는 자리는 48px */
+.cal-quick button.cal-quick-save { position: relative; width: 34px; height: 34px; min-height: 34px; margin: 0 4px; border-radius: 999px; }
+.cal-quick button.cal-quick-save::before { content: ""; position: absolute; inset: -7px; }
 .cal-quick-save:hover {
-  background: var(--fill-hover);
+  background: var(--brand-yellow-hover, var(--brand-yellow));
 }
 .cal-quick-save:active {
   transform: scale(0.92);
@@ -1389,7 +1393,7 @@ dialog.quick-event[open] {
 .feed-text small { overflow: hidden; font-size: 11.5px; color: var(--muted); text-overflow: ellipsis; }
 .feed-text small.err { color: var(--danger); }
 .feed-add { display: flex; gap: 6px; }
-.feed-open-add { display: block; margin: 2px 0 0 -6px; min-height: 40px; }
+.link-btn.feed-open-add { display: flex; align-items: center; width: 100%; min-height: 44px; margin: 8px 0 0; padding: 0 14px; border-radius: var(--radius-md); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line); text-decoration: none; text-align: left; } /* 더하는 동작이라 링크가 아닌 단추 모양 */
 .feed-open-add[hidden], .cal-help[hidden] { display: none; }
 .feed-add[hidden] { display: none; }
 .feed-naver { display: grid; gap: 10px; }
@@ -1421,7 +1425,7 @@ dialog.quick-event[open] {
 .ed-lines svg { flex: none; width: 18px; height: 18px; margin-top: 1px; color: var(--muted); }
 .ed-lines .ed-when { font-weight: 700; color: var(--text-strong); }
 .ed-dot { flex: none; width: 12px; height: 12px; margin: 4px 3px 0; border-radius: 99px; background: var(--ev-color, var(--note-chip, var(--brand-yellow))); }
-.ed-badge { flex: none; margin-left: auto; padding: 1px 8px; border: 1px solid var(--line); border-radius: 99px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.ed-badge { flex: none; margin-left: auto; font-size: 12px; font-weight: 600; color: var(--muted); } /* 표시일 뿐이라 단추처럼 보이지 않게 테두리 없이 */
 .dialog p.ed-note { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-1); font-size: 13.5px; line-height: 1.6; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
 .ed-link { color: var(--text-strong); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 2px; overflow-wrap: anywhere; cursor: pointer; }
 .ed-lines .ed-url { font-size: 13.5px; }
@@ -1577,7 +1581,7 @@ dialog.quick-event[open] {
 .work-hours .wh-days { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
 .work-hours .wh-day { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .work-hours .wh-day.sun { color: var(--danger); }
-.work-hours .wh-day[aria-pressed="true"] { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); }
+.work-hours .wh-day[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); }
 .work-hours .wh-time { display: flex; align-items: center; gap: 8px; }
 .work-hours .wh-time input { height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
 .work-hours .wh-sum { font-weight: 500; color: var(--muted); }
@@ -1741,7 +1745,8 @@ body.picking .card.picked::after {
 @media (prefers-reduced-motion: no-preference) { .fchip:active { transform: scale(0.96); } }
 @media (hover: hover) and (pointer: fine) { .fchip:hover { background: var(--hover); } }
 .fchip:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
-.fchip[aria-pressed="true"] { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
+/* 고른 것: 옅은 노랑 바탕 + 노랑 테두리 (일정 창의 고른 칸과 같게). 꽉 찬 노랑은 ＋ 같은 주요 동작에만 */
+.fchip[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 800; }
 .fchip[aria-pressed="true"] svg, .fchip[aria-pressed="true"] .fchip-count { color: inherit; }
 /* ＋ 새 폴더: 점선 — 폴더가 아니라 만드는 단추로 읽히게 */
 .fchip-add { border-style: dashed; color: var(--muted); }
@@ -1762,6 +1767,6 @@ body.picking .card.picked::after {
 .fchip-input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
 .fchip-ok { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
 @media (pointer: coarse) {
-  .fchip, .fchip-input { height: 40px; font-size: 14.5px; }
+  .fchip, .fchip-input { height: 36px; font-size: 13.5px; } /* 보기 패널의 칩과 같은 크기 (누르는 자리는 mobile.css 가 48px 로 넓힌다) */
   .fchip-all, .fchip-cancel { height: 44px; min-width: 44px; }
 }
