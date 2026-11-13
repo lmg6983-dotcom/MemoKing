@@ -1,4 +1,4 @@
-// 일정 탭이 구독하는 다른 캘린더(.ics 주소, 예: Google 캘린더 "iCal 형식의 비공개 주소") 받기 — PC 메인 프로세스
+// 일정 탭이 구독하는 다른 캘린더(.ics 주소, 예: Google 캘린더 "iCal 형식의 비공개 주소" · CalDAV 계정, 예: 네이버 캘린더) 받기 — PC 메인 프로세스
 //   화면(목록 창)에서 바로 받으면 CORS 에 막히므로 메인이 받는다. 주소는 비밀(누구나 그 캘린더를 볼 수 있음)이라
 //   메모 폴더(동기화 · AI 인덱스)가 아니라 이 PC 설정(%APPDATA%\MemoKing)에만 둔다.
 //   받은 글은 %APPDATA%\MemoKing\calendars\<id>.ics 에 두어 인터넷이 없을 때·다시 켰을 때 그대로 보인다.
@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { FeedStore, checkFeedStatus, feedResponseText, MAX_FEED_BYTES, FEED_FRESH_MS } from '../app/js/core/calendar-feed-list.js';
+import { caldavIcs } from '../app/js/core/caldav.js';
 
 export const FRESH_MS = FEED_FRESH_MS;
 const TIMEOUT_MS = 20_000;
@@ -47,7 +48,19 @@ export class CalendarFeeds extends FeedStore {
       getList,
       setList,
       now,
-      download: async (url) => {
+      download: async (url, feed) => {
+        if (feed?.user) {
+          return caldavIcs(feed, async (u, { method, headers, body }) => {
+            let r;
+            try {
+              // 넘겨 가기는 caldavIcs 가 같은 서버일 때만 (비밀번호가 다른 곳으로 가지 않게)
+              r = await fetchImpl(u, { method, headers, body, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) });
+            } catch {
+              throw new Error('캘린더 서버에 연결하지 못했어요 (인터넷 확인)');
+            }
+            return { status: r.status, location: r.headers.get('location') ?? '', text: await readLimited(r, MAX_FEED_BYTES) };
+          });
+        }
         let res;
         try {
           res = await fetchImpl(url, { headers: { Accept: 'text/calendar, */*;q=0.5' }, signal: AbortSignal.timeout(TIMEOUT_MS) });

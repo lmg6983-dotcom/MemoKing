@@ -1352,6 +1352,8 @@ dialog.quick-event[open] {
 .feed-open-add { display: block; margin: 2px 0 0 -6px; min-height: 40px; }
 .feed-open-add[hidden], .cal-help[hidden] { display: none; }
 .feed-add[hidden] { display: none; }
+.feed-naver { flex-wrap: wrap; }
+.feed-naver .feed-url { flex-basis: 140px; }
 .feed-url { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; }
 .feed-url:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
 .feed-add .btn { height: 38px; padding: 0 14px; }

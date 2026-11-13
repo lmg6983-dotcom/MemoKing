@@ -517,6 +517,10 @@ try {
   await page.waitForSelector('.cal-links[open]');
   check('다른 캘린더 창: 함께 보기만 (서로 맞추기 · 보내기 없음)',
     (await page.textContent('.cal-links h2')) === '다른 캘린더 함께 보기' && (await page.locator('.cal-links :is(.gsync, .cal-export)').count()) === 0);
+  await page.tap('.feed-open-add >> text=네이버');
+  check('다른 캘린더: "＋ 네이버 캘린더 연결" 은 아이디 · 애플리케이션 비밀번호 칸을 연다',
+    await page.isVisible('.feed-naver input[type=password]') && await page.isHidden('.feed-open-add'));
+  await shot('calendar-naver');
   await page.tap('.feed-device .switch');
   await page.waitForTimeout(300);
   check('다른 캘린더: 휴대폰 캘린더 켜기 (권한 허용)', await page.isChecked('.feed-device .switch'));

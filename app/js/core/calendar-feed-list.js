@@ -29,27 +29,31 @@ export function feedLabel(url) {
     if (/(^|\.)google\.com$/.test(u.hostname)) return UI.googleCalendar;
     if (/(^|\.)(icloud|me)\.com$/.test(u.hostname)) return 'iCloud 캘린더';
     if (/outlook|office|live\.com/.test(u.hostname)) return 'Outlook 캘린더';
+    if (/(^|\.)naver\.com$/.test(u.hostname)) return '네이버 캘린더';
     return u.hostname.replace(/^www\./, '');
   } catch {
     return '캘린더';
   }
 }
 
-/** 저장해 둔 구독 목록을 안전한 모양으로 [{ id, name, url, color, on }] */
+/** 저장해 둔 구독 목록을 안전한 모양으로 [{ id, name, url, color, on, user?, pass? }] (user · pass 는 CalDAV 계정) */
 export function normalizeFeeds(list) {
   if (!Array.isArray(list)) return [];
   const seen = new Set();
   const out = [];
   for (const f of list) {
     const url = normalizeFeedUrl(f?.url);
-    if (!url || seen.has(url)) continue;
-    seen.add(url);
+    const user = typeof f.user === 'string' ? f.user.trim().slice(0, 200) : '';
+    const key = `${user}@${url}`; // 같은 CalDAV 서버의 다른 계정은 따로
+    if (!url || seen.has(key)) continue;
+    seen.add(key);
     out.push({
       id: typeof f.id === 'string' && /^[\w-]{1,40}$/.test(f.id) ? f.id : `c${Math.random().toString(36).slice(2, 8)}`,
       name: String(f.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40) || feedLabel(url),
       url,
       color: /^#[0-9a-f]{6}$/i.test(f.color ?? '') ? f.color : FEED_COLORS[out.length % FEED_COLORS.length],
       on: f.on !== false,
+      ...(user ? { user, pass: String(f.pass ?? '').slice(0, 200) } : {}),
     });
     if (out.length >= MAX_FEEDS) break;
   }
@@ -95,7 +99,7 @@ export class FeedStore {
    *           cache: { read: (feed: any) => ({ url: string, text: string, at: number } | null), write: (feed: any, entry: any) => (void | Promise<void>), remove: (id: string) => void },
    *           now?: () => number }} options
    */
-  constructor({ getList, setList, download, cache, now = Date.now }) {
+  constructor({ getList, setList, download, cache, now = Date.now }) { // download(url, feed): CalDAV 면 feed.user · feed.pass 도
     this.getList = getList;
     this.setList = setList;
     this.download = download;
@@ -112,7 +116,7 @@ export class FeedStore {
   save(list) {
     const next = normalizeFeeds(list);
     for (const f of this.list()) {
-      if (next.some((n) => n.id === f.id && n.url === f.url)) continue;
+      if (next.some((n) => n.id === f.id && n.url === f.url && n.user === f.user && n.pass === f.pass)) continue;
       this.cache.remove(f.id);
     }
     this.setList(next);
@@ -139,10 +143,10 @@ export class FeedStore {
   }
 
   async fetchFeed(feed) {
-    const text = await this.download(feed.url);
+    const text = await this.download(feed.url, feed);
     const entry = { url: feed.url, text, at: this.now() };
     // 받는 사이 연결을 끊었거나 주소를 바꿨으면 남기지 않는다 (비공개 캘린더가 남지 않게)
-    if (this.list().some((f) => f.id === feed.id && f.url === feed.url)) await this.cache.write(feed, entry);
+    if (this.list().some((f) => f.id === feed.id && f.url === feed.url && f.user === feed.user)) await this.cache.write(feed, entry);
     return { text, at: entry.at };
   }
 }

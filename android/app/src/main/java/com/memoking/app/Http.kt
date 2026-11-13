@@ -2,11 +2,15 @@ package com.memoking.app
 
 import android.content.Context
 import android.webkit.WebSettings
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.TimeUnit
 
 /**
  * 인터넷에서 받아 오기 — 링크 미리보기(페이지 제목·사진)와 붙여넣은 인터넷 사진 저장에 쓴다.
@@ -99,6 +103,30 @@ object Http {
             return result.put("latin1", String(bytes, Charsets.ISO_8859_1)).put("size", bytes.size)
         } finally {
             conn.disconnect()
+        }
+    }
+
+    private val davClient by lazy {
+        OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).callTimeout(20, TimeUnit.SECONDS).build()
+    }
+
+    /**
+     * CalDAV 요청 (네이버 캘린더 읽기, app/js/core/caldav.js 가 씀) — 인자: url, method, headers, body, limit
+     * 결과: { status, location, text }. 리디렉트는 따라가지 않는다 (같은 서버인지 화면 쪽이 보고 다시 부른다 — 비밀번호가 다른 곳으로 가지 않게)
+     */
+    fun dav(args: JSONObject): JSONObject {
+        val url = URL(args.getString("url"))
+        if (url.protocol != "https") throw IOException("https 주소만 돼요")
+        val limit = args.optLong("limit", 5L * 1024 * 1024)
+        val headers = args.optJSONObject("headers") ?: JSONObject()
+        val req = Request.Builder().url(url).method(args.getString("method"), args.optString("body").toRequestBody())
+        for (k in headers.keys()) req.header(k, headers.getString(k))
+        davClient.newCall(req.build()).execute().use { res ->
+            val body = res.body ?: return JSONObject().put("status", res.code).put("location", res.header("Location") ?: "").put("text", "")
+            if (body.contentLength() > limit) throw IOException("캘린더가 너무 커요 (5MB 넘음)")
+            val source = body.source()
+            if (source.request(limit + 1)) throw IOException("캘린더가 너무 커요 (5MB 넘음)")
+            return JSONObject().put("status", res.code).put("location", res.header("Location") ?: "").put("text", source.buffer.readUtf8())
         }
     }
 }
