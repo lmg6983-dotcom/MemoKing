@@ -1629,3 +1629,22 @@ dialog.quick-event[open] {
 @media (max-width: 700px) {
   dialog.folder-sheet, dialog.folder-pick-dialog { width: 100%; max-width: none; margin: auto 0 0; border-radius: 18px 18px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 }
+/* 메모 창 윗막대의 폴더 이름 (누르면 다른 폴더로) — Work / Life 표시처럼 작게 */
+.folder-tag {
+  display: inline-flex; align-items: center; gap: 3px; flex: 0 1 auto; min-width: 0; max-width: 40%; height: 20px; padding: 0 7px;
+  border: 0; border-radius: 999px; background: color-mix(in srgb, currentColor 9%, transparent); color: inherit; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+}
+.folder-tag[hidden] { display: none; }
+.folder-tag svg { flex: none; width: 12px; height: 12px; }
+.folder-tag span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.folder-tag:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
+/* 카드의 폴더 이름 (전체 · 검색에서만 — folder-ui.js) */
+.card-folder { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; overflow: hidden; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+.card-folder svg { flex: none; width: 12px; height: 12px; }
+/* 여러 장 고르기 (PC Ctrl+클릭 · 휴대폰 고르기) */
+.card.picked { box-shadow: 0 0 0 3px var(--brand-yellow), var(--card-shadow, 0 1px 2px rgba(0, 0, 0, 0.08)); }
+.pick-bar {
+  position: fixed; left: 50%; bottom: 16px; z-index: 60; display: flex; align-items: center; gap: 8px; transform: translateX(-50%);
+  padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--surface-1, #fff); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); font-size: 13.5px; font-weight: 700; white-space: nowrap;
+}
+.pick-bar[hidden] { display: none; }

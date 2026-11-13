@@ -36,7 +36,7 @@ import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
-import { renderFolderList, askFolderName } from './folder-ui.js';
+import { renderFolderList, askFolderName, pickFolder } from './folder-ui.js';
 import { folderList } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
@@ -87,6 +87,7 @@ const state = {
   filter: { tags: [], colors: [], kinds: [] },
   folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 PC 에 기억
   folderDirs: [], // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도)
+  picked: new Set(), // Ctrl+클릭으로 고른 카드 (폴더로 옮기기)
 };
 try {
   state.folder = localStorage.getItem('memoking.folder') ?? '';
@@ -540,6 +541,7 @@ function renderCard(memo) {
   const justDropped = memo.id === state.droppedId && Date.now() < state.droppedUntil;
   card.className = `card${memo.open ? ' open' : ''}${justDropped ? ' dropped' : ''}`;
   card.dataset.id = memo.id;
+  if (state.picked.has(memo.id)) card.classList.add('picked');
   card.dataset.color = memo.color; // 카드 바탕·글씨 = 실제 메모 창의 색
   if (memo.open) card.title = '메모 창이 열려 있어요';
 
@@ -588,6 +590,15 @@ function renderCard(memo) {
   const tags = document.createElement('div');
   tags.className = 'card-tags';
   if (state.workLife) tags.append(fillModeTag(document.createElement('span'), memo, true));
+  // 폴더 이름: 전체 · 검색에서만 (폴더 안에서는 다 같으니 빼서 조용하게) — 누르면 그 폴더로
+  if (memo.folder && (!state.folder || state.query)) {
+    const f = document.createElement('span');
+    f.className = 'card-folder';
+    f.dataset.cardFolder = memo.folder;
+    f.title = `${memo.folder} 폴더 보기`;
+    f.append(icon('folder'), memo.folder);
+    tags.append(f);
+  }
   for (const name of memo.tags ?? []) {
     const t = document.createElement('span');
     t.className = 'card-tag';
@@ -1513,6 +1524,7 @@ el.cards.addEventListener('contextmenu', (e) => {
         if (await api.memo.set(m.id, { mode: to })) flashStatus(`${MODE_LABEL[to]}로 옮겼어요. 위의 ${MODE_LABEL[to]}에서 보여요`);
         else flashStatus(UI.moveFail);
       },
+      folder: (m) => moveToFolder([m.id], m.folder ?? ''),
       trash: (id) => deleteMemo(id),
       flash: flashStatus,
       openSettings: () => el.settingsBtn.click(),
@@ -1542,6 +1554,16 @@ el.cards.addEventListener('click', (e) => {
     const m = state.memos.find((x) => x.id === pinBtn.dataset.pin);
     return m ? togglePin(m) : undefined;
   }
+  const cardFolder = e.target.closest('[data-card-folder]');
+  if (cardFolder) {
+    el.search.value = '';
+    state.query = '';
+    setFolder(cardFolder.dataset.cardFolder);
+    return runSearch();
+  }
+  const card0 = e.target.closest('.card');
+  // Ctrl(⌘)+클릭: 여러 장 고르기 (아래 막대에서 폴더로 옮기기)
+  if (card0 && (e.ctrlKey || e.metaKey)) return togglePick(card0.dataset.id);
   const cardTag = e.target.closest('[data-card-tag]');
   if (cardTag) return toggleTagFilter(cardTag.dataset.cardTag, { only: true });
   const card = e.target.closest('.card');
@@ -1621,6 +1643,7 @@ el.cards.addEventListener('pointermove', (e) => {
   }
   press.clone.style.transform = `translate(${dx}px, ${dy}px) rotate(-2deg) scale(1.03)`;
   api.drag.move(e.screenX, e.screenY);
+  markFolderDrop(e.clientX, e.clientY);
 });
 
 el.cards.addEventListener('pointerup', (e) => {
@@ -1630,10 +1653,80 @@ el.cards.addEventListener('pointerup', (e) => {
   if (!p.dragging) return; // 그냥 클릭 → click 이벤트가 연다
   suppressClick = true;
   setTimeout(() => (suppressClick = false), 0);
+  // 왼쪽 폴더 막대에 놓으면 그 폴더로 (고른 카드가 여럿이고 이 카드도 골랐으면 모두)
+  const target = markFolderDrop(e.clientX, e.clientY);
+  markFolderDrop(-1, -1);
+  if (target != null) {
+    finishDrag(p, null);
+    return moveToFolder(state.picked.has(p.id) ? [...state.picked] : [p.id], null, target);
+  }
   finishDrag(p, { x: e.screenX, y: e.screenY });
 });
 
 el.cards.addEventListener('dragstart', (e) => e.preventDefault()); // 브라우저 기본 드래그 끄기
+
+// 끄는 카드 아래의 폴더 (막대에 있으면 그 폴더 이름, "" 은 전체 = 폴더에서 빼기) — 표시도 한다
+function markFolderDrop(x, y) {
+  const item = el.folderSide.hidden ? null : document.elementFromPoint(x, y)?.closest('#folder-side [data-folder]');
+  for (const b of el.folderSide.querySelectorAll('.drop-on')) if (b !== item) b.classList.remove('drop-on');
+  item?.classList.add('drop-on');
+  return item ? item.dataset.folder : null;
+}
+
+// ---------- 폴더로 옮기기 (카드 메뉴 · 끌어 놓기 · 여러 장 고르기) ----------
+
+function togglePick(id) {
+  if (state.picked.has(id)) state.picked.delete(id);
+  else state.picked.add(id);
+  for (const c of el.cards.querySelectorAll('.card')) c.classList.toggle('picked', state.picked.has(c.dataset.id));
+  showPickBar();
+}
+
+function clearPicks() {
+  if (!state.picked.size) return false;
+  state.picked.clear();
+  for (const c of el.cards.querySelectorAll('.card.picked')) c.classList.remove('picked');
+  showPickBar();
+  return true;
+}
+
+function showPickBar() {
+  let bar = $('pick-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'pick-bar';
+    bar.className = 'pick-bar';
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', '고른 메모');
+    const text = document.createElement('span');
+    const move = Object.assign(document.createElement('button'), { type: 'button', className: 'btn primary', textContent: '폴더로 옮기기' });
+    move.addEventListener('click', () => moveToFolder([...state.picked], ''));
+    const cancel = Object.assign(document.createElement('button'), { type: 'button', className: 'btn', textContent: '그만 고르기' });
+    cancel.addEventListener('click', clearPicks);
+    bar.append(text, move, cancel);
+    document.body.append(bar);
+  }
+  bar.firstChild.textContent = `${state.picked.size}개 골랐어요`;
+  bar.hidden = state.picked.size === 0;
+}
+
+/** 메모들을 폴더로: to 가 없으면 폴더 고르기 창 (current: 지금 폴더 — 고르기 창에서 흐리게) */
+async function moveToFolder(ids, current, to = undefined) {
+  if (!ids.length) return;
+  let target = to;
+  if (target === undefined) {
+    target = await pickFolder({ folders: state.folderDirs, current: ids.length === 1 ? current : null, count: ids.length });
+    if (target === null) return;
+  }
+  try {
+    const moved = await api.memos.moveToFolder(ids, target);
+    clearPicks();
+    loadFolders();
+    flashStatus(target ? `${moved > 1 ? `메모 ${moved}개를 ` : ''}${target} 폴더로 옮겼어요` : `${moved > 1 ? `메모 ${moved}개를 ` : ''}폴더에서 뺐어요`);
+  } catch (err) {
+    flashStatus(err.message || '옮기지 못했어요');
+  }
+}
 
 el.cards.addEventListener('pointercancel', () => {
   if (!press) return;
@@ -1663,6 +1756,7 @@ el.search.addEventListener('input', () => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && cancelDrag()) return;
+  if (e.key === 'Escape' && clearPicks()) return;
   if (e.key === 'Escape' && setFabMenu(false)) return;
   if (e.key === 'Escape' && !el.filterPanel.hidden) {
     setFilterPanel(false);

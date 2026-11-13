@@ -380,7 +380,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
     done.addEventListener('click', () => dialog.close());
     actions.append(done);
 
-    dialog.append(head, lead, list, addHolidays, openAdd, openNaver, addForm, naverForm, addNote, help, naverHelp, actions);
+    dialog.append(head, lead, list, openAdd, openNaver, addHolidays, addForm, naverForm, addNote, help, naverHelp, actions);
     dialog.addEventListener('close', () => {
       dialog.remove();
       resolve();

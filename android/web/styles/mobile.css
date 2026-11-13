@@ -1294,3 +1294,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .folder-bar small { font-size: 12.5px; font-weight: 500; color: var(--muted); }
 .folder-bar-caret { font-size: 11px; color: var(--muted); }
 .folder-bar:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+/* 여러 장 고르기 막대: 아래 탭 막대 위에 */
+.pick-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.pick-bar .btn { min-height: 40px; }
+body.picking #fab { display: none; }

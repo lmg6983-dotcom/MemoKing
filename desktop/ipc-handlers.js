@@ -294,7 +294,11 @@ export function registerIpc(ctx) {
     const vault = getVault();
     if (!vault) throw new Error(UI.noVault);
     let moved = 0;
-    for (const id of (Array.isArray(ids) ? ids : [ids]).slice(0, 500)) if (vault.moveToFolder(String(id), String(folder ?? ''))) moved++;
+    for (const id of (Array.isArray(ids) ? ids : [ids]).slice(0, 500)) {
+      if (!vault.moveToFolder(String(id), String(folder ?? ''))) continue;
+      moved++;
+      wm.noteWins.get(String(id))?.webContents.send('memo:meta', { file: vault.get(String(id))?.file ?? null }); // 메모 창의 폴더 표시
+    }
     return moved;
   });
   ipcMain.handle('tags:list', () => collectTags(getVault()?.list() ?? []));

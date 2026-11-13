@@ -41,6 +41,7 @@ import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
 import { openMemoryDay, dayText } from '../../app/js/memory-day.js';
 import { memoMode, otherMode, moveLabel, MODE_LABEL } from '../../app/js/core/modes.js';
+import { folderOf } from '../../app/js/core/folders.js';
 import { renderWorkSettings } from '../../app/js/work-settings.js';
 import { workHours, saveWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
@@ -474,6 +475,8 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="day"] small').textContent = memo.day ? dayText(memo.day) : UI.madeDay;
   memoSheet.querySelector('[data-memo-action="mode"] span').textContent = moveLabel(memo);
   memoSheet.querySelector('[data-memo-action="mode"]').hidden = !list.workLifeOn(); // Work / Life 를 나눠 쓸 때만
+  memoSheet.querySelector('[data-memo-action="folder"] small').textContent = folderOf(memo.file) || '폴더 없음';
+  memoSheet.querySelector('[data-memo-action="pick"]').hidden = inNote; // 여러 장 고르기는 목록에서만
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -534,6 +537,16 @@ memoSheet.addEventListener('click', async (e) => {
       else toast(`${MODE_LABEL[to]}로 옮겼어요`);
       break;
     }
+    case 'folder':
+      // 다른 폴더로 (folder-ui.js · core/folders.js)
+      note.flush();
+      closeSheet(memoSheet);
+      await list.moveToFolder([id], folderOf(memo?.file));
+      break;
+    case 'pick':
+      closeSheet(memoSheet);
+      list.startPicking(id);
+      break;
     case 'share':
       closeSheet(memoSheet);
       openShare(id);
