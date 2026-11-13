@@ -22,7 +22,8 @@ import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { openFolderSheet, pickFolder, createPickBar } from '../../app/js/folder-ui.js';
+import { openFolderSheet, pickFolder, createPickBar, askFolderName } from '../../app/js/folder-ui.js';
+import { openContextMenu } from '../../app/js/ctx-menu.js';
 import { folderList, movedText, isFolderName } from '../../app/js/core/folders.js';
 
 const $ = (x) => document.getElementById(x);
@@ -451,8 +452,38 @@ function setFolder(name) {
 function renderFolderBar() {
   const list = folders();
   $('folder-bar-name').textContent = state.folder || '전체';
-  $('folder-bar-count').textContent = String(state.folder ? list.find((f) => f.name === state.folder)?.count ?? 0 : modeMemos().length);
+  // 폴더 안에서만 수 (전체 수는 아래 메모 탭에 있다)
+  $('folder-bar-count').textContent = state.folder ? String(list.find((f) => f.name === state.folder)?.count ?? 0) : '';
   el.folderBar.hidden = Boolean(state.query); // 검색은 모든 폴더에서
+}
+
+// 폴더 ⋯ 메뉴 (폴더 시트): 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
+async function folderMenu(name, anchor) {
+  const r = anchor.getBoundingClientRect();
+  const pick = await openContextMenu({
+    x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`,
+    items: [{ id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기 (메모는 폴더 밖으로)' }],
+  });
+  try {
+    if (pick === 'rename') {
+      const to = await askFolderName({ existing: (state.folderDirs ?? []).filter((f) => f !== name), title: '폴더 이름 바꾸기', value: name, okLabel: '바꾸기' });
+      if (!to || to === name) return;
+      const done = app.vault.renameFolder(name, to);
+      loadFolderDirs();
+      if (state.folder === name) setFolder(done);
+      else render();
+      toast(`폴더 이름을 "${done}"(으)로 바꿨어요`);
+    } else if (pick === 'delete') {
+      const { moved, removed } = app.vault.deleteFolder(name);
+      loadFolderDirs();
+      if (state.folder === name) setFolder('');
+      else render();
+      toast(!removed ? `메모 ${moved}개는 폴더 밖으로 옮겼어요. 폴더에 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
+        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖으로 옮겼어요` : `${name} 폴더를 지웠어요`);
+    }
+  } catch (err) {
+    toast(err.message || '폴더를 바꾸지 못했어요', true);
+  }
 }
 
 // ---------- 폴더로 옮기기 · 여러 장 고르기 ----------
@@ -507,7 +538,7 @@ function stopPicking() {
 
 el.folderBar.addEventListener('click', async () => {
   loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
-  const picked = await openFolderSheet({ folders: folders(), total: modeMemos().length, current: state.folder });
+  const picked = await openFolderSheet({ folders: folders(), current: state.folder, onMenu: folderMenu });
   if (picked == null) return;
   if (typeof picked === 'object') {
     try {

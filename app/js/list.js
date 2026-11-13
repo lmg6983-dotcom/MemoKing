@@ -20,6 +20,7 @@ import { COLORS, COLOR_NAMES } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
 import { hintOnce } from './hints.js';
 import { openCardMenu } from './list-card-menu.js';
+import { openContextMenu } from './ctx-menu.js';
 import { openMemoryDay, dayText } from './memory-day.js';
 import { renderCollage, collageName } from './memories-collage.js';
 import { base64Bytes, collageMemoBody } from './collage-preview.js';
@@ -36,7 +37,7 @@ import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
-import { renderFolderList, askFolderName, pickFolder, createPickBar } from './folder-ui.js';
+import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet } from './folder-ui.js';
 import { folderList, movedText, isFolderName } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
@@ -166,6 +167,7 @@ function render() {
   renderPending = false;
   memosStale = false;
   keepFolderValid();
+  applyFolderSide();
   // 동기화 충돌 사본만 보기 (위쪽 구름 단추 · 설정의 "충돌 사본 보기") — 검색 · 필터와 겹치지 않게 따로, 다 지우면 저절로 풀린다
   let only = null;
   if (state.onlyFiles) {
@@ -228,7 +230,41 @@ function setFolder(name) {
 
 async function newFolder() {
   const name = await askFolderName({ existing: state.folderDirs ?? [] });
-  if (!name) return;
+  if (name) createAndOpenFolder(name);
+}
+
+// 폴더 ⋯ 메뉴 (막대의 ⋯ · 오른쪽 클릭 · 폴더 시트): 이름 바꾸기 · 지우기
+async function folderMenu(name, anchor) {
+  const r = anchor.getBoundingClientRect();
+  const pick = await openContextMenu({
+    x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`,
+    items: [{ id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기 (메모는 폴더 밖으로)' }],
+  });
+  if (pick === 'rename') {
+    const to = await askFolderName({ existing: (state.folderDirs ?? []).filter((f) => f !== name), title: '폴더 이름 바꾸기', value: name, okLabel: '바꾸기' });
+    if (!to || to === name) return;
+    try {
+      const done = await api.memos.renameFolder(name, to);
+      if (state.folder === name) setFolder(done);
+      await loadFolders();
+      flashStatus(`폴더 이름을 "${done}"(으)로 바꿨어요`);
+    } catch (err) {
+      flashStatus(err.message || '폴더 이름을 바꾸지 못했어요');
+    }
+  } else if (pick === 'delete') {
+    try {
+      const { moved, removed } = await api.memos.deleteFolder(name);
+      if (state.folder === name) setFolder('');
+      await loadFolders();
+      flashStatus(!removed ? `메모 ${moved}개는 폴더 밖으로 옮겼어요. 폴더에 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
+        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖으로 옮겼어요` : `${name} 폴더를 지웠어요`);
+    } catch (err) {
+      flashStatus(err.message || '폴더를 지우지 못했어요');
+    }
+  }
+}
+
+async function createAndOpenFolder(name) {
   try {
     await api.memos.createFolder(name);
   } catch (err) {
@@ -238,37 +274,63 @@ async function newFolder() {
   setFolder(name);
 }
 
+const currentFolders = () => folderList(state.folderDirs ?? [], modeMemos());
+
 function renderFolders() {
   if (!el.folderSide) return;
-  const memos = modeMemos();
-  const folders = folderList(state.folderDirs ?? [], memos);
-  renderFolderList(el.folderSide, { folders, total: memos.length, current: state.folder, onPick: setFolder, onNew: newFolder });
-  // 막대를 숨겼으면 카드 위에 지금 폴더 이름
-  el.folderTitle.textContent = state.folder;
+  renderFolderList(el.folderSide, { folders: currentFolders(), current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
+  // 막대가 없으면 카드 위에 지금 폴더 이름 (누르면 폴더 시트)
+  el.folderTitle.querySelector('span').textContent = state.folder;
   el.folderTitle.hidden = !state.folder || !el.folderSide.hidden || Boolean(state.query);
 }
 
-// 폴더 막대 보이기 · 숨기기 (이 PC 에 기억) — 좁은 창에서 카드 자리를 넓게 쓰려면 숨긴다
-function showFolderSide(on) {
-  el.folderSide.hidden = !on;
-  el.folderBtn.setAttribute('aria-pressed', String(on));
-  try {
-    localStorage.setItem('memoking.folderSide', on ? '1' : '0');
-  } catch {
-    // 이번만
-  }
-  renderFolders();
-  queueMicrotask(() => render()); // 카드 줄 수를 새 폭에 맞춘다
-}
-el.folderBtn?.addEventListener('click', () => showFolderSide(el.folderSide.hidden));
+// ---------- 폴더 막대: 넓은 창 · 폴더가 있을 때만 (좁은 기본 창에서 카드 자리를 빼앗지 않게) ----------
+//   그 밖에는 폴더 단추(와 카드 위 폴더 이름)가 휴대폰처럼 폴더 시트를 연다
+const SIDE_MIN_WIDTH = 560;
+let sideWanted = true; // 넓은 창에서 막대를 보이게 둘지 (폴더 단추로 바꾸고, 이 PC 에 기억)
 try {
-  if (localStorage.getItem('memoking.folderSide') === '0') {
-    el.folderSide.hidden = true;
-    el.folderBtn.setAttribute('aria-pressed', 'false');
-  }
+  sideWanted = localStorage.getItem('memoking.folderSide') !== '0';
 } catch {
   // 보임
 }
+const sideFits = () => window.innerWidth >= SIDE_MIN_WIDTH && currentFolders().length > 0;
+
+// 막대를 보일지 정한다 (카드 줄 수를 재기 전에 — render 맨 앞에서)
+function applyFolderSide() {
+  if (!el.folderSide) return;
+  const fits = sideFits();
+  el.folderSide.hidden = !(fits && sideWanted);
+  // 막대를 켜고 끄는 단추일 때만 눌림 상태, 아니면 시트를 여는 단추
+  if (fits) el.folderBtn.setAttribute('aria-pressed', String(sideWanted));
+  else el.folderBtn.removeAttribute('aria-pressed');
+  el.folderBtn.setAttribute('aria-haspopup', fits ? 'false' : 'dialog');
+  el.folderBtn.title = fits ? (sideWanted ? '폴더 막대 숨기기' : '폴더 막대 보이기') : `폴더: ${state.folder || '전체'}`;
+}
+
+async function openFolderPicker() {
+  const picked = await openFolderSheet({ folders: currentFolders(), current: state.folder, onMenu: folderMenu });
+  if (picked == null) return;
+  if (typeof picked === 'object') return createAndOpenFolder(picked.create);
+  setFolder(picked);
+}
+
+el.folderBtn?.addEventListener('click', () => {
+  if (!sideFits()) return openFolderPicker();
+  sideWanted = !sideWanted;
+  try {
+    localStorage.setItem('memoking.folderSide', sideWanted ? '1' : '0');
+  } catch {
+    // 이번만
+  }
+  render();
+});
+el.folderTitle?.addEventListener('click', openFolderPicker);
+let sideWasShown = null;
+window.addEventListener('resize', () => {
+  const shown = sideFits() && sideWanted;
+  if (shown !== sideWasShown) render(); // 막대가 생기거나 없어지면 카드 줄 수도
+  sideWasShown = shown;
+});
 
 // ---------- 카드 쌓기 (휴대폰과 같음): 메모지처럼 엇갈려 — 카드마다 지금 가장 짧은 줄(같으면 왼쪽)에 붙인다 ----------
 // 격자: 목록 폭에 맞춰 2~6줄 (카드 폭 180px 쯤 — 축소하면 줄이 늘고, 확대하면 준다) · 한 줄씩: 1줄

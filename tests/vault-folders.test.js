@@ -95,3 +95,32 @@ test('잠긴 메모를 옮겨도 파일은 잠긴 그대로 (풀린 글이 새 �
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('폴더 이름 바꾸기: 안의 메모가 같은 id 로 새 폴더에, 옮긴 때를 남김 · 겹치는 이름은 거절 · 대소문자만 바꾸기', () => withVault(({ dir, vault }) => {
+  const id = vault.create({ folder: '업무' });
+  vault.save(id, '# 회의\n\n내용');
+  vault.createFolder('집');
+  assert.throws(() => vault.renameFolder('업무', '집'), /이미 있어요/);
+  assert.equal(vault.renameFolder('업무', ' 회사 '), '회사');
+  assert.ok(!fs.existsSync(path.join(dir, '업무')));
+  assert.equal(vault.list().find((m) => m.id === id).file, '회사/회의.md');
+  assert.ok(parseMemoFile(fs.readFileSync(path.join(dir, '회사', '회의.md'), 'utf8')).meta.extra.moved);
+  vault.scan();
+  assert.equal(vault.list().length, 1);
+  vault.createFolder('work');
+  assert.equal(vault.renameFolder('work', 'Work'), 'Work');
+  assert.ok(vault.folders().includes('Work') && !vault.folders().includes('work'));
+}));
+
+test('폴더 지우기: 메모는 폴더 밖으로 꺼내고 빈 폴더만 지운다 (메모가 아닌 파일이 있으면 폴더는 둔다)', () => withVault(({ dir, vault }) => {
+  const a = vault.create({ folder: '업무' });
+  vault.save(a, '# 보고서\n\n내용');
+  assert.deepEqual(vault.deleteFolder('업무'), { moved: 1, removed: true });
+  assert.equal(vault.list().find((m) => m.id === a).file, '보고서.md');
+  assert.ok(!fs.existsSync(path.join(dir, '업무')));
+  const b = vault.create({ folder: '자료' });
+  vault.save(b, '# 링크\n\n내용');
+  fs.writeFileSync(path.join(dir, '자료', '계약서.pdf'), 'pdf');
+  assert.deepEqual(vault.deleteFolder('자료'), { moved: 1, removed: false });
+  assert.ok(fs.existsSync(path.join(dir, '자료', '계약서.pdf')), '사용자의 파일은 지우지 않는다');
+}));

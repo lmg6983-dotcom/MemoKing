@@ -290,6 +290,24 @@ export function registerIpc(ctx) {
     if (!vault) throw new Error(UI.noVault);
     return vault.createFolder(String(name ?? ''));
   });
+  // 폴더 이름 바꾸기 · 지우기: 열려 있는 메모 창의 폴더 표시도 새로
+  const refreshNoteFolders = (vault) => {
+    for (const [id, win] of wm.noteWins) win.webContents.send('memo:meta', { file: vault.get(id)?.file ?? null });
+  };
+  ipcMain.handle('folders:rename', (_e, from, to) => {
+    const vault = getVault();
+    if (!vault) throw new Error(UI.noVault);
+    const name = vault.renameFolder(String(from ?? ''), String(to ?? ''));
+    refreshNoteFolders(vault);
+    return name;
+  });
+  ipcMain.handle('folders:delete', (_e, name) => {
+    const vault = getVault();
+    if (!vault) throw new Error(UI.noVault);
+    const result = vault.deleteFolder(String(name ?? ''));
+    refreshNoteFolders(vault);
+    return result;
+  });
   ipcMain.handle('memo:move-folder', (_e, ids, folder) => {
     const vault = getVault();
     if (!vault) throw new Error(UI.noVault);

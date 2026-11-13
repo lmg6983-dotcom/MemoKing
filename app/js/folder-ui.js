@@ -15,6 +15,7 @@ function folderButton({ name, label, count, current, iconName }) {
   const b = el('button', 'mf-item');
   b.type = 'button';
   b.dataset.folder = name;
+  b.title = label; // 긴 이름은 잘려 보이므로 전체 이름
   if (current) b.setAttribute('aria-current', 'true');
   b.append(icon(iconName), el('span', 'mf-name', label));
   if (count != null) b.append(el('small', 'mf-count', String(count)));
@@ -23,23 +24,42 @@ function folderButton({ name, label, count, current, iconName }) {
 
 /**
  * 폴더 목록을 그린다 (누르면 onPick(폴더 이름, "" = 전체))
+ *   onMenu 가 있으면 폴더마다 ⋯ 단추(와 오른쪽 클릭) — 이름 바꾸기 · 지우기
+ *   "전체" 에는 수를 적지 않는다 (위 메모 탭에 이미 있다)
  * @param {HTMLElement} container
- * @param {{ folders: { name: string, count: number }[], total: number, current: string,
- *           onPick: (name: string) => any, onNew: () => any }} o
+ * @param {{ folders: { name: string, count: number }[], current: string,
+ *           onPick: (name: string) => any, onNew: () => any, onMenu?: (name: string, anchor: HTMLElement) => any }} o
  */
-export function renderFolderList(container, { folders, total, current, onPick, onNew }) {
+export function renderFolderList(container, { folders, current, onPick, onNew, onMenu }) {
   const list = el('ul', 'mf-list');
   list.setAttribute('aria-label', '폴더');
-  const item = (b) => {
-    const li = el('li');
+  const item = (b, name) => {
+    const li = el('li', 'mf-row');
     li.append(b);
+    if (onMenu && name) {
+      const more = el('button', 'icon-btn mf-more');
+      more.type = 'button';
+      more.dataset.folderMenu = name;
+      more.title = '이름 바꾸기, 지우기';
+      more.setAttribute('aria-label', `${name} 폴더 메뉴`);
+      more.append(icon('more'));
+      li.append(more);
+    }
     return li;
   };
-  list.append(item(folderButton({ name: '', label: '전체', count: total, current: !current, iconName: 'note' })));
-  for (const f of folders) list.append(item(folderButton({ name: f.name, label: f.name, count: f.count, current: f.name === current, iconName: 'folder' })));
+  list.append(item(folderButton({ name: '', label: '전체', current: !current, iconName: 'note' }), ''));
+  for (const f of folders) list.append(item(folderButton({ name: f.name, label: f.name, count: f.count, current: f.name === current, iconName: 'folder' }), f.name));
   list.addEventListener('click', (e) => {
+    const m = e.target.closest('[data-folder-menu]');
+    if (m) return onMenu?.(m.dataset.folderMenu, m);
     const b = e.target.closest('[data-folder]');
     if (b) onPick(b.dataset.folder);
+  });
+  list.addEventListener('contextmenu', (e) => {
+    const b = e.target.closest('[data-folder]');
+    if (!onMenu || !b?.dataset.folder) return;
+    e.preventDefault();
+    onMenu(b.dataset.folder, b);
   });
   const add = el('button', 'link-btn mf-new', '＋ 새 폴더');
   add.type = 'button';
@@ -82,8 +102,8 @@ function sheet(title, className) {
  * 새 폴더 이름 묻기 → 정리한 이름, 그만두면 null
  * @param {{ existing?: string[] }} [o] 이미 있는 폴더 (같은 이름이면 그 폴더를 고른 것으로)
  */
-export function askFolderName({ existing = [] } = {}) {
-  const { body, closed, done } = sheet('새 폴더', 'mf-name-dialog');
+export function askFolderName({ existing = [], title = '새 폴더', value = '', okLabel = '만들기' } = {}) {
+  const { body, closed, done } = sheet(title, 'mf-name-dialog');
   const form = el('form', 'mf-name-form');
   const input = el('input', 'mf-name-input');
   input.type = 'text';
@@ -91,9 +111,10 @@ export function askFolderName({ existing = [] } = {}) {
   input.placeholder = '폴더 이름 (예: 업무)';
   input.setAttribute('aria-label', '폴더 이름');
   input.autocomplete = 'off';
+  input.value = value;
   const note = el('p', 'mf-name-note');
   note.setAttribute('role', 'status');
-  const ok = el('button', 'btn primary', '만들기');
+  const ok = el('button', 'btn primary', okLabel);
   ok.type = 'submit';
   form.append(input, note, ok);
   form.addEventListener('submit', (e) => {
@@ -108,6 +129,7 @@ export function askFolderName({ existing = [] } = {}) {
   });
   body.append(form);
   input.focus();
+  input.select();
   return closed;
 }
 
@@ -127,7 +149,7 @@ export function pickFolder({ folders, current, count = 1 }) {
     li.append(b);
     list.append(li);
   };
-  add('', '폴더 없음', 'note');
+  add('', '폴더 없음', 'inbox'); // "전체" 와 다른 뜻이라 다른 그림
   for (const f of folders) add(f, f, 'folder');
   const create = el('button', 'link-btn mf-new', '＋ 새 폴더로 옮기기');
   create.type = 'button';
@@ -168,18 +190,24 @@ export function createPickBar({ onMove, onCancel }) {
 }
 
 /**
- * 휴대폰: 아래에서 올라오는 폴더 시트 — 고른 폴더 이름 ("" = 전체), 그만두면 null. 새 폴더는 만든 뒤 그 폴더로
- * @param {{ folders: { name: string, count: number }[], total: number, current: string }} o
+ * 폴더 시트 (휴대폰 · 좁은 PC 창): 고른 폴더 이름 ("" = 전체), 그만두면 null. 새 폴더는 { create: 이름 }
+ *   ⋯ 메뉴(onMenu)를 누르면 시트를 닫고 메뉴를 연다 (이름이 바뀌면 시트 내용이 낡으므로)
+ * @param {{ folders: { name: string, count: number }[], current: string, onMenu?: (name: string, anchor: HTMLElement) => any }} o
  */
-export function openFolderSheet({ folders, total, current }) {
+export function openFolderSheet({ folders, current, onMenu }) {
   const { body, closed, done } = sheet('폴더', 'folder-sheet');
   renderFolderList(body, {
-    folders, total, current,
+    folders, current,
     onPick: (name) => done(name),
     onNew: async () => {
       const name = await askFolderName({ existing: folders.map((f) => f.name) });
       if (name) done({ create: name });
     },
+    onMenu: onMenu && ((name, anchor) => {
+      const r = anchor.getBoundingClientRect();
+      done(null);
+      onMenu(name, { getBoundingClientRect: () => r });
+    }),
   });
   return closed;
 }

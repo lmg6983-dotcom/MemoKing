@@ -640,20 +640,74 @@ export class Vault extends EventEmitter {
     fs.mkdirSync(path.dirname(this.abs(target)), { recursive: true });
     fs.renameSync(this.abs(entry.file), this.abs(target));
     entry.file = target;
+    this.stampMoved(entry);
+    this.changed([id]);
+    return true;
+  }
+
+  // 옮긴 메모의 머리말에 옮긴 때(moved) — 디스크의 글 그대로에 더한다 (잠긴 메모가 풀린 채 쓰이지 않게)
+  stampMoved(entry) {
     try {
-      const { meta, body } = parseMemoFile(fs.readFileSync(this.abs(target), 'utf8'));
+      const { meta, body } = parseMemoFile(fs.readFileSync(this.abs(entry.file), 'utf8'));
       meta.extra = { ...meta.extra, moved: toLocalIso() };
-      writeAtomic(this.abs(target), serializeMemoFile(meta, body));
+      writeAtomic(this.abs(entry.file), serializeMemoFile(meta, body));
       entry.meta.extra = { ...entry.meta.extra, moved: meta.extra.moved };
-      const stat = fs.statSync(this.abs(target));
+      const stat = fs.statSync(this.abs(entry.file));
       entry.mtimeMs = stat.mtimeMs;
       entry.size = stat.size;
       entry.diskMeta = diskCopy(entry.meta);
     } catch (err) {
       this.emit('error', err); // 옮기기는 됐다 — 옮긴 때만 못 남김
     }
-    this.changed([id]);
-    return true;
+  }
+
+  /**
+   * 폴더 이름 바꾸기 → 새 이름. 폴더를 통째로 옮긴 뒤 안의 메모마다 옮긴 때(moved)를 남긴다
+   *   (그사이 다른 기기가 옛 폴더의 메모를 고쳐 되살려도 새 폴더로 맞추게 — settleTwin)
+   */
+  renameFolder(from, to) {
+    const dst = cleanFolderName(to);
+    if (!isFolderName(from) || !dst) throw new Error('폴더 이름으로 쓸 수 없어요');
+    if (dst === from) return dst;
+    const a = path.join(this.root, from);
+    if (!fs.statSync(a, { throwIfNoEntry: false })?.isDirectory()) throw new Error('폴더를 찾지 못했어요. 다른 곳에서 지웠을 수 있어요');
+    const caseOnly = dst.toLowerCase() === from.toLowerCase(); // Windows 는 대소문자만 다른 이름을 같은 폴더로 본다
+    if (!caseOnly && fs.existsSync(path.join(this.root, dst))) throw new Error(`"${dst}" 폴더가 이미 있어요. 다른 이름을 써 주세요`);
+    if (caseOnly) {
+      const tmp = path.join(this.root, `.rename-${randomBytes(3).toString('hex')}`);
+      fs.renameSync(a, tmp);
+      fs.renameSync(tmp, path.join(this.root, dst));
+    } else fs.renameSync(a, path.join(this.root, dst));
+    const ids = [];
+    for (const e of this.entries.values()) {
+      if (!e.file || folderOf(e.file) !== from) continue;
+      e.file = `${dst}${e.file.slice(from.length)}`;
+      this.stampMoved(e);
+      ids.push(e.id);
+    }
+    if (ids.length) this.changed(ids);
+    return dst;
+  }
+
+  /**
+   * 폴더 지우기: 안의 메모는 모두 폴더 밖(맨 위)으로 꺼내고, 그러고 나서 비었으면 폴더를 지운다
+   *   (메모가 아닌 파일이 남아 있으면 폴더는 그대로 둔다 — 사용자의 파일을 지우지 않게) → { moved, removed }
+   */
+  deleteFolder(name) {
+    if (!isFolderName(name)) throw new Error('폴더 이름으로 쓸 수 없어요');
+    let moved = 0;
+    for (const e of [...this.entries.values()]) if (e.file && folderOf(e.file) === name && this.moveToFolder(e.id, '')) moved++;
+    const dir = path.join(this.root, name);
+    const junk = new Set(['desktop.ini', 'thumbs.db', '.ds_store']);
+    let left = [];
+    try {
+      left = fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter((d) => !d.isDirectory() && !junk.has(d.name.toLowerCase()));
+    } catch {
+      return { moved, removed: true }; // 이미 없음
+    }
+    if (left.length) return { moved, removed: false };
+    fs.rmSync(dir, { recursive: true, force: true });
+    return { moved, removed: true };
   }
 
   // 같은 id 의 두 파일을 하나로: 남길 자리에 남길 내용을 두고, 다른 파일은 id 를 뺀 채 휴지통으로
