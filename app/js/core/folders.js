@@ -3,6 +3,8 @@
 //   더 깊은 폴더("업무/2026/회의.md")의 메모도 맨 위 폴더("업무")로 센다 (메모킹은 한 단계만 보여 준다).
 //   첨부는 폴더와 상관없이 늘 맨 위 attachments/ 에 두고 본문에도 "attachments/..." 로 적는다 (옮겨도 고칠 것이 없게).
 
+import { parseMemoFile, serializeMemoFile } from './memo-file.js';
+
 // 메모킹이 쓰는 폴더 — 메모 폴더로 보이지 않게
 const RESERVED = new Set(['_memoking', 'attachments']);
 // Windows · 안드로이드 파일 이름에 못 쓰는 글자와 줄바꿈 같은 보이지 않는 글자
@@ -41,6 +43,21 @@ export function folderList(dirs, memos) {
 }
 
 const time = (v) => Date.parse(v ?? '') || 0;
+
+/**
+ * 휴지통으로 보내는 같은 id 의 남은 파일: id 를 지운 글로 — 되살리면 새 id 를 받은 따로인 메모(사본)가 된다
+ *   (id 가 그대로면 되살리자마자 다시 "같은 id 의 두 파일" 로 보여 휴지통으로 돌아갔다)
+ */
+export function withoutId(text) {
+  const { meta, body } = parseMemoFile(String(text ?? ''));
+  return serializeMemoFile({ ...meta, id: undefined }, body);
+}
+
+/** 옮긴 뒤 안내: "업무 폴더로 옮겼어요" · "메모 3개를 폴더에서 뺐어요" */
+export function movedText(moved, to) {
+  const many = moved > 1 ? `메모 ${moved}개를 ` : '';
+  return to ? `${many}${to} 폴더로 옮겼어요` : `${many}폴더에서 뺐어요`;
+}
 
 /**
  * 같은 id 의 메모 파일이 둘 — 한 기기에서 폴더를 옮긴 사이 다른 기기가 옛 자리의 메모를 고쳐 동기화가 되살린 경우.

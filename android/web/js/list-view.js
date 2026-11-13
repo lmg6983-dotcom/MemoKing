@@ -22,8 +22,8 @@ import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { openFolderSheet, pickFolder } from '../../app/js/folder-ui.js';
-import { folderList } from '../../app/js/core/folders.js';
+import { openFolderSheet, pickFolder, createPickBar } from '../../app/js/folder-ui.js';
+import { folderList, movedText } from '../../app/js/core/folders.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -76,6 +76,7 @@ const state = {
   mode: 'life', // 메모킹 Work / Life — 이 휴대폰에서 고른 것 (메모 파일에는 메모마다 mode)
   workLife: null, // 설정 › Work / Life 나누기 (null: 정한 적 없음 — 처음 목록을 읽을 때 Work 메모가 있으면 켬)
   folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 휴대폰에 기억
+  folderDirs: null, // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도) — 앱에 묻는 일이라 기억해 두고 필요할 때만 다시 (loadFolderDirs)
   picking: false, // 여러 장 고르기 (메모 메뉴 › 여러 개 고르기) — 카드를 누르면 열지 않고 고른다
   picked: new Set(),
 };
@@ -396,6 +397,7 @@ function filterCount() {
 export function render() {
   stale = false;
   clearTimeout(staleTimer);
+  keepFolderValid();
   const narrowed = Boolean(state.query) || filterCount() > 0;
   const pick = { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] };
   // 폴더: 고른 폴더의 메모만 (검색은 모든 폴더에서 — 카드에 폴더 이름이 보인다)
@@ -418,8 +420,20 @@ export function render() {
 
 // ---------- 폴더 (folder-ui.js · core/folders.js) ----------
 
+function loadFolderDirs() {
+  state.folderDirs = app.vault?.folders?.() ?? [];
+}
+
+// 폴더 목록: 기억해 둔 것 + 메모가 든 폴더 (처음 · 모르는 폴더의 메모가 들어왔을 때만 앱에 다시 묻는다)
 function folders() {
-  return folderList(app.vault?.folders?.() ?? [], modeMemos());
+  const memos = modeMemos();
+  if (!state.folderDirs || memos.some((m) => m.folder && !state.folderDirs.includes(m.folder))) loadFolderDirs();
+  return folderList(state.folderDirs, memos);
+}
+
+// 고른 폴더가 없어졌으면(다른 기기 · 파일 앱에서 지움) 전체로 — 카드를 거르기 전에
+function keepFolderValid() {
+  if (state.folder && !folders().some((f) => f.name === state.folder)) state.folder = '';
 }
 
 function setFolder(name) {
@@ -435,8 +449,6 @@ function setFolder(name) {
 
 function renderFolderBar() {
   const list = folders();
-  // 고른 폴더가 없어졌으면(다른 기기에서 지움) 전체로
-  if (state.folder && !list.some((f) => f.name === state.folder)) state.folder = '';
   $('folder-bar-name').textContent = state.folder || '전체';
   $('folder-bar-count').textContent = String(state.folder ? list.find((f) => f.name === state.folder)?.count ?? 0 : modeMemos().length);
   el.folderBar.hidden = Boolean(state.query); // 검색은 모든 폴더에서
@@ -447,7 +459,8 @@ function renderFolderBar() {
 /** 메모들을 폴더로: 폴더 고르기 창 (current: 지금 폴더 — 흐리게) */
 export async function moveToFolder(ids, current) {
   if (!ids.length || !app.vault) return;
-  const to = await pickFolder({ folders: app.vault.folders(), current: ids.length === 1 ? current ?? '' : null, count: ids.length });
+  loadFolderDirs();
+  const to = await pickFolder({ folders: state.folderDirs, current: ids.length === 1 ? current ?? '' : null, count: ids.length });
   if (to === null) return;
   let moved = 0;
   try {
@@ -456,32 +469,17 @@ export async function moveToFolder(ids, current) {
     toast(err.message || '옮기지 못했어요', true);
   }
   stopPicking();
+  loadFolderDirs(); // 새 폴더로 옮겼으면 그 폴더도
   render();
-  if (moved) toast(to ? `${moved > 1 ? `메모 ${moved}개를 ` : ''}${to} 폴더로 옮겼어요` : `${moved > 1 ? `메모 ${moved}개를 ` : ''}폴더에서 뺐어요`);
+  if (moved) toast(movedText(moved, to));
 }
 
-const pickBar = (() => {
-  const bar = document.createElement('div');
-  bar.className = 'pick-bar';
-  bar.setAttribute('role', 'toolbar');
-  bar.setAttribute('aria-label', '고른 메모');
-  bar.hidden = true;
-  const text = document.createElement('span');
-  const move = Object.assign(document.createElement('button'), { type: 'button', className: 'btn primary', textContent: '폴더로 옮기기' });
-  move.addEventListener('click', () => moveToFolder([...state.picked], null));
-  const cancel = Object.assign(document.createElement('button'), { type: 'button', className: 'btn', textContent: '그만' });
-  cancel.addEventListener('click', () => stopPicking());
-  bar.append(text, move, cancel);
-  document.body.append(bar);
-  return bar;
-})();
+const pickBar = createPickBar({ onMove: () => moveToFolder([...state.picked], null), onCancel: () => stopPicking() });
 
 function showPicks() {
   for (const c of el.cards.querySelectorAll('.card')) c.classList.toggle('picked', state.picked.has(c.dataset.id));
-  pickBar.firstChild.textContent = `${state.picked.size}개 골랐어요`;
-  pickBar.hidden = !state.picking;
+  pickBar.show(state.picked.size, state.picking);
   document.body.classList.toggle('picking', state.picking); // 고르는 동안 + 단추는 숨긴다 (막대와 겹치지 않게)
-  pickBar.querySelector('.primary').disabled = state.picked.size === 0;
 }
 
 /** 여러 장 고르기 시작 (이 메모를 고른 채) */
@@ -507,11 +505,13 @@ function stopPicking() {
 }
 
 el.folderBar.addEventListener('click', async () => {
+  loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
   const picked = await openFolderSheet({ folders: folders(), total: modeMemos().length, current: state.folder });
   if (picked == null) return;
   if (typeof picked === 'object') {
     try {
       app.vault.createFolder(picked.create);
+      loadFolderDirs();
     } catch (err) {
       return toast(err.message || '폴더를 만들지 못했어요');
     }

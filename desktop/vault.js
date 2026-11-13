@@ -15,7 +15,7 @@ import { isLockedBody, parseLocked } from '../app/js/core/memo-lock.js';
 import { isLiveCached } from '../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles, diskCopy } from '../app/js/core/vault-locks.js';
 import { textMatcher } from '../app/js/core/text-match.js';
-import { folderOf, cleanFolderName, isFolderName, resolveMovedTwin } from '../app/js/core/folders.js';
+import { folderOf, cleanFolderName, isFolderName, resolveMovedTwin, withoutId } from '../app/js/core/folders.js';
 import {
   VERSIONS_DIR, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune, describeVersions } from '../app/js/core/versions.js';
 
@@ -656,11 +656,14 @@ export class Vault extends EventEmitter {
     return true;
   }
 
-  // 같은 id 의 두 파일을 하나로: 남길 자리에 남길 내용을 두고, 다른 파일은 휴지통으로 (지우지 않는다)
+  // 같은 id 의 두 파일을 하나로: 남길 자리에 남길 내용을 두고, 다른 파일은 id 를 뺀 채 휴지통으로
+  //   (지우지 않는다 — 되살리면 따로인 사본 메모로. 휴지통에 먼저 쓴 뒤에 지운다)
   settleTwin({ target, source, drop }) {
     try {
+      const dropText = fs.readFileSync(this.abs(drop), 'utf8');
       if (source !== target) writeAtomic(this.abs(target), fs.readFileSync(this.abs(source), 'utf8'));
-      fs.renameSync(this.abs(drop), path.join(this.trashDir, `${path.posix.basename(drop, '.md')} (${stamp()}).md`));
+      writeAtomic(path.join(this.trashDir, `${path.posix.basename(drop, '.md')} (${stamp()}).md`), withoutId(dropText));
+      fs.rmSync(this.abs(drop), { force: true });
     } catch (err) {
       this.emit('error', err);
     }

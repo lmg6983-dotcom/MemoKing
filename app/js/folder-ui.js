@@ -140,6 +140,34 @@ export function pickFolder({ folders, current, count = 1 }) {
 }
 
 /**
+ * 여러 장 고르기 막대 (화면 아래 가운데): "N개 골랐어요 · 폴더로 옮기기 · 그만"
+ * @param {{ onMove: () => any, onCancel: () => any }} o
+ * @returns {{ show: (count: number, visible: boolean) => void }}
+ */
+export function createPickBar({ onMove, onCancel }) {
+  const bar = el('div', 'pick-bar');
+  bar.setAttribute('role', 'toolbar');
+  bar.setAttribute('aria-label', '고른 메모');
+  bar.hidden = true;
+  const text = el('span');
+  const move = el('button', 'btn primary', '폴더로 옮기기');
+  move.type = 'button';
+  move.addEventListener('click', () => onMove());
+  const cancel = el('button', 'btn', '그만 고르기');
+  cancel.type = 'button';
+  cancel.addEventListener('click', () => onCancel());
+  bar.append(text, move, cancel);
+  document.body.append(bar);
+  return {
+    show(count, visible) {
+      text.textContent = `${count}개 골랐어요`;
+      move.disabled = count === 0;
+      bar.hidden = !visible;
+    },
+  };
+}
+
+/**
  * 휴대폰: 아래에서 올라오는 폴더 시트 — 고른 폴더 이름 ("" = 전체), 그만두면 null. 새 폴더는 만든 뒤 그 폴더로
  * @param {{ folders: { name: string, count: number }[], total: number, current: string }} o
  */

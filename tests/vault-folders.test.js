@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Vault } from '../desktop/vault.js';
 import { parseMemoFile } from '../app/js/core/memo-file.js';
+import { newLockSession } from '../app/js/core/memo-lock.js';
 
 function withVault(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-folders-'));
@@ -58,6 +59,12 @@ test('옮긴 사이 다른 기기가 옛 자리에서 고쳐 되살림: 옮긴 �
   assert.match(vault.get(id).body, /휴대폰에서 고침/);
   assert.ok(!fs.existsSync(path.join(dir, '회의.md')));
   assert.equal(vault.trashList().length, 1, '옛 파일은 지우지 않고 휴지통에');
+  // 휴지통의 그 파일을 되살리면 따로인 사본 메모로 남는다 (같은 id 라 다시 휴지통으로 가지 않게)
+  const back = vault.restoreTrash(vault.trashList()[0].name);
+  vault.scan();
+  assert.equal(vault.list().length, 2, vault.list().map((m) => m.file).join(', '));
+  assert.notEqual(back, id);
+  assert.equal(vault.trashList().length, 0);
 }));
 
 test('휴지통: 폴더에 있던 메모는 그 폴더로 되살린다 (폴더가 없어졌어도)', () => withVault(({ dir, vault }) => {
@@ -69,3 +76,22 @@ test('휴지통: 폴더에 있던 메모는 그 폴더로 되살린다 (폴더�
   assert.equal(memo(vault, back).file, '업무/보고서.md');
   assert.equal(parseMemoFile(fs.readFileSync(path.join(dir, '업무', '보고서.md'), 'utf8')).meta.extra.trashedFrom, undefined);
 }));
+
+test('잠긴 메모를 옮겨도 파일은 잠긴 그대로 (풀린 글이 새 자리에 쓰이지 않는다)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-folders-'));
+  const vault = new Vault(dir);
+  vault.open();
+  try {
+    const id = vault.create();
+    vault.save(id, '# 비밀\n\n비밀 글');
+    vault.lock(id, await newLockSession('사과1234', { iterations: 1000 })); // 연 채로 (메모리에는 풀린 글)
+    vault.moveToFolder(id, '업무');
+    const text = fs.readFileSync(path.join(dir, '업무', '비밀.md'), 'utf8');
+    assert.ok(!text.includes('비밀 글'), '옮긴 파일에 풀린 글이 없음');
+    assert.equal(vault.list().find((m) => m.id === id).locked, true);
+    assert.equal(vault.get(id).body, '# 비밀\n\n비밀 글', '연 동안은 그대로 읽힘');
+  } finally {
+    vault.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
