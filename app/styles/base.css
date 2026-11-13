@@ -575,7 +575,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   margin-top: 14px; padding: 10px 0 2px;
   background: linear-gradient(to bottom, transparent, var(--flow-bg, var(--surface-2)) 14px);
 }
-.flow-footer .btn { width: 100%; min-height: 40px; border-radius: 12px; font-weight: 700; }
+.flow-footer .btn { width: 100%; min-height: 40px; font-weight: 700; }
 .flow-footer .btn.primary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flow-progress { margin: 0 0 4px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .flow-progress:empty { display: none; }
@@ -912,7 +912,7 @@ dialog.quick-event[open] {
 .cal-views button { height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 .cal-views button[aria-checked="true"] { background: var(--surface-1); color: var(--text-strong); box-shadow: var(--shadow-card); }
 .cal-views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 12.5px; white-space: nowrap; }
+.cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 13px; white-space: nowrap; }
 .cal-link svg { width: 15px; height: 15px; flex: none; }
 .cal-link[hidden] { display: none; }
 
@@ -1733,9 +1733,9 @@ body.picking .card.picked::after {
 .fchip-row.fade-start.fade-end { mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
 .fchip-row::-webkit-scrollbar { display: none; }
 .fchip {
-  display: inline-flex; align-items: center; gap: 5px; flex: none; height: 36px; padding: 0 13px;
+  display: inline-flex; align-items: center; gap: 5px; flex: none; height: 30px; padding: 0 12px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--surface-1, #fff); color: var(--text);
-  font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
   transition: background-color 0.15s ease-out, border-color 0.15s ease-out, transform 0.1s ease-out;
 }
@@ -1751,18 +1751,18 @@ body.picking .card.picked::after {
 /* ＋ 새 폴더: 점선 — 폴더가 아니라 만드는 단추로 읽히게 */
 .fchip-add { border-style: dashed; color: var(--muted); }
 /* 폴더 목록: 폴더 칩이 아닌 "단추" 로 읽히게 — 테두리 없는 그림 단추, 앞에 얇은 구분선 */
-.fchip-all { position: relative; display: inline-flex; align-items: center; gap: 1px; flex: none; width: auto; height: 36px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--muted); }
-.fchip-all::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 1px; background: var(--line); }
+.fchip-all { position: relative; display: inline-flex; align-items: center; gap: 1px; flex: none; width: auto; height: 30px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--muted); }
+.fchip-all::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 1px; background: var(--line); }
 .fchip-all svg { width: 17px; height: 17px; }
 .fchip-all svg:last-child { width: 13px; height: 13px; }
 .fchip-all[aria-expanded="true"] { color: var(--text-strong); background: var(--hover); }
 .fchip-all[hidden] { display: none; }
-.fchip-cancel { flex: none; width: 36px; height: 36px; }
+.fchip-cancel { flex: none; width: 30px; height: 30px; }
 .fchip-cancel svg { width: 16px; height: 16px; }
 .fchip-new { display: flex; gap: 6px; flex: none; }
 .fchip-input {
-  box-sizing: border-box; width: 150px; height: 36px; padding: 0 12px; border: 1px solid var(--brand-yellow); border-radius: 999px;
-  background: var(--bg); color: var(--text-strong); font: inherit; font-size: 14px; outline: none; box-shadow: 0 0 0 1px var(--brand-yellow);
+  box-sizing: border-box; width: 150px; height: 30px; padding: 0 12px; border: 1px solid var(--brand-yellow); border-radius: 999px;
+  background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; outline: none; box-shadow: 0 0 0 1px var(--brand-yellow);
 }
 .fchip-input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
 .fchip-ok { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
