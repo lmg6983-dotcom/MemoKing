@@ -178,7 +178,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 /* 필터 */
 .filter-panel { margin: 4px 16px 8px; padding: 12px; border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line); animation: mk-drop-in 0.15s ease-out; }
 .filter-group { display: flex; align-items: center; gap: 10px; }
-.filter-group + .filter-group { margin-top: 10px; }
+.filter-group + .filter-group { margin-top: 6px; }
 .filter-label { width: 48px; flex: none; font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .color-filter { display: flex; flex-wrap: wrap; gap: 8px; }
 .color-filter button {
@@ -186,16 +186,16 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   height: 30px;
   border: 2px solid transparent;
   border-radius: 50%;
-  background: var(--note-chip);
-  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.3);
+  background: var(--note-bg); /* 메모 메뉴의 색 고르기와 한 벌: 메모지 색 바탕 + 그 색의 진한 테두리 (바탕만으로는 색이 잘 안 갈린다) */
+  box-shadow: inset 0 0 0 2px var(--note-chip);
 }
-.color-filter button[aria-pressed="true"] { border-color: var(--text-strong); box-shadow: inset 0 0 0 2px var(--surface-1); }
+.color-filter button[aria-pressed="true"] { border-color: var(--text-strong); box-shadow: inset 0 0 0 2px var(--surface-1), inset 0 0 0 4px var(--note-chip); }
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip, .tag-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 32px;
+  height: 36px;
   padding: 0 12px;
   flex: none;
   border: 0;
@@ -208,10 +208,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   white-space: nowrap;
 }
 .chip svg { width: 15px; height: 15px; }
-.chip[aria-pressed="true"], .chip[aria-checked="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); box-shadow: none; } /* PC 목록과 같음 (보기 패널의 정렬 · 카드 모양은 aria-checked) */
-@media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .chip[aria-pressed="true"], :where(:root:not([data-theme="light"])) .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
-}
+.chip[aria-pressed="true"], .chip[aria-checked="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); } /* PC 목록과 같음 (보기 패널의 정렬 · 카드 모양은 aria-checked) */
 
 .tag-chip small { font-size: 12px; font-weight: 500; opacity: 0.72; }
 .filter-summary { display: flex; align-items: center; gap: 8px; margin: 0 16px 8px; font-size: 13px; color: var(--muted); }
@@ -500,7 +497,7 @@ h2.sheet-title { font-size: 20px; }
 .sheet .menu-item { min-height: 50px; padding: 10px 8px; font-size: 15.5px; }
 .sheet .menu-item svg { width: 21px; height: 21px; }
 .sheet .swatches { gap: 10px; padding: 4px 4px 14px; margin-bottom: 6px; }
-.sheet .swatch { min-height: 36px; }
+.sheet .swatch { min-height: 36px; box-shadow: inset 0 0 0 2px var(--note-chip); }
 .sheet .links-head { margin-bottom: 10px; font-size: 17px; }
 .sheet .link-search { height: 44px; font-size: 15px; border-radius: 12px; }
 .sheet .link-open { min-height: 44px; font-size: 15px; }
@@ -520,7 +517,7 @@ h2.sheet-title { font-size: 20px; }
 .sheet .task-check { width: 26px; height: 26px; }
 /* 아래 막대는 시트 아래 여백까지 덮는다 — 여백만큼 떠 있으면 그 틈으로 뒤 내용("…에 알려요")이 비쳐 보였다 */
 .sheet .flow-footer { bottom: calc(-20px - env(safe-area-inset-bottom)); margin-bottom: calc(-20px - env(safe-area-inset-bottom)); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
-.sheet .flow-footer .btn { min-height: 52px; font-size: 16px; border-radius: 14px; }
+.sheet .flow-footer .btn { min-height: 48px; }
 .sheet .alert-more { min-height: var(--tap); font-size: 14.5px; }
 /* 시트를 스크롤해도 제목·닫기는 위에 붙어 있게 */
 .sheet > .links-head { position: sticky; top: -6px; z-index: 3; margin: -6px -16px 10px; padding: 12px 16px 8px; background: var(--flow-bg, var(--surface-2)); }
@@ -530,7 +527,7 @@ h2.sheet-title { font-size: 20px; }
 .sheet .dp-time select { height: 44px; font-size: 15px; }
 .sheet .dp-summary { font-size: 14.5px; }
 .sheet .rem-title { font-size: 15px; }
-.sheet .btn { height: 46px; font-size: 15px; }
+.sheet .btn { height: 48px; font-size: 15px; }
 .sheet .btn.small { height: var(--tap); padding: 0 14px; font-size: 14px; }
 
 .sheet .label { margin: 18px 4px 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
@@ -720,7 +717,7 @@ h2.sheet-title { font-size: 20px; }
 
 .dialog { width: min(360px, calc(100vw - 40px)); }
 .dialog p { font-size: 15px; }
-.dialog .btn { height: 44px; min-width: 84px; }
+.dialog .btn { height: 48px; min-width: 84px; }
 
 /* 인쇄(PDF로 저장): 메모 내용만 */
 @media print {
@@ -1013,7 +1010,7 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   height: 52px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 18px; /* 목록의 ＋ 와 같은 둥근 사각 */
   background: var(--surface-2);
   color: var(--text-strong);
   box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
@@ -1131,7 +1128,7 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 }
 .color-filter { gap: 10px; } /* 30px 동그라미 사이를 넓혀 옆 동그라미와 누르는 자리가 덜 겹치게 (390px 폭에서도 7개가 한 줄) */
 .filter-group { align-items: flex-start; }
-.filter-label { line-height: 30px; }
+.filter-label { line-height: 36px; }
 /* 튜토리얼 그만두기 · 안내 알겠어요 단추도 손가락 크기로 */
 .coach-skip, .hint-ok { min-height: var(--tap); }
 
@@ -1153,7 +1150,7 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 18px;
   background: var(--surface-2);
   color: var(--text-strong);
   box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
@@ -1236,8 +1233,6 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 
 /* 고른 날 제목 옆 "＋ 일정 추가" (list-reminders.js) */
 .ev-day-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ev-add { text-decoration: none; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--fill-tab, var(--hover)); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
-.ev-add svg { width: 16px; height: 16px; }
 /* 일정 탭에도 + 단추가 있으므로 마지막 줄이 단추 위로 올라올 만큼 아래 여백 */
 #reminder-groups { padding-bottom: 104px; }
 /* 일정 탭 아래 빠른 추가 캡슐(base.css .cal-quick)은 아래 탭바 위에 — 탭바를 덮지 않게 (PC 는 탭바가 없어 base.css 의 자리 그대로) */

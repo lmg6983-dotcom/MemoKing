@@ -529,7 +529,7 @@ try {
   await page.waitForTimeout(300);
   check('다른 캘린더: 휴대폰 캘린더 켜기 (권한 허용)', await page.isChecked('.feed-device .switch'));
   await shot('02i-calendar-links');
-  await page.tap('.cal-links .dialog-actions .btn');
+  await page.tap('.cal-links .dialog-x');
   await page.waitForTimeout(800);
   const ext = await page.evaluate(() => ({
     bars: [...document.querySelectorAll('#reminder-groups .mk-ext')].map((e) => e.title),

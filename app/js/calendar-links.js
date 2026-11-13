@@ -378,13 +378,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
       ? '삼성 캘린더는 위의 "이 휴대폰의 캘린더" 를 켜면 바로 보여요. 비공개 주소는 그 캘린더를 누구나 볼 수 있는 열쇠라 이 기기에만 저장해요.'
       : '삼성 캘린더: Galaxy 휴대폰의 삼성 캘린더를 Google 계정과 동기화해 두면, 그 Google 캘린더 주소로 PC에서도 보여요. 휴대폰 메모킹에서는 "이 휴대폰의 캘린더" 를 켜면 바로 보여요. 비공개 주소는 그 캘린더를 누구나 볼 수 있는 열쇠라 이 PC에만 저장해요.'));
 
-    const actions = el('div', 'dialog-actions');
-    const done = el('button', 'btn', '닫기');
-    done.type = 'button';
-    done.addEventListener('click', () => dialog.close());
-    actions.append(done);
-
-    dialog.append(head, lead, list, openAdd, openNaver, addHolidays, addForm, naverForm, addNote, help, naverHelp, actions);
+    dialog.append(head, lead, list, openAdd, openNaver, addHolidays, addForm, naverForm, addNote, help, naverHelp);
     dialog.addEventListener('close', () => {
       dialog.remove();
       resolve();

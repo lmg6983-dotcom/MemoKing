@@ -27,6 +27,7 @@
   --text-muted: #6b6860;
   --text-faint: #8f8c83;
   --danger: #d93036;
+  --sat: #2260c4; /* 달력 토요일 (흰 바탕 5.9:1) */
   --ok-text: #1e7a45; /* 복사했어요 · 저장 같은 성공 글 */
   --err-text: #b42318; /* 실패 글 (빨강 바탕이 아닌 글자) */
   --on-danger: #ffffff;
@@ -98,6 +99,7 @@
     --text-muted: #a3a098;
     --text-faint: #77746c;
     --danger: #ff6b70;
+    --sat: #74b0f7;
     --ok-text: #6fd39a;
     --err-text: #ff8a80;
     --on-danger: #1a0506;
@@ -171,7 +173,7 @@ svg { width: 20px; height: 20px; flex: none; }
    누를 수 있는 글자는 그렇게 보이게 (휴대폰과 같은 노란 밑줄 · 지우는 일은 빨강) */
 .link-btn { flex: none; white-space: nowrap; border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 @media (hover: hover) and (pointer: fine) { .link-btn:hover { background: var(--hover); color: var(--text); } .link-btn.danger:hover { color: var(--danger); } }
-.link-btn:where(:not(.ev-add)) { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.link-btn { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .link-btn.danger { color: var(--danger); text-decoration-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .link-btn:where(:disabled) { opacity: 0.45; cursor: default; background: none; color: var(--muted); } /* :where — 각 창 CSS(휴대폰 mobile.css 등)의 .link-btn 이 그대로 이기게 */
 
@@ -510,8 +512,9 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   padding: 6px 10px;
   border: 0;
   border-radius: 6px;
-  background: var(--brand-yellow);
-  color: var(--on-brand); /* Work 에서는 남색 바탕 · 흰 글자 */
+  background: transparent; /* 안내를 닫는 것뿐이라 채우지 않는다 (노랑 채움은 주요 동작에만) */
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-strong);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -572,7 +575,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   margin-top: 14px; padding: 10px 0 2px;
   background: linear-gradient(to bottom, transparent, var(--flow-bg, var(--surface-2)) 14px);
 }
-.flow-footer .btn { width: 100%; min-height: 40px; border-radius: 12px; font-weight: 700; }
+.flow-footer .btn { width: 100%; min-height: 40px; font-weight: 700; }
 .flow-footer .btn.primary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flow-progress { margin: 0 0 4px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .flow-progress:empty { display: none; }
@@ -909,7 +912,7 @@ dialog.quick-event[open] {
 .cal-views button { height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 .cal-views button[aria-checked="true"] { background: var(--surface-1); color: var(--text-strong); box-shadow: var(--shadow-card); }
 .cal-views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 12.5px; white-space: nowrap; }
+.cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 13px; white-space: nowrap; }
 .cal-link svg { width: 15px; height: 15px; flex: none; }
 .cal-link[hidden] { display: none; }
 
@@ -1092,16 +1095,19 @@ dialog.quick-event[open] {
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: transparent;
-  color: var(--text-strong);
+  background: var(--brand-yellow); /* 이 줄의 주요 동작: 옆의 상세 · 닫기(고스트)와 달리 채운다 */
+  color: var(--on-brand);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
+/* 휴대폰의 48px 아이콘 단추 크기(mobile.css)보다 앞서게: 캡슐 안의 채운 동그라미, 누르는 자리는 48px */
+.cal-quick button.cal-quick-save { position: relative; width: 34px; height: 34px; min-height: 34px; margin: 0 4px; border-radius: 999px; }
+.cal-quick button.cal-quick-save::before { content: ""; position: absolute; inset: -7px; }
 .cal-quick-save:hover {
-  background: var(--fill-hover);
+  background: var(--brand-yellow-hover, var(--brand-yellow));
 }
 .cal-quick-save:active {
   transform: scale(0.92);
@@ -1184,6 +1190,12 @@ dialog.quick-event[open] {
 .cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: #c4282e; }
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal-body [role="columnheader"].mk-sun, :where(:root:not([data-theme="light"])) .cal-body [role="gridcell"].mk-sun > :first-child { color: var(--danger); } }
 
+/* 토요일 파랑 (네이버 · 삼성 캘린더처럼 한국 달력의 관례): 일요일 빨강과 같은 세기로 */
+.cal-body [role="columnheader"].mk-sat, .cal-body [role="gridcell"].mk-sat > :first-child { color: var(--sat); }
+/* 일정 · 알림 줄의 지우기: 줄마다 있어 조용하게, 누르거나 올리면 또렷하게 */
+.row > .icon-btn:last-child { color: var(--text-faint); }
+@media (hover: hover) and (pointer: fine) { .row > .icon-btn:last-child:hover { color: var(--danger); } }
+
 .cal-body [role="gridcell"] { cursor: pointer; }
 /* 고른 날: 노란 테두리 없이 옅은 노랑 바탕이 스르르 (고를 때마다 페이드 인) */
 .cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); animation: mk-day-pick 0.24s ease-out; }
@@ -1261,9 +1273,10 @@ dialog.quick-event[open] {
 .cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: 22px; min-width: 22px; height: 22px; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; line-height: 1; }
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: #c4282e; } /* 일요일 빨강은 그대로 */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
+.cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sat, [role="gridcell"].mk-sat > :first-child) { color: var(--sat); } /* 토요일 파랑도 */
 
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 3px !important; }
-.cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext), .cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext) > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
+.cal[data-view="dayGridMonth"] .cal-body .mk-ev, .cal[data-view="dayGridMonth"] .cal-body .mk-ev > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
 /* 좁은 창(휴대폰): 달력을 화면 폭 가까이 넓혀 칸마다 글자가 더 들어가게 */
 @media (max-width: 700px) { .cal[data-view="dayGridMonth"] { margin-inline: -9px; padding-inline: 2px; } }
 /* 칩 제목: 칸 폭에 맞춘 크기(공백 포함 한글 8자쯤 — 휴대폰 약 8~9px, 넓은 창은 11px 까지) · 보통 굵기 · 살짝 좁은 자간 */
@@ -1279,7 +1292,6 @@ dialog.quick-event[open] {
 .cal-daytop { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .cal-daytop .cal-dots { display: flex; gap: 2px; height: 4px; }
 .cal-daytop .cal-dots i { width: 4px; height: 4px; border-radius: 99px; background: var(--note-chip); }
-/* 무게: 내 메모 일정은 메모 색을 꽉 채운 칩, 다른 캘린더 일정은 그 캘린더 색을 옅게 + 아래 그림자 (보기만 하는 일정이라 덜 무겁게) */
 /* 칩 색: 메모 카드와 같은 메모지 색 — 연한 메모 바탕 + 메모 줄 색 얇은 테두리 + 같은 색 계열의 진한 글자 (목록 카드와 한 벌로 보이게) */
 .cal-body .mk-ev:not(.mk-ext) {
   background: var(--note-bg, var(--yellow-bg)) !important;
@@ -1324,17 +1336,20 @@ dialog.quick-event[open] {
 .cal-body .mk-ev:not(.mk-ext) * { color: inherit !important; } /* 칩 안쪽 글자도 (FullCalendar 가 안쪽에 색을 따로 줌) */
 /* 목록 보기는 줄이 넓어 꽉 채우면 무거움 — 메모 일정은 진한 옅은 바탕, 다른 캘린더는 더 옅게 (무게 차이는 그대로) */
 .cal[data-view="listMonth"] .cal-body .mk-ev:not(.mk-ext) { background: color-mix(in srgb, var(--fc-event-color) 26%, transparent) !important; color: var(--text-strong); }
-/* 다른 캘린더 일정: 그 캘린더 색이 칩에서 구별되게 — 몸통은 그 색을 옅게, 아래 2px 은 몸통보다 어두운 그림자.
-   보기만 하는 일정이라 내 메모 일정(꽉 찬 메모 색)보다 가볍게 둔다. 앞 점 · 왼쪽 띠처럼 글자 자리는 먹지 않는다 */
+/* 다른 캘린더 일정: 내 메모 일정과 같은 한 벌 — 그 캘린더 색을 메모지 색처럼 옅은 바탕 + 한 단계 진한 얇은 테두리 + 같은 색 계열의 진한 글자.
+   oklch 로 섞어 색이 탁해지지 않게 (검정을 섞은 아래 그림자는 갈색으로 죽어 보였다) */
 .cal-body .mk-ext {
-  background: color-mix(in srgb, var(--fc-event-color) 30%, var(--surface-1, #fff)) !important;
-  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--fc-event-color) 65%, #000);
-  color: var(--text-strong);
+  background: color-mix(in oklch, var(--fc-event-color) 20%, #fff) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 42%, #fff);
+  color: color-mix(in oklch, var(--fc-event-color) 40%, #1b1b1f);
+  font-weight: 600;
 }
+.cal-body .mk-ext * { color: inherit !important; }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .cal-body .mk-ext {
-    background: color-mix(in srgb, var(--fc-event-color) 40%, var(--surface-1, #1c1c1e)) !important;
-    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--fc-event-color) 22%, #000);
+    background: color-mix(in oklch, var(--fc-event-color) 26%, #1c1c1e) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 40%, #1c1c1e);
+    color: color-mix(in oklch, var(--fc-event-color) 55%, #fff);
   }
 }
 .cal-body .mk-ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -1378,7 +1393,7 @@ dialog.quick-event[open] {
 .feed-text small { overflow: hidden; font-size: 11.5px; color: var(--muted); text-overflow: ellipsis; }
 .feed-text small.err { color: var(--danger); }
 .feed-add { display: flex; gap: 6px; }
-.feed-open-add { display: block; margin: 2px 0 0 -6px; min-height: 40px; }
+.link-btn.feed-open-add { display: flex; align-items: center; width: 100%; min-height: 44px; margin: 8px 0 0; padding: 0 14px; border-radius: var(--radius-md); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line); text-decoration: none; text-align: left; } /* 더하는 동작이라 링크가 아닌 단추 모양 */
 .feed-open-add[hidden], .cal-help[hidden] { display: none; }
 .feed-add[hidden] { display: none; }
 .feed-naver { display: grid; gap: 10px; }
@@ -1391,6 +1406,7 @@ dialog.quick-event[open] {
 .feed-add .btn { height: 38px; padding: 0 14px; }
 .dialog p.feed-note { min-height: 1.4em; margin: 6px 2px 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .dialog p.feed-note.err { color: var(--danger); }
+.dialog p.feed-note:empty { min-height: 0; margin: 0; } /* 알릴 것이 없을 때는 창 아래에 빈 줄을 남기지 않는다 */
 .feed-note svg { width: 14px; height: 14px; vertical-align: -2px; }
 .cal-help { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
 .cal-help summary { display: flex; align-items: center; min-height: 40px; padding: 4px 0; font-weight: 700; color: var(--text); cursor: pointer; }
@@ -1410,7 +1426,7 @@ dialog.quick-event[open] {
 .ed-lines svg { flex: none; width: 18px; height: 18px; margin-top: 1px; color: var(--muted); }
 .ed-lines .ed-when { font-weight: 700; color: var(--text-strong); }
 .ed-dot { flex: none; width: 12px; height: 12px; margin: 4px 3px 0; border-radius: 99px; background: var(--ev-color, var(--note-chip, var(--brand-yellow))); }
-.ed-badge { flex: none; margin-left: auto; padding: 1px 8px; border: 1px solid var(--line); border-radius: 99px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.ed-badge { flex: none; margin-left: auto; font-size: 12px; font-weight: 600; color: var(--muted); } /* 표시일 뿐이라 단추처럼 보이지 않게 테두리 없이 */
 .dialog p.ed-note { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-1); font-size: 13.5px; line-height: 1.6; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
 .ed-link { color: var(--text-strong); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 2px; overflow-wrap: anywhere; cursor: pointer; }
 .ed-lines .ed-url { font-size: 13.5px; }
@@ -1430,7 +1446,7 @@ dialog.quick-event[open] {
 .rows-title.ev-upcoming-title { margin-top: 18px; color: var(--text); font-size: 13px; }
 .rows-title.ev-sub-title { margin-top: 8px; font-weight: 600; }
 /* 어두운 화면: 노랑을 섞은 칠은 칙칙한 올리브가 돼 — 한 단 밝은 바탕 + 노란 테두리로 */
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-body [role="gridcell"].mk-selected { background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent); } } /* 밝은 화면 · 휴대폰처럼 채움 + 테두리 */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-body [role="gridcell"].mk-selected { background: color-mix(in srgb, var(--accent) 13%, var(--surface-2)); } } /* 밝은 화면처럼 테두리 없이 옅은 채움만 */
 .event-dialog { max-height: calc(100vh - 16px); }
 @media (max-height: 520px) {
   .event-dialog { padding-top: 14px; padding-bottom: 12px; }
@@ -1566,7 +1582,7 @@ dialog.quick-event[open] {
 .work-hours .wh-days { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
 .work-hours .wh-day { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .work-hours .wh-day.sun { color: var(--danger); }
-.work-hours .wh-day[aria-pressed="true"] { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); }
+.work-hours .wh-day[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); }
 .work-hours .wh-time { display: flex; align-items: center; gap: 8px; }
 .work-hours .wh-time input { height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
 .work-hours .wh-sum { font-weight: 500; color: var(--muted); }
@@ -1718,9 +1734,9 @@ body.picking .card.picked::after {
 .fchip-row.fade-start.fade-end { mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
 .fchip-row::-webkit-scrollbar { display: none; }
 .fchip {
-  display: inline-flex; align-items: center; gap: 5px; flex: none; height: 36px; padding: 0 13px;
+  display: inline-flex; align-items: center; gap: 5px; flex: none; height: 30px; padding: 0 12px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--surface-1, #fff); color: var(--text);
-  font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
   transition: background-color 0.15s ease-out, border-color 0.15s ease-out, transform 0.1s ease-out;
 }
@@ -1730,27 +1746,28 @@ body.picking .card.picked::after {
 @media (prefers-reduced-motion: no-preference) { .fchip:active { transform: scale(0.96); } }
 @media (hover: hover) and (pointer: fine) { .fchip:hover { background: var(--hover); } }
 .fchip:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
-.fchip[aria-pressed="true"] { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
+/* 고른 것: 옅은 노랑 바탕 + 노랑 테두리 (일정 창의 고른 칸과 같게). 꽉 찬 노랑은 ＋ 같은 주요 동작에만 */
+.fchip[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 800; }
 .fchip[aria-pressed="true"] svg, .fchip[aria-pressed="true"] .fchip-count { color: inherit; }
 /* ＋ 새 폴더: 점선 — 폴더가 아니라 만드는 단추로 읽히게 */
 .fchip-add { border-style: dashed; color: var(--muted); }
 /* 폴더 목록: 폴더 칩이 아닌 "단추" 로 읽히게 — 테두리 없는 그림 단추, 앞에 얇은 구분선 */
-.fchip-all { position: relative; display: inline-flex; align-items: center; gap: 1px; flex: none; width: auto; height: 36px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--muted); }
-.fchip-all::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 1px; background: var(--line); }
+.fchip-all { position: relative; display: inline-flex; align-items: center; gap: 1px; flex: none; width: auto; height: 30px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--muted); }
+.fchip-all::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 1px; background: var(--line); }
 .fchip-all svg { width: 17px; height: 17px; }
 .fchip-all svg:last-child { width: 13px; height: 13px; }
 .fchip-all[aria-expanded="true"] { color: var(--text-strong); background: var(--hover); }
 .fchip-all[hidden] { display: none; }
-.fchip-cancel { flex: none; width: 36px; height: 36px; }
+.fchip-cancel { flex: none; width: 30px; height: 30px; }
 .fchip-cancel svg { width: 16px; height: 16px; }
 .fchip-new { display: flex; gap: 6px; flex: none; }
 .fchip-input {
-  box-sizing: border-box; width: 150px; height: 36px; padding: 0 12px; border: 1px solid var(--brand-yellow); border-radius: 999px;
-  background: var(--bg); color: var(--text-strong); font: inherit; font-size: 14px; outline: none; box-shadow: 0 0 0 1px var(--brand-yellow);
+  box-sizing: border-box; width: 150px; height: 30px; padding: 0 12px; border: 1px solid var(--brand-yellow); border-radius: 999px;
+  background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; outline: none; box-shadow: 0 0 0 1px var(--brand-yellow);
 }
 .fchip-input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
 .fchip-ok { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
 @media (pointer: coarse) {
-  .fchip, .fchip-input { height: 40px; font-size: 14.5px; }
+  .fchip, .fchip-input { height: 36px; font-size: 13.5px; } /* 보기 패널의 칩과 같은 크기 (누르는 자리는 mobile.css 가 48px 로 넓힌다) */
   .fchip-all, .fchip-cancel { height: 44px; min-width: 44px; }
 }

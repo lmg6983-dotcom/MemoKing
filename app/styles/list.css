@@ -167,14 +167,14 @@ body {
   overflow-wrap: anywhere;
 }
 .cards[data-layout="rows"] .card-preview { -webkit-line-clamp: 2; }
-/* 사진 높이를 미리 정해 두어야 카드를 엇갈려 쌓을 때 자리가 맞는다 · 사진 전체가 보이게 (남는 자리는 옅은 바탕) */
+/* 사진 높이를 미리 정해 두어야 카드를 엇갈려 쌓을 때 자리가 맞는다 · 휴대폰처럼 칸을 꽉 채운다 (양옆 띠 없이) */
 .card-thumb {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 4 / 3;
   border-radius: 10px;
-  object-fit: contain;
+  object-fit: cover;
   background: color-mix(in srgb, var(--note-fg) 7%, transparent);
 }
 .cards[data-layout="rows"] .card-thumb { aspect-ratio: 16 / 7; }
@@ -496,7 +496,8 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
   padding: 0 10px;
   border: 0;
   border-radius: 999px;
-  background: var(--fill-tab);
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--text);
   font-size: 12.5px;
   font-weight: 600;
@@ -504,7 +505,7 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
   cursor: pointer;
 }
 .filter-chip:hover, .tag-chip:hover { background: var(--hover); }
-.filter-chip[aria-pressed="true"], .filter-chip[aria-checked="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow); color: var(--on-brand); }
+.filter-chip[aria-pressed="true"], .filter-chip[aria-checked="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); }
 .tag-chip small { font-size: 12px; font-weight: 500; color: var(--muted); }
 .tag-chip[aria-pressed="true"] small { color: var(--on-brand); }
 
@@ -929,7 +930,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .setting-row.split { cursor: default; }
 .setting-row.split > span { flex: 1; min-width: 0; }
 .setting-row.split > :is(.kbd-btn, .btn) { flex: none; }
-.setting-row.split a.btn { height: 34px; color: var(--text); text-decoration: none; }
+.setting-row.split a.btn { color: var(--text); text-decoration: none; }
 .sc-note:empty { display: none; }
 .sc-note.warn { color: var(--danger); }
 
@@ -947,8 +948,6 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 
 /* 고른 날 제목 옆 "＋ 일정 추가" (list-reminders.js) */
 .ev-day-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ev-add { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 0; border-radius: 999px; background: var(--fill-tab, var(--hover)); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-.ev-add svg { width: 14px; height: 14px; }
 
 /* 파일을 끌어다 놓을 때 (list.js) — 목록 위에 "놓으면 메모로" */
 .file-drop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(2px); pointer-events: none; animation: mk-fade-in 0.12s ease-out; }
@@ -1090,3 +1089,6 @@ body.coaching .sync-btn.invite .sync-mark { display: none; } /* 튜토리얼 동
    그 줄은 그대로 잡고 창을 옮길 수 있음 */
 body > :is(.mem-album, .mem-preview) { padding-top: 52px; } /* memories.css 보다 늦게 와도 이기게 · 한 장으로 미리보기도 */
 body > :is(.mem-album, .mem-preview)::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 44px; -webkit-app-region: drag; }
+
+/* 스크롤 막대: 목록 창 어디서나 가늘고 옅게 (Windows 기본 굵은 막대와 화살표 대신), 메모 창 편집기와 같은 결 */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text) 24%, transparent) transparent; }
