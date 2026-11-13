@@ -27,6 +27,7 @@
   --text-muted: #6b6860;
   --text-faint: #8f8c83;
   --danger: #d93036;
+  --sat: #2260c4; /* 달력 토요일 (흰 바탕 5.9:1) */
   --ok-text: #1e7a45; /* 복사했어요 · 저장 같은 성공 글 */
   --err-text: #b42318; /* 실패 글 (빨강 바탕이 아닌 글자) */
   --on-danger: #ffffff;
@@ -98,6 +99,7 @@
     --text-muted: #a3a098;
     --text-faint: #77746c;
     --danger: #ff6b70;
+    --sat: #74b0f7;
     --ok-text: #6fd39a;
     --err-text: #ff8a80;
     --on-danger: #1a0506;
@@ -1184,6 +1186,12 @@ dialog.quick-event[open] {
 .cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: #c4282e; }
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal-body [role="columnheader"].mk-sun, :where(:root:not([data-theme="light"])) .cal-body [role="gridcell"].mk-sun > :first-child { color: var(--danger); } }
 
+/* 토요일 파랑 (네이버 · 삼성 캘린더처럼 한국 달력의 관례): 일요일 빨강과 같은 세기로 */
+.cal-body [role="columnheader"].mk-sat, .cal-body [role="gridcell"].mk-sat > :first-child { color: var(--sat); }
+/* 일정 · 알림 줄의 지우기: 줄마다 있어 조용하게, 누르거나 올리면 또렷하게 */
+.row > .icon-btn:last-child { color: var(--text-faint); }
+@media (hover: hover) and (pointer: fine) { .row > .icon-btn:last-child:hover { color: var(--danger); } }
+
 .cal-body [role="gridcell"] { cursor: pointer; }
 /* 고른 날: 노란 테두리 없이 옅은 노랑 바탕이 스르르 (고를 때마다 페이드 인) */
 .cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); animation: mk-day-pick 0.24s ease-out; }
@@ -1261,6 +1269,7 @@ dialog.quick-event[open] {
 .cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: 22px; min-width: 22px; height: 22px; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; line-height: 1; }
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: #c4282e; } /* 일요일 빨강은 그대로 */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
+.cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sat, [role="gridcell"].mk-sat > :first-child) { color: var(--sat); } /* 토요일 파랑도 */
 
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 3px !important; }
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext), .cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext) > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */

@@ -1090,3 +1090,6 @@ body.coaching .sync-btn.invite .sync-mark { display: none; } /* 튜토리얼 동
    그 줄은 그대로 잡고 창을 옮길 수 있음 */
 body > :is(.mem-album, .mem-preview) { padding-top: 52px; } /* memories.css 보다 늦게 와도 이기게 · 한 장으로 미리보기도 */
 body > :is(.mem-album, .mem-preview)::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 44px; -webkit-app-region: drag; }
+
+/* 스크롤 막대: 목록 창 어디서나 가늘고 옅게 (Windows 기본 굵은 막대와 화살표 대신), 메모 창 편집기와 같은 결 */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text) 24%, transparent) transparent; }

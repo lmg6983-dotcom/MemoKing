@@ -47,6 +47,7 @@
 .mem-weekdays { gap: 4px; }
 .mem-wd { padding: 2px 0; font-size: 11.5px; text-align: center; color: var(--muted); }
 .mem-wd.mem-sun { color: var(--danger); }
+.mem-wd.mem-sat { color: var(--sat); }
 .mem-day {
   position: relative; display: block; aspect-ratio: 1 / 1.08; min-width: 0; padding: 0; overflow: visible;
   border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; text-align: left;
@@ -56,6 +57,7 @@ button.mem-day:hover { transform: translateY(-1px) rotate(-0.6deg); }
 button.mem-day:active { transform: scale(0.96); }
 .mem-num { position: absolute; top: 3px; left: 5px; z-index: 2; font-size: 12px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .mem-day.mem-sun .mem-num { color: var(--danger); }
+.mem-day.mem-sat .mem-num { color: var(--sat); }
 .mem-day.mem-out { opacity: 0.32; }
 /* 오늘: 달 달력과 같은 빨간 색연필 동그라미 (base.css --mk-today-ring) */
 .mem-day.mem-today .mem-num { font-weight: 800; color: var(--text-strong); }
@@ -79,6 +81,7 @@ button.mem-day:active { transform: scale(0.96); }
   background: rgba(255, 255, 255, 0.86); color: #1f1f1c; font-size: 11px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 .mem-day.has-photo.mem-sun .mem-num { color: #d33a40; }
+.mem-day.has-photo.mem-sat .mem-num { color: #2260c4; }
 .mem-day.has-photo.mem-today .mem-num { color: #1f1f1c; } /* 사진 위 흰 바탕 그대로, 동그라미만 */
 .mem-count {
   position: absolute; right: 4px; bottom: 4px; z-index: 2; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px;

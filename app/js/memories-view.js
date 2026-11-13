@@ -121,7 +121,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
     grid.setAttribute('role', 'grid');
     grid.setAttribute('aria-label', `${month.getMonth() + 1}월 회상 달력`);
     const week = el('div', 'mem-week mem-weekdays');
-    WEEK.forEach((w, i) => week.append(el('span', i === 0 ? 'mem-wd mem-sun' : 'mem-wd', w)));
+    WEEK.forEach((w, i) => week.append(el('span', i === 0 ? 'mem-wd mem-sun' : i === 6 ? 'mem-wd mem-sat' : 'mem-wd', w)));
     grid.append(week);
     const start = new Date(first);
     start.setDate(1 - first.getDay());
@@ -145,6 +145,7 @@ export function setupMemoriesView({ api, notify = () => {}, onOverlay = null, co
     if (!inMonth) cell.classList.add('mem-out');
     if (today) cell.classList.add('mem-today');
     if (d.getDay() === 0) cell.classList.add('mem-sun');
+    if (d.getDay() === 6) cell.classList.add('mem-sat');
     const num = el('span', 'mem-num', String(d.getDate()));
     if (rec?.photos.length) {
       cell.classList.add('has-photo');
