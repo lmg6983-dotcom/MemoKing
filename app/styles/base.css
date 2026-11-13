@@ -1272,7 +1272,7 @@ dialog.quick-event[open] {
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sat, [role="gridcell"].mk-sat > :first-child) { color: var(--sat); } /* 토요일 파랑도 */
 
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 3px !important; }
-.cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext), .cal[data-view="dayGridMonth"] .cal-body .mk-ev:not(.mk-ext) > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
+.cal[data-view="dayGridMonth"] .cal-body .mk-ev, .cal[data-view="dayGridMonth"] .cal-body .mk-ev > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
 /* 좁은 창(휴대폰): 달력을 화면 폭 가까이 넓혀 칸마다 글자가 더 들어가게 */
 @media (max-width: 700px) { .cal[data-view="dayGridMonth"] { margin-inline: -9px; padding-inline: 2px; } }
 /* 칩 제목: 칸 폭에 맞춘 크기(공백 포함 한글 8자쯤 — 휴대폰 약 8~9px, 넓은 창은 11px 까지) · 보통 굵기 · 살짝 좁은 자간 */
@@ -1288,7 +1288,6 @@ dialog.quick-event[open] {
 .cal-daytop { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .cal-daytop .cal-dots { display: flex; gap: 2px; height: 4px; }
 .cal-daytop .cal-dots i { width: 4px; height: 4px; border-radius: 99px; background: var(--note-chip); }
-/* 무게: 내 메모 일정은 메모 색을 꽉 채운 칩, 다른 캘린더 일정은 그 캘린더 색을 옅게 + 아래 그림자 (보기만 하는 일정이라 덜 무겁게) */
 /* 칩 색: 메모 카드와 같은 메모지 색 — 연한 메모 바탕 + 메모 줄 색 얇은 테두리 + 같은 색 계열의 진한 글자 (목록 카드와 한 벌로 보이게) */
 .cal-body .mk-ev:not(.mk-ext) {
   background: var(--note-bg, var(--yellow-bg)) !important;
@@ -1333,17 +1332,20 @@ dialog.quick-event[open] {
 .cal-body .mk-ev:not(.mk-ext) * { color: inherit !important; } /* 칩 안쪽 글자도 (FullCalendar 가 안쪽에 색을 따로 줌) */
 /* 목록 보기는 줄이 넓어 꽉 채우면 무거움 — 메모 일정은 진한 옅은 바탕, 다른 캘린더는 더 옅게 (무게 차이는 그대로) */
 .cal[data-view="listMonth"] .cal-body .mk-ev:not(.mk-ext) { background: color-mix(in srgb, var(--fc-event-color) 26%, transparent) !important; color: var(--text-strong); }
-/* 다른 캘린더 일정: 그 캘린더 색이 칩에서 구별되게 — 몸통은 그 색을 옅게, 아래 2px 은 몸통보다 어두운 그림자.
-   보기만 하는 일정이라 내 메모 일정(꽉 찬 메모 색)보다 가볍게 둔다. 앞 점 · 왼쪽 띠처럼 글자 자리는 먹지 않는다 */
+/* 다른 캘린더 일정: 내 메모 일정과 같은 한 벌 — 그 캘린더 색을 메모지 색처럼 옅은 바탕 + 한 단계 진한 얇은 테두리 + 같은 색 계열의 진한 글자.
+   oklch 로 섞어 색이 탁해지지 않게 (검정을 섞은 아래 그림자는 갈색으로 죽어 보였다) */
 .cal-body .mk-ext {
-  background: color-mix(in srgb, var(--fc-event-color) 30%, var(--surface-1, #fff)) !important;
-  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--fc-event-color) 65%, #000);
-  color: var(--text-strong);
+  background: color-mix(in oklch, var(--fc-event-color) 20%, #fff) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 42%, #fff);
+  color: color-mix(in oklch, var(--fc-event-color) 40%, #1b1b1f);
+  font-weight: 600;
 }
+.cal-body .mk-ext * { color: inherit !important; }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .cal-body .mk-ext {
-    background: color-mix(in srgb, var(--fc-event-color) 40%, var(--surface-1, #1c1c1e)) !important;
-    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--fc-event-color) 22%, #000);
+    background: color-mix(in oklch, var(--fc-event-color) 26%, #1c1c1e) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 40%, #1c1c1e);
+    color: color-mix(in oklch, var(--fc-event-color) 55%, #fff);
   }
 }
 .cal-body .mk-ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
