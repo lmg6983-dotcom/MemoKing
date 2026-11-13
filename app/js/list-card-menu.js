@@ -31,6 +31,7 @@ export function cardMenuSpec(memo, { workLife = true } = {}) {
       { id: 'day', label: UI.memoryDay, hint: memo.day ? dayText(memo.day) : UI.madeDay },
       ...(workLife ? [{ id: 'mode', label: moveLabel(memo) }] : []),
       { id: 'folder', label: '폴더로 옮기기', hint: memo.folder || '폴더 없음' }, // 메모킹 폴더 (folder-ui.js)
+      { id: 'pick', label: '여러 개 고르기', hint: 'Ctrl+클릭' }, // 골라서 한 번에 폴더로
       { type: 'separator' },
       locked ? { id: 'unlock', label: '잠금 풀기' } : { id: 'lock', label: '잠그기' },
       { id: 'versions', label: '이전 버전', disabled: locked },
@@ -52,6 +53,7 @@ export async function openCardMenu({ memo, at, api, run, workLife = true }) {
     case 'day': await run.day?.(memo); break;
     case 'mode': await run.mode?.(memo); break;
     case 'folder': await run.folder?.(memo); break;
+    case 'pick': run.pick?.(memo); break;
     case 'trash': run.trash(memo.id); break;
     case 'pdf': api.pdf.open(memo.id); break;
     case 'lock':

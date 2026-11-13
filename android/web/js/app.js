@@ -84,6 +84,17 @@ const lsSet = (k, v) => {
 // 예전(0.27.0)의 Google 캘린더 상호 동기화는 없앴다 — 그 설정만 지운다 (Google 의 "메모킹" 캘린더는 그대로)
 for (const k of ['memoking.gcal', 'memoking.gcalDevice', 'memoking.gcalMine']) lsSet(k, null);
 
+// 앱의 인터넷 요청: 안드로이드가 준 영어 오류("Unable to resolve host ...")는 알기 쉬운 한국어로 (PC 와 같은 문구)
+//   앱이 쓴 한국어 오류(너무 큰 파일 등)는 그대로
+async function netCall(method, args) {
+  try {
+    return await call(method, args);
+  } catch (err) {
+    if (/[가-힣]/.test(err?.message ?? '')) throw err;
+    throw new Error('캘린더 서버에 연결하지 못했어요 (인터넷 확인)');
+  }
+}
+
 function calendarApi() {
   const mem = new Map(); // id → { url, text, at }
   const cacheKey = (id) => `memoking.calendarFeed.${id}`;
@@ -99,8 +110,8 @@ function calendarApi() {
     setList: (list) => lsSet(FEEDS_KEY, JSON.stringify(list)),
     download: async (url, feed) => {
       // CalDAV 계정(네이버 캘린더): PROPFIND · REPORT 는 앱(Http.dav)이 보낸다
-      if (feed?.user) return caldavIcs(feed, (u, init) => call('dav', { url: u, ...init, limit: MAX_FEED_BYTES }));
-      const res = await call('http', { url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
+      if (feed?.user) return caldavIcs(feed, (u, init) => netCall('dav', { url: u, ...init, limit: MAX_FEED_BYTES }));
+      const res = await netCall('http', { url, accept: 'text/calendar, */*;q=0.5', limit: MAX_FEED_BYTES, timeout: 20_000 });
       return feedResponseText(res.status, new TextDecoder().decode(Uint8Array.from(res.latin1 ?? '', (c) => c.charCodeAt(0) & 0xff)));
     },
     cache: {

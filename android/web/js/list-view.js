@@ -5,7 +5,7 @@ import { vaultUrl } from '../../app/js/media.js';
 import { videoThumb } from '../../app/js/video-poster.js';
 import { setupRemindersTab } from '../../app/js/list-reminders.js';
 import { setupHistoryTab } from '../../app/js/list-history.js';
-import { filterMemos, parseQuery, KIND_FILTERS } from '../../app/js/core/tags.js';
+import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../../app/js/core/tags.js';
 import { COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
@@ -38,6 +38,7 @@ const el = {
   filterPanel: $('filter-panel'),
   colorFilter: $('color-filter'),
   kindFilter: $('kind-filter'),
+  tagFilter: $('tag-filter'),
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
   sortGroup: $('sort-group'),
@@ -222,7 +223,10 @@ function renderCard(memo) {
   const card = document.createElement('button');
   card.className = 'card';
   card.dataset.id = memo.id;
-  if (state.picking && state.picked.has(memo.id)) card.classList.add('picked');
+  if (state.picking) {
+    card.classList.toggle('picked', state.picked.has(memo.id));
+    card.setAttribute('aria-pressed', String(state.picked.has(memo.id)));
+  }
   card.dataset.color = memo.color;
 
   const head = document.createElement('div');
@@ -280,7 +284,14 @@ function renderCard(memo) {
     f.append(icon('folder'), memo.folder);
     tags.append(f, ' ');
   }
-  tags.append((memo.tags ?? []).map((t) => `#${t}`).join(' '));
+  // 태그: 누르면 그 태그의 메모만 (PC 카드와 같음)
+  for (const name of memo.tags ?? []) {
+    const t = document.createElement('span');
+    t.className = 'card-tag';
+    t.dataset.cardTag = name;
+    t.textContent = `#${name}`;
+    tags.append(t, ' ');
+  }
   const meta = document.createElement('div');
   meta.className = 'card-meta';
   if (memo.reminderCount) {
@@ -509,7 +520,11 @@ export async function moveToFolder(ids, current) {
 const pickBar = createPickBar({ onMove: () => moveToFolder([...state.picked], null), onCancel: () => stopPicking() });
 
 function showPicks() {
-  for (const c of el.cards.querySelectorAll('.card')) c.classList.toggle('picked', state.picked.has(c.dataset.id));
+  for (const c of el.cards.querySelectorAll('.card')) {
+    c.classList.toggle('picked', state.picked.has(c.dataset.id));
+    if (state.picking) c.setAttribute('aria-pressed', String(state.picked.has(c.dataset.id)));
+    else c.removeAttribute('aria-pressed');
+  }
   pickBar.show(state.picked.size, state.picking);
   document.body.classList.toggle('picking', state.picking); // 고르는 동안 + 단추는 숨긴다 (막대와 겹치지 않게)
 }
@@ -573,7 +588,35 @@ function chip(className, content, pressed, data = {}) {
   return b;
 }
 
+const MAX_TAG_CHIPS = 30;
+
+// 보기 판의 태그 칩: 지금 모드에서 쓰는 태그를 많이 쓴 순으로 (골라 둔 태그는 앞에, 없어졌어도 남겨 풀 수 있게)
+function renderTagChips() {
+  const tags = collectTags(modeMemos());
+  for (const t of state.filter.tags) if (!tags.some((x) => sameTag(x.name, t))) tags.unshift({ name: t, count: 0 });
+  const picked = (name) => state.filter.tags.some((t) => sameTag(t, name));
+  $('tag-filter-group').hidden = !tags.length;
+  el.tagFilter.replaceChildren(...tags.slice(0, MAX_TAG_CHIPS).map((t) => {
+    const count = document.createElement('small');
+    count.textContent = String(t.count);
+    return chip('tag-chip', [`#${t.name}`, count], picked(t.name), { tag: t.name });
+  }));
+}
+
+// 태그 고르기 · 풀기 (보기 판의 칩 · 카드의 태그)
+function toggleTag(name, { only = false } = {}) {
+  const i = state.filter.tags.findIndex((t) => sameTag(t, name));
+  if (only) state.filter.tags = i >= 0 && state.filter.tags.length === 1 ? [] : [name];
+  else if (i >= 0) state.filter.tags.splice(i, 1);
+  else {
+    state.filter.tags.push(name);
+    tutEvent('tag-filtered');
+  }
+  render();
+}
+
 function renderFilters() {
+  renderTagChips();
   el.colorFilter.replaceChildren(...COLORS.map((c) => {
     const b = chip('color-dot', '', state.filter.colors.includes(c), { filterColor: c, color: c });
     b.setAttribute('aria-label', `${COLOR_NAMES[c] ?? c} 메모`);
@@ -598,6 +641,10 @@ const toggleIn = (list, value) => {
   else list.push(value);
 };
 
+el.tagFilter.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tag]');
+  if (b) toggleTag(b.dataset.tag);
+});
 el.colorFilter.addEventListener('click', (e) => {
   const b = e.target.closest('[data-filter-color]');
   if (!b) return;
@@ -689,6 +736,8 @@ document.querySelector('.tabs').addEventListener('click', (e) => {
 el.cards.addEventListener('click', (e) => {
   const card = e.target.closest('.card');
   if (card && state.picking) return togglePick(card.dataset.id);
+  const tag = e.target.closest('[data-card-tag]');
+  if (tag) return toggleTag(tag.dataset.cardTag, { only: true });
   if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect() }); // 그 카드가 커지며 메모 화면이 된다
 });
 // 카드를 옆으로 밀어 지우기 (여러 개를 빨리 지울 때) — 묻지 않고 휴지통으로, 되돌리기 가능

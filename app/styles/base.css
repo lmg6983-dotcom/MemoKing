@@ -1377,9 +1377,11 @@ dialog.quick-event[open] {
 .feed-open-add { display: block; margin: 2px 0 0 -6px; min-height: 40px; }
 .feed-open-add[hidden], .cal-help[hidden] { display: none; }
 .feed-add[hidden] { display: none; }
-.feed-naver { flex-wrap: wrap; }
-.feed-naver .feed-url { flex-basis: 140px; }
-.feed-naver .btn { margin-left: auto; }
+.feed-naver { display: grid; gap: 10px; }
+.feed-naver[hidden] { display: none; }
+.feed-field { display: grid; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--text); }
+.feed-field .feed-url { width: 100%; box-sizing: border-box; font-weight: 400; }
+.feed-naver .btn { justify-self: end; }
 .feed-url { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; }
 .feed-url:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
 .feed-add .btn { height: 38px; padding: 0 14px; }
@@ -1658,10 +1660,27 @@ dialog.quick-event[open] {
 .folder-tag span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .folder-tag:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
 /* 카드의 폴더 이름 (전체 · 검색에서만 — folder-ui.js) */
-.card-folder { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; overflow: hidden; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+/* 카드의 폴더 이름: 태그(#굵은 글자)와 다르게 "자리" 로 읽히게 — 흐린 글자의 옅은 알약 */
+.card-folder {
+  display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 0 7px 0 5px; overflow: hidden;
+  border-radius: 999px; background: color-mix(in srgb, currentColor 9%, transparent); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; opacity: 0.8; cursor: pointer;
+}
 .card-folder svg { flex: none; width: 12px; height: 12px; }
 /* 여러 장 고르기 (PC Ctrl+클릭 · 휴대폰 고르기) */
-.card.picked { box-shadow: 0 0 0 3px var(--brand-yellow), var(--card-shadow, 0 1px 2px rgba(0, 0, 0, 0.08)); }
+/* 고르는 동안: 카드 모서리에 동그라미(고를 수 있음), 고른 카드는 진한 테두리 + 체크 — 노란 카드 위에서도 보이게 */
+body.picking .card { position: relative; }
+body.picking .card::after {
+  content: ""; position: absolute; top: 8px; right: 8px; z-index: 2; width: 22px; height: 22px; box-sizing: border-box;
+  border: 2px solid color-mix(in srgb, var(--text-strong) 55%, transparent); border-radius: 50%; background: var(--surface-1, #fff); pointer-events: none;
+}
+.card.picked { box-shadow: 0 0 0 3px var(--text-strong), 0 4px 12px rgba(0, 0, 0, 0.12); }
+body.picking .card.picked::after {
+  border-color: var(--text-strong);
+  background: var(--text-strong) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 14px no-repeat;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root:not([data-theme="light"])) body.picking .card.picked::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+}
 .pick-bar {
   position: fixed; left: 50%; bottom: 16px; z-index: 60; display: flex; align-items: center; gap: 8px; transform: translateX(-50%);
   padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--surface-1, #fff); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); font-size: 13.5px; font-weight: 700; white-space: nowrap;

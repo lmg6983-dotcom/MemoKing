@@ -323,19 +323,23 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
 
     // 네이버 캘린더: .ics 주소가 없어 CalDAV 로 연다 (아이디 + 애플리케이션 비밀번호, 이 기기에만 저장)
     const naverForm = el('form', 'feed-add feed-naver');
+    // 칸 이름은 칸 위에 늘 보이게 (안내 글은 쓰기 시작하면 사라지므로 이름으로 쓰지 않는다)
+    const field = (label, input) => {
+      const f = el('label', 'feed-field');
+      f.append(el('span', '', label), input);
+      return f;
+    };
     const naverId = el('input', 'feed-url');
-    naverId.placeholder = '네이버 아이디';
-    naverId.setAttribute('aria-label', '네이버 아이디');
+    naverId.placeholder = '예: memoking (@naver.com 없이)';
     naverId.autocomplete = 'username';
     naverId.spellcheck = false;
     const naverPw = el('input', 'feed-url');
     naverPw.type = 'password';
-    naverPw.placeholder = '애플리케이션 비밀번호';
-    naverPw.setAttribute('aria-label', '네이버 애플리케이션 비밀번호');
+    naverPw.placeholder = '네이버에서 만든 비밀번호 (로그인 비밀번호 아님)';
     naverPw.autocomplete = 'off';
     const naverBtn = el('button', 'btn', '연결');
     naverBtn.type = 'submit';
-    naverForm.append(naverId, naverPw, naverBtn);
+    naverForm.append(field('네이버 아이디', naverId), field('애플리케이션 비밀번호', naverPw), naverBtn);
     naverForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const user = naverId.value.trim().replace(/@naver\.com$/i, '');
