@@ -185,8 +185,9 @@ class DriveApi(private val ctx: Context) : Remote {
         if (token == null) {
             return Remote.Changes(true, get("$API/changes/startPageToken").getString("startPageToken"))
         }
-        val known = HashSet(knownIds)
-        val items = ArrayList<Remote.Change>()
+        // 바뀐 것을 먼저 다 모은 뒤 고른다 — Drive 는 폴더에 파일이 들 때마다 그 폴더를 목록 뒤로 보내, 새 폴더가 그 안의 파일보다 뒤에 올 수 있다
+        //   (차례대로만 보면 그 파일을 빠뜨려 다 훑을 때까지 내려오지 않았다: 메모를 새 폴더로 옮겼을 때. 데스크탑 drive-api.js pickChanges 와 같은 규칙)
+        val raw = ArrayList<JSONObject>()
         var page: String = token
         while (true) {
             val res = get(
@@ -194,21 +195,36 @@ class DriveApi(private val ctx: Context) : Remote {
                     "&fields=${enc("nextPageToken,newStartPageToken,changes(fileId,removed,file($FIELDS,parents,trashed))")}",
             )
             val changes = res.optJSONArray("changes") ?: JSONArray()
-            for (i in 0 until changes.length()) {
-                val c = changes.getJSONObject(i)
-                val id = c.optString("fileId")
-                val file = c.optJSONObject("file")
-                val parents = file?.optJSONArray("parents")?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList()
-                // 이 메모 폴더 안의 것(알고 있는 파일, 또는 알고 있는 폴더에 든 것)만 — 새로 든 폴더는 바로 아는 것으로 (그 안의 새 파일도 담기게)
-                if (id !in known && parents.none { it in known }) continue
-                val entry = file?.let { f -> item(f.put("id", id)) }
-                if (entry?.folder == true) known.add(id)
-                items.add(Remote.Change(id, c.optBoolean("removed") || file?.optBoolean("trashed") == true, parents, entry))
-            }
+            for (i in 0 until changes.length()) raw.add(changes.getJSONObject(i))
             val next = res.optString("nextPageToken")
             if (next.isNotEmpty()) {
                 page = next
                 continue
+            }
+            val parentsOf = { c: JSONObject ->
+                c.optJSONObject("file")?.optJSONArray("parents")?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList()
+            }
+            // 이 메모 폴더 안의 것(알고 있는 파일, 또는 알고 있는 폴더에 든 것)만 — 새로 든 폴더는 아는 것으로 (그 안의 새 파일도 담기게)
+            val known = HashSet(knownIds)
+            val folders = raw.filter { it.optJSONObject("file")?.optString("mimeType") == SyncEngine.FOLDER }
+            var grew = true
+            while (grew) {
+                grew = false
+                for (c in folders) {
+                    val id = c.optString("fileId")
+                    if (id in known || parentsOf(c).none { it in known }) continue
+                    known.add(id)
+                    grew = true
+                }
+            }
+            val items = ArrayList<Remote.Change>()
+            for (c in raw) {
+                val id = c.optString("fileId")
+                val file = c.optJSONObject("file")
+                val parents = parentsOf(c)
+                if (id !in known && parents.none { it in known }) continue
+                val entry = file?.let { f -> item(f.put("id", id)) }
+                items.add(Remote.Change(id, c.optBoolean("removed") || file?.optBoolean("trashed") == true, parents, entry))
             }
             return Remote.Changes(items.isNotEmpty(), res.optString("newStartPageToken").ifEmpty { page }, items)
         }
