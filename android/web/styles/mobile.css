@@ -751,7 +751,7 @@ h2.sheet-title { font-size: 20px; }
 }
 .card[data-color="charcoal"] .card-clear { color: var(--rec-on-dark); border-color: var(--rec-on-dark); opacity: 0.62; }
 body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); border-color: var(--rec-on-dark); opacity: 0.58; }
-#note-screen .clear-stamp { font-size: 38px; }
+#note-screen .clear-stamp { position: absolute; font-size: 38px; } /* 메모 화면 안의 자리 (clear-stamp.js inside) — 화면이 열리고 닫히는 움직임과 함께 간다 */
 
 /* =====================================================================
    0.6.0 — 위 막대 되돌리기·다시 하기, 도구막대 정리(스타일 고르기), 녹음, 추천 태그,

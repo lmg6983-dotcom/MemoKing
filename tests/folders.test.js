@@ -1,7 +1,7 @@
 // 메모 폴더 — 폴더 이름 정리, 목록, 옮긴 사이 다른 기기에서 고쳐 생긴 같은 id 의 두 파일 맞추기
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { folderOf, cleanFolderName, isFolderName, folderList, resolveMovedTwin } from '../app/js/core/folders.js';
+import { folderOf, cleanFolderName, isFolderName, folderList, resolveMovedTwin, UNFILED, memosInFolder, withUnfiled } from '../app/js/core/folders.js';
 
 test('메모 파일 → 폴더: 맨 위 하위 폴더 하나, 더 깊으면 맨 위 것', () => {
   assert.equal(folderOf('회의.md'), '');
@@ -35,4 +35,16 @@ test('옮긴 사이 옛 자리에서 고침: 자리는 옮긴 쪽, 내용은 나
   // 옮긴 기록이 같으면(탐색기에서 복사) 손대지 않는다
   assert.equal(resolveMovedTwin(moved, { ...moved, file: '업무/회의 - 복사본.md' }), null);
   assert.equal(resolveMovedTwin({ file: 'a.md', meta: {} }, { file: 'b.md', meta: {} }), null);
+});
+
+test('미분류: 폴더에 넣지 않은 메모만 — 목록에는 폴더가 하나라도 있을 때만, 진짜 폴더 이름과 겹치지 않는다', () => {
+  const memos = [{ id: 1, folder: '' }, { id: 2, folder: '업무' }, { id: 3 }, { id: 4, folder: '집' }];
+  assert.deepEqual(memosInFolder(memos, '').map((m) => m.id), [1, 2, 3, 4]);
+  assert.deepEqual(memosInFolder(memos, '업무').map((m) => m.id), [2]);
+  assert.deepEqual(memosInFolder(memos, UNFILED).map((m) => m.id), [1, 3]);
+  const list = withUnfiled(folderList(['업무', '집'], memos), memos);
+  assert.deepEqual(list.map((f) => [f.name, f.count]), [[UNFILED, 2], ['업무', 1], ['집', 1]]);
+  assert.equal(list[0].label, '미분류');
+  assert.deepEqual(withUnfiled([], memos), []); // 폴더가 없으면 전체와 같아 두지 않는다
+  assert.equal(isFolderName(UNFILED), false); // 사용자가 같은 이름의 폴더를 만들 수 없다
 });

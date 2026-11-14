@@ -3,7 +3,10 @@
 //   폴더 고르기 창: 메모를 옮길 폴더 (폴더 없음 · 폴더들 · ＋ 새 폴더)
 import { icon } from './icons.js';
 import { haptic } from './dom.js';
-import { cleanFolderName, MAX_FOLDER_NAME } from './core/folders.js';
+import { cleanFolderName, MAX_FOLDER_NAME, UNFILED } from './core/folders.js';
+
+// 메뉴(이름 바꾸기 · 지우기)가 있는 진짜 폴더인가 — 전체("") · 미분류는 아니다
+const isReal = (name) => Boolean(name) && name !== UNFILED;
 
 function el(tag, className = '', text = '') {
   const node = document.createElement(tag);
@@ -16,7 +19,7 @@ function folderButton({ name, label, count, current, iconName }) {
   const b = el('button', 'mf-item');
   b.type = 'button';
   b.dataset.folder = name;
-  b.title = label; // 긴 이름은 잘려 보이므로 전체 이름
+  b.title = name === UNFILED ? '어느 폴더에도 넣지 않은 메모' : label; // 긴 이름은 잘려 보이므로 전체 이름
   if (current) b.setAttribute('aria-current', 'true');
   b.append(icon(iconName), el('span', 'mf-name', label));
   if (count != null) b.append(el('small', 'mf-count', String(count)));
@@ -37,7 +40,7 @@ export function renderFolderList(container, { folders, current, onPick, onNew, o
   const item = (b, name) => {
     const li = el('li', 'mf-row');
     li.append(b);
-    if (onMenu && name) {
+    if (onMenu && isReal(name)) {
       const more = el('button', 'icon-btn mf-more');
       more.type = 'button';
       more.tabIndex = -1; // 키보드는 F2 · 메뉴 키로 (줄마다 Tab 이 서지 않게)
@@ -50,7 +53,7 @@ export function renderFolderList(container, { folders, current, onPick, onNew, o
     return li;
   };
   list.append(item(folderButton({ name: '', label: '전체', current: !current, iconName: 'note' }), ''));
-  for (const f of folders) list.append(item(folderButton({ name: f.name, label: f.name, count: f.count, current: f.name === current, iconName: 'folder' }), f.name));
+  for (const f of folders) list.append(item(folderButton({ name: f.name, label: f.label ?? f.name, count: f.count, current: f.name === current, iconName: f.name === UNFILED ? 'inbox' : 'folder' }), f.name));
   list.addEventListener('click', (e) => {
     const m = e.target.closest('[data-folder-menu]');
     if (m) return onMenu?.(m.dataset.folderMenu, m);
@@ -72,14 +75,14 @@ export function renderFolderList(container, { folders, current, onPick, onNew, o
       const next = all[Math.max(0, Math.min(all.length - 1, to))];
       for (const x of all) x.tabIndex = x === next ? 0 : -1;
       next.focus();
-    } else if (e.key === 'F2' && onMenu && b.dataset.folder) {
+    } else if (e.key === 'F2' && onMenu && isReal(b.dataset.folder)) {
       e.preventDefault();
       onMenu(b.dataset.folder, b);
     }
   });
   list.addEventListener('contextmenu', (e) => {
     const b = e.target.closest('[data-folder]');
-    if (!onMenu || !b?.dataset.folder) return;
+    if (!onMenu || !isReal(b?.dataset.folder)) return;
     e.preventDefault();
     onMenu(b.dataset.folder, b);
   });
@@ -109,7 +112,8 @@ export function renderFolderChips(container, { folders, current, onPick, onCreat
     if (!name) b.append(icon('note'));
     b.append(el('span', 'fchip-name', label));
     if (count) b.append(el('small', 'fchip-count', String(count))); // 0 은 적지 않는다 (줄이 시끄럽지 않게)
-    if (name) b.title = touch ? label : `${label} (오른쪽 클릭: 이름 바꾸기, 지우기)`;
+    if (isReal(name)) b.title = touch ? label : `${label} (오른쪽 클릭: 이름 바꾸기, 지우기)`;
+    else if (name) b.title = '어느 폴더에도 넣지 않은 메모';
     return b;
   };
   const add = el('button', 'fchip fchip-add');
@@ -117,7 +121,7 @@ export function renderFolderChips(container, { folders, current, onPick, onCreat
   add.tabIndex = -1;
   add.append(icon('plus'), el('span', 'fchip-name', '새 폴더'));
   const row = el('div', 'fchip-row');
-  row.append(chip('', '전체'), ...folders.map((f) => chip(f.name, f.name, f.count)), add);
+  row.append(chip('', '전체'), ...folders.map((f) => chip(f.name, f.label ?? f.name, f.count)), add);
   // 폴더 목록: 폴더 칩과 다른 모양의 그림 단추 (전체 · 모두 처럼 같은 뜻의 낱말이 나란히 서지 않게)
   const all = el('button', 'icon-btn fchip-all');
   all.type = 'button';
@@ -162,7 +166,7 @@ export function renderFolderChips(container, { folders, current, onPick, onCreat
     const b = e.target.closest('[data-folder]');
     held = false;
     pressing = true;
-    if (!onMenu || !b?.dataset.folder) return;
+    if (!onMenu || !isReal(b?.dataset.folder)) return;
     const start = { x: e.clientX, y: e.clientY };
     clearTimeout(hold);
     hold = setTimeout(() => {
@@ -183,7 +187,7 @@ export function renderFolderChips(container, { folders, current, onPick, onCreat
   row.addEventListener('contextmenu', (e) => {
     const b = e.target.closest('[data-folder]');
     e.preventDefault(); // 꾹 누르기를 위 타이머가 맡는다 (휴대폰 글자 고르기 메뉴가 뜨지 않게)
-    if (!onMenu || !b?.dataset.folder || held) return;
+    if (!onMenu || !isReal(b?.dataset.folder) || held) return;
     clearTimeout(hold);
     held = pressing; // 손가락 · 마우스로 연 메뉴만 뒤따르는 "누름" 을 막는다 (메뉴 키로 열었으면 다음 Enter 는 그대로)
     onMenu(b.dataset.folder, b);

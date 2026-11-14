@@ -1468,7 +1468,7 @@ function flushTables() {
 }
 
 // ---------- CLEAR 도장: 체크리스트를 모두 끝내면 (PC 와 같음) ----------
-const clearStamp = createClearStamp(el.screen, el.editorRoot);
+const clearStamp = createClearStamp(el.screen, el.editorRoot, { inside: true });
 function showTasks(tasks, opts) {
   clearStamp.show(tasks, opts);
 }
