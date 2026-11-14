@@ -1879,6 +1879,39 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       check('서식: 표 마지막 칸 끝 Delete 는 표 아래 제목을 칸으로 끌어오지 않는다', has(a, 'h2:표뒤제목') || a === base, a);
       kw.close();
     }
+    // PC 폴더 (v0.82.5): 카드 위 줄 없이 왼쪽 목록 하나 (탐색기처럼), 메모를 끌어 폴더에 놓으면 그 폴더로
+    {
+      const fl = getList() ?? createListWindow();
+      await until(() => js(fl, `document.documentElement.dataset.ready === 'true'`), '목록 창');
+      fl.setBounds({ ...fl.getBounds(), width: 520, height: 760 });
+      // 화면이 쓰는 통로로 만든다: 끌 메모 하나, 폴더는 다른 메모를 넣어 만든다 (메모가 든 폴더는 목록이 곧바로 알아본다)
+      const fid = await js(fl, `window.memoking.memo.import('# 끌어 넣을 메모\\n\\n폴더로 옮긴다\\n', { open: false })`);
+      const other = await js(fl, `window.memoking.memo.import('# 폴더에 먼저 든 메모\\n', { open: false })`);
+      await js(fl, `window.memoking.memos.moveToFolder(['${other}'], '끌기폴더')`);
+      const fileOf = async () => (await js(fl, `window.memoking.memos.list()`)).find((m) => m.id === fid)?.file ?? '';
+      await js(fl, `(() => { document.querySelector('[data-tab="memos"]')?.click(); const s = document.getElementById('search'); if (s.value) { s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('filter-clear')?.click(); })()`);
+      await until(() => js(fl, `!!document.querySelector('#folder-side [data-folder="끌기폴더"]')`), '폴더 목록에 새 폴더', 8000);
+      await js(fl, `document.querySelector('#folder-side [data-folder=""]')?.click()`);
+      await until(() => js(fl, `!!document.querySelector('.card[data-id="${fid}"]')`), '끌 메모 카드', 8000);
+      if (await js(fl, `document.getElementById('folder-side').hidden`)) await js(fl, `document.getElementById('folder-btn').click()`);
+      await wait(400);
+      const side = await js(fl, `({ shown: !document.getElementById('folder-side').hidden && document.getElementById('folder-side').offsetWidth > 100, chips: document.getElementById('folder-chips')?.hidden !== false, rows: [...document.querySelectorAll('#folder-side [data-folder]')].map((b) => b.dataset.folder) })`);
+      check('PC 폴더: 왼쪽 폴더 목록이 늘 보이고 카드 위 폴더 줄은 없다', side.shown && side.chips && side.rows.includes('끌기폴더') && side.rows[0] === '', JSON.stringify(side));
+      const at = await js(fl, `(() => {
+        const c = document.querySelector('.card[data-id="${fid}"]'); c.scrollIntoView({ block: 'center' });
+        const r = c.getBoundingClientRect(); const f = document.querySelector('#folder-side [data-folder="끌기폴더"]').getBoundingClientRect();
+        return { cx: r.left + 30, cy: r.top + 20, fx: f.left + f.width / 2, fy: f.top + f.height / 2 };
+      })()`);
+      const pointer = (type, x, y) => js(fl, `document.querySelector('.card[data-id="${fid}"]').dispatchEvent(new PointerEvent('${type}', { bubbles: true, cancelable: true, pointerId: 1, button: 0, buttons: ${type === 'pointerup' ? 0 : 1}, clientX: ${x}, clientY: ${y}, screenX: ${x}, screenY: ${y} }))`);
+      await pointer('pointerdown', at.cx, at.cy);
+      for (let i = 1; i <= 5; i++) await pointer('pointermove', at.cx + ((at.fx - at.cx) * i) / 5, at.cy + ((at.fy - at.cy) * i) / 5);
+      const over = await js(fl, `({ on: document.querySelector('#folder-side .drop-on')?.dataset.folder ?? null, small: document.querySelector('.drag-clone')?.classList.contains('over-folder') ?? false })`);
+      check('PC 폴더: 끄는 카드가 폴더 위에 오면 그 폴더가 표시되고 카드는 작아진다', over.on === '끌기폴더' && over.small, JSON.stringify(over));
+      await pointer('pointerup', at.fx, at.fy);
+      await until(async () => (await fileOf()).replace(/\\/g, '/').startsWith('끌기폴더/'), '끌어 넣은 메모가 폴더로', 4000).catch(() => {});
+      const movedFile = (await fileOf()).replace(/\\/g, '/');
+      check('PC 폴더: 놓으면 메모 파일이 그 폴더로 옮겨진다', movedFile.startsWith('끌기폴더/'), movedFile);
+    }
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {
