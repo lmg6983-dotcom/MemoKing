@@ -23,6 +23,34 @@ const item = (o) => ({
   size: Number(o.size ?? 0),
 });
 
+/**
+ * Drive 의 "바뀐 것" 가운데 이 메모 폴더 안의 것만 (알고 있는 파일, 또는 알고 있는 폴더에 든 것).
+ *   새로 생긴 폴더는 아는 것으로 쳐서 그 안의 새 파일도 담는다 — 목록의 순서와 상관없이.
+ *   (Drive 는 폴더에 파일이 들 때마다 그 폴더를 목록 뒤로 보내, 새 폴더가 그 안의 파일보다 뒤에 올 수 있다.
+ *    차례대로만 보면 그 파일을 빠뜨려, 다 훑는 15분 뒤에야 내려왔다: 메모를 새 폴더로 옮겼을 때)
+ * @param {{ fileId: string, removed?: boolean, file?: any }[]} changes
+ * @param {Iterable<string>} knownIds
+ */
+export function pickChanges(changes, knownIds) {
+  const known = new Set(knownIds);
+  const folders = changes.filter((c) => c.file?.mimeType === FOLDER);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const c of folders) {
+      if (known.has(c.fileId) || !(c.file.parents ?? []).some((p) => known.has(p))) continue;
+      known.add(c.fileId);
+      grew = true;
+    }
+  }
+  const items = [];
+  for (const c of changes) {
+    const parents = c.file?.parents ?? [];
+    if (!known.has(c.fileId) && !parents.some((p) => known.has(p))) continue;
+    items.push({ id: c.fileId, removed: Boolean(c.removed || c.file?.trashed), parents, item: c.file ? item({ ...c.file, id: c.fileId }) : null });
+  }
+  return items;
+}
+
 const quote = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 function describe(status, text) {
@@ -172,8 +200,7 @@ export class DriveApi {
    */
   async changesSince(token, knownIds) {
     if (!token) return { changed: true, token: (await this.request('GET', `${API}/changes/startPageToken`)).startPageToken, items: null };
-    const known = new Set(knownIds);
-    const items = [];
+    const raw = [];
     let page = token;
     for (;;) {
       const params = new URLSearchParams({
@@ -181,17 +208,12 @@ export class DriveApi {
         fields: `nextPageToken,newStartPageToken,changes(fileId,removed,file(${FIELDS},parents,trashed))`,
       });
       const res = await this.request('GET', `${API}/changes?${params}`);
-      // 이 메모 폴더 안의 것(알고 있는 파일, 또는 알고 있는 폴더에 든 것)만 따진다
-      for (const c of res.changes ?? []) {
-        const parents = c.file?.parents ?? [];
-        if (!known.has(c.fileId) && !parents.some((p) => known.has(p))) continue;
-        if (c.file?.mimeType === FOLDER) known.add(c.fileId);
-        items.push({ id: c.fileId, removed: Boolean(c.removed || c.file?.trashed), parents, item: c.file ? item({ ...c.file, id: c.fileId }) : null });
-      }
+      raw.push(...(res.changes ?? []));
       if (res.nextPageToken) {
         page = res.nextPageToken;
         continue;
       }
+      const items = pickChanges(raw, knownIds);
       return { changed: items.length > 0, token: res.newStartPageToken ?? page, items };
     }
   }
