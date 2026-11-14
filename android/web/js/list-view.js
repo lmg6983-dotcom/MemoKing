@@ -257,6 +257,7 @@ function renderCard(memo) {
     img.src = vaultUrl(memo.thumb);
     img.alt = '';
     img.loading = 'lazy';
+    img.decoding = 'async'; // 큰 사진을 푸는 동안 스크롤이 멈추지 않게
     img.draggable = false;
     img.onerror = () => img.remove();
     card.append(img);
@@ -331,7 +332,7 @@ function layoutCards(memos) {
     return c;
   });
   el.cards.replaceChildren(...columns);
-  stackCards(columns, memos.map(cardFor));
+  stackCards(columns, memos.map(cardFor), { late: (items) => items.forEach((li) => (li.style.animation = 'none')) }); // 나눠 쌓이는 뒤쪽 카드는 튀어나오지 않게
   if (cardCache.size > memos.length + 200) for (const id of cardCache.keys()) if (!memos.some((m) => m.id === id)) cardCache.delete(id);
 }
 
@@ -958,24 +959,27 @@ applyLayout(layout);
 function glideCards(change) {
   const vh = window.innerHeight;
   const near = (r) => r.bottom > -vh && r.top < vh * 2;
-  const before = new Map([...el.cards.querySelectorAll('.card')].map((c) => [c.dataset.id, c.getBoundingClientRect()]).filter(([, r]) => r.width));
+  // 카드를 감싼 칸(.item)을 잰다 — 화면 밖 칸은 그리기를 건너뛰는데(base.css), 그 안의 카드를 재면 건너뛴 것을 모두 다시 계산한다
+  const idOf = (item) => item.firstElementChild?.dataset.id;
+  const before = new Map([...el.cards.querySelectorAll('.item')].map((it) => [idOf(it), it.getBoundingClientRect()]).filter(([, r]) => r.width));
   change();
   const still = [];
   const moves = [];
   const animate = !reduceMotion() && !calmRender;
-  if (calmRender) for (const item of el.cards.querySelectorAll('.item')) item.style.animation = 'none'; // 검색 중: 다시 보인 카드도 튀어나오지 않게
-  for (const c of el.cards.querySelectorAll('.card')) {
-    const a = before.get(c.dataset.id);
+  const items = [...el.cards.querySelectorAll('.item')];
+  if (calmRender) for (const item of items) item.style.animation = 'none'; // 검색 중: 다시 보인 카드도 튀어나오지 않게
+  for (const it of items) {
+    const a = before.get(idOf(it));
     if (!a) continue;
-    still.push(c);
-    if (animate && near(a)) moves.push([c, a, c.getBoundingClientRect()]);
+    still.push(it);
+    if (animate && near(a)) moves.push([it, a, it.getBoundingClientRect()]);
   }
-  for (const c of still) c.closest('.item').style.animation = 'none'; // 이미 있던 카드는 다시 튀어나오지 않는다 (새 카드만 등장 움직임)
-  for (const [c, a, b] of moves) {
+  for (const it of still) it.style.animation = 'none'; // 이미 있던 카드는 다시 튀어나오지 않는다 (새 카드만 등장 움직임)
+  for (const [it, a, b] of moves) {
     const dx = a.left - b.left;
     const dy = a.top - b.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 260, easing: EASE_OUT });
+    it.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 260, easing: EASE_OUT });
   }
 }
 

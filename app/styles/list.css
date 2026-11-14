@@ -220,6 +220,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 }
 /* 목록 밖으로 나가면 미리보기 창이 이어받으므로 흐리게 */
 body.drag-outside .drag-clone { opacity: 0.25; }
+.drag-clone.over-folder { opacity: 0.85; }
 .drag-clone.returning { transition: transform 0.25s var(--ease-out), opacity 0.25s; }
 .drag-clone.drop-out { opacity: 0 !important; transition: opacity 0.2s ease-out; }
 
@@ -294,6 +295,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .tabs button[aria-selected="true"] .tab-count { color: var(--text); }
 
 .view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.main > .view:not([hidden]) { animation: view-in 0.14s var(--ease-out); }
+@keyframes view-in { from { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) { .main > .view:not([hidden]) { animation: none; } }
 /* 메모 탭은 숨기지 않고(배치 그대로) 일정 · 보관함이 그 위를 덮는다 — 돌아올 때 카드 수백 개를 다시 배치하느라 멈칫하지 않게.
    덮인 동안 메모 칸은 누르거나 Tab 으로 갈 수 없다(inert). 스크롤한 자리도 그대로 남는다 */
 #view-memos.covered { visibility: hidden; } /* 덮인 동안 그리지 않음 (배치는 그대로) */
@@ -510,10 +514,31 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
 .tag-chip[aria-pressed="true"] small { color: var(--on-brand); }
 
 /* 메모 탭: 왼쪽 폴더 막대 + 오른쪽 카드 (folder-ui.js) — 막대는 위 폴더 단추로 숨긴다 */
-#view-memos { flex-direction: row; }
+#view-memos { position: relative; flex-direction: row; }
 .memos-col { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
 .folder-side { flex: none; width: 156px; padding: 0 6px 12px 10px; overflow-y: auto; border-right: 1px solid var(--line); }
+/* 좁은 창(기본 크기)에서는 조금 좁게 — 카드 자리를 덜 빼앗게 */
+@media (max-width: 560px) { .folder-side { width: 132px; padding-left: 8px; } }
+/* 메모를 끄는 동안: 폴더가 놓을 자리임을 보이고, 목록을 접어 두었어도 카드 위로 떠오른다 */
+body.is-dragging .folder-side { background: var(--bg); }
+body.is-dragging .folder-side[hidden] { display: block !important; position: absolute; z-index: 5; left: 0; top: 0; bottom: 0; box-shadow: var(--shadow-pop); animation: mk-slide-in-left 0.16s var(--ease-out); }
+body.is-dragging .folder-side .mf-item { box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow 0.12s ease-out, background-color 0.12s ease-out, transform 0.12s var(--ease-out); }
+body.is-dragging .folder-side .mf-item.drop-on { box-shadow: inset 0 0 0 2px var(--brand-yellow); background: var(--brand-yellow-soft); transform: scale(1.03); }
+body.is-dragging .folder-side .mf-more, body.is-dragging .folder-side .mf-new { visibility: hidden; }
+@keyframes mk-slide-in-left { from { opacity: 0; transform: translateX(-12px); } }
 .folder-side[hidden] { display: none; }
+/* 폴더 목록 (탐색기처럼): 옆으로는 넘치지 않고, 줄은 목록 폭을 다 쓴다 */
+.folder-side { display: flex; flex-direction: column; overflow-x: hidden; scrollbar-gutter: stable; }
+.folder-side .mf-list { flex: none; }
+/* ⋯ 는 줄 폭을 차지하지 않고 올렸을 때 오른쪽 끝에 겹쳐 뜬다 (좁은 목록에서 이름 · 메모 수 자리를 지킨다) */
+.folder-side .mf-more { position: absolute; right: 2px; top: 50%; width: 26px; height: 26px; margin: -13px 0 0; border-radius: 6px; background: var(--bg); box-shadow: 0 0 0 1px var(--line); }
+/* ＋ 새 폴더: 폴더가 많아 목록을 내려도 늘 아래에 붙어 있다 — 링크가 아니라 목록의 한 줄처럼 */
+.folder-side .mf-new {
+  position: sticky; bottom: -12px; display: flex; align-items: center; width: 100%; min-height: 34px; margin: 6px 0 0; padding: 6px 10px;
+  border-radius: var(--radius-sm); background: var(--bg); color: var(--muted); font-size: 13px; font-weight: 600; text-align: left; text-decoration: none;
+}
+.folder-side .mf-new:hover { background: color-mix(in srgb, var(--text) 6%, var(--bg)); color: var(--text); }
+.folder-side .mf-new:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: -2px; }
 .memos-col > .folder-chips { margin: 0 12px 6px; }
 .toolbar .folder-btn[hidden] { display: none; }
 .toolbar .folder-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); }

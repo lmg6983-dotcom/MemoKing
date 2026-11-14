@@ -40,6 +40,7 @@ export function renderFolderList(container, { folders, current, onPick, onNew, o
     if (onMenu && name) {
       const more = el('button', 'icon-btn mf-more');
       more.type = 'button';
+      more.tabIndex = -1; // 키보드는 F2 · 메뉴 키로 (줄마다 Tab 이 서지 않게)
       more.dataset.folderMenu = name;
       more.title = '이름 바꾸기, 지우기';
       more.setAttribute('aria-label', `${name} 폴더 메뉴`);
@@ -55,6 +56,26 @@ export function renderFolderList(container, { folders, current, onPick, onNew, o
     if (m) return onMenu?.(m.dataset.folderMenu, m);
     const b = e.target.closest('[data-folder]');
     if (b) onPick(b.dataset.folder);
+  });
+  // 키보드: 목록은 Tab 한 번에 들어오고(고른 폴더), 그 안에서는 ↑ ↓ Home End 로 옮겨 다닌다 (폴더가 많아도 Tab 을 여러 번 누르지 않게)
+  const rows = () => [...list.querySelectorAll('[data-folder]')];
+  for (const b of rows()) b.tabIndex = b.hasAttribute('aria-current') ? 0 : -1;
+  if (!list.querySelector('[data-folder][tabindex="0"]')) rows()[0].tabIndex = 0;
+  list.addEventListener('keydown', (e) => {
+    const b = e.target.closest('[data-folder]');
+    if (!b) return;
+    const all = rows();
+    const i = all.indexOf(b);
+    const to = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : -2;
+    if (to !== -2) {
+      e.preventDefault();
+      const next = all[Math.max(0, Math.min(all.length - 1, to))];
+      for (const x of all) x.tabIndex = x === next ? 0 : -1;
+      next.focus();
+    } else if (e.key === 'F2' && onMenu && b.dataset.folder) {
+      e.preventDefault();
+      onMenu(b.dataset.folder, b);
+    }
   });
   list.addEventListener('contextmenu', (e) => {
     const b = e.target.closest('[data-folder]');

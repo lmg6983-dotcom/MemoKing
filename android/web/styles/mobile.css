@@ -376,6 +376,10 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .note-screen .icon-btn { color: var(--note-muted); }
 .note-screen .icon-btn:active { background: var(--note-hover); }
 .note-screen.entering { animation: note-in 0.2s var(--ease-out); }
+/* 편집기가 만들어지면 글이 툭 나타나지 않고 스며든다 (여는 움직임과 겹쳐 자연스럽게) */
+.note-screen .editor .ProseMirror { animation: m-doc-in 0.18s ease-out; }
+@keyframes m-doc-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .note-screen .editor .ProseMirror { animation: none; } }
 .note-screen.leaving { animation: note-out 0.16s var(--ease-out) forwards; }
 @keyframes note-in { from { opacity: 0; transform: translateY(24px); } }
 @keyframes note-out { to { opacity: 0; transform: translateY(24px); } }
