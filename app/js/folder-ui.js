@@ -2,6 +2,7 @@
 //   폴더 목록: 전체 · 폴더마다 (메모 수) · ＋ 새 폴더  (PC 는 왼쪽 막대, 휴대폰은 아래에서 올라오는 시트)
 //   폴더 고르기 창: 메모를 옮길 폴더 (폴더 없음 · 폴더들 · ＋ 새 폴더)
 import { icon } from './icons.js';
+import { haptic } from './dom.js';
 import { cleanFolderName, MAX_FOLDER_NAME } from './core/folders.js';
 
 function el(tag, className = '', text = '') {
@@ -145,6 +146,7 @@ export function renderFolderChips(container, { folders, current, onPick, onCreat
     clearTimeout(hold);
     hold = setTimeout(() => {
       held = true;
+      haptic(10); // 꾹 눌린 것을 손끝에 (메모 카드와 같게)
       onMenu(b.dataset.folder, b);
     }, 500);
     const cancel = (ev) => {

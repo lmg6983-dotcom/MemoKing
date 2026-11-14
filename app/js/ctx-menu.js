@@ -7,6 +7,13 @@ import { clearOfSticker } from './sticker-zone.js';
 
 let current = null; // { el, done, cleanup }
 
+// 지금 화면을 누르고 있는가 — 꾹 눌러 연 메뉴는 그 손가락을 뗄 때까지 "밖을 눌렀다" 로 닫지 않는다
+let pressed = false;
+if (typeof document !== 'undefined') {
+  document.addEventListener('pointerdown', () => (pressed = true), true);
+  for (const type of ['pointerup', 'pointercancel']) document.addEventListener(type, () => (pressed = false), true);
+}
+
 /** 메뉴가 떠 있는가 (다른 곳에서 단추 · 호버를 띄우지 않게) */
 export const isContextMenuOpen = () => Boolean(current);
 
@@ -191,8 +198,16 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
   const onDown = (e) => {
     if (!el.contains(e.target)) closeContextMenu();
   };
+  // 꾹 눌러 연 메뉴: 손가락을 아직 대고 있을 때 안드로이드가 뒤늦게 보내는 contextmenu 는 "밖을 눌렀다" 가 아니다
+  //   (폴더 칩은 500ms 타이머로 먼저 열고, 안드로이드의 꾹 누르기 신호가 그 직후에 와서 메뉴가 뜨자마자 닫혔다)
+  //   연 손가락을 아직 대고 있는 동안(안드로이드가 그 신호와 함께 누름을 끊어도 1초까지)은 닫지 않는다
+  const openedAt = performance.now();
+  let opener = pressed;
+  const release = () => (opener = false);
+  document.addEventListener('pointerup', release, true);
+  document.addEventListener('pointercancel', release, true);
   const onMenu = (e) => {
-    if (el.contains(e.target)) e.preventDefault(); // 메뉴 위의 오른쪽 클릭은 아무 일 없이
+    if (el.contains(e.target) || opener || performance.now() - openedAt < 1000) e.preventDefault(); // 메뉴 위의 오른쪽 클릭은 아무 일 없이
     else closeContextMenu();
   };
   const close = () => closeContextMenu();
@@ -206,6 +221,8 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
     document.removeEventListener('keydown', onKey, true);
     document.removeEventListener('mousedown', onDown, true);
     document.removeEventListener('contextmenu', onMenu, true);
+    document.removeEventListener('pointerup', release, true);
+    document.removeEventListener('pointercancel', release, true);
     window.removeEventListener('blur', close);
     window.removeEventListener('resize', close);
     window.removeEventListener('wheel', close, { capture: true });
