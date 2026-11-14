@@ -216,8 +216,20 @@ export class SyncEngine {
   // ---------- 동기화 ----------
 
   /** @param {{ full?: boolean }} [opts] full: "바뀐 것" 목록과 상관없이 Drive 폴더를 처음부터 훑는다 ("지금 동기화") */
-  async run({ full = false } = {}) {
+  async run({ full = false, localClean = false } = {}) {
     const files = this.state.files;
+    // 이 PC 의 메모 폴더가 그대로인 것을 알면(파일 지켜보기 — drive-sync.js) 폴더를 훑지 않고 Drive 에 바뀐 것만 묻는다.
+    //   훑기는 파일마다 정보를 읽는 일이라, 파일이 수천 개면 10초마다 앱이 잠깐씩 멈췄다
+    let peeked = null;
+    if (localClean && !full && this.state.pageToken && this.now() - (this.state.lastFullScan ?? 0) < FULL_SCAN_MS) {
+      const ids = new Set([...Object.values(files).map((f) => f.id), ...Object.values(this.state.folders ?? {}), this.rootId]);
+      const peek = await this.remote.changesSince(this.state.pageToken, ids);
+      if (!peek.changed) {
+        this.state.pageToken = peek.token;
+        return { skipped: true, uploaded: 0, downloaded: 0, deletedLocal: 0, deletedRemote: 0, conflicts: [], localChanged: false };
+      }
+      peeked = peek; // Drive 에 바뀐 것이 있다: 아래에서 보통대로 (물은 것은 그대로 쓴다)
+    }
     const local = this.walkLocal();
     const known = Object.keys(files);
     const localDirty = local.size !== known.length || [...local].some(([rel, l]) => {
@@ -225,7 +237,7 @@ export class SyncEngine {
       return !b || b.lmtime !== l.mtime || b.lsize !== l.size;
     });
     const knownIds = new Set([...known.map((k) => files[k].id), ...Object.values(this.state.folders ?? {}), this.rootId]);
-    const { changed: remoteDirty, token, items } = await this.remote.changesSince(this.state.pageToken || null, knownIds);
+    const { changed: remoteDirty, token, items } = peeked ?? await this.remote.changesSince(this.state.pageToken || null, knownIds);
     const scanDue = full || this.now() - (this.state.lastFullScan ?? 0) >= FULL_SCAN_MS;
     if (!localDirty && !remoteDirty && !scanDue) {
       this.state.pageToken = token;

@@ -7,8 +7,8 @@ import path from 'node:path';
 import { SyncEngine, skipName, skipPath } from './sync-engine.js';
 import { UI } from '../../app/js/core/ui-text.js';
 
-// 주기: 쉬는 중 1분 · 메모킹 창을 쓰는 중 10초 · 파일이 오간 뒤 2분은 5초 (휴대폰과 주고받는 중일 때 빨리)
-export const POLL = { idle: 60_000, active: 10_000, burst: 5_000, burstFor: 120_000, focusGap: 5_000 };
+// 주기: 쉬는 중 30초 · 메모킹 창을 쓰는 중 10초 · 파일이 오간 뒤 2분은 5초 (휴대폰과 주고받는 중일 때 빨리)
+export const POLL = { idle: 30_000, active: 10_000, burst: 5_000, burstFor: 120_000, focusGap: 5_000 };
 export const pollDelay = ({ now, active, burstUntil }) => (now < burstUntil ? POLL.burst : active ? POLL.active : POLL.idle);
 export const DOUBLE_SYNC = '메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). '
   + '설정의 Google Drive 동기화에서 "다른 Drive 폴더로 바꾸기"로 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요';
@@ -34,6 +34,30 @@ export class DriveSync extends EventEmitter {
     this.isActive = () => false; // 메모킹 창을 쓰고 있나 (main.js 가 채운다)
     this.burstUntil = 0;
     this.lastFocus = 0;
+    // 메모 폴더 지켜보기: 바뀐 것이 없으면 동기화가 폴더를 훑지 않는다 (sync-engine.js localClean). 지켜볼 수 없으면 늘 훑는다
+    this.watcher = null;
+    this.localDirty = true;
+  }
+
+  watch(root) {
+    this.watcher?.close();
+    this.watcher = null;
+    this.localDirty = true;
+    if (!root) return;
+    try {
+      this.watcher = fs.watch(root, { recursive: true, persistent: false }, (_type, name) => {
+        // 동기화하지 않는 파일(기기마다 따로 두는 색인 · 임시 파일)이 바뀐 것은 세지 않는다
+        if (name && skipPath(String(name).replace(/\\/g, '/'))) return;
+        this.localDirty = true;
+      });
+      this.watcher.on('error', () => {
+        this.watcher?.close();
+        this.watcher = null; // 지켜보지 못하면 예전처럼 늘 훑는다
+        this.localDirty = true;
+      });
+    } catch {
+      this.watcher = null;
+    }
   }
 
   get active() {
@@ -56,6 +80,7 @@ export class DriveSync extends EventEmitter {
     this.config = config?.folderId && config?.root ? config : null;
     clearTimeout(this.timer);
     this.timer = null;
+    this.watch(this.active ? this.config.root : null);
     if (!this.active) {
       this.publish({ state: 'off', error: '' });
       return;
@@ -85,7 +110,7 @@ export class DriveSync extends EventEmitter {
     const now = Date.now();
     if (now - this.lastFocus < POLL.focusGap) return;
     this.lastFocus = now;
-    this.request(300);
+    this.request(300, { local: true }); // 창을 떠나 있던 사이 탐색기에서 고쳤을 수 있다
     this.schedule();
   }
 
@@ -95,7 +120,8 @@ export class DriveSync extends EventEmitter {
   }
 
   /** 동기화를 부탁한다 (delayMs 안에 또 부탁하면 한 번으로) */
-  request(delayMs = 0) {
+  request(delayMs = 0, { local = false } = {}) {
+    if (local) this.localDirty = true; // 이 PC 에서 고친 것을 안다 (지켜보기가 놓쳐도 훑게)
     if (!this.active || !this.auth.connected) return;
     clearTimeout(this.pending);
     this.pending = setTimeout(() => {
@@ -171,7 +197,16 @@ export class DriveSync extends EventEmitter {
     };
     try {
       fs.mkdirSync(root, { recursive: true });
-      const result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state, onProgress }).run({ full });
+      // 지켜보는 중이고 지난번 뒤로 바뀐 것이 없으면 폴더를 훑지 않는다. 표시는 훑기 전에 내려 — 도는 사이 바뀐 것은 다음 차례에 본다
+      const localClean = Boolean(this.watcher) && !this.localDirty;
+      this.localDirty = false;
+      let result;
+      try {
+        result = await new SyncEngine({ root, remote: this.api, rootId: folderId, state, onProgress }).run({ full, localClean });
+      } catch (err) {
+        this.localDirty = true; // 끝내지 못했다 — 다음에는 다시 훑는다
+        throw err;
+      }
       save();
       if (result.uploaded + result.downloaded + result.deletedLocal + result.deletedRemote > 0) this.burstUntil = Date.now() + POLL.burstFor;
       if (!this.auth.email) this.api.about().then((email) => email && this.auth.setEmail(email)).catch(() => {});
@@ -189,6 +224,8 @@ export class DriveSync extends EventEmitter {
   stop() {
     clearTimeout(this.timer);
     clearTimeout(this.pending);
+    this.watcher?.close();
+    this.watcher = null;
     this.timer = null;
   }
 }

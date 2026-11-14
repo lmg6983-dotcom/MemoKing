@@ -218,7 +218,7 @@ function openVault(dir) {
     }
     next.defaultMode = viewMode(); // 새 메모는 지금 고른 Work / Life 로 (나눠 쓰지 않으면 Life)
     next.on('changed', ({ ids, external, removed }) => {
-      driveSync?.request(1000); // 메모 저장은 이미 0.6초 모아서 오므로 1초면 충분
+      driveSync?.request(1000, { local: true }); // 메모 저장은 이미 0.6초 모아서 오므로 1초면 충분
       if (sandbox?.real === next) return; // 연습 중: 화면은 연습 공간 것 (돌아올 때 목록을 다시 그린다)
       windowManager.pushList();
       for (const id of external) windowManager.sendToNote(id, 'memo:external', next.get(id));

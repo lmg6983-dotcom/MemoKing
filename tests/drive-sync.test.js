@@ -513,3 +513,35 @@ test('훑는 사이 사라진 파일(메모 창을 닫으며 제목에 맞춰 �
   }
   assert.equal((await sync()).uploaded, 1, '다음 차례에 맞춰진다');
 });
+
+test('메모 폴더가 그대로인 것을 알면(localClean) 폴더를 훑지 않고 Drive 에 바뀐 것만 묻는다', async () => {
+  drive = new ChangesDrive();
+  await lw('가.md', '하나');
+  await sync();
+  await sync(); // 방금 올린 것이 Drive 의 바뀐 목록으로 한 번 돌아온다
+  const run = (opts) => {
+    const engine = new SyncEngine({ root: dir, remote: drive, rootId: 'ROOT', state });
+    let walks = 0;
+    const walk = engine.walkLocal.bind(engine);
+    engine.walkLocal = () => (walks++, walk());
+    return engine.run(opts).then((r) => ({ ...r, walks }));
+  };
+  // 양쪽 다 그대로: 훑지 않는다
+  let r = await run({ localClean: true });
+  assert.equal(r.skipped, true);
+  assert.equal(r.walks, 0);
+  // Drive 에서 바뀌면: 훑고 내려받는다 (미리 물은 바뀐 목록을 그대로 쓴다)
+  drive.put('나.md', '둘');
+  r = await run({ localClean: true });
+  assert.equal(r.walks, 1);
+  assert.equal(r.downloaded, 1);
+  assert.equal(lt('나.md'), '둘');
+  await sync();
+  // 이 PC 에서 고쳤는데 그대로라고 잘못 알려도, 다 훑는 때(15분)가 되면 올린다
+  await lw('가.md', '고침');
+  r = await run({ localClean: true });
+  assert.equal(r.walks, 0);
+  state.lastFullScan = 0;
+  r = await run({ localClean: true });
+  assert.equal(r.uploaded, 1);
+});

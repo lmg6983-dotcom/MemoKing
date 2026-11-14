@@ -1204,6 +1204,9 @@ export async function openNote(memoId, options = {}) {
     current = saved = memo.body;
     el.editorRoot.replaceChildren();
     el.editorRoot.scrollTop = 0;
+    // 여는 움직임이 먼저 시작되게 한 박자 쉰다 — 바로 편집기를 만들면 그동안 화면이 멈춰 움직임이 늦게 시작됐다
+    if (!reduceMotion()) await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+    if (id !== memoId) return; // 그사이 닫았거나 다른 메모를 열었다
     $('format-items').scrollLeft = 0; // 도구막대는 늘 처음(+ · 굵게)부터 — 지난 메모에서 옆으로 밀어 둔 채로 열리지 않게
     if (memo.needsPassword) {
       // 잠긴 메모: 비밀번호를 넣어야 편집기를 만든다 (열쇠는 메모를 닫을 때까지만)
@@ -1329,15 +1332,17 @@ function cardMorph(rect, opening, done = () => {}) {
   if (isTwoPane() || typeof el.screen.animate !== 'function') return false;
   const s = el.screen.getBoundingClientRect();
   if (!s.width || !s.height) return false;
-  const card = `inset(${Math.max(0, rect.top - s.top)}px ${Math.max(0, s.right - rect.right)}px ${Math.max(0, s.bottom - rect.bottom)}px ${Math.max(0, rect.left - s.left)}px round 16px)`;
-  const full = 'inset(0px 0px 0px 0px round 0px)';
-  const frames = [{ clipPath: card, opacity: 0.55 }, { clipPath: full, opacity: 1 }];
+  // 크기 · 자리 · 투명도만 움직인다 (화면을 그리는 쪽이 따로 굴려, 편집기를 만들거나 목록을 다시 그리는 동안에도 끊기지 않는다).
+  //   예전에는 오려 내는 모양(clip-path)을 움직여, 그 일과 같은 줄에서 돌며 열고 닫을 때마다 툭툭 끊겼다
+  const scale = Math.max(0.3, Math.min(1, rect.width / s.width));
+  const small = `translate(${rect.left - s.left}px, ${rect.top - s.top}px) scale(${scale})`;
+  const frames = [{ transform: small, transformOrigin: '0 0', opacity: 0.4 }, { transform: 'none', transformOrigin: '0 0', opacity: 1 }];
   const anim = el.screen.animate(opening ? frames : frames.reverse(), opening
     ? { duration: 280, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' }
     : { duration: 200, easing: EASE_OUT, fill: 'forwards' });
   anim.finished.then(() => {
     done();
-    if (!opening) anim.cancel(); // 다음에 열 때 오려 낸 모양이 남지 않게
+    if (!opening) anim.cancel(); // 다음에 열 때 줄어든 모양이 남지 않게
   }).catch(() => {});
   return true;
 }

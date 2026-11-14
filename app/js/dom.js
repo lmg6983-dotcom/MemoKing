@@ -174,21 +174,63 @@ export function radioGroups(root = document) {
 // 가장 짧은 줄에 차례로 쌓기. 카드를 하나 넣을 때마다 줄 높이를 재면 카드 수만큼 화면 배치를 다시 계산해
 //   메모가 많으면 검색 한 번에 몇 초씩 걸렸다 (1,500개에 1초 넘게) — 첫 줄에 모두 넣어 높이를 한 번에 재고 나눈다 (줄 폭은 모두 같다)
 /** 카드 목록(PC · 휴대폰)의 엇갈려 쌓기 */
-export function stackCards(columns, items) {
-  columns[0].append(...items);
-  if (columns.length < 2) return;
-  const heights = items.map((it) => it.offsetHeight);
-  const gap = parseFloat(getComputedStyle(columns[0]).rowGap) || 0;
+export function stackCards(columns, items, { late } = {}) {
+  const run = ++stackRun;
+  const single = columns.length < 2;
+  const width = columns[0].clientWidth;
+  const gap = single ? 0 : parseFloat(getComputedStyle(columns[0]).rowGap) || 0;
   const sums = columns.map(() => 0);
-  const buckets = columns.map(() => []);
-  items.forEach((it, i) => {
-    let k = 0;
-    for (let c = 1; c < columns.length; c++) if (sums[c] < sums[k]) k = c;
-    buckets[k].push(it);
-    sums[k] += heights[i] + gap;
-  });
-  columns.forEach((c, i) => c.replaceChildren(...buckets[i]));
+  const known = (it) => it.mkEpoch === stackEpoch && it.mkW === width && it.mkH > 0;
+  // 한 묶음을 쌓는다: 높이를 모르는 카드만 첫 줄에 붙여 한 번에 재고(화면 배치 계산 한 번), 줄마다 한 번씩 붙인다
+  const place = (batch) => {
+    if (single) {
+      for (const it of batch) it.mkEpoch ??= stackEpoch; // 한 번 놓인 카드 (다시 그릴 때는 한 번에)
+      return void columns[0].append(...batch);
+    }
+    const fresh = batch.filter((it) => !known(it));
+    if (fresh.length) {
+      // 화면 밖 카드는 그리기를 건너뛰므로(base.css .mk-skip) 잴 때만 잠깐 다 그리게 하고, 잰 높이를 건너뛸 때의 자리 크기로 남긴다
+      for (const it of fresh) it.classList.add('mk-measure');
+      columns[0].append(...fresh);
+      const heights = fresh.map((it) => it.offsetHeight);
+      fresh.forEach((it, i) => {
+        Object.assign(it, { mkH: heights[i], mkW: width, mkEpoch: stackEpoch });
+        it.style.containIntrinsicBlockSize = `auto ${heights[i]}px`;
+        it.classList.remove('mk-measure');
+      });
+    }
+    const buckets = columns.map(() => []);
+    for (const it of batch) {
+      let k = 0;
+      for (let c = 1; c < columns.length; c++) if (sums[c] < sums[k]) k = c;
+      buckets[k].push(it);
+      sums[k] += it.mkH + gap;
+    }
+    columns.forEach((c, i) => buckets[i].length && c.append(...buckets[i]));
+  };
+  // 처음 보는 카드가 많을 때(앱을 켠 직후 · 폭이 바뀐 뒤)만 나눠 쌓는다: 화면에 보이는 것 먼저, 나머지는 다음 화면 그리기마다 조금씩
+  //   (한꺼번에 쌓으면 메모 수백 개에서 화면이 몇 초 멈췄다). 높이를 아는 카드뿐이면 한 번에 — 보던 자리(스크롤)가 그대로 있게
+  const unknown = single ? items.reduce((n, it) => n + (it.mkEpoch === undefined ? 1 : 0), 0) : items.reduce((n, it) => n + (known(it) ? 0 : 1), 0);
+  if (unknown <= STACK_SYNC_MAX || !width) return void place(items);
+  place(items.slice(0, STACK_FIRST));
+  let i = STACK_FIRST;
+  const step = () => {
+    if (run !== stackRun || !columns[0].isConnected) return; // 그사이 다시 그렸다
+    const batch = items.slice(i, i + STACK_CHUNK);
+    i += STACK_CHUNK;
+    late?.(batch);
+    place(batch);
+    if (i < items.length) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
+let stackRun = 0;
+// 글꼴이 늦게 실리면 카드 높이가 달라진다 — 그 뒤 처음 쌓을 때 다시 잰다
+let stackEpoch = 0;
+if (typeof document !== 'undefined') document.fonts?.ready?.then(() => stackEpoch++);
+const STACK_SYNC_MAX = 60;
+const STACK_FIRST = 40;
+const STACK_CHUNK = 80;
 
 /**
  * 밀어서 닫기 (잠깐 뜨는 알림 · 막대): 옆으로(up 이면 위로도) 밀면 손을 따라오다가, 놓으면 날아가며 닫힌다.

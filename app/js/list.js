@@ -375,7 +375,11 @@ function layoutCards(memos) {
     return c;
   });
   el.cards.replaceChildren(...columns);
-  stackCards(columns, memos.map(renderCard)); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다)
+  stackCards(columns, memos.map(cardFor)); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다)
+  if (cardCache.size > memos.length + 200) {
+    const shown = new Set(memos.map((m) => m.id));
+    for (const id of cardCache.keys()) if (!shown.has(id)) cardCache.delete(id);
+  }
   if (top) el.cards.scrollTop = top;
 }
 
@@ -644,6 +648,27 @@ function renderEmpty(narrowed, elsewhere = 0) {
   el.empty.replaceChildren(art, text, actions);
 }
 
+// 바뀌지 않은 메모의 카드는 다시 만들지 않고 그대로 옮겨 쌓는다 (휴대폰과 같음)
+//   — 검색 · 필터 · 저장 때마다 모든 카드를 새로 만들고 높이를 다시 재서, 메모가 많으면 그때마다 화면이 멈칫했다
+const cardCache = new Map(); // 메모 id → { key, li }
+const cardKey = (memo) => `${JSON.stringify(memo)}|${friendlyTime(memo.updated)}|${state.workLife ? 1 : 0}|${!state.folder || state.query ? 1 : 0}`;
+function cardFor(memo) {
+  const key = cardKey(memo);
+  const hit = cardCache.get(memo.id);
+  if (hit?.key === key) {
+    // 그릴 때마다 달라지는 것만 다시: 고르는 중 표시 · 방금 놓은 카드 표시
+    const card = hit.li.querySelector('.card');
+    card.classList.toggle('dropped', memo.id === state.droppedId && Date.now() < state.droppedUntil);
+    card.classList.remove('drag-source');
+    card.style.visibility = ''; // 지우며 숨긴 카드를 되돌렸을 때
+    markPick(card);
+    return hit.li;
+  }
+  const li = renderCard(memo);
+  cardCache.set(memo.id, { key, li });
+  return li;
+}
+
 function renderCard(memo) {
   const li = document.createElement('div');
   li.className = 'item';
@@ -680,6 +705,7 @@ function renderCard(memo) {
     img.src = vaultUrl(memo.thumb);
     img.alt = '';
     img.loading = 'lazy';
+    img.decoding = 'async'; // 큰 사진을 푸는 동안 스크롤이 멈추지 않게
     img.draggable = false;
     img.onerror = () => img.remove();
     card.append(img);
@@ -2081,19 +2107,25 @@ try {
 applyLayout();
 // 카드들이 새 자리로 미끄러져 간다 (옛 자리 → 새 자리) — 모양이 바뀐 것을 눈으로 따라갈 수 있게
 function glideCards(change) {
-  const before = new Map([...el.cards.querySelectorAll('.card')].map((c) => [c.dataset.id, c.getBoundingClientRect()]));
+  // 카드를 감싼 칸(.item)을 잰다 — 화면 밖 칸은 그리기를 건너뛰는데(base.css), 그 안의 카드를 재면 건너뛴 것을 모두 다시 계산한다.
+  //   미끄러짐도 화면 근처 칸만 (보이지 않는 칸은 움직여도 보이지 않는다)
+  const vh = window.innerHeight;
+  const near = (r) => r.bottom > -vh && r.top < vh * 2;
+  const idOf = (item) => item.firstElementChild?.dataset.id;
+  const before = new Map([...el.cards.querySelectorAll('.item')].map((it) => [idOf(it), it.getBoundingClientRect()]));
   change();
   if (reduceMotion()) return;
-  for (const c of el.cards.querySelectorAll('.card')) {
-    const a = before.get(c.dataset.id);
-    if (!a) continue;
-    const b = c.getBoundingClientRect();
+  for (const it of el.cards.querySelectorAll('.item')) {
+    const a = before.get(idOf(it));
+    if (!a || !a.width || !near(a)) continue;
+    const b = it.getBoundingClientRect();
     const dx = a.left - b.left;
     const dy = a.top - b.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-    c.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' });
+    it.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${a.width / b.width}, ${a.height / b.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' });
   }
 }
+
 el.layoutGroup.addEventListener('click', (e) => {
   const b = e.target.closest('[data-value]');
   if (!b || b.dataset.value === layout) return;
