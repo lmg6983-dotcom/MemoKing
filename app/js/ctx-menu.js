@@ -191,8 +191,11 @@ export function openContextMenu({ x, y, icons = [], items = [], label = '메뉴'
   const onDown = (e) => {
     if (!el.contains(e.target)) closeContextMenu();
   };
+  // 꾹 눌러 연 메뉴: 손가락을 아직 대고 있을 때 안드로이드가 뒤늦게 보내는 contextmenu 는 "밖을 눌렀다" 가 아니다
+  //   (폴더 칩은 500ms 타이머로 먼저 열고, 안드로이드의 꾹 누르기 신호가 그 직후에 와서 메뉴가 뜨자마자 닫혔다)
+  const openedAt = performance.now();
   const onMenu = (e) => {
-    if (el.contains(e.target)) e.preventDefault(); // 메뉴 위의 오른쪽 클릭은 아무 일 없이
+    if (el.contains(e.target) || performance.now() - openedAt < 1000) e.preventDefault(); // 메뉴 위의 오른쪽 클릭은 아무 일 없이
     else closeContextMenu();
   };
   const close = () => closeContextMenu();
