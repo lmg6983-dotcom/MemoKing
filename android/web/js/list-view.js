@@ -24,7 +24,7 @@ import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
 import { openFolderSheet, pickFolder, createPickBar, askFolderName, renderFolderChips, closeFolderInput } from '../../app/js/folder-ui.js';
 import { openContextMenu } from '../../app/js/ctx-menu.js';
-import { folderList, movedText, isFolderName } from '../../app/js/core/folders.js';
+import { folderList, movedText, isFolderName, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from '../../app/js/core/folders.js';
 
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -88,8 +88,8 @@ try {
   // 전체
 }
 /** 보고 있는 폴더 — 새 메모는 이 폴더에 (app.newMemo) */
-export const currentFolder = () => state.folder;
-const inFolder = (memos) => (state.folder ? memos.filter((m) => m.folder === state.folder) : memos);
+export const currentFolder = () => (state.folder === UNFILED ? '' : state.folder); // 새 메모를 넣을 폴더 (미분류에서는 폴더 없이)
+const inFolder = (memos) => memosInFolder(memos, state.folder);
 const WORK_LIFE_KEY = 'memoking.workLife';
 try {
   state.mode = validMode(localStorage.getItem(MODE_KEY));
@@ -339,7 +339,9 @@ function layoutCards(memos) {
 // 바뀌지 않은 메모의 카드는 다시 만들지 않고 그대로 옮겨 쌓는다
 //   — 지우기 · 되돌리기 · 저장 때마다 모든 카드를 새로 만들어, 남은 카드가 미끄러지는 중에 화면이 잠깐 멈췄다
 const cardCache = new Map(); // 메모 id → { key, li }
-const cardKey = (memo) => JSON.stringify(memo) + friendlyTime(memo.updated);
+// 메모 내용뿐 아니라 그릴 때 보는 것도 열쇠에: 폴더 이름을 보일지(전체 · 검색에서만) · Work/Life 표시
+//   (빠뜨리면 전체에서 만든 카드가 폴더 안에서도 폴더 이름을 달고, 폴더 안에서 만든 카드는 전체에서도 이름이 없었다)
+const cardKey = (memo) => `${JSON.stringify(memo)}|${friendlyTime(memo.updated)}|${workLifeOn() ? 1 : 0}|${!state.folder || state.query ? 1 : 0}`;
 function cardFor(memo) {
   const key = cardKey(memo);
   const hit = cardCache.get(memo.id);
@@ -375,6 +377,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
     ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
     : narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : UI.noMatch
+    : state.folder === UNFILED ? `${UNFILED_LABEL} 메모가 없어요.\n모든 메모가 폴더에 들어 있어요. 여기서 쓰는 새 메모는 폴더 없이 만들어져요.`
     : state.folder ? `${state.folder} 폴더가 비어 있어요.\n여기서 쓰는 새 메모는 이 폴더에 들어가요. 메모를 꾹 눌러 "폴더로 옮기기" 해도 돼요.`
     : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 메모를 꾹 눌러 "Work로 옮기기" 해 보세요.'
       : '아직 메모가 없어요.\n떠오른 생각을 바로 적거나 말로 남겨 보세요.';
@@ -448,7 +451,7 @@ function folders() {
 
 // 고른 폴더가 없어졌으면(다른 기기 · 파일 앱에서 지움) 전체로 — 카드를 거르기 전에
 function keepFolderValid() {
-  if (state.folder && !folders().some((f) => f.name === state.folder)) state.folder = '';
+  if (state.folder === UNFILED ? !folders().length : state.folder && !folders().some((f) => f.name === state.folder)) state.folder = '';
 }
 
 function setFolder(name) {
@@ -468,7 +471,7 @@ let chipsKey = '';
 let chipsNames = ''; // 그중 폴더 이름 · 고른 폴더만 (새 폴더 이름을 쓰는 중에는 메모 수만 바뀐 것으로 다시 그리지 않는다)
 function renderFolderBar() {
   el.folderChips.hidden = Boolean(state.query); // 검색은 모든 폴더에서
-  const list = folders();
+  const list = withUnfiled(folders(), split(state.memos, state.mode).mine);
   const key = JSON.stringify([list, state.folder]);
   const names = JSON.stringify([list.map((f) => f.name), state.folder]);
   if (key === chipsKey || (el.folderChips.querySelector('.fchip-new') && names === chipsNames)) return;
@@ -476,7 +479,7 @@ function renderFolderBar() {
   chipsNames = names;
   // 폴더가 생기면 한 번: 꾹 누르면 이름 바꾸기 · 지우기 (눈에 안 보이는 동작)
   if (list.length) setTimeout(() => {
-    const first = el.folderChips.querySelector('.fchip[data-folder]:not([data-folder=""])');
+    const first = el.folderChips.querySelector(`.fchip[data-folder]:not([data-folder=""]):not([data-folder="${UNFILED}"])`);
     if (first?.getClientRects().length && state.tab === 'memos') hintOnce('folder-chips', '폴더를 꾹 누르면 이름을 바꾸거나 지울 수 있어요. 오른쪽 끝 단추로 폴더 목록도 봐요', { anchor: first });
   }, 900);
   renderFolderChips(el.folderChips, {
@@ -500,7 +503,7 @@ function renderFolderBar() {
 // 칩이 넘칠 때 "모두": 그 단추 바로 아래에 폴더 목록
 async function openAllFolders(anchor) {
   loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
-  const picked = await openFolderSheet({ folders: folders(), current: state.folder, onMenu: folderMenu, anchor });
+  const picked = await openFolderSheet({ folders: withUnfiled(folders(), split(state.memos, state.mode).mine), current: state.folder, onMenu: folderMenu, anchor });
   if (picked == null) return;
   if (typeof picked === 'object') {
     try {

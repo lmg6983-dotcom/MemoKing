@@ -38,7 +38,7 @@ import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewT
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
 import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet } from './folder-ui.js';
-import { folderList, movedText, isFolderName } from './core/folders.js';
+import { folderList, movedText, isFolderName, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
@@ -203,9 +203,9 @@ function render() {
 
 // ---------- 폴더 (folder-ui.js · core/folders.js) ----------
 
-const inFolder = (memos) => (state.folder ? memos.filter((m) => m.folder === state.folder) : memos);
+const inFolder = (memos) => memosInFolder(memos, state.folder);
 // 새 메모는 보고 있는 폴더에
-const newMemo = (opts = {}) => api.memo.create({ ...opts, ...(state.folder ? { folder: state.folder } : {}) });
+const newMemo = (opts = {}) => api.memo.create({ ...opts, ...(state.folder && state.folder !== UNFILED ? { folder: state.folder } : {}) });
 
 async function loadFolders() {
   state.folderDirs = await api.memos.folders?.().catch(() => []) ?? [];
@@ -215,6 +215,10 @@ async function loadFolders() {
 // 고른 폴더가 없어졌으면(탐색기에서 지움 · 다른 기기) 전체로 — 카드를 거르기 전에 (폴더 목록을 받기 전에는 그대로)
 function keepFolderValid() {
   if (!state.folder || !state.folderDirs) return;
+  if (state.folder === UNFILED) {
+    if (!currentFolders().length) state.folder = ''; // 폴더가 하나도 없으면 미분류 항목도 없다
+    return;
+  }
   if (state.folderDirs.includes(state.folder) || modeMemos().some((m) => m.folder === state.folder)) return;
   state.folder = '';
 }
@@ -289,7 +293,7 @@ const currentFolders = () => folderList(state.folderDirs ?? [], modeMemos());
 // PC 의 폴더는 왼쪽 목록 하나 (탐색기처럼) — 카드 위에 줄을 따로 두지 않는다. 메모를 끌어 폴더에 놓으면 그 폴더로 옮긴다
 function renderFolders() {
   if (!el.folderSide) return;
-  renderFolderList(el.folderSide, { folders: currentFolders(), current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
+  renderFolderList(el.folderSide, { folders: withUnfiled(currentFolders(), modeMemos()), current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
 }
 
 // ---------- 폴더 목록 (왼쪽): 폴더가 없어도, 창이 좁아도 늘 — 위 폴더 단추로 접고 편다 (이 PC 에 기억) ----------
@@ -312,7 +316,7 @@ function applyFolderSide() {
 
 // anchor: 누른 단추 (그 바로 아래에 폴더 목록)
 async function openFolderPicker(anchor = el.folderBtn) {
-  const picked = await openFolderSheet({ folders: currentFolders(), current: state.folder, onMenu: folderMenu, anchor });
+  const picked = await openFolderSheet({ folders: withUnfiled(currentFolders(), modeMemos()), current: state.folder, onMenu: folderMenu, anchor });
   if (picked == null) return;
   if (typeof picked === 'object') return createAndOpenFolder(picked.create);
   setFolder(picked);
@@ -608,6 +612,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
     ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
     : narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : UI.noMatch
+    : state.folder === UNFILED ? `${UNFILED_LABEL} 메모가 없어요.\n모든 메모가 폴더에 들어 있어요. 여기서 쓰는 새 메모는 폴더 없이 만들어져요.`
     : state.folder ? `${state.folder} 폴더가 비어 있어요.\n여기서 쓰는 새 메모는 이 폴더에 들어가요. 다른 메모를 끌어 왼쪽 폴더에 놓아도 돼요.`
     : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 카드 메뉴의 "Work로 옮기기"로 옮겨 보세요.'
       : '아직 메모가 없어요.\n떠오른 생각을 바로 적어 보세요.';
@@ -1814,7 +1819,7 @@ function markFolderDrop(x, y) {
   const item = document.elementFromPoint(x, y)?.closest('#folder-side [data-folder]'); // 접혀 있어도 끄는 동안은 떠오른다 (list.css)
   for (const b of el.folderSide.querySelectorAll('.drop-on')) if (b !== item) b.classList.remove('drop-on');
   item?.classList.add('drop-on');
-  return item ? item.dataset.folder : null;
+  return item ? (item.dataset.folder === UNFILED ? '' : item.dataset.folder) : null; // 미분류에 놓기 = 폴더에서 빼기
 }
 
 // ---------- 폴더로 옮기기 (카드 메뉴 · 끌어 놓기 · 여러 장 고르기) ----------

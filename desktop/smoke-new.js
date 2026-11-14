@@ -1897,6 +1897,13 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       await wait(400);
       const side = await js(fl, `({ shown: !document.getElementById('folder-side').hidden && document.getElementById('folder-side').offsetWidth > 100, chips: document.getElementById('folder-chips')?.hidden !== false, rows: [...document.querySelectorAll('#folder-side [data-folder]')].map((b) => b.dataset.folder) })`);
       check('PC 폴더: 왼쪽 폴더 목록이 늘 보이고 카드 위 폴더 줄은 없다', side.shown && side.chips && side.rows.includes('끌기폴더') && side.rows[0] === '', JSON.stringify(side));
+      // 미분류 (v0.83.1): 폴더에 넣지 않은 메모만 — 고르면 폴더 이름이 붙은 카드가 없고, 끌 메모는 아직 미분류에 있다
+      await js(fl, `document.querySelector('#folder-side [data-folder=":unfiled"]')?.click()`);
+      await wait(400);
+      const unfiled = await js(fl, `({ row: document.querySelector('#folder-side [data-folder=":unfiled"]')?.textContent.trim() ?? null, labels: document.querySelectorAll('.card .card-folder').length, has: !!document.querySelector('.card[data-id="${fid}"]'), other: !!document.querySelector('.card[data-id="${other}"]') })`);
+      check('PC 폴더: "미분류" 줄은 폴더에 넣지 않은 메모만 보여 준다', /^미분류/.test(unfiled.row ?? '') && unfiled.labels === 0 && unfiled.has && !unfiled.other, JSON.stringify(unfiled));
+      await js(fl, `document.querySelector('#folder-side [data-folder=""]')?.click()`);
+      await wait(300);
       const at = await js(fl, `(() => {
         const c = document.querySelector('.card[data-id="${fid}"]'); c.scrollIntoView({ block: 'center' });
         const r = c.getBoundingClientRect(); const f = document.querySelector('#folder-side [data-folder="끌기폴더"]').getBoundingClientRect();

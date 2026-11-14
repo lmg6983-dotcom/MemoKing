@@ -27,6 +27,16 @@ export function cleanFolderName(raw) {
   return name;
 }
 
+/** 폴더 목록의 "미분류" (어느 폴더에도 넣지 않은 메모) — 폴더 이름으로 쓸 수 없는 글자라 진짜 폴더와 겹치지 않는다 */
+export const UNFILED = ':unfiled';
+export const UNFILED_LABEL = '미분류';
+
+/** 고른 폴더(이름 · "" 전체 · UNFILED)의 메모만 */
+export const memosInFolder = (memos, folder) => (!folder ? memos : folder === UNFILED ? memos.filter((m) => !m.folder) : memos.filter((m) => m.folder === folder));
+
+/** 폴더 목록 앞에 "미분류" 를 더한다 — 폴더가 하나라도 있을 때만 (없으면 모든 메모가 미분류라 전체와 같다) */
+export const withUnfiled = (list, memos) => (list.length ? [{ name: UNFILED, label: UNFILED_LABEL, count: (memos ?? []).filter((m) => !m.folder).length }, ...list] : list);
+
 /** 메모 폴더 맨 위의 하위 폴더 이름 중 메모킹 폴더로 보일 것 */
 export const isFolderName = (name) => Boolean(name) && cleanFolderName(name) === name;
 
