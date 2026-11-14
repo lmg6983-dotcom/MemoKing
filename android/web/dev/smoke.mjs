@@ -136,6 +136,27 @@ try {
   // 태그로 거르기: 검색창에 #태그 (태그 줄은 없앰 — 그 자리에 폴더 단추)
   check('목록: 태그 줄 대신 폴더 칩 줄 (전체가 골라짐 · 새 폴더 칩)', (await page.locator('#tag-strip').count()) === 0
     && (await page.getAttribute('#folder-chips .fchip[data-folder=""]', 'aria-pressed')) === 'true' && (await page.locator('#folder-chips .fchip-add').count()) === 1);
+  // 폴더 칩 꾹 누르기: 안드로이드는 타이머로 메뉴가 뜬 직후 contextmenu 를 한 번 더 보낸다 — 그래도 메뉴가 그대로 떠 있어야 한다
+  await page.tap('#folder-chips .fchip-add');
+  await page.fill('#folder-chips .fchip-input', '점검폴더');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#folder-chips .fchip[data-folder="점검폴더"]');
+  {
+    const box = await page.locator('#folder-chips .fchip[data-folder="점검폴더"]').boundingBox();
+    const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.waitForTimeout(620);
+    await page.evaluate(([px, py]) => document.elementFromPoint(px, py).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: px, clientY: py })), [x, y]);
+    await page.mouse.up();
+    await page.waitForTimeout(250);
+    check('폴더 칩: 꾹 눌러 뜬 메뉴가 손을 뗀 뒤에도 그대로 (이름 바꾸기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 2);
+    await page.locator('.mk-ctx-item[data-id="delete"]').click();
+    await page.waitForTimeout(300);
+    check('폴더 칩: 메뉴에서 지우면 칩이 사라짐', (await page.locator('#folder-chips .fchip[data-folder="점검폴더"]').count()) === 0);
+    await page.tap('#folder-chips .fchip[data-folder=""]').catch(() => {});
+    await page.waitForTimeout(200);
+  }
   await page.fill('#search', '#업무');
   await page.waitForTimeout(250);
   check('검색 #업무: 그 태그의 메모만', (await page.locator('.card').count()) === 2);
