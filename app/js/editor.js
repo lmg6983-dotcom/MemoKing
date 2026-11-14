@@ -50,6 +50,7 @@ import { mathPlugins, insertMathBlock } from './math.js';
 import { fileChipGuard } from './file-chip-guard.js';
 import { listContentGuard, listsFixed } from './list-content-guard.js';
 import { listDeleteGuard } from './list-delete-guard.js';
+import { blockEdgeKeys } from './block-edge-keys.js';
 import { looksLikeMarkdown, normalizeMath } from './core/markdown-import.js';
 
 // ---------- 이미지·소리·동영상 표시 ----------
@@ -596,6 +597,7 @@ function atLineIndent($pos) {
 const fileChips = $prose(() => fileChipGuard());
 const listContent = $prose(() => listContentGuard());
 const protectListDelete = $prose(() => listDeleteGuard());
+const edgeKeys = $prose(() => blockEdgeKeys());
 
 // 서식이 있는 HTML 인가 (글자 모양 · 목록 · 표 · 그림 · 링크 등) — 없으면 글자만 있는 것 (메신저 · 채팅 복사)
 const RICH_TAGS = 'h1,h2,h3,h4,h5,h6,ul,ol,li,table,pre,code,blockquote,img,picture,video,audio,svg,hr,strong,b,em,i,u,s,del,strike,mark,sub,sup,a[href]';
@@ -2104,6 +2106,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       }));
     })
     .use(protectListDelete) // 목록 맨 앞 Delete 시 서식이 깨지는 버그 방지 (commonmark 키맵보다 먼저)
+    .use(edgeKeys) // 줄 맨 앞 Backspace · 줄 끝 Delete 로 제목 단계 · 목록 종류 · 코드가 뜻밖에 바뀌지 않게 (commonmark 키맵보다 먼저)
     .use(commonmark)
     .use(cellPaste) // 표 칸에 여러 줄 붙이기 — 표 기능보다 먼저
     .use(gfm)

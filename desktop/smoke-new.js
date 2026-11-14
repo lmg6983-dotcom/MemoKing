@@ -1825,6 +1825,60 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       }
       fw.close();
     }
+    // 줄 맨 앞 Backspace · 줄 끝 Delete (v0.82.4): 제목 단계 · 목록 종류 · 코드가 뜻밖에 바뀌지 않는다 (예전: 제목2 → 제목1, 번호 목록이 점 목록에 붙음 …)
+    {
+      const body = '# 제목하나\n\n본문앞줄\n\n## 제목둘\n\n### 제목셋\n\n> 인용글\n\n- 점하나\n- 점둘\n\n1. 번호하나\n2. 번호둘\n\n```\n코드줄\n```\n\n본문끝줄\n\n| 가 | 나 |\n| --- | --- |\n| 칸하나 | 칸둘 |\n\n## 표뒤제목\n';
+      const kid = vault.import({ body });
+      windowManager.openNote(kid);
+      const kw = await until(() => noteWins.get(kid)?.isVisible() && noteWins.get(kid), '서식 점검 메모 창');
+      await until(() => js(kw, `document.documentElement.dataset.ready === 'true' && !!document.querySelector('.mk-doc h2')`), '서식 점검 메모 준비');
+      const shape = `(() => {
+        const walk = (el) => [...el.children].filter((c) => /^(H[1-6]|P|UL|OL|LI|BLOCKQUOTE|PRE)$/.test(c.tagName)).map((c) => {
+          const tag = c.tagName.toLowerCase();
+          return /^(ul|ol|li|blockquote)$/.test(tag) ? tag + '[' + walk(c).join(' ') + ']' : tag + ':' + (c.textContent || '').trim();
+        });
+        return walk(document.querySelector('.ProseMirror')).join(' | ');
+      })()`;
+      const base = await js(kw, shape);
+      // 글자로 줄을 찾아 커서를 맨 앞(0) · 끝(-1)에 두고 키를 누른 뒤의 모양. 다음 경우를 위해 되돌린다
+      const press = async (text, at, keyCode) => {
+        await js(kw, `(() => {
+          const root = document.querySelector('.ProseMirror'); root.focus();
+          const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (n.nodeValue.includes(${JSON.stringify(text)})) break;
+          const off = n.nodeValue.indexOf(${JSON.stringify(text)}) + (${at} < 0 ? ${text.length} : 0);
+          const r = document.createRange(); r.setStart(n, off); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+        })()`);
+        await wait(150);
+        key(kw, keyCode);
+        await wait(200);
+        const after = await js(kw, shape);
+        if (after !== base) {
+          key(kw, 'Z', ['control']);
+          await until(() => js(kw, shape).then((x) => x === base), `되돌리기 (${text} ${keyCode})`, 3000).catch(() => {});
+        }
+        return after;
+      };
+      const has = (after, part) => after.includes(part);
+      let a = await press('제목둘', 0, 'Backspace');
+      check('서식: 제목2 맨 앞 Backspace 는 제목1 로 바꾸지 않고 윗줄에 잇는다', !has(a, 'h1:제목둘') && has(a, 'p:본문앞줄제목둘'), a);
+      a = await press('제목하나', 0, 'Backspace');
+      check('서식: 맨 위 제목 맨 앞 Backspace 는 제목을 풀지 않는다', a === base, a);
+      a = await press('제목셋', 0, 'Delete');
+      check('서식: 제목3 맨 앞 Delete 는 단계를 바꾸지 않고 글자를 지운다', has(a, 'h3:목셋'), a);
+      a = await press('번호하나', 0, 'Backspace');
+      check('서식: 번호 목록 첫 항목 맨 앞 Backspace 는 위 점 목록에 붙지 않는다', has(a, 'ul[li[p:점하나] li[p:점둘]] | p:번호하나 | ol[li[p:번호둘]]'), a);
+      a = await press('점하나', 0, 'Backspace');
+      check('서식: 점 목록 첫 항목 맨 앞 Backspace 로 목록이 위 인용 안으로 들어가지 않는다', has(a, 'blockquote[p:인용글] | p:점하나 | ul[li[p:점둘]]'), a);
+      a = await press('점둘', -1, 'Delete');
+      check('서식: 점 목록 끝 Delete 는 아래 번호 목록을 점 목록으로 만들지 않고 글자만 잇는다', has(a, 'li[p:점둘번호하나]] | ol[li[p:번호둘]]'), a);
+      a = await press('코드줄', 0, 'Backspace');
+      check('서식: 코드 블록 맨 앞 Backspace 는 코드를 보통 글에 섞지 않는다', a === base, a);
+      a = await press('본문끝줄', 0, 'Backspace');
+      check('서식: 코드 블록 다음 줄 맨 앞 Backspace 는 글을 코드에 섞지 않는다', a === base, a);
+      a = await press('칸둘', -1, 'Delete');
+      check('서식: 표 마지막 칸 끝 Delete 는 표 아래 제목을 칸으로 끌어오지 않는다', has(a, 'h2:표뒤제목') || a === base, a);
+      kw.close();
+    }
     check('콘솔 오류 없음', errors.length === 0, errors.join(' / '));
     exitCode = checks.every((x) => x.ok) ? 0 : 1;
   } catch (err) {
