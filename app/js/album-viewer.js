@@ -335,12 +335,24 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       gesture.d = d;
       gesture.m = m;
     } else if (gesture.kind === 'swipe' && !still && !turning && !moving) {
-      if (!gesture.follow) sliding++; // 들어오는 움직임의 마무리(transform 비우기)가 끄는 그림을 제자리로 튕기지 않게
-      gesture.follow = true;
-      let t = e.clientX - gesture.x;
-      if ((t > 0 && i === 0) || (t < 0 && i === images.length - 1)) t /= 3; // 끝 장은 덜 따라온다
-      img.style.transition = 'none';
-      img.style.transform = `translateX(${t}px)`;
+      const tx = e.clientX - gesture.x;
+      const ty = e.clientY - gesture.y;
+      // 처음 10px 로 방향을 정한다: 옆 = 넘기기, 아래 = 닫기 (휴대폰 사진 앱처럼)
+      if (!gesture.axis && Math.hypot(tx, ty) > 10) gesture.axis = ty > 0 && Math.abs(ty) > Math.abs(tx) ? 'y' : 'x';
+      if (gesture.axis) {
+        if (!gesture.follow) sliding++; // 들어오는 움직임의 마무리(transform 비우기)가 끄는 그림을 제자리로 튕기지 않게
+        gesture.follow = true;
+        img.style.transition = 'none';
+        if (gesture.axis === 'y') {
+          const down = Math.max(0, ty);
+          img.style.transform = `translate(${tx / 3}px, ${down}px) scale(${1 - Math.min(0.2, down / 1500)})`;
+          view.style.backgroundColor = `rgba(0, 0, 0, ${1 - Math.min(0.7, down / 400)})`;
+        } else {
+          let t = tx;
+          if ((t > 0 && i === 0) || (t < 0 && i === images.length - 1)) t /= 3; // 끝 장은 덜 따라온다
+          img.style.transform = `translateX(${t}px)`;
+        }
+      }
     } else if (gesture.kind === 'pan') {
       z.x += dx;
       z.y += dy;
@@ -365,12 +377,24 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       if (g.follow && !moving) {
         img.style.transition = '';
         img.style.transform = '';
+        view.style.backgroundColor = '';
       }
       return;
     }
     const dx = e.clientX - g.x;
     const dy = e.clientY - g.y;
-    if (g.kind === 'swipe' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && images[i + (dx < 0 ? 1 : -1)]) {
+    // 아래로 충분히 밀었으면 닫는다 (그림이 내려가며 사라진다)
+    if (g.kind === 'swipe' && g.axis === 'y' && dy > 110 && !moving) {
+      img.style.transition = 'transform 0.18s ease-in, opacity 0.18s ease-in';
+      img.style.transform = `translate(${dx / 3}px, ${dy + 160}px) scale(0.85)`;
+      img.style.opacity = '0';
+      view.style.transition = 'background-color 0.18s ease-in';
+      view.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+      setTimeout(() => shut(), 170);
+      return;
+    }
+    if (g.kind === 'swipe' && g.axis === 'y') view.style.backgroundColor = ''; // 모자라면 제자리로 (아래에서 그림도)
+    if (g.kind === 'swipe' && g.axis !== 'y' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && images[i + (dx < 0 ? 1 : -1)]) {
       go(dx < 0 ? 1 : -1);
       return;
     }
@@ -571,7 +595,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     if (!localStorage.getItem(HINT_KEY) && images.length > 1) {
       localStorage.setItem(HINT_KEY, '1');
       const coarse = matchMedia('(pointer: coarse)').matches;
-      say(coarse ? '옆으로 밀거나 아래 장을 눌러 넘겨요. 두 손가락으로 벌리면 크게 보여요' : '← → 나 아래 장을 눌러 넘겨요. 휠을 굴리면 크게 보여요');
+      say(coarse ? '옆으로 밀거나 아래 장을 눌러 넘겨요. 두 손가락으로 벌리면 크게 보이고, 아래로 밀면 닫혀요' : '← → 나 아래 장을 눌러 넘겨요. 휠을 굴리면 크게 보여요');
     }
   } catch {
     // 저장소를 못 써도 보기는 그대로
