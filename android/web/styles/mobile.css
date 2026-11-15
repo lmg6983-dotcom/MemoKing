@@ -225,7 +225,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 2px 12px 96px; /* 마지막 카드가 + 버튼 위로 올라오게 */
+  padding: 2px 12px 120px; /* 마지막 카드가 + 버튼 위로 넉넉히 올라오게 */
 }
 .cards .col { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
 .cards[data-layout="rows"] .col { gap: 8px; }
@@ -295,7 +295,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .card-thumb { filter: brightness(0.86); } }
 
 .card-foot { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: auto; font-size: 12px; }
-.card-tags { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; opacity: 0.75; }
+.card-tags { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 500; opacity: 0.6; } /* 제목보다 한참 조용하게 */
 .card-meta { display: flex; align-items: center; gap: 6px; flex: none; opacity: 0.7; }
 .card-time { font-variant-numeric: tabular-nums; }
 .card.leaving { animation: card-out 0.2s var(--ease-out) forwards; }
@@ -1301,14 +1301,15 @@ body.picking #fab { display: none; }
 #view-memos.is-empty > #empty { min-height: calc(var(--view-h, 70vh) - 120px); justify-content: center; margin: 0; padding: 24px 16px 88px; }
 #view-memos > .folder-side {
   grid-column: side; grid-row: 2 / span 30; align-self: start; position: sticky; top: 0; z-index: 2;
-  display: flex; flex-direction: column; width: 112px; max-height: calc(var(--view-h, 70vh) - 4px); padding: 2px 4px 10px 8px;
+  display: flex; flex-direction: column; width: 112px; height: calc(var(--view-h, 70vh) - 4px); /* 늘 보이는 칸 높이 — 오른쪽 선이 중간에서 끊기지 않게 */ padding: 2px 4px 10px 8px;
   overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); background: var(--bg);
 }
 #view-memos > .folder-side[hidden] { display: none; }
 .list-screen.has-side .cards { padding-left: 8px; }
 .folder-side .mf-list { flex: none; gap: 0; }
 /* 줄 사이 아주 옅은 선 (iOS 목록처럼 — 폴더 경계가 또렷하게). 고른 줄 · 머리글 둘레는 빼고 */
-.folder-side .mf-row + .mf-row { box-shadow: 0 -1px 0 color-mix(in srgb, var(--line) 70%, transparent); }
+.folder-side .mf-row + .mf-row { box-shadow: 0 -1px 0 color-mix(in srgb, var(--line) 55%, transparent); }
+.folder-side .mf-sep { margin: 6px 0 0; padding-left: 8px; border-top-color: color-mix(in srgb, var(--line) 55%, transparent); }
 .folder-side .mf-row:has(> [aria-current="true"]), .folder-side .mf-row:has(> [aria-current="true"]) + .mf-row { box-shadow: none; }
 .folder-side .mf-count { font-size: 11px; line-height: 17px; padding: 0 5px; min-width: 18px; }
 .folder-side .mf-item { min-height: 42px; padding: 8px 8px; gap: 6px; font-size: 13.5px; -webkit-touch-callout: none; user-select: none; }

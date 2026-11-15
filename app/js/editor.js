@@ -515,14 +515,44 @@ function tagRanges(doc) {
   return ranges;
 }
 
+// 한국어 글쓰기 · 태그와 부딪히는 마크다운 단축 입력은 끈다 (서식은 서식 도구로):
+//   "# "  → 제목: # 는 태그
+//   "_글_" → 기울임: 한글 바로 뒤의 _ 도 단어 경계로 쳐 "#업무_템플릿_" 같은 태그가 기울임으로 바뀌고 _ 가 사라졌다
+//   "~글~" → 취소선: 물결 하나도 받아 "네~ 알겠어요~" 처럼 흔히 쓰는 말이 취소선으로 바뀌었다
+const OFF_RULES = new Set(['InputRule<wrapInHeadingInputRule>', 'InputRule<emphasis>|Underscore', 'InputRule<strikethrough>']);
+
 const tagHighlightKey = new PluginKey('memoking-tags');
+// 한글처럼 글자를 조합하는 중에는 지금 줄의 알약을 칠하지 않는다 — 조합 중인 글자 둘레를 알약으로 감싸면
+//   휴대폰(안드로이드) 키보드가 글자를 따로 넣어 "#" "내일" "할일" 처럼 알약이 여러 개로 쪼개져 보였다. 조합이 끝나면 다시 칠한다
+let tagComposing = false;
 const tagHighlight = $prose(() => new Plugin({
   key: tagHighlightKey,
   state: {
     init: (_config, state) => buildTagDecorations(state.doc),
     apply: (tr, old) => (tr.docChanged ? buildTagDecorations(tr.doc) : old),
   },
-  props: { decorations: (state) => tagHighlightKey.getState(state) },
+  props: {
+    decorations: (state) => {
+      const set = tagHighlightKey.getState(state);
+      if (!tagComposing) return set;
+      const { $from } = state.selection;
+      return set.remove(set.find($from.start(), $from.end()));
+    },
+    handleDOMEvents: {
+      compositionstart: () => {
+        tagComposing = true;
+        return false;
+      },
+      compositionend: (view) => {
+        tagComposing = false;
+        // 조합이 끝난 뒤 한 번 다시 그린다 (알약을 다시 칠하고, 따로 들어간 글자 조각도 한 덩어리로)
+        setTimeout(() => {
+          if (!tagComposing && !view.isDestroyed) view.dispatch(view.state.tr.setMeta(tagHighlightKey, 'redraw'));
+        }, 0);
+        return false;
+      },
+    },
+  },
 }));
 
 function buildTagDecorations(doc) {
@@ -2107,9 +2137,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     })
     .use(protectListDelete) // 목록 맨 앞 Delete 시 서식이 깨지는 버그 방지 (commonmark 키맵보다 먼저)
     .use(edgeKeys) // 줄 맨 앞 Backspace · 줄 끝 Delete 로 제목 단계 · 목록 종류 · 코드가 뜻밖에 바뀌지 않게 (commonmark 키맵보다 먼저)
-    .use(commonmark)
+    .use(commonmark.filter((p) => !OFF_RULES.has(p.meta?.displayName)))
     .use(cellPaste) // 표 칸에 여러 줄 붙이기 — 표 기능보다 먼저
-    .use(gfm)
+    .use(gfm.filter((p) => !OFF_RULES.has(p.meta?.displayName)))
     .use(tableTab)
     .use(uncheckedNext)
     .use(linkCardKeys)

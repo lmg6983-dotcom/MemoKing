@@ -24,7 +24,13 @@ function folderButton({ name, label, count, current, iconName }) {
   // 그림은 전체 · 미분류(폴더 없음)에만 — 보통 폴더는 그 자리를 이름에 준다
   if (iconName) b.append(icon(iconName));
   const nameEl = el('span', 'mf-name');
-  nameEl.append(el('span', 'mf-text', label));
+  const text = el('span', 'mf-text');
+  // "업무_템플릿_정리" 처럼 띄어쓰기 없는 긴 이름은 _ · - 뒤에서 줄을 바꾼다 (낱말 가운데서 끊기지 않게)
+  for (const part of String(label).split(/(?<=[_\-.])/)) {
+    if (text.childNodes.length) text.append(document.createElement('wbr'));
+    text.append(part);
+  }
+  nameEl.append(text);
   b.append(nameEl);
   if (count) b.append(el('small', 'mf-count', String(count))); // 0 은 적지 않는다 (빈 폴더가 많아도 목록이 조용하게 — 칩 줄과 같게)
   return b;

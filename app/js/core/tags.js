@@ -24,6 +24,9 @@ export function findTags(text) {
 
 const keyOf = (name) => name.toLocaleLowerCase('ko');
 
+/** 글이 태그로만 이루어졌는가 ("#내일할일", "#할일 #급함") — 카드 제목이 태그뿐일 때 아래 태그 줄에 겹쳐 보이지 않게 */
+export const titleTagsOnly = (text) => /^\s*(#[^\s#]+\s*)+$/.test(String(text ?? ''));
+
 /** 메모 본문(마크다운)의 태그 목록 (처음 나온 순, 대소문자 다른 같은 태그는 하나로) */
 export function extractTags(body) {
   const tags = new Map();
