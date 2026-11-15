@@ -719,11 +719,18 @@ $('show-list').addEventListener('click', () => {
 $('delete-btn').addEventListener('click', async () => {
   closeMenu();
   // 묻지 않고 바로 휴지통으로 (목록 창에 되돌리기) — 창이 휴지통으로 빨려 들어가듯 사라진다
+  const keep = saved;
   saved = current; // 삭제하는 메모는 저장하지 않는다
-  if (!reduceMotion()) {
-    await document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: EASE_OUT, fill: 'forwards' }).finished.catch(() => {});
+  const fade = reduceMotion() ? null : document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: EASE_OUT, fill: 'forwards' });
+  await fade?.finished.catch(() => {});
+  try {
+    await api.memo.remove(id);
+  } catch (err) {
+    // 지우지 못했으면 창을 되돌린다 (예전: 사라진 채 투명한 창이 남았다) — 고친 글도 다시 저장되게
+    fade?.cancel();
+    saved = keep;
+    setStatus(err?.message || '메모를 삭제하지 못했어요', true);
   }
-  await api.memo.remove(id);
 });
 
 api.on('memo:meta', applyMeta);
