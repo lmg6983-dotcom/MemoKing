@@ -1348,3 +1348,5 @@ body.m-dragging .folder-side .mf-new { visibility: hidden; }
 #view-memos > .folder-side.peek { display: flex !important; position: fixed; left: 0; z-index: 40; max-height: none; box-shadow: var(--shadow-pop); animation: m-side-peek 0.16s var(--ease-out); }
 @keyframes m-side-peek { from { opacity: 0; transform: translateX(-14px); } }
 @media (prefers-reduced-motion: reduce) { .card.lifted { transition: none; } #view-memos > .folder-side.peek { animation: none; } }
+/* 오프라인: 오류(빨강)가 아니라 흐리게 — 메모는 휴대폰에 저장되고 연결되면 맞춘다 (drive.js) */
+#sync-btn.offline { opacity: 0.5; }

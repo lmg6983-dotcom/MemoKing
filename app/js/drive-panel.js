@@ -97,6 +97,8 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     if (!info.connected) return { tone: 'off', title: '동기화 꺼짐', sub: 'Google 계정으로 연결하면 휴대폰 메모킹과 같은 메모를 써요', on };
     if (!info.active) return { tone: 'off', title: `${info.email || 'Google 계정'} 로그인됨`, sub: '동기화할 Drive 폴더를 아직 고르지 않았어요', on };
     const where = `${info.email || 'Google 계정'}의 ${info.folderName || '메모킹'} 폴더`;
+    // 인터넷이 끊겼으면 오류가 아니라 오프라인 — 메모는 이 PC 에 저장되고 연결되면 맞춘다 (예전: 동기화 오류처럼 빨갛게 보였다)
+    if (navigator.onLine === false) return { tone: 'off', title: '오프라인', sub: '메모는 이 PC에 저장돼요. 인터넷이 연결되면 맞춰요', on };
     if (st.state === 'syncing') {
       const p = st.progress;
       const count = p?.phase === 'transfer' && p.total ? ` · ${p.done}/${p.total}` : '';
@@ -142,6 +144,12 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     saveConflicts(conflicts);
   }
 
+  // 인터넷이 끊기거나 다시 붙으면 바로 다시 그린다 (다시 붙으면 곧 동기화)
+  window.addEventListener('offline', () => render());
+  window.addEventListener('online', () => {
+    render();
+    if (info?.connected && info?.active) api.drive.sync?.().catch(() => {});
+  });
   function render(next) {
     if (next) info = next;
     if (!info) return;
