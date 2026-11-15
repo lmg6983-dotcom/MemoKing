@@ -638,7 +638,7 @@ export class Vault extends EventTarget {
       const dropText = fs.readText(drop);
       if (dropText == null) return;
       if (source !== target) fs.writeText(target, fs.readText(source) ?? '');
-      fs.writeText(`${TRASH_DIR}/${stripMd(baseName(drop))} (${stamp()}).md`, withoutId(dropText));
+      fs.writeText(this.trashPath(stripMd(baseName(drop))), withoutId(dropText));
       fs.remove(drop);
     } catch (err) {
       this.emit('error', err);
@@ -657,18 +657,22 @@ export class Vault extends EventTarget {
     }
   }
 
+  // 휴지통에 둘 파일 자리 — 같은 제목을 같은 초에 지우면 이름이 겹쳐 옮기기가 실패하거나 앞의 것을 덮어썼다
+  //   → 겹치면 "제목 (2) (지운 시각).md" (지운 시각은 늘 이름 끝에)
+  trashPath(base) {
+    for (let n = 1; ; n++) {
+      const dest = `${TRASH_DIR}/${base}${n > 1 ? ` (${n})` : ''} (${stamp()}).md`;
+      if (!fs.stat(dest)) return dest;
+    }
+  }
+
   trash(id) {
     const entry = this.entries.get(id);
     if (!entry) return false;
     this.entries.delete(id);
     let trashed = null;
     if (entry.file && fs.stat(entry.file)) {
-      // 같은 제목을 같은 초에 지우면 이름이 겹쳐 옮기기가 실패하거나 앞의 것을 덮어썼다 → 겹치면 (2) (지운 시각은 늘 이름 끝에)
-      let dest;
-      for (let n = 1; ; n++) {
-        dest = `${TRASH_DIR}/${stripMd(baseName(entry.file))}${n > 1 ? ` (${n})` : ''} (${stamp()}).md`;
-        if (!fs.stat(dest)) break;
-      }
+      const dest = this.trashPath(stripMd(baseName(entry.file)));
       trashed = baseName(dest);
       if (!fs.move(entry.file, dest)) {
         this.entries.set(id, entry);

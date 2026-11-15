@@ -722,7 +722,7 @@ export class Vault extends EventEmitter {
     try {
       const dropText = fs.readFileSync(this.abs(drop), 'utf8');
       if (source !== target) writeAtomic(this.abs(target), fs.readFileSync(this.abs(source), 'utf8'));
-      writeAtomic(path.join(this.trashDir, `${path.posix.basename(drop, '.md')} (${stamp()}).md`), withoutId(dropText));
+      writeAtomic(this.trashPath(path.posix.basename(drop, '.md')), withoutId(dropText));
       fs.rmSync(this.abs(drop), { force: true });
     } catch (err) {
       this.emit('error', err);
@@ -741,6 +741,15 @@ export class Vault extends EventEmitter {
     }
   }
 
+  // 휴지통에 둘 파일 자리 "제목 (지운 시각).md" — 같은 제목을 같은 초에 지우면(다른 폴더의 "회의" 둘을 함께 등)
+  //   이름이 겹쳐 앞의 것을 덮어썼다 → 겹치면 "제목 (2) (지운 시각).md" (지운 시각은 늘 이름 끝에 — trashedAt 이 읽는다)
+  trashPath(base) {
+    for (let n = 1; ; n++) {
+      const dest = path.join(this.trashDir, `${base}${n > 1 ? ` (${n})` : ''} (${stamp()}).md`);
+      if (!fs.existsSync(dest)) return dest;
+    }
+  }
+
   trash(id) {
     const entry = this.entries.get(id);
     if (!entry) return false;
@@ -748,13 +757,7 @@ export class Vault extends EventEmitter {
     let trashed = null;
     if (entry.file) {
       const base = path.posix.basename(entry.file, '.md');
-      // 같은 제목을 같은 초에 지우면(다른 폴더의 "회의" 둘을 함께 등) 이름이 겹쳐 앞의 것을 덮어썼다 → 겹치면 (2)
-      //   지운 시각은 늘 이름 끝에 (trashedAt 이 읽는다)
-      let dest;
-      for (let n = 1; ; n++) {
-        dest = path.join(this.trashDir, `${base}${n > 1 ? ` (${n})` : ''} (${stamp()}).md`);
-        if (!fs.existsSync(dest)) break;
-      }
+      const dest = this.trashPath(base);
       try {
         fs.renameSync(this.abs(entry.file), dest);
         trashed = path.basename(dest);
