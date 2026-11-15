@@ -281,11 +281,22 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   const del = { view, btn, extras, pos, node, target, markTarget, state: view.state, place, setMark: persist ? (on) => !on && setMark(false) : setMark, persist, follow, rescroll: () => { scroller = scrollParent(del.target); } };
   place();
   if (!persist) setMark(true);
+  // 막 뜬 단추는 잠깐 누름을 받지 않는다 — 두 번 눌러 크게 보려던 두 번째 누름이 손가락 밑에 뜬 단추(지우기 등)에 떨어져
+  //   그대로 지워질 수 있었다 (단추는 닿는 순간 동작한다). 키보드(click detail 0)는 그대로
+  const shownAt = performance.now();
+  const tooSoon = (e) => {
+    if (e.type === 'click' && e.detail === 0) return false;
+    if (performance.now() - shownAt >= 350) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    return true;
+  };
   document.dispatchEvent(new CustomEvent('mk:tools', { detail: { view, target } })); // 그림 · 동영상이면 크기 손잡이도 함께 (media-resize.js)
   // 누르면 그 일을 하고 ✓ (실패하면 !, 저장을 그만두면 그대로) — 다시 누르면 다시 (실패한 뒤 다시 해 보기 등)
   const action = (b, icon, run, doneText) => {
     let busy = false;
     const go = (e) => {
+      if (tooSoon(e)) return;
       e.preventDefault();
       e.stopPropagation();
       if (e.type === 'click' && e.detail > 0) return; // 마우스는 mousedown 으로 이미 — click 은 키보드(Enter · Space)만
@@ -326,6 +337,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   if (openBtn) {
     let opened = false;
     const go = (e) => {
+      if (tooSoon(e)) return;
       e.preventDefault();
       e.stopPropagation();
       if (opened) return; // touchstart 뒤 따라오는 mousedown · click 은 한 번으로
@@ -355,6 +367,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
     window.dispatchEvent(new CustomEvent('mk:removed', { detail: { what: label.replace(/ 삭제$/, '').replace(/^이 /, ''), verb: cutDone ? '잘라냈어요' : '삭제했어요' } }));
   };
   const press = (e) => {
+    if (tooSoon(e)) return;
     e.preventDefault();
     e.stopPropagation();
     if (view.state.doc.nodeAt(del.pos) !== del.node) return hideDeleteButton();
@@ -363,6 +376,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   // 잘라내기: 복사가 끝난 뒤에만 지운다 (복사하지 못했으면 그대로 두고 알린다)
   let cutting = false;
   const cut = (e) => {
+    if (tooSoon(e)) return;
     e.preventDefault();
     e.stopPropagation();
     if (e.type === 'click' && e.detail > 0) return; // 마우스는 mousedown 으로 이미 — click 은 키보드만
