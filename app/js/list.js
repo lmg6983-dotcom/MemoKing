@@ -34,7 +34,7 @@ import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT, slideSide } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
 import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet } from './folder-ui.js';
@@ -336,14 +336,9 @@ el.folderBtn?.addEventListener('click', async () => {
   const side = el.folderSide;
   if (reduceMotion() || typeof side.animate !== 'function') return render();
   sideSliding = true;
-  if (sideWanted) side.hidden = false;
-  const w = side.offsetWidth;
-  const closed = { marginLeft: `${-w}px`, opacity: 0 };
-  const open = { marginLeft: '0px', opacity: 1 };
-  if (sideWanted) render(); // 펼 때는 줄 수를 먼저 맞추고 밀려 나온다
-  await side.animate(sideWanted ? [closed, open] : [open, closed], { duration: 180, easing: EASE_OUT }).finished.catch(() => {});
+  await slideSide(side, sideWanted, renderNow, el.cards); // 카드 움직임은 slideSide 가 (renderNow: 스스로 움직이지 않게)
   sideSliding = false;
-  render();
+  applyFolderSide();
 });
 
 // ---------- 카드 쌓기 (휴대폰과 같음): 메모지처럼 엇갈려 — 카드마다 지금 가장 짧은 줄(같으면 왼쪽)에 붙인다 ----------
@@ -1732,6 +1727,9 @@ function beginDrag() {
   document.body.classList.add('is-dragging');
   el.dragHint.textContent = '목록 밖으로 끌어내면 그 자리에 열려요';
   press.clone = clone;
+  // 끄는 동안은 작게 (커서 둘레에 들린 쪽지처럼 — 큰 카드가 폴더 막대와 다른 카드를 가리지 않게). 긴 카드일수록 더 작게
+  press.small = Math.max(0.3, Math.min(0.6, 170 / rect.width, 190 / rect.height));
+  void clone.offsetWidth; // 지금 크기에서 작아지는 움직임이 보이게
   press.dragging = true;
   api.drag.start(press.id);
 }
@@ -1753,12 +1751,14 @@ async function finishDrag(p, point) {
     const dx = p.into.left + p.into.width / 2 - (c.left + c.width / 2);
     const dy = p.into.top + p.into.height / 2 - (c.top + c.height / 2);
     clone.classList.add('returning');
-    clone.style.transform = `translate(${dx}px, ${dy}px) ${clone.style.transform} scale(0.12)`;
+    clone.style.translate = `${(p.dx ?? 0) + dx}px ${(p.dy ?? 0) + dy}px`;
+    clone.style.scale = '0.08';
     clone.style.opacity = '0';
   } else {
     // 취소: 복제본이 제자리로 돌아간다
     clone.classList.add('returning');
-    clone.style.transform = '';
+    clone.style.translate = clone.style.scale = '';
+    clone.style.rotate = '0deg';
   }
   const cleanup = () => {
     clone.remove();
@@ -1792,7 +1792,10 @@ el.cards.addEventListener('pointermove', (e) => {
   // 폴더 위에서는 들린 카드가 작아진다 — 큰 카드가 놓을 폴더 줄을 가리지 않게 (잡은 자리를 기준으로 줄어든다)
   const over = markFolderDrop(e.clientX, e.clientY) != null;
   press.clone.classList.toggle('over-folder', over);
-  press.clone.style.transform = `translate(${dx}px, ${dy}px) rotate(-2deg) scale(${over ? 0.42 : 1.03})`;
+  press.clone.style.translate = `${dx}px ${dy}px`;
+  press.clone.style.scale = String(over ? Math.min(press.small, 0.4) * 0.85 : press.small);
+  press.dx = dx;
+  press.dy = dy;
   api.drag.move(e.screenX, e.screenY);
 });
 
