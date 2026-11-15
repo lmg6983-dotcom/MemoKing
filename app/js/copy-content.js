@@ -5,7 +5,7 @@
 //   링크 카드: 주소 하나 (글자는 주소, 서식은 <a href="주소">제목</a> — 메모킹에 다시 붙이면 카드, 메신저 · 주소창에는 주소)
 //   그 밖의 내용(줄 · 목록 · 표 · 수식): 서식(HTML)과 일반 글자를 함께
 import { plainTextOf, spacedHtml } from './clipboard-text.js';
-import { mediaKindOf } from './core/memo-file.js';
+import { mediaKindOf, isAlbumTitle, plainAlt } from './core/memo-file.js';
 import { textBase64 } from './core/base64.js';
 import { voiceAudioOf } from './voice-card-view.js';
 
@@ -16,6 +16,8 @@ let host = {
   text: null,
   /** @param {string} href 메모 폴더 안의 첨부 (attachments/…) · @param {string} name 칩에 적힌 이름 → 넣었으면 true */
   file: null,
+  /** 여러 파일을 한 번에 (묶음 사진) — [{ href, name }] → 넣었으면 true */
+  files: null,
   /**
    * 저장: 어디에 둘지 고르는 창을 띄워 저장 → 저장한 파일 이름 | 'cancelled'
    * @param {{ name: string, mime: string, rel?: string, base64?: string }} f rel: 메모 폴더의 첨부 그대로 · base64: 만든 내용
@@ -128,6 +130,22 @@ export function attachmentOf(node) {
   return !other && hrefs.size === 1 && isAttachment(href) ? href : null;
 }
 
+/** 묶음 사진 줄 → 장마다 { href, name } (메모 폴더의 첨부가 아닌 장이 섞였으면 null) */
+function albumFiles(node) {
+  if (node?.type.name !== 'paragraph' || node.childCount < 2) return null;
+  const files = [];
+  let ok = true;
+  node.forEach((child) => {
+    if (child.type.name !== 'image') {
+      if (!(child.isText && !child.text.trim()) && child.type.name !== 'hardbreak' && child.type.name !== 'hard_break') ok = false;
+      return;
+    }
+    if (!isAlbumTitle(child.attrs.title) || !isAttachment(child.attrs.src)) ok = false;
+    else files.push({ href: child.attrs.src, name: fileNameOf(child.attrs.alt || '', child.attrs.src.split('/').pop()) });
+  });
+  return ok && files.length > 1 ? files : null;
+}
+
 /** 화면의 상자를 복사용 HTML 로: 편집기 단추 · 손잡이 · 커서 자리 표시는 빼고 */
 function cleanHtml(dom) {
   if (!(dom instanceof Element)) return '';
@@ -156,6 +174,10 @@ export async function copyBlock(view, pos, node, target) {
     await copyText(linkCardClip(node.attrs));
     return '링크';
   }
+  // 묶음 사진: 누른 한 장이 아니라 묶음의 모든 장을 파일로 (예전에는 첫 장 · 누른 장만 그림으로 복사됐다)
+  //   메모킹에 붙이면 사진들로(묶음으로 할지 묻는다), 탐색기 · 메신저에는 사진 파일들로
+  const album = albumFiles(node);
+  if (album && host.files && (await host.files(album).catch(() => false))) return `사진 ${album.length}장`;
   const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : imageOfLine(node, target, view, pos); // 그림 · 소리 · 동영상 · 손 메모 노드 (묶음 사진은 그 장)
   if (media) {
     const img = imageIn(target) ?? imageIn(view.nodeDOM(pos));
@@ -212,7 +234,7 @@ export function handleImageCopy(view, event) {
 const SAFE_NAME = /[\\/:*?"<>|\u0000-\u001f]+/g;
 /** 파일 이름으로 쓸 글 (앞 30자, 못 쓰는 글자는 빈칸) */
 export function fileNameOf(text, fallback = '메모 내용') {
-  const t = String(text ?? '').replace(SAFE_NAME, ' ').replace(/\s+/g, ' ').trim().slice(0, 30).trim();
+  const t = plainAlt(text) // 사진 설명 끝의 크기 표시(|50%)는 이름이 아니다.replace(SAFE_NAME, ' ').replace(/\s+/g, ' ').trim().slice(0, 30).trim();
   return t || fallback;
 }
 

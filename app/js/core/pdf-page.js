@@ -17,6 +17,9 @@ export const RATIOS = [
 ];
 
 export const MARGINS = { none: 0, narrow: 8, normal: 16, wide: 25 };
+/** 여백 직접 맞추기 (mm, 0~40 · 1mm 단위) — 엉뚱한 값은 보통 */
+export const MAX_MARGIN_MM = 40;
+export const clampMarginMm = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? MARGINS.normal : Math.round(Math.min(MAX_MARGIN_MM, Math.max(0, Number(v)))));
 export const MIN_MM = 50;
 export const MAX_MM = 1200;
 

@@ -12,7 +12,8 @@ import {
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
-import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, isAlbumPageTitle, isInkedAlbumTitle, inkedAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE } from './core/memo-file.js';
+import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, isAlbumPageTitle, isInkedAlbumTitle, inkedAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE, mediaWidthOf, plainAlt } from './core/memo-file.js';
+import { mediaResizePlugin } from './media-resize.js';
 import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkForDark } from './core/ink.js';
 import { getStroke } from '../vendor/perfect-freehand.js';
 import { openInkEditor } from './ink-editor.js';
@@ -162,7 +163,13 @@ function mediaView(node, view, getPos) {
     const label = document.createElement('span');
     label.className = 'mk-media-label';
     label.title = '잡고 끌어서 옮기기';
-    label.textContent = alt || baseName(String(src).split('/').pop() ?? '') || (kind === 'video' ? '동영상' : '소리');
+    label.textContent = plainAlt(alt) || baseName(String(src).split('/').pop() ?? '') || (kind === 'video' ? '동영상' : '소리');
+    // 동영상 크기 (설명 끝의 "|50%" — media-resize.js 로 끌어서 바꾼다)
+    const vw = kind === 'video' ? mediaWidthOf(alt) : null;
+    if (vw) {
+      dom.classList.add('mk-sized');
+      dom.style.width = `${vw}%`;
+    }
     dom.append(label);
     const el = document.createElement(kind);
     el.preload = 'metadata';
@@ -206,8 +213,14 @@ function mediaView(node, view, getPos) {
   const album = isAlbumTitle(title);
   dom.className = album ? `mk-image mk-album-img${isAlbumPageTitle(title) ? ' mk-album-page' : ''}` : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
   dom.src = vaultUrl(src);
-  dom.alt = alt ?? '';
+  dom.alt = plainAlt(alt);
   if (title && !album) dom.title = title;
+  // 크기 (설명 끝의 "|50%" — media-resize.js 로 끌어서 바꾼다). 묶음 사진은 묶음 모양 그대로
+  const w = album ? null : mediaWidthOf(alt);
+  if (w) {
+    dom.classList.add('mk-sized');
+    dom.style.width = `${w}%`;
+  }
   dom.onerror = () => dom.classList.add('broken');
   // 누르면 크게 보기 — 묶음 사진은 누른 장부터 넘겨 보고, 한 장짜리 그림도 같은 보기로
   dom.addEventListener('click', (e) => {
@@ -1346,8 +1359,53 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         v.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true })); // 편집기의 Ctrl+Z 와 같은 기록
         return collect();
       },
+      // 오른쪽으로 90도: 돌린 그림을 새 파일로 저장해 이 장만 바꾼다 (원본은 그대로 — 메모의 되돌리기로 원래 장)
+      onRotate: !editable ? null : async (i) => {
+        const it = images[i];
+        if (/\.gif$/i.test(it.src)) throw new Error('움직이는 그림(GIF)은 돌리면 멈춘 그림이 돼서 돌리지 않았어요');
+        const blob = await rotatedBlob(vaultUrl(it.src), it.src);
+        const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+        const src = await saveFile(new File([blob], `${baseName(it.alt || '사진')}.${ext}`, { type: blob.type }));
+        const cur = nodeOf(it);
+        if (!cur) return null;
+        it.src = src;
+        v.dispatch(v.state.tr.setNodeMarkup(it.pos, null, { ...cur.attrs, src }));
+        return src;
+      },
+      // 묶음 풀기: 장마다 한 줄씩 따로 된 사진으로 (메모의 되돌리기로 다시 묶음)
+      onSplit: !editable || !album ? null : () => {
+        const node = v.state.doc.nodeAt(para);
+        const { paragraph } = v.state.schema.nodes;
+        if (node?.type !== paragraph) return false;
+        const lines = [];
+        node.forEach((child) => {
+          if (child.type.name === 'image') lines.push(paragraph.create(null, child.type.create({ ...child.attrs, title: '' })));
+        });
+        if (lines.length < 2) return false;
+        v.dispatch(v.state.tr.replaceWith(para, para + node.nodeSize, lines).scrollIntoView());
+        onNotice?.(`묶음을 풀어 사진 ${lines.length}장을 따로 두었어요`);
+        return true;
+      },
     });
   };
+
+  // 그림을 오른쪽으로 90도 돌린 것 (JPEG · HEIC 사진은 JPEG, 그 밖은 PNG — 사진의 방향 정보는 브라우저가 그릴 때 이미 반영)
+  async function rotatedBlob(url, src) {
+    const im = new Image();
+    im.crossOrigin = 'anonymous'; // 메모 폴더 그림을 캔버스로 읽을 수 있게 (copy-content.js pngBase64 와 같게)
+    im.src = url;
+    await im.decode();
+    const canvas = document.createElement('canvas');
+    const k = Math.min(1, 8000 / Math.max(im.naturalWidth, im.naturalHeight)); // 너무 큰 그림은 줄여서 (메모리 한도)
+    canvas.width = Math.round(im.naturalHeight * k);
+    canvas.height = Math.round(im.naturalWidth * k);
+    const g = canvas.getContext('2d');
+    g.translate(canvas.width, 0);
+    g.rotate(Math.PI / 2);
+    g.drawImage(im, 0, 0, canvas.height, canvas.width);
+    const jpeg = /\.(jpe?g|heic|heif)$/i.test(src); // WebP · PNG 는 투명한 곳이 있을 수 있어 PNG 로 (JPEG 는 투명한 곳이 검게 된다)
+    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진을 돌리지 못했어요'))), jpeg ? 'image/jpeg' : 'image/png', 0.92));
+  }
 
   // 파일들을 메모 폴더에 저장 → 넣을 줄들. 하나가 안 읽혀도(폴더 · 잠긴 파일 · 너무 큰 파일) 나머지는 그대로 넣고 알린다
   //   (예전에는 하나만 실패해도 여러 파일을 한꺼번에 놓은 것이 통째로 사라졌다)
@@ -2146,6 +2204,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(tableAutoFit)
     .use(tableResize) // 읽기 전용(PDF)에서도 열 너비가 보이게 (끌기는 편집할 때만)
     .use(tableExtras)
+    .use($prose(() => (readOnly ? new Plugin({}) : mediaResizePlugin()))) // 사진 · 동영상 오른쪽 아래 손잡이로 크기 (보기만 하는 편집기는 없음)
     .use(tagSuggest) // 자동완성 목록이 떠 있을 때 Enter·↑↓ 를 먼저 받는다
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(keepIndentPlugin)

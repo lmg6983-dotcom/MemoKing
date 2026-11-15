@@ -3,7 +3,7 @@
 //   — 저장 · 공유 · 끌어내기에서 이 이름으로 나간다
 import { isVoiceCard } from './voice-card-view.js';
 import { chipRanges } from './file-chip-guard.js';
-import { mediaKindOf } from './core/memo-file.js';
+import { mediaKindOf, mediaWidthOf, plainAlt, withMediaWidth } from './core/memo-file.js';
 
 const BAD = /[\\/:*?"<>|\u0000-\u001f]+/g;
 const extOf = (name) => /\.[A-Za-z0-9]{1,8}$/.exec(name)?.[0] ?? '';
@@ -18,7 +18,7 @@ export function renameTarget(doc, pos, node) {
   if (chip) return { kind: 'chip', from: chip.from, to: chip.to, name: doc.textBetween(chip.from, chip.to) };
   let found = null;
   para.forEach((child, off) => {
-    if (!found && child.type.name === 'image') found = { kind: 'image', pos: start + off, name: child.attrs.alt ?? '' };
+    if (!found && child.type.name === 'image') found = { kind: 'image', pos: start + off, name: plainAlt(child.attrs.alt) }; // 크기 표시(|50%)는 이름이 아니다
   });
   return found;
 }
@@ -43,7 +43,7 @@ export function renameContent(view, target, newName) {
     const node = state.doc.nodeAt(target.pos);
     if (node?.type.name !== 'image') return false;
     if (mediaKindOf(node.attrs.src, node.attrs.alt ?? '') !== mediaKindOf(node.attrs.src, newName)) return 'kind';
-    tr = tr.setNodeMarkup(target.pos, undefined, { ...node.attrs, alt: newName });
+    tr = tr.setNodeMarkup(target.pos, undefined, { ...node.attrs, alt: withMediaWidth(newName, mediaWidthOf(node.attrs.alt)) }); // 맞춰 둔 크기는 그대로
   }
   view.dispatch(tr.scrollIntoView());
   return true;

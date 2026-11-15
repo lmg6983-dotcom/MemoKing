@@ -1461,6 +1461,20 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
           await wait(200);
           const closed = await js(aw, `!document.querySelector('.mk-album-view')`);
           check('묶음 사진: 누른 장부터 크게 (2 / 5), → 로 다음 장, Esc로 닫힘', viewer === '2 / 5' && after === '3 / 5' && closed, JSON.stringify({ viewer, after, closed }));
+          // 묶음 사진 복사: 오른쪽 클릭 › 복사 → 첫 장만이 아니라 모든 장이 파일로 클립보드에
+          {
+            const at = await js(aw, `(() => { const e = document.querySelector('.mk-doc img.mk-album-img'); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + 12), y: Math.round(r.top + 10) }; })()`);
+            aw.webContents.sendInputEvent({ type: 'mouseMove', x: at.x, y: at.y });
+            aw.webContents.sendInputEvent({ type: 'mouseDown', x: at.x, y: at.y, button: 'right', clickCount: 1 });
+            aw.webContents.sendInputEvent({ type: 'mouseUp', x: at.x, y: at.y, button: 'right', clickCount: 1 });
+            await until(() => js(aw, `!!document.querySelector('.mk-ctx:not(.closing) .mk-ctx-ic[data-id="copy"]')`), '묶음 사진 오른쪽 클릭 메뉴', 3000).catch(() => {});
+            const before = smokeOpened.filter((o) => o.kind === 'copy-files').length;
+            await js(aw, `document.querySelector('.mk-ctx-ic[data-id="copy"]')?.click()`);
+            const copied = await until(() => smokeOpened.filter((o) => o.kind === 'copy-files').length > before && smokeOpened.filter((o) => o.kind === 'copy-files').at(-1), '묶음 사진 복사', 3000).catch(() => null);
+            check('묶음 사진: 복사하면 모든 장(5장)이 파일로 클립보드에 (첫 장만 복사되던 것)', copied?.target?.length === 5, JSON.stringify(copied));
+            key(aw, 'Escape');
+            await wait(200);
+          }
           // PDF → 장마다 그림 (pdf.js 로 실제로 바꿔 본다)
           const pdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R 5 0 R 6 0 R 7 0 R 8 0 R]/Count 5>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n4 0 obj<</Length 33>>stream\n0 0 1 rg 20 20 160 240 re f\nendstream endobj\n5 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n6 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n7 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n8 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
           await js(aw, `(() => {

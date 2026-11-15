@@ -283,7 +283,7 @@ function renderCard(memo) {
   if (memo.folder && (!state.folder || state.query)) {
     const f = document.createElement('span');
     f.className = 'card-folder';
-    f.append(icon('folder'), memo.folder);
+    f.append(icon('folder'), Object.assign(document.createElement('span'), { textContent: memo.folder })); // 이름은 따로 — 길면 … 로 (태그 자리를 남기게)
     tags.append(f, ' ');
   }
   // 태그: 누르면 그 태그의 메모만 (PC 카드와 같음)

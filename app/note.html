@@ -17,6 +17,8 @@
   <nav id="stack-tabs" class="stack-tabs" role="tablist" aria-label="스택의 메모" hidden></nav>
   <div id="stack-drop" class="stack-drop" hidden><span>놓으면 탭으로 합쳐요</span></div>
   <header class="bar">
+    <!-- 메모 목록으로: 목록 창을 앞으로 (메뉴의 "목록 보기" 와 같음 — 늘 보이게) -->
+    <button id="list-btn" class="icon-btn list-btn" title="메모 목록 보기" aria-label="메모 목록 보기"><svg><use href="#i-grid"/></svg></button>
     <button id="new-btn" class="icon-btn" title="새 탭: 이 창에 메모를 하나 더 쌓아요 (새 창은 Ctrl+N)" aria-label="새 탭으로 메모 추가"><svg><use href="#i-plus"/></svg></button>
     <span id="status" class="status" role="status"></span>
     <span id="mode-tag" class="mode-tag" hidden></span>
@@ -141,11 +143,11 @@
     </header>
     <input id="link-search" class="link-search" type="search" aria-label="연결할 메모 검색" placeholder="연결할 메모 검색" autocomplete="off">
     <ul id="link-results" class="link-list"></ul>
-    <h4>연결한 메모</h4>
+    <h3>연결한 메모</h3>
     <ul id="links-out" class="link-list"></ul>
-    <h4>이 메모를 연결한 메모</h4>
+    <h3>이 메모를 연결한 메모</h3>
     <ul id="links-in" class="link-list"></ul>
-    <h4>비슷한 메모</h4>
+    <h3>비슷한 메모</h3>
     <ul id="links-suggest" class="link-list"></ul>
   </aside>
 

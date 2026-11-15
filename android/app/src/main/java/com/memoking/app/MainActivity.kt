@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.print.PdfPrint
 import android.print.PrintAttributes
+import kotlin.math.roundToInt
 import android.print.PrintManager
 import android.provider.CalendarContract
 import android.provider.MediaStore
@@ -770,11 +771,17 @@ class MainActivity : Activity() {
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
     private var pdfJob = 0
 
-    private fun pdfAttributes() = PrintAttributes.Builder()
-        .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-        .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
-        .setMinMargins(PrintAttributes.Margins(720, 720, 720, 720)) // 0.72인치 = 1.83cm (1/1000 인치 단위) — print-html.js PAGE_MARGIN_MM 과 같게
-        .build()
+    /** PDF · 인쇄 쪽 여백 (mm) — 화면의 PDF 시트에서 고른 값 (print-html.js 가 같은 여백으로 쪽 안 크기를 맞춘다) */
+    var pdfMarginMm = 16.0
+
+    private fun pdfAttributes(): PrintAttributes {
+        val mils = (pdfMarginMm.coerceIn(0.0, 40.0) / 25.4 * 1000).roundToInt() // 1/1000 인치 단위
+        return PrintAttributes.Builder()
+            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+            .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
+            .setMinMargins(PrintAttributes.Margins(mils, mils, mils, mils))
+            .build()
+    }
 
     // 인쇄용 WebView 치우기. 주의: 창에 붙지 않은 View 의 postDelayed 는 붙을 때까지 미뤄져 끝내 돌지 않으므로 Handler 로
     //   (아직 PDF 를 쓰는 중일 수 있으면 later — 한참 뒤에 없앤다)

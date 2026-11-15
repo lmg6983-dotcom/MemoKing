@@ -264,11 +264,13 @@ export async function writeClipboard({ png = null, text = null, html = null }) {
   else clipboard.write({ ...(text != null ? { text } : {}), ...(html ? { html } : {}), ...(png ? { image: nativeImage.createFromBuffer(png) } : {}) });
 }
 
+/** 파일 하나 또는 여러 개(p: 경로 배열)를 파일 그대로 클립보드에 */
 export function copyFileToClipboard(p) {
+  const all = Array.isArray(p) ? p : [p];
   return new Promise((resolve) => {
     if (process.platform === 'win32') {
       const list = path.join(os.tmpdir(), `memoking-copy-${process.pid}-${Date.now()}.txt`);
-      fs.writeFileSync(list, `${p}\r\n`, 'utf8');
+      fs.writeFileSync(list, all.map((f) => `${f}\r\n`).join(''), 'utf8');
       execFile(POWERSHELL, psArgs(['-File', CLIPBOARD_HELPER, '-Action', 'files', '-ListFile', list], { sta: true }),
         psOptions({ timeout: 15000 }), (err) => {
           if (err) console.error('파일을 클립보드에 넣지 못했어요', err.message);
@@ -276,11 +278,17 @@ export function copyFileToClipboard(p) {
           resolve(!err);
         });
     } else if (process.platform === 'darwin') {
-      execFile('osascript', ['-e', 'on run argv', '-e', 'set the clipboard to (POSIX file (item 1 of argv))', '-e', 'end run', p], { timeout: 8000 }, (err) => resolve(!err));
+      // 하나는 예전 그대로, 여러 개는 클립보드(NSPasteboard)에 파일 주소들로 — 파인더에 붙이면 모두 (AppleScript 목록은 파일로 붙지 않는다)
+      const script = all.length === 1
+        ? ['on run argv', 'set the clipboard to (POSIX file (item 1 of argv))', 'end run']
+        : ['use framework "AppKit"', 'on run argv', 'set urls to current application\'s NSMutableArray\'s array()', 'repeat with a in argv',
+          'urls\'s addObject:(current application\'s NSURL\'s fileURLWithPath:(a as text))', 'end repeat',
+          'set pb to current application\'s NSPasteboard\'s generalPasteboard()', 'pb\'s clearContents()', 'pb\'s writeObjects:urls', 'end run'];
+      execFile('osascript', [...script.flatMap((l) => ['-e', l]), ...all], { timeout: 8000 }, (err) => resolve(!err));
     } else {
       // 리눅스: 파일 관리자용 형식이 없으면(일부 Electron) 경로라도 글로
-      if (typeof clipboard.writeBuffer === 'function') clipboard.writeBuffer('x-special/gnome-copied-files', Buffer.from(`copy\n${pathToFileURL(p).href}`));
-      else clipboard.writeText(p);
+      if (typeof clipboard.writeBuffer === 'function') clipboard.writeBuffer('x-special/gnome-copied-files', Buffer.from(`copy\n${all.map((f) => pathToFileURL(f).href).join('\n')}`));
+      else clipboard.writeText(all.join('\n'));
       resolve(true);
     }
   });

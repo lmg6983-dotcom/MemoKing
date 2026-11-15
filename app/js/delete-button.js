@@ -87,7 +87,7 @@ export function undoHint(what, rect, view, verb = '삭제했어요') {
   document.addEventListener('keydown', onKey, true);
 }
 
-const COPY_DONE = (what) => (what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
+const COPY_DONE = (what) => (what === '그림' ? '그림을 복사했어요' : /^사진 \d+장$/.test(what ?? '') ? `${what}을 복사했어요. 메모, 탐색기, 메신저에 붙여 넣으세요` : what === '주소' ? '그림 주소를 복사했어요'
   : what === '파일' ? '파일을 복사했어요. 탐색기, 메신저에 붙여 넣으세요' : what === '링크' ? '링크 주소를 복사했어요' : '내용을 복사했어요');
 const SAVE_DONE = (name) => `저장했어요: ${name}`;
 const SHARE_DONE_TEXT = (what) => SHARE_DONE[what] ?? '공유했어요';
@@ -281,6 +281,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   const del = { view, btn, extras, pos, node, target, markTarget, state: view.state, place, setMark: persist ? (on) => !on && setMark(false) : setMark, persist, follow, rescroll: () => { scroller = scrollParent(del.target); } };
   place();
   if (!persist) setMark(true);
+  document.dispatchEvent(new CustomEvent('mk:tools', { detail: { view, target } })); // 그림 · 동영상이면 크기 손잡이도 함께 (media-resize.js)
   // 누르면 그 일을 하고 ✓ (실패하면 !, 저장을 그만두면 그대로) — 다시 누르면 다시 (실패한 뒤 다시 해 보기 등)
   const action = (b, icon, run, doneText) => {
     let busy = false;
@@ -410,6 +411,7 @@ export function hideDeleteButton(now = false) {
   if (!del) return;
   current = null;
   clearTimeout(del.timer);
+  document.dispatchEvent(new CustomEvent('mk:tools-hide', { detail: { now } })); // now: 시트를 열거나 다른 내용을 눌러 바로 거둠 (저절로 사라질 때는 false)
   window.removeEventListener('scroll', del.place, true);
   if (!del.view.isDestroyed) del.setMark(false);
   del.target.classList?.remove('mk-ink-armed'); // 손 메모: 단추가 거둬지면 다시 처음 누르기부터

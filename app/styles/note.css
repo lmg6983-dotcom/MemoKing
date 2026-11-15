@@ -506,8 +506,8 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   outline: none;
 }
 .link-search:focus { border-color: var(--text-strong); }
-.links-panel h4 { margin: 14px 0 4px; font-size: 12px; color: var(--muted); }
-.links-panel h4 small { font-weight: 400; }
+.links-panel h3 { margin: 14px 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.links-panel h3 small { font-weight: 400; }
 .link-list { margin: 4px 0 0; padding: 0; list-style: none; }
 .link-list:empty::after { content: "아직 없어요"; display: block; padding: 4px 2px; font-size: 12px; color: var(--muted); }
 #link-results:empty::after { content: none; }
@@ -1664,7 +1664,7 @@ body.mk-block-compact .mk-doc .mk-block-compact-item { max-height: 96px; overflo
 body.mk-block-compact .mk-doc .mk-block-compact-item.mk-block-clipped { -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
 body.mk-block-compact .mk-doc :is(p, h1, h2, h3, h4, h5, h6).mk-block-compact-item { width: fit-content; max-width: 100%; }
 /* 사진 폭 제한은 % 가 아닌 px 로 (% 는 사진을 감싼 줄 기준이라 사진만 줄고 틀은 넓게 남았다) */
-body.mk-block-compact .mk-doc .mk-block-compact-item img.mk-image { width: auto; height: auto; max-height: 88px; max-width: 220px; border-radius: 8px; }
+body.mk-block-compact .mk-doc .mk-block-compact-item img.mk-image { width: auto !important; height: auto; max-height: 88px; max-width: 220px; border-radius: 8px; } /* !important: 크기를 맞춘 그림의 width % (줄 안 style) 보다 앞서게 — 아니면 높이만 줄어 찌그러진다 */
 body.mk-block-compact .mk-doc p.mk-image-line.mk-block-compact-item { -webkit-mask-image: none; mask-image: none; }
 body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height: 92px; }
 
@@ -2369,6 +2369,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-inked svg { width: 13px; height: 13px; }
 .mk-album-inked[hidden] { display: none; }
 .mk-album-icon { width: 36px; padding: 0; justify-content: center; }
+.mk-album-btn:disabled { opacity: 0.45; cursor: progress; } /* 돌리는 중 */
 .mk-album-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 /* 아래 장 목록 (이미지 위 오버레이) */
 .mk-album-strip { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3; display: flex; gap: 6px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent); overflow-x: auto; scrollbar-width: thin; justify-content: safe center; transition: opacity 0.2s ease-out; }
@@ -2407,3 +2408,35 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 @media (pointer: fine) and (max-width: 420px) { .mk-album-nav { width: 34px; height: 34px; margin-top: -17px; } .mk-album-nav.prev { left: 5px; } .mk-album-nav.next { right: 5px; } }
 .mk-uploading { margin-right: 6px; font-size: 12px; color: var(--muted, #888); }
 @media print { .mk-album-view { display: none !important; } }
+
+/* ---------- 사진 · 동영상 크기 조절 (media-resize.js) ----------
+   오른쪽 아래 모서리의 흰 동그라미 손잡이 하나, 끄는 동안 위에 지금 크기. 크기는 줄 폭의 % */
+.mk-doc .mk-image.mk-sized, .mk-doc .mk-video.mk-sized { max-width: 100%; height: auto; }
+.mk-doc p.mk-image-line:has(> .mk-sized) { width: auto; } /* 줄이 그림만 감싸면 % 가 기준을 잃는다 — 크기를 정한 그림의 줄은 칸 폭 그대로 */
+.mk-doc .mk-resize-on { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-yellow) 85%, transparent); transition: box-shadow 0.15s ease-out; }
+.mk-resize { position: fixed; z-index: 40; pointer-events: none; opacity: 0; transition: opacity 0.16s ease-out; }
+.mk-resize.in { opacity: 1; }
+.mk-resize[hidden] { display: none; }
+.mk-resize-handle {
+  position: absolute; right: -11px; bottom: -11px; width: 30px; height: 30px; pointer-events: auto; cursor: nwse-resize; touch-action: none;
+  display: flex; align-items: center; justify-content: center;
+}
+/* 오른쪽 아래 모서리에 흰 동그라미 하나 — 잡으면 조금 커지고 그림자가 짙어진다 */
+.mk-resize-handle::before {
+  content: ""; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.15s;
+}
+.mk-resize.clipped .mk-resize-handle { visibility: hidden; }
+.mk-resize.video .mk-resize-handle { right: -26px; bottom: -26px; } /* 동영상 재생기의 전체 화면 단추가 오른쪽 아래에 있다 */
+.mk-resize-handle:hover::before, .mk-resize.dragging .mk-resize-handle::before { transform: scale(1.18); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.22), 0 3px 12px rgba(0, 0, 0, 0.36); }
+.mk-resize-badge {
+  position: absolute; left: 50%; top: 10px; transform: translate(-50%, -4px); padding: 4px 10px; border-radius: 999px;
+  background: rgba(17, 17, 17, 0.78); backdrop-filter: blur(8px); color: #fff; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  opacity: 0; transition: opacity 0.15s, transform 0.15s cubic-bezier(0.23, 1, 0.32, 1); white-space: nowrap;
+}
+.mk-resize.dragging .mk-resize-badge { opacity: 1; transform: translate(-50%, 0); }
+body.mk-resizing, body.mk-resizing * { cursor: nwse-resize !important; user-select: none; }
+.mk-resize-handle:focus-visible { outline: none; }
+@media (pointer: coarse) { .mk-resize-handle { width: 44px; height: 44px; right: -18px; bottom: -18px; } .mk-resize-handle::before { width: 20px; height: 20px; } } /* 손가락 닿는 자리 44px */
+@media (prefers-reduced-motion: reduce) { .mk-resize, .mk-resize-handle::before, .mk-resize-badge { transition: none; } }
