@@ -107,6 +107,15 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       view.classList.remove('ui-active');
     }, 2000);
   }
+  // 숨어 있던 머리 줄 · 장 목록 · 화살표가 누르는 순간 떠오르면, 같은 누르기의 click 이 그 자리의 단추(다른 장 등)에 떨어졌다 →
+  //   떠오른 직후 잠깐은 사진 밖 click 을 버린다 (사진 보기를 연 누르기도 같다)
+  let guardUntil = Date.now() + 400;
+  view.addEventListener('click', (e) => {
+    if (Date.now() < guardUntil && !stage.contains(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
   for (const bar of [head, strip, prev, next]) {
     bar.addEventListener('pointerdown', () => wakeUI());
     bar.addEventListener('click', () => wakeUI());
@@ -128,6 +137,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   }
   function show() {
     const it = images[i];
+    img.style.transition = '';
     resetZoom();
     img.src = url(it.src);
     img.alt = it.alt ?? '';
@@ -142,10 +152,40 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     });
     strip.children[i]?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
+  // 장 넘기기: 지금 장은 미끄러져 나가고, 새 장은 반대쪽에서 들어온다
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let sliding = 0;
+  const glide = (t, ms = 180) => {
+    img.style.transition = `transform ${ms}ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity ${ms}ms ease-out`;
+    img.style.transform = `translateX(${t}px)`;
+  };
   const goTo = (k) => {
-    if (inking || k < 0 || k >= images.length) return;
+    if (inking || k < 0 || k >= images.length || k === i) return;
+    const dir = k > i ? 1 : -1;
+    const w = stage.clientWidth;
+    const job = ++sliding;
     i = k;
-    show();
+    if (still || z.s > 1) {
+      show();
+      return;
+    }
+    glide(-dir * w * 0.6);
+    img.style.opacity = '0';
+    setTimeout(() => {
+      if (job !== sliding) return;
+      show();
+      img.style.transition = 'none';
+      img.style.transform = `translateX(${dir * w * 0.35}px)`;
+      img.style.opacity = '0';
+      void img.offsetWidth;
+      glide(0, 220);
+      img.style.opacity = '';
+      setTimeout(() => {
+        if (job !== sliding) return;
+        img.style.transition = '';
+        img.style.transform = '';
+      }, 240);
+    }, 150);
   };
   const go = (d) => goTo(i + d);
 
@@ -274,6 +314,11 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       zoomTo(z.s * (d / gesture.d), m.x, m.y);
       gesture.d = d;
       gesture.m = m;
+    } else if (gesture.kind === 'swipe' && !still) {
+      let t = e.clientX - gesture.x;
+      if ((t > 0 && i === 0) || (t < 0 && i === images.length - 1)) t /= 3; // 끝 장은 덜 따라온다
+      img.style.transition = 'none';
+      img.style.transform = `translateX(${t}px)`;
     } else if (gesture.kind === 'pan') {
       z.x += dx;
       z.y += dy;
@@ -295,9 +340,18 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     if (!g || e.type === 'pointercancel') return;
     const dx = e.clientX - g.x;
     const dy = e.clientY - g.y;
-    if (g.kind === 'swipe' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+    if (g.kind === 'swipe' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && images[i + (dx < 0 ? 1 : -1)]) {
       go(dx < 0 ? 1 : -1);
       return;
+    }
+    if (g.kind === 'swipe' && img.style.transform) {
+      glide(0); // 넘기지 않으면 제자리로
+      const job = ++sliding;
+      setTimeout(() => {
+        if (job !== sliding) return;
+        img.style.transition = '';
+        img.style.transform = '';
+      }, 200);
     }
     if (g.moved) return;
     const now = Date.now();
@@ -308,7 +362,10 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     } else {
       lastTap = { at: now, x: e.clientX, y: e.clientY };
       if (view.classList.contains('ui-active')) hideUI();
-      else wakeUI();
+      else {
+        guardUntil = Date.now() + 400;
+        wakeUI();
+      }
     }
   };
   stage.addEventListener('pointerup', lift);

@@ -814,7 +814,7 @@ async function fittedDoc(id) {
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   const page = pagePx(printSize(), printMargin());
-  frame.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${page.width}px; height: ${page.height}px; border: 0; visibility: hidden;`;
+  frame.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${pageFullPx(printSize()).width}px; height: ${page.height}px; border: 0; visibility: hidden;`;
   const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
   frame.srcdoc = html;
   document.body.append(frame);
