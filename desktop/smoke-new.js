@@ -1461,6 +1461,20 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
           await wait(200);
           const closed = await js(aw, `!document.querySelector('.mk-album-view')`);
           check('묶음 사진: 누른 장부터 크게 (2 / 5), → 로 다음 장, Esc로 닫힘', viewer === '2 / 5' && after === '3 / 5' && closed, JSON.stringify({ viewer, after, closed }));
+          // 사진 보기 위 단추는 진짜 마우스로도 눌린다 (메모 창 위 막대의 창 끌기 영역에 가려 눌리지 않던 것 — Windows 에서만 드러남)
+          {
+            await js(aw, `document.querySelector('.mk-doc img.mk-album-img').click()`);
+            await until(() => js(aw, `!!document.querySelector('.mk-album-view .mk-album-head')`), '사진 보기 다시', 3000).catch(() => {});
+            await wait(250);
+            const c = await js(aw, `(() => { const v = document.querySelector('.mk-album-view'); v.classList.add('ui-active'); const b = [...v.querySelectorAll('.mk-album-head button')].at(-1); const r = b.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), region: getComputedStyle(v).getPropertyValue('-webkit-app-region') || getComputedStyle(v).getPropertyValue('app-region') }; })()`);
+            aw.webContents.sendInputEvent({ type: 'mouseMove', x: c.x, y: c.y });
+            aw.webContents.sendInputEvent({ type: 'mouseDown', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+            aw.webContents.sendInputEvent({ type: 'mouseUp', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+            const shut = await until(() => js(aw, `!document.querySelector('.mk-album-view')`), '닫기 단추로 닫힘', 2000).catch(() => false);
+            check('사진 보기: 창 끌기 영역이 아니고(no-drag), 위 단추(닫기)를 마우스로 누르면 닫힘', shut === true && c.region === 'no-drag', JSON.stringify(c));
+            if (!shut) key(aw, 'Escape');
+            await wait(200);
+          }
           // 묶음 사진 복사: 오른쪽 클릭 › 복사 → 첫 장만이 아니라 모든 장이 파일로 클립보드에
           {
             const at = await js(aw, `(() => { const e = document.querySelector('.mk-doc img.mk-album-img'); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + 12), y: Math.round(r.top + 10) }; })()`);
