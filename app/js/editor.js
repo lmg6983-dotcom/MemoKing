@@ -14,6 +14,7 @@ import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
 import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, isAlbumPageTitle, isInkedAlbumTitle, inkedAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE, mediaWidthOf, plainAlt } from './core/memo-file.js';
 import { mediaResizePlugin } from './media-resize.js';
+import { hideDeleteButton } from './delete-button.js';
 import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkForDark } from './core/ink.js';
 import { getStroke } from '../vendor/perfect-freehand.js';
 import { openInkEditor } from './ink-editor.js';
@@ -101,6 +102,7 @@ let inkEditHandler = null;
 let albumHandler = null;
 
 let inkReader = null; // 손 메모 SVG 글 읽기 (createNoteEditor 의 readAttachment)
+const DOUBLE_TAP_MS = 450; // 휴대폰 사진: 이 안에 다시 누르면 크게 보기
 const INK_FILE = '손 메모';
 
 // 손 메모 한 칸: 그린 만큼의 그림 + (마우스를 올리거나 고르면) "이어 그리기" — PC 는 두 번 눌러도
@@ -210,6 +212,7 @@ function mediaView(node, view, getPos) {
     };
   }
   const dom = document.createElement('img');
+  let lastTap = 0; // 휴대폰 두 번 누르기 (이 그림을 마지막으로 누른 때)
   const album = isAlbumTitle(title);
   dom.className = album ? `mk-image mk-album-img${isAlbumPageTitle(title) ? ' mk-album-page' : ''}` : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
   dom.src = vaultUrl(src);
@@ -226,6 +229,16 @@ function mediaView(node, view, getPos) {
   dom.addEventListener('click', (e) => {
     if (e.defaultPrevented || typeof getPos !== 'function') return;
     if (!album && ['move', 'draw'].includes(touchMode())) return; // 휴대폰 옮기기 · 그리기 방식: 누르기는 그 손짓에 쓴다
+    // 휴대폰: 파일 칩처럼 두 번 눌러야 크게 보기 — 한 번 누르면 단추 줄(복사 · 저장 · 지우기 · 크기, block-move.js)만
+    if (view.editable && matchMedia('(pointer: coarse)').matches) {
+      const now = Date.now();
+      if (now - lastTap > DOUBLE_TAP_MS) {
+        lastTap = now;
+        return;
+      }
+      lastTap = 0;
+      hideDeleteButton(true); // 첫 번째 누름에 뜬 단추 줄은 거둔다 (보기를 닫으면 다시 — block-move.js)
+    }
     albumHandler?.(view, getPos());
   });
   return { dom };

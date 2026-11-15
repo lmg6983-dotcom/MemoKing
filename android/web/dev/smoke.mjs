@@ -1659,13 +1659,24 @@ try {
   await setMode('edit');
   {
     const ib2 = await page.locator('img.mk-image').first().boundingBox();
-    await touch('touchStart', ib2.x + 40, ib2.y + 40);
-    await page.waitForTimeout(80);
-    await touch('touchEnd', ib2.x + 40, ib2.y + 40);
+    const tapImg = async () => {
+      await touch('touchStart', ib2.x + 40, ib2.y + 40);
+      await page.waitForTimeout(60);
+      await touch('touchEnd', ib2.x + 40, ib2.y + 40);
+    };
+    // 한 번 누르면 크게 보기 없이 단추 줄만 (파일 칩처럼 두 번 눌러야 연다)
+    await tapImg();
     await page.waitForTimeout(250);
-    // 그림 한 장도 누르면 크게 보기 (묶음 사진과 같은 보기) — 닫으면 그 그림의 단추 줄
+    const once = await page.evaluate(() => ({ viewer: Boolean(document.querySelector('.mk-album-view')), row: Boolean(document.querySelector('.mk-delete-btn')) }));
+    check('그림 한 번 누르기: 크게 보기는 열리지 않고 단추 줄만', !once.viewer && once.row, JSON.stringify(once));
+    await page.waitForTimeout(500);
+    await tapImg();
+    await page.waitForTimeout(80);
+    await tapImg();
+    await page.waitForTimeout(250);
+    // 두 번 누르면 크게 보기 (묶음 사진과 같은 보기) — 닫으면 그 그림의 단추 줄
     const big = await page.evaluate(() => { const v = document.querySelector('.mk-album-view'); return v && { src: Boolean(v.querySelector('.mk-album-big')?.src), count: v.querySelector('.mk-album-count').textContent, row: Boolean(document.querySelector('.mk-delete-btn')) }; });
-    check('그림 한 장을 누르면 크게 보기 (번호 없이 · 단추 줄은 닫은 뒤에)', Boolean(big?.src) && big.count === '' && !big.row, JSON.stringify(big));
+    check('그림 두 번 누르기: 크게 보기 (번호 없이 · 단추 줄은 닫은 뒤에)', Boolean(big?.src) && big.count === '' && !big.row, JSON.stringify(big));
     await page.tap('.mk-album-view button[aria-label="닫기"]');
     await page.waitForTimeout(250);
     const shown = await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn') && await page.isVisible('.mk-save-btn');
@@ -1692,9 +1703,7 @@ try {
       await touch('touchStart', ib3.x + 40, ib3.y + 40);
       await page.waitForTimeout(80);
       await touch('touchEnd', ib3.x + 40, ib3.y + 40);
-      await page.waitForTimeout(250);
-      await page.tap('.mk-album-view button[aria-label="닫기"]'); // 크게 보기를 닫으면 단추 줄
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(400); // 한 번 누르면 단추 줄 (크게 보기는 두 번 눌러야)
     }
     await shot('18c-tap-buttons');
     // 저장 단추: 메모 폴더의 사진은 원본 파일 그대로 안드로이드 저장 창으로
