@@ -100,6 +100,57 @@ class AlarmReceiver : BroadcastReceiver() {
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Alarms.restore(context)
+        if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) UpdateRestart.afterUpdate(context)
+    }
+}
+
+/**
+ * 앱 안 업데이트가 끝나면 메모킹을 다시 켠다 — 설치하는 동안 안드로이드가 앱을 끄고, 새 버전을 저절로 켜 주지 않는다.
+ *   업데이트를 시작할 때 표시해 두고(mark), 새 버전이 깔리면(MY_PACKAGE_REPLACED) 그 표시가 있을 때만 화면을 연다.
+ *   안드로이드 10 이상은 뒤에서 화면을 여는 것을 막을 수 있어 "눌러서 다시 열기" 알림도 함께 — 앱이 열리면 지운다 (clear)
+ */
+object UpdateRestart {
+    private const val PREFS = "memoking_update"
+    private const val KEY = "restart_at"
+    private const val NOTE_ID = 7_301
+    private const val WINDOW_MS = 30 * 60_000L // 업데이트를 시작하고 이 안에 깔린 것만 (다른 경로의 업데이트로 켜지지 않게)
+
+    fun mark(ctx: Context) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(KEY, System.currentTimeMillis()).apply()
+    }
+
+    fun afterUpdate(ctx: Context) {
+        val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val at = prefs.getLong(KEY, 0L)
+        prefs.edit().remove(KEY).apply()
+        if (at == 0L || System.currentTimeMillis() - at > WINDOW_MS) return
+        val open = Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        try {
+            ctx.startActivity(open)
+        } catch (e: Exception) {
+            android.util.Log.w("MemoKing", "업데이트 뒤 다시 켜지 못했어요", e)
+        }
+        // 뒤에서 화면을 열지 못한 휴대폰을 위해: 눌러서 여는 알림 (앱이 열리면 clear 가 지운다)
+        try {
+            Notifier.ensureChannel(ctx)
+            val content = PendingIntent.getActivity(ctx, NOTE_ID, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val note = Notification.Builder(ctx, Notifier.CHANNEL)
+                .setSmallIcon(R.drawable.ic_stat_crown)
+                .setColor(0xFFFFCC00.toInt())
+                .setContentTitle("메모킹을 새 버전으로 바꿨어요")
+                .setContentText("눌러서 다시 열어요")
+                .setContentIntent(content)
+                .setAutoCancel(true)
+                .build()
+            ctx.getSystemService(NotificationManager::class.java)?.notify(NOTE_ID, note)
+        } catch (e: Exception) {
+            android.util.Log.w("MemoKing", "업데이트 알림", e)
+        }
+    }
+
+    /** 앱이 열렸으면 "다시 열어요" 알림은 필요 없다 */
+    fun clear(ctx: Context) {
+        ctx.getSystemService(NotificationManager::class.java)?.cancel(NOTE_ID)
     }
 }
 

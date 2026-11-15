@@ -228,9 +228,11 @@ function mediaView(node, view, getPos) {
   // 누르면 크게 보기 — 묶음 사진은 누른 장부터 넘겨 보고, 한 장짜리 그림도 같은 보기로
   dom.addEventListener('click', (e) => {
     if (e.defaultPrevented || typeof getPos !== 'function') return;
-    if (!album && ['move', 'draw'].includes(touchMode())) return; // 휴대폰 옮기기 · 그리기 방식: 누르기는 그 손짓에 쓴다
-    // 휴대폰: 파일 칩처럼 두 번 눌러야 크게 보기 — 한 번 누르면 단추 줄(복사 · 저장 · 지우기 · 크기, block-move.js)만
-    if (view.editable && matchMedia('(pointer: coarse)').matches) {
+    if (touchMode() === 'draw') return; // 휴대폰 그리기 방식: 누르기는 그리기에 쓴다
+    // 휴대폰: 파일 칩처럼 두 번 눌러야 크게 보기 — 한 번 누르면 단추 줄(복사 · 저장 · 지우기 · 크기, block-move.js)만.
+    //   고치기 · 옮기기 방식, 한 장 사진 · 묶음 사진 · PDF 를 펼친 장 모두 같게 (예전: 옮기기에서는 한 장 사진이 아예 열리지 않고,
+    //   글을 고칠 수 없는 때라 묶음 · PDF 장은 한 번만 눌러도 열렸다)
+    if (matchMedia('(pointer: coarse)').matches) {
       const now = Date.now();
       if (now - lastTap > DOUBLE_TAP_MS) {
         lastTap = now;

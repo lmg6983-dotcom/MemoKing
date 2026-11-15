@@ -322,6 +322,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         visible = this
+        UpdateRestart.clear(this) // 업데이트 뒤 다시 열렸으면 "눌러서 다시 열어요" 알림은 지운다
         if (pageReady) emit("app", "resume")
         DriveSync.listener = { status -> runOnUiThread { if (pageReady) emit("sync", status.json()) } }
         NotiStore.listener = { runOnUiThread { if (pageReady) emit("history", null) } }
@@ -562,6 +563,7 @@ class MainActivity : Activity() {
 
     /** 받은 업데이트 APK 를 안드로이드 설치 화면으로 (브라우저로 받은 APK 를 열 때와 같은 화면) */
     fun installUpdate(file: java.io.File) {
+        UpdateRestart.mark(this) // 새 버전이 깔리면 다시 켠다 (BootReceiver · MY_PACKAGE_REPLACED)
         try {
             @Suppress("DEPRECATION")
             startActivityForResult(AppUpdate.installIntent(file), REQ_INSTALL)

@@ -48,6 +48,7 @@ test('업데이트: 흐름 — 확인 → 새 버전 알림 → 받기 진행률
   await u.download();
   assert.ok(sent.some(([c, p]) => c === 'update:state' && p.status === 'downloading' && p.percent === 42));
   assert.ok(sent.some(([c, p]) => c === 'update:ready' && p.version === '0.39.0' && p.notes === '새 기능'));
+  assert.equal(u.state.restarting, true, '받기를 눌러 받은 것은 다 받으면 저절로 다시 시작');
   assert.equal(await u.installNow(), true);
   assert.equal(saved, true, '재시작 전에 메모 저장');
   assert.deepEqual(installed, [true, true]);
