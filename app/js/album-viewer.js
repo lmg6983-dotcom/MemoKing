@@ -175,7 +175,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     img.style.transform = `translateX(${t}px)`;
   };
   const goTo = (k) => {
-    if (inking || k < 0 || k >= images.length || k === i) return;
+    if (inking || turning || k < 0 || k >= images.length || k === i) return; // 돌리는 중에는 넘기지 않는다 (돌린 모양이 다른 장에 남았다)
     const dir = k > i ? 1 : -1;
     const w = stage.clientWidth;
     const job = ++sliding;
@@ -329,7 +329,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       zoomTo(z.s * (d / gesture.d), m.x, m.y);
       gesture.d = d;
       gesture.m = m;
-    } else if (gesture.kind === 'swipe' && !still) {
+    } else if (gesture.kind === 'swipe' && !still && !turning) {
       let t = e.clientX - gesture.x;
       if ((t > 0 && i === 0) || (t < 0 && i === images.length - 1)) t /= 3; // 끝 장은 덜 따라온다
       img.style.transition = 'none';

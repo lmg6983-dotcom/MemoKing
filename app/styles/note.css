@@ -2450,3 +2450,12 @@ body.mk-resizing, body.mk-resizing * { cursor: nwse-resize !important; user-sele
 .mk-resize-handle:focus-visible { outline: none; }
 @media (pointer: coarse) { .mk-resize-handle { width: 44px; height: 44px; right: -18px; bottom: -18px; } .mk-resize-handle::before { width: 20px; height: 20px; } } /* 손가락 닿는 자리 44px */
 @media (prefers-reduced-motion: reduce) { .mk-resize, .mk-resize-handle::before, .mk-resize-badge { transition: none; } }
+/* 크기를 줄인 그림의 줄은 칸 폭 그대로라(위) 들기 · 맞바꿀 자리 · 놓은 자리 · 지우기 표시가 줄 전체(원래 크기)로 떴다 → 그림에만 */
+.mk-doc p:has(> .mk-image.mk-sized):is(.mk-block-lift, .mk-block-swap-target, .mk-block-dropped, .mk-delete-target, .mk-block-pressing) { background: none; box-shadow: none; outline: none; animation: none; }
+.mk-doc p.mk-block-lift > .mk-image.mk-sized { border-radius: 8px; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24), 0 0 0 4px var(--note-bg), 0 0 0 6px var(--note-text); }
+body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow: none; }
+.mk-doc p.mk-block-swap-target > .mk-image.mk-sized { border-radius: 8px; outline: 2px dashed #7a4dff; outline-offset: 2px; }
+.mk-doc p.mk-block-dropped > .mk-image.mk-sized { border-radius: 8px; animation: mk-dropped-img 0.7s ease-out; }
+@keyframes mk-dropped-img { 0% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--note-text) 16%, transparent); } 100% { box-shadow: 0 0 0 6px transparent; } }
+.mk-doc p.mk-delete-target > .mk-image.mk-sized { outline: 1.5px solid color-mix(in srgb, var(--rec) 55%, transparent); outline-offset: 3px; border-radius: var(--radius-lg); }
+.mk-doc p.mk-block-pressing > .mk-image.mk-sized { border-radius: 8px; animation: mk-block-press 0.32s linear forwards; }

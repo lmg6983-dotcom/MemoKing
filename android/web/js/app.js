@@ -866,7 +866,15 @@ function drawPrintSize() {
   previewTimer = setTimeout(() => {
     if (!printJob.id || printSheet.hidden) return;
     const frame = $('print-frame');
-    if (printJob.fit) frame.addEventListener('load', () => fitFrame(frame, pageFullPx(printSize()).height - 2 * Math.round(printMargin() * 96 / 25.4)), { once: true }); // 미리보기 쪽: 쪽 전체 크기, 안쪽 여백 = 고른 여백 (print-html.js)
+    const contentH = pageFullPx(printSize()).height - 2 * Math.round(printMargin() * 96 / 25.4); // 미리보기 쪽: 쪽 전체 크기, 안쪽 여백 = 고른 여백 (print-html.js)
+    frame.addEventListener('load', async () => {
+      if (printJob.fit) await fitFrame(frame, contentH);
+      // 미리보기는 첫 쪽만 — 모두 몇 쪽인지 크기 옆에 (PC PDF 창처럼)
+      const main = frame.contentDocument?.querySelector('main');
+      const pages = main ? Math.max(1, Math.ceil((main.getBoundingClientRect().height - 1) / contentH)) : 0;
+      const s = printSize();
+      $('print-summary').textContent = `${Math.round(s.width)} × ${Math.round(s.height)}mm${pages > 1 ? ` · ${pages}쪽` : ''}`;
+    }, { once: true });
     frame.srcdoc = printDoc(printJob.id, true);
   }, 120);
 }
