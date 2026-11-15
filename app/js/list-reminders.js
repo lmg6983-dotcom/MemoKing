@@ -223,8 +223,12 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   /** @param {{ quiet?: boolean }} [o] quiet: 탭이 안 보일 때 — 탭 숫자만 (달력은 다음에 보일 때 그린다. 메모를 지울 때마다 안 보이는 달력을 다시 그려 목록이 끊겼다) */
   // ifChanged: 탭으로 돌아올 때 — 일정 · 검색어 · 날짜가 지난번 그린 것과 같으면 달력을 다시 그리지 않는다 (달력 그리기가 탭 전환을 붙잡았다)
   let drawnKey = '';
+  let refreshSeq = 0; // 늦게 끝난 앞 읽기가 새 일정 목록을 덮지 않게
   async function refresh({ quiet = false, ifChanged = false } = {}) {
-    allItems = await api.reminders.all();
+    const seq = ++refreshSeq;
+    const all = await api.reminders.all();
+    if (seq !== refreshSeq) return;
+    allItems = all;
     items = visible ? allItems.filter(visible) : allItems;
     if (quiet) return updateCount(new Date());
     const key = `${JSON.stringify(items)}|${query}|${today().getTime()}`;

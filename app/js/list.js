@@ -812,8 +812,12 @@ function badge(name, text, extra = '') {
   return span;
 }
 
+let refreshSeq = 0; // 바뀜이 잇따르면 늦게 끝난 앞 읽기가 새 목록을 덮지 않게 (지운 메모가 잠깐 되살아 보였다)
 async function refresh() {
-  state.memos = await api.memos.list();
+  const seq = ++refreshSeq;
+  const memos = await api.memos.list();
+  if (seq !== refreshSeq) return;
+  state.memos = memos;
   loadFolders();
   await runSearch();
 }
