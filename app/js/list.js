@@ -862,7 +862,12 @@ async function deleteMemo(id) {
     ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
     setTimeout(() => ghost.remove(), 600);
   }
-  await api.memo.remove(id);
+  try {
+    await api.memo.remove(id);
+  } catch (err) {
+    if (card) card.style.visibility = ''; // 지우지 못했으면 카드를 다시 보인다 (예전: 빈자리로 남았다)
+    flashStatus(err?.message || '메모를 삭제하지 못했어요');
+  }
 }
 
 // ---------- 파일을 끌어다 놓으면 메모로 (.md · .txt · 그림 · 그 밖의 파일) ----------

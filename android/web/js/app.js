@@ -516,6 +516,12 @@ memoSheet.addEventListener('click', async (e) => {
   if (!b || !menuFor) return;
   const id = menuFor;
   const memo = app.vault.get(id);
+  if (!memo) {
+    // 메뉴를 연 사이 다른 기기에서 지워졌다 (예전: 고정 등을 누르면 오류로 멈췄다)
+    closeSheet(memoSheet);
+    toast('이 메모는 이미 삭제됐어요', true);
+    return;
+  }
   const body = note.currentId() === id ? note.editorMarkdown() : memo?.body ?? '';
   switch (b.dataset.memoAction) {
     case 'find':
