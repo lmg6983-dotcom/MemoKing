@@ -1770,10 +1770,19 @@ async function closeTabOrWindow() {
 }
 
 // 윗막대 + : 새 메모를 이 창의 새 탭으로 (스택이 아니면 스택이 된다). 따로 새 창은 Ctrl+N
-$('new-btn').addEventListener('click', async () => {
-  await flush();
-  api.stack.newTab(id);
-});
+// 빠르게 두 번 눌러도 새 메모는 하나만 (예전: 빈 메모 탭이 두 개 생겼다)
+let addingTab = false;
+async function newTab() {
+  if (addingTab) return;
+  addingTab = true;
+  try {
+    await flush();
+    await api.stack.newTab(id);
+  } finally {
+    setTimeout(() => (addingTab = false), 400);
+  }
+}
+$('new-btn').addEventListener('click', newTab);
 $('close-btn').addEventListener('click', closeWindow);
 el.editorRoot.addEventListener('mousedown', (e) => {
   // 글 아래 빈 곳을 눌러도 편집을 시작할 수 있게
@@ -1845,10 +1854,7 @@ tabsEl.addEventListener('click', async (e) => {
     if (close.dataset.closeTab === id) await flush();
     return api.stack.remove(close.dataset.closeTab);
   }
-  if (e.target.closest('.stack-add')) {
-    await flush();
-    return api.stack.newTab(id);
-  }
+  if (e.target.closest('.stack-add')) return newTab();
   const tab = e.target.closest('[data-tab-id]');
   if (tab && tab.dataset.tabId !== id) {
     // 저장을 기다리지 않고 바로 바꾼다 (저장은 함께 진행 — 다른 탭은 이 메모의 글이 필요 없다)
