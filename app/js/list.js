@@ -232,8 +232,8 @@ function setFolder(name) {
   } catch {
     // 이번만
   }
-  render();
-  el.cards.scrollTop = 0;
+  el.cards.scrollTop = 0; // 먼저 올려 두면 위쪽 카드만 그린다
+  renderNow(); // 다른 폴더의 카드는 대부분 다른 카드 — 옛 자리 · 새 자리를 재지 않는다
   // 다른 폴더의 카드로 툭 바뀌지 않게: 살짝 떠오르며 나타난다
   if (!reduceMotion()) el.cards.animate?.([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 160, easing: EASE_OUT });
 }

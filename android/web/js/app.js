@@ -991,8 +991,7 @@ const trashDays = () => {
   }
 };
 
-function refreshNotifyRow() {
-  const info = native.info();
+function refreshNotifyRow(info = native.info()) {
   const exact = info.exactAlarms;
   $('notify-note').textContent = exact
     ? '알림이 오지 않으면 허용해 주세요'
@@ -1001,30 +1000,36 @@ function refreshNotifyRow() {
   $('notify-btn').onclick = () => (exact ? call('notifyPermission').then((ok) => toast(ok ? '알림을 허용했어요' : '휴대폰 설정에서 메모킹 알림을 켜 주세요', !ok)) : call('exactAlarmSettings'));
 }
 
-function openSettings() {
+// 설정: 누르면 시트부터 바로 띄우고, 휴대폰에 묻는 일(폴더 정보 · 권한 · 동기화 · 휴지통 · 받아쓰기)은 시트가 뜬 다음에 채운다
+//   (예전: 이것들을 다 묻고 휴지통 메모까지 모두 읽은 뒤에야 시트가 떠, 누르고 한참 멈칫했다)
+let settingsSeq = 0;
+function fillSettingsFromPhone() {
   const info = native.info();
   $('vault-path').textContent = info.vault?.label || '(없음)';
   $('use-internal-2').hidden = Boolean(info.vault?.internal);
   $('change-vault').textContent = info.vault?.drive ? '휴대폰 폴더 선택' : '위치 변경';
   $('vault-hint').hidden = Boolean(info.vault?.drive);
-  $('trash-days').value = String(trashDays());
   $('version').textContent = `메모킹 ${info.version}`;
   refreshUpdateRow(info.version);
-  const n = app.vault?.trashList().length ?? 0;
+  const n = app.vault?.trashCount() ?? 0;
   $('trash-count').textContent = n ? String(n) : '';
-  refreshNotifyRow();
+  refreshNotifyRow(info);
   refreshHistoryRow();
   renderDrive();
-  $('auto-tags').checked = note.autoTagsOn();
-  paintChoices();
-  $('link-previews').checked = note.linkPreviewsOn();
-  $('pen-writing').checked = note.penWriting() !== 'off';
   $('rec-stt').checked = recorder.sttOn();
   $('rec-stt-note').textContent = recorder.sttReady()
     ? '말하는 내용을 휴대폰의 Google 음성 인식으로 바로 글로 받아써요'
     : '이 휴대폰은 Google 음성 인식(안드로이드 13 이상)을 쓸 수 없어 녹음만 해요';
   $('rec-stt').disabled = !recorder.sttReady();
   refreshSpeakerRow();
+}
+
+function openSettings() {
+  $('trash-days').value = String(trashDays());
+  $('auto-tags').checked = note.autoTagsOn();
+  paintChoices();
+  $('link-previews').checked = note.linkPreviewsOn();
+  $('pen-writing').checked = note.penWriting() !== 'off';
   renderWorkSettings($('work-settings'), {
     enabled: list.workLifeOn(),
     setEnabled: (on) => list.setWorkLife(on),
@@ -1037,6 +1042,10 @@ function openSettings() {
     quietNote: '업무 시간 밖에는 Work 메모의 알림을 울리지 않아요. 고정한 메모의 알림은 늘 울려요',
   });
   openSheet($('settings-sheet'));
+  const my = ++settingsSeq;
+  requestAnimationFrame(() => setTimeout(() => {
+    if (my === settingsSeq && !$('settings-sheet').hidden) fillSettingsFromPhone();
+  }, 0));
 }
 
 // 말한 사람 나누기: 다른 켜고 끄기와 같은 스위치 (PC 설정과 같음). 데이터(약 28MB)가 없으면 켤 때 받고, 받는 동안은 켜진 채 잠금
