@@ -345,6 +345,10 @@ function fireReminder(memoId, reminder, info) {
       win.moveTop();
       win.flashFrame(true);
       win.once('focus', () => win.flashFrame(false));
+    } else {
+      // 창을 열 수 없으면(사용법 연습 중 — 화면은 연습 폴더) Windows 알림으로라도 (예전: 아무것도 뜨지 않았다)
+      windowManager.pendingAlarms.delete(memoId);
+      showToast(memoId, memo, { ...alarm, title, label });
     }
   } else {
     showToast(memoId, memo, { ...alarm, title, label });
@@ -864,12 +868,25 @@ async function enterSandbox() {
   await closeNoteWindows({ keep: true });
   const dir = fs.mkdtempSync(path.join(app.getPath('temp'), 'memoking-tutorial-'));
   const next = new Vault(dir);
-  next.defaultMode = viewMode();
-  next.on('changed', () => windowManager.pushList());
-  next.on('error', (err) => console.error('[연습 공간]', err));
-  next.open();
-  // 예시 사진: 앱에 든 사진을 연습 폴더 첨부로 복사
-  await seedTutorialSandbox(next, toLocalIso, { photo: (name) => next.saveAttachment(fs.readFileSync(path.join(import.meta.dirname, '..', 'app', 'assets', 'tutorial', 'sample', `${name}.jpg`)), 'jpg') }); // 설치본(asar) 안의 사진도 readFileSync 로 읽힌다
+  try {
+    next.defaultMode = viewMode();
+    next.on('changed', () => windowManager.pushList());
+    next.on('error', (err) => console.error('[연습 공간]', err));
+    next.open();
+    // 예시 사진: 앱에 든 사진을 연습 폴더 첨부로 복사
+    await seedTutorialSandbox(next, toLocalIso, { photo: (name) => next.saveAttachment(fs.readFileSync(path.join(import.meta.dirname, '..', 'app', 'assets', 'tutorial', 'sample', `${name}.jpg`)), 'jpg') }); // 설치본(asar) 안의 사진도 readFileSync 로 읽힌다
+  } catch (err) {
+    // 만들다 실패하면 임시 폴더를 치우고 닫아 둔 실제 메모 창을 다시 연다 (예전: 창이 닫힌 채 남았다)
+    console.error('연습 공간을 만들지 못했어요', err);
+    next.close();
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      // 임시 폴더라 Windows 가 나중에 치운다
+    }
+    for (const id of openNotes) windowManager.openNote(id, { inactive: true });
+    return;
+  }
   sandbox = { real, dir, openNotes, workLife: settings.workLife };
   vault = next;
   windowManager.loadStacks();
@@ -935,6 +952,7 @@ function whatsNew() {
 async function startTutorial() {
   if (!vault) return false;
   await enterSandbox();
+  if (!sandbox) return false; // 연습 공간을 만들지 못했다 (실제 메모로 사용법을 돌리지 않는다)
   tutorial = { active: true, index: 0, memoId: null, praise: false, again: settings.tutorialDone === true };
   windowManager.createListWindow('memos');
   sendTutorial();
