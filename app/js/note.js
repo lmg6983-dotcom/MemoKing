@@ -275,6 +275,7 @@ function onChange(md) {
 // 빈 메모 안내 문구
 const showPlaceholder = trackPlaceholder(el.editorRoot);
 
+let saveFails = 0; // 잇따라 저장하지 못한 수 (다시 해 보기 간격)
 async function flush() {
   clearTimeout(saveTimer);
   saveTimer = null;
@@ -297,10 +298,13 @@ async function flush() {
       return;
     }
     saved = body;
+    saveFails = 0;
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
     setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
+    // 잠깐의 실패(파일을 다른 프로그램이 잡고 있음 등)면 더 치지 않아도 다시 저장해 본다 — 몇 번까지만, 점점 길게
+    if (++saveFails <= 4) saveTimer = setTimeout(flush, 2000 * saveFails);
   }
 }
 

@@ -139,6 +139,7 @@ function onChange(md) {
 // 빈 메모 안내 문구 (한글 조합 중에도 바로 끈다)
 const showPlaceholder = trackPlaceholder(el.editorRoot);
 
+let saveFails = 0; // 잇따라 저장하지 못한 수 (다시 해 보기 간격)
 /** 쓰던 내용을 바로 저장 (화면을 떠나거나 앱이 뒤로 갈 때) */
 export function flush() {
   clearTimeout(saveTimer);
@@ -172,11 +173,14 @@ export function flush() {
     }
     refusedSave = false;
     saved = body;
+    saveFails = 0;
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
     refusedSave = true; // 이대로 닫으면 사본 메모로라도 남긴다 (closeNote)
     setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
+    // 잠깐의 실패(저장소가 바쁨 등)면 더 치지 않아도 다시 저장해 본다 — 몇 번까지만, 점점 길게
+    if (++saveFails <= 4) saveTimer = setTimeout(flush, 2000 * saveFails);
   }
 }
 
