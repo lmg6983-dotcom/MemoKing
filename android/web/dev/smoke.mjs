@@ -892,7 +892,7 @@ try {
     await page.waitForTimeout(400);
     check('목록 카드: 꾹 눌렀다가 움직이면 지우지 않고 들어 올려 끌기 · 놓을 곳이 아니면 제자리', dragging.clone && dragging.source && await page.isVisible(cardSel)
       && await page.isHidden('#memo-sheet') && !(await page.$eval(cardSel, (c) => c.classList.contains('drag-source'))) && (await page.locator('.m-drag-clone').count()) === 0, JSON.stringify(dragging));
-    // 위로 훑다가(비스듬히) 손을 떼도 지우지 않는다 · 오른쪽으로 밀어도 지우지 않는다
+    // 위로 훑다가(비스듬히) 손을 떼도 지우지 않는다 · 왼쪽으로 밀어도 지우지 않는다 (왼쪽은 당겨서 폴더로 끌기 — 놓으면 제자리)
     await touch('touchStart', cx, cy);
     for (const [mx, my] of [[-4, -10], [-10, -25], [-18, -50], [-26, -90]]) await touch('touchMove', cx + mx, cy + my);
     await touch('touchEnd', 0, 0);
@@ -901,10 +901,22 @@ try {
     await page.evaluate(() => (document.getElementById('view-memos').scrollTop = 0)); // 훑어서 내려간 목록을 처음으로 (아래 점검이 같은 자리를 누르게)
     await page.waitForTimeout(400);
     await touch('touchStart', cx, cy);
-    for (const mx of [15, 60, 120, 200]) await touch('touchMove', cx + mx, cy);
+    for (const mx of [-15, -60, -120, -200]) await touch('touchMove', cx + mx, cy);
     await touch('touchEnd', 0, 0);
     await page.waitForTimeout(400);
-    check('목록 카드: 위아래로 훑거나 오른쪽으로 밀면 지우지 않음 (훑기는 스크롤)', await page.isVisible(cardSel) && !(await cardX()), `scrolled ${scrolledBy}`);
+    check('목록 카드: 위아래로 훑거나 왼쪽으로 밀면 지우지 않음 (훑기는 스크롤, 왼쪽은 놓으면 제자리)', await page.isVisible(cardSel) && !(await cardX())
+      && (await page.locator('.m-drag-clone').count()) === 0, `scrolled ${scrolledBy}`);
+    // 왼쪽으로 조금 당긴 채 멈추면 "폴더로" 가 보이고 카드가 들려 끌기로 (상용 앱의 당겨서 옮기기)
+    await touch('touchStart', cx, cy);
+    for (const mx of [-20, -40, -55]) await touch('touchMove', cx + mx, cy);
+    await page.waitForTimeout(40);
+    const pullMark = await page.$eval(cardSel, (c) => c.classList.contains('swipe-folder'));
+    await page.waitForTimeout(260);
+    const pulled = await page.evaluate(() => Boolean(document.querySelector('.m-drag-clone')));
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(400);
+    check('목록 카드: 왼쪽으로 당긴 채 멈추면 "폴더로" 표시 뒤 들려 끌기 · 놓을 곳이 아니면 제자리', pullMark && pulled && await page.isVisible(cardSel)
+      && (await page.locator('.m-drag-clone').count()) === 0, JSON.stringify({ pullMark, pulled }));
     // 꾹 누르고 밀지 않고 떼면 메뉴 (실제 길게 누르기처럼 오래 누른 뒤 떼야 "눌림" 이 따라오지 않는다)
     await touch('touchStart', cx, cy);
     await page.waitForTimeout(30);
@@ -926,7 +938,7 @@ try {
         new MutationObserver((l) => { for (const m of l) if ([...m.addedNodes].some((n) => n.classList?.contains('col'))) window.__colsBuilt++; }).observe(document.getElementById('cards'), { childList: true });
       });
       await touch('touchStart', cx, cy);
-      for (const mx of [-15, -50, -100, -160, -220, -260]) await touch('touchMove', cx + mx, cy);
+      for (const mx of [15, 50, 100, 160, 220, 260]) await touch('touchMove', cx + mx, cy); // 오른쪽으로 밀면 지우기
       await page.waitForTimeout(40);
       await touch('touchEnd', 0, 0);
       await page.waitForTimeout(120);
