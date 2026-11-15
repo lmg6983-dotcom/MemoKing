@@ -1,6 +1,6 @@
 // 메모킹 안드로이드 — 시작, 화면 바꾸기, 설정·휴지통, 다른 앱에서 받은 것, 예약 알림
 import { daysAgoText } from '../../app/js/core/time.js';
-import { clampPrintScale } from '../../app/js/core/pdf-page.js';
+import { clampPrintScale, clampMarginMm, MARGINS } from '../../app/js/core/pdf-page.js';
 import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
@@ -35,7 +35,7 @@ import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
 import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
-import { printHtml, PAGE_PX } from './print-html.js';
+import { printHtml, pagePx } from './print-html.js';
 import { fitPages } from '../../app/js/print-fit.js';
 import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
@@ -757,10 +757,12 @@ shareSheet.addEventListener('click', async (e) => {
 const printSheet = $('print-sheet');
 const SCALE_KEY = 'memoking.printScale';
 const FIT_KEY = 'memoking.printFit';
-const printJob = { id: null, mode: 'share', scale: 1, fit: true };
+const MARGIN_KEY = 'memoking.printMargin';
+const printJob = { id: null, mode: 'share', scale: 1, fit: true, margin: MARGINS.normal };
 try {
   printJob.scale = clampPrintScale(localStorage.getItem(SCALE_KEY));
   printJob.fit = localStorage.getItem(FIT_KEY) !== 'off';
+  printJob.margin = clampMarginMm(localStorage.getItem(MARGIN_KEY));
 } catch {
   // 기본 크기
 }
@@ -769,7 +771,7 @@ function printTitle(id) {
   return titleOf(note.currentId() === id ? note.editorMarkdown() : app.vault.get(id)?.body ?? '');
 }
 function printDoc(id, preview = false) {
-  return printHtml(note.getEditor().dom(), { title: printTitle(id), color: app.vault.get(id)?.color, scale: printJob.scale, fit: printJob.fit, preview });
+  return printHtml(note.getEditor().dom(), { title: printTitle(id), color: app.vault.get(id)?.color, scale: printJob.scale, fit: printJob.fit, margin: printJob.margin, preview });
 }
 // 쪽 나눔 다듬기(print-fit.js)는 그려진 높이를 재야 한다 — 인쇄용 WebView 는 스크립트 없이 그대로 찍으므로
 //   여기서 보이지 않는 틀에 쪽 폭으로 그려 고친 뒤 그 HTML 을 넘긴다 (미리보기 틀은 그 자리에서 고친다)
@@ -787,13 +789,14 @@ async function fittedDoc(id) {
   if (!printJob.fit) return html;
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
-  frame.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${PAGE_PX.width}px; height: ${PAGE_PX.height}px; border: 0; visibility: hidden;`;
+  const page = pagePx(printJob.margin);
+  frame.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${page.width}px; height: ${page.height}px; border: 0; visibility: hidden;`;
   const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
   frame.srcdoc = html;
   document.body.append(frame);
   try {
     await loaded;
-    await fitFrame(frame, PAGE_PX.height);
+    await fitFrame(frame, page.height);
     return `<!doctype html>\n${frame.contentDocument.documentElement.outerHTML}`;
   } finally {
     frame.remove();
@@ -806,11 +809,14 @@ function drawPrintSize() {
   $('print-scale-out').textContent = `${pct}%`;
   for (const b of printSheet.querySelectorAll('[data-scale]')) b.setAttribute('aria-checked', String(Math.abs(Number(b.dataset.scale) - printJob.scale) < 0.001));
   $('print-fit').checked = printJob.fit;
+  $('print-margin').value = String(printJob.margin);
+  $('print-margin-out').textContent = `${printJob.margin}mm`;
+  for (const b of printSheet.querySelectorAll('[data-margin]')) b.setAttribute('aria-checked', String(Number(b.dataset.margin) === printJob.margin));
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
     if (!printJob.id || printSheet.hidden) return;
     const frame = $('print-frame');
-    if (printJob.fit) frame.addEventListener('load', () => fitFrame(frame, 1123 - 2 * 48), { once: true }); // 미리보기 쪽: 794×1123, 안쪽 여백 48px (print-html.js)
+    if (printJob.fit) frame.addEventListener('load', () => fitFrame(frame, 1123 - 2 * Math.round(printJob.margin * 96 / 25.4)), { once: true }); // 미리보기 쪽: 794×1123, 안쪽 여백 = 고른 여백 (print-html.js)
     frame.srcdoc = printDoc(printJob.id, true);
   }, 120);
 }
@@ -846,6 +852,21 @@ printSheet.querySelector('#print-size-seg').addEventListener('click', (e) => {
   if (b) setPrintScale(Number(b.dataset.scale));
 });
 $('print-scale').addEventListener('input', (e) => setPrintScale(Number(e.target.value) / 100));
+// 여백: 단계(없음 · 좁게 · 보통 · 넓게) 또는 직접 mm — PC PDF 만들기 창과 같은 단계
+function setPrintMargin(v) {
+  printJob.margin = clampMarginMm(v);
+  try {
+    localStorage.setItem(MARGIN_KEY, String(printJob.margin));
+  } catch {
+    // 이번만
+  }
+  drawPrintSize();
+}
+printSheet.querySelector('#print-margin-seg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-margin]');
+  if (b) setPrintMargin(Number(b.dataset.margin));
+});
+$('print-margin').addEventListener('input', (e) => setPrintMargin(Number(e.target.value)));
 $('print-fit').addEventListener('change', (e) => {
   printJob.fit = e.target.checked;
   try {
@@ -863,14 +884,14 @@ $('print-go').addEventListener('click', async () => {
   const html = await fittedDoc(id);
   if (printJob.mode === 'print') {
     closeSheet(printSheet);
-    call('print', { title, html }).catch((err) => toast(err.message, true));
+    call('print', { title, html, margin: printJob.margin }).catch((err) => toast(err.message, true));
     return;
   }
   $('print-go').disabled = true;
   $('print-busy').hidden = false;
   try {
     // 앱이 PDF 를 바로 만들지 못하면 스스로 인쇄 화면("PDF로 저장")을 연다. 그래도 답이 없으면 계속 기다리지 않는다
-    await withTimeout(call('sharePdf', { title, name: fileName(title, 'pdf'), html }), PDF_WAIT_MS, 'PDF를 만들지 못했어요. 잠시 뒤 다시 해 주세요');
+    await withTimeout(call('sharePdf', { title, name: fileName(title, 'pdf'), html, margin: printJob.margin }), PDF_WAIT_MS, 'PDF를 만들지 못했어요. 잠시 뒤 다시 해 주세요');
     closeSheet(printSheet);
   } catch (err) {
     console.error(err);

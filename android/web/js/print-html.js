@@ -1,11 +1,15 @@
 // PDF 로 보내기용 문서: 지금 그려진 메모 본문을 복사해 인쇄 전용 페이지(PC 의 print.css 와 같은 모양)로
 //   화면 그대로 인쇄하면 앱 화면 틀(고정 높이·안쪽 스크롤·열린 시트)이 끼어 휴대폰에서 빈 쪽이 나올 수 있다 →
 //   앱이 이 HTML 을 보이지 않는 WebView 에 따로 띄워 PDF 로 쓴다 (글자는 글자 그대로, 고를 수 있게)
-import { clampPrintScale } from '../../app/js/core/pdf-page.js';
+import { clampPrintScale, clampMarginMm } from '../../app/js/core/pdf-page.js';
 
-// 휴대폰 PDF 쪽: A4, 여백 0.72인치씩 (MainActivity pdfAttributes) — 쪽 안 내용 크기 (96dpi px)
-export const PAGE_MARGIN_MM = 18.288;
-export const PAGE_PX = { width: Math.round(((210 - 2 * PAGE_MARGIN_MM) * 96) / 25.4), height: Math.round(((297 - 2 * PAGE_MARGIN_MM) * 96) / 25.4) };
+// 휴대폰 PDF 쪽: A4, 여백은 고른 mm (앱이 같은 여백으로 쪽을 만든다 — MainActivity pdfAttributes)
+const MM = 96 / 25.4;
+/** 여백(mm)을 뺀 쪽 안 내용 크기 (96dpi px) */
+export const pagePx = (marginMm) => {
+  const m = clampMarginMm(marginMm);
+  return { width: Math.round((210 - 2 * m) * MM), height: Math.round((297 - 2 * m) * MM) };
+};
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -14,13 +18,15 @@ const SCREEN_ONLY = /^(ProseMirror-selectednode|ProseMirror-hideselection|mk-blo
 
 /**
  * @param {Element} dom 편집기 본문 (.mk-doc)
- * @param {{ title: string, color?: string, scale?: number, preview?: boolean, fit?: boolean }} memo
+ * @param {{ title: string, color?: string, scale?: number, preview?: boolean, fit?: boolean, margin?: number }} memo
+ *   margin: 쪽 여백 (mm)
  *   scale: 종이에 담을 내용 크기 (1 = 보통, 글·그림·표가 함께 커지고 작아진다)
  *   fit: 쪽보다 긴 그림은 한 쪽 안에 들게 줄인다 (print.css html.fit-images)
  *   preview: 첫 쪽 미리보기용 (A4 한 장 크기, 여백 포함)
  */
-export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = false, fit = true }) {
+export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = false, fit = true, margin }) {
   const zoom = clampPrintScale(scale);
+  const m = clampMarginMm(margin);
   const doc = dom.cloneNode(true);
   doc.removeAttribute('contenteditable');
   doc.removeAttribute('inputmode');
@@ -52,8 +58,8 @@ ${links}
 .print-doc p.mk-image-line { line-height: normal; font-size: inherit; }
 .print-doc .mk-doc li::after { border-color: transparent !important; }
 ${zoom !== 1 ? `.print-doc { zoom: ${zoom}; }` : ''}
-:root { --fit-h: ${((297 - 2 * PAGE_MARGIN_MM - 12) / zoom).toFixed(1)}mm; } /* A4 에서 위아래 여백 · 줄 간격 몫을 뺀 높이, 내용 배율로 나눔 */
-${preview ? 'html.print-page body { box-sizing: border-box; width: 794px; height: 1123px; padding: 48px; overflow: hidden; background: #fff; }' : ''}
+:root { --fit-h: ${(Math.max(20, 297 - 2 * m - 12) / zoom).toFixed(1)}mm; } /* A4 에서 위아래 여백 · 줄 간격 몫을 뺀 높이, 내용 배율로 나눔 */
+${preview ? 'html.print-page body { box-sizing: border-box; width: 794px; height: 1123px; padding: ${Math.round(m * MM)}px; overflow: hidden; background: #fff; }' : ''}
 </style>
 </head>
 <body data-color="${esc(color)}">

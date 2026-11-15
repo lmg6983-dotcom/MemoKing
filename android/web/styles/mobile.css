@@ -848,6 +848,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .print-preview { position: relative; width: min(100%, 280px); aspect-ratio: 794 / 1123; margin: 0 auto 12px; overflow: hidden; border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
 .print-preview iframe { position: absolute; top: 0; left: 0; width: 794px; height: 1123px; border: 0; transform: scale(var(--fit, 0.35)); transform-origin: 0 0; pointer-events: none; }
 .print-size .seg { margin-bottom: 8px; }
+.print-label { margin: 6px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .print-range { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; color: var(--muted); }
 .print-range input { flex: 1; accent-color: var(--brand-yellow); }
 .print-range output { min-width: 3.2em; font-weight: 700; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }

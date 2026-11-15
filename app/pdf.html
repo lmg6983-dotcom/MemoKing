@@ -60,6 +60,11 @@
       <button type="button" data-m="normal" aria-checked="true">보통</button>
       <button type="button" data-m="wide" aria-checked="false">넓게</button>
     </div>
+    <label class="slider-row" title="쪽 가장자리의 빈 곳을 mm 단위로 맞춰요">
+      <span>직접</span>
+      <input type="range" id="margin-range" min="0" max="40" step="1" value="16" aria-label="여백 (mm)">
+      <output id="margin-out">16mm</output>
+    </label>
 
     <p class="label">글자 크기</p>
     <div class="seg" role="radiogroup" aria-label="글자 크기" id="zoom">
