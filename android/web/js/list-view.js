@@ -22,7 +22,7 @@ import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { openFolderSheet, pickFolder, createPickBar, askFolderName, renderFolderChips, closeFolderInput } from '../../app/js/folder-ui.js';
+import { pickFolder, createPickBar, askFolderName, renderFolderList } from '../../app/js/folder-ui.js';
 import { openContextMenu } from '../../app/js/ctx-menu.js';
 import { folderList, movedText, isFolderName, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from '../../app/js/core/folders.js';
 
@@ -32,7 +32,8 @@ const el = {
   search: $('search'),
   cards: $('cards'),
   empty: $('empty'),
-  folderChips: $('folder-chips'),
+  folderSide: $('folder-side'),
+  folderBtn: $('folder-btn'),
   filterBtn: $('filter-btn'),
   filterCount: $('filter-count'),
   filterPanel: $('filter-panel'),
@@ -320,19 +321,46 @@ function renderCard(memo) {
 let lastCols = 0;
 function columnsFor(width) {
   if (layout === 'rows') return 1;
-  return width >= 900 ? 4 : width >= 600 ? 3 : 2;
+  return width >= 900 ? 4 : width >= 600 ? 3 : width >= 300 ? 2 : 1; // 폴더 목록 옆 좁은 자리(휴대폰)는 한 줄
 }
 
+// 지금 목록에 쌓인 메모 (빠진 것만 있으면 그 카드만 들어낸다 — 아래 layoutCards)
+let shownIds = [];
 function layoutCards(memos) {
   const cols = columnsFor(el.cards.clientWidth || window.innerWidth);
+  // 메모 몇 개만 빠졌고(지우기 · 다른 폴더로 옮기기) 나머지 카드가 그대로면 그 카드만 들어낸다 —
+  //   모든 카드를 다시 쌓으면 메모가 많을 때 화면 모양을 통째로 다시 계산해, 밀어 지운 뒤 화면이 잠깐 멈췄다.
+  //   남은 카드는 제 줄에서 위로 미끄러진다 (glideCards). 줄 길이가 조금 어긋나는 것은 다음에 다시 쌓을 때 맞춘다
+  const ids = memos.map((m) => m.id);
+  if (cols === lastCols && shownIds.length > ids.length && el.cards.querySelector('.item')) {
+    const keep = new Set(ids);
+    const gone = shownIds.filter((id) => !keep.has(id));
+    const same = gone.length === shownIds.length - ids.length && shownIds.filter((id) => keep.has(id)).every((id, i) => id === ids[i])
+      && memos.every((m) => cardCache.get(m.id)?.key === cardKey(m) && cardCache.get(m.id).li.isConnected);
+    if (same) {
+      for (const id of gone) cardCache.get(id)?.li.remove();
+      for (const m of memos) cardFor(m); // 남은 카드의 밀다 만 자리 · 표시를 정리 (그대로인 카드라 새로 만들지 않는다)
+      shownIds = ids;
+      return;
+    }
+  }
+  shownIds = ids;
   lastCols = cols;
   const columns = Array.from({ length: cols }, () => {
     const c = document.createElement('div');
     c.className = 'col';
     return c;
   });
+  // 다시 쌓는 동안 보던 자리(스크롤)를 지킨다: 목록이 잠깐 비면 브라우저가 스크롤을 맨 위로 당겨, 메모를 지우거나 고친 뒤 맨 위로 튀었다
+  //   — 쌓는 동안은 옛 높이를 붙들고, 다 쌓은 뒤 보던 자리로 돌린다
+  const scroller = el.cards.closest('.view');
+  const top = scroller?.scrollTop ?? 0;
+  const had = Boolean(el.cards.querySelector('.item'));
+  if (had) el.cards.style.minHeight = `${el.cards.offsetHeight}px`;
   el.cards.replaceChildren(...columns);
-  stackCards(columns, memos.map(cardFor), { late: (items) => items.forEach((li) => (li.style.animation = 'none')) }); // 나눠 쌓이는 뒤쪽 카드는 튀어나오지 않게
+  stackCards(columns, memos.map(cardFor), { chunk: !had, late: (items) => items.forEach((li) => (li.style.animation = 'none')) }); // 나눠 쌓이는 뒤쪽 카드는 튀어나오지 않게
+  el.cards.style.minHeight = '';
+  if (scroller && top && scroller.scrollTop !== top) scroller.scrollTop = top;
   if (cardCache.size > memos.length + 200) for (const id of cardCache.keys()) if (!memos.some((m) => m.id === id)) cardCache.delete(id);
 }
 
@@ -348,7 +376,8 @@ function cardFor(memo) {
   if (hit?.key === key) {
     const card = hit.li.querySelector('.card');
     card.removeAttribute('style'); // 밀다 만 자리 · 숨김(animateRemove)이 남지 않게
-    card.classList.remove('swiping', 'swipe-ready', 'swipe-open', 'flying');
+    card.classList.remove('swiping', 'swipe-ready', 'swipe-open', 'flying', 'lifted', 'drag-source');
+    hit.li.classList.remove('mk-live');
     delete card.dataset.swiped;
     hit.li.style.animation = ''; // 다시 나타난 카드는 등장 움직임 (이미 있던 카드는 glideCards 가 끈다)
     return hit.li;
@@ -362,6 +391,11 @@ function cardFor(memo) {
 new ResizeObserver(() => {
   if (!el.screen.hidden && columnsFor(el.cards.clientWidth) !== lastCols) render();
 }).observe(el.cards);
+// 메모 칸의 보이는 높이: 왼쪽 폴더 목록이 그만큼만 차지하고 넘치면 따로 스크롤 (mobile.css --view-h)
+{
+  const view = el.cards.closest('.view');
+  new ResizeObserver(() => view.style.setProperty('--view-h', `${view.clientHeight}px`)).observe(view);
+}
 
 // 빈 목록: 그림 + 다음에 할 일 단추 (검색·필터로 비었으면 풀기, 메모가 없으면 첫 메모 만들기)
 function renderEmpty(narrowed, elsewhere = 0) {
@@ -415,6 +449,7 @@ export function render() {
   stale = false;
   clearTimeout(staleTimer);
   keepFolderValid();
+  applyFolderSide();
   const narrowed = Boolean(state.query) || filterCount() > 0;
   const pick = { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] };
   // 폴더: 고른 폴더의 메모만 (검색은 모든 폴더에서 — 카드에 폴더 이름이 보인다)
@@ -431,7 +466,7 @@ export function render() {
   if (!memos.length) renderEmpty(narrowed, elsewhere);
   $('count-memos').textContent = modeMemos().length ? String(modeMemos().length) : '';
   renderFilters();
-  renderFolderBar();
+  renderFolderSide();
   if (memos.length >= 2) setTimeout(hintCards, 800);
 }
 
@@ -455,6 +490,7 @@ function keepFolderValid() {
 }
 
 function setFolder(name) {
+  const changed = name !== state.folder;
   state.folder = name;
   try {
     localStorage.setItem('memoking.folder', name);
@@ -462,63 +498,89 @@ function setFolder(name) {
     // 이번만
   }
   render();
-  el.cards.scrollTop = 0;
+  if (!changed) return;
+  const scroller = el.cards.closest('.view');
+  if (scroller) scroller.scrollTop = 0; // 다른 폴더는 처음부터
+  // 다른 폴더의 카드로 툭 바뀌지 않게: 살짝 떠오르며 나타난다
+  if (!reduceMotion()) el.cards.animate?.([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 160, easing: EASE_OUT });
 }
 
-// 폴더 칩 줄: 폴더 · 고른 폴더가 바뀔 때만 다시 그린다 (메모를 쓸 때마다 그리면 넘겨 보던 자리가 튀고,
-//   새 폴더 이름을 쓰는 중이면 그대로 둔다 — 쓰던 이름이 날아가지 않게)
-let chipsKey = '';
-let chipsNames = ''; // 그중 폴더 이름 · 고른 폴더만 (새 폴더 이름을 쓰는 중에는 메모 수만 바뀐 것으로 다시 그리지 않는다)
-function renderFolderBar() {
-  el.folderChips.hidden = Boolean(state.query); // 검색은 모든 폴더에서
+// ---------- 폴더 목록 (왼쪽 · PC 처럼 탐색기 모양) ----------
+//   위 폴더 단추로 접고 편다 (이 휴대폰에 기억). 정한 적이 없으면 폴더가 있을 때만 펴 둔다 — 폴더를 쓰지 않는 사람의 카드 자리를 빼앗지 않게
+let sideWanted = null;
+try {
+  const v = localStorage.getItem('memoking.folderSide');
+  sideWanted = v === null ? null : v !== '0';
+} catch {
+  // 정하지 않음
+}
+let sideSliding = false;
+const sideShown = () => (sideWanted ?? folders().length > 0) && !state.query; // 검색은 모든 폴더에서라 그동안은 접는다
+
+// 목록을 보일지 정한다 (카드 줄 수를 재기 전에 — render 맨 앞에서)
+function applyFolderSide() {
+  const shown = sideShown();
+  if (!sideSliding) el.folderSide.hidden = !shown;
+  el.screen.classList.toggle('has-side', shown);
+  el.folderBtn.setAttribute('aria-pressed', String(shown));
+  el.folderBtn.setAttribute('aria-label', shown ? '폴더 목록 접기' : '폴더 목록 펴기');
+}
+
+function renderFolderSide() {
   const list = withUnfiled(folders(), split(state.memos, state.mode).mine);
-  const key = JSON.stringify([list, state.folder]);
-  const names = JSON.stringify([list.map((f) => f.name), state.folder]);
-  if (key === chipsKey || (el.folderChips.querySelector('.fchip-new') && names === chipsNames)) return;
-  chipsKey = key;
-  chipsNames = names;
-  // 폴더가 생기면 한 번: 꾹 누르면 이름 바꾸기 · 지우기 (눈에 안 보이는 동작)
-  if (list.length) setTimeout(() => {
-    const first = el.folderChips.querySelector(`.fchip[data-folder]:not([data-folder=""]):not([data-folder="${UNFILED}"])`);
-    if (first?.getClientRects().length && state.tab === 'memos') hintOnce('folder-chips', '폴더를 꾹 누르면 이름을 바꾸거나 지울 수 있어요. 오른쪽 끝 단추로 폴더 목록도 봐요', { anchor: first });
+  renderFolderList(el.folderSide, { folders: list, current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
+  // 폴더가 생기면 한 번: 메모를 꾹 눌러 끌면 폴더로 (눈에 안 보이는 동작)
+  if (list.length && !el.folderSide.hidden) setTimeout(() => {
+    const first = el.folderSide.querySelector(`[data-folder]:not([data-folder=""]):not([data-folder="${UNFILED}"])`);
+    if (first?.getClientRects().length && state.tab === 'memos') hintOnce('folder-drag', '메모를 꾹 누른 채 끌어 폴더에 놓으면 옮겨져요. 폴더를 꾹 누르면 이름을 바꾸거나 지울 수 있어요', { anchor: first });
   }, 900);
-  renderFolderChips(el.folderChips, {
-    folders: list,
-    current: state.folder,
-    onPick: setFolder,
-    onCreate: (name) => {
-      try {
-        app.vault.createFolder(name);
-        loadFolderDirs();
-      } catch (err) {
-        return toast(err.message || '폴더를 만들지 못했어요', true);
-      }
-      setFolder(name);
-    },
-    onMenu: folderMenu,
-    onAll: openAllFolders,
-  });
 }
 
-// 칩이 넘칠 때 "모두": 그 단추 바로 아래에 폴더 목록
-async function openAllFolders(anchor) {
-  loadFolderDirs(); // 다른 기기에서 만든 빈 폴더도
-  const picked = await openFolderSheet({ folders: withUnfiled(folders(), split(state.memos, state.mode).mine), current: state.folder, onMenu: folderMenu, anchor });
-  if (picked == null) return;
-  if (typeof picked === 'object') {
-    try {
-      app.vault.createFolder(picked.create);
-      loadFolderDirs();
-    } catch (err) {
-      return toast(err.message || '폴더를 만들지 못했어요', true);
-    }
-    return setFolder(picked.create);
+async function newFolder() {
+  loadFolderDirs();
+  const name = await askFolderName({ existing: state.folderDirs ?? [] });
+  if (!name) return;
+  try {
+    app.vault.createFolder(name);
+    loadFolderDirs();
+  } catch (err) {
+    return toast(err.message || '폴더를 만들지 못했어요', true);
   }
-  setFolder(picked);
+  setFolder(name);
 }
 
-// 폴더 ⋯ 메뉴 (폴더 시트): 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
+// 접고 펼 때 목록이 옆에서 미끄러져 나오고 들어간다 (카드 자리도 함께 밀린다)
+el.folderBtn.addEventListener('click', async () => {
+  if (sideSliding) return;
+  sideWanted = !sideShown();
+  if (state.query && sideWanted) {
+    el.search.value = ''; // 검색 중에 펴면 검색을 푼다 (폴더는 검색하지 않을 때만)
+    runSearch();
+  }
+  try {
+    localStorage.setItem('memoking.folderSide', sideWanted ? '1' : '0');
+  } catch {
+    // 이번만
+  }
+  haptic(5);
+  const side = el.folderSide;
+  if (reduceMotion() || typeof side.animate !== 'function') return render();
+  sideSliding = true;
+  if (sideWanted) {
+    side.hidden = false;
+    render(); // 펼 때는 카드 줄 수를 먼저 맞추고 밀려 나온다
+  }
+  const w = side.offsetWidth;
+  const closed = { marginLeft: `${-w}px`, opacity: 0 };
+  const open = { marginLeft: '0px', opacity: 1 };
+  await side.animate(sideWanted ? [closed, open] : [open, closed], { duration: 180, easing: EASE_OUT }).finished.catch(() => {});
+  sideSliding = false;
+  render();
+});
+
+// 폴더 메뉴 (폴더 목록에서 꾹 누르기): 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
 async function folderMenu(name, anchor) {
+  haptic(12);
   const r = anchor.getBoundingClientRect();
   const pick = await openContextMenu({
     x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
@@ -783,22 +845,42 @@ el.cards.addEventListener('click', (e) => {
   if (tag) return toggleTag(tag.dataset.cardTag, { only: true });
   if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect() }); // 그 카드가 커지며 메모 화면이 된다
 });
-// 카드를 옆으로 밀어 지우기 (여러 개를 빨리 지울 때) — 묻지 않고 휴지통으로, 되돌리기 가능
-//   카드는 손가락을 프레임마다 한 번만(requestAnimationFrame) 따라가고, 미는 동안은 compositor 층(will-change)이라
-//   좌우로 빠르게 흔들어도 끊기지 않는다. 가로 움직임은 브라우저가 화면을 끌지 않게(.card touch-action: pan-y)
-//   — 밀기 시작하면 목록 스크롤도 잠근다 (화면 전체가 같이 흔들리지 않게)
+// 카드 손짓 (휴대폰)
+//   - 왼쪽으로 밀기: 휴지통으로 (묻지 않고, 되돌리기 가능). 오른쪽은 살짝만 따라오고 돌아온다 (태블릿 두 칸 화면은 열기)
+//   - 꾹 누르기: 카드가 들리고, 그대로 떼면 메뉴 · 끌면 왼쪽 폴더 목록에 놓아 그 폴더로 옮긴다
+//   - 위아래로 훑기는 스크롤: 방향은 처음 12px 에서 한 번만 정하고, 가로가 세로의 1.5배를 넘어야 밀기.
+//     스크롤이 아직 미끄러지는 중(멈춘 지 0.25초 안)에 닿은 손가락은 밀기를 시작하지 않는다 (훑다가 지워지던 것)
+//   카드는 손가락을 프레임마다 한 번만(requestAnimationFrame) 따라가고, 미는 동안은 따로 그리는 층(will-change)이다.
+//   미는 카드의 칸에는 .mk-live — 화면 밖 칸의 그리기 건너뛰기(base.css)가 칸 밖으로 나간 카드를 자르지 않게
+const HOLD_MS = 450;
 let swipe = null;
 let swipeFrame = 0;
+let lastScroll = 0;
+el.cards.closest('.view')?.addEventListener('scroll', () => (lastScroll = performance.now()), { passive: true });
+const liveOn = (card, on) => card.closest('.item')?.classList.toggle('mk-live', on);
+
 el.cards.addEventListener('touchstart', (e) => {
   const card = e.target.closest('.card');
   if (!card || e.touches.length !== 1) return;
-  swipe = { card, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, active: false, t: e.timeStamp, vx: 0, id: e.touches[0].identifier, w: 1 };
+  const t = e.touches[0];
+  swipe = { card, x: t.clientX, y: t.clientY, sx: t.clientX, sy: t.clientY, dx: 0, active: false, t: e.timeStamp, vx: 0, id: t.identifier, w: 1,
+    flinging: performance.now() - lastScroll < 250, held: false, drag: null, hold: 0 };
+  // 꾹 누르기: 손가락이 거의 그대로면 들어 올린다 (안드로이드의 contextmenu 보다 먼저 · 같은 때)
+  swipe.hold = setTimeout(() => holdCard(card), HOLD_MS);
 }, { passive: true });
+
+function holdCard(card) {
+  if (!swipe || swipe.card !== card || swipe.active || swipe.held) return;
+  swipe.held = true;
+  haptic(12);
+  card.classList.add('lifted');
+}
+
 function drawSwipe() {
   swipeFrame = 0;
   if (!swipe?.active) return;
   const { card, dx, w } = swipe;
-  // 태블릿: 오른쪽으로 밀면 열기 — 카드는 목록 안에서만 살짝 따라온다 · 지우기는 왼쪽으로만
+  // 태블릿: 오른쪽으로 밀면 열기 — 카드는 목록 안에서만 살짝 따라온다
   const open = isTwoPane() && dx > 0;
   card.classList.toggle('swipe-open', open);
   if (open) {
@@ -809,32 +891,51 @@ function drawSwipe() {
     card.classList.toggle('swipe-ready', dx > w * 0.28);
     return;
   }
+  if (dx > 0) {
+    // 오른쪽: 지우지 않는다 — 고무줄처럼 조금만 따라온다
+    card.style.transform = `translate3d(${Math.min(dx * 0.25, 28)}px, 0, 0)`;
+    card.style.opacity = '';
+    card.classList.remove('swipe-ready');
+    return;
+  }
   card.style.transform = `translate3d(${dx}px, 0, 0) rotate(${dx / w * 4}deg)`;
   card.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / w * 0.7));
-  card.classList.toggle('swipe-ready', Math.abs(dx) > w * 0.38);
+  card.classList.toggle('swipe-ready', -dx > w * 0.4);
 }
+
 el.cards.addEventListener('touchmove', (e) => {
   if (!swipe) return;
   // 두 번째 손가락이 닿아도 카드가 튀지 않게 첫 손가락만 따른다
   const t = [...e.touches].find((x) => x.identifier === swipe.id);
   if (!t) return;
+  if (swipe.drag) {
+    if (e.cancelable) e.preventDefault();
+    moveDrag(t.clientX, t.clientY);
+    return;
+  }
   const dx = t.clientX - swipe.x;
   const dy = t.clientY - swipe.y;
+  if (swipe.held) {
+    // 들어 올린 뒤 움직이면 끌기 (폴더에 넣기) — 밀어 지우기가 아니다
+    if (Math.hypot(dx, dy) < 8) return;
+    if (e.cancelable) e.preventDefault();
+    startDrag(t.clientX, t.clientY);
+    return;
+  }
   if (!swipe.active) {
-    // 방향은 손가락이 10px 움직였을 때 한 번만 정한다 — 처음에 살짝 위아래로 흔들려도(비스듬히 밀어도) 가로가 세로의 0.8배 넘으면 밀기
-    if (Math.hypot(dx, dy) < 10) return;
-    if (Math.abs(dx) < Math.abs(dy) * 0.8) {
+    if (Math.hypot(dx, dy) < 12) return;
+    clearTimeout(swipe.hold);
+    if (swipe.flinging || Math.abs(dx) < Math.abs(dy) * 1.5) {
       swipe = null; // 세로 = 스크롤
       return;
     }
-    // 스크롤이 아직 미끄러지는 중에 누르면 브라우저가 첫 움직임을 막을 수 없게(cancelable=false) 보내도 밀기는 한다
-    //   — 아래 swipe-lock 이 목록 스크롤을 멈춰 화면이 같이 움직이지 않는다
     swipe.active = true;
-    swipe.menu = false; // 꾹 눌렀다가 밀면 메뉴 대신 밀기
-    swipe.x = t.clientX - Math.sign(dx) * Math.min(10, Math.abs(dx)); // 문턱만큼 뛰지 않고 손가락 자리에서 이어서
+    swipe.x = t.clientX - Math.sign(dx) * Math.min(12, Math.abs(dx)); // 문턱만큼 뛰지 않고 손가락 자리에서 이어서
     swipe.w = swipe.card.offsetWidth || 1; // 크기는 한 번만 읽는다 (움직일 때마다 읽으면 레이아웃을 다시 계산)
     swipe.card.classList.add('swiping');
-    el.screen.classList.add('swipe-lock');
+    liveOn(swipe.card, true);
+    // 첫 움직임을 막을 수 없으면(스크롤이 미끄러지는 중) 목록 스크롤을 잠근다 — 늘 잠그면 목록 모양을 통째로 다시 따져 버벅였다
+    if (!e.cancelable) el.screen.classList.add('swipe-lock');
   }
   if (e.cancelable) e.preventDefault();
   const nx = t.clientX - swipe.x;
@@ -845,17 +946,97 @@ el.cards.addEventListener('touchmove', (e) => {
   swipe.dx = nx;
   if (!swipeFrame) swipeFrame = requestAnimationFrame(drawSwipe);
 }, { passive: false });
+
+// ---------- 꾹 눌러 끌어 폴더에 넣기 ----------
+function startDrag(x, y) {
+  const { card } = swipe;
+  const r = card.getBoundingClientRect();
+  const clone = card.cloneNode(true);
+  clone.classList.remove('lifted', 'swiping');
+  clone.classList.add('m-drag-clone');
+  Object.assign(clone.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, transformOrigin: `${x - r.left}px ${y - r.top}px` });
+  document.body.append(clone);
+  card.classList.add('drag-source');
+  document.body.classList.add('m-dragging');
+  // 폴더 목록을 접어 두었으면 끄는 동안만 왼쪽에 띄운다 (메모 칸의 높이에 맞춰)
+  if (el.folderSide.hidden) {
+    const v = el.cards.closest('.view').getBoundingClientRect();
+    renderFolderSide();
+    Object.assign(el.folderSide.style, { top: `${v.top}px`, height: `${v.height}px` });
+    el.folderSide.classList.add('peek');
+  }
+  swipe.drag = { clone, x, y, over: null };
+  moveDrag(x, y);
+}
+
+function moveDrag(x, y) {
+  const d = swipe.drag;
+  const row = document.elementFromPoint(x, y)?.closest('#folder-side [data-folder]') ?? null;
+  if (row !== d.overRow) {
+    d.overRow?.classList.remove('drop-on');
+    row?.classList.add('drop-on');
+    if (row) haptic(6);
+    d.overRow = row;
+  }
+  // 폴더 위에서는 카드가 작아져 폴더 줄을 가리지 않는다 (손가락 자리를 기준으로)
+  d.clone.style.transform = `translate3d(${x - d.x}px, ${y - d.y}px, 0) rotate(-2deg) scale(${row ? 0.4 : 1.03})`;
+  d.clone.classList.toggle('over-folder', Boolean(row));
+}
+
+function endDrag(drop) {
+  const d = swipe.drag;
+  const { card } = swipe;
+  const row = drop ? d.overRow : null;
+  d.overRow?.classList.remove('drop-on');
+  document.body.classList.remove('m-dragging');
+  el.folderSide.classList.remove('peek');
+  el.folderSide.style.top = el.folderSide.style.height = '';
+  const clone = d.clone;
+  const finish = () => {
+    clone.remove();
+    card.classList.remove('drag-source', 'lifted');
+  };
+  if (row && !reduceMotion()) {
+    // 폴더 줄로 작아지며 들어가고, 그 줄이 한 번 튄다
+    const c = clone.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    clone.style.transition = `transform 0.22s ${EASE_OUT}, opacity 0.22s ${EASE_OUT}`;
+    clone.style.transform = `${clone.style.transform} translate3d(${(r.left + r.width / 2 - (c.left + c.width / 2)) * 2.5}px, ${(r.top + r.height / 2 - (c.top + c.height / 2)) * 2.5}px, 0) scale(0.2)`;
+    clone.style.opacity = '0';
+    row.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 260, easing: EASE_OUT });
+  } else if (!reduceMotion()) {
+    // 놓을 곳이 아니면 제자리로 돌아간다
+    clone.style.transition = `transform 0.2s ${EASE_OUT}`;
+    clone.style.transform = '';
+  }
+  setTimeout(finish, reduceMotion() ? 0 : 230);
+  card.dataset.swiped = '1'; // 뒤따르는 "눌림" 으로 메모가 열리지 않게
+  setTimeout(() => delete card.dataset.swiped, 400);
+  if (row) {
+    const to = row.dataset.folder === UNFILED ? '' : row.dataset.folder; // 전체 · 미분류에 놓기 = 폴더에서 빼기
+    const id = card.dataset.id;
+    moveIdsTo(state.picking && state.picked.has(id) ? [...state.picked] : [id], to);
+  }
+}
+
 function endSwipe(e) {
   if (!swipe) return;
   // 다른 손가락만 뗀 경우는 계속 민다
   if (e?.touches && [...e.touches].some((x) => x.identifier === swipe.id)) return;
-  const { card, dx, active, menu } = swipe;
+  clearTimeout(swipe.hold);
+  if (swipe.drag) {
+    endDrag(e?.type === 'touchend');
+    swipe = null;
+    return;
+  }
+  const { card, dx, active, held } = swipe;
   // 멈췄다가 뗀 건 튕긴 게 아니다
   const vx = e && e.timeStamp - swipe.t < 100 ? swipe.vx : 0;
   swipe = null;
   if (!active) {
-    if (menu) {
-      // 꾹 누른 채 밀지 않고 뗐으면 메뉴 — 뒤따르는 "눌림" 으로 메모가 열리지 않게 잠깐 막는다
+    card.classList.remove('lifted');
+    if (held && e?.type === 'touchend') {
+      // 꾹 누른 채 움직이지 않고 뗐으면 메뉴 — 뒤따르는 "눌림" 으로 메모가 열리지 않게 잠깐 막는다
       card.dataset.swiped = '1';
       setTimeout(() => delete card.dataset.swiped, 400);
       app.memoMenu(card.dataset.id);
@@ -866,12 +1047,19 @@ function endSwipe(e) {
   swipeFrame = 0;
   el.screen.classList.remove('swipe-lock');
   const opening = card.classList.contains('swipe-open');
-  card.classList.remove('swiping', 'swipe-ready', 'swipe-open');
+  card.classList.remove('swiping', 'swipe-ready', 'swipe-open', 'lifted');
   const w = card.offsetWidth || 1;
-  if (opening) {
-    card.style.transition = `transform 0.22s ${EASE_OUT}`;
+  const settle = () => {
+    card.style.transition = `transform 0.2s ${EASE_OUT}, opacity 0.2s`;
     card.style.transform = '';
-    setTimeout(() => (card.style.transition = ''), 240);
+    card.style.opacity = '';
+    setTimeout(() => {
+      card.style.transition = '';
+      liveOn(card, false);
+    }, 220);
+  };
+  if (opening) {
+    settle();
     if (dx > w * 0.28) {
       card.dataset.swiped = '1';
       setTimeout(() => delete card.dataset.swiped, 400);
@@ -880,14 +1068,13 @@ function endSwipe(e) {
     }
     return;
   }
-  // 멀리 밀었거나, 같은 방향으로 휙 튕겼으면 (빠르기 0.11px/ms 넘음 · 너무 짧은 건 빼고) 지운다
-  const flick = Math.abs(vx) > 0.11 && Math.sign(vx) === Math.sign(dx) && Math.abs(dx) > w * 0.12;
-  if (Math.abs(dx) > w * 0.38 || flick) {
-    // 카드가 끝까지 날아간 뒤에 지운다 — 날아가는 중에 목록을 다시 그리면(무거운 일) 카드가 중간에 멈칫했다.
-    //   날아가는 동안도 따로 그리는 층(flying: will-change)에 둬 화면 스레드가 바빠도 매끄럽게
+  // 왼쪽으로 멀리 밀었거나, 왼쪽으로 휙 튕겼으면 (빠르기 0.35px/ms 넘고 폭의 1/5 넘게) 지운다
+  const flick = vx < -0.35 && dx < -w * 0.2;
+  if (dx < -w * 0.4 || flick) {
+    // 카드가 끝까지 날아간 뒤에 지운다 — 날아가는 중에 목록을 다시 그리면(무거운 일) 카드가 중간에 멈칫했다
     card.classList.add('flying');
     card.style.transition = `transform 0.2s ${EASE_OUT}, opacity 0.2s ${EASE_OUT}`;
-    card.style.transform = `translate3d(${Math.sign(dx) * w * 1.3}px, 0, 0) rotate(${Math.sign(dx) * 8}deg)`;
+    card.style.transform = `translate3d(${-w * 1.3}px, 0, 0) rotate(-8deg)`;
     card.style.opacity = '0';
     card.dataset.swiped = '1';
     let done = false;
@@ -901,33 +1088,56 @@ function endSwipe(e) {
     setTimeout(remove, 260); // transitionend 가 오지 않을 때(움직임 줄이기 등)
     return;
   }
-  card.style.transition = `transform 0.2s ${EASE_OUT}, opacity 0.2s`;
-  card.style.transform = '';
-  card.style.opacity = '';
-  setTimeout(() => (card.style.transition = ''), 220);
+  settle();
 }
 el.cards.addEventListener('touchend', endSwipe);
 el.cards.addEventListener('touchcancel', endSwipe);
-// 밀어서 지운 카드는 눌린 것으로 치지 않는다
+// 밀거나 끈 카드는 눌린 것으로 치지 않는다
 el.cards.addEventListener('click', (e) => {
   const card = e.target.closest('.card');
   if (card?.dataset.swiped || card?.classList.contains('swiping')) e.stopImmediatePropagation();
 }, true);
 
-// 길게 누르면 메뉴 (고정·색·보내기·지우기)
+// 길게 누르기 (안드로이드 · 화면 읽기의 메뉴 키): 손가락이면 위 타이머와 같은 들어 올리기 — 메뉴는 뗄 때, 끌면 폴더로.
+//   손가락이 아닌 길(키보드 · 화면 읽기)이면 바로 메뉴
 el.cards.addEventListener('contextmenu', (e) => {
   const card = e.target.closest('.card');
   if (!card) return;
   e.preventDefault();
-  if (swipe?.active || card.classList.contains('swiping')) return; // 누른 채 옆으로 밀고 있으면 메뉴는 띄우지 않는다
-  haptic(12);
-  // 손가락으로 꾹 누른 것이면 메뉴는 뗄 때 — 그 사이 옆으로 밀면 메뉴 대신 밀기 (잠깐 멈췄다 밀어도 밀리게)
+  if (swipe?.active || swipe?.drag || card.classList.contains('swiping')) return;
   if (swipe && swipe.card.dataset.id === card.dataset.id) { // 목록을 다시 그렸으면 카드 요소가 바뀌었을 수 있어 메모로 비교
-    swipe.menu = true;
+    clearTimeout(swipe.hold);
+    holdCard(swipe.card);
     return;
   }
+  haptic(12);
   app.memoMenu(card.dataset.id);
 });
+
+/** 끌어 놓은 메모들을 그 폴더로 ("" = 폴더에서 빼기) — 되돌리기는 알림에서 */
+function moveIdsTo(ids, to) {
+  if (!app.vault) return;
+  const before = new Map(ids.map((id) => [id, state.memos.find((m) => m.id === id)?.folder ?? '']));
+  const go = ids.filter((id) => before.get(id) !== to);
+  if (!go.length) return;
+  let moved = 0;
+  try {
+    for (const id of go) if (app.vault.moveToFolder(id, to)) moved++;
+  } catch (err) {
+    return toast(err.message || '옮기지 못했어요', true);
+  }
+  stopPicking();
+  loadFolderDirs();
+  render();
+  if (moved) toast(movedText(moved, to), false, {
+    label: '되돌리기',
+    run: () => {
+      for (const id of go) app.vault.moveToFolder(id, before.get(id));
+      loadFolderDirs();
+      render();
+    },
+  });
+}
 
 // ---------- 카드 모양 (격자 / 한 줄씩) ----------
 
@@ -1176,7 +1386,6 @@ export function show() {
 /** 뒤로 가기: 필터 패널 → 검색어 → 알림 탭 순으로 풀고, 더 없으면 false */
 export function back() {
   if (stopPicking()) return true;
-  if (closeFolderInput(el.folderChips)) return true; // 칩 줄의 새 폴더 이름 칸
   // 일정 탭의 펼친 입력창을 먼저 (메모 탭의 검색 · 필터보다 — 보이지 않는 것이 먼저 풀리지 않게)
   if (state.tab === 'reminders' && remindersTab?.closeQuick?.()) return true;
   if (!el.filterPanel.hidden) {

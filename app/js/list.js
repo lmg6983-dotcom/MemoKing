@@ -366,8 +366,9 @@ function layoutCards(memos) {
     c.className = 'col';
     return c;
   });
+  const had = Boolean(el.cards.querySelector('.item'));
   el.cards.replaceChildren(...columns);
-  stackCards(columns, memos.map(cardFor)); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다)
+  stackCards(columns, memos.map(cardFor), { chunk: !had }); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다). 나눠 쌓기는 처음에만 (보던 자리가 튀지 않게)
   if (cardCache.size > memos.length + 200) {
     const shown = new Set(memos.map((m) => m.id));
     for (const id of cardCache.keys()) if (!shown.has(id)) cardCache.delete(id);

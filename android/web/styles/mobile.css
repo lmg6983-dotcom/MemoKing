@@ -102,6 +102,8 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .searchbar > #sync-btn, .searchbar > #settings-btn { order: 5; }
 .searchbar .search { order: 10; flex: 1 1 0; min-width: 0; }
 .searchbar .filter-btn { order: 11; }
+.searchbar .folder-btn { order: 10; margin-right: 2px; } /* 검색창 왼쪽 (PC 와 같은 자리) */
+.searchbar .folder-btn[aria-pressed="true"] { color: var(--text-strong); background: var(--hover); }
 .searchbar::after { content: ""; order: 9; flex-basis: 100%; height: 0; } /* 줄 바꿈 */
 .search {
   display: flex;
@@ -1276,9 +1278,49 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .mk-find-item { min-height: 40px; }
 
 /* 메모킹 폴더 칩 줄: 칩은 화면 끝까지 넘겨 보고, 처음 · 끝 자리만 16px 들여 둔다 (folder-ui.js renderFolderChips) */
-.folder-chips { margin: 0 0 6px; padding: 0 12px 0 0; }
-.folder-chips .fchip-row { padding-inline: 16px; scroll-padding-inline: 16px; }
 /* 여러 장 고르기 막대: 아래 탭 막대 위에 */
 .pick-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .pick-bar .btn { min-height: 44px; }
 body.picking #fab { display: none; }
+
+/* ========== 메모 탭: 왼쪽 폴더 목록 + 카드 (PC 처럼 탐색기 모양 — folder-ui.js renderFolderList) ==========
+   메모 칸은 그대로 하나의 스크롤. 폴더 목록은 왼쪽 칸에 붙어(sticky) 카드를 내려도 그 자리에 있고, 넘치면 따로 스크롤한다.
+   줄 번호를 정해 두어(보기 패널 1 · 목록 2~ · 오른쪽 칸 2~5) 숨은 것이 있어도 목록과 카드가 같은 줄에서 시작한다 */
+#view-memos { display: grid; grid-template-columns: [side] auto [main] minmax(0, 1fr); grid-auto-rows: min-content; align-content: start; }
+#view-memos > * { grid-column: main; }
+#view-memos > .filter-panel { grid-column: side / -1; grid-row: 1; }
+#view-memos > .filter-summary { grid-row: 2; }
+#view-memos > .other-mode { grid-row: 3; }
+#view-memos > .cards { grid-row: 4; }
+#view-memos > #empty { grid-row: 5; }
+#view-memos.is-empty > #empty { min-height: calc(var(--view-h, 70vh) - 120px); justify-content: center; margin: 0; padding: 24px 16px 88px; }
+#view-memos > .folder-side {
+  grid-column: side; grid-row: 2 / span 30; align-self: start; position: sticky; top: 0; z-index: 2;
+  display: flex; flex-direction: column; width: 112px; max-height: calc(var(--view-h, 70vh) - 4px); padding: 2px 4px 10px 8px;
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); background: var(--bg);
+}
+#view-memos > .folder-side[hidden] { display: none; }
+.list-screen.has-side .cards { padding-left: 8px; }
+.folder-side .mf-list { flex: none; gap: 2px; }
+.folder-side .mf-item { min-height: 42px; padding: 8px 8px; gap: 6px; font-size: 13.5px; -webkit-touch-callout: none; user-select: none; }
+.folder-side .mf-item svg { width: 15px; height: 15px; }
+.folder-side .mf-count { font-size: 11.5px; }
+.folder-side .mf-more { display: none; } /* 이름 바꾸기 · 지우기는 폴더를 꾹 눌러 (좁은 목록에서 이름 자리를 지킨다) */
+.folder-side .mf-new {
+  position: sticky; bottom: -10px; display: flex; align-items: center; width: 100%; min-height: 42px; margin: 4px 0 0; padding: 8px;
+  border-radius: var(--radius-sm); background: var(--bg); color: var(--muted); font-size: 13px; font-weight: 600; text-decoration: none; text-align: left;
+}
+.folder-side .mf-new:active { background: var(--hover); }
+
+/* 꾹 눌러 들어 올린 카드 · 끄는 동안 */
+.card.lifted { transform: scale(1.03); box-shadow: var(--shadow-pop); transition: transform 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out); }
+.card.drag-source { transform: none; opacity: 0.4; box-shadow: none; outline: 2px dashed var(--muted); outline-offset: -2px; }
+.m-drag-clone { position: fixed; z-index: 60; margin: 0; pointer-events: none; box-shadow: var(--shadow-pop) !important; will-change: transform; transition: opacity 0.15s ease-out; }
+.m-drag-clone.over-folder { opacity: 0.85; }
+body.m-dragging .folder-side .mf-item { box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow 0.12s ease-out, background-color 0.12s ease-out, transform 0.12s var(--ease-out); }
+body.m-dragging .folder-side .mf-item.drop-on { box-shadow: inset 0 0 0 2px var(--brand-yellow); background: var(--brand-yellow-soft); transform: scale(1.04); }
+body.m-dragging .folder-side .mf-new { visibility: hidden; }
+/* 목록을 접어 두었어도 끄는 동안은 왼쪽에서 떠오른다 (list-view.js startDrag 가 자리를 정한다) */
+#view-memos > .folder-side.peek { display: flex !important; position: fixed; left: 0; z-index: 40; max-height: none; box-shadow: var(--shadow-pop); animation: m-side-peek 0.16s var(--ease-out); }
+@keyframes m-side-peek { from { opacity: 0; transform: translateX(-14px); } }
+@media (prefers-reduced-motion: reduce) { .card.lifted { transition: none; } #view-memos > .folder-side.peek { animation: none; } }
