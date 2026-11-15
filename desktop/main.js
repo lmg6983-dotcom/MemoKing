@@ -1269,7 +1269,28 @@ console.error = (...args) => {
   consoleError(...args);
   errors().write(args.map(logText).join(' '));
 };
-app.on('render-process-gone', (_e, wc, details) => errors().write(`[창 꺼짐] ${wc.getURL().split('/').pop()} ${details.reason} (${details.exitCode})`));
+// 메모 · 목록 창의 화면이 꺼지면 다시 불러온다 — 창 틀이 없어(닫기 단추도 화면이 그린다) 흰 창으로 남으면 닫을 수도 없었다.
+//   메모 창은 마지막으로 저장된 글로 다시 열린다. 1분 안에 세 번 꺼지면 되풀이하지 않고 창을 닫는다
+//   (메모 창은 새로 연다 — 예비 창으로 열린 창은 주소에 메모가 없어 다시 불러오면 빈 창이 된다)
+const crashTimes = new Map(); // 메모 id · 'list' → 꺼진 때들
+app.on('render-process-gone', (_e, wc, details) => {
+  errors().write(`[창 꺼짐] ${wc.getURL().split('/').pop()} ${details.reason} (${details.exitCode})`);
+  if (details.reason === 'clean-exit' || quitting || wc.isDestroyed()) return;
+  const win = BrowserWindow.fromWebContents(wc);
+  if (!win) return;
+  const noteId = [...windowManager.noteWins].find(([, w]) => w === win)?.[0];
+  const key = noteId ?? (win === windowManager.listWin ? 'list' : null);
+  if (!key) return;
+  const now = Date.now();
+  const recent = (crashTimes.get(key) ?? []).filter((t) => now - t < 60_000);
+  recent.push(now);
+  crashTimes.set(key, recent);
+  if (recent.length >= 3) return win.destroy();
+  if (key === 'list') return wc.reload();
+  win.mkKeep = true; // 닫았다가 바로 다시 여는 것 — 열린 메모 기억은 그대로
+  win.once('closed', () => windowManager.openNote(noteId)); // 창 관리자의 정리(closed)가 먼저 돈 뒤에 (새 창을 지우지 않게)
+  win.destroy();
+});
 
 /** 설정 › 문제 보내기: 최근 기록은 클립보드에, 들어가는 만큼은 새 메일 본문에 (보낼지는 사용자가) */
 async function reportProblem() {
