@@ -1352,8 +1352,13 @@ if (api.ai) {
   }
   $('ai-default').addEventListener('click', async () => {
     $('ai-default').hidden = true;
-    const st = await api.ai.downloadDefault();
-    renderAi(st, st?.error ? { chat: st.error } : {});
+    try {
+      const st = await api.ai.downloadDefault();
+      renderAi(st, st?.error ? { chat: st.error } : {});
+    } catch (err) {
+      $('ai-default').hidden = false; // 실패해도 단추가 숨은 채로 남지 않게
+      $('ai-try-out').textContent = err?.message || '모델을 받지 못했어요';
+    }
   });
   $('ai-default-stop').addEventListener('click', () => api.ai.cancelDownload());
   $('ai-reinstall').addEventListener('click', () => api.links.open(WINDOWS_SETUP));
@@ -1373,9 +1378,9 @@ if (api.ai) {
     const btn = $('ai-try');
     btn.disabled = true;
     $('ai-try-out').textContent = '모델을 올리고 묻는 중이에요…';
-    const r = await api.ai.try();
+    const r = await api.ai.try().catch((err) => ({ error: err?.message || '모델에 묻지 못했어요' })); // 실패해도 단추가 잠긴 채 · "묻는 중" 으로 남지 않게
     btn.disabled = false;
-    $('ai-try-out').textContent = r.error ? r.error : `답: ${r.text} (${r.seconds.toFixed(1)}초)`;
+    $('ai-try-out').textContent = r?.error ? r.error : `답: ${r.text} (${r.seconds.toFixed(1)}초)`;
   });
 } else {
   $('local-ai-sec').hidden = true;
@@ -2320,7 +2325,11 @@ trashEl.list.addEventListener('click', async (e) => {
   const restore = e.target.closest('[data-restore]');
   if (restore) {
     restore.disabled = true;
-    await api.trash.restore(restore.dataset.restore);
+    try {
+      await api.trash.restore(restore.dataset.restore);
+    } catch (err) {
+      await confirmDialog(`메모를 되살리지 못했어요.\n${err?.message ?? ''}`.trim(), '확인'); // 예전: 단추만 잠기고 아무 말이 없었다
+    }
     return renderTrash();
   }
   const remove = e.target.closest('[data-remove]');
