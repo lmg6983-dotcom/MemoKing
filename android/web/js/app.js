@@ -1687,7 +1687,8 @@ function openVault() {
   if (pendingIntent) {
     const p = pendingIntent;
     pendingIntent = null;
-    if (p.type === 'open') app.openMemo(p.memoId, { alarm: p.label ? { label: p.label } : undefined, highlight: true });
+    if (p.type === 'open' && !p.memoId) app.showList(); // 묶은 놓친 알림 (휴대폰을 다시 켠 뒤) — 메모 하나가 아니라 목록으로
+    else if (p.type === 'open') app.openMemo(p.memoId, { alarm: p.label ? { label: p.label } : undefined, highlight: true });
     else if (p.type === 'new') app.newMemo({ voice: p.voice === true });
     else if (p.type === 'widget-pick') widgets.startPick(p.widgetId, { toast });
     else if (p.type === 'share') memoFromShare(p);
