@@ -2394,6 +2394,14 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-view.zoomed .mk-album-stage:active { cursor: grabbing; }
 .mk-album-zoom { position: absolute; left: 50%; top: calc(64px + env(safe-area-inset-top)); z-index: 3; transform: translateX(-50%); padding: 4px 12px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
 .mk-album-zoom[hidden] { display: none; }
+/* 좁은 휴대폰: 위 단추 줄이 화면 밖으로 밀려 오른쪽 끝(닫기)을 누를 수 없던 것 — 간격을 줄이고 "그리기" 는 그림만 */
+@media (max-width: 440px) {
+  .mk-album-head { gap: 2px; padding-left: 8px; padding-right: 8px; }
+  .mk-album-head .mk-album-btn { padding: 0 8px; }
+  .mk-album-head .mk-album-icon { width: 34px; padding: 0; }
+  .mk-album-btn-text { display: none; }
+}
+.mk-album-count { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .mk-album-nav { position: absolute; top: 50%; z-index: 3; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.45); color: #fff; cursor: pointer; display: grid; place-items: center; transition: opacity 0.2s ease-out; }
 .mk-album-nav:hover { background: rgba(0, 0, 0, 0.65); }
 .mk-album-nav svg { width: 20px; height: 20px; }

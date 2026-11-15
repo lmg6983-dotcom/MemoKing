@@ -70,8 +70,8 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   const split = onSplit && images.length > 1 ? svgBtn('묶음 풀기 (한 장씩 따로)', SPLIT_ICON, () => {
     if (!inking && onSplit()) shut();
   }) : null;
-  const draw = el('button', 'mk-album-btn', { type: 'button', title: '이 장 위에 그리기' });
-  draw.append(icon('pen'), document.createTextNode('그리기'));
+  const draw = el('button', 'mk-album-btn', { type: 'button', title: '이 장 위에 그리기', ariaLabel: '이 장 위에 그리기' });
+  draw.append(icon('pen'), el('span', 'mk-album-btn-text', { textContent: '그리기' })); // 좁은 화면에서는 글자를 숨기고 그림만 (note.css)
   const close = el('button', 'mk-album-btn', { type: 'button', title: '닫기 (Esc)', ariaLabel: '닫기' });
   close.append(icon('close'));
   // 확대해 보는 중이면 장 위쪽 가운데에 배율 단추 (누르면 원래 크기로 · 좁은 창의 머리 줄을 붐비게 하지 않게)
