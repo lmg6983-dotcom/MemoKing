@@ -14,7 +14,7 @@ import { call } from './native.js';
 import { renderCollage, collageName } from '../../app/js/memories-collage.js';
 import { base64Bytes, collageMemoBody } from '../../app/js/collage-preview.js';
 import { tutEvent, tutorialStepId } from './tutorial.js';
-import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition, setModeSwitch, EASE_OUT } from '../../app/js/dom.js';
+import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition, setModeSwitch, EASE_OUT, slideSide } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
 import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode, fillModeTag } from '../../app/js/core/modes.js';
@@ -527,8 +527,9 @@ function applyFolderSide() {
 }
 
 function renderFolderSide() {
-  const list = withUnfiled(folders(), split(state.memos, state.mode).mine);
-  renderFolderList(el.folderSide, { folders: list, current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
+  const mine = split(state.memos, state.mode).mine;
+  const list = withUnfiled(folders(), mine);
+  renderFolderList(el.folderSide, { folders: list, total: mine.length, current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
   // 폴더가 생기면 한 번: 메모를 꾹 눌러 끌면 폴더로 (눈에 안 보이는 동작)
   if (list.length && !el.folderSide.hidden) setTimeout(() => {
     const first = el.folderSide.querySelector(`[data-folder]:not([data-folder=""]):not([data-folder="${UNFILED}"])`);
@@ -566,16 +567,17 @@ el.folderBtn.addEventListener('click', async () => {
   const side = el.folderSide;
   if (reduceMotion() || typeof side.animate !== 'function') return render();
   sideSliding = true;
-  if (sideWanted) {
-    side.hidden = false;
-    render(); // 펼 때는 카드 줄 수를 먼저 맞추고 밀려 나온다
-  }
-  const w = side.offsetWidth;
-  const closed = { marginLeft: `${-w}px`, opacity: 0 };
-  const open = { marginLeft: '0px', opacity: 1 };
-  await side.animate(sideWanted ? [closed, open] : [open, closed], { duration: 180, easing: EASE_OUT }).finished.catch(() => {});
+  // 카드는 slideSide 가 자리만 미끄러뜨린다 (크기까지 늘이고 줄이면 글자가 찌그러져 보였다)
+  await slideSide(side, sideWanted, () => {
+    glideOff = true;
+    try {
+      render();
+    } finally {
+      glideOff = false;
+    }
+  }, el.cards);
   sideSliding = false;
-  render();
+  applyFolderSide();
 });
 
 // 폴더 메뉴 (폴더 목록에서 꾹 누르기): 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
@@ -1014,11 +1016,13 @@ function startDrag(x, y, { pop = false } = {}) {
     const r = row.getBoundingClientRect();
     return { row, top: r.top - sr.top + side.scrollTop, bottom: r.bottom - sr.top + side.scrollTop };
   });
-  swipe.drag = { clone, x, y, px: x, py: y, overRow: null, rows, top: sr.top, bottom: sr.bottom, left: sr.left - 14, right: sr.right,
+  // 끄는 동안은 작게 (손가락 둘레에 들린 쪽지처럼 — 큰 카드가 폴더 목록을 가리지 않게). 긴 카드일수록 더 작게
+  const small = Math.max(0.28, Math.min(0.55, 150 / r.width, 170 / r.height));
+  swipe.drag = { clone, x, y, px: x, py: y, overRow: null, rows, small, top: sr.top, bottom: sr.bottom, left: sr.left - 14, right: sr.right,
     scroll: side.scrollTop, maxScroll: side.scrollHeight - side.clientHeight, frame: 0 };
   moveDrag(swipe.drag);
   // 당겨서 들었으면 한 번 톡 튄다 (들렸다는 것을 손끝과 눈으로)
-  if (pop && !reduceMotion()) clone.animate([{ scale: '1' }, { scale: '1.08' }, { scale: '1' }], { duration: 220, easing: EASE_OUT, composite: 'add' });
+  if (pop && !reduceMotion()) clone.animate([{ transform: 'none' }, { transform: 'scale(1.12)' }, { transform: 'none' }], { duration: 220, easing: EASE_OUT });
 }
 
 // 프레임마다 한 번: 손가락 자리로 카드를 옮기고, 아래 폴더를 찾고, 끝에 머물면 목록을 계속 넘긴다
@@ -1040,8 +1044,9 @@ function moveDrag(d) {
     if (row) haptic(6);
     d.overRow = row;
   }
-  // 폴더 위에서는 카드가 작아져 폴더 줄을 가리지 않는다 (손가락 자리를 기준으로)
-  d.clone.style.transform = `translate3d(${x - d.x}px, ${y - d.y}px, 0) rotate(-2deg) scale(${row ? 0.4 : 1.03})`;
+  // 손가락 자리를 기준으로 작게 들고 다니고, 폴더 위에서는 조금 더 작아진다 (크기 바뀜은 CSS 가 부드럽게 — m-drag-clone)
+  d.clone.style.translate = `${x - d.x}px ${y - d.y}px`;
+  d.clone.style.scale = String(row ? Math.min(d.small, 0.36) * 0.85 : d.small);
   d.clone.classList.toggle('over-folder', Boolean(row));
 }
 
@@ -1063,14 +1068,16 @@ function endDrag(drop) {
     // 폴더 줄로 작아지며 들어가고, 그 줄이 한 번 튄다
     const c = clone.getBoundingClientRect();
     const r = row.getBoundingClientRect();
-    clone.style.transition = `transform 0.22s ${EASE_OUT}, opacity 0.22s ${EASE_OUT}`;
-    clone.style.transform = `${clone.style.transform} translate3d(${(r.left + r.width / 2 - (c.left + c.width / 2)) * 2.5}px, ${(r.top + r.height / 2 - (c.top + c.height / 2)) * 2.5}px, 0) scale(0.2)`;
+    clone.style.transition = `translate 0.22s ${EASE_OUT}, scale 0.22s ${EASE_OUT}, opacity 0.22s ${EASE_OUT}`;
+    clone.style.translate = `${d.px - d.x + r.left + r.width / 2 - (c.left + c.width / 2)}px ${d.py - d.y + r.top + r.height / 2 - (c.top + c.height / 2)}px`;
+    clone.style.scale = '0.08';
     clone.style.opacity = '0';
     row.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 260, easing: EASE_OUT });
   } else if (!reduceMotion()) {
     // 놓을 곳이 아니면 제자리로 돌아간다
-    clone.style.transition = `transform 0.2s ${EASE_OUT}`;
-    clone.style.transform = '';
+    clone.style.transition = `translate 0.2s ${EASE_OUT}, scale 0.2s ${EASE_OUT}, rotate 0.2s ${EASE_OUT}`;
+    clone.style.translate = clone.style.scale = '';
+    clone.style.rotate = '0deg';
   }
   setTimeout(finish, reduceMotion() ? 0 : 230);
   card.dataset.swiped = '1'; // 뒤따르는 "눌림" 으로 메모가 열리지 않게
@@ -1233,6 +1240,7 @@ applyLayout(layout);
 // 카드들이 새 자리로 미끄러져 간다 (FLIP: 옛 자리 → 새 자리) — 모양이 바뀐 것을 눈으로 따라갈 수 있게
 //   재기 → 쓰기를 나눈다: 카드마다 재고 바로 고치면 그때마다 화면 배치를 다시 계산했다 (메모 1,500개에 3초 넘게).
 //   미끄러짐은 화면 근처 카드만 (보이지 않는 카드는 움직여도 보이지 않는다)
+let glideOff = false; // 폴더 목록을 펴고 접을 때: 카드 움직임은 slideSide 가 맡는다
 function glideCards(change) {
   const vh = window.innerHeight;
   const near = (r) => r.bottom > -vh && r.top < vh * 2;
@@ -1242,7 +1250,7 @@ function glideCards(change) {
   change();
   const still = [];
   const moves = [];
-  const animate = !reduceMotion() && !calmRender;
+  const animate = !reduceMotion() && !calmRender && !glideOff;
   const items = [...el.cards.querySelectorAll('.item')];
   if (calmRender) for (const item of items) item.style.animation = 'none'; // 검색 중: 다시 보인 카드도 튀어나오지 않게
   for (const it of items) {
@@ -1403,6 +1411,7 @@ export function refresh() {
   if (!app.vault) return;
   app.vault.defaultMode = state.mode; // 폴더를 다시 열어 새 저장소가 됐어도 지금 모드로
   state.memos = app.vault.list();
+  state.folderDirs = null; // 폴더 목록도 다시 묻는다 — 다른 기기에서 만들거나 지운 빈 폴더는 메모만 봐서는 알 수 없다
   // Work / Life 나누기를 정한 적이 없으면: 이미 Work 메모가 있을 때만 켠다 (PC 에서 옮겨 둔 것 등)
   if (state.workLife === null && state.memos.length) {
     state.workLife = state.memos.some((m) => m.mode === 'work');

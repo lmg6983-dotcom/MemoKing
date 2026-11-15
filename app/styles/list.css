@@ -216,12 +216,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
   margin: 0;
   pointer-events: none;
   box-shadow: var(--shadow-pop) !important;
-  transition: opacity 0.15s ease-out;
+  rotate: -3deg;
+  will-change: translate, scale;
+  transition: opacity 0.15s ease-out, scale 0.18s var(--ease-out);
 }
 /* 목록 밖으로 나가면 미리보기 창이 이어받으므로 흐리게 */
 body.drag-outside .drag-clone { opacity: 0.25; }
 .drag-clone.over-folder { opacity: 0.85; }
-.drag-clone.returning { transition: transform 0.25s var(--ease-out), opacity 0.25s; }
+.drag-clone.returning { transition: translate 0.25s var(--ease-out), scale 0.25s var(--ease-out), rotate 0.25s var(--ease-out), opacity 0.25s; }
 .drag-clone.drop-out { opacity: 0 !important; transition: opacity 0.2s ease-out; }
 
 /* 놓아서 열린 카드가 한 번 반짝인다 */

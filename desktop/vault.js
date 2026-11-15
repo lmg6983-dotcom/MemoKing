@@ -209,7 +209,11 @@ export class Vault extends EventEmitter {
       this.rescanSoon();
     }
 
-    if (changed.size && !silent) {
+    // 폴더만 생기거나 없어졌어도 (다른 기기 · 탐색기) 목록 창이 폴더 목록을 다시 읽게
+    const dirs = this.folders().join('\n');
+    const dirsChanged = this.seenDirs !== undefined && dirs !== this.seenDirs;
+    this.seenDirs = dirs;
+    if ((changed.size || dirsChanged) && !silent) {
       this.emit('changed', { ids: [...changed], external, removed });
       this.scheduleIndex();
     }

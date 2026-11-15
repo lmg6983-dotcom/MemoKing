@@ -300,3 +300,51 @@ export function swipeDismiss(el, onDismiss, { up = false, onHold = () => {}, can
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
 }
+
+/**
+ * 옆 목록(폴더)을 펴고 접기 — 바뀐 뒤의 배치를 한 번에 정하고(relayout: 카드는 그 안에서 새 자리로 미끄러진다),
+ *   목록은 transform 으로만 옆에서 미끄러진다. 예전에는 여백(margin)을 프레임마다 바꿔 카드 배치를 매번 다시 계산해 끊겼다.
+ *   접을 때는 목록을 그 자리에 띄워(배치에서 빼고) 카드가 먼저 넓어진 뒤 목록이 밀려 들어간다
+ * @param {HTMLElement} side
+ * @param {boolean} show
+ * @param {() => void} relayout 펴거나 접은 뒤의 화면으로 다시 그리기 (카드를 스스로 움직이지 않게 — 여기서 움직인다)
+ * @param {HTMLElement} [cards] 카드 칸들(.item)이 든 곳 — 카드는 크기는 바로, 자리만 옛 자리에서 미끄러진다
+ */
+export async function slideSide(side, show, relayout, cards) {
+  const keep = side.style.cssText;
+  // 카드를 감싼 칸(.item)을 잰다 (화면 밖 칸은 그리기를 건너뛰어, 안의 카드를 재면 모두 다시 계산한다). 화면 근처만
+  const vh = window.innerHeight;
+  const near = (r) => r.width && r.bottom > -vh * 0.5 && r.top < vh * 1.5;
+  const idOf = (it) => it.firstElementChild?.dataset.id;
+  const before = new Map();
+  for (const it of cards?.querySelectorAll('.item') ?? []) {
+    const r = it.getBoundingClientRect();
+    if (near(r)) before.set(idOf(it), r);
+  }
+  if (show) side.hidden = false;
+  else {
+    const r = side.getBoundingClientRect();
+    Object.assign(side.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, maxHeight: 'none', margin: '0', zIndex: '30', background: 'var(--bg)' });
+  }
+  relayout();
+  const moves = [];
+  for (const it of cards?.querySelectorAll('.item') ?? []) {
+    const a = before.get(idOf(it));
+    if (a) moves.push([it, a, it.getBoundingClientRect()]); // 먼저 모두 재고 나서 움직인다
+  }
+  for (const [it, a, b] of moves) {
+    const dx = a.left - b.left;
+    const dy = a.top - b.top;
+    if (Math.abs(dx) >= 1 || Math.abs(dy) >= 1) it.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 220, easing: EASE_OUT });
+  }
+  const w = side.offsetWidth;
+  const off = { transform: `translateX(${-w}px)`, opacity: 0 };
+  const on = { transform: 'none', opacity: 1 };
+  const anim = side.animate(show ? [off, on] : [on, off], { duration: 220, easing: EASE_OUT, fill: 'forwards' });
+  await anim.finished.catch(() => {});
+  if (!show) {
+    side.hidden = true;
+    side.style.cssText = keep;
+  }
+  anim.cancel();
+}

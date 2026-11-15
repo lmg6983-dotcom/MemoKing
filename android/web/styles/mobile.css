@@ -1306,10 +1306,13 @@ body.picking #fab { display: none; }
 }
 #view-memos > .folder-side[hidden] { display: none; }
 .list-screen.has-side .cards { padding-left: 8px; }
-.folder-side .mf-list { flex: none; gap: 2px; }
+.folder-side .mf-list { flex: none; gap: 0; }
+/* 줄 사이 아주 옅은 선 (iOS 목록처럼 — 폴더 경계가 또렷하게). 고른 줄 · 머리글 둘레는 빼고 */
+.folder-side .mf-row + .mf-row { box-shadow: 0 -1px 0 color-mix(in srgb, var(--line) 70%, transparent); }
+.folder-side .mf-row:has(> [aria-current="true"]), .folder-side .mf-row:has(> [aria-current="true"]) + .mf-row { box-shadow: none; }
+.folder-side .mf-count { font-size: 11px; line-height: 17px; padding: 0 5px; min-width: 18px; }
 .folder-side .mf-item { min-height: 42px; padding: 8px 8px; gap: 6px; font-size: 13.5px; -webkit-touch-callout: none; user-select: none; }
 .folder-side .mf-item svg { width: 15px; height: 15px; }
-.folder-side .mf-count { font-size: 11.5px; }
 .folder-side .mf-more { display: none; } /* 이름 바꾸기 · 지우기는 폴더를 꾹 눌러 (좁은 목록에서 이름 자리를 지킨다) */
 #view-memos > .folder-side .mf-new { /* 누르는 자리를 넓히는 .link-btn 의 position 보다 앞서게 */
   position: sticky; bottom: -10px; z-index: 1; display: flex; align-items: center; width: 100%; min-height: 42px; margin: 4px 0 0; padding: 8px;
@@ -1320,7 +1323,7 @@ body.picking #fab { display: none; }
 /* 꾹 눌러 들어 올린 카드 · 끄는 동안 */
 .card.lifted { transform: scale(1.03); box-shadow: var(--shadow-pop); transition: transform 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out); }
 .card.drag-source { transform: none; opacity: 0.4; box-shadow: none; outline: 2px dashed var(--muted); outline-offset: -2px; }
-.m-drag-clone { position: fixed; z-index: 60; margin: 0; pointer-events: none; box-shadow: var(--shadow-pop) !important; will-change: transform; transition: opacity 0.15s ease-out; }
+.m-drag-clone { position: fixed; z-index: 60; margin: 0; pointer-events: none; box-shadow: var(--shadow-pop) !important; rotate: -3deg; will-change: translate, scale; transition: opacity 0.15s ease-out, scale 0.18s var(--ease-out); }
 .m-drag-clone.over-folder { opacity: 0.85; }
 body.m-dragging .folder-side .mf-item { box-shadow: inset 0 0 0 1px var(--line); transition: background-color 0.1s ease-out, transform 0.1s var(--ease-out); }
 body.m-dragging .folder-side .mf-item.drop-on { box-shadow: inset 0 0 0 2px var(--brand-yellow); background: var(--brand-yellow-soft); transform: scale(1.04); }

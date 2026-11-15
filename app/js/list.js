@@ -34,11 +34,11 @@ import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT, slideSide } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
 import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet } from './folder-ui.js';
-import { folderList, movedText, isFolderName, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
+import { folderList, movedText, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
@@ -208,7 +208,9 @@ const inFolder = (memos) => memosInFolder(memos, state.folder);
 const newMemo = (opts = {}) => api.memo.create({ ...opts, ...(state.folder && state.folder !== UNFILED ? { folder: state.folder } : {}) });
 
 async function loadFolders() {
-  state.folderDirs = await api.memos.folders?.().catch(() => []) ?? [];
+  const dirs = await api.memos.folders?.().catch(() => []) ?? [];
+  if (state.folderDirs && dirs.join('\n') === state.folderDirs.join('\n')) return; // 그대로면 다시 그리지 않는다
+  state.folderDirs = dirs;
   render(); // 카드도 (고른 폴더가 없어졌으면 전체로 — keepFolderValid)
 }
 
@@ -293,7 +295,7 @@ const currentFolders = () => folderList(state.folderDirs ?? [], modeMemos());
 // PC 의 폴더는 왼쪽 목록 하나 (탐색기처럼) — 카드 위에 줄을 따로 두지 않는다. 메모를 끌어 폴더에 놓으면 그 폴더로 옮긴다
 function renderFolders() {
   if (!el.folderSide) return;
-  renderFolderList(el.folderSide, { folders: withUnfiled(currentFolders(), modeMemos()), current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
+  renderFolderList(el.folderSide, { folders: withUnfiled(currentFolders(), modeMemos()), total: modeMemos().length, current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
 }
 
 // ---------- 폴더 목록 (왼쪽): 폴더가 없어도, 창이 좁아도 늘 — 위 폴더 단추로 접고 편다 (이 PC 에 기억) ----------
@@ -334,14 +336,9 @@ el.folderBtn?.addEventListener('click', async () => {
   const side = el.folderSide;
   if (reduceMotion() || typeof side.animate !== 'function') return render();
   sideSliding = true;
-  if (sideWanted) side.hidden = false;
-  const w = side.offsetWidth;
-  const closed = { marginLeft: `${-w}px`, opacity: 0 };
-  const open = { marginLeft: '0px', opacity: 1 };
-  if (sideWanted) render(); // 펼 때는 줄 수를 먼저 맞추고 밀려 나온다
-  await side.animate(sideWanted ? [closed, open] : [open, closed], { duration: 180, easing: EASE_OUT }).finished.catch(() => {});
+  await slideSide(side, sideWanted, renderNow, el.cards); // 카드 움직임은 slideSide 가 (renderNow: 스스로 움직이지 않게)
   sideSliding = false;
-  render();
+  applyFolderSide();
 });
 
 // ---------- 카드 쌓기 (휴대폰과 같음): 메모지처럼 엇갈려 — 카드마다 지금 가장 짧은 줄(같으면 왼쪽)에 붙인다 ----------
@@ -1730,6 +1727,9 @@ function beginDrag() {
   document.body.classList.add('is-dragging');
   el.dragHint.textContent = '목록 밖으로 끌어내면 그 자리에 열려요';
   press.clone = clone;
+  // 끄는 동안은 작게 (커서 둘레에 들린 쪽지처럼 — 큰 카드가 폴더 막대와 다른 카드를 가리지 않게). 긴 카드일수록 더 작게
+  press.small = Math.max(0.3, Math.min(0.6, 170 / rect.width, 190 / rect.height));
+  void clone.offsetWidth; // 지금 크기에서 작아지는 움직임이 보이게
   press.dragging = true;
   api.drag.start(press.id);
 }
@@ -1751,12 +1751,14 @@ async function finishDrag(p, point) {
     const dx = p.into.left + p.into.width / 2 - (c.left + c.width / 2);
     const dy = p.into.top + p.into.height / 2 - (c.top + c.height / 2);
     clone.classList.add('returning');
-    clone.style.transform = `translate(${dx}px, ${dy}px) ${clone.style.transform} scale(0.12)`;
+    clone.style.translate = `${(p.dx ?? 0) + dx}px ${(p.dy ?? 0) + dy}px`;
+    clone.style.scale = '0.08';
     clone.style.opacity = '0';
   } else {
     // 취소: 복제본이 제자리로 돌아간다
     clone.classList.add('returning');
-    clone.style.transform = '';
+    clone.style.translate = clone.style.scale = '';
+    clone.style.rotate = '0deg';
   }
   const cleanup = () => {
     clone.remove();
@@ -1790,7 +1792,10 @@ el.cards.addEventListener('pointermove', (e) => {
   // 폴더 위에서는 들린 카드가 작아진다 — 큰 카드가 놓을 폴더 줄을 가리지 않게 (잡은 자리를 기준으로 줄어든다)
   const over = markFolderDrop(e.clientX, e.clientY) != null;
   press.clone.classList.toggle('over-folder', over);
-  press.clone.style.transform = `translate(${dx}px, ${dy}px) rotate(-2deg) scale(${over ? 0.42 : 1.03})`;
+  press.clone.style.translate = `${dx}px ${dy}px`;
+  press.clone.style.scale = String(over ? Math.min(press.small, 0.4) * 0.85 : press.small);
+  press.dx = dx;
+  press.dy = dy;
   api.drag.move(e.screenX, e.screenY);
 });
 
@@ -1944,7 +1949,7 @@ document.addEventListener('keydown', (e) => {
 api.on('memos:changed', (memos) => {
   state.memos = memos;
   // 폴더 목록: 아직 읽지 않았으면 지금 (앱을 켠 뒤 처음 — 빈 폴더가 목록에 빠져 있었다), 그 뒤로는 다른 기기 · 탐색기에서 생긴 폴더가 보일 때
-  if (!state.folderDirs || memos.some((m) => isFolderName(m.folder) && !state.folderDirs.includes(m.folder))) loadFolders();
+  loadFolders(); // 폴더 목록도 늘 다시 묻는다 — 다른 기기에서 만들거나 지운 빈 폴더는 메모만 봐서는 알 수 없다 (그대로면 다시 그리지 않음)
   // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
   const hb = $('handoff-bar');
   if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;

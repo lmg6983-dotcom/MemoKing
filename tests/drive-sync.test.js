@@ -545,3 +545,36 @@ test('메모 폴더가 그대로인 것을 알면(localClean) 폴더를 훑지 �
   r = await run({ localClean: true });
   assert.equal(r.uploaded, 1);
 });
+
+test('빈 폴더: 만들기와 지우기를 서로 맞춘다 (안에 무엇이 남았으면 지우지 않는다)', async () => {
+  await sync();
+  // 이 PC 에서 빈 폴더를 만들면 Drive 에도
+  fs.mkdirSync(path.join(dir, '여행'));
+  assert.equal((await sync()).skipped, false);
+  assert.ok(drive.path('여행')?.folder);
+  // 다른 기기가 Drive 에 빈 폴더를 만들면 이 PC 에도
+  await drive.createFolder('ROOT', '공부');
+  drive.changed = true;
+  const r = await sync();
+  assert.ok(fs.statSync(path.join(dir, '공부')).isDirectory());
+  assert.equal(r.localChanged, true);
+  // 이 PC 에서 지우면 Drive 에서도 (휴지통)
+  fs.rmSync(path.join(dir, '여행'), { recursive: true });
+  await sync();
+  assert.equal(drive.path('여행'), null);
+  // 다른 기기가 Drive 에서 지우면 이 PC 에서도
+  await drive.trash(drive.path('공부').id);
+  drive.changed = true;
+  await sync();
+  assert.equal(fs.existsSync(path.join(dir, '공부')), false);
+  // Drive 에서 지웠어도 이 PC 의 폴더에 파일이 남았으면 지우지 않는다 (다시 올린다)
+  await lw('일기/오늘.md', '# 오늘');
+  await sync();
+  await drive.trash(drive.path('일기').id);
+  drive.changed = true;
+  await lw('일기/내일.md', '# 내일');
+  await sync();
+  assert.ok(fs.existsSync(path.join(dir, '일기', '내일.md')));
+  // 앱이 쓰는 폴더는 건드리지 않는다
+  assert.equal(drive.path('_memoking'), null);
+});

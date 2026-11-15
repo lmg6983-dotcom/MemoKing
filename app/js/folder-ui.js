@@ -33,12 +33,13 @@ function folderButton({ name, label, count, current, iconName }) {
 /**
  * 폴더 목록을 그린다 (누르면 onPick(폴더 이름, "" = 전체))
  *   onMenu 가 있으면 폴더마다 ⋯ 단추(와 오른쪽 클릭) — 이름 바꾸기 · 지우기
- *   "전체" 에는 수를 적지 않는다 (위 메모 탭에 이미 있다)
+ *   두 묶음: 위에 전체 · 미분류, 가는 선과 "폴더" 머리글 아래에 만든 폴더들 (Apple 메모 · Things 처럼)
  * @param {HTMLElement} container
- * @param {{ folders: { name: string, count: number }[], current: string,
+ * @param {{ folders: { name: string, count: number }[], current: string, total?: number,
  *           onPick: (name: string) => any, onNew: () => any, onMenu?: (name: string, anchor: HTMLElement) => any }} o
+ *   total: 전체 메모 수
  */
-export function renderFolderList(container, { folders, current, onPick, onNew, onMenu }) {
+export function renderFolderList(container, { folders, current, total = 0, onPick, onNew, onMenu }) {
   const list = el('ul', 'mf-list');
   list.setAttribute('aria-label', '폴더');
   const item = (b, name) => {
@@ -56,8 +57,15 @@ export function renderFolderList(container, { folders, current, onPick, onNew, o
     }
     return li;
   };
-  list.append(item(folderButton({ name: '', label: '전체', current: !current, iconName: 'note' }), ''));
-  for (const f of folders) list.append(item(folderButton({ name: f.name, label: f.label ?? f.name, count: f.count, current: f.name === current, iconName: f.name === UNFILED ? 'inbox' : '' }), f.name));
+  list.append(item(folderButton({ name: '', label: '전체', count: total, current: !current, iconName: 'note' }), ''));
+  const make = (f) => item(folderButton({ name: f.name, label: f.label ?? f.name, count: f.count, current: f.name === current, iconName: isReal(f.name) ? '' : 'inbox' }), f.name);
+  for (const f of folders) if (!isReal(f.name)) list.append(make(f));
+  if (folders.some((f) => isReal(f.name))) {
+    const head = el('li', 'mf-sep', '폴더');
+    head.setAttribute('aria-hidden', 'true');
+    list.append(head);
+  }
+  for (const f of folders) if (isReal(f.name)) list.append(make(f));
   list.addEventListener('click', (e) => {
     const m = e.target.closest('[data-folder-menu]');
     if (m) return onMenu?.(m.dataset.folderMenu, m);
