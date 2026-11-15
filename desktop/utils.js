@@ -66,8 +66,16 @@ export function loadSettings() {
     const loaded = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
     Object.assign(settings, loaded);
     if (!('tutorialDone' in loaded)) settings.tutorialDone = true;
-  } catch {
-    // 첫 실행
+  } catch (err) {
+    // 첫 실행 — 다만 파일이 있는데 못 읽었으면(깨짐) 곧 새 설정으로 덮어쓰기 전에 따로 남긴다 (메모 폴더 위치 · Drive 연결을 되살릴 수 있게)
+    if (err.code !== 'ENOENT') {
+      try {
+        fs.copyFileSync(settingsFile(), `${settingsFile()}.broken-${Date.now()}`);
+        console.error('설정 파일을 읽지 못해 따로 남겼어요', err.message);
+      } catch {
+        // 남기지 못해도 시작은 한다
+      }
+    }
   }
 }
 
@@ -423,7 +431,9 @@ export function mcpConnect(on) {
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     if (fs.existsSync(file) && !fs.existsSync(`${file}.memoking-backup`)) fs.copyFileSync(file, `${file}.memoking-backup`);
-    fs.writeFileSync(file, `${JSON.stringify({ ...config, mcpServers: servers }, null, 2)}\n`);
+    // 임시 파일에 쓰고 바꿔치기 — 쓰는 도중 꺼져도 Claude 설정 파일이 깨지지 않게
+    fs.writeFileSync(`${file}.memoking-tmp`, `${JSON.stringify({ ...config, mcpServers: servers }, null, 2)}\n`);
+    fs.renameSync(`${file}.memoking-tmp`, file);
   } catch (err) {
     return { ...mcpStatus(), error: `설정 파일에 쓰지 못했어요 (${err.message})` };
   }
