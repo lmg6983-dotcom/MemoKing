@@ -657,6 +657,9 @@ async function switchDriveFolder(folderId, folderName) {
   const moving = root !== vault?.root;
   if (moving) {
     const wins = [...windowManager.noteWins.values()].filter((w) => !w.isDestroyed());
+    // 옮기기 전에 쓰던 글부터 저장 — 3초 안에 안 닫히는 창이 있어도 마지막 글이 옛 폴더에만 남지 않게 (업데이트 설치 전과 같게)
+    const flushed = Promise.all(wins.map((w) => w.webContents.executeJavaScript('window.mkFlushSync?.()', true).catch(() => {})));
+    await Promise.race([flushed, new Promise((r) => setTimeout(r, 2000))]); // 멈춘 창이 있어도 옮기기가 멈추지 않게
     await Promise.all(wins.map((w) => new Promise((resolve) => {
       w.once('closed', resolve);
       setTimeout(resolve, 3000);
@@ -1281,7 +1284,13 @@ app.on('web-contents-created', (_e, wc) => {
       copyImage: () => wc.copyImageAt(params.x, params.y),
       saveImage: src && fs.existsSync(src) ? async () => {
         const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), path.basename(src)) });
-        if (!r.canceled && r.filePath) fs.copyFileSync(src, r.filePath);
+        if (r.canceled || !r.filePath) return;
+        try {
+          await fs.promises.copyFile(src, r.filePath);
+        } catch (err) {
+          console.error('그림 저장 실패', err);
+          windowManager.showHud({ title: '그림을 저장하지 못했어요', body: '다른 위치에 저장해 보세요', kind: 'warn' }); // 예전: 말없이 실패했다
+        }
       } : null,
       // 메모 창의 편집기는 서식 없이 붙여넣기 · 서식 지우기를 직접 한다 (note.js 가 'edit:*' 를 받는다). 그 밖의 칸은 창의 기본 동작
       pastePlain: isNote ? async () => wc.send('edit:paste-plain', await clipboard.readText()) : null, // readText 는 약속(Promise)을 돌려준다
@@ -1519,7 +1528,8 @@ app.whenReady().then(async () => {
     // 메모 하나를 열거나(점프 목록) MagicKey 가 새 메모를 만들 때는 목록 창을 띄우지 않는다
     if (!(launched?.kind === 'memo' && vault?.get(launched.id)) && !(launched?.kind === 'newFile' && vault)) windowManager.createListWindow();
   }
-  for (const id of [...settings.openNotes]) {
+  // 메모 폴더를 찾지 못했으면(외장 드라이브를 안 꽂음 등) 열 수 없을 뿐 — 다음에 다시 열 수 있게 목록은 그대로 둔다
+  if (vault) for (const id of [...settings.openNotes]) {
     // 테이프 메모는 바탕화면 층에 조용히 (로그인 때 쓰던 앱의 포커스를 빼앗지 않게)
     const inactive = windowManager.layerOf(id) === 'bottom';
     if (!windowManager.openNote(id, { inactive })) settings.openNotes = settings.openNotes.filter((x) => x !== id);
@@ -1574,8 +1584,9 @@ updater = new Updater({
       quitting = false;
       syncPopupWatch();
     }, 20_000).unref?.();
-    await Promise.all([...windowManager.noteWins.values()].filter((w) => !w.isDestroyed())
+    const flushed = Promise.all([...windowManager.noteWins.values()].filter((w) => !w.isDestroyed())
       .map((w) => w.webContents.executeJavaScript('window.mkFlushSync?.()', true).catch(() => {})));
+    await Promise.race([flushed, new Promise((r) => setTimeout(r, 3000))]); // 멈춘 창이 있어도 설치가 멈추지 않게
     saveSettings(true);
     // 설치 파일이 이전 설치 폴더를 지우려면 메모킹이 띄운 PowerShell 도우미(알림 · 창 층 · 클립보드)가 다 꺼져 있어야 한다 —
     //   남아 있으면 "이전 설치 파일을 지우지 못했어요(Failed to uninstall old application files)" 로 업데이트가 멈춘다
