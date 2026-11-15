@@ -496,7 +496,10 @@ async function pasteClipboardFiles(text) {
   if (!editor) return;
   if (files.length) {
     try {
-      editor.insertItems(await editor.arrangeItems(tempsToItems(files)), { atCursor: true }); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
+      const ed = editor;
+      const items = await ed.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
+      if (editor !== ed) return; // 묻는 사이에 메모를 닫거나 바꿨다
+      ed.insertItems(items, { atCursor: true });
       flush();
       setStatus(files.length > 1 ? `파일 ${files.length}개를 붙여 넣었어요` : '붙여 넣었어요');
     } catch (err) {

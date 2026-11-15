@@ -1575,7 +1575,7 @@ export class WindowManager {
         await new Promise((r) => setTimeout(r, 100));
       }
       const pdf = await win.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true, margins: { marginType: 'none' } });
-      fs.writeFileSync(file, pdf);
+      await fs.promises.writeFile(file, pdf); // 큰 PDF 를 쓰는 동안 모든 창이 멈추지 않게
       const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) ?? []).length;
       if (o.open && !SMOKE) shell.openPath(file);
       return { file, pages };
