@@ -22,7 +22,7 @@ import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { pickFolder, createPickBar, askFolderName, renderFolderList } from '../../app/js/folder-ui.js';
+import { pickFolder, createPickBar, askFolderName, renderFolderList, markCurrentFolder } from '../../app/js/folder-ui.js';
 import { openContextMenu } from '../../app/js/ctx-menu.js';
 import { folderList, movedText, isFolderName, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from '../../app/js/core/folders.js';
 
@@ -491,6 +491,9 @@ function keepFolderValid() {
   if (state.folder === UNFILED ? !folders().length : state.folder && !folders().some((f) => f.name === state.folder)) state.folder = '';
 }
 
+// 폴더 고르기: 누른 줄은 바로 고른 모양이 되고, 카드 다시 그리기는 그 모습이 화면에 나온 다음 프레임에
+//   (예전: 누르는 순간 카드 전체를 다시 쌓고 옛 자리 · 새 자리를 모두 재느라 누른 표시까지 늦게 떠 툭툭 끊겼다)
+let folderSeq = 0;
 function setFolder(name) {
   const changed = name !== state.folder;
   state.folder = name;
@@ -499,12 +502,23 @@ function setFolder(name) {
   } catch {
     // 이번만
   }
-  render();
-  if (!changed) return;
-  const scroller = el.cards.closest('.view');
-  if (scroller) scroller.scrollTop = 0; // 다른 폴더는 처음부터
-  // 다른 폴더의 카드로 툭 바뀌지 않게: 살짝 떠오르며 나타난다
-  if (!reduceMotion()) el.cards.animate?.([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 160, easing: EASE_OUT });
+  if (!changed) return render();
+  markCurrentFolder(el.folderSide, name);
+  haptic(5);
+  const my = ++folderSeq;
+  requestAnimationFrame(() => setTimeout(() => {
+    if (my !== folderSeq) return; // 그사이 다른 폴더를 눌렀다
+    const scroller = el.cards.closest('.view');
+    if (scroller) scroller.scrollTop = 0; // 다른 폴더는 처음부터 (먼저 올려 두면 위쪽 카드만 그린다)
+    glideOff = true; // 다른 폴더의 카드는 대부분 다른 카드 — 옛 자리에서 미끄러질 것이 없다 (재는 일만 줄인다)
+    try {
+      render();
+    } finally {
+      glideOff = false;
+    }
+    // 다른 폴더의 카드로 툭 바뀌지 않게: 살짝 떠오르며 나타난다
+    if (!reduceMotion()) el.cards.animate?.([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 160, easing: EASE_OUT });
+  }, 0));
 }
 
 // ---------- 폴더 목록 (왼쪽 · PC 처럼 탐색기 모양) ----------

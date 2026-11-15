@@ -46,6 +46,13 @@ function folderButton({ name, label, count, current, iconName }) {
  *   total: 전체 메모 수
  */
 export function renderFolderList(container, { folders, current, total = 0, onPick, onNew, onMenu }) {
+  // 폴더 · 수가 그대로면 목록을 다시 만들지 않고 고른 줄만 바꾼다 (폴더를 누를 때마다 목록을 통째로 새로 만들고 이름 길이를 다시 재 멈칫했다)
+  const key = JSON.stringify([folders.map((f) => [f.name, f.label ?? '', f.count]), total, Boolean(onMenu)]);
+  if (container.mfKey === key && container.querySelector('.mf-list')) {
+    markCurrentFolder(container, current);
+    return;
+  }
+  container.mfKey = key;
   const list = el('ul', 'mf-list');
   list.setAttribute('aria-label', '폴더');
   const item = (b, name) => {
@@ -110,6 +117,16 @@ export function renderFolderList(container, { folders, current, total = 0, onPic
   container.replaceChildren(list, add);
   markLongNames(container);
   nameWatch.observe(container); // 접혀 있다 보이거나 폭이 바뀌면 다시 잰다
+}
+
+/** 고른 폴더 줄 표시만 바꾼다 (목록은 그대로) — 누르자마자 손가락 아래에서 바뀌게 */
+export function markCurrentFolder(container, current) {
+  for (const b of container.querySelectorAll('.mf-list [data-folder]')) {
+    const on = b.dataset.folder === (current ?? '');
+    if (on) b.setAttribute('aria-current', 'true');
+    else b.removeAttribute('aria-current');
+    b.tabIndex = on ? 0 : -1;
+  }
 }
 
 // 두 줄로도 다 안 들어가는 이름에 .long — 고른 폴더 · 끌어 올려놓은 폴더에서는 한 줄로 천천히 흘러 끝까지 보인다 (base.css)

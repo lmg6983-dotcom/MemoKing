@@ -747,6 +747,15 @@ export class Vault extends EventTarget {
     return new Set(this.trashEntries().map((t) => t?.meta?.id).filter(Boolean));
   }
 
+  /** 휴지통의 메모 수 — 파일을 읽지 않고 이름만 센다 (설정 화면을 열 때 휴지통 메모를 모두 읽어 멈칫했다) */
+  trashCount() {
+    try {
+      return fs.list(TRASH_DIR).filter((e) => !e.dir && e.name.toLowerCase().endsWith('.md')).length;
+    } catch {
+      return 0;
+    }
+  }
+
   trashList() {
     return this.trashEntries()
       .sort((a, b) => b.at - a.at)
