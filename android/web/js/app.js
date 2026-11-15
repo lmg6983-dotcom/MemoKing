@@ -679,7 +679,8 @@ async function deleteMemo(id, { flown = false } = {}) {
     name = app.vault.trash(id);
   } catch (err) {
     toast(err.message, true);
-    list.refresh();
+    if (inNote) app.showList(); // 메모 화면은 이미 닫았다 — 목록으로 (예전: 빈 화면에 남았다)
+    else list.refresh();
     return;
   }
   if (inNote) app.showList();

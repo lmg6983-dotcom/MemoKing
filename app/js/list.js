@@ -905,7 +905,9 @@ window.addEventListener('drop', async (e) => {
   if (el.main.hidden) return;
   // 폴더는 빼고 (폴더는 webkitGetAsEntry 로만 알 수 있다)
   const entries = [...e.dataTransfer.items].map((it) => it.webkitGetAsEntry?.());
-  const files = [...e.dataTransfer.files].filter((_f, i) => !entries[i]?.isDirectory).slice(0, MAX_DROP_FILES);
+  const all = [...e.dataTransfer.files].filter((_f, i) => !entries[i]?.isDirectory);
+  const files = all.slice(0, MAX_DROP_FILES);
+  const over = all.length - files.length; // 한 번에 넣는 수를 넘은 파일 (예전: 말없이 빠졌다)
   if (!files.length) return;
   const made = [];
   let failed = 0;
@@ -927,7 +929,7 @@ window.addEventListener('drop', async (e) => {
   }
   if (activeTab !== 'memos') showTab('memos');
   flashStatus(made.length
-    ? `파일 ${made.length}개로 메모를 만들었어요${failed ? ` (${failed}개는 못 만들었어요)` : ''}`
+    ? `파일 ${made.length}개로 메모를 만들었어요${failed ? ` (${failed}개는 못 만들었어요)` : ''}${over ? `. 한 번에 ${MAX_DROP_FILES}개까지라 ${over}개는 넣지 않았어요` : ''}`
     : '이 파일로는 메모를 만들지 못했어요');
 });
 
