@@ -887,9 +887,47 @@ function drawPrintSize() {
       const pages = main ? Math.max(1, Math.ceil((main.getBoundingClientRect().height - 1) / contentH)) : 0;
       const s = printSize();
       $('print-summary').textContent = `${Math.round(s.width)} × ${Math.round(s.height)}mm${pages > 1 ? ` · ${pages}쪽` : ''}`;
+      if (pages > 1) paginatePreview(frame, Math.min(pages, PREVIEW_PAGES), contentH);
     }, { once: true });
+    frame.style.height = ''; // 한 쪽 모양으로 (여러 쪽이면 load 뒤 paginatePreview 가 다시)
+    $('print-preview').classList.remove('multi');
+    $('print-preview').scrollTop = 0;
     frame.srcdoc = printDoc(printJob.id, true);
   }, 120);
+}
+// 여러 쪽 미리보기 (PC print.js paginate 와 같다): 본문을 쪽마다 복사해 쪽의 글 칸 높이만큼씩 올려 보이고, 미리보기 칸은 위아래로 넘긴다
+const PREVIEW_PAGES = 30; // 이보다 긴 메모는 앞 30쪽만 (복사본이 많으면 시트가 무거워진다)
+const PREVIEW_GAP = 28; // 쪽 사이 (print.css .pv-pages)
+function paginatePreview(frame, n, contentH) {
+  const d = frame.contentDocument;
+  const main = d?.querySelector('main');
+  if (!main) return;
+  const date = d.querySelector('.print-date');
+  const list = d.createElement('div');
+  list.className = 'pv-pages';
+  for (let i = 0; i < n; i++) {
+    const page = d.createElement('section');
+    page.className = 'pv-page';
+    const view = d.createElement('div');
+    view.className = 'pv-view';
+    const flow = d.createElement('div');
+    flow.style.transform = `translateY(${-i * contentH}px)`;
+    flow.append(main.cloneNode(true));
+    if (date) flow.append(date.cloneNode(true));
+    view.append(flow);
+    page.append(view);
+    list.append(page);
+  }
+  main.remove();
+  date?.remove();
+  d.body.append(list);
+  d.documentElement.classList.add('multi');
+  const full = pageFullPx(printSize()).height;
+  const total = n * full + (n - 1) * PREVIEW_GAP;
+  frame.style.height = `${total}px`;
+  const box = $('print-preview');
+  box.classList.add('multi');
+  box.querySelector('.pv-spacer')?.style.setProperty('height', `${total * Number(box.style.getPropertyValue('--fit') || 0.35)}px`);
 }
 function fitPreview() {
   const box = $('print-preview');

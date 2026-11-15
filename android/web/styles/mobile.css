@@ -847,6 +847,10 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 /* PDF · 인쇄 내용 크기 (app.js openPrint) — A4 첫 쪽을 시트 폭에 맞춰 줄여 보인다 */
 .print-preview { position: relative; width: min(100%, 280px); aspect-ratio: var(--page-ratio, 794 / 1123); margin: 0 auto 12px; overflow: hidden; border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
 .print-preview iframe { position: absolute; top: 0; left: 0; width: var(--page-pw, 794px); height: var(--page-ph, 1123px); border: 0; transform: scale(var(--fit, 0.35)); transform-origin: 0 0; pointer-events: none; }
+/* 여러 쪽: 칸은 한 쪽 크기 그대로, 안에서 위아래로 넘긴다 (줄여 보인 높이만큼 자리를 잡는 빈 칸) — 쪽 사이는 시트 바탕색 */
+.print-preview .pv-spacer { display: none; }
+.print-preview.multi { overflow-y: auto; overscroll-behavior: contain; background: var(--surface-2, #ececea); }
+.print-preview.multi .pv-spacer { display: block; }
 .print-size .seg { margin-bottom: 8px; }
 .print-label { margin: 6px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
 body.sheet-open .mk-date-chip { visibility: hidden; } /* 시트가 열리면 메모의 날짜 알약은 숨긴다 (시트 제목 위에 겹쳤다) */
