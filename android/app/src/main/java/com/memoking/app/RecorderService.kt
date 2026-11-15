@@ -495,11 +495,22 @@ object RecordStore {
         JSONArray()
     }
 
+    // 임시 파일에 쓰고 바꿔치기 — 쓰는 도중 꺼져 목록이 깨지면 아직 메모에 넣지 않은 녹음들을 모두 잊었다
+    private fun save(ctx: Context, arr: JSONArray) {
+        val target = list(ctx)
+        val tmp = File(target.parentFile, "done.json.tmp")
+        tmp.writeText(arr.toString())
+        if (!tmp.renameTo(target)) {
+            tmp.copyTo(target, overwrite = true)
+            tmp.delete()
+        }
+    }
+
     @Synchronized
     fun add(ctx: Context, result: JSONObject) {
         val arr = all(ctx)
         arr.put(result)
-        list(ctx).writeText(arr.toString())
+        save(ctx, arr)
     }
 
     /** 아직 메모에 넣지 않은 것 (소리 파일이 남아 있는 것만) */
@@ -522,7 +533,7 @@ object RecordStore {
             val r = arr.getJSONObject(i)
             if (r.optString("id") == id) file(ctx, r.optString("temp"))?.delete() else keep.put(r)
         }
-        list(ctx).writeText(keep.toString())
+        save(ctx, keep)
     }
 
     /** "rec-<id>" → 녹음 파일 (Temp.file 이 함께 찾는다) */
