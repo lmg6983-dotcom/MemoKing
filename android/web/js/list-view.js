@@ -677,7 +677,7 @@ function hintCards() {
   if (state.tab !== 'memos') return; // 그사이 일정 · 보관함 탭으로 갔으면 다음에 (달력 위에 메모 카드 안내가 뜨지 않게)
   const card = document.querySelector('.item .card');
   if (!card?.getClientRects().length) return; // 목록이 안 보이면 다음에
-  hintOnce('card-gestures', '카드를 오른쪽으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 메뉴가 뜨고, 꾹 누른 채 끌면 폴더로 옮길 수 있어요', { anchor: card });
+  hintOnce('card-gestures', '카드를 오른쪽으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 메뉴가 뜨고, 꾹 누르거나 왼쪽으로 당긴 채 멈추면 들려서 폴더로 옮길 수 있어요', { anchor: card });
 }
 
 // ---------- 필터 ----------
@@ -846,13 +846,17 @@ el.cards.addEventListener('click', (e) => {
   if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect() }); // 그 카드가 커지며 메모 화면이 된다
 });
 // 카드 손짓 (휴대폰)
-//   - 오른쪽으로 밀기: 휴지통으로 (묻지 않고, 되돌리기 가능). 왼쪽은 살짝만 따라오고 돌아온다 (태블릿 두 칸 화면은 열기)
+//   - 오른쪽으로 밀기: 휴지통으로 (묻지 않고, 되돌리기 가능)
+//   - 왼쪽으로 당긴 채 잠깐 멈추면 카드가 톡 튀어 올라 끌기로 — 왼쪽 폴더 목록에 놓아 옮긴다
+//     (iOS 홈 화면 · Gmail 처럼 "당기고 기다리면 들린다"). 그냥 놓으면 제자리 (태블릿 두 칸 화면은 왼쪽이 열기)
 //   - 꾹 누르기: 카드가 들리고, 그대로 떼면 메뉴 · 끌면 왼쪽 폴더 목록에 놓아 그 폴더로 옮긴다
 //   - 위아래로 훑기는 스크롤: 방향은 처음 12px 에서 한 번만 정하고, 가로가 세로의 1.5배를 넘어야 밀기.
 //     스크롤이 아직 미끄러지는 중(멈춘 지 0.25초 안)에 닿은 손가락은 밀기를 시작하지 않는다 (훑다가 지워지던 것)
 //   카드는 손가락을 프레임마다 한 번만(requestAnimationFrame) 따라가고, 미는 동안은 따로 그리는 층(will-change)이다.
 //   미는 카드의 칸에는 .mk-live — 화면 밖 칸의 그리기 건너뛰기(base.css)가 칸 밖으로 나간 카드를 자르지 않게
 const HOLD_MS = 280; // 꾹 눌러 끌기를 기다리는 때 (길면 끌기가 굼떠 보인다)
+const PULL_HOLD_MS = 300; // 왼쪽으로 당긴 채 이만큼 멈추면 끌기로
+const PULL_MIN = 24; // 이만큼 당겨야 기다리기 시작 (살짝 흔들린 것은 아니다)
 let swipe = null;
 let swipeFrame = 0;
 let lastScroll = 0;
@@ -892,12 +896,14 @@ function drawSwipe() {
     return;
   }
   if (dx < 0) {
-    // 왼쪽: 지우지 않는다 — 고무줄처럼 조금만 따라온다
+    // 왼쪽: 지우지 않는다 — 고무줄처럼 조금만 따라오고, 충분히 당기면 "폴더로" 표시 (그대로 멈추면 들린다)
     card.style.transform = `translate3d(${Math.max(dx * 0.25, -28)}px, 0, 0)`;
     card.style.opacity = '';
     card.classList.remove('swipe-ready');
+    card.classList.toggle('swipe-folder', -dx >= PULL_MIN);
     return;
   }
+  card.classList.remove('swipe-folder');
   card.style.transform = `translate3d(${dx}px, 0, 0) rotate(${dx / w * 4}deg)`;
   card.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / w * 0.7));
   card.classList.toggle('swipe-ready', dx > w * 0.4);
@@ -944,11 +950,39 @@ el.cards.addEventListener('touchmove', (e) => {
   if (dt > 0) swipe.vx = (nx - swipe.dx) / dt;
   swipe.t = e.timeStamp;
   swipe.dx = nx;
+  swipe.lx = t.clientX;
+  swipe.ly = t.clientY;
+  // 왼쪽으로 충분히 당겼으면 멈추기를 기다린다 — 그사이 많이 움직이면 다시 기다린다
+  if (!isTwoPane() && -nx >= PULL_MIN) {
+    if (!swipe.pull || Math.hypot(t.clientX - swipe.pull.x, t.clientY - swipe.pull.y) > 12) {
+      clearTimeout(swipe.pull?.timer);
+      swipe.pull = { x: t.clientX, y: t.clientY, timer: setTimeout(pullToDrag, PULL_HOLD_MS) };
+    }
+  } else if (swipe.pull) {
+    clearTimeout(swipe.pull.timer);
+    swipe.pull = null;
+  }
   if (!swipeFrame) swipeFrame = requestAnimationFrame(drawSwipe);
 }, { passive: false });
 
+// 왼쪽으로 당긴 채 멈춤 → 카드가 톡 튀어 올라 끌기로 (손가락은 떼지 않은 채 그대로 폴더로)
+function pullToDrag() {
+  if (!swipe?.active || swipe.drag) return;
+  const { card } = swipe;
+  cancelAnimationFrame(swipeFrame);
+  swipeFrame = 0;
+  el.screen.classList.remove('swipe-lock');
+  card.classList.remove('swiping', 'swipe-ready', 'swipe-folder');
+  card.style.transform = card.style.opacity = '';
+  swipe.active = false;
+  swipe.held = true;
+  swipe.pull = null;
+  haptic(14);
+  startDrag(swipe.lx, swipe.ly, { pop: true });
+}
+
 // ---------- 꾹 눌러 끌어 폴더에 넣기 ----------
-function startDrag(x, y) {
+function startDrag(x, y, { pop = false } = {}) {
   const { card } = swipe;
   const r = card.getBoundingClientRect();
   const clone = card.cloneNode(true);
@@ -967,11 +1001,22 @@ function startDrag(x, y) {
   }
   swipe.drag = { clone, x, y, over: null };
   moveDrag(x, y);
+  // 당겨서 들었으면 한 번 톡 튄다 (들렸다는 것을 손끝과 눈으로)
+  if (pop && !reduceMotion()) clone.animate([{ scale: '1' }, { scale: '1.08' }, { scale: '1' }], { duration: 220, easing: EASE_OUT, composite: 'add' });
 }
 
 function moveDrag(x, y) {
   const d = swipe.drag;
   const row = document.elementFromPoint(x, y)?.closest('#folder-side [data-folder]') ?? null;
+  // 폴더가 많아 목록이 넘치면: 목록의 위 · 아래 끝 가까이로 끌면 그쪽으로 넘겨 준다
+  const side = el.folderSide;
+  if (side.scrollHeight > side.clientHeight) {
+    const r = side.getBoundingClientRect();
+    if (x >= r.left && x <= r.right) {
+      if (y < r.top + 44) side.scrollTop -= 14;
+      else if (y > r.bottom - 44) side.scrollTop += 14;
+    }
+  }
   if (row !== d.overRow) {
     d.overRow?.classList.remove('drop-on');
     row?.classList.add('drop-on');
@@ -1024,6 +1069,7 @@ function endSwipe(e) {
   // 다른 손가락만 뗀 경우는 계속 민다
   if (e?.touches && [...e.touches].some((x) => x.identifier === swipe.id)) return;
   clearTimeout(swipe.hold);
+  clearTimeout(swipe.pull?.timer);
   if (swipe.drag) {
     endDrag(e?.type === 'touchend');
     swipe = null;
@@ -1047,7 +1093,7 @@ function endSwipe(e) {
   swipeFrame = 0;
   el.screen.classList.remove('swipe-lock');
   const opening = card.classList.contains('swipe-open');
-  card.classList.remove('swiping', 'swipe-ready', 'swipe-open', 'lifted');
+  card.classList.remove('swiping', 'swipe-ready', 'swipe-open', 'lifted', 'swipe-folder');
   const w = card.offsetWidth || 1;
   const settle = () => {
     card.style.transition = `transform 0.2s ${EASE_OUT}, opacity 0.2s`;

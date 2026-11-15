@@ -542,7 +542,9 @@ body.is-dragging .folder-side .mf-more, body.is-dragging .folder-side .mf-new { 
 .memos-col > .folder-chips { margin: 0 12px 6px; }
 .toolbar .folder-btn[hidden] { display: none; }
 .toolbar .folder-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); }
-.toolbar .folder-btn[aria-pressed="true"] { color: var(--text-strong); background: var(--hover); }
+/* 펴져 있을 때는 그림만 진하게 (큰 회색 바탕은 옆 단추들보다 무거웠다) */
+.toolbar .folder-btn { color: var(--muted); }
+.toolbar .folder-btn[aria-pressed="true"] { color: var(--text-strong); background: none; }
 body:not([data-tab="memos"]) .folder-btn { display: none; }
 
 .filter-summary {

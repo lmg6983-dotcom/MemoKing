@@ -103,7 +103,9 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .searchbar .search { order: 10; flex: 1 1 0; min-width: 0; }
 .searchbar .filter-btn { order: 11; }
 .searchbar .folder-btn { order: 10; margin-right: 2px; } /* 검색창 왼쪽 (PC 와 같은 자리) */
-.searchbar .folder-btn[aria-pressed="true"] { color: var(--text-strong); background: var(--hover); }
+/* 펴져 있을 때는 그림만 진하게 — 큰 회색 바탕은 옆의 검색창 · 보기 단추보다 무거웠다 */
+.searchbar .folder-btn { color: var(--muted); }
+.searchbar .folder-btn[aria-pressed="true"] { color: var(--text-strong); background: none; }
 .searchbar::after { content: ""; order: 9; flex-basis: 100%; height: 0; } /* 줄 바꿈 */
 .search {
   display: flex;
@@ -912,6 +914,8 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .card.swiping.swipe-ready::before { opacity: 1; transform: none; }
 /* 태블릿: 오른쪽으로 밀면 열기 (지우기는 왼쪽으로만) — 안내는 카드 왼쪽 안에 (옆 메모 칸에 가리지 않게) */
 .card.swipe-open.swipe-ready { box-shadow: 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
+/* 왼쪽으로 당기면: 오른쪽 끝에 "폴더로" — 그대로 멈추면 카드가 들려 폴더로 끈다 (list-view.js pullToDrag) */
+.card.swipe-folder::before { content: "폴더로"; left: auto; right: 10px; background: var(--brand-yellow); color: var(--on-brand); opacity: 1; transform: none; }
 .card.swipe-open.swipe-ready::before { content: attr(data-open-label); left: auto; right: 10px; background: var(--brand-yellow); color: var(--on-brand); }
 .note-screen.trashing { animation: note-trash 0.26s var(--ease-out) forwards; transform-origin: 85% 100%; }
 @keyframes note-trash { to { opacity: 0; transform: translateY(30%) scale(0.35) rotate(-6deg); border-radius: 40px; } }
