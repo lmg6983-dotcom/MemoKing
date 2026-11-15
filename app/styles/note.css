@@ -2459,3 +2459,5 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 @keyframes mk-dropped-img { 0% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--note-text) 16%, transparent); } 100% { box-shadow: 0 0 0 6px transparent; } }
 .mk-doc p.mk-delete-target > .mk-image.mk-sized { outline: 1.5px solid color-mix(in srgb, var(--rec) 55%, transparent); outline-offset: 3px; border-radius: var(--radius-lg); }
 .mk-doc p.mk-block-pressing > .mk-image.mk-sized { border-radius: 8px; animation: mk-block-press 0.32s linear forwards; }
+/* 막 뜬 내용 단추 줄: 누름을 받지 않는 0.35초 동안 흐리게 (delete-button.js mk-arming) */
+:is(.mk-delete-btn, .mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).mk-arming { opacity: 0.45; transition: opacity 0.2s ease-out; }

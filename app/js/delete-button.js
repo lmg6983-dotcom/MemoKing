@@ -284,6 +284,9 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   // 막 뜬 단추는 잠깐 누름을 받지 않는다 — 두 번 눌러 크게 보려던 두 번째 누름이 손가락 밑에 뜬 단추(지우기 등)에 떨어져
   //   그대로 지워질 수 있었다 (단추는 닿는 순간 동작한다). 키보드(click detail 0)는 그대로
   const shownAt = performance.now();
+  // 누를 수 없는 그동안은 흐리게 — 또렷해지면 누를 수 있다 (고장으로 보이지 않게)
+  for (const b of [btn, ...extras]) b.classList.add('mk-arming');
+  setTimeout(() => { for (const b of [btn, ...extras]) b.classList.remove('mk-arming'); }, 350);
   const tooSoon = (e) => {
     if (e.type === 'click' && e.detail === 0) return false;
     if (performance.now() - shownAt >= 350) return false;
