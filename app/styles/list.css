@@ -1124,3 +1124,6 @@ body > :is(.mem-album, .mem-preview)::before { content: ''; position: absolute; 
 /* 휴지통 줄을 누르면 펼쳐 보는 글 (되살리기 전에) */
 .trash-text { cursor: pointer; }
 .trash-body { margin-top: 6px; max-height: 180px; overflow-y: auto; font-size: 12.5px; line-height: 1.55; color: var(--text); white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
+/* 알림 보관함: 하루에 같은 앱 알림이 많으면 "N개 더" 한 줄로 묶는다 (list-history.js) */
+.noti-more { display: block; width: 100%; padding: 6px 12px 10px 56px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.noti-more:hover { color: var(--text-strong); }

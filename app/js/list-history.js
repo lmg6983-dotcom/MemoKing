@@ -226,6 +226,22 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
     });
   }
 
+  const GROUP_SHOW = 3;
+  const openGroups = new Set(); // 펼친 묶음 (`${날} ${앱}`)
+  function moreRow(key, appName) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'row noti-more';
+    b.dataset.group = key;
+    b.dataset.app = appName;
+    b.append(document.createElement('span'));
+    b.addEventListener('click', () => {
+      openGroups.add(key);
+      render();
+    });
+    return b;
+  }
+
   function render() {
     els.consent.hidden = data.enabled || data.total > 0;
     els.clear.disabled = !data.total; // 비울 것이 없으면
@@ -263,8 +279,24 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
 
     const nodes = [];
     let lastDay = '';
+    // 앱별로 묶기: 하루에 같은 앱 알림이 많으면 앞의 3개만 보이고 나머지는 "N개 더" 한 줄로 (누르면 펼친다).
+    //   한 앱만 보거나 찾는 중이면 묶지 않는다
+    const fold = !app && !query;
+    let seen = new Map(); // 그날 앱 → 보인 수
+    const extra = new Map(); // `${날} ${앱}` → 접힌 수
     for (const e of data.entries) {
       const day = dayLabel(new Date(e.time));
+      if (fold) {
+        const k = `${day}\u0000${e.app}`;
+        if (day !== lastDay) seen = new Map();
+        const n = (seen.get(e.app) ?? 0) + 1;
+        seen.set(e.app, n);
+        if (n > GROUP_SHOW && !openGroups.has(k)) {
+          extra.set(k, (extra.get(k) ?? 0) + 1);
+          if (extra.get(k) === 1) nodes.push(moreRow(k, e.app)); // 그 앱의 3번째 알림 바로 뒤
+          continue;
+        }
+      }
       if (day !== lastDay) {
         const h = document.createElement('h3');
         h.className = 'rows-title';
@@ -274,6 +306,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
       }
       nodes.push(pendingRemoval.get(e.id)?.strip ?? row(e)); // 되돌리기를 기다리는 중이면 그 띠를 그대로
     }
+    for (const n of nodes) if (n.dataset?.group) n.querySelector('span').textContent = `${n.dataset.app} 알림 ${extra.get(n.dataset.group)}개 더`;
     els.rows.replaceChildren(...nodes);
     els.empty.hidden = data.entries.length > 0;
     els.empty.textContent = query || app
