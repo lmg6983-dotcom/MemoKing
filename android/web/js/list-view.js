@@ -677,7 +677,7 @@ function hintCards() {
   if (state.tab !== 'memos') return; // 그사이 일정 · 보관함 탭으로 갔으면 다음에 (달력 위에 메모 카드 안내가 뜨지 않게)
   const card = document.querySelector('.item .card');
   if (!card?.getClientRects().length) return; // 목록이 안 보이면 다음에
-  hintOnce('card-gestures', '카드를 왼쪽으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 메뉴가 뜨고, 꾹 누른 채 끌면 폴더로 옮길 수 있어요', { anchor: card });
+  hintOnce('card-gestures', '카드를 오른쪽으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 메뉴가 뜨고, 꾹 누른 채 끌면 폴더로 옮길 수 있어요', { anchor: card });
 }
 
 // ---------- 필터 ----------
@@ -846,13 +846,13 @@ el.cards.addEventListener('click', (e) => {
   if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect() }); // 그 카드가 커지며 메모 화면이 된다
 });
 // 카드 손짓 (휴대폰)
-//   - 왼쪽으로 밀기: 휴지통으로 (묻지 않고, 되돌리기 가능). 오른쪽은 살짝만 따라오고 돌아온다 (태블릿 두 칸 화면은 열기)
+//   - 오른쪽으로 밀기: 휴지통으로 (묻지 않고, 되돌리기 가능). 왼쪽은 살짝만 따라오고 돌아온다 (태블릿 두 칸 화면은 열기)
 //   - 꾹 누르기: 카드가 들리고, 그대로 떼면 메뉴 · 끌면 왼쪽 폴더 목록에 놓아 그 폴더로 옮긴다
 //   - 위아래로 훑기는 스크롤: 방향은 처음 12px 에서 한 번만 정하고, 가로가 세로의 1.5배를 넘어야 밀기.
 //     스크롤이 아직 미끄러지는 중(멈춘 지 0.25초 안)에 닿은 손가락은 밀기를 시작하지 않는다 (훑다가 지워지던 것)
 //   카드는 손가락을 프레임마다 한 번만(requestAnimationFrame) 따라가고, 미는 동안은 따로 그리는 층(will-change)이다.
 //   미는 카드의 칸에는 .mk-live — 화면 밖 칸의 그리기 건너뛰기(base.css)가 칸 밖으로 나간 카드를 자르지 않게
-const HOLD_MS = 450;
+const HOLD_MS = 280; // 꾹 눌러 끌기를 기다리는 때 (길면 끌기가 굼떠 보인다)
 let swipe = null;
 let swipeFrame = 0;
 let lastScroll = 0;
@@ -880,27 +880,27 @@ function drawSwipe() {
   swipeFrame = 0;
   if (!swipe?.active) return;
   const { card, dx, w } = swipe;
-  // 태블릿: 오른쪽으로 밀면 열기 — 카드는 목록 안에서만 살짝 따라온다
-  const open = isTwoPane() && dx > 0;
+  // 태블릿: 왼쪽으로 밀면 열기 — 카드는 목록 안에서만 살짝 따라온다
+  const open = isTwoPane() && dx < 0;
   card.classList.toggle('swipe-open', open);
   if (open) {
-    const pull = Math.min(dx, w * 0.32) + Math.max(0, dx - w * 0.32) * 0.15;
+    const pull = Math.min(-dx, w * 0.32) + Math.max(0, -dx - w * 0.32) * 0.15;
     card.dataset.openLabel = '열기 ▸';
-    card.style.transform = `translate3d(${pull}px, 0, 0)`;
+    card.style.transform = `translate3d(${-pull}px, 0, 0)`;
     card.style.opacity = '';
-    card.classList.toggle('swipe-ready', dx > w * 0.28);
+    card.classList.toggle('swipe-ready', -dx > w * 0.28);
     return;
   }
-  if (dx > 0) {
-    // 오른쪽: 지우지 않는다 — 고무줄처럼 조금만 따라온다
-    card.style.transform = `translate3d(${Math.min(dx * 0.25, 28)}px, 0, 0)`;
+  if (dx < 0) {
+    // 왼쪽: 지우지 않는다 — 고무줄처럼 조금만 따라온다
+    card.style.transform = `translate3d(${Math.max(dx * 0.25, -28)}px, 0, 0)`;
     card.style.opacity = '';
     card.classList.remove('swipe-ready');
     return;
   }
   card.style.transform = `translate3d(${dx}px, 0, 0) rotate(${dx / w * 4}deg)`;
   card.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / w * 0.7));
-  card.classList.toggle('swipe-ready', -dx > w * 0.4);
+  card.classList.toggle('swipe-ready', dx > w * 0.4);
 }
 
 el.cards.addEventListener('touchmove', (e) => {
@@ -917,7 +917,7 @@ el.cards.addEventListener('touchmove', (e) => {
   const dy = t.clientY - swipe.y;
   if (swipe.held) {
     // 들어 올린 뒤 움직이면 끌기 (폴더에 넣기) — 밀어 지우기가 아니다
-    if (Math.hypot(dx, dy) < 8) return;
+    if (Math.hypot(dx, dy) < 5) return;
     if (e.cancelable) e.preventDefault();
     startDrag(t.clientX, t.clientY);
     return;
@@ -1060,7 +1060,7 @@ function endSwipe(e) {
   };
   if (opening) {
     settle();
-    if (dx > w * 0.28) {
+    if (-dx > w * 0.28) {
       card.dataset.swiped = '1';
       setTimeout(() => delete card.dataset.swiped, 400);
       haptic(8);
@@ -1068,13 +1068,13 @@ function endSwipe(e) {
     }
     return;
   }
-  // 왼쪽으로 멀리 밀었거나, 왼쪽으로 휙 튕겼으면 (빠르기 0.35px/ms 넘고 폭의 1/5 넘게) 지운다
-  const flick = vx < -0.35 && dx < -w * 0.2;
-  if (dx < -w * 0.4 || flick) {
+  // 오른쪽으로 멀리 밀었거나, 오른쪽으로 휙 튕겼으면 (빠르기 0.35px/ms 넘고 폭의 1/5 넘게) 지운다
+  const flick = vx > 0.35 && dx > w * 0.2;
+  if (dx > w * 0.4 || flick) {
     // 카드가 끝까지 날아간 뒤에 지운다 — 날아가는 중에 목록을 다시 그리면(무거운 일) 카드가 중간에 멈칫했다
     card.classList.add('flying');
     card.style.transition = `transform 0.2s ${EASE_OUT}, opacity 0.2s ${EASE_OUT}`;
-    card.style.transform = `translate3d(${-w * 1.3}px, 0, 0) rotate(-8deg)`;
+    card.style.transform = `translate3d(${w * 1.3}px, 0, 0) rotate(8deg)`;
     card.style.opacity = '0';
     card.dataset.swiped = '1';
     let done = false;
