@@ -412,7 +412,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
     : narrowed
     ? state.query ? `'${state.query}' 검색 결과가 없어요.` : UI.noMatch
     : state.folder === UNFILED ? `${UNFILED_LABEL} 메모가 없어요.\n모든 메모가 폴더에 들어 있어요. 여기서 쓰는 새 메모는 폴더 없이 만들어져요.`
-    : state.folder ? `${state.folder} 폴더가 비어 있어요.\n여기서 쓰는 새 메모는 이 폴더에 들어가요. 메모를 꾹 눌러 "폴더로 옮기기" 해도 돼요.`
+    : state.folder ? `${state.folder} 폴더가 비어 있어요.\n여기서 쓰는 새 메모는 이 폴더에 들어가요. 다른 메모를 꾹 눌러 끌어 이 폴더에 놓아도 돼요.`
     : state.mode === 'work' ? '아직 Work 메모가 없어요.\n일할 때 쓸 메모를 적거나, 메모를 꾹 눌러 "Work로 옮기기" 해 보세요.'
       : '아직 메모가 없어요.\n떠오른 생각을 바로 적거나 말로 남겨 보세요.';
   const actions = document.createElement('span');
@@ -677,7 +677,7 @@ function hintCards() {
   if (state.tab !== 'memos') return; // 그사이 일정 · 보관함 탭으로 갔으면 다음에 (달력 위에 메모 카드 안내가 뜨지 않게)
   const card = document.querySelector('.item .card');
   if (!card?.getClientRects().length) return; // 목록이 안 보이면 다음에
-  hintOnce('card-gestures', '카드를 옆으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 색, 고정, 공유 메뉴가 떠요', { anchor: card });
+  hintOnce('card-gestures', '카드를 왼쪽으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 메뉴가 뜨고, 꾹 누른 채 끌면 폴더로 옮길 수 있어요', { anchor: card });
 }
 
 // ---------- 필터 ----------

@@ -1286,7 +1286,8 @@ body.picking #fab { display: none; }
 /* ========== 메모 탭: 왼쪽 폴더 목록 + 카드 (PC 처럼 탐색기 모양 — folder-ui.js renderFolderList) ==========
    메모 칸은 그대로 하나의 스크롤. 폴더 목록은 왼쪽 칸에 붙어(sticky) 카드를 내려도 그 자리에 있고, 넘치면 따로 스크롤한다.
    줄 번호를 정해 두어(보기 패널 1 · 목록 2~ · 오른쪽 칸 2~5) 숨은 것이 있어도 목록과 카드가 같은 줄에서 시작한다 */
-#view-memos { display: grid; grid-template-columns: [side] auto [main] minmax(0, 1fr); grid-auto-rows: min-content; align-content: start; }
+#view-memos { display: grid; grid-template-columns: [side] auto [main] minmax(0, 1fr); grid-auto-rows: min-content; align-content: start; padding-bottom: 0; }
+/* 아래 + 단추 자리는 카드 칸의 아래 여백(.cards)이 맡는다 — 메모 칸 자체에 여백을 두면 폴더 목록이 붙어 있을 칸이 그만큼 짧아져, 끝까지 내리면 목록이 위로 밀려 "전체" 가 가려졌다 */
 #view-memos > * { grid-column: main; }
 #view-memos > .filter-panel { grid-column: side / -1; grid-row: 1; }
 #view-memos > .filter-summary { grid-row: 2; }
@@ -1306,11 +1307,11 @@ body.picking #fab { display: none; }
 .folder-side .mf-item svg { width: 15px; height: 15px; }
 .folder-side .mf-count { font-size: 11.5px; }
 .folder-side .mf-more { display: none; } /* 이름 바꾸기 · 지우기는 폴더를 꾹 눌러 (좁은 목록에서 이름 자리를 지킨다) */
-.folder-side .mf-new {
-  position: sticky; bottom: -10px; display: flex; align-items: center; width: 100%; min-height: 42px; margin: 4px 0 0; padding: 8px;
+#view-memos > .folder-side .mf-new { /* 누르는 자리를 넓히는 .link-btn 의 position 보다 앞서게 */
+  position: sticky; bottom: -10px; z-index: 1; display: flex; align-items: center; width: 100%; min-height: 42px; margin: 4px 0 0; padding: 8px;
   border-radius: var(--radius-sm); background: var(--bg); color: var(--muted); font-size: 13px; font-weight: 600; text-decoration: none; text-align: left;
 }
-.folder-side .mf-new:active { background: var(--hover); }
+#view-memos > .folder-side .mf-new:active { background: var(--hover); }
 
 /* 꾹 눌러 들어 올린 카드 · 끄는 동안 */
 .card.lifted { transform: scale(1.03); box-shadow: var(--shadow-pop); transition: transform 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out); }

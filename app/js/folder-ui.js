@@ -22,7 +22,7 @@ function folderButton({ name, label, count, current, iconName }) {
   b.title = name === UNFILED ? '어느 폴더에도 넣지 않은 메모' : label; // 긴 이름은 잘려 보이므로 전체 이름
   if (current) b.setAttribute('aria-current', 'true');
   b.append(icon(iconName), el('span', 'mf-name', label));
-  if (count != null) b.append(el('small', 'mf-count', String(count)));
+  if (count) b.append(el('small', 'mf-count', String(count))); // 0 은 적지 않는다 (빈 폴더가 많아도 목록이 조용하게 — 칩 줄과 같게)
   return b;
 }
 
