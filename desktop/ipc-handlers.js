@@ -850,7 +850,7 @@ export function registerIpc(ctx) {
       if (r.canceled || !r.filePath) return { cancelled: true };
       file = r.filePath;
     }
-    fs.writeFileSync(file, Buffer.from(String(base64), 'base64'));
+    await fs.promises.writeFile(file, Buffer.from(String(base64), 'base64'));
     return { file, name: path.basename(file) };
   });
   ipcMain.handle('pdf:open', (_e, id) => wm.openPdfWindow(String(id)));
@@ -876,11 +876,11 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 첨부 파일 ----------
-  ipcMain.handle('attachment:read', (_e, rel) => {
+  ipcMain.handle('attachment:read', async (_e, rel) => {
     const file = getVault()?.resolve(String(rel ?? ''));
     if (!file || !fs.existsSync(file)) throw new Error('파일을 찾지 못했어요. 메모 폴더에서 삭제됐거나 옮겨졌는지 확인해 주세요');
     if (fs.statSync(file).size > 500 * 1024 * 1024) throw new Error('파일이 너무 커요 (500MB 넘음). 더 작은 파일로 해 주세요');
-    return new Uint8Array(fs.readFileSync(file));
+    return new Uint8Array(await fs.promises.readFile(file)); // 큰 파일을 읽는 동안 모든 창이 멈추지 않게
   });
   ipcMain.handle('attachment:save', (_e, bytes, ext) => {
     const vault = getVault();
