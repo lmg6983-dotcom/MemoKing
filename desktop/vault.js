@@ -748,7 +748,13 @@ export class Vault extends EventEmitter {
     let trashed = null;
     if (entry.file) {
       const base = path.posix.basename(entry.file, '.md');
-      const dest = path.join(this.trashDir, `${base} (${stamp()}).md`);
+      // 같은 제목을 같은 초에 지우면(다른 폴더의 "회의" 둘을 함께 등) 이름이 겹쳐 앞의 것을 덮어썼다 → 겹치면 (2)
+      //   지운 시각은 늘 이름 끝에 (trashedAt 이 읽는다)
+      let dest;
+      for (let n = 1; ; n++) {
+        dest = path.join(this.trashDir, `${base}${n > 1 ? ` (${n})` : ''} (${stamp()}).md`);
+        if (!fs.existsSync(dest)) break;
+      }
       try {
         fs.renameSync(this.abs(entry.file), dest);
         trashed = path.basename(dest);

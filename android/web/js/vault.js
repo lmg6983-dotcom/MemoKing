@@ -663,7 +663,12 @@ export class Vault extends EventTarget {
     this.entries.delete(id);
     let trashed = null;
     if (entry.file && fs.stat(entry.file)) {
-      const dest = `${TRASH_DIR}/${stripMd(baseName(entry.file))} (${stamp()}).md`;
+      // 같은 제목을 같은 초에 지우면 이름이 겹쳐 옮기기가 실패하거나 앞의 것을 덮어썼다 → 겹치면 (2) (지운 시각은 늘 이름 끝에)
+      let dest;
+      for (let n = 1; ; n++) {
+        dest = `${TRASH_DIR}/${stripMd(baseName(entry.file))}${n > 1 ? ` (${n})` : ''} (${stamp()}).md`;
+        if (!fs.stat(dest)) break;
+      }
       trashed = baseName(dest);
       if (!fs.move(entry.file, dest)) {
         this.entries.set(id, entry);
