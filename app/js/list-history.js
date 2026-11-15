@@ -29,8 +29,12 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
   let app = '';
   let data = { enabled: false, total: 0, apps: [], entries: [] };
 
+  let seq = 0; // 늦게 온 앞 검색 결과가 마지막 것을 덮어쓰지 않게
   async function refresh() {
-    data = await api.history.list({ query, app });
+    const mine = ++seq;
+    const next = await api.history.list({ query, app });
+    if (mine !== seq) return;
+    data = next;
     render();
   }
 
