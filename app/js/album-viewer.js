@@ -21,11 +21,16 @@ const el = (tag, cls, attrs = {}) => Object.assign(document.createElement(tag), 
  * @param {{ images: { src: string, alt: string, inked?: boolean }[], start: number, url: (src: string) => string,
  *           onDraw?: (index: number, png: Blob) => Promise<string|null>,
  *           onSave?: (index: number) => Promise<string|null>, onShare?: (index: number) => Promise<void>,
- *           onDelete?: (index: number) => object[]|null, onUndo?: () => object[] }} o
+ *           onDelete?: (index: number) => object[]|null, onUndo?: () => object[],
+ *           onRotate?: (index: number) => Promise<string|null>, onSplit?: () => boolean }} o
+ *   onRotate: 이 장을 오른쪽으로 90도 돌려 저장하고 새 src · onSplit: 묶음을 풀어 한 장씩 따로 (풀었으면 true — 보기를 닫는다)
  *   onDraw: 그린 장(PNG)을 저장하고 새 src 를 돌려준다 · onSave: 이 장 저장 (알릴 말) · onShare: 이 장 공유 (휴대폰)
  *   onDelete: 이 장을 묶음에서 빼고 남은 장들 · onUndo: 방금 뺀 것 되돌리기 → 장들. 없는 것은 단추도 없다 (읽기 전용)
  */
-export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShare, onDelete, onUndo }) {
+const ROTATE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
+const SPLIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M14 7h4v4M10 17H6v-4"/></svg>';
+
+export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShare, onDelete, onUndo, onRotate, onSplit }) {
   let i = Math.max(0, Math.min(images.length - 1, start));
   const view = el('div', 'mk-album-view', { role: 'dialog', ariaModal: 'true', ariaLabel: images.length > 1 ? '묶음 사진' : '사진 크게 보기' });
   const head = el('div', 'mk-album-head');
@@ -41,6 +46,30 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   const save = onSave ? svgBtn('이 장 저장', SAVE_ICON, () => act(onSave)) : null;
   const share = onShare ? svgBtn('이 장 공유', SHARE_ICON, () => act(onShare)) : null;
   const del = onDelete ? svgBtn('이 장 삭제', TRASH_ICON, () => removePage()) : null;
+  // 오른쪽으로 90도 돌리기 (돌린 그림을 새 파일로 저장 — 메모의 되돌리기로 원래대로)
+  let turning = false;
+  const rotate = onRotate ? svgBtn('오른쪽으로 90도 돌리기', ROTATE_ICON, async () => {
+    if (inking || turning) return;
+    turning = true;
+    rotate.disabled = true;
+    try {
+      const src = await onRotate(i);
+      if (src) {
+        images[i].src = src;
+        paintStrip();
+        show();
+      }
+    } catch (err) {
+      say(err?.message || '돌리지 못했어요');
+    } finally {
+      turning = false;
+      rotate.disabled = false;
+    }
+  }) : null;
+  // 묶음 풀기: 한 장씩 따로 된 사진으로 (두 장 이상일 때 · 휴대폰 머리 줄이 넘치지 않게 그림 단추)
+  const split = onSplit && images.length > 1 ? svgBtn('묶음 풀기 (한 장씩 따로)', SPLIT_ICON, () => {
+    if (!inking && onSplit()) shut();
+  }) : null;
   const draw = el('button', 'mk-album-btn', { type: 'button', title: '이 장 위에 그리기' });
   draw.append(icon('pen'), document.createTextNode('그리기'));
   const close = el('button', 'mk-album-btn', { type: 'button', title: '닫기 (Esc)', ariaLabel: '닫기' });
@@ -48,7 +77,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // 확대해 보는 중이면 장 위쪽 가운데에 배율 단추 (누르면 원래 크기로 · 좁은 창의 머리 줄을 붐비게 하지 않게)
   const zoomBtn = el('button', 'mk-album-btn mk-album-zoom', { type: 'button', title: '원래 크기로 (0)', hidden: true });
   zoomBtn.addEventListener('click', () => resetZoom());
-  head.append(count, inkedMark, el('span', 'mk-album-gap'), ...[save, share, del].filter(Boolean), ...(onDraw ? [draw] : []), close);
+  head.append(count, inkedMark, el('span', 'mk-album-gap'), ...[rotate, save, share, del].filter(Boolean), ...(onDraw ? [draw] : []), ...(split ? [split] : []), close);
   const stage = el('div', 'mk-album-stage');
   const img = el('img', 'mk-album-big', { draggable: false });
   stage.append(img);

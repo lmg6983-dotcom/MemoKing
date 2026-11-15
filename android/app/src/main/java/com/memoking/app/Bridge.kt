@@ -452,6 +452,36 @@ class Bridge(private val activity: MainActivity) {
                     name // 클립보드에 넣은 이름 글 (메모킹에 붙일 때 알아보려고)
                 }
             }
+            // 묶음 사진 복사: 장마다의 파일을 클립보드 한 칸에 여러 개로 (메모킹 · 파일 앱 · 여러 장을 받는 앱에는 모두) —
+            //   { items: [{ rel, name }] } → 클립보드에 넣은 이름 글 ("사진 3장")
+            "copyFiles" -> pool.execute {
+                resolve(id) {
+                    val items = a.getJSONArray("items")
+                    val uris = ArrayList<android.net.Uri>()
+                    val mimes = LinkedHashSet<String>()
+                    for (k in 0 until items.length()) {
+                        val o = items.getJSONObject(k)
+                        val rel = o.getString("rel")
+                        if (!rel.startsWith("attachments/")) continue // 메모 폴더의 첨부만 (copyFile 과 같게)
+                        val ext = rel.substringAfterLast('.', "")
+                        var name = o.optString("name").trim().ifEmpty { rel.substringAfterLast('/') }
+                        if (ext.isNotEmpty() && !name.endsWith(".$ext", ignoreCase = true)) name += ".$ext"
+                        if (uris.isNotEmpty()) name = "${k + 1} $name" // 같은 이름의 장이 서로 덮어쓰지 않게
+                        val file = shareFile(name)
+                        storage().openRead(rel).use { input -> file.outputStream().use { input.copyTo(it) } }
+                        uris += VaultFileProvider.shareUriFor(file.name)
+                        mimes += VaultFileProvider.mimeOf(file.name)
+                    }
+                    if (uris.isEmpty()) throw IllegalArgumentException("파일을 찾지 못했어요")
+                    val label = "사진 ${uris.size}장"
+                    val desc = ClipDescription(label, (mimes + ClipDescription.MIMETYPE_TEXT_PLAIN).toTypedArray())
+                    val clip = ClipData(desc, ClipData.Item(label, null, uris[0]))
+                    for (u in uris.drop(1)) clip.addItem(ClipData.Item(u))
+                    val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(clip)
+                    label
+                }
+            }
             // 클립보드의 그림 · 파일(content://) → 임시 파일 [{ temp, name, mime, size }] — 메모킹이나 다른 앱에서 복사한 그림을 메모에 붙여 넣기
             //   (WebView 의 붙여넣기는 클립보드의 그림을 넘겨주지 않고 주소 글만 준다)
             "clipboardFiles" -> activity.runOnUiThread {

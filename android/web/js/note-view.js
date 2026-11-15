@@ -26,6 +26,11 @@ setCopyHost({
     copiedFileName = await call('copyFile', { rel, name });
     return true;
   },
+  // 묶음 사진: 모든 장을 한 번에 (메모킹에 붙이면 사진들로 — 아래 paste 가 "사진 N장" 글을 알아본다)
+  files: async (list) => {
+    copiedFileName = await call('copyFiles', { items: list.map((f) => ({ rel: f.href, name: f.name })) });
+    return true;
+  },
   text: ({ text }) => native.copyText(text),
   // 저장 단추: 안드로이드 저장 창 → 저장한 이름 | 'cancelled'
   save: async (f) => (await call('saveAs', f)) ?? 'cancelled',

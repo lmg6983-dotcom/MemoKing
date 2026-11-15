@@ -1346,8 +1346,52 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         v.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true })); // 편집기의 Ctrl+Z 와 같은 기록
         return collect();
       },
+      // 오른쪽으로 90도: 돌린 그림을 새 파일로 저장해 이 장만 바꾼다 (원본은 그대로 — 메모의 되돌리기로 원래 장)
+      onRotate: !editable ? null : async (i) => {
+        const it = images[i];
+        const blob = await rotatedBlob(vaultUrl(it.src), it.src);
+        const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+        const src = await saveFile(new File([blob], `${baseName(it.alt || '사진')}.${ext}`, { type: blob.type }));
+        const cur = nodeOf(it);
+        if (!cur) return null;
+        it.src = src;
+        v.dispatch(v.state.tr.setNodeMarkup(it.pos, null, { ...cur.attrs, src }));
+        return src;
+      },
+      // 묶음 풀기: 장마다 한 줄씩 따로 된 사진으로 (메모의 되돌리기로 다시 묶음)
+      onSplit: !editable || !album ? null : () => {
+        const node = v.state.doc.nodeAt(para);
+        const { paragraph } = v.state.schema.nodes;
+        if (node?.type !== paragraph) return false;
+        const lines = [];
+        node.forEach((child) => {
+          if (child.type.name === 'image') lines.push(paragraph.create(null, child.type.create({ ...child.attrs, title: '' })));
+        });
+        if (lines.length < 2) return false;
+        v.dispatch(v.state.tr.replaceWith(para, para + node.nodeSize, lines).scrollIntoView());
+        onNotice?.(`묶음을 풀어 사진 ${lines.length}장을 따로 두었어요`);
+        return true;
+      },
     });
   };
+
+  // 그림을 오른쪽으로 90도 돌린 것 (사진은 JPEG, 그 밖은 PNG — 사진의 방향 정보는 브라우저가 그릴 때 이미 반영)
+  async function rotatedBlob(url, src) {
+    const im = new Image();
+    im.crossOrigin = 'anonymous'; // 메모 폴더 그림을 캔버스로 읽을 수 있게 (copy-content.js pngBase64 와 같게)
+    im.src = url;
+    await im.decode();
+    const canvas = document.createElement('canvas');
+    const k = Math.min(1, 8000 / Math.max(im.naturalWidth, im.naturalHeight)); // 너무 큰 그림은 줄여서 (메모리 한도)
+    canvas.width = Math.round(im.naturalHeight * k);
+    canvas.height = Math.round(im.naturalWidth * k);
+    const g = canvas.getContext('2d');
+    g.translate(canvas.width, 0);
+    g.rotate(Math.PI / 2);
+    g.drawImage(im, 0, 0, canvas.height, canvas.width);
+    const jpeg = /\.(jpe?g|heic|heif|webp)$/i.test(src);
+    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진을 돌리지 못했어요'))), jpeg ? 'image/jpeg' : 'image/png', 0.92));
+  }
 
   // 파일들을 메모 폴더에 저장 → 넣을 줄들. 하나가 안 읽혀도(폴더 · 잠긴 파일 · 너무 큰 파일) 나머지는 그대로 넣고 알린다
   //   (예전에는 하나만 실패해도 여러 파일을 한꺼번에 놓은 것이 통째로 사라졌다)

@@ -913,6 +913,26 @@ export function registerIpc(ctx) {
     if (SMOKE || !file || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return null;
     return officeToPdf(file);
   });
+  // 묶음 사진 복사: 장마다의 파일을 한 번에 클립보드에 (탐색기 · 메신저 · 메모킹에 사진들로 붙는다)
+  ipcMain.handle('attachment:copy-many', async (_e, rels) => {
+    const files = [];
+    for (const rel of Array.isArray(rels) ? rels : []) {
+      let decoded = String(rel ?? '');
+      try {
+        decoded = decodeURI(decoded);
+      } catch {
+        // 이미 디코딩됨
+      }
+      const file = getVault()?.resolve(decoded);
+      if (file && fs.statSync(file, { throwIfNoEntry: false })?.isFile()) files.push(file);
+    }
+    if (!files.length) return false;
+    if (SMOKE) {
+      smokeOpened.push({ kind: 'copy-files', target: files });
+      return true;
+    }
+    return copyFileToClipboard(files);
+  });
   ipcMain.handle('attachment:copy', async (_e, rel) => {
     let decoded = String(rel ?? '');
     try {

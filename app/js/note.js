@@ -49,6 +49,7 @@ setCopyHost({
   image: (b64) => api.image.copy(b64),
   text: ({ text, html }) => api.copyRich({ text, html }),
   file: (href) => api.attachments.copy(href), // PDF · 소리 같은 첨부는 파일 그대로
+  files: (list) => api.attachments.copyMany(list.map((f) => f.href)), // 묶음 사진: 모든 장을 파일로
   // 저장 단추: 어디에 저장할지 고르는 창 → 저장한 파일 이름 | 'cancelled'
   save: async (f) => {
     const r = await api.attachments.saveAs(f);

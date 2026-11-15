@@ -87,7 +87,7 @@ export function undoHint(what, rect, view, verb = '삭제했어요') {
   document.addEventListener('keydown', onKey, true);
 }
 
-const COPY_DONE = (what) => (what === '그림' ? '그림을 복사했어요' : what === '주소' ? '그림 주소를 복사했어요'
+const COPY_DONE = (what) => (what === '그림' ? '그림을 복사했어요' : /^사진 \d+장$/.test(what ?? '') ? `${what}을 복사했어요. 메모, 탐색기, 메신저에 붙여 넣으세요` : what === '주소' ? '그림 주소를 복사했어요'
   : what === '파일' ? '파일을 복사했어요. 탐색기, 메신저에 붙여 넣으세요' : what === '링크' ? '링크 주소를 복사했어요' : '내용을 복사했어요');
 const SAVE_DONE = (name) => `저장했어요: ${name}`;
 const SHARE_DONE_TEXT = (what) => SHARE_DONE[what] ?? '공유했어요';
