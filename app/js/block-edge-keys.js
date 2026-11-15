@@ -6,7 +6,7 @@
 //     - 코드 블록 경계: 코드가 보통 글로, 보통 글이 코드로 섞였다
 //   원칙: 지금 줄(또는 윗줄)의 서식은 그대로, 이어 붙는 줄의 글자만 옮긴다 — 글 편집기에서 줄바꿈 하나를 지운 것과 같게.
 //         코드와 보통 글은 서로 잇지 않는다 (빈 줄이면 그 줄만 없앤다). 표 · 그림 · 가로줄 경계는 기본 동작에 맡긴다.
-//   인용(> 출처 줄 등) 안의 줄 맨 앞 Backspace: 윗줄에 붙지 않고 인용 서식만 벗긴다 (Notion · Google Docs 처럼)
+//   인용(> 출처 줄 등)의 첫 줄 맨 앞 Backspace: 윗줄에 붙지 않고 인용 서식만 벗긴다 (Notion · Google Docs 처럼)
 import { Plugin, PluginKey, TextSelection, liftListItem } from '../vendor/milkdown.js';
 
 export const blockEdgeKeysKey = new PluginKey('memoking-block-edge-keys');
@@ -112,7 +112,8 @@ export function edgeKeyAction(state, key) {
       return tr ? tr.scrollIntoView() : null;
     }
     // 인용 안의 줄 맨 앞: 인용 서식만 벗겨 보통 줄로 (복사해 온 메모의 "출처:" 줄 등 — 예전에는 글이 윗줄에 붙었다)
-    if ($from.depth >= 2 && $from.node(-1).type.name === 'blockquote') {
+    // (첫 줄만 — 둘째 줄부터는 윗줄에 잇는 보통 동작. 글로 시작하는 줄만 — 음성 카드처럼 녹음 · 그림으로 시작하는 인용은 풀지 않는다)
+    if ($from.depth >= 2 && $from.node(-1).type.name === 'blockquote' && $from.index(-1) === 0 && (!block.firstChild || block.firstChild.isText)) {
       const range = $from.blockRange();
       if (range && range.parent.type.name === 'blockquote') {
         try {

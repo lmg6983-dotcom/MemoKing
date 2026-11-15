@@ -1722,7 +1722,7 @@ try {
   {
     fs.writeFileSync(path.join(vault, 'attachments/voice-btn.m4a'), Buffer.from('fake audio'));
     fs.writeFileSync(path.join(vault, 'attachments/안내서.pdf'), Buffer.from('%PDF-1.4 fake'));
-    write('콘텐츠 버튼.md', '---\nid: 00000000-0000-4000-8000-0000000000dd\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: purple\n---\n# 콘텐츠 버튼\n\n> ![녹음 10월 14일](attachments/voice-btn.m4a)\n>\n> 도레미파솔라시도\n\n[안내서.pdf](attachments/안내서.pdf)\n\n$$\nx^2\n$$\n\n끝\n');
+    write('콘텐츠 버튼.md', '---\nid: 00000000-0000-4000-8000-0000000000dd\ncreated: 2026-10-01T00:00:00+00:00\nupdated: 2026-10-01T00:00:00+00:00\ncolor: purple\n---\n# 콘텐츠 버튼\n\n> ![녹음 10월 14일](attachments/voice-btn.m4a)\n>\n> 도레미파솔라시도\n\n[안내서.pdf](attachments/안내서.pdf)\n\n$$\nx^2\n$$\n\n끝\n\n> 출처: 테스트 사이트, 2026.11.15 09:00\n');
     await back();
     await page.waitForTimeout(300);
     await page.evaluate(() => window.__mk.emit('app', 'resume'));
@@ -1825,6 +1825,17 @@ try {
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(1500);
     const chipText = await page.textContent('.mk-doc a[data-file]');
+    // 인용(출처 줄) 첫 줄 맨 앞 Backspace: 윗줄에 붙지 않고 인용 서식만 벗긴다
+    await page.evaluate(() => {
+      const q = [...document.querySelectorAll('.mk-doc blockquote')].find((b) => b.textContent.includes('출처:'));
+      document.querySelector('#note-screen .ProseMirror').focus();
+      window.getSelection().collapse(q.querySelector('p').firstChild, 0);
+    });
+    await page.waitForTimeout(150);
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(1500);
+    const srcMd = read('콘텐츠 버튼.md');
+    check('출처 줄: 맨 앞 Backspace 는 인용 서식만 벗김 (윗줄에 붙지 않음)', /\n\n출처: 테스트 사이트/.test(srcMd) && !srcMd.includes('> 출처') && srcMd.includes('\n\n끝\n'), JSON.stringify(srcMd.slice(-80)));
     check('파일 칩: 이름 가운데에 쳐도 · 지워도 바뀌지 않음', chipText === '안내서.pdf' && read('콘텐츠 버튼.md').includes('[안내서.pdf](attachments/안내서.pdf)') && !read('콘텐츠 버튼.md').includes('XY'), JSON.stringify({ chipText, same: chipBefore === read('콘텐츠 버튼.md') }));
     // 다음 점검을 위해 '그림 둘' 로 돌아감
     await back();

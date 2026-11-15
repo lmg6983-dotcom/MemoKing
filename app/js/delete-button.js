@@ -411,7 +411,7 @@ export function hideDeleteButton(now = false) {
   if (!del) return;
   current = null;
   clearTimeout(del.timer);
-  document.dispatchEvent(new CustomEvent('mk:tools-hide'));
+  document.dispatchEvent(new CustomEvent('mk:tools-hide', { detail: { now } })); // now: 시트를 열거나 다른 내용을 눌러 바로 거둠 (저절로 사라질 때는 false)
   window.removeEventListener('scroll', del.place, true);
   if (!del.view.isDestroyed) del.setMark(false);
   del.target.classList?.remove('mk-ink-armed'); // 손 메모: 단추가 거둬지면 다시 처음 누르기부터

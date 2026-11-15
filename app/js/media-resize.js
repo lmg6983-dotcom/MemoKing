@@ -93,7 +93,14 @@ export function mediaResizePlugin() {
         const media = t?.matches?.(SEL) ? t : t?.querySelectorAll?.(SEL).length === 1 ? t.querySelector(SEL) : null;
         if (media) show(media);
       };
-      const onToolsHide = () => !drag && hide(true);
+      // 단추 줄이 시간이 지나 저절로 사라질 때는 손잡이를 남긴다 (사진을 보다가 잡을 수 있게) — 바로 거둘 때(시트 열기 등)만 함께
+      const onToolsHide = (e) => e.detail?.now && !drag && hide(true);
+      // 손잡이 · 사진 밖을 누르면 숨긴다
+      const onDown = (e) => {
+        if (!target || drag || layer.contains(e.target) || target.contains(e.target)) return;
+        hide(true);
+      };
+      document.addEventListener('pointerdown', onDown, true);
       document.addEventListener('mk:tools', onTools);
       document.addEventListener('mk:tools-hide', onToolsHide);
       window.addEventListener('scroll', place, true);
@@ -117,6 +124,7 @@ export function mediaResizePlugin() {
       };
       const move = (e) => {
         if (!drag || e.pointerId !== drag.id) return;
+        if (drag.pct == null && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4) return; // 누르기만 한 손가락의 떨림은 끌기가 아니다 (크기를 저장하지 않게)
         const byX = e.clientX - drag.x;
         const byY = (e.clientY - drag.y) * drag.ratio; // 세로로 끈 만큼을 가로로 바꿔 (비율 유지)
         const dx = Math.abs(byX) >= Math.abs(byY) ? byX : byY;
@@ -142,7 +150,13 @@ export function mediaResizePlugin() {
         if (node?.type.name !== 'image') return;
         const alt = withMediaWidth(node.attrs.alt, pct);
         if (alt !== node.attrs.alt) view.dispatch(view.state.tr.setNodeMarkup(pos, null, { ...node.attrs, alt }));
-        requestAnimationFrame(place);
+        reattach(pos);
+      };
+      // 크기를 바꾸면 그 그림이 새로 그려진다 — 새 그림에 손잡이를 다시 붙여 이어서 맞출 수 있게 (휴대폰에서 다시 꾹 누르지 않게)
+      const reattach = (pos) => {
+        const dom = view.nodeDOM(pos);
+        const media = dom?.matches?.(SEL) ? dom : dom?.querySelector?.(SEL);
+        if (media) show(media);
       };
       const reset = (e) => {
         e.preventDefault();
@@ -151,17 +165,15 @@ export function mediaResizePlugin() {
         const node = pos >= 0 ? view.state.doc.nodeAt(pos) : null;
         if (!node || mediaWidthOf(node.attrs.alt) == null) return;
         view.dispatch(view.state.tr.setNodeMarkup(pos, null, { ...node.attrs, alt: withMediaWidth(node.attrs.alt, 100) }));
-        requestAnimationFrame(place);
+        reattach(pos);
       };
-      for (const h of [grip]) {
-        h.addEventListener('pointerdown', start);
-        h.addEventListener('pointermove', move);
-        h.addEventListener('pointerup', end);
-        h.addEventListener('pointercancel', end);
-        h.addEventListener('lostpointercapture', end); // 끄는 중 캡처를 잃어도 끄기 상태가 남지 않게
-        h.addEventListener('dblclick', reset);
-        h.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false }); // 끄는 동안 화면이 스크롤되지 않게
-      }
+      grip.addEventListener('pointerdown', start);
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('pointercancel', end);
+      grip.addEventListener('lostpointercapture', end); // 끄는 중 캡처를 잃어도 끄기 상태가 남지 않게
+      grip.addEventListener('dblclick', reset);
+      grip.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false }); // 끄는 동안 화면이 스크롤되지 않게
 
       return {
         update() {
@@ -173,6 +185,7 @@ export function mediaResizePlugin() {
           view.dom.removeEventListener('pointermove', onMove);
           document.removeEventListener('mk:tools', onTools);
           document.removeEventListener('mk:tools-hide', onToolsHide);
+          document.removeEventListener('pointerdown', onDown, true);
           window.removeEventListener('scroll', place, true);
           window.removeEventListener('resize', place);
           layer.remove();

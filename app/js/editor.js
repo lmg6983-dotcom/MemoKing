@@ -1362,6 +1362,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       // 오른쪽으로 90도: 돌린 그림을 새 파일로 저장해 이 장만 바꾼다 (원본은 그대로 — 메모의 되돌리기로 원래 장)
       onRotate: !editable ? null : async (i) => {
         const it = images[i];
+        if (/\.gif$/i.test(it.src)) throw new Error('움직이는 그림(GIF)은 돌리면 멈춘 그림이 돼서 돌리지 않았어요');
         const blob = await rotatedBlob(vaultUrl(it.src), it.src);
         const ext = blob.type === 'image/png' ? 'png' : 'jpg';
         const src = await saveFile(new File([blob], `${baseName(it.alt || '사진')}.${ext}`, { type: blob.type }));

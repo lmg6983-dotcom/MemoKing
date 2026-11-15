@@ -41,6 +41,8 @@ function radios(container, attr, value) {
 }
 
 const size = () => pageSize(opt);
+// 실제로 쓸 여백: 작은 종이에 큰 여백을 고르면 글 칸이 없어지므로 짧은 변에 글 칸 20mm 는 남긴다
+const marginFor = (s) => Math.max(0, Math.min(opt.marginMm, Math.floor((Math.min(s.width, s.height) - 20) / 2)));
 
 let frameTimer = 0;
 let shown = null; // 지금 미리보기가 알려 준 것 { src, pages, gap }
@@ -88,7 +90,7 @@ function render() {
   document.body.dataset.pages = '';
   $('summary').textContent = `${s.width} × ${s.height}mm (${ratioLabel(s.width, s.height)})`;
   // 쪽 내용은 잠깐 멈춘 뒤에 다시 그린다 (입력하는 동안 깜빡이지 않게)
-  const src = `print.html?${new URLSearchParams({ id, w: s.width, h: s.height, m: opt.marginMm, bg: opt.bg ? 1 : 0, date: opt.date ? 1 : 0, fit: opt.fit ? 1 : 0, z: opt.zoom / 100, preview: 1 })}`;
+  const src = `print.html?${new URLSearchParams({ id, w: s.width, h: s.height, m: marginFor(s), bg: opt.bg ? 1 : 0, date: opt.date ? 1 : 0, fit: opt.fit ? 1 : 0, z: opt.zoom / 100, preview: 1 })}`;
   clearTimeout(frameTimer);
   // 같은 미리보기를 그대로 두는 다시 그리기(창 · 미리보기 칸 크기만 바뀜)면 받아 둔 쪽 수를 다시 입힌다 — 미리보기는 다시 알려 주지 않으므로
   if (shown && shown.src === src && frame.getAttribute('src') === src) showPages();
@@ -232,7 +234,7 @@ $('form').addEventListener('submit', async (e) => {
   $('save').disabled = true;
   $('status').textContent = 'PDF를 만드는 중';
   $('status').classList.remove('error');
-  const r = await api.pdf.save(id, { width: s.width, height: s.height, margin: opt.marginMm, bg: opt.bg, date: opt.date, fit: opt.fit, open: opt.open, zoom: opt.zoom / 100 }).catch(() => null);
+  const r = await api.pdf.save(id, { width: s.width, height: s.height, margin: marginFor(s), bg: opt.bg, date: opt.date, fit: opt.fit, open: opt.open, zoom: opt.zoom / 100 }).catch(() => null);
   $('save').disabled = false;
   if (r?.file) {
     $('status').textContent = `${r.pages}쪽 PDF로 저장했어요`;

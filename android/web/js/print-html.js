@@ -59,7 +59,7 @@ ${links}
 .print-doc .mk-doc li::after { border-color: transparent !important; }
 ${zoom !== 1 ? `.print-doc { zoom: ${zoom}; }` : ''}
 :root { --fit-h: ${(Math.max(20, 297 - 2 * m - 12) / zoom).toFixed(1)}mm; } /* A4 에서 위아래 여백 · 줄 간격 몫을 뺀 높이, 내용 배율로 나눔 */
-${preview ? 'html.print-page body { box-sizing: border-box; width: 794px; height: 1123px; padding: ${Math.round(m * MM)}px; overflow: hidden; background: #fff; }' : ''}
+${preview ? `html.print-page body { box-sizing: border-box; width: 794px; height: 1123px; padding: ${Math.round(m * MM)}px; overflow: hidden; background: #fff; }` : ''}
 </style>
 </head>
 <body data-color="${esc(color)}">
