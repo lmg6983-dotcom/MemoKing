@@ -1371,6 +1371,21 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         v.dispatch(tr);
         return collect();
       },
+      // 장 순서 바꾸기 (사진 보기의 장 목록에서 끌어서): 묶음 줄 안에서 그 장만 옮긴다 → 새 장 목록 (메모의 되돌리기로 원래대로)
+      onMove: !editable || !album ? null : (from, to) => {
+        const node = v.state.doc.nodeAt(para);
+        if (node?.type.name !== 'paragraph') return null;
+        const kids = [];
+        node.forEach((c) => kids.push(c));
+        const at = kids.map((c, k) => (c.type.name === 'image' && isAlbumTitle(c.attrs.title) ? k : -1)).filter((k) => k >= 0);
+        if (from === to || at[from] === undefined || at[to] === undefined) return null;
+        const pics = at.map((k) => kids[k]);
+        pics.splice(to, 0, pics.splice(from, 1)[0]);
+        const next = kids.slice();
+        at.forEach((k, j) => (next[k] = pics[j]));
+        v.dispatch(v.state.tr.replaceWith(para + 1, para + 1 + node.content.size, next));
+        return collect();
+      },
       onUndo: !editable ? null : () => {
         v.focus();
         v.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true })); // 편집기의 Ctrl+Z 와 같은 기록

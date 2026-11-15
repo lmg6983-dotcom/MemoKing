@@ -30,7 +30,7 @@ const el = (tag, cls, attrs = {}) => Object.assign(document.createElement(tag), 
 const ROTATE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
 const SPLIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M14 7h4v4M10 17H6v-4"/></svg>';
 
-export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShare, onDelete, onUndo, onRotate, onSplit }) {
+export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShare, onDelete, onUndo, onRotate, onSplit, onMove }) {
   let i = Math.max(0, Math.min(images.length - 1, start));
   const view = el('div', 'mk-album-view', { role: 'dialog', ariaModal: 'true', ariaLabel: images.length > 1 ? '묶음 사진' : '사진 크게 보기' });
   const head = el('div', 'mk-album-head');
@@ -139,6 +139,67 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     if (e.pointerType === 'mouse' && !pts.size && !inking) wakeUI();
   });
 
+  // ---------- 장 순서 바꾸기: 아래 장 목록의 장을 꾹 누르면(마우스는 끌면) 들리고, 놓은 자리로 ----------
+  const reorder = { justDropped: false };
+  if (onMove) {
+    let d = null; // { thumb, from, to, x, y, armed, timer, id }
+    const thumbs = () => [...strip.querySelectorAll('.mk-album-thumb')];
+    const arm = () => {
+      if (!d || inking || turning || moving) return;
+      d.armed = true;
+      d.thumb.classList.add('lifting');
+      strip.setPointerCapture?.(d.id);
+      if (navigator.vibrate) navigator.vibrate(10);
+    };
+    strip.addEventListener('pointerdown', (e) => {
+      const thumb = e.target.closest('.mk-album-thumb');
+      if (!thumb || images.length < 2) return;
+      d = { thumb, from: thumbs().indexOf(thumb), x: e.clientX, y: e.clientY, armed: false, id: e.pointerId, mouse: e.pointerType === 'mouse' };
+      d.to = d.from;
+      if (!d.mouse) d.timer = setTimeout(arm, 300);
+    });
+    strip.addEventListener('pointermove', (e) => {
+      if (!d) return;
+      const far = Math.hypot(e.clientX - d.x, e.clientY - d.y);
+      if (!d.armed) {
+        if (d.mouse && far > 6) arm();
+        else if (!d.mouse && far > 10) { clearTimeout(d.timer); d = null; } // 밀면 장 목록 넘기기
+        if (!d?.armed) return;
+      }
+      // 손가락 · 마우스 아래 장 앞(또는 뒤)으로 바로 옮겨 보인다
+      const over = thumbs().find((t) => t !== d.thumb && (() => { const r = t.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right; })());
+      if (!over) return;
+      const list = thumbs();
+      const before = list.indexOf(over) < list.indexOf(d.thumb);
+      if (before) over.before(d.thumb);
+      else over.after(d.thumb);
+      d.to = thumbs().indexOf(d.thumb);
+    });
+    // 들린 동안은 장 목록이 스크롤되지 않게 (터치)
+    strip.addEventListener('touchmove', (e) => d?.armed && e.cancelable && e.preventDefault(), { passive: false });
+    const drop = () => {
+      if (!d) return;
+      clearTimeout(d.timer);
+      const { armed, from, to, thumb } = d;
+      d = null;
+      if (!armed) return;
+      thumb.classList.remove('lifting');
+      reorder.justDropped = true; // 놓을 때 따라오는 click 으로 그 장이 열리지 않게
+      setTimeout(() => (reorder.justDropped = false), 0);
+      const next = from !== to ? onMove(from, to) : null;
+      if (next?.length) {
+        const showing = images[i];
+        images.splice(0, images.length, ...next);
+        i = Math.max(0, images.findIndex((it) => it.src === showing?.src));
+        say('장 순서를 바꿨어요');
+      }
+      paintStrip();
+      show();
+    };
+    strip.addEventListener('pointerup', drop);
+    strip.addEventListener('pointercancel', drop);
+  }
+
   function paintStrip() {
     strip.hidden = images.length < 2;
     strip.replaceChildren(...images.map((it, k) => {
@@ -146,7 +207,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       b.setAttribute('aria-selected', String(k === i));
       const t = el('img', '', { src: url(it.src), alt: '', loading: 'lazy', draggable: false });
       b.append(t);
-      b.addEventListener('click', () => goTo(k));
+      b.addEventListener('click', () => !reorder.justDropped && goTo(k));
       return b;
     }));
   }
@@ -595,7 +656,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     if (!localStorage.getItem(HINT_KEY) && images.length > 1) {
       localStorage.setItem(HINT_KEY, '1');
       const coarse = matchMedia('(pointer: coarse)').matches;
-      say(coarse ? '옆으로 밀거나 아래 장을 눌러 넘겨요. 두 손가락으로 벌리면 크게 보이고, 아래로 밀면 닫혀요' : '← → 나 아래 장을 눌러 넘겨요. 휠을 굴리면 크게 보여요');
+      say(coarse ? '옆으로 밀어 넘기고, 아래로 밀면 닫혀요. 아래 장을 꾹 눌러 끌면 순서가 바뀌어요' : '← → 나 아래 장을 눌러 넘겨요. 아래 장을 끌면 순서가 바뀌어요');
     }
   } catch {
     // 저장소를 못 써도 보기는 그대로

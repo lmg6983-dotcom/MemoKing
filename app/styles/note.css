@@ -2461,3 +2461,5 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-doc p.mk-block-pressing > .mk-image.mk-sized { border-radius: 8px; animation: mk-block-press 0.32s linear forwards; }
 /* 막 뜬 내용 단추 줄: 누름을 받지 않는 0.35초 동안 흐리게 (delete-button.js mk-arming) */
 :is(.mk-delete-btn, .mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).mk-arming { opacity: 0.45; transition: opacity 0.2s ease-out; }
+/* 장 순서 바꾸기: 들린 장 (album-viewer.js) */
+.mk-album-thumb.lifting { transform: scale(1.15); z-index: 1; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5); transition: transform 0.12s ease-out; }
