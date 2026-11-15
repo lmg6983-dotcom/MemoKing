@@ -295,7 +295,7 @@ const currentFolders = () => folderList(state.folderDirs ?? [], modeMemos());
 // PC 의 폴더는 왼쪽 목록 하나 (탐색기처럼) — 카드 위에 줄을 따로 두지 않는다. 메모를 끌어 폴더에 놓으면 그 폴더로 옮긴다
 function renderFolders() {
   if (!el.folderSide) return;
-  renderFolderList(el.folderSide, { folders: withUnfiled(currentFolders(), modeMemos()), current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
+  renderFolderList(el.folderSide, { folders: withUnfiled(currentFolders(), modeMemos()), total: modeMemos().length, current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
 }
 
 // ---------- 폴더 목록 (왼쪽): 폴더가 없어도, 창이 좁아도 늘 — 위 폴더 단추로 접고 편다 (이 PC 에 기억) ----------

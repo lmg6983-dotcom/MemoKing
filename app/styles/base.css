@@ -1644,7 +1644,10 @@ dialog.quick-event[open] {
 .mf-item svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
 .mf-item:hover:not(:disabled) { background: var(--hover); }
 .mf-item:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
-.mf-item[aria-current="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); font-weight: 700; } /* 폴더 칩의 고른 모양과 같게 (꽉 찬 노랑은 주요 동작에만) */
+/* 고른 폴더: 옅은 바탕 + 왼쪽 노란 막대 (Notion · Linear 처럼 — 줄마다 상자가 겹쳐 보이지 않게) */
+.mf-item { position: relative; }
+.mf-item[aria-current="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 700; }
+.mf-item[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 3px; background: var(--brand-yellow); }
 .mf-item[aria-current="true"] svg, .mf-item[aria-current="true"] .mf-count { color: inherit; }
 .mf-item:disabled { cursor: default; opacity: 0.6; }
 .mf-item.drop-on { box-shadow: inset 0 0 0 2px var(--brand-yellow); background: var(--hover); }
@@ -1664,7 +1667,11 @@ dialog.quick-event[open] {
   .mf-item:is([aria-current="true"], .drop-on) .mf-name.long .mf-text { flex: none; white-space: nowrap; animation: mf-run var(--mf-dur, 4s) ease-in-out 0.5s infinite alternate; }
 }
 @keyframes mf-run { 0%, 12% { transform: none; } 88%, 100% { transform: translateX(calc(var(--mf-w, 0px) - 100%)); } }
-.mf-count { flex: none; font-size: 12px; color: var(--muted); }
+/* 메모 수: 이름과 떨어진 작은 알약 (Apple 메일처럼) */
+.mf-count { flex: none; min-width: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--muted); font-size: 11.5px; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.mf-item[aria-current="true"] .mf-count { background: color-mix(in srgb, var(--brand-yellow) 40%, transparent); }
+/* 두 묶음 사이: 가는 선과 "폴더" 머리글 */
+.mf-sep { margin: 6px 4px 0; padding: 9px 6px 3px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; list-style: none; user-select: none; }
 .mf-new { margin: 6px 0 0 4px; }
 .folder-dialog { width: min(360px, calc(100vw - 24px)); }
 .folder-dialog-body { max-height: min(60vh, 480px); padding: 3px; overflow-y: auto; } /* 3px: 칸의 노란 테두리가 잘리지 않게 */

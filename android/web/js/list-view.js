@@ -527,8 +527,9 @@ function applyFolderSide() {
 }
 
 function renderFolderSide() {
-  const list = withUnfiled(folders(), split(state.memos, state.mode).mine);
-  renderFolderList(el.folderSide, { folders: list, current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
+  const mine = split(state.memos, state.mode).mine;
+  const list = withUnfiled(folders(), mine);
+  renderFolderList(el.folderSide, { folders: list, total: mine.length, current: state.folder, onPick: setFolder, onNew: newFolder, onMenu: folderMenu });
   // 폴더가 생기면 한 번: 메모를 꾹 눌러 끌면 폴더로 (눈에 안 보이는 동작)
   if (list.length && !el.folderSide.hidden) setTimeout(() => {
     const first = el.folderSide.querySelector(`[data-folder]:not([data-folder=""]):not([data-folder="${UNFILED}"])`);
