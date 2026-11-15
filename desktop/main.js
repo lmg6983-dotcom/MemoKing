@@ -1018,7 +1018,7 @@ function setShortcut(name, acc) {
   const prev = shortcutKey(name);
   const enabled = shortcutStatus(name).enabled;
   if (enabled && next !== prev) {
-    if (!globalShortcut.register(next, () => {})) return { ok: false, reason: 'taken', label: displayAccelerator(next), status: shortcutStatus(name) };
+    if (!tryRegister(next, () => {})) return { ok: false, reason: 'taken', label: displayAccelerator(next), status: shortcutStatus(name) };
     globalShortcut.unregister(next);
   }
   settings.shortcuts = { ...normalizeShortcuts(settings.shortcuts), [name]: next };
@@ -1039,12 +1039,22 @@ function pauseShortcuts(on) {
   memoHotkeys.pause(on);
 }
 
+// 단축키 잡기: 잘못된 키 이름(손상된 설정 등)은 Electron 이 예외를 던진다 — 앱이 멈추지 않고 "잡지 못함" 으로
+function tryRegister(key, run) {
+  try {
+    return globalShortcut.register(key, run);
+  } catch (err) {
+    console.warn('단축키를 등록하지 못했어요', key, err?.message);
+    return false;
+  }
+}
+
 function registerQuickMemoKey() {
   if (heldKeys.quickMemo) globalShortcut.unregister(heldKeys.quickMemo);
   heldKeys.quickMemo = null;
   if (!settings.quickMemo || process.platform !== 'win32' || shortcutsPaused) return false;
   const key = shortcutKey('quickMemo');
-  const ok = globalShortcut.register(key, () => onQuickMemoKey());
+  const ok = tryRegister(key, () => onQuickMemoKey());
   if (!ok) console.warn(`${displayAccelerator(key)}를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else {
     heldKeys.quickMemo = key;
@@ -1058,7 +1068,7 @@ function registerListKey() {
   heldKeys.list = null;
   if (shortcutsPaused) return false;
   const key = shortcutKey('list');
-  const ok = globalShortcut.register(key, () => windowManager.toggleListWindow());
+  const ok = tryRegister(key, () => windowManager.toggleListWindow());
   if (!ok) console.warn(`${displayAccelerator(key)}를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else heldKeys.list = key;
   return ok;
