@@ -819,6 +819,7 @@ async function refresh() {
 }
 
 // 검색창은 지금 보고 있는 탭을 검색한다
+let searchSeq = 0; // 늦게 온 앞 검색어의 결과가 마지막 검색어 결과를 덮어쓰지 않게
 async function runSearch() {
   if (activeTab === 'reminders') return remindersTab.setQuery(el.search.value);
   if (activeTab === 'history') return historyTab.setQuery(el.search.value);
@@ -826,7 +827,10 @@ async function runSearch() {
   // 검색어의 #태그 는 태그 필터로, 나머지는 글자 검색으로
   const { text, tags } = parseQuery(state.query);
   state.queryTags = tags;
-  state.results = text ? await api.memos.search(text) : null;
+  const seq = ++searchSeq;
+  const results = text ? await api.memos.search(text) : null;
+  if (seq !== searchSeq) return;
+  state.results = results;
   render();
   aiAsk?.update(text);
 }
