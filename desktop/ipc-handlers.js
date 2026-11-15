@@ -789,6 +789,7 @@ export function registerIpc(ctx) {
   ipcMain.on('memo:save-sync', (event, id, body) => {
     try {
       const vault = getVault();
+      if (typeof body === 'string' && !vault) throw new Error(UI.noVault); // 메모 폴더가 없다 — 아래에서 따로 남긴다 (예전: 저장한 척했다)
       let r = typeof body === 'string' && vault ? vault.save(id, body) : null;
       if (r?.retry) {
         vault.scan();
@@ -801,6 +802,18 @@ export function registerIpc(ctx) {
       event.returnValue = true;
     } catch (err) {
       console.error('저장 실패', err);
+      // 창을 닫는 마지막 저장이라 다시 할 수 없다 — 쓴 글을 앱 폴더에 따로 남기고 알린다 (예전: 말없이 사라졌다. 디스크 가득 참 · 드라이브 빠짐 등)
+      if (typeof body === 'string' && !isBlankBody(body)) {
+        try {
+          const dir = path.join(app.getPath('userData'), 'recovered');
+          fs.mkdirSync(dir, { recursive: true });
+          const file = path.join(dir, `${new Date().toISOString().replace(/[:.]/g, '-')}.md`);
+          fs.writeFileSync(file, body);
+          toast({ title: '메모를 저장하지 못해 따로 남겼어요', body: '눌러서 남긴 글 보기. 메모 폴더를 확인하고 다시 넣어 주세요', onClick: () => shell.showItemInFolder(file) });
+        } catch (err2) {
+          console.error('따로 남기기도 실패', err2);
+        }
+      }
       event.returnValue = false;
     }
   });
