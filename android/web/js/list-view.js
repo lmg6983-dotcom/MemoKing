@@ -5,7 +5,7 @@ import { vaultUrl } from '../../app/js/media.js';
 import { videoThumb } from '../../app/js/video-poster.js';
 import { setupRemindersTab } from '../../app/js/list-reminders.js';
 import { setupHistoryTab } from '../../app/js/list-history.js';
-import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag } from '../../app/js/core/tags.js';
+import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag, titleTagsOnly } from '../../app/js/core/tags.js';
 import { COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
@@ -287,7 +287,10 @@ function renderCard(memo) {
     tags.append(f, ' ');
   }
   // 태그: 누르면 그 태그의 메모만 (PC 카드와 같음)
+  // 첫 줄이 태그뿐인 메모: 제목에 이미 보이는 태그는 아래 줄에서 뺀다 (#내일할일 이 두 번 보이던 것)
+  const inTitle = titleTagsOnly(memo.title) ? new Set(String(memo.title).match(/#[^\s#]+/g).map((t) => t.slice(1).toLocaleLowerCase('ko'))) : null;
   for (const name of memo.tags ?? []) {
+    if (inTitle?.has(name.toLocaleLowerCase('ko'))) continue;
     const t = document.createElement('span');
     t.className = 'card-tag';
     t.dataset.cardTag = name;
@@ -464,7 +467,6 @@ export function render() {
   el.empty.hidden = memos.length > 0;
   el.empty.parentElement.classList.toggle('is-empty', !memos.length); // 안내 · 단추를 목록 칸 가운데에 (PC 와 같이)
   if (!memos.length) renderEmpty(narrowed, elsewhere);
-  $('count-memos').textContent = modeMemos().length ? String(modeMemos().length) : '';
   renderFilters();
   renderFolderSide();
   if (memos.length >= 2) setTimeout(hintCards, 800);

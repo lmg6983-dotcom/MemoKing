@@ -1659,7 +1659,7 @@ dialog.quick-event[open] {
 .mf-more svg { width: 16px; height: 16px; }
 @media (pointer: coarse) { .mf-more { width: 44px; height: 44px; opacity: 1; } }
 /* 폴더 이름: 두 줄까지 감싸고, 넘치면 … (folder-ui.js markLongNames 가 넘치는 이름에 .long) */
-.mf-name { flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; line-height: 1.3; }
+.mf-name { flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.3; } /* 낱말은 통째로, _ · - 뒤에서 먼저 끊는다 (folder-ui.js 의 <wbr>) */
 .mf-name.long { height: 2.6em; } /* 한 줄로 흐를 때도 줄 높이가 그대로 (끄는 동안 잰 자리가 어긋나지 않게) */
 @media (prefers-reduced-motion: no-preference) {
   /* 고른 폴더 · 끌어 올려놓은 폴더의 긴 이름은 한 줄로 천천히 흘러 끝까지 보인다 */
