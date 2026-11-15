@@ -965,7 +965,7 @@ function showUndo({ name, title }) {
 }
 
 /** 아래 "…했어요 · 되돌리기" 막대 (지우기 · 폴더로 옮기기) — run: 되돌리기 */
-function showUndoBar(message, run) {
+function showUndoBar(message, run, { label = '되돌리기', ms = 6000 } = {}) {
   let bar = $('undo-bar');
   if (!bar) {
     bar = document.createElement('div');
@@ -994,7 +994,7 @@ function showUndoBar(message, run) {
   text.textContent = message;
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.textContent = '되돌리기';
+  btn.textContent = label;
   btn.addEventListener('click', async () => {
     bar.hidden = true;
     await run();
@@ -1002,7 +1002,7 @@ function showUndoBar(message, run) {
   bar.replaceChildren(text, btn);
   bar.hidden = false;
   clearTimeout(undoTimer);
-  undoTimer = setTimeout(() => (bar.hidden = true), 6000);
+  undoTimer = setTimeout(() => (bar.hidden = true), ms);
 }
 api.on('memo:trashed', showUndo);
 
@@ -2419,6 +2419,14 @@ api.on('mode:changed', ({ mode, enabled } = {}) => {
 });
 await refresh();
 showMode();
+// 창을 닫으며 저장하지 못해 따로 남긴 글이 있으면: 한 번에 메모로 되살리기 (예전: 앱 폴더의 파일을 찾아 직접 붙여 넣어야 했다)
+api.recovered?.count().then((n) => {
+  if (!n) return;
+  showUndoBar(`저장하지 못한 글 ${n}개를 따로 남겨 뒀어요`, async () => {
+    const back = await api.recovered.restore().catch(() => 0);
+    flashStatus(back ? `메모 ${back}개로 되살렸어요` : '되살리지 못했어요. 메모 폴더를 확인하고 다시 해 주세요');
+  }, { label: '되살리기', ms: 20_000 });
+}, () => {});
 await remindersTab.refresh();
 showTab(new URLSearchParams(location.search).get('tab') ?? 'memos');
 document.documentElement.dataset.ready = 'true';

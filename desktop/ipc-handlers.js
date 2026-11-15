@@ -786,6 +786,32 @@ export function registerIpc(ctx) {
     if (unlocked && !vault.locks.has(sourceId)) return vault.import({ body, color: vault.get(sourceId)?.color });
     return vault.importCopyOf(sourceId, body, { color: vault.get(sourceId)?.color });
   });
+  // 따로 남긴 글: 몇 개인지 · 메모로 되살리기 (되살린 파일은 지운다)
+  const recoveredDir = () => path.join(app.getPath('userData'), 'recovered');
+  const recoveredFiles = () => {
+    try {
+      return fs.readdirSync(recoveredDir()).filter((n) => n.endsWith('.md')).map((n) => path.join(recoveredDir(), n));
+    } catch {
+      return [];
+    }
+  };
+  ipcMain.handle('recovered:count', () => (getVault() ? recoveredFiles().length : 0));
+  ipcMain.handle('recovered:restore', () => {
+    const vault = getVault();
+    if (!vault) return 0;
+    let n = 0;
+    for (const file of recoveredFiles()) {
+      try {
+        const id = vault.import({ body: fs.readFileSync(file, 'utf8') });
+        if (!id) continue;
+        fs.rmSync(file, { force: true });
+        n++;
+      } catch (err) {
+        console.error('따로 남긴 글 되살리기', err);
+      }
+    }
+    return n;
+  });
   ipcMain.on('memo:save-sync', (event, id, body) => {
     try {
       const vault = getVault();
@@ -809,7 +835,7 @@ export function registerIpc(ctx) {
           fs.mkdirSync(dir, { recursive: true });
           const file = path.join(dir, `${new Date().toISOString().replace(/[:.]/g, '-')}.md`);
           fs.writeFileSync(file, body);
-          toast({ title: '메모를 저장하지 못해 따로 남겼어요', body: '눌러서 남긴 글 보기. 메모 폴더를 확인하고 다시 넣어 주세요', onClick: () => shell.showItemInFolder(file) });
+          toast({ title: '메모를 저장하지 못해 따로 남겼어요', body: '메모킹을 다시 켜면 목록에서 한 번에 되살릴 수 있어요. 눌러서 남긴 글 보기', onClick: () => shell.showItemInFolder(file) });
         } catch (err2) {
           console.error('따로 남기기도 실패', err2);
         }

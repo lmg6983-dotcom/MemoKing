@@ -143,6 +143,8 @@ contextBridge.exposeInMainWorld('memoking', {
     setWrite: invoke('mcp:set-write'),
   },
   // 휴지통 (지운 메모)
+  // 창을 닫으며 저장하지 못해 따로 남긴 글 (ipc-handlers memo:save-sync) — 몇 개인지 · 메모로 되살리기 → 되살린 수
+  recovered: { count: invoke('recovered:count'), restore: invoke('recovered:restore') },
   trash: {
     list: invoke('trash:list'),
     restore: invoke('trash:restore'),
