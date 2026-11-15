@@ -7,6 +7,7 @@ import { contextMenuTemplate } from './context-menu.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { createErrorLog, problemMail } from './error-log.js';
+import { SUPPORT_MAIL } from './support-mail.js';
 import { MODE_LABEL } from '../app/js/core/modes.js';
 import path from 'node:path';
 import { Vault } from './vault.js';
@@ -1255,7 +1256,7 @@ async function reportProblem() {
   const version = app.getVersion();
   const osName = `${os.type()} ${os.release()}`;
   clipboard.writeText([`메모킹 v${version} · ${osName}`, ...lines].join('\n'));
-  const url = problemMail({ to: 'lmg6983@gmail.com', version, os: osName, lines });
+  const url = problemMail({ to: SUPPORT_MAIL, version, os: osName, lines });
   if (SMOKE) return smokeOpened.push({ kind: 'mail', target: url }), { ok: true, lines: lines.length };
   await shell.openExternal(url).catch(() => {});
   return { ok: true, lines: lines.length };
