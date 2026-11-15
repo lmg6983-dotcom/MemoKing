@@ -309,7 +309,7 @@ let sideSliding = false; // 접고 펴는 움직임 중
 function applyFolderSide() {
   if (!el.folderSide) return;
   if (!sideSliding) el.folderSide.hidden = !sideWanted;
-  el.folderBtn.hidden = false;
+  el.folderBtn.hidden = (document.body.dataset.tab ?? 'memos') !== 'memos'; // 폴더는 메모에만 (일정 · 보관함에는 쓸 데가 없다)
   el.folderBtn.setAttribute('aria-pressed', String(sideWanted));
   el.folderBtn.title = sideWanted ? '폴더 목록 접기' : '폴더 목록 펴기';
 }
@@ -1584,6 +1584,7 @@ function showTab(tab) {
   memosView.inert = tab !== 'memos';
   memosView.classList.toggle('covered', tab !== 'memos');
   document.body.dataset.tab = tab;
+  if (el.folderBtn) el.folderBtn.hidden = tab !== 'memos';
   el.search.placeholder = TAB_PLACEHOLDER[tab];
   el.search.value = '';
   // 메모 탭으로 돌아올 때: 그사이 바뀐 것이 없으면 다시 그리지 않는다 (숨겨 둔 카드는 그대로 남아 있다)

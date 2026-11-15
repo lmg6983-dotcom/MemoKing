@@ -813,6 +813,7 @@ function setTab(tab) {
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
   el.filterBtn.hidden = tab !== 'memos';
+  el.folderBtn.hidden = tab !== 'memos'; // 폴더는 메모에만 (일정 · 보관함에는 쓸 데가 없다)
   el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: UI.searchHistory }[tab];
   $('fab').hidden = tab !== 'memos'; // + 는 메모 탭에만. 일정 탭은 아래 빠른 추가 캡슐(list-reminders.js), 보관함엔 없음
   // 무거운 일(달력 · 카드 다시 그리기)은 탭 표시가 먼저 바뀐 다음 프레임에 — 누른 손가락 아래에서 탭이 바로 바뀌게
