@@ -1389,7 +1389,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     });
   };
 
-  // 그림을 오른쪽으로 90도 돌린 것 (사진은 JPEG, 그 밖은 PNG — 사진의 방향 정보는 브라우저가 그릴 때 이미 반영)
+  // 그림을 오른쪽으로 90도 돌린 것 (JPEG · HEIC 사진은 JPEG, 그 밖은 PNG — 사진의 방향 정보는 브라우저가 그릴 때 이미 반영)
   async function rotatedBlob(url, src) {
     const im = new Image();
     im.crossOrigin = 'anonymous'; // 메모 폴더 그림을 캔버스로 읽을 수 있게 (copy-content.js pngBase64 와 같게)
@@ -1403,7 +1403,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     g.translate(canvas.width, 0);
     g.rotate(Math.PI / 2);
     g.drawImage(im, 0, 0, canvas.height, canvas.width);
-    const jpeg = /\.(jpe?g|heic|heif|webp)$/i.test(src);
+    const jpeg = /\.(jpe?g|heic|heif)$/i.test(src); // WebP · PNG 는 투명한 곳이 있을 수 있어 PNG 로 (JPEG 는 투명한 곳이 검게 된다)
     return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진을 돌리지 못했어요'))), jpeg ? 'image/jpeg' : 'image/png', 0.92));
   }
 
@@ -2204,7 +2204,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(tableAutoFit)
     .use(tableResize) // 읽기 전용(PDF)에서도 열 너비가 보이게 (끌기는 편집할 때만)
     .use(tableExtras)
-    .use($prose(() => (readOnly ? new Plugin({}) : mediaResizePlugin()))) // 사진 · 동영상 양옆 손잡이로 크기 (보기만 하는 편집기는 없음)
+    .use($prose(() => (readOnly ? new Plugin({}) : mediaResizePlugin()))) // 사진 · 동영상 오른쪽 아래 손잡이로 크기 (보기만 하는 편집기는 없음)
     .use(tagSuggest) // 자동완성 목록이 떠 있을 때 Enter·↑↓ 를 먼저 받는다
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(keepIndentPlugin)

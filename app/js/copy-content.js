@@ -131,7 +131,7 @@ export function attachmentOf(node) {
 }
 
 /** 묶음 사진 줄 → 장마다 { href, name } (메모 폴더의 첨부가 아닌 장이 섞였으면 null) */
-export function albumFiles(node) {
+function albumFiles(node) {
   if (node?.type.name !== 'paragraph' || node.childCount < 2) return null;
   const files = [];
   let ok = true;

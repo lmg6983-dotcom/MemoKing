@@ -53,10 +53,9 @@ function render() {
   $('papers').replaceChildren(...PAPERS.map((p) => chip('paper', p.id, p.label, p.id === opt.paper)));
   $('ratios').replaceChildren(...RATIOS.map((r) => chip('ratio', r.id, r.label, r.id === opt.ratio)));
   radios($('orientation'), 'o', opt.orientation);
-  opt.marginMm = clampMarginMm(opt.marginMm);
   radios($('margin'), 'm', Object.keys(MARGINS).find((k) => MARGINS[k] === opt.marginMm) ?? ''); // 직접 맞춘 값이 단계와 다르면 단계는 모두 꺼진다
   $('margin-range').value = String(opt.marginMm);
-  $('margin-out').textContent = `${opt.marginMm}mm`;
+  $('margin-out').textContent = `${marginFor(size())}mm`; // 작은 종이라 줄여 쓰면 줄인 값을 (막대와 다르게 보이면 줄인 것)
   const z = Number(opt.zoom);
   opt.zoom = z >= 50 && z <= 200 ? Math.round((clampPrintScale(z / 100) * 100) / 5) * 5 : 100; // 5% 단위 · 엉뚱한 값은 100%
   radios($('zoom'), 'z', String(opt.zoom)); // 직접 맞춘 값이 단계와 다르면 단계는 모두 꺼진다

@@ -2427,6 +2427,8 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.3);
   transition: transform 0.15s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.15s;
 }
+.mk-resize.clipped .mk-resize-handle { visibility: hidden; }
+.mk-resize.video .mk-resize-handle { right: -26px; bottom: -26px; } /* 동영상 재생기의 전체 화면 단추가 오른쪽 아래에 있다 */
 .mk-resize-handle:hover::before, .mk-resize.dragging .mk-resize-handle::before { transform: scale(1.18); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.22), 0 3px 12px rgba(0, 0, 0, 0.36); }
 .mk-resize-badge {
   position: absolute; left: 50%; top: 10px; transform: translate(-50%, -4px); padding: 4px 10px; border-radius: 999px;

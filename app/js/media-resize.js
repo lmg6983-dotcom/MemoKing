@@ -8,7 +8,7 @@ import { mediaWidthOf, withMediaWidth, MIN_MEDIA_PCT } from './core/memo-file.js
 
 const SEL = '.mk-image:not(.mk-album-img), .mk-video';
 const SNAPS = [25, 33, 50, 66, 75, 100];
-export const mediaResizeKey = new PluginKey('memoking-media-resize');
+const mediaResizeKey = new PluginKey('memoking-media-resize');
 
 const el = (tag, cls) => Object.assign(document.createElement(tag), { className: cls });
 
@@ -44,12 +44,20 @@ export function mediaResizePlugin() {
         const cs = getComputedStyle(box);
         return Math.max(1, box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
       };
+      // 메모 글이 스크롤되는 칸 — 손잡이가 그 밖(위 막대 · 아래 서식 막대 위)에 떠서 막대 단추를 가리지 않게
+      let scroller = null;
+      const scrollerOf = (el) => {
+        for (let p = el.parentElement; p; p = p.parentElement) if (/(auto|scroll)/.test(getComputedStyle(p).overflowY)) return p;
+        return null;
+      };
       const place = () => {
         if (!target) return; // 숨어 있으면 스크롤마다 재지 않는다
         if (!target.isConnected) return hide(true);
         const r = target.getBoundingClientRect();
         if (r.bottom < 0 || r.top > window.innerHeight || !r.width) return hide(true);
         Object.assign(layer.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+        const box = scroller?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+        layer.classList.toggle('clipped', !drag && (r.bottom > box.bottom - 4 || r.bottom < box.top + 12)); // 모서리가 보이는 칸 밖이면 손잡이만 숨긴다
       };
       const show = (dom) => {
         clearTimeout(hideTimer);
@@ -58,6 +66,8 @@ export function mediaResizePlugin() {
           target?.classList.remove('mk-resize-on');
           target = dom;
           target.classList.add('mk-resize-on');
+          layer.classList.toggle('video', dom.classList.contains('mk-video')); // 동영상: 오른쪽 아래의 전체 화면 단추와 겹치지 않게 손잡이를 바깥으로
+          scroller = scrollerOf(dom);
         }
         layer.hidden = false;
         place();
