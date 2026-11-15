@@ -77,7 +77,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // 확대해 보는 중이면 장 위쪽 가운데에 배율 단추 (누르면 원래 크기로 · 좁은 창의 머리 줄을 붐비게 하지 않게)
   const zoomBtn = el('button', 'mk-album-btn mk-album-zoom', { type: 'button', title: '원래 크기로 (0)', hidden: true });
   zoomBtn.addEventListener('click', () => resetZoom());
-  head.append(count, inkedMark, el('span', 'mk-album-gap'), ...[rotate, save, share, del].filter(Boolean), ...(onDraw ? [draw] : []), ...(split ? [split] : []), close);
+  head.append(count, inkedMark, el('span', 'mk-album-gap'), ...[rotate, split, save, share, del].filter(Boolean), ...(onDraw ? [draw] : []), close);
   const stage = el('div', 'mk-album-stage');
   const img = el('img', 'mk-album-big', { draggable: false });
   stage.append(img);

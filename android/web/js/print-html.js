@@ -14,7 +14,7 @@ export const pagePx = (marginMm) => {
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 // 화면에서만 쓰는 표시(고른 줄·누르는 중·목록 커서 등)는 지운다
-const SCREEN_ONLY = /^(ProseMirror-selectednode|ProseMirror-hideselection|mk-block-|mk-list-|mk-swap|mk-drop|mk-cursor|mk-item-)/;
+const SCREEN_ONLY = /^(ProseMirror-selectednode|ProseMirror-hideselection|mk-block-|mk-list-|mk-swap|mk-drop|mk-cursor|mk-item-|mk-delete-target|mk-resize-on)/; // 지우기 대상 붉은 표시 · 크기 손잡이 테두리도
 
 /**
  * @param {Element} dom 편집기 본문 (.mk-doc)

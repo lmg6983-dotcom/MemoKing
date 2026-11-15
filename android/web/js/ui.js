@@ -1,6 +1,7 @@
 // 시트(아래에서 올라오는 창)·잠깐 알림·확인 대화 상자·시스템 막대 색
 import { native } from './native.js';
 import { swipeDismiss } from '../../app/js/dom.js';
+import { hideDeleteButton } from '../../app/js/delete-button.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -45,6 +46,7 @@ function addCloseButton(el) {
 /** 시트를 연다. close: 닫을 때 할 일 (기본은 숨기기) */
 export function openSheet(el, { onClose } = {}) {
   if (sheets.some((s) => s.el === el)) return;
+  hideDeleteButton(true); // 내용 위에 떠 있던 단추 줄(복사 · 지우기)과 크기 손잡이가 시트 위에 남지 않게
   addCloseButton(el);
   el.hidden = false;
   openedAt = performance.now();

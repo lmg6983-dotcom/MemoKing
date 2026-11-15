@@ -21,11 +21,8 @@ export function mediaResizePlugin() {
       const left = el('span', 'mk-resize-handle left');
       const right = el('span', 'mk-resize-handle right');
       const badge = el('span', 'mk-resize-badge');
-      for (const h of [left, right]) {
-        h.setAttribute('role', 'slider');
-        h.setAttribute('aria-label', '크기 (끌어서 바꾸기, 두 번 누르면 원래대로)');
-        h.title = '끌어서 크기 바꾸기 · 두 번 누르면 원래대로';
-      }
+      layer.setAttribute('aria-hidden', 'true'); // 마우스 · 손가락으로 끄는 손잡이 (키보드 · 화면 읽기 프로그램에는 값 없는 슬라이더로 잡히지 않게)
+      for (const h of [left, right]) h.title = '끌어서 크기 바꾸기, 두 번 누르면 원래대로';
       layer.append(left, right, badge);
       document.body.append(layer);
       let target = null; // 지금 손잡이가 붙은 그림 · 동영상
@@ -49,7 +46,8 @@ export function mediaResizePlugin() {
         return Math.max(1, box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
       };
       const place = () => {
-        if (!target?.isConnected) return hide(true);
+        if (!target) return; // 숨어 있으면 스크롤마다 재지 않는다
+        if (!target.isConnected) return hide(true);
         const r = target.getBoundingClientRect();
         if (r.bottom < 0 || r.top > window.innerHeight || !r.width) return hide(true);
         Object.assign(layer.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
@@ -158,6 +156,7 @@ export function mediaResizePlugin() {
         h.addEventListener('pointermove', move);
         h.addEventListener('pointerup', end);
         h.addEventListener('pointercancel', end);
+        h.addEventListener('lostpointercapture', end); // 끄는 중 캡처를 잃어도 끄기 상태가 남지 않게
         h.addEventListener('dblclick', reset);
         h.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false }); // 끄는 동안 화면이 스크롤되지 않게
       }

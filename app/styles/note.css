@@ -2369,6 +2369,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-inked svg { width: 13px; height: 13px; }
 .mk-album-inked[hidden] { display: none; }
 .mk-album-icon { width: 36px; padding: 0; justify-content: center; }
+.mk-album-btn:disabled { opacity: 0.45; cursor: progress; } /* 돌리는 중 */
 .mk-album-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 /* 아래 장 목록 (이미지 위 오버레이) */
 .mk-album-strip { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3; display: flex; gap: 6px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent); overflow-x: auto; scrollbar-width: thin; justify-content: safe center; transition: opacity 0.2s ease-out; }
@@ -2427,7 +2428,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 }
 .mk-resize-handle.left { left: -3px; }
 .mk-resize-handle.right { right: -3px; }
-.mk-resize-handle:hover::before, .mk-resize.dragging .mk-resize-handle::before { transform: scaleY(1.12); background: var(--brand-yellow); }
+.mk-resize-handle:hover::before, .mk-resize.dragging .mk-resize-handle::before { transform: scaleY(1.12); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.24), 0 3px 12px rgba(0, 0, 0, 0.34); } /* 늘 흰색 — 잡으면 조금 길어지고 그림자가 짙어진다 */
 .mk-resize-badge {
   position: absolute; left: 50%; top: 10px; transform: translate(-50%, -4px); padding: 4px 10px; border-radius: 999px;
   background: rgba(17, 17, 17, 0.78); backdrop-filter: blur(8px); color: #fff; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
@@ -2435,5 +2436,6 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 }
 .mk-resize.dragging .mk-resize-badge { opacity: 1; transform: translate(-50%, 0); }
 body.mk-resizing, body.mk-resizing * { cursor: ew-resize !important; user-select: none; }
-@media (pointer: coarse) { .mk-resize-handle { width: 32px; height: 64px; margin-top: -32px; } .mk-resize-handle.left { left: -10px; } .mk-resize-handle.right { right: -10px; } }
+.mk-resize-handle:focus-visible { outline: none; }
+@media (pointer: coarse) { .mk-resize-handle { width: 44px; height: 64px; margin-top: -32px; } .mk-resize-handle.left { left: -19px; } .mk-resize-handle.right { right: -19px; } } /* 손가락 닿는 자리 44px (알약은 그대로 6px) */
 @media (prefers-reduced-motion: reduce) { .mk-resize, .mk-resize-handle::before, .mk-resize-badge { transition: none; } }

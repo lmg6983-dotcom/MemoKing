@@ -350,14 +350,15 @@
     <div class="sheet-grip"></div>
     <h3 id="print-sheet-title" class="sheet-title">인쇄할 크기</h3>
     <div class="print-preview" id="print-preview" aria-hidden="true"><iframe id="print-frame" title="첫 쪽 미리보기" tabindex="-1" sandbox="allow-same-origin"></iframe></div>
+    <p class="print-label">글자 크기</p>
     <div class="print-size">
-      <div class="seg" id="print-size-seg" role="radiogroup" aria-label="내용 크기">
+      <div class="seg" id="print-size-seg" role="radiogroup" aria-label="글자 크기">
         <button type="button" data-scale="0.8" aria-checked="false">작게</button>
         <button type="button" data-scale="1" aria-checked="true">보통</button>
         <button type="button" data-scale="1.2" aria-checked="false">크게</button>
         <button type="button" data-scale="1.45" aria-checked="false">아주 크게</button>
       </div>
-      <label class="print-range"><span>직접</span><input type="range" id="print-scale" min="50" max="200" step="5" value="100" aria-label="내용 크기 (퍼센트)"><output id="print-scale-out">100%</output></label>
+      <label class="print-range"><span>직접</span><input type="range" id="print-scale" min="50" max="200" step="5" value="100" aria-label="글자 크기 (퍼센트)"><output id="print-scale-out">100%</output></label>
     </div>
     <p class="print-label">여백</p>
     <div class="print-size">
