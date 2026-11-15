@@ -1,7 +1,7 @@
 // Google Drive 연결 화면 (① OAuth 클라이언트 ② 로그인 ③ 폴더 고르기) 과 동기화 상태 표시
 import { drive, call } from './native.js';
 import { app } from './state.js';
-import { openSheet, closeSheet, toast } from './ui.js';
+import { openSheet, closeSheet, toast, promptName } from './ui.js';
 import { icon } from '../../app/js/icons.js';
 import { installShareText } from '../../app/js/core/install-links.js';
 import { UI } from '../../app/js/core/ui-text.js';
@@ -181,7 +181,7 @@ function renderCrumbs() {
 
 $('folder-new').addEventListener('click', async () => {
   const here = path.at(-1);
-  const name = window.prompt('새 폴더 이름', here.id === 'root' ? SUGGEST : '')?.trim();
+  const name = (await promptName({ title: '새 폴더 이름', value: here.id === 'root' ? SUGGEST : '', okLabel: '만들기' }))?.trim(); // 앱의 이름 창 (WebView 기본 창은 모양이 달랐다)
   if (!name) return;
   try {
     const f = await call('driveCreateFolder', { parent: here.id, name });
@@ -262,7 +262,10 @@ export function renderStatus(s = drive.status()) {
   $('drive-connect').classList.toggle('primary', !(s.active && s.connected)); // 연결 전에는 PC처럼 주 단추
 }
 
+let syncing = false; // 여러 번 눌러도 동기화는 한 번만
 export async function syncNow() {
+  if (syncing) return;
+  syncing = true;
   renderStatus({ ...drive.status(), status: { ...drive.status().status, state: 'syncing' } });
   try {
     const st = await call('driveSync');
@@ -270,6 +273,8 @@ export async function syncNow() {
     else toast('동기화했어요');
   } catch (err) {
     toast(err.message, true);
+  } finally {
+    syncing = false;
   }
   renderStatus();
 }
