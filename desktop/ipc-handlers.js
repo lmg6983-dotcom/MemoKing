@@ -725,6 +725,36 @@ export function registerIpc(ctx) {
     if (opts?.open) wm.openNote(id);
     return id;
   });
+  // ---------- 충돌 사본 비교: "제목 (PC 충돌 2026-11-15 1530).md" ↔ 원본 "제목.md" ----------
+  const CONFLICT_TAG = / \((?:PC|휴대폰) 충돌 \d{4}-\d{2}-\d{2} \d{4}(?: \d+)?\)(?=\.md$)/;
+  const conflictPair = (copyId) => {
+    const vault = getVault();
+    const copy = vault?.get(String(copyId));
+    if (!copy?.file || !CONFLICT_TAG.test(copy.file)) return null;
+    const origFile = copy.file.replace(CONFLICT_TAG, '');
+    const original = vault.list().find((m) => m.file === origFile);
+    return { vault, copy, original: original ? vault.get(original.id) : null };
+  };
+  const side = (m) => (m ? { id: m.id, title: m.title, file: m.file, updated: m.updated, locked: Boolean(m.locked), body: m.locked ? '' : m.body } : null);
+  ipcMain.handle('conflict:get', (_e, copyId) => {
+    const p = conflictPair(copyId);
+    return p ? { copy: side(p.copy), original: side(p.original) } : null;
+  });
+  // keep: 'copy' 사본 내용으로 원본을 바꾸고 사본은 휴지통 · 'original' 원본 그대로, 사본만 휴지통
+  ipcMain.handle('conflict:resolve', (_e, copyId, keep) => {
+    const p = conflictPair(copyId);
+    if (!p) return { ok: false, message: '사본을 찾지 못했어요. 이미 지웠을 수 있어요' };
+    if (p.copy.locked || p.original?.locked) return { ok: false, message: '잠긴 메모는 직접 열어 고쳐 주세요' };
+    if (keep === 'copy') {
+      if (!p.original) return { ok: false, message: '원본 메모를 찾지 못했어요. 사본을 그대로 쓰면 돼요' };
+      const r = p.vault.save(p.original.id, p.copy.body);
+      if (r?.refused) return { ok: false, message: '원본을 바꾸지 못했어요. 잠시 뒤 다시 해 주세요' };
+      wm.sendToNote(p.original.id, 'memo:external', p.vault.get(p.original.id)); // 원본 창이 열려 있으면 바꾼 글로
+    }
+    wm.noteWins.get(p.copy.id)?.destroy();
+    p.vault.trash(p.copy.id);
+    return { ok: true, message: keep === 'copy' ? '사본 내용으로 바꾸고 사본은 휴지통으로 옮겼어요' : '사본을 휴지통으로 옮겼어요' };
+  });
   ipcMain.handle('memo:get', (_e, id) => {
     const memo = getVault()?.get(id);
     if (!memo) return null;

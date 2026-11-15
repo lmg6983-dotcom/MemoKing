@@ -1697,7 +1697,7 @@ el.cards.addEventListener('keydown', (e) => {
   e.preventDefault();
   deleteMemo(card.dataset.id);
 });
-el.cards.addEventListener('click', (e) => {
+el.cards.addEventListener('click', async (e) => {
   if (suppressClick) {
     suppressClick = false; // 끌기가 끝난 직후의 클릭은 무시
     return;
@@ -1724,8 +1724,77 @@ el.cards.addEventListener('click', (e) => {
   const cardTag = e.target.closest('[data-card-tag]');
   if (cardTag) return toggleTagFilter(cardTag.dataset.cardTag, { only: true });
   const card = e.target.closest('.card');
-  if (card) api.memo.open(card.dataset.id);
+  if (!card) return;
+  // 충돌 사본만 보는 중: 사본을 누르면 원본과 나란히 견주는 창 (사본이 아니면 평소대로 연다)
+  if (state.onlyFiles && api.conflict) {
+    const pair = await api.conflict.get(card.dataset.id).catch(() => null);
+    if (pair) return compareConflict(pair);
+  }
+  api.memo.open(card.dataset.id);
 });
+
+/** 충돌 사본 ↔ 원본 나란히: 사본 내용으로 바꾸기 · 사본 지우기 · 둘 다 두기 · 따로 열어 보기 */
+function compareConflict({ copy, original }) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'compare-dialog';
+  const h = document.createElement('h2');
+  h.textContent = '충돌 사본 견주기';
+  const note = document.createElement('p');
+  note.className = 'compare-note';
+  note.textContent = '두 기기에서 같은 메모를 동시에 고쳐 따로 남긴 사본이에요. 남길 쪽을 골라 주세요.';
+  const col = (label, m) => {
+    const box = document.createElement('section');
+    box.className = 'compare-col';
+    const t = document.createElement('h3');
+    t.textContent = label;
+    const sub = document.createElement('div');
+    sub.className = 'compare-sub';
+    sub.textContent = m ? `${m.file}${m.updated ? `, ${new Date(m.updated).toLocaleString('ko-KR')}` : ''}` : '원본을 찾지 못했어요 (이름을 바꿨거나 지웠어요)';
+    const pre = document.createElement('pre');
+    pre.className = 'compare-body';
+    pre.textContent = !m ? '' : m.locked ? '(잠긴 메모라 내용을 볼 수 없어요)' : m.body;
+    box.append(t, sub, pre);
+    if (m) {
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'link-btn';
+      open.textContent = '따로 열기';
+      open.addEventListener('click', () => api.memo.open(m.id));
+      box.append(open);
+    }
+    return box;
+  };
+  const cols = document.createElement('div');
+  cols.className = 'compare-cols';
+  cols.append(col('지금 메모', original), col('충돌 사본', copy));
+  const actions = document.createElement('div');
+  actions.className = 'dialog-actions';
+  const btn = (label, cls, run) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `btn${cls ? ` ${cls}` : ''}`;
+    b.textContent = label;
+    b.addEventListener('click', run);
+    return b;
+  };
+  const resolve = (keep) => async () => {
+    const r = await api.conflict.resolve(copy.id, keep).catch((err) => ({ ok: false, message: err.message }));
+    flashStatus(r.message);
+    if (r.ok) dialog.close();
+  };
+  const locked = copy.locked || original?.locked;
+  actions.append(
+    btn('둘 다 두기', '', () => dialog.close()),
+    btn('사본 지우기', '', resolve('original')),
+    btn('사본 내용으로 바꾸기', 'primary', resolve('copy')),
+  );
+  if (locked || !original) actions.lastChild.disabled = true;
+  if (locked) actions.children[1].disabled = true;
+  dialog.append(h, note, cols, actions);
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+}
 
 // ---------- 카드를 끌어 화면에 놓기 ----------
 // 목록 안: 카드 복제본이 커서를 따라온다. 목록 밖: 메인 프로세스가 실제 크기의 미리보기 창을 띄운다.
