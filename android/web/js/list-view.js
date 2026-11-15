@@ -855,8 +855,9 @@ el.cards.addEventListener('click', (e) => {
 //   카드는 손가락을 프레임마다 한 번만(requestAnimationFrame) 따라가고, 미는 동안은 따로 그리는 층(will-change)이다.
 //   미는 카드의 칸에는 .mk-live — 화면 밖 칸의 그리기 건너뛰기(base.css)가 칸 밖으로 나간 카드를 자르지 않게
 const HOLD_MS = 280; // 꾹 눌러 끌기를 기다리는 때 (길면 끌기가 굼떠 보인다)
-const PULL_HOLD_MS = 300; // 왼쪽으로 당긴 채 이만큼 멈추면 끌기로
+const PULL_HOLD_MS = 150; // 왼쪽으로 당긴 채 이만큼 멈추면 끌기로
 const PULL_MIN = 24; // 이만큼 당겨야 기다리기 시작 (살짝 흔들린 것은 아니다)
+const PULL_NOW = 64; // 이만큼 당기면 멈추기를 기다리지 않고 바로 들린다
 let swipe = null;
 let swipeFrame = 0;
 let lastScroll = 0;
@@ -916,7 +917,8 @@ el.cards.addEventListener('touchmove', (e) => {
   if (!t) return;
   if (swipe.drag) {
     if (e.cancelable) e.preventDefault();
-    moveDrag(t.clientX, t.clientY);
+    swipe.drag.px = t.clientX; // 그리기는 프레임마다 한 번 (dragTick)
+    swipe.drag.py = t.clientY;
     return;
   }
   const dx = t.clientX - swipe.x;
@@ -953,6 +955,11 @@ el.cards.addEventListener('touchmove', (e) => {
   swipe.lx = t.clientX;
   swipe.ly = t.clientY;
   // 왼쪽으로 충분히 당겼으면 멈추기를 기다린다 — 그사이 많이 움직이면 다시 기다린다
+  if (!isTwoPane() && -nx >= PULL_NOW) {
+    clearTimeout(swipe.pull?.timer);
+    pullToDrag();
+    return;
+  }
   if (!isTwoPane() && -nx >= PULL_MIN) {
     if (!swipe.pull || Math.hypot(t.clientX - swipe.pull.x, t.clientY - swipe.pull.y) > 12) {
       clearTimeout(swipe.pull?.timer);
@@ -999,24 +1006,33 @@ function startDrag(x, y, { pop = false } = {}) {
     Object.assign(el.folderSide.style, { top: `${v.top}px`, height: `${v.height}px` });
     el.folderSide.classList.add('peek');
   }
-  swipe.drag = { clone, x, y, over: null };
-  moveDrag(x, y);
+  // 폴더 줄의 자리는 처음 한 번만 잰다 — 움직일 때마다 elementFromPoint 로 찾으면 레이아웃을 다시 따져 버벅였다
+  const side = el.folderSide;
+  const sr = side.getBoundingClientRect();
+  const rows = [...side.querySelectorAll('[data-folder]')].map((row) => {
+    const r = row.getBoundingClientRect();
+    return { row, top: r.top - sr.top + side.scrollTop, bottom: r.bottom - sr.top + side.scrollTop };
+  });
+  swipe.drag = { clone, x, y, px: x, py: y, overRow: null, rows, top: sr.top, bottom: sr.bottom, left: sr.left - 14, right: sr.right,
+    scroll: side.scrollTop, maxScroll: side.scrollHeight - side.clientHeight, frame: 0 };
+  moveDrag(swipe.drag);
   // 당겨서 들었으면 한 번 톡 튄다 (들렸다는 것을 손끝과 눈으로)
   if (pop && !reduceMotion()) clone.animate([{ scale: '1' }, { scale: '1.08' }, { scale: '1' }], { duration: 220, easing: EASE_OUT, composite: 'add' });
 }
 
-function moveDrag(x, y) {
-  const d = swipe.drag;
-  const row = document.elementFromPoint(x, y)?.closest('#folder-side [data-folder]') ?? null;
-  // 폴더가 많아 목록이 넘치면: 목록의 위 · 아래 끝 가까이로 끌면 그쪽으로 넘겨 준다
-  const side = el.folderSide;
-  if (side.scrollHeight > side.clientHeight) {
-    const r = side.getBoundingClientRect();
-    if (x >= r.left && x <= r.right) {
-      if (y < r.top + 44) side.scrollTop -= 14;
-      else if (y > r.bottom - 44) side.scrollTop += 14;
-    }
+// 프레임마다 한 번: 손가락 자리로 카드를 옮기고, 아래 폴더를 찾고, 끝에 머물면 목록을 계속 넘긴다
+function moveDrag(d) {
+  d.frame = requestAnimationFrame(() => moveDrag(d));
+  const { px: x, py: y } = d;
+  const inSide = x >= d.left && x <= d.right && y >= d.top && y <= d.bottom;
+  // 폴더가 많아 목록이 넘치면: 목록의 위 · 아래 끝 가까이에 대고 있으면 그쪽으로 넘겨 준다 (손가락이 멈춰 있어도)
+  if (inSide && d.maxScroll > 0) {
+    const step = y < d.top + 44 ? -8 : y > d.bottom - 44 ? 8 : 0;
+    const next = Math.max(0, Math.min(d.maxScroll, d.scroll + step));
+    if (next !== d.scroll) el.folderSide.scrollTop = d.scroll = next;
   }
+  const at = y - d.top + d.scroll;
+  const row = inSide ? d.rows.find((r) => at >= r.top && at < r.bottom)?.row ?? null : null;
   if (row !== d.overRow) {
     d.overRow?.classList.remove('drop-on');
     row?.classList.add('drop-on');
@@ -1030,6 +1046,7 @@ function moveDrag(x, y) {
 
 function endDrag(drop) {
   const d = swipe.drag;
+  cancelAnimationFrame(d.frame);
   const { card } = swipe;
   const row = drop ? d.overRow : null;
   d.overRow?.classList.remove('drop-on');
