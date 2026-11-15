@@ -755,7 +755,10 @@ shareSheet.addEventListener('click', async (e) => {
     closeSheet(shareSheet);
   } catch (err) {
     console.error(err);
-    toast(err.message || UI.shareFail, true);
+    // 너무 길어 그림 한 장이 안 되면 알림에서 바로 PDF 로 (예전: 말만 하고 다시 메뉴를 찾아가야 했다)
+    const toPdf = /PDF로 저장/.test(err?.message ?? '') ? { label: 'PDF로 저장', run: () => openPrint(id, 'share') } : undefined;
+    if (toPdf) closeSheet(shareSheet);
+    toast(err.message || UI.shareFail, true, toPdf);
   } finally {
     $('share-busy').hidden = true;
     for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = false;

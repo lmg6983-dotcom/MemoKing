@@ -605,7 +605,8 @@ async function memoImage(kind) {
     setStatus(kind === 'copy' ? '그림을 복사했어요. 붙여 넣으면 돼요' : `그림으로 저장했어요: ${r?.name ?? ''}`);
   } catch (err) {
     console.error(err);
-    setStatus('그림을 만들지 못했어요. 다시 해 주세요', true);
+    // 너무 길어 그림 한 장이 안 되는 것은 다시 해도 같다 — 그 까닭(PDF로 저장)을 그대로
+    setStatus(/PDF로 저장/.test(err?.message ?? '') ? err.message : '그림을 만들지 못했어요. 다시 해 주세요', true);
   }
 }
 // 메뉴 맨 위 아이콘: 목록 카드 메뉴와 같은 그림 · 같은 순서 · 같은 일 (같은 아이콘은 같은 뜻)
