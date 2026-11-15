@@ -103,7 +103,9 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .searchbar .search { order: 10; flex: 1 1 0; min-width: 0; }
 .searchbar .filter-btn { order: 11; }
 .searchbar .folder-btn { order: 10; margin-right: 2px; } /* 검색창 왼쪽 (PC 와 같은 자리) */
-.searchbar .folder-btn[aria-pressed="true"] { color: var(--text-strong); background: var(--hover); }
+/* 펴져 있을 때는 그림만 진하게 — 큰 회색 바탕은 옆의 검색창 · 보기 단추보다 무거웠다 */
+.searchbar .folder-btn { color: var(--muted); }
+.searchbar .folder-btn[aria-pressed="true"] { color: var(--text-strong); background: none; }
 .searchbar::after { content: ""; order: 9; flex-basis: 100%; height: 0; } /* 줄 바꿈 */
 .search {
   display: flex;
