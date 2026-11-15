@@ -1350,3 +1350,6 @@ body.m-dragging .folder-side .mf-new { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .card.lifted { transition: none; } #view-memos > .folder-side.peek { animation: none; } }
 /* 오프라인: 오류(빨강)가 아니라 흐리게 — 메모는 휴대폰에 저장되고 연결되면 맞춘다 (drive.js) */
 #sync-btn.offline { opacity: 0.5; }
+/* 휴지통 줄을 누르면 펼쳐 보는 글 (app.js renderTrash) */
+.trash-item .trash-text { cursor: pointer; }
+.trash-item .trash-body { display: block; margin-top: 6px; max-height: 40vh; overflow-y: auto; font-size: 13px; line-height: 1.55; color: var(--text); white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }

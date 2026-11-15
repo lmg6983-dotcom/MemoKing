@@ -1340,6 +1340,15 @@ function renderTrash() {
     sub.className = 'trash-sub';
     sub.textContent = [`${daysAgoText(t.deletedAt)} 지움`, t.attachments ? `첨부 ${t.attachments}개` : ''].filter(Boolean).join(', ');
     text.append(title, sub);
+    // 누르면 글을 펼쳐 본다 — 되살리기 전에 무엇인지 알게 (다시 누르면 접힌다)
+    text.addEventListener('click', () => {
+      const open = text.querySelector('.trash-body');
+      if (open) return open.remove();
+      const body = document.createElement('span');
+      body.className = 'trash-body';
+      body.textContent = app.vault.trashPreview(t.name) || '(내용이 없어요)';
+      text.append(body);
+    });
     const restore = document.createElement('button');
     restore.className = 'btn';
     restore.textContent = '되살리기';
