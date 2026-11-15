@@ -302,9 +302,11 @@ async function flush() {
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
-    setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
     // 잠깐의 실패(파일을 다른 프로그램이 잡고 있음 등)면 더 치지 않아도 다시 저장해 본다 — 몇 번까지만, 점점 길게
-    if (++saveFails <= 4) saveTimer = setTimeout(flush, 2000 * saveFails);
+    if (++saveFails <= 4) {
+      setStatus('저장하지 못해 곧 다시 저장해요…', true); // 다시 해 보는 중임을 보인다 (급히 글을 복사해 두지 않아도 되게)
+      saveTimer = setTimeout(flush, 2000 * saveFails);
+    } else setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
   }
 }
 
