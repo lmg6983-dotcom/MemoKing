@@ -1,4 +1,4 @@
-// 사진 · 동영상 크기 조절 (편집기 플러그인, PC · 휴대폰 함께) — Notion 처럼 양옆의 손잡이를 끌어 크기를 바꾼다
+// 사진 · 동영상 크기 조절 (편집기 플러그인, PC · 휴대폰 함께) — 오른쪽 아래 모서리의 동그란 손잡이 하나를 끌어 크기를 바꾼다 (Apple 메모 · Google Docs 의 모서리 손잡이처럼)
 //   PC: 마우스를 올리면 손잡이가 나타난다. 휴대폰: 내용을 눌러 단추 줄(복사 · 저장 · 지우기)이 뜰 때 함께 (delete-button.js 의 mk:tools)
 //   크기는 그 줄 폭의 % 로 설명 끝에 "|50%" 로 저장 (core/memo-file.js withMediaWidth) — 25 · 33 · 50 · 66 · 75 · 100% 가까이에서 딱 붙는다
 //   손잡이를 두 번 누르면 원래(줄 폭에 맞춤)로. 끄는 동안 위에 지금 크기 (50%)
@@ -18,12 +18,11 @@ export function mediaResizePlugin() {
     view(view) {
       const layer = el('div', 'mk-resize');
       layer.hidden = true;
-      const left = el('span', 'mk-resize-handle left');
-      const right = el('span', 'mk-resize-handle right');
+      const grip = el('span', 'mk-resize-handle');
       const badge = el('span', 'mk-resize-badge');
       layer.setAttribute('aria-hidden', 'true'); // 마우스 · 손가락으로 끄는 손잡이 (키보드 · 화면 읽기 프로그램에는 값 없는 슬라이더로 잡히지 않게)
-      for (const h of [left, right]) h.title = '끌어서 크기 바꾸기, 두 번 누르면 원래대로';
-      layer.append(left, right, badge);
+      grip.title = '끌어서 크기 바꾸기, 두 번 누르면 원래대로';
+      layer.append(grip, badge);
       document.body.append(layer);
       let target = null; // 지금 손잡이가 붙은 그림 · 동영상
       let drag = null;
@@ -100,15 +99,16 @@ export function mediaResizePlugin() {
       window.addEventListener('scroll', place, true);
       window.addEventListener('resize', place);
 
-      // 끌기: 그림은 왼쪽에 붙어 있으므로 오른쪽 손잡이는 끈 만큼, 왼쪽 손잡이는 반대로
-      const start = (e, side) => {
+      // 끌기: 그림은 왼쪽 위에 붙어 있으므로 모서리를 오른쪽 · 아래로 끌면 커진다 (비율은 그대로 — 가로 · 세로 중 더 많이 끈 쪽으로)
+      const start = (e) => {
         if (!target || !view.editable) return;
         e.preventDefault();
         e.stopPropagation();
         const pos = posOf(target);
         if (pos < 0) return;
         const base = baseWidth(target);
-        drag = { side, x: e.clientX, w: target.getBoundingClientRect().width, base, pos, pct: null, snapped: null, id: e.pointerId };
+        const r = target.getBoundingClientRect();
+        drag = { x: e.clientX, y: e.clientY, w: r.width, ratio: r.height ? r.width / r.height : 1, base, pos, pct: null, snapped: null, id: e.pointerId };
         e.currentTarget.setPointerCapture?.(e.pointerId);
         layer.classList.add('dragging');
         target.classList.add('mk-sized');
@@ -117,7 +117,9 @@ export function mediaResizePlugin() {
       };
       const move = (e) => {
         if (!drag || e.pointerId !== drag.id) return;
-        const dx = (e.clientX - drag.x) * (drag.side === 'right' ? 1 : -1);
+        const byX = e.clientX - drag.x;
+        const byY = (e.clientY - drag.y) * drag.ratio; // 세로로 끈 만큼을 가로로 바꿔 (비율 유지)
+        const dx = Math.abs(byX) >= Math.abs(byY) ? byX : byY;
         let pct = ((drag.w + dx) / drag.base) * 100;
         const snap = SNAPS.find((s) => Math.abs(s - pct) < 2.5);
         if (snap) pct = snap;
@@ -151,8 +153,8 @@ export function mediaResizePlugin() {
         view.dispatch(view.state.tr.setNodeMarkup(pos, null, { ...node.attrs, alt: withMediaWidth(node.attrs.alt, 100) }));
         requestAnimationFrame(place);
       };
-      for (const [h, side] of [[left, 'left'], [right, 'right']]) {
-        h.addEventListener('pointerdown', (e) => start(e, side));
+      for (const h of [grip]) {
+        h.addEventListener('pointerdown', start);
         h.addEventListener('pointermove', move);
         h.addEventListener('pointerup', end);
         h.addEventListener('pointercancel', end);

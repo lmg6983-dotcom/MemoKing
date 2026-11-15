@@ -506,8 +506,8 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   outline: none;
 }
 .link-search:focus { border-color: var(--text-strong); }
-.links-panel h4 { margin: 14px 0 4px; font-size: 12px; color: var(--muted); }
-.links-panel h4 small { font-weight: 400; }
+.links-panel h3 { margin: 14px 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.links-panel h3 small { font-weight: 400; }
 .link-list { margin: 4px 0 0; padding: 0; list-style: none; }
 .link-list:empty::after { content: "아직 없어요"; display: block; padding: 4px 2px; font-size: 12px; color: var(--muted); }
 #link-results:empty::after { content: none; }
@@ -2410,7 +2410,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 @media print { .mk-album-view { display: none !important; } }
 
 /* ---------- 사진 · 동영상 크기 조절 (media-resize.js) ----------
-   Notion · Apple 메모처럼: 그림 양옆 가운데에 세로 알약 손잡이, 끄는 동안 위에 지금 크기. 크기는 줄 폭의 % */
+   오른쪽 아래 모서리의 흰 동그라미 손잡이 하나, 끄는 동안 위에 지금 크기. 크기는 줄 폭의 % */
 .mk-doc .mk-image.mk-sized, .mk-doc .mk-video.mk-sized { max-width: 100%; height: auto; }
 .mk-doc p.mk-image-line:has(> .mk-sized) { width: auto; } /* 줄이 그림만 감싸면 % 가 기준을 잃는다 — 크기를 정한 그림의 줄은 칸 폭 그대로 */
 .mk-doc .mk-resize-on { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-yellow) 85%, transparent); transition: box-shadow 0.15s ease-out; }
@@ -2418,24 +2418,23 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-resize.in { opacity: 1; }
 .mk-resize[hidden] { display: none; }
 .mk-resize-handle {
-  position: absolute; top: 50%; width: 22px; height: 56px; margin-top: -28px; pointer-events: auto; cursor: ew-resize; touch-action: none;
+  position: absolute; right: -11px; bottom: -11px; width: 30px; height: 30px; pointer-events: auto; cursor: nwse-resize; touch-action: none;
   display: flex; align-items: center; justify-content: center;
 }
+/* 오른쪽 아래 모서리에 흰 동그라미 하나 — 잡으면 조금 커지고 그림자가 짙어진다 */
 .mk-resize-handle::before {
-  content: ""; width: 6px; height: 40px; border-radius: 999px; background: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.28);
-  transition: transform 0.15s cubic-bezier(0.23, 1, 0.32, 1), background-color 0.15s;
+  content: ""; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.15s;
 }
-.mk-resize-handle.left { left: -3px; }
-.mk-resize-handle.right { right: -3px; }
-.mk-resize-handle:hover::before, .mk-resize.dragging .mk-resize-handle::before { transform: scaleY(1.12); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.24), 0 3px 12px rgba(0, 0, 0, 0.34); } /* 늘 흰색 — 잡으면 조금 길어지고 그림자가 짙어진다 */
+.mk-resize-handle:hover::before, .mk-resize.dragging .mk-resize-handle::before { transform: scale(1.18); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.22), 0 3px 12px rgba(0, 0, 0, 0.36); }
 .mk-resize-badge {
   position: absolute; left: 50%; top: 10px; transform: translate(-50%, -4px); padding: 4px 10px; border-radius: 999px;
   background: rgba(17, 17, 17, 0.78); backdrop-filter: blur(8px); color: #fff; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
   opacity: 0; transition: opacity 0.15s, transform 0.15s cubic-bezier(0.23, 1, 0.32, 1); white-space: nowrap;
 }
 .mk-resize.dragging .mk-resize-badge { opacity: 1; transform: translate(-50%, 0); }
-body.mk-resizing, body.mk-resizing * { cursor: ew-resize !important; user-select: none; }
+body.mk-resizing, body.mk-resizing * { cursor: nwse-resize !important; user-select: none; }
 .mk-resize-handle:focus-visible { outline: none; }
-@media (pointer: coarse) { .mk-resize-handle { width: 44px; height: 64px; margin-top: -32px; } .mk-resize-handle.left { left: -19px; } .mk-resize-handle.right { right: -19px; } } /* 손가락 닿는 자리 44px (알약은 그대로 6px) */
+@media (pointer: coarse) { .mk-resize-handle { width: 44px; height: 44px; right: -18px; bottom: -18px; } .mk-resize-handle::before { width: 20px; height: 20px; } } /* 손가락 닿는 자리 44px */
 @media (prefers-reduced-motion: reduce) { .mk-resize, .mk-resize-handle::before, .mk-resize-badge { transition: none; } }

@@ -723,7 +723,7 @@ function renderCard(memo) {
     f.className = 'card-folder';
     f.dataset.cardFolder = memo.folder;
     f.title = `${memo.folder} 폴더 보기`;
-    f.append(icon('folder'), memo.folder);
+    f.append(icon('folder'), Object.assign(document.createElement('span'), { textContent: memo.folder })); // 이름은 따로 — 길면 … 로 (태그 자리를 남기게)
     tags.append(f);
   }
   // 첫 줄이 태그뿐인 메모: 제목에 이미 보이는 태그는 아래 줄에서 뺀다 (#내일할일 이 두 번 보이던 것)
