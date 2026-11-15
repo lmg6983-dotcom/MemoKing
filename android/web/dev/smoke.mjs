@@ -586,6 +586,10 @@ try {
     rows: [...document.querySelectorAll('#reminder-groups .ev-ext .row-title')].map((e) => e.textContent),
   }));
   check('다른 캘린더: 삼성 캘린더 일정이 달력(점선) · 다가오는 일정에 함께', ext.bars.some((t) => /삼성 캘린더/.test(t)) && ext.rows.includes('가족 저녁'), JSON.stringify(ext));
+  // 같은 일정이 두 캘린더에 (결혼식: 삼성 캘린더 · Google 캘린더 (개인)) — 하나로, 캘린더 이름은 둘 다
+  const weddings = ext.bars.filter((t) => /^결혼식/.test(t));
+  check('다른 캘린더: 같은 일정이 여러 캘린더에 있으면 하나로 (캘린더 이름은 모두)', weddings.length === 1 && ext.rows.filter((t) => t === '결혼식').length === 1
+    && /삼성 캘린더, Google 캘린더 \(개인\)/.test(weddings[0]), JSON.stringify({ weddings, rows: ext.rows }));
   await shot('02j-calendar-device');
   // 일정을 누르면 다른 캘린더 앱으로 나가지 않고 메모킹 안에서 자세히 보기 (예전: 캘린더 앱 → "일정을 찾을 수 없습니다")
   await page.tap('.ev-ext .row-main >> nth=0');

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeFeedUrl, normalizeFeeds, feedLabel, icsName, looksLikeIcs, feedEvents, googleEventUrl, fromDeviceEvent, reminderFromExternal, importedEventBody,
-  MAX_FEEDS,
+  MAX_FEEDS, mergeDuplicateEvents, eventKey,
 } from '../app/js/core/calendar-feeds.js';
 import { normalizeReminder } from '../app/js/core/reminders.js';
 
@@ -201,4 +201,38 @@ test('Google 구독 일정 → 그 일정의 Google 캘린더 주소 (반복은 
   assert.equal(eid(googleEventUrl(feed, rep1)), 'rep456_20261102 me@gmail.com');
   assert.equal(googleEventUrl('https://example.com/a.ics', one), '');
   assert.equal(googleEventUrl(feed, { uid: 'x@naver.com' }), '');
+});
+
+test('같은 일정이 여러 캘린더에: 하나로 보이고 캘린더 이름은 모두, 빈 칸은 다른 것에서 채운다', () => {
+  const at = (h, m = 0) => new Date(2026, 10, 20, h, m);
+  const day = (d) => new Date(2026, 10, d);
+  const events = [
+    { title: '치과 예약', start: at(15), end: at(16), allDay: false, source: '삼성 캘린더', color: '#ff0000' },
+    { title: '치과  예약 ', start: at(15), end: at(15, 30), allDay: false, source: 'Google 캘린더', link: 'https://calendar.google.com/x', location: '강남' },
+    { title: '치과 예약', start: at(16), end: at(17), allDay: false, source: 'Google 캘린더' }, // 시각이 다르면 다른 일정
+    { title: '휴가', start: day(25), end: day(28), allDay: true, source: '네이버 캘린더' },
+    { title: '휴가', start: day(25), end: day(28), allDay: true, source: '삼성 캘린더' },
+    { title: '휴가', start: day(25), end: day(26), allDay: true, source: '삼성 캘린더' }, // 날 수가 다르면 다른 일정
+    { title: '휴가', start: at(9), end: at(10), allDay: false, source: '삼성 캘린더' }, // 하루 종일이 아니면 다른 일정
+  ];
+  const out = mergeDuplicateEvents(events);
+  assert.equal(out.length, 5);
+  assert.equal(out[0].source, '삼성 캘린더, Google 캘린더');
+  assert.deepEqual(out[0].sources, ['삼성 캘린더', 'Google 캘린더']);
+  assert.equal(out[0].color, '#ff0000'); // 처음 것을 남기고
+  assert.equal(out[0].link, 'https://calendar.google.com/x'); // 비어 있던 것은 채운다
+  assert.equal(out[0].location, '강남');
+  assert.equal(out[2].source, '네이버 캘린더, 삼성 캘린더');
+  // 같은 캘린더에서 같은 일정이 두 번이면 이름은 한 번만
+  assert.equal(mergeDuplicateEvents([events[3], { ...events[3] }])[0].source, '네이버 캘린더');
+});
+
+test('메모킹 일정의 사본이 다른 캘린더로 다시 들어오면 빼고, 원본 일정은 그대로', () => {
+  const start = new Date(2026, 10, 20, 10);
+  const mine = [eventKey({ title: '주간 회의', start, allDay: false })];
+  const out = mergeDuplicateEvents([
+    { title: '주간 회의', start, end: new Date(2026, 10, 20, 11), allDay: false, source: 'Google 캘린더' },
+    { title: '점심', start, allDay: false, source: 'Google 캘린더' },
+  ], mine);
+  assert.deepEqual(out.map((e) => e.title), ['점심']);
 });

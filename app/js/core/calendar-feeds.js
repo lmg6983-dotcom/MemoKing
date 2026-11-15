@@ -196,3 +196,53 @@ export function importedEventBody({ title, imageRel = '', imageAlt = '', locatio
   if (description) parts.push(...description.split(/\n+/).map((l) => plainLine(l.trim())).filter(Boolean));
   return `${parts.join('\n\n')}\n`;
 }
+
+// ---------- 같은 일정이 여러 캘린더에 (한 번만 보이게) ----------
+//   Google 캘린더를 휴대폰 캘린더로도, .ics 주소로도 함께 보면 같은 일정이 두세 번 보였다.
+//   메모킹 일정을 Google 에 옮겨 둔 것이 다른 캘린더로 다시 들어오는 경우도 같다.
+//   같다고 보는 것: 제목(띄어쓰기 · 대소문자 무시)과 시작이 같고, 하루 종일 여부 · 날 수가 같을 때
+//   (끝 시각은 캘린더마다 반올림이 달라 보지 않는다 — 시각 일정은 분 단위, 하루 종일은 날짜로)
+
+const normTitle = (s) => String(s ?? '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
+const ymd = (d) => {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`;
+};
+
+/** 같은 일정을 알아보는 열쇠 */
+export function eventKey({ title, start, end, allDay }) {
+  if (allDay) {
+    const days = Math.max(1, Math.round((new Date(end ?? start) - new Date(start)) / 86_400_000));
+    return `d|${normTitle(title)}|${ymd(start)}|${days}`;
+  }
+  return `t|${normTitle(title)}|${Math.round(new Date(start).getTime() / 60_000)}`;
+}
+
+/**
+ * 다른 캘린더 일정에서 겹치는 것을 하나로 — 처음 것을 남기고, 빈 칸(장소 · 설명 · 링크 · 색)은 같은 일정의 다른 것에서 채운다.
+ *   source 는 모든 캘린더 이름을 이어 적고(sources 에 따로), mine 의 열쇠와 같은 것(메모킹 일정의 사본)은 뺀다.
+ * @template {{ title: string, start: Date, end?: Date, allDay?: boolean, source?: string }} E
+ * @param {E[]} events
+ * @param {Iterable<string>} [mine] 메모킹 일정의 eventKey 들
+ * @returns {(E & { sources: string[] })[]}
+ */
+export function mergeDuplicateEvents(events, mine = []) {
+  const skip = new Set(mine);
+  const byKey = new Map();
+  const out = [];
+  for (const e of events) {
+    const key = eventKey(e);
+    if (skip.has(key)) continue;
+    const kept = byKey.get(key);
+    if (!kept) {
+      const first = { ...e, sources: e.source ? [e.source] : [] };
+      byKey.set(key, first);
+      out.push(first);
+      continue;
+    }
+    if (e.source && !kept.sources.includes(e.source)) kept.sources.push(e.source);
+    for (const k of ['location', 'description', 'url', 'link', 'color']) if (!kept[k] && e[k]) kept[k] = e[k];
+  }
+  for (const e of out) if (e.sources.length > 1) e.source = e.sources.join(', ');
+  return out;
+}
