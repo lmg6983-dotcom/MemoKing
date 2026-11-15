@@ -4,7 +4,7 @@
 import { createNoteEditor } from './editor.js';
 import { injectIcons } from './icons.js';
 import { clampPrintScale } from './core/pdf-page.js';
-import { fitPages } from './print-fit.js';
+import { fitPages, spaceBreaks } from './print-fit.js';
 
 const api = window.memoking;
 const q = new URLSearchParams(location.search);
@@ -83,12 +83,16 @@ if (memo) {
   }
   await document.fonts.ready;
   await settled();
-  if (q.get('fit') !== '0') {
+  const breaks = q.get('br') === '1'; // 구분선에서 다음 쪽으로
+  if (q.get('fit') !== '0' || breaks) {
     // 쪽 나눔 다듬기는 그려진 높이를 재서 고친다 — 편집기 대신 그대로 굳힌 복사본에 (편집기는 고친 모양을 되돌린다)
     const still = root.firstElementChild.cloneNode(true);
     root.replaceChildren(still);
     await settled();
-    fitPages(still.querySelector('.mk-doc') ?? still, { pageH: (H - 2 * M) * (96 / 25.4), zoom: Z }); // 쪽 높이는 확대와 상관없이 그대로 (잰 높이는 확대된 값)
+    const doc = still.querySelector('.mk-doc') ?? still;
+    const pageH = (H - 2 * M) * (96 / 25.4); // 쪽 높이는 확대와 상관없이 그대로 (잰 높이는 확대된 값)
+    if (breaks) spaceBreaks(doc, { pageH, zoom: Z });
+    if (q.get('fit') !== '0') fitPages(doc, { pageH, zoom: Z });
   }
 }
 const count = pages();

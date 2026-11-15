@@ -36,7 +36,7 @@ import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWai
 import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml, pagePx, pageFullPx } from './print-html.js';
-import { fitPages } from '../../app/js/print-fit.js';
+import { fitPages, spaceBreaks } from '../../app/js/print-fit.js';
 import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
 import { openMemoryDay, dayText } from '../../app/js/memory-day.js';
@@ -775,11 +775,13 @@ const SCALE_KEY = 'memoking.printScale';
 const FIT_KEY = 'memoking.printFit';
 const MARGIN_KEY = 'memoking.printMargin';
 const PAGE_KEY = 'memoking.printPage';
+const BREAKS_KEY = 'memoking.printBreaks';
 const printJob = { id: null, mode: 'share', scale: 1, fit: true, margin: MARGINS.normal,
   page: { kind: 'paper', paper: 'a4', orientation: 'portrait', ratio: '4:3', long: 150, width: 100, height: 150, lock: true, bg: false, date: true } };
 try {
   printJob.scale = clampPrintScale(localStorage.getItem(SCALE_KEY));
   printJob.fit = localStorage.getItem(FIT_KEY) !== 'off';
+  printJob.breaks = localStorage.getItem(BREAKS_KEY) === 'on';
   printJob.margin = clampMarginMm(localStorage.getItem(MARGIN_KEY));
   printJob.page = { ...printJob.page, ...JSON.parse(localStorage.getItem(PAGE_KEY) ?? '{}') };
 } catch {
@@ -821,11 +823,12 @@ async function fitFrame(frame, pageH) {
   if (!doc) return;
   await imagesLoaded(d);
   await d.fonts?.ready;
-  fitPages(doc, { pageH, zoom: printJob.scale });
+  if (printJob.breaks) spaceBreaks(doc, { pageH, zoom: printJob.scale }); // 구분선에서 다음 쪽으로 (그림 맞추기가 그 자리를 알게 먼저)
+  if (printJob.fit) fitPages(doc, { pageH, zoom: printJob.scale });
 }
 async function fittedDoc(id) {
   const html = printDoc(id);
-  if (!printJob.fit) return html;
+  if (!printJob.fit && !printJob.breaks) return html;
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   const page = pagePx(printSize(), printMargin());
@@ -848,6 +851,7 @@ function drawPrintSize() {
   $('print-scale-out').textContent = `${pct}%`;
   for (const b of printSheet.querySelectorAll('[data-scale]')) b.setAttribute('aria-checked', String(Math.abs(Number(b.dataset.scale) - printJob.scale) < 0.001));
   $('print-fit').checked = printJob.fit;
+  $('print-breaks').checked = printJob.breaks === true;
   $('print-margin').value = String(printJob.margin);
   $('print-margin-out').textContent = `${printMargin()}mm`; // 작은 종이라 줄여 쓰면 줄인 값
   // 크기 (종이 · 카드 비율 · 직접 입력)
@@ -883,7 +887,7 @@ function drawPrintSize() {
     const frame = $('print-frame');
     const contentH = pageFullPx(printSize()).height - 2 * Math.round(printMargin() * 96 / 25.4); // 미리보기 쪽: 쪽 전체 크기, 안쪽 여백 = 고른 여백 (print-html.js)
     frame.addEventListener('load', async () => {
-      if (printJob.fit) await fitFrame(frame, contentH);
+      if (printJob.fit || printJob.breaks) await fitFrame(frame, contentH);
       // 미리보기는 첫 쪽만 — 모두 몇 쪽인지 크기 옆에 (PC PDF 창처럼)
       const main = frame.contentDocument?.querySelector('main');
       const pages = main ? Math.max(1, Math.ceil((main.getBoundingClientRect().height - 1) / contentH)) : 0;
@@ -1008,6 +1012,15 @@ for (const [input, side] of [[$('print-cw'), 'width'], [$('print-ch'), 'height']
 $('print-lock').addEventListener('change', (e) => setPrintPage({ lock: e.target.checked }));
 $('print-bg').addEventListener('change', (e) => setPrintPage({ bg: e.target.checked }));
 $('print-date').addEventListener('change', (e) => setPrintPage({ date: e.target.checked }));
+$('print-breaks').addEventListener('change', (e) => {
+  printJob.breaks = e.target.checked;
+  try {
+    localStorage.setItem(BREAKS_KEY, printJob.breaks ? 'on' : 'off');
+  } catch {
+    // 이번만
+  }
+  drawPrintSize();
+});
 $('print-fit').addEventListener('change', (e) => {
   printJob.fit = e.target.checked;
   try {
