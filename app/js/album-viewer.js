@@ -389,7 +389,10 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // ---------- 그리기 ----------
   let inking = null; // { svg, surface, toolbar, hist }
   function startInk() {
-    if (inking || !img.naturalWidth) return;
+    if (inking || turning || !img.naturalWidth) return;
+    sliding++; // 넘기는 움직임이 남아 있으면 멈춘다 (그리기판이 움직이는 그림 자리에 맞춰지지 않게)
+    img.style.transition = '';
+    img.style.opacity = '';
     resetZoom(); // 그리기판은 원래 크기의 장 위에
     view.classList.add('inking'); // 도구 막대 자리를 비운 뒤에 그림 크기를 잰다 (그리기판이 그림에 꼭 맞게)
     const r = img.getBoundingClientRect();
@@ -446,13 +449,14 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     k.toolbar.el.remove();
     k.svg.remove();
     if (!strokes.length || !onDraw) return;
+    const at = i; // 저장하는 동안 다른 장으로 넘겨도 그린 장에 (예전: 넘긴 장에 저장됐다)
     try {
       const png = await flatten(strokes, k.w, k.h);
-      const src = await onDraw(i, png);
+      const src = await onDraw(at, png);
       if (src) {
-        images[i] = { ...images[i], src, inked: true };
+        images[at] = { ...images[at], src, inked: true };
         paintStrip();
-        show();
+        if (i === at) show();
         say('그린 것을 이 장에 저장했어요');
       }
     } catch (err) {
@@ -461,6 +465,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   }
 
   async function flatten(strokes, w, h) {
+    const photo = /\.(jpe?g|heic|heif)$/i.test(images[i].src); // 사진 위에 그린 것은 JPEG, 그 밖(투명할 수 있는 그림)은 WebP — PNG 보다 몇 배 빨리 만들고 작다
     const base = new Image();
     base.crossOrigin = 'anonymous'; // 메모 폴더 그림(다른 오리진)도 캔버스로 읽을 수 있게
     base.src = img.currentSrc || img.src;
@@ -484,7 +489,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     layer.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
     await layer.decode();
     ctx.drawImage(layer, 0, 0, W, H);
-    return new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('그림을 만들지 못했어요'))), 'image/png'));
+    return new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('그림을 만들지 못했어요'))), photo ? 'image/jpeg' : 'image/webp', 0.92));
   }
 
   // ---------- 닫기 · 키 ----------

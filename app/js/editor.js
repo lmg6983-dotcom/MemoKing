@@ -1341,7 +1341,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       url: vaultUrl,
       onDraw: !editable ? null : async (i, png) => {
         const it = images[i];
-        const src = await saveFile(new File([png], `${baseName(it.alt || '그림')} 그림.png`, { type: 'image/png' }));
+        const ext = { 'image/jpeg': 'jpg', 'image/webp': 'webp' }[png.type] ?? 'png';
+        const src = await saveFile(new File([png], `${baseName(it.alt || '그림')} 그림.${ext}`, { type: png.type || 'image/png' }));
         const cur = nodeOf(it);
         if (!cur) return null;
         it.src = src; // 같은 장을 또 그리면 이번 그림에서 이어서
