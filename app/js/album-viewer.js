@@ -52,16 +52,31 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     if (inking || turning) return;
     turning = true;
     rotate.disabled = true;
+    // 누르자마자 화면에서 먼저 돌려 보이고(화면에 맞게 줄여), 새 파일은 그 뒤에서 만든다
+    resetZoom();
+    const fit = Math.min(stage.clientWidth / (img.offsetHeight || 1), stage.clientHeight / (img.offsetWidth || 1), 1 / Math.min(1, img.offsetWidth / (img.naturalWidth || img.offsetWidth || 1)));
+    img.style.transformOrigin = '50% 50%';
+    img.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1)';
+    img.style.transform = `rotate(90deg) scale(${fit})`;
+    const at = i;
     try {
-      const src = await onRotate(i);
+      const src = await onRotate(at);
       if (src) {
-        images[i].src = src;
+        images[at].src = src;
+        const pre = new Image();
+        pre.src = url(src);
+        await pre.decode().catch(() => {}); // 새 그림이 준비된 뒤 바꿔야 깜빡이지 않는다
         paintStrip();
-        show();
+        if (i === at) show();
       }
     } catch (err) {
       say(err?.message || '돌리지 못했어요');
     } finally {
+      img.style.transformOrigin = '';
+      if (img.style.transform.startsWith('rotate')) {
+        img.style.transition = '';
+        img.style.transform = '';
+      }
       turning = false;
       rotate.disabled = false;
     }

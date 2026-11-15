@@ -1380,7 +1380,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         const it = images[i];
         if (/\.gif$/i.test(it.src)) throw new Error('움직이는 그림(GIF)은 돌리면 멈춘 그림이 돼서 돌리지 않았어요');
         const blob = await rotatedBlob(vaultUrl(it.src), it.src);
-        const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+        const ext = { 'image/png': 'png', 'image/webp': 'webp' }[blob.type] ?? 'jpg';
         const src = await saveFile(new File([blob], `${baseName(it.alt || '사진')}.${ext}`, { type: blob.type }));
         const cur = nodeOf(it);
         if (!cur) return null;
@@ -1412,15 +1412,15 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     im.src = url;
     await im.decode();
     const canvas = document.createElement('canvas');
-    const k = Math.min(1, 8000 / Math.max(im.naturalWidth, im.naturalHeight)); // 너무 큰 그림은 줄여서 (메모리 한도)
+    const k = Math.min(1, 4096 / Math.max(im.naturalWidth, im.naturalHeight)); // 너무 큰 그림은 줄여서 (메모리 · 시간 — 4096 이면 화면 · 인쇄에 충분)
     canvas.width = Math.round(im.naturalHeight * k);
     canvas.height = Math.round(im.naturalWidth * k);
     const g = canvas.getContext('2d');
     g.translate(canvas.width, 0);
     g.rotate(Math.PI / 2);
     g.drawImage(im, 0, 0, canvas.height, canvas.width);
-    const jpeg = /\.(jpe?g|heic|heif)$/i.test(src); // WebP · PNG 는 투명한 곳이 있을 수 있어 PNG 로 (JPEG 는 투명한 곳이 검게 된다)
-    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진을 돌리지 못했어요'))), jpeg ? 'image/jpeg' : 'image/png', 0.92));
+    const jpeg = /\.(jpe?g|heic|heif)$/i.test(src); // 투명한 곳이 있을 수 있는 그림은 WebP 로 (PNG 보다 몇 배 빨리 만들고 작다 · 못 만들면 브라우저가 PNG 로)
+    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진을 돌리지 못했어요'))), jpeg ? 'image/jpeg' : 'image/webp', 0.92));
   }
 
   // 파일들을 메모 폴더에 저장 → 넣을 줄들. 하나가 안 읽혀도(폴더 · 잠긴 파일 · 너무 큰 파일) 나머지는 그대로 넣고 알린다

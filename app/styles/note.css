@@ -1325,11 +1325,13 @@ body.mk-block-dragging, body.mk-block-dragging * { cursor: grabbing !important; 
   background: var(--note-bg);
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24), 0 0 0 4px var(--note-bg), 0 0 0 6px var(--note-text);
   opacity: 0.96;
-  width: fit-content; max-width: 100%; /* 들어 올린 틀은 내용 크기에 맞게 (높이는 그대로라 다른 줄 자리 계산은 같다) */
 }
+.mk-doc .mk-block-lift:not(:has(> img.mk-album-img)) { width: fit-content; max-width: 100%; } /* 들어 올린 틀은 내용 크기에 맞게 (높이는 그대로라 다른 줄 자리 계산은 같다) */
 p.mk-block-lift:has(> .mk-file), p.mk-block-lift:has(> a) { padding-right: 2px; }
 body.mk-block-dragging .mk-doc .ProseMirror-selectednode { outline: none; }
 .mk-doc .mk-block-lift > * { animation: mk-lift-in 0.18s ease-out both; }
+/* 묶음 사진은 들어 올려도 격자 폭 · 장마다 기운 모양 그대로 (fit-content 면 두 칸 격자가 줄어 배치가 깨지고, 들기 움직임이 장의 기울기를 덮었다) */
+.mk-doc p.mk-block-lift:has(> img.mk-album-img) > * { animation: none; }
 .mk-doc .mk-block-swap-target { border-radius: 8px; outline: 2px dashed #7a4dff; outline-offset: 2px; background: color-mix(in srgb, #7a4dff 8%, transparent); }
 .mk-doc .mk-block-dropped { border-radius: 8px; animation: mk-dropped 0.7s ease-out; }
 /* 처음 한 번 옮기는 방법 안내 */
