@@ -83,8 +83,13 @@ class FileStorage(private val root: File, override val label: String, private va
         if (!tmp.renameTo(target)) {
             target.delete()
             if (!tmp.renameTo(target)) {
-                tmp.delete()
-                throw java.io.IOException("저장하지 못했어요: $rel")
+                // 원본을 이미 지웠다 — 복사로라도 넣고, 그것도 안 되면 임시 파일을 남긴다 (예전: 임시 파일까지 지워 원본 · 새 글이 모두 사라졌다)
+                try {
+                    tmp.copyTo(target, overwrite = true)
+                    tmp.delete()
+                } catch (e: Exception) {
+                    throw java.io.IOException("저장하지 못했어요: $rel (쓴 글은 ${tmp.name} 에 남았어요)", e)
+                }
             }
         }
         return entry(target)
