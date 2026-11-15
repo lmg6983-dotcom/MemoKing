@@ -21,7 +21,11 @@ function folderButton({ name, label, count, current, iconName }) {
   b.dataset.folder = name;
   b.title = name === UNFILED ? '어느 폴더에도 넣지 않은 메모' : label; // 긴 이름은 잘려 보이므로 전체 이름
   if (current) b.setAttribute('aria-current', 'true');
-  b.append(icon(iconName), el('span', 'mf-name', label));
+  // 그림은 전체 · 미분류(폴더 없음)에만 — 보통 폴더는 그 자리를 이름에 준다
+  if (iconName) b.append(icon(iconName));
+  const nameEl = el('span', 'mf-name');
+  nameEl.append(el('span', 'mf-text', label));
+  b.append(nameEl);
   if (count) b.append(el('small', 'mf-count', String(count))); // 0 은 적지 않는다 (빈 폴더가 많아도 목록이 조용하게 — 칩 줄과 같게)
   return b;
 }
@@ -53,7 +57,7 @@ export function renderFolderList(container, { folders, current, onPick, onNew, o
     return li;
   };
   list.append(item(folderButton({ name: '', label: '전체', current: !current, iconName: 'note' }), ''));
-  for (const f of folders) list.append(item(folderButton({ name: f.name, label: f.label ?? f.name, count: f.count, current: f.name === current, iconName: f.name === UNFILED ? 'inbox' : 'folder' }), f.name));
+  for (const f of folders) list.append(item(folderButton({ name: f.name, label: f.label ?? f.name, count: f.count, current: f.name === current, iconName: f.name === UNFILED ? 'inbox' : '' }), f.name));
   list.addEventListener('click', (e) => {
     const m = e.target.closest('[data-folder-menu]');
     if (m) return onMenu?.(m.dataset.folderMenu, m);
@@ -90,7 +94,25 @@ export function renderFolderList(container, { folders, current, onPick, onNew, o
   add.type = 'button';
   add.addEventListener('click', () => onNew());
   container.replaceChildren(list, add);
+  markLongNames(container);
+  nameWatch.observe(container); // 접혀 있다 보이거나 폭이 바뀌면 다시 잰다
 }
+
+// 두 줄로도 다 안 들어가는 이름에 .long — 고른 폴더 · 끌어 올려놓은 폴더에서는 한 줄로 천천히 흘러 끝까지 보인다 (base.css)
+//   --mf-w: 이름 칸의 폭 (흐를 거리), --mf-dur: 글자 수에 맞춘 흐르는 시간
+function markLongNames(container) {
+  for (const name of container.querySelectorAll('.mf-name')) {
+    if (!name.clientWidth) continue; // 접혀 있으면 보일 때 (nameWatch)
+    const long = name.scrollHeight > name.clientHeight + 1;
+    name.classList.toggle('long', long);
+    if (!long) continue;
+    name.style.setProperty('--mf-w', `${name.clientWidth}px`);
+    name.style.setProperty('--mf-dur', `${Math.max(2.5, name.textContent.length * 0.18)}s`);
+  }
+}
+const nameWatch = new ResizeObserver((entries) => {
+  for (const e of entries) markLongNames(e.target);
+});
 
 /**
  * 폴더 칩 줄 (휴대폰 · 좁은 PC 창): 전체 · 폴더마다 · ＋ — 한 번 누르면 그 폴더로, 옆으로 넘겨 본다.
@@ -341,7 +363,7 @@ export function pickFolder({ folders, current, count = 1 }) {
     list.append(li);
   };
   add('', '폴더 없음', 'inbox'); // "전체" 와 다른 뜻이라 다른 그림
-  for (const f of folders) add(f, f, 'folder');
+  for (const f of folders) add(f, f, '');
   const create = el('button', 'link-btn mf-new', '＋ 새 폴더로 옮기기');
   create.type = 'button';
   create.addEventListener('click', async () => {
